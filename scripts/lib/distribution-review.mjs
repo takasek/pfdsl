@@ -31,8 +31,7 @@ import { gitDiffNames, tryGit } from "./run-exec.mjs";
 
 // Re-exported so this module's existing importers (this file's own test,
 // canonicalSourceOf callers, etc.) keep working unchanged — the empty-tree
-// constant and the base-selection function now live in review-record-gate.mjs,
-// shared with asset-sweep.mjs.
+// constant and the base-selection function live in review-record-gate.mjs.
 export { diffBase, EMPTY_TREE };
 
 const CLAUDE_PLUGIN_ROOT = "plugin/pfdsl/";

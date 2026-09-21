@@ -535,8 +535,8 @@ export function formatCycleWindowReport({ fetchResult, window }) {
 }
 
 /**
- * commit subject lint: Conventional Commits format plus the English-language
- * rule. Granularity stays MANUAL.
+ * Commit subject lint: Conventional Commits format only.
+ * Language and granularity remain review guidance.
  *
  * --no-merges is not an optimisation. Taking base into a branch is a step this
  * repo's own procedure prescribes, and git writes those subjects itself
@@ -564,12 +564,9 @@ export function commitSubjectStep({ exec, base, check = checkCommitSubjects }) {
  * check-docs: the documentation and distributed-prose checks CI runs.
  *
  * The whole `make check-docs` target rather than one check lifted out of it.
- * Seven checks sit behind that target and none of them was on the gate, so
- * migrating one — the one whose absence happened to be noticed — would leave
- * six with the same gap and the same issue waiting to be filed. Whole-repo
+ * Keeping the target intact also covers checks added to it later. Whole-repo
  * scope is not a problem in practice: CI runs this same target on every push,
- * so the tree the branch starts from is already clean (the argument
- * md-write-check.mjs makes for reading whole files rather than diffs).
+ * so the tree the branch starts from is already clean.
  */
 export function checkDocsStep({ exec }) {
 	const name = "check-docs";

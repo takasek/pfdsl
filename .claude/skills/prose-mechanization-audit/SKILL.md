@@ -6,20 +6,18 @@ description: |
   and check scripts actually form — prose still teaching a discipline a hook
   now enforces, prose re-explaining what a script already prints, the same
   paragraph restated within one layer, and prose whose taught command form a
-  guard now denies. Invoke when `make release` refuses because the
-  prose-mechanization sweep gate is overdue, when `make release-status`
-  reports that threshold exceeded, or when asked to audit the prose assets
-  against the hooks and checks.
+  guard now denies. Use when asked to audit these prose assets against the
+  hooks and checks, including a tanaoroshi request about this repo's prose
+  and mechanisms. Releases do not trigger this audit.
 ---
 
 # 散文資産と機械化台帳の突合 sweep
 
 pfd-ops の運用契約「知見と機械化」とそれが指す binding にある散文の機械化検討は**書く時点**の規律であり、既に書かれて堆積した散文を洗う工程はどこにも無い。
 このスキルがその工程になる（#915）。
-機構が1つ増えるたびに、それを語っていた散文・それが禁じる形を教えている散文が黙って陳腐化する — 増えるのは機構の側なので、増分は機構の追加件数で数える。
-
-発火条件は `scripts/lib/asset-sweep.mjs` の `SWEEP_TARGETS`（`id: prose-mechanization`）が持つ閾値。
-`node scripts/check-asset-sweep.mjs` が現在の状態を判定する。
+ユーザーが散文と機構の突合を求めたときに実行する。
+`/tanaoroshi` 等の棚卸し依頼も、対象がこのリポの散文と hook・check ならこの手順を使う。
+リリースや追加ファイル数は起動条件にしない。
 
 ## 対象
 
@@ -48,7 +46,8 @@ git diff --name-only --diff-filter=A --no-renames <前回 sweep commit> HEAD -- 
   | grep -E '^(scripts|hooks)/[^/]+\.mjs$' | grep -v '\.test\.mjs$'
 ```
 
-絞り込みはゲートが数える単位に合わせる（`scripts/lib/` と `*.test.mjs` は機構を増やさない — 一次情報は `SWEEP_TARGETS` の `matches`）。
+絞り込みは `scripts/`・`hooks/` 直下の非テスト `.mjs` を起点にする。
+`scripts/lib/` と `*.test.mjs` は独立した機構ではないが、起点の実装を読むときは追う。
 素の `-- scripts/ hooks/` で見ると、1つの check を実装分割しただけの refactor が機構3件に見える。
 
 工程3 と工程4 は散文側の変更分を起点にしてよい。
@@ -112,13 +111,13 @@ guard が読むのは生のコマンド行ではなく hook の payload なの�
 ## 各工程の直後に検査する
 
 ```sh
-node scripts/check-md-linebreaks.mjs
 make check-docs
 ```
 
 散文を削除・ポインタ化・書き換えた工程の直後に回す。
+Markdown の改行規約は pre-commit の staged 検査が担う。
 最後にまとめて回すと、どの工程の編集が壊したかを切り分ける手戻りが出る。
-散文を消す編集では `check-companion-bindings`（必須見出しの実在）と `check-entry-path-headings` が特に落ちやすい — 一次情報へのポインタだけを残したつもりで、見出しごと落としている場合がある。
+散文を消す編集では `check-companion-bindings`（必須見出しの実在）が特に落ちやすい — 一次情報へのポインタだけを残したつもりで、見出しごと落としている場合がある。
 
 ## 記録する
 
@@ -128,8 +127,7 @@ make check-docs
 記録の2コミット手順は `docs/asset-sweep/README.md`「記録の確定」が一次情報。1コミット目には工程1〜5 の散文変更と実行記録を含め、2コミット目で `docs/asset-sweep/prose-mechanization.json` を確定する。
 
 実行記録の冒頭に、前回の記録の `date` からの日数・その間に追加された機構の件数・本回の findings 件数を書く。
-閾値 20 は「1回の sweep で期待 findings ≒ 1.2件」を根拠に置いた値だが、その歩留まりを実測し直す工程は他にどこにも無い — ここで残さないと閾値は一度も見直されないまま回り続ける。
-findings が0件の回が続くなら閾値を上げ、毎回大量に出るなら下げる。
+これらは監査範囲と結果の記録であり、次回の実行やリリースを強制する閾値には使わない。
 初回は前回が無いので、代わりに #915 のマージ日からの日数を書く。
 
 ## このスキルを配布しない理由

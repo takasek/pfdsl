@@ -66,11 +66,6 @@ const result = checkCommitSubjects({
 const detail = result.detail ? ` — ${result.detail}` : "";
 console.log(`check-commit-subjects: ${result.status}${detail}`);
 if (result.status === "FAIL") {
-	// What the predicate enforces, not what the convention aspires to: it
-	// rejects CJK outside quoted spans and says nothing about other scripts, so
-	// naming "English" here would promise a check that does not exist.
-	console.error(
-		"Commit subjects must follow Conventional Commits and carry no CJK text outside quoted spans.",
-	);
+	console.error("Commit subjects must follow Conventional Commits.");
 	process.exit(1);
 }

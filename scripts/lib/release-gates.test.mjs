@@ -10,7 +10,7 @@ describe("release gate registry", () => {
 	it("enumerates the release-only gates in release order", () => {
 		assert.deepEqual(
 			RELEASE_GATE_DEFINITIONS.map(({ id }) => id),
-			["distribution-review", "asset-sweep", "spec-history"],
+			["distribution-review", "spec-history"],
 		);
 		for (const gate of RELEASE_GATE_DEFINITIONS) {
 			assert.equal(typeof gate.run, "function");
@@ -23,7 +23,7 @@ describe("release gate registry", () => {
 
 		assert.deepEqual(
 			results.map(({ id }) => id),
-			["distribution-review", "asset-sweep", "spec-history"],
+			["distribution-review", "spec-history"],
 		);
 		for (const result of results) {
 			assert.equal(typeof result.ok, "boolean");
