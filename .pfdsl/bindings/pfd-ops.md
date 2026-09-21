@@ -74,6 +74,36 @@ pfd-ops の `references/work-cycle.md` が持つ手順1〜3の各段で、この
 
 hook の決定を選ぶ軸は害の発生点である。実行自体が害なら advisory は選ばない。対処法を message に書けば1回の retry で自己修復し、対処済みかを rule 側から判定できる場合は deny を使う。対処済みかが payload から見えず人間判断が必要な場合は ask を使い、deny による同じ retry の再拒否を避ける。結果の読み違いだけが害なら advisory を使える。event と channel の対応は harness の版で変わるため列挙せず、実装時に一次情報を確認する。
 
+既存の Node テストへ一時的な文字列変異を当てて検出能力を確認する場合は、分離した作業場所で `node scripts/mutation-check.mjs --config <json-file>` を使う。
+Linux / macOS のプロセスグループを使い、タイムアウト時も子テストの終了を確認してから復元する。Windows では変異を適用する前に未対応として拒否する。
+JSON のパスは実行時の cwd を基準とし、対象とテストファイルはその配下に限る。
+`expected.name` は suite から個別テストまでの名前を順に並べる完全一致の配列で、期待する失敗は1テストだけ指定する。
+
+```json
+{
+  "target": ".claude/skills/pfd-ops/references/file-based-tracker-backend.md",
+  "from": "binding が定める現行の書式を使い",
+  "to": "常に Format 3 を使い",
+  "tests": ["scripts/lib/pfd-ops-applicability.test.mjs"],
+  "expected": {
+    "file": "scripts/lib/pfd-ops-applicability.test.mjs",
+    "name": ["pfd-ops applicability contract", "keeps placement and readback distributed while record policy belongs to the binding"]
+  },
+  "timeoutMs": 30000
+}
+```
+
+ヘルパーは変異前の緑、1箇所の実置換、指定テストだけの失敗、原文復元、復元後の緑を確認し、各段のテスト名と結果を JSON に残す。
+A（指定テストが変異で落ちた）は `detected` / exit 0、B（元から赤）は `baseline-failed` / exit 2、C（置換不成立・期待名の非一致や重複・期待テストの skip/todo・変異を検出しない）は `ineffective` / exit 3 とする。
+巻き添え失敗、実行テスト集合の変化、実行・復元エラーは `error` / exit 1 とし、成功に含めない。
+失敗件数や `--test-name-pattern` の終了コードだけで代用しない。
+エラー時も原文のバイト列へ戻すが、独立した書換えを検出した場合は上書きせず、復元用の `<target>.mutation-check-backup` を残す。
+強制終了など自動復元できない場合もこのバックアップを使い、残ったテストプロセスを終了させてから対象との差分を確認して復旧する。
+既存バックアップがある場合は別実行の復元資料として保護し、自動で上書き・削除しない。
+テスト自身の副作用やビルド生成物の復元は対象外なので、副作用を持つ検査は使い捨ての環境で実行する。
+fixture で正常版・欠陥版を既に比較している検査には重ねて要求しない。
+結果を再利用できるのは対象ファイル、置換、テストとその依存、Node と実行条件が同じ場合だけで、いずれかを変えたら再実行する。
+
 ### 手順 1 の追加
 
 - **このサイクル用の worktree を作り、ブランチはその中に切る。既定であり、宣言も確認も要らない。** 同じ作業ツリーで別のセッションが同時に動くと、双方の未コミット変更が同じファイルに混ざって現れ、どちらが書いたかを git の状態から区別できない。ブランチの切り替えは相手の HEAD ごと動かすため、相手が読んでいるファイルの内容が黙って入れ替わる。どちらも「自分の変更だけを見ている」限り検出できない形で壊れる。現在の作業ツリーでそのまま進めてよいのは、ユーザーがそう指示した場合と、リポの構成上 worktree を作れない場合に限る。前セッションから継続する worktree があるならそれを使う（新規作成は不要）。worktree の置き場・命名・セットアップ（依存・ビルド生成物・hook はいずれも引き継がれない）は companion が定義する。

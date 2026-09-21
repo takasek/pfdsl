@@ -370,7 +370,7 @@ artifact:
       pfd-retro が参照する図・仕様レンズと、検索可能な事例・観察・反例の保存先、運用責任の終了、配布物への finding 反映手続きを持つ。
       bindings/pfd-retro-patterns/ の当時の本文と証拠を保存し、現行手順の適用点を案内する。
       カタログの対策抽出・phase・自動選別には依存しない。
-    criteria: check-companion-bindings が必須見出しを確認し、最終差分レビューで事例の証拠保存と現行手順の到達・非依存、および1回の実行契約と知識成果物ライフサイクル監査の採用宣言（ADR-0039）の実在を確認する
+    criteria: check-companion-bindings が必須見出しと、事例が .pfdsl 内へ張った相対リンクの解決先の実在を確認し、最終差分レビューで事例の証拠保存と現行手順へのリンクの有無・非依存、および1回の実行契約と知識成果物ライフサイクル監査の採用宣言（ADR-0039）の実在を確認する
     location: [ bindings/pfd-retro.md, bindings/pfd-retro-patterns/ ]
     group: generation
     tags: [ distilled_doc ]

@@ -14,6 +14,16 @@ const FENCE_RE = /^(```|~~~)/;
 
 const INLINE_CODE_RE = /`([^`]*)`/g;
 const MD_LINK_RE = new RegExp(`\\]\\(((?:${PREFIX_ALT})/[^)\\s]*)\\)`, "g");
+// A link target resolved against the linking file's own directory: no scheme
+// (`https:`, `mailto:`), no leading `/`, not an in-page `#anchor`, not one of
+// the repo-relative prefixes MD_LINK_RE already owns, and ending in `.md`
+// before any anchor or title attribute. Carrying the prefix set in a negative
+// lookahead keeps the two extractors from both claiming a target; targets that
+// are neither (an image, a `.json`) belong to neither by design.
+const RELATIVE_MD_LINK_RE = new RegExp(
+	`\\]\\((?!(?:${PREFIX_ALT})/)(?![a-zA-Z][a-zA-Z0-9+.-]*:)(?![/#])([^)\\s]*\\.md(?:#[^)\\s]*)?)(?:\\s+"[^"]*")?\\)`,
+	"g",
+);
 
 /**
  * @param {string} text
@@ -69,6 +79,35 @@ export function extractPathReferences(text) {
 	}
 
 	for (const linkMatch of unfenced.matchAll(MD_LINK_RE)) {
+		refs.push(normalizeRef(linkMatch[1]));
+	}
+
+	return [...new Set(refs)];
+}
+
+/**
+ * Extracts markdown link targets that point at another .md file relative to
+ * the linking file, in source order with duplicates removed.
+ *
+ * This is the complement of extractPathReferences, which only sees targets
+ * under docs/, .claude/, scripts/ or packages/. A link written relative to
+ * the file it sits in — `../pfd-retro.md` from a case file, or a bare
+ * sibling filename — matched neither pattern, so nothing resolved it. The
+ * pfd-retro case store carries 87 copies of one such link, which a single
+ * rename would break all at once (#1231 follow-up).
+ *
+ * Only .md targets are returned: resolving them needs nothing but the
+ * linking file's directory, whereas an image or data target may legitimately
+ * live outside the tree this check can see.
+ * @param {string} text
+ * @returns {string[]}
+ */
+export function extractRelativeMarkdownLinks(text) {
+	const refs = [];
+
+	for (const linkMatch of stripFencedBlocks(text).matchAll(
+		RELATIVE_MD_LINK_RE,
+	)) {
 		refs.push(normalizeRef(linkMatch[1]));
 	}
 
