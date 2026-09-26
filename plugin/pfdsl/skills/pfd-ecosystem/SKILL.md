@@ -75,7 +75,7 @@ node <pfd-ops skill root>/scripts/check-install-sync.mjs --deploy
 
 `<pfd-ops skill root>` はステップ 3 と同じ規則で解決する（plugin: `${CLAUDE_PLUGIN_ROOT}/skills/pfd-ops`、repo-local: `.claude/skills/pfd-ops`）。
 既導入リポでは同じコマンドが refresh になる — ローカル編集されたファイルは上書きせず警告するので、編集を捨てて上書きする場合のみユーザーに確認して `--overwrite-local-edits` を付ける（編集を抱えた旧ファイルを編集ごと削除するのは別フラグ `--delete-edited-orphans`。編集の無い旧ファイルはフラグ無しで削除される）。
-バックエンド規約と監査スクリプトの実行環境（認証済みの `gh` を前提とする）の詳細は pfd-ops スキルの `references/github-issues-backend.md`。
+バックエンド規約の詳細は pfd-ops スキルの `references/github-issues-backend.md`。
 
 **リポ内 markdown ファイルで管理する場合**は、リポルートへの実配置手順は無い（GitHub Actions を使わないため）。バックエンド規約の詳細は pfd-ops スキルの `references/file-based-tracker-backend.md`。
 

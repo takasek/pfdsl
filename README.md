@@ -189,8 +189,6 @@ Adopt it in any repo through the plugin:
 
 `/pfd-init` copies the `.pfdsl/` scaffold for the PFD kinds your project needs, and (optionally, step 3.5) deploys the GitHub-Issues backend automation — workflows and audit scripts — to the repo root, via the `check-install-sync.mjs` script bundled with the `pfd-ops` skill. Running it again refreshes an already-adopted repo. Files a later release dropped are removed and new ones copied without any extra flag; what the extra flags govern is whether a local edit standing in the way is discarded — `--overwrite-local-edits` for an edit on a path that survives, `--delete-edited-orphans` for one on a path that is going away. A rename on the canonical side is reported as a `Possible renames` pair so a local edit on the old path can be carried over to the new one first.
 
-The GitHub-Issues backend's audit script (`audit-issues-flow.mjs`) requires the `gh` CLI, authenticated to your repo's GitHub host. Versions from v0.0.26 up to this change documented a token-only setup (`GH_TOKEN` / `GITHUB_TOKEN` without `gh`); that setup is no longer supported, so install `gh` and authenticate it when you update. The runtime requirements are listed in the `pfd-ops` skill's `references/github-issues-backend.md`.
-
 Once adopted, use `/pfd-cycle` to run a work cycle and `/pfd-retro` to audit and improve the process.
 
 ## Library
