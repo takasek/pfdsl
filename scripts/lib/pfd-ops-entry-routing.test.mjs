@@ -9,6 +9,28 @@ const workCycle = read(".claude/skills/pfd-ops/references/work-cycle.md");
 // ADR-0039 moved this repo's own work discipline out of the bundle, so the
 // rules the entry must not carry now live here rather than in work-cycle.md.
 const opsBinding = read(".pfdsl/bindings/pfd-ops.md");
+
+function headingBody(markdown, path) {
+	const lines = markdown.split("\n");
+	const ancestry = [];
+	let selected;
+	for (let index = 0; index < lines.length; index += 1) {
+		const match = /^(#{2,6}) (.+)$/.exec(lines[index]);
+		if (!match) continue;
+		const depth = match[1].length;
+		if (selected && depth <= selected.depth) {
+			return lines.slice(selected.bodyStart, index).join("\n");
+		}
+		ancestry.length = depth - 2;
+		ancestry[depth - 2] = match[2];
+		ancestry.length = depth - 1;
+		if (depth === path.length + 1 && ancestry.join("\0") === path.join("\0")) {
+			selected = { bodyStart: index + 1, depth };
+		}
+	}
+	assert.ok(selected, `missing heading path: ${path.join(" > ")}`);
+	return lines.slice(selected.bodyStart).join("\n");
+}
 const activeCanonicalPaths = [
 	".claude/skills/pfd-ops/SKILL.md",
 	".claude/skills/pfd-ops/references/architecture.md",
@@ -24,6 +46,39 @@ const activeCanonicalPaths = [
 	".pfdsl/pipeline.md",
 	".pfdsl/workflow.pfdsl",
 ];
+const opsBindingHeadings = new Set(
+	[...opsBinding.matchAll(/^#{2,6} (.+)$/gm)].map((match) => match[1]),
+);
+
+function namedOpsBindingReferences(markdown, sourcePath) {
+	const references = [];
+	for (const line of markdown.split("\n")) {
+		const pathCitation = line.match(
+			/\.pfdsl\/bindings\/pfd-ops\.md`?\s*(「[^」]+」(?:の「[^」]+」)*)/,
+		);
+		if (pathCitation) {
+			for (const match of pathCitation[1].matchAll(/「([^」]+)」/g)) {
+				references.push({ sourcePath, heading: match[1] });
+			}
+		}
+		for (const match of line.matchAll(/\bbinding「([^」]+)」/g)) {
+			references.push({ sourcePath, heading: match[1] });
+		}
+		if (sourcePath === ".pfdsl/bindings/pfd-retro.md") {
+			for (const match of line.matchAll(/同節「([^」]+)」/g)) {
+				references.push({ sourcePath, heading: match[1] });
+			}
+		}
+		if (sourcePath === ".pfdsl/bindings/pfd-ops.md") {
+			for (const match of line.matchAll(
+				/(?:本節末尾の|本節の|本節|本 binding の|上の|同節の?)「([^」]+)」/g,
+			)) {
+				references.push({ sourcePath, heading: match[1] });
+			}
+		}
+	}
+	return references;
+}
 
 describe("pfd-ops entry routing", () => {
 	it("routes representative operations to one existing reference", () => {
@@ -61,15 +116,65 @@ describe("pfd-ops entry routing", () => {
 		assert.match(architecture, /案内に従わず未採用のまま進む/);
 	});
 
-	it("keeps mandatory startup actions in the entry", () => {
+	it("selects the binding self-check body before running the default check", () => {
+		const startup = headingBody(skill, ["発火時の必須セルフチェック"]);
+		const bindingLookup = startup.indexOf(".pfdsl/bindings/pfd-ops.md");
+		const bodyRead = startup.indexOf("本文を読んでから実行");
+		const defaultCheck = startup.indexOf("check-install-sync.mjs --upstream");
+		assert.ok(bindingLookup >= 0 && bodyRead > bindingLookup);
+		assert.ok(defaultCheck > bodyRead);
+		assert.match(startup, /本文に別の実行パスが指定されていない場合/);
 		assert.match(
-			skill,
-			/スキル発火時に一度[^\n]+check-install-sync\.mjs --upstream/,
+			startup,
+			/node \$\{CLAUDE_PLUGIN_ROOT\}\/skills\/pfd-ops\/scripts\/check-install-sync\.mjs --upstream/,
 		);
 		assert.match(
-			skill,
-			/同じタイミング[^\n]+\.pfdsl\/bindings\/pfd-ops\.md[^\n]+読/,
+			startup,
+			/repo-local の `\.claude\/skills\/pfd-ops\/scripts\/check-install-sync\.mjs`/,
 		);
+		assert.match(startup, /現在読んでいるこのファイルの所在から相対/);
+
+		const upstreamSelfCheck = headingBody(opsBinding, [
+			"配置ファイル鮮度セルフチェックをこのリポでは repo-local 版で実行する",
+		]);
+		assert.match(
+			upstreamSelfCheck,
+			/node \.claude\/skills\/pfd-ops\/scripts\/check-install-sync\.mjs --upstream/,
+		);
+		assert.doesNotMatch(upstreamSelfCheck, /CLAUDE_PLUGIN_ROOT/);
+	});
+
+	it("keeps design prerequisites in the body selected for design", () => {
+		const routing = headingBody(skill, ["リポ固有の手順を該当見出しで選ぶ"]);
+		assert.match(routing, /見出し一覧.*階層/);
+		assert.match(routing, /該当する本文だけを読む/);
+		assert.match(routing, /見出し名の列挙だけで本文を省略しない/);
+		const selectedDesign = headingBody(opsBinding, [
+			"ワークサイクルの追加手順",
+			"適用点 1 で採用案と対案を比較して設計を決める",
+		]);
+		assert.match(selectedDesign, /一次記録.*設計判断履歴.*現行のコード・仕様/);
+		assert.match(selectedDesign, /サイクルの範囲.*設計が確定するまで/);
+	});
+
+	it("resolves active named binding references to existing headings", () => {
+		const activeBindingDocuments = [
+			".pfdsl/workflow.md",
+			".pfdsl/roadmap.md",
+			".pfdsl/bindings/pfd-retro.md",
+			".pfdsl/bindings/pfd-ops.md",
+		];
+		for (const sourcePath of activeBindingDocuments) {
+			for (const reference of namedOpsBindingReferences(
+				read(sourcePath),
+				sourcePath,
+			)) {
+				assert.ok(
+					opsBindingHeadings.has(reference.heading),
+					`${reference.sourcePath} references missing pfd-ops binding heading: ${reference.heading}`,
+				);
+			}
+		}
 	});
 
 	it("moves low-frequency self-check and operation details out of the entry", () => {
