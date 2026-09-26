@@ -48,6 +48,7 @@ GitHub Issues。規約と採用手順は `.claude/skills/pfd-ops/references/gith
 `edited` を trigger に含めるのは `check-closes-reference.yml` と同じ理由で、PR 本文の編集が対象集合を変えるからである。
 
 **`gh` CLI が使えない環境（Claude Code Remote 等）での代替**: `cycle-status.mjs` / `gate-check.mjs`（内部の `audit-issues-flow.mjs`）は `gh` を呼ぶが、`github-ops.mjs` が `GH_TOKEN` / `GITHUB_TOKEN` のある環境では HTTP backend へ落ちる（#489・#1044）。token も無い場合は GitHub MCP server のツール（`list_pull_requests` / `issue_read` / `pull_request_read` 等）で個別に代替する: PR一覧は `list_pull_requests`、設計の確認は `issue_read` で本文とコメントを取得して読む、`audit-issues-flow` 相当は対象 issue の `location:`・`updated_at:` を roadmap.pfdsl の記載と手動突合する。
+この HTTP 代替は pfdsl 自身の開発（Claude Code Remote のように `gh` を持たず token だけがある環境）のための利用条件であり、採用リポへの保証ではない。配布側の支援環境は認証済みの `gh` で、一次情報は pfd-ops の `references/github-issues-backend.md`「監査スクリプトの実行環境」。開発用の経路は配布コピーと同じ `github-ops.mjs` を通るため、共通関数へ `gh` 必須の拒否を加えたり、HTTP backend とその試験を削ったりしない。
 `github-ops.mjs` の HTTP backend は上のリポ内スクリプトが必要とする operation の互換層であり、issue コメントや PR 本文の作成・編集を代行する汎用 GitHub write adapter ではない。
 fallback の transport は REST だけではない — `closingIssuesReferences` は REST の pull request payload に存在せず、GraphQL へ直接問い合わせる（#1043）。
 GitHub 側にしか無い読みを本文の正規表現で再構成すると、Development sidebar で手動リンクされた PR が「closing issue 0件」に見える。
