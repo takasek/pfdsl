@@ -3214,9 +3214,9 @@ the frontmatter changes.
 <old> must be declared in the file's own local group: section, and must not
 also be defined by an extends: preset (a local entry that only partially
 overrides a preset cannot be renamed here — rename it at the preset instead).
-<new> must not already exist as an artifact or process id (spec §2.8.1: the
-group key is unique within the front matter), or as a group id, locally or
-in the effective frontmatter resolved through extends: (§2.9.4).
+<new> must not already exist as an artifact or process id (other meta
+subcommands would then address that node, never the group), or as a group
+id, locally or in the effective frontmatter resolved through extends: (§2.9.4).
 
   --json      emit JSON ({ ok, from, to, members: string[], children: string[] })
               on failure: { ok: false, diagnostics } / { ok: false, error }
