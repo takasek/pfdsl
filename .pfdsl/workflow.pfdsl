@@ -679,6 +679,7 @@ bindings_pfd_ops >>? develop
 bindings_pfd_retro >>? develop
 ops_skill_general >>? develop
 ops_skill_l3 >>? develop
+pipeline_md >>? develop
 pipeline_pfdsl >>? develop
 roadmap_md >>? develop
 
@@ -705,7 +706,7 @@ readme >>? update_readme
 distribution_review_skill >>? review_distribution
 
 
-[bindings_pfd_ops, bindings_pfd_retro, decisions, delegation_guard, main_branch_guard, ops_skill_general, ops_skill_l3, roadmap_md, workflow_md] >> sweep_prose_mechanization -> prose_mechanization_sweep_record
+[bindings_pfd_ops, bindings_pfd_retro, decisions, delegation_guard, main_branch_guard, ops_skill_general, ops_skill_l3, pipeline_md, roadmap_md, workflow_md] >> sweep_prose_mechanization -> prose_mechanization_sweep_record
 
 prose_mechanization_audit_skill >>? sweep_prose_mechanization
 
