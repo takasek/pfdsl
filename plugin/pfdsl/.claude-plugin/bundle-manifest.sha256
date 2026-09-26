@@ -4,7 +4,7 @@
 
 cfb049860c22a08aceb38c039b538c108d0f7401d221c71ee712a323315bd6f9  agents/pfd-lens.md
 
-4ef2264eb1abfc0f6d3a618bdb442d17bef955a6d07563b260a06ab4180061c0  commands/pfd-cycle.md
+0c899e7f5f040f5bc5f735965fcd07836894f7f0d75a07e236636ea09d71faf1  commands/pfd-cycle.md
 
 7b27a5bcc65351451fc98ba6466aa91fcc7fe602f8de8d9d932e6132ec55420e  commands/pfd-init.md
 
@@ -82,7 +82,7 @@ b51600df7bb094ecefd9ae3f6a8cc1f46fca660b1b6977af88f3464f333a1472  skills/pfd-ops
 
 c1328f9dcb946c35f7bba42306324d82929f7031fb52d459c3b2ee12fd904686  skills/pfd-ops/references/scaffold/workflow.pfdsl
 
-528d302f16b6ea3582fa00aa58f2b410922df4e82a44d257dcc30b95132dea01  skills/pfd-ops/references/work-cycle.md
+6c8cf97e53e25cba041be8284242d6931d84a365b292bb692788d3f40f516a8e  skills/pfd-ops/references/work-cycle.md
 
 2cae2118000945dd3e0f0f8e8a8ce9550da5b666aeb601295dc3561a5448168b  skills/pfd-ops/scripts/check-install-sync.mjs
 
