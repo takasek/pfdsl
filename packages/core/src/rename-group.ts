@@ -41,9 +41,10 @@ export interface RenameGroupResult {
  * not deleted and re-added — so its position in the `group:` map is kept.
  *
  * Refusal/validation (does `oldId` exist, is `newId` free, extends-chain
- * conflicts) is the CLI layer's job (`meta rename-group`), not this
- * function's: it always performs the rename it is asked for when `oldId` is
- * locally declared, and reports a no-op (`found: false`) otherwise.
+ * conflicts) is the CLI layer's job (the top-level `rename` command), not
+ * this function's: it always performs the rename it is asked for when
+ * `oldId` is locally declared, and reports a no-op (`found: false`)
+ * otherwise.
  */
 export function renameGroup(
 	source: string,
