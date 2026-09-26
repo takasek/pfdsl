@@ -374,7 +374,7 @@ artifact:
     group: published
   installed_plugin:
     label: 導入済みプラグイン
-    description: "/plugin marketplace add takasek/pfdsl + /plugin install pfdsl@pfdsl でユーザー環境（plugin cache）へ展開されたコピー。gen_plugin が束ねるスキルツリー・pfd-*コマンド・pfd-lens agent が一括で届く。リポ単位でなくユーザー単位のため、バージョンskewはcheck_install_syncの警告で緩和する（ADR-0028 論点4）。同一version内のbundle内容差は同梱のbundle-manifest.jsonのハッシュ照合で識別する（#971）"
+    description: "/plugin marketplace add takasek/pfdsl + /plugin install pfdsl@pfdsl でユーザー環境（plugin cache）へ展開されたコピー。gen_plugin が束ねるスキルツリー・pfd-*コマンド・pfd-lens agent が一括で届く。リポ単位でなくユーザー単位のため、バージョンskewはcheck_install_syncの警告で緩和する（ADR-0028 論点4）。同一version内のbundle内容差は同梱のbundle-manifest.sha256が記録するファイル単位digestから読み手が計算した集約値の照合で識別する（#971, #1264）"
     criteria: "/plugin marketplace add takasek/pfdsl に続けて /plugin install pfdsl@pfdsl を実行すると、gen_plugin が束ねるスキルツリー・pfd-*コマンド・pfd-lens agentが一括でユーザー環境に届く"
     externalStakeholders: [ 採用リポのAIエージェント ]
     group: adopter_env
@@ -486,7 +486,7 @@ process:
     tags: [ gen, g ]
   gen_plugin:
     label: Claude Code plugin root 組み立て
-    description: "make gen-pluginのClaude Code adapter。contract検証済みのharness_capability_modelと中立生成済みpfdsl skill、install mirrorから、Claude Code skill tree、Markdown command、Markdown agent、hooks、manifest、marketplace記述をplugin/pfdsl/へidentity互換に組み立てる。あわせてclaude-repository mappingのルート指示文書CLAUDE.mdを、AGENTS.mdと同じmustacheテンプレートから描画してリポジトリルートへ書く。全Claude root writeの後、manifest自身を除く全bundleファイルの内容ハッシュを.claude-plugin/bundle-manifest.jsonへ記録する（#971）"
+    description: "make gen-pluginのClaude Code adapter。contract検証済みのharness_capability_modelと中立生成済みpfdsl skill、install mirrorから、Claude Code skill tree、Markdown command、Markdown agent、hooks、manifest、marketplace記述をplugin/pfdsl/へidentity互換に組み立てる。あわせてclaude-repository mappingのルート指示文書CLAUDE.mdを、AGENTS.mdと同じmustacheテンプレートから描画してリポジトリルートへ書く。全Claude root writeの後、manifest自身を除く全bundleファイルのdigestをファイル単位で.claude-plugin/bundle-manifest.sha256へ記録する。集約値は読み手が計算する（#971, #1264）"
     command: make gen-plugin
     location: ../scripts/gen-plugin.mjs
     tags: [ gen, g ]
