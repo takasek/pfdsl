@@ -382,7 +382,7 @@ artifact:
     group: planning
   workflow_pfdsl:
     label: ワークフロー図
-    description: "この図そのもの。対話から公開までのサイクル全体を変換グラフとして持つ。roadmap_pfdsl（issue 依存）・pipeline_pfdsl（変換境界）と並ぶ3つ目の運用 PFD で、3つとも専用の整理プロセスが生産する。自分の companion（workflow_md）だけが artifact で図が無い状態を解消した（#904）"
+    description: "この図そのもの。対話から公開までのサイクル全体を変換グラフとして持つ。roadmap_pfdsl（issue 依存）・pipeline_pfdsl（変換境界）と並ぶ3つ目の運用 PFD で、3つの図はそれぞれ専用の整理プロセスが生産する。companion のうち roadmap_md・pipeline_md は図と同じ整理プロセスが生産するが、workflow_md は decisions から改訂される運用手続きなので maintain_repo_bindings が生産し、この図を突合相手として読む。自分の companion（workflow_md）だけが artifact で図が無い状態を解消した（#904）"
     criteria: check がエラーなし、meta check-links が通過する。workflow_md が名指すノード・エッジを graph describe で引いて食い違いがない
     location: workflow.pfdsl
     group: planning
@@ -414,6 +414,7 @@ process:
     description: >
       decisions が指名した repo-local な binding・guard・companion の正本を改訂する。
       prose_mechanization_sweep_record の散文・機構矛盾、retro_findings の運用実態との不一致を binding 文言・guard 規則・説明へ反映する。
+      workflow_md の改訂では workflow_pfdsl を突合相手として読み、図の改訂で名指しが食い違った箇所を追随させる。
       検証コマンドは正本ごとに異なり、各出力 artifact の criteria が一次情報である。
     group: generation
     tags: [ knowledge_maintenance ]
@@ -487,7 +488,7 @@ process:
     command: node scripts/pfdsl/audit-issues-flow.mjs
   map_workflow:
     label: ワークフロー整理
-    description: "開発サイクルの営み（対話・整備・実践・実装・公開）を PFD 化する。roadmap_pfdsl を map_deps が、pipeline_pfdsl を map_transform_boundaries が担うのと同じ位置づけで、この図自身の維持を担う。方法論判断と ADR が改訂を駆動する"
+    description: "開発サイクルの営み（対話・整備・実践・実装・公開）を PFD 化する。roadmap_pfdsl を map_deps が、pipeline_pfdsl を map_transform_boundaries が担うのと同じ位置づけで、この図自身の維持を担う。方法論判断と ADR が改訂を駆動する。図の改訂で workflow_md が名指すノード・エッジが変わる場合、companion の追随は maintain_repo_bindings が担い、食い違いの有無は workflow_pfdsl の criteria が問う"
     group: planning
   map_transform_boundaries:
     label: 変換境界整理
@@ -639,6 +640,7 @@ distribution_review_record >>? maintain_distributed_prompt_assets
 distribution_review_record >>? maintain_repo_local_capabilities
 
 prose_mechanization_sweep_record >>? maintain_repo_bindings
+workflow_pfdsl >>? maintain_repo_bindings
 
 spec_stress_skill >>? maintain_spec
 
