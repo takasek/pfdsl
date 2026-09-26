@@ -9,7 +9,7 @@ import {
 	rmSync,
 	writeFileSync,
 } from "node:fs";
-import { basename, dirname, resolve } from "node:path";
+import { basename, dirname, relative, resolve, sep } from "node:path";
 
 import {
 	BUNDLE_MANIFEST_RELATIVE_PATH,
@@ -27,7 +27,9 @@ import {
 	hookCapabilityToCodexHooks,
 } from "./gen-codex-assets.mjs";
 import { genInstall } from "./gen-install.mjs";
+import { GEN_PLUGIN_OUTPUTS } from "./gen-plugin-outputs.mjs";
 import { writeSkillRefs } from "./gen-skill-refs.mjs";
+import { listTrackedFiles, listUntrackedFiles } from "./git-ls-files.mjs";
 import {
 	assertTargetOutputClosure,
 	capabilitiesForTarget,
@@ -49,11 +51,8 @@ const CODEX_COMMAND_SKILLS_MANIFEST = "codex-command-skills.json";
 const CODEX_SKILLS_ROOT = "skills";
 const CODEX_REPOSITORY_DESTINATIONS = Object.freeze([
 	["AGENTS.md", "agents.md"],
-	[".codex/config.toml", "codex-config.toml"],
-	[".codex/hooks.json", "codex-hooks.json"],
-	[".codex/GENERATED.md", "codex-generated.md"],
-	[".agents/skills", "agent-skills"],
-	[".codex/agents", "codex-agents"],
+	[".agents", "agent-skills"],
+	[".codex", "codex-repository"],
 ]);
 const HARNESS_PROBE_KINDS = new Set([
 	"claude-repository-consumer",
@@ -648,6 +647,79 @@ export function pluginGenerationSnapshotTargets(
 	];
 }
 
+// These directories contain only generated assets in this repository. Rebuild
+// them from an empty tree so an output removed from a generator becomes a Git
+// deletion instead of silently surviving the next regeneration.
+// scripts/lib/gen-plugin-outputs.test.mjs holds each of them to a snapshot target.
+export function ownedPluginOutputRoots(root, pluginRoot, codexPluginRoot) {
+	return [
+		pluginRoot,
+		codexPluginRoot,
+		resolve(root, GENERATED_SKILLS.pfdsl.target),
+		resolve(root, ".agents"),
+		resolve(root, ".codex"),
+	];
+}
+
+// A generated root that no generator owns any more is never rebuilt, so its
+// tracked files would survive every regeneration unchanged.
+function assertNoTrackedFileOutsideOwnedRoots(root, owned, deps) {
+	const within = (path, parent) => path.startsWith(`${parent}${sep}`);
+	const enclosing = GEN_PLUGIN_OUTPUTS.map((path) =>
+		resolve(root, path),
+	).filter((path) => owned.some((ownedRoot) => within(ownedRoot, path)));
+	if (enclosing.length === 0) return;
+	const unowned = (deps.listTrackedFiles?.(root, enclosing) ?? []).filter(
+		(path) =>
+			!owned.some((ownedRoot) => path === ownedRoot || within(path, ownedRoot)),
+	);
+	if (unowned.length === 0) return;
+	throw new Error(
+		`Tracked files under generated roots are written by no generator. Remove retired outputs with 'git rm', or give their root to a generator:\n${unowned
+			.map((path) => `  ${relative(root, path)}`)
+			.join("\n")}`,
+	);
+}
+
+// A tracked file the rebuild drops shows up as a Git deletion; an untracked
+// one would vanish without a trace, so the generation fails and rolls back.
+function assertNoUntrackedFileLost(root, untracked, deps) {
+	const lost = untracked.filter((path) => !deps.existsSync(path));
+	if (lost.length === 0) return;
+	throw new Error(
+		`Regenerating would delete untracked files under generated roots. Move them out of the generated roots or delete them, then rerun:\n${lost
+			.map((path) => `  ${relative(root, path)}`)
+			.join("\n")}`,
+	);
+}
+
+function clearOwnedPluginOutputs(
+	root,
+	pluginRoot,
+	codexPluginRoot,
+	generateNeutralSkill,
+	deps,
+) {
+	const skillRoot = resolve(root, GENERATED_SKILLS.pfdsl.target);
+	const skillMdPath = resolve(skillRoot, "SKILL.md");
+	const retainedSkill =
+		!generateNeutralSkill && deps.existsSync(skillMdPath)
+			? deps.readFileSync(skillMdPath)
+			: null;
+	for (const path of ownedPluginOutputRoots(
+		root,
+		pluginRoot,
+		codexPluginRoot,
+	)) {
+		deps.rmSync(path, { recursive: true, force: true });
+	}
+	deps.mkdirSync(skillRoot, { recursive: true });
+	if (retainedSkill !== null) {
+		deps.writeFileSync(skillMdPath, retainedSkill);
+	}
+	deps.mkdirSync(pluginRoot, { recursive: true });
+}
+
 function snapshotPluginGeneration(
 	root,
 	pluginRoot,
@@ -829,20 +901,6 @@ function readOwnedCommandSkillDirectories(pluginRoot, deps) {
 		throw new Error(`${path}: invalid Codex command skill ownership manifest.`);
 	}
 	return { codex: owned, legacy: [] };
-}
-
-function legacyClaudeCleanupDestinations(
-	pluginRoot,
-	legacyOwnedNames,
-	protectedSkillDirectories,
-) {
-	return [
-		...legacyOwnedNames
-			.filter((name) => !protectedSkillDirectories.has(name))
-			.map((name) => resolve(pluginRoot, "skills", name)),
-		resolve(pluginRoot, ".codex-plugin"),
-		resolve(pluginRoot, "codex"),
-	];
 }
 
 const DEFAULT_CODEX_ASSEMBLY_DEPS = {
@@ -1210,19 +1268,6 @@ export function assembleClaudeAssets({ root, pluginRoot, capabilities, deps }) {
 		observed["claude-plugin"],
 		targetCapabilityRecord(capabilities, "claude-plugin", "skill:pfdsl"),
 	);
-	const legacyOwned = readOwnedCommandSkillDirectories(pluginRoot, deps);
-	const protectedSkillDirectories = new Set([
-		...DISTRIBUTED_SKILLS,
-		...Object.keys(GENERATED_SKILLS),
-	]);
-	for (const destination of legacyClaudeCleanupDestinations(
-		pluginRoot,
-		legacyOwned.legacy,
-		protectedSkillDirectories,
-	)) {
-		deps.rmSync(destination, { recursive: true, force: true });
-	}
-
 	// Last inside the Claude root: the recorded digests cover every other file in the bundle.
 	// Recording it before Codex assembly means a manifest failure rolls back this root before the other transaction begins.
 	deps.writeBundleManifest(pluginRoot);
@@ -1235,7 +1280,7 @@ export function assembleClaudeAssets({ root, pluginRoot, capabilities, deps }) {
 }
 
 // Assembles the Claude and Codex plugin roots from the generated pfdsl skill tree, whose SKILL.md embeds `pfdsl help` output and therefore needs packages/cli/dist — see scripts/gen-skill.mjs.
-// The default invocation neither touches dist nor spawns a child process, so pre-commit can drift-check it even when dist is missing/stale (#593). Full generation supplies a neutral-skill callback, which runs inside the same lock and transaction.
+// The default invocation neither touches dist nor spawns anything but fixed Git queries, so pre-commit can drift-check it even when dist is missing/stale (#593). Full generation supplies a neutral-skill callback, which runs inside the same lock and transaction.
 // deps defaults to the real implementations; tests inject fakes to assert the wiring without touching the filesystem.
 export function assemblePluginDistIndependent({
 	root,
@@ -1257,6 +1302,8 @@ export function assemblePluginDistIndependent({
 		writeFileSync,
 		mkdirSync,
 		writeBundleManifest,
+		listTrackedFiles,
+		listUntrackedFiles,
 		newRunId: randomUUID,
 		assembleCodexAssets: assembleCodexAssetsUnlocked,
 		assembleClaudeAssets,
@@ -1267,12 +1314,22 @@ export function assemblePluginDistIndependent({
 	let transaction;
 	let preserveTransaction = false;
 	try {
+		const owned = ownedPluginOutputRoots(root, pluginRoot, codexPluginRoot);
+		assertNoTrackedFileOutsideOwnedRoots(root, owned, deps);
 		transaction = snapshotPluginGeneration(
 			root,
 			pluginRoot,
 			codexPluginRoot,
 			deps,
 			runId,
+		);
+		const untracked = deps.listUntrackedFiles?.(root, owned) ?? [];
+		clearOwnedPluginOutputs(
+			root,
+			pluginRoot,
+			codexPluginRoot,
+			generateNeutralSkill,
+			deps,
 		);
 		generateNeutralSkill?.();
 		const actualWrites = new Set();
@@ -1366,6 +1423,7 @@ export function assemblePluginDistIndependent({
 				observed,
 			});
 		}
+		assertNoUntrackedFileLost(root, untracked, deps);
 	} catch (error) {
 		if (transaction) {
 			for (const [destination, snapshot] of [

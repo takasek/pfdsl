@@ -1066,6 +1066,8 @@ describe("assemblePluginDistIndependent", () => {
 				[`${pluginRoot}/prior.txt`, "old Claude plugin"],
 				[codexPluginRoot, "directory"],
 				[`${codexPluginRoot}/prior.txt`, "old Codex plugin"],
+				["/repo/.agents", "directory"],
+				["/repo/.codex", "directory"],
 				...codexRepositoryDestinations.flatMap((destination) => [
 					[destination, `old ${destination}`],
 					[`${destination}/prior.txt`, `old ${destination} child`],
@@ -1216,94 +1218,143 @@ describe("assemblePluginDistIndependent", () => {
 		]);
 	});
 
-	it("removes migrated Claude-root outputs before recording the bundle content hash", () => {
-		const pluginRoot = "/repo/plugin/pfdsl";
-		const legacyOwnershipManifest = `${pluginRoot}/.codex-plugin/codex-command-skills.json`;
-		const legacyOutputs = [
-			`${pluginRoot}/skills/pfd-cycle`,
-			`${pluginRoot}/.codex-plugin`,
-			`${pluginRoot}/codex`,
+	it("restores all owned roots if assembly fails after rebuilding starts", () => {
+		const root = mkdtempSync(join(tmpdir(), "gen-plugin-obsolete-rollback-"));
+		const pluginRoot = join(root, "plugin/pfdsl");
+		const codexPluginRoot = join(root, "plugin/pfdsl-codex");
+		const obsolete = [
+			join(pluginRoot, "obsolete.json"),
+			join(codexPluginRoot, "obsolete.json"),
+			join(root, "generated/skills/pfdsl/references/obsolete.md"),
+			join(root, ".agents/obsolete.md"),
+			join(root, ".codex/obsolete.json"),
 		];
-		const { calls, deps } = fakeDeps({
-			existsSync: (path) => path === legacyOwnershipManifest,
-			readFileSync: (path) => {
-				if (path === legacyOwnershipManifest) {
-					return JSON.stringify({
-						skillRoot: "codex/skills",
-						ownedSkillDirectories: ["pfd-cycle"],
-					});
-				}
-				return String(path).endsWith("marketplace.json")
-					? JSON.stringify(fakeMarketplace)
-					: "---\nsummary: generated skill\n---\nbody\n";
-			},
-			rmSync: (path) => calls.push(["rmSync", path]),
-		});
-
-		assemblePluginDistIndependent({ root: "/repo", pluginRoot, deps });
-
-		const bundleManifest = calls.findIndex(
-			(call) => call[0] === "writeBundleManifest",
-		);
-		for (const output of legacyOutputs) {
-			const cleanup = calls.findIndex(
-				(call) => call[0] === "rmSync" && call[1] === output,
+		for (const path of obsolete) {
+			mkdirSync(dirname(path), { recursive: true });
+			writeFileSync(path, "old\n");
+		}
+		try {
+			assert.throws(
+				() =>
+					assemblePluginDistIndependent({
+						root,
+						pluginRoot,
+						codexPluginRoot,
+						deps: {
+							cpSync,
+							existsSync,
+							mkdirSync,
+							readFileSync,
+							renameSync,
+							rmSync,
+							writeFileSync,
+							newRunId: () => "obsolete-rollback",
+							decodeHarnessCapabilities: () => [],
+							assembleClaudeAssets: () => {
+								for (const path of obsolete) {
+									assert.equal(existsSync(path), false, path);
+								}
+								throw new Error("assembly failed");
+							},
+						},
+					}),
+				/assembly failed/,
 			);
-			assert.ok(
-				cleanup >= 0 && cleanup < bundleManifest,
-				`${output} must be removed before recording the bundle content hash`,
-			);
+			for (const path of obsolete) {
+				assert.equal(readFileSync(path, "utf8"), "old\n", path);
+			}
+		} finally {
+			rmSync(root, { recursive: true, force: true });
 		}
 	});
 
-	it("restores the Claude snapshot and skips publication when legacy cleanup fails", () => {
-		const pluginRoot = "/repo/plugin/pfdsl";
-		const transactionRoot = "/repo/plugin/.pfdsl-gen-txn-cleanup-failure-test";
-		const legacySkill = `${pluginRoot}/skills/pfd-cycle`;
-		const legacyOwnershipManifest = `${pluginRoot}/.codex-plugin/codex-command-skills.json`;
-		const { calls, deps } = fakeDeps({
-			cpSync: (from, to) => calls.push(["cpSync", from, to]),
-			existsSync: (path) =>
-				path === pluginRoot || path === legacyOwnershipManifest,
-			newRunId: () => "cleanup-failure-test",
-			readFileSync: (path) => {
-				if (path === legacyOwnershipManifest) {
-					return JSON.stringify({
-						skillRoot: "codex/skills",
-						ownedSkillDirectories: ["pfd-cycle"],
-					});
-				}
-				return String(path).endsWith("marketplace.json")
-					? JSON.stringify(fakeMarketplace)
-					: "---\nsummary: generated skill\n---\nbody\n";
-			},
-			renameSync: (from, to) => calls.push(["renameSync", from, to]),
-			rmSync: (path) => {
-				calls.push(["rmSync", path]);
-				if (path === legacySkill) throw new Error("legacy cleanup failed");
-			},
+	describe("files the rebuild of the owned roots could drop", () => {
+		function assembleWithUntracked(root, untracked, regenerated, tracked = []) {
+			return assemblePluginDistIndependent({
+				root,
+				pluginRoot: join(root, "plugin/pfdsl"),
+				codexPluginRoot: join(root, "plugin/pfdsl-codex"),
+				deps: {
+					cpSync,
+					existsSync,
+					mkdirSync,
+					readFileSync,
+					renameSync,
+					rmSync,
+					writeFileSync,
+					newRunId: () => "untracked",
+					listUntrackedFiles: () => untracked,
+					listTrackedFiles: () => tracked,
+					decodeHarnessCapabilities: () => [],
+					assertTargetOutputClosure: () => {},
+					assembleClaudeAssets: () => {
+						for (const path of regenerated) {
+							mkdirSync(dirname(path), { recursive: true });
+							writeFileSync(path, "new\n");
+						}
+						return { observed: {} };
+					},
+					assembleCodexAssets: () => ({ observed: {} }),
+				},
+			});
+		}
+
+		it("refuses and restores them when the rebuild would lose them", () => {
+			const root = mkdtempSync(join(tmpdir(), "gen-plugin-untracked-"));
+			const handPlaced = join(root, ".codex/local-note.md");
+			mkdirSync(dirname(handPlaced), { recursive: true });
+			writeFileSync(handPlaced, "maintained by hand\n");
+			try {
+				assert.throws(
+					() => assembleWithUntracked(root, [handPlaced], []),
+					(error) =>
+						error.message.includes("untracked") &&
+						error.message.includes(".codex/local-note.md"),
+				);
+				assert.equal(readFileSync(handPlaced, "utf8"), "maintained by hand\n");
+			} finally {
+				rmSync(root, { recursive: true, force: true });
+			}
 		});
 
-		assert.throws(
-			() => assemblePluginDistIndependent({ root: "/repo", pluginRoot, deps }),
-			/legacy cleanup failed/,
-		);
-		assert.equal(
-			calls.some((call) => call[0] === "writeBundleManifest"),
-			false,
-		);
-		assert.equal(
-			calls.some((call) => call[0] === "assembleCodexAssets"),
-			false,
-		);
-		assert.ok(
-			calls.some(
-				(call) =>
-					call[0] === "renameSync" &&
-					call[1] === `${transactionRoot}/plugin-root` &&
-					call[2] === pluginRoot,
-			),
-		);
+		it("accepts them when the generator writes them again", () => {
+			const root = mkdtempSync(join(tmpdir(), "gen-plugin-untracked-"));
+			const newOutput = join(root, "plugin/pfdsl/new-output.json");
+			mkdirSync(dirname(newOutput), { recursive: true });
+			writeFileSync(newOutput, "old\n");
+			try {
+				assembleWithUntracked(root, [newOutput], [newOutput]);
+				assert.equal(readFileSync(newOutput, "utf8"), "new\n");
+			} finally {
+				rmSync(root, { recursive: true, force: true });
+			}
+		});
+
+		it("refuses tracked files under a generated root no generator owns", () => {
+			// A retired or renamed root is never rebuilt, so its tracked files
+			// would otherwise survive every regeneration unchanged.
+			const root = mkdtempSync(join(tmpdir(), "gen-plugin-unowned-"));
+			const owned = [
+				join(root, "plugin/pfdsl/.claude-plugin/plugin.json"),
+				join(root, "generated/skills/pfdsl/SKILL.md"),
+			];
+			const retired = [
+				join(root, "plugin/pfdsl-old/plugin.json"),
+				join(root, "generated/skills/retired/SKILL.md"),
+			];
+			try {
+				assert.throws(
+					() => assembleWithUntracked(root, [], [], [...owned, ...retired]),
+					(error) =>
+						error.message.includes("plugin/pfdsl-old/plugin.json") &&
+						error.message.includes("generated/skills/retired/SKILL.md") &&
+						!error.message.includes("plugin/pfdsl/.claude-plugin"),
+				);
+				assembleWithUntracked(root, [], [], owned);
+			} finally {
+				rmSync(root, { recursive: true, force: true });
+			}
+		});
 	});
 
 	it("restores both plugin roots when the later Codex assembly fails", () => {
@@ -3163,12 +3214,15 @@ describe("dist independence", () => {
 			"expected the closure to include at least the entry and lib/gen-plugin.mjs",
 		);
 
-		// The one module allowed to spawn: its executable and subcommand are
-		// fixed at `git check-ignore`, which scripts/lib/git-ignore-oracle.test.mjs
-		// holds there. See findDistDependentFiles for why a runner that takes
+		// The modules allowed to spawn: each fixes its executable and subcommand,
+		// `git check-ignore` and `git ls-files`, which their own tests
+		// hold there. See findDistDependentFiles for why a runner that takes
 		// the executable as an argument cannot be exempted the same way.
 		const violations = findDistDependentFiles([...closure], {
-			allowed: [resolve(repoRoot, "scripts/lib/git-ignore-oracle.mjs")],
+			allowed: [
+				resolve(repoRoot, "scripts/lib/git-ignore-oracle.mjs"),
+				resolve(repoRoot, "scripts/lib/git-ls-files.mjs"),
+			],
 		});
 		assert.deepEqual(
 			violations,
