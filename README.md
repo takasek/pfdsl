@@ -173,7 +173,7 @@ After changing `docs/spec/spec.md`, `docs/samples/`, or the skill template, rege
 make gen-skill
 ```
 
-The script copies `docs/spec/spec.md` and `docs/samples/` into `references/` alongside `SKILL.md`. `make gen-plugin` (which depends on `gen-skill`) regenerates the marketplace plugin's copy too.
+The script copies `docs/spec/spec.md` and `docs/samples/` into `references/` alongside `SKILL.md`. `make gen-plugin` (which runs `gen-skill` itself) regenerates the marketplace plugin's copy too.
 
 ## pfd-cycle suite (cross-project)
 
