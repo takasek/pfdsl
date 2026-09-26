@@ -902,20 +902,6 @@ function readOwnedCommandSkillDirectories(pluginRoot, deps) {
 	return { codex: owned, legacy: [] };
 }
 
-function legacyClaudeCleanupDestinations(
-	pluginRoot,
-	legacyOwnedNames,
-	protectedSkillDirectories,
-) {
-	return [
-		...legacyOwnedNames
-			.filter((name) => !protectedSkillDirectories.has(name))
-			.map((name) => resolve(pluginRoot, "skills", name)),
-		resolve(pluginRoot, ".codex-plugin"),
-		resolve(pluginRoot, "codex"),
-	];
-}
-
 const DEFAULT_CODEX_ASSEMBLY_DEPS = {
 	cpSync,
 	decodeHarnessCapabilities,
@@ -1281,19 +1267,6 @@ export function assembleClaudeAssets({ root, pluginRoot, capabilities, deps }) {
 		observed["claude-plugin"],
 		targetCapabilityRecord(capabilities, "claude-plugin", "skill:pfdsl"),
 	);
-	const legacyOwned = readOwnedCommandSkillDirectories(pluginRoot, deps);
-	const protectedSkillDirectories = new Set([
-		...DISTRIBUTED_SKILLS,
-		...Object.keys(GENERATED_SKILLS),
-	]);
-	for (const destination of legacyClaudeCleanupDestinations(
-		pluginRoot,
-		legacyOwned.legacy,
-		protectedSkillDirectories,
-	)) {
-		deps.rmSync(destination, { recursive: true, force: true });
-	}
-
 	// Last inside the Claude root: the recorded digests cover every other file in the bundle.
 	// Recording it before Codex assembly means a manifest failure rolls back this root before the other transaction begins.
 	deps.writeBundleManifest(pluginRoot);
