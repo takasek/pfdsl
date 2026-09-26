@@ -1430,10 +1430,22 @@ export function runMetaRenameGroup(
 	);
 	const hasExtends = frontmatter?.extends !== undefined;
 
+	// Every group-id lookup below is an own-property check, not bracket
+	// access: `frontmatter.group` / `effectiveFrontmatter.group` /
+	// `presetGroup` are all plain objects, and bracket access on an
+	// inherited Object.prototype member name (toString, constructor,
+	// __proto__) reads that member instead of undefined — turning "not
+	// declared" into a false success and "does not exist" into a false
+	// refusal (both reachable from the CLI with an ordinary group name).
+	const hasGroupId = (
+		group: Record<string, unknown> | undefined,
+		id: string,
+	): boolean => group !== undefined && Object.hasOwn(group, id);
+
 	// (e) `<oldId>` must be declared in the file's own local `group:` section.
-	if (frontmatter?.group?.[oldId] === undefined) {
+	if (!hasGroupId(frontmatter?.group, oldId)) {
 		const fromPreset =
-			hasExtends && effectiveFrontmatter?.group?.[oldId] !== undefined;
+			hasExtends && hasGroupId(effectiveFrontmatter?.group, oldId);
 		const message = fromPreset
 			? `meta rename-group: '${oldId}' is not declared in ${file} — it comes from a preset and must be renamed there`
 			: `meta rename-group: '${oldId}' is not declared in ${file}`;
@@ -1451,7 +1463,7 @@ export function runMetaRenameGroup(
 			(c) => c.path !== absFile,
 		);
 		const presetGroup = resolvePresentation(presetChain).group;
-		if (presetGroup?.[oldId] !== undefined) {
+		if (hasGroupId(presetGroup, oldId)) {
 			const message = `meta rename-group: '${oldId}' is also defined by a preset extended from ${file}; the local entry is a partial override and cannot be renamed here`;
 			if (opts.json) return failJson({ error: message });
 			return fail(`${message}\n`);
@@ -1460,15 +1472,27 @@ export function runMetaRenameGroup(
 
 	// (f) `<newId>` must not already exist, locally or via `extends:`.
 	if (
-		frontmatter?.group?.[newId] !== undefined ||
-		effectiveFrontmatter?.group?.[newId] !== undefined
+		hasGroupId(frontmatter?.group, newId) ||
+		hasGroupId(effectiveFrontmatter?.group, newId)
 	) {
 		const message = `meta rename-group: '${newId}' already exists as a group id in ${file}`;
 		if (opts.json) return failJson({ error: message });
 		return fail(`${message}\n`);
 	}
 
-	const { output, members, children } = renameGroup(src, oldId, newId);
+	const { output, found, members, children } = renameGroup(src, oldId, newId);
+
+	// Defence in depth: the check above already established that `oldId` is
+	// declared, so `found` should always be true here — but if a future
+	// mismatch between this CLI-level check and the CST-level rename (e.g. a
+	// group id that round-trips through a different scalar type, #1218
+	// review) ever makes them disagree, refuse rather than silently writing
+	// the unchanged source back and reporting success.
+	if (!found) {
+		const message = `meta rename-group: '${oldId}' could not be renamed in ${file} (internal mismatch)`;
+		if (opts.json) return failJson({ error: message });
+		return fail(`${message}\n`);
+	}
 
 	// The gate on the write: the result must be clean, same contract as
 	// runMetaSet (index.ts) — an error the rewrite introduced or one the
