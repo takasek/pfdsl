@@ -92,6 +92,30 @@ artifact:
     description: "#482 コネクタ編集 / #483 Preview UI / #484 定義挿入を含む次期 Marketplace リリース"
     status: todo
     criteria: "npx @vscode/vsce show takasek.pfdsl --json の versions に packages/vscode-extension/package.json の version が含まれ、その版でコネクタ編集・Preview 生成 UI・定義挿入が動作する"
+  node_definition_creation:
+    label: プレビューと CLI から作れるノード定義
+    description: "未定義ノードから共通 core 処理を使って frontmatter 定義を挿入する機能。要件は issue #1282"
+    status: todo
+    criteria: "Preview のノードから定義作成でき、CLI でも同じファイルに同じ定義を作れる。既存定義・不正な入力では重複や部分書込みが起きず、拡張では Undo できる"
+    location: ../packages/
+  node_definition_navigation:
+    label: 図と frontmatter 定義を往復する操作
+    description: "プレビューのノードから定義へ、定義からプレビューの同じノードへ移動する機能。要件は issue #1283"
+    status: todo
+    criteria: "プレビューの右クリックから定義へ、frontmatter 定義の右クリックから図上ノードへ移動できる。未定義・不在時の挙動も検証済み"
+    location: ../packages/vscode-extension/
+  direct_neighbor_focus:
+    label: 直接の前後ノード表示とホバー内移動
+    description: "注目ノードの入出力1段だけを表示し、前後ノードへホバー表示から移動できるプレビュー機能。要件は issue #1284"
+    status: todo
+    criteria: "直接の前後ノードと edge だけの表示を切り替えられ、feedback edge を含む。ホバー表示の項目をポインタとキーボードで選んで別ノードへ移動できる"
+    location: ../packages/vscode-extension/
+  preview_focus_cue:
+    label: フォーカス先ノードの一時的な強調
+    description: "エディタから図へ移動した先を短時間示す視覚的な合図。要件は issue #1285"
+    status: todo
+    criteria: "エディタでノードを選ぶとプレビューの対象ノードだけが短時間強調され、連続選択・再描画でも残留せず、動きを減らす設定を尊重する"
+    location: ../packages/vscode-extension/
   standalone_baseline:
     label: スタンドアロン採用仕様と試作
     description: Tauri・macOS Apple Silicon の採用仕様、試作コードと限定的な検証記録。製品完成の証拠ではない。実装工程と引き継ぎは SPEC.md 第9節、個別の完了条件は各 process の issue を正とする
@@ -154,6 +178,22 @@ process:
     updated_at: 2026-07-18T00:33:46Z
   publish_ext_editing:
     label: extension 編集支援リリース
+  i1282_create_node_definition:
+    label: ノード定義作成操作を実装する
+    location: https://github.com/takasek/pfdsl/issues/1282
+    updated_at: 2026-09-26T18:14:16Z
+  i1283_connect_definition_navigation:
+    label: 図と定義の相互移動を実装する
+    location: https://github.com/takasek/pfdsl/issues/1283
+    updated_at: 2026-09-26T18:20:22Z
+  i1284_add_direct_neighbor_focus:
+    label: 前後ノード表示と移動を実装する
+    location: https://github.com/takasek/pfdsl/issues/1284
+    updated_at: 2026-09-26T18:14:20Z
+  i1285_add_preview_focus_cue:
+    label: 図上の移動先を一時強調する
+    location: https://github.com/takasek/pfdsl/issues/1285
+    updated_at: 2026-09-26T18:14:22Z
   i1257_build_standalone_foundation:
     label: 共通処理を製品用アプリ基盤へ接続する
     location: https://github.com/takasek/pfdsl/issues/1257
@@ -205,6 +245,14 @@ ext_v0015 >> i482_implement_editor_connector -> editor_connector
 editor_connector >> i483_implement_preview_connector -> preview_connector
 
 [def_insertion, editor_connector, preview_connector] >> publish_ext_editing -> ext_editing_release
+
+def_insertion >> i1282_create_node_definition -> node_definition_creation
+
+[node_definition_creation, toolchain] >> i1283_connect_definition_navigation -> node_definition_navigation
+
+toolchain >> i1284_add_direct_neighbor_focus -> direct_neighbor_focus
+
+toolchain >> i1285_add_preview_focus_cue -> preview_focus_cue
 
 [standalone_baseline, toolchain] >> i1257_build_standalone_foundation -> standalone_foundation
 
