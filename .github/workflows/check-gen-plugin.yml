@@ -24,7 +24,8 @@ jobs:
       - run: node scripts/link-repo-skill.mjs
 
       # gen-plugin renders SKILL.md from `pfdsl help` and runs check-docs, both
-      # of which read packages/cli/dist. The build used to ride along inside
+      # of which read packages/cli/dist. This is CI's only check-docs run;
+      # test.yml leaves it to this required job. The build used to ride along inside
       # bootstrap-pfdsl-skill; the link replaced that target, so name it here.
       - run: pnpm -r build
 

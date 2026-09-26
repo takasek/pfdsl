@@ -33,6 +33,34 @@ describe("check-gen-plugin workflow", () => {
 		);
 	});
 
+	it("runs check-docs once per CI event, in the required gen-plugin job", () => {
+		const testJob = workflowSteps(".github/workflows/test.yml", "test");
+		assert.deepEqual(
+			testJob.filter((step) => step.run?.includes("check-docs")),
+			[],
+			"test.yml must not repeat the suite make gen-plugin runs",
+		);
+
+		const makefile = readFileSync(resolve(root, "Makefile"), "utf8");
+		const rule = /^gen-plugin:([^\n]*)$/m.exec(makefile);
+		assert.ok(rule, "Makefile declares gen-plugin");
+		assert.ok(rule[1].trim().split(/\s+/).includes("check-docs"));
+
+		// A check-docs failure has to fail the job: the step keeps the default
+		// errexit shell and nothing downstream of make swallows its status.
+		const job = parse(
+			readFileSync(
+				resolve(root, ".github/workflows/check-gen-plugin.yml"),
+				"utf8",
+			),
+		).jobs["gen-plugin"];
+		const step = job.steps.find((s) => s.run?.includes("make gen-plugin"));
+		assert.equal(job["continue-on-error"], undefined);
+		assert.equal(step["continue-on-error"], undefined);
+		assert.equal(step.shell, undefined);
+		assert.doesNotMatch(step.run, /set \+e|make gen-plugin\s*(\|\||;)/);
+	});
+
 	it("checks untracked outputs in the install workflow", () => {
 		const cases = [
 			[".github/workflows/check-pfd-ops-sync.yml", [GEN_INSTALL_OUTPUT]],
