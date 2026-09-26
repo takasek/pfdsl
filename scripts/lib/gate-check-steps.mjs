@@ -28,6 +28,7 @@ import {
 import { GEN_INSTALL_TRIGGER } from "./gen-install-trigger.mjs";
 import { genPluginDriftPathspecs } from "./gen-plugin-outputs.mjs";
 import { GEN_PLUGIN_TRIGGER } from "./gen-plugin-trigger.mjs";
+import { splitNulSeparated } from "./run-exec.mjs";
 
 const ROADMAP_PATH = ".pfdsl/roadmap.pfdsl";
 
@@ -58,6 +59,8 @@ export function changedFilesSince({ exec, base }) {
  * name only. Neither is right for a trigger: deleting or moving a generator
  * input out of a trigger pattern still changes what the generator writes.
  * --no-renames reports a move as its deleted old path plus its added new one.
+ * NUL separation preserves non-ASCII and newline-containing paths without
+ * Git's display quoting, so trigger matching sees the actual filenames.
  * @param {{exec: Function, base: string}} params
  * @returns {{ok: boolean, files: string[], error?: string}}
  */
@@ -66,10 +69,11 @@ export function triggerPathsSince({ exec, base }) {
 		"diff",
 		"--no-renames",
 		"--name-only",
+		"-z",
 		`origin/${base}...HEAD`,
 	]);
 	if (!r.ok) return { ok: false, files: [], error: r.out.trim() };
-	return { ok: true, files: r.out.trim().split("\n").filter(Boolean) };
+	return { ok: true, files: splitNulSeparated(r.out) };
 }
 
 /**

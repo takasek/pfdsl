@@ -132,7 +132,7 @@ describe("genPluginIdentityStep", () => {
 describe("triggerPathsSince", () => {
 	it("keeps deletions and reports a move under both of its paths", () => {
 		const { exec, calls } = fakeExec({
-			"git diff": { out: "hooks/gone.mjs\nhooks/old.mjs\ndocs/new.mjs\n" },
+			"git diff": { out: "hooks/gone.mjs\0hooks/old.mjs\0docs/new.mjs\0" },
 		});
 		const result = triggerPathsSince({ exec, base: "main" });
 		assert.deepEqual(result, {
@@ -140,7 +140,7 @@ describe("triggerPathsSince", () => {
 			files: ["hooks/gone.mjs", "hooks/old.mjs", "docs/new.mjs"],
 		});
 		assert.deepEqual(calls, [
-			"git diff --no-renames --name-only origin/main...HEAD",
+			"git diff --no-renames --name-only -z origin/main...HEAD",
 		]);
 	});
 
