@@ -25,7 +25,7 @@
 - **c（PFD読み書き分析skill）**: `pfdsl_skill`。bのホストとしては図外（次節）だが、`gen_skill` の生成物であり `gen_plugin` の同梱素材でもあるため、その2つの役では図に現れる
 - **d（VSCode拡張）**: `packages/vscode-extension/`。図に現れない — bのホストであり、データを供給も保管もしないため（次節）
 - **e（a,bの配布）**: `push_cli_release_tag` / `publish_cli`、`push_libraries_release_tag` / `publish_libraries`、`package_vscode_release` / `verify_vsix` / `upload_vsix`。ADR-0035 までは workflow.pfdsl 側にあったが、release request 以降の変換に判断は入らないためこちらへ移した。リリース可否・版数の判断は workflow.pfdsl の3種の decide process が持ち、この図は kind ごとの release request を入力として受ける
-- **f（PFD運用フレームワーク）**: `tags: [f1]`（L1+L2 汎用層）/ `tags: [f2]`（L3 GitHub Issues バックエンド層）。f2 は規約本文（`ops_skill_l3`）と採用テンプレート（`ops_install_templates`）の2 artifact に分かれる — 前者は手書き、後者は `gen_install` の生成物であり、生成経路も ADR-0035 でこの図へ移った（`ops_install_sources` → `gen_install` → `ops_install_templates`）。内容・retro フィードバックの一次情報は workflow.pfdsl の `ops_skill_general` / `ops_skill_l3`
+- **f（PFD運用フレームワーク）**: `tags: [f1]`（L1+L2 汎用層）/ `tags: [f2]`（L3 バックエンドプリセット層。採用リポが選択できる GitHub Issues 版とリポ内ファイル版の2種）。f2 は規約本文（`ops_skill_l3`。2種の reference を location に列挙する）と GitHub Issues 版の採用テンプレート（`ops_install_templates`）の2 artifact に分かれる — 前者は手書き、後者は `gen_install` の生成物であり、生成経路も ADR-0035 でこの図へ移った（`ops_install_sources` → `gen_install` → `ops_install_templates`）。リポ内ファイル版は実配置を要しないため採用テンプレートを持たない。内容・retro フィードバックの一次情報は workflow.pfdsl の `ops_skill_general` / `ops_skill_l3`
 - **g（fの配布）**: `tags: [g]` の process 群。make gen-plugin（Claude Code / Codex両対応の組み立て）・Claude Code plugin marketplace（既存のインストール経路）・現在のCodexが同じ `.claude-plugin/marketplace.json` 互換経路で利用するClaude-compatible published artifact・check-install-sync.mjs（実配置とランタイム照合）が実装。`gen_plugin` と `gen_install` は生成でもあるため `gen` タグも併せ持つ
 
 ## ホスト（c/d）とbの関係
