@@ -3279,6 +3279,26 @@ raw >> ingest -> processed
 processed >> transform -> done
 `;
 
+	// --help must not overclaim: a same-line trailing comment on the renamed
+	// key moves to its own line on the next line (the byte-exact test above
+	// documents it), so only position and value are actually kept.
+	it("--help does not claim the renamed key's own comment is kept unchanged", async () => {
+		const r = await run(["meta", "rename-group", "--help"]);
+		expect(r.exitCode).toBe(0);
+		expect(r.stdout).not.toContain("position, value, and comments");
+		expect(r.stdout).toContain(
+			"keeping its position and value — a trailing\ncomment on the renamed key's own line may move to the next line",
+		);
+	});
+
+	it("--help documents that new must not already exist as an artifact or process id", async () => {
+		const r = await run(["meta", "rename-group", "--help"]);
+		expect(r.exitCode).toBe(0);
+		expect(r.stdout).toContain(
+			"must not already exist as an artifact or process id",
+		);
+	});
+
 	it("renames the declaration key, the child group's parent:, and every member's group: — byte-exact", async () => {
 		const f = join(dir, "rename-group-full.pfdsl");
 		writeFileSync(f, grouped);
