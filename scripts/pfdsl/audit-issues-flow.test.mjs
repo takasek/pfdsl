@@ -40,4 +40,20 @@ describe("audit-issues-flow without gh", () => {
 		assert.match(result.stdout, /install and authenticate the gh CLI/);
 		assert.match(result.stdout, /set GH_TOKEN or GITHUB_TOKEN/);
 	});
+
+	// With a token set, the HTTP route resolves owner/repo from the git remote.
+	// If git itself is missing, that is not "gh unavailable": telling the reader
+	// to set the token they already set would not help them recover.
+	it("reports a git remote failure instead of skipping when a token is set", () => {
+		const env = { ...process.env, PATH: emptyBin, GH_TOKEN: "dummy" };
+		delete env.GITHUB_TOKEN;
+		const result = spawnSync(process.execPath, [scriptPath], {
+			encoding: "utf-8",
+			env,
+		});
+		assert.notEqual(result.status, GH_UNAVAILABLE_EXIT_CODE, result.stdout);
+		assert.notEqual(result.status, 0);
+		assert.doesNotMatch(result.stdout, /gh unavailable/);
+		assert.match(result.stderr, /could not read the git remote/);
+	});
 });
