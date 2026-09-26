@@ -185,6 +185,8 @@ export type {
 export { reindex } from "./reindex.js";
 export type { RenameGroupResult } from "./rename-group.js";
 export { renameGroup } from "./rename-group.js";
+export type { RenameIdResult } from "./rename-id.js";
+export { renameId } from "./rename-id.js";
 
 export type {
 	SortKey,
