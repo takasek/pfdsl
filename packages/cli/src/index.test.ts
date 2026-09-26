@@ -116,6 +116,8 @@ describe("command metadata parse surface (#1050)", () => {
 			"usage: pfdsl status blocked <file|-> [--json] [--no-color]",
 		"meta set":
 			"usage: pfdsl meta set <file> <id[,id...]> <field> <value> [--json] [--no-color]",
+		"meta rename-group":
+			"usage: pfdsl meta rename-group <file> <old> <new> [--json] [--no-color]",
 		"meta check-links":
 			"usage: pfdsl meta check-links <file> [--json] [--no-color]",
 		"meta get":
@@ -186,6 +188,7 @@ describe("command metadata parse surface (#1050)", () => {
 			"  list <file|-> [--tag|--group|--producer] [field[,field...]]",
 			"  values <file|-> <field[,field...]>             Print a field's values in use, with counts",
 			"  set <file> <id> <field> <value>                Set a field value in place",
+			"  rename-group <file> <old> <new>                Rename a group id and every reference to it",
 			"  sort <file|-> --by <keys>                      Sort node definitions",
 			"  reindex <file|->                               Assign topological index: values",
 			"  check-links <file>                             Verify location: file paths exist",
@@ -204,8 +207,8 @@ describe("command metadata parse surface (#1050)", () => {
 		options: Record<string, unknown>;
 	}) => new Set(Object.keys(entry.options).map((name) => `--${name}`));
 
-	it("covers exactly 28 dispatchable command entries", () => {
-		expect(commandTargets).toHaveLength(28);
+	it("covers exactly 29 dispatchable command entries", () => {
+		expect(commandTargets).toHaveLength(29);
 	});
 
 	it.each(
@@ -3239,6 +3242,257 @@ target >> p -> zz
 		const after = readFileSync(f, "utf-8");
 		expect(after).toContain("index: 5");
 		expect(after).not.toContain('index: "5"');
+	});
+});
+
+describe("meta rename-group", () => {
+	// >=3 groups (layer1sub's parent: references layer1, other is unrelated),
+	// a comment on the renamed group's declaration, a folded (>) description,
+	// and members declared in both flow ({ group: layer1 }) and block style.
+	const grouped = `---
+description: >
+  Roadmap for the
+  Q3 initiative.
+group:
+  layer1: # ingestion layer
+    label: "Layer 1"
+    color: lightblue
+  layer1sub:
+    label: "Sub layer"
+    parent: layer1
+  other:
+    label: "Other layer"
+artifact:
+  raw: { group: layer1, label: Raw }
+  processed:
+    label: Processed
+    group: layer1
+  done:
+    label: Done
+process:
+  ingest: { group: layer1, label: Ingest }
+  transform:
+    label: Transform
+    group: layer1
+---
+raw >> ingest -> processed
+processed >> transform -> done
+`;
+
+	it("renames the declaration key, the child group's parent:, and every member's group: — byte-exact", async () => {
+		const f = join(dir, "rename-group-full.pfdsl");
+		writeFileSync(f, grouped);
+		const r = await run(["meta", "rename-group", f, "layer1", "layerx"]);
+		expect(r.exitCode).toBe(0);
+		expect(readFileSync(f, "utf-8")).toBe(`---
+description: >
+  Roadmap for the
+  Q3 initiative.
+group:
+  layerx:
+    # ingestion layer
+    label: "Layer 1"
+    color: lightblue
+  layer1sub:
+    label: "Sub layer"
+    parent: layerx
+  other:
+    label: "Other layer"
+artifact:
+  raw: { group: layerx, label: Raw }
+  processed:
+    label: Processed
+    group: layerx
+  done:
+    label: Done
+process:
+  ingest: { group: layerx, label: Ingest }
+  transform:
+    label: Transform
+    group: layerx
+---
+raw >> ingest -> processed
+processed >> transform -> done
+`);
+	});
+
+	it("reports the text success message with node and child-group counts", async () => {
+		const f = join(dir, "rename-group-text.pfdsl");
+		writeFileSync(f, grouped);
+		const r = await run(["meta", "rename-group", f, "layer1", "layerx"]);
+		expect(r.exitCode).toBe(0);
+		expect(r.stdout).toBe(
+			"renamed group 'layer1' to 'layerx': 4 node(s), 1 child group(s)\n",
+		);
+	});
+
+	it("--json reports { ok, from, to, members, children }", async () => {
+		const f = join(dir, "rename-group-json.pfdsl");
+		writeFileSync(f, grouped);
+		const r = await run([
+			"meta",
+			"rename-group",
+			f,
+			"layer1",
+			"layerx",
+			"--json",
+		]);
+		expect(r.exitCode).toBe(0);
+		expect(JSON.parse(r.stdout)).toEqual({
+			ok: true,
+			from: "layer1",
+			to: "layerx",
+			members: ["raw", "processed", "ingest", "transform"],
+			children: ["layer1sub"],
+		});
+	});
+
+	// --- refusals (a-g); each asserts exit code and byte-identical content ---
+
+	it("(a) refuses stdin, since it has nowhere to write the result", async () => {
+		const r = await run(["meta", "rename-group", "-", "layer1", "layerx"]);
+		expect(r.exitCode).toBe(2);
+		expect(r.stderr).toContain("stdin");
+	});
+
+	it("(b) exits 2 with help when a positional argument is missing", async () => {
+		const f = join(dir, "rename-group-missing-arg.pfdsl");
+		writeFileSync(f, grouped);
+		const r = await run(["meta", "rename-group", f, "layer1"]);
+		expect(r.exitCode).toBe(2);
+		expect(readFileSync(f, "utf-8")).toBe(grouped);
+	});
+
+	it("(b) exits 2 with help on an extra positional argument", async () => {
+		const f = join(dir, "rename-group-extra-arg.pfdsl");
+		writeFileSync(f, grouped);
+		const r = await run([
+			"meta",
+			"rename-group",
+			f,
+			"layer1",
+			"layerx",
+			"extra",
+		]);
+		expect(r.exitCode).toBe(2);
+		expect(readFileSync(f, "utf-8")).toBe(grouped);
+	});
+
+	it("(c) exits 2 when old and new are the same id", async () => {
+		const f = join(dir, "rename-group-same-id.pfdsl");
+		writeFileSync(f, grouped);
+		const r = await run(["meta", "rename-group", f, "layer1", "layer1"]);
+		expect(r.exitCode).toBe(2);
+		expect(readFileSync(f, "utf-8")).toBe(grouped);
+	});
+
+	it("(d) exits 1 on a structural (FM/P/L/N) diagnostic and leaves the file untouched", async () => {
+		const broken = `---
+group:
+  layer1: [unterminated
+---
+a
+`;
+		const f = join(dir, "rename-group-structural.pfdsl");
+		writeFileSync(f, broken);
+		const r = await run(["meta", "rename-group", f, "layer1", "layerx"]);
+		expect(r.exitCode).toBe(1);
+		expect(readFileSync(f, "utf-8")).toBe(broken);
+	});
+
+	it("(e) exits 1 when old is not declared locally", async () => {
+		const f = join(dir, "rename-group-not-declared.pfdsl");
+		writeFileSync(f, grouped);
+		const r = await run(["meta", "rename-group", f, "ghost", "layerx"]);
+		expect(r.exitCode).toBe(1);
+		expect(r.stderr).toContain("not declared");
+		expect(readFileSync(f, "utf-8")).toBe(grouped);
+	});
+
+	it("(f) exits 1 when new already exists locally", async () => {
+		const f = join(dir, "rename-group-new-exists.pfdsl");
+		writeFileSync(f, grouped);
+		const r = await run(["meta", "rename-group", f, "layer1", "other"]);
+		expect(r.exitCode).toBe(1);
+		expect(r.stderr).toContain("other");
+		expect(readFileSync(f, "utf-8")).toBe(grouped);
+	});
+
+	describe("with an extends: preset", () => {
+		const withExtends = `---
+extends: ./preset.yaml
+group:
+  local:
+    label: Local
+artifact:
+  a: { group: local }
+---
+a
+`;
+		const withOverride = `---
+extends: ./preset.yaml
+group:
+  shared:
+    label: Local override
+artifact:
+  a: { group: shared }
+---
+a
+`;
+		const preset = `group:
+  shared: { label: S }
+`;
+
+		it("(f) exits 1 when new already exists in the effective (extends-resolved) frontmatter", async () => {
+			const d = mkdtempSync(join(tmpdir(), "pfdsl-rename-group-extends-"));
+			try {
+				const f = join(d, "main.pfdsl");
+				writeFileSync(f, withExtends);
+				writeFileSync(join(d, "preset.yaml"), preset);
+				const r = await run(["meta", "rename-group", f, "local", "shared"]);
+				expect(r.exitCode).toBe(1);
+				expect(readFileSync(f, "utf-8")).toBe(withExtends);
+			} finally {
+				rmSync(d, { recursive: true, force: true });
+			}
+		});
+
+		it("(g) exits 1 when old is also defined by the extends: preset (partial override)", async () => {
+			const d = mkdtempSync(join(tmpdir(), "pfdsl-rename-group-extends-"));
+			try {
+				const f = join(d, "main.pfdsl");
+				writeFileSync(f, withOverride);
+				writeFileSync(join(d, "preset.yaml"), preset);
+				const r = await run(["meta", "rename-group", f, "shared", "renamed"]);
+				expect(r.exitCode).toBe(1);
+				expect(r.stderr).toContain("preset");
+				expect(readFileSync(f, "utf-8")).toBe(withOverride);
+			} finally {
+				rmSync(d, { recursive: true, force: true });
+			}
+		});
+
+		it("(e) not-declared-locally message names the preset when the id is inherited, not locally defined", async () => {
+			const d = mkdtempSync(join(tmpdir(), "pfdsl-rename-group-extends-"));
+			try {
+				const f = join(d, "main.pfdsl");
+				const inheritingOnly = `---
+extends: ./preset.yaml
+artifact:
+  a: { group: shared }
+---
+a
+`;
+				writeFileSync(f, inheritingOnly);
+				writeFileSync(join(d, "preset.yaml"), preset);
+				const r = await run(["meta", "rename-group", f, "shared", "renamed"]);
+				expect(r.exitCode).toBe(1);
+				expect(r.stderr).toContain("preset");
+				expect(readFileSync(f, "utf-8")).toBe(inheritingOnly);
+			} finally {
+				rmSync(d, { recursive: true, force: true });
+			}
+		});
 	});
 });
 
