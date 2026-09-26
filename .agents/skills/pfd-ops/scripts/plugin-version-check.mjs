@@ -38,27 +38,17 @@ export function readJsonOrNull(path) {
  * @param {string} text
  * @returns {{path: string, hex: string}[] | null}
  */
-export function parseBundleManifestEntries(text) {
-	if (text.length === 0) return null;
-	const lines = text.split(/\r?\n/);
-	if (lines[lines.length - 1] !== "") return null;
-	lines.pop();
-	if (lines.length === 0) return null;
-	if (lines.length % 2 === 0) return null;
+function parseBundleManifestEntries(text) {
+	const normalized = text.replaceAll("\r\n", "\n");
+	if (!normalized.endsWith("\n")) return null;
 	const entries = [];
 	const seen = new Set();
-	for (let i = 0; i < lines.length; i++) {
-		if (i % 2 === 1) {
-			if (lines[i] !== "") return null;
-			continue;
-		}
-		const line = lines[i];
-		const hex = line.slice(0, 64);
-		const separator = line.slice(64, 66);
-		const path = line.slice(66);
-		if (!/^[0-9a-f]{64}$/.test(hex)) return null;
-		if (separator !== "  ") return null;
-		if (path.length === 0) return null;
+	// A block holding a stray newline fails the match: `.` and the unflagged
+	// `^`/`$` do not cross line boundaries.
+	for (const block of normalized.slice(0, -1).split("\n\n")) {
+		const match = /^([0-9a-f]{64}) {2}(.+)$/.exec(block);
+		if (match === null) return null;
+		const [, hex, path] = match;
 		if (seen.has(path)) return null;
 		seen.add(path);
 		entries.push({ path, hex });
@@ -100,33 +90,29 @@ export function computeManifestAggregateHash(text) {
  * @returns {string | null}
  */
 export function readLocalBundleAggregateHash(pluginRoot) {
-	const path = resolve(pluginRoot, ".claude-plugin/bundle-manifest.sha256");
-	if (!existsSync(path)) return null;
 	try {
-		return computeManifestAggregateHash(readFileSync(path, "utf-8"));
+		return computeManifestAggregateHash(
+			readFileSync(
+				resolve(pluginRoot, ".claude-plugin/bundle-manifest.sha256"),
+				"utf-8",
+			),
+		);
 	} catch {
 		return null;
 	}
 }
 
 /**
+ * @template T
  * @param {typeof fetch} fetchImpl
  * @param {string} url
+ * @param {(res: Response) => Promise<T>} read
+ * @returns {Promise<T | null>}
  */
-async function fetchJsonOrNull(fetchImpl, url) {
+async function fetchOrNull(fetchImpl, url, read) {
 	const res = await fetchImpl(url, { signal: AbortSignal.timeout(3000) });
 	if (!res.ok) return null;
-	return await res.json();
-}
-
-/**
- * @param {typeof fetch} fetchImpl
- * @param {string} url
- */
-async function fetchTextOrNull(fetchImpl, url) {
-	const res = await fetchImpl(url, { signal: AbortSignal.timeout(3000) });
-	if (!res.ok) return null;
-	return await res.text();
+	return await read(res);
 }
 
 /**
@@ -161,14 +147,14 @@ export async function checkUpstreamVersion(skillRoot, fetchImpl = fetch) {
 	if (localManifest === null) return null;
 	try {
 		const localVersion = localManifest.version;
-		const remote = await fetchJsonOrNull(fetchImpl, UPSTREAM_PLUGIN_JSON_URL);
+		const remote = await fetchOrNull(fetchImpl, UPSTREAM_PLUGIN_JSON_URL, (res) => res.json());
 		if (remote === null || !remote.version) return null;
 		if (remote.version !== localVersion) {
 			return `Warning: installed pfdsl plugin version (${localVersion}) differs from upstream (${remote.version}). Consider updating the plugin.`;
 		}
 		const localHash = readLocalBundleAggregateHash(resolve(skillRoot, "../.."));
 		if (localHash === null) return null;
-		const remoteText = await fetchTextOrNull(fetchImpl, UPSTREAM_BUNDLE_MANIFEST_URL);
+		const remoteText = await fetchOrNull(fetchImpl, UPSTREAM_BUNDLE_MANIFEST_URL, (res) => res.text());
 		if (remoteText === null) return null;
 		const remoteHash = computeManifestAggregateHash(remoteText);
 		if (remoteHash === null || remoteHash === localHash) return null;
