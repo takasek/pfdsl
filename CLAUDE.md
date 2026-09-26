@@ -13,7 +13,7 @@
 ## Claude Code の作業分担
 
 Claude Code では Opus を中心に作業を進め、調査・実装を必要に応じて委譲する。
-Claude Code のコード変更では自己レビューに加えて別主体のレビューを行い、観点と実施条件は `.pfdsl/workflow.md` の「Claude Code（Opus）でのレビュー」に従う。
+Claude Code のコード変更では自己レビューに加えて別主体のレビューを行い、観点と実施条件は `.pfdsl/workflow.md` の「レビューの観点と記録」「レビューの実施と手段」に従う。
 
 ## セットアップ
 
