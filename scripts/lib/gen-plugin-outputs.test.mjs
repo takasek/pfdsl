@@ -2,7 +2,10 @@ import assert from "node:assert/strict";
 import { relative, resolve, sep } from "node:path";
 import { describe, it } from "node:test";
 
-import { pluginGenerationSnapshotTargets } from "./gen-plugin.mjs";
+import {
+	ownedPluginOutputRoots,
+	pluginGenerationSnapshotTargets,
+} from "./gen-plugin.mjs";
 import {
 	GEN_INSTALL_OUTPUT,
 	GEN_PLUGIN_OUTPUTS,
@@ -80,5 +83,28 @@ describe("gen-plugin output contract", () => {
 			(output) => !targets.some((target) => within(target, output)),
 		);
 		assert.deepEqual(unrestored, [], "drift-checked but never restored");
+	});
+
+	it("restores every root a generation empties before rebuilding it", () => {
+		const root = resolve("/repo");
+		const pluginRoot = resolve(root, "plugin/pfdsl");
+		const codexPluginRoot = resolve(root, "plugin/pfdsl-codex");
+		const targets = pluginGenerationSnapshotTargets(
+			root,
+			pluginRoot,
+			codexPluginRoot,
+		).map(([destination]) => destination);
+
+		const unrestored = ownedPluginOutputRoots(
+			root,
+			pluginRoot,
+			codexPluginRoot,
+		).filter(
+			(owned) =>
+				!targets.some(
+					(target) => owned === target || owned.startsWith(`${target}${sep}`),
+				),
+		);
+		assert.deepEqual(unrestored, [], "emptied but never restored");
 	});
 });
