@@ -387,7 +387,7 @@ export async function runCycleStatus({
 			source: targetSource,
 		})),
 		manualChecks: [
-			"MANUAL: Before starting, read the primary issue records for every issueTargets entry and follow 選択後の設計確認 in .pfdsl/bindings/pfd-ops.md. Resolve missing targets or failed reads first; this output does not verify design decisions or approvals.",
+			"MANUAL: Before starting, read the primary issue records for every issueTargets entry and follow 適用点 1 で採用案と対案を比較して設計を決める in .pfdsl/bindings/pfd-ops.md. Resolve missing targets or failed reads first; this output does not verify design decisions or approvals.",
 		],
 		issueLookupFailures,
 		blocking: issueLookupFailures.length > 0,
