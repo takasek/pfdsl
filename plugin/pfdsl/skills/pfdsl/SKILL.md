@@ -84,6 +84,8 @@ statusStyles:
   suspended: { fillcolor: "#e2e3e5", style: filled }
 ```
 
+**値にコロン＋空白（`: `）を含むなら引用符で囲む。** `description: 例: 対応するケース` のようなプレーンスカラーは YAML がネストした mapping と解釈し、frontmatter 全体が `FM002: Invalid YAML in front matter` で失敗する。`label` / `description` / `criteria` 等の文字列値に `: ` が入る場合は `description: "例: 対応するケース"` のようにダブルクォートで囲むか、folded scalar（`>`）で書く。`tags` 等のシーケンス要素（`- 例: 対応するケース`）では FM002 すら出ず、要素が文字列でなく1キーの mapping として黙って読まれるため、`check` が通っても同じく引用符で囲む。値の中の `#` の扱いは `references/spec.md` の FM003 を参照。
+
 その他のトップレベルフィールド（`version` / `dslVersion` 等）と各フィールドの正確な仕様は `references/spec.md` §2、機能別の最小例は `references/samples.md` を参照。
 
 ## CLI

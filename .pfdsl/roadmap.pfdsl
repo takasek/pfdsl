@@ -13,12 +13,6 @@ artifact:
     status: done
     criteria: check/fmt/graph が全サンプルに対してエラーなし、npm view @pfdsl/cli versions で公開済みバージョンが1件以上確認できる
     location: ../packages/
-  adrs:
-    label: "ADR 群 (docs/adr)"
-    description: 方法論の設計決定記録。一覧と本数は docs/adr/README.md が一次情報（ここに数を書かない — ドリフトするため）
-    status: done
-    criteria: 対象判断が文書化され docs/adr/README.md の一覧に追記済み
-    location: ../docs/adr/
   spec_v0011:
     label: 仕様書 v0.0.11（waiting/suspended/type統合）
     status: done
@@ -34,15 +28,6 @@ artifact:
     description: "VS Marketplace は OIDC/Trusted Publishing 非対応のため PAT が必要。VSCE_PAT 環境変数を設定して `make release-extension` でローカル実行する"
     status: suspended
     criteria: "`VSCE_PAT` を設定した `make release-extension` で VS Code Marketplace への publish が動作確認済み"
-  article:
-    label: "公開記事 (#12)"
-    description: ADR 群を素材とした外部公開記事。依存なしで着手可能、spec v0.0.7 確定後はより充実
-    status: wip
-    criteria: "本ノードの location: に設定した公開先 URL をブラウザで開くと記事本文が表示される"
-  obsidian_plugin:
-    label: "Obsidian プラグイン (#3)"
-    status: todo
-    criteria: Obsidian で .pfdsl ファイルを開くとプレビューペインに図が描画され、テキストを編集すると再描画される
   spec_id_syntax:
     label: "仕様ID構文 ADR + 最小lint (#328)"
     description: "spec.md 相互参照の仕様ID方式。構文・レンジ規則の詳細と移行方針は issue #328 が一次情報。汎用ツール化の検討記録は issue コメント参照"
@@ -92,6 +77,30 @@ artifact:
     description: "#482 コネクタ編集 / #483 Preview UI / #484 定義挿入を含む次期 Marketplace リリース"
     status: todo
     criteria: "npx @vscode/vsce show takasek.pfdsl --json の versions に packages/vscode-extension/package.json の version が含まれ、その版でコネクタ編集・Preview 生成 UI・定義挿入が動作する"
+  node_definition_creation:
+    label: プレビューと CLI から作れるノード定義
+    description: "未定義ノードから共通 core 処理を使って frontmatter 定義を挿入する機能。要件は issue #1282"
+    status: todo
+    criteria: "Preview のノードから定義作成でき、CLI でも同じファイルに同じ定義を作れる。既存定義・不正な入力では重複や部分書込みが起きず、拡張では Undo できる"
+    location: ../packages/
+  node_location_cycle:
+    label: 定義と本文中の同一ノード位置を巡回する操作
+    description: "エディタ内で frontmatter 定義キーとグラフ本文に現れる同一ノード ID の各位置を順に巡回する機能。右クリックとショートカットから使い、Cmd+クリックの適否は既存操作との整合で判断する。要件は issue #1283"
+    status: todo
+    criteria: "定義キーから本文中の同一 ID の全出現箇所を文書順に巡回して定義へ戻れ、途中からも次へ進める。キー操作と右クリックから利用でき、VS Code の既存操作とのショートカット衝突が解消済み"
+    location: ../packages/vscode-extension/
+  hover_local_graph:
+    label: ホバー内の周辺グラフとノード移動
+    description: "注目ノードと直接の前後ノード・エッジからなる小さな図をホバー表示内に描き、図内のノードを選んでメインのプレビューへ移動する機能。要件は issue #1284"
+    status: todo
+    criteria: "メタデータの有無にかかわらずホバー内に中心と直接の前後ノード・エッジだけの小さな図を表示し、feedback edge を含む接続方向を保つ。図内のノードをクリックしてメインの図でそのノードへ移動できる"
+    location: ../packages/vscode-extension/
+  preview_focus_cue:
+    label: フォーカス先ノードの一時的な強調
+    description: "エディタでの選択とホバー内の周辺グラフでのクリックによってメインの図が移動した先を、短時間示す視覚的な合図。要件は issue #1285"
+    status: todo
+    criteria: "エディタでのノード選択とホバー内の周辺グラフでのノードクリックのどちらでも、移動先のノードだけが短時間強調される。連続選択で古い強調が残らず、再描画だけでは点滅せず、動きを減らす設定を尊重する"
+    location: ../packages/vscode-extension/
   standalone_baseline:
     label: スタンドアロン採用仕様と試作
     description: Tauri・macOS Apple Silicon の採用仕様、試作コードと限定的な検証記録。製品完成の証拠ではない。実装工程と引き継ぎは SPEC.md 第9節、個別の完了条件は各 process の issue を正とする
@@ -129,14 +138,6 @@ process:
     label: extension自動公開実装
     location: https://github.com/takasek/pfdsl/issues/119
     updated_at: 2026-06-29T01:43:14Z
-  i12_write_article:
-    label: 記事執筆
-    location: https://github.com/takasek/pfdsl/issues/12
-    updated_at: 2026-06-12T08:18:56Z
-  i3_build_obsidian_plugin:
-    label: Obsidianプラグイン実装
-    location: https://github.com/takasek/pfdsl/issues/3
-    updated_at: 2026-06-12T08:18:35Z
   i542_migrate_spec_id_refs:
     label: spec.md 仕様ID参照移行
     description: "spec.md の節番号相互参照を仕様ID参照へ段階移行する。クラスタ単位の段階計画（§15 制約 → §2.x 意味論 → 残り）は #542 が一次情報"
@@ -154,6 +155,22 @@ process:
     updated_at: 2026-07-18T00:33:46Z
   publish_ext_editing:
     label: extension 編集支援リリース
+  i1282_create_node_definition:
+    label: ノード定義作成操作を実装する
+    location: https://github.com/takasek/pfdsl/issues/1282
+    updated_at: 2026-09-26T18:14:16Z
+  i1283_add_node_location_cycle:
+    label: 定義と本文中のノード位置の巡回を実装する
+    location: https://github.com/takasek/pfdsl/issues/1283
+    updated_at: 2026-09-26T18:47:44Z
+  i1284_add_hover_local_graph:
+    label: ホバー内の周辺グラフと移動を実装する
+    location: https://github.com/takasek/pfdsl/issues/1284
+    updated_at: 2026-09-26T18:41:36Z
+  i1285_add_preview_focus_cue:
+    label: エディタとホバー内の図からの移動先を一時強調する
+    location: https://github.com/takasek/pfdsl/issues/1285
+    updated_at: 2026-09-26T19:02:08Z
   i1257_build_standalone_foundation:
     label: 共通処理を製品用アプリ基盤へ接続する
     location: https://github.com/takasek/pfdsl/issues/1257
@@ -190,10 +207,6 @@ statusStyles:
   suspended: { fillcolor: "#e2e3e5", style: filled }
 ---
 
-adrs >> i12_write_article -> article
-
-toolchain >> i3_build_obsidian_plugin -> obsidian_plugin
-
 toolchain >> i119_publish_extension -> published_extension
 
 [get_by_id_tool, mint_check_tool, spec_id_syntax, spec_v0011] >> i542_migrate_spec_id_refs -> spec_id_refs
@@ -205,6 +218,14 @@ ext_v0015 >> i482_implement_editor_connector -> editor_connector
 editor_connector >> i483_implement_preview_connector -> preview_connector
 
 [def_insertion, editor_connector, preview_connector] >> publish_ext_editing -> ext_editing_release
+
+def_insertion >> i1282_create_node_definition -> node_definition_creation
+
+toolchain >> i1283_add_node_location_cycle -> node_location_cycle
+
+toolchain >> i1284_add_hover_local_graph -> hover_local_graph
+
+[hover_local_graph, toolchain] >> i1285_add_preview_focus_cue -> preview_focus_cue
 
 [standalone_baseline, toolchain] >> i1257_build_standalone_foundation -> standalone_foundation
 

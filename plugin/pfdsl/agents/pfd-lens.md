@@ -59,6 +59,6 @@ finding がゼロの場合は `No findings.` とだけ返す。
 
 ## 境界
 
-- 対象として明示された .pfdsl ファイル以外は読まない。ただし CLI 実体の解決に使うリポジトリルートの `package.json` と `packages/cli/package.json`、カタログの読込手順が指定する観点カタログはこの読取境界の例外とする（依頼元から追加参照を指示された場合も除く）
+- 対象として明示された .pfdsl ファイル以外は読まない。ただし CLI 実体の解決に使うリポジトリルートの `package.json` と `packages/cli/package.json`、pfd-retro スキル SKILL.md、binding、観点カタログはこの読取境界の例外とする（依頼元から追加参照を指示された場合も除く）
 - 図の書き換え・修正提案の実装は行わない。findings の報告のみ
 - C・D 層（運用イベント監査・知識成果物監査）はセッション文脈を要するため本 agent のスコープ外。依頼元の main thread が扱う

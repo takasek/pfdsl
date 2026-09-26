@@ -319,7 +319,7 @@ binding・companion・guard の分類に当たることは根拠にならない 
 
 ## workflow.pfdsl に status を書かない
 
-汎用ルール（flow 種別の artifact に `status:` を書かない。同一 id が複数の図に現れる場合も一次情報は roadmap 側に一元化する）は `docs/quality-guide.md`「進捗 status は roadmap にだけ書く」が一次情報。このリポで両図に現れる id は `article` で、workflow 側にも status を書いたため #763 の食い違いが起きた。
+汎用ルール（flow 種別の artifact に `status:` を書かない。同一 id が複数の図に現れる場合も一次情報は roadmap 側に一元化する）は `docs/quality-guide.md`「進捗 status は roadmap にだけ書く」が一次情報。かつて `article` が両図に現れ、workflow 側にも status を書いたため #763 の食い違いが起きた。現在の `article` は workflow にだけあり、進捗と公開先は依存グラフの対象外である issue #12 で確認する。
 
 ## release milestone artifact の作成規約
 
