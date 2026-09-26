@@ -66,8 +66,20 @@ export function renameGroup(
 	const doc = cst.doc;
 	const groupMap = doc.getIn(["group"], true);
 	if (!isMap(groupMap)) return noop;
+	// `analyze()`'s plain-object frontmatter (read above) always has string
+	// keys/values — JS coerces every object property key to a string
+	// regardless of the underlying YAML scalar type, and `yaml`'s own
+	// `parse()` does the same for a value. A bare, unquoted `42:` key (or a
+	// `group: 42` / `parent: 42` value) round-trips as the CST's Scalar
+	// *number* 42, not the string "42" — so matching it against `oldId`
+	// (always a string, since CLI arguments are strings) must go through
+	// the same stringification, or a caller who already found `oldId`
+	// declared via that plain object (an own-property read) would see this
+	// function silently fail to find the pair it was just told exists.
+	const matchesOldId = (value: unknown): boolean =>
+		value !== undefined && String(value) === oldId;
 	const pair = groupMap.items.find(
-		(p) => isScalar(p.key) && p.key.value === oldId,
+		(p) => isScalar(p.key) && matchesOldId(p.key.value),
 	);
 	if (!pair || !isScalar(pair.key)) return noop;
 	pair.key.value = newId;
@@ -75,7 +87,7 @@ export function renameGroup(
 	const children: string[] = [];
 	for (const [gid, meta] of Object.entries(frontmatter?.group ?? {})) {
 		if (gid === oldId) continue;
-		if (meta?.parent === oldId) {
+		if (matchesOldId(meta?.parent)) {
 			doc.setIn(["group", gid, "parent"], newId);
 			children.push(gid);
 		}
@@ -83,13 +95,13 @@ export function renameGroup(
 
 	const members: string[] = [];
 	for (const [aid, meta] of Object.entries(frontmatter?.artifact ?? {})) {
-		if (meta?.group === oldId) {
+		if (matchesOldId(meta?.group)) {
 			doc.setIn(["artifact", aid, "group"], newId);
 			members.push(aid);
 		}
 	}
 	for (const [pid, meta] of Object.entries(frontmatter?.process ?? {})) {
-		if (meta?.group === oldId) {
+		if (matchesOldId(meta?.group)) {
 			doc.setIn(["process", pid, "group"], newId);
 			members.push(pid);
 		}

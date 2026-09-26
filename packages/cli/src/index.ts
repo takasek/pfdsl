@@ -1522,11 +1522,13 @@ export function runMetaRenameGroup(
 	const { output, found, members, children } = renameGroup(src, oldId, newId);
 
 	// Defence in depth: the check above already established that `oldId` is
-	// declared, so `found` should always be true here — but if a future
-	// mismatch between this CLI-level check and the CST-level rename (e.g. a
-	// group id that round-trips through a different scalar type, #1218
-	// review) ever makes them disagree, refuse rather than silently writing
-	// the unchanged source back and reporting success.
+	// declared, so `found` should always be true here — but this CLI-level
+	// check and the CST-level rename read `oldId`'s declaration through two
+	// independent parses (`analyze()`'s plain-object frontmatter vs.
+	// `parseFrontmatterCst`'s own fence detection, deliberately kept
+	// independent — see frontmatter-cst.ts). If a future input ever makes
+	// them disagree about what's declared, refuse rather than silently
+	// writing the unchanged source back and reporting success.
 	if (!found) {
 		const message = `meta rename-group: '${oldId}' could not be renamed in ${file} (internal mismatch)`;
 		if (opts.json) return failJson({ error: message });
