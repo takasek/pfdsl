@@ -106,15 +106,6 @@ describe("check-generated-drift", () => {
 					encoding: "utf8",
 				});
 			assert.equal(check().status, 0, "the committed baseline is clean");
-			const standaloneCodex = spawnSync(
-				process.execPath,
-				[join(root, "scripts/gen-codex-assets.mjs")],
-				{ cwd: root, encoding: "utf8" },
-			);
-			assert.equal(standaloneCodex.status, 0, standaloneCodex.stderr);
-			for (const output of [oldOutputs[1], oldOutputs[3], oldOutputs[4]]) {
-				assert.throws(() => readFileSync(join(root, output)), output);
-			}
 			const generation = spawnSync(
 				process.execPath,
 				[join(root, "scripts/gen-plugin-dist-independent.mjs")],

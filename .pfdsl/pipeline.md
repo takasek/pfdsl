@@ -57,7 +57,7 @@
 
 生成・公開チェーン（ADR-0035 で workflow.pfdsl から移動）:
 
-- **gen_skill（`scripts/gen-skill.mjs`）**: 一次ソース（skill-template / spec / samples / examples / review-perspectives）からリポ内 pfdsl スキルを組む。`references/*.md` の生成は `packages/cli/dist` に触れない `scripts/lib/gen-skill-refs.mjs` に切り出し済みで、完成した references 一式を旧ディレクトリと入れ替え、廃止ファイルを除く。SKILL.md（`pfdsl help` 埋め込み）のみ dist を必要とする（#586）。
+- **gen_skill（`scripts/gen-skill.mjs`）**: 一次ソース（skill-template / spec / samples / examples / review-perspectives）からリポ内 pfdsl スキルを組む。`references/*.md` の生成は `packages/cli/dist` に触れない `scripts/lib/gen-skill-refs.mjs` に切り出し済みで、SKILL.md（`pfdsl help` 埋め込み）のみ dist を必要とする（#586）。
 同モジュールを単体で呼ぶ CLI エントリもあったが、`scripts/pre-commit` が呼び出しをやめた後は誰も起動しておらず削除した（#668）。
 dist 非依存の手動再生成は `scripts/gen-plugin-dist-independent.mjs` が担う
 - **gen_install（`scripts/lib/install-templates.mjs` の明示リスト）**: repo ルートの配布ソースから `install/` ミラーを一方向で再生成する。生成の向きは repo ルート → `install/` → `plugin/` の一本のみ（#547 で双方向 sync を廃止）

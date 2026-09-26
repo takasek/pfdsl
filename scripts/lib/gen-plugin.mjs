@@ -1091,37 +1091,7 @@ export function assembleCodexAssets({
 }) {
 	const runId = deps.newRunId?.() ?? randomUUID();
 	const lockPath = acquireCodexAssemblyLock(root, deps);
-	const transactionRoot = resolve(
-		dirname(codexPluginRoot),
-		`.pfdsl-codex-gen-txn-${runId}`,
-	);
-	let snapshots;
-	let preserveTransaction = false;
 	try {
-		// Validate the previous manifest while it is still available. The whole
-		// Codex output tree is then replaced, including retired files.
-		readOwnedCommandSkillDirectories(codexPluginRoot, deps);
-		deps.rmSync(transactionRoot, { recursive: true, force: true });
-		snapshots = [
-			[resolve(root, "AGENTS.md"), "agents-md"],
-			[resolve(root, ".agents"), "agent-skills"],
-			[resolve(root, ".codex"), "codex-repository"],
-			[codexPluginRoot, "codex-plugin-root"],
-		].map(([destination, backup]) => [
-			destination,
-			snapshotAssemblyDestination(
-				destination,
-				resolve(transactionRoot, backup),
-				deps,
-			),
-		]);
-		for (const path of [
-			resolve(root, ".agents"),
-			resolve(root, ".codex"),
-			codexPluginRoot,
-		]) {
-			deps.rmSync(path, { recursive: true, force: true });
-		}
 		return assembleCodexAssetsUnlocked({
 			root,
 			codexPluginRoot,
@@ -1129,20 +1099,7 @@ export function assembleCodexAssets({
 			deps,
 			runId,
 		});
-	} catch (error) {
-		if (snapshots) {
-			for (const [destination, snapshot] of [...snapshots].reverse()) {
-				if (!restoreAssemblySnapshot(destination, snapshot, deps)) {
-					preserveTransaction = true;
-				}
-			}
-			if (preserveTransaction && error && typeof error === "object") {
-				error.rollbackBackup = transactionRoot;
-			}
-		}
-		throw error;
 	} finally {
-		if (!preserveTransaction) removeAssemblyArtifact(transactionRoot, deps);
 		releaseCodexAssemblyLock(lockPath, deps, runId);
 	}
 }
