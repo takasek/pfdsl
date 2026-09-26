@@ -2,7 +2,7 @@
 
 2026-09-26、Apple M5 / 24 GiB、macOS 27.0 (26A428)、arm64 で実施した。
 結論は、既存の TypeScript 処理を共有した Tauri アプリで閲覧・編集・書き出しへ接続できたが、今回の測定では Electron に対するメモリ優位を確認できなかった、である。
-Tauri の正式採用や製品要件の完了を示す記録ではない。
+採用方針は [SPEC.md](SPEC.md) の1.11節で Tauri に確定したが、本記録は製品要件の完了を示さない。
 
 ## 構成と再現性
 
@@ -81,7 +81,24 @@ footprint -p <main-pid> -p <gpu-pid> -p <renderer-pid> -p <network-pid> \
 起動時間、編集中のピーク、多数タブ、出力中のピーク、開閉を繰り返した後の残留、最低対応 OS、長時間安定性は未測定である。
 メモリ上限や採用基準もまだ決めていない。
 
-## 残件と次の判断
+## 配布サイズの探索的測定
+
+同日の既存 arm64 成果物を測定した。
+Tauri は release `.app`、Electron は公式ランタイム `.app` と同じ共通 frontend および比較用ホストの合算である。
+ディスク占有量は `du -sk`、圧縮容量は各成分を同じ `ditto -c -k --sequesterRsrc --keepParent` で ZIP 化して求めた。
+Electron は未パッケージのため成分ごとの ZIP 容量を合算しており、ホストの約13 KiBの非圧縮量も目安に含めた。
+
+| 対象 | Tauri | Electron |
+| --- | ---: | ---: |
+| 展開後のアプリ資産のディスク占有量 | 約17 MiB | 約288 MiB |
+| ZIP 圧縮した転送量の目安 | 約10 MiB | 約123 MiB |
+
+原票は [distribution-size.json](evidence/distribution-size.json)。
+正式な署名・公証済み DMG のサイズや、完成製品のサイズを測ったものではない。
+Tauri の容量に OS 既存の WebKit は含めず、Electron には同梱ランタイムを含める。
+この結果をメモリ・起動速度・消費電力の優位と読み替えず、将来の Windows 配布にもそのまま当てはめない。
+
+## 残件と製品化に向けた確認
 
 試作中に文字や画面が白く見える採取結果があった。
 元の描画設定へ戻した後に文字・行番号と実際の編集を確認し、最終の検証レポートには JavaScript / CSP のエラーがなかった。
@@ -93,5 +110,6 @@ footprint -p <main-pid> -p <gpu-pid> -p <renderer-pid> -p <network-pid> \
 
 共通化の次の対象は、core の browser / Node 境界、プレビューの host 接続、エディタの言語支援である。
 現在の browser path adapter と VS Code 配下の計算モジュールの直接参照は、共有可能性を見るための試作上の接続である。
-Tauri で進める判断には、OS 連携・配布の小ささと、Rust 接続部・OS WebView 差異の保守を併せて評価する。
+Tauri 採用後も、対応する macOS 版での OS 連携・日本語入力・描画・出力と、Rust 接続部の保守は残る。
+Windows 向けの実装・配布・検証・動作保証は当面の対象に含めない。
 機能差を増やさない製品方針は [SPEC.md](SPEC.md) のままとする。

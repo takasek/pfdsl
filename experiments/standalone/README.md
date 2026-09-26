@@ -2,7 +2,9 @@
 
 This experiment evaluates whether the existing TypeScript PFDSL processing and preview can support a standalone macOS application with paired document editors and previews.
 Tauri is the first prototype; Electron is a bounded comparator that loads the exact same built frontend from `dist/`.
-Neither framework has been selected for the product; bounded runtime measurements and their limits are recorded in [RESULTS.md](RESULTS.md).
+Tauri has been selected for the product, with macOS on Apple Silicon as the supported platform; Windows remains a possible future port without a current implementation, distribution, or support commitment.
+The Electron harness remains comparison evidence, not a second product to maintain at feature parity.
+Bounded runtime measurements and their limits are recorded in [RESULTS.md](RESULTS.md).
 The agreed product requirements and the proposals that remain open are recorded separately in [SPEC.md](SPEC.md).
 
 The prototype reuses the repository's core, Graphviz exporter, preview engine, and selected existing preview interaction calculations.
@@ -16,7 +18,7 @@ This is a developer experiment, not an end-user installer or a completed impleme
 Tauri editing, manual save, and paired tab switching were exercised on the copied corpus.
 Transient blank captures occurred during UI verification; later captures showed text and line numbers with the original rendering settings, but their cause has not been isolated.
 Local checks and the sample probe establish only the specific results they exercise; they do not establish feature parity or production readiness.
-The current measurements do not establish a Tauri RAM advantage or settle framework selection.
+The selection reflects shared TypeScript processing, smaller distribution artifacts, and the macOS maintenance scope; the measurements do not establish a Tauri RAM advantage or product readiness.
 
 The hosts compare the last known document text with disk content before saving, then replace the file through a temporary file.
 That protects against an external change already visible at the comparison, but it is not a filesystem compare-and-swap: an independent writer can still change the file between comparison and replacement.
