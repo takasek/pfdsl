@@ -27,8 +27,8 @@ GitHub Issues。規約と採用手順は `.claude/skills/pfd-ops/references/gith
 ## プリフライト・ゲート集約スクリプト（#354）
 
 - **選択フェーズ（pfd-ops 手順1）**: `GH_HOST=github.com node scripts/cycle-status.mjs` — fetch 実行・base への遅れコミット数・open PR の一覧・`status ready --best` の結果を1回の JSON 出力に集約する。`--base <branch>` で対象ブランチを変更可能（デフォルト `main`）。加えて次の情報を出力する（#461）:
-  - 対象 issue の本文・コメントを取得し、`issueTargets` に対象と解決元を出力する。`--issue <n>` で明示した全件を優先し、指定なしなら best プロセスの `location:` から解決する。設計の確定・未確定や記録の適否は機械判定せず、`manualChecks` が案内する binding「選択後の設計確認」に従う。対象未解決はエラー情報とコマンド未生成として報告し、その理由だけでは終了コードを変えない。取得失敗は対象 issue を保持して終了コードを非ゼロにする。終了コード0を一次資料や承認の確認済みと読まない。実装は `scripts/lib/cycle-status-steps.mjs` の `runCycleStatus` と `cycleStatusExitCode` が一次情報
-  - `behindBase > 0` のときは判定を一切出さず `staleTree`（`{base, message}`）と `behindBase` だけを返し、終了コード 1 で拒否する（#716）。`origin/<base>` を起点にサイクルのブランチを切ってから実行する（遅れたツリーで古い版が走ること・その拒否は拒否する版でしか起きないことは `.pfdsl/bindings/pfd-ops.md`「ワークサイクルの追加手順」の「手順 1 の追加」が一次情報）
+  - 対象 issue の本文・コメントを取得し、`issueTargets` に対象と解決元を出力する。`--issue <n>` で明示した全件を優先し、指定なしなら best プロセスの `location:` から解決する。設計の確定・未確定や記録の適否は機械判定せず、`manualChecks` が案内する binding「適用点 1 で採用案と対案を比較して設計を決める」に従う。対象未解決はエラー情報とコマンド未生成として報告し、その理由だけでは終了コードを変えない。取得失敗は対象 issue を保持して終了コードを非ゼロにする。終了コード0を一次資料や承認の確認済みと読まない。実装は `scripts/lib/cycle-status-steps.mjs` の `runCycleStatus` と `cycleStatusExitCode` が一次情報
+  - `behindBase > 0` のときは判定を一切出さず `staleTree`（`{base, message}`）と `behindBase` だけを返し、終了コード 1 で拒否する（#716）。`origin/<base>` を起点にサイクルのブランチを切ってから実行する（遅れたツリーで古い版が走ること・その拒否は拒否する版でしか起きないことは `.pfdsl/bindings/pfd-ops.md`「ワークサイクルの追加手順」の「手順 1 の追加で worktree と upstream を確認する」が一次情報）
   - `currentBranch` と `commitsAheadOfBase`（`origin/<base>..HEAD` の件数）を出力する（#629）。0 でなければ前サイクルのブランチに乗っている可能性を示すが、既存ブランチの意図的な継続もあるためスクリプトは拒否せず判断を残す
   - 作業ツリーに未コミットの変更（追跡外ファイルを含む）があるときは、`behindBase` と同じく判定を一切出さず `uncommittedFiles` と `dirtyTree` だけを返し、終了コード 1 で拒否する（#744）。前サイクルの変更はブランチを切り替えてもツリーに残り、次サイクルの最初のコミットに紛れ込む — `commitsAheadOfBase` が塞ぐのと同じ失敗の型で、経路がコミットでなく作業ツリーであるだけ。`commitsAheadOfBase` と違い判断を残さず拒否するのは、サイクルは clean なツリーから始める前提であり、`git worktree add` がそれを作るため、拒否への答えが「weigh する」でなく「worktree を切る」で済むから。ツリーが base に遅れかつ汚れている場合は遅れの方を返す（走っているスクリプト自身が古い版だという判定が、汚れの判定の信頼性も奪う）
   - 公開 pending を `releasePending`（`{needsAction, report}`）で出力する（#814）。`scripts/release-status.mjs` をそのまま走らせた結果で、`needsAction` はその終了コード、`report` は印字された行。判定でなく報告材料で、pending は公開直後を除いて常に nonzero になる。`needsAction` が何を畳み込むか、なぜそこで止まるかは `scripts/lib/release-status-check.mjs` の `needsAction` の JSDoc が一次情報 — ここには複製しない（#880）。運用上知っておく必要があるのは、false が「公開までにやるべきことが残っていない」であって「`make release` が成功する」ではないこと、true の理由は `report` の行にしか出ないので読むのは行のほうになること、の2点。台帳へ書き写す運用を置かないのは、値の一次情報が npm レジストリ・Marketplace・git であり、書き写した側は無視されたうえに古くなるため
@@ -61,7 +61,7 @@ GitHub 側にしか無い読みを本文の正規表現で再構成すると、D
 **着手時**: develop ブランチを切った時点で、実装対象の出力 artifact を `todo → wip` に更新する（規則の一次情報は workflow.md「develop 着手時の artifact status 更新」）。
 
 **着手前の選択記録**: 実装着手前に、選んだ方針を issue コメントとして残す。`--issue` で明示した各 issue と、指定なしで best プロセスから解決した issue の双方が対象で、候補の列挙の有無は問わない。既存の採用済み記録があればそれを確認して使い、記録不足だけを理由に再承認を求めない。
-判断・理由・候補の扱い・前提を外した案の検討・決定変更と承認の追跡は binding「GitHub Issues バックエンドの設計記録」に従う。固定の書式・項目順は要求しない。
+判断・理由・候補の扱い・前提を外した案の検討・決定変更と承認の追跡は binding「GitHub Issues バックエンドの設計記録を確認する」に従う。固定の書式・項目順は要求しない。
 投稿・編集直後の exact-write readback は L3 reference に従う。記録の存在・正本・承認根拠への参照と対応は人間が必ず確認し、終端ゲートの成功をその代わりにしない。
 記録の欠落や正本の曖昧さは同じ記録の補修・確認で解消し、決定を変える場合は必要な承認と変更履歴を残す。既存実装との整合は通常の追加コミットで直し、日時の変更やコミットの再作成を回復手順にしない。
 
