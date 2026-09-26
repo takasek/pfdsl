@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // Assembles the Claude and Codex plugin roots from generated/skills/pfdsl, whose SKILL.md needs packages/cli/dist (embeds `pfdsl help` output — see scripts/gen-skill.mjs).
-// Never touches dist or spawns a child process, so scripts/pre-commit can drift-check this bulk even when dist is missing/stale (#593, same split rationale as scripts/lib/gen-skill-refs.mjs in #586).
+// Never touches dist or spawns anything but fixed Git queries, so scripts/pre-commit can drift-check this bulk even when dist is missing/stale (#593, same split rationale as scripts/lib/gen-skill-refs.mjs in #586).
 // Run: node scripts/gen-plugin-dist-independent.mjs
 
 import { dirname, resolve } from "node:path";

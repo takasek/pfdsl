@@ -9,7 +9,7 @@ import {
 	rmSync,
 	writeFileSync,
 } from "node:fs";
-import { basename, dirname, resolve } from "node:path";
+import { basename, dirname, relative, resolve } from "node:path";
 
 import {
 	BUNDLE_MANIFEST_RELATIVE_PATH,
@@ -28,6 +28,7 @@ import {
 } from "./gen-codex-assets.mjs";
 import { genInstall } from "./gen-install.mjs";
 import { writeSkillRefs } from "./gen-skill-refs.mjs";
+import { listUntrackedFiles } from "./git-untracked-files.mjs";
 import {
 	assertTargetOutputClosure,
 	capabilitiesForTarget,
@@ -648,6 +649,28 @@ export function pluginGenerationSnapshotTargets(
 // These directories contain only generated assets in this repository. Rebuild
 // them from an empty tree so an output removed from a generator becomes a Git
 // deletion instead of silently surviving the next regeneration.
+function ownedPluginOutputRoots(root, pluginRoot, codexPluginRoot) {
+	return [
+		pluginRoot,
+		codexPluginRoot,
+		resolve(root, GENERATED_SKILLS.pfdsl.target),
+		resolve(root, ".agents"),
+		resolve(root, ".codex"),
+	];
+}
+
+// A tracked file the rebuild drops shows up as a Git deletion; an untracked
+// one would vanish without a trace, so the generation fails and rolls back.
+function assertNoUntrackedFileLost(root, untracked, deps) {
+	const lost = untracked.filter((path) => !deps.existsSync(path));
+	if (lost.length === 0) return;
+	throw new Error(
+		`Regenerating would delete untracked files under generated roots. Move them out of the generated roots or delete them, then rerun:\n${lost
+			.map((path) => `  ${relative(root, path)}`)
+			.join("\n")}`,
+	);
+}
+
 function clearOwnedPluginOutputs(
 	root,
 	pluginRoot,
@@ -661,13 +684,11 @@ function clearOwnedPluginOutputs(
 		!generateNeutralSkill && deps.existsSync(skillMdPath)
 			? deps.readFileSync(skillMdPath)
 			: null;
-	for (const path of [
+	for (const path of ownedPluginOutputRoots(
+		root,
 		pluginRoot,
 		codexPluginRoot,
-		skillRoot,
-		resolve(root, ".agents"),
-		resolve(root, ".codex"),
-	]) {
+	)) {
 		deps.rmSync(path, { recursive: true, force: true });
 	}
 	deps.mkdirSync(skillRoot, { recursive: true });
@@ -1264,7 +1285,7 @@ export function assembleClaudeAssets({ root, pluginRoot, capabilities, deps }) {
 }
 
 // Assembles the Claude and Codex plugin roots from the generated pfdsl skill tree, whose SKILL.md embeds `pfdsl help` output and therefore needs packages/cli/dist — see scripts/gen-skill.mjs.
-// The default invocation neither touches dist nor spawns a child process, so pre-commit can drift-check it even when dist is missing/stale (#593). Full generation supplies a neutral-skill callback, which runs inside the same lock and transaction.
+// The default invocation neither touches dist nor spawns anything but fixed Git queries, so pre-commit can drift-check it even when dist is missing/stale (#593). Full generation supplies a neutral-skill callback, which runs inside the same lock and transaction.
 // deps defaults to the real implementations; tests inject fakes to assert the wiring without touching the filesystem.
 export function assemblePluginDistIndependent({
 	root,
@@ -1286,6 +1307,7 @@ export function assemblePluginDistIndependent({
 		writeFileSync,
 		mkdirSync,
 		writeBundleManifest,
+		listUntrackedFiles,
 		newRunId: randomUUID,
 		assembleCodexAssets: assembleCodexAssetsUnlocked,
 		assembleClaudeAssets,
@@ -1303,6 +1325,11 @@ export function assemblePluginDistIndependent({
 			deps,
 			runId,
 		);
+		const untracked =
+			deps.listUntrackedFiles?.(
+				root,
+				ownedPluginOutputRoots(root, pluginRoot, codexPluginRoot),
+			) ?? [];
 		clearOwnedPluginOutputs(
 			root,
 			pluginRoot,
@@ -1402,6 +1429,7 @@ export function assemblePluginDistIndependent({
 				observed,
 			});
 		}
+		assertNoUntrackedFileLost(root, untracked, deps);
 	} catch (error) {
 		if (transaction) {
 			for (const [destination, snapshot] of [

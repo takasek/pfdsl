@@ -1358,6 +1358,68 @@ describe("assemblePluginDistIndependent", () => {
 		}
 	});
 
+	describe("untracked files under the rebuilt roots", () => {
+		function assembleWithUntracked(root, untracked, regenerated) {
+			return assemblePluginDistIndependent({
+				root,
+				pluginRoot: join(root, "plugin/pfdsl"),
+				codexPluginRoot: join(root, "plugin/pfdsl-codex"),
+				deps: {
+					cpSync,
+					existsSync,
+					mkdirSync,
+					readFileSync,
+					renameSync,
+					rmSync,
+					writeFileSync,
+					newRunId: () => "untracked",
+					listUntrackedFiles: () => untracked,
+					decodeHarnessCapabilities: () => [],
+					assertTargetOutputClosure: () => {},
+					assembleClaudeAssets: () => {
+						for (const path of regenerated) {
+							mkdirSync(dirname(path), { recursive: true });
+							writeFileSync(path, "new\n");
+						}
+						return { observed: {} };
+					},
+					assembleCodexAssets: () => ({ observed: {} }),
+				},
+			});
+		}
+
+		it("refuses and restores them when the rebuild would lose them", () => {
+			const root = mkdtempSync(join(tmpdir(), "gen-plugin-untracked-"));
+			const handPlaced = join(root, ".codex/local-note.md");
+			mkdirSync(dirname(handPlaced), { recursive: true });
+			writeFileSync(handPlaced, "maintained by hand\n");
+			try {
+				assert.throws(
+					() => assembleWithUntracked(root, [handPlaced], []),
+					(error) =>
+						error.message.includes("untracked") &&
+						error.message.includes(".codex/local-note.md"),
+				);
+				assert.equal(readFileSync(handPlaced, "utf8"), "maintained by hand\n");
+			} finally {
+				rmSync(root, { recursive: true, force: true });
+			}
+		});
+
+		it("accepts them when the generator writes them again", () => {
+			const root = mkdtempSync(join(tmpdir(), "gen-plugin-untracked-"));
+			const newOutput = join(root, "plugin/pfdsl/new-output.json");
+			mkdirSync(dirname(newOutput), { recursive: true });
+			writeFileSync(newOutput, "old\n");
+			try {
+				assembleWithUntracked(root, [newOutput], [newOutput]);
+				assert.equal(readFileSync(newOutput, "utf8"), "new\n");
+			} finally {
+				rmSync(root, { recursive: true, force: true });
+			}
+		});
+	});
+
 	it("restores both plugin roots when the later Codex assembly fails", () => {
 		const pluginRoot = "/repo/plugin/pfdsl";
 		const codexPluginRoot = "/repo/plugin/pfdsl-codex";
@@ -3215,12 +3277,15 @@ describe("dist independence", () => {
 			"expected the closure to include at least the entry and lib/gen-plugin.mjs",
 		);
 
-		// The one module allowed to spawn: its executable and subcommand are
-		// fixed at `git check-ignore`, which scripts/lib/git-ignore-oracle.test.mjs
-		// holds there. See findDistDependentFiles for why a runner that takes
+		// The modules allowed to spawn: each fixes its executable and subcommand,
+		// `git check-ignore` and `git ls-files --others`, which their own tests
+		// hold there. See findDistDependentFiles for why a runner that takes
 		// the executable as an argument cannot be exempted the same way.
 		const violations = findDistDependentFiles([...closure], {
-			allowed: [resolve(repoRoot, "scripts/lib/git-ignore-oracle.mjs")],
+			allowed: [
+				resolve(repoRoot, "scripts/lib/git-ignore-oracle.mjs"),
+				resolve(repoRoot, "scripts/lib/git-untracked-files.mjs"),
+			],
 		});
 		assert.deepEqual(
 			violations,
