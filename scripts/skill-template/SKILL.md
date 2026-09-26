@@ -151,7 +151,8 @@ pfdsl meta rename-group <file> <old-id> <new-id>       # rename a group id and e
 `meta set` takes comma-separated ids and writes all of them or none, so regrouping a batch of nodes is one call, not one edit per node.
 Declare a new group under `group:` before moving nodes into it: a `group:` value that names an undeclared group passes `check` without a warning, and those nodes render outside every cluster.
 `meta rename-group` rewrites the declaration key, the child groups' `parent:` and the members' `group:` together.
-It refuses when the old id is not declared in this file (a group inherited through `extends:` is renamed in its preset) and when the new id already exists.
+It leaves the group's `label:` as it was, so update a label that names the old id with `meta set <file> <new-id> label <text>`.
+It refuses when the old id is not declared in this file (a group inherited through `extends:` is renamed in its preset) and when the new id is already a group, artifact or process id.
 
 ## References — which to read when
 
