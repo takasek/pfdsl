@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { execFileSync } from "node:child_process";
 import { mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, it } from "node:test";
@@ -23,6 +24,31 @@ describe("listTrackedFiles", () => {
 				join(root, "owned/sub/tracked.md"),
 			]);
 		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	it("reads the index a commit hook points GIT_INDEX_FILE at", () => {
+		// `git commit -a` and `git commit <path>` run pre-commit against a
+		// temporary index; the drift check that follows the generator reads it
+		// too, so both must agree on what the commit tracks.
+		const root = makeGitRepository({ prefix: "git-ls-files-" });
+		const savedIndex = process.env.GIT_INDEX_FILE;
+		try {
+			mkdirSync(join(root, "owned"), { recursive: true });
+			writeFileSync(join(root, "owned/retired.md"), "tracked\n");
+			commitEverything(root);
+			const commitIndex = join(root, ".git/next-index.lock");
+			execFileSync("git", ["read-tree", "--empty"], {
+				cwd: root,
+				env: { ...process.env, GIT_INDEX_FILE: commitIndex },
+			});
+			process.env.GIT_INDEX_FILE = commitIndex;
+
+			assert.deepEqual(listTrackedFiles(root, [join(root, "owned")]), []);
+		} finally {
+			if (savedIndex === undefined) delete process.env.GIT_INDEX_FILE;
+			else process.env.GIT_INDEX_FILE = savedIndex;
 			rmSync(root, { recursive: true, force: true });
 		}
 	});

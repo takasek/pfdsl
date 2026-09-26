@@ -3305,7 +3305,7 @@ describe("dist independence", () => {
 		);
 
 		// The modules allowed to spawn: each fixes its executable and subcommand,
-		// `git check-ignore` and `git ls-files --others`, which their own tests
+		// `git check-ignore` and `git ls-files`, which their own tests
 		// hold there. See findDistDependentFiles for why a runner that takes
 		// the executable as an argument cannot be exempted the same way.
 		const violations = findDistDependentFiles([...closure], {

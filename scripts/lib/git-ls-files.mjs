@@ -19,6 +19,12 @@ function lsFiles(root, flags, roots) {
 	try {
 		// GIT_DIR and its siblings are stripped so the repository is the one
 		// `root` sits in — scripts/pre-commit runs the generator from a hook.
+		// GIT_INDEX_FILE is kept: a commit hook points it at the index being
+		// committed, which the drift check run after the generator also reads.
+		const env = withoutGitTargetEnvironment();
+		if (process.env.GIT_INDEX_FILE) {
+			env.GIT_INDEX_FILE = process.env.GIT_INDEX_FILE;
+		}
 		output = execFileSync(
 			"git",
 			[
@@ -30,7 +36,7 @@ function lsFiles(root, flags, roots) {
 			],
 			{
 				cwd: root,
-				env: withoutGitTargetEnvironment(),
+				env,
 				encoding: "utf8",
 				stdio: ["ignore", "pipe", "pipe"],
 			},
