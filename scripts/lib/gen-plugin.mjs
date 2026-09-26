@@ -650,7 +650,8 @@ export function pluginGenerationSnapshotTargets(
 // These directories contain only generated assets in this repository. Rebuild
 // them from an empty tree so an output removed from a generator becomes a Git
 // deletion instead of silently surviving the next regeneration.
-function ownedPluginOutputRoots(root, pluginRoot, codexPluginRoot) {
+// scripts/lib/gen-plugin-outputs.test.mjs holds each of them to a snapshot target.
+export function ownedPluginOutputRoots(root, pluginRoot, codexPluginRoot) {
 	return [
 		pluginRoot,
 		codexPluginRoot,
