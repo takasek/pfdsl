@@ -1223,11 +1223,11 @@ export function assembleClaudeAssets({ root, pluginRoot, capabilities, deps }) {
 		deps.rmSync(destination, { recursive: true, force: true });
 	}
 
-	// Last inside the Claude root: the recorded hash covers every other file in the bundle.
+	// Last inside the Claude root: the recorded digests cover every other file in the bundle.
 	// Recording it before Codex assembly means a manifest failure rolls back this root before the other transaction begins.
 	deps.writeBundleManifest(pluginRoot);
 	console.log(
-		`plugin/pfdsl/${BUNDLE_MANIFEST_RELATIVE_PATH} ← content hash of the assembled bundle`,
+		`plugin/pfdsl/${BUNDLE_MANIFEST_RELATIVE_PATH} ← per-file digests of the assembled bundle`,
 	);
 	return {
 		observed,
