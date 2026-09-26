@@ -1415,7 +1415,7 @@ export function runMetaRenameGroup(
 	// Structural diagnostics (FM/P/L/N) report a document that could not be
 	// read, so `frontmatter` below cannot be trusted to describe it — same
 	// gate as runMetaSet (index.ts), for the same reason.
-	const { diagnostics, frontmatter } = analyze(src);
+	const { diagnostics, frontmatter, nodeKinds } = analyze(src);
 	const unreadable = diagnostics.filter((d) =>
 		STRUCTURAL_CODE.test(String(d.code)),
 	);
@@ -1494,7 +1494,22 @@ export function runMetaRenameGroup(
 		}
 	}
 
-	// (f) `<newId>` must not already exist, locally or via `extends:`.
+	// (f) `<newId>` must not already exist — as an artifact/process id (spec
+	// §2.8.1's group-key uniqueness only names other groups, but
+	// normalizer.ts registers artifact/process ids before group ids and
+	// silently *skips* a group whose id one of them already took
+	// (packages/core/src/normalizer.ts:37-40, no diagnostic) — a rename
+	// landing on that id would leave the renamed group declared but
+	// unaddressable by id, e.g. `meta set <file> <newId> label X` would
+	// resolve to the artifact/process, never the group), or as a group id,
+	// locally or via `extends:`.
+	const newKind = nodeKinds.get(newId);
+	if (newKind === "artifact" || newKind === "process") {
+		const article = newKind === "artifact" ? "an" : "a";
+		const message = `meta rename-group: '${newId}' already exists as ${article} ${newKind} id in ${file}`;
+		if (opts.json) return failJson({ error: message });
+		return fail(`${message}\n`);
+	}
 	if (
 		hasGroupId(frontmatter?.group, newId) ||
 		hasGroupId(effectiveFrontmatter?.group, newId)
