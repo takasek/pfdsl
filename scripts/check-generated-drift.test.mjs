@@ -60,4 +60,41 @@ describe("check-generated-drift", () => {
 			rmSync(root, { recursive: true, force: true });
 		}
 	});
+
+	it("diffs a consumer's paths from the gen-plugin output contract", () => {
+		const root = mkdtempSync(join(tmpdir(), "generated-drift-"));
+		try {
+			execFileSync("git", ["init", "--quiet"], { cwd: root });
+			writeFileSync(join(root, "AGENTS.md"), "untracked output\n");
+
+			const result = spawnSync(
+				process.execPath,
+				[script, "--gen-plugin", "ci"],
+				{ cwd: root, encoding: "utf8" },
+			);
+
+			assert.equal(result.status, 1);
+			assert.match(result.stderr, /AGENTS\.md/);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	it("refuses an unknown gen-plugin consumer instead of diffing nothing", () => {
+		const root = mkdtempSync(join(tmpdir(), "generated-drift-"));
+		try {
+			execFileSync("git", ["init", "--quiet"], { cwd: root });
+
+			const result = spawnSync(
+				process.execPath,
+				[script, "--gen-plugin", "nightly"],
+				{ cwd: root, encoding: "utf8" },
+			);
+
+			assert.notEqual(result.status, 0);
+			assert.match(result.stderr, /nightly/);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
 });

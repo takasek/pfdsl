@@ -192,8 +192,12 @@ gen-skill: check-docs
 gen-install:
 	node scripts/gen-install.mjs
 
+# gen-plugin.mjs runs gen-skill and gen-install itself, inside its lock and
+# snapshot, so they are not prerequisites here: a first pass outside the lock
+# would race a concurrent generator, and a failed run would restore that first
+# pass's output instead of the state before the run.
 .PHONY: gen-plugin
-gen-plugin: gen-skill gen-install
+gen-plugin: check-docs
 	node scripts/gen-plugin.mjs
 
 .PHONY: push

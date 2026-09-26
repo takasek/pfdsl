@@ -24,14 +24,16 @@ jobs:
       - run: node scripts/link-repo-skill.mjs
 
       # gen-plugin renders SKILL.md from `pfdsl help` and runs check-docs, both
-      # of which read packages/cli/dist. The build used to ride along inside
+      # of which read packages/cli/dist. This is CI's only check-docs run;
+      # test.yml leaves it to this required job. The build used to ride along inside
       # bootstrap-pfdsl-skill; the link replaced that target, so name it here.
       - run: pnpm -r build
 
+      # The diffed paths come from scripts/lib/gen-plugin-outputs.mjs, shared with the pre-commit and terminal gates (#1203).
       - name: Regenerate Claude and Codex assets and assert no drift
         run: |
           make gen-plugin
-          if ! node scripts/check-generated-drift.mjs -- generated plugin .claude-plugin/marketplace.json CLAUDE.md AGENTS.md .agents .codex; then
+          if ! node scripts/check-generated-drift.mjs --gen-plugin ci; then
             echo ""
             echo "ERROR: generated Claude or Codex assets are stale."
             echo "Run 'make gen-plugin' and commit the result."
