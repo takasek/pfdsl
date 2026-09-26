@@ -104,11 +104,11 @@ artifact:
     status: todo
     criteria: "プレビューの右クリックから定義へ、frontmatter 定義の右クリックから図上ノードへ移動できる。未定義・不在時の挙動も検証済み"
     location: ../packages/vscode-extension/
-  direct_neighbor_focus:
-    label: 直接の前後ノード表示とホバー内移動
-    description: "注目ノードの入出力1段だけを表示し、前後ノードへホバー表示から移動できるプレビュー機能。要件は issue #1284"
+  neighbor_hover_navigation:
+    label: ホバー表示内の前後ノード一覧と移動
+    description: "注目ノードの直接の前後ノードをホバー表示内に一覧化し、選んだノードへ移動できるプレビュー機能。要件は issue #1284"
     status: todo
-    criteria: "直接の前後ノードと edge だけの表示を切り替えられ、feedback edge を含む。ホバー表示の項目をポインタとキーボードで選んで別ノードへ移動できる"
+    criteria: "メタデータの有無にかかわらずホバー表示内で直接の前後ノード一覧へ切り替えられ、feedback edge を含む接続の向きを示す。一覧へカーソルを移してノードをクリックできる"
     location: ../packages/vscode-extension/
   preview_focus_cue:
     label: フォーカス先ノードの一時的な強調
@@ -186,10 +186,10 @@ process:
     label: 図と定義の相互移動を実装する
     location: https://github.com/takasek/pfdsl/issues/1283
     updated_at: 2026-09-26T18:20:22Z
-  i1284_add_direct_neighbor_focus:
-    label: 前後ノード表示と移動を実装する
+  i1284_add_neighbor_hover_navigation:
+    label: ホバー内の前後ノード一覧と移動を実装する
     location: https://github.com/takasek/pfdsl/issues/1284
-    updated_at: 2026-09-26T18:14:20Z
+    updated_at: 2026-09-26T18:33:24Z
   i1285_add_preview_focus_cue:
     label: 図上の移動先を一時強調する
     location: https://github.com/takasek/pfdsl/issues/1285
@@ -250,7 +250,7 @@ def_insertion >> i1282_create_node_definition -> node_definition_creation
 
 [node_definition_creation, toolchain] >> i1283_connect_definition_navigation -> node_definition_navigation
 
-toolchain >> i1284_add_direct_neighbor_focus -> direct_neighbor_focus
+toolchain >> i1284_add_neighbor_hover_navigation -> neighbor_hover_navigation
 
 toolchain >> i1285_add_preview_focus_cue -> preview_focus_cue
 
