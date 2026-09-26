@@ -69,6 +69,16 @@ describe("classifyGitCommand", () => {
 		});
 	});
 
+	it("does not read --attr-source's value as the subcommand (#1232)", () => {
+		// --attr-source takes a separate value the way -C does; before
+		// GIT_GLOBAL_FLAGS_WITH_VALUE knew that, gitSubcommandIndex misread
+		// "HEAD" as the subcommand and this whole command went unclassified.
+		assert.deepEqual(classifyGitCommand("git --attr-source HEAD commit -m x"), {
+			subcommand: "commit",
+			decision: "deny",
+		});
+	});
+
 	it("classifies quoted executables and subcommands as the argv Git receives", () => {
 		for (const command of ['git "add" -A', '"git" commit -m x']) {
 			assert.deepEqual(

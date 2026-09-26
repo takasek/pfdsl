@@ -154,12 +154,12 @@ function isHooksPathAssignment(raw) {
 }
 
 /**
- * Whether `tokens` (a whole `git ...` segment) carries a `-c core.hooksPath=<v>`
- * or `--config-env[=]core.hooksPath=<env>` global override, any value, ahead
- * of the subcommand.
+ * Whether tokens `1..subAt` (a whole `git ...` segment's global-option span,
+ * ahead of its subcommand at `subAt`) carry a `-c core.hooksPath=<v>` or
+ * `--config-env[=]core.hooksPath=<env>` override, any value.
  */
-function hasHooksPathGlobalOverride(tokens) {
-	for (let i = 1; i < tokens.length; i++) {
+function hasHooksPathGlobalOverride(tokens, subAt) {
+	for (let i = 1; i < subAt; i++) {
 		const value = tokens[i].value;
 		if (value === "-c" || value === "--config-env") {
 			if (isHooksPathAssignment(tokens[i + 1]?.value)) return true;
@@ -173,30 +173,9 @@ function hasHooksPathGlobalOverride(tokens) {
 		}
 		if (GIT_GLOBAL_FLAGS_WITH_VALUE.has(value)) {
 			i++;
-			continue;
 		}
-		if (!value.startsWith("-")) break; // reached the subcommand
 	}
 	return false;
-}
-
-/**
- * The subcommand index, treating `--config-env` as taking a separate value
- * the way gitSubcommandIndex already treats `-c` (#1232) — that function
- * does not know `--config-env` does, which would otherwise misread its value
- * token as the subcommand.
- */
-function bypassAwareSubcommandIndex(tokens) {
-	for (let i = 1; i < tokens.length; i++) {
-		const { value } = tokens[i];
-		if (GIT_GLOBAL_FLAGS_WITH_VALUE.has(value) || value === "--config-env") {
-			i++;
-			continue;
-		}
-		if (value.startsWith("-")) continue;
-		return i;
-	}
-	return null;
 }
 
 /** Whether a `-n`/clustered short option means `--no-verify` for `sub`. */
@@ -296,14 +275,15 @@ function configHooksPathBypass(tokens) {
 
 /**
  * The bypass form `tokens` (a whole `git ...` segment) uses, or null. Only
- * fires once a subcommand is present — an override with nothing mutating
- * behind it does nothing a hook would ever see.
+ * fires once a subcommand is present — an override with no subcommand behind
+ * it runs nothing a hook would ever see. `-c core.hooksPath`/`--config-env`
+ * apply to any subcommand, not just a mutating one.
  */
 function classifyBypass(tokens) {
-	const subAt = bypassAwareSubcommandIndex(tokens);
+	const subAt = gitSubcommandIndex(tokens);
 	if (subAt === null) return null;
 	const sub = tokens[subAt].value;
-	if (hasHooksPathGlobalOverride(tokens))
+	if (hasHooksPathGlobalOverride(tokens, subAt))
 		return { subcommand: sub, flag: "core.hooksPath" };
 	const rest = tokens.slice(subAt + 1);
 	if (NO_VERIFY_SUBCOMMANDS.has(sub) && hasNoVerifyLongFlag(rest))

@@ -48,9 +48,13 @@ const OUTWARD_GIT_SUBCOMMANDS = new Set(["push"]);
 /**
  * git global flags that take a separate value, so the value is not the
  * subcommand. Exported so main-commit-guard.mjs's bypass classifier (#1232)
- * can recognize the same flags when it scans for a `core.hooksPath`
- * override — it needs `-c`'s value token skipped the same way this file's
- * own gitSubcommandIndex already skips it.
+ * can reuse gitSubcommandIndex's own subcommand resolution — and so it can
+ * scan the same pre-subcommand span for a `-c`/`--config-env` `core.hooksPath`
+ * override — instead of re-deriving where the subcommand starts.
+ * `--config-env` and `--attr-source` were added once their value tokens
+ * turned up misread as the subcommand itself (#1232): `git --attr-source
+ * HEAD commit -m x` on main went unclassified because `HEAD` read as the
+ * subcommand.
  */
 export const GIT_GLOBAL_FLAGS_WITH_VALUE = new Set([
 	"-C",
@@ -59,6 +63,8 @@ export const GIT_GLOBAL_FLAGS_WITH_VALUE = new Set([
 	"--work-tree",
 	"--namespace",
 	"--exec-path",
+	"--config-env",
+	"--attr-source",
 ]);
 
 // Split on shell separators that start a new command, ignoring separators
