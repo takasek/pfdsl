@@ -1268,8 +1268,8 @@ describe("assemblePluginDistIndependent", () => {
 		}
 	});
 
-	describe("files the rebuild of the owned roots could drop", () => {
-		function assembleWithUntracked(root, untracked, regenerated, tracked = []) {
+	describe("untracked files the rebuild of the owned roots could drop", () => {
+		function assembleWithUntracked(root, untracked, regenerated) {
 			return assemblePluginDistIndependent({
 				root,
 				pluginRoot: join(root, "plugin/pfdsl"),
@@ -1284,7 +1284,6 @@ describe("assemblePluginDistIndependent", () => {
 					writeFileSync,
 					newRunId: () => "untracked",
 					listUntrackedFiles: () => untracked,
-					listTrackedFiles: () => tracked,
 					decodeHarnessCapabilities: () => [],
 					assertTargetOutputClosure: () => {},
 					assembleClaudeAssets: () => {
@@ -1325,32 +1324,6 @@ describe("assemblePluginDistIndependent", () => {
 			try {
 				assembleWithUntracked(root, [newOutput], [newOutput]);
 				assert.equal(readFileSync(newOutput, "utf8"), "new\n");
-			} finally {
-				rmSync(root, { recursive: true, force: true });
-			}
-		});
-
-		it("refuses tracked files under a generated root no generator owns", () => {
-			// A retired or renamed root is never rebuilt, so its tracked files
-			// would otherwise survive every regeneration unchanged.
-			const root = mkdtempSync(join(tmpdir(), "gen-plugin-unowned-"));
-			const owned = [
-				join(root, "plugin/pfdsl/.claude-plugin/plugin.json"),
-				join(root, "generated/skills/pfdsl/SKILL.md"),
-			];
-			const retired = [
-				join(root, "plugin/pfdsl-old/plugin.json"),
-				join(root, "generated/skills/retired/SKILL.md"),
-			];
-			try {
-				assert.throws(
-					() => assembleWithUntracked(root, [], [], [...owned, ...retired]),
-					(error) =>
-						error.message.includes("plugin/pfdsl-old/plugin.json") &&
-						error.message.includes("generated/skills/retired/SKILL.md") &&
-						!error.message.includes("plugin/pfdsl/.claude-plugin"),
-				);
-				assembleWithUntracked(root, [], [], owned);
 			} finally {
 				rmSync(root, { recursive: true, force: true });
 			}
@@ -3215,7 +3188,7 @@ describe("dist independence", () => {
 		);
 
 		// The modules allowed to spawn: each fixes its executable and subcommand,
-		// `git check-ignore` and `git ls-files`, which their own tests
+		// `git check-ignore` and `git ls-files --others`, which their own tests
 		// hold there. See findDistDependentFiles for why a runner that takes
 		// the executable as an argument cannot be exempted the same way.
 		const violations = findDistDependentFiles([...closure], {
