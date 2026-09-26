@@ -120,12 +120,10 @@ describe("pfd-ops applicability contract", () => {
 		assert.match(fileBackend, /当該項目に追記/);
 		assert.match(fileBackend, /実装の初コミットとの順序は判定しない/);
 		assert.doesNotMatch(fileBackend, /投稿時刻|コメント.*編集|createdAt/);
-		// The preset no longer names this repo's format history; it only says the
-		// time-based legacy compatibility is the GitHub backend's alone.
-		assert.match(
-			fileBackend,
-			/時刻による旧形式の互換性は GitHub Issues backend だけに適用する/,
-		);
+		// Legacy-format cutoffs are this repo's binding's (ADR-0039 category iii);
+		// neither preset defines one, so the file preset must not point at one.
+		assert.doesNotMatch(fileBackend, /旧形式/);
+		assert.doesNotMatch(githubBackend, /旧形式/);
 		assert.doesNotMatch(fileBackend, /形式2/);
 		assert.doesNotMatch(fileBackend, format2Tokens);
 		// The reapproval reference's grammar, what counts as approval evidence,
