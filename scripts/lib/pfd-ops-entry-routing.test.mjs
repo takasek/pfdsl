@@ -125,6 +125,37 @@ describe("pfd-ops entry routing", () => {
 		}
 	});
 
+	// #1239: stage zero named the terminal-audit contract but not how one audit
+	// run is frozen, so an adopting repo could not place its run management.
+	it("closes the promotion categories over audit-run management", () => {
+		const stageZero = architecture.match(/\*\*0段目[\s\S]+?\n\*\*1段目/);
+		assert.ok(stageZero);
+		const categoryOne = stageZero[0].match(/^- \*\*区分 i —[^\n]+/m);
+		const categoryThree = stageZero[0].match(/^- \*\*区分 iii —[^\n]+/m);
+		assert.ok(categoryOne);
+		assert.ok(categoryThree);
+		assert.match(categoryOne[0], /終端監査の契約[^\n]*監査対象/);
+		assert.match(categoryThree[0], /実行 ID[^\n]+cutoff[^\n]+checkpoint/);
+		assert.match(stageZero[0], /ライフサイクル監査[^\n]+区分 ii/);
+
+		const opsIntro = opsBinding.split(/\n## /)[0];
+		assert.doesNotMatch(opsIntro, /一般に有効/);
+		assert.match(opsIntro, /昇格先の判定ルール[^\n]+0段目/);
+		assert.doesNotMatch(opsBinding, /Claude 向け指示の置き場/);
+
+		const routeOne = read(".pfdsl/workflow.md").match(
+			/^1\. \*\*即時ルール化\*\*[^\n]+/m,
+		);
+		assert.ok(routeOne);
+		assert.match(routeOne[0], /昇格先の判定ルール[^\n]+0段目/);
+
+		const runContract = read(".pfdsl/bindings/pfd-retro.md").match(
+			/\n## 1 回の実行契約\n\n([^\n]+)/,
+		);
+		assert.ok(runContract);
+		assert.match(runContract[1], /区分 iii/);
+	});
+
 	it("has no active canonical references to removed protocol anchors", () => {
 		for (const path of activeCanonicalPaths) {
 			const content = read(path);
