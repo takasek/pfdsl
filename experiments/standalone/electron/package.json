@@ -1,0 +1,13 @@
+{
+  "name": "pfdsl-standalone-electron-comparison",
+  "version": "0.0.0",
+  "private": true,
+  "main": "main.cjs",
+  "scripts": {
+    "start": "electron .",
+    "test": "node --test *.test.cjs"
+  },
+  "devDependencies": {
+    "electron": "43.0.0"
+  }
+}
