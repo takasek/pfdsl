@@ -119,7 +119,7 @@ for (const proc of processes) {
 
 function exitGhUnavailable() {
 	console.log(
-		"gh unavailable: skipping GitHub-dependent checks (label sync, issue sync)",
+		"gh unavailable: skipping GitHub-dependent checks (label sync, issue sync); install the gh CLI and authenticate it to run them",
 	);
 	process.exit(GH_UNAVAILABLE_EXIT_CODE);
 }
