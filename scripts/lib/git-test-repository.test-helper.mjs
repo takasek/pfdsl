@@ -33,8 +33,9 @@ export function makeGitRepository({
  * read as tracked. The identity is supplied per-command: a test machine need
  * not have one configured, and the repository's own config stays untouched.
  * @param {string} root
+ * @param {string} [message]
  */
-export function commitEverything(root) {
+export function commitEverything(root, message = "fixture") {
 	execFileSync("git", ["add", "-A", "-f"], { cwd: root });
 	execFileSync(
 		"git",
@@ -45,7 +46,7 @@ export function commitEverything(root) {
 			"user.name=test",
 			"commit",
 			"-qm",
-			"fixture",
+			message,
 		],
 		{ cwd: root },
 	);
