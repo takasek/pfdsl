@@ -136,6 +136,10 @@ describe("pfd-ops entry routing", () => {
 		assert.ok(categoryThree);
 		assert.match(categoryOne[0], /終端監査の契約[^\n]*監査対象/);
 		assert.match(categoryThree[0], /実行 ID[^\n]+cutoff[^\n]+checkpoint/);
+		// Only audit runs were clarified; widening iii to work runs would move
+		// backend-integration duties (category ii) into the binding.
+		assert.match(categoryThree[0], /1回の監査の実行管理/);
+		assert.doesNotMatch(categoryThree[0], /作業の1回/);
 		assert.match(stageZero[0], /ライフサイクル監査[^\n]+区分 ii/);
 
 		const opsIntro = opsBinding.split(/\n## /)[0];
