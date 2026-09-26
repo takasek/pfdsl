@@ -3418,6 +3418,33 @@ a
 		expect(readFileSync(f, "utf-8")).toBe(grouped);
 	});
 
+	// spec §2.8.1: the group key is unique within the front matter — but
+	// normalizer.ts registers artifact/process ids before group ids and skips
+	// a group whose id an artifact/process already took
+	// (packages/core/src/normalizer.ts:37-40), so a rename that collides with
+	// an artifact/process id would leave that group declared but unaddressable
+	// by id (`meta set <file> raw label X` would resolve to the artifact, not
+	// the renamed group).
+	it("(f) exits 1 when new already exists as an artifact id, leaving the file untouched", async () => {
+		const f = join(dir, "rename-group-new-is-artifact.pfdsl");
+		writeFileSync(f, grouped);
+		const r = await run(["meta", "rename-group", f, "layer1", "raw"]);
+		expect(r.exitCode).toBe(1);
+		expect(r.stderr).toContain("raw");
+		expect(r.stderr).toContain("artifact");
+		expect(readFileSync(f, "utf-8")).toBe(grouped);
+	});
+
+	it("(f) exits 1 when new already exists as a process id, leaving the file untouched", async () => {
+		const f = join(dir, "rename-group-new-is-process.pfdsl");
+		writeFileSync(f, grouped);
+		const r = await run(["meta", "rename-group", f, "layer1", "ingest"]);
+		expect(r.exitCode).toBe(1);
+		expect(r.stderr).toContain("ingest");
+		expect(r.stderr).toContain("process");
+		expect(readFileSync(f, "utf-8")).toBe(grouped);
+	});
+
 	// Group-id lookups must be own-property checks: `frontmatter.group` is a
 	// plain object, and bracket access on an inherited Object.prototype member
 	// name (toString, constructor, __proto__) reads that member instead of
