@@ -1,6 +1,6 @@
 # ADR-0039: 配布層の所有範囲を提供すると決めた用途で定め、汎用性では定めない
 
-- Status: Accepted
+- Status: Accepted（区分の境界を ADR-0040 で明確化）
 - Date: 2026-09-19
 
 ## Context

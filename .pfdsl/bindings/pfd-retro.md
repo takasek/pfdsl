@@ -42,6 +42,8 @@ rg --files .pfdsl/bindings/pfd-retro-patterns/
 
 ## 1 回の実行契約
 
+この節は監査の対象でなく1回の監査の実行管理を定めるので、`.claude/skills/pfd-ops/references/architecture.md`「昇格先の判定ルール」の区分 iii に当たり、配布層でなくこの binding が持つ（ADR-0040）。
+
 適用単位は、1回の監査へ入れられる層と情報源を決める。`retro_request` が情報源を必須として指定した後の欠落は非適用による省略ではない。収集前に実行 ID、cutoff、必須情報源集合、任意情報源集合を確定し、cutoff より後の活動をその実行から除外する。
 
 1. 各情報源について、問い合わせ、cutoff、取得結果、coverage 状態、安定したイベント ID を凍結 inventory に記録する。必須情報源を取得できなければ coverage を incomplete とし、計画、監査実行、「特になし」の結論を停止する。任意情報源を取得できなければ unavailable と記録して継続する。
