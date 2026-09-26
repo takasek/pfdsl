@@ -623,6 +623,31 @@ function snapshotAssemblyDestination(destination, backup, deps) {
 	return { backup, hadDestination };
 }
 
+/**
+ * What a failed generation restores, each with the name of its backup inside
+ * the transaction directory. scripts/lib/gen-plugin-outputs.test.mjs holds
+ * these destinations to the drift-checked output contract.
+ * @returns {[string, string][]} absolute destination and backup name
+ */
+export function pluginGenerationSnapshotTargets(
+	root,
+	pluginRoot,
+	codexPluginRoot,
+) {
+	return [
+		[pluginRoot, "plugin-root"],
+		[codexPluginRoot, "codex-plugin-root"],
+		[resolve(root, ".claude-plugin/marketplace.json"), "marketplace.json"],
+		[resolve(root, "CLAUDE.md"), "claude-md"],
+		[resolve(root, ".claude/skills/pfd-ops/install"), "install"],
+		...CODEX_REPOSITORY_DESTINATIONS.map(([destination, backup]) => [
+			resolve(root, destination),
+			backup,
+		]),
+		[resolve(root, GENERATED_SKILLS.pfdsl.target), "generated-pfdsl-skill"],
+	];
+}
+
 function snapshotPluginGeneration(
 	root,
 	pluginRoot,
@@ -636,64 +661,18 @@ function snapshotPluginGeneration(
 	);
 	deps.rmSync(transactionRoot, { recursive: true, force: true });
 	try {
-		const snapshots = [
-			[
-				pluginRoot,
-				snapshotAssemblyDestination(
-					pluginRoot,
-					resolve(transactionRoot, "plugin-root"),
-					deps,
-				),
-			],
-			[
-				codexPluginRoot,
-				snapshotAssemblyDestination(
-					codexPluginRoot,
-					resolve(transactionRoot, "codex-plugin-root"),
-					deps,
-				),
-			],
-			[
-				resolve(root, ".claude-plugin/marketplace.json"),
-				snapshotAssemblyDestination(
-					resolve(root, ".claude-plugin/marketplace.json"),
-					resolve(transactionRoot, "marketplace.json"),
-					deps,
-				),
-			],
-			[
-				resolve(root, "CLAUDE.md"),
-				snapshotAssemblyDestination(
-					resolve(root, "CLAUDE.md"),
-					resolve(transactionRoot, "claude-md"),
-					deps,
-				),
-			],
-			[
-				resolve(root, ".claude/skills/pfd-ops/install"),
-				snapshotAssemblyDestination(
-					resolve(root, ".claude/skills/pfd-ops/install"),
-					resolve(transactionRoot, "install"),
-					deps,
-				),
-			],
-			...CODEX_REPOSITORY_DESTINATIONS.map(([destination, backup]) => [
-				resolve(root, destination),
-				snapshotAssemblyDestination(
-					resolve(root, destination),
-					resolve(transactionRoot, backup),
-					deps,
-				),
-			]),
-			[
-				resolve(root, GENERATED_SKILLS.pfdsl.target),
-				snapshotAssemblyDestination(
-					resolve(root, GENERATED_SKILLS.pfdsl.target),
-					resolve(transactionRoot, "generated-pfdsl-skill"),
-					deps,
-				),
-			],
-		];
+		const snapshots = pluginGenerationSnapshotTargets(
+			root,
+			pluginRoot,
+			codexPluginRoot,
+		).map(([destination, backup]) => [
+			destination,
+			snapshotAssemblyDestination(
+				destination,
+				resolve(transactionRoot, backup),
+				deps,
+			),
+		]);
 		return { transactionRoot, snapshots };
 	} catch (error) {
 		removeAssemblyArtifact(transactionRoot, deps);

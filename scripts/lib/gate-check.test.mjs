@@ -912,8 +912,9 @@ describe("collectModeledLocations", () => {
 			["SKILL.md", "ops_skill_general"],
 			["references/work-cycle.md", "ops_skill_general"],
 			["references/architecture.md", "ops_skill_general"],
-			// This workflow adopts GitHub Issues, not the alternative file tracker.
-			["references/file-based-tracker-backend.md", null],
+			// Both backend presets are maintained as one L3 artifact, whichever of
+			// them this repo adopts (#1227).
+			["references/file-based-tracker-backend.md", "ops_skill_l3"],
 		];
 		const skillRoot = resolve(root, ".claude/skills/pfd-ops");
 		const actualFiles = [

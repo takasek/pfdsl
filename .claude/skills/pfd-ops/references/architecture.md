@@ -8,7 +8,7 @@ pfd-ops スキルは4層で構成される。各層の「配布可能性」が�
 |---|---|---|
 | **L1** 汎用プロトコル | PFD という概念だけから導ける手順。固有名詞ゼロ | SKILL.md 本文に直接記載 |
 | **L2** ディスパッチ | 汎用パターン。宛先はリポが供給する `.md` companion | SKILL.md 本文でディスパッチ先を規約化 |
-| **L3** バックエンド・プリセット | 「GitHub Issues で管理する」流儀。採用リポが選択して利用 | `references/` に同梱して配布 |
+| **L3** バックエンド・プリセット | 作業項目の管理先として選択できる2種の流儀（GitHub Issues・ファイルベース・トラッカー）。採用リポはどちらかを選ぶか、どちらも採用しない | `references/` に同梱して配布 |
 | **L4** リポ固有 | 対象リポ専有の事項（payoff_log・品質ガイド改訂経路等） | 配布対象外。採用リポの companion に記述 |
 
 ## L1: 汎用プロトコル（SKILL.md 本文）
@@ -81,11 +81,20 @@ companion の一覧をここに再掲しないのは、上の表と二重管理�
 bundle 同梱スキル全数ではない — 自分の binding を読まないスキルの分を置いても、誰も読まないファイルが採用リポに増えるだけである。
 スキルが新たに binding を読み始めたら、その時点で scaffold にも1ファイル追加する。
 
-## L3: GitHub Issues バックエンド（`references/github-issues-backend.md`）
+## L3: バックエンド・プリセット
 
-「PFD の作業項目を GitHub Issues で管理する」流儀。pfdsl 固有ではなく、採用したいリポが選択できる再利用可能プリセット。
+「PFD の作業項目をどこで管理し、roadmap とどう同期するか」の流儀を、採用リポが選択できる再利用可能プリセットとして2種提供する。
+どちらも pfdsl 固有ではなく、採用は任意である。
+採用しないリポは `roadmap.pfdsl` の依存構造管理だけで運用する。
 
-`references/github-issues-backend.md` は pfd-ops スキルの一部として plugin に同梱される（ADR-0028）。
+| プリセット | reference | リポルートへの実配置 |
+|---|---|---|
+| GitHub Issues | `references/github-issues-backend.md` | 要る（`install/` テンプレート） |
+| ファイルベース・トラッカー（リポ内 markdown ファイル） | `references/file-based-tracker-backend.md` | 要らない |
+
+どちらの reference も pfd-ops スキルの一部として plugin に同梱される（ADR-0028）。
+採用リポは roadmap companion で採用したプリセットを宣言し、作業項目の管理では宣言したプリセットの reference だけに従う。
+作業項目の管理以外で GitHub への外部書込みを行うスキル（上流への報告等）が GitHub Issues 版の書込み規約を参照するのは、この宣言と独立である。
 
 ### 配布単位
 
@@ -93,13 +102,15 @@ pfdsl / pfd-grill / pfd-ops / pfd-retro / pfd-ecosystem の5スキルツリー�
 スキル間の相互参照（pfd-retro → pfdsl の review-perspectives、pfd-ecosystem → pfd-ops の scaffold、コマンド → 各スキル）はこの bundle 配布が担保する。
 `hooks/`（PostToolUse の managed issue リマインダ等）も同じ bundle に同梱される。plugin hook はインストール/有効化の同意機構を Claude Code プラットフォーム側に委ねる（`install/` + `check-install-sync.mjs --deploy` の配線を pfd-ops が自前で持たずに済む代替経路）。
 
-L3 を採用するには `install/` テンプレートをリポルートへ実配置する（`/pfd-init` のステップ 3.5 が実行する）:
+### GitHub Issues プリセット
+
+GitHub Issues プリセットを採用するには `install/` テンプレートをリポルートへ実配置する（`/pfd-init` のステップ 3.5 が実行する）:
 
 ```bash
 node <pfd-ops skill root>/scripts/check-install-sync.mjs --deploy
 ```
 
-採用済みかどうかは `install/` 由来の監査スクリプトの存在で判定される。
+このプリセットの配置済みかどうかは、`check-install-sync.mjs` が `install/` 由来ファイルの存在で判定する（どのプリセットを採用したかの一次情報は下の「採用」とは節）。
 
 主な規約:
 - issue が一次情報。`roadmap.pfdsl` は依存構造のみ管理
@@ -109,6 +120,14 @@ node <pfd-ops skill root>/scripts/check-install-sync.mjs --deploy
 - `audit-issues-flow.mjs` で読取専用の同期監査
 
 詳細: [`github-issues-backend.md`](github-issues-backend.md)
+
+### ファイルベース・トラッカー
+
+作業項目をリポ内の markdown ファイルで管理する。
+GitHub Actions や監査スクリプトを使わないため、`install/` の実配置も `check-install-sync.mjs --deploy` も要らない。
+作業項目ファイルの所在は採用リポが決め、roadmap companion に書く。
+
+詳細: [`file-based-tracker-backend.md`](file-based-tracker-backend.md)
 
 ## L4: リポ固有（配布対象外）
 
@@ -130,12 +149,13 @@ pfdsl 開発リポ固有の例:
   references/
     architecture.md            ← このファイル
     work-cycle.md              ← /pfd-cycle のサイクル4手順（L1 の手順本文を SKILL.md から切り出したもの。リポ固有の規律は採用リポの binding）
-    github-issues-backend.md   ← L3 プリセット規約
+    github-issues-backend.md   ← L3 プリセット規約（GitHub Issues）
+    file-based-tracker-backend.md ← L3 プリセット規約（ファイルベース・トラッカー）
     scaffold/                  ← L4 雛形テンプレート
   scripts/
     check-install-sync.mjs     ← install/ の実配置・鮮度セルフチェック（ADR-0028）
     plugin-version-check.mjs   ← plugin version skew チェック（install/ 同期と無関係、check-install-sync.mjs から呼ばれる）
-  install/                     ← L3 採用用テンプレート（リポルートへ実配置）
+  install/                     ← GitHub Issues プリセットの採用用テンプレート（リポルートへ実配置）
     .github/workflows/         ← pfdsl-sweep-completed-chains.yml
     scripts/pfdsl/             ← audit-issues-flow.mjs 等（配布物の由来を示す専用ディレクトリ、ADR-0032）
 ```
@@ -155,9 +175,12 @@ plugin version の上流差分警告は更新をユーザーに案内する。�
 
 ## 「採用」とは
 
-L3 バックエンド（GitHub Issues 連携ワークフロー）を使う設定を当該リポに展開した状態。`install/` 由来のファイルがリポルートに1つ以上存在すれば「採用済み」と判定する。
+L3 プリセットのいずれかを当該リポの作業項目バックエンドとして使う状態。
+どのプリセットを採用したかは roadmap companion の宣言が一次情報である。
+GitHub Issues プリセットは連携ワークフローの実配置を伴うため、`install/` 由来のファイルがリポルートに1つ以上存在すれば、その配置について「採用済み」と判定する。
+ファイルベース・トラッカーは実配置を伴わないので、この判定の対象にならない。
 
-「L3」= GitHub Issues バックエンドプリセット、「バックエンド」= 作業項目管理の一次情報源と同期機構を指す。
+「L3」= 選択できるバックエンド・プリセット群（GitHub Issues・ファイルベース・トラッカー）、「バックエンド」= 作業項目管理の一次情報源と同期機構を指す。
 
 ## 配布物中の ADR 参照の解決
 

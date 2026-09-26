@@ -154,3 +154,52 @@ export function createGitHubOps() {
 		});
 	}
 });
+
+describe("gate-check gen-plugin trigger", () => {
+	function publishHookSource(path = "hooks/example.mjs") {
+		mkdirSync(join(fixture, "hooks"), { recursive: true });
+		writeFileSync(join(fixture, path), "export {};\n");
+		git(["add", path]);
+		git(["commit", "-m", "test: add a gen-plugin source"]);
+		git(["push", "origin", "HEAD:main"]);
+	}
+
+	const identityRow = (stdout) =>
+		stdout.split("\n").find((line) => line.includes("gen-plugin identity"));
+
+	for (const path of ["hooks/日本語.mjs", "hooks/line\nbreak.mjs"]) {
+		for (const change of ["delete", "move"]) {
+			it(`regenerates after ${change} of a quoted Git path: ${JSON.stringify(path)}`, () => {
+				git(["config", "core.quotePath", "true"]);
+				publishHookSource(path);
+				git(
+					change === "delete"
+						? ["rm", "--quiet", path]
+						: ["mv", path, "packages/example/moved.mjs"],
+				);
+				git(["commit", "-m", `fix: ${change} the hook source`]);
+				const row = identityRow(runGate().stdout);
+				assert.ok(row, "expected a gen-plugin identity row");
+				assert.match(row, /FAIL/);
+			});
+		}
+	}
+
+	it("regenerates when a branch only deletes a generator input", () => {
+		publishHookSource();
+		git(["rm", "--quiet", "hooks/example.mjs"]);
+		git(["commit", "-m", "fix: drop the hook source"]);
+		const row = identityRow(runGate().stdout);
+		assert.ok(row, "expected a gen-plugin identity row");
+		assert.doesNotMatch(row, /SKIP/);
+	});
+
+	it("regenerates when a branch moves a generator input out of the trigger", () => {
+		publishHookSource();
+		git(["mv", "hooks/example.mjs", "packages/example/moved.mjs"]);
+		git(["commit", "-m", "fix: move the hook source"]);
+		const row = identityRow(runGate().stdout);
+		assert.ok(row, "expected a gen-plugin identity row");
+		assert.doesNotMatch(row, /SKIP/);
+	});
+});

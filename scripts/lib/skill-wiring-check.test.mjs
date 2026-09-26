@@ -24,7 +24,10 @@ const ARTIFACTS = {
 	retro_skill: { location: "../.claude/skills/pfd-retro/" },
 	grill_skill: { location: "../.claude/skills/pfd-grill/" },
 	ops_skill_l3: {
-		location: "../.claude/skills/pfd-ops/references/github-issues-backend.md",
+		location: [
+			"../.claude/skills/pfd-ops/references/github-issues-backend.md",
+			"../.claude/skills/pfd-ops/references/file-based-tracker-backend.md",
+		],
 	},
 	pfd_lens_agent: { location: "../.claude/agents/pfd-lens.md" },
 	pfdsl_skill: { location: "../.claude/skills/pfdsl/" },
