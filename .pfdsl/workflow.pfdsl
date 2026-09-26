@@ -195,8 +195,8 @@ artifact:
     group: decision
   article:
     label: 公開記事
-    description: "ADR 群を素材とした外部公開記事。本生態系の最終納品物のひとつ。進捗 status の一次情報は roadmap.pfdsl の同 id — この図は手続きを描くもので status を持たない"
-    criteria: "roadmap.pfdsl の article ノードに location: として設定される公開先URLをブラウザで開くと記事本文が表示される"
+    description: "ADR 群を素材とした外部公開記事。本生態系の最終納品物のひとつ。進捗と公開先は issue #12 が一次情報で、この図は手続きを描く"
+    criteria: "issue #12 に記録された公開先 URL をブラウザで開くと記事本文が表示される"
     group: decision
   gh_issues:
     label: GitHub issues
