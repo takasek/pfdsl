@@ -183,6 +183,8 @@ export type {
 	ReindexResult,
 } from "./reindex.js";
 export { reindex } from "./reindex.js";
+export type { RenameGroupResult } from "./rename-group.js";
+export { renameGroup } from "./rename-group.js";
 
 export type {
 	SortKey,
