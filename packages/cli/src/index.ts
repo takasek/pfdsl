@@ -34,6 +34,7 @@ import {
 	loadSubflowGraph,
 	locateNode,
 	type NodeKind,
+	type NormalizedEdge,
 	type PfdType,
 	parseIdList,
 	reindex,
@@ -423,6 +424,56 @@ export interface CheckOptions {
 	color?: boolean;
 }
 
+/**
+ * The subflow half of `runCheck`'s multi-file diagnostics (originally
+ * inline there, factored out for #1218's `rename`: after rewriting a file
+ * in memory, `rename` re-runs exactly this check against the result before
+ * deciding to emit/write, so a rename that breaks a subflow boundary match
+ * is caught the same way `check` would catch it, without a second
+ * implementation of the same rule to drift from this one).
+ */
+function subflowBoundaryDiagnostics(
+	absFile: string,
+	edges: readonly NormalizedEdge[],
+	frontmatter: ReturnType<typeof analyze>["frontmatter"],
+): Diagnostic[] {
+	const diags: Diagnostic[] = [];
+	const subflowGraph = loadSubflowGraph(absFile, fileLoader);
+	diags.push(...subflowGraph.diagnostics);
+
+	for (const [pid, pmeta] of Object.entries(frontmatter?.process ?? {})) {
+		if (typeof pmeta.subflow !== "string") continue;
+		const resolved = resolveRefPath(absFile, pmeta.subflow);
+		if (!resolved.ok) continue; // already in subflowGraph.diagnostics
+		const childDoc = subflowGraph.docs.get(resolved.path);
+		if (!childDoc) continue; // missing file — already in diagnostics
+		const childEdges = childDoc.edges;
+		const childOpenInputs = computeOpenInputs(childEdges);
+		const childTerminals = computeTerminals(childEdges);
+		const parentNormalInputs = new Set(
+			edges
+				.filter((e) => e.kind === "input" && e.process === pid)
+				.map((e) => e.artifact),
+		);
+		const parentOutputs = new Set(
+			edges
+				.filter((e) => e.kind === "output" && e.process === pid)
+				.map((e) => e.artifact),
+		);
+		diags.push(
+			...validateSubflowBoundary({
+				processId: pid,
+				parentNormalInputs,
+				parentOutputs,
+				boundaryMap: (pmeta.boundary as Record<string, string>) ?? {},
+				childOpenInputs,
+				childTerminals,
+			}),
+		);
+	}
+	return diags;
+}
+
 export function runCheck(file: string, opts: CheckOptions = {}): CommandResult {
 	const src = readSource(file);
 	if (isCommandResult(src)) return src;
@@ -463,39 +514,7 @@ export function runCheck(file: string, opts: CheckOptions = {}): CommandResult {
 	const multiDiags: Diagnostic[] = [];
 
 	// --- Subflow checks ---
-	const subflowGraph = loadSubflowGraph(absFile, fileLoader);
-	multiDiags.push(...subflowGraph.diagnostics);
-
-	for (const [pid, pmeta] of Object.entries(frontmatter?.process ?? {})) {
-		if (typeof pmeta.subflow !== "string") continue;
-		const resolved = resolveRefPath(absFile, pmeta.subflow);
-		if (!resolved.ok) continue; // already in subflowGraph.diagnostics
-		const childDoc = subflowGraph.docs.get(resolved.path);
-		if (!childDoc) continue; // missing file — already in diagnostics
-		const childEdges = childDoc.edges;
-		const childOpenInputs = computeOpenInputs(childEdges);
-		const childTerminals = computeTerminals(childEdges);
-		const parentNormalInputs = new Set(
-			edges
-				.filter((e) => e.kind === "input" && e.process === pid)
-				.map((e) => e.artifact),
-		);
-		const parentOutputs = new Set(
-			edges
-				.filter((e) => e.kind === "output" && e.process === pid)
-				.map((e) => e.artifact),
-		);
-		multiDiags.push(
-			...validateSubflowBoundary({
-				processId: pid,
-				parentNormalInputs,
-				parentOutputs,
-				boundaryMap: (pmeta.boundary as Record<string, string>) ?? {},
-				childOpenInputs,
-				childTerminals,
-			}),
-		);
-	}
+	multiDiags.push(...subflowBoundaryDiagnostics(absFile, edges, frontmatter));
 
 	// --- Extends checks ---
 	const extendsChain = loadExtendsChain(absFile, fileLoader);
