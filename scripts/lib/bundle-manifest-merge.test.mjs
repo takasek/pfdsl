@@ -3,7 +3,7 @@
 // repository rather than asserting about the format in the abstract.
 
 import assert from "node:assert/strict";
-import { execFileSync } from "node:child_process";
+import { execFileSync, spawnSync } from "node:child_process";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, it } from "node:test";
@@ -21,41 +21,29 @@ const DRIFT_CHECKER = fileURLToPath(
 	new URL("../check-generated-drift.mjs", import.meta.url),
 );
 
+// `git merge` records a merge commit, so it needs an identity just like the
+// commits commitEverything makes; supply it per-command for the same reason.
 function git(repo, args) {
-	return execFileSync("git", ["-c", "commit.gpgsign=false", ...args], {
-		cwd: repo,
-		encoding: "utf-8",
-	});
-}
-
-function commit(repo, message) {
-	git(repo, ["add", "-A"]);
-	git(repo, [
-		"-c",
-		"user.email=bundle-manifest-merge-test@example.com",
-		"-c",
-		"user.name=Bundle Manifest Merge Test",
-		"commit",
-		"-qm",
-		message,
-	]);
-}
-
-function runDriftChecker(repo, pathspec) {
-	return execFileSync(process.execPath, [DRIFT_CHECKER, "--", pathspec], {
-		cwd: repo,
-		encoding: "utf-8",
-		stdio: ["ignore", "pipe", "pipe"],
-	});
+	return execFileSync(
+		"git",
+		[
+			"-c",
+			"user.email=test@example.com",
+			"-c",
+			"user.name=test",
+			"-c",
+			"commit.gpgsign=false",
+			...args,
+		],
+		{ cwd: repo, encoding: "utf-8", stdio: ["ignore", "pipe", "pipe"] },
+	);
 }
 
 function driftCheckerExitCode(repo, pathspec) {
-	try {
-		runDriftChecker(repo, pathspec);
-		return 0;
-	} catch (error) {
-		return error.status;
-	}
+	return spawnSync(process.execPath, [DRIFT_CHECKER, "--", pathspec], {
+		cwd: repo,
+		encoding: "utf-8",
+	}).status;
 }
 
 describe("bundle manifest merges", () => {
@@ -78,12 +66,12 @@ describe("bundle manifest merges", () => {
 		git(root, ["checkout", "-b", "branch-a"]);
 		writeFileSync(join(bundleRoot, "b.md"), "b changed on branch-a\n");
 		writeBundleManifest(bundleRoot);
-		commit(root, "branch-a changes b.md");
+		commitEverything(root, "branch-a changes b.md");
 
 		git(root, ["checkout", "-b", "branch-b", "main"]);
 		writeFileSync(join(bundleRoot, "c.md"), "c changed on branch-b\n");
 		writeBundleManifest(bundleRoot);
-		commit(root, "branch-b changes c.md");
+		commitEverything(root, "branch-b changes c.md");
 
 		git(root, ["checkout", "branch-a"]);
 		// A conflict here would throw; the manifest's blank-line separators are
@@ -132,12 +120,12 @@ describe("bundle manifest merges", () => {
 		git(root, ["checkout", "-b", "branch-a"]);
 		writeFileSync(join(bundleRoot, "a.md"), "a changed on branch-a\n");
 		writeBundleManifest(bundleRoot);
-		commit(root, "branch-a changes a.md");
+		commitEverything(root, "branch-a changes a.md");
 
 		git(root, ["checkout", "-b", "branch-b", "main"]);
 		writeFileSync(join(bundleRoot, "a.md"), "a changed on branch-b\n");
 		writeBundleManifest(bundleRoot);
-		commit(root, "branch-b changes a.md");
+		commitEverything(root, "branch-b changes a.md");
 
 		git(root, ["checkout", "branch-a"]);
 		assert.throws(
@@ -163,7 +151,10 @@ describe("bundle manifest merges", () => {
 			join(bundleRoot, BUNDLE_MANIFEST_RELATIVE_PATH),
 			staleManifest,
 		);
-		commit(root, "merge branch-b (defective: manifest not regenerated)");
+		commitEverything(
+			root,
+			"merge branch-b (defective: manifest not regenerated)",
+		);
 
 		// Regenerating in place now diverges from what was just committed,
 		// because a.md's committed digest still reflects branch-a's content.
