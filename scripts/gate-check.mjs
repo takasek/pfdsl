@@ -42,6 +42,7 @@ import {
 	formatCycleWindowReport,
 	genPluginIdentityStep,
 	outputArtifactStatusStep,
+	triggerPathsSince,
 	wipTransitionStep,
 } from "./lib/gate-check-steps.mjs";
 import { parseIssueNumbers } from "./lib/issue-args.mjs";
@@ -113,6 +114,13 @@ if (!diff.ok) {
 	process.exit(1);
 }
 const changedFiles = diff.files;
+const triggers = triggerPathsSince({ exec, base });
+if (!triggers.ok) {
+	console.error(
+		`gate-check: failed to diff against origin/${base}: ${triggers.error}`,
+	);
+	process.exit(1);
+}
 const pfdslFiles = changedFiles.filter((f) => f.endsWith(".pfdsl"));
 
 const results = [];
@@ -160,7 +168,9 @@ if (pfdslFiles.length === 0) {
 results.push(checkDocsStep({ exec }));
 
 // 4. gen-plugin identity (only when skill/plugin/install-source paths changed)
-results.push(genPluginIdentityStep({ exec, node, changedFiles }));
+results.push(
+	genPluginIdentityStep({ exec, node, triggerPaths: triggers.files }),
+);
 
 // 5. output artifact status update in .pfdsl/roadmap.pfdsl
 results.push(

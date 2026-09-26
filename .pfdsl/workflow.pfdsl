@@ -213,7 +213,7 @@ artifact:
   integrated_repository:
     label: 統合済みリポジトリ
     description: "PR を main に統合した後のリポジトリ全体の現行状態"
-    criteria: 対象 PR が merged で、その merge commit が main の HEAD の祖先であり、.github/workflows/test.yml の test job と vscode-smoke job がその commit に対して成功している
+    criteria: 対象 PR が merged で、その merge commit が main の HEAD の祖先であり、.github/workflows/test.yml の test job と vscode-smoke job、および check-docs を実行する .github/workflows/check-gen-plugin.yml の gen-plugin job がその commit に対して成功している
     location: ../
     group: planning
   toolchain:
@@ -237,7 +237,7 @@ artifact:
   pull_request:
     label: Pull Request
     description: "ブランチ上のリポジトリ変更束のレビュー・統合単位。レビュー指摘はブランチ上の修正で解消してからマージする"
-    criteria: "変更束が対象 issue の実装方針・scope と一致し、レビュー指摘（PR の review comment）が解消済みで、.github/workflows/test.yml の test job が green になっており、merge_pr が実行可能な状態"
+    criteria: "変更束が対象 issue の実装方針・scope と一致し、レビュー指摘（PR の review comment）が解消済みで、.github/workflows/test.yml の test job と check-docs を実行する .github/workflows/check-gen-plugin.yml の gen-plugin job が green になっており、merge_pr が実行可能な状態"
     location: https://github.com/takasek/pfdsl/pulls
     group: planning
   issue_updates:

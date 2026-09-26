@@ -40,7 +40,10 @@ function stagedPaths(args) {
 	return gitDiffNames(["--cached", ...args], { cwd: root });
 }
 
-const staged = stagedPaths([]);
+// Triggers see deletions and both sides of a move: moving a generator input
+// out of a trigger pattern still changes what the generator writes, and with
+// rename detection git would report only the new path.
+const staged = stagedPaths(["--no-renames"]);
 // Deletions are staged changes, but not files a per-file check can be run on.
 const stagedPresent = stagedPaths(["--diff-filter=d"]);
 
