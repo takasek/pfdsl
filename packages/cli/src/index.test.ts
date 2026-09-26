@@ -3418,6 +3418,63 @@ a
 		expect(readFileSync(f, "utf-8")).toBe(grouped);
 	});
 
+	// Group-id lookups must be own-property checks: `frontmatter.group` is a
+	// plain object, and bracket access on an inherited Object.prototype member
+	// name (toString, constructor, __proto__) reads that member instead of
+	// undefined — turning "not declared" into a false success and "does not
+	// exist" into a false refusal.
+	describe("prototype-inherited names are not group ids", () => {
+		it.each([
+			"toString",
+			"constructor",
+			"__proto__",
+		])("(e) exits 1 for '%s' as old — it is not an own group, just inherited", async (protoName) => {
+			const f = join(dir, `rename-group-proto-old-${protoName}.pfdsl`);
+			writeFileSync(f, grouped);
+			const r = await run(["meta", "rename-group", f, protoName, "renamed"]);
+			expect(r.exitCode).toBe(1);
+			expect(r.stderr).toContain("not declared");
+			expect(readFileSync(f, "utf-8")).toBe(grouped);
+		});
+
+		it.each([
+			"toString",
+			"constructor",
+			"__proto__",
+		])("(f) succeeds renaming to '%s' as new — it is not an own group, just inherited", async (protoName) => {
+			const f = join(dir, `rename-group-proto-new-${protoName}.pfdsl`);
+			writeFileSync(f, grouped);
+			const r = await run(["meta", "rename-group", f, "layer1", protoName]);
+			expect(r.exitCode).toBe(0);
+			expect(readFileSync(f, "utf-8")).toContain(`${protoName}:`);
+		});
+	});
+
+	// A group id that CST-parses to a non-string scalar (a bare, unquoted
+	// integer key) still round-trips as a string key once `analyze()` builds
+	// the plain-object frontmatter (`yaml`'s own `parse()` stringifies every
+	// object key) — so the pre-write "is it declared" check (an own-property
+	// read on that plain object) says yes, while the CST-level rename inside
+	// `renameGroup` compares the *typed* scalar value (`42`, a number) against
+	// `oldId` (`"42"`, a string) with strict equality and finds no match. The
+	// CLI must not read that internal mismatch as success.
+	it("(found:false) refuses rather than reporting a false success, when renameGroup cannot locate a group the CLI itself found declared", async () => {
+		const numericKeyGroup = `---
+group:
+  42:
+    label: Num
+  other:
+    label: Other
+---
+a
+`;
+		const f = join(dir, "rename-group-numeric-key.pfdsl");
+		writeFileSync(f, numericKeyGroup);
+		const r = await run(["meta", "rename-group", f, "42", "numbered"]);
+		expect(r.exitCode).toBe(1);
+		expect(readFileSync(f, "utf-8")).toBe(numericKeyGroup);
+	});
+
 	describe("with an extends: preset", () => {
 		const withExtends = `---
 extends: ./preset.yaml
