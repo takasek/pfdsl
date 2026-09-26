@@ -13,6 +13,14 @@
 // currentBranch is passed in rather than read here, since a PreToolUse hook
 // payload does not carry it — the hook wrapper resolves it once via `git
 // branch --show-current` and this stays a pure function.
+//
+// A second, independent deny axis (#1232) catches commands that skip this
+// repo's pre-commit checks — `--no-verify`/`-n` and a `core.hooksPath`
+// override via `-c`, `--config-env`, or `git config` — regardless of branch
+// or worktree. A commit that skipped the checks is the harm itself, with no
+// later point at which this hook could still catch it, so it denies on
+// every branch and worktree except a foreign target, which stays out of
+// scope like every other rule here.
 
 import { basename, resolve } from "node:path";
 import {
