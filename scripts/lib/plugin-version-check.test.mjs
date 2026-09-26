@@ -243,6 +243,22 @@ describe("computeManifestAggregateHash", () => {
 		assert.equal(computeManifestAggregateHash(text), expected.digest("hex"));
 	});
 
+	// A plugin cache cloned with core.autocrlf=true holds the manifest with CRLF
+	// line endings; the digests it records are unchanged, so it still identifies
+	// the same bundle as the LF text served from upstream.
+	it("gives CRLF text the same aggregate as the LF text it was converted from", () => {
+		const text = manifestText([
+			{ path: "a.md", hex: hexOf("a") },
+			{ path: "b.md", hex: hexOf("b") },
+		]);
+		const aggregate = computeManifestAggregateHash(text);
+		assert.notEqual(aggregate, null);
+		assert.equal(
+			computeManifestAggregateHash(text.replaceAll("\n", "\r\n")),
+			aggregate,
+		);
+	});
+
 	it("returns null for an empty manifest", () => {
 		assert.equal(computeManifestAggregateHash(""), null);
 	});

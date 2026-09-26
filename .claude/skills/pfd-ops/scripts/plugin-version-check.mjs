@@ -31,13 +31,15 @@ export function readJsonOrNull(path) {
  * writer would never produce: a 64-char lowercase-hex digest is expected to be
  * followed by exactly two spaces and a non-empty path, entries are separated
  * by exactly one blank line, no path repeats, and the text holds at least one
- * entry.
+ * entry. CRLF line endings are accepted as LF: a plugin cache cloned with
+ * core.autocrlf=true holds the file that way, and its digests still describe
+ * the same bundle.
  * @param {string} text
  * @returns {{path: string, hex: string}[] | null}
  */
 export function parseBundleManifestEntries(text) {
 	if (text.length === 0) return null;
-	const lines = text.split("\n");
+	const lines = text.split(/\r?\n/);
 	if (lines[lines.length - 1] !== "") return null;
 	lines.pop();
 	if (lines.length === 0) return null;
