@@ -570,7 +570,10 @@ decision_trigger >> decide -> decisions
 decisions >> draft_adrs -> adrs
 
 adrs >>? draft_adrs
+pipeline_pfdsl >>? draft_adrs
+roadmap_pfdsl >>? draft_adrs
 toolchain >>? draft_adrs
+workflow_pfdsl >>? draft_adrs
 
 gh_issues >> draft_proposals -> spec_proposals
 
