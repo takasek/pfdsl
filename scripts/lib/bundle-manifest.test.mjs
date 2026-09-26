@@ -98,7 +98,7 @@ describe("writeBundleManifest", () => {
 	it("throws when a bundled file's path contains a newline", () => {
 		writeFile(tmp, "skills/pfd-ops/SKILL.md", "body\n");
 		writeFile(tmp, "a\nb.md", "content\n");
-		assert.throws(() => writeBundleManifest(tmp), /newline/);
+		assert.throws(() => writeBundleManifest(tmp), /line terminator/);
 	});
 
 	it("writes the exact per-file format: one line per file, sorted by path, blank line between entries, single trailing newline", () => {
@@ -139,5 +139,49 @@ describe("writer and reader round trip", () => {
 			expected.update("\n");
 		}
 		assert.equal(readLocalBundleAggregateHash(tmp), expected.digest("hex"));
+	});
+
+	// Every file name the writer accepts must come back from the reader as the
+	// old-definition aggregate of exactly that name, and the writer must refuse
+	// exactly the names the reader cannot give back: those holding a character
+	// the reader treats as a line boundary (JS regex line terminators, and the
+	// CR it strips from CRLF).
+	for (const [label, name, refused] of [
+		["plain", "a.md", false],
+		["space", "a b.md", false],
+		["backslash", "a\\b.md", false],
+		["non-ASCII", "é.md", false],
+		["astral", "\u{1F600}.md", false],
+		["leading spaces", "  a.md", false],
+		["trailing CR", "a.md\r", true],
+		["embedded CR", "a\rb.md", true],
+		["LF", "a\nb.md", true],
+		["U+2028", "a\u2028b.md", true],
+		["U+2029", "a\u2029b.md", true],
+	]) {
+		it(`${refused ? "refuses" : "round-trips"} a file name with ${label}`, () => {
+			writeFile(tmp, "base.md", "base\n");
+			writeFile(tmp, name, "content\n");
+			if (refused) {
+				assert.throws(() => writeBundleManifest(tmp), /line terminator/);
+				return;
+			}
+			writeBundleManifest(tmp);
+			const expected = createHash("sha256");
+			for (const [rel, content] of [
+				["base.md", "base\n"],
+				[name, "content\n"],
+			].sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))) {
+				expected.update(rel);
+				expected.update("\0");
+				expected.update(sha256(content));
+				expected.update("\n");
+			}
+			assert.equal(readLocalBundleAggregateHash(tmp), expected.digest("hex"));
+		});
+	}
+
+	it("refuses to write a manifest for a bundle with no files, which the reader could not tell from a truncated one", () => {
+		assert.throws(() => writeBundleManifest(tmp), /no files/);
 	});
 });

@@ -47,13 +47,14 @@ function listBundleFiles(bundleRoot) {
 			if (entry.isDirectory()) {
 				walk(join(dir, entry.name), rel);
 			} else if (rel !== BUNDLE_MANIFEST_RELATIVE_PATH) {
-				// A newline in a path would make it indistinguishable from the
-				// blank line the manifest uses to separate entries (see
-				// writeBundleManifest), so a file whose path contains one cannot be
-				// recorded at all.
-				if (rel.includes("\n")) {
+				// The pfd-ops reader splits the manifest into lines, strips the CR
+				// of a CRLF ending, and matches each entry with a regex whose `.`
+				// stops at every line terminator. A path holding any of those
+				// characters would come back as a different path or not at all,
+				// so it cannot be recorded.
+				if (/[\n\r\u2028\u2029]/.test(rel)) {
 					throw new Error(
-						`bundle-manifest: file path contains a newline, which the manifest format cannot represent: ${JSON.stringify(rel)}`,
+						`bundle-manifest: file path contains a line terminator, which the manifest format cannot represent: ${JSON.stringify(rel)}`,
 					);
 				}
 				results.push(rel);
@@ -82,15 +83,18 @@ export function writeBundleManifest(bundleRoot) {
 		bundleRoot,
 		...BUNDLE_MANIFEST_RELATIVE_PATH.split("/"),
 	);
+	const files = listBundleFiles(bundleRoot);
+	// An empty manifest would read the same as a truncated one, which the
+	// reader refuses; an assembled bundle always holds at least plugin.json.
+	if (files.length === 0) {
+		throw new Error(`bundle-manifest: the bundle has no files: ${bundleRoot}`);
+	}
 	mkdirSync(dirname(manifestPath), { recursive: true });
-	const lines = listBundleFiles(bundleRoot).map((rel) => {
+	const lines = files.map((rel) => {
 		const hex = createHash("sha256")
 			.update(readFileSync(join(bundleRoot, rel)))
 			.digest("hex");
 		return `${hex}  ${rel}`;
 	});
-	writeFileSync(
-		manifestPath,
-		lines.length > 0 ? `${lines.join("\n\n")}\n` : "",
-	);
+	writeFileSync(manifestPath, `${lines.join("\n\n")}\n`);
 }
