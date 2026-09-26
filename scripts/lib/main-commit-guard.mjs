@@ -96,13 +96,13 @@ const READ_ONLY_APPLY_FLAGS = new Set([
 	"--summary",
 ]);
 
-// Bypass detection (#1232): commands that skip this repo's pre-commit
-// checks are denied regardless of branch or worktree, because the commit
-// itself is the harm — there is no later point at which the guard can still
-// intervene. This axis is checked before DENIED_SUBCOMMANDS/ASKED_SUBCOMMANDS
-// below, and its result short-circuits the branch/worktree-scoped decision in
-// evaluateGuardedCommand (except for a foreign target, which stays out of
-// scope like every other rule here).
+// Bypass detection (#1232): see the file header for why this denies
+// independently of branch and worktree. Inside classifySegment, this check
+// runs first, ahead of the DENIED_SUBCOMMANDS/ASKED_SUBCOMMANDS lookup, and
+// its result short-circuits the branch/worktree-scoped decision in
+// evaluateGuardedCommand (except for a `git config` bypass that writes
+// outside the target repo, which stays in scope even against a foreign
+// target — see evaluateGuardedCommand).
 
 /** git subcommands that accept `--no-verify` (git 2.54; #1232). */
 const NO_VERIFY_SUBCOMMANDS = new Set([
@@ -705,16 +705,16 @@ function evaluateGuardedCommand(
 	)
 		return { decision: "allow" };
 
-	// A bypass is a deny axis independent of branch and worktree (#1232): the
-	// commit that skips the checks is itself the harm, so there is no later
-	// point — main, a sibling, ask — at which this guard could still catch it.
-	// This still sits after the foreign check above, which stays in scope for
-	// a bypass that writes outside the target (immediately above).
+	// See the file header for why a bypass denies independently of branch and
+	// worktree. This still sits after the foreign check above, which stays in
+	// scope for a bypass that writes outside the target (immediately above).
 	if (guarded.bypass) {
+		const hookName =
+			guarded.subcommand === "commit" ? "pre-commit" : "git hooks";
 		return {
 			decision: "deny",
 			reason:
-				`Blocked 'git ${guarded.subcommand}' for using '${guarded.flag}': this skips this repo's pre-commit checks. ` +
+				`Blocked 'git ${guarded.subcommand}' for using '${guarded.flag}': this skips ${hookName}, which is where this repo's checks run. ` +
 				"Re-run the command without it. If a hook itself is broken, fix it in the working tree — the shim execs " +
 				"the working tree's scripts/pre-commit — and a normal run will pick up the fix. If a bypass is genuinely " +
 				"needed (e.g. to debug a hook), run the command in your own terminal instead.",

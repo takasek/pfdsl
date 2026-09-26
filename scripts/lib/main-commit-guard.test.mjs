@@ -720,6 +720,18 @@ describe("evaluateMainCommitGuard bypass axis (#1232)", () => {
 		assert.equal(result.decision, "deny");
 	});
 
+	it("names git hooks rather than pre-commit for a non-commit subcommand", () => {
+		const result = evaluateMainCommitGuard(
+			payload({ command: "git push --no-verify" }),
+			{ currentBranch: "feature/x" },
+		);
+		assert.equal(result.decision, "deny");
+		// "this skips git hooks" up front, not "this skips pre-commit" — the
+		// shim-guidance sentence still names scripts/pre-commit regardless.
+		assert.match(result.reason, /this skips git hooks/);
+		assert.doesNotMatch(result.reason, /this skips pre-commit/);
+	});
+
 	it("denies a git config bypass that writes outside a foreign target (#1232)", () => {
 		for (const command of [
 			"git -C /tmp/sbx config --global core.hooksPath /x",
