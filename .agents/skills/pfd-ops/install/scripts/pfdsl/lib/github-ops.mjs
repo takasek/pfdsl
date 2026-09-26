@@ -84,10 +84,20 @@ function normalizeIssueViewComments(issue) {
  * @returns {{host: string, owner: string, repo: string}}
  */
 function repositoryFromGitRemote(cwd) {
-	const remoteUrl = execFileSync("git", ["remote", "get-url", "origin"], {
-		cwd,
-		encoding: "utf-8",
-	}).trim();
+	let remoteUrl;
+	try {
+		remoteUrl = execFileSync("git", ["remote", "get-url", "origin"], {
+			cwd,
+			encoding: "utf-8",
+		}).trim();
+	} catch (e) {
+		// Rethrown without e.code: a missing git binary is also ENOENT, and
+		// callers would otherwise read it as "gh unavailable" and skip.
+		throw new Error(
+			`could not read the git remote 'origin' to resolve owner/repo: ${e.message}`,
+			{ cause: e },
+		);
+	}
 	const ownerRepo = parseOwnerRepo(remoteUrl);
 	const host = parseHost(remoteUrl);
 	if (!ownerRepo || !host)

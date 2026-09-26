@@ -43,7 +43,7 @@ tag:
     label: "f1: 運用フレームワーク汎用層"
     style: { color: "#c0392b" }
   f2:
-    label: "f2: 運用フレームワークGitHub Issues層"
+    label: "f2: 運用フレームワークバックエンドプリセット層"
     style: { color: "#e67e22" }
   g:
     label: "g: fの配布"
@@ -379,7 +379,7 @@ artifact:
     externalStakeholders: [ 採用リポのAIエージェント ]
     group: adopter_env
   installed_l3_layer:
-    label: 導入済みL3レイヤー
+    label: 導入済みL3 GitHub Issuesプリセット
     description: "plugin同梱install/由来の読取専用監査スクリプト、完了チェーン回収スクリプト、それをデフォルトブランチへのpushで起動するworkflow、依存moduleの採用リポルートへの実配置結果"
     criteria: check-install-sync.mjs --deploy が実装され、採用リポへの実配置が動作確認済み
     externalStakeholders: [ 採用リポのメンテナ, 採用リポのGitHub Actions ]
@@ -562,7 +562,7 @@ process:
     description: "外部ユーザーがmainのplugin_marketplace_entryからpublished_claude_pluginを導入・更新する（/plugin install、更新は/plugin marketplace update）。現在のCodexも.claude-plugin/marketplace.json互換経路から同じClaude-compatible snapshotを消費する。codex_plugin_distはこの導入経路に渡さない"
     tags: [ g ]
   deploy_install_layer:
-    label: L3レイヤー実配置
+    label: L3 GitHub Issuesプリセット実配置
     description: "/pfd-init ステップ3.5。plugin同梱install/を採用リポルートへコピーする。既配置ファイルがcanonicalとhash不一致（ローカル編集）なら上書きせず警告し、--overwrite-local-edits指定時のみ上書きする。canonicalから消えた旧ファイルはローカル編集が無ければフラグ無しで削除され、編集を抱える場合のみ--delete-edited-orphansを要する。canonical側のリネームは新旧パスの対をPossible renamesとして報告する"
     command: node ${CLAUDE_PLUGIN_ROOT}/skills/pfd-ops/scripts/check-install-sync.mjs --deploy
     location: ../.claude/skills/pfd-ops/scripts/check-install-sync.mjs

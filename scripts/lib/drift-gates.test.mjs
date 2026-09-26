@@ -6,6 +6,11 @@ import { join } from "node:path";
 import { describe, it } from "node:test";
 
 import { buildGates } from "./drift-gates.mjs";
+import {
+	GEN_INSTALL_OUTPUT,
+	GEN_SKILL_MD_OUTPUT,
+	genPluginDriftPathspecs,
+} from "./gen-plugin-outputs.mjs";
 
 /**
  * `staged` names the paths a commit touches; `stagedPresent` narrows that to
@@ -78,6 +83,20 @@ describe("buildGates", () => {
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}
+	});
+
+	it("derives the gen-plugin gates' diffed paths from the output contract", () => {
+		const diffed = (id) =>
+			gates({})
+				.find((gate) => gate.id === id)
+				.commands.at(-1)[1]
+				.slice(2);
+		assert.deepEqual(
+			diffed("gen-plugin-bulk"),
+			genPluginDriftPathspecs("pre-commit"),
+		);
+		assert.deepEqual(diffed("gen-plugin-skill-md"), [GEN_SKILL_MD_OUTPUT]);
+		assert.deepEqual(diffed("gen-install"), [GEN_INSTALL_OUTPUT]);
 	});
 
 	it("fires readme-cli for the npm-page README, which the generator also writes", () => {

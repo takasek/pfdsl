@@ -16,6 +16,11 @@
  */
 
 import { GEN_INSTALL_TRIGGER } from "./gen-install-trigger.mjs";
+import {
+	GEN_INSTALL_OUTPUT,
+	GEN_SKILL_MD_OUTPUT,
+	genPluginDriftPathspecs,
+} from "./gen-plugin-outputs.mjs";
 import { GEN_PLUGIN_TRIGGER } from "./gen-plugin-trigger.mjs";
 
 const CLI_DIST = "packages/cli/dist/cli.js";
@@ -109,7 +114,7 @@ export function buildGates({ stagedPresent }) {
 			requireDist: [],
 			commands: regenerateThenCheck(
 				["node", ["scripts/gen-install.mjs"]],
-				[".claude/skills/pfd-ops/install"],
+				[GEN_INSTALL_OUTPUT],
 			),
 			hint: ".claude/skills/pfd-ops/install is stale (or was hand-edited). Run 'make gen-install' and re-stage.",
 		},
@@ -124,7 +129,7 @@ export function buildGates({ stagedPresent }) {
 			requireDist: [CLI_DIST],
 			commands: regenerateThenCheck(
 				["node", ["scripts/gen-skill.mjs", "--out", "generated/skills/pfdsl"]],
-				["generated/skills/pfdsl/SKILL.md"],
+				[GEN_SKILL_MD_OUTPUT],
 			),
 			hint: "generated/skills/pfdsl/SKILL.md is stale. Run 'make gen-plugin' and re-stage generated and harness files.",
 		},
@@ -138,16 +143,7 @@ export function buildGates({ stagedPresent }) {
 			requireDist: [],
 			commands: regenerateThenCheck(
 				["node", ["scripts/gen-plugin-dist-independent.mjs"]],
-				[
-					"generated",
-					"plugin",
-					":(exclude)generated/skills/pfdsl/SKILL.md",
-					".claude-plugin/marketplace.json",
-					"CLAUDE.md",
-					"AGENTS.md",
-					".agents",
-					".codex",
-				],
+				genPluginDriftPathspecs("pre-commit"),
 			),
 			hint: "Claude and Codex outputs are stale (generated skill references, plugin/pfdsl, plugin/pfdsl-codex, .claude-plugin/marketplace.json, CLAUDE.md, AGENTS.md, .agents, or .codex; SKILL.md checked above). Run 'node scripts/gen-plugin-dist-independent.mjs' (dist-free) and re-stage the harness outputs, or 'pnpm -r build && make gen-plugin' to regenerate everything.",
 		},

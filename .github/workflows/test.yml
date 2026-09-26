@@ -38,7 +38,7 @@ jobs:
       - run: node scripts/check-no-shell-strings.mjs
       - run: node scripts/check-cli-conventions.mjs
 
-      - run: make check-docs
+      # check-docs runs as the prerequisite of make gen-plugin in the required check-gen-plugin.yml job on the same events and build.
 
       - run: make check-fmt
 
