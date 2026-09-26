@@ -1423,12 +1423,40 @@ export function runMetaRenameGroup(
 	if (failed) return failed;
 
 	const absFile = resolve(file);
+	const hasExtends = frontmatter?.extends !== undefined;
+
+	// (e)/(f)/(g) below all read the extends chain (directly for the preset
+	// group set, or indirectly through `resolveEffectiveFrontmatter`) — an
+	// unloadable chain (missing file: V026, cycle: V027) resolves to an
+	// *empty* preset set rather than an error (multifile.ts's
+	// `buildPresentationChain` silently stops walking past whatever
+	// `loadExtendsChain` could not load), so those checks would silently run
+	// against a preset that was never actually read, and report success.
+	// Refuse up front instead, the same way `runCheck` does (index.ts,
+	// `loadExtendsChain` + `hasErrors` + the diagText/failJson pair) for the
+	// same V026/V027 diagnostics (multifile.ts:374, multifile.ts:363).
+	let presetChain: ReturnType<typeof buildPresentationChain> = [];
+	if (hasExtends) {
+		const { docs, diagnostics: extendsDiagnostics } = loadExtendsChain(
+			absFile,
+			fileLoader,
+		);
+		const failedExtends = failIfErrors(
+			extendsDiagnostics,
+			file,
+			opts.json,
+			opts.color,
+		);
+		if (failedExtends) return failedExtends;
+		presetChain = buildPresentationChain(absFile, docs).filter(
+			(c) => c.path !== absFile,
+		);
+	}
 	const effectiveFrontmatter = resolveEffectiveFrontmatter(
 		absFile,
 		frontmatter,
 		fileLoader,
 	);
-	const hasExtends = frontmatter?.extends !== undefined;
 
 	// Every group-id lookup below is an own-property check, not bracket
 	// access: `frontmatter.group` / `effectiveFrontmatter.group` /
@@ -1458,10 +1486,6 @@ export function runMetaRenameGroup(
 	// the canonical declaration (the one every un-overridden field still
 	// reads from) lives at the preset.
 	if (hasExtends) {
-		const { docs } = loadExtendsChain(absFile, fileLoader);
-		const presetChain = buildPresentationChain(absFile, docs).filter(
-			(c) => c.path !== absFile,
-		);
 		const presetGroup = resolvePresentation(presetChain).group;
 		if (hasGroupId(presetGroup, oldId)) {
 			const message = `meta rename-group: '${oldId}' is also defined by a preset extended from ${file}; the local entry is a partial override and cannot be renamed here`;

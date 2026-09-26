@@ -3550,6 +3550,88 @@ a
 				rmSync(d, { recursive: true, force: true });
 			}
 		});
+
+		// The (f)/(g) preset-conflict checks read the extends chain, and an
+		// unloadable chain (missing file, cycle) resolves to an *empty* preset
+		// set rather than an error — so a broken `extends:` must be refused up
+		// front, the same way `check` refuses it (V026/V027), or the rename
+		// would silently "succeed" having never actually looked at the preset
+		// it claims to have checked against.
+		it("refuses (V026) when the extends: target file does not exist, leaving the file untouched", async () => {
+			const d = mkdtempSync(
+				join(tmpdir(), "pfdsl-rename-group-extends-missing-"),
+			);
+			try {
+				const f = join(d, "main.pfdsl");
+				const missingPreset = `---
+extends: ./missing.yaml
+group:
+  g1:
+    label: G1
+---
+a
+`;
+				writeFileSync(f, missingPreset);
+				const r = await run(["meta", "rename-group", f, "g1", "g2"]);
+				expect(r.exitCode).toBe(1);
+				expect(r.stderr).toContain("V026");
+				expect(readFileSync(f, "utf-8")).toBe(missingPreset);
+			} finally {
+				rmSync(d, { recursive: true, force: true });
+			}
+		});
+
+		it("--json reports the V026 diagnostic as { ok: false, diagnostics }", async () => {
+			const d = mkdtempSync(
+				join(tmpdir(), "pfdsl-rename-group-extends-missing-json-"),
+			);
+			try {
+				const f = join(d, "main.pfdsl");
+				const missingPreset = `---
+extends: ./missing.yaml
+group:
+  g1:
+    label: G1
+---
+a
+`;
+				writeFileSync(f, missingPreset);
+				const r = await run(["meta", "rename-group", f, "g1", "g2", "--json"]);
+				expect(r.exitCode).toBe(1);
+				const parsed = JSON.parse(r.stdout);
+				expect(parsed.ok).toBe(false);
+				expect(
+					(parsed.diagnostics as Array<{ code: string }>).map((x) => x.code),
+				).toContain("V026");
+				expect(readFileSync(f, "utf-8")).toBe(missingPreset);
+			} finally {
+				rmSync(d, { recursive: true, force: true });
+			}
+		});
+
+		it("refuses (V027) when extends: is a self-referential cycle, leaving the file untouched", async () => {
+			const d = mkdtempSync(
+				join(tmpdir(), "pfdsl-rename-group-extends-cycle-"),
+			);
+			try {
+				const f = join(d, "self.pfdsl");
+				const selfExtends = `---
+extends: ./self.pfdsl
+group:
+  g1:
+    label: G1
+---
+a
+`;
+				writeFileSync(f, selfExtends);
+				const r = await run(["meta", "rename-group", f, "g1", "g2"]);
+				expect(r.exitCode).toBe(1);
+				expect(r.stderr).toContain("V027");
+				expect(readFileSync(f, "utf-8")).toBe(selfExtends);
+			} finally {
+				rmSync(d, { recursive: true, force: true });
+			}
+		});
 	});
 });
 
