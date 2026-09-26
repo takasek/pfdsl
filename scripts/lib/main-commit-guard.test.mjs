@@ -190,6 +190,9 @@ describe("classifyGitCommand bypass detection (#1232)", () => {
 			"git config set core.hooksPath /tmp/x",
 			"git config --add core.hooksPath /tmp/x",
 			"git config --local core.hooksPath /tmp/x",
+			"git config --type path core.hooksPath /tmp/x",
+			"git config set --comment note core.hooksPath /tmp/x",
+			"git config -t path core.hooksPath /tmp/x",
 			"git am -n",
 			"git merge --no-verify x",
 			"git rebase --no-verify",
@@ -211,6 +214,7 @@ describe("classifyGitCommand bypass detection (#1232)", () => {
 			"git config --unset core.hooksPath",
 			"git config --get core.hooksPath",
 			"git config core.hooksPath",
+			"git config --default /x core.hooksPath",
 			"git commit -m x",
 		]) {
 			const result = classifyGitCommand(command);

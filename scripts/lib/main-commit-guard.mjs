@@ -228,7 +228,17 @@ const CONFIG_SCOPE_FLAGS = new Set([
 	"--system",
 	"--worktree",
 ]);
-const CONFIG_FILE_FLAGS_WITH_VALUE = new Set(["--file", "-f", "--blob"]);
+/** `git config` flags whose value is a separate token, so it is not the key. */
+const CONFIG_FLAGS_WITH_VALUE = new Set([
+	"--file",
+	"-f",
+	"--blob",
+	"--type",
+	"-t",
+	"--value",
+	"--comment",
+	"--default",
+]);
 const CONFIG_READ_FLAGS = new Set(["--unset", "--unset-all", "-l", "--list"]);
 const CONFIG_SET_FLAGS = new Set(["--add", "--replace-all"]);
 const CONFIG_READ_VERBS = new Set([
@@ -257,7 +267,7 @@ function configHooksPathBypass(tokens) {
 			break;
 		}
 		if (CONFIG_SCOPE_FLAGS.has(value)) continue;
-		if (CONFIG_FILE_FLAGS_WITH_VALUE.has(value)) {
+		if (CONFIG_FLAGS_WITH_VALUE.has(value)) {
 			i++;
 			continue;
 		}
