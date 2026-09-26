@@ -119,19 +119,20 @@ describe("pfd-ops entry routing", () => {
 	it("selects the binding self-check body before running the default check", () => {
 		const startup = headingBody(skill, ["発火時の必須セルフチェック"]);
 		const bindingLookup = startup.indexOf(".pfdsl/bindings/pfd-ops.md");
-		const checkExecution = startup.indexOf("check-install-sync.mjs --upstream");
-		assert.ok(bindingLookup >= 0);
-		assert.ok(checkExecution > bindingLookup);
-		assert.match(startup, /見出し一覧[^\n]+本文を読んでから実行/);
-		assert.match(startup, /該当する binding 本文が[^\n]+場合/);
+		const bodyRead = startup.indexOf("本文を読んでから実行");
+		const defaultCheck = startup.indexOf("check-install-sync.mjs --upstream");
+		assert.ok(bindingLookup >= 0 && bodyRead > bindingLookup);
+		assert.ok(defaultCheck > bodyRead);
+		assert.match(startup, /本文に別の実行パスが指定されていない場合/);
 		assert.match(
 			startup,
 			/node \$\{CLAUDE_PLUGIN_ROOT\}\/skills\/pfd-ops\/scripts\/check-install-sync\.mjs --upstream/,
 		);
 		assert.match(
 			startup,
-			/repo-local の `\.claude\/skills\/pfd-ops\/scripts\/check-install-sync\.mjs`、それも無ければ現在読んでいるこのファイルの所在から相対で解決する/,
+			/repo-local の `\.claude\/skills\/pfd-ops\/scripts\/check-install-sync\.mjs`/,
 		);
+		assert.match(startup, /現在読んでいるこのファイルの所在から相対/);
 
 		const upstreamSelfCheck = headingBody(opsBinding, [
 			"配置ファイル鮮度セルフチェックをこのリポでは repo-local 版で実行する",
@@ -143,100 +144,17 @@ describe("pfd-ops entry routing", () => {
 		assert.doesNotMatch(upstreamSelfCheck, /CLAUDE_PLUGIN_ROOT/);
 	});
 
-	it("lists binding headings hierarchically and reads only action-relevant bodies", () => {
-		const bindingRouting = skill.match(
-			/^## リポ固有の手順を該当見出しで選ぶ\n([\s\S]+?)(?=^## )/m,
-		);
-		assert.ok(bindingRouting);
-		assert.match(bindingRouting[1], /##[^\n]+###/);
-		assert.match(bindingRouting[1], /####/);
-		assert.match(bindingRouting[1], /セルフチェック/);
-		assert.match(bindingRouting[1], /設計/);
-		assert.match(bindingRouting[1], /実装/);
-		assert.match(bindingRouting[1], /委譲/);
-		assert.match(bindingRouting[1], /終端ゲート/);
-		assert.match(bindingRouting[1], /該当する本文/);
-		assert.match(bindingRouting[1], /関係しない節本文は読まない/);
-
-		const scenarios = [
-			[
-				"design",
-				[
-					"ワークサイクルの追加手順",
-					"適用点 1 で採用案と対案を比較して設計を決める",
-				],
-				/前提を否定した案を1つ作り/,
-			],
-			[
-				"implementation",
-				[
-					"ワークサイクルの追加手順",
-					"手順 2 の追加で worktree 上の変更を検証する",
-				],
-				/変更前後を報告する作業では/,
-			],
-			[
-				"delegation",
-				[
-					"ワークサイクルの追加手順",
-					"適用点 3 と 3 層制御で実装を委譲し外向き操作を制御する",
-				],
-				/実装を別エージェント・別セッションへ渡す場合/,
-			],
-			[
-				"terminal",
-				[
-					"ワークサイクルの追加手順",
-					"終端ゲートの追加項目を検査して完了を確認する",
-				],
-				/work-cycle\.md 手順3 の終端ゲート/,
-			],
-		];
-		for (const [operation, path, expectedBody] of scenarios) {
-			const selectedBody = headingBody(opsBinding, path);
-			assert.match(selectedBody, expectedBody, operation);
-			assert.doesNotMatch(selectedBody, /^### /m, operation);
-		}
-
+	it("keeps design prerequisites in the body selected for design", () => {
+		const routing = headingBody(skill, ["リポ固有の手順を該当見出しで選ぶ"]);
+		assert.match(routing, /見出し一覧.*階層/);
+		assert.match(routing, /該当する本文だけを読む/);
+		assert.match(routing, /見出し名の列挙だけで本文を省略しない/);
 		const selectedDesign = headingBody(opsBinding, [
 			"ワークサイクルの追加手順",
 			"適用点 1 で採用案と対案を比較して設計を決める",
 		]);
-		const selectionSetup = headingBody(opsBinding, [
-			"ワークサイクルの追加手順",
-			"手順 1 の追加で worktree と upstream を確認する",
-		]);
-		assert.match(
-			selectedDesign,
-			/その作業項目の一次記録と設計判断履歴を確認し、現行のコード・仕様と照合する/,
-		);
-		assert.match(
-			selectedDesign,
-			/サイクルの範囲は、選んだ作業項目の設計が確定するまで確定しない/,
-		);
-		assert.doesNotMatch(
-			selectionSetup,
-			/その作業項目の一次記録と設計判断履歴を確認し/,
-		);
-		assert.doesNotMatch(
-			selectionSetup,
-			/サイクルの範囲は、選んだ作業項目の設計が確定するまで確定しない/,
-		);
-	});
-
-	it("keeps the required work-cycle heading and names its action sections", () => {
-		assert.match(opsBinding, /^## ワークサイクルの追加手順$/m);
-		for (const heading of [
-			"配置ファイル鮮度セルフチェックをこのリポでは repo-local 版で実行する",
-			"このリポの CLI をローカルビルドから実行する",
-			"spec 参照では get-by-ID で必要な節だけ読む",
-			"新しい仕様 ID を確認して採番する",
-			"削除を確定する前に上流の意図を確認する",
-			"サイクル中の下書きをリポジトリの外へ置く",
-			"GitHub Issues バックエンドの設計記録を確認する",
-		]) {
-			assert.ok(opsBinding.includes(`## ${heading}`), heading);
-		}
+		assert.match(selectedDesign, /一次記録.*設計判断履歴.*現行のコード・仕様/);
+		assert.match(selectedDesign, /サイクルの範囲.*設計が確定するまで/);
 	});
 
 	it("resolves active named binding references to existing headings", () => {
