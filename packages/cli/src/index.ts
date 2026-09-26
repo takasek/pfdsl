@@ -4,6 +4,7 @@ import { parseArgs as parseNodeArgs } from "node:util";
 import {
 	analyze,
 	auditGraph,
+	buildPresentationChain,
 	type ConsumerAsymmetryHint,
 	compareIds,
 	computeDependsOn,
@@ -36,8 +37,10 @@ import {
 	type PfdType,
 	parseIdList,
 	reindex,
+	renameGroup,
 	resolveEffectiveFrontmatter,
 	resolveLocationFsPath,
+	resolvePresentation,
 	resolveRefPath,
 	type SortKey,
 	STATUS_VALUES,
@@ -193,6 +196,10 @@ const META_VALUES_OPTIONS = {
 	"no-color": BOOLEAN_OPTION,
 };
 const META_SET_OPTIONS = {
+	json: BOOLEAN_OPTION,
+	"no-color": BOOLEAN_OPTION,
+};
+const META_RENAME_GROUP_OPTIONS = {
 	json: BOOLEAN_OPTION,
 	"no-color": BOOLEAN_OPTION,
 };
@@ -1366,6 +1373,191 @@ export function runMetaSet(
 		return ok(`newly ready: ${newlyReady.join(", ")}\n`, warnText);
 	}
 	return ok("", warnText);
+}
+
+export interface MetaRenameGroupOptions {
+	json?: boolean;
+	color?: boolean;
+}
+
+/**
+ * Rename a group id in one atomic in-place write (issue #1218): the
+ * `group.<oldId>` declaration key, every other group's `parent: <oldId>`
+ * reference, and every artifact's/process's `group: <oldId>` field. Only the
+ * frontmatter changes (spec §2.8: the body never references groups).
+ *
+ * `<oldId>` must be declared in the file's own local `group:` section and
+ * must not also be defined by an `extends:` preset (a local entry that only
+ * partially overrides a preset's fields cannot be renamed here — the
+ * canonical declaration lives at the preset). `<newId>` must not already
+ * exist as a group id, locally or in the effective frontmatter resolved
+ * through `extends:` (§2.9.4), the same way `runRender` resolves it.
+ */
+export function runMetaRenameGroup(
+	file: string,
+	oldId: string,
+	newId: string,
+	opts: MetaRenameGroupOptions = {},
+): CommandResult {
+	if (file === "-") {
+		return fail("meta rename-group cannot be used with stdin (-)\n", 2);
+	}
+	if (oldId === newId) {
+		return fail(
+			`meta rename-group: '${oldId}' and '${newId}' must differ\n`,
+			2,
+		);
+	}
+
+	const src = readSource(file);
+	if (isCommandResult(src)) return src;
+
+	// Structural diagnostics (FM/P/L/N) report a document that could not be
+	// read, so `frontmatter` below cannot be trusted to describe it — same
+	// gate as runMetaSet (index.ts), for the same reason.
+	const { diagnostics, frontmatter, nodeKinds } = analyze(src);
+	const unreadable = diagnostics.filter((d) =>
+		STRUCTURAL_CODE.test(String(d.code)),
+	);
+	const failed = failIfErrors(unreadable, file, opts.json, opts.color);
+	if (failed) return failed;
+
+	const absFile = resolve(file);
+	const hasExtends = frontmatter?.extends !== undefined;
+
+	// (e)/(f)/(g) below all read the extends chain, for the preset group set
+	// — an unloadable chain (missing file: V026, cycle: V027) resolves to an
+	// *empty* preset set rather than an error (multifile.ts's
+	// `buildPresentationChain` silently stops walking past whatever
+	// `loadExtendsChain` could not load), so those checks would silently run
+	// against a preset that was never actually read, and report success.
+	// Refuse up front instead, the same way `runCheck` does (index.ts,
+	// `loadExtendsChain` + `hasErrors` + the diagText/failJson pair) for the
+	// same V026/V027 diagnostics (multifile.ts:374, multifile.ts:363).
+	//
+	// The chain is loaded at most once, here — not through
+	// `resolveEffectiveFrontmatter`, which would walk it a second time
+	// internally (multifile.ts:458), and would do so even when there is no
+	// `extends:` at all. `effectiveGroup` is derived straight from the
+	// already-loaded chain (`resolvePresentation`, the same merge
+	// `resolveEffectiveFrontmatter` itself calls); with no `extends:`, it is
+	// just the local `group:` section, so preset work is skipped entirely.
+	let presetChain: ReturnType<typeof buildPresentationChain> = [];
+	let effectiveGroup: ReturnType<typeof resolvePresentation>["group"] =
+		frontmatter?.group;
+	if (hasExtends) {
+		const { docs, diagnostics: extendsDiagnostics } = loadExtendsChain(
+			absFile,
+			fileLoader,
+		);
+		const failedExtends = failIfErrors(
+			extendsDiagnostics,
+			file,
+			opts.json,
+			opts.color,
+		);
+		if (failedExtends) return failedExtends;
+		const fullChain = buildPresentationChain(absFile, docs);
+		presetChain = fullChain.filter((c) => c.path !== absFile);
+		effectiveGroup = resolvePresentation(fullChain).group;
+	}
+
+	// Every group-id lookup below is an own-property check, not bracket
+	// access: `frontmatter.group` / `effectiveGroup` /
+	// `presetGroup` are all plain objects, and bracket access on an
+	// inherited Object.prototype member name (toString, constructor,
+	// __proto__) reads that member instead of undefined — turning "not
+	// declared" into a false success and "does not exist" into a false
+	// refusal (both reachable from the CLI with an ordinary group name).
+	const hasGroupId = (
+		group: Record<string, unknown> | undefined,
+		id: string,
+	): boolean => group !== undefined && Object.hasOwn(group, id);
+
+	// (e) `<oldId>` must be declared in the file's own local `group:` section.
+	if (!hasGroupId(frontmatter?.group, oldId)) {
+		const fromPreset = hasExtends && hasGroupId(effectiveGroup, oldId);
+		const message = fromPreset
+			? `meta rename-group: '${oldId}' is not declared in ${file} — it comes from a preset and must be renamed there`
+			: `meta rename-group: '${oldId}' is not declared in ${file}`;
+		if (opts.json) return failJson({ error: message });
+		return fail(`${message}\n`);
+	}
+
+	// (g) `<oldId>` must not also be defined by an `extends:` preset — a
+	// local entry declaring the same id is then only a partial override, and
+	// the canonical declaration (the one every un-overridden field still
+	// reads from) lives at the preset.
+	if (hasExtends) {
+		const presetGroup = resolvePresentation(presetChain).group;
+		if (hasGroupId(presetGroup, oldId)) {
+			const message = `meta rename-group: '${oldId}' is also defined by a preset extended from ${file}; the local entry is a partial override and cannot be renamed here`;
+			if (opts.json) return failJson({ error: message });
+			return fail(`${message}\n`);
+		}
+	}
+
+	// (f) `<newId>` must not already exist — as an artifact/process id (spec
+	// §2.8.1's group-key uniqueness only names other groups, but
+	// normalizer.ts registers artifact/process ids before group ids and
+	// silently *skips* a group whose id one of them already took
+	// (packages/core/src/normalizer.ts:37-40, no diagnostic) — a rename
+	// landing on that id would leave the renamed group declared but
+	// unaddressable by id, e.g. `meta set <file> <newId> label X` would
+	// resolve to the artifact/process, never the group), or as a group id,
+	// locally or via `extends:`.
+	const newKind = nodeKinds.get(newId);
+	if (newKind === "artifact" || newKind === "process") {
+		const article = newKind === "artifact" ? "an" : "a";
+		const message = `meta rename-group: '${newId}' already exists as ${article} ${newKind} id in ${file}`;
+		if (opts.json) return failJson({ error: message });
+		return fail(`${message}\n`);
+	}
+	if (
+		hasGroupId(frontmatter?.group, newId) ||
+		hasGroupId(effectiveGroup, newId)
+	) {
+		const message = `meta rename-group: '${newId}' already exists as a group id in ${file}`;
+		if (opts.json) return failJson({ error: message });
+		return fail(`${message}\n`);
+	}
+
+	const { output, found, members, children } = renameGroup(src, oldId, newId);
+
+	// Defence in depth: the check above already established that `oldId` is
+	// declared, so `found` should always be true here — but this CLI-level
+	// check and the CST-level rename read `oldId`'s declaration through two
+	// independent parses (`analyze()`'s plain-object frontmatter vs.
+	// `parseFrontmatterCst`'s own fence detection, deliberately kept
+	// independent — see frontmatter-cst.ts). If a future input ever makes
+	// them disagree about what's declared, refuse rather than silently
+	// writing the unchanged source back and reporting success.
+	if (!found) {
+		const message = `meta rename-group: '${oldId}' could not be renamed in ${file} (internal mismatch)`;
+		if (opts.json) return failJson({ error: message });
+		return fail(`${message}\n`);
+	}
+
+	// The gate on the write: the result must be clean, same contract as
+	// runMetaSet (index.ts) — an error the rewrite introduced or one the
+	// original already had and this write did not cure.
+	const resulting = analyze(output).diagnostics;
+	if (hasErrors(resulting)) {
+		const errs = resulting.filter((d) => d.severity === "error");
+		const message = `meta rename-group: refusing to write ${file}: the result would have errors`;
+		if (opts.json) return failJson({ error: message, diagnostics: errs });
+		return fail(`${diagText(errs, file, opts.color)}${message}\n`);
+	}
+	writeFileSync(file, output, "utf-8");
+
+	if (opts.json) {
+		return ok(
+			`${JSON.stringify({ ok: true, from: oldId, to: newId, members, children })}\n`,
+		);
+	}
+	return ok(
+		`renamed group '${oldId}' to '${newId}': ${members.length} node(s), ${children.length} child group(s)\n`,
+	);
 }
 
 export interface GetOptions {
@@ -3010,6 +3202,33 @@ Exit codes:
   2  invalid usage (missing argument, invalid field or value)
 `;
 
+const HELP_META_RENAME_GROUP = `${helpUsage("meta rename-group", "<file> <old> <new>", META_RENAME_GROUP_OPTIONS)}
+
+Rename a group id in one atomic in-place write: the group's own declaration
+key (group.<old> -> <new>, keeping its position and value — a trailing
+comment on the renamed key's own line may move to the next line), every
+other group's parent: <old> reference, and every artifact's/process's
+group: <old> field. The body never references groups (spec §2.8), so only
+the frontmatter changes.
+
+<old> must be declared in the file's own local group: section, and must not
+also be defined by an extends: preset (a local entry that only partially
+overrides a preset cannot be renamed here — rename it at the preset instead).
+<new> must not already exist as an artifact or process id (other meta
+subcommands would then address that node, never the group), or as a group
+id, locally or in the effective frontmatter resolved through extends: (§2.9.4).
+
+  --json      emit JSON ({ ok, from, to, members: string[], children: string[] })
+              on failure: { ok: false, diagnostics } / { ok: false, error }
+  --no-color  disable ANSI color codes (also: NO_COLOR env var)
+
+Exit codes:
+  0  success
+  1  old not declared locally (or defined by a preset), new already exists,
+     structural diagnostics in the input, or the rewrite was refused
+  2  invalid usage (missing/extra argument, stdin, or old equal to new)
+`;
+
 const HELP_CHECK_LINKS = `${helpUsage("meta check-links", "<file>", META_CHECK_LINKS_OPTIONS)}
 
 Verify that every artifact/process \`location:\` file path exists on disk
@@ -3938,6 +4157,22 @@ const META_COMMANDS: readonly CommandEntry[] = [
 				);
 			}
 			return runMetaSet(f, id, field, value, {
+				json: flags.json === true,
+				color: resolveColor(flags),
+			});
+		},
+	},
+	{
+		name: "rename-group",
+		synopsis: "rename-group <file> <old> <new>",
+		description: ["Rename a group id and every reference to it"],
+		help: HELP_META_RENAME_GROUP,
+		options: META_RENAME_GROUP_OPTIONS,
+		run: (rest, flags) => {
+			const [f, oldId, newId, ...extra] = rest;
+			if (!f || !oldId || !newId) return fail(HELP_META_RENAME_GROUP, 2);
+			if (extra.length > 0) return fail(HELP_META_RENAME_GROUP, 2);
+			return runMetaRenameGroup(f, oldId, newId, {
 				json: flags.json === true,
 				color: resolveColor(flags),
 			});

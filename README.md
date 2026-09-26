@@ -115,7 +115,7 @@ Commands:
 Command groups (run `pfdsl <group>` for their subcommands):
   graph summary|io|stats|neighbors|locate|describe|impact|depends-on|path|edges|orphans
                            Read-only queries on the graph topology
-  meta get|list|values|set|sort|reindex|check-links
+  meta get|list|values|set|rename-group|sort|reindex|check-links
                            Read and write frontmatter metadata
   status ready|blocked|list|gaps
                            Planning queries derived from artifact status
