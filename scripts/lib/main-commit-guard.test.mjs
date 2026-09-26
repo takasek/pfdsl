@@ -861,6 +861,22 @@ describe("runMainCommitGuard", () => {
 		assert.equal(shouldOutput, true);
 		assert.equal(output.hookSpecificOutput.permissionDecision, "deny");
 	});
+
+	it("names the bypass flag too when the cwd is unresolved, so one retry fixes both (#1232)", () => {
+		const input = JSON.stringify(
+			payload({ command: "git -C $W commit --no-verify -m x" }),
+		);
+		const { shouldOutput, output } = runMainCommitGuard(input, {
+			resolveBranches: () => {
+				throw new Error("must not resolve branches for an unresolved cwd");
+			},
+		});
+		assert.equal(shouldOutput, true);
+		const reason = output.hookSpecificOutput.permissionDecisionReason;
+		assert.match(reason, /cwd cannot be resolved/);
+		assert.match(reason, /--no-verify/);
+		assert.match(reason, /drop/i);
+	});
 });
 
 describe("main-commit-guard wrapper", () => {

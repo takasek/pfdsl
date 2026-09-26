@@ -765,11 +765,18 @@ function evaluateGuardedCommand(
 
 function evaluateUnresolvedCwd(guarded) {
 	const command = `git ${guarded.subcommand}`;
+	// Naming the bypass flag too means a single retry — dropping both the
+	// unresolvable path and the flag — fixes the command instead of only
+	// fixing the cwd and leaving the bypass to be caught (and retried again)
+	// on the next attempt (#1232).
+	const bypassNote = guarded.bypass
+		? ` It also uses '${guarded.flag}', which skips this repo's git hooks — drop that too.`
+		: "";
 	return {
 		decision: guarded.decision,
 		reason:
 			`Blocked '${command}': its effective cwd cannot be resolved without shell expansion. ` +
-			"Use a literal path or harness workdir.",
+			`Use a literal path or harness workdir.${bypassNote}`,
 	};
 }
 
