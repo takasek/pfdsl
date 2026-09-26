@@ -9,7 +9,7 @@ import {
 	rmSync,
 	writeFileSync,
 } from "node:fs";
-import { basename, dirname, relative, resolve } from "node:path";
+import { basename, dirname, relative, resolve, sep } from "node:path";
 
 import {
 	BUNDLE_MANIFEST_RELATIVE_PATH,
@@ -27,8 +27,9 @@ import {
 	hookCapabilityToCodexHooks,
 } from "./gen-codex-assets.mjs";
 import { genInstall } from "./gen-install.mjs";
+import { GEN_PLUGIN_OUTPUTS } from "./gen-plugin-outputs.mjs";
 import { writeSkillRefs } from "./gen-skill-refs.mjs";
-import { listUntrackedFiles } from "./git-untracked-files.mjs";
+import { listTrackedFiles, listUntrackedFiles } from "./git-ls-files.mjs";
 import {
 	assertTargetOutputClosure,
 	capabilitiesForTarget,
@@ -657,6 +658,26 @@ function ownedPluginOutputRoots(root, pluginRoot, codexPluginRoot) {
 		resolve(root, ".agents"),
 		resolve(root, ".codex"),
 	];
+}
+
+// A generated root that no generator owns any more is never rebuilt, so its
+// tracked files would survive every regeneration unchanged.
+function assertNoTrackedFileOutsideOwnedRoots(root, owned, deps) {
+	const within = (path, parent) => path.startsWith(`${parent}${sep}`);
+	const enclosing = GEN_PLUGIN_OUTPUTS.map((path) =>
+		resolve(root, path),
+	).filter((path) => owned.some((ownedRoot) => within(ownedRoot, path)));
+	if (enclosing.length === 0) return;
+	const unowned = (deps.listTrackedFiles?.(root, enclosing) ?? []).filter(
+		(path) =>
+			!owned.some((ownedRoot) => path === ownedRoot || within(path, ownedRoot)),
+	);
+	if (unowned.length === 0) return;
+	throw new Error(
+		`Tracked files under generated roots are written by no generator. Remove retired outputs with 'git rm', or give their root to a generator:\n${unowned
+			.map((path) => `  ${relative(root, path)}`)
+			.join("\n")}`,
+	);
 }
 
 // A tracked file the rebuild drops shows up as a Git deletion; an untracked
@@ -1307,6 +1328,7 @@ export function assemblePluginDistIndependent({
 		writeFileSync,
 		mkdirSync,
 		writeBundleManifest,
+		listTrackedFiles,
 		listUntrackedFiles,
 		newRunId: randomUUID,
 		assembleCodexAssets: assembleCodexAssetsUnlocked,
@@ -1318,6 +1340,8 @@ export function assemblePluginDistIndependent({
 	let transaction;
 	let preserveTransaction = false;
 	try {
+		const owned = ownedPluginOutputRoots(root, pluginRoot, codexPluginRoot);
+		assertNoTrackedFileOutsideOwnedRoots(root, owned, deps);
 		transaction = snapshotPluginGeneration(
 			root,
 			pluginRoot,
@@ -1325,11 +1349,7 @@ export function assemblePluginDistIndependent({
 			deps,
 			runId,
 		);
-		const untracked =
-			deps.listUntrackedFiles?.(
-				root,
-				ownedPluginOutputRoots(root, pluginRoot, codexPluginRoot),
-			) ?? [];
+		const untracked = deps.listUntrackedFiles?.(root, owned) ?? [];
 		clearOwnedPluginOutputs(
 			root,
 			pluginRoot,

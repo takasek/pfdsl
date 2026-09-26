@@ -1358,8 +1358,8 @@ describe("assemblePluginDistIndependent", () => {
 		}
 	});
 
-	describe("untracked files under the rebuilt roots", () => {
-		function assembleWithUntracked(root, untracked, regenerated) {
+	describe("files the rebuild of the owned roots could drop", () => {
+		function assembleWithUntracked(root, untracked, regenerated, tracked = []) {
 			return assemblePluginDistIndependent({
 				root,
 				pluginRoot: join(root, "plugin/pfdsl"),
@@ -1374,6 +1374,7 @@ describe("assemblePluginDistIndependent", () => {
 					writeFileSync,
 					newRunId: () => "untracked",
 					listUntrackedFiles: () => untracked,
+					listTrackedFiles: () => tracked,
 					decodeHarnessCapabilities: () => [],
 					assertTargetOutputClosure: () => {},
 					assembleClaudeAssets: () => {
@@ -1414,6 +1415,32 @@ describe("assemblePluginDistIndependent", () => {
 			try {
 				assembleWithUntracked(root, [newOutput], [newOutput]);
 				assert.equal(readFileSync(newOutput, "utf8"), "new\n");
+			} finally {
+				rmSync(root, { recursive: true, force: true });
+			}
+		});
+
+		it("refuses tracked files under a generated root no generator owns", () => {
+			// A retired or renamed root is never rebuilt, so its tracked files
+			// would otherwise survive every regeneration unchanged.
+			const root = mkdtempSync(join(tmpdir(), "gen-plugin-unowned-"));
+			const owned = [
+				join(root, "plugin/pfdsl/.claude-plugin/plugin.json"),
+				join(root, "generated/skills/pfdsl/SKILL.md"),
+			];
+			const retired = [
+				join(root, "plugin/pfdsl-old/plugin.json"),
+				join(root, "generated/skills/retired/SKILL.md"),
+			];
+			try {
+				assert.throws(
+					() => assembleWithUntracked(root, [], [], [...owned, ...retired]),
+					(error) =>
+						error.message.includes("plugin/pfdsl-old/plugin.json") &&
+						error.message.includes("generated/skills/retired/SKILL.md") &&
+						!error.message.includes("plugin/pfdsl/.claude-plugin"),
+				);
+				assembleWithUntracked(root, [], [], owned);
 			} finally {
 				rmSync(root, { recursive: true, force: true });
 			}
@@ -3284,7 +3311,7 @@ describe("dist independence", () => {
 		const violations = findDistDependentFiles([...closure], {
 			allowed: [
 				resolve(repoRoot, "scripts/lib/git-ignore-oracle.mjs"),
-				resolve(repoRoot, "scripts/lib/git-untracked-files.mjs"),
+				resolve(repoRoot, "scripts/lib/git-ls-files.mjs"),
 			],
 		});
 		assert.deepEqual(
