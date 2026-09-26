@@ -49,6 +49,7 @@ npm install -g @pfdsl/cli
 | `pfdsl meta list <file\|-> [--tag\|--group\|--producer] [field[,field...]]` | Print field values for nodes matching selectors |
 | `pfdsl meta values <file\|-> <field[,field...]>` | Print a field's values in use, with counts |
 | `pfdsl meta set <file> <id> <field> <value>` | Set a field value in place |
+| `pfdsl meta rename-group <file> <old> <new>` | Rename a group id and every reference to it |
 | `pfdsl meta sort <file\|-> --by <keys>` | Sort node definitions |
 | `pfdsl meta reindex <file\|->` | Assign topological index: values |
 | `pfdsl meta check-links <file>` | Verify location: file paths exist |
