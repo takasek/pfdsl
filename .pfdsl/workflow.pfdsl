@@ -253,10 +253,16 @@ artifact:
     group: generation
     tags: [ distilled_skill ]
   ops_skill_l3:
-    label: PFD運用スキル（GitHub Issuesバックエンド層）
-    description: GitHub Issues で作業項目管理する採用リポ向けプリセット（L3）の規約本文 = references/github-issues-backend.md。手書き（生成対象外）で、retro_skill の監査結果がこの層の規約改訂に還流する。採用リポが実際に配置するファイル群は ops_install_templates 側
-    criteria: ../.claude/skills/pfd-ops/references/github-issues-backend.md に、採用リポが GitHub Issues バックエンドを採用するのに必要な規約（ラベル判定・close 時の降格規則・PR 本文規約）が記述されている
-    location: ../.claude/skills/pfd-ops/references/github-issues-backend.md
+    label: PFD運用スキル（バックエンドプリセット層）
+    description: >-
+      採用リポが作業項目バックエンドとして選択できる L3 プリセット群の規約本文。GitHub Issues 版 = references/github-issues-backend.md、ファイルベース・トラッカー版 = references/file-based-tracker-backend.md。
+      上流が配布する選択肢の集合であり、採用リポはどちらか一方を選ぶか、どちらも採用しない。このリポは GitHub Issues 版を採用しており、develop が読むのはその版である。
+      手書き（生成対象外）で、retro_skill の監査結果がこの層の規約改訂に還流する。
+      GitHub Issues 版の採用リポが実際に配置するファイル群は pipeline.pfdsl の ops_install_templates 側で、ファイルベース・トラッカー版は実配置を要しない
+    criteria: >-
+      ../.claude/skills/pfd-ops/references/github-issues-backend.md に、採用リポが GitHub Issues バックエンドを採用するのに必要な規約（ラベル判定・status 更新と完了チェーン回収・PR 本文規約）が記述されている。
+      ../.claude/skills/pfd-ops/references/file-based-tracker-backend.md に、採用リポがリポ内ファイルで作業項目を管理するのに必要な規約（一次情報ファイル・id 規約・flow 分類・status 同期・完了規則と完了契約）が記述され、GitHub Issues 版の install テンプレートを要求しない
+    location: [ ../.claude/skills/pfd-ops/references/github-issues-backend.md, ../.claude/skills/pfd-ops/references/file-based-tracker-backend.md ]
     group: generation
     tags: [ distilled_skill ]
   retro_skill:
