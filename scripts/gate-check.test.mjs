@@ -154,3 +154,34 @@ export function createGitHubOps() {
 		});
 	}
 });
+
+describe("gate-check gen-plugin trigger", () => {
+	function publishHookSource() {
+		mkdirSync(join(fixture, "hooks"), { recursive: true });
+		writeFileSync(join(fixture, "hooks/example.mjs"), "export {};\n");
+		git(["add", "hooks/example.mjs"]);
+		git(["commit", "-m", "test: add a gen-plugin source"]);
+		git(["push", "origin", "HEAD:main"]);
+	}
+
+	const identityRow = (stdout) =>
+		stdout.split("\n").find((line) => line.includes("gen-plugin identity"));
+
+	it("regenerates when a branch only deletes a generator input", () => {
+		publishHookSource();
+		git(["rm", "--quiet", "hooks/example.mjs"]);
+		git(["commit", "-m", "fix: drop the hook source"]);
+		const row = identityRow(runGate().stdout);
+		assert.ok(row, "expected a gen-plugin identity row");
+		assert.doesNotMatch(row, /SKIP/);
+	});
+
+	it("regenerates when a branch moves a generator input out of the trigger", () => {
+		publishHookSource();
+		git(["mv", "hooks/example.mjs", "packages/example/moved.mjs"]);
+		git(["commit", "-m", "fix: move the hook source"]);
+		const row = identityRow(runGate().stdout);
+		assert.ok(row, "expected a gen-plugin identity row");
+		assert.doesNotMatch(row, /SKIP/);
+	});
+});

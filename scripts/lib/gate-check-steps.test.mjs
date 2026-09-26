@@ -13,6 +13,7 @@ import {
 	formatCycleWindowReport,
 	genPluginIdentityStep,
 	outputArtifactStatusStep,
+	triggerPathsSince,
 	wipTransitionStep,
 } from "./gate-check-steps.mjs";
 import { genPluginDriftPathspecs } from "./gen-plugin-outputs.mjs";
@@ -44,7 +45,7 @@ describe("genPluginIdentityStep", () => {
 		const result = genPluginIdentityStep({
 			exec,
 			node: exec,
-			changedFiles: ["packages/core/src/graph.ts"],
+			triggerPaths: ["packages/core/src/graph.ts"],
 		});
 		assert.equal(result.status, "SKIP");
 		assert.match(result.detail, /no skill\/plugin\/install-source changes/);
@@ -56,7 +57,7 @@ describe("genPluginIdentityStep", () => {
 		const result = genPluginIdentityStep({
 			exec,
 			node: exec,
-			changedFiles: [".claude/skills/pfd-ops/SKILL.md"],
+			triggerPaths: [".claude/skills/pfd-ops/SKILL.md"],
 		});
 		assert.equal(result.status, "PASS");
 		assert.ok(calls.some((c) => c.includes("gen-plugin.mjs")));
@@ -70,7 +71,7 @@ describe("genPluginIdentityStep", () => {
 		genPluginIdentityStep({
 			exec,
 			node: ([script, ...args]) => exec(script, args),
-			changedFiles: [".claude/skills/pfd-ops/SKILL.md"],
+			triggerPaths: [".claude/skills/pfd-ops/SKILL.md"],
 		});
 		assert.deepEqual(
 			calls.filter((c) => c.startsWith("scripts/check-generated-drift.mjs")),
@@ -97,7 +98,7 @@ describe("genPluginIdentityStep", () => {
 		const result = genPluginIdentityStep({
 			exec,
 			node: exec,
-			changedFiles: [".claude/skills/pfd-ops/SKILL.md"],
+			triggerPaths: [".claude/skills/pfd-ops/SKILL.md"],
 		});
 		assert.equal(result.status, "FAIL");
 	});
@@ -108,7 +109,7 @@ describe("genPluginIdentityStep", () => {
 		const result = genPluginIdentityStep({
 			exec,
 			node,
-			changedFiles: [".claude/skills/pfd-ops/SKILL.md"],
+			triggerPaths: [".claude/skills/pfd-ops/SKILL.md"],
 		});
 		assert.equal(result.status, "FAIL");
 		assert.deepEqual(
@@ -122,9 +123,34 @@ describe("genPluginIdentityStep", () => {
 		genPluginIdentityStep({
 			exec,
 			node: exec,
-			changedFiles: ["scripts/pfdsl/lib/gh-exec.mjs"],
+			triggerPaths: ["scripts/pfdsl/lib/gh-exec.mjs"],
 		});
 		assert.ok(calls.some((c) => c.includes("gen-plugin.mjs")));
+	});
+});
+
+describe("triggerPathsSince", () => {
+	it("keeps deletions and reports a move under both of its paths", () => {
+		const { exec, calls } = fakeExec({
+			"git diff": { out: "hooks/gone.mjs\nhooks/old.mjs\ndocs/new.mjs\n" },
+		});
+		const result = triggerPathsSince({ exec, base: "main" });
+		assert.deepEqual(result, {
+			ok: true,
+			files: ["hooks/gone.mjs", "hooks/old.mjs", "docs/new.mjs"],
+		});
+		assert.deepEqual(calls, [
+			"git diff --no-renames --name-only origin/main...HEAD",
+		]);
+	});
+
+	it("reports a failed diff instead of an empty trigger set", () => {
+		const { exec } = fakeExec({ "git diff": { ok: false, out: "bad ref\n" } });
+		assert.deepEqual(triggerPathsSince({ exec, base: "main" }), {
+			ok: false,
+			files: [],
+			error: "bad ref",
+		});
 	});
 });
 

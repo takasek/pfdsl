@@ -51,6 +51,28 @@ export function changedFilesSince({ exec, base }) {
 }
 
 /**
+ * Every path the branch touched, for deciding whether a generator has to run.
+ *
+ * changedFilesSince is the set a per-file check can be pointed at, so it drops
+ * deletions and, with rename detection on, reports a moved file under its new
+ * name only. Neither is right for a trigger: deleting or moving a generator
+ * input out of a trigger pattern still changes what the generator writes.
+ * --no-renames reports a move as its deleted old path plus its added new one.
+ * @param {{exec: Function, base: string}} params
+ * @returns {{ok: boolean, files: string[], error?: string}}
+ */
+export function triggerPathsSince({ exec, base }) {
+	const r = exec("git", [
+		"diff",
+		"--no-renames",
+		"--name-only",
+		`origin/${base}...HEAD`,
+	]);
+	if (!r.ok) return { ok: false, files: [], error: r.out.trim() };
+	return { ok: true, files: r.out.trim().split("\n").filter(Boolean) };
+}
+
+/**
  * The branch's deleted paths, the half changedFilesSince drops (#778).
  *
  * The gate item this feeds names deletion as one of the changes a PFD has to
@@ -110,12 +132,14 @@ export function firstCommitAuthorDate({ exec, base }) {
  * plugin/ churn. gen-plugin.mjs runs gen-install internally, so one
  * regeneration covers both hops. Unlike pre-commit and CI, no earlier step
  * here owns install/ or SKILL.md, so the whole output contract is diffed.
+ * `triggerPaths` comes from triggerPathsSince, deletions and both sides of a
+ * move included.
  */
-export function genPluginIdentityStep({ node, changedFiles }) {
+export function genPluginIdentityStep({ node, triggerPaths }) {
 	const name = "gen-plugin identity";
 	if (
-		!matchesTrigger(changedFiles, GEN_PLUGIN_TRIGGER) &&
-		!matchesTrigger(changedFiles, GEN_INSTALL_TRIGGER)
+		!matchesTrigger(triggerPaths, GEN_PLUGIN_TRIGGER) &&
+		!matchesTrigger(triggerPaths, GEN_INSTALL_TRIGGER)
 	) {
 		return {
 			name,
