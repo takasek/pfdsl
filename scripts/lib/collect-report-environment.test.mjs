@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
+import { createHash } from "node:crypto";
 import {
 	mkdirSync,
 	mkdtempSync,
@@ -52,8 +53,57 @@ function writeProvenance(repoRoot, value = provenance) {
 	writeJson(join(repoRoot, PROVENANCE_RELATIVE_PATH), value);
 }
 
+function hexOf(seed) {
+	return createHash("sha256").update(seed).digest("hex");
+}
+
+/** @param {{path: string, hex: string}[]} entries */
+function manifestText(entries) {
+	return `${entries.map(({ hex, path }) => `${hex}  ${path}`).join("\n\n")}\n`;
+}
+
+/**
+ * The aggregate `computeManifestAggregateHash` in plugin-version-check.mjs
+ * would compute for these entries — recomputed independently here so a test
+ * asserting equality with it is not just checking that both sides call the
+ * same function.
+ * @param {{path: string, hex: string}[]} entries
+ */
+function aggregateOf(entries) {
+	const digest = createHash("sha256");
+	for (const { path, hex } of [...entries].sort((a, b) =>
+		a.path < b.path ? -1 : a.path > b.path ? 1 : 0,
+	)) {
+		digest.update(path);
+		digest.update("\0");
+		digest.update(hex);
+		digest.update("\n");
+	}
+	return digest.digest("hex");
+}
+
+function writeBundleManifest(bundleRoot, entries) {
+	const path = join(bundleRoot, ".claude-plugin", "bundle-manifest.sha256");
+	mkdirSync(dirname(path), { recursive: true });
+	writeFileSync(path, manifestText(entries));
+}
+
 describe("collectReportEnvironment", () => {
 	it("reports version and bundle hash for a Claude plugin installation", () => {
+		const skillRoot = join(tmp, "skills", "pfd-ops");
+		mkdirSync(skillRoot, { recursive: true });
+		writeJson(join(tmp, ".claude-plugin", "plugin.json"), { version: "0.4.2" });
+		const entries = [{ path: "a.md", hex: hexOf("a") }];
+		writeBundleManifest(tmp, entries);
+
+		const env = collectReportEnvironment(skillRoot, { runCommand: noCommands });
+
+		assert.equal(env.installation, "claude-plugin");
+		assert.equal(env.pluginVersion, "0.4.2");
+		assert.equal(env.bundleContentHash, aggregateOf(entries));
+	});
+
+	it("reports bundleContentHash as unavailable when only the pre-#1264 bundle-manifest.json is present", () => {
 		const skillRoot = join(tmp, "skills", "pfd-ops");
 		mkdirSync(skillRoot, { recursive: true });
 		writeJson(join(tmp, ".claude-plugin", "plugin.json"), { version: "0.4.2" });
@@ -64,8 +114,11 @@ describe("collectReportEnvironment", () => {
 		const env = collectReportEnvironment(skillRoot, { runCommand: noCommands });
 
 		assert.equal(env.installation, "claude-plugin");
-		assert.equal(env.pluginVersion, "0.4.2");
-		assert.equal(env.bundleContentHash, "abc123");
+		assert.equal(env.bundleContentHash, null);
+		assert.ok(
+			env.unavailable.some(({ field }) => field === "bundleContentHash"),
+			"bundleContentHash should be recorded as unavailable",
+		);
 	});
 
 	it("reports the Codex plugin version and records the missing bundle hash", () => {
@@ -189,13 +242,13 @@ describe("collectReportEnvironment", () => {
 		assert.match(failure.reason, /could not be parsed/);
 	});
 
-	it("rejects a manifest value that parses but is not an identifier", () => {
+	it("rejects a manifest value that parses but is not an identifier, and a malformed bundle manifest", () => {
 		const skillRoot = join(tmp, "skills", "pfd-ops");
 		mkdirSync(skillRoot, { recursive: true });
 		writeJson(join(tmp, ".claude-plugin", "plugin.json"), { version: "" });
-		writeJson(join(tmp, ".claude-plugin", "bundle-manifest.json"), {
-			contentHash: 42,
-		});
+		const manifestPath = join(tmp, ".claude-plugin", "bundle-manifest.sha256");
+		mkdirSync(dirname(manifestPath), { recursive: true });
+		writeFileSync(manifestPath, "not a manifest\n");
 
 		const env = collectReportEnvironment(skillRoot, { runCommand: noCommands });
 
@@ -327,9 +380,7 @@ describe("collectReportEnvironment", () => {
 		const skillRoot = join(tmp, "skills", "pfd-ops");
 		mkdirSync(skillRoot, { recursive: true });
 		writeJson(join(tmp, ".claude-plugin", "plugin.json"), { version: "0.4.2" });
-		writeJson(join(tmp, ".claude-plugin", "bundle-manifest.json"), {
-			contentHash: "abc123",
-		});
+		writeBundleManifest(tmp, [{ path: "a.md", hex: hexOf("a") }]);
 
 		const env = collectReportEnvironment(skillRoot, { runCommand: noCommands });
 
