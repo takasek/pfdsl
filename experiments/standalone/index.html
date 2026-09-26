@@ -1,0 +1,11 @@
+<!doctype html>
+<html lang="en">
+  <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self' ipc: http://ipc.localhost; worker-src 'self' blob:; object-src 'none'; base-uri 'none'; frame-src 'none'"><title>PFDSL Prototype</title></head>
+  <body>
+    <header><strong>PFDSL</strong><span class="badge">PROTOTYPE</span><select id="files" aria-label="Open a sample"></select><button id="open">Open</button><span class="spacer"></span><button id="save">Save ⌘S</button><button id="format">Format</button><button id="svg">SVG</button><button id="png">PNG</button><button id="pdf">PDF</button></header>
+    <nav id="tabs" aria-label="Documents"></nav>
+    <main><section class="editor-pane"><div class="pane-label">SOURCE</div><div id="editor"></div></section><section class="preview-pane"><div class="pane-label"><span>PREVIEW</span><button id="fit">Fit</button><span id="zoom">100%</span></div><div id="preview"><div id="drawing"></div><div id="placeholder">Open a document</div></div></section></main>
+    <footer><span id="status">Starting…</span><span class="spacer"></span><button id="verify">Verify samples</button><span id="metrics"></span></footer>
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>

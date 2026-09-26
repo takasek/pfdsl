@@ -1,0 +1,368 @@
+{
+  "sourceCommit": "557f27e960fc1c396d0e8598c3fac9b3fa5da3e3",
+  "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) pfdsl-standalone-electron-comparison/0.0.0 Chrome/150.0.7871.46 Electron/43.0.0 Safari/537.36",
+  "createdAt": "2026-09-26T04:33:33.146Z",
+  "viewport": {
+    "width": 1280,
+    "height": 768
+  },
+  "ui": {
+    "container": {
+      "x": 0,
+      "y": 129,
+      "width": 575,
+      "height": 605,
+      "top": 129,
+      "right": 575,
+      "bottom": 734,
+      "left": 0
+    },
+    "layout": {
+      "width": 575,
+      "height": 605,
+      "glyphMarginLeft": 0,
+      "glyphMarginWidth": 0,
+      "glyphMarginDecorationLaneCount": 1,
+      "lineNumbersLeft": 0,
+      "lineNumbersWidth": 39,
+      "decorationsLeft": 39,
+      "decorationsWidth": 26,
+      "contentLeft": 65,
+      "contentWidth": 510,
+      "minimap": {
+        "renderMinimap": 0,
+        "minimapLeft": 0,
+        "minimapWidth": 0,
+        "minimapHeightIsEditorHeight": false,
+        "minimapIsSampling": false,
+        "minimapScale": 1,
+        "minimapLineHeight": 1,
+        "minimapCanvasInnerWidth": 0,
+        "minimapCanvasInnerHeight": 1210,
+        "minimapCanvasOuterWidth": 0,
+        "minimapCanvasOuterHeight": 605
+      },
+      "viewportColumn": 63,
+      "isWordWrapMinified": false,
+      "isViewportWrapping": false,
+      "wrappingColumn": -1,
+      "verticalScrollbarWidth": 14,
+      "horizontalScrollbarHeight": 12,
+      "overviewRuler": {
+        "top": 0,
+        "width": 14,
+        "height": 605,
+        "right": 0
+      }
+    },
+    "modelLines": 2,
+    "styles": [
+      {
+        "selector": ".view-line",
+        "rect": {
+          "x": 65,
+          "y": 144,
+          "width": 510,
+          "height": 21,
+          "top": 144,
+          "right": 575,
+          "bottom": 165,
+          "left": 65
+        },
+        "color": "rgb(0, 0, 0)",
+        "display": "block",
+        "visibility": "visible",
+        "position": "absolute",
+        "background": "rgba(0, 0, 0, 0)"
+      },
+      {
+        "selector": ".mtk1",
+        "rect": {
+          "x": 65,
+          "y": 147,
+          "width": 234.8046875,
+          "height": 15,
+          "top": 147,
+          "right": 299.8046875,
+          "bottom": 162,
+          "left": 65
+        },
+        "color": "rgb(0, 0, 0)",
+        "display": "inline",
+        "visibility": "visible",
+        "position": "static",
+        "background": "rgba(0, 0, 0, 0)"
+      },
+      {
+        "selector": ".line-numbers",
+        "rect": {
+          "x": 0,
+          "y": 144,
+          "width": 39,
+          "height": 21,
+          "top": 144,
+          "right": 39,
+          "bottom": 165,
+          "left": 0
+        },
+        "color": "rgb(11, 33, 111)",
+        "display": "block",
+        "visibility": "visible",
+        "position": "absolute",
+        "background": "rgba(0, 0, 0, 0)"
+      },
+      {
+        "selector": ".lines-content",
+        "rect": {
+          "x": 65,
+          "y": 129,
+          "width": 16777215,
+          "height": 16777215,
+          "top": 129,
+          "right": 16777280,
+          "bottom": 16777344,
+          "left": 65
+        },
+        "color": "rgb(0, 0, 0)",
+        "display": "block",
+        "visibility": "visible",
+        "position": "absolute",
+        "background": "rgb(255, 255, 254)"
+      },
+      {
+        "selector": ".monaco-editor",
+        "rect": {
+          "x": 0,
+          "y": 129,
+          "width": 575,
+          "height": 605,
+          "top": 129,
+          "right": 575,
+          "bottom": 734,
+          "left": 0
+        },
+        "color": "rgb(0, 0, 0)",
+        "display": "block",
+        "visibility": "visible",
+        "position": "relative",
+        "background": "rgb(255, 255, 254)"
+      }
+    ],
+    "csp": [
+      "default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self' ipc: http://ipc.localhost; worker-src 'self' blob:; object-src 'none'; base-uri 'none'; frame-src 'none'"
+    ],
+    "runtimeErrors": []
+  },
+  "cases": [
+    {
+      "path": "docs/samples/01-simple-chain.pfdsl",
+      "matched": true,
+      "elapsedMs": 15.099999994039536,
+      "nodes": 3,
+      "svgBytes": 2050
+    },
+    {
+      "path": "docs/samples/02-feedback.pfdsl",
+      "matched": true,
+      "elapsedMs": 4.5,
+      "nodes": 5,
+      "svgBytes": 3591
+    },
+    {
+      "path": "docs/samples/03-set-input.pfdsl",
+      "matched": true,
+      "elapsedMs": 2.7999999970197678,
+      "nodes": 4,
+      "svgBytes": 2686
+    },
+    {
+      "path": "docs/samples/04-set-output.pfdsl",
+      "matched": true,
+      "elapsedMs": 2.7000000029802322,
+      "nodes": 4,
+      "svgBytes": 2627
+    },
+    {
+      "path": "docs/samples/05-label-cjk.pfdsl",
+      "matched": true,
+      "elapsedMs": 10.700000002980232,
+      "nodes": 3,
+      "svgBytes": 2474
+    },
+    {
+      "path": "docs/samples/06-status-styles.pfdsl",
+      "matched": true,
+      "elapsedMs": 9.400000005960464,
+      "nodes": 6,
+      "svgBytes": 4533
+    },
+    {
+      "path": "docs/samples/08-groups.pfdsl",
+      "matched": true,
+      "elapsedMs": 6,
+      "nodes": 11,
+      "svgBytes": 5682
+    },
+    {
+      "path": "docs/samples/09-parts.pfdsl",
+      "matched": true,
+      "elapsedMs": 2.7999999970197678,
+      "nodes": 6,
+      "svgBytes": 3777
+    },
+    {
+      "path": "docs/samples/10-layout-tb.pfdsl",
+      "matched": true,
+      "elapsedMs": 0.9000000059604645,
+      "nodes": 5,
+      "svgBytes": 3269
+    },
+    {
+      "path": "docs/samples/11-external-stakeholders.pfdsl",
+      "matched": true,
+      "elapsedMs": 2.2999999970197678,
+      "nodes": 5,
+      "svgBytes": 3880
+    },
+    {
+      "path": "docs/samples/12-subflow-detail.pfdsl",
+      "matched": true,
+      "elapsedMs": 1.5,
+      "nodes": 7,
+      "svgBytes": 5278
+    },
+    {
+      "path": "docs/samples/12-subflow.pfdsl",
+      "matched": true,
+      "elapsedMs": 0.7000000029802322,
+      "nodes": 3,
+      "svgBytes": 2829
+    },
+    {
+      "path": "docs/samples/13-preset-base.pfdsl",
+      "matched": true,
+      "elapsedMs": 0.9000000059604645,
+      "nodes": 0,
+      "svgBytes": 560
+    },
+    {
+      "path": "docs/samples/13-preset.pfdsl",
+      "matched": true,
+      "elapsedMs": 2.1000000089406967,
+      "nodes": 5,
+      "svgBytes": 3676
+    },
+    {
+      "path": "docs/samples/14-boundary-detail.pfdsl",
+      "matched": true,
+      "elapsedMs": 1.4000000059604645,
+      "nodes": 5,
+      "svgBytes": 3964
+    },
+    {
+      "path": "docs/samples/14-boundary.pfdsl",
+      "matched": true,
+      "elapsedMs": 1.5999999940395355,
+      "nodes": 3,
+      "svgBytes": 2711
+    },
+    {
+      "path": "docs/samples/15-index.pfdsl",
+      "matched": true,
+      "elapsedMs": 3,
+      "nodes": 5,
+      "svgBytes": 3191
+    },
+    {
+      "path": "docs/samples/16-basepath.pfdsl",
+      "matched": true,
+      "elapsedMs": 1,
+      "nodes": 3,
+      "svgBytes": 2775
+    },
+    {
+      "path": "docs/samples/17-type.pfdsl",
+      "matched": true,
+      "elapsedMs": 1.0999999940395355,
+      "nodes": 3,
+      "svgBytes": 2802
+    },
+    {
+      "path": "docs/samples/pfdsl_implementation_flow.pfdsl",
+      "matched": true,
+      "elapsedMs": 32,
+      "nodes": 81,
+      "svgBytes": 94442
+    },
+    {
+      "path": ".pfdsl/roadmap.pfdsl",
+      "matched": true,
+      "elapsedMs": 19.099999994039536,
+      "nodes": 24,
+      "svgBytes": 35061
+    },
+    {
+      "path": ".pfdsl/pipeline.pfdsl",
+      "matched": true,
+      "elapsedMs": 73.90000000596046,
+      "nodes": 96,
+      "svgBytes": 142615
+    },
+    {
+      "path": ".pfdsl/workflow.pfdsl",
+      "matched": true,
+      "elapsedMs": 76.6000000089407,
+      "nodes": 97,
+      "svgBytes": 182072
+    }
+  ],
+  "exports": [
+    {
+      "path": "exports/05-label-cjk.svg",
+      "width": 436,
+      "height": 67
+    },
+    {
+      "path": "exports/05-label-cjk.png",
+      "width": 436,
+      "height": 67
+    },
+    {
+      "path": "exports/05-label-cjk.pdf",
+      "width": 436,
+      "height": 67
+    },
+    {
+      "path": "exports/13-preset.svg",
+      "width": 522,
+      "height": 61
+    },
+    {
+      "path": "exports/13-preset.png",
+      "width": 522,
+      "height": 61
+    },
+    {
+      "path": "exports/13-preset.pdf",
+      "width": 522,
+      "height": 61
+    },
+    {
+      "path": "exports/pfdsl_implementation_flow.svg",
+      "width": 2294,
+      "height": 2867
+    },
+    {
+      "path": "exports/pfdsl_implementation_flow.png",
+      "width": 2294,
+      "height": 2867
+    },
+    {
+      "path": "exports/pfdsl_implementation_flow.pdf",
+      "width": 2294,
+      "height": 2867
+    }
+  ],
+  "passed": true,
+  "completedAt": "2026-09-26T04:33:37.825Z"
+}

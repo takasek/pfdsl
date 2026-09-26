@@ -92,6 +92,38 @@ artifact:
     description: "#482 コネクタ編集 / #483 Preview UI / #484 定義挿入を含む次期 Marketplace リリース"
     status: todo
     criteria: "npx @vscode/vsce show takasek.pfdsl --json の versions に packages/vscode-extension/package.json の version が含まれ、その版でコネクタ編集・Preview 生成 UI・定義挿入が動作する"
+  standalone_baseline:
+    label: スタンドアロン採用仕様と試作
+    description: Tauri・macOS Apple Silicon の採用仕様、試作コードと限定的な検証記録。製品完成の証拠ではない。実装工程と引き継ぎは SPEC.md 第9節、個別の完了条件は各 process の issue を正とする
+    status: done
+    criteria: experiments/standalone/ に SPEC.md・README.md・RESULTS.md・試作コードと evidence があり、採用事項と未検証範囲を再読できる
+    location: ../experiments/standalone/
+  standalone_foundation:
+    label: 両ホストで利用するアプリ共通基盤
+    status: todo
+    criteria: VS Code と製品用 Tauri アプリが共通処理で同じサンプルを解析・描画し、Mac の起動・日本語入力・再描画を確認済み。全機能の受入対応表に後続工程と検証方法が割り当てられている
+  standalone_documents:
+    label: 安全に編集・保存できる文書アプリ
+    status: todo
+    criteria: 任意 PFD の新規・開く・手動保存・別名保存とエディタ＋プレビューの組のタブ操作が実機で動き、未保存終了・外部再変更・削除・保存失敗の試験で内容を黙って失わずに解決できる
+  standalone_pfd_features:
+    label: PFD 編集・閲覧機能が揃ったアプリ
+    status: todo
+    criteria: 受入対応表の言語支援・構造編集・プレビュー操作・相互移動・extends が両ホストで検証され、日本語・大きい図・不完全な文書・タブ切替の実機確認と証拠が揃っている
+  standalone_integrations:
+    label: 関連参照・差分・外部実行を備えたアプリ
+    status: todo
+    criteria: 関連 PFD・外部ファイル・URL・ディレクトリ候補、未保存内容を含む別ファイル／Git 差分、Terminal.app／Ghostty 実行を Mac 実機で確認し、Git 不在・起動失敗・権限拒否を扱える
+  standalone_exports:
+    label: 全形式を書き出せるアプリ
+    status: todo
+    criteria: 開発環境を別途導入しない Mac で DOT・SVG・PDF・PNG・TSV と一括出力を利用でき、日本語・フォント・大きい図・寸法・部分成功を実ファイルと両ホストの受入証拠で確認できる
+  standalone_release:
+    label: 公開済み macOS スタンドアロンアプリ
+    status: todo
+    criteria: GitHub Releases の固定した公開版から署名・公証済み Apple Silicon DMG を取得でき、版・ソースコミット・DMG 識別情報・対応 macOS 下限を記録済み。配布物で全機能・関連付け・更新案内・導入入替・長時間利用の受入証拠が揃っている
+    location: https://github.com/takasek/pfdsl/releases
+    externalStakeholders: [ macOS 利用者 ]
 process:
   i119_publish_extension:
     label: extension自動公開実装
@@ -122,6 +154,30 @@ process:
     updated_at: 2026-07-18T00:33:46Z
   publish_ext_editing:
     label: extension 編集支援リリース
+  i1257_build_standalone_foundation:
+    label: 共通処理を製品用アプリ基盤へ接続する
+    location: https://github.com/takasek/pfdsl/issues/1257
+    updated_at: 2026-09-26T07:15:50Z
+  i1258_build_standalone_documents:
+    label: 文書の安全な編集・保存を完成させる
+    location: https://github.com/takasek/pfdsl/issues/1258
+    updated_at: 2026-09-26T07:15:52Z
+  i1259_build_standalone_pfd_features:
+    label: PFD 編集・閲覧機能を両版で揃える
+    location: https://github.com/takasek/pfdsl/issues/1259
+    updated_at: 2026-09-26T07:15:54Z
+  i1260_build_standalone_integrations:
+    label: 関連参照・差分・外部実行を接続する
+    location: https://github.com/takasek/pfdsl/issues/1260
+    updated_at: 2026-09-26T07:15:56Z
+  i1261_build_standalone_exports:
+    label: 全形式の書き出しを完成させる
+    location: https://github.com/takasek/pfdsl/issues/1261
+    updated_at: 2026-09-26T07:15:59Z
+  i1262_publish_standalone:
+    label: 配布物の全体受入を完了して公開する
+    location: https://github.com/takasek/pfdsl/issues/1262
+    updated_at: 2026-09-26T07:16:01Z
 
 tag:
   "priority:high": { style: { color: "#b60205", penwidth: "2" } }
@@ -149,3 +205,15 @@ ext_v0015 >> i482_implement_editor_connector -> editor_connector
 editor_connector >> i483_implement_preview_connector -> preview_connector
 
 [def_insertion, editor_connector, preview_connector] >> publish_ext_editing -> ext_editing_release
+
+[standalone_baseline, toolchain] >> i1257_build_standalone_foundation -> standalone_foundation
+
+standalone_foundation >> i1258_build_standalone_documents -> standalone_documents
+
+standalone_documents >> i1259_build_standalone_pfd_features -> standalone_pfd_features
+
+standalone_pfd_features >> i1260_build_standalone_integrations -> standalone_integrations
+
+standalone_pfd_features >> i1261_build_standalone_exports -> standalone_exports
+
+[standalone_exports, standalone_integrations] >> i1262_publish_standalone -> standalone_release
