@@ -15,6 +15,7 @@ import {
 	outputArtifactStatusStep,
 	wipTransitionStep,
 } from "./gate-check-steps.mjs";
+import { genPluginDriftPathspecs } from "./gen-plugin-outputs.mjs";
 
 /**
  * A stand-in for the real subprocess runner. `responses` maps a command line
@@ -62,6 +63,31 @@ describe("genPluginIdentityStep", () => {
 		assert.ok(
 			calls.some((c) => c.startsWith("scripts/check-generated-drift.mjs")),
 		);
+	});
+
+	it("diffs every surface of the output contract, not only plugin/ and install/", () => {
+		const { exec, calls } = fakeExec();
+		genPluginIdentityStep({
+			exec,
+			node: ([script, ...args]) => exec(script, args),
+			changedFiles: [".claude/skills/pfd-ops/SKILL.md"],
+		});
+		assert.deepEqual(
+			calls.filter((c) => c.startsWith("scripts/check-generated-drift.mjs")),
+			[
+				[
+					"scripts/check-generated-drift.mjs",
+					"--",
+					...genPluginDriftPathspecs("terminal"),
+				].join(" "),
+			],
+		);
+		for (const surface of ["CLAUDE.md", "AGENTS.md", ".codex", "generated"]) {
+			assert.ok(
+				genPluginDriftPathspecs("terminal").includes(surface),
+				`${surface} missing from the terminal set`,
+			);
+		}
 	});
 
 	it("fails when regeneration produces a diff in the generated trees", () => {

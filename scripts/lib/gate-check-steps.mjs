@@ -26,6 +26,7 @@ import {
 	wipTransitionDetected,
 } from "./gate-check.mjs";
 import { GEN_INSTALL_TRIGGER } from "./gen-install-trigger.mjs";
+import { genPluginDriftPathspecs } from "./gen-plugin-outputs.mjs";
 import { GEN_PLUGIN_TRIGGER } from "./gen-plugin-trigger.mjs";
 
 const ROADMAP_PATH = ".pfdsl/roadmap.pfdsl";
@@ -107,7 +108,8 @@ export function firstCommitAuthorDate({ exec, base }) {
  * sources (#547) that GEN_PLUGIN_TRIGGER doesn't match, so a PR editing only a
  * template source would otherwise report SKIP while in fact owing install/ and
  * plugin/ churn. gen-plugin.mjs runs gen-install internally, so one
- * regeneration covers both hops — hence both output trees are diffed.
+ * regeneration covers both hops. Unlike pre-commit and CI, no earlier step
+ * here owns install/ or SKILL.md, so the whole output contract is diffed.
  */
 export function genPluginIdentityStep({ node, changedFiles }) {
 	const name = "gen-plugin identity";
@@ -127,8 +129,7 @@ export function genPluginIdentityStep({ node, changedFiles }) {
 		node([
 			"scripts/check-generated-drift.mjs",
 			"--",
-			"plugin",
-			".claude/skills/pfd-ops/install",
+			...genPluginDriftPathspecs("terminal"),
 		]).ok;
 	return { name, status: clean ? "PASS" : "FAIL" };
 }
