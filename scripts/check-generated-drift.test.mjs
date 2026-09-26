@@ -49,10 +49,21 @@ describe("check-generated-drift", () => {
 		];
 		const manualPath = join(root, ".claude-plugin/manual-note.md");
 		try {
-			for (const source of sources) {
-				const destination = join(root, source);
+			// Tracked files only: a checkout also holds build output and, in the
+			// main one, every session's worktree under .claude/worktrees.
+			const tracked = execFileSync(
+				"git",
+				["ls-files", "-z", "--", ...sources],
+				{ cwd: repoRoot, encoding: "utf8" },
+			)
+				.split("\0")
+				.filter(Boolean);
+			for (const file of tracked) {
+				const destination = join(root, file);
 				mkdirSync(dirname(destination), { recursive: true });
-				cpSync(join(repoRoot, source), destination, {
+				// recursive lets cpSync accept a tracked symlink to a directory,
+				// which verbatimSymlinks then copies as the link itself.
+				cpSync(join(repoRoot, file), destination, {
 					recursive: true,
 					verbatimSymlinks: true,
 				});
