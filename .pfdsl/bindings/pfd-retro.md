@@ -29,7 +29,7 @@ rg --files .pfdsl/bindings/pfd-retro-patterns/
 
 ## 日常の適用点
 
-委譲と変更前後の報告は `.pfdsl/bindings/pfd-ops.md`「ワークサイクルの追加手順」の「手順 2 の追加で worktree 上の変更を検証する」と「適用点 3 と 3 層制御で実装を委譲し外向き操作を制御する」、最終レビューは同節「終端ゲートの追加項目を検査して完了を確認する」と `.pfdsl/workflow.md`「Codex でのレビュー」が持つ。事例を引かなくても、今回の入力・実物・期待結果が渡ることを確認する。
+委譲と変更前後の報告は `.pfdsl/bindings/pfd-ops.md`「ワークサイクルの追加手順」の「手順 2 の追加で worktree 上の変更を検証する」と「適用点 3 と 3 層制御で実装を委譲し外向き操作を制御する」、最終レビューは同節「終端ゲートの追加項目を検査して完了を確認する」と `.pfdsl/workflow.md`「レビューの観点と記録」「レビューの実施と手段」が持つ。事例を引かなくても、今回の入力・実物・期待結果が渡ることを確認する。
 毎サイクルの retro は同 reference の「定期監査」と手順5が持つ。repo-local の `scripts/pre-commit` は `scripts/lib/retro-reminder-check.mjs` で staged roadmap の done 追加を通知する。この通知は commit 前の補助であり、done のないサイクル終結や `--no-verify`、配布先の commit を見ない。
 変更した事例も通常の最終差分レビューで根拠・観測と推論・現在の手順との区別を確認する。カタログ全体の現行性や対策抽出の意味を維持する専用レビュー・release gate は持たない。
 
