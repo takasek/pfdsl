@@ -28,10 +28,11 @@ jobs:
       # bootstrap-pfdsl-skill; the link replaced that target, so name it here.
       - run: pnpm -r build
 
+      # The diffed paths come from scripts/lib/gen-plugin-outputs.mjs, shared with the pre-commit and terminal gates (#1203).
       - name: Regenerate Claude and Codex assets and assert no drift
         run: |
           make gen-plugin
-          if ! node scripts/check-generated-drift.mjs -- generated plugin .claude-plugin/marketplace.json CLAUDE.md AGENTS.md .agents .codex; then
+          if ! node scripts/check-generated-drift.mjs --gen-plugin ci; then
             echo ""
             echo "ERROR: generated Claude or Codex assets are stale."
             echo "Run 'make gen-plugin' and commit the result."
