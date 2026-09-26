@@ -197,7 +197,10 @@ function setDifference(left: Set<string>, right: Set<string>): string[] {
 
 describe("declared command options", () => {
 	it("matches every table entry with the flags its handler reads", () => {
-		expect(DISPATCHABLE_COMMANDS).toHaveLength(29);
+		// 30, not 29: transitionally counts both the new top-level `rename`
+		// and the still-present `meta rename-group` it replaces — restored to
+		// 29 by the follow-up commit that removes the latter.
+		expect(DISPATCHABLE_COMMANDS).toHaveLength(30);
 		const mismatches = DISPATCHABLE_COMMANDS.flatMap(
 			({ label, tableName, entry }) => {
 				const declared = new Set(Object.keys(entry.options));
