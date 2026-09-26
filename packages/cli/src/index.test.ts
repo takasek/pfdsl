@@ -3596,6 +3596,38 @@ a
 			}
 		});
 
+		// buildPresentationChain resolves the whole extends: DAG, not just the
+		// immediate parent (multifile.ts's post-order DFS over refs) — (f)'s
+		// "already exists in the effective frontmatter" check must see a group
+		// defined only at the grandparent, two extends: hops away.
+		it("(f) exits 1 when new already exists two extends: hops away (grandparent preset)", async () => {
+			const d = mkdtempSync(join(tmpdir(), "pfdsl-rename-group-extends-2hop-"));
+			try {
+				const f = join(d, "main.pfdsl");
+				const mainFile = `---
+extends: ./parent.yaml
+group:
+  local:
+    label: Local
+artifact:
+  a: { group: local }
+---
+a
+`;
+				writeFileSync(f, mainFile);
+				writeFileSync(join(d, "parent.yaml"), "extends: ./grandparent.yaml\n");
+				writeFileSync(
+					join(d, "grandparent.yaml"),
+					"group:\n  shared: { label: S }\n",
+				);
+				const r = await run(["meta", "rename-group", f, "local", "shared"]);
+				expect(r.exitCode).toBe(1);
+				expect(readFileSync(f, "utf-8")).toBe(mainFile);
+			} finally {
+				rmSync(d, { recursive: true, force: true });
+			}
+		});
+
 		it("(g) exits 1 when old is also defined by the extends: preset (partial override)", async () => {
 			const d = mkdtempSync(join(tmpdir(), "pfdsl-rename-group-extends-"));
 			try {

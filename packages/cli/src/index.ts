@@ -1425,9 +1425,8 @@ export function runMetaRenameGroup(
 	const absFile = resolve(file);
 	const hasExtends = frontmatter?.extends !== undefined;
 
-	// (e)/(f)/(g) below all read the extends chain (directly for the preset
-	// group set, or indirectly through `resolveEffectiveFrontmatter`) — an
-	// unloadable chain (missing file: V026, cycle: V027) resolves to an
+	// (e)/(f)/(g) below all read the extends chain, for the preset group set
+	// — an unloadable chain (missing file: V026, cycle: V027) resolves to an
 	// *empty* preset set rather than an error (multifile.ts's
 	// `buildPresentationChain` silently stops walking past whatever
 	// `loadExtendsChain` could not load), so those checks would silently run
@@ -1435,7 +1434,17 @@ export function runMetaRenameGroup(
 	// Refuse up front instead, the same way `runCheck` does (index.ts,
 	// `loadExtendsChain` + `hasErrors` + the diagText/failJson pair) for the
 	// same V026/V027 diagnostics (multifile.ts:374, multifile.ts:363).
+	//
+	// The chain is loaded at most once, here — not through
+	// `resolveEffectiveFrontmatter`, which would walk it a second time
+	// internally (multifile.ts:458), and would do so even when there is no
+	// `extends:` at all. `effectiveGroup` is derived straight from the
+	// already-loaded chain (`resolvePresentation`, the same merge
+	// `resolveEffectiveFrontmatter` itself calls); with no `extends:`, it is
+	// just the local `group:` section, so preset work is skipped entirely.
 	let presetChain: ReturnType<typeof buildPresentationChain> = [];
+	let effectiveGroup: ReturnType<typeof resolvePresentation>["group"] =
+		frontmatter?.group;
 	if (hasExtends) {
 		const { docs, diagnostics: extendsDiagnostics } = loadExtendsChain(
 			absFile,
@@ -1448,18 +1457,13 @@ export function runMetaRenameGroup(
 			opts.color,
 		);
 		if (failedExtends) return failedExtends;
-		presetChain = buildPresentationChain(absFile, docs).filter(
-			(c) => c.path !== absFile,
-		);
+		const fullChain = buildPresentationChain(absFile, docs);
+		presetChain = fullChain.filter((c) => c.path !== absFile);
+		effectiveGroup = resolvePresentation(fullChain).group;
 	}
-	const effectiveFrontmatter = resolveEffectiveFrontmatter(
-		absFile,
-		frontmatter,
-		fileLoader,
-	);
 
 	// Every group-id lookup below is an own-property check, not bracket
-	// access: `frontmatter.group` / `effectiveFrontmatter.group` /
+	// access: `frontmatter.group` / `effectiveGroup` /
 	// `presetGroup` are all plain objects, and bracket access on an
 	// inherited Object.prototype member name (toString, constructor,
 	// __proto__) reads that member instead of undefined — turning "not
@@ -1472,8 +1476,7 @@ export function runMetaRenameGroup(
 
 	// (e) `<oldId>` must be declared in the file's own local `group:` section.
 	if (!hasGroupId(frontmatter?.group, oldId)) {
-		const fromPreset =
-			hasExtends && hasGroupId(effectiveFrontmatter?.group, oldId);
+		const fromPreset = hasExtends && hasGroupId(effectiveGroup, oldId);
 		const message = fromPreset
 			? `meta rename-group: '${oldId}' is not declared in ${file} — it comes from a preset and must be renamed there`
 			: `meta rename-group: '${oldId}' is not declared in ${file}`;
@@ -1512,7 +1515,7 @@ export function runMetaRenameGroup(
 	}
 	if (
 		hasGroupId(frontmatter?.group, newId) ||
-		hasGroupId(effectiveFrontmatter?.group, newId)
+		hasGroupId(effectiveGroup, newId)
 	) {
 		const message = `meta rename-group: '${newId}' already exists as a group id in ${file}`;
 		if (opts.json) return failJson({ error: message });
