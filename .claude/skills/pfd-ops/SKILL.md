@@ -25,14 +25,25 @@ pfd-ops は、操作に対応する採用済み PFD ごとに適用する。対�
 
 ## 発火時の必須セルフチェック
 
-スキル発火時に一度、配置形態に応じたパスで `check-install-sync.mjs --upstream` を実行する。plugin 経由では次を使い、変数が置換されていなければ repo-local の `.claude/skills/pfd-ops/scripts/check-install-sync.mjs`、それも無ければ現在読んでいるこのファイルの所在から相対で解決する。警告への対応、deploy flag、rename、version と bundle の差分は `references/architecture.md` の「配置ファイルの鮮度セルフチェック」に従う。
+スキル発火時に一度、まず `.pfdsl/bindings/pfd-ops.md` があれば、その見出し一覧を取り、配置ファイル鮮度セルフチェックに適用される本文を読んでから実行パスを選ぶ。
+該当する binding 本文が実行パスを指定している場合は、その指示を使う。
+該当する binding 本文に別の実行パスが指定されていない場合は、配置形態に応じたパスで `check-install-sync.mjs --upstream` を実行する。
+plugin 経由では次を使い、変数が置換されていなければ repo-local の `.claude/skills/pfd-ops/scripts/check-install-sync.mjs`、それも無ければ現在読んでいるこのファイルの所在から相対で解決する。
+警告への対応、deploy flag、rename、version と bundle の差分は `references/architecture.md` の「配置ファイルの鮮度セルフチェック」に従う。
 
 ```bash
 node ${CLAUDE_PLUGIN_ROOT}/skills/pfd-ops/scripts/check-install-sync.mjs --upstream
 ```
 
-同じタイミングで `.pfdsl/bindings/pfd-ops.md` が存在すれば、**まず節見出しの一覧を取り**、自己点検を指示する節があればその本文を読んで実行する。binding はリポ固有の追加自己点検の一次置き場であり、本ファイルは個別スクリプト名を持たない。
-**発火時に binding を全読しない。ただし見出し一覧は毎回取る。** binding は工程ごとの節も持ち、その本文は該当する操作を行う時点で初めて要る — 発火はその操作を行わない回も含むので、全読すると使わない節のぶんを毎回払う。**逆に見出し一覧を省くと、下の L2 ディスパッチが名前で導く節以外は入口を失う**（採用リポは binding に任意の節を置けるので、配布層はその一覧を持てない）。一覧は安く、そこから主題が今回の操作に該当する節だけ本文を読む。
+`.pfdsl/bindings/pfd-ops.md` はリポ固有の追加セルフチェックの一次置き場であり、本ファイルは個別スクリプト名を持たない。
+
+## リポ固有の手順を該当見出しで選ぶ
+
+`.pfdsl/bindings/pfd-ops.md` があれば、操作を進める前に見出し一覧を階層が分かる形で作る。
+見出し一覧には `##` と `###` を含め、`####` 以深の見出しがあれば、その深さまで含める。
+一覧から今回の操作に関係する見出しを選び、該当する本文だけを読む。
+セルフチェック、設計確認、実装、委譲、終端ゲートでは、見出し名の列挙だけで本文を省略しない。
+親節が適用範囲を定める場合はその記述も読み、関係しない節本文は読まない。
 
 ## 運用ファイルの所在（L2 ディスパッチ）
 
