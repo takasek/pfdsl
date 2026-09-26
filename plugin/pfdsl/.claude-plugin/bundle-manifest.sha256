@@ -86,9 +86,9 @@ c1328f9dcb946c35f7bba42306324d82929f7031fb52d459c3b2ee12fd904686  skills/pfd-ops
 
 2cae2118000945dd3e0f0f8e8a8ce9550da5b666aeb601295dc3561a5448168b  skills/pfd-ops/scripts/check-install-sync.mjs
 
-f75adfa44aa42d37d302573ccfc9665eb748baa0e992dcd4541fa038fe75f6dc  skills/pfd-ops/scripts/collect-report-environment.mjs
+42cf20f0cee42b8a18368baafff36ab665b8a2ab5b8c63a07630c8370219d804  skills/pfd-ops/scripts/collect-report-environment.mjs
 
-bef0668f11e381643cb8a0e6866c5db532802e5e481253b32ff87a2f31254c2e  skills/pfd-ops/scripts/plugin-version-check.mjs
+12d98d42b04a26184ac8f29af879640fbe0eeb208b661fd50e464872d849fcee  skills/pfd-ops/scripts/plugin-version-check.mjs
 
 6ff85a61a88d3da0eea53dc9e25d8f74727282c9263d3f1b57e675b892ee90f7  skills/pfd-retro/SKILL.md
 

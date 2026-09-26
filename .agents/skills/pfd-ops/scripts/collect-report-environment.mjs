@@ -17,7 +17,10 @@ import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { readManifest } from "./check-install-sync.mjs";
-import { readJsonOrNull } from "./plugin-version-check.mjs";
+import {
+	readJsonOrNull,
+	readLocalBundleAggregateHash,
+} from "./plugin-version-check.mjs";
 
 // A manifest that parses can still hold something unusable in an identifier's
 // place — an empty string, whitespace, a number, an array. Those are collection
@@ -168,14 +171,11 @@ export function collectReportEnvironment(skillRoot, options = {}) {
 				"The plugin manifest could not be parsed, or carried no usable version. Its absence is not reachable here: the installation shape is classified by that manifest existing.",
 			);
 		}
-		bundleContentHash = asIdentifier(
-			readJsonOrNull(resolve(bundleRoot, ".claude-plugin/bundle-manifest.json"))
-				?.contentHash,
-		);
+		bundleContentHash = readLocalBundleAggregateHash(bundleRoot);
 		if (bundleContentHash === null) {
 			recordFailure(
 				"bundleContentHash",
-				"The bundle manifest could not be read, or carried no usable content hash.",
+				"The bundle manifest could not be read, or carried no usable per-file digests.",
 			);
 		}
 	}
