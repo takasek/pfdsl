@@ -3202,16 +3202,18 @@ Exit codes:
 const HELP_META_RENAME_GROUP = `${helpUsage("meta rename-group", "<file> <old> <new>", META_RENAME_GROUP_OPTIONS)}
 
 Rename a group id in one atomic in-place write: the group's own declaration
-key (group.<old> -> <new>, keeping its position, value, and comments
-unchanged), every other group's parent: <old> reference, and every
-artifact's/process's group: <old> field. The body never references groups
-(spec §2.8), so only the frontmatter changes.
+key (group.<old> -> <new>, keeping its position and value — a trailing
+comment on the renamed key's own line may move to the next line), every
+other group's parent: <old> reference, and every artifact's/process's
+group: <old> field. The body never references groups (spec §2.8), so only
+the frontmatter changes.
 
 <old> must be declared in the file's own local group: section, and must not
 also be defined by an extends: preset (a local entry that only partially
 overrides a preset cannot be renamed here — rename it at the preset instead).
-<new> must not already exist as a group id, locally or in the effective
-frontmatter resolved through extends: (§2.9.4).
+<new> must not already exist as an artifact or process id (spec §2.8.1: the
+group key is unique within the front matter), or as a group id, locally or
+in the effective frontmatter resolved through extends: (§2.9.4).
 
   --json      emit JSON ({ ok, from, to, members: string[], children: string[] })
               on failure: { ok: false, diagnostics } / { ok: false, error }
