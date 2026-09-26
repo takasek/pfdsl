@@ -486,7 +486,7 @@ process:
     tags: [ gen, g ]
   gen_plugin:
     label: Claude Code plugin root 組み立て
-    description: "make gen-pluginのClaude Code adapter。組み立て前に生成専用のplugin rootとrepository assetsをsnapshotして空にし、生成をやめた旧ファイルが残らないよう毎回再構築する。失敗時はsnapshotから復元し、dist非依存の再生成では中立pfdsl skillのSKILL.mdだけを保持する。contract検証済みのharness_capability_modelと中立生成済みpfdsl skill、install mirrorから、Claude Code skill tree、Markdown command、Markdown agent、hooks、manifest、marketplace記述をplugin/pfdsl/へidentity互換に組み立てる。あわせてclaude-repository mappingのルート指示文書CLAUDE.mdを、AGENTS.mdと同じmustacheテンプレートから描画してリポジトリルートへ書く。全Claude root writeの後、manifest自身を除く全bundleファイルのdigestをファイル単位で.claude-plugin/bundle-manifest.sha256へ記録する。集約値は読み手が計算する（#971, #1264, #1267）"
+    description: "make gen-pluginのClaude Code adapter。組み立て前に生成専用のplugin rootとrepository assetsをsnapshotして空にし、生成をやめた旧ファイルが残らないよう毎回再構築する。失敗時はsnapshotから復元し、dist非依存の再生成では中立pfdsl skillのSKILL.mdだけを保持する。専有rootを囲む生成物ディレクトリにどの専有rootにも属さない追跡済みファイルがある場合と、再構築で未追跡ファイルが失われる場合は失敗させる。contract検証済みのharness_capability_modelと中立生成済みpfdsl skill、install mirrorから、Claude Code skill tree、Markdown command、Markdown agent、hooks、manifest、marketplace記述をplugin/pfdsl/へidentity互換に組み立てる。あわせてclaude-repository mappingのルート指示文書CLAUDE.mdを、AGENTS.mdと同じmustacheテンプレートから描画してリポジトリルートへ書く。全Claude root writeの後、manifest自身を除く全bundleファイルのdigestをファイル単位で.claude-plugin/bundle-manifest.sha256へ記録する。集約値は読み手が計算する（#971, #1264, #1267）"
     command: make gen-plugin
     location: ../scripts/gen-plugin.mjs
     tags: [ gen, g ]
