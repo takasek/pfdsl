@@ -17,6 +17,7 @@
 import { basename, resolve } from "node:path";
 import {
 	createProtectedShellState,
+	GIT_GLOBAL_FLAGS_WITH_VALUE,
 	gitSubcommand,
 	gitSubcommandIndex,
 	hasProtectedCdPathOverride,
@@ -85,6 +86,217 @@ const READ_ONLY_APPLY_FLAGS = new Set([
 	"--summary",
 ]);
 
+// Bypass detection (#1232): commands that skip this repo's pre-commit
+// checks are denied regardless of branch or worktree, because the commit
+// itself is the harm — there is no later point at which the guard can still
+// intervene. This axis is checked before DENIED_SUBCOMMANDS/ASKED_SUBCOMMANDS
+// below, and its result short-circuits the branch/worktree-scoped decision in
+// evaluateGuardedCommand (except for a foreign target, which stays out of
+// scope like every other rule here).
+
+/** git subcommands that accept `--no-verify` (git 2.54; #1232). */
+const NO_VERIFY_SUBCOMMANDS = new Set([
+	"commit",
+	"merge",
+	"push",
+	"rebase",
+	"am",
+	"pull",
+]);
+
+/** git subcommands whose `-n` means `--no-verify` rather than dry-run/no-stat. */
+const SHORT_NO_VERIFY_SUBCOMMANDS = new Set(["commit", "am"]);
+
+/**
+ * Short-option characters that consume an argument for a given subcommand.
+ * `mandatory` chars take the rest of the token, or the next token if the rest
+ * is empty. `optional` chars take an argument only if attached, but either
+ * way stop this token's char-by-char scan since the remaining characters
+ * cannot be told apart from an attached argument.
+ */
+const SHORT_OPTION_ARG_CHARS = {
+	commit: {
+		mandatory: new Set(["m", "F", "c", "C", "t"]),
+		optional: new Set(["u", "S"]),
+	},
+	am: { mandatory: new Set(["C", "p"]), optional: new Set(["S"]) },
+};
+
+/** Whether token value `t` is `--no-verify` or a unique abbreviation of it. */
+function isNoVerifyToken(value) {
+	return value.length >= "--no-veri".length && "--no-verify".startsWith(value);
+}
+
+/** Last-wins scan for `--no-verify`/abbreviation, cancelled by a later `--verify`. */
+function hasNoVerifyLongFlag(tokens) {
+	let bypass = false;
+	for (const token of tokens) {
+		if (token.value === "--verify") bypass = false;
+		else if (isNoVerifyToken(token.value)) bypass = true;
+	}
+	return bypass;
+}
+
+/** Whether a `key` or `key=value` token names `core.hooksPath`, case-insensitively. */
+function isHooksPathAssignment(raw) {
+	if (typeof raw !== "string") return false;
+	const equals = raw.indexOf("=");
+	const key = equals === -1 ? raw : raw.slice(0, equals);
+	return key.toLowerCase() === "core.hookspath";
+}
+
+/**
+ * Whether `tokens` (a whole `git ...` segment) carries a `-c core.hooksPath=<v>`
+ * or `--config-env[=]core.hooksPath=<env>` global override, any value, ahead
+ * of the subcommand.
+ */
+function hasHooksPathGlobalOverride(tokens) {
+	for (let i = 1; i < tokens.length; i++) {
+		const value = tokens[i].value;
+		if (value === "-c" || value === "--config-env") {
+			if (isHooksPathAssignment(tokens[i + 1]?.value)) return true;
+			i++;
+			continue;
+		}
+		if (value.startsWith("--config-env=")) {
+			if (isHooksPathAssignment(value.slice("--config-env=".length)))
+				return true;
+			continue;
+		}
+		if (GIT_GLOBAL_FLAGS_WITH_VALUE.has(value)) {
+			i++;
+			continue;
+		}
+		if (!value.startsWith("-")) break; // reached the subcommand
+	}
+	return false;
+}
+
+/**
+ * The subcommand index, treating `--config-env` as taking a separate value
+ * the way gitSubcommandIndex already treats `-c` (#1232) — that function
+ * does not know `--config-env` does, which would otherwise misread its value
+ * token as the subcommand.
+ */
+function bypassAwareSubcommandIndex(tokens) {
+	for (let i = 1; i < tokens.length; i++) {
+		const { value } = tokens[i];
+		if (GIT_GLOBAL_FLAGS_WITH_VALUE.has(value) || value === "--config-env") {
+			i++;
+			continue;
+		}
+		if (value.startsWith("-")) continue;
+		return i;
+	}
+	return null;
+}
+
+/** Whether a `-n`/clustered short option means `--no-verify` for `sub`. */
+function hasShortNoVerifyFlag(tokens, sub) {
+	const table = SHORT_OPTION_ARG_CHARS[sub];
+	if (!table) return false;
+	for (let i = 0; i < tokens.length; i++) {
+		const value = tokens[i].value;
+		if (value === "--") break;
+		if (value.startsWith("--") || !value.startsWith("-") || value.length < 2)
+			continue;
+		const chars = value.slice(1);
+		for (let j = 0; j < chars.length; j++) {
+			const c = chars[j];
+			if (c === "n") return true;
+			if (table.mandatory.has(c)) {
+				if (j === chars.length - 1) i++; // consumes the next token too
+				break;
+			}
+			if (table.optional.has(c)) break;
+		}
+	}
+	return false;
+}
+
+const CONFIG_SCOPE_FLAGS = new Set([
+	"--local",
+	"--global",
+	"--system",
+	"--worktree",
+]);
+const CONFIG_FILE_FLAGS_WITH_VALUE = new Set(["--file", "-f", "--blob"]);
+const CONFIG_READ_FLAGS = new Set(["--unset", "--unset-all", "-l", "--list"]);
+const CONFIG_SET_FLAGS = new Set(["--add", "--replace-all"]);
+const CONFIG_READ_VERBS = new Set([
+	"get",
+	"get-all",
+	"list",
+	"unset",
+	"unset-all",
+]);
+const CONFIG_SET_VERBS = new Set(["set"]);
+
+/**
+ * Whether `tokens` (the args to `git config`) persistently set `core.hooksPath`
+ * (#1232). `--unset`/`--get*`/`-l`/`--list` and their git-2.46+ verb forms
+ * read or clear the override rather than set it, and a bare `git config
+ * core.hooksPath` with no value also only reads.
+ */
+function configHooksPathBypass(tokens) {
+	let sawSetFlag = false;
+	let sawReadFlag = false;
+	const positional = [];
+	for (let i = 0; i < tokens.length; i++) {
+		const value = tokens[i].value;
+		if (value === "--") {
+			positional.push(...tokens.slice(i + 1));
+			break;
+		}
+		if (CONFIG_SCOPE_FLAGS.has(value)) continue;
+		if (CONFIG_FILE_FLAGS_WITH_VALUE.has(value)) {
+			i++;
+			continue;
+		}
+		if (value.startsWith("--file=")) continue;
+		if (CONFIG_READ_FLAGS.has(value) || value.startsWith("--get")) {
+			sawReadFlag = true;
+			continue;
+		}
+		if (CONFIG_SET_FLAGS.has(value)) {
+			sawSetFlag = true;
+			continue;
+		}
+		if (value.startsWith("-")) continue; // unrecognized flag, not the key
+		positional.push(tokens[i]);
+	}
+	if (positional.length === 0) return false;
+	const verb = positional[0].value.toLowerCase();
+	if (CONFIG_READ_VERBS.has(verb)) return false;
+	const keyIndex = CONFIG_SET_VERBS.has(verb) ? 1 : 0;
+	if (CONFIG_SET_VERBS.has(verb)) sawSetFlag = true;
+	const key = positional[keyIndex];
+	if (!key || key.value.toLowerCase() !== "core.hookspath") return false;
+	if (sawReadFlag) return false;
+	return sawSetFlag || positional.length > keyIndex + 1;
+}
+
+/**
+ * The bypass form `tokens` (a whole `git ...` segment) uses, or null. Only
+ * fires once a subcommand is present — an override with nothing mutating
+ * behind it does nothing a hook would ever see.
+ */
+function classifyBypass(tokens) {
+	const subAt = bypassAwareSubcommandIndex(tokens);
+	if (subAt === null) return null;
+	const sub = tokens[subAt].value;
+	if (hasHooksPathGlobalOverride(tokens))
+		return { subcommand: sub, flag: "core.hooksPath" };
+	const rest = tokens.slice(subAt + 1);
+	if (NO_VERIFY_SUBCOMMANDS.has(sub) && hasNoVerifyLongFlag(rest))
+		return { subcommand: sub, flag: "--no-verify" };
+	if (SHORT_NO_VERIFY_SUBCOMMANDS.has(sub) && hasShortNoVerifyFlag(rest, sub))
+		return { subcommand: sub, flag: "-n" };
+	if (sub === "config" && configHooksPathBypass(rest))
+		return { subcommand: sub, flag: "core.hooksPath" };
+	return null;
+}
+
 const CODEX_ROUTINE_MUTATIONS = new Map([
 	["stage-all", "add"],
 	["commit", "commit"],
@@ -108,6 +320,15 @@ function classifySegment(tokens) {
 		const subcommand = codexRoutineSubcommand(tokens);
 		return subcommand === null ? null : { subcommand, decision: "deny" };
 	}
+
+	const bypass = classifyBypass(tokens);
+	if (bypass)
+		return {
+			subcommand: bypass.subcommand,
+			decision: "deny",
+			bypass: true,
+			flag: bypass.flag,
+		};
 
 	const sub = gitSubcommand(tokens);
 	if (!sub) return null;
@@ -426,6 +647,22 @@ function evaluateGuardedCommand(
 	// Out of scope entirely: this guard speaks for one repository's ecosystem,
 	// and another repository's branch names carry none of its meaning (#1221).
 	if (targetRelation === "foreign") return { decision: "allow" };
+
+	// A bypass is a deny axis independent of branch and worktree (#1232): the
+	// commit that skips the checks is itself the harm, so there is no later
+	// point — main, a sibling, ask — at which this guard could still catch it.
+	// This still sits after the foreign check above, which stays out of scope
+	// for every rule here, bypass included.
+	if (guarded.bypass) {
+		return {
+			decision: "deny",
+			reason:
+				`Blocked 'git ${guarded.subcommand}' for using '${guarded.flag}': this skips this repo's pre-commit checks. ` +
+				"Re-run the command without it. If a hook itself is broken, fix it in the working tree — the shim execs " +
+				"the working tree's scripts/pre-commit — and a normal run will pick up the fix. If a bypass is genuinely " +
+				"needed (e.g. to debug a hook), run the command in your own terminal instead.",
+		};
+	}
 
 	// `unknown` rides with `own`, which is where it already sat before the
 	// relation had a name — the branch-name rule still applies, and reaching a

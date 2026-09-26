@@ -175,6 +175,50 @@ describe("classifyGitCommand", () => {
 	});
 });
 
+describe("classifyGitCommand bypass detection (#1232)", () => {
+	it("denies every form that skips the pre-commit checks", () => {
+		for (const command of [
+			"git -c core.hooksPath=/nonexistent commit -m x",
+			"git commit --no-verify -m x",
+			"git commit -nm x",
+			"git commit --no-veri -m x",
+			"git push --no-verify",
+			"git -c CORE.HOOKSPATH=x commit",
+			"git --config-env=core.hooksPath=X commit",
+			"git --config-env core.hooksPath=X commit",
+			"git config core.hooksPath /tmp/x",
+			"git config set core.hooksPath /tmp/x",
+			"git config --add core.hooksPath /tmp/x",
+			"git config --local core.hooksPath /tmp/x",
+			"git am -n",
+			"git merge --no-verify x",
+			"git rebase --no-verify",
+			"git pull --no-verify",
+		]) {
+			const result = classifyGitCommand(command);
+			assert.equal(result?.decision, "deny", command);
+			assert.equal(result?.bypass, true, command);
+		}
+	});
+
+	it("does not treat these lookalikes as a bypass", () => {
+		for (const command of [
+			"git commit -m -n",
+			"git commit -mn",
+			"git push -n",
+			"git merge --no-verify-signatures x",
+			"git commit --no-verify --verify -m x",
+			"git config --unset core.hooksPath",
+			"git config --get core.hooksPath",
+			"git config core.hooksPath",
+			"git commit -m x",
+		]) {
+			const result = classifyGitCommand(command);
+			assert.notEqual(result?.bypass, true, command);
+		}
+	});
+});
+
 describe("resolveCommandCwd", () => {
 	const HOOK_CWD = "/repo";
 
@@ -479,6 +523,45 @@ describe("evaluateMainCommitGuard", () => {
 	});
 });
 
+describe("evaluateMainCommitGuard bypass axis (#1232)", () => {
+	it("denies a bypass on a feature branch in the session's own worktree", () => {
+		for (const command of [
+			"git -c core.hooksPath=/nonexistent commit -m x",
+			"git commit --no-verify -m x",
+		]) {
+			const result = evaluateMainCommitGuard(payload({ command }), {
+				currentBranch: "feature/x",
+			});
+			assert.equal(result.decision, "deny", command);
+			assert.match(result.reason, /pre-commit/);
+		}
+	});
+
+	it("still allows a plain commit on a feature branch (no blanket deny)", () => {
+		const result = evaluateMainCommitGuard(
+			payload({ command: "git commit -m x" }),
+			{ currentBranch: "feature/x" },
+		);
+		assert.equal(result.decision, "allow");
+	});
+
+	it("allows a bypass targeting a foreign repository", () => {
+		const result = evaluateMainCommitGuard(
+			payload({ command: "git commit --no-verify -m x" }),
+			{ currentBranch: "main", targetRelation: "foreign" },
+		);
+		assert.equal(result.decision, "allow");
+	});
+
+	it("denies rather than asks for a bypass targeting a sibling worktree", () => {
+		const result = evaluateMainCommitGuard(
+			payload({ command: "git commit --no-verify -m x" }),
+			{ currentBranch: "feature/x", targetRelation: "sibling" },
+		);
+		assert.equal(result.decision, "deny");
+	});
+});
+
 describe("runMainCommitGuard", () => {
 	const commit = JSON.stringify(payload({ command: "git commit -m 'x'" }));
 
@@ -585,6 +668,18 @@ describe("runMainCommitGuard", () => {
 				shouldOutput: false,
 			},
 		);
+	});
+
+	it("denies a bypass on a feature branch under Codex, where ask is unsupported (#1232)", () => {
+		const input = JSON.stringify(
+			payload({ command: "git commit --no-verify -m x" }),
+		);
+		const { shouldOutput, output } = runMainCommitGuard(input, {
+			resolveBranches: () => ({ currentBranch: "topic", mainBranch: "main" }),
+			supportsAsk: false,
+		});
+		assert.equal(shouldOutput, true);
+		assert.equal(output.hookSpecificOutput.permissionDecision, "deny");
 	});
 });
 

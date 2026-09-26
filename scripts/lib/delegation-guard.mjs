@@ -45,8 +45,14 @@ const READ_ONLY_GH_VERBS = new Set([
 /** git subcommands that publish to a remote. */
 const OUTWARD_GIT_SUBCOMMANDS = new Set(["push"]);
 
-/** git global flags that take a separate value, so the value is not the subcommand. */
-const GIT_GLOBAL_FLAGS_WITH_VALUE = new Set([
+/**
+ * git global flags that take a separate value, so the value is not the
+ * subcommand. Exported so main-commit-guard.mjs's bypass classifier (#1232)
+ * can recognize the same flags when it scans for a `core.hooksPath`
+ * override — it needs `-c`'s value token skipped the same way this file's
+ * own gitSubcommandIndex already skips it.
+ */
+export const GIT_GLOBAL_FLAGS_WITH_VALUE = new Set([
 	"-C",
 	"-c",
 	"--git-dir",
