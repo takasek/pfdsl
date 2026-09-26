@@ -20,7 +20,9 @@
 // or worktree. A commit that skipped the checks is the harm itself, with no
 // later point at which this hook could still catch it, so it denies on
 // every branch and worktree except a foreign target, which stays out of
-// scope like every other rule here.
+// scope like every other rule here — unless the `git config` write itself
+// lands outside the target repo (`--global`/`--system`/`--file`), which a
+// foreign target does not excuse either.
 
 import { basename, resolve } from "node:path";
 import {
@@ -201,76 +203,89 @@ function hasShortNoVerifyFlag(tokens, sub) {
 	return false;
 }
 
-const CONFIG_SCOPE_FLAGS = new Set([
-	"--local",
-	"--global",
-	"--system",
-	"--worktree",
-]);
-/** `git config` flags whose value is a separate token, so it is not the key. */
-const CONFIG_FLAGS_WITH_VALUE = new Set([
-	"--file",
-	"-f",
-	"--blob",
-	"--type",
-	"-t",
-	"--value",
-	"--comment",
-	"--default",
-]);
-const CONFIG_READ_FLAGS = new Set(["--unset", "--unset-all", "-l", "--list"]);
-const CONFIG_SET_FLAGS = new Set(["--add", "--replace-all"]);
+// `git config` no longer tracks flag positions to find the key (#1232): a
+// second flag — first --type's value read as the key, then abbreviated
+// flags going unrecognized — showed that any scheme built on skipping known
+// flags in order fails for the flag it does not yet know, one flag at a
+// time. Bypass detection instead asks two position-independent questions:
+// does `core.hooksPath` appear at all, with something after it, and does a
+// read/unset marker appear anywhere. Neither depends on knowing what a flag
+// this parser has not seen yet does with its own argument.
+
+/** `--`-prefixed `git config` flags that only read or unset, plus their unique abbreviations (>= 4 chars). */
+const CONFIG_READ_FLAG_NAMES = [
+	"--get",
+	"--get-all",
+	"--get-regexp",
+	"--get-urlmatch",
+	"--get-color",
+	"--get-colorbool",
+	"--unset",
+	"--unset-all",
+	"--list",
+];
+/** git-2.46+ `git config` verbs that only read or unset, recognized only as the first token. */
 const CONFIG_READ_VERBS = new Set([
 	"get",
 	"get-all",
 	"list",
 	"unset",
 	"unset-all",
+	"rename-section",
+	"remove-section",
+	"edit",
 ]);
-const CONFIG_SET_VERBS = new Set(["set"]);
+
+/** `--`-prefixed `git config` flags that write outside the target repo, plus their unique abbreviations (>= 4 chars). */
+const CONFIG_OUTSIDE_TARGET_FLAG_NAMES = ["--global", "--system", "--file"];
+
+/** Whether `value` is `candidate` or a unique (>= 4 char) abbreviation of it. */
+function abbreviates(value, candidate) {
+	return (
+		value.startsWith("--") && value.length >= 4 && candidate.startsWith(value)
+	);
+}
+
+/** Whether any token in `tokens` is a read/unset marker for `git config`. */
+function hasConfigReadMarker(tokens) {
+	if (tokens.some((t) => t.value === "-l")) return true;
+	if (
+		tokens.some((t) =>
+			CONFIG_READ_FLAG_NAMES.some((name) => abbreviates(t.value, name)),
+		)
+	)
+		return true;
+	return CONFIG_READ_VERBS.has(tokens[0]?.value.toLowerCase() ?? "");
+}
 
 /**
  * Whether `tokens` (the args to `git config`) persistently set `core.hooksPath`
- * (#1232). `--unset`/`--get*`/`-l`/`--list` and their git-2.46+ verb forms
- * read or clear the override rather than set it, and a bare `git config
- * core.hooksPath` with no value also only reads.
+ * (#1232): the key appears (case-insensitively) with at least one token after
+ * it — its new value, whatever flag put it there — and no read/unset marker
+ * appears anywhere.
  */
 function configHooksPathBypass(tokens) {
-	let sawSetFlag = false;
-	let sawReadFlag = false;
-	const positional = [];
-	for (let i = 0; i < tokens.length; i++) {
-		const value = tokens[i].value;
-		if (value === "--") {
-			positional.push(...tokens.slice(i + 1));
-			break;
-		}
-		if (CONFIG_SCOPE_FLAGS.has(value)) continue;
-		if (CONFIG_FLAGS_WITH_VALUE.has(value)) {
-			i++;
-			continue;
-		}
-		if (value.startsWith("--file=")) continue;
-		if (CONFIG_READ_FLAGS.has(value) || value.startsWith("--get")) {
-			sawReadFlag = true;
-			continue;
-		}
-		if (CONFIG_SET_FLAGS.has(value)) {
-			sawSetFlag = true;
-			continue;
-		}
-		if (value.startsWith("-")) continue; // unrecognized flag, not the key
-		positional.push(tokens[i]);
-	}
-	if (positional.length === 0) return false;
-	const verb = positional[0].value.toLowerCase();
-	if (CONFIG_READ_VERBS.has(verb)) return false;
-	const keyIndex = CONFIG_SET_VERBS.has(verb) ? 1 : 0;
-	if (CONFIG_SET_VERBS.has(verb)) sawSetFlag = true;
-	const key = positional[keyIndex];
-	if (!key || key.value.toLowerCase() !== "core.hookspath") return false;
-	if (sawReadFlag) return false;
-	return sawSetFlag || positional.length > keyIndex + 1;
+	const keyIndex = tokens.findIndex(
+		(t) => t.value.toLowerCase() === "core.hookspath",
+	);
+	if (keyIndex === -1 || keyIndex >= tokens.length - 1) return false;
+	return !hasConfigReadMarker(tokens);
+}
+
+/**
+ * Whether `tokens` (the args to `git config`) name `--global`/`--system`/
+ * `--file`/`-f` (or a unique abbreviation), which write outside whatever
+ * repository the command targets (#1232) — unlike `--local`/`--worktree`,
+ * which write inside it.
+ */
+function configWritesOutsideTarget(tokens) {
+	return tokens.some((t) => {
+		if (t.value === "-f") return true;
+		if (t.value.startsWith("--file=")) return true;
+		return CONFIG_OUTSIDE_TARGET_FLAG_NAMES.some((name) =>
+			abbreviates(t.value, name),
+		);
+	});
 }
 
 /**
@@ -291,7 +306,11 @@ function classifyBypass(tokens) {
 	if (SHORT_NO_VERIFY_SUBCOMMANDS.has(sub) && hasShortNoVerifyFlag(rest, sub))
 		return { subcommand: sub, flag: "-n" };
 	if (sub === "config" && configHooksPathBypass(rest))
-		return { subcommand: sub, flag: "core.hooksPath" };
+		return {
+			subcommand: sub,
+			flag: "core.hooksPath",
+			outsideTarget: configWritesOutsideTarget(rest),
+		};
 	return null;
 }
 
@@ -309,7 +328,7 @@ function codexRoutineSubcommand(tokens) {
 /**
  * The guarded git subcommand one already-tokenized segment runs, or null.
  * @param {{value: string, quoted: boolean}[]} tokens
- * @returns {{subcommand: string, decision: "deny" | "ask"} | null}
+ * @returns {{subcommand: string, decision: "deny" | "ask", bypass?: boolean, flag?: string, outsideTarget?: boolean} | null}
  */
 function classifySegment(tokens) {
 	if (tokens.length === 0) return null;
@@ -326,6 +345,7 @@ function classifySegment(tokens) {
 			decision: "deny",
 			bypass: true,
 			flag: bypass.flag,
+			outsideTarget: bypass.outsideTarget === true,
 		};
 
 	const sub = gitSubcommand(tokens);
@@ -357,12 +377,12 @@ function classifySegment(tokens) {
  * add y` is a deny, since letting the ask through would put the add on the
  * default branch behind a prompt that names the checkout.
  * @param {string} command
- * @returns {{subcommand: string, decision: "deny" | "ask"} | null}
+ * @returns {{subcommand: string, decision: "deny" | "ask", bypass?: boolean, flag?: string, outsideTarget?: boolean} | null}
  */
 export function classifyGitCommand(command) {
 	if (typeof command !== "string" || command.trim() === "") return null;
 
-	/** @type {{subcommand: string, decision: "deny" | "ask"} | null} */
+	/** @type {{subcommand: string, decision: "deny" | "ask", bypass?: boolean, flag?: string, outsideTarget?: boolean} | null} */
 	let asked = null;
 	for (const segment of splitSegments(command)) {
 		const found = classifySegment(stripLeadingNoise(tokenize(segment)));
@@ -644,13 +664,21 @@ function evaluateGuardedCommand(
 ) {
 	// Out of scope entirely: this guard speaks for one repository's ecosystem,
 	// and another repository's branch names carry none of its meaning (#1221).
-	if (targetRelation === "foreign") return { decision: "allow" };
+	// A `git config` bypass that writes outside the target repo is the one
+	// exception (#1232): `--global`/`--system`/`--file` land in a config this
+	// repo's checks (or another repo's) still read, so foreign does not buy it
+	// the pass-through this rule otherwise grants.
+	if (
+		targetRelation === "foreign" &&
+		!(guarded.bypass && guarded.outsideTarget)
+	)
+		return { decision: "allow" };
 
 	// A bypass is a deny axis independent of branch and worktree (#1232): the
 	// commit that skips the checks is itself the harm, so there is no later
 	// point — main, a sibling, ask — at which this guard could still catch it.
-	// This still sits after the foreign check above, which stays out of scope
-	// for every rule here, bypass included.
+	// This still sits after the foreign check above, which stays in scope for
+	// a bypass that writes outside the target (immediately above).
 	if (guarded.bypass) {
 		return {
 			decision: "deny",

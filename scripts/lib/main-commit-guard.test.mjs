@@ -233,6 +233,105 @@ describe("classifyGitCommand bypass detection (#1232)", () => {
 	});
 });
 
+// The `git config` parser has produced a defect twice in a row — first
+// --type's value read as the key, then abbreviated flags — because each fix
+// added one more literal case instead of a rule. This is a product-style
+// invariant instead: every combination of the components below is checked
+// against a single equation, so a whole *class* of positional-parsing bugs
+// fails at once rather than one abbreviation at a time (#1232).
+describe("git config bypass invariant (#1232)", () => {
+	// Tokens placed between "config" and the read marker/key. "set"-based
+	// prefixes carry their own verb; combining them with any read marker
+	// mixes two verbs, or a verb with a legacy flag, in a way git itself
+	// rejects (confirmed against the git-config(1) synopsis, which does not
+	// list --type/--comment/--add/--replace-all under `get`/`unset`) — those
+	// combinations are dropped by isValidCombo below.
+	const CONFIG_PREFIXES = [
+		[],
+		["--local"],
+		["--worktree"],
+		["-f", "x"],
+		["--file", "x"],
+		["--fil", "x"],
+		["--file=x"],
+		["--type", "path"],
+		["--typ", "path"],
+		["-t", "path"],
+		["--comment", "note"],
+		["--comm", "note"],
+		["set"],
+		["set", "--comment", "note"],
+		["--add"],
+		["--replace-all"],
+	];
+	const FILE_OPTION_ONLY_PREFIXES = new Set([
+		"",
+		"--local",
+		"--worktree",
+		"-f x",
+		"--file x",
+		"--fil x",
+		"--file=x",
+	]);
+	const isVerbPrefix = (prefix) => prefix[0] === "set";
+
+	// A read marker is either a "--"-style flag, valid in any position
+	// relative to the prefix under the legacy invocation, or a bare verb,
+	// which git only recognizes as the very first token — so verb markers
+	// are placed ahead of the prefix below, flag markers after it.
+	const READ_MARKERS = [
+		null,
+		"--get",
+		"--get-all",
+		"--unset",
+		"--unse",
+		"--unset-all",
+		"-l",
+		"get",
+		"unset",
+	];
+	const isVerbMarker = (marker) => marker === "get" || marker === "unset";
+
+	const KEYS = ["core.hooksPath", "CORE.HOOKSPATH"];
+	const VALUE_SETS = [["/x"], []];
+
+	function isValidCombo(prefix, marker) {
+		if (isVerbPrefix(prefix) && marker !== null) return false;
+		if (
+			isVerbMarker(marker) &&
+			!FILE_OPTION_ONLY_PREFIXES.has(prefix.join(" "))
+		)
+			return false;
+		return true;
+	}
+
+	for (const prefix of CONFIG_PREFIXES) {
+		for (const marker of READ_MARKERS) {
+			if (!isValidCombo(prefix, marker)) continue;
+			for (const key of KEYS) {
+				for (const value of VALUE_SETS) {
+					const markerTokens = marker === null ? [] : [marker];
+					const tokens = isVerbMarker(marker)
+						? [...markerTokens, ...prefix, key, ...value]
+						: [...prefix, ...markerTokens, key, ...value];
+					const command = `git config ${tokens.join(" ")}`;
+					// The invariant: bypass iff a value is present and no read
+					// marker cancels it — independent of which flag carries the
+					// value, so the parser no longer needs to track positions.
+					const expectBypass = value.length > 0 && marker === null;
+					it(`${expectBypass ? "denies" : "allows"} '${command}'`, () => {
+						assert.equal(
+							classifyGitCommand(command)?.bypass === true,
+							expectBypass,
+							command,
+						);
+					});
+				}
+			}
+		}
+	}
+});
+
 describe("resolveCommandCwd", () => {
 	const HOOK_CWD = "/repo";
 
@@ -573,6 +672,27 @@ describe("evaluateMainCommitGuard bypass axis (#1232)", () => {
 			{ currentBranch: "feature/x", targetRelation: "sibling" },
 		);
 		assert.equal(result.decision, "deny");
+	});
+
+	it("denies a git config bypass that writes outside a foreign target (#1232)", () => {
+		for (const command of [
+			"git -C /tmp/sbx config --global core.hooksPath /x",
+			"git -C /tmp/sbx config --file /abs/.git/config core.hooksPath /x",
+		]) {
+			const result = evaluateMainCommitGuard(payload({ command }), {
+				currentBranch: "main",
+				targetRelation: "foreign",
+			});
+			assert.equal(result.decision, "deny", command);
+		}
+	});
+
+	it("still allows a plain git config bypass in a foreign target", () => {
+		const result = evaluateMainCommitGuard(
+			payload({ command: "git config core.hooksPath /x" }),
+			{ currentBranch: "main", targetRelation: "foreign" },
+		);
+		assert.equal(result.decision, "allow");
 	});
 });
 
