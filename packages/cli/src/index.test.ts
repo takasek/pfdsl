@@ -2,7 +2,7 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { deleteNodes } from "@pfdsl/core";
+import { analyze, deleteNodes } from "@pfdsl/core";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { readyUnchanged } from "../../../scripts/pfdsl/lib/ready-compare.mjs";
 import {
@@ -3480,26 +3480,61 @@ a
 	// A group id that CST-parses to a non-string scalar (a bare, unquoted
 	// integer key) still round-trips as a string key once `analyze()` builds
 	// the plain-object frontmatter (`yaml`'s own `parse()` stringifies every
-	// object key) — so the pre-write "is it declared" check (an own-property
-	// read on that plain object) says yes, while the CST-level rename inside
-	// `renameGroup` compares the *typed* scalar value (`42`, a number) against
-	// `oldId` (`"42"`, a string) with strict equality and finds no match. The
-	// CLI must not read that internal mismatch as success.
-	it("(found:false) refuses rather than reporting a false success, when renameGroup cannot locate a group the CLI itself found declared", async () => {
+	// object key) — renameGroup (packages/core/src/rename-group.ts) matches
+	// the declaration key, and every `group:`/`parent:` reference to it, by
+	// `String(value) === oldId`, the same identity the CLI's own
+	// Object.hasOwn checks above read.
+	it("renames a bare, unquoted numeric group id to a non-numeric name", async () => {
 		const numericKeyGroup = `---
 group:
   42:
     label: Num
   other:
     label: Other
+artifact:
+  a:
+    group: 42
 ---
 a
 `;
-		const f = join(dir, "rename-group-numeric-key.pfdsl");
+		const f = join(dir, "rename-group-numeric-key-to-name.pfdsl");
 		writeFileSync(f, numericKeyGroup);
 		const r = await run(["meta", "rename-group", f, "42", "numbered"]);
-		expect(r.exitCode).toBe(1);
-		expect(readFileSync(f, "utf-8")).toBe(numericKeyGroup);
+		expect(r.exitCode).toBe(0);
+		const after = readFileSync(f, "utf-8");
+		expect(after).toContain("numbered:");
+		expect(after).not.toMatch(/^\s*42:/m);
+		expect(after).toContain("group: numbered");
+	});
+
+	it("renames a bare, unquoted numeric group id to another bare numeric id", async () => {
+		const numericKeyGroup = `---
+group:
+  42:
+    label: Num
+  other:
+    label: Other
+artifact:
+  a:
+    group: 42
+---
+a
+`;
+		const f = join(dir, "rename-group-numeric-key-to-numeric.pfdsl");
+		writeFileSync(f, numericKeyGroup);
+		const r = await run(["meta", "rename-group", f, "42", "43"]);
+		expect(r.exitCode).toBe(0);
+		// Re-parse instead of matching the literal text: writing a JS string
+		// "43" back into a key/value that used to be a bare, unquoted integer
+		// makes `yaml`'s stringifier quote it (round-trip type safety), so the
+		// on-disk form is `"43":` — what matters is that it re-parses to the
+		// same "43" the CLI's own Object.hasOwn checks work with (object keys
+		// are always strings), not whether it renders bare or quoted.
+		const after = readFileSync(f, "utf-8");
+		const { frontmatter } = analyze(after);
+		expect(Object.hasOwn(frontmatter?.group ?? {}, "43")).toBe(true);
+		expect(Object.hasOwn(frontmatter?.group ?? {}, "42")).toBe(false);
+		expect(String(frontmatter?.artifact?.a?.group)).toBe("43");
 	});
 
 	describe("with an extends: preset", () => {

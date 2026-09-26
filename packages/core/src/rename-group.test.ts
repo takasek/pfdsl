@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { analyze } from "./index.js";
 import { renameGroup } from "./rename-group.js";
 
 describe("renameGroup", () => {
@@ -86,6 +87,83 @@ a
 		expect(children).toEqual([]);
 		expect(output).toContain('g2: { label: "Layer 2" }');
 		expect(output).toContain("a: { group: g2 }");
+	});
+
+	// `analyze()`'s plain-object frontmatter always has string keys — JS
+	// coerces every object property key to a string, regardless of what
+	// scalar type the YAML source had (`42:` bare and unquoted parses to the
+	// CST's Scalar as the *number* 42, not the string "42") — so a caller
+	// checking "is `oldId` declared?" via that plain object (an own-property
+	// read, e.g. Object.hasOwn(frontmatter.group, "42")) sees it declared,
+	// and this function must match the same identity or it silently fails to
+	// find the pair it was just told exists.
+	it("matches a bare, unquoted integer group key by its string form", () => {
+		const src = `---
+group:
+  42:
+    label: Num
+---
+a
+`;
+		const { output, found, diagnostics } = renameGroup(src, "42", "numbered");
+		expect(diagnostics.filter((d) => d.severity === "error")).toEqual([]);
+		expect(found).toBe(true);
+		const { frontmatter } = analyze(output);
+		expect(Object.hasOwn(frontmatter?.group ?? {}, "numbered")).toBe(true);
+		expect(Object.hasOwn(frontmatter?.group ?? {}, "42")).toBe(false);
+	});
+
+	it("matches a bare, unquoted integer group key when renaming to another bare integer", () => {
+		const src = `---
+group:
+  42:
+    label: Num
+---
+a
+`;
+		const { output, found } = renameGroup(src, "42", "43");
+		expect(found).toBe(true);
+		const { frontmatter } = analyze(output);
+		expect(Object.hasOwn(frontmatter?.group ?? {}, "43")).toBe(true);
+		expect(Object.hasOwn(frontmatter?.group ?? {}, "42")).toBe(false);
+	});
+
+	it("matches a member whose group: field is the same bare, unquoted integer", () => {
+		const src = `---
+group:
+  42:
+    label: Num
+artifact:
+  a:
+    group: 42
+process:
+  p:
+    group: 42
+---
+a >> p -> b
+`;
+		const { output, members } = renameGroup(src, "42", "numbered");
+		expect(members).toEqual(["a", "p"]);
+		const { frontmatter } = analyze(output);
+		expect(String(frontmatter?.artifact?.a?.group)).toBe("numbered");
+		expect(String(frontmatter?.process?.p?.group)).toBe("numbered");
+	});
+
+	it("matches another group's parent: field when it is the same bare, unquoted integer", () => {
+		const src = `---
+group:
+  42:
+    label: Num
+  child:
+    label: Child
+    parent: 42
+---
+a
+`;
+		const { output, children } = renameGroup(src, "42", "numbered");
+		expect(children).toEqual(["child"]);
+		const { frontmatter } = analyze(output);
+		expect(String(frontmatter?.group?.child?.parent)).toBe("numbered");
 	});
 
 	it("is a no-op reporting found: false when oldId has no local group: declaration", () => {
