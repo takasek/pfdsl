@@ -30,7 +30,7 @@ root \`package.json\` の \`name\` が \`pfdsl\` かつ \`private\` が \`true\`
 どちらかの manifest が存在しない場合や、いずれかの identity が一致しない場合は採用リポと判定し、この監査中の CLI 実体を導入済みの \`pfdsl\` とする。
 以下の \`<resolved-cli>\` はここで1回だけ選んだ同じ CLI 実体を表す。\`<resolved-cli> check <file>\`、\`<resolved-cli> graph describe <file> <id>\`、その他すべての \`<resolved-cli> graph ...\` を、途中で実体を解決し直さずに使う。
 
-対象として明示された .pfdsl ファイル以外は読まない。ただし CLI 実体の解決に使うリポジトリルートの \`package.json\` と \`packages/cli/package.json\`、カタログの読込手順が指定する観点カタログはこの読取境界の例外とする。
+対象として明示された .pfdsl ファイル以外は読まない。ただし CLI 実体の解決に使うリポジトリルートの \`package.json\` と \`packages/cli/package.json\`、pfd-retro スキル SKILL.md、binding、観点カタログはこの読取境界の例外とする。
 `;
 
 function commandRecord({
@@ -506,16 +506,25 @@ describe("agentCapabilityToCodexToml", () => {
 			agentRecord({
 				body:
 					`\n${PFD_LENS_BASH_RESTRICTION}\n` +
-					"カタログを読み込み、対象 `.pfdsl` ファイルを Read する。\n",
+					"存在する manifest だけを Read して CLI 実体を解決する。\n" +
+					"カタログを読み込み、対象 `.pfdsl` ファイルを Read する。\n" +
+					"対象以外は読まない。ただし pfd-retro スキル SKILL.md、binding、観点カタログは例外。\n",
 			}),
 		);
 		const instructions = parseTomlDeveloperInstructions(output);
 
+		assert.match(instructions, /Bash は .*`rg` と `sed`.*のみ許可される/);
+		assert.equal(
+			(instructions.match(/Bash は .*のみ許可される/g) ?? []).length,
+			1,
+		);
+		assert.doesNotMatch(instructions, /\bRead\b/);
+		assert.match(instructions, /manifest だけを `sed` で読んで/);
+		assert.match(instructions, /対象 `\.pfdsl` ファイルを `sed` で読む/);
 		assert.match(
 			instructions,
-			/`rg` と `sed` を観点カタログと対象 `\.pfdsl` ファイルの読取に使用してよい。/,
+			/pfd-retro スキル SKILL\.md、binding、観点カタログ/,
 		);
-		assert.equal(instructions.includes(PFD_LENS_BASH_RESTRICTION), false);
 		assert.match(output, /^sandbox_mode = "read-only"$/m);
 	});
 
@@ -550,7 +559,7 @@ describe("agentCapabilityToCodexToml", () => {
 		assert.match(instructions, /途中で実体を解決し直さずに使う/);
 		assert.match(
 			instructions,
-			/`package\.json` と `packages\/cli\/package\.json`、カタログの読込手順が指定する観点カタログはこの読取境界の例外/,
+			/`package\.json` と `packages\/cli\/package\.json`、pfd-retro スキル SKILL\.md、binding、観点カタログはこの読取境界の例外/,
 		);
 	});
 
@@ -565,6 +574,30 @@ describe("agentCapabilityToCodexToml", () => {
 				/\.claude\/agents\/pfd-lens\.md.*Bash restriction clause/,
 			);
 		}
+	});
+
+	it("rejects new pfd-lens Read instructions that have no Codex translation", () => {
+		assert.throws(
+			() =>
+				agentCapabilityToCodexToml(
+					agentRecord({
+						body: `\n${PFD_LENS_BASH_RESTRICTION}\n別のファイルを Read で確認する。\n`,
+					}),
+				),
+			/\.claude\/agents\/pfd-lens\.md: Codex instructions contain Read/,
+		);
+	});
+
+	it("rejects a second Bash rule instead of shipping conflicting permissions", () => {
+		assert.throws(
+			() =>
+				agentCapabilityToCodexToml(
+					agentRecord({
+						body: `\n${PFD_LENS_BASH_RESTRICTION}\nBash は \`pfdsl fmt --write\` も許可される。\n`,
+					}),
+				),
+			/\.claude\/agents\/pfd-lens\.md: unexpected Bash instruction/,
+		);
 	});
 
 	it("maps pfd-implementer's known write tools and repository instructions", () => {
