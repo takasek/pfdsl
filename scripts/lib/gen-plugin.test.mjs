@@ -1066,6 +1066,8 @@ describe("assemblePluginDistIndependent", () => {
 				[`${pluginRoot}/prior.txt`, "old Claude plugin"],
 				[codexPluginRoot, "directory"],
 				[`${codexPluginRoot}/prior.txt`, "old Codex plugin"],
+				["/repo/.agents", "directory"],
+				["/repo/.codex", "directory"],
 				...codexRepositoryDestinations.flatMap((destination) => [
 					[destination, `old ${destination}`],
 					[`${destination}/prior.txt`, `old ${destination} child`],
@@ -1304,6 +1306,56 @@ describe("assemblePluginDistIndependent", () => {
 					call[2] === pluginRoot,
 			),
 		);
+	});
+
+	it("restores all owned roots if assembly fails after rebuilding starts", () => {
+		const root = mkdtempSync(join(tmpdir(), "gen-plugin-obsolete-rollback-"));
+		const pluginRoot = join(root, "plugin/pfdsl");
+		const codexPluginRoot = join(root, "plugin/pfdsl-codex");
+		const obsolete = [
+			join(pluginRoot, "obsolete.json"),
+			join(codexPluginRoot, "obsolete.json"),
+			join(root, "generated/skills/pfdsl/references/obsolete.md"),
+			join(root, ".agents/obsolete.md"),
+			join(root, ".codex/obsolete.json"),
+		];
+		for (const path of obsolete) {
+			mkdirSync(dirname(path), { recursive: true });
+			writeFileSync(path, "old\n");
+		}
+		try {
+			assert.throws(
+				() =>
+					assemblePluginDistIndependent({
+						root,
+						pluginRoot,
+						codexPluginRoot,
+						deps: {
+							cpSync,
+							existsSync,
+							mkdirSync,
+							readFileSync,
+							renameSync,
+							rmSync,
+							writeFileSync,
+							newRunId: () => "obsolete-rollback",
+							decodeHarnessCapabilities: () => [],
+							assembleClaudeAssets: () => {
+								for (const path of obsolete) {
+									assert.equal(existsSync(path), false, path);
+								}
+								throw new Error("assembly failed");
+							},
+						},
+					}),
+				/assembly failed/,
+			);
+			for (const path of obsolete) {
+				assert.equal(readFileSync(path, "utf8"), "old\n", path);
+			}
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
 	});
 
 	it("restores both plugin roots when the later Codex assembly fails", () => {
@@ -1882,12 +1934,13 @@ describe("assembleCodexAssets", () => {
 			"/repo/AGENTS.md",
 			"/repo/.codex/config.toml",
 			"/repo/.codex/hooks.json",
-			"/repo/plugin/pfdsl/.codex-plugin/plugin.json",
+			"/repo/plugin/pfdsl-codex/.codex-plugin/plugin.json",
+			"/repo/plugin/pfdsl-codex/.codex-plugin/retired.json",
 			"/repo/.agents/skills",
 			"/repo/.codex/agents",
-			"/repo/plugin/pfdsl/skills/pfd-cycle",
-			"/repo/plugin/pfdsl/skills/pfd-init",
-			"/repo/plugin/pfdsl/skills/source-command-pfd-retro",
+			"/repo/plugin/pfdsl-codex/skills/pfd-cycle",
+			"/repo/plugin/pfdsl-codex/skills/pfd-init",
+			"/repo/plugin/pfdsl-codex/skills/source-command-pfd-retro",
 		];
 		for (const destination of destinations) {
 			files.set(destination, "directory");
@@ -1922,9 +1975,17 @@ describe("assembleCodexAssets", () => {
 				...sourceDeps,
 				cpSync: (source, destination, options) => {
 					calls.push(["cpSync", source, destination, options]);
-					files.set(destination, "directory");
+					const entries = [...files.entries()].filter(
+						([path]) => path === source || path.startsWith(`${source}/`),
+					);
+					if (entries.length === 0) files.set(destination, "directory");
+					for (const [path, content] of entries) {
+						files.set(`${destination}${path.slice(source.length)}`, content);
+					}
 				},
-				existsSync: (path) => files.has(path),
+				existsSync: (path) =>
+					files.has(path) ||
+					[...files.keys()].some((entry) => entry.startsWith(`${path}/`)),
 				mkdirSync: (path) => {
 					calls.push(["mkdirSync", path]);
 					files.set(path, "directory");
@@ -2393,6 +2454,7 @@ describe("assembleCodexAssets", () => {
 		);
 		assertPriorDestinationsRestored(files, before);
 		assertNoAssemblyArtifacts(files);
+		assert.equal(files.has("/repo/plugin/pfdsl-codex/GENERATED.md"), false);
 	});
 
 	it("restores every prior destination and removes staging siblings when publication fails", () => {
@@ -2411,6 +2473,7 @@ describe("assembleCodexAssets", () => {
 		);
 		assertPriorDestinationsRestored(files, before);
 		assertNoAssemblyArtifacts(files);
+		assert.equal(files.has("/repo/plugin/pfdsl-codex/GENERATED.md"), false);
 	});
 
 	it("keeps the publication error when rollback cleanup also fails", () => {

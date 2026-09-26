@@ -59,6 +59,32 @@ afterEach(() => {
 });
 
 describe("writeSkillRefs", () => {
+	it("removes references retired by the generator while keeping SKILL.md", () => {
+		mkdirSync(join(outDir, "references"), { recursive: true });
+		writeFileSync(join(outDir, "references/retired.md"), "old output\n");
+		writeFileSync(join(outDir, "SKILL.md"), "existing skill\n");
+
+		writeSkillRefs(fixtureRoot, outDir);
+
+		assert.throws(() => readFileSync(join(outDir, "references/retired.md")));
+		assert.equal(
+			readFileSync(join(outDir, "SKILL.md"), "utf8"),
+			"existing skill\n",
+		);
+	});
+
+	it("keeps prior references when a later source cannot be read", () => {
+		mkdirSync(join(outDir, "references"), { recursive: true });
+		writeFileSync(join(outDir, "references/spec.md"), "prior spec\n");
+		rmSync(join(fixtureRoot, "docs/quality-guide.md"));
+
+		assert.throws(() => writeSkillRefs(fixtureRoot, outDir));
+		assert.equal(
+			readFileSync(join(outDir, "references/spec.md"), "utf8"),
+			"prior spec\n",
+		);
+	});
+
 	it("returns the spec version extracted from docs/spec/spec.md", () => {
 		const specVersion = writeSkillRefs(fixtureRoot, outDir);
 		assert.equal(specVersion, "v9.9.9");

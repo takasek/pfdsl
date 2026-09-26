@@ -10,11 +10,14 @@
 // drift check in scripts/pre-commit relies on. scripts/lib/gen-skill-refs.test.mjs
 // asserts this via static import-graph inspection.
 
+import { randomUUID } from "node:crypto";
 import {
 	existsSync,
 	mkdirSync,
 	readdirSync,
 	readFileSync,
+	renameSync,
+	rmSync,
 	writeFileSync,
 } from "node:fs";
 import { resolve } from "node:path";
@@ -49,6 +52,50 @@ function buildExamplesIndexMd(dir) {
  */
 export function writeSkillRefs(root, outDir) {
 	const refsDir = resolve(outDir, "references");
+	const runId = randomUUID();
+	const stagedDir = `${refsDir}.pfdsl-tmp-${runId}`;
+	const backupDir = `${refsDir}.pfdsl-prev-${runId}`;
+	let displaced = false;
+	let published = false;
+	try {
+		const specVersion = writeSkillRefsStaged(root, stagedDir);
+		if (existsSync(refsDir)) {
+			renameSync(refsDir, backupDir);
+			displaced = true;
+		}
+		renameSync(stagedDir, refsDir);
+		published = true;
+		return specVersion;
+	} catch (error) {
+		if (displaced && !published) {
+			try {
+				renameSync(backupDir, refsDir);
+			} catch {
+				// Keep the old tree recoverable and report its exact path.
+				if (error && typeof error === "object") {
+					error.rollbackBackup = backupDir;
+					error.message += `; previous references retained at ${backupDir}`;
+				}
+			}
+		}
+		throw error;
+	} finally {
+		try {
+			rmSync(stagedDir, { recursive: true, force: true });
+		} catch {
+			console.warn(`Could not remove staged references at ${stagedDir}`);
+		}
+		if (published) {
+			try {
+				rmSync(backupDir, { recursive: true, force: true });
+			} catch {
+				console.warn(`Could not remove previous references at ${backupDir}`);
+			}
+		}
+	}
+}
+
+function writeSkillRefsStaged(root, refsDir) {
 	mkdirSync(refsDir, { recursive: true });
 
 	// --- 1. Copy spec ---
