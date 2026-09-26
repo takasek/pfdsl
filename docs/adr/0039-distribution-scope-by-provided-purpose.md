@@ -37,7 +37,7 @@ D 層7項目を `pfd-retro/references/knowledge-lifecycle.md` へ分け、`.pfds
 宣言が無ければ、対象の知識成果物が実在しても監査しない。
 
 区分 iii の移設先は採用リポの binding である。
-このリポでは `work-cycle.md` の区分 iii を `.pfdsl/bindings/pfd-ops.md`「ワークサイクルの追加手順」へ、`github-issues-backend.md`「設計確定の証拠」の書式・再承認部分を同 binding の「GitHub Issues バックエンドの設計記録」へ、pfd-retro の「1 回の実行契約」と上流専用2項目を `.pfdsl/bindings/pfd-retro.md` へ移した。
+このリポでは `work-cycle.md` の区分 iii を `.pfdsl/bindings/pfd-ops.md`「ワークサイクルの追加手順」へ、`github-issues-backend.md`「設計確定の証拠」の書式・再承認部分を同 binding の「GitHub Issues バックエンドの設計記録を確認する」節へ、pfd-retro の「1 回の実行契約」と上流専用2項目を `.pfdsl/bindings/pfd-retro.md` へ移した。
 `work-cycle.md` に残るのは運用契約・定期監査・前提条件・4手順の骨格・PFD 固有の終端ゲート項目で、binding に「ワークサイクルの追加手順」節があれば手順1〜3の各段でそれに従う旨だけを本文が指す。
 
 `github-issues-backend.md`「規約」節の「複数行本文の外部書込み」は配布層に残す。
