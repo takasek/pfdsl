@@ -139,8 +139,12 @@ describe("pfd-ops entry routing", () => {
 		// Only audit runs were clarified; widening iii to work runs would move
 		// backend-integration duties (category ii) into the binding.
 		assert.match(categoryThree[0], /1回の監査の実行管理/);
-		assert.doesNotMatch(categoryThree[0], /作業の1回/);
+		assert.doesNotMatch(categoryThree[0], /作業[^、。]*実行/);
 		assert.match(stageZero[0], /ライフサイクル監査[^\n]+区分 ii/);
+		// Backend integration in category ii is not an audit, so the
+		// target-versus-run explanation must stay scoped to audit items.
+		assert.match(stageZero[0], /^監査に関わる区分 i・ii の項目が定めるのは/m);
+		assert.doesNotMatch(stageZero[0], /^区分 i・ii が定めるのは/m);
 
 		const opsIntro = opsBinding.split(/\n## /)[0];
 		assert.doesNotMatch(opsIntro, /一般に有効/);
