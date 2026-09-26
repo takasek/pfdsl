@@ -126,22 +126,49 @@ const SHORT_NO_VERIFY_SUBCOMMANDS = new Set(["commit", "am"]);
  */
 const SHORT_OPTION_ARG_CHARS = {
 	commit: {
-		mandatory: new Set(["m", "F", "c", "C", "t"]),
+		mandatory: new Set(["m", "F", "c", "C", "t", "U"]),
 		optional: new Set(["u", "S"]),
 	},
 	am: { mandatory: new Set(["C", "p"]), optional: new Set(["S"]) },
 };
 
-/** Whether token value `t` is `--no-verify` or a unique abbreviation of it. */
+/**
+ * `commit`'s long options that take a mandatory separate value (git 2.54;
+ * exact names only, no abbreviation). Their value has to be skipped before
+ * hasShortNoVerifyFlag scans for `-n`, or a value that happens to look like a
+ * short option — `--message -n` — reads as one (#1232). Harmless for `am`:
+ * none of these names are among its own options.
+ */
+const COMMIT_LONG_VALUE_OPTIONS = new Set([
+	"--message",
+	"--file",
+	"--author",
+	"--date",
+	"--template",
+	"--reuse-message",
+	"--reedit-message",
+	"--fixup",
+	"--squash",
+	"--trailer",
+	"--cleanup",
+	"--pathspec-from-file",
+]);
+
+/** Whether token value `value` is `--no-verify` or a unique abbreviation of it. */
 function isNoVerifyToken(value) {
 	return value.length >= "--no-veri".length && "--no-verify".startsWith(value);
 }
 
-/** Last-wins scan for `--no-verify`/abbreviation, cancelled by a later `--verify`. */
+/** Whether token value `value` is `--verify` or a unique abbreviation of it. */
+function isVerifyToken(value) {
+	return value.length >= "--veri".length && "--verify".startsWith(value);
+}
+
+/** Last-wins scan for `--no-verify`/abbreviation, cancelled by a later `--verify`/abbreviation. */
 function hasNoVerifyLongFlag(tokens) {
 	let bypass = false;
 	for (const token of tokens) {
-		if (token.value === "--verify") bypass = false;
+		if (isVerifyToken(token.value)) bypass = false;
 		else if (isNoVerifyToken(token.value)) bypass = true;
 	}
 	return bypass;
@@ -187,6 +214,10 @@ function hasShortNoVerifyFlag(tokens, sub) {
 	for (let i = 0; i < tokens.length; i++) {
 		const value = tokens[i].value;
 		if (value === "--") break;
+		if (COMMIT_LONG_VALUE_OPTIONS.has(value)) {
+			i++; // its value is a separate token, not a short option to scan
+			continue;
+		}
 		if (value.startsWith("--") || !value.startsWith("-") || value.length < 2)
 			continue;
 		const chars = value.slice(1);

@@ -332,6 +332,52 @@ describe("git config bypass invariant (#1232)", () => {
 	}
 });
 
+// The `-n` cluster parser and the `--no-verify`/`--verify` last-wins scan
+// each depend on correctly skipping *other* flags — commit's long
+// value-taking options, global options ahead of the subcommand — that carry
+// no bypass meaning of their own. This invariant checks the combination
+// directly instead of one global prefix at a time (#1232).
+describe("git global-option bypass invariant (#1232)", () => {
+	const GLOBAL_PREFIXES = [
+		[],
+		["-C", "."],
+		["--no-pager"],
+		["--attr-source", "HEAD"],
+		["--config-env", "core.editor=E"],
+		["-c", "user.name=x"],
+		["--literal-pathspecs"],
+	];
+	const BYPASS_FORMS = [
+		"commit --no-verify -m x",
+		"commit -nm x",
+		"-c core.hooksPath=/x commit -m x",
+		"--config-env=core.hooksPath=E commit -m x",
+		"push --no-verify",
+	];
+	const NON_BYPASS_FORMS = [
+		"commit -m x",
+		"push -n",
+		"commit -m -n",
+		"commit --no-verify --verif -m x",
+		"commit --message -n",
+	];
+
+	for (const prefix of GLOBAL_PREFIXES) {
+		for (const form of BYPASS_FORMS) {
+			const command = `git ${[...prefix, form].join(" ")}`;
+			it(`denies '${command}'`, () => {
+				assert.equal(classifyGitCommand(command)?.bypass, true, command);
+			});
+		}
+		for (const form of NON_BYPASS_FORMS) {
+			const command = `git ${[...prefix, form].join(" ")}`;
+			it(`does not treat '${command}' as bypass`, () => {
+				assert.notEqual(classifyGitCommand(command)?.bypass, true, command);
+			});
+		}
+	}
+});
+
 describe("resolveCommandCwd", () => {
 	const HOOK_CWD = "/repo";
 
