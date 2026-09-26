@@ -214,3 +214,92 @@ a
 		expect(output).toContain("gx:");
 	});
 });
+
+// The id-identity defects found in review (#1218: a prototype-member name,
+// a bare numeric key) were each one shape of the same question — does the
+// group id the caller names match the id every representation of the file
+// holds? This checks that question across the product of the ways an id can
+// be written, the places it is referenced, and the YAML styles, against the
+// invariant from spec §2.8 rather than against the implementation: after the
+// rename, re-reading the file finds <new> wherever <old> was and <old>
+// nowhere, and leaves every other reference alone.
+describe("renameGroup id identity across key shapes, positions and styles", () => {
+	const oldTokens = [
+		"g1",
+		'"g1"',
+		"'g1'",
+		"42",
+		"3.14",
+		"true",
+		"toString",
+		'"42"',
+	];
+	const newIds = ["gx", "43", "constructor"];
+	const styles = ["flow", "block"] as const;
+
+	const unquote = (token: string): string => token.replace(/^["']|["']$/g, "");
+
+	const render = (token: string, style: (typeof styles)[number]): string =>
+		style === "flow"
+			? `---
+group:
+  ${token}: { label: Old }
+  child: { label: Child, parent: ${token} }
+  other: { label: Other }
+artifact:
+  a: { status: done, criteria: x, group: ${token} }
+  b: { status: todo, criteria: y, group: other }
+process:
+  p: { group: ${token} }
+---
+a >> p -> b
+`
+			: `---
+group:
+  ${token}:
+    label: Old
+  child:
+    label: Child
+    parent: ${token}
+  other:
+    label: Other
+artifact:
+  a:
+    status: done
+    criteria: x
+    group: ${token}
+  b:
+    status: todo
+    criteria: y
+    group: other
+process:
+  p:
+    group: ${token}
+---
+a >> p -> b
+`;
+
+	const cases = oldTokens.flatMap((token) =>
+		newIds.flatMap((newId) => styles.map((style) => ({ token, newId, style }))),
+	);
+
+	it.each(cases)("renames $token -> $newId ($style)", ({
+		token,
+		newId,
+		style,
+	}) => {
+		const oldId = unquote(token);
+		const { output, found } = renameGroup(render(token, style), oldId, newId);
+		expect(found).toBe(true);
+		const { frontmatter, diagnostics } = analyze(output);
+		expect(diagnostics.filter((d) => d.severity === "error")).toEqual([]);
+		const groups = frontmatter?.group ?? {};
+		expect(Object.hasOwn(groups, newId)).toBe(true);
+		expect(Object.hasOwn(groups, oldId)).toBe(false);
+		expect(Object.keys(groups).map(String)).toEqual([newId, "child", "other"]);
+		expect(String(groups.child?.parent)).toBe(newId);
+		expect(String(frontmatter?.artifact?.a?.group)).toBe(newId);
+		expect(String(frontmatter?.process?.p?.group)).toBe(newId);
+		expect(frontmatter?.artifact?.b?.group).toBe("other");
+	});
+});
