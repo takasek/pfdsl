@@ -10,7 +10,7 @@ import {
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, it } from "node:test";
-
+import { readLocalBundleAggregateHash } from "../../.claude/skills/pfd-ops/scripts/plugin-version-check.mjs";
 import {
 	BUNDLE_MANIFEST_RELATIVE_PATH,
 	writeBundleManifest,
@@ -112,5 +112,32 @@ describe("writeBundleManifest", () => {
 		const hexD = sha256("content-d\n");
 		const expected = `${hexA}  a.md\n\n${hexB}  b.md\n\n${hexD}  c/d.md\n`;
 		assert.equal(readManifest(tmp), expected);
+	});
+});
+
+// The writer lives here and the reader ships inside the pfd-ops skill, which
+// cannot import this module, so the format is defined twice. This pins the two
+// definitions to each other: the reader must aggregate the writer's real output
+// to the bundle's content identifier.
+describe("writer and reader round trip", () => {
+	it("lets the pfd-ops reader aggregate the written manifest to the bundle's content identifier", () => {
+		const files = {
+			".claude-plugin/plugin.json": '{"version":"1.2.3"}\n',
+			"skills/pfd-ops/SKILL.md": "body\n",
+			"skills/pfd-ops/scripts/x.mjs": "export {};\n",
+		};
+		for (const [rel, content] of Object.entries(files)) {
+			writeFile(tmp, rel, content);
+		}
+		writeBundleManifest(tmp);
+
+		const expected = createHash("sha256");
+		for (const rel of Object.keys(files).sort()) {
+			expected.update(rel);
+			expected.update("\0");
+			expected.update(sha256(files[rel]));
+			expected.update("\n");
+		}
+		assert.equal(readLocalBundleAggregateHash(tmp), expected.digest("hex"));
 	});
 });
