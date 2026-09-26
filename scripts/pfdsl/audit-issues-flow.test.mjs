@@ -1,7 +1,8 @@
 // Integration coverage for audit-issues-flow.mjs's gh-unavailable exit.
 // The GitHub-dependent checks are skipped (exit code 2) when the gh binary is
 // missing and no token is set; the message is what an adopting repo reads to
-// recover, so it must name the supported environment (an authenticated gh).
+// recover, so it must name both supported routes: an authenticated gh, or a
+// GH_TOKEN/GITHUB_TOKEN for gh-less environments such as Claude Code Remote.
 
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
@@ -26,7 +27,7 @@ afterEach(() => {
 });
 
 describe("audit-issues-flow without gh", () => {
-	it("skips with exit code 2 and tells the reader to install and authenticate gh", () => {
+	it("skips with exit code 2 and names both gh and the token as ways to recover", () => {
 		const env = { ...process.env, PATH: emptyBin };
 		delete env.GH_TOKEN;
 		delete env.GITHUB_TOKEN;
@@ -36,6 +37,7 @@ describe("audit-issues-flow without gh", () => {
 		});
 		assert.equal(result.status, GH_UNAVAILABLE_EXIT_CODE, result.stderr);
 		assert.match(result.stdout, /skipping GitHub-dependent checks/);
-		assert.match(result.stdout, /install the gh CLI and authenticate it/);
+		assert.match(result.stdout, /install and authenticate the gh CLI/);
+		assert.match(result.stdout, /set GH_TOKEN or GITHUB_TOKEN/);
 	});
 });
