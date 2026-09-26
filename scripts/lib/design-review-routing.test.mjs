@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import { describe, it } from "node:test";
 import { cycleStatusExitCode, runCycleStatus } from "./cycle-status-steps.mjs";
 
@@ -69,6 +70,27 @@ function assertNoRecordVerdict(result) {
 }
 
 describe("cycle preflight routes issue records to human review", () => {
+	it("points manual design review to an existing pfd-ops binding heading", async () => {
+		const { deps } = preflight();
+		const result = await runCycleStatus(deps);
+		const manualCheck = result.manualChecks.join("\n");
+		const reference = manualCheck.match(
+			/follow (.+?) in (\.pfdsl\/bindings\/pfd-ops\.md)/,
+		);
+		assert.ok(reference, "manual check must name the binding heading");
+		const binding = readFileSync(reference[2], "utf8");
+		assert.ok(
+			binding
+				.split("\n")
+				.some(
+					(line) =>
+						/^#{2,6} /.test(line) &&
+						line.replace(/^#{2,6} /, "") === reference[1],
+				),
+			`manual check references missing pfd-ops binding heading: ${reference[1]}`,
+		);
+	});
+
 	for (const issues of [[1208], [1208, 1221]]) {
 		it(`retains all explicit targets (${issues}) without classifying their prose`, async () => {
 			const { deps, reads } = preflight({ issues });
