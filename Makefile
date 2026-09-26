@@ -88,6 +88,10 @@ vscode-prepare:
 gen-samples: build-deps
 	node scripts/gen-samples.mjs
 
+.PHONY: gen-article-images
+gen-article-images: build-deps
+	node scripts/gen-article-images.mjs
+
 .PHONY: gen-readme-cli
 gen-readme-cli:
 	node scripts/gen-readme-cli.mjs
