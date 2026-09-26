@@ -98,11 +98,11 @@ artifact:
     status: todo
     criteria: "Preview のノードから定義作成でき、CLI でも同じファイルに同じ定義を作れる。既存定義・不正な入力では重複や部分書込みが起きず、拡張では Undo できる"
     location: ../packages/
-  body_definition_navigation:
-    label: グラフ本文と frontmatter 定義を往復する操作
-    description: "エディタ内でグラフ本文のノード ID と frontmatter の定義キーを右クリックから相互に移動する機能。要件は issue #1283"
+  node_location_cycle:
+    label: 定義と本文中の同一ノード位置を巡回する操作
+    description: "エディタ内で frontmatter 定義キーとグラフ本文に現れる同一ノード ID の各位置を順に巡回する機能。右クリックとショートカットから使い、Cmd+クリックの適否は既存操作との整合で判断する。要件は issue #1283"
     status: todo
-    criteria: "本文のノード ID と frontmatter 定義キーの右クリックから相互に移動でき、複数出現時の戻り先と行き先不在時の挙動が検証済み"
+    criteria: "定義キーから本文中の同一 ID の全出現箇所を文書順に巡回して定義へ戻れ、途中からも次へ進める。キー操作と右クリックから利用でき、VS Code の既存操作とのショートカット衝突が解消済み"
     location: ../packages/vscode-extension/
   hover_local_graph:
     label: ホバー内の周辺グラフとノード移動
@@ -182,10 +182,10 @@ process:
     label: ノード定義作成操作を実装する
     location: https://github.com/takasek/pfdsl/issues/1282
     updated_at: 2026-09-26T18:14:16Z
-  i1283_add_body_definition_navigation:
-    label: 本文と定義の相互移動を実装する
+  i1283_add_node_location_cycle:
+    label: 定義と本文中のノード位置の巡回を実装する
     location: https://github.com/takasek/pfdsl/issues/1283
-    updated_at: 2026-09-26T18:37:38Z
+    updated_at: 2026-09-26T18:47:44Z
   i1284_add_hover_local_graph:
     label: ホバー内の周辺グラフと移動を実装する
     location: https://github.com/takasek/pfdsl/issues/1284
@@ -248,7 +248,7 @@ editor_connector >> i483_implement_preview_connector -> preview_connector
 
 def_insertion >> i1282_create_node_definition -> node_definition_creation
 
-toolchain >> i1283_add_body_definition_navigation -> body_definition_navigation
+toolchain >> i1283_add_node_location_cycle -> node_location_cycle
 
 toolchain >> i1284_add_hover_local_graph -> hover_local_graph
 
