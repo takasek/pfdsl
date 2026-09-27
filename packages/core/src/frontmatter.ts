@@ -1,4 +1,16 @@
-import { isPair, parseDocument, parse as parseYaml, visit } from "yaml";
+import {
+	type Document,
+	isAlias,
+	isMap,
+	isNode,
+	isPair,
+	isScalar,
+	isSeq,
+	type Node,
+	parseDocument,
+	parse as parseYaml,
+	visit,
+} from "yaml";
 import { detectChildIndent } from "./frontmatter-text.js";
 import type {
 	Diagnostic,
@@ -46,6 +58,95 @@ export function findFrontmatterNodeRanges(source: string): Map<string, Range> {
 		});
 	}
 	return result;
+}
+
+/** Validate only the declared string-sequence paths, leaving extension metadata open. */
+function stringSequenceDiagnostics(
+	document: Document,
+	frontmatter: Frontmatter,
+	source: string,
+	yamlOffset: number,
+): Diagnostic[] {
+	const paths: string[][] = [["tags"], ["extends"]];
+	for (const section of ["artifact", "process"] as const) {
+		for (const id of Object.keys(frontmatter[section] ?? {})) {
+			for (const field of [
+				"tags",
+				"externalStakeholders",
+				"location",
+				...(section === "artifact" ? ["parts"] : []),
+			]) {
+				paths.push([section, id, field]);
+			}
+		}
+	}
+	// Resolve aliases along the whole path, but locate errors at the first use
+	// site rather than at a shared anchor declaration.
+	function at(path: (string | number)[]) {
+		let node: unknown = document.contents;
+		let alias: Node | undefined;
+		for (const key of [...path, undefined]) {
+			if (isAlias(node)) {
+				alias ??= node;
+				node = node.resolve(document);
+			}
+			if (key === undefined) break;
+			if (isMap(node)) {
+				// YAML object keys are stringified by toJS (null becomes "").
+				// Follow the same identity for numeric and boolean node IDs.
+				let value: unknown;
+				for (const pair of node.items) {
+					const mapKey = isAlias(pair.key)
+						? pair.key.resolve(document)
+						: pair.key;
+					if (isScalar(mapKey) && String(mapKey.value ?? "") === String(key))
+						value = pair.value;
+				}
+				node = value;
+			} else {
+				node =
+					isSeq(node) && typeof key === "number" ? node.items[key] : undefined;
+			}
+		}
+		return { node, alias };
+	}
+	function position(offset: number) {
+		const before = source.slice(0, offset);
+		return {
+			line: before.split("\n").length,
+			column: offset - before.lastIndexOf("\n"),
+			offset,
+		};
+	}
+	const diagnostics: Diagnostic[] = [];
+	for (const path of paths) {
+		const sequence = at(path);
+		// toJS already succeeded before this pass. Read its resolved values so
+		// aliases to strings are accepted and cyclic collections remain non-strings.
+		let value: unknown = frontmatter;
+		for (const key of path) {
+			value =
+				value != null && typeof value === "object"
+					? (value as Record<string, unknown>)[key]
+					: undefined;
+		}
+		if (!Array.isArray(value)) continue;
+		for (let index = 0; index < value.length; index++) {
+			if (typeof value[index] === "string") continue;
+			const item = at([...path, index]);
+			const location = item.alias ?? item.node ?? sequence.node;
+			const range = isNode(location) ? location.range : undefined;
+			const start = yamlOffset + (range?.[0] ?? 0);
+			const end = yamlOffset + (range?.[1] ?? 0);
+			diagnostics.push({
+				severity: "error",
+				code: "FM004",
+				message: `Expected a string in '${path.join(".")}' at index ${index}; quote values containing ': ' or YAML scalar literals.`,
+				range: { start: position(start), end: position(end) },
+			});
+		}
+	}
+	return diagnostics;
 }
 
 export function loadFrontmatter(
@@ -133,7 +234,19 @@ export function loadFrontmatter(
 		});
 	}
 
-	visit(parseDocument(yamlText), {
+	const yamlDocument = parseDocument(yamlText);
+	if (frontmatter !== null) {
+		const typeDiagnostics = stringSequenceDiagnostics(
+			yamlDocument,
+			frontmatter,
+			source,
+			firstNl + 1,
+		);
+		diagnostics.push(...typeDiagnostics);
+		// Like malformed YAML, invalid typed metadata must not reach consumers.
+		if (typeDiagnostics.length > 0) frontmatter = null;
+	}
+	visit(yamlDocument, {
 		Scalar(_key, scalar, path) {
 			if (
 				scalar.type !== "PLAIN" ||

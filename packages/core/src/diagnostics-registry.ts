@@ -47,6 +47,12 @@ export const DIAGNOSTIC_REGISTRY: Readonly<
 		summary: "an inline comment may truncate an intended plain-scalar value",
 	},
 
+	FM004: {
+		severities: ["error"],
+		section: "2.1",
+		summary: "a string sequence contains a non-string element",
+	},
+
 	P001: {
 		severities: ["error"],
 		section: "8",

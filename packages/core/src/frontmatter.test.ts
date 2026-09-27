@@ -229,3 +229,155 @@ describe("findFrontmatterNodeRanges", () => {
 		});
 	});
 });
+
+describe("string-sequence element types (FM004)", () => {
+	const fields = [
+		"tags",
+		"extends",
+		"artifact.a.tags",
+		"artifact.a.parts",
+		"artifact.a.externalStakeholders",
+		"artifact.a.location",
+		"process.p.tags",
+		"process.p.externalStakeholders",
+		"process.p.location",
+	];
+	function sourceFor(path: string, value: string) {
+		const keys = path.split(".");
+		return `---\n${keys.map((key, i) => `${"  ".repeat(i)}${key}:${i === keys.length - 1 ? ` ${value}` : ""}`).join("\n")}\n---\na >> p -> b\n`;
+	}
+	for (const field of fields) {
+		for (const value of [
+			"[{x: y}]",
+			"[[nested]]",
+			"[42]",
+			"[true]",
+			"[null]",
+		]) {
+			it(`rejects ${value} in ${field}`, () => {
+				const result = loadFrontmatter(sourceFor(field, value));
+				expect(result.diagnostics).toEqual([
+					expect.objectContaining({
+						code: "FM004",
+						severity: "error",
+						message: expect.stringContaining(field),
+					}),
+				]);
+				expect(result.frontmatter).toBeNull();
+			});
+		}
+		for (const value of ["[]", '["x: y", "42", "true", "null", ""]']) {
+			it(`accepts ${value} in ${field}`, () => {
+				expect(loadFrontmatter(sourceFor(field, value)).diagnostics).toEqual(
+					[],
+				);
+			});
+		}
+	}
+	it.each([
+		"\n",
+		"\r\n",
+	])("locates each offending element with %j newlines", (newline) => {
+		const source = [
+			"---",
+			"artifact:",
+			"  a:",
+			"    tags:",
+			"      - x: y",
+			"      - 42",
+			"---",
+			"a >> p -> b",
+		].join(newline);
+		const result = loadFrontmatter(source);
+		expect(
+			result.diagnostics.map((d) => [
+				d.code,
+				d.range.start.line,
+				d.range.start.column,
+				source.slice(d.range.start.offset, d.range.end.offset).trim(),
+			]),
+		).toEqual([
+			["FM004", 5, 9, "x: y"],
+			["FM004", 6, 9, "42"],
+		]);
+	});
+	it("accepts string aliases, block scalars, scalar paths, and unrelated extension values", () => {
+		const source = `---
+text: &text hello
+list: &list [*text]
+tags: *list
+extends: ./theme.yaml
+artifact:
+  a:
+    tags:
+      - *text
+      - |
+        x: y
+    location: ./a.md
+    custom:
+      tags: [{x: y}]
+    owner: [alice]
+process:
+  p:
+    parts: [{custom: value}]
+tag:
+  x:
+    tags: [{custom: value}]
+---
+a >> p -> b
+`;
+		expect(loadFrontmatter(source).diagnostics).toEqual([]);
+	});
+	it.each([
+		["bad: &bad {x: y}\ntags: [*bad]", "*bad"],
+		["bad: &bad [{x: y}]\ntags: *bad", "*bad"],
+		["bad: &bad {tags: [{x: y}]}\nartifact:\n  a: *bad", "*bad"],
+		["bad: &bad {a: {tags: [{x: y}]}}\nartifact: *bad", "*bad"],
+	])("checks aliases at every supported path level: %s", (yaml, marker) => {
+		const source = `---\n${yaml}\n---\na >> p -> b\n`;
+		const diagnostics = loadFrontmatter(source).diagnostics;
+		expect(diagnostics).toHaveLength(1);
+		expect(diagnostics[0]?.code).toBe("FM004");
+		expect(diagnostics[0]?.range.start.offset).toBe(source.lastIndexOf(marker));
+	});
+	it("leaves invalid YAML and unresolved aliases to FM002", () => {
+		for (const yaml of [
+			"tags: [*missing]",
+			"tags: [",
+			"tags: [a]\ntags: [b]",
+		]) {
+			const diagnostics = loadFrontmatter(
+				`---\n${yaml}\n---\na >> p\n`,
+			).diagnostics;
+			expect(diagnostics.map((d) => d.code)).toEqual(["FM002"]);
+		}
+	});
+	it("diagnoses cyclic and empty sequence elements without throwing", () => {
+		for (const yaml of ["tags: &tags [*tags]", "tags:\n  -"]) {
+			const result = loadFrontmatter(`---\n${yaml}\n---\na >> p\n`);
+			expect(result.diagnostics.some((d) => d.code === "FM004")).toBe(true);
+		}
+	});
+});
+
+describe("FM004 with YAML metadata keys", () => {
+	it.each([
+		"42",
+		"true",
+		"01",
+		"null",
+		'"42"',
+	])("checks scalar key %s after YAML key coercion", (id) => {
+		const source = `---\nartifact:\n  ${id}:\n    tags: [{x: y}]\n---\na >> p -> b\n`;
+		const result = loadFrontmatter(source);
+		expect(result.diagnostics).toHaveLength(1);
+		expect(result.diagnostics[0]?.code).toBe("FM004");
+		expect(result.diagnostics[0]?.range.start.line).toBe(4);
+		expect(
+			source.slice(
+				result.diagnostics[0]?.range.start.offset,
+				result.diagnostics[0]?.range.end.offset,
+			),
+		).toBe("{x: y}");
+	});
+});

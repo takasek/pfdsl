@@ -5759,3 +5759,89 @@ legacy_in >> build_legacy -> legacy_out
 		expect(readyUnchanged(before.ready, after.ready)).toBe(false);
 	});
 });
+
+describe("FM004 string-sequence diagnostics", () => {
+	it.each([
+		false,
+		true,
+	])("rejects a mapping element with strict=%s", async (strict) => {
+		const file = join(dir, `bad-sequence-${strict}.pfdsl`);
+		writeFileSync(
+			file,
+			"---\nartifact:\n  a:\n    tags:\n      - x: y\n---\na >> p -> b\n",
+		);
+		const result = await run([
+			"check",
+			file,
+			"--json",
+			...(strict ? ["--strict"] : []),
+		]);
+		expect(result.exitCode).toBe(1);
+		expect(result.stderr).toBe("");
+		expect(JSON.parse(result.stdout).diagnostics).toContainEqual(
+			expect.objectContaining({
+				code: "FM004",
+				severity: "error",
+				range: expect.objectContaining({
+					start: expect.objectContaining({ line: 5, column: 9 }),
+				}),
+			}),
+		);
+	});
+	it("reports an invalid extends element rather than crashing in path resolution", async () => {
+		const file = join(dir, "bad-extends.pfdsl");
+		writeFileSync(file, "---\nextends: [{x: y}]\n---\na >> p -> b\n");
+		const result = await run(["check", file]);
+		expect(result.exitCode).toBe(1);
+		expect(result.stderr).toContain("FM004");
+		expect(result.stderr).toContain("extends");
+	});
+	it("explains FM004", async () => {
+		const result = await run(["explain", "FM004"]);
+		expect(result.exitCode).toBe(0);
+		expect(result.stdout).toContain("non-string");
+	});
+});
+
+describe("FM004 in referenced files", () => {
+	it("reports invalid extends elements inside a nested preset", async () => {
+		const entry = join(dir, "preset-entry.pfdsl");
+		const middle = join(dir, "preset-middle.yaml");
+		const broken = join(dir, "preset-broken.yaml");
+		writeFileSync(
+			entry,
+			"---\nextends: ./preset-middle.yaml\n---\na >> p -> b\n",
+		);
+		writeFileSync(middle, "extends: [./preset-broken.yaml]\n");
+		writeFileSync(broken, "extends:\n  - x: y\n");
+		const result = await run(["check", entry, "--json"]);
+		expect(result.exitCode).toBe(1);
+		const diagnostics = JSON.parse(result.stdout).diagnostics;
+		expect(diagnostics).toContainEqual(
+			expect.objectContaining({
+				code: "FM004",
+				file: broken,
+				range: expect.objectContaining({
+					start: expect.objectContaining({ line: 2, column: 5, offset: 13 }),
+				}),
+			}),
+		);
+	});
+	it("reports invalid tags in a subflow child", async () => {
+		const entry = join(dir, "sequence-parent.pfdsl");
+		const child = join(dir, "sequence-child.pfdsl");
+		writeFileSync(
+			entry,
+			"---\nprocess:\n  p:\n    subflow: ./sequence-child.pfdsl\n---\na >> p -> b\n",
+		);
+		writeFileSync(
+			child,
+			"---\nartifact:\n  a:\n    tags: [42]\n---\na >> q -> b\n",
+		);
+		const result = await run(["check", entry, "--json"]);
+		expect(result.exitCode).toBe(1);
+		expect(JSON.parse(result.stdout).diagnostics).toContainEqual(
+			expect.objectContaining({ code: "FM004", file: child }),
+		);
+	});
+});
