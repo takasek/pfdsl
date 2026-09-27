@@ -11,7 +11,10 @@ import {
 	parse as parseYaml,
 	visit,
 } from "yaml";
+import type { $ZodIssue } from "zod/v4/core";
+import en from "zod/v4/locales/en.js";
 import { detectChildIndent } from "./frontmatter-text.js";
+import { frontmatterInputSchema } from "./types/frontmatter.js";
 import type {
 	Diagnostic,
 	Frontmatter,
@@ -61,25 +64,12 @@ export function findFrontmatterNodeRanges(source: string): Map<string, Range> {
 }
 
 /** Validate only the declared string-sequence paths, leaving extension metadata open. */
-function stringSequenceDiagnostics(
+function frontmatterTypeDiagnostics(
 	document: Document,
-	frontmatter: Frontmatter,
+	frontmatter: unknown,
 	source: string,
 	yamlOffset: number,
 ): Diagnostic[] {
-	const paths: string[][] = [["tags"], ["extends"]];
-	for (const section of ["artifact", "process"] as const) {
-		for (const id of Object.keys(frontmatter[section] ?? {})) {
-			for (const field of [
-				"tags",
-				"externalStakeholders",
-				"location",
-				...(section === "artifact" ? ["parts"] : []),
-			]) {
-				paths.push([section, id, field]);
-			}
-		}
-	}
 	// Resolve aliases along the whole path, but locate errors at the first use
 	// site rather than at a shared anchor declaration.
 	function at(path: (string | number)[]) {
@@ -119,33 +109,45 @@ function stringSequenceDiagnostics(
 		};
 	}
 	const diagnostics: Diagnostic[] = [];
-	for (const path of paths) {
-		const sequence = at(path);
-		// toJS already succeeded before this pass. Read its resolved values so
-		// aliases to strings are accepted and cyclic collections remain non-strings.
-		let value: unknown = frontmatter;
-		for (const key of path) {
-			value =
-				value != null && typeof value === "object"
-					? (value as Record<string, unknown>)[key]
-					: undefined;
-		}
-		if (!Array.isArray(value)) continue;
-		for (let index = 0; index < value.length; index++) {
-			if (typeof value[index] === "string") continue;
-			const item = at([...path, index]);
-			const location = item.alias ?? item.node ?? sequence.node;
+	const result = frontmatterInputSchema.safeParse(frontmatter, {
+		error: en().localeError,
+	});
+	// Union branches report a parent issue. Prefer errors below that parent,
+	// e.g. the invalid element in string | string[], not the whole sequence.
+	function leaves(issues: $ZodIssue[]): $ZodIssue[] {
+		return issues.flatMap((issue) => {
+			if (issue.code !== "invalid_union") return [issue];
+			const nested = issue.errors.flatMap((branch) =>
+				leaves(
+					branch.map((child) => ({
+						...child,
+						path: [...issue.path, ...child.path],
+					})),
+				),
+			);
+			const deeper = nested.filter(
+				(child) => child.path.length > issue.path.length,
+			);
+			return deeper.length ? deeper : [issue];
+		});
+	}
+	if (!result.success)
+		for (const issue of leaves(result.error.issues)) {
+			const path = issue.path.map((key) =>
+				typeof key === "number" ? key : String(key),
+			);
+			const item = at(path);
+			const location = item.alias ?? item.node;
 			const range = isNode(location) ? location.range : undefined;
 			const start = yamlOffset + (range?.[0] ?? 0);
 			const end = yamlOffset + (range?.[1] ?? 0);
 			diagnostics.push({
 				severity: "error",
 				code: "FM004",
-				message: `Expected a string in '${path.join(".")}' at index ${index}; quote values containing ': ' or YAML scalar literals.`,
+				message: `Invalid front matter field '${path.join(".") || "<root>"}': ${issue.message}`,
 				range: { start: position(start), end: position(end) },
 			});
 		}
-	}
 	return diagnostics;
 }
 
@@ -215,13 +217,13 @@ export function loadFrontmatter(
 
 	const diagnostics: Diagnostic[] = [];
 	let frontmatter: Frontmatter | null = null;
+	let parsed: unknown = null;
+	let yamlValid = true;
 
 	try {
-		const parsed = parseYaml(yamlText);
-		if (parsed != null && typeof parsed === "object") {
-			frontmatter = parsed as Frontmatter;
-		}
+		parsed = parseYaml(yamlText);
 	} catch (e) {
+		yamlValid = false;
 		const msg = e instanceof Error ? e.message : String(e);
 		diagnostics.push({
 			severity: "error",
@@ -235,16 +237,31 @@ export function loadFrontmatter(
 	}
 
 	const yamlDocument = parseDocument(yamlText);
-	if (frontmatter !== null) {
-		const typeDiagnostics = stringSequenceDiagnostics(
+	if (yamlValid && (parsed !== null || yamlDocument.contents !== null)) {
+		const typeDiagnostics = frontmatterTypeDiagnostics(
 			yamlDocument,
-			frontmatter,
+			parsed,
 			source,
 			firstNl + 1,
 		);
 		diagnostics.push(...typeDiagnostics);
 		// Like malformed YAML, invalid typed metadata must not reach consumers.
-		if (typeDiagnostics.length > 0) frontmatter = null;
+		if (typeDiagnostics.length === 0) {
+			// Checked above. Retain the original YAML values (including extension
+			// aliases), normalizing only the documented empty declarations.
+			frontmatter = { ...(parsed as Frontmatter) };
+			for (const section of ["artifact", "process", "group", "tag"] as const) {
+				const entries = frontmatter[section];
+				if (entries) frontmatter[section] = { ...entries };
+				if (entries)
+					for (const [id, meta] of Object.entries(entries)) {
+						if (meta === null) {
+							const normalized = frontmatter[section];
+							if (normalized) normalized[id] = {};
+						}
+					}
+			}
+		}
 	}
 	visit(yamlDocument, {
 		Scalar(_key, scalar, path) {

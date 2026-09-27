@@ -316,7 +316,7 @@ artifact:
     location: ./a.md
     custom:
       tags: [{x: y}]
-    owner: [alice]
+    owner: alice
 process:
   p:
     parts: [{custom: value}]
@@ -380,4 +380,144 @@ describe("FM004 with YAML metadata keys", () => {
 			),
 		).toBe("{x: y}");
 	});
+});
+
+describe("known frontmatter field shapes", () => {
+	const strings = [
+		"title",
+		"dslVersion",
+		"description",
+		"basePath",
+		"artifact.a.label",
+		"artifact.a.description",
+		"artifact.a.owner",
+		"artifact.a.group",
+		"artifact.a.criteria",
+		"artifact.a.revises",
+		"process.p.label",
+		"process.p.description",
+		"process.p.owner",
+		"process.p.group",
+		"process.p.command",
+		"process.p.subflow",
+		"process.p.boundary.a",
+		"group.g.label",
+		"group.g.color",
+		"group.g.parent",
+		"tag.t.label",
+		"tag.t.description",
+		"tag.t.style.fillcolor",
+		"statusStyles.done.penwidth",
+	];
+	const arrays = [
+		"tags",
+		"artifact.a.tags",
+		"artifact.a.parts",
+		"artifact.a.externalStakeholders",
+		"process.p.tags",
+		"process.p.externalStakeholders",
+	];
+	const numbers = ["artifact.a.index", "process.p.index", "layout.maxWidth"];
+	const maps = [
+		"artifact",
+		"process",
+		"group",
+		"tag",
+		"layout",
+		"statusStyles",
+		"artifact.a",
+		"process.p",
+		"group.g",
+		"tag.t",
+		"tag.t.style",
+		"statusStyles.done",
+		"process.p.boundary",
+	];
+	function source(path: string, value: string) {
+		const keys = path.split(".");
+		return `---\n${keys.map((key, i) => `${"  ".repeat(i)}${key}:${i === keys.length - 1 ? ` ${value}` : ""}`).join("\n")}\n---\na >> p -> b\n`;
+	}
+	for (const [fields, value] of [
+		[strings, "42"],
+		[arrays, "hello"],
+		[numbers, "wide"],
+		[maps, "[]"],
+	] as const) {
+		it.each(fields)(`rejects ${value} at %s`, (path) => {
+			const result = loadFrontmatter(source(path, value));
+			expect(result.frontmatter).toBeNull();
+			expect(result.diagnostics).toEqual([
+				expect.objectContaining({
+					code: "FM004",
+					message: expect.stringContaining(path),
+				}),
+			]);
+		});
+	}
+	it.each([
+		"42",
+		"true",
+		"[one, two]",
+		"null",
+		"~",
+	])("rejects non-map root %s", (value) => {
+		expect(loadFrontmatter(`---\n${value}\n---\na >> p\n`).diagnostics).toEqual(
+			[expect.objectContaining({ code: "FM004" })],
+		);
+	});
+	it.each([
+		"location",
+		"extends",
+	])("locates invalid union array elements in %s", (field) => {
+		const yaml =
+			field === "location"
+				? "artifact:\n  a:\n    location: [ok, 42]"
+				: "extends: [ok, 42]";
+		const src = `---\n${yaml}\n---\na >> p\n`;
+		const diagnostics = loadFrontmatter(src).diagnostics;
+		expect(diagnostics).toHaveLength(1);
+		expect(diagnostics[0]?.range.start.offset).toBe(src.indexOf("42"));
+	});
+	it("accepts and normalizes empty declarations while retaining extensions", () => {
+		const result = loadFrontmatter(
+			"---\nartifact: {a: null}\nprocess: {p: null}\ngroup: {g: null}\ntag: {t: null}\ncustom: {values: [1, true]}\n---\na >> p\n",
+		);
+		expect(result.diagnostics).toEqual([]);
+		expect(result.frontmatter).toMatchObject({
+			artifact: { a: {} },
+			process: { p: {} },
+			group: { g: {} },
+			tag: { t: {} },
+			custom: { values: [1, true] },
+		});
+	});
+});
+
+it.each([
+	"artifact.a.status",
+	"type",
+	"layout.direction",
+	"extends",
+	"artifact.a.location",
+	"version",
+])("rejects an invalid type at %s", (path) => {
+	const keys = path.split(".");
+	const yaml = keys
+		.map(
+			(key, i) =>
+				`${"  ".repeat(i)}${key}:${i === keys.length - 1 ? " true" : ""}`,
+		)
+		.join("\n");
+	expect(
+		loadFrontmatter(`---\n${yaml}\n---\na >> p\n`).diagnostics,
+	).toContainEqual(expect.objectContaining({ code: "FM004" }));
+});
+
+it("does not normalize nulls in extension values sharing a section alias", () => {
+	const result = loadFrontmatter(
+		"---\ncustom: &x {a: null}\nartifact: *x\n---\na >> p\n",
+	);
+	expect(result.diagnostics).toEqual([]);
+	expect(result.frontmatter?.artifact).toEqual({ a: {} });
+	expect(result.frontmatter?.custom).toEqual({ a: null });
 });

@@ -50,7 +50,7 @@ export const DIAGNOSTIC_REGISTRY: Readonly<
 	FM004: {
 		severities: ["error"],
 		section: "2.1",
-		summary: "a string sequence contains a non-string element",
+		summary: "a known front matter field has an invalid type",
 	},
 
 	P001: {

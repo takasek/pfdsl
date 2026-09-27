@@ -3312,15 +3312,17 @@ describe("status gaps", () => {
 
 	// `tags:` written without brackets parses as a plain string, and a substring
 	// test on it would accept any value containing the tag as a fragment. The
-	// selector asks for an element of a list, so a scalar matches nothing.
-	it("does not match a scalar tags: value that merely contains the tag", async () => {
+	// schema now rejects this malformed value before selection.
+	it("rejects a scalar tags: value before matching reserved tags", async () => {
 		const rm = roadmapWith("  other:\n    status: done\n");
 		const fl = flowWith(
 			"  gap_art:\n    tags: not-really-roadmap-tracked-thing\n    label: Gap\n",
 		);
 		const r = await run(["status", "gaps", rm, fl, "--json"]);
-		expect(r.exitCode).toBe(0);
-		expect(JSON.parse(r.stdout).trackedArtifactCount).toBe(0);
+		expect(r.exitCode).toBe(1);
+		expect(JSON.parse(r.stdout).diagnostics).toContainEqual(
+			expect.objectContaining({ code: "FM004" }),
+		);
 	});
 
 	it("does not match a tag that merely contains the reserved value", async () => {
@@ -5799,7 +5801,7 @@ describe("FM004 string-sequence diagnostics", () => {
 	it("explains FM004", async () => {
 		const result = await run(["explain", "FM004"]);
 		expect(result.exitCode).toBe(0);
-		expect(result.stdout).toContain("non-string");
+		expect(result.stdout).toContain("invalid type");
 	});
 });
 

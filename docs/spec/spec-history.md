@@ -8,7 +8,10 @@
 
 `vOLD` は直前のバージョン、`vNEW` はこのエントリが導入したバージョン（＝そのエントリを書いた時点の spec.md タイトル行と一致）。先頭エントリの `vNEW` は常に spec.md の現行バージョンと一致していなければならない（`scripts/check-spec-history.mjs` が release 前に機械検査する）。エントリは maintain_spec（統合フェーズ）でタイトル行 bump と同じ作業の中で書く（`.pfdsl/workflow.md`）ので、release 時点で複数バージョン分がまとまって欠けている状態は本来生じない。生じていた場合は書き忘れであり、欠けているエントリを追記する（`spec-history-finalize` スキル）。エントリは version ごとに永続する記録であり、release 単位でまとめたり削除したりしない。v0.0.2 以前のエントリは旧形式（丸括弧なし）のまま残す — 過去の記録は書き換えない。
 
-v0.0.22 からの主な変更点（v0.0.23）：文字列配列の非文字列要素を検出する FM004 を追加した（§2.1、#1272）。トップレベルの `tags` / `extends`、artifact の `tags` / `parts` / `externalStakeholders` / `location`、process の `tags` / `externalStakeholders` / `location` が対象となる。**破壊的変更**を含む — 従来受理していた mapping・sequence・数値・真偽値・null の配列要素を通常 mode でも error とする。文字列を意図していた値は引用符で囲んで修正できる。文字列 alias と空配列は引き続き有効で、自由ラベルの内容・拡張フィールドは検査しない。
+v0.0.22 からの主な変更点（v0.0.23）：既知の front matter フィールドの型違反を検出する FM004 を追加した（§2.1、#1272）。
+文字列配列の要素に加え、既知の文字列・数値・mapping・union の型を通常 mode でも検査する。
+空宣言と未知の拡張キーは保持し、既存の列挙値・スタイルキー・正整数・参照整合性の診断は維持する。
+**破壊的変更**を含む — これまで黙認されていた既知フィールドの型違反は error となり、不正なメタデータは後続処理へ渡さない。
 
 v0.0.21 からの主な変更点（v0.0.22）：`type: roadmap` のファイルで、body の edge に現れる artifact id が front matter に宣言を持たない場合、または宣言はあるが `status:` を持たない場合を検出する V035 を追加した（§15.16、#1125）。宣言ブロックだけを削除して edge 行を残すと、label も status も criteria も持たない「幽霊ノード」がグラフに残る。旧 W005（roadmap の produced artifact に `status:` 未設定; warning、strict mode では error）はこの穴を塞げなかった — produced artifact しか走査せず、ghost node の形は素通りさせていた。V035 は edge 上の全 artifact を対象に、宣言の欠落と `status:` の欠落の両方を無条件 error（`ctx.strictly(...)` を経由しない）で検出するため、W005 が検出していた集合を完全に包含する。W005 は単独で発火する余地を失ったため廃止した。**破壊的変更**を含む — 宣言のない artifact に加え、`status:` を持たない空宣言（`id: {}` 等）を持つ既存の roadmap ファイルも、非 strict の `check` で新たに error になる。W005 コードは消滅し、これをフィルタしていたツール連携があれば見直しが必要になる。
 

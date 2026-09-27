@@ -42,3 +42,54 @@ raw YAML プリセットに解析用の fence を付けた場合は、診断位�
 
 文字列 alias と独自の `custom.tags` は `fmt --write` 後も `check` と `meta get` で同じ意味を保持した。
 通常・strict の FM004、参照プリセットと subflow の拒否、`explain FM004` は CLI の回帰テストでも確認する。
+
+## 既知フィールド全体への拡張
+
+上記は最初の文字列配列限定版の記録である。
+ユーザーの指摘を受け、文字列・数値・配列・mapping・union を含む既知フィールド全体へ範囲を広げた。
+TypeBox＋Ajv と Zod を比較し、既存読込みへの試作、Node 18 と実ブラウザ検証、サイズ比較を経て Zod Mini＋英語 locale を採用した。
+スキーマから公開型を導出し、空宣言を受け入れる入力形状と正規化後の型を分ける。
+`status` / `type` の列挙値とスタイルキーは既存の意味検証へ残し、診断コードと `meta set` の修復経路を維持する。
+既知フィールドの型違反は FM004 とし、拡張キーは保持する。
+
+単一制約節 §2.1 の型検査拡張として spec-stress-test フェーズ1を実施した。
+粒度・N:M・diamond・孤立宣言は今回の型制約を変えない。
+実CLIに対する追加17例は、以下の予測と一致した。
+
+| 入力境界 | 予測と実測 |
+| --- | --- |
+| スカラー tags、配列 owner、数値 parts、数値 boundary 値、数値 penwidth | FM004、exit 1 |
+| 未定義 layout.direction | FM004、exit 1 |
+| 不正な文字列 status / type | V007 / V031、exit 1 |
+| 未定義スタイル属性 / statusStyles キー | V009 / V008、exit 1 |
+| index: 0 | V029、exit 1 |
+| 拡張キー内の owner 配列・parts 数値 | error なし、exit 0 |
+| 空の artifact / process 宣言 | error なし、exit 0 |
+| 拡張値と共有された空宣言 alias | error なし、exit 0 |
+| location 配列の非文字列要素を含む alias | FM004、exit 1 |
+| 有効な tags と feedback の併用 | error なし、exit 0 |
+| frontmatter-only の title 数値 | FM004、exit 1 |
+
+回帰テストでは union の子診断パスを親パスへ結合し、`location: [ok, 42]` の `42` 自体を指すことを確認した。
+独立レビューで、空宣言の破壊的正規化が共有 alias の拡張値まで変える反例が見つかった。
+回帰テストの Red を確認後、ルートと宣言 mapping をコピーして正規化し、Green と再レビューで解消を確認した。
+明示的な null / `~` ルートは FM004、空の front matter は引き続き許容する。
+
+### サイズと実行環境
+
+同一入口・esbuild 0.28.2・minify・gzip 条件で、旧コミット c8722d5e のバンドルと比較した。
+ここでの browser は frontmatter loader のみで、アプリや拡張の配布サイズではない。
+全 core は既存の `node:path` 依存があるため、この測定を全 core のブラウザ対応とは扱わない。
+
+| 構成 | browser gzip bytes | 旧版との差 |
+| --- | ---: | ---: |
+| 旧版 | 32011 | 0 |
+| 部分スキーマ・通常 Zod namespace import | 124348 | 92337 |
+| 部分スキーマ・通常 Zod 個別 import | 58726 | 26715 |
+| 部分スキーマ・Mini＋英語 | 38784 | 6773 |
+| 全既知フィールド・Mini＋英語（今回の実装） | 40277 | 8266 |
+
+最終 core バンドルは Node 18.20.8 で6不正例と1有効例を通し、行・列と型検査を確認した。
+Chrome 153.0.8010.53 では、ページ自身のスクリプトで `new Function` が禁止される CSP 下で読み込み、alias 使用位置と未知キー・空宣言の保持を確認した。
+型検査からスキーマ生成への移行、全パッケージのテスト、参照先プリセットと subflow の診断伝播も別途検証した。
+全項目の配布利用者受入れや、VS Code の対話操作を確認したという意味ではない。

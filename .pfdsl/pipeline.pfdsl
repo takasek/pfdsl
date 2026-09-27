@@ -83,9 +83,21 @@ artifact:
     criteria: node packages/cli/dist/cli.js graph edges が実装され動作確認済み（validate/render_graph/export_metadata/diff_graphsの共通入力として機能）
     externalStakeholders: [ CLIユーザー ]
     group: in_memory
+  parse_diagnostics:
+    label: 読込・構文診断
+    description: frontmatterの型・YAML検査とlex・parseが返すFM/L/P診断
+    group: in_memory
+  normalize_diagnostics:
+    label: 正規化診断
+    description: normalizeが返すN診断
+    group: in_memory
+  validation_diagnostics:
+    label: 意味検証診断
+    description: validateが返すV/W診断
+    group: in_memory
   diagnostics_report:
     label: 診断結果
-    description: "V/Wルールに基づくエラー・警告一覧。CLI checkコマンドの出力で、VSCode拡張は同じvalidateをエディタ内リアルタイム診断に使う"
+    description: "frontmatterの型・YAML検査、lex/parse、normalize、V/Wルールのエラー・警告を集約した一覧。CLI checkとVSCode拡張のリアルタイム診断が共有する"
     criteria: node packages/cli/dist/cli.js check が実装され動作確認済み（VSCode拡張のリアルタイム診断でも共有）
     externalStakeholders: [ CLIユーザー, CI, VSCode拡張ユーザー ]
     group: run_outputs
@@ -394,7 +406,7 @@ artifact:
 process:
   parse:
     label: 構文解析
-    description: "frontmatter読込・lex・parseの3段を1トランザクションで実行しdocument+frontmatterを得る。CLI（c経由）・VSCode拡張（d）双方の全コマンドが内部で通る"
+    description: "frontmatterの既知フィールドをスキーマで検査し、lex・parseと合わせてdocument+frontmatterと診断を得る。CLI（c経由）・VSCode拡張（d）双方の全コマンドが内部で通る"
     location: ../packages/core/src/index.ts
     tags: [ b ]
   normalize:
@@ -412,6 +424,11 @@ process:
     label: 比較対象の正規化
     description: normalize と同じ正規化処理を比較対象の構文木へ適用し、第2グラフを構築する
     location: ../packages/core/src/normalizer.ts
+    tags: [ b ]
+  collect_diagnostics:
+    label: 診断の集約
+    description: analyzeが読込・構文診断、正規化診断、意味検証診断を連結し、CLIと拡張が利用する診断一覧を返す
+    location: ../packages/core/src/index.ts
     tags: [ b ]
   validate:
     label: 検証
@@ -575,11 +592,13 @@ process:
     tags: [ g ]
 ---
 
-pfdsl_source >> parse -> parsed_doc
+pfdsl_source >> parse -> [parse_diagnostics, parsed_doc]
 
-parsed_doc >> normalize -> normalized_graph
+parsed_doc >> normalize -> [normalize_diagnostics, normalized_graph]
 
-[normalized_graph, parsed_doc] >> validate -> diagnostics_report
+[normalized_graph, parsed_doc] >> validate -> validation_diagnostics
+
+[normalize_diagnostics, parse_diagnostics, validation_diagnostics] >> collect_diagnostics -> diagnostics_report
 
 pfdsl_source >> format -> [format_diagnostics, formatted_source]
 
