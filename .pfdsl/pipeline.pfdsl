@@ -370,6 +370,13 @@ artifact:
     criteria: "mainの.claude-plugin/marketplace.jsonでpfdslのsourceがgit-subdir、url=https://github.com/takasek/pfdsl.git、path=plugin/pfdsl、ref=v<VERSION>を持ち、そのrefから検証済みpluginを取得できる"
     location: https://github.com/takasek/pfdsl/blob/main/.claude-plugin/marketplace.json
     group: published
+  frontmatter_json_schema:
+    label: frontmatter JSON Schema
+    description: Zod定義から生成した非空frontmatter mapping用のJSON Schema。coreパッケージにも同梱し、外部の検証器や編集支援が利用する
+    criteria: coreのbuildでJSONが生成され、json-schema.test.tsで追跡済み生成物との一致と独立検証器による受理・拒否を確認できる
+    location: ../packages/core/schema/frontmatter.schema.json
+    externalStakeholders: [ 外部ライブラリ利用者, エディタ連携開発者 ]
+    group: run_outputs
   published_libraries:
     label: npm 公開ライブラリ群
     description: "@pfdsl/core / graphviz-exporter / preview-engine の npm 公開物。lib-v* tag push で GitHub Actions が自動 publish する（core → graphviz-exporter → preview-engine 順）"
@@ -548,6 +555,12 @@ process:
     command: "make release-libs COMMIT=<SHA>"
     location: ../scripts/release.mjs
     tags: [ gen ]
+  generate_frontmatter_schema:
+    label: JSON Schema生成
+    description: coreのZod定義からJSON Schemaを生成する。buildはdistへ書き、gen:schemaは追跡済み参照用コピーを更新する。変換器はランタイム入口から読み込まない
+    command: pnpm --filter @pfdsl/core gen:schema
+    location: ../packages/core/scripts/write-schema.mjs
+    tags: [ b ]
   publish_libraries:
     label: ライブラリ自動公開
     description: "lib-v* tag push、または同じrelease tagを指定した手動再開でpublish-libraries.ymlがeventのSHAをcheckoutし、tagと共通package versionを照合してcore・graphviz-exporter・preview-engineを順にnpm publishする（Trusted Publishing / OIDC）。branchからの手動公開は拒否する"
@@ -596,7 +609,7 @@ pfdsl_source >> parse -> [parse_diagnostics, parsed_doc]
 
 parsed_doc >> normalize -> [normalize_diagnostics, normalized_graph]
 
-[normalized_graph, parsed_doc] >> validate -> validation_diagnostics
+[normalized_graph, parsed_doc, pfdsl_source] >> validate -> validation_diagnostics
 
 [normalize_diagnostics, parse_diagnostics, validation_diagnostics] >> collect_diagnostics -> diagnostics_report
 
@@ -642,7 +655,9 @@ toolchain >> gen_readme_cli -> readme_cli_blocks
 
 [libraries_release_request, toolchain] >> push_libraries_release_tag -> libraries_release_tag
 
-[libraries_release_tag, toolchain] >> publish_libraries -> published_libraries
+toolchain >> generate_frontmatter_schema -> frontmatter_json_schema
+
+[frontmatter_json_schema, libraries_release_tag, toolchain] >> publish_libraries -> published_libraries
 
 [toolchain, vscode_release_request] >> package_vscode_release -> [vscode_release_tag, vsix_candidate]
 

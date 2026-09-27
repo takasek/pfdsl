@@ -43,9 +43,11 @@
 
 ## 変換境界の定義
 
-- **parse（`@pfdsl/core` の `parse()`）**: frontmatter 読込 → lex → parse の3段を1トランザクションとして扱う。出力は `document`（構文木）と `frontmatter`。個別サブコマンドとしては露出しない内部境界
+- **parse（`@pfdsl/core` の `parse()`）**: frontmatter 読込 → lex → parse の3段を1トランザクションとして扱う。出力は `document`（構文木）と型検査済み `frontmatter`、FM/L/P 診断。個別サブコマンドとしては露出しない内部境界
 - **normalize（`normalizer.ts` + `buildGraph`）**: parse の出力からエッジリスト・ノード種別・孤立ノード集合・`Graph` 構造を組み立てる。CLI `normalize` コマンドはこれをそのまま JSON 出力する
-- **validate（`validator.ts`）**: 正準化グラフと frontmatter に V/W ルールを適用し診断を生成する。CLI `check` は parse→normalize→validate を1回で実行する。VSCode 拡張は `analyze()` 経由で同じ validate をエディタ内リアルタイム診断に使う（`diagnostics.ts`）
+- **validate（`validator.ts`）**: 正準化グラフと frontmatter に V/W ルールを適用し、原文から宣言位置を取得して診断を生成する。CLI `check` は parse→normalize→validate を1回で実行する。VSCode 拡張は `analyze()` 経由で同じ validate をエディタ内リアルタイム診断に使う（`diagnostics.ts`）
+- **collect_diagnostics（`index.ts` の `analyze()`）**: parse・normalize・validate の診断を集約する。CLI と VSCode は集約後の結果を受け取る。
+- **generate_frontmatter_schema**: Zod の型・値制約から外部検証用 JSON Schema を生成する。空宣言を許可する文書形状を公開し、後続の意味検証へ委譲するために緩めた読込み用スキーマは公開しない。変換コードはビルド時だけ使い、core の通常入口へ含めない。
 - **format（`formatter.ts`）**: ソーステキストから独立に再 lex/parse し整形済みテキストを生成する。check の parse 結果を再利用しない別経路。frontmatter は yaml CST（`frontmatter-cst.ts`）経由で正準化する（ADR-0034）
 - **sort_meta（`sort.ts` の `sort(source, opts)`）**: 入力はソーステキスト（format と同じく独立再 parse）。構文木を受け取る経路ではない。frontmatter の並べ替えは yaml CST（`frontmatter-cst.ts`）経由（ADR-0034）
 - **set_meta（`frontmatter-cst.ts` の `setFrontmatterField(source, kind, id, field, value)`）**: sort_meta と同じくソーステキストを入力に取り、指定ノードの指定フィールドだけを yaml CST 上で書き換える。対象ノードの定義が無い場合の新規挿入は `insert-definition.ts` が担う

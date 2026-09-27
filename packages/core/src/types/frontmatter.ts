@@ -37,6 +37,7 @@ const styleFields = Object.fromEntries(
 ) as Record<StyleAttr, typeof text>;
 export const nodeStyleSchema = z.strictObject(styleFields);
 const styleInputSchema = z.looseObject(styleFields);
+export const nodeIndexSchema = z.number().check(z.gte(1), z.multipleOf(1));
 const strings = z.array(z.string());
 const paths = z.union([z.string(), strings]);
 const common = {

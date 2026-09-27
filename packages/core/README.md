@@ -148,3 +148,15 @@ pnpm --filter @pfdsl/core build
 pnpm --filter @pfdsl/core test
 pnpm --filter @pfdsl/core typecheck
 ```
+
+## Frontmatter JSON Schema
+
+The package includes a generated Draft 2020-12 JSON Schema for authored, non-empty frontmatter mappings:
+
+```js
+const schema = require("@pfdsl/core/frontmatter.schema.json");
+```
+
+It accepts empty node declarations and extension data, and checks field types, enum values, style keys, and positive integer indices. Extract the YAML frontmatter before applying it to a `.pfdsl` document; the schema does not validate the DSL body. Graph references, cycles, field placement, and cross-node uniqueness still require `pfdsl check`.
+
+The Zod definitions are the source of truth. The checked-in copy is `schema/frontmatter.schema.json`; regenerate it with `pnpm --filter @pfdsl/core build` followed by `pnpm --filter @pfdsl/core gen:schema`. Build also writes the packaged copy to `dist/frontmatter.schema.json`. Tests detect drift between the definitions and the checked-in JSON. JSON Schema conversion is not imported by the core runtime entry.
