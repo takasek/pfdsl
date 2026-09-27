@@ -1,0 +1,315 @@
+{
+	"$schema": "https://json-schema.org/draft/2020-12/schema",
+	"type": "object",
+	"properties": {
+		"title": {
+			"type": "string"
+		},
+		"version": {
+			"type": ["string", "number"]
+		},
+		"dslVersion": {
+			"type": "string"
+		},
+		"description": {
+			"type": "string"
+		},
+		"tags": {
+			"type": "array",
+			"items": {
+				"type": "string"
+			}
+		},
+		"layout": {
+			"type": "object",
+			"properties": {
+				"direction": {
+					"type": "string",
+					"enum": ["LR", "RL", "TB", "BT"]
+				},
+				"maxWidth": {
+					"type": "number"
+				}
+			},
+			"additionalProperties": {}
+		},
+		"artifact": {
+			"type": "object",
+			"propertyNames": {
+				"type": "string"
+			},
+			"additionalProperties": {
+				"anyOf": [
+					{
+						"type": "object",
+						"properties": {
+							"label": {
+								"type": "string"
+							},
+							"description": {
+								"type": "string"
+							},
+							"owner": {
+								"type": "string"
+							},
+							"externalStakeholders": {
+								"type": "array",
+								"items": {
+									"type": "string"
+								}
+							},
+							"index": {
+								"type": "number",
+								"minimum": 1,
+								"multipleOf": 1
+							},
+							"tags": {
+								"type": "array",
+								"items": {
+									"type": "string"
+								}
+							},
+							"group": {
+								"type": "string"
+							},
+							"location": {
+								"anyOf": [
+									{
+										"type": "string"
+									},
+									{
+										"type": "array",
+										"items": {
+											"type": "string"
+										}
+									}
+								]
+							},
+							"parts": {
+								"type": "array",
+								"items": {
+									"type": "string"
+								}
+							},
+							"status": {
+								"type": "string",
+								"enum": ["done", "wip", "todo", "waiting", "suspended"]
+							},
+							"criteria": {
+								"type": "string"
+							},
+							"revises": {
+								"type": "string"
+							}
+						},
+						"additionalProperties": {}
+					},
+					{
+						"type": "null"
+					}
+				]
+			}
+		},
+		"process": {
+			"type": "object",
+			"propertyNames": {
+				"type": "string"
+			},
+			"additionalProperties": {
+				"anyOf": [
+					{
+						"type": "object",
+						"properties": {
+							"label": {
+								"type": "string"
+							},
+							"description": {
+								"type": "string"
+							},
+							"owner": {
+								"type": "string"
+							},
+							"externalStakeholders": {
+								"type": "array",
+								"items": {
+									"type": "string"
+								}
+							},
+							"index": {
+								"type": "number",
+								"minimum": 1,
+								"multipleOf": 1
+							},
+							"tags": {
+								"type": "array",
+								"items": {
+									"type": "string"
+								}
+							},
+							"group": {
+								"type": "string"
+							},
+							"location": {
+								"anyOf": [
+									{
+										"type": "string"
+									},
+									{
+										"type": "array",
+										"items": {
+											"type": "string"
+										}
+									}
+								]
+							},
+							"command": {
+								"type": "string"
+							},
+							"subflow": {
+								"type": "string"
+							},
+							"boundary": {
+								"type": "object",
+								"propertyNames": {
+									"type": "string"
+								},
+								"additionalProperties": {
+									"type": "string"
+								}
+							}
+						},
+						"additionalProperties": {}
+					},
+					{
+						"type": "null"
+					}
+				]
+			}
+		},
+		"group": {
+			"type": "object",
+			"propertyNames": {
+				"type": "string"
+			},
+			"additionalProperties": {
+				"anyOf": [
+					{
+						"type": "object",
+						"properties": {
+							"label": {
+								"type": "string"
+							},
+							"color": {
+								"type": "string"
+							},
+							"parent": {
+								"type": "string"
+							}
+						},
+						"additionalProperties": {}
+					},
+					{
+						"type": "null"
+					}
+				]
+			}
+		},
+		"tag": {
+			"type": "object",
+			"propertyNames": {
+				"type": "string"
+			},
+			"additionalProperties": {
+				"anyOf": [
+					{
+						"type": "object",
+						"properties": {
+							"label": {
+								"type": "string"
+							},
+							"description": {
+								"type": "string"
+							},
+							"style": {
+								"type": "object",
+								"properties": {
+									"fillcolor": {
+										"type": "string"
+									},
+									"color": {
+										"type": "string"
+									},
+									"fontcolor": {
+										"type": "string"
+									},
+									"style": {
+										"type": "string"
+									},
+									"penwidth": {
+										"type": "string"
+									}
+								},
+								"additionalProperties": false
+							}
+						},
+						"additionalProperties": {}
+					},
+					{
+						"type": "null"
+					}
+				]
+			}
+		},
+		"statusStyles": {
+			"type": "object",
+			"propertyNames": {
+				"type": "string",
+				"enum": ["done", "wip", "todo", "waiting", "suspended"]
+			},
+			"additionalProperties": {
+				"type": "object",
+				"properties": {
+					"fillcolor": {
+						"type": "string"
+					},
+					"color": {
+						"type": "string"
+					},
+					"fontcolor": {
+						"type": "string"
+					},
+					"style": {
+						"type": "string"
+					},
+					"penwidth": {
+						"type": "string"
+					}
+				},
+				"additionalProperties": false
+			}
+		},
+		"extends": {
+			"anyOf": [
+				{
+					"type": "string"
+				},
+				{
+					"type": "array",
+					"items": {
+						"type": "string"
+					}
+				}
+			]
+		},
+		"basePath": {
+			"type": "string"
+		},
+		"type": {
+			"type": "string",
+			"enum": ["roadmap", "workflow", "pipeline"]
+		}
+	},
+	"additionalProperties": {},
+	"title": "PFDSL frontmatter",
+	"description": "Validates non-empty frontmatter mappings. Graph references, cycles, field placement and cross-node constraints require pfdsl check. This schema does not validate the DSL body."
+}

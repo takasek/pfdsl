@@ -1,4 +1,5 @@
 import { Document, isPair, isScalar, isSeq, parseDocument, visit } from "yaml";
+import { invalidIdKeys } from "./frontmatter-id-keys.js";
 import type { NodeKind } from "./types/index.js";
 
 /**
@@ -316,7 +317,8 @@ export function setFrontmatterField(
 	value: string | number,
 ): string | null {
 	const { present, doc, body, yamlText, newline } = parseFrontmatterCst(source);
-	if (!present || !doc.hasIn([kind, id])) return null;
+	if (!present || invalidIdKeys(doc).length > 0 || !doc.hasIn([kind, id]))
+		return null;
 	doc.setIn([kind, id, field], value);
 	return renderFrontmatterCst(doc, newline, yamlText) + body;
 }

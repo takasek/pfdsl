@@ -1,6 +1,6 @@
 <!-- DO NOT EDIT — snapshot distributed with pfdsl skill. Authoritative source: https://github.com/takasek/pfdsl/blob/main/docs/spec/spec.md -->
 
-# PFDSL仕様書 v0.0.23
+# PFDSL仕様書 v0.0.24
 
 ## 1. 目的
 
@@ -47,6 +47,14 @@ mapping key ではない YAML プレーンスカラー値の同一行に空白�
 未定義の拡張キーとその値は保持するが、既知フィールドの検査を省略する理由にはしない。
 空配列・空文字列・quoted scalar・block scalar と、許可する型へ解決される alias は受理する。
 配列全体またはその親 mapping が alias の場合も同じ検査を行い、alias 経由の違反は使用側の位置を指す。
+`artifact` / `process` / `group` / `tag` の宣言 mapping のキー（ID）は、YAML 上で文字列でなければならない。
+数値・真偽値・null・collection のキーは、JavaScript のプロパティ名への変換前に FM004（error）で拒否する。
+例えば `10:` / `true:` は不正で、`"10":` / `"true":` は有効である。明示的な文字列タグ（`!!str 10`）も有効とする。
+alias は参照先の型を検査し、未知の拡張 mapping のキーにはこの制約を課さない。
+数値キーと同じ綴りの文字列キーを併記しても、数値キーを拒否するため黙った上書きは許さない。
+JSON Schema は解析後の mapping を検証するため、元の YAML キー型の検査には `pfdsl check` が必要となる。
+不正な ID キーを含む文書に対する `meta set` / 定義挿入 / `reindex` / `delete` は、文書の一部だけを書き換えて成功としてはならない。
+
 FM004 がある front matter は不正として扱い、処理系は不正なメタデータを後続処理へ渡さない。
 意図した文字列に `: ` を含める場合や、数値・真偽値・null と解釈されるテキストは引用符で囲む。
 

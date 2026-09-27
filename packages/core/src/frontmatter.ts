@@ -13,6 +13,7 @@ import {
 } from "yaml";
 import type { $ZodIssue } from "zod/v4/core";
 import en from "zod/v4/locales/en.js";
+import { invalidIdKeys } from "./frontmatter-id-keys.js";
 import { detectChildIndent } from "./frontmatter-text.js";
 import { frontmatterInputSchema } from "./types/frontmatter.js";
 import type {
@@ -63,7 +64,7 @@ export function findFrontmatterNodeRanges(source: string): Map<string, Range> {
 	return result;
 }
 
-/** Validate only the declared string-sequence paths, leaving extension metadata open. */
+/** Validate authored ID keys and declared field types, leaving extension metadata open. */
 function frontmatterTypeDiagnostics(
 	document: Document,
 	frontmatter: unknown,
@@ -83,7 +84,7 @@ function frontmatterTypeDiagnostics(
 			if (key === undefined) break;
 			if (isMap(node)) {
 				// YAML object keys are stringified by toJS (null becomes "").
-				// Follow the same identity for numeric and boolean node IDs.
+				// Follow that identity when traversing metadata fields.
 				let value: unknown;
 				for (const pair of node.items) {
 					const mapKey = isAlias(pair.key)
@@ -108,7 +109,19 @@ function frontmatterTypeDiagnostics(
 			offset,
 		};
 	}
-	const diagnostics: Diagnostic[] = [];
+	const diagnostics: Diagnostic[] = invalidIdKeys(document).map(
+		({ section, node }) => {
+			const start = yamlOffset + (node?.range?.[0] ?? 0);
+			const end = yamlOffset + (node?.range?.[1] ?? 0);
+			return {
+				severity: "error",
+				code: "FM004",
+				message: `Invalid front matter ID key in '${section}': expected a YAML string; quote numeric, boolean and null-like IDs`,
+				range: { start: position(start), end: position(end) },
+			};
+		},
+	);
+	if (diagnostics.length > 0) return diagnostics;
 	const result = frontmatterInputSchema.safeParse(frontmatter, {
 		error: en().localeError,
 	});
@@ -219,9 +232,14 @@ export function loadFrontmatter(
 	let frontmatter: Frontmatter | null = null;
 	let parsed: unknown = null;
 	let yamlValid = true;
+	const yamlDocument = parseDocument(yamlText);
 
 	try {
-		parsed = parseYaml(yamlText);
+		// Do not coerce invalid declaration keys or lose colliding entries.
+		parsed =
+			yamlDocument.errors.length === 0 && invalidIdKeys(yamlDocument).length > 0
+				? {}
+				: parseYaml(yamlText);
 	} catch (e) {
 		yamlValid = false;
 		const msg = e instanceof Error ? e.message : String(e);
@@ -236,7 +254,6 @@ export function loadFrontmatter(
 		});
 	}
 
-	const yamlDocument = parseDocument(yamlText);
 	if (yamlValid && (parsed !== null || yamlDocument.contents !== null)) {
 		const typeDiagnostics = frontmatterTypeDiagnostics(
 			yamlDocument,

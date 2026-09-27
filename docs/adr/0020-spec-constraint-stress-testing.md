@@ -63,3 +63,5 @@ v0.0.8 のマルチファイル意味論（`subflow:` / `extends:`）は、確�
 - `docs/spec/proposals/{i5-hierarchy,i6-presets,multifile-policy}.md`（統合元の確定提案）
 - ADR-0013（v0.0.8 依存順序 — 統合が提案の盲点を露出する非対称）
 - #137（status 非単調 lint）・#138（fenced 例の check 検証）— 同型の検出死角
+
+- `docs/adr/0020-spec-stress-testing/yaml-id-key-types.md` — v0.0.24 の宣言 ID キー型、alias と書込み拒否の境界確認。

@@ -362,12 +362,12 @@ a >> p -> b
 
 describe("FM004 with YAML metadata keys", () => {
 	it.each([
-		"42",
-		"true",
-		"01",
-		"null",
 		'"42"',
-	])("checks scalar key %s after YAML key coercion", (id) => {
+		'"true"',
+		'"01"',
+		'"null"',
+		"!!str 42",
+	])("locates field errors under string key %s", (id) => {
 		const source = `---\nartifact:\n  ${id}:\n    tags: [{x: y}]\n---\na >> p -> b\n`;
 		const result = loadFrontmatter(source);
 		expect(result.diagnostics).toHaveLength(1);
