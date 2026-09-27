@@ -1018,15 +1018,43 @@ describe("evaluateMainCommitGuard bypass axis (#1232)", () => {
 		assert.equal(result.decision, "allow");
 	});
 
-	it("names the scope/file flag and suggests local config or a terminal for an outsideTarget deny (#1232)", () => {
+	it("names the scope/file flag and suggests local config or a terminal for an outsideTarget deny against a foreign target (#1232)", () => {
 		const result = evaluateMainCommitGuard(
 			payload({ command: "git config --global core.hooksPath /x" }),
-			{ currentBranch: "feature/x" },
+			{ currentBranch: "main", targetRelation: "foreign" },
 		);
 		assert.equal(result.decision, "deny");
 		assert.match(result.reason, /'--global'/);
 		assert.match(result.reason, /--local|--worktree/);
 		assert.match(result.reason, /own terminal/);
+	});
+
+	it("says 'may write' rather than asserting it for a --file outsideTarget deny", () => {
+		const result = evaluateMainCommitGuard(
+			payload({
+				command: "git config --file /abs/.git/config core.hooksPath /x",
+			}),
+			{ currentBranch: "main", targetRelation: "foreign" },
+		);
+		assert.equal(result.decision, "deny");
+		assert.match(result.reason, /may write/);
+	});
+
+	it("uses the general bypass message, not the outsideTarget one, for an own-target outsideTarget bypass (#1232)", () => {
+		// Against the session's own worktree (or a sibling, or an unknown
+		// target), dropping just the scope flag still leaves a bypass that
+		// skips hooks and still denies — "drop the scope flag" would be
+		// incomplete advice, so the general message applies instead.
+		const result = evaluateMainCommitGuard(
+			payload({ command: "git config --global core.hooksPath /x" }),
+			{ currentBranch: "feature/x" },
+		);
+		assert.equal(result.decision, "deny");
+		assert.match(result.reason, /this skips git hooks/);
+		assert.doesNotMatch(
+			result.reason,
+			/Write to the target's own local config/,
+		);
 	});
 });
 

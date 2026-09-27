@@ -923,11 +923,21 @@ function evaluateGuardedCommand(
 	// worktree. This still sits after the foreign check above, which stays in
 	// scope for a bypass that writes outside the target (immediately above).
 	if (guarded.bypass) {
-		if (guarded.outsideTarget) {
+		// The outside-target wording is only correct against a foreign target:
+		// there, "drop the scope/file flag" is the complete fix (the plain
+		// command is allowed against a foreign target, per the check above).
+		// Against own/sibling/unknown, the plain command still skips hooks and
+		// still denies, so that advice would lead to a second deny instead of
+		// fixing anything — the general message below applies there instead.
+		if (guarded.outsideTarget && targetRelation === "foreign") {
+			const certainty =
+				guarded.outsideTargetName === "--file"
+					? "may write core.hooksPath outside the target repo (this parser does not check where the path points)"
+					: "writes core.hooksPath outside the target repo";
 			return {
 				decision: "deny",
 				reason:
-					`Blocked 'git ${guarded.subcommand}' for using '${guarded.outsideTargetFlag}': this writes core.hooksPath outside the target repo, where it can still skip this repo's (or another repo's) git hooks. ` +
+					`Blocked 'git ${guarded.subcommand}' for using '${guarded.outsideTargetFlag}': this ${certainty}, where it can still skip this repo's (or another repo's) git hooks. ` +
 					"Write to the target's own local config instead (drop the scope/file flag, or use --local/--worktree). " +
 					"If writing outside the target is genuinely needed, run the command in your own terminal instead.",
 			};
