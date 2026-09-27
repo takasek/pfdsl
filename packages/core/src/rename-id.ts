@@ -88,17 +88,14 @@ export function renameId(
 	const cst = parseFrontmatterCst(source);
 	const doc = cst.present ? cst.doc : new Document();
 
-	const matchesOldId = (value: unknown): boolean =>
-		value !== undefined && String(value) === oldId;
-
-	// Declaration key, in the section matching the resolved kind — see
-	// rename-group.ts's `matchesOldId` for why the match goes through
-	// `String(value)` rather than `===`.
+	// Declaration keys and revises:/parts: values are YAML strings in any
+	// readable document (a typed one is FM004, refused above), so they are
+	// compared to `oldId` as they are.
 	let declared = false;
 	const sectionMap = doc.getIn([kind], true);
 	if (isMap(sectionMap)) {
 		const pair = sectionMap.items.find(
-			(p) => isScalar(p.key) && matchesOldId(p.key.value),
+			(p) => isScalar(p.key) && p.key.value === oldId,
 		);
 		if (pair && isScalar(pair.key)) {
 			pair.key.value = newId;
@@ -109,14 +106,14 @@ export function renameId(
 	// Other artifacts' revises:/parts: references.
 	for (const [aid, meta] of Object.entries(frontmatter?.artifact ?? {})) {
 		if (aid === oldId) continue;
-		if (typeof meta?.revises === "string" && matchesOldId(meta.revises)) {
+		if (meta?.revises === oldId) {
 			doc.setIn(["artifact", aid, "revises"], newId);
 		}
 		if (Array.isArray(meta?.parts)) {
 			const partsNode = doc.getIn(["artifact", aid, "parts"], true);
 			if (isSeq(partsNode)) {
 				for (const item of partsNode.items) {
-					if (isScalar(item) && matchesOldId(item.value)) item.value = newId;
+					if (isScalar(item) && item.value === oldId) item.value = newId;
 				}
 			}
 		}
@@ -125,11 +122,13 @@ export function renameId(
 	// Every subflow process's boundary: KEY that names oldId (values are the
 	// child file's own ids and are never touched).
 	for (const [pid, meta] of Object.entries(frontmatter?.process ?? {})) {
-		if (!meta?.boundary || typeof meta.boundary !== "object") continue;
+		if (meta?.boundary === undefined) continue;
 		const boundaryNode = doc.getIn(["process", pid, "boundary"], true);
 		if (!isMap(boundaryNode)) continue;
 		for (const pair of boundaryNode.items) {
-			if (isScalar(pair.key) && matchesOldId(pair.key.value)) {
+			// boundary: keys are not restricted to YAML strings, so a bare `10:`
+			// is the Scalar number 10 and matches `oldId` "10" by its string form.
+			if (isScalar(pair.key) && String(pair.key.value) === oldId) {
 				pair.key.value = newId;
 			}
 		}
@@ -152,24 +151,13 @@ export function renameId(
 				e.artifact === oldId,
 		);
 		if (!isBoundaryAdjacent) continue;
-		const originalBoundary =
-			meta.boundary && typeof meta.boundary === "object"
-				? (meta.boundary as Record<string, unknown>)
-				: undefined;
-		if (
-			originalBoundary !== undefined &&
-			Object.hasOwn(originalBoundary, oldId)
-		) {
-			continue; // already renamed as a key above, value (child id) untouched
-		}
-		// An existing map gains the entry; anything else — absent, or an
-		// empty `boundary:` / `boundary: ~` (null, which `hasIn` still
-		// reports as present) — is replaced by a fresh one-entry map.
-		if (isMap(doc.getIn(["process", pid, "boundary"], true))) {
-			doc.setIn(["process", pid, "boundary", newId], oldId);
-		} else {
+		if (meta.boundary === undefined) {
 			doc.setIn(["process", pid, "boundary"], { [newId]: oldId });
+		} else if (!Object.hasOwn(meta.boundary, oldId)) {
+			doc.setIn(["process", pid, "boundary", newId], oldId);
 		}
+		// Otherwise the key was already renamed above; its value (the child
+		// id) stays untouched.
 	}
 
 	const frontmatterOutput = cst.present
