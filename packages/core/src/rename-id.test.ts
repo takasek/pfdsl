@@ -504,6 +504,70 @@ correction >>? work
 	});
 });
 
+// A new id that looks like a YAML number, boolean or null must be written as
+// a string in every frontmatter position the rename touches: declaration ids
+// and revises:/parts:/boundary: values are strings (FM004 otherwise).
+describe("renameId writes a typed-looking new id as a YAML string", () => {
+	const src = `---
+artifact:
+  a: { label: A }
+  copy: { revises: a }
+  bundle: { parts: [a, sib] }
+process:
+  mapped: { subflow: ./child.pfdsl, boundary: { a: child_a } }
+  merged: { subflow: ./child.pfdsl, boundary: { k: v } }
+  fresh: { subflow: ./child.pfdsl }
+---
+a >> mapped
+a >> merged
+a >> fresh
+`;
+
+	it.each(["43", "true", "null", "1e3"])("%s", (newId) => {
+		const { output, found } = renameId(src, "a", newId);
+		expect(found).toBe(true);
+		const { frontmatter, diagnostics } = analyze(output);
+		expect(diagnostics.filter((d) => d.severity === "error")).toEqual([]);
+		expect(Object.keys(frontmatter?.artifact ?? {})).toEqual([
+			newId,
+			"copy",
+			"bundle",
+		]);
+		expect(frontmatter?.artifact?.copy?.revises).toBe(newId);
+		expect(frontmatter?.artifact?.bundle?.parts).toEqual([newId, "sib"]);
+		expect(frontmatter?.process?.mapped?.boundary).toEqual({
+			[newId]: "child_a",
+		});
+		expect(frontmatter?.process?.merged?.boundary).toEqual({
+			k: "v",
+			[newId]: "a",
+		});
+		expect(frontmatter?.process?.fresh?.boundary).toEqual({ [newId]: "a" });
+	});
+
+	it("writes a typed-looking old id as a string boundary: value", () => {
+		const typedOld = `---
+artifact:
+  "43": { label: N }
+process:
+  merged: { subflow: ./child.pfdsl, boundary: { k: v } }
+  fresh: { subflow: ./child.pfdsl }
+---
+"43" >> merged
+"43" >> fresh
+`;
+		const { output, found } = renameId(typedOld, "43", "n43");
+		expect(found).toBe(true);
+		const { frontmatter, diagnostics } = analyze(output);
+		expect(diagnostics.filter((d) => d.severity === "error")).toEqual([]);
+		expect(frontmatter?.process?.merged?.boundary).toEqual({
+			k: "v",
+			n43: "43",
+		});
+		expect(frontmatter?.process?.fresh?.boundary).toEqual({ n43: "43" });
+	});
+});
+
 // The product of the ways an id can be spelled, the body position it can
 // occupy, and whether it is frontmatter-declared or body-only — checked
 // against the invariant from spec §9/§15.11 rather than the implementation:
