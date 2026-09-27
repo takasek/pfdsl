@@ -52,6 +52,8 @@ v0.0.8 のマルチファイル意味論（`subflow:` / `extends:`）は、確�
 
 ## References
 
+- `docs/adr/0020-spec-stress-testing/string-sequence-elements.md` — 文字列配列の要素型、alias、数値キー、参照ファイルの診断（#1272）
+
 - `docs/adr/0020-spec-stress-testing/boundary-validation-log.md` — 具体例トレース全ログ（subflow/extends の穴・境界の粒度/名前/再利用・rename マップ edge ケース）
 - `docs/adr/0020-spec-stress-testing/spec-v0011-review.md` — v0.0.11 全体の机上レビュー + CLI 実測（F1–F21。feedback×open input の非対称・V025 二重割当・terminal 三重定義ほか）
 - `docs/adr/0020-spec-stress-testing/subflow-agent-probe.md` — 本 ADR の手法の拡張: spec のみを読ませた sonnet subagent に実書き・合否予測をさせ CLI を正解器に採点する「読者実験」。手トレースが規則の穴を、agent プローブが読者の躓きを検出する補完関係を確認
@@ -61,3 +63,5 @@ v0.0.8 のマルチファイル意味論（`subflow:` / `extends:`）は、確�
 - `docs/spec/proposals/{i5-hierarchy,i6-presets,multifile-policy}.md`（統合元の確定提案）
 - ADR-0013（v0.0.8 依存順序 — 統合が提案の盲点を露出する非対称）
 - #137（status 非単調 lint）・#138（fenced 例の check 検証）— 同型の検出死角
+
+- `docs/adr/0020-spec-stress-testing/yaml-id-key-types.md` — v0.0.24 の宣言 ID キー型、alias と書込み拒否の境界確認。

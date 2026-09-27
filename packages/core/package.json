@@ -8,16 +8,19 @@
 		".": {
 			"import": "./dist/index.js",
 			"types": "./dist/index.d.ts"
-		}
+		},
+		"./frontmatter.schema.json": "./dist/frontmatter.schema.json"
 	},
 	"scripts": {
-		"build": "tsup src/index.ts --format esm --dts",
+		"build": "tsup src/index.ts src/json-schema.ts --format esm --dts && node scripts/write-schema.mjs",
 		"test": "vitest run --coverage",
 		"coverage": "pnpm test",
-		"typecheck": "tsgo --noEmit"
+		"typecheck": "tsgo --noEmit",
+		"gen:schema": "node scripts/write-schema.mjs --source"
 	},
 	"dependencies": {
-		"yaml": "^2.4.0"
+		"yaml": "^2.4.0",
+		"zod": "4.6.5"
 	},
 	"engines": {
 		"node": ">=18"
@@ -31,6 +34,7 @@
 	"devDependencies": {
 		"@types/node": "^20.0.0",
 		"@vitest/coverage-v8": "^1.6.0",
+		"ajv": "8.20.0",
 		"tsup": "^8.0.0",
 		"vitest": "^1.6.0"
 	},

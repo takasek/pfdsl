@@ -1,4 +1,5 @@
 import { zeroRange } from "../position.js";
+import { nodeIndexSchema } from "../types/frontmatter.js";
 import type { Diagnostic } from "../types/index.js";
 import { STATUS_VALUES, STYLE_ATTRS } from "../types/index.js";
 import type { RuleContext } from "./context.js";
@@ -22,7 +23,7 @@ export function indexShape(ctx: RuleContext): Diagnostic[] {
 		for (const [id, meta] of Object.entries(entries)) {
 			const idx = meta?.index;
 			if (idx === undefined) continue;
-			if (typeof idx !== "number" || !Number.isInteger(idx) || idx < 1) {
+			if (typeof idx !== "number" || !nodeIndexSchema.safeParse(idx).success) {
 				diagnostics.push({
 					severity: "error",
 					code: "V029",

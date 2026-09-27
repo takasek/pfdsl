@@ -47,6 +47,12 @@ export const DIAGNOSTIC_REGISTRY: Readonly<
 		summary: "an inline comment may truncate an intended plain-scalar value",
 	},
 
+	FM004: {
+		severities: ["error"],
+		section: "2.1",
+		summary: "a known front matter field has an invalid type",
+	},
+
 	P001: {
 		severities: ["error"],
 		section: "8",
