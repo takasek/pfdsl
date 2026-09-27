@@ -1514,7 +1514,8 @@ export function runRename(
 	// to that gate so that an id declared as both a group and a process
 	// (which the normalizer reports as N001) reaches the "declared twice"
 	// refusal below with its own message.
-	const { diagnostics, frontmatter, nodeKinds, edges } = analyze(source);
+	const { diagnostics, frontmatter, nodeKinds, edges, isolatedNodes } =
+		analyze(source);
 	const unreadable = diagnostics.filter((d) =>
 		UNREADABLE_CODE.test(String(d.code)),
 	);
@@ -1559,8 +1560,8 @@ export function runRename(
 	// `group:` section (own-property, not `nodeKinds` — see this function's
 	// own doc comment above for why). An id declared as both a group and an
 	// artifact/process is invalid, not disambiguated by a `--kind` flag. The
-	// clash is read from the frontmatter sections and the body edges
-	// themselves, not from `nodeKinds`, which holds only one kind per id: a
+	// clash is read from the frontmatter sections, the body edges and the
+	// isolated body node-decls themselves, not from `nodeKinds`, which holds only one kind per id: a
 	// node used only in the body under a group's id would otherwise resolve
 	// to the group and be renamed as one, silently picking a side.
 	const isGroupId = declaresId(frontmatter?.group, oldId);
@@ -1572,7 +1573,9 @@ export function runRename(
 			: declaresId(frontmatter?.process, oldId) ||
 					edges.some((e) => e.process === oldId)
 				? "process"
-				: undefined;
+				: isolatedNodes.has(oldId)
+					? "artifact"
+					: undefined;
 	if (isGroupId && clashingKind !== undefined) {
 		const message = `rename: '${oldId}' is declared twice in ${file} — as a group and as ${clashingKind === "artifact" ? "an" : "a"} ${clashingKind}; this is invalid and cannot be renamed unambiguously`;
 		return refuse(message);

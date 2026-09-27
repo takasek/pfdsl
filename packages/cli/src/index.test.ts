@@ -992,6 +992,25 @@ a >> g -> b
 		expect(readFileSync(f, "utf-8")).toBe(ambiguous);
 	});
 
+	it("exits 1 when old is a group and also an isolated body node (node-decl), naming the clash", async () => {
+		const ambiguous = `---
+group:
+  g:
+    label: G
+---
+g
+a >> p -> b
+`;
+		const f = join(dir, "rename-ambiguous-body-node-decl.pfdsl");
+		writeFileSync(f, ambiguous);
+		const r = await run(["rename", f, "g", "h"]);
+		expect(r.exitCode).toBe(1);
+		expect(r.stderr).toBe(
+			`rename: 'g' is declared twice in ${f} — as a group and as an artifact; this is invalid and cannot be renamed unambiguously\n`,
+		);
+		expect(readFileSync(f, "utf-8")).toBe(ambiguous);
+	});
+
 	it("exits 1 when old is not found at all (neither a group nor an artifact/process)", async () => {
 		const f = join(dir, "rename-not-found.pfdsl");
 		writeFileSync(f, grouped);
