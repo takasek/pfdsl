@@ -528,12 +528,24 @@ describe("git config bypass oracle (#1232)", () => {
 
 	// (3) The design record's specific examples: an option placed after the
 	// key, and a key-/marker-like token sitting in a *different* flag's value
-	// position.
+	// position. Also review findings from round 4: a short prefix that
+	// resolves differently depending on which mode it is scoped to (`--g`/
+	// `--l`/`--e` under `set`, where `set`'s own narrower option table has no
+	// `--get*`/`--list` to be ambiguous with, unlike the shared table); and
+	// short-option clusters (`f`/`t` take a value, `l`/`e` are read markers,
+	// `z` takes nothing), including one stacked with `-t`'s attached form.
 	const LITERAL_EXAMPLES = [
 		["core.hooksPath", "--show-origin"],
 		["core.hooksPath", "--type=path"],
 		["--comment", "--list", "core.hooksPath", "/x"],
 		["--file", customFile, "user.name", "x"],
+		["set", "--g", "core.hooksPath", "/x"],
+		["set", "--l", "core.hooksPath", "/x"],
+		["set", "--e", "core.hooksPath", "/x"],
+		["-zf", customFile, "core.hooksPath", "/x"],
+		["-zt", "path", "core.hooksPath", "/x"],
+		["-zl", "core.hooksPath", "/x"],
+		["-tpath", "core.hooksPath", "/x"],
 	];
 
 	console.log(
