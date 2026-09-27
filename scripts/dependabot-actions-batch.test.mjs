@@ -5,7 +5,7 @@ import { parse } from "yaml";
 import {
 	batchBranchName,
 	batchNumbers,
-	batchNumbersFromSubjects,
+	createFinalPr,
 	selectBatch,
 	updateWorkflowPinExpectations,
 	validateDependencyPrFiles,
@@ -106,15 +106,6 @@ describe("Dependabot Actions batch selection", () => {
 			[10, 11],
 		);
 		assert.deepEqual(batchNumbers("unrelated PR"), []);
-	});
-
-	it("recovers batch membership from published merge commits", () => {
-		assert.deepEqual(
-			batchNumbersFromSubjects(
-				"fix(ci): synchronize assets\nchore(ci): merge Dependabot PR #11\nchore(ci): merge Dependabot PR #10\nchore(ci): merge Dependabot PR #11",
-			),
-			[10, 11],
-		);
 	});
 });
 
@@ -247,5 +238,26 @@ describe("passive workflow trigger", () => {
 			false,
 		);
 		assert.equal(workflow.jobs.integrate.needs, "settle");
+	});
+});
+
+describe("final PR publication", () => {
+	it("retries creation even when the existence check also fails", () => {
+		let attempts = 0;
+		let waits = 0;
+		createFinalPr("codex/dependabot-actions-10-10", [10], {
+			execute: () => {
+				attempts++;
+				if (attempts < 3) throw new Error("temporary network failure");
+			},
+			query: () => {
+				throw new Error("temporary network failure");
+			},
+			wait: () => {
+				waits++;
+			},
+		});
+		assert.equal(attempts, 3);
+		assert.equal(waits, 2);
 	});
 });

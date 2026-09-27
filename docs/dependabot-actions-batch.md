@@ -8,4 +8,4 @@
 
 専用の GitHub App をこのリポジトリだけにインストールし、Repository permissions に Contents、Pull requests、Workflows の Write を与える。App の Client ID を Actions variable `DEPENDABOT_BATCH_CLIENT_ID` に、秘密鍵の全文を Actions secret `DEPENDABOT_BATCH_APP_PRIVATE_KEY` に設定する。Client ID が未設定の間は待機ジョブを起動しない。App token は最終 PR の通常 CI が起動するように使用し、テストと生成の子プロセスには渡さない。
 
-自動実行が失敗した場合は Actions のログと中間ブランチを確認する。対象 PR の変更が SHA pin 以外だった場合は処理を止め、手動で内容を確認する。テスト前に失敗した場合は公開ブランチを作らない。ブランチの push 後に PR 作成だけ失敗した場合は、次の対象イベントで公開済みブランチのマージコミットから対象番号を復元して PR 作成を再試行する。既存の中間ブランチを自動で上書きしない。
+自動実行が失敗した場合は Actions のログと中間ブランチを確認する。対象 PR の変更が SHA pin 以外だった場合は処理を止め、手動で内容を確認する。テスト前に失敗した場合は公開ブランチを作らない。ブランチの push 後に PR 作成が失敗した場合は3回まで再試行する。それでも PR が作成できず公開ブランチだけ残った場合や、最終 PR をマージせず閉じた場合は、次回の実行を止めて手動確認を求める。既存の中間ブランチを自動で上書きしない。

@@ -145,25 +145,14 @@ export function batchNumbers(body) {
 	return match ? match[1].split(",").map(Number) : [];
 }
 
-export function batchNumbersFromSubjects(subjects) {
-	return [
-		...new Set(
-			subjects
-				.split("\n")
-				.map(
-					(line) =>
-						line.match(/^chore\(ci\): merge Dependabot PR #([0-9]+)$/)?.[1],
-				)
-				.filter(Boolean)
-				.map(Number),
-		),
-	].sort((a, b) => a - b);
-}
-
-function createFinalPr(branch, numbers) {
+export function createFinalPr(
+	branch,
+	numbers,
+	{ execute = run, query = ghJson, wait = () => run("sleep", ["5"]) } = {},
+) {
 	const refs = numbers.map((number) => `#${number}`).join(", ");
 	const body = `Combines Dependabot GitHub Actions updates ${refs} and refreshes generated mirrors and pin assertions.\n\nno-issue: automated dependency maintenance\n\nbatch-includes: ${numbers.join(",")}`;
-	run("gh", [
+	const args = [
 		"pr",
 		"create",
 		"--base",
@@ -174,10 +163,34 @@ function createFinalPr(branch, numbers) {
 		`chore(ci): integrate Dependabot Actions updates ${refs}`,
 		"--body",
 		body,
-	]);
+	];
+	for (let attempt = 1; attempt <= 3; attempt++) {
+		try {
+			execute("gh", args);
+			return;
+		} catch (error) {
+			try {
+				const existing = query([
+					"pr",
+					"list",
+					"--state",
+					"open",
+					"--head",
+					branch,
+					"--json",
+					"number",
+				]);
+				if (existing.length) return;
+			} catch {
+				// An API outage can affect both calls. Retry the create request.
+			}
+			if (attempt === 3) throw error;
+			wait();
+		}
+	}
 }
 
-function recoverOrphanBranch() {
+function assertNoOrphanBranch() {
 	const refs = run("git", [
 		"ls-remote",
 		"--heads",
@@ -200,17 +213,10 @@ function recoverOrphanBranch() {
 			"100",
 		]);
 		if (existing.length) continue;
-		run("git", ["fetch", "--no-tags", "origin", `refs/heads/${branch}`]);
-		const numbers = batchNumbersFromSubjects(
-			run("git", ["log", "--format=%s", "HEAD..FETCH_HEAD"]),
+		throw new Error(
+			`Batch branch ${branch} has no PR; review it before continuing`,
 		);
-		if (numbers.length === 0)
-			throw new Error(`Cannot recover batch membership: ${branch}`);
-		createFinalPr(branch, numbers);
-		console.log(`Recovered final PR for ${branch}`);
-		return true;
 	}
-	return false;
 }
 
 function main() {
@@ -218,7 +224,6 @@ function main() {
 	if (!repository || !/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(repository))
 		throw new Error("Invalid GITHUB_REPOSITORY");
 	run("gh", ["auth", "setup-git"]);
-	if (recoverOrphanBranch()) return;
 	const pulls = allPages(`repos/${repository}/pulls?state=open&per_page=100`);
 	const pendingBatch = pulls.find(
 		(p) =>
@@ -229,9 +234,28 @@ function main() {
 		console.log(`Waiting for batch PR #${pendingBatch.number}`);
 		return;
 	}
+	assertNoOrphanBranch();
 	const closed = allPages(
 		`repos/${repository}/pulls?state=closed&per_page=100`,
 	);
+	const cancelledNumbers = new Set(
+		closed
+			.filter(
+				(p) =>
+					!p.merged_at && p.head?.ref?.startsWith("codex/dependabot-actions-"),
+			)
+			.flatMap((p) => batchNumbers(p.body)),
+	);
+	if (
+		pulls.some(
+			(p) =>
+				p.user?.login === "dependabot[bot]" && cancelledNumbers.has(p.number),
+		)
+	) {
+		throw new Error(
+			"A closed, unmerged batch still contains open Dependabot PRs; review it before continuing",
+		);
+	}
 	const excludedNumbers = new Set(
 		closed
 			.filter(
@@ -264,29 +288,7 @@ function main() {
 		run("git", ["ls-remote", "--heads", "origin", `refs/heads/${branch}`]),
 	);
 	const noToken = { ...process.env, GH_TOKEN: "", GITHUB_TOKEN: "" };
-	if (remoteExists) {
-		const existing = ghJson([
-			"pr",
-			"list",
-			"--state",
-			"all",
-			"--head",
-			branch,
-			"--json",
-			"number,state",
-		]);
-		if (existing.length) {
-			console.log(
-				`Batch PR #${existing[0].number} already exists (${existing[0].state})`,
-			);
-			return;
-		}
-		createFinalPr(
-			branch,
-			batch.pulls.map((p) => p.number),
-		);
-		return;
-	}
+	if (remoteExists) throw new Error(`Batch branch already exists: ${branch}`);
 	for (const pull of batch.pulls) {
 		const fresh = ghJson(["api", `repos/${repository}/pulls/${pull.number}`]);
 		if (
