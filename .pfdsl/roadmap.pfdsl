@@ -178,7 +178,7 @@ process:
   i1218_add_rename:
     label: id 改名 CLI の追加
     location: https://github.com/takasek/pfdsl/issues/1218
-    updated_at: 2026-09-26T12:22:32Z
+    updated_at: 2026-09-26T17:36:06Z
   publish_cli_rename:
     label: CLI id 改名公開
   i1278_add_group_delete:
