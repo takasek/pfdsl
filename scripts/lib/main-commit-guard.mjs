@@ -234,17 +234,74 @@ function hasShortNoVerifyFlag(tokens, sub) {
 	return false;
 }
 
-// `git config` no longer tracks flag positions to find the key (#1232): a
-// second flag — first --type's value read as the key, then abbreviated
-// flags going unrecognized — showed that any scheme built on skipping known
-// flags in order fails for the flag it does not yet know, one flag at a
-// time. Bypass detection instead asks two position-independent questions:
-// does `core.hooksPath` appear at all, with something after it, and does a
-// read/unset marker appear anywhere. Neither depends on knowing what a flag
-// this parser has not seen yet does with its own argument.
+// `git config` no longer tracks flag positions to find the key by hand
+// (#1232): three rounds running, a scheme built on recognizing known flags
+// one at a time missed the flag it did not yet know — first --type's value
+// read as the key, then abbreviated flags going unrecognized, then an
+// abbreviated *attached* form (`--fil=<path>`) and a marker token consumed
+// as a *different* flag's own value (`--comment --list core.hooksPath /x`,
+// where --comment's value is the literal string "--list"). This parses
+// `git config`'s argv the way git's own parse-options does instead: an
+// option table with arity, unique-prefix abbreviation resolution against
+// that table, and the same "stop recognizing options at the first
+// positional" rule git itself uses for this command (verified against the
+// installed git 2.54: `git config core.hooksPath --show-origin` sets the
+// literal value `--show-origin`, and `git config core.hooksPath /x --local`
+// never touches `--local` scope — both confirm nothing past the first
+// positional is read as an option again, even inside `set`, e.g. `git
+// config set core.hooksPath --type=path` sets the literal value
+// `--type=path` too).
+//
+// Options this repo's hook never needs to distinguish (display/filter flags
+// like --all, --regexp, -z, --show-origin, ...) are deliberately absent from
+// the table below: an unrecognized long option defaults to arity 0 (skip
+// only itself), which is safe here because every option that affects
+// whether core.hooksPath gets written, or where, is named below — an
+// unnamed one can only ever ends up as an inert positional or get skipped
+// harmlessly, never mistaken for the key or its value.
 
-/** `--`-prefixed `git config` flags that only read or unset, plus their unique abbreviations (>= 4 chars). */
-const CONFIG_READ_FLAG_NAMES = [
+/**
+ * `git config` long-option arities this parser tracks, taken from `git
+ * config -h` / `git config set -h` / `git config get -h` / `git config
+ * unset -h` / `git config list -h` and the git-config(1) DEPRECATED MODES
+ * table, on the installed git 2.54.
+ */
+const CONFIG_OPTION_ARITY = new Map([
+	// scope (boolean)
+	["--global", 0],
+	["--system", 0],
+	["--local", 0],
+	["--worktree", 0],
+	// file location (value)
+	["--file", 1],
+	["--blob", 1],
+	// misc value-taking
+	["--type", 1],
+	["--comment", 1],
+	["--default", 1],
+	["--value", 1],
+	["--url", 1],
+	// read/unset/list/edit/rename/remove actions (boolean)
+	["--get", 0],
+	["--get-all", 0],
+	["--get-regexp", 0],
+	["--get-urlmatch", 0],
+	["--get-color", 0],
+	["--get-colorbool", 0],
+	["--unset", 0],
+	["--unset-all", 0],
+	["--rename-section", 0],
+	["--remove-section", 0],
+	["--list", 0],
+	["--edit", 0],
+	// write-modifier actions (boolean, still a write)
+	["--add", 0],
+	["--replace-all", 0],
+]);
+const CONFIG_OPTION_NAMES = [...CONFIG_OPTION_ARITY.keys()];
+
+/** Long options that only read or unset — never write a new value. */
+const CONFIG_READ_MARKER_NAMES = new Set([
 	"--get",
 	"--get-all",
 	"--get-regexp",
@@ -253,70 +310,158 @@ const CONFIG_READ_FLAG_NAMES = [
 	"--get-colorbool",
 	"--unset",
 	"--unset-all",
+	"--rename-section",
+	"--remove-section",
 	"--list",
-];
-/** git-2.46+ `git config` verbs that only read or unset, recognized only as the first token. */
-const CONFIG_READ_VERBS = new Set([
-	"get",
-	"get-all",
-	"list",
-	"unset",
-	"unset-all",
-	"rename-section",
-	"remove-section",
-	"edit",
+	"--edit",
 ]);
 
-/** `--`-prefixed `git config` flags that write outside the target repo, plus their unique abbreviations (>= 4 chars). */
-const CONFIG_OUTSIDE_TARGET_FLAG_NAMES = ["--global", "--system", "--file"];
+/** Long options that write outside whatever repository the command targets. `--local`/`--worktree` write inside it and are excluded. */
+const CONFIG_OUTSIDE_TARGET_NAMES = new Set(["--global", "--system", "--file"]);
 
-/** Whether `value` is `candidate` or a unique (>= 4 char) abbreviation of it. */
-function abbreviates(value, candidate) {
-	return (
-		value.startsWith("--") && value.length >= 4 && candidate.startsWith(value)
+/** git-2.46+ `git config` verbs, recognized only as the very first token. */
+const CONFIG_VERB_WORDS = new Set([
+	"get",
+	"set",
+	"unset",
+	"list",
+	"edit",
+	"rename-section",
+	"remove-section",
+]);
+/** Verbs among those that never write a new value to core.hooksPath. */
+const CONFIG_READ_ONLY_VERBS = new Set([
+	"get",
+	"unset",
+	"list",
+	"edit",
+	"rename-section",
+	"remove-section",
+]);
+
+/**
+ * Resolves `namePart` (a `--`-long option name, no attached value) to the one
+ * candidate it exactly matches or is a unique prefix of, mirroring git's own
+ * option-abbreviation resolution. Returns null if it matches none; when it
+ * matches more than one, deterministically returns the alphabetically first
+ * rather than trying to reproduce git's ambiguity error — git itself would
+ * reject the input either way (confirmed against the installed git 2.54:
+ * `git config --unse core.hooksPath` exits 129, "ambiguous option"), and
+ * this parser does not need to agree with git on a command git rejects.
+ */
+function resolveConfigOptionName(namePart) {
+	if (CONFIG_OPTION_ARITY.has(namePart)) return namePart;
+	const matches = CONFIG_OPTION_NAMES.filter((name) =>
+		name.startsWith(namePart),
 	);
-}
-
-/** Whether any token in `tokens` is a read/unset marker for `git config`. */
-function hasConfigReadMarker(tokens) {
-	if (tokens.some((t) => t.value === "-l")) return true;
-	if (
-		tokens.some((t) =>
-			CONFIG_READ_FLAG_NAMES.some((name) => abbreviates(t.value, name)),
-		)
-	)
-		return true;
-	return CONFIG_READ_VERBS.has(tokens[0]?.value.toLowerCase() ?? "");
+	return matches.length === 0 ? null : matches.sort()[0];
 }
 
 /**
- * Whether `tokens` (the args to `git config`) persistently set `core.hooksPath`
- * (#1232): the key appears (case-insensitively) with at least one token after
- * it — its new value, whatever flag put it there — and no read/unset marker
- * appears anywhere.
+ * One `--`/`-x` token's role during `git config`'s option-scanning phase:
+ * how many further tokens it consumes as its own value (0 when attached via
+ * `=` or a short option's suffix), and whether it is a read/unset marker or
+ * an outside-target scope/file flag.
  */
-function configHooksPathBypass(tokens) {
-	const keyIndex = tokens.findIndex(
-		(t) => t.value.toLowerCase() === "core.hookspath",
-	);
-	if (keyIndex === -1 || keyIndex >= tokens.length - 1) return false;
-	return !hasConfigReadMarker(tokens);
+function resolveConfigOption(raw) {
+	if (raw.startsWith("--")) {
+		const equals = raw.indexOf("=");
+		const namePart = equals === -1 ? raw : raw.slice(0, equals);
+		const name = resolveConfigOptionName(namePart);
+		if (!name)
+			return {
+				consumesNext: false,
+				isReadMarker: false,
+				isOutsideTarget: false,
+			};
+		return {
+			consumesNext: CONFIG_OPTION_ARITY.get(name) === 1 && equals === -1,
+			isReadMarker: CONFIG_READ_MARKER_NAMES.has(name),
+			isOutsideTarget: CONFIG_OUTSIDE_TARGET_NAMES.has(name),
+		};
+	}
+	// Short options: -f/-t take a value (attached with no separator, or the
+	// next token); -l/-e are read markers; anything else defaults to arity 0.
+	const shortChar = raw[1];
+	const attached = raw.length > 2;
+	if (shortChar === "f")
+		return {
+			consumesNext: !attached,
+			isReadMarker: false,
+			isOutsideTarget: true,
+		};
+	if (shortChar === "t")
+		return {
+			consumesNext: !attached,
+			isReadMarker: false,
+			isOutsideTarget: false,
+		};
+	if (shortChar === "l" || shortChar === "e")
+		return { consumesNext: false, isReadMarker: true, isOutsideTarget: false };
+	return { consumesNext: false, isReadMarker: false, isOutsideTarget: false };
 }
 
 /**
- * Whether `tokens` (the args to `git config`) name `--global`/`--system`/
- * `--file`/`-f` (or a unique abbreviation), which write outside whatever
- * repository the command targets (#1232) — unlike `--local`/`--worktree`,
- * which write inside it.
+ * Parses `tokens` (the args to `git config`) the way git's own parse-options
+ * does for this command: recognizes options left to right only until the
+ * first non-option token (or a literal `--`), at which point option
+ * scanning stops for good and every remaining token — dashes and all — is a
+ * literal positional. `set`/`get`/`unset`/`list`/`edit`/`rename-section`/
+ * `remove-section` are recognized as a leading verb only in that same
+ * very-first-token position.
  */
-function configWritesOutsideTarget(tokens) {
-	return tokens.some((t) => {
-		if (t.value === "-f") return true;
-		if (t.value.startsWith("--file=")) return true;
-		return CONFIG_OUTSIDE_TARGET_FLAG_NAMES.some((name) =>
-			abbreviates(t.value, name),
-		);
-	});
+function parseConfigArgs(tokens) {
+	let i = 0;
+	let verb = null;
+	if (tokens[0] && CONFIG_VERB_WORDS.has(tokens[0].value)) {
+		verb = tokens[0].value;
+		i = 1;
+	}
+	let sawOutsideTarget = false;
+	let sawReadMarker = false;
+	while (i < tokens.length) {
+		const raw = tokens[i].value;
+		if (raw === "--") {
+			i++;
+			break;
+		}
+		if (raw === "-" || !raw.startsWith("-")) break;
+		const { consumesNext, isReadMarker, isOutsideTarget } =
+			resolveConfigOption(raw);
+		if (isReadMarker) sawReadMarker = true;
+		if (isOutsideTarget) sawOutsideTarget = true;
+		i++;
+		if (consumesNext) i++;
+	}
+	return {
+		verb,
+		sawOutsideTarget,
+		sawReadMarker,
+		positionals: tokens.slice(i),
+	};
+}
+
+/**
+ * Whether `tokens` (the args to `git config`) persistently set
+ * `core.hooksPath` (#1232), and whether that write lands outside the target
+ * repo. `set`/`--add`/`--replace-all` (or bare legacy 2-positional form) all
+ * write the second positional as the new value; a read-only verb or a
+ * read/unset marker anywhere in the option-scanning phase means it never
+ * does, regardless of what follows.
+ */
+function classifyConfigWrite(tokens) {
+	const parsed = parseConfigArgs(tokens);
+	if (parsed.verb && CONFIG_READ_ONLY_VERBS.has(parsed.verb))
+		return { bypass: false, outsideTarget: parsed.sawOutsideTarget };
+	if (parsed.sawReadMarker)
+		return { bypass: false, outsideTarget: parsed.sawOutsideTarget };
+	const key = parsed.positionals[0];
+	const hasValue = parsed.positionals.length > 1;
+	const isHooksPath = key?.value.toLowerCase() === "core.hookspath";
+	return {
+		bypass: Boolean(isHooksPath && hasValue),
+		outsideTarget: parsed.sawOutsideTarget,
+	};
 }
 
 /**
@@ -336,12 +481,11 @@ function classifyBypass(tokens) {
 		return { subcommand: sub, flag: "--no-verify" };
 	if (SHORT_NO_VERIFY_SUBCOMMANDS.has(sub) && hasShortNoVerifyFlag(rest, sub))
 		return { subcommand: sub, flag: "-n" };
-	if (sub === "config" && configHooksPathBypass(rest))
-		return {
-			subcommand: sub,
-			flag: "core.hooksPath",
-			outsideTarget: configWritesOutsideTarget(rest),
-		};
+	if (sub === "config") {
+		const { bypass, outsideTarget } = classifyConfigWrite(rest);
+		if (bypass)
+			return { subcommand: sub, flag: "core.hooksPath", outsideTarget };
+	}
 	return null;
 }
 

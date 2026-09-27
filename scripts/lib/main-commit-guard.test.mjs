@@ -1,8 +1,10 @@
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
 import {
+	existsSync,
 	mkdirSync,
 	mkdtempSync,
+	readFileSync,
 	realpathSync,
 	rmSync,
 	writeFileSync,
@@ -233,102 +235,343 @@ describe("classifyGitCommand bypass detection (#1232)", () => {
 	});
 });
 
-// The `git config` parser has produced a defect twice in a row — first
-// --type's value read as the key, then abbreviated flags — because each fix
-// added one more literal case instead of a rule. This is a product-style
-// invariant instead: every combination of the components below is checked
-// against a single equation, so a whole *class* of positional-parsing bugs
-// fails at once rather than one abbreviation at a time (#1232).
-describe("git config bypass invariant (#1232)", () => {
-	// Tokens placed between "config" and the read marker/key. "set"-based
-	// prefixes carry their own verb; combining them with any read marker
-	// mixes two verbs, or a verb with a legacy flag, in a way git itself
-	// rejects (confirmed against the git-config(1) synopsis, which does not
-	// list --type/--comment/--add/--replace-all under `get`/`unset`) — those
-	// combinations are dropped by isValidCombo below.
-	const CONFIG_PREFIXES = [
-		[],
-		["--local"],
-		["--worktree"],
-		["-f", "x"],
-		["--file", "x"],
-		["--fil", "x"],
-		["--file=x"],
-		["--type", "path"],
-		["--typ", "path"],
-		["-t", "path"],
-		["--comment", "note"],
-		["--comm", "note"],
-		["set"],
-		["set", "--comment", "note"],
-		["--add"],
-		["--replace-all"],
-	];
-	const FILE_OPTION_ONLY_PREFIXES = new Set([
-		"",
-		"--local",
-		"--worktree",
-		"-f x",
-		"--file x",
-		"--fil x",
-		"--file=x",
-	]);
-	const isVerbPrefix = (prefix) => prefix[0] === "set";
+// The `git config` parser has produced a defect three rounds running — first
+// --type's value read as the key, then abbreviated flags going unrecognized,
+// then a mutation-testing gap: a variant that treats "key followed only by
+// dash-prefixed tokens" as a read passed the self-referential invariant that
+// used to live here, because that invariant computed its own expectation
+// from the implementation's rule instead of from git. This replaces it with
+// an oracle: every generated combination is run through the *real* installed
+// git, in an isolated repo/global/system/file set, and the classifier is
+// graded against what git actually did — not against what this file assumes
+// git does (#1232).
+describe("git config bypass oracle (#1232)", () => {
+	// Set up synchronously, inline, rather than in a before() hook: the
+	// combos below are graded during this describe callback's own
+	// synchronous run (so each combo's expected outcome is known before its
+	// `it()` is created), and a before() hook is not guaranteed to have run
+	// by then — node:test may re-invoke a nested describe's callback during
+	// a separate collection pass, ahead of the outer suite's before() hook.
+	const root = mkdtempSync(join(tmpdir(), "gitconfig-oracle-"));
+	const repo = join(root, "repo");
+	mkdirSync(repo, { recursive: true });
+	execFileSync("git", ["init", "-q", "-b", "main", repo]);
+	const globalFile = join(root, "global.gitconfig");
+	const systemFile = join(root, "system.gitconfig");
+	const customFile = join(root, "custom.gitconfig");
+	writeFileSync(globalFile, "");
+	writeFileSync(systemFile, "");
+	writeFileSync(customFile, "");
+	const baselineRepoConfig = readFileSync(join(repo, ".git", "config"), "utf8");
+	const env = {
+		...process.env,
+		HOME: root,
+		GIT_CONFIG_GLOBAL: globalFile,
+		GIT_CONFIG_SYSTEM: systemFile,
+	};
 
-	// A read marker is either a "--"-style flag, valid in any position
-	// relative to the prefix under the legacy invocation, or a bare verb,
-	// which git only recognizes as the very first token — so verb markers
-	// are placed ahead of the prefix below, flag markers after it.
-	const READ_MARKERS = [
-		null,
-		"--get",
-		"--get-all",
-		"--unset",
-		"--unse",
-		"--unset-all",
-		"-l",
-		"get",
-		"unset",
-	];
-	const isVerbMarker = (marker) => marker === "get" || marker === "unset";
+	after(() => {
+		rmSync(root, { recursive: true, force: true });
+	});
 
-	const KEYS = ["core.hooksPath", "CORE.HOOKSPATH"];
-	const VALUE_SETS = [["/x"], []];
-
-	function isValidCombo(prefix, marker) {
-		if (isVerbPrefix(prefix) && marker !== null) return false;
-		if (
-			isVerbMarker(marker) &&
-			!FILE_OPTION_ONLY_PREFIXES.has(prefix.join(" "))
-		)
-			return false;
-		return true;
+	function resetAll() {
+		writeFileSync(join(repo, ".git", "config"), baselineRepoConfig);
+		writeFileSync(globalFile, "");
+		writeFileSync(systemFile, "");
+		writeFileSync(customFile, "");
 	}
 
-	for (const prefix of CONFIG_PREFIXES) {
-		for (const marker of READ_MARKERS) {
-			if (!isValidCombo(prefix, marker)) continue;
-			for (const key of KEYS) {
-				for (const value of VALUE_SETS) {
-					const markerTokens = marker === null ? [] : [marker];
-					const tokens = isVerbMarker(marker)
-						? [...markerTokens, ...prefix, key, ...value]
-						: [...prefix, ...markerTokens, key, ...value];
-					const command = `git config ${tokens.join(" ")}`;
-					// The invariant: bypass iff a value is present and no read
-					// marker cancels it — independent of which flag carries the
-					// value, so the parser no longer needs to track positions.
-					const expectBypass = value.length > 0 && marker === null;
-					it(`${expectBypass ? "denies" : "allows"} '${command}'`, () => {
-						assert.equal(
-							classifyGitCommand(command)?.bypass === true,
-							expectBypass,
-							command,
-						);
+	/** Whether `path` (repo config, global, system, or the shared --file target) mentions core.hooksPath at all, in any case. */
+	function fileHasHooksPath(path) {
+		if (!existsSync(path)) return false;
+		return readFileSync(path, "utf8").toLowerCase().includes("hookspath");
+	}
+
+	/**
+	 * Runs `git config <args>` for real, in an isolated repo/global/system/file
+	 * set reset before this call, and reports what actually happened.
+	 * `gitRejected` is true only for a parse-level rejection (unrecognized or
+	 * ambiguous option, wrong argument count) — git's own exit code 129 for
+	 * this command — not for an ordinary "no such key" miss from `get`/`unset`
+	 * (exit 1/5), which is a legitimate, gradable non-bypass outcome.
+	 */
+	function observe(args) {
+		resetAll();
+		let exit = 0;
+		try {
+			execFileSync("git", ["config", ...args], {
+				cwd: repo,
+				encoding: "utf8",
+				env,
+				stdio: ["ignore", "pipe", "pipe"],
+			});
+		} catch (e) {
+			exit = e.status ?? 1;
+		}
+		const setOutside =
+			fileHasHooksPath(globalFile) ||
+			fileHasHooksPath(systemFile) ||
+			fileHasHooksPath(customFile);
+		const setAnywhere =
+			setOutside || fileHasHooksPath(join(repo, ".git", "config"));
+		return { gitRejected: exit === 129, setAnywhere, setOutside };
+	}
+
+	// ---- combo generation ----
+	//
+	// The full cross product of every dimension below is tens of thousands of
+	// combinations. Instead of that, or a pure one-factor-at-a-time sweep, this
+	// builds: (1) a full cross of the four small dimensions (mode x key x
+	// value-presence x scope/file/value-opt/marker each individually against
+	// that base, one dimension varying at a time — catching every individual
+	// form against every mode/key/value combination); plus (2) a restricted
+	// pairwise cross between (scope/file x marker) and (value-opt x marker),
+	// using small representative subsets of each, to catch interaction defects
+	// like a marker token being consumed as a *different* flag's value
+	// (`--comment --list core.hooksPath /x`); plus (3) the specific literal
+	// examples from the design record for "option after the key" and
+	// "key-/marker-like token in a flag's value position". This stays well
+	// under the ~800 target while still exercising every individual form and
+	// the specific interactions this round's defects came from.
+
+	const customFileToken = () => customFile;
+
+	/** [tokens] for each scope/file form, "" first (none). */
+	const SCOPE_FILE_FORMS = [
+		{ name: "", tokens: [] },
+		{ name: "--global", tokens: ["--global"] },
+		{ name: "--system", tokens: ["--system"] },
+		{ name: "--local", tokens: ["--local"] },
+		{ name: "--worktree", tokens: ["--worktree"] },
+		{ name: "-f (separate)", tokens: () => ["-f", customFileToken()] },
+		{ name: "--file (separate)", tokens: () => ["--file", customFileToken()] },
+		{ name: "-f (attached)", tokens: () => [`-f${customFileToken()}`] },
+		{
+			name: "--file= (attached)",
+			tokens: () => [`--file=${customFileToken()}`],
+		},
+		{
+			name: "--fil (abbrev, separate)",
+			tokens: () => ["--fil", customFileToken()],
+		},
+		{
+			name: "--fil= (abbrev, attached)",
+			tokens: () => [`--fil=${customFileToken()}`],
+		},
+		{ name: "--glob (abbrev)", tokens: ["--glob"] },
+		{ name: "--sys (abbrev)", tokens: ["--sys"] },
+		{ name: "--loc (abbrev)", tokens: ["--loc"] },
+	];
+
+	/** [tokens] for each value-taking-option form, "" first (none). */
+	const VALUE_OPT_FORMS = [
+		{ name: "", tokens: [] },
+		{ name: "--type (separate)", tokens: ["--type", "path"] },
+		{ name: "--type= (attached)", tokens: ["--type=path"] },
+		{ name: "--typ (abbrev)", tokens: ["--typ", "path"] },
+		{ name: "--comment (separate)", tokens: ["--comment", "note"] },
+		{ name: "--comment= (attached)", tokens: ["--comment=note"] },
+		{ name: "--comm (abbrev)", tokens: ["--comm", "note"] },
+		{ name: "--default (separate)", tokens: ["--default", "orig"] },
+		{ name: "--default= (attached)", tokens: ["--default=orig"] },
+		{ name: "--value (separate)", tokens: ["--value", "pat"] },
+		{ name: "--value= (attached)", tokens: ["--value=pat"] },
+	];
+
+	/** [tokens] for each read/unset marker, "" first (none). `bare` markers must be the very first token overall to dispatch as a verb. */
+	const MARKER_FORMS = [
+		{ name: "", tokens: [], bare: false },
+		{ name: "--get", tokens: ["--get"], bare: false },
+		{ name: "--get-all", tokens: ["--get-all"], bare: false },
+		{ name: "--unset", tokens: ["--unset"], bare: false },
+		{ name: "--unse (ambiguous abbrev)", tokens: ["--unse"], bare: false },
+		{ name: "--unset-all", tokens: ["--unset-all"], bare: false },
+		{ name: "-l", tokens: ["-l"], bare: false },
+		{ name: "get (bare verb)", tokens: ["get"], bare: true },
+		{ name: "unset (bare verb)", tokens: ["unset"], bare: true },
+		{ name: "list (bare verb)", tokens: ["list"], bare: true },
+	];
+
+	const MODES = ["legacy", "set"];
+	const KEYS = ["core.hooksPath", "CORE.HOOKSPATH"];
+	const VALUE_PRESENCE = [true, false];
+
+	function tokensOf(form) {
+		return typeof form.tokens === "function" ? form.tokens() : form.tokens;
+	}
+
+	/**
+	 * Builds one full argv (as a flat token array) for a combo. A bare marker
+	 * (git's git-2.46+ subcommand words used as a marker rather than the
+	 * `set` mode) must be the absolute first token to dispatch as a verb, so
+	 * it goes ahead of everything else; otherwise `set` (if this combo's mode
+	 * is `set`) leads, then scope/file, then value-opt, then the marker flag,
+	 * then the key and optional value.
+	 */
+	function buildArgs({ mode, scope, valueOpt, marker, key, hasValue }) {
+		const scopeTokens = tokensOf(scope);
+		const valueOptTokens = tokensOf(valueOpt);
+		const markerTokens = tokensOf(marker);
+		const tail = [key, ...(hasValue ? ["/x"] : [])];
+		if (marker.bare)
+			return [...markerTokens, ...scopeTokens, ...valueOptTokens, ...tail];
+		const modeTokens = mode === "set" ? ["set"] : [];
+		return [
+			...modeTokens,
+			...scopeTokens,
+			...valueOptTokens,
+			...markerTokens,
+			...tail,
+		];
+	}
+
+	/** A bare marker is a second verb slot; `set` already claimed the first. */
+	function isValidCombo({ mode, marker }) {
+		return !(mode === "set" && marker.bare);
+	}
+
+	const NONE_SCOPE = SCOPE_FILE_FORMS[0];
+	const NONE_VALUE_OPT = VALUE_OPT_FORMS[0];
+	const NONE_MARKER = MARKER_FORMS[0];
+
+	const combos = new Map(); // command string -> combo (dedup identical argvs)
+
+	function addCombo(combo) {
+		if (!isValidCombo(combo)) return;
+		const args = buildArgs(combo);
+		const command = `git config ${args.join(" ")}`;
+		if (!combos.has(command)) combos.set(command, { combo, args, command });
+	}
+
+	// (1) Every individual form of each large dimension, crossed with the full
+	// small-dimension base (mode x key x value-presence).
+	for (const mode of MODES) {
+		for (const key of KEYS) {
+			for (const hasValue of VALUE_PRESENCE) {
+				for (const scope of SCOPE_FILE_FORMS) {
+					addCombo({
+						mode,
+						key,
+						hasValue,
+						scope,
+						valueOpt: NONE_VALUE_OPT,
+						marker: NONE_MARKER,
+					});
+				}
+				for (const valueOpt of VALUE_OPT_FORMS) {
+					addCombo({
+						mode,
+						key,
+						hasValue,
+						scope: NONE_SCOPE,
+						valueOpt,
+						marker: NONE_MARKER,
+					});
+				}
+				for (const marker of MARKER_FORMS) {
+					addCombo({
+						mode,
+						key,
+						hasValue,
+						scope: NONE_SCOPE,
+						valueOpt: NONE_VALUE_OPT,
+						marker,
 					});
 				}
 			}
 		}
+	}
+
+	// (2) Restricted pairwise cross: a small representative subset of
+	// scope/file forms and value-opt forms, each against every marker, to
+	// catch a marker consumed as a *different* flag's own value (or vice
+	// versa) — the class of defect `--comment --list core.hooksPath /x` is
+	// an instance of. Held at mode=legacy, key=core.hooksPath, both value
+	// presences.
+	const SCOPE_SUBSET = [
+		NONE_SCOPE,
+		SCOPE_FILE_FORMS.find((f) => f.name === "--global"),
+		SCOPE_FILE_FORMS.find((f) => f.name === "-f (separate)"),
+		SCOPE_FILE_FORMS.find((f) => f.name === "--fil= (abbrev, attached)"),
+	];
+	const VALUE_OPT_SUBSET = [
+		NONE_VALUE_OPT,
+		VALUE_OPT_FORMS.find((f) => f.name === "--comment (separate)"),
+		VALUE_OPT_FORMS.find((f) => f.name === "--type= (attached)"),
+	];
+	for (const hasValue of VALUE_PRESENCE) {
+		for (const scope of SCOPE_SUBSET) {
+			for (const marker of MARKER_FORMS) {
+				addCombo({
+					mode: "legacy",
+					key: "core.hooksPath",
+					hasValue,
+					scope,
+					valueOpt: NONE_VALUE_OPT,
+					marker,
+				});
+			}
+		}
+		for (const valueOpt of VALUE_OPT_SUBSET) {
+			for (const marker of MARKER_FORMS) {
+				addCombo({
+					mode: "legacy",
+					key: "core.hooksPath",
+					hasValue,
+					scope: NONE_SCOPE,
+					valueOpt,
+					marker,
+				});
+			}
+		}
+	}
+
+	// (3) The design record's specific examples: an option placed after the
+	// key, and a key-/marker-like token sitting in a *different* flag's value
+	// position.
+	const LITERAL_EXAMPLES = [
+		["core.hooksPath", "--show-origin"],
+		["core.hooksPath", "--type=path"],
+		["--comment", "--list", "core.hooksPath", "/x"],
+		["--file", customFile, "user.name", "x"],
+	];
+
+	console.log(
+		`git config bypass oracle: ${combos.size} generated combinations`,
+	);
+
+	let rejectedCount = 0;
+	for (const { args, command } of combos.values()) {
+		const { gitRejected, setAnywhere, setOutside } = observe(args);
+		if (gitRejected) {
+			rejectedCount++;
+			continue;
+		}
+		it(`${setAnywhere ? "denies" : "allows"} '${command}'`, () => {
+			const result = classifyGitCommand(command);
+			assert.equal(result?.bypass === true, setAnywhere, command);
+			if (setAnywhere) {
+				assert.equal(result?.outsideTarget === true, setOutside, command);
+			}
+		});
+	}
+	it(`excludes ${rejectedCount} combo(s) git itself rejected (ambiguous option/wrong arg count) from grading`, () => {
+		assert.ok(rejectedCount >= 0);
+	});
+
+	// Literal examples from the design record (kept flat, not in a nested
+	// describe — see the setup comment above for why).
+	for (const args of LITERAL_EXAMPLES) {
+		const command = `git config ${args.join(" ")}`;
+		const { gitRejected, setAnywhere, setOutside } = observe(args);
+		if (gitRejected) continue;
+		it(`example: ${setAnywhere ? "denies" : "allows"} '${command}'`, () => {
+			const result = classifyGitCommand(command);
+			assert.equal(result?.bypass === true, setAnywhere, command);
+			if (setAnywhere) {
+				assert.equal(result?.outsideTarget === true, setOutside, command);
+			}
+		});
 	}
 });
 
