@@ -95,7 +95,7 @@ artifact:
   rename_cli:
     label: "id 改名 CLI と group 一括再割当ての案内 (#1218)"
     description: "artifact / process / group の id を改名するトップレベルの rename の新設と、既存の multi-id meta set による group 一括再割当てを pfdsl スキルで案内すること。設計選択と決定変更は #1218 のコメントが一次情報"
-    status: wip
+    status: done
     criteria: "pfdsl rename <file> <old> <new> --write が artifact / process の宣言・body の edge・revises: / parts: / boundary: の参照と、group の宣言キー・parent:・group: を1回で書き換え、拒否条件が packages/cli/src/index.test.ts のテストで検証され、pfdsl スキル本文が meta set による group 一括再割当てと rename を案内している"
   cli_release_rename:
     label: "CLIリリース: id 改名"
