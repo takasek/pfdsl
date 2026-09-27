@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { analyze } from "./index.js";
 import {
 	buildPresentationChain,
 	buildProducedConsumed,
@@ -9,9 +10,11 @@ import {
 	isUrlLike,
 	loadExtendsChain,
 	loadSubflowGraph,
+	parentBoundaryArtifacts,
 	resolveEffectiveFrontmatter,
 	resolvePresentation,
 	resolveRefPath,
+	subflowBoundaryDiagnostics,
 	validatePresetKeys,
 	validateSubflowBoundary,
 	wrapPresetSource,
@@ -1054,5 +1057,65 @@ describe("wrapPresetSource", () => {
 
 	it("wraps .yml as well", () => {
 		expect(wrapPresetSource("/p/p.yml", "tag: {}")).toBe("---\ntag: {}\n---\n");
+	});
+});
+
+describe("parentBoundaryArtifacts", () => {
+	it("collects the normal inputs and the outputs of one process, not its feedback inputs or another process's edges", () => {
+		const edges: NormalizedEdge[] = [
+			{ kind: "input", artifact: "a", process: "P" },
+			{ kind: "feedback", artifact: "fb", process: "P" },
+			{ kind: "output", process: "P", artifact: "b" },
+			{ kind: "input", artifact: "x", process: "Q" },
+			{ kind: "output", process: "Q", artifact: "y" },
+		];
+		expect(parentBoundaryArtifacts(edges, "P")).toEqual({
+			inputs: new Set(["a"]),
+			outputs: new Set(["b"]),
+		});
+	});
+});
+
+describe("subflowBoundaryDiagnostics", () => {
+	const child = analyze("order >> pack -> shipment\n");
+	const parentSource = (body: string) =>
+		`---\nprocess:\n  P:\n    subflow: ./child.pfdsl\n---\n${body}\n`;
+	const check = (body: string) => {
+		const parent = analyze(parentSource(body));
+		const docs: Record<string, ReturnType<typeof analyze>> = {
+			"/p/parent.pfdsl": parent,
+			"/p/child.pfdsl": child,
+		};
+		return subflowBoundaryDiagnostics(
+			"/p/parent.pfdsl",
+			parent.edges,
+			parent.frontmatter,
+			(path) => docs[path] ?? null,
+		);
+	};
+
+	it("reports nothing when the parent's boundary matches the child's", () => {
+		const result = check("order >> P -> shipment");
+		expect(result.diagnostics).toEqual([]);
+		expect([...result.docs.keys()]).toEqual([
+			"/p/parent.pfdsl",
+			"/p/child.pfdsl",
+		]);
+	});
+
+	it("reports a boundary mismatch (V034)", () => {
+		const result = check("order >> P -> z");
+		expect(result.diagnostics.map((d) => d.code)).toContain("V034");
+	});
+
+	it("reports a missing child (V021) and skips its boundary check", () => {
+		const parent = analyze(parentSource("order >> P -> z"));
+		const result = subflowBoundaryDiagnostics(
+			"/p/parent.pfdsl",
+			parent.edges,
+			parent.frontmatter,
+			(path) => (path === "/p/parent.pfdsl" ? parent : null),
+		);
+		expect(result.diagnostics.map((d) => d.code)).toEqual(["V021"]);
 	});
 });

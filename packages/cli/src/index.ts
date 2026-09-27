@@ -10,11 +10,9 @@ import {
 	computeDependsOn,
 	computeImpact,
 	computeNeighbors,
-	computeOpenInputs,
 	computeOrphans,
 	computePaths,
 	computeStats,
-	computeTerminals,
 	diffGraphs as coreDiffGraphs,
 	DIAGNOSTIC_REGISTRY,
 	type Diagnostic,
@@ -32,10 +30,8 @@ import {
 	isUnreadableError,
 	isUrlLike,
 	loadExtendsChain,
-	loadSubflowGraph,
 	locateNode,
 	type NodeKind,
-	type NormalizedEdge,
 	type PfdType,
 	parseIdList,
 	reindex,
@@ -44,14 +40,13 @@ import {
 	resolveEffectiveFrontmatter,
 	resolveLocationFsPath,
 	resolvePresentation,
-	resolveRefPath,
 	type SortKey,
 	STATUS_VALUES,
 	setFrontmatterField,
 	sort,
 	sortEdges,
+	subflowBoundaryDiagnostics,
 	validatePresetKeys,
-	validateSubflowBoundary,
 	wrapPresetSource,
 } from "@pfdsl/core";
 import { type BinaryFormat, svgToBinary } from "@pfdsl/graphviz-exporter";
@@ -447,59 +442,6 @@ export interface CheckOptions {
 	color?: boolean;
 }
 
-/**
- * The subflow half of `runCheck`'s multi-file diagnostics (originally
- * inline there, factored out for #1218's `rename`: after rewriting a file
- * in memory, `rename` re-runs exactly this check against the result before
- * deciding to emit/write, so a rename that breaks a subflow boundary match
- * is caught the same way `check` would catch it, without a second
- * implementation of the same rule to drift from this one).
- */
-function subflowBoundaryDiagnostics(
-	absFile: string,
-	edges: readonly NormalizedEdge[],
-	frontmatter: ReturnType<typeof analyze>["frontmatter"],
-): {
-	diagnostics: Diagnostic[];
-	docs: Map<string, ReturnType<typeof analyze>>;
-} {
-	const diags: Diagnostic[] = [];
-	const subflowGraph = loadSubflowGraph(absFile, fileLoader);
-	diags.push(...subflowGraph.diagnostics);
-
-	for (const [pid, pmeta] of Object.entries(frontmatter?.process ?? {})) {
-		if (typeof pmeta.subflow !== "string") continue;
-		const resolved = resolveRefPath(absFile, pmeta.subflow);
-		if (!resolved.ok) continue; // already in subflowGraph.diagnostics
-		const childDoc = subflowGraph.docs.get(resolved.path);
-		if (!childDoc) continue; // missing file — already in diagnostics
-		const childEdges = childDoc.edges;
-		const childOpenInputs = computeOpenInputs(childEdges);
-		const childTerminals = computeTerminals(childEdges);
-		const parentNormalInputs = new Set(
-			edges
-				.filter((e) => e.kind === "input" && e.process === pid)
-				.map((e) => e.artifact),
-		);
-		const parentOutputs = new Set(
-			edges
-				.filter((e) => e.kind === "output" && e.process === pid)
-				.map((e) => e.artifact),
-		);
-		diags.push(
-			...validateSubflowBoundary({
-				processId: pid,
-				parentNormalInputs,
-				parentOutputs,
-				boundaryMap: (pmeta.boundary as Record<string, string>) ?? {},
-				childOpenInputs,
-				childTerminals,
-			}),
-		);
-	}
-	return { diagnostics: diags, docs: subflowGraph.docs };
-}
-
 export function runCheck(file: string, opts: CheckOptions = {}): CommandResult {
 	const src = readSource(file);
 	if (isCommandResult(src)) return src;
@@ -540,7 +482,12 @@ export function runCheck(file: string, opts: CheckOptions = {}): CommandResult {
 	const multiDiags: (Diagnostic & { file?: string })[] = [];
 
 	// --- Subflow checks ---
-	const subflowGraph = subflowBoundaryDiagnostics(absFile, edges, frontmatter);
+	const subflowGraph = subflowBoundaryDiagnostics(
+		absFile,
+		edges,
+		frontmatter,
+		fileLoader,
+	);
 	multiDiags.push(...subflowGraph.diagnostics);
 
 	// --- Extends checks ---
@@ -1664,6 +1611,7 @@ export function runRename(
 				absFile,
 				resultAnalysis.edges,
 				resultAnalysis.frontmatter,
+				fileLoader,
 			).diagnostics,
 		);
 	}

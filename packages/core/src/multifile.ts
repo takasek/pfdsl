@@ -342,6 +342,62 @@ function formatSetDiff(
 }
 
 /**
+ * The artifacts on `pid`'s side of a subflow boundary (§15.11): its normal
+ * `>>` inputs (not `>>?` feedback) and its `->` outputs.
+ */
+export function parentBoundaryArtifacts(
+	edges: readonly NormalizedEdge[],
+	pid: string,
+): { inputs: Set<string>; outputs: Set<string> } {
+	const inputs = new Set<string>();
+	const outputs = new Set<string>();
+	for (const e of edges) {
+		if (e.process !== pid) continue;
+		if (e.kind === "input") inputs.add(e.artifact);
+		else if (e.kind === "output") outputs.add(e.artifact);
+	}
+	return { inputs, outputs };
+}
+
+/**
+ * Load `entryPath`'s subflow graph through `load` and validate every
+ * subflow process's boundary in `frontmatter`/`edges` against its child
+ * (§15.11). Returns the loader's diagnostics (V021 / V022) followed by the
+ * boundary ones, and the loaded documents. A child whose path is invalid or
+ * whose file is missing is only reported by the loader.
+ */
+export function subflowBoundaryDiagnostics<
+	T extends DocWithFrontmatter & { edges: NormalizedEdge[] },
+>(
+	entryPath: string,
+	edges: readonly NormalizedEdge[],
+	frontmatter: Frontmatter | null,
+	load: (path: string) => T | null,
+): { diagnostics: Diagnostic[]; docs: Map<string, T> } {
+	const subflowGraph = loadSubflowGraph(entryPath, load);
+	const diagnostics: Diagnostic[] = [...subflowGraph.diagnostics];
+	for (const [pid, pmeta] of Object.entries(frontmatter?.process ?? {})) {
+		if (typeof pmeta.subflow !== "string") continue;
+		const resolved = resolveRefPath(entryPath, pmeta.subflow);
+		if (!resolved.ok) continue;
+		const childDoc = subflowGraph.docs.get(resolved.path);
+		if (!childDoc) continue;
+		const { inputs, outputs } = parentBoundaryArtifacts(edges, pid);
+		diagnostics.push(
+			...validateSubflowBoundary({
+				processId: pid,
+				parentNormalInputs: inputs,
+				parentOutputs: outputs,
+				boundaryMap: (pmeta.boundary as Record<string, string>) ?? {},
+				childOpenInputs: computeOpenInputs(childDoc.edges),
+				childTerminals: computeTerminals(childDoc.edges),
+			}),
+		);
+	}
+	return { diagnostics, docs: subflowGraph.docs };
+}
+
+/**
  * Recursively load an entry file and its `extends:` preset chain (§2.9.4 / §15.12).
  * `load` reads + analyzes a file by absolute path, returning null when absent.
  * Detects self-referential and multi-hop extends cycles (V027) and missing
