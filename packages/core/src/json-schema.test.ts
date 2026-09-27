@@ -1,6 +1,11 @@
-import { readFileSync } from "node:fs";
+import { execFileSync } from "node:child_process";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { createRequire } from "node:module";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { Ajv2020 } from "ajv/dist/2020.js";
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 import { FRONTMATTER_JSON_SCHEMA } from "./json-schema.js";
 
 const validate = new Ajv2020({ strict: false }).compile(
@@ -56,46 +61,35 @@ describe("portable frontmatter JSON Schema", () => {
 		expect(validate(value)).toBe(false));
 });
 
-describe("JSON Schema artifact writer", () => {
-	const writerModule = "../scripts/write-schema.mjs";
-	it.each([
-		{ args: [], destination: "/dist/frontmatter.schema.json" },
-		{ args: ["--source"], destination: "/schema/frontmatter.schema.json" },
-	])("writes the generated document to $destination", async ({
-		args,
-		destination,
-	}) => {
-		const writeFile = vi.fn();
-		vi.doMock("node:fs/promises", () => ({ writeFile }));
-		const originalArgv = process.argv;
+describe("packaged JSON Schema", () => {
+	it("exposes the current schema to a consumer outside the workspace", () => {
+		const temporary = mkdtempSync(join(tmpdir(), "pfdsl-schema-package-"));
 		try {
-			process.argv = ["node", "write-schema.mjs", ...args];
-			vi.resetModules();
-			await import(writerModule);
-			expect(writeFile).toHaveBeenCalledTimes(1);
-			const [target, contents] = writeFile.mock.calls[0];
-			expect(target.pathname.endsWith(destination)).toBe(true);
-			expect(JSON.parse(contents)).toEqual(FRONTMATTER_JSON_SCHEMA);
+			const core = fileURLToPath(new URL("..", import.meta.url));
+			const manifest = JSON.parse(
+				readFileSync(join(core, "package.json"), "utf8"),
+			);
+			execFileSync("pnpm", ["pack", "--pack-destination", temporary], {
+				cwd: core,
+				stdio: "pipe",
+			});
+			const installed = join(temporary, "node_modules", "@pfdsl", "core");
+			mkdirSync(installed, { recursive: true });
+			execFileSync("tar", [
+				"-xzf",
+				join(temporary, `pfdsl-core-${manifest.version}.tgz`),
+				"--strip-components=1",
+				"-C",
+				installed,
+			]);
+			const require = createRequire(join(temporary, "consumer.cjs"));
+			const schema = require("@pfdsl/core/frontmatter.schema.json");
+			expect(schema).toEqual(FRONTMATTER_JSON_SCHEMA);
+			const check = new Ajv2020({ allowUnionTypes: true }).compile(schema);
+			expect(check({ artifact: { a: null } })).toBe(true);
+			expect(check({ artifact: { a: { label: 42 } } })).toBe(false);
 		} finally {
-			process.argv = originalArgv;
-			vi.doUnmock("node:fs/promises");
+			rmSync(temporary, { recursive: true, force: true });
 		}
-	});
-	it.each([
-		["--unknown"],
-		["--source", "extra"],
-	])("rejects invalid arguments %j", async (...args) => {
-		const writeFile = vi.fn();
-		vi.doMock("node:fs/promises", () => ({ writeFile }));
-		const originalArgv = process.argv;
-		try {
-			process.argv = ["node", "write-schema.mjs", ...args];
-			vi.resetModules();
-			await expect(import(writerModule)).rejects.toThrow("Usage:");
-			expect(writeFile).not.toHaveBeenCalled();
-		} finally {
-			process.argv = originalArgv;
-			vi.doUnmock("node:fs/promises");
-		}
-	});
+	}, 30_000);
 });
