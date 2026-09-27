@@ -705,6 +705,17 @@ describe("rename", () => {
 		expect(r.stdout).toContain("invisible here and is never rewritten");
 	});
 
+	it("--help says a stdin (-) preview skips the extends: and subflow checks a file path gets", async () => {
+		const r = await run(["rename", "--help"]);
+		const prose = r.stdout.replace(/\s+/g, " ");
+		expect(prose).toContain(
+			"With -, the extends: and subflow checks are skipped because relative paths cannot be resolved",
+		);
+		expect(prose).toContain(
+			"a preview from stdin can succeed where the same file path is refused",
+		);
+	});
+
 	it("renames an artifact across frontmatter and body, printing the rewritten file to stdout by default", async () => {
 		const f = join(dir, "rename-artifact-default.pfdsl");
 		writeFileSync(f, artifactSrc);

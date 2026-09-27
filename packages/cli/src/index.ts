@@ -3146,6 +3146,10 @@ this file (including the subflow-boundary check, for a file on disk); a
 result with any error is refused, not printed or written. That includes an
 error the input already had: fix it first, then rename.
 
+With -, the extends: and subflow checks are skipped because relative paths
+cannot be resolved without a file on disk, so a preview from stdin can
+succeed where the same file path is refused.
+
   --write     rewrite the file in place (cannot be used with -)
   --json      emit { ok: true, kind, from, to } (kind: "artifact" | "process"
               | "group"; a group rename also reports members: string[] and
