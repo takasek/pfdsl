@@ -1,5 +1,6 @@
-import { isMap, isScalar } from "yaml";
+import { isScalar } from "yaml";
 import {
+	declarationPair,
 	parseFrontmatterCst,
 	renderFrontmatterCst,
 } from "./frontmatter-cst.js";
@@ -66,14 +67,7 @@ export function renameGroup(
 	if (!cst.present) return noop;
 
 	const doc = cst.doc;
-	const groupMap = doc.getIn(["group"], true);
-	if (!isMap(groupMap)) return noop;
-	// Declaration keys and `group:` / `parent:` values are YAML strings in any
-	// readable document (a typed one is FM004, refused above), so they are
-	// compared to `oldId` as they are.
-	const pair = groupMap.items.find(
-		(p) => isScalar(p.key) && p.key.value === oldId,
-	);
+	const pair = declarationPair(doc, oldId, "group");
 	if (!pair || !isScalar(pair.key)) return noop;
 	pair.key.value = newId;
 

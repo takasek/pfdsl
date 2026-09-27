@@ -1,6 +1,8 @@
 import { Document, isMap, isScalar, isSeq } from "yaml";
 import { formatId, quoteId } from "./formatter.js";
 import {
+	declarationPair,
+	pairId,
 	parseFrontmatterCst,
 	renderFrontmatterCst,
 } from "./frontmatter-cst.js";
@@ -81,18 +83,12 @@ export function renameId(
 	const doc = cst.present ? cst.doc : new Document();
 
 	// Declaration keys and revises:/parts: values are YAML strings in any
-	// readable document (a typed one is FM004, refused above), so they are
-	// compared to `oldId` as they are.
+	// readable document (a typed one is FM004, refused above).
 	let declared = false;
-	const sectionMap = doc.getIn([kind], true);
-	if (isMap(sectionMap)) {
-		const pair = sectionMap.items.find(
-			(p) => isScalar(p.key) && p.key.value === oldId,
-		);
-		if (pair && isScalar(pair.key)) {
-			pair.key.value = newId;
-			declared = true;
-		}
+	const pair = declarationPair(doc, oldId, kind);
+	if (pair && isScalar(pair.key)) {
+		pair.key.value = newId;
+		declared = true;
 	}
 
 	// Other artifacts' revises:/parts: references.
@@ -118,9 +114,9 @@ export function renameId(
 		const boundaryNode = doc.getIn(["process", pid, "boundary"], true);
 		if (!isMap(boundaryNode)) continue;
 		for (const pair of boundaryNode.items) {
-			// boundary: keys are not restricted to YAML strings, so a bare `10:`
-			// is the Scalar number 10 and matches `oldId` "10" by its string form.
-			if (isScalar(pair.key) && String(pair.key.value) === oldId) {
+			// boundary: keys are not restricted to YAML strings; `pairId` reads a
+			// bare `10:` by its string form, so it matches `oldId` "10".
+			if (pairId(pair) === oldId && isScalar(pair.key)) {
 				pair.key.value = newId;
 			}
 		}

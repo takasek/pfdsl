@@ -1,4 +1,13 @@
-import { Document, isPair, isScalar, isSeq, parseDocument, visit } from "yaml";
+import {
+	Document,
+	isMap,
+	isPair,
+	isScalar,
+	isSeq,
+	type Pair,
+	parseDocument,
+	visit,
+} from "yaml";
 import { invalidIdKeys } from "./frontmatter-id-keys.js";
 import type { NodeKind } from "./types/index.js";
 
@@ -299,6 +308,30 @@ export function renderFrontmatterCst(
 			: preserveFolds(originalYaml, rendered);
 	const block = `---\n${withFolds}---\n`;
 	return newline === "\r\n" ? block.replace(/\n/g, "\r\n") : block;
+}
+
+/** The id a `Pair`'s key represents, or null when the key isn't a plain scalar. */
+export function pairId(pair: Pair): string | null {
+	return isScalar(pair.key) ? String(pair.key.value) : null;
+}
+
+/**
+ * `id`'s declaration `Pair` within a frontmatter yaml CST (as parsed by
+ * `parseFrontmatterCst`), looked up in the one section its `kind` names.
+ * Null when `id` has no entry there. Returns the whole `Pair` so callers can
+ * rewrite its key or reach into its value map.
+ */
+export function declarationPair(
+	doc: Document,
+	id: string,
+	kind: NodeKind,
+): Pair | null {
+	const section = doc.get(kind, true);
+	if (!isMap(section)) return null;
+	for (const item of section.items) {
+		if (pairId(item) === id) return item;
+	}
+	return null;
 }
 
 /**
