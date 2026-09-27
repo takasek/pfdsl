@@ -1005,6 +1005,17 @@ describe("evaluateMainCommitGuard bypass axis (#1232)", () => {
 		);
 		assert.equal(result.decision, "allow");
 	});
+
+	it("names the scope/file flag and suggests local config or a terminal for an outsideTarget deny (#1232)", () => {
+		const result = evaluateMainCommitGuard(
+			payload({ command: "git config --global core.hooksPath /x" }),
+			{ currentBranch: "feature/x" },
+		);
+		assert.equal(result.decision, "deny");
+		assert.match(result.reason, /'--global'/);
+		assert.match(result.reason, /--local|--worktree/);
+		assert.match(result.reason, /own terminal/);
+	});
 });
 
 describe("runMainCommitGuard", () => {

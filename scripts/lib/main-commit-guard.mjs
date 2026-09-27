@@ -100,9 +100,11 @@ const READ_ONLY_APPLY_FLAGS = new Set([
 // independently of branch and worktree. Inside classifySegment, this check
 // runs first, ahead of the DENIED_SUBCOMMANDS/ASKED_SUBCOMMANDS lookup, and
 // its result short-circuits the branch/worktree-scoped decision in
-// evaluateGuardedCommand (except for a `git config` bypass that writes
-// outside the target repo, which stays in scope even against a foreign
-// target — see evaluateGuardedCommand).
+// evaluateGuardedCommand. That short-circuit has one exception — a foreign
+// target is out of scope and allowed, same as every other rule here — and
+// that exception has one exception of its own: a `git config` bypass that
+// writes outside the target repo stays in scope and denies even against a
+// foreign target (see evaluateGuardedCommand).
 
 /** git subcommands that accept `--no-verify` (git 2.54; #1232). */
 const NO_VERIFY_SUBCOMMANDS = new Set([
@@ -418,6 +420,7 @@ function parseConfigArgs(tokens) {
 		i = 1;
 	}
 	let sawOutsideTarget = false;
+	let outsideTargetFlag = null;
 	let sawReadMarker = false;
 	while (i < tokens.length) {
 		const raw = tokens[i].value;
@@ -429,13 +432,17 @@ function parseConfigArgs(tokens) {
 		const { consumesNext, isReadMarker, isOutsideTarget } =
 			resolveConfigOption(raw);
 		if (isReadMarker) sawReadMarker = true;
-		if (isOutsideTarget) sawOutsideTarget = true;
+		if (isOutsideTarget) {
+			sawOutsideTarget = true;
+			outsideTargetFlag ??= raw;
+		}
 		i++;
 		if (consumesNext) i++;
 	}
 	return {
 		verb,
 		sawOutsideTarget,
+		outsideTargetFlag,
 		sawReadMarker,
 		positionals: tokens.slice(i),
 	};
@@ -444,23 +451,33 @@ function parseConfigArgs(tokens) {
 /**
  * Whether `tokens` (the args to `git config`) persistently set
  * `core.hooksPath` (#1232), and whether that write lands outside the target
- * repo. `set`/`--add`/`--replace-all` (or bare legacy 2-positional form) all
- * write the second positional as the new value; a read-only verb or a
- * read/unset marker anywhere in the option-scanning phase means it never
- * does, regardless of what follows.
+ * repo — and, if so, the flag (as the command spelled it) responsible, for
+ * naming in the deny message. `set`/`--add`/`--replace-all` (or bare legacy
+ * 2-positional form) all write the second positional as the new value; a
+ * read-only verb or a read/unset marker anywhere in the option-scanning
+ * phase means it never does, regardless of what follows.
  */
 function classifyConfigWrite(tokens) {
 	const parsed = parseConfigArgs(tokens);
 	if (parsed.verb && CONFIG_READ_ONLY_VERBS.has(parsed.verb))
-		return { bypass: false, outsideTarget: parsed.sawOutsideTarget };
+		return {
+			bypass: false,
+			outsideTarget: parsed.sawOutsideTarget,
+			outsideTargetFlag: parsed.outsideTargetFlag,
+		};
 	if (parsed.sawReadMarker)
-		return { bypass: false, outsideTarget: parsed.sawOutsideTarget };
+		return {
+			bypass: false,
+			outsideTarget: parsed.sawOutsideTarget,
+			outsideTargetFlag: parsed.outsideTargetFlag,
+		};
 	const key = parsed.positionals[0];
 	const hasValue = parsed.positionals.length > 1;
 	const isHooksPath = key?.value.toLowerCase() === "core.hookspath";
 	return {
 		bypass: Boolean(isHooksPath && hasValue),
 		outsideTarget: parsed.sawOutsideTarget,
+		outsideTargetFlag: parsed.outsideTargetFlag,
 	};
 }
 
@@ -482,9 +499,15 @@ function classifyBypass(tokens) {
 	if (SHORT_NO_VERIFY_SUBCOMMANDS.has(sub) && hasShortNoVerifyFlag(rest, sub))
 		return { subcommand: sub, flag: "-n" };
 	if (sub === "config") {
-		const { bypass, outsideTarget } = classifyConfigWrite(rest);
+		const { bypass, outsideTarget, outsideTargetFlag } =
+			classifyConfigWrite(rest);
 		if (bypass)
-			return { subcommand: sub, flag: "core.hooksPath", outsideTarget };
+			return {
+				subcommand: sub,
+				flag: "core.hooksPath",
+				outsideTarget,
+				outsideTargetFlag,
+			};
 	}
 	return null;
 }
@@ -503,7 +526,7 @@ function codexRoutineSubcommand(tokens) {
 /**
  * The guarded git subcommand one already-tokenized segment runs, or null.
  * @param {{value: string, quoted: boolean}[]} tokens
- * @returns {{subcommand: string, decision: "deny" | "ask", bypass?: boolean, flag?: string, outsideTarget?: boolean} | null}
+ * @returns {{subcommand: string, decision: "deny" | "ask", bypass?: boolean, flag?: string, outsideTarget?: boolean, outsideTargetFlag?: string} | null}
  */
 function classifySegment(tokens) {
 	if (tokens.length === 0) return null;
@@ -521,6 +544,7 @@ function classifySegment(tokens) {
 			bypass: true,
 			flag: bypass.flag,
 			outsideTarget: bypass.outsideTarget === true,
+			outsideTargetFlag: bypass.outsideTargetFlag,
 		};
 
 	const sub = gitSubcommand(tokens);
@@ -552,12 +576,12 @@ function classifySegment(tokens) {
  * add y` is a deny, since letting the ask through would put the add on the
  * default branch behind a prompt that names the checkout.
  * @param {string} command
- * @returns {{subcommand: string, decision: "deny" | "ask", bypass?: boolean, flag?: string, outsideTarget?: boolean} | null}
+ * @returns {{subcommand: string, decision: "deny" | "ask", bypass?: boolean, flag?: string, outsideTarget?: boolean, outsideTargetFlag?: string} | null}
  */
 export function classifyGitCommand(command) {
 	if (typeof command !== "string" || command.trim() === "") return null;
 
-	/** @type {{subcommand: string, decision: "deny" | "ask", bypass?: boolean, flag?: string, outsideTarget?: boolean} | null} */
+	/** @type {{subcommand: string, decision: "deny" | "ask", bypass?: boolean, flag?: string, outsideTarget?: boolean, outsideTargetFlag?: string} | null} */
 	let asked = null;
 	for (const segment of splitSegments(command)) {
 		const found = classifySegment(stripLeadingNoise(tokenize(segment)));
@@ -853,6 +877,15 @@ function evaluateGuardedCommand(
 	// worktree. This still sits after the foreign check above, which stays in
 	// scope for a bypass that writes outside the target (immediately above).
 	if (guarded.bypass) {
+		if (guarded.outsideTarget) {
+			return {
+				decision: "deny",
+				reason:
+					`Blocked 'git ${guarded.subcommand}' for using '${guarded.outsideTargetFlag}': this writes core.hooksPath outside the target repo, where it can still skip this repo's (or another repo's) git hooks. ` +
+					"Write to the target's own local config instead (drop the scope/file flag, or use --local/--worktree). " +
+					"If writing outside the target is genuinely needed, run the command in your own terminal instead.",
+			};
+		}
 		const hookName =
 			guarded.subcommand === "commit" ? "pre-commit" : "git hooks";
 		return {
