@@ -162,7 +162,10 @@ export function renameId(
 		) {
 			continue; // already renamed as a key above, value (child id) untouched
 		}
-		if (doc.hasIn(["process", pid, "boundary"])) {
+		// An existing map gains the entry; anything else — absent, or an
+		// empty `boundary:` / `boundary: ~` (null, which `hasIn` still
+		// reports as present) — is replaced by a fresh one-entry map.
+		if (isMap(doc.getIn(["process", pid, "boundary"], true))) {
 			doc.setIn(["process", pid, "boundary", newId], oldId);
 		} else {
 			doc.setIn(["process", pid, "boundary"], { [newId]: oldId });

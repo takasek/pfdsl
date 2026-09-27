@@ -424,6 +424,24 @@ order >> work -> fulfilled
 		});
 	});
 
+	it.each([
+		["block-style with no value", "    boundary:\n"],
+		["an explicit null (~)", "    boundary: ~\n"],
+	])("replaces an empty boundary: (%s) with a {new: old} map instead of throwing", (_name, boundaryLine) => {
+		const src = `---
+process:
+  sub:
+    subflow: ./child.pfdsl
+${boundaryLine}---
+x >> sub -> y
+`;
+		const { output, found } = renameId(src, "y", "y2");
+		expect(found).toBe(true);
+		const { frontmatter, diagnostics } = analyze(output);
+		expect(frontmatter?.process?.sub?.boundary).toEqual({ y2: "y" });
+		expect(diagnostics.filter((d) => d.severity === "error")).toEqual([]);
+	});
+
 	it("adds nothing when the renamed artifact is not adjacent to any subflow process", () => {
 		const src = `---
 artifact:
