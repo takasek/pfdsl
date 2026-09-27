@@ -1,0 +1,76 @@
+name: integrate Dependabot Actions updates
+
+# Setup and recovery: docs/dependabot-actions-batch.md
+
+# Dependabot opens several Actions PRs in one burst. Each later event cancels
+# only the waiting job; publication is serialized separately and never canceled.
+on:
+  pull_request_target:
+    types: [opened, reopened, labeled, closed]
+    branches: [main]
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  settle:
+    if: >-
+      vars.DEPENDABOT_BATCH_CLIENT_ID != '' &&
+      ((github.event.action == 'closed' &&
+        github.event.pull_request.merged == true &&
+        startsWith(github.event.pull_request.head.ref, 'codex/dependabot-actions-')) ||
+       (github.event.pull_request.user.login == 'dependabot[bot]' &&
+        github.event.pull_request.head.repo.full_name == github.repository &&
+        contains(github.event.pull_request.labels.*.name, 'github-actions')))
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    concurrency:
+      group: dependabot-actions-settle
+      cancel-in-progress: true
+    steps:
+      - name: Wait for the last PR in the burst
+        run: sleep 900
+
+  integrate:
+    needs: settle
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    concurrency:
+      group: dependabot-actions-integrate
+      cancel-in-progress: false
+    steps:
+      # Base branch code only. PR files are checked as data before their Git
+      # commits are merged locally into the batch branch.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: main
+          fetch-depth: 0
+          persist-credentials: false
+
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - run: make setup
+
+      - run: make build
+
+      - uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        id: app-token
+        with:
+          client-id: ${{ vars.DEPENDABOT_BATCH_CLIENT_ID }}
+          private-key: ${{ secrets.DEPENDABOT_BATCH_APP_PRIVATE_KEY }}
+          permission-contents: write
+          permission-pull-requests: write
+          permission-workflows: write
+
+      - name: Combine, repair, verify, and open the final PR
+        run: node scripts/dependabot-actions-batch.mjs
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
