@@ -3,13 +3,14 @@ import {
 	parseFrontmatterCst,
 	renderFrontmatterCst,
 } from "./frontmatter-cst.js";
+import { invalidIdKeys } from "./frontmatter-id-keys.js";
 
 export interface InsertDefinitionResult {
 	/**
 	 * The frontmatter block (fenced `---`s included) after inserting the
 	 * definition, or unchanged (the original block text) when `inserted` is
 	 * false. `""` when the source had no frontmatter, or when its fences were
-	 * well-formed but the YAML content didn't parse (FM002) — neither has
+	 * well-formed but the YAML was invalid (FM002) or ID keys were not strings (FM004) — neither has
 	 * anything safe to rewrite.
 	 */
 	output: string;
@@ -33,10 +34,11 @@ export function insertDefinition(
 	id: string,
 ): InsertDefinitionResult {
 	const cst = parseFrontmatterCst(source);
-	if (cst.present && cst.doc.errors.length > 0) {
-		// The fences are well-formed but the YAML content doesn't parse
-		// (FM002) — `Document#toString()` throws on a Document carrying parse
-		// errors, so there is nothing safe to insert into.
+	if (
+		cst.present &&
+		(cst.doc.errors.length > 0 || invalidIdKeys(cst.doc).length > 0)
+	) {
+		// Do not rewrite malformed YAML or create a second, stringified ID.
 		return { output: "", inserted: false };
 	}
 	const doc = cst.present ? cst.doc : new Document();
