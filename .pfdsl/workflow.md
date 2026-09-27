@@ -84,6 +84,14 @@ worktree を既定とする理由は `.pfdsl/bindings/pfd-ops.md`「ワークサ
 
 配布プロンプトの利用側シナリオは、公開前または明示的な検証依頼がある場合に、この作業 checkout の `.claude/skills/distribution-review/SKILL.md` を直接読んで模擬実行する。通常の編集では `docs/distribution-review/reviewed.json` を進めず、公開時のゲートに残す。
 
+### backend 契約を変える回の比較
+
+作業項目 backend の契約を変える回は、片方の reference だけの変更でも、`docs/distribution-review.md`「backend 契約の比較」に従って両 backend と責任範囲の正本を最終差分レビューの入力に含める。
+共通契約・backend 固有の連携方法・採用リポが決める規律を区別し、条件や操作順序の変更では同節の採用側シナリオで要求と次の操作を確認する。
+共有 reference の変更が backend の契約へ影響する場合も対象とし、誤字・リンク修正など要求や操作を変えない変更は追加シナリオの対象外とする。
+既に同じ版・条件で確認済みなら結果を再利用し、方式の評価実験を毎回全件繰り返さない。
+結果と未確認範囲は既存の PR 本文にまとめる。
+
 ### レビュー結果の記録
 
 **レビューは最終差分に対して実施し、指摘があれば通常の追加コミットで修正する。** レビュー後に差分が増えた場合は、追加部分とその影響を確認する。
@@ -319,7 +327,7 @@ binding・companion・guard の分類に当たることは根拠にならない 
 
 ## workflow.pfdsl に status を書かない
 
-汎用ルール（flow 種別の artifact に `status:` を書かない。同一 id が複数の図に現れる場合も一次情報は roadmap 側に一元化する）は `docs/quality-guide.md`「進捗 status は roadmap にだけ書く」が一次情報。このリポで両図に現れる id は `article` で、workflow 側にも status を書いたため #763 の食い違いが起きた。
+汎用ルール（flow 種別の artifact に `status:` を書かない。同一 id が複数の図に現れる場合も一次情報は roadmap 側に一元化する）は `docs/quality-guide.md`「進捗 status は roadmap にだけ書く」が一次情報。かつて `article` が両図に現れ、workflow 側にも status を書いたため #763 の食い違いが起きた。現在の `article` は workflow にだけあり、進捗と公開先は依存グラフの対象外である issue #12 で確認する。
 
 ## release milestone artifact の作成規約
 
