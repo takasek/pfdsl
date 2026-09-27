@@ -1314,14 +1314,10 @@ a
 			}
 		});
 
-		it("refuses a rename that would break the subflow boundary match, leaving the file untouched", async () => {
-			// Renaming `shipment` (a boundary output) onto an id that already
-			// exists in the file cannot happen (the new-exists gate refuses
-			// first) — a genuine "boundary broke" refusal instead comes from
-			// the child not being touched: if the child already exists in the
-			// old id's shape and the parent boundary somehow ends up
-			// inconsistent, the post-write gate must catch it. Simulate that
-			// by pre-declaring a boundary: map that will collide after rename.
+		// The post-write gate's subflow half is covered by the V034 test above;
+		// this one pins that a boundary artifact is still subject to the
+		// earlier <new>-already-exists refusal.
+		it("refuses renaming a boundary artifact onto another boundary artifact's id (new already exists), leaving the file untouched", async () => {
 			const d = mkdtempSync(join(tmpdir(), "pfdsl-rename-subflow-conflict-"));
 			try {
 				const parent = [
@@ -1337,12 +1333,11 @@ a
 				writeFileSync(parentFile, parent);
 				writeFileSync(join(d, "child.pfdsl"), child);
 
-				// order_v2 is already mapped to the child's `order`; renaming it
-				// again onto `shipment` is refused earlier (new already exists as
-				// an artifact) — this just re-confirms the file is untouched by a
-				// refusal, not that this exact path reaches the post-write gate.
 				const r = await run(["rename", parentFile, "order_v2", "shipment"]);
 				expect(r.exitCode).toBe(1);
+				expect(r.stderr).toBe(
+					`rename: 'shipment' already exists as an artifact id in ${parentFile}\n`,
+				);
 				expect(readFileSync(parentFile, "utf-8")).toBe(parent);
 			} finally {
 				rmSync(d, { recursive: true, force: true });
