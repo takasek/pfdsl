@@ -1,5 +1,20 @@
-import { isPair, parseDocument, parse as parseYaml, visit } from "yaml";
+import {
+	type Document,
+	isAlias,
+	isMap,
+	isNode,
+	isPair,
+	isScalar,
+	isSeq,
+	type Node,
+	parseDocument,
+	parse as parseYaml,
+	visit,
+} from "yaml";
+import type { $ZodIssue } from "zod/v4/core";
+import en from "zod/v4/locales/en.js";
 import { detectChildIndent } from "./frontmatter-text.js";
+import { frontmatterInputSchema } from "./types/frontmatter.js";
 import type {
 	Diagnostic,
 	Frontmatter,
@@ -46,6 +61,94 @@ export function findFrontmatterNodeRanges(source: string): Map<string, Range> {
 		});
 	}
 	return result;
+}
+
+/** Validate only the declared string-sequence paths, leaving extension metadata open. */
+function frontmatterTypeDiagnostics(
+	document: Document,
+	frontmatter: unknown,
+	source: string,
+	yamlOffset: number,
+): Diagnostic[] {
+	// Resolve aliases along the whole path, but locate errors at the first use
+	// site rather than at a shared anchor declaration.
+	function at(path: (string | number)[]) {
+		let node: unknown = document.contents;
+		let alias: Node | undefined;
+		for (const key of [...path, undefined]) {
+			if (isAlias(node)) {
+				alias ??= node;
+				node = node.resolve(document);
+			}
+			if (key === undefined) break;
+			if (isMap(node)) {
+				// YAML object keys are stringified by toJS (null becomes "").
+				// Follow the same identity for numeric and boolean node IDs.
+				let value: unknown;
+				for (const pair of node.items) {
+					const mapKey = isAlias(pair.key)
+						? pair.key.resolve(document)
+						: pair.key;
+					if (isScalar(mapKey) && String(mapKey.value ?? "") === String(key))
+						value = pair.value;
+				}
+				node = value;
+			} else {
+				node =
+					isSeq(node) && typeof key === "number" ? node.items[key] : undefined;
+			}
+		}
+		return { node, alias };
+	}
+	function position(offset: number) {
+		const before = source.slice(0, offset);
+		return {
+			line: before.split("\n").length,
+			column: offset - before.lastIndexOf("\n"),
+			offset,
+		};
+	}
+	const diagnostics: Diagnostic[] = [];
+	const result = frontmatterInputSchema.safeParse(frontmatter, {
+		error: en().localeError,
+	});
+	// Union branches report a parent issue. Prefer errors below that parent,
+	// e.g. the invalid element in string | string[], not the whole sequence.
+	function leaves(issues: $ZodIssue[]): $ZodIssue[] {
+		return issues.flatMap((issue) => {
+			if (issue.code !== "invalid_union") return [issue];
+			const nested = issue.errors.flatMap((branch) =>
+				leaves(
+					branch.map((child) => ({
+						...child,
+						path: [...issue.path, ...child.path],
+					})),
+				),
+			);
+			const deeper = nested.filter(
+				(child) => child.path.length > issue.path.length,
+			);
+			return deeper.length ? deeper : [issue];
+		});
+	}
+	if (!result.success)
+		for (const issue of leaves(result.error.issues)) {
+			const path = issue.path.map((key) =>
+				typeof key === "number" ? key : String(key),
+			);
+			const item = at(path);
+			const location = item.alias ?? item.node;
+			const range = isNode(location) ? location.range : undefined;
+			const start = yamlOffset + (range?.[0] ?? 0);
+			const end = yamlOffset + (range?.[1] ?? 0);
+			diagnostics.push({
+				severity: "error",
+				code: "FM004",
+				message: `Invalid front matter field '${path.join(".") || "<root>"}': ${issue.message}`,
+				range: { start: position(start), end: position(end) },
+			});
+		}
+	return diagnostics;
 }
 
 export function loadFrontmatter(
@@ -114,13 +217,13 @@ export function loadFrontmatter(
 
 	const diagnostics: Diagnostic[] = [];
 	let frontmatter: Frontmatter | null = null;
+	let parsed: unknown = null;
+	let yamlValid = true;
 
 	try {
-		const parsed = parseYaml(yamlText);
-		if (parsed != null && typeof parsed === "object") {
-			frontmatter = parsed as Frontmatter;
-		}
+		parsed = parseYaml(yamlText);
 	} catch (e) {
+		yamlValid = false;
 		const msg = e instanceof Error ? e.message : String(e);
 		diagnostics.push({
 			severity: "error",
@@ -133,7 +236,34 @@ export function loadFrontmatter(
 		});
 	}
 
-	visit(parseDocument(yamlText), {
+	const yamlDocument = parseDocument(yamlText);
+	if (yamlValid && (parsed !== null || yamlDocument.contents !== null)) {
+		const typeDiagnostics = frontmatterTypeDiagnostics(
+			yamlDocument,
+			parsed,
+			source,
+			firstNl + 1,
+		);
+		diagnostics.push(...typeDiagnostics);
+		// Like malformed YAML, invalid typed metadata must not reach consumers.
+		if (typeDiagnostics.length === 0) {
+			// Checked above. Retain the original YAML values (including extension
+			// aliases), normalizing only the documented empty declarations.
+			frontmatter = { ...(parsed as Frontmatter) };
+			for (const section of ["artifact", "process", "group", "tag"] as const) {
+				const entries = frontmatter[section];
+				if (entries) frontmatter[section] = { ...entries };
+				if (entries)
+					for (const [id, meta] of Object.entries(entries)) {
+						if (meta === null) {
+							const normalized = frontmatter[section];
+							if (normalized) normalized[id] = {};
+						}
+					}
+			}
+		}
+	}
+	visit(yamlDocument, {
 		Scalar(_key, scalar, path) {
 			if (
 				scalar.type !== "PLAIN" ||

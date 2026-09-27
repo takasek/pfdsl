@@ -17,7 +17,8 @@
 		"typecheck": "tsgo --noEmit"
 	},
 	"dependencies": {
-		"yaml": "^2.4.0"
+		"yaml": "^2.4.0",
+		"zod": "4.6.5"
 	},
 	"engines": {
 		"node": ">=18"

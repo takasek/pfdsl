@@ -1,6 +1,6 @@
 <!-- DO NOT EDIT — snapshot distributed with pfdsl skill. Authoritative source: https://github.com/takasek/pfdsl/blob/main/docs/spec/spec.md -->
 
-# PFDSL仕様書 v0.0.22
+# PFDSL仕様書 v0.0.23
 
 ## 1. 目的
 
@@ -35,6 +35,20 @@ mapping key ではない YAML プレーンスカラー値の同一行に空白�
 ---
 
 ### 2.1 YAML front matter
+
+空の front matter を除き、ルートは mapping でなければならない。
+本仕様で型を定義したフィールドは、読み込み時に型を検査する。
+文字列・数値・配列・mapping の取り違え、配列要素や mapping 値の型違反は、通常 mode と strict mode の両方で FM004（error）とする。
+数値フィールドは有限数でなければならず、`index` の正整数制約・重複検査は引き続き V029 / W004 で行う。
+`status` / `type` の文字列の列挙値、およびスタイルのキー制約は既存の V007 / V031 / V008 / V009 で検査する。
+`layout.direction` は `LR` / `RL` / `TB` / `BT` のいずれかでなければならない。
+`version` は文字列または数値、`location` / `extends` は文字列または文字列の配列を許可する。
+`artifact` / `process` / `group` / `tag` の各エントリで値を省略した空宣言（null）は、空の mapping として扱う。
+未定義の拡張キーとその値は保持するが、既知フィールドの検査を省略する理由にはしない。
+空配列・空文字列・quoted scalar・block scalar と、許可する型へ解決される alias は受理する。
+配列全体またはその親 mapping が alias の場合も同じ検査を行い、alias 経由の違反は使用側の位置を指す。
+FM004 がある front matter は不正として扱い、処理系は不正なメタデータを後続処理へ渡さない。
+意図した文字列に `: ` を含める場合や、数値・真偽値・null と解釈されるテキストは引用符で囲む。
 
 ```yaml
 ---
@@ -315,7 +329,7 @@ process:
 
 * 任意文字列の配列（0..N 個）
 * Artifact / Process のどちらにも付与できる
-* 検証は行わない（自由ラベル）
+* 文字列の内容は検証しない（自由ラベル）。要素型は §2.1 の FM004 で検査する。
 * `tag` セクション（§2.7.4）で宣言されていないタグを使ってもよい（宣言は任意。未宣言タグは error/warning とせず無視する）
 
 #### 2.7.3 statusStyles
@@ -1057,7 +1071,7 @@ artifact.C.parts = [Ca, Cb]
 * artifact.X.status は §2.7.1 の列挙値のみ許可。列挙外は error
 * statusStyles のキーは §2.7.1 の列挙値のみ許可。列挙外は error
 * statusStyles および `tag.<id>.style` の属性キーは §2.7.3 の許可属性のみ。許可外は error
-* tags 配列の各要素は任意文字列（検証なし）
+* tags 配列の各要素は任意文字列（内容は検証しない。要素型は §2.1 の FM004 で検査する）
 * Process の出力 Artifact が `status: done` なのに、明示 status を持つ入力 Artifact が `done` 未満の場合は warning (W003)。status 未宣言の入力 Artifact は対象外
 
 ### 15.7 criteria 制約
@@ -1168,6 +1182,7 @@ graph body の node-decl で宣言された孤立ノード（edge なし）は �
 | FM001 | error | §2.1 | front matter の閉じ `---` がない |
 | FM002 | error | §2.1 | front matter の YAML が不正 |
 | FM003 | warning (--strict: error) | §2.1 | プレーンスカラー値の inline comment により意図した値が切り詰められる可能性がある |
+| FM004 | error | §2.1 | 既知の front matter フィールドに型違反がある |
 | P001 | error | §8 | 構文不正（汎用トークンエラー） |
 | P002 | error | §11 | artifact 集合内で識別子が期待される位置に無い |
 | P003 | error | §11 | artifact 集合内でカンマの後に識別子が無い |
