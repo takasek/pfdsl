@@ -4,6 +4,7 @@ import {
 	renderFrontmatterCst,
 } from "./frontmatter-cst.js";
 import { analyze } from "./index.js";
+import { hasUnreadableError } from "./rename-id.js";
 import type { Diagnostic } from "./types/index.js";
 
 export interface RenameGroupResult {
@@ -13,8 +14,8 @@ export interface RenameGroupResult {
 	 * process's `group:` reference to it renamed to `newId`. Only the
 	 * frontmatter changes — the body never references groups (spec §2.8).
 	 * Unchanged (the original `source`) when `oldId` has no declaration in
-	 * the local `group:` section, or when `source` already carries a parse
-	 * error — there is nothing safe to rewrite.
+	 * the local `group:` section, or when `source` could not be read (see
+	 * `hasUnreadableError`) — there is nothing safe to rewrite.
 	 */
 	output: string;
 	/** True when `oldId` had a local `group:` declaration to rename. */
@@ -59,7 +60,7 @@ export function renameGroup(
 		children: [],
 		diagnostics,
 	};
-	if (diagnostics.some((d) => d.severity === "error")) return noop;
+	if (hasUnreadableError(diagnostics)) return noop;
 
 	const cst = parseFrontmatterCst(source);
 	if (!cst.present) return noop;

@@ -887,7 +887,7 @@ processed >> transform -> done
 		);
 	});
 
-	it("exits 1 on a structural (FM/P/L/N) diagnostic and leaves the file untouched", async () => {
+	it("exits 1 on a structural (FM/P/L) diagnostic and leaves the file untouched", async () => {
 		const broken = `---
 group:
   layer1: [unterminated
@@ -899,6 +899,68 @@ a
 		const r = await run(["rename", f, "layer1", "layerx"]);
 		expect(r.exitCode).toBe(1);
 		expect(readFileSync(f, "utf-8")).toBe(broken);
+	});
+
+	// The result is judged, not the input (same contract as `meta set`): a
+	// validation error the input already had surfaces as its own diagnostic
+	// on the refused result, never as an "internal mismatch".
+	const invalidStatus = `---
+artifact:
+  a: { status: bogus }
+---
+a >> p -> b
+`;
+	const inputErrorMessage =
+		"the result would have errors (an error already in the input also blocks the rename)";
+
+	it("refuses an input with a validation error, printing that diagnostic (V007) and leaving the file untouched", async () => {
+		const f = join(dir, "rename-input-v007.pfdsl");
+		writeFileSync(f, invalidStatus);
+		const r = await run(["rename", f, "b", "bb", "--write"]);
+		expect(r.exitCode).toBe(1);
+		expect(r.stderr).toContain("[V007]");
+		expect(r.stderr).toContain(
+			`rename: refusing to write ${f}: ${inputErrorMessage}`,
+		);
+		expect(r.stderr).not.toContain("internal mismatch");
+		expect(readFileSync(f, "utf-8")).toBe(invalidStatus);
+	});
+
+	it("--json reports the input's validation error (V007) as diagnostics on refusal", async () => {
+		const f = join(dir, "rename-input-v007-json.pfdsl");
+		writeFileSync(f, invalidStatus);
+		const r = await run(["rename", f, "b", "bb", "--json"]);
+		expect(r.exitCode).toBe(1);
+		expect(r.stderr).toBe("");
+		const parsed = JSON.parse(r.stdout);
+		expect(parsed.ok).toBe(false);
+		expect(parsed.error).toBe(
+			`rename: refusing to write ${f}: ${inputErrorMessage}`,
+		);
+		expect(parsed.diagnostics.map((d: { code: string }) => d.code)).toContain(
+			"V007",
+		);
+	});
+
+	it("exits 1 when old is declared as both a group and a process id (ambiguous), naming the clash", async () => {
+		const ambiguous = `---
+group:
+  g:
+    label: G
+process:
+  g:
+    label: P
+---
+a >> g -> b
+`;
+		const f = join(dir, "rename-ambiguous-process.pfdsl");
+		writeFileSync(f, ambiguous);
+		const r = await run(["rename", f, "g", "g2"]);
+		expect(r.exitCode).toBe(1);
+		expect(r.stderr).toBe(
+			`rename: 'g' is declared twice in ${f} — as a group and as a process; this is invalid and cannot be renamed unambiguously\n`,
+		);
+		expect(readFileSync(f, "utf-8")).toBe(ambiguous);
 	});
 
 	it("exits 1 when old is not found at all (neither a group nor an artifact/process)", async () => {
@@ -1175,6 +1237,37 @@ a
 
 				const checkResult = await run(["check", parentFile]);
 				expect(checkResult.exitCode).toBe(0);
+			} finally {
+				rmSync(d, { recursive: true, force: true });
+			}
+		});
+
+		it("refuses a rename when the input already has an unrelated subflow boundary error (V034), leaving the file untouched", async () => {
+			const d = mkdtempSync(join(tmpdir(), "pfdsl-rename-subflow-v034-"));
+			try {
+				// The child's terminal is `shipment`; the parent's output `z`
+				// does not match it — a V034 the input already has, unrelated to
+				// the `q` being renamed.
+				const parent = [
+					"---",
+					"process:",
+					"  P:",
+					"    subflow: ./child.pfdsl",
+					"---",
+					"order >> P -> z",
+					"q >> r -> s",
+				].join("\n");
+				const parentFile = join(d, "parent.pfdsl");
+				writeFileSync(parentFile, parent);
+				writeFileSync(join(d, "child.pfdsl"), child);
+
+				const r = await run(["rename", parentFile, "q", "q2", "--write"]);
+				expect(r.exitCode).toBe(1);
+				expect(r.stderr).toContain("[V034]");
+				expect(r.stderr).toContain(
+					`rename: refusing to write ${parentFile}: the result would have errors (an error already in the input also blocks the rename)`,
+				);
+				expect(readFileSync(parentFile, "utf-8")).toBe(parent);
 			} finally {
 				rmSync(d, { recursive: true, force: true });
 			}

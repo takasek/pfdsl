@@ -309,6 +309,49 @@ a
 		expect(output).toBe(src);
 		expect(diagnostics.some((d) => d.severity === "error")).toBe(true);
 	});
+
+	it("is a no-op when the body carries a parser (P) error", () => {
+		const src = "a >> >> p -> b\n";
+		const { output, found, diagnostics } = renameId(src, "b", "bx");
+		expect(diagnostics.some((d) => String(d.code).startsWith("P"))).toBe(true);
+		expect(found).toBe(false);
+		expect(output).toBe(src);
+	});
+
+	// Only a document that could not be read (FM / L / P) blocks the rewrite.
+	// A validation (V) or normalizer (N) error is judged on the result by the
+	// caller, the same way `meta set` judges its write.
+	it("still renames when the source carries a validation (V) error", () => {
+		const src = `---
+artifact:
+  a: { status: bogus }
+---
+a >> p -> b
+`;
+		const { output, found, kind } = renameId(src, "b", "bb");
+		expect(found).toBe(true);
+		expect(kind).toBe("artifact");
+		expect(output).toBe(`---
+artifact:
+  a: { status: bogus }
+---
+a >> p -> bb
+`);
+	});
+
+	it("still renames when the source carries a normalizer (N) error", () => {
+		const src = `---
+artifact:
+  x: {label: X}
+process:
+  x: {label: X}
+---
+a >> p -> b
+`;
+		const { output, found } = renameId(src, "b", "bb");
+		expect(found).toBe(true);
+		expect(output.endsWith("a >> p -> bb\n")).toBe(true);
+	});
 });
 
 describe("renameId subflow boundary preservation (spec §2.9.3)", () => {

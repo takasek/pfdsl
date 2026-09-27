@@ -198,6 +198,50 @@ a
 		expect(diagnostics.some((d) => d.severity === "error")).toBe(true);
 	});
 
+	// Only a document that could not be read (FM / L / P) blocks the rewrite.
+	// A validation (V) or normalizer (N) error is judged on the result by the
+	// caller, the same way `meta set` judges its write.
+	it("still renames when the source carries a validation (V) error", () => {
+		const src = `---
+group:
+  g1:
+    label: G1
+artifact:
+  a: { status: bogus, group: g1 }
+---
+a >> p -> b
+`;
+		const { output, found, members } = renameGroup(src, "g1", "gx");
+		expect(found).toBe(true);
+		expect(members).toEqual(["a"]);
+		expect(output).toBe(`---
+group:
+  gx:
+    label: G1
+artifact:
+  a: { status: bogus, group: gx }
+---
+a >> p -> b
+`);
+	});
+
+	it("still renames when the source carries a normalizer (N) error", () => {
+		const src = `---
+group:
+  g1:
+    label: G1
+artifact:
+  x: {label: X}
+process:
+  x: {label: X}
+---
+a >> p -> b
+`;
+		const { output, found } = renameGroup(src, "g1", "gx");
+		expect(found).toBe(true);
+		expect(output).toContain("  gx:\n    label: G1\n");
+	});
+
 	it("preserves a folded (>) scalar's hand-wrapped line breaks elsewhere in the document", () => {
 		const src = `---
 description: >

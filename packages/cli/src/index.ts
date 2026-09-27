@@ -1223,6 +1223,8 @@ export interface MetaSetOptions {
  * result instead.
  */
 const STRUCTURAL_CODE = /^(?:FM|P|L|N)\d+$/;
+/** A document that could not be read at all (frontmatter, lexer, parser) — `rename`'s up-front gate. */
+const UNREADABLE_CODE = /^(?:FM|P|L)\d+$/;
 
 /** Fields whose values are arrays/maps — meta set only writes scalars. */
 const NON_SCALAR_FIELDS = new Set([
@@ -1427,9 +1429,10 @@ export interface RenameOptions {
  * an artifact/process id. Either way, the result is re-validated with
  * `analyze()` and — for a file on disk — the same subflow-boundary check
  * `runCheck` runs (`subflowBoundaryDiagnostics`, factored out of it just
- * above `runCheck` in this file) before deciding to emit/write: a rename
- * that would leave the file with an error it did not already have is
- * refused, not written.
+ * above `runCheck` in this file) before deciding to emit/write: a result
+ * with any error is refused, not emitted or written — including an error
+ * the input already had, since a rename does not cure it. Only an input
+ * that could not be read (FM/L/P) is refused before the rewrite.
  *
  * A file elsewhere that references this one from outside — a parent's
  * `subflow:`/`boundary:` naming an id in this file, or another file's
@@ -1452,12 +1455,17 @@ export function runRename(
 	const source = readSource(file);
 	if (isCommandResult(source)) return source;
 
-	// Structural diagnostics (FM/P/L/N) report a document that could not be
-	// read, so `frontmatter`/`nodeKinds` below cannot be trusted to describe
-	// it — same gate as runMetaSet, for the same reason.
+	// Only a document that could not be read (FM/L/P) is refused up front:
+	// `frontmatter`/`nodeKinds` below cannot be trusted to describe it, and
+	// the rewrite itself would be a no-op. Every other error — validation
+	// (V) and normalizer (N) alike — is judged on the result by the gate on
+	// the write below, the same way runMetaSet judges its write. N is left
+	// to that gate so that an id declared as both a group and a process
+	// (which the normalizer reports as N001) reaches the "declared twice"
+	// refusal below with its own message.
 	const { diagnostics, frontmatter, nodeKinds } = analyze(source);
 	const unreadable = diagnostics.filter((d) =>
-		STRUCTURAL_CODE.test(String(d.code)),
+		UNREADABLE_CODE.test(String(d.code)),
 	);
 	const failed = failIfErrors(unreadable, file, opts.json, opts.color);
 	if (failed) return failed;
@@ -1488,22 +1496,29 @@ export function runRename(
 		effectiveGroup = resolvePresentation(fullChain).group;
 	}
 
-	// Every group-id lookup is an own-property check, not bracket access — a
-	// prototype member name like `toString` must read as "not declared", not
-	// as itself.
-	const hasGroupId = (
-		group: Record<string, unknown> | undefined,
+	// Every declaration lookup is an own-property check, not bracket access —
+	// a prototype member name like `toString` must read as "not declared",
+	// not as itself.
+	const declaresId = (
+		section: Record<string, unknown> | undefined,
 		id: string,
-	): boolean => group !== undefined && Object.hasOwn(group, id);
+	): boolean => section !== undefined && Object.hasOwn(section, id);
 
 	// Kind resolution of <old>: a group id comes from this file's own local
 	// `group:` section (own-property, not `nodeKinds` — see this function's
 	// own doc comment above for why). An id declared as both a group and an
-	// artifact/process is invalid, not disambiguated by a `--kind` flag.
-	const isGroupId = hasGroupId(frontmatter?.group, oldId);
+	// artifact/process is invalid, not disambiguated by a `--kind` flag. The
+	// clash is read from the frontmatter sections themselves, not from
+	// `nodeKinds`, which holds only one kind per id.
+	const isGroupId = declaresId(frontmatter?.group, oldId);
 	const oldNodeKind = nodeKinds.get(oldId);
-	if (isGroupId && (oldNodeKind === "artifact" || oldNodeKind === "process")) {
-		const message = `rename: '${oldId}' is declared twice in ${file} — as a group and as ${oldNodeKind === "artifact" ? "an" : "a"} ${oldNodeKind}; this is invalid and cannot be renamed unambiguously`;
+	const clashingKind = declaresId(frontmatter?.artifact, oldId)
+		? "artifact"
+		: declaresId(frontmatter?.process, oldId)
+			? "process"
+			: undefined;
+	if (isGroupId && clashingKind !== undefined) {
+		const message = `rename: '${oldId}' is declared twice in ${file} — as a group and as ${clashingKind === "artifact" ? "an" : "a"} ${clashingKind}; this is invalid and cannot be renamed unambiguously`;
 		if (opts.json) return failJson({ error: message });
 		return fail(`${message}\n`);
 	}
@@ -1514,7 +1529,7 @@ export function runRename(
 			: undefined;
 
 	if (targetKind === undefined) {
-		const fromPreset = hasExtends && hasGroupId(effectiveGroup, oldId);
+		const fromPreset = hasExtends && declaresId(effectiveGroup, oldId);
 		const message = fromPreset
 			? `rename: '${oldId}' is not declared in ${file} — it comes from a preset and must be renamed there`
 			: `rename: '${oldId}' not found in ${file}`;
@@ -1527,7 +1542,7 @@ export function runRename(
 	// renamed here (rename it at the preset instead).
 	if (targetKind === "group" && hasExtends) {
 		const presetGroup = resolvePresentation(presetChain).group;
-		if (hasGroupId(presetGroup, oldId)) {
+		if (declaresId(presetGroup, oldId)) {
 			const message = `rename: '${oldId}' is also defined by a preset extended from ${file}; the local entry is a partial override and cannot be renamed here`;
 			if (opts.json) return failJson({ error: message });
 			return fail(`${message}\n`);
@@ -1548,8 +1563,8 @@ export function runRename(
 		return fail(`${message}\n`);
 	}
 	if (
-		hasGroupId(frontmatter?.group, newId) ||
-		hasGroupId(effectiveGroup, newId)
+		declaresId(frontmatter?.group, newId) ||
+		declaresId(effectiveGroup, newId)
 	) {
 		const message = `rename: '${newId}' already exists as a group id in ${file}`;
 		if (opts.json) return failJson({ error: message });
@@ -1565,7 +1580,9 @@ export function runRename(
 	const children = "children" in result ? result.children : undefined;
 
 	// Defence in depth: the CLI-level lookup above and the CST-level rewrite
-	// read the declaration through two independent parses.
+	// read the declaration through two independent parses. Not reached by an
+	// input's validation error — the up-front gate above and the rewrite
+	// both skip only an unreadable (FM/L/P) document.
 	if (!found) {
 		const message = `rename: '${oldId}' could not be renamed in ${file} (internal mismatch)`;
 		if (opts.json) return failJson({ error: message });
@@ -1573,10 +1590,12 @@ export function runRename(
 	}
 
 	// The gate on the write: the result must be clean, same contract as
-	// runMetaSet — an error the rewrite introduced or one
-	// the original already had and this write did not cure. For a file on
-	// disk, also re-run the subflow-boundary check `check` runs for this
-	// file (skipped for stdin, same reason as the extends: load above).
+	// runMetaSet. ANY error on the result refuses — one the rewrite
+	// introduced and one the input already had (which a rename does not
+	// cure) alike; this is the only place an input's validation error
+	// surfaces. For a file on disk, also re-run the subflow-boundary check
+	// `check` runs for this file (skipped for stdin, same reason as the
+	// extends: load above).
 	const resultAnalysis = analyze(output);
 	const resultDiags = [...resultAnalysis.diagnostics];
 	if (absFile !== null) {
@@ -1590,7 +1609,7 @@ export function runRename(
 	}
 	if (hasErrors(resultDiags)) {
 		const errs = resultDiags.filter((d) => d.severity === "error");
-		const message = `rename: refusing to write ${file}: the result would have errors`;
+		const message = `rename: refusing to write ${file}: the result would have errors (an error already in the input also blocks the rename)`;
 		if (opts.json) return failJson({ error: message, diagnostics: errs });
 		return fail(`${diagText(errs, file, opts.color)}${message}\n`);
 	}
@@ -3124,8 +3143,8 @@ invisible here and is never rewritten — check that file separately.
 
 After the rewrite, the result is validated the same way check validates
 this file (including the subflow-boundary check, for a file on disk); a
-rename that would leave an error the input did not have is refused, not
-written.
+result with any error is refused, not printed or written. That includes an
+error the input already had: fix it first, then rename.
 
   --write     rewrite the file in place (cannot be used with -)
   --json      emit { ok: true, kind, from, to } (kind: "artifact" | "process"

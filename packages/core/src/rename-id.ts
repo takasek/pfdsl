@@ -8,6 +8,21 @@ import { analyze } from "./index.js";
 import { lex } from "./lexer.js";
 import type { Diagnostic } from "./types/index.js";
 
+/**
+ * True when `diagnostics` report a document that could not be read —
+ * frontmatter (FM), lexer (L), or parser (P) — so there is no trustworthy
+ * structure to rewrite. A validation (V/W) or normalizer (N) error does not
+ * count: the rename is still performed and the caller judges the result
+ * (the top-level `rename` command refuses to emit a result that has errors).
+ */
+export function hasUnreadableError(
+	diagnostics: readonly Diagnostic[],
+): boolean {
+	return diagnostics.some(
+		(d) => d.severity === "error" && /^(?:FM|L|P)\d+$/.test(String(d.code)),
+	);
+}
+
 export interface RenameIdResult {
 	/**
 	 * The whole document (frontmatter + body) with `oldId` renamed to `newId`
@@ -18,7 +33,7 @@ export interface RenameIdResult {
 	 * ids and are never touched. Unchanged (the original `source`) when
 	 * `oldId` is not this file's own artifact/process id (frontmatter
 	 * declaration or body-inferred node — nodeKinds from analyze()), or when
-	 * `source` already carries a parse/validation error.
+	 * `source` could not be read (see `hasUnreadableError`).
 	 */
 	output: string;
 	/** True when `oldId` existed as an artifact/process id (declared or body-only) and was renamed. */
@@ -65,7 +80,7 @@ export function renameId(
 		kind: null,
 		diagnostics,
 	};
-	if (diagnostics.some((d) => d.severity === "error")) return noop;
+	if (hasUnreadableError(diagnostics)) return noop;
 
 	const kind = nodeKinds.get(oldId);
 	if (kind !== "artifact" && kind !== "process") return noop;
