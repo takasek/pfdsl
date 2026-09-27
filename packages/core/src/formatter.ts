@@ -9,6 +9,11 @@ const BARE_ID_RE = /^[\p{L}\p{N}_-]+$/u;
 
 export function formatId(id: string): string {
 	if (BARE_ID_RE.test(id)) return id;
+	return quoteId(id);
+}
+
+/** The `"..."`-quoted spelling of `id`, which `formatId` falls back to when the bare one is not a valid id token. */
+export function quoteId(id: string): string {
 	let escaped = "";
 	for (const char of id) {
 		if (char === "\\") escaped += "\\\\";

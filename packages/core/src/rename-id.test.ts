@@ -196,6 +196,20 @@ process:
 		]);
 	});
 
+	// The lexer ends a bare id before a `-` that starts `->`, so a bare new id
+	// ending in `-` placed right before `>` would lose that dash to an arrow.
+	it.each([
+		["a>>p -> b", '"x-">>p -> b\n'],
+		["a >>p -> b", "x- >>p -> b\n"],
+	])("quotes a new id ending in '-' only where the next character is '>' (%s)", (body, expected) => {
+		const { output, found } = renameId(`${body}\n`, "a", "x-");
+		expect(found).toBe(true);
+		expect(output).toBe(expected);
+		const after = analyze(output);
+		expect(after.diagnostics.filter((d) => d.severity === "error")).toEqual([]);
+		expect(after.nodeKinds.get("x-")).toBe("artifact");
+	});
+
 	it("preserves CRLF line endings", () => {
 		const src =
 			"---\r\nartifact:\r\n  a:\r\n    label: A\r\nprocess:\r\n  p:\r\n    label: P\r\n---\r\na >> p\r\n";
