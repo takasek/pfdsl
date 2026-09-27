@@ -1457,6 +1457,18 @@ export function runRename(
 	const source = readSource(file);
 	if (isCommandResult(source)) return source;
 
+	// Every exit-1 refusal: the message alone, or — from the gate on the
+	// write — preceded by the diagnostics that caused it.
+	const refuse = (message: string, errs?: Diagnostic[]): CommandResult => {
+		if (opts.json) {
+			return failJson(
+				errs ? { error: message, diagnostics: errs } : { error: message },
+			);
+		}
+		const diagLines = errs ? diagText(errs, file, opts.color) : "";
+		return fail(`${diagLines}${message}\n`);
+	};
+
 	// Only a document that could not be read (FM/L/P) is refused up front:
 	// `frontmatter`/`nodeKinds` below cannot be trusted to describe it, and
 	// the rewrite itself would be a no-op. Every other error — validation
@@ -1521,8 +1533,7 @@ export function runRename(
 			: undefined;
 	if (isGroupId && clashingKind !== undefined) {
 		const message = `rename: '${oldId}' is declared twice in ${file} — as a group and as ${clashingKind === "artifact" ? "an" : "a"} ${clashingKind}; this is invalid and cannot be renamed unambiguously`;
-		if (opts.json) return failJson({ error: message });
-		return fail(`${message}\n`);
+		return refuse(message);
 	}
 	const targetKind: "artifact" | "process" | "group" | undefined = isGroupId
 		? "group"
@@ -1535,8 +1546,7 @@ export function runRename(
 		const message = fromPreset
 			? `rename: '${oldId}' is not declared in ${file} — it comes from a preset and must be renamed there`
 			: `rename: '${oldId}' not found in ${file}`;
-		if (opts.json) return failJson({ error: message });
-		return fail(`${message}\n`);
+		return refuse(message);
 	}
 
 	// A group-only refusal: a local entry that only partially overrides a
@@ -1546,8 +1556,7 @@ export function runRename(
 		const presetGroup = resolvePresentation(presetChain).group;
 		if (declaresId(presetGroup, oldId)) {
 			const message = `rename: '${oldId}' is also defined by a preset extended from ${file}; the local entry is a partial override and cannot be renamed here`;
-			if (opts.json) return failJson({ error: message });
-			return fail(`${message}\n`);
+			return refuse(message);
 		}
 	}
 
@@ -1563,25 +1572,27 @@ export function runRename(
 	if (newNodeKind === "artifact" || newNodeKind === "process") {
 		const article = newNodeKind === "artifact" ? "an" : "a";
 		const message = `rename: '${newId}' already exists as ${article} ${newNodeKind} id in ${file}`;
-		if (opts.json) return failJson({ error: message });
-		return fail(`${message}\n`);
+		return refuse(message);
 	}
 	if (
 		declaresId(frontmatter?.group, newId) ||
 		declaresId(effectiveGroup, newId)
 	) {
 		const message = `rename: '${newId}' already exists as a group id in ${file}`;
-		if (opts.json) return failJson({ error: message });
-		return fail(`${message}\n`);
+		return refuse(message);
 	}
 
-	const result =
-		targetKind === "group"
-			? renameGroup(source, oldId, newId)
-			: renameId(source, oldId, newId);
-	const { output, found } = result;
-	const members = "members" in result ? result.members : undefined;
-	const children = "children" in result ? result.children : undefined;
+	let output: string;
+	let found: boolean;
+	// A group rename also reports the members and child groups it rewrote.
+	let groupReport: { members: string[]; children: string[] } | undefined;
+	if (targetKind === "group") {
+		const r = renameGroup(source, oldId, newId);
+		({ output, found } = r);
+		groupReport = { members: r.members, children: r.children };
+	} else {
+		({ output, found } = renameId(source, oldId, newId));
+	}
 
 	// Defence in depth: the CLI-level lookup above and the CST-level rewrite
 	// read the declaration through two independent parses. Not reached by an
@@ -1589,8 +1600,7 @@ export function runRename(
 	// both skip only an unreadable (FM/L/P) document.
 	if (!found) {
 		const message = `rename: '${oldId}' could not be renamed in ${file} (internal mismatch)`;
-		if (opts.json) return failJson({ error: message });
-		return fail(`${message}\n`);
+		return refuse(message);
 	}
 
 	// The gate on the write: the result must be clean, same contract as
@@ -1614,21 +1624,19 @@ export function runRename(
 	if (hasErrors(resultDiags)) {
 		const errs = resultDiags.filter((d) => d.severity === "error");
 		const message = `rename: refusing to write ${file}: the result would have errors (an error already in the input also blocks the rename)`;
-		if (opts.json) return failJson({ error: message, diagnostics: errs });
-		return fail(`${diagText(errs, file, opts.color)}${message}\n`);
+		return refuse(message, errs);
 	}
 
 	if (opts.write) writeFileSync(file, output, "utf-8");
 
 	if (opts.json) {
-		const payload: Record<string, unknown> = {
+		const payload = {
 			ok: true,
 			kind: targetKind,
 			from: oldId,
 			to: newId,
+			...groupReport,
 		};
-		if (members !== undefined) payload.members = members;
-		if (children !== undefined) payload.children = children;
 		return ok(`${JSON.stringify(payload)}\n`);
 	}
 	if (opts.write) return ok("");
