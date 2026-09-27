@@ -438,10 +438,11 @@ order >> work -> fulfilled
 		});
 	});
 
+	// `boundary:` must be a map; an empty one is unreadable (FM004).
 	it.each([
 		["block-style with no value", "    boundary:\n"],
 		["an explicit null (~)", "    boundary: ~\n"],
-	])("replaces an empty boundary: (%s) with a {new: old} map instead of throwing", (_name, boundaryLine) => {
+	])("is a no-op next to an empty boundary: (%s), which is FM004", (_name, boundaryLine) => {
 		const src = `---
 process:
   sub:
@@ -449,11 +450,11 @@ process:
 ${boundaryLine}---
 x >> sub -> y
 `;
-		const { output, found } = renameId(src, "y", "y2");
-		expect(found).toBe(true);
-		const { frontmatter, diagnostics } = analyze(output);
-		expect(frontmatter?.process?.sub?.boundary).toEqual({ y2: "y" });
-		expect(diagnostics.filter((d) => d.severity === "error")).toEqual([]);
+		const { output, found, kind, diagnostics } = renameId(src, "y", "y2");
+		expect(diagnostics.map((d) => d.code)).toContain("FM004");
+		expect(found).toBe(false);
+		expect(kind).toBeNull();
+		expect(output).toBe(src);
 	});
 
 	it("adds nothing when the renamed artifact is not adjacent to any subflow process", () => {

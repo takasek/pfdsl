@@ -1238,7 +1238,7 @@ a
 		it.each([
 			["block-style with no value", "    boundary:"],
 			["an explicit null (~)", "    boundary: ~"],
-		])("renaming a boundary artifact next to an empty boundary: (%s) fills it in, and check on the result stays clean", async (_name, boundaryLine) => {
+		])("refuses to rename a boundary artifact next to an empty boundary: (%s), which is FM004, leaving the file untouched", async (_name, boundaryLine) => {
 			const d = mkdtempSync(join(tmpdir(), "pfdsl-rename-subflow-empty-"));
 			try {
 				const parent = [
@@ -1253,7 +1253,6 @@ a
 				const parentFile = join(d, "parent.pfdsl");
 				writeFileSync(parentFile, parent);
 				writeFileSync(join(d, "child.pfdsl"), child);
-				expect((await run(["check", parentFile])).exitCode).toBe(0);
 
 				const r = await run([
 					"rename",
@@ -1262,15 +1261,9 @@ a
 					"shipment_v2",
 					"--write",
 				]);
-				expect(r.exitCode).toBe(0);
-				const rewritten = readFileSync(parentFile, "utf-8");
-				expect(analyze(rewritten).frontmatter?.process?.P?.boundary).toEqual({
-					shipment_v2: "shipment",
-				});
-
-				const checkResult = await run(["check", parentFile]);
-				expect(checkResult.stdout + checkResult.stderr).toBe("OK\n");
-				expect(checkResult.exitCode).toBe(0);
+				expect(r.exitCode).toBe(1);
+				expect(r.stderr).toMatch(/FM004.*boundary/);
+				expect(readFileSync(parentFile, "utf-8")).toBe(parent);
 			} finally {
 				rmSync(d, { recursive: true, force: true });
 			}
