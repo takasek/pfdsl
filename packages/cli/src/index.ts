@@ -355,7 +355,27 @@ function readSource(file: string): string | CommandResult {
 function fileLoader(path: string): ReturnType<typeof analyze> | null {
 	try {
 		const src = readFileSync(path, "utf-8");
-		return analyze(wrapPresetSource(path, src));
+		const wrapped = wrapPresetSource(path, src);
+		const result = analyze(wrapped);
+		if (wrapped !== src) {
+			// Raw YAML presets gain a synthetic opening fence for analysis.
+			result.diagnostics = result.diagnostics.map((diagnostic) => ({
+				...diagnostic,
+				range: {
+					start: {
+						...diagnostic.range.start,
+						line: Math.max(1, diagnostic.range.start.line - 1),
+						offset: Math.max(0, diagnostic.range.start.offset - 4),
+					},
+					end: {
+						...diagnostic.range.end,
+						line: Math.max(1, diagnostic.range.end.line - 1),
+						offset: Math.max(0, diagnostic.range.end.offset - 4),
+					},
+				},
+			}));
+		}
+		return result;
 	} catch {
 		return null;
 	}
@@ -453,7 +473,7 @@ export function runCheck(file: string, opts: CheckOptions = {}): CommandResult {
 		};
 	}
 	const absFile = resolve(file);
-	const multiDiags: Diagnostic[] = [];
+	const multiDiags: (Diagnostic & { file?: string })[] = [];
 
 	// --- Subflow checks ---
 	const subflowGraph = loadSubflowGraph(absFile, fileLoader);
@@ -494,6 +514,19 @@ export function runCheck(file: string, opts: CheckOptions = {}): CommandResult {
 	const extendsChain = loadExtendsChain(absFile, fileLoader);
 	multiDiags.push(...extendsChain.diagnostics);
 
+	// Loaded documents are analyzed independently. Surface their new type
+	// errors as well, retaining the source file and its own coordinates.
+	for (const [path, doc] of new Map([
+		...subflowGraph.docs,
+		...extendsChain.docs,
+	])) {
+		if (path === absFile) continue;
+		for (const diagnostic of doc.diagnostics) {
+			if (diagnostic.code === "FM004")
+				multiDiags.push({ ...diagnostic, file: path });
+		}
+	}
+
 	for (const [path, doc] of extendsChain.docs) {
 		if (path === absFile) continue; // skip entry file itself
 		multiDiags.push(...validatePresetKeys(path, doc.frontmatter));
@@ -509,7 +542,7 @@ export function runCheck(file: string, opts: CheckOptions = {}): CommandResult {
 			};
 		}
 		return fail(
-			`${errs.map((d) => formatDiagnostic(d, file, opts.color)).join("\n")}\n`,
+			`${errs.map((d) => formatDiagnostic(d, d.file ?? file, opts.color)).join("\n")}\n`,
 		);
 	}
 
@@ -555,7 +588,7 @@ export function runCheck(file: string, opts: CheckOptions = {}): CommandResult {
 
 	const allLines = [
 		...lines,
-		...multiDiags.map((d) => formatDiagnostic(d, file, opts.color)),
+		...multiDiags.map((d) => formatDiagnostic(d, d.file ?? file, opts.color)),
 		...extraLines,
 	];
 	return {

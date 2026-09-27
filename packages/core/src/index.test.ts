@@ -119,10 +119,10 @@ describe("public API", () => {
 
 	it("analyze: warns for a block sequence plain scalar followed by a comment (regression: Pair-only CST traversal)", () => {
 		const src =
-			"---\nartifact:\n  steps:\n    - intended value #123\n---\nstep >> P -> output\n";
+			"---\nmetadata:\n  steps:\n    - intended value #123\n---\nstep >> P -> output\n";
 
 		expect(parse(src).frontmatter).toEqual({
-			artifact: { steps: ["intended value"] },
+			metadata: { steps: ["intended value"] },
 		});
 		expect(analyze(src).diagnostics).toContainEqual({
 			severity: "warning",

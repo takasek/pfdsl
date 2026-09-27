@@ -1,3 +1,4 @@
+import * as z from "zod/mini";
 import type { Diagnostic } from "./diagnostic.js";
 
 export const STATUS_VALUES = [
@@ -30,81 +31,104 @@ export const STYLE_ATTRS = [
 	"penwidth",
 ] as const;
 export type StyleAttr = (typeof STYLE_ATTRS)[number];
-export type NodeStyle = Partial<Record<StyleAttr, string>>;
-
-export interface ArtifactMeta {
-	label?: string;
-	description?: string;
-	owner?: string;
-	externalStakeholders?: string[];
-	parts?: string[];
-	/** Optional positive-integer node index (pfd-tools D{index}). Namespace independent from processes. */
-	index?: number;
-	status?: Status;
-	tags?: string[];
-	group?: string;
-	criteria?: string;
-	location?: string | string[];
-	revises?: string;
-	[key: string]: unknown;
-}
-
-export interface ProcessMeta {
-	label?: string;
-	description?: string;
-	owner?: string;
-	externalStakeholders?: string[];
-	/** Optional positive-integer node index (pfd-tools P{index}). Namespace independent from artifacts. */
-	index?: number;
-	group?: string;
-	tags?: string[];
-	command?: string;
-	location?: string | string[];
-	/** Relative path to a child .pfdsl expanded as a subflow view-link (§2.9.3). */
-	subflow?: string;
-	/** Optional 1:1 boundary rename map (parent id → child id) for a subflow (§2.9.3). */
-	boundary?: Record<string, string>;
-	[key: string]: unknown;
-}
-
-export interface GroupMeta {
-	label?: string;
-	color?: string;
-	parent?: string;
-	[key: string]: unknown;
-}
-
-export interface TagMeta {
-	label?: string;
-	description?: string;
-	style?: NodeStyle;
-	[key: string]: unknown;
-}
-
-export interface Frontmatter {
-	title?: string;
-	version?: string | number;
-	dslVersion?: string;
-	description?: string;
-	tags?: string[];
-	layout?: {
-		direction?: "LR" | "RL" | "TB" | "BT";
-		maxWidth?: number;
-		[key: string]: unknown;
-	};
-	artifact?: Record<string, ArtifactMeta>;
-	process?: Record<string, ProcessMeta>;
-	group?: Record<string, GroupMeta>;
-	tag?: Record<string, TagMeta>;
-	statusStyles?: Partial<Record<Status, NodeStyle>>;
-	/** Relative path(s) to preset file(s) inherited for presentation keys (§2.9.4). */
-	extends?: string | string[];
-	/** Relative path from the .pfdsl file used as base for location: and command: resolution. Default: .pfdsl file's directory. */
-	basePath?: string;
-	/** PFD kind: roadmap | workflow | pipeline. Controls which commands apply. */
-	type?: PfdType;
-	[key: string]: unknown;
-}
+const text = z.optional(z.string());
+const styleFields = Object.fromEntries(
+	STYLE_ATTRS.map((key) => [key, text]),
+) as Record<StyleAttr, typeof text>;
+export const nodeStyleSchema = z.strictObject(styleFields);
+const styleInputSchema = z.looseObject(styleFields);
+const strings = z.array(z.string());
+const paths = z.union([z.string(), strings]);
+const common = {
+	label: text,
+	description: text,
+	owner: text,
+	externalStakeholders: z.optional(strings),
+	index: z.optional(z.number()),
+	tags: z.optional(strings),
+	group: text,
+	location: z.optional(paths),
+};
+export const artifactMetaSchema = z.looseObject({
+	...common,
+	parts: z.optional(strings),
+	status: z.optional(z.enum(STATUS_VALUES)),
+	criteria: text,
+	revises: text,
+});
+export const processMetaSchema = z.looseObject({
+	...common,
+	command: text,
+	subflow: text,
+	boundary: z.optional(z.record(z.string(), z.string())),
+});
+export const groupMetaSchema = z.looseObject({
+	label: text,
+	color: text,
+	parent: text,
+});
+export const tagMetaSchema = z.looseObject({
+	label: text,
+	description: text,
+	style: z.optional(nodeStyleSchema),
+});
+export const frontmatterSchema = z.looseObject({
+	title: text,
+	version: z.optional(z.union([z.string(), z.number()])),
+	dslVersion: text,
+	description: text,
+	tags: z.optional(strings),
+	layout: z.optional(
+		z.looseObject({
+			direction: z.optional(z.enum(["LR", "RL", "TB", "BT"])),
+			maxWidth: z.optional(z.number()),
+		}),
+	),
+	artifact: z.optional(z.record(z.string(), artifactMetaSchema)),
+	process: z.optional(z.record(z.string(), processMetaSchema)),
+	group: z.optional(z.record(z.string(), groupMetaSchema)),
+	tag: z.optional(z.record(z.string(), tagMetaSchema)),
+	statusStyles: z.optional(
+		z.partialRecord(z.enum(STATUS_VALUES), nodeStyleSchema),
+	),
+	extends: z.optional(paths),
+	basePath: text,
+	type: z.optional(z.enum(PFD_TYPE_VALUES)),
+});
+/** Shape validation precedes semantic rules. Keep string-valued enum errors
+ * and unknown style keys readable so V007/V008/V009/V031 and meta set repair
+ * retain their existing behavior. Allowed values still come from the constants
+ * above. Empty YAML declarations are normalized to {} after checking. */
+export const frontmatterInputSchema = z.extend(frontmatterSchema, {
+	artifact: z.optional(
+		z.record(
+			z.string(),
+			z.nullable(z.extend(artifactMetaSchema, { status: text })),
+		),
+	),
+	process: z.optional(z.record(z.string(), z.nullable(processMetaSchema))),
+	group: z.optional(z.record(z.string(), z.nullable(groupMetaSchema))),
+	tag: z.optional(
+		z.record(
+			z.string(),
+			z.nullable(
+				z.extend(tagMetaSchema, { style: z.optional(styleInputSchema) }),
+			),
+		),
+	),
+	statusStyles: z.optional(z.record(z.string(), styleInputSchema)),
+	type: text,
+});
+/** Match exactOptionalPropertyTypes: omission, not an explicit undefined value. */
+type DefinedOptionals<T> = T extends object
+	? { [K in keyof T]: DefinedOptionals<Exclude<T[K], undefined>> }
+	: T;
+export type NodeStyle = DefinedOptionals<z.infer<typeof nodeStyleSchema>>;
+export type ArtifactMeta = DefinedOptionals<z.infer<typeof artifactMetaSchema>>;
+export type ProcessMeta = DefinedOptionals<z.infer<typeof processMetaSchema>>;
+export type GroupMeta = DefinedOptionals<z.infer<typeof groupMetaSchema>>;
+export type TagMeta = DefinedOptionals<z.infer<typeof tagMetaSchema>>;
+export type Frontmatter = DefinedOptionals<z.infer<typeof frontmatterSchema>>;
 
 export interface LoadResult {
 	frontmatter: Frontmatter | null;
