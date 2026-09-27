@@ -1,0 +1,49 @@
+name: render pfdsl svg
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.pfdsl/**/*.pfdsl'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: render-pfdsl-svg-main
+  cancel-in-progress: false
+
+jobs:
+  render:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: main
+
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm -r build
+
+      - name: Render sibling SVG files
+        run: |
+          while IFS= read -r -d '' file; do
+            node packages/cli/dist/cli.js render "$file" --format svg > "${file%.pfdsl}.svg"
+          done < <(find .pfdsl -type f -name '*.pfdsl' -print0)
+
+      - name: Commit updated SVG files
+        run: |
+          git add -- '.pfdsl/**/*.svg'
+          if git diff --cached --quiet; then
+            exit 0
+          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m 'docs(pfdsl): update generated SVG diagrams'
+          git push origin HEAD:main
