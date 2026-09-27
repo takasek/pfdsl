@@ -8,6 +8,7 @@ import {
 } from "./frontmatter-cst.js";
 import { analyze, isUnreadableError } from "./index.js";
 import { lex } from "./lexer.js";
+import { parentBoundaryArtifacts } from "./multifile.js";
 import type { Diagnostic } from "./types/index.js";
 
 /** True when `diagnostics` include an unreadable-document error (see `isUnreadableError`). */
@@ -107,45 +108,33 @@ export function renameId(
 		}
 	}
 
-	// Every subflow process's boundary: KEY that names oldId (values are the
-	// child file's own ids and are never touched).
+	// Each process's boundary: map. A KEY naming `oldId` is renamed; values
+	// are the child file's own ids and are never touched. Otherwise, when
+	// `oldId` is a normal input/output of a subflow process, a
+	// `{ <newId>: <oldId> }` entry is added: an unmapped boundary artifact is
+	// matched to the child by identical id (spec §2.9.3), and the entry keeps
+	// that match after the rename.
 	for (const [pid, meta] of Object.entries(frontmatter?.process ?? {})) {
-		if (meta?.boundary === undefined) continue;
 		const boundaryNode = doc.getIn(["process", pid, "boundary"], true);
-		if (!isMap(boundaryNode)) continue;
-		for (const pair of boundaryNode.items) {
-			// boundary: keys are not restricted to YAML strings; `pairId` reads a
-			// bare `10:` by its string form, so it matches `oldId` "10".
-			if (pairId(pair) === oldId && isScalar(pair.key)) {
-				pair.key.value = newId;
+		let mapped = false;
+		if (isMap(boundaryNode)) {
+			for (const pair of boundaryNode.items) {
+				// boundary: keys are not restricted to YAML strings; `pairId` reads a
+				// bare `10:` by its string form, so it matches `oldId` "10".
+				if (pairId(pair) === oldId && isScalar(pair.key)) {
+					pair.key.value = newId;
+					mapped = true;
+				}
 			}
 		}
-	}
-
-	// Boundary preservation (spec §2.9.3): a subflow process's unmapped
-	// boundary artifacts are matched to the child by identical id. When
-	// `oldId` is a normal input/output of a subflow process whose `boundary:`
-	// did not already map it (the case just rewritten above), renaming it
-	// would silently break that identity match unless the map now says so
-	// explicitly. Read from the pre-mutation `frontmatter` (the original
-	// boundary map, before the key-rename loop above), so this only fires for
-	// a boundary that truly lacked `oldId` as a key.
-	for (const [pid, meta] of Object.entries(frontmatter?.process ?? {})) {
-		if (typeof meta?.subflow !== "string") continue;
-		const isBoundaryAdjacent = edges.some(
-			(e) =>
-				(e.kind === "input" || e.kind === "output") &&
-				e.process === pid &&
-				e.artifact === oldId,
-		);
-		if (!isBoundaryAdjacent) continue;
-		if (meta.boundary === undefined) {
-			doc.setIn(["process", pid, "boundary"], { [newId]: oldId });
-		} else if (!Object.hasOwn(meta.boundary, oldId)) {
+		if (mapped || typeof meta?.subflow !== "string") continue;
+		const { inputs, outputs } = parentBoundaryArtifacts(edges, pid);
+		if (!inputs.has(oldId) && !outputs.has(oldId)) continue;
+		if (isMap(boundaryNode)) {
 			doc.setIn(["process", pid, "boundary", newId], oldId);
+		} else {
+			doc.setIn(["process", pid, "boundary"], { [newId]: oldId });
 		}
-		// Otherwise the key was already renamed above; its value (the child
-		// id) stays untouched.
 	}
 
 	const frontmatterOutput = cst.present
