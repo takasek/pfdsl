@@ -16,4 +16,6 @@ tags: [target:cli-write-command, context:review-finding]
 
   原因の仮説（未検証）: 委譲時のブリーフが拒否条件を列挙する一方、「どの表現で id を照合するか」を入力として渡していなかった。既存の `meta set` は id をノード（artifact / process）の存在確認だけに使い、YAML キーの型を問題にしない経路だったため、先例にも答えがなかった。
 
-  未解決: prototype 名の欠陥は CLI 層（`Object.hasOwn`）で塞いでおり、core の直積テストの範囲外にある。group を消す `delete` や、種別を問わない汎用 `rename`（#1218 の設計選択記録で保留）を作る場合は、同じ照合の問題を持つ。
+  続報（2026-09-27）: 同じサイクルで決定を変え、`meta rename-group` をトップレベルの `rename`（artifact / process / group）に置き換えた。`renameId` も `String()` で照合し、node 改名について id の綴り × 参照位置 × 宣言の有無の直積テストを `packages/core/src/rename-id.test.ts` に持つ。種別の判定では `nodeKinds` が1つの id に1種別しか持たないため、group と node の同名を frontmatter の各節と body の edge から直接検出して拒否している。
+
+  未解決: prototype 名の欠陥は CLI 層（`Object.hasOwn`）で塞いでおり、core の直積テストの範囲外にある。既存の `delete` は数値キーの宣言を `doc.hasIn` に文字列を渡して探すため、`10:` の宣言を消せないまま `deleted` と報告する（#1218 の独立設計レビューで観測。group を消せない件は #1278）。
