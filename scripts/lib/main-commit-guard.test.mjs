@@ -976,9 +976,19 @@ describe("evaluateMainCommitGuard bypass axis (#1232)", () => {
 	});
 
 	it("denies a git config bypass that writes outside a foreign target (#1232)", () => {
+		// The oracle (describe "git config bypass oracle") already confirms
+		// classifyGitCommand's outsideTarget is correct for each of these
+		// forms; this checks the other half — that evaluateMainCommitGuard's
+		// foreign-target exemption actually stays narrowed for each of them,
+		// not just for the two forms it happened to be written against.
 		for (const command of [
 			"git -C /tmp/sbx config --global core.hooksPath /x",
+			"git -C /tmp/sbx config --system core.hooksPath /x",
+			"git -C /tmp/sbx config --glob core.hooksPath /x",
+			"git -C /tmp/sbx config --sys core.hooksPath /x",
 			"git -C /tmp/sbx config --file /abs/.git/config core.hooksPath /x",
+			"git -C /tmp/sbx config -f/abs/.git/config core.hooksPath /x",
+			"git -C /tmp/sbx config --fil=/abs/.git/config core.hooksPath /x",
 		]) {
 			const result = evaluateMainCommitGuard(payload({ command }), {
 				currentBranch: "main",
