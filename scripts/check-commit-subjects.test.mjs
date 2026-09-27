@@ -192,18 +192,13 @@ describe("check-commit-subjects CLI", () => {
 
 describe("check-commit-subjects workflow", () => {
 	// Compared whole, against the document below, rather than property by
-	// property. Enumerating the ways a workflow can stop judging does not
-	// terminate: guarding the step's env leaves the job's and the workflow's,
-	// rejecting shell operators leaves a template that ignores the script
-	// placeholder, and reading the options as a map hides a duplicate whose
-	// value is a command substitution. Each of those runs the pull request's
-	// own code with the checkout already in place, and each is invisible to an
-	// assertion about some other property.
+	// property. The base branch's workflow must never check out or execute the
+	// PR's code under pull_request_target, and must not mask a failed verdict.
 	//
 	// The cost is that every edit to this file must be mirrored here, including
 	// harmless ones such as spelling out an equivalent shell. For a workflow
-	// that executes PR-controlled code, that is the intended trade: the diff
-	// says what changed, and a reviewer sees it.
+	// that has access to a base-branch token, the diff must show exactly what
+	// changed for review.
 	const EXPECTED = {
 		name: "check commit subjects",
 		on: {
@@ -211,45 +206,52 @@ describe("check-commit-subjects workflow", () => {
 			// so retargeting a PR swaps the range without firing the workflow. No
 			// paths filter either — the check is about the range, so no path's
 			// absence makes it inapplicable.
-			pull_request: {
+			pull_request_target: {
 				types: ["opened", "synchronize", "reopened", "edited"],
 			},
 		},
-		// Nothing is used after the clone, and the job runs a script from the
-		// pull request's head.
+		// The checkout and script come from the base branch.
 		permissions: { contents: "read" },
 		jobs: {
 			check: {
-				// Named: branch protection identifies a required check by the job's
-				// name, and three other workflows here already run a `check`.
+				// Keep the reported context distinct from every other job.
 				name: "check commit subjects",
-				// GitHub-hosted: on a persistent runner the PR's code shares a host
-				// that neither of the two settings above protects.
+				// A GitHub-hosted runner also limits exposure if the checked data is
+				// later mishandled by the base script.
 				"runs-on": "ubuntu-latest",
 				steps: [
 					{
-						uses: "actions/checkout@v6",
+						uses: "actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803",
 						with: {
-							// Full history, at the head rather than the synthetic merge
-							// commit, and no token left on disk.
+							// Full base history, with no token left on disk.
 							"fetch-depth": 0,
-							// biome-ignore lint/suspicious/noTemplateCurlyInString: a GitHub Actions expression, not an interpolation
-							ref: "${{ github.event.pull_request.head.sha }}",
 							"persist-credentials": false,
 						},
 					},
-					{ uses: "actions/setup-node@v6", with: { "node-version": 24 } },
+					{
+						uses: "actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38",
+						with: { "node-version": 24 },
+					},
+					{
+						name: "Fetch the PR commit range",
+						// biome-ignore lint/suspicious/noTemplateCurlyInString: a shell variable, not JavaScript interpolation
+						run: 'git fetch --no-tags origin "refs/pull/${PR_NUMBER}/head"\ntest "$(git rev-parse FETCH_HEAD)" = "$HEAD_SHA"\n',
+						env: {
+							// biome-ignore lint/suspicious/noTemplateCurlyInString: a GitHub Actions expression, not an interpolation
+							PR_NUMBER: "${{ github.event.pull_request.number }}",
+							// biome-ignore lint/suspicious/noTemplateCurlyInString: a GitHub Actions expression, not an interpolation
+							HEAD_SHA: "${{ github.event.pull_request.head.sha }}",
+						},
+					},
 					{
 						name: "Lint the branch's commit subjects",
 						// origin/<base_ref>, not the payload's base.sha: that value is
 						// the base tip as of the event and stops matching the gate's
 						// range once the base advances.
-						run: 'node scripts/check-commit-subjects.mjs --base "origin/$BASE_REF" --head "$HEAD_SHA"',
+						run: 'node scripts/check-commit-subjects.mjs --base "origin/$BASE_REF" --head FETCH_HEAD',
 						env: {
 							// biome-ignore lint/suspicious/noTemplateCurlyInString: a GitHub Actions expression, not an interpolation
 							BASE_REF: "${{ github.base_ref }}",
-							// biome-ignore lint/suspicious/noTemplateCurlyInString: a GitHub Actions expression, not an interpolation
-							HEAD_SHA: "${{ github.event.pull_request.head.sha }}",
 						},
 					},
 				],
@@ -274,7 +276,10 @@ describe("check-commit-subjects workflow", () => {
 	const job = workflow.jobs?.check ?? {};
 	const steps = job.steps ?? [];
 	const runSteps = steps.filter((s) => typeof s.run === "string");
-	const lint = runSteps[0] ?? {};
+	const fetch =
+		runSteps.find((s) => s.name === "Fetch the PR commit range") ?? {};
+	const lint =
+		runSteps.find((s) => s.name === "Lint the branch's commit subjects") ?? {};
 	const checkouts = steps.filter((s) =>
 		String(s.uses ?? "").startsWith("actions/checkout"),
 	);
@@ -312,12 +317,17 @@ describe("check-commit-subjects workflow", () => {
 		assert.doesNotMatch(lint.run, /[|;&]/);
 	});
 
-	it("runs exactly one command, from published actions, on a hosted runner", () => {
-		assert.equal(runSteps.length, 1);
+	it("fetches only the event's PR head before running the base checker", () => {
+		assert.equal(runSteps.length, 2);
+		assert.equal(
+			fetch.run,
+			// biome-ignore lint/suspicious/noTemplateCurlyInString: a shell variable, not JavaScript interpolation
+			'git fetch --no-tags origin "refs/pull/${PR_NUMBER}/head"\ntest "$(git rev-parse FETCH_HEAD)" = "$HEAD_SHA"\n',
+		);
 		assert.equal(lint.run.trim().replace(/\\\n/g, " ").split("\n").length, 1);
 		assert.deepEqual(steps.map((s) => s.uses).filter(Boolean), [
-			"actions/checkout@v6",
-			"actions/setup-node@v6",
+			"actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803",
+			"actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38",
 		]);
 		assert.ok(
 			["ubuntu-latest", "ubuntu-24.04", "ubuntu-22.04"].includes(
@@ -341,25 +351,31 @@ describe("check-commit-subjects workflow", () => {
 			"--base",
 			"origin/$BASE_REF",
 			"--head",
-			"$HEAD_SHA",
+			"FETCH_HEAD",
 		]);
 	});
 
-	it("hands the PR's own code no credentials and no extra environment", () => {
+	it("leaves no checkout credentials and confines input to the event data", () => {
 		assert.equal(checkouts.length, 1);
 		assert.equal(String(checkouts[0]?.with?.["persist-credentials"]), "false");
 		assert.deepEqual(workflow.permissions, { contents: "read" });
-		assert.deepEqual(Object.keys(lint.env ?? {}).sort(), [
-			"BASE_REF",
+		assert.deepEqual(Object.keys(lint.env ?? {}).sort(), ["BASE_REF"]);
+		assert.deepEqual(Object.keys(fetch.env ?? {}).sort(), [
 			"HEAD_SHA",
+			"PR_NUMBER",
 		]);
 		assert.equal(workflow.env, undefined);
 		assert.equal(job.env, undefined);
 	});
 
-	it("judges every pull request, including one that was retargeted", () => {
-		assert.deepEqual(Object.keys(workflow.on.pull_request), ["types"]);
-		assert.ok(workflow.on.pull_request.types.includes("edited"));
+	it("runs on ordinary PR updates, including retargeting", () => {
+		assert.equal(workflow.on.pull_request, undefined);
+		assert.deepEqual(Object.keys(workflow.on.pull_request_target), ["types"]);
+		assert.ok(workflow.on.pull_request_target.types.includes("edited"));
+	});
+	it("runs the trusted base checkout when its own checker is changed", () => {
+		assert.equal(checkouts[0]?.with?.ref, undefined);
+		assert.equal(String(checkouts[0]?.with?.["persist-credentials"]), "false");
 	});
 	it("matches the reviewed document exactly", () => {
 		assert.deepEqual(workflow, EXPECTED);

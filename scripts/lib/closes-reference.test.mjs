@@ -117,7 +117,7 @@ describe("classifyClosesReference", () => {
 });
 
 // The verdict is derived from the PR body, which lives on GitHub rather than in
-// the tree (#936). `pull_request` without `types:` defaults to opened /
+// the tree (#936). `pull_request_target` without `types:` defaults to opened /
 // synchronize / reopened — none of which fire when the body is edited, so the
 // very fix this check asks for leaves the red in place until someone re-runs
 // the job by hand. Naming `types:` at all opts out of that default, so the
@@ -134,12 +134,21 @@ describe("check-closes-reference workflow trigger", () => {
 				"utf8",
 			),
 		);
-		const types = workflow.on.pull_request?.types ?? [];
+		assert.equal(workflow.on.pull_request, undefined);
+		const types = workflow.on.pull_request_target?.types ?? [];
 		for (const type of ["edited", "opened", "synchronize", "reopened"]) {
 			assert.ok(
 				types.includes(type),
 				`expected the workflow to trigger on \`${type}\`, got ${JSON.stringify(types)}`,
 			);
 		}
+		assert.deepEqual(workflow.permissions, {
+			contents: "read",
+			issues: "read",
+			"pull-requests": "read",
+		});
+		const checkout = workflow.jobs.check.steps[0];
+		assert.equal(checkout.with.ref, undefined);
+		assert.equal(checkout.with["persist-credentials"], false);
 	});
 });
