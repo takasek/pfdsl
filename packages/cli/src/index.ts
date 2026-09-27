@@ -1412,11 +1412,13 @@ export interface RenameOptions {
  * subcommand).
  *
  * Kind resolution: `<old>` names a group only if it has a declaration in
- * this file's own local `group:` section (own-property — `nodeKinds`
- * registers artifact/process ids first and silently skips a same-named
- * group, packages/core/src/normalizer.ts:36-41). Declaring the same id
- * twice — once under `group:`, once as an artifact/process — is treated as
- * invalid and refused; there is no `--kind` selector to disambiguate it.
+ * this file's own local `group:` section (own-property, not `nodeKinds`,
+ * which holds one kind per id: packages/core/src/normalizer.ts:36-53
+ * registers artifact ids first, then group ids — silently skipping one an
+ * artifact already took — then process ids, raising N001 for one an
+ * artifact or a group already took). Declaring the same id twice — once
+ * under `group:`, once as an artifact/process — is treated as invalid and
+ * refused; there is no `--kind` selector to disambiguate it.
  *
  * `<new>` must not already exist as any artifact, process, or group id,
  * locally or (for a group) via the effective frontmatter resolved through
@@ -1551,10 +1553,12 @@ export function runRename(
 
 	// <new> must not already exist as any artifact, process, or group id —
 	// locally, or (for a group) via extends:. normalizer.ts registers
-	// artifact/process ids before group ids and silently skips a group whose
-	// id one of them already took (packages/core/src/normalizer.ts:37-40, no
-	// diagnostic), so an artifact/process collision is checked first and
-	// named by its own kind.
+	// artifact ids, then group ids (silently skipping one an artifact already
+	// took), then process ids (N001 for one an artifact or a group already
+	// took) — packages/core/src/normalizer.ts:36-53. So an artifact/process
+	// collision is checked first and named by its own kind; an id declared as
+	// both a group and a process reads as a group in `nodeKinds` and is
+	// caught by the group check after it.
 	const newNodeKind = nodeKinds.get(newId);
 	if (newNodeKind === "artifact" || newNodeKind === "process") {
 		const article = newNodeKind === "artifact" ? "an" : "a";
