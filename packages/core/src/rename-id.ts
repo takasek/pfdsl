@@ -4,23 +4,15 @@ import {
 	parseFrontmatterCst,
 	renderFrontmatterCst,
 } from "./frontmatter-cst.js";
-import { analyze } from "./index.js";
+import { analyze, isUnreadableError } from "./index.js";
 import { lex } from "./lexer.js";
 import type { Diagnostic } from "./types/index.js";
 
-/**
- * True when `diagnostics` report a document that could not be read —
- * frontmatter (FM), lexer (L), or parser (P) — so there is no trustworthy
- * structure to rewrite. A validation (V/W) or normalizer (N) error does not
- * count: the rename is still performed and the caller judges the result
- * (the top-level `rename` command refuses to emit a result that has errors).
- */
+/** True when `diagnostics` include an unreadable-document error (see `isUnreadableError`). */
 export function hasUnreadableError(
 	diagnostics: readonly Diagnostic[],
 ): boolean {
-	return diagnostics.some(
-		(d) => d.severity === "error" && /^(?:FM|L|P)\d+$/.test(String(d.code)),
-	);
+	return diagnostics.some(isUnreadableError);
 }
 
 export interface RenameIdResult {

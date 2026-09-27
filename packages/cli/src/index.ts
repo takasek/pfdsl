@@ -29,6 +29,7 @@ import {
 	hasErrors,
 	type IndexChange,
 	isRoadmapType,
+	isUnreadableError,
 	isUrlLike,
 	loadExtendsChain,
 	loadSubflowGraph,
@@ -1260,8 +1261,6 @@ export interface MetaSetOptions {
  * result instead.
  */
 const STRUCTURAL_CODE = /^(?:FM|P|L|N)\d+$/;
-/** A document that could not be read at all (frontmatter, lexer, parser) — `rename`'s up-front gate. */
-const UNREADABLE_CODE = /^(?:FM|P|L)\d+$/;
 
 /** Fields whose values are arrays/maps — meta set only writes scalars. */
 const NON_SCALAR_FIELDS = new Set([
@@ -1516,10 +1515,12 @@ export function runRename(
 	// refusal below with its own message.
 	const { diagnostics, frontmatter, nodeKinds, edges, isolatedNodes } =
 		analyze(source);
-	const unreadable = diagnostics.filter((d) =>
-		UNREADABLE_CODE.test(String(d.code)),
+	const failed = failIfErrors(
+		diagnostics.filter(isUnreadableError),
+		file,
+		opts.json,
+		opts.color,
 	);
-	const failed = failIfErrors(unreadable, file, opts.json, opts.color);
 	if (failed) return failed;
 
 	// Multi-file context (extends:) needs a real path to resolve relative

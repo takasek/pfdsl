@@ -211,6 +211,16 @@ export function hasErrors(diags: readonly Diagnostic[]): boolean {
 	return diags.some((d) => d.severity === "error");
 }
 
+/**
+ * True for an error reporting a document that could not be read —
+ * frontmatter (FM), lexer (L), or parser (P) — so there is no trustworthy
+ * structure to rewrite. A validation (V) or normalizer (N) error is not one:
+ * the document was read, and its content is what is wrong.
+ */
+export function isUnreadableError(d: Diagnostic): boolean {
+	return d.severity === "error" && /^(?:FM|L|P)\d+$/.test(String(d.code));
+}
+
 export { resolveMeta } from "./meta.js";
 
 export interface AnalyzeOptions {
