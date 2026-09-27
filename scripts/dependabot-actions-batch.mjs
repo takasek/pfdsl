@@ -1,6 +1,6 @@
 import { execFileSync } from "node:child_process";
 import { readFileSync, writeFileSync } from "node:fs";
-import { pathToFileURL } from "node:url";
+import { isCliEntrypoint } from "./lib/cli-entrypoint.mjs";
 
 const sha = "[0-9a-f]{40}";
 const pinLine = new RegExp(
@@ -355,5 +355,4 @@ function main() {
 	);
 }
 
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href)
-	main();
+if (isCliEntrypoint(import.meta.url, process.argv[1])) main();
