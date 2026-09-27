@@ -12,8 +12,19 @@ export function formatId(id: string): string {
 	return quoteId(id);
 }
 
+/**
+ * `formatId`'s spelling of `id` for a position directly followed by `next`
+ * in the source. The lexer ends a bare id before a `-` that starts `->`, so
+ * a bare spelling ending in `-` right before `>` would lose that dash to an
+ * arrow; it is quoted there instead.
+ */
+export function formatIdBefore(id: string, next: string | undefined): string {
+	const bare = formatId(id);
+	return bare.endsWith("-") && next === ">" ? quoteId(id) : bare;
+}
+
 /** The `"..."`-quoted spelling of `id`, which `formatId` falls back to when the bare one is not a valid id token. */
-export function quoteId(id: string): string {
+function quoteId(id: string): string {
 	let escaped = "";
 	for (const char of id) {
 		if (char === "\\") escaped += "\\\\";

@@ -3,6 +3,7 @@ import {
 	formatAsFlows,
 	formatEdges,
 	formatId,
+	formatIdBefore,
 	parseIdList,
 	splitBodyIntoSegments,
 } from "./formatter.js";
@@ -365,5 +366,27 @@ describe("formatAsFlows", () => {
 		];
 		const isolated = ['isolated space # " \\ newline\n tab\t'];
 		assertRoundTrips(formatAsFlows(edges, isolated), edges, isolated);
+	});
+});
+
+describe("formatIdBefore", () => {
+	// The lexer ends a bare id before a `-` that starts `->`, so a bare
+	// spelling ending in `-` right before `>` would lose that dash to an arrow.
+	it.each([
+		["x-", ">", '"x-"'],
+		["x-", " ", "x-"],
+		["x-", undefined, "x-"],
+		["x", ">", "x"],
+		["a b", ">", '"a b"'],
+	])("spells %j before %j as %s", (id, next, expected) => {
+		expect(formatIdBefore(id, next)).toBe(expected);
+	});
+
+	it("keeps the id one token when spliced before '>>'", () => {
+		const { tokens } = lex(`${formatIdBefore("x-", ">")}>>p\n`);
+		expect(tokens.filter((t) => t.type === "ID").map((t) => t.value)).toEqual([
+			"x-",
+			"p",
+		]);
 	});
 });

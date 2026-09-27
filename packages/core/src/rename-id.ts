@@ -1,5 +1,5 @@
 import { Document, isMap, isScalar, isSeq } from "yaml";
-import { formatId, quoteId } from "./formatter.js";
+import { formatIdBefore } from "./formatter.js";
 import {
 	declarationPair,
 	pairId,
@@ -156,16 +156,10 @@ export function renameId(
 	let bodyOutput = "";
 	let cursor = 0;
 	let foundInBody = false;
-	// The lexer ends a bare id before a `-` that starts `->`, so a bare
-	// spelling ending in `-` right before `>` would lose that dash to an
-	// arrow (`x-` + `>>p` lexes as `x`, `->`, `>`). Quote it there instead.
-	const bareNewId = formatId(newId);
-	const spellingBefore = (next: string | undefined): string =>
-		bareNewId.endsWith("-") && next === ">" ? quoteId(newId) : bareNewId;
 	for (const t of tokens) {
 		if (t.type === "ID" && t.value === oldId) {
 			bodyOutput += cst.body.slice(cursor, t.start.offset);
-			bodyOutput += spellingBefore(cst.body[t.end.offset]);
+			bodyOutput += formatIdBefore(newId, cst.body[t.end.offset]);
 			cursor = t.end.offset;
 			foundInBody = true;
 		}
