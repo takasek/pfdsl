@@ -26,7 +26,7 @@ da1db67300285253731124967f705e00d8df5c23bda9d5b60e5130298eaadf0a  skills/pfd-eco
 
 4b702b67cbaba6172e42743e0ed9182c104491017f534672e92943e3baec947f  skills/pfd-ops/SKILL.md
 
-e38b227074c0c5bab8853a167dc487e68f509bce5b37601305f025a757b63498  skills/pfd-ops/install/.github/workflows/pfdsl-sweep-completed-chains.yml
+bab66f16509c3bc57d5184cafcebdc34cc87b3edf1c97b53c49d629135c1601c  skills/pfd-ops/install/.github/workflows/pfdsl-sweep-completed-chains.yml
 
 35faacd4d5c13add67d9c303c8a68d2909d82fc32d9637501c0b100ae590d26f  skills/pfd-ops/install/scripts/pfdsl/audit-issues-flow.mjs
 
