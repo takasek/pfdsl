@@ -457,6 +457,22 @@ x >> sub -> y
 		expect(output).toBe(src);
 	});
 
+	// boundary: keys are not restricted to YAML strings (only declaration ids
+	// are), so a bare `10:` there names the parent artifact "10".
+	it("renames a bare numeric boundary: key naming the renamed artifact, adding no second entry", () => {
+		const src = `---
+process:
+  work: { subflow: ./child.pfdsl, boundary: { 10: child_in } }
+---
+"10" >> work
+`;
+		const { output, found } = renameId(src, "10", "ten");
+		expect(found).toBe(true);
+		const { frontmatter, diagnostics } = analyze(output);
+		expect(diagnostics.filter((d) => d.severity === "error")).toEqual([]);
+		expect(frontmatter?.process?.work?.boundary).toEqual({ ten: "child_in" });
+	});
+
 	it("adds nothing when the renamed artifact is not adjacent to any subflow process", () => {
 		const src = `---
 artifact:
