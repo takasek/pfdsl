@@ -89,81 +89,52 @@ a
 		expect(output).toContain("a: { group: g2 }");
 	});
 
-	// `analyze()`'s plain-object frontmatter always has string keys — JS
-	// coerces every object property key to a string, regardless of what
-	// scalar type the YAML source had (`42:` bare and unquoted parses to the
-	// CST's Scalar as the *number* 42, not the string "42") — so a caller
-	// checking "is `oldId` declared?" via that plain object (an own-property
-	// read, e.g. Object.hasOwn(frontmatter.group, "42")) sees it declared,
-	// and this function must match the same identity or it silently fails to
-	// find the pair it was just told exists.
-	it("matches a bare, unquoted integer group key by its string form", () => {
+	// A group id that looks numeric must be written as a YAML string wherever
+	// it lands (spec: declaration ids and group:/parent: references are
+	// strings; a bare `43` would re-read as a number and fail with FM004).
+	it("writes a numeric-looking new id quoted in the key, parent: and group: positions", () => {
 		const src = `---
 group:
-  42:
-    label: Num
----
-a
-`;
-		const { output, found, diagnostics } = renameGroup(src, "42", "numbered");
-		expect(diagnostics.filter((d) => d.severity === "error")).toEqual([]);
-		expect(found).toBe(true);
-		const { frontmatter } = analyze(output);
-		expect(Object.hasOwn(frontmatter?.group ?? {}, "numbered")).toBe(true);
-		expect(Object.hasOwn(frontmatter?.group ?? {}, "42")).toBe(false);
-	});
-
-	it("matches a bare, unquoted integer group key when renaming to another bare integer", () => {
-		const src = `---
-group:
-  42:
-    label: Num
----
-a
-`;
-		const { output, found } = renameGroup(src, "42", "43");
-		expect(found).toBe(true);
-		const { frontmatter } = analyze(output);
-		expect(Object.hasOwn(frontmatter?.group ?? {}, "43")).toBe(true);
-		expect(Object.hasOwn(frontmatter?.group ?? {}, "42")).toBe(false);
-	});
-
-	it("matches a member whose group: field is the same bare, unquoted integer", () => {
-		const src = `---
-group:
-  42:
-    label: Num
-artifact:
-  a:
-    group: 42
-process:
-  p:
-    group: 42
----
-a >> p -> b
-`;
-		const { output, members } = renameGroup(src, "42", "numbered");
-		expect(members).toEqual(["a", "p"]);
-		const { frontmatter } = analyze(output);
-		expect(String(frontmatter?.artifact?.a?.group)).toBe("numbered");
-		expect(String(frontmatter?.process?.p?.group)).toBe("numbered");
-	});
-
-	it("matches another group's parent: field when it is the same bare, unquoted integer", () => {
-		const src = `---
-group:
-  42:
+  "42":
     label: Num
   child:
     label: Child
-    parent: 42
+    parent: "42"
+artifact:
+  a:
+    group: "42"
+process:
+  p:
+    group: "42"
 ---
-a
+a >> p -> b
 `;
-		const { output, children } = renameGroup(src, "42", "numbered");
+		const { output, found, members, children } = renameGroup(src, "42", "43");
+		expect(found).toBe(true);
+		expect(members).toEqual(["a", "p"]);
 		expect(children).toEqual(["child"]);
-		const { frontmatter } = analyze(output);
-		expect(String(frontmatter?.group?.child?.parent)).toBe("numbered");
+		expect(output).toBe(`---
+group:
+  "43":
+    label: Num
+  child:
+    label: Child
+    parent: "43"
+artifact:
+  a:
+    group: "43"
+process:
+  p:
+    group: "43"
+---
+a >> p -> b
+`);
+		const after = analyze(output);
+		expect(after.diagnostics.filter((d) => d.severity === "error")).toEqual([]);
+		expect(Object.keys(after.frontmatter?.group ?? {})).toEqual([
+			"43",
+			"child",
+		]);
 	});
 
 	it("is a no-op reporting found: false when oldId has no local group: declaration", () => {
@@ -260,25 +231,16 @@ a
 });
 
 // The id-identity defects found in review (#1218: a prototype-member name,
-// a bare numeric key) were each one shape of the same question — does the
+// a numeric-looking key) were each one shape of the same question — does the
 // group id the caller names match the id every representation of the file
-// holds? This checks that question across the product of the ways an id can
-// be written, the places it is referenced, and the YAML styles, against the
-// invariant from spec §2.8 rather than against the implementation: after the
-// rename, re-reading the file finds <new> wherever <old> was and <old>
-// nowhere, and leaves every other reference alone.
+// holds? This checks that question across the product of the ways a string
+// id can be written, the places it is referenced, and the YAML styles,
+// against the invariant from spec §2.8 rather than against the
+// implementation: after the rename, re-reading the file finds <new> wherever
+// <old> was and <old> nowhere, and leaves every other reference alone.
 describe("renameGroup id identity across key shapes, positions and styles", () => {
-	const oldTokens = [
-		"g1",
-		'"g1"',
-		"'g1'",
-		"42",
-		"3.14",
-		"true",
-		"toString",
-		'"42"',
-	];
-	const newIds = ["gx", "43", "constructor"];
+	const oldTokens = ["g1", '"g1"', "'g1'", "toString", '"42"'];
+	const newIds = ["gx", "43", "true", "null", "1e3", "constructor"];
 	const styles = ["flow", "block"] as const;
 
 	const unquote = (token: string): string => token.replace(/^["']|["']$/g, "");
@@ -340,10 +302,68 @@ a >> p -> b
 		const groups = frontmatter?.group ?? {};
 		expect(Object.hasOwn(groups, newId)).toBe(true);
 		expect(Object.hasOwn(groups, oldId)).toBe(false);
-		expect(Object.keys(groups).map(String)).toEqual([newId, "child", "other"]);
-		expect(String(groups.child?.parent)).toBe(newId);
-		expect(String(frontmatter?.artifact?.a?.group)).toBe(newId);
-		expect(String(frontmatter?.process?.p?.group)).toBe(newId);
+		expect(Object.keys(groups)).toEqual([newId, "child", "other"]);
+		expect(groups.child?.parent).toBe(newId);
+		expect(frontmatter?.artifact?.a?.group).toBe(newId);
+		expect(frontmatter?.process?.p?.group).toBe(newId);
 		expect(frontmatter?.artifact?.b?.group).toBe("other");
+	});
+});
+
+// A bare typed token (a YAML number or boolean) is not an id: as a
+// declaration key or as a group:/parent: value it makes the frontmatter
+// unreadable (FM004), so there is nothing trustworthy to rename.
+describe("renameGroup on a bare typed id token", () => {
+	const tokens = ["42", "3.14", "true"];
+	const shapes = [
+		{
+			name: "the group id",
+			oldId: (token: string) => token,
+			render: (token: string) => `group:\n  ${token}: { label: N }\n`,
+		},
+		{
+			name: "a member id",
+			oldId: () => "g1",
+			render: (token: string) =>
+				`group:\n  g1: { label: G }\nartifact:\n  ${token}: { group: g1 }\n`,
+		},
+		{
+			name: "a child group id",
+			oldId: () => "g1",
+			render: (token: string) =>
+				`group:\n  g1: { label: G }\n  ${token}: { label: C, parent: g1 }\n`,
+		},
+		{
+			name: "a member's group: value",
+			oldId: (token: string) => token,
+			render: (token: string) =>
+				`group:\n  "${token}": { label: N }\nartifact:\n  a: { group: ${token} }\n`,
+		},
+		{
+			name: "a child's parent: value",
+			oldId: (token: string) => token,
+			render: (token: string) =>
+				`group:\n  "${token}": { label: N }\n  c: { label: C, parent: ${token} }\n`,
+		},
+	];
+	const cases = tokens.flatMap((token) =>
+		shapes.map((shape) => ({ token, shape })),
+	);
+
+	it.each(cases)("is a no-op when $token is $shape.name", ({
+		token,
+		shape,
+	}) => {
+		const src = `---\n${shape.render(token)}---\na\n`;
+		const { output, found, members, children, diagnostics } = renameGroup(
+			src,
+			shape.oldId(token),
+			"renamed",
+		);
+		expect(diagnostics.map((d) => d.code)).toContain("FM004");
+		expect(found).toBe(false);
+		expect(members).toEqual([]);
+		expect(children).toEqual([]);
+		expect(output).toBe(src);
 	});
 });
