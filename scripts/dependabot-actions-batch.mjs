@@ -145,6 +145,13 @@ export function batchNumbers(body) {
 	return match ? match[1].split(",").map(Number) : [];
 }
 
+export function isOwnBatchPull(pull, repository) {
+	return (
+		pull.head?.repo?.full_name === repository &&
+		pull.head?.ref?.startsWith("codex/dependabot-actions-")
+	);
+}
+
 export function createFinalPr(
 	branch,
 	numbers,
@@ -225,11 +232,7 @@ function main() {
 		throw new Error("Invalid GITHUB_REPOSITORY");
 	run("gh", ["auth", "setup-git"]);
 	const pulls = allPages(`repos/${repository}/pulls?state=open&per_page=100`);
-	const pendingBatch = pulls.find(
-		(p) =>
-			p.head?.repo?.full_name === repository &&
-			p.head?.ref?.startsWith("codex/dependabot-actions-"),
-	);
+	const pendingBatch = pulls.find((p) => isOwnBatchPull(p, repository));
 	if (pendingBatch) {
 		console.log(`Waiting for batch PR #${pendingBatch.number}`);
 		return;
@@ -240,10 +243,7 @@ function main() {
 	);
 	const cancelledNumbers = new Set(
 		closed
-			.filter(
-				(p) =>
-					!p.merged_at && p.head?.ref?.startsWith("codex/dependabot-actions-"),
-			)
+			.filter((p) => !p.merged_at && isOwnBatchPull(p, repository))
 			.flatMap((p) => batchNumbers(p.body)),
 	);
 	if (
@@ -258,12 +258,7 @@ function main() {
 	}
 	const excludedNumbers = new Set(
 		closed
-			.filter(
-				(p) =>
-					p.merged_at &&
-					p.head?.repo?.full_name === repository &&
-					p.head?.ref?.startsWith("codex/dependabot-actions-"),
-			)
+			.filter((p) => p.merged_at && isOwnBatchPull(p, repository))
 			.flatMap((p) => batchNumbers(p.body)),
 	);
 	const batch = selectBatch(pulls, {

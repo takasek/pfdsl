@@ -6,6 +6,7 @@ import {
 	batchBranchName,
 	batchNumbers,
 	createFinalPr,
+	isOwnBatchPull,
 	selectBatch,
 	updateWorkflowPinExpectations,
 	validateDependencyPrFiles,
@@ -106,6 +107,33 @@ describe("Dependabot Actions batch selection", () => {
 			[10, 11],
 		);
 		assert.deepEqual(batchNumbers("unrelated PR"), []);
+	});
+
+	it("does not trust a fork PR with the batch branch name", () => {
+		assert.equal(
+			isOwnBatchPull(
+				{
+					head: {
+						ref: "codex/dependabot-actions-10-11",
+						repo: { full_name: "other/pfdsl" },
+					},
+				},
+				"takasek/pfdsl",
+			),
+			false,
+		);
+		assert.equal(
+			isOwnBatchPull(
+				{
+					head: {
+						ref: "codex/dependabot-actions-10-11",
+						repo: { full_name: "takasek/pfdsl" },
+					},
+				},
+				"takasek/pfdsl",
+			),
+			true,
+		);
 	});
 });
 
