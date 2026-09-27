@@ -41,6 +41,18 @@ describe("Dependabot Actions batch selection", () => {
 		);
 	});
 
+	it("waits after an old PR is updated or reopened", () => {
+		const result = selectBatch(
+			[pr(10, { updated_at: "2026-09-28T09:59:00Z" })],
+			{
+				now,
+				repository: "takasek/pfdsl",
+				quietMinutes: 15,
+			},
+		);
+		assert.equal(result.status, "waiting");
+	});
+
 	it("collects only open first-party Dependabot GitHub Actions PRs", () => {
 		const result = selectBatch(
 			[
@@ -243,29 +255,49 @@ describe("workflow pin expectation repair", () => {
 });
 
 describe("passive workflow trigger", () => {
-	it("debounces PR events without canceling an active integration", () => {
-		const workflow = parse(
+	it("debounces bot PRs in an unprivileged workflow, then uses workflow_run for secrets", () => {
+		const queueSource = readFileSync(
+			new URL(
+				"../.github/workflows/dependabot-actions-batch.yml",
+				import.meta.url,
+			),
+			"utf8",
+		);
+		const queue = parse(queueSource);
+		const integrate = parse(
 			readFileSync(
 				new URL(
-					"../.github/workflows/dependabot-actions-batch.yml",
+					"../.github/workflows/dependabot-actions-integrate.yml",
 					import.meta.url,
 				),
 				"utf8",
 			),
 		);
-		assert.deepEqual(workflow.on.pull_request_target.types, [
+		assert.deepEqual(queue.on.pull_request_target.types, [
 			"opened",
 			"reopened",
 			"labeled",
 			"closed",
 		]);
-		assert.equal(workflow.on.schedule, undefined);
-		assert.equal(workflow.jobs.settle.concurrency["cancel-in-progress"], true);
+		assert.equal(queue.on.schedule, undefined);
+		assert.equal(queue.jobs.settle.concurrency["cancel-in-progress"], true);
+		assert.equal(queue.jobs.integrate, undefined);
+		assert.doesNotMatch(queueSource, /secrets\./);
+		assert.deepEqual(integrate.on.workflow_run.workflows, [queue.name]);
+		assert.deepEqual(integrate.on.workflow_run.types, ["completed"]);
+		assert.match(integrate.jobs.integrate.if, /conclusion == 'success'/);
 		assert.equal(
-			workflow.jobs.integrate.concurrency["cancel-in-progress"],
+			integrate.jobs.integrate.concurrency["cancel-in-progress"],
 			false,
 		);
-		assert.equal(workflow.jobs.integrate.needs, "settle");
+		assert.equal(integrate.permissions.actions, "read");
+		const steps = integrate.jobs.integrate.steps;
+		const proof = steps.findIndex(
+			(step) => step.name === "Verify the settle job completed",
+		);
+		const token = steps.findIndex((step) => step.id === "app-token");
+		assert.ok(proof >= 0 && proof < token);
+		assert.match(steps[proof].run, /conclusion == "success"/);
 	});
 });
 

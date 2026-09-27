@@ -25,7 +25,9 @@ export function selectBatch(
 		)
 		.sort((a, b) => a.number - b.number);
 	if (eligible.length === 0) return { status: "empty", pulls: [] };
-	const newest = Math.max(...eligible.map((p) => Date.parse(p.created_at)));
+	const newest = Math.max(
+		...eligible.map((p) => Date.parse(p.updated_at ?? p.created_at)),
+	);
 	if (!Number.isFinite(newest) || now - newest < quietMinutes * 60_000)
 		return { status: "waiting", pulls: eligible };
 	return { status: "ready", pulls: eligible };

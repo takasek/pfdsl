@@ -1,6 +1,6 @@
 # Dependabot GitHub Actions の一括統合
 
-`.github/workflows/dependabot-actions-batch.yml` は、`main` 向けの Dependabot GitHub Actions PR が `github-actions` ラベル付きで作成・再開・ラベル付与されたときに起動する。後続イベントが待機ジョブを取り消すため、最後の対象 PR から15分待ってまとめる。統合ジョブは別の排他グループで直列化し、処理中のイベントで取り消さない。最終 PR が開いている間は次の束を保留し、最終 PR がマージされたイベントで再開する。
+`.github/workflows/dependabot-actions-batch.yml` は、`main` 向けの Dependabot GitHub Actions PR が `github-actions` ラベル付きで作成・再開・ラベル付与されたときに起動する。後続イベントが待機ジョブを取り消すため、対象 PR の最後の更新から15分待ってまとめる。待機ジョブの完了イベントで `.github/workflows/dependabot-actions-integrate.yml` が起動し、元の `settle` ジョブの成功を GitHub API で確認した後に Actions secret にアクセスして統合する。統合ジョブは別の排他グループで直列化し、処理中のイベントで取り消さない。最終 PR が開いている間は次の束を保留し、最終 PR がマージされたイベントで再開する。
 
 `scripts/dependabot-actions-batch.mjs` は対象 PR の作成者、同一リポジトリの head、ブランチ名、base、変更ファイルを検証する。変更は workflow 内の40桁 SHA の `uses:` 行だけを受け入れる。PR のコミットをローカルの中間ブランチに統合し、生成物と pin のテスト期待値を更新してテストに通った場合だけ、中間ブランチを公開して `main` 向けの最終 PR を作る。元の Dependabot PR と `main` にはマージ操作を行わない。
 
