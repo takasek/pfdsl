@@ -8,9 +8,9 @@
  * gate-check.mjs runs the same check, but only when a cycle's runner invokes
  * it, and only over the range that existed at that moment. Commits pushed
  * afterwards are never judged: the gate's green stays green and nothing
- * re-derives it (#1174). A `pull_request` workflow calling this script fires
- * on every push to the branch, so the verdict is recomputed over the current
- * range each time.
+ * re-derives it (#1174). The base-owned `pull_request_target` workflow calls
+ * this script on every push to the PR branch, so the verdict is recomputed
+ * over the current range each time.
  *
  * Both callers go through checkCommitSubjects so the range and the merge
  * exclusion have one owner. Sharing only the subject linter would let this
@@ -19,9 +19,8 @@
  *
  * `--base` is a ref, not a branch name: CI passes `origin/<base_ref>` after a
  * full-history checkout, which is the same range definition the gate uses.
- * `--head` defaults to HEAD; CI passes the event payload's head SHA, because a
- * `pull_request` checkout leaves HEAD on a synthetic merge commit unless the
- * workflow points it elsewhere.
+ * `--head` defaults to HEAD; CI fetches the event payload's PR head as Git
+ * data, verifies its SHA, and passes FETCH_HEAD without checking out PR code.
  *
  * Usage: node scripts/check-commit-subjects.mjs --base <ref> [--head <ref>]
  */
