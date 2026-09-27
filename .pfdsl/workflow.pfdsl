@@ -699,6 +699,7 @@ vscode_ext_debug_skill >>? develop
 workflow_pfdsl >>? develop
 
 delegation_guard >>? develop
+distribution_review_perspectives >>? develop
 implementer_agent >>? develop
 main_branch_guard >>? develop
 workflow_md >>? develop
