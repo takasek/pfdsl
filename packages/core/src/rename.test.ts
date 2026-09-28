@@ -125,3 +125,45 @@ a >> p -> b
 		expect(r.ok && r.output).toBe(`---\n${frontmatter}---\na >> p -> bb\n`);
 	});
 });
+
+// A YAML alias shares one node between places, so a rewrite through it
+// either misses the reference or changes every place the node is used.
+describe("rename refuses frontmatter with YAML anchors, aliases or merge keys", () => {
+	it.each([
+		[
+			"an alias used as a group key",
+			"---\nkey: &key g\ngroup:\n  *key : {}\nartifact:\n  a: {group: g}\n---\na\n",
+			"g",
+		],
+		[
+			"an aliased parts: sequence",
+			"---\nrefs: &refs [a]\nartifact:\n  a: {}\n  b: {parts: *refs}\n---\na\nb\n",
+			"a",
+		],
+		[
+			"an anchored declaration key reused as values",
+			"---\ngroup:\n  &key g: {}\nartifact:\n  a: {group: *key, label: *key}\n---\na\n",
+			"g",
+		],
+		[
+			"an aliased declaration",
+			"---\ngroup:\n  g: {}\nartifact:\n  a: &a {group: g}\n  b: *a\n---\na\nb\n",
+			"g",
+		],
+		[
+			"an anchor without any alias",
+			"---\nartifact:\n  a: &a {label: A}\n---\na\n",
+			"a",
+		],
+		[
+			"a merge key",
+			"---\ngroup:\n  g: {}\nartifact:\n  a: {<<: {group: g}}\n---\na\n",
+			"g",
+		],
+	])("refuses %s as unsupportedYaml", (_name, src, oldId) => {
+		expect(rename(src, oldId, "new")).toEqual({
+			ok: false,
+			reason: "unsupportedYaml",
+		});
+	});
+});

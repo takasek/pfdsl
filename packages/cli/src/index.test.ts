@@ -1064,6 +1064,73 @@ a >> p -> b
 		expect(readFileSync(f, "utf-8")).toBe(grouped);
 	});
 
+	describe("frontmatter with YAML anchors, aliases or merge keys", () => {
+		const write = tempFiles();
+
+		const cases: [string, string, string][] = [
+			[
+				"an alias used as a group key",
+				"---\nkey: &key g\ngroup:\n  *key : {}\nartifact:\n  a: {group: g}\n---\na\n",
+				"g",
+			],
+			[
+				"an aliased parts: sequence",
+				"---\nrefs: &refs [a]\nartifact:\n  a: {}\n  b: {parts: *refs}\n---\na\nb\n",
+				"a",
+			],
+			[
+				"an anchored declaration key reused as values",
+				"---\ngroup:\n  &key g: {}\nartifact:\n  a: {group: *key, label: *key}\n---\na\n",
+				"g",
+			],
+			[
+				"an aliased declaration",
+				"---\ngroup:\n  g: {}\nartifact:\n  a: &a {group: g}\n  b: *a\n---\na\nb\n",
+				"g",
+			],
+			[
+				"a merge key",
+				"---\ngroup:\n  g: {}\nartifact:\n  a: {<<: {group: g}}\n---\na\n",
+				"g",
+			],
+		];
+
+		it.each(
+			cases,
+		)("refuses %s with exit 1, leaving the file untouched", async (_name, src, oldId) => {
+			const f = write("anchored.pfdsl", src);
+			const r = await run(["rename", f, oldId, "new", "--write"]);
+			expect(r.exitCode).toBe(1);
+			expect(r.stdout).toBe("");
+			expect(r.stderr).toContain(
+				"YAML anchors, aliases and merge keys (<<) are not supported by rename",
+			);
+			expect(readFileSync(f, "utf-8")).toBe(src);
+		});
+
+		it.each(
+			cases,
+		)("refuses %s from stdin with { ok: false, error } under --json", async (_name, src, oldId) => {
+			const r = await run(
+				["rename", "-", oldId, "new", "--json"],
+				withStdin(src),
+			);
+			expect(r.exitCode).toBe(1);
+			const payload = JSON.parse(r.stdout);
+			expect(payload.ok).toBe(false);
+			expect(payload.error).toContain(
+				"YAML anchors, aliases and merge keys (<<) are not supported by rename",
+			);
+		});
+
+		it("--help lists the refusal", async () => {
+			const r = await run(["rename", "--help"]);
+			expect(r.stdout.replace(/\s+/g, " ")).toContain(
+				"A frontmatter using YAML anchors, aliases or merge keys (<<) anywhere is refused",
+			);
+		});
+	});
+
 	describe("with an extends: preset", () => {
 		const write = tempFiles();
 

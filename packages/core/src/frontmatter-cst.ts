@@ -1,5 +1,6 @@
 import {
 	Document,
+	isAlias,
 	isMap,
 	isPair,
 	isScalar,
@@ -354,4 +355,30 @@ export function setFrontmatterField(
 		return null;
 	doc.setIn([kind, id, field], value);
 	return renderFrontmatterCst(doc, newline, yamlText) + body;
+}
+
+/**
+ * True when `doc` shares a node between places — an alias (`*a`), an
+ * anchor (`&a`, even one no alias uses yet), or a merge key (`<<`). A
+ * rewrite through a shared node either misses a place that reads it or
+ * changes every place at once, so the write paths that key on one place
+ * refuse such a document rather than guess.
+ */
+export function usesYamlReferences(doc: Document): boolean {
+	let found = false;
+	visit(doc, {
+		Node(_key, node) {
+			if (isAlias(node) || ("anchor" in node && node.anchor)) {
+				found = true;
+				return visit.BREAK;
+			}
+		},
+		Pair(_key, pair) {
+			if (isScalar(pair.key) && pair.key.value === "<<") {
+				found = true;
+				return visit.BREAK;
+			}
+		},
+	});
+	return found;
 }

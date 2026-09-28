@@ -1,3 +1,4 @@
+import { parseFrontmatterCst, usesYamlReferences } from "./frontmatter-cst.js";
 import { type AnalyzeResult, analyze, isUnreadableError } from "./index.js";
 import { renameGroup } from "./rename-group.js";
 import { renameId } from "./rename-id.js";
@@ -7,6 +8,8 @@ import type { Diagnostic, NodeKind } from "./types/index.js";
 export type RenameRefusal =
 	/** `source` could not be read; `diagnostics` are its FM / L / P errors. */
 	| { ok: false; reason: "unreadable"; diagnostics: Diagnostic[] }
+	/** The frontmatter has a YAML anchor, alias or merge key (`<<`), which the rewrite cannot follow. */
+	| { ok: false; reason: "unsupportedYaml" }
 	/** `oldId` is not one of this file's own artifact, process or group ids. */
 	| { ok: false; reason: "notFound" }
 	/** `oldId` is a local group id and also an artifact/process id (`clashingKind`). */
@@ -79,7 +82,8 @@ function resolveKind(
  * reference to it in this file, in one rewrite (see `renameId` and
  * `renameGroup` for what each kind rewrites).
  *
- * Refuses, without rewriting, a source that could not be read, an `oldId`
+ * Refuses, without rewriting, a source that could not be read, a
+ * frontmatter with a YAML anchor, alias or merge key anywhere in it, an `oldId`
  * that is not this file's own id, an `oldId` that is both a local group id
  * and an artifact/process id, and a `newId` that is already any of this
  * file's ids. A validation (V) or normalizer (N) error does not refuse: the
@@ -97,6 +101,9 @@ export function rename(
 	const unreadable = analysis.diagnostics.filter(isUnreadableError);
 	if (unreadable.length > 0) {
 		return { ok: false, reason: "unreadable", diagnostics: unreadable };
+	}
+	if (usesYamlReferences(parseFrontmatterCst(source).doc)) {
+		return { ok: false, reason: "unsupportedYaml" };
 	}
 
 	const kind = resolveKind(analysis, oldId);

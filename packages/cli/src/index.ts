@@ -1450,6 +1450,11 @@ export function runRename(
 		if (opts.json) return failJson({ diagnostics: result.diagnostics });
 		return fail(diagText(result.diagnostics, file, opts.color));
 	}
+	if (!result.ok && result.reason === "unsupportedYaml") {
+		return refuse(
+			`rename: YAML anchors, aliases and merge keys (<<) are not supported by rename, and the frontmatter of ${file} uses one; edit it by hand or expand them first`,
+		);
+	}
 
 	// Groups declared by the extends: presets, for a file on disk (a relative
 	// ref cannot be resolved from stdin, the same reason runCheck skips its
@@ -3055,6 +3060,10 @@ artifact, process, or group id — locally, or as a group inherited via
 extends: (§2.9.4). A group only partially overridden from a preset (also
 defined there) is refused: rename it at the preset instead.
 
+A frontmatter using YAML anchors, aliases or merge keys (<<) anywhere is
+refused: a rewrite through a shared node would miss a reference or change
+every place that shares it. Edit such a file by hand, or expand them first.
+
 This is a one-file command: a parent file's subflow:/boundary: naming an id
 in this file, or another file's extends: naming this file as a preset, is
 invisible here and is never rewritten — check that file separately.
@@ -3080,8 +3089,9 @@ succeed where the same file path is refused.
 Exit codes:
   0  success
   1  <old> not found, ambiguous (both a group and an artifact/process),
-     <new> already exists, an extends: preset conflict, a parse/validation
-     error in the input, or the rewrite was refused
+     <new> already exists, YAML anchors/aliases/merge keys in the
+     frontmatter, an extends: preset conflict, a parse/validation error in
+     the input, or the rewrite was refused
   2  invalid usage (missing/extra argument, stdin with --write, or <old>
      equal to <new>)
 `;
