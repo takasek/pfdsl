@@ -39,6 +39,7 @@ function fakeExec(responses = {}) {
 }
 
 const ROADMAP = ".pfdsl/roadmap.pfdsl";
+const frontmatter = (body) => `---\n${body}\n---\n`;
 describe("genPluginIdentityStep", () => {
 	it("skips when no skill, plugin or install-source path changed", () => {
 		const { exec, calls } = fakeExec();
@@ -156,12 +157,12 @@ describe("triggerPathsSince", () => {
 
 describe("outputArtifactStatusStep", () => {
 	const wipThenDone = (key) => ({
-		before: `artifact:\n  ${key}:\n    status: wip\n`,
-		after: `artifact:\n  ${key}:\n    status: done\n`,
+		before: frontmatter(`artifact:\n  ${key}:\n    status: wip`),
+		after: frontmatter(`artifact:\n  ${key}:\n    status: done`),
 	});
 	const snapshots = (beforeStatus, afterStatus) => ({
-		before: `artifact:\n  spec_v1:\n    status: ${beforeStatus}\n`,
-		after: `artifact:\n  spec_v1:\n    status: ${afterStatus}\n`,
+		before: frontmatter(`artifact:\n  spec_v1:\n    status: ${beforeStatus}`),
+		after: frontmatter(`artifact:\n  spec_v1:\n    status: ${afterStatus}`),
 	});
 
 	it("skips on an explicit --no-artifact declaration", () => {
@@ -394,9 +395,11 @@ describe("outputArtifactStatusStep", () => {
 	it("fails when a different artifact moved but the named one did not", () => {
 		const { exec } = fakeExec({
 			"git show origin/main:": {
-				out: "artifact:\n  other:\n    status: wip\n",
+				out: frontmatter("artifact:\n  other:\n    status: wip"),
 			},
-			"git show HEAD:": { out: "artifact:\n  other:\n    status: done\n" },
+			"git show HEAD:": {
+				out: frontmatter("artifact:\n  other:\n    status: done"),
+			},
 		});
 		const result = outputArtifactStatusStep({
 			exec,
@@ -488,8 +491,12 @@ describe("wipTransitionStep", () => {
 	it("passes when some commit's snapshot shows the artifact at wip", () => {
 		const { exec } = fakeExec({
 			"git log --format=%H": { out: "sha1\nsha2\n" },
-			"git show sha1:": { out: "artifact:\n  spec_v1:\n    status: wip\n" },
-			"git show sha2:": { out: "artifact:\n  spec_v1:\n    status: done\n" },
+			"git show sha1:": {
+				out: frontmatter("artifact:\n  spec_v1:\n    status: wip"),
+			},
+			"git show sha2:": {
+				out: frontmatter("artifact:\n  spec_v1:\n    status: done"),
+			},
 		});
 		const result = wipTransitionStep({
 			exec,
@@ -504,7 +511,9 @@ describe("wipTransitionStep", () => {
 	it("fails when the artifact went straight to done in every snapshot", () => {
 		const { exec } = fakeExec({
 			"git log --format=%H": { out: "sha1\n" },
-			"git show sha1:": { out: "artifact:\n  spec_v1:\n    status: done\n" },
+			"git show sha1:": {
+				out: frontmatter("artifact:\n  spec_v1:\n    status: done"),
+			},
 		});
 		const result = wipTransitionStep({
 			exec,
@@ -519,7 +528,9 @@ describe("wipTransitionStep", () => {
 	it("says the check is presence-only when no artifact key narrows it", () => {
 		const { exec } = fakeExec({
 			"git log --format=%H": { out: "sha1\n" },
-			"git show sha1:": { out: "artifact:\n  anything:\n    status: wip\n" },
+			"git show sha1:": {
+				out: frontmatter("artifact:\n  anything:\n    status: wip"),
+			},
 		});
 		const result = wipTransitionStep({
 			exec,
@@ -534,7 +545,9 @@ describe("wipTransitionStep", () => {
 		const { exec } = fakeExec({
 			"git log --format=%H": { out: "gone\nsha2\n" },
 			"git show gone:": { ok: false, out: "fatal: bad object" },
-			"git show sha2:": { out: "artifact:\n  spec_v1:\n    status: wip\n" },
+			"git show sha2:": {
+				out: frontmatter("artifact:\n  spec_v1:\n    status: wip"),
+			},
 		});
 		const result = wipTransitionStep({
 			exec,

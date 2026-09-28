@@ -93,6 +93,17 @@ export function isUnregisteredManagedIssue(labelNames, processId) {
 }
 
 /**
+ * Quote one value for a POSIX shell command line.
+ * @param {string | number} value
+ * @returns {string}
+ */
+export function quoteShellArgument(value) {
+	const argument = String(value);
+	if (/^[A-Za-z0-9._-]+$/.test(argument)) return argument;
+	return `'${argument.replaceAll("'", "'\\''")}'`;
+}
+
+/**
  * The gate-check invocation for this cycle. `--issue` is folded in for the
  * same reason `--artifact` is: the operator copies this line verbatim, so a
  * flag left out here is a check that silently SKIPs every cycle (#669). It is
@@ -103,11 +114,13 @@ export function isUnregisteredManagedIssue(labelNames, processId) {
  * @returns {string}
  */
 export function buildGateCheckCommand(artifactKey, base, issueNumbers = []) {
-	const issueFlags = issueNumbers.map((n) => ` --issue ${n}`).join("");
+	const issueFlags = issueNumbers
+		.map((n) => ` --issue ${quoteShellArgument(n)}`)
+		.join("");
 	const artifactFlag = artifactKey
-		? `--artifact ${artifactKey}`
+		? `--artifact ${quoteShellArgument(artifactKey)}`
 		: "--no-artifact";
-	return `node scripts/gate-check.mjs --base ${base} ${artifactFlag}${issueFlags}`;
+	return `node scripts/gate-check.mjs --base ${quoteShellArgument(base)} ${artifactFlag}${issueFlags}`;
 }
 
 /**

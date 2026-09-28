@@ -16,6 +16,7 @@ import {
 	derivePackageLayers,
 	diffNewTerminals,
 	diffReadySets,
+	extractArtifactStatus,
 	formatGateTable,
 	formatRunTreeLine,
 	formatSizeDelta,
@@ -222,6 +223,7 @@ describe("hasStatusChange", () => {
 
 describe("statusChangedForArtifact", () => {
 	const before = [
+		"---",
 		"artifact:",
 		"  ops_checkers:",
 		'    label: "scripts"',
@@ -230,6 +232,7 @@ describe("statusChangedForArtifact", () => {
 		'    label: "hook"',
 		"    status: todo",
 		"",
+		"---",
 	].join("\n");
 
 	it("detects a status change scoped to the named artifact", () => {
@@ -255,6 +258,110 @@ describe("statusChangedForArtifact", () => {
 		assert.equal(
 			statusChangedForArtifact(before, before, "nonexistent_artifact"),
 			false,
+		);
+	});
+
+	it("does not read a same-named group child as the artifact status", () => {
+		const before = `---\ngroup:\n  output:\n    status: todo\nartifact:\n  output:\n    status: wip\n---\n`;
+		const after = `---\ngroup:\n  output:\n    status: done\nartifact:\n  output:\n    status: wip\n---\n`;
+		assert.equal(statusChangedForArtifact(before, after, "output"), false);
+	});
+});
+
+describe("extractArtifactStatus", () => {
+	const frontmatter = (body) => `---\n${body}\n---\n`;
+
+	it("reads flow-style artifact mappings", () => {
+		assert.equal(
+			extractArtifactStatus(
+				frontmatter("artifact: { output: { status: done } }"),
+				"output",
+			),
+			"done",
+		);
+	});
+
+	it("reads block scalar status values", () => {
+		assert.equal(
+			extractArtifactStatus(
+				frontmatter("artifact:\n  output:\n    status: >-\n      done"),
+				"output",
+			),
+			"done",
+		);
+	});
+
+	it("resolves aliases in status values", () => {
+		assert.equal(
+			extractArtifactStatus(
+				frontmatter(
+					"complete: &complete done\nartifact:\n  output:\n    status: *complete",
+				),
+				"output",
+			),
+			"done",
+		);
+	});
+
+	it("parses an artifact key with a trailing YAML comment", () => {
+		assert.equal(
+			extractArtifactStatus(
+				frontmatter("artifact:\n  output: # named output\n    status: done"),
+				"output",
+			),
+			"done",
+		);
+	});
+
+	it("matches a quoted numeric key by its parsed string value", () => {
+		assert.equal(
+			extractArtifactStatus(
+				frontmatter('artifact:\n  "10":\n    status: done'),
+				"10",
+			),
+			"done",
+		);
+	});
+
+	it("ignores status values outside artifact and outside frontmatter", () => {
+		assert.equal(
+			extractArtifactStatus(
+				`${frontmatter("group:\n  output:\n    status: wip\nartifact:\n  other:\n    status: done")}artifact:\n  output:\n    status: done\n`,
+				"output",
+			),
+			undefined,
+		);
+	});
+
+	it("returns undefined for missing, non-string, or malformed values", () => {
+		assert.equal(
+			extractArtifactStatus(frontmatter("artifact: {}"), "output"),
+			undefined,
+		);
+		assert.equal(
+			extractArtifactStatus(
+				frontmatter("artifact:\n  output:\n    status: 10"),
+				"output",
+			),
+			undefined,
+		);
+		assert.equal(
+			extractArtifactStatus("---\nartifact: [\n---\n", "output"),
+			undefined,
+		);
+		assert.equal(
+			extractArtifactStatus(
+				"---\nartifact:\n  output:\n    status: done\n",
+				"output",
+			),
+			undefined,
+		);
+		assert.equal(
+			extractArtifactStatus(
+				"artifact:\n  output:\n    status: done\n",
+				"output",
+			),
+			undefined,
 		);
 	});
 });
@@ -334,32 +441,36 @@ describe("lintCommitSubjects", () => {
 
 describe("wipTransitionDetected", () => {
 	const wipSnapshot = [
+		"---",
 		"artifact:",
 		"  ops_checkers:",
 		'    label: "scripts"',
 		"    status: wip",
-		"",
+		"---",
 	].join("\n");
 	const todoSnapshot = [
+		"---",
 		"artifact:",
 		"  ops_checkers:",
 		'    label: "scripts"',
 		"    status: todo",
-		"",
+		"---",
 	].join("\n");
 	const doneSnapshot = [
+		"---",
 		"artifact:",
 		"  ops_checkers:",
 		'    label: "scripts"',
 		"    status: done",
-		"",
+		"---",
 	].join("\n");
 	const otherWipSnapshot = [
+		"---",
 		"artifact:",
 		"  retro_due_hook:",
 		'    label: "hook"',
 		"    status: wip",
-		"",
+		"---",
 	].join("\n");
 
 	it("detects a wip snapshot for the named artifact", () => {
@@ -387,6 +498,12 @@ describe("wipTransitionDetected", () => {
 			),
 			false,
 		);
+	});
+
+	it("does not detect a same-named group child as a wip artifact", () => {
+		const snapshot =
+			"---\ngroup:\n  ops_checkers:\n    status: wip\nartifact:\n  ops_checkers:\n    status: done\n---\n";
+		assert.equal(wipTransitionDetected([snapshot], "ops_checkers"), false);
 	});
 
 	it("without an artifact key, detects wip anywhere in any snapshot", () => {

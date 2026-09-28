@@ -667,6 +667,32 @@ describe("runCycleStatus", () => {
 		);
 	});
 
+	it("quotes the artifact key in both suggested shell commands", async () => {
+		const result = await runCycleStatus(
+			baseDeps({
+				issueNumbers: [669],
+				sh: (_file, args) => {
+					if (args.includes("neighbors")) return neighborsJsonOk(["art key"]);
+					if (args.includes(CLI_PATH)) return readyJsonOk(null);
+					return "";
+				},
+				readFileSync: () => roadmapWithIssue("proc_x", 669),
+				execGh: async (args) => {
+					if (args[0] === "issue") return issueJson({ body: "普通の説明文。" });
+					return JSON.stringify([]);
+				},
+			}),
+		);
+		assert.equal(
+			result.gateCheckCommand,
+			"node scripts/gate-check.mjs --base main --artifact 'art key' --issue 669",
+		);
+		assert.equal(
+			result.wipUpdateCommand,
+			"node packages/cli/dist/cli.js meta set .pfdsl/roadmap.pfdsl 'art key' status wip",
+		);
+	});
+
 	// This is the actual shape of #800/#772/#794 themselves: all three are
 	// flow:exempt, so none has a roadmap process to resolve an artifact from.
 	it("falls back to --no-artifact when the --issue's issue has no roadmap process (exempt issue)", async () => {

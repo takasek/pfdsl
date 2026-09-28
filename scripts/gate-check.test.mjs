@@ -5,7 +5,9 @@ import {
 	mkdirSync,
 	mkdtempSync,
 	readFileSync,
+	realpathSync,
 	rmSync,
+	symlinkSync,
 	writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
@@ -24,6 +26,12 @@ function git(args) {
 beforeEach(() => {
 	fixture = mkdtempSync(join(tmpdir(), "gate-check-record-recovery-"));
 	cpSync(join(root, "scripts"), join(fixture, "scripts"), { recursive: true });
+	mkdirSync(join(fixture, "node_modules"));
+	symlinkSync(
+		realpathSync(join(root, "node_modules/yaml")),
+		join(fixture, "node_modules/yaml"),
+		"dir",
+	);
 	// Isolate unrelated project-wide checks; the gate entrypoint, its steps,
 	// commit lint and all git history queries run unchanged.
 	writeFileSync(

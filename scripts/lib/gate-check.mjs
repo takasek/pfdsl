@@ -3,6 +3,7 @@
  * Process/git I/O lives in the main script; this module stays testable.
  */
 
+import { parse as parseYaml } from "yaml";
 import { isGhUnavailableError } from "../pfdsl/lib/gh-compat.mjs";
 
 /**
@@ -280,19 +281,32 @@ export function hasStatusChange(diffText) {
  * @returns {string | undefined}
  */
 export function extractArtifactStatus(text, artifactKey) {
-	const escapedArtifactKeys = [artifactKey, JSON.stringify(artifactKey)].map(
-		(key) => key.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"),
+	const lines = text.split(/\r?\n/);
+	if (lines[0]?.trimEnd() !== "---") return undefined;
+	const closingDelimiter = lines.findIndex(
+		(line, index) => index > 0 && line.trimEnd() === "---",
 	);
-	const block = text.match(
-		new RegExp(
-			`\\n {2}(?:${escapedArtifactKeys.join("|")}):\\n([\\s\\S]*?)(?=\\n {2}\\S+:\\n|$)`,
-		),
-	);
-	if (!block) return undefined;
-	const status = block[1].match(
-		/^ {4}status:\s*(["']?)([^"'#\s]+)\1(?:\s+#.*)?\s*$/m,
-	);
-	return status ? status[2] : undefined;
+	if (closingDelimiter < 0) return undefined;
+
+	let frontmatter;
+	try {
+		frontmatter = parseYaml(lines.slice(1, closingDelimiter).join("\n"));
+	} catch {
+		return undefined;
+	}
+	if (!frontmatter || typeof frontmatter !== "object") return undefined;
+	if (!Object.hasOwn(frontmatter, "artifact")) return undefined;
+
+	const artifacts = frontmatter.artifact;
+	if (!artifacts || typeof artifacts !== "object" || Array.isArray(artifacts))
+		return undefined;
+	if (!Object.hasOwn(artifacts, artifactKey)) return undefined;
+
+	const artifact = artifacts[artifactKey];
+	if (!artifact || typeof artifact !== "object" || Array.isArray(artifact))
+		return undefined;
+	if (!Object.hasOwn(artifact, "status")) return undefined;
+	return typeof artifact.status === "string" ? artifact.status : undefined;
 }
 
 /**
