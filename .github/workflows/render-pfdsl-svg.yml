@@ -108,7 +108,13 @@ jobs:
               echo 'PFD file paths cannot contain newlines' >&2
               exit 1
             fi
-            node .pfdsl-renderer/packages/cli/dist/cli.js render "$file" --format svg > "$svg"
+            tmp_svg=$(mktemp "$RUNNER_TEMP/pfdsl-svg.XXXXXX")
+            node .pfdsl-renderer/packages/cli/dist/cli.js render "$file" --format svg > "$tmp_svg"
+            if [[ -e "$svg" ]] && cmp -s -- "$tmp_svg" "$svg"; then
+              rm -f -- "$tmp_svg"
+              continue
+            fi
+            mv -- "$tmp_svg" "$svg"
             printf '%s\n' "$svg" >> "$svg_paths"
           done < <(git ls-files -z -- "${patterns[@]}")
           if [[ -s "$svg_paths" ]]; then

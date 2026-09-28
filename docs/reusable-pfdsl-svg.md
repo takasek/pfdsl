@@ -40,6 +40,7 @@ jobs:
 
 Pin the `uses` reference to a reviewed commit or release tag for stable behavior.
 The reusable workflow checks out the caller's target branch, builds the renderer from `takasek/pfdsl`, renders the selected `.pfdsl` files, and commits only changed sibling SVG files.
+When every rendered SVG is identical to its existing file, it skips App authentication, commit, and PR creation.
 Its optional `cli-ref` input selects a different renderer revision; it defaults to `main`.
 The `mode` input accepts `pr` or `direct` and defaults to `direct`.
 PR mode creates or updates a branch named `pfdsl-svg/<target-branch>` and opens a PR for human review.
