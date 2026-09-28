@@ -6,91 +6,40 @@ import {
 	parseFrontmatterCst,
 	renderFrontmatterCst,
 } from "./frontmatter-cst.js";
-import { analyze, isUnreadableError } from "./index.js";
+import type { AnalyzeResult } from "./index.js";
 import { lex } from "./lexer.js";
 import { parentBoundaryArtifacts } from "./multifile.js";
-import type { Diagnostic } from "./types/index.js";
-
-/** True when `diagnostics` include an unreadable-document error (see `isUnreadableError`). */
-export function hasUnreadableError(
-	diagnostics: readonly Diagnostic[],
-): boolean {
-	return diagnostics.some(isUnreadableError);
-}
-
-export interface RenameIdResult {
-	/**
-	 * The whole document (frontmatter + body) with `oldId` renamed to `newId`
-	 * everywhere it is this file's own id: its frontmatter declaration key (if
-	 * declared), every other artifact's `revises:` value and `parts:` item
-	 * that named it, every process's `boundary:` KEY that named it, and every
-	 * body edge token equal to it. `boundary:` VALUES are the child file's own
-	 * ids and are never touched. Unchanged (the original `source`) when
-	 * `oldId` is not this file's own artifact/process id (frontmatter
-	 * declaration or body-inferred node — nodeKinds from analyze()), or when
-	 * `source` could not be read (see `hasUnreadableError`).
-	 */
-	output: string;
-	/** True when `oldId` existed as an artifact/process id (declared or body-only) and was renamed. */
-	found: boolean;
-	/** The resolved kind of `oldId`, or null when not found / not an artifact-or-process id (e.g. a group id — the caller routes those to `renameGroup`). */
-	kind: "artifact" | "process" | null;
-	diagnostics: Diagnostic[];
-}
 
 /**
- * Rename an artifact or process id in one atomic in-place rewrite (issue
- * #1218): its frontmatter declaration key, every other node's `revises:` /
- * `parts:` reference, every subflow process's `boundary:` key, every body
- * edge occurrence, and — when `oldId` is an artifact adjacent (input or
- * output) to a subflow process whose `boundary:` does not already map it —
- * a new `boundary: { <newId>: <oldId> }` entry, so the child file's
- * unchanged boundary id set still matches after the rename (spec §2.9.3: an
- * unmapped boundary artifact is matched to the child by identical id).
+ * Rewrite artifact or process id `oldId` (of kind `kind`, resolved by
+ * `rename`) to `newId` in `source`, returning the whole document: its
+ * frontmatter declaration key, every other artifact's `revises:` / `parts:`
+ * reference, every process's `boundary:` key naming it, every body token
+ * equal to it, and — when `oldId` is a normal input/output of a subflow
+ * process whose `boundary:` does not already map it — a new
+ * `boundary: { <newId>: <oldId> }` entry. `boundary:` values are the child
+ * file's own ids and are never touched.
  *
- * Kind resolution and every refusal (ambiguous id, `<new>` collision, `<old>`
- * not found, `<old>` === `<new>`) are the CLI layer's job (the top-level
- * `rename` command), not this function's — it always performs the rename it
- * is asked for when `oldId` resolves to an artifact or process id, and
- * reports a no-op (`found: false`) otherwise.
- *
- * The frontmatter half is applied through the yaml CST (ADR-0034), the same
- * way `renameGroup` and `deleteNodes` are — comments, quote style, and
- * flow-vs-block choice elsewhere in the frontmatter survive untouched. The
- * body half is a plain lexer-token splice (not the statement-level rebuild
- * `deleteNodes` needs for its drop/keep/replace planning): nothing is being
- * removed, so every byte outside a matched `ID` token's own span — operators,
- * brackets, comments, continuation lines, `>>?` — is copied through
- * unchanged.
+ * The frontmatter half goes through the yaml CST (ADR-0034), so comments,
+ * quote style and flow-vs-block choice elsewhere survive. The body half is a
+ * lexer-token splice: every byte outside a matched `ID` token's span —
+ * operators, brackets, comments, continuation lines — is copied through.
  */
 export function renameId(
 	source: string,
+	analysis: Pick<AnalyzeResult, "frontmatter" | "edges">,
 	oldId: string,
 	newId: string,
-): RenameIdResult {
-	const { diagnostics, frontmatter, edges, nodeKinds } = analyze(source);
-	const noop: RenameIdResult = {
-		output: source,
-		found: false,
-		kind: null,
-		diagnostics,
-	};
-	if (hasUnreadableError(diagnostics)) return noop;
-
-	const kind = nodeKinds.get(oldId);
-	if (kind !== "artifact" && kind !== "process") return noop;
-
+	kind: "artifact" | "process",
+): string {
+	const { frontmatter, edges } = analysis;
 	const cst = parseFrontmatterCst(source);
 	const doc = cst.present ? cst.doc : new Document();
 
 	// Declaration keys and revises:/parts: values are YAML strings in any
-	// readable document (a typed one is FM004, refused above).
-	let declared = false;
+	// readable document (a typed one is FM004, which `rename` refuses).
 	const pair = declarationPair(doc, oldId, kind);
-	if (pair && isScalar(pair.key)) {
-		pair.key.value = newId;
-		declared = true;
-	}
+	if (pair && isScalar(pair.key)) pair.key.value = newId;
 
 	// Other artifacts' revises:/parts: references.
 	for (const [aid, meta] of Object.entries(frontmatter?.artifact ?? {})) {
@@ -144,17 +93,14 @@ export function renameId(
 	const { tokens } = lex(cst.body);
 	let bodyOutput = "";
 	let cursor = 0;
-	let foundInBody = false;
 	for (const t of tokens) {
 		if (t.type === "ID" && t.value === oldId) {
 			bodyOutput += cst.body.slice(cursor, t.start.offset);
 			bodyOutput += formatIdBefore(newId, cst.body[t.end.offset]);
 			cursor = t.end.offset;
-			foundInBody = true;
 		}
 	}
 	bodyOutput += cst.body.slice(cursor);
 
-	const output = frontmatterOutput + bodyOutput;
-	return { output, found: declared || foundInBody, kind, diagnostics };
+	return frontmatterOutput + bodyOutput;
 }

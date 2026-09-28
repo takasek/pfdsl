@@ -1,6 +1,15 @@
 import { describe, expect, it } from "vitest";
 import { analyze } from "./index.js";
-import { renameGroup } from "./rename-group.js";
+import { rename } from "./rename.js";
+
+/** `rename`'s result for a group id it is expected to rename. */
+function renamed(source: string, oldId: string, newId: string) {
+	const r = rename(source, oldId, newId);
+	if (!r.ok || r.kind !== "group") {
+		throw new Error(`expected a group rename, got ${JSON.stringify(r)}`);
+	}
+	return r;
+}
 
 describe("renameGroup", () => {
 	it("renames the declaration key, keeping its position and comments", () => {
@@ -20,8 +29,7 @@ group:
 ---
 a
 `;
-		const { output, found } = renameGroup(src, "g1", "gx");
-		expect(found).toBe(true);
+		const { output } = renamed(src, "g1", "gx");
 		expect(output).toBe(`---
 group:
   gx:
@@ -45,7 +53,7 @@ group:
 ---
 a
 `;
-		const { output, children } = renameGroup(src, "g1", "gx");
+		const { output, children } = renamed(src, "g1", "gx");
 		expect(children).toEqual(["g2"]);
 		expect(output).toContain("parent: gx");
 	});
@@ -66,7 +74,7 @@ process:
 ---
 a >> p -> b
 `;
-		const { output, members } = renameGroup(src, "g1", "gx");
+		const { output, members } = renamed(src, "g1", "gx");
 		expect(members).toEqual(["a", "p"]);
 		expect(output).toContain("a:\n    group: gx");
 		expect(output).toContain("p:\n    group: gx");
@@ -82,7 +90,7 @@ artifact:
 ---
 a
 `;
-		const { output, members, children } = renameGroup(src, "g1", "gx");
+		const { output, members, children } = renamed(src, "g1", "gx");
 		expect(members).toEqual([]);
 		expect(children).toEqual([]);
 		expect(output).toContain('g2: { label: "Layer 2" }');
@@ -109,8 +117,7 @@ process:
 ---
 a >> p -> b
 `;
-		const { output, found, members, children } = renameGroup(src, "42", "43");
-		expect(found).toBe(true);
+		const { output, members, children } = renamed(src, "42", "43");
 		expect(members).toEqual(["a", "p"]);
 		expect(children).toEqual(["child"]);
 		expect(output).toBe(`---
@@ -137,38 +144,6 @@ a >> p -> b
 		]);
 	});
 
-	it("is a no-op reporting found: false when oldId has no local group: declaration", () => {
-		const src = `---
-group:
-  g1:
-    label: "Layer 1"
----
-a
-`;
-		const { output, found, members, children } = renameGroup(
-			src,
-			"ghost",
-			"gx",
-		);
-		expect(found).toBe(false);
-		expect(members).toEqual([]);
-		expect(children).toEqual([]);
-		expect(output).toBe(src);
-	});
-
-	it("is a no-op when the source already carries a parse error", () => {
-		const src = `---
-group:
-  g1: [unterminated
----
-a
-`;
-		const { output, found, diagnostics } = renameGroup(src, "g1", "gx");
-		expect(found).toBe(false);
-		expect(output).toBe(src);
-		expect(diagnostics.some((d) => d.severity === "error")).toBe(true);
-	});
-
 	// Only a document that could not be read (FM / L / P) blocks the rewrite.
 	// A validation (V) or normalizer (N) error is judged on the result by the
 	// caller, the same way `meta set` judges its write.
@@ -182,8 +157,7 @@ artifact:
 ---
 a >> p -> b
 `;
-		const { output, found, members } = renameGroup(src, "g1", "gx");
-		expect(found).toBe(true);
+		const { output, members } = renamed(src, "g1", "gx");
 		expect(members).toEqual(["a"]);
 		expect(output).toBe(`---
 group:
@@ -208,8 +182,7 @@ process:
 ---
 a >> p -> b
 `;
-		const { output, found } = renameGroup(src, "g1", "gx");
-		expect(found).toBe(true);
+		const { output } = renamed(src, "g1", "gx");
 		expect(output).toContain("  gx:\n    label: G1\n");
 	});
 
@@ -224,7 +197,7 @@ group:
 ---
 a
 `;
-		const { output } = renameGroup(src, "g1", "gx");
+		const { output } = renamed(src, "g1", "gx");
 		expect(output).toContain("description: >\n  Line one.\n  Line two.\n");
 		expect(output).toContain("gx:");
 	});
@@ -295,8 +268,7 @@ a >> p -> b
 		style,
 	}) => {
 		const oldId = unquote(token);
-		const { output, found } = renameGroup(render(token, style), oldId, newId);
-		expect(found).toBe(true);
+		const { output } = renamed(render(token, style), oldId, newId);
 		const { frontmatter, diagnostics } = analyze(output);
 		expect(diagnostics.filter((d) => d.severity === "error")).toEqual([]);
 		const groups = frontmatter?.group ?? {};
@@ -307,63 +279,5 @@ a >> p -> b
 		expect(frontmatter?.artifact?.a?.group).toBe(newId);
 		expect(frontmatter?.process?.p?.group).toBe(newId);
 		expect(frontmatter?.artifact?.b?.group).toBe("other");
-	});
-});
-
-// A bare typed token (a YAML number or boolean) is not an id: as a
-// declaration key or as a group:/parent: value it makes the frontmatter
-// unreadable (FM004), so there is nothing trustworthy to rename.
-describe("renameGroup on a bare typed id token", () => {
-	const tokens = ["42", "3.14", "true"];
-	const shapes = [
-		{
-			name: "the group id",
-			oldId: (token: string) => token,
-			render: (token: string) => `group:\n  ${token}: { label: N }\n`,
-		},
-		{
-			name: "a member id",
-			oldId: () => "g1",
-			render: (token: string) =>
-				`group:\n  g1: { label: G }\nartifact:\n  ${token}: { group: g1 }\n`,
-		},
-		{
-			name: "a child group id",
-			oldId: () => "g1",
-			render: (token: string) =>
-				`group:\n  g1: { label: G }\n  ${token}: { label: C, parent: g1 }\n`,
-		},
-		{
-			name: "a member's group: value",
-			oldId: (token: string) => token,
-			render: (token: string) =>
-				`group:\n  "${token}": { label: N }\nartifact:\n  a: { group: ${token} }\n`,
-		},
-		{
-			name: "a child's parent: value",
-			oldId: (token: string) => token,
-			render: (token: string) =>
-				`group:\n  "${token}": { label: N }\n  c: { label: C, parent: ${token} }\n`,
-		},
-	];
-	const cases = tokens.flatMap((token) =>
-		shapes.map((shape) => ({ token, shape })),
-	);
-
-	it.each(cases)("is a no-op when $token is $shape.name", ({
-		token,
-		shape,
-	}) => {
-		const src = `---\n${shape.render(token)}---\na\n`;
-		const { output, found, members, children, diagnostics } = renameGroup(
-			src,
-			shape.oldId(token),
-			"renamed",
-		);
-		expect(diagnostics.map((d) => d.code)).toContain("FM004");
-		expect(found).toBe(false);
-		expect(members).toEqual([]);
-		expect(children).toEqual([]);
-		expect(output).toBe(src);
 	});
 });

@@ -478,6 +478,22 @@ describe("known frontmatter field shapes", () => {
 		expect(diagnostics).toHaveLength(1);
 		expect(diagnostics[0]?.range.start.offset).toBe(src.indexOf("42"));
 	});
+	// A declaration may be empty (normalized to {}), but boundary: must be a map.
+	it.each([
+		["block-style with no value", "    boundary:\n"],
+		["an explicit null (~)", "    boundary: ~\n"],
+	])("rejects an empty boundary: (%s)", (_name, boundaryLine) => {
+		const result = loadFrontmatter(
+			`---\nprocess:\n  sub:\n    subflow: ./child.pfdsl\n${boundaryLine}---\nx >> sub -> y\n`,
+		);
+		expect(result.frontmatter).toBeNull();
+		expect(result.diagnostics).toEqual([
+			expect.objectContaining({
+				code: "FM004",
+				message: expect.stringContaining("boundary"),
+			}),
+		]);
+	});
 	it("accepts and normalizes empty declarations while retaining extensions", () => {
 		const result = loadFrontmatter(
 			"---\nartifact: {a: null}\nprocess: {p: null}\ngroup: {g: null}\ntag: {t: null}\ncustom: {values: [1, true]}\n---\na >> p\n",

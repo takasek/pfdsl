@@ -914,7 +914,7 @@ a
 
 	// The result is judged, not the input (same contract as `meta set`): a
 	// validation error the input already had surfaces as its own diagnostic
-	// on the refused result, never as an "internal mismatch".
+	// on the refused result.
 	const invalidStatus = `---
 artifact:
   a: { status: bogus }
@@ -933,7 +933,6 @@ a >> p -> b
 		expect(r.stderr).toContain(
 			`rename: refusing to write ${f}: ${inputErrorMessage}`,
 		);
-		expect(r.stderr).not.toContain("internal mismatch");
 		expect(readFileSync(f, "utf-8")).toBe(invalidStatus);
 	});
 

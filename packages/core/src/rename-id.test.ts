@@ -1,6 +1,17 @@
 import { describe, expect, it } from "vitest";
 import { analyze } from "./index.js";
-import { renameId } from "./rename-id.js";
+import { rename } from "./rename.js";
+
+/** `rename`'s result for an artifact/process id it is expected to rename. */
+function renamed(source: string, oldId: string, newId: string) {
+	const r = rename(source, oldId, newId);
+	if (!r.ok || r.kind === "group") {
+		throw new Error(
+			`expected an artifact/process rename, got ${JSON.stringify(r)}`,
+		);
+	}
+	return r;
+}
 
 describe("renameId", () => {
 	it("renames an artifact in a chain statement, byte-exact", () => {
@@ -20,8 +31,7 @@ process:
 ---
 a >> p -> b >> q -> c
 `;
-		const { output, found, kind } = renameId(src, "b", "bx");
-		expect(found).toBe(true);
+		const { output, kind } = renamed(src, "b", "bx");
 		expect(kind).toBe("artifact");
 		expect(output).toBe(`---
 artifact:
@@ -54,7 +64,7 @@ process:
 ---
 [a, b] >> p
 `;
-		const { output } = renameId(src, "a", "ax");
+		const { output } = renamed(src, "a", "ax");
 		expect(output).toBe(`---
 artifact:
   ax:
@@ -87,7 +97,7 @@ process:
 a >> p -> b
   >> q -> c
 `;
-		const { output } = renameId(src, "p", "px");
+		const { output } = renamed(src, "p", "px");
 		expect(output).toBe(`---
 artifact:
   a:
@@ -121,7 +131,7 @@ process:
 a >> p  # trailing note
   -> b
 `;
-		const { output } = renameId(src, "a", "ax");
+		const { output } = renamed(src, "a", "ax");
 		expect(output).toBe(`---
 artifact:
   ax:
@@ -151,7 +161,7 @@ process:
 a >> p -> b
 b >>? p
 `;
-		const { output } = renameId(src, "b", "bx");
+		const { output } = renamed(src, "b", "bx");
 		expect(output).toBe(`---
 artifact:
   a:
@@ -180,7 +190,7 @@ process:
 ---
 [a, b] >> p
 `;
-		const { output } = renameId(src, "a", "a new");
+		const { output } = renamed(src, "a", "a new");
 		// The frontmatter declaration key's own scalar type (plain, from the
 		// original unquoted `a`) is preserved by the CST mutation — a plain
 		// key needing no `: ` disambiguation round-trips fine unquoted, the
@@ -202,8 +212,7 @@ process:
 		["a>>p -> b", '"x-">>p -> b\n'],
 		["a >>p -> b", "x- >>p -> b\n"],
 	])("quotes a new id ending in '-' only where the next character is '>' (%s)", (body, expected) => {
-		const { output, found } = renameId(`${body}\n`, "a", "x-");
-		expect(found).toBe(true);
+		const { output } = renamed(`${body}\n`, "a", "x-");
 		expect(output).toBe(expected);
 		const after = analyze(output);
 		expect(after.diagnostics.filter((d) => d.severity === "error")).toEqual([]);
@@ -213,7 +222,7 @@ process:
 	it("preserves CRLF line endings", () => {
 		const src =
 			"---\r\nartifact:\r\n  a:\r\n    label: A\r\nprocess:\r\n  p:\r\n    label: P\r\n---\r\na >> p\r\n";
-		const { output } = renameId(src, "a", "ax");
+		const { output } = renamed(src, "a", "ax");
 		expect(output.replace(/\r\n/g, "")).not.toContain("\n");
 		expect(output).toContain("ax:\r\n");
 		expect(output).toContain("ax >> p\r\n");
@@ -233,7 +242,7 @@ process:
 ---
 a >> p -> b
 `;
-		const { output } = renameId(src, "a", "ax");
+		const { output } = renamed(src, "a", "ax");
 		expect(output).toContain("revises: ax");
 	});
 
@@ -253,7 +262,7 @@ process:
 ---
 a >> p -> bundle
 `;
-		const { output } = renameId(src, "a", "ax");
+		const { output } = renamed(src, "a", "ax");
 		// A mutated flow-sequence item re-serializes with the `yaml` package's
 		// own default flow spacing (the same shape `deleteNodes` produces for
 		// a trimmed `parts:`, e.g. `parts: [ y ]`), not the original spacing.
@@ -275,7 +284,7 @@ process:
 ---
 order >> work -> fulfilled
 `;
-		const { output } = renameId(src, "order", "order_v2");
+		const { output } = renamed(src, "order", "order_v2");
 		expect(output).toContain(
 			"boundary: { order_v2: incoming_order, fulfilled: outgoing_fulfilled }",
 		);
@@ -283,88 +292,9 @@ order >> work -> fulfilled
 
 	it("renames a body-only (undeclared) node", () => {
 		const src = "a >> p -> b\n";
-		const { output, found, kind } = renameId(src, "b", "bx");
-		expect(found).toBe(true);
+		const { output, kind } = renamed(src, "b", "bx");
 		expect(kind).toBe("artifact");
 		expect(output).toBe("a >> p -> bx\n");
-	});
-
-	it("is a no-op reporting found: false when oldId does not exist", () => {
-		const src = "a >> p -> b\n";
-		const { output, found, kind } = renameId(src, "ghost", "gx");
-		expect(found).toBe(false);
-		expect(kind).toBeNull();
-		expect(output).toBe(src);
-	});
-
-	it("is a no-op when oldId is a group id, not an artifact/process id", () => {
-		const src = `---
-group:
-  g1:
-    label: G1
----
-a
-`;
-		const { output, found, kind } = renameId(src, "g1", "gx");
-		expect(found).toBe(false);
-		expect(kind).toBeNull();
-		expect(output).toBe(src);
-	});
-
-	it("is a no-op when the source already carries a parse error", () => {
-		const src = `---
-artifact:
-  a: [unterminated
----
-a
-`;
-		const { output, found, diagnostics } = renameId(src, "a", "ax");
-		expect(found).toBe(false);
-		expect(output).toBe(src);
-		expect(diagnostics.some((d) => d.severity === "error")).toBe(true);
-	});
-
-	it("is a no-op when the body carries a parser (P) error", () => {
-		const src = "a >> >> p -> b\n";
-		const { output, found, diagnostics } = renameId(src, "b", "bx");
-		expect(diagnostics.some((d) => String(d.code).startsWith("P"))).toBe(true);
-		expect(found).toBe(false);
-		expect(output).toBe(src);
-	});
-
-	// Only a document that could not be read (FM / L / P) blocks the rewrite.
-	// A validation (V) or normalizer (N) error is judged on the result by the
-	// caller, the same way `meta set` judges its write.
-	it("still renames when the source carries a validation (V) error", () => {
-		const src = `---
-artifact:
-  a: { status: bogus }
----
-a >> p -> b
-`;
-		const { output, found, kind } = renameId(src, "b", "bb");
-		expect(found).toBe(true);
-		expect(kind).toBe("artifact");
-		expect(output).toBe(`---
-artifact:
-  a: { status: bogus }
----
-a >> p -> bb
-`);
-	});
-
-	it("still renames when the source carries a normalizer (N) error", () => {
-		const src = `---
-artifact:
-  x: {label: X}
-process:
-  x: {label: X}
----
-a >> p -> b
-`;
-		const { output, found } = renameId(src, "b", "bb");
-		expect(found).toBe(true);
-		expect(output.endsWith("a >> p -> bb\n")).toBe(true);
 	});
 });
 
@@ -383,7 +313,7 @@ process:
 ---
 order >> work -> fulfilled
 `;
-		const { output } = renameId(src, "order", "order_v2");
+		const { output } = renamed(src, "order", "order_v2");
 		const { frontmatter } = analyze(output);
 		expect(frontmatter?.process?.work?.boundary).toEqual({
 			order_v2: "order",
@@ -408,7 +338,7 @@ process:
 order >> work -> fulfilled
 other_in >> work
 `;
-		const { output } = renameId(src, "fulfilled", "fulfilled_v2");
+		const { output } = renamed(src, "fulfilled", "fulfilled_v2");
 		const { frontmatter } = analyze(output);
 		expect(frontmatter?.process?.work?.boundary).toEqual({
 			other_in: "mapped_in",
@@ -431,30 +361,11 @@ process:
 ---
 order >> work -> fulfilled
 `;
-		const { output } = renameId(src, "order", "order_v2");
+		const { output } = renamed(src, "order", "order_v2");
 		const { frontmatter } = analyze(output);
 		expect(frontmatter?.process?.work?.boundary).toEqual({
 			order_v2: "incoming_order",
 		});
-	});
-
-	// `boundary:` must be a map; an empty one is unreadable (FM004).
-	it.each([
-		["block-style with no value", "    boundary:\n"],
-		["an explicit null (~)", "    boundary: ~\n"],
-	])("is a no-op next to an empty boundary: (%s), which is FM004", (_name, boundaryLine) => {
-		const src = `---
-process:
-  sub:
-    subflow: ./child.pfdsl
-${boundaryLine}---
-x >> sub -> y
-`;
-		const { output, found, kind, diagnostics } = renameId(src, "y", "y2");
-		expect(diagnostics.map((d) => d.code)).toContain("FM004");
-		expect(found).toBe(false);
-		expect(kind).toBeNull();
-		expect(output).toBe(src);
 	});
 
 	// boundary: keys are not restricted to YAML strings (only declaration ids
@@ -466,8 +377,7 @@ process:
 ---
 "10" >> work
 `;
-		const { output, found } = renameId(src, "10", "ten");
-		expect(found).toBe(true);
+		const { output } = renamed(src, "10", "ten");
 		const { frontmatter, diagnostics } = analyze(output);
 		expect(diagnostics.filter((d) => d.severity === "error")).toEqual([]);
 		expect(frontmatter?.process?.work?.boundary).toEqual({ ten: "child_in" });
@@ -492,7 +402,7 @@ process:
 order >> work -> fulfilled
 unrelated >> other
 `;
-		const { output } = renameId(src, "unrelated", "unrelated_v2");
+		const { output } = renamed(src, "unrelated", "unrelated_v2");
 		const { frontmatter } = analyze(output);
 		expect(frontmatter?.process?.work?.boundary).toBeUndefined();
 	});
@@ -514,7 +424,7 @@ process:
 order >> work -> fulfilled
 correction >>? work
 `;
-		const { output } = renameId(src, "correction", "correction_v2");
+		const { output } = renamed(src, "correction", "correction_v2");
 		const { frontmatter } = analyze(output);
 		expect(frontmatter?.process?.work?.boundary).toBeUndefined();
 	});
@@ -540,8 +450,7 @@ a >> fresh
 `;
 
 	it.each(["43", "true", "null", "1e3"])("%s", (newId) => {
-		const { output, found } = renameId(src, "a", newId);
-		expect(found).toBe(true);
+		const { output } = renamed(src, "a", newId);
 		const { frontmatter, diagnostics } = analyze(output);
 		expect(diagnostics.filter((d) => d.severity === "error")).toEqual([]);
 		expect(Object.keys(frontmatter?.artifact ?? {})).toEqual([
@@ -572,8 +481,7 @@ process:
 "43" >> merged
 "43" >> fresh
 `;
-		const { output, found } = renameId(typedOld, "43", "n43");
-		expect(found).toBe(true);
+		const { output } = renamed(typedOld, "43", "n43");
 		const { frontmatter, diagnostics } = analyze(output);
 		expect(diagnostics.filter((d) => d.severity === "error")).toEqual([]);
 		expect(frontmatter?.process?.merged?.boundary).toEqual({
@@ -697,8 +605,7 @@ describe("renameId invariant across id spellings, positions, and declared vs bod
 		);
 		expect(before.nodeKinds.get(spelling.id)).toBe("artifact");
 
-		const { output, found, kind } = renameId(source, spelling.id, newId);
-		expect(found).toBe(true);
+		const { output, kind } = renamed(source, spelling.id, newId);
 		expect(kind).toBe("artifact");
 
 		const after = analyze(output);

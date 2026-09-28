@@ -4,72 +4,29 @@ import {
 	parseFrontmatterCst,
 	renderFrontmatterCst,
 } from "./frontmatter-cst.js";
-import { analyze } from "./index.js";
-import { hasUnreadableError } from "./rename-id.js";
-import type { Diagnostic } from "./types/index.js";
-
-export interface RenameGroupResult {
-	/**
-	 * The whole document (frontmatter + body) with `oldId`'s declaration key,
-	 * every other group's `parent:` reference to it, and every artifact's/
-	 * process's `group:` reference to it renamed to `newId`. Only the
-	 * frontmatter changes — the body never references groups (spec §2.8).
-	 * Unchanged (the original `source`) when `oldId` has no declaration in
-	 * the local `group:` section, or when `source` could not be read (see
-	 * `hasUnreadableError`) — there is nothing safe to rewrite.
-	 */
-	output: string;
-	/** True when `oldId` had a local `group:` declaration to rename. */
-	found: boolean;
-	/**
-	 * Artifact/process ids whose `group:` field was rewritten, in frontmatter
-	 * declaration order (every renamed artifact before every renamed process).
-	 */
-	members: string[];
-	/** Other group ids whose `parent:` field was rewritten, in frontmatter declaration order. */
-	children: string[];
-	diagnostics: Diagnostic[];
-}
+import type { AnalyzeResult } from "./index.js";
 
 /**
- * Rename a group id in one atomic in-place rewrite (issue #1218): the
- * declaration key (`group.<oldId>` -> `<newId>`), every other group's
- * `parent: <oldId>` reference, and every artifact's/process's
- * `group: <oldId>` field. Built on the yaml CST (ADR-0034, the same
- * `parseFrontmatterCst` / `renderFrontmatterCst` pair `setFrontmatterField`
- * and `deleteNodes` use) so comments, quoting, flow-vs-block style, and
- * folded (`>`) scalars elsewhere in the frontmatter survive untouched. The
- * declaration key's Pair is mutated in place (its key scalar's `.value`) —
- * not deleted and re-added — so its position in the `group:` map is kept.
- *
- * Refusal/validation (does `oldId` exist, is `newId` free, extends-chain
- * conflicts) is the CLI layer's job (the top-level `rename` command), not
- * this function's: it always performs the rename it is asked for when
- * `oldId` is locally declared, and reports a no-op (`found: false`)
- * otherwise.
+ * Rewrite group id `oldId` to `newId` in `source`: its declaration key (kept
+ * in place among its siblings), every other group's `parent:` reference, and
+ * every artifact's/process's `group:` field. Only the frontmatter changes —
+ * the body never references groups (spec §2.8). Applied through the yaml
+ * CST (ADR-0034), so comments, quoting, flow-vs-block style and folded (`>`)
+ * scalars elsewhere survive. Returns the whole document, the rewritten
+ * members (artifacts before processes, each in declaration order) and the
+ * rewritten child groups (in declaration order).
  */
 export function renameGroup(
 	source: string,
+	analysis: Pick<AnalyzeResult, "frontmatter">,
 	oldId: string,
 	newId: string,
-): RenameGroupResult {
-	const { frontmatter, diagnostics } = analyze(source);
-	const noop: RenameGroupResult = {
-		output: source,
-		found: false,
-		members: [],
-		children: [],
-		diagnostics,
-	};
-	if (hasUnreadableError(diagnostics)) return noop;
-
+): { output: string; members: string[]; children: string[] } {
+	const { frontmatter } = analysis;
 	const cst = parseFrontmatterCst(source);
-	if (!cst.present) return noop;
-
 	const doc = cst.doc;
 	const pair = declarationPair(doc, oldId, "group");
-	if (!pair || !isScalar(pair.key)) return noop;
-	pair.key.value = newId;
+	if (pair && isScalar(pair.key)) pair.key.value = newId;
 
 	const children: string[] = [];
 	for (const [gid, meta] of Object.entries(frontmatter?.group ?? {})) {
@@ -101,9 +58,7 @@ export function renameGroup(
 	);
 	return {
 		output: frontmatterOutput + cst.body,
-		found: true,
 		members,
 		children,
-		diagnostics,
 	};
 }
