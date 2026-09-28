@@ -155,4 +155,32 @@ describe("entry scripts reject argv they do not understand", () => {
 		assert.equal(status, 2);
 		assert.match(stderr, /mutually exclusive/);
 	});
+
+	it("gate-check.mjs requires --artifact with --in-progress", () => {
+		const { status, stderr } = runScript("scripts/gate-check.mjs", [
+			"--in-progress",
+		]);
+		assert.equal(status, 2);
+		assert.match(stderr, /--in-progress.*--artifact/);
+	});
+
+	it("gate-check.mjs rejects --in-progress with --no-artifact", () => {
+		const { status, stderr } = runScript("scripts/gate-check.mjs", [
+			"--in-progress",
+			"--no-artifact",
+		]);
+		assert.equal(status, 2);
+		assert.match(stderr, /--in-progress.*--no-artifact/);
+	});
+
+	it("gate-check.mjs rejects --in-progress with --artifact and --no-artifact", () => {
+		const { status, stderr } = runScript("scripts/gate-check.mjs", [
+			"--artifact",
+			"k",
+			"--in-progress",
+			"--no-artifact",
+		]);
+		assert.equal(status, 2);
+		assert.match(stderr, /mutually exclusive/);
+	});
 });

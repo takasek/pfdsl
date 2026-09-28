@@ -22,6 +22,7 @@ import {
 	isUnregisteredManagedIssue,
 	parsePorcelainPaths,
 	parseReadyOutput,
+	quoteShellArgument,
 	summarizeReleasePending,
 } from "./cycle-status.mjs";
 /**
@@ -370,7 +371,7 @@ export async function runCycleStatus({
 		? null
 		: buildGateCheckCommand(artifactKey, base, targetIssues);
 	const wipUpdateCommand = artifactKey
-		? `node packages/cli/dist/cli.js meta set .pfdsl/roadmap.pfdsl ${artifactKey} status wip`
+		? `node packages/cli/dist/cli.js meta set .pfdsl/roadmap.pfdsl ${quoteShellArgument(artifactKey)} status wip`
 		: undefined;
 
 	const result = {

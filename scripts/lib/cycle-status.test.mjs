@@ -187,6 +187,17 @@ describe("buildGateCheckCommand", () => {
 			"node scripts/gate-check.mjs --base main --no-artifact --issue 969",
 		);
 	});
+
+	it("quotes dynamic values that contain shell-special characters", () => {
+		assert.equal(
+			buildGateCheckCommand("artifact key", "release candidate", [969]),
+			"node scripts/gate-check.mjs --base 'release candidate' --artifact 'artifact key' --issue 969",
+		);
+		assert.equal(
+			buildGateCheckCommand("artifact's output", "main"),
+			"node scripts/gate-check.mjs --base main --artifact 'artifact'\\''s output'",
+		);
+	});
 });
 
 describe("countBehind", () => {

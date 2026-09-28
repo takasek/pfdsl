@@ -1,6 +1,13 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { cpSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import {
+	cpSync,
+	mkdirSync,
+	mkdtempSync,
+	rmSync,
+	symlinkSync,
+	writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { afterEach, beforeEach, describe, it } from "node:test";
@@ -17,6 +24,7 @@ function git(args) {
 beforeEach(() => {
 	fixture = mkdtempSync(join(tmpdir(), "check-drift-gates-"));
 	cpSync(join(root, "scripts"), join(fixture, "scripts"), { recursive: true });
+	symlinkSync(join(root, "node_modules"), join(fixture, "node_modules"), "dir");
 	git(["init", "--quiet", "--initial-branch=main"]);
 	git(["config", "user.email", "test@example.com"]);
 	git(["config", "user.name", "Test User"]);

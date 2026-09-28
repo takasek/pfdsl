@@ -3,6 +3,7 @@
  * Process/git I/O lives in the main script; this module stays testable.
  */
 
+import { parse as parseYaml } from "yaml";
 import { isGhUnavailableError } from "../pfdsl/lib/gh-compat.mjs";
 
 /**
@@ -187,10 +188,8 @@ export function classifyIssueLookupFailure(error) {
 }
 
 /**
- * Classify the output-artifact status-update gate (item 6). No new states:
- * this reuses the existing reasoned-SKIP vocabulary the same way item 9
- * (wip transition) already does for the no-roadmap-change case.
- * @param {{artifactKey?: string, noArtifact?: boolean, roadmapChanged?: boolean, changed?: boolean}} params
+ * Classify the output-artifact status-update gate (item 6).
+ * @param {{artifactKey?: string, noArtifact?: boolean, roadmapChanged?: boolean, changed?: boolean, status?: string, inProgress?: boolean}} params
  *   - artifactKey: the --artifact CLI flag value, if given.
  *   - noArtifact: the cycle declared it owns no output artifact (--no-artifact).
  *     Wins over everything else — it is a statement about the work, not the diff.
@@ -199,6 +198,8 @@ export function classifyIssueLookupFailure(error) {
  *   - changed: whether a status: change was detected (precise per-artifact
  *     check when artifactKey is set, presence-only fallback otherwise).
  *     Not evaluated (may be undefined) in the SKIP case.
+ *   - status: the named artifact's status at HEAD.
+ *   - inProgress: the cycle explicitly declared it will remain incomplete.
  * @returns {{status: 'PASS'|'FAIL'|'SKIP', detail?: string}}
  */
 export function classifyOutputArtifactStatus({
@@ -206,6 +207,8 @@ export function classifyOutputArtifactStatus({
 	noArtifact,
 	roadmapChanged,
 	changed,
+	status,
+	inProgress,
 }) {
 	// A declaration beats inference. Bookkeeping cycles (a rename, a location:)
 	// touch roadmap.pfdsl without owning an output artifact, and no reading of
@@ -223,11 +226,29 @@ export function classifyOutputArtifactStatus({
 		};
 	}
 	if (artifactKey) {
+		if (inProgress) {
+			return {
+				status: status === "wip" ? "PASS" : "FAIL",
+				detail:
+					status === "wip"
+						? undefined
+						: `--in-progress declared for artifact '${artifactKey}', but HEAD status is '${status ?? "unset"}'; expected wip`,
+			};
+		}
+		if (status !== "done") {
+			return {
+				status: "FAIL",
+				detail:
+					`artifact '${artifactKey}' has status '${status ?? "unset"}' at HEAD; ` +
+					"completed cycles must set it to done in this PR per spec §2.7.1, " +
+					"or pass --in-progress for an intentionally incomplete cycle",
+			};
+		}
 		return {
 			status: changed ? "PASS" : "FAIL",
 			detail: changed
 				? undefined
-				: `no status: change detected for artifact '${artifactKey}'`,
+				: `artifact '${artifactKey}' is done at HEAD, but its status did not change in this PR`,
 		};
 	}
 	return {
@@ -260,12 +281,32 @@ export function hasStatusChange(diffText) {
  * @returns {string | undefined}
  */
 export function extractArtifactStatus(text, artifactKey) {
-	const block = text.match(
-		new RegExp(`\\n {2}${artifactKey}:\\n([\\s\\S]*?)(?=\\n {2}\\S+:\\n|$)`),
+	const lines = text.split(/\r?\n/);
+	if (lines[0]?.trimEnd() !== "---") return undefined;
+	const closingDelimiter = lines.findIndex(
+		(line, index) => index > 0 && line.trimEnd() === "---",
 	);
-	if (!block) return undefined;
-	const status = block[1].match(/status:\s*(\S+)/);
-	return status ? status[1] : undefined;
+	if (closingDelimiter < 0) return undefined;
+
+	let frontmatter;
+	try {
+		frontmatter = parseYaml(lines.slice(1, closingDelimiter).join("\n"));
+	} catch {
+		return undefined;
+	}
+	if (!frontmatter || typeof frontmatter !== "object") return undefined;
+	if (!Object.hasOwn(frontmatter, "artifact")) return undefined;
+
+	const artifacts = frontmatter.artifact;
+	if (!artifacts || typeof artifacts !== "object" || Array.isArray(artifacts))
+		return undefined;
+	if (!Object.hasOwn(artifacts, artifactKey)) return undefined;
+
+	const artifact = artifacts[artifactKey];
+	if (!artifact || typeof artifact !== "object" || Array.isArray(artifact))
+		return undefined;
+	if (!Object.hasOwn(artifact, "status")) return undefined;
+	return typeof artifact.status === "string" ? artifact.status : undefined;
 }
 
 /**
