@@ -222,7 +222,7 @@ process:
   i1282_create_node_definition:
     label: ノード定義作成操作を実装する
     location: https://github.com/takasek/pfdsl/issues/1282
-    updated_at: 2026-09-26T18:14:16Z
+    updated_at: 2026-09-28T08:04:13Z
   i1283_add_node_location_cycle:
     label: 定義と本文中のノード位置の巡回を実装する
     location: https://github.com/takasek/pfdsl/issues/1283
