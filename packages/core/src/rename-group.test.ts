@@ -203,13 +203,11 @@ a
 	});
 });
 
-// The id-identity defects found in review (#1218: a prototype-member name,
-// a numeric-looking key) were each one shape of the same question — does the
-// group id the caller names match the id every representation of the file
-// holds? This checks that question across the product of the ways a string
-// id can be written, the places it is referenced, and the YAML styles,
-// against the invariant from spec §2.8 rather than against the
-// implementation: after the rename, re-reading the file finds <new> wherever
+// Does the group id the caller names match the id every representation of
+// the file holds? This checks that across the product of the ways a string
+// id can be written (including a prototype-member name and a numeric-looking
+// key), the places it is referenced, and the YAML styles, against the
+// invariant from spec §2.8 rather than against the implementation: after the rename, re-reading the file finds <new> wherever
 // <old> was and <old> nowhere, and leaves every other reference alone.
 describe("renameGroup id identity across key shapes, positions and styles", () => {
 	const oldTokens = ["g1", '"g1"', "'g1'", "toString", '"42"'];

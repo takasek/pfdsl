@@ -765,8 +765,7 @@ describe("rename", () => {
 
 	// >=3 groups (layer1sub's parent: references layer1, other is unrelated),
 	// a comment on the renamed group's declaration, a folded (>) description,
-	// and members declared in both flow ({ group: layer1 }) and block style —
-	// ported from the removed `meta rename-group`'s own byte-exact coverage.
+	// and members declared in both flow ({ group: layer1 }) and block style.
 	const grouped = `---
 description: >
   Roadmap for the
@@ -884,7 +883,6 @@ processed >> transform -> done
 		expect(r.stderr).toBe("--write cannot be used with stdin (-)\n");
 	});
 
-	// Unlike the removed `meta rename-group` (which refused stdin outright),
 	// `rename` follows `delete`'s output model: stdin is a valid preview
 	// source as long as --write is not requested.
 	it("allows stdin for a preview (no --write)", async () => {
@@ -1077,8 +1075,8 @@ raw >> p
 	});
 
 	// Renaming an artifact/process id onto an existing group id is refused
-	// too — normalizer.ts registers artifact/process ids first and would
-	// silently shadow the group otherwise (packages/core/src/normalizer.ts:37-40).
+	// too: group and node ids share one namespace, and the normalizer would
+	// register the renamed artifact first and silently drop the group.
 	it("exits 1 when new (an artifact rename target) collides with an existing group id", async () => {
 		const f = join(dir, "rename-artifact-new-is-group.pfdsl");
 		writeFileSync(f, grouped);

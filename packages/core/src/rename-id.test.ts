@@ -497,8 +497,6 @@ process:
 // against the invariant from spec §9/§15.11 rather than the implementation:
 // re-analyzing the output after a rename gives exactly the original edge
 // list with old→new substituted, the same node kinds, and old nowhere.
-// Modelled on rename-group.test.ts's "id identity across key shapes,
-// positions and styles" describe block.
 describe("renameId invariant across id spellings, positions, and declared vs body-only", () => {
 	interface Spelling {
 		name: string;

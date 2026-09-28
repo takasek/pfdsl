@@ -105,7 +105,10 @@ export function rename(
 		return { ok: false, reason: "ambiguous", clashingKind: kind.clashingKind };
 	}
 
-	// `nodeKinds` holds every artifact, process and group id of this file.
+	// `nodeKinds` holds every artifact, process and group id of this file,
+	// one kind per id: the normalizer registers frontmatter artifact ids,
+	// then group ids an artifact did not take, then process ids, then ids
+	// inferred from the body.
 	const existingKind = analysis.nodeKinds.get(newId);
 	if (existingKind !== undefined) {
 		return { ok: false, reason: "newExists", kind, existingKind };
