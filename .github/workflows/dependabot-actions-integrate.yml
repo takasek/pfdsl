@@ -6,6 +6,7 @@ on:
   workflow_run:
     workflows: [queue Dependabot Actions updates]
     types: [completed]
+  workflow_dispatch:
 
 permissions:
   actions: read
@@ -15,8 +16,11 @@ permissions:
 jobs:
   integrate:
     if: >-
-      github.event.workflow_run.conclusion == 'success' &&
-      vars.DEPENDABOT_BATCH_CLIENT_ID != ''
+      vars.DEPENDABOT_BATCH_CLIENT_ID != '' &&
+      ((github.event_name == 'workflow_dispatch' &&
+        github.ref == 'refs/heads/main') ||
+       (github.event_name == 'workflow_run' &&
+        github.event.workflow_run.conclusion == 'success'))
     runs-on: ubuntu-latest
     timeout-minutes: 60
     concurrency:
@@ -24,6 +28,7 @@ jobs:
       cancel-in-progress: false
     steps:
       - name: Verify the settle job completed
+        if: github.event_name == 'workflow_run'
         env:
           GH_TOKEN: ${{ github.token }}
           UPSTREAM_RUN_ID: ${{ github.event.workflow_run.id }}
