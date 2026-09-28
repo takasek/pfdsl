@@ -613,7 +613,7 @@ describe("renameId invariant across id spellings, positions, and declared vs bod
 		expect(after.nodeKinds.has(spelling.id)).toBe(false);
 
 		if (position.name === "reference") {
-			expect(String(after.frontmatter?.artifact?.copy?.revises)).toBe(newId);
+			expect(after.frontmatter?.artifact?.copy?.revises).toBe(newId);
 			expect(after.frontmatter?.artifact?.bundle?.parts).toContain(newId);
 			expect(after.frontmatter?.artifact?.bundle?.parts).not.toContain(
 				spelling.id,
