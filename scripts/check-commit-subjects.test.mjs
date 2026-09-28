@@ -221,7 +221,7 @@ describe("check-commit-subjects workflow", () => {
 				"runs-on": "ubuntu-latest",
 				steps: [
 					{
-						uses: "actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803",
+						uses: "actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
 						with: {
 							// Full base history, with no token left on disk.
 							"fetch-depth": 0,
@@ -229,7 +229,7 @@ describe("check-commit-subjects workflow", () => {
 						},
 					},
 					{
-						uses: "actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38",
+						uses: "actions/setup-node@820762786026740c76f36085b0efc47a31fe5020",
 						with: { "node-version": 24 },
 					},
 					{
@@ -326,8 +326,8 @@ describe("check-commit-subjects workflow", () => {
 		);
 		assert.equal(lint.run.trim().replace(/\\\n/g, " ").split("\n").length, 1);
 		assert.deepEqual(steps.map((s) => s.uses).filter(Boolean), [
-			"actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803",
-			"actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38",
+			"actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+			"actions/setup-node@820762786026740c76f36085b0efc47a31fe5020",
 		]);
 		assert.ok(
 			["ubuntu-latest", "ubuntu-24.04", "ubuntu-22.04"].includes(
