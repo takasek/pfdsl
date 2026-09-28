@@ -351,6 +351,7 @@ test("direct push catches up with an unrelated branch update", () => {
 			git(publisher, ["show", "HEAD:.pfdsl/flow.svg"]),
 			"<svg>flow</svg>",
 		);
+		git(other, ["pull", "-q", "--ff-only", "origin", "main"]);
 		writeFileSync(join(other, ".pfdsl/flow.pfdsl"), "artifact changed\n");
 		git(other, ["add", ".pfdsl/flow.pfdsl"]);
 		git(other, [
@@ -362,7 +363,6 @@ test("direct push catches up with an unrelated branch update", () => {
 			"-qm",
 			"changed source",
 		]);
-		git(other, ["pull", "-q", "--rebase", "origin", "main"]);
 		git(other, ["push", "-q", "origin", "main"]);
 		const stale = push();
 		assert.equal(stale.status, 1);
