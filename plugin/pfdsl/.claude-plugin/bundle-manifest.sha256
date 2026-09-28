@@ -82,7 +82,7 @@ b51600df7bb094ecefd9ae3f6a8cc1f46fca660b1b6977af88f3464f333a1472  skills/pfd-ops
 
 c1328f9dcb946c35f7bba42306324d82929f7031fb52d459c3b2ee12fd904686  skills/pfd-ops/references/scaffold/workflow.pfdsl
 
-e202d1f12cef92021285a08cfe452fdcc0390eda5d4b90b07ee93ec6240d2702  skills/pfd-ops/references/work-cycle.md
+471cd311db86eeaa6196afb11a5446e30a5f4cfa62b9c9d04b4329d210932eb3  skills/pfd-ops/references/work-cycle.md
 
 2cae2118000945dd3e0f0f8e8a8ce9550da5b666aeb601295dc3561a5448168b  skills/pfd-ops/scripts/check-install-sync.mjs
 
@@ -96,7 +96,7 @@ af5a394361b3f289305af865d6b7e8fcb0b8bccf2cb3a0a0e10c396f238b7e1e  skills/pfd-ret
 
 611fd292a6cd35b3c46a58d8d555e16078c0f453229a2cbe510aba2bcf1b9e58  skills/pfd-upstream-report/SKILL.md
 
-891c57d00f5e3e26731cbf1238f53896342ee089b8ed04f15bb7cfd6e89c2640  skills/pfdsl/SKILL.md
+cf8c1008fc5ff691a8edaba98329106e64cd3aa3425af370e395b8ca570651c7  skills/pfdsl/SKILL.md
 
 cd3b49619550799898858fe1fec583816c00a335f3e70fa20fdfa8e1a2dc1a8d  skills/pfdsl/references/examples.md
 
@@ -106,4 +106,4 @@ b657698a8a10210e10ee40130a292007ca55a02e8f46e77181d4777b769a86bb  skills/pfdsl/r
 
 3168c3cba3190fc247daca502d24467f484a3774b432ded5744a5f47cb9f800f  skills/pfdsl/references/samples.md
 
-321fe6a7a3e6d447a3a8014219695e3291bf7f0ddf64602d909c0fa1b00f8d82  skills/pfdsl/references/spec.md
+194cbfc6b405a025c0ee44d8703d2a61e28e54a6a2202065266d2221d26e9ed5  skills/pfdsl/references/spec.md
