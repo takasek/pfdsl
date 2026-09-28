@@ -16,6 +16,7 @@
 import { checkCommitSubjects } from "./commit-subjects.mjs";
 import {
 	classifyOutputArtifactStatus,
+	extractArtifactStatus,
 	hasStatusChange,
 	matchesTrigger,
 	NO_ARTIFACT_DETAIL,
@@ -163,7 +164,7 @@ export function genPluginIdentityStep({ node, triggerPaths }) {
 }
 
 /**
- * Output artifact status update: did this cycle move its artifact's status?
+ * Output artifact status update: is the artifact done, or explicitly left wip?
  * Three ways in, and which one applies is the point of the step: a declared
  * --no-artifact cycle skips, a named artifact is checked strictly against the
  * two roadmap snapshots, and everything else falls back to "some status: line
@@ -173,6 +174,7 @@ export function outputArtifactStatusStep({
 	exec,
 	base,
 	artifactKey,
+	inProgress,
 	noArtifact,
 	changedFiles,
 }) {
@@ -205,7 +207,16 @@ export function outputArtifactStatusStep({
 			after.out,
 			artifactKey,
 		);
-		return { name, ...classifyOutputArtifactStatus({ artifactKey, changed }) };
+		const status = extractArtifactStatus(after.out, artifactKey);
+		return {
+			name,
+			...classifyOutputArtifactStatus({
+				artifactKey,
+				changed,
+				status,
+				inProgress,
+			}),
+		};
 	}
 
 	const diffResult = exec("git", [

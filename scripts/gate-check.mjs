@@ -4,7 +4,7 @@
 // gen-plugin identity / output-artifact status update)
 // against the diff from origin/<base> to HEAD, then prints the remaining
 // canonical manual checklist locations as fixed guidance.
-// Usage: node scripts/gate-check.mjs [--base main] [--artifact <key> | --no-artifact] [--issue <n> ...]
+// Usage: node scripts/gate-check.mjs [--base main] [--artifact <key> [--in-progress] | --no-artifact] [--issue <n> ...]
 
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { dirname, relative, resolve } from "node:path";
@@ -64,6 +64,7 @@ try {
 		options: {
 			base: { type: "string" },
 			artifact: { type: "string" },
+			"in-progress": { type: "boolean" },
 			"no-artifact": { type: "boolean" },
 			issue: { type: "string", multiple: true },
 		},
@@ -76,6 +77,7 @@ try {
 }
 const base = values.base ?? "main";
 const artifactKey = values.artifact;
+const inProgress = values["in-progress"] === true;
 // Declared, not inferred: a bookkeeping cycle touches roadmap.pfdsl without
 // owning an output artifact, and the diff cannot tell that apart from a cycle
 // that forgot its status update (#564).
@@ -83,6 +85,12 @@ const noArtifact = values["no-artifact"] === true;
 if (noArtifact && artifactKey) {
 	console.error(
 		"gate-check: --artifact and --no-artifact are mutually exclusive",
+	);
+	process.exit(2);
+}
+if (inProgress && (!artifactKey || noArtifact)) {
+	console.error(
+		"gate-check: --in-progress requires --artifact and is mutually exclusive with --no-artifact",
 	);
 	process.exit(2);
 }
@@ -178,6 +186,7 @@ results.push(
 		exec,
 		base,
 		artifactKey,
+		inProgress,
 		noArtifact,
 		changedFiles,
 	}),

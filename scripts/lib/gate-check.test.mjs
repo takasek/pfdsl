@@ -120,6 +120,7 @@ describe("classifyOutputArtifactStatus", () => {
 		const result = classifyOutputArtifactStatus({
 			artifactKey: "ops_checkers",
 			changed: true,
+			status: "done",
 		});
 		assert.equal(result.status, "PASS");
 	});
@@ -128,6 +129,7 @@ describe("classifyOutputArtifactStatus", () => {
 		const result = classifyOutputArtifactStatus({
 			artifactKey: "ops_checkers",
 			changed: false,
+			status: "done",
 		});
 		assert.equal(result.status, "FAIL");
 		assert.match(result.detail, /ops_checkers/);

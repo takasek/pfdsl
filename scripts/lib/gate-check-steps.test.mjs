@@ -159,6 +159,10 @@ describe("outputArtifactStatusStep", () => {
 		before: `artifact:\n  ${key}:\n    status: wip\n`,
 		after: `artifact:\n  ${key}:\n    status: done\n`,
 	});
+	const snapshots = (beforeStatus, afterStatus) => ({
+		before: `artifact:\n  spec_v1:\n    status: ${beforeStatus}\n`,
+		after: `artifact:\n  spec_v1:\n    status: ${afterStatus}\n`,
+	});
 
 	it("skips on an explicit --no-artifact declaration", () => {
 		const { exec, calls } = fakeExec();
@@ -195,6 +199,196 @@ describe("outputArtifactStatusStep", () => {
 			changedFiles: [ROADMAP],
 		});
 		assert.equal(result.status, "PASS");
+	});
+
+	it("fails when a changed named artifact is still wip at HEAD", () => {
+		const { before, after } = snapshots("todo", "wip");
+		const { exec } = fakeExec({
+			"git show origin/main:": { out: before },
+			"git show HEAD:": { out: after },
+		});
+		const result = outputArtifactStatusStep({
+			exec,
+			base: "main",
+			artifactKey: "spec_v1",
+			changedFiles: [ROADMAP],
+		});
+		assert.equal(result.status, "FAIL");
+		assert.match(result.detail, /done in this PR.*--in-progress/);
+	});
+
+	it("fails when a named artifact stays todo at HEAD", () => {
+		const { before, after } = snapshots("todo", "todo");
+		const { exec } = fakeExec({
+			"git show origin/main:": { out: before },
+			"git show HEAD:": { out: after },
+		});
+		const result = outputArtifactStatusStep({
+			exec,
+			base: "main",
+			artifactKey: "spec_v1",
+			changedFiles: [ROADMAP],
+		});
+		assert.equal(result.status, "FAIL");
+		assert.match(result.detail, /done in this PR.*--in-progress/);
+	});
+
+	it("fails when done was already present at the base and did not change", () => {
+		const { before, after } = snapshots("done", "done");
+		const { exec } = fakeExec({
+			"git show origin/main:": { out: before },
+			"git show HEAD:": { out: after },
+		});
+		const result = outputArtifactStatusStep({
+			exec,
+			base: "main",
+			artifactKey: "spec_v1",
+			changedFiles: [ROADMAP],
+		});
+		assert.equal(result.status, "FAIL");
+		assert.match(result.detail, /status did not change/);
+	});
+
+	it("does not read a regex-like quoted ID from a neighboring artifact", () => {
+		const before = [
+			"---",
+			"artifact:",
+			'  "a.b":',
+			"    status: todo",
+			"  axb:",
+			"    status: todo",
+			"---",
+		].join("\n");
+		const after = before
+			.replace("    status: todo\n  axb:", "    status: wip\n  axb:")
+			.replace("  axb:\n    status: todo", "  axb:\n    status: done");
+		const { exec } = fakeExec({
+			"git show origin/main:": { out: before },
+			"git show HEAD:": { out: after },
+		});
+		const result = outputArtifactStatusStep({
+			exec,
+			base: "main",
+			artifactKey: "a.b",
+			changedFiles: [ROADMAP],
+		});
+		assert.equal(result.status, "FAIL");
+		assert.match(result.detail, /a\.b.*wip.*done in this PR/);
+	});
+
+	it("checks a quoted regex-like ID when only that artifact becomes done", () => {
+		const before = [
+			"---",
+			"artifact:",
+			'  "a.b":',
+			"    status: todo",
+			"  axb:",
+			"    status: done",
+			"---",
+		].join("\n");
+		const after = before.replace("status: todo", "status: done");
+		const { exec } = fakeExec({
+			"git show origin/main:": { out: before },
+			"git show HEAD:": { out: after },
+		});
+		const result = outputArtifactStatusStep({
+			exec,
+			base: "main",
+			artifactKey: "a.b",
+			changedFiles: [ROADMAP],
+		});
+		assert.equal(result.status, "PASS");
+	});
+
+	it("does not treat status text inside a folded description as the artifact status", () => {
+		const before = [
+			"---",
+			"artifact:",
+			"  spec_v1:",
+			"    description: >",
+			"      status: todo",
+			"    status: wip",
+			"---",
+		].join("\n");
+		const after = before.replace("status: todo", "status: done");
+		const { exec } = fakeExec({
+			"git show origin/main:": { out: before },
+			"git show HEAD:": { out: after },
+		});
+		const result = outputArtifactStatusStep({
+			exec,
+			base: "main",
+			artifactKey: "spec_v1",
+			changedFiles: [ROADMAP],
+		});
+		assert.equal(result.status, "FAIL");
+		assert.match(result.detail, /status 'wip'.*done in this PR/);
+	});
+
+	it("passes an in-progress declaration when HEAD is wip, even without a status change", () => {
+		const { before, after } = snapshots("wip", "wip");
+		const { exec } = fakeExec({
+			"git show origin/main:": { out: before },
+			"git show HEAD:": { out: after },
+		});
+		const result = outputArtifactStatusStep({
+			exec,
+			base: "main",
+			artifactKey: "spec_v1",
+			inProgress: true,
+			changedFiles: [ROADMAP],
+		});
+		assert.equal(result.status, "PASS");
+	});
+
+	it("passes an in-progress declaration when a changed artifact is wip at HEAD", () => {
+		const { before, after } = snapshots("todo", "wip");
+		const { exec } = fakeExec({
+			"git show origin/main:": { out: before },
+			"git show HEAD:": { out: after },
+		});
+		const result = outputArtifactStatusStep({
+			exec,
+			base: "main",
+			artifactKey: "spec_v1",
+			inProgress: true,
+			changedFiles: [ROADMAP],
+		});
+		assert.equal(result.status, "PASS");
+	});
+
+	it("fails an in-progress declaration when HEAD is todo", () => {
+		const { before, after } = snapshots("todo", "todo");
+		const { exec } = fakeExec({
+			"git show origin/main:": { out: before },
+			"git show HEAD:": { out: after },
+		});
+		const result = outputArtifactStatusStep({
+			exec,
+			base: "main",
+			artifactKey: "spec_v1",
+			inProgress: true,
+			changedFiles: [ROADMAP],
+		});
+		assert.equal(result.status, "FAIL");
+		assert.match(result.detail, /--in-progress.*wip/);
+	});
+
+	it("fails an in-progress declaration when HEAD is done", () => {
+		const { before, after } = snapshots("wip", "done");
+		const { exec } = fakeExec({
+			"git show origin/main:": { out: before },
+			"git show HEAD:": { out: after },
+		});
+		const result = outputArtifactStatusStep({
+			exec,
+			base: "main",
+			artifactKey: "spec_v1",
+			inProgress: true,
+			changedFiles: [ROADMAP],
+		});
+		assert.equal(result.status, "FAIL");
+		assert.match(result.detail, /--in-progress.*wip/);
 	});
 
 	it("fails when a different artifact moved but the named one did not", () => {

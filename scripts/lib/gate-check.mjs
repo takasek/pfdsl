@@ -187,10 +187,8 @@ export function classifyIssueLookupFailure(error) {
 }
 
 /**
- * Classify the output-artifact status-update gate (item 6). No new states:
- * this reuses the existing reasoned-SKIP vocabulary the same way item 9
- * (wip transition) already does for the no-roadmap-change case.
- * @param {{artifactKey?: string, noArtifact?: boolean, roadmapChanged?: boolean, changed?: boolean}} params
+ * Classify the output-artifact status-update gate (item 6).
+ * @param {{artifactKey?: string, noArtifact?: boolean, roadmapChanged?: boolean, changed?: boolean, status?: string, inProgress?: boolean}} params
  *   - artifactKey: the --artifact CLI flag value, if given.
  *   - noArtifact: the cycle declared it owns no output artifact (--no-artifact).
  *     Wins over everything else — it is a statement about the work, not the diff.
@@ -199,6 +197,8 @@ export function classifyIssueLookupFailure(error) {
  *   - changed: whether a status: change was detected (precise per-artifact
  *     check when artifactKey is set, presence-only fallback otherwise).
  *     Not evaluated (may be undefined) in the SKIP case.
+ *   - status: the named artifact's status at HEAD.
+ *   - inProgress: the cycle explicitly declared it will remain incomplete.
  * @returns {{status: 'PASS'|'FAIL'|'SKIP', detail?: string}}
  */
 export function classifyOutputArtifactStatus({
@@ -206,6 +206,8 @@ export function classifyOutputArtifactStatus({
 	noArtifact,
 	roadmapChanged,
 	changed,
+	status,
+	inProgress,
 }) {
 	// A declaration beats inference. Bookkeeping cycles (a rename, a location:)
 	// touch roadmap.pfdsl without owning an output artifact, and no reading of
@@ -223,11 +225,29 @@ export function classifyOutputArtifactStatus({
 		};
 	}
 	if (artifactKey) {
+		if (inProgress) {
+			return {
+				status: status === "wip" ? "PASS" : "FAIL",
+				detail:
+					status === "wip"
+						? undefined
+						: `--in-progress declared for artifact '${artifactKey}', but HEAD status is '${status ?? "unset"}'; expected wip`,
+			};
+		}
+		if (status !== "done") {
+			return {
+				status: "FAIL",
+				detail:
+					`artifact '${artifactKey}' has status '${status ?? "unset"}' at HEAD; ` +
+					"completed cycles must set it to done in this PR per spec §2.7.1, " +
+					"or pass --in-progress for an intentionally incomplete cycle",
+			};
+		}
 		return {
 			status: changed ? "PASS" : "FAIL",
 			detail: changed
 				? undefined
-				: `no status: change detected for artifact '${artifactKey}'`,
+				: `artifact '${artifactKey}' is done at HEAD, but its status did not change in this PR`,
 		};
 	}
 	return {
@@ -260,12 +280,19 @@ export function hasStatusChange(diffText) {
  * @returns {string | undefined}
  */
 export function extractArtifactStatus(text, artifactKey) {
+	const escapedArtifactKeys = [artifactKey, JSON.stringify(artifactKey)].map(
+		(key) => key.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"),
+	);
 	const block = text.match(
-		new RegExp(`\\n {2}${artifactKey}:\\n([\\s\\S]*?)(?=\\n {2}\\S+:\\n|$)`),
+		new RegExp(
+			`\\n {2}(?:${escapedArtifactKeys.join("|")}):\\n([\\s\\S]*?)(?=\\n {2}\\S+:\\n|$)`,
+		),
 	);
 	if (!block) return undefined;
-	const status = block[1].match(/status:\s*(\S+)/);
-	return status ? status[1] : undefined;
+	const status = block[1].match(
+		/^ {4}status:\s*(["']?)([^"'#\s]+)\1(?:\s+#.*)?\s*$/m,
+	);
+	return status ? status[2] : undefined;
 }
 
 /**
