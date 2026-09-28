@@ -1,4 +1,14 @@
-import { Document, isPair, isScalar, isSeq, parseDocument, visit } from "yaml";
+import {
+	Document,
+	isAlias,
+	isMap,
+	isPair,
+	isScalar,
+	isSeq,
+	type Pair,
+	parseDocument,
+	visit,
+} from "yaml";
 import { invalidIdKeys } from "./frontmatter-id-keys.js";
 import type { NodeKind } from "./types/index.js";
 
@@ -301,6 +311,30 @@ export function renderFrontmatterCst(
 	return newline === "\r\n" ? block.replace(/\n/g, "\r\n") : block;
 }
 
+/** The id a `Pair`'s key represents, or null when the key isn't a plain scalar. */
+export function pairId(pair: Pair): string | null {
+	return isScalar(pair.key) ? String(pair.key.value) : null;
+}
+
+/**
+ * `id`'s declaration `Pair` within a frontmatter yaml CST (as parsed by
+ * `parseFrontmatterCst`), looked up in the one section its `kind` names.
+ * Null when `id` has no entry there. Returns the whole `Pair` so callers can
+ * rewrite its key or reach into its value map.
+ */
+export function declarationPair(
+	doc: Document,
+	id: string,
+	kind: NodeKind,
+): Pair | null {
+	const section = doc.get(kind, true);
+	if (!isMap(section)) return null;
+	for (const item of section.items) {
+		if (pairId(item) === id) return item;
+	}
+	return null;
+}
+
 /**
  * Rewrite one node's field in `source`'s frontmatter, preserving everything
  * else (comments, quote style, flow-vs-block). Used by `meta set` (ADR-0034).
@@ -321,4 +355,30 @@ export function setFrontmatterField(
 		return null;
 	doc.setIn([kind, id, field], value);
 	return renderFrontmatterCst(doc, newline, yamlText) + body;
+}
+
+/**
+ * True when `doc` shares a node between places — an alias (`*a`), an
+ * anchor (`&a`, even one no alias uses yet), or a merge key (`<<`). A
+ * rewrite through a shared node either misses a place that reads it or
+ * changes every place at once, so the write paths that key on one place
+ * refuse such a document rather than guess.
+ */
+export function usesYamlReferences(doc: Document): boolean {
+	let found = false;
+	visit(doc, {
+		Node(_key, node) {
+			if (isAlias(node) || ("anchor" in node && node.anchor)) {
+				found = true;
+				return visit.BREAK;
+			}
+		},
+		Pair(_key, pair) {
+			if (isScalar(pair.key) && pair.key.value === "<<") {
+				found = true;
+				return visit.BREAK;
+			}
+		},
+	});
+	return found;
 }

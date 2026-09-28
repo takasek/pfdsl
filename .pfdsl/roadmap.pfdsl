@@ -77,6 +77,46 @@ artifact:
     description: "#482 コネクタ編集 / #483 Preview UI / #484 定義挿入を含む次期 Marketplace リリース"
     status: todo
     criteria: "npx @vscode/vsce show takasek.pfdsl --json の versions に packages/vscode-extension/package.json の version が含まれ、その版でコネクタ編集・Preview 生成 UI・定義挿入が動作する"
+  rename_cli:
+    label: "id 改名 CLI と group 一括再割当ての案内 (#1218)"
+    description: "artifact / process / group の id を改名するトップレベルの rename の新設と、既存の multi-id meta set による group 一括再割当てを pfdsl スキルで案内すること。設計選択と決定変更は #1218 のコメントが一次情報"
+    status: done
+    criteria: "pfdsl rename <file> <old> <new> --write が artifact / process の宣言・body の edge・revises: / parts: / boundary: の参照と、group の宣言キー・parent:・group: を1回で書き換え、拒否条件が packages/cli/src/index.test.ts のテストで検証され、pfdsl スキル本文が meta set による group 一括再割当てと rename を案内している"
+  cli_release_rename:
+    label: "CLIリリース: id 改名"
+    description: "#1218 の rename と pfdsl スキルの案内を含む npm CLI と、同じ release tag から配布する plugin 資産"
+    status: todo
+    criteria: "npm view @pfdsl/cli versions に rename を含む版が含まれ、その版を固定して取得した CLI で pfdsl rename が動作する"
+  group_delete_cli:
+    label: "group を削除できる delete (#1278)"
+    description: "delete が group id を受け付け、宣言と所属ノード・子 group からの参照を扱うこと。扱いの設計は #1278 で決める"
+    status: todo
+    criteria: "pfdsl delete <file> <group-id> --write が group の宣言を削除し、所属ノードの group: と子 group の parent: を #1278 で決めた規則どおりに扱うことが packages/cli/src/index.test.ts のテストで検証されている"
+  group_node_clash_diagnostic:
+    label: "group と node の同名を報告する診断 (#1291)"
+    description: "1ファイル内で group と artifact / process が同じ id を持つことを invalid として、種別を正しく名指して報告する診断。spec §2.8.1 と §15 への規定を含む"
+    status: todo
+    criteria: "group と artifact / process が同じ id を持つファイルに対し、check が種別を名指すエラーを報告し、docs/spec/spec.md に規定があり、packages/core のテストで検証されている"
+  cli_release_group_node_clash:
+    label: "CLIリリース: group と node の同名の診断"
+    description: "#1291 の診断を含む npm CLI と、同じ release tag から配布する plugin 資産"
+    status: todo
+    criteria: "npm view @pfdsl/cli versions に同名の診断を含む版が含まれ、その版を固定して取得した CLI の check が group と node の同名をエラーとして報告する"
+  meta_set_extension_fields:
+    label: "拡張フィールドを更新できる meta set (#1305)"
+    description: "既にある未知フィールドの更新を許し、新しい未知フィールドの追加は明示的なフラグで許す meta set。監査の stale_updated_at に修正コマンドを表示する"
+    status: todo
+    criteria: "pfdsl meta set が既存の updated_at を更新でき、フラグなしの新しい未知フィールドは拒否し、フラグ付きなら追加することが packages/cli/src/index.test.ts のテストで検証され、audit-issues-flow.mjs の stale_updated_at の出力に meta set のコマンドが含まれる"
+  cli_release_meta_set_extension:
+    label: "CLIリリース: 拡張フィールドの meta set"
+    description: "#1305 の meta set を含む npm CLI と、同じ release tag から配布する plugin 資産"
+    status: todo
+    criteria: "npm view @pfdsl/cli versions に #1305 を含む版が含まれ、その版を固定して取得した CLI の meta set が既存の updated_at を更新できる"
+  cli_release_group_delete:
+    label: "CLIリリース: group 削除"
+    description: "#1278 の group 削除を含む npm CLI と、同じ release tag から配布する plugin 資産"
+    status: todo
+    criteria: "npm view @pfdsl/cli versions に group 削除を含む版が含まれ、その版を固定して取得した CLI で pfdsl delete <file> <group-id> が group を削除する"
   node_definition_creation:
     label: プレビューと CLI から作れるノード定義
     description: "未定義ノードから共通 core 処理を使って frontmatter 定義を挿入する機能。要件は issue #1282"
@@ -155,10 +195,34 @@ process:
     updated_at: 2026-07-18T00:33:46Z
   publish_ext_editing:
     label: extension 編集支援リリース
+  i1218_add_rename:
+    label: id 改名 CLI の追加
+    location: https://github.com/takasek/pfdsl/issues/1218
+    updated_at: 2026-09-28T08:56:39Z
+  publish_cli_rename:
+    label: CLI id 改名公開
+  i1278_add_group_delete:
+    label: group 削除の追加
+    location: https://github.com/takasek/pfdsl/issues/1278
+    updated_at: 2026-09-26T17:36:28Z
+  publish_cli_group_delete:
+    label: CLI group 削除公開
+  i1305_allow_extension_fields:
+    label: meta set で拡張フィールドを更新できるようにする
+    location: https://github.com/takasek/pfdsl/issues/1305
+    updated_at: 2026-09-28T08:04:04Z
+  publish_cli_meta_set_extension:
+    label: CLI 拡張フィールド更新公開
+  i1291_report_group_node_clash:
+    label: group と node の同名の診断を追加する
+    location: https://github.com/takasek/pfdsl/issues/1291
+    updated_at: 2026-09-27T10:23:04Z
+  publish_cli_group_node_clash:
+    label: CLI 同名診断公開
   i1282_create_node_definition:
     label: ノード定義作成操作を実装する
     location: https://github.com/takasek/pfdsl/issues/1282
-    updated_at: 2026-09-26T18:14:16Z
+    updated_at: 2026-09-28T08:04:13Z
   i1283_add_node_location_cycle:
     label: 定義と本文中のノード位置の巡回を実装する
     location: https://github.com/takasek/pfdsl/issues/1283
@@ -219,6 +283,17 @@ editor_connector >> i483_implement_preview_connector -> preview_connector
 
 [def_insertion, editor_connector, preview_connector] >> publish_ext_editing -> ext_editing_release
 
+toolchain >> i1218_add_rename -> rename_cli
+rename_cli >> publish_cli_rename -> cli_release_rename
+
+toolchain >> i1278_add_group_delete -> group_delete_cli
+group_delete_cli >> publish_cli_group_delete -> cli_release_group_delete
+
+toolchain >> i1305_allow_extension_fields -> meta_set_extension_fields
+meta_set_extension_fields >> publish_cli_meta_set_extension -> cli_release_meta_set_extension
+
+toolchain >> i1291_report_group_node_clash -> group_node_clash_diagnostic
+group_node_clash_diagnostic >> publish_cli_group_node_clash -> cli_release_group_node_clash
 def_insertion >> i1282_create_node_definition -> node_definition_creation
 
 toolchain >> i1283_add_node_location_cycle -> node_location_cycle

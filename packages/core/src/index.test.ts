@@ -6,6 +6,7 @@ import { parseFrontmatterCst } from "./frontmatter-cst.js";
 import {
 	analyze,
 	format,
+	isUnreadableError,
 	normalizeDocument,
 	parse,
 	resolveMeta,
@@ -13,6 +14,7 @@ import {
 } from "./index.js";
 import { lex } from "./lexer.js";
 import { parseTokens } from "./parser.js";
+import { zeroRange } from "./position.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const samplePath = resolve(__dirname, "__fixtures__/pipeline-scale.pfdsl");
@@ -478,5 +480,24 @@ describe("public API", () => {
 		it("returns undefined when fm is null", () => {
 			expect(resolveMeta(null, "artifact", "art1")).toBeUndefined();
 		});
+	});
+});
+
+describe("isUnreadableError", () => {
+	it.each([
+		["FM004", true],
+		["L001", true],
+		["P001", true],
+		["V007", false],
+		["N001", false],
+	])("%s error -> %s", (code, expected) => {
+		expect(
+			isUnreadableError({
+				severity: "error",
+				code,
+				message: "",
+				range: zeroRange(),
+			}),
+		).toBe(expected);
 	});
 });

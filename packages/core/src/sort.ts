@@ -1,6 +1,7 @@
 import { isMap, isScalar, type Pair, type YAMLMap } from "yaml";
 import { compareIds } from "./compare.js";
 import {
+	pairId,
 	parseFrontmatterCst,
 	renderFrontmatterCst,
 } from "./frontmatter-cst.js";
@@ -18,11 +19,6 @@ export interface SortResult {
 	output: string;
 	changed: boolean;
 	diagnostics: Diagnostic[];
-}
-
-/** The node id a `Pair`'s key represents, or "" when the key isn't a plain scalar. */
-function pairId(pair: Pair): string {
-	return isScalar(pair.key) ? String(pair.key.value) : "";
 }
 
 /**
@@ -117,7 +113,7 @@ export function sort(source: string, opts: SortOptions): SortResult {
 		const indexed = map.items.map((item, idx) => ({
 			item,
 			idx,
-			id: pairId(item as Pair),
+			id: pairId(item as Pair) ?? "",
 		}));
 
 		indexed.sort((a, b) => {

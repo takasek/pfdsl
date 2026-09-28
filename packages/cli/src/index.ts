@@ -4,16 +4,15 @@ import { parseArgs as parseNodeArgs } from "node:util";
 import {
 	analyze,
 	auditGraph,
+	buildPresentationChain,
 	type ConsumerAsymmetryHint,
 	compareIds,
 	computeDependsOn,
 	computeImpact,
 	computeNeighbors,
-	computeOpenInputs,
 	computeOrphans,
 	computePaths,
 	computeStats,
-	computeTerminals,
 	diffGraphs as coreDiffGraphs,
 	DIAGNOSTIC_REGISTRY,
 	type Diagnostic,
@@ -30,22 +29,22 @@ import {
 	isRoadmapType,
 	isUrlLike,
 	loadExtendsChain,
-	loadSubflowGraph,
 	locateNode,
 	type NodeKind,
 	type PfdType,
 	parseIdList,
 	reindex,
+	rename,
 	resolveEffectiveFrontmatter,
 	resolveLocationFsPath,
-	resolveRefPath,
+	resolvePresentation,
 	type SortKey,
 	STATUS_VALUES,
 	setFrontmatterField,
 	sort,
 	sortEdges,
+	subflowBoundaryDiagnostics,
 	validatePresetKeys,
-	validateSubflowBoundary,
 	wrapPresetSource,
 } from "@pfdsl/core";
 import { type BinaryFormat, svgToBinary } from "@pfdsl/graphviz-exporter";
@@ -255,6 +254,11 @@ const DELETE_OPTIONS = {
 	json: BOOLEAN_OPTION,
 	"no-color": BOOLEAN_OPTION,
 };
+const RENAME_OPTIONS = {
+	write: BOOLEAN_OPTION,
+	json: BOOLEAN_OPTION,
+	"no-color": BOOLEAN_OPTION,
+};
 const RENDER_OPTIONS = {
 	format: { type: "string", multiple: true, placeholder: "dot|svg|pdf|png" },
 	"no-color": BOOLEAN_OPTION,
@@ -413,6 +417,27 @@ function failIfErrors(
 }
 
 /**
+ * An exit-1 refusal: `message`, preceded by the error diagnostics that
+ * caused it when there are any. With --json: `{ ok: false, error }`, plus
+ * `diagnostics` when given.
+ */
+function refuseWith(
+	message: string,
+	file: string,
+	errs: Diagnostic[] | undefined,
+	json = false,
+	color = false,
+): CommandResult {
+	if (json) {
+		return failJson(
+			errs ? { error: message, diagnostics: errs } : { error: message },
+		);
+	}
+	const diagLines = errs ? diagText(errs, file, color) : "";
+	return fail(`${diagLines}${message}\n`);
+}
+
+/**
  * Refuse an operation that only a roadmap may take part in (§15.14). `subject`
  * names what is being refused and opens the message. An omitted `type:` reads
  * as roadmap, so only an explicit other kind is turned away — the callers all
@@ -476,39 +501,13 @@ export function runCheck(file: string, opts: CheckOptions = {}): CommandResult {
 	const multiDiags: (Diagnostic & { file?: string })[] = [];
 
 	// --- Subflow checks ---
-	const subflowGraph = loadSubflowGraph(absFile, fileLoader);
+	const subflowGraph = subflowBoundaryDiagnostics(
+		absFile,
+		edges,
+		frontmatter,
+		fileLoader,
+	);
 	multiDiags.push(...subflowGraph.diagnostics);
-
-	for (const [pid, pmeta] of Object.entries(frontmatter?.process ?? {})) {
-		if (typeof pmeta.subflow !== "string") continue;
-		const resolved = resolveRefPath(absFile, pmeta.subflow);
-		if (!resolved.ok) continue; // already in subflowGraph.diagnostics
-		const childDoc = subflowGraph.docs.get(resolved.path);
-		if (!childDoc) continue; // missing file — already in diagnostics
-		const childEdges = childDoc.edges;
-		const childOpenInputs = computeOpenInputs(childEdges);
-		const childTerminals = computeTerminals(childEdges);
-		const parentNormalInputs = new Set(
-			edges
-				.filter((e) => e.kind === "input" && e.process === pid)
-				.map((e) => e.artifact),
-		);
-		const parentOutputs = new Set(
-			edges
-				.filter((e) => e.kind === "output" && e.process === pid)
-				.map((e) => e.artifact),
-		);
-		multiDiags.push(
-			...validateSubflowBoundary({
-				processId: pid,
-				parentNormalInputs,
-				parentOutputs,
-				boundaryMap: (pmeta.boundary as Record<string, string>) ?? {},
-				childOpenInputs,
-				childTerminals,
-			}),
-		);
-	}
 
 	// --- Extends checks ---
 	const extendsChain = loadExtendsChain(absFile, fileLoader);
@@ -1373,10 +1372,13 @@ export function runMetaSet(
 		// shares the `{ ok: false, diagnostics: [...] }` failure contract with
 		// every other diagnostic-emitting command (#508). The `error` line
 		// carries what diagnostics cannot: that nothing was written.
-		const errs = resulting.filter((d) => d.severity === "error");
-		const message = `meta set: refusing to write ${file}: the result would have errors`;
-		if (opts.json) return failJson({ error: message, diagnostics: errs });
-		return fail(`${diagText(errs, file, opts.color)}${message}\n`);
+		return refuseWith(
+			`meta set: refusing to write ${file}: the result would have errors`,
+			file,
+			resulting.filter((d) => d.severity === "error"),
+			opts.json,
+			opts.color,
+		);
 	}
 	writeFileSync(file, newSrc, "utf-8");
 
@@ -1399,6 +1401,161 @@ export function runMetaSet(
 		return ok(`newly ready: ${newlyReady.join(", ")}\n`, warnText);
 	}
 	return ok("", warnText);
+}
+
+export interface RenameOptions {
+	write?: boolean;
+	json?: boolean;
+	color?: boolean;
+}
+
+/**
+ * Rename one of this file's own ids — artifact, process, or group — and
+ * every reference to it in this file, in one atomic in-place rewrite. It
+ * rewrites body edges, so it is a top-level whole-file command beside
+ * `delete`, not a `meta` subcommand (ADR-0030).
+ *
+ * Core `rename` resolves `<old>`'s kind and refuses what this one file
+ * shows. This command adds what needs other files, for a file on disk: a
+ * group `<old>` or `<new>` an `extends:` preset declares (§2.9.4), and the
+ * subflow-boundary check `check` runs. The result is re-validated before it
+ * is emitted or written; a result with any error is refused, including an
+ * error the input already had, since a rename does not cure it.
+ *
+ * A file that references this one from outside — a parent's
+ * `subflow:`/`boundary:`, another file's `extends:` — is never rewritten.
+ */
+export function runRename(
+	file: string,
+	oldId: string,
+	newId: string,
+	opts: RenameOptions = {},
+): CommandResult {
+	if (file === "-" && opts.write) {
+		return fail("--write cannot be used with stdin (-)\n", 2);
+	}
+	if (oldId === newId) {
+		return fail(`rename: '${oldId}' and '${newId}' must differ\n`, 2);
+	}
+
+	const source = readSource(file);
+	if (isCommandResult(source)) return source;
+
+	const refuse = (message: string, errs?: Diagnostic[]): CommandResult =>
+		refuseWith(message, file, errs, opts.json, opts.color);
+
+	const analysis = analyze(source);
+	const result = rename(source, oldId, newId, { analysis });
+	if (!result.ok && result.reason === "unreadable") {
+		if (opts.json) return failJson({ diagnostics: result.diagnostics });
+		return fail(diagText(result.diagnostics, file, opts.color));
+	}
+	if (!result.ok && result.reason === "unsupportedYaml") {
+		return refuse(
+			`rename: YAML anchors, aliases and merge keys (<<) are not supported by rename, and the frontmatter of ${file} uses one; edit it by hand or expand them first`,
+		);
+	}
+
+	// Groups declared by the extends: presets, for a file on disk (a relative
+	// ref cannot be resolved from stdin, the same reason runCheck skips its
+	// multi-file checks there).
+	const absFile = file === "-" ? null : resolve(file);
+	let presetGroup: Record<string, unknown> | undefined;
+	if (absFile !== null && analysis.frontmatter?.extends !== undefined) {
+		// The entry file is already read and analyzed; only presets are loaded.
+		const { docs, diagnostics: extendsDiagnostics } = loadExtendsChain(
+			absFile,
+			(p) => (p === absFile ? analysis : fileLoader(p)),
+		);
+		// check's V028 on each loaded preset, which loadExtendsChain leaves out.
+		const presetKeyDiagnostics = [...docs]
+			.filter(([path]) => path !== absFile)
+			.flatMap(([path, doc]) => validatePresetKeys(path, doc.frontmatter));
+		const failedExtends = failIfErrors(
+			[...extendsDiagnostics, ...presetKeyDiagnostics],
+			file,
+			opts.json,
+			opts.color,
+		);
+		if (failedExtends) return failedExtends;
+		const presets = buildPresentationChain(absFile, docs).filter(
+			(c) => c.path !== absFile,
+		);
+		presetGroup = resolvePresentation(presets).group;
+	}
+	const presetDeclares = (id: string): boolean =>
+		presetGroup !== undefined && Object.hasOwn(presetGroup, id);
+	const article = (kind: NodeKind): string =>
+		kind === "artifact" ? "an" : "a";
+
+	if (!result.ok && result.reason === "ambiguous") {
+		return refuse(
+			`rename: '${oldId}' is declared twice in ${file} — as a group and as ${article(result.clashingKind)} ${result.clashingKind}; this is invalid and cannot be renamed unambiguously`,
+		);
+	}
+	if (!result.ok && result.reason === "notFound") {
+		if (!presetDeclares(oldId)) {
+			return idsNotFoundError(file, [oldId], opts.json);
+		}
+		return refuse(
+			`rename: '${oldId}' is not declared in ${file} — it comes from a preset and must be renamed there`,
+		);
+	}
+	// A local group entry that a preset also defines only partially
+	// overrides it, so it is not the declaration to rename.
+	if (result.kind === "group" && presetDeclares(oldId)) {
+		return refuse(
+			`rename: '${oldId}' is also defined by a preset extended from ${file}; the local entry is a partial override and cannot be renamed here`,
+		);
+	}
+	if (!result.ok) {
+		return refuse(
+			`rename: '${newId}' already exists as ${article(result.existingKind)} ${result.existingKind} id in ${file}`,
+		);
+	}
+	if (presetDeclares(newId)) {
+		return refuse(`rename: '${newId}' already exists as a group id in ${file}`);
+	}
+
+	// The gate on the write, same contract as runMetaSet: any error on the
+	// result refuses, whether the rewrite introduced it or the input already
+	// had it. For a file on disk this includes the subflow-boundary check.
+	const { output } = result;
+	const resultAnalysis = analyze(output);
+	const resultDiags = [...resultAnalysis.diagnostics];
+	if (absFile !== null) {
+		resultDiags.push(
+			...subflowBoundaryDiagnostics(
+				absFile,
+				resultAnalysis.edges,
+				resultAnalysis.frontmatter,
+				// The entry is the rewritten result, not the file on disk.
+				(p) => (p === absFile ? resultAnalysis : fileLoader(p)),
+			).diagnostics,
+		);
+	}
+	if (hasErrors(resultDiags)) {
+		const errs = resultDiags.filter((d) => d.severity === "error");
+		const message = `rename: refusing to write ${file}: the result would have errors (an error already in the input also blocks the rename)`;
+		return refuse(message, errs);
+	}
+
+	if (opts.write) writeFileSync(file, output, "utf-8");
+
+	if (opts.json) {
+		const payload = {
+			ok: true,
+			kind: result.kind,
+			from: oldId,
+			to: newId,
+			...(result.kind === "group"
+				? { members: result.members, children: result.children }
+				: {}),
+		};
+		return ok(`${JSON.stringify(payload)}\n`);
+	}
+	if (opts.write) return ok("");
+	return ok(output);
 }
 
 export interface GetOptions {
@@ -2879,6 +3036,75 @@ Exit codes:
   2  invalid usage (missing arguments, or --write combined with stdin)
 `;
 
+const HELP_RENAME = `${helpUsage("rename", "<file|-> <old> <new>", RENAME_OPTIONS)}
+
+Rename an artifact, process, or group id and every reference to it in this
+file, in a single atomic pass. Use - to read from stdin (--write not
+allowed with stdin).
+
+What is rewritten depends on <old>'s kind:
+  - artifact/process: the frontmatter declaration key; every body edge
+    occurrence (chains, sets, feedback >>?, comments and continuation lines
+    untouched); other artifacts' revises:/parts: references; a subflow
+    process's boundary: KEYS naming it (boundary: VALUES are the child
+    file's own ids and are never touched). If <old> is a normal input/output
+    of a subflow process whose boundary: does not already map it, a
+    boundary: { <new>: <old> } entry is added so the child file's id set
+    still matches by identity (spec §2.9.3) — the child file itself is
+    never read or written.
+  - group: the group's own declaration key, every other group's parent:
+    reference, and every artifact's/process's group: field. The body never
+    references groups (spec §2.8), so only the frontmatter changes.
+
+<old> must be this file's own id: a group only if it has a local group:
+declaration (own-property, not the derived node-kind table — an id
+declared as both a group and an artifact/process is invalid and refused,
+not disambiguated by a --kind flag). <new> must not already exist as an
+artifact, process, or group id — locally, or as a group inherited via
+extends: (§2.9.4). A group only partially overridden from a preset (also
+defined there) is refused: rename it at the preset instead.
+
+A frontmatter using YAML anchors, aliases or merge keys (<<) anywhere is
+refused: a rewrite through a shared node would miss a reference or change
+every place that shares it. Edit such a file by hand, or expand them first.
+
+This is a one-file command: a parent file's subflow:/boundary: naming an id
+in this file, or another file's extends: naming this file as a preset, is
+invisible here and is never rewritten — check that file separately.
+
+After the rewrite, the result is validated the same way check validates
+this file (including the subflow-boundary check, for a file on disk); a
+result with any error is refused, not printed or written. That includes an
+error the input already had: fix it first, then rename.
+
+With -, the extends: and subflow checks are skipped because relative paths
+cannot be resolved without a file on disk, so a preview from stdin can
+succeed where the same file path is refused.
+
+Layout: the body keeps its bytes outside the rewritten id tokens, so set
+members keep their order. The frontmatter is re-rendered through the YAML
+CST like meta set (comments and quoting kept, flow spacing normalized). A
+file kept formatted may need pfdsl fmt --write afterwards.
+
+  --write     rewrite the file in place (cannot be used with -)
+  --json      emit { ok: true, kind, from, to } (kind: "artifact" | "process"
+              | "group"; a group rename also reports members: string[] and
+              children: string[]) instead of the rewritten document — same
+              shape whether or not --write is also given
+              on refusal: { ok: false, diagnostics } / { ok: false, error }
+              / { ok: false, missing: [<old>] } when <old> is not found
+  --no-color  disable ANSI color codes (also: NO_COLOR env var)
+
+Exit codes:
+  0  success
+  1  <old> not found, ambiguous (both a group and an artifact/process),
+     <new> already exists, YAML anchors/aliases/merge keys in the
+     frontmatter, an extends: preset conflict, a parse/validation error in
+     the input, or the rewrite was refused
+  2  invalid usage (missing/extra argument, stdin with --write, or <old>
+     equal to <new>)
+`;
+
 const HELP_REINDEX = `${helpUsage(
 	"meta reindex",
 	"<file|->",
@@ -4198,6 +4424,28 @@ export const TOP_LEVEL_COMMANDS: readonly CommandEntry[] = [
 			const [f, idList] = positional;
 			if (!f || !idList) return fail(HELP_DELETE, 2);
 			return runDelete(f, idList, {
+				write: flags.write === true,
+				json: flags.json === true,
+				color: resolveColor(flags),
+			});
+		},
+	},
+	{
+		name: "rename",
+		synopsis: "rename <file|-> <old> <new> [--write] [--json] [--no-color]",
+		description: [
+			"Rename an artifact, process, or group id and every reference to it (- = stdin)",
+		],
+		help: HELP_RENAME,
+		options: RENAME_OPTIONS,
+		run: (positional, flags) => {
+			const [f, oldId, newId, ...extra] = positional;
+			// `""` is a valid quoted id, so only an absent argument is missing.
+			if (!f || oldId === undefined || newId === undefined) {
+				return fail(HELP_RENAME, 2);
+			}
+			if (extra.length > 0) return fail(HELP_RENAME, 2);
+			return runRename(f, oldId, newId, {
 				write: flags.write === true,
 				json: flags.json === true,
 				color: resolveColor(flags),

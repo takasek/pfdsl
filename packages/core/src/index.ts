@@ -183,6 +183,8 @@ export type {
 	ReindexResult,
 } from "./reindex.js";
 export { reindex } from "./reindex.js";
+export type { RenameRefusal, RenameResult } from "./rename.js";
+export { rename } from "./rename.js";
 
 export type {
 	SortKey,
@@ -205,6 +207,16 @@ export {
 
 export function hasErrors(diags: readonly Diagnostic[]): boolean {
 	return diags.some((d) => d.severity === "error");
+}
+
+/**
+ * True for an error reporting a document that could not be read —
+ * frontmatter (FM), lexer (L), or parser (P) — so there is no trustworthy
+ * structure to rewrite. A validation (V) or normalizer (N) error is not one:
+ * the document was read, and its content is what is wrong.
+ */
+export function isUnreadableError(d: Diagnostic): boolean {
+	return d.severity === "error" && /^(?:FM|L|P)\d+$/.test(String(d.code));
 }
 
 export { resolveMeta } from "./meta.js";
@@ -268,9 +280,11 @@ export {
 	isUrlLike,
 	loadExtendsChain,
 	loadSubflowGraph,
+	parentBoundaryArtifacts,
 	resolveEffectiveFrontmatter,
 	resolvePresentation,
 	resolveRefPath,
+	subflowBoundaryDiagnostics,
 	validatePresetKeys,
 	validateSubflowBoundary,
 	wrapPresetSource,

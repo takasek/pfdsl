@@ -1,5 +1,9 @@
 import { isMap, isScalar, type Pair } from "yaml";
-import { parseFrontmatterCst } from "./frontmatter-cst.js";
+import {
+	declarationPair,
+	pairId,
+	parseFrontmatterCst,
+} from "./frontmatter-cst.js";
 import type {
 	ArtifactExpr,
 	Document,
@@ -21,32 +25,6 @@ export interface LocateResult {
 	 * name, in request order. Empty when no fields were requested.
 	 */
 	fieldLines: Record<string, number | null>;
-}
-
-/** The node id a `Pair`'s key represents, or null when the key isn't a plain scalar. */
-function pairId(pair: Pair): string | null {
-	return isScalar(pair.key) ? String(pair.key.value) : null;
-}
-
-/**
- * `id`'s declaration `Pair` within the frontmatter's yaml CST (as parsed by
- * `parseFrontmatterCst`), looked up in the one section its `kind` names — the
- * same kind-scoped dispatch `setFrontmatterField` uses on the write path.
- * Null when `id` has no frontmatter entry. Returns the whole `Pair` (not
- * just the key's offset) so callers can also reach into its value map for
- * field key offsets.
- */
-function declarationPair(
-	doc: ReturnType<typeof parseFrontmatterCst>["doc"],
-	id: string,
-	kind: NodeKind,
-): Pair | null {
-	const section = doc.get(kind, true);
-	if (!isMap(section)) return null;
-	for (const item of section.items) {
-		if (pairId(item) === id) return item;
-	}
-	return null;
 }
 
 /**
