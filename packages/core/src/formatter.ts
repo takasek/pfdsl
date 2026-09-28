@@ -7,13 +7,8 @@ export type BodySegment =
 
 const BARE_ID_RE = /^[\p{L}\p{N}_-]+$/u;
 
-/**
- * `id`'s spelling in the body: bare when it is a valid bare id token,
- * `"..."`-quoted otherwise. An id starting with `---` is quoted too: bare at
- * the start of a document, that line would be read as a frontmatter fence.
- */
 export function formatId(id: string): string {
-	if (BARE_ID_RE.test(id) && !id.startsWith("---")) return id;
+	if (BARE_ID_RE.test(id)) return id;
 	return quoteId(id);
 }
 

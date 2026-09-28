@@ -38,20 +38,6 @@ a >> p -> b
 		});
 	});
 
-	it("renames onto an id starting with '---', quoting it so the result re-reads", () => {
-		const r = rename("a >> p -> b\n", "a", "---");
-		expect(r).toEqual({
-			ok: true,
-			output: '"---" >> p -> b\n',
-			kind: "artifact",
-		});
-		const reread = analyze(r.ok ? r.output : "");
-		expect(reread.diagnostics.filter((d) => d.severity === "error")).toEqual(
-			[],
-		);
-		expect(reread.edges.map((e) => e.artifact)).toContain("---");
-	});
-
 	it("uses a precomputed analysis of the same source", () => {
 		const src = "a >> p -> b\n";
 		expect(rename(src, "b", "bx", { analysis: analyze(src) })).toEqual(

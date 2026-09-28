@@ -924,16 +924,6 @@ processed >> transform -> done
 		);
 	});
 
-	// Bare at the start of the document, `---` would open a frontmatter fence.
-	it("renames onto '---', quoting it so the result is not read as a fence", async () => {
-		const r = await run(
-			["rename", "-", "--", "a", "---"],
-			withStdin("a >> p -> b\n"),
-		);
-		expect(r.exitCode).toBe(0);
-		expect(r.stdout).toBe('"---" >> p -> b\n');
-	});
-
 	// `""` is a valid quoted id, so an empty argument names it rather than
 	// being a missing one.
 	it("renames the empty id away", async () => {
