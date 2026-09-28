@@ -38,7 +38,29 @@ test("manual dispatch exposes regeneration inputs", () => {
 test("App credentials are confined to a separate publish job", () => {
 	const renderJob = workflow.jobs.render;
 	const publishJob = workflow.jobs.publish;
+	const externalPublishJob = workflow.jobs["publish-external"];
 	assert.equal(publishJob.needs, "render");
+	assert.match(
+		publishJob.environment.name,
+		/inputs\.publish-environment \|\| 'pfdsl-svg-publish'/,
+	);
+	assert.equal(
+		workflow.on.workflow_call.inputs["publish-environment"].default,
+		"none",
+	);
+	assert.equal(
+		workflow.on.workflow_call.secrets["app-private-key"].required,
+		false,
+	);
+	assert.equal(externalPublishJob.environment, undefined);
+	assert.deepEqual(externalPublishJob.steps, publishJob.steps);
+	const tokenStep = publishJob.steps.find(
+		(step) => step.name === "Create short-lived App token",
+	);
+	assert.match(
+		tokenStep.with["private-key"],
+		/inputs\.publish-environment == 'none' && secrets\.app-private-key \|\| inputs\.publish-environment != 'none' && secrets\.PFD_GENERATOR_APP_PRIVATE_KEY/,
+	);
 	assert.equal(
 		renderJob.steps.some((step) =>
 			step.uses?.includes("create-github-app-token"),

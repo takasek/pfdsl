@@ -10,8 +10,14 @@ PR mode also requires Pull requests read and write access.
 Direct push mode requires that App to bypass the pull request requirement on the target branch.
 Keep the App installation limited to the repositories that need this workflow.
 
-Store the App's private key in each caller repository as an Actions secret, and pass its client ID as an input.
-For this repository's built-in push trigger, use the `PFD_GENERATOR_APP_PRIVATE_KEY` secret and `PFD_GENERATOR_APP_CLIENT_ID` variable.
+For this repository, create a `pfdsl-svg-publish` Environment with **Selected branches and tags** limited to `main`.
+Store `PFD_GENERATOR_APP_PRIVATE_KEY` as an Environment secret and keep `PFD_GENERATOR_APP_CLIENT_ID` as a repository variable.
+The built-in push and manual triggers use that Environment for the publish job.
+After a successful App-authenticated run on `main`, remove the old repository secret with the same name.
+
+Other repositories can store the App private key as an Actions secret and pass it to the reusable workflow with `app-private-key`.
+The reusable workflow's default `publish-environment: none` uses a publish job with no Environment and requires the caller-provided `app-private-key` secret.
+Callers that want an Environment can set `publish-environment` to its name and configure that Environment's branch policy and `PFD_GENERATOR_APP_PRIVATE_KEY` secret; `app-private-key` is unnecessary in this case.
 
 For another repository, add a caller workflow such as the following.
 The caller's `branches` and `paths` filters control when the workflow starts; the `target-branch` and `paths` inputs control which branch and PFD files it processes.
@@ -38,6 +44,7 @@ jobs:
       paths: |
         .pfdsl/**/*.pfdsl
         docs/process/**/*.pfdsl
+      publish-environment: none
     secrets:
       app-private-key: ${{ secrets.PFD_GENERATOR_APP_PRIVATE_KEY }}
 ```
@@ -45,6 +52,7 @@ jobs:
 Pin the `uses` reference to a reviewed commit or release tag for stable behavior.
 The reusable workflow checks out the caller's target branch, builds the renderer from `takasek/pfdsl` at the workflow commit by default, renders the selected `.pfdsl` files, and commits only changed sibling SVG files.
 Rendering and publishing run in separate jobs; only changed SVG files cross between them as an artifact.
+The internal publish job uses the protected Environment, while the external caller path has no Environment unless `publish-environment` is set.
 When every rendered SVG is identical to its existing file, it skips App authentication, commit, and PR creation.
 Its optional `cli-ref` input selects a different renderer commit SHA in PR mode only.
 The `mode` input accepts `pr` or `direct` and defaults to `direct`.
