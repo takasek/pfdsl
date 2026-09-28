@@ -6,7 +6,7 @@ name: queue Dependabot Actions updates
 # this unprivileged waiting job. The workflow_run consumer uses the App secret.
 on:
   pull_request_target:
-    types: [opened, reopened, labeled]
+    types: [opened]
     branches: [main]
 
 permissions:
@@ -20,7 +20,7 @@ jobs:
       vars.DEPENDABOT_BATCH_CLIENT_ID != '' &&
       github.event.pull_request.user.login == 'dependabot[bot]' &&
       github.event.pull_request.head.repo.full_name == github.repository &&
-      contains(github.event.pull_request.labels.*.name, 'github-actions')
+      startsWith(github.event.pull_request.head.ref, 'dependabot/github_actions/')
     runs-on: ubuntu-latest
     timeout-minutes: 20
     concurrency:

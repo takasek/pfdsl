@@ -163,11 +163,11 @@ export function batchEntries(body) {
 }
 
 export function isOwnBatchPull(pull, repository) {
-	const entries = batchEntries(pull.body);
 	return (
 		pull.head?.repo?.full_name === repository &&
-		entries.length > 0 &&
-		pull.head?.ref === batchBranchName(entries)
+		/^automation\/dependabot-actions-[0-9]+-[0-9]+-[0-9a-f]{12}$/.test(
+			pull.head?.ref ?? "",
+		)
 	);
 }
 

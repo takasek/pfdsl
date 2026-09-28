@@ -1,6 +1,6 @@
 # Dependabot GitHub Actions の一括統合
 
-`.github/workflows/dependabot-actions-batch.yml` は、`main` 向けの Dependabot GitHub Actions PR が `github-actions` ラベル付きで作成・再開・ラベル付与されたときに起動する。後続イベントが待機ジョブを取り消すため、最後の対象イベントから15分待ってまとめる。待機ジョブの完了イベントで `.github/workflows/dependabot-actions-integrate.yml` が起動し、元の `settle` ジョブの成功を GitHub API で確認した後に Actions secret にアクセスして統合する。統合ジョブは別の排他グループで直列化し、処理中のイベントで取り消さない。待機完了直後に別の PR が届いても早取りしないよう、自動実行では作成から15分以上経った PR だけを収集する。最終 PR のマージでは起動せず、必要な場合は統合 workflow の `workflow_dispatch` で手動再収集する。
+`.github/workflows/dependabot-actions-batch.yml` は、`main` 向けの Dependabot GitHub Actions PR が作成されたときに起動する。対象は作成者と `dependabot/github_actions/` ブランチ名で判定する。後続の作成イベントが待機ジョブを取り消すため、最後の対象 PR 作成から15分待ってまとめる。待機ジョブの完了イベントで `.github/workflows/dependabot-actions-integrate.yml` が起動し、元の `settle` ジョブの成功を GitHub API で確認した後に Actions secret にアクセスして統合する。統合ジョブは別の排他グループで直列化し、処理中のイベントで取り消さない。待機完了直後に別の PR が届いても早取りしないよう、自動実行では作成から15分以上経った PR だけを収集する。再開や head 更新などの例外は統合 workflow の `workflow_dispatch` で手動再収集する。最終 PR のマージでは起動しない。
 
 `scripts/dependabot-actions-batch.mjs` は対象 PR の作成者、同一リポジトリの head、ブランチ名、base、変更ファイルを検証する。変更は workflow 内の40桁 SHA の `uses:` 行だけを受け入れる。PR のコミットをローカルの中間ブランチに統合し、生成物と pin のテスト期待値を更新してテストに通った場合だけ、中間ブランチを公開して `main` 向けの最終 PR を作る。元の Dependabot PR の base は変更せず、個別のマージ操作も行わない。最終 PR は元のコミットを保持する merge commit 方式でマージする。元 PR の head SHA がその後変わった場合は、同じ PR 番号でも次回の収集対象になる。
 

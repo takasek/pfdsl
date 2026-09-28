@@ -155,11 +155,9 @@ describe("Dependabot Actions batch selection", () => {
 
 	it("recognizes only a batch branch from this repository", () => {
 		const ref = batchBranchName([pr(10), pr(11)]);
-		const body = `batch-includes: 10@${pr(10).head.sha},11@${pr(11).head.sha}`;
 		assert.equal(
 			isOwnBatchPull(
 				{
-					body,
 					head: {
 						ref,
 						repo: { full_name: "other/pfdsl" },
@@ -172,7 +170,6 @@ describe("Dependabot Actions batch selection", () => {
 		assert.equal(
 			isOwnBatchPull(
 				{
-					body,
 					head: {
 						ref,
 						repo: { full_name: "takasek/pfdsl" },
@@ -205,7 +202,7 @@ describe("Dependabot Actions batch selection", () => {
 				},
 				"takasek/pfdsl",
 			),
-			false,
+			true,
 		);
 		assert.equal(
 			isOwnBatchPull(
@@ -346,20 +343,19 @@ describe("passive workflow trigger", () => {
 				"utf8",
 			),
 		);
-		assert.deepEqual(queue.on.pull_request_target.types, [
-			"opened",
-			"reopened",
-			"labeled",
-		]);
+		assert.deepEqual(queue.on.pull_request_target.types, ["opened"]);
+		assert.equal(queue.on.workflow_dispatch, undefined);
 		assert.equal(queue.on.schedule, undefined);
 		assert.equal(queue.jobs.settle.concurrency["cancel-in-progress"], true);
 		assert.doesNotMatch(queue.jobs.settle.if, /closed|dependabot-actions-/);
+		assert.match(queue.jobs.settle.if, /dependabot\/github_actions\//);
 		assert.equal(queue.jobs.integrate, undefined);
 		assert.doesNotMatch(queueSource, /secrets\./);
 		assert.deepEqual(integrate.on.workflow_run.workflows, [queue.name]);
 		assert.deepEqual(integrate.on.workflow_run.types, ["completed"]);
 		assert.equal(integrate.on.workflow_dispatch, null);
 		assert.match(integrate.jobs.integrate.if, /workflow_dispatch/);
+		assert.match(integrate.jobs.integrate.if, /refs\/heads\/main/);
 		assert.match(integrate.jobs.integrate.if, /conclusion == 'success'/);
 		assert.equal(
 			integrate.jobs.integrate.concurrency["cancel-in-progress"],
@@ -372,8 +368,8 @@ describe("passive workflow trigger", () => {
 		);
 		const token = steps.findIndex((step) => step.id === "app-token");
 		assert.ok(proof >= 0 && proof < token);
-		assert.equal(steps[proof].if, "github.event_name == 'workflow_run'");
 		assert.match(steps[proof].run, /conclusion == "success"/);
+		assert.equal(steps[proof].if, "github.event_name == 'workflow_run'");
 	});
 });
 
