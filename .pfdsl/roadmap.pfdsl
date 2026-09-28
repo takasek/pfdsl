@@ -195,10 +195,6 @@ process:
     updated_at: 2026-07-18T00:33:46Z
   publish_ext_editing:
     label: extension 編集支援リリース
-  i1218_add_rename:
-    label: id 改名 CLI の追加
-    location: https://github.com/takasek/pfdsl/issues/1218
-    updated_at: 2026-09-28T08:56:39Z
   publish_cli_rename:
     label: CLI id 改名公開
   i1278_add_group_delete:
@@ -283,7 +279,6 @@ editor_connector >> i483_implement_preview_connector -> preview_connector
 
 [def_insertion, editor_connector, preview_connector] >> publish_ext_editing -> ext_editing_release
 
-toolchain >> i1218_add_rename -> rename_cli
 rename_cli >> publish_cli_rename -> cli_release_rename
 
 toolchain >> i1278_add_group_delete -> group_delete_cli
