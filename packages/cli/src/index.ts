@@ -3081,6 +3081,11 @@ With -, the extends: and subflow checks are skipped because relative paths
 cannot be resolved without a file on disk, so a preview from stdin can
 succeed where the same file path is refused.
 
+Layout: the body keeps its bytes outside the rewritten id tokens, so set
+members keep their order. The frontmatter is re-rendered through the YAML
+CST like meta set (comments and quoting kept, flow spacing normalized). A
+file kept formatted may need pfdsl fmt --write afterwards.
+
   --write     rewrite the file in place (cannot be used with -)
   --json      emit { ok: true, kind, from, to } (kind: "artifact" | "process"
               | "group"; a group rename also reports members: string[] and
