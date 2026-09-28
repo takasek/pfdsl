@@ -1,0 +1,34 @@
+name: queue Dependabot Actions updates
+
+# Setup and recovery: docs/dependabot-actions-batch.md
+
+# Dependabot opens several Actions PRs in one burst. Each later event cancels
+# this unprivileged waiting job. The workflow_run consumer uses the App secret.
+on:
+  pull_request_target:
+    types: [opened, reopened, labeled, closed]
+    branches: [main]
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  settle:
+    name: settle
+    if: >-
+      vars.DEPENDABOT_BATCH_CLIENT_ID != '' &&
+      ((github.event.action == 'closed' &&
+        github.event.pull_request.merged == true &&
+        startsWith(github.event.pull_request.head.ref, 'codex/dependabot-actions-')) ||
+       (github.event.pull_request.user.login == 'dependabot[bot]' &&
+        github.event.pull_request.head.repo.full_name == github.repository &&
+        contains(github.event.pull_request.labels.*.name, 'github-actions')))
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    concurrency:
+      group: dependabot-actions-settle
+      cancel-in-progress: true
+    steps:
+      - name: Wait for the last PR in the burst
+        run: sleep 900
