@@ -1,11 +1,13 @@
 import { compareIds } from "./compare.js";
+import { ID_PATTERN } from "./lexer.js";
 import type { NormalizedEdge } from "./types/index.js";
 
 export type BodySegment =
 	| { kind: "edges"; text: string }
 	| { kind: "comment"; text: string };
 
-const BARE_ID_RE = /^[\p{L}\p{N}_-]+$/u;
+// A bare spelling is one the lexer reads back as the same single id.
+const BARE_ID_RE = new RegExp(`^(?:${ID_PATTERN.source})$`, "u");
 
 export function formatId(id: string): string {
 	if (BARE_ID_RE.test(id)) return id;

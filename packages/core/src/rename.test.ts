@@ -167,3 +167,15 @@ describe("rename refuses frontmatter with YAML anchors, aliases or merge keys", 
 		});
 	});
 });
+
+describe("rename onto an id that cannot be bare", () => {
+	it.each(["---", "-x"])("quotes %s so the result re-reads", (newId) => {
+		const r = rename("a >> p -> b\n", "a", newId);
+		expect(r.ok).toBe(true);
+		if (!r.ok) return;
+		expect(r.output).toBe(`${JSON.stringify(newId)} >> p -> b\n`);
+		const after = analyze(r.output);
+		expect(after.diagnostics.filter((d) => d.severity === "error")).toEqual([]);
+		expect(after.edges.map((e) => e.artifact)).toContain(newId);
+	});
+});
