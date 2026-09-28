@@ -150,6 +150,7 @@ pfdsl meta set <file> <id1,id2,...> group <group-id>   # reassign many nodes in 
 
 `rename` rewrites the declaration and every reference in the file, including body edges for an artifact or process, so prefer it over search-and-replace.
 Without `--write` it prints the rewritten file, which is a preview.
+It keeps the body's layout, including the order of set members, so run `pfdsl fmt --write` afterwards on a file you keep formatted.
 It edits only the given file: a parent that points to it through `subflow:`, or a file that extends it as a preset, must be checked separately, and `pfdsl rename --help` lists what it rewrites and refuses.
 It leaves `label:` as it was, so update a label that names the old id with `meta set <file> <new-id> label <text>`.
 `meta set` takes comma-separated ids and writes all of them or none, so regrouping a batch of nodes is one call, not one edit per node.
