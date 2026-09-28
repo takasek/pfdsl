@@ -1,6 +1,6 @@
 <!-- DO NOT EDIT — snapshot distributed with pfdsl skill. Authoritative source: https://github.com/takasek/pfdsl/blob/main/docs/spec/spec.md -->
 
-# PFDSL仕様書 v0.0.24
+# PFDSL仕様書 v0.0.25
 
 ## 1. 目的
 
@@ -315,10 +315,13 @@ artifact:
 
 * 列挙値: done | wip | todo | waiting | suspended
   * `todo` — 未着手（成果物未生成）
-  * `wip` — 生産中（成果物が部分的に存在する。例: ソフトウェア工程ではブランチ・PR がオープン）
-  * `done` — 完了・受入済み（成果物が確定し受け入れられた。例: ソフトウェア工程では main にマージ済み）
+  * `wip` — 生産中（成果物が部分的に存在する。例: ソフトウェア工程では作業ブランチで生産中）
+  * `done` — 完了・受入済み（成果物が確定し受け入れられた。例: ソフトウェア工程では完了した変更が main に統合された状態）
   * `waiting` — 外部要因で着手不能（locus of control: 他者。レビュー待ち・外部ベンダー回答待ち等）
   * `suspended` — 自主的な一時中断・再開予定あり（locus of control: 自分たち）
+* 値は、そのファイルを含むツリーが示す状態である。複数のツリーがある場合は統合先（例: main）のツリーの値を正とする。
+  変更を PR で統合する工程では、完了の変更と同じ PR に含められるなら、その PR の中で `done` に更新する。PR がオープンの間、統合先の値はまだ `done` にならず、merge によって `done` になる。
+  成果物が別のリポジトリにある場合など同じ PR に含められないときは、完了の変更が統合された後に、`done` への更新を統合先へ統合する。
 * 1 Artifact につき 0 個または 1 個
 * 列挙外の値は error
 
