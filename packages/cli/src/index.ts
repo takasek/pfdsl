@@ -1484,10 +1484,11 @@ export function runRename(
 		);
 	}
 	if (!result.ok && result.reason === "notFound") {
+		if (!presetDeclares(oldId)) {
+			return idsNotFoundError(file, [oldId], opts.json);
+		}
 		return refuse(
-			presetDeclares(oldId)
-				? `rename: '${oldId}' is not declared in ${file} — it comes from a preset and must be renamed there`
-				: `rename: '${oldId}' not found in ${file}`,
+			`rename: '${oldId}' is not declared in ${file} — it comes from a preset and must be renamed there`,
 		);
 	}
 	// A local group entry that a preset also defines only partially
@@ -3071,6 +3072,7 @@ succeed where the same file path is refused.
               children: string[]) instead of the rewritten document — same
               shape whether or not --write is also given
               on refusal: { ok: false, diagnostics } / { ok: false, error }
+              / { ok: false, missing: [<old>] } when <old> is not found
   --no-color  disable ANSI color codes (also: NO_COLOR env var)
 
 Exit codes:

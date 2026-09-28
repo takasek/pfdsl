@@ -1015,8 +1015,16 @@ a >> p -> b
 		writeFileSync(f, grouped);
 		const r = await run(["rename", f, "ghost", "gx"]);
 		expect(r.exitCode).toBe(1);
-		expect(r.stderr).toContain("not found");
+		expect(r.stderr).toBe(`error: id(s) not found in ${f}: ghost\n`);
 		expect(readFileSync(f, "utf-8")).toBe(grouped);
+	});
+
+	it("--json reports a not-found old as { ok: false, missing }, like the other id commands", async () => {
+		const f = join(dir, "rename-not-found-json.pfdsl");
+		writeFileSync(f, grouped);
+		const r = await run(["rename", f, "ghost", "gx", "--json"]);
+		expect(r.exitCode).toBe(1);
+		expect(JSON.parse(r.stdout)).toEqual({ ok: false, missing: ["ghost"] });
 	});
 
 	it("exits 1 when old is declared as both a group and an artifact id (ambiguous)", async () => {
