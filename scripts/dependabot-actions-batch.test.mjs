@@ -4,7 +4,7 @@ import { describe, it } from "node:test";
 import { parse } from "yaml";
 import {
 	batchBranchName,
-	batchNumbers,
+	batchEntries,
 	createFinalPr,
 	isOwnBatchPull,
 	selectBatch,
@@ -12,7 +12,6 @@ import {
 	validateDependencyPrFiles,
 } from "./dependabot-actions-batch.mjs";
 
-const now = Date.parse("2026-09-28T10:00:00Z");
 const pr = (number, overrides = {}) => ({
 	number,
 	state: "open",
@@ -29,28 +28,26 @@ const pr = (number, overrides = {}) => ({
 });
 
 describe("Dependabot Actions batch selection", () => {
-	it("waits until every candidate is older than the quiet period", () => {
+	it("collects the current heads after the queue has settled", () => {
 		const result = selectBatch(
 			[pr(10), pr(11, { created_at: "2026-09-28T09:30:00Z" })],
-			{ now, repository: "takasek/pfdsl", quietMinutes: 45 },
+			{ repository: "takasek/pfdsl" },
 		);
-		assert.equal(result.status, "waiting");
+		assert.equal(result.status, "ready");
 		assert.deepEqual(
 			result.pulls.map((p) => p.number),
 			[10, 11],
 		);
 	});
 
-	it("waits after an old PR is updated or reopened", () => {
+	it("does not lose a PR after its update timestamp changes", () => {
 		const result = selectBatch(
 			[pr(10, { updated_at: "2026-09-28T09:59:00Z" })],
 			{
-				now,
 				repository: "takasek/pfdsl",
-				quietMinutes: 15,
 			},
 		);
-		assert.equal(result.status, "waiting");
+		assert.equal(result.status, "ready");
 	});
 
 	it("collects only open first-party Dependabot GitHub Actions PRs", () => {
@@ -76,57 +73,75 @@ describe("Dependabot Actions batch selection", () => {
 				}),
 				pr(16),
 			],
-			{ now, repository: "takasek/pfdsl", quietMinutes: 45 },
+			{ repository: "takasek/pfdsl" },
 		);
 		assert.equal(result.status, "ready");
 		assert.deepEqual(
 			result.pulls.map((p) => p.number),
 			[10, 16],
 		);
-		assert.equal(
+		assert.match(
 			batchBranchName(result.pulls),
-			"codex/dependabot-actions-10-16",
+			/^automation\/dependabot-actions-10-16-[0-9a-f]{12}$/,
 		);
 	});
 
 	it("returns empty when there is no eligible PR", () => {
 		assert.equal(
 			selectBatch([pr(10, { state: "closed" })], {
-				now,
 				repository: "takasek/pfdsl",
-				quietMinutes: 45,
 			}).status,
 			"empty",
 		);
 	});
 
-	it("excludes PRs already delivered by a merged batch", () => {
-		const result = selectBatch([pr(10), pr(11)], {
-			now,
-			repository: "takasek/pfdsl",
-			quietMinutes: 15,
-			excludedNumbers: new Set([10]),
-		});
+	it("excludes only the exact head delivered by a merged batch", () => {
+		const result = selectBatch(
+			[
+				pr(10),
+				pr(11),
+				pr(12, { head: { ...pr(12).head, sha: "a".repeat(40) } }),
+			],
+			{
+				repository: "takasek/pfdsl",
+				excludedHeads: new Set([
+					`10@${pr(10).head.sha}`,
+					`12@${pr(12).head.sha}`,
+				]),
+			},
+		);
 		assert.deepEqual(
 			result.pulls.map((p) => p.number),
-			[11],
+			[11, 12],
+		);
+		assert.notEqual(
+			batchBranchName([pr(10)]),
+			batchBranchName([
+				pr(10, { head: { ...pr(10).head, sha: "a".repeat(40) } }),
+			]),
 		);
 	});
 
 	it("reads the durable PR membership marker", () => {
 		assert.deepEqual(
-			batchNumbers("no-issue: upkeep\n\nbatch-includes: 10,11"),
-			[10, 11],
+			batchEntries(
+				`no-issue: upkeep\n\nbatch-includes: 10@${pr(10).head.sha},11@${pr(11).head.sha}`,
+			),
+			[
+				{ number: 10, sha: pr(10).head.sha },
+				{ number: 11, sha: pr(11).head.sha },
+			],
 		);
-		assert.deepEqual(batchNumbers("unrelated PR"), []);
+		assert.deepEqual(batchEntries("unrelated PR"), []);
 	});
 
-	it("does not trust a fork PR with the batch branch name", () => {
+	it("recognizes only a batch branch from this repository", () => {
+		const ref = batchBranchName([pr(10), pr(11)]);
 		assert.equal(
 			isOwnBatchPull(
 				{
 					head: {
-						ref: "codex/dependabot-actions-10-11",
+						ref,
 						repo: { full_name: "other/pfdsl" },
 					},
 				},
@@ -138,13 +153,37 @@ describe("Dependabot Actions batch selection", () => {
 			isOwnBatchPull(
 				{
 					head: {
-						ref: "codex/dependabot-actions-10-11",
+						ref,
 						repo: { full_name: "takasek/pfdsl" },
 					},
 				},
 				"takasek/pfdsl",
 			),
 			true,
+		);
+		assert.equal(
+			isOwnBatchPull(
+				{
+					head: {
+						ref: "codex/dependabot-actions-batch",
+						repo: { full_name: "takasek/pfdsl" },
+					},
+				},
+				"takasek/pfdsl",
+			),
+			false,
+		);
+		assert.equal(
+			isOwnBatchPull(
+				{
+					head: {
+						ref: "automation/dependabot-actions-10-11",
+						repo: { full_name: "takasek/pfdsl" },
+					},
+				},
+				"takasek/pfdsl",
+			),
+			false,
 		);
 	});
 });
@@ -277,14 +316,16 @@ describe("passive workflow trigger", () => {
 			"opened",
 			"reopened",
 			"labeled",
-			"closed",
 		]);
 		assert.equal(queue.on.schedule, undefined);
 		assert.equal(queue.jobs.settle.concurrency["cancel-in-progress"], true);
+		assert.doesNotMatch(queue.jobs.settle.if, /closed|dependabot-actions-/);
 		assert.equal(queue.jobs.integrate, undefined);
 		assert.doesNotMatch(queueSource, /secrets\./);
 		assert.deepEqual(integrate.on.workflow_run.workflows, [queue.name]);
 		assert.deepEqual(integrate.on.workflow_run.types, ["completed"]);
+		assert.equal(integrate.on.workflow_dispatch, null);
+		assert.match(integrate.jobs.integrate.if, /workflow_dispatch/);
 		assert.match(integrate.jobs.integrate.if, /conclusion == 'success'/);
 		assert.equal(
 			integrate.jobs.integrate.concurrency["cancel-in-progress"],
@@ -297,6 +338,7 @@ describe("passive workflow trigger", () => {
 		);
 		const token = steps.findIndex((step) => step.id === "app-token");
 		assert.ok(proof >= 0 && proof < token);
+		assert.equal(steps[proof].if, "github.event_name == 'workflow_run'");
 		assert.match(steps[proof].run, /conclusion == "success"/);
 	});
 });
@@ -305,10 +347,12 @@ describe("final PR publication", () => {
 	it("retries creation even when the existence check also fails", () => {
 		let attempts = 0;
 		let waits = 0;
-		createFinalPr("codex/dependabot-actions-10-10", [10], {
-			execute: () => {
+		let body;
+		createFinalPr(batchBranchName([pr(10)]), [pr(10)], {
+			execute: (_file, args) => {
 				attempts++;
 				if (attempts < 3) throw new Error("temporary network failure");
+				body = args[args.indexOf("--body") + 1];
 			},
 			query: () => {
 				throw new Error("temporary network failure");
@@ -319,5 +363,10 @@ describe("final PR publication", () => {
 		});
 		assert.equal(attempts, 3);
 		assert.equal(waits, 2);
+		assert.match(
+			body,
+			new RegExp(`^batch-includes: 10@${pr(10).head.sha}$`, "m"),
+		);
+		assert.match(body, /merge commit/);
 	});
 });

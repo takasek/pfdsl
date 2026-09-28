@@ -1,4 +1,5 @@
 import { execFileSync } from "node:child_process";
+import { createHash } from "node:crypto";
 import { readFileSync, writeFileSync } from "node:fs";
 import { isCliEntrypoint } from "./lib/cli-entrypoint.mjs";
 
@@ -7,10 +8,10 @@ const pinLine = new RegExp(
 	`^(\\s*-?\\s*uses:\\s*)([A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+)@(${sha})(\\s+#\\s+v[0-9][A-Za-z0-9_.-]*)?\\s*$`,
 );
 
-export function selectBatch(
-	pulls,
-	{ now, repository, quietMinutes, excludedNumbers = new Set() },
-) {
+const headSha = (pull) => pull.head?.sha ?? pull.sha;
+const headKey = (pull) => `${pull.number}@${headSha(pull)}`;
+
+export function selectBatch(pulls, { repository, excludedHeads = new Set() }) {
 	const eligible = pulls
 		.filter(
 			(p) =>
@@ -18,24 +19,20 @@ export function selectBatch(
 				!p.draft &&
 				p.user?.login === "dependabot[bot]" &&
 				p.base?.ref === "main" &&
-				!excludedNumbers.has(p.number) &&
+				!excludedHeads.has(headKey(p)) &&
 				p.head?.repo?.full_name === repository &&
 				p.head?.ref?.startsWith("dependabot/github_actions/") &&
 				/^[0-9a-f]{40}$/.test(p.head?.sha ?? ""),
 		)
 		.sort((a, b) => a.number - b.number);
-	if (eligible.length === 0) return { status: "empty", pulls: [] };
-	const newest = Math.max(
-		...eligible.map((p) => Date.parse(p.updated_at ?? p.created_at)),
-	);
-	if (!Number.isFinite(newest) || now - newest < quietMinutes * 60_000)
-		return { status: "waiting", pulls: eligible };
-	return { status: "ready", pulls: eligible };
+	return { status: eligible.length ? "ready" : "empty", pulls: eligible };
 }
 
 export function batchBranchName(pulls) {
 	if (pulls.length === 0) throw new Error("empty batch");
-	return `codex/dependabot-actions-${pulls[0].number}-${pulls.at(-1).number}`;
+	const heads = pulls.map(headKey).join(",");
+	const digest = createHash("sha256").update(heads).digest("hex").slice(0, 12);
+	return `automation/dependabot-actions-${pulls[0].number}-${pulls.at(-1).number}-${digest}`;
 }
 
 export function validateDependencyPrFiles(files) {
@@ -142,25 +139,42 @@ function updatedPins(files) {
 	return pins;
 }
 
-export function batchNumbers(body) {
-	const match = body?.match(/^batch-includes: ([0-9]+(?:,[0-9]+)*)$/m);
-	return match ? match[1].split(",").map(Number) : [];
+export function batchEntries(body) {
+	const match = body?.match(
+		/^batch-includes: ([0-9]+@[0-9a-f]{40}(?:,[0-9]+@[0-9a-f]{40})*)$/m,
+	);
+	return match
+		? match[1].split(",").map((entry) => {
+				const [number, sha] = entry.split("@");
+				return { number: Number(number), sha };
+			})
+		: [];
 }
 
 export function isOwnBatchPull(pull, repository) {
 	return (
 		pull.head?.repo?.full_name === repository &&
-		pull.head?.ref?.startsWith("codex/dependabot-actions-")
+		/^automation\/dependabot-actions-[0-9]+-[0-9]+-[0-9a-f]{12}$/.test(
+			pull.head?.ref ?? "",
+		)
 	);
+}
+
+function entriesForBatchPull(pull) {
+	const entries = batchEntries(pull.body);
+	if (entries.length === 0 || batchBranchName(entries) !== pull.head.ref)
+		throw new Error(`Invalid batch membership marker on PR #${pull.number}`);
+	return entries;
 }
 
 export function createFinalPr(
 	branch,
-	numbers,
+	pulls,
 	{ execute = run, query = ghJson, wait = () => run("sleep", ["5"]) } = {},
 ) {
+	const numbers = pulls.map((pull) => pull.number);
 	const refs = numbers.map((number) => `#${number}`).join(", ");
-	const body = `Combines Dependabot GitHub Actions updates ${refs} and refreshes generated mirrors and pin assertions.\n\nno-issue: automated dependency maintenance\n\nbatch-includes: ${numbers.join(",")}`;
+	const body = `Combines Dependabot GitHub Actions updates ${refs} and refreshes generated mirrors and pin assertions. Merge this PR with a merge commit so the source PRs are marked as merged.\n\nno-issue: automated dependency maintenance\n\nbatch-includes: ${pulls.map(headKey).join(",")}`;
 	const args = [
 		"pr",
 		"create",
@@ -204,7 +218,7 @@ function assertNoOrphanBranch() {
 		"ls-remote",
 		"--heads",
 		"origin",
-		"refs/heads/codex/dependabot-actions-*",
+		"refs/heads/automation/dependabot-actions-*",
 	]);
 	for (const line of refs.split("\n").filter(Boolean)) {
 		const branch = line.split("\trefs/heads/")[1];
@@ -246,7 +260,7 @@ function main() {
 	const cancelledNumbers = new Set(
 		closed
 			.filter((p) => !p.merged_at && isOwnBatchPull(p, repository))
-			.flatMap((p) => batchNumbers(p.body)),
+			.flatMap((p) => entriesForBatchPull(p).map((entry) => entry.number)),
 	);
 	if (
 		pulls.some(
@@ -258,16 +272,14 @@ function main() {
 			"A closed, unmerged batch still contains open Dependabot PRs; review it before continuing",
 		);
 	}
-	const excludedNumbers = new Set(
+	const excludedHeads = new Set(
 		closed
 			.filter((p) => p.merged_at && isOwnBatchPull(p, repository))
-			.flatMap((p) => batchNumbers(p.body)),
+			.flatMap((p) => entriesForBatchPull(p).map(headKey)),
 	);
 	const batch = selectBatch(pulls, {
-		now: Date.now(),
 		repository,
-		quietMinutes: 15,
-		excludedNumbers,
+		excludedHeads,
 	});
 	if (batch.status !== "ready") {
 		console.log(`Dependabot Actions batch: ${batch.status}`);
@@ -351,10 +363,7 @@ function main() {
 		);
 	}
 	run("git", ["push", "origin", branch]);
-	createFinalPr(
-		branch,
-		batch.pulls.map((p) => p.number),
-	);
+	createFinalPr(branch, batch.pulls);
 }
 
 if (isCliEntrypoint(import.meta.url, process.argv[1])) main();
