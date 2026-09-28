@@ -7,6 +7,7 @@ import {
 	parseIdList,
 	splitBodyIntoSegments,
 } from "./formatter.js";
+import { analyze, format } from "./index.js";
 import { lex } from "./lexer.js";
 import { normalize } from "./normalizer.js";
 import { parseTokens } from "./parser.js";
@@ -388,5 +389,40 @@ describe("formatIdBefore", () => {
 			"x-",
 			"p",
 		]);
+	});
+});
+
+// A line that starts with `---` opens a frontmatter fence at the start of a
+// document, so an id starting with `---` is never spelled bare.
+describe("ids starting with ---", () => {
+	it.each([
+		["---", '"---"'],
+		["----", '"----"'],
+		["---x", '"---x"'],
+		["--", "--"],
+		["a---", "a---"],
+	])("formatId spells %j as %s", (id, expected) => {
+		expect(formatId(id)).toBe(expected);
+	});
+
+	it.each([
+		" ",
+		">",
+		undefined,
+	])("formatIdBefore quotes '---' before %j", (next) => {
+		expect(formatIdBefore("---", next)).toBe('"---"');
+	});
+
+	it.each([
+		["flat", '"---" >> p\np -> b\n'],
+		["flows", '"---" >> p -> b\n'],
+	] as const)("fmt (style: %s) keeps a quoted '---' id quoted, and the result re-reads", (style, expected) => {
+		const { output } = format('"---" >> p -> b\n', { style });
+		expect(output).toBe(expected);
+		const reread = analyze(output);
+		expect(reread.diagnostics.filter((d) => d.severity === "error")).toEqual(
+			[],
+		);
+		expect(reread.edges.map((e) => e.artifact)).toContain("---");
 	});
 });

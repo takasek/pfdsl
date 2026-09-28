@@ -924,6 +924,16 @@ processed >> transform -> done
 		);
 	});
 
+	// Bare at the start of the document, `---` would open a frontmatter fence.
+	it("renames onto '---', quoting it so the result is not read as a fence", async () => {
+		const r = await run(
+			["rename", "-", "--", "a", "---"],
+			withStdin("a >> p -> b\n"),
+		);
+		expect(r.exitCode).toBe(0);
+		expect(r.stdout).toBe('"---" >> p -> b\n');
+	});
+
 	it("exits 1 on a structural (FM/P/L) diagnostic and leaves the file untouched", async () => {
 		const broken = `---
 group:
