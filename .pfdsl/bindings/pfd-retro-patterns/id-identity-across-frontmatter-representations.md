@@ -18,4 +18,6 @@ tags: [target:cli-write-command, context:review-finding]
 
   続報（2026-09-27）: 同じサイクルで決定を変え、`meta rename-group` をトップレベルの `rename`（artifact / process / group）に置き換えた。`renameId` も `String()` で照合し、node 改名について id の綴り × 参照位置 × 宣言の有無の直積テストを `packages/core/src/rename-id.test.ts` に持つ。種別の判定では `nodeKinds` が1つの id に1種別しか持たないため、group と node の同名を frontmatter の各節と body の edge から直接検出して拒否している。
 
-  未解決: prototype 名の欠陥は CLI 層（`Object.hasOwn`）で塞いでおり、core の直積テストの範囲外にある。既存の `delete` は数値キーの宣言を `doc.hasIn` に文字列を渡して探すため、`10:` の宣言を消せないまま `deleted` と報告する（#1218 の独立設計レビューで観測。group を消せない件は #1278）。
+  続報（2026-09-28）: 最初は「この照合の罠に気をつける」形で記録したが、ユーザーの指摘で設計の欠陥として扱い直した。原因は、モデルの id（文字列）と YAML の CST のキー（型付き）を結ぶ同一性の規約が無かったことにある。根本の対策は PR #1298（spec v0.0.24）で、宣言 id のキーと参照値を YAML の文字列に限定し、型付きのキーや型だけが違うキーの重複を読込み時に FM004 で拒否する。これにより、書込み経路ごとに照合を工夫する必要が無くなり、`rename` の型付きキー向けの照合は撤去した（`boundary:` の中のキーだけは制約外のため文字列で照合する）。種別の判定は core の `rename()` に一本化し、frontmatter の各節・edge・body の単独ノード宣言から判定している。
+
+  未解決: group と artifact / process の同名を `check` が正しく報告しない件は #1291、`meta set` が body だけに現れるノードを「not found」と報告する件は #1292。
