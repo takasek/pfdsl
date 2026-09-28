@@ -1,6 +1,10 @@
 # Render PFD files as sibling SVGs
 
 The [render pfdsl svg workflow](../.github/workflows/render-pfdsl-svg.yml) runs automatically for changes to `.pfdsl/**/*.pfdsl` on this repository's `main` branch.
+After this workflow reaches the default branch, use **Actions → render pfdsl svg → Run workflow** to regenerate every tracked PFD file matching `paths`, including files whose PFD content has not changed.
+Select the branch containing the workflow in the Run workflow selector, then set `target-branch` to the branch containing the PFD files.
+Use `cli-ref` to regenerate with a specific renderer revision after a CLI update; the default is `main`.
+The manual run publishes only SVG files whose rendered content differs from the existing file, so an unchanged run creates no commit or PR.
 Other repositories can call the same workflow after installing a GitHub App with repository Contents read and write access.
 PR mode also requires Pull requests read and write access.
 Direct push mode requires that App to bypass the pull request requirement on the target branch.

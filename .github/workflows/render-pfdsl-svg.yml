@@ -5,6 +5,25 @@ on:
     branches: [main]
     paths:
       - '.pfdsl/**/*.pfdsl'
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: Publish changed SVGs directly or by pull request
+        type: choice
+        options: [direct, pr]
+        default: direct
+      target-branch:
+        description: Branch containing the PFD files and receiving changed SVGs
+        type: string
+        default: main
+      paths:
+        description: Newline-separated glob patterns for PFD files to regenerate
+        type: string
+        default: .pfdsl/**/*.pfdsl
+      cli-ref:
+        description: Git ref of takasek/pfdsl used to build the renderer
+        type: string
+        default: main
   workflow_call:
     inputs:
       app-client-id:
@@ -141,6 +160,7 @@ jobs:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
           APP_SLUG: ${{ steps.app-token.outputs.app-slug }}
           SVG_PATHS: ${{ steps.render.outputs.svg_paths }}
+          TARGET_BRANCH: ${{ inputs.target-branch || 'main' }}
         run: |
           while IFS= read -r svg; do
             [[ -z "$svg" ]] || git add -- "$svg"
@@ -153,7 +173,7 @@ jobs:
           git config user.email "${bot_id}+${APP_SLUG}[bot]@users.noreply.github.com"
           git commit -m 'docs(pfdsl): update generated SVG diagrams'
           gh auth setup-git
-          git push origin "HEAD:${{ inputs.target-branch || 'main' }}"
+          git push origin "HEAD:$TARGET_BRANCH"
 
       - name: Open or update SVG pull request
         if: steps.render.outputs.svg_paths != '' && inputs.mode == 'pr'
