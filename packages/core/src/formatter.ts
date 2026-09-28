@@ -1,14 +1,32 @@
 import { compareIds } from "./compare.js";
+import { ID_PATTERN } from "./lexer.js";
 import type { NormalizedEdge } from "./types/index.js";
 
 export type BodySegment =
 	| { kind: "edges"; text: string }
 	| { kind: "comment"; text: string };
 
-const BARE_ID_RE = /^[\p{L}\p{N}_-]+$/u;
+// A bare spelling is one the lexer reads back as the same single id.
+const BARE_ID_RE = new RegExp(`^(?:${ID_PATTERN.source})$`, "u");
 
 export function formatId(id: string): string {
 	if (BARE_ID_RE.test(id)) return id;
+	return quoteId(id);
+}
+
+/**
+ * `formatId`'s spelling of `id` for a position directly followed by `next`
+ * in the source. The lexer ends a bare id before a `-` that starts `->`, so
+ * a bare spelling ending in `-` right before `>` would lose that dash to an
+ * arrow; it is quoted there instead.
+ */
+export function formatIdBefore(id: string, next: string | undefined): string {
+	const bare = formatId(id);
+	return bare.endsWith("-") && next === ">" ? quoteId(id) : bare;
+}
+
+/** The `"..."`-quoted spelling of `id`, which `formatId` falls back to when the bare one is not a valid id token. */
+function quoteId(id: string): string {
 	let escaped = "";
 	for (const char of id) {
 		if (char === "\\") escaped += "\\\\";

@@ -1,4 +1,4 @@
-# PFDSL仕様書 v0.0.25
+# PFDSL仕様書 v0.0.26
 
 ## 1. 目的
 
@@ -684,6 +684,8 @@ ID は bare-id または quoted-id とする。
 ### 4.1 bare-id
 
 Unicode Letter / Number および `_` `-` を許可する。
+
+先頭の文字は Letter / Number / `_` のいずれかとし、`-` で始めてはならない。`-` で始まる ID は quoted-id（§4.2）で書く。
 
 禁止文字：
 

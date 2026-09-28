@@ -66,6 +66,7 @@ Feature-by-feature syntax examples with rendered `.dot` and `.svg`: [docs/sample
 - **Pipeline** — lexer → parser → normalizer → validator → canonical sorter → formatter (`@pfdsl/core`)
 - **DOT / SVG** — Graphviz export and Wasm-based rendering (`@pfdsl/graphviz-exporter`, `@pfdsl/preview-engine`)
 - **CLI** — `pfdsl check / fmt / render / diff` plus `graph` / `meta` / `status` command groups (`@pfdsl/cli`)
+- **GitHub Actions** — [reusable SVG generation workflow](docs/reusable-pfdsl-svg.md) for sibling `.svg` files, with automatic or manual runs and direct push or PR output
 - **VSCode extension** — syntax highlighting, diagnostics, hover, document formatter, live SVG preview (`@pfdsl/vscode-extension`)
 - **Claude Code skill** — syntax reference, CLI guidance, workflow for editing `.pfdsl` files (`.claude/skills/pfdsl/`); installable via `/plugin marketplace add takasek/pfdsl` + `/plugin install pfdsl@pfdsl`
 
@@ -106,6 +107,8 @@ Commands:
                            Format a .pfdsl file (- = stdin)
   delete <file|-> <id[,id...]> [--write] [--json] [--no-color]
                            Remove one or more nodes from a .pfdsl file (- = stdin)
+  rename <file|-> <old> <new> [--write] [--json] [--no-color]
+                           Rename an artifact, process, or group id and every reference to it (- = stdin)
   render <file|-> [--format dot|svg|pdf|png] [--no-color]
                            Render as Graphviz DOT (default), SVG, PDF, or PNG (- = stdin)
                            PDF/PNG requires puppeteer in the CLI's own Node env (npm install puppeteer)

@@ -1,0 +1,338 @@
+name: render pfdsl svg
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.pfdsl/**/*.pfdsl'
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: Publish changed SVGs directly or by pull request
+        type: choice
+        options: [direct, pr]
+        default: direct
+      target-branch:
+        description: Branch containing the PFD files and receiving changed SVGs
+        type: string
+        default: main
+      paths:
+        description: Newline-separated glob patterns for PFD files to regenerate
+        type: string
+        default: .pfdsl/**/*.pfdsl
+      cli-ref:
+        description: Renderer commit SHA (blank uses this workflow's commit)
+        type: string
+  workflow_call:
+    inputs:
+      app-client-id:
+        description: Client ID of a GitHub App installed on the caller repository
+        required: true
+        type: string
+      mode:
+        description: Open a pull request or push generated SVGs directly
+        required: false
+        type: string
+        default: direct
+      target-branch:
+        description: Branch that contains the PFD files and receives generated SVGs
+        required: false
+        type: string
+        default: main
+      paths:
+        description: Newline-separated glob patterns for PFD files
+        required: false
+        type: string
+        default: .pfdsl/**/*.pfdsl
+      cli-ref:
+        description: Renderer commit SHA (blank uses this workflow's commit)
+        required: false
+        type: string
+      publish-environment:
+        description: Environment for the publish job (none uses the caller secret)
+        required: false
+        type: string
+        default: none
+    secrets:
+      app-private-key:
+        description: Private key of the GitHub App
+        required: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: render-pfdsl-svg-${{ github.repository }}-${{ inputs.target-branch || 'main' }}
+  cancel-in-progress: false
+
+jobs:
+  render:
+    runs-on: ubuntu-latest
+    outputs:
+      source_sha: ${{ steps.source.outputs.sha }}
+      has_changes: ${{ steps.render.outputs.has_changes }}
+    steps:
+      - name: Validate mode
+        env:
+          MODE: ${{ inputs.mode || 'direct' }}
+        run: |
+          if [[ "$MODE" != direct && "$MODE" != pr ]]; then
+            echo "mode must be 'direct' or 'pr'" >&2
+            exit 1
+          fi
+
+      - name: Validate renderer revision
+        env:
+          CLI_REF: ${{ inputs.cli-ref || job.workflow_sha }}
+          CLI_OVERRIDE: ${{ inputs.cli-ref }}
+          MODE: ${{ inputs.mode || 'direct' }}
+        run: |
+          if [[ ! "$CLI_REF" =~ ^[0-9a-fA-F]{40}$ ]]; then
+            echo 'cli-ref must be a full commit SHA' >&2
+            exit 1
+          fi
+          if [[ "$MODE" == direct && -n "$CLI_OVERRIDE" ]]; then
+            echo 'cli-ref overrides require PR mode' >&2
+            exit 1
+          fi
+
+      - name: Check out diagrams
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ inputs.target-branch || 'main' }}
+          persist-credentials: false
+
+      - name: Record diagram revision
+        id: source
+        run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+      - name: Check out renderer source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: takasek/pfdsl
+          ref: ${{ inputs.cli-ref || job.workflow_sha }}
+          path: .pfdsl-renderer
+          persist-credentials: false
+
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+        with:
+          version: 10.33.2
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+          cache: pnpm
+          cache-dependency-path: .pfdsl-renderer/pnpm-lock.yaml
+
+      - name: Build renderer
+        working-directory: .pfdsl-renderer
+        run: |
+          pnpm install --frozen-lockfile
+          pnpm -r build
+
+      - name: Render sibling SVG files
+        id: render
+        env:
+          FILE_PATTERNS: ${{ inputs.paths || '.pfdsl/**/*.pfdsl' }}
+        run: |
+          patterns=()
+          while IFS= read -r pattern; do
+            [[ -z "$pattern" ]] || patterns+=(":(glob)$pattern")
+          done <<< "$FILE_PATTERNS"
+          if (( ${#patterns[@]} == 0 )); then
+            echo 'paths must contain at least one pattern' >&2
+            exit 1
+          fi
+          artifact_dir="$RUNNER_TEMP/rendered-svg"
+          mkdir -p -- "$artifact_dir"
+          changed=0
+          while IFS= read -r -d '' file; do
+            [[ "$file" == *.pfdsl ]] || continue
+            svg="${file%.pfdsl}.svg"
+            if [[ "$svg" == *$'\n'* ]]; then
+              echo 'PFD file paths cannot contain newlines' >&2
+              exit 1
+            fi
+            tmp_svg=$(mktemp "$RUNNER_TEMP/pfdsl-svg.XXXXXX")
+            node .pfdsl-renderer/packages/cli/dist/cli.js render "$file" --format svg > "$tmp_svg"
+            if [[ -e "$svg" ]] && cmp -s -- "$tmp_svg" "$svg"; then
+              rm -f -- "$tmp_svg"
+              continue
+            fi
+            mv -- "$tmp_svg" "$svg"
+            mkdir -p -- "$artifact_dir/$(dirname -- "$svg")"
+            cp -- "$svg" "$artifact_dir/$svg"
+            changed=1
+          done < <(git ls-files -z -- "${patterns[@]}")
+          echo "has_changes=$changed" >> "$GITHUB_OUTPUT"
+
+      - name: Upload changed SVG files
+        if: steps.render.outputs.has_changes == '1'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: rendered-svg
+          path: ${{ runner.temp }}/rendered-svg/
+          include-hidden-files: true
+          if-no-files-found: error
+
+  publish:
+    needs: render
+    if: needs.render.outputs.has_changes == '1' && inputs.publish-environment != 'none'
+    runs-on: ubuntu-latest
+    environment:
+      name: ${{ inputs.publish-environment || 'pfdsl-svg-publish' }}
+      deployment: false
+    steps: &publish_steps
+      - name: Check out diagrams
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ inputs.target-branch || 'main' }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Download changed SVG files
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: rendered-svg
+          path: ${{ runner.temp }}/rendered-svg
+
+      - name: Prepare changed SVG files
+        id: prepare
+        env:
+          FILE_PATTERNS: ${{ inputs.paths || '.pfdsl/**/*.pfdsl' }}
+          SOURCE_SHA: ${{ needs.render.outputs.source_sha }}
+        run: |
+          patterns=()
+          while IFS= read -r pattern; do
+            [[ -z "$pattern" ]] || patterns+=(":(glob)$pattern")
+          done <<< "$FILE_PATTERNS"
+          if (( ${#patterns[@]} == 0 )); then
+            echo 'paths must contain at least one pattern' >&2
+            exit 1
+          fi
+          if [[ ! "$SOURCE_SHA" =~ ^[0-9a-f]{40}$ ]]; then
+            echo 'Invalid source revision' >&2
+            exit 1
+          fi
+          if ! git diff --quiet "$SOURCE_SHA" HEAD -- "${patterns[@]}"; then
+            echo 'PFD files changed during rendering; rerun this workflow' >&2
+            exit 1
+          fi
+          artifact_dir="$RUNNER_TEMP/rendered-svg"
+          if find "$artifact_dir" -type l | grep -q .; then
+            echo 'SVG artifact contains a symbolic link' >&2
+            exit 1
+          fi
+          svg_paths="$RUNNER_TEMP/pfdsl-svg-paths"
+          : > "$svg_paths"
+          workspace_dir=$(cd -- "$GITHUB_WORKSPACE" && pwd -P)
+          while IFS= read -r -d '' artifact; do
+            svg="${artifact#"$artifact_dir"/}"
+            expected=0
+            while IFS= read -r -d '' file; do
+              if [[ "$file" == *.pfdsl && "${file%.pfdsl}.svg" == "$svg" ]]; then
+                expected=1
+                break
+              fi
+            done < <(git ls-files -z -- "${patterns[@]}")
+            if [[ "$svg" == *$'\n'* || "$expected" != 1 ]]; then
+              echo "Unexpected SVG artifact path: $svg" >&2
+              exit 1
+            fi
+            destination_dir=$(cd -- "$(dirname -- "$svg")" && pwd -P)
+            if [[ "$destination_dir" != "$workspace_dir" && "$destination_dir" != "$workspace_dir/"* ]] || [[ -L "$svg" ]]; then
+              echo "Unsafe SVG destination: $svg" >&2
+              exit 1
+            fi
+            if [[ -e "$svg" ]] && cmp -s -- "$artifact" "$svg"; then
+              continue
+            fi
+            cp -- "$artifact" "$svg"
+            printf '%s\n' "$svg" >> "$svg_paths"
+          done < <(find "$artifact_dir" -type f -print0)
+          if [[ -s "$svg_paths" ]]; then
+            {
+              echo 'svg_paths<<PFDSL_SVG_PATHS'
+              cat "$svg_paths"
+              echo 'PFDSL_SVG_PATHS'
+            } >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Create short-lived App token
+        id: app-token
+        if: steps.prepare.outputs.svg_paths != ''
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3
+        with:
+          client-id: ${{ inputs.app-client-id || vars.PFD_GENERATOR_APP_CLIENT_ID }}
+          private-key: ${{ inputs.publish-environment == 'none' && secrets.app-private-key || inputs.publish-environment != 'none' && secrets.PFD_GENERATOR_APP_PRIVATE_KEY }}
+          permission-contents: write
+          permission-pull-requests: ${{ (inputs.mode || 'direct') == 'pr' && 'write' || '' }}
+
+      - name: Push updated SVG files
+        if: steps.prepare.outputs.svg_paths != '' && (inputs.mode || 'direct') == 'direct'
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          APP_SLUG: ${{ steps.app-token.outputs.app-slug }}
+          SVG_PATHS: ${{ steps.prepare.outputs.svg_paths }}
+          TARGET_BRANCH: ${{ inputs.target-branch || 'main' }}
+          SOURCE_SHA: ${{ needs.render.outputs.source_sha }}
+          FILE_PATTERNS: ${{ inputs.paths || '.pfdsl/**/*.pfdsl' }}
+        run: |
+          bot_id=$(gh api "/users/${APP_SLUG}[bot]" --jq .id)
+          git config user.name "${APP_SLUG}[bot]"
+          git config user.email "${bot_id}+${APP_SLUG}[bot]@users.noreply.github.com"
+          gh auth setup-git
+          if ! git check-ref-format "refs/heads/$TARGET_BRANCH"; then
+            echo 'Invalid target branch' >&2
+            exit 1
+          fi
+          patterns=()
+          while IFS= read -r pattern; do
+            [[ -z "$pattern" ]] || patterns+=(":(glob)$pattern")
+          done <<< "$FILE_PATTERNS"
+          workspace_dir=$(cd -- "$GITHUB_WORKSPACE" && pwd -P)
+          for attempt in 1 2 3; do
+            git fetch origin "refs/heads/$TARGET_BRANCH:refs/remotes/origin/$TARGET_BRANCH"
+            if ! git diff --quiet "$SOURCE_SHA" "origin/$TARGET_BRANCH" -- "${patterns[@]}"; then
+              echo 'PFD files changed during rendering; rerun this workflow' >&2
+              exit 1
+            fi
+            git -c core.hooksPath=/dev/null reset --hard "origin/$TARGET_BRANCH"
+            while IFS= read -r svg; do
+              [[ -z "$svg" ]] && continue
+              destination_dir=$(cd -- "$(dirname -- "$svg")" && pwd -P)
+              if [[ "$destination_dir" != "$workspace_dir" && "$destination_dir" != "$workspace_dir/"* ]] || [[ -L "$svg" ]]; then
+                echo "Unsafe SVG destination after branch update: $svg" >&2
+                exit 1
+              fi
+              cp -- "$RUNNER_TEMP/rendered-svg/$svg" "$svg"
+              git add -- "$svg"
+            done <<< "$SVG_PATHS"
+            if git diff --cached --quiet; then
+              exit 0
+            fi
+            git -c core.hooksPath=/dev/null commit -m 'docs(pfdsl): update generated SVG diagrams'
+            if git -c core.hooksPath=/dev/null push origin "HEAD:$TARGET_BRANCH"; then
+              exit 0
+            fi
+          done
+          echo 'Could not push generated SVGs after three attempts' >&2
+          exit 1
+
+      - name: Open or update SVG pull request
+        if: steps.prepare.outputs.svg_paths != '' && inputs.mode == 'pr'
+        uses: peter-evans/create-pull-request@5f6978faf089d4d20b00c7766989d076bb2fc7f1 # v8
+        with:
+          token: ${{ steps.app-token.outputs.token }}
+          base: ${{ inputs.target-branch }}
+          branch: pfdsl-svg/${{ inputs.target-branch }}
+          add-paths: ${{ steps.prepare.outputs.svg_paths }}
+          commit-message: 'docs(pfdsl): update generated SVG diagrams'
+          title: 'docs(pfdsl): update generated SVG diagrams'
+          body: 'Generated sibling SVG files for the current PFD files.'
+
+  publish-external:
+    needs: render
+    if: needs.render.outputs.has_changes == '1' && inputs.publish-environment == 'none'
+    runs-on: ubuntu-latest
+    steps: *publish_steps

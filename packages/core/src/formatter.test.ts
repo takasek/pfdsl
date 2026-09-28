@@ -3,6 +3,7 @@ import {
 	formatAsFlows,
 	formatEdges,
 	formatId,
+	formatIdBefore,
 	parseIdList,
 	splitBodyIntoSegments,
 } from "./formatter.js";
@@ -134,10 +135,10 @@ describe("formatEdges", () => {
 			{
 				kind: "input",
 				artifact: "日本語１２３_成果物-1",
-				process: "-処理_2",
+				process: "_処理-2",
 			},
 		];
-		expect(formatEdges(edges)).toBe("日本語１２３_成果物-1 >> -処理_2\n");
+		expect(formatEdges(edges)).toBe("日本語１２３_成果物-1 >> _処理-2\n");
 	});
 
 	it.each([
@@ -365,5 +366,57 @@ describe("formatAsFlows", () => {
 		];
 		const isolated = ['isolated space # " \\ newline\n tab\t'];
 		assertRoundTrips(formatAsFlows(edges, isolated), edges, isolated);
+	});
+});
+
+describe("formatIdBefore", () => {
+	// The lexer ends a bare id before a `-` that starts `->`, so a bare
+	// spelling ending in `-` right before `>` would lose that dash to an arrow.
+	it.each([
+		["x-", ">", '"x-"'],
+		["x-", " ", "x-"],
+		["x-", undefined, "x-"],
+		["x", ">", "x"],
+		["a b", ">", '"a b"'],
+	])("spells %j before %j as %s", (id, next, expected) => {
+		expect(formatIdBefore(id, next)).toBe(expected);
+	});
+
+	it("keeps the id one token when spliced before '>>'", () => {
+		const { tokens } = lex(`${formatIdBefore("x-", ">")}>>p\n`);
+		expect(tokens.filter((t) => t.type === "ID").map((t) => t.value)).toEqual([
+			"x-",
+			"p",
+		]);
+	});
+});
+
+describe("formatId spells an id bare only when the lexer reads it back as one id", () => {
+	it.each([
+		"a",
+		"_a",
+		"a-b",
+		"a_",
+		"要求",
+		"1x",
+		"x-",
+	])("keeps %s bare", (id) => {
+		expect(formatId(id)).toBe(id);
+	});
+
+	it.each(["-a", "---", "--", "a b", "", "a,b"])("quotes %s", (id) => {
+		expect(formatId(id)).toBe(JSON.stringify(id));
+	});
+
+	it.each([
+		"-a",
+		"---",
+	])("fmt keeps %s quoted and the result re-reads", (id) => {
+		const src = `${JSON.stringify(id)} >> p -> b\n`;
+		const { tokens } = lex(src);
+		const { document } = parseTokens(tokens);
+		const { edges } = normalize(document, null);
+		expect(edges.map((e) => e.artifact)).toContain(id);
+		expect(formatEdges(edges)).toContain(JSON.stringify(id));
 	});
 });

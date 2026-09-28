@@ -2,8 +2,16 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { deleteNodes } from "@pfdsl/core";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { analyze, deleteNodes } from "@pfdsl/core";
+import {
+	afterAll,
+	afterEach,
+	beforeAll,
+	beforeEach,
+	describe,
+	expect,
+	it,
+} from "vitest";
 import { readyUnchanged } from "../../../scripts/pfdsl/lib/ready-compare.mjs";
 import {
 	COMMAND_GROUPS,
@@ -100,6 +108,8 @@ describe("command metadata parse surface (#1050)", () => {
 		fmt: "usage: pfdsl fmt <file|-> [--write] [--check] [--no-color]",
 		delete:
 			"usage: pfdsl delete <file|-> <id[,id...]> [--write] [--json] [--no-color]",
+		rename:
+			"usage: pfdsl rename <file|-> <old> <new> [--write] [--json] [--no-color]",
 		"meta reindex":
 			"usage: pfdsl meta reindex <file|-> [--write] [--check] [--renumber] [--json] [--no-color]",
 		"meta sort":
@@ -204,8 +214,8 @@ describe("command metadata parse surface (#1050)", () => {
 		options: Record<string, unknown>;
 	}) => new Set(Object.keys(entry.options).map((name) => `--${name}`));
 
-	it("covers exactly 28 dispatchable command entries", () => {
-		expect(commandTargets).toHaveLength(28);
+	it("covers exactly 29 dispatchable command entries", () => {
+		expect(commandTargets).toHaveLength(29);
 	});
 
 	it.each(
@@ -688,6 +698,695 @@ process:
 			ok: true,
 			deleted: ["a,b"],
 			notFound: [],
+		});
+	});
+});
+
+/**
+ * A fresh temp directory for each test of the enclosing describe, removed
+ * after it; returns a writer that puts `content` at `name` there and
+ * returns the file's path.
+ */
+function tempFiles(): (name: string, content: string) => string {
+	let d = "";
+	beforeEach(() => {
+		d = mkdtempSync(join(tmpdir(), "pfdsl-rename-"));
+	});
+	afterEach(() => {
+		rmSync(d, { recursive: true, force: true });
+	});
+	return (name, content) => {
+		const f = join(d, name);
+		writeFileSync(f, content);
+		return f;
+	};
+}
+
+describe("rename", () => {
+	const artifactSrc = "req >> design -> spec\nspec >> impl -> code\n";
+
+	it("--help documents which references are rewritten, the refusals, and the cross-file blind spot", async () => {
+		const r = await run(["rename", "--help"]);
+		expect(r.exitCode).toBe(0);
+		expect(r.stdout).toContain("boundary: { <new>: <old> }");
+		expect(r.stdout).toContain("both a group and an artifact/process");
+		expect(r.stdout).toContain("invisible here and is never rewritten");
+	});
+
+	it("--help says a stdin (-) preview skips the extends: and subflow checks a file path gets", async () => {
+		const r = await run(["rename", "--help"]);
+		const prose = r.stdout.replace(/\s+/g, " ");
+		expect(prose).toContain(
+			"With -, the extends: and subflow checks are skipped because relative paths cannot be resolved",
+		);
+		expect(prose).toContain(
+			"a preview from stdin can succeed where the same file path is refused",
+		);
+	});
+
+	it("renames an artifact across frontmatter and body, printing the rewritten file to stdout by default", async () => {
+		const f = join(dir, "rename-artifact-default.pfdsl");
+		writeFileSync(f, artifactSrc);
+		const r = await run(["rename", f, "spec", "design_doc"]);
+		expect(r.exitCode).toBe(0);
+		expect(r.stdout).toBe(
+			"req >> design -> design_doc\ndesign_doc >> impl -> code\n",
+		);
+		expect(readFileSync(f, "utf-8")).toBe(artifactSrc);
+	});
+
+	it("--write rewrites the file in place and reports kind: artifact via --json", async () => {
+		const f = join(dir, "rename-artifact-write.pfdsl");
+		writeFileSync(f, artifactSrc);
+		const r = await run([
+			"rename",
+			f,
+			"spec",
+			"design_doc",
+			"--write",
+			"--json",
+		]);
+		expect(r.exitCode).toBe(0);
+		expect(JSON.parse(r.stdout)).toEqual({
+			ok: true,
+			kind: "artifact",
+			from: "spec",
+			to: "design_doc",
+		});
+		expect(readFileSync(f, "utf-8")).toBe(
+			"req >> design -> design_doc\ndesign_doc >> impl -> code\n",
+		);
+	});
+
+	it("renames a process, reporting kind: process via --json", async () => {
+		const f = join(dir, "rename-process.pfdsl");
+		writeFileSync(f, artifactSrc);
+		const r = await run(["rename", f, "design", "design_v2", "--json"]);
+		expect(r.exitCode).toBe(0);
+		expect(JSON.parse(r.stdout)).toEqual({
+			ok: true,
+			kind: "process",
+			from: "design",
+			to: "design_v2",
+		});
+	});
+
+	// >=3 groups (layer1sub's parent: references layer1, other is unrelated),
+	// a comment on the renamed group's declaration, a folded (>) description,
+	// and members declared in both flow ({ group: layer1 }) and block style.
+	const grouped = `---
+description: >
+  Roadmap for the
+  Q3 initiative.
+group:
+  layer1: # ingestion layer
+    label: "Layer 1"
+    color: lightblue
+  layer1sub:
+    label: "Sub layer"
+    parent: layer1
+  other:
+    label: "Other layer"
+artifact:
+  raw: { group: layer1, label: Raw }
+  processed:
+    label: Processed
+    group: layer1
+  done:
+    label: Done
+process:
+  ingest: { group: layer1, label: Ingest }
+  transform:
+    label: Transform
+    group: layer1
+---
+raw >> ingest -> processed
+processed >> transform -> done
+`;
+
+	it("renames a group: the declaration key, the child group's parent:, and every member's group: — byte-exact", async () => {
+		const f = join(dir, "rename-group-full.pfdsl");
+		writeFileSync(f, grouped);
+		const r = await run(["rename", f, "layer1", "layerx", "--write"]);
+		expect(r.exitCode).toBe(0);
+		expect(readFileSync(f, "utf-8")).toBe(`---
+description: >
+  Roadmap for the
+  Q3 initiative.
+group:
+  layerx:
+    # ingestion layer
+    label: "Layer 1"
+    color: lightblue
+  layer1sub:
+    label: "Sub layer"
+    parent: layerx
+  other:
+    label: "Other layer"
+artifact:
+  raw: { group: layerx, label: Raw }
+  processed:
+    label: Processed
+    group: layerx
+  done:
+    label: Done
+process:
+  ingest: { group: layerx, label: Ingest }
+  transform:
+    label: Transform
+    group: layerx
+---
+raw >> ingest -> processed
+processed >> transform -> done
+`);
+	});
+
+	it("--json on a group rename reports { ok, kind: group, from, to, members, children }", async () => {
+		const f = join(dir, "rename-group-json.pfdsl");
+		writeFileSync(f, grouped);
+		const r = await run(["rename", f, "layer1", "layerx", "--json"]);
+		expect(r.exitCode).toBe(0);
+		expect(JSON.parse(r.stdout)).toEqual({
+			ok: true,
+			kind: "group",
+			from: "layer1",
+			to: "layerx",
+			members: ["raw", "processed", "ingest", "transform"],
+			children: ["layer1sub"],
+		});
+	});
+
+	// --- refusals ---
+
+	it("exits 2 with help when a positional argument is missing", async () => {
+		const f = join(dir, "rename-missing-arg.pfdsl");
+		writeFileSync(f, grouped);
+		const r = await run(["rename", f, "layer1"]);
+		expect(r.exitCode).toBe(2);
+		expect(readFileSync(f, "utf-8")).toBe(grouped);
+	});
+
+	it("exits 2 with help on an extra positional argument", async () => {
+		const f = join(dir, "rename-extra-arg.pfdsl");
+		writeFileSync(f, grouped);
+		const r = await run(["rename", f, "layer1", "layerx", "extra"]);
+		expect(r.exitCode).toBe(2);
+		expect(readFileSync(f, "utf-8")).toBe(grouped);
+	});
+
+	it("exits 2 when old and new are the same id", async () => {
+		const f = join(dir, "rename-same-id.pfdsl");
+		writeFileSync(f, grouped);
+		const r = await run(["rename", f, "layer1", "layer1"]);
+		expect(r.exitCode).toBe(2);
+		expect(readFileSync(f, "utf-8")).toBe(grouped);
+	});
+
+	it("--write with stdin is rejected (exit 2)", async () => {
+		const r = await run(
+			["rename", "-", "spec", "design_doc", "--write"],
+			withStdin(artifactSrc),
+		);
+		expect(r.exitCode).toBe(2);
+		expect(r.stderr).toBe("--write cannot be used with stdin (-)\n");
+	});
+
+	// `rename` follows `delete`'s output model: stdin is a valid preview
+	// source as long as --write is not requested.
+	it("allows stdin for a preview (no --write)", async () => {
+		const r = await run(
+			["rename", "-", "spec", "design_doc"],
+			withStdin(artifactSrc),
+		);
+		expect(r.exitCode).toBe(0);
+		expect(r.stdout).toBe(
+			"req >> design -> design_doc\ndesign_doc >> impl -> code\n",
+		);
+	});
+
+	// `""` is a valid quoted id, so an empty argument names it rather than
+	// being a missing one.
+	it("renames the empty id away", async () => {
+		const r = await run(["rename", "-", "", "x"], withStdin('"" >> p -> b\n'));
+		expect(r.exitCode).toBe(0);
+		expect(r.stdout).toBe("x >> p -> b\n");
+	});
+
+	it("renames onto the empty id, quoting it so the result re-reads", async () => {
+		const r = await run(["rename", "-", "a", ""], withStdin("a >> p -> b\n"));
+		expect(r.exitCode).toBe(0);
+		expect(r.stdout).toBe('"" >> p -> b\n');
+		const reread = analyze(r.stdout);
+		expect(reread.diagnostics.filter((d) => d.severity === "error")).toEqual(
+			[],
+		);
+		expect(reread.edges.map((e) => e.artifact)).toContain("");
+	});
+
+	it("exits 1 on a structural (FM/P/L) diagnostic and leaves the file untouched", async () => {
+		const broken = `---
+group:
+  layer1: [unterminated
+---
+a
+`;
+		const f = join(dir, "rename-structural.pfdsl");
+		writeFileSync(f, broken);
+		const r = await run(["rename", f, "layer1", "layerx"]);
+		expect(r.exitCode).toBe(1);
+		expect(r.stderr).toMatch(/\[FM\d+\]/);
+		expect(readFileSync(f, "utf-8")).toBe(broken);
+	});
+
+	// The result is judged, not the input (same contract as `meta set`): a
+	// validation error the input already had surfaces as its own diagnostic
+	// on the refused result.
+	const invalidStatus = `---
+artifact:
+  a: { status: bogus }
+---
+a >> p -> b
+`;
+	const inputErrorMessage =
+		"the result would have errors (an error already in the input also blocks the rename)";
+
+	it("refuses an input with a validation error, printing that diagnostic (V007) and leaving the file untouched", async () => {
+		const f = join(dir, "rename-input-v007.pfdsl");
+		writeFileSync(f, invalidStatus);
+		const r = await run(["rename", f, "b", "bb", "--write"]);
+		expect(r.exitCode).toBe(1);
+		expect(r.stderr).toContain("[V007]");
+		expect(r.stderr).toContain(
+			`rename: refusing to write ${f}: ${inputErrorMessage}`,
+		);
+		expect(readFileSync(f, "utf-8")).toBe(invalidStatus);
+	});
+
+	it("--json reports the input's validation error (V007) as diagnostics on refusal", async () => {
+		const f = join(dir, "rename-input-v007-json.pfdsl");
+		writeFileSync(f, invalidStatus);
+		const r = await run(["rename", f, "b", "bb", "--json"]);
+		expect(r.exitCode).toBe(1);
+		expect(r.stderr).toBe("");
+		const parsed = JSON.parse(r.stdout);
+		expect(parsed.ok).toBe(false);
+		expect(parsed.error).toBe(
+			`rename: refusing to write ${f}: ${inputErrorMessage}`,
+		);
+		expect(parsed.diagnostics.map((d: { code: string }) => d.code)).toContain(
+			"V007",
+		);
+	});
+
+	it.each([
+		[
+			"a process declaration",
+			"process:\n  g:\n    label: P\n",
+			"a >> g -> b",
+			"a process",
+		],
+		["a body process", "", "a >> g -> b", "a process"],
+		[
+			"an artifact declaration",
+			"artifact:\n  g:\n    label: A\n",
+			"g >> p",
+			"an artifact",
+		],
+		["an isolated body node", "", "g\na >> p -> b", "an artifact"],
+	])("exits 1 when old is a group and also %s (ambiguous), naming the clash", async (name, extra, body, clash) => {
+		const ambiguous = `---\ngroup:\n  g:\n    label: G\n${extra}---\n${body}\n`;
+		const f = join(dir, `rename-ambiguous-${name.replace(/ /g, "-")}.pfdsl`);
+		writeFileSync(f, ambiguous);
+		const r = await run(["rename", f, "g", "h"]);
+		expect(r.exitCode).toBe(1);
+		expect(r.stderr).toBe(
+			`rename: 'g' is declared twice in ${f} — as a group and as ${clash}; this is invalid and cannot be renamed unambiguously\n`,
+		);
+		expect(readFileSync(f, "utf-8")).toBe(ambiguous);
+	});
+
+	it("exits 1 when old is not found at all (neither a group nor an artifact/process)", async () => {
+		const f = join(dir, "rename-not-found.pfdsl");
+		writeFileSync(f, grouped);
+		const r = await run(["rename", f, "ghost", "gx"]);
+		expect(r.exitCode).toBe(1);
+		expect(r.stderr).toBe(`error: id(s) not found in ${f}: ghost\n`);
+		expect(readFileSync(f, "utf-8")).toBe(grouped);
+	});
+
+	it("--json reports a not-found old as { ok: false, missing }, like the other id commands", async () => {
+		const f = join(dir, "rename-not-found-json.pfdsl");
+		writeFileSync(f, grouped);
+		const r = await run(["rename", f, "ghost", "gx", "--json"]);
+		expect(r.exitCode).toBe(1);
+		expect(JSON.parse(r.stdout)).toEqual({ ok: false, missing: ["ghost"] });
+	});
+
+	it("exits 1 when new already exists as an artifact id, leaving the file untouched", async () => {
+		const f = join(dir, "rename-new-is-artifact.pfdsl");
+		writeFileSync(f, artifactSrc);
+		const r = await run(["rename", f, "design", "spec"]);
+		expect(r.exitCode).toBe(1);
+		expect(r.stderr).toContain("spec");
+		expect(r.stderr).toContain("artifact");
+		expect(readFileSync(f, "utf-8")).toBe(artifactSrc);
+	});
+
+	it("exits 1 when new already exists as a process id, leaving the file untouched", async () => {
+		const f = join(dir, "rename-new-is-process.pfdsl");
+		writeFileSync(f, artifactSrc);
+		const r = await run(["rename", f, "spec", "impl"]);
+		expect(r.exitCode).toBe(1);
+		expect(r.stderr).toContain("impl");
+		expect(r.stderr).toContain("process");
+		expect(readFileSync(f, "utf-8")).toBe(artifactSrc);
+	});
+
+	it("exits 1 when new already exists as a group id, leaving the file untouched", async () => {
+		const f = join(dir, "rename-new-is-group.pfdsl");
+		writeFileSync(f, grouped);
+		const r = await run(["rename", f, "layer1", "other"]);
+		expect(r.exitCode).toBe(1);
+		expect(r.stderr).toContain("other");
+		expect(readFileSync(f, "utf-8")).toBe(grouped);
+	});
+
+	// Renaming an artifact/process id onto an existing group id is refused
+	// too: group and node ids share one namespace, and the normalizer would
+	// register the renamed artifact first and silently drop the group.
+	it("exits 1 when new (an artifact rename target) collides with an existing group id", async () => {
+		const f = join(dir, "rename-artifact-new-is-group.pfdsl");
+		writeFileSync(f, grouped);
+		const r = await run(["rename", f, "raw", "other"]);
+		expect(r.exitCode).toBe(1);
+		expect(r.stderr).toContain("other");
+		expect(readFileSync(f, "utf-8")).toBe(grouped);
+	});
+
+	describe("frontmatter with YAML anchors, aliases or merge keys", () => {
+		const write = tempFiles();
+
+		const cases: [string, string, string][] = [
+			[
+				"an alias used as a group key",
+				"---\nkey: &key g\ngroup:\n  *key : {}\nartifact:\n  a: {group: g}\n---\na\n",
+				"g",
+			],
+			[
+				"an aliased parts: sequence",
+				"---\nrefs: &refs [a]\nartifact:\n  a: {}\n  b: {parts: *refs}\n---\na\nb\n",
+				"a",
+			],
+			[
+				"an anchored declaration key reused as values",
+				"---\ngroup:\n  &key g: {}\nartifact:\n  a: {group: *key, label: *key}\n---\na\n",
+				"g",
+			],
+			[
+				"an aliased declaration",
+				"---\ngroup:\n  g: {}\nartifact:\n  a: &a {group: g}\n  b: *a\n---\na\nb\n",
+				"g",
+			],
+			[
+				"a merge key",
+				"---\ngroup:\n  g: {}\nartifact:\n  a: {<<: {group: g}}\n---\na\n",
+				"g",
+			],
+		];
+
+		it.each(
+			cases,
+		)("refuses %s with exit 1, leaving the file untouched", async (_name, src, oldId) => {
+			const f = write("anchored.pfdsl", src);
+			const r = await run(["rename", f, oldId, "new", "--write"]);
+			expect(r.exitCode).toBe(1);
+			expect(r.stdout).toBe("");
+			expect(r.stderr).toContain(
+				"YAML anchors, aliases and merge keys (<<) are not supported by rename",
+			);
+			expect(readFileSync(f, "utf-8")).toBe(src);
+		});
+
+		it.each(
+			cases,
+		)("refuses %s from stdin with { ok: false, error } under --json", async (_name, src, oldId) => {
+			const r = await run(
+				["rename", "-", oldId, "new", "--json"],
+				withStdin(src),
+			);
+			expect(r.exitCode).toBe(1);
+			const payload = JSON.parse(r.stdout);
+			expect(payload.ok).toBe(false);
+			expect(payload.error).toContain(
+				"YAML anchors, aliases and merge keys (<<) are not supported by rename",
+			);
+		});
+
+		it("--help lists the refusal", async () => {
+			const r = await run(["rename", "--help"]);
+			expect(r.stdout.replace(/\s+/g, " ")).toContain(
+				"A frontmatter using YAML anchors, aliases or merge keys (<<) anywhere is refused",
+			);
+		});
+	});
+
+	describe("with an extends: preset", () => {
+		const write = tempFiles();
+
+		const withExtends = `---
+extends: ./preset.yaml
+group:
+  local:
+    label: Local
+artifact:
+  a: { group: local }
+---
+a
+`;
+		const withOverride = `---
+extends: ./preset.yaml
+group:
+  shared:
+    label: Local override
+artifact:
+  a: { group: shared }
+---
+a
+`;
+		const preset = `group:
+  shared: { label: S }
+`;
+
+		it("exits 1 when new already exists in the effective (extends-resolved) frontmatter", async () => {
+			const f = write("main.pfdsl", withExtends);
+			write("preset.yaml", preset);
+			const r = await run(["rename", f, "local", "shared"]);
+			expect(r.exitCode).toBe(1);
+			expect(readFileSync(f, "utf-8")).toBe(withExtends);
+		});
+
+		it("exits 1 when old is also defined by the extends: preset (partial override)", async () => {
+			const f = write("main.pfdsl", withOverride);
+			write("preset.yaml", preset);
+			const r = await run(["rename", f, "shared", "renamed"]);
+			expect(r.exitCode).toBe(1);
+			expect(r.stderr).toContain("preset");
+			expect(readFileSync(f, "utf-8")).toBe(withOverride);
+		});
+
+		it("not-declared-locally message names the preset when old is inherited, not locally defined", async () => {
+			const inheritingOnly = `---
+extends: ./preset.yaml
+artifact:
+  a: { group: shared }
+---
+a
+`;
+			const f = write("main.pfdsl", inheritingOnly);
+			write("preset.yaml", preset);
+			const r = await run(["rename", f, "shared", "renamed"]);
+			expect(r.exitCode).toBe(1);
+			expect(r.stderr).toContain("preset");
+			expect(readFileSync(f, "utf-8")).toBe(inheritingOnly);
+		});
+
+		it("refuses (V026) when the extends: target file does not exist, leaving the file untouched", async () => {
+			const missingPreset = `---
+extends: ./missing.yaml
+group:
+  g1:
+    label: G1
+---
+a
+`;
+			const f = write("main.pfdsl", missingPreset);
+			const r = await run(["rename", f, "g1", "g2"]);
+			expect(r.exitCode).toBe(1);
+			expect(r.stderr).toContain("V026");
+			expect(readFileSync(f, "utf-8")).toBe(missingPreset);
+		});
+
+		it("refuses (V028), as check does, when the extends: preset carries a non-presentation key", async () => {
+			const f = write("main.pfdsl", withExtends);
+			write("preset.yaml", `${preset}artifact:\n  x: { label: X }\n`);
+			const checked = await run(["check", f]);
+			expect(checked.exitCode).toBe(1);
+			expect(checked.stderr).toContain("V028");
+
+			const r = await run(["rename", f, "local", "renamed", "--write"]);
+			expect(r.exitCode).toBe(1);
+			expect(r.stderr).toContain("V028");
+			expect(r.stderr).toContain("non-presentation key 'artifact'");
+			expect(readFileSync(f, "utf-8")).toBe(withExtends);
+
+			const json = await run(["rename", f, "local", "renamed", "--json"]);
+			expect(json.exitCode).toBe(1);
+			expect(JSON.parse(json.stdout)).toMatchObject({
+				ok: false,
+				diagnostics: [{ code: "V028" }],
+			});
+		});
+	});
+
+	// Acceptance: rename a boundary artifact with a real child file on disk.
+	describe("subflow boundary preservation with a real child file", () => {
+		const write = tempFiles();
+
+		const child = "order >> pack -> shipment\n";
+
+		it("renaming a boundary artifact adds boundary: {new: old}, and check on the result stays clean", async () => {
+			const parent = [
+				"---",
+				"process:",
+				"  P:",
+				"    subflow: ./child.pfdsl",
+				"---",
+				"order >> P -> shipment",
+			].join("\n");
+			const parentFile = write("parent.pfdsl", parent);
+			write("child.pfdsl", child);
+
+			const r = await run([
+				"rename",
+				parentFile,
+				"order",
+				"order_v2",
+				"--write",
+			]);
+			expect(r.exitCode).toBe(0);
+			const rewritten = readFileSync(parentFile, "utf-8");
+			expect(analyze(rewritten).frontmatter?.process?.P?.boundary).toEqual({
+				order_v2: "order",
+			});
+			expect(rewritten).toContain("order_v2 >> P -> shipment");
+
+			const checkResult = await run(["check", parentFile]);
+			expect(checkResult.exitCode).toBe(0);
+		});
+
+		it("renaming an already-mapped boundary key renames the key, keeping the child-side value", async () => {
+			const parent = [
+				"---",
+				"process:",
+				"  P:",
+				"    subflow: ./child.pfdsl",
+				"    boundary: { incoming_order: order }",
+				"---",
+				"incoming_order >> P -> shipment",
+			].join("\n");
+			const parentFile = write("parent.pfdsl", parent);
+			write("child.pfdsl", child);
+
+			const r = await run([
+				"rename",
+				parentFile,
+				"incoming_order",
+				"incoming_order_v2",
+				"--write",
+			]);
+			expect(r.exitCode).toBe(0);
+			const rewritten = readFileSync(parentFile, "utf-8");
+			expect(rewritten).toContain("boundary: { incoming_order_v2: order }");
+
+			const checkResult = await run(["check", parentFile]);
+			expect(checkResult.exitCode).toBe(0);
+		});
+
+		it("renaming a non-boundary artifact adds no boundary: entry", async () => {
+			const parent = [
+				"---",
+				"process:",
+				"  P:",
+				"    subflow: ./child.pfdsl",
+				"---",
+				"order >> P -> shipment",
+				"unrelated >> other",
+			].join("\n");
+			const parentFile = write("parent.pfdsl", parent);
+			write("child.pfdsl", child);
+
+			const r = await run([
+				"rename",
+				parentFile,
+				"unrelated",
+				"unrelated_v2",
+				"--write",
+			]);
+			expect(r.exitCode).toBe(0);
+			const rewritten = readFileSync(parentFile, "utf-8");
+			expect(rewritten).not.toContain("boundary:");
+
+			const checkResult = await run(["check", parentFile]);
+			expect(checkResult.exitCode).toBe(0);
+		});
+
+		it("refuses a rename when the input already has an unrelated subflow boundary error (V034), leaving the file untouched", async () => {
+			// The child's terminal is `shipment`; the parent's output `z`
+			// does not match it — a V034 the input already has, unrelated to
+			// the `q` being renamed.
+			const parent = [
+				"---",
+				"process:",
+				"  P:",
+				"    subflow: ./child.pfdsl",
+				"---",
+				"order >> P -> z",
+				"q >> r -> s",
+			].join("\n");
+			const parentFile = write("parent.pfdsl", parent);
+			write("child.pfdsl", child);
+
+			const r = await run(["rename", parentFile, "q", "q2", "--write"]);
+			expect(r.exitCode).toBe(1);
+			expect(r.stderr).toContain("[V034]");
+			expect(r.stderr).toContain(
+				`rename: refusing to write ${parentFile}: the result would have errors (an error already in the input also blocks the rename)`,
+			);
+			expect(readFileSync(parentFile, "utf-8")).toBe(parent);
+		});
+
+		// The post-write gate's subflow half is covered by the V034 test above;
+		// this one pins that a boundary artifact is still subject to the
+		// earlier <new>-already-exists refusal.
+		it("refuses renaming a boundary artifact onto another boundary artifact's id (new already exists), leaving the file untouched", async () => {
+			const parent = [
+				"---",
+				"process:",
+				"  P:",
+				"    subflow: ./child.pfdsl",
+				"    boundary: { shipment: shipment, order_v2: order }",
+				"---",
+				"order_v2 >> P -> shipment",
+			].join("\n");
+			const parentFile = write("parent.pfdsl", parent);
+			write("child.pfdsl", child);
+
+			const r = await run(["rename", parentFile, "order_v2", "shipment"]);
+			expect(r.exitCode).toBe(1);
+			expect(r.stderr).toBe(
+				`rename: 'shipment' already exists as an artifact id in ${parentFile}\n`,
+			);
+			expect(readFileSync(parentFile, "utf-8")).toBe(parent);
 		});
 	});
 });

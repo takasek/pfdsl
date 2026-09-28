@@ -140,6 +140,23 @@ pfdsl meta set <file> <artifact-id> status <status>   # todo|wip|done|waiting|su
 
 Sets the status in place and validates in one step — always prefer it over hand-editing. Only if the CLI is genuinely unavailable, edit `status:` in the artifact's frontmatter and then run `check` to validate.
 
+## Typical task: rename an id or regroup nodes
+
+```bash
+pfdsl rename <file> <old-id> <new-id> --write          # artifact, process or group id, with every reference to it
+pfdsl meta list <file> --group <group-id>              # current members of a group
+pfdsl meta set <file> <id1,id2,...> group <group-id>   # reassign many nodes in one write
+```
+
+`rename` rewrites the declaration and every reference in the file, including body edges for an artifact or process, so prefer it over search-and-replace.
+Without `--write` it prints the rewritten file, which is a preview.
+It keeps the body's layout, including the order of set members, so run `pfdsl fmt --write` afterwards on a file you keep formatted.
+It edits only the given file: a parent that points to it through `subflow:`, or a file that extends it as a preset, must be checked separately, and `pfdsl rename --help` lists what it rewrites and refuses.
+It leaves `label:` as it was, so update a label that names the old id with `meta set <file> <new-id> label <text>`.
+`meta set` takes comma-separated ids and writes all of them or none, so regrouping a batch of nodes is one call, not one edit per node.
+It only writes to nodes declared in the frontmatter; a node that appears only in the body is reported as not found, so declare it first.
+Declare a new group under `group:` before moving nodes into it: a `group:` value that names an undeclared group passes `check` without a warning, and those nodes render outside every cluster.
+
 ## References — which to read when
 
 | 局面 | 読む場所 |
