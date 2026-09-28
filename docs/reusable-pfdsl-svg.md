@@ -7,7 +7,7 @@ Direct push mode requires that App to bypass the pull request requirement on the
 Keep the App installation limited to the repositories that need this workflow.
 
 Store the App's private key in each caller repository as an Actions secret, and pass its client ID as an input.
-For this repository's built-in push trigger, use the `PFDSL_SVG_APP_PRIVATE_KEY` secret and `PFDSL_SVG_APP_CLIENT_ID` variable.
+For this repository's built-in push trigger, use the `PFD_GENERATOR_APP_PRIVATE_KEY` secret and `PFD_GENERATOR_APP_CLIENT_ID` variable.
 
 For another repository, add a caller workflow such as the following.
 The caller's `branches` and `paths` filters control when the workflow starts; the `target-branch` and `paths` inputs control which branch and PFD files it processes.
@@ -28,14 +28,14 @@ jobs:
   render:
     uses: takasek/pfdsl/.github/workflows/render-pfdsl-svg.yml@main
     with:
-      app-client-id: ${{ vars.PFDSL_SVG_APP_CLIENT_ID }}
+      app-client-id: ${{ vars.PFD_GENERATOR_APP_CLIENT_ID }}
       mode: pr
       target-branch: main
       paths: |
         .pfdsl/**/*.pfdsl
         docs/process/**/*.pfdsl
     secrets:
-      app-private-key: ${{ secrets.PFDSL_SVG_APP_PRIVATE_KEY }}
+      app-private-key: ${{ secrets.PFD_GENERATOR_APP_PRIVATE_KEY }}
 ```
 
 Pin the `uses` reference to a reviewed commit or release tag for stable behavior.
