@@ -1467,8 +1467,12 @@ export function runRename(
 			absFile,
 			(p) => (p === absFile ? analysis : fileLoader(p)),
 		);
+		// check's V028 on each loaded preset, which loadExtendsChain leaves out.
+		const presetKeyDiagnostics = [...docs]
+			.filter(([path]) => path !== absFile)
+			.flatMap(([path, doc]) => validatePresetKeys(path, doc.frontmatter));
 		const failedExtends = failIfErrors(
-			extendsDiagnostics,
+			[...extendsDiagnostics, ...presetKeyDiagnostics],
 			file,
 			opts.json,
 			opts.color,

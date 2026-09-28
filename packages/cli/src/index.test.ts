@@ -1206,6 +1206,27 @@ a
 			expect(r.stderr).toContain("V026");
 			expect(readFileSync(f, "utf-8")).toBe(missingPreset);
 		});
+
+		it("refuses (V028), as check does, when the extends: preset carries a non-presentation key", async () => {
+			const f = write("main.pfdsl", withExtends);
+			write("preset.yaml", `${preset}artifact:\n  x: { label: X }\n`);
+			const checked = await run(["check", f]);
+			expect(checked.exitCode).toBe(1);
+			expect(checked.stderr).toContain("V028");
+
+			const r = await run(["rename", f, "local", "renamed", "--write"]);
+			expect(r.exitCode).toBe(1);
+			expect(r.stderr).toContain("V028");
+			expect(r.stderr).toContain("non-presentation key 'artifact'");
+			expect(readFileSync(f, "utf-8")).toBe(withExtends);
+
+			const json = await run(["rename", f, "local", "renamed", "--json"]);
+			expect(json.exitCode).toBe(1);
+			expect(JSON.parse(json.stdout)).toMatchObject({
+				ok: false,
+				diagnostics: [{ code: "V028" }],
+			});
+		});
 	});
 
 	// Acceptance: rename a boundary artifact with a real child file on disk.
