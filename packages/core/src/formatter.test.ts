@@ -415,7 +415,7 @@ describe("formatId spells an id bare only when the lexer reads it back as one id
 		const src = `${JSON.stringify(id)} >> p -> b\n`;
 		const { tokens } = lex(src);
 		const { document } = parseTokens(tokens);
-		const { edges } = normalize(document);
+		const { edges } = normalize(document, null);
 		expect(edges.map((e) => e.artifact)).toContain(id);
 		expect(formatEdges(edges)).toContain(JSON.stringify(id));
 	});
