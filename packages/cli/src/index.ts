@@ -417,6 +417,27 @@ function failIfErrors(
 }
 
 /**
+ * An exit-1 refusal: `message`, preceded by the error diagnostics that
+ * caused it when there are any. With --json: `{ ok: false, error }`, plus
+ * `diagnostics` when given.
+ */
+function refuseWith(
+	message: string,
+	file: string,
+	errs: Diagnostic[] | undefined,
+	json = false,
+	color = false,
+): CommandResult {
+	if (json) {
+		return failJson(
+			errs ? { error: message, diagnostics: errs } : { error: message },
+		);
+	}
+	const diagLines = errs ? diagText(errs, file, color) : "";
+	return fail(`${diagLines}${message}\n`);
+}
+
+/**
  * Refuse an operation that only a roadmap may take part in (§15.14). `subject`
  * names what is being refused and opens the message. An omitted `type:` reads
  * as roadmap, so only an explicit other kind is turned away — the callers all
@@ -1351,10 +1372,13 @@ export function runMetaSet(
 		// shares the `{ ok: false, diagnostics: [...] }` failure contract with
 		// every other diagnostic-emitting command (#508). The `error` line
 		// carries what diagnostics cannot: that nothing was written.
-		const errs = resulting.filter((d) => d.severity === "error");
-		const message = `meta set: refusing to write ${file}: the result would have errors`;
-		if (opts.json) return failJson({ error: message, diagnostics: errs });
-		return fail(`${diagText(errs, file, opts.color)}${message}\n`);
+		return refuseWith(
+			`meta set: refusing to write ${file}: the result would have errors`,
+			file,
+			resulting.filter((d) => d.severity === "error"),
+			opts.json,
+			opts.color,
+		);
 	}
 	writeFileSync(file, newSrc, "utf-8");
 
@@ -1417,17 +1441,8 @@ export function runRename(
 	const source = readSource(file);
 	if (isCommandResult(source)) return source;
 
-	// Every exit-1 refusal: the message alone, or — from the gate on the
-	// write — preceded by the diagnostics that caused it.
-	const refuse = (message: string, errs?: Diagnostic[]): CommandResult => {
-		if (opts.json) {
-			return failJson(
-				errs ? { error: message, diagnostics: errs } : { error: message },
-			);
-		}
-		const diagLines = errs ? diagText(errs, file, opts.color) : "";
-		return fail(`${diagLines}${message}\n`);
-	};
+	const refuse = (message: string, errs?: Diagnostic[]): CommandResult =>
+		refuseWith(message, file, errs, opts.json, opts.color);
 
 	const analysis = analyze(source);
 	const result = rename(source, oldId, newId, { analysis });
