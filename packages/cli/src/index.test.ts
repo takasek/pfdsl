@@ -934,6 +934,25 @@ processed >> transform -> done
 		expect(r.stdout).toBe('"---" >> p -> b\n');
 	});
 
+	// `""` is a valid quoted id, so an empty argument names it rather than
+	// being a missing one.
+	it("renames the empty id away", async () => {
+		const r = await run(["rename", "-", "", "x"], withStdin('"" >> p -> b\n'));
+		expect(r.exitCode).toBe(0);
+		expect(r.stdout).toBe("x >> p -> b\n");
+	});
+
+	it("renames onto the empty id, quoting it so the result re-reads", async () => {
+		const r = await run(["rename", "-", "a", ""], withStdin("a >> p -> b\n"));
+		expect(r.exitCode).toBe(0);
+		expect(r.stdout).toBe('"" >> p -> b\n');
+		const reread = analyze(r.stdout);
+		expect(reread.diagnostics.filter((d) => d.severity === "error")).toEqual(
+			[],
+		);
+		expect(reread.edges.map((e) => e.artifact)).toContain("");
+	});
+
 	it("exits 1 on a structural (FM/P/L) diagnostic and leaves the file untouched", async () => {
 		const broken = `---
 group:

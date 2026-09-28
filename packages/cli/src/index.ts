@@ -4435,7 +4435,10 @@ export const TOP_LEVEL_COMMANDS: readonly CommandEntry[] = [
 		options: RENAME_OPTIONS,
 		run: (positional, flags) => {
 			const [f, oldId, newId, ...extra] = positional;
-			if (!f || !oldId || !newId) return fail(HELP_RENAME, 2);
+			// `""` is a valid quoted id, so only an absent argument is missing.
+			if (!f || oldId === undefined || newId === undefined) {
+				return fail(HELP_RENAME, 2);
+			}
 			if (extra.length > 0) return fail(HELP_RENAME, 2);
 			return runRename(f, oldId, newId, {
 				write: flags.write === true,
