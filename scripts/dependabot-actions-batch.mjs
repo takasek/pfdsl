@@ -11,7 +11,16 @@ const pinLine = new RegExp(
 const headSha = (pull) => pull.head?.sha ?? pull.sha;
 const headKey = (pull) => `${pull.number}@${headSha(pull)}`;
 
-export function selectBatch(pulls, { repository, excludedHeads = new Set() }) {
+export function selectBatch(
+	pulls,
+	{
+		repository,
+		excludedHeads = new Set(),
+		now = Date.now(),
+		minimumAgeMinutes = 0,
+	},
+) {
+	const createdBefore = now - minimumAgeMinutes * 60_000;
 	const eligible = pulls
 		.filter(
 			(p) =>
@@ -22,7 +31,9 @@ export function selectBatch(pulls, { repository, excludedHeads = new Set() }) {
 				!excludedHeads.has(headKey(p)) &&
 				p.head?.repo?.full_name === repository &&
 				p.head?.ref?.startsWith("dependabot/github_actions/") &&
-				/^[0-9a-f]{40}$/.test(p.head?.sha ?? ""),
+				/^[0-9a-f]{40}$/.test(p.head?.sha ?? "") &&
+				(minimumAgeMinutes === 0 ||
+					Date.parse(p.created_at ?? "") <= createdBefore),
 		)
 		.sort((a, b) => a.number - b.number);
 	return { status: eligible.length ? "ready" : "empty", pulls: eligible };
@@ -152,19 +163,12 @@ export function batchEntries(body) {
 }
 
 export function isOwnBatchPull(pull, repository) {
+	const entries = batchEntries(pull.body);
 	return (
 		pull.head?.repo?.full_name === repository &&
-		/^automation\/dependabot-actions-[0-9]+-[0-9]+-[0-9a-f]{12}$/.test(
-			pull.head?.ref ?? "",
-		)
+		entries.length > 0 &&
+		pull.head?.ref === batchBranchName(entries)
 	);
-}
-
-function entriesForBatchPull(pull) {
-	const entries = batchEntries(pull.body);
-	if (entries.length === 0 || batchBranchName(entries) !== pull.head.ref)
-		throw new Error(`Invalid batch membership marker on PR #${pull.number}`);
-	return entries;
 }
 
 export function createFinalPr(
@@ -174,7 +178,7 @@ export function createFinalPr(
 ) {
 	const numbers = pulls.map((pull) => pull.number);
 	const refs = numbers.map((number) => `#${number}`).join(", ");
-	const body = `Combines Dependabot GitHub Actions updates ${refs} and refreshes generated mirrors and pin assertions. Merge this PR with a merge commit so the source PRs are marked as merged.\n\nno-issue: automated dependency maintenance\n\nbatch-includes: ${pulls.map(headKey).join(",")}`;
+	const body = `Combines Dependabot GitHub Actions updates ${refs} and refreshes generated mirrors and pin assertions. Merge this PR with a merge commit so the source PRs are marked as merged. Keep the batch-includes line unchanged.\n\nno-issue: automated dependency maintenance\n\nbatch-includes: ${pulls.map(headKey).join(",")}`;
 	const args = [
 		"pr",
 		"create",
@@ -243,6 +247,9 @@ function assertNoOrphanBranch() {
 }
 
 function main() {
+	const eventName = process.env.GITHUB_EVENT_NAME;
+	if (eventName !== "workflow_run" && eventName !== "workflow_dispatch")
+		throw new Error("Unsupported GITHUB_EVENT_NAME");
 	const repository = process.env.GITHUB_REPOSITORY;
 	if (!repository || !/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(repository))
 		throw new Error("Invalid GITHUB_REPOSITORY");
@@ -260,7 +267,7 @@ function main() {
 	const cancelledNumbers = new Set(
 		closed
 			.filter((p) => !p.merged_at && isOwnBatchPull(p, repository))
-			.flatMap((p) => entriesForBatchPull(p).map((entry) => entry.number)),
+			.flatMap((p) => batchEntries(p.body).map((entry) => entry.number)),
 	);
 	if (
 		pulls.some(
@@ -275,11 +282,12 @@ function main() {
 	const excludedHeads = new Set(
 		closed
 			.filter((p) => p.merged_at && isOwnBatchPull(p, repository))
-			.flatMap((p) => entriesForBatchPull(p).map(headKey)),
+			.flatMap((p) => batchEntries(p.body).map(headKey)),
 	);
 	const batch = selectBatch(pulls, {
 		repository,
 		excludedHeads,
+		minimumAgeMinutes: eventName === "workflow_run" ? 15 : 0,
 	});
 	if (batch.status !== "ready") {
 		console.log(`Dependabot Actions batch: ${batch.status}`);

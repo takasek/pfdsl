@@ -40,6 +40,24 @@ describe("Dependabot Actions batch selection", () => {
 		);
 	});
 
+	it("leaves a newly opened PR for its own 15-minute queue run", () => {
+		const pulls = [pr(10), pr(11, { created_at: "2026-09-28T09:59:59Z" })];
+		const automatic = selectBatch(pulls, {
+			repository: "takasek/pfdsl",
+			now: Date.parse("2026-09-28T10:00:00Z"),
+			minimumAgeMinutes: 15,
+		});
+		assert.deepEqual(
+			automatic.pulls.map((p) => p.number),
+			[10],
+		);
+		const manual = selectBatch(pulls, { repository: "takasek/pfdsl" });
+		assert.deepEqual(
+			manual.pulls.map((p) => p.number),
+			[10, 11],
+		);
+	});
+
 	it("does not lose a PR after its update timestamp changes", () => {
 		const result = selectBatch(
 			[pr(10, { updated_at: "2026-09-28T09:59:00Z" })],
@@ -137,9 +155,11 @@ describe("Dependabot Actions batch selection", () => {
 
 	it("recognizes only a batch branch from this repository", () => {
 		const ref = batchBranchName([pr(10), pr(11)]);
+		const body = `batch-includes: 10@${pr(10).head.sha},11@${pr(11).head.sha}`;
 		assert.equal(
 			isOwnBatchPull(
 				{
+					body,
 					head: {
 						ref,
 						repo: { full_name: "other/pfdsl" },
@@ -152,6 +172,7 @@ describe("Dependabot Actions batch selection", () => {
 		assert.equal(
 			isOwnBatchPull(
 				{
+					body,
 					head: {
 						ref,
 						repo: { full_name: "takasek/pfdsl" },
@@ -166,6 +187,19 @@ describe("Dependabot Actions batch selection", () => {
 				{
 					head: {
 						ref: "codex/dependabot-actions-batch",
+						repo: { full_name: "takasek/pfdsl" },
+					},
+				},
+				"takasek/pfdsl",
+			),
+			false,
+		);
+		assert.equal(
+			isOwnBatchPull(
+				{
+					body: "unrelated PR",
+					head: {
+						ref,
 						repo: { full_name: "takasek/pfdsl" },
 					},
 				},
