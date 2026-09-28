@@ -45,14 +45,25 @@ const READ_ONLY_GH_VERBS = new Set([
 /** git subcommands that publish to a remote. */
 const OUTWARD_GIT_SUBCOMMANDS = new Set(["push"]);
 
-/** git global flags that take a separate value, so the value is not the subcommand. */
-const GIT_GLOBAL_FLAGS_WITH_VALUE = new Set([
+/**
+ * git global flags that take a separate value, so the value is not the
+ * subcommand. Exported so main-commit-guard.mjs's hasHooksPathGlobalOverride
+ * (#1232) can skip the same flags' values when it scans the pre-subcommand
+ * span for a `-c`/`--config-env` `core.hooksPath` override.
+ * `--config-env` and `--attr-source` were added once their value tokens
+ * turned up misread as the subcommand itself (#1232): `git --attr-source
+ * HEAD commit -m x` on main went unclassified because `HEAD` read as the
+ * subcommand.
+ */
+export const GIT_GLOBAL_FLAGS_WITH_VALUE = new Set([
 	"-C",
 	"-c",
 	"--git-dir",
 	"--work-tree",
 	"--namespace",
 	"--exec-path",
+	"--config-env",
+	"--attr-source",
 ]);
 
 // Split on shell separators that start a new command, ignoring separators

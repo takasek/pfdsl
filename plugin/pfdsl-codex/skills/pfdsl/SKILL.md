@@ -40,7 +40,7 @@ artifact:
   <id>:
     label: 人間向けラベル
     description: ...
-    status: done           # todo=未着手 | wip=生産中（ブランチ/PR open）| done=main済み | waiting=外部要因待ち | suspended=自主保留
+    status: done           # todo=未着手 | wip=生産中 | done=完了（PR で統合するなら完了の PR の中で done にし、merge で統合先に届く）| waiting=外部要因待ち | suspended=自主保留
     criteria: ...           # 完了条件（todo/wip でも前宣言として書く）
     location: path/to/file  # 実体ファイル・URL へのポインタ。可視化でリンクになる。相対パスは「この .pfdsl ファイルからの相対」で書く
     owner: ...
@@ -178,4 +178,4 @@ Declare a new group under `group:` before moving nodes into it: a `group:` value
 | フィールドの正確な仕様 | `references/spec.md` §3–5（モデル・識別子・型推論）・§14（正準順序） |
 | PFD のレビュー・監査 | `references/review-perspectives.md`（A/B/C カタログ。A/B は図、C は normative 仕様文書（自リポ保守の仕様がある場合）の監査。書くルールは `references/quality-guide.md`、問い詰めはこちら） |
 
-`references/spec.md` は full spec v0.0.24（20節・大型）— 全読せず、節見出し（`## N.`）とエラーコードで該当箇所だけ読む。
+`references/spec.md` は full spec v0.0.25（20節・大型）— 全読せず、節見出し（`## N.`）とエラーコードで該当箇所だけ読む。
