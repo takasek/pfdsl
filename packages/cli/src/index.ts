@@ -1457,9 +1457,10 @@ export function runRename(
 	const absFile = file === "-" ? null : resolve(file);
 	let presetGroup: Record<string, unknown> | undefined;
 	if (absFile !== null && analysis.frontmatter?.extends !== undefined) {
+		// The entry file is already read and analyzed; only presets are loaded.
 		const { docs, diagnostics: extendsDiagnostics } = loadExtendsChain(
 			absFile,
-			fileLoader,
+			(p) => (p === absFile ? analysis : fileLoader(p)),
 		);
 		const failedExtends = failIfErrors(
 			extendsDiagnostics,
@@ -1519,7 +1520,8 @@ export function runRename(
 				absFile,
 				resultAnalysis.edges,
 				resultAnalysis.frontmatter,
-				fileLoader,
+				// The entry is the rewritten result, not the file on disk.
+				(p) => (p === absFile ? resultAnalysis : fileLoader(p)),
 			).diagnostics,
 		);
 	}
