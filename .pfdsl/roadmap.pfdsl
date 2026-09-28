@@ -92,6 +92,16 @@ artifact:
     description: "delete が group id を受け付け、宣言と所属ノード・子 group からの参照を扱うこと。扱いの設計は #1278 で決める"
     status: todo
     criteria: "pfdsl delete <file> <group-id> --write が group の宣言を削除し、所属ノードの group: と子 group の parent: を #1278 で決めた規則どおりに扱うことが packages/cli/src/index.test.ts のテストで検証されている"
+  group_node_clash_diagnostic:
+    label: "group と node の同名を報告する診断 (#1291)"
+    description: "1ファイル内で group と artifact / process が同じ id を持つことを invalid として、種別を正しく名指して報告する診断。spec §2.8.1 と §15 への規定を含む"
+    status: todo
+    criteria: "group と artifact / process が同じ id を持つファイルに対し、check が種別を名指すエラーを報告し、docs/spec/spec.md に規定があり、packages/core のテストで検証されている"
+  cli_release_group_node_clash:
+    label: "CLIリリース: group と node の同名の診断"
+    description: "#1291 の診断を含む npm CLI と、同じ release tag から配布する plugin 資産"
+    status: todo
+    criteria: "npm view @pfdsl/cli versions に同名の診断を含む版が含まれ、その版を固定して取得した CLI の check が group と node の同名をエラーとして報告する"
   cli_release_group_delete:
     label: "CLIリリース: group 削除"
     description: "#1278 の group 削除を含む npm CLI と、同じ release tag から配布する plugin 資産"
@@ -178,7 +188,7 @@ process:
   i1218_add_rename:
     label: id 改名 CLI の追加
     location: https://github.com/takasek/pfdsl/issues/1218
-    updated_at: 2026-09-26T17:36:06Z
+    updated_at: 2026-09-28T07:29:35Z
   publish_cli_rename:
     label: CLI id 改名公開
   i1278_add_group_delete:
@@ -187,6 +197,12 @@ process:
     updated_at: 2026-09-26T17:36:28Z
   publish_cli_group_delete:
     label: CLI group 削除公開
+  i1291_report_group_node_clash:
+    label: group と node の同名の診断を追加する
+    location: https://github.com/takasek/pfdsl/issues/1291
+    updated_at: 2026-09-27T10:23:04Z
+  publish_cli_group_node_clash:
+    label: CLI 同名診断公開
   i1282_create_node_definition:
     label: ノード定義作成操作を実装する
     location: https://github.com/takasek/pfdsl/issues/1282
@@ -256,6 +272,9 @@ rename_cli >> publish_cli_rename -> cli_release_rename
 
 toolchain >> i1278_add_group_delete -> group_delete_cli
 group_delete_cli >> publish_cli_group_delete -> cli_release_group_delete
+
+toolchain >> i1291_report_group_node_clash -> group_node_clash_diagnostic
+group_node_clash_diagnostic >> publish_cli_group_node_clash -> cli_release_group_node_clash
 def_insertion >> i1282_create_node_definition -> node_definition_creation
 
 toolchain >> i1283_add_node_location_cycle -> node_location_cycle
