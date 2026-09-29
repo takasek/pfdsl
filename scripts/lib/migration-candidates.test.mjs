@@ -46,6 +46,29 @@ describe("parseMigrationCandidateArgs", () => {
 		);
 	});
 
+	it("rejects an empty end instead of listing up to HEAD", () => {
+		assert.throws(
+			() => parseMigrationCandidateArgs(["--from", "v0.0.26", "--to="]),
+			/--to must not be empty/,
+		);
+		assert.throws(
+			() => parseMigrationCandidateArgs(["--from", "v0.0.26", "--to", ""]),
+			/--to must not be empty/,
+		);
+	});
+
+	it("rejects a flag given twice instead of keeping the last one", () => {
+		assert.throws(
+			() => parseMigrationCandidateArgs(["--from", "a", "--from", "b"]),
+			/--from was given more than once/,
+		);
+		assert.throws(
+			() =>
+				parseMigrationCandidateArgs(["--from", "a", "--to", "b", "--to", "c"]),
+			/--to was given more than once/,
+		);
+	});
+
 	it("rejects unknown flags and positionals instead of skipping them", () => {
 		assert.throws(() =>
 			parseMigrationCandidateArgs(["--from", "v0.0.26", "--since", "x"]),

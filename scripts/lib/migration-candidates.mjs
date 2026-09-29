@@ -22,7 +22,7 @@ export function migrationCandidatePaths() {
  * @returns {{from: string, to: string}}
  */
 export function parseMigrationCandidateArgs(args) {
-	const { values } = parseArgs({
+	const { values, tokens } = parseArgs({
 		args,
 		options: {
 			from: { type: "string" },
@@ -30,15 +30,28 @@ export function parseMigrationCandidateArgs(args) {
 		},
 		strict: true,
 		allowPositionals: false,
+		tokens: true,
 	});
-	if (values.from === undefined || values.from === "") {
-		throw new Error("--from is required");
+	// parseArgs keeps the last of a repeated flag, which would hide a mistyped interval.
+	for (const flag of ["from", "to"]) {
+		const given = tokens.filter(
+			(token) => token.kind === "option" && token.name === flag,
+		);
+		if (given.length > 1) {
+			throw new Error(`--${flag} was given more than once`);
+		}
 	}
 	const to = values.to ?? "HEAD";
+	// An empty value is rejected, not defaulted: `--to "$UNSET"` would otherwise list `from..` up to HEAD.
 	for (const [flag, value] of [
 		["--from", values.from],
 		["--to", to],
 	]) {
+		if (value === undefined || value === "") {
+			throw new Error(
+				flag === "--from" ? "--from is required" : "--to must not be empty",
+			);
+		}
 		// The revisions reach git as positional arguments, where a leading dash would be read as one of its options.
 		if (value.startsWith("-")) {
 			throw new Error(`${flag} must not start with '-'`);
