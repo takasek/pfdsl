@@ -761,6 +761,7 @@ describe("generated-file attributes", () => {
 				".codex/config.toml",
 				".codex/GENERATED.md",
 				".codex/hooks.json",
+				".codex/future-policy.toml",
 				"plugin/pfdsl-codex/skills/pfd-ops/SKILL.md",
 				"generated/skills/pfdsl/SKILL.md",
 				".claude/skills/pfd-ops/install/scripts/pfdsl/sweep-completed-chains.mjs",
@@ -804,13 +805,14 @@ describe("generated-file attributes", () => {
 			".claude/skills/pfd-ops/install/scripts/pfdsl/sweep-completed-chains.mjs",
 			"plugin/pfdsl/skills/pfdsl/SKILL.md",
 			"CLAUDE.md",
-			".claude-plugin/marketplace.json",
 			"docs/samples/01-simple-chain.dot",
-			"docs/samples/README.md",
 		]) {
 			assert.equal(attributes.get(path), "true", path);
 		}
 		for (const path of [
+			".claude-plugin/marketplace.json",
+			".codex/future-policy.toml",
+			"docs/samples/README.md",
 			".pfdsl/workflow.svg",
 			".pfdsl/team/flow.svg",
 			"docs/readme-example.svg",
