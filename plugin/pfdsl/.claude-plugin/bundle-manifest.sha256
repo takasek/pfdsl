@@ -24,7 +24,7 @@ f06d659b5f29b1e79d5f528e130e329a8751db83dcd3aa7452ab3d9575a27460  skills/pfd-eco
 
 13d64d0bcb84a67cddd72948bfe48547bf97648b2b5631496fdd525d5fbbc22f  skills/pfd-grill/SKILL.md
 
-4b702b67cbaba6172e42743e0ed9182c104491017f534672e92943e3baec947f  skills/pfd-ops/SKILL.md
+9ac9eeecd460323fed88be760423dd42e02bd24cf703dd3bac7f588f7cd8279f  skills/pfd-ops/SKILL.md
 
 558934bd272e04e5e3bbcdd7aaf8557f1e3f58efbc6b67602f4a64f4afac1ffd  skills/pfd-ops/install/.github/workflows/pfdsl-sweep-completed-chains.yml
 
@@ -82,7 +82,7 @@ b51600df7bb094ecefd9ae3f6a8cc1f46fca660b1b6977af88f3464f333a1472  skills/pfd-ops
 
 c1328f9dcb946c35f7bba42306324d82929f7031fb52d459c3b2ee12fd904686  skills/pfd-ops/references/scaffold/workflow.pfdsl
 
-471cd311db86eeaa6196afb11a5446e30a5f4cfa62b9c9d04b4329d210932eb3  skills/pfd-ops/references/work-cycle.md
+d8c92e2918a8e3f82e6f79a023e81b563c14513ca34f64092445e61292a1c247  skills/pfd-ops/references/work-cycle.md
 
 73fbfa448340284eac36b338e709a1246405371c77bd6856bde3d3cbbf7b4ca1  skills/pfd-ops/scripts/check-install-sync.mjs
 

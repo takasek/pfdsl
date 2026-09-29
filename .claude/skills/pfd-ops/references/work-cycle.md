@@ -55,6 +55,7 @@ bare GitHub Issue 番号や一般的な issue 作業の依頼だけを根拠に 
 binding（`.pfdsl/bindings/pfd-ops.md`）に「ワークサイクルの追加手順」節がある場合、手順 1〜3 の各段でその追加手順に従う。無ければ本文の手順だけで足りる。
 
 1. **選択**:
+   - 手順1で CLI を使う前に pfdsl スキルの CLI プリフライトを実施し、要求版を満たす CLI の実行方法を確定する。採用リポ固有の CLI 実行規約がある場合は、その規約も適用する。
    - `.pfdsl/roadmap.pfdsl` の着手可能プロセスを列挙する。`pfdsl status ready <roadmap.pfdsl> --best --json` で、入力 artifact が全て done のプロセス一覧と `--best` 推薦（合流点を解放するもの＝後続プロセスの最後の未完入力になっているもの）が JSON で得られる。着手可能集合が薄く「何が止めているか」を知りたい場合は `status blocked <roadmap.pfdsl>` で各未着手プロセスの未達入力 artifact を一覧できる（`graph stats` の fan-out と併せればボトルネックの優先度づけもできる）
    - ユーザー指定があればそれを、なければ `best` の推薦を優先して1つ選ぶ。roadmap 非管理の作業項目（exempt 等）を識別子で指定された場合も本手順で処理する — ready 列挙に出ないことは cycle を通さない理由にならない（プリフライト・終端ゲート・retro は変更内容と独立に有効）。**ユーザー指定で入力 artifact が done でないプロセスを選んだ場合、「前提条件未達で着手する」とその理由を記録してから実行する**
    - binding の追加手順（手順 1）があればここで従う。

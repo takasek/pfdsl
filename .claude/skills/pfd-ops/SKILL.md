@@ -49,7 +49,7 @@ node ${CLAUDE_PLUGIN_ROOT}/skills/pfd-ops/scripts/check-install-sync.mjs --upstr
 
 各運用 `.pfdsl` を扱うときは同名 sibling `.md` も読み、次の一意な経路で詳細を解決する。
 
-- **閲覧・分類・優先順位**: 採用済み roadmap では `pfdsl status ready <roadmap.pfdsl> --best --json` で着手可能集合と推薦を列挙し、作業項目の分類は roadmap companion が指す採用バックエンドに従う
+- **閲覧・分類・優先順位**: 採用済み roadmap では pfdsl スキルの CLI プリフライトを先に実施し、要求版を満たす CLI で `pfdsl status ready <roadmap.pfdsl> --best --json` を実行して着手可能集合と推薦を列挙する。作業項目の分類は roadmap companion が指す採用バックエンドに従う
 - **作業項目への着手**: `references/work-cycle.md` の全手順に従い、`.pfdsl/bindings/pfd-ops.md` に「ワークサイクルの追加手順」節があれば手順1〜3の各段でその追加手順にも従う
 - **終端ゲート**: `references/work-cycle.md` の終端ゲートと、binding の「ワークサイクルの追加手順」が加える項目に従う
 - **知見の振り分け**: `references/work-cycle.md` の運用契約「知見と機械化」と `.pfdsl/workflow.pfdsl` および sibling companion に従い、再発防止の反映先・機械化の判定・hook の決定軸は binding に従う
