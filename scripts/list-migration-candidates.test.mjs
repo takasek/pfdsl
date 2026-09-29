@@ -8,14 +8,15 @@ import { tryGit, tryRun } from "./lib/run-exec.mjs";
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const script = resolve(root, "scripts/list-migration-candidates.mjs");
 
-const listing = (args) =>
+const listing = (args, env) =>
 	tryRun(process.execPath, [script, ...args], {
 		cwd: root,
 		captureStderr: true,
+		...(env === undefined ? {} : { env: { ...process.env, ...env } }),
 	});
 
-// Commits between v0.0.26 and dc94909e that changed adopter-facing behavior but carry no `!` marker.
-// They are the ones a listing keyed on commit markers missed.
+// Commits between v0.0.26 and dc94909e that changed adopter-facing behavior.
+// Some carry a `!` marker and some do not; a listing keyed on commit markers or per-PR notes missed them.
 const KNOWN_ADOPTER_COMMITS = [
 	"1ecbbb24",
 	"5685f158",
@@ -24,6 +25,12 @@ const KNOWN_ADOPTER_COMMITS = [
 	"8a84b139",
 	"313c490f",
 ];
+
+const gitAbbrev = (length) => ({
+	GIT_CONFIG_COUNT: "1",
+	GIT_CONFIG_KEY_0: "core.abbrev",
+	GIT_CONFIG_VALUE_0: String(length),
+});
 
 describe("list-migration-candidates", () => {
 	it("refuses to run without the start of the interval", () => {
@@ -55,27 +62,38 @@ describe("list-migration-candidates", () => {
 		assert.equal(result.status, 1);
 	});
 
-	it("keeps every known adopter-affecting commit of v0.0.26..dc94909e", (t) => {
-		// A shallow clone or a checkout without tags cannot answer this; skip rather than report a false failure.
-		for (const rev of ["v0.0.26", "dc94909e", ...KNOWN_ADOPTER_COMMITS]) {
-			if (!tryGit(["cat-file", "-e", `${rev}^{commit}`], { cwd: root }).ok) {
-				t.skip(`${rev} is not available in this checkout`);
-				return;
+	for (const [label, env] of [
+		["the default abbreviation length", undefined],
+		["core.abbrev=12", gitAbbrev(12)],
+	]) {
+		it(`keeps every known adopter-affecting commit of v0.0.26..dc94909e with ${label}`, (t) => {
+			// A shallow clone or a checkout without tags cannot answer this; skip rather than report a false failure.
+			const full = [];
+			for (const rev of ["v0.0.26", "dc94909e", ...KNOWN_ADOPTER_COMMITS]) {
+				const resolved = tryGit(["rev-parse", "--verify", `${rev}^{commit}`], {
+					cwd: root,
+				});
+				if (!resolved.ok) {
+					t.skip(`${rev} is not available in this checkout`);
+					return;
+				}
+				if (KNOWN_ADOPTER_COMMITS.includes(rev)) full.push(resolved.out.trim());
 			}
-		}
 
-		const result = listing(["--from", "v0.0.26", "--to", "dc94909e"]);
+			const result = listing(["--from", "v0.0.26", "--to", "dc94909e"], env);
 
-		assert.equal(result.ok, true);
-		const listed = result.out
-			.split("\n")
-			.filter(Boolean)
-			.map((line) => line.split(" ", 1)[0]);
-		for (const commit of KNOWN_ADOPTER_COMMITS) {
-			assert.ok(
-				listed.some((hash) => commit.startsWith(hash)),
-				`${commit} is missing from the listing`,
-			);
-		}
-	});
+			assert.equal(result.ok, true);
+			// The listing prints abbreviated hashes, so each one has to be a prefix of the full hash.
+			const listed = result.out
+				.split("\n")
+				.filter(Boolean)
+				.map((line) => line.split(" ", 1)[0]);
+			for (const [i, commit] of full.entries()) {
+				assert.ok(
+					listed.some((hash) => commit.startsWith(hash)),
+					`${KNOWN_ADOPTER_COMMITS[i]} is missing from the listing`,
+				);
+			}
+		});
+	}
 });
