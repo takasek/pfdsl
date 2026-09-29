@@ -84,7 +84,8 @@ The manifest then no longer describes the file on disk, and the current installe
 The current installer preserves a mismatched entry and does not repair it automatically.
 Neither the manifest hash nor the latest canonical hash proves that the file is unedited.
 
-Recovery is deterministic: an unedited distributed copy is byte-identical to that file in some released upstream tag.
+Recovery compares each file's bytes with every version of that file in the upstream history.
+An unedited distributed copy is byte-identical to some upstream version of the same path, whether that version was released or came from an untagged development or repository-local build.
 Every step below preserves the files and the manifest until the comparison has finished.
 
 1. Save the current manifest and list the candidate paths.
@@ -97,41 +98,48 @@ Every step below preserves the files and the manifest until the comparison has f
 
    Copy the paths marked `different from bundled version` into the `for` line of step 3.
 
-2. Clone the upstream tags outside the adopting repository.
+2. Clone the upstream history, including its tags, outside the adopting repository.
 
    ```sh
    UP="$(mktemp -d)/pfdsl.git"
    git clone --quiet --bare --filter=blob:none https://github.com/takasek/pfdsl.git "$UP"
    ```
 
-3. For each skipped path, hash the file on disk and hash the same path under `install/` in every released tag.
-   A deployed target path is the file's path below `install/`, so the upstream file is `.claude/skills/pfd-ops/install/<deployed path>` at each tag.
-   The install directory moved to `scripts/pfdsl/` in v0.0.23 ([ADR-0032](adr/0032-pfd-ops-install-dedicated-dir.md)); a tag that has no file at that path is skipped by the loop, so a current path can match only tags from v0.0.23 on.
+3. Run the following from the adopting repository root, once per path from step 1.
+   A deployed target path is the file's path below `install/`, so the upstream file is `.claude/skills/pfd-ops/install/<deployed path>` in every commit that touched it.
+   The loop compares Git blob IDs, which identify the exact bytes, so it needs no file contents from the clone.
+   The install directory moved to `scripts/pfdsl/` in v0.0.23 ([ADR-0032](adr/0032-pfd-ops-install-dedicated-dir.md)), so a current path only has history from that move on.
 
    ```sh
    for rel in scripts/pfdsl/lib/gh-exec.mjs scripts/pfdsl/lib/proxy-fetch.mjs; do
-     actual=$(shasum -a 256 "$rel" | cut -d' ' -f1)
-     match=
-     for tag in $(git -C "$UP" tag --list 'v[0-9]*'); do
-       blob="$tag:.claude/skills/pfd-ops/install/$rel"
-       if git -C "$UP" cat-file -e "$blob" 2>/dev/null &&
-         [ "$(git -C "$UP" show "$blob" | shasum -a 256 | cut -d' ' -f1)" = "$actual" ]; then
-         match="$match $tag"
+     want=$(git hash-object --no-filters "$rel")
+     found=
+     for c in $(git -C "$UP" log --all --full-history --format=%H -- ".claude/skills/pfd-ops/install/$rel"); do
+       if [ "$(git -C "$UP" rev-parse -q --verify "$c:.claude/skills/pfd-ops/install/$rel" 2>/dev/null)" = "$want" ]; then
+         found=$c
+         break
        fi
      done
-     echo "$rel: ${match:-NO MATCH}"
+     if [ -n "$found" ]; then
+       tag=$(git -C "$UP" tag --contains "$found" --list 'v[0-9]*' | sort -V | head -n 1)
+       echo "$rel: match at $found (first release tag containing it: ${tag:-none})"
+     else
+       echo "$rel: NO MATCH"
+     fi
    done
    ```
 
    Use a name other than `path` for the loop variable: in zsh it is tied to `PATH`.
-   `git show` returns the stored bytes, so a checkout that converted line endings does not match; treat that as a difference to inspect.
+   `--no-filters` hashes the bytes on disk, so a file whose line endings were converted does not match; treat that as a difference to inspect.
 
 4. Decide from the result.
-   A path that matches at least one tag is an unedited distributed copy.
-   A path that matches no tag differs from every release: it carries a local edit, or comes from a build that was never tagged.
-   Do not overwrite it; inspect the difference against the nearest tag and carry the needed edits into the current file by hand.
+   A match means the file is byte-identical to that upstream version, so it carries no local edit.
+   A match with `none` as the release tag is an unreleased upstream version, for example from a development build or a repository-local install.
+   `NO MATCH` means the file differs from every version in the clone: it carries a local edit, or comes from a source that is not in the upstream history.
+   Do not overwrite it; inspect the difference against the nearest version and carry the needed edits into the current file by hand.
 
 5. Only if every listed path matched, redeploy with overwrite.
+   The redeploy also adds the sweep workflow described in the next section, so read that section first.
 
    ```sh
    node <pfd-ops skill root>/scripts/check-install-sync.mjs --target . --deploy --overwrite-local-edits
@@ -178,8 +186,16 @@ Points to settle before redeploying:
   The workflow itself needs no dependency beyond the published CLI above.
   The first audit and local runs of `audit-issues-flow.mjs` need the `yaml` package: follow the section 依存の準備と初回監査 in the [GitHub Issues backend reference](../.claude/skills/pfd-ops/references/github-issues-backend.md).
 
-Opt-out: the source shows none. The installer has no option to skip a file, the workflow has no input or variable that disables it, and a deleted deployed file is copied again by the next deploy.
+Opt-out: neither the installer nor the workflow file has a switch. The installer has no option to skip a file, the workflow has no input or variable that disables it, and a deleted deployed file is copied again by the next deploy.
 A locally edited copy is preserved as a `Skipped` file on later deploys.
+
+There are two ways to keep it from running:
+
+- Disable the workflow on GitHub, from the repository's Actions tab ("Disable workflow") or with `gh workflow disable pfdsl-sweep-completed-chains.yml`.
+  GitHub documents that this stops the workflow from being triggered without deleting the file ([Disabling and enabling a workflow](https://docs.github.com/en/actions/how-tos/manage-workflow-runs/disable-and-enable-workflows)).
+  The file itself is unchanged, and the documentation does not say where the disabled state is kept, so confirm the workflow is still disabled after a later redeploy.
+- Do not commit the deployed workflow file. Its job runs only for a push to the default branch, so it does nothing until the file is committed there; leaving it uncommitted, or removing it before committing, keeps it from running.
+  Because a deploy copies it again whenever it is missing, repeat this after each redeploy.
 
 ### Verify the cleanup
 
