@@ -117,6 +117,7 @@ PLUGIN_ROOT は plugin ロード時に実パスへ置換される変数（`${PLU
 - 症状・コマンド名・診断メッセージ・該当パスなど複数の語で `gh issue list --repo github.com/takasek/pfdsl --search <語> --state all --limit 50` を引く
 - open と closed の両方を対象にする（`--state all`）
 - `--limit` を既定値任せにしない
+- 更新の後に現れた症状は、上流の [migration guide](https://github.com/takasek/pfdsl/blob/main/docs/migration-guide.md) に版別の移行手順として既に書かれていることがある。issue の検索とあわせて、更新前後の版の区間の項目を確かめ、該当すれば起票せずその手順を利用者へ示す
 
 **ヒットを同一と決めない。**
 候補として提示し、同一性の判断は利用者が行う。
