@@ -41,6 +41,9 @@ remote だけを根拠にしない。
 素の `gh auth status` は設定済みの全ホストを検査するため、github.com が未認証でも別ホストの認証が通っていれば成功し、逆に github.com が正常でも無関係なホストの壊れた認証で失敗する。
 報告の宛先は github.com に固定されているので、確かめるべきもそのホストだけである。
 
+後続の所在確認・検索・投稿・readback も github.com に固定する。
+`GH_HOST` や採用リポの remote に依存させず、repo 引数は `github.com/takasek/pfdsl`（例: `gh repo view github.com/takasek/pfdsl`）、API 呼出しは `--hostname github.com` を使う。
+
 工程5の重複確認も工程6の投稿も `gh` に依存しており、**本文を組み立ててから使えないと分かるのが最も無駄が大きい**。
 
 `gh` が存在しない、または github.com が未認証の場合はここで止め、何が足りないかをユーザーへ報告する。
@@ -106,7 +109,7 @@ CLAUDE_PLUGIN_ROOT は plugin ロード時に実パスへ置換される変数�
 
 単一の語による1回の検索では取りこぼす。
 
-- 症状・コマンド名・診断メッセージ・該当パスなど複数の語で `gh issue list --repo takasek/pfdsl --search <語> --state all --limit 50` を引く
+- 症状・コマンド名・診断メッセージ・該当パスなど複数の語で `gh issue list --repo github.com/takasek/pfdsl --search <語> --state all --limit 50` を引く
 - open と closed の両方を対象にする（`--state all`）
 - `--limit` を既定値任せにしない
 
@@ -143,17 +146,17 @@ readback_path="$(mktemp)"
 新規起票:
 
 ```bash
-issue_url="$(gh issue create --repo takasek/pfdsl --title "$title" --body-file "$body_path")"
+issue_url="$(gh issue create --repo github.com/takasek/pfdsl --title "$title" --body-file "$body_path")"
 issue_number="${issue_url##*/}"
-gh issue view "$issue_number" --repo takasek/pfdsl --json body,url > "$readback_path"
+gh issue view "$issue_number" --repo github.com/takasek/pfdsl --json body,url > "$readback_path"
 ```
 
 既存 issue へのコメント（`issue_number` は工程5で同定した issue の番号）:
 
 ```bash
-comment_url="$(gh issue comment "$issue_number" --repo takasek/pfdsl --body-file "$body_path")"
+comment_url="$(gh issue comment "$issue_number" --repo github.com/takasek/pfdsl --body-file "$body_path")"
 comment_id="${comment_url##*issuecomment-}"
-gh api "repos/takasek/pfdsl/issues/comments/$comment_id" > "$readback_path"
+gh api --hostname github.com "repos/takasek/pfdsl/issues/comments/$comment_id" > "$readback_path"
 ```
 
 **`gh issue view --json comments` の一覧から似た本文を拾って代用しない。**

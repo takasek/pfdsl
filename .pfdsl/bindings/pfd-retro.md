@@ -55,7 +55,9 @@ rg --files .pfdsl/bindings/pfd-retro-patterns/
 
 ## 知識成果物ライフサイクル監査
 
-知識成果物ライフサイクル監査: 採用する。対象: `.pfdsl/roadmap.pfdsl` の criteria、`.pfdsl/*.md` companion、`docs/adr/`、`docs/pfd_payoff_log.md`
+knowledge-lifecycle-audit: adopt
+
+監査対象: `.pfdsl/roadmap.pfdsl` の criteria、`.pfdsl/*.md` companion、`docs/adr/`、`docs/pfd_payoff_log.md`
 
 監査項目の本文は配布層の `references/knowledge-lifecycle.md` が持つ。次の2項目は pfdsl の配布機構を前提にするため、配布層でなくこの binding が持ち、上流であるこのリポでだけ適用する。
 

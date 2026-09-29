@@ -12,6 +12,8 @@ description: |
 
 # PFD-driven project operations
 
+既存導入の更新に伴う移行・掃除手順は、上流リポの [migration guide](https://github.com/takasek/pfdsl/blob/main/docs/migration-guide.md) を参照する。
+
 記法・品質ガイドは pfdsl スキル。本スキルは発火直後に必要な契約と既存 reference へのルーティングだけを持つ。リポ固有のバインディングは各 `.pfdsl` の sibling `.md` companion・`.pfdsl/bindings/<スキル名>.md`・references に置く。
 
 調査・実装・レビューの分担は、利用中のハーネス・モデルとリポジトリの指示に従う。

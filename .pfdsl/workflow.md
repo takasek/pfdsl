@@ -227,6 +227,41 @@ drift 検査は pre-commit（`gen-install` の check_drift。他の drift 検査
 
 合成を CLI でなく `gate-check.mjs` に置いたのは spec §2.9.1 が ID をファイルローカルに保ち、複数ファイルを跨いだ平坦化ビューの構成を禁じているためである。「同名 ID は同じ成果物」はこのリポの `.pfdsl/` のローカルな慣行であり、規範ではない。慣行が及ぶ範囲は `scripts/lib/gate-check.mjs` の `SIBLING_ID_NAMESPACE_DIRS` が持ち、`.pfdsl/` だけを列挙する — `docs/samples/` は互いに無関係なチュートリアル図が `spec` / `code` を使い回しており、同一ディレクトリという理由だけで合成すると本物の門番違反が sibling 見出しへ落ちる。`>>?` フィードバック消費も合成の対象に入れない — `graph io` の `terminals` は spec §15.11 の audit-terminal でフィードバック消費を無視するため、sibling 側だけフィードバックを数えると同じ artifact が消費者の置き場所次第で別分類になる。
 
+## 採用先への移行案内
+
+`maintain_adopter_guidance` が、更新前後の公開版で必要な移行だけを選ぶ正本 `migration_guide` を保守する。
+配布物にはガイドへの安定した参照だけを持たせ、旧機構の判定・回復処理や版別手順を蓄積しない。
+
+ガイドの保守は公開準備で1回まとめて行う。
+変更 PR ごとの記載義務は置かない — 変更の実装者に「採用先への影響を自分で気づいて書く」ことを課す形は、気づかなかった変更がそのまま漏れる。
+公開準備の担当が、対象区間の全コミットを1件ずつ影響ありか無しかに振り分け、人が確認する。
+
+公開担当は `decide_cli_release`・`decide_libraries_release`・`decide_vscode_release` の判断前に、次を行う。
+
+1. 前回の対応する公開 tag（CLI/plugin は `v[0-9]*`、ライブラリは `lib-v*`、拡張は `vscode-v*`）から公開対象 SHA までの、配布物に触れたコミットを列挙する。`v*` は `vscode-v*` にも一致するので使わない。
+
+   ```sh
+   git log --no-merges --format='%h %s' <前回の公開 tag>..<公開対象 SHA> -- \
+     plugin/pfdsl plugin/pfdsl-codex packages/ docs/spec/
+   ```
+
+   配布物の一次情報は `scripts/lib/distribution-review.mjs` の `DISTRIBUTION_ROOTS`（配布 bundle のルート）と、`scripts/lib/distribution-sources.mjs` の `GENERATED_DISTRIBUTION_SOURCES`（生成物と生成元の対応）である。
+   手書きの生成元は、pre-commit と CI の同一性検査により生成物と同じ変更で更新される。
+   そのため生成物のルートを指定すれば、スキル・コマンド・agent・hook・scaffold・`install/` の生成元の一覧をここへ複製せずに拾える。
+   生成器だけを変えて出力だけが変わったコミットも、生成物のルートで拾える。
+   `packages/` と `docs/spec/` は CLI と仕様の変更を拾うために加える。
+   `DISTRIBUTION_ROOTS` を変えたら上のコマンドも合わせる。
+2. 列挙した各コミットを、採用先の作業を要するもの（ファイル・呼出し・運用設定・診断の扱いの変更）と、要さないものに分ける。分類の手段は問わないが、分類そのものを人が確認する。
+3. 要するものごとに、旧挙動、該当条件、必要操作、検証方法、根拠 issue/commit をガイドの項目に書く。
+4. 未公開項目を実際の公開先の版へ対応付け、CLI/plugin・ライブラリ・拡張と仕様の版を混同しない。複数版を飛ばす更新でも対象区間の項目を順に選べること、旧節とリンクを保持することを確認する。
+5. 要するコミットが無い公開では、対象区間と、全コミットを分類して影響なしと確認したことを公開準備の既存記録へ残す。
+
+これは公開判断の必須確認であり、現行の `make release-status` や release runner が内容の網羅性を自動判定するという意味ではない。
+リリースノートを作る場合は該当節へリンクする。
+
+最終差分レビューでは、ガイドの対象区間、正本のリンク、必要な知見を保存したまま旧経路を終了できることを確認する。
+手順の用意・公開と、採用先での適用済み証拠は区別する。
+
 ## 配布プロンプトのレビューと承認記録（`review_distribution`）
 
 `make release` は `docs/distribution-review/reviewed.json` の commit と HEAD の間に配布 `.md` の差分があると pre-tag checks で止まる。
