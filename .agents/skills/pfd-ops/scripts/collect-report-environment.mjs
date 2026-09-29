@@ -166,12 +166,14 @@ function detectInstallation(skillRoot, resolveRepoRoot) {
  * @param {{
  *   runCommand?: (command: string, args: string[]) => string | null,
  *   findRepoRootOrNull?: (from: string) => string | null,
+ *   cwd?: string,
  * }} [options]
  */
 export function collectReportEnvironment(skillRoot, options = {}) {
+	const resolveRepoRoot = options.findRepoRootOrNull ?? findRepoRootOrNull;
 	const { installation, bundleRoot, repoRoot } = detectInstallation(
 		skillRoot,
-		options.findRepoRootOrNull ?? findRepoRootOrNull,
+		resolveRepoRoot,
 	);
 	const unavailable = [];
 	const missing = MISSING_IDENTIFIERS[installation] ?? {};
@@ -246,7 +248,14 @@ export function collectReportEnvironment(skillRoot, options = {}) {
 			"`pfdsl --version` did not run, or returned no output.",
 		);
 	}
-	const repoCli = repoRoot === null ? null : readRepoCliVersion(repoRoot);
+	// A plugin installation has no checkout above its skill root, so the
+	// adopting project is the one the collector is run from: the checkout that
+	// contains the working directory, or the directory itself outside any
+	// checkout. The plugin cache is never read as the project.
+	const workingDirectory = resolve(options.cwd ?? process.cwd());
+	const projectRoot =
+		repoRoot ?? resolveRepoRoot(workingDirectory) ?? workingDirectory;
+	const repoCli = readRepoCliVersion(projectRoot);
 	if (repoCli !== null && repoCli.version === null) {
 		recordFailure("repoCliVersion", repoCli.reason);
 	}

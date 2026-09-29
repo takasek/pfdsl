@@ -96,7 +96,10 @@ describe("collectReportEnvironment", () => {
 		const entries = [{ path: "a.md", hex: hexOf("a") }];
 		writeBundleManifest(tmp, entries);
 
-		const env = collectReportEnvironment(skillRoot, { runCommand: noCommands });
+		const env = collectReportEnvironment(skillRoot, {
+			runCommand: noCommands,
+			cwd: tmp,
+		});
 
 		assert.equal(env.installation, "claude-plugin");
 		assert.equal(env.pluginVersion, "0.4.2");
@@ -111,7 +114,10 @@ describe("collectReportEnvironment", () => {
 			contentHash: "abc123",
 		});
 
-		const env = collectReportEnvironment(skillRoot, { runCommand: noCommands });
+		const env = collectReportEnvironment(skillRoot, {
+			runCommand: noCommands,
+			cwd: tmp,
+		});
 
 		assert.equal(env.installation, "claude-plugin");
 		assert.equal(env.bundleContentHash, null);
@@ -126,7 +132,10 @@ describe("collectReportEnvironment", () => {
 		mkdirSync(skillRoot, { recursive: true });
 		writeJson(join(tmp, ".codex-plugin", "plugin.json"), { version: "0.4.2" });
 
-		const env = collectReportEnvironment(skillRoot, { runCommand: noCommands });
+		const env = collectReportEnvironment(skillRoot, {
+			runCommand: noCommands,
+			cwd: tmp,
+		});
 
 		assert.equal(env.installation, "codex-plugin");
 		assert.equal(env.pluginVersion, "0.4.2");
@@ -199,7 +208,10 @@ describe("collectReportEnvironment", () => {
 		mkdirSync(skillRoot, { recursive: true });
 		writeJson(join(tmp, ".claude-plugin", "plugin.json"), { version: "0.4.2" });
 
-		const env = collectReportEnvironment(skillRoot, { runCommand: noCommands });
+		const env = collectReportEnvironment(skillRoot, {
+			runCommand: noCommands,
+			cwd: tmp,
+		});
 
 		assert.equal(env.cliVersion, null);
 		assert.ok(
@@ -314,6 +326,95 @@ describe("collectReportEnvironment", () => {
 			);
 		});
 
+		// A plugin installation has no checkout above its skill root, so the
+		// adopting project is wherever the collector is run from. The plugin
+		// cache's own directory must never be read as that project.
+		function pluginInstall(shape) {
+			const skillRoot = join(tmp, "cache", "skills", "pfd-ops");
+			mkdirSync(skillRoot, { recursive: true });
+			writeJson(join(tmp, "cache", `.${shape}-plugin`, "plugin.json"), {
+				version: "0.4.2",
+			});
+			return skillRoot;
+		}
+
+		for (const shape of ["claude", "codex"]) {
+			it(`reads the project from the working directory's checkout for a ${shape} plugin install`, () => {
+				const skillRoot = pluginInstall(shape);
+				const project = join(tmp, "project");
+				mkdirSync(join(project, ".git"), { recursive: true });
+				mkdirSync(join(project, "packages", "app"), { recursive: true });
+				writeJson(join(project, "package.json"), {
+					devDependencies: { "@pfdsl/cli": "^0.0.26" },
+				});
+				writeJson(join(project, "node_modules/@pfdsl/cli/package.json"), {
+					version: "0.0.26",
+				});
+
+				const env = collectReportEnvironment(skillRoot, {
+					runCommand: pathCli,
+					cwd: join(project, "packages", "app"),
+				});
+
+				assert.equal(env.installation, `${shape}-plugin`);
+				assert.equal(env.cliVersion, "0.0.25");
+				assert.equal(env.repoCliVersion, "0.0.26");
+			});
+		}
+
+		it("uses the working directory itself when it is not inside a checkout", () => {
+			const skillRoot = pluginInstall("claude");
+			const project = join(tmp, "project");
+			mkdirSync(project, { recursive: true });
+			writeJson(join(project, "package.json"), {
+				dependencies: { "@pfdsl/cli": "^0.0.26" },
+			});
+
+			const env = collectReportEnvironment(skillRoot, {
+				runCommand: pathCli,
+				cwd: project,
+				findRepoRootOrNull: () => null,
+			});
+
+			assert.equal(env.repoCliVersion, null);
+			assert.match(
+				env.unavailable.find(({ field }) => field === "repoCliVersion").reason,
+				/not installed/,
+			);
+		});
+
+		it("omits repoCliVersion for a plugin install run from a directory without package.json", () => {
+			const skillRoot = pluginInstall("claude");
+			const project = join(tmp, "project");
+			mkdirSync(project, { recursive: true });
+
+			const env = collectReportEnvironment(skillRoot, {
+				runCommand: pathCli,
+				cwd: project,
+			});
+
+			assert.ok(!("repoCliVersion" in env));
+			assert.ok(
+				!env.unavailable.some(({ field }) => field === "repoCliVersion"),
+			);
+		});
+
+		it("does not read the plugin cache as the project", () => {
+			const skillRoot = pluginInstall("claude");
+			writeJson(join(tmp, "cache", "package.json"), {
+				dependencies: { "@pfdsl/cli": "^9.9.9" },
+			});
+			const project = join(tmp, "project");
+			mkdirSync(project, { recursive: true });
+
+			const env = collectReportEnvironment(skillRoot, {
+				runCommand: pathCli,
+				cwd: project,
+			});
+
+			assert.ok(!("repoCliVersion" in env));
+		});
+
 		it("never runs the repo-local binary", () => {
 			const { repoRoot, skillRoot } = adopter();
 			writeJson(join(repoRoot, "package.json"), {
@@ -361,7 +462,10 @@ describe("collectReportEnvironment", () => {
 		mkdirSync(join(tmp, ".claude-plugin"), { recursive: true });
 		writeFileSync(join(tmp, ".claude-plugin", "plugin.json"), "{ broken");
 
-		const env = collectReportEnvironment(skillRoot, { runCommand: noCommands });
+		const env = collectReportEnvironment(skillRoot, {
+			runCommand: noCommands,
+			cwd: tmp,
+		});
 
 		assert.equal(env.installation, "claude-plugin");
 		assert.equal(env.pluginVersion, null);
@@ -380,7 +484,10 @@ describe("collectReportEnvironment", () => {
 		mkdirSync(dirname(manifestPath), { recursive: true });
 		writeFileSync(manifestPath, "not a manifest\n");
 
-		const env = collectReportEnvironment(skillRoot, { runCommand: noCommands });
+		const env = collectReportEnvironment(skillRoot, {
+			runCommand: noCommands,
+			cwd: tmp,
+		});
 
 		assert.equal(env.pluginVersion, null);
 		assert.equal(env.bundleContentHash, null);
@@ -423,7 +530,10 @@ describe("collectReportEnvironment", () => {
 		mkdirSync(skillRoot, { recursive: true });
 		writeJson(join(tmp, ".claude-plugin", "plugin.json"), { version: "  " });
 
-		const env = collectReportEnvironment(skillRoot, { runCommand: noCommands });
+		const env = collectReportEnvironment(skillRoot, {
+			runCommand: noCommands,
+			cwd: tmp,
+		});
 
 		assert.equal(env.pluginVersion, null);
 		assert.ok(
@@ -512,7 +622,10 @@ describe("collectReportEnvironment", () => {
 		writeJson(join(tmp, ".claude-plugin", "plugin.json"), { version: "0.4.2" });
 		writeBundleManifest(tmp, [{ path: "a.md", hex: hexOf("a") }]);
 
-		const env = collectReportEnvironment(skillRoot, { runCommand: noCommands });
+		const env = collectReportEnvironment(skillRoot, {
+			runCommand: noCommands,
+			cwd: tmp,
+		});
 
 		assert.deepEqual(unavailableFields(env), [
 			"cliVersion",
@@ -529,6 +642,7 @@ describe("collectReportEnvironment", () => {
 
 		const env = collectReportEnvironment(skillRoot, {
 			runCommand: noCommands,
+			cwd: tmp,
 			findRepoRootOrNull: () => elsewhere,
 		});
 
@@ -545,6 +659,7 @@ describe("collectReportEnvironment", () => {
 		// suite happens to run.
 		const env = collectReportEnvironment(skillRoot, {
 			runCommand: noCommands,
+			cwd: tmp,
 			findRepoRootOrNull: () => null,
 		});
 

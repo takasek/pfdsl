@@ -86,7 +86,7 @@ d8c92e2918a8e3f82e6f79a023e81b563c14513ca34f64092445e61292a1c247  skills/pfd-ops
 
 73fbfa448340284eac36b338e709a1246405371c77bd6856bde3d3cbbf7b4ca1  skills/pfd-ops/scripts/check-install-sync.mjs
 
-7044d932c8c9259538382739b7d8e045c601f84bda6933285f39082e95c45fdd  skills/pfd-ops/scripts/collect-report-environment.mjs
+ca2a5edae2d1650f2dc40bdc0e59af09941d9164510dc03e5ff6e443f706fce5  skills/pfd-ops/scripts/collect-report-environment.mjs
 
 b9d035e5ed2cb8c6d7aa2fc4b23bb69cba2ac98c68d8642fe1a9704b0287ed83  skills/pfd-ops/scripts/plugin-version-check.mjs
 
@@ -94,7 +94,7 @@ b9d035e5ed2cb8c6d7aa2fc4b23bb69cba2ac98c68d8642fe1a9704b0287ed83  skills/pfd-ops
 
 28b304f836bc738658146396556e0ed59d1974750b59939d61618a2aa286002f  skills/pfd-retro/references/knowledge-lifecycle.md
 
-bcd4a909c61efb2e971f80ce8848f7340b9172ab85d545d22cf560f071e5df05  skills/pfd-upstream-report/SKILL.md
+647748c63a5ecc8f0f9a96fed33ca02f9c551c0bf448ec343b8702fa971bec29  skills/pfd-upstream-report/SKILL.md
 
 65a26be4be48651b12dbcb92fe753da1a187efd44c244284c548d3c6be618f83  skills/pfdsl/SKILL.md
 
