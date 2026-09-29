@@ -59,19 +59,50 @@ function migrationGuideGate(root, mode, _exec, kind) {
 	if (mode === "release" && kind === undefined) {
 		throw new Error("the migration-guide gate needs the release kind");
 	}
-	const pending = pendingUnreleasedHeadings(
-		readFileSync(resolve(root, MIGRATION_GUIDE_PATH), "utf8"),
-	);
+	// A release that is not gated must not depend on the guide being readable.
+	if (mode === "release" && kind !== "cli") {
+		return { kind, pending: [], ok: true };
+	}
+	let text;
+	try {
+		text = readFileSync(resolve(root, MIGRATION_GUIDE_PATH), "utf8");
+	} catch (error) {
+		// Only a gated release fails on it; status reports it and carries on.
+		return {
+			kind,
+			pending: [],
+			unreadable: error?.code ?? String(error),
+			ok: mode !== "release",
+		};
+	}
+	const pending = pendingUnreleasedHeadings(text);
 	return {
 		kind,
 		pending,
-		ok: mode !== "release" || kind !== "cli" || pending.length === 0,
+		ok: mode !== "release" || pending.length === 0,
 	};
 }
 
-function formatMigrationGuide({ kind, pending, ok }, mode) {
+function formatMigrationGuide({ kind, pending, unreadable, ok }, mode) {
+	if (unreadable !== undefined && mode === "release") {
+		return {
+			ok,
+			lines: [
+				`cannot read ${MIGRATION_GUIDE_PATH} (${unreadable}), so a CLI/plugin release cannot be checked for an Unreleased section.`,
+				`Restore the guide before a CLI/plugin release (${MIGRATION_GUIDE_PROCEDURE}).`,
+			],
+		};
+	}
 	if (mode === "status") {
 		const name = `migration-guide (${MIGRATION_GUIDE_PATH})`;
+		if (unreadable !== undefined) {
+			return {
+				ok,
+				lines: [
+					`  ${name} · cannot read ${MIGRATION_GUIDE_PATH} (${unreadable}); its Unreleased section was not checked`,
+				],
+			};
+		}
 		if (pending.length === 0) {
 			return {
 				ok,

@@ -216,6 +216,54 @@ describe("migration-guide gate", () => {
 		});
 	});
 
+	function withoutGuide(body) {
+		const dir = mkdtempSync(join(tmpdir(), "release-gates-noguide-"));
+		try {
+			return body(dir);
+		} finally {
+			rmSync(dir, { recursive: true, force: true });
+		}
+	}
+
+	it("does not read the guide for a release it does not gate", () => {
+		withoutGuide((dir) => {
+			for (const kind of ["libs", "vscode"]) {
+				const result = runOnly(dir, { mode: "release", kind });
+
+				assert.equal(result.ok, true, kind);
+			}
+		});
+	});
+
+	it("fails a CLI/plugin release with a clear message when the guide is missing", () => {
+		withoutGuide((dir) => {
+			const result = runOnly(dir, { mode: "release", kind: "cli" });
+
+			assert.equal(result.ok, false);
+			const message = result.lines.join("\n");
+			assert.match(message, /cannot read docs\/migration-guide\.md/);
+			assert.ok(message.includes(WORKFLOW_LINK), message);
+		});
+	});
+
+	it("reports a missing guide in status without failing or throwing", () => {
+		withoutGuide((dir) => {
+			const result = runOnly(dir, { mode: "status" });
+
+			assert.equal(result.ok, true);
+			assert.match(
+				result.lines.join("\n"),
+				/cannot read docs\/migration-guide\.md/,
+			);
+		});
+	});
+
+	it("still requires the kind before looking for the guide", () => {
+		withoutGuide((dir) => {
+			assert.throws(() => runOnly(dir, { mode: "release" }), /release kind/);
+		});
+	});
+
 	it("hands the release kind to every gate", () => {
 		const seen = [];
 		runReleaseGates(root, {
