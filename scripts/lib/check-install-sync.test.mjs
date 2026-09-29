@@ -23,6 +23,7 @@ import {
 	deployInstall,
 	listInstallFiles,
 	parseArgs,
+	readManifest,
 	UPSTREAM_MARKERS,
 } from "../../.claude/skills/pfd-ops/scripts/check-install-sync.mjs";
 
@@ -283,6 +284,75 @@ describe("checkInstallSync rename candidates", () => {
 });
 
 describe("deployInstall", () => {
+	it("updates an unedited deployment and records the installed canonical hash", () => {
+		const skillRoot = makeSkillRoot();
+		const targetRoot = join(tmp, "target-upgrade");
+		deployInstall(skillRoot, targetRoot);
+		const previous = readManifest(targetRoot);
+		writeFile(join(skillRoot, "install"), "a.txt", "new-canonical");
+		const result = deployInstall(skillRoot, targetRoot);
+		assert.deepEqual(result.skipped, []);
+		assert.equal(
+			readFileSync(join(targetRoot, "a.txt"), "utf8"),
+			"new-canonical",
+		);
+		assert.notDeepEqual(readManifest(targetRoot), previous);
+		const fresh = join(tmp, "fresh-upgrade");
+		deployInstall(skillRoot, fresh);
+		assert.deepEqual(readManifest(targetRoot), readManifest(fresh));
+	});
+
+	it("retains the last deployed hash across skipped upgrades and later overwrites", () => {
+		const skillRoot = makeSkillRoot();
+		const targetRoot = join(tmp, "target-skipped-upgrade");
+		deployInstall(skillRoot, targetRoot);
+		const previous = readManifest(targetRoot);
+		writeFile(targetRoot, "a.txt", "local-edit");
+		writeFile(join(skillRoot, "install"), "a.txt", "new-canonical");
+		for (let n = 0; n < 2; n++) {
+			assert.deepEqual(deployInstall(skillRoot, targetRoot).skipped, ["a.txt"]);
+			assert.equal(
+				readFileSync(join(targetRoot, "a.txt"), "utf8"),
+				"local-edit",
+			);
+			assert.deepEqual(readManifest(targetRoot), previous);
+		}
+		deployInstall(skillRoot, targetRoot, { overwriteLocalEdits: true });
+		assert.equal(
+			readFileSync(join(targetRoot, "a.txt"), "utf8"),
+			"new-canonical",
+		);
+		assert.notDeepEqual(readManifest(targetRoot), previous);
+	});
+
+	it("does not claim an untracked conflicting file, including on repeated deploys", () => {
+		const skillRoot = makeSkillRoot();
+		const targetRoot = join(tmp, "target-untracked");
+		writeFile(targetRoot, "a.txt", "existing-content");
+		for (let n = 0; n < 2; n++) {
+			assert.deepEqual(deployInstall(skillRoot, targetRoot).skipped, ["a.txt"]);
+			assert.equal(
+				readManifest(targetRoot).some((entry) => entry.path === "a.txt"),
+				false,
+			);
+		}
+	});
+
+	it("adopts an existing file already equal to the new canonical", () => {
+		const skillRoot = makeSkillRoot();
+		const targetRoot = join(tmp, "target-converged");
+		deployInstall(skillRoot, targetRoot);
+		writeFile(targetRoot, "a.txt", "new-canonical");
+		writeFile(join(skillRoot, "install"), "a.txt", "new-canonical");
+		assert.deepEqual(deployInstall(skillRoot, targetRoot).skipped, []);
+		writeFile(join(skillRoot, "install"), "a.txt", "next-canonical");
+		assert.deepEqual(deployInstall(skillRoot, targetRoot).skipped, []);
+		assert.equal(
+			readFileSync(join(targetRoot, "a.txt"), "utf8"),
+			"next-canonical",
+		);
+	});
+
 	it("copies every canonical file into an empty target, creating directories as needed", () => {
 		const skillRoot = makeSkillRoot();
 		const targetRoot = join(tmp, "target-fresh");
@@ -755,6 +825,21 @@ describe("CLI output", () => {
 		const { status, stdout } = runCli(skillRoot, target);
 		assert.equal(status, 0);
 		assert.match(stdout, /in sync/);
+	});
+
+	it("describes both outdated and edited adopter files as different from the bundle", () => {
+		const skillRoot = makeSkillRoot();
+		const target = join(tmp, "target-adopter-differences");
+		deployInstall(skillRoot, target);
+		writeFile(join(skillRoot, "install"), "a.txt", "new-canonical-a");
+		writeFile(target, "sub/b.txt", "user-edit-b");
+
+		const { status, stdout } = runCli(skillRoot, target);
+		assert.equal(status, 1);
+		assert.match(stdout, /^ {2}different from bundled version: a\.txt$/m);
+		assert.match(stdout, /^ {2}different from bundled version: sub\/b\.txt$/m);
+		assert.doesNotMatch(stdout, /^ {2}modified:/m);
+		assert.match(stdout, /Run with --deploy to refresh/);
 	});
 
 	it("still deploys into an ordinary adopting repo", () => {
