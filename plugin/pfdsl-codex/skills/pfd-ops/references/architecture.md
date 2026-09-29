@@ -174,6 +174,7 @@ pfdsl 開発リポ固有の例:
 チェックの出力末尾が対応を名指しするため、その指示に従う。スクリプトは target の役割を分類し、`--deploy` が正しい向きの場合だけ案内するので、drift だけを根拠に反射的に deploy しない。GitHub Issues バックエンドを採用していないリポでは、未採用である旨と `--deploy` の案内が出る — これは報告であって指示ではない。そのリポが別のバックエンドを採用している、またはどれも採用していないなら、案内に従わず未採用のまま進む。
 
 素の `--deploy` はローカル編集がないファイルをコピーし、ローカル編集がない orphan を削除する。`--overwrite-local-edits` は残るパスのローカル編集を canonical で上書きし、`--delete-edited-orphans` は消えるパスのローカル編集ごと削除する。旧ファイルの掃除ではまず素の deploy を実行し、編集済みとして残ったパスだけについて追加 flag の要否を判断する。
+誰も編集していないのに同じファイルが deploy のたびに `Skipped` として残る場合は、旧版から更新した採用先に特有の状態である可能性がある。flag で上書きする前、また上流へ報告する前に、上流リポの [migration guide](https://github.com/takasek/pfdsl/blob/main/docs/migration-guide.md#files-reported-as-skipped-on-every-deploy) の該当節で確かめ方を確認する。
 
 `Possible renames` は canonical 側の rename が新旧パスの `missing` と `orphaned` に分かれて見えている状態を表す。新パスを信用する前に旧パスのローカル編集を引き継ぐ。
 

@@ -56,7 +56,7 @@ a8e4d35e456f05babab77d002a20f7230b7942aaf7bb82138bf2007b5926c4f7  skills/pfd-ops
 
 a5854e16415ea04e508b0f88a391446679dcc60060b9bf8d62a27454eb0b39d4  skills/pfd-ops/install/scripts/pfdsl/sweep-completed-chains.mjs
 
-67720b9ca6aec9375e08bc84228e18192e2068cb9df9dc7f847f4e2a05a390b3  skills/pfd-ops/references/architecture.md
+2cfce1bcaaaf337c8b341a8085348dfd28e49d3612cec79fc16c7693cea86ed7  skills/pfd-ops/references/architecture.md
 
 ec4c10c6394964a5259ce63b446562181550bb397743b0b1c79d087bc2c7c307  skills/pfd-ops/references/file-based-tracker-backend.md
 
@@ -66,7 +66,7 @@ a5d160cb0b24c45e545cdf296dd987b81cbf59bb1646f847f8525ad0f5aa2615  skills/pfd-ops
 
 b92ece9045e5cae1d745cbbf4ebec7c7e136b4880fcfa840f5cbeba628377e8b  skills/pfd-ops/references/scaffold/bindings/pfd-retro-patterns/sample-pattern.md
 
-2cc8977f57d204272c04813fa813f4cbe4e6fb69968198bb0b55cf909d469c1e  skills/pfd-ops/references/scaffold/bindings/pfd-retro.md
+8623b850d65993d2ecee02afcba55855afd4feda6241d40d74d63a2f0c1b5a28  skills/pfd-ops/references/scaffold/bindings/pfd-retro.md
 
 f764e416cca5cf985170f973242023b2fbc8d20a70a5c880832e132d528418df  skills/pfd-ops/references/scaffold/pipeline.md
 
@@ -90,7 +90,7 @@ d8c92e2918a8e3f82e6f79a023e81b563c14513ca34f64092445e61292a1c247  skills/pfd-ops
 
 b9d035e5ed2cb8c6d7aa2fc4b23bb69cba2ac98c68d8642fe1a9704b0287ed83  skills/pfd-ops/scripts/plugin-version-check.mjs
 
-79b9344be943a40e6dc4f056bd55af598a6382892c6288958642cc4b88dd32a0  skills/pfd-retro/SKILL.md
+4003955f3e29e5d6160408e37a91cbd055aaf60a7cd0a7372a5f4715bc2d5224  skills/pfd-retro/SKILL.md
 
 28b304f836bc738658146396556e0ed59d1974750b59939d61618a2aa286002f  skills/pfd-retro/references/knowledge-lifecycle.md
 
