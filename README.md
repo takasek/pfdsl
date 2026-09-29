@@ -73,6 +73,8 @@ Feature-by-feature syntax examples with rendered `.dot` and `.svg`: [docs/sample
 
 ## Quick start
 
+Upgrading an existing installation? Read the [migration guide](docs/migration-guide.md) for version-specific cleanup and validation steps.
+
 ```bash
 pnpm install
 pnpm -r build

@@ -229,6 +229,11 @@ drift 検査は pre-commit（`gen-install` の check_drift。他の drift 検査
 
 ## 配布プロンプトのレビューと承認記録（`review_distribution`）
 
+既存採用先のファイルや運用を変える配布変更では、`docs/migration-guide.md` に対象版・症状・掃除手順・確認方法を記載する。
+旧機構に固有の移行・回復手順は配布スキルへ蓄積せず、配布側は同ガイドへの参照を持つ。
+公開前にガイドの対象版を公開する CLI/plugin の版と照合し、リリースノートを作る場合は該当節へリンクする。
+採用先への適用は所有者が対象リポで行い、手順の用意と適用済みの証拠を区別する。
+
 `make release` は `docs/distribution-review/reviewed.json` の commit と HEAD の間に配布 `.md` の差分があると pre-tag checks で止まる。
 逃げ道は用意していない。
 公開は稀で、かつ利用側が実際にその散文を渡される唯一の瞬間なので、その希少性自体を起動条件に使っている（ADR-0029 が起動条件ゼロで休眠した反省）。
