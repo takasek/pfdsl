@@ -6,6 +6,11 @@
 import { parse as parseYaml } from "yaml";
 import { isGhUnavailableError } from "../pfdsl/lib/gh-compat.mjs";
 
+export {
+	lintCommitSubjects,
+	parseCommitLogLines,
+} from "./commit-subject-rules.mjs";
+
 /**
  * Every repo-relative path an adopted PFD claims to model, via the `location:`
  * field its artifacts and processes carry (#778). This is what lets the
@@ -349,26 +354,6 @@ export function wipTransitionDetected(fileSnapshots, artifactKey) {
  */
 export const VSCODE_EXT_TRIGGER = /^packages\/vscode-extension\//;
 
-// Conventional Commits subject line: type(scope)!: description.
-// Scope and ! are optional; type must be one of the conventional set.
-const CONVENTIONAL_COMMIT_PATTERN =
-	/^(feat|fix|refactor|docs|chore|test|style|perf|build|ci|revert)(\([\w.,/-]+\))?!?: .+/;
-
-/**
- * Lint commit subjects against the Conventional Commits format.
- * Language and commit granularity remain review guidance.
- * @param {string[]} subjects
- * @returns {Array<{subject: string, ok: boolean, reason?: string}>}
- */
-export function lintCommitSubjects(subjects) {
-	return subjects.map((subject) => {
-		if (!CONVENTIONAL_COMMIT_PATTERN.test(subject)) {
-			return { subject, ok: false, reason: "not Conventional Commits" };
-		}
-		return { subject, ok: true };
-	});
-}
-
 /**
  * Parse a `<label> a, b, c` list line out of `pfdsl graph io` text output.
  * @param {string} auditText
@@ -614,29 +599,6 @@ export function formatSizeDelta(d) {
 	const bytes = sign(d.afterBytes - d.beforeBytes);
 	const lines = sign(d.afterLines - d.beforeLines);
 	return `${d.path}: ${bytes} bytes / ${lines} lines (${d.beforeBytes} → ${d.afterBytes} bytes)`;
-}
-
-/**
- * Parse `git log --format=%h%x09%s <range>` output into sha/subject records,
- * one per non-blank line (#834's cycle window: collectCycleWindow in
- * gate-check-steps.mjs is what runs the git calls this shape comes from).
- *
- * Splits on the first tab only. `%s` does not escape a tab that a subject
- * itself carries, so splitting on every tab would cut such a subject short
- * and drop its tail rather than keep it whole.
- * @param {string} text
- * @returns {{sha: string, subject: string}[]}
- */
-export function parseCommitLogLines(text) {
-	return text
-		.split("\n")
-		.filter((line) => line !== "")
-		.map((line) => {
-			const i = line.indexOf("\t");
-			return i === -1
-				? { sha: line, subject: "" }
-				: { sha: line.slice(0, i), subject: line.slice(i + 1) };
-		});
 }
 
 /**
