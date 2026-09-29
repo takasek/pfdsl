@@ -90,18 +90,24 @@ issue findings の `blocking:` は監査を失敗させ、`advisory:` だけな�
 
 採用リポのルートを作業ディレクトリにして、配置した監査モジュールから依存を読めるか確認する。
 
-依存をインストールする前に、リポ直下の `.gitignore` に `/node_modules/` の規則がなければ追加する（ファイルがなければ作成し、既存の規則は残す）。
-
-```gitignore
-/node_modules/
-```
-
 ```bash
 node --input-type=module -e "await import('./scripts/pfdsl/lib/yaml-require.mjs')"
 ```
 
 成功すれば yaml の追加インストールは不要。
 `yaml` が見つからない場合は、依存準備までを導入作業として続ける。
+
+インストールする前に `git check-ignore -q -- node_modules/x` を実行し、Git が依存ディレクトリを除外するか確認する。
+終了コード 0 なら既存の有効な規則を利用し、同じ意味の行を追加しない。
+終了コード 1 ならリポ直下の `.gitignore` に次の規則を追加する（ファイルがなければ作成し、既存の規則は残す）。
+それ以外の終了コードでは確認の失敗理由を解消してから続ける。
+
+```gitignore
+/node_modules/
+```
+
+新規作成・変更した `.gitignore` は導入変更と一緒にコミットし、ほかの checkout にも除外規則を共有する。
+
 `package.json` のないリポでは次を実行する。
 package.json や lockfile は作らず、リポ直下の `node_modules` に配置する。
 

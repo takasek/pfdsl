@@ -827,6 +827,21 @@ describe("CLI output", () => {
 		assert.match(stdout, /in sync/);
 	});
 
+	it("describes both outdated and edited adopter files as different from the bundle", () => {
+		const skillRoot = makeSkillRoot();
+		const target = join(tmp, "target-adopter-differences");
+		deployInstall(skillRoot, target);
+		writeFile(join(skillRoot, "install"), "a.txt", "new-canonical-a");
+		writeFile(target, "sub/b.txt", "user-edit-b");
+
+		const { status, stdout } = runCli(skillRoot, target);
+		assert.equal(status, 1);
+		assert.match(stdout, /^ {2}different from bundled version: a\.txt$/m);
+		assert.match(stdout, /^ {2}different from bundled version: sub\/b\.txt$/m);
+		assert.doesNotMatch(stdout, /^ {2}modified:/m);
+		assert.match(stdout, /Run with --deploy to refresh/);
+	});
+
 	it("still deploys into an ordinary adopting repo", () => {
 		// The guard has to leave the case it was never about untouched.
 		const skillRoot = join(tmp, "skill-adopter-still-works");
