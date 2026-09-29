@@ -1,0 +1,7 @@
+# DO NOT EDIT. Authoritative source: scripts/lib/gen-codex-assets.mjs.
+
+sandbox_mode = "workspace-write"
+approval_policy = "on-request"
+
+[sandbox_workspace_write]
+network_access = true

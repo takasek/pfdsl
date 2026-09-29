@@ -10,6 +10,7 @@ description: |
   for when a finding belongs to the distribution layer. Not for defects in the
   adopting repository's own PFDs, code or work items; those belong to pfd-ops.
 ---
+<!-- DO NOT EDIT. Authoritative source: .claude/skills/pfd-upstream-report/SKILL.md. -->
 
 # 上流への欠陥報告
 
@@ -41,9 +42,6 @@ remote だけを根拠にしない。
 素の `gh auth status` は設定済みの全ホストを検査するため、github.com が未認証でも別ホストの認証が通っていれば成功し、逆に github.com が正常でも無関係なホストの壊れた認証で失敗する。
 報告の宛先は github.com に固定されているので、確かめるべきもそのホストだけである。
 
-後続の所在確認・検索・投稿・readback も github.com に固定する。
-`GH_HOST` や採用リポの remote に依存させず、repo 引数は `github.com/takasek/pfdsl`（例: `gh repo view github.com/takasek/pfdsl`）、API 呼出しは `--hostname github.com` を使う。
-
 工程5の重複確認も工程6の投稿も `gh` に依存しており、**本文を組み立ててから使えないと分かるのが最も無駄が大きい**。
 
 `gh` が存在しない、または github.com が未認証の場合はここで止め、何が足りないかをユーザーへ報告する。
@@ -60,12 +58,12 @@ issue へ切り出してコンテキストを区切るほうが健全である�
 環境ブロックは pfd-ops 同梱のスクリプトが採取する。
 
 ```bash
-node ${CLAUDE_PLUGIN_ROOT}/skills/pfd-ops/scripts/collect-report-environment.mjs
+node ${PLUGIN_ROOT}/skills/pfd-ops/scripts/collect-report-environment.mjs
 ```
 
-CLAUDE_PLUGIN_ROOT は plugin ロード時に実パスへ置換される変数（`${CLAUDE_PLUGIN_ROOT}` の形でのみ置換対象 — この説明文中の表記のように波括弧を外せば置換されない）。
-上のコマンド行がパス置換されず変数名のまま見えている場合は plugin 外（repo-local）ロード — `node .claude/skills/pfd-ops/scripts/collect-report-environment.mjs` を使う。
-**どちらも解決しない場合**（変数名のまま見えており、かつ repo-local の `.claude/skills/pfd-ops/` も存在しない）は、いま読んでいるこのファイル自身の所在から sibling の `pfd-ops/scripts/` を相対で辿る。
+PLUGIN_ROOT は plugin ロード時に実パスへ置換される変数（`${PLUGIN_ROOT}` の形でのみ置換対象 — この説明文中の表記のように波括弧を外せば置換されない）。
+上のコマンド行がパス置換されず変数名のまま見えている場合は plugin 外（repo-local）ロード — `node .agents/skills/pfd-ops/scripts/collect-report-environment.mjs` を使う。
+**どちらも解決しない場合**（変数名のまま見えており、かつ repo-local の `.agents/skills/pfd-ops/` も存在しない）は、いま読んでいるこのファイル自身の所在から sibling の `pfd-ops/scripts/` を相対で辿る。
 このファイルが読めている以上その所在は判明しており、それが3つ目の分岐になる。
 
 出力は JSON で、`installation`（`claude-plugin` / `codex-plugin` / `repo-local` / `upstream-checkout` / `unknown`）・`pluginVersion`・`bundleContentHash`・`cliVersion`・`repoCommit`・`installProvenance`・`unavailable` を持つ。
@@ -109,7 +107,7 @@ CLAUDE_PLUGIN_ROOT は plugin ロード時に実パスへ置換される変数�
 
 単一の語による1回の検索では取りこぼす。
 
-- 症状・コマンド名・診断メッセージ・該当パスなど複数の語で `gh issue list --repo github.com/takasek/pfdsl --search <語> --state all --limit 50` を引く
+- 症状・コマンド名・診断メッセージ・該当パスなど複数の語で `gh issue list --repo takasek/pfdsl --search <語> --state all --limit 50` を引く
 - open と closed の両方を対象にする（`--state all`）
 - `--limit` を既定値任せにしない
 
@@ -146,17 +144,17 @@ readback_path="$(mktemp)"
 新規起票:
 
 ```bash
-issue_url="$(gh issue create --repo github.com/takasek/pfdsl --title "$title" --body-file "$body_path")"
+issue_url="$(gh issue create --repo takasek/pfdsl --title "$title" --body-file "$body_path")"
 issue_number="${issue_url##*/}"
-gh issue view "$issue_number" --repo github.com/takasek/pfdsl --json body,url > "$readback_path"
+gh issue view "$issue_number" --repo takasek/pfdsl --json body,url > "$readback_path"
 ```
 
 既存 issue へのコメント（`issue_number` は工程5で同定した issue の番号）:
 
 ```bash
-comment_url="$(gh issue comment "$issue_number" --repo github.com/takasek/pfdsl --body-file "$body_path")"
+comment_url="$(gh issue comment "$issue_number" --repo takasek/pfdsl --body-file "$body_path")"
 comment_id="${comment_url##*issuecomment-}"
-gh api --hostname github.com "repos/takasek/pfdsl/issues/comments/$comment_id" > "$readback_path"
+gh api "repos/takasek/pfdsl/issues/comments/$comment_id" > "$readback_path"
 ```
 
 **`gh issue view --json comments` の一覧から似た本文を拾って代用しない。**
