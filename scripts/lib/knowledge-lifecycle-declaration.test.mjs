@@ -30,10 +30,14 @@ function declarations(markdown) {
 }
 
 describe("pfd-retro D-layer declaration token (ADR-0041)", () => {
-	it("SKILL names the literal key and the three states it distinguishes", () => {
+	it("SKILL names the literal key, both values and the report-every-run rule", () => {
 		assert.ok(skill.includes(KEY));
 		assert.match(skill, /`adopt`/);
 		assert.match(skill, /`decline`/);
+		assert.match(
+			skill,
+			/所有者が `adopt` か `decline` を宣言する必要があることを毎回報告する/,
+		);
 		assert.doesNotMatch(skill, /知識成果物ライフサイクル監査: 採用する/);
 	});
 
