@@ -748,39 +748,22 @@ describe("buildCodexProjectConfig", () => {
 });
 
 describe("generated-file attributes", () => {
-	it("collapses generated mirrors while keeping reviewable outputs and sources visible", () => {
+	it("keeps reviewable outputs visible without hiding future Codex files", () => {
+		const expected = new Map([
+			["AGENTS.md", "true"],
+			[".codex/agents/pfd-implementer.toml", "true"],
+			[".codex/config.toml", "true"],
+			["docs/samples/01-simple-chain.dot", "true"],
+			[".codex/future-policy.toml", "unspecified"],
+			[".claude-plugin/marketplace.json", "unspecified"],
+			[".pfdsl/workflow.svg", "unspecified"],
+			["docs/samples/01-simple-chain.svg", "unspecified"],
+			["docs/samples/README.md", "unspecified"],
+			[".claude/skills/pfd-ops/SKILL.md", "unspecified"],
+		]);
 		const output = execFileSync(
 			"git",
-			[
-				"check-attr",
-				"linguist-generated",
-				"--",
-				"AGENTS.md",
-				".agents/skills/pfd-ops/SKILL.md",
-				".codex/agents/pfd-implementer.toml",
-				".codex/config.toml",
-				".codex/GENERATED.md",
-				".codex/hooks.json",
-				".codex/future-policy.toml",
-				"plugin/pfdsl-codex/skills/pfd-ops/SKILL.md",
-				"generated/skills/pfdsl/SKILL.md",
-				".claude/skills/pfd-ops/install/scripts/pfdsl/sweep-completed-chains.mjs",
-				"plugin/pfdsl/skills/pfdsl/SKILL.md",
-				"CLAUDE.md",
-				".claude-plugin/marketplace.json",
-				".pfdsl/workflow.svg",
-				".pfdsl/team/flow.svg",
-				"docs/readme-example.svg",
-				"docs/samples/01-simple-chain.dot",
-				"docs/samples/01-simple-chain.svg",
-				"docs/samples/README.md",
-				".claude/agents/pfd-implementer.md",
-				".claude/skills/pfd-ops/SKILL.md",
-				".claude/settings.json",
-				"docs/samples/01-simple-chain.pfdsl",
-				".pfdsl/team/flow.pfdsl",
-				"hooks/managed-issue-reminder-post-tool-use.mjs",
-			],
+			["check-attr", "linguist-generated", "--", ...expected.keys()],
 			{ cwd: root, encoding: "utf-8" },
 		);
 		const attributes = new Map(
@@ -793,39 +776,7 @@ describe("generated-file attributes", () => {
 				}),
 		);
 
-		for (const path of [
-			"AGENTS.md",
-			".agents/skills/pfd-ops/SKILL.md",
-			".codex/agents/pfd-implementer.toml",
-			".codex/config.toml",
-			".codex/GENERATED.md",
-			".codex/hooks.json",
-			"plugin/pfdsl-codex/skills/pfd-ops/SKILL.md",
-			"generated/skills/pfdsl/SKILL.md",
-			".claude/skills/pfd-ops/install/scripts/pfdsl/sweep-completed-chains.mjs",
-			"plugin/pfdsl/skills/pfdsl/SKILL.md",
-			"CLAUDE.md",
-			"docs/samples/01-simple-chain.dot",
-		]) {
-			assert.equal(attributes.get(path), "true", path);
-		}
-		for (const path of [
-			".claude-plugin/marketplace.json",
-			".codex/future-policy.toml",
-			"docs/samples/README.md",
-			".pfdsl/workflow.svg",
-			".pfdsl/team/flow.svg",
-			"docs/readme-example.svg",
-			"docs/samples/01-simple-chain.svg",
-			".claude/agents/pfd-implementer.md",
-			".claude/skills/pfd-ops/SKILL.md",
-			".claude/settings.json",
-			"docs/samples/01-simple-chain.pfdsl",
-			".pfdsl/team/flow.pfdsl",
-			"hooks/managed-issue-reminder-post-tool-use.mjs",
-		]) {
-			assert.equal(attributes.get(path), "unspecified", path);
-		}
+		assert.deepEqual(attributes, expected);
 	});
 });
 
