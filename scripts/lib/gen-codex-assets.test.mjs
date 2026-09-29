@@ -747,26 +747,23 @@ describe("buildCodexProjectConfig", () => {
 	});
 });
 
-describe("Codex generated-file attributes", () => {
-	it("marks generated Codex outputs while leaving their maintained sources unclassified", () => {
+describe("generated-file attributes", () => {
+	it("keeps reviewable outputs visible without hiding future Codex files", () => {
+		const expected = new Map([
+			["AGENTS.md", "true"],
+			[".codex/agents/pfd-implementer.toml", "true"],
+			[".codex/config.toml", "true"],
+			["docs/samples/01-simple-chain.dot", "true"],
+			[".codex/future-policy.toml", "unspecified"],
+			[".claude-plugin/marketplace.json", "unspecified"],
+			[".pfdsl/workflow.svg", "unspecified"],
+			["docs/samples/01-simple-chain.svg", "unspecified"],
+			["docs/samples/README.md", "unspecified"],
+			[".claude/skills/pfd-ops/SKILL.md", "unspecified"],
+		]);
 		const output = execFileSync(
 			"git",
-			[
-				"check-attr",
-				"linguist-generated",
-				"--",
-				"AGENTS.md",
-				".agents/skills/pfd-ops/SKILL.md",
-				".codex/agents/pfd-implementer.toml",
-				".codex/config.toml",
-				".codex/GENERATED.md",
-				".codex/hooks.json",
-				"plugin/pfdsl-codex/skills/pfd-ops/SKILL.md",
-				"CLAUDE.md",
-				".claude/agents/pfd-implementer.md",
-				".claude/settings.json",
-				"hooks/managed-issue-reminder-post-tool-use.mjs",
-			],
+			["check-attr", "linguist-generated", "--", ...expected.keys()],
 			{ cwd: root, encoding: "utf-8" },
 		);
 		const attributes = new Map(
@@ -779,25 +776,7 @@ describe("Codex generated-file attributes", () => {
 				}),
 		);
 
-		for (const path of [
-			"AGENTS.md",
-			".agents/skills/pfd-ops/SKILL.md",
-			".codex/agents/pfd-implementer.toml",
-			".codex/config.toml",
-			".codex/GENERATED.md",
-			".codex/hooks.json",
-			"plugin/pfdsl-codex/skills/pfd-ops/SKILL.md",
-		]) {
-			assert.equal(attributes.get(path), "true", path);
-		}
-		for (const path of [
-			"CLAUDE.md",
-			".claude/agents/pfd-implementer.md",
-			".claude/settings.json",
-			"hooks/managed-issue-reminder-post-tool-use.mjs",
-		]) {
-			assert.equal(attributes.get(path), "unspecified", path);
-		}
+		assert.deepEqual(attributes, expected);
 	});
 });
 

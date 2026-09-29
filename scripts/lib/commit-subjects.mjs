@@ -15,7 +15,10 @@
  * (#1174).
  */
 
-import { lintCommitSubjects, parseCommitLogLines } from "./gate-check.mjs";
+import {
+	lintCommitSubjects,
+	parseCommitLogLines,
+} from "./commit-subject-rules.mjs";
 
 /**
  * @param {{exec: (file: string, args: string[]) => {ok: boolean, out: string}, baseRef: string, headRef: string}} params
