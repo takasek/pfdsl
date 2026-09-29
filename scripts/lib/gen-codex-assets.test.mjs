@@ -748,7 +748,7 @@ describe("buildCodexProjectConfig", () => {
 });
 
 describe("generated-file attributes", () => {
-	it("marks generated outputs while leaving their maintained sources unclassified", () => {
+	it("collapses generated mirrors while keeping reviewable outputs and sources visible", () => {
 		const output = execFileSync(
 			"git",
 			[
@@ -805,16 +805,16 @@ describe("generated-file attributes", () => {
 			"plugin/pfdsl/skills/pfdsl/SKILL.md",
 			"CLAUDE.md",
 			".claude-plugin/marketplace.json",
-			".pfdsl/workflow.svg",
-			".pfdsl/team/flow.svg",
-			"docs/readme-example.svg",
 			"docs/samples/01-simple-chain.dot",
-			"docs/samples/01-simple-chain.svg",
 			"docs/samples/README.md",
 		]) {
 			assert.equal(attributes.get(path), "true", path);
 		}
 		for (const path of [
+			".pfdsl/workflow.svg",
+			".pfdsl/team/flow.svg",
+			"docs/readme-example.svg",
+			"docs/samples/01-simple-chain.svg",
 			".claude/agents/pfd-implementer.md",
 			".claude/skills/pfd-ops/SKILL.md",
 			".claude/settings.json",

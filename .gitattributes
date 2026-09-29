@@ -14,9 +14,6 @@ CLAUDE.md linguist-generated=true
 .agents/** linguist-generated=true
 .codex/** linguist-generated=true
 
-# Generated previews and sample catalogue.
-.pfdsl/**/*.svg linguist-generated=true
-docs/readme-example.svg linguist-generated=true
+# Generated sample intermediate files and catalogue.
 docs/samples/*.dot linguist-generated=true
-docs/samples/*.svg linguist-generated=true
 docs/samples/README.md linguist-generated=true
