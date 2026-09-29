@@ -56,11 +56,11 @@ a8e4d35e456f05babab77d002a20f7230b7942aaf7bb82138bf2007b5926c4f7  skills/pfd-ops
 
 a5854e16415ea04e508b0f88a391446679dcc60060b9bf8d62a27454eb0b39d4  skills/pfd-ops/install/scripts/pfdsl/sweep-completed-chains.mjs
 
-67720b9ca6aec9375e08bc84228e18192e2068cb9df9dc7f847f4e2a05a390b3  skills/pfd-ops/references/architecture.md
+42998fe1881d5780b5f6d0f7e0ca2c66cd567b7b2744d35086b8804c026a5f22  skills/pfd-ops/references/architecture.md
 
 ec4c10c6394964a5259ce63b446562181550bb397743b0b1c79d087bc2c7c307  skills/pfd-ops/references/file-based-tracker-backend.md
 
-f4aa6521cb87f772e0724f68eb043d26698b3fe58a71c22e7949f195d70e6d30  skills/pfd-ops/references/github-issues-backend.md
+a82ae8e2b33fee5083ffa95ed9cfeb86391da575da1c715fdb3714e83f794e4c  skills/pfd-ops/references/github-issues-backend.md
 
 57d30128361e2e29736bbb3f66ea10c3beaed751fe17fe6f4b711bae6faec53b  skills/pfd-ops/references/scaffold/bindings/pfd-ops.md
 
@@ -84,7 +84,7 @@ c1328f9dcb946c35f7bba42306324d82929f7031fb52d459c3b2ee12fd904686  skills/pfd-ops
 
 471cd311db86eeaa6196afb11a5446e30a5f4cfa62b9c9d04b4329d210932eb3  skills/pfd-ops/references/work-cycle.md
 
-d0f56af70be3c5553258dcb1035daf53c5e7741aae3a939c997fd6de9ed9e580  skills/pfd-ops/scripts/check-install-sync.mjs
+73fbfa448340284eac36b338e709a1246405371c77bd6856bde3d3cbbf7b4ca1  skills/pfd-ops/scripts/check-install-sync.mjs
 
 42cf20f0cee42b8a18368baafff36ab665b8a2ab5b8c63a07630c8370219d804  skills/pfd-ops/scripts/collect-report-environment.mjs
 

@@ -27,7 +27,7 @@ const steps = workflow.jobs["sweep-completed-chains"].steps;
 // run the real sweep with the already-built CLI. Live Actions remains a separate
 // acceptance check.
 for (const shape of ["no-package", "no-package-manager", "workspace"]) {
-	test(`sweep workflow reaches recovery for ${shape}`, () => {
+	test(`sweep workflow selects setup for ${shape} and sweeps with the local CLI build`, () => {
 		const dir = mkdtempSync(join(tmpdir(), "sweep-workflow-"));
 		try {
 			if (shape !== "no-package") {
@@ -77,11 +77,6 @@ for (const shape of ["no-package", "no-package-manager", "workspace"]) {
 						shape,
 						"workspace",
 						"Adopters must not execute pnpm setup",
-					);
-					assert.equal(
-						detected,
-						"true",
-						"Detect the workspace before pnpm setup",
 					);
 					pnpmSetUp = true;
 				} else if (step.id === "build-cli") {

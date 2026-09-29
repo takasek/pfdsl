@@ -584,7 +584,10 @@ async function main() {
 				console.log("pfd-ops install/ files are in sync with the deployed copies.");
 			} else {
 				console.log("pfd-ops install/ files are out of sync:");
-				for (const r of issues) console.log(`  ${r.status}: ${r.path}`);
+				for (const r of issues) {
+					const label = r.status === "modified" ? "different from bundled version" : r.status;
+					console.log(`  ${label}: ${r.path}`);
+				}
 				printRenameCandidates(renameCandidates);
 				console.log(
 					"Run with --deploy to refresh. Files that carry no local edit are copied, and orphans that carry none are removed, without any further flag — add --overwrite-local-edits or --delete-edited-orphans only to discard the edits standing in the way.",

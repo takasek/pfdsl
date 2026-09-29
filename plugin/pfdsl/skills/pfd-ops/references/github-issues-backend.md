@@ -88,6 +88,12 @@ issue findings の `blocking:` は監査を失敗させ、`advisory:` だけな�
 
 採用リポのルートを作業ディレクトリにして、配置した監査モジュールから依存を読めるか確認する。
 
+依存をインストールする前に、リポ直下の `.gitignore` に `/node_modules/` の規則がなければ追加する（ファイルがなければ作成し、既存の規則は残す）。
+
+```gitignore
+/node_modules/
+```
+
 ```bash
 node --input-type=module -e "await import('./scripts/pfdsl/lib/yaml-require.mjs')"
 ```
@@ -109,6 +115,8 @@ npm install --prefix . --no-save --package-lock=false --ignore-scripts yaml@2.8.
 既存の依存宣言・lockfile を尊重し、別の package manager へ切り替えない。
 未保存依存は clean checkout や依存の掃除後には再準備が必要で、CI でも監査の前に用意する。
 `node_modules` はコミットしない。
+インストール後に `git check-ignore -v -- node_modules/yaml/package.json` で除外されることを確認し、`git status --short` で依存ファイルが追加対象になっていないことを確認する。
+既に追跡されている依存ファイルは `.gitignore` だけでは除外できないため、その場合はリポの方針に従って追跡状態を整理してから先へ進む。
 
 準備後は上の import 確認を再実行し、roadmap と認証の準備ができたら初回監査を実行する。
 
