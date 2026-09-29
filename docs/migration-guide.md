@@ -189,9 +189,11 @@ Do not report an adopter as migrated until these checks have run there.
 
 ## Maintaining this guide
 
-Contributors add migration-relevant changes as unreleased entries in the change PR, including the previous behavior, affected installations, action, verification, and source issue or commit.
-Release preparation checks the complete previous-release-to-target interval, assigns the actual destination release, and retains historical sections and their links.
+This guide is maintained once, during release preparation, and not by an obligation on each change.
+Release preparation lists every commit since the previous release tag that touched distributed files, classifies each as requiring adopter action or not, and has a maintainer confirm the classification.
+For each commit that requires action, it writes an entry with the previous behavior, affected installations, action, verification, and source issue or commit.
+It assigns the actual destination release and retains historical sections and their links.
 Do not guess future release numbers or discard older instructions after publishing.
-If an interval requires no action for a package family, record that conclusion in its release preparation record rather than inventing cleanup steps.
+If an interval requires no action for a package family, record that all commits were classified and none required action in its release preparation record, rather than inventing cleanup steps.
 Link the relevant section from release notes when release notes are produced.
-The repository's [workflow procedure](../.pfdsl/workflow.md#採用先への移行案内) owns the maintenance and release review steps.
+The repository's [workflow procedure](../.pfdsl/workflow.md#採用先への移行案内) owns the commit listing command and the release review steps.

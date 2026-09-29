@@ -557,7 +557,7 @@ process:
     group: release
   maintain_adopter_guidance:
     label: 採用先向け移行案内の整備
-    description: 統合済みの版・履歴、変更 PR の差分・検証結果と issue の採用先影響から版別移行ガイドを保守する。変更 PR で未公開項目を起草し、公開準備 PR で公開版との対応を確定する。手続きと完了条件は workflow.md の採用先への移行案内に従う。
+    description: 統合済みの版・履歴と issue の採用先影響から版別移行ガイドを保守する。変更 PR ごとの記載義務は置かず、公開準備で前回の公開 tag 以降に配布物へ触れた全コミットを、採用先の作業を要するかで振り分け、人が確認してからガイドの項目を書く。手続きと完了条件は workflow.md の採用先への移行案内に従う。
     group: release
 
 tag:
@@ -736,7 +736,7 @@ prose_mechanization_audit_skill >>? sweep_prose_mechanization
 prose_mechanization_sweep_record >>? sweep_prose_mechanization
 
 migration_guide >>? maintain_adopter_guidance
-[gh_issues, integrated_repository, pull_request] >> maintain_adopter_guidance -> migration_guide
+[gh_issues, integrated_repository] >> maintain_adopter_guidance -> migration_guide
 
 [distribution_review_record, migration_guide, toolchain] >> decide_cli_release -> cli_release_request
 

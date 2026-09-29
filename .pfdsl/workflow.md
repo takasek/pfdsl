@@ -232,14 +232,32 @@ drift 検査は pre-commit（`gen-install` の check_drift。他の drift 検査
 `maintain_adopter_guidance` が、更新前後の公開版で必要な移行だけを選ぶ正本 `migration_guide` を保守する。
 配布物にはガイドへの安定した参照だけを持たせ、旧機構の判定・回復処理や版別手順を蓄積しない。
 
-変更の実装者は、採用先のファイル・呼出し・運用に影響する変更を、その変更 PR でガイドの未公開項目へ記載する。
-旧挙動、該当条件、必要操作、検証方法、根拠 issue/commit を含め、影響がなければ PR の確認記録にその理由を残す。
+ガイドの保守は公開準備で1回まとめて行う。
+変更 PR ごとの記載義務は置かない — 変更の実装者に「採用先への影響を自分で気づいて書く」ことを課す形は、気づかなかった変更がそのまま漏れる。
+公開準備の担当が、対象区間の全コミットを1件ずつ影響ありか無しかに振り分け、人が確認する。
 
-公開担当は `decide_cli_release`・`decide_libraries_release`・`decide_vscode_release` で、前回の対応する公開版から公開対象 SHA までの差分とガイドを照合する。
-仕様履歴だけでなく CLI・配布スキル・scaffold・配置ファイル・呼出し元への影響を確認し、抜けは公開準備 PR で補う。
-未公開項目を実際の公開先の版へ対応付け、CLI/plugin・ライブラリ・拡張と仕様の版を混同しない。
-複数版を飛ばす更新でも対象区間の項目を順に選べること、旧節とリンクを保持することを確認する。
-該当する変更が無い公開では、対象区間と影響なしの根拠を公開準備の既存記録へ残す。
+公開担当は `decide_cli_release`・`decide_libraries_release`・`decide_vscode_release` の判断前に、次を行う。
+
+1. 前回の対応する公開 tag（CLI/plugin は `v*`、ライブラリは `lib-v*`、拡張は `vscode-v*`）から公開対象 SHA までの、配布物に触れたコミットを列挙する。
+
+   ```sh
+   git log --no-merges --format='%h %s' <前回の公開 tag>..<公開対象 SHA> -- \
+     .claude/skills/pfd-ecosystem .claude/skills/pfd-grill .claude/skills/pfd-ops \
+     .claude/skills/pfd-retro .claude/skills/pfd-upstream-report \
+     .claude/commands/pfd-cycle.md .claude/commands/pfd-init.md .claude/commands/pfd-retro.md \
+     .claude/agents/pfd-lens.md .claude/agents/pfd-implementer.md \
+     hooks/ plugin/ .agents/ .codex/ packages/ \
+     docs/spec/ docs/quality-guide.md docs/review-perspectives.md docs/samples/ docs/examples/
+   ```
+
+   パス一覧の一次情報は `scripts/lib/harness-inventory.mjs`（配布するスキル・コマンド・agent と plugin hook）と、`references/` の生成元（`gen-skill` の入力の `docs/spec/`・`docs/quality-guide.md`・`docs/review-perspectives.md`・`docs/samples/`・`docs/examples/`）である。
+   配布対象を増減したら上のコマンドも更新する。
+   `plugin/`・`.agents/`・`.codex/` は生成物だが、生成器の変更が出力だけを変えたコミットを拾うために含める。
+2. 列挙した各コミットを、採用先の作業を要するもの（ファイル・呼出し・運用設定・診断の扱いの変更）と、要さないものに分ける。分類の手段は問わないが、分類そのものを人が確認する。
+3. 要するものごとに、旧挙動、該当条件、必要操作、検証方法、根拠 issue/commit をガイドの項目に書く。
+4. 未公開項目を実際の公開先の版へ対応付け、CLI/plugin・ライブラリ・拡張と仕様の版を混同しない。複数版を飛ばす更新でも対象区間の項目を順に選べること、旧節とリンクを保持することを確認する。
+5. 要するコミットが無い公開では、対象区間と、全コミットを分類して影響なしと確認したことを公開準備の既存記録へ残す。
+
 これは公開判断の必須確認であり、現行の `make release-status` や release runner が内容の網羅性を自動判定するという意味ではない。
 リリースノートを作る場合は該当節へリンクする。
 
