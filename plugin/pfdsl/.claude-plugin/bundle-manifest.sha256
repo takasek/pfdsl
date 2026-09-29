@@ -18,7 +18,7 @@ a3f96e180a957152509a1d019b2b4247fb74c3f0ce6c7b25cd79355d9a3e75bb  hooks/lib/mana
 
 ae6f8cfe03b3df98c89a4b46eb176609cbf2a7c311f0d36f42817eab337ffcf2  hooks/managed-issue-reminder-post-tool-use.mjs
 
-da1db67300285253731124967f705e00d8df5c23bda9d5b60e5130298eaadf0a  skills/pfd-ecosystem/SKILL.md
+f06d659b5f29b1e79d5f528e130e329a8751db83dcd3aa7452ab3d9575a27460  skills/pfd-ecosystem/SKILL.md
 
 62d635bc7607d1aa0ad830337e1f9d3e2b2a389e0503f9e14a41726436d9fb67  skills/pfd-ecosystem/references/kind-taxonomy.md
 
@@ -26,7 +26,7 @@ da1db67300285253731124967f705e00d8df5c23bda9d5b60e5130298eaadf0a  skills/pfd-eco
 
 4b702b67cbaba6172e42743e0ed9182c104491017f534672e92943e3baec947f  skills/pfd-ops/SKILL.md
 
-bab66f16509c3bc57d5184cafcebdc34cc87b3edf1c97b53c49d629135c1601c  skills/pfd-ops/install/.github/workflows/pfdsl-sweep-completed-chains.yml
+558934bd272e04e5e3bbcdd7aaf8557f1e3f58efbc6b67602f4a64f4afac1ffd  skills/pfd-ops/install/.github/workflows/pfdsl-sweep-completed-chains.yml
 
 35faacd4d5c13add67d9c303c8a68d2909d82fc32d9637501c0b100ae590d26f  skills/pfd-ops/install/scripts/pfdsl/audit-issues-flow.mjs
 
@@ -60,7 +60,7 @@ a5854e16415ea04e508b0f88a391446679dcc60060b9bf8d62a27454eb0b39d4  skills/pfd-ops
 
 ec4c10c6394964a5259ce63b446562181550bb397743b0b1c79d087bc2c7c307  skills/pfd-ops/references/file-based-tracker-backend.md
 
-31c35f15c0397972395507f52a9e3641b9742b55bdfe82264e0f574de1d8423f  skills/pfd-ops/references/github-issues-backend.md
+f4aa6521cb87f772e0724f68eb043d26698b3fe58a71c22e7949f195d70e6d30  skills/pfd-ops/references/github-issues-backend.md
 
 57d30128361e2e29736bbb3f66ea10c3beaed751fe17fe6f4b711bae6faec53b  skills/pfd-ops/references/scaffold/bindings/pfd-ops.md
 
@@ -84,7 +84,7 @@ c1328f9dcb946c35f7bba42306324d82929f7031fb52d459c3b2ee12fd904686  skills/pfd-ops
 
 471cd311db86eeaa6196afb11a5446e30a5f4cfa62b9c9d04b4329d210932eb3  skills/pfd-ops/references/work-cycle.md
 
-2cae2118000945dd3e0f0f8e8a8ce9550da5b666aeb601295dc3561a5448168b  skills/pfd-ops/scripts/check-install-sync.mjs
+d0f56af70be3c5553258dcb1035daf53c5e7741aae3a939c997fd6de9ed9e580  skills/pfd-ops/scripts/check-install-sync.mjs
 
 42cf20f0cee42b8a18368baafff36ab665b8a2ab5b8c63a07630c8370219d804  skills/pfd-ops/scripts/collect-report-environment.mjs
 

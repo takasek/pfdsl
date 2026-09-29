@@ -303,9 +303,9 @@ export function checkInstallSync(skillRoot, targetRoot) {
 
 /**
  * Copy canonical install/ files to targetRoot, creating directories as
- * needed. A target file whose hash differs from canonical is treated as a
- * local edit and skipped unless overwriteLocalEdits is true (a local edit would
- * otherwise be silently destroyed). Also removes files this tool previously
+ * needed. A target differing from both the last deployed hash and the new
+ * canonical is preserved unless overwriteLocalEdits is true. Untracked
+ * conflicting files are preserved too. Also removes files this tool previously
  * deployed (per the deploy manifest) whose canonical source has since been
  * dropped from install/ — unless the on-disk copy was locally modified, in
  * which case it's left alone (reported in `orphanSkipped`) unless
@@ -333,11 +333,23 @@ export function deployInstall(
 	const files = listInstallFiles(installDir);
 	const copied = [];
 	const skipped = [];
+	const previousEntries = readManifest(targetRoot);
+	const previousByPath = new Map(previousEntries.map((entry) => [entry.path, entry]));
+	const deployedEntries = [];
 	for (const rel of files) {
 		const canonicalPath = join(installDir, rel);
 		const targetPath = join(targetRoot, rel);
-		if (existsSync(targetPath) && !overwriteLocalEdits && !filesEqual(canonicalPath, targetPath)) {
+		const previous = previousByPath.get(rel);
+		if (
+			existsSync(targetPath) &&
+			!overwriteLocalEdits &&
+			!filesEqual(canonicalPath, targetPath) &&
+			(!previous || sha256(targetPath) !== previous.hash)
+		) {
 			skipped.push(rel);
+			// A skipped copy never establishes a new deployment baseline. An
+			// untracked conflicting file must remain untracked as well.
+			if (previous) deployedEntries.push(previous);
 			continue;
 		}
 		mkdirSync(dirname(targetPath), { recursive: true });
@@ -348,13 +360,14 @@ export function deployInstall(
 		// regardless of OS (#421).
 		chmodSync(targetPath, statSync(canonicalPath).mode);
 		copied.push(rel);
+		deployedEntries.push({ path: rel, hash: sha256(targetPath) });
 	}
 
 	const currentSet = new Set(files);
 	const removed = [];
 	const orphanSkipped = [];
 	const retainedOrphanEntries = [];
-	for (const entry of readManifest(targetRoot)) {
+	for (const entry of previousEntries) {
 		if (currentSet.has(entry.path)) continue;
 		const targetPath = join(targetRoot, entry.path);
 		if (!existsSync(targetPath)) continue;
@@ -372,7 +385,7 @@ export function deployInstall(
 	}
 
 	writeManifest(targetRoot, [
-		...files.map((rel) => ({ path: rel, hash: sha256(join(installDir, rel)) })),
+		...deployedEntries,
 		...retainedOrphanEntries,
 	]);
 
@@ -537,6 +550,9 @@ async function main() {
 		// files, so it would otherwise turn up in `git status` as an unexplained
 		// new file (a distribution-review probe hit exactly that).
 		console.log(`Wrote deploy manifest: ${MANIFEST_RELATIVE_PATH}`);
+		console.log(
+			`Before running the audit, follow the dependency setup and first-audit instructions in ${join(skillRoot, "references/github-issues-backend.md")}. File deployment alone does not install runtime dependencies.`,
+		);
 		printGroup("Skipped (locally modified; re-run with --overwrite-local-edits to overwrite):", skipped);
 		printGroup("Removed (no longer part of canonical install/):", removed);
 		printGroup(

@@ -84,12 +84,49 @@ issue findings の `blocking:` は監査を失敗させ、`advisory:` だけな�
 3. GitHub の `flow:managed` / `flow:exempt` ラベルを確認し、不足分は導入時に明示的に作成する
 4. `roadmap.pfdsl` を依存構造のみのグラフとして用意し、issue に対応する process に `iN_` prefix を付ける
 5. リポの `roadmap.md` で本プリセットを指し、リポ URL を記載する
+6. 下の「依存の準備と初回監査」を実行する。配置だけで終了しない
+
+## 依存の準備と初回監査
+
+採用リポのルートを作業ディレクトリにして、配置した監査モジュールから依存を読めるか確認する。
+
+```bash
+node --input-type=module -e "await import('./scripts/pfdsl/lib/yaml-require.mjs')"
+```
+
+成功すれば yaml の追加インストールは不要。
+`yaml` が見つからない場合は、依存準備までを導入作業として続ける。
+`package.json` のないリポでは次を実行する。
+package.json や lockfile は作らず、リポ直下の `node_modules` に配置する。
+
+```bash
+npm install --prefix . --no-save --package-lock=false --ignore-scripts yaml@2.8.3
+```
+
+`--prefix .` で採用リポへ配置先を固定する（親フォルダの package.json に依存の配置先を引き寄せられないようにする）。
+同じリポで CLI も未保存依存として用意する場合は、上のコマンドの代わりに `npm install --prefix . --no-save --package-lock=false --ignore-scripts yaml@2.8.3 @pfdsl/cli` を使う。
+別々の `npm install --no-save` は先に置いた未保存依存を除去しうるため、保持する未保存依存を同じ install に列挙する。
+公開 CLI が回収に必要な `delete` を持つことは、回収スクリプト自身の起動時チェックで別途確認する。
+`package.json` があるリポでは、そのリポの package manager で yaml を開発依存へ追加する（npm なら `npm install --save-dev yaml@2.8.3`）。
+既存の依存宣言・lockfile を尊重し、別の package manager へ切り替えない。
+未保存依存は clean checkout や依存の掃除後には再準備が必要で、CI でも監査の前に用意する。
+`node_modules` はコミットしない。
+
+準備後は上の import 確認を再実行し、roadmap と認証の準備ができたら初回監査を実行する。
+
+```bash
+node scripts/pfdsl/audit-issues-flow.mjs
+```
+
+import 成功だけを監査成功としない。
+監査の終了コードと findings を確認し、認証・通信・依存取得の失敗はその理由を報告する。
+既に認証された gh または token を使用し、権限の追加が必要なら利用中の環境の承認境界に従う。
 
 ## 監査スクリプトの実行環境
 
 - Node.js 24 以上
 - `gh` CLI、または `GH_TOKEN` / `GITHUB_TOKEN`
-- npm パッケージ `yaml`（採用リポの実行環境に用意する）
+- npm パッケージ `yaml`（上の「依存の準備と初回監査」で採用リポへ用意する）
 - `delete` サブコマンドを持つ版の `@pfdsl/cli`（回収スクリプトが判定・削除・検証のすべてをこの CLI 経由で行う）。最低版を数字では断定しない: pfdsl リポ自身の `packages/cli/package.json` は `delete` 追加後もまだ version を上げていないため、その値をそのまま「次の公開版」として読むと誤った版数を書くことになる。回収スクリプトは起動時に解決した CLI が `delete` を持つか確かめ、持たなければ対象の有無にかかわらずその場で停止し、直し方を示す
   - pfdsl リポ自身の workflow は、checkout したツリーが pfdsl workspace（`pnpm-workspace.yaml` と `packages/cli/package.json` を持つ）なら `pnpm -r build` してそのビルドを使う。採用リポのように workspace でなければ `npm install --no-save @pfdsl/cli` で公開版を導入する（フォールバック時は `delete` を含む公開版以降でないと上の起動時チェックで止まる）。運用プロトコルの着手判断が既に `status ready` を要求しているので、`@pfdsl/cli` の導入自体は採用リポにとって新しい前提ではない
   - 回収スクリプトは `PFDSL_CLI`、リポの `packages/cli/dist/cli.js`、`node_modules/@pfdsl/cli/dist/cli.js` の順に CLI を探す
