@@ -70,6 +70,19 @@ describe("findSpecIdDefinitions", () => {
 		assert.deepEqual(findSpecIdDefinitions(text), []);
 	});
 
+	it("keeps a four-backtick block open through a three-backtick line", () => {
+		const text = [
+			"````md",
+			"```",
+			"## Fake heading (SPEC_inside_fence)",
+			"````",
+			"## Real heading (SPEC_outside_fence)",
+		].join("\n");
+		const hits = findSpecIdDefinitions(text);
+		assert.equal(hits.length, 1);
+		assert.equal(hits[0].id, "SPEC_outside_fence");
+	});
+
 	it("ignores markers inside an inline code span", () => {
 		const text = "See `(SPEC_inline_example)` for the syntax.";
 		assert.deepEqual(findSpecIdDefinitions(text), []);

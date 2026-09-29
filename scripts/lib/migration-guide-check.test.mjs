@@ -93,6 +93,19 @@ describe("pendingUnreleasedHeadings", () => {
 		);
 	});
 
+	it("finds a real heading after a block that quotes a differing fence marker", () => {
+		assert.deepEqual(
+			pendingUnreleasedHeadings(
+				guide(
+					"```\n~~~\n```",
+					"## Unreleased — after CLI/plugin v0.0.27",
+					"````md\n```\n## Unreleased — CLI quoted\n```\n````",
+				),
+			),
+			["## Unreleased — after CLI/plugin v0.0.27"],
+		);
+	});
+
 	it("does not treat body text after a closed fence as fenced", () => {
 		assert.deepEqual(
 			pendingUnreleasedHeadings(

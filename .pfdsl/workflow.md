@@ -258,7 +258,7 @@ drift 検査は pre-commit（`gen-install` の check_drift。他の drift 検査
 5. 要するコミットが無い公開では、対象区間と、全コミットを分類して影響なしと確認したことを公開準備の既存記録へ残す。
 
 これは公開判断の必須確認である。
-release runner の `migration-guide` ゲートが CLI/plugin の公開で確かめるのは、`docs/migration-guide.md` に、CLI/plugin を名指すレベル2の `Unreleased` 見出しが残っていないことだけで、列挙したコミットが漏れなく分類されたかは判定しない。
+release runner の `migration-guide` ゲートが CLI/plugin の公開で確かめるのは、`docs/migration-guide.md` に、CLI/plugin を名指すレベル2の見出しのうち `Unreleased` で始まるもの（大文字小文字は区別しない）が残っていないことだけで、列挙したコミットが漏れなく分類されたかは判定しない。
 見出しは、手順 4 で実際の公開先の版へ書き換えると解消する。
 ライブラリと拡張の公開は、この見出しが残っていても止めない。
 `make release-status` は同じ見出しが残っていることを表示するが、失敗にはしない。
