@@ -12,7 +12,7 @@ Changing a version number alone is not evidence that old local copies have been 
 
 ## Unreleased — after CLI/plugin v0.0.26
 
-This section covers changes through upstream commit `dc94909e` (2026-09-29), including specification versions v0.0.22–v0.0.26.
+This section covers changes through upstream commit `dc94909e` (2026-09-29), including specification versions v0.0.22–v0.0.26, and the D-layer declaration syntax that was changed after that commit ([ADR-0041](adr/0041-retro-d-layer-declaration-token.md)).
 CLI/package versions and specification versions are separate.
 Confirm that your upgrade contains these changes; the released CLI tag v0.0.26 predates them, even if a development build reports the same package version.
 These instructions do not claim that a newer package has been published.
@@ -143,6 +143,43 @@ Every step below preserves the files and the manifest until the comparison has f
    Delete `.claude/pfd-ops-install-manifest.json.before` once the redeploy is reviewed.
 
 The installer's ordinary deployment and orphan-handling options are documented in the [installer guidance](../.claude/skills/pfd-ops/references/architecture.md#配置ファイルの鮮度セルフチェック).
+
+### GitHub Issues backend: new completed-chain sweep workflow
+
+This applies to repositories that deploy the GitHub Issues backend files with `check-install-sync.mjs --deploy`.
+
+Redeploying now adds a workflow and its script:
+
+- `.github/workflows/pfdsl-sweep-completed-chains.yml`
+- `scripts/pfdsl/sweep-completed-chains.mjs`, with the helpers `chain-sweep.mjs`, `cli-id-arg.mjs`, `ready-compare.mjs`, and `scratch-path.mjs` under `scripts/pfdsl/lib/`
+
+Behavior, from the workflow file:
+
+- Trigger: every `push`. The job runs only when the pushed ref is the repository's default branch and does nothing otherwise.
+- Action: it runs `node scripts/pfdsl/sweep-completed-chains.mjs .pfdsl/roadmap.pfdsl --write`, which removes chains whose artifacts are all done from the roadmap.
+  When the roadmap changes, it opens a pull request from the branch `flow-sync/pending` titled `chore(plan): sweep completed chains`, touching only `.pfdsl/roadmap.pfdsl`. A person merges it.
+- Permissions: the workflow requests `contents: write` and `pull-requests: write`.
+- Concurrency: runs share the group `flow-sync`, and a run in progress is not cancelled by a newer one.
+
+Points to settle before redeploying:
+
+- The pull request is created with `GITHUB_TOKEN`, so GitHub does not start the repository's own `pull_request` workflows for it.
+  The pull request body says the sweep's own checks are the only verification it received.
+  If the default branch requires status checks, this pull request will not report them until you trigger them by your own means.
+- Creating the pull request requires that the repository, and its organization if it restricts this, allows GitHub Actions to create pull requests (Settings, Actions, General, Workflow permissions).
+  This setting is GitHub's requirement for the pull-request step; the workflow file does not check it.
+  A rule that blocks creating the `flow-sync/pending` branch also blocks the step.
+- The workflow installs the published `@pfdsl/cli` with an unpinned `npm install --no-save @pfdsl/cli`, and the sweep script stops at startup unless that CLI has the `delete` subcommand.
+  The script's own startup check records that `@pfdsl/cli` 0.0.26 and earlier lack `delete`, and the npm `latest` tag was still 0.0.26 on 2026-09-30.
+  Until a release that includes `delete` is published, each run on the default branch of an adopting repository ends with that startup error.
+  Confirm which `@pfdsl/cli` release the workflow would resolve before you commit the deployed files.
+- The script fails when `.pfdsl/roadmap.pfdsl` is missing or does not pass `check`, so a repository without that file gets a failed run on every push to the default branch.
+- Deployment copies files only; it does not install runtime dependencies (the installer prints this).
+  The workflow itself needs no dependency beyond the published CLI above.
+  The first audit and local runs of `audit-issues-flow.mjs` need the `yaml` package: follow the section 依存の準備と初回監査 in the [GitHub Issues backend reference](../.claude/skills/pfd-ops/references/github-issues-backend.md).
+
+Opt-out: the source shows none. The installer has no option to skip a file, the workflow has no input or variable that disables it, and a deleted deployed file is copied again by the next deploy.
+A locally edited copy is preserved as a `Skipped` file on later deploys.
 
 ### Verify the cleanup
 
