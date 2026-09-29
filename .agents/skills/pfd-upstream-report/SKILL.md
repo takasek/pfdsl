@@ -70,6 +70,9 @@ PLUGIN_ROOT は plugin ロード時に実パスへ置換される変数（`${PLU
 このファイルが読めている以上その所在は判明しており、それが3つ目の分岐になる。
 
 出力は JSON で、`installation`（`claude-plugin` / `codex-plugin` / `repo-local` / `upstream-checkout` / `unknown`）・`pluginVersion`・`bundleContentHash`・`cliVersion`・`repoCommit`・`installProvenance`・`unavailable` を持つ。
+`cliVersion` は PATH 上の `pfdsl --version` の結果である。
+リポジトリの `package.json` が `@pfdsl/cli` を宣言している場合に限り `repoCliVersion`（`node_modules/@pfdsl/cli/package.json` の版）が加わり、未インストールなら `unavailable` に載る。
+宣言が無ければ `repoCliVersion` は出力に現れない。
 `installProvenance` は installer が有効と認めた entry（`path` と `hash` の組）の配列で、repo-local 以外の形態では常に `null` になる。
 `unavailable` は `{ field, reason }` の配列である。
 取得できた項目と `unavailable` の全件を、そのまま issue 本文の環境ブロックへ載せる。

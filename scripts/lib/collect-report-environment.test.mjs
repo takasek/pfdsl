@@ -208,6 +208,136 @@ describe("collectReportEnvironment", () => {
 		);
 	});
 
+	describe("repoCliVersion", () => {
+		// The PATH `pfdsl --version` stays in cliVersion. A repository that pins
+		// @pfdsl/cli in its package.json can run a different CLI than the one on
+		// PATH, and the report has to show both.
+		function adopter() {
+			const repoRoot = join(tmp, "adopter");
+			const skillRoot = join(repoRoot, ".claude", "skills", "pfd-ops");
+			mkdirSync(skillRoot, { recursive: true });
+			mkdirSync(join(repoRoot, ".git"), { recursive: true });
+			writeProvenance(repoRoot);
+			return { repoRoot, skillRoot };
+		}
+
+		const pathCli = (command) => (command === "pfdsl" ? "0.0.25" : null);
+
+		for (const section of ["dependencies", "devDependencies"]) {
+			it(`reports the installed version next to the PATH version when ${section} lists @pfdsl/cli`, () => {
+				const { repoRoot, skillRoot } = adopter();
+				writeJson(join(repoRoot, "package.json"), {
+					[section]: { "@pfdsl/cli": "^0.0.26" },
+				});
+				writeJson(join(repoRoot, "node_modules/@pfdsl/cli/package.json"), {
+					name: "@pfdsl/cli",
+					version: "0.0.26",
+				});
+
+				const env = collectReportEnvironment(skillRoot, {
+					runCommand: pathCli,
+				});
+
+				assert.equal(env.cliVersion, "0.0.25");
+				assert.equal(env.repoCliVersion, "0.0.26");
+				assert.ok(
+					!env.unavailable.some(({ field }) => field === "repoCliVersion"),
+				);
+			});
+		}
+
+		it("records repoCliVersion as unavailable when the dependency is declared but not installed", () => {
+			const { repoRoot, skillRoot } = adopter();
+			writeJson(join(repoRoot, "package.json"), {
+				devDependencies: { "@pfdsl/cli": "^0.0.26" },
+			});
+
+			const env = collectReportEnvironment(skillRoot, {
+				runCommand: pathCli,
+			});
+
+			assert.equal(env.cliVersion, "0.0.25");
+			assert.equal(env.repoCliVersion, null);
+			const failure = env.unavailable.find(
+				({ field }) => field === "repoCliVersion",
+			);
+			assert.ok(failure, "repoCliVersion should be recorded as unavailable");
+			assert.match(failure.reason, /\^0\.0\.26/);
+			assert.match(failure.reason, /not installed/);
+		});
+
+		it("records repoCliVersion as unavailable when the installed package carries no usable version", () => {
+			const { repoRoot, skillRoot } = adopter();
+			writeJson(join(repoRoot, "package.json"), {
+				dependencies: { "@pfdsl/cli": "^0.0.26" },
+			});
+			writeJson(join(repoRoot, "node_modules/@pfdsl/cli/package.json"), {
+				version: "",
+			});
+
+			const env = collectReportEnvironment(skillRoot, {
+				runCommand: pathCli,
+			});
+
+			assert.equal(env.repoCliVersion, null);
+			assert.ok(
+				env.unavailable.some(({ field }) => field === "repoCliVersion"),
+			);
+		});
+
+		it("omits repoCliVersion and its unavailable entry when the repository does not depend on @pfdsl/cli", () => {
+			const { repoRoot, skillRoot } = adopter();
+			writeJson(join(repoRoot, "package.json"), {
+				dependencies: { "left-pad": "1.0.0" },
+			});
+
+			const env = collectReportEnvironment(skillRoot, {
+				runCommand: pathCli,
+			});
+
+			assert.ok(!("repoCliVersion" in env));
+			assert.ok(
+				!env.unavailable.some(({ field }) => field === "repoCliVersion"),
+			);
+		});
+
+		it("omits repoCliVersion when the repository has no package.json", () => {
+			const { skillRoot } = adopter();
+
+			const env = collectReportEnvironment(skillRoot, {
+				runCommand: pathCli,
+			});
+
+			assert.ok(!("repoCliVersion" in env));
+			assert.ok(
+				!env.unavailable.some(({ field }) => field === "repoCliVersion"),
+			);
+		});
+
+		it("never runs the repo-local binary", () => {
+			const { repoRoot, skillRoot } = adopter();
+			writeJson(join(repoRoot, "package.json"), {
+				dependencies: { "@pfdsl/cli": "^0.0.26" },
+			});
+			writeJson(join(repoRoot, "node_modules/@pfdsl/cli/package.json"), {
+				version: "0.0.26",
+			});
+			const calls = [];
+
+			collectReportEnvironment(skillRoot, {
+				runCommand: (command, args) => {
+					calls.push([command, ...args]);
+					return null;
+				},
+			});
+
+			assert.deepEqual(calls.map(([command]) => command).sort(), [
+				"git",
+				"pfdsl",
+			]);
+		});
+	});
+
 	it("accounts for every identifier a repo-local install lacks", () => {
 		const repoRoot = join(tmp, "adopter");
 		const skillRoot = join(repoRoot, ".claude", "skills", "pfd-ops");

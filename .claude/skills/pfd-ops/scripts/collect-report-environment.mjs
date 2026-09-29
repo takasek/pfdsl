@@ -106,6 +106,35 @@ const MISSING_IDENTIFIERS = Object.freeze({
 	}),
 });
 
+// The CLI a repository pins is not necessarily the one on PATH, so the report
+// carries both. This reads the declaration and the installed package.json and
+// never runs the repo-local binary. Returns null when the repository does not
+// declare @pfdsl/cli at all: nothing was expected, so nothing is missing.
+/** @param {string} repoRoot */
+function readRepoCliVersion(repoRoot) {
+	const manifest = readJsonOrNull(resolve(repoRoot, "package.json"));
+	const declared =
+		manifest?.dependencies?.["@pfdsl/cli"] ??
+		manifest?.devDependencies?.["@pfdsl/cli"];
+	if (declared === undefined) return null;
+	const installed = readJsonOrNull(
+		resolve(repoRoot, "node_modules/@pfdsl/cli/package.json"),
+	);
+	if (installed === null) {
+		return {
+			version: null,
+			reason: `package.json declares @pfdsl/cli ${JSON.stringify(declared)} but node_modules/@pfdsl/cli is not installed.`,
+		};
+	}
+	const version = asIdentifier(installed.version);
+	return version === null
+		? {
+				version: null,
+				reason: `package.json declares @pfdsl/cli ${JSON.stringify(declared)} but node_modules/@pfdsl/cli/package.json carries no usable version.`,
+			}
+		: { version };
+}
+
 /**
  * @param {string} skillRoot
  * @param {(from: string) => string | null} resolveRepoRoot
@@ -216,6 +245,10 @@ export function collectReportEnvironment(skillRoot, options = {}) {
 			"`pfdsl --version` did not run, or returned no output.",
 		);
 	}
+	const repoCli = repoRoot === null ? null : readRepoCliVersion(repoRoot);
+	if (repoCli !== null && repoCli.version === null) {
+		recordFailure("repoCliVersion", repoCli.reason);
+	}
 	const repoCommit =
 		repoRoot === null
 			? null
@@ -232,6 +265,7 @@ export function collectReportEnvironment(skillRoot, options = {}) {
 		pluginVersion,
 		bundleContentHash,
 		cliVersion,
+		...(repoCli === null ? {} : { repoCliVersion: repoCli.version }),
 		repoCommit,
 		installProvenance,
 		unavailable,
