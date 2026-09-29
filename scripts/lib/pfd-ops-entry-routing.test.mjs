@@ -81,6 +81,23 @@ function namedOpsBindingReferences(markdown, sourcePath) {
 }
 
 describe("pfd-ops entry routing", () => {
+	it("checks the pfdsl CLI before the first ready query", () => {
+		const inspectionRoute = skill.match(
+			/^- \*\*閲覧・分類・優先順位\*\*:[^\n]+/m,
+		);
+		assert.ok(inspectionRoute);
+		assert.match(inspectionRoute[0], /pfdsl スキル.*CLI プリフライト/);
+		assert.ok(
+			inspectionRoute[0].indexOf("CLI プリフライト") <
+				inspectionRoute[0].indexOf("status ready"),
+		);
+		const selection = workCycle.slice(workCycle.indexOf("1. **選択**:"));
+		assert.match(selection, /pfdsl スキル.*CLI プリフライト/);
+		assert.ok(
+			selection.indexOf("CLI プリフライト") < selection.indexOf("status ready"),
+		);
+	});
+
 	it("routes representative operations to one existing reference", () => {
 		for (const route of [
 			["作業項目への着手", "references/work-cycle.md"],
