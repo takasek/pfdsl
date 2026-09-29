@@ -80,7 +80,7 @@
 <!-- deploy_install_layer -->
 <g id="node65" class="node">
 <title>deploy_install_layer</title>
-<g id="a_node65"><a xlink:title="L3 GitHub Issuesプリセット実配置&#10;&#10;/pfd&#45;init ステップ3.5。plugin同梱install/を採用リポルートへコピーする。既配置ファイルがcanonicalとhash不一致（ローカル編集）なら上書きせず警告し、&#45;&#45;overwrite&#45;local&#45;edits指定時のみ上書きする。canonicalから消えた旧ファイルはローカル編集が無ければフラグ無しで削除され、編集を抱える場合のみ&#45;&#45;delete&#45;edited&#45;orphansを要する。canonical側のリネームは新旧パスの対をPossible renamesとして報告する&#10;command: node ${CLAUDE_PLUGIN_ROOT}/skills/pfd&#45;ops/scripts/check&#45;install&#45;sync.mjs &#45;&#45;deploy&#10;location: ../.claude/skills/pfd&#45;ops/scripts/check&#45;install&#45;sync.mjs">
+<g id="a_node65"><a xlink:title="L3 GitHub Issuesプリセット実配置&#10;&#10;/pfd&#45;init ステップ3.5。plugin同梱install/を採用リポルートへコピーする。前回配置のmanifest hashと一致するファイルは通常更新し、新canonicalと同一のファイルも記録を更新する。それ以外の既存ファイルは旧記録を保持して警告し、&#45;&#45;overwrite&#45;local&#45;edits指定時のみ上書きする。未記録の相違ファイルは未記録のまま保護する。canonicalから消えた旧ファイルはローカル編集が無ければフラグ無しで削除され、編集を抱える場合のみ&#45;&#45;delete&#45;edited&#45;orphansを要する。canonical側のリネームは新旧パスの対をPossible renamesとして報告する。出力で依存準備と初回監査の手順を案内する&#10;command: node ${CLAUDE_PLUGIN_ROOT}/skills/pfd&#45;ops/scripts/check&#45;install&#45;sync.mjs &#45;&#45;deploy&#10;location: ../.claude/skills/pfd&#45;ops/scripts/check&#45;install&#45;sync.mjs">
 <ellipse fill="none" stroke="#16a085" cx="3660.69" cy="-819.22" rx="94.91" ry="41.3"/>
 <text xml:space="preserve" text-anchor="middle" x="3660.69" y="-831.82" font-family="Times,serif" font-size="14.00">deploy_install_layer</text>
 <text xml:space="preserve" text-anchor="middle" x="3660.69" y="-815.02" font-family="Times,serif" font-size="14.00">L3 GitHub</text>
