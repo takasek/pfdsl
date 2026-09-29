@@ -356,6 +356,20 @@ artifact:
     criteria: make check-readme-cli が差分なしで通過し、Library 節の pnpm add 例が published_libraries の全パッケージを名指す
     location: ../README.md
     group: release
+  migration_guide:
+    label: 版別移行ガイド
+    description: 公開版間の変更と未公開の移行項目。採用先は更新前後の版で対象節を選び、リリース判断は対象範囲と版の確定を確認する。
+    criteria: 更新前後の CLI/plugin 版または未公開の根拠 commit、影響、手順、検証が特定でき、過去の導入残骸は別の初回点検表へ案内される
+    location: ../docs/migration-guide.md
+    externalStakeholders: [ 採用リポの保守担当 ]
+    group: release
+  legacy_cleanup_checklist:
+    label: 旧導入の初回点検表
+    description: ガイド整備前からの残骸または導入履歴が不明な採用先を点検する。適用の有無と未解決事項は採用先の既存記録に残し、毎更新の全件再点検には使わない。
+    criteria: 配置物と消費者、固有変更の保全、廃止判断、確認方法と未確認の扱いがあり、既知の旧機構へ一次資料から辿れる
+    location: ../docs/legacy-installation-checklist.md
+    externalStakeholders: [ 採用リポの保守担当 ]
+    group: release
   workflow_md:
     label: 生態系 companion
     description: "workflow.pfdsl のグラフが運べない運用手続き散文。セクション構成は実ファイルが一次情報（ここに列挙しない）。pfd-ops skill が読む L4 ホスト"
@@ -548,6 +562,10 @@ process:
     label: README 更新
     description: CLI の提供形態・サンプル構成の変更を導入文書に反映する。CLI コマンドリファレンスは gen-readme-cli が自動化済みのため対象外
     group: release
+  maintain_adopter_guidance:
+    label: 採用先向け移行案内の整備
+    description: 統合済みの版・履歴、変更 PR の差分・検証結果と issue の採用先影響から版別移行ガイドと旧導入の初回点検表を保守する。変更 PR で未公開項目を起草し、公開準備 PR で公開版との対応を確定する。手続きと完了条件は workflow.md の採用先への移行案内に従う。
+    group: release
 
 tag:
   knowledge_maintenance:
@@ -724,8 +742,12 @@ prose_mechanization_audit_skill >>? sweep_prose_mechanization
 
 prose_mechanization_sweep_record >>? sweep_prose_mechanization
 
-[distribution_review_record, toolchain] >> decide_cli_release -> cli_release_request
+legacy_cleanup_checklist >>? maintain_adopter_guidance
+migration_guide >>? maintain_adopter_guidance
+[gh_issues, integrated_repository, pull_request] >> maintain_adopter_guidance -> [legacy_cleanup_checklist, migration_guide]
 
-[distribution_review_record, toolchain] >> decide_libraries_release -> libraries_release_request
+[distribution_review_record, migration_guide, toolchain] >> decide_cli_release -> cli_release_request
 
-[distribution_review_record, toolchain] >> decide_vscode_release -> vscode_release_request
+[distribution_review_record, migration_guide, toolchain] >> decide_libraries_release -> libraries_release_request
+
+[distribution_review_record, migration_guide, toolchain] >> decide_vscode_release -> vscode_release_request

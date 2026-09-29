@@ -173,12 +173,7 @@ pfdsl 開発リポ固有の例:
 
 素の `--deploy` はローカル編集がないファイルをコピーし、ローカル編集がない orphan を削除する。`--overwrite-local-edits` は残るパスのローカル編集を canonical で上書きし、`--delete-edited-orphans` は消えるパスのローカル編集ごと削除する。旧ファイルの掃除ではまず素の deploy を実行し、編集済みとして残ったパスだけについて追加 flag の要否を判断する。
 
-旧版の deploy で `Skipped` が出た採用先では、ディスク上の旧版を残したまま `.claude/pfd-ops-install-manifest.json` に新しい canonical の hash が記録されていることがある。
-この状態は本当のローカル編集と区別できず、修正版でも自動修復しない。
-復旧時は対象ファイルと manifest を退避し、対象ファイルの SHA-256 を実際に配置した旧 bundle の同じファイルと比較する（壊れた manifest や最新 canonical の hash を未編集の根拠にしない）。
-全ての上書き対象に編集がないと確認できた場合だけ、同じ target に `--deploy --overwrite-local-edits` を実行する。
-この flag は対象パスを限定せず、残る全てのパスの編集を上書きするため、他の `Skipped` ファイルも確認する。
-旧 bundle が入手できない、または hash が一致しない場合は flag を使わず、差分を確認して必要な編集を手動で引き継ぐ。
+旧版由来の配置不整合や導入履歴不明の点検は、上流の [legacy installation checklist](https://github.com/takasek/pfdsl/blob/main/docs/legacy-installation-checklist.md) を参照する。
 
 `Possible renames` は canonical 側の rename が新旧パスの `missing` と `orphaned` に分かれて見えている状態を表す。新パスを信用する前に旧パスのローカル編集を引き継ぐ。
 

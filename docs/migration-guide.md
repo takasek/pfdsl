@@ -4,13 +4,23 @@ Use this guide when upgrading an existing pfdsl installation.
 Release-specific cleanup instructions live here; distributed skills link here rather than retaining old migration rules.
 Run applicable steps in the adopting repository, preserving local changes and following its approval rules.
 
-## Changes after CLI/plugin v0.0.26
+## Choosing the update range
+
+Record both the installed and target CLI/plugin releases, including the bundle revision when package versions alone are ambiguous.
+Read the entries introduced after the installed release and through the target release, in release order; skip entries outside that interval.
+For an installation predating this guide, or one with unknown or mixed deployment history, first use the separate [legacy installation checklist](legacy-installation-checklist.md).
+After that baseline is recorded, routine upgrades use the version interval here; unresolved legacy findings remain explicit follow-up work in the adopting repository.
+Changing a version number alone is not evidence that old local copies have been cleaned up.
+
+## Unreleased — after CLI/plugin v0.0.26
 
 This section covers changes through upstream commit `dc94909e` (2026-09-29), including specification versions v0.0.22–v0.0.26.
 CLI/package versions and specification versions are separate.
 Confirm that your upgrade contains these changes; the released CLI tag v0.0.26 predates them, even if a development build reports the same package version.
 These instructions do not claim that a newer package has been published.
-For later revisions, also consult the [specification history](spec/spec-history.md).
+The destination release is not yet assigned; do not infer one from the specification version.
+Release preparation must verify the full interval through its target commit and assign the destination release before publication.
+The [specification history](spec/spec-history.md) provides additional technical context, not a substitute for this guide's CLI and workflow migration coverage.
 
 Before editing, record the installed CLI/plugin identity, the affected files, and validation results with the intended upgrade.
 Edit the adopting repository's sources, not plugin caches or generated distribution files.
@@ -25,6 +35,13 @@ If continuing, add `知識成果物ライフサイクル監査: 採用する` an
 Do not infer the audit scope from descriptions or future plans.
 If discontinuing, remove obsolete active D-layer instructions and links after checking their consumers; retain historical records and content needed by other audit layers.
 See [ADR-0039](adr/0039-distribution-scope-by-provided-purpose.md) and [Issue #1275](https://github.com/takasek/pfdsl/issues/1275).
+
+### Retro catalog retirement
+
+This interval also retires the former retro catalog and its dedicated notification paths.
+Follow [the retro binding migration instructions in #1177](https://github.com/takasek/pfdsl/issues/1177) for preserving evidence, moving needed countermeasures, and retiring old consumers.
+Those instructions predate explicit D-layer adoption: also apply the D-layer choice above, whether or not the catalog was already migrated.
+The [legacy installation checklist](legacy-installation-checklist.md) identifies old local copies and rules that updating the bundle alone does not remove.
 
 ### Frontmatter types and declaration keys (FM004)
 
@@ -61,5 +78,10 @@ Do not report an adopter as migrated until these checks have run there.
 
 ## Maintaining this guide
 
-When a release changes accepted files or adopter workflows, add the affected versions, symptoms, cleanup steps, and verification here, and link the relevant section from its release notes.
-Keep old procedures in this repository document; distributed skills only need a stable link to it.
+Contributors add migration-relevant changes as unreleased entries in the change PR, including the previous behavior, affected installations, action, verification, and source issue or commit.
+Release preparation checks the complete previous-release-to-target interval, assigns the actual destination release, and retains historical sections and their links.
+Do not guess future release numbers or discard older instructions after publishing.
+If an interval requires no action for a package family, record that conclusion in its release preparation record rather than inventing cleanup steps.
+Link the relevant section from release notes when release notes are produced.
+The repository's [workflow procedure](../.pfdsl/workflow.md#採用先への移行案内) owns the maintenance and release review steps.
+Distributed skills retain only a stable reference; unknown historical residue belongs in the separate initial checklist.
