@@ -46,6 +46,24 @@ This interval also retires the former retro catalog and its dedicated notificati
 Follow [the retro binding migration instructions in #1177](https://github.com/takasek/pfdsl/issues/1177) for preserving evidence, moving needed countermeasures, and retiring old consumers.
 Those instructions predate explicit D-layer adoption: also apply the D-layer choice above, whether or not the catalog was already migrated.
 
+### Repository-level work discipline leaves the distributed skills
+
+The distributed skills no longer carry rules that each repository decides for itself ([ADR-0039](adr/0039-distribution-scope-by-provided-purpose.md), category iii).
+After upgrading, the pfd-ops work cycle (`references/work-cycle.md`) and the work-item backend presets (`references/github-issues-backend.md`, `references/file-based-tracker-backend.md`) no longer state:
+
+- git hygiene, delegation control, the generic terminal-gate items, the split between machine-checked and human-checked items, and the non-exemption conditions for generating comparison targets;
+- the design-record format (Format 3), its reapproval-reference grammar, and the commit steps that produce approval evidence;
+- the commit granularity of a design record in the file-based preset, and the scope rule for unrelated bug fixes in the GitHub preset.
+
+The work cycle now keeps only the PFD-specific contract, and follows an optional `## ワークサイクルの追加手順` section of `.pfdsl/bindings/pfd-ops.md` in steps 1 to 3 when that section exists.
+The pfd-ops binding scaffold already contains that heading.
+
+If your repository relied on any of these rules, ask the owner which to keep, and write the kept rules into that binding section in your own words.
+Compare the work cycle and presets of your installed release with the target release to see exactly what was removed.
+Do not copy the upstream repository's own binding wholesale: it contains that repository's decisions, not defaults.
+If you keep none of them, no action is needed.
+Source commits include `8dfd50f5`, `57de2d68`, `b2ed2450`, and `f3f0dc4c`.
+
 ### Frontmatter types and declaration keys (FM004)
 
 Known fields now enforce their declared types, including strings, numbers, arrays, and mappings.
