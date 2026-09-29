@@ -8,7 +8,7 @@ tags: [target:migration-guide, context:review-finding]
   コミットの印（Conventional Commits の `!` 等）だけで絞ると、印を付けなかった変更がそのまま落ちる。
   問いの形: 「ガイドの対象区間のコミットを配布物のパスで全件列挙したとき、採用先の作業を要するものがすべて項目になっているか」。
 
-  観測（2026-09-30、PR #1317 のレビュー）: PR の初版は `docs/migration-guide.md` の「Unreleased — after v0.0.26」節を、変更 PR ごとに未公開項目を書く運用とともに新設した。
+  観測（2026-09-30、PR #1317 のレビュー）: PR の初版は `docs/migration-guide.md` の「Unreleased — after CLI/plugin v0.0.26」節を、変更 PR ごとに未公開項目を書く運用とともに新設した。
   その節は、同じ区間に入っていた2件を落としていた。
   1件は GitHub Issues backend の採用先へ新たに配置される `pfdsl-sweep-completed-chains.yml`、もう1件は #1314 より前の installer が壊した `.claude/pfd-ops-install-manifest.json` の回復である。
   後者の回復手順は、通常の更新経路から辿れない一度きりの点検表にだけ置かれていた。
@@ -26,7 +26,7 @@ tags: [target:migration-guide, context:review-finding]
 
   追加の観測（2026-09-30、同じ区間の164件）: 判定専用モデル Jev（`jev-latest`、noul 型の質問1問）に、各コミットの件名・本文・変更ファイル一覧を渡して「採用先の作業を要するか」を確率で答えさせた。
   既知の6件は閾値 0.3 で全件入り（陽性42件）、0.5 では installer の修正（`5685f158`、本文が空、0.30で41位）が落ちた（陽性15件）。
-  上位には、ガイドにも2回のレビューにも無かった `8dfd50f5`（0.64、配布版 `work-cycle.md` からリポ単位の規律を約144行 binding へ移設）が入り、ガイドへ項目を足した。
+  上位には、ガイドにも2回のレビューにも無かった `8dfd50f5`（0.64、配布版 `work-cycle.md` からリポ単位の規律を136行削って binding へ移設）が入り、ガイドへ項目を足した。
   2位の `d6d864e5`（0.84）は同じ区間の `7ca57fce` で取り消されており、区間全体では作業を要さなかった。
 
   未解決: 振り分けそのものは人か agent の判断であり、列挙が全件でも分類で落ちうる。

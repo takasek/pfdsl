@@ -49,20 +49,21 @@ Those instructions predate explicit D-layer adoption: also apply the D-layer cho
 ### Repository-level work discipline leaves the distributed skills
 
 The distributed skills no longer carry rules that each repository decides for itself ([ADR-0039](adr/0039-distribution-scope-by-provided-purpose.md), category iii).
-After upgrading, the pfd-ops work cycle (`references/work-cycle.md`) and the work-item backend presets (`references/github-issues-backend.md`, `references/file-based-tracker-backend.md`) no longer state:
+After upgrading, three distributed files no longer carry such rules.
+The examples below are not exhaustive.
 
-- git hygiene, delegation control, the generic terminal-gate items, the split between machine-checked and human-checked items, and the non-exemption conditions for generating comparison targets;
-- the design-record format (Format 3), its reapproval-reference grammar, and the commit steps that produce approval evidence;
-- the commit granularity of a design record in the file-based preset, and the scope rule for unrelated bug fixes in the GitHub preset.
+- The pfd-ops work cycle (`references/work-cycle.md`) keeps only the PFD-specific contract. Removed rules include the comparison-target principle and its application points, fixing a baseline before measuring a change, checking that an existing mechanism actually observes the property it is named to guard, git hygiene in shared trees, delegation control, the generic terminal-gate items, and the split between machine-checked and human-checked items.
+- The work-item backend presets (`references/github-issues-backend.md`, `references/file-based-tracker-backend.md`) no longer define the design-record format (Format 3), its reapproval-reference grammar, the commit steps that produce approval evidence, the commit granularity of a design record, or the scope rule for unrelated bug fixes.
+- The pfd-retro skill no longer defines the execution contract of one audit run (run ID, cutoff, required sources, frozen inventory, and checkpoints). It now tells the auditor to check the pfd-retro binding for such a section before collecting sources.
 
-The work cycle now keeps only the PFD-specific contract, and follows an optional `## ワークサイクルの追加手順` section of `.pfdsl/bindings/pfd-ops.md` in steps 1 to 3 when that section exists.
-The pfd-ops binding scaffold already contains that heading.
+The work cycle follows an optional `## ワークサイクルの追加手順` section of `.pfdsl/bindings/pfd-ops.md` in steps 1 to 3 when that section exists.
+The current pfd-ops binding scaffold contains that heading, but a binding created from an earlier scaffold does not; add the heading yourself if you keep any rule there.
 
-If your repository relied on any of these rules, ask the owner which to keep, and write the kept rules into that binding section in your own words.
-Compare the work cycle and presets of your installed release with the target release to see exactly what was removed.
-Do not copy the upstream repository's own binding wholesale: it contains that repository's decisions, not defaults.
+To see exactly what was removed, compare these three files between your installed release and the target release.
+Ask the owner which removed rules to keep, and write the kept rules into the pfd-ops or pfd-retro binding in your own words.
+Do not copy the upstream repository's own bindings wholesale: they contain that repository's decisions, not defaults.
 If you keep none of them, no action is needed.
-Source commits include `8dfd50f5`, `57de2d68`, `b2ed2450`, and `f3f0dc4c`.
+Source commits include `8dfd50f5`, `57de2d68`, `b2ed2450`, `f3f0dc4c`, `1ecbbb24`, and `6b031144`.
 
 ### Frontmatter types and declaration keys (FM004)
 
