@@ -238,21 +238,19 @@ drift 検査は pre-commit（`gen-install` の check_drift。他の drift 検査
 
 公開担当は `decide_cli_release`・`decide_libraries_release`・`decide_vscode_release` の判断前に、次を行う。
 
-1. 前回の対応する公開 tag（CLI/plugin は `v*`、ライブラリは `lib-v*`、拡張は `vscode-v*`）から公開対象 SHA までの、配布物に触れたコミットを列挙する。
+1. 前回の対応する公開 tag（CLI/plugin は `v[0-9]*`、ライブラリは `lib-v*`、拡張は `vscode-v*`）から公開対象 SHA までの、配布物に触れたコミットを列挙する。`v*` は `vscode-v*` にも一致するので使わない。
 
    ```sh
    git log --no-merges --format='%h %s' <前回の公開 tag>..<公開対象 SHA> -- \
-     .claude/skills/pfd-ecosystem .claude/skills/pfd-grill .claude/skills/pfd-ops \
-     .claude/skills/pfd-retro .claude/skills/pfd-upstream-report \
-     .claude/commands/pfd-cycle.md .claude/commands/pfd-init.md .claude/commands/pfd-retro.md \
-     .claude/agents/pfd-lens.md .claude/agents/pfd-implementer.md \
-     hooks/ plugin/ .agents/ .codex/ packages/ \
-     docs/spec/ docs/quality-guide.md docs/review-perspectives.md docs/samples/ docs/examples/
+     plugin/pfdsl plugin/pfdsl-codex packages/ docs/spec/
    ```
 
-   パス一覧の一次情報は `scripts/lib/harness-inventory.mjs`（配布するスキル・コマンド・agent と plugin hook）と、`references/` の生成元（`gen-skill` の入力の `docs/spec/`・`docs/quality-guide.md`・`docs/review-perspectives.md`・`docs/samples/`・`docs/examples/`）である。
-   配布対象を増減したら上のコマンドも更新する。
-   `plugin/`・`.agents/`・`.codex/` は生成物だが、生成器の変更が出力だけを変えたコミットを拾うために含める。
+   配布物の一次情報は `scripts/lib/distribution-review.mjs` の `DISTRIBUTION_ROOTS`（配布 bundle のルート）と、`scripts/lib/distribution-sources.mjs` の `GENERATED_DISTRIBUTION_SOURCES`（生成物と生成元の対応）である。
+   手書きの生成元は、pre-commit と CI の同一性検査により生成物と同じ変更で更新される。
+   そのため生成物のルートを指定すれば、スキル・コマンド・agent・hook・scaffold・`install/` の生成元の一覧をここへ複製せずに拾える。
+   生成器だけを変えて出力だけが変わったコミットも、生成物のルートで拾える。
+   `packages/` と `docs/spec/` は CLI と仕様の変更を拾うために加える。
+   `DISTRIBUTION_ROOTS` を変えたら上のコマンドも合わせる。
 2. 列挙した各コミットを、採用先の作業を要するもの（ファイル・呼出し・運用設定・診断の扱いの変更）と、要さないものに分ける。分類の手段は問わないが、分類そのものを人が確認する。
 3. 要するものごとに、旧挙動、該当条件、必要操作、検証方法、根拠 issue/commit をガイドの項目に書く。
 4. 未公開項目を実際の公開先の版へ対応付け、CLI/plugin・ライブラリ・拡張と仕様の版を混同しない。複数版を飛ばす更新でも対象区間の項目を順に選べること、旧節とリンクを保持することを確認する。
