@@ -25,14 +25,20 @@ Edit the adopting repository's sources, not plugin caches or generated distribut
 
 ### Optional knowledge lifecycle audit
 
-The pfd-retro D layer now requires explicit adoption.
+The pfd-retro D layer now requires an explicit declaration.
 An old D heading or extra audit rules in `.pfdsl/bindings/pfd-retro.md` no longer enable it.
+The former Japanese declaration line (`知識成果物ライフサイクル監査: 採用する`) is not recognized.
 
-Ask the repository owner whether to continue this audit.
-If continuing, add `知識成果物ライフサイクル監査: 採用する` and explicitly identify the artifacts to audit in that binding.
+Ask the repository owner whether to continue this audit, then put exactly one of these lines at the start of a line in that binding:
+
+- `knowledge-lifecycle-audit: adopt` — continue the audit, and explicitly identify the artifacts to audit in the same binding section.
+- `knowledge-lifecycle-audit: decline` — stop the audit; retro neither audits nor reports the D layer.
+
+Until one of these lines exists, retro does not audit the D layer and reports on every run that the owner must declare `adopt` or `decline`.
+A duplicated line or an invalid value is reported the same way, naming which problem it is.
 Do not infer the audit scope from descriptions or future plans.
-If discontinuing, remove obsolete active D-layer instructions and links after checking their consumers; retain historical records and content needed by other audit layers.
-See [ADR-0039](adr/0039-distribution-scope-by-provided-purpose.md) and [Issue #1275](https://github.com/takasek/pfdsl/issues/1275).
+If declining, remove obsolete active D-layer instructions and links after checking their consumers; retain historical records and content needed by other audit layers.
+See [ADR-0039](adr/0039-distribution-scope-by-provided-purpose.md), [ADR-0041](adr/0041-retro-d-layer-declaration-token.md), and [Issue #1275](https://github.com/takasek/pfdsl/issues/1275).
 
 ### Retro catalog retirement
 
