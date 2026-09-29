@@ -8,7 +8,7 @@
 import { forEachNonFencedLine } from "./forward-ref-marker-check.mjs";
 import { headingLevel, headingText } from "./markdown-heading.mjs";
 
-const UNRELEASED = /^Unreleased\b/;
+const UNRELEASED = /^Unreleased\b/i;
 const NAMES_CLI_OR_PLUGIN = /\b(?:CLI|plugin)\b/i;
 
 /**

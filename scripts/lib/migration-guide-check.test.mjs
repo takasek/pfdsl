@@ -41,6 +41,21 @@ describe("pendingUnreleasedHeadings", () => {
 		);
 	});
 
+	it("matches Unreleased case-insensitively, as it does CLI and plugin", () => {
+		assert.deepEqual(
+			pendingUnreleasedHeadings(
+				guide(
+					"## unreleased — after CLI/plugin v0.0.26",
+					"## UNRELEASED — after plugin v0.0.26",
+				),
+			),
+			[
+				"## unreleased — after CLI/plugin v0.0.26",
+				"## UNRELEASED — after plugin v0.0.26",
+			],
+		);
+	});
+
 	it("ignores an Unreleased heading that names neither CLI nor plugin", () => {
 		assert.deepEqual(
 			pendingUnreleasedHeadings(
