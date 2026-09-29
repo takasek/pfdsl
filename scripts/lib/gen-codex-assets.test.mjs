@@ -747,8 +747,8 @@ describe("buildCodexProjectConfig", () => {
 	});
 });
 
-describe("Codex generated-file attributes", () => {
-	it("marks generated Codex outputs while leaving their maintained sources unclassified", () => {
+describe("generated-file attributes", () => {
+	it("marks generated outputs while leaving their maintained sources unclassified", () => {
 		const output = execFileSync(
 			"git",
 			[
@@ -762,9 +762,22 @@ describe("Codex generated-file attributes", () => {
 				".codex/GENERATED.md",
 				".codex/hooks.json",
 				"plugin/pfdsl-codex/skills/pfd-ops/SKILL.md",
+				"generated/skills/pfdsl/SKILL.md",
+				".claude/skills/pfd-ops/install/scripts/pfdsl/sweep-completed-chains.mjs",
+				"plugin/pfdsl/skills/pfdsl/SKILL.md",
 				"CLAUDE.md",
+				".claude-plugin/marketplace.json",
+				".pfdsl/workflow.svg",
+				".pfdsl/team/flow.svg",
+				"docs/readme-example.svg",
+				"docs/samples/01-simple-chain.dot",
+				"docs/samples/01-simple-chain.svg",
+				"docs/samples/README.md",
 				".claude/agents/pfd-implementer.md",
+				".claude/skills/pfd-ops/SKILL.md",
 				".claude/settings.json",
+				"docs/samples/01-simple-chain.pfdsl",
+				".pfdsl/team/flow.pfdsl",
 				"hooks/managed-issue-reminder-post-tool-use.mjs",
 			],
 			{ cwd: root, encoding: "utf-8" },
@@ -787,13 +800,26 @@ describe("Codex generated-file attributes", () => {
 			".codex/GENERATED.md",
 			".codex/hooks.json",
 			"plugin/pfdsl-codex/skills/pfd-ops/SKILL.md",
+			"generated/skills/pfdsl/SKILL.md",
+			".claude/skills/pfd-ops/install/scripts/pfdsl/sweep-completed-chains.mjs",
+			"plugin/pfdsl/skills/pfdsl/SKILL.md",
+			"CLAUDE.md",
+			".claude-plugin/marketplace.json",
+			".pfdsl/workflow.svg",
+			".pfdsl/team/flow.svg",
+			"docs/readme-example.svg",
+			"docs/samples/01-simple-chain.dot",
+			"docs/samples/01-simple-chain.svg",
+			"docs/samples/README.md",
 		]) {
 			assert.equal(attributes.get(path), "true", path);
 		}
 		for (const path of [
-			"CLAUDE.md",
 			".claude/agents/pfd-implementer.md",
+			".claude/skills/pfd-ops/SKILL.md",
 			".claude/settings.json",
+			"docs/samples/01-simple-chain.pfdsl",
+			".pfdsl/team/flow.pfdsl",
 			"hooks/managed-issue-reminder-post-tool-use.mjs",
 		]) {
 			assert.equal(attributes.get(path), "unspecified", path);

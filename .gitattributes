@@ -1,12 +1,22 @@
 # Generated skill files — excluded from language stats and collapsed in PR diffs
 .claude/skills/pfdsl/** linguist-generated=true
+.claude/skills/pfd-ops/install/** linguist-generated=true
+generated/skills/pfdsl/** linguist-generated=true
 plugin/pfdsl/** linguist-generated=true
+plugin/pfdsl-codex/** linguist-generated=true
+
+# Generated repository instructions and Claude plugin catalog.
+AGENTS.md linguist-generated=true
+CLAUDE.md linguist-generated=true
+.claude-plugin/marketplace.json linguist-generated=true
 
 # Codex harness outputs — maintained through scripts/gen-codex-assets.mjs.
-AGENTS.md linguist-generated=true
 .agents/** linguist-generated=true
-.codex/agents/** linguist-generated=true
-.codex/config.toml linguist-generated=true
-.codex/GENERATED.md linguist-generated=true
-.codex/hooks.json linguist-generated=true
-plugin/pfdsl-codex/** linguist-generated=true
+.codex/** linguist-generated=true
+
+# Generated previews and sample catalogue.
+.pfdsl/**/*.svg linguist-generated=true
+docs/readme-example.svg linguist-generated=true
+docs/samples/*.dot linguist-generated=true
+docs/samples/*.svg linguist-generated=true
+docs/samples/README.md linguist-generated=true
