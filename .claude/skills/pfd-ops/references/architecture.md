@@ -173,7 +173,6 @@ pfdsl 開発リポ固有の例:
 
 素の `--deploy` はローカル編集がないファイルをコピーし、ローカル編集がない orphan を削除する。`--overwrite-local-edits` は残るパスのローカル編集を canonical で上書きし、`--delete-edited-orphans` は消えるパスのローカル編集ごと削除する。旧ファイルの掃除ではまず素の deploy を実行し、編集済みとして残ったパスだけについて追加 flag の要否を判断する。
 
-旧版由来の配置不整合や導入履歴不明の点検は、上流の [legacy installation checklist](https://github.com/takasek/pfdsl/blob/main/docs/legacy-installation-checklist.md) を参照する。
 
 `Possible renames` は canonical 側の rename が新旧パスの `missing` と `orphaned` に分かれて見えている状態を表す。新パスを信用する前に旧パスのローカル編集を引き継ぐ。
 

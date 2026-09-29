@@ -1,6 +1,8 @@
 # Legacy installation checklist
 
-Use this once to establish a baseline for installations predating the [migration guide](migration-guide.md), or when deployment history is unknown or mixed.
+This historical handoff accompanies [PR #1317](https://github.com/takasek/pfdsl/pull/1317).
+The owner may give it to existing adopting repositories once to establish a baseline for the migration guide.
+It is not part of the normal upgrade route or an ongoing maintenance checklist.
 This is a list of known inspection points, not proof that every historical residue has been enumerated.
 Routine upgrades after that baseline use the guide's installed-to-target version interval.
 Keep unresolved findings in the adopting repository's existing work records; do not repeat the entire checklist on every upgrade.
@@ -44,4 +46,5 @@ Confirm that needed rules still reach their operational steps, retired callers n
 Record the checked installation/revision, coverage, changes, inapplicable items, and unresolved findings in the adopter's existing records.
 This baseline is local to that repository: publication of this checklist or closure of an upstream issue does not prove any adopter is clean.
 
-Future version-specific changes belong in the migration guide; add an item here only for a newly established legacy residue or a gap in this initial inspection.
+Future version-specific changes belong in the migration guide.
+Track unresolved findings from this one-time cleanup in each adopting repository rather than extending this historical checklist for routine upgrades.

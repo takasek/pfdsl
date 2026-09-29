@@ -8,8 +8,6 @@ Run applicable steps in the adopting repository, preserving local changes and fo
 
 Record both the installed and target CLI/plugin releases, including the bundle revision when package versions alone are ambiguous.
 Read the entries introduced after the installed release and through the target release, in release order; skip entries outside that interval.
-For an installation predating this guide, or one with unknown or mixed deployment history, first use the separate [legacy installation checklist](legacy-installation-checklist.md).
-After that baseline is recorded, routine upgrades use the version interval here; unresolved legacy findings remain explicit follow-up work in the adopting repository.
 Changing a version number alone is not evidence that old local copies have been cleaned up.
 
 ## Unreleased — after CLI/plugin v0.0.26
@@ -41,7 +39,6 @@ See [ADR-0039](adr/0039-distribution-scope-by-provided-purpose.md) and [Issue #1
 This interval also retires the former retro catalog and its dedicated notification paths.
 Follow [the retro binding migration instructions in #1177](https://github.com/takasek/pfdsl/issues/1177) for preserving evidence, moving needed countermeasures, and retiring old consumers.
 Those instructions predate explicit D-layer adoption: also apply the D-layer choice above, whether or not the catalog was already migrated.
-The [legacy installation checklist](legacy-installation-checklist.md) identifies old local copies and rules that updating the bundle alone does not remove.
 
 ### Frontmatter types and declaration keys (FM004)
 
@@ -84,4 +81,3 @@ Do not guess future release numbers or discard older instructions after publishi
 If an interval requires no action for a package family, record that conclusion in its release preparation record rather than inventing cleanup steps.
 Link the relevant section from release notes when release notes are produced.
 The repository's [workflow procedure](../.pfdsl/workflow.md#採用先への移行案内) owns the maintenance and release review steps.
-Distributed skills retain only a stable reference; unknown historical residue belongs in the separate initial checklist.
