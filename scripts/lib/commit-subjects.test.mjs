@@ -4,7 +4,12 @@
  */
 
 import assert from "node:assert/strict";
+import { spawnSync } from "node:child_process";
+import { cpSync, mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { describe, it } from "node:test";
+import { fileURLToPath } from "node:url";
 import { checkCommitSubjects } from "./commit-subjects.mjs";
 
 /**
@@ -36,6 +41,33 @@ function logOutput(subjects) {
 }
 
 describe("checkCommitSubjects", () => {
+	it("loads without installed packages in the base-owned CI job", () => {
+		const isolated = mkdtempSync(join(tmpdir(), "pfdsl-subjects-"));
+		try {
+			cpSync(new URL("../", import.meta.url), join(isolated, "scripts"), {
+				recursive: true,
+			});
+			const result = spawnSync(
+				process.execPath,
+				[
+					join(isolated, "scripts/check-commit-subjects.mjs"),
+					"--base",
+					"HEAD",
+					"--head",
+					"HEAD",
+				],
+				{
+					cwd: fileURLToPath(new URL("../..", import.meta.url)),
+					encoding: "utf-8",
+				},
+			);
+			assert.equal(result.status, 0, result.stderr);
+			assert.match(result.stdout, /SKIP — no commits in range/);
+		} finally {
+			rmSync(isolated, { recursive: true, force: true });
+		}
+	});
+
 	it("reads the range the caller names, rather than a fixed origin/<base>..HEAD", () => {
 		const { exec, calls } = fakeExec({
 			"git log": { out: logOutput(["feat(cli): a"]) },
