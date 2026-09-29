@@ -73,6 +73,77 @@ A body ID beginning with `-` must use quoted-ID syntax.
 Preserve the ID and check every reference when quoting it.
 Do not apply a blanket replacement to hyphens: frontmatter delimiters and edge operators are unrelated syntax.
 
+### Files reported as skipped on every deploy
+
+This applies to repositories that deploy the GitHub Issues backend files (`.github/workflows/`, `scripts/pfdsl/`) with `check-install-sync.mjs --deploy`.
+
+Symptom: the same files appear under `Skipped (locally modified; ...)` on every deploy, although nobody edited them.
+
+Cause: installers before [#1314](https://github.com/takasek/pfdsl/pull/1314) wrote the new canonical hash into `.claude/pfd-ops-install-manifest.json` even for files they skipped.
+The manifest then no longer describes the file on disk, and the current installer cannot tell that state from a local edit.
+The current installer preserves a mismatched entry and does not repair it automatically.
+Neither the manifest hash nor the latest canonical hash proves that the file is unedited.
+
+Recovery is deterministic: an unedited distributed copy is byte-identical to that file in some released upstream tag.
+Every step below preserves the files and the manifest until the comparison has finished.
+
+1. Save the current manifest and list the candidate paths.
+   The read-only check lists every file that differs from the bundled copy, which includes all skipped files and writes nothing.
+
+   ```sh
+   cp .claude/pfd-ops-install-manifest.json .claude/pfd-ops-install-manifest.json.before
+   node <pfd-ops skill root>/scripts/check-install-sync.mjs --target .
+   ```
+
+   Copy the paths marked `different from bundled version` into the `for` line of step 3.
+
+2. Clone the upstream tags outside the adopting repository.
+
+   ```sh
+   UP="$(mktemp -d)/pfdsl.git"
+   git clone --quiet --bare --filter=blob:none https://github.com/takasek/pfdsl.git "$UP"
+   ```
+
+3. For each skipped path, hash the file on disk and hash the same path under `install/` in every released tag.
+   A deployed target path is the file's path below `install/`, so the upstream file is `.claude/skills/pfd-ops/install/<deployed path>` at each tag.
+   The install directory moved to `scripts/pfdsl/` in v0.0.23 ([ADR-0032](adr/0032-pfd-ops-install-dedicated-dir.md)); a tag that has no file at that path is skipped by the loop, so a current path can match only tags from v0.0.23 on.
+
+   ```sh
+   for rel in scripts/pfdsl/lib/gh-exec.mjs scripts/pfdsl/lib/proxy-fetch.mjs; do
+     actual=$(shasum -a 256 "$rel" | cut -d' ' -f1)
+     match=
+     for tag in $(git -C "$UP" tag --list 'v[0-9]*'); do
+       blob="$tag:.claude/skills/pfd-ops/install/$rel"
+       if git -C "$UP" cat-file -e "$blob" 2>/dev/null &&
+         [ "$(git -C "$UP" show "$blob" | shasum -a 256 | cut -d' ' -f1)" = "$actual" ]; then
+         match="$match $tag"
+       fi
+     done
+     echo "$rel: ${match:-NO MATCH}"
+   done
+   ```
+
+   Use a name other than `path` for the loop variable: in zsh it is tied to `PATH`.
+   `git show` returns the stored bytes, so a checkout that converted line endings does not match; treat that as a difference to inspect.
+
+4. Decide from the result.
+   A path that matches at least one tag is an unedited distributed copy.
+   A path that matches no tag differs from every release: it carries a local edit, or comes from a build that was never tagged.
+   Do not overwrite it; inspect the difference against the nearest tag and carry the needed edits into the current file by hand.
+
+5. Only if every listed path matched, redeploy with overwrite.
+
+   ```sh
+   node <pfd-ops skill root>/scripts/check-install-sync.mjs --target . --deploy --overwrite-local-edits
+   ```
+
+   `--overwrite-local-edits` is not limited to one path: it overwrites every file that differs from the bundled copy, so a file you did not compare loses its edits.
+   If any skipped path did not match, merge manually instead of using the flag.
+   The overwrite rewrites the manifest entries for the files it copies, so the same files are no longer reported on the next deploy.
+   Delete `.claude/pfd-ops-install-manifest.json.before` once the redeploy is reviewed.
+
+The installer's ordinary deployment and orphan-handling options are documented in the [installer guidance](../.claude/skills/pfd-ops/references/architecture.md#配置ファイルの鮮度セルフチェック).
+
 ### Verify the cleanup
 
 Validate affected diagrams with the intended CLI and run the repository's relevant checks.
