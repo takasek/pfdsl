@@ -131,6 +131,18 @@ function isLocalSpec(declared) {
 	return typeof declared === "string" && /^(file|link|portal):/.test(declared);
 }
 
+/**
+ * @param {string} child
+ * @param {string} parent
+ */
+function isWithin(child, parent) {
+	const path = relative(parent, child);
+	return (
+		path === "" ||
+		(path !== ".." && !path.startsWith(`..${sep}`) && !isAbsolute(path))
+	);
+}
+
 // The directories from `start` up to `stop`, both included. A start outside
 // `stop` is not walked at all: the ascent never leaves the project root.
 /**
@@ -138,12 +150,8 @@ function isLocalSpec(declared) {
  * @param {string} stop
  */
 function directoriesUpTo(start, stop) {
-	const outside = relative(stop, start);
-	const isInside =
-		outside === "" ||
-		(outside !== ".." && !outside.startsWith(`..${sep}`) && !isAbsolute(outside));
 	const directories = [];
-	let current = isInside ? start : stop;
+	let current = isWithin(start, stop) ? start : stop;
 	for (;;) {
 		directories.push(current);
 		if (current === stop) return directories;
@@ -355,13 +363,26 @@ export function collectReportEnvironment(skillRoot, options = {}) {
 		);
 	}
 	// A plugin installation has no checkout above its skill root, so the
-	// adopting project is the one the collector is run from: the checkout that
-	// contains the working directory, or the directory itself outside any
-	// checkout. The plugin cache is never read as the project.
+	// working directory decides which project this is: the checkout that
+	// contains it, or the directory itself outside any checkout. The bundle root
+	// is never used as the project. A working directory inside it means the
+	// collector was run from the plugin cache, where whatever package.json turns
+	// up describes the bundle rather than an adopting project, so no project is
+	// identified and that is reported instead.
 	const workingDirectory = resolve(options.cwd ?? process.cwd());
-	const projectRoot =
-		repoRoot ?? resolveRepoRoot(workingDirectory) ?? workingDirectory;
-	const repoCli = readRepoCliVersion(workingDirectory, projectRoot);
+	const isPluginBundle =
+		installation === "claude-plugin" || installation === "codex-plugin";
+	const repoCli =
+		isPluginBundle && isWithin(workingDirectory, bundleRoot)
+			? {
+					version: null,
+					reason:
+						"The working directory is inside the plugin bundle, so no adopting project could be identified.",
+				}
+			: readRepoCliVersion(
+					workingDirectory,
+					repoRoot ?? resolveRepoRoot(workingDirectory) ?? workingDirectory,
+				);
 	if (repoCli !== null && repoCli.version === null) {
 		recordFailure("repoCliVersion", repoCli.reason);
 	}
