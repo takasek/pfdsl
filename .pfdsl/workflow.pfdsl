@@ -377,6 +377,12 @@ artifact:
     location: bindings/pfd-ops.md
     group: generation
     tags: [ distilled_doc ]
+  adopter_config:
+    label: 採用リポの宣言値
+    description: "このリポ自身が採用リポとして持つ宣言の値（ADR-0042）。pfd-retro D 層の採用と監査対象（knowledgeLifecycleAudit）、completed-chain sweep の有効化（sweepCompletedChains）を持つ。散文の binding はキーを指すだけで値を持たない。sweep の workflow も実行時にこのファイルを読む"
+    criteria: JSON として読め、knowledgeLifecycleAudit が adopt と空でない監査対象を、sweepCompletedChains が有効化を宣言している（scripts/lib/knowledge-lifecycle-declaration.test.mjs が検査する）
+    location: config.json
+    group: generation
   bindings_pfd_retro:
     label: pfd-retro バインディング
     description: >
@@ -624,7 +630,7 @@ retro_skill >>? review_examples
 toolchain >>? review_examples
 
 decisions >> maintain_distributed_prompt_assets -> [distributed_advisory_hooks, ecosystem_skill, grill_skill, implementer_agent, ops_skill_general, ops_skill_l3, pfd_lens_agent, retro_skill, review_perspectives]
-decisions >> maintain_repo_bindings -> [bindings_pfd_ops, bindings_pfd_retro, delegation_guard, main_branch_guard, workflow_md]
+decisions >> maintain_repo_bindings -> [adopter_config, bindings_pfd_ops, bindings_pfd_retro, delegation_guard, main_branch_guard, workflow_md]
 decisions >> maintain_repo_local_capabilities -> [distribution_review_perspectives, distribution_review_skill, prose_mechanization_audit_skill, spec_stress_skill, vscode_ext_debug_skill]
 
 distributed_advisory_hooks >>? maintain_distributed_prompt_assets
@@ -665,7 +671,7 @@ spec_stress_skill >>? maintain_spec
 
 retro_skill >>? collect_activity
 
-[integrated_repository, pre_retro_inventory] >> plan_retro -> [retro_plan, retro_subject_snapshot]
+[adopter_config, integrated_repository, pre_retro_inventory] >> plan_retro -> [retro_plan, retro_subject_snapshot]
 
 retro_skill >>? plan_retro
 
