@@ -83,9 +83,9 @@ artifact:
     status: done
     criteria: "pfdsl rename <file> <old> <new> --write が artifact / process の宣言・body の edge・revises: / parts: / boundary: の参照と、group の宣言キー・parent:・group: を1回で書き換え、拒否条件が packages/cli/src/index.test.ts のテストで検証され、pfdsl スキル本文が meta set による group 一括再割当てと rename を案内している"
   cli_release_rename:
-    label: "CLIリリース: id 改名"
+    label: "CLIリリース: id 改名（npm v0.1.0）"
     description: "#1218 の rename と pfdsl スキルの案内を含む npm CLI と、同じ release tag から配布する plugin 資産"
-    status: todo
+    status: done
     criteria: "npm view @pfdsl/cli versions に rename を含む版が含まれ、その版を固定して取得した CLI で pfdsl rename が動作する"
   group_delete_cli:
     label: "group を削除できる delete (#1278)"
