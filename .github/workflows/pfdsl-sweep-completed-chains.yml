@@ -32,7 +32,50 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
+      # The sweep opens PRs, so it acts only in a repository that opted in through the git-managed .pfdsl/config.json.
+      # This workflow file ships to adopting repos and gets committed with routine redeploys.
+      # The opt-in lives in a file the installer never writes, reviewed in its own PR.
+      # Nothing after this step runs unless it reports enabled=true, so a repository that has not opted in spends nothing else.
+      # A declaration that cannot be read fails the job instead of silently disabling the sweep.
+      # The runner image's own node runs it, ahead of setup-node.
+      - name: Read the sweep opt-in from .pfdsl/config.json
+        id: sweep-gate
+        run: |
+          node -e '
+            const fs = require("node:fs");
+            const file = ".pfdsl/config.json";
+            const fail = (why) => {
+              console.log("::error::" + file + " " + why);
+              process.exit(1);
+            };
+            const isObject = (v) => typeof v === "object" && v !== null && !Array.isArray(v);
+            let text = null;
+            try {
+              text = fs.readFileSync(file, "utf8");
+            } catch (e) {
+              if (e.code !== "ENOENT") fail("cannot be read: " + e.message);
+            }
+            let enabled = false;
+            if (text !== null) {
+              let config;
+              try {
+                config = JSON.parse(text);
+              } catch (e) {
+                fail("is not valid JSON: " + e.message);
+              }
+              if (!isObject(config)) fail("must contain a JSON object at the top level");
+              const sweep = config.sweepCompletedChains;
+              if (sweep !== undefined && !isObject(sweep)) fail("has a sweepCompletedChains that is not an object");
+              enabled = sweep !== undefined && sweep.enabled === true;
+            }
+            if (!enabled) {
+              console.log("::notice::The completed-chain sweep is disabled. To enable it, commit " + file + " containing {\"sweepCompletedChains\": {\"enabled\": true}}.");
+            }
+            fs.appendFileSync(process.env.GITHUB_OUTPUT, "enabled=" + enabled + "\n");
+          '
+
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        if: steps.sweep-gate.outputs.enabled == 'true'
         with:
           node-version: 24
 
@@ -42,6 +85,7 @@ jobs:
       # both run off one committed workflow file.
       - name: Detect this repo's own pfdsl workspace
         id: detect-workspace
+        if: steps.sweep-gate.outputs.enabled == 'true'
         run: |
           if [ -f pnpm-workspace.yaml ] && [ -f packages/cli/package.json ]; then
             echo "in_workspace=true" >> "$GITHUB_OUTPUT"
@@ -50,14 +94,14 @@ jobs:
           fi
 
       - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
-        if: steps.detect-workspace.outputs.in_workspace == 'true'
+        if: steps.sweep-gate.outputs.enabled == 'true' && steps.detect-workspace.outputs.in_workspace == 'true'
 
       # In this repo: build packages/cli from the very source this push
       # carries, so the sweep checks with the same code its own tests cover —
       # not a published release that can lag behind, or even predate a
       # subcommand the sweep script depends on (#1125 review).
       - name: Build this repo's own @pfdsl/cli from source
-        if: steps.detect-workspace.outputs.in_workspace == 'true'
+        if: steps.sweep-gate.outputs.enabled == 'true' && steps.detect-workspace.outputs.in_workspace == 'true'
         id: build-cli
         run: |
           pnpm install --frozen-lockfile
@@ -71,7 +115,7 @@ jobs:
       # In an adopting repo: no packages/cli to build, so fall back to the
       # last published release, same as before.
       - name: Install the published @pfdsl/cli
-        if: steps.detect-workspace.outputs.in_workspace != 'true'
+        if: steps.sweep-gate.outputs.enabled == 'true' && steps.detect-workspace.outputs.in_workspace != 'true'
         id: install-cli
         run: |
           npm install --no-save @pfdsl/cli
@@ -82,9 +126,11 @@ jobs:
           } >> "$GITHUB_OUTPUT"
 
       - name: Sweep completed chains out of the roadmap
+        if: steps.sweep-gate.outputs.enabled == 'true'
         run: node scripts/pfdsl/sweep-completed-chains.mjs .pfdsl/roadmap.pfdsl --write
 
       - name: Open PR if roadmap.pfdsl changed
+        if: steps.sweep-gate.outputs.enabled == 'true'
         uses: peter-evans/create-pull-request@5f6978faf089d4d20b00c7766989d076bb2fc7f1 # v8
         with:
           add-paths: .pfdsl/roadmap.pfdsl
