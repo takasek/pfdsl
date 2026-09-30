@@ -359,6 +359,69 @@ describe("collectReportEnvironment", () => {
 			);
 		});
 
+		it("does not call an unreadable installed package.json not installed", () => {
+			for (const content of ["{ broken", "null", "[]"]) {
+				const { repoRoot, skillRoot } = adopter();
+				writeJson(join(repoRoot, "package.json"), {
+					devDependencies: { "@pfdsl/cli": "^0.0.26" },
+				});
+				mkdirSync(join(repoRoot, "node_modules/@pfdsl/cli"), {
+					recursive: true,
+				});
+				writeFileSync(
+					join(repoRoot, "node_modules/@pfdsl/cli/package.json"),
+					content,
+				);
+
+				const env = collectReportEnvironment(skillRoot, {
+					runCommand: pathCli,
+				});
+
+				assert.equal(env.repoCliVersion, null, content);
+				const { reason } = env.unavailable.find(
+					({ field }) => field === "repoCliVersion",
+				);
+				assert.match(reason, /could not be parsed/, content);
+				assert.doesNotMatch(reason, /not installed/, content);
+			}
+		});
+
+		it("does not call a Yarn Plug'n'Play install not installed", () => {
+			const { repoRoot, skillRoot } = adopter();
+			writeJson(join(repoRoot, "package.json"), {
+				devDependencies: { "@pfdsl/cli": "^0.0.26" },
+			});
+			writeFileSync(join(repoRoot, ".pnp.cjs"), "");
+
+			const env = collectReportEnvironment(skillRoot, {
+				runCommand: pathCli,
+			});
+
+			assert.equal(env.repoCliVersion, null);
+			const { reason } = env.unavailable.find(
+				({ field }) => field === "repoCliVersion",
+			);
+			assert.match(reason, /Plug'n'Play/);
+			assert.doesNotMatch(reason, /not installed/);
+		});
+
+		it("prefers an installed node_modules package over a stray .pnp.cjs", () => {
+			const { repoRoot, skillRoot } = adopter();
+			writeJson(join(repoRoot, "package.json"), {
+				devDependencies: { "@pfdsl/cli": "^0.0.26" },
+			});
+			writeFileSync(join(repoRoot, ".pnp.cjs"), "");
+			writeJson(join(repoRoot, "node_modules/@pfdsl/cli/package.json"), {
+				version: "0.0.26",
+			});
+
+			const env = collectReportEnvironment(skillRoot, {
+				runCommand: pathCli,
+			});
+
+			assert.equal(env.repoCliVersion, "0.0.26");
+		});
+
 		it("records repoCliVersion as unavailable when package.json cannot be parsed", () => {
 			for (const content of ["{ broken", "null", "[]"]) {
 				const { repoRoot, skillRoot } = adopter();

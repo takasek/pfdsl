@@ -151,10 +151,26 @@ function readRepoCliVersion(repoRoot) {
 		manifest.dependencies?.["@pfdsl/cli"] ??
 		manifest.devDependencies?.["@pfdsl/cli"];
 	if (declared === undefined) return null;
-	const installed = readJsonOrNull(
+	const installed = readJsonObject(
 		resolve(repoRoot, "node_modules/@pfdsl/cli/package.json"),
 	);
-	if (installed === null) {
+	if (installed === UNREADABLE) {
+		return {
+			version: null,
+			reason:
+				"package.json declares @pfdsl/cli but node_modules/@pfdsl/cli/package.json could not be parsed.",
+		};
+	}
+	if (installed === ABSENT) {
+		// Yarn Plug'n'Play keeps packages in zip archives and leaves no
+		// node_modules, so an absent directory there is not "not installed".
+		if (existsSync(resolve(repoRoot, ".pnp.cjs"))) {
+			return {
+				version: null,
+				reason:
+					"package.json declares @pfdsl/cli and the project uses Yarn Plug'n'Play, which has no node_modules to read the installed version from.",
+			};
+		}
 		return {
 			version: null,
 			reason: isLocalSpec(declared)
