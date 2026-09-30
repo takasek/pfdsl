@@ -12,7 +12,7 @@
 // from "collection failed".
 
 import { spawnSync } from "node:child_process";
-import { existsSync, realpathSync } from "node:fs";
+import { existsSync, readFileSync, realpathSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -107,6 +107,25 @@ const MISSING_IDENTIFIERS = Object.freeze({
 	}),
 });
 
+const ABSENT = Symbol("absent");
+const UNREADABLE = Symbol("unreadable");
+
+// readJsonOrNull folds "no such file" and "not valid JSON" into one null, which
+// is exactly the distinction this collector has to keep. A file that parses to
+// something other than an object cannot be a package.json either.
+/** @param {string} path */
+function readJsonObject(path) {
+	if (!existsSync(path)) return ABSENT;
+	try {
+		const value = JSON.parse(readFileSync(path, "utf-8"));
+		const isObject =
+			typeof value === "object" && value !== null && !Array.isArray(value);
+		return isObject ? value : UNREADABLE;
+	} catch {
+		return UNREADABLE;
+	}
+}
+
 /** @param {unknown} declared */
 function isLocalSpec(declared) {
 	return typeof declared === "string" && /^(file|link|portal):/.test(declared);
@@ -120,10 +139,18 @@ function isLocalSpec(declared) {
 // declare @pfdsl/cli at all: nothing was expected, so nothing is missing.
 /** @param {string} repoRoot */
 function readRepoCliVersion(repoRoot) {
-	const manifest = readJsonOrNull(resolve(repoRoot, "package.json"));
+	const manifest = readJsonObject(resolve(repoRoot, "package.json"));
+	if (manifest === ABSENT) return null;
+	if (manifest === UNREADABLE) {
+		return {
+			version: null,
+			reason:
+				"package.json could not be parsed, so whether it declares @pfdsl/cli is unknown.",
+		};
+	}
 	const declared =
-		manifest?.dependencies?.["@pfdsl/cli"] ??
-		manifest?.devDependencies?.["@pfdsl/cli"];
+		manifest.dependencies?.["@pfdsl/cli"] ??
+		manifest.devDependencies?.["@pfdsl/cli"];
 	if (declared === undefined) return null;
 	const installed = readJsonOrNull(
 		resolve(repoRoot, "node_modules/@pfdsl/cli/package.json"),

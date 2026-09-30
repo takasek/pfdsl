@@ -359,6 +359,27 @@ describe("collectReportEnvironment", () => {
 			);
 		});
 
+		it("records repoCliVersion as unavailable when package.json cannot be parsed", () => {
+			for (const content of ["{ broken", "null", "[]"]) {
+				const { repoRoot, skillRoot } = adopter();
+				writeFileSync(join(repoRoot, "package.json"), content);
+
+				const env = collectReportEnvironment(skillRoot, {
+					runCommand: pathCli,
+				});
+
+				assert.equal(env.repoCliVersion, null, content);
+				const failure = env.unavailable.find(
+					({ field }) => field === "repoCliVersion",
+				);
+				assert.ok(
+					failure,
+					`repoCliVersion should be unavailable for ${content}`,
+				);
+				assert.match(failure.reason, /could not be parsed/);
+			}
+		});
+
 		it("omits repoCliVersion and its unavailable entry when the repository does not depend on @pfdsl/cli", () => {
 			const { repoRoot, skillRoot } = adopter();
 			writeJson(join(repoRoot, "package.json"), {
