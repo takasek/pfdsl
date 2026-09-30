@@ -235,7 +235,11 @@ describe("collectReportEnvironment", () => {
 
 		const pathCli = (command) => (command === "pfdsl" ? "0.0.25" : null);
 
-		for (const section of ["dependencies", "devDependencies"]) {
+		for (const section of [
+			"dependencies",
+			"devDependencies",
+			"optionalDependencies",
+		]) {
 			it(`reports the installed version next to the PATH version when ${section} lists @pfdsl/cli`, () => {
 				const { repoRoot, skillRoot } = adopter();
 				writeJson(join(repoRoot, "package.json"), {
@@ -420,6 +424,24 @@ describe("collectReportEnvironment", () => {
 			});
 
 			assert.equal(env.repoCliVersion, "0.0.26");
+		});
+
+		// peerDependencies do not install for the adopting project, so a package
+		// listing @pfdsl/cli only there has not declared a CLI of its own.
+		it("does not treat peerDependencies as a declaration", () => {
+			const { repoRoot, skillRoot } = adopter();
+			writeJson(join(repoRoot, "package.json"), {
+				peerDependencies: { "@pfdsl/cli": "^0.0.26" },
+			});
+
+			const env = collectReportEnvironment(skillRoot, {
+				runCommand: pathCli,
+			});
+
+			assert.ok(!("repoCliVersion" in env));
+			assert.ok(
+				!env.unavailable.some(({ field }) => field === "repoCliVersion"),
+			);
 		});
 
 		it("records repoCliVersion as unavailable when package.json cannot be parsed", () => {

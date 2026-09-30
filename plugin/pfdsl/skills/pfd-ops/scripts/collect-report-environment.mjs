@@ -147,9 +147,14 @@ function readRepoCliVersion(repoRoot) {
 				"package.json could not be parsed, so whether it declares @pfdsl/cli is unknown.",
 		};
 	}
+	// optionalDependencies install for the adopter like the other two, so they
+	// count as a declaration. peerDependencies are left out: they ask whoever
+	// consumes this package to provide @pfdsl/cli, so they do not install a CLI
+	// for this project.
 	const declared =
 		manifest.dependencies?.["@pfdsl/cli"] ??
-		manifest.devDependencies?.["@pfdsl/cli"];
+		manifest.devDependencies?.["@pfdsl/cli"] ??
+		manifest.optionalDependencies?.["@pfdsl/cli"];
 	if (declared === undefined) return null;
 	const installed = readJsonObject(
 		resolve(repoRoot, "node_modules/@pfdsl/cli/package.json"),
