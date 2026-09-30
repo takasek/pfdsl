@@ -8,9 +8,7 @@ PFD 採用状況: (採用した種別を列挙する。例: roadmap・workflow �
 
 出力宛先: (リポ固有の上書きがある場合のみ記入する。)
 
-knowledge-lifecycle-audit: decline
-
-上の行は pfd-retro の D 層（知識成果物のライフサイクル監査）の採用宣言で、値は `adopt`（監査する）か `decline`（監査しない）のどちらかである。`adopt` にする場合は、同じ節で監査対象の成果物を明示する。
+pfd-retro の D 層（知識成果物のライフサイクル監査）の採用と監査対象は、`.pfdsl/config.json` のキー `knowledgeLifecycleAudit` で宣言する。
 
 ## 事例・観察・反例
 

@@ -2,60 +2,126 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { describe, it } from "node:test";
 
-// ADR-0041: the pfd-retro D-layer adoption declaration is a stable ASCII
-// tri-state token. Adopters and tools match this exact line, so the SKILL,
-// the scaffold and this repo's binding must all agree on the literal key.
-const KEY = "knowledge-lifecycle-audit";
-const declarationLine = /^knowledge-lifecycle-audit: (adopt|decline)\s*$/;
+import { HARNESS_CAPABILITY_CONTRACT } from "./harness-inventory.mjs";
+
+// The pfd-retro D-layer adoption declaration is a discrete switch plus a list,
+// so it lives in the git-managed .pfdsl/config.json under the key
+// `knowledgeLifecycleAudit`: {"mode": "adopt" | "decline", "targets": [...]}.
+// Prose in the binding is never a declaration, and the two earlier line
+// forms are not recognized. The SKILL, the scaffold and this repo's config
+// must agree on the literal key.
+const KEY = "knowledgeLifecycleAudit";
+const CONFIG_PATH = ".pfdsl/config.json";
+const RETIRED_LINES =
+	/^(knowledge-lifecycle-audit|知識成果物ライフサイクル監査):/m;
 
 const read = (path) => readFileSync(path, "utf8");
 const skill = read(".claude/skills/pfd-retro/SKILL.md");
-const scaffold = read(
+const reference = read(
+	".claude/skills/pfd-retro/references/knowledge-lifecycle.md",
+);
+const scaffoldBinding = read(
 	".claude/skills/pfd-ops/references/scaffold/bindings/pfd-retro.md",
 );
-const binding = read(".pfdsl/bindings/pfd-retro.md");
+const repoBinding = read(".pfdsl/bindings/pfd-retro.md");
+const scaffoldConfig = JSON.parse(
+	read(".claude/skills/pfd-ops/references/scaffold/config.json"),
+);
+const repoConfig = JSON.parse(read(CONFIG_PATH));
 
-// A declaration is a whole line, so a line that only mentions the key in
-// prose (as the SKILL does) is not counted. Lines that start with the key
-// but carry an invalid value are counted separately so duplicates and typos
-// are both visible.
-function declarations(markdown) {
-	const keyed = markdown
-		.split("\n")
-		.filter((line) => line.startsWith(`${KEY}:`));
-	return {
-		keyed,
-		valid: keyed.filter((line) => declarationLine.test(line)),
-	};
+function section(markdown, heading) {
+	const start = markdown.indexOf(`\n## ${heading}`);
+	assert.notEqual(start, -1, `heading not found: ${heading}`);
+	const next = markdown.indexOf("\n## ", start + 1);
+	return markdown.slice(start, next === -1 ? undefined : next);
 }
 
-describe("pfd-retro D-layer declaration token (ADR-0041)", () => {
-	it("SKILL names the literal key, both values and the report-every-run rule", () => {
-		assert.ok(skill.includes(KEY));
-		assert.match(skill, /`adopt`/);
-		assert.match(skill, /`decline`/);
-		assert.match(
-			skill,
-			/所有者が `adopt` か `decline` を宣言する必要があることを毎回報告する/,
+const dSection = section(skill, "D. 知識成果物のライフサイクル（選択項目）");
+const applicability = section(skill, "適用単位");
+
+describe("pfd-retro D-layer declaration in .pfdsl/config.json", () => {
+	it("SKILL D section names the config file, the key, both modes and targets", () => {
+		assert.ok(dSection.includes(CONFIG_PATH));
+		assert.ok(dSection.includes(KEY));
+		assert.match(dSection, /`adopt`/);
+		assert.match(dSection, /`decline`/);
+		assert.match(dSection, /`targets`/);
+	});
+
+	it("SKILL D section states the report-every-run rule for every other state", () => {
+		assert.match(dSection, /毎回報告する/);
+		for (const state of [
+			"ファイルが無い",
+			"JSON として読めない",
+			"キーが無い",
+			"`mode`",
+			"空",
+		]) {
+			assert.ok(dSection.includes(state), `state not covered: ${state}`);
+		}
+	});
+
+	it("SKILL D section says a heading or prose is never a declaration and tells old adopters where to go", () => {
+		assert.match(dSection, /節見出し/);
+		assert.match(dSection, /knowledge-lifecycle-audit:/);
+		assert.match(dSection, /知識成果物ライフサイクル監査:/);
+		assert.match(dSection, /移った/);
+	});
+
+	it("SKILL applicability sentence points to the config and covers absent, invalid and malformed", () => {
+		assert.ok(applicability.includes(CONFIG_PATH));
+		assert.ok(applicability.includes(KEY));
+		for (const state of ["無い", "不正", "形式"]) {
+			assert.ok(applicability.includes(state), `state not covered: ${state}`);
+		}
+		assert.doesNotMatch(applicability, /採用を宣言したときだけ/);
+	});
+
+	it("the D reference names the config key rather than a binding line", () => {
+		assert.ok(reference.includes(KEY));
+		assert.ok(reference.includes(CONFIG_PATH));
+		assert.doesNotMatch(reference, /knowledge-lifecycle-audit/);
+	});
+
+	it("scaffold config declines the D layer", () => {
+		assert.deepEqual(scaffoldConfig, { [KEY]: { mode: "decline" } });
+	});
+
+	it("this repo's config adopts with non-empty string targets", () => {
+		const declaration = repoConfig[KEY];
+		assert.equal(declaration.mode, "adopt");
+		assert.ok(Array.isArray(declaration.targets));
+		assert.ok(declaration.targets.length > 0);
+		for (const target of declaration.targets) {
+			assert.equal(typeof target, "string");
+			assert.notEqual(target.trim(), "");
+		}
+	});
+
+	it("this repo's config keeps the existing sweep opt-in", () => {
+		assert.equal(repoConfig.sweepCompletedChains.enabled, true);
+	});
+
+	it("neither binding carries a retired declaration line", () => {
+		assert.doesNotMatch(scaffoldBinding, RETIRED_LINES);
+		assert.doesNotMatch(repoBinding, RETIRED_LINES);
+	});
+
+	it("both bindings point to the config key instead", () => {
+		assert.ok(scaffoldBinding.includes(KEY));
+		assert.ok(scaffoldBinding.includes(CONFIG_PATH));
+		assert.ok(repoBinding.includes(KEY));
+		assert.ok(repoBinding.includes(CONFIG_PATH));
+	});
+
+	it("pfd-ops distributes the scaffold config so /pfd-init can copy it", () => {
+		const opsSkill = HARNESS_CAPABILITY_CONTRACT.find(
+			(entry) => entry.id === "skill:pfd-ops",
 		);
-		assert.doesNotMatch(skill, /知識成果物ライフサイクル監査: 採用する/);
-	});
-
-	it("scaffold ships exactly one declaration line, with value decline", () => {
-		const { keyed, valid } = declarations(scaffold);
-		assert.equal(keyed.length, 1);
-		assert.equal(valid.length, 1);
-		assert.equal(valid[0].trim(), `${KEY}: decline`);
-	});
-
-	it("this repo's binding has exactly one valid declaration line", () => {
-		const { keyed, valid } = declarations(binding);
-		assert.equal(keyed.length, 1);
-		assert.equal(valid.length, 1);
-	});
-
-	it("no active consumer still uses the retired Japanese declaration", () => {
-		assert.doesNotMatch(scaffold, /^知識成果物ライフサイクル監査:/m);
-		assert.doesNotMatch(binding, /^知識成果物ライフサイクル監査:/m);
+		assert.ok(
+			opsSkill.source.files.includes("references/scaffold/config.json"),
+		);
+		const ecosystem = read(".claude/skills/pfd-ecosystem/SKILL.md");
+		assert.match(ecosystem, /<scaffold>\/config\.json/);
 	});
 });

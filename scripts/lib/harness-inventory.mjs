@@ -42,6 +42,7 @@ const SKILL_SOURCE_FILES = Object.freeze({
 		"references/scaffold/bindings/pfd-ops.md",
 		"references/scaffold/bindings/pfd-retro-patterns/sample-pattern.md",
 		"references/scaffold/bindings/pfd-retro.md",
+		"references/scaffold/config.json",
 		"references/scaffold/pipeline.md",
 		"references/scaffold/pipeline.pfdsl",
 		"references/scaffold/review-perspectives.md",
