@@ -57,6 +57,9 @@ Closes #<issue番号>
 ## push 駆動の回収（pfdsl-sweep-completed-chains）
 
 デフォルトブランチへ push されると `.github/workflows/pfdsl-sweep-completed-chains.yml` が `scripts/pfdsl/sweep-completed-chains.mjs .pfdsl/roadmap.pfdsl --write` を実行し、差分があれば `flow-sync/pending` ブランチへ PR を起票する。回収が読むのはデフォルトブランチの roadmap だけで、それが変わるのは push のときだからである。issue close は status を動かさないので、close 契機は push 契機に包含される。bot はデフォルトブランチへ直接書かず、マージは人が行う。
+回収は採用リポの `.pfdsl/config.json` が `{"sweepCompletedChains": {"enabled": true}}` を宣言したときだけ行う。
+宣言が無い、または `enabled` が真偽値の `true` でなければ、workflow は checkout の直後に無効である旨を通知して何もせず成功で終わる。`.pfdsl/config.json` が JSON として読めない、または値の形が違う場合は失敗する。
+workflow ファイル自体は他の配置ファイルとともに commit してよい。有効にするかどうかは所有者が判断し、その判断をこのキーに残す。
 同一ブランチへ起票するため、連続する push は既存 PR を更新する。`concurrency` グループで直列化してあり、再計算は冪等である。
 PR 本文には閉じる issue が無いので `no-issue:` を理由つきで宣言する（「PR 本文規約」参照）。
 この bot PR は `GITHUB_TOKEN` で作成されるため、GitHub の既定動作により `pull_request` トリガーの workflow を起動しない。そのため採用リポ自身の CI ゲート（ビルド・テスト・`fmt` 検査等）はこの PR に対して一切実行されない。回収の正しさを担保するのは `sweep-completed-chains.mjs` 自身の検証だけであり、その内訳は `check`・`graph orphans`・`fmt --check`・readiness 比較（`status ready`/`status blocked`）である。レビュアーは、この PR に CI チェックが一つも付かないことを「チェックが通った」ではなく「チェックがそもそも動いていない」と読むこと。
