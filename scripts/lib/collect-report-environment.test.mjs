@@ -391,6 +391,7 @@ describe("collectReportEnvironment", () => {
 			const env = collectReportEnvironment(skillRoot, {
 				runCommand: pathCli,
 				cwd: project,
+				findRepoRootOrNull: () => null,
 			});
 
 			assert.ok(!("repoCliVersion" in env));
@@ -410,6 +411,7 @@ describe("collectReportEnvironment", () => {
 			const env = collectReportEnvironment(skillRoot, {
 				runCommand: pathCli,
 				cwd: project,
+				findRepoRootOrNull: () => null,
 			});
 
 			assert.ok(!("repoCliVersion" in env));
