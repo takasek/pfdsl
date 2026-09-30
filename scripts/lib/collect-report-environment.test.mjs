@@ -585,6 +585,177 @@ describe("collectReportEnvironment", () => {
 			assert.ok(!("repoCliVersion" in env));
 		});
 
+		describe("in a monorepo", () => {
+			// The project root is the checkout's top level, but the package that
+			// declares @pfdsl/cli can be a workspace package below it. The nearest
+			// declaring package.json from the working directory wins, and its
+			// install is the nearest node_modules that holds the CLI, never
+			// anything above the project root.
+			function workspace() {
+				const skillRoot = pluginInstall("claude");
+				const project = join(tmp, "project");
+				const app = join(project, "packages", "app");
+				mkdirSync(join(project, ".git"), { recursive: true });
+				mkdirSync(app, { recursive: true });
+				return { skillRoot, project, app };
+			}
+
+			const collectFrom = (skillRoot, cwd) =>
+				collectReportEnvironment(skillRoot, { runCommand: pathCli, cwd });
+
+			it("finds a workspace package that declares @pfdsl/cli below the project root", () => {
+				const { skillRoot, project, app } = workspace();
+				writeJson(join(project, "package.json"), { name: "root" });
+				writeJson(join(app, "package.json"), {
+					devDependencies: { "@pfdsl/cli": "^0.0.26" },
+				});
+				writeJson(join(project, "node_modules/@pfdsl/cli/package.json"), {
+					version: "0.0.26",
+				});
+
+				const env = collectFrom(skillRoot, app);
+
+				assert.equal(env.repoCliVersion, "0.0.26");
+			});
+
+			it("prefers the nearest declaring package.json and its own node_modules", () => {
+				const { skillRoot, project, app } = workspace();
+				writeJson(join(project, "package.json"), {
+					devDependencies: { "@pfdsl/cli": "^2.0.0" },
+				});
+				writeJson(join(project, "node_modules/@pfdsl/cli/package.json"), {
+					version: "2.0.0",
+				});
+				writeJson(join(app, "package.json"), {
+					devDependencies: { "@pfdsl/cli": "^1.0.0" },
+				});
+				writeJson(join(app, "node_modules/@pfdsl/cli/package.json"), {
+					version: "1.0.0",
+				});
+
+				const env = collectFrom(skillRoot, app);
+
+				assert.equal(env.repoCliVersion, "1.0.0");
+			});
+
+			it("skips a nearer package.json that does not declare @pfdsl/cli", () => {
+				const { skillRoot, project, app } = workspace();
+				writeJson(join(app, "package.json"), { name: "app" });
+				writeJson(join(project, "package.json"), {
+					devDependencies: { "@pfdsl/cli": "^0.0.26" },
+				});
+				writeJson(join(project, "node_modules/@pfdsl/cli/package.json"), {
+					version: "0.0.26",
+				});
+
+				const env = collectFrom(skillRoot, app);
+
+				assert.equal(env.repoCliVersion, "0.0.26");
+			});
+
+			it("resolves the install through a hoisted node_modules above the workspace package", () => {
+				const { skillRoot, project, app } = workspace();
+				writeJson(join(app, "package.json"), {
+					dependencies: { "@pfdsl/cli": "^0.0.26" },
+				});
+				writeJson(
+					join(project, "packages/node_modules/@pfdsl/cli/package.json"),
+					{
+						version: "0.0.27",
+					},
+				);
+
+				const env = collectFrom(skillRoot, app);
+
+				assert.equal(env.repoCliVersion, "0.0.27");
+			});
+
+			it("reports Plug'n'Play when the marker sits above the declaring workspace package", () => {
+				const { skillRoot, project, app } = workspace();
+				writeJson(join(app, "package.json"), {
+					dependencies: { "@pfdsl/cli": "^0.0.26" },
+				});
+				writeFileSync(join(project, ".pnp.cjs"), "");
+
+				const env = collectFrom(skillRoot, app);
+
+				assert.match(
+					env.unavailable.find(({ field }) => field === "repoCliVersion")
+						.reason,
+					/Plug'n'Play/,
+				);
+			});
+
+			it("stops at the nearest package.json it cannot parse instead of guessing from a farther one", () => {
+				const { skillRoot, project, app } = workspace();
+				writeFileSync(join(app, "package.json"), "{ broken");
+				writeJson(join(project, "package.json"), {
+					devDependencies: { "@pfdsl/cli": "^0.0.26" },
+				});
+				writeJson(join(project, "node_modules/@pfdsl/cli/package.json"), {
+					version: "0.0.26",
+				});
+
+				const env = collectFrom(skillRoot, app);
+
+				assert.equal(env.repoCliVersion, null);
+				assert.match(
+					env.unavailable.find(({ field }) => field === "repoCliVersion")
+						.reason,
+					/could not be parsed/,
+				);
+			});
+
+			it("never reads above the project root", () => {
+				const { skillRoot, app } = workspace();
+				writeJson(join(tmp, "package.json"), {
+					dependencies: { "@pfdsl/cli": "^9.9.9" },
+				});
+				writeJson(join(tmp, "node_modules/@pfdsl/cli/package.json"), {
+					version: "9.9.9",
+				});
+
+				const env = collectFrom(skillRoot, app);
+
+				assert.ok(!("repoCliVersion" in env));
+			});
+
+			it("does not use a node_modules above the project root for a declaration inside it", () => {
+				const { skillRoot, project, app } = workspace();
+				writeJson(join(project, "package.json"), {
+					dependencies: { "@pfdsl/cli": "^0.0.26" },
+				});
+				writeJson(join(tmp, "node_modules/@pfdsl/cli/package.json"), {
+					version: "9.9.9",
+				});
+
+				const env = collectFrom(skillRoot, app);
+
+				assert.equal(env.repoCliVersion, null);
+				assert.match(
+					env.unavailable.find(({ field }) => field === "repoCliVersion")
+						.reason,
+					/not installed/,
+				);
+			});
+
+			it("walks from the working directory inside a repo-local install", () => {
+				const { repoRoot, skillRoot } = adopter();
+				const app = join(repoRoot, "packages", "app");
+				mkdirSync(app, { recursive: true });
+				writeJson(join(app, "package.json"), {
+					devDependencies: { "@pfdsl/cli": "^0.0.26" },
+				});
+				writeJson(join(repoRoot, "node_modules/@pfdsl/cli/package.json"), {
+					version: "0.0.26",
+				});
+
+				const env = collectFrom(skillRoot, app);
+
+				assert.equal(env.repoCliVersion, "0.0.26");
+			});
+		});
+
 		it("never runs the repo-local binary", () => {
 			const { repoRoot, skillRoot } = adopter();
 			writeJson(join(repoRoot, "package.json"), {

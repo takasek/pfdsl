@@ -12,7 +12,7 @@
 
 import { spawnSync } from "node:child_process";
 import { existsSync, readFileSync, realpathSync } from "node:fs";
-import { dirname, resolve } from "node:path";
+import { dirname, isAbsolute, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { readManifest } from "./check-install-sync.mjs";
@@ -130,67 +130,115 @@ function isLocalSpec(declared) {
 	return typeof declared === "string" && /^(file|link|portal):/.test(declared);
 }
 
+// The directories from `start` up to `stop`, both included. A start outside
+// `stop` is not walked at all: the ascent never leaves the project root.
+/**
+ * @param {string} start
+ * @param {string} stop
+ */
+function directoriesUpTo(start, stop) {
+	const outside = relative(stop, start);
+	const isInside =
+		outside === "" ||
+		(outside !== ".." && !outside.startsWith(`..${sep}`) && !isAbsolute(outside));
+	const directories = [];
+	let current = isInside ? start : stop;
+	for (;;) {
+		directories.push(current);
+		if (current === stop) return directories;
+		current = dirname(current);
+	}
+}
+
+// The version of the @pfdsl/cli that a package.json in `declaringDirectory`
+// resolves to. Node resolves a package through the nearest node_modules on the
+// way up, and a workspace package's dependency is usually hoisted to the
+// project root, so this ascends the same way — but only as far as the root.
+/**
+ * @param {string} declaringDirectory
+ * @param {string} projectRoot
+ */
+function readInstalledCliVersion(declaringDirectory, projectRoot) {
+	const directories = directoriesUpTo(declaringDirectory, projectRoot);
+	for (const directory of directories) {
+		const installed = readJsonObject(
+			resolve(directory, "node_modules/@pfdsl/cli/package.json"),
+		);
+		if (installed === ABSENT) continue;
+		if (installed === UNREADABLE) {
+			return {
+				version: null,
+				reason:
+					"package.json declares @pfdsl/cli but node_modules/@pfdsl/cli/package.json could not be parsed.",
+			};
+		}
+		const version = asIdentifier(installed.version);
+		return version === null
+			? {
+					version: null,
+					reason:
+						"package.json declares @pfdsl/cli but node_modules/@pfdsl/cli/package.json carries no usable version.",
+				}
+			: { version };
+	}
+	// Yarn Plug'n'Play keeps packages in zip archives and leaves no
+	// node_modules, so an absent directory there is not "not installed".
+	if (directories.some((d) => existsSync(resolve(d, ".pnp.cjs")))) {
+		return {
+			version: null,
+			reason:
+				"package.json declares @pfdsl/cli and the project uses Yarn Plug'n'Play, which has no node_modules to read the installed version from.",
+		};
+	}
+	return null;
+}
+
 // The CLI a repository pins is not necessarily the one on PATH, so the report
 // carries both. This reads the declaration and the installed package.json and
 // never runs the repo-local binary. The reasons it gives state a category and
 // never the declared value: they end up in a public issue, and a `file:` spec
-// is a local absolute path. Returns null when the repository does not
-// declare @pfdsl/cli at all: nothing was expected, so nothing is missing.
-/** @param {string} repoRoot */
-function readRepoCliVersion(repoRoot) {
-	const manifest = readJsonObject(resolve(repoRoot, "package.json"));
-	if (manifest === ABSENT) return null;
-	if (manifest === UNREADABLE) {
-		return {
-			version: null,
-			reason:
-				"package.json could not be parsed, so whether it declares @pfdsl/cli is unknown.",
-		};
-	}
-	// optionalDependencies install for the adopter like the other two, so they
-	// count as a declaration. peerDependencies are left out: they ask whoever
-	// consumes this package to provide @pfdsl/cli, so they do not install a CLI
-	// for this project.
-	const declared =
-		manifest.dependencies?.["@pfdsl/cli"] ??
-		manifest.devDependencies?.["@pfdsl/cli"] ??
-		manifest.optionalDependencies?.["@pfdsl/cli"];
-	if (declared === undefined) return null;
-	const installed = readJsonObject(
-		resolve(repoRoot, "node_modules/@pfdsl/cli/package.json"),
-	);
-	if (installed === UNREADABLE) {
-		return {
-			version: null,
-			reason:
-				"package.json declares @pfdsl/cli but node_modules/@pfdsl/cli/package.json could not be parsed.",
-		};
-	}
-	if (installed === ABSENT) {
-		// Yarn Plug'n'Play keeps packages in zip archives and leaves no
-		// node_modules, so an absent directory there is not "not installed".
-		if (existsSync(resolve(repoRoot, ".pnp.cjs"))) {
+// is a local absolute path. Returns null when no package.json between the
+// working directory and the project root declares @pfdsl/cli: nothing was
+// expected, so nothing is missing.
+//
+// In a monorepo the declaring package can sit below the project root, so the
+// nearest package.json that declares it wins. A package.json that cannot be
+// parsed stops the search: it may be the one that declares the CLI, and a
+// farther declaration would then describe a different package.
+/**
+ * @param {string} workingDirectory
+ * @param {string} projectRoot
+ */
+function readRepoCliVersion(workingDirectory, projectRoot) {
+	for (const directory of directoriesUpTo(workingDirectory, projectRoot)) {
+		const manifest = readJsonObject(resolve(directory, "package.json"));
+		if (manifest === ABSENT) continue;
+		if (manifest === UNREADABLE) {
 			return {
 				version: null,
 				reason:
-					"package.json declares @pfdsl/cli and the project uses Yarn Plug'n'Play, which has no node_modules to read the installed version from.",
+					"package.json could not be parsed, so whether it declares @pfdsl/cli is unknown.",
 			};
 		}
-		return {
-			version: null,
-			reason: isLocalSpec(declared)
-				? "package.json declares @pfdsl/cli as a local file or link spec, and node_modules/@pfdsl/cli is not installed."
-				: "package.json declares @pfdsl/cli but node_modules/@pfdsl/cli is not installed.",
-		};
-	}
-	const version = asIdentifier(installed.version);
-	return version === null
-		? {
+		// optionalDependencies install for the adopter like the other two, so they
+		// count as a declaration. peerDependencies are left out: they ask whoever
+		// consumes this package to provide @pfdsl/cli, so they do not install a CLI
+		// for this project.
+		const declared =
+			manifest.dependencies?.["@pfdsl/cli"] ??
+			manifest.devDependencies?.["@pfdsl/cli"] ??
+			manifest.optionalDependencies?.["@pfdsl/cli"];
+		if (declared === undefined) continue;
+		return (
+			readInstalledCliVersion(directory, projectRoot) ?? {
 				version: null,
-				reason:
-					"package.json declares @pfdsl/cli but node_modules/@pfdsl/cli/package.json carries no usable version.",
+				reason: isLocalSpec(declared)
+					? "package.json declares @pfdsl/cli as a local file or link spec, and node_modules/@pfdsl/cli is not installed."
+					: "package.json declares @pfdsl/cli but node_modules/@pfdsl/cli is not installed.",
 			}
-		: { version };
+		);
+	}
+	return null;
 }
 
 /**
@@ -312,7 +360,7 @@ export function collectReportEnvironment(skillRoot, options = {}) {
 	const workingDirectory = resolve(options.cwd ?? process.cwd());
 	const projectRoot =
 		repoRoot ?? resolveRepoRoot(workingDirectory) ?? workingDirectory;
-	const repoCli = readRepoCliVersion(projectRoot);
+	const repoCli = readRepoCliVersion(workingDirectory, projectRoot);
 	if (repoCli !== null && repoCli.version === null) {
 		recordFailure("repoCliVersion", repoCli.reason);
 	}
