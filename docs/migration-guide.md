@@ -10,15 +10,15 @@ Record both the installed and target CLI/plugin releases, including the bundle r
 Read the entries introduced after the installed release and through the target release, in release order; skip entries outside that interval.
 Changing a version number alone is not evidence that old local copies have been cleaned up.
 
-## Unreleased — after CLI/plugin v0.0.26
+## CLI/plugin v0.1.0 — after CLI/plugin v0.0.26
 
-This section covers changes through upstream commit `dc94909e` (2026-09-29), including specification versions v0.0.22–v0.0.26, and the D-layer declaration syntax that was changed after that commit ([ADR-0041](adr/0041-retro-d-layer-declaration-token.md)).
+This section covers the changes between CLI/plugin v0.0.26 and v0.1.0, including specification versions v0.0.22–v0.0.26.
 CLI/package versions and specification versions are separate.
-Confirm that your upgrade contains these changes; the released CLI tag v0.0.26 predates them, even if a development build reports the same package version.
-These instructions do not claim that a newer package has been published.
-The destination release is not yet assigned; do not infer one from the specification version.
-Release preparation must verify the full interval through its target commit and assign the destination release before publication.
+A development build made between these releases can report package version 0.0.26 while containing some of these changes; identify it by its bundle revision.
 The [specification history](spec/spec-history.md) provides additional technical context, not a substitute for this guide's CLI and workflow migration coverage.
+
+A dependency range written for 0.0.x, such as `^0.0.26`, does not admit 0.1.0.
+If the repository declares `@pfdsl/cli` in `package.json`, change the declared range to the target release.
 
 Before editing, record the installed CLI/plugin identity, the affected files, and validation results with the intended upgrade.
 Edit the adopting repository's sources, not plugin caches or generated distribution files.
@@ -92,6 +92,18 @@ If local instructions still defer `done` updates until after merging, update tho
 A body ID beginning with `-` must use quoted-ID syntax.
 Preserve the ID and check every reference when quoting it.
 Do not apply a blanket replacement to hyphens: frontmatter delimiters and edge operators are unrelated syntax.
+
+### Topological order (`meta sort --by topological`)
+
+The topological order now places every producer before its consumers by graph rank.
+Earlier releases ordered nodes by first appearance in the edge list, which could place a process after one that consumes its output.
+A file sorted with v0.0.26 can therefore fail `pfdsl meta sort --by topological --check` after the upgrade, although nobody edited it.
+The same order numbers nodes in `meta reindex`: the default run keeps existing `index:` values, but `--renumber` can assign different numbers than before.
+
+If the repository runs `meta sort --by topological --check`, run `pfdsl meta sort --by topological --write` on each reported file, review the reordered declarations, and commit them.
+Only declaration order changes; the graph does not.
+Verify that the check passes afterwards.
+Source commit: `6353f4c8`.
 
 ### Files reported as skipped on every deploy
 
@@ -210,9 +222,8 @@ Points to settle before enabling:
   This setting is GitHub's requirement for the pull-request step; the workflow file does not check it.
   A rule that blocks creating the `flow-sync/pending` branch also blocks the step.
 - The workflow installs the published `@pfdsl/cli` with an unpinned `npm install --no-save @pfdsl/cli`, and the sweep script stops at startup unless that CLI has the `delete` subcommand.
-  The script's own startup check records that `@pfdsl/cli` 0.0.26 and earlier lack `delete`, and the npm `latest` tag was still 0.0.26 on 2026-09-30.
-  Until a release that includes `delete` is published, each enabled run on the default branch of an adopting repository ends with that startup error.
-  Confirm which `@pfdsl/cli` release the workflow would resolve before you commit the deployed files.
+  `@pfdsl/cli` 0.0.26 and earlier lack `delete`; v0.1.0 is the first release that has it.
+  Because the install is unpinned, the workflow uses whatever release the npm `latest` tag names when it runs.
 - Once enabled, the script fails when `.pfdsl/roadmap.pfdsl` is missing or does not pass `check`, so enabling it in a repository without that file gives a failed run on every push to the default branch.
 - Deployment copies files only; it does not install runtime dependencies (the installer prints this).
   The workflow itself needs no dependency beyond the published CLI above.
