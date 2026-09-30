@@ -1,0 +1,14 @@
+{
+	"sweepCompletedChains": {
+		"enabled": true
+	},
+	"knowledgeLifecycleAudit": {
+		"mode": "adopt",
+		"targets": [
+			"the criteria of .pfdsl/roadmap.pfdsl",
+			".pfdsl/*.md companions",
+			"docs/adr/",
+			"docs/pfd_payoff_log.md"
+		]
+	}
+}

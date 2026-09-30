@@ -84,6 +84,7 @@ companion の一覧をここに再掲しないのは、上の表と二重管理�
 `bindings/<スキル名>.md` を読む規約を持つスキルの数だけ scaffold にファイルを用意する（内容が空でも実害のないファイル含む）。存在確認のコストは空ファイルでも実質変わらないため、都度作成でなく最初から揃えておく。
 bundle 同梱スキル全数ではない — 自分の binding を読まないスキルの分を置いても、誰も読まないファイルが採用リポに増えるだけである。
 スキルが新たに binding を読み始めたら、その時点で scaffold にも1ファイル追加する。
+採用リポの宣言のうち、切り替えや列挙のような値は binding に書かず、採用リポが git で管理する `.pfdsl/config.json` のキーに置く。binding には手順・判断基準・理由の散文を書き、値はそのキーを指す。値を機械的に検証でき、workflow やスクリプトと agent が同じ値を読むためである。新しい宣言を足すときも、値ならこのファイルにキーを足す。
 
 ## L3: バックエンド・プリセット
 
@@ -120,7 +121,7 @@ node <pfd-ops skill root>/scripts/check-install-sync.mjs --deploy
 - issue が一次情報。`roadmap.pfdsl` は依存構造のみ管理
 - process id は `iN_` prefix（N = issue 番号）。恒久 — issue close 後も剥がさない。出力 artifact id は最初から plain
 - `flow:managed` / `flow:exempt` ラベルで管理対象を分類
-- 未完了作業とその入出力を保って完了チェーンを回収する。デフォルトブランチへの push が `sweep-completed-chains.mjs` を起動して PR を提案し、マージは人が行う
+- 未完了作業とその入出力を保って完了チェーンを回収する。`.pfdsl/config.json` で有効にした採用リポでは、デフォルトブランチへの push が `sweep-completed-chains.mjs` を起動して PR を提案し、マージは人が行う
 - `audit-issues-flow.mjs` で読取専用の同期監査
 
 詳細: [`github-issues-backend.md`](github-issues-backend.md)
@@ -172,6 +173,7 @@ pfdsl 開発リポ固有の例:
 チェックの出力末尾が対応を名指しするため、その指示に従う。スクリプトは target の役割を分類し、`--deploy` が正しい向きの場合だけ案内するので、drift だけを根拠に反射的に deploy しない。GitHub Issues バックエンドを採用していないリポでは、未採用である旨と `--deploy` の案内が出る — これは報告であって指示ではない。そのリポが別のバックエンドを採用している、またはどれも採用していないなら、案内に従わず未採用のまま進む。
 
 素の `--deploy` はローカル編集がないファイルをコピーし、ローカル編集がない orphan を削除する。`--overwrite-local-edits` は残るパスのローカル編集を canonical で上書きし、`--delete-edited-orphans` は消えるパスのローカル編集ごと削除する。旧ファイルの掃除ではまず素の deploy を実行し、編集済みとして残ったパスだけについて追加 flag の要否を判断する。
+誰も編集していないのに同じファイルが deploy のたびに `Skipped` として残る場合は、旧版から更新した採用先に特有の状態である可能性がある。flag で上書きする前、また上流へ報告する前に、上流リポの [migration guide](https://github.com/takasek/pfdsl/blob/main/docs/migration-guide.md#files-reported-as-skipped-on-every-deploy) の該当節で確かめ方を確認する。
 
 `Possible renames` は canonical 側の rename が新旧パスの `missing` と `orphaned` に分かれて見えている状態を表す。新パスを信用する前に旧パスのローカル編集を引き継ぐ。
 

@@ -56,10 +56,12 @@ roadmap / workflow / pipeline の3種別（ADR-0017）に基づき、 プロジ�
 <scaffold>/bindings/pfd-retro-patterns/sample-pattern.md
 <scaffold>/bindings/pfd-ops.md
 <scaffold>/review-perspectives.md
+<scaffold>/config.json
 ```
 
 必要な種別のファイルだけを `.pfdsl/` にコピーする（不要な種別はコピーしない）。
 `bindings/pfd-retro.md`・`bindings/pfd-retro-patterns/`・`bindings/pfd-ops.md`・`review-perspectives.md` は種別と無関係（pfd-retro・pfd-ops スキルは全リポ共通で同梱される）— それぞれ `.pfdsl/bindings/pfd-retro.md`・`.pfdsl/bindings/pfd-retro-patterns/`・`.pfdsl/bindings/pfd-ops.md`・`.pfdsl/review-perspectives.md` として常にコピーする（`bindings/pfd-retro.md` がこのファイルを参照する）。
+`config.json` も種別と無関係で、`.pfdsl/config.json` として常にコピーする。採用リポの離散的な宣言（スイッチや一覧）を置くファイルで、雛形は pfd-retro の D 層を `decline` にしてある。
 `bindings/pfd-retro-patterns/` は事例・観察・反例の置き場で、`sample-pattern.md` は記録の見本を持つ（`bindings/pfd-retro.md` の「事例・観察・反例」節が保存と検索の方法を指す）。
 既に `.pfdsl/` にファイルが存在する場合は上書きしない。
 companion をどの言語で書くかは pfd-ops スキルの `references/architecture.md`「companion の記述言語」節に従う。
@@ -77,6 +79,7 @@ node <pfd-ops skill root>/scripts/check-install-sync.mjs --deploy
 `<pfd-ops skill root>` はステップ 3 と同じ規則で解決する（plugin: `${PLUGIN_ROOT}/skills/pfd-ops`、repo-local: `.agents/skills/pfd-ops`）。
 既導入リポでは同じコマンドが refresh になる — ローカル編集されたファイルは上書きせず警告するので、編集を捨てて上書きする場合のみユーザーに確認して `--overwrite-local-edits` を付ける（編集を抱えた旧ファイルを編集ごと削除するのは別フラグ `--delete-edited-orphans`。編集の無い旧ファイルはフラグ無しで削除される）。
 配置後は pfd-ops スキルの `references/github-issues-backend.md`「依存の準備と初回監査」に従い、依存の準備から監査実行まで進める。
+配置される completed-chain sweep の workflow は、`.pfdsl/config.json` で有効にしない限り動かない。有効にするかは同じ reference の「push 駆動の回収」節を示してユーザーに確認し、判断を config のキー `sweepCompletedChains` に残す。
 ファイル配置だけでは導入完了にならない。
 
 **リポ内 markdown ファイルで管理する場合**は、リポルートへの実配置手順は無い（GitHub Actions を使わないため）。バックエンド規約の詳細は pfd-ops スキルの `references/file-based-tracker-backend.md`。

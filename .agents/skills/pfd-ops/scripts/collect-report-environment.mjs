@@ -12,8 +12,8 @@
 // from "collection failed".
 
 import { spawnSync } from "node:child_process";
-import { existsSync, realpathSync } from "node:fs";
-import { dirname, resolve } from "node:path";
+import { existsSync, readFileSync, realpathSync } from "node:fs";
+import { dirname, isAbsolute, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { readManifest } from "./check-install-sync.mjs";
@@ -107,6 +107,149 @@ const MISSING_IDENTIFIERS = Object.freeze({
 	}),
 });
 
+const ABSENT = Symbol("absent");
+const UNREADABLE = Symbol("unreadable");
+
+// readJsonOrNull folds "no such file" and "not valid JSON" into one null, which
+// is exactly the distinction this collector has to keep. A file that parses to
+// something other than an object cannot be a package.json either.
+/** @param {string} path */
+function readJsonObject(path) {
+	if (!existsSync(path)) return ABSENT;
+	try {
+		const value = JSON.parse(readFileSync(path, "utf-8"));
+		const isObject =
+			typeof value === "object" && value !== null && !Array.isArray(value);
+		return isObject ? value : UNREADABLE;
+	} catch {
+		return UNREADABLE;
+	}
+}
+
+/** @param {unknown} declared */
+function isLocalSpec(declared) {
+	return typeof declared === "string" && /^(file|link|portal):/.test(declared);
+}
+
+/**
+ * @param {string} child
+ * @param {string} parent
+ */
+function isWithin(child, parent) {
+	const path = relative(parent, child);
+	return (
+		path === "" ||
+		(path !== ".." && !path.startsWith(`..${sep}`) && !isAbsolute(path))
+	);
+}
+
+// The directories from `start` up to `stop`, both included. A start outside
+// `stop` is not walked at all: the ascent never leaves the project root.
+/**
+ * @param {string} start
+ * @param {string} stop
+ */
+function directoriesUpTo(start, stop) {
+	const directories = [];
+	let current = isWithin(start, stop) ? start : stop;
+	for (;;) {
+		directories.push(current);
+		if (current === stop) return directories;
+		current = dirname(current);
+	}
+}
+
+// The version of the @pfdsl/cli that a package.json in `declaringDirectory`
+// resolves to. Node resolves a package through the nearest node_modules on the
+// way up, and a workspace package's dependency is usually hoisted to the
+// project root, so this ascends the same way — but only as far as the root.
+/**
+ * @param {string} declaringDirectory
+ * @param {string} projectRoot
+ */
+function readInstalledCliVersion(declaringDirectory, projectRoot) {
+	const directories = directoriesUpTo(declaringDirectory, projectRoot);
+	for (const directory of directories) {
+		const installed = readJsonObject(
+			resolve(directory, "node_modules/@pfdsl/cli/package.json"),
+		);
+		if (installed === ABSENT) continue;
+		if (installed === UNREADABLE) {
+			return {
+				version: null,
+				reason:
+					"package.json declares @pfdsl/cli but node_modules/@pfdsl/cli/package.json could not be parsed.",
+			};
+		}
+		const version = asIdentifier(installed.version);
+		return version === null
+			? {
+					version: null,
+					reason:
+						"package.json declares @pfdsl/cli but node_modules/@pfdsl/cli/package.json carries no usable version.",
+				}
+			: { version };
+	}
+	// Yarn Plug'n'Play keeps packages in zip archives and leaves no
+	// node_modules, so an absent directory there is not "not installed".
+	if (directories.some((d) => existsSync(resolve(d, ".pnp.cjs")))) {
+		return {
+			version: null,
+			reason:
+				"package.json declares @pfdsl/cli and the project uses Yarn Plug'n'Play, which has no node_modules to read the installed version from.",
+		};
+	}
+	return null;
+}
+
+// The CLI a repository pins is not necessarily the one on PATH, so the report
+// carries both. This reads the declaration and the installed package.json and
+// never runs the repo-local binary. The reasons it gives state a category and
+// never the declared value: they end up in a public issue, and a `file:` spec
+// is a local absolute path. Returns null when no package.json between the
+// working directory and the project root declares @pfdsl/cli: nothing was
+// expected, so nothing is missing.
+//
+// In a monorepo the declaring package can sit below the project root, so the
+// nearest package.json that declares it wins. A package.json that cannot be
+// parsed stops the search: it may be the one that declares the CLI, and a
+// farther declaration would then describe a different package.
+/**
+ * @param {string} workingDirectory
+ * @param {string} projectRoot
+ */
+function readRepoCliVersion(workingDirectory, projectRoot) {
+	for (const directory of directoriesUpTo(workingDirectory, projectRoot)) {
+		const manifest = readJsonObject(resolve(directory, "package.json"));
+		if (manifest === ABSENT) continue;
+		if (manifest === UNREADABLE) {
+			return {
+				version: null,
+				reason:
+					"package.json could not be parsed, so whether it declares @pfdsl/cli is unknown.",
+			};
+		}
+		// optionalDependencies install for the adopter like the other two, so they
+		// count as a declaration. peerDependencies are left out: they ask whoever
+		// consumes this package to provide @pfdsl/cli, so they do not install a CLI
+		// for this project.
+		const declared =
+			manifest.dependencies?.["@pfdsl/cli"] ??
+			manifest.devDependencies?.["@pfdsl/cli"] ??
+			manifest.optionalDependencies?.["@pfdsl/cli"];
+		if (declared === undefined) continue;
+		return (
+			readInstalledCliVersion(directory, projectRoot) ?? {
+				version: null,
+				reason: isLocalSpec(declared)
+					? "package.json declares @pfdsl/cli as a local file or link spec, and node_modules/@pfdsl/cli is not installed."
+					: "package.json declares @pfdsl/cli but node_modules/@pfdsl/cli is not installed.",
+			}
+		);
+	}
+	return null;
+}
+
 /**
  * @param {string} skillRoot
  * @param {(from: string) => string | null} resolveRepoRoot
@@ -137,12 +280,14 @@ function detectInstallation(skillRoot, resolveRepoRoot) {
  * @param {{
  *   runCommand?: (command: string, args: string[]) => string | null,
  *   findRepoRootOrNull?: (from: string) => string | null,
+ *   cwd?: string,
  * }} [options]
  */
 export function collectReportEnvironment(skillRoot, options = {}) {
+	const resolveRepoRoot = options.findRepoRootOrNull ?? findRepoRootOrNull;
 	const { installation, bundleRoot, repoRoot } = detectInstallation(
 		skillRoot,
-		options.findRepoRootOrNull ?? findRepoRootOrNull,
+		resolveRepoRoot,
 	);
 	const unavailable = [];
 	const missing = MISSING_IDENTIFIERS[installation] ?? {};
@@ -217,6 +362,30 @@ export function collectReportEnvironment(skillRoot, options = {}) {
 			"`pfdsl --version` did not run, or returned no output.",
 		);
 	}
+	// A plugin installation has no checkout above its skill root, so the
+	// working directory decides which project this is: the checkout that
+	// contains it, or the directory itself outside any checkout. The bundle root
+	// is never used as the project. A working directory inside it means the
+	// collector was run from the plugin cache, where whatever package.json turns
+	// up describes the bundle rather than an adopting project, so no project is
+	// identified and that is reported instead.
+	const workingDirectory = resolve(options.cwd ?? process.cwd());
+	const isPluginBundle =
+		installation === "claude-plugin" || installation === "codex-plugin";
+	const repoCli =
+		isPluginBundle && isWithin(workingDirectory, bundleRoot)
+			? {
+					version: null,
+					reason:
+						"The working directory is inside the plugin bundle, so no adopting project could be identified.",
+				}
+			: readRepoCliVersion(
+					workingDirectory,
+					repoRoot ?? resolveRepoRoot(workingDirectory) ?? workingDirectory,
+				);
+	if (repoCli !== null && repoCli.version === null) {
+		recordFailure("repoCliVersion", repoCli.reason);
+	}
 	const repoCommit =
 		repoRoot === null
 			? null
@@ -233,6 +402,7 @@ export function collectReportEnvironment(skillRoot, options = {}) {
 		pluginVersion,
 		bundleContentHash,
 		cliVersion,
+		...(repoCli === null ? {} : { repoCliVersion: repoCli.version }),
 		repoCommit,
 		installProvenance,
 		unavailable,
