@@ -107,9 +107,16 @@ const MISSING_IDENTIFIERS = Object.freeze({
 	}),
 });
 
+/** @param {unknown} declared */
+function isLocalSpec(declared) {
+	return typeof declared === "string" && /^(file|link|portal):/.test(declared);
+}
+
 // The CLI a repository pins is not necessarily the one on PATH, so the report
 // carries both. This reads the declaration and the installed package.json and
-// never runs the repo-local binary. Returns null when the repository does not
+// never runs the repo-local binary. The reasons it gives state a category and
+// never the declared value: they end up in a public issue, and a `file:` spec
+// is a local absolute path. Returns null when the repository does not
 // declare @pfdsl/cli at all: nothing was expected, so nothing is missing.
 /** @param {string} repoRoot */
 function readRepoCliVersion(repoRoot) {
@@ -124,14 +131,17 @@ function readRepoCliVersion(repoRoot) {
 	if (installed === null) {
 		return {
 			version: null,
-			reason: `package.json declares @pfdsl/cli ${JSON.stringify(declared)} but node_modules/@pfdsl/cli is not installed.`,
+			reason: isLocalSpec(declared)
+				? "package.json declares @pfdsl/cli as a local file or link spec, and node_modules/@pfdsl/cli is not installed."
+				: "package.json declares @pfdsl/cli but node_modules/@pfdsl/cli is not installed.",
 		};
 	}
 	const version = asIdentifier(installed.version);
 	return version === null
 		? {
 				version: null,
-				reason: `package.json declares @pfdsl/cli ${JSON.stringify(declared)} but node_modules/@pfdsl/cli/package.json carries no usable version.`,
+				reason:
+					"package.json declares @pfdsl/cli but node_modules/@pfdsl/cli/package.json carries no usable version.",
 			}
 		: { version };
 }

@@ -274,8 +274,70 @@ describe("collectReportEnvironment", () => {
 				({ field }) => field === "repoCliVersion",
 			);
 			assert.ok(failure, "repoCliVersion should be recorded as unavailable");
-			assert.match(failure.reason, /\^0\.0\.26/);
 			assert.match(failure.reason, /not installed/);
+		});
+
+		// The reason ends up in a public upstream issue, so it states the category
+		// of the failure and never the declared value, which can be a local path.
+		it("never puts the declared spec in the unavailable reason", () => {
+			for (const spec of [
+				"file:/Users/someone/private/x.tgz",
+				"link:../secret-checkout/packages/cli",
+				"^0.0.26",
+			]) {
+				for (const installed of [null, { version: "" }]) {
+					const { repoRoot, skillRoot } = adopter();
+					writeJson(join(repoRoot, "package.json"), {
+						devDependencies: { "@pfdsl/cli": spec },
+					});
+					rmSync(join(repoRoot, "node_modules"), {
+						recursive: true,
+						force: true,
+					});
+					if (installed !== null) {
+						writeJson(
+							join(repoRoot, "node_modules/@pfdsl/cli/package.json"),
+							installed,
+						);
+					}
+
+					const env = collectReportEnvironment(skillRoot, {
+						runCommand: pathCli,
+					});
+
+					const { reason } = env.unavailable.find(
+						({ field }) => field === "repoCliVersion",
+					);
+					for (const leaked of [
+						"someone",
+						"private",
+						"secret",
+						"0.0.26",
+						"x.tgz",
+					]) {
+						assert.ok(
+							!reason.includes(leaked),
+							`reason for ${spec} leaks ${JSON.stringify(leaked)}: ${reason}`,
+						);
+					}
+				}
+			}
+		});
+
+		it("names a local file or link spec as a category when it is not installed", () => {
+			const { repoRoot, skillRoot } = adopter();
+			writeJson(join(repoRoot, "package.json"), {
+				devDependencies: { "@pfdsl/cli": "file:/Users/someone/x.tgz" },
+			});
+
+			const env = collectReportEnvironment(skillRoot, {
+				runCommand: pathCli,
+			});
+
+			assert.match(
+				env.unavailable.find(({ field }) => field === "repoCliVersion").reason,
+				/local file or link/,
+			);
 		});
 
 		it("records repoCliVersion as unavailable when the installed package carries no usable version", () => {
