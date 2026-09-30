@@ -3,9 +3,55 @@ import { describe, it } from "node:test";
 import {
 	findForwardRefMarkers,
 	findImplementsMarkers,
+	forEachNonFencedLine,
 	formatResolvedForwardRefs,
 	matchResolvedForwardRefs,
 } from "./forward-ref-marker-check.mjs";
+
+describe("forEachNonFencedLine", () => {
+	const visited = (lines) => {
+		const seen = [];
+		forEachNonFencedLine(lines.join("\n"), (line) => seen.push(line));
+		return seen;
+	};
+
+	it("keeps a fence open through a line of the other fence character", () => {
+		assert.deepEqual(visited(["```", "~~~", "inside", "```", "outside"]), [
+			"outside",
+		]);
+		assert.deepEqual(visited(["~~~", "```", "inside", "~~~", "outside"]), [
+			"outside",
+		]);
+	});
+
+	it("closes a fence only with a run at least as long as the opener", () => {
+		assert.deepEqual(visited(["````", "```", "inside", "````", "outside"]), [
+			"outside",
+		]);
+		assert.deepEqual(visited(["```", "inside", "````", "outside"]), [
+			"outside",
+		]);
+	});
+
+	it("does not close a fence on a line that carries text after the marker", () => {
+		assert.deepEqual(visited(["```", "```js", "inside", "```", "outside"]), [
+			"outside",
+		]);
+	});
+
+	it("opens a fence with an info string", () => {
+		assert.deepEqual(visited(["```md", "inside", "```", "outside"]), [
+			"outside",
+		]);
+	});
+
+	it("does not open a fence on a backtick run that contains another backtick", () => {
+		assert.deepEqual(visited(["```code``` text", "outside"]), [
+			"```code``` text",
+			"outside",
+		]);
+	});
+});
 
 describe("findForwardRefMarkers", () => {
 	it("finds a single marker", () => {

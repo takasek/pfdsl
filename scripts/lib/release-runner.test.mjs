@@ -472,6 +472,35 @@ describe("publishRelease", () => {
 		assert.match(notice, /roadmap PR/);
 	});
 
+	it("tells the release gates which kind of release is being published", () => {
+		for (const kindArg of ["cli", "libs", "vscode"]) {
+			const root = packageRoot(kindArg);
+			const trace = cliTrace();
+			const seen = [];
+			try {
+				assert.throws(
+					() =>
+						publishRelease({
+							root,
+							kindArg,
+							commit: SHA,
+							...trace,
+							capture: (cmd, args) =>
+								args[0] === "ls-remote" ? "" : trace.capture(cmd, args),
+							runReleaseGates: (_root, options) => {
+								seen.push(options.kind);
+								throw new Error("stop after the gates");
+							},
+						}),
+					/stop after the gates/,
+				);
+			} finally {
+				rmSync(root, { recursive: true, force: true });
+			}
+			assert.deepEqual(seen, [kindArg]);
+		}
+	});
+
 	it("watches the exact CLI workflow run and only displays ready candidates", () => {
 		const root = packageRoot("cli");
 		const trace = cliTrace();

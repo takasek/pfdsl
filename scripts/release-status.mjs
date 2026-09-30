@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 // Checks published versions of all packages against local package.json
 // versions, plus the release gates that run nowhere else (distribution
-// review currency and spec-history currency).
+// review currency, spec-history currency, and the migration guide's Unreleased
+// section, which is shown here but only blocks a CLI/plugin release).
 // Usage: node scripts/release-status.mjs
 // Exit 1 if anything is left to do before the next publication — see
 // needsAction in lib/release-status-check.mjs for what that covers.

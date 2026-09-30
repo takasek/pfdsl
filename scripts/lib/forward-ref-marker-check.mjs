@@ -13,23 +13,36 @@ import { isHeading } from "./markdown-heading.mjs";
 
 const FORWARD_REF_RE = /\[\[SPEC_([A-Za-z0-9_]+)\?\]\]/g;
 const IMPLEMENTS_TRAILING_RE = /\(SPEC_([A-Za-z0-9_]+)\)\s*$/;
-const FENCE_RE = /^(```|~~~)/;
+// A run of three or more backticks or tildes at the start of a line. A backtick fence's info string cannot contain a backtick, or the line is inline code rather than a fence.
+const FENCE_OPEN_RE = /^(`{3,}(?!.*`)|~{3,})/;
+const FENCE_CLOSE_RE = /^(`{3,}|~{3,})\s*$/;
 
 /**
+ * Visits each line outside a fenced code block. A fence closes only on a line
+ * of the opener's character, at least as long as the opener, with nothing after
+ * it (CommonMark), so a differing marker or a shorter run inside a block does
+ * not end it. Fences indented under a list item are not recognized.
  * @param {string} text
  * @param {(line: string, lineNumber: number, hits: Array<{line: number, id: string}>) => void} visit
  */
 export function forEachNonFencedLine(text, visit) {
 	const lines = text.split("\n");
-	let inFence = false;
+	let fence = null;
 	for (let i = 0; i < lines.length; i++) {
 		const line = lines[i];
-		if (FENCE_RE.test(line)) {
-			inFence = !inFence;
+		if (fence === null) {
+			const open = FENCE_OPEN_RE.exec(line);
+			if (open) {
+				fence = open[1];
+				continue;
+			}
+			visit(line, i + 1);
 			continue;
 		}
-		if (inFence) continue;
-		visit(line, i + 1);
+		const close = FENCE_CLOSE_RE.exec(line);
+		if (close && close[1][0] === fence[0] && close[1].length >= fence.length) {
+			fence = null;
+		}
 	}
 }
 

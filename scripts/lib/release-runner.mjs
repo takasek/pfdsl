@@ -134,7 +134,7 @@ function assertMainAtCommit(capture, root, commit) {
 	}
 }
 
-function runChecks({ root, run, tryRun, runReleaseGates }) {
+function runChecks({ root, kindArg, run, tryRun, runReleaseGates }) {
 	for (const args of [["build"], ["test"], ["check-docs"], ["gen-plugin"]]) {
 		callRun(run, root, "make", args);
 	}
@@ -146,6 +146,7 @@ function runChecks({ root, run, tryRun, runReleaseGates }) {
 
 	for (const gate of runReleaseGates(root, {
 		mode: "release",
+		kind: kindArg,
 		stopOnFailure: true,
 		exec: (file, args, options) =>
 			tryRun(file, args, { cwd: root, ...options }),
@@ -429,7 +430,7 @@ export function publishRelease({
 	if (!remoteAlreadyPublished) {
 		callRun(run, root, "git", ["fetch", "origin", "main", "--quiet"]);
 		assertMainAtCommit(capture, root, commit);
-		runChecks({ root, run, tryRun, runReleaseGates });
+		runChecks({ root, kindArg, run, tryRun, runReleaseGates });
 		assertFinalSnapshot(capture, run, root, commit);
 
 		if (kindArg === "vscode") {

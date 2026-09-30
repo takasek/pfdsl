@@ -241,22 +241,27 @@ drift 検査は pre-commit（`gen-install` の check_drift。他の drift 検査
 1. 前回の対応する公開 tag（CLI/plugin は `v[0-9]*`、ライブラリは `lib-v*`、拡張は `vscode-v*`）から公開対象 SHA までの、配布物に触れたコミットを列挙する。`v*` は `vscode-v*` にも一致するので使わない。
 
    ```sh
-   git log --no-merges --format='%h %s' <前回の公開 tag>..<公開対象 SHA> -- \
-     plugin/pfdsl plugin/pfdsl-codex packages/ docs/spec/
+   node scripts/list-migration-candidates.mjs --from <前回の公開 tag> --to <公開対象 SHA>
    ```
 
+   `--to` を省くと `HEAD` までを列挙する。
+   このスクリプトは、マージコミットを除いた `<hash> <subject>` を、`DISTRIBUTION_ROOTS`・`packages/`・`docs/spec/` のいずれかに触れたものだけ出力する。
+   対象パスは `scripts/lib/migration-candidates.mjs` が `DISTRIBUTION_ROOTS` から組み立てるので、ルートを変えても手作業での同期は要らない。
    配布物の一次情報は `scripts/lib/distribution-review.mjs` の `DISTRIBUTION_ROOTS`（配布 bundle のルート）と、`scripts/lib/distribution-sources.mjs` の `GENERATED_DISTRIBUTION_SOURCES`（生成物と生成元の対応）である。
    手書きの生成元は、pre-commit と CI の同一性検査により生成物と同じ変更で更新される。
    そのため生成物のルートを指定すれば、スキル・コマンド・agent・hook・scaffold・`install/` の生成元の一覧をここへ複製せずに拾える。
    生成器だけを変えて出力だけが変わったコミットも、生成物のルートで拾える。
    `packages/` と `docs/spec/` は CLI と仕様の変更を拾うために加える。
-   `DISTRIBUTION_ROOTS` を変えたら上のコマンドも合わせる。
-2. 列挙した各コミットを、採用先の作業を要するもの（ファイル・呼出し・運用設定・診断の扱いの変更）と、要さないものに分ける。分類の手段は問わないが、分類そのものを人が確認する。
+2. 列挙した各コミットを、採用先の作業を要するもの（ファイル・呼出し・運用設定・診断の扱いの変更）と、要さないものに分ける。分類の手段は問わないが、分類そのものを人が確認する。同じ区間の後のコミットで取り消された・上書きされた変更は、コミット単体でなく区間全体の差分で要否を判断する。
 3. 要するものごとに、旧挙動、該当条件、必要操作、検証方法、根拠 issue/commit をガイドの項目に書く。
-4. 未公開項目を実際の公開先の版へ対応付け、CLI/plugin・ライブラリ・拡張と仕様の版を混同しない。複数版を飛ばす更新でも対象区間の項目を順に選べること、旧節とリンクを保持することを確認する。
+4. 未公開項目を実際の公開先の版へ対応付け、CLI/plugin・ライブラリ・拡張と仕様の版を混同しない。複数版を飛ばす更新でも対象区間の項目を順に選べること、旧節とリンクを保持することを確認する。未公開の時点の状態に依存する記述（公開先の版が未定であること、npm の `latest` の版、未公開の変更を取得する方法等）は、公開時点の事実へ書き換える。
 5. 要するコミットが無い公開では、対象区間と、全コミットを分類して影響なしと確認したことを公開準備の既存記録へ残す。
 
-これは公開判断の必須確認であり、現行の `make release-status` や release runner が内容の網羅性を自動判定するという意味ではない。
+これは公開判断の必須確認である。
+release runner の `migration-guide` ゲートが CLI/plugin の公開で確かめるのは、`docs/migration-guide.md` に、CLI/plugin を名指すレベル2の見出しのうち `Unreleased` で始まるもの（大文字小文字は区別しない）が残っていないことだけで、列挙したコミットが漏れなく分類されたかは判定しない。
+見出しは、手順 4 で実際の公開先の版へ書き換えると解消する。
+ライブラリと拡張の公開は、この見出しが残っていても止めない。
+`make release-status` は同じ見出しが残っていることを表示するが、失敗にはしない。
 リリースノートを作る場合は該当節へリンクする。
 
 最終差分レビューでは、ガイドの対象区間、正本のリンク、必要な知見を保存したまま旧経路を終了できることを確認する。
