@@ -9,9 +9,9 @@ PFD の作業項目を GitHub Issues で管理する流儀。pfdsl 固有では�
 - **id 規約**: issue に対応する作業の process id は `iN_` prefix（N = issue 番号）。**恒久** — issue close 後も剥がさない。同一 process が複数 issue に対応する場合は `i40_i41_do_work` のように連結する。対応する出力 artifact の id は最初から plain（prefix なし）。**まだ issue が無いプロセスは plain の id で置く** — `work-cycle.md` の成果物の門番が要求するプレースホルダ後続プロセスは、起票より先にグラフへ入る。採番できない番号を捏造せず、起票時に `iN_` を付けてリネームする。この状態は `check` を通ってしまい機械検出されないので、逸脱として `roadmap.md` に書き残す
 - **ラベル**: roadmap 登録 issue は `flow:managed`、対象外は `flow:exempt`（判定は「ラベル判定基準」節）
 - **updated_at**: 同期時点の GitHub `updatedAt` スナップショット
-- **issue close と進捗**: close は status を動かす契機にしない。成果物の完了判断と status 更新は `work-cycle.md` の完了根拠に従う。未実装のまま廃止する場合も、未完了作業が必要とする入力を保存し、代替や廃止の判断を依存構造へ反映する。デフォルトブランチへの push が起動するのは下の完了チェーン回収だけで、それも PR を提案するところまでであり、マージは人が行う
+- **issue close と進捗**: close は status を動かす契機にしない。成果物の完了判断と status 更新は `work-cycle.md` の完了根拠に従う。未実装のまま廃止する場合も、未完了作業が必要とする入力を保存し、代替や廃止の判断を依存構造へ反映する。デフォルトブランチへの push が起動するのは下の完了チェーン回収（`.pfdsl/config.json` で有効にした場合）だけで、それも PR を提案するところまでであり、マージは人が行う
 - **完了チェーン回収**: roadmap に残すのは、(a) done でない artifact を出力する process と、(b) その入出力として edge に現れる artifact である。(b) に入る done artifact は ready/blocked 判定の入力として残す。完了履歴は closed issue・git 履歴・決定記録・公開レジストリが持つ。`status list <file> --status todo,wip,waiting,suspended` で done でない artifact を列挙し、各 artifact の `graph neighbors <file> <artifact-id>` の `predecessors` から (a) を求める。続けて各 process の `graph neighbors` の `predecessors` と `successors` から (b) を求め、その外側のノード・edge と残存 `revises:` 参照を整理する。削除前後で `status ready <file> --json` と `status blocked <file> --json` の**出力全体**を比較し、`check` と `graph orphans` を確認する。id 集合だけの比較では、ready のまま入力が減る破損を検出できない。
-  この導出・削除・検証の全体を `scripts/pfdsl/sweep-completed-chains.mjs <file>` が行う。`--write` なしでは削除対象を列挙するだけで、`--write` を付けても上の検証が全て通るまでファイルを書き換えない。デフォルトブランチへ push があると `.github/workflows/pfdsl-sweep-completed-chains.yml` がこれを実行し、差分があれば PR を起票する。マージは人が行うので、グラフはレビューを経ない書換えを受けない。
+  この導出・削除・検証の全体を `scripts/pfdsl/sweep-completed-chains.mjs <file>` が行う。`--write` なしでは削除対象を列挙するだけで、`--write` を付けても上の検証が全て通るまでファイルを書き換えない。`.pfdsl/config.json` で有効にした採用リポでは、デフォルトブランチへ push があると `.github/workflows/pfdsl-sweep-completed-chains.yml` がこれを実行し、差分があれば PR を起票する。マージは人が行うので、グラフはレビューを経ない書換えを受けない。
   回収可否の判定はデフォルトブランチだけを読む。まだマージされていないブランチが done artifact を入力に取る process を足していた場合、その組合せはどちらの側からも見えない。統合の時点で「宣言のない id を edge が指す」形になり、roadmap の不変条件がそこで弾く
 
 ## ラベル判定基準
@@ -56,7 +56,7 @@ Closes #<issue番号>
 
 ## push 駆動の回収（pfdsl-sweep-completed-chains）
 
-デフォルトブランチへ push されると `.github/workflows/pfdsl-sweep-completed-chains.yml` が `scripts/pfdsl/sweep-completed-chains.mjs .pfdsl/roadmap.pfdsl --write` を実行し、差分があれば `flow-sync/pending` ブランチへ PR を起票する。回収が読むのはデフォルトブランチの roadmap だけで、それが変わるのは push のときだからである。issue close は status を動かさないので、close 契機は push 契機に包含される。bot はデフォルトブランチへ直接書かず、マージは人が行う。
+有効にした採用リポでは、デフォルトブランチへ push されると `.github/workflows/pfdsl-sweep-completed-chains.yml` が `scripts/pfdsl/sweep-completed-chains.mjs .pfdsl/roadmap.pfdsl --write` を実行し、差分があれば `flow-sync/pending` ブランチへ PR を起票する。回収が読むのはデフォルトブランチの roadmap だけで、それが変わるのは push のときだからである。issue close は status を動かさないので、close 契機は push 契機に包含される。bot はデフォルトブランチへ直接書かず、マージは人が行う。
 回収は採用リポの `.pfdsl/config.json` が `{"sweepCompletedChains": {"enabled": true}}` を宣言したときだけ行う。
 宣言が無い、または `enabled` が真偽値の `true` でなければ、workflow は checkout の直後に無効である旨を通知して何もせず成功で終わる。`.pfdsl/config.json` が JSON として読めない、または値の形が違う場合は失敗する。
 workflow ファイル自体は他の配置ファイルとともに commit してよい。有効にするかどうかは所有者が判断し、その判断をこのキーに残す。

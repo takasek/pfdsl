@@ -79,6 +79,7 @@ node <pfd-ops skill root>/scripts/check-install-sync.mjs --deploy
 `<pfd-ops skill root>` はステップ 3 と同じ規則で解決する（plugin: `${PLUGIN_ROOT}/skills/pfd-ops`、repo-local: `.agents/skills/pfd-ops`）。
 既導入リポでは同じコマンドが refresh になる — ローカル編集されたファイルは上書きせず警告するので、編集を捨てて上書きする場合のみユーザーに確認して `--overwrite-local-edits` を付ける（編集を抱えた旧ファイルを編集ごと削除するのは別フラグ `--delete-edited-orphans`。編集の無い旧ファイルはフラグ無しで削除される）。
 配置後は pfd-ops スキルの `references/github-issues-backend.md`「依存の準備と初回監査」に従い、依存の準備から監査実行まで進める。
+配置される completed-chain sweep の workflow は、`.pfdsl/config.json` で有効にしない限り動かない。有効にするかは同じ reference の「push 駆動の回収」節を示してユーザーに確認し、判断を config のキー `sweepCompletedChains` に残す。
 ファイル配置だけでは導入完了にならない。
 
 **リポ内 markdown ファイルで管理する場合**は、リポルートへの実配置手順は無い（GitHub Actions を使わないため）。バックエンド規約の詳細は pfd-ops スキルの `references/file-based-tracker-backend.md`。

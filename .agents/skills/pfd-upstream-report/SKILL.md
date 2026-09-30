@@ -72,9 +72,10 @@ PLUGIN_ROOT は plugin ロード時に実パスへ置換される変数（`${PLU
 出力は JSON で、`installation`（`claude-plugin` / `codex-plugin` / `repo-local` / `upstream-checkout` / `unknown`）・`pluginVersion`・`bundleContentHash`・`cliVersion`・`repoCommit`・`installProvenance`・`unavailable` を持つ。
 `cliVersion` は PATH 上の `pfdsl --version` の結果である。
 採用リポの `package.json` が `@pfdsl/cli` を `dependencies`・`devDependencies`・`optionalDependencies` のいずれかで宣言している場合に限り、`repoCliVersion`（入っている `@pfdsl/cli` の版）が加わる。
-宣言はあるが版を読めない場合（未インストール、`package.json` が壊れている等）は、理由を付けて `unavailable` に載る。
+宣言を探すのは作業ディレクトリからプロジェクトのルートまでの `package.json` で、最も近い宣言を使う。
+宣言はあるが版を読めない場合（未インストール等）や、`package.json` が壊れていて宣言の有無が分からない場合は、理由を付けて `unavailable` に載る。
 宣言が無ければ `repoCliVersion` は出力に現れない。
-plugin 構成では、採用リポを作業ディレクトリから決める（作業ディレクトリを含む git のトップレベル、git の外なら作業ディレクトリそのもの）。そのためスクリプトは採用リポのディレクトリで実行する。
+plugin 構成では、プロジェクトのルートも作業ディレクトリから決める（作業ディレクトリを含む git のトップレベル、git の外なら作業ディレクトリそのもの）。いずれの構成でも、スクリプトは採用リポのディレクトリで実行する。
 `installProvenance` は installer が有効と認めた entry（`path` と `hash` の組）の配列で、repo-local 以外の形態では常に `null` になる。
 `unavailable` は `{ field, reason }` の配列である。
 取得できた項目と `unavailable` の全件を、そのまま issue 本文の環境ブロックへ載せる。
