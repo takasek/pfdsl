@@ -67,6 +67,93 @@ function runGate(args = []) {
 	);
 }
 
+describe("gate-check package typechecks", () => {
+	function addPackage(pkg, source) {
+		const dir = join(fixture, "packages", pkg);
+		mkdirSync(dir, { recursive: true });
+		symlinkSync(
+			join(fixture, "node_modules"),
+			join(dir, "node_modules"),
+			"dir",
+		);
+		writeFileSync(
+			join(dir, "package.json"),
+			JSON.stringify({
+				name: pkg === "vscode-extension" ? "pfdsl" : `@pfdsl/${pkg}`,
+				scripts: { typecheck: "tsgo --noEmit" },
+			}),
+		);
+		writeFileSync(
+			join(dir, "tsconfig.json"),
+			JSON.stringify({
+				compilerOptions: { types: [], strict: true },
+				include: ["*.ts"],
+			}),
+		);
+		writeFileSync(join(dir, "example.test.ts"), source);
+		// Keep fixture-only manifests out of the branch diff; this suite changes test sources.
+		git(["add", `packages/${pkg}/example.test.ts`]);
+	}
+	beforeEach(() => {
+		mkdirSync(join(fixture, "node_modules/@typescript"));
+		symlinkSync(
+			realpathSync(join(root, "node_modules/@typescript/native-preview")),
+			join(fixture, "node_modules/@typescript/native-preview"),
+			"dir",
+		);
+		writeFileSync(
+			join(fixture, "pnpm-workspace.yaml"),
+			"packages:\n  - 'packages/*'\n",
+		);
+		symlinkSync(
+			join(root, "node_modules/.bin"),
+			join(fixture, "node_modules/.bin"),
+			"dir",
+		);
+	});
+	for (const pkg of ["core", "cli", "vscode-extension"]) {
+		it(`fails the gate for a real ${pkg} test-file type error`, () => {
+			addPackage(
+				pkg,
+				"function normalize(document: string, options: object) {}\nnormalize('document');\n",
+			);
+			git(["commit", "-m", "test: add package type error"]);
+			const typecheck = spawnSync(
+				"pnpm",
+				["--filter", `./packages/${pkg}`, "typecheck"],
+				{ cwd: fixture, encoding: "utf8" },
+			);
+			assert.equal(typecheck.status, 1, typecheck.stdout + typecheck.stderr);
+			assert.match(typecheck.stdout, /TS2554/);
+			const result = runGate();
+			assert.equal(result.status, 1, result.stdout + result.stderr);
+			assert.match(result.stdout, new RegExp(`FAIL ${pkg} typecheck`));
+		});
+	}
+	it("passes changed packages and skips the unchanged extension", () => {
+		for (const pkg of ["core", "cli"])
+			addPackage(pkg, "export const value: number = 1;\n");
+		git(["commit", "-m", "test: add valid packages"]);
+		const result = runGate();
+		assert.equal(result.status, 0, result.stdout + result.stderr);
+		assert.match(result.stdout, /PASS core typecheck/);
+		assert.match(result.stdout, /PASS cli typecheck/);
+		assert.match(result.stdout, /SKIP vscode-extension typecheck/);
+	});
+	it("checks a package when its only change deletes a file", () => {
+		addPackage("core", "export const value: number = 1;\n");
+		writeFileSync(join(fixture, "packages/core/obsolete.ts"), "export {};\n");
+		git(["add", "packages/core/obsolete.ts"]);
+		git(["commit", "-m", "test: establish package"]);
+		git(["push", "origin", "HEAD:main"]);
+		git(["rm", "packages/core/obsolete.ts"]);
+		git(["commit", "-m", "test: delete obsolete file"]);
+		const result = runGate();
+		assert.equal(result.status, 0, result.stdout + result.stderr);
+		assert.match(result.stdout, /PASS core typecheck/);
+	});
+});
+
 describe("gate-check record recovery", () => {
 	for (const message of [
 		"fix: correct value",
