@@ -13,6 +13,7 @@ import {
 	formatCycleWindowReport,
 	genPluginIdentityStep,
 	outputArtifactStatusStep,
+	packageTypecheckSteps,
 	triggerPathsSince,
 	wipTransitionStep,
 } from "./gate-check-steps.mjs";
@@ -39,6 +40,61 @@ function fakeExec(responses = {}) {
 }
 
 const ROADMAP = ".pfdsl/roadmap.pfdsl";
+describe("packageTypecheckSteps", () => {
+	for (const pkg of ["core", "cli", "vscode-extension"]) {
+		it(`checks changed ${pkg} test files and skips other packages`, () => {
+			const { exec, calls } = fakeExec();
+			const rows = packageTypecheckSteps({
+				exec,
+				triggerPaths: [`packages/${pkg}/src/example.test.ts`],
+			});
+			assert.deepEqual(calls, [`pnpm --filter ./packages/${pkg} typecheck`]);
+			assert.equal(
+				rows.find((row) => row.name === `${pkg} typecheck`).status,
+				"PASS",
+			);
+			assert.equal(rows.filter((row) => row.status === "SKIP").length, 2);
+		});
+	}
+	it("skips unrelated paths and package-name prefixes without executing commands", () => {
+		const { exec, calls } = fakeExec();
+		const rows = packageTypecheckSteps({
+			exec,
+			triggerPaths: [
+				"scripts/gate-check.mjs",
+				"packages/core-extra/src/index.ts",
+				"packages/cli-extra/package.json",
+			],
+		});
+		assert.equal(
+			rows.every((row) => row.status === "SKIP"),
+			true,
+		);
+		assert.deepEqual(calls, []);
+	});
+	it("reports type errors and still checks the remaining changed packages", () => {
+		const { exec, calls } = fakeExec({
+			"pnpm --filter ./packages/core": {
+				ok: false,
+				out: "formatter.test.ts: TS2554: Expected 2 arguments, but got 1.\n",
+			},
+		});
+		const rows = packageTypecheckSteps({
+			exec,
+			triggerPaths: [
+				"packages/core/src/formatter.test.ts",
+				"packages/cli/package.json",
+			],
+		});
+		assert.deepEqual(calls, [
+			"pnpm --filter ./packages/core typecheck",
+			"pnpm --filter ./packages/cli typecheck",
+		]);
+		assert.equal(rows[0].status, "FAIL");
+		assert.match(rows[0].detail, /TS2554/);
+		assert.equal(rows[1].status, "PASS");
+	});
+});
 const frontmatter = (body) => `---\n${body}\n---\n`;
 describe("genPluginIdentityStep", () => {
 	it("skips when no skill, plugin or install-source path changed", () => {

@@ -23,13 +23,11 @@ import {
 	formatGateTable,
 	formatRunTreeLine,
 	formatSizeDelta,
-	matchesTrigger,
 	parseAuditExternalTerminals,
 	parseAuditTerminals,
 	parseInputConsumedArtifacts,
 	partitionNewTerminals,
 	sharesSiblingIdNamespace,
-	VSCODE_EXT_TRIGGER,
 } from "./lib/gate-check.mjs";
 import {
 	analyzeAdoptedPfdsl,
@@ -42,6 +40,7 @@ import {
 	formatCycleWindowReport,
 	genPluginIdentityStep,
 	outputArtifactStatusStep,
+	packageTypecheckSteps,
 	triggerPathsSince,
 	wipTransitionStep,
 } from "./lib/gate-check-steps.mjs";
@@ -192,21 +191,8 @@ results.push(
 	}),
 );
 
-// 6. vscode-extension typecheck (only when packages/vscode-extension/ changed)
-if (!matchesTrigger(changedFiles, VSCODE_EXT_TRIGGER)) {
-	results.push({
-		name: "vscode-extension typecheck",
-		status: "SKIP",
-		detail: "no vscode-extension changes",
-	});
-} else {
-	const r = exec("pnpm", ["--filter", "@pfdsl/vscode-extension", "typecheck"]);
-	results.push({
-		name: "vscode-extension typecheck",
-		status: r.ok ? "PASS" : "FAIL",
-		detail: r.ok ? undefined : r.out.trim().slice(-200),
-	});
-}
+// 6. package typechecks (only for changed packages, including deletions)
+results.push(...packageTypecheckSteps({ exec, triggerPaths: triggers.files }));
 
 // 7. commit subject lint (Conventional Commits message format;
 // granularity stays MANUAL)

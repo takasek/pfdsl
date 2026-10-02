@@ -33,6 +33,24 @@ import { splitNulSeparated } from "./run-exec.mjs";
 
 const ROADMAP_PATH = ".pfdsl/roadmap.pfdsl";
 
+/** Run each changed package's typecheck, including test files and deleted paths.
+ * @param {{exec: Function, triggerPaths: string[]}} params
+ */
+export function packageTypecheckSteps({ exec, triggerPaths }) {
+	return ["core", "cli", "vscode-extension"].map((pkg) => {
+		const name = `${pkg} typecheck`;
+		if (!triggerPaths.some((path) => path.startsWith(`packages/${pkg}/`))) {
+			return { name, status: "SKIP", detail: `no ${pkg} changes` };
+		}
+		const r = exec("pnpm", ["--filter", `./packages/${pkg}`, "typecheck"]);
+		return {
+			name,
+			status: r.ok ? "PASS" : "FAIL",
+			detail: r.ok ? undefined : r.out.trim().slice(-200),
+		};
+	});
+}
+
 /**
  * The branch's changed paths, three-dot against the base.
  *
