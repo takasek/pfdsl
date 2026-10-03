@@ -566,9 +566,12 @@ for (const outcome of ["skipped", "failure", "cancelled"]) {
 		const message = runFailureNotice(outcome);
 		assert.match(
 			message,
-			/sweep and the push to flow-sync\/pending already happened/,
+			/Usually the sweep result has already been pushed to flow-sync\/pending and only the pull request is missing/,
 		);
-		assert.match(message, /only the pull request was not created/);
+		assert.match(
+			message,
+			/a rule that blocks creating flow-sync\/pending causes one/,
+		);
 		assert.ok(message.includes(SETTING_PATH), message);
 		assert.ok(message.includes(SETTING_NAME), message);
 		assert.match(message, /organization/);
@@ -581,9 +584,12 @@ test("the notice for a PR opened with the App token points at the App, not at th
 	const message = runFailureNotice("success");
 	assert.match(
 		message,
-		/sweep and the push to flow-sync\/pending already happened/,
+		/Usually the sweep result has already been pushed to flow-sync\/pending and only the pull request is missing/,
 	);
-	assert.match(message, /only the pull request was not created/);
+	assert.match(
+		message,
+		/a rule that blocks creating flow-sync\/pending causes one/,
+	);
 	assert.match(message, /installation/);
 	assert.match(message, /Contents/);
 	assert.match(message, /Pull requests/);

@@ -26,7 +26,7 @@ ae6f8cfe03b3df98c89a4b46eb176609cbf2a7c311f0d36f42817eab337ffcf2  hooks/managed-
 
 b6ee2191c34ba24f8813781d51dd5fbc43f90fbea88454f4ccfdcf7625075898  skills/pfd-ops/SKILL.md
 
-ab039902d481df2d86bfec3bdc26c9fb3378984938d7c429ea11b6d555c8cae8  skills/pfd-ops/install/.github/workflows/pfdsl-sweep-completed-chains.yml
+068f260531a1ad849539bbe94739d19cf14bf2da5485b3c849d14a6003d973b9  skills/pfd-ops/install/.github/workflows/pfdsl-sweep-completed-chains.yml
 
 2049e9a63ea5dc0443ae6361513b6c588a29dd51958d96db6a778f7df7a2b5a8  skills/pfd-ops/install/scripts/pfdsl/audit-issues-flow.mjs
 
@@ -60,7 +60,7 @@ bc4918d3d852b19f48bb4c90f0798d8dd7cafcb3dfb4f8db4c722bd23dc3d601  skills/pfd-ops
 
 ec4c10c6394964a5259ce63b446562181550bb397743b0b1c79d087bc2c7c307  skills/pfd-ops/references/file-based-tracker-backend.md
 
-e15dbfb5499f356a446e32748545c9a1e926983ec35ce41e482fe899234685c9  skills/pfd-ops/references/github-issues-backend.md
+f1b57b278ea1f899be85d3757ecf9a45dec96836092318928292686572e496c8  skills/pfd-ops/references/github-issues-backend.md
 
 57d30128361e2e29736bbb3f66ea10c3beaed751fe17fe6f4b711bae6faec53b  skills/pfd-ops/references/scaffold/bindings/pfd-ops.md
 

@@ -187,8 +187,8 @@ jobs:
         run: |
           branch=flow-sync/pending
           nl=$'\n'
-          msg='The sweep and the push to flow-sync/pending already happened; only the pull request was not created. If the log of the "Open PR if roadmap.pfdsl changed" step shows a push error instead, resolve that first.'
-          msg="${msg}${nl}To open the pull request by hand, use: ${SERVER_URL}/${REPOSITORY}/compare/${DEFAULT_BRANCH}...${branch}"
+          msg='The pull request step failed. Usually the sweep result has already been pushed to flow-sync/pending and only the pull request is missing. If the log of the "Open PR if roadmap.pfdsl changed" step shows a push error instead (a rule that blocks creating flow-sync/pending causes one), resolve that first; the branch then does not exist.'
+          msg="${msg}${nl}Once the branch exists, open the pull request by hand at: ${SERVER_URL}/${REPOSITORY}/compare/${DEFAULT_BRANCH}...${branch}"
           if [ "$APP_TOKEN_OUTCOME" = success ]; then
             msg="${msg}${nl}"'The pull request was attempted with a GitHub App installation token, which does not depend on the repository setting for GITHUB_TOKEN. Check that the App is installed on this repository with Contents and Pull requests write permissions.'
           else

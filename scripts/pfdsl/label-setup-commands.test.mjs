@@ -20,51 +20,68 @@ import { FLOW_LABELS } from "./lib/issues-flow-audit.mjs";
 const root = fileURLToPath(new URL("../../", import.meta.url));
 const REFERENCE = ".claude/skills/pfd-ops/references/github-issues-backend.md";
 
-// The one command shape the reference uses. A description with a quote, `$`,
-// backtick or backslash would not survive the double quotes, so such a
-// description is reported as an unparseable command instead of being compared.
-const COMMAND = /^gh label create (\S+) --description "([^"$`\\]*)" --force$/;
+// The two command shapes the reference uses: `create` for a label that does
+// not exist yet, and `edit` for one that does. `create --force` is not used:
+// without --color it also replaces an existing label's colour with a random one.
+// A description with a quote, `$`, backtick or backslash would not survive the
+// double quotes, so such a description is reported as an unparseable command
+// instead of being compared.
+const COMMAND = /^gh label (create|edit) (\S+) --description "([^"$`\\]*)"$/;
 
 function extractLabelCommands(markdown) {
 	const lines = markdown
 		.split("\n")
 		.map((line) => line.trim())
-		.filter((line) => line.startsWith("gh label create"));
+		.filter((line) => /^gh label (create|edit)\b/.test(line));
 	return lines.map((line) => {
 		const match = COMMAND.exec(line);
 		assert.ok(
 			match,
-			`not in the form gh label create <name> --description "<desc>" --force: ${line}`,
+			`not in the form gh label create|edit <name> --description "<desc>": ${line}`,
 		);
-		return { name: match[1], description: match[2] };
+		return { verb: match[1], name: match[2], description: match[3] };
 	});
+}
+
+function labelsFor(commands, verb) {
+	return commands
+		.filter((c) => c.verb === verb)
+		.map(({ name, description }) => ({ name, description }))
+		.sort((a, b) => a.name.localeCompare(b.name));
 }
 
 const reference = readFileSync(join(root, REFERENCE), "utf8");
 
-test("the reference's label commands create exactly the labels the audit expects", () => {
-	const commands = extractLabelCommands(reference);
-	assert.deepEqual(
-		[...commands].sort((a, b) => a.name.localeCompare(b.name)),
-		[...FLOW_LABELS].sort((a, b) => a.name.localeCompare(b.name)),
-	);
-});
+const expected = [...FLOW_LABELS].sort((a, b) => a.name.localeCompare(b.name));
 
-test("every FLOW_LABELS entry has a command and no command names another label", () => {
+for (const verb of ["create", "edit"]) {
+	test(`the reference's label ${verb} commands carry exactly the labels the audit expects`, () => {
+		assert.deepEqual(
+			labelsFor(extractLabelCommands(reference), verb),
+			expected,
+		);
+	});
+}
+
+test("every FLOW_LABELS entry has one command per verb and no command names another label", () => {
 	const commands = extractLabelCommands(reference);
-	const commanded = commands.map((c) => c.name);
-	for (const { name } of FLOW_LABELS) {
-		assert.equal(
-			commanded.filter((n) => n === name).length,
-			1,
-			`expected exactly one command for ${name}`,
-		);
-	}
-	for (const name of commanded) {
-		assert.ok(
-			FLOW_LABELS.some((label) => label.name === name),
-			`${name} is not in FLOW_LABELS`,
-		);
+	for (const verb of ["create", "edit"]) {
+		const commanded = commands
+			.filter((c) => c.verb === verb)
+			.map((c) => c.name);
+		for (const { name } of FLOW_LABELS) {
+			assert.equal(
+				commanded.filter((n) => n === name).length,
+				1,
+				`expected exactly one ${verb} command for ${name}`,
+			);
+		}
+		for (const name of commanded) {
+			assert.ok(
+				FLOW_LABELS.some((label) => label.name === name),
+				`${name} is not in FLOW_LABELS`,
+			);
+		}
 	}
 });
 
@@ -79,7 +96,7 @@ test("the extractor rejects a command that is not in the documented shape", () =
 	assert.throws(
 		() =>
 			extractLabelCommands(
-				'gh label create flow:managed --description "tracked in .pfdsl/roadmap.pfdsl"',
+				'gh label create flow:managed --description "tracked in .pfdsl/roadmap.pfdsl" --force',
 			),
 		/not in the form/,
 	);

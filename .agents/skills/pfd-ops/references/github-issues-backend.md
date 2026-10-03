@@ -67,9 +67,16 @@ workflow ファイル自体は他の配置ファイルとともに commit して
 リポジトリが GitHub Actions による PR の作成を許可していること（組織が制限している場合は組織も許可していること）である。
 有効にする場所は、リポジトリの Settings → Actions → General → Workflow permissions の「Allow GitHub Actions to create and approve pull requests」で、組織側は組織の Settings → Actions → General にある同名の設定である。
 workflow の `permissions: pull-requests: write` だけでは足りない。
+回収を有効にする前に、リポジトリの管理者権限を持つ人が次のコマンドで現在の値を確認できる（`true` なら許可されている）。
+
+```bash
+gh api repos/<owner>/<repo>/actions/permissions/workflow --jq .can_approve_pull_request_reviews
+```
+
 下の GitHub App の installation token で PR を作る経路は、この設定を必要としない。
 設定を有効にできない場合（組織ポリシー等）、回収と `flow-sync/pending` への push は成功するが PR は作られず、run は失敗で終わる。
-失敗した run には、PR だけが作られていないこと・確認する設定・手で PR を開く compare URL を示す `::error::` annotation が付く（`Explain a failed pull request step` step）。
+失敗した run には、多くの場合 PR だけが作られていないこと・確認する設定・手で PR を開く compare URL を示す `::error::` annotation が付く（`Explain a failed pull request step` step）。
+annotation は失敗の原因を判別しない。`flow-sync/pending` の作成を禁じるルール等で push 自体が失敗した場合は、PR 作成 step のログに push のエラーが出ており、ブランチは作られていない。
 この結果は全面成功ではない。差分は `flow-sync/pending` に置かれたままなので、compare URL から手で PR を開くか、設定を有効にして run を再実行する。
 workflow は設定値を事前に読まない。取得する REST endpoint が Administration の読取権限を要し、`GITHUB_TOKEN` に付与できないため、案内は失敗した後に出る。
 同一ブランチへ起票するため、連続する push は既存 PR を更新する。`concurrency` グループで直列化してあり、再計算は冪等である。
@@ -113,14 +120,23 @@ issue findings の `blocking:` は監査を失敗させ、`advisory:` だけな�
 2. `install/` 以下のファイルをリポルートに実配置する（`/pfd-init` ステップ3.5、または直接 `node <pfd-ops skill root>/scripts/check-install-sync.mjs --deploy`）。
    配置ファイルと plugin 同梱 canonical の drift は pfd-ops 発火時のランタイム hash 照合が警告する（設計根拠: ADR-0028）
 3. GitHub の `flow:managed` / `flow:exempt` ラベルを、監査が要求する説明文つきで作成または更新する。
-   説明文は監査が完全一致で照合する値である。`--force` を付けると、ラベルが無ければ作成し、あれば説明文を更新する。
+   説明文は監査が完全一致で照合する値である。
+   ラベルが無ければ作成する。
 
    ```bash
-   gh label create flow:managed --description "tracked in .pfdsl/roadmap.pfdsl" --force
-   gh label create flow:exempt --description "intentionally out of .pfdsl/roadmap.pfdsl scope" --force
+   gh label create flow:managed --description "tracked in .pfdsl/roadmap.pfdsl"
+   gh label create flow:exempt --description "intentionally out of .pfdsl/roadmap.pfdsl scope"
    ```
 
-   `gh` が無い環境では、リポジトリの Labels 画面（Issues → Labels）で同じ名前と説明文を入力して作成する。
+   既にあれば、色を保ったまま説明文だけを更新する。
+   `gh label create --force` は使わない。`--color` を省くと既存ラベルの色まで無作為な色で上書きする。
+
+   ```bash
+   gh label edit flow:managed --description "tracked in .pfdsl/roadmap.pfdsl"
+   gh label edit flow:exempt --description "intentionally out of .pfdsl/roadmap.pfdsl scope"
+   ```
+
+   `gh` が無い環境では、リポジトリの Labels 画面（Issues → Labels）で同じ名前と説明文を入力する。
 4. `roadmap.pfdsl` を依存構造のみのグラフとして用意し、issue に対応する process に `iN_` prefix を付ける
 5. リポの `roadmap.md` で本プリセットを指し、リポ URL を記載する
 6. 下の「依存の準備と初回監査」を実行する。配置だけで終了しない
@@ -166,6 +182,8 @@ npm install --prefix . --no-save --package-lock=false --ignore-scripts yaml@2.8.
 既に追跡されている依存ファイルは `.gitignore` だけでは除外できないため、その場合はリポの方針に従って追跡状態を整理してから先へ進む。
 
 準備後は上の import 確認を再実行し、roadmap と認証の準備ができたら初回監査を実行する。
+ラベルは監査の前に、上の「採用手順」の手順3のコマンドで作成または更新しておく。
+ラベルが無いと監査は `label_missing` で失敗する。
 
 ```bash
 node scripts/pfdsl/audit-issues-flow.mjs
