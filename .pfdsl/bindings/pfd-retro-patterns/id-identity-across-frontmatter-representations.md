@@ -20,4 +20,4 @@ tags: [target:cli-write-command, context:review-finding]
 
   続報（2026-09-28）: 最初は「この照合の罠に気をつける」形で記録したが、ユーザーの指摘で設計の欠陥として扱い直した。原因は、モデルの id（文字列）と YAML の CST のキー（型付き）を結ぶ同一性の規約が無かったことにある。根本の対策は PR #1298（spec v0.0.24）で、宣言 id のキーと参照値を YAML の文字列に限定し、型付きのキーや型だけが違うキーの重複を読込み時に FM004 で拒否する。これにより、書込み経路ごとに照合を工夫する必要が無くなり、`rename` の型付きキー向けの照合は撤去した（`boundary:` の中のキーだけは制約外のため文字列で照合する）。種別の判定は core の `rename()` に一本化し、frontmatter の各節・edge・body の単独ノード宣言から判定している。
 
-  未解決: group と artifact / process の同名を `check` が正しく報告しない件は #1291、`meta set` が body だけに現れるノードを「not found」と報告する件は #1292。
+  未解決: group と artifact / process の同名を `check` が正しく報告しない件は #1291、`meta set` が body だけに現れるノードを「not found」と報告する件は #1305（#1292 から移管）。
