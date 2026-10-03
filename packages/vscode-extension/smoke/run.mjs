@@ -238,15 +238,21 @@ async function stopVSCode(vscodeProcess) {
 		vscodeProcess.once("close", resolveExit),
 	);
 	vscodeProcess.kill("SIGTERM");
-	if (
-		await Promise.race([
+	let timeout;
+	try {
+		const didExit = await Promise.race([
 			exited.then(() => true),
-			delay(5_000).then(() => false),
-		])
-	)
-		return;
-	vscodeProcess.kill("SIGKILL");
-	await exited;
+			new Promise((resolveTimeout) => {
+				timeout = setTimeout(() => resolveTimeout(false), 5_000);
+			}),
+		]);
+		if (!didExit) {
+			vscodeProcess.kill("SIGKILL");
+			await exited;
+		}
+	} finally {
+		clearTimeout(timeout);
+	}
 }
 
 export async function cleanupSmokeSession({ browser, runDir, vscodeProcess }) {
