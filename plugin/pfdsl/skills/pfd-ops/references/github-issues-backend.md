@@ -89,6 +89,12 @@ issue findings の `blocking:` は監査を失敗させ、`advisory:` だけな�
 マージ前の時点では、roadmap を編集する PR について、その PR が閉じる issue の分だけを FAIL にする — 対象集合を PR 自身から導けるため、実行主体が渡すフラグに依存しない。
 後者の時点は PR の close 契機に置かない。close 後に気付いても、その PR はもう変えられない。
 
+ラベルの所見は issue ごとの照合を止めない。
+監査はラベルの所見を出力したうえで issue ごとの照合へ進み、終了コードは最後に決める。
+`label_missing`（`flow:managed` / `flow:exempt` のどちらかが存在しない）は blocking で、監査を失敗させる。ラベルが無いと issue に付けられず、`flow:managed` の判定自体が成り立たないためである。
+`label_description_mismatch`（ラベルはあるが説明文が期待値と違う）は advisory で、それだけでは監査を失敗させない。説明文を読んで動く判定は無く、人がラベル一覧で用途を判別する表示だからである。
+ずれは `label advisory (does not fail this audit):` の見出しで報せ、照合で見つかるはずの所見を説明文の修正まで隠さない。
+
 ## 採用手順
 
 1. pfdsl plugin を導入する（`/plugin marketplace add takasek/pfdsl` + `/plugin install pfdsl@pfdsl`）— pfd-ops スキル本体はリポでなく plugin から供給される

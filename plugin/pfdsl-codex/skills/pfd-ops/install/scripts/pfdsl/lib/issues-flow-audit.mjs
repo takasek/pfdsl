@@ -10,9 +10,14 @@ export const FLOW_LABELS = [
 ];
 
 /**
+ * A missing label blocks: without it no issue can carry the flow label, so the
+ * flow:managed judgement itself cannot hold. A description mismatch is
+ * advisory: no logic reads the description, it only tells a person scanning
+ * the label list what the label is for, so it must not hide the issue-level
+ * findings or fail the audit by itself.
  * @param {{ name: string, description: string }[]} expectedLabels
  * @param {{ name: string, description: string }[]} actualLabels
- * @returns {{ type: string, name: string, description: string, detail: string }[]}
+ * @returns {{ type: string, name: string, description: string, detail: string, advisory?: boolean }[]}
  */
 export function computeLabelFindings(expectedLabels, actualLabels) {
 	const actualByName = new Map(actualLabels.map((l) => [l.name, l]));
@@ -31,6 +36,7 @@ export function computeLabelFindings(expectedLabels, actualLabels) {
 				type: "label_description_mismatch",
 				name: expected.name,
 				description: expected.description,
+				advisory: true,
 				detail: `expected: "${expected.description}", actual: "${actual.description}"`,
 			});
 		}

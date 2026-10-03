@@ -576,6 +576,19 @@ describe("computeLabelFindings", () => {
 		assert.equal(findings[0].description, "tracked in .pfdsl/roadmap.pfdsl");
 	});
 
+	it("marks a description mismatch advisory and a missing label blocking", () => {
+		const findings = computeLabelFindings(expected, [
+			{ name: "flow:managed", description: "old description" },
+		]);
+		const byType = Object.fromEntries(findings.map((f) => [f.type, f]));
+		assert.equal(byType.label_description_mismatch.advisory, true);
+		assert.notEqual(byType.label_missing.advisory, true);
+		assert.deepEqual(
+			partitionFindings(findings).blocking.map((f) => f.type),
+			["label_missing"],
+		);
+	});
+
 	it("ignores extra labels not in expected", () => {
 		const actual = [
 			{ name: "flow:managed", description: "tracked in .pfdsl/roadmap.pfdsl" },
