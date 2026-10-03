@@ -74,9 +74,8 @@ export function classifyClosesReference({
 	closingIssueCount = 0,
 	body,
 }) {
-	// The convention reserves the keyword for the default branch: on an
-	// intermediate PR it closes the issue at the wrong moment, before the work
-	// has reached the branch that ships.
+	// GitHub ignores closing keywords in PR bodies targeting a non-default
+	// branch. The convention puts closing references on the final PR instead.
 	if (baseRef !== defaultBranch) {
 		return {
 			status: "SKIP",
