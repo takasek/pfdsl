@@ -1,4 +1,60 @@
+import { isMap, isScalar, parseDocument, visit } from "yaml";
+
 const READ_ONLY_TOOLS = "Read, Grep, Bash";
+
+export function skillMarkdownToCodex(source) {
+	const header = source.match(/^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)/);
+	if (!header) return source;
+	const document = parseDocument(header[1]);
+	if (document.errors.length) throw document.errors[0];
+	if (!document.has("summary")) return source;
+	const decoded = document.toJS();
+	const summary = decoded.summary;
+	const summaryNode = document.get("summary", true);
+	if (typeof summary !== "string" || !summary.trim()) {
+		throw new Error("Codex skill summary must be a non-empty string.");
+	}
+	const metadata = document.get("metadata", true);
+	if (metadata && !isMap(metadata)) {
+		throw new Error("Codex skill metadata must be a mapping.");
+	}
+	if (
+		document.hasIn(["metadata", "summary"]) &&
+		decoded.metadata.summary !== summary
+	) {
+		throw new Error("Codex skill metadata.summary conflicts with summary.");
+	}
+	// Resolve references to an anchor whose declaration is about to move.
+	if (summaryNode.anchor) {
+		visit(document, {
+			Alias(_key, node) {
+				if (node.resolve(document) === summaryNode)
+					return document.createNode(summary);
+			},
+		});
+	}
+	if (!document.hasIn(["metadata", "summary"])) {
+		const renderedSummary = isScalar(summaryNode)
+			? summaryNode.clone()
+			: document.createNode(summary);
+		delete renderedSummary.anchor;
+		document.setIn(["metadata", "summary"], renderedSummary);
+		if (!metadata) {
+			const pairs = document.contents.items;
+			const metadataIndex = pairs.findIndex(
+				({ key }) => key.value === "metadata",
+			);
+			const summaryIndex = pairs.findIndex(
+				({ key }) => key.value === "summary",
+			);
+			pairs.splice(summaryIndex, 0, pairs.splice(metadataIndex, 1)[0]);
+		}
+	}
+	document.delete("summary");
+	const newline = header[0].startsWith("---\r\n") ? "\r\n" : "\n";
+	const yaml = document.toString().replace(/\n/g, newline);
+	return `---${newline}${yaml}---${newline}${source.slice(header[0].length)}`;
+}
 const WORKSPACE_WRITE_TOOLS = "Bash, Read, Edit, Write, Grep, Glob, Skill";
 const MARKDOWN_GENERATED_NOTICE =
 	/^<!--(?=[^\r\n]*DO NOT EDIT)(?=[^\r\n]*Authoritative source:)[^\r\n]*-->$|^#{1,6}[ \t]+(?=[^\r\n]*DO NOT EDIT)(?=[^\r\n]*Authoritative source:)[^\r\n]*$/gm;

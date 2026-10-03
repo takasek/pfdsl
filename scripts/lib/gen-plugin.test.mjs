@@ -17,6 +17,7 @@ import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { afterEach, beforeEach, describe, it } from "node:test";
 import { fileURLToPath } from "node:url";
+import { parse } from "yaml";
 import {
 	collectModuleClosure,
 	findDistDependentFiles,
@@ -26,6 +27,7 @@ import {
 	commandCapabilityToCodexSkill,
 	generatedMarkdownNoticeCount,
 	generatedSourceCommentCount,
+	skillMarkdownToCodex,
 } from "./gen-codex-assets.mjs";
 import {
 	assembleClaudeAssets,
@@ -133,7 +135,10 @@ function codexMarkdownSource(root, relativePath) {
 }
 
 function expectedCodexMarkdown(source) {
-	return claudeInstructionsToAgents(source).replace(/(?:\r?\n){2,}$/, "\n");
+	return claudeInstructionsToAgents(skillMarkdownToCodex(source)).replace(
+		/(?:\r?\n){2,}$/,
+		"\n",
+	);
 }
 
 function removeGeneratedMarkdownNotice(source) {
@@ -2621,6 +2626,44 @@ describe("target-local consumer probes", () => {
 });
 
 describe("Codex generated consumers", () => {
+	it("emits supported skill headers on both Codex surfaces while preserving plugin descriptions", () => {
+		const allowed = new Set([
+			"name",
+			"description",
+			"license",
+			"allowed-tools",
+			"metadata",
+		]);
+		for (const surface of [".agents/skills", "plugin/pfdsl-codex/skills"]) {
+			for (const name of readdirSync(join(repoRoot, surface))) {
+				const markdown = readFileSync(
+					join(repoRoot, surface, name, "SKILL.md"),
+					"utf-8",
+				);
+				const header = parse(markdown.match(/^---\n([\s\S]*?)\n---/)[1]);
+				assert.ok(
+					Object.keys(header).every((key) => allowed.has(key)),
+					`${surface}/${name}`,
+				);
+				assert.equal(typeof header.description, "string");
+				if (PLUGIN_SKILL_DIRS.includes(name) || name === "pfdsl") {
+					const record = decodedHarnessCapabilities.find(
+						({ id }) => id === `skill:${name}`,
+					);
+					assert.equal(header.metadata.summary.trim(), record.semantic.summary);
+				}
+			}
+		}
+		for (const manifest of [
+			"plugin/pfdsl/.claude-plugin/plugin.json",
+			"plugin/pfdsl-codex/.codex-plugin/plugin.json",
+		]) {
+			assert.equal(
+				JSON.parse(readFileSync(join(repoRoot, manifest), "utf-8")).description,
+				buildPluginDescription({ capabilities: decodedHarnessCapabilities }),
+			);
+		}
+	});
 	it("normalizes generated Codex skill and hook consumers by path", () => {
 		const fixtureRoot = mkdtempSync(join(tmpdir(), "codex-assembly-"));
 		try {

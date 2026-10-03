@@ -1,6 +1,7 @@
 ---
 name: pfd-ops
-summary: project operations
+metadata:
+  summary: project operations
 description: |
   Use when operating a project that has adopted PFDs — prioritizing or
   accepting work items, updating progress status after completing work,
