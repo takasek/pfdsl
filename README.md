@@ -108,7 +108,7 @@ Commands:
   fmt <file|-> [--write] [--check] [--no-color]
                            Format a .pfdsl file (- = stdin)
   delete <file|-> <id[,id...]> [--write] [--json] [--no-color]
-                           Remove one or more nodes from a .pfdsl file (- = stdin)
+                           Remove artifacts, processes, or groups from a .pfdsl file (- = stdin)
   rename <file|-> <old> <new> [--write] [--json] [--no-color]
                            Rename an artifact, process, or group id and every reference to it (- = stdin)
   render <file|-> [--format dot|svg|pdf|png] [--no-color]

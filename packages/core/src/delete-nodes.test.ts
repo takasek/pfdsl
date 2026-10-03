@@ -8,6 +8,106 @@ import { analyze } from "./index.js";
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
 describe("deleteNodes", () => {
+	describe("groups", () => {
+		it("clears references when the declared parent does not exist", () => {
+			const source =
+				"---\ngroup:\n  g: { parent: absent }\n  child: { parent: g }\nartifact:\n  a: { group: g }\n---\n";
+			const fm = analyze(deleteNodes(source, ["g"]).output).frontmatter;
+			expect(fm?.artifact?.a).toEqual({});
+			expect(fm?.group?.child).toEqual({});
+		});
+		it.each([
+			"group:\n  g: {}\nartifact:\n  a: &member { group: g }\n  b: *member\n",
+			"custom: &groups { g: {} }\ngroup: *groups\n",
+		])("refuses shared YAML definitions without throwing or misreporting absence: %s", (fm) => {
+			const source = `---\n${fm}---\n`;
+			expect(
+				analyze(source).diagnostics.some((d) => d.severity === "error"),
+			).toBe(false);
+			const result = deleteNodes(source, ["g"]);
+			expect(result.refusal).toBe("unsupportedYaml");
+			expect(result.output).toBe(source);
+			expect(result.deleted).toEqual([]);
+			expect(result.notFound).toEqual([]);
+		});
+
+		const source = `---
+group:
+  root: { label: Root }
+  g: { label: Group, parent: root }
+  child: { label: Child, parent: g }
+  grandchild: { parent: child }
+  unrelated: { parent: absent }
+artifact:
+  a: { group: g, custom_ref: g }
+  b: { group: child }
+  c: { group: absent }
+process:
+  p: { group: g }
+---
+a >> p -> b
+`;
+		it("removes only the group and references to it, preserving members, children and body", () => {
+			const result = deleteNodes(source, ["g", "ghost"]);
+			expect(result.deleted).toEqual(["g"]);
+			expect(result.notFound).toEqual(["ghost"]);
+			const { frontmatter, diagnostics } = analyze(result.output);
+			expect(diagnostics.some((d) => d.severity === "error")).toBe(false);
+			expect(frontmatter?.group).toEqual({
+				root: { label: "Root" },
+				child: { label: "Child", parent: "root" },
+				grandchild: { parent: "child" },
+				unrelated: { parent: "absent" },
+			});
+			expect(frontmatter?.artifact).toEqual({
+				a: { group: "root", custom_ref: "g" },
+				b: { group: "child" },
+				c: { group: "absent" },
+			});
+			expect(frontmatter?.process?.p).toEqual({ group: "root" });
+			expect(result.output.endsWith("a >> p -> b\n")).toBe(true);
+			expect(deleteNodes(result.output, ["g"]).output).toBe(result.output);
+		});
+
+		it("handles parent and child group deletion with node deletion atomically", () => {
+			const result = deleteNodes(source, ["g", "child", "a"]);
+			expect(result.deleted).toEqual(["g", "child", "a"]);
+			const { frontmatter } = analyze(result.output);
+			expect(frontmatter?.group?.grandchild).toEqual({ parent: "root" });
+			expect(frontmatter?.artifact?.b).toEqual({ group: "root" });
+			expect(frontmatter?.artifact).not.toHaveProperty("a");
+			expect(result.output).toContain("p -> b");
+		});
+
+		it("removes an empty last group declaration", () => {
+			const result = deleteNodes("---\ngroup:\n  g:\n---\na >> p -> b\n", [
+				"g",
+			]);
+			expect(result.deleted).toEqual(["g"]);
+			expect(result.notFound).toEqual([]);
+			expect(result.output).toContain("group: {}");
+		});
+
+		it("refuses a group/node collision before rewriting", () => {
+			const input = "---\ngroup:\n  g: {}\nartifact:\n  g: {}\n---\n";
+			const result = deleteNodes(input, ["g"]);
+			expect(result.diagnostics).toContainEqual(
+				expect.objectContaining({ code: "N004", severity: "error" }),
+			);
+			expect(result.output).toBe(input);
+			expect(result.deleted).toEqual([]);
+		});
+
+		it("clears membership when every ancestor is deleted", () => {
+			const { output } = deleteNodes(source, ["root", "g", "child"]);
+			const { frontmatter } = analyze(output);
+			expect(frontmatter?.artifact?.a).toEqual({ custom_ref: "g" });
+			expect(frontmatter?.artifact?.b).toEqual({});
+			expect(frontmatter?.process?.p).toEqual({});
+			expect(frontmatter?.group?.grandchild).toEqual({});
+		});
+	});
+
 	describe("frontmatter declarations", () => {
 		it("removes a single artifact's declaration block", () => {
 			const src = `---

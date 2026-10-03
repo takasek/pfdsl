@@ -1,6 +1,6 @@
 <!-- DO NOT EDIT — snapshot distributed with pfdsl skill. Authoritative source: https://github.com/takasek/pfdsl/blob/main/docs/spec/spec.md -->
 
-# PFDSL仕様書 v0.0.26
+# PFDSL仕様書 v0.0.27
 
 ## 1. 目的
 
@@ -412,6 +412,7 @@ group:
 ```
 
 * キーがグループ ID（front matter 内で一意）
+* グループ ID は同一ファイルの Artifact / Process ID と共用できない。front matter の宣言に加え、graph body の edge と孤立宣言による使用も含む。同名は error（N004、§15.17）とする
 * label: 可視化時のグループ表示名（省略可）
 * color: 可視化時のグループ枠色（省略可、値は可視化バックエンド依存）
   * 色名（`lightblue` 等）またはカラーコード（`"#ff6600"` 等）を指定できる
@@ -1186,6 +1187,16 @@ graph body の node-decl で宣言された孤立ノード（edge なし）は �
 
 ---
 
+### 15.17 Group とノードの ID 衝突
+
+同一ファイル内で、`group:` に宣言された ID を Artifact または Process の ID として宣言・使用してはならない（§2.8.1）。
+違反は strict mode の有無に関わらず error（N004）とし、診断は group と衝突したノード種別を示す。
+対象は `artifact:` / `process:` の宣言、graph body の edge から推論される役割、および孤立ノード宣言である。
+group ID の孤立宣言は Artifact と衝突する。front matter で Process と宣言された ID の孤立宣言は、既存の front matter 優先規則（§5.1）に従い Process のままとする。
+Artifact / Process 同士の矛盾は引き続き N001 / N002 が扱う。
+
+---
+
 ## 16. エラー方針
 
 処理系は以下のコードをエラーまたは警告として報告する。定義節はそのコードが検証する条件を規範として定める§15 の小節（または該当節）を指す。
@@ -1252,6 +1263,7 @@ graph body の node-decl で宣言された孤立ノード（edge なし）は �
 | N001 | error | §5.1 | front matter で同一IDを artifact と process の両方に宣言 |
 | N002 | error | §5.1 | graph body で同一IDが artifact と process の両方として使用される |
 | N003 | warning | §15.4 | 同一 edge が重複記述されている |
+| N004 | error | §15.17 | group ID が同一ファイルの Artifact / Process ID として宣言・使用されている |
 
 P009 は実装に存在しない（欠番）。V013 は #310 で撤廃された（`location:` を Process に指定することは現在許可されている）。
 

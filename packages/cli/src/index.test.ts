@@ -125,7 +125,7 @@ describe("command metadata parse surface (#1050)", () => {
 		"status blocked":
 			"usage: pfdsl status blocked <file|-> [--json] [--no-color]",
 		"meta set":
-			"usage: pfdsl meta set <file> <id[,id...]> <field> <value> [--json] [--no-color]",
+			"usage: pfdsl meta set <file> <id[,id...]> <field> <value> [--allow-unknown] [--json] [--no-color]",
 		"meta check-links":
 			"usage: pfdsl meta check-links <file> [--json] [--no-color]",
 		"meta get":
@@ -3173,6 +3173,33 @@ describe("status ready", () => {
 	});
 });
 
+describe("delete group", () => {
+	it("delete removes a group in place, retaining its members and children", async () => {
+		const f = join(dir, "delete-group-cli.pfdsl");
+		const source =
+			"---\ngroup:\n  g: { label: Group }\n  child: { parent: g }\nartifact:\n  a: { group: g }\nprocess:\n  p: { group: g }\n---\na >> p -> b\n";
+		writeFileSync(f, source);
+		const preview = await run(["delete", f, "g", "--json"]);
+		expect(JSON.parse(preview.stdout)).toEqual({
+			ok: true,
+			deleted: ["g"],
+			notFound: [],
+		});
+		expect(readFileSync(f, "utf8")).toBe(source);
+		const written = await run(["delete", f, "g", "--json", "--write"]);
+		expect(written.exitCode).toBe(0);
+		expect(JSON.parse(written.stdout)).toEqual({
+			ok: true,
+			deleted: ["g"],
+			notFound: [],
+		});
+		const { frontmatter } = analyze(readFileSync(f, "utf8"));
+		expect(frontmatter?.group).toEqual({ child: {} });
+		expect(frontmatter?.artifact?.a).toEqual({});
+		expect(frontmatter?.process?.p).toEqual({});
+	});
+});
+
 describe("meta set", () => {
 	const base = `---
 artifact:
@@ -3184,25 +3211,28 @@ artifact:
 req >> design -> spec
 `;
 
-	// The id is in the graph but has no frontmatter entry, so the pre-check
-	// (nodeKinds, read from the body) passes and setFrontmatterField (doc.hasIn,
-	// read from the frontmatter) refuses. The two disagree by design; nothing
-	// covered the gap between them (#638).
 	it("exits 1 when the id is in the body but has no frontmatter entry", async () => {
 		const f = join(dir, "set-body-only-id.pfdsl");
 		writeFileSync(f, "req >> design -> spec\n");
 		const r = await run(["meta", "set", f, "spec", "status", "done"]);
 		expect(r.exitCode).toBe(1);
-		expect(r.stderr).toContain("'spec' not found");
+		expect(r.stderr).toContain("'spec' has no frontmatter definition");
+		expect(r.stderr).toContain("artifact:");
+		expect(r.stderr).toContain("Add");
 		expect(readFileSync(f, "utf-8")).toBe("req >> design -> spec\n");
 	});
 
-	it("--json reports that same case as { ok: false, missing: [id] }", async () => {
+	it("--json reports that same case as undefinedIds rather than missing", async () => {
 		const f = join(dir, "set-body-only-id-json.pfdsl");
 		writeFileSync(f, "req >> design -> spec\n");
 		const r = await run(["meta", "set", f, "spec", "status", "done", "--json"]);
 		expect(r.exitCode).toBe(1);
-		expect(JSON.parse(r.stdout)).toEqual({ ok: false, missing: ["spec"] });
+		expect(JSON.parse(r.stdout)).toEqual({
+			ok: false,
+			missing: [],
+			undefinedIds: [{ id: "spec", kind: "artifact" }],
+			error: expect.stringContaining("Add"),
+		});
 	});
 
 	it("refuses stdin, since it has nowhere to write the result", async () => {
@@ -5417,7 +5447,7 @@ spec >> review -> report
 			});
 		});
 
-		// A group never appears on an edge (N002), so it has no neighbors and no
+		// A group never appears on an edge (N004), so it has no neighbors and no
 		// opposite kind — the lists stay unannotated rather than claiming one.
 		it("omits the neighbor kind for a group, whose neighbors are empty", async () => {
 			const f = join(dir, "neighbors-group.pfdsl");
@@ -6149,13 +6179,17 @@ describe("review hardening", () => {
 	// "--json failure payload" table, which additionally requires the
 	// diagnostics array to be non-empty — this copy had dropped that (#614).
 
-	it("meta set --json on an edge-only id (no frontmatter entry) emits { ok: false, missing }", async () => {
+	it("meta set --json on an edge-only id reports its absent definition", async () => {
 		const f = join(dir, "review-set-edge-only.pfdsl");
 		writeFileSync(f, "req >> design -> spec\n");
 		const r = await run(["meta", "set", f, "req", "status", "done", "--json"]);
 		expect(r.exitCode).toBe(1);
 		expect(r.stderr).toBe("");
-		expect(JSON.parse(r.stdout)).toEqual({ ok: false, missing: ["req"] });
+		expect(JSON.parse(r.stdout)).toMatchObject({
+			ok: false,
+			missing: [],
+			undefinedIds: [{ id: "req", kind: "artifact" }],
+		});
 	});
 
 	it("graph path --limit 0 does not claim 'no path found' when paths exist", async () => {
