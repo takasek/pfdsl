@@ -19,11 +19,14 @@ export default mergeConfig(
 				// webview.ts だけは vscode API でなく DOM 直結（読み込み時に
 				// acquireVsCodeApi と getElementById を実行する）。pan / zoom /
 				// minimap の算術は webview-logic.ts、preview.ts の判定は
-				// preview-logic.ts、ディレクトリ展開は expand-directory.ts、
+				// preview-logic.ts、ready・差分保留・配送・破棄の状態管理は
+				// preview-controller.ts、ディレクトリ展開は expand-directory.ts、
 				// connector の入力検証は connector-logic.ts、codelens の行判定は
 				// codelens-logic.ts、export の命名と部分失敗の集約は
 				// export-logic.ts にあり、いずれもこのリストの外でテストされている
 				// （#611, #634）。
+				// preview.ts の controller 接続は src/preview.test.ts が小さな
+				// fake host で検査する。実 webview の輸送・DOM 描画の証明ではない。
 				//
 				// このリストの内容は src/coverage-exclusions.test.ts が固定する。
 				// 除外の追加は floor を保ったまま計測対象を減らせるため、無審査で
