@@ -18,13 +18,13 @@ a3f96e180a957152509a1d019b2b4247fb74c3f0ce6c7b25cd79355d9a3e75bb  hooks/lib/mana
 
 ae6f8cfe03b3df98c89a4b46eb176609cbf2a7c311f0d36f42817eab337ffcf2  hooks/managed-issue-reminder-post-tool-use.mjs
 
-1782ebbabc103465a8a1bd1619f7a824515c83e2ab7e3289e687e83ee1d332b3  skills/pfd-ecosystem/SKILL.md
+a271e325d285b298c6161dc3d11bc5967e3e0638de0b7c0314a6ed8a8743984d  skills/pfd-ecosystem/SKILL.md
 
 62d635bc7607d1aa0ad830337e1f9d3e2b2a389e0503f9e14a41726436d9fb67  skills/pfd-ecosystem/references/kind-taxonomy.md
 
 13d64d0bcb84a67cddd72948bfe48547bf97648b2b5631496fdd525d5fbbc22f  skills/pfd-grill/SKILL.md
 
-b6ee2191c34ba24f8813781d51dd5fbc43f90fbea88454f4ccfdcf7625075898  skills/pfd-ops/SKILL.md
+a698045b63c16d805c3ae9458bf0a0f21639b96fe1ef26febd6cb173c0c4cb6c  skills/pfd-ops/SKILL.md
 
 2083ba68c0bfecf47eae1f6f1c91d94891b648d468cba4457bff7d67328364ea  skills/pfd-ops/install/.github/workflows/pfdsl-sweep-completed-chains.yml
 
@@ -56,7 +56,7 @@ a8e4d35e456f05babab77d002a20f7230b7942aaf7bb82138bf2007b5926c4f7  skills/pfd-ops
 
 d6636ad19abcd0019d685f0cbc26db35fb779ea1afa9568d070fb94bb68eb7f2  skills/pfd-ops/install/scripts/pfdsl/sweep-completed-chains.mjs
 
-bc4918d3d852b19f48bb4c90f0798d8dd7cafcb3dfb4f8db4c722bd23dc3d601  skills/pfd-ops/references/architecture.md
+fac94fbb4fcc37b8b04de5662484b441a237d8515abfe4e2363202474af64cdc  skills/pfd-ops/references/architecture.md
 
 ec4c10c6394964a5259ce63b446562181550bb397743b0b1c79d087bc2c7c307  skills/pfd-ops/references/file-based-tracker-backend.md
 
