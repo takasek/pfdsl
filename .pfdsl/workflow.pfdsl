@@ -249,7 +249,7 @@ artifact:
     label: PFD運用スキル（汎用層）
     description: "pfd-ops スキル本体（起動口は /pfd-cycle に限らない）。PFD によるプロジェクト運用プロトコルとワークサイクル。PFDファイル種別の定義（ADR-0017）は ecosystem_skill が一次情報。汎用プロトコル（L1）+ディスパッチ（L2）= SKILL.md 本文 + バックエンド非依存の references（work-cycle.md のサイクル4手順・architecture.md の層構成。L3 の references は ops_skill_l3 側）。L4（リポ固有、配布対象外）は pfd-ops 自体の一部でなく、各採用リポの .pfdsl sibling .md companion に宿る"
     criteria: /pfd-cycle を起動するとワークサイクルの4手順（選択・実行・終端ゲート・報告）が最後まで走る。make gen-plugin が差分なしで完了する
-    location: [ ../.claude/skills/pfd-ops/SKILL.md, ../.claude/skills/pfd-ops/references/work-cycle.md, ../.claude/skills/pfd-ops/references/architecture.md ]
+    location: [ ../scripts/harness-template/skills/pfd-ops/SKILL.md, ../scripts/harness-template/skills/pfd-ops/references/work-cycle.md, ../scripts/harness-template/skills/pfd-ops/references/architecture.md ]
     group: generation
     tags: [ distilled_skill ]
   ops_skill_l3:
@@ -260,29 +260,29 @@ artifact:
       手書き（生成対象外）で、retro_skill の監査結果がこの層の規約改訂に還流する。
       GitHub Issues 版の採用リポが実際に配置するファイル群は pipeline.pfdsl の ops_install_templates 側で、ファイルベース・トラッカー版は実配置を要しない
     criteria: >-
-      ../.claude/skills/pfd-ops/references/github-issues-backend.md に、採用リポが GitHub Issues バックエンドを採用するのに必要な規約（ラベル判定・status 更新と完了チェーン回収・PR 本文規約）が記述されている。
-      ../.claude/skills/pfd-ops/references/file-based-tracker-backend.md に、採用リポがリポ内ファイルで作業項目を管理するのに必要な規約（一次情報ファイル・id 規約・flow 分類・status 同期・完了規則と完了契約）が記述され、GitHub Issues 版の install テンプレートを要求しない
-    location: [ ../.claude/skills/pfd-ops/references/github-issues-backend.md, ../.claude/skills/pfd-ops/references/file-based-tracker-backend.md ]
+      ../scripts/harness-template/skills/pfd-ops/references/github-issues-backend.md に、採用リポが GitHub Issues バックエンドを採用するのに必要な規約（ラベル判定・status 更新と完了チェーン回収・PR 本文規約）が記述されている。
+      ../scripts/harness-template/skills/pfd-ops/references/file-based-tracker-backend.md に、採用リポがリポ内ファイルで作業項目を管理するのに必要な規約（一次情報ファイル・id 規約・flow 分類・status 同期・完了規則と完了契約）が記述され、GitHub Issues 版の install テンプレートを要求しない
+    location: [ ../scripts/harness-template/skills/pfd-ops/references/github-issues-backend.md, ../scripts/harness-template/skills/pfd-ops/references/file-based-tracker-backend.md ]
     group: generation
     tags: [ distilled_skill ]
   retro_skill:
     label: ふりかえり監査スキル
     description: "/pfd-retro コマンド。図・セッションイベント・知識成果物の監査カタログ。ユーザーの監査介入17件から蒸留（手書き、生成対象外）。A・B 層は任意の PFD レビューにも使う"
     criteria: "/pfd-retro を起動すると適用した層の findings が振り分け先付きで出力される（D 層は `.pfdsl/config.json` のキー `knowledgeLifecycleAudit` が `mode: adopt` と空でない `targets` を宣言しているときだけ、`targets` の成果物に適用する。`decline` なら適用も報告もしない。config が無い・JSON として読めない・キーが無い・形式が不正なときは適用せず、所有者が宣言する必要があることを毎回報告する。binding の散文と旧宣言行は宣言として扱わない。ADR-0039、ADR-0041）。make gen-plugin が差分なしで完了する"
-    location: ../.claude/skills/pfd-retro/
+    location: ../scripts/harness-template/skills/pfd-retro/
     group: generation
     tags: [ distilled_skill ]
   pfd_lens_agent:
     label: pfd-lens agent
     description: "retro_skill の A・B 層委譲先。大きい図・複数図の監査を read-only agent へオフロードする（#357）。手書き、生成対象外"
     criteria: pfd-lens は upstream identity を確認した場合に checkout-local CLI を選び、全監査 query を同じ解決済み CLI で実行して、A・B 観点の findings を file:line アンカー付きで返す。make gen-plugin が差分なしで完了する
-    location: ../.claude/agents/pfd-lens.md
+    location: ../scripts/harness-template/agents/pfd-lens.md
     group: generation
   implementer_agent:
     label: 実装委譲agent
     description: "pfd-implementer agent。実装のみを委譲し、push・PR 作成・issue 操作は呼び出し元に残す。手書きだが gen_plugin が plugin へミラーする（#558）。留保指定を機構で担保するのは delegation_guard で、そちらは配布しない"
     criteria: make gen-plugin が差分なしで完了して plugin/pfdsl/agents/pfd-implementer.md が実在し、採用リポで plugin を入れただけで pfd-implementer が起動でき、その tools 列に外向きツール面（GitHub MCP）が無い
-    location: ../.claude/agents/pfd-implementer.md
+    location: ../scripts/harness-template/agents/pfd-implementer.md
     group: generation
   distributed_advisory_hooks:
     label: plugin配布advisory hooks
@@ -306,14 +306,14 @@ artifact:
     label: PFDセット構築スキル
     description: "/pfd-init コマンド。PFD セット（roadmap / workflow / pipeline）の対話的初期構築・再構築。PFDファイル種別の定義と問診リスト（ADR-0017）の一次情報ホスト。手書き、生成対象外"
     criteria: /pfd-init を .pfdsl/ の無いリポで起動すると PFD セットの scaffold が生成される。make gen-plugin が差分なしで完了する
-    location: ../.claude/skills/pfd-ecosystem/
+    location: ../scripts/harness-template/skills/pfd-ecosystem/
     group: generation
     tags: [ distilled_skill ]
   grill_skill:
     label: 後ろ向き対話構築スキル
     description: "pfd-grill スキル。最終成果物からの後ろ向き対話で単一 PFD の中身を書く手順（#481）。手書き、生成対象外"
     criteria: /pfd-grill を起動すると、最終成果物から外部入力まで遡ったノード列が対象の図に書き込まれる。make gen-plugin が差分なしで完了する
-    location: ../.claude/skills/pfd-grill/
+    location: ../scripts/harness-template/skills/pfd-grill/
     group: generation
     tags: [ distilled_skill ]
   vscode_ext_debug_skill:

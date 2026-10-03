@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // CLI wrapper for checkScaffoldSync (#422): warns when this repo's own
 // pfd-ops skill copy (.claude/skills/pfd-ops/references/scaffold/, the
-// source gen-plugin.mjs mirrors from) has drifted from the generated
+// generated surface gen-plugin.mjs mirrors from) has drifted from the generated
 // plugin/pfdsl/skills/pfd-ops/references/scaffold/ mirror. Repo-local tool,
 // not part of the distributed pfd-ops skill tree (scaffold/ has no --deploy
 // step, so there is nothing here to ship downstream).

@@ -1,4 +1,4 @@
-<!-- DO NOT EDIT. Authoritative source: .claude/skills/pfd-ecosystem/references/kind-taxonomy.md. -->
+<!-- DO NOT EDIT. Authoritative source: scripts/harness-template/skills/pfd-ecosystem/references/kind-taxonomy.md. -->
 
 # PFD 種別タクソノミー（ADR-0017 / ADR-0035）
 

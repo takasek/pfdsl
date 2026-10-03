@@ -782,7 +782,7 @@
 <!-- ecosystem_skill -->
 <g id="node30" class="node">
 <title>ecosystem_skill</title>
-<g id="a_node30"><a xlink:title="PFDセット構築スキル&#10;&#10;/pfd&#45;init コマンド。PFD セット（roadmap / workflow / pipeline）の対話的初期構築・再構築。PFDファイル種別の定義と問診リスト（ADR&#45;0017）の一次情報ホスト。手書き、生成対象外&#10;criteria: /pfd&#45;init を .pfdsl/ の無いリポで起動すると PFD セットの scaffold が生成される。make gen&#45;plugin が差分なしで完了する&#10;location: ../.claude/skills/pfd&#45;ecosystem/">
+<g id="a_node30"><a xlink:title="PFDセット構築スキル&#10;&#10;/pfd&#45;init コマンド。PFD セット（roadmap / workflow / pipeline）の対話的初期構築・再構築。PFDファイル種別の定義と問診リスト（ADR&#45;0017）の一次情報ホスト。手書き、生成対象外&#10;criteria: /pfd&#45;init を .pfdsl/ の無いリポで起動すると PFD セットの scaffold が生成される。make gen&#45;plugin が差分なしで完了する&#10;location: ../scripts/harness&#45;template/skills/pfd&#45;ecosystem/">
 <polygon fill="none" stroke="black" stroke-width="2" points="3033.67,-2263.59 2889.67,-2263.59 2889.67,-2205.19 3033.67,-2205.19 3033.67,-2263.59"/>
 <text xml:space="preserve" text-anchor="middle" x="2961.67" y="-2246.99" font-family="Times,serif" font-size="14.00">ecosystem_skill</text>
 <text xml:space="preserve" text-anchor="middle" x="2961.67" y="-2230.19" font-family="Times,serif" font-size="14.00">PFDセット構築スキ</text>
@@ -826,7 +826,7 @@
 <!-- grill_skill -->
 <g id="node32" class="node">
 <title>grill_skill</title>
-<g id="a_node32"><a xlink:title="後ろ向き対話構築スキル&#10;&#10;pfd&#45;grill スキル。最終成果物からの後ろ向き対話で単一 PFD の中身を書く手順（#481）。手書き、生成対象外&#10;criteria: /pfd&#45;grill を起動すると、最終成果物から外部入力まで遡ったノード列が対象の図に書き込まれる。make gen&#45;plugin が差分なしで完了する&#10;location: ../.claude/skills/pfd&#45;grill/">
+<g id="a_node32"><a xlink:title="後ろ向き対話構築スキル&#10;&#10;pfd&#45;grill スキル。最終成果物からの後ろ向き対話で単一 PFD の中身を書く手順（#481）。手書き、生成対象外&#10;criteria: /pfd&#45;grill を起動すると、最終成果物から外部入力まで遡ったノード列が対象の図に書き込まれる。make gen&#45;plugin が差分なしで完了する&#10;location: ../scripts/harness&#45;template/skills/pfd&#45;grill/">
 <polygon fill="none" stroke="black" stroke-width="2" points="3037.27,-2339.59 2886.07,-2339.59 2886.07,-2281.19 3037.27,-2281.19 3037.27,-2339.59"/>
 <text xml:space="preserve" text-anchor="middle" x="2961.67" y="-2322.99" font-family="Times,serif" font-size="14.00">grill_skill</text>
 <text xml:space="preserve" text-anchor="middle" x="2961.67" y="-2306.19" font-family="Times,serif" font-size="14.00">後ろ向き対話構築ス</text>
@@ -844,7 +844,7 @@
 <!-- implementer_agent -->
 <g id="node33" class="node">
 <title>implementer_agent</title>
-<g id="a_node33"><a xlink:title="実装委譲agent&#10;&#10;pfd&#45;implementer agent。実装のみを委譲し、push・PR 作成・issue 操作は呼び出し元に残す。手書きだが gen_plugin が plugin へミラーする（#558）。留保指定を機構で担保するのは delegation_guard で、そちらは配布しない&#10;criteria: make gen&#45;plugin が差分なしで完了して plugin/pfdsl/agents/pfd&#45;implementer.md が実在し、採用リポで plugin を入れただけで pfd&#45;implementer が起動でき、その tools 列に外向きツール面（GitHub MCP）が無い&#10;location: ../.claude/agents/pfd&#45;implementer.md">
+<g id="a_node33"><a xlink:title="実装委譲agent&#10;&#10;pfd&#45;implementer agent。実装のみを委譲し、push・PR 作成・issue 操作は呼び出し元に残す。手書きだが gen_plugin が plugin へミラーする（#558）。留保指定を機構で担保するのは delegation_guard で、そちらは配布しない&#10;criteria: make gen&#45;plugin が差分なしで完了して plugin/pfdsl/agents/pfd&#45;implementer.md が実在し、採用リポで plugin を入れただけで pfd&#45;implementer が起動でき、その tools 列に外向きツール面（GitHub MCP）が無い&#10;location: ../scripts/harness&#45;template/agents/pfd&#45;implementer.md">
 <polygon fill="none" stroke="black" stroke-width="2" points="3033.67,-2399.19 2889.67,-2399.19 2889.67,-2357.59 3033.67,-2357.59 3033.67,-2399.19"/>
 <text xml:space="preserve" text-anchor="middle" x="2961.67" y="-2382.59" font-family="Times,serif" font-size="14.00">implementer_agent</text>
 <text xml:space="preserve" text-anchor="middle" x="2961.67" y="-2365.79" font-family="Times,serif" font-size="14.00">実装委譲agent</text>
@@ -919,7 +919,7 @@
 <!-- ops_skill_general -->
 <g id="node41" class="node">
 <title>ops_skill_general</title>
-<g id="a_node41"><a xlink:title="PFD運用スキル（汎用層）&#10;&#10;pfd&#45;ops スキル本体（起動口は /pfd&#45;cycle に限らない）。PFD によるプロジェクト運用プロトコルとワークサイクル。PFDファイル種別の定義（ADR&#45;0017）は ecosystem_skill が一次情報。汎用プロトコル（L1）+ディスパッチ（L2）= SKILL.md 本文 + バックエンド非依存の references（work&#45;cycle.md のサイクル4手順・architecture.md の層構成。L3 の references は ops_skill_l3 側）。L4（リポ固有、配布対象外）は pfd&#45;ops 自体の一部でなく、各採用リポの .pfdsl sibling .md companion に宿る&#10;criteria: /pfd&#45;cycle を起動するとワークサイクルの4手順（選択・実行・終端ゲート・報告）が最後まで走る。make gen&#45;plugin が差分なしで完了する&#10;location: ../.claude/skills/pfd&#45;ops/SKILL.md, ../.claude/skills/pfd&#45;ops/references/work&#45;cycle.md, ../.claude/skills/pfd&#45;ops/references/architecture.md">
+<g id="a_node41"><a xlink:title="PFD運用スキル（汎用層）&#10;&#10;pfd&#45;ops スキル本体（起動口は /pfd&#45;cycle に限らない）。PFD によるプロジェクト運用プロトコルとワークサイクル。PFDファイル種別の定義（ADR&#45;0017）は ecosystem_skill が一次情報。汎用プロトコル（L1）+ディスパッチ（L2）= SKILL.md 本文 + バックエンド非依存の references（work&#45;cycle.md のサイクル4手順・architecture.md の層構成。L3 の references は ops_skill_l3 側）。L4（リポ固有、配布対象外）は pfd&#45;ops 自体の一部でなく、各採用リポの .pfdsl sibling .md companion に宿る&#10;criteria: /pfd&#45;cycle を起動するとワークサイクルの4手順（選択・実行・終端ゲート・報告）が最後まで走る。make gen&#45;plugin が差分なしで完了する&#10;location: ../scripts/harness&#45;template/skills/pfd&#45;ops/SKILL.md, ../scripts/harness&#45;template/skills/pfd&#45;ops/references/work&#45;cycle.md, ../scripts/harness&#45;template/skills/pfd&#45;ops/references/architecture.md">
 <polygon fill="none" stroke="black" points="3033.67,-2093.59 2889.67,-2093.59 2889.67,-2035.19 3033.67,-2035.19 3033.67,-2093.59"/>
 <text xml:space="preserve" text-anchor="middle" x="2961.67" y="-2076.99" font-family="Times,serif" font-size="14.00">ops_skill_general</text>
 <text xml:space="preserve" text-anchor="middle" x="2961.67" y="-2060.19" font-family="Times,serif" font-size="14.00">PFD運用スキル（汎</text>
@@ -937,7 +937,7 @@
 <!-- ops_skill_l3 -->
 <g id="node42" class="node">
 <title>ops_skill_l3</title>
-<g id="a_node42"><a xlink:title="PFD運用スキル（バックエンドプリセット層）&#10;&#10;採用リポが作業項目バックエンドとして選択できる L3 プリセット群の規約本文。GitHub Issues 版 = references/github&#45;issues&#45;backend.md、ファイルベース・トラッカー版 = references/file&#45;based&#45;tracker&#45;backend.md。 上流が配布する選択肢の集合であり、採用リポはどちらか一方を選ぶか、どちらも採用しない。このリポは GitHub Issues 版を採用しており、develop が読むのはその版である。 手書き（生成対象外）で、retro_skill の監査結果がこの層の規約改訂に還流する。 GitHub Issues 版の採用リポが実際に配置するファイル群は pipeline.pfdsl の ops_install_templates 側で、ファイルベース・トラッカー版は実配置を要しない&#10;criteria: ../.claude/skills/pfd&#45;ops/references/github&#45;issues&#45;backend.md に、採用リポが GitHub Issues バックエンドを採用するのに必要な規約（ラベル判定・status 更新と完了チェーン回収・PR 本文規約）が記述されている。 ../.claude/skills/pfd&#45;ops/references/file&#45;based&#45;tracker&#45;backend.md に、採用リポがリポ内ファイルで作業項目を管理するのに必要な規約（一次情報ファイル・id 規約・flow 分類・status 同期・完了規則と完了契約）が記述され、GitHub Issues 版の install テンプレートを要求しない&#10;location: ../.claude/skills/pfd&#45;ops/references/github&#45;issues&#45;backend.md, ../.claude/skills/pfd&#45;ops/references/file&#45;based&#45;tracker&#45;backend.md">
+<g id="a_node42"><a xlink:title="PFD運用スキル（バックエンドプリセット層）&#10;&#10;採用リポが作業項目バックエンドとして選択できる L3 プリセット群の規約本文。GitHub Issues 版 = references/github&#45;issues&#45;backend.md、ファイルベース・トラッカー版 = references/file&#45;based&#45;tracker&#45;backend.md。 上流が配布する選択肢の集合であり、採用リポはどちらか一方を選ぶか、どちらも採用しない。このリポは GitHub Issues 版を採用しており、develop が読むのはその版である。 手書き（生成対象外）で、retro_skill の監査結果がこの層の規約改訂に還流する。 GitHub Issues 版の採用リポが実際に配置するファイル群は pipeline.pfdsl の ops_install_templates 側で、ファイルベース・トラッカー版は実配置を要しない&#10;criteria: ../scripts/harness&#45;template/skills/pfd&#45;ops/references/github&#45;issues&#45;backend.md に、採用リポが GitHub Issues バックエンドを採用するのに必要な規約（ラベル判定・status 更新と完了チェーン回収・PR 本文規約）が記述されている。 ../scripts/harness&#45;template/skills/pfd&#45;ops/references/file&#45;based&#45;tracker&#45;backend.md に、採用リポがリポ内ファイルで作業項目を管理するのに必要な規約（一次情報ファイル・id 規約・flow 分類・status 同期・完了規則と完了契約）が記述され、GitHub Issues 版の install テンプレートを要求しない&#10;location: ../scripts/harness&#45;template/skills/pfd&#45;ops/references/github&#45;issues&#45;backend.md, ../scripts/harness&#45;template/skills/pfd&#45;ops/references/file&#45;based&#45;tracker&#45;backend.md">
 <polygon fill="none" stroke="black" points="3037.27,-2186.99 2886.07,-2186.99 2886.07,-2111.79 3037.27,-2111.79 3037.27,-2186.99"/>
 <text xml:space="preserve" text-anchor="middle" x="2961.67" y="-2170.39" font-family="Times,serif" font-size="14.00">ops_skill_l3</text>
 <text xml:space="preserve" text-anchor="middle" x="2961.67" y="-2153.59" font-family="Times,serif" font-size="14.00">PFD運用スキル（バ</text>
@@ -956,7 +956,7 @@
 <!-- pfd_lens_agent -->
 <g id="node43" class="node">
 <title>pfd_lens_agent</title>
-<g id="a_node43"><a xlink:title="pfd&#45;lens agent&#10;&#10;retro_skill の A・B 層委譲先。大きい図・複数図の監査を read&#45;only agent へオフロードする（#357）。手書き、生成対象外&#10;criteria: pfd&#45;lens は upstream identity を確認した場合に checkout&#45;local CLI を選び、全監査 query を同じ解決済み CLI で実行して、A・B 観点の findings を file:line アンカー付きで返す。make gen&#45;plugin が差分なしで完了する&#10;location: ../.claude/agents/pfd&#45;lens.md">
+<g id="a_node43"><a xlink:title="pfd&#45;lens agent&#10;&#10;retro_skill の A・B 層委譲先。大きい図・複数図の監査を read&#45;only agent へオフロードする（#357）。手書き、生成対象外&#10;criteria: pfd&#45;lens は upstream identity を確認した場合に checkout&#45;local CLI を選び、全監査 query を同じ解決済み CLI で実行して、A・B 観点の findings を file:line アンカー付きで返す。make gen&#45;plugin が差分なしで完了する&#10;location: ../scripts/harness&#45;template/agents/pfd&#45;lens.md">
 <polygon fill="none" stroke="black" stroke-width="2" points="3012.43,-2459.19 2910.9,-2459.19 2910.9,-2417.59 3012.43,-2417.59 3012.43,-2459.19"/>
 <text xml:space="preserve" text-anchor="middle" x="2961.67" y="-2442.59" font-family="Times,serif" font-size="14.00">pfd_lens_agent</text>
 <text xml:space="preserve" text-anchor="middle" x="2961.67" y="-2425.79" font-family="Times,serif" font-size="14.00">pfd&#45;lens agent</text>
@@ -972,7 +972,7 @@
 <!-- retro_skill -->
 <g id="node47" class="node">
 <title>retro_skill</title>
-<g id="a_node47"><a xlink:title="ふりかえり監査スキル&#10;&#10;/pfd&#45;retro コマンド。図・セッションイベント・知識成果物の監査カタログ。ユーザーの監査介入17件から蒸留（手書き、生成対象外）。A・B 層は任意の PFD レビューにも使う&#10;criteria: /pfd&#45;retro を起動すると適用した層の findings が振り分け先付きで出力される（D 層は `.pfdsl/config.json` のキー `knowledgeLifecycleAudit` が `mode: adopt` と空でない `targets` を宣言しているときだけ、`targets` の成果物に適用する。`decline` なら適用も報告もしない。config が無い・JSON として読めない・キーが無い・形式が不正なときは適用せず、所有者が宣言する必要があることを毎回報告する。binding の散文と旧宣言行は宣言として扱わない。ADR&#45;0039、ADR&#45;0041）。make gen&#45;plugin が差分なしで完了する&#10;location: ../.claude/skills/pfd&#45;retro/">
+<g id="a_node47"><a xlink:title="ふりかえり監査スキル&#10;&#10;/pfd&#45;retro コマンド。図・セッションイベント・知識成果物の監査カタログ。ユーザーの監査介入17件から蒸留（手書き、生成対象外）。A・B 層は任意の PFD レビューにも使う&#10;criteria: /pfd&#45;retro を起動すると適用した層の findings が振り分け先付きで出力される（D 層は `.pfdsl/config.json` のキー `knowledgeLifecycleAudit` が `mode: adopt` と空でない `targets` を宣言しているときだけ、`targets` の成果物に適用する。`decline` なら適用も報告もしない。config が無い・JSON として読めない・キーが無い・形式が不正なときは適用せず、所有者が宣言する必要があることを毎回報告する。binding の散文と旧宣言行は宣言として扱わない。ADR&#45;0039、ADR&#45;0041）。make gen&#45;plugin が差分なしで完了する&#10;location: ../scripts/harness&#45;template/skills/pfd&#45;retro/">
 <polygon fill="none" stroke="black" stroke-width="2" points="3037.27,-2535.59 2886.07,-2535.59 2886.07,-2477.19 3037.27,-2477.19 3037.27,-2535.59"/>
 <text xml:space="preserve" text-anchor="middle" x="2961.67" y="-2518.99" font-family="Times,serif" font-size="14.00">retro_skill</text>
 <text xml:space="preserve" text-anchor="middle" x="2961.67" y="-2502.19" font-family="Times,serif" font-size="14.00">ふりかえり監査スキ</text>

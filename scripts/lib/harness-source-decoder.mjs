@@ -7,6 +7,7 @@ import {
 	LOCAL_CLAUDE_ROOT_ENTRIES,
 	SOURCE_EXCLUSIONS,
 } from "./harness-inventory.mjs";
+import { renderHarnessTemplate } from "./harness-template.mjs";
 
 const CLAUDE_ROOT_FILES = new Set(["settings.json"]);
 const CLAUDE_ROOT_DIRECTORIES = new Set(["agents", "commands", "skills"]);
@@ -103,7 +104,19 @@ function assertEntryClosure(
 	exclusions,
 	sourceType,
 	isUnmaintained,
+	optionalEntries = {},
 ) {
+	try {
+		fs.lstatSync(path);
+	} catch (error) {
+		if (
+			error.code === "ENOENT" &&
+			entries.size === 0 &&
+			Object.keys(exclusions).length === 0
+		)
+			return;
+		throw error;
+	}
 	assertType(fs, path, "directory");
 	for (const name of Object.keys(exclusions)) {
 		if (entries.has(name)) {
@@ -115,6 +128,10 @@ function assertEntryClosure(
 		}
 	}
 	for (const name of fs.readdirSync(path)) {
+		if (Object.hasOwn(optionalEntries, name)) {
+			assertType(fs, resolve(path, name), sourceType);
+			continue;
+		}
 		if (entries.has(name) || Object.hasOwn(exclusions, name)) continue;
 		const entryPath = resolve(path, name);
 		if (isUnmaintained(entryPath)) continue;
@@ -174,6 +191,72 @@ function normalizedSourceExclusions(sourceExclusions) {
 	};
 }
 
+function generatedClaudeEntries(contract, kind) {
+	return Object.fromEntries(
+		contract
+			.filter(
+				(entry) =>
+					entry.kind === kind && entry.source.encoding.startsWith("harness-"),
+			)
+			.map((entry) => {
+				const output = entry.mappings.find(
+					(mapping) => mapping.target === "claude-repository",
+				).outputs[0];
+				return [entryName(output), entry];
+			}),
+	);
+}
+
+function assertHarnessTemplateTopology(root, contract, fs, isUnmaintained) {
+	const templates = contract.filter((entry) =>
+		entry.source.encoding.startsWith("harness-"),
+	);
+	if (!templates.length) return;
+	const base = pathFor(root, "scripts/harness-template");
+	assertEntryClosure(
+		fs,
+		base,
+		new Map(
+			["skills", "commands", "agents"].map((name) => [name, { source: {} }]),
+		),
+		{},
+		"directory",
+		isUnmaintained,
+	);
+	for (const [kind, directory] of [
+		["skill", "skills"],
+		["command", "commands"],
+		["agent", "agents"],
+	]) {
+		const entries = new Map(
+			templates
+				.filter((entry) => entry.kind === kind)
+				.map((entry) => [entryName(entry.source.path), entry]),
+		);
+		assertEntryClosure(
+			fs,
+			resolve(base, directory),
+			entries,
+			{},
+			kind === "skill" ? "directory" : "file",
+			isUnmaintained,
+		);
+		if (kind === "skill")
+			for (const entry of entries.values()) {
+				assertSkillTreeClosure(
+					fs,
+					pathFor(root, entry.source.path),
+					entry,
+					isUnmaintained,
+				);
+				for (const file of entry.source.templates) {
+					if (!entry.source.files.includes(file))
+						sourceTopologyError(entry.source.path, file, "undeclared template");
+				}
+			}
+	}
+}
+
 function assertClaudeTopology(
 	root,
 	contract,
@@ -203,6 +286,7 @@ function assertClaudeTopology(
 		sourceExclusions.skills,
 		"directory",
 		isUnmaintained,
+		generatedClaudeEntries(contract, "skill"),
 	);
 	for (const capability of sourceEntries(
 		contract,
@@ -225,6 +309,7 @@ function assertClaudeTopology(
 		sourceExclusions.commands,
 		"file",
 		isUnmaintained,
+		generatedClaudeEntries(contract, "command"),
 	);
 	assertEntryClosure(
 		fs,
@@ -233,6 +318,7 @@ function assertClaudeTopology(
 		sourceExclusions.agents,
 		"file",
 		isUnmaintained,
+		generatedClaudeEntries(contract, "agent"),
 	);
 	assertType(fs, resolve(claudeRoot, "settings.json"), "file");
 	for (const name of Object.keys(sourceExclusions.root)) {
@@ -244,6 +330,11 @@ function assertDeclaredSourceTypes(root, contract, fs) {
 	for (const capability of contract) {
 		const path = pathFor(root, capability.source.path);
 		switch (capability.source.encoding) {
+			case "harness-skill-template":
+				assertType(fs, path, "directory");
+				continue;
+			case "harness-command-template":
+			case "harness-agent-template":
 			case "claude-skill":
 			case "claude-command":
 			case "claude-agent":
@@ -373,7 +464,47 @@ function readAndValidateDeclaredSources(root, contract, fs) {
 	for (const capability of contract) {
 		const path = pathFor(root, capability.source.path);
 		const source = capability.source;
-		if (source.encoding === "claude-skill") {
+		if (source.encoding.startsWith("harness-")) {
+			const variants = {};
+			for (const target of ["claude", "codex"]) {
+				if (capability.kind === "skill") {
+					const contents = Object.fromEntries(
+						source.files.map((file) => {
+							const text = fs.readFileSync(resolve(path, file), "utf-8");
+							return [
+								file,
+								source.templates.includes(file)
+									? renderHarnessTemplate(
+											text,
+											target,
+											`${source.path}/${file}`,
+										)
+									: text,
+							];
+						}),
+					);
+					const parsed = parseFrontmatter(
+						path,
+						source.encoding,
+						contents["SKILL.md"],
+					);
+					validateSkill(path, parsed.frontmatter);
+					variants[target] = { ...parsed, contents };
+				} else {
+					const markdown = renderHarnessTemplate(
+						fs.readFileSync(path, "utf-8"),
+						target,
+						source.path,
+					);
+					const parsed = parseFrontmatter(path, source.encoding, markdown);
+					if (capability.kind === "command")
+						validateCommand(path, parsed.frontmatter);
+					else validateAgent(path, parsed.frontmatter);
+					variants[target] = { ...parsed, markdown };
+				}
+			}
+			decoded.set(capability.id, variants);
+		} else if (source.encoding === "claude-skill") {
 			const skillPath = resolve(path, "SKILL.md");
 			const parsed = parseFrontmatter(
 				skillPath,
@@ -445,6 +576,19 @@ function deepFreeze(value) {
 
 function decodeSemanticRecord(capability, source) {
 	switch (capability.source.encoding) {
+		case "harness-skill-template":
+			return {
+				files: clone(capability.source.files),
+				summary: source.claude.frontmatter.summary.trim(),
+				variants: clone(source),
+			};
+		case "harness-command-template":
+		case "harness-agent-template":
+			return {
+				...clone(source.codex.frontmatter),
+				body: source.codex.body,
+				variants: clone(source),
+			};
 		case "claude-skill":
 			return {
 				files: clone(capability.source.files ?? []),
@@ -494,6 +638,12 @@ export function decodeHarnessSources({
 	isIgnored = createGitIgnoreOracle(root),
 }) {
 	const exclusions = normalizedSourceExclusions(sourceExclusions);
+	assertHarnessTemplateTopology(
+		root,
+		contract,
+		fs,
+		createUnmaintainedEntryTest(root, fs, isIgnored),
+	);
 	assertClaudeTopology(
 		root,
 		contract,

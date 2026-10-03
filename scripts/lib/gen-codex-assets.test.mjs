@@ -11,7 +11,6 @@ import {
 	agentCapabilityToCodexToml,
 	buildCodexPluginManifest,
 	buildCodexProjectConfig,
-	claudeInstructionsToAgents,
 	commandCapabilityToCodexSkill,
 	hookCapabilityToCodexHooks,
 	skillMarkdownToCodex,
@@ -414,7 +413,7 @@ describe("generated ownership notices", () => {
 			"\n# Instructions\n\n<!-- DO NOT EDIT. Authoritative source: example.md. -->\n";
 		assert.equal(
 			commandCapabilityToCodexSkill(commandRecord({ body }), "pfd-cycle"),
-			"---\nname: pfd-cycle\ndescription: Choose the next PFD task.\n---\n" +
+			'---\nname: pfd-cycle\ndescription: "Choose the next PFD task."\n---\n' +
 				"<!-- DO NOT EDIT. Authoritative source: .claude/commands/pfd-cycle.md. -->\n" +
 				body,
 		);
@@ -473,61 +472,13 @@ describe("generated ownership notices", () => {
 });
 
 describe("commandCapabilityToCodexSkill", () => {
-	it("converts each maintained command argument clause without leaving a Claude placeholder", () => {
-		const cases = [
-			[
-				"pfd-cycle",
-				"引数（あれば作業選択の指定として扱う）: $ARGUMENTS",
-				"作業選択の指定として扱う。",
-			],
-			["pfd-init", "引数（あれば）: $ARGUMENTS", "引数として扱う。"],
-			[
-				"pfd-retro",
-				"対象範囲の指定（あれば）: $ARGUMENTS",
-				"監査対象範囲の指定として扱う。",
-			],
-		];
-
-		for (const [name, clause, expected] of cases) {
-			const output = commandCapabilityToCodexSkill(
-				commandRecord({ name, body: `\n${clause}\n` }),
-				name === "pfd-retro" ? "source-command-pfd-retro" : name,
-			);
-			assert.doesNotMatch(output, /\$ARGUMENTS/, name);
-			assert.match(output, new RegExp(expected), name);
-		}
-	});
-
-	it("rejects an unrecognized argument construct with its source path", () => {
-		assert.throws(
-			() =>
-				commandCapabilityToCodexSkill(
-					commandRecord({
-						name: "pfd-unknown",
-						body: "\nUnsupported argument form: $ARGUMENTS\n",
-					}),
-					"pfd-unknown",
-				),
-			/\.claude\/commands\/pfd-unknown\.md.*\$ARGUMENTS/,
+	it("preserves the decoded body including intentional foreign literals", () => {
+		const body = "\nCLAUDE.md and $ARGUMENTS are quoted examples.\n";
+		const output = commandCapabilityToCodexSkill(
+			commandRecord({ body }),
+			"pfd-cycle",
 		);
-	});
-
-	it("preserves the command body except for the Codex argument instruction", () => {
-		assert.equal(
-			commandCapabilityToCodexSkill(
-				commandRecord({
-					body: "\nKeep this body verbatim.\n\n引数（あれば作業選択の指定として扱う）: $ARGUMENTS\n",
-				}),
-				"pfd-cycle",
-			),
-			"---\n" +
-				"name: pfd-cycle\n" +
-				"description: Choose the next PFD task.\n" +
-				"---\n" +
-				"<!-- DO NOT EDIT. Authoritative source: .claude/commands/pfd-cycle.md. -->\n\n" +
-				"Keep this body verbatim.\n\n" +
-				"ユーザーがスキル呼び出しとともに指定した内容があれば、作業選択の指定として扱う。\n",
-		);
+		assert.ok(output.endsWith(body));
 	});
 
 	it("uses an assembly-supplied non-colliding output name while retaining the real source path for errors", () => {
@@ -584,33 +535,6 @@ describe("agentCapabilityToCodexToml", () => {
 		assert.match(output, /\$\{PLUGIN_ROOT\}/);
 	});
 
-	it("permits read-only shell inspection for pfd-lens catalog and target PFD reads", () => {
-		const output = agentCapabilityToCodexToml(
-			agentRecord({
-				body:
-					`\n${PFD_LENS_BASH_RESTRICTION}\n` +
-					"存在する manifest だけを Read して CLI 実体を解決する。\n" +
-					"カタログを読み込み、対象 `.pfdsl` ファイルを Read する。\n" +
-					"対象以外は読まない。ただし pfd-retro スキル SKILL.md、binding、観点カタログは例外。\n",
-			}),
-		);
-		const instructions = parseTomlDeveloperInstructions(output);
-
-		assert.match(instructions, /Bash は .*`rg` と `sed`.*のみ許可される/);
-		assert.equal(
-			(instructions.match(/Bash は .*のみ許可される/g) ?? []).length,
-			1,
-		);
-		assert.doesNotMatch(instructions, /\bRead\b/);
-		assert.match(instructions, /manifest だけを `sed` で読んで/);
-		assert.match(instructions, /対象 `\.pfdsl` ファイルを `sed` で読む/);
-		assert.match(
-			instructions,
-			/pfd-retro スキル SKILL\.md、binding、観点カタログ/,
-		);
-		assert.match(output, /^sandbox_mode = "read-only"$/m);
-	});
-
 	it("preserves one blank-context CLI resolution for check, graph describe, and other graph queries", () => {
 		const output = agentCapabilityToCodexToml(
 			agentRecord({
@@ -643,88 +567,6 @@ describe("agentCapabilityToCodexToml", () => {
 		assert.match(
 			instructions,
 			/`package\.json` と `packages\/cli\/package\.json`、pfd-retro スキル SKILL\.md、binding、観点カタログはこの読取境界の例外/,
-		);
-	});
-
-	it("rejects pfd-lens when its expected Bash restriction clause changes", () => {
-		for (const body of [
-			"\nBash は `pfdsl delete <file>` のみ許可される。\n",
-			`\n${PFD_LENS_BASH_RESTRICTION} Bash は \`pfdsl fmt --write\` も許可される。\n`,
-			`\n${PFD_LENS_BASH_RESTRICTION}\n${PFD_LENS_BASH_RESTRICTION}\n`,
-		]) {
-			assert.throws(
-				() => agentCapabilityToCodexToml(agentRecord({ body })),
-				/\.claude\/agents\/pfd-lens\.md.*Bash restriction clause/,
-			);
-		}
-	});
-
-	it("rejects new pfd-lens Read instructions that have no Codex translation", () => {
-		assert.throws(
-			() =>
-				agentCapabilityToCodexToml(
-					agentRecord({
-						body: `\n${PFD_LENS_BASH_RESTRICTION}\n別のファイルを Read で確認する。\n`,
-					}),
-				),
-			/\.claude\/agents\/pfd-lens\.md: Codex instructions contain Read/,
-		);
-	});
-
-	it("rejects a second Bash rule instead of shipping conflicting permissions", () => {
-		assert.throws(
-			() =>
-				agentCapabilityToCodexToml(
-					agentRecord({
-						body: `\n${PFD_LENS_BASH_RESTRICTION}\nBash は \`pfdsl fmt --write\` も許可される。\n`,
-					}),
-				),
-			/\.claude\/agents\/pfd-lens\.md: unexpected Bash instruction/,
-		);
-	});
-
-	it("maps pfd-implementer's known write tools and repository instructions", () => {
-		const output = agentCapabilityToCodexToml(
-			agentRecord({
-				name: "pfd-implementer",
-				tools: "Bash, Read, Edit, Write, Grep, Glob, Skill",
-				body: "\nRead `CLAUDE.md`.\n",
-			}),
-		);
-
-		assert.match(output, /^sandbox_mode = "workspace-write"$/m);
-		assert.match(
-			output,
-			/^# DO NOT EDIT\. Authoritative source: \.claude\/agents\/pfd-implementer\.md\.$/m,
-		);
-		assert.match(output, /`AGENTS\.md`/);
-		assert.match(
-			output,
-			/親 agent が `git fetch`、stage、commit、`git push`、PR の作成・更新、issue の作成・クローズ・コメントを担当する。/,
-		);
-		assert.match(
-			output,
-			/権限エラーはユーザーへ直接継続を求めず、親 agent へ引き上げる。/,
-		);
-		assert.match(output, /この節は本文中の git に関する指示より優先する。/);
-	});
-
-	it("keeps the Codex-only git boundary when Claude's pfd-implementer wording changes", () => {
-		const output = agentCapabilityToCodexToml(
-			agentRecord({
-				name: "pfd-implementer",
-				body: "\nThe upstream wording may change without changing this Codex boundary.\n",
-				tools: "Bash, Read, Edit, Write, Grep, Glob, Skill",
-			}),
-		);
-
-		assert.match(
-			output,
-			/親 agent が `git fetch`、stage、commit、`git push`、PR の作成・更新、issue の作成・クローズ・コメントを担当する。/,
-		);
-		assert.match(
-			output,
-			/subagent は worktree 内のファイル編集とテスト・検査だけを担当する。/,
 		);
 	});
 
@@ -786,38 +628,6 @@ describe("Codex plugin intentional exclusions", () => {
 	it("keeps agent mappings excluded with no Codex plugin output", () => {
 		assertCodexPluginAgentExclusions(HARNESS_CAPABILITY_CONTRACT);
 		assert.equal(existsSync(join(root, "plugin/pfdsl-codex/agents")), false);
-	});
-});
-
-describe("claudeInstructionsToAgents", () => {
-	it("replaces the approved repository paths and Codex-specific instructions", () => {
-		const source =
-			"CLAUDE.md\n" +
-			"CLAUDE_PLUGIN_ROOT\n" +
-			".claude/skills/pfd-ops/SKILL.md\n" +
-			`\${CLAUDE_PLUGIN_ROOT}/skills/pfd-ops/SKILL.md\n` +
-			"Claude 向け指示\n" +
-			"Claude へ恒常的に届ける\n" +
-			"1つの Claude Code plugin\n" +
-			"を Claude Code プラットフォーム側\n" +
-			".Codex/settings.json\n" +
-			".claude/settings.json\n" +
-			"unchanged\n";
-
-		assert.equal(
-			claudeInstructionsToAgents(source),
-			"AGENTS.md\n" +
-				"PLUGIN_ROOT\n" +
-				".agents/skills/pfd-ops/SKILL.md\n" +
-				`\${PLUGIN_ROOT}/skills/pfd-ops/SKILL.md\n` +
-				"Codex 向け指示\n" +
-				"Codex へ恒常的に届ける\n" +
-				"Claude Code と Codex の両方で使える plugin\n" +
-				"を各ハーネスのプラットフォーム側\n" +
-				".codex/hooks.json\n" +
-				".codex/hooks.json\n" +
-				"unchanged\n",
-		);
 	});
 });
 

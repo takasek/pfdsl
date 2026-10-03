@@ -1,4 +1,4 @@
-<!-- DO NOT EDIT. Authoritative source: .claude/skills/pfd-ops/references/scaffold/review-perspectives.md. -->
+<!-- DO NOT EDIT. Authoritative source: scripts/harness-template/skills/pfd-ops/references/scaffold/review-perspectives.md. -->
 
 # review-perspectives.md — instance seed
 

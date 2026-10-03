@@ -1,4 +1,4 @@
-<!-- DO NOT EDIT. Authoritative source: .claude/skills/pfd-ops/references/scaffold/bindings/pfd-retro-patterns/sample-pattern.md. -->
+<!-- DO NOT EDIT. Authoritative source: scripts/harness-template/skills/pfd-ops/references/scaffold/bindings/pfd-retro-patterns/sample-pattern.md. -->
 
 # 事例の記入例: 未検証の前提の持ち越し
 

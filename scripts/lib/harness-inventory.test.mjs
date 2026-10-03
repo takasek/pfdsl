@@ -72,16 +72,16 @@ describe("harness distribution inventory", () => {
 			"command:pfd-retro",
 		]) {
 			assert.deepEqual(dispositionsFor(id), [
-				"native",
-				"native",
+				"transform",
+				"transform",
 				"transform",
 				"transform",
 			]);
 		}
 		for (const id of ["agent:pfd-lens", "agent:pfd-implementer"]) {
 			assert.deepEqual(dispositionsFor(id), [
-				"native",
-				"native",
+				"transform",
+				"transform",
 				"transform",
 				"intentional-exclusion",
 			]);

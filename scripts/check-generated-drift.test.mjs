@@ -46,6 +46,7 @@ describe("check-generated-drift", () => {
 			"generated/skills/pfdsl/references/obsolete.md",
 			".agents/obsolete.md",
 			".codex/obsolete.json",
+			".claude/skills/pfd-grill/obsolete.md",
 		];
 		const manualPath = join(root, ".claude-plugin/manual-note.md");
 		try {
@@ -68,6 +69,15 @@ describe("check-generated-drift", () => {
 					verbatimSymlinks: true,
 				});
 			}
+			cpSync(
+				join(repoRoot, "scripts/harness-template"),
+				join(root, "scripts/harness-template"),
+				{ recursive: true },
+			);
+			cpSync(
+				join(repoRoot, "scripts/lib/harness-template.mjs"),
+				join(root, "scripts/lib/harness-template.mjs"),
+			);
 			symlinkSync(join(repoRoot, "node_modules"), join(root, "node_modules"));
 			writeFileSync(manualPath, "maintained by hand\n");
 			const skillBefore = readFileSync(
@@ -95,7 +105,7 @@ describe("check-generated-drift", () => {
 					".agents",
 					".codex",
 					".claude-plugin/marketplace.json",
-					".claude/skills/pfd-ops/install",
+					".claude",
 					"AGENTS.md",
 					"CLAUDE.md",
 				],
@@ -116,7 +126,12 @@ describe("check-generated-drift", () => {
 					cwd: root,
 					encoding: "utf8",
 				});
-			assert.equal(check().status, 0, "the committed baseline is clean");
+			const baseline = check();
+			assert.equal(
+				baseline.status,
+				0,
+				`the committed baseline is clean: ${baseline.stderr}`,
+			);
 			const generation = spawnSync(
 				process.execPath,
 				[join(root, "scripts/gen-plugin-dist-independent.mjs")],
