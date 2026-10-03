@@ -10,6 +10,9 @@
 2. **設計決定** — ADR 起草（`docs/adr/`）。ADR 化した判断は適用ルールのガイド蒸留要否も判定する
 3. **作業項目** — issue 起票 + 依存グラフ更新（`roadmap.pfdsl`。手段は roadmap.md 参照）
 
+`maintain_repo_bindings` は binding・guard・companionに加えて、現行の `adopter_config` も改版基準として読む。
+`.pfdsl/config.json` の一方の宣言値を変更するときも、もう一方を含む既存値を保持して差分改訂する。
+
 今回の監査で得た所見を起票する前に、共通の方針判断・調査・修正を一度に進める利点が大きいものは、一つの作業項目にまとめる。まとめた場合も、各所見の受入条件は残す。この整理のために、過去の類似 issue を追加で探索する必要はない。
 
 このリポが pfdsl スキルの上流であるため経路1（品質ガイド改訂）が成立する。配布先リポでは経路1は存在しない場合がある。
@@ -140,6 +143,7 @@ issue が spec 変更を明示しており、変更が単一の制約節・sever
 ## spec_proposals ライフサイクル
 
 `docs/spec/proposals/*.md` は `draft_proposals` が生成し `maintain_spec`（integrate フェーズ）が消費する中間成果物。
+提案文書の criteria は起草内容が統合判断に使える状態を指し、後続の spec 統合完了を要求しない。
 
 - **作成タイミング**: issue 着手時、spec 改版の起草フェーズ
 - **消費**: `maintain_spec` で spec 本文に統合される
@@ -211,7 +215,7 @@ drift 検査は pre-commit（`gen-install` の check_drift。他の drift 検査
 
 検査対象は手書きリストでなく既存データから導く（列挙を持つとそれ自体が追随漏れの対象になる）。同梱されるかは `scripts/lib/gen-plugin.mjs` の `PLUGIN_MIRRORS`（組み立てと `distribution-review` の逆写像が既に読んでいる同梱マニフェスト）が答え、artifact の `location:` とエッジは `@pfdsl/core` の `analyze()` から取る。`pfdsl_skill` はマニフェストが「rendered, not mirrored」として除外するため特別扱いが要らない。
 
-**2つの要件は要求範囲が異なる（#944）**: `gen_plugin` への到達は図に宣言された同梱の手書き artifact に要求する。workflow 側の producer の存在は `workflow.pfdsl` が整備対象として宣言している artifact にのみ要求する。この図は配送 membership でなく整備責任を持つため、生成元がなければ整備契約が欠ける。`pfd_commands` は `pipeline.pfdsl` にしか宣言が無く（#780）、workflow 側の生成元は要求しない。両図が宣言する artifact は workflow 側の宣言を採り、finding は1件に畳む。
+**2つの要件は要求範囲が異なる（#944）**: `gen_plugin` への到達は図に宣言された同梱の手書き artifact に要求する。workflow 側の producer の存在は `workflow.pfdsl` が整備対象として宣言している artifact にのみ要求する。この図は配送 membership でなく整備責任を持つため、生成元がなければ整備契約が欠ける。command 正本は `ops_skill_general`・`retro_skill`・`ecosystem_skill` の location に含め、`maintain_distributed_prompt_assets` が整備する。生成済みcommand/command由来skillの配送は `pipeline.pfdsl` が持つ。両図が宣言する artifact は workflow 側の宣言を採り、finding は1件に畳む。
 
 照合先は ADR-0035 の描き直しで4箇所から2箇所に減った。旧 `publish_cli` 入力エッジは判断部分が3種の release 判断になり素材列挙を持たなくなり、`pipeline.pfdsl` の旧 `assemble_plugin` は `workflow.pfdsl` の旧 `gen_plugin` と同一物の二重モデル化だったため統合した。実際にこの二重化は `pfd_lens_agent` / `implementer_agent` が片方の図にしか無いという乖離を生んでいた。
 

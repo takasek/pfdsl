@@ -44,7 +44,7 @@
 ## 変換境界の定義
 
 - **parse（`@pfdsl/core` の `parse()`）**: frontmatter 読込 → lex → parse の3段を1トランザクションとして扱う。宣言 ID の YAML キー型は文字列化前に検査する。出力は `document`（構文木）と型検査済み `frontmatter`、FM/L/P 診断。個別サブコマンドとしては露出しない内部境界
-- **normalize（`normalizer.ts` + `buildGraph`）**: parse の出力からエッジリスト・ノード種別・孤立ノード集合・`Graph` 構造を組み立てる。CLI `normalize` コマンドはこれをそのまま JSON 出力する
+- **normalize（`normalizer.ts` + `buildGraph`）**: parse の出力からエッジリスト・ノード種別・孤立ノード集合・`Graph` 構造を組み立てる。個別の CLI `normalize` コマンドは公開しない。グラフの閲覧は `graph` コマンド群が担う（ADR-0030）
 - **validate（`validator.ts`）**: 正準化グラフと frontmatter に V/W ルールを適用し、解析時のソース位置索引から宣言位置を取得して診断を生成する。単独の `validateGraph` は従来の `source` 引数も利用できる。CLI `check` は parse→normalize→validate を1回で実行する。VSCode 拡張は `analyzeSource()` 経由で同じ validate をエディタ内リアルタイム診断に使う（`diagnostics.ts`）
 - **collect_diagnostics（`index.ts` の `analyze()`）**: parse・normalize・validate の診断を集約する。CLI と VSCode は集約後の結果を受け取る。
 
@@ -68,12 +68,21 @@ VSCode の URI・version 単位の解析 cache はこの snapshot を jump・lin
 - **gen_skill（`scripts/gen-skill.mjs`）**: 一次ソース（skill-template / spec / samples / examples / review-perspectives）からリポ内 pfdsl スキルを組む。`references/*.md` の生成は `packages/cli/dist` に触れない `scripts/lib/gen-skill-refs.mjs` に切り出し済みで、SKILL.md（`pfdsl help` 埋め込み）のみ dist を必要とする（#586）。
 同モジュールを単体で呼ぶ CLI エントリもあったが、`scripts/pre-commit` が呼び出しをやめた後は誰も起動しておらず削除した（#668）。
 dist 非依存の手動再生成は `scripts/gen-plugin-dist-independent.mjs` が担う
+
+`gen_skill` の素材には `toolchain` も含む。
+`scripts/gen-skill.mjs` はローカルビルドの CLI help と `packages/cli/package.json` の version を SKILL.md に埋め込み、`packages/core/src/types/frontmatter.ts` とテンプレートのフィールドも照合する。
+CLI help・version だけが変わっても生成内容が変わるため、ビルドの前提だけでなくデータ入力として配線する。
+
 - **gen_install（`scripts/lib/install-templates.mjs` の明示リスト）**: repo ルートの配布ソースから `install/` ミラーを一方向で再生成する。生成の向きは repo ルート → `install/` → `plugin/` の一本のみ（#547 で双方向 sync を廃止）
-- **plugin root assembly（`scripts/gen-plugin.mjs`）**: `pnpm -r build && make gen-plugin` が、中立テンプレートの source topology と schemaを中立capability recordへdecodeして四target contractを検証し、その同じrecord objectから両ハーネスの出力を生成する。pfdsl skillの中立な生成正本は`generated/skills/pfdsl`であり、`.claude/skills/pfdsl`はそこへの生成symlinkなので手編集しない。組み立て前に専有rootをsnapshotして空から再構築するため、生成をやめた追跡済みファイルはGitの削除差分になり、生成失敗時は元のrootへ戻る。再構築でignore対象を含む未追跡ファイルが失われる場合は生成を失敗させる。dist非依存の経路では中立skillの`SKILL.md`だけを保持する。Claude Code adapterはplugin tree・manifest・marketplace記述を`plugin/pfdsl/`へidentity互換に組み立てる。Codex adapterは生成済みClaude rootやmanifestを読まず、repositoryの`AGENTS.md`・`.agents/`・`.codex/`とnative skill tree・manifest・hooksを`plugin/pfdsl-codex/`へ生成する。公式Codex validator/runtimeはplugin rootの`skills/`を固定するため、二つのrootを混在させない。内部でgen_installを実行するため、pluginが古い`install/`から組まれることはない
+- **plugin root assembly（`scripts/gen-plugin.mjs`）**: `pnpm -r build && make gen-plugin` が、中立テンプレートの source topology と schemaを中立capability recordへdecodeして四target contractを検証し、その同じrecord objectから両ハーネスの出力を生成する。pfdsl skillの中立な生成正本は`generated/skills/pfdsl`であり、`.claude/skills/pfdsl`はそこへの生成symlinkなので手編集しない。組み立て前に専有rootをsnapshotして空から再構築するため、生成をやめた追跡済みファイルはGitの削除差分になり、生成失敗時は元のrootへ戻る。再構築でignore対象を含む未追跡ファイルが失われる場合は生成を失敗させる。dist非依存の経路では中立skillの`SKILL.md`だけを保持する。Claude Code adapterはplugin tree・manifestを`plugin/pfdsl/`へidentity互換に組み立て、repo-rootの`.claude-plugin/marketplace.json`も更新する。Codex adapterは生成済みClaude rootやmanifestを読まず、repositoryの`AGENTS.md`・`.agents/`・`.codex/`とnative skill tree・manifest・hooksを`plugin/pfdsl-codex/`へ生成する。公式Codex validator/runtimeはplugin rootの`skills/`を固定するため、二つのrootを混在させない。内部でgen_installを実行するため、pluginが古い`install/`から組まれることはない
 
 復元未完時には両 generator CLI が primary error を先に表示し、snapshot の保存理由と recovery path を続ける。
 再試行と `check-generated-drift.mjs` は `plugin/.pfdsl-gen-txn-*` の残留を専用診断で示すが、active transaction や cleanup 失敗もあり得るため、全件を rollback failure と断定しない。
 再試行は保存済みデータの復元・削除を行わないため、元のエラーと snapshot を確認してから復旧を判断する。
+
+Claude adapter が改版する repo-root `.claude-plugin/marketplace.json` は、前世代の `claude_adapter_output` から `gen_plugin` へのフィードバック入力である。
+生成器はこの既存 JSON を読み、plugin の description だけを書き換え、owner・source.ref 等を保持する。
+`claude_adapter_output` の location は専有 root `plugin/pfdsl/` 全体とこの repo-root JSON を指し、skill の追加や bundle manifest も生成器の出力範囲として含む。
 
 - **render_previews（`make gen-samples`）**: 機能カタログとロードマップを dot/svg に描画する。`.dot` / README は graphviz-exporter、`.svg` は preview-engine の wasm graphviz で生成され、いずれも決定論的（#588）
 - **push_cli_release_tag / publish_cli**: `make release COMMIT=<SHA>` は準備PRがmergeされた明示commitを検査し、そのSHAへ`v*` tagを作成・pushする。
@@ -129,6 +138,12 @@ VSIXのローカル検証・アップロードと、公開済みpluginのmarketp
 実行主体が人でも、入力を消費して公開物や参照を作る変換はこの図に置く（ADR-0035）。
 
 ## plugin 配布チェーンの依存
+
+`decode_harness_capabilities` はテンプレート・inventory・toolchainに加え、実行時のGit ignore判定素材を読む。
+repository内のignore規則だけでなくGit indexとclone固有のinfo/excludeも回答に影響するため、`.gitignore`だけの決定論的な入力とみなさない。
+`check_install_sync --upstream` は導入済みファイル・pluginと、その実行で上流mainから取得するversion・bundle manifestを比較する。
+取得不能時やローカルClaude plugin manifestが無い場合はbest-effortで通知を省く。
+上流の二つのURLを同一commitへ固定する保証は実装にない。
 
 - **同梱対象リストの一元化（`harness_inventory`）**: 同梱スキル・コマンド・agent・hookと生成分類の一次情報に加え、各capabilityの`claude-repository`・`claude-plugin`・`codex-repository`・`codex-plugin` mappingは`scripts/lib/harness-inventory.mjs`が持つ。スキル・agentを追加するときは四targetすべてへnative・transform・intentional exclusionのいずれか一つを宣言する。PFD側の照合先はworkflow.pfdsl companionの「配布スキルの新規追加時の横断照合」が一次情報（ADR-0035以前の二重モデル化とその乖離の経緯もそちら）。
 - **二重ハーネスのadapter境界**: `decode_harness_capabilities`が中立正本の source encoding とハーネス別の描画済み本文を中立recordへ閉じ込め、`gen_plugin`と`assemble_codex_plugin`はcontract検証済みの同じrecord objectを兄弟入力としてそれぞれのrootを作る。Claude Code rootは`plugin/pfdsl/`、Codex native rootは`plugin/pfdsl-codex/`である。Codex adapterは生成済みClaude rootやmanifestを入力にせず、run固有のtemporary siblingへstageし、rootのassembly lock下でまとめて置換する。公式Codex validator/runtimeがroot直下の`skills/`を固定するため、異なるskill treeを単一rootに置かない。Codex plugin manifestのcapabilityは現在Skillsのみだが、同梱の`hooks/hooks.json`は既定discoveryで公開され、Codex runtimeの`CLAUDE_PLUGIN_ROOT`互換環境でhook commandを解決する。native agentとrepo-local hook設定はリポジトリの`.codex/`へ出力する。command skillの所有manifestは削除・改名後のstale dirを掃除し、commandとskillの出力名が衝突する場合はcommandを`source-command-<name>`へ改名する。`codex_plugin_dist`はCodex native rootの検証済み成果物だが、repo-owned native marketplace/install pathには渡さず、現在のCodex互換導入でも使わない。外部のCodex marketplace構築者が自身のnative sourceとして扱う検証済みhandoff surfaceであり、現在のCodex互換導入は`.claude-plugin/marketplace.json`が同じClaude-compatible published artifactを指す経路を使う。
