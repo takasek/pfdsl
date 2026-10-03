@@ -341,7 +341,7 @@ export function declarationPair(
  * Quoting for the new value is left to the `yaml` package's own core-schema
  * judgment — pass a `number` for integer fields (e.g. `index`) and a
  * `string` for everything else. Returns null when there is no frontmatter,
- * or when `id` has no entry under `kind`.
+ * or when `id` has no entry under `kind` or is accessed through a YAML alias.
  */
 export function setFrontmatterField(
 	source: string,
@@ -353,6 +353,20 @@ export function setFrontmatterField(
 	const { present, doc, body, yamlText, newline } = parseFrontmatterCst(source);
 	if (!present || invalidIdKeys(doc).length > 0 || !doc.hasIn([kind, id]))
 		return null;
+	if (!isMap(doc.get(kind, true))) return null;
+	const entry = doc.getIn([kind, id], true);
+	if (entry === null || (isScalar(entry) && entry.value === null)) {
+		const mapping = doc.createNode({});
+		if (entry) {
+			if (entry.comment !== undefined) mapping.comment = entry.comment;
+			if (entry.commentBefore !== undefined)
+				mapping.commentBefore = entry.commentBefore;
+			if (entry.spaceBefore !== undefined)
+				mapping.spaceBefore = entry.spaceBefore;
+			if (entry.anchor !== undefined) mapping.anchor = entry.anchor;
+		}
+		doc.setIn([kind, id], mapping);
+	} else if (!isMap(entry)) return null;
 	doc.setIn([kind, id, field], value);
 	return renderFrontmatterCst(doc, newline, yamlText) + body;
 }

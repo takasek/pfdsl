@@ -100,7 +100,7 @@ statusStyles:
 pfdsl check <file|-> [--strict] [--hints] [--json] [--no-color]   # Validate a .pfdsl file (- = stdin)
 pfdsl explain <code>   # Print the summary and spec section for a diagnostic code (e.g. V021)
 pfdsl fmt <file|-> [--write] [--check] [--no-color]   # Format a .pfdsl file (- = stdin)
-pfdsl delete <file|-> <id[,id...]> [--write] [--json] [--no-color]   # Remove one or more nodes from a .pfdsl file (- = stdin)
+pfdsl delete <file|-> <id[,id...]> [--write] [--json] [--no-color]   # Remove artifacts, processes, or groups from a .pfdsl file (- = stdin)
 pfdsl rename <file|-> <old> <new> [--write] [--json] [--no-color]   # Rename an artifact, process, or group id and every reference to it (- = stdin)
 pfdsl render <file|-> [--format dot|svg|pdf|png] [--no-color]   # Render as Graphviz DOT (default), SVG, PDF, or PNG (- = stdin)
 pfdsl diff <a> <b> [--format text|dot|svg] [--json] [--no-color]   # Structural diff (text), or visual diff DOT/SVG
@@ -165,7 +165,8 @@ It keeps the body's layout, including the order of set members, so run `pfdsl fm
 It edits only the given file: a parent that points to it through `subflow:`, or a file that extends it as a preset, must be checked separately, and `pfdsl rename --help` lists what it rewrites and refuses.
 It leaves `label:` as it was, so update a label that names the old id with `meta set <file> <new-id> label <text>`.
 `meta set` takes comma-separated ids and writes all of them or none, so regrouping a batch of nodes is one call, not one edit per node.
-It only writes to nodes declared in the frontmatter; a node that appears only in the body is reported as not found, so declare it first.
+It only writes to nodes declared in the frontmatter; if a node appears only in the body, add its definition first.
+For extension fields, check `meta set --help`: versions supporting `--allow-unknown` update existing scalar fields without a flag and require the flag only to add a new unknown field. Arrays/maps remain unsupported.
 Declare a new group under `group:` before moving nodes into it: a `group:` value that names an undeclared group passes `check` without a warning, and those nodes render outside every cluster.
 
 ## References — which to read when
@@ -179,4 +180,4 @@ Declare a new group under `group:` before moving nodes into it: a `group:` value
 | フィールドの正確な仕様 | `references/spec.md` §3–5（モデル・識別子・型推論）・§14（正準順序） |
 | PFD のレビュー・監査 | `references/review-perspectives.md`（A/B/C カタログ。A/B は図、C は normative 仕様文書（自リポ保守の仕様がある場合）の監査。書くルールは `references/quality-guide.md`、問い詰めはこちら） |
 
-`references/spec.md` は full spec v0.0.26（20節・大型）— 全読せず、節見出し（`## N.`）とエラーコードで該当箇所だけ読む。
+`references/spec.md` は full spec v0.0.27（20節・大型）— 全読せず、節見出し（`## N.`）とエラーコードで該当箇所だけ読む。

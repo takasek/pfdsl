@@ -3,6 +3,7 @@ import { formatId } from "./formatter.js";
 import {
 	parseFrontmatterCst,
 	renderFrontmatterCst,
+	usesYamlReferences,
 } from "./frontmatter-cst.js";
 import { analyze } from "./index.js";
 import { lex } from "./lexer.js";
@@ -10,6 +11,7 @@ import { parseTokens } from "./parser.js";
 import type {
 	ArtifactExpr,
 	Diagnostic,
+	GroupMeta,
 	Statement,
 	Token,
 } from "./types/index.js";
@@ -28,6 +30,13 @@ export interface DeleteNodesResult {
 	/** Ids that existed nowhere in `source` — a no-op for that id (idempotent). */
 	notFound: string[];
 	diagnostics: Diagnostic[];
+	/** No mutation or absence report is produced for shared YAML definitions. */
+	refusal?: "unsupportedYaml";
+}
+
+export interface DeleteNodesOptions {
+	/** Resolved preset + local groups; defaults to declarations in source. */
+	groups?: Record<string, GroupMeta>;
 }
 
 /**
@@ -397,6 +406,9 @@ function spliceBody(
  * deleted id. Applied atomically across all three so a caller can never end
  * up with a declaration and no edge occurrence (or vice versa) — the
  * decomposed repair this API exists to close off.
+ * Groups are removed without deleting their members or children: local
+ * node `group:` and child-group `parent:` references move to the nearest
+ * ancestor not being deleted, or are cleared when no such ancestor exists.
  *
  * The frontmatter half is applied through the yaml CST (ADR-0034), the same
  * way `insertDefinition` and `reindex` do, so unrelated comments, quote
@@ -410,6 +422,7 @@ function spliceBody(
 export function deleteNodes(
 	source: string,
 	ids: readonly string[],
+	opts: DeleteNodesOptions = {},
 ): DeleteNodesResult {
 	const { frontmatter, diagnostics } = analyze(source);
 	if (diagnostics.some((d) => d.severity === "error")) {
@@ -418,9 +431,20 @@ export function deleteNodes(
 
 	const deleteSet = new Set(ids);
 	const found = new Set<string>();
+	const deletedGroups = new Set<string>();
 
 	const cst = parseFrontmatterCst(source);
 	const doc = cst.present ? cst.doc : new Document();
+	if (usesYamlReferences(doc)) {
+		return {
+			output: source,
+			deleted: [],
+			notFound: [],
+			diagnostics,
+			refusal: "unsupportedYaml",
+		};
+	}
+	const groups = opts.groups ?? frontmatter?.group ?? {};
 
 	for (const id of deleteSet) {
 		if (doc.hasIn(["artifact", id])) {
@@ -429,6 +453,27 @@ export function deleteNodes(
 		} else if (doc.hasIn(["process", id])) {
 			doc.deleteIn(["process", id]);
 			found.add(id);
+		} else if (doc.hasIn(["group", id])) {
+			doc.deleteIn(["group", id]);
+			found.add(id);
+			deletedGroups.add(id);
+		}
+	}
+
+	for (const kind of ["artifact", "process", "group"] as const) {
+		const field = kind === "group" ? "parent" : "group";
+		for (const [id, meta] of Object.entries(frontmatter?.[kind] ?? {})) {
+			if (deleteSet.has(id)) continue;
+			const target = meta[field];
+			if (typeof target === "string" && deletedGroups.has(target)) {
+				let parent = groups[target]?.parent;
+				while (parent !== undefined && deletedGroups.has(parent)) {
+					parent = groups[parent]?.parent;
+				}
+				if (parent !== undefined && Object.hasOwn(groups, parent))
+					doc.setIn([kind, id, field], parent);
+				else doc.deleteIn([kind, id, field]);
+			}
 		}
 	}
 

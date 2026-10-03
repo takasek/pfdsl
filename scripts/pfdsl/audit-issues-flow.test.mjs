@@ -6,7 +6,7 @@
 
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { afterEach, beforeEach, describe, it } from "node:test";
@@ -27,6 +27,34 @@ afterEach(() => {
 });
 
 describe("audit-issues-flow without gh", () => {
+	it("prints a copyable timestamp repair command without changing the roadmap", () => {
+		const roadmap = resolve(__dirname, "../../.pfdsl/roadmap.pfdsl");
+		const before = readFileSync(roadmap, "utf8");
+		writeFileSync(
+			join(emptyBin, "gh"),
+			`#!${process.execPath}
+const args = process.argv.slice(2);
+const result = args[0] === "label"
+  ? [{ name: "flow:managed", description: "tracked in .pfdsl/roadmap.pfdsl" }, { name: "flow:exempt", description: "intentionally out of .pfdsl/roadmap.pfdsl scope" }]
+  : [{ number: 1291, state: "OPEN", labels: [{ name: "flow:managed" }], updatedAt: "2099-10-03T12:00:00Z" }];
+process.stdout.write(JSON.stringify(result));
+`,
+			{ mode: 0o755 },
+		);
+		const result = spawnSync(process.execPath, [scriptPath], {
+			encoding: "utf8",
+			env: { ...process.env, PATH: `${emptyBin}:${process.env.PATH}` },
+		});
+		assert.equal(result.status, 1, result.stderr);
+		assert.match(result.stdout, /stale_updated_at/);
+		assert.ok(
+			result.stdout.includes(
+				"pfdsl meta set .pfdsl/roadmap.pfdsl 'i1291_report_group_node_clash' updated_at '2099-10-03T12:00:00Z' --allow-unknown",
+			),
+		);
+		assert.equal(readFileSync(roadmap, "utf8"), before);
+	});
+
 	it("skips with exit code 2 and names both gh and the token as ways to recover", () => {
 		const env = { ...process.env, PATH: emptyBin };
 		delete env.GH_TOKEN;
