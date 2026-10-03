@@ -134,9 +134,10 @@ legacy_in >> build_feature -> feature
 });
 
 describe("sweep-completed-chains: canonical-fmt gate (#1125)", () => {
-	// GITHUB_TOKEN-authored PRs never trigger the pull_request workflow, so
-	// the repo's own `make check-fmt` never runs against this bot's output —
-	// nothing outside the script itself verifies it. This fixture starts
+	// A PR opened with GITHUB_TOKEN has its pull_request runs held until
+	// someone approves them, so the repo's own `make check-fmt` cannot be
+	// counted on to run against this bot's output — nothing outside the
+	// script itself is guaranteed to verify it. This fixture starts
 	// from a structurally valid but not canonically formatted roadmap
 	// (`check` only warns, `fmt --check` fails): the quoting `"123a"`/`"on"`
 	// carry in the body is unnecessary and `fmt` would strip it, but nothing
