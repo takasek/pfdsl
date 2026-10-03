@@ -606,7 +606,20 @@ function graphqlStub(pages, rest = undefined) {
 	return { fetchImpl, bodies };
 }
 
-/** Wraps closing-issue numbers in the GraphQL connection payload's shape. */
+function closingIssue(number, repo = "pfdsl", owner = "takasek") {
+	return {
+		id: `issue:${owner}/${repo}#${number}`,
+		number,
+		url: `https://github.com/${owner}/${repo}/issues/${number}`,
+		repository: {
+			id: `repo:${owner}/${repo}`,
+			name: repo,
+			owner: { id: `owner:${owner}`, login: owner },
+		},
+	};
+}
+
+/** Wraps closing issues in the GraphQL connection payload's shape. */
 function closingIssuesPage(
 	numbers,
 	{ hasNextPage = false, endCursor = null } = {},
@@ -616,7 +629,9 @@ function closingIssuesPage(
 			repository: {
 				pullRequest: {
 					closingIssuesReferences: {
-						nodes: numbers.map((number) => ({ number })),
+						nodes: numbers.map((issue) =>
+							typeof issue === "number" ? closingIssue(issue) : issue,
+						),
 						pageInfo: { hasNextPage, endCursor },
 					},
 				},
@@ -639,7 +654,7 @@ describe("fetchClosingIssueReferences", () => {
 			12,
 			fetchImpl,
 		);
-		assert.deepEqual(refs, [{ number: 99 }]);
+		assert.deepEqual(refs, [closingIssue(99)]);
 		assert.deepEqual(bodies[0].variables, {
 			owner: "takasek",
 			repo: "pfdsl",
@@ -675,9 +690,41 @@ describe("fetchClosingIssueReferences", () => {
 				12,
 				fetchImpl,
 			),
-			[{ number: 99 }, { number: 103 }],
+			[closingIssue(99), closingIssue(103)],
 		);
 		assert.equal(bodies[1].variables.cursor, "cur1");
+	});
+
+	it("keeps same-number issues from different repositories distinct across pages", async () => {
+		const issues = [
+			closingIssue(1200),
+			closingIssue(1200, "other", "another-owner"),
+		];
+		const { fetchImpl, bodies } = graphqlStub([
+			closingIssuesPage([issues[0]], {
+				hasNextPage: true,
+				endCursor: "next-repo",
+			}),
+			closingIssuesPage([issues[1]]),
+		]);
+		assert.deepEqual(
+			await fetchClosingIssueReferences(
+				"takasek",
+				"pfdsl",
+				"tok",
+				12,
+				fetchImpl,
+			),
+			issues,
+		);
+		assert.equal(bodies[1].variables.cursor, "next-repo");
+		// The API only returns requested fields; fixture identity alone is not
+		// evidence that the real query can retrieve it.
+		assert.match(bodies[0].query, /nodes\s*\{\s*id\s+number\s+url/);
+		assert.match(
+			bodies[0].query,
+			/repository\s*\{\s*id\s+name\s+owner\s*\{\s*id\s+login/,
+		);
 	});
 
 	// A lookup that ran and failed must not read as "closes no issue" — that is
@@ -728,7 +775,7 @@ describe("fetchPullRequestView", () => {
 		);
 		assert.deepEqual(result, {
 			body: "Closes #99",
-			closingIssuesReferences: [{ number: 99 }],
+			closingIssuesReferences: [closingIssue(99)],
 		});
 	});
 
@@ -788,7 +835,7 @@ describe("closing-issue parity between the gh CLI and gh-less backends", () => {
 			);
 			assert.deepEqual(
 				result.closingIssuesReferences,
-				github.map((number) => ({ number })),
+				github.map((number) => closingIssue(number)),
 			);
 			assert.equal(result.body, body);
 		});

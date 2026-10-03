@@ -330,12 +330,16 @@ function buildPrView(fields, pr, closing) {
  * A failed lookup throws, never returns []: callers turn "closes no issue"
  * into a FAIL verdict, so the two must stay distinguishable (#745).
  *
+ * Preserve the same issue/repository identity fields as `gh pr view`, so
+ * references to equal issue numbers in different repositories remain distinct.
+ *
  * @param {string} owner
  * @param {string} repo
  * @param {string} token
  * @param {number} number
  * @param {typeof fetch} [fetchImpl]
- * @returns {Promise<{number: number}[]>}
+ * @returns {Promise<Array<{id: string, number: number, url: string,
+ *   repository: {id: string, name: string, owner: {id: string, login: string}}}>>}
  */
 export async function fetchClosingIssueReferences(
 	owner,
@@ -348,7 +352,12 @@ export async function fetchClosingIssueReferences(
   repository(owner: $owner, name: $repo) {
     pullRequest(number: $number) {
       closingIssuesReferences(first: ${PER_PAGE}, after: $cursor) {
-        nodes { number }
+        nodes {
+          id
+          number
+          url
+          repository { id name owner { id login } }
+        }
         pageInfo { hasNextPage endCursor }
       }
     }
@@ -387,9 +396,7 @@ export async function fetchClosingIssueReferences(
 			throw new Error(
 				`GitHub GraphQL API returned no closing issue references for ${owner}/${repo}#${number}`,
 			);
-		references.push(
-			...(connection.nodes ?? []).map((node) => ({ number: node.number })),
-		);
+		references.push(...(connection.nodes ?? []));
 		if (!connection.pageInfo?.hasNextPage) return references;
 		cursor = connection.pageInfo.endCursor;
 	}
