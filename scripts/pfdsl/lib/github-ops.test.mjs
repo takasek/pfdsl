@@ -5,7 +5,11 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, it } from "node:test";
 
-import { createGitHubOps } from "./github-ops.mjs";
+import {
+	createGitHubOps,
+	GitHubUnavailableError,
+	isGitHubUnavailableError,
+} from "./github-ops.mjs";
 
 // A real `gh` binary may or may not be on PATH depending on the environment
 // (see gh-exec.test.mjs) — this builds a PATH containing only a symlink to
@@ -481,13 +485,16 @@ describe("createGitHubOps: backend-selection discipline against a real gh-less P
 		globalThis.fetch = originalFetch;
 	});
 
-	it("rethrows the original ENOENT when gh is absent and there is no token", async () => {
+	it("reports operation unavailability when gh is absent and there is no token", async () => {
 		delete process.env.GH_TOKEN;
 		delete process.env.GITHUB_TOKEN;
 		const ops = createGitHubOps();
 		await assert.rejects(
 			() => ops.listLabels(),
-			(e) => e.code === "ENOENT",
+			(e) =>
+				isGitHubUnavailableError(e) &&
+				e.operation === "listLabels" &&
+				e.cause.code === "ENOENT",
 		);
 	});
 
@@ -500,5 +507,50 @@ describe("createGitHubOps: backend-selection discipline against a real gh-less P
 		const ops = createGitHubOps();
 		const result = await ops.listLabels();
 		assert.deepEqual(result, [{ name: "flow:managed", description: "" }]);
+	});
+});
+
+describe("GitHub operation unavailability", () => {
+	it("does not classify arbitrary ENOENT or a code-shaped object as API unavailability", () => {
+		assert.equal(
+			isGitHubUnavailableError(
+				Object.assign(new Error("disk"), { code: "ENOENT" }),
+			),
+			false,
+		);
+		assert.equal(
+			isGitHubUnavailableError({ code: "GITHUB_UNAVAILABLE" }),
+			false,
+		);
+		assert.equal(
+			isGitHubUnavailableError(new GitHubUnavailableError("viewIssue")),
+			true,
+		);
+	});
+	it("preserves executed backend failures, including ENOENT from HTTP", async () => {
+		const previous = process.env.GH_TOKEN;
+		process.env.GH_TOKEN = "test-token";
+		try {
+			for (const failure of [
+				new SyntaxError("invalid JSON"),
+				new Error("HTTP 401"),
+				new TypeError("network failure"),
+				Object.assign(new Error("HTTP ENOENT"), { code: "ENOENT" }),
+			]) {
+				const ops = createGitHubOps({
+					execGhImpl: stubExecGh({ "issue view": new Error("ENOENT") }),
+					fetchImpl: async () => {
+						throw failure;
+					},
+				});
+				await assert.rejects(
+					() => ops.viewIssue({ number: 1, fields: ["body"] }),
+					(error) => error === failure && !isGitHubUnavailableError(error),
+				);
+			}
+		} finally {
+			if (previous === undefined) delete process.env.GH_TOKEN;
+			else process.env.GH_TOKEN = previous;
+		}
 	});
 });

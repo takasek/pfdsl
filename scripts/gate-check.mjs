@@ -6,7 +6,7 @@
 // canonical manual checklist locations as fixed guidance.
 // Usage: node scripts/gate-check.mjs [--base main] [--artifact <key> [--in-progress] | --no-artifact] [--issue <n> ...]
 
-import { existsSync, readdirSync, readFileSync } from "node:fs";
+import { existsSync } from "node:fs";
 import { dirname, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
@@ -44,6 +44,11 @@ import {
 	triggerPathsSince,
 	wipTransitionStep,
 } from "./lib/gate-check-steps.mjs";
+import {
+	pinRevisionExec,
+	resolveReportRevision,
+	revisionPfdReaders,
+} from "./lib/gate-report-revision.mjs";
 import { parseIssueNumbers } from "./lib/issue-args.mjs";
 import { tryRun } from "./lib/run-exec.mjs";
 import { createGitHubOps } from "./pfdsl/lib/github-ops.mjs";
@@ -103,15 +108,34 @@ const issueNumbers = parsedIssues.numbers;
 
 // Every call names the executable and its arguments separately — `base` and
 // `artifactKey` come from argv and must never be parsed by a shell (#572).
-const exec = (file, execArgs, input) =>
+const rawExec = (file, execArgs, input) =>
 	tryRun(file, execArgs, {
 		cwd: root,
+		captureStderr: file === "git",
 		...(input === undefined ? {} : { input }),
 	});
+let exec = rawExec;
 const node = (execArgs, input) => exec(process.execPath, execArgs, input);
 
 // Best-effort — a stale/missing origin ref surfaces as a clear diff failure below, while a usable existing ref is labelled unverified in the cycle window.
 const fetchResult = exec("git", ["fetch", "origin"]);
+let revision;
+try {
+	revision = resolveReportRevision({ exec, base });
+	exec = pinRevisionExec(exec, revision);
+} catch (error) {
+	console.error(
+		`gate-check: could not resolve report revision: ${error.message}`,
+	);
+	process.exit(1);
+}
+console.log(
+	`Report revision: head ${revision.head}; base origin/${base} ${revision.baseTip}; merge-base ${revision.mergeBase}; measured ${new Date().toISOString()}`,
+);
+if (!fetchResult.ok)
+	console.log(
+		"Report origin freshness: unverified (fetch failed; existing base ref used)",
+	);
 
 const diff = changedFilesSince({ exec, base });
 if (!diff.ok) {
@@ -131,6 +155,14 @@ if (!triggers.ok) {
 const pfdslFiles = changedFiles.filter((f) => f.endsWith(".pfdsl"));
 
 const results = [];
+{
+	const inventory = node(["scripts/check-pfdsl-inventory.mjs"]);
+	results.push({
+		name: "tracked .pfdsl inventory",
+		status: inventory.ok ? "PASS" : "FAIL",
+		detail: inventory.out.trim(),
+	});
+}
 
 // 1. pfdsl check on changed .pfdsl files
 if (pfdslFiles.length === 0) {
@@ -221,7 +253,14 @@ results.push(
 
 // 10. knowledge-artifact size report: collect the measured deltas regardless of
 // issue metadata so the terminal output always shows changed knowledge artifacts.
-const sizeDeltas = collectSizeDeltas({ exec, base, changedFiles });
+const deletions = deletedFilesSince({ exec, base });
+const sizeReport = collectSizeDeltas({
+	exec,
+	base,
+	changedFiles: [...changedFiles, ...deletions.files],
+	comparisonRef: revision.mergeBase,
+	headRef: revision.head,
+});
 
 // `root` here is this script's own location (resolved from import.meta.url
 // above), not the shell's cwd. gate-check's PreToolUse guard
@@ -231,7 +270,7 @@ const sizeDeltas = collectSizeDeltas({ exec, base, changedFiles });
 // tree named here is the one gate-check actually inspected, not wherever the
 // invoking shell happened to be sitting (#840).
 const mainRootLookup = exec("git", ["rev-parse", "--git-common-dir"]);
-const branchLookup = exec("git", ["rev-parse", "--abbrev-ref", "HEAD"]);
+const branchLookup = rawExec("git", ["rev-parse", "--abbrev-ref", "HEAD"]);
 // Either lookup failing (e.g. no git on PATH) must not stop the gate itself
 // — only this report line degrades, to a null-branch/root-as-mainRoot line
 // via formatRunTreeLine, same as verification-tree-guard.mjs's own read of a
@@ -403,10 +442,20 @@ console.log(formatGateTable(results));
 
 // Report material: the size of every tracked knowledge artifact this branch
 // touched. The numbers are always printed for human review.
-if (sizeDeltas.length > 0) {
-	console.log(`\nKnowledge-artifact size (origin/${base} → HEAD):`);
-	for (const d of sizeDeltas) console.log(`  ${formatSizeDelta(d)}`);
-}
+console.log(
+	`\nKnowledge-artifact size (${revision.mergeBase} → ${revision.head}):`,
+);
+for (const d of sizeReport.deltas) console.log(`  ${formatSizeDelta(d)}`);
+for (const reason of sizeReport.unreadable)
+	console.log(`  could not be measured: ${reason}`);
+if (!deletions.ok)
+	console.log(`  deleted paths could not be measured: ${deletions.error}`);
+if (
+	sizeReport.deltas.length === 0 &&
+	sizeReport.unreadable.length === 0 &&
+	deletions.ok
+)
+	console.log("  (none)");
 
 // Report material: the cycle window (#834), which collectCycleWindow's own doc
 // comment defines and motivates. Not a verdict — it hands the runner a starting
@@ -453,13 +502,12 @@ if (sizeDeltas.length > 0) {
 	} else {
 		// The same pair the CLI applies to a `location:` element (spec §15.8),
 		// so this report and `meta get` cannot disagree about where a node lives.
-		const { analyze, isUrlLike, resolveLocationFsPath } = await import(
-			corePath
-		);
+		const { analyze, isUnreadableError, isUrlLike, resolveLocationFsPath } =
+			await import(corePath);
 		const { analyzed, unreadable } = analyzeAdoptedPfdsl({
-			readdirSync: (dir) => readdirSync(resolve(root, dir)),
-			readFile: (file) => readFileSync(resolve(root, file), "utf-8"),
+			...revisionPfdReaders({ exec, head: revision.head }),
 			analyze,
+			isUnreadableError,
 		});
 		const resolveLocation = (file, location, basePath) =>
 			isUrlLike(location)
@@ -472,7 +520,7 @@ if (sizeDeltas.length > 0) {
 		// them: the item asks about additions, changes and deletions alike, and
 		// a deleted file is the case where the PFD modeling it is likeliest to
 		// be left describing something gone.
-		const deletedFiles = deletedFilesSince({ exec, base });
+		const deletedFiles = deletions.files;
 		const wasDeleted = new Set(deletedFiles);
 		const { modeled, unmodeled } = classifyChangedFilesByModeling(
 			[...changedFiles, ...deletedFiles],
@@ -486,11 +534,15 @@ if (sizeDeltas.length > 0) {
 			console.log(`    ${mark(path)} ← ${by}`);
 		}
 		console.log(
-			"  not modeled by any adopted PFD (an N/A here is out-of-scope, not a judgment):",
+			unreadable.length
+				? "  not matched by readable PFDs (model classification incomplete):"
+				: "  not modeled by any adopted PFD (an N/A here is out-of-scope, not a judgment):",
 		);
 		if (unmodeled.length === 0) console.log("    (none)");
 		for (const path of unmodeled) console.log(`    ${mark(path)}`);
 		for (const reason of unreadable) console.log(`  could not read ${reason}`);
+		if (!deletions.ok)
+			console.log(`  deleted paths could not be measured: ${deletions.error}`);
 	}
 }
 

@@ -394,6 +394,31 @@ vscode-extension 等で新しいノード種別をホバー対応する場合、
 
 ## 終端ゲートの根拠
 
+### 検査対象と報告版の対応
+
+追跡下の `.pfdsl` の分類は `scripts/lib/pfdsl-check-inventory.mjs` が正本であり、Makefile の graph・strict・fmt・render・location 検査が同じ分類を使う（#1185）。
+`git ls-files -z` で分類宣言から独立に列挙し、未分類・曖昧な割当・生成元の欠落を失敗にする。
+scaffold 正本は `scripts/harness-template/` で検証し、4つの生成先は正本の検証と `check-gen-plugin.yml` の再生成・drift 検査へ委譲する。
+core fixture の parse・normalize・validateGraph は package test が持ち、CLI の exit と multi-file の repo-wide 検証済みとは扱わない。
+新しい root を追加する場合は、必要な検査軸と検査責任を分類へ同時に追加する。
+root の全域分類は、読み込まれた子の診断範囲を保証しない。
+
+終端報告は冒頭の `Report revision` が示す head・base tip・merge-base と測定時刻を対象とする（#1190）。
+知識成果物のサイズは merge-base→head の blob 差、変更・削除一覧はその PR 差分、location 突合は head の PFD blob、cycle window は固定した base/head の履歴から測る。
+head の表示と未 commit の作業ファイルを混ぜない。
+新規ファイルの比較元不在と blob 読取不能、削除なしと削除列挙失敗、完全なモデル分類と読み取れたモデルだけの分類を区別する。
+fetch 失敗時の既存 base は鮮度未確認として全報告の冒頭にも示す。
+報告材料の欠落は表示し、人間向け材料を新しい合否判定にはしない。
+
+作業者と PR 本文作成者は、報告を利用する直前に記載された対象版と最終差分を対応させる。
+reviewer へ渡した後に commit を追加した場合は、新しい head で再測定して報告を置き換える。
+base が進んだ場合は cycle window を再測定し、merge-base も変わればサイズと変更・削除の突合も再測定する。
+rebase 後の cycle window は、外部に書いた issue・PR 本文が新しい規約と整合するかを再読する材料であり、サイクル開始から最初の commit までの時間帯を完全に復元する証拠ではない。
+同じ head・merge-base・モデル blob と検査実装を使い、前回の取得が完全だった材料は再利用できる。
+cycle window の再利用には base tip と開始 commit の同一性も必要で、鮮度未確認・部分測定・測定不能の結果を後から完全な報告として再利用しない。
+
+### 機械検査と人間確認
+
 汎用ゲート項目（status 更新 / check 通過 / 論理単位コミット / PR 集約）に加え、このリポでは issue 固有項目を合成する。issue 固有項目は `roadmap.md` を参照。
 
 - **終端ゲートの機械項目と報告材料（pfd-ops 手順3・#462）**: `GH_HOST=github.com node scripts/gate-check.mjs [--base main] [--artifact <key> [--in-progress] | --no-artifact] [--issue <n> ...]` — 内部で `git fetch origin` を試みたうえで `origin/<base>...HEAD` を基準に差分を取る（fetch 失敗時も既存 remote-tracking ref で続行し、ref 自体が無ければ明示エラーで終了する）。**項目名・PASS/FAIL/SKIP の判定・SKIP 条件はここに列挙しない** — スクリプトの出力が自己記述的であり、実行すれば全項目が detail 付きで印字される（#560。列挙をここに置くとスクリプト変更のたび手で追随することになり、追随を保証する機構が無い）。`--artifact <key>` を渡すと status 更新・wip 経由の両方をその artifact に厳密スコープする（省略時はどちらも粗いフォールバック判定になる旨を detail に明示）。出力 artifact を持たないサイクル（`flow:exempt` の bookkeeping 等）は `--no-artifact` で宣言する — `roadmap.pfdsl` を status 以外の理由で触ると、宣言なしでは構造的に FAIL する（#564）。表のほかに報告材料が印字される。**その種類・件数・内容もここに列挙しない** — 同じ理由で、出力が節見出しごと自己記述する（#839）。機械結果に含まれない判断は `scripts/harness-template/skills/pfd-ops/references/work-cycle.md` の「3. 反映 — 終端ゲート」を直接確認する。スクリプトは本文を解析・再印字せず、PR 作成前の同節とPR 作成後の `PR 作成後` 項目への固定案内だけを表示する
