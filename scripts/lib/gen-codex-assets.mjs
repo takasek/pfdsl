@@ -1,23 +1,93 @@
+import { isAlias, isMap, isScalar, parseDocument, visit } from "yaml";
+
 const READ_ONLY_TOOLS = "Read, Grep, Bash";
+
+export function skillMarkdownToCodex(source) {
+	const header = source.match(/^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)/);
+	if (!header) return source;
+	const document = parseDocument(header[1], { merge: true });
+	if (document.errors.length) throw document.errors[0];
+	if (!document.has("summary")) return source;
+	// Materialized strings must remain strings in YAML 1.1 consumers too
+	// (e.g. the standard validator treats unquoted yes/no/on as booleans).
+	const literalNode = (value) => {
+		const node = document.createNode(value);
+		visit(node, {
+			Scalar(_key, scalar) {
+				if (typeof scalar.value === "string") scalar.type = "QUOTE_DOUBLE";
+			},
+		});
+		return node;
+	};
+	const decoded = document.toJS();
+	const summary = decoded.summary;
+	const summaryNode = document.get("summary", true);
+	if (typeof summary !== "string" || !summary.trim()) {
+		throw new Error("Codex skill summary must be a non-empty string.");
+	}
+	const metadataNode = document.get("metadata", true);
+	const metadata = isAlias(metadataNode)
+		? metadataNode.resolve(document)
+		: (metadataNode ??
+			(Object.hasOwn(decoded, "metadata")
+				? literalNode(decoded.metadata)
+				: undefined));
+	if (metadata && !isMap(metadata)) {
+		throw new Error("Codex skill metadata must be a mapping.");
+	}
+	const hasMetadataSummary =
+		metadata && Object.hasOwn(decoded.metadata, "summary");
+	if (hasMetadataSummary && decoded.metadata.summary !== summary) {
+		throw new Error("Codex skill metadata.summary conflicts with summary.");
+	}
+	// Detach aliases before changing their target so unrelated fields retain
+	// their decoded values. Mapping aliases also need a writable metadata node.
+	if (isAlias(metadataNode) || (!metadataNode && metadata)) {
+		document.set("metadata", literalNode(decoded.metadata));
+	}
+	if (summaryNode.anchor || (metadata?.anchor && !hasMetadataSummary)) {
+		visit(document, {
+			Alias(_key, node) {
+				if (node.resolve(document) === summaryNode) return literalNode(summary);
+				if (!hasMetadataSummary && node.resolve(document) === metadata)
+					return literalNode(decoded.metadata);
+			},
+		});
+	}
+	if (!hasMetadataSummary) {
+		const renderedSummary = isScalar(summaryNode)
+			? summaryNode.clone()
+			: literalNode(summary);
+		delete renderedSummary.anchor;
+		document.setIn(["metadata", "summary"], renderedSummary);
+		if (!metadata) {
+			const pairs = document.contents.items;
+			const metadataIndex = pairs.findIndex(
+				({ key }) => key.value === "metadata",
+			);
+			const summaryIndex = pairs.findIndex(
+				({ key }) => key.value === "summary",
+			);
+			pairs.splice(summaryIndex, 0, pairs.splice(metadataIndex, 1)[0]);
+		}
+	}
+	document.delete("summary");
+	// Removing an explicit key can expose a merge donor's summary. Only that
+	// case needs the effective root mapping materialized to remove the key.
+	const rendered = document.toJS();
+	if (Object.hasOwn(rendered, "summary")) {
+		delete rendered.summary;
+		document.contents = literalNode(rendered);
+	}
+	const newline = header[0].startsWith("---\r\n") ? "\r\n" : "\n";
+	const yaml = document.toString().replace(/\n/g, newline);
+	return `---${newline}${yaml}---${newline}${source.slice(header[0].length)}`;
+}
 const WORKSPACE_WRITE_TOOLS = "Bash, Read, Edit, Write, Grep, Glob, Skill";
 const MARKDOWN_GENERATED_NOTICE =
 	/^<!--(?=[^\r\n]*DO NOT EDIT)(?=[^\r\n]*Authoritative source:)[^\r\n]*-->$|^#{1,6}[ \t]+(?=[^\r\n]*DO NOT EDIT)(?=[^\r\n]*Authoritative source:)[^\r\n]*$/gm;
 const JAVASCRIPT_GENERATED_NOTICE =
 	/^\/\/(?=[^\r\n]*DO NOT EDIT)(?=[^\r\n]*Authoritative source:)[^\r\n]*$/gm;
-const CODEX_ARGUMENT_INSTRUCTIONS = new Map([
-	[
-		"引数（あれば作業選択の指定として扱う）: $ARGUMENTS",
-		"ユーザーがスキル呼び出しとともに指定した内容があれば、作業選択の指定として扱う。",
-	],
-	[
-		"引数（あれば）: $ARGUMENTS",
-		"ユーザーがスキル呼び出しとともに指定した内容があれば、引数として扱う。",
-	],
-	[
-		"対象範囲の指定（あれば）: $ARGUMENTS",
-		"ユーザーがスキル呼び出しとともに指定した内容があれば、監査対象範囲の指定として扱う。",
-	],
-]);
 
 function tomlString(value) {
 	return JSON.stringify(value);
@@ -186,22 +256,8 @@ export function commandCapabilityToCodexSkill(record, outputName) {
 	if (typeof name !== "string" || !name.trim()) {
 		throw new Error(`${sourcePath}: output name must be a non-empty string.`);
 	}
-	let codexBody = body;
-	for (const [
-		claudeInstruction,
-		codexInstruction,
-	] of CODEX_ARGUMENT_INSTRUCTIONS) {
-		codexBody = codexBody.replaceAll(claudeInstruction, codexInstruction);
-	}
-	const unsupportedArgument = codexBody.match(/^.*\$ARGUMENTS.*$/m);
-	if (unsupportedArgument) {
-		throw new Error(
-			`${sourcePath}: unsupported $ARGUMENTS construct ${JSON.stringify(unsupportedArgument[0])}.`,
-		);
-	}
-
 	return addGeneratedMarkdownNotice(
-		`---\nname: ${name}\ndescription: ${description}\n---\n${codexBody}`,
+		`---\nname: ${name}\ndescription: ${JSON.stringify(description)}\n---\n${body}`,
 		sourcePath,
 	);
 }
@@ -210,91 +266,6 @@ function sandboxMode(sourcePath, tools) {
 	if (tools === READ_ONLY_TOOLS) return "read-only";
 	if (tools === WORKSPACE_WRITE_TOOLS) return "workspace-write";
 	throw new Error(`${sourcePath}: unsupported tools.`);
-}
-
-export function claudeInstructionsToAgents(source) {
-	return source
-		.replaceAll("CLAUDE.md", "AGENTS.md")
-		.replaceAll(".claude/skills/", ".agents/skills/")
-		.replaceAll(`\${CLAUDE_PLUGIN_ROOT}`, `\${PLUGIN_ROOT}`)
-		.replaceAll("CLAUDE_PLUGIN_ROOT", "PLUGIN_ROOT")
-		.replaceAll(
-			"を Claude Code プラットフォーム側",
-			"を各ハーネスのプラットフォーム側",
-		)
-		.replaceAll(
-			"Claude Code プラットフォーム側",
-			"各ハーネスのプラットフォーム側",
-		)
-		.replaceAll(
-			"1つの Claude Code plugin",
-			"Claude Code と Codex の両方で使える plugin",
-		)
-		.replaceAll("Claude 向け", "Codex 向け")
-		.replaceAll("Claude へ", "Codex へ")
-		.replaceAll(".Codex/settings.json", ".codex/hooks.json")
-		.replaceAll(".claude/settings.json", ".codex/hooks.json");
-}
-
-export const CODEX_WORKTREE_METADATA_INSTRUCTIONS = [
-	"",
-	"## Codex 固有の責務境界",
-	"",
-	"この節は本文中の git に関する指示より優先する。",
-	"親 agent が `git fetch`、stage、commit、`git push`、PR の作成・更新、issue の作成・クローズ・コメントを担当する。",
-	"subagent は worktree 内のファイル編集とテスト・検査だけを担当する。",
-	"subagent は git metadata 操作や外部公開操作を実行しない。",
-	"subagent の権限エラーはユーザーへ直接継続を求めず、親 agent へ引き上げる。",
-	"",
-].join("\n");
-
-function codexPfdImplementerDescription() {
-	return "設計が確定済みの実装を委譲する。指定された worktree 内で t-wada 流 TDD によりファイルを編集し、検査する。git metadata 操作は親 agent が担当する。";
-}
-
-function pfdImplementerInstructions(source) {
-	return `${claudeInstructionsToAgents(source)}${CODEX_WORKTREE_METADATA_INSTRUCTIONS}`;
-}
-
-function pfdLensInstructions(sourcePath, source) {
-	const localCliPath = ["packages", "cli", "dist", "cli.js"].join("/");
-	const bashRestriction = `Bash は CLI 実体を解決するための \`test -f package.json\` と \`test -f packages/cli/package.json\` と \`test -f ${localCliPath}\`、解決した CLI による \`check <file>\` と読み取り専用クエリ（\`graph\` グループ全体、\`meta get\` / \`meta list\` / \`meta check-links\`、\`status\` グループ全体）のみ許可される — 図やリポジトリの他の状態を書き換えない。`;
-	const codexRestriction = `Bash は CLI 実体を解決するための \`test -f package.json\` と \`test -f packages/cli/package.json\` と \`test -f ${localCliPath}\`、pfd-retro スキル SKILL.md・binding・観点カタログ・manifest・対象 \`.pfdsl\` ファイルの読取に使う \`rg\` と \`sed\`、解決した pfdsl CLI による \`check <file>\` と読み取り専用クエリ（\`graph\` グループ全体、\`meta get\` / \`meta list\` / \`meta check-links\`、\`status\` グループ全体）のみ許可される — 図やリポジトリの他の状態を書き換えない。`;
-	if (
-		source.split("\n").filter((line) => line === bashRestriction).length !== 1
-	) {
-		throw new Error(`${sourcePath}: expected Bash restriction clause.`);
-	}
-	const instructions = claudeInstructionsToAgents(source)
-		.replace(bashRestriction, codexRestriction)
-		.replaceAll("を Read して", "を `sed` で読んで")
-		.replaceAll("を Read する", "を `sed` で読む");
-	if (
-		instructions.split("\n").filter((line) => /^\s*Bash は /.test(line))
-			.length !== 1
-	) {
-		throw new Error(`${sourcePath}: unexpected Bash instruction.`);
-	}
-	if (/\bRead\b/.test(instructions)) {
-		throw new Error(`${sourcePath}: Codex instructions contain Read.`);
-	}
-	return instructions;
-}
-
-function codexAgentDescription(sourcePath, description) {
-	return sourcePath === "pfd-implementer.md"
-		? codexPfdImplementerDescription()
-		: description;
-}
-
-function codexAgentInstructions(sourcePath, sourceName, body) {
-	if (sourceName === "pfd-implementer.md") {
-		return pfdImplementerInstructions(body);
-	}
-	if (sourceName === "pfd-lens.md") {
-		return pfdLensInstructions(sourcePath, body);
-	}
-	return claudeInstructionsToAgents(body);
 }
 
 export function buildCodexProjectConfig() {
@@ -313,12 +284,8 @@ export function buildCodexProjectConfig() {
 export function agentCapabilityToCodexToml(record) {
 	const sourcePath = capabilitySourcePath(record);
 	const semantic = semanticRecord(record, "agent");
-	const sourceName = sourcePath.split("/").pop();
 	const name = requiredSemanticString(record, semantic, "name");
-	const description = codexAgentDescription(
-		sourceName,
-		requiredSemanticString(record, semantic, "description"),
-	);
+	const description = requiredSemanticString(record, semantic, "description");
 	if (semantic.model !== "sonnet") {
 		throw new Error(`${sourcePath}: unsupported model.`);
 	}
@@ -326,9 +293,7 @@ export function agentCapabilityToCodexToml(record) {
 	const body = requiredSemanticString(record, semantic, "body", {
 		nonEmpty: false,
 	});
-	const instructions = tomlMultilineString(
-		codexAgentInstructions(sourcePath, sourceName, body),
-	);
+	const instructions = tomlMultilineString(body);
 
 	return [
 		`# ${generatedNotice(sourcePath)}`,

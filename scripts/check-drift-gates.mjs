@@ -25,13 +25,14 @@
  *
  * Usage: node scripts/check-drift-gates.mjs
  */
+import { spawnSync } from "node:child_process";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { isDistStale } from "./lib/dist-freshness.mjs";
 import { buildGates } from "./lib/drift-gates.mjs";
 import { runDriftGates } from "./lib/pre-commit-drift.mjs";
-import { gitDiffNames, tryRun } from "./lib/run-exec.mjs";
+import { gitDiffNames } from "./lib/run-exec.mjs";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -55,13 +56,19 @@ const { failures, notes } = runDriftGates(buildGates({ stagedPresent }), {
 	// still asked against process.cwd() (#771).
 	isDistFresh: (path) => !isDistStale(resolve(root, path)),
 	runCommand: (file, args) => {
-		const result = tryRun(file, args, { cwd: root, captureStderr: true });
-		// Git can discard a temporary commit index before the operator can
-		// rerun the checker, so show its diagnostics while that index exists.
-		if (!result.ok && args[0] === "scripts/check-md-linebreaks.mjs") {
-			console.log(result.out.trimEnd());
+		const result = spawnSync(file, args, {
+			cwd: root,
+			encoding: "utf8",
+			maxBuffer: 32 * 1024 * 1024,
+		});
+		// Warnings on a successful retry and failure diagnostics must reach the
+		// operator. Keep routine stdout quiet, but retain it when a gate fails.
+		if (result.stderr) process.stderr.write(result.stderr);
+		if (result.status !== 0 || result.error) {
+			if (result.stdout) console.log(result.stdout.trimEnd());
+			if (result.error) console.error(result.error.message);
 		}
-		return result.ok;
+		return result.status === 0 && !result.error;
 	},
 });
 

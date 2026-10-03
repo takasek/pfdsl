@@ -6,7 +6,7 @@
 
 ## バックエンド
 
-GitHub Issues。規約と採用手順は `.claude/skills/pfd-ops/references/github-issues-backend.md`（L3 プリセット）に従う。
+GitHub Issues。規約と採用手順は `scripts/harness-template/skills/pfd-ops/references/github-issues-backend.md`（L3 プリセット）に従う。
 
 ## このリポのインスタンス値
 
@@ -83,7 +83,7 @@ GitHub 側にしか無い読みを本文の正規表現で再構成すると、D
 - [ ] `flow:managed` の issue がすべて roadmap.pfdsl の artifact として登録済みか確認した（exempt は登録しない）
 - [ ] `node scripts/pfdsl/audit-issues-flow.mjs` が差分なしで通過した（手動追記した `updated_at` のズレを機械的に検出する。`gate-check.mjs` 実行時はその一部として自動実行される）
 
-**バージョン artifact を起こす契機と criteria の形**: 規定の一般形は `.claude/skills/pfd-ops/references/work-cycle.md` の「成果物の門番」が一次情報（#729 で昇格）。
+**バージョン artifact を起こす契機と criteria の形**: 規定の一般形は `scripts/harness-template/skills/pfd-ops/references/work-cycle.md` の「成果物の門番」が一次情報（#729 で昇格）。
 ここにはこのリポのインスタンス値だけを置く。
 
 - 対象ノード: `spec_vXXX` / `cli_release_*` / `ext_vXXXX`

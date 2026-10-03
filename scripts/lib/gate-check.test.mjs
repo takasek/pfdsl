@@ -1023,7 +1023,7 @@ describe("collectModeledLocations", () => {
 			// them this repo adopts (#1227).
 			["references/file-based-tracker-backend.md", "ops_skill_l3"],
 		];
-		const skillRoot = resolve(root, ".claude/skills/pfd-ops");
+		const skillRoot = resolve(root, "scripts/harness-template/skills/pfd-ops");
 		const actualFiles = [
 			...readdirSync(skillRoot).filter((name) => name === "SKILL.md"),
 			...readdirSync(resolve(skillRoot, "references"))
@@ -1036,7 +1036,7 @@ describe("collectModeledLocations", () => {
 			"Classify every protocol/reference file as generic, backend, or intentionally outside this workflow when adding, moving, or splitting it.",
 		);
 		for (const [path, id] of expected) {
-			const changedPath = `.claude/skills/pfd-ops/${path}`;
+			const changedPath = `scripts/harness-template/skills/pfd-ops/${path}`;
 			assert.deepEqual(
 				classifyChangedFilesByModeling([changedPath], locations),
 				id === null

@@ -47,6 +47,36 @@ function runGates() {
 // The fixture has no generator inputs, so a gen-plugin gate that runs fails
 // or reports its skipped SKILL.md half; one that is not triggered is silent.
 describe("check-drift-gates staged triggers", () => {
+	it("shows failed generator diagnostics even when it also wrote progress to stdout", () => {
+		git(["rm", "--quiet", "hooks/example.mjs"]);
+		writeFileSync(
+			join(fixture, "scripts/gen-plugin-dist-independent.mjs"),
+			'console.log("assembly progress"); console.error("primary assembly error"); console.error("Rollback restoration did not complete; saved /tmp/recovery-snapshot"); process.exit(1);\n',
+		);
+		const result = runGates();
+		assert.equal(result.status, 1);
+		assert.match(result.stderr, /primary assembly error/);
+		assert.match(result.stderr, /saved \/tmp\/recovery-snapshot/);
+		assert.match(result.stdout, /assembly progress/);
+		assert.match(result.stdout, /Claude and Codex outputs/);
+	});
+
+	it("preserves successful generator warnings before a later drift failure", () => {
+		git(["rm", "--quiet", "hooks/example.mjs"]);
+		writeFileSync(
+			join(fixture, "scripts/gen-plugin-dist-independent.mjs"),
+			'console.log("normal generation progress"); console.error("Generator transaction data remain: /tmp/recovery-snapshot");\n',
+		);
+		writeFileSync(
+			join(fixture, "scripts/check-generated-drift.mjs"),
+			'console.error("Recovery snapshot remains: /tmp/recovery-snapshot"); process.exit(1);\n',
+		);
+		const result = runGates();
+		assert.equal(result.status, 1);
+		assert.match(result.stderr, /Generator transaction data remain/);
+		assert.match(result.stderr, /Recovery snapshot remains/);
+		assert.doesNotMatch(result.stdout, /normal generation progress/);
+	});
 	it("runs the gen-plugin gates when a commit only deletes an input", () => {
 		git(["rm", "--quiet", "hooks/example.mjs"]);
 		assert.match(runGates().stdout, /SKILL\.md|Claude and Codex outputs/);

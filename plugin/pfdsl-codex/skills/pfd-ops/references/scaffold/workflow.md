@@ -1,4 +1,4 @@
-<!-- DO NOT EDIT. Authoritative source: .claude/skills/pfd-ops/references/scaffold/workflow.md. -->
+<!-- DO NOT EDIT. Authoritative source: scripts/harness-template/skills/pfd-ops/references/scaffold/workflow.md. -->
 
 # workflow.md — 運用手続き（workflow.pfdsl の companion）
 

@@ -1,5 +1,6 @@
 #!/usr/bin/env node
-// DO NOT EDIT. Authoritative source: .claude/skills/pfd-ops/scripts/check-install-sync.mjs.
+// DO NOT EDIT. Authoritative source: scripts/harness-template/skills/pfd-ops/scripts/check-install-sync.mjs.
+
 // Runtime self-check for the pfd-ops "install/" tree (ADR-0028).
 //
 // This file ships inside the pfd-ops skill and is copied verbatim (along
@@ -11,6 +12,7 @@
 // Usage: node check-install-sync.mjs [--target <dir>] [--deploy]
 //        [--overwrite-local-edits] [--delete-edited-orphans] [--upstream]
 
+import { createHash } from "node:crypto";
 import {
 	chmodSync,
 	copyFileSync,
@@ -23,8 +25,14 @@ import {
 	statSync,
 	writeFileSync,
 } from "node:fs";
-import { createHash } from "node:crypto";
-import { basename, dirname, isAbsolute, join, relative, resolve } from "node:path";
+import {
+	basename,
+	dirname,
+	isAbsolute,
+	join,
+	relative,
+	resolve,
+} from "node:path";
 import { fileURLToPath } from "node:url";
 import { parseArgs as parseNodeArgs } from "node:util";
 import { checkUpstreamVersion } from "./plugin-version-check.mjs";
@@ -97,7 +105,9 @@ export function readManifest(targetRoot) {
 	if (!existsSync(manifestPath)) return [];
 	try {
 		const data = JSON.parse(readFileSync(manifestPath, "utf-8"));
-		return Array.isArray(data.files) ? data.files.filter(isValidManifestEntry) : [];
+		return Array.isArray(data.files)
+			? data.files.filter(isValidManifestEntry)
+			: [];
 	} catch {
 		return [];
 	}
@@ -107,7 +117,10 @@ function writeManifest(targetRoot, entries) {
 	const manifestPath = join(targetRoot, MANIFEST_RELATIVE_PATH);
 	mkdirSync(dirname(manifestPath), { recursive: true });
 	const sorted = [...entries].sort((a, b) => a.path.localeCompare(b.path));
-	writeFileSync(manifestPath, `${JSON.stringify({ files: sorted }, null, "\t")}\n`);
+	writeFileSync(
+		manifestPath,
+		`${JSON.stringify({ files: sorted }, null, "\t")}\n`,
+	);
 }
 
 // A rename that only prefixes the basename (sweep-completed-chains.yml ->
@@ -137,7 +150,9 @@ function sharesSeparatedSuffix(a, b) {
  */
 function detectRenameCandidates(installDir, missing, orphanEntries) {
 	if (missing.length === 0 || orphanEntries.length === 0) return [];
-	const canonicalHashes = new Map(missing.map((rel) => [rel, sha256(join(installDir, rel))]));
+	const canonicalHashes = new Map(
+		missing.map((rel) => [rel, sha256(join(installDir, rel))]),
+	);
 
 	const candidates = [];
 	for (const entry of orphanEntries) {
@@ -145,7 +160,10 @@ function detectRenameCandidates(installDir, missing, orphanEntries) {
 		const signals = [
 			["same canonical hash", (rel) => canonicalHashes.get(rel) === entry.hash],
 			["same basename", (rel) => basename(rel) === orphanBase],
-			["same basename suffix", (rel) => sharesSeparatedSuffix(basename(rel), orphanBase)],
+			[
+				"same basename suffix",
+				(rel) => sharesSeparatedSuffix(basename(rel), orphanBase),
+			],
 		];
 		for (const [reason, matches] of signals) {
 			const to = missing.find(matches);
@@ -173,9 +191,18 @@ function detectRenameCandidates(installDir, missing, orphanEntries) {
 // and a path-only match would call that repo ambiguous — costing it the ability
 // to adopt at all, which is the primary flow this tool exists for.
 export const UPSTREAM_MARKERS = [
-	{ path: "scripts/gen-install.mjs", mustContain: ".claude/skills/pfd-ops/install" },
-	{ path: "scripts/lib/install-templates.mjs", mustContain: ".claude/skills/pfd-ops/install" },
-	{ path: "plugin/pfdsl/.claude-plugin/plugin.json", mustContain: '"name": "pfdsl"' },
+	{
+		path: "scripts/gen-install.mjs",
+		mustContain: ".claude/skills/pfd-ops/install",
+	},
+	{
+		path: "scripts/lib/install-templates.mjs",
+		mustContain: ".claude/skills/pfd-ops/install",
+	},
+	{
+		path: "plugin/pfdsl/.claude-plugin/plugin.json",
+		mustContain: '"name": "pfdsl"',
+	},
 ];
 
 const REPO_LOCAL_SKILL_RELATIVE_PATH = ".claude/skills/pfd-ops";
@@ -241,15 +268,20 @@ export function classifyTarget(skillRoot, targetRoot) {
 		fileContains(join(repoRoot, ...marker.path.split("/")), marker.mustContain),
 	);
 	const presentMarkers = present.map((marker) => marker.path);
-	const missingMarkers = UPSTREAM_MARKERS.filter((marker) => !present.includes(marker)).map(
-		(marker) => marker.path,
-	);
+	const missingMarkers = UPSTREAM_MARKERS.filter(
+		(marker) => !present.includes(marker),
+	).map((marker) => marker.path);
 
 	// A repo-local skill tree only competes when the running script is not it:
 	// a repo-local run over its own vendored copy is one entity seen twice.
-	const repoLocalSkill = join(repoRoot, ...REPO_LOCAL_SKILL_RELATIVE_PATH.split("/"));
+	const repoLocalSkill = join(
+		repoRoot,
+		...REPO_LOCAL_SKILL_RELATIVE_PATH.split("/"),
+	);
 	const competingCanonical =
-		!repoLocalRun && existsSync(join(repoLocalSkill, "install")) ? repoLocalSkill : null;
+		!repoLocalRun && existsSync(join(repoLocalSkill, "install"))
+			? repoLocalSkill
+			: null;
 
 	const kind =
 		missingMarkers.length === 0
@@ -257,7 +289,14 @@ export function classifyTarget(skillRoot, targetRoot) {
 			: presentMarkers.length > 0 || competingCanonical !== null
 				? "ambiguous"
 				: "adopter";
-	return { kind, repoRoot, repoLocalRun, presentMarkers, missingMarkers, competingCanonical };
+	return {
+		kind,
+		repoRoot,
+		repoLocalRun,
+		presentMarkers,
+		missingMarkers,
+		competingCanonical,
+	};
 }
 
 /**
@@ -281,7 +320,9 @@ export function checkInstallSync(skillRoot, targetRoot) {
 		if (!existsSync(targetPath)) {
 			return { path: rel, status: "missing" };
 		}
-		const status = filesEqual(join(installDir, rel), targetPath) ? "ok" : "modified";
+		const status = filesEqual(join(installDir, rel), targetPath)
+			? "ok"
+			: "modified";
 		return { path: rel, status };
 	});
 
@@ -289,7 +330,10 @@ export function checkInstallSync(skillRoot, targetRoot) {
 	const orphanEntries = readManifest(targetRoot)
 		.filter((entry) => !currentSet.has(entry.path))
 		.filter((entry) => existsSync(join(targetRoot, entry.path)));
-	const orphaned = orphanEntries.map((entry) => ({ path: entry.path, status: "orphaned" }));
+	const orphaned = orphanEntries.map((entry) => ({
+		path: entry.path,
+		status: "orphaned",
+	}));
 
 	const allResults = [...results, ...orphaned];
 	const adopted = allResults.some((r) => r.status !== "missing");
@@ -334,7 +378,9 @@ export function deployInstall(
 	const copied = [];
 	const skipped = [];
 	const previousEntries = readManifest(targetRoot);
-	const previousByPath = new Map(previousEntries.map((entry) => [entry.path, entry]));
+	const previousByPath = new Map(
+		previousEntries.map((entry) => [entry.path, entry]),
+	);
 	const deployedEntries = [];
 	for (const rel of files) {
 		const canonicalPath = join(installDir, rel);
@@ -384,10 +430,7 @@ export function deployInstall(
 		removed.push(entry.path);
 	}
 
-	writeManifest(targetRoot, [
-		...deployedEntries,
-		...retainedOrphanEntries,
-	]);
+	writeManifest(targetRoot, [...deployedEntries, ...retainedOrphanEntries]);
 
 	return { copied, skipped, removed, orphanSkipped };
 }
@@ -456,7 +499,12 @@ function printRenameCandidates(candidates) {
  * @param {boolean} deployRequested
  * @returns {boolean} whether any deployed file differs from this copy's install/
  */
-function reportNonDeployableTarget(role, skillRoot, targetRoot, deployRequested) {
+function reportNonDeployableTarget(
+	role,
+	skillRoot,
+	targetRoot,
+	deployRequested,
+) {
 	if (role.kind === "upstream") {
 		console.log(
 			`This target is the upstream repo that generates pfd-ops' install/ tree (${role.repoRoot}).\n` +
@@ -492,7 +540,11 @@ function reportNonDeployableTarget(role, skillRoot, targetRoot, deployRequested)
 			: role.kind === "upstream" && role.repoLocalRun
 				? " install/ is generated from the repo's own sources — reconcile the difference in those sources, then run 'node scripts/gen-install.mjs' to regenerate the mirror (regenerating first discards any edit made directly to install/)."
 				: " If this copy is the older snapshot, update the plugin or re-run the check from the repo-local copy instead.";
-	console.log(deployRequested ? `Refusing to deploy.${remedy}` : `Nothing to deploy from here.${remedy}`);
+	console.log(
+		deployRequested
+			? `Refusing to deploy.${remedy}`
+			: `Nothing to deploy from here.${remedy}`,
+	);
 	return issues.length > 0;
 }
 
@@ -515,7 +567,12 @@ async function main() {
 	const role = classifyTarget(skillRoot, targetRoot);
 	const deployable = role.kind === "adopter";
 	if (!deployable) {
-		const drifted = reportNonDeployableTarget(role, skillRoot, targetRoot, args.deploy);
+		const drifted = reportNonDeployableTarget(
+			role,
+			skillRoot,
+			targetRoot,
+			args.deploy,
+		);
 		// 3, not the 2 a malformed argv exits with: the argv was well-formed and
 		// this refusal is about the target, so a caller reading only the code can
 		// still tell "you typed it wrong" from "I will not write there".
@@ -529,10 +586,14 @@ async function main() {
 		// instruction to carry its local edit over to the new path is worth
 		// nothing once the file it points at is gone (#603).
 		printRenameCandidates(renameCandidates);
-		const { copied, skipped, removed, orphanSkipped } = deployInstall(skillRoot, targetRoot, {
-			overwriteLocalEdits: args.overwriteLocalEdits,
-			deleteEditedOrphans: args.deleteEditedOrphans,
-		});
+		const { copied, skipped, removed, orphanSkipped } = deployInstall(
+			skillRoot,
+			targetRoot,
+			{
+				overwriteLocalEdits: args.overwriteLocalEdits,
+				deleteEditedOrphans: args.deleteEditedOrphans,
+			},
+		);
 		// A bare path under "Copied:" reads as "your file moved here", so the
 		// destination of a detected rename says outright that it holds canonical
 		// content and the old path's edit is not in it — the thing #603 could
@@ -553,18 +614,29 @@ async function main() {
 		console.log(
 			`Before running the audit, follow the dependency setup and first-audit instructions in ${join(skillRoot, "references/github-issues-backend.md")}. File deployment alone does not install runtime dependencies.`,
 		);
-		printGroup("Skipped (locally modified; re-run with --overwrite-local-edits to overwrite):", skipped);
+		printGroup(
+			"Skipped (locally modified; re-run with --overwrite-local-edits to overwrite):",
+			skipped,
+		);
 		printGroup("Removed (no longer part of canonical install/):", removed);
 		printGroup(
 			"Orphaned but locally modified; re-run with --delete-edited-orphans to remove:",
 			orphanSkipped,
 		);
 		if (skipped.length > 0 || orphanSkipped.length > 0) exitCode = 1;
-		if (copied.length === 0 && skipped.length === 0 && removed.length === 0 && orphanSkipped.length === 0) {
+		if (
+			copied.length === 0 &&
+			skipped.length === 0 &&
+			removed.length === 0 &&
+			orphanSkipped.length === 0
+		) {
 			console.log("Nothing to deploy: install/ is empty.");
 		}
 	} else {
-		const { results, adopted, renameCandidates } = checkInstallSync(skillRoot, targetRoot);
+		const { results, adopted, renameCandidates } = checkInstallSync(
+			skillRoot,
+			targetRoot,
+		);
 		if (!adopted) {
 			console.log(
 				"The GitHub Issues backend (L3) is not adopted in this repo — no pfd-ops install/ files are deployed.\n" +
@@ -582,11 +654,16 @@ async function main() {
 		} else {
 			const issues = results.filter((r) => r.status !== "ok");
 			if (issues.length === 0) {
-				console.log("pfd-ops install/ files are in sync with the deployed copies.");
+				console.log(
+					"pfd-ops install/ files are in sync with the deployed copies.",
+				);
 			} else {
 				console.log("pfd-ops install/ files are out of sync:");
 				for (const r of issues) {
-					const label = r.status === "modified" ? "different from bundled version" : r.status;
+					const label =
+						r.status === "modified"
+							? "different from bundled version"
+							: r.status;
 					console.log(`  ${label}: ${r.path}`);
 				}
 				printRenameCandidates(renameCandidates);
@@ -612,6 +689,9 @@ async function main() {
 // crosses a symlink. This is the same comparison scripts/lib/cli-entrypoint.mjs
 // makes, spelled inline rather than imported: the file is distributed with the
 // pfd-ops skill and runs in adopting repos, which have no scripts/lib/ (#707).
-if (process.argv[1] && fileURLToPath(import.meta.url) === realpathSync(process.argv[1])) {
+if (
+	process.argv[1] &&
+	fileURLToPath(import.meta.url) === realpathSync(process.argv[1])
+) {
 	main();
 }

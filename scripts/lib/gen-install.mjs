@@ -19,7 +19,7 @@ import {
 } from "node:fs";
 import { dirname, join, posix } from "node:path";
 
-import { listInstallFiles } from "../../.claude/skills/pfd-ops/scripts/check-install-sync.mjs";
+import { listInstallFiles } from "../harness-template/skills/pfd-ops/scripts/check-install-sync.mjs";
 import { INSTALL_TEMPLATE_PATHS } from "./install-templates.mjs";
 import { extractRelativeImports } from "./relative-imports.mjs";
 

@@ -55,9 +55,38 @@ const SKILL_SOURCE_FILES = Object.freeze({
 		"scripts/collect-report-environment.mjs",
 		"scripts/plugin-version-check.mjs",
 	]),
-	"pfd-retro": Object.freeze(["SKILL.md", "references/knowledge-lifecycle.md"]),
+	"pfd-retro": Object.freeze([
+		"SKILL.md",
+		"references/knowledge-lifecycle.md",
+		"scripts/classify-knowledge-lifecycle.mjs",
+	]),
 	"pfd-upstream-report": Object.freeze(["SKILL.md"]),
 });
+
+// Only these files use the harness template language. Other references and
+// executable scripts are literal payloads, including any template examples.
+const SKILL_TEMPLATE_FILES = Object.freeze({
+	"pfd-grill": ["SKILL.md"],
+	"pfd-ops": [
+		"SKILL.md",
+		"references/architecture.md",
+		"references/scaffold/bindings/pfd-ops.md",
+		"references/scaffold/bindings/pfd-retro.md",
+		"references/scaffold/review-perspectives.md",
+		"references/scaffold/roadmap.md",
+	],
+	"pfd-retro": ["SKILL.md"],
+	"pfd-ecosystem": ["SKILL.md"],
+	"pfd-upstream-report": ["SKILL.md"],
+});
+
+export const CLAUDE_GENERATED_CAPABILITY_OUTPUTS = Object.freeze([
+	...Object.keys(SKILL_SOURCE_FILES).map((name) => `.claude/skills/${name}`),
+	...["pfd-cycle", "pfd-init", "pfd-retro"].map(
+		(name) => `.claude/commands/${name}.md`,
+	),
+	...["pfd-lens", "pfd-implementer"].map((name) => `.claude/agents/${name}.md`),
+]);
 
 function exclusion(target, reason, impact) {
 	return Object.freeze({
@@ -97,21 +126,24 @@ function skillCapability(name, source = {}) {
 		`skill:${name}`,
 		"skill",
 		{
-			encoding: "claude-skill",
-			path: `.claude/skills/${name}`,
-			...(files ? { files } : {}),
+			encoding: "harness-skill-template",
+			path: `scripts/harness-template/skills/${name}`,
+			...(files
+				? { files: files.filter((file) => !file.startsWith("install/")) }
+				: {}),
+			templates: SKILL_TEMPLATE_FILES[name] ?? [],
 			...source,
 		},
 		fourTargetMappings(
 			mapping(
 				"claude-repository",
-				"native",
+				source.generated ? "native" : "transform",
 				[`.claude/skills/${name}`],
 				PROBES.claudeRepository,
 			),
 			mapping(
 				"claude-plugin",
-				"native",
+				source.generated ? "native" : "transform",
 				[`skills/${name}`],
 				PROBES.claudePlugin,
 			),
@@ -137,17 +169,20 @@ function commandCapability(name) {
 	return capability(
 		`command:${name}`,
 		"command",
-		{ encoding: "claude-command", path: `.claude/commands/${name}.md` },
+		{
+			encoding: "harness-command-template",
+			path: `scripts/harness-template/commands/${name}.md`,
+		},
 		fourTargetMappings(
 			mapping(
 				"claude-repository",
-				"native",
+				"transform",
 				[`.claude/commands/${name}.md`],
 				PROBES.claudeRepository,
 			),
 			mapping(
 				"claude-plugin",
-				"native",
+				"transform",
 				[`commands/${name}.md`],
 				PROBES.claudePlugin,
 			),
@@ -171,17 +206,20 @@ function agentCapability(name) {
 	return capability(
 		`agent:${name}`,
 		"agent",
-		{ encoding: "claude-agent", path: `.claude/agents/${name}.md` },
+		{
+			encoding: "harness-agent-template",
+			path: `scripts/harness-template/agents/${name}.md`,
+		},
 		fourTargetMappings(
 			mapping(
 				"claude-repository",
-				"native",
+				"transform",
 				[`.claude/agents/${name}.md`],
 				PROBES.claudeRepository,
 			),
 			mapping(
 				"claude-plugin",
-				"native",
+				"transform",
 				[`agents/${name}.md`],
 				PROBES.claudePlugin,
 			),
@@ -207,6 +245,8 @@ export const HARNESS_CAPABILITY_CONTRACT = Object.freeze([
 	skillCapability("pfd-ecosystem"),
 	skillCapability("pfd-upstream-report"),
 	skillCapability("pfdsl", {
+		encoding: "claude-skill",
+		path: ".claude/skills/pfdsl",
 		generated: Object.freeze({
 			reason: "generated symlink to the neutral rendered skill tree",
 			target: "generated/skills/pfdsl",
@@ -392,10 +432,7 @@ export const LOCAL_CLAUDE_ROOT_ENTRIES = Object.freeze({
 });
 
 export const SOURCE_EXCLUSIONS = Object.freeze({
-	root: Object.freeze({
-		"pfd-ops-install-manifest.json":
-			"install provenance for the repository-local pfd-ops skill",
-	}),
+	root: Object.freeze({}),
 	skills: Object.freeze({
 		"distribution-review": "maintainer-only review workflow for this bundle",
 		"prose-mechanization-audit": "audits this repository's prose assets",
