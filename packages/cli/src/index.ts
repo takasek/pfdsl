@@ -53,6 +53,11 @@ import {
 	renderDiff,
 	renderGraph,
 } from "@pfdsl/preview-engine";
+import {
+	type CommandEntry,
+	defineCommand,
+	type OptionSpec,
+} from "./command-definition.js";
 
 export interface CommandResult {
 	stdout: string;
@@ -61,18 +66,11 @@ export interface CommandResult {
 	binaryOutput?: Buffer;
 }
 
-type OptionSpec = {
-	type: "boolean" | "string";
-	multiple?: true;
-	placeholder?: string;
-	required?: true;
-};
-
 const BOOLEAN_OPTION = { type: "boolean" } as const;
 const COMMON_OPTIONS: Record<string, OptionSpec> = {
 	help: BOOLEAN_OPTION,
 };
-const NO_OPTIONS: Record<string, OptionSpec> = {};
+const NO_OPTIONS = {};
 
 function formatSynopsisFlag(name: string, spec: OptionSpec): string {
 	if (spec.type === "boolean")
@@ -3844,48 +3842,26 @@ export function parseArgs(argv: readonly string[]): CliArgs {
  * Parse the optional --limit flag shared by graph path/stats: undefined when
  * absent, the parsed non-negative integer, or a usage-error CommandResult when
  * the value is not a non-negative integer. A bare --limit with no value no
- * longer arrives here — the strict parse rejects it before dispatch (#1050) —
- * so the `true` case remains only for callers that build `flags` themselves.
+ * longer arrives here — the strict parse rejects it before dispatch (#1050).
  */
 function parseLimitFlag(
-	flags: Record<string, string | boolean>,
+	flags: { limit?: string | undefined },
 	help: string,
 ): number | CommandResult | undefined {
 	const limitFlag = flags.limit;
 	if (limitFlag === undefined) return undefined;
-	if (limitFlag === true) return fail(help, 2);
 	const n = Number(limitFlag);
 	if (!Number.isInteger(n) || n < 0) return fail(help, 2);
 	return n;
 }
 
 /** Resolves --no-color/NO_COLOR/TTY for a dispatched command (ADR/#180, #435, #508). */
-function resolveColor(flags: Record<string, string | boolean>): boolean {
+function resolveColor(flags: { "no-color"?: boolean | undefined }): boolean {
 	return shouldColorize({
 		noColorFlag: flags["no-color"] === true,
 		stream: host.stdout,
 		env: host.env,
 	});
-}
-
-/**
- * One dispatchable command: `run` is the handler itself (a function
- * reference, not a string key — issue #902 rejected a JSON command table
- * because a string-keyed handler lookup falls outside tsgo's reach), `help`
- * is its full --help text (one of the hand-written HELP_* constants above,
- * referenced here rather than rebuilt), and `synopsis`/`description` are the
- * pieces a listing renders it with.
- */
-interface CommandEntry {
-	name: string;
-	synopsis: string;
-	description: readonly string[];
-	help: string;
-	options: Record<string, OptionSpec>;
-	run: (
-		positional: string[],
-		flags: Record<string, string | boolean>,
-	) => CommandResult | Promise<CommandResult>;
 }
 
 /** A `pfdsl <name> <subcommand> ...` group: dispatch table plus the pieces its own group help is built from. */
@@ -3938,12 +3914,11 @@ All subcommands accept --json and --no-color.
 }
 
 const GRAPH_COMMANDS: readonly CommandEntry[] = [
-	{
+	defineCommand(GRAPH_SUMMARY_OPTIONS, {
 		name: "summary",
 		synopsis: "summary <file|->",
 		description: ["Print artifact/process/edge counts"],
 		help: HELP_GRAPH_SUMMARY,
-		options: GRAPH_SUMMARY_OPTIONS,
 		run: (rest, flags) => {
 			const f = rest[0];
 			if (!f) return fail(HELP_GRAPH_SUMMARY, 2);
@@ -3952,13 +3927,12 @@ const GRAPH_COMMANDS: readonly CommandEntry[] = [
 				color: resolveColor(flags),
 			});
 		},
-	},
-	{
+	}),
+	defineCommand(GRAPH_IO_OPTIONS, {
 		name: "io",
 		synopsis: "io <file|->",
 		description: ["Print external inputs and terminal artifacts"],
 		help: HELP_GRAPH_IO,
-		options: GRAPH_IO_OPTIONS,
 		run: (rest, flags) => {
 			const f = rest[0];
 			if (!f) return fail(HELP_GRAPH_IO, 2);
@@ -3967,13 +3941,12 @@ const GRAPH_COMMANDS: readonly CommandEntry[] = [
 				color: resolveColor(flags),
 			});
 		},
-	},
-	{
+	}),
+	defineCommand(GRAPH_STATS_OPTIONS, {
 		name: "stats",
 		synopsis: "stats <file|-> [--limit]",
 		description: ["Rank nodes by primary degree, feedback degree apart"],
 		help: HELP_STATS,
-		options: GRAPH_STATS_OPTIONS,
 		run: (rest, flags) => {
 			const f = rest[0];
 			if (!f) return fail(HELP_STATS, 2);
@@ -3985,15 +3958,14 @@ const GRAPH_COMMANDS: readonly CommandEntry[] = [
 				color: resolveColor(flags),
 			});
 		},
-	},
-	{
+	}),
+	defineCommand(GRAPH_NEIGHBORS_OPTIONS, {
 		name: "neighbors",
 		synopsis: "neighbors <file|-> <id>",
 		description: [
 			"Direct predecessors/successors of a node, feedback included",
 		],
 		help: HELP_NEIGHBORS,
-		options: GRAPH_NEIGHBORS_OPTIONS,
 		run: (rest, flags) => {
 			const [f, id] = rest;
 			if (!f || !id) return fail(HELP_NEIGHBORS, 2);
@@ -4002,33 +3974,30 @@ const GRAPH_COMMANDS: readonly CommandEntry[] = [
 				color: resolveColor(flags),
 			});
 		},
-	},
-	{
+	}),
+	defineCommand(GRAPH_LOCATE_OPTIONS, {
 		name: "locate",
 		synopsis: "locate <file|-> <id>",
 		description: ["Frontmatter declaration line and body edge lines of a node"],
 		help: HELP_GRAPH_LOCATE,
-		options: GRAPH_LOCATE_OPTIONS,
 		run: (rest, flags) => {
 			const [f, id] = rest;
 			if (!f || !id) return fail(HELP_GRAPH_LOCATE, 2);
 			const fieldVal = flags.field;
-			if (fieldVal === true) return fail(HELP_GRAPH_LOCATE, 2);
 			return runGraphLocate(f, id, {
 				...(typeof fieldVal === "string" ? { field: fieldVal } : {}),
 				json: flags.json === true,
 				color: resolveColor(flags),
 			});
 		},
-	},
-	{
+	}),
+	defineCommand(GRAPH_DESCRIBE_OPTIONS, {
 		name: "describe",
 		synopsis: "describe <file|-> <id>",
 		description: [
 			"Kind, fields, neighbors, and locate lines of a node, in one call",
 		],
 		help: HELP_GRAPH_DESCRIBE,
-		options: GRAPH_DESCRIBE_OPTIONS,
 		run: (rest, flags) => {
 			const [f, id] = rest;
 			if (!f || !id) return fail(HELP_GRAPH_DESCRIBE, 2);
@@ -4037,13 +4006,12 @@ const GRAPH_COMMANDS: readonly CommandEntry[] = [
 				color: resolveColor(flags),
 			});
 		},
-	},
-	{
+	}),
+	defineCommand(GRAPH_IMPACT_OPTIONS, {
 		name: "impact",
 		synopsis: "impact <file|-> <id>",
 		description: ["Full downstream closure of a node"],
 		help: HELP_IMPACT,
-		options: GRAPH_IMPACT_OPTIONS,
 		run: (rest, flags) => {
 			const [f, id] = rest;
 			if (!f || !id) return fail(HELP_IMPACT, 2);
@@ -4052,13 +4020,12 @@ const GRAPH_COMMANDS: readonly CommandEntry[] = [
 				color: resolveColor(flags),
 			});
 		},
-	},
-	{
+	}),
+	defineCommand(GRAPH_DEPENDS_ON_OPTIONS, {
 		name: "depends-on",
 		synopsis: "depends-on <file|-> <id>",
 		description: ["Full upstream closure of a node"],
 		help: HELP_DEPENDS_ON,
-		options: GRAPH_DEPENDS_ON_OPTIONS,
 		run: (rest, flags) => {
 			const [f, id] = rest;
 			if (!f || !id) return fail(HELP_DEPENDS_ON, 2);
@@ -4067,13 +4034,12 @@ const GRAPH_COMMANDS: readonly CommandEntry[] = [
 				color: resolveColor(flags),
 			});
 		},
-	},
-	{
+	}),
+	defineCommand(GRAPH_PATH_OPTIONS, {
 		name: "path",
 		synopsis: "path <file|-> <from> <to> [--limit]",
 		description: ["All simple paths between two nodes"],
 		help: HELP_PATH,
-		options: GRAPH_PATH_OPTIONS,
 		run: (rest, flags) => {
 			const [f, from, to] = rest;
 			if (!f || !from || !to) return fail(HELP_PATH, 2);
@@ -4085,13 +4051,12 @@ const GRAPH_COMMANDS: readonly CommandEntry[] = [
 				color: resolveColor(flags),
 			});
 		},
-	},
-	{
+	}),
+	defineCommand(GRAPH_EDGES_OPTIONS, {
 		name: "edges",
 		synopsis: "edges <file|->",
 		description: ["Canonical edge list"],
 		help: HELP_GRAPH_EDGES,
-		options: GRAPH_EDGES_OPTIONS,
 		run: (rest, flags) => {
 			const f = rest[0];
 			if (!f) return fail(HELP_GRAPH_EDGES, 2);
@@ -4100,13 +4065,12 @@ const GRAPH_COMMANDS: readonly CommandEntry[] = [
 				color: resolveColor(flags),
 			});
 		},
-	},
-	{
+	}),
+	defineCommand(GRAPH_ORPHANS_OPTIONS, {
 		name: "orphans",
 		synopsis: "orphans <file|->",
 		description: ["Nodes with neither predecessor nor successor"],
 		help: HELP_GRAPH_ORPHANS,
-		options: GRAPH_ORPHANS_OPTIONS,
 		run: (rest, flags) => {
 			const f = rest[0];
 			if (!f) return fail(HELP_GRAPH_ORPHANS, 2);
@@ -4115,16 +4079,15 @@ const GRAPH_COMMANDS: readonly CommandEntry[] = [
 				color: resolveColor(flags),
 			});
 		},
-	},
+	}),
 ];
 
 const META_COMMANDS: readonly CommandEntry[] = [
-	{
+	defineCommand(META_GET_OPTIONS, {
 		name: "get",
 		synopsis: "get <file|-> <id[,id...]> [field[,field...]]",
 		description: ["Print field values"],
 		help: HELP_GET,
-		options: META_GET_OPTIONS,
 		run: (rest, flags) => {
 			const [f, id, field, ...extra] = rest;
 			if (!f || !id) return fail(HELP_GET, 2);
@@ -4136,13 +4099,12 @@ const META_COMMANDS: readonly CommandEntry[] = [
 				color: resolveColor(flags),
 			});
 		},
-	},
-	{
+	}),
+	defineCommand(META_LIST_OPTIONS, {
 		name: "list",
 		synopsis: "list <file|-> [--tag|--group|--producer] [field[,field...]]",
 		description: ["Print field values for nodes matching selectors"],
 		help: HELP_META_LIST,
-		options: META_LIST_OPTIONS,
 		run: (rest, flags) => {
 			const [f, field, ...extra] = rest;
 			if (!f) return fail(HELP_META_LIST, 2);
@@ -4163,13 +4125,12 @@ const META_COMMANDS: readonly CommandEntry[] = [
 				color: resolveColor(flags),
 			});
 		},
-	},
-	{
+	}),
+	defineCommand(META_VALUES_OPTIONS, {
 		name: "values",
 		synopsis: "values <file|-> <field[,field...]>",
 		description: ["Print a field's values in use, with counts"],
 		help: HELP_META_VALUES,
-		options: META_VALUES_OPTIONS,
 		run: (rest, flags) => {
 			const [f, field, ...extra] = rest;
 			if (!f || field === undefined) return fail(HELP_META_VALUES, 2);
@@ -4179,13 +4140,12 @@ const META_COMMANDS: readonly CommandEntry[] = [
 				color: resolveColor(flags),
 			});
 		},
-	},
-	{
+	}),
+	defineCommand(META_SET_OPTIONS, {
 		name: "set",
 		synopsis: "set <file> <id> <field> <value>",
 		description: ["Set a field value in place"],
 		help: HELP_META_SET,
-		options: META_SET_OPTIONS,
 		run: (rest, flags) => {
 			const [f, id, field, value, ...extra] = rest;
 			if (!f || !id || !field || value === undefined)
@@ -4201,18 +4161,17 @@ const META_COMMANDS: readonly CommandEntry[] = [
 				color: resolveColor(flags),
 			});
 		},
-	},
-	{
+	}),
+	defineCommand(META_SORT_OPTIONS, {
 		name: "sort",
 		synopsis: "sort <file|-> --by <keys>",
 		description: ["Sort node definitions"],
 		help: HELP_SORT,
-		options: META_SORT_OPTIONS,
 		run: (rest, flags) => {
 			const f = rest[0];
 			if (!f) return fail(HELP_SORT, 2);
 			const byVal = flags.by;
-			if (!byVal || byVal === true) return fail(HELP_SORT, 2);
+			if (!byVal) return fail(HELP_SORT, 2);
 			return runSort(f, {
 				by: String(byVal),
 				write: flags.write === true,
@@ -4220,13 +4179,12 @@ const META_COMMANDS: readonly CommandEntry[] = [
 				color: resolveColor(flags),
 			});
 		},
-	},
-	{
+	}),
+	defineCommand(META_REINDEX_OPTIONS, {
 		name: "reindex",
 		synopsis: "reindex <file|->",
 		description: ["Assign topological index: values"],
 		help: HELP_REINDEX,
-		options: META_REINDEX_OPTIONS,
 		run: (rest, flags) => {
 			const f = rest[0];
 			if (!f) return fail(HELP_REINDEX, 2);
@@ -4238,13 +4196,12 @@ const META_COMMANDS: readonly CommandEntry[] = [
 				color: resolveColor(flags),
 			});
 		},
-	},
-	{
+	}),
+	defineCommand(META_CHECK_LINKS_OPTIONS, {
 		name: "check-links",
 		synopsis: "check-links <file>",
 		description: ["Verify location: file paths exist"],
 		help: HELP_CHECK_LINKS,
-		options: META_CHECK_LINKS_OPTIONS,
 		run: (rest, flags) => {
 			const f = rest[0];
 			if (!f) return fail(HELP_CHECK_LINKS, 2);
@@ -4253,16 +4210,15 @@ const META_COMMANDS: readonly CommandEntry[] = [
 				color: resolveColor(flags),
 			});
 		},
-	},
+	}),
 ];
 
 const STATUS_COMMANDS: readonly CommandEntry[] = [
-	{
+	defineCommand(STATUS_READY_OPTIONS, {
 		name: "ready",
 		synopsis: "ready <file|-> [--best]",
 		description: ["List ready-to-start processes"],
 		help: HELP_READY,
-		options: STATUS_READY_OPTIONS,
 		run: (rest, flags) => {
 			const f = rest[0];
 			if (!f) return fail(HELP_READY, 2);
@@ -4272,13 +4228,12 @@ const STATUS_COMMANDS: readonly CommandEntry[] = [
 				color: resolveColor(flags),
 			});
 		},
-	},
-	{
+	}),
+	defineCommand(STATUS_BLOCKED_OPTIONS, {
 		name: "blocked",
 		synopsis: "blocked <file|->",
 		description: ["List not-ready processes and their blocking inputs"],
 		help: HELP_STATUS_BLOCKED,
-		options: STATUS_BLOCKED_OPTIONS,
 		run: (rest, flags) => {
 			const f = rest[0];
 			if (!f) return fail(HELP_STATUS_BLOCKED, 2);
@@ -4287,31 +4242,29 @@ const STATUS_COMMANDS: readonly CommandEntry[] = [
 				color: resolveColor(flags),
 			});
 		},
-	},
-	{
+	}),
+	defineCommand(STATUS_LIST_OPTIONS, {
 		name: "list",
 		synopsis: "list <file|-> --status <s[,s...]>",
 		description: ["List artifacts by status"],
 		help: HELP_STATUS_LIST,
-		options: STATUS_LIST_OPTIONS,
 		run: (rest, flags) => {
 			const f = rest[0];
 			if (!f) return fail(HELP_STATUS_LIST, 2);
 			const statusVal = flags.status;
-			if (!statusVal || statusVal === true) return fail(HELP_STATUS_LIST, 2);
+			if (!statusVal) return fail(HELP_STATUS_LIST, 2);
 			return runStatusList(f, {
 				status: String(statusVal),
 				json: flags.json === true,
 				color: resolveColor(flags),
 			});
 		},
-	},
-	{
+	}),
+	defineCommand(STATUS_GAPS_OPTIONS, {
 		name: "gaps",
 		synopsis: "gaps <roadmap> <flow> [<flow>...]",
 		description: ["Find todo artifacts missing from the roadmap"],
 		help: HELP_STATUS_GAPS,
-		options: STATUS_GAPS_OPTIONS,
 		run: (rest, flags) => {
 			const [roadmapFile, ...flowFiles] = rest;
 			if (!roadmapFile || flowFiles.length === 0)
@@ -4321,7 +4274,7 @@ const STATUS_COMMANDS: readonly CommandEntry[] = [
 				color: resolveColor(flags),
 			});
 		},
-	},
+	}),
 ];
 
 /**
@@ -4363,12 +4316,11 @@ export const COMMAND_GROUPS: readonly GroupDefinition[] = [
  * rendered from this, same reasoning as `COMMAND_GROUPS`.
  */
 export const TOP_LEVEL_COMMANDS: readonly CommandEntry[] = [
-	{
+	defineCommand(CHECK_OPTIONS, {
 		name: "check",
 		synopsis: "check <file|-> [--strict] [--hints] [--json] [--no-color]",
 		description: ["Validate a .pfdsl file (- = stdin)"],
 		help: HELP_CHECK,
-		options: CHECK_OPTIONS,
 		run: (positional, flags) => {
 			const f = positional[0];
 			if (!f) return fail(HELP_CHECK, 2);
@@ -4379,27 +4331,25 @@ export const TOP_LEVEL_COMMANDS: readonly CommandEntry[] = [
 				color: resolveColor(flags),
 			});
 		},
-	},
-	{
+	}),
+	defineCommand(EXPLAIN_OPTIONS, {
 		name: "explain",
 		synopsis: "explain <code>",
 		description: [
 			"Print the summary and spec section for a diagnostic code (e.g. V021)",
 		],
 		help: HELP_EXPLAIN,
-		options: EXPLAIN_OPTIONS,
 		run: (positional) => {
 			const code = positional[0];
 			if (!code) return fail(HELP_EXPLAIN, 2);
 			return runExplain(code);
 		},
-	},
-	{
+	}),
+	defineCommand(FMT_OPTIONS, {
 		name: "fmt",
 		synopsis: "fmt <file|-> [--write] [--check] [--no-color]",
 		description: ["Format a .pfdsl file (- = stdin)"],
 		help: HELP_FMT,
-		options: FMT_OPTIONS,
 		// The removed `--mode` is answered by `hasRemovedFmtMode` in `dispatch`,
 		// ahead of the strict parse that would otherwise reject it as an unknown
 		// option and flatten its message (#631's "the lookup decides what to say,
@@ -4413,13 +4363,12 @@ export const TOP_LEVEL_COMMANDS: readonly CommandEntry[] = [
 				color: resolveColor(flags),
 			});
 		},
-	},
-	{
+	}),
+	defineCommand(DELETE_OPTIONS, {
 		name: "delete",
 		synopsis: "delete <file|-> <id[,id...]> [--write] [--json] [--no-color]",
 		description: ["Remove one or more nodes from a .pfdsl file (- = stdin)"],
 		help: HELP_DELETE,
-		options: DELETE_OPTIONS,
 		run: (positional, flags) => {
 			const [f, idList] = positional;
 			if (!f || !idList) return fail(HELP_DELETE, 2);
@@ -4429,15 +4378,14 @@ export const TOP_LEVEL_COMMANDS: readonly CommandEntry[] = [
 				color: resolveColor(flags),
 			});
 		},
-	},
-	{
+	}),
+	defineCommand(RENAME_OPTIONS, {
 		name: "rename",
 		synopsis: "rename <file|-> <old> <new> [--write] [--json] [--no-color]",
 		description: [
 			"Rename an artifact, process, or group id and every reference to it (- = stdin)",
 		],
 		help: HELP_RENAME,
-		options: RENAME_OPTIONS,
 		run: (positional, flags) => {
 			const [f, oldId, newId, ...extra] = positional;
 			// `""` is a valid quoted id, so only an absent argument is missing.
@@ -4451,8 +4399,8 @@ export const TOP_LEVEL_COMMANDS: readonly CommandEntry[] = [
 				color: resolveColor(flags),
 			});
 		},
-	},
-	{
+	}),
+	defineCommand(RENDER_OPTIONS, {
 		name: "render",
 		synopsis: "render <file|-> [--format dot|svg|pdf|png] [--no-color]",
 		description: [
@@ -4460,7 +4408,6 @@ export const TOP_LEVEL_COMMANDS: readonly CommandEntry[] = [
 			"PDF/PNG requires puppeteer in the CLI's own Node env (npm install puppeteer)",
 		],
 		help: HELP_RENDER,
-		options: RENDER_OPTIONS,
 		run: (positional, flags) => {
 			const f = positional[0];
 			if (!f) return fail(HELP_RENDER, 2);
@@ -4479,13 +4426,12 @@ export const TOP_LEVEL_COMMANDS: readonly CommandEntry[] = [
 				color: resolveColor(flags),
 			});
 		},
-	},
-	{
+	}),
+	defineCommand(DIFF_OPTIONS, {
 		name: "diff",
 		synopsis: "diff <a> <b> [--format text|dot|svg] [--json] [--no-color]",
 		description: ["Structural diff (text), or visual diff DOT/SVG"],
 		help: HELP_DIFF,
-		options: DIFF_OPTIONS,
 		run: async (positional, flags) => {
 			const [a, b] = positional;
 			if (!a || !b) return fail(HELP_DIFF, 2);
@@ -4504,7 +4450,7 @@ export const TOP_LEVEL_COMMANDS: readonly CommandEntry[] = [
 				color: resolveColor(flags),
 			});
 		},
-	},
+	}),
 ];
 
 /** Alignment column shared by every listing block in `HELP`; the per-group counterpart is `GroupDefinition.columnWidth`. */
