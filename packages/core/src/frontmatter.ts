@@ -8,13 +8,15 @@ import {
 	isSeq,
 	type Node,
 	parseDocument,
-	parse as parseYaml,
 	visit,
 } from "yaml";
 import type { $ZodIssue } from "zod/v4/core";
 import en from "zod/v4/locales/en.js";
 import { invalidIdKeys } from "./frontmatter-id-keys.js";
-import { detectChildIndent } from "./frontmatter-text.js";
+import {
+	buildFrontmatterSource,
+	type FrontmatterSource,
+} from "./frontmatter-source.js";
 import { frontmatterInputSchema } from "./types/frontmatter.js";
 import type {
 	Diagnostic,
@@ -24,44 +26,21 @@ import type {
 } from "./types/index.js";
 
 /**
- * Locate the front matter key line of each artifact and process node, keyed by
- * id. Used to point diagnostics at the offending node. Each section's node id
- * indent is detected from its first content line (supports 2-space, 4-space,
- * etc. — not hardcoded; see #430).
+ * Locate artifact and process declaration keys using YAML node ranges,
+ * including quoted keys and flow maps, for standalone validation callers.
  */
 export function findFrontmatterNodeRanges(source: string): Map<string, Range> {
-	const result = new Map<string, Range>();
-	const { bodyStartLine } = loadFrontmatter(source);
-	const fmEndLine = bodyStartLine - 1;
-	const lines = source.split("\n");
-	let inNodeSection = false;
-	let sectionIndent: number | null = null;
-	for (let i = 0; i < fmEndLine && i < lines.length; i++) {
-		const line = lines[i];
-		if (line === undefined) continue;
-		// Top-level section key (no leading spaces)
-		if (/^\S/.test(line)) {
-			inNodeSection =
-				line.startsWith("artifact:") || line.startsWith("process:");
-			sectionIndent = inNodeSection
-				? detectChildIndent(lines.slice(i + 1, fmEndLine))
-				: null;
-			continue;
-		}
-		if (!inNodeSection || sectionIndent === null) continue;
-		// Node ID keys sit at the section's detected indent width.
-		const m = new RegExp(`^( {${sectionIndent}})(\\S[^:]*)\\s*:`).exec(line);
-		if (!m) continue;
-		const id = m[2] ?? "";
-		if (!id) continue;
-		const lineNum = i + 1; // 1-based
-		const col = sectionIndent + 1; // indent width + 1-based
-		result.set(id, {
-			start: { line: lineNum, column: col, offset: 0 },
-			end: { line: lineNum, column: col + id.length, offset: 0 },
-		});
-	}
-	return result;
+	return frontmatterNodeRanges(loadFrontmatterModel(source).sourceMap);
+}
+
+export function frontmatterNodeRanges(
+	model: FrontmatterSource,
+): Map<string, Range> {
+	return new Map(
+		model.declarations
+			.filter((d) => d.section === "artifact" || d.section === "process")
+			.map((d) => [d.id, d.range]),
+	);
 }
 
 /** Validate authored ID keys and declared field types, leaving extension metadata open. */
@@ -164,16 +143,17 @@ function frontmatterTypeDiagnostics(
 	return diagnostics;
 }
 
-export function loadFrontmatter(
+export function loadFrontmatterModel(
 	source: string,
 	options?: { strict?: boolean },
-): LoadResult {
+): LoadResult & { sourceMap: FrontmatterSource } {
 	if (!source.startsWith("---")) {
 		return {
 			frontmatter: null,
 			body: source,
 			bodyStartLine: 1,
 			diagnostics: [],
+			sourceMap: { declarations: [] },
 		};
 	}
 
@@ -212,6 +192,7 @@ export function loadFrontmatter(
 			body: source,
 			bodyStartLine: 1,
 			diagnostics: [diag],
+			sourceMap: { declarations: [] },
 		};
 	}
 
@@ -236,10 +217,8 @@ export function loadFrontmatter(
 
 	try {
 		// Do not coerce invalid declaration keys or lose colliding entries.
-		parsed =
-			yamlDocument.errors.length === 0 && invalidIdKeys(yamlDocument).length > 0
-				? {}
-				: parseYaml(yamlText);
+		if (yamlDocument.errors.length > 0) throw yamlDocument.errors[0];
+		parsed = invalidIdKeys(yamlDocument).length > 0 ? {} : yamlDocument.toJS();
 	} catch (e) {
 		yamlValid = false;
 		const msg = e instanceof Error ? e.message : String(e);
@@ -309,5 +288,22 @@ export function loadFrontmatter(
 		},
 	});
 
-	return { frontmatter, body, bodyStartLine, diagnostics };
+	return {
+		frontmatter,
+		body,
+		bodyStartLine,
+		diagnostics,
+		sourceMap: buildFrontmatterSource(source, yamlDocument, firstNl + 1),
+	};
+}
+
+export function loadFrontmatter(
+	source: string,
+	options?: { strict?: boolean },
+): LoadResult {
+	const { sourceMap: _sourceMap, ...result } = loadFrontmatterModel(
+		source,
+		options,
+	);
+	return result;
 }

@@ -6,7 +6,7 @@ import {
 	resolveEffectiveFrontmatterForUri,
 } from "./analyze.js";
 import { type DirectoryAccess, expandDirectory } from "./expand-directory.js";
-import { findFrontmatterDefinition } from "./jump.js";
+import { findFrontmatterDefinitionRange } from "./jump-logic.js";
 import {
 	buildDescriptions,
 	buildLocations,
@@ -155,8 +155,22 @@ function jumpToNode(
 	preferDefinition = false,
 ): void {
 	let targetPos: vscode.Position | undefined;
+	let targetEnd: vscode.Position | undefined;
 	if (preferDefinition) {
-		targetPos = findFrontmatterDefinition(doc, nodeId);
+		const definition = findFrontmatterDefinitionRange(
+			analyzeDocument(doc),
+			nodeId,
+		);
+		if (definition) {
+			targetPos = new vscode.Position(
+				definition.start.line - 1,
+				definition.start.column - 1,
+			);
+			targetEnd = new vscode.Position(
+				definition.end.line - 1,
+				definition.end.column - 1,
+			);
+		}
 	}
 	if (!targetPos) {
 		const found = positionOfNodeId(
@@ -168,7 +182,7 @@ function jumpToNode(
 	if (!targetPos) return;
 	const range = new vscode.Range(
 		targetPos,
-		targetPos.translate(0, nodeId.length),
+		targetEnd ?? targetPos.translate(0, nodeId.length),
 	);
 	const existingEditor = vscode.window.visibleTextEditors.find(
 		(e) => e.document === doc,
@@ -176,7 +190,7 @@ function jumpToNode(
 	if (existingEditor) {
 		existingEditor.selection = new vscode.Selection(
 			targetPos,
-			targetPos.translate(0, nodeId.length),
+			targetEnd ?? targetPos.translate(0, nodeId.length),
 		);
 		existingEditor.revealRange(range);
 		const vc = existingEditor.viewColumn;

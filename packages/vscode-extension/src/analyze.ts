@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import {
-	type AnalyzeResult,
 	analyze,
+	analyzeSource,
 	type Frontmatter,
 	resolveEffectiveFrontmatter,
 	wrapPresetSource,
@@ -12,21 +12,23 @@ export const LANGUAGE_ID = "pfdsl";
 
 interface CacheEntry {
 	version: number;
-	result: AnalyzeResult;
+	result: ReturnType<typeof analyzeSource>;
 }
 
 const cache = new Map<string, CacheEntry>();
 
-export function analyzeDocument(doc: vscode.TextDocument): AnalyzeResult {
+export function analyzeDocument(
+	doc: vscode.TextDocument,
+): ReturnType<typeof analyzeSource> {
 	const key = doc.uri.toString();
 	const entry = cache.get(key);
 	if (entry && entry.version === doc.version) return entry.result;
-	const result = analyze(doc.getText());
+	const result = analyzeSource(doc.getText());
 	cache.set(key, { version: doc.version, result });
 	return result;
 }
 
-/** Loader for `resolveEffectiveFrontmatter`: reads + analyzes a file by absolute path. */
+/** Dependency presets use saved files; the entry always uses its editor snapshot. */
 function extendsLoader(path: string): ReturnType<typeof analyze> | null {
 	try {
 		const src = readFileSync(path, "utf-8");

@@ -1,5 +1,5 @@
 import * as vscode from "vscode";
-import { LANGUAGE_ID } from "./analyze.js";
+import { analyzeDocument, LANGUAGE_ID } from "./analyze.js";
 import { extractDocumentLinks } from "./document-link-logic.js";
 import { type DirectoryAccess, expandDirectory } from "./expand-directory.js";
 
@@ -53,10 +53,15 @@ export function registerDocumentLinks(context: vscode.ExtensionContext): void {
 
 	const provider: vscode.DocumentLinkProvider = {
 		async provideDocumentLinks(doc) {
-			const links = extractDocumentLinks(doc.getText(), doc.uri.fsPath);
+			const links = extractDocumentLinks(analyzeDocument(doc), doc.uri.fsPath);
 			return await Promise.all(
-				links.map(async ({ line, startChar, endChar, target }) => {
-					const range = new vscode.Range(line, startChar, line, endChar);
+				links.map(async ({ line, startChar, endLine, endChar, target }) => {
+					const range = new vscode.Range(
+						line,
+						startChar,
+						endLine ?? line,
+						endChar,
+					);
 					if (target.startsWith("file://")) {
 						const fsPath = target.slice("file://".length);
 						const uri = vscode.Uri.file(fsPath);

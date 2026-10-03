@@ -45,6 +45,16 @@ interface FormatResult {
 
 ### Stage-by-stage API
 
+`analyzeSource(source, options)` returns the same analysis as `analyze()` plus a `sourceMap` of frontmatter declarations and fields.
+Each declaration records its section, decoded ID, authored key range, and fields with decoded string values and source ranges.
+Ranges use one-based lines and columns and zero-based UTF-16 offsets; scalar value ranges exclude surrounding quotes, while declaration key ranges include them.
+Aliases point to their use site, and folded scalars retain their decoded value and authored span.
+The model does not rewrite source or expose a mutable YAML document.
+The existing `analyze()`, `parse()`, and `loadFrontmatter()` return shapes are unchanged.
+
+`resolveEffectiveFrontmatter(entryPath, frontmatter, loader)` treats the supplied frontmatter as the entry snapshot, including its `extends` references.
+The loader retrieves dependencies only; local presentation values win last, even when the entry file has not been saved.
+
 For tools that need intermediate state (LSP, exporters):
 
 ```ts
