@@ -8,7 +8,7 @@
 // Enforcing those and no others keeps the check silent about work it cannot
 // reach.
 
-import { GH_UNAVAILABLE_EXIT_CODE } from "../pfdsl/lib/gh-compat.mjs";
+import { GITHUB_UNAVAILABLE_EXIT_CODE } from "../pfdsl/lib/github-ops.mjs";
 
 const AUDIT_SCRIPT = "scripts/pfdsl/audit-issues-flow.mjs";
 
@@ -35,8 +35,8 @@ export function classifyRoadmapRegistration({ issueNumbers, auditExit }) {
 			detail: "this PR closes no issue, so it has none to register",
 		};
 	}
-	if (auditExit === GH_UNAVAILABLE_EXIT_CODE) {
-		return { status: "SKIP", detail: "gh CLI unavailable" };
+	if (auditExit === GITHUB_UNAVAILABLE_EXIT_CODE) {
+		return { status: "SKIP", detail: "GitHub operations unavailable" };
 	}
 	const list = issueNumbers.map((n) => `#${n}`).join(", ");
 	if (auditExit === 0) {

@@ -43,6 +43,14 @@ beforeEach(() => {
 	git(["init", "--initial-branch=main"]);
 	git(["config", "user.email", "test@example.com"]);
 	git(["config", "user.name", "Test User"]);
+	mkdirSync(join(fixture, "packages/core/src/__fixtures__"), {
+		recursive: true,
+	});
+	writeFileSync(
+		join(fixture, "packages/core/src/__fixtures__/pipeline-scale.pfdsl"),
+		"a >> p -> b\n",
+	);
+	git(["add", "packages/core/src/__fixtures__/pipeline-scale.pfdsl"]);
 	git(["commit", "--allow-empty", "-m", "test: establish main"]);
 	git(["remote", "add", "origin", join(fixture, "remote.git")]);
 	git(["push", "origin", "HEAD:main"]);
@@ -55,6 +63,80 @@ beforeEach(() => {
 });
 
 afterEach(() => rmSync(fixture, { recursive: true, force: true }));
+
+it("uses the PR merge-base for size and the committed head model after base advances", () => {
+	mkdirSync(join(fixture, ".pfdsl"));
+	writeFileSync(join(fixture, ".pfdsl/workflow.md"), "base\n");
+	git(["add", ".pfdsl/workflow.md"]);
+	git(["commit", "-m", "test: establish knowledge baseline"]);
+	git(["push", "origin", "HEAD:main"]);
+	git(["switch", "-c", "review"]);
+	writeFileSync(
+		join(fixture, "packages/example/index.js"),
+		"export const value = 2;\n",
+	);
+	git(["add", "packages/example/index.js"]);
+	writeFileSync(join(fixture, ".pfdsl/workflow.md"), "branch growth\n");
+	const model =
+		"---\nartifact:\n  a:\n    location: ../packages/example/index.js\n---\na >> p -> b\n";
+	writeFileSync(join(fixture, ".pfdsl/workflow.pfdsl"), model);
+	git(["add", ".pfdsl"]);
+	git(["commit", "-m", "test: change reviewed knowledge"]);
+	const reviewed = spawnSync("git", ["rev-parse", "HEAD"], {
+		cwd: fixture,
+		encoding: "utf8",
+	}).stdout.trim();
+	git(["switch", "main"]);
+	writeFileSync(
+		join(fixture, ".pfdsl/workflow.md"),
+		"unrelated base growth that is much larger\n",
+	);
+	git(["add", ".pfdsl/workflow.md"]);
+	git(["commit", "-m", "test: advance base independently"]);
+	git(["push", "origin", "HEAD:main"]);
+	git(["switch", "review"]);
+	for (const pkg of ["core", "cli"]) {
+		mkdirSync(join(fixture, `packages/${pkg}`), { recursive: true });
+		symlinkSync(
+			join(root, `packages/${pkg}/dist`),
+			join(fixture, `packages/${pkg}/dist`),
+			"dir",
+		);
+	}
+	writeFileSync(
+		join(fixture, ".pfdsl/workflow.pfdsl"),
+		model.replace("packages/example/index.js", "uncommitted.js"),
+	);
+	const result = runGate();
+	assert.equal(result.status, 0, result.stdout + result.stderr);
+	assert.match(result.stdout, new RegExp(`Report revision: head ${reviewed}`));
+	assert.match(result.stdout, /workflow\.md: \+9 bytes/);
+	assert.doesNotMatch(result.stderr, /fatal:/);
+	assert.match(
+		result.stdout,
+		/packages\/example\/index\.js ← \.pfdsl\/workflow\.pfdsl:a/,
+	);
+	assert.doesNotMatch(result.stdout, /uncommitted\.js/);
+	writeFileSync(join(fixture, ".pfdsl/workflow.md"), "next branch growth\n");
+	git(["add", ".pfdsl/workflow.md"]);
+	git(["commit", "-m", "test: add reviewed commit"]);
+	const next = runGate();
+	assert.equal(next.status, 0, next.stdout + next.stderr);
+	assert.match(next.stdout, /workflow\.md: \+14 bytes/);
+	assert.ok(!next.stdout.includes(`Report revision: head ${reviewed}`));
+});
+
+it("reports original non-ASCII knowledge paths rather than Git display quoting", () => {
+	const path = ".pfdsl/bindings/日本語.md";
+	mkdirSync(dirname(join(fixture, path)), { recursive: true });
+	writeFileSync(join(fixture, path), "text\n");
+	git(["config", "core.quotePath", "true"]);
+	git(["add", path]);
+	git(["commit", "-m", "docs: add non-ASCII knowledge"]);
+	const result = runGate();
+	assert.equal(result.status, 0, result.stdout + result.stderr);
+	assert.ok(result.stdout.includes(`${path}: +5 bytes`), result.stdout);
+});
 
 function runGate(args = []) {
 	return spawnSync(
@@ -197,15 +279,22 @@ describe("gate-check record recovery", () => {
 
 describe("gate-check human review routing", () => {
 	function stubIssues(failures = {}) {
+		cpSync(
+			join(fixture, "scripts/pfdsl/lib/github-ops.mjs"),
+			join(fixture, "scripts/pfdsl/lib/github-ops-api.mjs"),
+		);
 		writeFileSync(
 			join(fixture, "scripts/pfdsl/lib/github-ops.mjs"),
 			`
 import { appendFileSync } from 'node:fs';
+import { GitHubUnavailableError } from './github-ops-api.mjs';
+export { isGitHubUnavailableError, GITHUB_UNAVAILABLE_EXIT_CODE } from './github-ops-api.mjs';
 export function createGitHubOps() {
   return {
     viewIssue: async ({ number, fields }) => {
       appendFileSync('issue-reads.jsonl', JSON.stringify({ number, fields }) + '\\n');
       const failure = ${JSON.stringify(failures)}[number];
+      if (failure?.unavailable) throw new GitHubUnavailableError('viewIssue');
       if (failure) throw Object.assign(new Error(failure.message), { code: failure.code });
       return { body: '設計未確定', comments: [] };
     },
@@ -253,10 +342,13 @@ export function createGitHubOps() {
 		[undefined, "HTTP 404: issue not found", 1, "FAIL"],
 		[undefined, "authentication failed", 1, "FAIL"],
 		[undefined, "network unavailable", 1, "FAIL"],
-		["ENOENT", "spawn gh ENOENT", 0, "SKIP"],
+		["ENOENT", "unrelated ENOENT", 1, "FAIL"],
+		["GITHUB_UNAVAILABLE", "no backend", 0, "SKIP"],
 	]) {
 		it(`preserves issue lookup handling: ${message}`, () => {
-			stubIssues({ 1208: { code, message } });
+			stubIssues({
+				1208: { code, message, unavailable: code === "GITHUB_UNAVAILABLE" },
+			});
 			const result = runGate(["--issue", "1208", "--issue", "1221"]);
 			assert.equal(result.status, status, result.stdout + result.stderr);
 			assert.match(

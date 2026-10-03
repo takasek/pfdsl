@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
+import { analyze, isUnreadableError } from "../../packages/core/dist/index.js";
 
 import { checkCommitSubjects } from "./commit-subjects.mjs";
 import {
@@ -632,6 +633,10 @@ describe("wipTransitionStep", () => {
 describe("collectSizeDeltas", () => {
 	it("measures tracked paths only", () => {
 		const { exec, calls } = fakeExec({
+			"git ls-tree --name-only -z origin/main": {
+				out: ".pfdsl/bindings/x.pfdsl\0",
+			},
+			"git ls-tree --name-only -z HEAD": { out: ".pfdsl/bindings/x.pfdsl\0" },
 			"git show origin/main:.pfdsl/bindings/x.pfdsl": { out: "aa\n" },
 			"git show HEAD:.pfdsl/bindings/x.pfdsl": { out: "aaaaaa\n" },
 		});
@@ -640,7 +645,7 @@ describe("collectSizeDeltas", () => {
 			base: "main",
 			changedFiles: [".pfdsl/bindings/x.pfdsl", "packages/core/src/graph.ts"],
 		});
-		assert.deepEqual(deltas, [
+		assert.deepEqual(deltas.deltas, [
 			{
 				path: ".pfdsl/bindings/x.pfdsl",
 				beforeBytes: 3,
@@ -659,14 +664,27 @@ describe("collectSizeDeltas", () => {
 				out: "fatal: does not exist",
 			},
 			"git show HEAD:.pfdsl/bindings/new.pfdsl": { out: "hello\n" },
+			"git ls-tree --name-only -z HEAD": { out: ".pfdsl/bindings/new.pfdsl\0" },
 		});
 		const deltas = collectSizeDeltas({
 			exec,
 			base: "main",
 			changedFiles: [".pfdsl/bindings/new.pfdsl"],
 		});
-		assert.equal(deltas[0].beforeBytes, 0);
-		assert.equal(deltas[0].afterBytes, 6);
+		assert.equal(deltas.deltas[0].beforeBytes, 0);
+		assert.equal(deltas.deltas[0].afterBytes, 6);
+	});
+	it("reports an unreadable size instead of fabricating zero growth", () => {
+		const { exec } = fakeExec({
+			"git ls-tree": { ok: false, out: "cannot read tree" },
+		});
+		const result = collectSizeDeltas({
+			exec,
+			base: "main",
+			changedFiles: ["docs/adr/x.md"],
+		});
+		assert.deepEqual(result.deltas, []);
+		assert.match(result.unreadable.join("\n"), /cannot read tree/);
 	});
 });
 
@@ -998,6 +1016,7 @@ describe("analyzeAdoptedPfdsl", () => {
 		readdirSync: () => ["workflow.pfdsl", "roadmap.pfdsl", "roadmap.md"],
 		readFile: (file) => `text of ${file}`,
 		analyze: (text) => ({ frontmatter: { title: text } }),
+		isUnreadableError,
 		...overrides,
 	});
 
@@ -1008,6 +1027,23 @@ describe("analyzeAdoptedPfdsl", () => {
 			[".pfdsl/roadmap.pfdsl", ".pfdsl/workflow.pfdsl"],
 		);
 		assert.deepEqual(unreadable, []);
+	});
+
+	it("marks real frontmatter parse diagnostics as incomplete measurement", () => {
+		for (const text of [
+			"---\n: bad: yaml\n---\na >> P -> b\n",
+			"---\nartifact: [\n",
+		]) {
+			const report = analyzeAdoptedPfdsl(
+				deps({
+					readdirSync: () => ["workflow.pfdsl"],
+					readFile: () => text,
+					analyze,
+				}),
+			);
+			assert.deepEqual(report.analyzed, []);
+			assert.match(report.unreadable.join("\n"), /workflow\.pfdsl:.*FM00[12]/);
+		}
 	});
 
 	it("passes the file's text through analyze and keeps the frontmatter", () => {
@@ -1038,22 +1074,30 @@ describe("analyzeAdoptedPfdsl", () => {
 describe("deletedFilesSince", () => {
 	it("returns the branch's deleted paths, three-dot against the base", () => {
 		const { exec, calls } = fakeExec({
-			"git diff --diff-filter=D": { out: "docs/samples/gone.svg\n" },
+			"git diff --diff-filter=D": { out: "docs/samples/gone.svg\0" },
 		});
-		assert.deepEqual(deletedFilesSince({ exec, base: "main" }), [
+		assert.deepEqual(deletedFilesSince({ exec, base: "main" }).files, [
 			"docs/samples/gone.svg",
 		]);
 		assert.ok(
 			calls.some((c) =>
-				c.startsWith("git diff --diff-filter=D --name-only origin/main...HEAD"),
+				c.startsWith(
+					"git diff --diff-filter=D --no-renames --name-only -z origin/main...HEAD",
+				),
 			),
 		);
 	});
 
 	// The report this feeds is material; a git failure there costs the deleted
 	// half of it, not the whole block.
-	it("returns nothing rather than throwing when git fails", () => {
-		const { exec } = fakeExec({ "git diff --diff-filter=D": { ok: false } });
-		assert.deepEqual(deletedFilesSince({ exec, base: "main" }), []);
+	it("reports unmeasured deletions rather than an empty successful set", () => {
+		const { exec } = fakeExec({
+			"git diff --diff-filter=D": { ok: false, out: "denied" },
+		});
+		assert.deepEqual(deletedFilesSince({ exec, base: "main" }), {
+			ok: false,
+			files: [],
+			error: "denied",
+		});
 	});
 });

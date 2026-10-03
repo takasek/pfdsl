@@ -12,6 +12,15 @@ Changing a version number alone is not evidence that old local copies have been 
 
 ## Unreleased — after CLI/plugin v0.1.0
 
+### GitHub operation availability
+
+The distributed issue audit still exits with code 2 when no GitHub backend is available, and with a failure for authentication, network, remote-resolution or response errors.
+When upgrading locally maintained callers of `createGitHubOps`, replace `isGhUnavailableError` with `isGitHubUnavailableError` imported from `github-ops.mjs`.
+The operation API now throws `GitHubUnavailableError` when gh is absent and neither `GH_TOKEN` nor `GITHUB_TOKEN` is set; raw `ENOENT` is no longer its public availability contract.
+An available token still enables the HTTP fallback, and an operation with no HTTP implementation remains an error.
+Refresh deployed audit/helper files together through the normal bundle update path, preserving local edits.
+The upstream repository's check inventory and terminal report revision changes do not add a new adopter CI requirement.
+
 ### Group and node IDs
 
 Specification v0.0.27 forbids a group ID from also being an artifact or process ID in the same file.

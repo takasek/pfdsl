@@ -4,7 +4,10 @@
  */
 
 import { parse as parseYaml } from "yaml";
-import { isGhUnavailableError } from "../pfdsl/lib/gh-compat.mjs";
+import {
+	GITHUB_UNAVAILABLE_EXIT_CODE,
+	isGitHubUnavailableError,
+} from "../pfdsl/lib/github-ops.mjs";
 
 export {
 	lintCommitSubjects,
@@ -93,13 +96,13 @@ export function matchesTrigger(files, pattern) {
 	return files.some((f) => pattern.test(f));
 }
 
-// audit-issues-flow.mjs exits with this code when the gh CLI is unavailable
-// (ENOENT), distinct from exit code 1 (real findings) — see #489, #492.
-export const AUDIT_ISSUES_FLOW_GH_UNAVAILABLE_EXIT_CODE = 2;
+// Preserve the audit subprocess exit contract; raw backend error shapes stay internal.
+export const AUDIT_ISSUES_FLOW_GH_UNAVAILABLE_EXIT_CODE =
+	GITHUB_UNAVAILABLE_EXIT_CODE;
 
 /**
  * Map an `node scripts/pfdsl/audit-issues-flow.mjs` subprocess result to a
- * gate-check row. Exit code 2 (gh CLI unavailable) degrades to SKIP instead
+ * gate-check row. Exit code 2 (GitHub operations unavailable) degrades to SKIP instead
  * of FAIL, so a missing gh binary doesn't get conflated with an actual
  * roadmap/issue sync drift.
  * @param {boolean} ok
@@ -111,7 +114,8 @@ export function classifyAuditIssuesFlowResult(ok, exitStatus) {
 	if (exitStatus === AUDIT_ISSUES_FLOW_GH_UNAVAILABLE_EXIT_CODE) {
 		return {
 			status: "SKIP",
-			detail: "gh CLI unavailable; GitHub-dependent checks skipped (see #492)",
+			detail:
+				"GitHub operations unavailable; GitHub-dependent checks skipped (see #492)",
 		};
 	}
 	return {
@@ -172,19 +176,15 @@ export const NO_ARTIFACT_DETAIL =
  * cause that was not theirs, and took a SKIP that the reader had every reason
  * to attribute to their environment (#745).
  *
- * Only a missing binary degrades to SKIP, matching the vocabulary
- * classifyAuditIssuesFlowResult already uses for the same environment (#489):
- * a repo whose sessions have no gh cannot be asked to fail on its absence.
- * Anything else FAILs — the check did not run, and a row nobody acts on is how
- * that goes unnoticed for a whole cycle.
+ * Only operation-level unavailability degrades to SKIP (#1085). Executed
+ * backend failures, including an unrelated ENOENT, always FAIL.
  * @param {{code?: string, message?: string}} error
  * @returns {{status: 'SKIP'|'FAIL', detail: string}}
  */
 export function classifyIssueLookupFailure(error) {
-	// The same predicate execGh uses to decide whether a REST fallback is even
-	// possible, rather than a second spelling of ENOENT that could drift from it.
-	if (isGhUnavailableError(error)) {
-		return { status: "SKIP", detail: "gh CLI unavailable" };
+	// Only the operation API can identify unavailable backends (#1085).
+	if (isGitHubUnavailableError(error)) {
+		return { status: "SKIP", detail: error.message };
 	}
 	return {
 		status: "FAIL",
