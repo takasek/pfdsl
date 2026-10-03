@@ -188,19 +188,19 @@ process:
   i1278_add_group_delete:
     label: group 削除の追加
     location: https://github.com/takasek/pfdsl/issues/1278
-    updated_at: 2026-09-26T17:36:28Z
+    updated_at: 2026-10-03T20:00:32Z
   publish_cli_group_delete:
     label: CLI group 削除公開
   i1305_allow_extension_fields:
     label: meta set の対象判定と拡張フィールド更新を整える
     location: https://github.com/takasek/pfdsl/issues/1305
-    updated_at: 2026-10-03T09:07:14Z
+    updated_at: 2026-10-03T20:00:28Z
   publish_cli_meta_set_extension:
     label: CLI 拡張フィールド更新公開
   i1291_report_group_node_clash:
     label: group と node の同名の診断を追加する
     location: https://github.com/takasek/pfdsl/issues/1291
-    updated_at: 2026-09-27T10:23:04Z
+    updated_at: 2026-10-03T20:00:14Z
   publish_cli_group_node_clash:
     label: CLI 同名診断公開
   i1282_create_node_definition:

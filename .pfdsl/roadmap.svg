@@ -471,7 +471,7 @@
 <!-- i1278_add_group_delete -->
 <g id="node19" class="node">
 <title>i1278_add_group_delete</title>
-<g id="a_node19"><a xlink:href="https://github.com/takasek/pfdsl/issues/1278" xlink:title="group 削除の追加&#10;updated_at: 2026&#45;09&#45;26T17:36:28Z&#10;location: https://github.com/takasek/pfdsl/issues/1278">
+<g id="a_node19"><a xlink:href="https://github.com/takasek/pfdsl/issues/1278" xlink:title="group 削除の追加&#10;updated_at: 2026&#45;10&#45;03T20:00:32Z&#10;location: https://github.com/takasek/pfdsl/issues/1278">
 <ellipse fill="none" stroke="black" cx="383.1" cy="-403.4" rx="109.73" ry="29.42"/>
 <text xml:space="preserve" text-anchor="middle" x="383.1" y="-407.6" font-family="Times,serif" font-size="14.00">i1278_add_group_delete</text>
 <text xml:space="preserve" text-anchor="middle" x="383.1" y="-390.8" font-family="Times,serif" font-size="14.00">group 削除の追加</text>
@@ -573,7 +573,7 @@
 <!-- i1291_report_group_node_clash -->
 <g id="node23" class="node">
 <title>i1291_report_group_node_clash</title>
-<g id="a_node23"><a xlink:href="https://github.com/takasek/pfdsl/issues/1291" xlink:title="group と node の同名の診断を追加する&#10;updated_at: 2026&#45;09&#45;27T10:23:04Z&#10;location: https://github.com/takasek/pfdsl/issues/1291">
+<g id="a_node23"><a xlink:href="https://github.com/takasek/pfdsl/issues/1291" xlink:title="group と node の同名の診断を追加する&#10;updated_at: 2026&#45;10&#45;03T20:00:14Z&#10;location: https://github.com/takasek/pfdsl/issues/1291">
 <ellipse fill="none" stroke="black" cx="383.1" cy="-54.4" rx="139.98" ry="53.17"/>
 <text xml:space="preserve" text-anchor="middle" x="383.1" y="-75.4" font-family="Times,serif" font-size="14.00">i1291_report_group_node_clash</text>
 <text xml:space="preserve" text-anchor="middle" x="383.1" y="-58.6" font-family="Times,serif" font-size="14.00">group と node</text>
@@ -591,7 +591,7 @@
 <!-- i1305_allow_extension_fields -->
 <g id="node24" class="node">
 <title>i1305_allow_extension_fields</title>
-<g id="a_node24"><a xlink:href="https://github.com/takasek/pfdsl/issues/1305" xlink:title="meta set の対象判定と拡張フィールド更新を整える&#10;updated_at: 2026&#45;10&#45;03T09:07:14Z&#10;location: https://github.com/takasek/pfdsl/issues/1305">
+<g id="a_node24"><a xlink:href="https://github.com/takasek/pfdsl/issues/1305" xlink:title="meta set の対象判定と拡張フィールド更新を整える&#10;updated_at: 2026&#45;10&#45;03T20:00:28Z&#10;location: https://github.com/takasek/pfdsl/issues/1305">
 <ellipse fill="none" stroke="black" cx="383.1" cy="-515.4" rx="130.64" ry="65.05"/>
 <text xml:space="preserve" text-anchor="middle" x="383.1" y="-544.8" font-family="Times,serif" font-size="14.00">i1305_allow_extension_fields</text>
 <text xml:space="preserve" text-anchor="middle" x="383.1" y="-528" font-family="Times,serif" font-size="14.00">meta set</text>
