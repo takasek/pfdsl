@@ -41,10 +41,14 @@ worktree を既定とする理由は `.pfdsl/bindings/pfd-ops.md`「ワークサ
 `make setup` が入れる pre-commit hook のシムについては CLAUDE.md「セットアップ」節が一次情報。
 
 **worktree での git 操作**: `git commit` など git コマンドは worktree ディレクトリを指して実行する（理由は `.pfdsl/bindings/pfd-ops.md`「ワークサイクルの追加手順」の「手順 2 の追加で worktree 上の変更を検証する」が一次情報）。
-**worktree のパスはシェル変数に入れず literal で書く**。
-`scripts/main-commit-guard.mjs`（#777。deny / ask の割り当ては CLAUDE.md「コミット粒度」節が一次情報）は hook の payload だけを見る静的解析なので `git -C $W commit` の `$W` を解決できず、fail closed して deny する。
-`git -C /Users/.../.claude/worktrees/<name> commit` と literal で書けば target が解決され、session の root として報告される worktree と一致すれば通り、一致しなければ Claude Code では ask になる（#1201。session が起動後に worktree へ移った場合、harness は起動時の root を報告し続けるため後者になる — 所有権を確認して承認する）。
-なお deny は Bash 呼び出し全体を止めるため、`git -C $W add … && git -C $W commit …` が弾かれたときは add も実行されていない。
+**worktree のパスは命令内にも literal の絶対パスで書く**。
+`git -C /absolute/worktree ...`、`make -C /absolute/worktree ...`、`cd /absolute/worktree && node ...` を使い、ツールの workdir とファイル操作の絶対パスも同じ checkout に固定する。
+ガードの保護政策と対応形式は root instructions「コミット粒度」が一次情報である。
+session root の違いから所有権を推測せず、対象 checkout とブランチを確認する。
+branch の切替・命名と、その後の Git 変更は別のツール呼出しに分ける。
+環境設定や解除の後に同じ呼出しで保護対象操作を続ける互換性は持たない。
+失敗する cd の後で別の場所を使わないよう、cd と操作は `&&` で結ぶ。
+deny は呼出し全体を止めるため、拒否された複合命令の前半も実行済みとは扱わない。
 
 ## develop のレビュー
 

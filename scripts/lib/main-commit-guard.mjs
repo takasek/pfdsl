@@ -1,18 +1,5 @@
-// Blocks or asks about git commands that change the working tree or index when
-// the target is main (#650, widened in #777) or another worktree in the same
-// repository (#784). CLAUDE.md and the pfd-ops binding require each session to keep
-// its work inside its own worktree so gate-check and review see one coherent
-// change set.
-//
-// Commits were the whole of it until a worktree session's shell cwd reverted
-// to the main checkout and staged two files there (#777). The commit itself
-// was blocked, but the staged files stayed in an index every session shares,
-// where the next commit made in the main checkout — by a human, too — picks
-// them up. Stopping the commit alone leaves the route into that index open.
-//
-// currentBranch is passed in rather than read here, since a PreToolUse hook
-// payload does not carry it — the hook wrapper resolves it once via `git
-// branch --show-current` and this stays a pure function.
+// Guards effective Git targets on the default branch. A session root identifies
+// repository scope; it does not establish exclusive ownership of a worktree.
 //
 // A second, independent deny axis (#1232) catches commands that skip this
 // repo's pre-commit checks — `--no-verify`/`-n` and a `core.hooksPath`
@@ -24,29 +11,22 @@
 // lands outside the target repo (`--global`/`--system`/`--file`), which a
 // foreign target does not excuse either.
 
-import { basename, resolve } from "node:path";
+import { basename } from "node:path";
 import {
-	createProtectedShellState,
 	GIT_GLOBAL_FLAGS_WITH_VALUE,
 	gitSubcommand,
 	gitSubcommandIndex,
-	hasProtectedCdPathOverride,
-	hasProtectedGitTargetOverride,
-	parseLeadingShellPrefix,
-	splitCommandFlow,
 	splitSegments,
 	stripLeadingNoise,
 	tokenize,
-	updateProtectedShellState,
 } from "./delegation-guard.mjs";
 import { buildPermissionOutput, parseHookPayload } from "./hook-io.mjs";
+import {
+	analyzeShellContext,
+	shellStartCwd,
+	staticPath,
+} from "./shell-context.mjs";
 
-// The decision splits by target before it splits by subcommand. Against a
-// worktree other than the session's own reported root it is always ask (#1201):
-// the guard cannot separate the session's own worktree from another session's,
-// so the grading below would deny the very arrangement the workflow mandates.
-// On the default branch the subcommand decides.
-//
 // Which subcommands land in which decision follows one rule (#777): deny the
 // ones that create new state on the branch, because "do it in a worktree
 // instead" is an equivalent substitute and fits in the deny message; ask for
@@ -557,6 +537,11 @@ function classifyBypass(tokens) {
 	return null;
 }
 
+/**
+ * The guarded git subcommand one already-tokenized segment runs, or null.
+ * @param {{value: string, quoted: boolean}[]} tokens
+ * @returns {{subcommand: string, decision: "deny" | "ask", bypass?: boolean, flag?: string, outsideTarget?: boolean, outsideTargetFlag?: string, outsideTargetName?: string} | null}
+ */
 const CODEX_ROUTINE_MUTATIONS = new Map([
 	["stage-all", "add"],
 	["commit", "commit"],
@@ -637,29 +622,6 @@ export function classifyGitCommand(command) {
 	return asked;
 }
 
-/** A path this layer can resolve without running a shell. */
-function staticPath(token) {
-	if (!token) return null;
-	if (token.quoted)
-		return token.quote === "'" || !/[$`]/.test(token.value)
-			? token.value
-			: null;
-	return /[$~*?`]/.test(token.value) ? null : token.value;
-}
-
-/** A literal target from the supported `cd` forms, or null when it is dynamic. */
-function cdPath(tokens) {
-	let targetAt = 1;
-	if (!tokens[targetAt]?.quoted && tokens[targetAt]?.value === "--") targetAt++;
-	const target = staticPath(tokens[targetAt]);
-	if (target === null) return null;
-	return tokens
-		.slice(targetAt + 1)
-		.every((token) => !token.quoted && /^(?:[0-9]*>>?|&>>?)/.test(token.value))
-		? target
-		: null;
-}
-
 /** Resolve every pre-subcommand `git -C` in the order Git applies them. */
 function resolveGitCwd(tokens, shellCwd) {
 	const subcommandAt = gitSubcommandIndex(tokens);
@@ -678,31 +640,18 @@ function resolveGitCwd(tokens, shellCwd) {
 		if (token.value !== "-C") continue;
 		const target = staticPath(tokens[i + 1]);
 		if (target === null) cwd = null;
-		else if (target.startsWith("/")) cwd = resolve(target);
-		else if (cwd !== null) cwd = resolve(cwd, target);
+		else if (target.startsWith("/")) cwd = target;
+		// Git chdir follows filesystem symlinks before resolving '..'. Keep
+		// the path intact for the wrapper's physical filesystem resolution.
+		else if (cwd !== null && target !== "") cwd = `${cwd}/${target}`;
 		i++;
-	}
-	return cwd;
-}
-
-function resolveEnvCwd(tokens, shellCwd) {
-	let cwd = shellCwd;
-	const prefix = parseLeadingShellPrefix(tokens);
-	if (prefix.unresolved || prefix.gitTargetOverride) return null;
-	for (const env of prefix.envs) {
-		if (env.chdir !== undefined) {
-			const target = staticPath(env.chdir);
-			if (target === null) cwd = null;
-			else if (target.startsWith("/")) cwd = resolve(target);
-			else if (cwd !== null) cwd = resolve(cwd, target);
-		}
 	}
 	return cwd;
 }
 
 function resolveCodexRoutineCwd(tokens) {
 	const target = staticPath(tokens[2]);
-	return target === null ? null : resolve(target);
+	return target?.startsWith("/") ? target : null;
 }
 
 function guardedSuffix(tokens) {
@@ -713,185 +662,66 @@ function guardedSuffix(tokens) {
 	return null;
 }
 
-const COMPOUND_TOKENS = new Set([
-	"{",
-	"}",
-	"if",
-	"then",
-	"elif",
-	"else",
-	"fi",
-	"for",
-	"while",
-	"until",
-	"case",
-	"esac",
-	"do",
-	"done",
-	"select",
-	"function",
-	"coproc",
-	"!",
-]);
-
-/**
- * Track the shell cwd and retain each guarded Git segment with its own target.
- * A PreToolUse hook fires before the shell does, so `payload.cwd` does not yet
- * reflect `cd` or `git -C` inside the command (#751). Keeping every target is
- * also necessary because one Bash invocation can move between worktrees
- * before running another guarded Git command (#784).
- */
-function analyzeCommand(
-	command,
-	hookCwd,
-	{ ambientCdPath = false, ambientGitTargetOverride = false } = {},
-) {
-	if (typeof command !== "string") return { targets: [], finalCwd: hookCwd };
-
-	/** Where the shell stands, or null once a `cd` moved it somewhere unknown. */
-	let cwd = hookCwd;
-	const protectedState = createProtectedShellState({
-		ambientCdPath,
-		ambientGitTargetOverride,
-	});
-	let unresolvedControlFlow = false;
-	let andListAffects = false;
-	let previousAffects = false;
+/** Retain every guarded segment with its own effective target. */
+function analyzeCommand(command, initialCwd, options) {
+	const analysis = analyzeShellContext(command, initialCwd, options);
 	const targets = [];
-
-	for (const { command: segment, separatorBefore } of splitCommandFlow(
-		command,
-	)) {
-		if (separatorBefore === "&&") andListAffects ||= previousAffects;
-		else if (separatorBefore === ";" || separatorBefore === "\n") {
-			unresolvedControlFlow ||= andListAffects;
-			andListAffects = false;
-		} else if (["(", ")"].includes(separatorBefore)) {
-			unresolvedControlFlow = true;
-			andListAffects = false;
-		} else if (["||", "|", "&"].includes(separatorBefore)) {
-			unresolvedControlFlow ||= previousAffects;
-			andListAffects = false;
-		}
-		const rawTokens = tokenize(segment);
-		const prefix = parseLeadingShellPrefix(rawTokens);
-		const envCwd = resolveEnvCwd(rawTokens, cwd);
-		const tokens = rawTokens.slice(prefix.end);
-		const finish = (cwdAffects = false) => {
-			const affects =
-				cwdAffects || updateProtectedShellState(protectedState, rawTokens);
-			if (separatorBefore === "&&") andListAffects ||= affects;
-			if (["||", "|", "&"].includes(separatorBefore))
-				unresolvedControlFlow ||= affects;
-			previousAffects = affects;
-		};
-		if (tokens.length === 0) {
-			finish();
-			continue;
-		}
-		const head = basename(tokens[0].value);
-		if (COMPOUND_TOKENS.has(head)) unresolvedControlFlow = true;
-
-		if (
-			(head === "builtin" &&
-				["cd", "pushd", "popd"].includes(tokens[1]?.value)) ||
-			head === "pushd" ||
-			head === "popd"
-		) {
-			cwd = null;
-			finish(true);
-			continue;
-		}
-
-		if (head === "cd") {
-			const target = cdPath(tokens);
-			if (target === null) cwd = null;
-			// An absolute target restores a trail lost to an unresolvable earlier cd.
-			else if (target.startsWith("/")) cwd = resolve(target);
-			else if (
-				hasProtectedCdPathOverride(protectedState) ||
-				prefix.cdPathOverride
-			)
-				cwd = null;
-			else if (cwd !== null) cwd = resolve(cwd, target);
-			finish(true);
-			continue;
-		}
-
+	for (const segment of analysis.segments) {
+		const tokens = segment.tokens;
+		const unknownRtk = basename(tokens[0]?.value ?? "") === "rtk";
 		const guarded =
 			classifySegment(tokens) ??
-			(prefix.unresolved ? guardedSuffix(tokens) : null);
-		if (!guarded) {
-			finish();
-			continue;
-		}
+			(segment.unresolved || unknownRtk
+				? guardedSuffix(tokens.slice(1))
+				: null);
+		const cwd =
+			segment.unresolved || segment.gitTargetOverride || unknownRtk
+				? null
+				: basename(tokens[0]?.value ?? "") === "git"
+					? resolveGitCwd(tokens, segment.cwd)
+					: resolveCodexRoutineCwd(tokens);
+		if (!guarded) continue;
 		targets.push({
 			...guarded,
-			cwd:
-				unresolvedControlFlow ||
-				prefix.unresolved ||
-				hasProtectedGitTargetOverride(protectedState) ||
-				prefix.gitTargetOverride
-					? null
-					: head === "git"
-						? resolveGitCwd(tokens, envCwd)
-						: resolveCodexRoutineCwd(tokens),
+
+			cwd,
 		});
-		finish();
 	}
-	return { targets, finalCwd: cwd };
+	return { targets, finalCwd: analysis.finalCwd };
 }
 
 /** Every guarded Git segment with the cwd in which Git will run it. */
-export function resolveGuardedGitCommands(command, hookCwd, options) {
-	return analyzeCommand(command, hookCwd, options).targets;
+export function resolveGuardedGitCommands(command, initialCwd, options) {
+	return analyzeCommand(command, initialCwd, options).targets;
 }
 
-/**
- * The directory the first guarded Git command runs in, retained for callers
- * that inspect one command. The hook itself evaluates every resolved target.
- */
-export function resolveCommandCwd(command, hookCwd, options) {
-	const analysis = analyzeCommand(command, hookCwd, options);
-	return analysis.targets[0]?.cwd ?? analysis.finalCwd;
+/** The first guarded Git target, or the final shell cwd if none exists. */
+export function resolveCommandCwd(command, initialCwd, options) {
+	const analysis = analyzeCommand(command, initialCwd, options);
+	return analysis.targets.length > 0
+		? analysis.targets[0].cwd
+		: analysis.finalCwd;
 }
 
-/**
- * How a command's target checkout relates to the session's own one.
- *
- * Four states, not two: a boolean collapsed "the session's own worktree" and
- * "a repository this guard has no business in" onto the same `false`, which
- * left an unrelated repo's `main` — the default branch `git init` hands every
- * throwaway sandbox — guarded on the strength of the branch name alone (#1221).
- * `unknown` stays separate from `foreign` because failing to resolve a root is
- * not evidence of being out of scope. The case it actually protects is a
- * session whose own root will not resolve — no `CLAUDE_PROJECT_DIR` and no
- * payload cwd — against a target that resolves fine and reports the default
- * branch: mapping that to a pass-through would hand such a session an
- * unguarded main checkout. It is not the git-is-broken case, where the target
- * has no readable branch either and `currentBranch === undefined` already
- * allows further down.
- * @param {{worktreeRoot: string, commonDir: string} | null} sessionRoots
- * @param {{worktreeRoot: string, commonDir: string} | null} targetRoots
- * @returns {"own" | "sibling" | "foreign" | "unknown"}
+/** Repository identity establishes scope, never session ownership.
+ * Missing identity stays unknown, not evidence of a foreign repository.
+ * @returns {"same" | "foreign" | "unknown"}
  */
 export function classifyTargetRepository(sessionRoots, targetRoots) {
 	if (!sessionRoots || !targetRoots) return "unknown";
 	if (sessionRoots.commonDir !== targetRoots.commonDir) return "foreign";
-	return sessionRoots.worktreeRoot === targetRoots.worktreeRoot
-		? "own"
-		: "sibling";
+	return "same";
 }
 
 /**
  * Decide whether a PreToolUse Bash invocation may proceed.
  * @param {object} payload PreToolUse hook payload
- * @param {{currentBranch: string | undefined, mainBranch?: string, targetRelation?: "own" | "sibling" | "foreign" | "unknown"}} context
+ * @param {{currentBranch: string | undefined, mainBranch?: string, targetRelation?: "same" | "foreign" | "unknown"}} context
  * @returns {{decision: "allow"} | {decision: "deny" | "ask", reason: string}}
  */
 export function evaluateMainCommitGuard(
 	payload,
-	{ currentBranch, mainBranch = "main", targetRelation = "own" } = {},
+	{ currentBranch, mainBranch = "main", targetRelation = "same" } = {},
 ) {
 	if (payload?.tool_name !== "Bash") return { decision: "allow" };
 	const guarded = classifyGitCommand(payload?.tool_input?.command);
@@ -905,7 +735,7 @@ export function evaluateMainCommitGuard(
 
 function evaluateGuardedCommand(
 	guarded,
-	{ currentBranch, mainBranch = "main", targetRelation = "own" } = {},
+	{ currentBranch, mainBranch = "main", targetRelation = "same" } = {},
 ) {
 	// Out of scope entirely: this guard speaks for one repository's ecosystem,
 	// and another repository's branch names carry none of its meaning (#1221).
@@ -957,42 +787,24 @@ function evaluateGuardedCommand(
 	// `unknown` rides with `own`, which is where it already sat before the
 	// relation had a name — the branch-name rule still applies, and reaching a
 	// deny through it requires the target's branch to be readable.
-	const crossesWorktree = targetRelation === "sibling";
-	const targetsDefaultBranch = currentBranch === mainBranch;
-	if (!targetsDefaultBranch && !crossesWorktree) return { decision: "allow" };
+	if (currentBranch !== mainBranch) return { decision: "allow" };
 
 	const command = `git ${guarded.subcommand}`;
-	// A cross-worktree target is asked about rather than denied, whatever the
-	// subcommand: the guard cannot tell the session's own worktree from another
-	// session's, and the harness keeps reporting the root a session started with,
-	// so a session that moved into its worktree reads as a sibling (#1201). The
-	// old deny named a remediation — reopen the session there — that entering the
-	// worktree does not deliver, which left the mandated workflow with no way to
-	// commit at all. Ownership is a fact only the human has, so the human is
-	// asked. Codex, where ask is unsupported, still falls closed to deny in
-	// runMainCommitGuard.
-	if (
-		guarded.decision === "deny" &&
-		!(crossesWorktree && !targetsDefaultBranch)
-	) {
+	if (guarded.decision === "deny") {
 		return {
 			decision: "deny",
 			reason:
 				`Blocked '${command}' on '${mainBranch}': this repo's ecosystem requires develop → PR → merge_pr, ` +
 				"and the main checkout's index is shared by processes and sessions targeting that checkout, so anything staged here rides along on " +
-				"the next commit made there. Create or switch to a feature branch first (e.g. via the worktree " +
-				"skill), then run it there.",
+				"the next commit made there. Create or switch to a feature branch first, then run it there.",
 		};
 	}
 	return {
 		decision: "ask",
 		reason:
-			crossesWorktree && !targetsDefaultBranch
-				? `'${command}' targets a worktree other than the one this session reports as its root, which can discard another session's uncommitted edits. Confirm only if this session owns that target worktree — which it does when the session is working in it, even though the harness still reports the root it started with.`
-				: `'${command}' on '${mainBranch}' would change the main checkout's working tree, which every session ` +
-					"shares — it can discard another session's uncommitted edits. It is also how CLAUDE.md says to repair " +
-					"a tree that was written to by mistake, and this hook cannot tell the two apart. Confirm only if this " +
-					"is the repair.",
+			`'${command}' on '${mainBranch}' would change the main checkout's working tree, which every session ` +
+			"shares — it can discard another session's uncommitted edits. It is also how CLAUDE.md says to repair " +
+			"a tree that was written to by mistake, and this hook cannot tell the two apart. Confirm only if this is the repair.",
 	};
 }
 
@@ -1008,8 +820,8 @@ function evaluateUnresolvedCwd(guarded) {
 	return {
 		decision: guarded.decision,
 		reason:
-			`Blocked '${command}': its effective cwd cannot be resolved without shell expansion. ` +
-			`Use a literal path or harness workdir.${bypassNote}`,
+			`Blocked '${command}': its effective cwd cannot be resolved from this hook payload and command. ` +
+			`Remove any Git target or configuration overrides, then use a literal absolute git -C path or cd /absolute/path && git command.${bypassNote}`,
 	};
 }
 
@@ -1023,7 +835,7 @@ function evaluateUnresolvedCwd(guarded) {
  * version repeated the tool_name/classify check there and carried a comment
  * asking the next reader to keep the two copies in sync by hand.
  * @param {string} inputText raw stdin payload
- * @param {{resolveBranches: (payload: object, targetCwd: string) => {currentBranch?: string, mainBranch?: string, targetRelation?: "own" | "sibling" | "foreign" | "unknown"}}} io
+ * @param {{resolveBranches: (payload: object, targetCwd: string) => {currentBranch?: string, mainBranch?: string, targetRelation?: "same" | "foreign" | "unknown"}}} io
  * @returns {{shouldOutput: boolean, output?: object}}
  */
 export function runMainCommitGuard(
@@ -1031,6 +843,7 @@ export function runMainCommitGuard(
 	{
 		resolveBranches,
 		supportsAsk = true,
+		payloadCwdIsExecutionCwd = true,
 		ambientGitTargetOverride = false,
 		ambientCdPath = false,
 	},
@@ -1038,11 +851,7 @@ export function runMainCommitGuard(
 	const payload = parseHookPayload(inputText);
 	if (!payload) return { shouldOutput: false };
 	if (payload?.tool_name !== "Bash") return { shouldOutput: false };
-	const payloadCwd = payload?.cwd;
-	const hookCwd =
-		typeof payloadCwd === "string" && payloadCwd.trim() !== ""
-			? payloadCwd
-			: process.cwd();
+	const hookCwd = shellStartCwd(payload, payloadCwdIsExecutionCwd);
 	const targets = resolveGuardedGitCommands(
 		payload?.tool_input?.command,
 		hookCwd,
@@ -1051,11 +860,17 @@ export function runMainCommitGuard(
 	if (targets.length === 0) return { shouldOutput: false };
 
 	let asked = null;
+	const contexts = new Map();
+	const contextFor = (cwd) => {
+		if (!contexts.has(cwd)) contexts.set(cwd, resolveBranches(payload, cwd));
+		return contexts.get(cwd);
+	};
 	for (const target of targets) {
+		const context = target.cwd === null ? null : contextFor(target.cwd);
 		const result =
 			target.cwd === null
 				? evaluateUnresolvedCwd(target)
-				: evaluateGuardedCommand(target, resolveBranches(payload, target.cwd));
+				: evaluateGuardedCommand(target, context);
 		if (result.decision === "deny") {
 			return { shouldOutput: true, output: buildPermissionOutput(result) };
 		}

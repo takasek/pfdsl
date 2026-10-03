@@ -7,6 +7,7 @@ import {
 	readFileSync,
 	realpathSync,
 	rmSync,
+	symlinkSync,
 	writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
@@ -22,7 +23,7 @@ import {
 	runMainCommitGuard,
 } from "./main-commit-guard.mjs";
 
-function payload({ toolName = "Bash", command, cwd }) {
+function payload({ toolName = "Bash", command, cwd = "/repo" }) {
 	const value = {
 		hook_event_name: "PreToolUse",
 		tool_name: toolName,
@@ -684,7 +685,7 @@ describe("resolveCommandCwd", () => {
 				"git -C /worktrees/session -C ../sibling add -A",
 				HOOK_CWD,
 			),
-			"/worktrees/sibling",
+			"/worktrees/session/../sibling",
 		);
 	});
 
@@ -785,9 +786,9 @@ describe("evaluateMainCommitGuard", () => {
 				...session,
 				worktreeRoot: "/repo/.claude/worktrees/b",
 			}),
-			"sibling",
+			"same",
 		);
-		assert.equal(classifyTargetRepository(session, session), "own");
+		assert.equal(classifyTargetRepository(session, session), "same");
 		assert.equal(
 			classifyTargetRepository(session, {
 				worktreeRoot: "/other/worktree",
@@ -865,16 +866,13 @@ describe("evaluateMainCommitGuard", () => {
 		assert.equal(result.decision, "allow");
 	});
 
-	it("asks before staging when a feature-branch session targets another worktree (#1201)", () => {
-		const result = evaluateMainCommitGuard(payload({ command: "git add -A" }), {
-			currentBranch: "feature/other",
-			targetRelation: "sibling",
-		});
-		assert.equal(result.decision, "ask");
-		assert.match(result.reason, /worktree/);
-		assert.doesNotMatch(
-			result.reason,
-			/starting or reopening a session whose project root is that worktree/,
+	it("allows add -A in an explicitly addressed feature checkout without inferring ownership", () => {
+		assert.deepEqual(
+			evaluateMainCommitGuard(payload({ command: "git add -A" }), {
+				currentBranch: "feature/other",
+				targetRelation: "same",
+			}),
+			{ decision: "allow" },
 		);
 	});
 
@@ -886,16 +884,14 @@ describe("evaluateMainCommitGuard", () => {
 		assert.equal(result.decision, "deny");
 	});
 
-	it("asks before restoring files in another worktree (#784)", () => {
-		const result = evaluateMainCommitGuard(
-			payload({ command: "git restore src/x.ts" }),
-			{
+	it("allows restore src/x.ts in an explicitly addressed feature checkout without inferring ownership", () => {
+		assert.deepEqual(
+			evaluateMainCommitGuard(payload({ command: "git restore src/x.ts" }), {
 				currentBranch: "feature/other",
-				targetRelation: "sibling",
-			},
+				targetRelation: "same",
+			}),
+			{ decision: "allow" },
 		);
-		assert.equal(result.decision, "ask");
-		assert.match(result.reason, /worktree other than the one this session/);
 	});
 
 	it("allows a commit on a feature branch", () => {
@@ -1063,6 +1059,101 @@ describe("evaluateMainCommitGuard bypass axis (#1232)", () => {
 });
 
 describe("runMainCommitGuard", () => {
+	it("requires unmodeled wrappers to use the direct operation form", () => {
+		for (const [command, expected] of [
+			["rtk git -C /feature add -- file.txt", "deny"],
+			["rtk git -C /repo add -- file.txt", "deny"],
+			["rtk git -C /feature commit --no-verify -m message", "deny"],
+			[
+				"rtk git -C /feature -c core.hooksPath=/tmp/hooks commit -m message",
+				"deny",
+			],
+			["rtk git add -- file.txt", "deny"],
+			["rtk --unknown git -C /feature add -- file.txt", "deny"],
+		]) {
+			const result = runMainCommitGuard(
+				JSON.stringify(payload({ command, cwd: "/repo" })),
+				{
+					supportsAsk: false,
+					payloadCwdIsExecutionCwd: false,
+					resolveBranches: (_payload, cwd) => ({
+						currentBranch: cwd === "/repo" ? "main" : "feature",
+						targetRelation: "sibling",
+					}),
+				},
+			);
+			assert.equal(
+				result.output?.hookSpecificOutput.permissionDecision ?? "allow",
+				expected,
+				command,
+			);
+		}
+	});
+	it("uses explicit Git targets rather than Codex's starting root", () => {
+		const resolveBranches = (_payload, cwd) => ({
+			currentBranch: cwd === "/repo" ? "main" : "feature",
+			targetRelation: cwd === "/repo" ? "own" : "sibling",
+		});
+		for (const command of [
+			"git -C /worktrees/feature add -A",
+			"cd /worktrees/feature && git add -A",
+			"env -C /worktrees/feature git add -A",
+		]) {
+			assert.deepEqual(
+				runMainCommitGuard(JSON.stringify(payload({ command, cwd: "/repo" })), {
+					resolveBranches,
+					supportsAsk: false,
+					payloadCwdIsExecutionCwd: false,
+				}),
+				{ shouldOutput: false },
+				command,
+			);
+		}
+		for (const command of ["git add -A", "git -C . add -A"]) {
+			const result = runMainCommitGuard(
+				JSON.stringify(payload({ command, cwd: "/worktrees/feature" })),
+				{
+					resolveBranches,
+					supportsAsk: false,
+					payloadCwdIsExecutionCwd: false,
+				},
+			);
+			assert.equal(
+				result.output?.hookSpecificOutput.permissionDecision,
+				"deny",
+				command,
+			);
+			assert.match(
+				result.output.hookSpecificOutput.permissionDecisionReason,
+				/absolute/i,
+			);
+		}
+	});
+
+	it("checks every explicit target and refuses a later main mutation", () => {
+		const visited = [];
+		const result = runMainCommitGuard(
+			JSON.stringify(
+				payload({
+					command: "git -C /worktrees/feature add -A && cd /repo && git add -A",
+					cwd: "/repo",
+				}),
+			),
+			{
+				supportsAsk: false,
+				payloadCwdIsExecutionCwd: false,
+				resolveBranches: (_payload, cwd) => {
+					visited.push(cwd);
+					return {
+						currentBranch: cwd === "/repo" ? "main" : "feature",
+						targetRelation: "sibling",
+					};
+				},
+			},
+		);
+		assert.deepEqual(visited, ["/worktrees/feature", "/repo"]);
+		assert.equal(result.output.hookSpecificOutput.permissionDecision, "deny");
+	});
 	const commit = JSON.stringify(payload({ command: "git commit -m 'x'" }));
 
 	it("denies a commit on the default branch", () => {
@@ -1108,8 +1199,8 @@ describe("runMainCommitGuard", () => {
 				},
 			});
 			assert.deepEqual(visited, ["/worktrees/session", "/worktrees/sibling"]);
-			assert.equal(shouldOutput, true);
-			assert.equal(output.hookSpecificOutput.permissionDecision, "ask");
+			assert.equal(shouldOutput, false);
+			assert.equal(output, undefined);
 		}
 	});
 
@@ -1121,7 +1212,7 @@ describe("runMainCommitGuard", () => {
 		});
 		const askInput = JSON.stringify(
 			payload({
-				command: "git add -A && git -C /worktrees/sibling restore tracked.txt",
+				command: "git add -A && git -C /repo restore tracked.txt",
 				cwd: "/worktrees/session",
 			}),
 		);
@@ -1177,6 +1268,7 @@ describe("runMainCommitGuard", () => {
 		const { shouldOutput, output } = runMainCommitGuard(input, {
 			resolveBranches: () => ({ currentBranch: "topic", mainBranch: "main" }),
 			supportsAsk: false,
+			payloadCwdIsExecutionCwd: false,
 		});
 		assert.equal(shouldOutput, true);
 		assert.equal(output.hookSpecificOutput.permissionDecision, "deny");
@@ -1263,719 +1355,109 @@ describe("main-commit-guard wrapper", () => {
 		}).trim();
 	}
 
-	it("stays silent on an unrelated repository's main while still guarding a sibling (#1221)", () => {
-		assert.equal(runWrapper(`git -C ${unrelated} add -A`), "");
-		// The pair matters: dropping the ownership check altogether would also
-		// make the line above pass, and only the sibling case notices.
-		assert.notEqual(runWrapper(`git -C ${sibling} add -A`), "");
-	});
-
-	it("denies the default branch when only the session root fails to resolve (#1221)", () => {
-		// The one route by which `unknown` reaches a decision: the target
-		// answers `main`, and the session root does not resolve at all. Pinning
-		// it here keeps a later reader from folding `unknown` into `foreign` on
-		// the grounds that nothing distinguishes it.
-		const output = runWrapper(`git -C ${repo} add -A`, {
-			claudeProjectDir: join(root, "no-such-session-dir"),
-		});
-		assert.match(output, /"permissionDecision":"deny"/);
-	});
-
-	it("stays silent when the target is not a git repository at all (#1221)", () => {
-		// The git-is-broken shape: no roots *and* no branch. The branch-name
-		// rule cannot fire without a branch, so this allows — which is what the
-		// guard did before #1221 too. Recorded so the prose describing
-		// `unknown` is not read as covering this case.
-		const notARepo = join(root, "not-a-repo");
-		mkdirSync(notARepo, { recursive: true });
-		assert.equal(runWrapper(`git -C ${notARepo} add -A`), "");
-	});
-
-	it("uses the payload cwd as the session worktree in Codex (#784)", () => {
-		const output = runWrapper(`git -C ${sibling} add -A`, {
-			claudeProjectDir: null,
-		});
-		assert.notEqual(output, "");
-		assert.equal(
-			JSON.parse(output).hookSpecificOutput.permissionDecision,
-			"deny",
-		);
-	});
-
-	it("guards the explicit wrapper target instead of invisible exec workdir", () => {
-		const routine = "/Users/example/.codex/bin/codex-git-routine.mjs";
-		for (const [target, branch, expected] of [
-			[sibling, "sibling", "deny"],
-			[repo, "main", "deny"],
-			[session, "session", null],
-		]) {
-			const output = runWrapper(`${routine} stage-all ${target} ${branch}`, {
-				claudeProjectDir: null,
-			});
-			if (expected === null) assert.equal(output, "");
-			else
+	const decision = (output) =>
+		output ? JSON.parse(output).hookSpecificOutput.permissionDecision : "allow";
+	it("checks explicit feature, main, foreign and bypass targets in both harness adapters", () => {
+		for (const claudeProjectDir of [session, null]) {
+			for (const [target, expected] of [
+				[session, "allow"],
+				[sibling, "allow"],
+				[repo, "deny"],
+				[unrelated, "allow"],
+			]) {
 				assert.equal(
-					JSON.parse(output).hookSpecificOutput.permissionDecision,
+					decision(runWrapper(`git -C ${target} add -A`, { claudeProjectDir })),
 					expected,
-					target,
 				);
-		}
-	});
-
-	it("converts an unsupported Codex ask into a fail-closed deny", () => {
-		const output = runWrapper(`git -C ${sibling} restore tracked.txt`, {
-			claudeProjectDir: null,
-		});
-		const result = JSON.parse(output).hookSpecificOutput;
-		assert.equal(result.permissionDecision, "deny");
-		assert.match(result.permissionDecisionReason, /Codex.*ask.*unsupported/i);
-	});
-
-	it("keeps the Claude permission prompt for the same recovery command", () => {
-		const output = runWrapper(`git -C ${sibling} restore tracked.txt`);
-		assert.equal(
-			JSON.parse(output).hookSpecificOutput.permissionDecision,
-			"ask",
-		);
-	});
-
-	it("asks instead of denying when a Claude session stages in the worktree it moved into (#1201)", () => {
-		// The harness keeps reporting the root the session started with, so the
-		// worktree the session actually works in reads as a sibling. The human
-		// confirms ownership, which is the fact the guard cannot verify itself.
-		const output = runWrapper(`git -C ${sibling} add -A`, {
-			payloadCwd: repo,
-			claudeProjectDir: repo,
-		});
-		const result = JSON.parse(output).hookSpecificOutput;
-		assert.equal(result.permissionDecision, "ask");
-		assert.doesNotMatch(
-			result.permissionDecisionReason,
-			/starting or reopening a session whose project root is that worktree/,
-		);
-	});
-
-	it("keeps CLAUDE_PROJECT_DIR authoritative over the payload cwd", () => {
-		const output = runWrapper(`git -C ${session} add -A`, {
-			payloadCwd: sibling,
-			claudeProjectDir: session,
-		});
-		assert.equal(output, "");
-	});
-
-	it("treats whitespace-only session roots as absent", () => {
-		const fallbackToPayload = runWrapper(`git -C ${sibling} add -A`, {
-			payloadCwd: session,
-			claudeProjectDir: " \t ",
-		});
-		assert.notEqual(fallbackToPayload, "");
-		assert.equal(
-			JSON.parse(fallbackToPayload).hookSpecificOutput.permissionDecision,
-			"deny",
-		);
-
-		const claudeStillWins = runWrapper(`git -C ${session} add -A`, {
-			payloadCwd: " \n ",
-			claudeProjectDir: session,
-		});
-		assert.equal(claudeStillWins, "");
-	});
-
-	it("denies a guarded mutation when ambient Git target variables point at a sibling", () => {
-		const output = runWrapper("git add -A", {
-			environment: {
-				GIT_DIR: git(sibling, ["rev-parse", "--git-dir"]),
-				GIT_WORK_TREE: sibling,
-			},
-		});
-		assert.notEqual(output, "");
-		assert.equal(
-			JSON.parse(output).hookSpecificOutput.permissionDecision,
-			"deny",
-		);
-
-		assert.equal(
-			runWrapper("git status", {
-				environment: { GIT_DIR: git(sibling, ["rev-parse", "--git-dir"]) },
-			}),
-			"",
-		);
-	});
-
-	it("fails closed when CDPATH can redirect a relative cd", () => {
-		for (const command of [
-			`CDPATH=${root} cd sibling && git add -A`,
-			`export CDPATH=${root}; cd sibling && git add -A`,
-		]) {
-			const output = runWrapper(command);
-			assert.notEqual(output, "", command);
+			}
 			assert.equal(
-				JSON.parse(output).hookSpecificOutput.permissionDecision,
+				decision(
+					runWrapper(`git -C ${sibling} commit --no-verify -m x`, {
+						claudeProjectDir,
+					}),
+				),
 				"deny",
-				command,
 			);
-		}
-
-		const ambient = runWrapper("cd sibling && git add -A", {
-			environment: { CDPATH: root },
-		});
-		assert.equal(
-			JSON.parse(ambient).hookSpecificOutput.permissionDecision,
-			"deny",
-		);
-
-		assert.equal(runWrapper(`CDPATH=${root} cd ${session} && git add -A`), "");
-		assert.equal(runWrapper("CDPATH= cd sibling && git add -A"), "");
-		assert.equal(
-			runWrapper("cd sibling && git status", { environment: { CDPATH: root } }),
-			"",
-		);
-	});
-
-	it("does not treat unset function options as clearing CDPATH", () => {
-		const blocked = runWrapper(
-			`CDPATH=${root}; unset -f CDPATH; cd sibling; git add -A`,
-		);
-		assert.notEqual(blocked, "");
-		assert.equal(
-			JSON.parse(blocked).hookSpecificOutput.permissionDecision,
-			"deny",
-		);
-
-		for (const command of [
-			`CDPATH=${root}; unset CDPATH; cd sibling; git add -A`,
-			`CDPATH=${root}; unset -v CDPATH; cd sibling; git add -A`,
-			`CDPATH=${root}; unset -- CDPATH; cd sibling; git add -A`,
-		]) {
-			assert.equal(runWrapper(command), "", command);
-		}
-	});
-
-	it("fails closed after cwd-changing control flow the parser cannot model", () => {
-		for (const command of [
-			`cd ${repo} || cd ${session}; git add -A`,
-			`cd ${repo}; cd ${session} | cat; git add -A`,
-			`cd ${repo}; (cd ${session}); git add -A`,
-			`cd ${repo}; cd ${session} & git add -A`,
-			`cd ${repo} && cd ${session}; git add -A`,
-		]) {
-			const output = runWrapper(command);
-			assert.notEqual(output, "", command);
 			assert.equal(
-				JSON.parse(output).hookSpecificOutput.permissionDecision,
-				"deny",
-				command,
-			);
-		}
-
-		assert.equal(runWrapper(`cd ${session} && git add -A`), "");
-		assert.equal(runWrapper(`cd ${repo} || cd ${session}; git status`), "");
-		assert.equal(runWrapper(`cd ${session} && git add -A; echo done`), "");
-		assert.equal(runWrapper("git add -A; false || echo later"), "");
-	});
-
-	it("decodes literal escapes and fails closed for dynamic protected setters", () => {
-		for (const command of [
-			`g\\it -C ${repo} add -A`,
-			`GIT\\_DIR=${join(repo, ".git")} g\\it add -A`,
-			'export "$d=/override"; git add -A',
-			'printf -v "$d" %s /override; git add -A',
-			'read "$n"; git add -A',
-		]) {
-			const output = runWrapper(command);
-			assert.notEqual(output, "", command);
-			assert.equal(
-				JSON.parse(output).hookSpecificOutput.permissionDecision,
-				"deny",
-				command,
+				decision(
+					runWrapper(`git -C ${repo} restore tracked.txt`, {
+						claudeProjectDir,
+					}),
+				),
+				claudeProjectDir === null ? "deny" : "ask",
 			);
 		}
 	});
-
-	it("parses read options before deciding which operands set state", () => {
-		assert.equal(runWrapper("read -p CDPATH REPLY; git add -A"), "");
-		for (const command of ["read -p; git add -A", 'read "$n"; git add -A']) {
-			const output = runWrapper(command);
-			assert.notEqual(output, "", command);
+	it("resolves Claude execution cwd independently from its project root", () => {
+		assert.equal(runWrapper("git add -A", { payloadCwd: sibling }), "");
+		assert.equal(
+			decision(runWrapper("git add -A", { claudeProjectDir: null })),
+			"deny",
+		);
+	});
+	it("retains the installed routine's explicit target during migration", () => {
+		const command = `/Users/example/.codex/bin/codex-git-routine.mjs stage-all ${sibling} sibling`;
+		assert.equal(runWrapper(command, { claudeProjectDir: null }), "");
+	});
+	it("rejects state setters and clears without simulating success or shell mode", () => {
+		for (const setup of [
+			"set -a; GIT_CONFIG_COUNT=1 :",
+			"set -o posix; GIT_DIR=/override :",
+			"readonly GIT_DIR=/override; unset GIT_DIR",
+			"source setup.sh; unset GIT_DIR",
+			"unset GIT_DIR",
+			"export FOO=x",
+			"read -r REPLY",
+		]) {
 			assert.equal(
-				JSON.parse(output).hookSpecificOutput.permissionDecision,
+				decision(runWrapper(`${setup}; git -C ${session} add -A`)),
 				"deny",
-				command,
+				setup,
 			);
 		}
 	});
-
-	it("does not unexport ambient Git targets after export option termination", () => {
-		const output = runWrapper(
-			"export -- -n GIT_DIR GIT_WORK_TREE; git add -A",
-			{
-				environment: {
-					GIT_DIR: join(sibling, ".git"),
-					GIT_WORK_TREE: sibling,
-				},
-			},
-		);
-		assert.notEqual(output, "");
-		assert.equal(
-			JSON.parse(output).hookSpecificOutput.permissionDecision,
-			"deny",
-		);
-	});
-
-	it("treats read array output variables as protected setters", () => {
-		for (const command of [
-			"read -a CDPATH <<< x; cd sibling; git add -A",
-			"read -aCDPATH <<< x; cd sibling; git add -A",
-			'read -a"$name" <<< x; cd sibling; git add -A',
-		]) {
-			const output = runWrapper(command);
-			assert.notEqual(output, "", command);
-			assert.equal(
-				JSON.parse(output).hookSpecificOutput.permissionDecision,
-				"deny",
-				command,
-			);
-		}
-	});
-
-	it("does not clear protected state through conflicting unset or export options", () => {
-		for (const command of [
-			`CDPATH=${root}; unset -f -v CDPATH; cd sibling; git add -A`,
-			`export GIT_NAMESPACE; export -n -f GIT_NAMESPACE; printf -v GIT_NAMESPACE %s /override; git add -A`,
-		]) {
-			const output = runWrapper(command);
-			assert.notEqual(output, "", command);
-			assert.equal(
-				JSON.parse(output).hookSpecificOutput.permissionDecision,
-				"deny",
-				command,
-			);
-		}
-	});
-
-	it("fails closed after brace and reserved compounds", () => {
-		for (const command of [
-			`{ cd ${session}; }; git add -A`,
-			`if true; then cd ${session}; fi; git add -A`,
-		]) {
-			const output = runWrapper(command);
-			assert.notEqual(output, "", command);
-			assert.equal(
-				JSON.parse(output).hookSpecificOutput.permissionDecision,
-				"deny",
-				command,
-			);
-		}
-	});
-
-	it("only treats reserved words in command position as compounds", () => {
-		assert.equal(runWrapper("git commit -m if"), "");
-		assert.equal(runWrapper("echo if; git add -A"), "");
-	});
-
-	it("parses clustered read options before protected variable operands", () => {
-		for (const command of [
-			"read -rp CDPATH REPLY <<< x; cd .; git add -A",
-			"read -pCDPATH REPLY <<< x; cd .; git add -A",
-		]) {
-			assert.equal(runWrapper(command), "", command);
-		}
-	});
-
-	it("recognizes printf setters only in its option phase", () => {
-		for (const command of [
-			"export GIT_NAMESPACE; printf -- -v GIT_NAMESPACE; git add -A",
-			"export GIT_NAMESPACE; printf %s -v GIT_NAMESPACE; git add -A",
-		]) {
-			assert.equal(runWrapper(command), "", command);
-		}
-	});
-
-	it("removes unquoted backslash-newline continuations", () => {
-		const command = `g\\${"\n"}it -C ${repo} add -A`;
-		const output = runWrapper(command);
-		assert.notEqual(output, "");
-		assert.equal(
-			JSON.parse(output).hookSpecificOutput.permissionDecision,
-			"deny",
-		);
-	});
-
-	it("removes double-quoted backslash-newline continuations", () => {
-		const command = `"g\\${"\n"}it" -C ${repo} add -A`;
-		const output = runWrapper(command);
-		assert.notEqual(output, "");
-		assert.equal(
-			JSON.parse(output).hookSpecificOutput.permissionDecision,
-			"deny",
-		);
-	});
-
-	it("preserves Git export state across assignment-only segments", () => {
-		assert.equal(runWrapper("GIT_NAMESPACE=/override; git add -A"), "");
-		assert.equal(runWrapper("GIT_NAMESPACE= git add -A"), "");
-	});
-
-	it("does not taint control flow without target-affecting commands", () => {
-		for (const command of [
-			"printf x | cat; git add -A",
-			"test -f package.json && printf ok; git add -A",
-			`printf x | cat; cd ${session}; git add -A`,
-		]) {
-			assert.equal(runWrapper(command), "", command);
-		}
-	});
-
-	it("fails closed when read makes CDPATH dynamically unknown", () => {
-		const output = runWrapper(
-			`read -r CDPATH <<< ${root}; cd sibling; git add -A`,
-		);
-		assert.notEqual(output, "");
-		assert.equal(
-			JSON.parse(output).hookSpecificOutput.permissionDecision,
-			"deny",
-		);
-
-		assert.equal(
-			runWrapper(`read -r CDPATH <<< ${root}; cd ${session}; git add -A`),
-			"",
-		);
-		assert.equal(
-			runWrapper(`read -r CDPATH <<< ${root}; cd sibling; git status`),
-			"",
-		);
-	});
-
-	it("fails closed when printf -v writes exported Git targets", () => {
-		const output = runWrapper(
-			`export GIT_DIR GIT_WORK_TREE; printf -v GIT_DIR %s ${join(sibling, ".git")}; printf -v GIT_WORK_TREE %s ${sibling}; git add -A`,
-		);
-		assert.notEqual(output, "");
-		assert.equal(
-			JSON.parse(output).hookSpecificOutput.permissionDecision,
-			"deny",
-		);
-
-		assert.equal(
-			runWrapper(
-				`export GIT_DIR GIT_WORK_TREE; printf -v GIT_DIR %s ${join(sibling, ".git")}; printf -v GIT_WORK_TREE %s ${sibling}; git status`,
-			),
-			"",
-		);
-	});
-
-	it("fails closed when dynamic builtins write protected state", () => {
+	it("rejects ambient redirection and configuration overrides", () => {
 		for (const variable of [
 			"GIT_DIR",
-			"GIT_WORK_TREE",
 			"GIT_INDEX_FILE",
-			"GIT_COMMON_DIR",
-			"GIT_OBJECT_DIRECTORY",
-			"GIT_ALTERNATE_OBJECT_DIRECTORIES",
-			"GIT_NAMESPACE",
+			"GIT_CONFIG_COUNT",
+			"GIT_CONFIG_PARAMETERS",
+			"GIT_CONFIG_GLOBAL",
+			"GIT_CONFIG_SYSTEM",
 		]) {
-			const output = runWrapper(
-				`export ${variable}; read -r ${variable} <<< /override; git add -A`,
-			);
-			assert.notEqual(output, "", variable);
 			assert.equal(
-				JSON.parse(output).hookSpecificOutput.permissionDecision,
+				decision(
+					runWrapper(`git -C ${session} add -A`, {
+						environment: { [variable]: "/override" },
+					}),
+				),
 				"deny",
 				variable,
 			);
 		}
-
-		for (const command of [
-			"source guard-state.sh; git add -A",
-			". guard-state.sh; git add -A",
-			"eval guard_state; git add -A",
-		]) {
-			const output = runWrapper(command);
-			assert.notEqual(output, "", command);
-			assert.equal(
-				JSON.parse(output).hookSpecificOutput.permissionDecision,
-				"deny",
-				command,
-			);
-		}
-
-		assert.equal(runWrapper("source guard-state.sh; git status"), "");
 	});
-
-	it("recovers only after protected state is literally cleared", () => {
-		const targetVariables = [
-			"GIT_DIR",
-			"GIT_WORK_TREE",
-			"GIT_INDEX_FILE",
-			"GIT_COMMON_DIR",
-			"GIT_OBJECT_DIRECTORY",
-			"GIT_ALTERNATE_OBJECT_DIRECTORIES",
-			"GIT_NAMESPACE",
-		].join(" ");
+	it("preserves physical symlink traversal when Git applies repeated chdir", () => {
+		const alias = join(root, "alias");
+		symlinkSync(session, alias);
 		assert.equal(
-			runWrapper(
-				`source guard-state.sh; unset CDPATH ${targetVariables}; cd .; git add -A`,
-			),
-			"",
-		);
-		const unsafeCdPath = runWrapper("cd sibling; git add -A", {
-			environment: { CDPATH: root },
-		});
-		assert.notEqual(unsafeCdPath, "");
-		assert.equal(
-			runWrapper("unset CDPATH; cd sibling; git add -A", {
-				environment: { CDPATH: root },
-			}),
-			"",
-		);
-		assert.equal(
-			runWrapper("CDPATH=; cd sibling; git add -A", {
-				environment: { CDPATH: root },
-			}),
-			"",
-		);
-	});
-
-	it("distinguishes Git export state from CDPATH shell state", () => {
-		assert.equal(runWrapper("export GIT_DIR; git add -A"), "");
-		assert.equal(
-			runWrapper(
-				`export -n GIT_DIR; printf -v GIT_DIR %s ${join(sibling, ".git")}; git add -A`,
-			),
-			"",
-		);
-		const output = runWrapper("export -n CDPATH; cd sibling; git add -A", {
-			environment: { CDPATH: root },
-		});
-		assert.notEqual(output, "");
-		assert.equal(
-			JSON.parse(output).hookSpecificOutput.permissionDecision,
+			decision(runWrapper(`git -C ${alias}/../repo add -A`)),
 			"deny",
 		);
 	});
-
-	it("recovers each concrete ambient Git target independently", () => {
+	it("requires branch changes to precede protected operations in a separate call", () => {
 		assert.equal(
-			runWrapper("unset GIT_NAMESPACE; git add -A", {
-				environment: { GIT_NAMESPACE: "/x" },
-			}),
-			"",
-		);
-		const blocked = runWrapper("unset GIT_NAMESPACE; git add -A", {
-			environment: { GIT_DIR: "/override", GIT_NAMESPACE: "/x" },
-		});
-		assert.notEqual(blocked, "");
-		assert.equal(
-			JSON.parse(blocked).hookSpecificOutput.permissionDecision,
+			decision(
+				runWrapper(`git -C ${session} switch main && git -C ${session} add -A`),
+			),
 			"deny",
 		);
 		assert.equal(
-			runWrapper("git add -A", { environment: { GIT_NAMESPACE: "" } }),
-			"",
+			decision(
+				runWrapper(
+					`git -C ${session} branch -m main && git -C ${session} add -A`,
+				),
+			),
+			"deny",
 		);
-	});
-
-	it("catches compound and repeated-C sibling mutations end to end (#784)", () => {
-		for (const command of [
-			`git add -A && cd ${sibling} && git add -A`,
-			`cd -- ${sibling} && git add -A`,
-			`cd ${sibling} >/dev/null && git add -A`,
-			`git add -A && git -C ${sibling} add -A`,
-			`git -C ${session} -C ../sibling add -A`,
-		]) {
-			const output = runWrapper(command);
-			assert.notEqual(output, "", command);
-			assert.equal(
-				JSON.parse(output).hookSpecificOutput.permissionDecision,
-				"ask",
-				command,
-			);
-		}
-	});
-
-	it("fails closed when cd requires shell expansion", () => {
-		for (const [command, decision] of [
-			[`SIBLING=${sibling}; cd "$SIBLING" && git add -A`, "deny"],
-			[`SIBLING=${sibling}; cd "$SIBLING" && git restore tracked.txt`, "ask"],
-		]) {
-			const output = runWrapper(command);
-			assert.notEqual(output, "", command);
-			const result = JSON.parse(output).hookSpecificOutput;
-			assert.equal(result.permissionDecision, decision, command);
-			assert.match(
-				result.permissionDecisionReason,
-				/literal path or harness workdir/,
-				command,
-			);
-		}
-	});
-
-	it("fails closed for cwd-changing shell builtins the parser cannot model", () => {
-		for (const [command, decision] of [
-			[`builtin cd "${sibling}" && git add -A`, "deny"],
-			// `command cd` resolves to a literal target, so it lands on the
-			// cross-worktree ask rather than the unresolved-cwd deny (#1201).
-			[`command cd "${sibling}" && git add -A`, "ask"],
-			[`pushd "${sibling}" && git add -A`, "deny"],
-			["popd && git restore tracked.txt", "ask"],
-		]) {
-			const output = runWrapper(command);
-			assert.notEqual(output, "", command);
-			assert.equal(
-				JSON.parse(output).hookSpecificOutput.permissionDecision,
-				decision,
-				command,
-			);
-		}
-	});
-
-	it("tracks env chdir prefixes and fails closed for unresolved forms", () => {
-		for (const [command, decision] of [
-			[`env -C ${repo} git add -A`, "deny"],
-			[`env --chdir=${sibling} git add -A`, "ask"],
-			['WORKTREE=/somewhere; env -C "$WORKTREE" git add -A', "deny"],
-			["env --chdir= git add -A", "deny"],
-		]) {
-			const output = runWrapper(command);
-			assert.notEqual(output, "", command);
-			assert.equal(
-				JSON.parse(output).hookSpecificOutput.permissionDecision,
-				decision,
-				command,
-			);
-		}
-	});
-
-	it("fails closed when Git environment variables override the target", () => {
-		for (const variable of [
-			"GIT_DIR",
-			"GIT_WORK_TREE",
-			"GIT_INDEX_FILE",
-			"GIT_COMMON_DIR",
-			"GIT_OBJECT_DIRECTORY",
-			"GIT_ALTERNATE_OBJECT_DIRECTORIES",
-			"GIT_NAMESPACE",
-		]) {
-			for (const command of [
-				`${variable}=/override git add -A`,
-				`env ${variable}=/override git add -A`,
-			]) {
-				const output = runWrapper(command);
-				assert.notEqual(output, "", command);
-				assert.equal(
-					JSON.parse(output).hookSpecificOutput.permissionDecision,
-					"deny",
-					command,
-				);
-			}
-		}
-	});
-
-	it("fails closed after a shell builtin persists a Git target override", () => {
-		for (const command of [
-			`export GIT_INDEX_FILE=${join(repo, ".git", "index")}; git add -A`,
-			`export GIT_DIR=${join(repo, ".git")} GIT_WORK_TREE=${repo}; git add -A`,
-			"readonly GIT_COMMON_DIR=/override; git add -A",
-			"typeset GIT_OBJECT_DIRECTORY=/override; git add -A",
-			"declare GIT_NAMESPACE=guard-test; git add -A",
-		]) {
-			const output = runWrapper(command);
-			assert.notEqual(output, "", command);
-			assert.equal(
-				JSON.parse(output).hookSpecificOutput.permissionDecision,
-				"deny",
-				command,
-			);
-		}
-
-		assert.equal(runWrapper("export FOO=x; git add -A"), "");
-		assert.equal(runWrapper("export GIT_INDEX_FILE=/override; git status"), "");
-	});
-
-	it("does not let Git repository-target flags or shell prefixes bypass sibling checks", () => {
-		for (const [command, decision] of [
-			[`git --git-dir=${join(repo, ".git")} add -A`, "deny"],
-			[`git --work-tree=${repo} add -A`, "deny"],
-			[`command -- git -C ${sibling} add -A`, "ask"],
-			[`sudo -n git -C ${sibling} add -A`, "ask"],
-			[`>/dev/null git -C ${sibling} add -A`, "ask"],
-		]) {
-			const output = runWrapper(command);
-			assert.notEqual(output, "", command);
-			assert.equal(
-				JSON.parse(output).hookSpecificOutput.permissionDecision,
-				decision,
-				command,
-			);
-		}
-	});
-
-	it("tracks env chdir after leading assignments and redirections", () => {
-		for (const command of [
-			`FOO=x env -C ${repo} git add -A`,
-			`>/dev/null env -C ${repo} git add -A`,
-			`< /dev/null env -C ${repo} git add -A`,
-			`</dev/null env -C ${repo} git add -A`,
-			`<& 0 env -C ${repo} git add -A`,
-			`<&0 env -C ${repo} git add -A`,
-			`<> /dev/null env -C ${repo} git add -A`,
-			`<>/dev/null env -C ${repo} git add -A`,
-		]) {
-			const output = runWrapper(command);
-			assert.notEqual(output, "", command);
-			assert.equal(
-				JSON.parse(output).hookSpecificOutput.permissionDecision,
-				"deny",
-				command,
-			);
-		}
-	});
-
-	it("distinguishes command execution from command path queries", () => {
-		const execution = runWrapper(`command -p git -C ${sibling} add -A`);
-		assert.notEqual(execution, "");
-		assert.equal(
-			JSON.parse(execution).hookSpecificOutput.permissionDecision,
-			"ask",
-		);
-
-		for (const query of [
-			"command -v git -C /somewhere add -A",
-			"command -V git -C /somewhere add -A",
-		]) {
-			assert.equal(runWrapper(query), "", query);
-		}
-	});
-
-	it("skips value-taking sudo and time options before guarded Git", () => {
-		for (const [command, decision] of [
-			[`sudo -u root git -C ${sibling} add -A`, "ask"],
-			[`sudo --user=root git -C ${sibling} add -A`, "ask"],
-			["sudo -R /jail git add -A", "deny"],
-			[`time -o /tmp/time-output git -C ${sibling} add -A`, "ask"],
-		]) {
-			const output = runWrapper(command);
-			assert.notEqual(output, "", command);
-			assert.equal(
-				JSON.parse(output).hookSpecificOutput.permissionDecision,
-				decision,
-				command,
-			);
-		}
-	});
-
-	it("fails closed when unknown shell-prefix options may hide guarded Git", () => {
-		for (const command of [
-			`sudo --unknown value git -C ${sibling} add -A`,
-			`time --unknown value git -C ${sibling} add -A`,
-		]) {
-			const output = runWrapper(command);
-			assert.notEqual(output, "", command);
-			assert.equal(
-				JSON.parse(output).hookSpecificOutput.permissionDecision,
-				"deny",
-				command,
-			);
-		}
 	});
 });

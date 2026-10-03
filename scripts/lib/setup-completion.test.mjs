@@ -69,7 +69,8 @@ function fixture() {
 		cp: '#!/bin/sh\nprintf \'cp\\n\' >> "$SETUP_LOG"\n[ "$SETUP_FAIL_STAGE" = cp ] && exit 1\nexec "$REAL_CP" "$@"\n',
 		chmod:
 			'#!/bin/sh\nprintf \'chmod\\n\' >> "$SETUP_LOG"\n[ "$SETUP_FAIL_STAGE" = chmod ] && exit 1\nexec "$REAL_CHMOD" "$@"\n',
-		node: '#!/bin/sh\nif [ "$1" = scripts/setup-completion.mjs ]; then [ "$2" = write ] && [ "$SETUP_FAIL_STAGE" = write ] && exit 1; exec "$REAL_NODE" "$@"; fi\nprintf \'node\\n\' >> "$SETUP_LOG"\n[ "$SETUP_FAIL_STAGE" = node ] && exit 1\nexit 0\n',
+		// biome-ignore lint/suspicious/noTemplateCurlyInString: shell parameter expansion is intentional.
+		node: '#!/bin/sh\nif [ "${1##*/}" = setup-completion.mjs ]; then [ "$2" = write ] && [ "$SETUP_FAIL_STAGE" = write ] && exit 1; exec "$REAL_NODE" "$@"; fi\nprintf \'node\\n\' >> "$SETUP_LOG"\n[ "$SETUP_FAIL_STAGE" = node ] && exit 1\nexit 0\n',
 	})) {
 		const command = join(bin, name);
 		writeFileSync(command, source);
@@ -165,7 +166,7 @@ function runSessionStart(context, command) {
 	return spawnSync("/bin/sh", ["-c", command], {
 		cwd: context.cwd,
 		encoding: "utf8",
-		env: environment(context),
+		env: environment(context, "", { CLAUDE_PROJECT_DIR: context.cwd }),
 	});
 }
 
@@ -578,7 +579,7 @@ describe("setup completion sentinel", () => {
 
 	it("runs each SessionStart hook only until setup completes", () => {
 		for (const path of [".claude/settings.json", ".codex/hooks.json"]) {
-			assert.match(sessionStartCommand(path), /setup-completion\.mjs check/);
+			assert.match(sessionStartCommand(path), /setup-completion\.mjs"? check/);
 			const context = fixture();
 			assertSucceeded(runSessionStart(context, sessionStartCommand(path)));
 			assert.equal(

@@ -54,13 +54,14 @@ t-wadaのTDDで。適切な粒度でコミットすること。
 
 ただし事後的な分割（先に一括で変更してから複数コミットへ割り直す）が中間ファイル再構成等でトークン効率を著しく損なう場合は、論理単位の純度より作業順=コミット順を優先してよい。
 
-変更束はブランチで作業し PR で main に統合する（main 直コミットしない。生態系図の develop→PR→merge_pr が正規経路）。`scripts/main-commit-guard.mjs`（PreToolUse(Bash) hook）は、mainまたはsibling worktreeを対象にする変更系Gitを保護する。ツールに渡すパスと実行worktreeを一致させる。
+変更束はブランチで作業し PR で main に統合する（main 直コミットしない。生態系図の develop→PR→merge_pr が正規経路）。タスクが決まった後、編集前に適切な worktree を選び、ブランチはその場所で命名する。意味ある名前を付けるためだけに worktree やチャットを作り直さない。`scripts/main-commit-guard.mjs` は明示された操作対象のブランチとリポジトリを検査する。
 main上では新しい状態を作る操作をdenyとし、破壊・復元操作はClaude Codeでask、askを表現できないCodexでfail-closed denyとする。
-sessionのrootと異なるworktreeを対象にする場合は操作の種類によらずClaude Codeでask、Codexでfail-closed denyとする（hookはsession自身のworktreeを他sessionのものと区別できず、session移動後もharnessは起動時のrootを報告し続けるため、所有権の確認を人間に委ねる）。
+session root はリポジトリの範囲を定める入力であり、worktree の所有権や実効実行場所の証明には使わない。同じリポジトリの feature checkout は対象を明示して操作できる。共有の有無と他者の変更は agent が事前に確認し、書込み権限は harness と sandbox に従う。
 保護の範囲はこのリポジトリのcheckoutに限る。targetのgit common dirがsessionのものと異なれば、ブランチ名が `main` でも素通しする（使い捨てsandboxの既定ブランチが `main` になるため）。
-変更系Gitの実効targetをshell構文から確定できない場合はfail closedとする。
+変更系Gitの実効 target を確定できない場合は fail closed とする。Codex の hook payload.cwd は session の場所なので、`git -C /absolute/worktree ...`、`make -C /absolute/worktree ...`、`cd /absolute/worktree && node ...` のように操作対象を命令内にも明示する。ツールの workdir とファイル操作の絶対パスも同じ checkout に固定する。絶対 Node script path は process.cwd() を変えない。shell の `cd` に `..` を含めず、対象の正準な絶対パスを使う（logical cd と Git の physical chdir は異なる）。
+環境状態を設定・解除する命令、複雑な制御構文、branch や repository の状態変更は、後続の変更系 Git・検証と別のツール呼出しに分ける。ガードは解除の成否や shell mode を予測して同じ呼出しの続行を許可しない。version/help の直接読取りは維持する。
 検査を飛ばすコマンド（`--no-verify`/`-n`、`-c`・`--config-env`・`git config` 経由の `core.hooksPath` 上書き）はforeign target以外、branch・worktreeを問わずdenyとし、`git config` の `--global`/`--system`/`--file`・`-f`（`--file`・`-f` は指す先を問わず対象）はforeign targetでもdenyとする（#1232）。
-sessionまたはtargetのgit rootsを解決できない場合は管轄外と区別し、ブランチ名規則を適用したままにする（targetのブランチ名が読めなければそもそもブランチ名規則が発火しないため、これが保護として効くのはsession側だけが解決できない場合である）。分類と構文対応の一次情報は `scripts/lib/main-commit-guard.mjs` とする。
+session または target の git roots を解決できない場合は管轄外と区別し、ブランチ名規則を適用したままにする。ファイル編集は対象の checkout とブランチを確認し、保護ブランチまたは未解決の対象を拒否する。生成された root instructions は対象 checkout の正本へ案内する。ガードは任意の program 内部、他者の専有や検査後の競合を保証しない。分類と対応形式の一次情報は `scripts/lib/main-commit-guard.mjs` と `scripts/lib/shell-context.mjs` とする。
 
 コミットメッセージは**英語**。
 

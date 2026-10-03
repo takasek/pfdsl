@@ -1,12 +1,9 @@
 #!/usr/bin/env node
-// PreToolUse(Edit|Write) hook: denies a write whose file_path escapes the
-// worktree this session's cwd is in (#357, #650). See
-// scripts/lib/worktree-write-guard.mjs for the detection logic and why this
-// resolves the worktree boundary via git rather than a path convention.
+// PreToolUse(Edit|Write) hook: checks actual Claude file_path and Codex
+// apply_patch targets, allowing feature checkouts in the same repository.
 //
 // Reads the hook payload on stdin. Prints a deny decision only when the
-// target path is outside the worktree; stays silent otherwise. Always exits
-// 0 — a crash in this guard must not wedge every Edit/Write call.
+// target is unresolved or on a protected branch; stays silent otherwise.
 //
 // Usage (wired in .claude/settings.json): node scripts/worktree-write-guard.mjs
 
@@ -15,16 +12,12 @@ import {
 	parseHookPayload,
 	readStdinText,
 } from "./lib/hook-io.mjs";
-import { resolveGitRoots } from "./lib/run-exec.mjs";
 import { evaluateWorktreeWriteGuard } from "./lib/worktree-write-guard.mjs";
 
 const payload = parseHookPayload(await readStdinText());
 if (!payload) process.exit(0);
 
-const cwd = payload?.cwd;
-const roots = typeof cwd === "string" ? resolveGitRoots(cwd) : null;
-
-const result = evaluateWorktreeWriteGuard(payload, roots);
+const result = evaluateWorktreeWriteGuard(payload);
 if (result.decision === "deny") {
 	console.log(JSON.stringify(buildPermissionOutput(result)));
 }

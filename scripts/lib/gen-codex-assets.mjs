@@ -350,5 +350,28 @@ export function hookCapabilityToCodexHooks(record) {
 	) {
 		throw new Error(`${sourcePath}: hooks must be an object.`);
 	}
-	return `${JSON.stringify({ hooks: semantic.hooks }, null, 2)}\n`;
+	const hooks = structuredClone(semantic.hooks);
+	if (record.id === "repository-hooks") {
+		// Resolve the code host from the hook process, never from the pending tool target
+		// or ambient Git configuration. Plugin hooks retain their plugin-root contract.
+		const bootstrap =
+			'pfdsl_hook_root=$(pwd -P) || exit 2; while [ ! -e "$pfdsl_hook_root/.git" ]; do [ "$pfdsl_hook_root" != / ] || { echo "[pfdsl] repository hook root is unavailable" >&2; exit 2; }; pfdsl_hook_root=$(dirname "$pfdsl_hook_root") || exit 2; done; ';
+		for (const groups of Object.values(hooks)) {
+			for (const group of groups) {
+				for (const hook of group.hooks ?? []) {
+					if (hook.type === "command") {
+						hook.command =
+							bootstrap +
+							hook.command
+								.replaceAll(`\${CLAUDE_PROJECT_DIR}`, `\${pfdsl_hook_root}`)
+								.replaceAll(
+									`\${CLAUDE_PROJECT_DIR:-}`,
+									`\${pfdsl_hook_root:-}`,
+								);
+					}
+				}
+			}
+		}
+	}
+	return `${JSON.stringify({ hooks }, null, 2)}\n`;
 }
