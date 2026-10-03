@@ -62,6 +62,16 @@ Closes #<issue番号>
 回収は採用リポの `.pfdsl/config.json` が `{"sweepCompletedChains": {"enabled": true}}` を宣言したときだけ行う。
 宣言が無い、または `enabled` が真偽値の `true` でなければ、workflow は checkout の直後に無効である旨を通知して何もせず成功で終わる。`.pfdsl/config.json` が JSON として読めない、または値の形が違う場合は失敗する。
 workflow ファイル自体は他の配置ファイルとともに commit してよい。有効にするかどうかは所有者が判断し、その判断をこのキーに残す。
+
+`GITHUB_TOKEN` で PR を作る経路には、リポジトリ設定の前提がある。
+リポジトリが GitHub Actions による PR の作成を許可していること（組織が制限している場合は組織も許可していること）である。
+有効にする場所は、リポジトリの Settings → Actions → General → Workflow permissions の「Allow GitHub Actions to create and approve pull requests」で、組織側は組織の Settings → Actions → General にある同名の設定である。
+workflow の `permissions: pull-requests: write` だけでは足りない。
+下の GitHub App の installation token で PR を作る経路は、この設定を必要としない。
+設定を有効にできない場合（組織ポリシー等）、回収と `flow-sync/pending` への push は成功するが PR は作られず、run は失敗で終わる。
+失敗した run には、PR だけが作られていないこと・確認する設定・手で PR を開く compare URL を示す `::error::` annotation が付く（`Explain a failed pull request step` step）。
+この結果は全面成功ではない。差分は `flow-sync/pending` に置かれたままなので、compare URL から手で PR を開くか、設定を有効にして run を再実行する。
+workflow は設定値を事前に読まない。取得する REST endpoint が Administration の読取権限を要し、`GITHUB_TOKEN` に付与できないため、案内は失敗した後に出る。
 同一ブランチへ起票するため、連続する push は既存 PR を更新する。`concurrency` グループで直列化してあり、再計算は冪等である。
 trigger は `flow-sync/pending` への push を除外する。App token で作成した PR ブランチへの push が workflow を起動すると、`concurrency` グループで保留中の run を押し出して回収を取りこぼすためである。
 PR 本文には閉じる issue が無いので `no-issue:` を理由つきで宣言する（「PR 本文規約」参照）。

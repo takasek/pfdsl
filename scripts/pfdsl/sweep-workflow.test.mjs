@@ -32,10 +32,21 @@ function writeConfig(dir, text) {
 	writeFileSync(join(dir, CONFIG_PATH), text);
 }
 
-// Evaluate the step conditions this workflow uses: `&&`-joined comparisons of earlier steps' outputs or repository variables.
-// A skipped or unset output or variable reads as the empty string, as it does on a runner.
-function conditionHolds(condition, outputs, vars = {}) {
+// Evaluate the step conditions this workflow uses: `&&`-joined comparisons of earlier steps' outputs or outcomes, repository variables, and `failure()`.
+// A skipped or unset output or variable reads as the empty string, and a step that never ran has the outcome `skipped`, as on a runner.
+function conditionHolds(
+	condition,
+	outputs,
+	vars = {},
+	state = { outcomes: {}, failed: false },
+) {
 	return condition.split(" && ").every((term) => {
+		if (term === "failure()") return state.failed;
+		const outcome = /^steps\.([\w-]+)\.outcome (==|!=) '([^']*)'$/.exec(term);
+		if (outcome) {
+			const actual = state.outcomes[outcome[1]] ?? "skipped";
+			return (actual === outcome[3]) === (outcome[2] === "==");
+		}
 		const match =
 			/^(?:steps\.([\w-]+)\.outputs\.(\w+)|vars\.(\w+)) (==|!=) '([^']*)'$/.exec(
 				term,
@@ -51,13 +62,13 @@ function conditionHolds(condition, outputs, vars = {}) {
 
 // Run one `run:` step under bash the way a runner does, in dir, and collect
 // what it wrote to GITHUB_OUTPUT.
-function runShellStep(step, dir) {
+function runShellStep(step, dir, extraEnv = {}) {
 	const outputFile = join(dir, `step-output-${step.id}`);
 	writeFileSync(outputFile, "");
 	const result = spawnSync("bash", ["-e", "-c", step.run], {
 		cwd: dir,
 		encoding: "utf8",
-		env: { ...process.env, GITHUB_OUTPUT: outputFile },
+		env: { ...process.env, GITHUB_OUTPUT: outputFile, ...extraEnv },
 	});
 	const outputs = {};
 	for (const line of readFileSync(outputFile, "utf8").split("\n")) {
@@ -69,12 +80,18 @@ function runShellStep(step, dir) {
 
 // Walk the workflow in dir without a runner: execute the detector steps for
 // real and record which other steps their conditions let through.
-function walkWorkflow(dir, vars = {}) {
+// failAt names (by id, else name) one step that is made to fail when it runs.
+// As on a runner, a step after a failure runs only if its condition uses a status function.
+function walkWorkflow(dir, vars = {}, failAt) {
 	const outputs = {};
+	const outcomes = {};
+	const state = { outcomes, failed: false };
 	const ran = [];
 	let failed;
 	for (const step of steps) {
-		if (step.if && !conditionHolds(step.if, outputs, vars)) continue;
+		const usesStatusFunction = /\b(failure|always)\(\)/.test(step.if ?? "");
+		if (state.failed && !usesStatusFunction) continue;
+		if (step.if && !conditionHolds(step.if, outputs, vars, state)) continue;
 		if (step.id === "sweep-gate" || step.id === "detect-workspace") {
 			const { result, outputs: own } = runShellStep(step, dir);
 			outputs[step.id] = own;
@@ -85,6 +102,9 @@ function walkWorkflow(dir, vars = {}) {
 			continue;
 		}
 		ran.push(step.uses ?? step.name);
+		const fails = failAt !== undefined && (step.id ?? step.name) === failAt;
+		if (step.id) outcomes[step.id] = fails ? "failure" : "success";
+		if (fails) state.failed = true;
 	}
 	return { ran, outputs, failed };
 }
@@ -441,3 +461,146 @@ test("the PR body says whether this repository's CI ran, matching the token that
 	assert.ok(withoutApp.includes(APP_CLIENT_ID_VAR), withoutApp);
 	assert.ok(withoutApp.includes(APP_PRIVATE_KEY_SECRET), withoutApp);
 });
+
+// The PR step can fail after the sweep succeeded and the branch was pushed, for example when the repository does not allow Actions to create pull requests.
+// The workflow cannot read that setting beforehand: the REST endpoint needs Administration read, which GITHUB_TOKEN cannot be granted.
+// So a step after the PR step explains the failure, and the job still ends failed.
+const failureNotice = steps.find((step) => step.id === "pr-failure-notice");
+const PR_STEP_ID = "open-pr";
+
+test("the PR step has an id and the failure notice follows it", () => {
+	assert.equal(openPrStep.id, PR_STEP_ID);
+	assert.ok(
+		failureNotice,
+		"the workflow must declare a pr-failure-notice step",
+	);
+	assert.ok(steps.indexOf(failureNotice) > steps.indexOf(openPrStep));
+});
+
+test("neither the PR step nor the notice swallows the failure, so the job ends failed", () => {
+	assert.equal(openPrStep["continue-on-error"], undefined);
+	assert.equal(failureNotice["continue-on-error"], undefined);
+});
+
+// [label, failing step (id, else name), vars, expect the notice to run]
+const NOTICE_CASES = [
+	["the PR step fails", PR_STEP_ID, {}, true],
+	[
+		"the PR step fails after the App token minted",
+		PR_STEP_ID,
+		{ [APP_CLIENT_ID_VAR]: "Iv1.abc" },
+		true,
+	],
+	["nothing fails", undefined, {}, false],
+	[
+		"the sweep fails before the PR step",
+		"Sweep completed chains out of the roadmap",
+		{},
+		false,
+	],
+	[
+		"the App token cannot be minted",
+		"app-token",
+		{ [APP_CLIENT_ID_VAR]: "Iv1.abc" },
+		false,
+	],
+];
+
+for (const [label, failAt, vars, runs] of NOTICE_CASES) {
+	test(`the failure notice ${runs ? "runs" : "does not run"} when ${label}`, () => {
+		inTempDir((dir) => {
+			writeConfig(dir, ENABLED_CONFIG);
+			const { ran, failed } = walkWorkflow(dir, vars, failAt);
+			assert.equal(failed, undefined, failed?.result.stderr);
+			assert.equal(
+				ran.includes(failureNotice.name),
+				runs,
+				`steps that ran: ${ran.join(", ")}`,
+			);
+		});
+	});
+}
+
+// Evaluate the one expression shape the notice's env uses: `${{ a.b.c }}`, a dotted context path.
+function resolveContextExpression(expression, context) {
+	const match = /^\$\{\{ ([\w.-]+) \}\}$/.exec(expression);
+	assert.ok(match, `Unsupported fixture expression: ${expression}`);
+	return (
+		match[1].split(".").reduce((value, key) => value?.[key], context) ?? ""
+	);
+}
+
+// Run the notice for real under bash with the env a runner would give it, and return its single annotation.
+function runFailureNotice(appTokenOutcome, defaultBranch = "main") {
+	const context = {
+		steps: { "app-token": { outcome: appTokenOutcome } },
+		github: {
+			server_url: "https://github.example",
+			repository: "octo/repo",
+			event: { repository: { default_branch: defaultBranch } },
+		},
+	};
+	const env = Object.fromEntries(
+		Object.entries(failureNotice.env ?? {}).map(([key, expression]) => [
+			key,
+			resolveContextExpression(expression, context),
+		]),
+	);
+	let outcome;
+	inTempDir((dir) => {
+		outcome = runShellStep(failureNotice, dir, env).result;
+	});
+	assert.equal(outcome.status, 0, outcome.stderr);
+	const annotations = outcome.stdout
+		.split("\n")
+		.filter((line) => line.startsWith("::error::"));
+	assert.equal(annotations.length, 1, outcome.stdout);
+	return annotations[0].slice("::error::".length).replaceAll("%0A", "\n");
+}
+
+const SETTING_PATH = "Settings → Actions → General → Workflow permissions";
+const SETTING_NAME = "Allow GitHub Actions to create and approve pull requests";
+
+for (const outcome of ["skipped", "failure", "cancelled"]) {
+	test(`the notice for a PR opened with GITHUB_TOKEN (App token step ${outcome}) points at the repository setting`, () => {
+		const message = runFailureNotice(outcome);
+		assert.match(
+			message,
+			/sweep and the push to flow-sync\/pending already happened/,
+		);
+		assert.match(message, /only the pull request was not created/);
+		assert.ok(message.includes(SETTING_PATH), message);
+		assert.ok(message.includes(SETTING_NAME), message);
+		assert.match(message, /organization/);
+		assert.match(message, /GITHUB_TOKEN/);
+		assert.doesNotMatch(message, /installation/);
+	});
+}
+
+test("the notice for a PR opened with the App token points at the App, not at the repository setting", () => {
+	const message = runFailureNotice("success");
+	assert.match(
+		message,
+		/sweep and the push to flow-sync\/pending already happened/,
+	);
+	assert.match(message, /only the pull request was not created/);
+	assert.match(message, /installation/);
+	assert.match(message, /Contents/);
+	assert.match(message, /Pull requests/);
+	assert.ok(!message.includes(SETTING_PATH), message);
+	assert.ok(!message.includes(SETTING_NAME), message);
+});
+
+for (const outcome of ["skipped", "success"]) {
+	test(`the notice carries a compare URL that opens the PR by hand (App token step ${outcome})`, () => {
+		for (const defaultBranch of ["main", "trunk", "release/2026"]) {
+			const message = runFailureNotice(outcome, defaultBranch);
+			assert.ok(
+				message.includes(
+					`https://github.example/octo/repo/compare/${defaultBranch}...${openPrStep.with.branch}`,
+				),
+				message,
+			);
+		}
+	});
+}
