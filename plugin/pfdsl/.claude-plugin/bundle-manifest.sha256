@@ -28,7 +28,7 @@ e07809b079ce3ef3aeb896dc070f3ac507f6fe9eb70e02938c13ca446570ca82  skills/pfd-gri
 
 2083ba68c0bfecf47eae1f6f1c91d94891b648d468cba4457bff7d67328364ea  skills/pfd-ops/install/.github/workflows/pfdsl-sweep-completed-chains.yml
 
-35faacd4d5c13add67d9c303c8a68d2909d82fc32d9637501c0b100ae590d26f  skills/pfd-ops/install/scripts/pfdsl/audit-issues-flow.mjs
+27bc91affa74b68a107bd93d755961eaeb1136f0d5beac58cf81d38b7122fe62  skills/pfd-ops/install/scripts/pfdsl/audit-issues-flow.mjs
 
 e5e4a9e59d4a0b82d50ab9219f7b16c71cefa4f938e2feb9a62795aa7a3a4833  skills/pfd-ops/install/scripts/pfdsl/lib/chain-sweep.mjs
 
@@ -42,7 +42,7 @@ c3f2fa839ba9590b4c6ebc97746546e5b626a09435d64d012c85a65622d9c1e5  skills/pfd-ops
 
 794cb7f9d6f0d57f86de5556803b9509c690407627615adff079acaee0b9681e  skills/pfd-ops/install/scripts/pfdsl/lib/github-rest.mjs
 
-d357a89596a789fa289d36ba55c94dfbdcd48a3e5acaa53a0fa1ad9ef2e8b28c  skills/pfd-ops/install/scripts/pfdsl/lib/issues-flow-audit.mjs
+5223f3ad1ffe3b8498aa6f4c9f38ed0dc45d28d7aff606cca75f8dba753512d9  skills/pfd-ops/install/scripts/pfdsl/lib/issues-flow-audit.mjs
 
 0c315f0afc41f21ee0b4914131159b85064b3a39ea633c5b695498c6c41c427e  skills/pfd-ops/install/scripts/pfdsl/lib/proxy-fetch-worker.mjs
 
@@ -100,7 +100,7 @@ c33d4bd989318b42ac64c84af25cf731df7e3678350915b3a7dff9c916abfbc5  skills/pfd-ops
 
 5d946e545b1dd9f84f3f74953c2d3ccfc55cd7c169d3b5ae4040dff1b4e62a26  skills/pfd-upstream-report/SKILL.md
 
-0decf7f6a30dee05098d874805e4b171b902ea7fba849e3b40b7dd890a1293d6  skills/pfdsl/SKILL.md
+704046f43fb6bd2cc083823e8b157d6d0666721c65a983346317a5173700d0d8  skills/pfdsl/SKILL.md
 
 cd3b49619550799898858fe1fec583816c00a335f3e70fa20fdfa8e1a2dc1a8d  skills/pfdsl/references/examples.md
 
@@ -110,4 +110,4 @@ b657698a8a10210e10ee40130a292007ca55a02e8f46e77181d4777b769a86bb  skills/pfdsl/r
 
 3168c3cba3190fc247daca502d24467f484a3774b432ded5744a5f47cb9f800f  skills/pfdsl/references/samples.md
 
-095df3ccb1e5db2a0a0c0277fdabf7be0d90f92f02b8f97014ea5ac8eb0e9b2d  skills/pfdsl/references/spec.md
+f27e460115883ced5b1a019c7cdeeacab98fa90fb58d24aef93e10b818f86ea7  skills/pfdsl/references/spec.md

@@ -23,6 +23,7 @@ import {
 	formatEdges,
 	type GraphNeighbor,
 	type GraphOrphan,
+	type GroupMeta,
 	groupEdges,
 	hasErrors,
 	type IndexChange,
@@ -190,6 +191,7 @@ const META_VALUES_OPTIONS = {
 	"no-color": BOOLEAN_OPTION,
 };
 const META_SET_OPTIONS = {
+	"allow-unknown": BOOLEAN_OPTION,
 	json: BOOLEAN_OPTION,
 	"no-color": BOOLEAN_OPTION,
 };
@@ -660,9 +662,101 @@ export function runDelete(
 	const source = readSource(file);
 	if (isCommandResult(source)) return source;
 
-	const { output, deleted, notFound, diagnostics } = deleteNodes(source, ids);
+	const analysis = analyze(source);
+	const failedInput = failIfErrors(
+		analysis.diagnostics,
+		file,
+		opts.json,
+		opts.color,
+	);
+	if (failedInput) return failedInput;
+	const refuse = (error: string): CommandResult =>
+		opts.json ? failJson({ error }) : fail(`${error}\n`);
+	let groups: Record<string, GroupMeta> | undefined;
+	const deletedGroupIds = new Set(
+		ids.filter((id) => Object.hasOwn(analysis.frontmatter?.group ?? {}, id)),
+	);
+	if (analysis.frontmatter?.extends !== undefined && deletedGroupIds.size > 0) {
+		if (file === "-")
+			return refuse(
+				"delete: group deletion with extends requires a file path so preset ancestors can be resolved",
+			);
+		const absFile = resolve(file);
+		const { docs, diagnostics: extendsDiagnostics } = loadExtendsChain(
+			absFile,
+			(path) => (path === absFile ? analysis : fileLoader(path)),
+		);
+		const presetKeyDiagnostics = [...docs]
+			.filter(([path]) => path !== absFile)
+			.flatMap(([path, doc]) => validatePresetKeys(path, doc.frontmatter));
+		const presetDiagnostics = [...docs]
+			.filter(([path]) => path !== absFile)
+			.flatMap(([path, doc]) =>
+				doc.diagnostics.map((diagnostic) => ({ ...diagnostic, file: path })),
+			);
+		const errors: (Diagnostic & { file?: string })[] = [
+			...extendsDiagnostics,
+			...presetKeyDiagnostics,
+			...presetDiagnostics,
+		].filter((d) => d.severity === "error");
+		if (errors.length > 0) {
+			return opts.json
+				? failJson({ diagnostics: errors })
+				: fail(
+						`${errors.map((d) => formatDiagnostic(d, d.file ?? file, opts.color)).join("\n")}\n`,
+					);
+		}
+		const chain = buildPresentationChain(absFile, docs);
+		const presetGroups =
+			resolvePresentation(chain.filter((entry) => entry.path !== absFile))
+				.group ?? {};
+		for (const id of ids) {
+			if (
+				Object.hasOwn(analysis.frontmatter.group ?? {}, id) &&
+				Object.hasOwn(presetGroups, id)
+			)
+				return refuse(
+					`delete: '${id}' is also defined by a preset; the local entry is a partial override and cannot delete that group here`,
+				);
+		}
+		groups = resolvePresentation(chain).group;
+		for (const [childId, meta] of Object.entries(presetGroups)) {
+			const parent = groups?.[childId]?.parent;
+			if (
+				typeof meta.parent !== "string" ||
+				parent === undefined ||
+				!deletedGroupIds.has(parent)
+			)
+				continue;
+			let ancestor = groups?.[parent]?.parent;
+			while (ancestor !== undefined && deletedGroupIds.has(ancestor))
+				ancestor = groups?.[ancestor]?.parent;
+			const localParent = Object.hasOwn(
+				analysis.frontmatter.group?.[childId] ?? {},
+				"parent",
+			);
+			if (
+				!localParent ||
+				ancestor === undefined ||
+				!Object.hasOwn(groups ?? {}, ancestor)
+			) {
+				return refuse(
+					`delete: '${childId}' has a parent relationship supplied by a preset that cannot be cleared or updated here; update that preset relationship before deleting the group`,
+				);
+			}
+		}
+	}
+	const { output, deleted, notFound, diagnostics, refusal } = deleteNodes(
+		source,
+		ids,
+		groups === undefined ? {} : { groups },
+	);
 	const failed = failIfErrors(diagnostics, file, opts.json, opts.color);
 	if (failed) return failed;
+	if (refusal)
+		return refuse(
+			`delete: YAML anchors, aliases and merge keys (<<) are not supported; expand them before deleting IDs in ${file}; nothing was written`,
+		);
 
 	if (opts.write) writeFileSync(file, output, "utf-8");
 
@@ -1212,6 +1306,7 @@ export function runStatusBlocked(
 }
 
 export interface MetaSetOptions {
+	allowUnknown?: boolean;
 	json?: boolean;
 	color?: boolean;
 }
@@ -1309,15 +1404,53 @@ export function runMetaSet(
 	// Validate every id and field/kind pairing before touching anything, so a
 	// multi-id call is atomic: either all writes land or none do.
 	const missing = ids.filter((id) => !nodeKinds.has(id));
-	if (missing.length > 0) {
-		return idsNotFoundError(file, missing, opts.json);
+	const undefinedIds = ids.flatMap((id) => {
+		const kind = nodeKinds.get(id);
+		return kind && !Object.hasOwn(frontmatter?.[kind] ?? {}, id)
+			? [{ id, kind }]
+			: [];
+	});
+	if (undefinedIds.length > 0) {
+		const messages = undefinedIds.map(
+			({ id, kind }) =>
+				`'${id}' has no frontmatter definition in ${file}. Add an entry under ${kind}: before using meta set.`,
+		);
+		if (missing.length > 0)
+			messages.push(`id(s) not found in ${file}: ${missing.join(", ")}`);
+		const error = messages.join("\n");
+		if (opts.json) return failJson({ missing, undefinedIds, error });
+		return fail(`meta set: ${error}\n`);
 	}
+	if (missing.length > 0) return idsNotFoundError(file, missing, opts.json);
 	for (const id of ids) {
 		const kind = nodeKinds.get(id);
 		if (kind !== "artifact" && kind !== "process" && kind !== "group") continue;
-		if (!KNOWN_FIELDS[kind].has(field)) {
+		const meta = frontmatter?.[kind]?.[id];
+		const exists = meta !== undefined && Object.hasOwn(meta, field);
+		if (
+			!KNOWN_FIELDS[kind].has(field) &&
+			exists &&
+			meta[field] !== null &&
+			typeof meta[field] === "object"
+		) {
+			return fail(
+				`meta set: '${field}' is not a scalar field (id: ${id})\n`,
+				2,
+			);
+		}
+		if (
+			!exists &&
+			!KNOWN_FIELDS[kind].has(field) &&
+			Object.values(KNOWN_FIELDS).some((fields) => fields.has(field))
+		) {
 			return fail(
 				`meta set: '${field}' is not a valid ${kind} field (id: ${id})\n`,
+				2,
+			);
+		}
+		if (!KNOWN_FIELDS[kind].has(field) && !exists && !opts.allowUnknown) {
+			return fail(
+				`meta set: unknown ${kind} field '${field}' (id: ${id}); use --allow-unknown to add it\n`,
 				2,
 			);
 		}
@@ -1353,8 +1486,8 @@ export function runMetaSet(
 		const kind = nodeKinds.get(id) as NodeKind;
 		const applied = setFrontmatterField(newSrc, kind, id, field, parsedValue);
 		if (applied === null) {
-			if (opts.json) return failJson({ missing: [id] });
-			return fail(`error: '${id}' not found in ${file}\n`);
+			const error = `meta set: could not update the frontmatter definition of '${id}' in ${file}; aliased definitions and ambiguous or non-scalar field keys cannot be edited here. Expand the aliased definition and use one scalar YAML key per field; nothing was written`;
+			return opts.json ? failJson({ error }) : fail(`${error}\n`);
 		}
 		newSrc = applied;
 	}
@@ -3010,9 +3143,21 @@ Options:
 
 const HELP_DELETE = `${helpUsage("delete", "<file|-> <id[,id...]>", DELETE_OPTIONS)}
 
-Remove one or more nodes (artifact or process) from a .pfdsl file in a single
+Remove one or more ids (artifact, process, or group) from a .pfdsl file in a single
 atomic pass: the frontmatter declaration, every body edge occurrence, and
 every surviving node's revises:/parts:/boundary: reference to the deleted id.
+Deleting a group keeps its member nodes and child groups, moving their
+group:/parent: references to the nearest declared ancestor not being deleted. If there
+is no ancestor, the references are cleared. Extension field values are left
+unchanged.
+Preset ancestors are resolved for files on disk. A local override of a preset
+group cannot delete that group; edit its preset declaration instead. Group
+deletion with extends requires a file path, rather than stdin.
+A child relationship inherited from a preset must be updated in that preset
+before its parent group can be deleted.
+An explicit local child parent can be promoted to a surviving ancestor, but
+cannot be cleared when a preset would supply a parent again.
+YAML anchors, aliases and merge keys (<<) are unsupported; expand them first.
 An id that exists nowhere in the file is a no-op, not an error — it is
 reported in notFound rather than failing the call. Use - to read from stdin
 (--write not allowed with stdin).
@@ -3026,11 +3171,12 @@ Options:
               the rewritten document — same shape whether or not --write is
               also given
               on parse/validation failure: { ok: false, diagnostics } (exit 1)
+              on refusal: { ok: false, error } (exit 1)
   --no-color  disable ANSI color codes (also: NO_COLOR env var)
 
 Exit codes:
   0  success (including ids not found — idempotent)
-  1  the file has a parse/validation error; nothing is deleted or written
+  1  parse/validation error or unsupported rewrite; nothing is deleted or written
   2  invalid usage (missing arguments, or --write combined with stdin)
 `;
 
@@ -3039,6 +3185,8 @@ const HELP_RENAME = `${helpUsage("rename", "<file|-> <old> <new>", RENAME_OPTION
 Rename an artifact, process, or group id and every reference to it in this
 file, in a single atomic pass. Use - to read from stdin (--write not
 allowed with stdin).
+
+Values of extension fields are never rewritten, even when they contain an id.
 
 What is rewritten depends on <old>'s kind:
   - artifact/process: the frontmatter declaration key; every body edge
@@ -3240,13 +3388,27 @@ place. The frontmatter is re-emitted in canonical form, except that a folded
 (>) scalar keeps the line breaks its author wrote for as long as its value is
 unchanged — give a folded field a new value and it is re-serialized. Multiple
 comma-separated ids get the same value; the call is atomic (all writes land or
-none do). Quote values containing spaces.
+none do). Quote values containing spaces. For a value beginning with -, put
+options before -- and the value after it.
 
 Field-aware validation: status must be one of todo | wip | done | waiting |
-suspended; index must be a non-negative integer; the field must be valid for
-each node's kind. Array/map fields (tags, parts, externalStakeholders,
+suspended; index must be a non-negative integer; known fields must be valid for
+each node's kind. Existing extension scalar fields can be updated without a
+flag; adding a new unknown field requires --allow-unknown. Except for index,
+new values are stored as strings, even if the old value was a number, boolean,
+or null. Array/map fields (tags, parts, externalStakeholders,
 boundary) and derived read-only fields (location.resolved, command.cwd)
-cannot be set.
+cannot be set, and existing extension arrays/maps cannot be overwritten.
+
+Each id needs a local frontmatter definition. An id used only in the body is
+reported separately from an id absent from the file. Add its artifact: or
+process: entry first; meta set never creates a definition implicitly.
+Empty definitions can receive fields. A definition accessed through a YAML
+alias must be expanded first. Editing the original anchored definition also
+changes values read through its aliases, following YAML's shared-value behavior.
+An existing scalar field key keeps its YAML type. Fields whose
+keys are collections, or whose keys become the same name when read, must be
+rewritten with one scalar YAML key before editing.
 
 Setting status requires a roadmap file: an explicit type: other than roadmap
 is refused (spec §2.10/§15.14), since progress belongs to the roadmap — a file
@@ -3256,15 +3418,19 @@ When setting status on a roadmap file, reports which processes became newly
 ready after the change (once, after all writes).
 Omitting type: is treated as roadmap and allowed, with a warning (W006).
 
+  --allow-unknown  allow a new extension scalar field; does not bypass known
+                   field validation or create node definitions
   --json      emit JSON ({ ok, newlyReady: string[], warnings? }) instead of text
-              on failure: { ok: false, diagnostics } / { ok: false, missing } /
-              { ok: false, error }
+              on failure (exit 1): { ok: false, diagnostics } / { ok: false, missing } /
+              { ok: false, missing, undefinedIds: {id, kind}[], error } /
+              { ok: false, error }. missing lists ids absent from the file;
+              undefinedIds lists existing nodes without frontmatter definitions.
   --no-color  disable ANSI color codes (also: NO_COLOR env var)
 
 Exit codes:
   0  success
-  1  id not found in the file, or the rewrite was refused
-  2  invalid usage (missing argument, invalid field or value)
+  1  id not found, frontmatter definition absent, or the rewrite was refused
+  2  invalid usage (missing argument, invalid field or value); text on stderr
 `;
 
 const HELP_CHECK_LINKS = `${helpUsage("meta check-links", "<file>", META_CHECK_LINKS_OPTIONS)}
@@ -4157,6 +4323,7 @@ const META_COMMANDS: readonly CommandEntry[] = [
 				);
 			}
 			return runMetaSet(f, id, field, value, {
+				allowUnknown: flags["allow-unknown"] === true,
 				json: flags.json === true,
 				color: resolveColor(flags),
 			});
@@ -4367,7 +4534,9 @@ export const TOP_LEVEL_COMMANDS: readonly CommandEntry[] = [
 	defineCommand(DELETE_OPTIONS, {
 		name: "delete",
 		synopsis: "delete <file|-> <id[,id...]> [--write] [--json] [--no-color]",
-		description: ["Remove one or more nodes from a .pfdsl file (- = stdin)"],
+		description: [
+			"Remove artifacts, processes, or groups from a .pfdsl file (- = stdin)",
+		],
 		help: HELP_DELETE,
 		run: (positional, flags) => {
 			const [f, idList] = positional;

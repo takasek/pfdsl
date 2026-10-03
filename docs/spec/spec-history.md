@@ -8,6 +8,10 @@
 
 `vOLD` は直前のバージョン、`vNEW` はこのエントリが導入したバージョン（＝そのエントリを書いた時点の spec.md タイトル行と一致）。先頭エントリの `vNEW` は常に spec.md の現行バージョンと一致していなければならない（`scripts/check-spec-history.mjs` が release 前に機械検査する）。エントリは maintain_spec（統合フェーズ）でタイトル行 bump と同じ作業の中で書く（`.pfdsl/workflow.md`）ので、release 時点で複数バージョン分がまとまって欠けている状態は本来生じない。生じていた場合は書き忘れであり、欠けているエントリを追記する（`spec-history-finalize` スキル）。エントリは version ごとに永続する記録であり、release 単位でまとめたり削除したりしない。v0.0.2 以前のエントリは旧形式（丸括弧なし）のまま残す — 過去の記録は書き換えない。
 
+v0.0.26 からの主な変更点（v0.0.27）：group と Artifact / Process の同名を禁止し、衝突する種別を示す N004 を追加した（§2.8.1・§15.17・§16、#1291）。
+**破壊的変更**を含む — 同一ファイル内の group ID を、ノードの front matter 宣言・本文 edge・孤立ノード宣言でも使う文書は error となる。
+従来の診断は group / Artifact の宣言を見逃し、group / Process や本文での使用を Artifact / Process の矛盾として誤って報告していた。
+
 v0.0.25 からの主な変更点（v0.0.26）：bare-id の先頭文字を Letter / Number / `_` に限定した（§4.1、#1218）。
 **破壊的変更**を含む — `-` で始まる bare-id は字句エラー（L002）となる。`-` で始まる ID は quoted-id で書く。
 従来、字句解析は先頭の `-` を受理する一方、公開定数 `ID_PATTERN`・構文ハイライト・formatter の判定がそれぞれ異なる規則を持っていた。formatter が素の `---` を出力すると文書先頭で frontmatter の区切りと読まれるなど、定義の食い違いが実害になったため、既に `ID_PATTERN` と構文ハイライトが採っていた規則へ字句解析と formatter を揃えた。

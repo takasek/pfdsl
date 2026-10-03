@@ -159,7 +159,8 @@ function printFindings(findings) {
 	function fmtFinding(f) {
 		const pid = f.processId ? ` [${f.processId}]` : "";
 		const aid = f.artifactId ? ` -> ${f.artifactId}` : "";
-		return `  #${f.issueNumber} ${f.type}${pid}${aid} ${f.detail}`;
+		const repair = f.repairCommand ? `\n    ${f.repairCommand}` : "";
+		return `  #${f.issueNumber} ${f.type}${pid}${aid} ${f.detail}${repair}`;
 	}
 
 	if (blocking.length > 0) {

@@ -10,6 +10,45 @@ Record both the installed and target CLI/plugin releases, including the bundle r
 Read the entries introduced after the installed release and through the target release, in release order; skip entries outside that interval.
 Changing a version number alone is not evidence that old local copies have been cleaned up.
 
+## Unreleased — after CLI/plugin v0.1.0
+
+### Group and node IDs
+
+Specification v0.0.27 forbids a group ID from also being an artifact or process ID in the same file.
+`check` reports N004 for conflicting frontmatter declarations, body edges, and standalone body nodes.
+For an existing conflict, choose a distinct group ID and edit the group declaration key and its `group:` / `parent:` references together, keeping the artifact/process ID and its body occurrences unchanged.
+Run `check` afterwards; `rename` refuses the ambiguous input and cannot choose which identity to rename.
+
+`delete` now accepts group IDs.
+It keeps member nodes and child groups, moving their `group:` / `parent:` references to the nearest declared ancestor outside the deletion batch, including inherited preset ancestors for files on disk.
+When no ancestor remains, it removes those references.
+Deleting a local override cannot remove the group supplied by a preset and is refused; edit the preset declaration instead.
+If a child inherits its relationship to the deleted group from a preset, deletion is refused until that preset relationship is updated.
+An explicit local child `parent` can be promoted to a remaining ancestor, but removing it is refused if a preset would supply a parent again.
+Group deletion with `extends` requires a file path so ancestors can be resolved.
+`delete` refuses YAML anchors, aliases and merge keys; expand them before retrying.
+Preview the change before using `--write`, including when deleting several groups at once.
+
+### Metadata extension fields
+
+`meta set` updates an existing extension scalar field without an additional flag.
+An existing scalar YAML key retains its type when updated.
+If multiple keys become the same field name, or a field uses a collection key, rewrite it with one scalar key before editing; the command refuses these cases without writing.
+Adding a new unknown field requires `--allow-unknown`; existing arrays/maps remain unsupported.
+This collection restriction applies to extension fields; existing known-field updates such as replacing a `location` array with a string still work.
+Empty local definitions can receive fields, but `meta set` refuses to edit a definition accessed through an alias; expand that definition first.
+Updating the original anchored definition retains YAML's shared-value behavior for its aliases.
+Values are stored as strings, except for the existing numeric `index` field.
+For a value beginning with `-`, put options before `--` and the value after it, for example `meta set diagram.pfdsl a label --json -- --help`.
+The existing CLI rules for reserved names still apply: `status` uses the roadmap/status checks, `index` requires a number, and collection or derived field names remain unavailable through `meta set`.
+The issue audit remains read-only and prints a timestamp repair command, including the flag so an absent `updated_at` can be added.
+
+For JSON consumers, `missing` now contains only IDs absent from the file.
+Failures with exit code 1 return JSON when `--json` is set; invalid usage with exit code 2 still reports text on stderr.
+When an ID exists in the body without a frontmatter definition, the failure payload instead includes `undefinedIds: [{id, kind}]`, `missing`, and a recovery message in `error`.
+Add the definition before retrying; `meta set` does not create it implicitly.
+Definition creation from the preview and CLI remains tracked separately in [Issue #1282](https://github.com/takasek/pfdsl/issues/1282).
+
 ## CLI/plugin v0.1.0 — after CLI/plugin v0.0.26
 
 This section covers the changes between CLI/plugin v0.0.26 and v0.1.0, including specification versions v0.0.22–v0.0.26.

@@ -173,7 +173,7 @@ export function parse(source: string): ParseDocResult {
 	return { document, frontmatter, bodyStartLine, diagnostics };
 }
 
-export type { DeleteNodesResult } from "./delete-nodes.js";
+export type { DeleteNodesOptions, DeleteNodesResult } from "./delete-nodes.js";
 export { deleteNodes } from "./delete-nodes.js";
 export type { InsertDefinitionResult } from "./insert-definition.js";
 export { insertDefinition } from "./insert-definition.js";

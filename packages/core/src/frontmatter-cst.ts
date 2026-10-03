@@ -341,7 +341,8 @@ export function declarationPair(
  * Quoting for the new value is left to the `yaml` package's own core-schema
  * judgment — pass a `number` for integer fields (e.g. `index`) and a
  * `string` for everything else. Returns null when there is no frontmatter,
- * or when `id` has no entry under `kind`.
+ * or when `id` has no entry under `kind` or is accessed through a YAML alias,
+ * or an existing field does not have a unique scalar YAML key.
  */
 export function setFrontmatterField(
 	source: string,
@@ -353,7 +354,50 @@ export function setFrontmatterField(
 	const { present, doc, body, yamlText, newline } = parseFrontmatterCst(source);
 	if (!present || invalidIdKeys(doc).length > 0 || !doc.hasIn([kind, id]))
 		return null;
-	doc.setIn([kind, id, field], value);
+	if (!isMap(doc.get(kind, true))) return null;
+	let entry = doc.getIn([kind, id], true);
+	if (entry === null || (isScalar(entry) && entry.value === null)) {
+		const mapping = doc.createNode({});
+		if (entry) {
+			if (entry.comment !== undefined) mapping.comment = entry.comment;
+			if (entry.commentBefore !== undefined)
+				mapping.commentBefore = entry.commentBefore;
+			if (entry.spaceBefore !== undefined)
+				mapping.spaceBefore = entry.spaceBefore;
+			if (entry.anchor !== undefined) mapping.anchor = entry.anchor;
+		}
+		doc.setIn([kind, id], mapping);
+		entry = mapping;
+	}
+	if (!isMap(entry)) return null;
+	let metadata: Record<string, unknown>;
+	try {
+		metadata = doc.toJS()[kind][id];
+		// Distinct authored keys may collapse to one property, including a
+		// collection key and a scalar key. Do not infer identity from that loss.
+		if (Object.keys(metadata).length !== entry.items.length) return null;
+	} catch {
+		return null;
+	}
+	// The read path stringifies scalar keys into object properties. Preserve
+	// the authored key when updating that property instead of adding a string
+	// key next to a boolean/number key. Several such keys can collapse to the
+	// same property name; those cannot be addressed unambiguously by the CLI.
+	const fields = entry.items.filter((pair) => {
+		const key = isAlias(pair.key) ? pair.key.resolve(doc) : pair.key;
+		return (
+			isScalar(key) && (key.value === null ? "" : String(key.value)) === field
+		);
+	});
+	const [existingField] = fields;
+	if (existingField) {
+		entry.set(existingField.key, value);
+	} else {
+		// Collection keys have a YAML-specific stringification in the read
+		// model. Refuse them rather than guessing at a different authored key.
+		if (Object.hasOwn(metadata, field)) return null;
+		entry.set(field, value);
+	}
 	return renderFrontmatterCst(doc, newline, yamlText) + body;
 }
 

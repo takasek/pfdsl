@@ -154,7 +154,8 @@ It keeps the body's layout, including the order of set members, so run `pfdsl fm
 It edits only the given file: a parent that points to it through `subflow:`, or a file that extends it as a preset, must be checked separately, and `pfdsl rename --help` lists what it rewrites and refuses.
 It leaves `label:` as it was, so update a label that names the old id with `meta set <file> <new-id> label <text>`.
 `meta set` takes comma-separated ids and writes all of them or none, so regrouping a batch of nodes is one call, not one edit per node.
-It only writes to nodes declared in the frontmatter; a node that appears only in the body is reported as not found, so declare it first.
+It only writes to nodes declared in the frontmatter; if a node appears only in the body, add its definition first.
+For extension fields, check `meta set --help`: versions supporting `--allow-unknown` update existing scalar fields without a flag and require the flag only to add a new unknown field. Arrays/maps remain unsupported.
 Declare a new group under `group:` before moving nodes into it: a `group:` value that names an undeclared group passes `check` without a warning, and those nodes render outside every cluster.
 
 ## References — which to read when

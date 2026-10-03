@@ -28,7 +28,7 @@ const PUBLIC_OPTIONS: Record<string, readonly string[]> = {
 	"meta get": ["json", "no-color"],
 	"meta list": ["tag", "group", "producer", "json", "no-color"],
 	"meta values": ["json", "no-color"],
-	"meta set": ["json", "no-color"],
+	"meta set": ["allow-unknown", "json", "no-color"],
 	"meta sort": ["by", "write", "check", "no-color"],
 	"meta reindex": ["write", "check", "renumber", "json", "no-color"],
 	"meta check-links": ["json", "no-color"],
