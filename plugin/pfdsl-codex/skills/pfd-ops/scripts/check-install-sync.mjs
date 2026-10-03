@@ -666,19 +666,20 @@ async function main() {
 		// Independent of --upstream and of whether the GitHub Issues backend is
 		// adopted: the record concerns the repo's migration, not any one feature.
 		const recordCommand = `node ${fileURLToPath(import.meta.url)} --target ${targetRoot} --record-migration`;
-		let notice;
+		let outcome;
 		try {
-			notice = describeMigration(
-				evaluateMigration(targetRoot, readPluginIdentity(resolve(skillRoot, "../.."))),
-				recordCommand,
-			);
+			outcome = evaluateMigration(targetRoot, readPluginIdentity(resolve(skillRoot, "../..")));
 		} catch (e) {
 			// 3, as for any refusal about the target: the argv was fine, the
 			// declaration in the target is not.
 			console.error(e instanceof Error ? e.message : String(e));
 			process.exit(3);
 		}
+		const notice = describeMigration(outcome, recordCommand);
 		if (notice !== null) console.log(notice);
+		// Before any write: an older install/ would roll back what a newer
+		// release placed.
+		if (outcome.kind === "older" && args.deploy) process.exit(3);
 	}
 	if (!deployable) {
 		const drifted = reportNonDeployableTarget(role, skillRoot, targetRoot, args.deploy);

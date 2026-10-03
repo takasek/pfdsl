@@ -1523,6 +1523,110 @@ describe("applied migration state", () => {
 			assert.doesNotMatch(stdout, /appliedMigration/);
 		});
 	});
+
+	describe("--deploy", () => {
+		function withInstallFile(plugin) {
+			writeFile(
+				join(plugin.skillRoot, "install"),
+				"scripts/fixture-tool.mjs",
+				"canonical\n",
+			);
+			return plugin;
+		}
+
+		it("is refused with exit 3 and writes nothing when the plugin is older than the recorded state", () => {
+			const plugin = withInstallFile(
+				makeInstalledPlugin("deploy-older", { claude: "0.2.0" }),
+			);
+			const target = makeAdopter("deploy-older-adopter", {
+				appliedMigration: { pluginVersion: "0.3.0" },
+			});
+
+			const result = run(plugin, target, ["--deploy"]);
+			assert.equal(result.status, 3);
+			assert.match(result.stdout, /update the plugin/i);
+			assert.equal(existsSync(join(target, "scripts/fixture-tool.mjs")), false);
+			assert.equal(
+				existsSync(join(target, ".claude/pfd-ops-install-manifest.json")),
+				false,
+			);
+		});
+
+		it("is refused for every flag combination, not only the bare form", () => {
+			const plugin = withInstallFile(
+				makeInstalledPlugin("deploy-older-flags", { claude: "0.2.0" }),
+			);
+			const target = makeAdopter("deploy-older-flags-adopter", {
+				appliedMigration: { pluginVersion: "0.3.0" },
+			});
+
+			for (const extra of [
+				["--overwrite-local-edits"],
+				["--delete-edited-orphans"],
+			]) {
+				assert.equal(run(plugin, target, ["--deploy", ...extra]).status, 3);
+			}
+			assert.equal(existsSync(join(target, "scripts/fixture-tool.mjs")), false);
+		});
+
+		it("does not turn a plain check into a failure when the plugin is older", () => {
+			const plugin = withInstallFile(
+				makeInstalledPlugin("check-older", { claude: "0.2.0" }),
+			);
+			const target = makeAdopter("check-older-adopter", {
+				appliedMigration: { pluginVersion: "0.3.0" },
+			});
+
+			assert.notEqual(run(plugin, target).status, 3);
+		});
+
+		// Applying a migration itself needs --deploy, so a newer plugin must not be blocked.
+		it("proceeds when the plugin is newer than the recorded state", () => {
+			const plugin = withInstallFile(
+				makeInstalledPlugin("deploy-newer", { claude: "0.2.0" }),
+			);
+			const target = makeAdopter("deploy-newer-adopter", {
+				appliedMigration: { pluginVersion: "0.1.0" },
+			});
+
+			const result = run(plugin, target, ["--deploy"]);
+			assert.equal(result.status, 0);
+			assert.equal(
+				readFileSync(join(target, "scripts/fixture-tool.mjs"), "utf-8"),
+				"canonical\n",
+			);
+		});
+
+		it("proceeds when the order cannot be determined, when the version is unknown, and when nothing is recorded", () => {
+			const cases = {
+				"same-version-different-content": [
+					{ claude: "0.2.0", bundleSeed: "running" },
+					{ pluginVersion: "0.2.0", bundleHash: bundleHashOf("recorded") },
+				],
+				"unknown-version": [{}, { pluginVersion: "0.3.0" }],
+				"uncomparable-version": [
+					{ claude: "0.2.0" },
+					{ pluginVersion: "0.3.0-rc.1" },
+				],
+				"nothing-recorded": [{ claude: "0.2.0" }, undefined],
+			};
+			for (const [name, [pluginOptions, recorded]] of Object.entries(cases)) {
+				const plugin = withInstallFile(
+					makeInstalledPlugin(`deploy-${name}`, pluginOptions),
+				);
+				const target = makeAdopter(
+					`deploy-${name}-adopter`,
+					recorded === undefined ? {} : { appliedMigration: recorded },
+				);
+				assert.equal(run(plugin, target, ["--deploy"]).status, 0, name);
+				assert.equal(
+					existsSync(join(target, "scripts/fixture-tool.mjs")),
+					true,
+					name,
+				);
+			}
+		});
+	});
 });
 
 // checkUpstreamVersion moved to plugin-version-check.mjs/.test.mjs (ADR-0028
