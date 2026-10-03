@@ -70,11 +70,10 @@ GitHub 側にしか無い読みを本文の正規表現で再構成すると、D
 - [ ] 完了した issue をクローズし、進捗・新発見を issue に反映した
 - [ ] close 時の降格規則を適用した（定義は L3 reference。専属 process も含めて削除する）
 
-**PR 本文の `Closes` キーワード**: L3 reference「PR 本文規約」に従う（main 直接マージのみ使用・中間 PR では使わない）。
-判定は CI の `check-closes-reference.yml` が持ち、終端ゲートには項目を置かない — 根拠は GitHub が本文から導出する issue リンクであり、PR 作成前に走る終端ゲートの時点ではリンクも本文も存在しない。
+**PR 本文と issue 連携**: 参照の使い分けと、PR 作成・本文編集・base 変更後の確認は、採用済み L3 reference「PR 本文規約」が正本である。
+このリポの CI `check-closes-reference.yml` はデフォルトブランチ向け PR のリンクの有無を検査するが、対象 repository・issue 番号の集合が意図と一致するかは判定しない。
+終端ゲートにはこの CI の項目を置かない — PR 作成前にはリンクも本文も存在しない。
 トークンの有無でなくリンクの有無を見るため、コードフェンス内の `Closes #<n>` は通らない。
-
-**PR 作成・本文編集・base 変更後**: `gh pr view <PR番号> --json body,baseRefName,closingIssuesReferences` で現在の本文・base と GitHub が導いたクローズ対象を取得し、その base で意図した repository・issue 番号の集合と一致することを確認する。作成・本文編集時は本文の exact-write readback も行う。デフォルトブランチ以外を base とする中間 PR、または部分実装など閉じる issue が無い PR では空集合を確認する。base をデフォルトブランチへ変更した場合は、本文が同じでもクローズ対象を再確認する。`no-issue:` は GitHub の自動クローズを無効化せず、説明文の `resolved #<n>` もクローズ指定になりうる。上記 CI はリンクの存在を検査するだけで、閉じる対象の意図との一致は判定しない。不一致は現在の base・本文・リンクを調べ、必要な修正後に再読し、解消してからレビューへ渡す。本文の再保存だけで必ず解消すると仮定しない。
 
 **hotfix PR の明示**: 緊急修正（バグ修正、誤り修正）を PR にのせる場合は description 冒頭に `hotfix:` を明記する。レビュー優先度・マージ判断の依拠になる。
 `check-closes-reference.yml` は行頭の `hotfix:`、または理由付きの `no-issue: <理由>` を、デフォルトブランチ向けで閉じる issue が無い PR の明示宣言として認める。hotfix 宣言ではコロンまで含めて一致させる（L3 reference は「"hotfix" と明記」とだけ書くが、機械が読むのはこちらの厳しい形）。
