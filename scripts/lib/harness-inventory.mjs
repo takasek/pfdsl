@@ -55,7 +55,11 @@ const SKILL_SOURCE_FILES = Object.freeze({
 		"scripts/collect-report-environment.mjs",
 		"scripts/plugin-version-check.mjs",
 	]),
-	"pfd-retro": Object.freeze(["SKILL.md", "references/knowledge-lifecycle.md"]),
+	"pfd-retro": Object.freeze([
+		"SKILL.md",
+		"references/knowledge-lifecycle.md",
+		"scripts/classify-knowledge-lifecycle.mjs",
+	]),
 	"pfd-upstream-report": Object.freeze(["SKILL.md"]),
 });
 

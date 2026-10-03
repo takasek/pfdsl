@@ -40,63 +40,13 @@ const dSection = section(skill, "D. 知識成果物のライフサイクル（�
 const applicability = section(skill, "適用単位");
 
 describe("pfd-retro D-layer declaration in .pfdsl/config.json", () => {
-	it("SKILL D section names the config file, the key, both modes and targets", () => {
+	it("SKILL points to the config key, classifier and audit reference", () => {
 		assert.ok(dSection.includes(CONFIG_PATH));
 		assert.ok(dSection.includes(KEY));
-		assert.match(dSection, /`adopt`/);
-		assert.match(dSection, /`decline`/);
-		assert.match(dSection, /`targets`/);
-	});
-
-	it("SKILL D section states the report-every-run rule for every other state", () => {
-		// Match within the sentence that enumerates the invalid states only:
-		// phrases like 空 or `mode` also occur where the value's shape is
-		// described, so a whole-section search would pass with a state dropped.
-		const enumeration = dSection
-			.split("\n")
-			.find((line) => line.startsWith("それ以外の状態はすべて"));
-		assert.ok(enumeration, "the invalid-state sentence is missing");
-		assert.match(enumeration, /毎回報告する/);
-		for (const state of [
-			"config ファイルが無い",
-			"JSON として読めない",
-			"最上位がオブジェクトでない",
-			"キーが無い",
-			"キーがオブジェクトでない",
-			"`mode` が無い",
-			"`adopt` と `decline` のどちらでもない",
-			"`adopt` なのに `targets` が無い・空",
-			"空文字列",
-		]) {
-			assert.ok(enumeration.includes(state), `state not covered: ${state}`);
-		}
-	});
-
-	it("SKILL D section says a heading or prose is never a declaration and tells old adopters where to go", () => {
-		assert.match(dSection, /節見出し/);
-		assert.match(dSection, /knowledge-lifecycle-audit:/);
-		assert.match(dSection, /知識成果物ライフサイクル監査:/);
-		assert.match(dSection, /移った/);
-	});
-
-	it("SKILL D section reports a retired line even when the config declines", () => {
-		// A repo with an old adopt line that receives the scaffold's decline
-		// config would otherwise stop the audit with no report at all.
-		const retiredRule = dSection
-			.split("\n")
-			.find((line) => line.startsWith("節見出しや binding の散文"));
-		assert.ok(retiredRule, "the retired-line rule is missing");
-		assert.match(retiredRule, /`decline` でも/);
-		assert.match(retiredRule, /毎回報告する/);
-	});
-
-	it("SKILL applicability sentence points to the config and covers absent, invalid and malformed", () => {
+		assert.ok(dSection.includes("scripts/classify-knowledge-lifecycle.mjs"));
+		assert.ok(dSection.includes("references/knowledge-lifecycle.md"));
 		assert.ok(applicability.includes(CONFIG_PATH));
 		assert.ok(applicability.includes(KEY));
-		for (const state of ["無い", "不正", "形式"]) {
-			assert.ok(applicability.includes(state), `state not covered: ${state}`);
-		}
-		assert.doesNotMatch(applicability, /採用を宣言したときだけ/);
 	});
 
 	it("the D reference names the config key rather than a binding line", () => {
