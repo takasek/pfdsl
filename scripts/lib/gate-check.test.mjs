@@ -737,18 +737,6 @@ describe("manual gate guidance", () => {
 		assert.equal("partitionManualItemsByPhase" in gateCheck, false);
 	});
 
-	it("keeps the CLI wired to the shared finalizer exactly once", () => {
-		const source = readFileSync(
-			resolve(root, "scripts/gate-check.mjs"),
-			"utf-8",
-		);
-		assert.equal(
-			source.match(/^finishGateCheck\(results, \{ issueNumbers \}\);$/gm)
-				?.length,
-			1,
-		);
-	});
-
 	it("prints the heading and both guidance lines once before exiting on FAIL", () => {
 		assert.equal(typeof gateCheck.finishGateCheck, "function");
 		const lines = [];

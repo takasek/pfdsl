@@ -571,9 +571,9 @@ describe("git config bypass oracle (#1232)", () => {
 			}
 		});
 	}
-	it(`excludes ${rejectedCount} combo(s) git itself rejected (ambiguous option/wrong arg count) from grading`, () => {
-		assert.ok(rejectedCount >= 0);
-	});
+	console.log(
+		`git config bypass oracle: excludes ${rejectedCount} combo(s) git itself rejected (ambiguous option/wrong arg count) from grading`,
+	);
 
 	// Literal examples from the design record (kept flat, not in a nested
 	// describe — see the setup comment above for why).

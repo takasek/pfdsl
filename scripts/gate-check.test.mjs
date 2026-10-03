@@ -67,6 +67,23 @@ function runGate(args = []) {
 	);
 }
 
+function assertFinalManualGuidance(result) {
+	const expected = [
+		"Manual checks:",
+		"  MANUAL: Before creating the PR, review `3. 反映 — 終端ゲート` in `.claude/skills/pfd-ops/references/work-cycle.md`.",
+		"  MANUAL: After creating the PR, review the `PR 作成後` items in the same section.",
+		"  MANUAL: no --issue given; no issue review is implied. Pass every target explicitly for terminal review.",
+	];
+	const lines = result.stdout.trimEnd().split("\n");
+	assert.deepEqual(
+		lines.filter(
+			(line) => line === "Manual checks:" || line.startsWith("  MANUAL:"),
+		),
+		expected,
+	);
+	assert.deepEqual(lines.slice(-expected.length), expected);
+}
+
 describe("gate-check package typechecks", () => {
 	function addPackage(pkg, source) {
 		const dir = join(fixture, "packages", pkg);
@@ -165,6 +182,7 @@ describe("gate-check record recovery", () => {
 			assert.equal(result.status, 0, result.stdout + result.stderr);
 			assert.doesNotMatch(result.stdout, /Review record|malformed record/);
 			assert.match(result.stdout, /PASS commit subject lint/);
+			assertFinalManualGuidance(result);
 		});
 	}
 
@@ -173,6 +191,7 @@ describe("gate-check record recovery", () => {
 		const result = runGate();
 		assert.equal(result.status, 1, result.stdout + result.stderr);
 		assert.match(result.stdout, /FAIL commit subject lint/);
+		assertFinalManualGuidance(result);
 	});
 });
 
