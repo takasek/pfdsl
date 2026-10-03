@@ -1,6 +1,7 @@
 ---
 name: pfd-retro
-summary: retrospective audit
+metadata:
+  summary: retrospective audit
 description: |
   Use after a sustained stretch of design dialogue or work sessions, when the
   user asks for a retrospective, or before consolidating decision records
@@ -50,11 +51,15 @@ A・B 層はセッション文脈不要 — 任意の PFD のレビューに単�
 
 ## D. 知識成果物のライフサイクル（選択項目）
 
-D 層の適用は `.pfdsl/config.json` のキー `knowledgeLifecycleAudit` で決める。値は `{"mode": "adopt" | "decline", "targets": [...]}` の形のオブジェクトで、`targets` は監査対象の成果物を名指す空でない文字列の配列である（パス、またはパスに限定句を添えたもの。例: `.pfdsl/roadmap.pfdsl` の criteria）。
-`mode` が `decline` のときは D 層を監査せず、報告もしない（`targets` は無視する）。
-`mode` が `adopt` で `targets` が空でない文字列の配列のときだけ `references/knowledge-lifecycle.md` を読み、`targets` に挙がった成果物に限って適用する。挙がっていない成果物は推測で補わない。
-それ以外の状態はすべて D 層を監査せず、何が不備かを書いたうえで、所有者が `.pfdsl/config.json` に宣言する必要があることを毎回報告する。不備は次のいずれかである: config ファイルが無い、JSON として読めない・最上位がオブジェクトでない、キーが無い、キーがオブジェクトでない、`mode` が無い・`adopt` と `decline` のどちらでもない、`adopt` なのに `targets` が無い・空・文字列でない要素か空文字列を含む。明示した `decline` は、宣言を選んだ採用先と、宣言を知らない旧版の採用先（キーが無い）を区別する。
-節見出しや binding の散文は宣言の代わりにならない — 見るのは config のキーだけである。旧形式の行（`知識成果物ライフサイクル監査:` で始まる日本語の行と `knowledge-lifecycle-audit:` で始まる行）は認識しない。binding にそれらの行があるときは、config の宣言の状態にかかわらず（`decline` でも）、宣言が `.pfdsl/config.json` へ移ったこと、旧行の意図と config の宣言が一致しているかを所有者が確かめる必要があることを毎回報告する。
+D 層へ入るたび、この SKILL.md の所在から相対で `scripts/classify-knowledge-lifecycle.mjs` を解決し、次を実行する。`<repository-root>` は監査する採用リポのルートであり、スキルの配置先ではない。分類器は `.pfdsl/config.json` の `knowledgeLifecycleAudit` と `.pfdsl/bindings/pfd-retro.md` の旧宣言行を読み、JSON を返す。plugin・repo-local のどちらでも、このスキルに同梱されたスクリプトを使う。
+
+```bash
+node <skill-directory>/scripts/classify-knowledge-lifecycle.mjs <repository-root>
+```
+
+`state` が `adopt` のときだけ `references/knowledge-lifecycle.md` を読み、`auditTargets` に挙がった成果物に限って D 層を監査する。対象を推測で補わない。それ以外の `state` では D 層を監査しない。
+`reportRequired` が true なら `reports` の不備・移行警告を毎回報告する。`decline` でも旧宣言の移行警告は消さない。スクリプトが起動できない、読取エラーで終了する、または JSON を取得できない場合は、その失敗を報告して D 層を止め、分類結果を推測しない。
+宣言は `{"mode": "adopt" | "decline", "targets": [...]}` の形で、`adopt` の `targets` は成果物を名指す非空配列の文字列である（パス、またはパスに限定句を添えたもの。例: `.pfdsl/roadmap.pfdsl` の criteria）。空文字列と空白だけの要素は不正とし、有効な対象の文字列は変更しない。`decline` は `targets` を無視する。節見出し・binding の散文・旧宣言行は採用宣言にならない。
 
 - **L4 滞留監査**: companion のルールのうち、`pfd-ops/references/architecture.md` の「昇格先の判定ルール」の0段目を満たし、かつルール文そのものが固有名詞（列挙は同節が一次情報 — ここには複製しない）に依存しないものは汎用ルールの疑いがある — 配布層（L3 reference / スキル SKILL.md 本文）への昇格候補として検出する。**0段目に入らない汎用ルールは昇格候補にせず、利用者環境（global 設定・共通リポ）への移設候補として報告する。****節に固有名詞が現れることを候補から外す理由にしない** — 同じ「昇格先の判定ルール」は「一般化してから昇格し、一般化できない具体例は companion に残す」と定めている。昇格の単位はルール文であり、その具体例は残ってよい以上、節に具体例が残っていることはそのルールが昇格できないことを意味しない。節単位の存在で足切りすると、原則に実例を添える書き方をしているリポでは候補がほぼ全件落ち、しかも落ちたことは0件という緑の形でしか現れない。companion（L4）は配布されないため、汎用知見が滞留すると採用リポに永久に届かない。昇格先の判定は同じ「昇格先の判定ルール」に従う（同ファイルの「companion への書き分けルール」表は宛先 companion を決めるもので、昇格先は決められない — 別の表を見ること）。昇格候補の検出はどのリポでも行うが、昇格そのものを実施できるリポは「出力」節の上流変更ルールが決める。ただし scaffold 由来の未記入行（プレースホルダのまま残っている記述）は昇格候補から除外する — scaffold はすでに配布層に同梱されているため「companion は配布されない」という滞留の前提が成り立たず、候補は全件偽陽性になる
 

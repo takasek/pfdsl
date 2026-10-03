@@ -165,9 +165,6 @@ function copyClaudeRepositoryFixture(sourceRoot, consumerRoot) {
 			force: true,
 		});
 	}
-	rmSync(join(consumerRoot, ".claude/pfd-ops-install-manifest.json"), {
-		force: true,
-	});
 	// Runs last so it prunes the swapped-in .claude/skills/pfdsl (copied from
 	// plugin/pfdsl/skills/pfdsl above) rather than the maintainer's local
 	// symlink this fixture already replaced. The two mappings below tell

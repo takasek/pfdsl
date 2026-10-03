@@ -1,6 +1,7 @@
 ---
 name: pfd-grill
-summary: backward-dialogue diagram construction
+metadata:
+  summary: backward-dialogue diagram construction
 description: |
   Use when building a single .pfdsl diagram's content through backward
   dialogue — starting from a named final deliverable and recursively

@@ -1,6 +1,7 @@
 ---
 name: pfd-upstream-report
-summary: upstream defect report
+metadata:
+  summary: upstream defect report
 description: |
   Use when a defect or a missing capability turns up in the distributed pfdsl
   bundle itself — a pfd-* skill body, reference, agent, command or hook whose

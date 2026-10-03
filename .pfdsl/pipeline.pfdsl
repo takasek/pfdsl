@@ -516,7 +516,7 @@ process:
     tags: [ gen, g ]
   assemble_codex_plugin:
     label: Codex plugin root 組み立て
-    description: "make gen-pluginのCodex adapter。Claude adapterと同一objectのharness_capability_model、中立生成済みpfdsl skill、install mirrorを入力に、stageTargetSkillTreeが.claude/skills/pfd-opsを再帰コピーしてinstall/を含むCodex native skill treeをrepositoryとpluginへ生成し、command由来skill、hooks、manifestもplugin/pfdsl-codex/へ生成する。生成済みClaude rootとmanifestは読まない。Codex command名が同名skillと衝突するとsource-command-接頭辞を付け、repository Codex assetsとともにatomicに置換する"
+    description: "make gen-pluginのCodex adapter。Claude adapterと同一objectのharness_capability_model、中立生成済みpfdsl skill、install mirrorを入力に、stageTargetSkillTreeが.claude/skills/pfd-opsを再帰コピーしてinstall/を含むCodex native skill treeをrepositoryとpluginへ生成し、command由来skill、hooks、manifestもplugin/pfdsl-codex/へ生成する。Codex SKILL.mdのsummaryはmetadata.summaryへ移し、plugin descriptionは元のsemantic.summaryを消費する。生成済みClaude rootとmanifestは読まない。Codex command名が同名skillと衝突するとsource-command-接頭辞を付け、repository Codex assetsとともにatomicに置換する"
     command: make gen-plugin
     location: ../scripts/lib/gen-plugin.mjs
     tags: [ gen, g ]

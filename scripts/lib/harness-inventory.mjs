@@ -55,7 +55,11 @@ const SKILL_SOURCE_FILES = Object.freeze({
 		"scripts/collect-report-environment.mjs",
 		"scripts/plugin-version-check.mjs",
 	]),
-	"pfd-retro": Object.freeze(["SKILL.md", "references/knowledge-lifecycle.md"]),
+	"pfd-retro": Object.freeze([
+		"SKILL.md",
+		"references/knowledge-lifecycle.md",
+		"scripts/classify-knowledge-lifecycle.mjs",
+	]),
 	"pfd-upstream-report": Object.freeze(["SKILL.md"]),
 });
 
@@ -392,10 +396,7 @@ export const LOCAL_CLAUDE_ROOT_ENTRIES = Object.freeze({
 });
 
 export const SOURCE_EXCLUSIONS = Object.freeze({
-	root: Object.freeze({
-		"pfd-ops-install-manifest.json":
-			"install provenance for the repository-local pfd-ops skill",
-	}),
+	root: Object.freeze({}),
 	skills: Object.freeze({
 		"distribution-review": "maintainer-only review workflow for this bundle",
 		"prose-mechanization-audit": "audits this repository's prose assets",

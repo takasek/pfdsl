@@ -4,7 +4,7 @@ import { existsSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { describe, it } from "node:test";
 import { fileURLToPath } from "node:url";
-
+import { parse } from "yaml";
 import {
 	addGeneratedMarkdownNotice,
 	addGeneratedSourceComment,
@@ -14,12 +14,209 @@ import {
 	claudeInstructionsToAgents,
 	commandCapabilityToCodexSkill,
 	hookCapabilityToCodexHooks,
+	skillMarkdownToCodex,
 } from "./gen-codex-assets.mjs";
 import { validateCapabilityContract } from "./harness-capability-contract.mjs";
 import { PROBE_FIXTURES } from "./harness-capability-probes.test-helper.mjs";
 import { HARNESS_CAPABILITY_CONTRACT } from "./harness-inventory.mjs";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
+
+describe("Codex skill metadata", () => {
+	it("moves a multiline summary into metadata while preserving the body and other fields", () => {
+		const body = "\n# Body\nsummary: this is body text\n";
+		const input = `---\nname: example\nsummary: >\n  short\n  summary\ndescription: Long description.\nmetadata:\n  owner: maintainer\n---\n${body}`;
+		const output = skillMarkdownToCodex(input);
+		const boundary = output.indexOf("\n---\n", 4);
+		const header = parse(output.slice(4, boundary));
+		assert.equal(header.summary, undefined);
+		assert.deepEqual(header.metadata, {
+			owner: "maintainer",
+			summary: "short summary\n",
+		});
+		assert.equal(header.description, "Long description.");
+		assert.equal(output.slice(boundary + 5), body);
+		assert.equal(skillMarkdownToCodex(output), output);
+	});
+
+	it("preserves skills without summary verbatim", () => {
+		const input =
+			"---\nname: command\ndescription: Run a command.\n---\nbody\n";
+		assert.equal(skillMarkdownToCodex(input), input);
+	});
+
+	it("accepts metadata mapping aliases without changing their other consumers", () => {
+		const input =
+			"---\nname: example\nsummary: canonical\ndescription: Example.\nlicense: &meta {owner: maintainer}\nmetadata: *meta\n---\nbody\n";
+		const output = skillMarkdownToCodex(input);
+		const header = parse(output.match(/^---\n([\s\S]*?)\n---/)[1], {
+			merge: true,
+		});
+		assert.deepEqual(header.metadata, {
+			owner: "maintainer",
+			summary: "canonical",
+		});
+		assert.deepEqual(header.license, { owner: "maintainer" });
+		assert.equal(output.slice(output.indexOf("\n---\n", 4) + 5), "body\n");
+	});
+
+	it("rejects conflicting summaries inherited through merge keys and mapping aliases", () => {
+		for (const fields of [
+			"metadata:\n  <<: {summary: conflicting, owner: maintainer}",
+			"license: &base {summary: conflicting}\nmetadata:\n  <<: *base",
+			"metadata:\n  <<: [{summary: conflicting}, {owner: maintainer}]",
+			"license: &base {summary: conflicting}\nmetadata: *base",
+			"<<: {metadata: {summary: conflicting, owner: maintainer}}",
+		]) {
+			assert.throws(
+				() =>
+					skillMarkdownToCodex(
+						`---\nsummary: canonical\ndescription: Example.\n${fields}\n---\nbody\n`,
+					),
+				/metadata.summary conflicts/,
+			);
+		}
+	});
+
+	it("retains an agreeing merged summary and the original merged fields", () => {
+		const output = skillMarkdownToCodex(
+			"---\nsummary: canonical\ndescription: Example.\nlicense: &base {summary: canonical, owner: maintainer}\nmetadata:\n  <<: *base\n---\nbody\n",
+		);
+		const header = parse(output.match(/^---\n([\s\S]*?)\n---/)[1], {
+			merge: true,
+		});
+		assert.equal(header.summary, undefined);
+		assert.deepEqual(header.metadata, {
+			summary: "canonical",
+			owner: "maintainer",
+		});
+		assert.deepEqual(header.license, header.metadata);
+	});
+
+	it("preserves metadata inherited by the root mapping", () => {
+		const output = skillMarkdownToCodex(
+			"---\nname: example\nsummary: canonical\ndescription: Example.\n<<: {metadata: {owner: maintainer}}\n---\nbody\n",
+		);
+		const header = parse(output.match(/^---\n([\s\S]*?)\n---/)[1], {
+			merge: true,
+		});
+		assert.deepEqual(header.metadata, {
+			owner: "maintainer",
+			summary: "canonical",
+		});
+	});
+
+	it("removes summary even when deleting it exposes a root merge donor", () => {
+		const input =
+			"---\nname: example\nsummary: canonical\ndescription: Example.\n<<: &base {summary: inherited, license: MIT}\nmetadata: {owner: maintainer}\n---\nbody\n";
+		const output = skillMarkdownToCodex(input);
+		const header = parse(output.match(/^---\n([\s\S]*?)\n---/)[1], {
+			merge: true,
+		});
+		assert.equal(header.summary, undefined);
+		assert.equal(header.license, "MIT");
+		assert.deepEqual(header.metadata, {
+			owner: "maintainer",
+			summary: "canonical",
+		});
+		assert.equal(output.slice(output.indexOf("\n---\n", 4) + 5), "body\n");
+		assert.equal(skillMarkdownToCodex(output), output);
+	});
+
+	it("preserves quoted strings for YAML 1.1 consumers when materializing aliases or root merges", () => {
+		for (const fields of [
+			'license: &meta {owner: "yes", enabled: "no"}\nmetadata: *meta',
+			'<<: {summary: inherited}\nmetadata: {owner: "yes", enabled: "no"}',
+		]) {
+			const output = skillMarkdownToCodex(
+				`---\nname: "on"\nsummary: canonical\ndescription: "yes"\n${fields}\n---\nbody\n`,
+			);
+			const header = parse(output.match(/^---\n([\s\S]*?)\n---/)[1], {
+				version: "1.1",
+				merge: true,
+			});
+			assert.equal(header.name, "on");
+			assert.equal(header.description, "yes");
+			assert.deepEqual(header.metadata, {
+				owner: "yes",
+				enabled: "no",
+				summary: "canonical",
+			});
+			if (header.license)
+				assert.deepEqual(header.license, { owner: "yes", enabled: "no" });
+		}
+	});
+
+	it("keeps other aliases of anchored metadata unchanged when adding summary", () => {
+		const output = skillMarkdownToCodex(
+			"---\nsummary: canonical\ndescription: Example.\nmetadata: &meta {owner: maintainer}\nlicense: *meta\n---\nbody\n",
+		);
+		const header = parse(output.match(/^---\n([\s\S]*?)\n---/)[1]);
+		assert.deepEqual(header.metadata, {
+			owner: "maintainer",
+			summary: "canonical",
+		});
+		assert.deepEqual(header.license, { owner: "maintainer" });
+	});
+
+	it("preserves description aliases when summary's anchor moves below them", () => {
+		const input =
+			"---\nname: example\nsummary: &shared Common description.\ndescription: *shared\n---\nbody\n";
+		const output = skillMarkdownToCodex(input);
+		const header = parse(output.match(/^---\n([\s\S]*?)\n---/)[1]);
+		assert.equal(header.description, "Common description.");
+		assert.equal(header.metadata.summary, "Common description.");
+	});
+
+	it("compares metadata aliases by value and preserves later declarations of the same anchor", () => {
+		const agreeing = skillMarkdownToCodex(
+			"---\nsummary: &shared canonical\ndescription: Normal.\nmetadata:\n  summary: *shared\n---\nbody\n",
+		);
+		assert.equal(
+			parse(agreeing.match(/^---\n([\s\S]*?)\n---/)[1]).metadata.summary,
+			"canonical",
+		);
+		const reused = skillMarkdownToCodex(
+			"---\nsummary: &shared First\ndescription: *shared\nmetadata:\n  owner: &shared Second\nlicense: *shared\n---\nbody\n",
+		);
+		const header = parse(reused.match(/^---\n([\s\S]*?)\n---/)[1]);
+		assert.equal(header.description, "First");
+		assert.equal(header.license, "Second");
+	});
+
+	it("retains an agreeing metadata declaration referenced by another field", () => {
+		const output = skillMarkdownToCodex(
+			"---\nsummary: canonical\ndescription: Normal.\nmetadata:\n  summary: &existing canonical\nlicense: *existing\n---\nbody\n",
+		);
+		assert.equal(
+			parse(output.match(/^---\n([\s\S]*?)\n---/)[1]).license,
+			"canonical",
+		);
+	});
+
+	it("preserves the decoded value of a final literal description", () => {
+		const input =
+			"---\nsummary: concise\nname: example\ndescription: |\n  Trigger description.\n---\nbody\n";
+		const decode = (markdown) =>
+			parse(markdown.match(/^---\n([\s\S]*?)\n---/)[1]).description;
+		assert.equal(decode(skillMarkdownToCodex(input)), decode(input));
+	});
+
+	it("rejects conflicting metadata instead of silently discarding it", () => {
+		for (const metadata of [
+			"metadata: scalar",
+			"metadata: {summary: different}",
+		]) {
+			assert.throws(
+				() =>
+					skillMarkdownToCodex(
+						`---\nsummary: canonical\n${metadata}\n---\nbody\n`,
+					),
+				/metadata/,
+			);
+		}
+	});
+});
 const PFD_LENS_BASH_RESTRICTION =
 	"Bash は CLI 実体を解決するための `test -f package.json` と `test -f packages/cli/package.json` と `test -f packages/cli/dist/cli.js`、解決した CLI による `check <file>` と読み取り専用クエリ（`graph` グループ全体、`meta get` / `meta list` / `meta check-links`、`status` グループ全体）のみ許可される — 図やリポジトリの他の状態を書き換えない。";
 const PFD_LENS_CLI_RESOLUTION = `

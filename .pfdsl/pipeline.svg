@@ -246,7 +246,7 @@
 <!-- assemble_codex_plugin -->
 <g id="node59" class="node">
 <title>assemble_codex_plugin</title>
-<g id="a_node59"><a xlink:title="Codex plugin root 組み立て&#10;&#10;make gen&#45;pluginのCodex adapter。Claude adapterと同一objectのharness_capability_model、中立生成済みpfdsl skill、install mirrorを入力に、stageTargetSkillTreeが.claude/skills/pfd&#45;opsを再帰コピーしてinstall/を含むCodex native skill treeをrepositoryとpluginへ生成し、command由来skill、hooks、manifestもplugin/pfdsl&#45;codex/へ生成する。生成済みClaude rootとmanifestは読まない。Codex command名が同名skillと衝突するとsource&#45;command&#45;接頭辞を付け、repository Codex assetsとともにatomicに置換する&#10;command: make gen&#45;plugin&#10;location: ../scripts/lib/gen&#45;plugin.mjs">
+<g id="a_node59"><a xlink:title="Codex plugin root 組み立て&#10;&#10;make gen&#45;pluginのCodex adapter。Claude adapterと同一objectのharness_capability_model、中立生成済みpfdsl skill、install mirrorを入力に、stageTargetSkillTreeが.claude/skills/pfd&#45;opsを再帰コピーしてinstall/を含むCodex native skill treeをrepositoryとpluginへ生成し、command由来skill、hooks、manifestもplugin/pfdsl&#45;codex/へ生成する。Codex SKILL.mdのsummaryはmetadata.summaryへ移し、plugin descriptionは元のsemantic.summaryを消費する。生成済みClaude rootとmanifestは読まない。Codex command名が同名skillと衝突するとsource&#45;command&#45;接頭辞を付け、repository Codex assetsとともにatomicに置換する&#10;command: make gen&#45;plugin&#10;location: ../scripts/lib/gen&#45;plugin.mjs">
 <ellipse fill="none" stroke="#8e44ad" cx="911.49" cy="-1777.22" rx="106.44" ry="41.3"/>
 <text xml:space="preserve" text-anchor="middle" x="911.49" y="-1789.82" font-family="Times,serif" font-size="14.00">assemble_codex_plugin</text>
 <text xml:space="preserve" text-anchor="middle" x="911.49" y="-1773.02" font-family="Times,serif" font-size="14.00">Codex plugin root</text>
