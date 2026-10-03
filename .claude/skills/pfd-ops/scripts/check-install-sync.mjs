@@ -9,6 +9,7 @@
 //
 // Usage: node check-install-sync.mjs [--target <dir>] [--deploy]
 //        [--overwrite-local-edits] [--delete-edited-orphans] [--upstream]
+//        | --record-migration (exclusive with --deploy)
 
 import {
 	chmodSync,
@@ -539,6 +540,57 @@ export function describeMigration(outcome, recordCommand) {
 	}
 }
 
+/**
+ * Write the running plugin's identity into appliedMigration, keeping every
+ * other key and, as far as is reasonable, the file's own formatting (indent
+ * width or tabs, trailing newline; tab-indented with a newline for a new
+ * file, like this repo's own config). The caller has already established that
+ * the target is an adopter; every other reason this cannot be recorded throws
+ * before anything is written.
+ * @param {string} targetRoot
+ * @param {{ version: string, bundleHash: string | null } | null} running
+ * @returns {{ pluginVersion: string, bundleHash?: string }} the entry written
+ */
+export function recordMigration(targetRoot, running) {
+	if (!isDirectory(join(targetRoot, ".pfdsl"))) {
+		throw new Error(
+			`Cannot record the migration state: ${targetRoot} has no .pfdsl/ directory, so it is not a repo that has adopted pfdsl.`,
+		);
+	}
+	if (running === null) {
+		throw new Error(
+			"Cannot record the migration state: the version of the running plugin is unknown (no .claude-plugin/plugin.json or .codex-plugin/plugin.json above the skill). Run this from the installed plugin, not from a repo-local copy.",
+		);
+	}
+	const file = readConfigFile(targetRoot);
+	const recorded = file === null ? null : readRecordedMigration(file.config);
+	if (recorded !== null) {
+		const runningParts = parseVersion(running.version);
+		const recordedParts = parseVersion(recorded.pluginVersion);
+		if (
+			runningParts !== null &&
+			recordedParts !== null &&
+			compareParsedVersions(runningParts, recordedParts) < 0
+		) {
+			throw new Error(
+				`Cannot record the migration state: the running plugin (${running.version}) is older than the one already recorded in ${CONFIG_RELATIVE_PATH} (${recorded.pluginVersion}). Update the plugin first.`,
+			);
+		}
+	}
+
+	const entry = { pluginVersion: running.version };
+	if (running.bundleHash !== null) entry.bundleHash = running.bundleHash;
+	// Spreading keeps an existing appliedMigration where it already sits.
+	const config = { ...(file?.config ?? {}), appliedMigration: entry };
+	const indent = file === null ? "\t" : (/^([ \t]+)\S/m.exec(file.text)?.[1] ?? "\t");
+	const newline = file === null || file.text.endsWith("\n") ? "\n" : "";
+	writeFileSync(
+		join(targetRoot, ...CONFIG_RELATIVE_PATH.split("/")),
+		`${JSON.stringify(config, null, indent)}${newline}`,
+	);
+	return entry;
+}
+
 // --- CLI ---
 
 export function parseArgs(argv) {
@@ -568,14 +620,23 @@ export function parseArgs(argv) {
 			"overwrite-local-edits": { type: "boolean", default: false },
 			"delete-edited-orphans": { type: "boolean", default: false },
 			upstream: { type: "boolean", default: false },
+			"record-migration": { type: "boolean", default: false },
 		},
 	});
+	// Recording is the last step of a migration, after the deploy and the rest
+	// of it have been verified; one invocation cannot be both.
+	if (values["record-migration"] && values.deploy) {
+		throw new Error(
+			"--record-migration cannot be combined with --deploy: record the migration state only after the deploy and the rest of the migration have been verified",
+		);
+	}
 	return {
 		target: values.target,
 		deploy: values.deploy,
 		overwriteLocalEdits: values["overwrite-local-edits"],
 		deleteEditedOrphans: values["delete-edited-orphans"],
 		upstream: values.upstream,
+		recordMigration: values["record-migration"],
 	};
 }
 
@@ -661,31 +722,54 @@ async function main() {
 	// two that only print text would keep pointing at the one that writes.
 	const role = classifyTarget(skillRoot, targetRoot);
 	const deployable = role.kind === "adopter";
+	const running = readPluginIdentity(resolve(skillRoot, "../.."));
 	if (deployable) {
 		// Independent of --upstream and of whether the GitHub Issues backend is
 		// adopted: the record concerns the repo's migration, not any one feature.
 		const recordCommand = `node ${fileURLToPath(import.meta.url)} --target ${targetRoot} --record-migration`;
 		let outcome;
 		try {
-			outcome = evaluateMigration(targetRoot, readPluginIdentity(resolve(skillRoot, "../..")));
+			outcome = evaluateMigration(targetRoot, running);
 		} catch (e) {
 			// 3, as for any refusal about the target: the argv was fine, the
 			// declaration in the target is not.
 			console.error(e instanceof Error ? e.message : String(e));
 			process.exit(3);
 		}
-		const notice = describeMigration(outcome, recordCommand);
-		if (notice !== null) console.log(notice);
 		// Before any write: an older install/ would roll back what a newer
-		// release placed.
-		if (outcome.kind === "older" && args.deploy) process.exit(3);
+		// release placed, and a record from it would claim an older state.
+		const refused = outcome.kind === "older" && (args.deploy || args.recordMigration);
+		// Advice to "record the state afterwards" is noise in the run that does it.
+		const notice =
+			args.recordMigration && !refused ? null : describeMigration(outcome, recordCommand);
+		if (notice !== null) console.log(notice);
+		if (refused) process.exit(3);
 	}
 	if (!deployable) {
+		if (args.recordMigration) {
+			console.error(
+				role.kind === "upstream"
+					? `Cannot record the migration state: this target is the upstream repo (${role.repoRoot}), which generates the plugin rather than adopting it.`
+					: `Cannot record the migration state: canonical is ambiguous for this target (${role.repoRoot}), so it cannot be told whether it is an adopter.`,
+			);
+			process.exit(3);
+		}
 		const drifted = reportNonDeployableTarget(role, skillRoot, targetRoot, args.deploy);
 		// 3, not the 2 a malformed argv exits with: the argv was well-formed and
 		// this refusal is about the target, so a caller reading only the code can
 		// still tell "you typed it wrong" from "I will not write there".
 		exitCode = args.deploy ? 3 : drifted ? 1 : 0;
+	} else if (args.recordMigration) {
+		try {
+			const entry = recordMigration(targetRoot, running);
+			console.log(
+				`Recorded appliedMigration in ${CONFIG_RELATIVE_PATH}: pluginVersion ${entry.pluginVersion}${entry.bundleHash === undefined ? " (no bundleHash: this plugin has no bundle manifest)" : `, bundleHash ${entry.bundleHash}`}.\n` +
+					"Commit it together with the migration changes.",
+			);
+		} catch (e) {
+			console.error(e instanceof Error ? e.message : String(e));
+			process.exit(3);
+		}
 	} else if (args.deploy) {
 		// Read the pre-deploy state: deployInstall rewrites the manifest and may
 		// delete the very orphans a rename is inferred from.

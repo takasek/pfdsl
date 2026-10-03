@@ -1074,6 +1074,18 @@ describe("parseArgs", () => {
 		});
 	});
 
+	it("parses --record-migration and defaults it to false", () => {
+		assert.equal(parseArgs(["--record-migration"]).recordMigration, true);
+		assert.equal(parseArgs([]).recordMigration, false);
+	});
+
+	it("rejects --record-migration together with --deploy", () => {
+		assert.throws(
+			() => parseArgs(["--record-migration", "--deploy"]),
+			/--record-migration cannot be combined with --deploy/,
+		);
+	});
+
 	it("rejects a bare positional argument", () => {
 		assert.throws(() => parseArgs(["/tmp/foo"]), {
 			code: "ERR_PARSE_ARGS_UNEXPECTED_POSITIONAL",
@@ -1625,6 +1637,247 @@ describe("applied migration state", () => {
 					name,
 				);
 			}
+		});
+	});
+
+	describe("--record-migration", () => {
+		function configText(target) {
+			return readFileSync(join(target, ".pfdsl/config.json"), "utf-8");
+		}
+
+		it("creates .pfdsl/config.json with the running version and bundle hash when only .pfdsl/ exists", () => {
+			const plugin = makeInstalledPlugin("record-create", {
+				claude: "0.2.0",
+				bundleSeed: "running",
+			});
+			const target = makeAdopter("record-create-adopter");
+
+			const result = run(plugin, target, ["--record-migration"]);
+			assert.equal(result.status, 0);
+			assert.equal(
+				configText(target),
+				`${JSON.stringify(
+					{
+						appliedMigration: {
+							pluginVersion: "0.2.0",
+							bundleHash: bundleHashOf("running"),
+						},
+					},
+					null,
+					"\t",
+				)}\n`,
+			);
+		});
+
+		it("omits bundleHash for a Codex plugin, which has no bundle manifest", () => {
+			const plugin = makeInstalledPlugin("record-codex", { codex: "0.2.0" });
+			const target = makeAdopter("record-codex-adopter");
+
+			assert.equal(run(plugin, target, ["--record-migration"]).status, 0);
+			assert.deepEqual(JSON.parse(configText(target)), {
+				appliedMigration: { pluginVersion: "0.2.0" },
+			});
+		});
+
+		it("keeps the other keys, their order, and the tab-indented style with a trailing newline", () => {
+			const plugin = makeInstalledPlugin("record-keep", { codex: "0.2.0" });
+			const target = makeAdopter("record-keep-adopter", {
+				sweepCompletedChains: { enabled: true },
+				knowledgeLifecycleAudit: { mode: "decline" },
+			});
+
+			assert.equal(run(plugin, target, ["--record-migration"]).status, 0);
+			assert.equal(
+				configText(target),
+				[
+					"{",
+					'\t"sweepCompletedChains": {',
+					'\t\t"enabled": true',
+					"\t},",
+					'\t"knowledgeLifecycleAudit": {',
+					'\t\t"mode": "decline"',
+					"\t},",
+					'\t"appliedMigration": {',
+					'\t\t"pluginVersion": "0.2.0"',
+					"\t}",
+					"}",
+					"",
+				].join("\n"),
+			);
+		});
+
+		it("keeps an existing space-indented style and a missing trailing newline", () => {
+			const plugin = makeInstalledPlugin("record-style", { codex: "0.2.0" });
+			const target = makeAdopter(
+				"record-style-adopter",
+				JSON.stringify({ sweepCompletedChains: { enabled: true } }, null, 2),
+			);
+
+			assert.equal(run(plugin, target, ["--record-migration"]).status, 0);
+			assert.equal(
+				configText(target),
+				JSON.stringify(
+					{
+						sweepCompletedChains: { enabled: true },
+						appliedMigration: { pluginVersion: "0.2.0" },
+					},
+					null,
+					2,
+				),
+			);
+		});
+
+		it("replaces an older record in place and drops a bundleHash the new identity does not have", () => {
+			const plugin = makeInstalledPlugin("record-replace", { codex: "0.2.0" });
+			const target = makeAdopter("record-replace-adopter", {
+				appliedMigration: {
+					pluginVersion: "0.1.0",
+					bundleHash: bundleHashOf("old"),
+				},
+				sweepCompletedChains: { enabled: true },
+			});
+
+			assert.equal(run(plugin, target, ["--record-migration"]).status, 0);
+			const written = JSON.parse(configText(target));
+			assert.deepEqual(written.appliedMigration, { pluginVersion: "0.2.0" });
+			assert.deepEqual(Object.keys(written), [
+				"appliedMigration",
+				"sweepCompletedChains",
+			]);
+		});
+
+		it("records over a same-version record whose content differs", () => {
+			const plugin = makeInstalledPlugin("record-same", {
+				claude: "0.2.0",
+				bundleSeed: "running",
+			});
+			const target = makeAdopter("record-same-adopter", {
+				appliedMigration: {
+					pluginVersion: "0.2.0",
+					bundleHash: bundleHashOf("recorded"),
+				},
+			});
+
+			assert.equal(run(plugin, target, ["--record-migration"]).status, 0);
+			assert.equal(
+				JSON.parse(configText(target)).appliedMigration.bundleHash,
+				bundleHashOf("running"),
+			);
+		});
+
+		it("makes the following check silent about migration", () => {
+			const plugin = makeInstalledPlugin("record-recheck", {
+				claude: "0.2.0",
+				bundleSeed: "running",
+			});
+			const target = makeAdopter("record-recheck-adopter", {
+				sweepCompletedChains: { enabled: true },
+			});
+
+			assert.match(run(plugin, target).stdout, /appliedMigration/);
+			assert.equal(run(plugin, target, ["--record-migration"]).status, 0);
+			const after = run(plugin, target);
+			assert.equal(after.status, 0);
+			assert.doesNotMatch(after.stdout, /migration/i);
+		});
+
+		it("is the only writer: a plain check leaves config.json untouched", () => {
+			const plugin = makeInstalledPlugin("record-readonly", {
+				claude: "0.2.0",
+			});
+			const target = makeAdopter("record-readonly-adopter", {
+				sweepCompletedChains: { enabled: true },
+			});
+			const before = configText(target);
+
+			run(plugin, target);
+			run(plugin, target, ["--upstream"]);
+			assert.equal(configText(target), before);
+		});
+
+		it("refuses with exit 3 and writes nothing in each case where the state cannot be recorded", () => {
+			const olderPlugin = makeInstalledPlugin("refuse-older-plugin", {
+				claude: "0.2.0",
+			});
+			const unknownPlugin = makeInstalledPlugin("refuse-unknown-plugin");
+			const knownPlugin = makeInstalledPlugin("refuse-known-plugin", {
+				claude: "0.2.0",
+			});
+
+			const olderTarget = makeAdopter("refuse-older", {
+				appliedMigration: { pluginVersion: "0.3.0" },
+			});
+			const unknownTarget = makeAdopter("refuse-unknown", {
+				sweepCompletedChains: { enabled: true },
+			});
+			const malformedTarget = makeAdopter("refuse-malformed", "{ not json");
+			const noPfdslTarget = join(tmp, "refuse-no-pfdsl");
+			mkdirSync(noPfdslTarget, { recursive: true });
+			const upstreamTarget = join(tmp, "refuse-upstream");
+			mkdirSync(join(upstreamTarget, ".pfdsl"), { recursive: true });
+			writeFile(upstreamTarget, ".git", "gitdir: elsewhere\n");
+			for (const marker of UPSTREAM_MARKERS) {
+				writeFile(
+					upstreamTarget,
+					marker.path,
+					`prelude\n${marker.mustContain}\n`,
+				);
+			}
+			const ambiguousTarget = join(tmp, "refuse-ambiguous");
+			mkdirSync(join(ambiguousTarget, ".pfdsl"), { recursive: true });
+			writeFile(ambiguousTarget, ".git", "gitdir: elsewhere\n");
+			writeFile(
+				ambiguousTarget,
+				UPSTREAM_MARKERS[0].path,
+				`prelude\n${UPSTREAM_MARKERS[0].mustContain}\n`,
+			);
+
+			const cases = [
+				["older than the recorded state", olderPlugin, olderTarget, /older/i],
+				[
+					"unknown running version",
+					unknownPlugin,
+					unknownTarget,
+					/unknown|version/i,
+				],
+				[
+					"malformed config",
+					knownPlugin,
+					malformedTarget,
+					/\.pfdsl\/config\.json/,
+				],
+				["no .pfdsl/", knownPlugin, noPfdslTarget, /\.pfdsl/],
+				["upstream target", knownPlugin, upstreamTarget, /upstream/i],
+				["ambiguous target", knownPlugin, ambiguousTarget, /ambiguous/i],
+			];
+			for (const [name, plugin, target, expected] of cases) {
+				const configPath = join(target, ".pfdsl/config.json");
+				const before = existsSync(configPath)
+					? readFileSync(configPath, "utf-8")
+					: null;
+				const result = run(plugin, target, ["--record-migration"]);
+				assert.equal(result.status, 3, name);
+				assert.match(`${result.stdout}${result.stderr}`, expected, name);
+				const after = existsSync(configPath)
+					? readFileSync(configPath, "utf-8")
+					: null;
+				assert.equal(after, before, name);
+			}
+		});
+
+		it("is rejected with exit 2 when combined with --deploy", () => {
+			const plugin = makeInstalledPlugin("record-with-deploy", {
+				claude: "0.2.0",
+			});
+			const target = makeAdopter("record-with-deploy-adopter");
+
+			const result = run(plugin, target, ["--record-migration", "--deploy"]);
+			assert.equal(result.status, 2);
+			assert.match(
+				result.stderr,
+				/--record-migration.*--deploy|--deploy.*--record-migration/,
+			);
+			assert.equal(existsSync(join(target, ".pfdsl/config.json")), false);
 		});
 	});
 });
