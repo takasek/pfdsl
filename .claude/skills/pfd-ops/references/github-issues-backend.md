@@ -100,7 +100,15 @@ issue findings の `blocking:` は監査を失敗させ、`advisory:` だけな�
 1. pfdsl plugin を導入する（`/plugin marketplace add takasek/pfdsl` + `/plugin install pfdsl@pfdsl`）— pfd-ops スキル本体はリポでなく plugin から供給される
 2. `install/` 以下のファイルをリポルートに実配置する（`/pfd-init` ステップ3.5、または直接 `node <pfd-ops skill root>/scripts/check-install-sync.mjs --deploy`）。
    配置ファイルと plugin 同梱 canonical の drift は pfd-ops 発火時のランタイム hash 照合が警告する（設計根拠: ADR-0028）
-3. GitHub の `flow:managed` / `flow:exempt` ラベルを確認し、不足分は導入時に明示的に作成する
+3. GitHub の `flow:managed` / `flow:exempt` ラベルを、監査が要求する説明文つきで作成または更新する。
+   説明文は監査が完全一致で照合する値である。`--force` を付けると、ラベルが無ければ作成し、あれば説明文を更新する。
+
+   ```bash
+   gh label create flow:managed --description "tracked in .pfdsl/roadmap.pfdsl" --force
+   gh label create flow:exempt --description "intentionally out of .pfdsl/roadmap.pfdsl scope" --force
+   ```
+
+   `gh` が無い環境では、リポジトリの Labels 画面（Issues → Labels）で同じ名前と説明文を入力して作成する。
 4. `roadmap.pfdsl` を依存構造のみのグラフとして用意し、issue に対応する process に `iN_` prefix を付ける
 5. リポの `roadmap.md` で本プリセットを指し、リポ URL を記載する
 6. 下の「依存の準備と初回監査」を実行する。配置だけで終了しない
