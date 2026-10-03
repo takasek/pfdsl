@@ -1,26 +1,26 @@
-import { escapeRe, loadFrontmatter } from "@pfdsl/core";
+import { analyzeSource } from "@pfdsl/core";
 
 export interface FrontmatterPosition {
 	line: number;
 	column: number;
 }
 
+export function findFrontmatterDefinitionRange(
+	model: ReturnType<typeof analyzeSource>,
+	nodeId: string,
+) {
+	return model.sourceMap.declarations.find(
+		(d) =>
+			d.id === nodeId && (d.section === "artifact" || d.section === "process"),
+	)?.range;
+}
+
 export function findFrontmatterDefinitionInText(
 	text: string,
 	nodeId: string,
 ): FrontmatterPosition | undefined {
-	const { bodyStartLine } = loadFrontmatter(text);
-	const lines = text.split("\n");
-	const fmEnd = bodyStartLine - 1;
-	const pattern = new RegExp(`^(\\s+)(${escapeRe(nodeId)})\\s*:`);
-	for (let i = 0; i < fmEnd && i < lines.length; i++) {
-		const line = lines[i];
-		if (line === undefined) continue;
-		const m = pattern.exec(line);
-		if (m) {
-			const indent = m[1] ?? "";
-			return { line: i, column: indent.length };
-		}
-	}
-	return undefined;
+	const range = findFrontmatterDefinitionRange(analyzeSource(text), nodeId);
+	return range
+		? { line: range.start.line - 1, column: range.start.column - 1 }
+		: undefined;
 }

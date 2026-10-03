@@ -1,20 +1,17 @@
 import * as vscode from "vscode";
 import { analyzeDocument, LANGUAGE_ID } from "./analyze.js";
-import { declaredCommands, runHintAnchors } from "./codelens-logic.js";
+import { runHintsFromAnalysis } from "./codelens-logic.js";
 import { RUN_COMMAND } from "./hover-logic.js";
 
 export function registerCodeLens(context: vscode.ExtensionContext): void {
 	const provider: vscode.InlayHintsProvider = {
 		provideInlayHints(doc) {
-			const { frontmatter, bodyStartLine } = analyzeDocument(doc);
+			const model = analyzeDocument(doc);
+			const { frontmatter } = model;
 			if (!frontmatter?.process) return [];
 
 			const docUri = doc.uri.toString();
-			const anchors = runHintAnchors(
-				doc.getText().split("\n"),
-				bodyStartLine,
-				declaredCommands(frontmatter.process),
-			);
+			const anchors = runHintsFromAnalysis(model, doc.getText().split("\n"));
 
 			return anchors.map(({ line, column, command }) => {
 				const part = new vscode.InlayHintLabelPart("▶ run");

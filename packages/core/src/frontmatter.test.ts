@@ -183,8 +183,8 @@ describe("findFrontmatterNodeRanges", () => {
 		].join("\n");
 		const ranges = findFrontmatterNodeRanges(src);
 		expect(ranges.get("spec")).toEqual({
-			start: { line: 3, column: 3, offset: 0 },
-			end: { line: 3, column: 7, offset: 0 },
+			start: { line: 3, column: 3, offset: src.indexOf("spec:") },
+			end: { line: 3, column: 7, offset: src.indexOf("spec:") + 4 },
 		});
 	});
 
@@ -200,8 +200,8 @@ describe("findFrontmatterNodeRanges", () => {
 		].join("\n");
 		const ranges = findFrontmatterNodeRanges(src);
 		expect(ranges.get("spec")).toEqual({
-			start: { line: 3, column: 5, offset: 0 },
-			end: { line: 3, column: 9, offset: 0 },
+			start: { line: 3, column: 5, offset: src.indexOf("spec:") },
+			end: { line: 3, column: 9, offset: src.indexOf("spec:") + 4 },
 		});
 	});
 
@@ -220,12 +220,12 @@ describe("findFrontmatterNodeRanges", () => {
 		].join("\n");
 		const ranges = findFrontmatterNodeRanges(src);
 		expect(ranges.get("spec")).toEqual({
-			start: { line: 3, column: 5, offset: 0 },
-			end: { line: 3, column: 9, offset: 0 },
+			start: { line: 3, column: 5, offset: src.indexOf("spec:") },
+			end: { line: 3, column: 9, offset: src.indexOf("spec:") + 4 },
 		});
 		expect(ranges.get("build")).toEqual({
-			start: { line: 6, column: 3, offset: 0 },
-			end: { line: 6, column: 8, offset: 0 },
+			start: { line: 6, column: 3, offset: src.indexOf("build:") },
+			end: { line: 6, column: 8, offset: src.indexOf("build:") + 5 },
 		});
 	});
 });

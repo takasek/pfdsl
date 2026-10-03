@@ -602,18 +602,18 @@
 <g id="node20" class="node">
 <title>comparison_parsed_doc</title>
 <g id="a_node20"><a xlink:title="比較対象の構文木・frontmatter&#10;&#10;比較対象文書を独立に解析して得たdocument構造とfrontmatter。diff_graphs に第2文書のfrontmatterを渡す&#10;criteria: packages/cli/src/index.test.ts の diff 検査で、比較対象文書のfrontmatter変更が差分として報告される">
-<polygon fill="none" stroke="black" points="738.3,-911.42 551.1,-911.42 551.1,-853.02 738.3,-853.02 738.3,-911.42"/>
-<text xml:space="preserve" text-anchor="middle" x="644.7" y="-894.82" font-family="Times,serif" font-size="14.00">comparison_parsed_doc</text>
-<text xml:space="preserve" text-anchor="middle" x="644.7" y="-878.02" font-family="Times,serif" font-size="14.00">比較対象の構文木・front</text>
-<text xml:space="preserve" text-anchor="middle" x="644.7" y="-861.22" font-family="Times,serif" font-size="14.00">matter</text>
+<polygon fill="none" stroke="black" points="738.3,-927.42 551.1,-927.42 551.1,-869.02 738.3,-869.02 738.3,-927.42"/>
+<text xml:space="preserve" text-anchor="middle" x="644.7" y="-910.82" font-family="Times,serif" font-size="14.00">comparison_parsed_doc</text>
+<text xml:space="preserve" text-anchor="middle" x="644.7" y="-894.02" font-family="Times,serif" font-size="14.00">比較対象の構文木・front</text>
+<text xml:space="preserve" text-anchor="middle" x="644.7" y="-877.22" font-family="Times,serif" font-size="14.00">matter</text>
 </a>
 </g>
 </g>
 <!-- comparison_parsed_doc&#45;&gt;diff_graphs -->
 <g id="edge37" class="edge">
 <title>comparison_parsed_doc&#45;&gt;diff_graphs</title>
-<path fill="none" stroke="black" d="M732.87,-852.74C736.11,-850.13 739.15,-847.3 741.9,-844.22 782.95,-798.2 730.1,-749.19 777.9,-710.22 940.49,-577.63 1214.53,-625.89 1335.17,-656.16"/>
-<polygon fill="black" stroke="black" points="1333.99,-659.48 1344.54,-658.57 1335.72,-652.69 1333.99,-659.48"/>
+<path fill="none" stroke="black" d="M732.98,-868.83C736.19,-866.2 739.19,-863.33 741.9,-860.22 786.85,-808.45 725.35,-754.25 777.9,-710.22 938.89,-575.28 1214.37,-624.98 1335.32,-655.91"/>
+<polygon fill="black" stroke="black" points="1334.16,-659.23 1344.72,-658.37 1335.93,-652.46 1334.16,-659.23"/>
 </g>
 <!-- normalize_comparison -->
 <g id="node77" class="node">
@@ -629,8 +629,8 @@
 <!-- comparison_parsed_doc&#45;&gt;normalize_comparison -->
 <g id="edge34" class="edge">
 <title>comparison_parsed_doc&#45;&gt;normalize_comparison</title>
-<path fill="none" stroke="black" d="M724.8,-852.55C730.65,-849.88 736.41,-847.09 741.9,-844.22 776.05,-826.34 812.14,-802.25 839.64,-782.68"/>
-<polygon fill="black" stroke="black" points="841.68,-785.52 847.76,-776.84 837.59,-779.84 841.68,-785.52"/>
+<path fill="none" stroke="black" d="M725.8,-868.64C731.33,-865.97 736.75,-863.15 741.9,-860.22 779.73,-838.61 818.48,-807.88 846.22,-784.06"/>
+<polygon fill="black" stroke="black" points="848.42,-786.78 853.68,-777.59 843.84,-781.5 848.42,-786.78"/>
 </g>
 <!-- normalize_diagnostics -->
 <g id="node21" class="node">
@@ -712,7 +712,7 @@
 <!-- validate -->
 <g id="node93" class="node">
 <title>validate</title>
-<g id="a_node93"><a xlink:title="検証&#10;&#10;正準化グラフとfrontmatterにV/Wルールを適用し診断を生成する。ルールの一次情報docs/spec/spec.md（a層）は設計時にこの実装へ反映されるもので、実行時の入力ではない&#10;command: node packages/cli/dist/cli.js check&#10;location: ../packages/core/src/validator.ts">
+<g id="a_node93"><a xlink:title="検証&#10;&#10;正準化グラフとfrontmatterにV/Wルールを適用し診断を生成する。analyze と analyzeSource は解析時のソース位置索引を渡し、宣言位置を再解釈しない。ルールの一次情報docs/spec/spec.md（a層）は設計時にこの実装へ反映されるもので、実行時の入力ではない&#10;command: node packages/cli/dist/cli.js check&#10;location: ../packages/core/src/validator.ts">
 <ellipse fill="none" stroke="#27ae60" cx="1396.24" cy="-1025.22" rx="42.65" ry="29.42"/>
 <text xml:space="preserve" text-anchor="middle" x="1396.24" y="-1029.42" font-family="Times,serif" font-size="14.00">validate</text>
 <text xml:space="preserve" text-anchor="middle" x="1396.24" y="-1012.62" font-family="Times,serif" font-size="14.00">検証</text>
@@ -745,24 +745,25 @@
 <!-- parsed_doc -->
 <g id="node24" class="node">
 <title>parsed_doc</title>
-<g id="a_node24"><a xlink:title="構文木・frontmatter&#10;&#10;frontmatter読込・lex・parseの出力（document構造とfrontmatter）&#10;criteria: frontmatter 読込・lex・parse の3段が packages/core/src/lexer.test.ts・packages/core/src/parser.test.ts・packages/core/src/frontmatter&#45;cst.test.ts のテストで検証されており、CLI（packages/cli）・VSCode 拡張（packages/vscode&#45;extension）はいずれも @pfdsl/core のこの実装を通じて document を取得する">
-<polygon fill="none" stroke="black" points="723.9,-835.02 565.5,-835.02 565.5,-793.42 723.9,-793.42 723.9,-835.02"/>
-<text xml:space="preserve" text-anchor="middle" x="644.7" y="-818.42" font-family="Times,serif" font-size="14.00">parsed_doc</text>
-<text xml:space="preserve" text-anchor="middle" x="644.7" y="-801.62" font-family="Times,serif" font-size="14.00">構文木・frontmatter</text>
+<g id="a_node24"><a xlink:title="構文木・frontmatter・ソース位置&#10;&#10;frontmatter読込・lex・parseの出力（document構造・frontmatter・同じYAML文書の宣言とフィールドのソース位置）。analyzeSource が解析結果と位置索引をホストへ渡す&#10;criteria: frontmatter 読込・lex・parse の3段が packages/core/src/lexer.test.ts・packages/core/src/parser.test.ts・packages/core/src/frontmatter&#45;source.test.ts で検証されており、CLI と VSCode 拡張は @pfdsl/core の解析を利用する。拡張の jump・link・run hint・diagnostic は packages/vscode&#45;extension/src/document&#45;corpus.test.ts の共通入力で個別に検証される">
+<polygon fill="none" stroke="black" points="738.3,-851.42 551.1,-851.42 551.1,-793.02 738.3,-793.02 738.3,-851.42"/>
+<text xml:space="preserve" text-anchor="middle" x="644.7" y="-834.82" font-family="Times,serif" font-size="14.00">parsed_doc</text>
+<text xml:space="preserve" text-anchor="middle" x="644.7" y="-818.02" font-family="Times,serif" font-size="14.00">構文木・frontmatter・ソ</text>
+<text xml:space="preserve" text-anchor="middle" x="644.7" y="-801.22" font-family="Times,serif" font-size="14.00">ース位置</text>
 </a>
 </g>
 </g>
 <!-- parsed_doc&#45;&gt;diff_graphs -->
 <g id="edge39" class="edge">
 <title>parsed_doc&#45;&gt;diff_graphs</title>
-<path fill="none" stroke="black" d="M653.48,-793.22C669.59,-753.28 710.76,-667.32 777.9,-633.22 873.25,-584.78 1193.85,-635.91 1331.53,-661.01"/>
-<polygon fill="black" stroke="black" points="1330.75,-664.42 1341.22,-662.79 1332.01,-657.54 1330.75,-664.42"/>
+<path fill="none" stroke="black" d="M656.1,-792.77C673.49,-748.65 713.08,-666.98 777.9,-633.22 872.75,-583.81 1193.63,-635.48 1331.46,-660.87"/>
+<polygon fill="black" stroke="black" points="1330.68,-664.28 1341.15,-662.66 1331.96,-657.4 1330.68,-664.28"/>
 </g>
 <!-- parsed_doc&#45;&gt;export_metadata -->
 <g id="edge30" class="edge">
 <title>parsed_doc&#45;&gt;export_metadata</title>
-<path fill="none" stroke="black" d="M653.03,-793.01C668.59,-751.69 709.23,-661.13 777.9,-623.22 951.15,-527.54 1195.31,-555.74 1318.2,-578.96"/>
-<polygon fill="black" stroke="black" points="1317.37,-582.37 1327.86,-580.83 1318.7,-575.5 1317.37,-582.37"/>
+<path fill="none" stroke="black" d="M655.18,-792.81C671.76,-746.81 710.82,-659.15 777.9,-621.22 950.6,-523.53 1196.03,-553.96 1318.93,-578.36"/>
+<polygon fill="black" stroke="black" points="1318.09,-581.77 1328.59,-580.33 1319.49,-574.91 1318.09,-581.77"/>
 </g>
 <!-- normalize -->
 <g id="node76" class="node">
@@ -778,20 +779,20 @@
 <!-- parsed_doc&#45;&gt;normalize -->
 <g id="edge4" class="edge">
 <title>parsed_doc&#45;&gt;normalize</title>
-<path fill="none" stroke="black" d="M681.38,-792.96C723.86,-767.66 794.83,-725.4 840.98,-697.92"/>
-<polygon fill="black" stroke="black" points="842.61,-701.02 849.41,-692.9 839.03,-695 842.61,-701.02"/>
+<path fill="none" stroke="black" d="M692.85,-792.56C736.09,-765.37 799.65,-725.4 841.85,-698.86"/>
+<polygon fill="black" stroke="black" points="843.69,-701.84 850.29,-693.56 839.96,-695.92 843.69,-701.84"/>
 </g>
 <!-- parsed_doc&#45;&gt;render_graph -->
 <g id="edge25" class="edge">
 <title>parsed_doc&#45;&gt;render_graph</title>
-<path fill="none" stroke="black" d="M652.57,-793.11C667.67,-750.42 708.08,-654.1 777.9,-609.22 948.4,-499.59 1199.56,-502.15 1322.31,-511.46"/>
-<polygon fill="black" stroke="black" points="1321.67,-514.92 1331.91,-512.22 1322.22,-507.94 1321.67,-514.92"/>
+<path fill="none" stroke="black" d="M654.84,-792.57C671.17,-745.04 710.15,-652.63 777.9,-608.22 947.6,-496.96 1199.66,-500.89 1322.56,-511"/>
+<polygon fill="black" stroke="black" points="1321.92,-514.45 1332.18,-511.83 1322.52,-507.48 1321.92,-514.45"/>
 </g>
 <!-- parsed_doc&#45;&gt;validate -->
 <g id="edge8" class="edge">
 <title>parsed_doc&#45;&gt;validate</title>
-<path fill="none" stroke="black" d="M724.33,-830.92C730.82,-834.53 736.82,-838.9 741.9,-844.22 785.39,-889.73 729.44,-941.02 777.9,-981.22 862.87,-1051.71 1209.26,-1037.38 1342.58,-1028.98"/>
-<polygon fill="black" stroke="black" points="1342.42,-1032.5 1352.18,-1028.36 1341.97,-1025.51 1342.42,-1032.5"/>
+<path fill="none" stroke="black" d="M732.77,-851.78C736.04,-854.37 739.1,-857.17 741.9,-860.22 779.81,-901.58 734.14,-946.09 777.9,-981.22 863.9,-1050.25 1208.88,-1036.87 1342.24,-1028.85"/>
+<polygon fill="black" stroke="black" points="1342.08,-1032.37 1351.84,-1028.26 1341.65,-1025.38 1342.08,-1032.37"/>
 </g>
 <!-- validation_diagnostics -->
 <g id="node25" class="node">
@@ -1408,9 +1409,9 @@
 <g id="node63" class="node">
 <title>comparison_source</title>
 <g id="a_node63"><a xlink:title="比較対象の.pfdslソース&#10;&#10;diff の第2引数で指定する、比較対象文書のfrontmatter+bodyのテキスト">
-<polygon fill="none" stroke="black" stroke-width="2" points="206.8,-907.02 26.8,-907.02 26.8,-865.42 206.8,-865.42 206.8,-907.02"/>
-<text xml:space="preserve" text-anchor="middle" x="116.8" y="-890.42" font-family="Times,serif" font-size="14.00">comparison_source</text>
-<text xml:space="preserve" text-anchor="middle" x="116.8" y="-873.62" font-family="Times,serif" font-size="14.00">比較対象の.pfdslソース</text>
+<polygon fill="none" stroke="black" stroke-width="2" points="206.8,-919.02 26.8,-919.02 26.8,-877.42 206.8,-877.42 206.8,-919.02"/>
+<text xml:space="preserve" text-anchor="middle" x="116.8" y="-902.42" font-family="Times,serif" font-size="14.00">comparison_source</text>
+<text xml:space="preserve" text-anchor="middle" x="116.8" y="-885.62" font-family="Times,serif" font-size="14.00">比較対象の.pfdslソース</text>
 </a>
 </g>
 </g>
@@ -1418,18 +1419,18 @@
 <g id="node80" class="node">
 <title>parse_comparison</title>
 <g id="a_node80"><a xlink:title="比較対象の構文解析&#10;&#10;diff の第2文書に対する独立した解析。parse と同じfrontmatter読込・lex・parseを比較対象のソースへ適用する&#10;location: ../packages/core/src/index.ts">
-<ellipse fill="none" stroke="#27ae60" cx="382.55" cy="-886.22" rx="83.34" ry="29.42"/>
-<text xml:space="preserve" text-anchor="middle" x="382.55" y="-890.42" font-family="Times,serif" font-size="14.00">parse_comparison</text>
-<text xml:space="preserve" text-anchor="middle" x="382.55" y="-873.62" font-family="Times,serif" font-size="14.00">比較対象の構文解析</text>
+<ellipse fill="none" stroke="#27ae60" cx="382.55" cy="-898.22" rx="83.34" ry="29.42"/>
+<text xml:space="preserve" text-anchor="middle" x="382.55" y="-902.42" font-family="Times,serif" font-size="14.00">parse_comparison</text>
+<text xml:space="preserve" text-anchor="middle" x="382.55" y="-885.62" font-family="Times,serif" font-size="14.00">比較対象の構文解析</text>
 </a>
 </g>
-<text xml:space="preserve" text-anchor="middle" x="295.71" y="-844.2" font-family="Times,serif" font-size="14.00">b</text>
+<text xml:space="preserve" text-anchor="middle" x="295.71" y="-856.2" font-family="Times,serif" font-size="14.00">b</text>
 </g>
 <!-- comparison_source&#45;&gt;parse_comparison -->
 <g id="edge32" class="edge">
 <title>comparison_source&#45;&gt;parse_comparison</title>
-<path fill="none" stroke="black" d="M207.46,-886.22C233.22,-886.22 261.38,-886.22 287.4,-886.22"/>
-<polygon fill="black" stroke="black" points="287.28,-889.72 297.28,-886.22 287.28,-882.72 287.28,-889.72"/>
+<path fill="none" stroke="black" d="M207.46,-898.22C233.22,-898.22 261.38,-898.22 287.4,-898.22"/>
+<polygon fill="black" stroke="black" points="287.28,-901.72 297.28,-898.22 287.28,-894.72 287.28,-901.72"/>
 </g>
 <!-- decode_harness_capabilities&#45;&gt;harness_capability_model -->
 <g id="edge53" class="edge">
@@ -1559,31 +1560,31 @@
 <!-- parse -->
 <g id="node79" class="node">
 <title>parse</title>
-<g id="a_node79"><a xlink:title="構文解析&#10;&#10;frontmatterの既知フィールドをスキーマで検査し、lex・parseと合わせてdocument+frontmatterと診断を得る。CLI（c経由）・VSCode拡張（d）双方の全コマンドが内部で通る&#10;location: ../packages/core/src/index.ts">
-<ellipse fill="none" stroke="#27ae60" cx="382.55" cy="-809.22" rx="41.01" ry="29.42"/>
-<text xml:space="preserve" text-anchor="middle" x="382.55" y="-813.42" font-family="Times,serif" font-size="14.00">parse</text>
-<text xml:space="preserve" text-anchor="middle" x="382.55" y="-796.62" font-family="Times,serif" font-size="14.00">構文解析</text>
+<g id="a_node79"><a xlink:title="構文解析&#10;&#10;frontmatterの既知フィールドをスキーマで検査し、同じYAML文書から意味値とソース位置索引を得る。lex・parseと合わせてdocument+frontmatterと診断を得る。CLI（c経由）・VSCode拡張（d）双方の全コマンドが内部で通る&#10;location: ../packages/core/src/index.ts">
+<ellipse fill="none" stroke="#27ae60" cx="382.55" cy="-821.22" rx="41.01" ry="29.42"/>
+<text xml:space="preserve" text-anchor="middle" x="382.55" y="-825.42" font-family="Times,serif" font-size="14.00">parse</text>
+<text xml:space="preserve" text-anchor="middle" x="382.55" y="-808.62" font-family="Times,serif" font-size="14.00">構文解析</text>
 </a>
 </g>
-<text xml:space="preserve" text-anchor="middle" x="338.04" y="-767.2" font-family="Times,serif" font-size="14.00">b</text>
+<text xml:space="preserve" text-anchor="middle" x="338.04" y="-779.2" font-family="Times,serif" font-size="14.00">b</text>
 </g>
 <!-- parse&#45;&gt;parse_diagnostics -->
 <g id="edge2" class="edge">
 <title>parse&#45;&gt;parse_diagnostics</title>
-<path fill="none" stroke="black" d="M423.57,-812.32C451.37,-816.45 487.58,-826.03 511.5,-848.22 536.67,-871.57 511.55,-900.26 539.5,-920.22 615.92,-974.8 727.89,-968.03 803.65,-954.43"/>
-<polygon fill="black" stroke="black" points="803.88,-957.95 813.06,-952.66 802.59,-951.07 803.88,-957.95"/>
+<path fill="none" stroke="black" d="M423.69,-824.19C451.55,-828.25 487.77,-837.81 511.5,-860.22 537.67,-884.93 509.97,-915.63 539.5,-936.22 618.12,-991.04 733.11,-976.81 808.69,-958.27"/>
+<polygon fill="black" stroke="black" points="809.25,-961.74 818.08,-955.88 807.53,-954.95 809.25,-961.74"/>
 </g>
 <!-- parse&#45;&gt;parsed_doc -->
 <g id="edge3" class="edge">
 <title>parse&#45;&gt;parsed_doc</title>
-<path fill="none" stroke="black" d="M423.91,-809.99C458.5,-810.66 509.61,-811.64 553.83,-812.49"/>
-<polygon fill="black" stroke="black" points="553.63,-815.99 563.69,-812.68 553.76,-808.99 553.63,-815.99"/>
+<path fill="none" stroke="black" d="M423.91,-821.37C454.83,-821.49 498.93,-821.66 539.52,-821.82"/>
+<polygon fill="black" stroke="black" points="539.34,-825.31 549.35,-821.85 539.36,-818.31 539.34,-825.31"/>
 </g>
 <!-- parse_comparison&#45;&gt;comparison_parsed_doc -->
 <g id="edge33" class="edge">
 <title>parse_comparison&#45;&gt;comparison_parsed_doc</title>
-<path fill="none" stroke="black" d="M466.22,-884.94C489.46,-884.59 515.05,-884.19 539.39,-883.82"/>
-<polygon fill="black" stroke="black" points="539.38,-887.32 549.33,-883.67 539.27,-880.32 539.38,-887.32"/>
+<path fill="none" stroke="black" d="M466.22,-898.22C489.46,-898.22 515.05,-898.22 539.39,-898.22"/>
+<polygon fill="black" stroke="black" points="539.33,-901.72 549.33,-898.22 539.33,-894.72 539.33,-901.72"/>
 </g>
 <!-- pfdsl_source -->
 <g id="node81" class="node">
@@ -1604,8 +1605,8 @@
 <!-- pfdsl_source&#45;&gt;parse -->
 <g id="edge1" class="edge">
 <title>pfdsl_source&#45;&gt;parse</title>
-<path fill="none" stroke="black" d="M129.13,-326.87C169.94,-404.86 309.74,-671.99 361.8,-771.48"/>
-<polygon fill="black" stroke="black" points="358.69,-773.09 366.43,-780.33 364.9,-769.85 358.69,-773.09"/>
+<path fill="none" stroke="black" d="M128.8,-326.73C169.29,-405.94 310.39,-682 362.24,-783.44"/>
+<polygon fill="black" stroke="black" points="359.04,-784.88 366.71,-792.19 365.28,-781.69 359.04,-784.88"/>
 </g>
 <!-- reindex_meta -->
 <g id="node87" class="node">
@@ -1661,7 +1662,7 @@
 <!-- pfdsl_source&#45;&gt;validate -->
 <g id="edge9" class="edge">
 <title>pfdsl_source&#45;&gt;validate</title>
-<path fill="none" stroke="black" d="M121.31,-326.77C138.37,-430.66 213.51,-876.71 253.6,-924.22 374.24,-1067.17 456.64,-1082.22 643.7,-1082.22 643.7,-1082.22 643.7,-1082.22 887.82,-1082.22 1047.9,-1082.22 1089.73,-1093.92 1247.74,-1068.22 1281.55,-1062.71 1318.57,-1051.91 1347.06,-1042.51"/>
+<path fill="none" stroke="black" d="M121.2,-326.86C137.9,-432.2 212.17,-888.25 253.6,-936.22 374.59,-1076.32 458.57,-1082.22 643.7,-1082.22 643.7,-1082.22 643.7,-1082.22 887.82,-1082.22 1047.9,-1082.22 1089.73,-1093.92 1247.74,-1068.22 1281.55,-1062.71 1318.57,-1051.91 1347.06,-1042.51"/>
 <polygon fill="black" stroke="black" points="1348.13,-1045.84 1356.49,-1039.33 1345.9,-1039.2 1348.13,-1045.84"/>
 </g>
 <!-- pin_plugin_marketplace&#45;&gt;plugin_marketplace_entry -->

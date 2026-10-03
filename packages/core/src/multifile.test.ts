@@ -1024,7 +1024,7 @@ describe("resolveEffectiveFrontmatter", () => {
 		expect(resolveEffectiveFrontmatter("/p/main.pfdsl", fm, load)).toBe(fm);
 	});
 
-	it("null entry frontmatter with presets still yields merged presentation", () => {
+	it("null entry frontmatter does not resurrect disk extends", () => {
 		const load = makeLoad({
 			"/p/main.pfdsl": { frontmatter: { extends: "./p.yaml" } },
 			"/p/p.yaml": {
@@ -1032,7 +1032,7 @@ describe("resolveEffectiveFrontmatter", () => {
 			},
 		});
 		const eff = resolveEffectiveFrontmatter("/p/main.pfdsl", null, load);
-		expect(eff?.statusStyles?.done?.fillcolor).toBe("green");
+		expect(eff).toBeNull();
 	});
 });
 
