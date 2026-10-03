@@ -10,6 +10,7 @@ description: |
   for when a finding belongs to the distribution layer. Not for defects in the
   adopting repository's own PFDs, code or work items; those belong to pfd-ops.
 ---
+<!-- DO NOT EDIT. Authoritative source: scripts/harness-template/skills/pfd-upstream-report/SKILL.md. -->
 
 # 上流への欠陥報告
 

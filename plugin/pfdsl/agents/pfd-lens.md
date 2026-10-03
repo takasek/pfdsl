@@ -8,6 +8,7 @@ description: >
 tools: Read, Grep, Bash
 model: sonnet
 ---
+<!-- DO NOT EDIT. Authoritative source: scripts/harness-template/agents/pfd-lens.md. -->
 
 対象の .pfdsl 図に A・B 層の観点で監査をかけ、findings を返す read-only agent。
 Bash は CLI 実体を解決するための `test -f package.json` と `test -f packages/cli/package.json` と `test -f packages/cli/dist/cli.js`、解決した CLI による `check <file>` と読み取り専用クエリ（`graph` グループ全体、`meta get` / `meta list` / `meta check-links`、`status` グループ全体）のみ許可される — 図やリポジトリの他の状態を書き換えない。

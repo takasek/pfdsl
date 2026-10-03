@@ -1,13 +1,13 @@
 # pfd-ops バインディング
 
-pfd-ops 運用に紐づく、Claude へ恒常的に届けたい指示（PR 本文規約等）はこのファイルに置く（命名規則は `.claude/skills/pfd-ops/references/architecture.md` の「バインディングファイルの命名規則」参照）。読まれる契機は pfd-ops SKILL.md の該当行が保証する。サイクル外でも常時届けたい指示は root `CLAUDE.md` からこのファイルへポインタを張る。
+pfd-ops 運用に紐づく、Claude へ恒常的に届けたい指示（PR 本文規約等）はこのファイルに置く（命名規則は `scripts/harness-template/skills/pfd-ops/references/architecture.md` の「バインディングファイルの命名規則」参照）。読まれる契機は pfd-ops SKILL.md の該当行が保証する。サイクル外でも常時届けたい指示は root `CLAUDE.md` からこのファイルへポインタを張る。
 
-新しい指示が生まれたら、配布層へ載せるかを `.claude/skills/pfd-ops/references/architecture.md`「昇格先の判定ルール」で判定する。昇格候補は0段目の区分 i・ii に入るものだけで、配布先リポでも一般に役立つことはその根拠にならない（workflow.md「知見の振り分け（3経路）」の経路1も同じ判定を通る）。
+新しい指示が生まれたら、配布層へ載せるかを `scripts/harness-template/skills/pfd-ops/references/architecture.md`「昇格先の判定ルール」で判定する。昇格候補は0段目の区分 i・ii に入るものだけで、配布先リポでも一般に役立つことはその根拠にならない（workflow.md「知見の振り分け（3経路）」の経路1も同じ判定を通る）。
 候補にならない指示のうち、このリポの開発で必要なものはこのファイルに追記する。宛先がこのファイルであることは同 architecture.md の「companion への書き分けルール」表が定める。
 
 ## 配置ファイル鮮度セルフチェックをこのリポでは repo-local 版で実行する
 
-このリポは pfd-ops スキルの上流であり、`.claude/skills/pfd-ops/` が canonical、plugin cache 配下（`~/.claude/plugins/cache/pfdsl/pfdsl/<version>/`）はそこから配布された過去のスナップショットである。
+このリポは pfd-ops スキルの上流であり、`scripts/harness-template/skills/pfd-ops/` が正本、`.claude/skills/pfd-ops/` はそこから描画した生成物、plugin cache 配下（`~/.claude/plugins/cache/pfdsl/pfdsl/<version>/`）は配布済みの過去のスナップショットである。
 両方が実在して食い違う状況を SKILL.md のロード元判定が扱わないこと、古い側の報告が drift でなく陳腐化であること、`--deploy` で追随してはならないことは `.pfdsl/bindings/pfd-retro-patterns/duplicate-name-not-a-discriminator.md` が一次情報。
 
 したがってこのリポでは、pfd-ops 発火時のセルフチェックは `node .claude/skills/pfd-ops/scripts/check-install-sync.mjs --upstream` で実行する。
@@ -19,7 +19,7 @@ pfd-ops 発火時、SKILL.md の配置ファイル鮮度セルフチェックに
 node scripts/check-scaffold-sync.mjs
 ```
 
-`.claude/skills/pfd-ops/references/scaffold/`（`gen-plugin.mjs` のコピー元）と `plugin/pfdsl/skills/pfd-ops/references/scaffold/`（配布用ミラー）の drift を検知する。警告が出たら `node scripts/gen-plugin.mjs` で反映してからコミットする。`install/` と異なり `scaffold/` に `--deploy` 相当の機構はない（scaffold は `/pfd-init` がコピー後にユーザーが値を埋めるテンプレートのため、実配置先は用途的に別物になる）。
+`scripts/harness-template/skills/pfd-ops/references/scaffold/`（ハーネス分岐を持つ正本）から描画する `.claude/skills/pfd-ops/references/scaffold/` と `plugin/pfdsl/skills/pfd-ops/references/scaffold/`（配布用ミラー）の drift を検知する。警告が出たら `node scripts/gen-plugin.mjs` で反映してからコミットする。`install/` と異なり `scaffold/` に `--deploy` 相当の機構はない（scaffold は `/pfd-init` がコピー後にユーザーが値を埋めるテンプレートのため、実配置先は用途的に別物になる）。
 
 ## このリポの CLI をローカルビルドから実行する
 
@@ -82,7 +82,7 @@ JSON のパスは実行時の cwd を基準とし、対象とテストファイ�
 
 ```json
 {
-  "target": ".claude/skills/pfd-ops/references/file-based-tracker-backend.md",
+  "target": "scripts/harness-template/skills/pfd-ops/references/file-based-tracker-backend.md",
   "from": "binding が定める現行の書式を使い",
   "to": "常に Format 3 を使い",
   "tests": ["scripts/lib/pfd-ops-applicability.test.mjs"],

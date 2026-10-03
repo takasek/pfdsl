@@ -26,36 +26,48 @@ describe("generator recovery diagnostics", () => {
 		it(`preserves recovery data and reports it on failure and retry through ${entrypoint}`, () => {
 			const root = mkdtempSync(join(tmpdir(), "pfdsl-recovery-cli-"));
 			try {
-				execFileSync("tar", ["-x", "-C", root], {
-					input: execFileSync(
-						"git",
-						[
-							"archive",
-							"HEAD",
-							"scripts",
-							".claude",
-							".pfdsl",
-							"hooks",
-							"generated",
-							"plugin",
-							".claude-plugin",
-							"docs",
-							".github",
-							".gitignore",
-							"AGENTS.md",
-							"CLAUDE.md",
-							".agents",
-							".codex",
-							"package.json",
-							"packages",
-						],
-						{ cwd: repo, maxBuffer: 128 * 1024 * 1024 },
-					),
-				});
+				const paths = execFileSync(
+					"git",
+					[
+						"ls-files",
+						"-z",
+						"--",
+						"scripts",
+						".claude",
+						".pfdsl",
+						"hooks",
+						"generated",
+						"plugin",
+						".claude-plugin",
+						"docs",
+						".github",
+						".gitignore",
+						"AGENTS.md",
+						"CLAUDE.md",
+						".agents",
+						".codex",
+						"package.json",
+						"packages",
+					],
+					{ cwd: repo, encoding: "utf8", maxBuffer: 128 * 1024 * 1024 },
+				)
+					.split("\0")
+					.filter(Boolean);
+				for (const path of new Set(paths)) {
+					mkdirSync(dirname(join(root, path)), { recursive: true });
+					cpSync(join(repo, path), join(root, path), {
+						recursive: true,
+						verbatimSymlinks: true,
+					});
+				}
 				cpSync(join(repo, "scripts"), join(root, "scripts"), {
 					recursive: true,
 				});
 				symlinkSync(join(repo, "node_modules"), join(root, "node_modules"));
+				symlinkSync(
+					join(repo, "packages/core/node_modules"),
+					join(root, "packages/core/node_modules"),
+				);
 				if (!existsSync(join(root, ".claude/skills/pfdsl")))
 					symlinkSync(
 						"../../generated/skills/pfdsl",

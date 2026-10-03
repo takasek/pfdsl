@@ -7,6 +7,8 @@
 // The entries are roots rather than the individual files the generator snapshots, so an untracked stray file under a generated root is still reported.
 // scripts/lib/gen-plugin-outputs.test.mjs holds these roots and the snapshot destinations of a failed generation to each other in both directions.
 
+import { CLAUDE_GENERATED_CAPABILITY_OUTPUTS } from "./harness-inventory.mjs";
+
 export const GEN_INSTALL_OUTPUT = ".claude/skills/pfd-ops/install";
 export const GEN_SKILL_MD_OUTPUT = "generated/skills/pfdsl/SKILL.md";
 
@@ -18,12 +20,13 @@ export const GEN_PLUGIN_OUTPUTS = Object.freeze([
 	"AGENTS.md",
 	".agents",
 	".codex",
-	GEN_INSTALL_OUTPUT,
+	...CLAUDE_GENERATED_CAPABILITY_OUTPUTS,
 ]);
 
-const WITHOUT_INSTALL = GEN_PLUGIN_OUTPUTS.filter(
-	(path) => path !== GEN_INSTALL_OUTPUT,
-);
+const WITHOUT_INSTALL = [
+	...GEN_PLUGIN_OUTPUTS,
+	`:(exclude)${GEN_INSTALL_OUTPUT}`,
+];
 
 const PATHSPECS_BY_CONSUMER = Object.freeze({
 	terminal: GEN_PLUGIN_OUTPUTS,

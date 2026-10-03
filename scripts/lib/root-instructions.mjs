@@ -10,13 +10,20 @@ import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import Mustache from "mustache";
 
-import {
-	addGeneratedMarkdownNotice,
-	CODEX_WORKTREE_METADATA_INSTRUCTIONS,
-} from "./gen-codex-assets.mjs";
+import { addGeneratedMarkdownNotice } from "./gen-codex-assets.mjs";
 import { findUnresolvedTemplateTokens } from "./template-tokens.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
+
+const CODEX_WORKTREE_METADATA_INSTRUCTIONS = [
+	"## Codex 固有の責務境界",
+	"",
+	"この節は本文中の git に関する指示より優先する。",
+	"親 agent が `git fetch`、stage、commit、`git push`、PR の作成・更新、issue の作成・クローズ・コメントを担当する。",
+	"subagent は worktree 内のファイル編集とテスト・検査だけを担当する。",
+	"subagent は git metadata 操作や外部公開操作を実行しない。",
+	"subagent の権限エラーはユーザーへ直接継続を求めず、親 agent へ引き上げる。",
+].join("\n");
 
 export const ROOT_INSTRUCTIONS_TEMPLATE_PATH = resolve(
 	__dirname,

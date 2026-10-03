@@ -23,7 +23,6 @@ import {
 	findDistDependentFiles,
 } from "./check-script-imports.mjs";
 import {
-	claudeInstructionsToAgents,
 	commandCapabilityToCodexSkill,
 	generatedMarkdownNoticeCount,
 	generatedSourceCommentCount,
@@ -134,11 +133,19 @@ function codexMarkdownSource(root, relativePath) {
 	return join(skillRoot, ...path);
 }
 
-function expectedCodexMarkdown(source) {
-	return claudeInstructionsToAgents(skillMarkdownToCodex(source)).replace(
-		/(?:\r?\n){2,}$/,
-		"\n",
+function decodedCodexMarkdown(relativePath) {
+	const [name, ...tail] = relativePath.split("/");
+	const record = decodedHarnessCapabilities.find(
+		(record) => record.id === `skill:${name}`,
 	);
+	const source = record?.semantic.variants?.codex.contents[tail.join("/")];
+	return source === undefined
+		? readFileSync(codexMarkdownSource(repoRoot, relativePath), "utf-8")
+		: source;
+}
+
+function expectedCodexMarkdown(source) {
+	return skillMarkdownToCodex(source).replace(/(?:\r?\n){2,}$/, "\n");
 }
 
 function removeGeneratedMarkdownNotice(source) {
@@ -874,6 +881,45 @@ describe("assemblePluginDistIndependent", () => {
 		);
 	});
 
+	it("detects undeclared Claude repository writes independently of declared outputs", () => {
+		const capabilities = decodedHarnessCapabilities;
+		const { deps } = fakeDeps({
+			assembleClaudeAssets: ({ deps: adapterDeps }) => {
+				adapterDeps.writeFileSync(
+					"/repo/.claude/commands/leaked.md",
+					"undeclared\n",
+				);
+				return {
+					observed: {
+						"claude-repository": targetOutputEntries(
+							capabilities,
+							"claude-repository",
+						),
+						"claude-plugin": targetOutputEntries(capabilities, "claude-plugin"),
+					},
+				};
+			},
+			assembleCodexAssets: () => ({
+				observed: {
+					"codex-repository": targetOutputEntries(
+						capabilities,
+						"codex-repository",
+					),
+					"codex-plugin": targetOutputEntries(capabilities, "codex-plugin"),
+				},
+			}),
+		});
+		assert.throws(
+			() =>
+				assemblePluginDistIndependent({
+					root: "/repo",
+					pluginRoot: "/repo/plugin/pfdsl",
+					deps,
+				}),
+			/output closure claude-repository.*leaked\.md/,
+		);
+	});
+
 	it("detects undeclared mirror and publish destinations at adapter operation boundaries", () => {
 		for (const fixture of [
 			{
@@ -1346,6 +1392,7 @@ describe("assemblePluginDistIndependent", () => {
 			[codexPluginRoot, "directory"],
 			[`${codexPluginRoot}/skills/pfd-ops/SKILL.md`, "legacy Codex skill"],
 			[marketplacePath, "legacy marketplace"],
+			[dirname(installRoot), "directory"],
 			[installRoot, "directory"],
 			[`${installRoot}/install.md`, "legacy install"],
 		]);
@@ -1602,6 +1649,7 @@ describe("assemblePluginDistIndependent", () => {
 			[pluginRoot, "directory"],
 			[`${pluginRoot}/skills/pfd-ops/SKILL.md`, "legacy Claude skill"],
 			[marketplacePath, "legacy marketplace"],
+			[dirname(installRoot), "directory"],
 			[installRoot, "directory"],
 			[`${installRoot}/install.md`, "legacy install"],
 		]);
@@ -2323,8 +2371,10 @@ describe("assembleCodexAssets", () => {
 
 		const copied = calls.filter(([kind]) => kind === "cpSync");
 		assert.equal(
-			copied.some(([, , path]) =>
-				path.includes(".agents/skills.codex-tmp-test-run/pfd-grill"),
+			calls.some(
+				([kind, path]) =>
+					kind === "writeFileSync" &&
+					path.includes(".agents/skills.codex-tmp-test-run/pfd-grill"),
 			),
 			true,
 		);
@@ -2849,7 +2899,7 @@ describe("Codex generated consumers", () => {
 					);
 					assert.equal(
 						removeGeneratedMarkdownNotice(native.toString("utf-8")),
-						expectedCodexMarkdown(legacy.toString("utf-8")),
+						expectedCodexMarkdown(decodedCodexMarkdown(relativePath)),
 						relativePath,
 					);
 				} else if (relativePath.endsWith(".mjs")) {
@@ -2860,7 +2910,7 @@ describe("Codex generated consumers", () => {
 					);
 					assert.equal(
 						removeGeneratedSourceComment(native.toString("utf-8")),
-						legacy.toString("utf-8"),
+						removeGeneratedSourceComment(legacy.toString("utf-8")),
 						relativePath,
 					);
 				} else {
@@ -2873,7 +2923,7 @@ describe("Codex generated consumers", () => {
 			);
 			assert.match(
 				nativePfdOpsSkill,
-				/DO NOT EDIT\. Authoritative source: \.claude\/skills\/pfd-ops\/SKILL\.md\./,
+				/DO NOT EDIT\. Authoritative source: scripts\/harness-template\/skills\/pfd-ops\/SKILL\.md\./,
 			);
 			const nativeScript = readFileSync(
 				join(skillsRoot, "pfd-ops/scripts/check-install-sync.mjs"),
@@ -2881,12 +2931,15 @@ describe("Codex generated consumers", () => {
 			);
 			assert.match(
 				nativeScript,
-				/DO NOT EDIT\. Authoritative source: \.claude\/skills\/pfd-ops\/scripts\/check-install-sync\.mjs\./,
+				/DO NOT EDIT\. Authoritative source: scripts\/harness-template\/skills\/pfd-ops\/scripts\/check-install-sync\.mjs\./,
 			);
 			assert.equal(
 				removeGeneratedSourceComment(nativeScript),
 				readFileSync(
-					join(pluginRoot, "skills/pfd-ops/scripts/check-install-sync.mjs"),
+					join(
+						repoRoot,
+						"scripts/harness-template/skills/pfd-ops/scripts/check-install-sync.mjs",
+					),
 					"utf-8",
 				),
 			);
@@ -2970,7 +3023,7 @@ describe("Codex generated consumers", () => {
 			);
 			assert.match(
 				agentScript,
-				/DO NOT EDIT\. Authoritative source: \.claude\/skills\/pfd-ops\/scripts\/check-install-sync\.mjs\./,
+				/DO NOT EDIT\. Authoritative source: scripts\/harness-template\/skills\/pfd-ops\/scripts\/check-install-sync\.mjs\./,
 			);
 			assert.equal(generatedSourceCommentCount(agentScript), 1);
 			assert.equal(
@@ -2978,7 +3031,7 @@ describe("Codex generated consumers", () => {
 				readFileSync(
 					join(
 						repoRoot,
-						".claude/skills/pfd-ops/scripts/check-install-sync.mjs",
+						"scripts/harness-template/skills/pfd-ops/scripts/check-install-sync.mjs",
 					),
 					"utf-8",
 				),
@@ -3014,17 +3067,15 @@ describe("Codex generated consumers", () => {
 					);
 					assert.equal(
 						output,
-						claudeInstructionsToAgents(
-							commandCapabilityToCodexSkill(command, skillName),
-						).replace(/(?:\r?\n){2,}$/, "\n"),
+						commandCapabilityToCodexSkill(command, skillName).replace(
+							/(?:\r?\n){2,}$/,
+							"\n",
+						),
 						relativePath,
 					);
 					continue;
 				}
-				const source = readFileSync(
-					codexMarkdownSource(repoRoot, relativePath),
-					"utf-8",
-				);
+				const source = decodedCodexMarkdown(relativePath);
 				const isInstallPath = relativePath.startsWith("pfd-ops/install/");
 				assert.equal(
 					generatedMarkdownNoticeCount(output),
@@ -3035,7 +3086,7 @@ describe("Codex generated consumers", () => {
 					assert.match(
 						output,
 						new RegExp(
-							`DO NOT EDIT\\. Authoritative source: \\.claude/skills/${relativePath.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\.`,
+							`DO NOT EDIT\\. Authoritative source: scripts/harness-template/skills/${relativePath.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\.`,
 						),
 						relativePath,
 					);

@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// DO NOT EDIT. Authoritative source: .claude/skills/pfd-retro/scripts/classify-knowledge-lifecycle.mjs.
+// DO NOT EDIT. Authoritative source: scripts/harness-template/skills/pfd-retro/scripts/classify-knowledge-lifecycle.mjs.
 
 import { readFileSync, realpathSync } from "node:fs";
 import { resolve } from "node:path";

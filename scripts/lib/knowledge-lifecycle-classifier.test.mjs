@@ -11,12 +11,12 @@ import {
 import { tmpdir } from "node:os";
 import { resolve } from "node:path";
 import { describe, it } from "node:test";
-import { classifyDeclaration } from "../../.claude/skills/pfd-retro/scripts/classify-knowledge-lifecycle.mjs";
+import { classifyDeclaration } from "../harness-template/skills/pfd-retro/scripts/classify-knowledge-lifecycle.mjs";
 
 const key = "knowledgeLifecycleAudit";
 const json = (declaration) => JSON.stringify({ [key]: declaration });
 const sourcePath =
-	".claude/skills/pfd-retro/scripts/classify-knowledge-lifecycle.mjs";
+	"scripts/harness-template/skills/pfd-retro/scripts/classify-knowledge-lifecycle.mjs";
 
 describe("knowledge lifecycle classification", () => {
 	for (const [name, input, state] of [
