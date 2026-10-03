@@ -1,6 +1,10 @@
 import type { EdgeGroups } from "../edge-groups.js";
 import { groupEdges } from "../edge-groups.js";
-import { findFrontmatterNodeRanges } from "../frontmatter.js";
+import {
+	findFrontmatterNodeRanges,
+	frontmatterNodeRanges,
+} from "../frontmatter.js";
+import type { FrontmatterSource } from "../frontmatter-source.js";
 import { zeroRange } from "../position.js";
 import type {
 	ArtifactMeta,
@@ -16,6 +20,7 @@ import type {
 export interface ValidateOptions {
 	strict?: boolean;
 	source?: string;
+	sourceMap?: FrontmatterSource;
 	readyGate?: boolean;
 }
 
@@ -66,9 +71,11 @@ export function buildRuleContext(
 	fm: Frontmatter | null,
 	options: ValidateOptions = {},
 ): RuleContext {
-	const nodeRanges = options.source
-		? findFrontmatterNodeRanges(options.source)
-		: new Map<string, Range>();
+	const nodeRanges = options.sourceMap
+		? frontmatterNodeRanges(options.sourceMap)
+		: options.source
+			? findFrontmatterNodeRanges(options.source)
+			: new Map<string, Range>();
 
 	const edgeGroups = groupEdges(edges);
 	const edgeProcesses = new Set<string>([

@@ -73,9 +73,9 @@ artifact:
     criteria: packages/cli/src/index.test.ts の diff 検査で、比較対象文書のノード追加が差分として報告される
     group: in_memory
   parsed_doc:
-    label: 構文木・frontmatter
-    description: frontmatter読込・lex・parseの出力（document構造とfrontmatter）
-    criteria: frontmatter 読込・lex・parse の3段が packages/core/src/lexer.test.ts・packages/core/src/parser.test.ts・packages/core/src/frontmatter-cst.test.ts のテストで検証されており、CLI（packages/cli）・VSCode 拡張（packages/vscode-extension）はいずれも @pfdsl/core のこの実装を通じて document を取得する
+    label: 構文木・frontmatter・ソース位置
+    description: frontmatter読込・lex・parseの出力（document構造・frontmatter・同じYAML文書の宣言とフィールドのソース位置）。analyzeSource が解析結果と位置索引をホストへ渡す
+    criteria: frontmatter 読込・lex・parse の3段が packages/core/src/lexer.test.ts・packages/core/src/parser.test.ts・packages/core/src/frontmatter-source.test.ts で検証されており、CLI と VSCode 拡張は @pfdsl/core の解析を利用する。拡張の jump・link・run hint・diagnostic は packages/vscode-extension/src/document-corpus.test.ts の共通入力で個別に検証される
     group: in_memory
   normalized_graph:
     label: 正準化グラフ
@@ -413,7 +413,7 @@ artifact:
 process:
   parse:
     label: 構文解析
-    description: "frontmatterの既知フィールドをスキーマで検査し、lex・parseと合わせてdocument+frontmatterと診断を得る。CLI（c経由）・VSCode拡張（d）双方の全コマンドが内部で通る"
+    description: "frontmatterの既知フィールドをスキーマで検査し、同じYAML文書から意味値とソース位置索引を得る。lex・parseと合わせてdocument+frontmatterと診断を得る。CLI（c経由）・VSCode拡張（d）双方の全コマンドが内部で通る"
     location: ../packages/core/src/index.ts
     tags: [ b ]
   normalize:
@@ -439,7 +439,7 @@ process:
     tags: [ b ]
   validate:
     label: 検証
-    description: "正準化グラフとfrontmatterにV/Wルールを適用し診断を生成する。ルールの一次情報docs/spec/spec.md（a層）は設計時にこの実装へ反映されるもので、実行時の入力ではない"
+    description: "正準化グラフとfrontmatterにV/Wルールを適用し診断を生成する。analyze と analyzeSource は解析時のソース位置索引を渡し、宣言位置を再解釈しない。ルールの一次情報docs/spec/spec.md（a層）は設計時にこの実装へ反映されるもので、実行時の入力ではない"
     command: node packages/cli/dist/cli.js check
     location: ../packages/core/src/validator.ts
     tags: [ b ]

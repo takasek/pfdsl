@@ -45,8 +45,14 @@
 
 - **parse（`@pfdsl/core` の `parse()`）**: frontmatter 読込 → lex → parse の3段を1トランザクションとして扱う。宣言 ID の YAML キー型は文字列化前に検査する。出力は `document`（構文木）と型検査済み `frontmatter`、FM/L/P 診断。個別サブコマンドとしては露出しない内部境界
 - **normalize（`normalizer.ts` + `buildGraph`）**: parse の出力からエッジリスト・ノード種別・孤立ノード集合・`Graph` 構造を組み立てる。CLI `normalize` コマンドはこれをそのまま JSON 出力する
-- **validate（`validator.ts`）**: 正準化グラフと frontmatter に V/W ルールを適用し、原文から宣言位置を取得して診断を生成する。CLI `check` は parse→normalize→validate を1回で実行する。VSCode 拡張は `analyze()` 経由で同じ validate をエディタ内リアルタイム診断に使う（`diagnostics.ts`）
+- **validate（`validator.ts`）**: 正準化グラフと frontmatter に V/W ルールを適用し、解析時のソース位置索引から宣言位置を取得して診断を生成する。単独の `validateGraph` は従来の `source` 引数も利用できる。CLI `check` は parse→normalize→validate を1回で実行する。VSCode 拡張は `analyzeSource()` 経由で同じ validate をエディタ内リアルタイム診断に使う（`diagnostics.ts`）
 - **collect_diagnostics（`index.ts` の `analyze()`）**: parse・normalize・validate の診断を集約する。CLI と VSCode は集約後の結果を受け取る。
+
+`analyzeSource()` は同じ解析 snapshot に frontmatter の宣言・フィールド・文字列値の位置索引を付けて返す。
+VSCode の URI・version 単位の解析 cache はこの snapshot を jump・link・run hint・diagnostic に共有する。
+描画用の継承解決は cache せず、渡された entry frontmatter の `extends` と local 設定を正本として依存プリセットだけを loader へ渡す。
+依存プリセットは保存済みファイルを読み、untitled 文書の相対 extends は解決しない。
+無効な YAML・型不正の metadata を描画・操作の消費者へ渡さない契約と、renderer の寛容な解決・strict check の診断は維持する。
 - **generate_frontmatter_schema**: Zod の型・値制約から外部検証用 JSON Schema を生成する。空宣言を許可する文書形状を公開し、後続の意味検証へ委譲するために緩めた読込み用スキーマは公開しない。変換コードはビルド時だけ使い、core の通常入口へ含めない。
 - **format（`formatter.ts`）**: ソーステキストから独立に再 lex/parse し整形済みテキストを生成する。check の parse 結果を再利用しない別経路。frontmatter は yaml CST（`frontmatter-cst.ts`）経由で正準化する（ADR-0034）
 - **sort_meta（`sort.ts` の `sort(source, opts)`）**: 入力はソーステキスト（format と同じく独立再 parse）。構文木を受け取る経路ではない。frontmatter の並べ替えは yaml CST（`frontmatter-cst.ts`）経由（ADR-0034）
