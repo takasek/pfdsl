@@ -9,13 +9,15 @@ name: sweep completed chains
 # artifact — that case surfaces as an undeclared id on an edge when the
 # branch lands, and the checker rejects it there.
 #
-# Triggers on every push (adopting repos don't all name their default branch
+# Triggers on every branch push (adopting repos don't all name their default branch
 # "main"), then the job itself checks github.ref against
-# github.event.repository.default_branch and no-ops otherwise. A tag push
-# never matches a refs/heads/* ref, so it no-ops the same way without a
-# separate filter.
+# github.event.repository.default_branch and no-ops otherwise.
+# A tag push does not match a branch filter, so it does not trigger at all.
+# The push to the sweep's own PR branch is ignored: when the PR is opened with an App token that push starts this workflow, and the run would queue in the concurrency group below and replace a pending run for a default-branch push, losing that sweep.
 on:
   push:
+    branches-ignore:
+      - flow-sync/pending
 
 concurrency:
   group: flow-sync
@@ -129,10 +131,27 @@ jobs:
         if: steps.sweep-gate.outputs.enabled == 'true'
         run: node scripts/pfdsl/sweep-completed-chains.mjs .pfdsl/roadmap.pfdsl --write
 
+      # GitHub holds the pull_request runs of a PR opened with GITHUB_TOKEN until someone with write access approves them.
+      # A PR opened with a GitHub App installation token runs them straight away, which is what lets this repo's own CI gate the sweep.
+      # The repository opts in by setting the PFDSL_SWEEP_APP_CLIENT_ID variable and the PFDSL_SWEEP_APP_PRIVATE_KEY secret.
+      # Without them the PR is opened with GITHUB_TOKEN as before, and the run waits for approval.
+      # The variable is the switch: a variable set without a usable secret fails this step instead of silently falling back, while a secret set without the variable leaves the PR on GITHUB_TOKEN (the secret cannot be read in a step condition).
+      # The PR body says which token opened the PR.
+      - name: Create short-lived App token to open the PR
+        id: app-token
+        if: steps.sweep-gate.outputs.enabled == 'true' && vars.PFDSL_SWEEP_APP_CLIENT_ID != ''
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        with:
+          client-id: ${{ vars.PFDSL_SWEEP_APP_CLIENT_ID }}
+          private-key: ${{ secrets.PFDSL_SWEEP_APP_PRIVATE_KEY }}
+          permission-contents: write
+          permission-pull-requests: write
+
       - name: Open PR if roadmap.pfdsl changed
         if: steps.sweep-gate.outputs.enabled == 'true'
         uses: peter-evans/create-pull-request@5f6978faf089d4d20b00c7766989d076bb2fc7f1 # v8
         with:
+          token: ${{ steps.app-token.outputs.token || github.token }}
           add-paths: .pfdsl/roadmap.pfdsl
           branch: flow-sync/pending
           commit-message: "chore(plan): sweep completed chains after a push to the default branch"
@@ -143,7 +162,9 @@ jobs:
 
             The sweep applied nothing until `check` passed, `graph orphans` came back empty, `fmt --check` passed, and `status blocked` produced byte-identical output before and after. `status ready` is compared the same way except for one field: `empty.complete` (the count of completed-chain processes, present only when the ready set is empty) is excluded, because a sweep that found anything to remove always reduces it by design. Comparing everything else whole is the point: an id-set comparison alone would pass a sweep that leaves a process ready while quietly taking one of its inputs away.
 
-            A `GITHUB_TOKEN`-authored PR like this one does not trigger this repo's `pull_request` workflow, so none of the repo's own CI (build, tests, `make check-fmt`, etc.) ran against it. The checks above — `check`, `graph orphans`, `fmt --check`, and the ready/blocked comparison — are the only verification this change has received; an absence of failing CI checks on this PR does not mean anything else passed.
+            The checks above — `check`, `graph orphans`, `fmt --check`, and the ready/blocked comparison — ran in the sweep job itself, whichever token opened this PR.
+
+            ${{ steps.app-token.outcome == 'success' && 'This PR was opened with a GitHub App token, so the `pull_request` workflows of this repository, if it has any, started on it without waiting for approval. Their results appear in the checks of this PR.' || 'This PR was opened with `GITHUB_TOKEN`, so GitHub holds the `pull_request` workflows of this repository, if it has any, in an approval-required state until someone with write access approves them. Until then the checks above are the only verification this change has received, and a PR with no passing CI checks means those runs are still waiting, not that they passed. To start them without approval, set the `PFDSL_SWEEP_APP_CLIENT_ID` variable and the `PFDSL_SWEEP_APP_PRIVATE_KEY` secret of a GitHub App with contents and pull-requests write access.' }}
 
             This job used ${{ steps.build-cli.outputs.description || steps.install-cli.outputs.description }} to run the checks above.
 

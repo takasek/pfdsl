@@ -32,17 +32,20 @@ function writeConfig(dir, text) {
 	writeFileSync(join(dir, CONFIG_PATH), text);
 }
 
-// Evaluate the step conditions this workflow uses: `&&`-joined comparisons of
-// earlier steps' outputs. A skipped or unset output reads as the empty string,
-// as it does on a runner.
-function conditionHolds(condition, outputs) {
+// Evaluate the step conditions this workflow uses: `&&`-joined comparisons of earlier steps' outputs or repository variables.
+// A skipped or unset output or variable reads as the empty string, as it does on a runner.
+function conditionHolds(condition, outputs, vars = {}) {
 	return condition.split(" && ").every((term) => {
-		const match = /^steps\.([\w-]+)\.outputs\.(\w+) (==|!=) '([^']*)'$/.exec(
-			term,
-		);
+		const match =
+			/^(?:steps\.([\w-]+)\.outputs\.(\w+)|vars\.(\w+)) (==|!=) '([^']*)'$/.exec(
+				term,
+			);
 		assert.ok(match, `Unsupported fixture condition: ${condition}`);
-		const actual = outputs[match[1]]?.[match[2]] ?? "";
-		return (actual === match[4]) === (match[3] === "==");
+		const actual =
+			(match[3] === undefined
+				? outputs[match[1]]?.[match[2]]
+				: vars[match[3]]) ?? "";
+		return (actual === match[5]) === (match[4] === "==");
 	});
 }
 
@@ -66,12 +69,12 @@ function runShellStep(step, dir) {
 
 // Walk the workflow in dir without a runner: execute the detector steps for
 // real and record which other steps their conditions let through.
-function walkWorkflow(dir) {
+function walkWorkflow(dir, vars = {}) {
 	const outputs = {};
 	const ran = [];
 	let failed;
 	for (const step of steps) {
-		if (step.if && !conditionHolds(step.if, outputs)) continue;
+		if (step.if && !conditionHolds(step.if, outputs, vars)) continue;
 		if (step.id === "sweep-gate" || step.id === "detect-workspace") {
 			const { result, outputs: own } = runShellStep(step, dir);
 			outputs[step.id] = own;
@@ -291,3 +294,150 @@ for (const shape of ["no-package", "no-package-manager", "workspace"]) {
 		}
 	});
 }
+
+// GitHub holds the `pull_request` runs of a PR opened with GITHUB_TOKEN in an approval-required state ("Triggering a workflow" in the Actions docs).
+// The docs name a GitHub App installation token and a personal access token as the ways past that; this repository uses an App because it already mints App tokens for other workflows.
+// The sweep opens that PR, so it mints the App token when the repository configured an App, and falls back to GITHUB_TOKEN for adopters that did not.
+const APP_CLIENT_ID_VAR = "PFDSL_SWEEP_APP_CLIENT_ID";
+const APP_PRIVATE_KEY_SECRET = "PFDSL_SWEEP_APP_PRIVATE_KEY";
+const appTokenStep = steps.find((step) => step.id === "app-token");
+const openPrStep = steps.find((step) =>
+	step.uses?.startsWith("peter-evans/create-pull-request@"),
+);
+
+function mintedAppToken(ran) {
+	return ran.some((entry) =>
+		entry.startsWith("actions/create-github-app-token@"),
+	);
+}
+
+// Evaluate the one expression shape the token input uses: `${{ a.b || c.d }}`,
+// each side a dotted context path. A missing or empty value is falsy, as it is
+// on a runner.
+function resolveFallbackExpression(expression, context) {
+	const match = /^\$\{\{ ([\w.-]+) \|\| ([\w.-]+) \}\}$/.exec(expression);
+	assert.ok(match, `Unsupported fixture expression: ${expression}`);
+	const lookup = (path) =>
+		path.split(".").reduce((value, key) => value?.[key], context);
+	return lookup(match[1]) || lookup(match[2]);
+}
+
+test("the App token step reads the configured App and asks for no more than the sweep needs", () => {
+	assert.ok(appTokenStep, "the workflow must declare a step with id app-token");
+	assert.match(appTokenStep.uses, /^actions\/create-github-app-token@/);
+	assert.equal(
+		appTokenStep.with["client-id"],
+		`\${{ vars.${APP_CLIENT_ID_VAR} }}`,
+	);
+	assert.equal(
+		appTokenStep.with["private-key"],
+		`\${{ secrets.${APP_PRIVATE_KEY_SECRET} }}`,
+	);
+	// The sweep rewrites .pfdsl/roadmap.pfdsl and opens a PR, nothing else.
+	const permissions = Object.keys(appTokenStep.with)
+		.filter((key) => key.startsWith("permission-"))
+		.sort();
+	assert.deepEqual(permissions, [
+		"permission-contents",
+		"permission-pull-requests",
+	]);
+	for (const key of permissions) assert.equal(appTokenStep.with[key], "write");
+	// A failing mint must stop the job: continuing would open the PR with GITHUB_TOKEN unnoticed.
+	assert.equal(appTokenStep["continue-on-error"], undefined);
+	// Without owner and repositories the token is scoped to this repository only.
+	assert.equal(appTokenStep.with.owner, undefined);
+	assert.equal(appTokenStep.with.repositories, undefined);
+});
+
+// A push to the PR branch with the App token starts the push trigger.
+// That run would queue in the flow-sync concurrency group and replace a pending run for a default-branch push, losing that sweep.
+test("a push to the sweep's own PR branch does not start the sweep", () => {
+	const push = workflow.on?.push;
+	assert.ok(push, "the workflow must declare a push trigger");
+	assert.deepEqual(push["branches-ignore"], [openPrStep.with.branch]);
+	assert.equal(push.branches, undefined);
+});
+
+// [label, config text, vars, expect the App token minted]
+const APP_TOKEN_CASES = [
+	[
+		"opted in and the App configured",
+		ENABLED_CONFIG,
+		{ [APP_CLIENT_ID_VAR]: "Iv1.abc" },
+		true,
+	],
+	["opted in, no App configured", ENABLED_CONFIG, {}, false],
+	[
+		"opted in, App variable empty",
+		ENABLED_CONFIG,
+		{ [APP_CLIENT_ID_VAR]: "" },
+		false,
+	],
+	[
+		"not opted in, App configured",
+		'{"sweepCompletedChains": {"enabled": false}}',
+		{ [APP_CLIENT_ID_VAR]: "Iv1.abc" },
+		false,
+	],
+];
+
+for (const [label, text, vars, minted] of APP_TOKEN_CASES) {
+	test(`the App token is ${minted ? "minted before the PR is opened" : "not minted"}: ${label}`, () => {
+		inTempDir((dir) => {
+			writeConfig(dir, text);
+			const { ran, failed } = walkWorkflow(dir, vars);
+			assert.equal(failed, undefined, failed?.result.stderr);
+			assert.equal(
+				mintedAppToken(ran),
+				minted,
+				`steps that ran: ${ran.join(", ")}`,
+			);
+			if (minted) {
+				const mintAt = ran.findIndex((entry) =>
+					entry.startsWith("actions/create-github-app-token@"),
+				);
+				const openAt = ran.findIndex((entry) =>
+					entry.startsWith("peter-evans/create-pull-request@"),
+				);
+				assert.ok(openAt > mintAt, `steps that ran: ${ran.join(", ")}`);
+			}
+		});
+	});
+}
+
+test("the PR is opened with the App token, and with GITHUB_TOKEN when no App minted one", () => {
+	const expression = openPrStep.with.token;
+	assert.ok(expression, "create-pull-request must be given a token input");
+	const githubToken = "workflow-github-token";
+	assert.equal(
+		resolveFallbackExpression(expression, {
+			steps: { "app-token": { outputs: { token: "app-installation-token" } } },
+			github: { token: githubToken },
+		}),
+		"app-installation-token",
+	);
+	assert.equal(
+		resolveFallbackExpression(expression, {
+			steps: {},
+			github: { token: githubToken },
+		}),
+		githubToken,
+	);
+});
+
+test("the PR body says whether this repository's CI ran, matching the token that opened the PR", () => {
+	const body = openPrStep.with.body;
+	assert.doesNotMatch(body, /does not trigger/);
+	const note =
+		/\$\{\{ steps\.app-token\.outcome == 'success' && '([^']*)' \|\| '([^']*)' \}\}/.exec(
+			body,
+		);
+	assert.ok(note, "the body must pick its CI note by the app-token outcome");
+	const [, withApp, withoutApp] = note;
+	assert.match(withApp, /without waiting for approval/);
+	assert.match(withoutApp, /GITHUB_TOKEN/);
+	assert.match(withoutApp, /until someone with write access approves/);
+	// A reviewer who sees the held runs must find the two settings that avoid the hold.
+	assert.ok(withoutApp.includes(APP_CLIENT_ID_VAR), withoutApp);
+	assert.ok(withoutApp.includes(APP_PRIVATE_KEY_SECRET), withoutApp);
+});
