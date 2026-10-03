@@ -39,6 +39,7 @@ This collection restriction applies to extension fields; existing known-field up
 Empty local definitions can receive fields, but `meta set` refuses to edit a definition accessed through an alias; expand that definition first.
 Updating the original anchored definition retains YAML's shared-value behavior for its aliases.
 Values are stored as strings, except for the existing numeric `index` field.
+For a value beginning with `-`, put options before `--` and the value after it, for example `meta set diagram.pfdsl a label --json -- --help`.
 The existing CLI rules for reserved names still apply: `status` uses the roadmap/status checks, `index` requires a number, and collection or derived field names remain unavailable through `meta set`.
 The issue audit remains read-only and prints a timestamp repair command, including the flag so an absent `updated_at` can be added.
 
