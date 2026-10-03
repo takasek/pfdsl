@@ -1,381 +1,342 @@
 import assert from "node:assert/strict";
-import { describe, it } from "node:test";
-
+import { execFileSync } from "node:child_process";
+import { mkdirSync, mkdtempSync, realpathSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { dirname, join, resolve } from "node:path";
+import { after, before, describe, it } from "node:test";
+import { fileURLToPath } from "node:url";
 import {
-	evaluateVerificationTreeGuard,
 	findVerificationSegments,
 	runVerificationTreeGuard,
 	supportsPermissionAsk,
 } from "./verification-tree-guard.mjs";
 
-const WORKTREE_ROOT = "/Users/m5/works/pfdsl/.claude/worktrees/some-branch";
-const MAIN_ROOT = "/Users/m5/works/pfdsl";
-
-function payload({ toolName = "Bash", command }) {
-	return {
-		hook_event_name: "PreToolUse",
-		tool_name: toolName,
-		tool_input: { command },
-	};
+const MAIN = "/repo";
+const FEATURE = "/worktrees/feature";
+function run(
+	command,
+	{
+		cwd = MAIN,
+		supportsAsk = false,
+		resolveRoots = (target) => ({
+			worktreeRoot: target,
+			mainRoot: MAIN,
+			hasLinkedWorktrees: true,
+		}),
+		...options
+	} = {},
+) {
+	return runVerificationTreeGuard(
+		JSON.stringify({ tool_name: "Bash", tool_input: { command }, cwd }),
+		{
+			resolveRoots,
+			supportsAsk,
+			payloadCwdIsExecutionCwd: supportsAsk,
+			...options,
+		},
+	);
+}
+function decision(result) {
+	return result.output?.hookSpecificOutput.permissionDecision ?? "allow";
 }
 
-describe("findVerificationSegments", () => {
-	it("finds a bare `make test`", () => {
-		assert.deepEqual(findVerificationSegments("make test"), ["make test"]);
-	});
+describe("verification command boundaries", () => {
+	for (const command of [
+		"make",
+		"make format",
+		"make test",
+		"make -C /repo test",
+		"make --directory=/repo test",
+		"pnpm --dir /repo test",
+		"pnpm -r build",
+		"pnpm install",
+		"npm --prefix /repo test",
+		"npm run build",
+		"npx biome check",
+		"node scripts/check.mjs",
+		'node "scripts/check.mjs"',
+		"node check.js",
+		"node some/entrypoint",
+		"node /repo/scripts/check.mjs",
+		"node --test",
+		"node --test /repo/scripts/check.test.mjs",
+	])
+		it(`classifies ${command}`, () =>
+			assert.deepEqual(findVerificationSegments(command), [command]));
 
-	it("finds any `make` target, not just test/check/build (#840 gap: `make format`)", () => {
-		for (const command of [
-			"make check-format",
-			"make build-cli",
-			"make format",
-		]) {
-			assert.deepEqual(findVerificationSegments(command), [command], command);
-		}
-	});
+	for (const command of [
+		"git status",
+		"ls",
+		"node --version",
+		"node -v",
+		"node",
+		"node -e '1+1'",
+		"node --input-type=module -e 'console.log(1)'",
+		"node --eval='1+1'",
+		"node -p '1+1'",
+		"node -e '1+1' /repo/script.mjs",
+	])
+		it(`leaves the supported non-verification boundary: ${command}`, () =>
+			assert.deepEqual(findVerificationSegments(command), []));
 
-	it("finds a bare `make` with no target", () => {
-		assert.deepEqual(findVerificationSegments("make"), ["make"]);
-	});
-
-	it("finds `node --test ...`", () => {
+	it("does not mistake script arguments for Node eval flags", () => {
 		assert.deepEqual(
-			findVerificationSegments('node --test "scripts/*.test.mjs"'),
-			['node --test "scripts/*.test.mjs"'],
+			findVerificationSegments("node scripts/check.mjs --eval example"),
+			["node scripts/check.mjs --eval example"],
 		);
 	});
-
-	it("finds a bare `node --test` with no operand", () => {
-		assert.deepEqual(findVerificationSegments("node --test"), ["node --test"]);
-	});
-
-	it("finds `node <relative script path>` even without --test (#840 gap: check-md-linebreaks.mjs)", () => {
-		for (const command of [
-			"node scripts/foo.mjs",
-			"node scripts/check-md-linebreaks.mjs",
-			"node ./scripts/foo.js",
-			"node lib/foo.cjs",
-			"node scripts/gen.ts",
-			"node some/dir/entrypoint",
-		]) {
-			assert.deepEqual(findVerificationSegments(command), [command], command);
-		}
-	});
-
-	it("does not match `node <absolute script path>` (explicit path, no drift risk)", () => {
-		assert.deepEqual(findVerificationSegments("node /abs/scripts/foo.mjs"), []);
-	});
-
-	it("does not match `node --test <absolute script path>` (explicit path overrides --test)", () => {
-		assert.deepEqual(
-			findVerificationSegments("node --test /abs/scripts/foo.test.mjs"),
-			[],
-		);
-	});
-
-	it("does not match `node -e '...'` (no path operand)", () => {
-		assert.deepEqual(findVerificationSegments("node -e '1+1'"), []);
-	});
-
-	it("does not match `node --input-type=module -e '...'` (no path operand)", () => {
-		assert.deepEqual(
-			findVerificationSegments("node --input-type=module -e '1+1'"),
-			[],
-		);
-	});
-
-	it("does not match an eval body that merely contains `/` chars — the body is program source, not a path (false-positive fix)", () => {
-		for (const command of [
-			'node -e "console.log(1)"',
-			`node -e "import x from '/abs/path/x.mjs'"`,
-			`node --input-type=module -e "import { checkFile } from '/Users/m5/works/pfdsl/scripts/lib/md-linebreaks.mjs';"`,
-		]) {
-			assert.deepEqual(findVerificationSegments(command), [], command);
-		}
-	});
-
-	it("still matches a real relative script path, and still excludes a real absolute one (eval-flag fix must not widen or narrow those)", () => {
-		assert.deepEqual(findVerificationSegments("node scripts/x.mjs"), [
-			"node scripts/x.mjs",
-		]);
-		assert.deepEqual(findVerificationSegments("node /abs/scripts/x.mjs"), []);
-	});
-
-	it("finds pnpm/npm subcommands generally, not just test/build (#840 gap widening)", () => {
-		for (const command of [
-			"pnpm test",
-			"pnpm -r test",
-			"pnpm -r build",
-			"pnpm run test",
-			"pnpm --filter x build",
-			"pnpm install",
-			"pnpm biome check",
-			"npm install",
-			"npm run build",
-		]) {
-			assert.deepEqual(findVerificationSegments(command), [command], command);
-		}
-	});
-
-	it("always finds npx (resolves from cwd's node_modules, no explicit-cwd escape)", () => {
-		assert.deepEqual(findVerificationSegments("npx biome check"), [
-			"npx biome check",
-		]);
-	});
-
-	it("does not match `make -C <path> ...` (explicit cwd, no drift risk)", () => {
-		assert.deepEqual(findVerificationSegments("make -C /some/path test"), []);
-	});
-
-	it("does not match `make --directory <path> ...` or `--directory=<path>`", () => {
-		assert.deepEqual(
-			findVerificationSegments("make --directory /some/path test"),
-			[],
-		);
-		assert.deepEqual(
-			findVerificationSegments("make --directory=/some/path test"),
-			[],
-		);
-	});
-
-	it("does not match `pnpm -C <path> ...`, `--dir <path>`, or `--prefix=<path>`", () => {
-		assert.deepEqual(findVerificationSegments("pnpm -C /some/path test"), []);
-		assert.deepEqual(
-			findVerificationSegments("pnpm --dir /some/path test"),
-			[],
-		);
-		assert.deepEqual(
-			findVerificationSegments("pnpm --prefix=/some/path test"),
-			[],
-		);
-	});
-
-	it("does not match `npm --prefix <path> ...`", () => {
-		assert.deepEqual(
-			findVerificationSegments("npm --prefix /some/path test"),
-			[],
-		);
-	});
-
-	it("does not match unrelated commands", () => {
-		for (const command of ["git status", "ls", "gh issue view 1"]) {
-			assert.deepEqual(findVerificationSegments(command), [], command);
-		}
-	});
-
-	it("finds a verification segment inside a compound command", () => {
-		assert.deepEqual(findVerificationSegments("cd x && make test"), [
-			"make test",
-		]);
-	});
-
-	it("returns an empty array for a non-string command", () => {
+	it("handles malformed/unrelated payloads without Git reads", () => {
+		const options = {
+			resolveRoots: () => {
+				throw Error("unexpected Git read");
+			},
+			supportsAsk: false,
+			payloadCwdIsExecutionCwd: false,
+		};
+		for (const input of [
+			"not-json",
+			JSON.stringify({
+				tool_name: "Read",
+				tool_input: { command: "make test" },
+			}),
+			JSON.stringify({ tool_name: "Bash" }),
+		])
+			assert.deepEqual(runVerificationTreeGuard(input, options), {
+				shouldOutput: false,
+			});
 		assert.deepEqual(findVerificationSegments(undefined), []);
 	});
 });
 
-describe("evaluateVerificationTreeGuard", () => {
-	it("allows tools other than Bash", () => {
-		const result = evaluateVerificationTreeGuard(
-			payload({ toolName: "Read", command: "make test" }),
-			{
-				worktreeRoot: MAIN_ROOT,
-				mainRoot: MAIN_ROOT,
-				hasLinkedWorktrees: true,
-			},
-		);
-		assert.equal(result.decision, "allow");
+describe("effective verification cwd", () => {
+	it("uses explicit effective cwd for Codex verification", () => {
+		for (const command of [
+			`cd ${FEATURE} && node scripts/check.mjs`,
+			`cd ${FEATURE} && node --test ${FEATURE}/scripts/check.test.mjs`,
+			`make -C ${FEATURE} test`,
+			`make --directory=${FEATURE} test`,
+			`make -C${FEATURE} test`,
+			`pnpm --dir ${FEATURE} test`,
+			`npm --prefix ${FEATURE} test`,
+			`env -C ${FEATURE} node scripts/check.mjs`,
+			`cd ${MAIN} && make test`,
+			`make -C ${MAIN} test`,
+			`cd ${FEATURE} && node scripts/check-md-linebreaks.mjs scripts/lib/example.mjs`,
+		])
+			assert.equal(decision(run(command)), "allow", command);
 	});
-
-	it("allows when command is not a string", () => {
-		const result = evaluateVerificationTreeGuard(
-			payload({ command: undefined }),
-			{
-				worktreeRoot: MAIN_ROOT,
-				mainRoot: MAIN_ROOT,
-				hasLinkedWorktrees: true,
-			},
-		);
-		assert.equal(result.decision, "allow");
+	it("does not treat invisible Codex workdir or an absolute script as cwd proof", () => {
+		for (const cwd of [MAIN, FEATURE])
+			for (const command of [
+				"node scripts/check.mjs",
+				`node ${FEATURE}/scripts/check.mjs`,
+				`node --test ${FEATURE}/scripts/check.test.mjs`,
+				"make -C . test",
+				"pnpm --dir ../feature test",
+				"npm --prefix . test",
+				"make -C test",
+				"make -C",
+				"pnpm --dir= test",
+				`make -C ${FEATURE} test && node scripts/check.mjs`,
+				`env -C ${FEATURE} make test && node scripts/check.mjs`,
+			]) {
+				const result = run(command, { cwd });
+				assert.equal(decision(result), "deny", command);
+				assert.match(
+					result.output.hookSpecificOutput.permissionDecisionReason,
+					/absolute/i,
+				);
+				assert.doesNotMatch(
+					result.output.hookSpecificOutput.permissionDecisionReason,
+					/retry.*workdir|reopen/i,
+				);
+			}
 	});
-
-	it("allows when roots could not be resolved", () => {
-		const result = evaluateVerificationTreeGuard(
-			payload({ command: "make test" }),
-			null,
-		);
-		assert.equal(result.decision, "allow");
+	it("does not mistake an option's value or forwarded script arguments for cwd options", () => {
+		for (const command of [
+			"make -f -C /feature test",
+			"npm --userconfig --prefix /feature test",
+			"pnpm test -- --dir /feature",
+			"npm run test -- --prefix /feature",
+		])
+			assert.equal(decision(run(command)), "deny", command);
 	});
-
-	it("allows when cwd is inside a linked worktree (worktreeRoot !== mainRoot)", () => {
-		const result = evaluateVerificationTreeGuard(
-			payload({ command: "make test" }),
-			{
-				worktreeRoot: WORKTREE_ROOT,
-				mainRoot: MAIN_ROOT,
-				hasLinkedWorktrees: true,
-			},
-		);
-		assert.equal(result.decision, "allow");
+	it("resolves relative options only from a known base, including repeated make -C", () => {
+		for (const command of [
+			"cd /feature && make -C . test",
+			"make -C /worktrees -C feature test",
+			"cd /worktrees && pnpm --dir feature test",
+			"cd /worktrees && npm --prefix feature test",
+		])
+			assert.equal(decision(run(command)), "allow", command);
 	});
-
-	it("asks when cwd is the main checkout, linked worktrees exist, and the command is `make test`", () => {
-		const result = evaluateVerificationTreeGuard(
-			payload({ command: "make test" }),
-			{
-				worktreeRoot: MAIN_ROOT,
-				mainRoot: MAIN_ROOT,
-				hasLinkedWorktrees: true,
-			},
-		);
-		assert.equal(result.decision, "ask");
-		assert.ok(result.reason.includes(MAIN_ROOT));
+	it("resolves the last npm and pnpm cwd option against the original process cwd", () => {
+		for (const command of [
+			"npm --prefix /feature --prefix . root",
+			"pnpm --dir /feature --dir . root",
+		])
+			assert.equal(decision(run(command)), "deny", command);
+		for (const command of [
+			"npm --prefix . --prefix /feature root",
+			"pnpm --dir . --dir /feature root",
+		])
+			assert.equal(decision(run(command)), "allow", command);
 	});
-
-	it("asks for `node --test ...` under the same conditions", () => {
-		const result = evaluateVerificationTreeGuard(
-			payload({ command: 'node --test "scripts/*.test.mjs"' }),
-			{
-				worktreeRoot: MAIN_ROOT,
-				mainRoot: MAIN_ROOT,
-				hasLinkedWorktrees: true,
-			},
+	it("inspects every segment, preserving later uncertainty", () => {
+		for (const command of [
+			"make -C /feature test && make test",
+			"cd /feature && node check.mjs && cd $UNKNOWN && make test",
+			"cd /feature && make test; node check.mjs",
+		])
+			assert.equal(decision(run(command)), "deny", command);
+		assert.equal(
+			decision(run("cd /feature && make test && cd /repo && node check.mjs")),
+			"allow",
 		);
-		assert.equal(result.decision, "ask");
 	});
-
-	it("asks for `pnpm -r test` under the same conditions", () => {
-		const result = evaluateVerificationTreeGuard(
-			payload({ command: "pnpm -r test" }),
-			{
-				worktreeRoot: MAIN_ROOT,
-				mainRoot: MAIN_ROOT,
-				hasLinkedWorktrees: true,
-			},
+	it("fails closed for unknown control flow, prefixes, and protected environment", () => {
+		for (const command of [
+			"if true; then make -C /feature test; fi",
+			"(cd /feature && make test)",
+			"cd /feature || make test",
+			"pushd /feature && make test",
+			'cd "$FEATURE" && make test',
+			"sudo --unknown value make -C /feature test",
+			"GIT_DIR=/repo/.git make -C /feature test",
+			"export GIT_WORK_TREE=/repo; make -C /feature test",
+			"CDPATH=/root cd feature && node check.mjs",
+		])
+			assert.equal(decision(run(command)), "deny", command);
+		assert.equal(
+			decision(
+				run("make -C /feature test", { ambientGitTargetOverride: true }),
+			),
+			"deny",
 		);
-		assert.equal(result.decision, "ask");
-	});
-
-	it("converts the unsupported Codex ask into a fail-closed deny (#1013)", () => {
-		const result = runVerificationTreeGuard(
-			JSON.stringify({ ...payload({ command: "make test" }), cwd: MAIN_ROOT }),
-			{
-				resolveRoots: () => ({
-					worktreeRoot: MAIN_ROOT,
-					mainRoot: MAIN_ROOT,
-					hasLinkedWorktrees: true,
+		assert.equal(
+			decision(
+				run("cd feature && make test", {
+					supportsAsk: true,
+					ambientCdPath: true,
 				}),
-				supportsAsk: false,
-			},
+			),
+			"deny",
 		);
-		const output = result.output.hookSpecificOutput;
-		assert.equal(output.permissionDecision, "deny");
-		assert.match(output.permissionDecisionReason, /Codex.*ask.*unsupported/i);
-		assert.match(output.permissionDecisionReason, /workdir/i);
-		assert.match(output.permissionDecisionReason, /cannot prove/i);
-		assert.doesNotMatch(output.permissionDecisionReason, /absolute path.*-C/i);
-		assert.doesNotMatch(output.permissionDecisionReason, /confirm to proceed/i);
 	});
-
-	it("does not claim a compound command actually targets the main tree", () => {
-		const result = runVerificationTreeGuard(
-			JSON.stringify({
-				...payload({ command: `cd ${WORKTREE_ROOT} && make test` }),
-				cwd: MAIN_ROOT,
-			}),
-			{
-				resolveRoots: () => ({
-					worktreeRoot: MAIN_ROOT,
-					mainRoot: MAIN_ROOT,
-					hasLinkedWorktrees: true,
+	it("uses Claude's actual initial cwd and asks only for implicit main drift", () => {
+		assert.equal(
+			decision(run("make test", { supportsAsk: true, cwd: FEATURE })),
+			"allow",
+		);
+		assert.equal(decision(run("make test", { supportsAsk: true })), "ask");
+		assert.equal(
+			decision(run("node /feature/check.mjs", { supportsAsk: true })),
+			"ask",
+		);
+		assert.equal(
+			decision(run("cd /feature && make test", { supportsAsk: true })),
+			"allow",
+		);
+		assert.equal(
+			decision(
+				run("cd /repo && make test", { supportsAsk: true, cwd: FEATURE }),
+			),
+			"allow",
+		);
+	});
+	it("preserves known implicit cwd outside Git or without linked worktrees", () => {
+		assert.equal(
+			decision(
+				run("make test", { supportsAsk: true, resolveRoots: () => null }),
+			),
+			"allow",
+		);
+		assert.equal(
+			decision(
+				run("make test", {
+					supportsAsk: true,
+					resolveRoots: () => ({
+						worktreeRoot: MAIN,
+						mainRoot: MAIN,
+						hasLinkedWorktrees: false,
+					}),
 				}),
-				supportsAsk: false,
-			},
+			),
+			"allow",
 		);
-		const reason = result.output.hookSpecificOutput.permissionDecisionReason;
-		assert.match(reason, /cannot prove/i);
-		assert.doesNotMatch(reason, /That tree does not contain/i);
 	});
-
-	it("preserves the Claude ask at the orchestration boundary", () => {
-		const result = runVerificationTreeGuard(
-			JSON.stringify({ ...payload({ command: "make test" }), cwd: MAIN_ROOT }),
-			{
-				resolveRoots: () => ({
-					worktreeRoot: MAIN_ROOT,
-					mainRoot: MAIN_ROOT,
-					hasLinkedWorktrees: true,
-				}),
-				supportsAsk: true,
-			},
-		);
-		assert.equal(result.output.hookSpecificOutput.permissionDecision, "ask");
-	});
-
-	it("treats an absent or blank Claude project root as Codex", () => {
+	it("recognizes the existing Claude harness signal", () => {
 		assert.equal(supportsPermissionAsk({}), false);
 		assert.equal(supportsPermissionAsk({ CLAUDE_PROJECT_DIR: " \t " }), false);
-		assert.equal(
-			supportsPermissionAsk({ CLAUDE_PROJECT_DIR: WORKTREE_ROOT }),
-			true,
-		);
+		assert.equal(supportsPermissionAsk({ CLAUDE_PROJECT_DIR: MAIN }), true);
 	});
+});
 
-	it("keeps malformed and unrelated payloads silent in either harness", () => {
-		const resolveRoots = () => {
-			throw new Error("allow paths must not resolve Git roots");
-		};
-		assert.deepEqual(
-			runVerificationTreeGuard("not json{{{", {
-				resolveRoots,
-				supportsAsk: false,
+describe("verification wrapper", () => {
+	const script = resolve(
+		dirname(fileURLToPath(import.meta.url)),
+		"../verification-tree-guard.mjs",
+	);
+	let root, main, feature;
+	function git(cwd, args) {
+		return execFileSync("git", args, {
+			cwd,
+			encoding: "utf8",
+			stdio: ["ignore", "pipe", "pipe"],
+		});
+	}
+	before(() => {
+		root = realpathSync(
+			mkdtempSync(join(tmpdir(), "verification-tree-guard-")),
+		);
+		main = join(root, "main");
+		feature = join(root, "feature");
+		mkdirSync(main);
+		git(main, ["init", "-b", "main"]);
+		git(main, [
+			"-c",
+			"user.name=Guard Test",
+			"-c",
+			"user.email=guard@example.invalid",
+			"commit",
+			"--allow-empty",
+			"-m",
+			"fixture",
+		]);
+		git(main, ["worktree", "add", "-b", "feature", feature]);
+	});
+	after(() => rmSync(root, { recursive: true, force: true }));
+	function wrapper(command, cwd, claude) {
+		const env = { ...process.env };
+		delete env.CLAUDE_PROJECT_DIR;
+		if (claude) env.CLAUDE_PROJECT_DIR = main;
+		const out = execFileSync(process.execPath, [script], {
+			env,
+			encoding: "utf8",
+			input: JSON.stringify({
+				tool_name: "Bash",
+				tool_input: { command },
+				cwd,
 			}),
-			{ shouldOutput: false },
+		}).trim();
+		return out === ""
+			? "allow"
+			: JSON.parse(out).hookSpecificOutput.permissionDecision;
+	}
+	it("keeps the original Claude project root separate from actual shell cwd", () => {
+		assert.equal(wrapper("node check.mjs", feature, true), "allow");
+		assert.equal(wrapper("node check.mjs", main, true), "ask");
+		assert.equal(
+			wrapper(`cd ${feature} && node check.mjs`, main, true),
+			"allow",
 		);
-		for (const supportsAsk of [false, true]) {
-			assert.deepEqual(
-				runVerificationTreeGuard(
-					JSON.stringify(payload({ command: "git status" })),
-					{ resolveRoots: () => null, supportsAsk },
-				),
-				{ shouldOutput: false },
-			);
-		}
 	});
-
-	it("allows `make -C <path> test` even from the main checkout (explicit cwd)", () => {
-		const result = evaluateVerificationTreeGuard(
-			payload({ command: "make -C /some/path test" }),
-			{
-				worktreeRoot: MAIN_ROOT,
-				mainRoot: MAIN_ROOT,
-				hasLinkedWorktrees: true,
-			},
+	it("requires explicit cwd for Codex even when payload cwd names a feature worktree", () => {
+		assert.equal(wrapper("node check.mjs", feature, false), "deny");
+		assert.equal(wrapper(`node ${feature}/check.mjs`, feature, false), "deny");
+		assert.equal(
+			wrapper(`cd ${feature} && node check.mjs`, main, false),
+			"allow",
 		);
-		assert.equal(result.decision, "allow");
-	});
-
-	it("allows from the main checkout when no linked worktrees exist at all", () => {
-		const result = evaluateVerificationTreeGuard(
-			payload({ command: "make test" }),
-			{
-				worktreeRoot: MAIN_ROOT,
-				mainRoot: MAIN_ROOT,
-				hasLinkedWorktrees: false,
-			},
-		);
-		assert.equal(result.decision, "allow");
-	});
-
-	it("allows a non-verification command from the main checkout with linked worktrees", () => {
-		const result = evaluateVerificationTreeGuard(
-			payload({ command: "git status" }),
-			{
-				worktreeRoot: MAIN_ROOT,
-				mainRoot: MAIN_ROOT,
-				hasLinkedWorktrees: true,
-			},
-		);
-		assert.equal(result.decision, "allow");
 	});
 });

@@ -25,22 +25,154 @@
 
 import { basename } from "node:path";
 
-import { flagValues, parseGhCommand } from "./gh-command.mjs";
+import { parseGhCommand } from "./gh-command.mjs";
 import { buildPermissionOutput, parseHookPayload } from "./hook-io.mjs";
+import { prepareHeredocs } from "./shell-heredoc.mjs";
 
 /** Agents permitted to perform outward-facing actions. Publishing is their job. */
 export const DEFAULT_ALLOWED_AGENTS = ["issue-worker"];
 
-/** gh verbs that only read. Everything else is treated as mutating. */
-const READ_ONLY_GH_VERBS = new Set([
-	"view",
-	"list",
-	"status",
-	"checks",
-	"diff",
-	"download",
-	"log",
+/** Built-in read operations; a verb alone cannot establish an extension's effect. */
+const READ_ONLY_GH_COMMANDS = {
+	pr: ["view", "list", "status", "checks", "diff"],
+	issue: ["view", "list", "status"],
+	run: ["view", "list", "watch", "download"],
+	workflow: ["view", "list"],
+	auth: ["status"],
+	repo: ["view", "list"],
+	release: ["view", "list", "download"],
+	gist: ["view", "list"],
+	search: ["code", "commits", "issues", "prs", "repos"],
+	cache: ["list"],
+	secret: ["list"],
+	variable: ["get", "list"],
+	config: ["get", "list"],
+	extension: ["list"],
+	label: ["list"],
+	org: ["list"],
+	project: ["list", "view"],
+	codespace: ["list", "view", "logs"],
+	"gpg-key": ["list"],
+	"ssh-key": ["list"],
+	ruleset: ["list", "view", "check"],
+};
+const BUILTIN_GH_GROUPS = new Set([
+	...Object.keys(READ_ONLY_GH_COMMANDS),
+	"api",
+	"help",
+	"browse",
+	"extension",
+	"alias",
+	"config",
+	"codespace",
+	"gpg-key",
+	"ssh-key",
+	"label",
+	"org",
+	"project",
+	"ruleset",
+	"attestation",
+	"completion",
 ]);
+const GH_BOOLEAN_FLAGS = new Set([
+	"--draft",
+	"--fill",
+	"--fill-first",
+	"--fill-verbose",
+	"--web",
+	"--no-browser",
+	"--watch",
+	"--exit-status",
+	"--verbose",
+	"--silent",
+	"--paginate",
+	"--slurp",
+	"--include",
+	"--insecure",
+	"--confirm",
+	"--yes",
+	"-y",
+]);
+export const GH_VALUE_FLAGS = new Set([
+	"-R",
+	"--repo",
+	"--hostname",
+	"-X",
+	"--method",
+	"-f",
+	"-F",
+	"--field",
+	"--raw-field",
+	"--input",
+	"--cache",
+	"-H",
+	"--header",
+	"-q",
+	"--jq",
+	"--template",
+	"-t",
+	"--title",
+	"-b",
+	"--body",
+	"--body-file",
+	"-B",
+	"--base",
+	"--head",
+	"-a",
+	"--assignee",
+	"-r",
+	"--reviewer",
+	"-l",
+	"--label",
+	"-m",
+	"--milestone",
+	"-p",
+	"--project",
+	"--json",
+	"--limit",
+	"--state",
+	"--search",
+	"--branch",
+	"--name",
+]);
+
+export function hasHelpOption(parsed) {
+	if (!BUILTIN_GH_GROUPS.has(parsed.group)) return false;
+	// `extension exec` forwards the remaining argv to arbitrary extension code.
+	if (parsed.group === "extension" && parsed.verb === "exec") return false;
+	const mergeFlags =
+		parsed.group === "pr" && parsed.verb === "merge"
+			? new Set([
+					"--auto",
+					"--admin",
+					"-d",
+					"--delete-branch",
+					"--disable-auto",
+					"-m",
+					"--merge",
+					"-r",
+					"--rebase",
+					"-s",
+					"--squash",
+				])
+			: new Set();
+	for (let i = 0; i < parsed.args.length; i++) {
+		const arg = parsed.args[i];
+		if (arg === "--") break;
+		if (arg === "--help" || arg === "-h") return true;
+		const name = arg.split("=", 1)[0];
+		if (mergeFlags.has(name) || GH_BOOLEAN_FLAGS.has(name)) continue;
+		if (GH_VALUE_FLAGS.has(arg)) {
+			i++;
+			continue;
+		}
+		if (arg.startsWith("-") && !GH_BOOLEAN_FLAGS.has(arg)) {
+			const flag = arg.split("=", 1)[0];
+			if (!GH_VALUE_FLAGS.has(flag)) return false;
+		}
+	}
+	return false;
+}
 
 /** git subcommands that publish to a remote. */
 const OUTWARD_GIT_SUBCOMMANDS = new Set(["push"]);
@@ -73,6 +205,51 @@ export const GIT_GLOBAL_FLAGS_WITH_VALUE = new Set([
 // Exported so other command-inspecting guards (main-commit-guard.mjs) reuse
 // this parsing instead of re-implementing quote/segment handling.
 export function splitCommandFlow(command) {
+	command = prepareHeredocs(command, {
+		isShellInput: (header) =>
+			splitCommandFlow(header).some(({ command: segment }) => {
+				const tokens = stripLeadingNoise(tokenize(segment));
+				const executable = basename(tokens[0]?.value ?? "");
+				const shell = ["sh", "bash", "dash", "ksh", "zsh"].includes(executable);
+				let commandString = false;
+				let stdinScript = false;
+				let scriptFile = false;
+				let options = true;
+				for (let i = 1; i < tokens.length; i++) {
+					const redirection = leadingRedirectionLength(tokens, i);
+					if (redirection > 0) {
+						i += redirection - 1;
+						continue;
+					}
+					const arg = tokens[i].value;
+					if (
+						options &&
+						["--rcfile", "--init-file", "-o", "-O"].includes(arg)
+					) {
+						i++;
+						continue;
+					}
+					if (options && arg === "--") {
+						options = false;
+						continue;
+					}
+					if (options && /^-[a-zA-Z]*c/.test(arg)) {
+						commandString = true;
+						break;
+					}
+					if (options && /^-[a-zA-Z]*s/.test(arg)) stdinScript = true;
+					if (!options || (!arg.startsWith("-") && !arg.startsWith("+"))) {
+						scriptFile = true;
+						break;
+					}
+				}
+				return (
+					(shell && !commandString && (stdinScript || !scriptFile)) ||
+					(["source", "."].includes(executable) &&
+						["/dev/stdin", "/dev/fd/0"].includes(tokens[1]?.value))
+				);
+			}),
+	});
 	const segments = [];
 	let current = "";
 	let quote = null;
@@ -222,13 +399,6 @@ const GIT_TARGET_VARIABLES = new Set([
 	"GIT_ALTERNATE_OBJECT_DIRECTORIES",
 	"GIT_NAMESPACE",
 ]);
-const STATEFUL_ASSIGNMENT_BUILTINS = new Set([
-	"export",
-	"readonly",
-	"typeset",
-	"declare",
-	"local",
-]);
 
 function protectedAssignment(value) {
 	const equals = value.indexOf("=");
@@ -250,288 +420,6 @@ function isGitTargetAssignment(value) {
 
 function isNonemptyCdPathAssignment(value) {
 	return value.startsWith("CDPATH=") && value.slice("CDPATH=".length) !== "";
-}
-
-function persistsShellAssignment(tokens, isAssignment) {
-	const prefix = parseLeadingShellPrefix(tokens);
-	const head = basename(tokens[prefix.end]?.value ?? "");
-	const assignment = tokens.some(({ value }) => isAssignment(value));
-	if (STATEFUL_ASSIGNMENT_BUILTINS.has(head)) return assignment;
-	return prefix.end === tokens.length && assignment;
-}
-
-/** Whether a segment changes a Git target variable for later shell commands. */
-export function persistsGitTargetOverride(tokens) {
-	return persistsShellAssignment(tokens, isGitTargetAssignment);
-}
-
-/** Whether a segment gives later relative `cd` calls a nonempty CDPATH. */
-export function persistsCdPathOverride(tokens) {
-	return persistsShellAssignment(tokens, isNonemptyCdPathAssignment);
-}
-
-/** State that matters to commands guarded for cross-worktree mutations. */
-export function createProtectedShellState({
-	ambientGitTargetOverride = false,
-	ambientGitTargetVariables,
-	ambientCdPath = false,
-} = {}) {
-	const ambientGitTargets =
-		ambientGitTargetVariables ??
-		(ambientGitTargetOverride
-			? [...GIT_TARGET_VARIABLES].filter(
-					(name) => process.env[name] !== undefined && process.env[name] !== "",
-				)
-			: []);
-	const fallbackGitTargets =
-		ambientGitTargetOverride && ambientGitTargets.length === 0
-			? GIT_TARGET_VARIABLES
-			: new Set(ambientGitTargets);
-	return {
-		cdPath: ambientCdPath ? "unknown" : "safe",
-		gitTargets: new Map(
-			[...GIT_TARGET_VARIABLES].map((name) => [
-				name,
-				{
-					exported: fallbackGitTargets.has(name),
-					value: fallbackGitTargets.has(name) ? "unknown" : "safe",
-				},
-			]),
-		),
-	};
-}
-
-export function hasProtectedGitTargetOverride(state) {
-	return [...state.gitTargets.values()].some(
-		({ exported, value }) => exported && value !== "safe",
-	);
-}
-
-export function hasProtectedCdPathOverride(state) {
-	return state.cdPath !== "safe";
-}
-
-function setProtectedValue(state, name, value, exported) {
-	if (name === "CDPATH") {
-		state.cdPath = value === "" ? "safe" : "unknown";
-		return;
-	}
-	const target = state.gitTargets.get(name);
-	if (!target) return;
-	target.value = value === "" ? "safe" : "unknown";
-	if (exported !== undefined) target.exported = exported;
-}
-
-function setProtectedUnknown(state, name) {
-	if (name === "CDPATH") {
-		state.cdPath = "unknown";
-		return;
-	}
-	const target = state.gitTargets.get(name);
-	if (target) target.value = "unknown";
-}
-
-function setAllProtectedUnknown(state) {
-	state.cdPath = "unknown";
-	for (const name of GIT_TARGET_VARIABLES)
-		setProtectedValue(state, name, "unknown", true);
-}
-
-function isDynamicSetterName(token) {
-	return (
-		(token.quote !== "'" && /[$`]/.test(token.value)) ||
-		/\[|\]/.test(token.value)
-	);
-}
-
-function unsetProtectedValue(state, name) {
-	if (name === "CDPATH") {
-		state.cdPath = "safe";
-		return;
-	}
-	const target = state.gitTargets.get(name);
-	if (!target) return;
-	target.value = "safe";
-	target.exported = false;
-}
-
-function protectedName(value) {
-	return value === "CDPATH" || GIT_TARGET_VARIABLES.has(value) ? value : null;
-}
-
-function applyAssignments(state, tokens, exported) {
-	let changed = false;
-	for (const token of tokens) {
-		const assignment = protectedAssignment(token.value);
-		if (assignment) {
-			setProtectedValue(state, assignment.name, assignment.value, exported);
-			changed = true;
-		}
-	}
-	return changed;
-}
-
-function applyExport(state, tokens) {
-	let unexport = false;
-	let functionMode = false;
-	let valid = true;
-	let options = true;
-	for (const token of tokens) {
-		const { value } = token;
-		if (options && value === "--") {
-			options = false;
-			continue;
-		}
-		if (options && value.startsWith("-")) {
-			for (const option of value.slice(1)) {
-				if (option === "n") unexport = true;
-				else if (option === "f") functionMode = true;
-				else valid = false;
-			}
-			continue;
-		}
-		if (isDynamicSetterName(token)) {
-			setAllProtectedUnknown(state);
-			return true;
-		}
-	}
-	if (!valid || functionMode) return false;
-	let changed = false;
-	options = true;
-	for (const { value } of tokens) {
-		if (options && value === "--") {
-			options = false;
-			continue;
-		}
-		if (options && value.startsWith("-")) continue;
-		const assignment = protectedAssignment(value);
-		if (assignment) {
-			setProtectedValue(state, assignment.name, assignment.value, !unexport);
-			changed = true;
-			continue;
-		}
-		const name = protectedName(value);
-		if (name && name !== "CDPATH") {
-			state.gitTargets.get(name).exported = !unexport;
-			changed = true;
-		}
-	}
-	return changed;
-}
-
-function applyUnset(state, tokens) {
-	let variables = true;
-	let options = true;
-	for (const { value } of tokens) {
-		if (options && value === "--") {
-			options = false;
-			continue;
-		}
-		if (options && value.startsWith("-")) {
-			variables &&= value === "-v";
-			continue;
-		}
-		if (!variables) continue;
-		const name = protectedName(value);
-		if (name) unsetProtectedValue(state, name);
-	}
-	return variables;
-}
-
-function readProtectedNames(tokens) {
-	const valueOptions = new Set(["a", "d", "i", "n", "N", "p", "t", "u"]);
-	const flagOptions = new Set(["e", "r", "s"]);
-	const names = [];
-	let options = true;
-	for (let i = 0; i < tokens.length; i++) {
-		const token = tokens[i];
-		if (options && token.value === "--") {
-			options = false;
-			continue;
-		}
-		if (options && token.value.startsWith("-") && token.value !== "-") {
-			const cluster = token.value.slice(1);
-			for (let index = 0; index < cluster.length; index++) {
-				const option = cluster[index];
-				if (flagOptions.has(option)) continue;
-				if (!valueOptions.has(option)) return { names, unknown: true };
-				const value =
-					index + 1 < cluster.length
-						? { ...token, value: cluster.slice(index + 1) }
-						: tokens[++i];
-				if (!value) return { names, unknown: true };
-				if (option === "a") {
-					if (isDynamicSetterName(value)) return { names, unknown: true };
-					const name = protectedName(value.value);
-					if (name) names.push(name);
-				}
-				break;
-			}
-			continue;
-		}
-		if (isDynamicSetterName(token)) return { names, unknown: true };
-		const name = protectedName(token.value);
-		if (name) names.push(name);
-	}
-	return { names, unknown: false };
-}
-
-function dynamicallyWrittenProtectedNames(head, tokens) {
-	if (head === "read") return readProtectedNames(tokens);
-	if (head !== "printf") return { names: [], unknown: false };
-	let options = true;
-	for (let i = 0; i < tokens.length; i++) {
-		const token = tokens[i];
-		if (options && token.value === "--") {
-			options = false;
-			continue;
-		}
-		if (!options || !token.value.startsWith("-") || token.value === "-")
-			return { names: [], unknown: false };
-		if (token.value === "-v") {
-			const name = tokens[i + 1];
-			if (!name || isDynamicSetterName(name))
-				return { names: [], unknown: true };
-			return {
-				names: [protectedName(name.value)].filter(Boolean),
-				unknown: false,
-			};
-		}
-		if (token.value.startsWith("-v"))
-			return {
-				names: [protectedName(token.value.slice(2))].filter(Boolean),
-				unknown: false,
-			};
-	}
-	return { names: [], unknown: false };
-}
-
-/** Update state after one shell command segment has run. */
-export function updateProtectedShellState(state, tokens) {
-	const prefix = parseLeadingShellPrefix(tokens);
-	const head = basename(tokens[prefix.end]?.value ?? "");
-	const arguments_ = tokens.slice(prefix.end + 1);
-	const assignments = tokens.slice(0, prefix.end);
-	if (prefix.end === tokens.length) return applyAssignments(state, assignments);
-	else if (STATEFUL_ASSIGNMENT_BUILTINS.has(head))
-		applyAssignments(state, assignments, true);
-
-	if (head === "source" || head === "." || head === "eval") {
-		setAllProtectedUnknown(state);
-		return true;
-	}
-	if (head === "unset") return applyUnset(state, arguments_);
-	if (head === "export") return applyExport(state, arguments_);
-	if (STATEFUL_ASSIGNMENT_BUILTINS.has(head)) {
-		return applyAssignments(state, arguments_, true);
-	}
-	const { names, unknown } = dynamicallyWrittenProtectedNames(head, arguments_);
-	if (unknown) {
-		setAllProtectedUnknown(state);
-		return true;
-	}
-	for (const name of names) setProtectedUnknown(state, name);
-	return names.length > 0;
 }
 
 export function parseEnvPrefix(tokens, start = 0) {
@@ -818,8 +706,27 @@ export function gitSubcommand(tokens) {
 }
 
 function ghApiMethod(args) {
-	const [method] = flagValues(args, ["-X", "--method"]);
-	return method ?? null;
+	let method = null;
+	let input = false;
+	for (let i = 0; i < args.length; i++) {
+		const arg = args[i];
+		if (arg === "--") break;
+		const flag = arg.split("=", 1)[0];
+		if (["-X", "--method"].includes(flag)) {
+			method = arg.includes("=") ? arg.slice(flag.length + 1) : args[++i];
+			if (method === undefined) return "UNKNOWN";
+			continue;
+		}
+		if (/^-X.+/.test(arg)) {
+			method = arg.slice(2);
+			continue;
+		}
+		input ||=
+			["-f", "-F", "--raw-field", "--field", "--input"].includes(flag) ||
+			/^-[fF].+/.test(arg);
+		if (GH_VALUE_FLAGS.has(arg)) i++;
+	}
+	return method ?? (input ? "POST" : "GET");
 }
 
 /**
@@ -848,18 +755,29 @@ export function findOutwardCommand(command) {
 			// first, and reading the flag as the group made this guard fail open
 			// on `gh -R owner/repo pr create` (review finding, #650).
 			const parsed = parseGhCommand(tokens);
-			if (!parsed) continue;
+			if (!parsed) {
+				if (
+					tokens
+						.slice(1)
+						.some((token) =>
+							["--help", "-h", "--version"].includes(token.value),
+						)
+				)
+					continue;
+				return "gh";
+			}
+			if (hasHelpOption(parsed) || parsed.group === "help") continue;
+			if (parsed.group === "browse") continue;
 			if (parsed.group === "api") {
 				const method = ghApiMethod(parsed.args);
-				// No explicit method means GET, which only reads.
-				if (method && method.toUpperCase() !== "GET")
+				if (method.toUpperCase() !== "GET")
 					return `gh api ${method.toUpperCase()}`;
 				continue;
 			}
 			// An unrecognised or absent verb is treated as mutating: guessing
 			// in the permissive direction is what this guard exists to prevent.
 			if (parsed.verb === null) return `gh ${parsed.group}`;
-			if (!READ_ONLY_GH_VERBS.has(parsed.verb))
+			if (!READ_ONLY_GH_COMMANDS[parsed.group]?.includes(parsed.verb))
 				return `gh ${parsed.group} ${parsed.verb}`;
 		}
 	}
@@ -895,8 +813,8 @@ export function evaluateDelegationGuard(
 		matched,
 		reason:
 			`Blocked '${matched}': the '${agentType}' subagent must not perform outward-facing actions. ` +
-			"Publishing is the caller's to do. Finish the work as commits on the current branch, then report back " +
-			"to your caller and let it review, push and open the pull request. Do not look for another route.",
+			"Publishing is the caller's to do. Finish the permitted local edits and checks, then report the result and blocked action " +
+			"to your caller, which owns Git metadata changes, review and publishing. Do not look for another route.",
 	};
 }
 

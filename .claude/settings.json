@@ -27,27 +27,27 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node scripts/delegation-guard.mjs",
+            "command": "test \"${CLAUDE_PROJECT_DIR#/}\" != \"${CLAUDE_PROJECT_DIR}\" || exit 2; node \"${CLAUDE_PROJECT_DIR}/scripts/run-repo-hook.mjs\" scripts/delegation-guard.mjs || exit 2",
             "timeout": 10
           },
           {
             "type": "command",
-            "command": "node scripts/main-commit-guard.mjs",
+            "command": "test \"${CLAUDE_PROJECT_DIR#/}\" != \"${CLAUDE_PROJECT_DIR}\" || exit 2; node \"${CLAUDE_PROJECT_DIR}/scripts/run-repo-hook.mjs\" scripts/main-commit-guard.mjs || exit 2",
             "timeout": 10
           },
           {
             "type": "command",
-            "command": "node scripts/command-usage-guard.mjs",
+            "command": "test \"${CLAUDE_PROJECT_DIR#/}\" != \"${CLAUDE_PROJECT_DIR}\" || exit 2; node \"${CLAUDE_PROJECT_DIR}/scripts/run-repo-hook.mjs\" scripts/command-usage-guard.mjs || exit 2",
             "timeout": 10
           },
           {
             "type": "command",
-            "command": "node scripts/verification-tree-guard.mjs",
+            "command": "test \"${CLAUDE_PROJECT_DIR#/}\" != \"${CLAUDE_PROJECT_DIR}\" || exit 2; node \"${CLAUDE_PROJECT_DIR}/scripts/run-repo-hook.mjs\" scripts/verification-tree-guard.mjs || exit 2",
             "timeout": 10
           },
           {
             "type": "command",
-            "command": "node scripts/closes-create-guard.mjs",
+            "command": "test \"${CLAUDE_PROJECT_DIR#/}\" != \"${CLAUDE_PROJECT_DIR}\" || exit 2; node \"${CLAUDE_PROJECT_DIR}/scripts/run-repo-hook.mjs\" scripts/closes-create-guard.mjs || exit 2",
             "timeout": 10
           }
         ]
@@ -57,17 +57,17 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node scripts/worktree-write-guard.mjs",
+            "command": "test \"${CLAUDE_PROJECT_DIR#/}\" != \"${CLAUDE_PROJECT_DIR}\" || exit 2; node \"${CLAUDE_PROJECT_DIR}/scripts/run-repo-hook.mjs\" scripts/worktree-write-guard.mjs || exit 2",
             "timeout": 10
           },
           {
             "type": "command",
-            "command": "node scripts/roadmap-publish-guard.mjs",
+            "command": "test \"${CLAUDE_PROJECT_DIR#/}\" != \"${CLAUDE_PROJECT_DIR}\" || exit 2; node \"${CLAUDE_PROJECT_DIR}/scripts/run-repo-hook.mjs\" scripts/roadmap-publish-guard.mjs || exit 2",
             "timeout": 10
           },
           {
             "type": "command",
-            "command": "node scripts/generated-root-instructions-guard.mjs",
+            "command": "test \"${CLAUDE_PROJECT_DIR#/}\" != \"${CLAUDE_PROJECT_DIR}\" || exit 2; node \"${CLAUDE_PROJECT_DIR}/scripts/run-repo-hook.mjs\" scripts/generated-root-instructions-guard.mjs || exit 2",
             "timeout": 10
           }
         ]
@@ -79,7 +79,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node hooks/managed-issue-reminder-post-tool-use.mjs",
+            "command": "test \"${CLAUDE_PROJECT_DIR#/}\" != \"${CLAUDE_PROJECT_DIR}\" || exit 2; node \"${CLAUDE_PROJECT_DIR}/scripts/run-repo-hook.mjs\" hooks/managed-issue-reminder-post-tool-use.mjs || exit 2",
             "timeout": 10
           }
         ]
@@ -90,7 +90,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "if ! node scripts/setup-completion.mjs check; then echo '[pfdsl] setup completion marker is missing or stale in this worktree - running make setup'; make setup; fi",
+            "command": "test \"${CLAUDE_PROJECT_DIR#/}\" != \"${CLAUDE_PROJECT_DIR}\" || exit 2; node \"${CLAUDE_PROJECT_DIR}/scripts/run-repo-hook.mjs\" --setup || exit 2",
             "timeout": 300,
             "statusMessage": "pfdsl: checking setup completion (make setup when marker is absent)"
           }

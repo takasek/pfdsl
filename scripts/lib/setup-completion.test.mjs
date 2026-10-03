@@ -41,12 +41,17 @@ function sessionStartCommand(path) {
 function fixture() {
 	const cwd = mkdtempSync(join(tmpdir(), "setup-completion-"));
 	fixtures.push(cwd);
+	assert.equal(spawnSync("/usr/bin/git", ["init", "-q", cwd]).status, 0);
 	const bin = join(cwd, "bin");
 	const log = join(cwd, "setup.log");
 	mkdirSync(join(cwd, "scripts/hooks"), { recursive: true });
 	mkdirSync(join(cwd, "scripts/lib"), { recursive: true });
 	mkdirSync(join(cwd, ".git-common/hooks"), { recursive: true });
 	mkdirSync(bin);
+	writeFileSync(
+		join(cwd, "scripts/run-repo-hook.mjs"),
+		readFileSync(join(root, "scripts/run-repo-hook.mjs")),
+	);
 	symlinkSync(makefile, join(cwd, "Makefile"));
 	writeFileSync(join(cwd, "scripts/hooks/pre-commit-shim"), "#!/bin/sh\n");
 	writeFileSync(join(cwd, "scripts/link-repo-skill.mjs"), "// fixture\n");
@@ -64,11 +69,12 @@ function fixture() {
 
 	for (const [name, source] of Object.entries({
 		pnpm: '#!/bin/sh\nprintf \'pnpm\\n\' >> "$SETUP_LOG"\n[ -d "$SETUP_EXPECT_LOCK" ] || exit 97\n[ -n "$SETUP_READY_FILE" ] && : > "$SETUP_READY_FILE"\nif [ -n "$SETUP_RELEASE_FILE" ]; then while [ ! -f "$SETUP_RELEASE_FILE" ]; do /bin/sleep 0.02; done; fi\n[ "$SETUP_FAIL_STAGE" = pnpm ] && exit 1\nmkdir -p node_modules\nif [ -n "$SETUP_LINK_PATH" ]; then mkdir -p "$SETUP_LINK_PATH"; printf "%s\\n" "{\\"bin\\":{\\"fixture-command\\":\\"cli.js\\"}}" > "$SETUP_LINK_PATH/package.json"; mkdir -p "$(dirname "$SETUP_LINK_PATH")/.bin"; : > "$(dirname "$SETUP_LINK_PATH")/.bin/fixture-command"; "$REAL_CHMOD" 755 "$(dirname "$SETUP_LINK_PATH")/.bin/fixture-command"; fi\n[ -d "$SETUP_EXPECT_LOCK" ] || exit 98\n',
-		git: "#!/bin/sh\nprintf 'git\\n' >> \"$SETUP_LOG\"\n[ \"$SETUP_FAIL_STAGE\" = git ] && exit 1\nprintf '.git-common\\n'\n",
+		git: '#!/bin/sh\n[ "$1" = config ] && exit 1\nprintf \'git\\n\' >> "$SETUP_LOG"\n[ "$SETUP_FAIL_STAGE" = git ] && exit 1\nprintf \'.git-common\\n\'\n',
 		cp: '#!/bin/sh\nprintf \'cp\\n\' >> "$SETUP_LOG"\n[ "$SETUP_FAIL_STAGE" = cp ] && exit 1\nexec "$REAL_CP" "$@"\n',
 		chmod:
 			'#!/bin/sh\nprintf \'chmod\\n\' >> "$SETUP_LOG"\n[ "$SETUP_FAIL_STAGE" = chmod ] && exit 1\nexec "$REAL_CHMOD" "$@"\n',
-		node: '#!/bin/sh\nif [ "$1" = scripts/setup-completion.mjs ]; then [ "$2" = write ] && [ "$SETUP_FAIL_STAGE" = write ] && exit 1; exec "$REAL_NODE" "$@"; fi\nprintf \'node\\n\' >> "$SETUP_LOG"\n[ "$SETUP_FAIL_STAGE" = node ] && exit 1\nexit 0\n',
+		// biome-ignore lint/suspicious/noTemplateCurlyInString: shell parameter expansion is intentional.
+		node: '#!/bin/sh\nif { [ "${1##*/}" = setup-completion.mjs ] || [ "${1##*/}" = run-repo-hook.mjs ]; }; then [ "$2" = write ] && [ "$SETUP_FAIL_STAGE" = write ] && exit 1; exec "$REAL_NODE" "$@"; fi\nprintf \'node\\n\' >> "$SETUP_LOG"\n[ "$SETUP_FAIL_STAGE" = node ] && exit 1\nexit 0\n',
 	})) {
 		const command = join(bin, name);
 		writeFileSync(command, source);
@@ -164,7 +170,7 @@ function runSessionStart(context, command) {
 	return spawnSync("/bin/sh", ["-c", command], {
 		cwd: context.cwd,
 		encoding: "utf8",
-		env: environment(context),
+		env: environment(context, "", { CLAUDE_PROJECT_DIR: context.cwd }),
 	});
 }
 
@@ -577,7 +583,7 @@ describe("setup completion sentinel", () => {
 
 	it("runs each SessionStart hook only until setup completes", () => {
 		for (const path of [".claude/settings.json", ".codex/hooks.json"]) {
-			assert.match(sessionStartCommand(path), /setup-completion\.mjs check/);
+			assert.match(sessionStartCommand(path), /run-repo-hook\.mjs" --setup/);
 			const context = fixture();
 			assertSucceeded(runSessionStart(context, sessionStartCommand(path)));
 			assert.equal(

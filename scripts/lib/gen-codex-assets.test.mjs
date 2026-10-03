@@ -788,6 +788,33 @@ describe("generated-file attributes", () => {
 });
 
 describe("hookCapabilityToCodexHooks", () => {
+	it("anchors repository commands without changing plugin commands or their source record", () => {
+		const hooks = {
+			PreToolUse: [
+				{
+					matcher: "Bash",
+					hooks: [
+						{
+							type: "command",
+							command: `node "\${CLAUDE_PROJECT_DIR}/scripts/guard.mjs" || exit 2`,
+						},
+					],
+				},
+			],
+		};
+		const plugin = hookRecord(hooks);
+		assert.deepEqual(
+			JSON.parse(hookCapabilityToCodexHooks(plugin)).hooks,
+			hooks,
+		);
+		const repository = { ...plugin, id: "repository-hooks" };
+		const generated = JSON.parse(hookCapabilityToCodexHooks(repository));
+		const command = generated.hooks.PreToolUse[0].hooks[0].command;
+		assert.match(command, /pwd -P/);
+		assert.ok(command.includes(`\${pfdsl_hook_root}/scripts/guard.mjs`));
+		assert.doesNotMatch(command, /CLAUDE_PROJECT_DIR/);
+		assert.deepEqual(repository.semantic.hooks, hooks);
+	});
 	it("copies only the hooks object", () => {
 		const record = hookRecord({
 			PreToolUse: [{ matcher: "Bash", hooks: [] }],

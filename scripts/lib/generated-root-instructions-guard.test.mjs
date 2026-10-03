@@ -8,138 +8,131 @@ import {
 	mayTargetGeneratedRootInstructions,
 } from "./generated-root-instructions-guard.mjs";
 
-const WORKTREE_ROOT = "/Users/m5/works/pfdsl/.claude/worktrees/some-branch";
-
-function payload({ toolName = "Write", filePath }) {
-	return {
-		hook_event_name: "PreToolUse",
-		tool_name: toolName,
-		tool_input: { file_path: filePath },
-	};
-}
+const payload = { tool_name: "Write" };
+const roots = (worktreeRoot, commonDir = "/repo/.git") => ({
+	worktreeRoot,
+	commonDir,
+});
+const context = (path, targetRoots = roots("/worktrees/b")) => ({
+	sessionRoots: roots("/repo"),
+	targets: [{ path, roots: targetRoots }],
+});
 
 describe("evaluateGeneratedRootInstructionsGuard", () => {
-	it("ignores tools other than Edit/Write", () => {
-		const result = evaluateGeneratedRootInstructionsGuard(
-			payload({ toolName: "Read", filePath: `${WORKTREE_ROOT}/CLAUDE.md` }),
-			WORKTREE_ROOT,
-		);
-		assert.equal(result.decision, "allow");
+	it("ignores non-file tools, including generator commands", () => {
+		for (const tool_name of ["Read", "Bash"]) {
+			assert.equal(
+				evaluateGeneratedRootInstructionsGuard({ tool_name }).decision,
+				"allow",
+			);
+		}
 	});
 
-	it("allows when the worktree root could not be resolved (not a git repo, git failure)", () => {
-		const result = evaluateGeneratedRootInstructionsGuard(
-			payload({ filePath: `${WORKTREE_ROOT}/CLAUDE.md` }),
-			null,
-		);
-		assert.equal(result.decision, "allow");
+	it("denies every generated root file in the target feature checkout", () => {
+		for (const name of Object.keys(GENERATED_ROOT_INSTRUCTION_FILES)) {
+			const result = evaluateGeneratedRootInstructionsGuard(
+				payload,
+				context(`/worktrees/b/${name}`),
+			);
+			assert.equal(result.decision, "deny");
+			assert.match(
+				result.reason,
+				/\/worktrees\/b\/scripts\/root-instructions-template\/INSTRUCTIONS\.md/,
+			);
+			assert.match(result.reason, /make gen-plugin/);
+		}
 	});
 
-	it("allows when file_path is missing (nothing to check)", () => {
-		const result = evaluateGeneratedRootInstructionsGuard(
-			payload({ filePath: undefined }),
-			WORKTREE_ROOT,
-		);
-		assert.equal(result.decision, "allow");
+	it("allows the template, nested hand-authored instructions, and prefix matches", () => {
+		for (const path of [
+			"scripts/root-instructions-template/INSTRUCTIONS.md",
+			"nested/AGENTS.md",
+			"CLAUDE.md.bak",
+		]) {
+			assert.equal(
+				evaluateGeneratedRootInstructionsGuard(
+					payload,
+					context(`/worktrees/b/${path}`),
+				).decision,
+				"allow",
+			);
+		}
 	});
 
-	it("denies an Edit of the worktree root's generated CLAUDE.md", () => {
-		const result = evaluateGeneratedRootInstructionsGuard(
-			payload({ toolName: "Edit", filePath: `${WORKTREE_ROOT}/CLAUDE.md` }),
-			WORKTREE_ROOT,
+	it("allows generated-looking names in foreign and scratch directories", () => {
+		assert.equal(
+			evaluateGeneratedRootInstructionsGuard(
+				payload,
+				context("/foreign/AGENTS.md", roots("/foreign", "/foreign/.git")),
+			).decision,
+			"allow",
 		);
-		assert.equal(result.decision, "deny");
-		assert.match(
-			result.reason,
-			/scripts\/root-instructions-template\/INSTRUCTIONS\.md/,
-		);
-		assert.match(result.reason, /make gen-plugin/);
-	});
-
-	it("denies a Write of the worktree root's generated AGENTS.md", () => {
-		const result = evaluateGeneratedRootInstructionsGuard(
-			payload({ toolName: "Write", filePath: `${WORKTREE_ROOT}/AGENTS.md` }),
-			WORKTREE_ROOT,
-		);
-		assert.equal(result.decision, "deny");
-		assert.match(
-			result.reason,
-			/scripts\/root-instructions-template\/INSTRUCTIONS\.md/,
+		assert.equal(
+			evaluateGeneratedRootInstructionsGuard(payload, {
+				targets: [{ path: "/tmp/AGENTS.md", outsideRepository: true }],
+			}).decision,
+			"allow",
 		);
 	});
 
-	it("allows an edit of the template itself", () => {
-		const result = evaluateGeneratedRootInstructionsGuard(
-			payload({
-				toolName: "Edit",
-				filePath: `${WORKTREE_ROOT}/scripts/root-instructions-template/INSTRUCTIONS.md`,
+	it("does not treat unresolved roots as proof that generated instructions are foreign", () => {
+		for (const unresolved of [
+			context("/worktrees/b/AGENTS.md", null),
+			{ ...context("/worktrees/b/AGENTS.md"), sessionRoots: null },
+		]) {
+			assert.equal(
+				evaluateGeneratedRootInstructionsGuard(payload, unresolved).decision,
+				"deny",
+			);
+		}
+	});
+
+	it("checks generated targets after preceding unguarded patch targets", () => {
+		const multiple = context("/worktrees/b/source.mjs");
+		multiple.targets.push({
+			path: "/worktrees/b/AGENTS.md",
+			roots: roots("/worktrees/b"),
+		});
+		assert.equal(
+			evaluateGeneratedRootInstructionsGuard(
+				{ tool_name: "apply_patch" },
+				multiple,
+			).decision,
+			"deny",
+		);
+	});
+
+	it("denies unresolved patch targets", () => {
+		assert.deepEqual(
+			evaluateGeneratedRootInstructionsGuard(payload, {
+				error: "Unresolved patch.",
 			}),
-			WORKTREE_ROOT,
+			{ decision: "deny", reason: "Unresolved patch." },
 		);
-		assert.equal(result.decision, "allow");
-	});
-
-	it("allows an edit of a same-named file that is not at the worktree root (e.g. scripts/skill-template/CLAUDE.md)", () => {
-		const result = evaluateGeneratedRootInstructionsGuard(
-			payload({
-				toolName: "Edit",
-				filePath: `${WORKTREE_ROOT}/scripts/skill-template/CLAUDE.md`,
-			}),
-			WORKTREE_ROOT,
-		);
-		assert.equal(result.decision, "allow");
-	});
-
-	it("allows a directory that merely shares the CLAUDE.md/AGENTS.md name as a prefix", () => {
-		const result = evaluateGeneratedRootInstructionsGuard(
-			payload({ filePath: `${WORKTREE_ROOT}/CLAUDE.md.bak` }),
-			WORKTREE_ROOT,
-		);
-		assert.equal(result.decision, "allow");
 	});
 });
 
 describe("GENERATED_ROOT_INSTRUCTION_FILES", () => {
-	// Derived, not restated: a third template-rendered root file added to
-	// GENERATED_DISTRIBUTION_SOURCES must be guarded without editing this guard.
-	it("is every repository-root entry of GENERATED_DISTRIBUTION_SOURCES", () => {
+	it("is every repository-root entry and source in the distribution mapping", () => {
 		assert.deepEqual(
-			Object.keys(GENERATED_ROOT_INSTRUCTION_FILES).sort(),
-			Object.keys(GENERATED_DISTRIBUTION_SOURCES)
-				.filter((name) => !name.includes("/"))
-				.sort(),
-		);
-	});
-
-	it("names each file's authoritative source from the same mapping", () => {
-		for (const [name, source] of Object.entries(
 			GENERATED_ROOT_INSTRUCTION_FILES,
-		)) {
-			assert.equal(source, GENERATED_DISTRIBUTION_SOURCES[name]);
-		}
+			Object.fromEntries(
+				Object.entries(GENERATED_DISTRIBUTION_SOURCES).filter(
+					([name]) => !name.includes("/"),
+				),
+			),
+		);
 	});
 });
 
 describe("mayTargetGeneratedRootInstructions", () => {
-	// The hook runs on every Edit/Write, so the expensive worktree-root lookup
-	// (two git subprocesses) must not run for paths that cannot match by name.
-	it("rejects a path whose basename is not a guarded root file", () => {
+	it("matches generated names only after filesystem path resolution", () => {
+		assert.equal(mayTargetGeneratedRootInstructions("/repo/AGENTS.md"), true);
 		assert.equal(
-			mayTargetGeneratedRootInstructions(`${WORKTREE_ROOT}/src/foo.mjs`),
-			false,
-		);
-	});
-
-	it("accepts a path whose basename is a guarded root file, before any root check", () => {
-		assert.equal(
-			mayTargetGeneratedRootInstructions(
-				`${WORKTREE_ROOT}/scripts/skill-template/CLAUDE.md`,
-			),
+			mayTargetGeneratedRootInstructions("/repo/nested/CLAUDE.md"),
 			true,
 		);
-	});
-
-	it("rejects a non-string path", () => {
+		assert.equal(mayTargetGeneratedRootInstructions("/repo/source.mjs"), false);
 		assert.equal(mayTargetGeneratedRootInstructions(undefined), false);
 	});
 });
