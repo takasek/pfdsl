@@ -164,6 +164,48 @@ describe("generator recovery diagnostics", () => {
 							: /Untracked generated files/,
 					);
 				}
+				const gateRetry = spawnSync(
+					process.execPath,
+					[join(root, "scripts/check-drift-gates.mjs")],
+					{ cwd: root, encoding: "utf8" },
+				);
+				assert.equal(gateRetry.status, 1, gateRetry.stdout + gateRetry.stderr);
+				assert.match(gateRetry.stderr, /Generator transaction data remain/);
+				assert.ok(gateRetry.stderr.includes(snapshot), gateRetry.stderr);
+				assert.equal(
+					readFileSync(
+						join(snapshot, "plugin-root/skills/pfd-ops/SKILL.md"),
+						"utf8",
+					),
+					saved,
+				);
+
+				const gateFailure = spawnSync(
+					process.execPath,
+					[join(root, "scripts/check-drift-gates.mjs")],
+					{
+						cwd: root,
+						encoding: "utf8",
+						env: { ...process.env, NODE_OPTIONS: `--import=${injection}` },
+					},
+				);
+				assert.equal(
+					gateFailure.status,
+					1,
+					gateFailure.stdout + gateFailure.stderr,
+				);
+				assert.match(gateFailure.stderr, /injected primary assembly failure/);
+				assert.match(
+					gateFailure.stderr,
+					/Rollback restoration did not complete/,
+				);
+				assert.equal(
+					readFileSync(
+						join(snapshot, "plugin-root/skills/pfd-ops/SKILL.md"),
+						"utf8",
+					),
+					saved,
+				);
 			} finally {
 				rmSync(root, { recursive: true, force: true });
 			}
