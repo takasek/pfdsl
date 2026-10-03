@@ -63,6 +63,7 @@ Closes #<issue番号>
 宣言が無い、または `enabled` が真偽値の `true` でなければ、workflow は checkout の直後に無効である旨を通知して何もせず成功で終わる。`.pfdsl/config.json` が JSON として読めない、または値の形が違う場合は失敗する。
 workflow ファイル自体は他の配置ファイルとともに commit してよい。有効にするかどうかは所有者が判断し、その判断をこのキーに残す。
 同一ブランチへ起票するため、連続する push は既存 PR を更新する。`concurrency` グループで直列化してあり、再計算は冪等である。
+trigger は `flow-sync/pending` への push を除外する。App token で作成した PR ブランチへの push が workflow を起動すると、`concurrency` グループで保留中の run を押し出して回収を取りこぼすためである。
 PR 本文には閉じる issue が無いので `no-issue:` を理由つきで宣言する（「PR 本文規約」参照）。
 この bot PR は既定では `GITHUB_TOKEN` で作成される。
 GitHub は `GITHUB_TOKEN` で作成された PR の `pull_request` トリガーの workflow を、書き込み権限を持つ人が承認するまで承認待ち（`action_required`）で保留する（[Triggering a workflow](https://docs.github.com/en/actions/using-workflows/triggering-a-workflow)）。
@@ -73,7 +74,8 @@ GitHub は `GITHUB_TOKEN` で作成された PR の `pull_request` トリガー�
 承認なしで CI を走らせるには、GitHub App の installation token で PR を作成する。
 リポジトリ変数 `PFDSL_SWEEP_APP_CLIENT_ID` と secret `PFDSL_SWEEP_APP_PRIVATE_KEY` を設定すると、workflow が `actions/create-github-app-token` で短命 token を発行し、その token で PR を作成する。
 App に必要な権限は contents と pull-requests の write だけである。
-変数が空なら `GITHUB_TOKEN` に戻り、変数があって secret が使えなければ step が失敗する（黙って戻らない）。
+切り替えのスイッチは変数である。
+変数が空なら secret の有無によらず `GITHUB_TOKEN` に戻り、変数があって secret が使えなければ step が失敗する（黙って戻らない）。
 PR 本文は、どちらの token で作成されたかに応じて CI の扱いを書き分ける。
 
 ## 同期監査

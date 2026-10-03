@@ -32,9 +32,8 @@ function writeConfig(dir, text) {
 	writeFileSync(join(dir, CONFIG_PATH), text);
 }
 
-// Evaluate the step conditions this workflow uses: `&&`-joined comparisons of
-// earlier steps' outputs or repository variables. A skipped or unset output or
-// variable reads as the empty string, as it does on a runner.
+// Evaluate the step conditions this workflow uses: `&&`-joined comparisons of earlier steps' outputs or repository variables.
+// A skipped or unset output or variable reads as the empty string, as it does on a runner.
 function conditionHolds(condition, outputs, vars = {}) {
 	return condition.split(" && ").every((term) => {
 		const match =
@@ -296,11 +295,9 @@ for (const shape of ["no-package", "no-package-manager", "workspace"]) {
 	});
 }
 
-// GitHub holds the `pull_request` runs of a PR opened with GITHUB_TOKEN in an
-// approval-required state ("Triggering a workflow" in the Actions docs); its
-// recommended way past that is a GitHub App installation token. The sweep opens
-// that PR, so it mints the token when the repository configured an App, and
-// falls back to GITHUB_TOKEN for adopters that did not.
+// GitHub holds the `pull_request` runs of a PR opened with GITHUB_TOKEN in an approval-required state ("Triggering a workflow" in the Actions docs).
+// The docs name a GitHub App installation token and a personal access token as the ways past that; this repository uses an App because it already mints App tokens for other workflows.
+// The sweep opens that PR, so it mints the App token when the repository configured an App, and falls back to GITHUB_TOKEN for adopters that did not.
 const APP_CLIENT_ID_VAR = "PFDSL_SWEEP_APP_CLIENT_ID";
 const APP_PRIVATE_KEY_SECRET = "PFDSL_SWEEP_APP_PRIVATE_KEY";
 const appTokenStep = steps.find((step) => step.id === "app-token");
@@ -345,6 +342,20 @@ test("the App token step reads the configured App and asks for no more than the 
 		"permission-pull-requests",
 	]);
 	for (const key of permissions) assert.equal(appTokenStep.with[key], "write");
+	// A failing mint must stop the job: continuing would open the PR with GITHUB_TOKEN unnoticed.
+	assert.equal(appTokenStep["continue-on-error"], undefined);
+	// Without owner and repositories the token is scoped to this repository only.
+	assert.equal(appTokenStep.with.owner, undefined);
+	assert.equal(appTokenStep.with.repositories, undefined);
+});
+
+// A push to the PR branch with the App token starts the push trigger.
+// That run would queue in the flow-sync concurrency group and replace a pending run for a default-branch push, losing that sweep.
+test("a push to the sweep's own PR branch does not start the sweep", () => {
+	const push = workflow.on?.push;
+	assert.ok(push, "the workflow must declare a push trigger");
+	assert.deepEqual(push["branches-ignore"], [openPrStep.with.branch]);
+	assert.equal(push.branches, undefined);
 });
 
 // [label, config text, vars, expect the App token minted]
@@ -426,4 +437,7 @@ test("the PR body says whether this repository's CI ran, matching the token that
 	assert.match(withApp, /without waiting for approval/);
 	assert.match(withoutApp, /GITHUB_TOKEN/);
 	assert.match(withoutApp, /until someone with write access approves/);
+	// A reviewer who sees the held runs must find the two settings that avoid the hold.
+	assert.ok(withoutApp.includes(APP_CLIENT_ID_VAR), withoutApp);
+	assert.ok(withoutApp.includes(APP_PRIVATE_KEY_SECRET), withoutApp);
 });

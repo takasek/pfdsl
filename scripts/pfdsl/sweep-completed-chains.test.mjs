@@ -134,16 +134,11 @@ legacy_in >> build_feature -> feature
 });
 
 describe("sweep-completed-chains: canonical-fmt gate (#1125)", () => {
-	// A PR opened with GITHUB_TOKEN has its pull_request runs held until
-	// someone approves them, so the repo's own `make check-fmt` cannot be
-	// counted on to run against this bot's output — nothing outside the
-	// script itself is guaranteed to verify it. This fixture starts
-	// from a structurally valid but not canonically formatted roadmap
-	// (`check` only warns, `fmt --check` fails): the quoting `"123a"`/`"on"`
-	// carry in the body is unnecessary and `fmt` would strip it, but nothing
-	// the delete touches revisits that quoting, so it survives into the
-	// delete output untouched — still non-canonical, still unnoticed by
-	// `check`, `graph orphans`, or the ready/blocked comparison alone.
+	// A PR opened with GITHUB_TOKEN has its pull_request runs held until someone approves them, so the repo's own `make check-fmt` cannot be counted on to run against this bot's output.
+	// Nothing outside the script itself is guaranteed to verify it.
+	// This fixture starts from a structurally valid but not canonically formatted roadmap (`check` only warns, `fmt --check` fails).
+	// The quoting `"123a"`/`"on"` carry in the body is unnecessary and `fmt` would strip it, but nothing the delete touches revisits that quoting.
+	// So it survives into the delete output untouched, still non-canonical, still unnoticed by `check`, `graph orphans`, or the ready/blocked comparison alone.
 	const nonCanonical = `---
 type: roadmap
 artifact:
