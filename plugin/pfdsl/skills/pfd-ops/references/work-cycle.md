@@ -1,3 +1,5 @@
+<!-- DO NOT EDIT. Authoritative source: scripts/harness-template/skills/pfd-ops/references/work-cycle.md. -->
+
 # ワークサイクル（選択・実行・終端ゲート・報告）
 
 ## 運用契約

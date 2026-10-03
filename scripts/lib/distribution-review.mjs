@@ -16,7 +16,10 @@
 import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
-import { GENERATED_DISTRIBUTION_SOURCES } from "./distribution-sources.mjs";
+import {
+	canonicalPluginSkillSource,
+	GENERATED_DISTRIBUTION_SOURCES,
+} from "./distribution-sources.mjs";
 import {
 	codexCommandSkillName,
 	PLUGIN_COMMAND_FILES,
@@ -92,7 +95,8 @@ export function canonicalSourceOf(distPath) {
 			distPath ===
 			`${CODEX_SKILLS_ROOT}${codexCommandSkillName(source)}/SKILL.md`,
 	);
-	if (commandSource) return `.claude/commands/${commandSource}`;
+	if (commandSource)
+		return `scripts/harness-template/commands/${commandSource}`;
 	// Pre-native bundles placed generated Codex command skills below the Claude
 	// tree. The generator removes those owned directories during migration, but
 	// retain their source mapping while a staged deletion is still visible to
@@ -102,7 +106,8 @@ export function canonicalSourceOf(distPath) {
 			distPath ===
 			`${CLAUDE_SKILLS_ROOT}${codexCommandSkillName(source)}/SKILL.md`,
 	);
-	if (legacyCommandSource) return `.claude/commands/${legacyCommandSource}`;
+	if (legacyCommandSource)
+		return `scripts/harness-template/commands/${legacyCommandSource}`;
 	if (distPath.startsWith(CODEX_SKILLS_ROOT)) {
 		return canonicalSourceOf(
 			`${CLAUDE_SKILLS_ROOT}${distPath.slice(CODEX_SKILLS_ROOT.length)}`,
@@ -120,7 +125,11 @@ export function canonicalSourceOf(distPath) {
 			const members = mirror.trees ?? mirror.files;
 			// A whole-tree mirror has no member list: everything under it ships.
 			if (!members || members.includes(mirror.trees ? tail[0] : relative)) {
-				return `${mirror.src}/${relative}`;
+				return dir === "skills"
+					? canonicalPluginSkillSource(relative)
+					: dir === "commands" || dir === "agents"
+						? `scripts/harness-template/${dir}/${relative}`
+						: `${mirror.src}/${relative}`;
 			}
 		}
 	}

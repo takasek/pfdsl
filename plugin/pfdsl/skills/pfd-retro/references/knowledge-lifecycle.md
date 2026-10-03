@@ -1,3 +1,5 @@
+<!-- DO NOT EDIT. Authoritative source: scripts/harness-template/skills/pfd-retro/references/knowledge-lifecycle.md. -->
+
 # 知識成果物のライフサイクル監査（pfd-retro D 層・選択項目）
 
 PFD 運用が生む知識成果物（roadmap の criteria・companion・決定記録・効果ログ）のライフサイクルを監査する選択項目。`.pfdsl/config.json` のキー `knowledgeLifecycleAudit` が `mode: adopt` と空でない `targets` を宣言したときだけ適用し、対象はその `targets` が名指した成果物に限る。

@@ -40,7 +40,11 @@ const COMMENT_LINE = /^(?:\/\/|\/?\*)/;
  */
 const CHECK_INSTALL_SYNC_RELATIVE_PATH =
 	"pfd-ops/scripts/check-install-sync.mjs";
-const SKILL_MIRROR_ROOTS = [".claude/skills", ".agents/skills"];
+const SKILL_MIRROR_ROOTS = [
+	".claude/skills",
+	".agents/skills",
+	"scripts/harness-template/skills",
+];
 const FOREIGN_ARGV_GUARDS = new Set([
 	"scripts/lib/delegation-guard.mjs",
 	"scripts/lib/main-commit-guard.mjs",
@@ -49,7 +53,7 @@ const FOREIGN_ARGV_GUARDS = new Set([
 // Its one flag-name lookup is the --force deprecation hint that #631 put
 // deliberately *ahead* of its strict parse, so the message survives instead
 // of being flattened into "unknown option". The lookup decides what to say,
-// not what to do. Both roots contain the same generated skill tree.
+// not what to do. The canonical script and both generated trees use it.
 function isCheckInstallSyncMirror(file) {
 	return SKILL_MIRROR_ROOTS.some(
 		(root) => file === `${root}/${CHECK_INSTALL_SYNC_RELATIVE_PATH}`,

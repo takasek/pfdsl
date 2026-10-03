@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// DO NOT EDIT. Authoritative source: .claude/skills/pfd-ops/scripts/collect-report-environment.mjs.
+// DO NOT EDIT. Authoritative source: scripts/harness-template/skills/pfd-ops/scripts/collect-report-environment.mjs.
 // Collects the environment block of an upstream report (pfd-upstream-report).
 //
 // This file ships inside the pfd-ops skill and travels with the whole skill
@@ -308,7 +308,8 @@ export function collectReportEnvironment(skillRoot, options = {}) {
 
 	if (installation === "claude-plugin") {
 		pluginVersion = asIdentifier(
-			readJsonOrNull(resolve(bundleRoot, ".claude-plugin/plugin.json"))?.version,
+			readJsonOrNull(resolve(bundleRoot, ".claude-plugin/plugin.json"))
+				?.version,
 		);
 		if (pluginVersion === null) {
 			recordFailure(

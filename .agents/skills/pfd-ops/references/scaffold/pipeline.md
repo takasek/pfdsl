@@ -1,4 +1,4 @@
-<!-- DO NOT EDIT. Authoritative source: .claude/skills/pfd-ops/references/scaffold/pipeline.md. -->
+<!-- DO NOT EDIT. Authoritative source: scripts/harness-template/skills/pfd-ops/references/scaffold/pipeline.md. -->
 
 # pipeline.md — 変換境界の補足（pipeline.pfdsl の companion）
 

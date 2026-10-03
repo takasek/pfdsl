@@ -4,6 +4,7 @@
 import { spawnSync } from "node:child_process";
 
 import { genPluginDriftPathspecs } from "./lib/gen-plugin-outputs.mjs";
+import { pluginRecoveryNotice } from "./lib/gen-plugin-recovery.mjs";
 
 function requestedPaths(args) {
 	if (args[0] === "--gen-plugin") return genPluginDriftPathspecs(args[1]);
@@ -17,6 +18,8 @@ try {
 	process.stderr.write(`${error instanceof Error ? error.message : error}\n`);
 	process.exit(2);
 }
+const recovery = pluginRecoveryNotice(process.cwd());
+if (recovery) process.stderr.write(`${recovery}\n`);
 const tracked = spawnSync("git", ["diff", "--quiet", "--", ...paths], {
 	encoding: "utf8",
 });

@@ -1,3 +1,5 @@
+<!-- DO NOT EDIT. Authoritative source: scripts/harness-template/skills/pfd-ops/references/scaffold/bindings/pfd-retro-patterns/sample-pattern.md. -->
+
 # 事例の記入例: 未検証の前提の持ち越し
 
 これは書式の見本であり、実際の発生や効果を主張する記録ではない。

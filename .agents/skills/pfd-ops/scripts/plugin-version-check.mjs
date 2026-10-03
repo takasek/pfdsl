@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// DO NOT EDIT. Authoritative source: .claude/skills/pfd-ops/scripts/plugin-version-check.mjs.
+// DO NOT EDIT. Authoritative source: scripts/harness-template/skills/pfd-ops/scripts/plugin-version-check.mjs.
 // Best-effort plugin version-skew check (ADR-0028). Decoupled from install/
 // sync semantics so any pfd-ops-bundled skill's runtime self-check can call
 // into it, not just check-install-sync.mjs.
@@ -12,7 +12,8 @@ import { createHash } from "node:crypto";
 import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
-const UPSTREAM_RAW_BASE = "https://raw.githubusercontent.com/takasek/pfdsl/main/plugin/pfdsl/.claude-plugin";
+const UPSTREAM_RAW_BASE =
+	"https://raw.githubusercontent.com/takasek/pfdsl/main/plugin/pfdsl/.claude-plugin";
 const UPSTREAM_PLUGIN_JSON_URL = `${UPSTREAM_RAW_BASE}/plugin.json`;
 const UPSTREAM_BUNDLE_MANIFEST_URL = `${UPSTREAM_RAW_BASE}/bundle-manifest.sha256`;
 
@@ -143,18 +144,28 @@ async function fetchOrNull(fetchImpl, url, read) {
  * @returns {Promise<string|null>}
  */
 export async function checkUpstreamVersion(skillRoot, fetchImpl = fetch) {
-	const localManifest = readJsonOrNull(resolve(skillRoot, "../../.claude-plugin/plugin.json"));
+	const localManifest = readJsonOrNull(
+		resolve(skillRoot, "../../.claude-plugin/plugin.json"),
+	);
 	if (localManifest === null) return null;
 	try {
 		const localVersion = localManifest.version;
-		const remote = await fetchOrNull(fetchImpl, UPSTREAM_PLUGIN_JSON_URL, (res) => res.json());
+		const remote = await fetchOrNull(
+			fetchImpl,
+			UPSTREAM_PLUGIN_JSON_URL,
+			(res) => res.json(),
+		);
 		if (remote === null || !remote.version) return null;
 		if (remote.version !== localVersion) {
 			return `Warning: installed pfdsl plugin version (${localVersion}) differs from upstream (${remote.version}). Consider updating the plugin.`;
 		}
 		const localHash = readLocalBundleAggregateHash(resolve(skillRoot, "../.."));
 		if (localHash === null) return null;
-		const remoteText = await fetchOrNull(fetchImpl, UPSTREAM_BUNDLE_MANIFEST_URL, (res) => res.text());
+		const remoteText = await fetchOrNull(
+			fetchImpl,
+			UPSTREAM_BUNDLE_MANIFEST_URL,
+			(res) => res.text(),
+		);
 		if (remoteText === null) return null;
 		const remoteHash = computeManifestAggregateHash(remoteText);
 		if (remoteHash === null || remoteHash === localHash) return null;

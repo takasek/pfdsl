@@ -10,7 +10,7 @@ C 系の対象仕様: `docs/spec/spec.md`。実行手順: `/spec-stress-test`（
 
 PFD 採用状況: roadmap（`.pfdsl/roadmap.pfdsl`）・workflow（`.pfdsl/workflow.pfdsl`）・pipeline（`.pfdsl/pipeline.pfdsl`）を採用。
 
-出力宛先は `.pfdsl/workflow.md`「知見の振り分け（3経路）」セクションに従う。companion への書き分け（どの companion に書くか）は `.claude/skills/pfd-ops/references/architecture.md` の「companion への書き分けルール」表が一次情報。
+出力宛先は `.pfdsl/workflow.md`「知見の振り分け（3経路）」セクションに従う。companion への書き分け（どの companion に書くか）は `scripts/harness-template/skills/pfd-ops/references/architecture.md` の「companion への書き分けルール」表が一次情報。
 ## 事例・観察・反例の記録
 
 `.pfdsl/bindings/pfd-retro-patterns/` は検索可能な過去事例の置き場であり、通常作業へ対策を配る正本ではない。既存の本文・具体例・未コミットの失敗記録を残す。`33878aebdaae1c69fda95bd4aea5bf2ba0b321e3` までの記述とタグは当時の資料で、現在も適用できるとは限らない。移行の判断と確認範囲は `docs/adr/0038-retro-case-migration.md` に記録する。
@@ -42,7 +42,7 @@ rg --files .pfdsl/bindings/pfd-retro-patterns/
 
 ## 1 回の実行契約
 
-この節は監査の対象でなく1回の監査の実行管理を定めるので、`.claude/skills/pfd-ops/references/architecture.md`「昇格先の判定ルール」の区分 iii に当たり、配布層でなくこの binding が持つ（ADR-0040）。
+この節は監査の対象でなく1回の監査の実行管理を定めるので、`scripts/harness-template/skills/pfd-ops/references/architecture.md`「昇格先の判定ルール」の区分 iii に当たり、配布層でなくこの binding が持つ（ADR-0040）。
 
 適用単位は、1回の監査へ入れられる層と情報源を決める。`retro_request` が情報源を必須として指定した後の欠落は非適用による省略ではない。収集前に実行 ID、cutoff、必須情報源集合、任意情報源集合を確定し、cutoff より後の活動をその実行から除外する。
 
