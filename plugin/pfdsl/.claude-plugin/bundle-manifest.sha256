@@ -26,7 +26,7 @@ ae6f8cfe03b3df98c89a4b46eb176609cbf2a7c311f0d36f42817eab337ffcf2  hooks/managed-
 
 b6ee2191c34ba24f8813781d51dd5fbc43f90fbea88454f4ccfdcf7625075898  skills/pfd-ops/SKILL.md
 
-f2e99de2d9516c4e8c205c82755d017057b4e9b7767a90a117a19ee77e2c4766  skills/pfd-ops/install/.github/workflows/pfdsl-sweep-completed-chains.yml
+2083ba68c0bfecf47eae1f6f1c91d94891b648d468cba4457bff7d67328364ea  skills/pfd-ops/install/.github/workflows/pfdsl-sweep-completed-chains.yml
 
 35faacd4d5c13add67d9c303c8a68d2909d82fc32d9637501c0b100ae590d26f  skills/pfd-ops/install/scripts/pfdsl/audit-issues-flow.mjs
 
@@ -54,13 +54,13 @@ a8e4d35e456f05babab77d002a20f7230b7942aaf7bb82138bf2007b5926c4f7  skills/pfd-ops
 
 1e5a4bd4e622bfae32b3f86d9832eee5c4f18602618035ee6dc50ac021fd138c  skills/pfd-ops/install/scripts/pfdsl/lib/yaml-require.mjs
 
-a5854e16415ea04e508b0f88a391446679dcc60060b9bf8d62a27454eb0b39d4  skills/pfd-ops/install/scripts/pfdsl/sweep-completed-chains.mjs
+d6636ad19abcd0019d685f0cbc26db35fb779ea1afa9568d070fb94bb68eb7f2  skills/pfd-ops/install/scripts/pfdsl/sweep-completed-chains.mjs
 
 bc4918d3d852b19f48bb4c90f0798d8dd7cafcb3dfb4f8db4c722bd23dc3d601  skills/pfd-ops/references/architecture.md
 
 ec4c10c6394964a5259ce63b446562181550bb397743b0b1c79d087bc2c7c307  skills/pfd-ops/references/file-based-tracker-backend.md
 
-e3adffad1399922493b987a4f83535e4a05b61b6f529cc85459e4a134d43c033  skills/pfd-ops/references/github-issues-backend.md
+98844d0381bdc84b059ae401510ef2153e7c7beb4940a4e790e8aa545b554707  skills/pfd-ops/references/github-issues-backend.md
 
 57d30128361e2e29736bbb3f66ea10c3beaed751fe17fe6f4b711bae6faec53b  skills/pfd-ops/references/scaffold/bindings/pfd-ops.md
 

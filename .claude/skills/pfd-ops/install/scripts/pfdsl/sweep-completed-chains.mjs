@@ -263,12 +263,9 @@ try {
 		);
 	}
 
-	// A GITHUB_TOKEN-authored PR never triggers the pull_request workflow, so
-	// this repo's own `make check-fmt` never runs against this script's
-	// output — nothing outside this gate verifies it stayed canonically
-	// formatted. `delete` only rewrites what it touches, so a non-canonical
-	// input can pass its own `check` (which does not judge formatting) and
-	// still come out non-canonical.
+	// A PR opened with GITHUB_TOKEN has its pull_request runs held until someone approves them, so this repo's own `make check-fmt` cannot be counted on to run against this script's output.
+	// Nothing outside this gate is guaranteed to verify it stayed canonically formatted.
+	// `delete` only rewrites what it touches, so a non-canonical input can pass its own `check` (which does not judge formatting) and still come out non-canonical.
 	const verifyFmt = runCli(["fmt", scratchFile, "--check"]);
 	if (verifyFmt.status !== 0) {
 		failVerify(

@@ -207,7 +207,7 @@ Ask the repository owner whether to enable it, after settling the points below.
 
 Behavior once enabled, from the workflow file:
 
-- Trigger: every `push`. The job runs only when the pushed ref is the repository's default branch and does nothing otherwise.
+- Trigger: every `push` to a branch other than `flow-sync/pending`, the sweep's own pull request branch. The job runs only when the pushed ref is the repository's default branch and does nothing otherwise.
 - Action: it runs `node scripts/pfdsl/sweep-completed-chains.mjs .pfdsl/roadmap.pfdsl --write`, which removes chains whose artifacts are all done from the roadmap.
   When the roadmap changes, it opens a pull request from the branch `flow-sync/pending` titled `chore(plan): sweep completed chains`, touching only `.pfdsl/roadmap.pfdsl`. A person merges it.
 - Permissions: the workflow requests `contents: write` and `pull-requests: write`.
@@ -215,9 +215,12 @@ Behavior once enabled, from the workflow file:
 
 Points to settle before enabling:
 
-- The pull request is created with `GITHUB_TOKEN`, so GitHub does not start the repository's own `pull_request` workflows for it.
-  The pull request body says the sweep's own checks are the only verification it received.
-  If the default branch requires status checks, this pull request will not report them until you trigger them by your own means.
+- By default the pull request is created with `GITHUB_TOKEN`, so GitHub holds the repository's own `pull_request` workflow runs for it in an approval-required state (`action_required`) until someone with write access approves them.
+  The pull request body says so, and that the sweep's own checks are the only verification it has received until then.
+  If the default branch requires status checks, this pull request does not report them until those runs are approved.
+  To have them start without approval, set the repository variable `PFDSL_SWEEP_APP_CLIENT_ID` and the secret `PFDSL_SWEEP_APP_PRIVATE_KEY` for a GitHub App installed on the repository with Contents and Pull requests write access.
+  The workflow then opens the pull request with a short-lived token of that App.
+  A repository without the variable keeps using `GITHUB_TOKEN`.
 - Creating the pull request requires that the repository, and its organization if it restricts this, allows GitHub Actions to create pull requests (Settings, Actions, General, Workflow permissions).
   This setting is GitHub's requirement for the pull-request step; the workflow file does not check it.
   A rule that blocks creating the `flow-sync/pending` branch also blocks the step.
