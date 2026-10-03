@@ -362,12 +362,7 @@ export function hookCapabilityToCodexHooks(record) {
 					if (hook.type === "command") {
 						hook.command =
 							bootstrap +
-							hook.command
-								.replaceAll(`\${CLAUDE_PROJECT_DIR}`, `\${pfdsl_hook_root}`)
-								.replaceAll(
-									`\${CLAUDE_PROJECT_DIR:-}`,
-									`\${pfdsl_hook_root:-}`,
-								);
+							hook.command.replaceAll("CLAUDE_PROJECT_DIR", "pfdsl_hook_root");
 					}
 				}
 			}

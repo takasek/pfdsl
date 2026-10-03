@@ -48,6 +48,10 @@ function fixture() {
 	mkdirSync(join(cwd, "scripts/lib"), { recursive: true });
 	mkdirSync(join(cwd, ".git-common/hooks"), { recursive: true });
 	mkdirSync(bin);
+	writeFileSync(
+		join(cwd, "scripts/run-repo-hook.mjs"),
+		readFileSync(join(root, "scripts/run-repo-hook.mjs")),
+	);
 	symlinkSync(makefile, join(cwd, "Makefile"));
 	writeFileSync(join(cwd, "scripts/hooks/pre-commit-shim"), "#!/bin/sh\n");
 	writeFileSync(join(cwd, "scripts/link-repo-skill.mjs"), "// fixture\n");
@@ -70,7 +74,7 @@ function fixture() {
 		chmod:
 			'#!/bin/sh\nprintf \'chmod\\n\' >> "$SETUP_LOG"\n[ "$SETUP_FAIL_STAGE" = chmod ] && exit 1\nexec "$REAL_CHMOD" "$@"\n',
 		// biome-ignore lint/suspicious/noTemplateCurlyInString: shell parameter expansion is intentional.
-		node: '#!/bin/sh\nif [ "${1##*/}" = setup-completion.mjs ]; then [ "$2" = write ] && [ "$SETUP_FAIL_STAGE" = write ] && exit 1; exec "$REAL_NODE" "$@"; fi\nprintf \'node\\n\' >> "$SETUP_LOG"\n[ "$SETUP_FAIL_STAGE" = node ] && exit 1\nexit 0\n',
+		node: '#!/bin/sh\nif { [ "${1##*/}" = setup-completion.mjs ] || [ "${1##*/}" = run-repo-hook.mjs ]; }; then [ "$2" = write ] && [ "$SETUP_FAIL_STAGE" = write ] && exit 1; exec "$REAL_NODE" "$@"; fi\nprintf \'node\\n\' >> "$SETUP_LOG"\n[ "$SETUP_FAIL_STAGE" = node ] && exit 1\nexit 0\n',
 	})) {
 		const command = join(bin, name);
 		writeFileSync(command, source);
@@ -579,7 +583,7 @@ describe("setup completion sentinel", () => {
 
 	it("runs each SessionStart hook only until setup completes", () => {
 		for (const path of [".claude/settings.json", ".codex/hooks.json"]) {
-			assert.match(sessionStartCommand(path), /setup-completion\.mjs"? check/);
+			assert.match(sessionStartCommand(path), /run-repo-hook\.mjs" --setup/);
 			const context = fixture();
 			assertSucceeded(runSessionStart(context, sessionStartCommand(path)));
 			assert.equal(

@@ -6,27 +6,27 @@
         "hooks": [
           {
             "type": "command",
-            "command": "pfdsl_hook_root=$(pwd -P) || exit 2; while [ ! -e \"$pfdsl_hook_root/.git\" ]; do [ \"$pfdsl_hook_root\" != / ] || { echo \"[pfdsl] repository hook root is unavailable\" >&2; exit 2; }; pfdsl_hook_root=$(dirname \"$pfdsl_hook_root\") || exit 2; done; case \"${pfdsl_hook_root:-}\" in /*) ;; *) echo \"[pfdsl] repository hook root is unavailable\" >&2; exit 2 ;; esac; test -e \"${pfdsl_hook_root}/.git\" && command -v node >/dev/null || exit 2; node \"${pfdsl_hook_root}/scripts/delegation-guard.mjs\" || { echo \"[pfdsl] repository hook failed to run\" >&2; exit 2; }",
+            "command": "pfdsl_hook_root=$(pwd -P) || exit 2; while [ ! -e \"$pfdsl_hook_root/.git\" ]; do [ \"$pfdsl_hook_root\" != / ] || { echo \"[pfdsl] repository hook root is unavailable\" >&2; exit 2; }; pfdsl_hook_root=$(dirname \"$pfdsl_hook_root\") || exit 2; done; test \"${pfdsl_hook_root#/}\" != \"${pfdsl_hook_root}\" || exit 2; node \"${pfdsl_hook_root}/scripts/run-repo-hook.mjs\" scripts/delegation-guard.mjs || exit 2",
             "timeout": 10
           },
           {
             "type": "command",
-            "command": "pfdsl_hook_root=$(pwd -P) || exit 2; while [ ! -e \"$pfdsl_hook_root/.git\" ]; do [ \"$pfdsl_hook_root\" != / ] || { echo \"[pfdsl] repository hook root is unavailable\" >&2; exit 2; }; pfdsl_hook_root=$(dirname \"$pfdsl_hook_root\") || exit 2; done; case \"${pfdsl_hook_root:-}\" in /*) ;; *) echo \"[pfdsl] repository hook root is unavailable\" >&2; exit 2 ;; esac; test -e \"${pfdsl_hook_root}/.git\" && command -v node >/dev/null || exit 2; node \"${pfdsl_hook_root}/scripts/main-commit-guard.mjs\" || { echo \"[pfdsl] repository hook failed to run\" >&2; exit 2; }",
+            "command": "pfdsl_hook_root=$(pwd -P) || exit 2; while [ ! -e \"$pfdsl_hook_root/.git\" ]; do [ \"$pfdsl_hook_root\" != / ] || { echo \"[pfdsl] repository hook root is unavailable\" >&2; exit 2; }; pfdsl_hook_root=$(dirname \"$pfdsl_hook_root\") || exit 2; done; test \"${pfdsl_hook_root#/}\" != \"${pfdsl_hook_root}\" || exit 2; node \"${pfdsl_hook_root}/scripts/run-repo-hook.mjs\" scripts/main-commit-guard.mjs || exit 2",
             "timeout": 10
           },
           {
             "type": "command",
-            "command": "pfdsl_hook_root=$(pwd -P) || exit 2; while [ ! -e \"$pfdsl_hook_root/.git\" ]; do [ \"$pfdsl_hook_root\" != / ] || { echo \"[pfdsl] repository hook root is unavailable\" >&2; exit 2; }; pfdsl_hook_root=$(dirname \"$pfdsl_hook_root\") || exit 2; done; case \"${pfdsl_hook_root:-}\" in /*) ;; *) echo \"[pfdsl] repository hook root is unavailable\" >&2; exit 2 ;; esac; test -e \"${pfdsl_hook_root}/.git\" && command -v node >/dev/null || exit 2; node \"${pfdsl_hook_root}/scripts/command-usage-guard.mjs\" || { echo \"[pfdsl] repository hook failed to run\" >&2; exit 2; }",
+            "command": "pfdsl_hook_root=$(pwd -P) || exit 2; while [ ! -e \"$pfdsl_hook_root/.git\" ]; do [ \"$pfdsl_hook_root\" != / ] || { echo \"[pfdsl] repository hook root is unavailable\" >&2; exit 2; }; pfdsl_hook_root=$(dirname \"$pfdsl_hook_root\") || exit 2; done; test \"${pfdsl_hook_root#/}\" != \"${pfdsl_hook_root}\" || exit 2; node \"${pfdsl_hook_root}/scripts/run-repo-hook.mjs\" scripts/command-usage-guard.mjs || exit 2",
             "timeout": 10
           },
           {
             "type": "command",
-            "command": "pfdsl_hook_root=$(pwd -P) || exit 2; while [ ! -e \"$pfdsl_hook_root/.git\" ]; do [ \"$pfdsl_hook_root\" != / ] || { echo \"[pfdsl] repository hook root is unavailable\" >&2; exit 2; }; pfdsl_hook_root=$(dirname \"$pfdsl_hook_root\") || exit 2; done; case \"${pfdsl_hook_root:-}\" in /*) ;; *) echo \"[pfdsl] repository hook root is unavailable\" >&2; exit 2 ;; esac; test -e \"${pfdsl_hook_root}/.git\" && command -v node >/dev/null || exit 2; node \"${pfdsl_hook_root}/scripts/verification-tree-guard.mjs\" || { echo \"[pfdsl] repository hook failed to run\" >&2; exit 2; }",
+            "command": "pfdsl_hook_root=$(pwd -P) || exit 2; while [ ! -e \"$pfdsl_hook_root/.git\" ]; do [ \"$pfdsl_hook_root\" != / ] || { echo \"[pfdsl] repository hook root is unavailable\" >&2; exit 2; }; pfdsl_hook_root=$(dirname \"$pfdsl_hook_root\") || exit 2; done; test \"${pfdsl_hook_root#/}\" != \"${pfdsl_hook_root}\" || exit 2; node \"${pfdsl_hook_root}/scripts/run-repo-hook.mjs\" scripts/verification-tree-guard.mjs || exit 2",
             "timeout": 10
           },
           {
             "type": "command",
-            "command": "pfdsl_hook_root=$(pwd -P) || exit 2; while [ ! -e \"$pfdsl_hook_root/.git\" ]; do [ \"$pfdsl_hook_root\" != / ] || { echo \"[pfdsl] repository hook root is unavailable\" >&2; exit 2; }; pfdsl_hook_root=$(dirname \"$pfdsl_hook_root\") || exit 2; done; case \"${pfdsl_hook_root:-}\" in /*) ;; *) echo \"[pfdsl] repository hook root is unavailable\" >&2; exit 2 ;; esac; test -e \"${pfdsl_hook_root}/.git\" && command -v node >/dev/null || exit 2; node \"${pfdsl_hook_root}/scripts/closes-create-guard.mjs\" || { echo \"[pfdsl] repository hook failed to run\" >&2; exit 2; }",
+            "command": "pfdsl_hook_root=$(pwd -P) || exit 2; while [ ! -e \"$pfdsl_hook_root/.git\" ]; do [ \"$pfdsl_hook_root\" != / ] || { echo \"[pfdsl] repository hook root is unavailable\" >&2; exit 2; }; pfdsl_hook_root=$(dirname \"$pfdsl_hook_root\") || exit 2; done; test \"${pfdsl_hook_root#/}\" != \"${pfdsl_hook_root}\" || exit 2; node \"${pfdsl_hook_root}/scripts/run-repo-hook.mjs\" scripts/closes-create-guard.mjs || exit 2",
             "timeout": 10
           }
         ]
@@ -36,17 +36,17 @@
         "hooks": [
           {
             "type": "command",
-            "command": "pfdsl_hook_root=$(pwd -P) || exit 2; while [ ! -e \"$pfdsl_hook_root/.git\" ]; do [ \"$pfdsl_hook_root\" != / ] || { echo \"[pfdsl] repository hook root is unavailable\" >&2; exit 2; }; pfdsl_hook_root=$(dirname \"$pfdsl_hook_root\") || exit 2; done; case \"${pfdsl_hook_root:-}\" in /*) ;; *) echo \"[pfdsl] repository hook root is unavailable\" >&2; exit 2 ;; esac; test -e \"${pfdsl_hook_root}/.git\" && command -v node >/dev/null || exit 2; node \"${pfdsl_hook_root}/scripts/worktree-write-guard.mjs\" || { echo \"[pfdsl] repository hook failed to run\" >&2; exit 2; }",
+            "command": "pfdsl_hook_root=$(pwd -P) || exit 2; while [ ! -e \"$pfdsl_hook_root/.git\" ]; do [ \"$pfdsl_hook_root\" != / ] || { echo \"[pfdsl] repository hook root is unavailable\" >&2; exit 2; }; pfdsl_hook_root=$(dirname \"$pfdsl_hook_root\") || exit 2; done; test \"${pfdsl_hook_root#/}\" != \"${pfdsl_hook_root}\" || exit 2; node \"${pfdsl_hook_root}/scripts/run-repo-hook.mjs\" scripts/worktree-write-guard.mjs || exit 2",
             "timeout": 10
           },
           {
             "type": "command",
-            "command": "pfdsl_hook_root=$(pwd -P) || exit 2; while [ ! -e \"$pfdsl_hook_root/.git\" ]; do [ \"$pfdsl_hook_root\" != / ] || { echo \"[pfdsl] repository hook root is unavailable\" >&2; exit 2; }; pfdsl_hook_root=$(dirname \"$pfdsl_hook_root\") || exit 2; done; case \"${pfdsl_hook_root:-}\" in /*) ;; *) echo \"[pfdsl] repository hook root is unavailable\" >&2; exit 2 ;; esac; test -e \"${pfdsl_hook_root}/.git\" && command -v node >/dev/null || exit 2; node \"${pfdsl_hook_root}/scripts/roadmap-publish-guard.mjs\" || { echo \"[pfdsl] repository hook failed to run\" >&2; exit 2; }",
+            "command": "pfdsl_hook_root=$(pwd -P) || exit 2; while [ ! -e \"$pfdsl_hook_root/.git\" ]; do [ \"$pfdsl_hook_root\" != / ] || { echo \"[pfdsl] repository hook root is unavailable\" >&2; exit 2; }; pfdsl_hook_root=$(dirname \"$pfdsl_hook_root\") || exit 2; done; test \"${pfdsl_hook_root#/}\" != \"${pfdsl_hook_root}\" || exit 2; node \"${pfdsl_hook_root}/scripts/run-repo-hook.mjs\" scripts/roadmap-publish-guard.mjs || exit 2",
             "timeout": 10
           },
           {
             "type": "command",
-            "command": "pfdsl_hook_root=$(pwd -P) || exit 2; while [ ! -e \"$pfdsl_hook_root/.git\" ]; do [ \"$pfdsl_hook_root\" != / ] || { echo \"[pfdsl] repository hook root is unavailable\" >&2; exit 2; }; pfdsl_hook_root=$(dirname \"$pfdsl_hook_root\") || exit 2; done; case \"${pfdsl_hook_root:-}\" in /*) ;; *) echo \"[pfdsl] repository hook root is unavailable\" >&2; exit 2 ;; esac; test -e \"${pfdsl_hook_root}/.git\" && command -v node >/dev/null || exit 2; node \"${pfdsl_hook_root}/scripts/generated-root-instructions-guard.mjs\" || { echo \"[pfdsl] repository hook failed to run\" >&2; exit 2; }",
+            "command": "pfdsl_hook_root=$(pwd -P) || exit 2; while [ ! -e \"$pfdsl_hook_root/.git\" ]; do [ \"$pfdsl_hook_root\" != / ] || { echo \"[pfdsl] repository hook root is unavailable\" >&2; exit 2; }; pfdsl_hook_root=$(dirname \"$pfdsl_hook_root\") || exit 2; done; test \"${pfdsl_hook_root#/}\" != \"${pfdsl_hook_root}\" || exit 2; node \"${pfdsl_hook_root}/scripts/run-repo-hook.mjs\" scripts/generated-root-instructions-guard.mjs || exit 2",
             "timeout": 10
           }
         ]
@@ -58,7 +58,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "pfdsl_hook_root=$(pwd -P) || exit 2; while [ ! -e \"$pfdsl_hook_root/.git\" ]; do [ \"$pfdsl_hook_root\" != / ] || { echo \"[pfdsl] repository hook root is unavailable\" >&2; exit 2; }; pfdsl_hook_root=$(dirname \"$pfdsl_hook_root\") || exit 2; done; case \"${pfdsl_hook_root:-}\" in /*) ;; *) echo \"[pfdsl] repository hook root is unavailable\" >&2; exit 2 ;; esac; test -e \"${pfdsl_hook_root}/.git\" && command -v node >/dev/null || exit 2; node \"${pfdsl_hook_root}/hooks/managed-issue-reminder-post-tool-use.mjs\" || { echo \"[pfdsl] repository hook failed to run\" >&2; exit 2; }",
+            "command": "pfdsl_hook_root=$(pwd -P) || exit 2; while [ ! -e \"$pfdsl_hook_root/.git\" ]; do [ \"$pfdsl_hook_root\" != / ] || { echo \"[pfdsl] repository hook root is unavailable\" >&2; exit 2; }; pfdsl_hook_root=$(dirname \"$pfdsl_hook_root\") || exit 2; done; test \"${pfdsl_hook_root#/}\" != \"${pfdsl_hook_root}\" || exit 2; node \"${pfdsl_hook_root}/scripts/run-repo-hook.mjs\" hooks/managed-issue-reminder-post-tool-use.mjs || exit 2",
             "timeout": 10
           }
         ]
@@ -69,7 +69,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "pfdsl_hook_root=$(pwd -P) || exit 2; while [ ! -e \"$pfdsl_hook_root/.git\" ]; do [ \"$pfdsl_hook_root\" != / ] || { echo \"[pfdsl] repository hook root is unavailable\" >&2; exit 2; }; pfdsl_hook_root=$(dirname \"$pfdsl_hook_root\") || exit 2; done; case \"${pfdsl_hook_root:-}\" in /*) ;; *) echo \"[pfdsl] repository hook root is unavailable\" >&2; exit 2 ;; esac; test -e \"${pfdsl_hook_root}/.git\" && command -v node >/dev/null || exit 2; cd \"${pfdsl_hook_root}\" || exit 2; test -f \"${pfdsl_hook_root}/scripts/setup-completion.mjs\" || exit 2; if ! node \"${pfdsl_hook_root}/scripts/setup-completion.mjs\" check; then echo \"[pfdsl] setup completion marker is missing or stale in this worktree - running make setup\"; make setup || exit 2; fi",
+            "command": "pfdsl_hook_root=$(pwd -P) || exit 2; while [ ! -e \"$pfdsl_hook_root/.git\" ]; do [ \"$pfdsl_hook_root\" != / ] || { echo \"[pfdsl] repository hook root is unavailable\" >&2; exit 2; }; pfdsl_hook_root=$(dirname \"$pfdsl_hook_root\") || exit 2; done; test \"${pfdsl_hook_root#/}\" != \"${pfdsl_hook_root}\" || exit 2; node \"${pfdsl_hook_root}/scripts/run-repo-hook.mjs\" --setup || exit 2",
             "timeout": 300,
             "statusMessage": "pfdsl: checking setup completion (make setup when marker is absent)"
           }
