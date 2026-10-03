@@ -92,9 +92,11 @@ a36491954ed82a43067e087687ce819c1ee4221e232f8c3e2904ea5900f0ed20  skills/pfd-ops
 
 c33d4bd989318b42ac64c84af25cf731df7e3678350915b3a7dff9c916abfbc5  skills/pfd-ops/scripts/plugin-version-check.mjs
 
-52082fe7bfa5c9944b786332705a2d5e31bebd1c8c07c69bac52c8bba76fd831  skills/pfd-retro/SKILL.md
+7fbb4821acd71d84c98a089ed6216ff63af58f8d4a019b9e8c1094d15eaf2e0e  skills/pfd-retro/SKILL.md
 
 41ca0b17738aa63e0df704d724ed4cdde6c6a5f376af8b96a9e96703a5886b4a  skills/pfd-retro/references/knowledge-lifecycle.md
+
+10346a295595f3e47207102a0d4f31359fce888b0563eb5f9e245a94281b329f  skills/pfd-retro/scripts/classify-knowledge-lifecycle.mjs
 
 5d946e545b1dd9f84f3f74953c2d3ccfc55cd7c169d3b5ae4040dff1b4e62a26  skills/pfd-upstream-report/SKILL.md
 

@@ -64,6 +64,11 @@
 dist 非依存の手動再生成は `scripts/gen-plugin-dist-independent.mjs` が担う
 - **gen_install（`scripts/lib/install-templates.mjs` の明示リスト）**: repo ルートの配布ソースから `install/` ミラーを一方向で再生成する。生成の向きは repo ルート → `install/` → `plugin/` の一本のみ（#547 で双方向 sync を廃止）
 - **plugin root assembly（`scripts/gen-plugin.mjs`）**: `pnpm -r build && make gen-plugin` が、中立テンプレートの source topology と schemaを中立capability recordへdecodeして四target contractを検証し、その同じrecord objectから両ハーネスの出力を生成する。pfdsl skillの中立な生成正本は`generated/skills/pfdsl`であり、`.claude/skills/pfdsl`はそこへの生成symlinkなので手編集しない。組み立て前に専有rootをsnapshotして空から再構築するため、生成をやめた追跡済みファイルはGitの削除差分になり、生成失敗時は元のrootへ戻る。再構築でignore対象を含む未追跡ファイルが失われる場合は生成を失敗させる。dist非依存の経路では中立skillの`SKILL.md`だけを保持する。Claude Code adapterはplugin tree・manifest・marketplace記述を`plugin/pfdsl/`へidentity互換に組み立てる。Codex adapterは生成済みClaude rootやmanifestを読まず、repositoryの`AGENTS.md`・`.agents/`・`.codex/`とnative skill tree・manifest・hooksを`plugin/pfdsl-codex/`へ生成する。公式Codex validator/runtimeはplugin rootの`skills/`を固定するため、二つのrootを混在させない。内部でgen_installを実行するため、pluginが古い`install/`から組まれることはない
+
+復元未完時には両 generator CLI が primary error を先に表示し、snapshot の保存理由と recovery path を続ける。
+再試行と `check-generated-drift.mjs` は `plugin/.pfdsl-gen-txn-*` の残留を専用診断で示すが、active transaction や cleanup 失敗もあり得るため、全件を rollback failure と断定しない。
+再試行は保存済みデータの復元・削除を行わないため、元のエラーと snapshot を確認してから復旧を判断する。
+
 - **render_previews（`make gen-samples`）**: 機能カタログとロードマップを dot/svg に描画する。`.dot` / README は graphviz-exporter、`.svg` は preview-engine の wasm graphviz で生成され、いずれも決定論的（#588）
 - **push_cli_release_tag / publish_cli**: `make release COMMIT=<SHA>` は準備PRがmergeされた明示commitを検査し、そのSHAへ`v*` tagを作成・pushする。
 このtag上の`plugin/pfdsl/`が公開snapshotとなり、`publish-cli.yml`が同じtagのcommitから`@pfdsl/cli`をnpm publishする（Trusted Publishing / OIDC）。

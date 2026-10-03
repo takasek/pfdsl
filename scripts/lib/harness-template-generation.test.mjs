@@ -93,6 +93,10 @@ function fixture() {
 		join(root, "scripts/lib/harness-template.mjs"),
 	);
 	symlinkSync(join(repo, "node_modules"), join(root, "node_modules"));
+	symlinkSync(
+		join(repo, "packages/core/node_modules"),
+		join(root, "packages/core/node_modules"),
+	);
 	for (const name of ["cli", "parser", "renderer", "exporter", "analyzer"]) {
 		const source = join(repo, "packages", name, "dist");
 		if (existsSync(source))

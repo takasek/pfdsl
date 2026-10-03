@@ -13,6 +13,10 @@ import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { assemblePluginDistIndependent } from "./lib/gen-plugin.mjs";
+import {
+	formatPluginAssemblyError,
+	pluginRecoveryNotice,
+} from "./lib/gen-plugin-recovery.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const root = resolve(__dirname, "..");
@@ -45,8 +49,10 @@ function assemble() {
 }
 
 try {
+	const recovery = pluginRecoveryNotice(root);
+	if (recovery) console.error(recovery);
 	assemble();
 } catch (e) {
-	console.error(e instanceof Error ? e.message : String(e));
+	console.error(formatPluginAssemblyError(e));
 	process.exit(1);
 }
