@@ -45,6 +45,120 @@ describe("Codex skill metadata", () => {
 		assert.equal(skillMarkdownToCodex(input), input);
 	});
 
+	it("accepts metadata mapping aliases without changing their other consumers", () => {
+		const input =
+			"---\nname: example\nsummary: canonical\ndescription: Example.\nlicense: &meta {owner: maintainer}\nmetadata: *meta\n---\nbody\n";
+		const output = skillMarkdownToCodex(input);
+		const header = parse(output.match(/^---\n([\s\S]*?)\n---/)[1], {
+			merge: true,
+		});
+		assert.deepEqual(header.metadata, {
+			owner: "maintainer",
+			summary: "canonical",
+		});
+		assert.deepEqual(header.license, { owner: "maintainer" });
+		assert.equal(output.slice(output.indexOf("\n---\n", 4) + 5), "body\n");
+	});
+
+	it("rejects conflicting summaries inherited through merge keys and mapping aliases", () => {
+		for (const fields of [
+			"metadata:\n  <<: {summary: conflicting, owner: maintainer}",
+			"license: &base {summary: conflicting}\nmetadata:\n  <<: *base",
+			"metadata:\n  <<: [{summary: conflicting}, {owner: maintainer}]",
+			"license: &base {summary: conflicting}\nmetadata: *base",
+			"<<: {metadata: {summary: conflicting, owner: maintainer}}",
+		]) {
+			assert.throws(
+				() =>
+					skillMarkdownToCodex(
+						`---\nsummary: canonical\ndescription: Example.\n${fields}\n---\nbody\n`,
+					),
+				/metadata.summary conflicts/,
+			);
+		}
+	});
+
+	it("retains an agreeing merged summary and the original merged fields", () => {
+		const output = skillMarkdownToCodex(
+			"---\nsummary: canonical\ndescription: Example.\nlicense: &base {summary: canonical, owner: maintainer}\nmetadata:\n  <<: *base\n---\nbody\n",
+		);
+		const header = parse(output.match(/^---\n([\s\S]*?)\n---/)[1], {
+			merge: true,
+		});
+		assert.equal(header.summary, undefined);
+		assert.deepEqual(header.metadata, {
+			summary: "canonical",
+			owner: "maintainer",
+		});
+		assert.deepEqual(header.license, header.metadata);
+	});
+
+	it("preserves metadata inherited by the root mapping", () => {
+		const output = skillMarkdownToCodex(
+			"---\nname: example\nsummary: canonical\ndescription: Example.\n<<: {metadata: {owner: maintainer}}\n---\nbody\n",
+		);
+		const header = parse(output.match(/^---\n([\s\S]*?)\n---/)[1], {
+			merge: true,
+		});
+		assert.deepEqual(header.metadata, {
+			owner: "maintainer",
+			summary: "canonical",
+		});
+	});
+
+	it("removes summary even when deleting it exposes a root merge donor", () => {
+		const input =
+			"---\nname: example\nsummary: canonical\ndescription: Example.\n<<: &base {summary: inherited, license: MIT}\nmetadata: {owner: maintainer}\n---\nbody\n";
+		const output = skillMarkdownToCodex(input);
+		const header = parse(output.match(/^---\n([\s\S]*?)\n---/)[1], {
+			merge: true,
+		});
+		assert.equal(header.summary, undefined);
+		assert.equal(header.license, "MIT");
+		assert.deepEqual(header.metadata, {
+			owner: "maintainer",
+			summary: "canonical",
+		});
+		assert.equal(output.slice(output.indexOf("\n---\n", 4) + 5), "body\n");
+		assert.equal(skillMarkdownToCodex(output), output);
+	});
+
+	it("preserves quoted strings for YAML 1.1 consumers when materializing aliases or root merges", () => {
+		for (const fields of [
+			'license: &meta {owner: "yes", enabled: "no"}\nmetadata: *meta',
+			'<<: {summary: inherited}\nmetadata: {owner: "yes", enabled: "no"}',
+		]) {
+			const output = skillMarkdownToCodex(
+				`---\nname: "on"\nsummary: canonical\ndescription: "yes"\n${fields}\n---\nbody\n`,
+			);
+			const header = parse(output.match(/^---\n([\s\S]*?)\n---/)[1], {
+				version: "1.1",
+				merge: true,
+			});
+			assert.equal(header.name, "on");
+			assert.equal(header.description, "yes");
+			assert.deepEqual(header.metadata, {
+				owner: "yes",
+				enabled: "no",
+				summary: "canonical",
+			});
+			if (header.license)
+				assert.deepEqual(header.license, { owner: "yes", enabled: "no" });
+		}
+	});
+
+	it("keeps other aliases of anchored metadata unchanged when adding summary", () => {
+		const output = skillMarkdownToCodex(
+			"---\nsummary: canonical\ndescription: Example.\nmetadata: &meta {owner: maintainer}\nlicense: *meta\n---\nbody\n",
+		);
+		const header = parse(output.match(/^---\n([\s\S]*?)\n---/)[1]);
+		assert.deepEqual(header.metadata, {
+			owner: "maintainer",
+			summary: "canonical",
+		});
+		assert.deepEqual(header.license, { owner: "maintainer" });
+	});
+
 	it("preserves description aliases when summary's anchor moves below them", () => {
 		const input =
 			"---\nname: example\nsummary: &shared Common description.\ndescription: *shared\n---\nbody\n";

@@ -1,42 +1,63 @@
-import { isMap, isScalar, parseDocument, visit } from "yaml";
+import { isAlias, isMap, isScalar, parseDocument, visit } from "yaml";
 
 const READ_ONLY_TOOLS = "Read, Grep, Bash";
 
 export function skillMarkdownToCodex(source) {
 	const header = source.match(/^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)/);
 	if (!header) return source;
-	const document = parseDocument(header[1]);
+	const document = parseDocument(header[1], { merge: true });
 	if (document.errors.length) throw document.errors[0];
 	if (!document.has("summary")) return source;
+	// Materialized strings must remain strings in YAML 1.1 consumers too
+	// (e.g. the standard validator treats unquoted yes/no/on as booleans).
+	const literalNode = (value) => {
+		const node = document.createNode(value);
+		visit(node, {
+			Scalar(_key, scalar) {
+				if (typeof scalar.value === "string") scalar.type = "QUOTE_DOUBLE";
+			},
+		});
+		return node;
+	};
 	const decoded = document.toJS();
 	const summary = decoded.summary;
 	const summaryNode = document.get("summary", true);
 	if (typeof summary !== "string" || !summary.trim()) {
 		throw new Error("Codex skill summary must be a non-empty string.");
 	}
-	const metadata = document.get("metadata", true);
+	const metadataNode = document.get("metadata", true);
+	const metadata = isAlias(metadataNode)
+		? metadataNode.resolve(document)
+		: (metadataNode ??
+			(Object.hasOwn(decoded, "metadata")
+				? literalNode(decoded.metadata)
+				: undefined));
 	if (metadata && !isMap(metadata)) {
 		throw new Error("Codex skill metadata must be a mapping.");
 	}
-	if (
-		document.hasIn(["metadata", "summary"]) &&
-		decoded.metadata.summary !== summary
-	) {
+	const hasMetadataSummary =
+		metadata && Object.hasOwn(decoded.metadata, "summary");
+	if (hasMetadataSummary && decoded.metadata.summary !== summary) {
 		throw new Error("Codex skill metadata.summary conflicts with summary.");
 	}
-	// Resolve references to an anchor whose declaration is about to move.
-	if (summaryNode.anchor) {
+	// Detach aliases before changing their target so unrelated fields retain
+	// their decoded values. Mapping aliases also need a writable metadata node.
+	if (isAlias(metadataNode) || (!metadataNode && metadata)) {
+		document.set("metadata", literalNode(decoded.metadata));
+	}
+	if (summaryNode.anchor || (metadata?.anchor && !hasMetadataSummary)) {
 		visit(document, {
 			Alias(_key, node) {
-				if (node.resolve(document) === summaryNode)
-					return document.createNode(summary);
+				if (node.resolve(document) === summaryNode) return literalNode(summary);
+				if (!hasMetadataSummary && node.resolve(document) === metadata)
+					return literalNode(decoded.metadata);
 			},
 		});
 	}
-	if (!document.hasIn(["metadata", "summary"])) {
+	if (!hasMetadataSummary) {
 		const renderedSummary = isScalar(summaryNode)
 			? summaryNode.clone()
-			: document.createNode(summary);
+			: literalNode(summary);
 		delete renderedSummary.anchor;
 		document.setIn(["metadata", "summary"], renderedSummary);
 		if (!metadata) {
@@ -51,6 +72,13 @@ export function skillMarkdownToCodex(source) {
 		}
 	}
 	document.delete("summary");
+	// Removing an explicit key can expose a merge donor's summary. Only that
+	// case needs the effective root mapping materialized to remove the key.
+	const rendered = document.toJS();
+	if (Object.hasOwn(rendered, "summary")) {
+		delete rendered.summary;
+		document.contents = literalNode(rendered);
+	}
 	const newline = header[0].startsWith("---\r\n") ? "\r\n" : "\n";
 	const yaml = document.toString().replace(/\n/g, newline);
 	return `---${newline}${yaml}---${newline}${source.slice(header[0].length)}`;
