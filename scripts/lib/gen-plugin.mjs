@@ -25,6 +25,7 @@ import {
 	claudeInstructionsToAgents,
 	commandCapabilityToCodexSkill,
 	hookCapabilityToCodexHooks,
+	skillMarkdownToCodex,
 } from "./gen-codex-assets.mjs";
 import { genInstall } from "./gen-install.mjs";
 import { writeSkillRefs } from "./gen-skill-refs.mjs";
@@ -453,8 +454,10 @@ function normalizeCodexMarkdownTree(
 		}
 		if (!entry.isFile() || !path.endsWith(".md")) continue;
 		const source = deps.readFileSync(path, "utf-8");
+		const markdown =
+			entry.name === "SKILL.md" ? skillMarkdownToCodex(source) : source;
 		const normalized = addGeneratedMarkdownNotice(
-			claudeInstructionsToAgents(source).replace(/(?:\r?\n){2,}$/, "\n"),
+			claudeInstructionsToAgents(markdown).replace(/(?:\r?\n){2,}$/, "\n"),
 			canonicalSource(sourcePath),
 		);
 		if (normalized !== source) deps.writeFileSync(path, normalized);
