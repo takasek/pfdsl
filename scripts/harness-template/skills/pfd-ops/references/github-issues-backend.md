@@ -28,7 +28,7 @@ issue 本文は依頼内容、コメントは設計選択記録の置き場と�
 
 ## PR 本文規約
 
-issue に対応する PR を作る際、本文に必ず閉じるキーワードを含める:
+issue を完了させ、デフォルトブランチへ直接マージする PR を作る際、本文に閉じるキーワードを含める:
 
 ```
 Closes #<issue番号>
@@ -36,7 +36,7 @@ Closes #<issue番号>
 
 複数 issue の場合は1行ずつ列挙する。これによりデフォルトブランチへの PR マージ時に GitHub が issue を自動 close する。
 
-**中間 PR では使わない**: `Closes` を使うのはデフォルトブランチ（main 等）へ直接マージする PR のみ。feature branch への中間 PR に書くと、feature branch マージ時点で issue が閉じられ、デフォルトブランチ未到達のまま誤 close になる。issue close と flow 確定はデフォルトブランチへのマージ時に行う。
+**中間 PR では使わない**: このプリセットでは、`Closes` を使うのはデフォルトブランチ（main 等）へ直接マージする完了 PR のみとし、feature branch への中間 PR では使わない。[GitHub の仕様](https://docs.github.com/en/issues/tracking-your-work-with-issues/using-issues/linking-a-pull-request-to-an-issue)では、デフォルトブランチ以外を base とする PR 本文の閉じるキーワードは無視され、リンクも生成されず、その PR のマージは issue を閉じない。中間 PR の本文が最終 PR へ引き継がれると仮定せず、デフォルトブランチへ統合する最終 PR に、完了する issue の参照をまとめる。issue close と flow 確定はデフォルトブランチへのマージ時に行う。
 
 **閉じる issue が無い PR**: hotfix（次節）に該当しない、bookkeeping やドキュメントの spin-off 等では、行頭に `no-issue: <理由>` と明示する。理由は必須（コロンの後に空でない理由テキストを書く）。これは「issue なし develop は hotfix のみに限る」の例外であり、理由必須の明示宣言に限って緩めたもの — 宣言なしに閉じる issue が無いまま PR を出すことは変わらず認めない。
 
