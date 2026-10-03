@@ -259,6 +259,10 @@ describe("git config bypass oracle (#1232)", () => {
 	const globalFile = join(root, "global.gitconfig");
 	const systemFile = join(root, "system.gitconfig");
 	const customFile = join(root, "custom.gitconfig");
+	// Keep test identities stable across isolated oracle runs. The real command
+	// and its assertion diagnostics still use the actual temporary file path.
+	const displayCommand = (command) =>
+		command.replaceAll(customFile, "<custom-file>");
 	writeFileSync(globalFile, "");
 	writeFileSync(systemFile, "");
 	writeFileSync(customFile, "");
@@ -559,7 +563,7 @@ describe("git config bypass oracle (#1232)", () => {
 			rejectedCount++;
 			continue;
 		}
-		it(`${setAnywhere ? "denies" : "allows"} '${command}'`, () => {
+		it(`${setAnywhere ? "denies" : "allows"} '${displayCommand(command)}'`, () => {
 			const result = classifyGitCommand(command);
 			assert.equal(result?.bypass === true, setAnywhere, command);
 			if (setAnywhere) {
@@ -577,7 +581,7 @@ describe("git config bypass oracle (#1232)", () => {
 		const command = `git config ${args.join(" ")}`;
 		const { gitRejected, setAnywhere, setOutside } = observe(args);
 		if (gitRejected) continue;
-		it(`example: ${setAnywhere ? "denies" : "allows"} '${command}'`, () => {
+		it(`example: ${setAnywhere ? "denies" : "allows"} '${displayCommand(command)}'`, () => {
 			const result = classifyGitCommand(command);
 			assert.equal(result?.bypass === true, setAnywhere, command);
 			if (setAnywhere) {

@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { spawnSync } from "node:child_process";
 import {
 	access,
 	mkdir,
@@ -770,6 +771,94 @@ test("cleanupSmokeSession removes the run directory after a browser cleanup fail
 	assert.match(errors[0].message, /browser close failed/);
 	assert.equal(killed, true);
 	await assert.rejects(access(runDir), { code: "ENOENT" });
+});
+
+test("cleanupSmokeSession leaves no deadline keeping Node alive after SIGTERM", () => {
+	const runModule = new URL("./run.mjs", import.meta.url).href;
+	const harnessModule = new URL("./harness.mjs", import.meta.url).href;
+	const result = spawnSync(
+		process.execPath,
+		[
+			"--input-type=module",
+			"-e",
+			`import assert from "node:assert/strict";
+import { cleanupSmokeSession } from ${JSON.stringify(runModule)};
+import { createRunDirectory } from ${JSON.stringify(harnessModule)};
+let closed;
+const vscodeProcess = {
+  exitCode: null,
+  signalCode: null,
+  once: (_event, callback) => { closed = callback; },
+  kill: () => { closed(); },
+};
+const errors = await cleanupSmokeSession({ vscodeProcess, runDir: await createRunDirectory() });
+if (errors.length) throw errors[0];
+assert.ok(!process.getActiveResourcesInfo().includes("Timeout"), "cleanup deadline still keeps Node alive");`,
+		],
+		{ encoding: "utf8", timeout: 10_000 },
+	);
+	assert.ifError(result.error);
+	assert.equal(result.status, 0, result.stderr);
+});
+
+test("cleanupSmokeSession force-kills after the grace period and waits for close", async (t) => {
+	t.mock.timers.enable({ apis: ["setTimeout"] });
+	const runDir = await createRunDirectory();
+	const signals = [];
+	let closed;
+	let terminated;
+	const sentTerm = new Promise((resolve) => {
+		terminated = resolve;
+	});
+	const vscodeProcess = {
+		exitCode: null,
+		signalCode: null,
+		once: (_event, callback) => {
+			closed = callback;
+		},
+		kill: (signal) => {
+			signals.push(signal);
+			if (signal === "SIGTERM") terminated();
+		},
+	};
+	let completed = false;
+	const cleanup = cleanupSmokeSession({ runDir, vscodeProcess }).then(
+		(errors) => {
+			completed = true;
+			return errors;
+		},
+	);
+	t.after(async () => {
+		closed?.();
+		await cleanup;
+	});
+	await sentTerm;
+	t.mock.timers.tick(4_999);
+	await new Promise(setImmediate);
+	assert.deepEqual(signals, ["SIGTERM"]);
+	t.mock.timers.tick(1);
+	await new Promise(setImmediate);
+	assert.deepEqual(signals, ["SIGTERM", "SIGKILL"]);
+	assert.equal(completed, false);
+	await access(runDir);
+	closed();
+	assert.deepEqual(await cleanup, []);
+	await assert.rejects(access(runDir), { code: "ENOENT" });
+});
+
+test("cleanupSmokeSession leaves absent or already exited processes alone", async () => {
+	for (const vscodeProcess of [
+		undefined,
+		{ exitCode: 0, signalCode: null },
+		{ exitCode: null, signalCode: "SIGTERM" },
+	]) {
+		if (vscodeProcess) {
+			vscodeProcess.kill = () => assert.fail("process is already closed");
+		}
+		const runDir = await createRunDirectory();
+		assert.deepEqual(await cleanupSmokeSession({ vscodeProcess, runDir }), []);
+		await assert.rejects(access(runDir), { code: "ENOENT" });
+	}
 });
 
 test("removeRunDirectory refuses an unissued lookalike path", async () => {
