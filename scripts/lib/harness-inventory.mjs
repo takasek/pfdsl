@@ -392,10 +392,7 @@ export const LOCAL_CLAUDE_ROOT_ENTRIES = Object.freeze({
 });
 
 export const SOURCE_EXCLUSIONS = Object.freeze({
-	root: Object.freeze({
-		"pfd-ops-install-manifest.json":
-			"install provenance for the repository-local pfd-ops skill",
-	}),
+	root: Object.freeze({}),
 	skills: Object.freeze({
 		"distribution-review": "maintainer-only review workflow for this bundle",
 		"prose-mechanization-audit": "audits this repository's prose assets",
