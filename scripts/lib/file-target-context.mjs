@@ -39,8 +39,10 @@ export function extractFileTargets(payload) {
 		// Do not normalize dot-dot before resolving symlink components.
 		return { paths: [`${cwd}/${path}`] };
 	}
+	return extractPatchTargets(payload?.tool_input?.command);
+}
 
-	const command = payload?.tool_input?.command;
+function extractPatchTargets(command) {
 	if (typeof command !== "string" || command.includes("\0"))
 		return invalidPatch();
 	const lines = command.replace(/\r\n/g, "\n").split("\n");
@@ -129,6 +131,42 @@ function findGitAncestor(cwd) {
 	}
 }
 
+function canonicalRoots(cwd, resolveRoots, exec, environment) {
+	if (typeof cwd !== "string" || !isAbsolute(cwd)) return null;
+	try {
+		const roots = resolveRoots(realpathSync(cwd), { environment, exec });
+		if (!roots) return roots;
+		return {
+			...roots,
+			worktreeRoot: realpathSync(roots.worktreeRoot),
+			commonDir: realpathSync(roots.commonDir),
+		};
+	} catch {
+		return null;
+	}
+}
+
+function repositoryContext(cwd, gitAncestor, roots, exec, env) {
+	if (!roots)
+		return {
+			roots,
+			outsideRepository: roots === null && gitAncestor === null,
+			currentBranch: undefined,
+			mainBranch: "main",
+		};
+	const current = exec(["branch", "--show-current"], { cwd, env });
+	const head = exec(["symbolic-ref", "--short", "refs/remotes/origin/HEAD"], {
+		cwd,
+		env,
+	});
+	return {
+		roots,
+		outsideRepository: false,
+		currentBranch: current?.ok ? current.out.trim() : undefined,
+		mainBranch: head?.ok ? head.out.trim().replace(/^origin\//, "") : "main",
+	};
+}
+
 /**
  * Resolve the session's repository scope and each independently addressed file.
  * A failed Git lookup is distinct from a confirmed path outside any repository.
@@ -147,26 +185,9 @@ export function resolveFileTargetContext(
 	const env = withoutGitTargetEnvironment(environment);
 	const probe = (args, options) =>
 		exec(args, { ...options, captureStderr: true });
-	const canonicalRoots = (cwd) => {
-		if (typeof cwd !== "string" || !isAbsolute(cwd)) return null;
-		try {
-			const roots = resolveRoots(realpathSync(cwd), {
-				environment: env,
-				exec: probe,
-			});
-			return (
-				roots && {
-					...roots,
-					worktreeRoot: realpathSync(roots.worktreeRoot),
-					commonDir: realpathSync(roots.commonDir),
-				}
-			);
-		} catch {
-			return null;
-		}
-	};
+	const rootsFor = (cwd) => canonicalRoots(cwd, resolveRoots, probe, env);
 	const projectDir = environment.CLAUDE_PROJECT_DIR;
-	const sessionRoots = canonicalRoots(
+	const sessionRoots = rootsFor(
 		typeof projectDir === "string" && projectDir.trim()
 			? projectDir
 			: payload?.cwd,
@@ -183,25 +204,13 @@ export function resolveFileTargetContext(
 			const contextKey = gitAncestor ?? file.cwd;
 			let context = directoryContexts.get(contextKey);
 			if (!context) {
-				const roots = canonicalRoots(file.cwd);
-				const outsideRepository = roots === null && gitAncestor === null;
-				const current = roots
-					? probe(["branch", "--show-current"], { cwd: file.cwd, env })
-					: null;
-				const head = roots
-					? probe(["symbolic-ref", "--short", "refs/remotes/origin/HEAD"], {
-							cwd: file.cwd,
-							env,
-						})
-					: null;
-				context = {
-					roots,
-					outsideRepository,
-					currentBranch: current?.ok ? current.out.trim() : undefined,
-					mainBranch: head?.ok
-						? head.out.trim().replace(/^origin\//, "")
-						: "main",
-				};
+				context = repositoryContext(
+					file.cwd,
+					gitAncestor,
+					rootsFor(file.cwd),
+					probe,
+					env,
+				);
 				directoryContexts.set(contextKey, context);
 			}
 			targets.push({

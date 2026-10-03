@@ -537,11 +537,6 @@ function classifyBypass(tokens) {
 	return null;
 }
 
-/**
- * The guarded git subcommand one already-tokenized segment runs, or null.
- * @param {{value: string, quoted: boolean}[]} tokens
- * @returns {{subcommand: string, decision: "deny" | "ask", bypass?: boolean, flag?: string, outsideTarget?: boolean, outsideTargetFlag?: string, outsideTargetName?: string} | null}
- */
 const CODEX_ROUTINE_MUTATIONS = new Map([
 	["stage-all", "add"],
 	["commit", "commit"],
@@ -674,18 +669,15 @@ function analyzeCommand(command, initialCwd, options) {
 			(segment.unresolved || unknownRtk
 				? guardedSuffix(tokens.slice(1))
 				: null);
-		const cwd =
-			segment.unresolved || segment.gitTargetOverride || unknownRtk
-				? null
-				: basename(tokens[0]?.value ?? "") === "git"
+		if (!guarded) continue;
+		let cwd = null;
+		if (!segment.unresolved && !segment.gitTargetOverride && !unknownRtk) {
+			cwd =
+				basename(tokens[0]?.value ?? "") === "git"
 					? resolveGitCwd(tokens, segment.cwd)
 					: resolveCodexRoutineCwd(tokens);
-		if (!guarded) continue;
-		targets.push({
-			...guarded,
-
-			cwd,
-		});
+		}
+		targets.push({ ...guarded, cwd });
 	}
 	return { targets, finalCwd: analysis.finalCwd };
 }

@@ -21,21 +21,29 @@ export function shellStartCwd(payload, payloadCwdIsExecutionCwd) {
 
 export function staticPath(token) {
 	if (!token) return null;
-	if (token.quoted)
-		return token.quote === "'" || !/[$`]/.test(token.value)
-			? token.value
-			: null;
-	return /[$~*?`]/.test(token.value) ? null : token.value;
+	if (token.quoted && token.quote === "'") return token.value;
+	const dynamic = token.quoted ? /[$`]/ : /[$~*?`]/;
+	return dynamic.test(token.value) ? null : token.value;
 }
 
 export function resolveCwdPath(token, cwd) {
 	const target = staticPath(token);
 	if (target === null || target === "") return null;
-	return target.startsWith("/")
-		? target
-		: cwd === null
-			? null
-			: `${cwd}/${target}`;
+	if (target.startsWith("/")) return target;
+	return cwd === null ? null : `${cwd}/${target}`;
+}
+
+/** Only a successful, canonical cd followed by && establishes shell cwd. */
+function resolveShellCd(tokens, cwd, nextSeparator, ambientCdPath) {
+	const args = tokens.slice(tokens[1]?.value === "--" ? 2 : 1);
+	const target = staticPath(args[0]);
+	if (!target || target === "-" || nextSeparator !== "&&") return null;
+	// Shell cd is logical; Git -C and env -C use physical filesystem traversal.
+	if (target.split("/").includes("..")) return null;
+	if (!args.slice(1).every((t) => /^(?:[0-9]*>>?|&>>?)/.test(t.value)))
+		return null;
+	if (target.startsWith("/")) return target;
+	return ambientCdPath ? null : resolveCwdPath(args[0], cwd);
 }
 
 const STATE_COMMANDS = new Set([
@@ -182,27 +190,14 @@ export function analyzeShellContext(
 			raw.some((t) => protectedAssignment(t.value));
 		if (tokens.length === 0) continue;
 		if (head === "cd" && prefix.end === 0) {
-			const args = tokens.slice(1);
-			if (args[0]?.value === "--") args.shift();
-			const target = staticPath(args[0]);
-			const onlyPathAndRedirects = args
-				.slice(1)
-				.every((t) => /^(?:[0-9]*>>?|&>>?)/.test(t.value));
-			cwd =
-				target &&
-				target !== "-" &&
-				// Shell cd is logical by default, unlike Git -C / env -C.
-				// Require a canonical path rather than predict PWD and shell mode.
-				!target.split("/").includes("..") &&
-				onlyPathAndRedirects &&
-				flow[index + 1]?.separatorBefore === "&&" &&
-				!prefix.unresolved
-					? target.startsWith("/")
-						? target
-						: ambientCdPath
-							? null
-							: resolveCwdPath(args[0], cwd)
-					: null;
+			cwd = prefix.unresolved
+				? null
+				: resolveShellCd(
+						tokens,
+						cwd,
+						flow[index + 1]?.separatorBefore,
+						ambientCdPath,
+					);
 			explicitCwd = true;
 			cwdDependsOnAndList = true;
 			continue;

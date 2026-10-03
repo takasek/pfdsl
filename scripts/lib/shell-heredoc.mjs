@@ -14,34 +14,7 @@ export function prepareHeredocs(source, { isShellInput }) {
 			comment = false;
 			const header = source.slice(lineStart, i);
 			for (const doc of pending.splice(0)) {
-				let body = "";
-				let end = i + 1;
-				while (end < source.length) {
-					const newline = source.indexOf("\n", end);
-					const next = newline === -1 ? source.length : newline + 1;
-					let line = source.slice(end, newline === -1 ? next : newline);
-					end = next;
-					if (doc.tabs) line = line.replace(/^\t+/, "");
-					// Unquoted heredocs remove backslash-newline before testing
-					// the delimiter; a delimiter can therefore span physical lines.
-					while (
-						!doc.quoted &&
-						/(?:^|[^\\])(?:\\\\)*\\$/.test(line) &&
-						end < source.length
-					) {
-						const continuedNewline = source.indexOf("\n", end);
-						const continuedEnd =
-							continuedNewline === -1 ? source.length : continuedNewline;
-						let continuation = source.slice(end, continuedEnd);
-						if (doc.tabs) continuation = continuation.replace(/^\t+/, "");
-						line = line.slice(0, -1) + continuation;
-						end =
-							continuedNewline === -1 ? source.length : continuedNewline + 1;
-					}
-					if ((doc.tabs ? line.replace(/^\t+/, "") : line) === doc.delimiter)
-						break;
-					body += `${line}\n`;
-				}
+				const { body, end } = readBody(source, i + 1, doc);
 				i = end - 1;
 				// Shell stdin is code even when the delimiter was quoted. The
 				// synthetic scope makes Git target resolution conservative:
@@ -98,6 +71,38 @@ export function prepareHeredocs(source, { isShellInput }) {
 		result += ch;
 	}
 	return result;
+}
+
+function readLine(source, start, tabs) {
+	const newline = source.indexOf("\n", start);
+	const end = newline === -1 ? source.length : newline;
+	const line = source.slice(start, end);
+	return {
+		line: tabs ? line.replace(/^\t+/, "") : line,
+		next: newline === -1 ? end : end + 1,
+	};
+}
+
+function readBody(source, start, doc) {
+	let body = "";
+	let end = start;
+	while (end < source.length) {
+		let { line, next } = readLine(source, end, doc.tabs);
+		end = next;
+		// Unquoted bodies join backslash-newline before delimiter comparison.
+		while (
+			!doc.quoted &&
+			/(?:^|[^\\])(?:\\\\)*\\$/.test(line) &&
+			end < source.length
+		) {
+			const continuation = readLine(source, end, doc.tabs);
+			line = line.slice(0, -1) + continuation.line;
+			end = continuation.next;
+		}
+		if (line === doc.delimiter) break;
+		body += `${line}\n`;
+	}
+	return { body, end };
 }
 
 function readDelimiter(source, start) {
