@@ -1581,6 +1581,28 @@ describe("applied migration state", () => {
 			assert.equal(existsSync(join(target, "scripts/fixture-tool.mjs")), false);
 		});
 
+		it("does not point a plain check at the --deploy it would refuse", () => {
+			const plugin = withInstallFile(
+				makeInstalledPlugin("hint-older", { claude: "0.2.0" }),
+			);
+			const notAdopted = makeAdopter("hint-older-not-adopted", {
+				appliedMigration: { pluginVersion: "0.3.0" },
+			});
+			const outOfSync = makeAdopter("hint-older-out-of-sync", {
+				appliedMigration: { pluginVersion: "0.3.0" },
+			});
+			writeFile(outOfSync, "scripts/fixture-tool.mjs", "locally edited\n");
+
+			const first = run(plugin, notAdopted);
+			assert.match(first.stdout, /not adopted/);
+			assert.doesNotMatch(first.stdout, /To adopt it/);
+
+			const second = run(plugin, outOfSync);
+			assert.equal(second.status, 1);
+			assert.match(second.stdout, /out of sync/);
+			assert.doesNotMatch(second.stdout, /Run with --deploy to refresh/);
+		});
+
 		it("does not turn a plain check into a failure when the plugin is older", () => {
 			const plugin = withInstallFile(
 				makeInstalledPlugin("check-older", { claude: "0.2.0" }),

@@ -724,6 +724,9 @@ async function main() {
 	const role = classifyTarget(skillRoot, targetRoot);
 	const deployable = role.kind === "adopter";
 	const running = readPluginIdentity(resolve(skillRoot, "../.."));
+	// A plain check must not end by telling the reader to run the --deploy that
+	// the notice above it says will be refused.
+	let deployRefused = false;
 	if (deployable) {
 		// Independent of --upstream and of whether the GitHub Issues backend is
 		// adopted: the record concerns the repo's migration, not any one feature.
@@ -739,7 +742,8 @@ async function main() {
 		}
 		// Before any write: an older install/ would roll back what a newer
 		// release placed, and a record from it would claim an older state.
-		const refused = outcome.kind === "older" && (args.deploy || args.recordMigration);
+		deployRefused = outcome.kind === "older";
+		const refused = deployRefused && (args.deploy || args.recordMigration);
 		// Advice to "record the state afterwards" is noise in the run that does it.
 		const notice =
 			args.recordMigration && !refused ? null : describeMigration(outcome, recordCommand);
@@ -817,18 +821,18 @@ async function main() {
 	} else {
 		const { results, adopted, renameCandidates } = checkInstallSync(skillRoot, targetRoot);
 		if (!adopted) {
+			// The full path, not the bare filename: the reader is standing
+			// in their repo root while this script lives in a plugin
+			// cache outside it, so a bare name — or a relative one —
+			// makes them reconstruct the path the caller just used.
+			// --target is spelled out for the same reason it is resolved
+			// rather than echoed verbatim: it defaults to the cwd, so a
+			// reader who copies this line from a different directory
+			// deploys into that other directory instead of the repo the
+			// line was printed about.
+			const adoptHint = `\nTo adopt it, run: node ${fileURLToPath(import.meta.url)} --target ${targetRoot} --deploy`;
 			console.log(
-				"The GitHub Issues backend (L3) is not adopted in this repo — no pfd-ops install/ files are deployed.\n" +
-					// The full path, not the bare filename: the reader is standing
-					// in their repo root while this script lives in a plugin
-					// cache outside it, so a bare name — or a relative one —
-					// makes them reconstruct the path the caller just used.
-					// --target is spelled out for the same reason it is resolved
-					// rather than echoed verbatim: it defaults to the cwd, so a
-					// reader who copies this line from a different directory
-					// deploys into that other directory instead of the repo the
-					// line was printed about.
-					`To adopt it, run: node ${fileURLToPath(import.meta.url)} --target ${targetRoot} --deploy`,
+				`The GitHub Issues backend (L3) is not adopted in this repo — no pfd-ops install/ files are deployed.${deployRefused ? "" : adoptHint}`,
 			);
 		} else {
 			const issues = results.filter((r) => r.status !== "ok");
@@ -841,9 +845,11 @@ async function main() {
 					console.log(`  ${label}: ${r.path}`);
 				}
 				printRenameCandidates(renameCandidates);
-				console.log(
-					"Run with --deploy to refresh. Files that carry no local edit are copied, and orphans that carry none are removed, without any further flag — add --overwrite-local-edits or --delete-edited-orphans only to discard the edits standing in the way.",
-				);
+				if (!deployRefused) {
+					console.log(
+						"Run with --deploy to refresh. Files that carry no local edit are copied, and orphans that carry none are removed, without any further flag — add --overwrite-local-edits or --delete-edited-orphans only to discard the edits standing in the way.",
+					);
+				}
 				exitCode = 1;
 			}
 		}
