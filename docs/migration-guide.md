@@ -32,6 +32,8 @@ Preview the change before using `--write`, including when deleting several group
 ### Metadata extension fields
 
 `meta set` updates an existing extension scalar field without an additional flag.
+An existing scalar YAML key retains its type when updated.
+If multiple keys become the same field name, or a field uses a collection key, rewrite it with one scalar key before editing; the command refuses these cases without writing.
 Adding a new unknown field requires `--allow-unknown`; existing arrays/maps remain unsupported.
 This collection restriction applies to extension fields; existing known-field updates such as replacing a `location` array with a string still work.
 Empty local definitions can receive fields, but `meta set` refuses to edit a definition accessed through an alias; expand that definition first.
@@ -41,6 +43,7 @@ The existing CLI rules for reserved names still apply: `status` uses the roadmap
 The issue audit remains read-only and prints a timestamp repair command, including the flag so an absent `updated_at` can be added.
 
 For JSON consumers, `missing` now contains only IDs absent from the file.
+Failures with exit code 1 return JSON when `--json` is set; invalid usage with exit code 2 still reports text on stderr.
 When an ID exists in the body without a frontmatter definition, the failure payload instead includes `undefinedIds: [{id, kind}]`, `missing`, and a recovery message in `error`.
 Add the definition before retrying; `meta set` does not create it implicitly.
 Definition creation from the preview and CLI remains tracked separately in [Issue #1282](https://github.com/takasek/pfdsl/issues/1282).

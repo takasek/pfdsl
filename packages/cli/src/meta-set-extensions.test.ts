@@ -14,6 +14,116 @@ beforeEach(() => {
 afterEach(() => rmSync(dir, { recursive: true, force: true }));
 
 describe("meta set extension fields", () => {
+	it.each([
+		"true",
+		"false",
+		"12",
+		"0",
+	])("updates an existing typed extension key %s without adding a string key", async (key) => {
+		writeFileSync(
+			file,
+			`---\nprocess:\n  p: { ${key}: old }\n---\na >> p -> b\n`,
+		);
+		const result = await run(["meta", "set", file, "p", key, "new", "--json"]);
+		expect(result.exitCode).toBe(0);
+		const output = readFileSync(file, "utf8");
+		expect(output).toContain(`${key}: new`);
+		expect(output).not.toContain(`"${key}":`);
+		expect(analyze(output).frontmatter?.process?.p?.[key]).toBe("new");
+	});
+
+	it("updates an extension with an aliased scalar key", async () => {
+		writeFileSync(
+			file,
+			"---\ncustom_key: &key true\nprocess:\n  p: { *key : old }\n---\na >> p -> b\n",
+		);
+		const result = await run([
+			"meta",
+			"set",
+			file,
+			"p",
+			"true",
+			"new",
+			"--json",
+		]);
+		expect(result.exitCode).toBe(0);
+		const output = readFileSync(file, "utf8");
+		expect(output).toContain("*key");
+		expect(output).not.toContain('"true":');
+		expect(analyze(output).frontmatter?.process?.p?.true).toBe("new");
+	});
+
+	it("refuses ambiguous typed and string field keys without partially updating a batch", async () => {
+		const source =
+			'---\nprocess:\n  p: { true: old }\n  q: { true: old, "true": other }\n---\na >> p -> b >> q -> c\n';
+		writeFileSync(file, source);
+		const result = await run([
+			"meta",
+			"set",
+			file,
+			"p,q",
+			"true",
+			"new",
+			"--json",
+		]);
+		expect(result.exitCode).toBe(1);
+		expect(JSON.parse(result.stdout)).toMatchObject({ ok: false });
+		expect(JSON.parse(result.stdout).error).toContain("field keys");
+		expect(readFileSync(file, "utf8")).toBe(source);
+	});
+
+	it("refuses a collection field key instead of inserting a new string key", async () => {
+		const source = "---\nprocess:\n  p: { [a, b]: old }\n---\na >> p -> b\n";
+		writeFileSync(file, source);
+		const result = await run([
+			"meta",
+			"set",
+			file,
+			"p",
+			"[ a, b ]",
+			"new",
+			"--json",
+		]);
+		expect(result.exitCode).toBe(1);
+		expect(JSON.parse(result.stdout).error).toContain("field keys");
+		expect(readFileSync(file, "utf8")).toBe(source);
+	});
+
+	it.each([
+		'[a, b]: old, "[ a, b ]": other',
+		'"[ a, b ]": other, [a, b]: old',
+	])("refuses collection/scalar key collisions in either order: %s", async (fields) => {
+		const source = `---\nprocess:\n  p: { ${fields} }\n---\na >> p -> b\n`;
+		writeFileSync(file, source);
+		const result = await run([
+			"meta",
+			"set",
+			file,
+			"p",
+			"[ a, b ]",
+			"new",
+			"--json",
+		]);
+		expect(result.exitCode).toBe(1);
+		expect(JSON.parse(result.stdout).error).toContain("field keys");
+		expect(readFileSync(file, "utf8")).toBe(source);
+	});
+
+	it("still edits an unambiguous scalar beside an unrelated collection key", async () => {
+		writeFileSync(
+			file,
+			"---\nprocess:\n  p: { [a, b]: old, custom: original }\n---\na >> p -> b\n",
+		);
+		const result = await run(["meta", "set", file, "p", "custom", "new"]);
+		expect(result.exitCode).toBe(0);
+		expect(
+			analyze(readFileSync(file, "utf8")).frontmatter?.process?.p,
+		).toMatchObject({
+			"[ a, b ]": "old",
+			custom: "new",
+		});
+	});
+
 	it("updates an existing extension named like another kind's field", async () => {
 		writeFileSync(file, "---\ngroup:\n  g: { description: old }\n---\n");
 		expect(
@@ -88,7 +198,7 @@ describe("meta set extension fields", () => {
 			"--json",
 		]);
 		expect(result.exitCode).toBe(1);
-		expect(JSON.parse(result.stdout).error).toContain("YAML anchors");
+		expect(JSON.parse(result.stdout).error).toContain("aliased definition");
 		expect(readFileSync(file, "utf8")).toBe(source);
 	});
 

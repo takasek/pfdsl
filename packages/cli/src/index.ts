@@ -1486,7 +1486,7 @@ export function runMetaSet(
 		const kind = nodeKinds.get(id) as NodeKind;
 		const applied = setFrontmatterField(newSrc, kind, id, field, parsedValue);
 		if (applied === null) {
-			const error = `meta set: could not update the frontmatter definition of '${id}' in ${file}; definitions accessed through YAML anchors or aliases cannot be edited here. Expand the aliased definition first; nothing was written`;
+			const error = `meta set: could not update the frontmatter definition of '${id}' in ${file}; aliased definitions and ambiguous or non-scalar field keys cannot be edited here. Expand the aliased definition and use one scalar YAML key per field; nothing was written`;
 			return opts.json ? failJson({ error }) : fail(`${error}\n`);
 		}
 		newSrc = applied;
@@ -3388,7 +3388,8 @@ place. The frontmatter is re-emitted in canonical form, except that a folded
 (>) scalar keeps the line breaks its author wrote for as long as its value is
 unchanged — give a folded field a new value and it is re-serialized. Multiple
 comma-separated ids get the same value; the call is atomic (all writes land or
-none do). Quote values containing spaces.
+none do). Quote values containing spaces. For a value beginning with -, put
+options before -- and the value after it.
 
 Field-aware validation: status must be one of todo | wip | done | waiting |
 suspended; index must be a non-negative integer; known fields must be valid for
@@ -3405,6 +3406,9 @@ process: entry first; meta set never creates a definition implicitly.
 Empty definitions can receive fields. A definition accessed through a YAML
 alias must be expanded first. Editing the original anchored definition also
 changes values read through its aliases, following YAML's shared-value behavior.
+An existing scalar field key keeps its YAML type. Fields whose
+keys are collections, or whose keys become the same name when read, must be
+rewritten with one scalar YAML key before editing.
 
 Setting status requires a roadmap file: an explicit type: other than roadmap
 is refused (spec §2.10/§15.14), since progress belongs to the roadmap — a file
@@ -3417,7 +3421,7 @@ Omitting type: is treated as roadmap and allowed, with a warning (W006).
   --allow-unknown  allow a new extension scalar field; does not bypass known
                    field validation or create node definitions
   --json      emit JSON ({ ok, newlyReady: string[], warnings? }) instead of text
-              on failure: { ok: false, diagnostics } / { ok: false, missing } /
+              on failure (exit 1): { ok: false, diagnostics } / { ok: false, missing } /
               { ok: false, missing, undefinedIds: {id, kind}[], error } /
               { ok: false, error }. missing lists ids absent from the file;
               undefinedIds lists existing nodes without frontmatter definitions.
@@ -3426,7 +3430,7 @@ Omitting type: is treated as roadmap and allowed, with a warning (W006).
 Exit codes:
   0  success
   1  id not found, frontmatter definition absent, or the rewrite was refused
-  2  invalid usage (missing argument, invalid field or value)
+  2  invalid usage (missing argument, invalid field or value); text on stderr
 `;
 
 const HELP_CHECK_LINKS = `${helpUsage("meta check-links", "<file>", META_CHECK_LINKS_OPTIONS)}
