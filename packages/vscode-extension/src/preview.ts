@@ -13,6 +13,7 @@ import {
 	buildSubflows,
 } from "./location-utils.js";
 import type { MessageFromWebview, MessageToWebview } from "./messages.js";
+import { PreviewController } from "./preview-controller.js";
 import {
 	allIdsOfDocument,
 	blockingDiagnosticMessage,
@@ -25,9 +26,7 @@ import { requireActivePfdslEditor } from "./utils.js";
 interface PreviewState {
 	panel: vscode.WebviewPanel;
 	doc: vscode.TextDocument;
-	webviewReady: boolean;
-	pendingFocusNodeId?: string;
-	pendingDiff?: DiffReport | null; // null = clearDiff
+	controller: PreviewController;
 }
 
 /** The vscode filesystem, shaped for expandDirectory: fsPaths in, fsPaths out. */
@@ -202,11 +201,11 @@ export function registerPreview(context: vscode.ExtensionContext): {
 	const panels = new Map<string, PreviewState>();
 	let activePreviewDocUri: string | null = null;
 
-	function sendUpdate(state: PreviewState): void {
-		if (!state.webviewReady) return;
+	function renderUpdate(
+		state: PreviewState,
+		focusNodeId: string | undefined,
+	): void {
 		const { dot, error } = dotForDocument(state.doc);
-		const focusNodeId = state.pendingFocusNodeId;
-		delete state.pendingFocusNodeId;
 		state.panel.title = `PFDSL Preview — ${state.doc.uri.path.split("/").pop() ?? ""}`;
 		if (error) {
 			state.panel.webview.postMessage({ type: "error", message: error });
@@ -223,15 +222,6 @@ export function registerPreview(context: vscode.ExtensionContext): {
 				locations,
 				subflows,
 			});
-		}
-		if ("pendingDiff" in state) {
-			const d = state.pendingDiff;
-			delete state.pendingDiff;
-			state.panel.webview.postMessage(
-				d == null
-					? ({ type: "clearDiff" } satisfies MessageToWebview)
-					: ({ type: "diff", report: d } satisfies MessageToWebview),
-			);
 		}
 	}
 
@@ -266,14 +256,18 @@ export function registerPreview(context: vscode.ExtensionContext): {
 		const state: PreviewState = {
 			panel,
 			doc,
-			webviewReady: false,
-			...(focusNodeId ? { pendingFocusNodeId: focusNodeId } : {}),
+			controller: new PreviewController(
+				(focus) => renderUpdate(state, focus),
+				(message) => {
+					panel.webview.postMessage(message);
+				},
+				focusNodeId || undefined,
+			),
 		};
 
 		panel.webview.onDidReceiveMessage((msg: MessageFromWebview) => {
 			if (msg.type === "ready") {
-				state.webviewReady = true;
-				sendUpdate(state);
+				state.controller.markReady();
 			} else if (msg.type === "nodeClick") {
 				const editor = vscode.window.visibleTextEditors.find(
 					(e) => e.document === state.doc,
@@ -317,6 +311,7 @@ export function registerPreview(context: vscode.ExtensionContext): {
 		});
 
 		panel.onDidDispose(() => {
+			state.controller.dispose();
 			panels.delete(docUri);
 			if (activePreviewDocUri === docUri) activePreviewDocUri = null;
 		});
@@ -330,16 +325,7 @@ export function registerPreview(context: vscode.ExtensionContext): {
 		const state = activePreviewDocUri
 			? panels.get(activePreviewDocUri)
 			: undefined;
-		if (!state) return;
-		if (state.webviewReady) {
-			state.panel.webview.postMessage(
-				report == null
-					? ({ type: "clearDiff" } satisfies MessageToWebview)
-					: ({ type: "diff", report } satisfies MessageToWebview),
-			);
-		} else {
-			state.pendingDiff = report;
-		}
+		state?.controller.postDiff(report);
 	}
 
 	function getActivePreviewDoc(): vscode.TextDocument | undefined {
@@ -358,7 +344,7 @@ export function registerPreview(context: vscode.ExtensionContext): {
 			const existing = panels.get(docUri);
 			if (existing) {
 				existing.panel.reveal(vscode.ViewColumn.Beside, true);
-				sendUpdate(existing);
+				existing.controller.update();
 				return;
 			}
 
@@ -369,7 +355,7 @@ export function registerPreview(context: vscode.ExtensionContext): {
 
 		vscode.workspace.onDidChangeTextDocument((e) => {
 			const state = panels.get(e.document.uri.toString());
-			if (state) sendUpdate(state);
+			state?.controller.update();
 		}),
 
 		vscode.window.onDidChangeTextEditorSelection((e) => {
