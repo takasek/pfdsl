@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
+import { createHash } from "node:crypto";
 import {
 	chmodSync,
 	copyFileSync,
@@ -21,11 +22,13 @@ import {
 	checkInstallSync,
 	classifyTarget,
 	deployInstall,
+	evaluateMigration,
 	listInstallFiles,
 	parseArgs,
 	readManifest,
 	UPSTREAM_MARKERS,
 } from "../../.claude/skills/pfd-ops/scripts/check-install-sync.mjs";
+import { computeManifestAggregateHash } from "../../.claude/skills/pfd-ops/scripts/plugin-version-check.mjs";
 
 const repoRoot = fileURLToPath(new URL("../..", import.meta.url));
 
@@ -1074,6 +1077,450 @@ describe("parseArgs", () => {
 	it("rejects a bare positional argument", () => {
 		assert.throws(() => parseArgs(["/tmp/foo"]), {
 			code: "ERR_PARSE_ARGS_UNEXPECTED_POSITIONAL",
+		});
+	});
+});
+
+// The applied-migration state (#1319): the adopter records, in
+// .pfdsl/config.json, the plugin release it has finished migrating to. These
+// tests drive the comparison against a fake installed plugin so that the
+// "running" side is exactly what each case says it is.
+describe("applied migration state", () => {
+	const scriptPath = fileURLToPath(
+		new URL(
+			"../../.claude/skills/pfd-ops/scripts/check-install-sync.mjs",
+			import.meta.url,
+		),
+	);
+	const pluginVersionCheckPath = join(
+		dirname(scriptPath),
+		"plugin-version-check.mjs",
+	);
+
+	function hexOf(seed) {
+		return createHash("sha256").update(seed).digest("hex");
+	}
+
+	function bundleManifestText(seed) {
+		return `${hexOf(seed)}  a.md\n`;
+	}
+
+	function bundleHashOf(seed) {
+		return computeManifestAggregateHash(bundleManifestText(seed));
+	}
+
+	// The layout the installed plugin has: <root>/skills/pfd-ops/scripts/ beside
+	// <root>/.claude-plugin/ (or .codex-plugin/). The script derives the plugin
+	// root from its own location, so the manifests have to sit there.
+	function makeInstalledPlugin(name, { claude, codex, bundleSeed } = {}) {
+		const pluginRoot = join(tmp, name);
+		const skillRoot = join(pluginRoot, "skills", "pfd-ops");
+		mkdirSync(join(skillRoot, "install"), { recursive: true });
+		mkdirSync(join(skillRoot, "scripts"), { recursive: true });
+		copyFileSync(
+			scriptPath,
+			join(skillRoot, "scripts", "check-install-sync.mjs"),
+		);
+		copyFileSync(
+			pluginVersionCheckPath,
+			join(skillRoot, "scripts", "plugin-version-check.mjs"),
+		);
+		if (claude !== undefined) {
+			writeFile(
+				pluginRoot,
+				".claude-plugin/plugin.json",
+				JSON.stringify({ version: claude }),
+			);
+		}
+		if (codex !== undefined) {
+			writeFile(
+				pluginRoot,
+				".codex-plugin/plugin.json",
+				JSON.stringify({ version: codex }),
+			);
+		}
+		if (bundleSeed !== undefined) {
+			writeFile(
+				pluginRoot,
+				".claude-plugin/bundle-manifest.sha256",
+				bundleManifestText(bundleSeed),
+			);
+		}
+		return { pluginRoot, skillRoot };
+	}
+
+	// An adopting repo: .pfdsl/ present, the config as the case needs it.
+	function makeAdopter(name, config) {
+		const target = join(tmp, name);
+		mkdirSync(join(target, ".pfdsl"), { recursive: true });
+		if (config !== undefined) {
+			writeFile(
+				target,
+				".pfdsl/config.json",
+				typeof config === "string"
+					? config
+					: `${JSON.stringify(config, null, "\t")}\n`,
+			);
+		}
+		return target;
+	}
+
+	function run(plugin, target, extraArgs = []) {
+		return spawnSync(
+			process.execPath,
+			[
+				join(plugin.skillRoot, "scripts", "check-install-sync.mjs"),
+				"--target",
+				target,
+				...extraArgs,
+			],
+			{ encoding: "utf-8" },
+		);
+	}
+
+	describe("evaluateMigration", () => {
+		const running = { version: "0.2.0", bundleHash: null };
+
+		it("does nothing when the target has no .pfdsl/ directory", () => {
+			const target = join(tmp, "no-pfdsl");
+			mkdirSync(target, { recursive: true });
+
+			assert.deepEqual(evaluateMigration(target, running), {
+				kind: "no-pfdsl",
+			});
+		});
+
+		it("reports an adopter that predates the state when appliedMigration is absent, with or without a config file", () => {
+			const withoutFile = makeAdopter("absent-no-file");
+			const withoutKey = makeAdopter("absent-no-key", {
+				sweepCompletedChains: { enabled: true },
+			});
+
+			assert.deepEqual(evaluateMigration(withoutFile, running), {
+				kind: "absent",
+			});
+			assert.deepEqual(evaluateMigration(withoutKey, running), {
+				kind: "absent",
+			});
+		});
+
+		it("skips the comparison when the running version is unknown", () => {
+			const target = makeAdopter("unknown-running", {
+				appliedMigration: { pluginVersion: "0.1.0" },
+			});
+
+			assert.deepEqual(evaluateMigration(target, null), {
+				kind: "unknown-running",
+				recorded: { pluginVersion: "0.1.0", bundleHash: null },
+			});
+		});
+
+		it("flags a running version older than the recorded one", () => {
+			const target = makeAdopter("older", {
+				appliedMigration: { pluginVersion: "0.3.0" },
+			});
+
+			assert.deepEqual(evaluateMigration(target, running), {
+				kind: "older",
+				recorded: { pluginVersion: "0.3.0", bundleHash: null },
+				running,
+			});
+		});
+
+		it("flags a running version newer than the recorded one", () => {
+			const target = makeAdopter("newer", {
+				appliedMigration: { pluginVersion: "0.1.0" },
+			});
+
+			assert.equal(evaluateMigration(target, running).kind, "newer");
+		});
+
+		it("compares versions numerically per component, not as strings", () => {
+			const target = makeAdopter("numeric", {
+				appliedMigration: { pluginVersion: "0.9.0" },
+			});
+
+			assert.equal(
+				evaluateMigration(target, { version: "0.10.0", bundleHash: null }).kind,
+				"newer",
+			);
+			assert.equal(
+				evaluateMigration(target, { version: "0.8.12", bundleHash: null }).kind,
+				"older",
+			);
+			assert.equal(
+				evaluateMigration(target, { version: "0.9.1", bundleHash: null }).kind,
+				"newer",
+			);
+		});
+
+		it("reports equal versions with different bundle hashes as indeterminate order", () => {
+			const target = makeAdopter("same-differs", {
+				appliedMigration: {
+					pluginVersion: "0.2.0",
+					bundleHash: bundleHashOf("recorded"),
+				},
+			});
+
+			const result = evaluateMigration(target, {
+				version: "0.2.0",
+				bundleHash: bundleHashOf("running"),
+			});
+			assert.equal(result.kind, "different-content");
+		});
+
+		it("treats equal versions as in sync when the hashes match or either side has none", () => {
+			const hash = bundleHashOf("same");
+			const both = makeAdopter("in-sync-both", {
+				appliedMigration: { pluginVersion: "0.2.0", bundleHash: hash },
+			});
+			const recordedOnly = makeAdopter("in-sync-recorded-only", {
+				appliedMigration: { pluginVersion: "0.2.0", bundleHash: hash },
+			});
+			const neither = makeAdopter("in-sync-neither", {
+				appliedMigration: { pluginVersion: "0.2.0" },
+			});
+
+			assert.equal(
+				evaluateMigration(both, { version: "0.2.0", bundleHash: hash }).kind,
+				"in-sync",
+			);
+			assert.equal(evaluateMigration(recordedOnly, running).kind, "in-sync");
+			assert.equal(
+				evaluateMigration(neither, { version: "0.2.0", bundleHash: hash }).kind,
+				"in-sync",
+			);
+		});
+
+		it("says a version that is not x.y.z cannot be compared, on either side", () => {
+			const prerelease = makeAdopter("prerelease-recorded", {
+				appliedMigration: { pluginVersion: "0.2.0-beta.1" },
+			});
+			const plain = makeAdopter("plain-recorded", {
+				appliedMigration: { pluginVersion: "0.1.0" },
+			});
+
+			assert.equal(evaluateMigration(prerelease, running).kind, "uncomparable");
+			assert.equal(
+				evaluateMigration(plain, { version: "nightly", bundleHash: null }).kind,
+				"uncomparable",
+			);
+		});
+
+		it("fails naming .pfdsl/config.json when the file is not valid JSON", () => {
+			const target = makeAdopter("bad-json", "{ not json");
+
+			assert.throws(
+				() => evaluateMigration(target, running),
+				/\.pfdsl\/config\.json.*JSON/s,
+			);
+		});
+
+		it("fails naming .pfdsl/config.json when the top level is not an object", () => {
+			const target = makeAdopter("bad-top", "[]\n");
+
+			assert.throws(
+				() => evaluateMigration(target, running),
+				/\.pfdsl\/config\.json.*object/s,
+			);
+		});
+
+		it("fails naming .pfdsl/config.json for each wrong shape of appliedMigration", () => {
+			const shapes = {
+				"not-an-object": "0.1.0",
+				null: null,
+				array: [],
+				"no-version": {},
+				"numeric-version": { pluginVersion: 1 },
+				"empty-version": { pluginVersion: "" },
+				"non-string-hash": { pluginVersion: "0.1.0", bundleHash: 5 },
+			};
+			for (const [name, appliedMigration] of Object.entries(shapes)) {
+				const target = makeAdopter(`shape-${name}`, { appliedMigration });
+				assert.throws(
+					() => evaluateMigration(target, running),
+					/\.pfdsl\/config\.json.*appliedMigration/s,
+					name,
+				);
+			}
+		});
+
+		it("fails on a malformed config even when the running version is unknown", () => {
+			const target = makeAdopter("bad-unknown", "{ not json");
+
+			assert.throws(
+				() => evaluateMigration(target, null),
+				/\.pfdsl\/config\.json/,
+			);
+		});
+	});
+
+	describe("check output", () => {
+		it("prints nothing about migration for a repo without .pfdsl/", () => {
+			const plugin = makeInstalledPlugin("plugin-no-pfdsl", {
+				claude: "0.2.0",
+			});
+			const target = join(tmp, "repo-no-pfdsl");
+			mkdirSync(target, { recursive: true });
+
+			const { stdout, status } = run(plugin, target);
+			assert.equal(status, 0);
+			assert.doesNotMatch(stdout, /migration/i);
+		});
+
+		it("points an adopter without appliedMigration at the guide and --record-migration, without failing", () => {
+			const plugin = makeInstalledPlugin("plugin-absent", { claude: "0.2.0" });
+			const target = makeAdopter("adopter-absent", {
+				sweepCompletedChains: { enabled: false },
+			});
+
+			const { stdout, status } = run(plugin, target);
+			assert.equal(status, 0);
+			assert.match(stdout, /appliedMigration/);
+			assert.match(
+				stdout,
+				/https:\/\/github\.com\/takasek\/pfdsl\/blob\/main\/docs\/migration-guide\.md/,
+			);
+			assert.match(stdout, /Choosing the update range/);
+			assert.match(stdout, /--record-migration/);
+		});
+
+		it("says the comparison was skipped, and why, when the plugin version is unknown", () => {
+			const plugin = makeInstalledPlugin("plugin-unknown");
+			const target = makeAdopter("adopter-unknown", {
+				appliedMigration: { pluginVersion: "0.1.0" },
+			});
+
+			const { stdout, status } = run(plugin, target);
+			assert.equal(status, 0);
+			assert.match(stdout, /skipped/i);
+			assert.match(stdout, /plugin\.json/);
+		});
+
+		it("tells the reader to update the plugin when it is older than the recorded state", () => {
+			const plugin = makeInstalledPlugin("plugin-older", { claude: "0.2.0" });
+			const target = makeAdopter("adopter-older", {
+				appliedMigration: { pluginVersion: "0.3.0" },
+			});
+
+			const { stdout } = run(plugin, target);
+			assert.match(stdout, /0\.2\.0/);
+			assert.match(stdout, /0\.3\.0/);
+			assert.match(stdout, /update the plugin/i);
+		});
+
+		it("names both versions and the guide when the plugin is newer than the recorded state", () => {
+			const plugin = makeInstalledPlugin("plugin-newer", { claude: "0.2.0" });
+			const target = makeAdopter("adopter-newer", {
+				appliedMigration: { pluginVersion: "0.1.0" },
+			});
+
+			const { stdout, status } = run(plugin, target);
+			assert.equal(status, 0);
+			assert.match(stdout, /0\.1\.0/);
+			assert.match(stdout, /0\.2\.0/);
+			assert.match(stdout, /migration-guide\.md/);
+			assert.match(stdout, /--record-migration/);
+		});
+
+		it("says same version with different content and undeterminable order, without failing", () => {
+			const plugin = makeInstalledPlugin("plugin-differs", {
+				claude: "0.2.0",
+				bundleSeed: "running",
+			});
+			const target = makeAdopter("adopter-differs", {
+				appliedMigration: {
+					pluginVersion: "0.2.0",
+					bundleHash: bundleHashOf("recorded"),
+				},
+			});
+
+			const { stdout, status } = run(plugin, target);
+			assert.equal(status, 0);
+			assert.match(stdout, /same version/i);
+			assert.match(stdout, /different content/i);
+			assert.match(stdout, /cannot be determined|undeterminable|cannot tell/i);
+		});
+
+		it("stays silent about migration when the plugin matches the recorded state", () => {
+			const plugin = makeInstalledPlugin("plugin-sync", {
+				claude: "0.2.0",
+				bundleSeed: "same",
+			});
+			const target = makeAdopter("adopter-sync", {
+				appliedMigration: {
+					pluginVersion: "0.2.0",
+					bundleHash: bundleHashOf("same"),
+				},
+			});
+
+			const { stdout, status } = run(plugin, target);
+			assert.equal(status, 0);
+			assert.doesNotMatch(stdout, /migration/i);
+		});
+
+		it("says a version that is not x.y.z cannot be compared, without failing", () => {
+			const plugin = makeInstalledPlugin("plugin-uncomparable", {
+				claude: "0.2.0",
+			});
+			const target = makeAdopter("adopter-uncomparable", {
+				appliedMigration: { pluginVersion: "0.2.0-beta.1" },
+			});
+
+			const { stdout, status } = run(plugin, target);
+			assert.equal(status, 0);
+			assert.match(stdout, /cannot be compared/i);
+		});
+
+		it("reads the version of a Codex plugin, which has no bundle manifest", () => {
+			const plugin = makeInstalledPlugin("plugin-codex", { codex: "0.2.0" });
+			const target = makeAdopter("adopter-codex", {
+				appliedMigration: { pluginVersion: "0.1.0" },
+			});
+
+			const { stdout } = run(plugin, target);
+			assert.match(stdout, /0\.1\.0/);
+			assert.match(stdout, /0\.2\.0/);
+			assert.match(stdout, /migration-guide\.md/);
+		});
+
+		it("runs the comparison without --upstream, and with the GitHub Issues backend not adopted", () => {
+			const plugin = makeInstalledPlugin("plugin-no-upstream", {
+				claude: "0.2.0",
+			});
+			const target = makeAdopter("adopter-no-upstream", {
+				appliedMigration: { pluginVersion: "0.1.0" },
+			});
+
+			const { stdout } = run(plugin, target);
+			assert.match(stdout, /not adopted/);
+			assert.match(stdout, /migration-guide\.md/);
+		});
+
+		it("fails with exit 3, naming .pfdsl/config.json, when the config is malformed", () => {
+			const plugin = makeInstalledPlugin("plugin-bad-config", {
+				claude: "0.2.0",
+			});
+			const target = makeAdopter("adopter-bad-config", "{ not json");
+
+			const { stderr, status } = run(plugin, target);
+			assert.equal(status, 3);
+			assert.match(stderr, /\.pfdsl\/config\.json/);
+		});
+
+		it("does not compare when the target is the upstream repo", () => {
+			const plugin = makeInstalledPlugin("plugin-upstream", {
+				claude: "0.2.0",
+			});
+			const target = join(tmp, "upstream-with-pfdsl");
+			mkdirSync(join(target, ".pfdsl"), { recursive: true });
+			writeFile(target, ".git", "gitdir: elsewhere\n");
+			for (const marker of UPSTREAM_MARKERS) {
+				writeFile(target, marker.path, `prelude\n${marker.mustContain}\n`);
+			}
+
+			const { stdout } = run(plugin, target);
+			assert.doesNotMatch(stdout, /appliedMigration/);
 		});
 	});
 });
