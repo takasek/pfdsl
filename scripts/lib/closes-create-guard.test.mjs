@@ -83,20 +83,20 @@ describe("evaluateClosesCreateGuard", () => {
 		assert.equal(result.decision, "allow");
 	});
 
-	it("allows --web, which leaves no body to inspect", () => {
+	it("asks for --web, which leaves no body to inspect", () => {
 		const result = evaluateClosesCreateGuard(
 			payload({ command: "gh pr create --base main --web" }),
 			deps,
 		);
-		assert.equal(result.decision, "allow");
+		assert.equal(result.decision, "ask");
 	});
 
-	it("allows a call with no body given at all", () => {
+	it("asks for a call with no body given at all", () => {
 		const result = evaluateClosesCreateGuard(
 			payload({ command: "gh pr create --base main --title x" }),
 			deps,
 		);
-		assert.equal(result.decision, "allow");
+		assert.equal(result.decision, "ask");
 	});
 
 	it("reads the body from --body-file via the injected readFile", () => {
@@ -113,7 +113,7 @@ describe("evaluateClosesCreateGuard", () => {
 		assert.equal(result.decision, "ask");
 	});
 
-	it("allows when --body-file cannot be read", () => {
+	it("asks when --body-file cannot be read", () => {
 		const result = evaluateClosesCreateGuard(
 			payload({
 				command: "gh pr create --base main --title x --body-file /tmp/body.md",
@@ -125,10 +125,10 @@ describe("evaluateClosesCreateGuard", () => {
 				},
 			},
 		);
-		assert.equal(result.decision, "allow");
+		assert.equal(result.decision, "ask");
 	});
 
-	it("detects a Closes keyword inside a heredoc-quoted body", () => {
+	it("does not infer the result of a command substitution from its source", () => {
 		const command = [
 			"gh pr create --base main --title x --body \"$(cat <<'EOF'",
 			"Summary of the change.",
@@ -138,7 +138,50 @@ describe("evaluateClosesCreateGuard", () => {
 			')"',
 		].join("\n");
 		const result = evaluateClosesCreateGuard(payload({ command }), deps);
-		assert.equal(result.decision, "allow");
+		assert.equal(result.decision, "ask");
+	});
+
+	it("asks when body or base depends on shell expansion", () => {
+		for (const command of [
+			'body=/tmp/body.md; gh pr create --base main --body-file "$body"',
+			// biome-ignore lint/suspicious/noTemplateCurlyInString: literal shell expansion is the regression input.
+			'gh pr create --base main --body "${text:-Closes #1}"',
+			'gh pr create --base "$base" --body "no closes"',
+			"gh pr create --base main --body-file -",
+		]) {
+			const result = evaluateClosesCreateGuard(payload({ command }), deps);
+			assert.equal(result.decision, "ask", command);
+			assert.match(result.reason, /cannot|could not/i);
+		}
+	});
+	it("allows literal single-quoted body text and actual help options", () => {
+		for (const command of [
+			"gh pr create --body 'Closes #1 $literal'",
+			"gh pr create --help",
+		]) {
+			assert.equal(
+				evaluateClosesCreateGuard(payload({ command }), deps).decision,
+				"allow",
+			);
+		}
+	});
+	it("does not treat title values as body or base flags, or a file's old content as its future content", () => {
+		for (const command of [
+			"gh pr create --body 'no closes' --title '--body=Closes #1' --head feat",
+			"gh pr create --body 'no closes' --title '--base' --head feat",
+			"printf new-content > /tmp/body.md; gh pr create --body-file /tmp/body.md",
+			'gh pr create --body-file /tmp/body.md --title "$(printf no > /tmp/body.md)"',
+			"env -C /other gh pr create --body-file body.md",
+		]) {
+			assert.equal(
+				evaluateClosesCreateGuard(payload({ command }), {
+					...deps,
+					readFile: () => "Closes #1",
+				}).decision,
+				"ask",
+				command,
+			);
+		}
 	});
 
 	it("asks on a heredoc-quoted body with no keyword or exemption", () => {

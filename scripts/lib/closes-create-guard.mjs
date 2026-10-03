@@ -19,11 +19,14 @@
 
 import { hasExemptionDeclaration } from "./closes-reference.mjs";
 import {
+	GH_VALUE_FLAGS,
+	hasHelpOption,
+	parseLeadingShellPrefix,
 	splitSegments,
 	stripLeadingNoise,
 	tokenize,
 } from "./delegation-guard.mjs";
-import { flagValues, parseGhCommand } from "./gh-command.mjs";
+import { parseGhCommand } from "./gh-command.mjs";
 import { buildPermissionOutput, parseHookPayload } from "./hook-io.mjs";
 
 /**
@@ -33,25 +36,52 @@ import { buildPermissionOutput, parseHookPayload } from "./hook-io.mjs";
 const CLOSE_KEYWORD_REFERENCE =
 	/\b(close|closes|closed|fix|fixes|fixed|resolve|resolves|resolved)\b\s+#\d+/i;
 
-/**
- * The PR body text a `gh pr create` call would send, or null when it cannot
- * be determined from the command line alone — `--web`/`--fill` open a browser
- * or fill from commits, no `--body`/`--body-file` at all opens $EDITOR, and an
- * unreadable `--body-file` (including `-` for stdin) leaves nothing to read.
- * A null return is deliberately treated as "let it through" by the caller:
- * asking without evidence would just be noise, and CI remains the final net.
- * @param {string[]} args parseGhCommand()'s args
- * @param {(path: string) => string} readFile
- * @returns {string | null}
- */
-function resolveBodyText(args, readFile) {
-	const [inlineBody] = flagValues(args, ["--body", "-b"]);
-	if (inlineBody !== undefined) return inlineBody;
+// Preserve quoting evidence: single-quoted dollars are literal, while a
+// double-quoted variable or substitution cannot be resolved without running it.
+function staticOption(tokens, flags) {
+	let result = { present: false, value: null };
+	for (let i = 1; i < tokens.length; i++) {
+		const token = tokens[i];
+		if (token.value === "--") break;
+		const flag = flags.find(
+			(name) => token.value === name || token.value.startsWith(`${name}=`),
+		);
+		if (!flag) {
+			if (GH_VALUE_FLAGS.has(token.value)) i++;
+			continue;
+		}
+		const valueToken =
+			token.value === flag
+				? tokens[++i]
+				: { ...token, value: token.value.slice(flag.length + 1) };
+		const value = valueToken?.value;
+		result = {
+			present: true,
+			value:
+				typeof value === "string" &&
+				(valueToken.quote === "'" ||
+					(valueToken.quote === '"' && !/[$`]/.test(value)) ||
+					!/[$`~*?]/.test(value))
+					? value
+					: null,
+		};
+	}
+	return result;
+}
 
-	const [bodyFile] = flagValues(args, ["--body-file", "-F"]);
-	if (bodyFile === undefined || bodyFile === "-") return null;
+function resolveBodyText(tokens, readFile, priorCommands) {
+	const inlineBody = staticOption(tokens, ["--body", "-b"]);
+	if (inlineBody.present) return inlineBody.value;
+	const bodyFile = staticOption(tokens, ["--body-file", "-F"]);
+	if (
+		priorCommands ||
+		tokens.some((token) => token.quote !== "'" && /[$`]/.test(token.value))
+	)
+		return null;
+	if (bodyFile.value === null || bodyFile.value === "-") return null;
 	try {
-		return readFile(bodyFile);
+		const text = readFile(bodyFile.value);
+		return typeof text === "string" ? text : null;
 	} catch {
 		return null;
 	}
@@ -63,7 +93,7 @@ function resolveBodyText(args, readFile) {
  * `getDefaultBranch` is a function rather than a value because this runs on
  * every Bash call while `gh pr create` is a rare one: resolving the branch up
  * front would spawn a git process for each of them. It is called only once a
- * `gh pr create` with a readable body has been found.
+ * `gh pr create` requiring body validation has been found.
  * @param {object} payload PreToolUse hook payload
  * @param {{getDefaultBranch: () => string, readFile: (path: string) => string}} deps
  * @returns {{decision: "allow"} | {decision: "ask", reason: string}}
@@ -77,20 +107,38 @@ export function evaluateClosesCreateGuard(
 	if (typeof command !== "string" || command.trim() === "")
 		return { decision: "allow" };
 
+	let priorCommands = false;
 	for (const segment of splitSegments(command)) {
-		const tokens = stripLeadingNoise(tokenize(segment));
+		const rawTokens = tokenize(segment);
+		const prefix = parseLeadingShellPrefix(rawTokens);
+		const tokens = stripLeadingNoise(rawTokens);
 		const parsed = parseGhCommand(tokens);
-		if (!parsed || parsed.group !== "pr" || parsed.verb !== "create") continue;
+		if (!parsed || parsed.group !== "pr" || parsed.verb !== "create") {
+			priorCommands ||= tokens.length > 0;
+			continue;
+		}
+		if (hasHelpOption(parsed)) continue;
 
-		const bodyText = resolveBodyText(parsed.args, readFile);
-		if (bodyText === null) continue;
+		const defaultBranch = getDefaultBranch();
+		const base = staticOption(tokens, ["--base", "-B"]);
+		if (base.value !== null && base.value !== defaultBranch) continue;
+		const bodyText = resolveBodyText(
+			tokens,
+			readFile,
+			priorCommands ||
+				prefix.unresolved ||
+				prefix.envs.some((env) => env.chdir !== undefined),
+		);
+		if ((base.present && base.value === null) || bodyText === null) {
+			return {
+				decision: "ask",
+				reason:
+					"This 'gh pr create' could not be checked because its base or body cannot be determined from literal arguments and a readable body file. Use a literal base and --body-file with a literal path to the completed body, or approve this once. Include 'Closes #<n>' or a line-head 'no-issue: <reason>' when targeting the default branch. CI's check-closes-reference still runs after creation.",
+			};
+		}
 
 		if (CLOSE_KEYWORD_REFERENCE.test(bodyText)) continue;
 		if (hasExemptionDeclaration(bodyText)) continue;
-
-		const defaultBranch = getDefaultBranch();
-		const [base] = flagValues(parsed.args, ["--base", "-B"]);
-		if ((base ?? defaultBranch) !== defaultBranch) continue;
 
 		return {
 			decision: "ask",
