@@ -139,8 +139,9 @@ artifact:
     location: ../experiments/standalone/
   standalone_foundation:
     label: 両ホストで利用するアプリ共通基盤
-    status: todo
+    status: wip
     criteria: VS Code と製品用 Tauri アプリが共通処理で同じサンプルを解析・描画し、Mac の起動・日本語入力・再描画を確認済み。全機能の受入対応表に後続工程と検証方法が割り当てられている
+    location: ../packages/standalone/
   standalone_documents:
     label: 安全に編集・保存できる文書アプリ
     status: todo

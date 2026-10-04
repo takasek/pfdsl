@@ -306,14 +306,14 @@
 <!-- standalone_foundation -->
 <g id="node47" class="node">
 <title>standalone_foundation</title>
-<g id="a_node47"><a xlink:title="両ホストで利用するアプリ共通基盤&#10;criteria: VS Code と製品用 Tauri アプリが共通処理で同じサンプルを解析・描画し、Mac の起動・日本語入力・再描画を確認済み。全機能の受入対応表に後続工程と検証方法が割り当てられている">
-<polygon fill="#f8f9fa" stroke="black" points="767.79,-769.6 594.99,-769.6 594.99,-711.2 767.79,-711.2 767.79,-769.6"/>
+<g id="a_node47"><a xlink:title="両ホストで利用するアプリ共通基盤&#10;criteria: VS Code と製品用 Tauri アプリが共通処理で同じサンプルを解析・描画し、Mac の起動・日本語入力・再描画を確認済み。全機能の受入対応表に後続工程と検証方法が割り当てられている&#10;location: ../packages/standalone/">
+<polygon fill="#fff3cd" stroke="black" points="767.79,-769.6 594.99,-769.6 594.99,-711.2 767.79,-711.2 767.79,-769.6"/>
 <text xml:space="preserve" text-anchor="middle" x="681.39" y="-753" font-family="Times,serif" font-size="14.00">standalone_foundation</text>
 <text xml:space="preserve" text-anchor="middle" x="681.39" y="-736.2" font-family="Times,serif" font-size="14.00">両ホストで利用する</text>
 <text xml:space="preserve" text-anchor="middle" x="681.39" y="-719.4" font-family="Times,serif" font-size="14.00">アプリ共通基盤</text>
 </a>
 </g>
-<text xml:space="preserve" text-anchor="middle" x="582.54" y="-698.6" font-family="Times,serif" font-size="14.00">todo</text>
+<text xml:space="preserve" text-anchor="middle" x="584.49" y="-698.6" font-family="Times,serif" font-size="14.00">wip</text>
 </g>
 <!-- i1257_build_standalone_foundation&#45;&gt;standalone_foundation -->
 <g id="edge40" class="edge">
