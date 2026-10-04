@@ -18,7 +18,7 @@ a3f96e180a957152509a1d019b2b4247fb74c3f0ce6c7b25cd79355d9a3e75bb  hooks/lib/mana
 
 ae6f8cfe03b3df98c89a4b46eb176609cbf2a7c311f0d36f42817eab337ffcf2  hooks/managed-issue-reminder-post-tool-use.mjs
 
-a271e325d285b298c6161dc3d11bc5967e3e0638de0b7c0314a6ed8a8743984d  skills/pfd-ecosystem/SKILL.md
+36afee58a1d88affdae991972ea9b87a5ef177de213c3de59d57dccd1082a24c  skills/pfd-ecosystem/SKILL.md
 
 62d635bc7607d1aa0ad830337e1f9d3e2b2a389e0503f9e14a41726436d9fb67  skills/pfd-ecosystem/references/kind-taxonomy.md
 
@@ -56,7 +56,7 @@ a8e4d35e456f05babab77d002a20f7230b7942aaf7bb82138bf2007b5926c4f7  skills/pfd-ops
 
 d6636ad19abcd0019d685f0cbc26db35fb779ea1afa9568d070fb94bb68eb7f2  skills/pfd-ops/install/scripts/pfdsl/sweep-completed-chains.mjs
 
-fac94fbb4fcc37b8b04de5662484b441a237d8515abfe4e2363202474af64cdc  skills/pfd-ops/references/architecture.md
+c456f8f1c4b6b7557ac8e86b67bd5efb82bceb9bf1c29989977cbe36b78a8199  skills/pfd-ops/references/architecture.md
 
 ec4c10c6394964a5259ce63b446562181550bb397743b0b1c79d087bc2c7c307  skills/pfd-ops/references/file-based-tracker-backend.md
 
