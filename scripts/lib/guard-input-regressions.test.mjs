@@ -62,13 +62,6 @@ describe("heredoc command boundaries", () => {
 			"git push",
 		);
 	});
-	it("keeps data passed to a shell -c command out of executable stdin", () => {
-		assert.equal(findOutwardCommand("sh -c cat <<'EOF'\ngit push\nEOF"), null);
-		assert.equal(
-			findOutwardCommand("bash -lc cat <<'EOF'\ngit push\nEOF"),
-			null,
-		);
-	});
 	it("handles delimiter continuation, quoted backslashes and literal-dollar delimiters", () => {
 		assert.equal(
 			findOutwardCommand("cat <<EOF\ndata\nEO\\\nF\ngit push"),

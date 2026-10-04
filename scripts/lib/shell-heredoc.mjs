@@ -1,11 +1,15 @@
-// Heredoc bodies are input data. Only unquoted-body expansions (or input to
-// a shell interpreter) become executable text for the command guards.
-export function prepareHeredocs(source, { isShellInput }) {
+// A heredoc body is input data only when every command reading it is known
+// to treat stdin as data (`isDataReader`); then only its unquoted expansions
+// stay executable text. Any other reader may run the body, so the guards
+// still see it. A << the scanner cannot place outside every quote and
+// expansion is not trusted as a document start: the rest stays visible.
+export function prepareHeredocs(source, { isDataReader }) {
 	let result = "";
 	let quote = null;
 	let comment = false;
 	let lineStart = 0;
-	let arithmetic = 0;
+	// Closers of open (, $(, ${, $[ and ` constructs.
+	const closers = [];
 	const pending = [];
 	for (let i = 0; i < source.length; i++) {
 		const ch = source[i];
@@ -43,10 +47,9 @@ export function prepareHeredocs(source, { isShellInput }) {
 					body += `${line}\n`;
 				}
 				i = end - 1;
-				// Shell stdin is code even when the delimiter was quoted. The
-				// synthetic scope makes Git target resolution conservative:
+				// The synthetic scope makes Git target resolution conservative:
 				// consumers may keep later targets unresolved, not restore cwd.
-				if (isShellInput(header)) {
+				if (!isDataReader(header)) {
 					result += `(\n${body}\n)\n`;
 				} else if (!doc.quoted) {
 					for (const expansion of heredocExpansions(body))
@@ -65,6 +68,12 @@ export function prepareHeredocs(source, { isShellInput }) {
 			i++;
 			continue;
 		}
+		const documentStart =
+			source.slice(i, i + 2) === "<<" &&
+			source[i + 2] !== "<" &&
+			source[i - 1] !== "<";
+		if (documentStart && (quote === '"' || closers.length > 0))
+			return result + source.slice(i);
 		if (quote) {
 			if (ch === quote) quote = null;
 			result += ch;
@@ -77,16 +86,17 @@ export function prepareHeredocs(source, { isShellInput }) {
 		}
 		if (ch === "#" && (i === 0 || /[\s;|&()]/.test(source[i - 1])))
 			comment = true;
-		if (!comment && source.slice(i, i + 2) === "((") arithmetic += 2;
-		else if (arithmetic && ch === "(" && source[i - 1] !== "(") arithmetic++;
-		if (arithmetic && ch === ")") arithmetic--;
-		if (
-			!comment &&
-			!arithmetic &&
-			source.slice(i, i + 2) === "<<" &&
-			source[i + 2] !== "<" &&
-			source[i - 1] !== "<"
-		) {
+		if (comment) {
+			result += ch;
+			continue;
+		}
+		if (ch === "`" && closers.at(-1) === "`") closers.pop();
+		else if (ch === "`") closers.push("`");
+		else if (ch === "(") closers.push(")");
+		else if (/[[{]/.test(ch) && (source[i - 1] === "$" || closers.length > 0))
+			closers.push(ch === "[" ? "]" : "}");
+		else if (ch === closers.at(-1)) closers.pop();
+		if (documentStart) {
 			const doc = readDelimiter(source, i + 2);
 			if (doc) {
 				pending.push(doc);

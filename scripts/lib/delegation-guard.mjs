@@ -200,6 +200,45 @@ export const GIT_GLOBAL_FLAGS_WITH_VALUE = new Set([
 	"--attr-source",
 ]);
 
+const readsStdinFile = (tokens, flags) =>
+	tokens.some(
+		({ value }, i) =>
+			(flags.includes(value) && tokens[i + 1]?.value === "-") ||
+			flags.some((flag) => value === `${flag}=-`),
+	);
+
+/** Commands that read stdin only as data, never as a program. */
+const STDIN_DATA_READERS = {
+	cat: () => true,
+	tee: () => true,
+	git: (tokens) =>
+		["commit", "tag"].includes(gitSubcommand(tokens)) &&
+		readsStdinFile(tokens, ["-F", "--file"]),
+	gh: (tokens) => readsStdinFile(tokens, ["--body-file", "-F", "--input"]),
+};
+
+/**
+ * Whether every command that reads the heredocs opened on `header` is a known
+ * data reader: the command carrying `<<` and the pipeline it feeds. Anything
+ * else, including a header that continues past the body, may run the body.
+ */
+function isDataReader(header) {
+	if (/(?:\|\|?|&&|\\)\s*$/.test(header)) return false;
+	let reading = false;
+	for (const { command: segment, separatorBefore } of splitCommandFlow(
+		header,
+	)) {
+		reading = segment.includes("<<") || (reading && separatorBefore === "|");
+		if (!reading) continue;
+		const raw = tokenize(segment);
+		const prefix = parseLeadingShellPrefix(raw);
+		const tokens = raw.slice(prefix.end);
+		const reader = STDIN_DATA_READERS[basename(tokens[0]?.value ?? "")];
+		if (prefix.unresolved || !reader?.(tokens)) return false;
+	}
+	return true;
+}
+
 // Split on shell separators that start a new command, ignoring separators
 // inside quotes. Quote tracking is what keeps `echo "git push"` from being
 // read as a push.
@@ -207,51 +246,7 @@ export const GIT_GLOBAL_FLAGS_WITH_VALUE = new Set([
 // Exported so other command-inspecting guards (main-commit-guard.mjs) reuse
 // this parsing instead of re-implementing quote/segment handling.
 export function splitCommandFlow(command) {
-	command = prepareHeredocs(command, {
-		isShellInput: (header) =>
-			splitCommandFlow(header).some(({ command: segment }) => {
-				const tokens = stripLeadingNoise(tokenize(segment));
-				const executable = basename(tokens[0]?.value ?? "");
-				const shell = ["sh", "bash", "dash", "ksh", "zsh"].includes(executable);
-				let commandString = false;
-				let stdinScript = false;
-				let scriptFile = false;
-				let options = true;
-				for (let i = 1; i < tokens.length; i++) {
-					const redirection = leadingRedirectionLength(tokens, i);
-					if (redirection > 0) {
-						i += redirection - 1;
-						continue;
-					}
-					const arg = tokens[i].value;
-					if (
-						options &&
-						["--rcfile", "--init-file", "-o", "-O"].includes(arg)
-					) {
-						i++;
-						continue;
-					}
-					if (options && arg === "--") {
-						options = false;
-						continue;
-					}
-					if (options && /^-[a-zA-Z]*c/.test(arg)) {
-						commandString = true;
-						break;
-					}
-					if (options && /^-[a-zA-Z]*s/.test(arg)) stdinScript = true;
-					if (!options || (!arg.startsWith("-") && !arg.startsWith("+"))) {
-						scriptFile = true;
-						break;
-					}
-				}
-				return (
-					(shell && !commandString && (stdinScript || !scriptFile)) ||
-					(["source", "."].includes(executable) &&
-						["/dev/stdin", "/dev/fd/0"].includes(tokens[1]?.value))
-				);
-			}),
-	});
+	command = prepareHeredocs(command, { isDataReader });
 	const segments = [];
 	let current = "";
 	let quote = null;
