@@ -7,7 +7,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
-import { listInstallFiles } from "../../.claude/skills/pfd-ops/scripts/check-install-sync.mjs";
+import { listInstallFiles } from "../harness-template/skills/pfd-ops/scripts/check-install-sync.mjs";
 
 /**
  * Compare every file under canonicalDir against its counterpart at the same

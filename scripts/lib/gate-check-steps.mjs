@@ -26,6 +26,7 @@ import {
 	unionCommitLogEntries,
 	wipTransitionDetected,
 } from "./gate-check.mjs";
+import { readRevisionBlob } from "./gate-report-revision.mjs";
 import { GEN_INSTALL_TRIGGER } from "./gen-install-trigger.mjs";
 import { genPluginDriftPathspecs } from "./gen-plugin-outputs.mjs";
 import { GEN_PLUGIN_TRIGGER } from "./gen-plugin-trigger.mjs";
@@ -63,11 +64,13 @@ export function changedFilesSince({ exec, base }) {
 	const r = exec("git", [
 		"diff",
 		"--diff-filter=d",
+		"--no-renames",
 		"--name-only",
+		"-z",
 		`origin/${base}...HEAD`,
 	]);
 	if (!r.ok) return { ok: false, files: [], error: r.out.trim() };
-	return { ok: true, files: r.out.trim().split("\n").filter(Boolean) };
+	return { ok: true, files: splitNulSeparated(r.out) };
 }
 
 /**
@@ -105,20 +108,21 @@ export function triggerPathsSince({ exec, base }) {
  * changedFilesSince rather than folded into it: the gates that call that one
  * would run `pfdsl check` against a path that no longer exists.
  *
- * A git failure yields an empty list rather than an error. The consumer is
- * report material, and losing the deleted half of it is cheaper than losing
- * the block.
  * @param {{exec: Function, base: string}} params
- * @returns {string[]}
+ * @returns {{ok: boolean, files: string[], error?: string}}
  */
 export function deletedFilesSince({ exec, base }) {
 	const r = exec("git", [
 		"diff",
 		"--diff-filter=D",
+		"--no-renames",
 		"--name-only",
+		"-z",
 		`origin/${base}...HEAD`,
 	]);
-	return r.ok ? r.out.trim().split("\n").filter(Boolean) : [];
+	return r.ok
+		? { ok: true, files: splitNulSeparated(r.out) }
+		: { ok: false, files: [], error: r.out.trim() };
 }
 
 /**
@@ -170,7 +174,11 @@ export function genPluginIdentityStep({ node, triggerPaths }) {
 			detail: "no skill/plugin/install-source changes",
 		};
 	}
-	const regenerated = node(["scripts/gen-plugin.mjs"]);
+	const regenerated = node([
+		"scripts/check-generation.mjs",
+		"--gen-plugin",
+		"terminal",
+	]);
 	const clean =
 		regenerated.ok &&
 		node([
@@ -306,24 +314,39 @@ export function wipTransitionStep({
 /**
  * Byte/line deltas for the tracked knowledge artifacts this branch touched.
  * The measured deltas are unconditional report material for human review.
- * @returns {import("./gate-check.mjs").SizeDelta[]}
+ * @returns {{deltas: import("./gate-check.mjs").SizeDelta[], unreadable: string[]}}
  */
-export function collectSizeDeltas({ exec, base, changedFiles }) {
-	return changedFiles
-		.filter((f) => SIZE_TRACKED_PATTERNS.some((p) => p.test(f)))
-		.map((path) => {
-			const before = exec("git", ["show", `origin/${base}:${path}`]);
-			const after = exec("git", ["show", `HEAD:${path}`]);
-			const beforeText = before.ok ? before.out : "";
-			const afterText = after.ok ? after.out : "";
-			return {
-				path,
-				beforeBytes: before.ok ? Buffer.byteLength(beforeText, "utf-8") : 0,
-				afterBytes: Buffer.byteLength(afterText, "utf-8"),
-				beforeLines: before.ok ? beforeText.split("\n").length : 0,
-				afterLines: afterText.split("\n").length,
-			};
+export function collectSizeDeltas({
+	exec,
+	base,
+	changedFiles,
+	comparisonRef = `origin/${base}`,
+	headRef = "HEAD",
+}) {
+	const deltas = [];
+	const unreadable = [];
+	for (const path of changedFiles.filter((f) =>
+		SIZE_TRACKED_PATTERNS.some((p) => p.test(f)),
+	)) {
+		const before = readRevisionBlob({ exec, ref: comparisonRef, path });
+		const after = readRevisionBlob({ exec, ref: headRef, path });
+		if (!before.ok || !after.ok) {
+			unreadable.push(
+				...[before, after]
+					.filter((result) => !result.ok)
+					.map((result) => result.error),
+			);
+			continue;
+		}
+		deltas.push({
+			path,
+			beforeBytes: Buffer.byteLength(before.text, "utf-8"),
+			afterBytes: Buffer.byteLength(after.text, "utf-8"),
+			beforeLines: before.exists ? before.text.split("\n").length : 0,
+			afterLines: after.exists ? after.text.split("\n").length : 0,
 		});
+	}
+	return { deltas, unreadable };
 }
 
 // #834: a failure past the base-commits-this-tree-lacks query costs only the
@@ -488,7 +511,8 @@ export function checkDocsStep({ exec }) {
  * @param {{
  *   readdirSync: (dir: string) => string[],
  *   readFile: (file: string) => string,
- *   analyze: (text: string) => {frontmatter: object},
+ *   analyze: (text: string) => {frontmatter: object, diagnostics?: object[]},
+ *   isUnreadableError: (diagnostic: object) => boolean,
  *   dir?: string,
  * }} deps
  * @returns {{analyzed: Array<{file: string, frontmatter: object}>, unreadable: string[]}}
@@ -497,17 +521,31 @@ export function analyzeAdoptedPfdsl({
 	readdirSync,
 	readFile,
 	analyze,
+	isUnreadableError,
 	dir = ".pfdsl",
 }) {
 	const analyzed = [];
 	const unreadable = [];
-	const names = readdirSync(dir)
-		.filter((name) => name.endsWith(".pfdsl"))
-		.sort();
+	let names;
+	try {
+		names = readdirSync(dir)
+			.filter((name) => name.endsWith(".pfdsl"))
+			.sort();
+	} catch (error) {
+		return { analyzed, unreadable: [`${dir}: ${error.message}`] };
+	}
 	for (const name of names) {
 		const file = `${dir}/${name}`;
 		try {
-			analyzed.push({ file, frontmatter: analyze(readFile(file)).frontmatter });
+			const result = analyze(readFile(file));
+			const failures = (result.diagnostics ?? []).filter(isUnreadableError);
+			if (failures.length) {
+				unreadable.push(
+					`${file}: ${failures.map((d) => `${d.code} ${d.message}`).join("; ")}`,
+				);
+				continue;
+			}
+			analyzed.push({ file, frontmatter: result.frontmatter });
 		} catch (e) {
 			unreadable.push(`${file}: ${e.message}`);
 		}

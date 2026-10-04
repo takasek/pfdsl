@@ -19,8 +19,10 @@ export const GENERATED_DISTRIBUTION_SOURCES = Object.freeze({
 });
 
 export function canonicalPluginSkillSource(relativePath) {
+	const install = relativePath.match(/^pfd-ops\/install\/(.+)$/);
+	if (install) return install[1];
 	return (
 		GENERATED_DISTRIBUTION_SOURCES[`plugin/pfdsl/skills/${relativePath}`] ??
-		`.claude/skills/${relativePath}`
+		`scripts/harness-template/skills/${relativePath}`
 	);
 }

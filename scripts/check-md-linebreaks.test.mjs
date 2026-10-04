@@ -30,8 +30,27 @@ describe("Markdown checks against the Git index", () => {
 			cpSync(join(source, "..", file), join(root, file));
 		}
 		symlinkSync(join(source, "..", "node_modules"), join(root, "node_modules"));
+		git(["add", "scripts", "biome.json", "package.json", ".gitignore"]);
+		git([
+			"-c",
+			"user.name=test",
+			"-c",
+			"user.email=test@example.com",
+			"commit",
+			"-qm",
+			"test: establish the indexed checkers",
+		]);
 	});
 	after(() => rmSync(root, { recursive: true, force: true }));
+
+	it("pre-commit ignores an unstaged syntax error after staging valid source", () => {
+		stage("scripts/probe.mjs", "export {};\n");
+		writeFileSync(join(root, "scripts/probe.mjs"), "export {\n");
+		const result = run("/bin/sh", ["scripts/pre-commit"]);
+		assert.equal(result.status, 0, result.stdout + result.stderr);
+		rmSync(join(root, "scripts/probe.mjs"));
+		git(["rm", "--cached", "scripts/probe.mjs"]);
+	});
 
 	for (const [name, index, working, expected] of [
 		["rejects a staged violation even after an unstaged repair", bad, good, 1],

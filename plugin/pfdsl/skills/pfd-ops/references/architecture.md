@@ -1,3 +1,5 @@
+<!-- DO NOT EDIT. Authoritative source: scripts/harness-template/skills/pfd-ops/references/architecture.md. -->
+
 # pfd-ops アーキテクチャ
 
 pfd-ops スキルは4層で構成される。各層の「配布可能性」が異なる。
@@ -36,7 +38,7 @@ findings やゲート項目を companion に書くとき、**どの companion �
 | issue 固有ゲート・issue 管理バインディング・open PR 規約・issue バックエンド手続き | `roadmap.md` |
 | 繰り返し手続き・知見振り分けルール・`develop` プロセスの運用規約・retro 宛先バインディング | `workflow.md` |
 | 変換コンポーネントの追加・削除・境界変更に関する手続き | `pipeline.md` |
-| Claude 向け追加指示（PR 本文規約等）| `.pfdsl/bindings/pfd-ops.md` |
+| ハーネス向け追加指示（PR 本文規約等）| `.pfdsl/bindings/pfd-ops.md` |
 
 この表が一次情報。`pfd-ops SKILL.md` の L2 ディスパッチ・`pfd-retro` の出力振り分け・`.pfdsl/bindings/pfd-retro.md` はすべてここを参照する。
 
@@ -103,9 +105,10 @@ bundle 同梱スキル全数ではない — 自分の binding を読まない�
 
 ### 配布単位
 
-pfdsl / pfd-grill / pfd-ops / pfd-retro / pfd-ecosystem の5スキルツリー・pfd-* コマンド群・pfd-lens agent は、1つの Claude Code plugin（`plugin/pfdsl/`、`make gen-plugin` で組み立て）として marketplace 配布される（ADR-0028。旧 `pfdsl skill sync` は廃止）。
+pfdsl / pfd-grill / pfd-ops / pfd-retro / pfd-ecosystem / pfd-upstream-report の6スキルツリーとハーネス別の資産を、`make gen-plugin` で共通正本から組み立てる（ADR-0028。旧 `pfdsl skill sync` は廃止）。
+Claude Code plugin（`plugin/pfdsl/`）にはスキル・pfd-* Markdown コマンド・pfd-lens と pfd-implementer agent・hooks が入り、marketplace 経由で配布される。
 スキル間の相互参照（pfd-retro → pfdsl の review-perspectives、pfd-ecosystem → pfd-ops の scaffold、コマンド → 各スキル）はこの bundle 配布が担保する。
-`hooks/`（PostToolUse の managed issue リマインダ等）も同じ bundle に同梱される。plugin hook はインストール/有効化の同意機構を Claude Code プラットフォーム側に委ねる（`install/` + `check-install-sync.mjs --deploy` の配線を pfd-ops が自前で持たずに済む代替経路）。
+`hooks/`（PostToolUse の managed issue リマインダ等）も同じ bundle に同梱される。plugin hook はインストール/有効化の同意機構を各ハーネスのプラットフォーム側に委ねる（`install/` + `check-install-sync.mjs --deploy` の配線を pfd-ops が自前で持たずに済む代替経路）。
 
 ### GitHub Issues プリセット
 

@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
 import {
 	chmodSync,
+	mkdirSync,
 	mkdtempSync,
 	rmSync,
 	symlinkSync,
@@ -72,6 +73,20 @@ describe("execGh", () => {
 		assert.equal(out, "label list --json name");
 	});
 
+	it("does not present a deleted cwd as a missing gh binary", async () => {
+		originalPath = process.env.PATH;
+		fakePath = fakePathWithGh("exit 0");
+		const cwd = join(fakePath, "deleted-cwd");
+		mkdirSync(cwd);
+		rmSync(cwd, { recursive: true });
+		process.env.PATH = fakePath;
+		await assert.rejects(
+			() => execGh(["label", "list"], { cwd }),
+			(error) =>
+				error.code !== "ENOENT" && /working directory/.test(error.message),
+		);
+	});
+
 	it("propagates a non-ENOENT gh failure (auth error, bad args, ...) unchanged", async () => {
 		originalPath = process.env.PATH;
 		fakePath = fakePathWithGh('echo "gh: not authenticated" >&2; exit 1');
@@ -79,6 +94,22 @@ describe("execGh", () => {
 		await assert.rejects(
 			() => execGh(["label", "list"]),
 			(e) => e.status === 1 && /not authenticated/.test(String(e.stderr)),
+		);
+	});
+
+	it("does not present an installed gh with a missing interpreter as unavailable", async () => {
+		originalPath = process.env.PATH;
+		fakePath = fakePathWithGh("exit 0");
+		writeFileSync(
+			join(fakePath, "gh"),
+			`#!${join(fakePath, "missing-interpreter")}\n`,
+			{ mode: 0o755 },
+		);
+		process.env.PATH = fakePath;
+		await assert.rejects(
+			() => execGh(["label", "list"]),
+			(error) =>
+				error.code !== "ENOENT" && /could not start/.test(error.message),
 		);
 	});
 

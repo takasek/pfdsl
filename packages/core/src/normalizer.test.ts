@@ -17,6 +17,57 @@ function isolated(src: string, fm: Frontmatter | null = null): string[] {
 }
 
 describe("normalize", () => {
+	it("retains N002 when a group is also used in both node roles", () => {
+		const { document } = parseTokens(lex("x >> p -> b\na >> x -> c").tokens);
+		const { diagnostics } = normalize(document, { group: { x: {} } });
+		expect(diagnostics.filter((d) => d.code === "N004")).toHaveLength(2);
+		expect(diagnostics.filter((d) => d.code === "N002")).toHaveLength(2);
+	});
+	it.each([
+		"artifact",
+		"process",
+	] as const)("N004: reports a group also declared as %s", (kind) => {
+		const fm = { group: { x: {} }, [kind]: { x: {} } } as Frontmatter;
+		const { document } = parseTokens(lex("").tokens);
+		const { diagnostics } = normalize(document, fm);
+		expect(diagnostics).toEqual([
+			expect.objectContaining({
+				code: "N004",
+				severity: "error",
+				message: expect.stringMatching(new RegExp(`group.*${kind}`)),
+			}),
+		]);
+	});
+
+	it.each([
+		["x >> p", "artifact"],
+		["a >> x -> b", "process"],
+		["x", "artifact"],
+	])("N004: reports group usage in %s as %s once", (body, kind) => {
+		const fm = { group: { x: {} } } as Frontmatter;
+		const { document } = parseTokens(lex(body).tokens);
+		const { diagnostics } = normalize(document, fm);
+		expect(diagnostics).toEqual([
+			expect.objectContaining({
+				code: "N004",
+				severity: "error",
+				message: expect.stringMatching(new RegExp(`group.*${kind}`)),
+			}),
+		]);
+	});
+
+	it("reports all conflicting kinds without duplicate group diagnostics", () => {
+		const fm = {
+			artifact: { x: {} },
+			process: { x: {} },
+			group: { x: {} },
+		} as Frontmatter;
+		const { document } = parseTokens(lex("x >> p").tokens);
+		const { diagnostics } = normalize(document, fm);
+		expect(diagnostics.filter((d) => d.code === "N001")).toHaveLength(1);
+		expect(diagnostics.filter((d) => d.code === "N004")).toHaveLength(2);
+	});
+
 	it("chain A >> P -> B produces 2 edges", () => {
 		const result = edges("A >> P -> B");
 		expect(result).toHaveLength(2);

@@ -1,4 +1,4 @@
-<!-- DO NOT EDIT. Authoritative source: .claude/skills/pfd-retro/references/knowledge-lifecycle.md. -->
+<!-- DO NOT EDIT. Authoritative source: scripts/harness-template/skills/pfd-retro/references/knowledge-lifecycle.md. -->
 
 # 知識成果物のライフサイクル監査（pfd-retro D 層・選択項目）
 

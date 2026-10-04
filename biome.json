@@ -13,7 +13,9 @@
 			"experiments/standalone/**",
 			"!**/dist",
 			"!**/node_modules",
-			"!experiments/standalone/src-tauri/target"
+			"!experiments/standalone/src-tauri/target",
+			"!packages/standalone/src-tauri/target",
+			"!packages/standalone/src-tauri/gen"
 		]
 	},
 	"formatter": {

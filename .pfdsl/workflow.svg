@@ -385,19 +385,19 @@
 <polygon fill="#888888" stroke="#888888" points="242.33,-1405.95 245.67,-1416 249.33,-1406.06 242.33,-1405.95"/>
 </g>
 <!-- retro_findings&#45;&gt;maintain_distributed_prompt_assets -->
-<g id="edge154" class="edge">
+<g id="edge155" class="edge">
 <title>retro_findings&#45;&gt;maintain_distributed_prompt_assets</title>
 <path fill="none" stroke="#888888" stroke-dasharray="5,2" d="M3898.77,-2787.96C3896.51,-2642.29 3880.16,-1800.8 3802.87,-1721.39 3738.18,-1654.93 3469.07,-1718.96 3388.3,-1673.39 3189.57,-1561.26 3278.92,-1367.88 3074.07,-1267.39 2987.56,-1224.95 2926.58,-1200.45 2857.27,-1267.39 2774.73,-1347.09 2891.66,-2208.79 2821.27,-2299.39 2816.56,-2305.44 2811.09,-2310.71 2805.07,-2315.3"/>
 <polygon fill="#888888" stroke="#888888" points="2803.44,-2312.18 2797.13,-2320.7 2807.37,-2317.97 2803.44,-2312.18"/>
 </g>
 <!-- retro_findings&#45;&gt;maintain_repo_bindings -->
-<g id="edge155" class="edge">
+<g id="edge156" class="edge">
 <title>retro_findings&#45;&gt;maintain_repo_bindings</title>
 <path fill="none" stroke="#888888" stroke-dasharray="5,2" d="M3898.82,-2787.74C3896.92,-2638.67 3882.47,-1767.8 3802.87,-1685.39 3738.4,-1618.65 3453.29,-1701.62 3388.3,-1635.39 3332.76,-1578.79 3409.87,-1334.91 3352.3,-1280.39 3332.67,-1261.8 2891.18,-1235.93 2857.27,-1267.39 2778.85,-1340.14 2888.57,-1664.25 2821.27,-1747.39 2810.57,-1760.61 2796.21,-1770.08 2780.55,-1776.84"/>
 <polygon fill="#888888" stroke="#888888" points="2779.56,-1773.47 2771.5,-1780.35 2782.09,-1779.99 2779.56,-1773.47"/>
 </g>
 <!-- retro_findings&#45;&gt;maintain_repo_local_capabilities -->
-<g id="edge156" class="edge">
+<g id="edge157" class="edge">
 <title>retro_findings&#45;&gt;maintain_repo_local_capabilities</title>
 <path fill="none" stroke="#888888" stroke-dasharray="5,2" d="M3898.24,-2788.06C3892.35,-2639.24 3855.44,-1758.96 3802.87,-1653.39 3683.1,-1412.89 3597.96,-1359.15 3352.3,-1250.39 2893.54,-1047.29 2572.15,-906.54 2223.59,-1267.39 2150.13,-1343.44 2251.63,-2134.25 2187.59,-2218.39 2183.23,-2224.12 2178.14,-2229.13 2172.53,-2233.52"/>
 <polygon fill="#888888" stroke="#888888" points="2170.78,-2230.48 2164.55,-2239.05 2174.76,-2236.23 2170.78,-2230.48"/>
@@ -577,23 +577,29 @@
 <path fill="none" stroke="black" d="M2993.48,-2017.56C3018.99,-2036.75 3054.18,-2067.32 3074.07,-2102.39 3196.72,-2318.64 3220.48,-2626.4 3225.08,-2736.37"/>
 <polygon fill="black" stroke="black" points="3221.57,-2736.22 3225.45,-2746.08 3228.56,-2735.95 3221.57,-2736.22"/>
 </g>
+<!-- adopter_config&#45;&gt;maintain_repo_bindings -->
+<g id="edge144" class="edge">
+<title>adopter_config&#45;&gt;maintain_repo_bindings</title>
+<path fill="none" stroke="#888888" stroke-dasharray="5,2" d="M2892.87,-1994.18C2880.6,-1990.87 2868.23,-1986.33 2857.27,-1980.39 2793.69,-1945.93 2735.58,-1884.84 2700.84,-1841.55"/>
+<polygon fill="#888888" stroke="#888888" points="2703.67,-1839.48 2694.73,-1833.79 2698.17,-1843.81 2703.67,-1839.48"/>
+</g>
 <!-- bindings_pfd_ops -->
 <g id="node23" class="node">
 <title>bindings_pfd_ops</title>
 <g id="a_node23"><a xlink:title="pfd&#45;ops バインディング&#10;&#10;pfd&#45;ops 運用に紐づく Claude への恒常指示（PR 本文規約等）。sibling companion でなく独立ファイル（読み込み契機がスキル発火であり PFD グラフ操作と一致しないため）。pfd&#45;ops skill が存在すれば読む&#10;criteria: 記載内容を pfd&#45;ops SKILL.md・work&#45;cycle.md の現行記述に突き合わせて矛盾がなく、配布層から移設した手順（ADR&#45;0039）が binding 側に揃っている（必須見出しだけ check&#45;companion&#45;bindings が検査し、本文の整合は pfd&#45;retro D 層監査で観察する）&#10;location: bindings/pfd&#45;ops.md">
-<polygon fill="none" stroke="black" points="3030.07,-1745.59 2893.27,-1745.59 2893.27,-1687.19 3030.07,-1687.19 3030.07,-1745.59"/>
-<text xml:space="preserve" text-anchor="middle" x="2961.67" y="-1728.99" font-family="Times,serif" font-size="14.00">bindings_pfd_ops</text>
-<text xml:space="preserve" text-anchor="middle" x="2961.67" y="-1712.19" font-family="Times,serif" font-size="14.00">pfd&#45;ops</text>
-<text xml:space="preserve" text-anchor="middle" x="2961.67" y="-1695.39" font-family="Times,serif" font-size="14.00">バインディング</text>
+<polygon fill="none" stroke="black" points="3030.07,-1821.59 2893.27,-1821.59 2893.27,-1763.19 3030.07,-1763.19 3030.07,-1821.59"/>
+<text xml:space="preserve" text-anchor="middle" x="2961.67" y="-1804.99" font-family="Times,serif" font-size="14.00">bindings_pfd_ops</text>
+<text xml:space="preserve" text-anchor="middle" x="2961.67" y="-1788.19" font-family="Times,serif" font-size="14.00">pfd&#45;ops</text>
+<text xml:space="preserve" text-anchor="middle" x="2961.67" y="-1771.39" font-family="Times,serif" font-size="14.00">バインディング</text>
 </a>
 </g>
-<text xml:space="preserve" text-anchor="middle" x="2857.1" y="-1674.59" font-family="Times,serif" font-size="14.00">distilled_doc</text>
+<text xml:space="preserve" text-anchor="middle" x="2857.1" y="-1750.59" font-family="Times,serif" font-size="14.00">distilled_doc</text>
 </g>
 <!-- bindings_pfd_ops&#45;&gt;maintain_repo_bindings -->
-<g id="edge144" class="edge">
+<g id="edge145" class="edge">
 <title>bindings_pfd_ops&#45;&gt;maintain_repo_bindings</title>
-<path fill="none" stroke="#888888" stroke-dasharray="5,2" d="M2893.03,-1739.71C2857.78,-1749.8 2813.83,-1761.43 2774.12,-1771.26"/>
-<polygon fill="#888888" stroke="#888888" points="2773.39,-1767.84 2764.51,-1773.62 2775.06,-1774.63 2773.39,-1767.84"/>
+<path fill="none" stroke="#888888" stroke-dasharray="5,2" d="M2893.11,-1798.18C2860.81,-1799.05 2821.21,-1799.33 2784.26,-1799.01"/>
+<polygon fill="#888888" stroke="#888888" points="2784.43,-1795.52 2774.39,-1798.91 2784.36,-1802.51 2784.43,-1795.52"/>
 </g>
 <!-- develop -->
 <g id="node55" class="node">
@@ -606,74 +612,74 @@
 </g>
 </g>
 <!-- bindings_pfd_ops&#45;&gt;develop -->
-<g id="edge171" class="edge">
+<g id="edge172" class="edge">
 <title>bindings_pfd_ops&#45;&gt;develop</title>
-<path fill="none" stroke="#888888" stroke-dasharray="5,2" d="M2892.89,-1706.94C2879.28,-1702 2866.38,-1694.56 2857.27,-1683.39 2762.33,-1567.01 2920.67,-1459.97 2821.27,-1347.39 2773.4,-1293.17 2259.44,-1206.72 2187.59,-1198.39 2061.58,-1183.77 2021.51,-1155.38 1902.17,-1198.39 1792.72,-1237.84 1800.51,-1305.81 1700.57,-1365.39 1694.03,-1369.29 1686.95,-1372.92 1679.78,-1376.23"/>
+<path fill="none" stroke="#888888" stroke-dasharray="5,2" d="M2892.99,-1783.17C2879.29,-1778.22 2866.33,-1770.72 2857.27,-1759.39 2799.87,-1687.61 2881.42,-1416.88 2821.27,-1347.39 2773.93,-1292.7 2259.44,-1206.72 2187.59,-1198.39 2061.58,-1183.77 2021.51,-1155.38 1902.17,-1198.39 1792.72,-1237.84 1800.51,-1305.81 1700.57,-1365.39 1694.03,-1369.29 1686.95,-1372.92 1679.78,-1376.23"/>
 <polygon fill="#888888" stroke="#888888" points="1678.39,-1373.02 1670.65,-1380.26 1681.21,-1379.43 1678.39,-1373.02"/>
 </g>
 <!-- bindings_pfd_ops&#45;&gt;sweep_prose_mechanization -->
 <g id="edge91" class="edge">
 <title>bindings_pfd_ops&#45;&gt;sweep_prose_mechanization</title>
-<path fill="none" stroke="black" d="M3030.48,-1710.31C3047.23,-1705.44 3063.4,-1697.2 3074.07,-1683.39 3132.77,-1607.37 3075.99,-911.83 3102.07,-819.39 3121.32,-751.14 3166.29,-681.53 3196.47,-639.89"/>
-<polygon fill="black" stroke="black" points="3199.24,-642.03 3202.34,-631.9 3193.6,-637.88 3199.24,-642.03"/>
+<path fill="none" stroke="black" d="M3030.5,-1786.33C3047.25,-1781.46 3063.42,-1773.21 3074.07,-1759.39 3105.95,-1718 3087.95,-869.69 3102.07,-819.39 3121.23,-751.12 3166.22,-681.51 3196.44,-639.88"/>
+<polygon fill="black" stroke="black" points="3199.21,-642.02 3202.31,-631.89 3193.57,-637.87 3199.21,-642.02"/>
 </g>
 <!-- bindings_pfd_retro -->
 <g id="node24" class="node">
 <title>bindings_pfd_retro</title>
 <g id="a_node24"><a xlink:title="pfd&#45;retro バインディング&#10;&#10;pfd&#45;retro が参照する図・仕様レンズと、検索可能な事例・観察・反例の保存先、運用責任の終了、配布物への finding 反映手続きを持つ。 bindings/pfd&#45;retro&#45;patterns/ の当時の本文と証拠を保存し、現行手順の適用点を案内する。 カタログの対策抽出・phase・自動選別には依存しない。&#10;&#10;criteria: check&#45;companion&#45;bindings が必須見出しと、事例が .pfdsl 内へ張った相対リンクの解決先の実在を確認し、最終差分レビューで事例の証拠保存と現行手順へのリンクの有無・非依存、および1回の実行契約と、知識成果物ライフサイクル監査の採用宣言（`.pfdsl/config.json` のキー `knowledgeLifecycleAudit` の `mode` と、`adopt` のときの空でない `targets`。binding は config のキーを指す1文だけを持つ。ADR&#45;0039、ADR&#45;0041）の実在を確認する&#10;location: bindings/pfd&#45;retro.md, bindings/pfd&#45;retro&#45;patterns/">
-<polygon fill="none" stroke="black" points="3037.27,-1821.59 2886.07,-1821.59 2886.07,-1763.19 3037.27,-1763.19 3037.27,-1821.59"/>
-<text xml:space="preserve" text-anchor="middle" x="2961.67" y="-1804.99" font-family="Times,serif" font-size="14.00">bindings_pfd_retro</text>
-<text xml:space="preserve" text-anchor="middle" x="2961.67" y="-1788.19" font-family="Times,serif" font-size="14.00">pfd&#45;retro</text>
-<text xml:space="preserve" text-anchor="middle" x="2961.67" y="-1771.39" font-family="Times,serif" font-size="14.00">バインディング</text>
+<polygon fill="none" stroke="black" points="3037.27,-1897.59 2886.07,-1897.59 2886.07,-1839.19 3037.27,-1839.19 3037.27,-1897.59"/>
+<text xml:space="preserve" text-anchor="middle" x="2961.67" y="-1880.99" font-family="Times,serif" font-size="14.00">bindings_pfd_retro</text>
+<text xml:space="preserve" text-anchor="middle" x="2961.67" y="-1864.19" font-family="Times,serif" font-size="14.00">pfd&#45;retro</text>
+<text xml:space="preserve" text-anchor="middle" x="2961.67" y="-1847.39" font-family="Times,serif" font-size="14.00">バインディング</text>
 </a>
 </g>
-<text xml:space="preserve" text-anchor="middle" x="2849.9" y="-1750.59" font-family="Times,serif" font-size="14.00">distilled_doc</text>
+<text xml:space="preserve" text-anchor="middle" x="2849.9" y="-1826.59" font-family="Times,serif" font-size="14.00">distilled_doc</text>
 </g>
 <!-- bindings_pfd_retro&#45;&gt;maintain_repo_bindings -->
-<g id="edge145" class="edge">
+<g id="edge146" class="edge">
 <title>bindings_pfd_retro&#45;&gt;maintain_repo_bindings</title>
-<path fill="none" stroke="#888888" stroke-dasharray="5,2" d="M2885.99,-1798.36C2855,-1799.09 2818.32,-1799.31 2783.95,-1799.01"/>
-<polygon fill="#888888" stroke="#888888" points="2784.43,-1795.52 2774.39,-1798.91 2784.36,-1802.52 2784.43,-1795.52"/>
+<path fill="none" stroke="#888888" stroke-dasharray="5,2" d="M2886.06,-1855.02C2847.52,-1845.94 2800.15,-1833.78 2759.37,-1822.53"/>
+<polygon fill="#888888" stroke="#888888" points="2760.36,-1819.18 2749.79,-1819.87 2758.49,-1825.92 2760.36,-1819.18"/>
 </g>
 <!-- bindings_pfd_retro&#45;&gt;develop -->
-<g id="edge172" class="edge">
+<g id="edge173" class="edge">
 <title>bindings_pfd_retro&#45;&gt;develop</title>
-<path fill="none" stroke="#888888" stroke-dasharray="5,2" d="M2885.76,-1780.41C2874.77,-1775.55 2864.68,-1768.79 2857.27,-1759.39 2789.8,-1673.83 2897.38,-1348.36 2821.27,-1270.39 2772.35,-1220.28 2108.44,-1143.33 1902.17,-1208.39 1816.47,-1235.42 1803.5,-1264.42 1736.57,-1324.39 1718.51,-1340.57 1720.35,-1351.36 1700.57,-1365.39 1694.45,-1369.73 1687.67,-1373.62 1680.71,-1377.08"/>
+<path fill="none" stroke="#888888" stroke-dasharray="5,2" d="M2885.68,-1856.47C2874.7,-1851.6 2864.63,-1844.82 2857.27,-1835.39 2779.86,-1736.21 2908.71,-1360.85 2821.27,-1270.39 2772.72,-1220.17 2108.6,-1143.28 1902.17,-1208.39 1816.47,-1235.42 1803.5,-1264.42 1736.57,-1324.39 1718.51,-1340.57 1720.35,-1351.36 1700.57,-1365.39 1694.45,-1369.73 1687.67,-1373.62 1680.71,-1377.08"/>
 <polygon fill="#888888" stroke="#888888" points="1679.42,-1373.82 1671.81,-1381.19 1682.36,-1380.17 1679.42,-1373.82"/>
 </g>
 <!-- bindings_pfd_retro&#45;&gt;sweep_prose_mechanization -->
 <g id="edge92" class="edge">
 <title>bindings_pfd_retro&#45;&gt;sweep_prose_mechanization</title>
-<path fill="none" stroke="black" d="M3037.71,-1784C3051.81,-1778.96 3064.96,-1771.21 3074.07,-1759.39 3105.95,-1718 3087.95,-869.69 3102.07,-819.39 3121.23,-751.12 3166.22,-681.51 3196.44,-639.88"/>
-<polygon fill="black" stroke="black" points="3199.21,-642.02 3202.31,-631.89 3193.57,-637.87 3199.21,-642.02"/>
+<path fill="none" stroke="black" d="M3037.73,-1860.01C3051.83,-1854.98 3064.97,-1847.22 3074.07,-1835.39 3108.47,-1790.61 3086.87,-873.77 3102.07,-819.39 3121.15,-751.1 3166.17,-681.49 3196.41,-639.87"/>
+<polygon fill="black" stroke="black" points="3199.18,-642.01 3202.29,-631.88 3193.54,-637.86 3199.18,-642.01"/>
 </g>
 <!-- delegation_guard -->
 <g id="node25" class="node">
 <title>delegation_guard</title>
 <g id="a_node25"><a xlink:title="外向き操作ガード&#10;&#10;委譲先 subagent の push・PR 作成・issue 操作を拒否する PreToolUse(Bash) フック（#554）。implementer_agent のブリーフが書く留保指定を、指示でなく権限として強制する。.claude/settings.json の配線を伴うリポ固有の機構であり、implementer_agent と違って配布対象外&#10;criteria: allowlist 外の subagent からの外向きコマンドが拒否され、呼び出し元と allowlist 対象 agent は影響を受けないことが scripts/lib/delegation&#45;guard.test.mjs のテストで検証されている&#10;location: ../scripts/delegation&#45;guard.mjs">
-<polygon fill="none" stroke="black" points="3030.07,-1881.19 2893.27,-1881.19 2893.27,-1839.59 3030.07,-1839.59 3030.07,-1881.19"/>
-<text xml:space="preserve" text-anchor="middle" x="2961.67" y="-1864.59" font-family="Times,serif" font-size="14.00">delegation_guard</text>
-<text xml:space="preserve" text-anchor="middle" x="2961.67" y="-1847.79" font-family="Times,serif" font-size="14.00">外向き操作ガード</text>
+<polygon fill="none" stroke="black" points="3030.07,-1957.19 2893.27,-1957.19 2893.27,-1915.59 3030.07,-1915.59 3030.07,-1957.19"/>
+<text xml:space="preserve" text-anchor="middle" x="2961.67" y="-1940.59" font-family="Times,serif" font-size="14.00">delegation_guard</text>
+<text xml:space="preserve" text-anchor="middle" x="2961.67" y="-1923.79" font-family="Times,serif" font-size="14.00">外向き操作ガード</text>
 </a>
 </g>
 </g>
 <!-- delegation_guard&#45;&gt;maintain_repo_bindings -->
-<g id="edge146" class="edge">
+<g id="edge147" class="edge">
 <title>delegation_guard&#45;&gt;maintain_repo_bindings</title>
-<path fill="none" stroke="#888888" stroke-dasharray="5,2" d="M2892.89,-1850.47C2854.15,-1842.52 2804.95,-1831.31 2762.41,-1820.78"/>
-<polygon fill="#888888" stroke="#888888" points="2763.48,-1817.44 2752.93,-1818.41 2761.78,-1824.23 2763.48,-1817.44"/>
+<path fill="none" stroke="#888888" stroke-dasharray="5,2" d="M2892.91,-1932.18C2880.81,-1929.07 2868.5,-1925.12 2857.27,-1920.39 2806.87,-1899.17 2754.57,-1865.36 2717.66,-1837.71"/>
+<polygon fill="#888888" stroke="#888888" points="2719.9,-1835.01 2709.82,-1831.74 2715.66,-1840.58 2719.9,-1835.01"/>
 </g>
 <!-- delegation_guard&#45;&gt;develop -->
-<g id="edge181" class="edge">
+<g id="edge182" class="edge">
 <title>delegation_guard&#45;&gt;develop</title>
-<path fill="none" stroke="#888888" stroke-dasharray="5,2" d="M2892.85,-1856.71C2879.24,-1852.79 2866.35,-1846.21 2857.27,-1835.39 2776.35,-1739.05 2906.07,-1363.32 2821.27,-1270.39 2682.79,-1118.65 2106.23,-1147.69 1902.17,-1171.39 1827.07,-1180.11 1789.96,-1156.84 1736.57,-1210.39 1686.64,-1260.47 1746.55,-1311.65 1700.57,-1365.39 1695.94,-1370.81 1690.28,-1375.35 1684.12,-1379.15"/>
+<path fill="none" stroke="#888888" stroke-dasharray="5,2" d="M2892.79,-1932.76C2879.19,-1928.84 2866.31,-1922.24 2857.27,-1911.39 2765.92,-1801.8 2917.04,-1376.13 2821.27,-1270.39 2683.37,-1118.13 2106.23,-1147.69 1902.17,-1171.39 1827.07,-1180.11 1789.96,-1156.84 1736.57,-1210.39 1686.64,-1260.47 1746.55,-1311.65 1700.57,-1365.39 1695.94,-1370.81 1690.28,-1375.35 1684.12,-1379.15"/>
 <polygon fill="#888888" stroke="#888888" points="1682.59,-1376 1675.45,-1383.82 1685.91,-1382.16 1682.59,-1376"/>
 </g>
 <!-- delegation_guard&#45;&gt;sweep_prose_mechanization -->
 <g id="edge94" class="edge">
 <title>delegation_guard&#45;&gt;sweep_prose_mechanization</title>
-<path fill="none" stroke="black" d="M3030.46,-1859.37C3047.1,-1855.69 3063.23,-1848.55 3074.07,-1835.39 3109.96,-1791.8 3086.87,-873.77 3102.07,-819.39 3121.15,-751.1 3166.17,-681.49 3196.41,-639.87"/>
-<polygon fill="black" stroke="black" points="3199.18,-642.01 3202.29,-631.88 3193.54,-637.86 3199.18,-642.01"/>
+<path fill="none" stroke="black" d="M3030.48,-1935.38C3047.12,-1931.7 3063.24,-1924.56 3074.07,-1911.39 3112.59,-1864.5 3085.79,-877.85 3102.07,-819.39 3121.09,-751.08 3166.12,-681.48 3196.38,-639.86"/>
+<polygon fill="black" stroke="black" points="3199.15,-642 3202.27,-631.88 3193.52,-637.85 3199.15,-642"/>
 </g>
 <!-- distributed_advisory_hooks -->
 <g id="node26" class="node">
@@ -703,13 +709,13 @@
 </g>
 </g>
 <!-- distribution_review_perspectives&#45;&gt;maintain_repo_local_capabilities -->
-<g id="edge149" class="edge">
+<g id="edge150" class="edge">
 <title>distribution_review_perspectives&#45;&gt;maintain_repo_local_capabilities</title>
 <path fill="none" stroke="#888888" stroke-dasharray="5,2" d="M2223.33,-2252.46C2214.61,-2253.39 2205.76,-2254.3 2196.91,-2255.17"/>
 <polygon fill="#888888" stroke="#888888" points="2196.84,-2251.66 2187.23,-2256.12 2197.52,-2258.63 2196.84,-2251.66"/>
 </g>
 <!-- distribution_review_perspectives&#45;&gt;develop -->
-<g id="edge182" class="edge">
+<g id="edge183" class="edge">
 <title>distribution_review_perspectives&#45;&gt;develop</title>
 <path fill="none" stroke="#888888" stroke-dasharray="5,2" d="M2227.25,-2212.2C2225.98,-2210.99 2224.76,-2209.72 2223.59,-2208.39 2149.5,-2124.32 2232.49,-1808.07 2187.59,-1705.39 2103.9,-1513.97 2057.86,-1445.46 1866.17,-1362.39 1813.32,-1339.49 1793.54,-1353.88 1736.57,-1362.39 1717.31,-1365.27 1696.83,-1370.66 1678.45,-1376.41"/>
 <polygon fill="#888888" stroke="#888888" points="1677.48,-1373.04 1669.04,-1379.45 1679.64,-1379.7 1677.48,-1373.04"/>
@@ -742,13 +748,13 @@
 </g>
 </g>
 <!-- distribution_review_skill&#45;&gt;maintain_repo_local_capabilities -->
-<g id="edge150" class="edge">
+<g id="edge151" class="edge">
 <title>distribution_review_skill&#45;&gt;maintain_repo_local_capabilities</title>
 <path fill="none" stroke="#888888" stroke-dasharray="5,2" d="M2247.95,-2289.82C2227.26,-2288.06 2205.13,-2285.98 2183.39,-2283.74"/>
 <polygon fill="#888888" stroke="#888888" points="2183.88,-2280.27 2173.57,-2282.72 2183.16,-2287.24 2183.88,-2280.27"/>
 </g>
 <!-- distribution_review_skill&#45;&gt;review_distribution -->
-<g id="edge188" class="edge">
+<g id="edge189" class="edge">
 <title>distribution_review_skill&#45;&gt;review_distribution</title>
 <path fill="none" stroke="#888888" stroke-dasharray="5,2" d="M2451.15,-2286.56C2460.48,-2282.26 2468.92,-2276.37 2475.59,-2268.39 2539.25,-2192.32 2471.05,-573.91 2511.59,-483.39 2530.68,-440.77 2569.16,-405.01 2602.86,-379.91"/>
 <polygon fill="#888888" stroke="#888888" points="2604.51,-383.04 2610.54,-374.33 2600.39,-377.37 2604.51,-383.04"/>
@@ -766,7 +772,7 @@
 <!-- spec_proposals -->
 <g id="node51" class="node">
 <title>spec_proposals</title>
-<g id="a_node51"><a xlink:title="spec 提案文書群&#10;&#10;各 spec 改版候補の起草文書（概要・仕様変更・設計判断・影響範囲）。draft_proposals が生成し maintain_spec が消費して spec 改版に統合する。マージ後も歴史的記録として保持（workflow.md でライフサイクル規約を管理）&#10;criteria: 対象改版の全提案が spec に統合済み（proposals/ に未統合ファイルなし）&#10;location: ../docs/spec/proposals/">
+<g id="a_node51"><a xlink:title="spec 提案文書群&#10;&#10;各 spec 改版候補の起草文書（概要・仕様変更・設計判断・影響範囲）。draft_proposals が生成し maintain_spec が消費して spec 改版に統合する。マージ後も歴史的記録として保持（workflow.md でライフサイクル規約を管理）&#10;criteria: 対象改版候補ごとの概要・仕様変更・設計判断・影響範囲が起草され、maintain_spec が統合判断できる提案文書として揃っている。spec への統合完了は後続 maintain_spec の出力側で判定する&#10;location: ../docs/spec/proposals/">
 <polygon fill="none" stroke="black" points="1148.76,-1677.19 1019.16,-1677.19 1019.16,-1635.59 1148.76,-1635.59 1148.76,-1677.19"/>
 <text xml:space="preserve" text-anchor="middle" x="1083.96" y="-1660.59" font-family="Times,serif" font-size="14.00">spec_proposals</text>
 <text xml:space="preserve" text-anchor="middle" x="1083.96" y="-1643.79" font-family="Times,serif" font-size="14.00">spec 提案文書群</text>
@@ -782,7 +788,7 @@
 <!-- ecosystem_skill -->
 <g id="node30" class="node">
 <title>ecosystem_skill</title>
-<g id="a_node30"><a xlink:title="PFDセット構築スキル&#10;&#10;/pfd&#45;init コマンド。PFD セット（roadmap / workflow / pipeline）の対話的初期構築・再構築。PFDファイル種別の定義と問診リスト（ADR&#45;0017）の一次情報ホスト。手書き、生成対象外&#10;criteria: /pfd&#45;init を .pfdsl/ の無いリポで起動すると PFD セットの scaffold が生成される。make gen&#45;plugin が差分なしで完了する&#10;location: ../.claude/skills/pfd&#45;ecosystem/">
+<g id="a_node30"><a xlink:title="PFDセット構築スキル&#10;&#10;/pfd&#45;init コマンド。PFD セット（roadmap / workflow / pipeline）の対話的初期構築・再構築。PFDファイル種別の定義と問診リスト（ADR&#45;0017）の一次情報ホスト。手書き、生成対象外&#10;criteria: /pfd&#45;init を .pfdsl/ の無いリポで起動すると PFD セットの scaffold が生成される。make gen&#45;plugin が差分なしで完了する&#10;location: ../scripts/harness&#45;template/skills/pfd&#45;ecosystem/, ../scripts/harness&#45;template/commands/pfd&#45;init.md">
 <polygon fill="none" stroke="black" stroke-width="2" points="3033.67,-2263.59 2889.67,-2263.59 2889.67,-2205.19 3033.67,-2205.19 3033.67,-2263.59"/>
 <text xml:space="preserve" text-anchor="middle" x="2961.67" y="-2246.99" font-family="Times,serif" font-size="14.00">ecosystem_skill</text>
 <text xml:space="preserve" text-anchor="middle" x="2961.67" y="-2230.19" font-family="Times,serif" font-size="14.00">PFDセット構築スキ</text>
@@ -826,7 +832,7 @@
 <!-- grill_skill -->
 <g id="node32" class="node">
 <title>grill_skill</title>
-<g id="a_node32"><a xlink:title="後ろ向き対話構築スキル&#10;&#10;pfd&#45;grill スキル。最終成果物からの後ろ向き対話で単一 PFD の中身を書く手順（#481）。手書き、生成対象外&#10;criteria: /pfd&#45;grill を起動すると、最終成果物から外部入力まで遡ったノード列が対象の図に書き込まれる。make gen&#45;plugin が差分なしで完了する&#10;location: ../.claude/skills/pfd&#45;grill/">
+<g id="a_node32"><a xlink:title="後ろ向き対話構築スキル&#10;&#10;pfd&#45;grill スキル。最終成果物からの後ろ向き対話で単一 PFD の中身を書く手順（#481）。手書き、生成対象外&#10;criteria: /pfd&#45;grill を起動すると、最終成果物から外部入力まで遡ったノード列が対象の図に書き込まれる。make gen&#45;plugin が差分なしで完了する&#10;location: ../scripts/harness&#45;template/skills/pfd&#45;grill/">
 <polygon fill="none" stroke="black" stroke-width="2" points="3037.27,-2339.59 2886.07,-2339.59 2886.07,-2281.19 3037.27,-2281.19 3037.27,-2339.59"/>
 <text xml:space="preserve" text-anchor="middle" x="2961.67" y="-2322.99" font-family="Times,serif" font-size="14.00">grill_skill</text>
 <text xml:space="preserve" text-anchor="middle" x="2961.67" y="-2306.19" font-family="Times,serif" font-size="14.00">後ろ向き対話構築ス</text>
@@ -844,7 +850,7 @@
 <!-- implementer_agent -->
 <g id="node33" class="node">
 <title>implementer_agent</title>
-<g id="a_node33"><a xlink:title="実装委譲agent&#10;&#10;pfd&#45;implementer agent。実装のみを委譲し、push・PR 作成・issue 操作は呼び出し元に残す。手書きだが gen_plugin が plugin へミラーする（#558）。留保指定を機構で担保するのは delegation_guard で、そちらは配布しない&#10;criteria: make gen&#45;plugin が差分なしで完了して plugin/pfdsl/agents/pfd&#45;implementer.md が実在し、採用リポで plugin を入れただけで pfd&#45;implementer が起動でき、その tools 列に外向きツール面（GitHub MCP）が無い&#10;location: ../.claude/agents/pfd&#45;implementer.md">
+<g id="a_node33"><a xlink:title="実装委譲agent&#10;&#10;pfd&#45;implementer agent。実装のみを委譲し、push・PR 作成・issue 操作は呼び出し元に残す。手書きだが gen_plugin が plugin へミラーする（#558）。留保指定を機構で担保するのは delegation_guard で、そちらは配布しない&#10;criteria: make gen&#45;plugin が差分なしで完了して plugin/pfdsl/agents/pfd&#45;implementer.md が実在し、採用リポで plugin を入れただけで pfd&#45;implementer が起動でき、その tools 列に外向きツール面（GitHub MCP）が無い&#10;location: ../scripts/harness&#45;template/agents/pfd&#45;implementer.md">
 <polygon fill="none" stroke="black" stroke-width="2" points="3033.67,-2399.19 2889.67,-2399.19 2889.67,-2357.59 3033.67,-2357.59 3033.67,-2399.19"/>
 <text xml:space="preserve" text-anchor="middle" x="2961.67" y="-2382.59" font-family="Times,serif" font-size="14.00">implementer_agent</text>
 <text xml:space="preserve" text-anchor="middle" x="2961.67" y="-2365.79" font-family="Times,serif" font-size="14.00">実装委譲agent</text>
@@ -858,7 +864,7 @@
 <polygon fill="#888888" stroke="#888888" points="2810.46,-2364.2 2800.11,-2366.49 2809.63,-2371.15 2810.46,-2364.2"/>
 </g>
 <!-- implementer_agent&#45;&gt;develop -->
-<g id="edge183" class="edge">
+<g id="edge184" class="edge">
 <title>implementer_agent&#45;&gt;develop</title>
 <path fill="none" stroke="#888888" stroke-dasharray="5,2" d="M2888.9,-2373.76C2876.7,-2369.73 2865.37,-2363.34 2857.27,-2353.39 2781.24,-2260.03 2901.62,-1360.05 2821.27,-1270.39 2684.29,-1117.54 2106.04,-1155.71 1902.17,-1179.39 1827.07,-1188.11 1790.28,-1165.16 1736.57,-1218.39 1688.8,-1265.74 1744.61,-1314.54 1700.57,-1365.39 1695.9,-1370.78 1690.22,-1375.31 1684.06,-1379.1"/>
 <polygon fill="#888888" stroke="#888888" points="1682.53,-1375.94 1675.37,-1383.76 1685.84,-1382.11 1682.53,-1375.94"/>
@@ -867,30 +873,30 @@
 <g id="node34" class="node">
 <title>main_branch_guard</title>
 <g id="a_node34"><a xlink:title="mainブランチ操作ガード&#10;&#10;main ブランチ上または同一リポジトリの別 worktree 上でツリー・インデックスを変える直接記述の git コマンドを止める PreToolUse(Bash) 事故防止フック（#650、#777、#784）。セッション root は Claude Code の空白でない CLAUDE_PROJECT_DIR を優先し、Codex では hook payload cwd へ fallback する。quoted または escaped literal argv、literal cd、git &#45;C、env &#45;C/&#45;&#45;chdir、input を含む先頭 redirection、既知 prefix、Codex routine wrapper の明示 target を実行順に解決する。Git target 環境変数、CDPATH、対応する assignment・export・unset・read・printf・source・dot・eval と target に影響する control flow を追跡し、静的 target が確定できない変更系 Git を fail closed する。対応外の compound は無害でも拒否しうるため raw mutation は単純 command へ分ける。この hook は任意 Bash を完全に解釈する security boundary ではない。Codex の承認なし機械的境界は trusted user wrapper、raw Git を永続 allow しない execpolicy、sandbox の組合せであり、Claude Code に Codex 専用 wrapper は前提化しない。復旧系は Claude Code では ask、ask 未対応の Codex では deny に変換する。session root と異なる worktree を target にする変更系は、hook が自セッションの worktree を他セッションのものと区別できず、session 移動後も harness が起動時の root を報告し続けるため、操作の種類によらず ask とし所有権の確認を人間に委ねる（#1201）。保護の作用域は session と git common dir を共有する checkout に限り、無関係なリポジトリの main は素通しする — 使い捨て sandbox の既定ブランチが main になるため、ブランチ名だけでは管轄内外を区別できない（#1221）。roots を解決できない場合は管轄外と区別し、ブランチ名規則を適用したままにする — これが保護として効くのは session 側だけが解決できず target が既定ブランチを返す場合で、target 自体が git リポジトリでなければブランチ名が読めず従来どおり allow になる。delegation_guard と同じくリポ固有で配布対象外。実体のファイル名は commit のみを見ていた頃のもので、起動中 session の配線を壊さないため据え置く。検査バイパス（`&#45;&#45;no&#45;verify`/`&#45;n`、`&#45;c`・`&#45;&#45;config&#45;env`・`git config` 経由の core.hooksPath 上書き）は branch・worktree を問わず deny とし、foreign target を除外する。ただし `git config` の `&#45;&#45;global`/`&#45;&#45;system`/`&#45;&#45;file`・`&#45;f`（`&#45;&#45;file`・`&#45;f` は指す先を問わず対象）は foreign target でも deny とする（#1232）&#10;criteria: main を直接 target にする変更系 git が拒否され、session root と異なる worktree を target にする変更系 git は Claude Code で ask になり、Claude Code は復旧系を ask、Codex は unsupported ask を deny にする。session と git common dir を共有しない target は、ブランチ名が main でも素通しし、session root だけが解決できず target が既定ブランチを返す場合は deny が維持され、target が git リポジトリでない場合は従来どおり allow になることが scripts/lib/main&#45;commit&#45;guard.test.mjs で検証される。空白でない CLAUDE_PROJECT_DIR の優先、Codex payload cwd fallback、escaped literal argv、cd &#45;&#45;、先頭 redirection、git &#45;C、env chdir、routine wrapper target、既知 prefix、Git target 環境変数、変数ごとの export 状態、CDPATH、assignment・export・unset・read・printf の option semantics、dynamic output name、array output variable、target に影響する OR&#45;list・pipeline・background・subshell・AND&#45;list と unsupported compound の fail&#45;closed が scripts/lib/main&#45;commit&#45;guard.test.mjs で検証される。identity Git subprocess は Git target 環境変数を除去し、読み取り系 Git、絶対 cd、literal 操作で安全へ戻した状態、単純な success&#45;path AND&#45;list、target&#45;neutral pipeline・AND&#45;list、変更系 Git より後ろの control flow、session 自身の feature branch 操作は影響を受けない。shared hook は直接形の事故防止であり任意 Bash の security guarantee は主張せず、Codex の永続 allow は trusted wrapper に限定する。バイパス（`&#45;&#45;no&#45;verify`/`&#45;n`/`core.hooksPath` 上書き、対象 subcommand は変更系に限らない）が feature branch・own worktree でも deny され、foreign target では `git config` の `&#45;&#45;global`/`&#45;&#45;system`/`&#45;&#45;file`・`&#45;f`、および `&#45;&#45;glob`/`&#45;&#45;sys`/`&#45;&#45;fil` 等の曖昧でない省略形（`&#45;&#45;g`/`&#45;&#45;l` 等の短い省略形は `set` mode でのみ曖昧さなく解決される。`&#45;&#45;file`・`&#45;f` は指す先を問わない）を除き allow のままであることが scripts/lib/main&#45;commit&#45;guard.test.mjs で検証される（#1232）&#10;location: ../scripts/main&#45;commit&#45;guard.mjs">
-<polygon fill="none" stroke="black" points="3037.27,-1957.59 2886.07,-1957.59 2886.07,-1899.19 3037.27,-1899.19 3037.27,-1957.59"/>
-<text xml:space="preserve" text-anchor="middle" x="2961.67" y="-1940.99" font-family="Times,serif" font-size="14.00">main_branch_guard</text>
-<text xml:space="preserve" text-anchor="middle" x="2961.67" y="-1924.19" font-family="Times,serif" font-size="14.00">mainブランチ操作ガ</text>
-<text xml:space="preserve" text-anchor="middle" x="2961.67" y="-1907.39" font-family="Times,serif" font-size="14.00">ード</text>
+<polygon fill="none" stroke="black" points="3037.27,-1745.59 2886.07,-1745.59 2886.07,-1687.19 3037.27,-1687.19 3037.27,-1745.59"/>
+<text xml:space="preserve" text-anchor="middle" x="2961.67" y="-1728.99" font-family="Times,serif" font-size="14.00">main_branch_guard</text>
+<text xml:space="preserve" text-anchor="middle" x="2961.67" y="-1712.19" font-family="Times,serif" font-size="14.00">mainブランチ操作ガ</text>
+<text xml:space="preserve" text-anchor="middle" x="2961.67" y="-1695.39" font-family="Times,serif" font-size="14.00">ード</text>
 </a>
 </g>
 </g>
 <!-- main_branch_guard&#45;&gt;maintain_repo_bindings -->
-<g id="edge147" class="edge">
+<g id="edge148" class="edge">
 <title>main_branch_guard&#45;&gt;maintain_repo_bindings</title>
-<path fill="none" stroke="#888888" stroke-dasharray="5,2" d="M2885.78,-1915.26C2876.08,-1911.95 2866.37,-1908.27 2857.27,-1904.39 2811.51,-1884.88 2762.21,-1857.94 2725.31,-1835.25"/>
-<polygon fill="#888888" stroke="#888888" points="2727.35,-1832.39 2717.02,-1830.07 2723.65,-1838.33 2727.35,-1832.39"/>
+<path fill="none" stroke="#888888" stroke-dasharray="5,2" d="M2885.63,-1741.82C2851.67,-1751.41 2810.93,-1762.15 2773.89,-1771.32"/>
+<polygon fill="#888888" stroke="#888888" points="2773.39,-1767.84 2764.51,-1773.62 2775.06,-1774.63 2773.39,-1767.84"/>
 </g>
 <!-- main_branch_guard&#45;&gt;develop -->
-<g id="edge184" class="edge">
+<g id="edge185" class="edge">
 <title>main_branch_guard&#45;&gt;develop</title>
-<path fill="none" stroke="#888888" stroke-dasharray="5,2" d="M2885.64,-1916.51C2874.66,-1911.64 2864.6,-1904.84 2857.27,-1895.39 2772,-1785.46 2912.98,-1375 2821.27,-1270.39 2814.35,-1262.5 1943.4,-974.9 1736.57,-1169.39 1672.05,-1230.06 1756.57,-1296.77 1700.57,-1365.39 1696.06,-1370.92 1690.48,-1375.53 1684.38,-1379.37"/>
-<polygon fill="#888888" stroke="#888888" points="1682.85,-1376.21 1675.75,-1384.07 1686.2,-1382.36 1682.85,-1376.21"/>
+<path fill="none" stroke="#888888" stroke-dasharray="5,2" d="M2885.73,-1704.44C2874.74,-1699.58 2864.65,-1692.8 2857.27,-1683.39 2785.48,-1591.92 2896.13,-1250.36 2821.27,-1161.39 2730.02,-1052.95 2635.07,-1154.95 2511.59,-1085.39 2491.88,-1074.28 2496.48,-1058.08 2475.59,-1049.39 2323.98,-986.28 1859.06,-937.99 1736.57,-1047.39 1683.53,-1094.76 1743.62,-1308.77 1700.57,-1365.39 1696.26,-1371.07 1690.8,-1375.77 1684.76,-1379.67"/>
+<polygon fill="#888888" stroke="#888888" points="1683.25,-1376.51 1676.2,-1384.42 1686.65,-1382.63 1683.25,-1376.51"/>
 </g>
 <!-- main_branch_guard&#45;&gt;sweep_prose_mechanization -->
 <g id="edge95" class="edge">
 <title>main_branch_guard&#45;&gt;sweep_prose_mechanization</title>
-<path fill="none" stroke="black" d="M3037.75,-1920.02C3051.84,-1914.99 3064.98,-1907.23 3074.07,-1895.39 3110.47,-1847.94 3086.01,-876.99 3102.07,-819.39 3121.1,-751.08 3166.13,-681.48 3196.39,-639.86"/>
-<polygon fill="black" stroke="black" points="3199.15,-642 3202.27,-631.88 3193.52,-637.85 3199.15,-642"/>
+<path fill="none" stroke="black" d="M3037.69,-1707.98C3051.79,-1702.94 3064.94,-1695.2 3074.07,-1683.39 3132.77,-1607.37 3075.99,-911.83 3102.07,-819.39 3121.32,-751.14 3166.29,-681.53 3196.47,-639.89"/>
+<polygon fill="black" stroke="black" points="3199.24,-642.03 3202.34,-631.9 3193.6,-637.88 3199.24,-642.03"/>
 </g>
 <!-- maintain_distributed_prompt_assets&#45;&gt;distributed_advisory_hooks -->
 <g id="edge25" class="edge">
@@ -919,7 +925,7 @@
 <!-- ops_skill_general -->
 <g id="node41" class="node">
 <title>ops_skill_general</title>
-<g id="a_node41"><a xlink:title="PFD運用スキル（汎用層）&#10;&#10;pfd&#45;ops スキル本体（起動口は /pfd&#45;cycle に限らない）。PFD によるプロジェクト運用プロトコルとワークサイクル。PFDファイル種別の定義（ADR&#45;0017）は ecosystem_skill が一次情報。汎用プロトコル（L1）+ディスパッチ（L2）= SKILL.md 本文 + バックエンド非依存の references（work&#45;cycle.md のサイクル4手順・architecture.md の層構成。L3 の references は ops_skill_l3 側）。L4（リポ固有、配布対象外）は pfd&#45;ops 自体の一部でなく、各採用リポの .pfdsl sibling .md companion に宿る&#10;criteria: /pfd&#45;cycle を起動するとワークサイクルの4手順（選択・実行・終端ゲート・報告）が最後まで走る。make gen&#45;plugin が差分なしで完了する&#10;location: ../.claude/skills/pfd&#45;ops/SKILL.md, ../.claude/skills/pfd&#45;ops/references/work&#45;cycle.md, ../.claude/skills/pfd&#45;ops/references/architecture.md">
+<g id="a_node41"><a xlink:title="PFD運用スキル（汎用層）&#10;&#10;pfd&#45;ops スキル本体（起動口は /pfd&#45;cycle に限らない）。PFD によるプロジェクト運用プロトコルとワークサイクル。PFDファイル種別の定義（ADR&#45;0017）は ecosystem_skill が一次情報。汎用プロトコル（L1）+ディスパッチ（L2）= SKILL.md 本文 + バックエンド非依存の references（work&#45;cycle.md のサイクル4手順・architecture.md の層構成。L3 の references は ops_skill_l3 側）。L4（リポ固有、配布対象外）は pfd&#45;ops 自体の一部でなく、各採用リポの .pfdsl sibling .md companion に宿る&#10;criteria: /pfd&#45;cycle を起動するとワークサイクルの4手順（選択・実行・終端ゲート・報告）が最後まで走る。make gen&#45;plugin が差分なしで完了する&#10;location: ../scripts/harness&#45;template/skills/pfd&#45;ops/SKILL.md, ../scripts/harness&#45;template/skills/pfd&#45;ops/references/work&#45;cycle.md, ../scripts/harness&#45;template/skills/pfd&#45;ops/references/architecture.md, ../scripts/harness&#45;template/commands/pfd&#45;cycle.md">
 <polygon fill="none" stroke="black" points="3033.67,-2093.59 2889.67,-2093.59 2889.67,-2035.19 3033.67,-2035.19 3033.67,-2093.59"/>
 <text xml:space="preserve" text-anchor="middle" x="2961.67" y="-2076.99" font-family="Times,serif" font-size="14.00">ops_skill_general</text>
 <text xml:space="preserve" text-anchor="middle" x="2961.67" y="-2060.19" font-family="Times,serif" font-size="14.00">PFD運用スキル（汎</text>
@@ -937,7 +943,7 @@
 <!-- ops_skill_l3 -->
 <g id="node42" class="node">
 <title>ops_skill_l3</title>
-<g id="a_node42"><a xlink:title="PFD運用スキル（バックエンドプリセット層）&#10;&#10;採用リポが作業項目バックエンドとして選択できる L3 プリセット群の規約本文。GitHub Issues 版 = references/github&#45;issues&#45;backend.md、ファイルベース・トラッカー版 = references/file&#45;based&#45;tracker&#45;backend.md。 上流が配布する選択肢の集合であり、採用リポはどちらか一方を選ぶか、どちらも採用しない。このリポは GitHub Issues 版を採用しており、develop が読むのはその版である。 手書き（生成対象外）で、retro_skill の監査結果がこの層の規約改訂に還流する。 GitHub Issues 版の採用リポが実際に配置するファイル群は pipeline.pfdsl の ops_install_templates 側で、ファイルベース・トラッカー版は実配置を要しない&#10;criteria: ../.claude/skills/pfd&#45;ops/references/github&#45;issues&#45;backend.md に、採用リポが GitHub Issues バックエンドを採用するのに必要な規約（ラベル判定・status 更新と完了チェーン回収・PR 本文規約）が記述されている。 ../.claude/skills/pfd&#45;ops/references/file&#45;based&#45;tracker&#45;backend.md に、採用リポがリポ内ファイルで作業項目を管理するのに必要な規約（一次情報ファイル・id 規約・flow 分類・status 同期・完了規則と完了契約）が記述され、GitHub Issues 版の install テンプレートを要求しない&#10;location: ../.claude/skills/pfd&#45;ops/references/github&#45;issues&#45;backend.md, ../.claude/skills/pfd&#45;ops/references/file&#45;based&#45;tracker&#45;backend.md">
+<g id="a_node42"><a xlink:title="PFD運用スキル（バックエンドプリセット層）&#10;&#10;採用リポが作業項目バックエンドとして選択できる L3 プリセット群の規約本文。GitHub Issues 版 = references/github&#45;issues&#45;backend.md、ファイルベース・トラッカー版 = references/file&#45;based&#45;tracker&#45;backend.md。 上流が配布する選択肢の集合であり、採用リポはどちらか一方を選ぶか、どちらも採用しない。このリポは GitHub Issues 版を採用しており、develop が読むのはその版である。 手書き（生成対象外）で、retro_skill の監査結果がこの層の規約改訂に還流する。 GitHub Issues 版の採用リポが実際に配置するファイル群は pipeline.pfdsl の ops_install_templates 側で、ファイルベース・トラッカー版は実配置を要しない&#10;criteria: ../scripts/harness&#45;template/skills/pfd&#45;ops/references/github&#45;issues&#45;backend.md に、採用リポが GitHub Issues バックエンドを採用するのに必要な規約（ラベル判定・status 更新と完了チェーン回収・PR 本文規約）が記述されている。 ../scripts/harness&#45;template/skills/pfd&#45;ops/references/file&#45;based&#45;tracker&#45;backend.md に、採用リポがリポ内ファイルで作業項目を管理するのに必要な規約（一次情報ファイル・id 規約・flow 分類・status 同期・完了規則と完了契約）が記述され、GitHub Issues 版の install テンプレートを要求しない&#10;location: ../scripts/harness&#45;template/skills/pfd&#45;ops/references/github&#45;issues&#45;backend.md, ../scripts/harness&#45;template/skills/pfd&#45;ops/references/file&#45;based&#45;tracker&#45;backend.md">
 <polygon fill="none" stroke="black" points="3037.27,-2186.99 2886.07,-2186.99 2886.07,-2111.79 3037.27,-2111.79 3037.27,-2186.99"/>
 <text xml:space="preserve" text-anchor="middle" x="2961.67" y="-2170.39" font-family="Times,serif" font-size="14.00">ops_skill_l3</text>
 <text xml:space="preserve" text-anchor="middle" x="2961.67" y="-2153.59" font-family="Times,serif" font-size="14.00">PFD運用スキル（バ</text>
@@ -956,7 +962,7 @@
 <!-- pfd_lens_agent -->
 <g id="node43" class="node">
 <title>pfd_lens_agent</title>
-<g id="a_node43"><a xlink:title="pfd&#45;lens agent&#10;&#10;retro_skill の A・B 層委譲先。大きい図・複数図の監査を read&#45;only agent へオフロードする（#357）。手書き、生成対象外&#10;criteria: pfd&#45;lens は upstream identity を確認した場合に checkout&#45;local CLI を選び、全監査 query を同じ解決済み CLI で実行して、A・B 観点の findings を file:line アンカー付きで返す。make gen&#45;plugin が差分なしで完了する&#10;location: ../.claude/agents/pfd&#45;lens.md">
+<g id="a_node43"><a xlink:title="pfd&#45;lens agent&#10;&#10;retro_skill の A・B 層委譲先。大きい図・複数図の監査を read&#45;only agent へオフロードする（#357）。手書き、生成対象外&#10;criteria: pfd&#45;lens は upstream identity を確認した場合に checkout&#45;local CLI を選び、全監査 query を同じ解決済み CLI で実行して、A・B 観点の findings を file:line アンカー付きで返す。make gen&#45;plugin が差分なしで完了する&#10;location: ../scripts/harness&#45;template/agents/pfd&#45;lens.md">
 <polygon fill="none" stroke="black" stroke-width="2" points="3012.43,-2459.19 2910.9,-2459.19 2910.9,-2417.59 3012.43,-2417.59 3012.43,-2459.19"/>
 <text xml:space="preserve" text-anchor="middle" x="2961.67" y="-2442.59" font-family="Times,serif" font-size="14.00">pfd_lens_agent</text>
 <text xml:space="preserve" text-anchor="middle" x="2961.67" y="-2425.79" font-family="Times,serif" font-size="14.00">pfd&#45;lens agent</text>
@@ -972,7 +978,7 @@
 <!-- retro_skill -->
 <g id="node47" class="node">
 <title>retro_skill</title>
-<g id="a_node47"><a xlink:title="ふりかえり監査スキル&#10;&#10;/pfd&#45;retro コマンド。図・セッションイベント・知識成果物の監査カタログ。ユーザーの監査介入17件から蒸留（手書き、生成対象外）。A・B 層は任意の PFD レビューにも使う&#10;criteria: /pfd&#45;retro を起動すると適用した層の findings が振り分け先付きで出力される（D 層は `.pfdsl/config.json` のキー `knowledgeLifecycleAudit` が `mode: adopt` と空でない `targets` を宣言しているときだけ、`targets` の成果物に適用する。`decline` なら適用も報告もしない。config が無い・JSON として読めない・キーが無い・形式が不正なときは適用せず、所有者が宣言する必要があることを毎回報告する。binding の散文と旧宣言行は宣言として扱わない。ADR&#45;0039、ADR&#45;0041）。make gen&#45;plugin が差分なしで完了する&#10;location: ../.claude/skills/pfd&#45;retro/">
+<g id="a_node47"><a xlink:title="ふりかえり監査スキル&#10;&#10;/pfd&#45;retro コマンド。図・セッションイベント・知識成果物の監査カタログと、D 層の設定を分類する同梱 scripts/classify&#45;knowledge&#45;lifecycle.mjs。ユーザーの監査介入17件から蒸留（手書き、生成対象外）。A・B 層は任意の PFD レビューにも使う&#10;criteria: /pfd&#45;retro を起動すると適用した層の findings が振り分け先付きで出力される。D 層は同梱分類器を採用リポに対して実行し、state が adopt のときだけ auditTargets の成果物に適用する。adopt の targets は空白だけの要素を含まない非空の文字列配列とし、有効な対象の文字列は変更せず、対象を推測で補わない。decline は targets を無視して監査しないが、旧宣言行の移行警告は残す。config の欠落・不正は監査せず不備を毎回報告する。分類器の実行・読取・JSON 取得失敗は報告して D 層を止める。binding の散文と旧宣言行は宣言として扱わない。scripts/lib/knowledge&#45;lifecycle&#45;classifier.test.mjs が分類結果と四配布先の実行を検査する。ADR&#45;0039、ADR&#45;0041。make gen&#45;plugin が差分なしで完了する&#10;location: ../scripts/harness&#45;template/skills/pfd&#45;retro/, ../scripts/harness&#45;template/commands/pfd&#45;retro.md">
 <polygon fill="none" stroke="black" stroke-width="2" points="3037.27,-2535.59 2886.07,-2535.59 2886.07,-2477.19 3037.27,-2477.19 3037.27,-2535.59"/>
 <text xml:space="preserve" text-anchor="middle" x="2961.67" y="-2518.99" font-family="Times,serif" font-size="14.00">retro_skill</text>
 <text xml:space="preserve" text-anchor="middle" x="2961.67" y="-2502.19" font-family="Times,serif" font-size="14.00">ふりかえり監査スキ</text>
@@ -1007,32 +1013,32 @@
 <!-- maintain_repo_bindings&#45;&gt;adopter_config -->
 <g id="edge35" class="edge">
 <title>maintain_repo_bindings&#45;&gt;adopter_config</title>
-<path fill="none" stroke="black" d="M2698.69,-1832.17C2733.14,-1873.26 2792.35,-1936.21 2857.27,-1971.39 2864.97,-1975.57 2873.38,-1979.05 2881.95,-1981.96"/>
-<polygon fill="black" stroke="black" points="2880.84,-1985.28 2891.42,-1984.9 2882.91,-1978.59 2880.84,-1985.28"/>
+<path fill="none" stroke="black" d="M2703.93,-1831.37C2738.96,-1870.37 2795.54,-1928.94 2857.27,-1962.39 2864.97,-1966.57 2873.38,-1970.05 2881.95,-1973.02"/>
+<polygon fill="black" stroke="black" points="2880.84,-1976.34 2891.43,-1976.05 2882.97,-1969.67 2880.84,-1976.34"/>
 </g>
 <!-- maintain_repo_bindings&#45;&gt;bindings_pfd_ops -->
 <g id="edge36" class="edge">
 <title>maintain_repo_bindings&#45;&gt;bindings_pfd_ops</title>
-<path fill="none" stroke="black" d="M2748.33,-1765.31C2789.95,-1753.66 2840.47,-1740.58 2881.79,-1730.77"/>
-<polygon fill="black" stroke="black" points="2882.51,-1734.2 2891.44,-1728.5 2880.91,-1727.38 2882.51,-1734.2"/>
+<path fill="none" stroke="black" d="M2772.88,-1785.88C2808.88,-1785.45 2848.47,-1785.6 2881.99,-1786.33"/>
+<polygon fill="black" stroke="black" points="2881.51,-1789.82 2891.59,-1786.56 2881.68,-1782.82 2881.51,-1789.82"/>
 </g>
 <!-- maintain_repo_bindings&#45;&gt;bindings_pfd_retro -->
 <g id="edge37" class="edge">
 <title>maintain_repo_bindings&#45;&gt;bindings_pfd_retro</title>
-<path fill="none" stroke="black" d="M2772.88,-1785.88C2806.22,-1785.48 2842.66,-1785.58 2874.48,-1786.18"/>
-<polygon fill="black" stroke="black" points="2874.4,-1789.68 2884.47,-1786.39 2874.55,-1782.68 2874.4,-1789.68"/>
+<path fill="none" stroke="black" d="M2763.04,-1810.8C2799.09,-1819.59 2839.84,-1830.2 2874.93,-1839.96"/>
+<polygon fill="black" stroke="black" points="2873.59,-1843.22 2884.17,-1842.55 2875.48,-1836.48 2873.59,-1843.22"/>
 </g>
 <!-- maintain_repo_bindings&#45;&gt;delegation_guard -->
 <g id="edge38" class="edge">
 <title>maintain_repo_bindings&#45;&gt;delegation_guard</title>
-<path fill="none" stroke="black" d="M2765.48,-1808.72C2803.81,-1817.05 2847.12,-1827.22 2883.2,-1836.39"/>
-<polygon fill="black" stroke="black" points="2882.12,-1839.73 2892.68,-1838.83 2883.86,-1832.95 2882.12,-1839.73"/>
+<path fill="none" stroke="black" d="M2724.59,-1827.31C2760.95,-1851.45 2809.95,-1882.46 2857.27,-1902.39 2865.83,-1906 2875.02,-1909.15 2884.26,-1911.96"/>
+<polygon fill="black" stroke="black" points="2883.07,-1915.26 2893.65,-1914.68 2885.02,-1908.53 2883.07,-1915.26"/>
 </g>
 <!-- maintain_repo_bindings&#45;&gt;main_branch_guard -->
 <g id="edge39" class="edge">
 <title>maintain_repo_bindings&#45;&gt;main_branch_guard</title>
-<path fill="none" stroke="black" d="M2734.43,-1824.73C2770.1,-1844.21 2815.19,-1868.45 2857.27,-1886.39 2864.14,-1889.32 2871.36,-1892.13 2878.66,-1894.83"/>
-<polygon fill="black" stroke="black" points="2877.36,-1898.08 2887.96,-1898.18 2879.74,-1891.5 2877.36,-1898.08"/>
+<path fill="none" stroke="black" d="M2748.33,-1765.31C2787.69,-1754.29 2835.02,-1741.99 2874.99,-1732.39"/>
+<polygon fill="black" stroke="black" points="2875.67,-1735.83 2884.58,-1730.11 2874.05,-1729.02 2875.67,-1735.83"/>
 </g>
 <!-- workflow_md -->
 <g id="node54" class="node">
@@ -1187,7 +1193,7 @@
 <polygon fill="#888888" stroke="#888888" points="2808.57,-2314.46 2802.17,-2322.91 2812.44,-2320.3 2808.57,-2314.46"/>
 </g>
 <!-- ops_skill_general&#45;&gt;develop -->
-<g id="edge173" class="edge">
+<g id="edge174" class="edge">
 <title>ops_skill_general&#45;&gt;develop</title>
 <path fill="none" stroke="#888888" stroke-dasharray="5,2" d="M2889.41,-2054.27C2876.93,-2049.31 2865.37,-2042.03 2857.27,-2031.39 2796.1,-1951.06 2885.14,-1201.59 2821.27,-1123.39 2731.62,-1013.63 2635.07,-1116.95 2511.59,-1047.39 2491.88,-1036.28 2496.47,-1020.12 2475.59,-1011.39 2225.71,-906.87 2137.03,-1008.23 1866.17,-1007.39 1808.57,-1007.21 1779.29,-968.75 1736.57,-1007.39 1677.28,-1061.02 1748.57,-1301.44 1700.57,-1365.39 1696.29,-1371.1 1690.86,-1375.82 1684.84,-1379.73"/>
 <polygon fill="#888888" stroke="#888888" points="1683.32,-1376.56 1676.29,-1384.48 1686.73,-1382.68 1683.32,-1376.56"/>
@@ -1205,10 +1211,10 @@
 <polygon fill="#888888" stroke="#888888" points="2804.99,-2313.49 2797.45,-2320.93 2807.98,-2319.81 2804.99,-2313.49"/>
 </g>
 <!-- ops_skill_l3&#45;&gt;develop -->
-<g id="edge174" class="edge">
+<g id="edge175" class="edge">
 <title>ops_skill_l3&#45;&gt;develop</title>
-<path fill="none" stroke="#888888" stroke-dasharray="5,2" d="M2885.68,-2131.23C2874.55,-2125.37 2864.43,-2117.63 2857.27,-2107.39 2794.52,-2017.76 2887.22,-1210.68 2821.27,-1123.39 2723.92,-994.53 2635.11,-1036.59 2475.59,-1011.39 2148.38,-959.7 1964,-867.52 1736.57,-1108.39 1657.39,-1192.25 1771.58,-1274.5 1700.57,-1365.39 1696.18,-1371.01 1690.68,-1375.68 1684.61,-1379.56"/>
-<polygon fill="#888888" stroke="#888888" points="1683.1,-1376.4 1676.03,-1384.29 1686.48,-1382.53 1683.1,-1376.4"/>
+<path fill="none" stroke="#888888" stroke-dasharray="5,2" d="M2885.68,-2131.23C2874.55,-2125.37 2864.43,-2117.63 2857.27,-2107.39 2794.52,-2017.76 2887.22,-1210.68 2821.27,-1123.39 2723.92,-994.53 2633.41,-1045.64 2475.59,-1011.39 2349.69,-984.06 2316.22,-985.73 2187.59,-978.39 2060.95,-971.16 2028.93,-973.42 1902.17,-978.39 1828.4,-981.28 1789.24,-939.65 1736.57,-991.39 1677.02,-1049.91 1750.55,-1298.5 1700.57,-1365.39 1696.3,-1371.1 1690.88,-1375.83 1684.86,-1379.74"/>
+<polygon fill="#888888" stroke="#888888" points="1683.35,-1376.58 1676.32,-1384.5 1686.76,-1382.69 1683.35,-1376.58"/>
 </g>
 <!-- ops_skill_l3&#45;&gt;sweep_prose_mechanization -->
 <g id="edge97" class="edge">
@@ -1256,13 +1262,13 @@
 <polygon fill="#888888" stroke="#888888" points="544.97,-641.61 547.43,-631.31 539.08,-637.83 544.97,-641.61"/>
 </g>
 <!-- prose_mechanization_audit_skill&#45;&gt;maintain_repo_local_capabilities -->
-<g id="edge151" class="edge">
+<g id="edge152" class="edge">
 <title>prose_mechanization_audit_skill&#45;&gt;maintain_repo_local_capabilities</title>
 <path fill="none" stroke="#888888" stroke-dasharray="5,2" d="M2226.5,-2338.3C2225.52,-2337.99 2224.56,-2337.69 2223.59,-2337.39 2191.91,-2327.44 2157.54,-2315.21 2127.55,-2303.5"/>
 <polygon fill="#888888" stroke="#888888" points="2129.13,-2300.36 2118.54,-2299.94 2126.56,-2306.87 2129.13,-2300.36"/>
 </g>
 <!-- prose_mechanization_audit_skill&#45;&gt;sweep_prose_mechanization -->
-<g id="edge189" class="edge">
+<g id="edge190" class="edge">
 <title>prose_mechanization_audit_skill&#45;&gt;sweep_prose_mechanization</title>
 <path fill="none" stroke="#888888" stroke-dasharray="5,2" d="M2472.99,-2331.45C2473.88,-2330.46 2474.75,-2329.44 2475.59,-2328.39 2549.15,-2236.17 2477.56,-1380.33 2511.59,-1267.39 2596.2,-986.62 2623.3,-882.17 2857.27,-705.39 2927.1,-652.62 3022.56,-626.62 3098.88,-613.82"/>
 <polygon fill="#888888" stroke="#888888" points="3099.19,-617.31 3108.5,-612.26 3098.07,-610.4 3099.19,-617.31"/>
@@ -1274,19 +1280,19 @@
 <polygon fill="#888888" stroke="#888888" points="2138.74,-1731.72 2129.3,-1736.54 2139.68,-1738.65 2138.74,-1731.72"/>
 </g>
 <!-- retro_skill&#45;&gt;collect_activity -->
-<g id="edge162" class="edge">
+<g id="edge163" class="edge">
 <title>retro_skill&#45;&gt;collect_activity</title>
 <path fill="none" stroke="#888888" stroke-dasharray="5,2" d="M2917.47,-2536.49C2895.93,-2553.83 2871.51,-2577.51 2857.27,-2604.39 2810.88,-2691.94 2889.58,-2752.63 2821.27,-2824.39 2802.89,-2843.69 2776.18,-2853.07 2750.15,-2857.29"/>
 <polygon fill="#888888" stroke="#888888" points="2750,-2853.78 2740.57,-2858.6 2750.95,-2860.72 2750,-2853.78"/>
 </g>
 <!-- retro_skill&#45;&gt;plan_retro -->
-<g id="edge163" class="edge">
+<g id="edge164" class="edge">
 <title>retro_skill&#45;&gt;plan_retro</title>
 <path fill="none" stroke="#888888" stroke-dasharray="5,2" d="M2999.09,-2536.38C3021.38,-2555.23 3050.12,-2580.43 3074.07,-2604.39 3119.03,-2649.37 3166.83,-2705.22 3196.59,-2741.08"/>
 <polygon fill="#888888" stroke="#888888" points="3193.72,-2743.11 3202.79,-2748.59 3199.12,-2738.65 3193.72,-2743.11"/>
 </g>
 <!-- retro_skill&#45;&gt;run_retro -->
-<g id="edge164" class="edge">
+<g id="edge165" class="edge">
 <title>retro_skill&#45;&gt;run_retro</title>
 <path fill="none" stroke="#888888" stroke-dasharray="5,2" d="M3038.2,-2524.57C3167.8,-2557.47 3438.78,-2633.77 3648.3,-2743.39 3665.82,-2752.56 3683.69,-2764.88 3698.86,-2776.39"/>
 <polygon fill="#888888" stroke="#888888" points="3696.69,-2779.13 3706.73,-2782.49 3700.97,-2773.6 3696.69,-2779.13"/>
@@ -1346,37 +1352,37 @@
 <polygon fill="black" stroke="black" points="1172.83,-1659.89 1182.83,-1656.39 1172.83,-1652.89 1172.83,-1659.89"/>
 </g>
 <!-- spec_stress_skill&#45;&gt;maintain_repo_local_capabilities -->
-<g id="edge152" class="edge">
+<g id="edge153" class="edge">
 <title>spec_stress_skill&#45;&gt;maintain_repo_local_capabilities</title>
 <path fill="none" stroke="#888888" stroke-dasharray="5,2" d="M2293.31,-2195.18C2257.99,-2206.89 2210.77,-2221.35 2167.05,-2233.99"/>
 <polygon fill="#888888" stroke="#888888" points="2166.12,-2230.62 2157.48,-2236.75 2168.06,-2237.35 2166.12,-2230.62"/>
 </g>
 <!-- spec_stress_skill&#45;&gt;maintain_spec -->
-<g id="edge161" class="edge">
+<g id="edge162" class="edge">
 <title>spec_stress_skill&#45;&gt;maintain_spec</title>
 <path fill="none" stroke="#888888" stroke-dasharray="5,2" d="M2262.48,-2168.48C2105.37,-2155.85 1767.06,-2111.32 1534.98,-1956.39 1424.51,-1882.64 1326.89,-1756.67 1282.24,-1694.04"/>
 <polygon fill="#888888" stroke="#888888" points="1285.3,-1692.29 1276.67,-1686.14 1279.58,-1696.33 1285.3,-1692.29"/>
 </g>
 <!-- vscode_ext_debug_skill&#45;&gt;maintain_repo_local_capabilities -->
-<g id="edge153" class="edge">
+<g id="edge154" class="edge">
 <title>vscode_ext_debug_skill&#45;&gt;maintain_repo_local_capabilities</title>
 <path fill="none" stroke="#888888" stroke-dasharray="5,2" d="M2320.89,-2135.44C2290.06,-2162.91 2237.93,-2202.46 2187.59,-2227.39 2182.45,-2229.94 2177.13,-2232.38 2171.7,-2234.72"/>
 <polygon fill="#888888" stroke="#888888" points="2170.46,-2231.44 2162.55,-2238.49 2173.13,-2237.91 2170.46,-2231.44"/>
 </g>
 <!-- vscode_ext_debug_skill&#45;&gt;develop -->
-<g id="edge179" class="edge">
+<g id="edge180" class="edge">
 <title>vscode_ext_debug_skill&#45;&gt;develop</title>
 <path fill="none" stroke="#888888" stroke-dasharray="5,2" d="M2258.7,-2096.5C2245.17,-2091.31 2232.71,-2083.64 2223.59,-2072.39 2172.87,-2009.82 2245.94,-1403.91 2187.59,-1348.39 2042.3,-1210.15 1933.5,-1324.42 1736.57,-1362.39 1717.71,-1366.03 1697.57,-1371.55 1679.38,-1377.18"/>
 <polygon fill="#888888" stroke="#888888" points="1678.55,-1373.77 1670.07,-1380.13 1680.66,-1380.44 1678.55,-1373.77"/>
 </g>
 <!-- workflow_md&#45;&gt;maintain_repo_bindings -->
-<g id="edge148" class="edge">
+<g id="edge149" class="edge">
 <title>workflow_md&#45;&gt;maintain_repo_bindings</title>
 <path fill="none" stroke="#888888" stroke-dasharray="5,2" d="M2943.4,-1669.51C2918.19,-1694.05 2869.09,-1733.23 2821.27,-1756.39 2807.56,-1763.03 2792.69,-1768.88 2777.77,-1773.9"/>
 <polygon fill="#888888" stroke="#888888" points="2776.8,-1770.54 2768.36,-1776.94 2778.95,-1777.2 2776.8,-1770.54"/>
 </g>
 <!-- workflow_md&#45;&gt;develop -->
-<g id="edge185" class="edge">
+<g id="edge186" class="edge">
 <title>workflow_md&#45;&gt;develop</title>
 <path fill="none" stroke="#888888" stroke-dasharray="5,2" d="M2892.81,-1644.74C2879.2,-1640.83 2866.33,-1634.23 2857.27,-1623.39 2769.63,-1518.51 2908.73,-1114.42 2821.27,-1009.39 2730.58,-900.48 2635.07,-1002.95 2511.59,-933.39 2491.88,-922.28 2496.1,-906.94 2475.59,-897.39 2326.53,-827.94 1856.91,-747.31 1736.57,-859.39 1654.08,-936.22 1766.91,-1274.25 1700.57,-1365.39 1696.38,-1371.16 1691,-1375.92 1685,-1379.85"/>
 <polygon fill="#888888" stroke="#888888" points="1683.5,-1376.68 1676.49,-1384.63 1686.92,-1382.79 1683.5,-1376.68"/>
@@ -1481,7 +1487,7 @@
 <polygon fill="black" stroke="black" points="3221.16,-2736.39 3225.04,-2746.25 3228.15,-2736.12 3221.16,-2736.39"/>
 </g>
 <!-- integrated_repository&#45;&gt;develop -->
-<g id="edge178" class="edge">
+<g id="edge179" class="edge">
 <title>integrated_repository&#45;&gt;develop</title>
 <path fill="none" stroke="#888888" stroke-dasharray="5,2" d="M2332.41,-1329.68C2306.2,-1362.21 2250.95,-1422.95 2187.59,-1446.39 2012.09,-1511.31 1786.04,-1454.35 1679.48,-1419.98"/>
 <polygon fill="#888888" stroke="#888888" points="1680.65,-1416.69 1670.06,-1416.9 1678.47,-1423.34 1680.65,-1416.69"/>
@@ -1535,7 +1541,7 @@
 </g>
 </g>
 <!-- issue_updates&#45;&gt;file_issues -->
-<g id="edge186" class="edge">
+<g id="edge187" class="edge">
 <title>issue_updates&#45;&gt;file_issues</title>
 <path fill="none" stroke="#888888" stroke-dasharray="5,2" d="M2334.4,-1407.91C2309.6,-1443.33 2254.56,-1512.65 2187.59,-1539.39 2069.79,-1586.44 2028.67,-1548.88 1902.17,-1539.39 1827.95,-1533.82 1809.05,-1531.37 1736.57,-1514.39 1518.39,-1463.28 1480.56,-1360.39 1256.47,-1360.39 1082.96,-1360.39 1082.96,-1360.39 1082.96,-1360.39 919.46,-1360.39 727.75,-1382.77 631.24,-1395.61"/>
 <polygon fill="#888888" stroke="#888888" points="630.9,-1392.12 621.45,-1396.92 631.83,-1399.06 630.9,-1392.12"/>
@@ -1627,13 +1633,13 @@
 <polygon fill="black" stroke="black" points="2262.97,-233.12 2271.67,-227.08 2261.1,-226.37 2262.97,-233.12"/>
 </g>
 <!-- pipeline_md&#45;&gt;develop -->
-<g id="edge175" class="edge">
+<g id="edge176" class="edge">
 <title>pipeline_md&#45;&gt;develop</title>
 <path fill="none" stroke="#888888" stroke-dasharray="5,2" d="M2885.87,-1430.33C2712.73,-1452.03 2271.01,-1499.78 1902.17,-1475.39 1828.09,-1470.49 1807.84,-1474.22 1736.57,-1453.39 1713.79,-1446.73 1689.85,-1436.26 1669.54,-1426.23"/>
 <polygon fill="#888888" stroke="#888888" points="1671.14,-1423.12 1660.63,-1421.73 1667.98,-1429.36 1671.14,-1423.12"/>
 </g>
 <!-- pipeline_md&#45;&gt;map_transform_boundaries -->
-<g id="edge168" class="edge">
+<g id="edge169" class="edge">
 <title>pipeline_md&#45;&gt;map_transform_boundaries</title>
 <path fill="none" stroke="#888888" stroke-dasharray="5,2" d="M2885.63,-1417.41C2851.82,-1414.17 2811.28,-1409.51 2774.37,-1404.68"/>
 <polygon fill="#888888" stroke="#888888" points="2774.91,-1401.22 2764.54,-1403.37 2773.99,-1408.16 2774.91,-1401.22"/>
@@ -1651,13 +1657,13 @@
 <polygon fill="#888888" stroke="#888888" points="2107.75,-2777.69 2098.01,-2781.86 2108.23,-2784.67 2107.75,-2777.69"/>
 </g>
 <!-- pipeline_pfdsl&#45;&gt;develop -->
-<g id="edge176" class="edge">
+<g id="edge177" class="edge">
 <title>pipeline_pfdsl&#45;&gt;develop</title>
 <path fill="none" stroke="#888888" stroke-dasharray="5,2" d="M2934.54,-1382.03C2907.85,-1402.82 2864.34,-1433.26 2821.27,-1448.39 2690.59,-1494.3 2645.25,-1447.06 2511.59,-1483.39 2494.7,-1487.98 2492.72,-1495.75 2475.59,-1499.39 2226.29,-1552.3 2156.42,-1513.03 1902.17,-1495.39 1828.16,-1490.25 1806.28,-1499.8 1736.57,-1474.39 1708.69,-1464.22 1680.64,-1446.5 1658.91,-1430.72"/>
 <polygon fill="#888888" stroke="#888888" points="1661.03,-1427.93 1650.91,-1424.78 1656.85,-1433.55 1661.03,-1427.93"/>
 </g>
 <!-- pipeline_pfdsl&#45;&gt;map_transform_boundaries -->
-<g id="edge169" class="edge">
+<g id="edge170" class="edge">
 <title>pipeline_pfdsl&#45;&gt;map_transform_boundaries</title>
 <path fill="none" stroke="#888888" stroke-dasharray="5,2" d="M2885.45,-1372.78C2858.7,-1375.69 2827.75,-1378.57 2797.73,-1380.99"/>
 <polygon fill="#888888" stroke="#888888" points="2797.48,-1377.5 2787.79,-1381.78 2798.03,-1384.48 2797.48,-1377.5"/>
@@ -1695,7 +1701,7 @@
 </g>
 </g>
 <!-- roadmap_md&#45;&gt;develop -->
-<g id="edge177" class="edge">
+<g id="edge178" class="edge">
 <title>roadmap_md&#45;&gt;develop</title>
 <path fill="none" stroke="#888888" stroke-dasharray="5,2" d="M1617.78,-1321.44C1617.78,-1333.36 1617.78,-1345.28 1617.78,-1357.2"/>
 <polygon fill="#888888" stroke="#888888" points="1614.28,-1357.12 1617.78,-1367.12 1621.28,-1357.12 1614.28,-1357.12"/>
@@ -1707,7 +1713,7 @@
 <polygon fill="black" stroke="black" points="3122.25,-582.56 3132.76,-581.17 3123.68,-575.71 3122.25,-582.56"/>
 </g>
 <!-- roadmap_md&#45;&gt;map_deps -->
-<g id="edge166" class="edge">
+<g id="edge167" class="edge">
 <title>roadmap_md&#45;&gt;map_deps</title>
 <path fill="none" stroke="#888888" stroke-dasharray="5,2" d="M1556.11,-1302.95C1503.88,-1303.65 1426.94,-1301.08 1362.18,-1284.39 1361.98,-1284.34 1333.45,-1270.84 1306.09,-1257.89"/>
 <polygon fill="#888888" stroke="#888888" points="1307.62,-1254.74 1297.09,-1253.62 1304.63,-1261.07 1307.62,-1254.74"/>
@@ -1735,7 +1741,7 @@
 <polygon fill="black" stroke="black" points="1542.76,-1402.69 1552.72,-1399.08 1542.69,-1395.69 1542.76,-1402.69"/>
 </g>
 <!-- roadmap_pfdsl&#45;&gt;map_deps -->
-<g id="edge167" class="edge">
+<g id="edge168" class="edge">
 <title>roadmap_pfdsl&#45;&gt;map_deps</title>
 <path fill="none" stroke="#888888" stroke-dasharray="5,2" d="M1384.93,-1379.13C1376.93,-1375.61 1368.98,-1371.47 1362.18,-1366.39 1327.82,-1340.74 1299.4,-1300.91 1280.71,-1271.59"/>
 <polygon fill="#888888" stroke="#888888" points="1283.84,-1269.99 1275.56,-1263.37 1277.91,-1273.7 1283.84,-1269.99"/>
@@ -1809,19 +1815,19 @@
 <polygon fill="#888888" stroke="#888888" points="2107.75,-2777.69 2098.01,-2781.86 2108.23,-2784.67 2107.75,-2777.69"/>
 </g>
 <!-- workflow_pfdsl&#45;&gt;maintain_repo_bindings -->
-<g id="edge160" class="edge">
+<g id="edge161" class="edge">
 <title>workflow_pfdsl&#45;&gt;maintain_repo_bindings</title>
 <path fill="none" stroke="#888888" stroke-dasharray="5,2" d="M2928.61,-1542.87C2905.53,-1559.94 2875.39,-1585.81 2857.27,-1615.39 2825.5,-1667.24 2863.87,-1704 2821.27,-1747.39 2809.43,-1759.44 2794.56,-1768.31 2778.76,-1774.82"/>
 <polygon fill="#888888" stroke="#888888" points="2777.8,-1771.44 2769.68,-1778.24 2780.27,-1777.99 2777.8,-1771.44"/>
 </g>
 <!-- workflow_pfdsl&#45;&gt;develop -->
-<g id="edge180" class="edge">
+<g id="edge181" class="edge">
 <title>workflow_pfdsl&#45;&gt;develop</title>
 <path fill="none" stroke="#888888" stroke-dasharray="5,2" d="M2899.8,-1523.38C2807.91,-1526.27 2628.27,-1531.5 2475.59,-1533.39 2220.63,-1536.54 2156.1,-1538.57 1902.17,-1515.39 1828.29,-1508.64 1804.76,-1523.62 1736.57,-1494.39 1704.11,-1480.47 1673.38,-1454.85 1651.45,-1433.58"/>
 <polygon fill="#888888" stroke="#888888" points="1654.13,-1431.3 1644.57,-1426.74 1649.19,-1436.27 1654.13,-1431.3"/>
 </g>
 <!-- workflow_pfdsl&#45;&gt;map_workflow -->
-<g id="edge170" class="edge">
+<g id="edge171" class="edge">
 <title>workflow_pfdsl&#45;&gt;map_workflow</title>
 <path fill="none" stroke="#888888" stroke-dasharray="5,2" d="M2899.78,-1526.99C2855.97,-1528.33 2796.41,-1528.5 2748.56,-1527.5"/>
 <polygon fill="#888888" stroke="#888888" points="2748.89,-1524.01 2738.81,-1527.27 2748.72,-1531.01 2748.89,-1524.01"/>
@@ -1865,7 +1871,7 @@
 <polygon fill="#888888" stroke="#888888" points="1948.63,-1739.38 1959.19,-1738.51 1950.4,-1732.6 1948.63,-1739.38"/>
 </g>
 <!-- findings&#45;&gt;file_issues -->
-<g id="edge165" class="edge">
+<g id="edge166" class="edge">
 <title>findings&#45;&gt;file_issues</title>
 <path fill="none" stroke="#888888" stroke-dasharray="5,2" d="M1038.66,-579.63C954.62,-541.83 771.38,-476.68 670,-571.39 640.6,-598.86 586.71,-1199.54 572.52,-1363.41"/>
 <polygon fill="#888888" stroke="#888888" points="569.03,-1363.1 571.66,-1373.37 576,-1363.71 569.03,-1363.1"/>
@@ -1882,13 +1888,13 @@
 </g>
 </g>
 <!-- prose_mechanization_sweep_record&#45;&gt;maintain_repo_bindings -->
-<g id="edge159" class="edge">
+<g id="edge160" class="edge">
 <title>prose_mechanization_sweep_record&#45;&gt;maintain_repo_bindings</title>
 <path fill="none" stroke="#888888" stroke-dasharray="5,2" d="M3400.41,-571.28C3384.36,-568.01 3367.99,-565.22 3352.3,-563.39 3124.95,-536.92 2974.92,-509.05 2857.27,-705.39 2797.72,-804.76 2892.33,-1655.9 2821.27,-1747.39 2810.83,-1760.82 2796.62,-1770.4 2781.01,-1777.21"/>
 <polygon fill="#888888" stroke="#888888" points="2780.03,-1773.84 2772,-1780.74 2782.58,-1780.35 2780.03,-1773.84"/>
 </g>
 <!-- prose_mechanization_sweep_record&#45;&gt;sweep_prose_mechanization -->
-<g id="edge190" class="edge">
+<g id="edge191" class="edge">
 <title>prose_mechanization_sweep_record&#45;&gt;sweep_prose_mechanization</title>
 <path fill="none" stroke="#888888" stroke-dasharray="5,2" d="M3387.52,-608.1C3378.64,-608.14 3369.68,-608.15 3360.76,-608.12"/>
 <polygon fill="#888888" stroke="#888888" points="3361.04,-604.63 3351.02,-608.08 3361.01,-611.63 3361.04,-604.63"/>
@@ -2027,13 +2033,13 @@
 </g>
 </g>
 <!-- distribution_review_record&#45;&gt;maintain_distributed_prompt_assets -->
-<g id="edge157" class="edge">
+<g id="edge158" class="edge">
 <title>distribution_review_record&#45;&gt;maintain_distributed_prompt_assets</title>
 <path fill="none" stroke="#888888" stroke-dasharray="5,2" d="M2953.58,-350.61C2933.78,-411.11 2877.94,-589.94 2857.27,-743.39 2845.72,-829.08 2873.92,-2230.8 2821.27,-2299.39 2816.6,-2305.47 2811.15,-2310.76 2805.15,-2315.37"/>
 <polygon fill="#888888" stroke="#888888" points="2803.52,-2312.24 2797.24,-2320.78 2807.47,-2318.02 2803.52,-2312.24"/>
 </g>
 <!-- distribution_review_record&#45;&gt;maintain_repo_local_capabilities -->
-<g id="edge158" class="edge">
+<g id="edge159" class="edge">
 <title>distribution_review_record&#45;&gt;maintain_repo_local_capabilities</title>
 <path fill="none" stroke="#888888" stroke-dasharray="5,2" d="M2894.16,-308.22C2880.23,-301.03 2866.88,-291.62 2857.27,-279.39 2810.33,-219.7 2876.47,-164.52 2821.27,-112.39 2811.05,-102.74 2296.05,12.87 2223.59,-58.39 2138.02,-142.54 2259.26,-2122.12 2187.59,-2218.39 2183.29,-2224.16 2178.25,-2229.21 2172.67,-2233.63"/>
 <polygon fill="#888888" stroke="#888888" points="2170.92,-2230.58 2164.74,-2239.19 2174.94,-2236.32 2170.92,-2230.58"/>
@@ -2091,7 +2097,7 @@
 <polygon fill="black" stroke="black" points="3114.01,-260.93 3124.18,-257.97 3114.38,-253.94 3114.01,-260.93"/>
 </g>
 <!-- migration_guide&#45;&gt;maintain_adopter_guidance -->
-<g id="edge191" class="edge">
+<g id="edge192" class="edge">
 <title>migration_guide&#45;&gt;maintain_adopter_guidance</title>
 <path fill="none" stroke="#888888" stroke-dasharray="5,2" d="M2896.61,-252.9C2866.89,-252.74 2830.46,-251.83 2795.47,-250.46"/>
 <polygon fill="#888888" stroke="#888888" points="2795.81,-246.97 2785.68,-250.06 2795.53,-253.96 2795.81,-246.97"/>
@@ -2140,7 +2146,7 @@
 </g>
 </g>
 <!-- readme&#45;&gt;update_readme -->
-<g id="edge187" class="edge">
+<g id="edge188" class="edge">
 <title>readme&#45;&gt;update_readme</title>
 <path fill="none" stroke="#888888" stroke-dasharray="5,2" d="M2923.12,-155.08C2879.29,-157.22 2805.54,-157.69 2748.47,-156.5"/>
 <polygon fill="#888888" stroke="#888888" points="2748.89,-153.01 2738.81,-156.27 2748.72,-160.01 2748.89,-153.01"/>

@@ -1,4 +1,4 @@
-<!-- DO NOT EDIT. Authoritative source: .claude/skills/pfd-ops/references/scaffold/roadmap.md. -->
+<!-- DO NOT EDIT. Authoritative source: scripts/harness-template/skills/pfd-ops/references/scaffold/roadmap.md. -->
 
 # roadmap.md — 作業項目管理バインディング（roadmap.pfdsl の companion）
 

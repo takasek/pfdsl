@@ -14,6 +14,29 @@ import {
 	parseOwnerRepo,
 } from "./github-rest.mjs";
 
+it("rejects missing issue fields requested by the design gate", async () => {
+	await assert.rejects(
+		fetchIssueView(
+			"takasek",
+			"pfdsl",
+			"tok",
+			12,
+			["body", "comments", "createdAt"],
+			async (url) => jsonResponse(url.includes("/comments?") ? [] : {}),
+		),
+		/malformed/i,
+	);
+});
+
+it("preserves a legitimate null issue body as an empty body", async () => {
+	assert.deepEqual(
+		await fetchIssueView("takasek", "pfdsl", "tok", 12, ["body"], async () =>
+			jsonResponse({ body: null }),
+		),
+		{ body: "" },
+	);
+});
+
 describe("parseOwnerRepo", () => {
 	it("https URL with .git suffix", () => {
 		assert.deepEqual(parseOwnerRepo("https://github.com/takasek/pfdsl.git"), {
@@ -606,7 +629,20 @@ function graphqlStub(pages, rest = undefined) {
 	return { fetchImpl, bodies };
 }
 
-/** Wraps closing-issue numbers in the GraphQL connection payload's shape. */
+function closingIssue(number, repo = "pfdsl", owner = "takasek") {
+	return {
+		id: `issue:${owner}/${repo}#${number}`,
+		number,
+		url: `https://github.com/${owner}/${repo}/issues/${number}`,
+		repository: {
+			id: `repo:${owner}/${repo}`,
+			name: repo,
+			owner: { id: `owner:${owner}`, login: owner },
+		},
+	};
+}
+
+/** Wraps closing issues in the GraphQL connection payload's shape. */
 function closingIssuesPage(
 	numbers,
 	{ hasNextPage = false, endCursor = null } = {},
@@ -616,7 +652,9 @@ function closingIssuesPage(
 			repository: {
 				pullRequest: {
 					closingIssuesReferences: {
-						nodes: numbers.map((number) => ({ number })),
+						nodes: numbers.map((issue) =>
+							typeof issue === "number" ? closingIssue(issue) : issue,
+						),
 						pageInfo: { hasNextPage, endCursor },
 					},
 				},
@@ -630,6 +668,31 @@ function closingIssuesPage(
 // body-regex reconstruction this replaced returned [] for those, and
 // check-closes-reference.mjs read that as "closes no issue" (#1043).
 describe("fetchClosingIssueReferences", () => {
+	for (const connection of [
+		{},
+		{ nodes: "bad", pageInfo: { hasNextPage: false } },
+		{ nodes: [1], pageInfo: { hasNextPage: false } },
+		{ nodes: [{ number: 7 }], pageInfo: { hasNextPage: false } },
+		{ nodes: [], pageInfo: {} },
+		{ nodes: [], pageInfo: { hasNextPage: "false" } },
+		{ nodes: [], pageInfo: { hasNextPage: true, endCursor: null } },
+	]) {
+		it(`rejects malformed closing connections: ${JSON.stringify(connection)}`, async () => {
+			const { fetchImpl } = graphqlStub([
+				{
+					data: {
+						repository: {
+							pullRequest: { closingIssuesReferences: connection },
+						},
+					},
+				},
+			]);
+			await assert.rejects(
+				fetchClosingIssueReferences("takasek", "pfdsl", "tok", 12, fetchImpl),
+				/malformed/i,
+			);
+		});
+	}
 	it("returns the links GitHub reports for a PR whose body has no closing keyword", async () => {
 		const { fetchImpl, bodies } = graphqlStub([closingIssuesPage([99])]);
 		const refs = await fetchClosingIssueReferences(
@@ -639,7 +702,7 @@ describe("fetchClosingIssueReferences", () => {
 			12,
 			fetchImpl,
 		);
-		assert.deepEqual(refs, [{ number: 99 }]);
+		assert.deepEqual(refs, [closingIssue(99)]);
 		assert.deepEqual(bodies[0].variables, {
 			owner: "takasek",
 			repo: "pfdsl",
@@ -675,9 +738,41 @@ describe("fetchClosingIssueReferences", () => {
 				12,
 				fetchImpl,
 			),
-			[{ number: 99 }, { number: 103 }],
+			[closingIssue(99), closingIssue(103)],
 		);
 		assert.equal(bodies[1].variables.cursor, "cur1");
+	});
+
+	it("keeps same-number issues from different repositories distinct across pages", async () => {
+		const issues = [
+			closingIssue(1200),
+			closingIssue(1200, "other", "another-owner"),
+		];
+		const { fetchImpl, bodies } = graphqlStub([
+			closingIssuesPage([issues[0]], {
+				hasNextPage: true,
+				endCursor: "next-repo",
+			}),
+			closingIssuesPage([issues[1]]),
+		]);
+		assert.deepEqual(
+			await fetchClosingIssueReferences(
+				"takasek",
+				"pfdsl",
+				"tok",
+				12,
+				fetchImpl,
+			),
+			issues,
+		);
+		assert.equal(bodies[1].variables.cursor, "next-repo");
+		// The API only returns requested fields; fixture identity alone is not
+		// evidence that the real query can retrieve it.
+		assert.match(bodies[0].query, /nodes\s*\{\s*id\s+number\s+url/);
+		assert.match(
+			bodies[0].query,
+			/repository\s*\{\s*id\s+name\s+owner\s*\{\s*id\s+login/,
+		);
 	});
 
 	// A lookup that ran and failed must not read as "closes no issue" — that is
@@ -728,7 +823,7 @@ describe("fetchPullRequestView", () => {
 		);
 		assert.deepEqual(result, {
 			body: "Closes #99",
-			closingIssuesReferences: [{ number: 99 }],
+			closingIssuesReferences: [closingIssue(99)],
 		});
 	});
 
@@ -788,7 +883,7 @@ describe("closing-issue parity between the gh CLI and gh-less backends", () => {
 			);
 			assert.deepEqual(
 				result.closingIssuesReferences,
-				github.map((number) => ({ number })),
+				github.map((number) => closingIssue(number)),
 			);
 			assert.equal(result.body, body);
 		});

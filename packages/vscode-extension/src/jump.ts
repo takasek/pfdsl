@@ -1,17 +1,18 @@
 import { ID_PATTERN } from "@pfdsl/core";
+import { findFrontmatterDefinitionRange } from "@pfdsl/editor";
 import * as vscode from "vscode";
-import { findFrontmatterDefinitionInText } from "./jump-logic.js";
+import { analyzeDocument } from "./analyze.js";
 
-export type { FrontmatterPosition } from "./jump-logic.js";
-export { findFrontmatterDefinitionInText } from "./jump-logic.js";
+export type { FrontmatterPosition } from "@pfdsl/editor";
+export { findFrontmatterDefinitionInText } from "@pfdsl/editor";
 
 export function findFrontmatterDefinition(
 	doc: vscode.TextDocument,
 	nodeId: string,
 ): vscode.Position | undefined {
-	const pos = findFrontmatterDefinitionInText(doc.getText(), nodeId);
-	if (!pos) return undefined;
-	return new vscode.Position(pos.line, pos.column);
+	const range = findFrontmatterDefinitionRange(analyzeDocument(doc), nodeId);
+	if (!range) return undefined;
+	return new vscode.Position(range.start.line - 1, range.start.column - 1);
 }
 
 export function registerDefinitionJump(context: vscode.ExtensionContext): void {
@@ -20,21 +21,29 @@ export function registerDefinitionJump(context: vscode.ExtensionContext): void {
 			const editor = vscode.window.activeTextEditor;
 			if (!editor || editor.document.languageId !== "pfdsl") return;
 			const { document: doc, selection } = editor;
-			const range = doc.getWordRangeAtPosition(selection.active, ID_PATTERN);
-			if (!range) return;
-			const nodeId = doc.getText(range);
-			const pos = findFrontmatterDefinition(doc, nodeId);
-			if (!pos) {
+			const wordRange = doc.getWordRangeAtPosition(
+				selection.active,
+				ID_PATTERN,
+			);
+			if (!wordRange) return;
+			const nodeId = doc.getText(wordRange);
+			const range = findFrontmatterDefinitionRange(
+				analyzeDocument(doc),
+				nodeId,
+			);
+			if (!range) {
 				vscode.window.showInformationMessage(
 					`No frontmatter definition found for "${nodeId}"`,
 				);
 				return;
 			}
-			const defRange = new vscode.Range(pos, pos.translate(0, nodeId.length));
-			editor.selection = new vscode.Selection(
-				pos,
-				pos.translate(0, nodeId.length),
+			const pos = new vscode.Position(
+				range.start.line - 1,
+				range.start.column - 1,
 			);
+			const end = new vscode.Position(range.end.line - 1, range.end.column - 1);
+			const defRange = new vscode.Range(pos, end);
+			editor.selection = new vscode.Selection(pos, end);
 			editor.revealRange(defRange);
 		}),
 	);

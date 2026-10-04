@@ -1,6 +1,7 @@
 ---
 name: pfd-ops
-summary: project operations
+metadata:
+  summary: project operations
 description: |
   Use when operating a project that has adopted PFDs — prioritizing or
   accepting work items, updating progress status after completing work,
@@ -9,7 +10,7 @@ description: |
   PFD operation. Complements the pfdsl skill (notation and quality of .pfdsl
   files); this skill covers how to run the project on top of them.
 ---
-<!-- DO NOT EDIT. Authoritative source: .claude/skills/pfd-ops/SKILL.md. -->
+<!-- DO NOT EDIT. Authoritative source: scripts/harness-template/skills/pfd-ops/SKILL.md. -->
 
 # PFD-driven project operations
 

@@ -4,7 +4,7 @@ import {
 	type NodeKind,
 	resolveLocationFsPath,
 } from "@pfdsl/core";
-import { normalizeLocation } from "./location-utils.js";
+import { normalizeLocation } from "@pfdsl/editor";
 
 const KIND_ICON: Record<NodeKind, string> = {
 	artifact: "📄",

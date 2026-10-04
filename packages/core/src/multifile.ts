@@ -516,7 +516,9 @@ export function resolveEffectiveFrontmatter<T extends DocWithFrontmatter>(
 	frontmatter: Frontmatter | null,
 	load: (path: string) => T | null,
 ): Frontmatter | null {
-	const { docs } = loadExtendsChain(entryPath, load);
+	const { docs } = loadExtendsChain<DocWithFrontmatter>(entryPath, (path) =>
+		path === entryPath ? { frontmatter } : load(path),
+	);
 	const chain = buildPresentationChain(entryPath, docs);
 	const resolved = resolvePresentation(chain);
 	if (

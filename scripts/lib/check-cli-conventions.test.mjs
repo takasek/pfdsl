@@ -143,6 +143,7 @@ describe("per-rule exemptions", () => {
 	const CHECK_INSTALL_SYNC_MIRRORS = [
 		".claude/skills/pfd-ops/scripts/check-install-sync.mjs",
 		".agents/skills/pfd-ops/scripts/check-install-sync.mjs",
+		"scripts/harness-template/skills/pfd-ops/scripts/check-install-sync.mjs",
 	];
 	const FOREIGN_ARGV_GUARDS = [
 		"scripts/lib/delegation-guard.mjs",

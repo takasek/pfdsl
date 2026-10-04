@@ -1,6 +1,7 @@
 ---
 name: pfd-upstream-report
-summary: upstream defect report
+metadata:
+  summary: upstream defect report
 description: |
   Use when a defect or a missing capability turns up in the distributed pfdsl
   bundle itself — a pfd-* skill body, reference, agent, command or hook whose
@@ -10,7 +11,7 @@ description: |
   for when a finding belongs to the distribution layer. Not for defects in the
   adopting repository's own PFDs, code or work items; those belong to pfd-ops.
 ---
-<!-- DO NOT EDIT. Authoritative source: .claude/skills/pfd-upstream-report/SKILL.md. -->
+<!-- DO NOT EDIT. Authoritative source: scripts/harness-template/skills/pfd-upstream-report/SKILL.md. -->
 
 # 上流への欠陥報告
 

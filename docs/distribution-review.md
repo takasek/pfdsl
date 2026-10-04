@@ -36,7 +36,7 @@
 
 通常の変更レビューでは workflow companion「backend 契約を変える回の比較」から、配布レビューでは backend 契約に関わる差分の検討時に、この節を使う。
 見出しの対称性でなく、利用側の同じ問いに必要な答えがあるか、配布側が決めてよい要求かを確認する。
-責任範囲の正本は `.claude/skills/pfd-ops/references/architecture.md`「昇格先の判定ルール」、対象は同じディレクトリの `github-issues-backend.md` と `file-based-tracker-backend.md`。
+責任範囲の正本は `scripts/harness-template/skills/pfd-ops/references/architecture.md`「昇格先の判定ルール」、対象は同じディレクトリの `github-issues-backend.md` と `file-based-tracker-backend.md`。
 差分が共有 reference を変える場合は、その契約を消費する両 backend まで読む。
 
 | 利用側の問い | 照合するもの |

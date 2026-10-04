@@ -18,7 +18,7 @@ const REPOSITORY_ROOT = resolve(
 	"../..",
 );
 const FIXTURE_SOURCE_EXCLUSIONS = {
-	root: { "pfd-ops-install-manifest.json": "fixture install manifest" },
+	root: { "fixture-root-file.json": "fixture root-level exclusion" },
 	skills: {},
 	commands: {},
 	agents: {},
@@ -32,7 +32,7 @@ const FIXTURE_SOURCE_FILES = {
 		"---\nname: pfd-lens\ndescription: Inspect a graph.\ntools: Read, Grep, Bash\nmodel: sonnet\n---\n\nagent body\n",
 	".claude/skills/pfd-ops/SKILL.md":
 		"---\nname: pfd-ops\nsummary: fixture operations\ndescription: fixture\n---\nbody\n",
-	".claude/pfd-ops-install-manifest.json": '{"files": []}\n',
+	".claude/fixture-root-file.json": '{"files": []}\n',
 	".claude/settings.json":
 		'{"permissions":{"allow":["Bash(node scripts/*)"]},"hooks":{"PostToolUse":[{"matcher":"Bash","hooks":[{"type":"command","command":"node hook.mjs","timeout":10}]}]}}\n',
 	"hooks/hooks.json":

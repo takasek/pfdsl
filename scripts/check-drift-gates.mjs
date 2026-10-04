@@ -2,7 +2,7 @@
 /**
  * check-drift-gates.mjs
  *
- * The pre-commit gates other than biome. Reports every failing one in a single
+ * The pre-commit gates, including optional Biome. Reports every failing one in a single
  * pass, so clearing two of them costs one commit attempt rather than two
  * (takasek/pfdsl#755, #759).
  *
@@ -25,15 +25,66 @@
  *
  * Usage: node scripts/check-drift-gates.mjs
  */
+import { spawnSync } from "node:child_process";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { parseArgs } from "node:util";
 
 import { isDistStale } from "./lib/dist-freshness.mjs";
-import { buildGates } from "./lib/drift-gates.mjs";
-import { runDriftGates } from "./lib/pre-commit-drift.mjs";
-import { gitDiffNames, tryRun } from "./lib/run-exec.mjs";
+import { pluginRecoveryNotice } from "./lib/gen-plugin-recovery.mjs";
+import { withIndexSnapshot } from "./lib/index-snapshot.mjs";
+import { gitDiffNames } from "./lib/run-exec.mjs";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+const { values } = parseArgs({
+	options: {
+		"index-snapshot": { type: "boolean" },
+		"with-biome": { type: "boolean" },
+	},
+	strict: true,
+});
+
+if (!values["index-snapshot"]) {
+	try {
+		const recovery = pluginRecoveryNotice(root);
+		if (recovery) console.error(recovery);
+		const status = withIndexSnapshot(root, (snapshot, env) => {
+			const result = spawnSync(
+				process.execPath,
+				[
+					resolve(snapshot, "scripts/check-drift-gates.mjs"),
+					"--index-snapshot",
+					...(values["with-biome"] ? ["--with-biome"] : []),
+				],
+				{ cwd: snapshot, env, stdio: "inherit" },
+			);
+			if (result.error) throw result.error;
+			return result.status ?? 1;
+		});
+		if (status !== 0)
+			console.error(
+				"The preceding generator diagnostics refer to an isolated checkout. Isolated verification data are discarded; the original checkout is unchanged. Existing recovery data in the original checkout remain preserved.",
+			);
+		process.exit(status);
+	} catch (error) {
+		console.error(error instanceof Error ? error.message : error);
+		process.exit(1);
+	}
+}
+
+if (values["with-biome"]) {
+	const result = spawnSync(
+		process.execPath,
+		["scripts/check-biome.mjs", "--staged", "--no-errors-on-unmatched"],
+		{ cwd: root, stdio: "inherit" },
+	);
+	if (result.status !== 0 || result.error) process.exit(result.status ?? 1);
+}
+
+// Gate definitions import generator inventories. Read them only after export
+// so unstaged generator code cannot affect the selected checks.
+const { buildGates } = await import("./lib/drift-gates.mjs");
+const { runDriftGates } = await import("./lib/pre-commit-drift.mjs");
 
 /** @param {string[]} args */
 function stagedPaths(args) {
@@ -55,13 +106,19 @@ const { failures, notes } = runDriftGates(buildGates({ stagedPresent }), {
 	// still asked against process.cwd() (#771).
 	isDistFresh: (path) => !isDistStale(resolve(root, path)),
 	runCommand: (file, args) => {
-		const result = tryRun(file, args, { cwd: root, captureStderr: true });
-		// Git can discard a temporary commit index before the operator can
-		// rerun the checker, so show its diagnostics while that index exists.
-		if (!result.ok && args[0] === "scripts/check-md-linebreaks.mjs") {
-			console.log(result.out.trimEnd());
+		const result = spawnSync(file, args, {
+			cwd: root,
+			encoding: "utf8",
+			maxBuffer: 32 * 1024 * 1024,
+		});
+		// Warnings on a successful retry and failure diagnostics must reach the
+		// operator. Keep routine stdout quiet, but retain it when a gate fails.
+		if (result.stderr) process.stderr.write(result.stderr);
+		if (result.status !== 0 || result.error) {
+			if (result.stdout) console.log(result.stdout.trimEnd());
+			if (result.error) console.error(result.error.message);
 		}
-		return result.ok;
+		return result.status === 0 && !result.error;
 	},
 });
 

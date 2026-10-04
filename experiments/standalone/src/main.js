@@ -1,11 +1,11 @@
 import { format } from "@pfdsl/core";
 import * as monaco from "monaco-editor/editor/editor.api.js";
 import EditorWorker from "monaco-editor/editor/editor.worker.js?worker";
-import { idsOfStatement } from "../../../packages/vscode-extension/src/preview-logic.ts";
+import { idsOfStatement } from "../../../packages/editor/src/preview-logic.ts";
 import {
 	centerPan,
 	zoomAt,
-} from "../../../packages/vscode-extension/src/webview-logic.ts";
+} from "../../../packages/editor/src/webview-logic.ts";
 import baseline from "../generated/baseline.json";
 import { guardClose, invoke } from "./bridge.js";
 import { Documents } from "./documents.mjs";

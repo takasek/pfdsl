@@ -100,7 +100,7 @@ describe("computeNeighbors", () => {
 		expect(computeNeighbors(graph, "build").neighborKind).toBe("artifact");
 	});
 
-	// A group is declared in front matter but never appears on an edge (N002
+	// A group is declared in front matter but never appears on an edge (N004
 	// again), so it has no neighbors and no opposite kind to name.
 	it("reports no neighbor kind for a group", () => {
 		const withGroup = buildGraph(

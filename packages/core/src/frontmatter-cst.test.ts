@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parseDocument } from "yaml";
+import { isMap, isScalar, parseDocument } from "yaml";
 import { loadFrontmatter } from "./frontmatter.js";
 import {
 	parseFrontmatterCst,
@@ -625,6 +625,36 @@ describe("setFrontmatterField", () => {
 		const out = setFrontmatterField(src, "artifact", "spec", "owner", "alice");
 		expect(out).toContain("owner: alice");
 		expect(out).toContain("label: Spec");
+	});
+
+	it.each([
+		["true", "true", true],
+		["12", "12", 12],
+		["0x10", "16", 16],
+		["null", "", null],
+	] as const)("preserves the authored scalar field key %s", (key, field, decoded) => {
+		const src = `---\nprocess:\n  p: { ${key}: old }\n---\na >> p -> b\n`;
+		const out = setFrontmatterField(src, "process", "p", field, "new");
+		expect(out).not.toBeNull();
+		const mapping = parseFrontmatterCst(out as string).doc.getIn(
+			["process", "p"],
+			true,
+		);
+		if (!isMap(mapping)) throw new Error("Expected a definition mapping");
+		expect(mapping.items).toHaveLength(1);
+		const pair = mapping.items[0];
+		if (!pair || !isScalar(pair.key))
+			throw new Error("Expected the original scalar key");
+		expect(pair.key.value).toBe(decoded);
+		expect(
+			loadFrontmatter(out as string).frontmatter?.process?.p?.[field],
+		).toBe("new");
+		expect(out).toContain("a >> p -> b\n");
+	});
+
+	it("refuses field keys that collapse to the same object property", () => {
+		const src = '---\nprocess:\n  p: { true: first, "true": last }\n---\n';
+		expect(setFrontmatterField(src, "process", "p", "true", "new")).toBeNull();
 	});
 
 	it("returns null when the id has no frontmatter entry under the given kind", () => {

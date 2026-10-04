@@ -45,7 +45,10 @@ describe("inScope", () => {
 	});
 
 	it("leaves out anything outside the distributed tree", () => {
-		assert.equal(inScope(".claude/skills/pfd-ops/SKILL.md"), false);
+		assert.equal(
+			inScope("scripts/harness-template/skills/pfd-ops/SKILL.md"),
+			false,
+		);
 		assert.equal(inScope("docs/quality-guide.md"), false);
 	});
 
@@ -68,10 +71,16 @@ describe("canonicalSourceOf", () => {
 	const PAIRS = [
 		[
 			"plugin/pfdsl/skills/pfd-ops/references/architecture.md",
-			".claude/skills/pfd-ops/references/architecture.md",
+			"scripts/harness-template/skills/pfd-ops/references/architecture.md",
 		],
-		["plugin/pfdsl/commands/pfd-cycle.md", ".claude/commands/pfd-cycle.md"],
-		["plugin/pfdsl/agents/pfd-lens.md", ".claude/agents/pfd-lens.md"],
+		[
+			"plugin/pfdsl/commands/pfd-cycle.md",
+			"scripts/harness-template/commands/pfd-cycle.md",
+		],
+		[
+			"plugin/pfdsl/agents/pfd-lens.md",
+			"scripts/harness-template/agents/pfd-lens.md",
+		],
 		[
 			"plugin/pfdsl/hooks/managed-issue-reminder-post-tool-use.mjs",
 			"hooks/managed-issue-reminder-post-tool-use.mjs",
@@ -99,7 +108,7 @@ describe("canonicalSourceOf", () => {
 
 	for (const source of PLUGIN_COMMAND_FILES) {
 		const dist = `plugin/pfdsl-codex/skills/${codexCommandSkillName(source)}/SKILL.md`;
-		const canonical = `.claude/commands/${source}`;
+		const canonical = `scripts/harness-template/commands/${source}`;
 		it(`maps generated Codex command skill ${dist} to ${canonical}`, () => {
 			assert.equal(canonicalSourceOf(dist), canonical);
 		});
@@ -209,7 +218,10 @@ describe("formatGateFailure", () => {
 			base: "abc1234",
 			files: ["plugin/pfdsl/skills/pfd-ops/SKILL.md"],
 		});
-		assert.match(message, /\.claude\/skills\/pfd-ops\/SKILL\.md/);
+		assert.match(
+			message,
+			/scripts\/harness-template\/skills\/pfd-ops\/SKILL\.md/,
+		);
 		assert.match(message, /abc1234/);
 	});
 

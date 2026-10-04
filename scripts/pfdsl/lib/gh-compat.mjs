@@ -5,9 +5,8 @@
  * github-rest.mjs.
  */
 
-// gh-exec.mjs's execGh exits/signals with this code when neither the gh
-// binary nor a GH_TOKEN/GITHUB_TOKEN REST fallback is available, distinct
-// from exit code 1 (real findings) — see #489, #492.
+// Legacy compatibility export. Operation consumers use github-ops.mjs's
+// GITHUB_UNAVAILABLE_EXIT_CODE; execGh itself throws backend errors.
 export const GH_UNAVAILABLE_EXIT_CODE = 2;
 
 /**
