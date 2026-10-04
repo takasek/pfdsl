@@ -2,6 +2,21 @@ import { describe, expect, it } from "vitest";
 import { analyzeSnapshot, preloadPresets, prepareDocument } from "./index.js";
 
 describe("shared document pipeline", () => {
+	it("derives presentation and diagnostics from the same dependency snapshot", () => {
+		const model = analyzeSnapshot(
+			"---\nextends: preset.yaml\n---\na >> p -> b\n",
+		);
+		let reads = 0;
+		const result = prepareDocument(model, "/project/a.pfdsl", () => {
+			reads++;
+			return reads === 1
+				? analyzeSnapshot("---\nstatusStyles: {done: {fillcolor: red}}\n---\n")
+				: null;
+		});
+		expect(result.frontmatter?.statusStyles?.done?.fillcolor).toBe("red");
+		expect(result.presetDiagnostics).toEqual([]);
+		expect(reads).toBe(1);
+	});
 	it("uses the unsaved snapshot, preserving declaration ranges and inherited styles", async () => {
 		const source =
 			"---\nextends: preset.yaml\nartifact:\n  'status':\n    status: done\n---\nstatus >> p -> b\n";

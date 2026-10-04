@@ -56,14 +56,19 @@ export function prepareDocument(
 	path: string | null,
 	load: PresetLoader,
 ) {
-	const entryLoader: PresetLoader = (file) =>
-		file === path ? model : load(file);
-	const frontmatter =
-		path === null
-			? model.frontmatter
-			: resolveEffectiveFrontmatter(path, model.frontmatter, entryLoader);
-	const presetDiagnostics: Diagnostic[] =
-		path === null ? [] : loadExtendsChain(path, entryLoader).diagnostics;
+	let frontmatter = model.frontmatter;
+	let presetDiagnostics: Diagnostic[] = [];
+	if (path !== null) {
+		const dependencies = loadExtendsChain(path, (file) =>
+			file === path ? model : load(file),
+		);
+		frontmatter = resolveEffectiveFrontmatter(
+			path,
+			model.frontmatter,
+			(file) => dependencies.docs.get(file) ?? null,
+		);
+		presetDiagnostics = dependencies.diagnostics;
+	}
 	let message: MessageToWebview;
 	const error = blockingDiagnosticMessage(model.diagnostics);
 	if (error) message = { type: "error", message: error };
