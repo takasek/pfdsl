@@ -7,8 +7,7 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import {
-	chmodSync,
-	cpSync,
+	copyFileSync,
 	mkdirSync,
 	mkdtempSync,
 	readFileSync,
@@ -38,7 +37,31 @@ afterEach(() => {
 
 describe("audit-issues-flow without gh", () => {
 	it("prints a copyable timestamp repair command without changing the roadmap", () => {
-		const roadmap = resolve(__dirname, "../../.pfdsl/roadmap.pfdsl");
+		// Run the real entry point against a disposable repository, independent
+		// of completed-chain sweeps or other changes to the live roadmap.
+		const fixtureRoot = join(emptyBin, "repo");
+		const fixtureScripts = join(fixtureRoot, "scripts/pfdsl");
+		mkdirSync(fixtureScripts, { recursive: true });
+		mkdirSync(join(fixtureRoot, ".pfdsl"));
+		const fixtureScript = join(fixtureScripts, "audit-issues-flow.mjs");
+		copyFileSync(scriptPath, fixtureScript);
+		symlinkSync(join(__dirname, "lib"), join(fixtureScripts, "lib"), "dir");
+		const roadmap = join(fixtureRoot, ".pfdsl/roadmap.pfdsl");
+		writeFileSync(
+			roadmap,
+			`---
+artifact:
+  input:
+    status: done
+  output:
+    status: todo
+process:
+  i1_build_output:
+    updated_at: 2020-01-01T00:00:00Z
+---
+input >> i1_build_output -> output
+`,
+		);
 		const before = readFileSync(roadmap, "utf8");
 		writeFileSync(
 			join(emptyBin, "gh"),
@@ -46,20 +69,22 @@ describe("audit-issues-flow without gh", () => {
 const args = process.argv.slice(2);
 const result = args[0] === "label"
   ? [{ name: "flow:managed", description: "tracked in .pfdsl/roadmap.pfdsl" }, { name: "flow:exempt", description: "intentionally out of .pfdsl/roadmap.pfdsl scope" }]
-  : [{ number: 1291, state: "OPEN", labels: [{ name: "flow:managed" }], updatedAt: "2099-10-03T12:00:00Z" }];
+  : [{ number: 1, state: "OPEN", labels: [{ name: "flow:managed" }], updatedAt: "2099-10-03T12:00:00Z" }];
 process.stdout.write(JSON.stringify(result));
 `,
 			{ mode: 0o755 },
 		);
-		const result = spawnSync(process.execPath, [scriptPath], {
+		const result = spawnSync(process.execPath, [fixtureScript], {
 			encoding: "utf8",
+			cwd: fixtureRoot,
 			env: { ...process.env, PATH: `${emptyBin}:${process.env.PATH}` },
 		});
 		assert.equal(result.status, 1, result.stderr);
 		assert.match(result.stdout, /stale_updated_at/);
+		assert.doesNotMatch(result.stdout, /unknown_issue|missing_process/);
 		assert.ok(
 			result.stdout.includes(
-				"pfdsl meta set .pfdsl/roadmap.pfdsl 'i1291_report_group_node_clash' updated_at '2099-10-03T12:00:00Z' --allow-unknown",
+				"pfdsl meta set .pfdsl/roadmap.pfdsl 'i1_build_output' updated_at '2099-10-03T12:00:00Z' --allow-unknown",
 			),
 		);
 		assert.equal(readFileSync(roadmap, "utf8"), before);
@@ -106,12 +131,9 @@ describe("audit-issues-flow label findings", () => {
 
 	beforeEach(() => {
 		tree = mkdtempSync(join(tmpdir(), "audit-issues-flow-labels-"));
-		cpSync(scriptPath, join(tree, "scripts/pfdsl/audit-issues-flow.mjs"), {
-			recursive: true,
-		});
-		cpSync(join(__dirname, "lib"), join(tree, "scripts/pfdsl/lib"), {
-			recursive: true,
-		});
+		mkdirSync(join(tree, "scripts/pfdsl"), { recursive: true });
+		copyFileSync(scriptPath, join(tree, "scripts/pfdsl/audit-issues-flow.mjs"));
+		symlinkSync(join(__dirname, "lib"), join(tree, "scripts/pfdsl/lib"), "dir");
 		symlinkSync(
 			resolve(__dirname, "../../node_modules"),
 			join(tree, "node_modules"),
@@ -132,8 +154,8 @@ case "$1 $2" in
   *) echo "unexpected gh $*" >&2; exit 64 ;;
 esac
 `,
+			{ mode: 0o755 },
 		);
-		chmodSync(gh, 0o755);
 	});
 
 	afterEach(() => {

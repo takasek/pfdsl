@@ -34,7 +34,28 @@ function writeConfig(dir, text) {
 
 // Evaluate the step conditions this workflow uses: `&&`-joined comparisons of earlier steps' outputs or outcomes, repository variables, and `failure()`.
 // A skipped or unset output or variable reads as the empty string, and a step that never ran has the outcome `skipped`, as on a runner.
-function conditionHolds(
+function conditionHolds(condition, outputs, vars = {}) {
+	return condition.split(" && ").every((term) => {
+		if (term.startsWith("("))
+			return term
+				.slice(1, -1)
+				.split(" || ")
+				.some((alternative) => conditionHolds(alternative, outputs, vars));
+		const match =
+			/^(?:steps\.([\w-]+)\.outputs\.(\w+)|vars\.(\w+)) (==|!=) '([^']*)'$/.exec(
+				term,
+			);
+		assert.ok(match, `Unsupported fixture condition: ${condition}`);
+		const actual =
+			(match[3] === undefined
+				? outputs[match[1]]?.[match[2]]
+				: vars[match[3]]) ?? "";
+		return (actual === match[5]) === (match[4] === "==");
+	});
+}
+
+// Extend the shared variable/output evaluator with failure-state comparisons.
+function stepConditionHolds(
 	condition,
 	outputs,
 	vars = {},
@@ -47,16 +68,7 @@ function conditionHolds(
 			const actual = state.outcomes[outcome[1]] ?? "skipped";
 			return (actual === outcome[3]) === (outcome[2] === "==");
 		}
-		const match =
-			/^(?:steps\.([\w-]+)\.outputs\.(\w+)|vars\.(\w+)) (==|!=) '([^']*)'$/.exec(
-				term,
-			);
-		assert.ok(match, `Unsupported fixture condition: ${condition}`);
-		const actual =
-			(match[3] === undefined
-				? outputs[match[1]]?.[match[2]]
-				: vars[match[3]]) ?? "";
-		return (actual === match[5]) === (match[4] === "==");
+		return conditionHolds(term, outputs, vars);
 	});
 }
 
@@ -91,7 +103,7 @@ function walkWorkflow(dir, vars = {}, failAt) {
 	for (const step of steps) {
 		const usesStatusFunction = /\b(failure|always)\(\)/.test(step.if ?? "");
 		if (state.failed && !usesStatusFunction) continue;
-		if (step.if && !conditionHolds(step.if, outputs, vars, state)) continue;
+		if (step.if && !stepConditionHolds(step.if, outputs, vars, state)) continue;
 		if (step.id === "sweep-gate" || step.id === "detect-workspace") {
 			const { result, outputs: own } = runShellStep(step, dir);
 			outputs[step.id] = own;
@@ -259,7 +271,7 @@ for (const shape of ["no-package", "no-package-manager", "workspace"]) {
 			let installation;
 			let swept = false;
 			for (const step of steps) {
-				if (step.if && !conditionHolds(step.if, outputs)) continue;
+				if (step.if && !stepConditionHolds(step.if, outputs)) continue;
 				if (step.id === "sweep-gate" || step.id === "detect-workspace") {
 					const { result, outputs: own } = runShellStep(step, dir);
 					assert.equal(result.status, 0, result.stderr);
