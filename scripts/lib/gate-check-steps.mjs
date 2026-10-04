@@ -174,7 +174,11 @@ export function genPluginIdentityStep({ node, triggerPaths }) {
 			detail: "no skill/plugin/install-source changes",
 		};
 	}
-	const regenerated = node(["scripts/gen-plugin.mjs"]);
+	const regenerated = node([
+		"scripts/check-generation.mjs",
+		"--gen-plugin",
+		"terminal",
+	]);
 	const clean =
 		regenerated.ok &&
 		node([

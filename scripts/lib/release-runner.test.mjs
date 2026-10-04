@@ -217,6 +217,21 @@ describe("prepareRelease", () => {
 });
 
 describe("publishRelease", () => {
+	it("checks the complete release output contract before tagging", () => {
+		const root = packageRoot("cli");
+		const trace = cliTrace();
+		try {
+			publishRelease({ root, kindArg: "cli", commit: SHA, ...trace });
+			assert.ok(
+				trace.calls.some(
+					([, args]) =>
+						args.includes("--gen-plugin") && args.includes("release"),
+				),
+			);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
 	it("refuses to tag when HEAD changes during checks", () => {
 		const root = packageRoot("vscode");
 		const calls = [];

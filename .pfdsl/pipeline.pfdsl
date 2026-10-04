@@ -518,7 +518,7 @@ process:
     tags: [ gen ]
   gen_install:
     label: install/ 生成
-    description: "repo ルートの配布ソースから pfd-ops スキルの install/ ミラーを一方向で再生成する（#547 で双方向 sync を廃止）。生成の向きは repo ルートのソース → install/ → plugin/ の一本のみ。gen_plugin が内部で実行するため plugin が古い install/ から組まれることはない。drift は pre-commit と check-pfd-ops-sync.yml が強制する"
+    description: "repo ルートの明示配布許可一覧から pfd-ops スキルの install/ ミラーを一方向で再生成する。skill の installFiles 宣言も同じ一覧から導出し、開発用ファイルを配布しない。生成の向きは repo ルートのソース → install/ → Claude・Codex の repository・plugin の4配布先のみ。gen_plugin が内部で実行するため古い install/ から組まれることはない。同一性検査は pre-commit・終端では index、push・release では公開対象の HEAD の隔離コピーで生成し、元の作業ツリーを変更せずに出力契約を照合する。CI の check-pfd-ops-sync.yml も一致を強制する"
     command: make gen-install
     location: ../scripts/lib/install-templates.mjs
     tags: [ gen, g ]

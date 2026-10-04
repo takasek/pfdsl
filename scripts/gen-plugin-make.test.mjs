@@ -20,6 +20,19 @@ function dryRun(target) {
 
 const runs = (script) => (line) => line.startsWith(`node scripts/${script}`);
 
+it("make push checks all generated surfaces and never stages or commits edits", () => {
+	const recipe = dryRun("push");
+	assert.ok(
+		recipe.includes(
+			"node scripts/check-generation.mjs --gen-plugin push --samples",
+		),
+	);
+	assert.ok(recipe.includes("git push"));
+	assert.ok(recipe.every((line) => !/git (?:add|commit)\b/.test(line)));
+	assert.deepEqual(recipe.filter(runs("gen-plugin.mjs")), []);
+	assert.deepEqual(recipe.filter(runs("gen-samples.mjs")), []);
+});
+
 describe("make gen-plugin", () => {
 	const recipe = dryRun("gen-plugin");
 

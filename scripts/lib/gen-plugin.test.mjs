@@ -2739,7 +2739,7 @@ describe("Codex generated consumers", () => {
 			const pfdOps = capabilities.find(
 				(record) => record.id === "skill:pfd-ops",
 			);
-			pfdOps.source.files.push("install/README.md");
+			pfdOps.source.installFiles.push("install/README.md");
 			const codexPluginRoot = join(fixtureRoot, "plugin/pfdsl-codex");
 			assembleCodexAssets({
 				root: fixtureRoot,

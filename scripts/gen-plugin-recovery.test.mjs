@@ -181,7 +181,9 @@ describe("generator recovery diagnostics", () => {
 					[join(root, "scripts/check-drift-gates.mjs")],
 					{ cwd: root, encoding: "utf8" },
 				);
-				assert.equal(gateRetry.status, 1, gateRetry.stdout + gateRetry.stderr);
+				// Unstaged output edits and existing recovery data do not change
+				// the consistent index; the original recovery warning still reaches us.
+				assert.equal(gateRetry.status, 0, gateRetry.stdout + gateRetry.stderr);
 				assert.match(gateRetry.stderr, /Generator transaction data remain/);
 				assert.ok(gateRetry.stderr.includes(snapshot), gateRetry.stderr);
 				assert.equal(
@@ -207,6 +209,10 @@ describe("generator recovery diagnostics", () => {
 					gateFailure.stdout + gateFailure.stderr,
 				);
 				assert.match(gateFailure.stderr, /injected primary assembly failure/);
+				assert.match(
+					gateFailure.stderr,
+					/Isolated verification data are discarded; the original checkout is unchanged/,
+				);
 				assert.match(
 					gateFailure.stderr,
 					/Rollback restoration did not complete/,

@@ -177,21 +177,7 @@ gen-plugin: check-docs
 
 .PHONY: push
 push: check-docs
-	@if ! git diff --quiet HEAD -- docs/samples docs/examples plugin .claude-plugin; then \
-		echo "docs/samples, docs/examples, plugin, または .claude-plugin に差分があります。コミットしてから push してください。"; \
-		git diff --stat HEAD -- docs/samples docs/examples plugin .claude-plugin; \
-		exit 1; \
-	fi
-	$(MAKE) gen-samples
-	@if ! git diff --quiet HEAD -- docs/samples; then \
-		echo "gen-samples で docs/samples が更新されました。自動コミットします。"; \
-		git add docs/samples && git commit -m "chore: regenerate docs/samples"; \
-	fi
-	$(MAKE) gen-plugin
-	@if ! git diff --quiet HEAD -- plugin .claude-plugin; then \
-		echo "gen-plugin でプラグインが更新されました。自動コミットします。"; \
-		git add plugin .claude-plugin && git commit -m "chore: regenerate plugin"; \
-	fi
+	node scripts/check-generation.mjs --gen-plugin push --samples
 	git push
 
 .PHONY: release-status
