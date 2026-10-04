@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
-import { execFileSync } from "node:child_process";
+import { execFileSync, spawnSync } from "node:child_process";
 import {
+	chmodSync,
 	mkdirSync,
 	mkdtempSync,
 	readFileSync,
@@ -157,6 +158,70 @@ test("already integrated main is eligible for a generated-only single-parent rep
 	f.put("plugin/output.txt", "regenerated\n");
 	const repaired = f.commit("repair stale output");
 	verifyRepair(f.root, integrated, f.base, repaired);
+});
+
+test("publication CLI accepts a bundle without a duplicate result JSON and rejects missing bundle refs", (t) => {
+	const f = fixture(t);
+	mergeGeneratedConflicts(f.root, f.head, f.base);
+	f.put("plugin/output.txt", "regenerated\n");
+	const repaired = f.commit("repair");
+	const artifacts = join(f.root, "artifacts");
+	const bin = join(f.root, "bin");
+	mkdirSync(artifacts);
+	mkdirSync(bin);
+	const value = {
+		repository: "owner/repo",
+		number: 12,
+		head: f.head,
+		base: f.base,
+		branch: "feature",
+	};
+	writeFileSync(join(artifacts, "snapshot.json"), JSON.stringify(value));
+	const gh = join(bin, "gh");
+	writeFileSync(
+		gh,
+		`#!/usr/bin/env node\nconst v=JSON.parse(process.env.REPAIR_TEST_SNAPSHOT);console.log(JSON.stringify(process.argv.at(-1).endsWith('/heads/main') ? {object:{sha:v.base}} : {state:'open',head:{sha:v.head,ref:v.branch,repo:{full_name:v.repository}},base:{sha:v.base,ref:'main',repo:{full_name:v.repository}}}));\n`,
+	);
+	chmodSync(gh, 0o755);
+	const execute = () =>
+		spawnSync(
+			process.execPath,
+			[
+				new URL("./repair-generated-conflicts.mjs", import.meta.url).pathname,
+				"verify",
+				f.root,
+				artifacts,
+			],
+			{
+				encoding: "utf8",
+				env: {
+					...process.env,
+					PATH: `${bin}:${process.env.PATH}`,
+					GITHUB_REPOSITORY: value.repository,
+					PR_NUMBER: "12",
+					REPAIR_TEST_SNAPSHOT: JSON.stringify(value),
+				},
+			},
+		);
+	f.git("update-ref", "refs/heads/generated-repair-result", repaired);
+	f.git(
+		"bundle",
+		"create",
+		join(artifacts, "repair.bundle"),
+		"refs/heads/generated-repair-result",
+	);
+	let result = execute();
+	assert.equal(result.status, 0, result.stderr);
+	assert.match(result.stdout, /not pushed/);
+	f.git("bundle", "create", join(artifacts, "wrong.bundle"), "refs/heads/main");
+	writeFileSync(
+		join(artifacts, "repair.bundle"),
+		readFileSync(join(artifacts, "wrong.bundle")),
+	);
+	result = execute();
+	assert.notEqual(result.status, 0);
+	rmSync(join(artifacts, "repair.bundle"));
+	assert.notEqual(execute().status, 0);
 });
 
 test("workflow isolates PR execution from publication credentials", () => {
