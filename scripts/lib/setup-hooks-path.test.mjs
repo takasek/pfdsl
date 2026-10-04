@@ -12,6 +12,7 @@ import {
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, it } from "node:test";
+import { fileURLToPath } from "node:url";
 import {
 	inspectHooksPath,
 	isSetupCurrent,
@@ -157,5 +158,18 @@ describe("setup-managed pre-commit", () => {
 		assert.equal(managed.managed, true);
 		git("config", "core.hooksPath", "custom-hooks");
 		assert.equal(inspectHooksPath(root, { env }).managed, false);
+	});
+});
+describe("pre-commit shim", () => {
+	it("fails the commit when the checkout has no scripts/pre-commit", () => {
+		const root = mkdtempSync(join(tmpdir(), "pfdsl-shim-"));
+		fixtures.push(root);
+		const result = spawnSync(
+			"/bin/sh",
+			[fileURLToPath(new URL("../hooks/pre-commit-shim", import.meta.url))],
+			{ cwd: root, encoding: "utf8" },
+		);
+		assert.notEqual(result.status, 0);
+		assert.match(result.stderr, /scripts\/pre-commit/);
 	});
 });
