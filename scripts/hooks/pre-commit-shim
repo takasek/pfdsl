@@ -5,5 +5,5 @@
 if [ -x ./scripts/pre-commit ]; then
   exec ./scripts/pre-commit
 fi
-echo "warning: scripts/pre-commit not found in this checkout; skipping pre-commit checks" >&2
-exit 0
+echo "error: scripts/pre-commit is missing or not executable in this checkout, so the repository's pre-commit checks cannot run." >&2
+exit 1

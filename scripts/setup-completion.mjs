@@ -1,19 +1,20 @@
 #!/usr/bin/env node
 
-import { spawn } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import { createHash, randomUUID } from "node:crypto";
 import {
 	existsSync,
 	mkdirSync,
 	readdirSync,
 	readFileSync,
+	realpathSync,
 	renameSync,
 	rmSync,
 	statSync,
 	utimesSync,
 	writeFileSync,
 } from "node:fs";
-import { basename, dirname, join } from "node:path";
+import { basename, dirname, join, resolve } from "node:path";
 import { isCliEntrypoint } from "./lib/cli-entrypoint.mjs";
 
 export const SETUP_INPUTS = [
@@ -135,17 +136,102 @@ function isExecutableShim(path) {
 	}
 }
 
-export function isSetupCurrent(root = process.cwd()) {
+export function isSetupCurrent(root = process.cwd(), options = {}) {
 	try {
 		const inputs = setupInputs(root);
 		return (
 			readFileSync(join(root, MARKER), "utf8").trim() ===
 				setupFingerprint(root, inputs) &&
-			hasDeclaredDependencyLinks(root, inputs)
+			hasDeclaredDependencyLinks(root, inputs) &&
+			inspectHooksPath(root, options).reason === null
 		);
 	} catch {
 		return false;
 	}
+}
+
+function sameDirectory(left, right) {
+	try {
+		return realpathSync(dirname(left)) === realpathSync(dirname(right));
+	} catch {
+		return resolve(left) === resolve(right);
+	}
+}
+
+// Check the pre-commit Git will run. Setup owns the common-dir hooks, where it
+// installs the shim, and may repair it there (`managed`). It never executes or
+// rewrites a custom hooks directory or the user's Git configuration.
+export function inspectHooksPath(
+	root = process.cwd(),
+	{ env = process.env } = {},
+) {
+	const git = (args) =>
+		spawnSync("git", args, { cwd: root, env, encoding: "utf8" });
+	const configured = git([
+		"config",
+		"--show-origin",
+		"--get",
+		"core.hooksPath",
+	]);
+	if (configured.status !== 0 && configured.status !== 1)
+		return {
+			reason: "Cannot inspect core.hooksPath: Git configuration lookup failed.",
+			managed: false,
+		};
+	const common = git([
+		"rev-parse",
+		"--path-format=absolute",
+		"--git-common-dir",
+	]);
+	if (common.status !== 0)
+		return {
+			reason:
+				"Cannot resolve the Git common directory for the pre-commit hook.",
+			managed: false,
+		};
+	const managedPath = join(
+		resolve(root, common.stdout.trim()),
+		"hooks/pre-commit",
+	);
+	let path = managedPath;
+	if (configured.status === 0) {
+		const effective = git([
+			"rev-parse",
+			"--path-format=absolute",
+			"--git-path",
+			"hooks/pre-commit",
+		]);
+		if (effective.status !== 0)
+			return {
+				reason: "Cannot resolve the effective core.hooksPath pre-commit.",
+				managed: false,
+			};
+		path = resolve(root, effective.stdout.trim());
+	}
+	const managed = sameDirectory(path, managedPath);
+	const repair = managed
+		? `Run 'make setup' to install the repo's scripts/hooks/pre-commit-shim at ${path}.`
+		: `core.hooksPath (${configured.stdout.trim()}) selects ${path}. Install the repo's executable scripts/hooks/pre-commit-shim there or resolve the override explicitly; setup will not change Git configuration or custom hooks.`;
+	const failed = (problem) => ({ reason: `${problem} ${repair}`, managed });
+	if (!isExecutableShim(path))
+		return failed("The effective pre-commit is missing or not executable.");
+	try {
+		if (
+			!readFileSync(path).equals(
+				readFileSync(join(root, "scripts/hooks/pre-commit-shim")),
+			)
+		)
+			return failed(
+				"The effective hook differs from the repo shim; cannot verify that it runs the gate.",
+			);
+	} catch {
+		return failed("Cannot read the effective pre-commit shim.");
+	}
+	if (!isExecutableShim(join(root, "scripts/pre-commit")))
+		return failed(
+			"The checkout's scripts/pre-commit is missing or not executable.",
+		);
+	return { reason: null, managed };
 }
 
 export function setupLockPath(root = process.cwd()) {
@@ -284,10 +370,19 @@ function runSetupUnlocked(root) {
 }
 
 async function runSetup(root = process.cwd()) {
+	// A hook setup does not manage is refused untouched; a missing or stale
+	// shim in the setup-managed directory is what setup itself installs.
+	const hooks = inspectHooksPath(root);
+	if (hooks.reason !== null && !hooks.managed) throw new Error(hooks.reason);
 	const lock = await acquireSetupLock(root);
 	try {
 		if (isSetupCurrent(root)) return 0;
-		return await runSetupUnlocked(root);
+		const status = await runSetupUnlocked(root);
+		if (status === 0) {
+			const checked = inspectHooksPath(root);
+			if (checked.reason !== null) throw new Error(checked.reason);
+		}
+		return status;
 	} finally {
 		lock.release();
 	}
@@ -298,6 +393,12 @@ async function main(args) {
 		throw new Error("usage: setup-completion.mjs <check|run|write>");
 	}
 	if (args[0] === "check") {
+		const hooks = inspectHooksPath();
+		if (hooks.reason !== null) {
+			console.error(hooks.reason);
+			process.exitCode = 1;
+			return;
+		}
 		process.exitCode = isSetupCurrent() ? 0 : 1;
 		return;
 	}
