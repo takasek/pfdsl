@@ -288,8 +288,28 @@ function publication(root, directory, push) {
 			`https://github.com/${value.repository}.git`,
 			`${repaired}:refs/heads/${value.branch}`,
 		]);
-		if (snapshot(value.repository, value.number).head !== repaired)
-			throw new Error("Published head readback mismatch");
+		// The PR API may still report the old head immediately after push.
+		// Read the published Git ref instead of the derived PR metadata.
+		const ref = `refs/heads/${value.branch}`;
+		let published;
+		try {
+			published = git(root, [
+				"ls-remote",
+				"--exit-code",
+				"--refs",
+				`https://github.com/${value.repository}.git`,
+				ref,
+			]);
+		} catch (cause) {
+			throw new Error(
+				"Push succeeded, but remote branch verification failed. Check the PR branch before rerunning the repair.",
+				{ cause },
+			);
+		}
+		if (published !== `${repaired}\t${ref}`)
+			throw new Error(
+				`Push succeeded, but the remote branch does not match repair commit ${repaired}. Check the PR branch before rerunning the repair.`,
+			);
 	}
 	console.log(
 		`Validated repair for PR #${value.number}: ${repaired}${push ? " (pushed)" : " (not pushed)"}`,
