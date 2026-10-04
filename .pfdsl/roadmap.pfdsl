@@ -61,7 +61,7 @@ artifact:
     label: "エディタ コネクタ編集支援 (#482)"
     description: "ノード前後への新規追加・既存接続の code action/コマンド。edge 挿入ロジックはロジック層に分離し Preview UI (#483) と共用"
     status: wip
-    criteria: "カーソル下ノードへの前後追加・接続がコネクタ種選択付きの code action から実行でき、選択結果が .pfdsl テキストへ挿入されることが packages/vscode-extension/src/connector-logic.test.ts のテストで検証されている"
+    criteria: "カーソル下ノードへの前後追加・接続がコネクタ種選択付きの code action から実行でき、選択結果が .pfdsl テキストへ挿入されることが実 extension host で確認され、共有編集計算の回帰テストが成功している"
   preview_connector:
     label: "Preview コネクタ生成 UI (#483)"
     description: "webview の nodeClick 基盤を拡張し、ノードクリックから前後追加・接続をテキストへ反映する。#482 の編集機構を共用"
@@ -71,7 +71,7 @@ artifact:
     label: "frontmatter 定義挿入 code action (#484)"
     description: "edge にのみ現れる未定義ノードへ artifact/process 定義スケルトンを挿入する"
     status: done
-    criteria: "edge にのみ現れる未定義ノード上で Quick Fix『Insert {kind} definition』を実行すると frontmatter に artifact/process 定義が挿入されることが packages/vscode-extension/src/def-insertion-logic.test.ts のテストで検証されている"
+    criteria: "edge にのみ現れる未定義ノード上で Quick Fix『Insert {kind} definition』を実行すると frontmatter に artifact/process 定義が挿入されることが実 extension host で確認され、種別判定と定義挿入の回帰テストが成功している"
   ext_editing_release:
     label: "extension 編集支援リリース"
     description: "#482 コネクタ編集 / #483 Preview UI / #484 定義挿入を含む次期 Marketplace リリース"
@@ -139,8 +139,9 @@ artifact:
     location: ../experiments/standalone/
   standalone_foundation:
     label: 両ホストで利用するアプリ共通基盤
-    status: todo
+    status: done
     criteria: VS Code と製品用 Tauri アプリが共通処理で同じサンプルを解析・描画し、Mac の起動・日本語入力・再描画を確認済み。全機能の受入対応表に後続工程と検証方法が割り当てられている
+    location: ../packages/standalone/
   standalone_documents:
     label: 安全に編集・保存できる文書アプリ
     status: todo
@@ -182,7 +183,7 @@ process:
   i483_implement_preview_connector:
     label: Preview コネクタ UI 実装
     location: https://github.com/takasek/pfdsl/issues/483
-    updated_at: 2026-07-18T00:33:46Z
+    updated_at: 2026-10-04T08:37:59Z
   publish_ext_editing:
     label: extension 編集支援リリース
   i1278_add_group_delete:
@@ -206,39 +207,39 @@ process:
   i1282_create_node_definition:
     label: ノード定義作成操作を実装する
     location: https://github.com/takasek/pfdsl/issues/1282
-    updated_at: 2026-09-28T08:04:13Z
+    updated_at: 2026-10-04T08:38:01Z
   i1283_add_node_location_cycle:
     label: 定義と本文中のノード位置の巡回を実装する
     location: https://github.com/takasek/pfdsl/issues/1283
-    updated_at: 2026-09-26T18:47:44Z
+    updated_at: 2026-10-04T08:38:04Z
   i1284_add_hover_local_graph:
     label: ホバー内の周辺グラフ・移動と移動先強調を実装する
     location: https://github.com/takasek/pfdsl/issues/1284
-    updated_at: 2026-10-03T09:06:47Z
+    updated_at: 2026-10-04T08:38:06Z
   i1257_build_standalone_foundation:
     label: 共通処理を製品用アプリ基盤へ接続する
     location: https://github.com/takasek/pfdsl/issues/1257
-    updated_at: 2026-09-26T07:15:50Z
+    updated_at: 2026-10-04T02:46:10Z
   i1258_build_standalone_documents:
     label: 文書の安全な編集・保存を完成させる
     location: https://github.com/takasek/pfdsl/issues/1258
-    updated_at: 2026-09-26T07:15:52Z
+    updated_at: 2026-10-04T08:38:09Z
   i1259_build_standalone_pfd_features:
     label: PFD 編集・閲覧機能を両版で揃える
     location: https://github.com/takasek/pfdsl/issues/1259
-    updated_at: 2026-09-26T07:15:54Z
+    updated_at: 2026-10-04T08:38:11Z
   i1260_build_standalone_integrations:
     label: 関連参照・差分・外部実行を接続する
     location: https://github.com/takasek/pfdsl/issues/1260
-    updated_at: 2026-09-26T07:15:56Z
+    updated_at: 2026-10-04T08:38:14Z
   i1261_build_standalone_exports:
     label: 全形式の書き出しを完成させる
     location: https://github.com/takasek/pfdsl/issues/1261
-    updated_at: 2026-09-26T07:15:59Z
+    updated_at: 2026-10-04T08:38:17Z
   i1262_publish_standalone:
     label: 配布物の全体受入を完了して公開する
     location: https://github.com/takasek/pfdsl/issues/1262
-    updated_at: 2026-09-26T07:16:01Z
+    updated_at: 2026-10-04T08:38:19Z
 
 tag:
   "priority:high": { style: { color: "#b60205", penwidth: "2" } }

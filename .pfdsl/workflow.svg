@@ -43,7 +43,7 @@
 <!-- adrs -->
 <g id="node1" class="node">
 <title>adrs</title>
-<g id="a_node1"><a xlink:title="ADR&#10;&#10;方法論の設計決定記録。記事の原稿素材、ガイド改訂の根拠&#10;criteria: 対象判断が文書化され docs/adr/README.md の一覧に追記済み&#10;location: ../docs/adr/">
+<g id="a_node1"><a xlink:title="ADR&#10;&#10;方法論の設計決定記録。記事の原稿素材、ガイド改訂の根拠&#10;criteria: 対象判断が文書化され docs/adr/README.md の一覧に追記済み&#10;location: docs/adr/">
 <polygon fill="none" stroke="black" points="2376.59,-2790.19 2322.59,-2790.19 2322.59,-2748.59 2376.59,-2748.59 2376.59,-2790.19"/>
 <text xml:space="preserve" text-anchor="middle" x="2349.59" y="-2773.59" font-family="Times,serif" font-size="14.00">adrs</text>
 <text xml:space="preserve" text-anchor="middle" x="2349.59" y="-2756.79" font-family="Times,serif" font-size="14.00">ADR</text>
@@ -289,7 +289,7 @@
 <!-- payoff_log -->
 <g id="node7" class="node">
 <title>payoff_log</title>
-<g id="a_node7"><a xlink:title="効果局面ログ&#10;&#10;PFD が効いた局面の事例集。記事 (#12) の具体エピソード素材（write_article）。追記条件は ADR&#45;0014 反実仮想テスト（冒頭規約参照）&#10;criteria: ADR&#45;0014 反実仮想テストを通過した事例が追記済み&#10;location: ../docs/pfd_payoff_log.md">
+<g id="a_node7"><a xlink:title="効果局面ログ&#10;&#10;PFD が効いた局面の事例集。記事 (#12) の具体エピソード素材（write_article）。追記条件は ADR&#45;0014 反実仮想テスト（冒頭規約参照）&#10;criteria: ADR&#45;0014 反実仮想テストを通過した事例が追記済み&#10;location: docs/pfd_payoff_log.md">
 <polygon fill="none" stroke="black" points="786,-2820.19 678,-2820.19 678,-2778.59 786,-2778.59 786,-2820.19"/>
 <text xml:space="preserve" text-anchor="middle" x="732" y="-2803.59" font-family="Times,serif" font-size="14.00">payoff_log</text>
 <text xml:space="preserve" text-anchor="middle" x="732" y="-2786.79" font-family="Times,serif" font-size="14.00">効果局面ログ</text>
@@ -564,7 +564,7 @@
 <!-- adopter_config -->
 <g id="node22" class="node">
 <title>adopter_config</title>
-<g id="a_node22"><a xlink:title="採用リポの宣言値&#10;&#10;このリポ自身が採用リポとして持つ宣言の値（ADR&#45;0042）。pfd&#45;retro D 層の採用と監査対象（knowledgeLifecycleAudit）、completed&#45;chain sweep の有効化（sweepCompletedChains）を持つ。散文の binding はキーを指すだけで値を持たない。sweep の workflow も実行時にこのファイルを読む&#10;criteria: JSON として読め、knowledgeLifecycleAudit が adopt と空でない監査対象を、sweepCompletedChains が有効化を宣言している（scripts/lib/knowledge&#45;lifecycle&#45;declaration.test.mjs が検査する）&#10;location: config.json">
+<g id="a_node22"><a xlink:title="採用リポの宣言値&#10;&#10;このリポ自身が採用リポとして持つ宣言の値（ADR&#45;0042）。pfd&#45;retro D 層の採用と監査対象（knowledgeLifecycleAudit）、completed&#45;chain sweep の有効化（sweepCompletedChains）を持つ。散文の binding はキーを指すだけで値を持たない。sweep の workflow も実行時にこのファイルを読む&#10;criteria: JSON として読め、knowledgeLifecycleAudit が adopt と空でない監査対象を、sweepCompletedChains が有効化を宣言している（scripts/lib/knowledge&#45;lifecycle&#45;declaration.test.mjs が検査する）&#10;location: .pfdsl/config.json">
 <polygon fill="none" stroke="black" points="3030.07,-2017.19 2893.27,-2017.19 2893.27,-1975.59 3030.07,-1975.59 3030.07,-2017.19"/>
 <text xml:space="preserve" text-anchor="middle" x="2961.67" y="-2000.59" font-family="Times,serif" font-size="14.00">adopter_config</text>
 <text xml:space="preserve" text-anchor="middle" x="2961.67" y="-1983.79" font-family="Times,serif" font-size="14.00">採用リポの宣言値</text>
@@ -586,7 +586,7 @@
 <!-- bindings_pfd_ops -->
 <g id="node23" class="node">
 <title>bindings_pfd_ops</title>
-<g id="a_node23"><a xlink:title="pfd&#45;ops バインディング&#10;&#10;pfd&#45;ops 運用に紐づく Claude への恒常指示（PR 本文規約等）。sibling companion でなく独立ファイル（読み込み契機がスキル発火であり PFD グラフ操作と一致しないため）。pfd&#45;ops skill が存在すれば読む&#10;criteria: 記載内容を pfd&#45;ops SKILL.md・work&#45;cycle.md の現行記述に突き合わせて矛盾がなく、配布層から移設した手順（ADR&#45;0039）が binding 側に揃っている（必須見出しだけ check&#45;companion&#45;bindings が検査し、本文の整合は pfd&#45;retro D 層監査で観察する）&#10;location: bindings/pfd&#45;ops.md">
+<g id="a_node23"><a xlink:title="pfd&#45;ops バインディング&#10;&#10;pfd&#45;ops 運用に紐づく Claude への恒常指示（PR 本文規約等）。sibling companion でなく独立ファイル（読み込み契機がスキル発火であり PFD グラフ操作と一致しないため）。pfd&#45;ops skill が存在すれば読む&#10;criteria: 記載内容を pfd&#45;ops SKILL.md・work&#45;cycle.md の現行記述に突き合わせて矛盾がなく、配布層から移設した手順（ADR&#45;0039）が binding 側に揃っている（必須見出しだけ check&#45;companion&#45;bindings が検査し、本文の整合は pfd&#45;retro D 層監査で観察する）&#10;location: .pfdsl/bindings/pfd&#45;ops.md">
 <polygon fill="none" stroke="black" points="3030.07,-1821.59 2893.27,-1821.59 2893.27,-1763.19 3030.07,-1763.19 3030.07,-1821.59"/>
 <text xml:space="preserve" text-anchor="middle" x="2961.67" y="-1804.99" font-family="Times,serif" font-size="14.00">bindings_pfd_ops</text>
 <text xml:space="preserve" text-anchor="middle" x="2961.67" y="-1788.19" font-family="Times,serif" font-size="14.00">pfd&#45;ops</text>
@@ -626,7 +626,7 @@
 <!-- bindings_pfd_retro -->
 <g id="node24" class="node">
 <title>bindings_pfd_retro</title>
-<g id="a_node24"><a xlink:title="pfd&#45;retro バインディング&#10;&#10;pfd&#45;retro が参照する図・仕様レンズと、検索可能な事例・観察・反例の保存先、運用責任の終了、配布物への finding 反映手続きを持つ。 bindings/pfd&#45;retro&#45;patterns/ の当時の本文と証拠を保存し、現行手順の適用点を案内する。 カタログの対策抽出・phase・自動選別には依存しない。&#10;&#10;criteria: check&#45;companion&#45;bindings が必須見出しと、事例が .pfdsl 内へ張った相対リンクの解決先の実在を確認し、最終差分レビューで事例の証拠保存と現行手順へのリンクの有無・非依存、および1回の実行契約と、知識成果物ライフサイクル監査の採用宣言（`.pfdsl/config.json` のキー `knowledgeLifecycleAudit` の `mode` と、`adopt` のときの空でない `targets`。binding は config のキーを指す1文だけを持つ。ADR&#45;0039、ADR&#45;0041）の実在を確認する&#10;location: bindings/pfd&#45;retro.md, bindings/pfd&#45;retro&#45;patterns/">
+<g id="a_node24"><a xlink:title="pfd&#45;retro バインディング&#10;&#10;pfd&#45;retro が参照する図・仕様レンズと、検索可能な事例・観察・反例の保存先、運用責任の終了、配布物への finding 反映手続きを持つ。 bindings/pfd&#45;retro&#45;patterns/ の当時の本文と証拠を保存し、現行手順の適用点を案内する。 カタログの対策抽出・phase・自動選別には依存しない。&#10;&#10;criteria: check&#45;companion&#45;bindings が必須見出しと、事例が .pfdsl 内へ張った相対リンクの解決先の実在を確認し、最終差分レビューで事例の証拠保存と現行手順へのリンクの有無・非依存、および1回の実行契約と、知識成果物ライフサイクル監査の採用宣言（`.pfdsl/config.json` のキー `knowledgeLifecycleAudit` の `mode` と、`adopt` のときの空でない `targets`。binding は config のキーを指す1文だけを持つ。ADR&#45;0039、ADR&#45;0041）の実在を確認する&#10;location: .pfdsl/bindings/pfd&#45;retro.md, .pfdsl/bindings/pfd&#45;retro&#45;patterns/">
 <polygon fill="none" stroke="black" points="3037.27,-1897.59 2886.07,-1897.59 2886.07,-1839.19 3037.27,-1839.19 3037.27,-1897.59"/>
 <text xml:space="preserve" text-anchor="middle" x="2961.67" y="-1880.99" font-family="Times,serif" font-size="14.00">bindings_pfd_retro</text>
 <text xml:space="preserve" text-anchor="middle" x="2961.67" y="-1864.19" font-family="Times,serif" font-size="14.00">pfd&#45;retro</text>
@@ -656,7 +656,7 @@
 <!-- delegation_guard -->
 <g id="node25" class="node">
 <title>delegation_guard</title>
-<g id="a_node25"><a xlink:title="外向き操作ガード&#10;&#10;委譲先 subagent の push・PR 作成・issue 操作を拒否する PreToolUse(Bash) フック（#554）。implementer_agent のブリーフが書く留保指定を、指示でなく権限として強制する。.claude/settings.json の配線を伴うリポ固有の機構であり、implementer_agent と違って配布対象外&#10;criteria: allowlist 外の subagent からの外向きコマンドが拒否され、呼び出し元と allowlist 対象 agent は影響を受けないことが scripts/lib/delegation&#45;guard.test.mjs のテストで検証されている&#10;location: ../scripts/delegation&#45;guard.mjs">
+<g id="a_node25"><a xlink:title="外向き操作ガード&#10;&#10;委譲先 subagent の push・PR 作成・issue 操作を拒否する PreToolUse(Bash) フック（#554）。implementer_agent のブリーフが書く留保指定を、指示でなく権限として強制する。.claude/settings.json の配線を伴うリポ固有の機構であり、implementer_agent と違って配布対象外&#10;criteria: allowlist 外の subagent からの外向きコマンドが拒否され、呼び出し元と allowlist 対象 agent は影響を受けないことが scripts/lib/delegation&#45;guard.test.mjs のテストで検証されている&#10;location: scripts/delegation&#45;guard.mjs">
 <polygon fill="none" stroke="black" points="3030.07,-1957.19 2893.27,-1957.19 2893.27,-1915.59 3030.07,-1915.59 3030.07,-1957.19"/>
 <text xml:space="preserve" text-anchor="middle" x="2961.67" y="-1940.59" font-family="Times,serif" font-size="14.00">delegation_guard</text>
 <text xml:space="preserve" text-anchor="middle" x="2961.67" y="-1923.79" font-family="Times,serif" font-size="14.00">外向き操作ガード</text>
@@ -684,7 +684,7 @@
 <!-- distributed_advisory_hooks -->
 <g id="node26" class="node">
 <title>distributed_advisory_hooks</title>
-<g id="a_node26"><a xlink:title="plugin配布advisory hooks&#10;&#10;pfd&#45;ops 運用が要求する非ブロッキングな PostToolUse(Bash) advisory 群。hooks/ は成功した flow:managed issue&#45;create の roadmap reminder を含み、gen_plugin がディレクトリ全体をミラーして Claude Code と Codex の plugin host へ配布する&#10;criteria: 正本の hooks/hooks.json が各 PostToolUse(Bash) advisory を配線し、make gen&#45;plugin が Claude Code plugin root と Codex plugin root の hooks/ へ取り込み、scripts/lib/gen&#45;plugin.test.mjs が生成済み両 consumer を採用リポに追加インストールなしで実行して flow:managed issue&#45;create の reminder の command 解決、PostToolUse 出力、非ブロッキング（exit 0）を検証する&#10;location: ../hooks/">
+<g id="a_node26"><a xlink:title="plugin配布advisory hooks&#10;&#10;pfd&#45;ops 運用が要求する非ブロッキングな PostToolUse(Bash) advisory 群。hooks/ は成功した flow:managed issue&#45;create の roadmap reminder を含み、gen_plugin がディレクトリ全体をミラーして Claude Code と Codex の plugin host へ配布する&#10;criteria: 正本の hooks/hooks.json が各 PostToolUse(Bash) advisory を配線し、make gen&#45;plugin が Claude Code plugin root と Codex plugin root の hooks/ へ取り込み、scripts/lib/gen&#45;plugin.test.mjs が生成済み両 consumer を採用リポに追加インストールなしで実行して flow:managed issue&#45;create の reminder の command 解決、PostToolUse 出力、非ブロッキング（exit 0）を検証する&#10;location: hooks/">
 <polygon fill="none" stroke="black" stroke-width="2" points="3066.07,-2671.59 2857.27,-2671.59 2857.27,-2613.19 3066.07,-2613.19 3066.07,-2671.59"/>
 <text xml:space="preserve" text-anchor="middle" x="2961.67" y="-2654.99" font-family="Times,serif" font-size="14.00">distributed_advisory_hooks</text>
 <text xml:space="preserve" text-anchor="middle" x="2961.67" y="-2638.19" font-family="Times,serif" font-size="14.00">plugin配布advisory</text>
@@ -701,7 +701,7 @@
 <!-- distribution_review_perspectives -->
 <g id="node27" class="node">
 <title>distribution_review_perspectives</title>
-<g id="a_node27"><a xlink:title="配布レビュー観点集&#10;&#10;配布 bundle の散文を利用側の読み手として問い詰める観点の一次情報。review_perspectives（配布レンズ）側には置かない — あれは利用側にも同梱されるため、実施先の無い観点を配ることになる。回ごとの実行記録から一般化できた型だけを昇格して育てる&#10;criteria: 「観点」節の各項目について、由来する欠陥への参照（docs/distribution&#45;review/ の実行記録・issue・PR のいずれか）が本文にあり、機械検査ルール（一次情報は scripts/lib/distributed&#45;prose.mjs の RULES）で決定可能な分との境界が本文に書かれている&#10;location: ../docs/distribution&#45;review.md">
+<g id="a_node27"><a xlink:title="配布レビュー観点集&#10;&#10;配布 bundle の散文を利用側の読み手として問い詰める観点の一次情報。review_perspectives（配布レンズ）側には置かない — あれは利用側にも同梱されるため、実施先の無い観点を配ることになる。回ごとの実行記録から一般化できた型だけを昇格して育てる&#10;criteria: 「観点」節の各項目について、由来する欠陥への参照（docs/distribution&#45;review/ の実行記録・issue・PR のいずれか）が本文にあり、機械検査ルール（一次情報は scripts/lib/distributed&#45;prose.mjs の RULES）で決定可能な分との境界が本文に書かれている&#10;location: docs/distribution&#45;review.md">
 <polygon fill="none" stroke="black" points="2475.59,-2254.19 2223.59,-2254.19 2223.59,-2212.59 2475.59,-2212.59 2475.59,-2254.19"/>
 <text xml:space="preserve" text-anchor="middle" x="2349.59" y="-2237.59" font-family="Times,serif" font-size="14.00">distribution_review_perspectives</text>
 <text xml:space="preserve" text-anchor="middle" x="2349.59" y="-2220.79" font-family="Times,serif" font-size="14.00">配布レビュー観点集</text>
@@ -740,7 +740,7 @@
 <!-- distribution_review_skill -->
 <g id="node28" class="node">
 <title>distribution_review_skill</title>
-<g id="a_node28"><a xlink:title="配布レビュースキル&#10;&#10;/distribution&#45;review コマンド。sandbox に隔離した subagent を利用側の読み手として走らせ、詰まりを分類し、canonical の修正と承認済み commit hash の更新までを持つ。リポローカル・手書き（生成対象外・配布対象外 — 利用側リポには配布という行為自体が無く、この手順の実施先が存在しない）&#10;criteria: /distribution&#45;review を起動すると、sandbox 隔離した subagent の詰まりが観点ごとに分類され、canonical の修正と reviewed.json の commit 更新まで到達する&#10;location: ../.claude/skills/distribution&#45;review/">
+<g id="a_node28"><a xlink:title="配布レビュースキル&#10;&#10;/distribution&#45;review コマンド。sandbox に隔離した subagent を利用側の読み手として走らせ、詰まりを分類し、canonical の修正と承認済み commit hash の更新までを持つ。リポローカル・手書き（生成対象外・配布対象外 — 利用側リポには配布という行為自体が無く、この手順の実施先が存在しない）&#10;criteria: /distribution&#45;review を起動すると、sandbox 隔離した subagent の詰まりが観点ごとに分類され、canonical の修正と reviewed.json の commit 更新まで到達する&#10;location: .claude/skills/distribution&#45;review/">
 <polygon fill="none" stroke="black" stroke-width="2" points="2450.39,-2314.19 2248.79,-2314.19 2248.79,-2272.59 2450.39,-2272.59 2450.39,-2314.19"/>
 <text xml:space="preserve" text-anchor="middle" x="2349.59" y="-2297.59" font-family="Times,serif" font-size="14.00">distribution_review_skill</text>
 <text xml:space="preserve" text-anchor="middle" x="2349.59" y="-2280.79" font-family="Times,serif" font-size="14.00">配布レビュースキル</text>
@@ -772,7 +772,7 @@
 <!-- spec_proposals -->
 <g id="node51" class="node">
 <title>spec_proposals</title>
-<g id="a_node51"><a xlink:title="spec 提案文書群&#10;&#10;各 spec 改版候補の起草文書（概要・仕様変更・設計判断・影響範囲）。draft_proposals が生成し maintain_spec が消費して spec 改版に統合する。マージ後も歴史的記録として保持（workflow.md でライフサイクル規約を管理）&#10;criteria: 対象改版候補ごとの概要・仕様変更・設計判断・影響範囲が起草され、maintain_spec が統合判断できる提案文書として揃っている。spec への統合完了は後続 maintain_spec の出力側で判定する&#10;location: ../docs/spec/proposals/">
+<g id="a_node51"><a xlink:title="spec 提案文書群&#10;&#10;各 spec 改版候補の起草文書（概要・仕様変更・設計判断・影響範囲）。draft_proposals が生成し maintain_spec が消費して spec 改版に統合する。マージ後も歴史的記録として保持（workflow.md でライフサイクル規約を管理）&#10;criteria: 対象改版候補ごとの概要・仕様変更・設計判断・影響範囲が起草され、maintain_spec が統合判断できる提案文書として揃っている。spec への統合完了は後続 maintain_spec の出力側で判定する&#10;location: docs/spec/proposals/">
 <polygon fill="none" stroke="black" points="1148.76,-1677.19 1019.16,-1677.19 1019.16,-1635.59 1148.76,-1635.59 1148.76,-1677.19"/>
 <text xml:space="preserve" text-anchor="middle" x="1083.96" y="-1660.59" font-family="Times,serif" font-size="14.00">spec_proposals</text>
 <text xml:space="preserve" text-anchor="middle" x="1083.96" y="-1643.79" font-family="Times,serif" font-size="14.00">spec 提案文書群</text>
@@ -788,7 +788,7 @@
 <!-- ecosystem_skill -->
 <g id="node30" class="node">
 <title>ecosystem_skill</title>
-<g id="a_node30"><a xlink:title="PFDセット構築スキル&#10;&#10;/pfd&#45;init コマンド。PFD セット（roadmap / workflow / pipeline）の対話的初期構築・再構築。PFDファイル種別の定義と問診リスト（ADR&#45;0017）の一次情報ホスト。手書き、生成対象外&#10;criteria: /pfd&#45;init を .pfdsl/ の無いリポで起動すると PFD セットの scaffold が生成される。make gen&#45;plugin が差分なしで完了する&#10;location: ../scripts/harness&#45;template/skills/pfd&#45;ecosystem/, ../scripts/harness&#45;template/commands/pfd&#45;init.md">
+<g id="a_node30"><a xlink:title="PFDセット構築スキル&#10;&#10;/pfd&#45;init コマンド。PFD セット（roadmap / workflow / pipeline）の対話的初期構築・再構築。PFDファイル種別の定義と問診リスト（ADR&#45;0017）の一次情報ホスト。手書き、生成対象外&#10;criteria: /pfd&#45;init を .pfdsl/ の無いリポで起動すると PFD セットの scaffold が生成される。make gen&#45;plugin が差分なしで完了する&#10;location: scripts/harness&#45;template/skills/pfd&#45;ecosystem/, scripts/harness&#45;template/commands/pfd&#45;init.md">
 <polygon fill="none" stroke="black" stroke-width="2" points="3033.67,-2263.59 2889.67,-2263.59 2889.67,-2205.19 3033.67,-2205.19 3033.67,-2263.59"/>
 <text xml:space="preserve" text-anchor="middle" x="2961.67" y="-2246.99" font-family="Times,serif" font-size="14.00">ecosystem_skill</text>
 <text xml:space="preserve" text-anchor="middle" x="2961.67" y="-2230.19" font-family="Times,serif" font-size="14.00">PFDセット構築スキ</text>
@@ -806,7 +806,7 @@
 <!-- feature_samples -->
 <g id="node31" class="node">
 <title>feature_samples</title>
-<g id="a_node31"><a xlink:title="機能カタログ&#10;&#10;1機能1ファイルの最小例。skill の references/samples.md の生成元&#10;criteria: docs/samples/ に spec の各機能に対応する最小サンプルが存在し、pfdsl check がエラーなしで通過する&#10;location: ../docs/samples/">
+<g id="a_node31"><a xlink:title="機能カタログ&#10;&#10;1機能1ファイルの最小例。skill の references/samples.md の生成元&#10;criteria: docs/samples/ に spec の各機能に対応する最小サンプルが存在し、pfdsl check がエラーなしで通過する&#10;location: docs/samples/">
 <polygon fill="none" stroke="black" stroke-width="2" points="1866.17,-1677.19 1736.57,-1677.19 1736.57,-1635.59 1866.17,-1635.59 1866.17,-1677.19"/>
 <text xml:space="preserve" text-anchor="middle" x="1801.37" y="-1660.59" font-family="Times,serif" font-size="14.00">feature_samples</text>
 <text xml:space="preserve" text-anchor="middle" x="1801.37" y="-1643.79" font-family="Times,serif" font-size="14.00">機能カタログ</text>
@@ -832,7 +832,7 @@
 <!-- grill_skill -->
 <g id="node32" class="node">
 <title>grill_skill</title>
-<g id="a_node32"><a xlink:title="後ろ向き対話構築スキル&#10;&#10;pfd&#45;grill スキル。最終成果物からの後ろ向き対話で単一 PFD の中身を書く手順（#481）。手書き、生成対象外&#10;criteria: /pfd&#45;grill を起動すると、最終成果物から外部入力まで遡ったノード列が対象の図に書き込まれる。make gen&#45;plugin が差分なしで完了する&#10;location: ../scripts/harness&#45;template/skills/pfd&#45;grill/">
+<g id="a_node32"><a xlink:title="後ろ向き対話構築スキル&#10;&#10;pfd&#45;grill スキル。最終成果物からの後ろ向き対話で単一 PFD の中身を書く手順（#481）。手書き、生成対象外&#10;criteria: /pfd&#45;grill を起動すると、最終成果物から外部入力まで遡ったノード列が対象の図に書き込まれる。make gen&#45;plugin が差分なしで完了する&#10;location: scripts/harness&#45;template/skills/pfd&#45;grill/">
 <polygon fill="none" stroke="black" stroke-width="2" points="3037.27,-2339.59 2886.07,-2339.59 2886.07,-2281.19 3037.27,-2281.19 3037.27,-2339.59"/>
 <text xml:space="preserve" text-anchor="middle" x="2961.67" y="-2322.99" font-family="Times,serif" font-size="14.00">grill_skill</text>
 <text xml:space="preserve" text-anchor="middle" x="2961.67" y="-2306.19" font-family="Times,serif" font-size="14.00">後ろ向き対話構築ス</text>
@@ -850,7 +850,7 @@
 <!-- implementer_agent -->
 <g id="node33" class="node">
 <title>implementer_agent</title>
-<g id="a_node33"><a xlink:title="実装委譲agent&#10;&#10;pfd&#45;implementer agent。実装のみを委譲し、push・PR 作成・issue 操作は呼び出し元に残す。手書きだが gen_plugin が plugin へミラーする（#558）。留保指定を機構で担保するのは delegation_guard で、そちらは配布しない&#10;criteria: make gen&#45;plugin が差分なしで完了して plugin/pfdsl/agents/pfd&#45;implementer.md が実在し、採用リポで plugin を入れただけで pfd&#45;implementer が起動でき、その tools 列に外向きツール面（GitHub MCP）が無い&#10;location: ../scripts/harness&#45;template/agents/pfd&#45;implementer.md">
+<g id="a_node33"><a xlink:title="実装委譲agent&#10;&#10;pfd&#45;implementer agent。実装のみを委譲し、push・PR 作成・issue 操作は呼び出し元に残す。手書きだが gen_plugin が plugin へミラーする（#558）。留保指定を機構で担保するのは delegation_guard で、そちらは配布しない&#10;criteria: make gen&#45;plugin が差分なしで完了して plugin/pfdsl/agents/pfd&#45;implementer.md が実在し、採用リポで plugin を入れただけで pfd&#45;implementer が起動でき、その tools 列に外向きツール面（GitHub MCP）が無い&#10;location: scripts/harness&#45;template/agents/pfd&#45;implementer.md">
 <polygon fill="none" stroke="black" stroke-width="2" points="3033.67,-2399.19 2889.67,-2399.19 2889.67,-2357.59 3033.67,-2357.59 3033.67,-2399.19"/>
 <text xml:space="preserve" text-anchor="middle" x="2961.67" y="-2382.59" font-family="Times,serif" font-size="14.00">implementer_agent</text>
 <text xml:space="preserve" text-anchor="middle" x="2961.67" y="-2365.79" font-family="Times,serif" font-size="14.00">実装委譲agent</text>
@@ -872,7 +872,7 @@
 <!-- main_branch_guard -->
 <g id="node34" class="node">
 <title>main_branch_guard</title>
-<g id="a_node34"><a xlink:title="mainブランチ操作ガード&#10;&#10;main ブランチ上または同一リポジトリの別 worktree 上でツリー・インデックスを変える直接記述の git コマンドを止める PreToolUse(Bash) 事故防止フック（#650、#777、#784）。セッション root は Claude Code の空白でない CLAUDE_PROJECT_DIR を優先し、Codex では hook payload cwd へ fallback する。quoted または escaped literal argv、literal cd、git &#45;C、env &#45;C/&#45;&#45;chdir、input を含む先頭 redirection、既知 prefix、Codex routine wrapper の明示 target を実行順に解決する。Git target 環境変数、CDPATH、対応する assignment・export・unset・read・printf・source・dot・eval と target に影響する control flow を追跡し、静的 target が確定できない変更系 Git を fail closed する。対応外の compound は無害でも拒否しうるため raw mutation は単純 command へ分ける。この hook は任意 Bash を完全に解釈する security boundary ではない。Codex の承認なし機械的境界は trusted user wrapper、raw Git を永続 allow しない execpolicy、sandbox の組合せであり、Claude Code に Codex 専用 wrapper は前提化しない。復旧系は Claude Code では ask、ask 未対応の Codex では deny に変換する。session root と異なる worktree を target にする変更系は、hook が自セッションの worktree を他セッションのものと区別できず、session 移動後も harness が起動時の root を報告し続けるため、操作の種類によらず ask とし所有権の確認を人間に委ねる（#1201）。保護の作用域は session と git common dir を共有する checkout に限り、無関係なリポジトリの main は素通しする — 使い捨て sandbox の既定ブランチが main になるため、ブランチ名だけでは管轄内外を区別できない（#1221）。roots を解決できない場合は管轄外と区別し、ブランチ名規則を適用したままにする — これが保護として効くのは session 側だけが解決できず target が既定ブランチを返す場合で、target 自体が git リポジトリでなければブランチ名が読めず従来どおり allow になる。delegation_guard と同じくリポ固有で配布対象外。実体のファイル名は commit のみを見ていた頃のもので、起動中 session の配線を壊さないため据え置く。検査バイパス（`&#45;&#45;no&#45;verify`/`&#45;n`、`&#45;c`・`&#45;&#45;config&#45;env`・`git config` 経由の core.hooksPath 上書き）は branch・worktree を問わず deny とし、foreign target を除外する。ただし `git config` の `&#45;&#45;global`/`&#45;&#45;system`/`&#45;&#45;file`・`&#45;f`（`&#45;&#45;file`・`&#45;f` は指す先を問わず対象）は foreign target でも deny とする（#1232）&#10;criteria: main を直接 target にする変更系 git が拒否され、session root と異なる worktree を target にする変更系 git は Claude Code で ask になり、Claude Code は復旧系を ask、Codex は unsupported ask を deny にする。session と git common dir を共有しない target は、ブランチ名が main でも素通しし、session root だけが解決できず target が既定ブランチを返す場合は deny が維持され、target が git リポジトリでない場合は従来どおり allow になることが scripts/lib/main&#45;commit&#45;guard.test.mjs で検証される。空白でない CLAUDE_PROJECT_DIR の優先、Codex payload cwd fallback、escaped literal argv、cd &#45;&#45;、先頭 redirection、git &#45;C、env chdir、routine wrapper target、既知 prefix、Git target 環境変数、変数ごとの export 状態、CDPATH、assignment・export・unset・read・printf の option semantics、dynamic output name、array output variable、target に影響する OR&#45;list・pipeline・background・subshell・AND&#45;list と unsupported compound の fail&#45;closed が scripts/lib/main&#45;commit&#45;guard.test.mjs で検証される。identity Git subprocess は Git target 環境変数を除去し、読み取り系 Git、絶対 cd、literal 操作で安全へ戻した状態、単純な success&#45;path AND&#45;list、target&#45;neutral pipeline・AND&#45;list、変更系 Git より後ろの control flow、session 自身の feature branch 操作は影響を受けない。shared hook は直接形の事故防止であり任意 Bash の security guarantee は主張せず、Codex の永続 allow は trusted wrapper に限定する。バイパス（`&#45;&#45;no&#45;verify`/`&#45;n`/`core.hooksPath` 上書き、対象 subcommand は変更系に限らない）が feature branch・own worktree でも deny され、foreign target では `git config` の `&#45;&#45;global`/`&#45;&#45;system`/`&#45;&#45;file`・`&#45;f`、および `&#45;&#45;glob`/`&#45;&#45;sys`/`&#45;&#45;fil` 等の曖昧でない省略形（`&#45;&#45;g`/`&#45;&#45;l` 等の短い省略形は `set` mode でのみ曖昧さなく解決される。`&#45;&#45;file`・`&#45;f` は指す先を問わない）を除き allow のままであることが scripts/lib/main&#45;commit&#45;guard.test.mjs で検証される（#1232）&#10;location: ../scripts/main&#45;commit&#45;guard.mjs">
+<g id="a_node34"><a xlink:title="mainブランチ操作ガード&#10;&#10;main ブランチ上または同一リポジトリの別 worktree 上でツリー・インデックスを変える直接記述の git コマンドを止める PreToolUse(Bash) 事故防止フック（#650、#777、#784）。セッション root は Claude Code の空白でない CLAUDE_PROJECT_DIR を優先し、Codex では hook payload cwd へ fallback する。quoted または escaped literal argv、literal cd、git &#45;C、env &#45;C/&#45;&#45;chdir、input を含む先頭 redirection、既知 prefix、Codex routine wrapper の明示 target を実行順に解決する。Git target 環境変数、CDPATH、対応する assignment・export・unset・read・printf・source・dot・eval と target に影響する control flow を追跡し、静的 target が確定できない変更系 Git を fail closed する。対応外の compound は無害でも拒否しうるため raw mutation は単純 command へ分ける。この hook は任意 Bash を完全に解釈する security boundary ではない。Codex の承認なし機械的境界は trusted user wrapper、raw Git を永続 allow しない execpolicy、sandbox の組合せであり、Claude Code に Codex 専用 wrapper は前提化しない。復旧系は Claude Code では ask、ask 未対応の Codex では deny に変換する。session root と異なる worktree を target にする変更系は、hook が自セッションの worktree を他セッションのものと区別できず、session 移動後も harness が起動時の root を報告し続けるため、操作の種類によらず ask とし所有権の確認を人間に委ねる（#1201）。保護の作用域は session と git common dir を共有する checkout に限り、無関係なリポジトリの main は素通しする — 使い捨て sandbox の既定ブランチが main になるため、ブランチ名だけでは管轄内外を区別できない（#1221）。roots を解決できない場合は管轄外と区別し、ブランチ名規則を適用したままにする — これが保護として効くのは session 側だけが解決できず target が既定ブランチを返す場合で、target 自体が git リポジトリでなければブランチ名が読めず従来どおり allow になる。delegation_guard と同じくリポ固有で配布対象外。実体のファイル名は commit のみを見ていた頃のもので、起動中 session の配線を壊さないため据え置く。検査バイパス（`&#45;&#45;no&#45;verify`/`&#45;n`、`&#45;c`・`&#45;&#45;config&#45;env`・`git config` 経由の core.hooksPath 上書き）は branch・worktree を問わず deny とし、foreign target を除外する。ただし `git config` の `&#45;&#45;global`/`&#45;&#45;system`/`&#45;&#45;file`・`&#45;f`（`&#45;&#45;file`・`&#45;f` は指す先を問わず対象）は foreign target でも deny とする（#1232）&#10;criteria: main を直接 target にする変更系 git が拒否され、session root と異なる worktree を target にする変更系 git は Claude Code で ask になり、Claude Code は復旧系を ask、Codex は unsupported ask を deny にする。session と git common dir を共有しない target は、ブランチ名が main でも素通しし、session root だけが解決できず target が既定ブランチを返す場合は deny が維持され、target が git リポジトリでない場合は従来どおり allow になることが scripts/lib/main&#45;commit&#45;guard.test.mjs で検証される。空白でない CLAUDE_PROJECT_DIR の優先、Codex payload cwd fallback、escaped literal argv、cd &#45;&#45;、先頭 redirection、git &#45;C、env chdir、routine wrapper target、既知 prefix、Git target 環境変数、変数ごとの export 状態、CDPATH、assignment・export・unset・read・printf の option semantics、dynamic output name、array output variable、target に影響する OR&#45;list・pipeline・background・subshell・AND&#45;list と unsupported compound の fail&#45;closed が scripts/lib/main&#45;commit&#45;guard.test.mjs で検証される。identity Git subprocess は Git target 環境変数を除去し、読み取り系 Git、絶対 cd、literal 操作で安全へ戻した状態、単純な success&#45;path AND&#45;list、target&#45;neutral pipeline・AND&#45;list、変更系 Git より後ろの control flow、session 自身の feature branch 操作は影響を受けない。shared hook は直接形の事故防止であり任意 Bash の security guarantee は主張せず、Codex の永続 allow は trusted wrapper に限定する。バイパス（`&#45;&#45;no&#45;verify`/`&#45;n`/`core.hooksPath` 上書き、対象 subcommand は変更系に限らない）が feature branch・own worktree でも deny され、foreign target では `git config` の `&#45;&#45;global`/`&#45;&#45;system`/`&#45;&#45;file`・`&#45;f`、および `&#45;&#45;glob`/`&#45;&#45;sys`/`&#45;&#45;fil` 等の曖昧でない省略形（`&#45;&#45;g`/`&#45;&#45;l` 等の短い省略形は `set` mode でのみ曖昧さなく解決される。`&#45;&#45;file`・`&#45;f` は指す先を問わない）を除き allow のままであることが scripts/lib/main&#45;commit&#45;guard.test.mjs で検証される（#1232）&#10;location: scripts/main&#45;commit&#45;guard.mjs">
 <polygon fill="none" stroke="black" points="3037.27,-1745.59 2886.07,-1745.59 2886.07,-1687.19 3037.27,-1687.19 3037.27,-1745.59"/>
 <text xml:space="preserve" text-anchor="middle" x="2961.67" y="-1728.99" font-family="Times,serif" font-size="14.00">main_branch_guard</text>
 <text xml:space="preserve" text-anchor="middle" x="2961.67" y="-1712.19" font-family="Times,serif" font-size="14.00">mainブランチ操作ガ</text>
@@ -925,7 +925,7 @@
 <!-- ops_skill_general -->
 <g id="node41" class="node">
 <title>ops_skill_general</title>
-<g id="a_node41"><a xlink:title="PFD運用スキル（汎用層）&#10;&#10;pfd&#45;ops スキル本体（起動口は /pfd&#45;cycle に限らない）。PFD によるプロジェクト運用プロトコルとワークサイクル。PFDファイル種別の定義（ADR&#45;0017）は ecosystem_skill が一次情報。汎用プロトコル（L1）+ディスパッチ（L2）= SKILL.md 本文 + バックエンド非依存の references（work&#45;cycle.md のサイクル4手順・architecture.md の層構成。L3 の references は ops_skill_l3 側）。L4（リポ固有、配布対象外）は pfd&#45;ops 自体の一部でなく、各採用リポの .pfdsl sibling .md companion に宿る&#10;criteria: /pfd&#45;cycle を起動するとワークサイクルの4手順（選択・実行・終端ゲート・報告）が最後まで走る。make gen&#45;plugin が差分なしで完了する&#10;location: ../scripts/harness&#45;template/skills/pfd&#45;ops/SKILL.md, ../scripts/harness&#45;template/skills/pfd&#45;ops/references/work&#45;cycle.md, ../scripts/harness&#45;template/skills/pfd&#45;ops/references/architecture.md, ../scripts/harness&#45;template/commands/pfd&#45;cycle.md">
+<g id="a_node41"><a xlink:title="PFD運用スキル（汎用層）&#10;&#10;pfd&#45;ops スキル本体（起動口は /pfd&#45;cycle に限らない）。PFD によるプロジェクト運用プロトコルとワークサイクル。PFDファイル種別の定義（ADR&#45;0017）は ecosystem_skill が一次情報。汎用プロトコル（L1）+ディスパッチ（L2）= SKILL.md 本文 + バックエンド非依存の references（work&#45;cycle.md のサイクル4手順・architecture.md の層構成。L3 の references は ops_skill_l3 側）。L4（リポ固有、配布対象外）は pfd&#45;ops 自体の一部でなく、各採用リポの .pfdsl sibling .md companion に宿る&#10;criteria: /pfd&#45;cycle を起動するとワークサイクルの4手順（選択・実行・終端ゲート・報告）が最後まで走る。make gen&#45;plugin が差分なしで完了する&#10;location: scripts/harness&#45;template/skills/pfd&#45;ops/SKILL.md, scripts/harness&#45;template/skills/pfd&#45;ops/references/work&#45;cycle.md, scripts/harness&#45;template/skills/pfd&#45;ops/references/architecture.md, scripts/harness&#45;template/commands/pfd&#45;cycle.md">
 <polygon fill="none" stroke="black" points="3033.67,-2093.59 2889.67,-2093.59 2889.67,-2035.19 3033.67,-2035.19 3033.67,-2093.59"/>
 <text xml:space="preserve" text-anchor="middle" x="2961.67" y="-2076.99" font-family="Times,serif" font-size="14.00">ops_skill_general</text>
 <text xml:space="preserve" text-anchor="middle" x="2961.67" y="-2060.19" font-family="Times,serif" font-size="14.00">PFD運用スキル（汎</text>
@@ -943,7 +943,7 @@
 <!-- ops_skill_l3 -->
 <g id="node42" class="node">
 <title>ops_skill_l3</title>
-<g id="a_node42"><a xlink:title="PFD運用スキル（バックエンドプリセット層）&#10;&#10;採用リポが作業項目バックエンドとして選択できる L3 プリセット群の規約本文。GitHub Issues 版 = references/github&#45;issues&#45;backend.md、ファイルベース・トラッカー版 = references/file&#45;based&#45;tracker&#45;backend.md。 上流が配布する選択肢の集合であり、採用リポはどちらか一方を選ぶか、どちらも採用しない。このリポは GitHub Issues 版を採用しており、develop が読むのはその版である。 手書き（生成対象外）で、retro_skill の監査結果がこの層の規約改訂に還流する。 GitHub Issues 版の採用リポが実際に配置するファイル群は pipeline.pfdsl の ops_install_templates 側で、ファイルベース・トラッカー版は実配置を要しない&#10;criteria: ../scripts/harness&#45;template/skills/pfd&#45;ops/references/github&#45;issues&#45;backend.md に、採用リポが GitHub Issues バックエンドを採用するのに必要な規約（ラベル判定・status 更新と完了チェーン回収・PR 本文規約）が記述されている。 ../scripts/harness&#45;template/skills/pfd&#45;ops/references/file&#45;based&#45;tracker&#45;backend.md に、採用リポがリポ内ファイルで作業項目を管理するのに必要な規約（一次情報ファイル・id 規約・flow 分類・status 同期・完了規則と完了契約）が記述され、GitHub Issues 版の install テンプレートを要求しない&#10;location: ../scripts/harness&#45;template/skills/pfd&#45;ops/references/github&#45;issues&#45;backend.md, ../scripts/harness&#45;template/skills/pfd&#45;ops/references/file&#45;based&#45;tracker&#45;backend.md">
+<g id="a_node42"><a xlink:title="PFD運用スキル（バックエンドプリセット層）&#10;&#10;採用リポが作業項目バックエンドとして選択できる L3 プリセット群の規約本文。GitHub Issues 版 = references/github&#45;issues&#45;backend.md、ファイルベース・トラッカー版 = references/file&#45;based&#45;tracker&#45;backend.md。 上流が配布する選択肢の集合であり、採用リポはどちらか一方を選ぶか、どちらも採用しない。このリポは GitHub Issues 版を採用しており、develop が読むのはその版である。 手書き（生成対象外）で、retro_skill の監査結果がこの層の規約改訂に還流する。 GitHub Issues 版の採用リポが実際に配置するファイル群は pipeline.pfdsl の ops_install_templates 側で、ファイルベース・トラッカー版は実配置を要しない&#10;criteria: ../scripts/harness&#45;template/skills/pfd&#45;ops/references/github&#45;issues&#45;backend.md に、採用リポが GitHub Issues バックエンドを採用するのに必要な規約（ラベル判定・status 更新と完了チェーン回収・PR 本文規約）が記述されている。 ../scripts/harness&#45;template/skills/pfd&#45;ops/references/file&#45;based&#45;tracker&#45;backend.md に、採用リポがリポ内ファイルで作業項目を管理するのに必要な規約（一次情報ファイル・id 規約・flow 分類・status 同期・完了規則と完了契約）が記述され、GitHub Issues 版の install テンプレートを要求しない&#10;location: scripts/harness&#45;template/skills/pfd&#45;ops/references/github&#45;issues&#45;backend.md, scripts/harness&#45;template/skills/pfd&#45;ops/references/file&#45;based&#45;tracker&#45;backend.md">
 <polygon fill="none" stroke="black" points="3037.27,-2186.99 2886.07,-2186.99 2886.07,-2111.79 3037.27,-2111.79 3037.27,-2186.99"/>
 <text xml:space="preserve" text-anchor="middle" x="2961.67" y="-2170.39" font-family="Times,serif" font-size="14.00">ops_skill_l3</text>
 <text xml:space="preserve" text-anchor="middle" x="2961.67" y="-2153.59" font-family="Times,serif" font-size="14.00">PFD運用スキル（バ</text>
@@ -962,7 +962,7 @@
 <!-- pfd_lens_agent -->
 <g id="node43" class="node">
 <title>pfd_lens_agent</title>
-<g id="a_node43"><a xlink:title="pfd&#45;lens agent&#10;&#10;retro_skill の A・B 層委譲先。大きい図・複数図の監査を read&#45;only agent へオフロードする（#357）。手書き、生成対象外&#10;criteria: pfd&#45;lens は upstream identity を確認した場合に checkout&#45;local CLI を選び、全監査 query を同じ解決済み CLI で実行して、A・B 観点の findings を file:line アンカー付きで返す。make gen&#45;plugin が差分なしで完了する&#10;location: ../scripts/harness&#45;template/agents/pfd&#45;lens.md">
+<g id="a_node43"><a xlink:title="pfd&#45;lens agent&#10;&#10;retro_skill の A・B 層委譲先。大きい図・複数図の監査を read&#45;only agent へオフロードする（#357）。手書き、生成対象外&#10;criteria: pfd&#45;lens は upstream identity を確認した場合に checkout&#45;local CLI を選び、全監査 query を同じ解決済み CLI で実行して、A・B 観点の findings を file:line アンカー付きで返す。make gen&#45;plugin が差分なしで完了する&#10;location: scripts/harness&#45;template/agents/pfd&#45;lens.md">
 <polygon fill="none" stroke="black" stroke-width="2" points="3012.43,-2459.19 2910.9,-2459.19 2910.9,-2417.59 3012.43,-2417.59 3012.43,-2459.19"/>
 <text xml:space="preserve" text-anchor="middle" x="2961.67" y="-2442.59" font-family="Times,serif" font-size="14.00">pfd_lens_agent</text>
 <text xml:space="preserve" text-anchor="middle" x="2961.67" y="-2425.79" font-family="Times,serif" font-size="14.00">pfd&#45;lens agent</text>
@@ -978,7 +978,7 @@
 <!-- retro_skill -->
 <g id="node47" class="node">
 <title>retro_skill</title>
-<g id="a_node47"><a xlink:title="ふりかえり監査スキル&#10;&#10;/pfd&#45;retro コマンド。図・セッションイベント・知識成果物の監査カタログと、D 層の設定を分類する同梱 scripts/classify&#45;knowledge&#45;lifecycle.mjs。ユーザーの監査介入17件から蒸留（手書き、生成対象外）。A・B 層は任意の PFD レビューにも使う&#10;criteria: /pfd&#45;retro を起動すると適用した層の findings が振り分け先付きで出力される。D 層は同梱分類器を採用リポに対して実行し、state が adopt のときだけ auditTargets の成果物に適用する。adopt の targets は空白だけの要素を含まない非空の文字列配列とし、有効な対象の文字列は変更せず、対象を推測で補わない。decline は targets を無視して監査しないが、旧宣言行の移行警告は残す。config の欠落・不正は監査せず不備を毎回報告する。分類器の実行・読取・JSON 取得失敗は報告して D 層を止める。binding の散文と旧宣言行は宣言として扱わない。scripts/lib/knowledge&#45;lifecycle&#45;classifier.test.mjs が分類結果と四配布先の実行を検査する。ADR&#45;0039、ADR&#45;0041。make gen&#45;plugin が差分なしで完了する&#10;location: ../scripts/harness&#45;template/skills/pfd&#45;retro/, ../scripts/harness&#45;template/commands/pfd&#45;retro.md">
+<g id="a_node47"><a xlink:title="ふりかえり監査スキル&#10;&#10;/pfd&#45;retro コマンド。図・セッションイベント・知識成果物の監査カタログと、D 層の設定を分類する同梱 scripts/classify&#45;knowledge&#45;lifecycle.mjs。ユーザーの監査介入17件から蒸留（手書き、生成対象外）。A・B 層は任意の PFD レビューにも使う&#10;criteria: /pfd&#45;retro を起動すると適用した層の findings が振り分け先付きで出力される。D 層は同梱分類器を採用リポに対して実行し、state が adopt のときだけ auditTargets の成果物に適用する。adopt の targets は空白だけの要素を含まない非空の文字列配列とし、有効な対象の文字列は変更せず、対象を推測で補わない。decline は targets を無視して監査しないが、旧宣言行の移行警告は残す。config の欠落・不正は監査せず不備を毎回報告する。分類器の実行・読取・JSON 取得失敗は報告して D 層を止める。binding の散文と旧宣言行は宣言として扱わない。scripts/lib/knowledge&#45;lifecycle&#45;classifier.test.mjs が分類結果と四配布先の実行を検査する。ADR&#45;0039、ADR&#45;0041。make gen&#45;plugin が差分なしで完了する&#10;location: scripts/harness&#45;template/skills/pfd&#45;retro/, scripts/harness&#45;template/commands/pfd&#45;retro.md">
 <polygon fill="none" stroke="black" stroke-width="2" points="3037.27,-2535.59 2886.07,-2535.59 2886.07,-2477.19 3037.27,-2477.19 3037.27,-2535.59"/>
 <text xml:space="preserve" text-anchor="middle" x="2961.67" y="-2518.99" font-family="Times,serif" font-size="14.00">retro_skill</text>
 <text xml:space="preserve" text-anchor="middle" x="2961.67" y="-2502.19" font-family="Times,serif" font-size="14.00">ふりかえり監査スキ</text>
@@ -996,7 +996,7 @@
 <!-- review_perspectives -->
 <g id="node48" class="node">
 <title>review_perspectives</title>
-<g id="a_node48"><a xlink:title="レビュー観点集&#10;&#10;PFD と normative 仕様を問い詰める A/B/C 監査カタログの一次情報。pfdsl スキルに references として同梱され、pfd&#45;retro はポインタ参照&#10;criteria: make gen&#45;skill が差分なしで完了する&#10;location: ../docs/review&#45;perspectives.md">
+<g id="a_node48"><a xlink:title="レビュー観点集&#10;&#10;PFD と normative 仕様を問い詰める A/B/C 監査カタログの一次情報。pfdsl スキルに references として同梱され、pfd&#45;retro はポインタ参照&#10;criteria: make gen&#45;skill が差分なしで完了する&#10;location: docs/review&#45;perspectives.md">
 <polygon fill="none" stroke="black" stroke-width="2" points="3040.87,-2595.19 2882.47,-2595.19 2882.47,-2553.59 3040.87,-2553.59 3040.87,-2595.19"/>
 <text xml:space="preserve" text-anchor="middle" x="2961.67" y="-2578.59" font-family="Times,serif" font-size="14.00">review_perspectives</text>
 <text xml:space="preserve" text-anchor="middle" x="2961.67" y="-2561.79" font-family="Times,serif" font-size="14.00">レビュー観点集</text>
@@ -1043,7 +1043,7 @@
 <!-- workflow_md -->
 <g id="node54" class="node">
 <title>workflow_md</title>
-<g id="a_node54"><a xlink:title="生態系 companion&#10;&#10;workflow.pfdsl のグラフが運べない運用手続き散文。セクション構成は実ファイルが一次情報（ここに列挙しない）。pfd&#45;ops skill が読む L4 ホスト&#10;criteria: check&#45;companion&#45;bindings が参照パスの実在を通す。散文が名指す workflow.pfdsl のノード・エッジを graph describe で引いて食い違いがない（pfd&#45;retro B 層監査の観点）&#10;location: workflow.md">
+<g id="a_node54"><a xlink:title="生態系 companion&#10;&#10;workflow.pfdsl のグラフが運べない運用手続き散文。セクション構成は実ファイルが一次情報（ここに列挙しない）。pfd&#45;ops skill が読む L4 ホスト&#10;criteria: check&#45;companion&#45;bindings が参照パスの実在を通す。散文が名指す workflow.pfdsl のノード・エッジを graph describe で引いて食い違いがない（pfd&#45;retro B 層監査の観点）&#10;location: .pfdsl/workflow.md">
 <polygon fill="none" stroke="black" points="3030.07,-1669.19 2893.27,-1669.19 2893.27,-1627.59 3030.07,-1627.59 3030.07,-1669.19"/>
 <text xml:space="preserve" text-anchor="middle" x="2961.67" y="-1652.59" font-family="Times,serif" font-size="14.00">workflow_md</text>
 <text xml:space="preserve" text-anchor="middle" x="2961.67" y="-1635.79" font-family="Times,serif" font-size="14.00">生態系 companion</text>
@@ -1072,7 +1072,7 @@
 <!-- prose_mechanization_audit_skill -->
 <g id="node45" class="node">
 <title>prose_mechanization_audit_skill</title>
-<g id="a_node45"><a xlink:title="散文機械化監査スキル&#10;&#10;堆積した運用散文を hook・check の台帳と突き合わせる手順（台帳の実測列挙・機械化済み対策を語る散文・スクリプト出力の再説明・層内の同文再掲・散文と機械の矛盾）。「散文として書く前に機械化を検討する」は書く時点の規律であり、既に書かれた分を洗う工程がこれにあたる。リポローカル・手書き（生成対象外・配布対象外 — 利用側リポは突合の片側である hook・check 台帳を持たず、配布された散文の側もその上流はこのリポなので、直す工程はこちらにしか置けない）&#10;criteria: 散文と機構の突合を依頼すると5工程が実行され、対象範囲・所見・処遇の記録が docs/asset&#45;sweep/ に残る&#10;location: ../.claude/skills/prose&#45;mechanization&#45;audit/">
+<g id="a_node45"><a xlink:title="散文機械化監査スキル&#10;&#10;堆積した運用散文を hook・check の台帳と突き合わせる手順（台帳の実測列挙・機械化済み対策を語る散文・スクリプト出力の再説明・層内の同文再掲・散文と機械の矛盾）。「散文として書く前に機械化を検討する」は書く時点の規律であり、既に書かれた分を洗う工程がこれにあたる。リポローカル・手書き（生成対象外・配布対象外 — 利用側リポは突合の片側である hook・check 台帳を持たず、配布された散文の側もその上流はこのリポなので、直す工程はこちらにしか置けない）&#10;criteria: 散文と機構の突合を依頼すると5工程が実行され、対象範囲・所見・処遇の記録が docs/asset&#45;sweep/ に残る&#10;location: .claude/skills/prose&#45;mechanization&#45;audit/">
 <polygon fill="none" stroke="black" stroke-width="2" points="2471.99,-2390.59 2227.19,-2390.59 2227.19,-2332.19 2471.99,-2332.19 2471.99,-2390.59"/>
 <text xml:space="preserve" text-anchor="middle" x="2349.59" y="-2373.99" font-family="Times,serif" font-size="14.00">prose_mechanization_audit_skill</text>
 <text xml:space="preserve" text-anchor="middle" x="2349.59" y="-2357.19" font-family="Times,serif" font-size="14.00">散文機械化監査スキ</text>
@@ -1090,7 +1090,7 @@
 <!-- spec_stress_skill -->
 <g id="node52" class="node">
 <title>spec_stress_skill</title>
-<g id="a_node52"><a xlink:title="仕様stress&#45;testスキル&#10;&#10;/spec&#45;stress&#45;test コマンド。仕様制約の具体例 stress&#45;test（ADR&#45;0020）と agent 実書きプローブ（spec のみ読ませた subagent を CLI で採点）の実行手順。仕様改訂の検証能力として maintain_spec に還流。リポローカル・手書き（生成対象外・配布対象外）&#10;criteria: /spec&#45;stress&#45;test を起動すると境界例 stress&#45;test と agent 実書きプローブが実行され、記録が docs/adr/0020&#45;spec&#45;stress&#45;testing/ に残る&#10;location: ../.claude/skills/spec&#45;stress&#45;test/">
+<g id="a_node52"><a xlink:title="仕様stress&#45;testスキル&#10;&#10;/spec&#45;stress&#45;test コマンド。仕様制約の具体例 stress&#45;test（ADR&#45;0020）と agent 実書きプローブ（spec のみ読ませた subagent を CLI で採点）の実行手順。仕様改訂の検証能力として maintain_spec に還流。リポローカル・手書き（生成対象外・配布対象外）&#10;criteria: /spec&#45;stress&#45;test を起動すると境界例 stress&#45;test と agent 実書きプローブが実行され、記録が docs/adr/0020&#45;spec&#45;stress&#45;testing/ に残る&#10;location: .claude/skills/spec&#45;stress&#45;test/">
 <polygon fill="none" stroke="black" stroke-width="2" points="2435.99,-2194.19 2263.19,-2194.19 2263.19,-2152.59 2435.99,-2152.59 2435.99,-2194.19"/>
 <text xml:space="preserve" text-anchor="middle" x="2349.59" y="-2177.59" font-family="Times,serif" font-size="14.00">spec_stress_skill</text>
 <text xml:space="preserve" text-anchor="middle" x="2349.59" y="-2160.79" font-family="Times,serif" font-size="14.00">仕様stress&#45;testスキル</text>
@@ -1107,7 +1107,7 @@
 <!-- vscode_ext_debug_skill -->
 <g id="node53" class="node">
 <title>vscode_ext_debug_skill</title>
-<g id="a_node53"><a xlink:title="VSCode拡張デバッグスキル&#10;&#10;/vscode&#45;ext&#45;debug コマンド。worktree での VS Code 拡張デバッグ手順（make vscode&#45;dev・F5 起動・PFDSL Preview 検証・webview console フィルタ）。手書き、生成対象外&#10;criteria: 手順どおりに make vscode&#45;dev から F5 起動まで進むと拡張がデバッグ実行され、PFDSL Preview が対象 .pfdsl を描画する&#10;location: ../.claude/skills/vscode&#45;ext&#45;debug/">
+<g id="a_node53"><a xlink:title="VSCode拡張デバッグスキル&#10;&#10;/vscode&#45;ext&#45;debug コマンド。worktree での VS Code 拡張デバッグ手順（make vscode&#45;dev・F5 起動・PFDSL Preview 検証・webview console フィルタ）。手書き、生成対象外&#10;criteria: 手順どおりに make vscode&#45;dev から F5 起動まで進むと拡張がデバッグ実行され、PFDSL Preview が対象 .pfdsl を描画する&#10;location: .claude/skills/vscode&#45;ext&#45;debug/">
 <polygon fill="none" stroke="black" stroke-width="2" points="2439.59,-2134.59 2259.59,-2134.59 2259.59,-2076.19 2439.59,-2076.19 2439.59,-2134.59"/>
 <text xml:space="preserve" text-anchor="middle" x="2349.59" y="-2117.99" font-family="Times,serif" font-size="14.00">vscode_ext_debug_skill</text>
 <text xml:space="preserve" text-anchor="middle" x="2349.59" y="-2101.19" font-family="Times,serif" font-size="14.00">VSCode拡張デバッ</text>
@@ -1141,7 +1141,7 @@
 <!-- spec -->
 <g id="node50" class="node">
 <title>spec</title>
-<g id="a_node50"><a xlink:title="言語仕様書&#10;&#10;一次情報だが不変の外部入力ではない — 実装知見からの仕様提案（issue 経由）で改訂される。改版の詳細依存は .pfdsl/roadmap.pfdsl 参照&#10;criteria: check/fmt/graph が全サンプルに対してエラーなし&#10;location: ../docs/spec/spec.md">
+<g id="a_node50"><a xlink:title="言語仕様書&#10;&#10;一次情報だが不変の外部入力ではない — 実装知見からの仕様提案（issue 経由）で改訂される。改版の詳細依存は .pfdsl/roadmap.pfdsl 参照&#10;criteria: check/fmt/graph が全サンプルに対してエラーなし&#10;location: docs/spec/spec.md">
 <polygon fill="none" stroke="black" points="1477.38,-1677.19 1383.78,-1677.19 1383.78,-1635.59 1477.38,-1635.59 1477.38,-1677.19"/>
 <text xml:space="preserve" text-anchor="middle" x="1430.58" y="-1660.59" font-family="Times,serif" font-size="14.00">spec</text>
 <text xml:space="preserve" text-anchor="middle" x="1430.58" y="-1643.79" font-family="Times,serif" font-size="14.00">言語仕様書</text>
@@ -1157,7 +1157,7 @@
 <!-- quality_guide -->
 <g id="node46" class="node">
 <title>quality_guide</title>
-<g id="a_node46"><a xlink:title="品質ガイド&#10;&#10;PFD 設計判断ルールの一次情報。知見・ADR の反映先。pfdsl スキルに references として同梱される&#10;criteria: make gen&#45;skill が差分なしで完了する（skill の references/quality&#45;guide.md に同梱済み）&#10;location: ../docs/quality&#45;guide.md">
+<g id="a_node46"><a xlink:title="品質ガイド&#10;&#10;PFD 設計判断ルールの一次情報。知見・ADR の反映先。pfdsl スキルに references として同梱される&#10;criteria: make gen&#45;skill が差分なしで完了する（skill の references/quality&#45;guide.md に同梱済み）&#10;location: docs/quality&#45;guide.md">
 <polygon fill="none" stroke="black" stroke-width="2" points="2407.19,-1717.19 2291.99,-1717.19 2291.99,-1675.59 2407.19,-1675.59 2407.19,-1717.19"/>
 <text xml:space="preserve" text-anchor="middle" x="2349.59" y="-1700.59" font-family="Times,serif" font-size="14.00">quality_guide</text>
 <text xml:space="preserve" text-anchor="middle" x="2349.59" y="-1683.79" font-family="Times,serif" font-size="14.00">品質ガイド</text>
@@ -1173,7 +1173,7 @@
 <!-- skill_template -->
 <g id="node49" class="node">
 <title>skill_template</title>
-<g id="a_node49"><a xlink:title="スキルテンプレート&#10;&#10;スキル本文の正本（品質ガイドは quality_guide が別持ち）。gen&#45;skill.mjs がこれを読み込んで pfdsl_skill を生成する&#10;criteria: make gen&#45;skill が差分なしで完了し、pfdsl_skill が最新テンプレートと一致&#10;location: ../scripts/skill&#45;template/SKILL.md">
+<g id="a_node49"><a xlink:title="スキルテンプレート&#10;&#10;スキル本文の正本（品質ガイドは quality_guide が別持ち）。gen&#45;skill.mjs がこれを読み込んで pfdsl_skill を生成する&#10;criteria: make gen&#45;skill が差分なしで完了し、pfdsl_skill が最新テンプレートと一致&#10;location: scripts/skill&#45;template/SKILL.md">
 <polygon fill="none" stroke="black" stroke-width="2" points="2425.19,-1777.19 2273.99,-1777.19 2273.99,-1735.59 2425.19,-1735.59 2425.19,-1777.19"/>
 <text xml:space="preserve" text-anchor="middle" x="2349.59" y="-1760.59" font-family="Times,serif" font-size="14.00">skill_template</text>
 <text xml:space="preserve" text-anchor="middle" x="2349.59" y="-1743.79" font-family="Times,serif" font-size="14.00">スキルテンプレート</text>
@@ -1231,7 +1231,7 @@
 <!-- pfdsl_skill -->
 <g id="node44" class="node">
 <title>pfdsl_skill</title>
-<g id="a_node44"><a xlink:title="AI agent スキル（リポ内）&#10;&#10;pipeline.pfdsl の gen_skill が生産する中立生成物（判断を含まない生成のため、ADR&#45;0035 でそちらへ移した）。実体は generated/skills/pfdsl で、リポ内の .claude/skills/pfdsl はそこへの生成symlinkであり、正本入力でも編集先でもない（#714）。両ホストのadapterはこの中立生成物を各plugin rootへコピーする。この図では全 .pfdsl 作業の起点として実践・レビューへの還流入力に現れる&#10;location: ../generated/skills/pfdsl/">
+<g id="a_node44"><a xlink:title="AI agent スキル（リポ内）&#10;&#10;pipeline.pfdsl の gen_skill が生産する中立生成物（判断を含まない生成のため、ADR&#45;0035 でそちらへ移した）。実体は generated/skills/pfdsl で、リポ内の .claude/skills/pfdsl はそこへの生成symlinkであり、正本入力でも編集先でもない（#714）。両ホストのadapterはこの中立生成物を各plugin rootへコピーする。この図では全 .pfdsl 作業の起点として実践・レビューへの還流入力に現れる&#10;location: generated/skills/pfdsl/">
 <polygon fill="none" stroke="black" stroke-width="2" points="160,-2178.59 23.2,-2178.59 23.2,-2120.19 160,-2120.19 160,-2178.59"/>
 <text xml:space="preserve" text-anchor="middle" x="91.6" y="-2161.99" font-family="Times,serif" font-size="14.00">pfdsl_skill</text>
 <text xml:space="preserve" text-anchor="middle" x="91.6" y="-2145.19" font-family="Times,serif" font-size="14.00">AI agent</text>
@@ -1473,7 +1473,7 @@
 <!-- integrated_repository -->
 <g id="node58" class="node">
 <title>integrated_repository</title>
-<g id="a_node58"><a xlink:title="統合済みリポジトリ&#10;&#10;PR を main に統合した後のリポジトリ全体の現行状態&#10;criteria: 対象 PR が merged で、その merge commit が main の HEAD の祖先であり、.github/workflows/test.yml の test job と vscode&#45;smoke job、および check&#45;docs を実行する .github/workflows/check&#45;gen&#45;plugin.yml の gen&#45;plugin job がその commit に対して成功している&#10;location: ../">
+<g id="a_node58"><a xlink:title="統合済みリポジトリ&#10;&#10;PR を main に統合した後のリポジトリ全体の現行状態&#10;criteria: 対象 PR が merged で、その merge commit が main の HEAD の祖先であり、.github/workflows/test.yml の test job と vscode&#45;smoke job、および check&#45;docs を実行する .github/workflows/check&#45;gen&#45;plugin.yml の gen&#45;plugin job がその commit に対して成功している&#10;location: ./">
 <polygon fill="none" stroke="black" points="2435.99,-1329.19 2263.19,-1329.19 2263.19,-1287.59 2435.99,-1287.59 2435.99,-1329.19"/>
 <text xml:space="preserve" text-anchor="middle" x="2349.59" y="-1312.59" font-family="Times,serif" font-size="14.00">integrated_repository</text>
 <text xml:space="preserve" text-anchor="middle" x="2349.59" y="-1295.79" font-family="Times,serif" font-size="14.00">統合済みリポジトリ</text>
@@ -1549,7 +1549,7 @@
 <!-- pipeline_md -->
 <g id="node63" class="node">
 <title>pipeline_md</title>
-<g id="a_node63"><a xlink:title="変換境界 companion&#10;&#10;pipeline.pfdsl の sibling。グラフで運べない変換境界の定義・エラー処理方針&#10;criteria: check&#45;companion&#45;bindings が参照パスの実在を通す。散文が名指す pipeline.pfdsl のノード・エッジを graph describe で引いて食い違いがない&#10;location: pipeline.md">
+<g id="a_node63"><a xlink:title="変換境界 companion&#10;&#10;pipeline.pfdsl の sibling。グラフで運べない変換境界の定義・エラー処理方針&#10;criteria: check&#45;companion&#45;bindings が参照パスの実在を通す。散文が名指す pipeline.pfdsl のノード・エッジを graph describe で引いて食い違いがない&#10;location: .pfdsl/pipeline.md">
 <polygon fill="none" stroke="black" points="3037.27,-1441.19 2886.07,-1441.19 2886.07,-1399.59 3037.27,-1399.59 3037.27,-1441.19"/>
 <text xml:space="preserve" text-anchor="middle" x="2961.67" y="-1424.59" font-family="Times,serif" font-size="14.00">pipeline_md</text>
 <text xml:space="preserve" text-anchor="middle" x="2961.67" y="-1407.79" font-family="Times,serif" font-size="14.00">変換境界 companion</text>
@@ -1565,7 +1565,7 @@
 <!-- pipeline_pfdsl -->
 <g id="node64" class="node">
 <title>pipeline_pfdsl</title>
-<g id="a_node64"><a xlink:title="変換パイプライン図&#10;&#10;integrated_repository の実装にある実行時データ変換と生成・検査・公開処理の境界。変換コンポーネント追加・変更・削除時に更新（ADR&#45;0018 門番）&#10;criteria: check がエラーなし、meta check&#45;links が通過する。対象とする各変換段が integrated_repository の実装に対応したノード・エッジとして現れる&#10;location: pipeline.pfdsl">
+<g id="a_node64"><a xlink:title="変換パイプライン図&#10;&#10;integrated_repository の実装にある実行時データ変換と生成・検査・公開処理の境界。変換コンポーネント追加・変更・削除時に更新（ADR&#45;0018 門番）&#10;criteria: check がエラーなし、meta check&#45;links が通過する。対象とする各変換段が integrated_repository の実装に対応したノード・エッジとして現れる&#10;location: .pfdsl/pipeline.pfdsl">
 <polygon fill="none" stroke="black" stroke-width="2" points="3037.27,-1381.19 2886.07,-1381.19 2886.07,-1339.59 3037.27,-1339.59 3037.27,-1381.19"/>
 <text xml:space="preserve" text-anchor="middle" x="2961.67" y="-1364.59" font-family="Times,serif" font-size="14.00">pipeline_pfdsl</text>
 <text xml:space="preserve" text-anchor="middle" x="2961.67" y="-1347.79" font-family="Times,serif" font-size="14.00">変換パイプライン図</text>
@@ -1581,7 +1581,7 @@
 <!-- workflow_pfdsl -->
 <g id="node70" class="node">
 <title>workflow_pfdsl</title>
-<g id="a_node70"><a xlink:title="ワークフロー図&#10;&#10;この図そのもの。対話から公開までのサイクル全体を変換グラフとして持つ。roadmap_pfdsl（issue 依存）・pipeline_pfdsl（変換境界）と並ぶ3つ目の運用 PFD で、3つとも専用の整理プロセスが生産する。自分の companion（workflow_md）だけが artifact で図が無い状態を解消した（#904）&#10;criteria: check がエラーなし、meta check&#45;links が通過する。workflow_md が名指すノード・エッジを graph describe で引いて食い違いがない&#10;location: workflow.pfdsl">
+<g id="a_node70"><a xlink:title="ワークフロー図&#10;&#10;この図そのもの。対話から公開までのサイクル全体を変換グラフとして持つ。roadmap_pfdsl（issue 依存）・pipeline_pfdsl（変換境界）と並ぶ3つ目の運用 PFD で、3つとも専用の整理プロセスが生産する。自分の companion（workflow_md）だけが artifact で図が無い状態を解消した（#904）&#10;criteria: check がエラーなし、meta check&#45;links が通過する。workflow_md が名指すノード・エッジを graph describe で引いて食い違いがない&#10;location: .pfdsl/workflow.pfdsl">
 <polygon fill="none" stroke="black" stroke-width="2" points="3022.87,-1542.19 2900.47,-1542.19 2900.47,-1500.59 3022.87,-1500.59 3022.87,-1542.19"/>
 <text xml:space="preserve" text-anchor="middle" x="2961.67" y="-1525.59" font-family="Times,serif" font-size="14.00">workflow_pfdsl</text>
 <text xml:space="preserve" text-anchor="middle" x="2961.67" y="-1508.79" font-family="Times,serif" font-size="14.00">ワークフロー図</text>
@@ -1597,7 +1597,7 @@
 <!-- merge_pr -->
 <g id="node62" class="node">
 <title>merge_pr</title>
-<g id="a_node62"><a xlink:title="レビュー・マージ&#10;&#10;PR をレビューし main へ統合する。成果物はマージで正本になり、進捗・issue 更新もここで確定する。location はこのプロセスのうち機械化されている部分を指す — pr_diagrams の生成・配送がそれにあたり、その location（外部リポの URL）からは実装へ辿れないため、実装パスはこちらが持つ&#10;location: ../.github/workflows/pr&#45;diff&#45;images.yml">
+<g id="a_node62"><a xlink:title="レビュー・マージ&#10;&#10;PR をレビューし main へ統合する。成果物はマージで正本になり、進捗・issue 更新もここで確定する。location はこのプロセスのうち機械化されている部分を指す — pr_diagrams の生成・配送がそれにあたり、その location（外部リポの URL）からは実装へ辿れないため、実装パスはこちらが持つ&#10;location: .github/workflows/pr&#45;diff&#45;images.yml">
 <ellipse fill="none" stroke="black" cx="2044.88" cy="-1386.39" rx="70.71" ry="29.42"/>
 <text xml:space="preserve" text-anchor="middle" x="2044.88" y="-1390.59" font-family="Times,serif" font-size="14.00">merge_pr</text>
 <text xml:space="preserve" text-anchor="middle" x="2044.88" y="-1373.79" font-family="Times,serif" font-size="14.00">レビュー・マージ</text>
@@ -1671,7 +1671,7 @@
 <!-- toolchain -->
 <g id="node69" class="node">
 <title>toolchain</title>
-<g id="a_node69"><a xlink:title="ツールチェーン&#10;&#10;integrated_repository の packages/（core / cli / graphviz&#45;exporter / preview&#45;engine / vscode&#45;extension）の現行状態&#10;criteria: gh pr view &lt;PR番号&gt; &#45;&#45;json mergeCommit &#45;&#45;jq &#39;.mergeCommit.oid&#39; で merge commit C を得て、git rev&#45;parse origin/main:packages と git rev&#45;parse C:packages が同じ tree object ID を返す&#10;location: ../packages/">
+<g id="a_node69"><a xlink:title="ツールチェーン&#10;&#10;integrated_repository の packages/（core / cli / graphviz&#45;exporter / preview&#45;engine / vscode&#45;extension）の現行状態&#10;criteria: gh pr view &lt;PR番号&gt; &#45;&#45;json mergeCommit &#45;&#45;jq &#39;.mergeCommit.oid&#39; で merge commit C を得て、git rev&#45;parse origin/main:packages と git rev&#45;parse C:packages が同じ tree object ID を返す&#10;location: packages/">
 <polygon fill="none" stroke="black" points="3022.87,-1321.19 2900.47,-1321.19 2900.47,-1279.59 3022.87,-1279.59 3022.87,-1321.19"/>
 <text xml:space="preserve" text-anchor="middle" x="2961.67" y="-1304.59" font-family="Times,serif" font-size="14.00">toolchain</text>
 <text xml:space="preserve" text-anchor="middle" x="2961.67" y="-1287.79" font-family="Times,serif" font-size="14.00">ツールチェーン</text>
@@ -1693,7 +1693,7 @@
 <!-- roadmap_md -->
 <g id="node67" class="node">
 <title>roadmap_md</title>
-<g id="a_node67"><a xlink:title="計画 companion&#10;&#10;roadmap.pfdsl の sibling。このリポの issue 管理バインディング（GitHub backend、監査スクリプト実パス、L3 reference ポインタ、運用対象の計画 PFD 一覧、issue 固有の終端ゲート項目）。pfd&#45;ops skill が読む L4 ホスト&#10;criteria: check&#45;companion&#45;bindings と audit&#45;issues&#45;flow.mjs が差分なしで通過する。散文が名指す roadmap.pfdsl のノード・エッジを graph describe で引いて食い違いがない&#10;location: roadmap.md">
+<g id="a_node67"><a xlink:title="計画 companion&#10;&#10;roadmap.pfdsl の sibling。このリポの issue 管理バインディング（GitHub backend、監査スクリプト実パス、L3 reference ポインタ、運用対象の計画 PFD 一覧、issue 固有の終端ゲート項目）。pfd&#45;ops skill が読む L4 ホスト&#10;criteria: check&#45;companion&#45;bindings と audit&#45;issues&#45;flow.mjs が差分なしで通過する。散文が名指す roadmap.pfdsl のノード・エッジを graph describe で引いて食い違いがない&#10;location: .pfdsl/roadmap.md">
 <polygon fill="none" stroke="black" points="1678.98,-1321.19 1556.58,-1321.19 1556.58,-1279.59 1678.98,-1279.59 1678.98,-1321.19"/>
 <text xml:space="preserve" text-anchor="middle" x="1617.78" y="-1304.59" font-family="Times,serif" font-size="14.00">roadmap_md</text>
 <text xml:space="preserve" text-anchor="middle" x="1617.78" y="-1287.79" font-family="Times,serif" font-size="14.00">計画 companion</text>
@@ -1721,7 +1721,7 @@
 <!-- roadmap_pfdsl -->
 <g id="node68" class="node">
 <title>roadmap_pfdsl</title>
-<g id="a_node68"><a xlink:title="issue 依存グラフ&#10;&#10;着手可能順序の導出。issue 追加時に更新&#10;criteria: check がエラーなし、audit&#45;issues&#45;flow.mjs が差分なし。&#10;location: roadmap.pfdsl">
+<g id="a_node68"><a xlink:title="issue 依存グラフ&#10;&#10;着手可能順序の導出。issue 追加時に更新&#10;criteria: check がエラーなし、audit&#45;issues&#45;flow.mjs が差分なし。&#10;location: .pfdsl/roadmap.pfdsl">
 <polygon fill="none" stroke="black" points="1498.98,-1421.19 1362.18,-1421.19 1362.18,-1379.59 1498.98,-1379.59 1498.98,-1421.19"/>
 <text xml:space="preserve" text-anchor="middle" x="1430.58" y="-1404.59" font-family="Times,serif" font-size="14.00">roadmap_pfdsl</text>
 <text xml:space="preserve" text-anchor="middle" x="1430.58" y="-1387.79" font-family="Times,serif" font-size="14.00">issue 依存グラフ</text>
@@ -1835,7 +1835,7 @@
 <!-- examples -->
 <g id="node71" class="node">
 <title>examples</title>
-<g id="a_node71"><a xlink:title="実践例&#10;&#10;品質ガイドの実証とレビュー素材。スキル参照への採録候補&#10;criteria: check がエラーなし、レビュー結果が pfd&#45;retro の出力表に finding として記録されている&#10;location: ../docs/examples/">
+<g id="a_node71"><a xlink:title="実践例&#10;&#10;品質ガイドの実証とレビュー素材。スキル参照への採録候補&#10;criteria: check がエラーなし、レビュー結果が pfd&#45;retro の出力表に finding として記録されている&#10;location: docs/examples/">
 <polygon fill="none" stroke="black" points="771.6,-622.19 692.4,-622.19 692.4,-580.59 771.6,-580.59 771.6,-622.19"/>
 <text xml:space="preserve" text-anchor="middle" x="732" y="-605.59" font-family="Times,serif" font-size="14.00">examples</text>
 <text xml:space="preserve" text-anchor="middle" x="732" y="-588.79" font-family="Times,serif" font-size="14.00">実践例</text>
@@ -1879,7 +1879,7 @@
 <!-- prose_mechanization_sweep_record -->
 <g id="node73" class="node">
 <title>prose_mechanization_sweep_record</title>
-<g id="a_node73"><a xlink:title="散文機械化棚卸し記録&#10;&#10;要求時に行った散文・機構監査の commit hash（docs/asset&#45;sweep/prose&#45;mechanization.json）と実行記録。次回の監査範囲を絞るために使い、release 判断は止めない。監査対象は現行の散文と機構で、歴史資料の事例は含めない&#10;criteria: prose&#45;mechanization.json が実在する監査済み commit と実行記録を指し、記録に対象範囲・所見・処遇がある&#10;location: ../docs/asset&#45;sweep/">
+<g id="a_node73"><a xlink:title="散文機械化棚卸し記録&#10;&#10;要求時に行った散文・機構監査の commit hash（docs/asset&#45;sweep/prose&#45;mechanization.json）と実行記録。次回の監査範囲を絞るために使い、release 判断は止めない。監査対象は現行の散文と機構で、歴史資料の事例は含めない&#10;criteria: prose&#45;mechanization.json が実在する監査済み commit と実行記録を指し、記録に対象範囲・所見・処遇がある&#10;location: docs/asset&#45;sweep/">
 <polygon fill="none" stroke="black" stroke-width="2" points="3640.3,-630.59 3388.3,-630.59 3388.3,-572.19 3640.3,-572.19 3640.3,-630.59"/>
 <text xml:space="preserve" text-anchor="middle" x="3514.3" y="-613.99" font-family="Times,serif" font-size="14.00">prose_mechanization_sweep_record</text>
 <text xml:space="preserve" text-anchor="middle" x="3514.3" y="-597.19" font-family="Times,serif" font-size="14.00">散文機械化棚卸し記</text>
@@ -1920,7 +1920,7 @@
 <!-- claude_plugin_dist -->
 <g id="node77" class="node">
 <title>claude_plugin_dist</title>
-<g id="a_node77"><a xlink:title="Claude Code配布plugin root&#10;&#10;pipeline.pfdsl のClaude Code root組み立てと結合drift検査が生産する。既存marketplace経路を保つplugin/pfdsl/で、この図ではREADME更新と配布レビューの入力に現れる&#10;location: ../plugin/pfdsl/">
+<g id="a_node77"><a xlink:title="Claude Code配布plugin root&#10;&#10;pipeline.pfdsl のClaude Code root組み立てと結合drift検査が生産する。既存marketplace経路を保つplugin/pfdsl/で、この図ではREADME更新と配布レビューの入力に現れる&#10;location: plugin/pfdsl/">
 <polygon fill="none" stroke="black" stroke-width="2" points="2428.79,-381.59 2270.39,-381.59 2270.39,-323.19 2428.79,-323.19 2428.79,-381.59"/>
 <text xml:space="preserve" text-anchor="middle" x="2349.59" y="-364.99" font-family="Times,serif" font-size="14.00">claude_plugin_dist</text>
 <text xml:space="preserve" text-anchor="middle" x="2349.59" y="-348.19" font-family="Times,serif" font-size="14.00">Claude</text>
@@ -1963,7 +1963,7 @@
 <!-- codex_plugin_dist -->
 <g id="node79" class="node">
 <title>codex_plugin_dist</title>
-<g id="a_node79"><a xlink:title="Codex配布plugin root&#10;&#10;pipeline.pfdsl のCodex root組み立てと結合drift検査が生産する。公式Codex validator/runtimeのskills固定に従うnative rootのplugin/pfdsl&#45;codex/で、この図ではREADME更新と配布レビューの入力に現れる&#10;location: ../plugin/pfdsl&#45;codex/">
+<g id="a_node79"><a xlink:title="Codex配布plugin root&#10;&#10;pipeline.pfdsl のCodex root組み立てと結合drift検査が生産する。公式Codex validator/runtimeのskills固定に従うnative rootのplugin/pfdsl&#45;codex/で、この図ではREADME更新と配布レビューの入力に現れる&#10;location: plugin/pfdsl&#45;codex/">
 <polygon fill="none" stroke="black" stroke-width="2" points="2432.39,-305.19 2266.79,-305.19 2266.79,-263.59 2432.39,-263.59 2432.39,-305.19"/>
 <text xml:space="preserve" text-anchor="middle" x="2349.59" y="-288.59" font-family="Times,serif" font-size="14.00">codex_plugin_dist</text>
 <text xml:space="preserve" text-anchor="middle" x="2349.59" y="-271.79" font-family="Times,serif" font-size="14.00">Codex配布plugin root</text>
@@ -2025,7 +2025,7 @@
 <!-- distribution_review_record -->
 <g id="node83" class="node">
 <title>distribution_review_record</title>
-<g id="a_node83"><a xlink:title="配布レビュー記録&#10;&#10;承認済み commit hash（reviewed.json）と回ごとの実行記録。hash を進めるのは差分モードだけで、全文モードは記録だけを残す。check&#45;distribution&#45;review.mjs が記録と配布ツリーの齟齬を判定し、各 release 判断の pre&#45;tag checks で release を止める&#10;criteria: reviewed.json の commit と HEAD の間に、レビュー対象スコープの差分が無い&#10;location: ../docs/distribution&#45;review/">
+<g id="a_node83"><a xlink:title="配布レビュー記録&#10;&#10;承認済み commit hash（reviewed.json）と回ごとの実行記録。hash を進めるのは差分モードだけで、全文モードは記録だけを残す。check&#45;distribution&#45;review.mjs が記録と配布ツリーの齟齬を判定し、各 release 判断の pre&#45;tag checks で release を止める&#10;criteria: reviewed.json の commit と HEAD の間に、レビュー対象スコープの差分が無い&#10;location: docs/distribution&#45;review/">
 <polygon fill="none" stroke="black" points="3066.07,-350.19 2857.27,-350.19 2857.27,-308.59 3066.07,-308.59 3066.07,-350.19"/>
 <text xml:space="preserve" text-anchor="middle" x="2961.67" y="-333.59" font-family="Times,serif" font-size="14.00">distribution_review_record</text>
 <text xml:space="preserve" text-anchor="middle" x="2961.67" y="-316.79" font-family="Times,serif" font-size="14.00">配布レビュー記録</text>
@@ -2065,7 +2065,7 @@
 <!-- migration_guide -->
 <g id="node86" class="node">
 <title>migration_guide</title>
-<g id="a_node86"><a xlink:title="版別移行ガイド&#10;&#10;公開版間の変更と未公開の移行項目。採用先は更新前後の版で対象節を選び、リリース判断は対象範囲と版の確定を確認する。&#10;criteria: 更新前後の CLI/plugin 版または未公開の根拠 commit、影響、手順、検証が特定できる&#10;externalStakeholders: 採用リポの保守担当&#10;location: ../docs/migration&#45;guide.md">
+<g id="a_node86"><a xlink:title="版別移行ガイド&#10;&#10;公開版間の変更と未公開の移行項目。採用先は更新前後の版で対象節を選び、リリース判断は対象範囲と版の確定を確認する。&#10;criteria: 更新前後の CLI/plugin 版または未公開の根拠 commit、影響、手順、検証が特定できる&#10;externalStakeholders: 採用リポの保守担当&#10;location: docs/migration&#45;guide.md">
 <polygon fill="none" stroke="black" points="3026.47,-270.19 2896.87,-270.19 2896.87,-228.59 3026.47,-228.59 3026.47,-270.19"/>
 <text xml:space="preserve" text-anchor="middle" x="2961.67" y="-253.59" font-family="Times,serif" font-size="14.00">migration_guide</text>
 <text xml:space="preserve" text-anchor="middle" x="2961.67" y="-236.79" font-family="Times,serif" font-size="14.00">版別移行ガイド</text>
@@ -2138,7 +2138,7 @@
 <!-- readme -->
 <g id="node90" class="node">
 <title>readme</title>
-<g id="a_node90"><a xlink:title="README&#10;&#10;外部利用者向けの導入文書。CLI のインストール手順・Library 節のインストール例・サンプル描画物への参照リンクを含むが、リンク先パスは安定しており sample_previews の内容更新では変化しない — 追従更新が要るのは CLI 公開形態・ライブラリ公開形態・plugin 配布物（導入手順と同梱スキル・コマンドの列挙）の変更時のみ。extension 公開（pipeline.pfdsl の published_ext。この図には置かない）は update_readme をトリガーしない — README は拡張の公開版の版数を載せないため。現在の拡張の節は packages/vscode&#45;extension/README.md への参照と開発ホストでの利用方法で、Marketplace からの導入経路も持たない。CLI コマンドリファレンス（## CLI 節）は `make gen&#45;readme&#45;cli` が `pfdsl help` 出力から自動生成し、`make check&#45;readme&#45;cli` が pre&#45;commit と CI（test.yml）でドリフトを機械検査するため update_readme の手動対象外。同じ生成器とゲートが `packages/cli/README.md`（npm パッケージページ。toolchain 側の成果物）のコマンド表も書くため、CLI コマンドの追加・変更で手を入れる先は両 README とも packages/cli/src/index.ts のコマンド定義テーブルのみ（#850・#902）。help 本文自体もそのテーブルから生成されるため、dispatcher に載って help に載らないコマンドは表現できない&#10;criteria: make check&#45;readme&#45;cli が差分なしで通過し、Library 節の pnpm add 例が published_libraries の全パッケージを名指す&#10;location: ../README.md">
+<g id="a_node90"><a xlink:title="README&#10;&#10;外部利用者向けの導入文書。CLI のインストール手順・Library 節のインストール例・サンプル描画物への参照リンクを含むが、リンク先パスは安定しており sample_previews の内容更新では変化しない — 追従更新が要るのは CLI 公開形態・ライブラリ公開形態・plugin 配布物（導入手順と同梱スキル・コマンドの列挙）の変更時のみ。extension 公開（pipeline.pfdsl の published_ext。この図には置かない）は update_readme をトリガーしない — README は拡張の公開版の版数を載せないため。現在の拡張の節は packages/vscode&#45;extension/README.md への参照と開発ホストでの利用方法で、Marketplace からの導入経路も持たない。CLI コマンドリファレンス（## CLI 節）は `make gen&#45;readme&#45;cli` が `pfdsl help` 出力から自動生成し、`make check&#45;readme&#45;cli` が pre&#45;commit と CI（test.yml）でドリフトを機械検査するため update_readme の手動対象外。同じ生成器とゲートが `packages/cli/README.md`（npm パッケージページ。toolchain 側の成果物）のコマンド表も書くため、CLI コマンドの追加・変更で手を入れる先は両 README とも packages/cli/src/index.ts のコマンド定義テーブルのみ（#850・#902）。help 本文自体もそのテーブルから生成されるため、dispatcher に載って help に載らないコマンドは表現できない&#10;criteria: make check&#45;readme&#45;cli が差分なしで通過し、Library 節の pnpm add 例が published_libraries の全パッケージを名指す&#10;location: README.md">
 <polygon fill="none" stroke="black" stroke-width="2" points="2999.22,-171.19 2924.11,-171.19 2924.11,-129.59 2999.22,-129.59 2999.22,-171.19"/>
 <text xml:space="preserve" text-anchor="middle" x="2961.67" y="-154.59" font-family="Times,serif" font-size="14.00">readme</text>
 <text xml:space="preserve" text-anchor="middle" x="2961.67" y="-137.79" font-family="Times,serif" font-size="14.00">README</text>

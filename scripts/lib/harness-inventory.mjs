@@ -1,3 +1,5 @@
+import { INSTALL_TEMPLATE_PATHS } from "./install-templates.mjs";
+
 // The maintained product inventory is harness-neutral; adapters decide how
 // each source entry is rendered for their target harness.
 const PROBES = Object.freeze({
@@ -21,21 +23,6 @@ const SKILL_SOURCE_FILES = Object.freeze({
 	"pfd-grill": Object.freeze(["SKILL.md"]),
 	"pfd-ops": Object.freeze([
 		"SKILL.md",
-		"install/.github/workflows/pfdsl-sweep-completed-chains.yml",
-		"install/scripts/pfdsl/audit-issues-flow.mjs",
-		"install/scripts/pfdsl/lib/chain-sweep.mjs",
-		"install/scripts/pfdsl/lib/cli-id-arg.mjs",
-		"install/scripts/pfdsl/lib/gh-compat.mjs",
-		"install/scripts/pfdsl/lib/gh-exec.mjs",
-		"install/scripts/pfdsl/lib/github-ops.mjs",
-		"install/scripts/pfdsl/lib/github-rest.mjs",
-		"install/scripts/pfdsl/lib/issues-flow-audit.mjs",
-		"install/scripts/pfdsl/lib/proxy-fetch-worker.mjs",
-		"install/scripts/pfdsl/lib/proxy-fetch.mjs",
-		"install/scripts/pfdsl/lib/ready-compare.mjs",
-		"install/scripts/pfdsl/lib/scratch-path.mjs",
-		"install/scripts/pfdsl/lib/yaml-require.mjs",
-		"install/scripts/pfdsl/sweep-completed-chains.mjs",
 		"references/architecture.md",
 		"references/file-based-tracker-backend.md",
 		"references/github-issues-backend.md",
@@ -128,8 +115,13 @@ function skillCapability(name, source = {}) {
 		{
 			encoding: "harness-skill-template",
 			path: `scripts/harness-template/skills/${name}`,
-			...(files
-				? { files: files.filter((file) => !file.startsWith("install/")) }
+			...(files ? { files } : {}),
+			...(name === "pfd-ops"
+				? {
+						installFiles: Object.freeze(
+							INSTALL_TEMPLATE_PATHS.map((path) => `install/${path}`),
+						),
+					}
 				: {}),
 			templates: SKILL_TEMPLATE_FILES[name] ?? [],
 			...source,

@@ -532,11 +532,10 @@ function stageTargetSkillTree({
 			if (record.kind === "skill") {
 				if (record.semantic.variants) {
 					writeHarnessSkill(record, "codex", output, deps);
-					if (record.id === "skill:pfd-ops")
+					for (const file of record.source.installFiles ?? [])
 						deps.cpSync(
-							resolve(root, ".claude/skills/pfd-ops/install"),
-							resolve(output, "install"),
-							{ recursive: true },
+							resolve(root, ".claude/skills/pfd-ops", file),
+							resolve(output, file),
 						);
 					observeRecordOutputs(observed, record);
 					continue;

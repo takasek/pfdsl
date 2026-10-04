@@ -1,0 +1,22 @@
+[package]
+name = "pfdsl-desktop"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[lib]
+name = "pfdsl_desktop"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "~2.11", features = [] }
+tauri-plugin-dialog = "2"
+cap-std = "3"
+sha2 = "0.10"
+
+[features]
+default = ["custom-protocol"]
+custom-protocol = ["tauri/custom-protocol"]

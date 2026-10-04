@@ -72,7 +72,14 @@ describe("gen-plugin output contract", () => {
 	});
 
 	it("rejects a consumer it does not know", () => {
-		assert.throws(() => genPluginDriftPathspecs("release"), /release/);
+		assert.throws(() => genPluginDriftPathspecs("unknown"), /unknown/);
+	});
+	it("includes repository assets and install in push and release checks", () => {
+		for (const consumer of ["push", "release"])
+			assert.deepEqual(
+				sorted(genPluginDriftPathspecs(consumer)),
+				sorted(EVERY_GEN_PLUGIN_OUTPUT),
+			);
 	});
 
 	it("covers exactly the destinations a failed generation restores", () => {

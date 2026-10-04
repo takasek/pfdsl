@@ -1,13 +1,12 @@
-import { Graphviz } from "@hpcc-js/wasm";
 import type { Frontmatter, Graph } from "@pfdsl/core";
 import {
 	type ExportOptions,
 	exportDiffDot,
 	exportDot,
-} from "@pfdsl/graphviz-exporter";
+} from "@pfdsl/graphviz-exporter/dot";
 
-export type { ExportOptions } from "@pfdsl/graphviz-exporter";
-export { exportDiffDot } from "@pfdsl/graphviz-exporter";
+export type { ExportOptions } from "@pfdsl/graphviz-exporter/dot";
+export { exportDiffDot } from "@pfdsl/graphviz-exporter/dot";
 
 export type RenderFormat = "svg" | "dot";
 
@@ -15,21 +14,9 @@ export interface RenderOptions extends ExportOptions {
 	format?: RenderFormat;
 }
 
-type GraphvizInstance = Awaited<ReturnType<typeof Graphviz.load>>;
+import { renderDotToSvg } from "./renderer.js";
 
-let graphvizInstance: Promise<GraphvizInstance> | null = null;
-
-function getGraphviz(): Promise<GraphvizInstance> {
-	if (!graphvizInstance) {
-		graphvizInstance = Graphviz.load();
-	}
-	return graphvizInstance;
-}
-
-export async function renderDotToSvg(dot: string): Promise<string> {
-	const gv = await getGraphviz();
-	return gv.dot(dot, "svg");
-}
+export { renderDotToSvg } from "./renderer.js";
 
 export async function renderGraph(
 	graph: Graph,

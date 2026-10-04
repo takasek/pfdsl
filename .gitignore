@@ -44,3 +44,7 @@ docs/diagrams/
 
 # vscode extension package artifacts
 *.vsix
+
+# native desktop build and generated schemas
+packages/standalone/src-tauri/target/
+packages/standalone/src-tauri/gen/

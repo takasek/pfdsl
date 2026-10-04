@@ -4,7 +4,50 @@ import { describe, it } from "node:test";
 import {
 	buildAuditArgs,
 	classifyRoadmapRegistration,
+	localClosingIssueNumbers,
 } from "./roadmap-registration.mjs";
+
+describe("localClosingIssueNumbers", () => {
+	const ref = (number, owner, name) => ({
+		number,
+		repository: { owner: { login: owner }, name },
+	});
+
+	it("keeps only this repository's references before reducing to numbers", () => {
+		assert.deepEqual(
+			localClosingIssueNumbers(
+				[
+					ref(12, "other", "pfdsl"),
+					ref(12, "takasek", "other"),
+					ref(34, "takasek", "pfdsl"),
+				],
+				{ owner: "takasek", repo: "pfdsl" },
+			),
+			[34],
+		);
+	});
+
+	it("matches GitHub names case-insensitively and enforces duplicate links once", () => {
+		assert.deepEqual(
+			localClosingIssueNumbers(
+				[
+					ref(12, "TAKASEK", "PFDSL"),
+					ref(12, "takasek", "pfdsl"),
+					ref(12, "other", "pfdsl"),
+				],
+				{ owner: "takasek", repo: "pfdsl" },
+			),
+			[12],
+		);
+	});
+
+	it("keeps an empty reference set empty", () => {
+		assert.deepEqual(
+			localClosingIssueNumbers([], { owner: "takasek", repo: "pfdsl" }),
+			[],
+		);
+	});
+});
 
 describe("buildAuditArgs", () => {
 	it("enforces every issue the PR closes", () => {
@@ -47,6 +90,6 @@ describe("classifyRoadmapRegistration", () => {
 	it("skips on the gh-unavailable exit code rather than reading it as a rejection", () => {
 		const r = classifyRoadmapRegistration({ issueNumbers: [12], auditExit: 2 });
 		assert.equal(r.status, "SKIP");
-		assert.match(r.detail, /gh/);
+		assert.match(r.detail, /GitHub operations unavailable/);
 	});
 });

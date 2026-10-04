@@ -203,9 +203,22 @@ Codex pluginのmanifestは`plugin/pfdsl-codex/.codex-plugin/plugin.json`にあ�
 テンプレートを増減したらこのリストも更新する。
 
 drift 検査は pre-commit（`gen-install` の check_drift。他の drift 検査と違い dist を要求しないので、ビルド未実施でもローカルで走る）と CI（`check-pfd-ops-sync.yml`）が行う。
-生成側を手編集した場合も、再生成が作業ツリーの手編集を上書きしたうえで検査が落ちる。
-テンプレートのソースを変更したコミットは再ステージが2往復必要になる（1回目で `install/`、2回目で `plugin/`）。
-2ホップの生成チェーンに「直して exit 1」の流儀を適用した結果であり、意図した挙動である。
+pre-commit は index の凍結コピーを隔離した repository に展開し、その中の生成器・入力・出力・trigger を使って検査する。
+無関係な未stage編集や未追跡生成物は検査へ混ざらず、成功・失敗とも元の作業ツリーと index を書き換えない。
+隔離先を作る入口自身とその bootstrap helper は作業ツリーから実行するため、これらの未stage破損まで隔離する保証はない。
+隔離先で生成器の回復処理が失敗した場合も一時データは破棄され、元の作業ツリーに既存の回復データがあればそのまま残る。
+`GIT_INDEX_FILE` を使う hook ではその index を凍結し、隔離先の子プロセスには元 repository の Git target 環境を渡さない。
+不足する生成物や手編集した生成物を検出したら、明示的に `make gen-plugin` で2ホップをまとめて再生成し、意図した生成元と生成物を一緒にstageする。
+ビルドは元の鮮度検査に通り、ビルド入力が index と一致するときだけ隔離先へコピーする。
+その条件を満たさない dist 依存ゲートは従来どおり skip を報告するため、skip は同一性の確認済みを意味しない。
+
+終端ゲートと release は `scripts/check-generation.mjs --gen-plugin <terminal|release>` で同じ隔離検査を行い、生成出力契約全体を比較する。
+終端ゲートは index、push・release は公開対象の HEAD を隔離入力に使う。
+push・release は生成出力のstage済み未commit差分も拒否し、stage済みの修復で不整合な HEAD を隠せないようにする。
+これらの入口は生成物の未stage差分も先に検出する。
+`make push` は `--gen-plugin push --samples` で repository assets・install を含む plugin 出力とサンプルを検査し、不整合なら手動の再生成・コミットを促して停止する。
+自動stage・自動コミットは行わない。
+配布する install payload は `scripts/lib/install-templates.mjs` の許可一覧から skill の `installFiles` 宣言を導出し、開発用ファイルを列挙し直さない。
 
 **生成物 drift 検査はコミット分割を制約する**: 規則は `.pfdsl/bindings/pfd-ops.md`「ワークサイクルの追加手順」の「終端ゲートの追加項目を検査して完了を確認する」にあるコミット粒度ゲートが一次情報。このリポで該当する検査は`gen-plugin`（inventoryが選ぶ手書き入力と`CLAUDE.md`・settings・hooksからClaude root、Codex root、repository Codex assetsを同時に導出する結合gate）と`gen-install`。
 
@@ -393,6 +406,31 @@ marketplaceのpin反映・取得確認とroadmap同期の順序、中断時の�
 vscode-extension 等で新しいノード種別をホバー対応する場合、「`NodeKind`（コア公開型）に追加する」vs「provider 内で独自チェックする」の選択が生じる。判断基準: `analyze()` の `nodeKinds` マップに新種別が自然に乗る（frontmatter でスコープが確定する）なら型に追加する。provider ローカルの一時的な判定なら独自チェックにとどめる。コアへの変更は全パッケージの再ビルドと `Record<NodeKind, ...>` の exhaustive check 修正が必要になるため、影響範囲を確認してから選択する。
 
 ## 終端ゲートの根拠
+
+### 検査対象と報告版の対応
+
+追跡下の `.pfdsl` の分類は `scripts/lib/pfdsl-check-inventory.mjs` が正本であり、Makefile の graph・strict・fmt・render・location 検査が同じ分類を使う（#1185）。
+`git ls-files -z` で分類宣言から独立に列挙し、未分類・曖昧な割当・生成元の欠落を失敗にする。
+scaffold 正本は `scripts/harness-template/` で検証し、4つの生成先は正本の検証と `check-gen-plugin.yml` の再生成・drift 検査へ委譲する。
+core fixture の parse・normalize・validateGraph は package test が持ち、CLI の exit と multi-file の repo-wide 検証済みとは扱わない。
+新しい root を追加する場合は、必要な検査軸と検査責任を分類へ同時に追加する。
+root の全域分類は、読み込まれた子の診断範囲を保証しない。
+
+終端報告は冒頭の `Report revision` が示す head・base tip・merge-base と測定時刻を対象とする（#1190）。
+知識成果物のサイズは merge-base→head の blob 差、変更・削除一覧はその PR 差分、location 突合は head の PFD blob、cycle window は固定した base/head の履歴から測る。
+head の表示と未 commit の作業ファイルを混ぜない。
+新規ファイルの比較元不在と blob 読取不能、削除なしと削除列挙失敗、完全なモデル分類と読み取れたモデルだけの分類を区別する。
+fetch 失敗時の既存 base は鮮度未確認として全報告の冒頭にも示す。
+報告材料の欠落は表示し、人間向け材料を新しい合否判定にはしない。
+
+作業者と PR 本文作成者は、報告を利用する直前に記載された対象版と最終差分を対応させる。
+reviewer へ渡した後に commit を追加した場合は、新しい head で再測定して報告を置き換える。
+base が進んだ場合は cycle window を再測定し、merge-base も変わればサイズと変更・削除の突合も再測定する。
+rebase 後の cycle window は、外部に書いた issue・PR 本文が新しい規約と整合するかを再読する材料であり、サイクル開始から最初の commit までの時間帯を完全に復元する証拠ではない。
+同じ head・merge-base・モデル blob と検査実装を使い、前回の取得が完全だった材料は再利用できる。
+cycle window の再利用には base tip と開始 commit の同一性も必要で、鮮度未確認・部分測定・測定不能の結果を後から完全な報告として再利用しない。
+
+### 機械検査と人間確認
 
 汎用ゲート項目（status 更新 / check 通過 / 論理単位コミット / PR 集約）に加え、このリポでは issue 固有項目を合成する。issue 固有項目は `roadmap.md` を参照。
 
