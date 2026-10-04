@@ -129,3 +129,65 @@ for (const kind of ["unstaged", "staged-unbuilt", "deleted"]) {
 			);
 		}));
 }
+
+it("reuses a fresh build when package inputs match the index", () =>
+	fixture(({ root, write }) => {
+		write("packages/core/dist/index.js", "matching build\n");
+		const builtAt = new Date(Date.now() + 2000);
+		utimesSync(join(root, "packages/core/dist/index.js"), builtAt, builtAt);
+		withIndexSnapshot(root, (snapshot) =>
+			assert.equal(
+				readFileSync(join(snapshot, "packages/core/dist/index.js"), "utf8"),
+				"matching build\n",
+			),
+		);
+	}));
+
+for (const directory of ["src", "scripts"]) {
+	for (const kind of [
+		"unstaged",
+		"untracked",
+		"staged-for-head",
+		"staged-unbuilt",
+	]) {
+		it(`does not reuse dist with ${kind} package ${directory} inputs`, () =>
+			fixture(({ root, git, write }) => {
+				const input = `packages/core/${directory}/nested/input.js`;
+				write(input, "export {};\n");
+				git("add", input);
+				const committed = kind === "staged-for-head";
+				if (committed)
+					git(
+						"-c",
+						"user.name=test",
+						"-c",
+						"user.email=test@example.com",
+						"commit",
+						"-qm",
+						"test: base",
+					);
+				const changed = kind === "untracked" ? `${input}.new.js` : input;
+				write(changed, "export const changed = true;\n");
+				const changedAt = new Date(Date.now() + 1000);
+				utimesSync(join(root, changed), changedAt, changedAt);
+				if (committed || kind === "staged-unbuilt") git("add", changed);
+				write("packages/core/dist/index.js", "build from changed inputs\n");
+				const builtAt = new Date(
+					Date.now() + (kind === "staged-unbuilt" ? 0 : 2000),
+				);
+				utimesSync(join(root, "packages/core/dist/index.js"), builtAt, builtAt);
+				const before = readFileSync(join(root, ".git/index"));
+				withIndexSnapshot(
+					root,
+					(snapshot) =>
+						assert.equal(
+							existsSync(join(snapshot, "packages/core/dist/index.js")),
+							false,
+						),
+					process.env,
+					{ committed },
+				);
+				assert.deepEqual(readFileSync(join(root, ".git/index")), before);
+			}));
+	}
+}

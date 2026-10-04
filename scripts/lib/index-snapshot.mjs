@@ -19,10 +19,10 @@ import { isDistStale } from "./dist-freshness.mjs";
 import { withoutGitTargetEnvironment } from "./git-environment.mjs";
 
 const BUILD_INPUTS = [
-	"packages/*/src",
+	":(glob)packages/*/src/**",
 	"packages/*/package.json",
 	"packages/*/*config*",
-	"packages/*/scripts",
+	":(glob)packages/*/scripts/**",
 	"package.json",
 	"pnpm-lock.yaml",
 	"pnpm-workspace.yaml",
