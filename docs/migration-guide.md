@@ -268,8 +268,10 @@ Points to settle before enabling:
 - By default the pull request is created with `GITHUB_TOKEN`, so GitHub holds the repository's own `pull_request` workflow runs for it in an approval-required state (`action_required`) until someone with write access approves them.
   The pull request body says so, and that the sweep's own checks are the only verification it has received until then.
   If the default branch requires status checks, this pull request does not report them until those runs are approved.
-  To have them start without approval, set the repository variable `PFDSL_SWEEP_APP_CLIENT_ID` and the secret `PFDSL_SWEEP_APP_PRIVATE_KEY` for a GitHub App installed on the repository with Contents and Pull requests write access.
+  To have them start without approval, set the repository variable `REPO_AUTOMATION_APP_CLIENT_ID` and the secret `REPO_AUTOMATION_APP_PRIVATE_KEY` for a GitHub App installed on the repository with Contents and Pull requests write access.
   The workflow then opens the pull request with a short-lived token of that App.
+  Existing `PFDSL_SWEEP_APP_CLIENT_ID` and `PFDSL_SWEEP_APP_PRIVATE_KEY` settings remain supported when the shared Client ID is absent.
+  When migrating, register the shared private-key secret first, then set the shared Client ID; a configured shared Client ID requires its matching secret and never falls back to the legacy key.
   A repository without the variable keeps using `GITHUB_TOKEN`.
 - Creating the pull request requires that the repository, and its organization if it restricts this, allows GitHub Actions to create pull requests (Settings, Actions, General, Workflow permissions).
   This setting is GitHub's requirement for the pull-request step; the workflow file does not check it beforehand.
@@ -291,6 +293,41 @@ To also stop the workflow from starting at all, disable it on GitHub ([Disabling
 Validate affected diagrams with the intended CLI and run the repository's relevant checks.
 Report the before/after diagnostics, changed files, inapplicable steps, and unresolved decisions.
 Do not report an adopter as migrated until these checks have run there.
+
+## Unreleased — after CLI/plugin v0.1.0
+
+This section covers the changes after CLI/plugin v0.1.0 that need action in an adopting repository.
+The destination release is assigned during release preparation; do not infer it.
+
+### Record the applied migration state
+
+pfd-ops now compares the running plugin with `appliedMigration` in the repository's `.pfdsl/config.json`: the plugin release the repository has finished migrating to ([ADR-0043](adr/0043-applied-migration-state.md)).
+The comparison runs on every pfd-ops start (`check-install-sync.mjs`) in every repository that has a `.pfdsl/` directory, with or without `--upstream`, and it only reads the record.
+
+Until the key exists, every run prints a notice that the repository predates migration-state tracking and points back to "Choosing the update range" above.
+The notice is not a failure.
+
+After you finish applying this guide, record the state once your checks pass (see "Verify the cleanup").
+Run the following from the repository root, with the pfd-ops skill root of the plugin you are migrating to (`${CLAUDE_PLUGIN_ROOT}/skills/pfd-ops` in Claude Code, the installed plugin's `skills/pfd-ops` in Codex):
+
+```sh
+node <pfd-ops skill root>/scripts/check-install-sync.mjs --record-migration
+```
+
+The command writes the running plugin's version, and its bundle hash where the plugin has one, into `.pfdsl/config.json` and keeps every other key.
+Commit that change together with the migration it records.
+It cannot be combined with `--deploy`, `--overwrite-local-edits` or `--delete-edited-orphans` (exit 2), and it writes nothing, exiting with 3 after saying why, when the running plugin's version is unknown (a repo-local copy), when the plugin is older than the recorded state, or when `.pfdsl/config.json` is not valid JSON or does not contain a JSON object.
+A malformed `appliedMigration` does not stop it: the command overwrites that key, and a plain run or `--deploy` keeps failing on such a record until you do.
+You may write the key by hand, in the form `{"appliedMigration": {"pluginVersion": "0.1.0", "bundleHash": "<64 hex digits>"}}`, but the command computes the hash for you.
+A Codex plugin has no bundle manifest, so its record has no `bundleHash`.
+
+Once recorded, later runs say nothing while the plugin matches the record.
+A newer plugin prints the range of this guide to read, which is the cue to migrate and record again.
+A plugin older than the record is told to update, and `--deploy` and `--record-migration` are refused with exit 3 until it does, so an old `install/` cannot roll back files a newer release placed.
+If `.pfdsl/config.json` is not valid JSON or has a malformed `appliedMigration`, the run fails naming the file instead of ignoring it.
+
+Verify by running `check-install-sync.mjs` again: it prints no migration notice.
+Source: [#1319](https://github.com/takasek/pfdsl/issues/1319).
 
 ## Maintaining this guide
 

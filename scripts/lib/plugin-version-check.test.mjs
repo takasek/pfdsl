@@ -8,6 +8,7 @@ import { afterEach, beforeEach, describe, it } from "node:test";
 import {
 	checkUpstreamVersion,
 	computeManifestAggregateHash,
+	readPluginIdentity,
 } from "../../.claude/skills/pfd-ops/scripts/plugin-version-check.mjs";
 
 let tmp;
@@ -287,5 +288,72 @@ describe("computeManifestAggregateHash", () => {
 	it("returns null when the digest and path are not separated by two spaces", () => {
 		const bad = `${hexOf("a")} a.md\n`;
 		assert.equal(computeManifestAggregateHash(bad), null);
+	});
+});
+
+describe("readPluginIdentity", () => {
+	it("reads the version and bundle aggregate hash of a Claude Code plugin", () => {
+		const pluginRoot = join(tmp, "claude-plugin-root");
+		const text = manifestText([{ hex: hexOf("a"), path: "a.md" }]);
+		writeFile(
+			pluginRoot,
+			".claude-plugin/plugin.json",
+			JSON.stringify({ version: "0.2.0" }),
+		);
+		writeFile(pluginRoot, ".claude-plugin/bundle-manifest.sha256", text);
+
+		assert.deepEqual(readPluginIdentity(pluginRoot), {
+			version: "0.2.0",
+			bundleHash: computeManifestAggregateHash(text),
+		});
+	});
+
+	it("leaves the bundle hash null when the Claude Code plugin has no bundle manifest", () => {
+		const pluginRoot = join(tmp, "claude-plugin-no-manifest");
+		writeFile(
+			pluginRoot,
+			".claude-plugin/plugin.json",
+			JSON.stringify({ version: "0.2.0" }),
+		);
+
+		assert.deepEqual(readPluginIdentity(pluginRoot), {
+			version: "0.2.0",
+			bundleHash: null,
+		});
+	});
+
+	// The Codex plugin carries no bundle manifest, so its identity is the version alone.
+	it("reads the version of a Codex plugin from .codex-plugin/plugin.json", () => {
+		const pluginRoot = join(tmp, "codex-plugin-root");
+		writeFile(
+			pluginRoot,
+			".codex-plugin/plugin.json",
+			JSON.stringify({ version: "0.3.1" }),
+		);
+
+		assert.deepEqual(readPluginIdentity(pluginRoot), {
+			version: "0.3.1",
+			bundleHash: null,
+		});
+	});
+
+	it("returns null when neither plugin manifest exists (repo-local run)", () => {
+		const pluginRoot = join(tmp, "no-plugin");
+		mkdirSync(pluginRoot, { recursive: true });
+
+		assert.equal(readPluginIdentity(pluginRoot), null);
+	});
+
+	it("returns null when the manifest is unparsable or carries no usable version", () => {
+		for (const [name, content] of [
+			["not-json", "{"],
+			["no-version", JSON.stringify({ name: "pfdsl" })],
+			["numeric-version", JSON.stringify({ version: 1 })],
+			["blank-version", JSON.stringify({ version: "  " })],
+		]) {
+			const pluginRoot = join(tmp, name);
+			writeFile(pluginRoot, ".claude-plugin/plugin.json", content);
+			assert.equal(readPluginIdentity(pluginRoot), null, name);
+		}
 	});
 });

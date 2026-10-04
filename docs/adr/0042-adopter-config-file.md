@@ -33,7 +33,7 @@ GitHub Issues バックエンドを採用した採用先には、`check-install-
 上流リポ自身も同じ workflow を使うため、`.pfdsl/config.json` で sweep を有効にする。
 
 移行状態（#1319 の設計案。採用先が移行を適用した版の記録）も、実装する際はこのファイルに置く。
-キーの名前と形は、その設計の時点で決める。
+キーの名前と形は、その設計の時点で決める（[ADR-0043](0043-applied-migration-state.md) が `appliedMigration` と決めた）。
 この ADR は置き場所だけを先に決め、宣言の置き場所が複数できることを防ぐ。
 
 ## 検討した対案

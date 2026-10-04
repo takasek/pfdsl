@@ -17,7 +17,7 @@ jobs:
   settle:
     name: settle
     if: >-
-      vars.DEPENDABOT_BATCH_CLIENT_ID != '' &&
+      vars.REPO_AUTOMATION_APP_CLIENT_ID != '' &&
       github.event.pull_request.user.login == 'dependabot[bot]' &&
       github.event.pull_request.head.repo.full_name == github.repository &&
       startsWith(github.event.pull_request.head.ref, 'dependabot/github_actions/')
