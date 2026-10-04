@@ -1,0 +1,70 @@
+{
+	"name": "@pfdsl/editor",
+	"version": "0.0.0",
+	"private": true,
+	"type": "module",
+	"exports": {
+		".": {
+			"types": "./dist/index.d.ts",
+			"import": "./dist/index.js"
+		},
+		"./preview": {
+			"types": "./dist/preview.d.ts",
+			"import": "./dist/preview.js"
+		},
+		"./webview-logic": {
+			"types": "./dist/webview-logic.d.ts",
+			"import": "./dist/webview-logic.js"
+		},
+		"./svg-anchors": {
+			"types": "./dist/svg-anchors.d.ts",
+			"import": "./dist/svg-anchors.js"
+		},
+		"./diff-panel": {
+			"types": "./dist/diff-panel.d.ts",
+			"import": "./dist/diff-panel.js"
+		},
+		"./messages": {
+			"types": "./dist/messages.d.ts",
+			"import": "./dist/messages.js"
+		},
+		"./location-utils": {
+			"types": "./dist/location-utils.d.ts",
+			"import": "./dist/location-utils.js"
+		},
+		"./connector-logic": {
+			"types": "./dist/connector-logic.d.ts",
+			"import": "./dist/connector-logic.js"
+		},
+		"./def-insertion-logic": {
+			"types": "./dist/def-insertion-logic.d.ts",
+			"import": "./dist/def-insertion-logic.js"
+		},
+		"./jump-logic": {
+			"types": "./dist/jump-logic.d.ts",
+			"import": "./dist/jump-logic.js"
+		},
+		"./format-logic": {
+			"types": "./dist/format-logic.d.ts",
+			"import": "./dist/format-logic.js"
+		}
+	},
+	"scripts": {
+		"build": "tsup src/index.ts src/preview.ts src/webview-logic.ts src/svg-anchors.ts src/diff-panel.ts src/messages.ts src/location-utils.ts src/connector-logic.ts src/def-insertion-logic.ts src/jump-logic.ts src/format-logic.ts --format esm --dts",
+		"test": "vitest run --coverage",
+		"coverage": "vitest run --coverage",
+		"typecheck": "tsgo --noEmit"
+	},
+	"dependencies": {
+		"@pfdsl/core": "workspace:*",
+		"@pfdsl/graphviz-exporter": "workspace:*",
+		"@pfdsl/preview-engine": "workspace:*"
+	},
+	"devDependencies": {
+		"@vitest/coverage-v8": "^1.6.0",
+		"@types/node": "^20.0.0",
+		"jsdom": "^24.0.0",
+		"tsup": "^8.0.0",
+		"vitest": "^1.6.0"
+	}
+}

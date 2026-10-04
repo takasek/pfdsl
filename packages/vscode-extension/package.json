@@ -119,6 +119,7 @@
 		"test:smoke:unit": "node --test smoke/*.test.mjs"
 	},
 	"dependencies": {
+		"@pfdsl/editor": "workspace:*",
 		"@hpcc-js/wasm": "^2.18.0",
 		"@pfdsl/core": "workspace:*",
 		"@pfdsl/graphviz-exporter": "workspace:*",
