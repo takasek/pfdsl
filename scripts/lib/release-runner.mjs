@@ -135,13 +135,13 @@ function assertMainAtCommit(capture, root, commit) {
 }
 
 function runChecks({ root, kindArg, run, tryRun, runReleaseGates }) {
-	for (const args of [["build"], ["test"], ["check-docs"], ["gen-plugin"]]) {
+	for (const args of [["build"], ["test"], ["check-docs"]]) {
 		callRun(run, root, "make", args);
 	}
 	callRun(run, root, process.execPath, [
-		resolve(root, "scripts/check-generated-drift.mjs"),
-		"--",
-		"plugin",
+		resolve(root, "scripts/check-generation.mjs"),
+		"--gen-plugin",
+		"release",
 	]);
 
 	for (const gate of runReleaseGates(root, {

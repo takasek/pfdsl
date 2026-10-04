@@ -203,9 +203,22 @@ Codex pluginのmanifestは`plugin/pfdsl-codex/.codex-plugin/plugin.json`にあ�
 テンプレートを増減したらこのリストも更新する。
 
 drift 検査は pre-commit（`gen-install` の check_drift。他の drift 検査と違い dist を要求しないので、ビルド未実施でもローカルで走る）と CI（`check-pfd-ops-sync.yml`）が行う。
-生成側を手編集した場合も、再生成が作業ツリーの手編集を上書きしたうえで検査が落ちる。
-テンプレートのソースを変更したコミットは再ステージが2往復必要になる（1回目で `install/`、2回目で `plugin/`）。
-2ホップの生成チェーンに「直して exit 1」の流儀を適用した結果であり、意図した挙動である。
+pre-commit は index の凍結コピーを隔離した repository に展開し、その中の生成器・入力・出力・trigger を使って検査する。
+無関係な未stage編集や未追跡生成物は検査へ混ざらず、成功・失敗とも元の作業ツリーと index を書き換えない。
+隔離先を作る入口自身とその bootstrap helper は作業ツリーから実行するため、これらの未stage破損まで隔離する保証はない。
+隔離先で生成器の回復処理が失敗した場合も一時データは破棄され、元の作業ツリーに既存の回復データがあればそのまま残る。
+`GIT_INDEX_FILE` を使う hook ではその index を凍結し、隔離先の子プロセスには元 repository の Git target 環境を渡さない。
+不足する生成物や手編集した生成物を検出したら、明示的に `make gen-plugin` で2ホップをまとめて再生成し、意図した生成元と生成物を一緒にstageする。
+ビルドは元の鮮度検査に通り、ビルド入力が index と一致するときだけ隔離先へコピーする。
+その条件を満たさない dist 依存ゲートは従来どおり skip を報告するため、skip は同一性の確認済みを意味しない。
+
+終端ゲートと release は `scripts/check-generation.mjs --gen-plugin <terminal|release>` で同じ隔離検査を行い、生成出力契約全体を比較する。
+終端ゲートは index、push・release は公開対象の HEAD を隔離入力に使う。
+push・release は生成出力のstage済み未commit差分も拒否し、stage済みの修復で不整合な HEAD を隠せないようにする。
+これらの入口は生成物の未stage差分も先に検出する。
+`make push` は `--gen-plugin push --samples` で repository assets・install を含む plugin 出力とサンプルを検査し、不整合なら手動の再生成・コミットを促して停止する。
+自動stage・自動コミットは行わない。
+配布する install payload は `scripts/lib/install-templates.mjs` の許可一覧から skill の `installFiles` 宣言を導出し、開発用ファイルを列挙し直さない。
 
 **生成物 drift 検査はコミット分割を制約する**: 規則は `.pfdsl/bindings/pfd-ops.md`「ワークサイクルの追加手順」の「終端ゲートの追加項目を検査して完了を確認する」にあるコミット粒度ゲートが一次情報。このリポで該当する検査は`gen-plugin`（inventoryが選ぶ手書き入力と`CLAUDE.md`・settings・hooksからClaude root、Codex root、repository Codex assetsを同時に導出する結合gate）と`gen-install`。
 

@@ -348,7 +348,7 @@
 <!-- gen_install -->
 <g id="node72" class="node">
 <title>gen_install</title>
-<g id="a_node72"><a xlink:title="install/ 生成&#10;&#10;repo ルートの配布ソースから pfd&#45;ops スキルの install/ ミラーを一方向で再生成する（#547 で双方向 sync を廃止）。生成の向きは repo ルートのソース → install/ → plugin/ の一本のみ。gen_plugin が内部で実行するため plugin が古い install/ から組まれることはない。drift は pre&#45;commit と check&#45;pfd&#45;ops&#45;sync.yml が強制する&#10;command: make gen&#45;install&#10;location: ../scripts/lib/install&#45;templates.mjs">
+<g id="a_node72"><a xlink:title="install/ 生成&#10;&#10;repo ルートの明示配布許可一覧から pfd&#45;ops スキルの install/ ミラーを一方向で再生成する。skill の installFiles 宣言も同じ一覧から導出し、開発用ファイルを配布しない。生成の向きは repo ルートのソース → install/ → Claude・Codex の repository・plugin の4配布先のみ。gen_plugin が内部で実行するため古い install/ から組まれることはない。同一性検査は pre&#45;commit・終端では index、push・release では公開対象の HEAD の隔離コピーで生成し、元の作業ツリーを変更せずに出力契約を照合する。CI の check&#45;pfd&#45;ops&#45;sync.yml も一致を強制する&#10;command: make gen&#45;install&#10;location: ../scripts/lib/install&#45;templates.mjs">
 <ellipse fill="none" stroke="#8e44ad" cx="382.55" cy="-1594.22" rx="57.6" ry="29.42"/>
 <text xml:space="preserve" text-anchor="middle" x="382.55" y="-1598.42" font-family="Times,serif" font-size="14.00">gen_install</text>
 <text xml:space="preserve" text-anchor="middle" x="382.55" y="-1581.62" font-family="Times,serif" font-size="14.00">install/ 生成</text>
