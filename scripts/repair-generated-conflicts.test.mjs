@@ -138,6 +138,43 @@ test("canonical conflict stops before resolving even a generated conflict", (t) 
 	);
 });
 
+test("prepare CLI explains source conflicts in logs and the Actions summary without publishing", (t) => {
+	const f = fixture(t, true);
+	const artifacts = join(f.root, "artifacts");
+	mkdirSync(artifacts);
+	writeFileSync(
+		join(artifacts, "snapshot.json"),
+		JSON.stringify({
+			repository: "owner/repo",
+			number: 12,
+			head: f.head,
+			base: f.base,
+			branch: "feature",
+		}),
+	);
+	const summary = join(f.root, "summary.md");
+	const result = spawnSync(
+		process.execPath,
+		[
+			new URL("./repair-generated-conflicts.mjs", import.meta.url).pathname,
+			"prepare",
+			f.root,
+			artifacts,
+		],
+		{ encoding: "utf8", env: { ...process.env, GITHUB_STEP_SUMMARY: summary } },
+	);
+	assert.equal(result.status, 1);
+	assert.match(result.stderr, /source.txt/);
+	assert.match(result.stderr, /Resolve these files manually/);
+	assert.doesNotMatch(result.stderr, /at assertGenerated/);
+	assert.match(readFileSync(summary, "utf8"), /No changes were pushed/);
+	assert.match(readFileSync(summary, "utf8"), /source.txt/);
+	assert.match(
+		f.git("diff", "--name-only", "--diff-filter=U"),
+		/plugin\/output.txt/,
+	);
+});
+
 test("publisher rejects canonical tampering and wrong parents", (t) => {
 	const f = fixture(t);
 	mergeGeneratedConflicts(f.root, f.head, f.base);
@@ -235,6 +272,13 @@ test("workflow isolates PR execution from publication credentials", () => {
 		),
 	);
 	assert.equal(workflow.permissions.contents, "read");
+	assert.deepEqual(Object.keys(workflow.on.workflow_dispatch.inputs), [
+		"pull-request",
+	]);
+	const app = workflow.jobs.publish.steps.find(
+		(step) => step.id === "app-token",
+	);
+	assert.equal(app.if, undefined);
 	assert.equal(workflow.jobs.prepare.permissions, undefined);
 	assert.equal(workflow.jobs.publish.permissions.contents, "write");
 	assert.equal(workflow.jobs.publish.needs, "prepare");
@@ -262,6 +306,8 @@ test("workflow isolates PR execution from publication credentials", () => {
 	);
 	// biome-ignore lint/suspicious/noTemplateCurlyInString: GitHub expression syntax is intentionally literal.
 	assert.equal(publisher.env.PR_NUMBER, "${{ inputs.pull-request }}");
+	// biome-ignore lint/suspicious/noTemplateCurlyInString: GitHub expression syntax is intentionally literal.
+	assert.equal(publisher.env.GH_TOKEN, "${{ steps.app-token.outputs.token }}");
 });
 
 test("a fresh runner without global Git identity can begin a divergent merge", (t) => {

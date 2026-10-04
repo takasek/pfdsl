@@ -56,6 +56,8 @@ function git(root, args) {
 	}).trimEnd();
 }
 
+class SourceConflictError extends Error {}
+
 function assertGenerated(paths) {
 	const canonical = paths.filter((path) => !isGeneratedPath(path));
 	if (canonical.length)
@@ -87,7 +89,21 @@ export function mergeGeneratedConflicts(root, head, base) {
 	);
 	if (merge.status !== 0 && (merge.status !== 1 || conflicts.length === 0))
 		throw new Error(`Merge failed: ${merge.stderr}`);
-	assertGenerated(conflicts);
+	const sources = conflicts.filter((path) => !isGeneratedPath(path));
+	if (sources.length) {
+		throw new SourceConflictError(
+			`Automatic repair stopped: source files have merge conflicts.
+This workflow repairs generated files only; it cannot choose between source changes.
+
+Files requiring manual resolution:
+${sources.map((path) => `- ${path}`).join("\n")}
+
+Resolve these files manually while merging main into the PR branch locally.
+Regenerate generated files with make gen-plugin, finish the merge, then commit and push.
+Rerun this workflow if generated files still need repair.
+No changes were pushed.`,
+		);
+	}
 	for (const path of conflicts) {
 		const ours = spawnSync("git", ["cat-file", "-e", `${head}:${path}`], {
 			cwd: root,
@@ -280,7 +296,7 @@ function publication(root, directory, push) {
 	);
 }
 
-if (isCliEntrypoint(import.meta.url, process.argv[1])) {
+function main() {
 	const [mode, first, second] = process.argv.slice(2);
 	if (mode === "snapshot") {
 		const directory = resolve(process.env.RUNNER_TEMP, "generated-repair");
@@ -298,4 +314,20 @@ if (isCliEntrypoint(import.meta.url, process.argv[1])) {
 		throw new Error(
 			"Usage: repair-generated-conflicts.mjs snapshot <repository> <PR> | prepare|verify|publish <checkout> <artifact-directory>",
 		);
+}
+
+if (isCliEntrypoint(import.meta.url, process.argv[1])) {
+	try {
+		main();
+	} catch (error) {
+		if (!(error instanceof SourceConflictError)) throw error;
+		console.error(error.message);
+		if (process.env.GITHUB_STEP_SUMMARY) {
+			appendFileSync(
+				process.env.GITHUB_STEP_SUMMARY,
+				`## Generated repair requires manual resolution\n\n${error.message}\n`,
+			);
+		}
+		process.exitCode = 1;
+	}
 }
