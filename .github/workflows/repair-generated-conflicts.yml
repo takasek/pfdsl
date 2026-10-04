@@ -1,0 +1,110 @@
+name: repair generated conflicts
+
+on:
+  workflow_dispatch:
+    inputs:
+      pull-request:
+        description: Open same-repository PR targeting main
+        type: string
+        required: true
+      authentication:
+        description: App authentication also triggers downstream PR checks
+        type: choice
+        options: [github-token, github-app]
+        default: github-token
+
+permissions:
+  contents: read
+  pull-requests: read
+
+concurrency:
+  group: generated-repair-${{ inputs.pull-request }}
+  cancel-in-progress: false
+
+jobs:
+  prepare:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    outputs:
+      changed: ${{ steps.repair.outputs.changed }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          path: control
+          persist-credentials: false
+
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+        with:
+          package_json_file: control/package.json
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+
+      - name: Freeze PR and main identities
+        id: snapshot
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ inputs.pull-request }}
+        run: node control/scripts/repair-generated-conflicts.mjs snapshot "$GITHUB_REPOSITORY" "$PR_NUMBER"
+
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ steps.snapshot.outputs.head }}
+          fetch-depth: 0
+          path: target
+          persist-credentials: false
+
+      # PR-controlled generators and tests execute with no publication token.
+      - name: Merge, regenerate, and verify
+        id: repair
+        run: node control/scripts/repair-generated-conflicts.mjs prepare "$GITHUB_WORKSPACE/target" "$RUNNER_TEMP/generated-repair"
+
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: steps.repair.outputs.changed == 'true'
+        with:
+          name: generated-repair
+          path: ${{ runner.temp }}/generated-repair/
+          retention-days: 3
+          if-no-files-found: error
+
+  publish:
+    needs: prepare
+    if: needs.prepare.outputs.changed == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+      pull-requests: read
+    steps:
+      # This fresh runner executes only the workflow's trusted main code.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: generated-repair
+          path: ${{ runner.temp }}/generated-repair
+
+      - uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        id: app-token
+        if: inputs.authentication == 'github-app'
+        with:
+          client-id: ${{ vars.GENERATED_REPAIR_APP_CLIENT_ID }}
+          private-key: ${{ secrets.GENERATED_REPAIR_APP_PRIVATE_KEY }}
+          permission-contents: write
+          permission-workflows: write
+          permission-pull-requests: read
+
+      - name: Recheck identities and canonical merge, then push normally
+        env:
+          GH_TOKEN: ${{ inputs.authentication == 'github-app' && steps.app-token.outputs.token || github.token }}
+          PR_NUMBER: ${{ inputs.pull-request }}
+        run: node scripts/repair-generated-conflicts.mjs publish "$GITHUB_WORKSPACE" "$RUNNER_TEMP/generated-repair"
