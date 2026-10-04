@@ -1457,7 +1457,7 @@
 <!-- map_deps -->
 <g id="node94" class="node">
 <title>map_deps</title>
-<g id="a_node94"><a xlink:title="依存整理&#10;&#10;issue 間の依存を PFD 化し着手順を導出する。scripts/pfdsl/audit&#45;issues&#45;flow.mjs はラベルと OPEN issue の updated_at・priority を読取専用で監査する。flow:managed なのに process が無い issue は、実装ブランチの統合まで他セッションから欠落して見えるため advisory とし、着手時の cycle&#45;status.mjs と roadmap 編集 PR の登録検査はそのサイクルの対象 issue に限定する。閉鎖済みというだけの finding は出さず、close が status を動かすこともない。完了チェーン回収では、未完了 artifact を出力する process とその入出力を残し、削除前後の ready/blocked の出力全体と参照整合を確認する。デフォルトブランチへの push が pfdsl&#45;sweep&#45;completed&#45;chains workflow 経由で sweep&#45;completed&#45;chains.mjs を起動し、検証を通った差分だけを PR として起票する。マージは人が行うため、グラフはレビューを経ない書換えを受けない。判定はデフォルトブランチだけを読むので、未マージのブランチが done artifact を入力に取る組合せは統合時に未宣言 id として検出される。規則は references/github&#45;issues&#45;backend.md「完了チェーン回収」が一次情報&#10;command: node scripts/pfdsl/audit&#45;issues&#45;flow.mjs">
+<g id="a_node94"><a xlink:title="依存整理&#10;&#10;issue 間の依存を PFD 化し着手順を導出する。scripts/pfdsl/audit&#45;issues&#45;flow.mjs はラベルと OPEN issue の updated_at・priority を読取専用で監査する。flow:managed なのに process が無い issue は、実装ブランチの統合まで他セッションから欠落して見えるため advisory とし、着手時の cycle&#45;status.mjs と roadmap 編集 PR の登録検査はそのサイクルの対象 issue に限定する。閉鎖済みというだけの finding は出さず、close が status を動かすこともない。完了チェーン回収では、未完了 artifact を出力する process とその入出力を残し、削除前後の ready/blocked の出力全体と参照整合を確認する。デフォルトブランチへの push が pfdsl&#45;sweep&#45;completed&#45;chains workflow 経由で sweep&#45;completed&#45;chains.mjs を起動し、検証を通った差分だけを PR として起票する。マージは人が行うため、グラフはレビューを経ない書換えを受けない。判定はデフォルトブランチだけを読むので、未マージのブランチが done artifact を入力に取る組合せは統合時に未宣言 id として検出される。規則は references/github&#45;issues&#45;backend.md「完了チェーン回収」が一次情報&#10;command: node ../scripts/pfdsl/audit&#45;issues&#45;flow.mjs">
 <ellipse fill="none" stroke="black" cx="1255.47" cy="-1234.39" rx="51.45" ry="29.42"/>
 <text xml:space="preserve" text-anchor="middle" x="1255.47" y="-1238.59" font-family="Times,serif" font-size="14.00">map_deps</text>
 <text xml:space="preserve" text-anchor="middle" x="1255.47" y="-1221.79" font-family="Times,serif" font-size="14.00">依存整理</text>
@@ -1761,7 +1761,7 @@
 <!-- decide_cli_release -->
 <g id="node80" class="node">
 <title>decide_cli_release</title>
-<g id="a_node80"><a xlink:title="CLIリリース判断&#10;&#10;make release&#45;statusで@pfdsl/cliとplugin同梱物のbehindを確認し、公開するか・どの版で切るかを判断する。版数準備は通常PRで行い、判断後の明示SHAへのv* tag push・npm publish・marketplace参照更新はpipeline.pfdslが持つ。runnerのready表示は候補に留め、公開物・mainのpin反映・取得を確認したartifactだけをroadmap同期PRでdoneへ更新する&#10;command: make release&#45;status">
+<g id="a_node80"><a xlink:title="CLIリリース判断&#10;&#10;make release&#45;statusで@pfdsl/cliとplugin同梱物のbehindを確認し、公開するか・どの版で切るかを判断する。版数準備は通常PRで行い、判断後の明示SHAへのv* tag push・npm publish・marketplace参照更新はpipeline.pfdslが持つ。runnerのready表示は候補に留め、公開物・mainのpin反映・取得を確認したartifactだけをroadmap同期PRでdoneへ更新する&#10;command: make &#45;C .. release&#45;status">
 <ellipse fill="none" stroke="black" cx="3227.18" cy="-352.39" rx="84.41" ry="29.42"/>
 <text xml:space="preserve" text-anchor="middle" x="3227.18" y="-356.59" font-family="Times,serif" font-size="14.00">decide_cli_release</text>
 <text xml:space="preserve" text-anchor="middle" x="3227.18" y="-339.79" font-family="Times,serif" font-size="14.00">CLIリリース判断</text>
@@ -1777,7 +1777,7 @@
 <!-- decide_libraries_release -->
 <g id="node81" class="node">
 <title>decide_libraries_release</title>
-<g id="a_node81"><a xlink:title="ライブラリリリース判断&#10;&#10;make release&#45;statusでcore・graphviz&#45;exporter・preview&#45;engineのbehindを確認し、3ライブラリを公開するか・どの共通版で切るかを判断する。版数準備は通常PRで行い、判断後の明示SHAへのlib&#45;v* tag push・npm publishはpipeline.pfdslが持つ&#10;command: make release&#45;status">
+<g id="a_node81"><a xlink:title="ライブラリリリース判断&#10;&#10;make release&#45;statusでcore・graphviz&#45;exporter・preview&#45;engineのbehindを確認し、3ライブラリを公開するか・どの共通版で切るかを判断する。版数準備は通常PRで行い、判断後の明示SHAへのlib&#45;v* tag push・npm publishはpipeline.pfdslが持つ&#10;command: make &#45;C .. release&#45;status">
 <ellipse fill="none" stroke="black" cx="3227.18" cy="-162.39" rx="106.95" ry="41.3"/>
 <text xml:space="preserve" text-anchor="middle" x="3227.18" y="-174.99" font-family="Times,serif" font-size="14.00">decide_libraries_release</text>
 <text xml:space="preserve" text-anchor="middle" x="3227.18" y="-158.19" font-family="Times,serif" font-size="14.00">ライブラリリリース</text>
@@ -1794,7 +1794,7 @@
 <!-- decide_vscode_release -->
 <g id="node82" class="node">
 <title>decide_vscode_release</title>
-<g id="a_node82"><a xlink:title="VSCode拡張リリース判断&#10;&#10;make release&#45;statusでtakasek.pfdslのbehindを確認し、拡張をパッケージするか・どの版で切るかを判断する。版数準備は通常PRで行い、判断後の明示SHAからの.vsix生成・vscode&#45;v* tag push・marketplaceアップロードはpipeline.pfdslが持つ&#10;command: make release&#45;status">
+<g id="a_node82"><a xlink:title="VSCode拡張リリース判断&#10;&#10;make release&#45;statusでtakasek.pfdslのbehindを確認し、拡張をパッケージするか・どの版で切るかを判断する。版数準備は通常PRで行い、判断後の明示SHAからの.vsix生成・vscode&#45;v* tag push・marketplaceアップロードはpipeline.pfdslが持つ&#10;command: make &#45;C .. release&#45;status">
 <ellipse fill="none" stroke="black" cx="3227.18" cy="-263.39" rx="102.01" ry="41.3"/>
 <text xml:space="preserve" text-anchor="middle" x="3227.18" y="-275.99" font-family="Times,serif" font-size="14.00">decide_vscode_release</text>
 <text xml:space="preserve" text-anchor="middle" x="3227.18" y="-259.19" font-family="Times,serif" font-size="14.00">VSCode拡張リリー</text>

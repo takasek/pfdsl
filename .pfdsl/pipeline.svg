@@ -131,7 +131,7 @@
 <!-- push_cli_release_tag -->
 <g id="node87" class="node">
 <title>push_cli_release_tag</title>
-<g id="a_node87"><a xlink:title="CLIタグ生成・push&#10;&#10;準備PRをmergeしたcommitをCOMMITで明示し、make releaseがそのcommitのpre&#45;tag checksを実行して同じSHAへv* tagを作成・pushする。mainへのcommit/pushとmarketplace更新は行わない。正常出力はcli_release_tagとpublished_claude_pluginで、npm公開はpublish_cli、公開後の参照更新はpin_plugin_marketplaceが持つ&#10;command: make release COMMIT=&lt;SHA&gt;&#10;location: ../scripts/release.mjs">
+<g id="a_node87"><a xlink:title="CLIタグ生成・push&#10;&#10;準備PRをmergeしたcommitをCOMMITで明示し、make releaseがそのcommitのpre&#45;tag checksを実行して同じSHAへv* tagを作成・pushする。mainへのcommit/pushとmarketplace更新は行わない。正常出力はcli_release_tagとpublished_claude_pluginで、npm公開はpublish_cli、公開後の参照更新はpin_plugin_marketplaceが持つ&#10;command: make &#45;C .. release COMMIT=&lt;SHA&gt;&#10;location: ../scripts/release.mjs">
 <ellipse fill="none" stroke="#8e44ad" cx="1891.06" cy="-2091.22" rx="94.33" ry="29.42"/>
 <text xml:space="preserve" text-anchor="middle" x="1891.06" y="-2095.42" font-family="Times,serif" font-size="14.00">push_cli_release_tag</text>
 <text xml:space="preserve" text-anchor="middle" x="1891.06" y="-2078.62" font-family="Times,serif" font-size="14.00">CLIタグ生成・push</text>
@@ -185,7 +185,7 @@
 <!-- gen_skill -->
 <g id="node75" class="node">
 <title>gen_skill</title>
-<g id="a_node75"><a xlink:title="スキル生成&#10;&#10;スキル生成ソース（skill&#45;template/spec/samples/examples/review&#45;perspectives/skill dirs 等）からリポ内 pfdsl スキルを再生成する。出力のうち references/*.md（spec/samples/examples 等）は packages/cli/dist に触れない scripts/lib/gen&#45;skill&#45;refs.mjs に切り出し済み（同モジュールの単体 CLI エントリは呼び出し元を失って #668 で削除、dist 非依存の手動再生成は gen&#45;plugin&#45;dist&#45;independent.mjs が担う）。SKILL.md は toolchain の CLI help と CLI package version を埋め込み、core の frontmatter 型定義を照合するため、dist 必須のまま（#586）。identity は gen_plugin が内包する形で check&#45;gen&#45;plugin.yml が全 PR で強制する&#10;command: make gen&#45;skill&#10;location: ../scripts/gen&#45;skill.mjs">
+<g id="a_node75"><a xlink:title="スキル生成&#10;&#10;スキル生成ソース（skill&#45;template/spec/samples/examples/review&#45;perspectives/skill dirs 等）からリポ内 pfdsl スキルを再生成する。出力のうち references/*.md（spec/samples/examples 等）は packages/cli/dist に触れない scripts/lib/gen&#45;skill&#45;refs.mjs に切り出し済み（同モジュールの単体 CLI エントリは呼び出し元を失って #668 で削除、dist 非依存の手動再生成は gen&#45;plugin&#45;dist&#45;independent.mjs が担う）。SKILL.md は toolchain の CLI help と CLI package version を埋め込み、core の frontmatter 型定義を照合するため、dist 必須のまま（#586）。identity は gen_plugin が内包する形で check&#45;gen&#45;plugin.yml が全 PR で強制する&#10;command: make &#45;C .. gen&#45;skill&#10;location: ../scripts/gen&#45;skill.mjs">
 <ellipse fill="none" stroke="#8e44ad" cx="382.55" cy="-1823.22" rx="48.44" ry="29.42"/>
 <text xml:space="preserve" text-anchor="middle" x="382.55" y="-1827.42" font-family="Times,serif" font-size="14.00">gen_skill</text>
 <text xml:space="preserve" text-anchor="middle" x="382.55" y="-1810.62" font-family="Times,serif" font-size="14.00">スキル生成</text>
@@ -218,7 +218,7 @@
 <!-- render_previews -->
 <g id="node91" class="node">
 <title>render_previews</title>
-<g id="a_node91"><a xlink:title="サンプル描画&#10;&#10;機能カタログとロードマップを dot/svg に描画する。toolchain のビルド（make build&#45;deps）が実行前提だがコンテンツ依存ではない — 呼び出し元ソフトウェアと同様、入力エッジに含めない。.dot / .svg / README はいずれも決定論的に生成される（#588）&#10;command: make gen&#45;samples&#10;location: ../scripts/gen&#45;samples.mjs">
+<g id="a_node91"><a xlink:title="サンプル描画&#10;&#10;機能カタログとロードマップを dot/svg に描画する。toolchain のビルド（make build&#45;deps）が実行前提だがコンテンツ依存ではない — 呼び出し元ソフトウェアと同様、入力エッジに含めない。.dot / .svg / README はいずれも決定論的に生成される（#588）&#10;command: make &#45;C .. gen&#45;samples&#10;location: ../scripts/gen&#45;samples.mjs">
 <ellipse fill="none" stroke="#8e44ad" cx="382.55" cy="-1746.22" rx="77.28" ry="29.42"/>
 <text xml:space="preserve" text-anchor="middle" x="382.55" y="-1750.42" font-family="Times,serif" font-size="14.00">render_previews</text>
 <text xml:space="preserve" text-anchor="middle" x="382.55" y="-1733.62" font-family="Times,serif" font-size="14.00">サンプル描画</text>
@@ -246,7 +246,7 @@
 <!-- assemble_codex_plugin -->
 <g id="node61" class="node">
 <title>assemble_codex_plugin</title>
-<g id="a_node61"><a xlink:title="Codex plugin root 組み立て&#10;&#10;make gen&#45;pluginのCodex adapter。Claude adapterと同一objectのharness_capability_model、中立生成済みpfdsl skill、install mirrorを入力に、stageTargetSkillTreeが中立正本からdecodeしたCodex本文とliteral payloadを描画し、repoルート由来のinstall/ミラーを含むnative skill treeをrepositoryとpluginへ生成し、command由来skill、hooks、manifestもplugin/pfdsl&#45;codex/へ生成する。Codex SKILL.mdのsummaryはmetadata.summaryへ移し、plugin descriptionは元のsemantic.summaryを消費する。生成済みClaude rootとmanifestは読まない。Codex command名が同名skillと衝突するとsource&#45;command&#45;接頭辞を付け、repository Codex assetsとともにatomicに置換する&#10;command: make gen&#45;plugin&#10;location: ../scripts/lib/gen&#45;plugin.mjs">
+<g id="a_node61"><a xlink:title="Codex plugin root 組み立て&#10;&#10;make gen&#45;pluginのCodex adapter。Claude adapterと同一objectのharness_capability_model、中立生成済みpfdsl skill、install mirrorを入力に、stageTargetSkillTreeが中立正本からdecodeしたCodex本文とliteral payloadを描画し、repoルート由来のinstall/ミラーを含むnative skill treeをrepositoryとpluginへ生成し、command由来skill、hooks、manifestもplugin/pfdsl&#45;codex/へ生成する。Codex SKILL.mdのsummaryはmetadata.summaryへ移し、plugin descriptionは元のsemantic.summaryを消費する。生成済みClaude rootとmanifestは読まない。Codex command名が同名skillと衝突するとsource&#45;command&#45;接頭辞を付け、repository Codex assetsとともにatomicに置換する&#10;command: make &#45;C .. gen&#45;plugin&#10;location: ../scripts/lib/gen&#45;plugin.mjs">
 <ellipse fill="none" stroke="#8e44ad" cx="886.82" cy="-2079.22" rx="106.44" ry="41.3"/>
 <text xml:space="preserve" text-anchor="middle" x="886.82" y="-2091.82" font-family="Times,serif" font-size="14.00">assemble_codex_plugin</text>
 <text xml:space="preserve" text-anchor="middle" x="886.82" y="-2075.02" font-family="Times,serif" font-size="14.00">Codex plugin root</text>
@@ -264,7 +264,7 @@
 <!-- gen_plugin -->
 <g id="node73" class="node">
 <title>gen_plugin</title>
-<g id="a_node73"><a xlink:title="Claude Code plugin root 組み立て&#10;&#10;make gen&#45;pluginのClaude Code adapter。組み立て前に生成専用のplugin rootとrepository assetsをsnapshotして空にし、生成をやめた旧ファイルが残らないよう毎回再構築する。失敗時はsnapshotから復元し、復元未完ならsnapshotを保持して両CLI入口がprimary errorと保存理由・pathを表示する。再試行とdrift検査も残留transactionを報告し、削除はしない。dist非依存の再生成では中立pfdsl skillのSKILL.mdだけを保持する。再構築でignore対象を含む未追跡ファイルが失われる場合は失敗させる。contract検証済みのharness_capability_modelと中立生成済みpfdsl skill、install mirrorから、Claude Code skill tree、Markdown command、Markdown agent、hooks・manifestをplugin/pfdsl/へidentity互換に組み立て、repo&#45;rootのmarketplace記述も更新する。marketplace記述は前世代claude_adapter_outputのrepo&#45;root .claude&#45;plugin/marketplace.jsonを読み、descriptionだけを置換してowner・source.ref等を保持する。あわせてclaude&#45;repository mappingの配布skill・command・agentを中立正本から描画し、ルート指示文書CLAUDE.mdをAGENTS.mdと同じmustacheテンプレートから描画してリポジトリへ書く。全Claude root writeの後、manifest自身を除く全bundleファイルのdigestをファイル単位で.claude&#45;plugin/bundle&#45;manifest.sha256へ記録する。集約値は読み手が計算する（#971, #1264, #1267）&#10;command: make gen&#45;plugin&#10;location: ../scripts/gen&#45;plugin.mjs">
+<g id="a_node73"><a xlink:title="Claude Code plugin root 組み立て&#10;&#10;make gen&#45;pluginのClaude Code adapter。組み立て前に生成専用のplugin rootとrepository assetsをsnapshotして空にし、生成をやめた旧ファイルが残らないよう毎回再構築する。失敗時はsnapshotから復元し、復元未完ならsnapshotを保持して両CLI入口がprimary errorと保存理由・pathを表示する。再試行とdrift検査も残留transactionを報告し、削除はしない。dist非依存の再生成では中立pfdsl skillのSKILL.mdだけを保持する。再構築でignore対象を含む未追跡ファイルが失われる場合は失敗させる。contract検証済みのharness_capability_modelと中立生成済みpfdsl skill、install mirrorから、Claude Code skill tree、Markdown command、Markdown agent、hooks・manifestをplugin/pfdsl/へidentity互換に組み立て、repo&#45;rootのmarketplace記述も更新する。marketplace記述は前世代claude_adapter_outputのrepo&#45;root .claude&#45;plugin/marketplace.jsonを読み、descriptionだけを置換してowner・source.ref等を保持する。あわせてclaude&#45;repository mappingの配布skill・command・agentを中立正本から描画し、ルート指示文書CLAUDE.mdをAGENTS.mdと同じmustacheテンプレートから描画してリポジトリへ書く。全Claude root writeの後、manifest自身を除く全bundleファイルのdigestをファイル単位で.claude&#45;plugin/bundle&#45;manifest.sha256へ記録する。集約値は読み手が計算する（#971, #1264, #1267）&#10;command: make &#45;C .. gen&#45;plugin&#10;location: ../scripts/gen&#45;plugin.mjs">
 <ellipse fill="none" stroke="#8e44ad" cx="886.82" cy="-1901.22" rx="108.92" ry="41.3"/>
 <text xml:space="preserve" text-anchor="middle" x="886.82" y="-1913.82" font-family="Times,serif" font-size="14.00">gen_plugin</text>
 <text xml:space="preserve" text-anchor="middle" x="886.82" y="-1897.02" font-family="Times,serif" font-size="14.00">Claude Code plugin root</text>
@@ -292,7 +292,7 @@
 <!-- push_libraries_release_tag -->
 <g id="node88" class="node">
 <title>push_libraries_release_tag</title>
-<g id="a_node88"><a xlink:title="ライブラリタグ生成・push&#10;&#10;準備PRをmergeした共通版のcommitをCOMMITで明示し、make release&#45;libsがpre&#45;tag checks後に同じSHAのlib&#45;v* tagをpushする。mainへのcommit/pushは行わず、npm公開はpublish_librariesが持つ&#10;command: make release&#45;libs COMMIT=&lt;SHA&gt;&#10;location: ../scripts/release.mjs">
+<g id="a_node88"><a xlink:title="ライブラリタグ生成・push&#10;&#10;準備PRをmergeした共通版のcommitをCOMMITで明示し、make release&#45;libsがpre&#45;tag checks後に同じSHAのlib&#45;v* tagをpushする。mainへのcommit/pushは行わず、npm公開はpublish_librariesが持つ&#10;command: make &#45;C .. release&#45;libs COMMIT=&lt;SHA&gt;&#10;location: ../scripts/release.mjs">
 <ellipse fill="none" stroke="#8e44ad" cx="382.55" cy="-2952.22" rx="116.87" ry="41.3"/>
 <text xml:space="preserve" text-anchor="middle" x="382.55" y="-2964.82" font-family="Times,serif" font-size="14.00">push_libraries_release_tag</text>
 <text xml:space="preserve" text-anchor="middle" x="382.55" y="-2948.02" font-family="Times,serif" font-size="14.00">ライブラリタグ生成・pus</text>
@@ -348,7 +348,7 @@
 <!-- gen_install -->
 <g id="node72" class="node">
 <title>gen_install</title>
-<g id="a_node72"><a xlink:title="install/ 生成&#10;&#10;repo ルートの明示配布許可一覧から pfd&#45;ops スキルの install/ ミラーを一方向で再生成する。skill の installFiles 宣言も同じ一覧から導出し、開発用ファイルを配布しない。生成の向きは repo ルートのソース → install/ → Claude・Codex の repository・plugin の4配布先のみ。gen_plugin が内部で実行するため古い install/ から組まれることはない。同一性検査は pre&#45;commit・終端では index、push・release では公開対象の HEAD の隔離コピーで生成し、元の作業ツリーを変更せずに出力契約を照合する。CI の check&#45;pfd&#45;ops&#45;sync.yml も一致を強制する&#10;command: make gen&#45;install&#10;location: ../scripts/lib/install&#45;templates.mjs">
+<g id="a_node72"><a xlink:title="install/ 生成&#10;&#10;repo ルートの明示配布許可一覧から pfd&#45;ops スキルの install/ ミラーを一方向で再生成する。skill の installFiles 宣言も同じ一覧から導出し、開発用ファイルを配布しない。生成の向きは repo ルートのソース → install/ → Claude・Codex の repository・plugin の4配布先のみ。gen_plugin が内部で実行するため古い install/ から組まれることはない。同一性検査は pre&#45;commit・終端では index、push・release では公開対象の HEAD の隔離コピーで生成し、元の作業ツリーを変更せずに出力契約を照合する。CI の check&#45;pfd&#45;ops&#45;sync.yml も一致を強制する&#10;command: make &#45;C .. gen&#45;install&#10;location: ../scripts/lib/install&#45;templates.mjs">
 <ellipse fill="none" stroke="#8e44ad" cx="382.55" cy="-1594.22" rx="57.6" ry="29.42"/>
 <text xml:space="preserve" text-anchor="middle" x="382.55" y="-1598.42" font-family="Times,serif" font-size="14.00">gen_install</text>
 <text xml:space="preserve" text-anchor="middle" x="382.55" y="-1581.62" font-family="Times,serif" font-size="14.00">install/ 生成</text>
@@ -440,7 +440,7 @@
 <!-- decode_harness_capabilities -->
 <g id="node66" class="node">
 <title>decode_harness_capabilities</title>
-<g id="a_node66"><a xlink:title="ハーネスsource decode・contract検証&#10;&#10;claude_harness_sourcesのsource rootとschemaをharness_inventoryに照らして全件分類し、plugin metadataをtoolchainから読み、中立テンプレートの明示的なハーネス分岐を描画し、両方の本文と共通metadataをsemantic recordへdecodeする。分類できなかったentryは全階層で、OS生成の既知の名前か、repositoryのGitが無視するpathであれば維持対象外として除く。source_git_ignore_stateをgit check&#45;ignoreに問い、repository内の.gitignore・Git index・clone固有のinfo/excludeが回答に影響する。個人のglobal ignoreは除外する。git自体が答えられない環境では従来どおり未分類として扱う。除かれなかった未知topology・未知schema・四target mappingの欠落や重複はadapter出力前に拒否する&#10;command: node &#45;&#45;test scripts/lib/harness&#45;capability&#45;contract.test.mjs scripts/lib/harness&#45;source&#45;decoder.test.mjs scripts/lib/harness&#45;inventory.test.mjs scripts/lib/git&#45;ignore&#45;oracle.test.mjs&#10;location: ../scripts/lib/harness&#45;source&#45;decoder.mjs">
+<g id="a_node66"><a xlink:title="ハーネスsource decode・contract検証&#10;&#10;claude_harness_sourcesのsource rootとschemaをharness_inventoryに照らして全件分類し、plugin metadataをtoolchainから読み、中立テンプレートの明示的なハーネス分岐を描画し、両方の本文と共通metadataをsemantic recordへdecodeする。分類できなかったentryは全階層で、OS生成の既知の名前か、repositoryのGitが無視するpathであれば維持対象外として除く。source_git_ignore_stateをgit check&#45;ignoreに問い、repository内の.gitignore・Git index・clone固有のinfo/excludeが回答に影響する。個人のglobal ignoreは除外する。git自体が答えられない環境では従来どおり未分類として扱う。除かれなかった未知topology・未知schema・四target mappingの欠落や重複はadapter出力前に拒否する&#10;command: node &#45;&#45;test ../scripts/lib/harness&#45;capability&#45;contract.test.mjs ../scripts/lib/harness&#45;source&#45;decoder.test.mjs ../scripts/lib/harness&#45;inventory.test.mjs ../scripts/lib/git&#45;ignore&#45;oracle.test.mjs&#10;location: ../scripts/lib/harness&#45;source&#45;decoder.mjs">
 <ellipse fill="none" stroke="#8e44ad" cx="382.55" cy="-3053.22" rx="124.01" ry="41.3"/>
 <text xml:space="preserve" text-anchor="middle" x="382.55" y="-3065.82" font-family="Times,serif" font-size="14.00">decode_harness_capabilities</text>
 <text xml:space="preserve" text-anchor="middle" x="382.55" y="-3049.02" font-family="Times,serif" font-size="14.00">ハーネスsource</text>
@@ -490,7 +490,7 @@
 <!-- gen_readme_cli -->
 <g id="node74" class="node">
 <title>gen_readme_cli</title>
-<g id="a_node74"><a xlink:title="README CLI 節生成&#10;&#10;pfdsl help の出力から root README.md の `## CLI` ブロックと packages/cli/README.md のコマンド表を書き直す。どちらも sentinel ブロックで、囲みの外は人手が書く（root 側は workflow.pfdsl の update_readme、packages/cli 側は toolchain の一部）。drift は pre&#45;commit の readme&#45;cli ゲートと CI の make check&#45;readme&#45;cli が強制する。出力もゲートも2つになったのは #850&#10;command: make gen&#45;readme&#45;cli&#10;location: ../scripts/gen&#45;readme&#45;cli.mjs">
+<g id="a_node74"><a xlink:title="README CLI 節生成&#10;&#10;pfdsl help の出力から root README.md の `## CLI` ブロックと packages/cli/README.md のコマンド表を書き直す。どちらも sentinel ブロックで、囲みの外は人手が書く（root 側は workflow.pfdsl の update_readme、packages/cli 側は toolchain の一部）。drift は pre&#45;commit の readme&#45;cli ゲートと CI の make check&#45;readme&#45;cli が強制する。出力もゲートも2つになったのは #850&#10;command: make &#45;C .. gen&#45;readme&#45;cli&#10;location: ../scripts/gen&#45;readme&#45;cli.mjs">
 <ellipse fill="none" stroke="#8e44ad" cx="382.55" cy="-2091.22" rx="96.28" ry="29.42"/>
 <text xml:space="preserve" text-anchor="middle" x="382.55" y="-2095.42" font-family="Times,serif" font-size="14.00">gen_readme_cli</text>
 <text xml:space="preserve" text-anchor="middle" x="382.55" y="-2078.62" font-family="Times,serif" font-size="14.00">README CLI 節生成</text>
@@ -513,7 +513,7 @@
 <!-- generate_frontmatter_schema -->
 <g id="node76" class="node">
 <title>generate_frontmatter_schema</title>
-<g id="a_node76"><a xlink:title="JSON Schema生成&#10;&#10;coreのZod定義からJSON Schemaを生成する。buildはdistへ書き、gen:schemaは追跡済み参照用コピーを更新する。変換器はランタイム入口から読み込まない&#10;command: pnpm &#45;&#45;filter @pfdsl/core gen:schema&#10;location: ../packages/core/scripts/write&#45;schema.mjs">
+<g id="a_node76"><a xlink:title="JSON Schema生成&#10;&#10;coreのZod定義からJSON Schemaを生成する。buildはdistへ書き、gen:schemaは追跡済み参照用コピーを更新する。変換器はランタイム入口から読み込まない&#10;command: pnpm &#45;&#45;dir .. &#45;&#45;filter @pfdsl/core gen:schema&#10;location: ../packages/core/scripts/write&#45;schema.mjs">
 <ellipse fill="none" stroke="#27ae60" cx="382.55" cy="-1900.22" rx="128.95" ry="29.42"/>
 <text xml:space="preserve" text-anchor="middle" x="382.55" y="-1904.42" font-family="Times,serif" font-size="14.00">generate_frontmatter_schema</text>
 <text xml:space="preserve" text-anchor="middle" x="382.55" y="-1887.62" font-family="Times,serif" font-size="14.00">JSON Schema生成</text>
@@ -530,7 +530,7 @@
 <!-- package_vscode_release -->
 <g id="node80" class="node">
 <title>package_vscode_release</title>
-<g id="a_node80"><a xlink:title="VSIX生成・タグpush&#10;&#10;選択済み版の vscode&#45;extension を未検証 .vsix へパッケージングし、その生成が成功した後で vscode&#45;v* tag を push する。1回の make vscode&#45;package が正常完了したときの両成果物を単一変換の複数出力として扱い、内部順序はこの description が持つ&#10;command: make vscode&#45;package COMMIT=&lt;SHA&gt;&#10;location: ../scripts/release.mjs">
+<g id="a_node80"><a xlink:title="VSIX生成・タグpush&#10;&#10;選択済み版の vscode&#45;extension を未検証 .vsix へパッケージングし、その生成が成功した後で vscode&#45;v* tag を push する。1回の make vscode&#45;package が正常完了したときの両成果物を単一変換の複数出力として扱い、内部順序はこの description が持つ&#10;command: make &#45;C .. vscode&#45;package COMMIT=&lt;SHA&gt;&#10;location: ../scripts/release.mjs">
 <ellipse fill="none" stroke="#8e44ad" cx="382.55" cy="-2014.22" rx="108.6" ry="29.42"/>
 <text xml:space="preserve" text-anchor="middle" x="382.55" y="-2018.42" font-family="Times,serif" font-size="14.00">package_vscode_release</text>
 <text xml:space="preserve" text-anchor="middle" x="382.55" y="-2001.62" font-family="Times,serif" font-size="14.00">VSIX生成・タグpush</text>
@@ -624,7 +624,7 @@
 <!-- diff_graphs -->
 <g id="node68" class="node">
 <title>diff_graphs</title>
-<g id="a_node68"><a xlink:title="差分算出&#10;&#10;2つの正準化グラフ（とそれぞれのfrontmatter）の構造差分を計算する&#10;command: node packages/cli/dist/cli.js diff&#10;location: ../packages/core/src/diff.ts">
+<g id="a_node68"><a xlink:title="差分算出&#10;&#10;2つの正準化グラフ（とそれぞれのfrontmatter）の構造差分を計算する&#10;command: node ../packages/cli/dist/cli.js diff&#10;location: ../packages/core/src/diff.ts">
 <ellipse fill="none" stroke="#27ae60" cx="1396.24" cy="-673.22" rx="56.95" ry="29.42"/>
 <text xml:space="preserve" text-anchor="middle" x="1396.24" y="-677.42" font-family="Times,serif" font-size="14.00">diff_graphs</text>
 <text xml:space="preserve" text-anchor="middle" x="1396.24" y="-660.62" font-family="Times,serif" font-size="14.00">差分算出</text>
@@ -735,7 +735,7 @@
 <!-- render_graph -->
 <g id="node90" class="node">
 <title>render_graph</title>
-<g id="a_node90"><a xlink:title="DOT変換&#10;&#10;正準化グラフとfrontmatter（スタイル・タイトル）からGraphviz DOTを構築する&#10;command: node packages/cli/dist/cli.js render&#10;location: ../packages/graphviz&#45;exporter/src/index.ts">
+<g id="a_node90"><a xlink:title="DOT変換&#10;&#10;正準化グラフとfrontmatter（スタイル・タイトル）からGraphviz DOTを構築する&#10;command: node ../packages/cli/dist/cli.js render&#10;location: ../packages/graphviz&#45;exporter/src/index.ts">
 <ellipse fill="none" stroke="#27ae60" cx="1396.24" cy="-519.22" rx="64.08" ry="29.42"/>
 <text xml:space="preserve" text-anchor="middle" x="1396.24" y="-523.42" font-family="Times,serif" font-size="14.00">render_graph</text>
 <text xml:space="preserve" text-anchor="middle" x="1396.24" y="-506.62" font-family="Times,serif" font-size="14.00">DOT変換</text>
@@ -752,7 +752,7 @@
 <!-- validate -->
 <g id="node95" class="node">
 <title>validate</title>
-<g id="a_node95"><a xlink:title="検証&#10;&#10;正準化グラフとfrontmatterにV/Wルールを適用し診断を生成する。analyze と analyzeSource は解析時のソース位置索引を渡し、宣言位置を再解釈しない。ルールの一次情報docs/spec/spec.md（a層）は設計時にこの実装へ反映されるもので、実行時の入力ではない&#10;command: node packages/cli/dist/cli.js check&#10;location: ../packages/core/src/validator.ts">
+<g id="a_node95"><a xlink:title="検証&#10;&#10;正準化グラフとfrontmatterにV/Wルールを適用し診断を生成する。analyze と analyzeSource は解析時のソース位置索引を渡し、宣言位置を再解釈しない。ルールの一次情報docs/spec/spec.md（a層）は設計時にこの実装へ反映されるもので、実行時の入力ではない&#10;command: node ../packages/cli/dist/cli.js check&#10;location: ../packages/core/src/validator.ts">
 <ellipse fill="none" stroke="#27ae60" cx="1396.24" cy="-1025.22" rx="42.65" ry="29.42"/>
 <text xml:space="preserve" text-anchor="middle" x="1396.24" y="-1029.42" font-family="Times,serif" font-size="14.00">validate</text>
 <text xml:space="preserve" text-anchor="middle" x="1396.24" y="-1012.62" font-family="Times,serif" font-size="14.00">検証</text>
@@ -808,7 +808,7 @@
 <!-- normalize -->
 <g id="node78" class="node">
 <title>normalize</title>
-<g id="a_node78"><a xlink:title="正規化&#10;&#10;エッジリストとノード種別を正規化しGraphを構築する&#10;command: node packages/cli/dist/cli.js graph edges&#10;location: ../packages/core/src/normalizer.ts">
+<g id="a_node78"><a xlink:title="正規化&#10;&#10;エッジリストとノード種別を正規化しGraphを構築する&#10;command: node ../packages/cli/dist/cli.js graph edges&#10;location: ../packages/core/src/normalizer.ts">
 <ellipse fill="none" stroke="#27ae60" cx="886.82" cy="-671.22" rx="50.89" ry="29.42"/>
 <text xml:space="preserve" text-anchor="middle" x="886.82" y="-675.42" font-family="Times,serif" font-size="14.00">normalize</text>
 <text xml:space="preserve" text-anchor="middle" x="886.82" y="-658.62" font-family="Times,serif" font-size="14.00">正規化</text>
@@ -969,7 +969,7 @@
 <!-- check_plugin_drift -->
 <g id="node63" class="node">
 <title>check_plugin_drift</title>
-<g id="a_node63"><a xlink:title="Claude/Codex plugin・repository Codex assetsのdrift検査&#10;&#10;兄弟成果物であるClaude adapter出力、Codex adapter出力、repository Codex assetsが唯一合流する検査。生成専用rootを空から再構築した後に三者の追跡済み差分（旧ファイルの削除を含む）と対象pathspec内の未追跡ファイルをまとめて検査し、更新漏れと手編集をpre&#45;commitとCIで失敗させる。dist依存のpfdsl SKILL.mdは別gateで検査する&#10;command: node scripts/gen&#45;plugin&#45;dist&#45;independent.mjs&#10;location: ../scripts/lib/drift&#45;gates.mjs">
+<g id="a_node63"><a xlink:title="Claude/Codex plugin・repository Codex assetsのdrift検査&#10;&#10;兄弟成果物であるClaude adapter出力、Codex adapter出力、repository Codex assetsが唯一合流する検査。生成専用rootを空から再構築した後に三者の追跡済み差分（旧ファイルの削除を含む）と対象pathspec内の未追跡ファイルをまとめて検査し、更新漏れと手編集をpre&#45;commitとCIで失敗させる。dist依存のpfdsl SKILL.mdは別gateで検査する&#10;command: node ../scripts/gen&#45;plugin&#45;dist&#45;independent.mjs&#10;location: ../scripts/lib/drift&#45;gates.mjs">
 <ellipse fill="none" stroke="#8e44ad" cx="1396.24" cy="-1420.22" rx="112.5" ry="53.17"/>
 <text xml:space="preserve" text-anchor="middle" x="1396.24" y="-1441.22" font-family="Times,serif" font-size="14.00">check_plugin_drift</text>
 <text xml:space="preserve" text-anchor="middle" x="1396.24" y="-1424.42" font-family="Times,serif" font-size="14.00">Claude/Codex</text>
@@ -1259,7 +1259,7 @@
 <!-- export_image -->
 <g id="node69" class="node">
 <title>export_image</title>
-<g id="a_node69"><a xlink:title="画像化&#10;&#10;DOTをSVG（wasm、外部依存なし）またはPDF/PNG（puppeteer必須）へ変換する&#10;command: node packages/cli/dist/cli.js render &#45;&#45;format svg&#10;location: ../packages/preview&#45;engine/src/index.ts">
+<g id="a_node69"><a xlink:title="画像化&#10;&#10;DOTをSVG（wasm、外部依存なし）またはPDF/PNG（puppeteer必須）へ変換する&#10;command: node ../packages/cli/dist/cli.js render &#45;&#45;format svg&#10;location: ../packages/preview&#45;engine/src/index.ts">
 <ellipse fill="none" stroke="#27ae60" cx="1891.06" cy="-46.22" rx="65.74" ry="29.42"/>
 <text xml:space="preserve" text-anchor="middle" x="1891.06" y="-50.42" font-family="Times,serif" font-size="14.00">export_image</text>
 <text xml:space="preserve" text-anchor="middle" x="1891.06" y="-33.62" font-family="Times,serif" font-size="14.00">画像化</text>
@@ -1362,7 +1362,7 @@
 <!-- updated_source -->
 <g id="node58" class="node">
 <title>updated_source</title>
-<g id="a_node58"><a xlink:title="フィールド更新済みソース&#10;&#10;指定ノードの指定フィールドを書き換えた.pfdslテキスト。定義が無ければ新規に挿入する&#10;criteria: meta setコマンドが実装され動作確認済み&#10;externalStakeholders: CLIユーザー">
+<g id="a_node58"><a xlink:title="フィールド更新済みソース&#10;&#10;ローカルfrontmatterに定義されたノードの指定フィールドを書き換えた.pfdslテキスト。定義が無いノードは追加を案内し、エラー時はファイルを書き換えない&#10;criteria: meta setコマンドが実装され、定義済みノードの更新と未定義ノードの非書込みが動作確認済み&#10;externalStakeholders: CLIユーザー">
 <polygon fill="none" stroke="black" stroke-width="2" points="734.7,-329.42 554.7,-329.42 554.7,-271.02 734.7,-271.02 734.7,-329.42"/>
 <text xml:space="preserve" text-anchor="middle" x="644.7" y="-312.82" font-family="Times,serif" font-size="14.00">updated_source</text>
 <text xml:space="preserve" text-anchor="middle" x="644.7" y="-296.02" font-family="Times,serif" font-size="14.00">フィールド更新済みソー</text>
@@ -1511,7 +1511,7 @@
 <!-- format -->
 <g id="node71" class="node">
 <title>format</title>
-<g id="a_node71"><a xlink:title="整形&#10;&#10;ソースを独立に再lex/parseし正準整形済みテキストを生成する（parseの出力を再利用しない別経路）。frontmatterはyaml CST経由で正準化し、bodyはformatter.tsが担う（ADR&#45;0034）。出力はソースの改行スタイル（LF/CRLF）を保つ（#656。正準化するのはpfdslの記法であってファイルのバイト表現ではない）&#10;command: node packages/cli/dist/cli.js fmt &#45;&#45;write&#10;location: ../packages/core/src/formatter.ts">
+<g id="a_node71"><a xlink:title="整形&#10;&#10;ソースを独立に再lex/parseし正準整形済みテキストを生成する（parseの出力を再利用しない別経路）。frontmatterはyaml CST経由で正準化し、bodyはformatter.tsが担う（ADR&#45;0034）。出力はソースの改行スタイル（LF/CRLF）を保つ（#656。正準化するのはpfdslの記法であってファイルのバイト表現ではない）&#10;command: node ../packages/cli/dist/cli.js fmt &#45;&#45;write&#10;location: ../packages/core/src/formatter.ts">
 <ellipse fill="none" stroke="#27ae60" cx="382.55" cy="-223.22" rx="37.7" ry="29.42"/>
 <text xml:space="preserve" text-anchor="middle" x="382.55" y="-227.42" font-family="Times,serif" font-size="14.00">format</text>
 <text xml:space="preserve" text-anchor="middle" x="382.55" y="-210.62" font-family="Times,serif" font-size="14.00">整形</text>
@@ -1657,7 +1657,7 @@
 <!-- reindex_meta -->
 <g id="node89" class="node">
 <title>reindex_meta</title>
-<g id="a_node89"><a xlink:title="index採番&#10;&#10;frontmatterをyaml CSTとして再parseし、トポロジ順に沿ってindexフィールドを採番し直したテキストを生成する（ADR&#45;0034）。出力はソースの改行スタイル（LF/CRLF）を保つ（#644）&#10;command: node packages/cli/dist/cli.js meta reindex&#10;location: ../packages/core/src/reindex.ts">
+<g id="a_node89"><a xlink:title="index採番&#10;&#10;frontmatterをyaml CSTとして再parseし、トポロジ順に沿ってindexフィールドを採番し直したテキストを生成する（ADR&#45;0034）。出力はソースの改行スタイル（LF/CRLF）を保つ（#644）&#10;command: node ../packages/cli/dist/cli.js meta reindex&#10;location: ../packages/core/src/reindex.ts">
 <ellipse fill="none" stroke="#27ae60" cx="382.55" cy="-377.22" rx="65.19" ry="29.42"/>
 <text xml:space="preserve" text-anchor="middle" x="382.55" y="-381.42" font-family="Times,serif" font-size="14.00">reindex_meta</text>
 <text xml:space="preserve" text-anchor="middle" x="382.55" y="-364.62" font-family="Times,serif" font-size="14.00">index採番</text>
@@ -1674,7 +1674,7 @@
 <!-- set_meta -->
 <g id="node92" class="node">
 <title>set_meta</title>
-<g id="a_node92"><a xlink:title="フィールド更新&#10;&#10;frontmatterをyaml CSTとして再parseし、指定ノードの指定フィールドを書き換えたテキストを生成する（ADR&#45;0034）。出力はソースの改行スタイル（LF/CRLF）を保つ（#644）&#10;command: node packages/cli/dist/cli.js meta set&#10;location: ../packages/core/src/frontmatter&#45;cst.ts">
+<g id="a_node92"><a xlink:title="フィールド更新&#10;&#10;frontmatterをyaml CSTとして再parseし、ローカル定義があるノードの指定フィールドを書き換えたテキストを生成する（ADR&#45;0034）。出力はソースの改行スタイル（LF/CRLF）を保つ（#644）&#10;command: node ../packages/cli/dist/cli.js meta set&#10;location: ../packages/core/src/frontmatter&#45;cst.ts">
 <ellipse fill="none" stroke="#27ae60" cx="382.55" cy="-300.22" rx="63.29" ry="29.42"/>
 <text xml:space="preserve" text-anchor="middle" x="382.55" y="-304.42" font-family="Times,serif" font-size="14.00">set_meta</text>
 <text xml:space="preserve" text-anchor="middle" x="382.55" y="-287.62" font-family="Times,serif" font-size="14.00">フィールド更新</text>
@@ -1691,7 +1691,7 @@
 <!-- sort_meta -->
 <g id="node93" class="node">
 <title>sort_meta</title>
-<g id="a_node93"><a xlink:title="ノード定義ソート&#10;&#10;frontmatterをyaml CSTとして再parseし、指定キーでノード定義を並べ替えたテキストを生成する（ADR&#45;0034）。出力はソースの改行スタイル（LF/CRLF）を保つ（#644）&#10;command: node packages/cli/dist/cli.js meta sort&#10;location: ../packages/core/src/sort.ts">
+<g id="a_node93"><a xlink:title="ノード定義ソート&#10;&#10;frontmatterをyaml CSTとして再parseし、指定キーでノード定義を並べ替えたテキストを生成する（ADR&#45;0034）。出力はソースの改行スタイル（LF/CRLF）を保つ（#644）&#10;command: node ../packages/cli/dist/cli.js meta sort&#10;location: ../packages/core/src/sort.ts">
 <ellipse fill="none" stroke="#27ae60" cx="382.55" cy="-129.22" rx="70.71" ry="29.42"/>
 <text xml:space="preserve" text-anchor="middle" x="382.55" y="-133.42" font-family="Times,serif" font-size="14.00">sort_meta</text>
 <text xml:space="preserve" text-anchor="middle" x="382.55" y="-116.62" font-family="Times,serif" font-size="14.00">ノード定義ソート</text>
