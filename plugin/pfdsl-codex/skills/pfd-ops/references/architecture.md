@@ -184,7 +184,7 @@ plugin version の上流差分警告は更新をユーザーに案内する。�
 採用先では、同じチェックが `.pfdsl/config.json` の `appliedMigration` を実行中の plugin と照合し、`--upstream` の有無や GitHub Issues バックエンドの採否によらず、出力の先頭に結果を出す。
 `appliedMigration` は、採用先が移行を適用し終えた plugin の版を `pluginVersion` に、Claude Code の plugin ではその bundle の集約 hash を `bundleHash` に持つ（Codex の plugin には bundle manifest が無いので `bundleHash` を持たない）。
 `.pfdsl/` が無いリポでは何も出さない。plugin はユーザー単位で入るため、無関係なリポでも起動するからである。
-照合は読むだけで書かない。記録を書くのは `--record-migration` だけで、移行を実施する人または agent が、移行と同じ変更の中で、検証が通った後に明示的に実行する。`--deploy` と同時には指定できない。
+照合は読むだけで書かない。記録を書くのは `--record-migration` だけで、移行を実施する人または agent が、移行と同じ変更の中で、検証が通った後に明示的に実行する。`--deploy`・`--overwrite-local-edits`・`--delete-edited-orphans` と同時には指定できない（引数の誤りとして exit 2）。
 キーを手で書くことは禁じないが、hash を人手で計算させないためにコマンドを案内する。
 
 出力の意味と対応は次のとおり。

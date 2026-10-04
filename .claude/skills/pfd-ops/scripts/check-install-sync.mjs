@@ -9,7 +9,8 @@
 //
 // Usage: node check-install-sync.mjs [--target <dir>] [--deploy]
 //        [--overwrite-local-edits] [--delete-edited-orphans] [--upstream]
-//        | --record-migration (exclusive with --deploy)
+//        | --record-migration (exclusive with --deploy, --overwrite-local-edits
+//        and --delete-edited-orphans)
 
 import {
 	chmodSync,
@@ -657,6 +658,15 @@ export function parseArgs(argv) {
 		throw new Error(
 			"--record-migration cannot be combined with --deploy: record the migration state only after the deploy and the rest of the migration have been verified",
 		);
+	}
+	// Both only change what --deploy does, so beside --record-migration they would
+	// be accepted and have no effect, the silent no-op #631 closed for typos.
+	for (const flag of ["overwrite-local-edits", "delete-edited-orphans"]) {
+		if (values["record-migration"] && values[flag]) {
+			throw new Error(
+				`--record-migration cannot be combined with --${flag}: it only changes what --deploy does, and recording writes no install/ files`,
+			);
+		}
 	}
 	return {
 		target: values.target,

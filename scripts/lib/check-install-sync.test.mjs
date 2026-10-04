@@ -1086,6 +1086,16 @@ describe("parseArgs", () => {
 		);
 	});
 
+	it("rejects --record-migration together with a deploy-only override, which it would silently ignore", () => {
+		for (const flag of ["--overwrite-local-edits", "--delete-edited-orphans"]) {
+			assert.throws(
+				() => parseArgs(["--record-migration", flag]),
+				new RegExp(`--record-migration cannot be combined with ${flag}`),
+				flag,
+			);
+		}
+	});
+
 	it("rejects a bare positional argument", () => {
 		assert.throws(() => parseArgs(["/tmp/foo"]), {
 			code: "ERR_PARSE_ARGS_UNEXPECTED_POSITIONAL",
@@ -2017,6 +2027,31 @@ describe("applied migration state", () => {
 					assert.equal(configText(target), before, name);
 				}
 			});
+		});
+
+		it("is rejected with exit 2, writing nothing, when combined with a deploy-only override", () => {
+			const plugin = makeInstalledPlugin("record-with-override", {
+				claude: "0.2.0",
+			});
+			for (const flag of [
+				"--overwrite-local-edits",
+				"--delete-edited-orphans",
+			]) {
+				const target = makeAdopter(`record-with-override-${flag.slice(2)}`);
+
+				const result = run(plugin, target, ["--record-migration", flag]);
+				assert.equal(result.status, 2, flag);
+				assert.match(
+					result.stderr,
+					new RegExp(`--record-migration.*${flag}`),
+					flag,
+				);
+				assert.equal(
+					existsSync(join(target, ".pfdsl/config.json")),
+					false,
+					flag,
+				);
+			}
 		});
 
 		it("is rejected with exit 2 when combined with --deploy", () => {
