@@ -131,12 +131,6 @@ artifact:
     status: todo
     criteria: "エディタでのノード選択とホバー内の周辺グラフでのノードクリックのどちらでも、移動先のノードだけが短時間強調される。連続選択で古い強調が残らず、再描画だけでは点滅せず、動きを減らす設定を尊重する"
     location: ../packages/vscode-extension/
-  standalone_baseline:
-    label: スタンドアロン採用仕様と試作
-    description: Tauri・macOS Apple Silicon の採用仕様、試作コードと限定的な検証記録。製品完成の証拠ではない。実装工程と引き継ぎは SPEC.md 第9節、個別の完了条件は各 process の issue を正とする
-    status: done
-    criteria: experiments/standalone/ に SPEC.md・README.md・RESULTS.md・試作コードと evidence があり、採用事項と未検証範囲を再読できる
-    location: ../experiments/standalone/
   standalone_foundation:
     label: 両ホストで利用するアプリ共通基盤
     status: done
@@ -186,22 +180,10 @@ process:
     updated_at: 2026-10-04T09:05:14Z
   publish_ext_editing:
     label: extension 編集支援リリース
-  i1278_add_group_delete:
-    label: group 削除の追加
-    location: https://github.com/takasek/pfdsl/issues/1278
-    updated_at: 2026-10-03T20:00:32Z
   publish_cli_group_delete:
     label: CLI group 削除公開
-  i1305_allow_extension_fields:
-    label: meta set の対象判定と拡張フィールド更新を整える
-    location: https://github.com/takasek/pfdsl/issues/1305
-    updated_at: 2026-10-03T20:00:28Z
   publish_cli_meta_set_extension:
     label: CLI 拡張フィールド更新公開
-  i1291_report_group_node_clash:
-    label: group と node の同名の診断を追加する
-    location: https://github.com/takasek/pfdsl/issues/1291
-    updated_at: 2026-10-03T20:00:14Z
   publish_cli_group_node_clash:
     label: CLI 同名診断公開
   i1282_create_node_definition:
@@ -216,10 +198,6 @@ process:
     label: ホバー内の周辺グラフ・移動と移動先強調を実装する
     location: https://github.com/takasek/pfdsl/issues/1284
     updated_at: 2026-10-04T09:05:21Z
-  i1257_build_standalone_foundation:
-    label: 共通処理を製品用アプリ基盤へ接続する
-    location: https://github.com/takasek/pfdsl/issues/1257
-    updated_at: 2026-10-04T02:46:10Z
   i1258_build_standalone_documents:
     label: 文書の安全な編集・保存を完成させる
     location: https://github.com/takasek/pfdsl/issues/1258
@@ -264,21 +242,16 @@ editor_connector >> i483_implement_preview_connector -> preview_connector
 
 [def_insertion, editor_connector, preview_connector] >> publish_ext_editing -> ext_editing_release
 
-toolchain >> i1278_add_group_delete -> group_delete_cli
 group_delete_cli >> publish_cli_group_delete -> cli_release_group_delete
 
-toolchain >> i1305_allow_extension_fields -> meta_set_extension_fields
 meta_set_extension_fields >> publish_cli_meta_set_extension -> cli_release_meta_set_extension
 
-toolchain >> i1291_report_group_node_clash -> group_node_clash_diagnostic
 group_node_clash_diagnostic >> publish_cli_group_node_clash -> cli_release_group_node_clash
 def_insertion >> i1282_create_node_definition -> node_definition_creation
 
 toolchain >> i1283_add_node_location_cycle -> node_location_cycle
 
 toolchain >> i1284_add_hover_local_graph -> [hover_local_graph, preview_focus_cue]
-
-[standalone_baseline, toolchain] >> i1257_build_standalone_foundation -> standalone_foundation
 
 standalone_foundation >> i1258_build_standalone_documents -> standalone_documents
 
