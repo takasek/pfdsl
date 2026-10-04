@@ -223,9 +223,7 @@ export function prepare(root, directory) {
 	]);
 	const repaired = git(root, ["rev-parse", "HEAD"]);
 	verifyRepair(root, value.head, value.base, repaired);
-	run(root, "make", ["test"]);
-	run(root, "make", ["lint"]);
-	run(root, "make", ["typecheck"]);
+	run(root, "make", ["test", "lint", "typecheck"]);
 	run(root, "node", [
 		"scripts/check-generated-drift.mjs",
 		"--gen-plugin",
@@ -240,10 +238,6 @@ export function prepare(root, directory) {
 		resolve(directory, "repair.bundle"),
 		"refs/heads/generated-repair-result",
 	]);
-	writeFileSync(
-		resolve(directory, "result.json"),
-		`${JSON.stringify({ repaired })}\n`,
-	);
 	if (process.env.GITHUB_OUTPUT)
 		appendFileSync(process.env.GITHUB_OUTPUT, "changed=true\n");
 	console.log(`Verified repair commit: ${repaired}`);
@@ -259,16 +253,12 @@ function publication(root, directory, push) {
 	const fresh = snapshot(value.repository, value.number);
 	if (JSON.stringify(fresh) !== JSON.stringify(value))
 		throw new Error("PR or main changed; rerun the workflow");
-	const { repaired } = JSON.parse(
-		readFileSync(resolve(directory, "result.json"), "utf8"),
-	);
 	git(root, [
 		"fetch",
 		resolve(directory, "repair.bundle"),
 		"refs/heads/generated-repair-result",
 	]);
-	if (git(root, ["rev-parse", "FETCH_HEAD"]) !== repaired)
-		throw new Error("Artifact commit mismatch");
+	const repaired = git(root, ["rev-parse", "FETCH_HEAD"]);
 	verifyRepair(root, value.head, value.base, repaired);
 	git(root, ["check-ref-format", `refs/heads/${value.branch}`]);
 	if (push) {
