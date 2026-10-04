@@ -1,18 +1,10 @@
-import {
-	type DocumentModel,
-	findFrontmatterDefinitionRange,
-	nodeIdAtCursor,
-	positionOfNodeId,
-	previewStyles,
-} from "@pfdsl/editor";
-import { mountPreview } from "@pfdsl/editor/preview";
+import { previewStyles } from "@pfdsl/editor";
 import { invoke } from "@tauri-apps/api/core";
 import { getCurrentWindow } from "@tauri-apps/api/window";
-import * as monaco from "monaco-editor/editor/editor.api.js";
 import EditorWorker from "monaco-editor/editor/editor.worker.js?worker";
 import { verifyNativeCorpus } from "./acceptance.js";
 import { createCloseGuard } from "./close-guard.js";
-import { formatSnapshot, processSnapshot } from "./processing.js";
+import { createDocumentTab, type DocumentTab } from "./document-tab.js";
 import "./style.css";
 
 // The worker is bundled locally. No network service or language sidecar is used.
@@ -25,18 +17,8 @@ document.head.append(style);
 const status = document.querySelector<HTMLElement>("#status")!;
 const tabs = document.querySelector<HTMLElement>("#tabs")!;
 const documents = document.querySelector<HTMLElement>("#documents")!;
-interface Tab {
-	path: string | null;
-	container: HTMLElement;
-	button: HTMLButtonElement;
-	editor: monaco.editor.IStandaloneCodeEditor;
-	preview: ReturnType<typeof mountPreview>;
-	model?: DocumentModel;
-	revision: number;
-	initial: string;
-}
-const opened = new Map<string, Tab>();
-let active: Tab | undefined;
+const opened = new Map<string, DocumentTab>();
+let active: DocumentTab | undefined;
 const native = "__TAURI_INTERNALS__" in window;
 const read = async (path: string): Promise<string | null> => {
 	try {
@@ -45,39 +27,13 @@ const read = async (path: string): Promise<string | null> => {
 		return null;
 	}
 };
-function activate(tab: Tab) {
+function activate(tab: DocumentTab) {
 	active = tab;
 	for (const other of opened.values()) {
 		other.container.style.display = other === tab ? "flex" : "none";
 		other.button.setAttribute("aria-selected", String(other === tab));
 	}
-	tab.editor.layout();
-	void refresh(tab);
-}
-async function refresh(tab: Tab) {
-	const revision = ++tab.revision;
-	const result = await processSnapshot(tab.editor.getValue(), tab.path, read);
-	if (revision !== tab.revision) return;
-	tab.model = result.model;
-	monaco.editor.setModelMarkers(
-		tab.editor.getModel()!,
-		"pfdsl",
-		result.model.diagnostics.map((d) => ({
-			severity:
-				d.severity === "error"
-					? monaco.MarkerSeverity.Error
-					: d.severity === "warning"
-						? monaco.MarkerSeverity.Warning
-						: monaco.MarkerSeverity.Info,
-			message: d.message,
-			code: d.code,
-			startLineNumber: d.range.start.line,
-			startColumn: d.range.start.column,
-			endLineNumber: d.range.end.line,
-			endColumn: d.range.end.column,
-		})),
-	);
-	await tab.preview.receive(result.message);
+	tab.activate();
 }
 function openDocument(
 	key: string,
@@ -90,99 +46,24 @@ function openDocument(
 		activate(existing);
 		return;
 	}
-	const container = document.createElement("div");
-	container.className = "document";
-	const editorElement = document.createElement("div");
-	editorElement.className = "editor";
-	const previewElement = document.createElement("div");
-	previewElement.className = "preview";
-	container.append(editorElement, previewElement);
-	documents.append(container);
-	const model = monaco.editor.createModel(
+	const tab = createDocumentTab({
+		parent: documents,
+		key,
+		name,
 		source,
-		"plaintext",
-		monaco.Uri.parse(`inmemory://pfdsl/${encodeURIComponent(key)}`),
-	);
-	const editor = monaco.editor.create(editorElement, {
-		model,
-		automaticLayout: true,
-		minimap: { enabled: false },
-		fontSize: 14,
-		renderWhitespace: "selection",
-	});
-	const button = document.createElement("button");
-	button.textContent = name;
-	button.setAttribute("role", "tab");
-	tabs.append(button);
-	const preview = mountPreview(previewElement, {
-		postMessage(message) {
-			if (message.type === "nodeClick" && tab.model) {
-				const definition = findFrontmatterDefinitionRange(
-					tab.model,
-					message.nodeId,
-				);
-				const body = positionOfNodeId(
-					tab.model.document.statements,
-					message.nodeId,
-				);
-				const position =
-					definition?.start ??
-					(body ? { line: body.line + 1, column: body.column + 1 } : undefined);
-				if (position) {
-					editor.setPosition({
-						lineNumber: position.line,
-						column: position.column,
-					});
-					editor.revealPositionInCenter({
-						lineNumber: position.line,
-						column: position.column,
-					});
-					editor.focus();
-				}
-			} else if (message.type !== "ready")
-				status.textContent =
-					"Related-file navigation is not available in this build.";
+		path,
+		read,
+		reportStatus: (message) => {
+			status.textContent = message;
 		},
 	});
-	const tab: Tab = {
-		path,
-		container,
-		button,
-		editor,
-		preview,
-		revision: 0,
-		initial: source,
-	};
+	tabs.append(tab.button);
 	opened.set(key, tab);
-	button.onclick = () => activate(tab);
-	editor.onDidChangeModelContent(() => {
-		button.textContent = `${name}${editor.getValue() === tab.initial ? "" : " •"}`;
-		void refresh(tab).catch((error) => {
-			status.textContent = String(error);
-		});
-	});
-	editor.onDidChangeCursorPosition((event) => {
-		if (!tab.model) return;
-		const nodeId = nodeIdAtCursor(tab.model, {
-			line: event.position.lineNumber - 1,
-			character: event.position.column - 1,
-		});
-		void preview.receive(
-			nodeId ? { type: "focus", nodeId } : { type: "clearFocus" },
-		);
-	});
+	tab.button.onclick = () => activate(tab);
 	activate(tab);
 }
-document.querySelector<HTMLButtonElement>("#format")!.onclick = () => {
-	if (!active) return;
-	const output = formatSnapshot(active.editor.getValue());
-	if (output === null) return;
-	active.editor.pushUndoStop();
-	active.editor.executeEdits("pfdsl.format", [
-		{ range: active.editor.getModel()!.getFullModelRange(), text: output },
-	]);
-	active.editor.pushUndoStop();
-};
+document.querySelector<HTMLButtonElement>("#format")!.onclick = () =>
+	active?.format();
 document.querySelector<HTMLButtonElement>("#open")!.onclick = async () => {
 	if (!native) {
 		status.textContent = "Open the desktop application to choose a folder.";
@@ -234,7 +115,7 @@ if (native) {
 	void getCurrentWindow().onCloseRequested((event) => {
 		void guardClose(
 			event,
-			[...opened.values()].some((tab) => tab.editor.getValue() !== tab.initial),
+			[...opened.values()].some((tab) => tab.isDirty()),
 		).catch((error) => {
 			status.textContent = String(error);
 		});
