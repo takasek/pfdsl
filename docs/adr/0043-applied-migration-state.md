@@ -74,7 +74,8 @@ older の状態で、`--deploy` を指さない通常の実行は失敗にしな
 ### Codex
 
 既存の `checkUpstreamVersion` は `.claude-plugin/plugin.json` だけを読み、Codex の plugin（`.codex-plugin/plugin.json`、`bundle-manifest.sha256` なし）では何も出さない。
-照合の版読取は、両方の plugin manifest を読む `readPluginIdentity` にまとめる。
+移行状態の照合は、両方の plugin manifest を読む `readPluginIdentity` で実行中の plugin の版を読む。
+`checkUpstreamVersion` は変えない。`--upstream` の上流との版ずれ警告は、引き続き Claude Code の manifest だけを読み、Codex では何も出さない。
 `bundleHash` は、`.claude-plugin/bundle-manifest.sha256` がある plugin でだけ読み、無ければ持たない。
 plugin の外で動いていて、どちらの manifest も版を持たない場合は、版が不明として扱う。
 
