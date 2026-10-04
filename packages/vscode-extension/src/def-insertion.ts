@@ -1,7 +1,7 @@
 import { ID_PATTERN, insertDefinition } from "@pfdsl/core";
+import { findUndefinedNodeKind } from "@pfdsl/editor";
 import * as vscode from "vscode";
 import { analyzeDocument, LANGUAGE_ID } from "./analyze.js";
-import { findUndefinedNodeKind } from "./def-insertion-logic.js";
 
 export function registerDefInsertion(context: vscode.ExtensionContext): void {
 	const provider: vscode.CodeActionProvider = {

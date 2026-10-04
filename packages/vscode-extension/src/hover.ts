@@ -1,9 +1,9 @@
 import * as path from "node:path";
 import { ID_PATTERN } from "@pfdsl/core";
+import { findFrontmatterDefinitionRange } from "@pfdsl/editor";
 import * as vscode from "vscode";
 import { analyzeDocument, LANGUAGE_ID } from "./analyze.js";
 import { buildHoverLines, RUN_COMMAND } from "./hover-logic.js";
-import { findFrontmatterDefinitionRange } from "./jump-logic.js";
 
 export { buildHoverLines } from "./hover-logic.js";
 

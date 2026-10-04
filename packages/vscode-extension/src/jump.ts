@@ -1,10 +1,10 @@
 import { ID_PATTERN } from "@pfdsl/core";
+import { findFrontmatterDefinitionRange } from "@pfdsl/editor";
 import * as vscode from "vscode";
 import { analyzeDocument } from "./analyze.js";
-import { findFrontmatterDefinitionRange } from "./jump-logic.js";
 
-export type { FrontmatterPosition } from "./jump-logic.js";
-export { findFrontmatterDefinitionInText } from "./jump-logic.js";
+export type { FrontmatterPosition } from "@pfdsl/editor";
+export { findFrontmatterDefinitionInText } from "@pfdsl/editor";
 
 export function findFrontmatterDefinition(
 	doc: vscode.TextDocument,

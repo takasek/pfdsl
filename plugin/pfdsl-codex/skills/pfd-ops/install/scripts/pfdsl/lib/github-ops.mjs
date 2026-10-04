@@ -9,9 +9,8 @@
  *
  * Backend selection keeps the discipline execGh (gh-exec.mjs) always had:
  * try gh first; when it's missing (ENOENT) and a GH_TOKEN/GITHUB_TOKEN is
- * available, fall back to HTTP; otherwise rethrow the original ENOENT so a
- * caller's isGhUnavailableError(e) still recognizes "truly unavailable" and
- * can degrade gracefully (#489, #492).
+ * available, fall back to HTTP. With neither route, expose operation-level
+ * unavailability. Executed backend failures remain real errors (#1085).
  */
 
 import { execFileSync } from "node:child_process";
@@ -26,6 +25,7 @@ import {
 	mapLabelsResponse,
 	parseHost,
 	parseOwnerRepo,
+	requireGitHubViewFields,
 	addIssueLabel as restAddIssueLabel,
 	createLabel as restCreateLabel,
 	editLabel as restEditLabel,
@@ -39,6 +39,23 @@ import { proxyAwareFetch } from "./proxy-fetch.mjs";
 const LABEL_LIST_LIMIT = 100;
 const ISSUE_LIST_LIMIT = 1000;
 const PR_LIST_LIMIT = 100;
+
+/** No selectable backend exists for this operation; executed failures are never this type. */
+export class GitHubUnavailableError extends Error {
+	constructor(operation, options) {
+		super(
+			`GitHub operation unavailable: ${operation} (gh CLI absent and no HTTP token)`,
+			options,
+		);
+		this.name = "GitHubUnavailableError";
+		this.operation = operation;
+	}
+}
+
+export function isGitHubUnavailableError(error) {
+	return error instanceof GitHubUnavailableError;
+}
+export const GITHUB_UNAVAILABLE_EXIT_CODE = 2;
 
 async function rejectSaturatedList(operation, limit, itemsPromise) {
 	// A result with exactly `limit` entries may be the complete list or a
@@ -68,7 +85,7 @@ function normalizeIssueViewComments(issue) {
 				id: comment.id,
 				databaseId: comment.databaseId ?? commentDatabaseIdFromUrl(comment.url),
 				author: comment.author,
-				body: comment.body ?? "",
+				body: comment.body === null ? "" : comment.body,
 				createdAt: comment.createdAt,
 				url: comment.url,
 			};
@@ -135,9 +152,8 @@ export function createGitHubOps({
 	/**
 	 * Runs `ghCall`, and on a genuine gh-unavailable ENOENT with a token
 	 * present, resolves this repo's owner/repo and runs `httpCall` with it.
-	 * Every other case (no ENOENT, or ENOENT with no token) rethrows the
-	 * original error unchanged, so isGhUnavailableError keeps working for
-	 * callers. `httpCall` undefined means this operation has no HTTP
+	 * A missing gh with no token becomes GitHubUnavailableError. Other gh
+	 * errors remain unchanged. `httpCall` undefined means this operation has no HTTP
 	 * implementation: once gh is confirmed unavailable and a token is
 	 * present (so HTTP fallback would otherwise be attempted), that is
 	 * reported as a named, operation-specific error rather than the
@@ -152,7 +168,7 @@ export function createGitHubOps({
 		} catch (e) {
 			if (!isGhUnavailableError(e)) throw e;
 			const token = process.env.GH_TOKEN || process.env.GITHUB_TOKEN;
-			if (!token) throw e;
+			if (!token) throw new GitHubUnavailableError(operation, { cause: e });
 			if (!httpCall)
 				throw new Error(
 					`github-ops: '${operation}' has no HTTP backend implementation; the gh CLI is required for this operation`,
@@ -236,7 +252,7 @@ export function createGitHubOps({
 				},
 				({ owner, repo, token }) =>
 					fetchIssueView(owner, repo, token, number, fields, fetchImpl),
-			),
+			).then((value) => requireGitHubViewFields("issue view", fields, value)),
 
 		/** @returns {{host: string, owner: string, repo: string}} */
 		repository,
@@ -260,7 +276,7 @@ export function createGitHubOps({
 				},
 				({ owner, repo, token }) =>
 					fetchPullRequestView(owner, repo, token, number, fields, fetchImpl),
-			),
+			).then((value) => requireGitHubViewFields("pr view", fields, value)),
 
 		/** @returns {Promise<Array<{number: number, title: string}>>} */
 		listOpenPrs: () =>

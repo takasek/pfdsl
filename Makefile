@@ -20,7 +20,7 @@ build:
 .PHONY: test
 test: build
 	pnpm -r test
-	node --test "scripts/*.test.mjs" "scripts/lib/*.test.mjs" "scripts/pfdsl/*.test.mjs" "scripts/pfdsl/lib/*.test.mjs" "hooks/*.test.mjs" "hooks/lib/*.test.mjs" "plugin/pfdsl/hooks/lib/*.test.mjs" "plugin/pfdsl-codex/hooks/lib/*.test.mjs" "packages/vscode-extension/smoke/*.test.mjs" "experiments/standalone/src/*.test.mjs" "experiments/standalone/electron/*.test.cjs"
+	node --test "scripts/*.test.mjs" "scripts/lib/*.test.mjs" "scripts/pfdsl/*.test.mjs" "scripts/pfdsl/lib/*.test.mjs" "hooks/*.test.mjs" "hooks/lib/*.test.mjs" "plugin/pfdsl/hooks/lib/*.test.mjs" "plugin/pfdsl-codex/hooks/lib/*.test.mjs" "packages/vscode-extension/smoke/*.test.mjs" "experiments/standalone/src/*.test.mjs" "experiments/standalone/electron/*.test.cjs" "packages/standalone/test/*.test.mjs"
 	node scripts/check-script-imports.mjs
 	node scripts/check-no-shell-strings.mjs
 	node scripts/check-cli-conventions.mjs
@@ -47,6 +47,7 @@ build-deps:
 	pnpm --filter @pfdsl/graphviz-exporter build
 	pnpm --filter @pfdsl/metadata-exporter build
 	pnpm --filter @pfdsl/preview-engine build
+	pnpm --filter @pfdsl/editor build
 	pnpm --filter @pfdsl/cli build
 
 .PHONY: vscode-build
@@ -102,12 +103,7 @@ check-readme-cli:
 # exempt, since fmt can materialize implied nodes there.
 .PHONY: check-fmt
 check-fmt:
-	@find .pfdsl .claude/skills/pfd-ops/references/scaffold -name "*.pfdsl" -type f | sort | while read f; do \
-		echo "fmt --check $$f"; \
-		node packages/cli/dist/cli.js fmt "$$f" --check || \
-			{ echo "$$f is not canonically formatted. Run 'make fmt-pfdsl' and commit the result."; exit 1; }; \
-	done
-	@echo "check-fmt: all passed"
+	node scripts/check-pfdsl-inventory.mjs --run fmt
 
 # location: の参照先実在ガード。スコープは check-fmt と同じ理由で運用 .pfdsl のみ
 # — docs/ の教材と core の fixture は例示パスを意図して持つので、解決することは
@@ -116,17 +112,7 @@ check-fmt:
 # 移動で壊れた location: は当の .pfdsl を触らないコミットでは staged に現れないため。
 .PHONY: check-links
 check-links: check-pfdsl
-	@files=$$(find .pfdsl -maxdepth 1 -name "*.pfdsl" -type f | sort); \
-	if [ -z "$$files" ]; then \
-		echo "check-links: no operational .pfdsl found — the scope moved, so this target checks nothing. Fix it before trusting the green."; \
-		exit 1; \
-	fi; \
-	for f in $$files; do \
-		echo "check-links $$f"; \
-		node packages/cli/dist/cli.js meta check-links "$$f" || \
-			{ echo "$$f has a location: that does not resolve. Fix the path or restore the file."; exit 1; }; \
-	done; \
-	echo "check-links: all passed"
+	node scripts/check-pfdsl-inventory.mjs --run links
 
 # Runs `check` (non-strict) against operational .pfdsl/. Unlike check-scaffold
 # (--strict, distributed scaffold only), operational files carry in-flight
@@ -137,11 +123,11 @@ check-links: check-pfdsl
 # step (`make check-links`) runs it too, rather than adding a new CI step.
 .PHONY: check-pfdsl
 check-pfdsl:
-	@find .pfdsl -maxdepth 1 -name "*.pfdsl" -type f | sort | while read f; do \
-		echo "check $$f"; \
-		node packages/cli/dist/cli.js check "$$f" || exit 1; \
-	done
-	@echo "check-pfdsl: all passed"
+	node scripts/check-pfdsl-inventory.mjs --run operational
+
+.PHONY: check-pfdsl-inventory
+check-pfdsl-inventory:
+	node scripts/check-pfdsl-inventory.mjs
 
 # The distributed scaffold must pass the check the skills themselves
 # prescribe: pfd-grill gates on `check --strict` and pfd-ecosystem on
@@ -153,29 +139,19 @@ check-pfdsl:
 # design.
 .PHONY: check-scaffold
 check-scaffold:
-	@find .claude/skills/pfd-ops/references/scaffold -name "*.pfdsl" -type f | sort | while read f; do \
-		echo "check --strict $$f"; \
-		node packages/cli/dist/cli.js check "$$f" --strict || \
-			{ echo "$$f fails the check the skills prescribe for adopting repos."; exit 1; }; \
-	done
-	@echo "check-scaffold: all passed"
+	node scripts/check-pfdsl-inventory.mjs --run scaffold
 
 # Rewrite the operational .pfdsl/ and scaffold .pfdsl/ files to canonical fmt
 # (companion to check-fmt).
 .PHONY: fmt-pfdsl
 fmt-pfdsl:
-	@find .pfdsl .claude/skills/pfd-ops/references/scaffold -name "*.pfdsl" -type f | sort | while read f; do \
+	@find .pfdsl scripts/harness-template/skills/pfd-ops/references/scaffold -name "*.pfdsl" -type f | sort | while read f; do \
 		node packages/cli/dist/cli.js fmt "$$f" --write || exit 1; \
 	done
 
 .PHONY: check-docs
 check-docs:
-	@find docs -name "*.pfdsl" -type f | sort | while read f; do \
-		echo "check $$f"; \
-		node packages/cli/dist/cli.js check "$$f" || exit 1; \
-		node packages/cli/dist/cli.js render "$$f" --format dot > /dev/null || exit 1; \
-	done
-	@echo "check-docs: all passed"
+	node scripts/check-pfdsl-inventory.mjs --run docs
 	node scripts/check-doc-examples.mjs
 	node scripts/check-diag-registry.mjs
 	node scripts/check-forward-ref-markers.mjs

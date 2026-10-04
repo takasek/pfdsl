@@ -77,7 +77,7 @@ describe("entry scripts reject argv they do not understand", () => {
 			["--fix"],
 			{ PATH: "", GH_TOKEN: "", GITHUB_TOKEN: "" },
 		);
-		assert.equal(status, 2);
+		assert.equal(status, 1);
 		assert.match(stderr, /--fix/);
 	});
 
@@ -87,7 +87,7 @@ describe("entry scripts reject argv they do not understand", () => {
 			["--check-closed-registration", "959"],
 			{ PATH: "", GH_TOKEN: "", GITHUB_TOKEN: "" },
 		);
-		assert.equal(status, 2);
+		assert.equal(status, 1);
 		assert.match(stderr, /--check-closed-registration/);
 	});
 

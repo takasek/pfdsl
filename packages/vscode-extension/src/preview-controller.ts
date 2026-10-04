@@ -1,5 +1,5 @@
 import type { DiffReport } from "@pfdsl/core";
-import type { MessageToWebview } from "./messages.js";
+import type { MessageToWebview } from "@pfdsl/editor";
 
 type DiffMessage = Extract<MessageToWebview, { type: "diff" | "clearDiff" }>;
 

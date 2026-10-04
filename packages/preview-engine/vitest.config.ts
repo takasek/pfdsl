@@ -8,6 +8,10 @@ export default mergeConfig(
 		resolve: {
 			alias: {
 				"@pfdsl/core": resolve(__dirname, "../core/src/index.ts"),
+				"@pfdsl/graphviz-exporter/dot": resolve(
+					__dirname,
+					"../graphviz-exporter/src/dot.ts",
+				),
 				"@pfdsl/graphviz-exporter": resolve(
 					__dirname,
 					"../graphviz-exporter/src/index.ts",
