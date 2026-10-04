@@ -1,11 +1,13 @@
 import { readFileSync } from "node:fs";
 import {
-	analyze,
-	analyzeSource,
 	type Frontmatter,
 	resolveEffectiveFrontmatter,
 	wrapPresetSource,
 } from "@pfdsl/core";
+import {
+	analyzeSnapshot as analyzeSource,
+	prepareDocument,
+} from "@pfdsl/editor";
 import type * as vscode from "vscode";
 
 export const LANGUAGE_ID = "pfdsl";
@@ -29,10 +31,10 @@ export function analyzeDocument(
 }
 
 /** Dependency presets use saved files; the entry always uses its editor snapshot. */
-function extendsLoader(path: string): ReturnType<typeof analyze> | null {
+function extendsLoader(path: string): ReturnType<typeof analyzeSource> | null {
 	try {
 		const src = readFileSync(path, "utf-8");
-		return analyze(wrapPresetSource(path, src));
+		return analyzeSource(wrapPresetSource(path, src));
 	} catch {
 		return null;
 	}
@@ -54,6 +56,15 @@ export function resolveEffectiveFrontmatterForUri(
 
 export function dropAnalyzeCache(uri: vscode.Uri): void {
 	cache.delete(uri.toString());
+}
+
+/** The registered VS Code preview consumes this host adapter's prepared snapshot. */
+export function preparePreviewForDocument(doc: vscode.TextDocument) {
+	return prepareDocument(
+		analyzeDocument(doc),
+		doc.uri.scheme === "file" ? doc.uri.fsPath : null,
+		extendsLoader,
+	);
 }
 
 export function clearAnalyzeCache(): void {

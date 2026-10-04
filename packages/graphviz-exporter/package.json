@@ -8,10 +8,14 @@
 		".": {
 			"import": "./dist/index.js",
 			"types": "./dist/index.d.ts"
+		},
+		"./dot": {
+			"types": "./dist/dot.d.ts",
+			"import": "./dist/dot.js"
 		}
 	},
 	"scripts": {
-		"build": "tsup src/index.ts --format esm --dts",
+		"build": "tsup src/index.ts src/dot.ts --format esm --dts",
 		"test": "vitest run --coverage",
 		"coverage": "pnpm test",
 		"typecheck": "tsgo --noEmit"

@@ -1,0 +1,88 @@
+html,
+body {
+	height: 100%;
+	margin: 0;
+	font:
+		13px system-ui,
+		sans-serif;
+	color: #222;
+	background: #fafafa;
+}
+body {
+	display: flex;
+	flex-direction: column;
+}
+header {
+	display: flex;
+	gap: 12px;
+	align-items: center;
+	padding: 10px 16px;
+	border-bottom: 1px solid #ddd;
+}
+button {
+	font: inherit;
+	cursor: pointer;
+	padding: 5px 10px;
+	background: #fff;
+	border: 1px solid #ccc;
+	border-radius: 4px;
+}
+button[aria-selected="true"] {
+	background: #e6f0ff;
+	border-color: #3369a0;
+}
+#status {
+	margin-left: auto;
+	color: #555;
+}
+main {
+	display: flex;
+	flex: 1;
+	min-height: 0;
+}
+aside {
+	width: 210px;
+	overflow: auto;
+	padding: 8px;
+	border-right: 1px solid #ddd;
+}
+#files button {
+	display: block;
+	width: 100%;
+	text-align: left;
+	margin-bottom: 5px;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+#workspace {
+	flex: 1;
+	min-width: 0;
+	display: flex;
+	flex-direction: column;
+}
+#tabs {
+	display: flex;
+	gap: 4px;
+	padding: 6px;
+	overflow: auto;
+}
+#documents {
+	position: relative;
+	flex: 1;
+	min-height: 0;
+}
+.document {
+	position: absolute;
+	inset: 0;
+	display: flex;
+}
+.editor,
+.preview {
+	width: 50%;
+	min-width: 0;
+	height: 100%;
+}
+.preview {
+	border-left: 1px solid #ddd;
+	box-sizing: border-box;
+}

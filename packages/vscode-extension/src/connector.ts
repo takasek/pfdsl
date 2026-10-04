@@ -1,6 +1,4 @@
 import { ID_PATTERN } from "@pfdsl/core";
-import * as vscode from "vscode";
-import { analyzeDocument, LANGUAGE_ID } from "./analyze.js";
 import {
 	buildConnectorEdgeLine,
 	type ConnectorKind,
@@ -9,7 +7,9 @@ import {
 	edgeAlreadyExists,
 	insertConnectorEdge,
 	validateNewNodeId,
-} from "./connector-logic.js";
+} from "@pfdsl/editor";
+import * as vscode from "vscode";
+import { analyzeDocument, LANGUAGE_ID } from "./analyze.js";
 
 const PLACEHOLDER = "…";
 

@@ -20,7 +20,7 @@ build:
 .PHONY: test
 test: build
 	pnpm -r test
-	node --test "scripts/*.test.mjs" "scripts/lib/*.test.mjs" "scripts/pfdsl/*.test.mjs" "scripts/pfdsl/lib/*.test.mjs" "hooks/*.test.mjs" "hooks/lib/*.test.mjs" "plugin/pfdsl/hooks/lib/*.test.mjs" "plugin/pfdsl-codex/hooks/lib/*.test.mjs" "packages/vscode-extension/smoke/*.test.mjs" "experiments/standalone/src/*.test.mjs" "experiments/standalone/electron/*.test.cjs"
+	node --test "scripts/*.test.mjs" "scripts/lib/*.test.mjs" "scripts/pfdsl/*.test.mjs" "scripts/pfdsl/lib/*.test.mjs" "hooks/*.test.mjs" "hooks/lib/*.test.mjs" "plugin/pfdsl/hooks/lib/*.test.mjs" "plugin/pfdsl-codex/hooks/lib/*.test.mjs" "packages/vscode-extension/smoke/*.test.mjs" "experiments/standalone/src/*.test.mjs" "experiments/standalone/electron/*.test.cjs" "packages/standalone/test/*.test.mjs"
 	node scripts/check-script-imports.mjs
 	node scripts/check-no-shell-strings.mjs
 	node scripts/check-cli-conventions.mjs
@@ -47,6 +47,7 @@ build-deps:
 	pnpm --filter @pfdsl/graphviz-exporter build
 	pnpm --filter @pfdsl/metadata-exporter build
 	pnpm --filter @pfdsl/preview-engine build
+	pnpm --filter @pfdsl/editor build
 	pnpm --filter @pfdsl/cli build
 
 .PHONY: vscode-build
