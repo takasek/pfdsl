@@ -17,7 +17,7 @@
 - **ADR-0040** [監査の対象についての契約と、1回の監査の実行管理を別の区分に置く](0040-audit-target-versus-run-management.md) — ADR-0039 の0段目は「終端監査の契約」を区分 i に挙げたが、実行 ID・cutoff・checkpoint 等で1回の監査を凍結する規律はどの区分の文言にも当たらなかった。監査に関わる区分 i・ii の項目は監査の対象について何を判定するか、その実行管理は区分 iii とし、自リポ binding の昇格指示も0段目に揃える
 - **ADR-0041** [pfd-retro D 層の採用宣言を3値の構造化宣言にする](0041-retro-d-layer-declaration-token.md) — ADR-0039 の決定は変えず、宣言を `.pfdsl/config.json` の `knowledgeLifecycleAudit`（`mode` と `targets`）にする。宣言が無い・不正な状態は監査せず所有者へ毎回報告し、宣言を知らない旧版の採用先と選んだ採用先を区別する
 - **ADR-0042** [採用先の宣言の値を `.pfdsl/config.json` に置く](0042-adopter-config-file.md) — 切り替えや列挙のような宣言の値は採用先が git 管理する `.pfdsl/config.json` に置き、散文の binding はそのキーを指す。completed-chain sweep は同ファイルで有効にしない限り動かさない。移行状態の置き場所もここに予約する
-- **ADR-0044** [worktree 運用ガードの責務を、効果を観測できる層へ移す](0044-guard-responsibility-by-observable-layer.md) — hook に実行後の cwd・branch・shell の状態を予測させない。main の直接 commit は pre-commit、所有権は payload.cwd 基準の確認と harness の権限、検証ツリーは preflight、PR の Closes は CI へ移し、hook はコマンド文字列だけで判定できる検査回避・委譲先の外向き操作・作用先の分類に絞る。Claude Code の sandbox は保護パスとの衝突のため保留する
+- **ADR-0044** [worktree 運用ガードの責務を、効果を観測できる層へ移す](0044-guard-responsibility-by-observable-layer.md) — hook に実行後の cwd・branch・shell の状態を予測させない。main の直接 commit は pre-commit、検証ツリーは preflight が担い、PR の Closes は CI の検出に任せる（必須 check にするかは未決）。hook はコマンド文字列とファイルの物理パスで判定できるものに絞る。対象は検査回避、委譲先の外向き操作、payload.cwd を基準にした checkout の確認、作用先の分類、`gh pr merge` の確認である。#1208 の処遇表 B のうち2本の事前拒否を外す。Claude Code の sandbox は保護パスとの衝突のため保留する
 
 - **ADR-0001** [成果物の有形性](0001-tangible-outputs-intangible-inputs.md) — 出力は保管・検証可能なモノのみ、入力はフロー外リソースなら不定形を許可する非対称規則
 - **ADR-0002** [改版の表現](0002-revision-modeling.md) — 単一生成元制約下での改版・ループ・定常サイクルを3形態で使い分ける
