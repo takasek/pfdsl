@@ -7,10 +7,10 @@ import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
 import {
-	GH_UNAVAILABLE_EXIT_CODE,
-	isGhUnavailableError,
-} from "./lib/gh-compat.mjs";
-import { createGitHubOps } from "./lib/github-ops.mjs";
+	createGitHubOps,
+	GITHUB_UNAVAILABLE_EXIT_CODE,
+	isGitHubUnavailableError,
+} from "./lib/github-ops.mjs";
 import {
 	buildProcessOutputs,
 	computeFindings,
@@ -41,7 +41,7 @@ try {
 	});
 	enforcedIssues = (values["enforce-issue"] ?? []).map((value) => {
 		const n = Number(value);
-		if (!Number.isInteger(n) || n <= 0) {
+		if (!Number.isSafeInteger(n) || n <= 0) {
 			throw new TypeError(
 				`--enforce-issue expects an issue number, got '${value}'`,
 			);
@@ -50,7 +50,7 @@ try {
 	});
 } catch (err) {
 	console.error(`audit-issues-flow: ${err.message}`);
-	process.exit(2);
+	process.exit(1);
 }
 
 // --- Read and split roadmap.pfdsl ---
@@ -119,16 +119,16 @@ for (const proc of processes) {
 
 function exitGhUnavailable() {
 	console.log(
-		"gh unavailable: skipping GitHub-dependent checks (label sync, issue sync); to run them, install and authenticate the gh CLI, or set GH_TOKEN or GITHUB_TOKEN",
+		"GitHub operations unavailable: skipping GitHub-dependent checks (label sync, issue sync); to run them, install and authenticate the gh CLI, or set GH_TOKEN or GITHUB_TOKEN",
 	);
-	process.exit(GH_UNAVAILABLE_EXIT_CODE);
+	process.exit(GITHUB_UNAVAILABLE_EXIT_CODE);
 }
 
 let labels;
 try {
 	labels = await fetchLabels();
 } catch (e) {
-	if (isGhUnavailableError(e)) exitGhUnavailable();
+	if (isGitHubUnavailableError(e)) exitGhUnavailable();
 	throw e;
 }
 const labelFindings = computeLabelFindings(FLOW_LABELS, labels);
@@ -147,7 +147,7 @@ let issues;
 try {
 	issues = await fetchIssues();
 } catch (e) {
-	if (isGhUnavailableError(e)) exitGhUnavailable();
+	if (isGitHubUnavailableError(e)) exitGhUnavailable();
 	throw e;
 }
 const findings = computeFindings(entries, issues);

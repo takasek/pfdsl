@@ -14,6 +14,29 @@ import {
 	parseOwnerRepo,
 } from "./github-rest.mjs";
 
+it("rejects missing issue fields requested by the design gate", async () => {
+	await assert.rejects(
+		fetchIssueView(
+			"takasek",
+			"pfdsl",
+			"tok",
+			12,
+			["body", "comments", "createdAt"],
+			async (url) => jsonResponse(url.includes("/comments?") ? [] : {}),
+		),
+		/malformed/i,
+	);
+});
+
+it("preserves a legitimate null issue body as an empty body", async () => {
+	assert.deepEqual(
+		await fetchIssueView("takasek", "pfdsl", "tok", 12, ["body"], async () =>
+			jsonResponse({ body: null }),
+		),
+		{ body: "" },
+	);
+});
+
 describe("parseOwnerRepo", () => {
 	it("https URL with .git suffix", () => {
 		assert.deepEqual(parseOwnerRepo("https://github.com/takasek/pfdsl.git"), {
@@ -645,6 +668,31 @@ function closingIssuesPage(
 // body-regex reconstruction this replaced returned [] for those, and
 // check-closes-reference.mjs read that as "closes no issue" (#1043).
 describe("fetchClosingIssueReferences", () => {
+	for (const connection of [
+		{},
+		{ nodes: "bad", pageInfo: { hasNextPage: false } },
+		{ nodes: [1], pageInfo: { hasNextPage: false } },
+		{ nodes: [{ number: 7 }], pageInfo: { hasNextPage: false } },
+		{ nodes: [], pageInfo: {} },
+		{ nodes: [], pageInfo: { hasNextPage: "false" } },
+		{ nodes: [], pageInfo: { hasNextPage: true, endCursor: null } },
+	]) {
+		it(`rejects malformed closing connections: ${JSON.stringify(connection)}`, async () => {
+			const { fetchImpl } = graphqlStub([
+				{
+					data: {
+						repository: {
+							pullRequest: { closingIssuesReferences: connection },
+						},
+					},
+				},
+			]);
+			await assert.rejects(
+				fetchClosingIssueReferences("takasek", "pfdsl", "tok", 12, fetchImpl),
+				/malformed/i,
+			);
+		});
+	}
 	it("returns the links GitHub reports for a PR whose body has no closing keyword", async () => {
 		const { fetchImpl, bodies } = graphqlStub([closingIssuesPage([99])]);
 		const refs = await fetchClosingIssueReferences(

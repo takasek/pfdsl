@@ -19,8 +19,10 @@ import {
 	classifyRoadmapRegistration,
 } from "./lib/roadmap-registration.mjs";
 import { tryRun } from "./lib/run-exec.mjs";
-import { isGhUnavailableError } from "./pfdsl/lib/gh-compat.mjs";
-import { createGitHubOps } from "./pfdsl/lib/github-ops.mjs";
+import {
+	createGitHubOps,
+	isGitHubUnavailableError,
+} from "./pfdsl/lib/github-ops.mjs";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const githubOps = createGitHubOps({ cwd: root });
@@ -50,10 +52,9 @@ try {
 		fields: ["closingIssuesReferences"],
 	});
 } catch (err) {
-	// Same split as check-closes-reference (#745): only a missing binary is the
-	// environment's doing. A lookup that ran and failed has to fail the job.
-	if (isGhUnavailableError(err)) {
-		console.log("check-roadmap-registration: SKIP — gh CLI unavailable");
+	// Same operation API contract as check-closes-reference (#1085).
+	if (isGitHubUnavailableError(err)) {
+		console.log(`check-roadmap-registration: SKIP — ${err.message}`);
 		process.exit(0);
 	}
 	console.error(
