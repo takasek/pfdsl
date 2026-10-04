@@ -26,9 +26,9 @@ e07809b079ce3ef3aeb896dc070f3ac507f6fe9eb70e02938c13ca446570ca82  skills/pfd-gri
 
 46fe7dd863f636fd37ce220df853c009e9385a96521fc866767e89084b5a20cd  skills/pfd-ops/SKILL.md
 
-b0010ff5cdb83e6ee2aafe702a4c7621d56cbe6638388c580e5c88208c43b02b  skills/pfd-ops/install/.github/workflows/pfdsl-sweep-completed-chains.yml
+f6d66d456a4484b237b6005f93fb9572246e01e3c623ce578effc17789944fe0  skills/pfd-ops/install/.github/workflows/pfdsl-sweep-completed-chains.yml
 
-69fd60071f88c60a20a930fa42ac4f8990b635f78cc45b63bada48784ec8ccd0  skills/pfd-ops/install/scripts/pfdsl/audit-issues-flow.mjs
+bc07edaf424e0406a572ffd9ec73e8b7a2ad2daeaf9a74265228895206303f12  skills/pfd-ops/install/scripts/pfdsl/audit-issues-flow.mjs
 
 e5e4a9e59d4a0b82d50ab9219f7b16c71cefa4f938e2feb9a62795aa7a3a4833  skills/pfd-ops/install/scripts/pfdsl/lib/chain-sweep.mjs
 
@@ -42,7 +42,7 @@ f08ee397d4195d85188271f9c0a6b1c21c07551340f6698f0e778a61fc3037a9  skills/pfd-ops
 
 52962c5e87ee314c586f5d5341aa3c2d77e065babeb329e56a3fe8c60b1ab757  skills/pfd-ops/install/scripts/pfdsl/lib/github-rest.mjs
 
-5223f3ad1ffe3b8498aa6f4c9f38ed0dc45d28d7aff606cca75f8dba753512d9  skills/pfd-ops/install/scripts/pfdsl/lib/issues-flow-audit.mjs
+f309975345dec6cc586311937dcf10e0607a846def2468f27183abf6c730aa77  skills/pfd-ops/install/scripts/pfdsl/lib/issues-flow-audit.mjs
 
 0c315f0afc41f21ee0b4914131159b85064b3a39ea633c5b695498c6c41c427e  skills/pfd-ops/install/scripts/pfdsl/lib/proxy-fetch-worker.mjs
 
@@ -60,7 +60,7 @@ e85931c9fe76715a25cb5566d999ab589a6cb60d8b45041dead4da9ce5005b12  skills/pfd-ops
 
 3f7d9d46ffb5c432c39947152312856a30ccd27286d9d257f89bf5052c648a3c  skills/pfd-ops/references/file-based-tracker-backend.md
 
-864b29c26f81def2638c75030d96cf198c5eabf61b9b1745a6f7c5b1c6eb1918  skills/pfd-ops/references/github-issues-backend.md
+c89eb738c945df0e1f269938e586b53e799c9a4f62ae11a14c6bd32f67149da9  skills/pfd-ops/references/github-issues-backend.md
 
 4da6e061033c43a67bd71d55bd816fc3c57ef32f52d0dea19070bcc7c2b79582  skills/pfd-ops/references/scaffold/bindings/pfd-ops.md
 

@@ -132,13 +132,22 @@ try {
 	throw e;
 }
 const labelFindings = computeLabelFindings(FLOW_LABELS, labels);
+const labelParts = partitionFindings(labelFindings);
 
-if (labelFindings.length > 0) {
+// Label findings are printed here but do not end the audit: the issue-level
+// findings below are independent of them, and stopping would hide those until
+// the labels were fixed. The exit code is decided at the end.
+function fmtLabelFinding(f) {
+	return `  ${f.type} [${f.name}] ${f.detail}`;
+}
+
+if (labelParts.blocking.length > 0) {
 	console.log("label:");
-	for (const f of labelFindings) {
-		console.log(`  ${f.type} [${f.name}] ${f.detail}`);
-	}
-	process.exit(1);
+	for (const f of labelParts.blocking) console.log(fmtLabelFinding(f));
+}
+if (labelParts.advisory.length > 0) {
+	console.log("label advisory (does not fail this audit):");
+	for (const f of labelParts.advisory) console.log(fmtLabelFinding(f));
 }
 
 // --- Compute and print findings ---
@@ -175,7 +184,7 @@ function printFindings(findings) {
 }
 
 const { blocking } = printFindings(findings);
-if (blocking.length === 0) {
+if (blocking.length === 0 && labelParts.blocking.length === 0) {
 	console.log("roadmap.pfdsl is in sync");
 	process.exit(0);
 }

@@ -274,7 +274,8 @@ Points to settle before enabling:
   When migrating, register the shared private-key secret first, then set the shared Client ID; a configured shared Client ID requires its matching secret and never falls back to the legacy key.
   A repository without the variable keeps using `GITHUB_TOKEN`.
 - Creating the pull request requires that the repository, and its organization if it restricts this, allows GitHub Actions to create pull requests (Settings, Actions, General, Workflow permissions).
-  This setting is GitHub's requirement for the pull-request step; the workflow file does not check it.
+  This setting is GitHub's requirement for the pull-request step; the workflow file does not check it beforehand.
+  When the step fails, a later step adds an error annotation to the run naming the setting and a compare URL for opening the pull request by hand, and the run ends as failed.
   A rule that blocks creating the `flow-sync/pending` branch also blocks the step.
 - The workflow installs the published `@pfdsl/cli` with an unpinned `npm install --no-save @pfdsl/cli`, and the sweep script stops at startup unless that CLI has the `delete` subcommand.
   `@pfdsl/cli` 0.0.26 and earlier lack `delete`; v0.1.0 is the first release that has it.
