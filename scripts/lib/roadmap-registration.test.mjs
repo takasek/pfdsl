@@ -47,6 +47,6 @@ describe("classifyRoadmapRegistration", () => {
 	it("skips on the gh-unavailable exit code rather than reading it as a rejection", () => {
 		const r = classifyRoadmapRegistration({ issueNumbers: [12], auditExit: 2 });
 		assert.equal(r.status, "SKIP");
-		assert.match(r.detail, /gh/);
+		assert.match(r.detail, /GitHub operations unavailable/);
 	});
 });

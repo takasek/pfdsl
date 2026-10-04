@@ -192,7 +192,7 @@ artifact:
     group: gen_sources
   toolchain:
     label: ツールチェーン
-    description: "workflow.pfdsl の project_toolchain が integrated_repository から packages/ の現行状態を射影して生産する。plugin.json の version 由来であり、公開・パッケージングの素材でもある"
+    description: "workflow.pfdsl の project_toolchain が integrated_repository から packages/ の現行状態を射影して生産する。plugin.json の version 由来であり、公開・パッケージングの素材でもある。gen_skill は CLI help・CLI package version を SKILL.md に埋め込み、core の frontmatter 型定義も照合する"
     location: ../packages/
     group: gen_sources
   ops_install_sources:
@@ -210,6 +210,16 @@ artifact:
     description: "配布するskill・command・agent・hookの集合と生成分類を一元化し、各capabilityのclaude-repository・claude-plugin・codex-repository・codex-plugin mappingを宣言する。各targetの処分はnative・transform・intentional exclusionのいずれか一つであり、ハーネス別allowlistを重複して持たない"
     location: ../scripts/lib/harness-inventory.mjs
     group: skill_sources
+  source_git_ignore_state:
+    label: 生成時のGit ignore判定素材
+    description: >
+      decode_harness_capabilitiesが未知entryを分類する時点のrepository内Git状態。
+      root配下の.gitignore規則、Git indexの追跡状態とclone固有のinfo/excludeが判定に影響する。
+      個人のglobal ignoreは除外し、Gitが回答できない場合は未知entryを維持対象として扱う。
+      helperはquery pathごとに回答をcacheするが、生成全体のGit状態をatomicに凍結する契約は持たない
+    criteria: scripts/lib/git-ignore-oracle.test.mjsがrepository規則・追跡済みpath・global ignore除外・Git取得失敗の分岐を検証して成功する
+    location: ../.gitignore
+    group: gen_sources
   harness_capability_model:
     label: ハーネス中立capabilityモデル
     description: "中立正本のsource topologyとschemaおよびハーネス別に描画済みの本文をdecoderで閉じ込め、capability ID・kind・意味データ・source encoding・四targetのdelivery mappingを保持する、decode済みかつcontract検証済みのsemantic record集合。両adapterはこの同一objectを兄弟入力として消費し、相手方の生成rootやmanifestを入力にしない"
@@ -262,7 +272,7 @@ artifact:
     description: "harness_capability_modelのclaude-plugin mappingに従い、Claude Codeが読むskill tree・Markdown command・Markdown agent・hooks・Claude plugin manifestとmarketplace記述を生成する。同じプロセスがclaude-repository mappingの出力をclaude_repo_assetsとして別に生む。出力closureとClaude target-local consumer probeを通し、既存のClaude Code marketplace導入経路はidentity互換のまま維持する"
     criteria: scripts/lib/gen-plugin.test.mjs のClaude target-local consumer probeとoutput closureが成功し、scripts/lib/drift-gates.mjs の gen-plugin-bulk がClaude plugin出力の未再生成をpre-commitとCIで検出する
     externalStakeholders: [ Claude Code利用者 ]
-    location: [ ../plugin/pfdsl/skills/pfdsl/, ../plugin/pfdsl/skills/pfd-ecosystem/, ../plugin/pfdsl/skills/pfd-grill/, ../plugin/pfdsl/skills/pfd-ops/, ../plugin/pfdsl/skills/pfd-retro/, ../plugin/pfdsl/commands/, ../plugin/pfdsl/agents/, ../plugin/pfdsl/hooks/, ../plugin/pfdsl/.claude-plugin/plugin.json, ../.claude-plugin/marketplace.json ]
+    location: [ ../plugin/pfdsl/, ../.claude-plugin/marketplace.json ]
     group: repo_generated
     tags: [ gen ]
   claude_repo_assets:
@@ -391,6 +401,16 @@ artifact:
     externalStakeholders: [ VSCode拡張ユーザー ]
     location: https://marketplace.visualstudio.com/items?itemName=takasek.pfdsl
     group: published
+  upstream_plugin_metadata:
+    label: 上流mainから取得したplugin比較情報
+    description: >
+      check_install_syncの--upstreamがその実行で取得するmainのplugin.json versionとbundle-manifest.sha256。
+      導入済みClaude plugin manifestが無いときは比較せず、versionが一致した場合だけbundle manifestを取得する。
+      取得またはJSON parseの失敗、上流versionの欠落、bundle manifestの不正は警告を出さないbest-effortの分岐へ入る。
+      二つのURLを同一commitに固定して取得する契約は持たない
+    criteria: scripts/lib/plugin-version-check.test.mjsがversion skew・同一versionのbundle差分・比較不能時の無通知を検証して成功する
+    location: [ https://raw.githubusercontent.com/takasek/pfdsl/main/plugin/pfdsl/.claude-plugin/plugin.json, https://raw.githubusercontent.com/takasek/pfdsl/main/plugin/pfdsl/.claude-plugin/bundle-manifest.sha256 ]
+    group: gen_sources
   installed_plugin:
     label: 導入済みプラグイン
     description: "/plugin marketplace add takasek/pfdsl + /plugin install pfdsl@pfdsl でユーザー環境（plugin cache）へ展開されたコピー。gen_plugin が束ねるスキルツリー・pfd-*コマンド・pfd-lens agent が一括で届く。リポ単位でなくユーザー単位のため、バージョンskewはcheck_install_syncの警告で緩和する（ADR-0028 論点4）。同一version内のbundle内容差は同梱のbundle-manifest.sha256が記録するファイル単位digestから読み手が計算した集約値の照合で識別する（#971, #1264）"
@@ -492,25 +512,25 @@ process:
     tags: [ b ]
   gen_skill:
     label: スキル生成
-    description: "スキル生成ソース（skill-template/spec/samples/examples/review-perspectives/skill dirs 等）からリポ内 pfdsl スキルを再生成する。出力のうち references/*.md（spec/samples/examples 等）は packages/cli/dist に触れない scripts/lib/gen-skill-refs.mjs に切り出し済み（同モジュールの単体 CLI エントリは呼び出し元を失って #668 で削除、dist 非依存の手動再生成は gen-plugin-dist-independent.mjs が担う）。SKILL.md（pfdsl help 埋め込み）のみ dist 必須のまま（#586）。identity は gen_plugin が内包する形で check-gen-plugin.yml が全 PR で強制する"
+    description: "スキル生成ソース（skill-template/spec/samples/examples/review-perspectives/skill dirs 等）からリポ内 pfdsl スキルを再生成する。出力のうち references/*.md（spec/samples/examples 等）は packages/cli/dist に触れない scripts/lib/gen-skill-refs.mjs に切り出し済み（同モジュールの単体 CLI エントリは呼び出し元を失って #668 で削除、dist 非依存の手動再生成は gen-plugin-dist-independent.mjs が担う）。SKILL.md は toolchain の CLI help と CLI package version を埋め込み、core の frontmatter 型定義を照合するため、dist 必須のまま（#586）。identity は gen_plugin が内包する形で check-gen-plugin.yml が全 PR で強制する"
     command: make gen-skill
     location: ../scripts/gen-skill.mjs
     tags: [ gen ]
   gen_install:
     label: install/ 生成
-    description: "repo ルートの配布ソースから pfd-ops スキルの install/ ミラーを一方向で再生成する（#547 で双方向 sync を廃止）。生成の向きは repo ルートのソース → install/ → plugin/ の一本のみ。gen_plugin が内部で実行するため plugin が古い install/ から組まれることはない。drift は pre-commit と check-pfd-ops-sync.yml が強制する"
+    description: "repo ルートの明示配布許可一覧から pfd-ops スキルの install/ ミラーを一方向で再生成する。skill の installFiles 宣言も同じ一覧から導出し、開発用ファイルを配布しない。生成の向きは repo ルートのソース → install/ → Claude・Codex の repository・plugin の4配布先のみ。gen_plugin が内部で実行するため古い install/ から組まれることはない。同一性検査は pre-commit・終端では index、push・release では公開対象の HEAD の隔離コピーで生成し、元の作業ツリーを変更せずに出力契約を照合する。CI の check-pfd-ops-sync.yml も一致を強制する"
     command: make gen-install
     location: ../scripts/lib/install-templates.mjs
     tags: [ gen, g ]
   decode_harness_capabilities:
     label: ハーネスsource decode・contract検証
-    description: "claude_harness_sourcesのsource rootとschemaをharness_inventoryに照らして全件分類し、plugin metadataをtoolchainから読み、中立テンプレートの明示的なハーネス分岐を描画し、両方の本文と共通metadataをsemantic recordへdecodeする。分類できなかったentryは全階層で、OS生成の既知の名前か、repositoryのGitが無視するpathであれば維持対象外として除く。ignore状態はgit check-ignoreに問い、指定はrepository自身の.gitignoreに限る。git自体が答えられない環境では従来どおり未分類として扱う。除かれなかった未知topology・未知schema・四target mappingの欠落や重複はadapter出力前に拒否する"
+    description: "claude_harness_sourcesのsource rootとschemaをharness_inventoryに照らして全件分類し、plugin metadataをtoolchainから読み、中立テンプレートの明示的なハーネス分岐を描画し、両方の本文と共通metadataをsemantic recordへdecodeする。分類できなかったentryは全階層で、OS生成の既知の名前か、repositoryのGitが無視するpathであれば維持対象外として除く。source_git_ignore_stateをgit check-ignoreに問い、repository内の.gitignore・Git index・clone固有のinfo/excludeが回答に影響する。個人のglobal ignoreは除外する。git自体が答えられない環境では従来どおり未分類として扱う。除かれなかった未知topology・未知schema・四target mappingの欠落や重複はadapter出力前に拒否する"
     command: node --test scripts/lib/harness-capability-contract.test.mjs scripts/lib/harness-source-decoder.test.mjs scripts/lib/harness-inventory.test.mjs scripts/lib/git-ignore-oracle.test.mjs
     location: ../scripts/lib/harness-source-decoder.mjs
     tags: [ gen, g ]
   gen_plugin:
     label: Claude Code plugin root 組み立て
-    description: "make gen-pluginのClaude Code adapter。組み立て前に生成専用のplugin rootとrepository assetsをsnapshotして空にし、生成をやめた旧ファイルが残らないよう毎回再構築する。失敗時はsnapshotから復元し、復元未完ならsnapshotを保持して両CLI入口がprimary errorと保存理由・pathを表示する。再試行とdrift検査も残留transactionを報告し、削除はしない。dist非依存の再生成では中立pfdsl skillのSKILL.mdだけを保持する。再構築でignore対象を含む未追跡ファイルが失われる場合は失敗させる。contract検証済みのharness_capability_modelと中立生成済みpfdsl skill、install mirrorから、Claude Code skill tree、Markdown command、Markdown agent、hooks、manifest、marketplace記述をplugin/pfdsl/へidentity互換に組み立てる。あわせてclaude-repository mappingの配布skill・command・agentを中立正本から描画し、ルート指示文書CLAUDE.mdをAGENTS.mdと同じmustacheテンプレートから描画してリポジトリへ書く。全Claude root writeの後、manifest自身を除く全bundleファイルのdigestをファイル単位で.claude-plugin/bundle-manifest.sha256へ記録する。集約値は読み手が計算する（#971, #1264, #1267）"
+    description: "make gen-pluginのClaude Code adapter。組み立て前に生成専用のplugin rootとrepository assetsをsnapshotして空にし、生成をやめた旧ファイルが残らないよう毎回再構築する。失敗時はsnapshotから復元し、復元未完ならsnapshotを保持して両CLI入口がprimary errorと保存理由・pathを表示する。再試行とdrift検査も残留transactionを報告し、削除はしない。dist非依存の再生成では中立pfdsl skillのSKILL.mdだけを保持する。再構築でignore対象を含む未追跡ファイルが失われる場合は失敗させる。contract検証済みのharness_capability_modelと中立生成済みpfdsl skill、install mirrorから、Claude Code skill tree、Markdown command、Markdown agent、hooks・manifestをplugin/pfdsl/へidentity互換に組み立て、repo-rootのmarketplace記述も更新する。marketplace記述は前世代claude_adapter_outputのrepo-root .claude-plugin/marketplace.jsonを読み、descriptionだけを置換してowner・source.ref等を保持する。あわせてclaude-repository mappingの配布skill・command・agentを中立正本から描画し、ルート指示文書CLAUDE.mdをAGENTS.mdと同じmustacheテンプレートから描画してリポジトリへ書く。全Claude root writeの後、manifest自身を除く全bundleファイルのdigestをファイル単位で.claude-plugin/bundle-manifest.sha256へ記録する。集約値は読み手が計算する（#971, #1264, #1267）"
     command: make gen-plugin
     location: ../scripts/gen-plugin.mjs
     tags: [ gen, g ]
@@ -633,12 +653,13 @@ comparison_parsed_doc >> normalize_comparison -> comparison_normalized_graph
 
 [comparison_normalized_graph, comparison_parsed_doc, normalized_graph, parsed_doc] >> diff_graphs -> diff_report
 
-[examples, feature_samples, quality_guide, review_perspectives, skill_template, spec] >> gen_skill -> pfdsl_skill
+[examples, feature_samples, quality_guide, review_perspectives, skill_template, spec, toolchain] >> gen_skill -> pfdsl_skill
 
 ops_install_sources >> gen_install -> ops_install_templates
 
-[claude_harness_sources, harness_inventory, toolchain] >> decode_harness_capabilities -> harness_capability_model
+[claude_harness_sources, harness_inventory, source_git_ignore_state, toolchain] >> decode_harness_capabilities -> harness_capability_model
 
+claude_adapter_output >>? gen_plugin
 [harness_capability_model, ops_install_templates, pfdsl_skill] >> gen_plugin -> [claude_adapter_output, claude_repo_assets]
 
 [harness_capability_model, ops_install_templates, pfdsl_skill] >> assemble_codex_plugin -> [codex_adapter_output, codex_repo_assets]
@@ -675,4 +696,4 @@ installed_plugin >> deploy_install_layer -> installed_l3_layer
 
 installed_l3_layer >>? deploy_install_layer
 
-[installed_l3_layer, installed_plugin] >> check_install_sync -> drift_report
+[installed_l3_layer, installed_plugin, upstream_plugin_metadata] >> check_install_sync -> drift_report

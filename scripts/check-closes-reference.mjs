@@ -17,8 +17,10 @@ import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
 
 import { classifyClosesReference } from "./lib/closes-reference.mjs";
-import { isGhUnavailableError } from "./pfdsl/lib/gh-compat.mjs";
-import { createGitHubOps } from "./pfdsl/lib/github-ops.mjs";
+import {
+	createGitHubOps,
+	isGitHubUnavailableError,
+} from "./pfdsl/lib/github-ops.mjs";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const githubOps = createGitHubOps({ cwd: root });
@@ -57,11 +59,9 @@ try {
 		fields: ["body", "closingIssuesReferences"],
 	});
 } catch (err) {
-	// The same split every gh-backed lookup here draws (#745): only a missing
-	// binary is the environment's doing and degrades to SKIP. A lookup that ran
-	// and failed has to fail the job, or the row is one nobody acts on.
-	if (isGhUnavailableError(err)) {
-		console.log("check-closes-reference: SKIP — gh CLI unavailable");
+	// The operation API owns availability; an executed lookup failure fails the job.
+	if (isGitHubUnavailableError(err)) {
+		console.log(`check-closes-reference: SKIP — ${err.message}`);
 		process.exit(0);
 	}
 	console.error(

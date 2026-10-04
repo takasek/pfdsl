@@ -30,7 +30,7 @@ beforeEach(() => {
 	git(["config", "user.name", "Test User"]);
 	mkdirSync(join(fixture, "hooks"), { recursive: true });
 	writeFileSync(join(fixture, "hooks/example.mjs"), "export {};\n");
-	git(["add", "hooks/example.mjs"]);
+	git(["add", "hooks/example.mjs", "scripts"]);
 	git(["commit", "--quiet", "-m", "test: add a gen-plugin source"]);
 });
 
@@ -53,6 +53,7 @@ describe("check-drift-gates staged triggers", () => {
 			join(fixture, "scripts/gen-plugin-dist-independent.mjs"),
 			'console.log("assembly progress"); console.error("primary assembly error"); console.error("Rollback restoration did not complete; saved /tmp/recovery-snapshot"); process.exit(1);\n',
 		);
+		git(["add", "scripts/gen-plugin-dist-independent.mjs"]);
 		const result = runGates();
 		assert.equal(result.status, 1);
 		assert.match(result.stderr, /primary assembly error/);
@@ -71,6 +72,11 @@ describe("check-drift-gates staged triggers", () => {
 			join(fixture, "scripts/check-generated-drift.mjs"),
 			'console.error("Recovery snapshot remains: /tmp/recovery-snapshot"); process.exit(1);\n',
 		);
+		git([
+			"add",
+			"scripts/gen-plugin-dist-independent.mjs",
+			"scripts/check-generated-drift.mjs",
+		]);
 		const result = runGates();
 		assert.equal(result.status, 1);
 		assert.match(result.stderr, /Generator transaction data remain/);
