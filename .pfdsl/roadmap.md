@@ -56,6 +56,8 @@ GitHub 側にしか無い読みを本文の正規表現で再構成すると、D
 現行 API では、`gh` バイナリ不在かつ `GH_TOKEN` / `GITHUB_TOKEN` のどちらも無い場合に対応する。
 `gh` 不在でも token があれば HTTP backend を試し、認証・ネットワーク・存在しない issue・不正応答・remote 解決失敗・HTTP 未実装 operation は実エラーとして FAIL する。
 consumer は backend の ENOENT から利用不能を推測しない。
+audit の引数エラーは exit 1 とし、exit 2 は operation API の利用不能だけに予約する。
+issue/PR view の要求フィールド欠落、closing issue の識別情報不正、GraphQL のページ情報欠落は空結果にせず FAIL する。
 
 ## 終端ゲート追加項目（issue 固有）
 

@@ -55,3 +55,48 @@ for (const consumer of consumers) {
 		});
 	}
 }
+
+for (const consumer of consumers.slice(0, 2)) {
+	for (const closingIssuesReferences of ["bad", [1], [{ number: 0 }]]) {
+		it(`${consumer.script}: malformed references fail instead of PASS/SKIP`, () => {
+			const bin = mkdtempSync(join(tmpdir(), "github-consumer-malformed-"));
+			try {
+				const env = {
+					...process.env,
+					PATH: bin,
+					GH_TOKEN: "",
+					GITHUB_TOKEN: "",
+				};
+				writeFileSync(
+					join(bin, "gh"),
+					`#!${process.execPath}\nconsole.log(${JSON.stringify(JSON.stringify({ closingIssuesReferences }))});\n`,
+					{ mode: 0o755 },
+				);
+				const result = spawnSync(
+					process.execPath,
+					[join(root, consumer.script), ...consumer.args],
+					{ cwd: root, env, encoding: "utf8" },
+				);
+				assert.equal(result.status, 1, result.stdout + result.stderr);
+				assert.match(result.stdout + result.stderr, /malformed/i);
+				assert.doesNotMatch(result.stdout, /SKIP|PASS/);
+			} finally {
+				rmSync(bin, { recursive: true, force: true });
+			}
+		});
+	}
+}
+
+it("audit argument errors do not use the availability exit code", () => {
+	const result = spawnSync(
+		process.execPath,
+		[join(root, "scripts/pfdsl/audit-issues-flow.mjs"), "--enforce-issue", "0"],
+		{
+			cwd: root,
+			encoding: "utf8",
+			env: { ...process.env, PATH: "", GH_TOKEN: "", GITHUB_TOKEN: "" },
+		},
+	);
+	assert.equal(result.status, 1, result.stdout + result.stderr);
+	assert.match(result.stderr, /expects an issue number/);
+});

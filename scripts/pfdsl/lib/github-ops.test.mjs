@@ -11,6 +11,60 @@ import {
 	isGitHubUnavailableError,
 } from "./github-ops.mjs";
 
+for (const value of [
+	{},
+	[],
+	{ closingIssuesReferences: "bad" },
+	{ closingIssuesReferences: [1] },
+	{ closingIssuesReferences: [{ number: 0 }] },
+]) {
+	it(`viewPr rejects malformed CLI values: ${JSON.stringify(value)}`, async () => {
+		const ops = createGitHubOps({
+			execGhImpl: async () => JSON.stringify(value),
+		});
+		await assert.rejects(
+			ops.viewPr({ number: 12, fields: ["closingIssuesReferences"] }),
+			(error) => {
+				assert.match(error.message, /malformed/i);
+				assert.equal(isGitHubUnavailableError(error), false);
+				return true;
+			},
+		);
+	});
+}
+
+it("viewIssue rejects missing requested CLI fields", async () => {
+	const ops = createGitHubOps({
+		execGhImpl: async () => JSON.stringify({ body: "", comments: [] }),
+	});
+	await assert.rejects(
+		ops.viewIssue({ number: 12, fields: ["body", "comments", "createdAt"] }),
+		/malformed/i,
+	);
+});
+
+it("viewIssue preserves the legitimate DUPLICATE reason on both backends", async () => {
+	const ghOps = createGitHubOps({
+		execGhImpl: async () => JSON.stringify({ stateReason: "DUPLICATE" }),
+	});
+	const httpOps = createGitHubOps({
+		execGhImpl: stubExecGh({ "issue view": new Error("ENOENT") }),
+		fetchImpl: stubFetch({ state_reason: "duplicate" }),
+	});
+	const saved = process.env.GH_TOKEN;
+	process.env.GH_TOKEN = "test-token";
+	try {
+		for (const ops of [ghOps, httpOps])
+			assert.deepEqual(
+				await ops.viewIssue({ number: 12, fields: ["stateReason"] }),
+				{ stateReason: "DUPLICATE" },
+			);
+	} finally {
+		if (saved === undefined) delete process.env.GH_TOKEN;
+		else process.env.GH_TOKEN = saved;
+	}
+});
+
 // A real `gh` binary may or may not be on PATH depending on the environment
 // (see gh-exec.test.mjs) — this builds a PATH containing only a symlink to
 // the real `git` (owner/repo resolution needs it) and nothing else, so `gh`

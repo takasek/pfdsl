@@ -25,6 +25,7 @@ import {
 	mapLabelsResponse,
 	parseHost,
 	parseOwnerRepo,
+	requireGitHubViewFields,
 	addIssueLabel as restAddIssueLabel,
 	createLabel as restCreateLabel,
 	editLabel as restEditLabel,
@@ -84,7 +85,7 @@ function normalizeIssueViewComments(issue) {
 				id: comment.id,
 				databaseId: comment.databaseId ?? commentDatabaseIdFromUrl(comment.url),
 				author: comment.author,
-				body: comment.body ?? "",
+				body: comment.body === null ? "" : comment.body,
 				createdAt: comment.createdAt,
 				url: comment.url,
 			};
@@ -251,7 +252,7 @@ export function createGitHubOps({
 				},
 				({ owner, repo, token }) =>
 					fetchIssueView(owner, repo, token, number, fields, fetchImpl),
-			),
+			).then((value) => requireGitHubViewFields("issue view", fields, value)),
 
 		/** @returns {{host: string, owner: string, repo: string}} */
 		repository,
@@ -275,7 +276,7 @@ export function createGitHubOps({
 				},
 				({ owner, repo, token }) =>
 					fetchPullRequestView(owner, repo, token, number, fields, fetchImpl),
-			),
+			).then((value) => requireGitHubViewFields("pr view", fields, value)),
 
 		/** @returns {Promise<Array<{number: number, title: string}>>} */
 		listOpenPrs: () =>

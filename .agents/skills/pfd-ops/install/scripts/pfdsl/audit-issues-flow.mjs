@@ -41,7 +41,7 @@ try {
 	});
 	enforcedIssues = (values["enforce-issue"] ?? []).map((value) => {
 		const n = Number(value);
-		if (!Number.isInteger(n) || n <= 0) {
+		if (!Number.isSafeInteger(n) || n <= 0) {
 			throw new TypeError(
 				`--enforce-issue expects an issue number, got '${value}'`,
 			);
@@ -50,7 +50,7 @@ try {
 	});
 } catch (err) {
 	console.error(`audit-issues-flow: ${err.message}`);
-	process.exit(2);
+	process.exit(1);
 }
 
 // --- Read and split roadmap.pfdsl ---

@@ -15,6 +15,8 @@ Changing a version number alone is not evidence that old local copies have been 
 ### GitHub operation availability
 
 The distributed issue audit still exits with code 2 when no GitHub backend is available, and with a failure for authentication, network, remote-resolution or response errors.
+Argument errors now exit with code 1; code 2 is reserved for backend unavailability.
+Issue and PR views reject missing requested fields, malformed closing-issue identities and incomplete pagination metadata instead of accepting empty or partial results.
 When upgrading locally maintained callers of `createGitHubOps`, replace `isGhUnavailableError` with `isGitHubUnavailableError` imported from `github-ops.mjs`.
 The operation API now throws `GitHubUnavailableError` when gh is absent and neither `GH_TOKEN` nor `GITHUB_TOKEN` is set; raw `ENOENT` is no longer its public availability contract.
 An available token still enables the HTTP fallback, and an operation with no HTTP implementation remains an error.
