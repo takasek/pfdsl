@@ -16,8 +16,8 @@ A fresh publication job executes only trusted main code, checks that canonical f
 If the PR or main changes while preparation runs, publication stops; rerun the workflow.
 An already synchronized PR produces no commit.
 
-Publication always uses a GitHub App so repair pushes automatically trigger downstream PR checks.
-Configure repository variable `GENERATED_REPAIR_APP_CLIENT_ID` and secret `GENERATED_REPAIR_APP_PRIVATE_KEY` for an App installed on this repository.
+Publication always uses the shared `takasek-pr-bot` GitHub App so repair pushes automatically trigger downstream PR checks.
+Configure repository variable `REPO_AUTOMATION_APP_CLIENT_ID` and secret `REPO_AUTOMATION_APP_PRIVATE_KEY` for an App installed on this repository.
 The App needs Contents and Workflows write access, and Pull requests read access to recheck the target PR.
 Its credential is used only in the fresh publication job.
 An absent or insufficient credential stops publication without switching authentication modes.
