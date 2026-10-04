@@ -1,6 +1,11 @@
 # Repair generated conflicts
 
 Run **repair generated conflicts** from the Actions tab on `main`, entering the number of an open PR in this repository whose base is `main`.
+Choose `repair` to publish a repair; this mode requires `main` as the workflow branch.
+To test workflow changes before merge, select their branch and choose `validate`.
+Validation runs the same merge, generation and verification, uploads a repair bundle if changes are needed, and reports the result in the Actions summary.
+It never starts the publication job, creates an App token or pushes changes.
+Selecting another workflow branch in repair mode stops before checkout and explains how to select main or use validate instead.
 The workflow integrates the latest main into that PR and regenerates the outputs owned by `scripts/lib/gen-plugin-outputs.mjs`.
 It stops if any conflict requires a canonical source or code decision.
 The job log and Actions run summary list the source files requiring manual resolution and explain the next steps.

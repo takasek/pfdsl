@@ -1,5 +1,5 @@
 name: repair generated conflicts
-run-name: "Repair generated conflicts for PR #${{ inputs.pull-request }}"
+run-name: "${{ inputs.mode == 'validate' && 'Validate' || 'Repair' }} generated conflicts for PR #${{ inputs.pull-request }}"
 
 on:
   workflow_dispatch:
@@ -8,6 +8,11 @@ on:
         description: Open same-repository PR targeting main
         type: string
         required: true
+      mode:
+        description: Validate prepares and checks a repair without publishing it
+        type: choice
+        options: [repair, validate]
+        default: repair
 
 permissions:
   contents: read
@@ -19,12 +24,30 @@ concurrency:
 
 jobs:
   prepare:
-    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     timeout-minutes: 45
     outputs:
       changed: ${{ steps.repair.outputs.changed }}
     steps:
+      - name: Check execution mode and workflow branch
+        env:
+          REPAIR_MODE: ${{ inputs.mode }}
+        run: |
+          if [ "$REPAIR_MODE" != 'repair' ] && [ "$REPAIR_MODE" != 'validate' ]; then
+            echo '::error::Choose repair or validate as the execution mode.'
+            exit 1
+          fi
+          if [ "$REPAIR_MODE" = 'repair' ] && [ "$GITHUB_REF" != 'refs/heads/main' ]; then
+            echo '::error::Select main to publish a repair, or choose validate to check this workflow branch without pushing.'
+            {
+              echo '## Repair was not started'
+              echo
+              echo 'Select main in the Run workflow branch selector to publish a repair. To test a workflow branch before merge, choose validate instead.'
+              echo 'Publication must run from main so it uses trusted code. No repair was attempted and no changes were pushed.'
+            } >> "$GITHUB_STEP_SUMMARY"
+            exit 1
+          fi
+
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           path: control
@@ -65,9 +88,28 @@ jobs:
           retention-days: 3
           if-no-files-found: error
 
+      - name: Summarize preparation
+        env:
+          REPAIR_MODE: ${{ inputs.mode }}
+          CHANGED: ${{ steps.repair.outputs.changed }}
+        run: |
+          {
+            if [ "$REPAIR_MODE" = 'validate' ]; then
+              echo '## Validation completed'
+              echo 'No publication token was created and no changes were pushed.'
+            else
+              echo '## Repair preparation completed'
+            fi
+            if [ "$CHANGED" = 'true' ]; then
+              echo 'The repair passed generation and verification. Its bundle is available in the generated-repair artifact.'
+            else
+              echo 'The PR is already synchronized; no repair commit is needed.'
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
   publish:
     needs: prepare
-    if: needs.prepare.outputs.changed == 'true'
+    if: github.ref == 'refs/heads/main' && inputs.mode == 'repair' && needs.prepare.outputs.changed == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
