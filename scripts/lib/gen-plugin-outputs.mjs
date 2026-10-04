@@ -30,13 +30,15 @@ const WITHOUT_INSTALL = [
 
 const PATHSPECS_BY_CONSUMER = Object.freeze({
 	terminal: GEN_PLUGIN_OUTPUTS,
+	push: GEN_PLUGIN_OUTPUTS,
+	release: GEN_PLUGIN_OUTPUTS,
 	ci: WITHOUT_INSTALL,
 	"pre-commit": [...WITHOUT_INSTALL, `:(exclude)${GEN_SKILL_MD_OUTPUT}`],
 });
 
 /**
  * The pathspecs one consumer diffs after regenerating.
- * @param {"pre-commit" | "terminal" | "ci"} consumer
+ * @param {"pre-commit" | "terminal" | "ci" | "push" | "release"} consumer
  * @returns {string[]}
  */
 export function genPluginDriftPathspecs(consumer) {

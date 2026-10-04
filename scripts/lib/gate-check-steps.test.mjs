@@ -117,7 +117,11 @@ describe("genPluginIdentityStep", () => {
 			triggerPaths: [".claude/skills/pfd-ops/SKILL.md"],
 		});
 		assert.equal(result.status, "PASS");
-		assert.ok(calls.some((c) => c.includes("gen-plugin.mjs")));
+		assert.ok(
+			calls.some((c) =>
+				c.includes("check-generation.mjs,--gen-plugin,terminal"),
+			),
+		);
 		assert.ok(
 			calls.some((c) => c.startsWith("scripts/check-generated-drift.mjs")),
 		);
@@ -182,7 +186,11 @@ describe("genPluginIdentityStep", () => {
 			node: exec,
 			triggerPaths: ["scripts/pfdsl/lib/gh-exec.mjs"],
 		});
-		assert.ok(calls.some((c) => c.includes("gen-plugin.mjs")));
+		assert.ok(
+			calls.some((c) =>
+				c.includes("check-generation.mjs,--gen-plugin,terminal"),
+			),
+		);
 	});
 });
 
