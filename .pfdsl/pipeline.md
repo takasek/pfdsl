@@ -23,7 +23,7 @@
 - **a（言語仕様）**: `docs/spec/spec.md`。図に現れない — validate が適用する V/W ルールの根拠だが、実装へ反映されるのは設計時であり、実行時に読まれる入力ではないため
 - **b（処理系）**: `tags: [b]` の process 群。実体は `@pfdsl/core` + `graphviz-exporter` + `preview-engine` + `metadata-exporter` の4パッケージ（各 process の `location` 参照）
 - **c（PFD読み書き分析skill）**: `pfdsl_skill`。bのホストとしては図外（次節）だが、`gen_skill` の生成物であり `gen_plugin` の同梱素材でもあるため、その2つの役では図に現れる
-- **d（VSCode拡張）**: `packages/vscode-extension/`。図に現れない — bのホストであり、データを供給も保管もしないため（次節）
+- **d（編集ホスト）**: `packages/vscode-extension/` と `packages/standalone/`。共通の文書処理・preview DOM は private な `packages/editor/`。図に現れない — bのホストであり、データを供給も保管もしないため（次節）
 - **e（a,bの配布）**: `push_cli_release_tag` / `publish_cli`、`push_libraries_release_tag` / `publish_libraries`、`package_vscode_release` / `verify_vsix` / `upload_vsix`。ADR-0035 までは workflow.pfdsl 側にあったが、release request 以降の変換に判断は入らないためこちらへ移した。リリース可否・版数の判断は workflow.pfdsl の3種の decide process が持ち、この図は kind ごとの release request を入力として受ける
 - **f（PFD運用フレームワーク）**: `tags: [f1]`（L1+L2 汎用層）/ `tags: [f2]`（L3 バックエンドプリセット層。採用リポが選択できる GitHub Issues 版とファイルベース・トラッカー版の2種）。f2 は規約本文（`ops_skill_l3`。2種の reference を location に列挙する）と GitHub Issues 版の採用テンプレート（`ops_install_templates`）の2 artifact に分かれる — 前者は手書き、後者は `gen_install` の生成物であり、生成経路も ADR-0035 でこの図へ移った（`ops_install_sources` → `gen_install` → `ops_install_templates`）。ファイルベース・トラッカー版は実配置を要しないため採用テンプレートを持たない。内容・retro フィードバックの一次情報は workflow.pfdsl の `ops_skill_general` / `ops_skill_l3`
 - **g（fの配布）**: `tags: [g]` の process 群。make gen-plugin（Claude Code / Codex両対応の組み立て）・Claude Code plugin marketplace（既存のインストール経路）・現在のCodexが同じ `.claude-plugin/marketplace.json` 互換経路で利用するClaude-compatible published artifact・check-install-sync.mjs（実配置とランタイム照合）が実装。`gen_plugin` と `gen_install` は生成でもあるため `gen` タグも併せ持つ
@@ -31,7 +31,10 @@
 ## ホスト（c/d）とbの関係
 
 `@pfdsl/cli`（cが指示する実行主体）と `vscode-extension`（d）は互いに依存しない。
-両者とも `@pfdsl/core`・`graphviz-exporter`・`preview-engine` を個別に import し、`metadata-exporter` は vscode-extension のみが import する（`packages/cli/src/index.ts` と `packages/vscode-extension/src/*.ts` の import 文で確認済み）。
+CLI は `@pfdsl/core`・`graphviz-exporter`・`preview-engine` を呼ぶ。
+VS Code と Tauri の文書解析・表示 packet・位置解決は `@pfdsl/editor` を通り、preview は両ホストが同じ `mountPreview` を利用する。
+その共有層は core、browser 用の `graphviz-exporter/dot` と `preview-engine/renderer` を呼び、ファイルアクセス・エディタ操作・外部起動は各ホストが持つ。
+`metadata-exporter` は引き続き vscode-extension のみが import し、Tauri の出力導線は後続工程である（`packages/cli/src/index.ts`、`packages/editor/src/` と各ホストの実入口を照合）。
 
 **ホストはグラフに現れない。** c/d はb層パイプラインを起動・実行する側であって、変換に投入されるデータでも変換結果でもない。
 `>>` 入力にすると「bがc/dに依存する」向きに逆転し（実際はc/dがbを呼ぶ側で、bはc/dの存在を知らない）、tag で表すにしても is-a（層識別）と is-called-by（呼び出し関係）が同じ名前空間に混在して誤読を招く — いずれも過去の版で実際に踏んだ誤りである。
