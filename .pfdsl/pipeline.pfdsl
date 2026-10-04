@@ -418,6 +418,16 @@ artifact:
     criteria: "/plugin marketplace add takasek/pfdsl に続けて /plugin install pfdsl@pfdsl を実行すると、gen_plugin が束ねるスキルツリー・pfd-*コマンド・pfd-lens agentが一括でユーザー環境に届く"
     externalStakeholders: [ 採用リポのAIエージェント ]
     group: adopter_env
+  adopter_config_snapshot:
+    label: 採用リポ設定スナップショット
+    description: "--target（既定は cwd）の対象ルート直下の .pfdsl/config.json のその実行時点の内容または不在。appliedMigration は検証済みの移行先を記録し、ユーザー単位のpluginや配置済みL3ファイルとは区別する。対象は実行ごとに変わるため、この図の basePath で固定する location は置かない"
+    criteria: check-install-sync.mjs が対象リポの設定を読み、移行状態の照合・配置可否へ反映する
+    group: adopter_repo
+  recorded_migration_config:
+    label: 移行適用を記録した採用リポ設定
+    description: "移行適用と検証の後に --record-migration が既存キーを保持して appliedMigration を書いた、--target（既定は cwd）の対象ルート直下の .pfdsl/config.json。通常照合や --deploy はこの記録を進めない。対象は実行ごとに変わるため、この図の basePath で固定する location は置かない"
+    criteria: check-install-sync.mjs --record-migration が既知のplugin identityを記録し、古いpluginや不正な設定では書き込まない
+    group: adopter_repo
   installed_l3_layer:
     label: 導入済みL3 GitHub Issuesプリセット
     description: "plugin同梱install/由来の読取専用監査スクリプト、完了チェーン回収スクリプト、それをデフォルトブランチへのpushで起動するworkflow、依存moduleの採用リポルートへの実配置結果"
@@ -432,6 +442,12 @@ artifact:
     group: run_outputs
 
 process:
+  record_applied_migration:
+    label: 検証済み移行先を記録する
+    description: "移行適用と採用リポの検証を終えた担当者が --record-migration を明示実行する。plugin identity と対象設定から appliedMigration を更新し、他のキーを保持する。検証済みかの判断は呼出し前の担当者の責任で、自動照合からは起動しない"
+    command: node <pfd-ops skill root>/scripts/check-install-sync.mjs --record-migration
+    location: scripts/harness-template/skills/pfd-ops/scripts/check-install-sync.mjs
+    tags: [ g ]
   parse:
     label: 構文解析
     description: "frontmatterの既知フィールドをスキーマで検査し、同じYAML文書から意味値とソース位置索引を得る。lex・parseと合わせてdocument+frontmatterと診断を得る。CLI（c経由）・VSCode拡張（d）双方の全コマンドが内部で通る"
@@ -693,8 +709,10 @@ plugin_marketplace_entry >>? pin_plugin_marketplace
 
 [plugin_marketplace_entry, published_claude_plugin] >> install_plugin -> installed_plugin
 
-installed_plugin >> deploy_install_layer -> installed_l3_layer
+[adopter_config_snapshot, installed_plugin] >> deploy_install_layer -> installed_l3_layer
 
 installed_l3_layer >>? deploy_install_layer
 
-[installed_l3_layer, installed_plugin, upstream_plugin_metadata] >> check_install_sync -> drift_report
+[adopter_config_snapshot, installed_l3_layer, installed_plugin, upstream_plugin_metadata] >> check_install_sync -> drift_report
+
+[adopter_config_snapshot, installed_plugin] >> record_applied_migration -> recorded_migration_config

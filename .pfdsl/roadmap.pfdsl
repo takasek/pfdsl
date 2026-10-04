@@ -91,7 +91,7 @@ artifact:
     label: "CLIリリース: group と node の同名の診断"
     description: "#1291 の診断を含む npm CLI と、同じ release tag から配布する plugin 資産"
     status: todo
-    criteria: "npm view @pfdsl/cli versions に同名の診断を含む版が含まれ、その版を固定して取得した CLI の check が group と node の同名をエラーとして報告する"
+    criteria: "npm view @pfdsl/cli versions に同名の診断を含む版が含まれ、その版を固定して取得した CLI の check が group と node の同名をエラーとして報告する。同じ release tag の plugin 配布について .pfdsl/workflow.md の「release milestone artifact の作成規約」と .pfdsl/pipeline.md の公開・pin・取得確認を満たす"
   meta_set_extension_fields:
     label: "対象判定と拡張フィールド更新を整えた meta set (#1305)"
     description: "既存の未知スカラーフィールドの更新を許し、新しい未知フィールドの追加は明示的なフラグで許す meta set。本文だけのノードと不在 ID を区別し、frontmatter 定義の追加を案内する。通常出力と JSON の扱いを揃え、監査の stale_updated_at に修正コマンドを表示する。要件は統合後の issue #1305"
@@ -101,12 +101,12 @@ artifact:
     label: "CLIリリース: 拡張フィールドの meta set"
     description: "統合後の #1305 の対象判定・診断と拡張フィールド更新を含む npm CLI と、同じ release tag から配布する plugin 資産"
     status: todo
-    criteria: "npm view @pfdsl/cli versions に統合後の #1305 を含む版が含まれ、その版を固定して取得した CLI の meta set が既存の updated_at を更新でき、フラグなしの新しい未知フィールドを拒否し、フラグ付きなら追加する。本文だけのノードには定義追加を案内し、不在 ID との診断区別を通常出力と JSON の両方で確認できる"
+    criteria: "npm view @pfdsl/cli versions に統合後の #1305 を含む版が含まれ、その版を固定して取得した CLI の meta set が既存の updated_at を更新でき、フラグなしの新しい未知フィールドを拒否し、フラグ付きなら追加する。本文だけのノードには定義追加を案内し、不在 ID との診断区別を通常出力と JSON の両方で確認できる。同じ release tag の plugin 配布について .pfdsl/workflow.md の「release milestone artifact の作成規約」と .pfdsl/pipeline.md の公開・pin・取得確認を満たす"
   cli_release_group_delete:
     label: "CLIリリース: group 削除"
     description: "#1278 の group 削除を含む npm CLI と、同じ release tag から配布する plugin 資産"
     status: todo
-    criteria: "npm view @pfdsl/cli versions に group 削除を含む版が含まれ、その版を固定して取得した CLI で pfdsl delete <file> <group-id> が group を削除する"
+    criteria: "npm view @pfdsl/cli versions に group 削除を含む版が含まれ、その版を固定して取得した CLI で pfdsl delete <file> <group-id> が group を削除する。同じ release tag の plugin 配布について .pfdsl/workflow.md の「release milestone artifact の作成規約」と .pfdsl/pipeline.md の公開・pin・取得確認を満たす"
   node_definition_creation:
     label: プレビューと CLI から作れるノード定義
     description: "未定義ノードから共通 core 処理を使って frontmatter 定義を挿入する機能。要件は issue #1282"
