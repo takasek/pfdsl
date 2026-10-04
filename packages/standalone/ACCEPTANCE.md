@@ -83,7 +83,7 @@ report の userAgent は WebKit の互換文字列であり、実際の OS / CPU
 | 最新 release の dirty close | 合成 Welcome を `Close acceptance test` に変更。native sheet の Keep Editing で source・図・dirty 印を保持、再 close→Discard で当該試験 process が exit 0。ユーザーの debug 編集は保持 |
 | 最新 release の clean close | 全 tab の dirty 印がない状態から close。sheet なしで当該試験 process が exit 0。操作ツールの終了後の再取得は別 app を自動起動するため、process の終了記録と照合 |
 | pan の実機操作 | DOM regression は成功。native 左 drag は操作ツールの `-10005: noWindowsAvailable` または位置変化未観測により未確認。実機合格と扱わず、#1259 の preview 操作受入へ残す |
-| 全体検査 | build / typecheck / lint と全 package・script tests が成功。script tests は 2535 pass / 0 fail、import・shell・CLI 規約検査も成功。macOS CI は追加したが未実行 |
+| 全体検査 | build / typecheck / lint と全 package・script tests が成功。script tests は 2535 pass / 0 fail、import・shell・CLI 規約検査も成功。初回のローカル受入記録時点では macOS CI は未実行。公開後の結果は [PR #1364 の checks](https://github.com/takasek/pfdsl/pull/1364/checks) で確認 |
 
 独立設計 reviewer は変更を含まない基準 tree から文書処理・mount / dispose の境界を検討した。
 最終差分 reviewer は品質、correctness、採用理由の実現と変更外の消費者を確認し、未解決の P1/P2 finding はない。

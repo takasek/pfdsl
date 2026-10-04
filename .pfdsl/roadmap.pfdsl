@@ -219,7 +219,7 @@ process:
   i1257_build_standalone_foundation:
     label: 共通処理を製品用アプリ基盤へ接続する
     location: https://github.com/takasek/pfdsl/issues/1257
-    updated_at: 2026-09-26T07:15:50Z
+    updated_at: 2026-10-04T02:46:10Z
   i1258_build_standalone_documents:
     label: 文書の安全な編集・保存を完成させる
     location: https://github.com/takasek/pfdsl/issues/1258
