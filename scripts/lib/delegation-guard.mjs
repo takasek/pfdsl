@@ -61,16 +61,7 @@ const BUILTIN_GH_GROUPS = new Set([
 	"api",
 	"help",
 	"browse",
-	"extension",
 	"alias",
-	"config",
-	"codespace",
-	"gpg-key",
-	"ssh-key",
-	"label",
-	"org",
-	"project",
-	"ruleset",
 	"attestation",
 	"completion",
 ]);
@@ -168,10 +159,7 @@ function hasHelpOption(parsed) {
 			i++;
 			continue;
 		}
-		if (arg.startsWith("-") && !GH_BOOLEAN_FLAGS.has(arg)) {
-			const flag = arg.split("=", 1)[0];
-			if (!GH_VALUE_FLAGS.has(flag)) return false;
-		}
+		if (arg.startsWith("-") && !GH_VALUE_FLAGS.has(name)) return false;
 	}
 	return false;
 }
