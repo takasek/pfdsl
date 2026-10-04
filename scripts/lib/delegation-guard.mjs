@@ -1099,8 +1099,8 @@ export function evaluateDelegationGuard(
 		matched,
 		reason:
 			`Blocked '${matched}': the '${agentType}' subagent must not perform outward-facing actions. ` +
-			"Publishing is the caller's to do. Finish the permitted local edits and checks, then report the result and blocked action " +
-			"to your caller, which owns Git metadata changes, review and publishing. Do not look for another route.",
+			"Publishing is the caller's to do. Finish the work as commits on the current branch, then report back " +
+			"to your caller and let it review, push and open the pull request. Do not look for another route.",
 	};
 }
 
