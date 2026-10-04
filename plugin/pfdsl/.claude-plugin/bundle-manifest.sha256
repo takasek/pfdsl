@@ -56,7 +56,7 @@ a8e4d35e456f05babab77d002a20f7230b7942aaf7bb82138bf2007b5926c4f7  skills/pfd-ops
 
 d6636ad19abcd0019d685f0cbc26db35fb779ea1afa9568d070fb94bb68eb7f2  skills/pfd-ops/install/scripts/pfdsl/sweep-completed-chains.mjs
 
-c456f8f1c4b6b7557ac8e86b67bd5efb82bceb9bf1c29989977cbe36b78a8199  skills/pfd-ops/references/architecture.md
+b506ffb37a79fb3c419affc28ce7fa95abe36d7311debe0fc5cf3a3c65e1a3a2  skills/pfd-ops/references/architecture.md
 
 ec4c10c6394964a5259ce63b446562181550bb397743b0b1c79d087bc2c7c307  skills/pfd-ops/references/file-based-tracker-backend.md
 
@@ -86,7 +86,7 @@ c1328f9dcb946c35f7bba42306324d82929f7031fb52d459c3b2ee12fd904686  skills/pfd-ops
 
 d8c92e2918a8e3f82e6f79a023e81b563c14513ca34f64092445e61292a1c247  skills/pfd-ops/references/work-cycle.md
 
-cb77419e68d2d057e7c84f6c4241380367ff086c6a3b10d9b8d5cdf48a3151c8  skills/pfd-ops/scripts/check-install-sync.mjs
+1cfb326646bc64e4dc91e99b36956d1e0b07f2124678b2d5e4918a9af20997b9  skills/pfd-ops/scripts/check-install-sync.mjs
 
 424cc8e6a4fff825d1aa0ab1f00e56403763f5e81c1a130d962fca4e244ad7d8  skills/pfd-ops/scripts/collect-report-environment.mjs
 

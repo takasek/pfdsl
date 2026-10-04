@@ -189,7 +189,7 @@ plugin version の上流差分警告は更新をユーザーに案内する。�
 
 出力の意味と対応は次のとおり。
 
-- 「no appliedMigration」: この仕組みの導入前の採用先で、どの移行を適用したか分からない。失敗ではない。出力が指す migration guide の「Choosing the update range」で、導入済みの版から現在の版までの項目を実施し、検証が通ってから `--record-migration` を実行する。
+- 「no appliedMigration」: この仕組みの導入前の採用先で、どの移行を適用したか分からない。失敗ではない。出力が指す migration guide の「Choosing the update range」で、導入済みの版から現在の版までの項目を実施し、検証が通ってから `--record-migration` を実行する。plugin の外（repo-local の旧配置など）で動かした場合は版が不明で記録できないので、コマンドは出力されず、plugin 経由で実行し直す旨が示される。
 - 「Skipped the migration-state comparison」: 実行中の pfd-ops が plugin の外（repo-local の旧配置など）にあり、plugin の版を決められない。照合は行われていない。plugin 経由で実行し直す。
 - 「older than the migration state」: 実行中の plugin が記録より古い。plugin を更新する。更新するまで `--deploy` と `--record-migration` は exit 3 で拒否される（古い `install/` で新しい配置を巻き戻さないため）。
 - 「newer than the migration state」: 記録より新しい plugin で動いており、未適用の移行がありうる。出力が示す記録した版から実行中の版までの migration guide の項目を実施し、検証が通ってから `--record-migration` を実行する。拒否はされない（移行の作業自体に `--deploy` が要る）。

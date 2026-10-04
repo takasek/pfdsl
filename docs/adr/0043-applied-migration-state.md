@@ -56,7 +56,7 @@ GitHub Issues バックエンドの採否にも `--upstream` の有無にも依�
 `--deploy` の拒否が `--upstream` なしの実行でも効く必要があり、pfd-ops の発火時セルフチェックは既定で `--upstream` 付きで同じスクリプトを実行するので、Claude Code と Codex の両方で pfd-ops の起動時に走る。
 
 - `.pfdsl/` が無い: 何もしない。plugin はユーザー単位で入るため、無関係なリポでも起動する（ADR-0028）。
-- `appliedMigration` が無い: 仕組みの導入前の採用先として、移行ガイドの「Choosing the update range」を案内し、適用後に `--record-migration` を実行するよう示す。失敗にはしない。
+- `appliedMigration` が無い: 仕組みの導入前の採用先として、移行ガイドの「Choosing the update range」を案内し、適用後に `--record-migration` を実行するよう示す。実行中の plugin の版を決められない場合（repo-local の旧配置など）は、そのコマンドが exit 3 で拒否されるため出さず、記録には plugin（Claude Code または Codex）経由の実行が要る旨を示す。失敗にはしない。
 - 実行中の plugin の版を決められない: 照合を省き、その旨と理由を1行で示す。
 - 実行中の版 < 記録した版: plugin の更新を促す。`--deploy` と `--record-migration` は exit 3 で拒否する。古い `install/` で新しい配置を巻き戻すことを防ぐためである。
 - 実行中の版 > 記録した版: 記録した版と実行中の版を示し、その間のガイドの節を読むよう案内する。拒否しない。移行の作業そのものに `--deploy` が要る。

@@ -1397,6 +1397,20 @@ describe("applied migration state", () => {
 			assert.match(stdout, /--record-migration/);
 		});
 
+		it("does not print a --record-migration command that would fail when the plugin version is unknown and nothing is recorded", () => {
+			const plugin = makeInstalledPlugin("plugin-absent-unknown");
+			const target = makeAdopter("adopter-absent-unknown", {
+				sweepCompletedChains: { enabled: false },
+			});
+
+			const { stdout, status } = run(plugin, target);
+			assert.equal(status, 0);
+			assert.match(stdout, /appliedMigration/);
+			assert.match(stdout, /Choosing the update range/);
+			assert.doesNotMatch(stdout, /--record-migration/);
+			assert.match(stdout, /installed plugin \(Claude Code or Codex\)/);
+		});
+
 		it("says the comparison was skipped, and why, when the plugin version is unknown", () => {
 			const plugin = makeInstalledPlugin("plugin-unknown");
 			const target = makeAdopter("adopter-unknown", {

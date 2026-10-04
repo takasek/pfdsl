@@ -513,7 +513,7 @@ export function evaluateMigration(targetRoot, running) {
  * What to tell the reader about a comparison, or null when there is nothing to
  * say (no .pfdsl/, or the running plugin matches the record).
  * @param {ReturnType<typeof evaluateMigration>} outcome
- * @param {string} recordCommand the command that records the state
+ * @param {string | null} recordCommand the command that records the state, or null when it would be refused because the running plugin's version is unknown
  * @returns {string | null}
  */
 export function describeMigration(outcome, recordCommand) {
@@ -521,7 +521,10 @@ export function describeMigration(outcome, recordCommand) {
 		case "absent":
 			return (
 				`This repo has no appliedMigration in ${CONFIG_RELATIVE_PATH}, so it predates migration-state tracking and the plugin cannot tell which migrations were applied.\n` +
-				`To catch up, read "Choosing the update range" in the migration guide (${MIGRATION_GUIDE_URL}) and apply the entries for your range. After applying them, record the state with: ${recordCommand}`
+				`To catch up, read "Choosing the update range" in the migration guide (${MIGRATION_GUIDE_URL}) and apply the entries for your range. ` +
+					(recordCommand === null
+						? "After applying them, recording the state needs a run from the installed plugin (Claude Code or Codex): the version of the running pfd-ops is unknown here, so it cannot be recorded from this copy."
+						: `After applying them, record the state with: ${recordCommand}`)
 			);
 		case "unknown-running":
 			return `Skipped the migration-state comparison: the running pfd-ops is not inside an installed plugin (no .claude-plugin/plugin.json or .codex-plugin/plugin.json above the skill), so its plugin version is unknown.`;
@@ -730,7 +733,11 @@ async function main() {
 	if (deployable) {
 		// Independent of --upstream and of whether the GitHub Issues backend is
 		// adopted: the record concerns the repo's migration, not any one feature.
-		const recordCommand = `node ${fileURLToPath(import.meta.url)} --target ${targetRoot} --record-migration`;
+		// With no running version the command would be refused (exit 3), so none is offered.
+		const recordCommand =
+			running === null
+				? null
+				: `node ${fileURLToPath(import.meta.url)} --target ${targetRoot} --record-migration`;
 		let outcome;
 		try {
 			outcome = evaluateMigration(targetRoot, running);
