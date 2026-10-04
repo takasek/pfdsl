@@ -2,11 +2,7 @@ import { describe, expect, it } from "vitest";
 import { buildHtml } from "./preview-logic.js";
 
 describe("buildHtml", () => {
-	const html = buildHtml(
-		"https://example/webview.js",
-		"https://cdn.example",
-		false,
-	);
+	const html = buildHtml("https://example/webview.js", "https://cdn.example");
 
 	it("embeds the script URI as a module script", () => {
 		expect(html).toContain(
@@ -46,14 +42,5 @@ describe("buildHtml", () => {
 		for (const id of ["root", "inner", "tooltip", "diff-panel", "minimap"]) {
 			expect(html).toContain(`id="${id}"`);
 		}
-	});
-
-	it("exposes the debug flag to the webview", () => {
-		expect(buildHtml("s", "c", true)).toContain(
-			"window.__PFDSL_DEBUG__ = true;",
-		);
-		expect(buildHtml("s", "c", false)).toContain(
-			"window.__PFDSL_DEBUG__ = false;",
-		);
 	});
 });

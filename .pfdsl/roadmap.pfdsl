@@ -61,7 +61,7 @@ artifact:
     label: "エディタ コネクタ編集支援 (#482)"
     description: "ノード前後への新規追加・既存接続の code action/コマンド。edge 挿入ロジックはロジック層に分離し Preview UI (#483) と共用"
     status: wip
-    criteria: "カーソル下ノードへの前後追加・接続がコネクタ種選択付きの code action から実行でき、選択結果が .pfdsl テキストへ挿入されることが packages/vscode-extension/src/connector-logic.test.ts のテストで検証されている"
+    criteria: "カーソル下ノードへの前後追加・接続がコネクタ種選択付きの code action から実行でき、選択結果が .pfdsl テキストへ挿入されることが実 extension host で確認され、共有編集計算の回帰テストが成功している"
   preview_connector:
     label: "Preview コネクタ生成 UI (#483)"
     description: "webview の nodeClick 基盤を拡張し、ノードクリックから前後追加・接続をテキストへ反映する。#482 の編集機構を共用"
@@ -71,7 +71,7 @@ artifact:
     label: "frontmatter 定義挿入 code action (#484)"
     description: "edge にのみ現れる未定義ノードへ artifact/process 定義スケルトンを挿入する"
     status: done
-    criteria: "edge にのみ現れる未定義ノード上で Quick Fix『Insert {kind} definition』を実行すると frontmatter に artifact/process 定義が挿入されることが packages/vscode-extension/src/def-insertion-logic.test.ts のテストで検証されている"
+    criteria: "edge にのみ現れる未定義ノード上で Quick Fix『Insert {kind} definition』を実行すると frontmatter に artifact/process 定義が挿入されることが実 extension host で確認され、種別判定と定義挿入の回帰テストが成功している"
   ext_editing_release:
     label: "extension 編集支援リリース"
     description: "#482 コネクタ編集 / #483 Preview UI / #484 定義挿入を含む次期 Marketplace リリース"

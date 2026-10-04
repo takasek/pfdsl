@@ -1,8 +1,8 @@
 import { analyze } from "@pfdsl/core";
+import { findFrontmatterDefinitionInText } from "@pfdsl/editor";
 import { describe, expect, it } from "vitest";
 import { declaredCommands, runHintAnchors } from "./codelens-logic.js";
 import { extractDocumentLinks } from "./document-link-logic.js";
-import { findFrontmatterDefinitionInText } from "./jump-logic.js";
 
 const corpus = [
 	`---

@@ -28,7 +28,6 @@ export function mountPreview(container: HTMLElement, host: PreviewHost) {
 	container.classList.add("pfdsl-preview");
 	container.innerHTML = previewMarkup;
 	const renderDot = host.renderDot ?? renderDotToSvg;
-	function log(..._args: unknown[]) {}
 	function on<K extends keyof GlobalEventHandlersEventMap>(
 		target: EventTarget,
 		type: K,
@@ -227,20 +226,7 @@ export function mountPreview(container: HTMLElement, host: PreviewHost) {
 			{ width: w, height: h },
 			scale,
 		));
-		log("centerGraph", {
-			w,
-			h,
-			rootW: root.clientWidth,
-			rootH: root.clientHeight,
-			panX,
-			panY,
-			scale,
-		});
 		applyTransform();
-	}
-
-	function clearFocusHighlight() {
-		lastFocusedNodeId = undefined;
 	}
 
 	function focusNode(nodeId: string) {
@@ -293,10 +279,7 @@ export function mountPreview(container: HTMLElement, host: PreviewHost) {
 				minimap: minimapDragging,
 			})
 		) {
-			dragging = false;
-			minimapDragging = false;
-			minimapDragRect = null;
-			root.style.cursor = "grab";
+			releaseDrag();
 			return;
 		}
 		if (minimapDragging) {
@@ -309,12 +292,13 @@ export function mountPreview(container: HTMLElement, host: PreviewHost) {
 		applyTransform();
 	});
 
-	on(window, "mouseup", () => {
+	function releaseDrag() {
 		dragging = false;
 		minimapDragging = false;
 		minimapDragRect = null;
 		root.style.cursor = "grab";
-	});
+	}
+	on(window, "mouseup", releaseDrag);
 
 	on(root, "click", (e) => {
 		const node = (e.target as Element).closest("g.node");
@@ -370,7 +354,6 @@ export function mountPreview(container: HTMLElement, host: PreviewHost) {
 		if (disposed) return;
 		const currentRevision =
 			msg.type === "render" || msg.type === "error" ? ++revision : revision;
-		log("message received:", msg.type);
 		if (msg.type === "error") {
 			inner.innerHTML = `<div class="err">${escapeHtml(msg.message)}</div>`;
 			return;
@@ -380,7 +363,7 @@ export function mountPreview(container: HTMLElement, host: PreviewHost) {
 			return;
 		}
 		if (msg.type === "clearFocus") {
-			clearFocusHighlight();
+			lastFocusedNodeId = undefined;
 			return;
 		}
 		if (msg.type === "diff") {
@@ -400,7 +383,6 @@ export function mountPreview(container: HTMLElement, host: PreviewHost) {
 		try {
 			const svg = await renderDot(msg.dot);
 			if (disposed || currentRevision !== revision) return;
-			log("svg length:", svg.length);
 			inner.innerHTML = svg;
 			for (const node of inner.querySelectorAll("g.node")) {
 				const titleEl = node.querySelector(":scope > title");
@@ -420,19 +402,10 @@ export function mountPreview(container: HTMLElement, host: PreviewHost) {
 				if (el.tagName === "title") el.remove();
 				else el.removeAttributeNS("http://www.w3.org/1999/xlink", "title");
 			}
-			const svgEl = inner.querySelector("svg");
-			if (svgEl) {
-				log(
-					"svg size:",
-					svgEl.getAttribute("width"),
-					svgEl.getAttribute("height"),
-				);
-			}
 			requestAnimationFrame(() => {
 				if (currentRevision !== revision) return;
 				if (root.clientWidth === 0 || root.clientHeight === 0) return;
 				if (!hasPositioned) {
-					log("rAF fired, inner.offsetWidth:", inner.offsetWidth);
 					centerGraph();
 					hasPositioned = true;
 				}
@@ -442,7 +415,6 @@ export function mountPreview(container: HTMLElement, host: PreviewHost) {
 			if (currentDiff) renderDiffPanel(currentDiff);
 		} catch (e) {
 			if (disposed || currentRevision !== revision) return;
-			log("render error:", (e as Error).message);
 			inner.innerHTML = `<div class="err">${escapeHtml((e as Error).message)}</div>`;
 		}
 	}

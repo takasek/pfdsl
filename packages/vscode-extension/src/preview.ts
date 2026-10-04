@@ -1,17 +1,17 @@
 import { type DiffReport, resolveLocationFsPath } from "@pfdsl/core";
+import type { MessageFromWebview, MessageToWebview } from "@pfdsl/editor";
+import {
+	allIdsOfDocument,
+	buildLocations,
+	findFrontmatterDefinitionRange,
+	nodeIdAtCursor,
+	positionOfNodeId,
+} from "@pfdsl/editor";
 import * as vscode from "vscode";
 import { analyzeDocument, preparePreviewForDocument } from "./analyze.js";
 import { type DirectoryAccess, expandDirectory } from "./expand-directory.js";
-import { findFrontmatterDefinitionRange } from "./jump-logic.js";
-import { buildLocations } from "./location-utils.js";
-import type { MessageFromWebview, MessageToWebview } from "./messages.js";
 import { PreviewController } from "./preview-controller.js";
-import {
-	allIdsOfDocument,
-	buildHtml,
-	nodeIdAtCursor,
-	positionOfNodeId,
-} from "./preview-logic.js";
+import { buildHtml } from "./preview-logic.js";
 import { requireActivePfdslEditor } from "./utils.js";
 
 interface PreviewState {
@@ -222,11 +222,9 @@ export function registerPreview(context: vscode.ExtensionContext): {
 			},
 		);
 		const webviewScriptUri = panel.webview.asWebviewUri(scriptUri);
-		const isDebug = context.extensionMode === vscode.ExtensionMode.Development;
 		panel.webview.html = buildHtml(
 			webviewScriptUri.toString(),
 			panel.webview.cspSource,
-			isDebug,
 		);
 
 		const state: PreviewState = {

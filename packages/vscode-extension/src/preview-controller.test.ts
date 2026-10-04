@@ -1,6 +1,6 @@
 import { analyze, diffGraphs } from "@pfdsl/core";
+import type { MessageToWebview } from "@pfdsl/editor";
 import { describe, expect, it } from "vitest";
-import type { MessageToWebview } from "./messages.js";
 import { PreviewController } from "./preview-controller.js";
 
 const first = diffGraphs(
