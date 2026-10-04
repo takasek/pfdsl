@@ -7,6 +7,7 @@ import {
 	mkdirSync,
 	readdirSync,
 	readFileSync,
+	realpathSync,
 	renameSync,
 	rmSync,
 	statSync,
@@ -149,8 +150,17 @@ export function isSetupCurrent(root = process.cwd(), options = {}) {
 	}
 }
 
-// Check only configured overrides: setup still owns the default common-dir
-// installation. Never execute custom hooks or rewrite user Git configuration.
+function sameDirectory(left, right) {
+	try {
+		return realpathSync(dirname(left)) === realpathSync(dirname(right));
+	} catch {
+		return resolve(left) === resolve(right);
+	}
+}
+
+// Check the pre-commit Git will run. Setup owns the common-dir hooks, where it
+// installs the shim, and may repair it there (`managed`). It never executes or
+// rewrites a custom hooks directory or the user's Git configuration.
 export function inspectHooksPath(
 	root = process.cwd(),
 	{ env = process.env } = {},
@@ -163,45 +173,65 @@ export function inspectHooksPath(
 		"--get",
 		"core.hooksPath",
 	]);
-	if (configured.status === 1) return { reason: null };
-	if (configured.status !== 0)
+	if (configured.status !== 0 && configured.status !== 1)
 		return {
 			reason: "Cannot inspect core.hooksPath: Git configuration lookup failed.",
+			managed: false,
 		};
-	const effective = git([
+	const common = git([
 		"rev-parse",
 		"--path-format=absolute",
-		"--git-path",
-		"hooks/pre-commit",
+		"--git-common-dir",
 	]);
-	if (effective.status !== 0)
+	if (common.status !== 0)
 		return {
-			reason: "Cannot resolve the effective core.hooksPath pre-commit.",
+			reason:
+				"Cannot resolve the Git common directory for the pre-commit hook.",
+			managed: false,
 		};
-	const path = resolve(root, effective.stdout.trim());
-	const repair = `core.hooksPath (${configured.stdout.trim()}) selects ${path}. Install the repo's executable scripts/hooks/pre-commit-shim there or resolve the override explicitly; setup will not change Git configuration or custom hooks.`;
+	const managedPath = join(
+		resolve(root, common.stdout.trim()),
+		"hooks/pre-commit",
+	);
+	let path = managedPath;
+	if (configured.status === 0) {
+		const effective = git([
+			"rev-parse",
+			"--path-format=absolute",
+			"--git-path",
+			"hooks/pre-commit",
+		]);
+		if (effective.status !== 0)
+			return {
+				reason: "Cannot resolve the effective core.hooksPath pre-commit.",
+				managed: false,
+			};
+		path = resolve(root, effective.stdout.trim());
+	}
+	const managed = sameDirectory(path, managedPath);
+	const repair = managed
+		? `Run 'make setup' to install the repo's scripts/hooks/pre-commit-shim at ${path}.`
+		: `core.hooksPath (${configured.stdout.trim()}) selects ${path}. Install the repo's executable scripts/hooks/pre-commit-shim there or resolve the override explicitly; setup will not change Git configuration or custom hooks.`;
+	const failed = (problem) => ({ reason: `${problem} ${repair}`, managed });
 	if (!isExecutableShim(path))
-		return {
-			reason: `The effective pre-commit is missing or not executable. ${repair}`,
-		};
+		return failed("The effective pre-commit is missing or not executable.");
 	try {
 		if (
 			!readFileSync(path).equals(
 				readFileSync(join(root, "scripts/hooks/pre-commit-shim")),
 			)
-		) {
-			return {
-				reason: `The effective hook differs from the repo shim; cannot verify that it runs the gate. ${repair}`,
-			};
-		}
+		)
+			return failed(
+				"The effective hook differs from the repo shim; cannot verify that it runs the gate.",
+			);
 	} catch {
-		return { reason: `Cannot read the effective pre-commit shim. ${repair}` };
+		return failed("Cannot read the effective pre-commit shim.");
 	}
 	if (!isExecutableShim(join(root, "scripts/pre-commit")))
-		return {
-			reason: `The checkout's scripts/pre-commit is missing or not executable. ${repair}`,
-		};
-	return { reason: null };
+		return failed(
+			"The checkout's scripts/pre-commit is missing or not executable.",
+		);
+	return { reason: null, managed };
 }
 
 export function setupLockPath(root = process.cwd()) {
@@ -340,8 +370,10 @@ function runSetupUnlocked(root) {
 }
 
 async function runSetup(root = process.cwd()) {
+	// A hook setup does not manage is refused untouched; a missing or stale
+	// shim in the setup-managed directory is what setup itself installs.
 	const hooks = inspectHooksPath(root);
-	if (hooks.reason !== null) throw new Error(hooks.reason);
+	if (hooks.reason !== null && !hooks.managed) throw new Error(hooks.reason);
 	const lock = await acquireSetupLock(root);
 	try {
 		if (isSetupCurrent(root)) return 0;

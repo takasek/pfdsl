@@ -46,10 +46,15 @@ function fixture() {
 	const log = join(cwd, "setup.log");
 	mkdirSync(join(cwd, "scripts/hooks"), { recursive: true });
 	mkdirSync(join(cwd, "scripts/lib"), { recursive: true });
-	mkdirSync(join(cwd, ".git-common/hooks"), { recursive: true });
 	mkdirSync(bin);
 	symlinkSync(makefile, join(cwd, "Makefile"));
 	writeFileSync(join(cwd, "scripts/hooks/pre-commit-shim"), "#!/bin/sh\n");
+	writeFileSync(join(cwd, ".git/hooks/pre-commit"), "#!/bin/sh\n", {
+		mode: 0o755,
+	});
+	writeFileSync(join(cwd, "scripts/pre-commit"), "#!/bin/sh\n", {
+		mode: 0o755,
+	});
 	writeFileSync(join(cwd, "scripts/link-repo-skill.mjs"), "// fixture\n");
 	writeFileSync(
 		join(cwd, "scripts/setup-completion.mjs"),
@@ -65,7 +70,9 @@ function fixture() {
 
 	for (const [name, source] of Object.entries({
 		pnpm: '#!/bin/sh\nprintf \'pnpm\\n\' >> "$SETUP_LOG"\n[ -d "$SETUP_EXPECT_LOCK" ] || exit 97\n[ -n "$SETUP_READY_FILE" ] && : > "$SETUP_READY_FILE"\nif [ -n "$SETUP_RELEASE_FILE" ]; then while [ ! -f "$SETUP_RELEASE_FILE" ]; do /bin/sleep 0.02; done; fi\n[ "$SETUP_FAIL_STAGE" = pnpm ] && exit 1\nmkdir -p node_modules\nif [ -n "$SETUP_LINK_PATH" ]; then mkdir -p "$SETUP_LINK_PATH"; printf "%s\\n" "{\\"bin\\":{\\"fixture-command\\":\\"cli.js\\"}}" > "$SETUP_LINK_PATH/package.json"; mkdir -p "$(dirname "$SETUP_LINK_PATH")/.bin"; : > "$(dirname "$SETUP_LINK_PATH")/.bin/fixture-command"; "$REAL_CHMOD" 755 "$(dirname "$SETUP_LINK_PATH")/.bin/fixture-command"; fi\n[ -d "$SETUP_EXPECT_LOCK" ] || exit 98\n',
-		git: '#!/bin/sh\n[ "$1" = config ] && exit 1\nprintf \'git\\n\' >> "$SETUP_LOG"\n[ "$SETUP_FAIL_STAGE" = git ] && exit 1\nprintf \'.git-common\\n\'\n',
+		// setup-completion.mjs reads Git state through the real git; only the
+		// Makefile's own common-dir lookup is logged and can be failed.
+		git: '#!/bin/sh\ncase "$1 $2" in "config "*|"rev-parse --path-format=absolute") exec /usr/bin/git "$@";; esac\nprintf \'git\\n\' >> "$SETUP_LOG"\n[ "$SETUP_FAIL_STAGE" = git ] && exit 1\nprintf \'.git\\n\'\n',
 		cp: '#!/bin/sh\nprintf \'cp\\n\' >> "$SETUP_LOG"\n[ "$SETUP_FAIL_STAGE" = cp ] && exit 1\nexec "$REAL_CP" "$@"\n',
 		chmod:
 			'#!/bin/sh\nprintf \'chmod\\n\' >> "$SETUP_LOG"\n[ "$SETUP_FAIL_STAGE" = chmod ] && exit 1\nexec "$REAL_CHMOD" "$@"\n',
@@ -112,6 +119,8 @@ function environment(context, failureStage = "", extra = {}) {
 		SETUP_FAIL_STAGE: failureStage,
 		SETUP_EXPECT_LOCK: setupLockPath(context.cwd),
 		SETUP_LOG: context.log,
+		GIT_CONFIG_GLOBAL: join(context.cwd, "global-gitconfig"),
+		GIT_CONFIG_SYSTEM: "/dev/null",
 		...extra,
 	};
 }
@@ -200,6 +209,17 @@ describe("setup completion sentinel", () => {
 				path.endsWith("package.json") ? "{}\n" : `${path}\n`,
 			);
 		}
+
+		// Currency also requires the installed shim, so give the fixture one.
+		assert.equal(spawnSync("/usr/bin/git", ["init", "-q", cwd]).status, 0);
+		writeFileSync(
+			join(cwd, ".git/hooks/pre-commit"),
+			readFileSync(join(cwd, "scripts/hooks/pre-commit-shim")),
+			{ mode: 0o755 },
+		);
+		writeFileSync(join(cwd, "scripts/pre-commit"), "#!/bin/sh\n", {
+			mode: 0o755,
+		});
 
 		const inputs = setupInputs(cwd);
 		assert.deepEqual(
@@ -525,6 +545,39 @@ describe("setup completion sentinel", () => {
 			"pnpm\ngit\ncp\nchmod\nnode\n",
 		);
 		assert.equal(isSetupCurrent(context.cwd), true);
+	});
+
+	it("installs a missing shim before checking a hooksPath that selects the common-dir hooks", () => {
+		const context = fixture();
+		const installed = join(context.cwd, ".git/hooks/pre-commit");
+		rmSync(installed);
+		assert.equal(
+			spawnSync(
+				"/usr/bin/git",
+				["config", "core.hooksPath", join(context.cwd, ".git/hooks")],
+				{ cwd: context.cwd },
+			).status,
+			0,
+		);
+
+		assertSucceeded(runSetup(context));
+		assert.equal(existsSync(installed), true);
+		assert.equal(runCheck(context).status, 0);
+	});
+
+	it("refuses a custom hooksPath without changing it", () => {
+		const context = fixture();
+		assert.equal(
+			spawnSync("/usr/bin/git", ["config", "core.hooksPath", "custom-hooks"], {
+				cwd: context.cwd,
+			}).status,
+			0,
+		);
+
+		const result = runSetup(context);
+		assert.notEqual(result.status, 0);
+		assert.match(result.stderr, /core\.hooksPath/);
+		assert.equal(existsSync(context.log), false);
 	});
 
 	it("reclaims a lock whose owner process is gone", () => {

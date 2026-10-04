@@ -138,3 +138,24 @@ describe("effective core.hooksPath", () => {
 		assert.equal(inspectHooksPath(linked, { env }).reason, null);
 	});
 });
+describe("setup-managed pre-commit", () => {
+	it("requires the shim in the common-dir hooks when core.hooksPath is unset", () => {
+		const { root, env } = fixture();
+		const missing = inspectHooksPath(root, { env });
+		assert.match(missing.reason, /make setup/);
+		assert.equal(missing.managed, true);
+		assert.equal(isSetupCurrent(root, { env }), false);
+		install(root, ".git/hooks");
+		assert.equal(inspectHooksPath(root, { env }).reason, null);
+		assert.equal(isSetupCurrent(root, { env }), true);
+	});
+	it("lets setup repair a hooksPath that selects the common-dir hooks", () => {
+		const { root, env, git } = fixture();
+		git("config", "core.hooksPath", join(root, ".git/hooks"));
+		const managed = inspectHooksPath(root, { env });
+		assert.notEqual(managed.reason, null);
+		assert.equal(managed.managed, true);
+		git("config", "core.hooksPath", "custom-hooks");
+		assert.equal(inspectHooksPath(root, { env }).managed, false);
+	});
+});
