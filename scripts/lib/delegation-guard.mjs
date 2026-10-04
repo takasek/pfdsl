@@ -93,7 +93,7 @@ const GH_BOOLEAN_FLAGS = new Set([
 	"--yes",
 	"-y",
 ]);
-export const GH_VALUE_FLAGS = new Set([
+const GH_VALUE_FLAGS = new Set([
 	"-R",
 	"--repo",
 	"--hostname",
@@ -136,7 +136,7 @@ export const GH_VALUE_FLAGS = new Set([
 	"--name",
 ]);
 
-export function hasHelpOption(parsed) {
+function hasHelpOption(parsed) {
 	if (!BUILTIN_GH_GROUPS.has(parsed.group)) return false;
 	// `extension exec` forwards the remaining argv to arbitrary extension code.
 	if (parsed.group === "extension" && parsed.verb === "exec") return false;
@@ -159,7 +159,9 @@ export function hasHelpOption(parsed) {
 	for (let i = 0; i < parsed.args.length; i++) {
 		const arg = parsed.args[i];
 		if (arg === "--") break;
-		if (arg === "--help" || arg === "-h") return true;
+		// Only the long form: gh binds -h to value flags on some commands
+		// (--homepage on repo create/edit, --hostname on auth logout).
+		if (arg === "--help") return true;
 		const name = arg.split("=", 1)[0];
 		if (mergeFlags.has(name) || GH_BOOLEAN_FLAGS.has(name)) continue;
 		if (GH_VALUE_FLAGS.has(arg)) {

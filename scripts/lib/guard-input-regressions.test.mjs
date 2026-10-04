@@ -134,7 +134,6 @@ describe("gh invocation effects", () => {
 	});
 	for (const command of [
 		"gh workflow disable --help",
-		"gh issue create -h",
 		"gh help workflow",
 		"gh search issues foo",
 		"gh search code foo",
@@ -153,6 +152,12 @@ describe("gh invocation effects", () => {
 		"gh issue create -- --help",
 		"gh extension exec search",
 		"gh frobnicate list",
+		// gh binds -h to a value flag on some commands (gh 2.101: --homepage on
+		// repo create/edit, --hostname on auth logout), so only --help is help.
+		"gh repo create foo -h https://example.com --private",
+		"gh repo edit -h https://example.com",
+		"gh auth logout -h github.com",
+		"gh issue create -h",
 	]) {
 		it(`does not infer help or read-only behavior from argument data: ${command}`, () =>
 			assert.notEqual(findOutwardCommand(command), null));
