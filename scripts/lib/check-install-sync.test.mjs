@@ -1357,6 +1357,26 @@ describe("applied migration state", () => {
 			}
 		});
 
+		it("reads a wrong-shaped appliedMigration as absent only when asked to ignore it, and still fails on a broken file", () => {
+			const wrongShape = makeAdopter("ignore-shape", {
+				appliedMigration: { pluginVersion: 0.1 },
+			});
+			const brokenFile = makeAdopter("ignore-broken-file", "{ not json");
+			const options = { ignoreMalformedRecord: true };
+
+			assert.deepEqual(evaluateMigration(wrongShape, running, options), {
+				kind: "absent",
+			});
+			assert.throws(
+				() => evaluateMigration(wrongShape, running),
+				/\.pfdsl\/config\.json.*appliedMigration/s,
+			);
+			assert.throws(
+				() => evaluateMigration(brokenFile, running, options),
+				/\.pfdsl\/config\.json.*JSON/s,
+			);
+		});
+
 		it("fails on a malformed config even when the running version is unknown", () => {
 			const target = makeAdopter("bad-unknown", "{ not json");
 
@@ -1899,6 +1919,104 @@ describe("applied migration state", () => {
 					: null;
 				assert.equal(after, before, name);
 			}
+		});
+
+		// A record the checks refuse to read must still be repairable by the one
+		// command that writes it; otherwise the only repair is editing by hand.
+		describe("over a malformed appliedMigration", () => {
+			const malformed = {
+				"numeric pluginVersion": { pluginVersion: 0.1 },
+				"null bundleHash": { pluginVersion: "0.1.0", bundleHash: null },
+				"null bundleHash with a newer-looking version": {
+					pluginVersion: "0.3.0",
+					bundleHash: null,
+				},
+				"missing pluginVersion": {},
+				"string instead of an object": "0.1.0",
+				null: null,
+				array: [],
+			};
+
+			it("overwrites the record, keeping the other keys and the key's position", () => {
+				for (const [name, appliedMigration] of Object.entries(malformed)) {
+					const slug = name.replace(/\W+/g, "-");
+					const plugin = makeInstalledPlugin(`repair-plugin-${slug}`, {
+						codex: "0.2.0",
+					});
+					const target = makeAdopter(`repair-adopter-${slug}`, {
+						sweepCompletedChains: { enabled: true },
+						appliedMigration,
+						knowledgeLifecycleAudit: { mode: "decline" },
+					});
+
+					const result = run(plugin, target, ["--record-migration"]);
+					assert.equal(result.status, 0, `${name}: ${result.stderr}`);
+					const written = JSON.parse(configText(target));
+					assert.deepEqual(
+						written.appliedMigration,
+						{ pluginVersion: "0.2.0" },
+						name,
+					);
+					assert.deepEqual(
+						Object.keys(written),
+						[
+							"sweepCompletedChains",
+							"appliedMigration",
+							"knowledgeLifecycleAudit",
+						],
+						name,
+					);
+					assert.deepEqual(
+						written.sweepCompletedChains,
+						{ enabled: true },
+						name,
+					);
+					assert.equal(
+						run(plugin, target).status,
+						0,
+						`${name}: a plain check reads the repaired record`,
+					);
+				}
+			});
+
+			it("still fails with exit 3, writing nothing, when the file is not a JSON object", () => {
+				const plugin = makeInstalledPlugin("repair-invalid-plugin", {
+					codex: "0.2.0",
+				});
+				for (const [name, text] of Object.entries({
+					"invalid JSON": "{ not json",
+					"array top level": "[]\n",
+				})) {
+					const target = makeAdopter(
+						`repair-invalid-${name.replace(/\W+/g, "-")}`,
+						text,
+					);
+					const result = run(plugin, target, ["--record-migration"]);
+					assert.equal(result.status, 3, name);
+					assert.match(result.stderr, /\.pfdsl\/config\.json/, name);
+					assert.equal(configText(target), text, name);
+				}
+			});
+
+			it("leaves the plain check and --deploy failing on the same record", () => {
+				const plugin = makeInstalledPlugin("repair-others-plugin", {
+					codex: "0.2.0",
+				});
+				for (const [name, appliedMigration] of Object.entries(malformed)) {
+					const slug = name.replace(/\W+/g, "-");
+					const target = makeAdopter(`repair-others-${slug}`, {
+						appliedMigration,
+					});
+					const before = configText(target);
+
+					for (const extra of [[], ["--deploy"]]) {
+						const result = run(plugin, target, extra);
+						assert.equal(result.status, 3, `${name} ${extra.join(" ")}`);
+						assert.match(result.stderr, /appliedMigration/, name);
+					}
+					assert.equal(configText(target), before, name);
+				}
+			});
 		});
 
 		it("is rejected with exit 2 when combined with --deploy", () => {

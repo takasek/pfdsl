@@ -195,7 +195,8 @@ plugin version の上流差分警告は更新をユーザーに案内する。�
 - 「cannot be compared」: 記録か実行中の版が `x.y.z` として読めない。拒否はされない。
 - `.pfdsl/config.json` を名指しする失敗（exit 3）: JSON として読めない、最上位がオブジェクトでない、`appliedMigration` の形が違う、のいずれか。宣言が壊れたまま黙って無視しないための失敗で、ファイルを直すまで先へ進めない。
 
-`--record-migration` は、上流リポや canonical が曖昧な target、`.pfdsl/` が無いリポ、plugin の版を決められない実行、記録より古い plugin からでは、何も書かずに理由を示して拒否する。
+`--record-migration` は、上流リポや canonical が曖昧な target、`.pfdsl/` が無いリポ、plugin の版を決められない実行、記録より古い plugin、JSON として読めない・最上位がオブジェクトでない `.pfdsl/config.json` からでは、何も書かずに理由を示して拒否する。
+既にある `appliedMigration` の形が違う場合は拒否せず上書きする（通常の実行と `--deploy` が拒否する記録を直せるのはこのコマンドだけで、記録の版を読めないので古い plugin の拒否は評価されない）。
 `.pfdsl/config.json` が無く `.pfdsl/` だけがあるときは新規に作り、他のキーは保持する。
 新規の採用先（`/pfd-init` ステップ 3 の前に `.pfdsl/` が無かったリポ）は、config をコピーした後にこのコマンドを実行し、現在の版から始める。既存の `.pfdsl/` がある採用先は、移行を適用して検証が通ってから記録する。
 

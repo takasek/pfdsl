@@ -263,7 +263,8 @@ node <pfd-ops skill root>/scripts/check-install-sync.mjs --record-migration
 
 The command writes the running plugin's version, and its bundle hash where the plugin has one, into `.pfdsl/config.json` and keeps every other key.
 Commit that change together with the migration it records.
-It cannot be combined with `--deploy`, and it writes nothing, exiting with 3 after saying why, when the running plugin's version is unknown (a repo-local copy), when the plugin is older than the recorded state, or when `.pfdsl/config.json` is malformed.
+It cannot be combined with `--deploy`, and it writes nothing, exiting with 3 after saying why, when the running plugin's version is unknown (a repo-local copy), when the plugin is older than the recorded state, or when `.pfdsl/config.json` is not valid JSON or does not contain a JSON object.
+A malformed `appliedMigration` does not stop it: the command overwrites that key, and a plain run or `--deploy` keeps failing on such a record until you do.
 You may write the key by hand, in the form `{"appliedMigration": {"pluginVersion": "0.1.0", "bundleHash": "<64 hex digits>"}}`, but the command computes the hash for you.
 A Codex plugin has no bundle manifest, so its record has no `bundleHash`.
 

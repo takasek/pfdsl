@@ -443,20 +443,35 @@ function readConfigFile(targetRoot) {
 }
 
 /**
- * @param {Record<string, unknown>} config
- * @returns {{ pluginVersion: string, bundleHash: string | null } | null} null when the key is absent
+ * What is wrong with an appliedMigration value, or null when it is well formed.
+ * @param {unknown} value
+ * @returns {string | null}
  */
-function readRecordedMigration(config) {
-	if (!("appliedMigration" in config)) return null;
-	const value = config.appliedMigration;
-	const wrong = (why) =>
-		new Error(`${CONFIG_RELATIVE_PATH} has an appliedMigration ${why}`);
-	if (!isPlainObject(value)) throw wrong("that is not an object");
+function recordedMigrationProblem(value) {
+	if (!isPlainObject(value)) return "that is not an object";
 	if (typeof value.pluginVersion !== "string" || value.pluginVersion.length === 0) {
-		throw wrong("whose pluginVersion is not a non-empty string");
+		return "whose pluginVersion is not a non-empty string";
 	}
 	if (value.bundleHash !== undefined && typeof value.bundleHash !== "string") {
-		throw wrong("whose bundleHash is not a string");
+		return "whose bundleHash is not a string";
+	}
+	return null;
+}
+
+/**
+ * @param {Record<string, unknown>} config
+ * @param {{ ignoreMalformed?: boolean }} [options] ignoreMalformed reads a record
+ *   of the wrong shape as absent instead of throwing; only the writer asks for it,
+ *   so that a record the checks refuse can still be replaced
+ * @returns {{ pluginVersion: string, bundleHash: string | null } | null} null when the key is absent
+ */
+function readRecordedMigration(config, { ignoreMalformed = false } = {}) {
+	if (!("appliedMigration" in config)) return null;
+	const value = config.appliedMigration;
+	const problem = recordedMigrationProblem(value);
+	if (problem !== null) {
+		if (ignoreMalformed) return null;
+		throw new Error(`${CONFIG_RELATIVE_PATH} has an appliedMigration ${problem}`);
 	}
 	return { pluginVersion: value.pluginVersion, bundleHash: value.bundleHash ?? null };
 }
@@ -476,17 +491,23 @@ function compareParsedVersions(a, b) {
 
 /**
  * Compare the running plugin with the migration state the adopter recorded.
- * Throws when .pfdsl/config.json or its appliedMigration is malformed.
+ * Throws when .pfdsl/config.json or its appliedMigration is malformed, unless
+ * ignoreMalformedRecord is set: then an appliedMigration of the wrong shape is
+ * read as absent (the file itself must still be a JSON object).
  * @param {string} targetRoot
  * @param {{ version: string, bundleHash: string | null } | null} running null when the version is unknown
+ * @param {{ ignoreMalformedRecord?: boolean }} [options]
  * @returns {{ kind: "no-pfdsl" | "absent" }
  *   | { kind: "unknown-running", recorded: { pluginVersion: string, bundleHash: string | null } }
  *   | { kind: "older" | "newer" | "different-content" | "uncomparable" | "in-sync", recorded: { pluginVersion: string, bundleHash: string | null }, running: { version: string, bundleHash: string | null } }}
  */
-export function evaluateMigration(targetRoot, running) {
+export function evaluateMigration(targetRoot, running, { ignoreMalformedRecord = false } = {}) {
 	if (!isDirectory(join(targetRoot, ".pfdsl"))) return { kind: "no-pfdsl" };
 	const file = readConfigFile(targetRoot);
-	const recorded = file === null ? null : readRecordedMigration(file.config);
+	const recorded =
+		file === null
+			? null
+			: readRecordedMigration(file.config, { ignoreMalformed: ignoreMalformedRecord });
 	if (recorded === null) return { kind: "absent" };
 	if (running === null) return { kind: "unknown-running", recorded };
 
@@ -549,7 +570,10 @@ export function describeMigration(outcome, recordCommand) {
  * width or tabs, trailing newline; tab-indented with a newline for a new
  * file, like this repo's own config). The caller has already established that
  * the target is an adopter; every other reason this cannot be recorded throws
- * before anything is written.
+ * before anything is written. An existing appliedMigration of the wrong shape
+ * does not stop it: the record is being replaced, and the older-plugin refusal
+ * cannot be evaluated against a version that cannot be read, so the write is
+ * allowed. The file itself must still be a JSON object.
  * @param {string} targetRoot
  * @param {{ version: string, bundleHash: string | null } | null} running
  * @returns {{ pluginVersion: string, bundleHash?: string }} the entry written
@@ -566,7 +590,8 @@ export function recordMigration(targetRoot, running) {
 		);
 	}
 	const file = readConfigFile(targetRoot);
-	const recorded = file === null ? null : readRecordedMigration(file.config);
+	const recorded =
+		file === null ? null : readRecordedMigration(file.config, { ignoreMalformed: true });
 	if (recorded !== null) {
 		const runningParts = parseVersion(running.version);
 		const recordedParts = parseVersion(recorded.pluginVersion);
@@ -739,7 +764,10 @@ async function main() {
 				: `node ${fileURLToPath(import.meta.url)} --target ${targetRoot} --record-migration`;
 		let outcome;
 		try {
-			outcome = evaluateMigration(targetRoot, running);
+			// --record-migration is the repair for a malformed record, so it alone reads past one.
+			outcome = evaluateMigration(targetRoot, running, {
+				ignoreMalformedRecord: args.recordMigration,
+			});
 		} catch (e) {
 			// 3, as for any refusal about the target: the argv was fine, the
 			// declaration in the target is not.
