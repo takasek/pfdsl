@@ -90,8 +90,11 @@ GitHub は `GITHUB_TOKEN` で作成された PR の `pull_request` トリガー�
 レビュアーは、CI チェックが付いていない PR や承認待ちのままの PR を「チェックが通った」ではなく「チェックがまだ動いていない」と読むこと。
 
 承認なしで CI を走らせるには、GitHub App の installation token で PR を作成する。
-リポジトリ変数 `PFDSL_SWEEP_APP_CLIENT_ID` と secret `PFDSL_SWEEP_APP_PRIVATE_KEY` を設定すると、workflow が `actions/create-github-app-token` で短命 token を発行し、その token で PR を作成する。
-App に必要な権限は contents と pull-requests の write だけである。
+リポジトリ変数 `REPO_AUTOMATION_APP_CLIENT_ID` と secret `REPO_AUTOMATION_APP_PRIVATE_KEY` を設定すると、workflow が `actions/create-github-app-token` で短命 token を発行し、その token で PR を作成する。
+この workflow が token に要求する権限は contents と pull-requests の write だけである。
+同じ App を他のリポジトリ自動化にも利用できる。
+旧設定 `PFDSL_SWEEP_APP_CLIENT_ID` と `PFDSL_SWEEP_APP_PRIVATE_KEY` も共通 Client ID が空の場合に限り利用できる。
+共通 Client ID が設定されている場合は共通秘密鍵だけを使い、旧秘密鍵に戻らない。
 切り替えのスイッチは変数である。
 変数が空なら secret の有無によらず `GITHUB_TOKEN` に戻り、変数があって secret が使えなければ step が失敗する（黙って戻らない）。
 PR 本文は、どちらの token で作成されたかに応じて CI の扱いを書き分ける。

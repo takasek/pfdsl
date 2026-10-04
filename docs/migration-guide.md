@@ -268,8 +268,10 @@ Points to settle before enabling:
 - By default the pull request is created with `GITHUB_TOKEN`, so GitHub holds the repository's own `pull_request` workflow runs for it in an approval-required state (`action_required`) until someone with write access approves them.
   The pull request body says so, and that the sweep's own checks are the only verification it has received until then.
   If the default branch requires status checks, this pull request does not report them until those runs are approved.
-  To have them start without approval, set the repository variable `PFDSL_SWEEP_APP_CLIENT_ID` and the secret `PFDSL_SWEEP_APP_PRIVATE_KEY` for a GitHub App installed on the repository with Contents and Pull requests write access.
+  To have them start without approval, set the repository variable `REPO_AUTOMATION_APP_CLIENT_ID` and the secret `REPO_AUTOMATION_APP_PRIVATE_KEY` for a GitHub App installed on the repository with Contents and Pull requests write access.
   The workflow then opens the pull request with a short-lived token of that App.
+  Existing `PFDSL_SWEEP_APP_CLIENT_ID` and `PFDSL_SWEEP_APP_PRIVATE_KEY` settings remain supported when the shared Client ID is absent.
+  When migrating, register the shared private-key secret first, then set the shared Client ID; a configured shared Client ID requires its matching secret and never falls back to the legacy key.
   A repository without the variable keeps using `GITHUB_TOKEN`.
 - Creating the pull request requires that the repository, and its organization if it restricts this, allows GitHub Actions to create pull requests (Settings, Actions, General, Workflow permissions).
   This setting is GitHub's requirement for the pull-request step; the workflow file does not check it.

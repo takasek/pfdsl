@@ -133,17 +133,19 @@ jobs:
 
       # GitHub holds the pull_request runs of a PR opened with GITHUB_TOKEN until someone with write access approves them.
       # A PR opened with a GitHub App installation token runs them straight away, which is what lets this repo's own CI gate the sweep.
-      # The repository opts in by setting the PFDSL_SWEEP_APP_CLIENT_ID variable and the PFDSL_SWEEP_APP_PRIVATE_KEY secret.
+      # Shared repository automation uses REPO_AUTOMATION_APP_CLIENT_ID and REPO_AUTOMATION_APP_PRIVATE_KEY.
+      # Legacy adopters may keep PFDSL_SWEEP_APP_CLIENT_ID and PFDSL_SWEEP_APP_PRIVATE_KEY.
+      # The shared Client ID takes precedence and requires its matching key; it never borrows the legacy key.
       # Without them the PR is opened with GITHUB_TOKEN as before, and the run waits for approval.
       # The variable is the switch: a variable set without a usable secret fails this step instead of silently falling back, while a secret set without the variable leaves the PR on GITHUB_TOKEN (the secret cannot be read in a step condition).
       # The PR body says which token opened the PR.
       - name: Create short-lived App token to open the PR
         id: app-token
-        if: steps.sweep-gate.outputs.enabled == 'true' && vars.PFDSL_SWEEP_APP_CLIENT_ID != ''
+        if: steps.sweep-gate.outputs.enabled == 'true' && (vars.REPO_AUTOMATION_APP_CLIENT_ID != '' || vars.PFDSL_SWEEP_APP_CLIENT_ID != '')
         uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
         with:
-          client-id: ${{ vars.PFDSL_SWEEP_APP_CLIENT_ID }}
-          private-key: ${{ secrets.PFDSL_SWEEP_APP_PRIVATE_KEY }}
+          client-id: ${{ vars.REPO_AUTOMATION_APP_CLIENT_ID || vars.PFDSL_SWEEP_APP_CLIENT_ID }}
+          private-key: ${{ vars.REPO_AUTOMATION_APP_CLIENT_ID != '' && secrets.REPO_AUTOMATION_APP_PRIVATE_KEY || vars.REPO_AUTOMATION_APP_CLIENT_ID == '' && secrets.PFDSL_SWEEP_APP_PRIVATE_KEY }}
           permission-contents: write
           permission-pull-requests: write
 
@@ -164,7 +166,7 @@ jobs:
 
             The checks above — `check`, `graph orphans`, `fmt --check`, and the ready/blocked comparison — ran in the sweep job itself, whichever token opened this PR.
 
-            ${{ steps.app-token.outcome == 'success' && 'This PR was opened with a GitHub App token, so the `pull_request` workflows of this repository, if it has any, started on it without waiting for approval. Their results appear in the checks of this PR.' || 'This PR was opened with `GITHUB_TOKEN`, so GitHub holds the `pull_request` workflows of this repository, if it has any, in an approval-required state until someone with write access approves them. Until then the checks above are the only verification this change has received, and a PR with no passing CI checks means those runs are still waiting, not that they passed. To start them without approval, set the `PFDSL_SWEEP_APP_CLIENT_ID` variable and the `PFDSL_SWEEP_APP_PRIVATE_KEY` secret of a GitHub App with contents and pull-requests write access.' }}
+            ${{ steps.app-token.outcome == 'success' && 'This PR was opened with a GitHub App token, so the `pull_request` workflows of this repository, if it has any, started on it without waiting for approval. Their results appear in the checks of this PR.' || 'This PR was opened with `GITHUB_TOKEN`, so GitHub holds the `pull_request` workflows of this repository, if it has any, in an approval-required state until someone with write access approves them. Until then the checks above are the only verification this change has received, and a PR with no passing CI checks means those runs are still waiting, not that they passed. To start them without approval, set the `REPO_AUTOMATION_APP_CLIENT_ID` variable and the `REPO_AUTOMATION_APP_PRIVATE_KEY` secret of a GitHub App with contents and pull-requests write access.' }}
 
             This job used ${{ steps.build-cli.outputs.description || steps.install-cli.outputs.description }} to run the checks above.
 

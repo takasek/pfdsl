@@ -6,6 +6,12 @@
 
 ## 有効化
 
-専用の GitHub App をこのリポジトリだけにインストールし、Repository permissions に Contents、Pull requests、Workflows の Write を与える。App の Client ID を Actions variable `DEPENDABOT_BATCH_CLIENT_ID` に、秘密鍵の全文を Actions secret `DEPENDABOT_BATCH_APP_PRIVATE_KEY` に設定する。Client ID が未設定の間は待機ジョブを起動しない。App token は最終 PR の通常 CI が起動するように使用し、テストと生成の子プロセスには渡さない。
+このリポジトリでは Dependabot 統合・完了チェーン整理・生成物の競合修復が同じ `takasek-pr-bot` と共通設定を使う。
+workflow ごとに token の権限を必要な範囲へ絞り、App の秘密鍵を PR の生成・テスト処理に渡さない。
+SVG の main への直接公開は別 App と Environment の境界を維持する。
+共通秘密鍵を先に登録し、その後共通 Client ID を設定する。
+旧用途別設定は各 workflow の移行を実行確認してから撤去する。
+
+共通の GitHub App `takasek-pr-bot` をこのリポジトリにインストールし、Repository permissions に Contents、Pull requests、Workflows の Write を与える。App の Client ID を Actions variable `REPO_AUTOMATION_APP_CLIENT_ID` に、秘密鍵の全文を Actions secret `REPO_AUTOMATION_APP_PRIVATE_KEY` に設定する。Client ID が未設定の間は待機ジョブを起動しない。App token は最終 PR の通常 CI が起動するように使用し、テストと生成の子プロセスには渡さない。
 
 自動実行が失敗した場合は Actions のログと中間ブランチを確認する。対象 PR の変更が SHA pin 以外だった場合は処理を止め、手動で内容を確認する。テスト前に失敗した場合は公開ブランチを作らない。ブランチの push 後に PR 作成が失敗した場合は3回まで再試行する。それでも PR が作成できず公開ブランチだけ残った場合や、最終 PR をマージせず閉じた場合は、次回の実行を止めて手動確認を求める。既存の中間ブランチを自動で上書きしない。最終 PR 本文の `batch-includes:` 行は取り込み済み head の識別に使うため編集しない。収集漏れを再実行するときは、開いている最終 PR が無いことを確かめ、Actions の「integrate Dependabot Actions updates」から Run workflow を `main` で実行する。

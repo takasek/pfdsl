@@ -36,6 +36,11 @@ function writeConfig(dir, text) {
 // A skipped or unset output or variable reads as the empty string, as it does on a runner.
 function conditionHolds(condition, outputs, vars = {}) {
 	return condition.split(" && ").every((term) => {
+		if (term.startsWith("("))
+			return term
+				.slice(1, -1)
+				.split(" || ")
+				.some((alternative) => conditionHolds(alternative, outputs, vars));
 		const match =
 			/^(?:steps\.([\w-]+)\.outputs\.(\w+)|vars\.(\w+)) (==|!=) '([^']*)'$/.exec(
 				term,
@@ -327,11 +332,11 @@ test("the App token step reads the configured App and asks for no more than the 
 	assert.match(appTokenStep.uses, /^actions\/create-github-app-token@/);
 	assert.equal(
 		appTokenStep.with["client-id"],
-		`\${{ vars.${APP_CLIENT_ID_VAR} }}`,
+		`\${{ vars.REPO_AUTOMATION_APP_CLIENT_ID || vars.${APP_CLIENT_ID_VAR} }}`,
 	);
 	assert.equal(
 		appTokenStep.with["private-key"],
-		`\${{ secrets.${APP_PRIVATE_KEY_SECRET} }}`,
+		`\${{ vars.REPO_AUTOMATION_APP_CLIENT_ID != '' && secrets.REPO_AUTOMATION_APP_PRIVATE_KEY || vars.REPO_AUTOMATION_APP_CLIENT_ID == '' && secrets.${APP_PRIVATE_KEY_SECRET} }}`,
 	);
 	// The sweep rewrites .pfdsl/roadmap.pfdsl and opens a PR, nothing else.
 	const permissions = Object.keys(appTokenStep.with)
@@ -360,6 +365,18 @@ test("a push to the sweep's own PR branch does not start the sweep", () => {
 
 // [label, config text, vars, expect the App token minted]
 const APP_TOKEN_CASES = [
+	[
+		"opted in and shared App configured",
+		ENABLED_CONFIG,
+		{ REPO_AUTOMATION_APP_CLIENT_ID: "shared-id" },
+		true,
+	],
+	[
+		"not opted in, shared App configured",
+		'{"sweepCompletedChains": {"enabled": false}}',
+		{ REPO_AUTOMATION_APP_CLIENT_ID: "shared-id" },
+		false,
+	],
 	[
 		"opted in and the App configured",
 		ENABLED_CONFIG,
@@ -438,6 +455,6 @@ test("the PR body says whether this repository's CI ran, matching the token that
 	assert.match(withoutApp, /GITHUB_TOKEN/);
 	assert.match(withoutApp, /until someone with write access approves/);
 	// A reviewer who sees the held runs must find the two settings that avoid the hold.
-	assert.ok(withoutApp.includes(APP_CLIENT_ID_VAR), withoutApp);
-	assert.ok(withoutApp.includes(APP_PRIVATE_KEY_SECRET), withoutApp);
+	assert.ok(withoutApp.includes("REPO_AUTOMATION_APP_CLIENT_ID"), withoutApp);
+	assert.ok(withoutApp.includes("REPO_AUTOMATION_APP_PRIVATE_KEY"), withoutApp);
 });
