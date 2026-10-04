@@ -1,5 +1,6 @@
 ---
 type: workflow
+basePath: ..
 title: pfdsl開発ワークフロー
 description: ユーザーの関心を起点に、対話・仕様整備・実践・実装・リリースが繰り返されるサイクル全体。誰が何をトリガーに何を行うかを記述する
 layout:
@@ -31,70 +32,70 @@ artifact:
     label: 言語仕様書
     description: "一次情報だが不変の外部入力ではない — 実装知見からの仕様提案（issue 経由）で改訂される。改版の詳細依存は .pfdsl/roadmap.pfdsl 参照"
     criteria: check/fmt/graph が全サンプルに対してエラーなし
-    location: ../docs/spec/spec.md
+    location: "docs/spec/spec.md"
     group: generation
   spec_proposals:
     label: spec 提案文書群
     description: "各 spec 改版候補の起草文書（概要・仕様変更・設計判断・影響範囲）。draft_proposals が生成し maintain_spec が消費して spec 改版に統合する。マージ後も歴史的記録として保持（workflow.md でライフサイクル規約を管理）"
     criteria: 対象改版候補ごとの概要・仕様変更・設計判断・影響範囲が起草され、maintain_spec が統合判断できる提案文書として揃っている。spec への統合完了は後続 maintain_spec の出力側で判定する
-    location: ../docs/spec/proposals/
+    location: "docs/spec/proposals/"
     group: generation
   skill_template:
     label: スキルテンプレート
     description: "スキル本文の正本（品質ガイドは quality_guide が別持ち）。gen-skill.mjs がこれを読み込んで pfdsl_skill を生成する"
     criteria: make gen-skill が差分なしで完了し、pfdsl_skill が最新テンプレートと一致
-    location: ../scripts/skill-template/SKILL.md
+    location: "scripts/skill-template/SKILL.md"
     group: generation
   quality_guide:
     label: 品質ガイド
     description: "PFD 設計判断ルールの一次情報。知見・ADR の反映先。pfdsl スキルに references として同梱される"
     criteria: make gen-skill が差分なしで完了する（skill の references/quality-guide.md に同梱済み）
-    location: ../docs/quality-guide.md
+    location: "docs/quality-guide.md"
     group: generation
   feature_samples:
     label: 機能カタログ
     description: "1機能1ファイルの最小例。skill の references/samples.md の生成元"
     criteria: docs/samples/ に spec の各機能に対応する最小サンプルが存在し、pfdsl check がエラーなしで通過する
-    location: ../docs/samples/
+    location: "docs/samples/"
     group: generation
   pfdsl_skill:
     label: AI agent スキル（リポ内）
     description: "pipeline.pfdsl の gen_skill が生産する中立生成物（判断を含まない生成のため、ADR-0035 でそちらへ移した）。実体は generated/skills/pfdsl で、リポ内の .claude/skills/pfdsl はそこへの生成symlinkであり、正本入力でも編集先でもない（#714）。両ホストのadapterはこの中立生成物を各plugin rootへコピーする。この図では全 .pfdsl 作業の起点として実践・レビューへの還流入力に現れる"
-    location: ../generated/skills/pfdsl/
+    location: "generated/skills/pfdsl/"
     group: generation
   claude_plugin_dist:
     label: Claude Code配布plugin root
     description: "pipeline.pfdsl のClaude Code root組み立てと結合drift検査が生産する。既存marketplace経路を保つplugin/pfdsl/で、この図ではREADME更新と配布レビューの入力に現れる"
-    location: ../plugin/pfdsl/
+    location: "plugin/pfdsl/"
     group: release
   codex_plugin_dist:
     label: Codex配布plugin root
     description: "pipeline.pfdsl のCodex root組み立てと結合drift検査が生産する。公式Codex validator/runtimeのskills固定に従うnative rootのplugin/pfdsl-codex/で、この図ではREADME更新と配布レビューの入力に現れる"
-    location: ../plugin/pfdsl-codex/
+    location: "plugin/pfdsl-codex/"
     group: release
   distribution_review_perspectives:
     label: 配布レビュー観点集
     description: "配布 bundle の散文を利用側の読み手として問い詰める観点の一次情報。review_perspectives（配布レンズ）側には置かない — あれは利用側にも同梱されるため、実施先の無い観点を配ることになる。回ごとの実行記録から一般化できた型だけを昇格して育てる"
     criteria: 「観点」節の各項目について、由来する欠陥への参照（docs/distribution-review/ の実行記録・issue・PR のいずれか）が本文にあり、機械検査ルール（一次情報は scripts/lib/distributed-prose.mjs の RULES）で決定可能な分との境界が本文に書かれている
-    location: ../docs/distribution-review.md
+    location: "docs/distribution-review.md"
     group: generation
   distribution_review_skill:
     label: 配布レビュースキル
     description: "/distribution-review コマンド。sandbox に隔離した subagent を利用側の読み手として走らせ、詰まりを分類し、canonical の修正と承認済み commit hash の更新までを持つ。リポローカル・手書き（生成対象外・配布対象外 — 利用側リポには配布という行為自体が無く、この手順の実施先が存在しない）"
     criteria: /distribution-review を起動すると、sandbox 隔離した subagent の詰まりが観点ごとに分類され、canonical の修正と reviewed.json の commit 更新まで到達する
-    location: ../.claude/skills/distribution-review/
+    location: ".claude/skills/distribution-review/"
     group: generation
   distribution_review_record:
     label: 配布レビュー記録
     description: "承認済み commit hash（reviewed.json）と回ごとの実行記録。hash を進めるのは差分モードだけで、全文モードは記録だけを残す。check-distribution-review.mjs が記録と配布ツリーの齟齬を判定し、各 release 判断の pre-tag checks で release を止める"
     criteria: reviewed.json の commit と HEAD の間に、レビュー対象スコープの差分が無い
-    location: ../docs/distribution-review/
+    location: "docs/distribution-review/"
     group: release
   prose_mechanization_sweep_record:
     label: 散文機械化棚卸し記録
     description: "要求時に行った散文・機構監査の commit hash（docs/asset-sweep/prose-mechanization.json）と実行記録。次回の監査範囲を絞るために使い、release 判断は止めない。監査対象は現行の散文と機構で、歴史資料の事例は含めない"
     criteria: prose-mechanization.json が実在する監査済み commit と実行記録を指し、記録に対象範囲・所見・処遇がある
-    location: ../docs/asset-sweep/
+    location: "docs/asset-sweep/"
     group: practice
   cli_release_request:
     label: CLIリリース要求
@@ -174,7 +175,7 @@ artifact:
     label: 実践例
     description: "品質ガイドの実証とレビュー素材。スキル参照への採録候補"
     criteria: check がエラーなし、レビュー結果が pfd-retro の出力表に finding として記録されている
-    location: ../docs/examples/
+    location: "docs/examples/"
     group: practice
   findings:
     label: レビュー知見
@@ -185,13 +186,13 @@ artifact:
     label: ADR
     description: "方法論の設計決定記録。記事の原稿素材、ガイド改訂の根拠"
     criteria: 対象判断が文書化され docs/adr/README.md の一覧に追記済み
-    location: ../docs/adr/
+    location: "docs/adr/"
     group: decision
   payoff_log:
     label: 効果局面ログ
     description: "PFD が効いた局面の事例集。記事 (#12) の具体エピソード素材（write_article）。追記条件は ADR-0014 反実仮想テスト（冒頭規約参照）"
     criteria: ADR-0014 反実仮想テストを通過した事例が追記済み
-    location: ../docs/pfd_payoff_log.md
+    location: "docs/pfd_payoff_log.md"
     group: decision
   article:
     label: 公開記事
@@ -208,19 +209,19 @@ artifact:
     label: issue 依存グラフ
     description: "着手可能順序の導出。issue 追加時に更新"
     criteria: check がエラーなし、audit-issues-flow.mjs が差分なし。
-    location: roadmap.pfdsl
+    location: ".pfdsl/roadmap.pfdsl"
     group: planning
   integrated_repository:
     label: 統合済みリポジトリ
     description: "PR を main に統合した後のリポジトリ全体の現行状態"
     criteria: 対象 PR が merged で、その merge commit が main の HEAD の祖先であり、.github/workflows/test.yml の test job と vscode-smoke job、および check-docs を実行する .github/workflows/check-gen-plugin.yml の gen-plugin job がその commit に対して成功している
-    location: ../
+    location: "./"
     group: planning
   toolchain:
     label: ツールチェーン
     description: "integrated_repository の packages/（core / cli / graphviz-exporter / preview-engine / vscode-extension）の現行状態"
     criteria: gh pr view <PR番号> --json mergeCommit --jq '.mergeCommit.oid' で merge commit C を得て、git rev-parse origin/main:packages と git rev-parse C:packages が同じ tree object ID を返す
-    location: ../packages/
+    location: "packages/"
     group: planning
   published_cli:
     label: npm 公開 CLI
@@ -249,7 +250,7 @@ artifact:
     label: PFD運用スキル（汎用層）
     description: "pfd-ops スキル本体（起動口は /pfd-cycle に限らない）。PFD によるプロジェクト運用プロトコルとワークサイクル。PFDファイル種別の定義（ADR-0017）は ecosystem_skill が一次情報。汎用プロトコル（L1）+ディスパッチ（L2）= SKILL.md 本文 + バックエンド非依存の references（work-cycle.md のサイクル4手順・architecture.md の層構成。L3 の references は ops_skill_l3 側）。L4（リポ固有、配布対象外）は pfd-ops 自体の一部でなく、各採用リポの .pfdsl sibling .md companion に宿る"
     criteria: /pfd-cycle を起動するとワークサイクルの4手順（選択・実行・終端ゲート・報告）が最後まで走る。make gen-plugin が差分なしで完了する
-    location: [ ../scripts/harness-template/skills/pfd-ops/SKILL.md, ../scripts/harness-template/skills/pfd-ops/references/work-cycle.md, ../scripts/harness-template/skills/pfd-ops/references/architecture.md, ../scripts/harness-template/commands/pfd-cycle.md ]
+    location: [ "scripts/harness-template/skills/pfd-ops/SKILL.md", "scripts/harness-template/skills/pfd-ops/references/work-cycle.md", "scripts/harness-template/skills/pfd-ops/references/architecture.md", "scripts/harness-template/commands/pfd-cycle.md" ]
     group: generation
     tags: [ distilled_skill ]
   ops_skill_l3:
@@ -262,86 +263,86 @@ artifact:
     criteria: >-
       ../scripts/harness-template/skills/pfd-ops/references/github-issues-backend.md に、採用リポが GitHub Issues バックエンドを採用するのに必要な規約（ラベル判定・status 更新と完了チェーン回収・PR 本文規約）が記述されている。
       ../scripts/harness-template/skills/pfd-ops/references/file-based-tracker-backend.md に、採用リポがリポ内ファイルで作業項目を管理するのに必要な規約（一次情報ファイル・id 規約・flow 分類・status 同期・完了規則と完了契約）が記述され、GitHub Issues 版の install テンプレートを要求しない
-    location: [ ../scripts/harness-template/skills/pfd-ops/references/github-issues-backend.md, ../scripts/harness-template/skills/pfd-ops/references/file-based-tracker-backend.md ]
+    location: [ "scripts/harness-template/skills/pfd-ops/references/github-issues-backend.md", "scripts/harness-template/skills/pfd-ops/references/file-based-tracker-backend.md" ]
     group: generation
     tags: [ distilled_skill ]
   retro_skill:
     label: ふりかえり監査スキル
     description: "/pfd-retro コマンド。図・セッションイベント・知識成果物の監査カタログと、D 層の設定を分類する同梱 scripts/classify-knowledge-lifecycle.mjs。ユーザーの監査介入17件から蒸留（手書き、生成対象外）。A・B 層は任意の PFD レビューにも使う"
     criteria: "/pfd-retro を起動すると適用した層の findings が振り分け先付きで出力される。D 層は同梱分類器を採用リポに対して実行し、state が adopt のときだけ auditTargets の成果物に適用する。adopt の targets は空白だけの要素を含まない非空の文字列配列とし、有効な対象の文字列は変更せず、対象を推測で補わない。decline は targets を無視して監査しないが、旧宣言行の移行警告は残す。config の欠落・不正は監査せず不備を毎回報告する。分類器の実行・読取・JSON 取得失敗は報告して D 層を止める。binding の散文と旧宣言行は宣言として扱わない。scripts/lib/knowledge-lifecycle-classifier.test.mjs が分類結果と四配布先の実行を検査する。ADR-0039、ADR-0041。make gen-plugin が差分なしで完了する"
-    location: [ ../scripts/harness-template/skills/pfd-retro/, ../scripts/harness-template/commands/pfd-retro.md ]
+    location: [ "scripts/harness-template/skills/pfd-retro/", "scripts/harness-template/commands/pfd-retro.md" ]
     group: generation
     tags: [ distilled_skill ]
   pfd_lens_agent:
     label: pfd-lens agent
     description: "retro_skill の A・B 層委譲先。大きい図・複数図の監査を read-only agent へオフロードする（#357）。手書き、生成対象外"
     criteria: pfd-lens は upstream identity を確認した場合に checkout-local CLI を選び、全監査 query を同じ解決済み CLI で実行して、A・B 観点の findings を file:line アンカー付きで返す。make gen-plugin が差分なしで完了する
-    location: ../scripts/harness-template/agents/pfd-lens.md
+    location: "scripts/harness-template/agents/pfd-lens.md"
     group: generation
   implementer_agent:
     label: 実装委譲agent
     description: "pfd-implementer agent。実装のみを委譲し、push・PR 作成・issue 操作は呼び出し元に残す。手書きだが gen_plugin が plugin へミラーする（#558）。留保指定を機構で担保するのは delegation_guard で、そちらは配布しない"
     criteria: make gen-plugin が差分なしで完了して plugin/pfdsl/agents/pfd-implementer.md が実在し、採用リポで plugin を入れただけで pfd-implementer が起動でき、その tools 列に外向きツール面（GitHub MCP）が無い
-    location: ../scripts/harness-template/agents/pfd-implementer.md
+    location: "scripts/harness-template/agents/pfd-implementer.md"
     group: generation
   distributed_advisory_hooks:
     label: plugin配布advisory hooks
     description: "pfd-ops 運用が要求する非ブロッキングな PostToolUse(Bash) advisory 群。hooks/ は成功した flow:managed issue-create の roadmap reminder を含み、gen_plugin がディレクトリ全体をミラーして Claude Code と Codex の plugin host へ配布する"
     criteria: "正本の hooks/hooks.json が各 PostToolUse(Bash) advisory を配線し、make gen-plugin が Claude Code plugin root と Codex plugin root の hooks/ へ取り込み、scripts/lib/gen-plugin.test.mjs が生成済み両 consumer を採用リポに追加インストールなしで実行して flow:managed issue-create の reminder の command 解決、PostToolUse 出力、非ブロッキング（exit 0）を検証する"
-    location: ../hooks/
+    location: "hooks/"
     group: generation
   delegation_guard:
     label: 外向き操作ガード
     description: "委譲先 subagent の push・PR 作成・issue 操作を拒否する PreToolUse(Bash) フック（#554）。implementer_agent のブリーフが書く留保指定を、指示でなく権限として強制する。.claude/settings.json の配線を伴うリポ固有の機構であり、implementer_agent と違って配布対象外"
     criteria: allowlist 外の subagent からの外向きコマンドが拒否され、呼び出し元と allowlist 対象 agent は影響を受けないことが scripts/lib/delegation-guard.test.mjs のテストで検証されている
-    location: ../scripts/delegation-guard.mjs
+    location: "scripts/delegation-guard.mjs"
     group: generation
   main_branch_guard:
     label: mainブランチ操作ガード
     description: "main ブランチ上または同一リポジトリの別 worktree 上でツリー・インデックスを変える直接記述の git コマンドを止める PreToolUse(Bash) 事故防止フック（#650、#777、#784）。セッション root は Claude Code の空白でない CLAUDE_PROJECT_DIR を優先し、Codex では hook payload cwd へ fallback する。quoted または escaped literal argv、literal cd、git -C、env -C/--chdir、input を含む先頭 redirection、既知 prefix、Codex routine wrapper の明示 target を実行順に解決する。Git target 環境変数、CDPATH、対応する assignment・export・unset・read・printf・source・dot・eval と target に影響する control flow を追跡し、静的 target が確定できない変更系 Git を fail closed する。対応外の compound は無害でも拒否しうるため raw mutation は単純 command へ分ける。この hook は任意 Bash を完全に解釈する security boundary ではない。Codex の承認なし機械的境界は trusted user wrapper、raw Git を永続 allow しない execpolicy、sandbox の組合せであり、Claude Code に Codex 専用 wrapper は前提化しない。復旧系は Claude Code では ask、ask 未対応の Codex では deny に変換する。session root と異なる worktree を target にする変更系は、hook が自セッションの worktree を他セッションのものと区別できず、session 移動後も harness が起動時の root を報告し続けるため、操作の種類によらず ask とし所有権の確認を人間に委ねる（#1201）。保護の作用域は session と git common dir を共有する checkout に限り、無関係なリポジトリの main は素通しする — 使い捨て sandbox の既定ブランチが main になるため、ブランチ名だけでは管轄内外を区別できない（#1221）。roots を解決できない場合は管轄外と区別し、ブランチ名規則を適用したままにする — これが保護として効くのは session 側だけが解決できず target が既定ブランチを返す場合で、target 自体が git リポジトリでなければブランチ名が読めず従来どおり allow になる。delegation_guard と同じくリポ固有で配布対象外。実体のファイル名は commit のみを見ていた頃のもので、起動中 session の配線を壊さないため据え置く。検査バイパス（`--no-verify`/`-n`、`-c`・`--config-env`・`git config` 経由の core.hooksPath 上書き）は branch・worktree を問わず deny とし、foreign target を除外する。ただし `git config` の `--global`/`--system`/`--file`・`-f`（`--file`・`-f` は指す先を問わず対象）は foreign target でも deny とする（#1232）"
     criteria: main を直接 target にする変更系 git が拒否され、session root と異なる worktree を target にする変更系 git は Claude Code で ask になり、Claude Code は復旧系を ask、Codex は unsupported ask を deny にする。session と git common dir を共有しない target は、ブランチ名が main でも素通しし、session root だけが解決できず target が既定ブランチを返す場合は deny が維持され、target が git リポジトリでない場合は従来どおり allow になることが scripts/lib/main-commit-guard.test.mjs で検証される。空白でない CLAUDE_PROJECT_DIR の優先、Codex payload cwd fallback、escaped literal argv、cd --、先頭 redirection、git -C、env chdir、routine wrapper target、既知 prefix、Git target 環境変数、変数ごとの export 状態、CDPATH、assignment・export・unset・read・printf の option semantics、dynamic output name、array output variable、target に影響する OR-list・pipeline・background・subshell・AND-list と unsupported compound の fail-closed が scripts/lib/main-commit-guard.test.mjs で検証される。identity Git subprocess は Git target 環境変数を除去し、読み取り系 Git、絶対 cd、literal 操作で安全へ戻した状態、単純な success-path AND-list、target-neutral pipeline・AND-list、変更系 Git より後ろの control flow、session 自身の feature branch 操作は影響を受けない。shared hook は直接形の事故防止であり任意 Bash の security guarantee は主張せず、Codex の永続 allow は trusted wrapper に限定する。バイパス（`--no-verify`/`-n`/`core.hooksPath` 上書き、対象 subcommand は変更系に限らない）が feature branch・own worktree でも deny され、foreign target では `git config` の `--global`/`--system`/`--file`・`-f`、および `--glob`/`--sys`/`--fil` 等の曖昧でない省略形（`--g`/`--l` 等の短い省略形は `set` mode でのみ曖昧さなく解決される。`--file`・`-f` は指す先を問わない）を除き allow のままであることが scripts/lib/main-commit-guard.test.mjs で検証される（#1232）
-    location: ../scripts/main-commit-guard.mjs
+    location: "scripts/main-commit-guard.mjs"
     group: generation
   ecosystem_skill:
     label: PFDセット構築スキル
     description: "/pfd-init コマンド。PFD セット（roadmap / workflow / pipeline）の対話的初期構築・再構築。PFDファイル種別の定義と問診リスト（ADR-0017）の一次情報ホスト。手書き、生成対象外"
     criteria: /pfd-init を .pfdsl/ の無いリポで起動すると PFD セットの scaffold が生成される。make gen-plugin が差分なしで完了する
-    location: [ ../scripts/harness-template/skills/pfd-ecosystem/, ../scripts/harness-template/commands/pfd-init.md ]
+    location: [ "scripts/harness-template/skills/pfd-ecosystem/", "scripts/harness-template/commands/pfd-init.md" ]
     group: generation
     tags: [ distilled_skill ]
   grill_skill:
     label: 後ろ向き対話構築スキル
     description: "pfd-grill スキル。最終成果物からの後ろ向き対話で単一 PFD の中身を書く手順（#481）。手書き、生成対象外"
     criteria: /pfd-grill を起動すると、最終成果物から外部入力まで遡ったノード列が対象の図に書き込まれる。make gen-plugin が差分なしで完了する
-    location: ../scripts/harness-template/skills/pfd-grill/
+    location: "scripts/harness-template/skills/pfd-grill/"
     group: generation
     tags: [ distilled_skill ]
   vscode_ext_debug_skill:
     label: VSCode拡張デバッグスキル
     description: "/vscode-ext-debug コマンド。worktree での VS Code 拡張デバッグ手順（make vscode-dev・F5 起動・PFDSL Preview 検証・webview console フィルタ）。手書き、生成対象外"
     criteria: 手順どおりに make vscode-dev から F5 起動まで進むと拡張がデバッグ実行され、PFDSL Preview が対象 .pfdsl を描画する
-    location: ../.claude/skills/vscode-ext-debug/
+    location: ".claude/skills/vscode-ext-debug/"
     group: generation
     tags: [ distilled_skill ]
   prose_mechanization_audit_skill:
     label: 散文機械化監査スキル
     description: "堆積した運用散文を hook・check の台帳と突き合わせる手順（台帳の実測列挙・機械化済み対策を語る散文・スクリプト出力の再説明・層内の同文再掲・散文と機械の矛盾）。「散文として書く前に機械化を検討する」は書く時点の規律であり、既に書かれた分を洗う工程がこれにあたる。リポローカル・手書き（生成対象外・配布対象外 — 利用側リポは突合の片側である hook・check 台帳を持たず、配布された散文の側もその上流はこのリポなので、直す工程はこちらにしか置けない）"
     criteria: 散文と機構の突合を依頼すると5工程が実行され、対象範囲・所見・処遇の記録が docs/asset-sweep/ に残る
-    location: ../.claude/skills/prose-mechanization-audit/
+    location: ".claude/skills/prose-mechanization-audit/"
     group: generation
     tags: [ distilled_skill ]
   spec_stress_skill:
     label: 仕様stress-testスキル
     description: "/spec-stress-test コマンド。仕様制約の具体例 stress-test（ADR-0020）と agent 実書きプローブ（spec のみ読ませた subagent を CLI で採点）の実行手順。仕様改訂の検証能力として maintain_spec に還流。リポローカル・手書き（生成対象外・配布対象外）"
     criteria: /spec-stress-test を起動すると境界例 stress-test と agent 実書きプローブが実行され、記録が docs/adr/0020-spec-stress-testing/ に残る
-    location: ../.claude/skills/spec-stress-test/
+    location: ".claude/skills/spec-stress-test/"
     group: generation
     tags: [ distilled_skill ]
   review_perspectives:
     label: レビュー観点集
     description: "PFD と normative 仕様を問い詰める A/B/C 監査カタログの一次情報。pfdsl スキルに references として同梱され、pfd-retro はポインタ参照"
     criteria: make gen-skill が差分なしで完了する
-    location: ../docs/review-perspectives.md
+    location: "docs/review-perspectives.md"
     group: generation
     tags: [ distilled_doc ]
   pr_diagrams:
@@ -354,34 +355,34 @@ artifact:
     label: README
     description: "外部利用者向けの導入文書。CLI のインストール手順・Library 節のインストール例・サンプル描画物への参照リンクを含むが、リンク先パスは安定しており sample_previews の内容更新では変化しない — 追従更新が要るのは CLI 公開形態・ライブラリ公開形態・plugin 配布物（導入手順と同梱スキル・コマンドの列挙）の変更時のみ。extension 公開（pipeline.pfdsl の published_ext。この図には置かない）は update_readme をトリガーしない — README は拡張の公開版の版数を載せないため。現在の拡張の節は packages/vscode-extension/README.md への参照と開発ホストでの利用方法で、Marketplace からの導入経路も持たない。CLI コマンドリファレンス（## CLI 節）は `make gen-readme-cli` が `pfdsl help` 出力から自動生成し、`make check-readme-cli` が pre-commit と CI（test.yml）でドリフトを機械検査するため update_readme の手動対象外。同じ生成器とゲートが `packages/cli/README.md`（npm パッケージページ。toolchain 側の成果物）のコマンド表も書くため、CLI コマンドの追加・変更で手を入れる先は両 README とも packages/cli/src/index.ts のコマンド定義テーブルのみ（#850・#902）。help 本文自体もそのテーブルから生成されるため、dispatcher に載って help に載らないコマンドは表現できない"
     criteria: make check-readme-cli が差分なしで通過し、Library 節の pnpm add 例が published_libraries の全パッケージを名指す
-    location: ../README.md
+    location: "README.md"
     group: release
   migration_guide:
     label: 版別移行ガイド
     description: 公開版間の変更と未公開の移行項目。採用先は更新前後の版で対象節を選び、リリース判断は対象範囲と版の確定を確認する。
     criteria: 更新前後の CLI/plugin 版または未公開の根拠 commit、影響、手順、検証が特定できる
-    location: ../docs/migration-guide.md
+    location: "docs/migration-guide.md"
     externalStakeholders: [ 採用リポの保守担当 ]
     group: release
   workflow_md:
     label: 生態系 companion
     description: "workflow.pfdsl のグラフが運べない運用手続き散文。セクション構成は実ファイルが一次情報（ここに列挙しない）。pfd-ops skill が読む L4 ホスト"
     criteria: check-companion-bindings が参照パスの実在を通す。散文が名指す workflow.pfdsl のノード・エッジを graph describe で引いて食い違いがない（pfd-retro B 層監査の観点）
-    location: workflow.md
+    location: ".pfdsl/workflow.md"
     group: generation
     tags: [ distilled_doc ]
   bindings_pfd_ops:
     label: pfd-ops バインディング
     description: "pfd-ops 運用に紐づく Claude への恒常指示（PR 本文規約等）。sibling companion でなく独立ファイル（読み込み契機がスキル発火であり PFD グラフ操作と一致しないため）。pfd-ops skill が存在すれば読む"
     criteria: 記載内容を pfd-ops SKILL.md・work-cycle.md の現行記述に突き合わせて矛盾がなく、配布層から移設した手順（ADR-0039）が binding 側に揃っている（必須見出しだけ check-companion-bindings が検査し、本文の整合は pfd-retro D 層監査で観察する）
-    location: bindings/pfd-ops.md
+    location: ".pfdsl/bindings/pfd-ops.md"
     group: generation
     tags: [ distilled_doc ]
   adopter_config:
     label: 採用リポの宣言値
     description: "このリポ自身が採用リポとして持つ宣言の値（ADR-0042）。pfd-retro D 層の採用と監査対象（knowledgeLifecycleAudit）、completed-chain sweep の有効化（sweepCompletedChains）を持つ。散文の binding はキーを指すだけで値を持たない。sweep の workflow も実行時にこのファイルを読む"
     criteria: JSON として読め、knowledgeLifecycleAudit が adopt と空でない監査対象を、sweepCompletedChains が有効化を宣言している（scripts/lib/knowledge-lifecycle-declaration.test.mjs が検査する）
-    location: config.json
+    location: ".pfdsl/config.json"
     group: generation
   bindings_pfd_retro:
     label: pfd-retro バインディング
@@ -390,32 +391,32 @@ artifact:
       bindings/pfd-retro-patterns/ の当時の本文と証拠を保存し、現行手順の適用点を案内する。
       カタログの対策抽出・phase・自動選別には依存しない。
     criteria: "check-companion-bindings が必須見出しと、事例が .pfdsl 内へ張った相対リンクの解決先の実在を確認し、最終差分レビューで事例の証拠保存と現行手順へのリンクの有無・非依存、および1回の実行契約と、知識成果物ライフサイクル監査の採用宣言（`.pfdsl/config.json` のキー `knowledgeLifecycleAudit` の `mode` と、`adopt` のときの空でない `targets`。binding は config のキーを指す1文だけを持つ。ADR-0039、ADR-0041）の実在を確認する"
-    location: [ bindings/pfd-retro.md, bindings/pfd-retro-patterns/ ]
+    location: [ ".pfdsl/bindings/pfd-retro.md", ".pfdsl/bindings/pfd-retro-patterns/" ]
     group: generation
     tags: [ distilled_doc ]
   roadmap_md:
     label: 計画 companion
     description: "roadmap.pfdsl の sibling。このリポの issue 管理バインディング（GitHub backend、監査スクリプト実パス、L3 reference ポインタ、運用対象の計画 PFD 一覧、issue 固有の終端ゲート項目）。pfd-ops skill が読む L4 ホスト"
     criteria: check-companion-bindings と audit-issues-flow.mjs が差分なしで通過する。散文が名指す roadmap.pfdsl のノード・エッジを graph describe で引いて食い違いがない
-    location: roadmap.md
+    location: ".pfdsl/roadmap.md"
     group: planning
   workflow_pfdsl:
     label: ワークフロー図
     description: "この図そのもの。対話から公開までのサイクル全体を変換グラフとして持つ。roadmap_pfdsl（issue 依存）・pipeline_pfdsl（変換境界）と並ぶ3つ目の運用 PFD で、3つとも専用の整理プロセスが生産する。自分の companion（workflow_md）だけが artifact で図が無い状態を解消した（#904）"
     criteria: check がエラーなし、meta check-links が通過する。workflow_md が名指すノード・エッジを graph describe で引いて食い違いがない
-    location: workflow.pfdsl
+    location: ".pfdsl/workflow.pfdsl"
     group: planning
   pipeline_pfdsl:
     label: 変換パイプライン図
     description: "integrated_repository の実装にある実行時データ変換と生成・検査・公開処理の境界。変換コンポーネント追加・変更・削除時に更新（ADR-0018 門番）"
     criteria: check がエラーなし、meta check-links が通過する。対象とする各変換段が integrated_repository の実装に対応したノード・エッジとして現れる
-    location: pipeline.pfdsl
+    location: ".pfdsl/pipeline.pfdsl"
     group: planning
   pipeline_md:
     label: 変換境界 companion
     description: "pipeline.pfdsl の sibling。グラフで運べない変換境界の定義・エラー処理方針"
     criteria: check-companion-bindings が参照パスの実在を通す。散文が名指す pipeline.pfdsl のノード・エッジを graph describe で引いて食い違いがない
-    location: pipeline.md
+    location: ".pfdsl/pipeline.md"
     group: planning
 
 process:
@@ -526,7 +527,7 @@ process:
   merge_pr:
     label: レビュー・マージ
     description: "PR をレビューし main へ統合する。成果物はマージで正本になり、進捗・issue 更新もここで確定する。location はこのプロセスのうち機械化されている部分を指す — pr_diagrams の生成・配送がそれにあたり、その location（外部リポの URL）からは実装へ辿れないため、実装パスはこちらが持つ"
-    location: ../.github/workflows/pr-diff-images.yml
+    location: ".github/workflows/pr-diff-images.yml"
     group: planning
   project_toolchain:
     label: ツールチェーン射影
