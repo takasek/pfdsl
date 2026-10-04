@@ -250,7 +250,7 @@ artifact:
     label: PFD運用スキル（汎用層）
     description: "pfd-ops スキル本体（起動口は /pfd-cycle に限らない）。PFD によるプロジェクト運用プロトコルとワークサイクル。PFDファイル種別の定義（ADR-0017）は ecosystem_skill が一次情報。汎用プロトコル（L1）+ディスパッチ（L2）= SKILL.md 本文 + バックエンド非依存の references（work-cycle.md のサイクル4手順・architecture.md の層構成。L3 の references は ops_skill_l3 側）。L4（リポ固有、配布対象外）は pfd-ops 自体の一部でなく、各採用リポの .pfdsl sibling .md companion に宿る"
     criteria: /pfd-cycle を起動するとワークサイクルの4手順（選択・実行・終端ゲート・報告）が最後まで走る。make gen-plugin が差分なしで完了する
-    location: ["scripts/harness-template/skills/pfd-ops/SKILL.md", "scripts/harness-template/skills/pfd-ops/references/work-cycle.md", "scripts/harness-template/skills/pfd-ops/references/architecture.md", "scripts/harness-template/commands/pfd-cycle.md"]
+    location: [ "scripts/harness-template/skills/pfd-ops/SKILL.md", "scripts/harness-template/skills/pfd-ops/references/work-cycle.md", "scripts/harness-template/skills/pfd-ops/references/architecture.md", "scripts/harness-template/commands/pfd-cycle.md" ]
     group: generation
     tags: [ distilled_skill ]
   ops_skill_l3:
@@ -263,14 +263,14 @@ artifact:
     criteria: >-
       ../scripts/harness-template/skills/pfd-ops/references/github-issues-backend.md に、採用リポが GitHub Issues バックエンドを採用するのに必要な規約（ラベル判定・status 更新と完了チェーン回収・PR 本文規約）が記述されている。
       ../scripts/harness-template/skills/pfd-ops/references/file-based-tracker-backend.md に、採用リポがリポ内ファイルで作業項目を管理するのに必要な規約（一次情報ファイル・id 規約・flow 分類・status 同期・完了規則と完了契約）が記述され、GitHub Issues 版の install テンプレートを要求しない
-    location: ["scripts/harness-template/skills/pfd-ops/references/github-issues-backend.md", "scripts/harness-template/skills/pfd-ops/references/file-based-tracker-backend.md"]
+    location: [ "scripts/harness-template/skills/pfd-ops/references/github-issues-backend.md", "scripts/harness-template/skills/pfd-ops/references/file-based-tracker-backend.md" ]
     group: generation
     tags: [ distilled_skill ]
   retro_skill:
     label: ふりかえり監査スキル
     description: "/pfd-retro コマンド。図・セッションイベント・知識成果物の監査カタログと、D 層の設定を分類する同梱 scripts/classify-knowledge-lifecycle.mjs。ユーザーの監査介入17件から蒸留（手書き、生成対象外）。A・B 層は任意の PFD レビューにも使う"
     criteria: "/pfd-retro を起動すると適用した層の findings が振り分け先付きで出力される。D 層は同梱分類器を採用リポに対して実行し、state が adopt のときだけ auditTargets の成果物に適用する。adopt の targets は空白だけの要素を含まない非空の文字列配列とし、有効な対象の文字列は変更せず、対象を推測で補わない。decline は targets を無視して監査しないが、旧宣言行の移行警告は残す。config の欠落・不正は監査せず不備を毎回報告する。分類器の実行・読取・JSON 取得失敗は報告して D 層を止める。binding の散文と旧宣言行は宣言として扱わない。scripts/lib/knowledge-lifecycle-classifier.test.mjs が分類結果と四配布先の実行を検査する。ADR-0039、ADR-0041。make gen-plugin が差分なしで完了する"
-    location: ["scripts/harness-template/skills/pfd-retro/", "scripts/harness-template/commands/pfd-retro.md"]
+    location: [ "scripts/harness-template/skills/pfd-retro/", "scripts/harness-template/commands/pfd-retro.md" ]
     group: generation
     tags: [ distilled_skill ]
   pfd_lens_agent:
@@ -307,7 +307,7 @@ artifact:
     label: PFDセット構築スキル
     description: "/pfd-init コマンド。PFD セット（roadmap / workflow / pipeline）の対話的初期構築・再構築。PFDファイル種別の定義と問診リスト（ADR-0017）の一次情報ホスト。手書き、生成対象外"
     criteria: /pfd-init を .pfdsl/ の無いリポで起動すると PFD セットの scaffold が生成される。make gen-plugin が差分なしで完了する
-    location: ["scripts/harness-template/skills/pfd-ecosystem/", "scripts/harness-template/commands/pfd-init.md"]
+    location: [ "scripts/harness-template/skills/pfd-ecosystem/", "scripts/harness-template/commands/pfd-init.md" ]
     group: generation
     tags: [ distilled_skill ]
   grill_skill:
@@ -391,7 +391,7 @@ artifact:
       bindings/pfd-retro-patterns/ の当時の本文と証拠を保存し、現行手順の適用点を案内する。
       カタログの対策抽出・phase・自動選別には依存しない。
     criteria: "check-companion-bindings が必須見出しと、事例が .pfdsl 内へ張った相対リンクの解決先の実在を確認し、最終差分レビューで事例の証拠保存と現行手順へのリンクの有無・非依存、および1回の実行契約と、知識成果物ライフサイクル監査の採用宣言（`.pfdsl/config.json` のキー `knowledgeLifecycleAudit` の `mode` と、`adopt` のときの空でない `targets`。binding は config のキーを指す1文だけを持つ。ADR-0039、ADR-0041）の実在を確認する"
-    location: [".pfdsl/bindings/pfd-retro.md", ".pfdsl/bindings/pfd-retro-patterns/"]
+    location: [ ".pfdsl/bindings/pfd-retro.md", ".pfdsl/bindings/pfd-retro-patterns/" ]
     group: generation
     tags: [ distilled_doc ]
   roadmap_md:
