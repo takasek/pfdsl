@@ -1,4 +1,5 @@
 name: repair generated conflicts
+run-name: "Repair generated conflicts for PR #${{ inputs.pull-request }}"
 
 on:
   workflow_dispatch:
