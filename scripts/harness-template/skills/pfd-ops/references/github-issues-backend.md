@@ -218,7 +218,7 @@ import 成功だけを監査成功としない。
 - Node.js 24 以上
 - `gh` CLI、または `GH_TOKEN` / `GITHUB_TOKEN`
 - npm パッケージ `yaml`（上の「依存の準備と初回監査」で採用リポへ用意する）
-- `delete` サブコマンドを持つ版の `@pfdsl/cli`（回収スクリプトが判定・削除・検証のすべてをこの CLI 経由で行う）。最低版を数字では断定しない: pfdsl リポ自身の `packages/cli/package.json` は `delete` 追加後もまだ version を上げていないため、その値をそのまま「次の公開版」として読むと誤った版数を書くことになる。回収スクリプトは起動時に解決した CLI が `delete` を持つか確かめ、持たなければ対象の有無にかかわらずその場で停止し、直し方を示す
+- `delete` サブコマンドを持つ版の `@pfdsl/cli`（最初の対応公開版は v0.1.0。v0.0.26 以前には無い。回収スクリプトが判定・削除・検証のすべてをこの CLI 経由で行う）。開発版や解決先の違いもあるため、回収スクリプトは起動時に解決した CLI が `delete` を持つか確かめ、持たなければ対象の有無にかかわらずその場で停止し、直し方を示す
   - pfdsl リポ自身の workflow は、checkout したツリーが pfdsl workspace（`pnpm-workspace.yaml` と `packages/cli/package.json` を持つ）なら `pnpm -r build` してそのビルドを使う。採用リポのように workspace でなければ `npm install --no-save @pfdsl/cli` で公開版を導入する（フォールバック時は `delete` を含む公開版以降でないと上の起動時チェックで止まる）。運用プロトコルの着手判断が既に `status ready` を要求しているので、`@pfdsl/cli` の導入自体は採用リポにとって新しい前提ではない
   - 回収スクリプトは `PFDSL_CLI`、リポの `packages/cli/dist/cli.js`、`node_modules/@pfdsl/cli/dist/cli.js` の順に CLI を探す
 

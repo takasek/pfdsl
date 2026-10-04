@@ -26,7 +26,8 @@ Biomeの指摘は自動修正されないため、失敗時は `make format` を
 
 ## 検査コマンド
 
-新規 worktree では `make build` を先に通し、その後 `make test` を実行する（build 前の `make test` は packages/vscode-extension のテストで落ちる。2026-09-18 実測）。
+`make test` と `make typecheck` は依存する `build` を自動実行するため、新規 worktree でもこの全体入口を直接使う。
+単独packageのテストや `dist` を直接読む検査を実行する場合は、必要な `make build` を先に通す。
 `make test` は各パッケージのテストと `scripts/` `hooks/` の `node --test`、import・shell 文字列・CLI 規約の検査を通しで回す。
 `make lint` は Biome、`make typecheck` は型検査、`make coverage` はカバレッジ。
 単一ファイルは `node --test <path>` で直接回せる。

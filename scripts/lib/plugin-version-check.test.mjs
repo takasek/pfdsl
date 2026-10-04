@@ -49,7 +49,7 @@ describe("checkUpstreamVersion", () => {
 		return skillRoot;
 	}
 
-	// Two upstream files are consulted: plugin.json for the released version and
+	// Two upstream files are consulted: plugin.json for the version on main and
 	// bundle-manifest.sha256 for the per-file digests a Note is computed from. A
 	// test that only cares about the version leaves the manifest side
 	// undefined, which stands for "upstream has no manifest yet".
@@ -84,6 +84,23 @@ describe("checkUpstreamVersion", () => {
 		const warning = await checkUpstreamVersion(skillRoot, fakeFetch("1.0.0"));
 		assert.equal(warning, null);
 	});
+	for (const [local, remote] of [
+		["0.2.0", "0.1.0"],
+		["0.9.0", "0.10.0"],
+		["0.10.0", "0.9.0"],
+		["0.2.0-dev", "0.1.0"],
+	]) {
+		it(`describes ${local} versus main ${remote} without implying a release`, async () => {
+			const warning = await checkUpstreamVersion(
+				makePluginSkillRoot(local),
+				fakeFetch(remote),
+			);
+			assert.match(warning, /differs/);
+			assert.match(warning, /upstream main/);
+			assert.doesNotMatch(warning, /Consider updating/);
+			assert.match(warning, /does not establish that a published update/);
+		});
+	}
 
 	it("returns null silently when the injected fetch rejects", async () => {
 		const skillRoot = makePluginSkillRoot("1.0.0");
@@ -111,12 +128,9 @@ describe("checkUpstreamVersion", () => {
 			fakeFetch("1.0.0", remoteText),
 		);
 		assert.match(warning, /content/i);
-		// The marketplace source pins a release tag (.claude-plugin/marketplace.json
-		// -> source.ref), not main. A bundle change on main has no release to
-		// update to, so telling the reader to update the plugin would be an
-		// instruction they cannot carry out — on every adopting repo, until the
-		// next CLI release.
-		assert.doesNotMatch(warning, /updat/i);
+		// A difference from main alone proves neither ordering nor publication.
+		assert.doesNotMatch(warning, /Consider updating/);
+		assert.match(warning, /does not establish ordering/);
 	});
 
 	it("returns null when the version matches and the bundle content matches", async () => {

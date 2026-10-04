@@ -60,7 +60,7 @@ e85931c9fe76715a25cb5566d999ab589a6cb60d8b45041dead4da9ce5005b12  skills/pfd-ops
 
 3f7d9d46ffb5c432c39947152312856a30ccd27286d9d257f89bf5052c648a3c  skills/pfd-ops/references/file-based-tracker-backend.md
 
-c89eb738c945df0e1f269938e586b53e799c9a4f62ae11a14c6bd32f67149da9  skills/pfd-ops/references/github-issues-backend.md
+256a6299afb45add06d0f220a6d92823cae0272744b24aa0f8cbed80fdf76dc1  skills/pfd-ops/references/github-issues-backend.md
 
 4da6e061033c43a67bd71d55bd816fc3c57ef32f52d0dea19070bcc7c2b79582  skills/pfd-ops/references/scaffold/bindings/pfd-ops.md
 
@@ -90,7 +90,7 @@ bc0ca811ba9d01fbc55fc72c1badfb7f5c824ce9fe402474012c148fe6d79b3b  skills/pfd-ops
 
 a36491954ed82a43067e087687ce819c1ee4221e232f8c3e2904ea5900f0ed20  skills/pfd-ops/scripts/collect-report-environment.mjs
 
-6fcd8f53341d1947fdb345f4d5e4f240aed56d0014fa6a7851a7ef8808019d38  skills/pfd-ops/scripts/plugin-version-check.mjs
+776e90a5d8ddbd44a95701868ebe45ad5f598e4d28ac2cc4dc08073a98c85da4  skills/pfd-ops/scripts/plugin-version-check.mjs
 
 7fbb4821acd71d84c98a089ed6216ff63af58f8d4a019b9e8c1094d15eaf2e0e  skills/pfd-retro/SKILL.md
 

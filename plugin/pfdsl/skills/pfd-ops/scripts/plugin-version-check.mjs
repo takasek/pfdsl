@@ -153,8 +153,8 @@ async function fetchOrNull(fetchImpl, url, read) {
  * from the CLI package version and so does not move between releases — two
  * bundles a hundred commits apart still report the same version (#971). Its
  * message states the difference and stops there: the marketplace source pins
- * a release tag rather than main, so a bundle change on main has no release
- * for the reader to update to.
+ * a release tag rather than main, so a difference from main alone establishes
+ * neither ordering nor availability of a published update.
  *
  * Silent (returns null) whenever the local plugin manifest is absent
  * (repo-local run), either side's bundle manifest is absent or malformed —
@@ -180,7 +180,7 @@ export async function checkUpstreamVersion(skillRoot, fetchImpl = fetch) {
 		);
 		if (remote === null || !remote.version) return null;
 		if (remote.version !== localVersion) {
-			return `Warning: installed pfdsl plugin version (${localVersion}) differs from upstream (${remote.version}). Consider updating the plugin.`;
+			return `Note: installed pfdsl plugin version (${localVersion}) differs from upstream main (${remote.version}). This difference does not establish that a published update is available.`;
 		}
 		const localHash = readLocalBundleAggregateHash(resolve(skillRoot, "../.."));
 		if (localHash === null) return null;
@@ -192,7 +192,7 @@ export async function checkUpstreamVersion(skillRoot, fetchImpl = fetch) {
 		if (remoteText === null) return null;
 		const remoteHash = computeManifestAggregateHash(remoteText);
 		if (remoteHash === null || remoteHash === localHash) return null;
-		return `Note: this installed pfdsl plugin bundle carries the same version (${localVersion}) as upstream main but different content — main holds bundle changes that no release includes yet.`;
+		return `Note: this installed pfdsl plugin bundle carries the same version (${localVersion}) as upstream main but different content. This difference does not establish ordering or availability of a published update.`;
 	} catch {
 		return null;
 	}
