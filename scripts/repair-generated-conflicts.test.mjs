@@ -220,12 +220,12 @@ test("publication CLI accepts a bundle without a duplicate result JSON and rejec
 		`#!/usr/bin/env node\nconst v=JSON.parse(process.env.REPAIR_TEST_SNAPSHOT);console.log(JSON.stringify(process.argv.at(-1).endsWith('/heads/main') ? {object:{sha:v.base}} : {state:'open',head:{sha:v.head,ref:v.branch,repo:{full_name:v.repository}},base:{sha:v.base,ref:'main',repo:{full_name:v.repository}}}));\n`,
 	);
 	chmodSync(gh, 0o755);
-	const execute = () =>
+	const execute = (mode = "verify", extraEnv = {}) =>
 		spawnSync(
 			process.execPath,
 			[
 				new URL("./repair-generated-conflicts.mjs", import.meta.url).pathname,
-				"verify",
+				mode,
 				f.root,
 				artifacts,
 			],
@@ -237,6 +237,7 @@ test("publication CLI accepts a bundle without a duplicate result JSON and rejec
 					GITHUB_REPOSITORY: value.repository,
 					PR_NUMBER: "12",
 					REPAIR_TEST_SNAPSHOT: JSON.stringify(value),
+					...extraEnv,
 				},
 			},
 		);
@@ -250,6 +251,50 @@ test("publication CLI accepts a bundle without a duplicate result JSON and rejec
 	let result = execute();
 	assert.equal(result.status, 0, result.stderr);
 	assert.match(result.stdout, /not pushed/);
+	// Route only the GitHub remote URL to a real local bare repository. The
+	// fake PR API deliberately continues reporting the old head after push.
+	const realGit = execFileSync("which", ["git"], { encoding: "utf8" }).trim();
+	const remote = join(f.root, "remote.git");
+	f.git("init", "--bare", remote);
+	f.git("push", remote, `${f.head}:refs/heads/feature`);
+	writeFileSync(
+		join(bin, "git"),
+		`#!${process.execPath}
+const {spawnSync}=require('node:child_process');
+const args=process.argv.slice(2);
+const remote=${JSON.stringify(remote)};
+const git=${JSON.stringify(realGit)};
+const index=args.indexOf('https://github.com/owner/repo.git');
+if(index>=0)args[index]=remote;
+const result=spawnSync(git,args,{stdio:'inherit'});
+if(result.status===0 && args[0]==='push' && process.env.REPAIR_TEST_CHANGE_REMOTE){
+ const changed=spawnSync(git,['--git-dir',remote,'update-ref','refs/heads/feature',process.env.REPAIR_TEST_CHANGE_REMOTE],{stdio:'inherit'});
+ if(changed.status!==0)process.exit(changed.status);
+}
+if(result.status===0 && args[0]==='push' && process.env.REPAIR_TEST_DELETE_REMOTE){
+ const deleted=spawnSync(git,['--git-dir',remote,'update-ref','-d','refs/heads/feature'],{stdio:'inherit'});
+ if(deleted.status!==0)process.exit(deleted.status);
+}
+process.exit(result.status ?? 1);
+`,
+		{ mode: 0o755 },
+	);
+	result = execute("publish");
+	assert.equal(result.status, 0, result.stderr);
+	assert.equal(
+		f.git("--git-dir", remote, "rev-parse", "refs/heads/feature"),
+		repaired,
+	);
+	assert.match(result.stdout, /\(pushed\)/);
+	result = execute("publish", { REPAIR_TEST_CHANGE_REMOTE: f.head });
+	assert.notEqual(result.status, 0);
+	assert.match(result.stderr, /remote branch/);
+	result = execute("publish", { REPAIR_TEST_DELETE_REMOTE: "1" });
+	assert.notEqual(result.status, 0);
+	assert.match(
+		result.stderr,
+		/Push succeeded, but remote branch verification failed/,
+	);
 	f.git("bundle", "create", join(artifacts, "wrong.bundle"), "refs/heads/main");
 	writeFileSync(
 		join(artifacts, "repair.bundle"),

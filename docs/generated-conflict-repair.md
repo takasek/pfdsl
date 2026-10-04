@@ -18,6 +18,8 @@ It does not merge the PR into main.
 The preparation job runs the PR's merged generators and tests without a publication credential.
 It builds the packages, runs `make gen-plugin`, and checks the full tests, lint, typecheck, and generated drift.
 A fresh publication job executes only trusted main code, checks that canonical files match Git's automatic merge, and pushes one ordinary merge or repair commit to the existing PR branch.
+After pushing, it verifies the branch through Git rather than the PR API, whose head information may lag behind the push.
+If that verification fails, the error states that the push already succeeded and asks you to check the branch before rerunning.
 If the PR or main changes while preparation runs, publication stops; rerun the workflow.
 An already synchronized PR produces no commit.
 
