@@ -171,7 +171,8 @@ pfdsl 開発リポ固有の例:
 
 ### 配置ファイルの鮮度セルフチェック
 
-チェックの出力末尾が対応を名指しするため、その指示に従う。スクリプトは target の役割を分類し、`--deploy` が正しい向きの場合だけ案内するので、drift だけを根拠に反射的に deploy しない。GitHub Issues バックエンドを採用していないリポでは、未採用である旨と `--deploy` の案内が出る — これは報告であって指示ではない。そのリポが別のバックエンドを採用している、またはどれも採用していないなら、案内に従わず未採用のまま進む。
+採用先では、出力の先頭に移行状態の通知が出ることがある。末尾だけを読んで済ませず、先にその通知を後述の「出力の意味と対応」で扱う。
+deploy 関連の対応は出力末尾が名指しするため、移行状態の通知を扱った後で、その指示に従う。スクリプトは target の役割を分類し、`--deploy` が正しい向きの場合だけ案内するので、drift だけを根拠に反射的に deploy しない。GitHub Issues バックエンドを採用していないリポでは、未採用である旨と `--deploy` の案内が出る — これは報告であって指示ではない。そのリポが別のバックエンドを採用している、またはどれも採用していないなら、案内に従わず未採用のまま進む。
 
 素の `--deploy` はローカル編集がないファイルをコピーし、ローカル編集がない orphan を削除する。`--overwrite-local-edits` は残るパスのローカル編集を canonical で上書きし、`--delete-edited-orphans` は消えるパスのローカル編集ごと削除する。旧ファイルの掃除ではまず素の deploy を実行し、編集済みとして残ったパスだけについて追加 flag の要否を判断する。
 誰も編集していないのに同じファイルが deploy のたびに `Skipped` として残る場合は、旧版から更新した採用先に特有の状態である可能性がある。flag で上書きする前、また上流へ報告する前に、上流リポの [migration guide](https://github.com/takasek/pfdsl/blob/main/docs/migration-guide.md#files-reported-as-skipped-on-every-deploy) の該当節で確かめ方を確認する。
@@ -179,6 +180,27 @@ pfdsl 開発リポ固有の例:
 `Possible renames` は canonical 側の rename が新旧パスの `missing` と `orphaned` に分かれて見えている状態を表す。新パスを信用する前に旧パスのローカル編集を引き継ぐ。
 
 plugin version の上流差分警告は更新をユーザーに案内する。同じ version で bundle 内容だけが異なる場合は更新先 release がまだ存在しないため、その差分だけを報告する。
+
+採用先では、同じチェックが `.pfdsl/config.json` の `appliedMigration` を実行中の plugin と照合し、`--upstream` の有無や GitHub Issues バックエンドの採否によらず、出力の先頭に結果を出す。
+`appliedMigration` は、採用先が移行を適用し終えた plugin の版を `pluginVersion` に、Claude Code の plugin ではその bundle の集約 hash を `bundleHash` に持つ（Codex の plugin には bundle manifest が無いので `bundleHash` を持たない）。
+`.pfdsl/` が無いリポでは何も出さない。plugin はユーザー単位で入るため、無関係なリポでも起動するからである。
+照合は読むだけで書かない。記録を書くのは `--record-migration` だけで、移行を実施する人または agent が、移行と同じ変更の中で、検証が通った後に明示的に実行する。`--deploy`・`--overwrite-local-edits`・`--delete-edited-orphans` と同時には指定できない（引数の誤りとして exit 2）。
+キーを手で書くことは禁じないが、hash を人手で計算させないためにコマンドを案内する。
+
+出力の意味と対応は次のとおり。
+
+- 「no appliedMigration」: この仕組みの導入前の採用先で、どの移行を適用したか分からない。失敗ではない。出力が指す migration guide の「Choosing the update range」で、導入済みの版から現在の版までの項目を実施し、検証が通ってから `--record-migration` を実行する。plugin の外（repo-local の旧配置など）で動かした場合は版が不明で記録できないので、コマンドは出力されず、plugin 経由で実行し直す旨が示される。
+- 「Skipped the migration-state comparison」: 実行中の pfd-ops が plugin の外（repo-local の旧配置など）にあり、plugin の版を決められない。照合は行われていない。plugin 経由で実行し直す。
+- 「older than the migration state」: 実行中の plugin が記録より古い。plugin を更新する。更新するまで `--deploy` と `--record-migration` は exit 3 で拒否される（古い `install/` で新しい配置を巻き戻さないため）。
+- 「newer than the migration state」: 記録より新しい plugin で動いており、未適用の移行がありうる。出力が示す記録した版から実行中の版までの migration guide の項目を実施し、検証が通ってから `--record-migration` を実行する。拒否はされない（移行の作業自体に `--deploy` が要る）。
+- 「same version … but different content」: 版が同じで bundle の内容が異なる（開発版と公開版など）。どちらが新しいかは判定できない。拒否はされない。差が意図したものか確かめ、必要なら `--record-migration` で記録し直す。
+- 「cannot be compared」: 記録か実行中の版が `x.y.z` として読めない。拒否はされない。
+- `.pfdsl/config.json` を名指しする失敗（exit 3）: JSON として読めない、最上位がオブジェクトでない、`appliedMigration` の形が違う、のいずれか。宣言が壊れたまま黙って無視しないための失敗で、ファイルを直すまで先へ進めない。
+
+`--record-migration` は、上流リポや canonical が曖昧な target、`.pfdsl/` が無いリポ、plugin の版を決められない実行、記録より古い plugin、JSON として読めない・最上位がオブジェクトでない `.pfdsl/config.json` からでは、何も書かずに理由を示して拒否する。
+既にある `appliedMigration` の形が違う場合は拒否せず上書きする（通常の実行と `--deploy` が拒否する記録を直せるのはこのコマンドだけで、記録の版を読めないので古い plugin の拒否は評価されない）。
+`.pfdsl/config.json` が無く `.pfdsl/` だけがあるときは新規に作り、他のキーは保持する。
+新規の採用先（`/pfd-init` ステップ 3 の前に `.pfdsl/` が無かったリポ）は、config をコピーした後にこのコマンドを実行し、現在の版から始める。既存の `.pfdsl/` がある採用先は、移行を適用して検証が通ってから記録する。
 
 ## 「採用」とは
 

@@ -426,8 +426,8 @@ artifact:
     group: adopter_repo
   drift_report:
     label: 配置鮮度警告
-    description: "配置済みinstall/由来ファイルと同梱canonicalのhash照合結果、targetの役割分類（upstream/ambiguous/adopter）に応じた対処案内、および上流plugin versionとのskew警告・同一version時のbundle内容差の通知（stdout）。--deployを案内するのはadopterと分類した場合のみ"
-    criteria: check-install-sync.mjs --upstream によるhash照合・役割分類つきの案内・skew警告・bundle内容差の通知が実装され動作確認済み
+    description: "配置済みinstall/由来ファイルと同梱canonicalのhash照合結果、targetの役割分類（upstream/ambiguous/adopter）に応じた対処案内、および上流plugin versionとのskew警告・同一version時のbundle内容差の通知（stdout）。--deployを案内するのはadopterと分類した場合のみ採用リポではappliedMigrationとの照合結果（移行ガイドの該当区間への案内、古いpluginでの拒否）も出す。"
+    criteria: check-install-sync.mjs --upstream によるhash照合・役割分類つきの案内・skew警告・bundle内容差の通知と、appliedMigrationの照合・古いpluginでの拒否が実装され動作確認済み
     externalStakeholders: [ 採用リポのAIエージェント ]
     group: run_outputs
 
@@ -614,13 +614,13 @@ process:
     tags: [ g ]
   deploy_install_layer:
     label: L3 GitHub Issuesプリセット実配置
-    description: "/pfd-init ステップ3.5。plugin同梱install/を採用リポルートへコピーする。前回配置のmanifest hashと一致するファイルは通常更新し、新canonicalと同一のファイルも記録を更新する。それ以外の既存ファイルは旧記録を保持して警告し、--overwrite-local-edits指定時のみ上書きする。未記録の相違ファイルは未記録のまま保護する。canonicalから消えた旧ファイルはローカル編集が無ければフラグ無しで削除され、編集を抱える場合のみ--delete-edited-orphansを要する。canonical側のリネームは新旧パスの対をPossible renamesとして報告する。出力で依存準備と初回監査の手順を案内する"
+    description: "/pfd-init ステップ3.5。plugin同梱install/を採用リポルートへコピーする。前回配置のmanifest hashと一致するファイルは通常更新し、新canonicalと同一のファイルも記録を更新する。それ以外の既存ファイルは旧記録を保持して警告し、--overwrite-local-edits指定時のみ上書きする。未記録の相違ファイルは未記録のまま保護する。canonicalから消えた旧ファイルはローカル編集が無ければフラグ無しで削除され、編集を抱える場合のみ--delete-edited-orphansを要する。canonical側のリネームは新旧パスの対をPossible renamesとして報告する。出力で依存準備と初回監査の手順を案内する実行中のpluginが.pfdsl/config.jsonのappliedMigrationの記録より古い場合は、配置前に停止する。"
     command: node ${CLAUDE_PLUGIN_ROOT}/skills/pfd-ops/scripts/check-install-sync.mjs --deploy
     location: "scripts/harness-template/skills/pfd-ops/scripts/check-install-sync.mjs"
     tags: [ g ]
   check_install_sync:
     label: 配置鮮度セルフチェック
-    description: "pfd-ops発火時に同梱canonicalと配置済みファイルをhash照合しdriftを警告する。missingな新パスとorphanedな旧パスが同一ファイルのリネームとみなせる場合はPossible renamesとして対で報告する。実行のたびtargetの役割を上流マーカーで分類し、上流リポ・canonical不明と判定した場合は--deployを案内せず明示指定でも書き換え前に停止する（#971）。--upstreamで上流plugin.json versionとのskewと、version一致時のbundle内容差をベストエフォートで報告する。check-pfd-ops-sync.ymlは採用リポへ配布されなくなり、この経路が採用リポ唯一の安全網（ADR-0028）"
+    description: "pfd-ops発火時に同梱canonicalと配置済みファイルをhash照合しdriftを警告する。missingな新パスとorphanedな旧パスが同一ファイルのリネームとみなせる場合はPossible renamesとして対で報告する。実行のたびtargetの役割を上流マーカーで分類し、上流リポ・canonical不明と判定した場合は--deployを案内せず明示指定でも書き換え前に停止する（#971）。--upstreamで上流plugin.json versionとのskewと、version一致時のbundle内容差をベストエフォートで報告する。check-pfd-ops-sync.ymlは採用リポへ配布されなくなり、この経路が採用リポ唯一の安全網（ADR-0028）採用リポと分類したtargetでは、.pfdsl/config.json のappliedMigration（ADR-0043）を実行中pluginの版・bundle hashと照合し、未記録・新しい版・同版で内容差を移行ガイドへの案内つきで通知する。pluginが記録より古い場合だけ--deployと--record-migrationを書き換え前に拒否する。appliedMigrationを書くのは、移行を適用した人が明示的に実行する--record-migrationだけで、照合は書かない。"
     command: node ${CLAUDE_PLUGIN_ROOT}/skills/pfd-ops/scripts/check-install-sync.mjs --upstream
     location: "scripts/harness-template/skills/pfd-ops/scripts/check-install-sync.mjs"
     tags: [ g ]
