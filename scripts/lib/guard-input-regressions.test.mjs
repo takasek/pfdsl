@@ -125,6 +125,29 @@ describe("gh invocation effects", () => {
 		])
 			assert.equal(findOutwardCommand(command), null, command);
 	});
+	it("recognizes label help after label-specific flags", () => {
+		for (const command of [
+			"gh label create flow:managed --color 1D76DB --help",
+			"gh label create flow:managed --description 'Managed work' --force --help",
+			"gh label edit flow:managed --color=1D76DB --name flow:tracked --help",
+			"gh label create x -c 1D76DB -d text -f --help",
+			"gh label edit x -n y -d text --help",
+		])
+			assert.equal(findOutwardCommand(command), null, command);
+	});
+	it("keeps label flag values and positional help as data", () => {
+		for (const command of [
+			"gh label create x --description --help",
+			"gh label edit x --color --help",
+			"gh label create x --color=--help",
+			"gh label create x --description=--help",
+			"gh label create x -d --help",
+			"gh api -f --help",
+			"gh label create x --force -- --help",
+			"gh issue create --color --help",
+		])
+			assert.notEqual(findOutwardCommand(command), null, command);
+	});
 	for (const command of [
 		"gh workflow disable --help",
 		"gh help workflow",

@@ -127,10 +127,22 @@ const GH_VALUE_FLAGS = new Set([
 	"--name",
 ]);
 
+const GH_COMMAND_HELP_FLAGS = {
+	"label create": {
+		value: new Set(["--color", "-c", "--description", "-d"]),
+		boolean: new Set(["--force", "-f"]),
+	},
+	"label edit": {
+		value: new Set(["--color", "-c", "--description", "-d", "--name", "-n"]),
+		boolean: new Set(),
+	},
+};
+
 function hasHelpOption(parsed) {
 	if (!BUILTIN_GH_GROUPS.has(parsed.group)) return false;
 	// `extension exec` forwards the remaining argv to arbitrary extension code.
 	if (parsed.group === "extension" && parsed.verb === "exec") return false;
+	const commandFlags = GH_COMMAND_HELP_FLAGS[`${parsed.group} ${parsed.verb}`];
 	const mergeFlags =
 		parsed.group === "pr" && parsed.verb === "merge"
 			? new Set([
@@ -154,6 +166,11 @@ function hasHelpOption(parsed) {
 		// (--homepage on repo create/edit, --hostname on auth logout).
 		if (arg === "--help") return true;
 		const name = arg.split("=", 1)[0];
+		if (commandFlags?.value.has(name)) {
+			if (arg === name) i++;
+			continue;
+		}
+		if (commandFlags?.boolean.has(name)) continue;
 		if (mergeFlags.has(name) || GH_BOOLEAN_FLAGS.has(name)) continue;
 		if (GH_VALUE_FLAGS.has(arg)) {
 			i++;
