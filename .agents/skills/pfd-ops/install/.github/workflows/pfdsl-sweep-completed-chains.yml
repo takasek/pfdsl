@@ -192,6 +192,6 @@ jobs:
           if [ "$APP_TOKEN_OUTCOME" = success ]; then
             msg="${msg}${nl}"'The pull request was attempted with a GitHub App installation token, which does not depend on the repository setting for GITHUB_TOKEN. Check that the App is installed on this repository with Contents and Pull requests write permissions.'
           else
-            msg="${msg}${nl}"'The pull request was attempted with GITHUB_TOKEN. Check that the repository allows GitHub Actions to create pull requests: Settings → Actions → General → Workflow permissions → "Allow GitHub Actions to create and approve pull requests". If the repository belongs to an organization that restricts this, the organization setting must allow it too.'
+            msg="${msg}${nl}"'The pull request was attempted with GITHUB_TOKEN. Check that the repository allows GitHub Actions to create pull requests: Settings → Actions → General → Workflow permissions → "Allow GitHub Actions to create and approve pull requests". If the repository belongs to an organization that restricts this, the organization setting must allow it too. If the setting cannot be allowed, open the pull requests with a GitHub App token instead: set the PFDSL_SWEEP_APP_CLIENT_ID repository variable and the PFDSL_SWEEP_APP_PRIVATE_KEY secret for an App with Contents and Pull requests write access.'
           fi
           echo "::error::${msg//$'\n'/%0A}"

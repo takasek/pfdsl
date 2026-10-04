@@ -73,8 +73,9 @@ gh api repos/<owner>/<repo>/actions/permissions/workflow --jq .can_approve_pull_
 
 下の GitHub App の installation token で PR を作る経路は、この設定を必要としない。
 設定を有効にできない場合（組織ポリシー等）、回収と `flow-sync/pending` への push は成功するが PR は作られず、run は失敗で終わる。
+この場合は下の GitHub App の installation token で PR を作る経路へ切り替える。
 失敗した run には、多くの場合 PR だけが作られていないこと・確認する設定・手で PR を開く compare URL を示す `::error::` annotation が付く（`Explain a failed pull request step` step）。
-annotation は失敗の原因を判別しない。`flow-sync/pending` の作成を禁じるルール等で push 自体が失敗した場合は、PR 作成 step のログに push のエラーが出ており、ブランチは作られていない。
+この annotation は、PR 作成の拒否と push の失敗を判別しない（原因は PR 作成 step 自身のエラーに出る）。`flow-sync/pending` の作成を禁じるルール等で push 自体が失敗した場合は、PR 作成 step のログに push のエラーが出ており、ブランチは作られていない。
 この結果は全面成功ではない。差分は `flow-sync/pending` に置かれたままなので、compare URL から手で PR を開くか、設定を有効にして run を再実行する。
 workflow は設定値を事前に読まない。取得する REST endpoint が Administration の読取権限を要し、`GITHUB_TOKEN` に付与できないため、案内は失敗した後に出る。
 同一ブランチへ起票するため、連続する push は既存 PR を更新する。`concurrency` グループで直列化してあり、再計算は冪等である。
@@ -118,7 +119,7 @@ issue findings の `blocking:` は監査を失敗させ、`advisory:` だけな�
 2. `install/` 以下のファイルをリポルートに実配置する（`/pfd-init` ステップ3.5、または直接 `node <pfd-ops skill root>/scripts/check-install-sync.mjs --deploy`）。
    配置ファイルと plugin 同梱 canonical の drift は pfd-ops 発火時のランタイム hash 照合が警告する（設計根拠: ADR-0028）
 3. GitHub の `flow:managed` / `flow:exempt` ラベルを、監査が要求する説明文つきで作成または更新する。
-   説明文は監査が完全一致で照合する値である。
+   説明文は監査が照合する値で、異なると advisory の所見になる（それだけでは監査は失敗しない。下の「同期監査」）。
    ラベルが無ければ作成する。
 
    ```bash

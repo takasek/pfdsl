@@ -576,6 +576,8 @@ for (const outcome of ["skipped", "failure", "cancelled"]) {
 		assert.ok(message.includes(SETTING_NAME), message);
 		assert.match(message, /organization/);
 		assert.match(message, /GITHUB_TOKEN/);
+		assert.match(message, /PFDSL_SWEEP_APP_CLIENT_ID/);
+		assert.match(message, /PFDSL_SWEEP_APP_PRIVATE_KEY/);
 		assert.doesNotMatch(message, /installation/);
 	});
 }
