@@ -65,13 +65,13 @@
 全機能を #1257 だけで移植すること、機械テストで IME・配布物・過去 OS の対応を認定することはしない。
 
 2026-10-04、Apple Silicon arm64 / macOS 27.0 (26A428) の local `.app` で検証した。
-最終 release executable の SHA-256 は `4cabd95a31ae5a17eae2de26c8b6c687b29adbcaa803543274b0ddc355e8a449`。
+最終 release executable の SHA-256 は `373d731c7061c69d86435909d81b11167572558a5c0bc34bf7300673681919f7`。
 [native report](evidence/2026-10-04-native-report.json) に実行中 binary・同梱 frontend・入力 source の hash と各文書の結果、[環境記録](evidence/2026-10-04-environment.json) に実測 OS と Mach-O arm64 を残した。
 report の userAgent は WebKit の互換文字列であり、実際の OS / CPU の判定には使用しない。
 
 | 検証 | 結果と証拠の範囲 |
 | --- | --- |
-| 共通処理の TDD・package tests | editor 143、extension 113、standalone 5 が成功。移動した既存テストに加え、未保存 source / preset 分離、複数 mount、破棄、古い描画・位置・focus、drag、終了確認の回帰を Red → Green で確認 |
+| 共通処理の TDD・package tests | editor 144、extension 111、standalone 5 が成功。移動した既存テストに加え、未保存 source / preset 分離、複数 mount、破棄、古い描画・位置・focus、drag、終了確認と preset の二重読取による不整合の回帰を Red → Green で確認 |
 | native 読取境界 | locked Rust tests 2 が成功。選択外・traversal・symlink escape と、選択後に元 pathname を置換した状態を検査 |
 | production adapter 同値性 | top-level sample 20 と運用 PFD 3 の全 23 文書で authored model / sourceMap、診断の code・severity・message・range、継承 frontmatter・preset 診断、format、DOT と SVG を比較。Node 上の両 production adapter と native の両経路が成功 |
 | native corpus | 最新同梱 frontend が native reader で読み、共通 DOM に全 SVG を mount。23/23 成功、failures / JS errors は空。最後に現在の入力・frontend 10 ファイル・実行 binary の hash と照合 |
@@ -79,9 +79,11 @@ report の userAgent は WebKit の互換文字列であり、実際の OS / CPU
 | debug の実 editor、前面表示後 | 日本語貼付→図更新、Undo / Redo、Format→Undo、不完全な `入力 >>` の `P006: Expected process identifier` と Undo 回復を独立 reviewer が確認 |
 | debug の相互移動・tab・大きい図 | `design` の double click→source 4 行目、Welcome / 日本語 / workflow の source と図の隔離、大きい workflow の表示、wheel zoom、minimap の別領域移動を独立 reviewer が確認 |
 | 日本語 IME | ユーザー自身が「前面に出した・IMEも正常」と確認。reviewer の貼付操作とは別の composition / commit の証拠。Monaco と shared DOM は同じ版だが、最新 release の IME は独立に再測定していない |
-| release の native folder | folder picker→`docs/samples` の 20 文書一覧→`05-label-cjk.pfdsl` の source・日本語図を独立 reviewer が確認 |
-| 最新 release の dirty close | 合成 Welcome を `Close acceptance test` に変更。native sheet の Keep Editing で source・図・dirty 印を保持、再 close→Discard で当該試験 process が exit 0。ユーザーの debug 編集は保持 |
-| 最新 release の clean close | 全 tab の dirty 印がない状態から close。sheet なしで当該試験 process が exit 0。操作ツールの終了後の再取得は別 app を自動起動するため、process の終了記録と照合 |
+| 簡素化前 release の native folder | folder picker→`docs/samples` の 20 文書一覧→`05-label-cjk.pfdsl` の source・日本語図を独立 reviewer が確認 |
+| 簡素化前 release の dirty close | 合成 Welcome を `Close acceptance test` に変更。native sheet の Keep Editing で source・図・dirty 印を保持、再 close→Discard で当該試験 process が exit 0。ユーザーの debug 編集は保持 |
+| 簡素化前 release の clean close | 全 tab の dirty 印がない状態から close。sheet なしで当該試験 process が exit 0。操作ツールの終了後の再取得は別 app を自動起動するため、process の終了記録と照合 |
+| 簡素化後 release の GUI | 独立 reviewer が指定 app の `PFDSL — Acceptance` を取得したが、AX は window chrome のみ、採取画像は空白。Raise 後も同じで、前面起動 API は利用不能。編集・Undo・移動・tab・dirty close の新しい実機証拠は得ていない。アプリ機能の失敗とは判定できない |
+| 簡素化後 release の未編集終了 | corpus 完了後、編集操作のない検証 window の close button を実行し、起動した当該 process の exit 0 を確認。画面内容の正常性や dirty close の証拠とは分ける |
 | pan の実機操作 | DOM regression は成功。native 左 drag は操作ツールの `-10005: noWindowsAvailable` または位置変化未観測により未確認。実機合格と扱わず、#1259 の preview 操作受入へ残す |
 | 全体検査 | build / typecheck / lint と全 package・script tests が成功。script tests は 2535 pass / 0 fail、import・shell・CLI 規約検査も成功。初回のローカル受入記録時点では macOS CI は未実行。公開後の結果は [PR #1364 の checks](https://github.com/takasek/pfdsl/pull/1364/checks) で確認 |
 
@@ -90,11 +92,18 @@ report の userAgent は WebKit の互換文字列であり、実際の OS / CPU
 体験 reviewer は実装差分を渡さず app とシナリオだけで操作した。
 終了確認の async 契約、フォルダ読取の pathname 置換、初回中心・focus の古い frame、native report の実行版識別に対する指摘は修正し、回帰・再レビューを実施した。
 
+簡素化では VS Code の転送用 module と不要な package subpath、無効な debug script / log を削除し、各 consumer を共有 package の入口へ接続した。
+アプリ全体の管理は `src/main.ts`、Monaco と preview を対にする tab 内部の状態・操作は `src/document-tab.ts` が担当する。
+preset の表示と診断は一度読み取った依存 snapshot を使用する。
+独立 reviewer が品質・correctness と prototype / build / roadmap の消費者を再確認し、未解決 finding はない。
+既存の共通サービスと host 責務の方式は維持し、新しい編集 UI は追加していない。
+23 文書の native 証拠は簡素化後の source・frontend・実行 binary に更新し、簡素化前の release GUI は executable `4cabd95a31ae5a17eae2de26c8b6c687b29adbcaa803543274b0ddc355e8a449` の観測として区別した。
+
 ## 白い画面の再確認
 
 試作の `experiments/standalone/RESULTS.md` が残す白い採取画像について、今回も背景側の縮小画像や `noWindowsAvailable` を観測した。
-前面表示後の editor・日本語・編集再描画・大きい図は確認でき、同梱 app の corpus 実行中には JavaScript / CSP error を検出しなかった。
-最新の native 終了確認は main window の sheet として AX で取得できたが、親を指定する前の別 window dialog は操作ツールに現れず、ユーザーのスクリーンショットで表示を確認した。
+簡素化前 debug の前面表示後の editor・日本語・編集再描画・大きい図は確認でき、同梱 app の corpus 実行中には JavaScript / CSP error を検出しなかった。
+簡素化前 release の native 終了確認は main window の sheet として AX で取得できたが、親を指定する前の別 window dialog は操作ツールに現れず、ユーザーのスクリーンショットで表示を確認した。
 画面採取・前面状態と描画の切分けまでの観測であり、試作時の根本原因や長時間の白画面不発生を証明したものではない。
 
 ## macOS 下限の候補と制約

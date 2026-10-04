@@ -1,5 +1,5 @@
 {
-	"reference": "b7035cab192f4f568a1d2d52394ebdfa40b43b48",
+	"reference": "5651909539808a1ba403d996dd8a3d4468ffb3ba",
 	"build": {
 		"frontend": [
 			{
@@ -27,8 +27,8 @@
 				"sha256": "4e732cd5d308344fde1323f1682b7b6331bc62bc3e317d3c9d54ac269f7a5265"
 			},
 			{
-				"file": "packages/standalone/dist/assets/index-C2123mVf.js",
-				"sha256": "fb0a8cd373f344c48992750eab8c9010a99da26bfe8883f538a2dce0e195ea5a"
+				"file": "packages/standalone/dist/assets/index-DD6PXelN.js",
+				"sha256": "817c779e21734a66a4439e471c6d58a9abede0b5a7abe6afde8320c6d6795650"
 			},
 			{
 				"file": "packages/standalone/dist/assets/zstd-Dx_4Lof7.js",
@@ -36,7 +36,7 @@
 			},
 			{
 				"file": "packages/standalone/dist/index.html",
-				"sha256": "44c4dc3403a54cc59d912eda7daf67c7b28cb8c4a7159e8fa162a16b8cb63271"
+				"sha256": "aecb37f2fc56947f3499496fa4730728efa9ac36fa89dbfbf3bf078a4f7ae8f3"
 			},
 			{
 				"file": "packages/standalone/dist/processing.js",
@@ -45,12 +45,12 @@
 		],
 		"nativeExecutable": {
 			"path": "/Users/m5/.codex/worktrees/fae1/pfdsl/packages/standalone/src-tauri/target/release/bundle/macos/PFDSL.app/Contents/MacOS/pfdsl-desktop",
-			"sha256": "4cabd95a31ae5a17eae2de26c8b6c687b29adbcaa803543274b0ddc355e8a449"
+			"sha256": "373d731c7061c69d86435909d81b11167572558a5c0bc34bf7300673681919f7"
 		}
 	},
 	"execution": {
 		"path": "/Users/m5/.codex/worktrees/fae1/pfdsl/packages/standalone/src-tauri/target/release/bundle/macos/PFDSL.app/Contents/MacOS/pfdsl-desktop",
-		"sha256": "4cabd95a31ae5a17eae2de26c8b6c687b29adbcaa803543274b0ddc355e8a449"
+		"sha256": "373d731c7061c69d86435909d81b11167572558a5c0bc34bf7300673681919f7"
 	},
 	"userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko)",
 	"documentCount": 23,
@@ -178,7 +178,7 @@
 		},
 		{
 			"file": ".pfdsl/roadmap.pfdsl",
-			"inputSha256": "c929a0e65be464005e945cfba8f32e464b9aecd5dc13cc237bc0908709cbda7c",
+			"inputSha256": "ea4c52217db738d7e3a0e9537a6a43edda31c01251da03011b0290f9b8781c82",
 			"passed": true,
 			"checks": []
 		},
