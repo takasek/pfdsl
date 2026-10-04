@@ -25,22 +25,154 @@
 
 import { basename } from "node:path";
 
-import { flagValues, parseGhCommand } from "./gh-command.mjs";
+import { parseGhCommand } from "./gh-command.mjs";
 import { buildPermissionOutput, parseHookPayload } from "./hook-io.mjs";
+import { prepareHeredocs } from "./shell-heredoc.mjs";
 
 /** Agents permitted to perform outward-facing actions. Publishing is their job. */
 export const DEFAULT_ALLOWED_AGENTS = ["issue-worker"];
 
-/** gh verbs that only read. Everything else is treated as mutating. */
-const READ_ONLY_GH_VERBS = new Set([
-	"view",
-	"list",
-	"status",
-	"checks",
-	"diff",
-	"download",
-	"log",
+/** Built-in read operations; a verb alone cannot establish an extension's effect. */
+const READ_ONLY_GH_COMMANDS = {
+	pr: ["view", "list", "status", "checks", "diff"],
+	issue: ["view", "list", "status"],
+	run: ["view", "list", "watch", "download"],
+	workflow: ["view", "list"],
+	auth: ["status"],
+	repo: ["view", "list"],
+	release: ["view", "list", "download"],
+	gist: ["view", "list"],
+	search: ["code", "commits", "issues", "prs", "repos"],
+	cache: ["list"],
+	secret: ["list"],
+	variable: ["get", "list"],
+	config: ["get", "list"],
+	extension: ["list"],
+	label: ["list"],
+	org: ["list"],
+	project: ["list", "view"],
+	codespace: ["list", "view", "logs"],
+	"gpg-key": ["list"],
+	"ssh-key": ["list"],
+	ruleset: ["list", "view", "check"],
+};
+const BUILTIN_GH_GROUPS = new Set([
+	...Object.keys(READ_ONLY_GH_COMMANDS),
+	"api",
+	"help",
+	"browse",
+	"extension",
+	"alias",
+	"config",
+	"codespace",
+	"gpg-key",
+	"ssh-key",
+	"label",
+	"org",
+	"project",
+	"ruleset",
+	"attestation",
+	"completion",
 ]);
+const GH_BOOLEAN_FLAGS = new Set([
+	"--draft",
+	"--fill",
+	"--fill-first",
+	"--fill-verbose",
+	"--web",
+	"--no-browser",
+	"--watch",
+	"--exit-status",
+	"--verbose",
+	"--silent",
+	"--paginate",
+	"--slurp",
+	"--include",
+	"--insecure",
+	"--confirm",
+	"--yes",
+	"-y",
+]);
+export const GH_VALUE_FLAGS = new Set([
+	"-R",
+	"--repo",
+	"--hostname",
+	"-X",
+	"--method",
+	"-f",
+	"-F",
+	"--field",
+	"--raw-field",
+	"--input",
+	"--cache",
+	"-H",
+	"--header",
+	"-q",
+	"--jq",
+	"--template",
+	"-t",
+	"--title",
+	"-b",
+	"--body",
+	"--body-file",
+	"-B",
+	"--base",
+	"--head",
+	"-a",
+	"--assignee",
+	"-r",
+	"--reviewer",
+	"-l",
+	"--label",
+	"-m",
+	"--milestone",
+	"-p",
+	"--project",
+	"--json",
+	"--limit",
+	"--state",
+	"--search",
+	"--branch",
+	"--name",
+]);
+
+export function hasHelpOption(parsed) {
+	if (!BUILTIN_GH_GROUPS.has(parsed.group)) return false;
+	// `extension exec` forwards the remaining argv to arbitrary extension code.
+	if (parsed.group === "extension" && parsed.verb === "exec") return false;
+	const mergeFlags =
+		parsed.group === "pr" && parsed.verb === "merge"
+			? new Set([
+					"--auto",
+					"--admin",
+					"-d",
+					"--delete-branch",
+					"--disable-auto",
+					"-m",
+					"--merge",
+					"-r",
+					"--rebase",
+					"-s",
+					"--squash",
+				])
+			: new Set();
+	for (let i = 0; i < parsed.args.length; i++) {
+		const arg = parsed.args[i];
+		if (arg === "--") break;
+		if (arg === "--help" || arg === "-h") return true;
+		const name = arg.split("=", 1)[0];
+		if (mergeFlags.has(name) || GH_BOOLEAN_FLAGS.has(name)) continue;
+		if (GH_VALUE_FLAGS.has(arg)) {
+			i++;
+			continue;
+		}
+		if (arg.startsWith("-") && !GH_BOOLEAN_FLAGS.has(arg)) {
+			const flag = arg.split("=", 1)[0];
+			if (!GH_VALUE_FLAGS.has(flag)) return false;
+		}
+	}
+	return false;
+}
 
 /** git subcommands that publish to a remote. */
 const OUTWARD_GIT_SUBCOMMANDS = new Set(["push"]);
@@ -73,6 +205,51 @@ export const GIT_GLOBAL_FLAGS_WITH_VALUE = new Set([
 // Exported so other command-inspecting guards (main-commit-guard.mjs) reuse
 // this parsing instead of re-implementing quote/segment handling.
 export function splitCommandFlow(command) {
+	command = prepareHeredocs(command, {
+		isShellInput: (header) =>
+			splitCommandFlow(header).some(({ command: segment }) => {
+				const tokens = stripLeadingNoise(tokenize(segment));
+				const executable = basename(tokens[0]?.value ?? "");
+				const shell = ["sh", "bash", "dash", "ksh", "zsh"].includes(executable);
+				let commandString = false;
+				let stdinScript = false;
+				let scriptFile = false;
+				let options = true;
+				for (let i = 1; i < tokens.length; i++) {
+					const redirection = leadingRedirectionLength(tokens, i);
+					if (redirection > 0) {
+						i += redirection - 1;
+						continue;
+					}
+					const arg = tokens[i].value;
+					if (
+						options &&
+						["--rcfile", "--init-file", "-o", "-O"].includes(arg)
+					) {
+						i++;
+						continue;
+					}
+					if (options && arg === "--") {
+						options = false;
+						continue;
+					}
+					if (options && /^-[a-zA-Z]*c/.test(arg)) {
+						commandString = true;
+						break;
+					}
+					if (options && /^-[a-zA-Z]*s/.test(arg)) stdinScript = true;
+					if (!options || (!arg.startsWith("-") && !arg.startsWith("+"))) {
+						scriptFile = true;
+						break;
+					}
+				}
+				return (
+					(shell && !commandString && (stdinScript || !scriptFile)) ||
+					(["source", "."].includes(executable) &&
+						["/dev/stdin", "/dev/fd/0"].includes(tokens[1]?.value))
+				);
+			}),
+	});
 	const segments = [];
 	let current = "";
 	let quote = null;
@@ -818,8 +995,27 @@ export function gitSubcommand(tokens) {
 }
 
 function ghApiMethod(args) {
-	const [method] = flagValues(args, ["-X", "--method"]);
-	return method ?? null;
+	let method = null;
+	let input = false;
+	for (let i = 0; i < args.length; i++) {
+		const arg = args[i];
+		if (arg === "--") break;
+		const flag = arg.split("=", 1)[0];
+		if (["-X", "--method"].includes(flag)) {
+			method = arg.includes("=") ? arg.slice(flag.length + 1) : args[++i];
+			if (method === undefined) return "UNKNOWN";
+			continue;
+		}
+		if (/^-X.+/.test(arg)) {
+			method = arg.slice(2);
+			continue;
+		}
+		input ||=
+			["-f", "-F", "--raw-field", "--field", "--input"].includes(flag) ||
+			/^-[fF].+/.test(arg);
+		if (GH_VALUE_FLAGS.has(arg)) i++;
+	}
+	return method ?? (input ? "POST" : "GET");
 }
 
 /**
@@ -848,18 +1044,29 @@ export function findOutwardCommand(command) {
 			// first, and reading the flag as the group made this guard fail open
 			// on `gh -R owner/repo pr create` (review finding, #650).
 			const parsed = parseGhCommand(tokens);
-			if (!parsed) continue;
+			if (!parsed) {
+				if (
+					tokens
+						.slice(1)
+						.some((token) =>
+							["--help", "-h", "--version"].includes(token.value),
+						)
+				)
+					continue;
+				return "gh";
+			}
+			if (hasHelpOption(parsed) || parsed.group === "help") continue;
+			if (parsed.group === "browse") continue;
 			if (parsed.group === "api") {
 				const method = ghApiMethod(parsed.args);
-				// No explicit method means GET, which only reads.
-				if (method && method.toUpperCase() !== "GET")
+				if (method.toUpperCase() !== "GET")
 					return `gh api ${method.toUpperCase()}`;
 				continue;
 			}
 			// An unrecognised or absent verb is treated as mutating: guessing
 			// in the permissive direction is what this guard exists to prevent.
 			if (parsed.verb === null) return `gh ${parsed.group}`;
-			if (!READ_ONLY_GH_VERBS.has(parsed.verb))
+			if (!READ_ONLY_GH_COMMANDS[parsed.group]?.includes(parsed.verb))
 				return `gh ${parsed.group} ${parsed.verb}`;
 		}
 	}
@@ -895,8 +1102,8 @@ export function evaluateDelegationGuard(
 		matched,
 		reason:
 			`Blocked '${matched}': the '${agentType}' subagent must not perform outward-facing actions. ` +
-			"Publishing is the caller's to do. Finish the work as commits on the current branch, then report back " +
-			"to your caller and let it review, push and open the pull request. Do not look for another route.",
+			"Publishing is the caller's to do. Finish the permitted local edits and checks, then report the result and blocked action " +
+			"to your caller, which owns Git metadata changes, review and publishing. Do not look for another route.",
 	};
 }
 
