@@ -63,7 +63,7 @@
 <!-- check_install_sync -->
 <g id="node62" class="node">
 <title>check_install_sync</title>
-<g id="a_node62"><a xlink:title="配置鮮度セルフチェック&#10;&#10;pfd&#45;ops発火時に同梱canonicalと配置済みファイルをhash照合しdriftを警告する。missingな新パスとorphanedな旧パスが同一ファイルのリネームとみなせる場合はPossible renamesとして対で報告する。実行のたびtargetの役割を上流マーカーで分類し、上流リポ・canonical不明と判定した場合は&#45;&#45;deployを案内せず明示指定でも書き換え前に停止する（#971）。&#45;&#45;upstreamで上流plugin.json versionとのskewと、version一致時のbundle内容差をベストエフォートで報告する。check&#45;pfd&#45;ops&#45;sync.ymlは採用リポへ配布されなくなり、この経路が採用リポ唯一の安全網（ADR&#45;0028）&#10;command: node ${CLAUDE_PLUGIN_ROOT}/skills/pfd&#45;ops/scripts/check&#45;install&#45;sync.mjs &#45;&#45;upstream&#10;location: scripts/harness&#45;template/skills/pfd&#45;ops/scripts/check&#45;install&#45;sync.mjs">
+<g id="a_node62"><a xlink:title="配置鮮度セルフチェック&#10;&#10;pfd&#45;ops発火時に同梱canonicalと配置済みファイルをhash照合しdriftを警告する。missingな新パスとorphanedな旧パスが同一ファイルのリネームとみなせる場合はPossible renamesとして対で報告する。実行のたびtargetの役割を上流マーカーで分類し、上流リポ・canonical不明と判定した場合は&#45;&#45;deployを案内せず明示指定でも書き換え前に停止する（#971）。&#45;&#45;upstreamで上流plugin.json versionとのskewと、version一致時のbundle内容差をベストエフォートで報告する。check&#45;pfd&#45;ops&#45;sync.ymlは採用リポへ配布されなくなり、この経路が採用リポ唯一の安全網（ADR&#45;0028）採用リポと分類したtargetでは、.pfdsl/config.json のappliedMigration（ADR&#45;0043）を実行中pluginの版・bundle hashと照合し、未記録・新しい版・同版で内容差を移行ガイドへの案内つきで通知する。pluginが記録より古い場合だけ&#45;&#45;deployと&#45;&#45;record&#45;migrationを書き換え前に拒否する。appliedMigrationを書くのは、移行を適用した人が明示的に実行する&#45;&#45;record&#45;migrationだけで、照合は書かない。&#10;command: node ${CLAUDE_PLUGIN_ROOT}/skills/pfd&#45;ops/scripts/check&#45;install&#45;sync.mjs &#45;&#45;upstream&#10;location: scripts/harness&#45;template/skills/pfd&#45;ops/scripts/check&#45;install&#45;sync.mjs">
 <ellipse fill="none" stroke="#16a085" cx="4090.3" cy="-1159.22" rx="92.98" ry="29.42"/>
 <text xml:space="preserve" text-anchor="middle" x="4090.3" y="-1163.42" font-family="Times,serif" font-size="14.00">check_install_sync</text>
 <text xml:space="preserve" text-anchor="middle" x="4090.3" y="-1146.62" font-family="Times,serif" font-size="14.00">配置鮮度セルフチェック</text>
@@ -80,7 +80,7 @@
 <!-- deploy_install_layer -->
 <g id="node67" class="node">
 <title>deploy_install_layer</title>
-<g id="a_node67"><a xlink:title="L3 GitHub Issuesプリセット実配置&#10;&#10;/pfd&#45;init ステップ3.5。plugin同梱install/を採用リポルートへコピーする。前回配置のmanifest hashと一致するファイルは通常更新し、新canonicalと同一のファイルも記録を更新する。それ以外の既存ファイルは旧記録を保持して警告し、&#45;&#45;overwrite&#45;local&#45;edits指定時のみ上書きする。未記録の相違ファイルは未記録のまま保護する。canonicalから消えた旧ファイルはローカル編集が無ければフラグ無しで削除され、編集を抱える場合のみ&#45;&#45;delete&#45;edited&#45;orphansを要する。canonical側のリネームは新旧パスの対をPossible renamesとして報告する。出力で依存準備と初回監査の手順を案内する&#10;command: node ${CLAUDE_PLUGIN_ROOT}/skills/pfd&#45;ops/scripts/check&#45;install&#45;sync.mjs &#45;&#45;deploy&#10;location: scripts/harness&#45;template/skills/pfd&#45;ops/scripts/check&#45;install&#45;sync.mjs">
+<g id="a_node67"><a xlink:title="L3 GitHub Issuesプリセット実配置&#10;&#10;/pfd&#45;init ステップ3.5。plugin同梱install/を採用リポルートへコピーする。前回配置のmanifest hashと一致するファイルは通常更新し、新canonicalと同一のファイルも記録を更新する。それ以外の既存ファイルは旧記録を保持して警告し、&#45;&#45;overwrite&#45;local&#45;edits指定時のみ上書きする。未記録の相違ファイルは未記録のまま保護する。canonicalから消えた旧ファイルはローカル編集が無ければフラグ無しで削除され、編集を抱える場合のみ&#45;&#45;delete&#45;edited&#45;orphansを要する。canonical側のリネームは新旧パスの対をPossible renamesとして報告する。出力で依存準備と初回監査の手順を案内する実行中のpluginが.pfdsl/config.jsonのappliedMigrationの記録より古い場合は、配置前に停止する。&#10;command: node ${CLAUDE_PLUGIN_ROOT}/skills/pfd&#45;ops/scripts/check&#45;install&#45;sync.mjs &#45;&#45;deploy&#10;location: scripts/harness&#45;template/skills/pfd&#45;ops/scripts/check&#45;install&#45;sync.mjs">
 <ellipse fill="none" stroke="#16a085" cx="3636.01" cy="-1130.22" rx="94.91" ry="41.3"/>
 <text xml:space="preserve" text-anchor="middle" x="3636.01" y="-1142.82" font-family="Times,serif" font-size="14.00">deploy_install_layer</text>
 <text xml:space="preserve" text-anchor="middle" x="3636.01" y="-1126.02" font-family="Times,serif" font-size="14.00">L3 GitHub</text>
@@ -1276,7 +1276,7 @@
 <!-- drift_report -->
 <g id="node50" class="node">
 <title>drift_report</title>
-<g id="a_node50"><a xlink:title="配置鮮度警告&#10;&#10;配置済みinstall/由来ファイルと同梱canonicalのhash照合結果、targetの役割分類（upstream/ambiguous/adopter）に応じた対処案内、および上流plugin versionとのskew警告・同一version時のbundle内容差の通知（stdout）。&#45;&#45;deployを案内するのはadopterと分類した場合のみ&#10;criteria: check&#45;install&#45;sync.mjs &#45;&#45;upstream によるhash照合・役割分類つきの案内・skew警告・bundle内容差の通知が実装され動作確認済み&#10;externalStakeholders: 採用リポのAIエージェント">
+<g id="a_node50"><a xlink:title="配置鮮度警告&#10;&#10;配置済みinstall/由来ファイルと同梱canonicalのhash照合結果、targetの役割分類（upstream/ambiguous/adopter）に応じた対処案内、および上流plugin versionとのskew警告・同一version時のbundle内容差の通知（stdout）。&#45;&#45;deployを案内するのはadopterと分類した場合のみ採用リポではappliedMigrationとの照合結果（移行ガイドの該当区間への案内、古いpluginでの拒否）も出す。&#10;criteria: check&#45;install&#45;sync.mjs &#45;&#45;upstream によるhash照合・役割分類つきの案内・skew警告・bundle内容差の通知と、appliedMigrationの照合・古いpluginでの拒否が実装され動作確認済み&#10;externalStakeholders: 採用リポのAIエージェント">
 <polygon fill="none" stroke="black" stroke-width="2" points="4327.29,-449.02 4219.29,-449.02 4219.29,-407.42 4327.29,-407.42 4327.29,-449.02"/>
 <text xml:space="preserve" text-anchor="middle" x="4273.29" y="-432.42" font-family="Times,serif" font-size="14.00">drift_report</text>
 <text xml:space="preserve" text-anchor="middle" x="4273.29" y="-415.62" font-family="Times,serif" font-size="14.00">配置鮮度警告</text>
