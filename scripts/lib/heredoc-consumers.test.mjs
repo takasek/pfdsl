@@ -50,6 +50,13 @@ const CODE_OR_UNKNOWN_READERS = [
 	"cat <<D &&",
 	"cat <<D | bash",
 	"exec <<D",
+	// A data reader whose output reaches a program is not a data reader.
+	"cat <<D |& bash",
+	"cat <<D > >(bash)",
+	"cat <<D 2> >(bash)",
+	"tee <<D >(bash)",
+	"tee f <<D >(bash)",
+	"tee >(bash) <<D",
 ];
 
 const segments = (command) =>
@@ -107,6 +114,15 @@ describe("heredoc readers", () => {
 			"deny",
 		);
 		assert.equal(decide("cat > f <<'EOF'\nx\nEOF\ngit add -A"), "allow");
+	});
+	it("trusts gh -F - only where gh itself reads a body", () => {
+		// An alias may run a shell; issue/pr bodies and api input are data.
+		assert.equal(
+			segments(withBody("gh q -F - <<D", "'EOF'", "git push")).includes(
+				"git push",
+			),
+			true,
+		);
 	});
 	it("lets a commit message mention guarded commands (#1280)", () => {
 		const command =

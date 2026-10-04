@@ -202,13 +202,20 @@ const STDIN_DATA_READERS = {
 	git: (tokens) =>
 		["commit", "tag"].includes(gitSubcommand(tokens)) &&
 		readsStdinFile(tokens, ["-F", "--file"]),
-	gh: (tokens) => readsStdinFile(tokens, ["--body-file", "-F", "--input"]),
+	// Only where gh itself reads the body: an alias may run a shell.
+	gh: (tokens) => {
+		const group = parseGhCommand(tokens)?.group;
+		return ["issue", "pr"].includes(group)
+			? readsStdinFile(tokens, ["--body-file", "-F"])
+			: group === "api" && readsStdinFile(tokens, ["--input"]);
+	},
 };
 
 /**
  * Whether every command that reads the heredocs opened on `header` is a known
  * data reader: the command carrying `<<` and the pipeline it feeds. Anything
- * else, including a header that continues past the body, may run the body.
+ * else may run the body: a header that continues past the body, or one with a
+ * process or command substitution, whose program can receive a reader's output.
  */
 function isDataReader(header) {
 	if (/(?:\|\|?|&&|\\)\s*$/.test(header)) return false;
@@ -216,6 +223,7 @@ function isDataReader(header) {
 	for (const { command: segment, separatorBefore } of splitCommandFlow(
 		header,
 	)) {
+		if (separatorBefore === "(") return false;
 		reading = segment.includes("<<") || (reading && separatorBefore === "|");
 		if (!reading) continue;
 		const raw = tokenize(segment);
