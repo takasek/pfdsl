@@ -28,17 +28,35 @@ issue 本文は依頼内容、コメントは設計選択記録の置き場と�
 
 ## PR 本文規約
 
-issue に対応する PR を作る際、本文に必ず閉じるキーワードを含める:
+本文の参照は、PR が完了させる範囲と現在の base に応じて選ぶ。ユーザーが issue の OPEN 維持を明示した場合は、その指定を守る。
+
+| PR の範囲 | 本文の参照 |
+|---|---|
+| issue 全体の受入条件を満たし、デフォルトブランチへ直接マージする | 完了する issue ごとに `Closes #<issue番号>` |
+| 部分対応、または issue の OPEN 維持が指定されている | `Refs #<issue番号>` と閉じない理由 |
+| デフォルトブランチ以外への中間 PR | `Refs #<issue番号>` と中間 PR である理由 |
+
+複数 issue を完了させる場合は1行ずつ列挙する。
 
 ```
 Closes #<issue番号>
 ```
 
-複数 issue の場合は1行ずつ列挙する。これによりデフォルトブランチへの PR マージ時に GitHub が issue を自動 close する。
+[GitHub の仕様](https://docs.github.com/en/issues/tracking-your-work-with-issues/using-issues/linking-a-pull-request-to-an-issue)では、PR 本文の閉じるキーワードはデフォルトブランチを base とする場合に解釈され、マージ時に issue を自動 close する。別のブランチが base なら無視され、リンクも生成されず、その PR のマージは issue を閉じない。このプリセットでは中間 PR に `Closes` を使わず、その本文が最終 PR へ引き継がれると仮定せず、デフォルトブランチへ統合する最終 PR に完了する issue の参照をまとめる。
 
-**中間 PR では使わない**: `Closes` を使うのはデフォルトブランチ（main 等）へ直接マージする PR のみ。feature branch への中間 PR に書くと、feature branch マージ時点で issue が閉じられ、デフォルトブランチ未到達のまま誤 close になる。issue close と flow 確定はデフォルトブランチへのマージ時に行う。
+**閉じる issue が無い PR**: hotfix（次節）に該当しない、部分対応や bookkeeping・ドキュメントの spin-off 等では、行頭に `no-issue: <理由>` と明示する。理由は必須（コロンの後に空でない理由テキストを書く）。対応する issue が存在しても、今回閉じないなら `Refs` と理由に加えてこの宣言を使う。宣言なしに閉じる issue が無いまま PR を出すことは認めない。`no-issue:` は GitHub の自動クローズを無効化しないため、説明中の `resolved #<n>` 等にも注意する。
 
-**閉じる issue が無い PR**: hotfix（次節）に該当しない、bookkeeping やドキュメントの spin-off 等では、行頭に `no-issue: <理由>` と明示する。理由は必須（コロンの後に空でない理由テキストを書く）。これは「issue なし develop は hotfix のみに限る」の例外であり、理由必須の明示宣言に限って緩めたもの — 宣言なしに閉じる issue が無いまま PR を出すことは変わらず認めない。
+### PR 作成・本文編集・base 変更後の確認
+
+現在の本文・base と、GitHub が導いた `closingIssuesReferences` を取得し、その base で意図した repository・issue 番号の集合と比較する。`gh` がある場合の取得例:
+
+```
+gh pr view <PR番号> --json body,baseRefName,closingIssuesReferences
+```
+
+`gh` が無い場合も同じ情報を返す backend の参照手段を使い、ページ分割されるクローズ対象は全ページ取得する。本文の作成・編集では「規約」の「複数行本文の外部書込み」に従って exact-write readback も行う。
+中間 PR、部分対応、OPEN 維持が指定された PR など閉じる issue が無い場合は空集合を確認する。base をデフォルトブランチへ変更した場合は、本文が同じでも再確認する。リンクの有無だけを検査する CI は、対象集合の意図との一致を保証しない。
+不一致は現在の base・本文・リンクを調べ、必要な修正後に再読し、解消してからレビューへ渡す。本文の再保存だけで必ず解消すると仮定しない。
 
 ## hotfix 運用（issue 省略）
 

@@ -27,7 +27,9 @@ node scripts/check-scaffold-sync.mjs
 このリポは上流であり、公開版は main より必ず遅れているため、公開版で `.pfdsl` を検査すると main で既に直っている欠陥を実在の所見として拾う。
 同じ番号を名乗る2実体を番号では判別できない形は `.pfdsl/bindings/pfd-retro-patterns/duplicate-name-not-a-discriminator.md` が一次情報。
 
-したがって手で CLI を叩く場合も `node packages/cli/dist/cli.js <cmd>` を使う（`cycle-status.mjs` / `gate-check.mjs` および `.pfdsl` の `command:` フィールドが既にこの形を使っている — 手打ちだけが例外になっていた）。
+したがってリポジトリルートから手で CLI を叩く場合も `node packages/cli/dist/cli.js <cmd>` を使う。
+`.pfdsl` の `command:` は図のファイルと `basePath` から導出される `command.cwd` を基準にする。
+`pipeline.pfdsl` / `workflow.pfdsl` は `basePath: ..` によりリポジトリルートを基準とし、`command:` とローカルの `location:` をそこからの相対パスで記述する。
 worktree では先に `pnpm install && pnpm -r build` を済ませる。
 pfdsl スキル本文の CLI プリフライトは採用リポ向けに `pfdsl` / `npx pfdsl` を指示するが、上流であるこのリポではこの規約が優先する。
 

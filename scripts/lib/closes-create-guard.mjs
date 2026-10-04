@@ -27,11 +27,12 @@ import { flagValues, parseGhCommand } from "./gh-command.mjs";
 import { buildPermissionOutput, parseHookPayload } from "./hook-io.mjs";
 
 /**
- * GitHub's own closing-keyword vocabulary, immediately followed by `#<n>`.
- * Case-insensitive, since GitHub's own matching is.
+ * Closing-keyword token evidence: local/qualified issue numbers or issue URLs.
+ * Optional colon and case-insensitive keywords follow GitHub's syntax.
+ * This remains a token check; CI verifies GitHub's actual closing links.
  */
 const CLOSE_KEYWORD_REFERENCE =
-	/\b(close|closes|closed|fix|fixes|fixed|resolve|resolves|resolved)\b\s+#\d+/i;
+	/\b(close|closes|closed|fix|fixes|fixed|resolve|resolves|resolved)\b:?\s+(?:#|[a-z\d][a-z\d-]*\/[a-z\d_.-]+#|https:\/\/[a-z\d.-]+(?::\d+)?\/[a-z\d][a-z\d-]*\/[a-z\d_.-]+\/issues\/)[1-9]\d*(?=$|[\s.,;:!?)\]}>])/i;
 
 /**
  * The PR body text a `gh pr create` call would send, or null when it cannot

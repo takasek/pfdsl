@@ -103,6 +103,29 @@ export function readLocalBundleAggregateHash(pluginRoot) {
 }
 
 /**
+ * Identify the plugin this script is running from: the version from whichever
+ * plugin manifest the root carries, and the bundle aggregate hash only where a
+ * bundle manifest exists. Only the Claude Code plugin has one; the Codex plugin
+ * (`.codex-plugin/plugin.json`) is identified by its version alone, so a hash
+ * is never invented for it. Returns null when no manifest names a version —
+ * the repo-local run, where nothing says which release is executing.
+ * @param {string} pluginRoot
+ * @returns {{version: string, bundleHash: string | null} | null}
+ */
+export function readPluginIdentity(pluginRoot) {
+	for (const manifestPath of [
+		".claude-plugin/plugin.json",
+		".codex-plugin/plugin.json",
+	]) {
+		const version = readJsonOrNull(resolve(pluginRoot, manifestPath))?.version;
+		if (typeof version === "string" && version.trim().length > 0) {
+			return { version, bundleHash: readLocalBundleAggregateHash(pluginRoot) };
+		}
+	}
+	return null;
+}
+
+/**
  * @template T
  * @param {typeof fetch} fetchImpl
  * @param {string} url
