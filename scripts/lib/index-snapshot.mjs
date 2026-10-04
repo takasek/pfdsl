@@ -11,6 +11,7 @@ import {
 	rmSync,
 	statSync,
 	symlinkSync,
+	writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
@@ -113,6 +114,18 @@ export function withIndexSnapshot(
 			source,
 			["clone", "--quiet", "--shared", "--no-checkout", "--", source, snapshot],
 			env,
+		);
+		// Cloning a shallow source falls back to a transport copy, even with
+		// --shared, so newly staged objects outside HEAD may be omitted.
+		// Explicitly expose the source object store for our frozen index tree.
+		const objects = git(
+			source,
+			["rev-parse", "--git-path", "objects"],
+			environment,
+		).trim();
+		writeFileSync(
+			join(snapshot, ".git/objects/info/alternates"),
+			`${resolve(source, objects)}\n`,
 		);
 		git(snapshot, ["read-tree", tree], env);
 		git(snapshot, ["checkout-index", "--all"], env);

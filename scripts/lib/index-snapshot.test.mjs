@@ -69,6 +69,31 @@ it("exports a split index without modifying it", () =>
 		assert.deepEqual(readFileSync(join(root, ".git/index")), before);
 	}));
 
+it("exports newly staged objects from a shallow clone", () =>
+	fixture(({ root, git }) => {
+		git(
+			"-c",
+			"user.name=test",
+			"-c",
+			"user.email=test@example.com",
+			"commit",
+			"-qm",
+			"test: base",
+		);
+		const shallow = join(root, "shallow");
+		git("clone", "--quiet", "--depth=1", `file://${root}`, shallow);
+		writeFileSync(join(shallow, "tsconfig.base.json"), '{"strict":true}\n');
+		execFileSync("git", ["add", "tsconfig.base.json"], { cwd: shallow });
+		const before = readFileSync(join(shallow, ".git/index"));
+		withIndexSnapshot(shallow, (snapshot) =>
+			assert.equal(
+				readFileSync(join(snapshot, "tsconfig.base.json"), "utf8"),
+				'{"strict":true}\n',
+			),
+		);
+		assert.deepEqual(readFileSync(join(shallow, ".git/index")), before);
+	}));
+
 for (const cache of [".vite", ".cache"]) {
 	it(`keeps dependency ${cache} writes inside the snapshot`, () =>
 		fixture(({ root, write }) => {
