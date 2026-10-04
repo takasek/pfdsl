@@ -88,7 +88,7 @@ Bash と MCP の policy は次を判定する。
 - 検査回避は token 単位で deny する。
   - 対象は、commit 系の `--no-verify`/`-n`、`-c core.hooksPath=…`、`--config-env` による hooksPath、`git config` による core.hooksPath の書込みである。
   - `GIT_CONFIG_COUNT`・`GIT_CONFIG_KEY_n`・`GIT_CONFIG_VALUE_n`・`GIT_CONFIG_PARAMETERS`・`GIT_CONFIG_GLOBAL`・`GIT_CONFIG_SYSTEM` の代入は、hook を走らせる subcommand の前にある場合だけ deny する。
-  - `rtk git …` の前置きも扱う。
+  - 先頭に未知のコマンドが置かれていても、その後ろにある `git`・`gh` を検査する。特定の個人ツールの名前には依存しない。
 - Claude では、変更系 Git の target の checkout root を、payload.cwd の checkout root と比べる。
   - 明示 target は、`git -C <abs>`、`cd <abs> &&` の直後、`--git-dir`、`--work-tree`、`GIT_DIR`、`GIT_WORK_TREE` である。明示 target が無ければ payload.cwd の checkout を target とする。
   - target が primary checkout なら deny、別の worktree なら ask、解決できない変更系なら deny する。
@@ -153,6 +153,7 @@ Makefile は `build: preflight` とし、並列実行でも順序を保証する
 - `scripts/run-repo-hook.mjs` と、hook コマンドの書換え
 - `scripts/lib/file-target-context.mjs` の branch と origin/HEAD の取得
 - `GIT_CONFIG_*` を target 環境変数として扱う変更
+- 特定の個人ツール（`rtk`）の名前に依存する分類
 - verification-tree-guard と closes-create-guard の書換え
 - 所有権の確認の撤去（代わりに上記の payload.cwd 基準の確認を置く）
 
