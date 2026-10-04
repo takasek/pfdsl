@@ -64,6 +64,10 @@ roadmap / workflow / pipeline の3種別（ADR-0017）に基づき、 プロジ�
 `config.json` も種別と無関係で、`.pfdsl/config.json` として常にコピーする。採用リポの離散的な宣言（スイッチや一覧）を置くファイルで、雛形は pfd-retro の D 層を `decline` にしてある。
 `bindings/pfd-retro-patterns/` は事例・観察・反例の置き場で、`sample-pattern.md` は記録の見本を持つ（`bindings/pfd-retro.md` の「事例・観察・反例」節が保存と検索の方法を指す）。
 既に `.pfdsl/` にファイルが存在する場合は上書きしない。
+このステップの前に `.pfdsl/` が存在しなかった場合（新規の採用先）に限り、続けて `node <pfd-ops skill root>/scripts/check-install-sync.mjs --record-migration` を実行する（`<pfd-ops skill root>` は上の scaffold の所在と同じ規則で解決する）。
+新規の採用先には適用すべき移行が無いので、現在の plugin の版を `appliedMigration` に記録して始める。
+`.pfdsl/` が既にあった場合は、`config.json` をこのステップで新規に作っても実行しない。0.0.26 以前の採用先は `config.json` を持たない（0.1.0 の scaffold で導入された）ため、再実行で `config.json` が新規に作られても、その採用先は適用していない移行を適用済みと主張することになる。
+そのような採用先は、出力が指す migration guide を適用し、検証が通ってから記録する。
 companion をどの言語で書くかは pfd-ops スキルの `references/architecture.md`「companion の記述言語」節に従う。
 
 ## ステップ 3.5: 作業項目バックエンド（L3）の採用・更新（任意）

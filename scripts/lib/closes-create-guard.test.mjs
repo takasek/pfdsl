@@ -42,6 +42,46 @@ describe("evaluateClosesCreateGuard", () => {
 		assert.equal(result.decision, "allow");
 	});
 
+	for (const body of [
+		"Closes: #123",
+		"FIXES: takasek/pfdsl#1200",
+		"Resolves other-owner/other-repo#1200.",
+		"Closed https://github.com/takasek/pfdsl/issues/1200",
+		"Fix: https://github.example.com/octo-org/repo.name/issues/123.",
+	]) {
+		it(`allows a readable body-file carrying '${body}'`, () => {
+			const result = evaluateClosesCreateGuard(
+				payload({
+					command:
+						"gh pr create --base main --title x --body-file /tmp/body.md",
+				}),
+				{ ...deps, readFile: () => body },
+			);
+			assert.equal(result.decision, "allow");
+		});
+	}
+
+	for (const body of [
+		"Refs takasek/pfdsl#1200",
+		"Closes takasek/pfdsl#",
+		"Closes takasek/pfdsl#1200abc",
+		"Closes #123abc",
+		"Closes owner/repo#0",
+		"Closes https://github.com/takasek/pfdsl/pull/1200",
+		"Closes https://github.com/takasek/pfdsl/issues/1200/extra",
+	]) {
+		it(`asks for non-issue or malformed reference '${body}'`, () => {
+			const result = evaluateClosesCreateGuard(
+				payload({
+					command:
+						"gh pr create --base main --title x --body-file /tmp/body.md",
+				}),
+				{ ...deps, readFile: () => body },
+			);
+			assert.equal(result.decision, "ask");
+		});
+	}
+
 	it("allows a body carrying the no-issue: exemption", () => {
 		const result = evaluateClosesCreateGuard(
 			payload({

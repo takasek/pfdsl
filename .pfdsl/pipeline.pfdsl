@@ -1,6 +1,7 @@
 ---
 title: pfdsl 変換パイプライン
 type: pipeline
+basePath: ..
 description: "判断を含まない決定的変換を収める（ADR-0035）。3本の独立チェーンを持つ: .pfdslドキュメント変換（b: 処理系）・生成（一次ソース→スキル・plugin・描画物）・配布（plugin→採用リポ）。判断を含む営みはworkflow.pfdsl側。処理系の呼び出し元（c: pfdsl skill / d: VSCode拡張）はパイプラインを実行するホストでありデータではないため図には現れない。a-g層との対応と設計判断はsibling pipeline.md参照"
 layout:
   direction: LR
@@ -145,8 +146,8 @@ artifact:
     group: run_outputs
   updated_source:
     label: フィールド更新済みソース
-    description: 指定ノードの指定フィールドを書き換えた.pfdslテキスト。定義が無ければ新規に挿入する
-    criteria: meta setコマンドが実装され動作確認済み
+    description: ローカルfrontmatterに定義されたノードの指定フィールドを書き換えた.pfdslテキスト。定義が無いノードは追加を案内し、エラー時はファイルを書き換えない
+    criteria: meta setコマンドが実装され、定義済みノードの更新と未定義ノードの非書込みが動作確認済み
     externalStakeholders: [ CLIユーザー ]
     group: run_outputs
   reindexed_source:
@@ -158,57 +159,57 @@ artifact:
   spec:
     label: 言語仕様書
     description: "workflow.pfdsl の maintain_spec が生産する。gen_skill・gen_plugin の一次ソースとして現れる"
-    location: ../docs/spec/spec.md
+    location: "docs/spec/spec.md"
     group: gen_sources
   skill_template:
     label: スキルテンプレート
     description: "workflow.pfdsl の maintain_template が生産する。gen-skill.mjs がこれを読み込んで pfdsl_skill を生成する"
-    location: ../scripts/skill-template/SKILL.md
+    location: "scripts/skill-template/SKILL.md"
     group: gen_sources
   quality_guide:
     label: 品質ガイド
     description: "workflow.pfdsl の maintain_template が生産する。pfdsl スキルに references として同梱される"
-    location: ../docs/quality-guide.md
+    location: "docs/quality-guide.md"
     group: gen_sources
   feature_samples:
     label: 機能カタログ
     description: "workflow.pfdsl の maintain_samples が生産する。skill の references/samples.md と描画物の生成元"
-    location: ../docs/samples/
+    location: "docs/samples/"
     group: gen_sources
   review_perspectives:
     label: レビュー観点集
     description: "workflow.pfdsl の maintain_distributed_prompt_assets が生産する。pfdsl スキルに references として同梱される"
-    location: ../docs/review-perspectives.md
+    location: "docs/review-perspectives.md"
     group: gen_sources
   examples:
     label: 実践例
     description: "workflow.pfdsl の write_examples が生産する。gen_skill が読み、references/examples.md の索引を生成する"
-    location: ../docs/examples/
+    location: "docs/examples/"
     group: gen_sources
   roadmap_pfdsl:
     label: issue 依存グラフ
     description: "workflow.pfdsl の map_deps が生産する。描画対象として render_previews の入力になる"
-    location: roadmap.pfdsl
+    location: ".pfdsl/roadmap.pfdsl"
     group: gen_sources
   toolchain:
     label: ツールチェーン
     description: "workflow.pfdsl の project_toolchain が integrated_repository から packages/ の現行状態を射影して生産する。plugin.json の version 由来であり、公開・パッケージングの素材でもある。gen_skill は CLI help・CLI package version を SKILL.md に埋め込み、core の frontmatter 型定義も照合する"
-    location: ../packages/
+    location: "packages/"
     group: gen_sources
   ops_install_sources:
     label: pfd-ops 配布ソース（repo ルート）
     description: "採用リポへ配る読取専用の監査スクリプト、完了チェーン回収スクリプト、その起動に使う GitHub Actions workflow の一次情報。手書きで repo ルート側に実体があり、このリポ自身の運用にも同じ実体を使う。配布対象は scripts/lib/install-templates.mjs の明示リストが決める（同居する repo ローカルのテストを配らないため glob でなく明示リスト）"
-    location: [ ../scripts/pfdsl/, ../.github/workflows/pfdsl-sweep-completed-chains.yml ]
+    location: [ "scripts/pfdsl/", ".github/workflows/pfdsl-sweep-completed-chains.yml" ]
     group: gen_sources
   claude_harness_sources:
     label: 中立のハーネス配布入力
     description: "配布skill・command・agentの正本はscripts/harness-template/{skills,commands,agents}で、明示的なClaude/Codex sectionとraw path variableから両方の本文を生成する。テンプレート対象はinventoryが宣言し、shared referenceとscriptはliteral payloadである。ルート指示の正本はscripts/root-instructions-template/INSTRUCTIONS.md、settingsとhooksはそれぞれ既存の正本に従う。.claudeの配布対象は生成物であり、メンテナ専用資産は移動しない。.claude/skills/pfdslはgenerated/skills/pfdslへの生成symlinkである。install/はrepoルートの明示ソースから生成し、中立テンプレートに複製しない"
-    location: [ ../scripts/harness-template/, ../scripts/root-instructions-template/INSTRUCTIONS.md, ../.claude/settings.json, ../hooks/ ]
+    location: [ "scripts/harness-template/", "scripts/root-instructions-template/INSTRUCTIONS.md", ".claude/settings.json", "hooks/" ]
     group: skill_sources
   harness_inventory:
     label: ハーネス中立の配布inventory
     description: "配布するskill・command・agent・hookの集合と生成分類を一元化し、各capabilityのclaude-repository・claude-plugin・codex-repository・codex-plugin mappingを宣言する。各targetの処分はnative・transform・intentional exclusionのいずれか一つであり、ハーネス別allowlistを重複して持たない"
-    location: ../scripts/lib/harness-inventory.mjs
+    location: "scripts/lib/harness-inventory.mjs"
     group: skill_sources
   source_git_ignore_state:
     label: 生成時のGit ignore判定素材
@@ -218,7 +219,7 @@ artifact:
       個人のglobal ignoreは除外し、Gitが回答できない場合は未知entryを維持対象として扱う。
       helperはquery pathごとに回答をcacheするが、生成全体のGit状態をatomicに凍結する契約は持たない
     criteria: scripts/lib/git-ignore-oracle.test.mjsがrepository規則・追跡済みpath・global ignore除外・Git取得失敗の分岐を検証して成功する
-    location: ../.gitignore
+    location: ".gitignore"
     group: gen_sources
   harness_capability_model:
     label: ハーネス中立capabilityモデル
@@ -257,14 +258,14 @@ artifact:
     description: "AIエージェントに.pfdsl操作（check/fmt/render/diff/meta sort等のCLIコマンド）を指示するスキル。make gen-skillで中立なgenerated/skills/pfdslへ再生成し手編集禁止。Claude CodeとCodexのadapterはこの正本を各plugin rootへ別々にコピーし、リポ内の .claude/skills/pfdsl は中立正本への生成symlinkである。bの呼び出し元（ホスト）でもあるが、その関係はデータフローではないため図には現れない"
     criteria: make gen-skill が差分なしで完了し、.claude/skills/pfdsl が generated/skills/pfdsl への symlink である
     externalStakeholders: [ このリポのAIエージェント ]
-    location: ../generated/skills/pfdsl/
+    location: "generated/skills/pfdsl/"
     group: repo_generated
     tags: [ c, gen ]
   ops_install_templates:
     label: pfd-ops 採用テンプレート（install/）
     description: "採用リポへ配置されるテンプレート一式。make gen-installがrepoルートのソースから一方向で再生成する生成物であり手編集しない。内容の一次情報はpipeline.pfdslのops_install_sources"
     criteria: repo ルートのソースから make gen-install で再生成でき、check-pfd-ops-sync.yml が生成物一致と identity の両方で通過する
-    location: ../.claude/skills/pfd-ops/install/
+    location: ".claude/skills/pfd-ops/install/"
     group: repo_generated
     tags: [ f2, gen ]
   claude_adapter_output:
@@ -272,7 +273,7 @@ artifact:
     description: "harness_capability_modelのclaude-plugin mappingに従い、Claude Codeが読むskill tree・Markdown command・Markdown agent・hooks・Claude plugin manifestとmarketplace記述を生成する。同じプロセスがclaude-repository mappingの出力をclaude_repo_assetsとして別に生む。出力closureとClaude target-local consumer probeを通し、既存のClaude Code marketplace導入経路はidentity互換のまま維持する"
     criteria: scripts/lib/gen-plugin.test.mjs のClaude target-local consumer probeとoutput closureが成功し、scripts/lib/drift-gates.mjs の gen-plugin-bulk がClaude plugin出力の未再生成をpre-commitとCIで検出する
     externalStakeholders: [ Claude Code利用者 ]
-    location: [ ../plugin/pfdsl/, ../.claude-plugin/marketplace.json ]
+    location: [ "plugin/pfdsl/", ".claude-plugin/marketplace.json" ]
     group: repo_generated
     tags: [ gen ]
   claude_repo_assets:
@@ -280,7 +281,7 @@ artifact:
     description: "harness_capability_modelのclaude-repository mappingから生成するCLAUDE.mdと配布skill・command・agent。AGENTS.mdと同じmustacheテンプレートから描画され、harness固有の節はテンプレート内のinline sectionが宣言する。生成物はテンプレートのpathを名指す手編集禁止noticeを持ち、PreToolUseガードが生成物への直接編集を編集時点で拒否する"
     criteria: scripts/lib/drift-gates.mjs の gen-plugin-bulk と .github/workflows/check-gen-plugin.yml がCLAUDE.mdの未再生成をpre-commitとCIで検出する
     externalStakeholders: [ このリポのClaude Code利用者 ]
-    location: [ ../CLAUDE.md, ../.claude/skills/, ../.claude/commands/, ../.claude/agents/ ]
+    location: [ "CLAUDE.md", ".claude/skills/", ".claude/commands/", ".claude/agents/" ]
     group: repo_generated
     tags: [ gen ]
   codex_adapter_output:
@@ -288,7 +289,7 @@ artifact:
     description: "harness_capability_modelのcodex-plugin mappingからCodex plugin manifest、native skill tree、command由来skill、hookを専用rootへ生成する。公式Codex validator/runtimeがplugin rootのskills/を固定するため、Claude Code rootとは分離する。manifestのcapabilitiesはSkillsのみだが、hooks/hooks.jsonは既定discoveryで公開され、Codex runtimeが互換環境変数CLAUDE_PLUGIN_ROOTを与えて実行する。Codex native agentはpluginではなくリポジトリ開発資産として別に生成する"
     criteria: scripts/lib/gen-plugin.test.mjs のCodex plugin target-local consumer probeとoutput closureが成功し、scripts/lib/drift-gates.mjs の gen-plugin-bulk がCodex plugin rootのmanifest・skill・hookの未再生成をClaude rootと同時に検出する
     externalStakeholders: [ Codex plugin利用者 ]
-    location: [ ../plugin/pfdsl-codex/.codex-plugin/plugin.json, ../plugin/pfdsl-codex/.codex-plugin/codex-command-skills.json, ../plugin/pfdsl-codex/skills/, ../plugin/pfdsl-codex/hooks/ ]
+    location: [ "plugin/pfdsl-codex/.codex-plugin/plugin.json", "plugin/pfdsl-codex/.codex-plugin/codex-command-skills.json", "plugin/pfdsl-codex/skills/", "plugin/pfdsl-codex/hooks/" ]
     group: repo_generated
     tags: [ gen ]
   codex_repo_assets:
@@ -296,14 +297,14 @@ artifact:
     description: "harness_capability_modelのcodex-repository mappingから生成するAGENTS.md、配布skill tree全体と中立生成済みpfdsl skill bridgeを含む .agents/skills、.codex/config.toml、.codex/agents、.codex/hooks.json。生成されたMarkdown・TOML・JavaScriptは正本path付きの手編集禁止noticeを持ち、コメントを持てないJSONは隣接GENERATED.md guideで正本を示す。例外はpfd-ops skillのinstall/で、そこは採用リポの作業ツリーへverbatim配置されるpayloadでありエージェントが読むpromptではないため、noticeを注入せず正本とbyte一致させる。同一性はskill同梱のcheck-install-syncがrepo sourceと比較して検査するので、noticeを持つと1行差がcontent driftとして誤報される。root .gitattributesはCodex生成経路をlinguist-generatedに分類する。adapterはrunごとの一時siblingへ書き、rootのassembly lock下で成功後にまとめて置換するため半生成状態を公開しない"
     criteria: scripts/lib/gen-plugin.test.mjs のCodex repository target-local consumer probeとoutput closureが成功し、scripts/lib/drift-gates.mjs の gen-plugin-bulk がAGENTS.md、.agents、.codexの未再生成をpre-commitとCIで検出する
     externalStakeholders: [ このリポのCodex利用者 ]
-    location: [ ../AGENTS.md, ../.agents/skills/, ../.codex/config.toml, ../.codex/agents/, ../.codex/hooks.json, ../.codex/GENERATED.md, ../plugin/pfdsl-codex/GENERATED.md, ../.gitattributes ]
+    location: [ "AGENTS.md", ".agents/skills/", ".codex/config.toml", ".codex/agents/", ".codex/hooks.json", ".codex/GENERATED.md", "plugin/pfdsl-codex/GENERATED.md", ".gitattributes" ]
     group: repo_generated
     tags: [ gen ]
   claude_plugin_dist:
     label: drift検査済みのClaude Code plugin root
     description: "check_plugin_drift が、gen_pluginの生成済みClaude Code root（plugin/pfdsl/）を正本と照合済みにした配布状態。release tagへpinするpublished_claude_pluginの検証済み入力であり、公開後の導入はpublished artifactを消費する"
     criteria: gen-plugin-bulk がnode scripts/gen-plugin-dist-independent.mjsによる再生成後のClaude Code rootの差分をpre-commitで拒否し、check-gen-plugin.ymlがpnpm -r build && make gen-plugin後の同じ範囲の差分をCIで拒否する
-    location: ../plugin/pfdsl/
+    location: "plugin/pfdsl/"
     group: repo_generated
     tags: [ gen ]
     parts: [ claude_adapter_output ]
@@ -312,7 +313,7 @@ artifact:
     description: "check_plugin_drift が、assemble_codex_pluginの生成済みCodex native root（plugin/pfdsl-codex/）を正本と照合済みにした配布状態。repo-owned native marketplace/install pathには渡さず、現在のCodex互換導入でも使わない。外部のCodex marketplace構築者が自身のnative sourceとして扱うための検証済みhandoff surfaceである"
     criteria: gen-plugin-bulk がnode scripts/gen-plugin-dist-independent.mjsによる再生成後のCodex rootの差分をpre-commitで拒否し、check-gen-plugin.ymlがpnpm -r build && make gen-plugin後の同じ範囲の差分をCIで拒否する
     externalStakeholders: [ 外部のCodex marketplace構築者 ]
-    location: ../plugin/pfdsl-codex/
+    location: "plugin/pfdsl-codex/"
     group: repo_generated
     tags: [ gen ]
     parts: [ codex_adapter_output ]
@@ -320,7 +321,7 @@ artifact:
     label: drift検査済みのClaude Codeリポジトリ開発資産
     description: "check_plugin_drift が、gen_pluginの生成済みClaude Codeリポジトリ開発資産を正本と照合済みにした状態。pluginのインストール対象ではなく、このリポジトリでClaude Codeが読むルート指示文書の鮮度を表す"
     criteria: gen-plugin-bulk がnode scripts/gen-plugin-dist-independent.mjsによる再生成後のCLAUDE.mdの差分をpre-commitで拒否し、check-gen-plugin.ymlがpnpm -r build && make gen-plugin後の同じ範囲の差分をCIで拒否する
-    location: [ ../CLAUDE.md, ../.claude/skills/, ../.claude/commands/, ../.claude/agents/ ]
+    location: [ "CLAUDE.md", ".claude/skills/", ".claude/commands/", ".claude/agents/" ]
     group: repo_generated
     tags: [ gen ]
     parts: [ claude_repo_assets ]
@@ -328,7 +329,7 @@ artifact:
     label: drift検査済みのCodexリポジトリ開発資産
     description: "check_plugin_drift が、assemble_codex_pluginの生成済みCodexリポジトリ開発資産を正本と照合済みにした状態。pluginのインストール対象ではなく、このリポジトリでCodexが使う生成資産の鮮度を表す"
     criteria: gen-plugin-bulk がnode scripts/gen-plugin-dist-independent.mjsによる再生成後のCodexリポジトリ開発資産の差分をpre-commitで拒否し、check-gen-plugin.ymlがpnpm -r build && make gen-plugin後の同じ範囲の差分をCIで拒否する
-    location: [ ../AGENTS.md, ../.agents/skills/, ../.codex/config.toml, ../.codex/agents/, ../.codex/hooks.json, ../.codex/GENERATED.md, ../plugin/pfdsl-codex/GENERATED.md, ../.gitattributes ]
+    location: [ "AGENTS.md", ".agents/skills/", ".codex/config.toml", ".codex/agents/", ".codex/hooks.json", ".codex/GENERATED.md", "plugin/pfdsl-codex/GENERATED.md", ".gitattributes" ]
     group: repo_generated
     tags: [ gen ]
     parts: [ codex_repo_assets ]
@@ -337,7 +338,7 @@ artifact:
     description: "docs/samples/*.dot,*.svg と実装ロードマップの描画。make gen-samplesで再生成。.dot / README は graphviz-exporter、.svg は preview-engine の vitest が pre-commit と CI でドリフト検知する。GitHub 上の閲覧用終端成果物"
     criteria: make gen-samples が差分なしで完了し、README からのリンクが正常
     externalStakeholders: [ GitHub 閲覧者 ]
-    location: ../docs/samples/
+    location: "docs/samples/"
     group: repo_generated
     tags: [ gen ]
   readme_cli_blocks:
@@ -345,7 +346,7 @@ artifact:
     description: "gen_readme_cli が書く2つの sentinel ブロック — root README.md の `## CLI` と packages/cli/README.md のコマンド表。artifact はブロックであってファイル全体ではない（囲みの外は別の生産者が書く）。2つのブロックを1つの artifact にまとめてあるのは、生成器もドリフトゲートも1つで、片方だけ再生成する経路が無いため"
     criteria: make check-readme-cli が差分なしで通過する
     externalStakeholders: [ GitHub 閲覧者, npm パッケージページ閲覧者 ]
-    location: [ ../README.md, ../packages/cli/README.md ]
+    location: [ "README.md", "packages/cli/README.md" ]
     group: repo_generated
     tags: [ gen ]
   vsix_candidate:
@@ -384,7 +385,7 @@ artifact:
     label: frontmatter JSON Schema
     description: Zod定義から生成した非空frontmatter mapping用のJSON Schema。coreパッケージにも同梱し、外部の検証器や編集支援が利用する
     criteria: coreのbuildでJSONが生成され、json-schema.test.tsで追跡済み生成物との一致と独立検証器による受理・拒否を確認できる
-    location: ../packages/core/schema/frontmatter.schema.json
+    location: "packages/core/schema/frontmatter.schema.json"
     externalStakeholders: [ 外部ライブラリ利用者, エディタ連携開発者 ]
     group: run_outputs
   published_libraries:
@@ -425,8 +426,8 @@ artifact:
     group: adopter_repo
   drift_report:
     label: 配置鮮度警告
-    description: "配置済みinstall/由来ファイルと同梱canonicalのhash照合結果、targetの役割分類（upstream/ambiguous/adopter）に応じた対処案内、および上流plugin versionとのskew警告・同一version時のbundle内容差の通知（stdout）。--deployを案内するのはadopterと分類した場合のみ"
-    criteria: check-install-sync.mjs --upstream によるhash照合・役割分類つきの案内・skew警告・bundle内容差の通知が実装され動作確認済み
+    description: "配置済みinstall/由来ファイルと同梱canonicalのhash照合結果、targetの役割分類（upstream/ambiguous/adopter）に応じた対処案内、および上流plugin versionとのskew警告・同一version時のbundle内容差の通知（stdout）。--deployを案内するのはadopterと分類した場合のみ採用リポではappliedMigrationとの照合結果（移行ガイドの該当区間への案内、古いpluginでの拒否）も出す。"
+    criteria: check-install-sync.mjs --upstream によるhash照合・役割分類つきの案内・skew警告・bundle内容差の通知と、appliedMigrationの照合・古いpluginでの拒否が実装され動作確認済み
     externalStakeholders: [ 採用リポのAIエージェント ]
     group: run_outputs
 
@@ -434,163 +435,163 @@ process:
   parse:
     label: 構文解析
     description: "frontmatterの既知フィールドをスキーマで検査し、同じYAML文書から意味値とソース位置索引を得る。lex・parseと合わせてdocument+frontmatterと診断を得る。CLI（c経由）・VSCode拡張（d）双方の全コマンドが内部で通る"
-    location: ../packages/core/src/index.ts
+    location: "packages/core/src/index.ts"
     tags: [ b ]
   normalize:
     label: 正規化
     description: エッジリストとノード種別を正規化しGraphを構築する
     command: node packages/cli/dist/cli.js graph edges
-    location: ../packages/core/src/normalizer.ts
+    location: "packages/core/src/normalizer.ts"
     tags: [ b ]
   parse_comparison:
     label: 比較対象の構文解析
     description: diff の第2文書に対する独立した解析。parse と同じfrontmatter読込・lex・parseを比較対象のソースへ適用する
-    location: ../packages/core/src/index.ts
+    location: "packages/core/src/index.ts"
     tags: [ b ]
   normalize_comparison:
     label: 比較対象の正規化
     description: normalize と同じ正規化処理を比較対象の構文木へ適用し、第2グラフを構築する
-    location: ../packages/core/src/normalizer.ts
+    location: "packages/core/src/normalizer.ts"
     tags: [ b ]
   collect_diagnostics:
     label: 診断の集約
     description: analyzeが読込・構文診断、正規化診断、意味検証診断を連結し、CLIと拡張が利用する診断一覧を返す
-    location: ../packages/core/src/index.ts
+    location: "packages/core/src/index.ts"
     tags: [ b ]
   validate:
     label: 検証
     description: "正準化グラフとfrontmatterにV/Wルールを適用し診断を生成する。analyze と analyzeSource は解析時のソース位置索引を渡し、宣言位置を再解釈しない。ルールの一次情報docs/spec/spec.md（a層）は設計時にこの実装へ反映されるもので、実行時の入力ではない"
     command: node packages/cli/dist/cli.js check
-    location: ../packages/core/src/validator.ts
+    location: "packages/core/src/validator.ts"
     tags: [ b ]
   format:
     label: 整形
     description: "ソースを独立に再lex/parseし正準整形済みテキストを生成する（parseの出力を再利用しない別経路）。frontmatterはyaml CST経由で正準化し、bodyはformatter.tsが担う（ADR-0034）。出力はソースの改行スタイル（LF/CRLF）を保つ（#656。正準化するのはpfdslの記法であってファイルのバイト表現ではない）"
     command: node packages/cli/dist/cli.js fmt --write
-    location: ../packages/core/src/formatter.ts
+    location: "packages/core/src/formatter.ts"
     tags: [ b ]
   render_graph:
     label: DOT変換
     description: 正準化グラフとfrontmatter（スタイル・タイトル）からGraphviz DOTを構築する
     command: node packages/cli/dist/cli.js render
-    location: ../packages/graphviz-exporter/src/index.ts
+    location: "packages/graphviz-exporter/src/index.ts"
     tags: [ b ]
   export_image:
     label: 画像化
     description: DOTをSVG（wasm、外部依存なし）またはPDF/PNG（puppeteer必須）へ変換する
     command: node packages/cli/dist/cli.js render --format svg
-    location: ../packages/preview-engine/src/index.ts
+    location: "packages/preview-engine/src/index.ts"
     tags: [ b ]
   export_metadata:
     label: メタデータ抽出
     description: "正準化グラフとfrontmatterからノードメタデータを抽出しTSV化する。CLIサブコマンドはなくVSCode拡張のエクスポート機能のみが呼ぶ"
-    location: ../packages/metadata-exporter/src/index.ts
+    location: "packages/metadata-exporter/src/index.ts"
     tags: [ b ]
   diff_graphs:
     label: 差分算出
     description: 2つの正準化グラフ（とそれぞれのfrontmatter）の構造差分を計算する
     command: node packages/cli/dist/cli.js diff
-    location: ../packages/core/src/diff.ts
+    location: "packages/core/src/diff.ts"
     tags: [ b ]
   sort_meta:
     label: ノード定義ソート
     description: "frontmatterをyaml CSTとして再parseし、指定キーでノード定義を並べ替えたテキストを生成する（ADR-0034）。出力はソースの改行スタイル（LF/CRLF）を保つ（#644）"
     command: node packages/cli/dist/cli.js meta sort
-    location: ../packages/core/src/sort.ts
+    location: "packages/core/src/sort.ts"
     tags: [ b ]
   set_meta:
     label: フィールド更新
-    description: "frontmatterをyaml CSTとして再parseし、指定ノードの指定フィールドを書き換えたテキストを生成する（ADR-0034）。出力はソースの改行スタイル（LF/CRLF）を保つ（#644）"
+    description: "frontmatterをyaml CSTとして再parseし、ローカル定義があるノードの指定フィールドを書き換えたテキストを生成する（ADR-0034）。出力はソースの改行スタイル（LF/CRLF）を保つ（#644）"
     command: node packages/cli/dist/cli.js meta set
-    location: ../packages/core/src/frontmatter-cst.ts
+    location: "packages/core/src/frontmatter-cst.ts"
     tags: [ b ]
   reindex_meta:
     label: index採番
     description: "frontmatterをyaml CSTとして再parseし、トポロジ順に沿ってindexフィールドを採番し直したテキストを生成する（ADR-0034）。出力はソースの改行スタイル（LF/CRLF）を保つ（#644）"
     command: node packages/cli/dist/cli.js meta reindex
-    location: ../packages/core/src/reindex.ts
+    location: "packages/core/src/reindex.ts"
     tags: [ b ]
   gen_skill:
     label: スキル生成
     description: "スキル生成ソース（skill-template/spec/samples/examples/review-perspectives/skill dirs 等）からリポ内 pfdsl スキルを再生成する。出力のうち references/*.md（spec/samples/examples 等）は packages/cli/dist に触れない scripts/lib/gen-skill-refs.mjs に切り出し済み（同モジュールの単体 CLI エントリは呼び出し元を失って #668 で削除、dist 非依存の手動再生成は gen-plugin-dist-independent.mjs が担う）。SKILL.md は toolchain の CLI help と CLI package version を埋め込み、core の frontmatter 型定義を照合するため、dist 必須のまま（#586）。identity は gen_plugin が内包する形で check-gen-plugin.yml が全 PR で強制する"
     command: make gen-skill
-    location: ../scripts/gen-skill.mjs
+    location: "scripts/gen-skill.mjs"
     tags: [ gen ]
   gen_install:
     label: install/ 生成
     description: "repo ルートの明示配布許可一覧から pfd-ops スキルの install/ ミラーを一方向で再生成する。skill の installFiles 宣言も同じ一覧から導出し、開発用ファイルを配布しない。生成の向きは repo ルートのソース → install/ → Claude・Codex の repository・plugin の4配布先のみ。gen_plugin が内部で実行するため古い install/ から組まれることはない。同一性検査は pre-commit・終端では index、push・release では公開対象の HEAD の隔離コピーで生成し、元の作業ツリーを変更せずに出力契約を照合する。CI の check-pfd-ops-sync.yml も一致を強制する"
     command: make gen-install
-    location: ../scripts/lib/install-templates.mjs
+    location: "scripts/lib/install-templates.mjs"
     tags: [ gen, g ]
   decode_harness_capabilities:
     label: ハーネスsource decode・contract検証
     description: "claude_harness_sourcesのsource rootとschemaをharness_inventoryに照らして全件分類し、plugin metadataをtoolchainから読み、中立テンプレートの明示的なハーネス分岐を描画し、両方の本文と共通metadataをsemantic recordへdecodeする。分類できなかったentryは全階層で、OS生成の既知の名前か、repositoryのGitが無視するpathであれば維持対象外として除く。source_git_ignore_stateをgit check-ignoreに問い、repository内の.gitignore・Git index・clone固有のinfo/excludeが回答に影響する。個人のglobal ignoreは除外する。git自体が答えられない環境では従来どおり未分類として扱う。除かれなかった未知topology・未知schema・四target mappingの欠落や重複はadapter出力前に拒否する"
     command: node --test scripts/lib/harness-capability-contract.test.mjs scripts/lib/harness-source-decoder.test.mjs scripts/lib/harness-inventory.test.mjs scripts/lib/git-ignore-oracle.test.mjs
-    location: ../scripts/lib/harness-source-decoder.mjs
+    location: "scripts/lib/harness-source-decoder.mjs"
     tags: [ gen, g ]
   gen_plugin:
     label: Claude Code plugin root 組み立て
     description: "make gen-pluginのClaude Code adapter。組み立て前に生成専用のplugin rootとrepository assetsをsnapshotして空にし、生成をやめた旧ファイルが残らないよう毎回再構築する。失敗時はsnapshotから復元し、復元未完ならsnapshotを保持して両CLI入口がprimary errorと保存理由・pathを表示する。再試行とdrift検査も残留transactionを報告し、削除はしない。dist非依存の再生成では中立pfdsl skillのSKILL.mdだけを保持する。再構築でignore対象を含む未追跡ファイルが失われる場合は失敗させる。contract検証済みのharness_capability_modelと中立生成済みpfdsl skill、install mirrorから、Claude Code skill tree、Markdown command、Markdown agent、hooks・manifestをplugin/pfdsl/へidentity互換に組み立て、repo-rootのmarketplace記述も更新する。marketplace記述は前世代claude_adapter_outputのrepo-root .claude-plugin/marketplace.jsonを読み、descriptionだけを置換してowner・source.ref等を保持する。あわせてclaude-repository mappingの配布skill・command・agentを中立正本から描画し、ルート指示文書CLAUDE.mdをAGENTS.mdと同じmustacheテンプレートから描画してリポジトリへ書く。全Claude root writeの後、manifest自身を除く全bundleファイルのdigestをファイル単位で.claude-plugin/bundle-manifest.sha256へ記録する。集約値は読み手が計算する（#971, #1264, #1267）"
     command: make gen-plugin
-    location: ../scripts/gen-plugin.mjs
+    location: "scripts/gen-plugin.mjs"
     tags: [ gen, g ]
   assemble_codex_plugin:
     label: Codex plugin root 組み立て
     description: "make gen-pluginのCodex adapter。Claude adapterと同一objectのharness_capability_model、中立生成済みpfdsl skill、install mirrorを入力に、stageTargetSkillTreeが中立正本からdecodeしたCodex本文とliteral payloadを描画し、repoルート由来のinstall/ミラーを含むnative skill treeをrepositoryとpluginへ生成し、command由来skill、hooks、manifestもplugin/pfdsl-codex/へ生成する。Codex SKILL.mdのsummaryはmetadata.summaryへ移し、plugin descriptionは元のsemantic.summaryを消費する。生成済みClaude rootとmanifestは読まない。Codex command名が同名skillと衝突するとsource-command-接頭辞を付け、repository Codex assetsとともにatomicに置換する"
     command: make gen-plugin
-    location: ../scripts/lib/gen-plugin.mjs
+    location: "scripts/lib/gen-plugin.mjs"
     tags: [ gen, g ]
   check_plugin_drift:
     label: Claude/Codex plugin・repository Codex assetsのdrift検査
     description: "兄弟成果物であるClaude adapter出力、Codex adapter出力、repository Codex assetsが唯一合流する検査。生成専用rootを空から再構築した後に三者の追跡済み差分（旧ファイルの削除を含む）と対象pathspec内の未追跡ファイルをまとめて検査し、更新漏れと手編集をpre-commitとCIで失敗させる。dist依存のpfdsl SKILL.mdは別gateで検査する"
     command: node scripts/gen-plugin-dist-independent.mjs
-    location: ../scripts/lib/drift-gates.mjs
+    location: "scripts/lib/drift-gates.mjs"
     tags: [ gen, g ]
   gen_readme_cli:
     label: README CLI 節生成
     description: "pfdsl help の出力から root README.md の `## CLI` ブロックと packages/cli/README.md のコマンド表を書き直す。どちらも sentinel ブロックで、囲みの外は人手が書く（root 側は workflow.pfdsl の update_readme、packages/cli 側は toolchain の一部）。drift は pre-commit の readme-cli ゲートと CI の make check-readme-cli が強制する。出力もゲートも2つになったのは #850"
     command: make gen-readme-cli
-    location: ../scripts/gen-readme-cli.mjs
+    location: "scripts/gen-readme-cli.mjs"
     tags: [ gen ]
   render_previews:
     label: サンプル描画
     description: "機能カタログとロードマップを dot/svg に描画する。toolchain のビルド（make build-deps）が実行前提だがコンテンツ依存ではない — 呼び出し元ソフトウェアと同様、入力エッジに含めない。.dot / .svg / README はいずれも決定論的に生成される（#588）"
     command: make gen-samples
-    location: ../scripts/gen-samples.mjs
+    location: "scripts/gen-samples.mjs"
     tags: [ gen ]
   push_cli_release_tag:
     label: CLIタグ生成・push
     description: "準備PRをmergeしたcommitをCOMMITで明示し、make releaseがそのcommitのpre-tag checksを実行して同じSHAへv* tagを作成・pushする。mainへのcommit/pushとmarketplace更新は行わない。正常出力はcli_release_tagとpublished_claude_pluginで、npm公開はpublish_cli、公開後の参照更新はpin_plugin_marketplaceが持つ"
     command: "make release COMMIT=<SHA>"
-    location: ../scripts/release.mjs
+    location: "scripts/release.mjs"
     tags: [ gen ]
   publish_cli:
     label: CLI自動公開
     description: "v* tag push、または同じrelease tagを指定した手動再開でpublish-cli.ymlがeventのSHAをcheckoutし、tagとpackage versionを照合して@pfdsl/cliをnpm publishする（Trusted Publishing / OIDC）。branchからの手動公開は拒否する"
-    location: ../.github/workflows/publish-cli.yml
+    location: ".github/workflows/publish-cli.yml"
     tags: [ gen ]
   push_libraries_release_tag:
     label: ライブラリタグ生成・push
     description: "準備PRをmergeした共通版のcommitをCOMMITで明示し、make release-libsがpre-tag checks後に同じSHAのlib-v* tagをpushする。mainへのcommit/pushは行わず、npm公開はpublish_librariesが持つ"
     command: "make release-libs COMMIT=<SHA>"
-    location: ../scripts/release.mjs
+    location: "scripts/release.mjs"
     tags: [ gen ]
   generate_frontmatter_schema:
     label: JSON Schema生成
     description: coreのZod定義からJSON Schemaを生成する。buildはdistへ書き、gen:schemaは追跡済み参照用コピーを更新する。変換器はランタイム入口から読み込まない
     command: pnpm --filter @pfdsl/core gen:schema
-    location: ../packages/core/scripts/write-schema.mjs
+    location: "packages/core/scripts/write-schema.mjs"
     tags: [ b ]
   publish_libraries:
     label: ライブラリ自動公開
     description: "lib-v* tag push、または同じrelease tagを指定した手動再開でpublish-libraries.ymlがeventのSHAをcheckoutし、tagと共通package versionを照合してcore・graphviz-exporter・preview-engineを順にnpm publishする（Trusted Publishing / OIDC）。branchからの手動公開は拒否する"
-    location: ../.github/workflows/publish-libraries.yml
+    location: ".github/workflows/publish-libraries.yml"
     tags: [ gen ]
   package_vscode_release:
     label: VSIX生成・タグpush
     description: "選択済み版の vscode-extension を未検証 .vsix へパッケージングし、その生成が成功した後で vscode-v* tag を push する。1回の make vscode-package が正常完了したときの両成果物を単一変換の複数出力として扱い、内部順序はこの description が持つ"
     command: "make vscode-package COMMIT=<SHA>"
-    location: ../scripts/release.mjs
+    location: "scripts/release.mjs"
     tags: [ gen ]
   verify_vsix:
     label: VSIXローカル検証
@@ -605,7 +606,7 @@ process:
   pin_plugin_marketplace:
     label: marketplace参照をPRで更新
     description: "公開されたCLI版と同じtagのpluginを取得確認し、mainのmarketplace参照をその実在tagへ更新する通常PRを作る。merge後のmainから参照と取得先を再確認する。runnerはこの変更を行わず、release担当が差分を準備し人間がreview・mergeする"
-    location: ../.pfdsl/pipeline.md
+    location: ".pfdsl/pipeline.md"
     tags: [ g, manual_no_judgment ]
   install_plugin:
     label: プラグインインストール
@@ -613,15 +614,15 @@ process:
     tags: [ g ]
   deploy_install_layer:
     label: L3 GitHub Issuesプリセット実配置
-    description: "/pfd-init ステップ3.5。plugin同梱install/を採用リポルートへコピーする。前回配置のmanifest hashと一致するファイルは通常更新し、新canonicalと同一のファイルも記録を更新する。それ以外の既存ファイルは旧記録を保持して警告し、--overwrite-local-edits指定時のみ上書きする。未記録の相違ファイルは未記録のまま保護する。canonicalから消えた旧ファイルはローカル編集が無ければフラグ無しで削除され、編集を抱える場合のみ--delete-edited-orphansを要する。canonical側のリネームは新旧パスの対をPossible renamesとして報告する。出力で依存準備と初回監査の手順を案内する"
+    description: "/pfd-init ステップ3.5。plugin同梱install/を採用リポルートへコピーする。前回配置のmanifest hashと一致するファイルは通常更新し、新canonicalと同一のファイルも記録を更新する。それ以外の既存ファイルは旧記録を保持して警告し、--overwrite-local-edits指定時のみ上書きする。未記録の相違ファイルは未記録のまま保護する。canonicalから消えた旧ファイルはローカル編集が無ければフラグ無しで削除され、編集を抱える場合のみ--delete-edited-orphansを要する。canonical側のリネームは新旧パスの対をPossible renamesとして報告する。出力で依存準備と初回監査の手順を案内する実行中のpluginが.pfdsl/config.jsonのappliedMigrationの記録より古い場合は、配置前に停止する。"
     command: node ${CLAUDE_PLUGIN_ROOT}/skills/pfd-ops/scripts/check-install-sync.mjs --deploy
-    location: ../scripts/harness-template/skills/pfd-ops/scripts/check-install-sync.mjs
+    location: "scripts/harness-template/skills/pfd-ops/scripts/check-install-sync.mjs"
     tags: [ g ]
   check_install_sync:
     label: 配置鮮度セルフチェック
-    description: "pfd-ops発火時に同梱canonicalと配置済みファイルをhash照合しdriftを警告する。missingな新パスとorphanedな旧パスが同一ファイルのリネームとみなせる場合はPossible renamesとして対で報告する。実行のたびtargetの役割を上流マーカーで分類し、上流リポ・canonical不明と判定した場合は--deployを案内せず明示指定でも書き換え前に停止する（#971）。--upstreamで上流plugin.json versionとのskewと、version一致時のbundle内容差をベストエフォートで報告する。check-pfd-ops-sync.ymlは採用リポへ配布されなくなり、この経路が採用リポ唯一の安全網（ADR-0028）"
+    description: "pfd-ops発火時に同梱canonicalと配置済みファイルをhash照合しdriftを警告する。missingな新パスとorphanedな旧パスが同一ファイルのリネームとみなせる場合はPossible renamesとして対で報告する。実行のたびtargetの役割を上流マーカーで分類し、上流リポ・canonical不明と判定した場合は--deployを案内せず明示指定でも書き換え前に停止する（#971）。--upstreamで上流plugin.json versionとのskewと、version一致時のbundle内容差をベストエフォートで報告する。check-pfd-ops-sync.ymlは採用リポへ配布されなくなり、この経路が採用リポ唯一の安全網（ADR-0028）採用リポと分類したtargetでは、.pfdsl/config.json のappliedMigration（ADR-0043）を実行中pluginの版・bundle hashと照合し、未記録・新しい版・同版で内容差を移行ガイドへの案内つきで通知する。pluginが記録より古い場合だけ--deployと--record-migrationを書き換え前に拒否する。appliedMigrationを書くのは、移行を適用した人が明示的に実行する--record-migrationだけで、照合は書かない。"
     command: node ${CLAUDE_PLUGIN_ROOT}/skills/pfd-ops/scripts/check-install-sync.mjs --upstream
-    location: ../scripts/harness-template/skills/pfd-ops/scripts/check-install-sync.mjs
+    location: "scripts/harness-template/skills/pfd-ops/scripts/check-install-sync.mjs"
     tags: [ g ]
 ---
 

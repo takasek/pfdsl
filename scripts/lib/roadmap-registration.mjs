@@ -13,6 +13,27 @@ import { GITHUB_UNAVAILABLE_EXIT_CODE } from "../pfdsl/lib/github-ops.mjs";
 const AUDIT_SCRIPT = "scripts/pfdsl/audit-issues-flow.mjs";
 
 /**
+ * Select local links from the identity-validated GitHubOps view, then reduce
+ * them to the issue numbers the repository-local roadmap audit accepts.
+ * @param {Array<{number: number, repository: {name: string, owner: {login: string}}}>} references
+ * @param {{owner: string, repo: string}} repository
+ * @returns {number[]}
+ */
+export function localClosingIssueNumbers(references, { owner, repo }) {
+	return [
+		...new Set(
+			references
+				.filter(
+					(ref) =>
+						ref.repository.owner.login.toLowerCase() === owner.toLowerCase() &&
+						ref.repository.name.toLowerCase() === repo.toLowerCase(),
+				)
+				.map((ref) => ref.number),
+		),
+	];
+}
+
+/**
  * The argv for the audit run that enforces this PR's own issues.
  * @param {number[]} issueNumbers
  * @returns {string[]}
@@ -32,7 +53,8 @@ export function classifyRoadmapRegistration({ issueNumbers, auditExit }) {
 	if (issueNumbers.length === 0) {
 		return {
 			status: "SKIP",
-			detail: "this PR closes no issue, so it has none to register",
+			detail:
+				"this PR closes no issue in this repository, so it has none to register",
 		};
 	}
 	if (auditExit === GITHUB_UNAVAILABLE_EXIT_CODE) {
