@@ -5,7 +5,7 @@
 // a `flow:managed` issue with no tracked process as advisory, because in any
 // given tree that gap usually belongs to another session's unmerged branch.
 // This check enforces it for the issues GitHub reads this PR as closing — the
-// set the PR can actually register, derived from the PR itself rather than
+// local set the PR can actually register, derived from the PR itself rather than
 // from a flag the runner chooses.
 //
 // Usage: node scripts/check-roadmap-registration.mjs --pr <n>
@@ -17,6 +17,7 @@ import { parseArgs } from "node:util";
 import {
 	buildAuditArgs,
 	classifyRoadmapRegistration,
+	localClosingIssueNumbers,
 } from "./lib/roadmap-registration.mjs";
 import { tryRun } from "./lib/run-exec.mjs";
 import {
@@ -45,12 +46,16 @@ if (!values.pr) {
 	process.exit(2);
 }
 
-let pr;
+let issueNumbers;
 try {
-	pr = await githubOps.viewPr({
+	const pr = await githubOps.viewPr({
 		number: Number(values.pr),
 		fields: ["closingIssuesReferences"],
 	});
+	issueNumbers = localClosingIssueNumbers(
+		pr.closingIssuesReferences,
+		githubOps.repository(),
+	);
 } catch (err) {
 	// Same operation API contract as check-closes-reference (#1085).
 	if (isGitHubUnavailableError(err)) {
@@ -62,10 +67,6 @@ try {
 	);
 	process.exit(1);
 }
-
-const issueNumbers = (pr.closingIssuesReferences ?? [])
-	.map((ref) => ref?.number)
-	.filter((n) => Number.isInteger(n));
 
 let auditExit = 0;
 if (issueNumbers.length > 0) {

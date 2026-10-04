@@ -31,7 +31,8 @@ beforeEach(() => {
 			"const args = process.argv.slice(2);",
 			"if (args[0] === 'pr') {",
 			"  const number = Number(process.env.FIXTURE_PR_ISSUE);",
-			"  console.log(JSON.stringify({ closingIssuesReferences: [{ id: 'issue:' + number, number, url: 'https://github.com/test/fixture/issues/' + number, repository: { id: 'repo:fixture', name: 'fixture', owner: { id: 'owner:test', login: 'test' } } }] }));",
+			"  const refs = process.env.FIXTURE_CLOSING_REFS ? JSON.parse(process.env.FIXTURE_CLOSING_REFS) : [{ id: 'issue:' + number, number, url: 'https://github.com/test/fixture/issues/' + number, repository: { id: 'repo:fixture', name: 'fixture', owner: { id: 'owner:test', login: 'test' } } }];",
+			"  console.log(JSON.stringify({ closingIssuesReferences: refs }));",
 			"} else if (args[0] === 'label') {",
 			"  console.log(JSON.stringify([{ name: 'flow:managed', description: 'tracked in .pfdsl/roadmap.pfdsl' }, { name: 'flow:exempt', description: 'intentionally out of .pfdsl/roadmap.pfdsl scope' }]));",
 			"} else if (args[0] === 'issue') {",
@@ -59,7 +60,7 @@ afterEach(() => {
 	rmSync(fixture, { recursive: true, force: true });
 });
 
-function runWrapper({ roadmap, prIssue, issues }) {
+function runWrapper({ roadmap, prIssue, issues, closingRefs }) {
 	writeFileSync(join(fixture, ".pfdsl/roadmap.pfdsl"), roadmap);
 	return spawnSync(
 		process.execPath,
@@ -71,6 +72,7 @@ function runWrapper({ roadmap, prIssue, issues }) {
 				...process.env,
 				PATH: `${join(fixture, "bin")}:${process.env.PATH}`,
 				FIXTURE_PR_ISSUE: String(prIssue),
+				FIXTURE_CLOSING_REFS: closingRefs ? JSON.stringify(closingRefs) : "",
 				FIXTURE_ISSUES_JSON: JSON.stringify(issues),
 			},
 		},
@@ -84,7 +86,71 @@ const labelsAndNoIssues = {
 	updatedAt: "2026-09-08T00:00:00Z",
 };
 
+function closingRef(number, owner = "test", repo = "fixture") {
+	return {
+		id: `issue:${owner}/${repo}#${number}`,
+		number,
+		url: `https://github.com/${owner}/${repo}/issues/${number}`,
+		repository: {
+			id: `repo:${owner}/${repo}`,
+			name: repo,
+			owner: { id: `owner:${owner}`, login: owner },
+		},
+	};
+}
+
 describe("check-roadmap-registration", () => {
+	for (const ref of [
+		closingRef(99, "other"),
+		closingRef(99, "test", "other"),
+	]) {
+		it(`does not audit a foreign #99 in ${ref.repository.owner.login}/${ref.repository.name}`, () => {
+			const result = runWrapper({
+				roadmap: "---\nprocess: {}\n---\n",
+				closingRefs: [ref],
+				issues: [
+					{
+						number: 99,
+						...labelsAndNoIssues,
+						labels: [{ name: "flow:managed" }],
+					},
+				],
+			});
+			assert.equal(result.status, 0, result.stderr);
+			assert.match(result.stdout, /SKIP.*no issue in this repository/);
+			assert.doesNotMatch(result.stdout, /missing_process/);
+		});
+	}
+
+	it("enforces local references while leaving foreign same-number issues advisory", () => {
+		const result = runWrapper({
+			roadmap: "---\nprocess: {}\n---\n",
+			closingRefs: [closingRef(99), closingRef(42, "other")],
+			issues: [
+				{ number: 99, ...labelsAndNoIssues, labels: [{ name: "flow:exempt" }] },
+				{
+					number: 42,
+					...labelsAndNoIssues,
+					labels: [{ name: "flow:managed" }],
+				},
+			],
+		});
+		assert.equal(result.status, 0, result.stderr);
+		assert.match(result.stdout, /PASS.*#99/);
+		assert.doesNotMatch(result.stdout, /FAIL/);
+	});
+
+	it("does not turn a number-only response into a successful skip", () => {
+		const result = runWrapper({
+			roadmap: "---\nprocess: {}\n---\n",
+			closingRefs: [{ number: 99 }],
+			issues: [],
+		});
+		assert.equal(result.status, 1);
+		assert.match(result.stderr, /malformed.*closingIssuesReferences/);
+		assert.doesNotMatch(result.stdout, /SKIP/);
+	});
+
 	it("keeps an unrelated unknown_issue finding and uses a generic remedy", () => {
 		const result = runWrapper({
 			roadmap: [
