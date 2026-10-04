@@ -183,7 +183,7 @@ process:
   i483_implement_preview_connector:
     label: Preview コネクタ UI 実装
     location: https://github.com/takasek/pfdsl/issues/483
-    updated_at: 2026-10-04T08:37:59Z
+    updated_at: 2026-10-04T09:05:14Z
   publish_ext_editing:
     label: extension 編集支援リリース
   i1278_add_group_delete:
@@ -207,15 +207,15 @@ process:
   i1282_create_node_definition:
     label: ノード定義作成操作を実装する
     location: https://github.com/takasek/pfdsl/issues/1282
-    updated_at: 2026-10-04T08:38:01Z
+    updated_at: 2026-10-04T09:05:16Z
   i1283_add_node_location_cycle:
     label: 定義と本文中のノード位置の巡回を実装する
     location: https://github.com/takasek/pfdsl/issues/1283
-    updated_at: 2026-10-04T08:38:04Z
+    updated_at: 2026-10-04T09:05:19Z
   i1284_add_hover_local_graph:
     label: ホバー内の周辺グラフ・移動と移動先強調を実装する
     location: https://github.com/takasek/pfdsl/issues/1284
-    updated_at: 2026-10-04T08:38:06Z
+    updated_at: 2026-10-04T09:05:21Z
   i1257_build_standalone_foundation:
     label: 共通処理を製品用アプリ基盤へ接続する
     location: https://github.com/takasek/pfdsl/issues/1257
@@ -223,23 +223,23 @@ process:
   i1258_build_standalone_documents:
     label: 文書の安全な編集・保存を完成させる
     location: https://github.com/takasek/pfdsl/issues/1258
-    updated_at: 2026-10-04T08:38:09Z
+    updated_at: 2026-10-04T09:05:24Z
   i1259_build_standalone_pfd_features:
     label: PFD 編集・閲覧機能を両版で揃える
     location: https://github.com/takasek/pfdsl/issues/1259
-    updated_at: 2026-10-04T08:38:11Z
+    updated_at: 2026-10-04T09:05:27Z
   i1260_build_standalone_integrations:
     label: 関連参照・差分・外部実行を接続する
     location: https://github.com/takasek/pfdsl/issues/1260
-    updated_at: 2026-10-04T08:38:14Z
+    updated_at: 2026-10-04T09:05:30Z
   i1261_build_standalone_exports:
     label: 全形式の書き出しを完成させる
     location: https://github.com/takasek/pfdsl/issues/1261
-    updated_at: 2026-10-04T08:38:17Z
+    updated_at: 2026-10-04T09:05:34Z
   i1262_publish_standalone:
     label: 配布物の全体受入を完了して公開する
     location: https://github.com/takasek/pfdsl/issues/1262
-    updated_at: 2026-10-04T08:38:19Z
+    updated_at: 2026-10-04T09:05:37Z
 
 tag:
   "priority:high": { style: { color: "#b60205", penwidth: "2" } }
