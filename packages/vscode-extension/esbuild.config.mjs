@@ -48,5 +48,14 @@ if (watch) {
 	]);
 	await Promise.all([extCtx.watch(), wvCtx.watch()]);
 } else {
-	await Promise.all([build(extensionOptions), build(webviewOptions)]);
+	await Promise.all([
+		build(extensionOptions),
+		build(webviewOptions),
+		// The corpus probe loads the same snapshot adapter as the registered providers.
+		build({
+			...extensionOptions,
+			entryPoints: ["src/analyze.ts"],
+			outfile: "dist/analysis-host.cjs",
+		}),
+	]);
 }

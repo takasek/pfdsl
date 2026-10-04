@@ -4,6 +4,7 @@ import { dirname, posix, resolve } from "node:path";
 import { describe, it } from "node:test";
 import { fileURLToPath } from "node:url";
 import { parse as parseYaml } from "yaml";
+import { GitHubUnavailableError } from "../pfdsl/lib/github-ops.mjs";
 import * as gateCheck from "./gate-check.mjs";
 import {
 	AUDIT_ISSUES_FLOW_GH_UNAVAILABLE_EXIT_CODE,
@@ -50,7 +51,7 @@ describe("classifyAuditIssuesFlowResult", () => {
 			AUDIT_ISSUES_FLOW_GH_UNAVAILABLE_EXIT_CODE,
 		);
 		assert.equal(result.status, "SKIP");
-		assert.match(result.detail, /gh CLI unavailable/);
+		assert.match(result.detail, /GitHub operations unavailable/);
 	});
 
 	it("FAIL for a real findings/error exit code", () => {
@@ -857,13 +858,20 @@ describe("SIZE_TRACKED_PATTERNS", () => {
 // the caller cannot parse. Only the first of those is an environment this repo
 // accepts (#489), and only it may reduce the issue's checks to SKIP.
 describe("classifyIssueLookupFailure", () => {
-	it("SKIPs when the gh binary itself is missing", () => {
-		const enoent = Object.assign(new Error("spawn gh ENOENT"), {
-			code: "ENOENT",
-		});
-		const result = classifyIssueLookupFailure(enoent);
+	it("SKIPs only operation API unavailability", () => {
+		const result = classifyIssueLookupFailure(
+			new GitHubUnavailableError("viewIssue"),
+		);
 		assert.equal(result.status, "SKIP");
-		assert.match(result.detail, /gh CLI unavailable/);
+		assert.match(result.detail, /GitHub operation unavailable/);
+	});
+	it("does not infer GitHub unavailability from a backend ENOENT", () => {
+		assert.equal(
+			classifyIssueLookupFailure(
+				Object.assign(new Error("HTTP error"), { code: "ENOENT" }),
+			).status,
+			"FAIL",
+		);
 	});
 
 	it("FAILs when gh ran and reported an error", () => {
@@ -1023,7 +1031,7 @@ describe("collectModeledLocations", () => {
 			// them this repo adopts (#1227).
 			["references/file-based-tracker-backend.md", "ops_skill_l3"],
 		];
-		const skillRoot = resolve(root, ".claude/skills/pfd-ops");
+		const skillRoot = resolve(root, "scripts/harness-template/skills/pfd-ops");
 		const actualFiles = [
 			...readdirSync(skillRoot).filter((name) => name === "SKILL.md"),
 			...readdirSync(resolve(skillRoot, "references"))
@@ -1036,7 +1044,7 @@ describe("collectModeledLocations", () => {
 			"Classify every protocol/reference file as generic, backend, or intentionally outside this workflow when adding, moving, or splitting it.",
 		);
 		for (const [path, id] of expected) {
-			const changedPath = `.claude/skills/pfd-ops/${path}`;
+			const changedPath = `scripts/harness-template/skills/pfd-ops/${path}`;
 			assert.deepEqual(
 				classifyChangedFilesByModeling([changedPath], locations),
 				id === null

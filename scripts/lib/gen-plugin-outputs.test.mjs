@@ -24,7 +24,16 @@ const EVERY_GEN_PLUGIN_OUTPUT = [
 	"AGENTS.md",
 	".agents",
 	".codex",
-	".claude/skills/pfd-ops/install",
+	".claude/skills/pfd-grill",
+	".claude/skills/pfd-ops",
+	".claude/skills/pfd-retro",
+	".claude/skills/pfd-ecosystem",
+	".claude/skills/pfd-upstream-report",
+	".claude/commands/pfd-cycle.md",
+	".claude/commands/pfd-init.md",
+	".claude/commands/pfd-retro.md",
+	".claude/agents/pfd-lens.md",
+	".claude/agents/pfd-implementer.md",
 ];
 
 const sorted = (paths) => [...paths].sort();
@@ -47,7 +56,7 @@ describe("gen-plugin output contract", () => {
 	it("leaves install/ to the CI workflow that regenerates it with gen-install", () => {
 		assert.deepEqual(
 			sorted(genPluginDriftPathspecs("ci")),
-			sorted(EVERY_GEN_PLUGIN_OUTPUT.filter((p) => p !== GEN_INSTALL_OUTPUT)),
+			sorted([...EVERY_GEN_PLUGIN_OUTPUT, `:(exclude)${GEN_INSTALL_OUTPUT}`]),
 		);
 	});
 
@@ -55,14 +64,22 @@ describe("gen-plugin output contract", () => {
 		assert.deepEqual(
 			sorted(genPluginDriftPathspecs("pre-commit")),
 			sorted([
-				...EVERY_GEN_PLUGIN_OUTPUT.filter((p) => p !== GEN_INSTALL_OUTPUT),
+				...EVERY_GEN_PLUGIN_OUTPUT,
+				`:(exclude)${GEN_INSTALL_OUTPUT}`,
 				`:(exclude)${GEN_SKILL_MD_OUTPUT}`,
 			]),
 		);
 	});
 
 	it("rejects a consumer it does not know", () => {
-		assert.throws(() => genPluginDriftPathspecs("release"), /release/);
+		assert.throws(() => genPluginDriftPathspecs("unknown"), /unknown/);
+	});
+	it("includes repository assets and install in push and release checks", () => {
+		for (const consumer of ["push", "release"])
+			assert.deepEqual(
+				sorted(genPluginDriftPathspecs(consumer)),
+				sorted(EVERY_GEN_PLUGIN_OUTPUT),
+			);
 	});
 
 	it("covers exactly the destinations a failed generation restores", () => {

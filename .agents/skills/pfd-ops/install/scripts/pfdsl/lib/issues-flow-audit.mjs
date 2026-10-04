@@ -1,5 +1,9 @@
 // Pure logic for auditing sync between GitHub issues and .pfdsl/roadmap.pfdsl.
-// Zero I/O. No imports.
+// Zero I/O.
+
+import { formatIdForCliArg } from "./cli-id-arg.mjs";
+
+const shellQuote = (value) => `'${value.replaceAll("'", "'\\''")}'`;
 
 export const FLOW_LABELS = [
 	{ name: "flow:managed", description: "tracked in .pfdsl/roadmap.pfdsl" },
@@ -128,6 +132,7 @@ export function computeFindings(entries, issues) {
 				processId: entry.processId,
 				artifactId: entry.artifactId,
 				detail: `process: ${val}, issue: ${iss.updatedAt}`,
+				repairCommand: `pfdsl meta set .pfdsl/roadmap.pfdsl ${shellQuote(formatIdForCliArg(entry.processId))} updated_at ${shellQuote(iss.updatedAt)} --allow-unknown`,
 			});
 		}
 

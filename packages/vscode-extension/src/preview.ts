@@ -1,26 +1,17 @@
 import { type DiffReport, resolveLocationFsPath } from "@pfdsl/core";
-import { exportDot } from "@pfdsl/graphviz-exporter";
-import * as vscode from "vscode";
-import {
-	analyzeDocument,
-	resolveEffectiveFrontmatterForUri,
-} from "./analyze.js";
-import { type DirectoryAccess, expandDirectory } from "./expand-directory.js";
-import { findFrontmatterDefinition } from "./jump.js";
-import {
-	buildDescriptions,
-	buildLocations,
-	buildSubflows,
-} from "./location-utils.js";
-import type { MessageFromWebview, MessageToWebview } from "./messages.js";
-import { PreviewController } from "./preview-controller.js";
+import type { MessageFromWebview, MessageToWebview } from "@pfdsl/editor";
 import {
 	allIdsOfDocument,
-	blockingDiagnosticMessage,
-	buildHtml,
+	buildLocations,
+	findFrontmatterDefinitionRange,
 	nodeIdAtCursor,
 	positionOfNodeId,
-} from "./preview-logic.js";
+} from "@pfdsl/editor";
+import * as vscode from "vscode";
+import { analyzeDocument, preparePreviewForDocument } from "./analyze.js";
+import { type DirectoryAccess, expandDirectory } from "./expand-directory.js";
+import { PreviewController } from "./preview-controller.js";
+import { buildHtml } from "./preview-logic.js";
 import { requireActivePfdslEditor } from "./utils.js";
 
 interface PreviewState {
@@ -131,32 +122,28 @@ async function openFileActivatingExisting(
 	}
 }
 
-function dotForDocument(doc: vscode.TextDocument): {
-	dot?: string;
-	error?: string;
-} {
-	const { graph, frontmatter, diagnostics } = analyzeDocument(doc);
-	const blocking = blockingDiagnosticMessage(diagnostics);
-	if (blocking) return { error: blocking };
-	try {
-		const effectiveFrontmatter = resolveEffectiveFrontmatterForUri(
-			doc.uri,
-			frontmatter,
-		);
-		return { dot: exportDot(graph, effectiveFrontmatter) };
-	} catch (e) {
-		return { error: `Export failed: ${(e as Error).message}` };
-	}
-}
-
 function jumpToNode(
 	doc: vscode.TextDocument,
 	nodeId: string,
 	preferDefinition = false,
 ): void {
 	let targetPos: vscode.Position | undefined;
+	let targetEnd: vscode.Position | undefined;
 	if (preferDefinition) {
-		targetPos = findFrontmatterDefinition(doc, nodeId);
+		const definition = findFrontmatterDefinitionRange(
+			analyzeDocument(doc),
+			nodeId,
+		);
+		if (definition) {
+			targetPos = new vscode.Position(
+				definition.start.line - 1,
+				definition.start.column - 1,
+			);
+			targetEnd = new vscode.Position(
+				definition.end.line - 1,
+				definition.end.column - 1,
+			);
+		}
 	}
 	if (!targetPos) {
 		const found = positionOfNodeId(
@@ -168,7 +155,7 @@ function jumpToNode(
 	if (!targetPos) return;
 	const range = new vscode.Range(
 		targetPos,
-		targetPos.translate(0, nodeId.length),
+		targetEnd ?? targetPos.translate(0, nodeId.length),
 	);
 	const existingEditor = vscode.window.visibleTextEditors.find(
 		(e) => e.document === doc,
@@ -176,7 +163,7 @@ function jumpToNode(
 	if (existingEditor) {
 		existingEditor.selection = new vscode.Selection(
 			targetPos,
-			targetPos.translate(0, nodeId.length),
+			targetEnd ?? targetPos.translate(0, nodeId.length),
 		);
 		existingEditor.revealRange(range);
 		const vc = existingEditor.viewColumn;
@@ -205,24 +192,13 @@ export function registerPreview(context: vscode.ExtensionContext): {
 		state: PreviewState,
 		focusNodeId: string | undefined,
 	): void {
-		const { dot, error } = dotForDocument(state.doc);
+		const { message } = preparePreviewForDocument(state.doc);
 		state.panel.title = `PFDSL Preview — ${state.doc.uri.path.split("/").pop() ?? ""}`;
-		if (error) {
-			state.panel.webview.postMessage({ type: "error", message: error });
-		} else {
-			const { frontmatter } = analyzeDocument(state.doc);
-			const descriptions = buildDescriptions(frontmatter);
-			const locations = buildLocations(frontmatter);
-			const subflows = buildSubflows(frontmatter);
-			state.panel.webview.postMessage({
-				type: "render",
-				dot,
-				focusNodeId,
-				descriptions,
-				locations,
-				subflows,
-			});
-		}
+		state.panel.webview.postMessage(
+			message.type === "render" && focusNodeId !== undefined
+				? { ...message, focusNodeId }
+				: message,
+		);
 	}
 
 	function createPanel(
@@ -246,11 +222,9 @@ export function registerPreview(context: vscode.ExtensionContext): {
 			},
 		);
 		const webviewScriptUri = panel.webview.asWebviewUri(scriptUri);
-		const isDebug = context.extensionMode === vscode.ExtensionMode.Development;
 		panel.webview.html = buildHtml(
 			webviewScriptUri.toString(),
 			panel.webview.cspSource,
-			isDebug,
 		);
 
 		const state: PreviewState = {

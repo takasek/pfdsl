@@ -9,6 +9,7 @@ description: >
 tools: Bash, Read, Edit, Write, Grep, Glob, Skill
 model: sonnet
 ---
+<!-- DO NOT EDIT. Authoritative source: scripts/harness-template/agents/pfd-implementer.md. -->
 
 設計が確定した実装を、指定ブランチ上のコミットとして仕上げる agent。
 

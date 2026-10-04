@@ -1,0 +1,27 @@
+{
+	"name": "@pfdsl/standalone",
+	"version": "0.0.0",
+	"private": true,
+	"type": "module",
+	"scripts": {
+		"dev": "vite --host 127.0.0.1",
+		"build": "vite build && esbuild src/processing.ts --bundle --platform=node --format=esm --packages=external --outfile=dist/processing.js",
+		"typecheck": "tsgo --noEmit",
+		"test": "node --test \"test/*.test.mjs\"",
+		"tauri": "tauri"
+	},
+	"dependencies": {
+		"@pfdsl/editor": "workspace:*",
+		"@pfdsl/preview-engine": "workspace:*",
+		"@tauri-apps/api": "2.11.1",
+		"monaco-editor": "0.57.0",
+		"path-browserify": "1.0.1"
+	},
+	"devDependencies": {
+		"jsdom": "^24.0.0",
+		"@tauri-apps/cli": "2.11.5",
+		"@types/node": "^20.0.0",
+		"esbuild": "0.27.7",
+		"vite": "8.3.1"
+	}
+}

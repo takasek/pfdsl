@@ -6,9 +6,12 @@
 
 実践・レビューで得た知見は3経路に振り分ける:
 
-1. **即時ルール化** — 配布スキル群の直接改訂。配布層へ載せるかは `.claude/skills/pfd-ops/references/architecture.md`「昇格先の判定ルール」に従い、0段目の区分 i・ii に入らない規律はこの経路でなく binding か利用者環境へ置く。pfdsl スキルの品質ガイドは `quality_guide` artifact（= docs/quality-guide.md）を、スキル本文は `skill_template` artifact（= scripts/skill-template/SKILL.md）を直接改訂する（`maintain_template` プロセス）。知識正本の整備工程は `knowledge_maintenance` tag の3つで、改訂・検証手順が実際に違うところで分かれる。1つの正本 asset の整備工程を調べるときはその artifact の producer を問い合わせる。どの正本が plugin に同梱されるかは gen-plugin manifest と `pipeline_pfdsl` が一次情報で、この図の artifact ノードが持つのは配送 membership でなく整備責任である。人間の `decisions` が変更対象を指名し、採用した `retro_findings` の具体的観察を全 `knowledge_maintenance` プロセスが feedback evidence として対象固有の文言・規則・機構へ反映する。知識正本・仕様・サンプル・ADR・PFD・companion・README を改版する工程は自身の現行出力も feedback の改版基準として読み、既存内容を保った差分改訂を行う。現行出力は変更権限ではなく、各工程の通常入力だけが改訂を駆動する。単発納品物の `article` は改版サイクルを持たず、issue と repository の外部状態は既存の `issue_updates` および `integrated_repository` 還流で表すため、自己 baseline を重ねない。スキル改善は issue を通さず対話から直接行う
+1. **即時ルール化** — 配布スキル群の正本 `scripts/harness-template/skills`・`scripts/harness-template/commands`・`scripts/harness-template/agents` を直接改訂する。ハーネス別の本文は明示的な `claude` / `codex` section と raw path variable で表し、inventory が指定したテンプレートだけを描画する。`.claude/` の配布対象と `.agents/`・`.codex/`・両 plugin root は生成物であり、正本の改訂後に `make gen-plugin` で再生成する。メンテナ専用の `.claude/` 資産、別系統の `scripts/skill-template/SKILL.md`、repo ルート由来の `install/` payload はそれぞれ既存の正本に従う。配布層へ載せるかは `scripts/harness-template/skills/pfd-ops/references/architecture.md`「昇格先の判定ルール」に従い、0段目の区分 i・ii に入らない規律はこの経路でなく binding か利用者環境へ置く。pfdsl スキルの品質ガイドは `quality_guide` artifact（= docs/quality-guide.md）を、スキル本文は `skill_template` artifact（= scripts/skill-template/SKILL.md）を直接改訂する（`maintain_template` プロセス）。知識正本の整備工程は `knowledge_maintenance` tag の3つで、改訂・検証手順が実際に違うところで分かれる。1つの正本 asset の整備工程を調べるときはその artifact の producer を問い合わせる。どの正本が plugin に同梱されるかは gen-plugin manifest と `pipeline_pfdsl` が一次情報で、この図の artifact ノードが持つのは配送 membership でなく整備責任である。人間の `decisions` が変更対象を指名し、採用した `retro_findings` の具体的観察を全 `knowledge_maintenance` プロセスが feedback evidence として対象固有の文言・規則・機構へ反映する。知識正本・仕様・サンプル・ADR・PFD・companion・README を改版する工程は自身の現行出力も feedback の改版基準として読み、既存内容を保った差分改訂を行う。現行出力は変更権限ではなく、各工程の通常入力だけが改訂を駆動する。単発納品物の `article` は改版サイクルを持たず、issue と repository の外部状態は既存の `issue_updates` および `integrated_repository` 還流で表すため、自己 baseline を重ねない。スキル改善は issue を通さず対話から直接行う
 2. **設計決定** — ADR 起草（`docs/adr/`）。ADR 化した判断は適用ルールのガイド蒸留要否も判定する
 3. **作業項目** — issue 起票 + 依存グラフ更新（`roadmap.pfdsl`。手段は roadmap.md 参照）
+
+`maintain_repo_bindings` は binding・guard・companionに加えて、現行の `adopter_config` も改版基準として読む。
+`.pfdsl/config.json` の一方の宣言値を変更するときも、もう一方を含む既存値を保持して差分改訂する。
 
 今回の監査で得た所見を起票する前に、共通の方針判断・調査・修正を一度に進める利点が大きいものは、一つの作業項目にまとめる。まとめた場合も、各所見の受入条件は残す。この整理のために、過去の類似 issue を追加で探索する必要はない。
 
@@ -140,6 +143,7 @@ issue が spec 変更を明示しており、変更が単一の制約節・sever
 ## spec_proposals ライフサイクル
 
 `docs/spec/proposals/*.md` は `draft_proposals` が生成し `maintain_spec`（integrate フェーズ）が消費する中間成果物。
+提案文書の criteria は起草内容が統合判断に使える状態を指し、後続の spec 統合完了を要求しない。
 
 - **作成タイミング**: issue 着手時、spec 改版の起草フェーズ
 - **消費**: `maintain_spec` で spec 本文に統合される
@@ -180,14 +184,14 @@ proposal 起草での「既存構造」は対象 spec の現行 frontmatter キ�
 
 **`make gen-samples` 実行後**: `.dot` / `.svg` / README はいずれも決定論的（純 JS + `@pfdsl/preview-engine` の wasm graphviz）に生成されるため、再生成された全ファイルの差分をそのままステージしてよい（#588）。
 
-現在のcanonical inputは、`scripts/lib/harness-inventory.mjs` が選ぶ手書きの`.claude/skills`・`.claude/commands`・`.claude/agents`配布対象と、`scripts/root-instructions-template/INSTRUCTIONS.md`・`.claude/settings.json`・`hooks/`である。
+配布 skill・command・agent の canonical input は、`scripts/lib/harness-inventory.mjs` が宣言する `scripts/harness-template/skills`・`scripts/harness-template/commands`・`scripts/harness-template/agents` である。ハーネス別の本文は明示 section と raw path variable で表し、指定したファイルだけを厳密に描画する。ルート指示・設定・hook の正本は `scripts/root-instructions-template/INSTRUCTIONS.md`・`.claude/settings.json`・`hooks/` に置く。
 ルート指示文書は`CLAUDE.md`と`AGENTS.md`のどちらもこのテンプレートからの生成物であり、手書き入力ではない（#1160）。Claude CodeとCodexのadapterは同じinventoryを消費する。`.claude/skills/pfdsl` は中立生成物 `generated/skills/pfdsl` への生成symlinkであり、canonical inputでも編集先でもない。
 
 これらの入力、またはgen-skillの入力を変更したら、`pnpm -r build && make gen-plugin` を実行する。これはClaude Code rootの`plugin/pfdsl/`とCodex native rootの`plugin/pfdsl-codex/`、リポジトリの`CLAUDE.md`・`AGENTS.md`・`.agents/`・`.codex/`を同時に再生成する。公式Codex validator/runtimeはplugin rootの`skills/`を固定するため、異なるClaude Code/Codex skill treeを単一rootに同居させない。生成先は手編集しない。編集元を直して同じコマンドで再生成する。distが無い、または鮮度確認だけを行う場合は`node scripts/gen-plugin-dist-independent.mjs`を使えるが、Claude rootの`plugin/pfdsl/skills/pfdsl/SKILL.md`は含まれない。
 
 Codex pluginのmanifestは`plugin/pfdsl-codex/.codex-plugin/plugin.json`にあり、現在`Skills` capabilityのみを表す。hookはtop-level manifest fieldではなくplugin同梱の`plugin/pfdsl-codex/hooks/hooks.json`を既定discoveryして公開する。Codex runtimeはhook commandへ`CLAUDE_PLUGIN_ROOT`互換環境を与えるため、Claude Codeと同一のhook textを使う。Codex native agentはリポジトリ側の`.codex/agents/`へ生成し、`.codex/hooks.json`はrepo-local hook設定として残す。`.codex/config.toml`はtrusted projectの`workspace-write`と`on-request` approvalを維持しながらsandbox内network accessを有効にする。Codexではcommandとskillが同じplugin skill名前空間を共有するため、同名の場合は生成器がcommand側を`source-command-<name>`へ改名する。
 
-中立canonical sourceへの移行は今回の対象外である。将来はinventoryのsource pathと共通本文の置場を差し替え、Claude CodeとCodexのadapter出力契約とidentity検査を維持する。
+`.claude/skills`・`.claude/commands`・`.claude/agents` の配布対象も生成物であり、手編集しない。メンテナ専用の非配布資産は既存の `.claude/` 正本に残す。`install/` の一次情報は repo ルートの明示リストであり、中立テンプレートへ複製しない。
 
 再生成漏れは機械的に検出されるため手動チェックは不要である。gen-skill / gen-plugin の identity はpre-commit（各々の入力 staged 時）とCI（check-gen-plugin.yml）、`.dot` / README のドリフトはgraphviz-exporterのvitestテスト、`.svg` のドリフトはpreview-engineのvitestテスト（いずれもpre-commitの`docs/samples/` staged時とCI test）、README `## CLI` セクションのドリフトは`make check-readme-cli`（pre-commitの`packages/cli/src/` / `README.md` staged時とCI test.yml）が検査する。`references/*.md`を含むpluginのdist非依存部分は`scripts/gen-plugin-dist-independent.mjs`が生成し、pre-commitの結合`gen-plugin-bulk` gateはClaude rootの`plugin/pfdsl/`、Codex rootの`plugin/pfdsl-codex/`、`AGENTS.md`、`.agents/`、`.codex/`を同時に比較する。distがstaleでClaude pfdsl SKILL.md部分の検査がskipされても、このdriftはここで止まる（#593。前身は#586のreferences専用検査で、粒度拡張の経緯は`scripts/pre-commit`の当該コメントが一次情報）。
 
@@ -199,9 +203,22 @@ Codex pluginのmanifestは`plugin/pfdsl-codex/.codex-plugin/plugin.json`にあ�
 テンプレートを増減したらこのリストも更新する。
 
 drift 検査は pre-commit（`gen-install` の check_drift。他の drift 検査と違い dist を要求しないので、ビルド未実施でもローカルで走る）と CI（`check-pfd-ops-sync.yml`）が行う。
-生成側を手編集した場合も、再生成が作業ツリーの手編集を上書きしたうえで検査が落ちる。
-テンプレートのソースを変更したコミットは再ステージが2往復必要になる（1回目で `install/`、2回目で `plugin/`）。
-2ホップの生成チェーンに「直して exit 1」の流儀を適用した結果であり、意図した挙動である。
+pre-commit は index の凍結コピーを隔離した repository に展開し、その中の生成器・入力・出力・trigger を使って検査する。
+無関係な未stage編集や未追跡生成物は検査へ混ざらず、成功・失敗とも元の作業ツリーと index を書き換えない。
+隔離先を作る入口自身とその bootstrap helper は作業ツリーから実行するため、これらの未stage破損まで隔離する保証はない。
+隔離先で生成器の回復処理が失敗した場合も一時データは破棄され、元の作業ツリーに既存の回復データがあればそのまま残る。
+`GIT_INDEX_FILE` を使う hook ではその index を凍結し、隔離先の子プロセスには元 repository の Git target 環境を渡さない。
+不足する生成物や手編集した生成物を検出したら、明示的に `make gen-plugin` で2ホップをまとめて再生成し、意図した生成元と生成物を一緒にstageする。
+ビルドは元の鮮度検査に通り、ビルド入力が index と一致するときだけ隔離先へコピーする。
+その条件を満たさない dist 依存ゲートは従来どおり skip を報告するため、skip は同一性の確認済みを意味しない。
+
+終端ゲートと release は `scripts/check-generation.mjs --gen-plugin <terminal|release>` で同じ隔離検査を行い、生成出力契約全体を比較する。
+終端ゲートは index、push・release は公開対象の HEAD を隔離入力に使う。
+push・release は生成出力のstage済み未commit差分も拒否し、stage済みの修復で不整合な HEAD を隠せないようにする。
+これらの入口は生成物の未stage差分も先に検出する。
+`make push` は `--gen-plugin push --samples` で repository assets・install を含む plugin 出力とサンプルを検査し、不整合なら手動の再生成・コミットを促して停止する。
+自動stage・自動コミットは行わない。
+配布する install payload は `scripts/lib/install-templates.mjs` の許可一覧から skill の `installFiles` 宣言を導出し、開発用ファイルを列挙し直さない。
 
 **生成物 drift 検査はコミット分割を制約する**: 規則は `.pfdsl/bindings/pfd-ops.md`「ワークサイクルの追加手順」の「終端ゲートの追加項目を検査して完了を確認する」にあるコミット粒度ゲートが一次情報。このリポで該当する検査は`gen-plugin`（inventoryが選ぶ手書き入力と`CLAUDE.md`・settings・hooksからClaude root、Codex root、repository Codex assetsを同時に導出する結合gate）と`gen-install`。
 
@@ -211,7 +228,7 @@ drift 検査は pre-commit（`gen-install` の check_drift。他の drift 検査
 
 検査対象は手書きリストでなく既存データから導く（列挙を持つとそれ自体が追随漏れの対象になる）。同梱されるかは `scripts/lib/gen-plugin.mjs` の `PLUGIN_MIRRORS`（組み立てと `distribution-review` の逆写像が既に読んでいる同梱マニフェスト）が答え、artifact の `location:` とエッジは `@pfdsl/core` の `analyze()` から取る。`pfdsl_skill` はマニフェストが「rendered, not mirrored」として除外するため特別扱いが要らない。
 
-**2つの要件は要求範囲が異なる（#944）**: `gen_plugin` への到達は図に宣言された同梱の手書き artifact に要求する。workflow 側の producer の存在は `workflow.pfdsl` が整備対象として宣言している artifact にのみ要求する。この図は配送 membership でなく整備責任を持つため、生成元がなければ整備契約が欠ける。`pfd_commands` は `pipeline.pfdsl` にしか宣言が無く（#780）、workflow 側の生成元は要求しない。両図が宣言する artifact は workflow 側の宣言を採り、finding は1件に畳む。
+**2つの要件は要求範囲が異なる（#944）**: `gen_plugin` への到達は図に宣言された同梱の手書き artifact に要求する。workflow 側の producer の存在は `workflow.pfdsl` が整備対象として宣言している artifact にのみ要求する。この図は配送 membership でなく整備責任を持つため、生成元がなければ整備契約が欠ける。command 正本は `ops_skill_general`・`retro_skill`・`ecosystem_skill` の location に含め、`maintain_distributed_prompt_assets` が整備する。生成済みcommand/command由来skillの配送は `pipeline.pfdsl` が持つ。両図が宣言する artifact は workflow 側の宣言を採り、finding は1件に畳む。
 
 照合先は ADR-0035 の描き直しで4箇所から2箇所に減った。旧 `publish_cli` 入力エッジは判断部分が3種の release 判断になり素材列挙を持たなくなり、`pipeline.pfdsl` の旧 `assemble_plugin` は `workflow.pfdsl` の旧 `gen_plugin` と同一物の二重モデル化だったため統合した。実際にこの二重化は `pfd_lens_agent` / `implementer_agent` が片方の図にしか無いという乖離を生んでいた。
 
@@ -390,9 +407,34 @@ vscode-extension 等で新しいノード種別をホバー対応する場合、
 
 ## 終端ゲートの根拠
 
+### 検査対象と報告版の対応
+
+追跡下の `.pfdsl` の分類は `scripts/lib/pfdsl-check-inventory.mjs` が正本であり、Makefile の graph・strict・fmt・render・location 検査が同じ分類を使う（#1185）。
+`git ls-files -z` で分類宣言から独立に列挙し、未分類・曖昧な割当・生成元の欠落を失敗にする。
+scaffold 正本は `scripts/harness-template/` で検証し、4つの生成先は正本の検証と `check-gen-plugin.yml` の再生成・drift 検査へ委譲する。
+core fixture の parse・normalize・validateGraph は package test が持ち、CLI の exit と multi-file の repo-wide 検証済みとは扱わない。
+新しい root を追加する場合は、必要な検査軸と検査責任を分類へ同時に追加する。
+root の全域分類は、読み込まれた子の診断範囲を保証しない。
+
+終端報告は冒頭の `Report revision` が示す head・base tip・merge-base と測定時刻を対象とする（#1190）。
+知識成果物のサイズは merge-base→head の blob 差、変更・削除一覧はその PR 差分、location 突合は head の PFD blob、cycle window は固定した base/head の履歴から測る。
+head の表示と未 commit の作業ファイルを混ぜない。
+新規ファイルの比較元不在と blob 読取不能、削除なしと削除列挙失敗、完全なモデル分類と読み取れたモデルだけの分類を区別する。
+fetch 失敗時の既存 base は鮮度未確認として全報告の冒頭にも示す。
+報告材料の欠落は表示し、人間向け材料を新しい合否判定にはしない。
+
+作業者と PR 本文作成者は、報告を利用する直前に記載された対象版と最終差分を対応させる。
+reviewer へ渡した後に commit を追加した場合は、新しい head で再測定して報告を置き換える。
+base が進んだ場合は cycle window を再測定し、merge-base も変わればサイズと変更・削除の突合も再測定する。
+rebase 後の cycle window は、外部に書いた issue・PR 本文が新しい規約と整合するかを再読する材料であり、サイクル開始から最初の commit までの時間帯を完全に復元する証拠ではない。
+同じ head・merge-base・モデル blob と検査実装を使い、前回の取得が完全だった材料は再利用できる。
+cycle window の再利用には base tip と開始 commit の同一性も必要で、鮮度未確認・部分測定・測定不能の結果を後から完全な報告として再利用しない。
+
+### 機械検査と人間確認
+
 汎用ゲート項目（status 更新 / check 通過 / 論理単位コミット / PR 集約）に加え、このリポでは issue 固有項目を合成する。issue 固有項目は `roadmap.md` を参照。
 
-- **終端ゲートの機械項目と報告材料（pfd-ops 手順3・#462）**: `GH_HOST=github.com node scripts/gate-check.mjs [--base main] [--artifact <key> [--in-progress] | --no-artifact] [--issue <n> ...]` — 内部で `git fetch origin` を試みたうえで `origin/<base>...HEAD` を基準に差分を取る（fetch 失敗時も既存 remote-tracking ref で続行し、ref 自体が無ければ明示エラーで終了する）。**項目名・PASS/FAIL/SKIP の判定・SKIP 条件はここに列挙しない** — スクリプトの出力が自己記述的であり、実行すれば全項目が detail 付きで印字される（#560。列挙をここに置くとスクリプト変更のたび手で追随することになり、追随を保証する機構が無い）。`--artifact <key>` を渡すと status 更新・wip 経由の両方をその artifact に厳密スコープする（省略時はどちらも粗いフォールバック判定になる旨を detail に明示）。出力 artifact を持たないサイクル（`flow:exempt` の bookkeeping 等）は `--no-artifact` で宣言する — `roadmap.pfdsl` を status 以外の理由で触ると、宣言なしでは構造的に FAIL する（#564）。表のほかに報告材料が印字される。**その種類・件数・内容もここに列挙しない** — 同じ理由で、出力が節見出しごと自己記述する（#839）。機械結果に含まれない判断は `.claude/skills/pfd-ops/references/work-cycle.md` の「3. 反映 — 終端ゲート」を直接確認する。スクリプトは本文を解析・再印字せず、PR 作成前の同節とPR 作成後の `PR 作成後` 項目への固定案内だけを表示する
+- **終端ゲートの機械項目と報告材料（pfd-ops 手順3・#462）**: `GH_HOST=github.com node scripts/gate-check.mjs [--base main] [--artifact <key> [--in-progress] | --no-artifact] [--issue <n> ...]` — 内部で `git fetch origin` を試みたうえで `origin/<base>...HEAD` を基準に差分を取る（fetch 失敗時も既存 remote-tracking ref で続行し、ref 自体が無ければ明示エラーで終了する）。**項目名・PASS/FAIL/SKIP の判定・SKIP 条件はここに列挙しない** — スクリプトの出力が自己記述的であり、実行すれば全項目が detail 付きで印字される（#560。列挙をここに置くとスクリプト変更のたび手で追随することになり、追随を保証する機構が無い）。`--artifact <key>` を渡すと status 更新・wip 経由の両方をその artifact に厳密スコープする（省略時はどちらも粗いフォールバック判定になる旨を detail に明示）。出力 artifact を持たないサイクル（`flow:exempt` の bookkeeping 等）は `--no-artifact` で宣言する — `roadmap.pfdsl` を status 以外の理由で触ると、宣言なしでは構造的に FAIL する（#564）。表のほかに報告材料が印字される。**その種類・件数・内容もここに列挙しない** — 同じ理由で、出力が節見出しごと自己記述する（#839）。機械結果に含まれない判断は `scripts/harness-template/skills/pfd-ops/references/work-cycle.md` の「3. 反映 — 終端ゲート」を直接確認する。スクリプトは本文を解析・再印字せず、PR 作成前の同節とPR 作成後の `PR 作成後` 項目への固定案内だけを表示する
 
 - **対象 issue は全て明示する**: 終端の `--issue <n>` は繰り返し指定でき、各 issue の通常読取と、既存の人間確認案内への対象提示に使う。記録固有の PASS/FAIL や確認済み状態は出さない。省略時は対象を推測せず、人間確認を終えたとも扱わない。`cycle-status.mjs` は明示した各 issue、または指定なしで best プロセスから解決した issue を着手前確認の対象とし、その全件を含む `gateCheckCommand` を出す。記録の存在・正本・承認根拠への参照と対応は binding「終端ゲートの追加項目を検査して完了を確認する」で人間が確認する。変更された知識成果物のバイト・行差分は従来どおり報告材料として印字する。
 

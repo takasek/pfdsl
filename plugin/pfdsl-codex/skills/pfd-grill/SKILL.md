@@ -1,6 +1,7 @@
 ---
 name: pfd-grill
-summary: backward-dialogue diagram construction
+metadata:
+  summary: backward-dialogue diagram construction
 description: |
   Use when building a single .pfdsl diagram's content through backward
   dialogue — starting from a named final deliverable and recursively
@@ -15,7 +16,7 @@ description: |
   node whose connections remain unclear in an otherwise forward-built
   graph.
 ---
-<!-- DO NOT EDIT. Authoritative source: .claude/skills/pfd-grill/SKILL.md. -->
+<!-- DO NOT EDIT. Authoritative source: scripts/harness-template/skills/pfd-grill/SKILL.md. -->
 
 # pfd-grill: 最終成果物からの後ろ向き対話構築
 

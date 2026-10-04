@@ -1,4 +1,4 @@
-<!-- DO NOT EDIT. Authoritative source: .claude/skills/pfd-ops/references/file-based-tracker-backend.md. -->
+<!-- DO NOT EDIT. Authoritative source: scripts/harness-template/skills/pfd-ops/references/file-based-tracker-backend.md. -->
 
 # ファイルベース・トラッカー（pfd-ops プリセット）
 

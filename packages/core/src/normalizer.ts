@@ -31,16 +31,31 @@ export function normalize(
 	const nodeKinds = new Map<string, "artifact" | "process" | "group">();
 	const declaredNodes = new Set<string>(); // node-decl で宣言されたID（孤立候補）
 	const edgeNodes = new Set<string>(); // edge に参加したID
+	const groupClashes = new Set<string>();
+
+	function reportGroupClash(id: string, kind: "artifact" | "process"): void {
+		const key = `${id}\0${kind}`;
+		if (groupClashes.has(key)) return;
+		groupClashes.add(key);
+		diagnostics.push({
+			severity: "error",
+			code: "N004",
+			message: `'${id}' is declared as a group and also used as ${kind === "artifact" ? "an" : "a"} ${kind}`,
+			range: zeroRange(),
+		});
+	}
 
 	// Pre-populate from front matter (takes priority)
 	for (const id of Object.keys(fm?.artifact ?? {})) {
 		nodeKinds.set(id, "artifact");
+		if (Object.hasOwn(fm?.group ?? {}, id)) reportGroupClash(id, "artifact");
 	}
 	for (const id of Object.keys(fm?.group ?? {})) {
 		if (!nodeKinds.has(id)) nodeKinds.set(id, "group");
 	}
 	for (const id of Object.keys(fm?.process ?? {})) {
-		if (nodeKinds.has(id)) {
+		if (Object.hasOwn(fm?.group ?? {}, id)) reportGroupClash(id, "process");
+		if (nodeKinds.get(id) === "artifact") {
 			diagnostics.push({
 				severity: "error",
 				code: "N001",
@@ -54,11 +69,16 @@ export function normalize(
 
 	function inferKind(id: string, kind: "artifact" | "process"): void {
 		const existing = nodeKinds.get(id);
+		if (Object.hasOwn(fm?.group ?? {}, id)) reportGroupClash(id, kind);
 		if (existing === undefined) {
 			nodeKinds.set(id, kind);
 			return;
 		}
 		if (existing !== kind) {
+			if (existing === "group") {
+				nodeKinds.set(id, kind);
+				return;
+			}
 			diagnostics.push({
 				severity: "error",
 				code: "N002",
@@ -143,6 +163,8 @@ export function normalize(
 				declaredNodes.add(id);
 				// kind: front matter優先、なければArtifact既定（§5.1.3）
 				if (!nodeKinds.has(id)) nodeKinds.set(id, "artifact");
+				else if (nodeKinds.get(id) === "group")
+					reportGroupClash(id, "artifact");
 				break;
 			}
 		}

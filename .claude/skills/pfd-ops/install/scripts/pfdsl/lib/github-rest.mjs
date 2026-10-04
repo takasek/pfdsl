@@ -197,16 +197,86 @@ function requireMappableFields(verb, fields, map, alsoKnown = []) {
 	}
 }
 
+const isRecord = (value) =>
+	value !== null && typeof value === "object" && !Array.isArray(value);
+const isText = (value) => typeof value === "string";
+const isIdentity = (value) => isText(value) && value.length > 0;
+const isIssueNumber = (value) => Number.isSafeInteger(value) && value > 0;
+
+function isClosingIssue(value) {
+	return (
+		isRecord(value) &&
+		isIssueNumber(value.number) &&
+		isIdentity(value.id) &&
+		isIdentity(value.url) &&
+		isIdentity(value.repository?.id) &&
+		isIdentity(value.repository?.name) &&
+		isIdentity(value.repository?.owner?.id) &&
+		isIdentity(value.repository?.owner?.login)
+	);
+}
+
+const VIEW_FIELD_VALIDATORS = {
+	body: isText,
+	title: isText,
+	number: isIssueNumber,
+	createdAt: isIdentity,
+	updatedAt: isIdentity,
+	headRefName: isIdentity,
+	url: isIdentity,
+	state: (value) =>
+		["OPEN", "CLOSED", "MERGED", "open", "closed"].includes(value),
+	stateReason: (value) => value === null || isIdentity(value),
+	author: (value) => value === null || isIdentity(value?.login),
+	labels: (value) =>
+		Array.isArray(value) && value.every((label) => isIdentity(label?.name)),
+	comments: (value) =>
+		Array.isArray(value) &&
+		value.every(
+			(comment) =>
+				isRecord(comment) &&
+				isIdentity(comment.id) &&
+				isText(comment.body) &&
+				isIdentity(comment.createdAt) &&
+				isIdentity(comment.url) &&
+				(comment.author === null || isIdentity(comment.author?.login)),
+		),
+	closingIssuesReferences: (value) =>
+		Array.isArray(value) && value.every(isClosingIssue),
+};
+
+/** Validate the requested view value for both backends, before consumers use it. */
+export function requireGitHubViewFields(operation, fields, value) {
+	if (!isRecord(value))
+		throw new Error(`GitHub ${operation} returned a malformed view object`);
+	for (const field of fields) {
+		if (
+			!Object.hasOwn(value, field) ||
+			value[field] === undefined ||
+			(VIEW_FIELD_VALIDATORS[field] &&
+				!VIEW_FIELD_VALIDATORS[field](value[field]))
+		)
+			throw new Error(
+				`GitHub ${operation} returned a malformed '${field}' field`,
+			);
+	}
+	return value;
+}
+
 const ISSUE_VIEW_FIELDS = {
-	author: (issue) => ({ login: issue.user?.login }),
-	body: (issue) => issue.body ?? "",
+	author: (issue) =>
+		issue.user === null ? null : { login: issue.user?.login },
+	body: (issue) => (issue.body === null ? "" : issue.body),
 	createdAt: (issue) => issue.created_at,
 	number: (issue) => issue.number,
-	state: (issue) => String(issue.state).toUpperCase(),
+	state: (issue) =>
+		typeof issue.state === "string" ? issue.state.toUpperCase() : issue.state,
 	stateReason: (issue) =>
-		issue.state_reason ? String(issue.state_reason).toUpperCase() : null,
+		typeof issue.state_reason === "string"
+			? issue.state_reason.toUpperCase()
+			: issue.state_reason,
 	labels: (issue) =>
-		(issue.labels ?? []).map((l) => ({
+		issue.labels?.map((l) => ({
 			name: typeof l === "string" ? l : l.name,
 		})),
 	updatedAt: (issue) => issue.updated_at,
@@ -268,14 +338,14 @@ export async function fetchIssueView(
 		result.comments = comments.map((c) => ({
 			id: c.node_id,
 			databaseId: c.id,
-			author: { login: c.user?.login },
-			body: c.body ?? "",
+			author: c.user === null ? null : { login: c.user?.login },
+			body: c.body === null ? "" : c.body,
 			createdAt: c.created_at,
 			url: c.html_url,
 		}));
 	}
 
-	return result;
+	return requireGitHubViewFields("issue view", fields, result);
 }
 
 /**
@@ -284,7 +354,7 @@ export async function fetchIssueView(
  * rather than omitted.
  */
 const PR_VIEW_FIELDS = {
-	body: (pr) => pr.body ?? "",
+	body: (pr) => (pr.body === null ? "" : pr.body),
 	headRefName: (pr) => pr.head?.ref,
 	number: (pr) => pr.number,
 	state: (pr) => pr.state,
@@ -313,7 +383,7 @@ function buildPrView(fields, pr, closing) {
 	for (const field of fields)
 		result[field] =
 			field === CLOSING_ISSUES_FIELD ? closing : PR_VIEW_FIELDS[field](pr);
-	return result;
+	return requireGitHubViewFields("pr view", fields, result);
 }
 
 /**
@@ -330,12 +400,16 @@ function buildPrView(fields, pr, closing) {
  * A failed lookup throws, never returns []: callers turn "closes no issue"
  * into a FAIL verdict, so the two must stay distinguishable (#745).
  *
+ * Preserve the same issue/repository identity fields as `gh pr view`, so
+ * references to equal issue numbers in different repositories remain distinct.
+ *
  * @param {string} owner
  * @param {string} repo
  * @param {string} token
  * @param {number} number
  * @param {typeof fetch} [fetchImpl]
- * @returns {Promise<{number: number}[]>}
+ * @returns {Promise<Array<{id: string, number: number, url: string,
+ *   repository: {id: string, name: string, owner: {id: string, login: string}}}>>}
  */
 export async function fetchClosingIssueReferences(
 	owner,
@@ -348,7 +422,12 @@ export async function fetchClosingIssueReferences(
   repository(owner: $owner, name: $repo) {
     pullRequest(number: $number) {
       closingIssuesReferences(first: ${PER_PAGE}, after: $cursor) {
-        nodes { number }
+        nodes {
+          id
+          number
+          url
+          repository { id name owner { id login } }
+        }
         pageInfo { hasNextPage endCursor }
       }
     }
@@ -387,11 +466,23 @@ export async function fetchClosingIssueReferences(
 			throw new Error(
 				`GitHub GraphQL API returned no closing issue references for ${owner}/${repo}#${number}`,
 			);
-		references.push(
-			...(connection.nodes ?? []).map((node) => ({ number: node.number })),
+		requireGitHubViewFields(
+			"closing issue references",
+			[CLOSING_ISSUES_FIELD],
+			{ [CLOSING_ISSUES_FIELD]: connection.nodes },
 		);
-		if (!connection.pageInfo?.hasNextPage) return references;
-		cursor = connection.pageInfo.endCursor;
+		if (typeof connection.pageInfo?.hasNextPage !== "boolean")
+			throw new Error(
+				"GitHub closing issue references returned malformed pageInfo",
+			);
+		references.push(...connection.nodes);
+		if (!connection.pageInfo.hasNextPage) return references;
+		const nextCursor = connection.pageInfo.endCursor;
+		if (!isIdentity(nextCursor) || nextCursor === cursor)
+			throw new Error(
+				"GitHub closing issue references returned a malformed pagination cursor",
+			);
+		cursor = nextCursor;
 	}
 	throw new Error(
 		`GitHub GraphQL pagination exceeded ${MAX_PAGES} pages for closing issue references of ${owner}/${repo}#${number}`,

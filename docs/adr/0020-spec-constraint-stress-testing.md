@@ -52,6 +52,7 @@ v0.0.8 のマルチファイル意味論（`subflow:` / `extends:`）は、確�
 
 ## References
 
+- `docs/adr/0020-spec-stress-testing/group-node-id-collision.md` — group とノードの同名制約、feedback・N:M・単独ノード・三重衝突の境界確認（#1291）。
 - `docs/adr/0020-spec-stress-testing/string-sequence-elements.md` — 文字列配列の要素型、alias、数値キー、参照ファイルの診断（#1272）
 
 - `docs/adr/0020-spec-stress-testing/boundary-validation-log.md` — 具体例トレース全ログ（subflow/extends の穴・境界の粒度/名前/再利用・rename マップ edge ケース）

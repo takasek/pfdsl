@@ -1,3 +1,5 @@
+<!-- DO NOT EDIT. Authoritative source: scripts/harness-template/skills/pfd-ops/references/scaffold/pipeline.md. -->
+
 # pipeline.md — 変換境界の補足（pipeline.pfdsl の companion）
 
 `pipeline.pfdsl` のグラフが運べない、変換境界に関する補足をここに置く。pfd-ops skill の L2 ディスパッチがこのファイルを参照する。

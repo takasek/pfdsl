@@ -1,3 +1,5 @@
+<!-- DO NOT EDIT. Authoritative source: scripts/harness-template/skills/pfd-ops/references/scaffold/roadmap.md. -->
+
 # roadmap.md — 作業項目管理バインディング（roadmap.pfdsl の companion）
 
 `roadmap.pfdsl` は作業項目の依存構造のみ管理する。作業項目の一次情報と同期手段はここに書く。pfd-ops skill の L2 ディスパッチがこのファイルを参照する。

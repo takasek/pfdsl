@@ -1,4 +1,4 @@
-<!-- DO NOT EDIT. Authoritative source: .claude/skills/pfd-ops/references/github-issues-backend.md. -->
+<!-- DO NOT EDIT. Authoritative source: scripts/harness-template/skills/pfd-ops/references/github-issues-backend.md. -->
 
 # GitHub Issues バックエンド（pfd-ops プリセット）
 

@@ -1,7 +1,7 @@
 import { analyze, diffGraphs } from "@pfdsl/core";
+import type { MessageFromWebview, MessageToWebview } from "@pfdsl/editor";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type * as vscode from "vscode";
-import type { MessageFromWebview, MessageToWebview } from "./messages.js";
 
 // Only host callbacks and postMessage are faked. Parsing, DOT generation,
 // requireActivePfdslEditor and registerPreview are the production modules.

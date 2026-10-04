@@ -51,7 +51,7 @@
 <!-- def_insertion -->
 <g id="node4" class="node">
 <title>def_insertion</title>
-<g id="a_node4"><a xlink:title="frontmatter 定義挿入 code action (#484)&#10;&#10;edge にのみ現れる未定義ノードへ artifact/process 定義スケルトンを挿入する&#10;criteria: edge にのみ現れる未定義ノード上で Quick Fix『Insert {kind} definition』を実行すると frontmatter に artifact/process 定義が挿入されることが packages/vscode&#45;extension/src/def&#45;insertion&#45;logic.test.ts のテストで検証されている">
+<g id="a_node4"><a xlink:title="frontmatter 定義挿入 code action (#484)&#10;&#10;edge にのみ現れる未定義ノードへ artifact/process 定義スケルトンを挿入する&#10;criteria: edge にのみ現れる未定義ノード上で Quick Fix『Insert {kind} definition』を実行すると frontmatter に artifact/process 定義が挿入されることが実 extension host で確認され、種別判定と定義挿入の回帰テストが成功している">
 <polygon fill="#d4edda" stroke="black" stroke-width="2" points="1377.01,-998.6 1211.41,-998.6 1211.41,-940.2 1377.01,-940.2 1377.01,-998.6"/>
 <text xml:space="preserve" text-anchor="middle" x="1294.21" y="-982" font-family="Times,serif" font-size="14.00">def_insertion</text>
 <text xml:space="preserve" text-anchor="middle" x="1294.21" y="-965.2" font-family="Times,serif" font-size="14.00">frontmatter 定義挿入</text>
@@ -97,7 +97,7 @@
 <!-- editor_connector -->
 <g id="node5" class="node">
 <title>editor_connector</title>
-<g id="a_node5"><a xlink:title="エディタ コネクタ編集支援 (#482)&#10;&#10;ノード前後への新規追加・既存接続の code action/コマンド。edge 挿入ロジックはロジック層に分離し Preview UI (#483) と共用&#10;criteria: カーソル下ノードへの前後追加・接続がコネクタ種選択付きの code action から実行でき、選択結果が .pfdsl テキストへ挿入されることが packages/vscode&#45;extension/src/connector&#45;logic.test.ts のテストで検証されている">
+<g id="a_node5"><a xlink:title="エディタ コネクタ編集支援 (#482)&#10;&#10;ノード前後への新規追加・既存接続の code action/コマンド。edge 挿入ロジックはロジック層に分離し Preview UI (#483) と共用&#10;criteria: カーソル下ノードへの前後追加・接続がコネクタ種選択付きの code action から実行でき、選択結果が .pfdsl テキストへ挿入されることが実 extension host で確認され、共有編集計算の回帰テストが成功している">
 <polygon fill="#fff3cd" stroke="black" points="756.99,-898 605.79,-898 605.79,-822.8 756.99,-822.8 756.99,-898"/>
 <text xml:space="preserve" text-anchor="middle" x="681.39" y="-881.4" font-family="Times,serif" font-size="14.00">editor_connector</text>
 <text xml:space="preserve" text-anchor="middle" x="681.39" y="-864.6" font-family="Times,serif" font-size="14.00">エディタ</text>
@@ -203,14 +203,14 @@
 <!-- group_delete_cli -->
 <g id="node9" class="node">
 <title>group_delete_cli</title>
-<g id="a_node9"><a xlink:title="group を削除できる delete (#1278)&#10;&#10;delete が group id を受け付け、宣言と所属ノード・子 group からの参照を扱うこと。扱いの設計は #1278 で決める&#10;criteria: pfdsl delete &lt;file&gt; &lt;group&#45;id&gt; &#45;&#45;write が group の宣言を削除し、所属ノードの group: と子 group の parent: を #1278 で決めた規則どおりに扱うことが packages/cli/src/index.test.ts のテストで検証されている">
-<polygon fill="#f8f9fa" stroke="black" points="756.99,-432.6 605.79,-432.6 605.79,-374.2 756.99,-374.2 756.99,-432.6"/>
+<g id="a_node9"><a xlink:title="group を削除できる delete (#1278)&#10;&#10;delete が group id を受け付け、宣言を削除する。所属ノードと子 group は残し、group: と parent: を削除されずに残る最も近い祖先へ付け替える。祖先がなければ参照を外す&#10;criteria: pfdsl delete &lt;file&gt; &lt;group&#45;id&gt; &#45;&#45;write が group の宣言を削除し、所属ノードと子 group を残して group: と parent: を削除されずに残る最も近い祖先へ付け替える。祖先がない場合の参照解除と、親子 group の一括削除を含め、packages/core と packages/cli/src/index.test.ts のテストで検証されている">
+<polygon fill="#d4edda" stroke="black" points="756.99,-432.6 605.79,-432.6 605.79,-374.2 756.99,-374.2 756.99,-432.6"/>
 <text xml:space="preserve" text-anchor="middle" x="681.39" y="-416" font-family="Times,serif" font-size="14.00">group_delete_cli</text>
 <text xml:space="preserve" text-anchor="middle" x="681.39" y="-399.2" font-family="Times,serif" font-size="14.00">group を削除できる</text>
 <text xml:space="preserve" text-anchor="middle" x="681.39" y="-382.4" font-family="Times,serif" font-size="14.00">delete (#1278)</text>
 </a>
 </g>
-<text xml:space="preserve" text-anchor="middle" x="593.34" y="-361.6" font-family="Times,serif" font-size="14.00">todo</text>
+<text xml:space="preserve" text-anchor="middle" x="592.18" y="-361.6" font-family="Times,serif" font-size="14.00">done</text>
 </g>
 <!-- publish_cli_group_delete -->
 <g id="node35" class="node">
@@ -229,14 +229,14 @@
 <g id="node10" class="node">
 <title>group_node_clash_diagnostic</title>
 <g id="a_node10"><a xlink:title="group と node の同名を報告する診断 (#1291)&#10;&#10;1ファイル内で group と artifact / process が同じ id を持つことを invalid として、種別を正しく名指して報告する診断。spec §2.8.1 と §15 への規定を含む&#10;criteria: group と artifact / process が同じ id を持つファイルに対し、check が種別を名指すエラーを報告し、docs/spec/spec.md に規定があり、packages/core のテストで検証されている">
-<polygon fill="#f8f9fa" stroke="black" points="789.39,-92 573.39,-92 573.39,-16.8 789.39,-16.8 789.39,-92"/>
+<polygon fill="#d4edda" stroke="black" points="789.39,-92 573.39,-92 573.39,-16.8 789.39,-16.8 789.39,-92"/>
 <text xml:space="preserve" text-anchor="middle" x="681.39" y="-75.4" font-family="Times,serif" font-size="14.00">group_node_clash_diagnostic</text>
 <text xml:space="preserve" text-anchor="middle" x="681.39" y="-58.6" font-family="Times,serif" font-size="14.00">group と node</text>
 <text xml:space="preserve" text-anchor="middle" x="681.39" y="-41.8" font-family="Times,serif" font-size="14.00">の同名を報告する診</text>
 <text xml:space="preserve" text-anchor="middle" x="681.39" y="-25" font-family="Times,serif" font-size="14.00">断 (#1291)</text>
 </a>
 </g>
-<text xml:space="preserve" text-anchor="middle" x="560.94" y="-4.2" font-family="Times,serif" font-size="14.00">todo</text>
+<text xml:space="preserve" text-anchor="middle" x="559.78" y="-4.2" font-family="Times,serif" font-size="14.00">done</text>
 </g>
 <!-- publish_cli_group_node_clash -->
 <g id="node36" class="node">
@@ -295,7 +295,7 @@
 <!-- i1257_build_standalone_foundation -->
 <g id="node13" class="node">
 <title>i1257_build_standalone_foundation</title>
-<g id="a_node13"><a xlink:href="https://github.com/takasek/pfdsl/issues/1257" xlink:title="共通処理を製品用アプリ基盤へ接続する&#10;updated_at: 2026&#45;09&#45;26T07:15:50Z&#10;location: https://github.com/takasek/pfdsl/issues/1257">
+<g id="a_node13"><a xlink:href="https://github.com/takasek/pfdsl/issues/1257" xlink:title="共通処理を製品用アプリ基盤へ接続する&#10;updated_at: 2026&#45;10&#45;04T02:46:10Z&#10;location: https://github.com/takasek/pfdsl/issues/1257">
 <ellipse fill="none" stroke="black" cx="383.1" cy="-740.4" rx="154.29" ry="41.3"/>
 <text xml:space="preserve" text-anchor="middle" x="383.1" y="-753" font-family="Times,serif" font-size="14.00">i1257_build_standalone_foundation</text>
 <text xml:space="preserve" text-anchor="middle" x="383.1" y="-736.2" font-family="Times,serif" font-size="14.00">共通処理を製品用ア</text>
@@ -306,14 +306,14 @@
 <!-- standalone_foundation -->
 <g id="node47" class="node">
 <title>standalone_foundation</title>
-<g id="a_node47"><a xlink:title="両ホストで利用するアプリ共通基盤&#10;criteria: VS Code と製品用 Tauri アプリが共通処理で同じサンプルを解析・描画し、Mac の起動・日本語入力・再描画を確認済み。全機能の受入対応表に後続工程と検証方法が割り当てられている">
-<polygon fill="#f8f9fa" stroke="black" points="767.79,-769.6 594.99,-769.6 594.99,-711.2 767.79,-711.2 767.79,-769.6"/>
+<g id="a_node47"><a xlink:title="両ホストで利用するアプリ共通基盤&#10;criteria: VS Code と製品用 Tauri アプリが共通処理で同じサンプルを解析・描画し、Mac の起動・日本語入力・再描画を確認済み。全機能の受入対応表に後続工程と検証方法が割り当てられている&#10;location: ../packages/standalone/">
+<polygon fill="#d4edda" stroke="black" points="767.79,-769.6 594.99,-769.6 594.99,-711.2 767.79,-711.2 767.79,-769.6"/>
 <text xml:space="preserve" text-anchor="middle" x="681.39" y="-753" font-family="Times,serif" font-size="14.00">standalone_foundation</text>
 <text xml:space="preserve" text-anchor="middle" x="681.39" y="-736.2" font-family="Times,serif" font-size="14.00">両ホストで利用する</text>
 <text xml:space="preserve" text-anchor="middle" x="681.39" y="-719.4" font-family="Times,serif" font-size="14.00">アプリ共通基盤</text>
 </a>
 </g>
-<text xml:space="preserve" text-anchor="middle" x="582.54" y="-698.6" font-family="Times,serif" font-size="14.00">todo</text>
+<text xml:space="preserve" text-anchor="middle" x="581.38" y="-698.6" font-family="Times,serif" font-size="14.00">done</text>
 </g>
 <!-- i1257_build_standalone_foundation&#45;&gt;standalone_foundation -->
 <g id="edge40" class="edge">
@@ -471,7 +471,7 @@
 <!-- i1278_add_group_delete -->
 <g id="node19" class="node">
 <title>i1278_add_group_delete</title>
-<g id="a_node19"><a xlink:href="https://github.com/takasek/pfdsl/issues/1278" xlink:title="group 削除の追加&#10;updated_at: 2026&#45;09&#45;26T17:36:28Z&#10;location: https://github.com/takasek/pfdsl/issues/1278">
+<g id="a_node19"><a xlink:href="https://github.com/takasek/pfdsl/issues/1278" xlink:title="group 削除の追加&#10;updated_at: 2026&#45;10&#45;03T20:00:32Z&#10;location: https://github.com/takasek/pfdsl/issues/1278">
 <ellipse fill="none" stroke="black" cx="383.1" cy="-403.4" rx="109.73" ry="29.42"/>
 <text xml:space="preserve" text-anchor="middle" x="383.1" y="-407.6" font-family="Times,serif" font-size="14.00">i1278_add_group_delete</text>
 <text xml:space="preserve" text-anchor="middle" x="383.1" y="-390.8" font-family="Times,serif" font-size="14.00">group 削除の追加</text>
@@ -573,7 +573,7 @@
 <!-- i1291_report_group_node_clash -->
 <g id="node23" class="node">
 <title>i1291_report_group_node_clash</title>
-<g id="a_node23"><a xlink:href="https://github.com/takasek/pfdsl/issues/1291" xlink:title="group と node の同名の診断を追加する&#10;updated_at: 2026&#45;09&#45;27T10:23:04Z&#10;location: https://github.com/takasek/pfdsl/issues/1291">
+<g id="a_node23"><a xlink:href="https://github.com/takasek/pfdsl/issues/1291" xlink:title="group と node の同名の診断を追加する&#10;updated_at: 2026&#45;10&#45;03T20:00:14Z&#10;location: https://github.com/takasek/pfdsl/issues/1291">
 <ellipse fill="none" stroke="black" cx="383.1" cy="-54.4" rx="139.98" ry="53.17"/>
 <text xml:space="preserve" text-anchor="middle" x="383.1" y="-75.4" font-family="Times,serif" font-size="14.00">i1291_report_group_node_clash</text>
 <text xml:space="preserve" text-anchor="middle" x="383.1" y="-58.6" font-family="Times,serif" font-size="14.00">group と node</text>
@@ -591,7 +591,7 @@
 <!-- i1305_allow_extension_fields -->
 <g id="node24" class="node">
 <title>i1305_allow_extension_fields</title>
-<g id="a_node24"><a xlink:href="https://github.com/takasek/pfdsl/issues/1305" xlink:title="meta set の対象判定と拡張フィールド更新を整える&#10;updated_at: 2026&#45;10&#45;03T09:07:14Z&#10;location: https://github.com/takasek/pfdsl/issues/1305">
+<g id="a_node24"><a xlink:href="https://github.com/takasek/pfdsl/issues/1305" xlink:title="meta set の対象判定と拡張フィールド更新を整える&#10;updated_at: 2026&#45;10&#45;03T20:00:28Z&#10;location: https://github.com/takasek/pfdsl/issues/1305">
 <ellipse fill="none" stroke="black" cx="383.1" cy="-515.4" rx="130.64" ry="65.05"/>
 <text xml:space="preserve" text-anchor="middle" x="383.1" y="-544.8" font-family="Times,serif" font-size="14.00">i1305_allow_extension_fields</text>
 <text xml:space="preserve" text-anchor="middle" x="383.1" y="-528" font-family="Times,serif" font-size="14.00">meta set</text>
@@ -605,14 +605,14 @@
 <g id="node29" class="node">
 <title>meta_set_extension_fields</title>
 <g id="a_node29"><a xlink:title="対象判定と拡張フィールド更新を整えた meta set (#1305)&#10;&#10;既存の未知スカラーフィールドの更新を許し、新しい未知フィールドの追加は明示的なフラグで許す meta set。本文だけのノードと不在 ID を区別し、frontmatter 定義の追加を案内する。通常出力と JSON の扱いを揃え、監査の stale_updated_at に修正コマンドを表示する。要件は統合後の issue #1305&#10;criteria: pfdsl meta set が既存の updated_at を更新でき、フラグなしの新しい未知フィールドは拒否し、フラグ付きなら追加する。本文だけのノードには frontmatter 定義の追加を案内し、不在 ID と通常出力・JSON の両方で区別する。結果に error がある場合は書き込まない。これらが packages/cli/src/index.test.ts のテストで検証され、audit&#45;issues&#45;flow.mjs の stale_updated_at の出力に meta set のコマンドが含まれ、rename &#45;&#45;help が拡張フィールドの値を改名しないことを説明する">
-<polygon fill="#f8f9fa" stroke="black" points="782.19,-553 580.59,-553 580.59,-477.8 782.19,-477.8 782.19,-553"/>
+<polygon fill="#d4edda" stroke="black" points="782.19,-553 580.59,-553 580.59,-477.8 782.19,-477.8 782.19,-553"/>
 <text xml:space="preserve" text-anchor="middle" x="681.39" y="-536.4" font-family="Times,serif" font-size="14.00">meta_set_extension_fields</text>
 <text xml:space="preserve" text-anchor="middle" x="681.39" y="-519.6" font-family="Times,serif" font-size="14.00">対象判定と拡張フィ</text>
 <text xml:space="preserve" text-anchor="middle" x="681.39" y="-502.8" font-family="Times,serif" font-size="14.00">ールド更新を整えた</text>
 <text xml:space="preserve" text-anchor="middle" x="681.39" y="-486" font-family="Times,serif" font-size="14.00">meta set (#1305)</text>
 </a>
 </g>
-<text xml:space="preserve" text-anchor="middle" x="568.14" y="-465.2" font-family="Times,serif" font-size="14.00">todo</text>
+<text xml:space="preserve" text-anchor="middle" x="566.98" y="-465.2" font-family="Times,serif" font-size="14.00">done</text>
 </g>
 <!-- i1305_allow_extension_fields&#45;&gt;meta_set_extension_fields -->
 <g id="edge24" class="edge">

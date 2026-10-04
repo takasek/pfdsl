@@ -1,9 +1,9 @@
 import * as path from "node:path";
 import { ID_PATTERN } from "@pfdsl/core";
+import { findFrontmatterDefinitionRange } from "@pfdsl/editor";
 import * as vscode from "vscode";
 import { analyzeDocument, LANGUAGE_ID } from "./analyze.js";
 import { buildHoverLines, RUN_COMMAND } from "./hover-logic.js";
-import { findFrontmatterDefinition } from "./jump.js";
 
 export { buildHoverLines } from "./hover-logic.js";
 
@@ -42,25 +42,30 @@ export function registerHover(context: vscode.ExtensionContext): void {
 			(docUriStr: string, nodeId: string) => {
 				const uri = vscode.Uri.parse(docUriStr);
 				vscode.workspace.openTextDocument(uri).then((doc) => {
-					const pos = findFrontmatterDefinition(doc, nodeId);
-					if (!pos) {
+					const range = findFrontmatterDefinitionRange(
+						analyzeDocument(doc),
+						nodeId,
+					);
+					if (!range) {
 						vscode.window.showInformationMessage(
 							`No frontmatter definition found for "${nodeId}"`,
 						);
 						return;
 					}
-					const defRange = new vscode.Range(
-						pos,
-						pos.translate(0, nodeId.length),
+					const pos = new vscode.Position(
+						range.start.line - 1,
+						range.start.column - 1,
 					);
+					const end = new vscode.Position(
+						range.end.line - 1,
+						range.end.column - 1,
+					);
+					const defRange = new vscode.Range(pos, end);
 					const existing = vscode.window.visibleTextEditors.find(
 						(e) => e.document.uri.toString() === docUriStr,
 					);
 					if (existing) {
-						existing.selection = new vscode.Selection(
-							pos,
-							pos.translate(0, nodeId.length),
-						);
+						existing.selection = new vscode.Selection(pos, end);
 						existing.revealRange(defRange);
 						const vc = existing.viewColumn;
 						if (vc !== undefined) {

@@ -175,6 +175,33 @@ describe("buildProcessOutputs", () => {
 // ---------------------------------------------------------------------------
 
 describe("computeFindings", () => {
+	it("stale timestamps include a copyable command for absent and existing fields", () => {
+		for (const updatedAt of [undefined, "old"]) {
+			const [finding] = computeFindings(
+				[
+					{
+						processId: "i1_build",
+						issueNumber: 1,
+						artifactId: "result",
+						updatedAt,
+						priorities: [],
+					},
+				],
+				[
+					{
+						number: 1,
+						state: "OPEN",
+						labels: ["flow:managed"],
+						updatedAt: "2026-10-03T12:00:00Z",
+					},
+				],
+			);
+			assert.equal(
+				finding.repairCommand,
+				"pfdsl meta set .pfdsl/roadmap.pfdsl 'i1_build' updated_at '2026-10-03T12:00:00Z' --allow-unknown",
+			);
+		}
+	});
 	it("missing_label: open issue with tracked process but no flow:managed", () => {
 		const entries = [
 			{

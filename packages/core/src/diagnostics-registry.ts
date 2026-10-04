@@ -349,6 +349,11 @@ export const DIAGNOSTIC_REGISTRY: Readonly<
 		section: "15.4",
 		summary: "the same edge is stated more than once",
 	},
+	N004: {
+		severities: ["error"],
+		section: "15.17",
+		summary: "a group ID is also declared or used as an artifact or process ID",
+	},
 };
 
 const CODE_RE = /code:\s*"([A-Z]+\d+)"/g;

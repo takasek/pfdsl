@@ -22,9 +22,9 @@ import {
 	agentCapabilityToCodexToml,
 	buildCodexPluginManifest,
 	buildCodexProjectConfig,
-	claudeInstructionsToAgents,
 	commandCapabilityToCodexSkill,
 	hookCapabilityToCodexHooks,
+	skillMarkdownToCodex,
 } from "./gen-codex-assets.mjs";
 import { genInstall } from "./gen-install.mjs";
 import { writeSkillRefs } from "./gen-skill-refs.mjs";
@@ -36,6 +36,7 @@ import {
 } from "./harness-capability-contract.mjs";
 import {
 	AGENT_EXCLUSIONS,
+	CLAUDE_GENERATED_CAPABILITY_OUTPUTS,
 	CLAUDE_PLUGIN_MIRRORS,
 	DISTRIBUTED_AGENTS,
 	DISTRIBUTED_COMMANDS,
@@ -141,7 +142,13 @@ function findDeclaredOwner(declared, surface) {
  * @returns {"claude-repository" | "codex-repository" | null}
  */
 function classifyRepositoryRootSurface(surface) {
-	if (surface === "CLAUDE.md") return "claude-repository";
+	if (
+		surface === "CLAUDE.md" ||
+		[".claude/skills", ".claude/commands", ".claude/agents"].some(
+			(root) => surface === root || surface.startsWith(`${root}/`),
+		)
+	)
+		return "claude-repository";
 	if (
 		surface === "AGENTS.md" ||
 		surface.startsWith(".codex/") ||
@@ -453,8 +460,10 @@ function normalizeCodexMarkdownTree(
 		}
 		if (!entry.isFile() || !path.endsWith(".md")) continue;
 		const source = deps.readFileSync(path, "utf-8");
+		const markdown =
+			entry.name === "SKILL.md" ? skillMarkdownToCodex(source) : source;
 		const normalized = addGeneratedMarkdownNotice(
-			claudeInstructionsToAgents(source).replace(/(?:\r?\n){2,}$/, "\n"),
+			markdown.replace(/(?:\r?\n){2,}$/, "\n"),
 			canonicalSource(sourcePath),
 		);
 		if (normalized !== source) deps.writeFileSync(path, normalized);
@@ -521,6 +530,16 @@ function stageTargetSkillTree({
 			}
 			const output = resolve(temporary, surface.slice(skillRoot.length + 1));
 			if (record.kind === "skill") {
+				if (record.semantic.variants) {
+					writeHarnessSkill(record, "codex", output, deps);
+					for (const file of record.source.installFiles ?? [])
+						deps.cpSync(
+							resolve(root, ".claude/skills/pfd-ops", file),
+							resolve(output, file),
+						);
+					observeRecordOutputs(observed, record);
+					continue;
+				}
 				const source = resolve(
 					root,
 					record.source.generated?.target ?? record.source.path,
@@ -637,7 +656,10 @@ export function pluginGenerationSnapshotTargets(
 		[codexPluginRoot, "codex-plugin-root"],
 		[resolve(root, ".claude-plugin/marketplace.json"), "marketplace.json"],
 		[resolve(root, "CLAUDE.md"), "claude-md"],
-		[resolve(root, ".claude/skills/pfd-ops/install"), "install"],
+		...CLAUDE_GENERATED_CAPABILITY_OUTPUTS.map((path, index) => [
+			resolve(root, path),
+			`claude-capability-${index}`,
+		]),
 		...CODEX_REPOSITORY_DESTINATIONS.map(([destination, backup]) => [
 			resolve(root, destination),
 			backup,
@@ -657,6 +679,7 @@ export function ownedPluginOutputRoots(root, pluginRoot, codexPluginRoot) {
 		resolve(root, GENERATED_SKILLS.pfdsl.target),
 		resolve(root, ".agents"),
 		resolve(root, ".codex"),
+		...CLAUDE_GENERATED_CAPABILITY_OUTPUTS.map((path) => resolve(root, path)),
 	];
 }
 
@@ -1112,6 +1135,22 @@ export function assembleCodexAssets({
 	}
 }
 
+function writeHarnessSkill(record, target, output, deps) {
+	for (const [file, source] of Object.entries(
+		record.semantic.variants[target].contents,
+	)) {
+		const destination = resolve(output, file);
+		deps.mkdirSync(dirname(destination), { recursive: true });
+		const canonical = `${record.source.path}/${file}`;
+		const text = file.endsWith(".md")
+			? addGeneratedMarkdownNotice(source, canonical)
+			: file.endsWith(".mjs")
+				? addGeneratedSourceComment(source, canonical)
+				: source;
+		deps.writeFileSync(destination, text);
+	}
+}
+
 export function assembleClaudeAssets({ root, pluginRoot, capabilities, deps }) {
 	const observed = {
 		"claude-repository": [],
@@ -1131,6 +1170,28 @@ export function assembleClaudeAssets({ root, pluginRoot, capabilities, deps }) {
 		}),
 	);
 	console.log(`CLAUDE.md ← ${repositoryInstructions.source.path}`);
+	for (const record of capabilitiesForTarget(
+		capabilities,
+		"claude-repository",
+	)) {
+		if (!record.semantic.variants) continue;
+		const output = resolve(root, record.mapping.outputs[0]);
+		if (record.kind === "skill")
+			writeHarnessSkill(record, "claude", output, deps);
+		else {
+			deps.mkdirSync(dirname(output), { recursive: true });
+			deps.writeFileSync(
+				output,
+				addGeneratedMarkdownNotice(
+					record.semantic.variants.claude.markdown.replace(
+						/(?:\r?\n){2,}$/,
+						"\n",
+					),
+					record.source.path,
+				),
+			);
+		}
+	}
 	for (const record of capabilitiesForTarget(
 		capabilities,
 		"claude-repository",

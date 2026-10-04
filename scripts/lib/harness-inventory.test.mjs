@@ -15,10 +15,24 @@ import {
 	HARNESS_CAPABILITY_CONTRACT,
 	SKILL_EXCLUSIONS,
 } from "./harness-inventory.mjs";
+import { INSTALL_TEMPLATE_PATHS } from "./install-templates.mjs";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 
 describe("harness distribution inventory", () => {
+	it("derives the install payload declaration from the sole distribution allowlist", () => {
+		const ops = HARNESS_CAPABILITY_CONTRACT.find(
+			({ id }) => id === "skill:pfd-ops",
+		);
+		assert.deepEqual(
+			ops.source.installFiles,
+			INSTALL_TEMPLATE_PATHS.map((path) => `install/${path}`),
+		);
+		assert.ok(ops.source.files.every((path) => !path.startsWith("install/")));
+		assert.ok(
+			ops.source.installFiles.every((path) => !path.endsWith(".test.mjs")),
+		);
+	});
 	it("declares every current capability family with a stable unique ID", () => {
 		const expectedIds = [
 			"skill:pfd-grill",
@@ -72,16 +86,16 @@ describe("harness distribution inventory", () => {
 			"command:pfd-retro",
 		]) {
 			assert.deepEqual(dispositionsFor(id), [
-				"native",
-				"native",
+				"transform",
+				"transform",
 				"transform",
 				"transform",
 			]);
 		}
 		for (const id of ["agent:pfd-lens", "agent:pfd-implementer"]) {
 			assert.deepEqual(dispositionsFor(id), [
-				"native",
-				"native",
+				"transform",
+				"transform",
 				"transform",
 				"intentional-exclusion",
 			]);

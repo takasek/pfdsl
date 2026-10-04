@@ -33,7 +33,16 @@ import {
 
 export { formatId, parseIdList } from "./formatter.js";
 
-import { loadFrontmatter } from "./frontmatter.js";
+import { loadFrontmatter, loadFrontmatterModel } from "./frontmatter.js";
+import type { FrontmatterSource } from "./frontmatter-source.js";
+
+export type {
+	FrontmatterSource,
+	SourceDeclaration,
+	SourceField,
+	SourceValue,
+} from "./frontmatter-source.js";
+
 import {
 	parseFrontmatterCst,
 	renderFrontmatterCst,
@@ -128,6 +137,7 @@ export interface AnalyzeResult {
 interface ParsedBody extends ParseDocResult {
 	body: string;
 	tokens: Token[];
+	sourceMap: FrontmatterSource;
 }
 
 /**
@@ -145,7 +155,8 @@ function parseBody(
 		body,
 		diagnostics: fmDiags,
 		bodyStartLine,
-	} = loadFrontmatter(source, frontmatterOptions);
+		sourceMap,
+	} = loadFrontmatterModel(source, frontmatterOptions);
 	const { tokens: rawTokens, diagnostics: lexDiags } = lex(body);
 	const lineOffset = bodyStartLine - 1;
 	const tokens =
@@ -163,6 +174,7 @@ function parseBody(
 		bodyStartLine,
 		body,
 		tokens,
+		sourceMap,
 		diagnostics: [...fmDiags, ...lexDiags, ...parseDiags],
 	};
 }
@@ -173,7 +185,7 @@ export function parse(source: string): ParseDocResult {
 	return { document, frontmatter, bodyStartLine, diagnostics };
 }
 
-export type { DeleteNodesResult } from "./delete-nodes.js";
+export type { DeleteNodesOptions, DeleteNodesResult } from "./delete-nodes.js";
 export { deleteNodes } from "./delete-nodes.js";
 export type { InsertDefinitionResult } from "./insert-definition.js";
 export { insertDefinition } from "./insert-definition.js";
@@ -230,11 +242,21 @@ export function analyze(
 	source: string,
 	opts: AnalyzeOptions = {},
 ): AnalyzeResult {
+	const { sourceMap: _sourceMap, ...result } = analyzeSource(source, opts);
+	return result;
+}
+
+/** Analyze one source snapshot and retain its authored frontmatter positions. */
+export function analyzeSource(
+	source: string,
+	opts: AnalyzeOptions = {},
+): AnalyzeResult & { sourceMap: FrontmatterSource } {
 	const {
 		document,
 		frontmatter,
 		bodyStartLine,
 		diagnostics: parseDiags,
+		sourceMap,
 	} = parseBody(source, opts.strict ? { strict: true } : undefined);
 	const {
 		edges,
@@ -242,7 +264,7 @@ export function analyze(
 		isolatedNodes,
 		diagnostics: normDiags,
 	} = normalize(document, frontmatter);
-	const valOpts: import("./validator.js").ValidateOptions = { source };
+	const valOpts: import("./validator.js").ValidateOptions = { sourceMap };
 	if (opts.strict) valOpts.strict = true;
 	if (opts.readyGate) valOpts.readyGate = true;
 	const valDiags = validate(edges, nodeKinds, frontmatter, valOpts);
@@ -255,6 +277,7 @@ export function analyze(
 		nodeKinds,
 		isolatedNodes,
 		graph,
+		sourceMap,
 		diagnostics: [...parseDiags, ...normDiags, ...valDiags],
 	};
 }
