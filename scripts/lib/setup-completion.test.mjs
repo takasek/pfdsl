@@ -41,6 +41,7 @@ function sessionStartCommand(path) {
 function fixture() {
 	const cwd = mkdtempSync(join(tmpdir(), "setup-completion-"));
 	fixtures.push(cwd);
+	assert.equal(spawnSync("/usr/bin/git", ["init", "-q", cwd]).status, 0);
 	const bin = join(cwd, "bin");
 	const log = join(cwd, "setup.log");
 	mkdirSync(join(cwd, "scripts/hooks"), { recursive: true });
@@ -64,7 +65,7 @@ function fixture() {
 
 	for (const [name, source] of Object.entries({
 		pnpm: '#!/bin/sh\nprintf \'pnpm\\n\' >> "$SETUP_LOG"\n[ -d "$SETUP_EXPECT_LOCK" ] || exit 97\n[ -n "$SETUP_READY_FILE" ] && : > "$SETUP_READY_FILE"\nif [ -n "$SETUP_RELEASE_FILE" ]; then while [ ! -f "$SETUP_RELEASE_FILE" ]; do /bin/sleep 0.02; done; fi\n[ "$SETUP_FAIL_STAGE" = pnpm ] && exit 1\nmkdir -p node_modules\nif [ -n "$SETUP_LINK_PATH" ]; then mkdir -p "$SETUP_LINK_PATH"; printf "%s\\n" "{\\"bin\\":{\\"fixture-command\\":\\"cli.js\\"}}" > "$SETUP_LINK_PATH/package.json"; mkdir -p "$(dirname "$SETUP_LINK_PATH")/.bin"; : > "$(dirname "$SETUP_LINK_PATH")/.bin/fixture-command"; "$REAL_CHMOD" 755 "$(dirname "$SETUP_LINK_PATH")/.bin/fixture-command"; fi\n[ -d "$SETUP_EXPECT_LOCK" ] || exit 98\n',
-		git: "#!/bin/sh\nprintf 'git\\n' >> \"$SETUP_LOG\"\n[ \"$SETUP_FAIL_STAGE\" = git ] && exit 1\nprintf '.git-common\\n'\n",
+		git: '#!/bin/sh\n[ "$1" = config ] && exit 1\nprintf \'git\\n\' >> "$SETUP_LOG"\n[ "$SETUP_FAIL_STAGE" = git ] && exit 1\nprintf \'.git-common\\n\'\n',
 		cp: '#!/bin/sh\nprintf \'cp\\n\' >> "$SETUP_LOG"\n[ "$SETUP_FAIL_STAGE" = cp ] && exit 1\nexec "$REAL_CP" "$@"\n',
 		chmod:
 			'#!/bin/sh\nprintf \'chmod\\n\' >> "$SETUP_LOG"\n[ "$SETUP_FAIL_STAGE" = chmod ] && exit 1\nexec "$REAL_CHMOD" "$@"\n',
