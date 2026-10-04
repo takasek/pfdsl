@@ -36,7 +36,7 @@ PR の触ったテストは全て通っていた。
 - 同じ desktop の worktree セッションで worktree を PR head に切り替えても、guard の拒否の文面は起動元 checkout の版のままだった（2回観測）。Codex の hook は session の cwd（起動元）で実行される（OpenAI の Codex hooks 資料）。両 harness とも、hook のコードは起動元の checkout から来ると扱う。Claude Code で hook の定義をどこから読むかは未測定である。
 - Codex の PreToolUse は ask を出せない。payload.cwd は起動元で、`.git` は sandbox で保護される。
 - Claude Code の command hook は、2以外の非0終了や timeout では tool 呼出しを止めない（公式資料 hooks）。
-- Codex で、wrapper の `node-script` 経由の読取り検査（`setup-completion.mjs check`、CLI の `--version`）が、primary checkout だからと拒否された。特権 Git 入口と汎用の検証実行を1つの wrapper に同居させたことによる。
+- verification-tree-guard は、Codex が primary checkout で `node scripts/…` を直接実行するのを拒否する。読取りだけの検査（`setup-completion.mjs check`、CLI の `--version`）も実行できる経路が無くなる事例があった。
 - GitHub の ruleset は main に PR を必須にしているが、承認必須数は0で、必須 check は `gen-plugin` と `sync-check` だけである。bypass actor として Integration 5103181 が登録されている。
 
 方針は、Claude（Opus）と Codex の2モデル（gpt-6-astra、gpt-6.1-sol）が議論して作った。
@@ -123,16 +123,20 @@ Makefile は `build: preflight` とし、並列実行でも順序を保証する
 変更の検証として報告する個別テストは、一束につき一回 preflight を実行して報告に含める。
 読取りの監査と CLI の検査は preflight の対象外で、primary checkout でもそのまま実行できる。
 
-### harness と machine-local の設定
+### harness についての前提と範囲
 
-machine-local の設定は repo の外にあり、この ADR はその責務だけを定める。
+リポジトリの guard は、harness の既定の挙動とリポジトリの仕組みだけで成り立たせる。
+個人の machine-local の拡張（承認を省く wrapper、execpolicy の規則、個人の指示など）はリポジトリの範囲外で、その持ち主が管理する。
+リポジトリはそれを前提にせず、規定もしない。
+リポジトリのコードは machine-local の実行ファイル名を参照しない。
 
-- Claude Code の sandbox は必須経路にしない。
-- Codex の wrapper は Git の routine と整合性検査を残し、汎用実行（node-script、node-test、setup、build、test、typecheck）を外す。
-  - setup は、依存の準備を通常の sandbox で行い、shim の配置だけを routine にする。
-  - raw Git の恒久 allow を外す。
-  - 特権 Git 操作の target は、thread で最初に使った作業対象と比べる。意図した切替は明示の rebind で行う。
-- Codex の手順書には、hook 定義を変えた後は全ての policy hook を trust するまで Git の変更をしないことを書く。
+前提にする harness の性質は次のとおりである。
+
+- Codex の PreToolUse は ask を出せない。payload.cwd は起動元を表す。sandbox は `.git` を保護し、raw Git の変更は承認に回る。
+- Codex は、定義が変わった hook を trust されるまで skip する。
+- Claude Code の PreToolUse は ask を出せる。payload.cwd は worktree と `cd` に追従し、`CLAUDE_PROJECT_DIR` は起動元に留まる。
+- Claude Code の command hook は、2以外の非0終了や timeout では tool 呼出しを止めない。
+- Claude Code の sandbox は前提にしない（理由は「検討した対案」）。
 
 ### PR #1335 から採用するもの
 
@@ -159,6 +163,7 @@ machine-local の設定は repo の外にあり、この ADR はその責務だ�
 - `verification-tree-guard`（entrypoint・lib・テスト）
 - `closes-create-guard`（entrypoint・lib・テスト）
 - `main-commit-guard` の target 解決・default branch 判定・sibling 判定
+- `main-commit-guard` が machine-local の実行ファイル名（`codex-git-routine.mjs`）を参照する分類
 - 文書中の shell 対応形式の列挙
 
 ### #1208 の処遇表 B との関係
@@ -177,8 +182,7 @@ machine-local の設定は repo の外にあり、この ADR はその責務だ�
 1. launch checkout を default branch へ移し、作業場所にしない。Claude Code の hook 定義の読込元を実測する。PR #1335 の扱いを決める。
 2. Git 層と setup を直す。
 3. repo hook を再編する。マージの直後に launch checkout を fast-forward する。
-4. Codex の wrapper・rules・手順書を縮小する。
-5. Claude Code の組込み worktree 隔離（公式資料 worktrees の「How Claude Code enforces isolation」）が、desktop の worktree セッションで変更系 Git に効くかを実測する。効くなら primary checkout 宛ての分岐を削る。
+4. Claude Code の組込み worktree 隔離（公式資料 worktrees の「How Claude Code enforces isolation」）が、desktop の worktree セッションで変更系 Git に効くかを実測する。効くなら primary checkout 宛ての分岐を削る。
 
 ## 前提の検討
 
@@ -198,10 +202,7 @@ PR #1335 までの候補は、「PreToolUse hook がコマンド文字列から�
   - このリポジトリでは tracked file の57件がそこにある。`245bf669`（2026-10-03）から遡る30日の first-parent の変更137件のうち、46件がそこを変えている。
   - これらを書き換える rebase・switch・pull は、承認を得た sandbox 外での再実行でしか進まず、その間は sandbox の保護が外れる。
   - 保護パスを設定で外せるようになるか、tracked file を保護パスの外へ移した時点で再検討する。
-- **作業対象を固定した人間承認や所有者台帳を必須にする**: 縮小案を採用し、残部は保留した。
-  - Codex の PreToolUse は ask を出せないので、操作ごとの人間承認は hook では実現できない。
-  - 代わりに、thread で最初に使った対象と比べる結び付けを採用した。thread の最初の操作がコピーされたものである場合は防げない。
-  - その事故が実際に起きた時点で、台帳や承認を再検討する。
+- **Codex で作業対象を照合する（人間承認、所有者台帳、最初に使った対象との結び付け）**: リポジトリの guard では扱わない。Codex の PreToolUse は ask を出せず、payload.cwd は作業対象を表さないため、hook には照合の基準が無い。照合を行う場合は machine-local の拡張の責務になり、リポジトリはそれを前提にしない。
 - **全 hook を exit 2、または全 hook を exit 0 にする**: 却下。Claude Code の command hook は timeout で判定を失う（公式資料 hooks）ので、exit 2 だけでは保証にならない。一律の exit 0 は、ロード失敗で policy を素通しにする。
 - **session root を基準に sibling を確認する（base の形）**: 却下。`CLAUDE_PROJECT_DIR` は起動元に留まる（公式資料 worktrees）ため、自分の worktree の操作でも毎回発火する。
 
@@ -219,7 +220,8 @@ PR #1335 までの候補は、「PreToolUse hook がコマンド文字列から�
   - Claude Code で別の checkout へ `cd` した後の操作は、payload.cwd が追従するため自分の checkout の操作として扱われる。
   - hook の timeout で判定が失われる。
   - pre-commit が走らない Git 操作（merge、cherry-pick、rebase、reset）。
-  - Codex の thread の最初の操作がコピーされたものである。
+  - Codex で、別の worktree 向けのコマンド一式をコピーして実行する（primary checkout と `.claude/worktrees/` 配下への書込みを除く）。
+  - Codex で hook 定義を変えた後、trust されるまでの間は hook が skip される。リポジトリは trust の状態を検出できない。
   - 旧 checkout の setup が shim を降格させる。preflight と新しい pre-commit が置き直すまでの間に限られる。
   - 個別テストの preflight は報告の規約で、機械では強制しない。`build` に依存しない make の target（lint、coverage、check 系、gen-plugin）も preflight を通らない。
 - 各段階の受入条件は、後続の issue に記す。対象は、拒否と確認の境界、ロード失敗の扱い、Codex の trust、縮小後の Codex の setup → build → test、MCP の判定、shim の置き直しである。
