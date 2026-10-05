@@ -1,5 +1,8 @@
 name: render pfdsl svg
 
+# Default paths are owned by scripts/lib/operational-svg-contract.mjs.
+# Its contract test checks triggers, input defaults and every execution fallback.
+
 on:
   push:
     branches: [main]

@@ -264,7 +264,7 @@ push・release は生成出力のstage済み未commit差分も拒否し、stage�
    `--to` を省くと `HEAD` までを列挙する。
    このスクリプトは、マージコミットを除いた `<hash> <subject>` を、`DISTRIBUTION_ROOTS`・`packages/`・`docs/spec/` のいずれかに触れたものだけ出力する。
    対象パスは `scripts/lib/migration-candidates.mjs` が `DISTRIBUTION_ROOTS` から組み立てるので、ルートを変えても手作業での同期は要らない。
-   配布物の一次情報は `scripts/lib/distribution-review.mjs` の `DISTRIBUTION_ROOTS`（配布 bundle のルート）と、`scripts/lib/distribution-sources.mjs` の `GENERATED_DISTRIBUTION_SOURCES`（生成物と生成元の対応）である。
+   配布物の一次情報は `scripts/lib/distribution-roots.mjs` の `DISTRIBUTION_ROOTS`（配布 bundle のルート。生成器を import しない共有定義）と、`scripts/lib/distribution-sources.mjs` の `GENERATED_DISTRIBUTION_SOURCES`（生成物と生成元の対応）である。
    手書きの生成元は、pre-commit と CI の同一性検査により生成物と同じ変更で更新される。
    そのため生成物のルートを指定すれば、スキル・コマンド・agent・hook・scaffold・`install/` の生成元の一覧をここへ複製せずに拾える。
    生成器だけを変えて出力だけが変わったコミットも、生成物のルートで拾える。
