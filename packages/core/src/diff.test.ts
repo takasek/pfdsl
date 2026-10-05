@@ -1,8 +1,108 @@
 import { describe, expect, it } from "vitest";
-import { diffGraphs } from "./diff.js";
-import { analyze } from "./index.js";
+import { diffGraphs, diffGraphsDetailed } from "./diff.js";
+import { analyze, formatId } from "./index.js";
 
 describe("diffGraphs", () => {
+	const collisionBase =
+		'["a -> b", a] >> hub -> seed\nseed >> c -> out1\nseed >> "b -> c" -> out2\n';
+	it.each([
+		">>",
+		">>?",
+	])("keeps unchanged and removed colliding edges distinct for %s", (op) => {
+		const a = analyze(
+			`${collisionBase}"a -> b" ${op} c\na ${op} "b -> c"\n`,
+		).graph;
+		const b = analyze(`${collisionBase}a ${op} "b -> c"\n`).graph;
+		const detailed = diffGraphsDetailed(a, b);
+		const edges = op === ">>" ? detailed.primaryEdges : detailed.feedbackEdges;
+		expect(edges.filter((edge) => edge.status === "removed")).toHaveLength(1);
+		expect(edges.filter((edge) => edge.status === "added")).toHaveLength(0);
+		expect(detailed.report).toEqual(diffGraphs(a, b));
+		expect(diffGraphs(b, b).addedEdges).toEqual([]);
+	});
+	it("ignores duplicate edges and input order, keeping primary and feedback separate", () => {
+		const a = analyze("req >> design -> spec\nreq >>? design\n").graph;
+		const b = {
+			...a,
+			primaryEdges: [...a.primaryEdges, ...a.primaryEdges].reverse(),
+			feedbackEdges: [...a.feedbackEdges, ...a.feedbackEdges],
+		};
+		const detailed = diffGraphsDetailed(a, b);
+		expect(detailed.primaryEdges).toHaveLength(2);
+		expect(detailed.feedbackEdges).toHaveLength(1);
+		expect(
+			[...detailed.primaryEdges, ...detailed.feedbackEdges].every(
+				(edge) => edge.status === "unchanged",
+			),
+		).toBe(true);
+		expect(detailed.report.addedEdges).toEqual([]);
+		expect(detailed.report.removedEdges).toEqual([]);
+		const changed = diffGraphs(a, { ...a, feedbackEdges: [] });
+		expect(changed.removedFeedback).toEqual(["req -> design"]);
+		expect(changed.removedEdges).toEqual([]);
+	});
+	it.each([
+		["a >> b", '"a >> b"'],
+		['a"b', '"a\\"b"'],
+		["a\\b", '"a\\\\b"'],
+		["a\nb", '"a\\nb"'],
+		["a\tb", '"a\\tb"'],
+	])("quotes and escapes the endpoint %j for display", (id, spelling) => {
+		const parsed = analyze(`${formatId(id)} >> proc -> out\n`);
+		expect(parsed.diagnostics.filter((d) => d.severity === "error")).toEqual(
+			[],
+		);
+		const r = diffGraphs(analyze("").graph, parsed.graph);
+		expect(r.addedEdges).toContain(`${spelling} -> proc`);
+	});
+	it("does not use NUL as an identity delimiter for manually constructed Graphs", () => {
+		const a = analyze("").graph;
+		const b = {
+			...a,
+			primaryEdges: [
+				{ from: "a\0b", to: "c", kind: "input" as const },
+				{ from: "a", to: "b\0c", kind: "input" as const },
+			],
+		};
+		expect(diffGraphsDetailed(a, b).primaryEdges).toHaveLength(2);
+		expect(diffGraphs(a, b).addedEdges).toHaveLength(2);
+	});
+	it.each([
+		">>",
+		">>?",
+	])("distinguishes colliding endpoint pairs for %s", (op) => {
+		const a = analyze(`${collisionBase}"a -> b" ${op} c\n`);
+		const b = analyze(`${collisionBase}a ${op} "b -> c"\n`);
+		expect(a.diagnostics.filter((d) => d.severity === "error")).toEqual([]);
+		expect(b.diagnostics.filter((d) => d.severity === "error")).toEqual([]);
+		const r = diffGraphs(a.graph, b.graph);
+		expect(r.addedNodes).toEqual([]);
+		expect(r.removedNodes).toEqual([]);
+		expect(op === ">>" ? r.addedEdges : r.addedFeedback).toEqual([
+			'a -> "b -> c"',
+		]);
+		expect(op === ">>" ? r.removedEdges : r.removedFeedback).toEqual([
+			'"a -> b" -> c',
+		]);
+	});
+	it.each([
+		">>",
+		">>?",
+	])("retains both colliding edges in one graph for %s", (op) => {
+		const a = analyze(collisionBase).graph;
+		const b = analyze(
+			`${collisionBase}"a -> b" ${op} c\na ${op} "b -> c"\n`,
+		).graph;
+		const r = diffGraphs(a, b);
+		expect(op === ">>" ? r.addedEdges : r.addedFeedback).toEqual([
+			'"a -> b" -> c',
+			'a -> "b -> c"',
+		]);
+		const reverse = diffGraphs(b, a);
+		expect(
+			op === ">>" ? reverse.removedEdges : reverse.removedFeedback,
+		).toEqual(['"a -> b" -> c', 'a -> "b -> c"']);
+	});
 	it("reports no differences for identical graphs", () => {
 		const g = analyze("req >> design -> spec\n").graph;
 		const r = diffGraphs(g, g);

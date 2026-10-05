@@ -134,8 +134,8 @@ artifact:
     group: run_outputs
   diff_report:
     label: 差分レポート
-    description: "元の文書と比較対象文書のグラフ・frontmatterを比較した構造差分（追加・削除・改名ノード等）"
-    criteria: node packages/cli/dist/cli.js diff が実装され動作確認済み
+    description: "元の文書と比較対象文書のグラフ・frontmatterを比較したノード・エッジ差分。端点を保持したprimary/feedbackの分類から、表示用DiffReportとDOT差分を生成する"
+    criteria: packages/core/src/diff.test.ts、packages/graphviz-exporter/src/index.test.ts、packages/cli/src/index.test.ts、packages/editor/src/diff-panel.test.tsで、区切り文字を含むIDの識別・表示とノード集合を保ったエッジ変更の描画を検証する
     externalStakeholders: [ CLIユーザー, VSCode拡張ユーザー ]
     group: run_outputs
   sorted_source:
@@ -489,7 +489,7 @@ process:
     tags: [ b ]
   diff_graphs:
     label: 差分算出
-    description: 2つの正準化グラフ（とそれぞれのfrontmatter）の構造差分を計算する
+    description: 2つの正準化グラフ（とそれぞれのfrontmatter）の構造差分を計算する。エッジ種別ごとに端点組で同一性を判断し、coreの分類をDOTと共有する。表示用のID引用は同一性と分離する
     command: node packages/cli/dist/cli.js diff
     location: "packages/core/src/diff.ts"
     tags: [ b ]

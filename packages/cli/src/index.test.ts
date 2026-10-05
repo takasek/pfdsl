@@ -1711,6 +1711,45 @@ describe("render", () => {
 });
 
 describe("diff", () => {
+	it.each([
+		">>",
+		">>?",
+	])("preserves colliding endpoints through text, JSON and DOT for %s", async (op) => {
+		const a = join(dir, `collision-${op.length}-a.pfdsl`);
+		const b = join(dir, `collision-${op.length}-b.pfdsl`);
+		const base =
+			'["a -> b", a] >> hub -> seed\nseed >> c -> out1\nseed >> "b -> c" -> out2\n';
+		writeFileSync(a, `${base}"a -> b" ${op} c\n`);
+		writeFileSync(b, `${base}a ${op} "b -> c"\n`);
+		const text = await run(["diff", a, b]);
+		expect(text.exitCode).toBe(0);
+		const section = op === ">>" ? "edge" : "feedback";
+		expect(text.stdout).toContain(`+ ${section} a -> "b -> c"`);
+		expect(text.stdout).toContain(`- ${section} "a -> b" -> c`);
+		const json = await run(["diff", a, b, "--json"]);
+		expect(json.exitCode).toBe(0);
+		const report = JSON.parse(json.stdout).diff;
+		expect(Object.keys(report)).toEqual([
+			"addedNodes",
+			"removedNodes",
+			"changedNodes",
+			"addedEdges",
+			"removedEdges",
+			"addedFeedback",
+			"removedFeedback",
+		]);
+		expect(op === ">>" ? report.addedEdges : report.addedFeedback).toEqual([
+			'a -> "b -> c"',
+		]);
+		expect(op === ">>" ? report.removedEdges : report.removedFeedback).toEqual([
+			'"a -> b" -> c',
+		]);
+		const dot = await run(["diff", a, b, "--format", "dot"]);
+		expect(dot.exitCode).toBe(0);
+		expect(dot.stdout).not.toContain("_nodiff");
+		expect(dot.stdout).toContain('"a -> b" -> "c"');
+		expect(dot.stdout).toContain('"a" -> "b -> c"');
+	});
 	it("reports added and removed edges", async () => {
 		const a = join(dir, "diff-a.pfdsl");
 		const b = join(dir, "diff-b.pfdsl");
