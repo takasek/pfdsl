@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
-import { DISTRIBUTION_ROOTS } from "./distribution-review.mjs";
+import { DISTRIBUTION_ROOTS } from "./distribution-roots.mjs";
 import {
 	listMigrationCandidates,
 	migrationCandidateGitArgs,
@@ -100,7 +100,10 @@ describe("migrationCandidateGitArgs", () => {
 				"--format=%h %s",
 				"v0.0.26..HEAD",
 				"--",
-				...migrationCandidatePaths(),
+				"plugin/pfdsl",
+				"plugin/pfdsl-codex",
+				"packages/",
+				"docs/spec/",
 			],
 		);
 	});
@@ -123,7 +126,17 @@ describe("listMigrationCandidates", () => {
 		assert.equal(out, "abc1234 feat: x\n");
 		assert.deepEqual(calls, [
 			{
-				args: migrationCandidateGitArgs({ from: "a", to: "b" }),
+				args: [
+					"log",
+					"--no-merges",
+					"--format=%h %s",
+					"a..b",
+					"--",
+					"plugin/pfdsl",
+					"plugin/pfdsl-codex",
+					"packages/",
+					"docs/spec/",
+				],
 				options: { cwd: "/repo" },
 			},
 		]);

@@ -7,7 +7,7 @@
 
 import { parseArgs } from "node:util";
 
-import { DISTRIBUTION_ROOTS } from "./distribution-review.mjs";
+import { DISTRIBUTION_ROOTS } from "./distribution-roots.mjs";
 import { git } from "./run-exec.mjs";
 
 const EXTRA_PATHS = ["packages/", "docs/spec/"];

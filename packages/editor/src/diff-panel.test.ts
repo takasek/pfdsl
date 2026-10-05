@@ -1,4 +1,4 @@
-import type { DiffReport } from "@pfdsl/core";
+import { analyze, type DiffReport, diffGraphs } from "@pfdsl/core";
 import { describe, expect, it } from "vitest";
 import { buildDiffPanelHtml } from "./diff-panel.js";
 
@@ -16,6 +16,20 @@ function emptyReport(overrides: Partial<DiffReport> = {}): DiffReport {
 }
 
 describe("buildDiffPanelHtml", () => {
+	it.each([
+		">>",
+		">>?",
+	])("renders distinct endpoint spellings from core for %s", (op) => {
+		const base =
+			'["a -> b", a] >> hub -> seed\nseed >> c -> out1\nseed >> "b -> c" -> out2\n';
+		const a = analyze(`${base}"a -> b" ${op} c\n`).graph;
+		const b = analyze(`${base}a ${op} "b -> c"\n`).graph;
+		const html = buildDiffPanelHtml(diffGraphs(a, b));
+		const section = op === ">>" ? "edge" : "feedback";
+		expect(html).toContain(`+ ${section}  a -&gt; &quot;b -&gt; c&quot;`);
+		expect(html).toContain(`- ${section}  &quot;a -&gt; b&quot; -&gt; c`);
+		expect(html).not.toContain("No structural differences");
+	});
 	it("renders a '~ node' line for each changed node", () => {
 		const html = buildDiffPanelHtml(emptyReport({ changedNodes: ["spec"] }));
 
