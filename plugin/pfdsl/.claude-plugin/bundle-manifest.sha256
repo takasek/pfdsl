@@ -24,7 +24,7 @@ e895452e8fcbca4176557065ee9667702054e60d90d40cd7325bc065e0657292  skills/pfd-eco
 
 e07809b079ce3ef3aeb896dc070f3ac507f6fe9eb70e02938c13ca446570ca82  skills/pfd-grill/SKILL.md
 
-46fe7dd863f636fd37ce220df853c009e9385a96521fc866767e89084b5a20cd  skills/pfd-ops/SKILL.md
+c89206326d848f512ce64017839d87fb14f3106ea11b3e327f96229374e3b757  skills/pfd-ops/SKILL.md
 
 f6d66d456a4484b237b6005f93fb9572246e01e3c623ce578effc17789944fe0  skills/pfd-ops/install/.github/workflows/pfdsl-sweep-completed-chains.yml
 
@@ -56,7 +56,7 @@ a8e4d35e456f05babab77d002a20f7230b7942aaf7bb82138bf2007b5926c4f7  skills/pfd-ops
 
 d6636ad19abcd0019d685f0cbc26db35fb779ea1afa9568d070fb94bb68eb7f2  skills/pfd-ops/install/scripts/pfdsl/sweep-completed-chains.mjs
 
-e85931c9fe76715a25cb5566d999ab589a6cb60d8b45041dead4da9ce5005b12  skills/pfd-ops/references/architecture.md
+077b8b24352f9c8d54f4853de38bc6b6ca5c3f28a81fa5691dce810b80cae40d  skills/pfd-ops/references/architecture.md
 
 3f7d9d46ffb5c432c39947152312856a30ccd27286d9d257f89bf5052c648a3c  skills/pfd-ops/references/file-based-tracker-backend.md
 
@@ -86,11 +86,11 @@ c1328f9dcb946c35f7bba42306324d82929f7031fb52d459c3b2ee12fd904686  skills/pfd-ops
 
 d1bd89c550bee54ecf3735d0bf55aa922c9c24eb87c17bdaf0682b1cf184f2d4  skills/pfd-ops/references/work-cycle.md
 
-bc0ca811ba9d01fbc55fc72c1badfb7f5c824ce9fe402474012c148fe6d79b3b  skills/pfd-ops/scripts/check-install-sync.mjs
+be85d8e1614e9bf8e6ca3f89f2f591dbfd9deebd5c0e8131ba3309b3fd6537a2  skills/pfd-ops/scripts/check-install-sync.mjs
 
-a36491954ed82a43067e087687ce819c1ee4221e232f8c3e2904ea5900f0ed20  skills/pfd-ops/scripts/collect-report-environment.mjs
+83f018479af1fdf6ce37d375858d1d5ea0c69a32e25469eae9f0f72d395df53d  skills/pfd-ops/scripts/collect-report-environment.mjs
 
-776e90a5d8ddbd44a95701868ebe45ad5f598e4d28ac2cc4dc08073a98c85da4  skills/pfd-ops/scripts/plugin-version-check.mjs
+c8a84302faab507a4fadfee9ae2d06c4ac89dc64e29dcd7025a65ceebe98162b  skills/pfd-ops/scripts/plugin-version-check.mjs
 
 7fbb4821acd71d84c98a089ed6216ff63af58f8d4a019b9e8c1094d15eaf2e0e  skills/pfd-retro/SKILL.md
 

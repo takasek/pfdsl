@@ -37,10 +37,7 @@ import {
 } from "node:path";
 import { fileURLToPath } from "node:url";
 import { parseArgs as parseNodeArgs } from "node:util";
-import {
-	checkUpstreamVersion,
-	readPluginIdentity,
-} from "./plugin-version-check.mjs";
+import { readPluginIdentity } from "./plugin-version-check.mjs";
 
 /**
  * Recursively enumerate files under installDir, returning repo-root-relative
@@ -717,6 +714,7 @@ export function parseArgs(argv) {
 			deploy: { type: "boolean", default: false },
 			"overwrite-local-edits": { type: "boolean", default: false },
 			"delete-edited-orphans": { type: "boolean", default: false },
+			// Compatibility with installed callers: no network or notifications.
 			upstream: { type: "boolean", default: false },
 			"record-migration": { type: "boolean", default: false },
 		},
@@ -1002,11 +1000,6 @@ async function main() {
 				exitCode = 1;
 			}
 		}
-	}
-
-	if (args.upstream) {
-		const warning = await checkUpstreamVersion(skillRoot);
-		if (warning) console.log(warning);
 	}
 
 	process.exit(exitCode);

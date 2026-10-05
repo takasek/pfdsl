@@ -6,8 +6,8 @@
 // tree into every plugin bundle, so it must not import anything outside that
 // tree — Node stdlib and its own siblings only.
 //
-// Unlike plugin-version-check.mjs, which returns null and stays silent when a
-// manifest is missing, this reports what it could not obtain. A reader of the
+// Unlike the local manifest reader, which returns null when a manifest is
+// missing, this reports what it could not obtain. A reader of the
 // issue has to be able to tell "not available in this installation shape"
 // from "collection failed".
 

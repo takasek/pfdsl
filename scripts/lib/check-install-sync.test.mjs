@@ -1398,6 +1398,44 @@ describe("applied migration state", () => {
 	});
 
 	describe("check output", () => {
+		for (const version of ["0.0.26", "0.2.0"]) {
+			it(`does not fetch upstream or emit skew notices with legacy --upstream (${version})`, () => {
+				const plugin = makeInstalledPlugin(`no-skew-${version}`, {
+					claude: version,
+					bundleSeed: "same",
+				});
+				const target = makeAdopter(`no-skew-adopter-${version}`, {
+					appliedMigration: {
+						pluginVersion: version,
+						bundleHash: bundleHashOf("same"),
+					},
+				});
+				const marker = join(tmp, `fetch-${version}`);
+				const preload = join(tmp, `probe-${version}.mjs`);
+				writeFileSync(
+					preload,
+					`import { writeFileSync } from "node:fs";\nglobalThis.fetch = async () => { writeFileSync(${JSON.stringify(marker)}, "called"); return { ok: true, json: async () => ({ version: "0.1.0" }) }; };\n`,
+				);
+				const result = spawnSync(
+					process.execPath,
+					[
+						"--import",
+						preload,
+						join(plugin.skillRoot, "scripts", "check-install-sync.mjs"),
+						"--target",
+						target,
+						"--upstream",
+					],
+					{ encoding: "utf-8" },
+				);
+				assert.equal(result.status, 0, result.stderr);
+				assert.equal(existsSync(marker), false);
+				assert.doesNotMatch(
+					result.stdout,
+					/upstream main|differs from upstream|installed pfdsl plugin version/,
+				);
+			});
+		}
 		it("prints nothing about migration for a repo without .pfdsl/", () => {
 			const plugin = makeInstalledPlugin("plugin-no-pfdsl", {
 				claude: "0.2.0",
@@ -2070,6 +2108,3 @@ describe("applied migration state", () => {
 		});
 	});
 });
-
-// checkUpstreamVersion moved to plugin-version-check.mjs/.test.mjs (ADR-0028
-// review: decoupled from install/ sync semantics for reuse by other skills).

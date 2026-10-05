@@ -13,7 +13,7 @@
 <!-- cli_release_group_delete -->
 <g id="node1" class="node">
 <title>cli_release_group_delete</title>
-<g id="a_node1"><a xlink:title="CLIリリース: group 削除&#10;&#10;#1278 の group 削除を含む npm CLI と、同じ release tag から配布する plugin 資産&#10;criteria: npm view @pfdsl/cli versions に group 削除を含む版が含まれ、その版を固定して取得した CLI で pfdsl delete &lt;file&gt; &lt;group&#45;id&gt; が group を削除する">
+<g id="a_node1"><a xlink:title="CLIリリース: group 削除&#10;&#10;#1278 の group 削除を含む npm CLI と、同じ release tag から配布する plugin 資産&#10;criteria: npm view @pfdsl/cli versions に group 削除を含む版が含まれ、その版を固定して取得した CLI で pfdsl delete &lt;file&gt; &lt;group&#45;id&gt; が group を削除する。同じ release tag の plugin 配布について .pfdsl/workflow.md の「release milestone artifact の作成規約」と .pfdsl/pipeline.md の公開・pin・取得確認を満たす">
 <polygon fill="#f8f9fa" stroke="black" stroke-width="2" points="839.79,-75.2 645.39,-75.2 645.39,-16.8 839.79,-16.8 839.79,-75.2"/>
 <text xml:space="preserve" text-anchor="middle" x="742.59" y="-58.6" font-family="Times,serif" font-size="14.00">cli_release_group_delete</text>
 <text xml:space="preserve" text-anchor="middle" x="742.59" y="-41.8" font-family="Times,serif" font-size="14.00">CLIリリース: group</text>
@@ -25,7 +25,7 @@
 <!-- cli_release_group_node_clash -->
 <g id="node2" class="node">
 <title>cli_release_group_node_clash</title>
-<g id="a_node2"><a xlink:title="CLIリリース: group と node の同名の診断&#10;&#10;#1291 の診断を含む npm CLI と、同じ release tag から配布する plugin 資産&#10;criteria: npm view @pfdsl/cli versions に同名の診断を含む版が含まれ、その版を固定して取得した CLI の check が group と node の同名をエラーとして報告する">
+<g id="a_node2"><a xlink:title="CLIリリース: group と node の同名の診断&#10;&#10;#1291 の診断を含む npm CLI と、同じ release tag から配布する plugin 資産&#10;criteria: npm view @pfdsl/cli versions に同名の診断を含む版が含まれ、その版を固定して取得した CLI の check が group と node の同名をエラーとして報告する。同じ release tag の plugin 配布について .pfdsl/workflow.md の「release milestone artifact の作成規約」と .pfdsl/pipeline.md の公開・pin・取得確認を満たす">
 <polygon fill="#f8f9fa" stroke="black" stroke-width="2" points="854.19,-168.6 630.99,-168.6 630.99,-93.4 854.19,-93.4 854.19,-168.6"/>
 <text xml:space="preserve" text-anchor="middle" x="742.59" y="-152" font-family="Times,serif" font-size="14.00">cli_release_group_node_clash</text>
 <text xml:space="preserve" text-anchor="middle" x="742.59" y="-135.2" font-family="Times,serif" font-size="14.00">CLIリリース: group</text>
@@ -38,7 +38,7 @@
 <!-- cli_release_meta_set_extension -->
 <g id="node3" class="node">
 <title>cli_release_meta_set_extension</title>
-<g id="a_node3"><a xlink:title="CLIリリース: 拡張フィールドの meta set&#10;&#10;統合後の #1305 の対象判定・診断と拡張フィールド更新を含む npm CLI と、同じ release tag から配布する plugin 資産&#10;criteria: npm view @pfdsl/cli versions に統合後の #1305 を含む版が含まれ、その版を固定して取得した CLI の meta set が既存の updated_at を更新でき、フラグなしの新しい未知フィールドを拒否し、フラグ付きなら追加する。本文だけのノードには定義追加を案内し、不在 ID との診断区別を通常出力と JSON の両方で確認できる">
+<g id="a_node3"><a xlink:title="CLIリリース: 拡張フィールドの meta set&#10;&#10;統合後の #1305 の対象判定・診断と拡張フィールド更新を含む npm CLI と、同じ release tag から配布する plugin 資産&#10;criteria: npm view @pfdsl/cli versions に統合後の #1305 を含む版が含まれ、その版を固定して取得した CLI の meta set が既存の updated_at を更新でき、フラグなしの新しい未知フィールドを拒否し、フラグ付きなら追加する。本文だけのノードには定義追加を案内し、不在 ID との診断区別を通常出力と JSON の両方で確認できる。同じ release tag の plugin 配布について .pfdsl/workflow.md の「release milestone artifact の作成規約」と .pfdsl/pipeline.md の公開・pin・取得確認を満たす">
 <polygon fill="#f8f9fa" stroke="black" stroke-width="2" points="861.39,-261.6 623.79,-261.6 623.79,-186.4 861.39,-186.4 861.39,-261.6"/>
 <text xml:space="preserve" text-anchor="middle" x="742.59" y="-245" font-family="Times,serif" font-size="14.00">cli_release_meta_set_extension</text>
 <text xml:space="preserve" text-anchor="middle" x="742.59" y="-228.2" font-family="Times,serif" font-size="14.00">CLIリリース:</text>
