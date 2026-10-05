@@ -729,6 +729,59 @@ describe("loadExtendsChain", () => {
 // ---------------------------------------------------------------------------
 
 describe("buildPresentationChain", () => {
+	it("keeps the last occurrence of a shared preset, preserving later-parent precedence", () => {
+		const load = makeLoad({
+			"/p/main.pfdsl": {
+				frontmatter: { extends: ["./left.yaml", "./right.yaml"] },
+			},
+			"/p/left.yaml": {
+				frontmatter: {
+					extends: "./base.yaml",
+					statusStyles: { done: { fillcolor: "green", color: "black" } },
+				},
+			},
+			"/p/right.yaml": { frontmatter: { extends: "./base.yaml" } },
+			"/p/base.yaml": {
+				frontmatter: { statusStyles: { done: { fillcolor: "red" } } },
+			},
+		});
+		const { docs } = loadExtendsChain("/p/main.pfdsl", load);
+		const chain = buildPresentationChain("/p/main.pfdsl", docs);
+		expect(chain.map(({ path }) => path)).toEqual([
+			"/p/left.yaml",
+			"/p/base.yaml",
+			"/p/right.yaml",
+			"/p/main.pfdsl",
+		]);
+		expect(resolvePresentation(chain).statusStyles?.done).toEqual({
+			fillcolor: "red",
+			color: "black",
+		});
+	});
+
+	it("bounds a layered shared DAG by distinct files rather than inheritance routes", () => {
+		const files: Record<string, FakeDoc> = {
+			"/p/base.yaml": {
+				frontmatter: { statusStyles: { done: { fillcolor: "red" } } },
+			},
+		};
+		let refs = ["./base.yaml"];
+		for (let depth = 0; depth < 18; depth++) {
+			for (const side of ["a", "b"])
+				files[`/p/${side}${depth}.yaml`] = { frontmatter: { extends: refs } };
+			refs = [`./a${depth}.yaml`, `./b${depth}.yaml`];
+		}
+		files["/p/main.pfdsl"] = { frontmatter: { extends: refs } };
+		const { load, calls } = makeCountingLoad(files);
+		const { docs } = loadExtendsChain("/p/main.pfdsl", load);
+		const chain = buildPresentationChain("/p/main.pfdsl", docs);
+		expect(chain).toHaveLength(38);
+		expect([...calls.values()].every((count) => count === 1)).toBe(true);
+		expect(resolvePresentation(chain).statusStyles?.done?.fillcolor).toBe(
+			"red",
+		);
+	});
+
 	it("single file, no extends → chain of just the entry", () => {
 		const docs = makeLoad({
 			"/p/main.pfdsl": { frontmatter: { statusStyles: {} } },
@@ -808,6 +861,33 @@ describe("buildPresentationChain", () => {
 // ---------------------------------------------------------------------------
 
 describe("validatePresetKeys", () => {
+	it.each([
+		["an isolated node", "x\n"],
+		["graph edges", "a >> p -> b\n"],
+	])("rejects a preset with %s even without forbidden keys", (_name, body) => {
+		const doc = analyze(`---\nstatusStyles: {}\n---\n${body}`);
+		expect(
+			validatePresetKeys("/p/p.pfdsl", doc.frontmatter, doc.document),
+		).toEqual([expect.objectContaining({ code: "V028", severity: "error" })]);
+	});
+
+	it.each([
+		"",
+		"# Presentation settings only\n\n# No graph declarations\n",
+	])("accepts a presentation-only preset with body %j", (body) => {
+		const doc = analyze(`---\nstatusStyles: {}\n---\n${body}`);
+		expect(
+			validatePresetKeys("/p/p.pfdsl", doc.frontmatter, doc.document),
+		).toEqual([]);
+	});
+
+	it("rejects graph content without frontmatter", () => {
+		const doc = analyze("x\n");
+		expect(
+			validatePresetKeys("/p/p.pfdsl", doc.frontmatter, doc.document),
+		).toEqual([expect.objectContaining({ code: "V028", severity: "error" })]);
+	});
+
 	it("returns [] when fm is null", () => {
 		expect(validatePresetKeys("/p/p.yaml", null)).toEqual([]);
 	});

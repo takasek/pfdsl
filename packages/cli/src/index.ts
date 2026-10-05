@@ -356,11 +356,14 @@ function readSource(file: string): string | CommandResult {
  * Shared file loader for `loadExtendsChain` and `loadSubflowGraph`: reads +
  * analyzes a file by absolute path.
  */
-function fileLoader(path: string): ReturnType<typeof analyze> | null {
+function fileLoader(
+	path: string,
+	strict = false,
+): ReturnType<typeof analyze> | null {
 	try {
 		const src = readFileSync(path, "utf-8");
 		const wrapped = wrapPresetSource(path, src);
-		const result = analyze(wrapped);
+		const result = analyze(wrapped, strict ? { strict: true } : undefined);
 		if (wrapped !== src) {
 			// Raw YAML presets gain a synthetic opening fence for analysis.
 			result.diagnostics = result.diagnostics.map((diagnostic) => ({
@@ -464,10 +467,8 @@ export interface CheckOptions {
 export function runCheck(file: string, opts: CheckOptions = {}): CommandResult {
 	const src = readSource(file);
 	if (isCommandResult(src)) return src;
-	const { diagnostics, edges, nodeKinds, frontmatter } = analyze(
-		src,
-		opts.strict ? { strict: true } : undefined,
-	);
+	const entryResult = analyze(src, opts.strict ? { strict: true } : undefined);
+	const { diagnostics, edges, nodeKinds, frontmatter } = entryResult;
 	const lines = diagnostics.map((d) => formatDiagnostic(d, file, opts.color));
 	if (hasErrors(diagnostics)) {
 		if (opts.json) {
@@ -499,36 +500,54 @@ export function runCheck(file: string, opts: CheckOptions = {}): CommandResult {
 	}
 	const absFile = resolve(file);
 	const multiDiags: (Diagnostic & { file?: string })[] = [];
+	const loaded = new Map<string, ReturnType<typeof analyze> | null>([
+		[absFile, entryResult],
+	]);
+	const load = (path: string) => {
+		if (!loaded.has(path)) loaded.set(path, fileLoader(path, opts.strict));
+		return loaded.get(path) ?? null;
+	};
 
 	// --- Subflow checks ---
 	const subflowGraph = subflowBoundaryDiagnostics(
 		absFile,
 		edges,
 		frontmatter,
-		fileLoader,
+		load,
 	);
 	multiDiags.push(...subflowGraph.diagnostics);
 
 	// --- Extends checks ---
-	const extendsChain = loadExtendsChain(absFile, fileLoader);
-	multiDiags.push(...extendsChain.diagnostics);
+	const presets = new Set<string>();
+	const extendsDiags = new Map<string, Diagnostic & { file?: string }>();
+	for (const parentPath of subflowGraph.docs.keys()) {
+		const chain = loadExtendsChain(parentPath, load);
+		for (const diagnostic of chain.diagnostics) {
+			extendsDiags.set(JSON.stringify(diagnostic), diagnostic);
+		}
+		for (const path of chain.docs.keys())
+			if (path !== parentPath) presets.add(path);
+	}
+	multiDiags.push(...extendsDiags.values());
 
-	// Loaded documents are analyzed independently. Surface their new type
-	// errors as well, retaining the source file and its own coordinates.
-	for (const [path, doc] of new Map([
-		...subflowGraph.docs,
-		...extendsChain.docs,
-	])) {
+	// Analyze each dependency once under the same strictness as the entry.
+	// Keep file-local identifiers and coordinates; do not flatten the graphs.
+	for (const [path, doc] of loaded) {
+		if (doc === null) continue;
 		if (path === absFile) continue;
 		for (const diagnostic of doc.diagnostics) {
-			if (diagnostic.code === "FM004")
-				multiDiags.push({ ...diagnostic, file: path });
+			multiDiags.push({ ...diagnostic, file: path });
 		}
 	}
 
-	for (const [path, doc] of extendsChain.docs) {
-		if (path === absFile) continue; // skip entry file itself
-		multiDiags.push(...validatePresetKeys(path, doc.frontmatter));
+	for (const path of presets) {
+		const doc = loaded.get(path);
+		if (doc)
+			multiDiags.push(
+				...validatePresetKeys(path, doc.frontmatter, doc.document).map(
+					(diagnostic) => ({ ...diagnostic, file: path }),
+				),
+			);
 	}
 
 	if (hasErrors(multiDiags)) {
@@ -688,7 +707,9 @@ export function runDelete(
 		);
 		const presetKeyDiagnostics = [...docs]
 			.filter(([path]) => path !== absFile)
-			.flatMap(([path, doc]) => validatePresetKeys(path, doc.frontmatter));
+			.flatMap(([path, doc]) =>
+				validatePresetKeys(path, doc.frontmatter, doc.document),
+			);
 		const presetDiagnostics = [...docs]
 			.filter(([path]) => path !== absFile)
 			.flatMap(([path, doc]) =>
@@ -1592,7 +1613,9 @@ export function runRename(
 		// check's V028 on each loaded preset, which loadExtendsChain leaves out.
 		const presetKeyDiagnostics = [...docs]
 			.filter(([path]) => path !== absFile)
-			.flatMap(([path, doc]) => validatePresetKeys(path, doc.frontmatter));
+			.flatMap(([path, doc]) =>
+				validatePresetKeys(path, doc.frontmatter, doc.document),
+			);
 		const failedExtends = failIfErrors(
 			[...extendsDiagnostics, ...presetKeyDiagnostics],
 			file,
