@@ -481,34 +481,107 @@ export function loadExtendsChain<T extends DocWithFrontmatter>(
  * extends graph (§2.9.4 決定的解決アルゴリズム). `resolve(F)` merges
  * `resolve(P1) → … → resolve(Pn) → F のローカル定義`, so each preset's own
  * extends must resolve before the preset's own locals, and the entry file's
- * locals must land last. Repeated definitions have the same values, so only
- * their last occurrence can affect the attribute-level merge. Traverse the
- * reverse of that post-order (parent first, refs right-to-left), visiting each
- * file once, then reverse the result. This preserves later-parent precedence
- * without expanding every route through a shared DAG.
+ * locals must land last. This public API preserves the expanded post-order
+ * chain, including repeated presets and path-local cycle truncation.
+ * Consumers needing only merged values use `resolveLoadedPresentation`.
  */
 export function buildPresentationChain<T extends DocWithFrontmatter>(
 	entryPath: string,
 	docs: Map<string, T>,
 ): { path: string; fm: Frontmatter | null }[] {
 	const chain: { path: string; fm: Frontmatter | null }[] = [];
-	const seen = new Set<string>(); // also guards cycles (V027 already reported)
+	const stack = new Set<string>();
 
 	function visit(path: string): void {
-		if (seen.has(path)) return;
+		if (stack.has(path)) return;
 		const doc = docs.get(path);
 		if (doc === undefined) return; // missing file — V026 already reported
-		seen.add(path);
-		chain.push({ path, fm: doc.frontmatter ?? null });
-		for (const ref of collectExtendsRefs(doc.frontmatter ?? {}).reverse()) {
+		stack.add(path);
+		for (const ref of collectExtendsRefs(doc.frontmatter ?? {})) {
 			const resolved = resolveRefPath(path, ref);
 			if (!resolved.ok) continue;
 			visit(resolved.path);
 		}
+		stack.delete(path);
+		chain.push({ path, fm: doc.frontmatter ?? null });
 	}
 
 	visit(entryPath);
-	return chain.reverse();
+	return chain;
+}
+
+/**
+ * Resolve an already-loaded DAG's presentation, memoizing each file's merged
+ * values. Merge parents in declaration order and locals last, preserving both
+ * precedence and first appearance of keys. Attribute merging and summary size
+ * still cost work; only file resolution is bounded by distinct documents.
+ * A cycle or prototype-sensitive metadata aborts the memo pass and uses the
+ * legacy expanded chain, preserving lenient rendering and existing ID lookups.
+ * That fallback and the public chain retain their original
+ * route-expansion cost. `excludeEntry` omits only the entry's local values.
+ */
+export function resolveLoadedPresentation<T extends DocWithFrontmatter>(
+	entryPath: string,
+	docs: Map<string, T>,
+	options: { excludeEntry?: boolean } = {},
+): ResolvedPresentation {
+	const memo = new Map<string, ResolvedPresentation>();
+	const active = new Set<string>();
+
+	function visit(path: string): ResolvedPresentation | null {
+		const cached = memo.get(path);
+		if (cached !== undefined) return cached;
+		if (active.has(path)) return null;
+		const doc = docs.get(path);
+		if (doc === undefined) return resolvePresentation([]);
+		// The legacy merger assigns __proto__ through a plain object's setter.
+		// Its resulting prototype can also affect later ID lookups, so a merged
+		// summary is not a context-independent substitute for that source.
+		if (
+			Object.hasOwn(doc.frontmatter?.statusStyles ?? {}, "__proto__") ||
+			Object.hasOwn(doc.frontmatter?.tag ?? {}, "__proto__") ||
+			Object.hasOwn(doc.frontmatter?.group ?? {}, "__proto__")
+		) {
+			return null;
+		}
+		active.add(path);
+		try {
+			const chain: { path: string; fm: Frontmatter | null }[] = [];
+			for (const ref of collectExtendsRefs(doc.frontmatter ?? {})) {
+				const resolved = resolveRefPath(path, ref);
+				if (!resolved.ok) continue;
+				const parent = visit(resolved.path);
+				if (parent === null) return null;
+				chain.push({
+					path: resolved.path,
+					fm: {
+						...(parent.statusStyles !== undefined
+							? { statusStyles: parent.statusStyles }
+							: {}),
+						...(parent.tag !== undefined ? { tag: parent.tag } : {}),
+						...(parent.group !== undefined ? { group: parent.group } : {}),
+					},
+				});
+			}
+			if (!(options.excludeEntry && path === entryPath)) {
+				chain.push({ path, fm: doc.frontmatter ?? null });
+			}
+			const result = resolvePresentation(chain);
+			memo.set(path, result);
+			return result;
+		} finally {
+			active.delete(path);
+		}
+	}
+
+	return (
+		visit(entryPath) ??
+		resolvePresentation(
+			buildPresentationChain(entryPath, docs).filter(
+				({ path }) => !(options.excludeEntry && path === entryPath),
+			),
+		)
+	);
 }
 
 /**
@@ -542,8 +615,7 @@ export function resolveEffectiveFrontmatter<T extends DocWithFrontmatter>(
 	const { docs } = loadExtendsChain<DocWithFrontmatter>(entryPath, (path) =>
 		path === entryPath ? { frontmatter } : load(path),
 	);
-	const chain = buildPresentationChain(entryPath, docs);
-	const resolved = resolvePresentation(chain);
+	const resolved = resolveLoadedPresentation(entryPath, docs);
 	if (
 		resolved.statusStyles === undefined &&
 		resolved.tag === undefined &&

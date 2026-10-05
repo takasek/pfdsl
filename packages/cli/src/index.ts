@@ -4,7 +4,6 @@ import { parseArgs as parseNodeArgs } from "node:util";
 import {
 	analyze,
 	auditGraph,
-	buildPresentationChain,
 	type ConsumerAsymmetryHint,
 	compareIds,
 	computeDependsOn,
@@ -37,8 +36,8 @@ import {
 	reindex,
 	rename,
 	resolveEffectiveFrontmatter,
+	resolveLoadedPresentation,
 	resolveLocationFsPath,
-	resolvePresentation,
 	type SortKey,
 	STATUS_VALUES,
 	setFrontmatterField,
@@ -727,10 +726,10 @@ export function runDelete(
 						`${errors.map((d) => formatDiagnostic(d, d.file ?? file, opts.color)).join("\n")}\n`,
 					);
 		}
-		const chain = buildPresentationChain(absFile, docs);
 		const presetGroups =
-			resolvePresentation(chain.filter((entry) => entry.path !== absFile))
-				.group ?? {};
+			resolveLoadedPresentation(absFile, docs, {
+				excludeEntry: true,
+			}).group ?? {};
 		for (const id of ids) {
 			if (
 				Object.hasOwn(analysis.frontmatter.group ?? {}, id) &&
@@ -740,7 +739,7 @@ export function runDelete(
 					`delete: '${id}' is also defined by a preset; the local entry is a partial override and cannot delete that group here`,
 				);
 		}
-		groups = resolvePresentation(chain).group;
+		groups = resolveLoadedPresentation(absFile, docs).group;
 		for (const [childId, meta] of Object.entries(presetGroups)) {
 			const parent = groups?.[childId]?.parent;
 			if (
@@ -1623,10 +1622,9 @@ export function runRename(
 			opts.color,
 		);
 		if (failedExtends) return failedExtends;
-		const presets = buildPresentationChain(absFile, docs).filter(
-			(c) => c.path !== absFile,
-		);
-		presetGroup = resolvePresentation(presets).group;
+		presetGroup = resolveLoadedPresentation(absFile, docs, {
+			excludeEntry: true,
+		}).group;
 	}
 	const presetDeclares = (id: string): boolean =>
 		presetGroup !== undefined && Object.hasOwn(presetGroup, id);
