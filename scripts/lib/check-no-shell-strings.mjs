@@ -1,5 +1,6 @@
 /**
- * Detects forbidden child_process imports and literal shell: true options.
+ * Detects forbidden child_process imports and re-exports, and literal shell
+ * options that turn a shell on (`shell: true` or a non-empty string).
  *
  * `execSync` hands its argument to a shell, so any value spliced into it is
  * parsed as shell syntax: a space word-splits and a semicolon starts another
@@ -14,8 +15,9 @@
  * `)` inside a `--format="%h)"` string, an aliased import, `{shell: true}` on
  * a call that otherwise takes argv. Banning the import needs no such analysis
  * — `scripts/lib/run-exec.mjs` covers every use in this repo.
- * Parsing syntax also covers whole-module imports and quoted property names
- * without treating examples in comments or strings as executable code.
+ * Parsing syntax also covers whole-module imports, re-exports of the module or
+ * of exec / execSync, and quoted property names without treating examples in
+ * comments or strings as executable code.
  * This is a syntax gate, not data-flow analysis of computed module names or
  * option values.
  */
@@ -95,6 +97,20 @@ export function findShellExecutors(source) {
 						report(node, `imports ${imported} from child_process`);
 				}
 			}
+		} else if (
+			ts.isExportDeclaration(node) &&
+			isChildProcess(node.moduleSpecifier)
+		) {
+			const clause = node.exportClause;
+			if (!clause || ts.isNamespaceExport(clause)) {
+				report(node, "re-exports the child_process module");
+			} else {
+				for (const element of clause.elements) {
+					const exported = (element.propertyName ?? element.name).text;
+					if (SHELL_EXECUTORS.has(exported))
+						report(node, `re-exports ${exported} from child_process`);
+				}
+			}
 		} else if (ts.isCallExpression(node) && isChildProcess(node.arguments[0])) {
 			const expression = unwrap(node.expression);
 			if (
@@ -109,10 +125,16 @@ export function findShellExecutors(source) {
 				: node.name;
 			if (
 				(ts.isIdentifier(name) || ts.isStringLiteralLike(name)) &&
-				name.text === "shell" &&
-				unwrap(node.initializer).kind === ts.SyntaxKind.TrueKeyword
-			)
-				report(node, "uses shell: true");
+				name.text === "shell"
+			) {
+				const value = unwrap(node.initializer);
+				if (value.kind === ts.SyntaxKind.TrueKeyword)
+					report(node, "uses shell: true");
+				// Node runs through the named shell for any truthy value; only the
+				// empty string and false mean no shell.
+				else if (ts.isStringLiteralLike(value) && value.text !== "")
+					report(node, "uses a string shell option");
+			}
 		}
 		ts.forEachChild(node, visit);
 	}
