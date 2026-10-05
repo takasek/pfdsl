@@ -398,6 +398,10 @@ test("publication CLI accepts a bundle without a duplicate result JSON and rejec
 	const bin = join(f.root, "bin");
 	mkdirSync(artifacts);
 	mkdirSync(bin);
+	writeFileSync(
+		join(f.root, ".git/info/exclude"),
+		"artifacts/\nbin/\nremote.git/\n",
+	);
 	const value = {
 		repository: "owner/repo",
 		number: 12,
@@ -433,6 +437,23 @@ test("publication CLI accepts a bundle without a duplicate result JSON and rejec
 				},
 			},
 		);
+	const retryOutput = join(artifacts, "retry-output");
+	for (const field of ["head", "branch"]) {
+		const fresh = { ...value, [field]: "c".repeat(40) };
+		writeFileSync(retryOutput, "");
+		const stale = execute("publish", {
+			REPAIR_TEST_SNAPSHOT: JSON.stringify(fresh),
+			GITHUB_OUTPUT: retryOutput,
+		});
+		assert.equal(stale.status, 0, stale.stderr);
+		assert.equal(readFileSync(retryOutput, "utf8"), "retry=true\n");
+		assert.match(stale.stdout, /No changes were pushed/);
+	}
+	const staleValidation = execute("verify", {
+		REPAIR_TEST_SNAPSHOT: JSON.stringify({ ...value, head: "c".repeat(40) }),
+	});
+	assert.notEqual(staleValidation.status, 0);
+	assert.match(staleValidation.stderr, /fresh preparation/);
 	f.git("update-ref", "refs/heads/generated-repair-result", repaired);
 	f.git(
 		"bundle",
@@ -471,6 +492,62 @@ process.exit(result.status ?? 1);
 `,
 		{ mode: 0o755 },
 	);
+	// Concurrent main changes that merge cleanly can use Update branch later.
+	f.git("switch", "main");
+	f.put("parallel.txt", "parallel source update\n");
+	const cleanBase = f.commit("parallel update");
+	f.git("push", remote, `${cleanBase}:refs/heads/main`);
+	f.git("switch", "feature");
+	result = execute("verify", {
+		REPAIR_TEST_SNAPSHOT: JSON.stringify({ ...value, base: cleanBase }),
+	});
+	assert.equal(result.status, 0, result.stderr);
+	assert.match(result.stdout, /Update branch/);
+	// A new generated conflict must go through preparation again.
+	f.git("switch", "main");
+	f.put("plugin/output.txt", "new main output\n");
+	const conflictingBase = f.commit("parallel generated update");
+	f.git("push", remote, `${conflictingBase}:refs/heads/main`);
+	f.git("switch", "feature");
+	writeFileSync(retryOutput, "");
+	result = execute("publish", {
+		REPAIR_TEST_SNAPSHOT: JSON.stringify({ ...value, base: conflictingBase }),
+		GITHUB_OUTPUT: retryOutput,
+	});
+	assert.equal(result.status, 0, result.stderr);
+	assert.equal(readFileSync(retryOutput, "utf8"), "retry=true\n");
+	assert.equal(
+		f.git("--git-dir", remote, "rev-parse", "refs/heads/feature"),
+		f.head,
+	);
+	result = execute("verify", {
+		REPAIR_TEST_SNAPSHOT: JSON.stringify({ ...value, base: conflictingBase }),
+	});
+	assert.notEqual(result.status, 0);
+	const synchronized = { ...value, head: repaired };
+	const verifiedBundle = readFileSync(join(artifacts, "repair.bundle"));
+	rmSync(join(artifacts, "repair.bundle"));
+	writeFileSync(join(artifacts, "snapshot.json"), JSON.stringify(synchronized));
+	writeFileSync(retryOutput, "");
+	result = execute("recheck", {
+		REPAIR_TEST_SNAPSHOT: JSON.stringify({
+			...synchronized,
+			base: conflictingBase,
+		}),
+		GITHUB_OUTPUT: retryOutput,
+	});
+	assert.equal(result.status, 0, result.stderr);
+	assert.equal(readFileSync(retryOutput, "utf8"), "retry=true\n");
+	result = execute("recheck", {
+		REPAIR_TEST_SNAPSHOT: JSON.stringify(synchronized),
+	});
+	assert.equal(result.status, 0, result.stderr);
+	assert.match(result.stdout, /not pushed/);
+	writeFileSync(join(artifacts, "snapshot.json"), JSON.stringify(value));
+	result = execute("recheck");
+	assert.notEqual(result.status, 0);
+	assert.match(result.stderr, /has not integrated/);
+	writeFileSync(join(artifacts, "repair.bundle"), verifiedBundle);
 	result = execute("publish");
 	assert.equal(result.status, 0, result.stderr);
 	assert.equal(
@@ -498,20 +575,112 @@ process.exit(result.status ?? 1);
 	assert.notEqual(execute().status, 0);
 });
 
+test("repair workflow retries fresh isolated attempts only when requested", (t) => {
+	const readWorkflow = (name) =>
+		parse(
+			readFileSync(
+				new URL(`../.github/workflows/${name}`, import.meta.url),
+				"utf8",
+			),
+		);
+	const workflow = readWorkflow("repair-generated-conflicts.yml");
+	const attempt = readWorkflow("repair-generated-conflicts-attempt.yml");
+	assert.deepEqual(workflow.on.workflow_dispatch.inputs.mode.options, [
+		"repair",
+		"validate",
+	]);
+	assert.deepEqual(Object.keys(workflow.jobs), [
+		"attempt-1",
+		"attempt-2",
+		"attempt-3",
+		"retry-limit",
+	]);
+	for (let index = 1; index <= 3; index++) {
+		const job = workflow.jobs[`attempt-${index}`];
+		assert.equal(
+			job.uses,
+			"./.github/workflows/repair-generated-conflicts-attempt.yml",
+		);
+		assert.equal(job.with.attempt, index);
+		// biome-ignore lint/suspicious/noTemplateCurlyInString: Literal GitHub expression.
+		assert.equal(job.with.mode, "${{ inputs.mode }}");
+		// biome-ignore lint/suspicious/noTemplateCurlyInString: Literal GitHub expression.
+		assert.equal(job.with["pull-request"], "${{ inputs.pull-request }}");
+		assert.equal(job.permissions, undefined);
+		if (index === 1) assert.equal(job.needs, undefined);
+		else {
+			assert.equal(job.needs, `attempt-${index - 1}`);
+			assert.equal(
+				job.if,
+				`needs.attempt-${index - 1}.outputs.retry == 'true'`,
+			);
+		}
+	}
+	assert.equal(
+		attempt.on.workflow_call.outputs.retry.value,
+		// biome-ignore lint/suspicious/noTemplateCurlyInString: Literal GitHub expression.
+		"${{ jobs.publish.outputs.retry || jobs.recheck.outputs.retry }}",
+	);
+	assert.equal(
+		attempt.jobs.publish.outputs.retry,
+		// biome-ignore lint/suspicious/noTemplateCurlyInString: Literal GitHub expression.
+		"${{ steps.publish.outputs.retry }}",
+	);
+	assert.equal(
+		attempt.jobs.prepare.steps.find((step) =>
+			step.uses?.startsWith("actions/upload-artifact@"),
+		).with.name,
+		// biome-ignore lint/suspicious/noTemplateCurlyInString: Literal GitHub expression.
+		"generated-repair-${{ inputs.attempt }}",
+	);
+	assert.equal(
+		attempt.jobs.publish.steps.find((step) =>
+			step.uses?.startsWith("actions/download-artifact@"),
+		).with.name,
+		// biome-ignore lint/suspicious/noTemplateCurlyInString: Literal GitHub expression.
+		"generated-repair-${{ inputs.attempt }}",
+	);
+	assert.equal(attempt.concurrency, undefined);
+	assert.equal(attempt.jobs.recheck.permissions, undefined);
+	assert.equal(attempt.jobs.recheck.needs, "prepare");
+	assert.match(attempt.jobs.recheck.if, /changed == 'false'/);
+	assert.match(attempt.jobs.recheck.if, /inputs.mode == 'repair'/);
+	assert.equal(
+		attempt.jobs.prepare.steps.find((step) =>
+			step.uses?.startsWith("actions/upload-artifact@"),
+		).if,
+		undefined,
+	);
+	const limit = workflow.jobs["retry-limit"];
+	assert.equal(limit.needs, "attempt-3");
+	assert.equal(limit.if, "needs.attempt-3.outputs.retry == 'true'");
+	const root = mkdtempSync(join(tmpdir(), "repair-retry-limit-"));
+	t.after(() => rmSync(root, { recursive: true, force: true }));
+	const summary = join(root, "summary.md");
+	const result = spawnSync("bash", ["-e", "-c", limit.steps[0].run], {
+		encoding: "utf8",
+		env: { ...process.env, GITHUB_STEP_SUMMARY: summary },
+	});
+	assert.equal(result.status, 1);
+	assert.match(result.stdout, /three repair attempts/);
+	assert.match(readFileSync(summary, "utf8"), /No repair was pushed/);
+});
+
 test("workflow isolates PR execution from publication credentials", () => {
 	const workflow = parse(
 		readFileSync(
 			new URL(
-				"../.github/workflows/repair-generated-conflicts.yml",
+				"../.github/workflows/repair-generated-conflicts-attempt.yml",
 				import.meta.url,
 			),
 			"utf8",
 		),
 	);
 	assert.equal(workflow.permissions.contents, "read");
-	assert.deepEqual(Object.keys(workflow.on.workflow_dispatch.inputs), [
+	assert.deepEqual(Object.keys(workflow.on.workflow_call.inputs), [
 		"pull-request",
 		"mode",
+		"attempt",
 	]);
 	const app = workflow.jobs.publish.steps.find(
 		(step) => step.id === "app-token",
@@ -523,10 +692,6 @@ test("workflow isolates PR execution from publication credentials", () => {
 	assert.equal(workflow.jobs.prepare.if, undefined);
 	const guard = workflow.jobs.prepare.steps[0];
 	assert.equal(guard.name, "Check execution mode and workflow branch");
-	assert.deepEqual(workflow.on.workflow_dispatch.inputs.mode.options, [
-		"repair",
-		"validate",
-	]);
 	assert.match(workflow.jobs.publish.if, /github.ref == 'refs\/heads\/main'/);
 	assert.match(workflow.jobs.publish.if, /inputs.mode == 'repair'/);
 	const root = mkdtempSync(join(tmpdir(), "repair-branch-guard-"));
@@ -569,7 +734,11 @@ test("workflow isolates PR execution from publication credentials", () => {
 	);
 	const execution = preparing.find((step) => step.id === "repair");
 	assert.equal(execution.env, undefined);
-	for (const step of [...preparing, ...workflow.jobs.publish.steps]) {
+	for (const step of [
+		...preparing,
+		...workflow.jobs.publish.steps,
+		...workflow.jobs.recheck.steps,
+	]) {
 		if (step.uses?.startsWith("actions/checkout@"))
 			assert.equal(step.with["persist-credentials"], false);
 		if (step.run) assert.equal(step.run.includes("${{ inputs."), false);
