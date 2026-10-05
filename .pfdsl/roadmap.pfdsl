@@ -119,6 +119,12 @@ artifact:
     description: "#1278 の group 削除を含む npm CLI と、同じ release tag から配布する plugin 資産"
     status: todo
     criteria: "npm view @pfdsl/cli versions に group 削除を含む版が含まれ、その版を固定して取得した CLI で pfdsl delete <file> <group-id> が group を削除する。同じ release tag の plugin 配布について .pfdsl/workflow.md の「release milestone artifact の作成規約」と .pfdsl/pipeline.md の公開・pin・取得確認を満たす"
+  preview_editing_usability:
+    label: 図全体と編集・移動を見失わないプレビュー
+    description: "プレビューのエラー・全体表示・操作案内・定義作成後編集と関連する移動導線を整える。全要件と確認範囲は issue #1352"
+    status: wip
+    criteria: "issue #1352 の新規改善と関連 issue の受入条件に対応する操作が実 Extension Development Host で確認され、確認済みと未確認の範囲が記録されている"
+    location: ../packages/
   node_definition_creation:
     label: プレビューと CLI から作れるノード定義
     description: "未定義ノードから共通 core 処理を使って frontmatter 定義を挿入する機能。要件は issue #1282"
@@ -200,6 +206,10 @@ process:
     label: CLI 拡張フィールド更新公開
   publish_cli_group_node_clash:
     label: CLI 同名診断公開
+  i1352_improve_preview_editing:
+    label: プレビューの表示と編集・移動導線を整える
+    location: https://github.com/takasek/pfdsl/issues/1352
+    updated_at: 2026-10-05T03:05:18Z
   i1282_create_node_definition:
     label: ノード定義作成操作を実装する
     location: https://github.com/takasek/pfdsl/issues/1282
@@ -263,6 +273,8 @@ group_delete_cli >> publish_cli_group_delete -> cli_release_group_delete
 meta_set_extension_fields >> publish_cli_meta_set_extension -> cli_release_meta_set_extension
 
 group_node_clash_diagnostic >> publish_cli_group_node_clash -> cli_release_group_node_clash
+toolchain >> i1352_improve_preview_editing -> preview_editing_usability
+
 def_insertion >> i1282_create_node_definition -> node_definition_creation
 
 toolchain >> i1283_add_node_location_cycle -> node_location_cycle

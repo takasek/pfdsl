@@ -174,6 +174,22 @@ function parseBody(
 				}))
 			: rawTokens;
 	const { document, diagnostics: parseDiags } = parseTokens(tokens);
+	const sourceLexDiags =
+		lineOffset > 0
+			? lexDiags.map((diagnostic) => ({
+					...diagnostic,
+					range: {
+						start: {
+							...diagnostic.range.start,
+							line: diagnostic.range.start.line + lineOffset,
+						},
+						end: {
+							...diagnostic.range.end,
+							line: diagnostic.range.end.line + lineOffset,
+						},
+					},
+				}))
+			: lexDiags;
 	return {
 		document,
 		frontmatter,
@@ -181,7 +197,7 @@ function parseBody(
 		body,
 		tokens,
 		sourceMap,
-		diagnostics: [...fmDiags, ...lexDiags, ...parseDiags],
+		diagnostics: [...fmDiags, ...sourceLexDiags, ...parseDiags],
 	};
 }
 

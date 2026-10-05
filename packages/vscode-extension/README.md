@@ -16,6 +16,18 @@ VSCode language support for [PFDSL](https://github.com/takasek/pfdsl), a DSL for
 
 Open any `.pfdsl` file. The preview icon appears in the editor title bar — click it to open a side-by-side SVG preview.
 
+The first visible preview fits the complete diagram, without enlarging a small diagram.
+Use **Fit** to see the whole diagram again, **100%** for its original size, or **− / +** to zoom around the viewport center.
+The toolbar shows the current zoom level; **Help** lists the gestures.
+Wheel to zoom at the pointer, drag the diagram to pan, and click or drag the minimap to move.
+Double-click a node to go to its source; double-click the background to return to 100%.
+Ctrl+Click (⌘+Click on macOS) opens a node's location or subflow when available.
+Editing and error recovery preserve your zoom and pan; syntax and rendering errors appear separately at normal text size with the minimap hidden.
+
+For an undefined node, **Insert artifact/process definition** in Quick Fix inserts its frontmatter definition and selects the new label for editing.
+A produced artifact should also declare meaningful completion `criteria` (W002 warns when absent; strict validation treats it as an error).
+The Quick Fix keeps that diagnostic until you supply a criterion, and the insertion can be undone in one step.
+
 ```pfdsl
 [requirement, constraint] >> design -> spec
 spec >>? design
@@ -28,8 +40,11 @@ code >> review -> review_report
 From the repo root (a **worktree** root if you use one — not the main checkout, or you debug stale code):
 
 ```bash
+make setup
 make vscode-dev
 ```
+
+VS Code's `code` command must be available on your PATH before starting the development session.
 
 This builds the extension and its `@pfdsl/*` deps, opens `packages/vscode-extension` as its own VS Code window, and then watches for changes in the foreground (Ctrl+C to stop). Press `F5` in that window to launch an Extension Development Host with the extension loaded. F5 is backed by a committed `.vscode/launch.json` whose `preLaunchTask` rebuilds `dist/`, so the Dev Host always loads fresh code regardless of which worktree you opened.
 

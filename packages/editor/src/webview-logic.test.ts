@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
 	centerPan,
 	clampScale,
+	fitGraph,
 	MAX_SCALE,
 	MIN_SCALE,
 	minimapScale,
@@ -14,6 +15,46 @@ import {
 } from "./webview-logic.js";
 
 const view = (scale = 1, panX = 0, panY = 0) => ({ scale, panX, panY });
+
+describe("fitGraph", () => {
+	it("fits a wide graph with a margin without magnifying a small graph", () => {
+		expect(
+			fitGraph({ width: 400, height: 300 }, { width: 1600, height: 800 }),
+		).toEqual(view(0.23, 16, 58));
+		expect(
+			fitGraph({ width: 400, height: 300 }, { width: 100, height: 100 }),
+		).toEqual(view(1, 150, 100));
+		expect(
+			fitGraph({ width: 300, height: 400 }, { width: 800, height: 1600 }),
+		).toEqual(view(0.23, 58, 16));
+	});
+	it.each([
+		[0, 300, 100, 100],
+		[400, 0, 100, 100],
+		[400, 300, 0, 100],
+		[400, 300, 100, 0],
+	])("waits for positive dimensions (%s, %s, %s, %s)", (vw, vh, gw, gh) => {
+		expect(
+			fitGraph({ width: vw, height: vh }, { width: gw, height: gh }),
+		).toBeUndefined();
+	});
+	it("also fits narrow viewports and very large diagrams", () => {
+		expect(
+			fitGraph({ width: 20, height: 20 }, { width: 100, height: 100 })!.scale,
+		).toBe(0.01);
+		expect(
+			fitGraph({ width: 400, height: 300 }, { width: 40000, height: 1000 })!
+				.scale,
+		).toBe(0.0092);
+	});
+	it("lets zoom retain a Fit scale below the ordinary zoom floor", () => {
+		expect(zoomAt(view(0.0092), 10, 20, -1, 0.0092).scale).toBeCloseTo(0.01012);
+		expect(zoomAt(view(0.0092), 10, 20, 1, 0.0092).scale).toBe(0.0092);
+		expect(zoomAt(view(0.0092, 16, 145.4), 390, 150, 1, 0.0092)).toEqual(
+			view(0.0092, 16, 145.4),
+		);
+	});
+});
 
 describe("zoomAt", () => {
 	it("scrolling up zooms in by one step", () => {
@@ -52,8 +93,13 @@ describe("zoomAt", () => {
 		expect(zoomAt(view(MIN_SCALE), 0, 0, 1).scale).toBe(MIN_SCALE);
 	});
 
-	it("still pans at the ceiling, so a clamped zoom does not freeze the view", () => {
-		expect(zoomAt(view(MAX_SCALE, 10, 10), 100, 100, -1).panX).not.toBe(10);
+	it("keeps the view stable at the ceiling and floor", () => {
+		expect(zoomAt(view(MAX_SCALE, 10, 10), 100, 100, -1)).toEqual(
+			view(MAX_SCALE, 10, 10),
+		);
+		expect(zoomAt(view(MIN_SCALE, 10, 10), 100, 100, 1)).toEqual(
+			view(MIN_SCALE, 10, 10),
+		);
 	});
 });
 

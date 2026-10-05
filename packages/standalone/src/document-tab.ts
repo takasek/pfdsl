@@ -54,6 +54,7 @@ export function createDocumentTab({
 	button.textContent = name;
 	button.setAttribute("role", "tab");
 	const preview = mountPreview(previewElement, {
+		canOpenRelatedFiles: false,
 		postMessage(message) {
 			if (message.type === "nodeClick" && snapshot) {
 				const definition = findFrontmatterDefinitionRange(

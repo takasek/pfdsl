@@ -140,10 +140,13 @@ Exit codes:
 See [packages/vscode-extension/README.md](packages/vscode-extension/README.md) for full feature docs.
 
 ```bash
-pnpm --filter @pfdsl/vscode-extension build
+make setup
+make vscode-dev
 ```
 
-Open the repo in VS Code and press `F5` to launch an Extension Development Host with `@pfdsl/vscode-extension` loaded. In the host, `.pfdsl` files get:
+Run these commands from the clone or worktree root with VS Code's `code` command available on your PATH.
+`make vscode-dev` builds the extension and its dependencies, opens `packages/vscode-extension` as the VS Code workspace, and watches source changes.
+Press `F5` in that window to launch an Extension Development Host with PFDSL loaded. In the host, `.pfdsl` files get:
 
 - syntax highlighting (TextMate grammar; YAML embedded in frontmatter)
 - inline diagnostics (parse / normalize / validate)

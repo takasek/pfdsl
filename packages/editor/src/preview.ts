@@ -6,6 +6,9 @@ import { previewMarkup } from "./preview-shell.js";
 import { unwrapAnchors } from "./svg-anchors.js";
 import {
 	centerPan,
+	fitGraph,
+	MAX_SCALE,
+	MIN_SCALE,
 	minimapScale,
 	minimapViewport,
 	panFromMinimapPoint,
@@ -16,6 +19,8 @@ import {
 
 export interface PreviewHost {
 	postMessage(message: MessageFromWebview): void;
+	/** Hosts without related-file navigation omit its gestures and help. */
+	canOpenRelatedFiles?: boolean;
 	renderDot?: (dot: string) => Promise<string>;
 }
 /** Mount one independent preview. Transport and lifetime belong to its host. */
@@ -47,11 +52,32 @@ export function mountPreview(container: HTMLElement, host: PreviewHost) {
 	const root = container.querySelector("#root") as HTMLDivElement;
 	const inner = container.querySelector("#inner") as HTMLDivElement;
 	const tooltip = container.querySelector("#tooltip") as HTMLDivElement;
+	const error = container.querySelector("#preview-error") as HTMLDivElement;
+	const zoomLevel = container.querySelector("#zoom-level") as HTMLOutputElement;
+	const viewButtons = ["zoom-out", "zoom-in", "fit-graph", "actual-size"].map(
+		(id) => container.querySelector(`#${id}`) as HTMLButtonElement,
+	);
+	const [zoomOut, zoomIn, fitButton, actualSize] = viewButtons as [
+		HTMLButtonElement,
+		HTMLButtonElement,
+		HTMLButtonElement,
+		HTMLButtonElement,
+	];
+	const help = container.querySelector("#preview-help") as HTMLDivElement;
+	const helpToggle = container.querySelector(
+		"#preview-help-toggle",
+	) as HTMLButtonElement;
+	if (host.canOpenRelatedFiles === false)
+		container.querySelector("[data-related-files-help]")?.remove();
+	on(helpToggle, "click", () => {
+		help.hidden = !help.hidden;
+		helpToggle.setAttribute("aria-expanded", String(!help.hidden));
+	});
 
 	let descriptions: Record<string, Array<[string, string]>> = {};
 	let locations: Record<string, string[]> = {};
 	let subflows: Record<string, string> = {};
-	let lastFocusedNodeId: string | undefined;
+	let pendingFocusNodeId: string | undefined;
 
 	const diffPanel = container.querySelector("#diff-panel") as HTMLDivElement;
 	let currentDiff: DiffReport | null = null;
@@ -79,15 +105,18 @@ export function mountPreview(container: HTMLElement, host: PreviewHost) {
 		const desc = nodeId ? descriptions[nodeId] : undefined;
 		const nodeLocs = nodeId ? (locations[nodeId] ?? []) : [];
 		const subflow = (node as HTMLElement).dataset.subflow;
-		const hint = subflow
-			? `${modKey}+Click to open subflow`
-			: nodeLocs.length > 1
-				? `${modKey}+Click to open location…`
-				: nodeLocs.length === 1
-					? nodeLocs[0]!.includes("://")
-						? `${modKey}+Click to open URL`
-						: `${modKey}+Click to open file`
-					: null;
+		const hint =
+			host.canOpenRelatedFiles === false
+				? null
+				: subflow
+					? `${modKey}+Click to open subflow`
+					: nodeLocs.length > 1
+						? `${modKey}+Click to open location…`
+						: nodeLocs.length === 1
+							? nodeLocs[0]!.includes("://")
+								? `${modKey}+Click to open URL`
+								: `${modKey}+Click to open file`
+							: null;
 		if (!desc && !hint) {
 			tooltip.style.display = "none";
 			return;
@@ -211,10 +240,21 @@ export function mountPreview(container: HTMLElement, host: PreviewHost) {
 	let startX = 0;
 	let startY = 0;
 	let hasPositioned = false;
+	let graphRevision = -1;
+	let minimumScale = MIN_SCALE;
+
+	function updateControls() {
+		const hasGraph = inner.querySelector("svg") !== null && error.hidden;
+		for (const button of viewButtons) button.disabled = !hasGraph;
+		zoomOut.disabled ||= scale <= minimumScale;
+		zoomIn.disabled ||= scale >= MAX_SCALE;
+		zoomLevel.textContent = `${Number((scale * 100).toFixed(1))}%`;
+	}
 
 	function applyTransform() {
 		inner.style.transform = `translate(${panX}px, ${panY}px) scale(${scale})`;
 		inner.style.transformOrigin = "0 0";
+		updateControls();
 		updateMinimapVp();
 	}
 
@@ -230,7 +270,6 @@ export function mountPreview(container: HTMLElement, host: PreviewHost) {
 	}
 
 	function focusNode(nodeId: string) {
-		lastFocusedNodeId = nodeId;
 		const nodes = inner.querySelectorAll("g.node");
 		for (const node of nodes) {
 			if ((node as HTMLElement).dataset.nodeId === nodeId) {
@@ -246,19 +285,70 @@ export function mountPreview(container: HTMLElement, host: PreviewHost) {
 		}
 	}
 
+	function fitCurrentGraph() {
+		const view = fitGraph(
+			{ width: root.clientWidth, height: root.clientHeight },
+			{ width: inner.offsetWidth, height: inner.offsetHeight },
+		);
+		if (!view) return false;
+		({ scale, panX, panY } = view);
+		minimumScale = Math.min(MIN_SCALE, scale);
+		applyTransform();
+		return true;
+	}
+
+	function positionGraph() {
+		if (disposed || graphRevision !== revision || !error.hidden) return;
+		if (root.clientWidth === 0 || root.clientHeight === 0) return;
+		if (!hasPositioned) {
+			if (!fitCurrentGraph()) return;
+			hasPositioned = true;
+		}
+		if (pendingFocusNodeId) {
+			focusNode(pendingFocusNodeId);
+			pendingFocusNodeId = undefined;
+		}
+		refreshMinimap();
+	}
+	const resizeObserver =
+		typeof window.ResizeObserver === "function"
+			? new window.ResizeObserver(positionGraph)
+			: undefined;
+	resizeObserver?.observe(root);
+	on(window, "resize", positionGraph);
+	on(fitButton, "click", () => {
+		pendingFocusNodeId = undefined;
+		fitCurrentGraph();
+	});
+	on(actualSize, "click", () => {
+		pendingFocusNodeId = undefined;
+		scale = 1;
+		centerGraph();
+	});
+	function zoom(deltaY: number, x: number, y: number) {
+		({ scale, panX, panY } = zoomAt(
+			{ scale, panX, panY },
+			x,
+			y,
+			deltaY,
+			minimumScale,
+		));
+		applyTransform();
+	}
+	on(zoomOut, "click", () =>
+		zoom(1, root.clientWidth / 2, root.clientHeight / 2),
+	);
+	on(zoomIn, "click", () =>
+		zoom(-1, root.clientWidth / 2, root.clientHeight / 2),
+	);
+
 	on(
 		root,
 		"wheel",
 		(e) => {
 			e.preventDefault();
 			const rect = root.getBoundingClientRect();
-			({ scale, panX, panY } = zoomAt(
-				{ scale, panX, panY },
-				e.clientX - rect.left,
-				e.clientY - rect.top,
-				e.deltaY,
-			));
-			applyTransform();
+			zoom(e.deltaY, e.clientX - rect.left, e.clientY - rect.top);
 		},
 		{ passive: false },
 	);
@@ -301,6 +391,7 @@ export function mountPreview(container: HTMLElement, host: PreviewHost) {
 	on(window, "mouseup", releaseDrag);
 
 	on(root, "click", (e) => {
+		if (host.canOpenRelatedFiles === false) return;
 		const node = (e.target as Element).closest("g.node");
 		if (!node) return;
 		const el = node as HTMLElement;
@@ -328,6 +419,7 @@ export function mountPreview(container: HTMLElement, host: PreviewHost) {
 			}
 		}
 		scale = 1;
+		pendingFocusNodeId = undefined;
 		panX = 0;
 		panY = 0;
 		requestAnimationFrame(() => centerGraph());
@@ -350,20 +442,34 @@ export function mountPreview(container: HTMLElement, host: PreviewHost) {
 		return s.replace(/[&<>"']/g, (c) => HTML_ESCAPES[c]!);
 	}
 
+	function showError(message: string) {
+		error.textContent = message;
+		error.hidden = false;
+		root.hidden = true;
+		inner.replaceChildren();
+		minimapSvg.replaceChildren();
+		minimap.style.display = "none";
+		svgNatW = svgNatH = 0;
+		tooltip.style.display = "none";
+		releaseDrag();
+		updateControls();
+	}
+
 	async function receive(msg: MessageToWebview) {
 		if (disposed) return;
 		const currentRevision =
 			msg.type === "render" || msg.type === "error" ? ++revision : revision;
 		if (msg.type === "error") {
-			inner.innerHTML = `<div class="err">${escapeHtml(msg.message)}</div>`;
+			showError(msg.message);
 			return;
 		}
 		if (msg.type === "focus") {
-			focusNode(msg.nodeId);
+			pendingFocusNodeId = msg.nodeId;
+			positionGraph();
 			return;
 		}
 		if (msg.type === "clearFocus") {
-			lastFocusedNodeId = undefined;
+			pendingFocusNodeId = undefined;
 			return;
 		}
 		if (msg.type === "diff") {
@@ -376,7 +482,9 @@ export function mountPreview(container: HTMLElement, host: PreviewHost) {
 			return;
 		}
 		if (msg.type !== "render") return;
-		if (msg.focusNodeId !== undefined) lastFocusedNodeId = msg.focusNodeId;
+		// The cursor hint supplied while opening must not displace the initial Fit.
+		if (hasPositioned && msg.focusNodeId !== undefined)
+			pendingFocusNodeId = msg.focusNodeId;
 		descriptions = msg.descriptions ?? {};
 		locations = msg.locations ?? {};
 		subflows = msg.subflows ?? {};
@@ -384,6 +492,11 @@ export function mountPreview(container: HTMLElement, host: PreviewHost) {
 			const svg = await renderDot(msg.dot);
 			if (disposed || currentRevision !== revision) return;
 			inner.innerHTML = svg;
+			error.hidden = true;
+			error.textContent = "";
+			root.hidden = false;
+			graphRevision = currentRevision;
+			updateControls();
 			for (const node of inner.querySelectorAll("g.node")) {
 				const titleEl = node.querySelector(":scope > title");
 				if (titleEl?.textContent) {
@@ -404,18 +517,12 @@ export function mountPreview(container: HTMLElement, host: PreviewHost) {
 			}
 			requestAnimationFrame(() => {
 				if (currentRevision !== revision) return;
-				if (root.clientWidth === 0 || root.clientHeight === 0) return;
-				if (!hasPositioned) {
-					centerGraph();
-					hasPositioned = true;
-				}
-				if (lastFocusedNodeId) focusNode(lastFocusedNodeId);
-				refreshMinimap();
+				positionGraph();
 			});
 			if (currentDiff) renderDiffPanel(currentDiff);
 		} catch (e) {
 			if (disposed || currentRevision !== revision) return;
-			inner.innerHTML = `<div class="err">${escapeHtml((e as Error).message)}</div>`;
+			showError((e as Error).message);
 		}
 	}
 
@@ -425,6 +532,7 @@ export function mountPreview(container: HTMLElement, host: PreviewHost) {
 		dispose() {
 			disposed = true;
 			revision++;
+			resizeObserver?.disconnect();
 			abort.abort();
 		},
 	};
