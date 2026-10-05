@@ -40,6 +40,38 @@ describe("findShellExecutors", () => {
 		);
 	});
 
+	it("flags imports that expose the entire child_process module", () => {
+		for (const source of [
+			'import cp from "node:child_process";',
+			'import * as cp from "child_process";',
+			'const cp = await import("node:child_process");',
+			'const cp = await import(("node:child_process"));',
+			'const cp = (require)(("node:child_process"));',
+		])
+			assert.equal(findShellExecutors(source).length, 1, source);
+	});
+
+	it("flags literal shell options across quoted, computed and multiline syntax", () => {
+		for (const source of [
+			'execFileSync(cmd, { "shell": true });',
+			"execFileSync(cmd, { shell: (true) });",
+			'execFileSync(cmd, { ["shell"]: true });',
+			"execFileSync(cmd, { shell:\n true });",
+		])
+			assert.equal(findShellExecutors(source).length, 1, source);
+	});
+
+	it("does not interpret comments or strings as executable syntax", () => {
+		assert.deepEqual(
+			findShellExecutors(`
+// import { execSync } from "node:child_process";
+const example = 'execFileSync(cmd, { shell: true });';
+/* shell: true */
+`),
+			[],
+		);
+	});
+
 	it("leaves execFileSync alone, which takes argv", () => {
 		assert.deepEqual(
 			findShellExecutors('import { execFileSync } from "node:child_process";'),

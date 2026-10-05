@@ -2,7 +2,8 @@
 /**
  * check-no-shell-strings.mjs
  *
- * Fails when a script can run a command through a shell. These scripts take
+ * Rejects forbidden child_process imports and literal shell: true options.
+ * It does not trace computed module names or option values. These scripts take
  * refs, artifact keys, tags and paths from argv and from other commands'
  * output, and a shell parses whatever is spliced into the command line — a
  * space word-splits and a semicolon starts another command (#571 found this in
@@ -39,7 +40,7 @@ for (const file of files) {
 
 if (findings.length === 0) {
 	console.log(
-		`check-no-shell-strings: all ${files.length} script(s) run commands without a shell`,
+		`check-no-shell-strings: no forbidden child_process imports or literal shell: true options in ${files.length} script(s)`,
 	);
 	process.exit(0);
 }
