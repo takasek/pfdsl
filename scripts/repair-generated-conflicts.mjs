@@ -8,6 +8,7 @@ import {
 import { resolve } from "node:path";
 import { isCliEntrypoint } from "./lib/cli-entrypoint.mjs";
 import { GEN_PLUGIN_OUTPUTS } from "./lib/gen-plugin-outputs.mjs";
+import { operationalSvgSource } from "./lib/operational-svg-contract.mjs";
 
 const SHA = /^[0-9a-f]{40}$/;
 const nulPaths = (text) => text.split("\0").filter(Boolean);
@@ -66,6 +67,76 @@ function assertGenerated(paths) {
 		);
 }
 
+// Independent of gen-plugin ownership: only tracked, regular operational
+// diagrams with an already tracked matching SVG are renderer-owned here.
+function operationalSvgs(entries) {
+	const nonRegular = new Set(
+		entries
+			.filter(([mode]) => mode !== "100644" && mode !== "100755")
+			.map(([, path]) => path),
+	);
+	const regular = new Set(
+		entries
+			.filter(
+				([mode, path]) =>
+					(mode === "100644" || mode === "100755") && !nonRegular.has(path),
+			)
+			.map(([, path]) => path),
+	);
+	return new Set(
+		[...regular].filter((path) => regular.has(operationalSvgSource(path))),
+	);
+}
+
+function treeSvgs(root, tree) {
+	return operationalSvgs(
+		nulPaths(git(root, ["ls-tree", "-r", "-z", tree])).map((entry) => {
+			const [header, path] = entry.split("\t");
+			return [header.split(" ")[0], path];
+		}),
+	);
+}
+
+function assertRepairPaths(paths, svgs) {
+	assertGenerated(paths.filter((path) => !svgs.has(path)));
+}
+
+export function regenerateOperationalSvgs(root, tree) {
+	const paths = [...treeSvgs(root, tree)].sort();
+	for (const path of paths) {
+		const env = { ...process.env };
+		delete env.GH_TOKEN;
+		delete env.GITHUB_TOKEN;
+		// Capture before writing so a failed render cannot truncate the output.
+		const svg = execFileSync(
+			process.execPath,
+			[
+				"packages/cli/dist/cli.js",
+				"render",
+				operationalSvgSource(path),
+				"--format",
+				"svg",
+			],
+			{ cwd: root, env },
+		);
+		writeFileSync(resolve(root, path), svg);
+	}
+	const allowed = new Set(paths);
+	const changes = nulPaths(git(root, ["diff", "--name-only", "-z", tree]));
+	if (changes.some((path) => !allowed.has(path)))
+		throw new Error(
+			"SVG rendering modified files outside operational SVG outputs",
+		);
+	const untracked = nulPaths(
+		git(root, ["ls-files", "--others", "--exclude-standard", "-z"]),
+	);
+	if (untracked.length)
+		throw new Error(
+			`SVG rendering created unexpected files: ${untracked.join(", ")}`,
+		);
+	return paths;
+}
+
 export function mergeGeneratedConflicts(root, head, base) {
 	if (
 		!SHA.test(head) ||
@@ -89,7 +160,18 @@ export function mergeGeneratedConflicts(root, head, base) {
 	);
 	if (merge.status !== 0 && (merge.status !== 1 || conflicts.length === 0))
 		throw new Error(`Merge failed: ${merge.stderr}`);
-	const sources = conflicts.filter((path) => !isGeneratedPath(path));
+	const entries = nulPaths(git(root, ["ls-files", "--stage", "-z"])).flatMap(
+		(entry) => {
+			const [header, path] = entry.split("\t");
+			const [mode, , stage] = header.split(" ");
+			// A conflicted source is never an eligible renderer input.
+			return stage === "0" || path.endsWith(".svg") ? [[mode, path]] : [];
+		},
+	);
+	const svgs = operationalSvgs(entries);
+	const sources = conflicts.filter(
+		(path) => !isGeneratedPath(path) && !svgs.has(path),
+	);
 	if (sources.length) {
 		throw new SourceConflictError(
 			`Automatic repair stopped: source files have merge conflicts.
@@ -99,7 +181,10 @@ Files requiring manual resolution:
 ${sources.map((path) => `- ${path}`).join("\n")}
 
 Resolve these files manually while merging main into the PR branch locally.
-Regenerate generated files with make gen-plugin, finish the merge, then commit and push.
+Regenerate plugin outputs with make gen-plugin.
+For operational SVGs, run make build and render each matching .pfdsl source with node packages/cli/dist/cli.js render <source> --format svg.
+Capture successful output before replacing its matching SVG; see docs/generated-conflict-repair.md.
+Finish the merge after regenerating its outputs, then commit and push.
 Rerun this workflow if generated files still need repair.
 No changes were pushed.`,
 		);
@@ -147,13 +232,21 @@ export function verifyRepair(root, head, base, repaired) {
 	const sections = merged.stdout.split("\0");
 	const tree = sections.shift();
 	if (!SHA.test(tree)) throw new Error("Invalid automatic merge tree");
+	const svgs = treeSvgs(root, tree);
 	if (merged.status === 1)
-		assertGenerated(sections.slice(0, sections.indexOf("")));
-	assertGenerated(
+		assertRepairPaths(sections.slice(0, sections.indexOf("")), svgs);
+	assertRepairPaths(
 		nulPaths(
 			git(root, ["diff", "--name-only", "-z", tree, `${repaired}^{tree}`]),
 		),
+		svgs,
 	);
+	const repairedSvgs = treeSvgs(root, repaired);
+	for (const path of svgs)
+		if (!repairedSvgs.has(path))
+			throw new Error(
+				`Repair removed or changed the type of operational SVG: ${path}`,
+			);
 	return tree;
 }
 
@@ -218,6 +311,9 @@ export function prepare(root, directory) {
 	assertGenerated(
 		nulPaths(git(root, ["ls-files", "--others", "--exclude-standard", "-z"])),
 	);
+	git(root, ["add", "-A"]);
+	const generated = git(root, ["write-tree"]);
+	regenerateOperationalSvgs(root, generated);
 	git(root, ["add", "-A"]);
 	const merging =
 		spawnSync("git", ["rev-parse", "--verify", "MERGE_HEAD"], { cwd: root })
