@@ -2968,6 +2968,52 @@ describe("multifile check — which file a loader diagnostic points at", () => {
 		).toEqual([join(d, "a.pfdsl"), join(d, "b.pfdsl")]);
 	});
 
+	it("reports a child missing from two files once for each, under each file", async () => {
+		writeFileSync(
+			join(d, "entry.pfdsl"),
+			"---\nprocess:\n  p:\n    subflow: ./a.pfdsl\n  q:\n    subflow: ./b.pfdsl\n---\nin >> p -> mid\nin >> q -> out\n",
+		);
+		const a = join(d, "a.pfdsl");
+		const b = join(d, "b.pfdsl");
+		writeFileSync(
+			a,
+			"---\nprocess:\n  pa:\n    subflow: ./x.pfdsl\n---\nin >> pa -> mid\n",
+		);
+		writeFileSync(
+			b,
+			"---\nprocess:\n  qb:\n    subflow: ./x.pfdsl\n---\nin >> qb -> out\n",
+		);
+		const json = await run(["check", join(d, "entry.pfdsl"), "--json"]);
+		expect(
+			jsonFor(json.stdout, "V021").map((x: { file?: string }) => x.file),
+		).toEqual([a, b]);
+		const text = await run(["check", join(d, "entry.pfdsl")]);
+		expect(
+			linesFor(text.stderr, "V021").map((line) => line.slice(0, a.length + 4)),
+		).toEqual([`${a}:1:1`, `${b}:1:1`]);
+	});
+
+	it("reports a shared preset's own missing preset once, under the shared preset", async () => {
+		writeFileSync(
+			join(d, "entry.pfdsl"),
+			"---\nprocess:\n  p:\n    subflow: ./a.pfdsl\n  q:\n    subflow: ./b.pfdsl\n---\nin >> p -> mid\nin >> q -> out\n",
+		);
+		writeFileSync(
+			join(d, "a.pfdsl"),
+			"---\nextends: ./s.yaml\n---\nin >> pa -> mid\n",
+		);
+		writeFileSync(
+			join(d, "b.pfdsl"),
+			"---\nextends: ./s.yaml\n---\nin >> qb -> out\n",
+		);
+		writeFileSync(join(d, "s.yaml"), "extends: ./m.yaml\n");
+		const r = await run(["check", join(d, "entry.pfdsl"), "--json"]);
+		expect(r.exitCode).toBe(1);
+		const found = jsonFor(r.stdout, "V026");
+		expect(found).toHaveLength(1);
+		expect(found[0]).toMatchObject({ file: join(d, "s.yaml") });
+	});
+
 	it("reports the entry's missing preset once when a child's preset chain reaches the entry", async () => {
 		writeFileSync(
 			join(d, "entry.pfdsl"),

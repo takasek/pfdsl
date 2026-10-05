@@ -251,6 +251,54 @@ describe("loadSubflowGraph", () => {
 		]);
 	});
 
+	// One report per (referencing file, missing path): the message names no
+	// process, so a second one from the same file would be an identical line,
+	// while a different file's reference is a different thing to fix.
+	it("reports a missing child once per referencing file and still loads it once", () => {
+		const { load, calls } = makeCountingLoad({
+			"/p/main.pfdsl": {
+				frontmatter: {
+					process: {
+						P: { subflow: "./a.pfdsl" },
+						Q: { subflow: "./b.pfdsl" },
+						R: { subflow: "./x.pfdsl" },
+					},
+				},
+			},
+			"/p/a.pfdsl": {
+				frontmatter: { process: { S: { subflow: "./x.pfdsl" } } },
+			},
+			"/p/b.pfdsl": {
+				frontmatter: { process: { T: { subflow: "./x.pfdsl" } } },
+			},
+		});
+		const { diagnostics } = loadSubflowGraph("/p/main.pfdsl", load);
+		expect(diagnostics.map((d) => [d.code, fileOf(d)])).toEqual([
+			["V021", "/p/a.pfdsl"],
+			["V021", "/p/b.pfdsl"],
+			["V021", "<entry>"],
+		]);
+		expect(calls.get("/p/x.pfdsl")).toBe(1);
+	});
+
+	it("reports a missing child once when one file's processes all point at it", () => {
+		const { load, calls } = makeCountingLoad({
+			"/p/main.pfdsl": {
+				frontmatter: {
+					process: {
+						P: { subflow: "./x.pfdsl" },
+						Q: { subflow: "./x.pfdsl" },
+					},
+				},
+			},
+		});
+		const { diagnostics } = loadSubflowGraph("/p/main.pfdsl", load);
+		expect(diagnostics.map((d) => [d.code, fileOf(d)])).toEqual([
+			["V021", "<entry>"],
+		]);
+		expect(calls.get("/p/x.pfdsl")).toBe(1);
+	});
+
 	it("leaves `file` off a cycle the entry closes itself, and names the nested file that closes one", () => {
 		const self = loadSubflowGraph(
 			"/p/self.pfdsl",
@@ -750,6 +798,34 @@ describe("loadExtendsChain", () => {
 			["V026", "/p/preset.yaml"],
 			["V026", "/p/preset.yaml"],
 		]);
+	});
+
+	it("reports a missing preset once per referencing file and still loads it once", () => {
+		const { load, calls } = makeCountingLoad({
+			"/p/main.pfdsl": {
+				frontmatter: { extends: ["./p1.yaml", "./p2.yaml", "./x.yaml"] },
+			},
+			"/p/p1.yaml": { frontmatter: { extends: "./x.yaml" } },
+			"/p/p2.yaml": { frontmatter: { extends: "./x.yaml" } },
+		});
+		const { diagnostics } = loadExtendsChain("/p/main.pfdsl", load);
+		expect(diagnostics.map((d) => [d.code, fileOf(d)])).toEqual([
+			["V026", "/p/p1.yaml"],
+			["V026", "/p/p2.yaml"],
+			["V026", "<entry>"],
+		]);
+		expect(calls.get("/p/x.yaml")).toBe(1);
+	});
+
+	it("reports a missing preset once when one file lists it twice", () => {
+		const { load, calls } = makeCountingLoad({
+			"/p/main.pfdsl": { frontmatter: { extends: ["./x.yaml", "./x.yaml"] } },
+		});
+		const { diagnostics } = loadExtendsChain("/p/main.pfdsl", load);
+		expect(diagnostics.map((d) => [d.code, fileOf(d)])).toEqual([
+			["V026", "<entry>"],
+		]);
+		expect(calls.get("/p/x.yaml")).toBe(1);
 	});
 
 	it("leaves `file` off an extends cycle the entry closes itself, and names the preset that closes one", () => {

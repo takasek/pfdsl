@@ -80,7 +80,8 @@ function attributedTo(entryPath: string, from: string): { file?: string } {
  * Recursively load an entry .pfdsl and its `subflow:` children (§2.9.3 / §15.11).
  * `load` reads + analyzes a file by absolute path, returning null when absent.
  * Detects self-referential and multi-hop subflow cycles (V022) and missing
- * paths (V021). Shared children reached by multiple parents load once.
+ * paths (V021). Shared children reached by multiple parents load once. A
+ * missing path is reported once for each file that references it.
  */
 export function loadSubflowGraph<T extends DocWithFrontmatter>(
 	entryPath: string,
@@ -89,7 +90,8 @@ export function loadSubflowGraph<T extends DocWithFrontmatter>(
 	const docs = new Map<string, T>();
 	const diagnostics: (Diagnostic & { file?: string })[] = [];
 	const stack = new Set<string>(); // current DFS path
-	const missing = new Set<string>();
+	const missing = new Set<string>(); // already asked `load`; never asked again
+	const reported = new Set<string>(); // one V021 per (referencing file, path)
 
 	function visit(path: string, fromPath = entryPath): void {
 		if (stack.has(path)) {
@@ -102,10 +104,13 @@ export function loadSubflowGraph<T extends DocWithFrontmatter>(
 			});
 			return;
 		}
-		if (docs.has(path) || missing.has(path)) return;
-		const doc = load(path);
+		if (docs.has(path)) return;
+		const doc = missing.has(path) ? null : load(path);
 		if (doc === null) {
 			missing.add(path);
+			const key = `${fromPath}\0${path}`;
+			if (reported.has(key)) return;
+			reported.add(key);
 			diagnostics.push({
 				severity: "error",
 				code: "V021",
@@ -429,7 +434,8 @@ export function subflowBoundaryDiagnostics<
  * `load` reads + analyzes a file by absolute path, returning null when absent.
  * Detects self-referential and multi-hop extends cycles (V027) and missing
  * paths / invalid paths (V026). Diamond-shaped presets (same file reachable via
- * multiple paths) are loaded only once — not treated as a cycle.
+ * multiple paths) are loaded only once — not treated as a cycle. A missing
+ * path is reported once for each file that references it.
  */
 export function loadExtendsChain<T extends DocWithFrontmatter>(
 	entryPath: string,
@@ -438,7 +444,8 @@ export function loadExtendsChain<T extends DocWithFrontmatter>(
 	const docs = new Map<string, T>();
 	const diagnostics: (Diagnostic & { file?: string })[] = [];
 	const stack = new Set<string>(); // current DFS path
-	const missing = new Set<string>();
+	const missing = new Set<string>(); // already asked `load`; never asked again
+	const reported = new Set<string>(); // one V026 per (referencing file, path)
 
 	function visit(path: string, fromPath = entryPath): void {
 		if (stack.has(path)) {
@@ -451,10 +458,13 @@ export function loadExtendsChain<T extends DocWithFrontmatter>(
 			});
 			return;
 		}
-		if (docs.has(path) || missing.has(path)) return;
-		const doc = load(path);
+		if (docs.has(path)) return;
+		const doc = missing.has(path) ? null : load(path);
 		if (doc === null) {
 			missing.add(path);
+			const key = `${fromPath}\0${path}`;
+			if (reported.has(key)) return;
+			reported.add(key);
 			diagnostics.push({
 				severity: "error",
 				code: "V026",
