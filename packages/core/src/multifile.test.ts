@@ -25,6 +25,15 @@ import type { NormalizedEdge } from "./types/index.js";
 
 type FakeDoc = { frontmatter: Frontmatter | null };
 
+/**
+ * Where a loader diagnostic points: its `file`, or "<entry>" when the key is
+ * absent. A key present with an undefined value is neither, so it shows up as
+ * `undefined` and fails the comparison.
+ */
+function fileOf(d: { file?: string }): string | undefined {
+	return Object.hasOwn(d, "file") ? d.file : "<entry>";
+}
+
 function makeLoad(docs: Record<string, FakeDoc>) {
 	return (path: string): FakeDoc | null => docs[path] ?? null;
 }
@@ -209,6 +218,65 @@ describe("loadSubflowGraph", () => {
 		});
 		const result = loadSubflowGraph("/p/a.pfdsl", docs);
 		expect(result.diagnostics.filter((d) => d.code === "V022")).toHaveLength(2);
+	});
+
+	// A diagnostic without `file` belongs to the loader's entry, the same
+	// convention subflowBoundaryDiagnostics uses for its boundary diagnostics.
+	it("leaves `file` off the entry's own diagnostics and names the nested file for the rest", () => {
+		const docs = makeLoad({
+			"/p/main.pfdsl": {
+				frontmatter: {
+					process: {
+						A: { subflow: "./gone.pfdsl" },
+						B: { subflow: "/abs/b.pfdsl" },
+						C: { subflow: "./child.pfdsl" },
+					},
+				},
+			},
+			"/p/child.pfdsl": {
+				frontmatter: {
+					process: {
+						D: { subflow: "./child-gone.pfdsl" },
+						E: { subflow: "https://example.com/e.pfdsl" },
+					},
+				},
+			},
+		});
+		const { diagnostics } = loadSubflowGraph("/p/main.pfdsl", docs);
+		expect(diagnostics.map((d) => [d.code, fileOf(d)])).toEqual([
+			["V021", "<entry>"],
+			["V021", "<entry>"],
+			["V021", "/p/child.pfdsl"],
+			["V021", "/p/child.pfdsl"],
+		]);
+	});
+
+	it("leaves `file` off a cycle the entry closes itself, and names the nested file that closes one", () => {
+		const self = loadSubflowGraph(
+			"/p/self.pfdsl",
+			makeLoad({
+				"/p/self.pfdsl": {
+					frontmatter: { process: { P: { subflow: "./self.pfdsl" } } },
+				},
+			}),
+		);
+		expect(self.diagnostics.map((d) => [d.code, fileOf(d)])).toEqual([
+			["V022", "<entry>"],
+		]);
+		const hop = loadSubflowGraph(
+			"/p/a.pfdsl",
+			makeLoad({
+				"/p/a.pfdsl": {
+					frontmatter: { process: { P: { subflow: "./b.pfdsl" } } },
+				},
+				"/p/b.pfdsl": {
+					frontmatter: { process: { Q: { subflow: "./a.pfdsl" } } },
+				},
+			}),
+		);
+		expect(hop.diagnostics.map((d) => [d.code, fileOf(d)])).toEqual([
+			["V022", "/p/b.pfdsl"],
+		]);
 	});
 
 	it("reports a multi-hop subflow cycle (a->b->c->a) (§15.11)", () => {
@@ -660,6 +728,50 @@ describe("loadExtendsChain", () => {
 		});
 		const result = loadExtendsChain("/p/a.pfdsl", docs);
 		expect(result.diagnostics.filter((d) => d.code === "V027")).toHaveLength(2);
+	});
+
+	it("leaves `file` off the entry's own diagnostics and names the nested preset for the rest", () => {
+		const docs = makeLoad({
+			"/p/main.pfdsl": {
+				frontmatter: {
+					extends: ["./gone.yaml", "/abs/m.yaml", "./preset.yaml"],
+				},
+			},
+			"/p/preset.yaml": {
+				frontmatter: {
+					extends: ["./preset-gone.yaml", "https://example.com/p.yaml"],
+				},
+			},
+		});
+		const { diagnostics } = loadExtendsChain("/p/main.pfdsl", docs);
+		expect(diagnostics.map((d) => [d.code, fileOf(d)])).toEqual([
+			["V026", "<entry>"],
+			["V026", "<entry>"],
+			["V026", "/p/preset.yaml"],
+			["V026", "/p/preset.yaml"],
+		]);
+	});
+
+	it("leaves `file` off an extends cycle the entry closes itself, and names the preset that closes one", () => {
+		const self = loadExtendsChain(
+			"/p/self.pfdsl",
+			makeLoad({
+				"/p/self.pfdsl": { frontmatter: { extends: "./self.pfdsl" } },
+			}),
+		);
+		expect(self.diagnostics.map((d) => [d.code, fileOf(d)])).toEqual([
+			["V027", "<entry>"],
+		]);
+		const hop = loadExtendsChain(
+			"/p/a.pfdsl",
+			makeLoad({
+				"/p/a.pfdsl": { frontmatter: { extends: "./b.pfdsl" } },
+				"/p/b.pfdsl": { frontmatter: { extends: "./a.pfdsl" } },
+			}),
+		);
+		expect(hop.diagnostics.map((d) => [d.code, fileOf(d)])).toEqual([
+			["V027", "/p/b.pfdsl"],
+		]);
 	});
 
 	it("reports multi-hop extends cycle (a→b→c→a) as V027", () => {
@@ -1471,5 +1583,7 @@ describe("subflowBoundaryDiagnostics", () => {
 			(path) => (path === "/p/parent.pfdsl" ? parent : null),
 		);
 		expect(result.diagnostics.map((d) => d.code)).toEqual(["V021"]);
+		// The entry's own diagnostic carries no `file`, like its boundary ones.
+		expect(fileOf(result.diagnostics[0]!)).toBe("<entry>");
 	});
 });

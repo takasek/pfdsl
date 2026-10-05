@@ -61,8 +61,19 @@ export interface DocWithFrontmatter {
 export interface LoadedGraph<T> {
 	/** Resolved absolute path → loaded document, including the entry. */
 	docs: Map<string, T>;
-	/** Cross-file diagnostics: missing path (V021), circular subflow (V022). */
+	/**
+	 * Cross-file diagnostics: missing path (V021 / V026), circular reference
+	 * (V022 / V027). `file` names the file that holds the reference and is
+	 * absent when that file is the entry, the same convention
+	 * `subflowBoundaryDiagnostics` uses, so a diagnostic without `file` belongs
+	 * to whatever the caller passed as the entry.
+	 */
 	diagnostics: (Diagnostic & { file?: string })[];
+}
+
+/** The `file` of a loader diagnostic raised in `from`: absent for the entry. */
+function attributedTo(entryPath: string, from: string): { file?: string } {
+	return from === entryPath ? {} : { file: from };
 }
 
 /**
@@ -87,7 +98,7 @@ export function loadSubflowGraph<T extends DocWithFrontmatter>(
 				code: "V022",
 				message: `circular subflow reference: ${path}`,
 				range: zeroRange(),
-				file: fromPath,
+				...attributedTo(entryPath, fromPath),
 			});
 			return;
 		}
@@ -100,7 +111,7 @@ export function loadSubflowGraph<T extends DocWithFrontmatter>(
 				code: "V021",
 				message: `subflow file not found: ${path}`,
 				range: zeroRange(),
-				file: fromPath,
+				...attributedTo(entryPath, fromPath),
 			});
 			return;
 		}
@@ -114,7 +125,7 @@ export function loadSubflowGraph<T extends DocWithFrontmatter>(
 					code: "V021",
 					message: `invalid subflow path (${resolved.reason}): ${ref}`,
 					range: zeroRange(),
-					file: path,
+					...attributedTo(entryPath, path),
 				});
 				continue;
 			}
@@ -436,7 +447,7 @@ export function loadExtendsChain<T extends DocWithFrontmatter>(
 				code: "V027",
 				message: `circular extends reference: ${path}`,
 				range: zeroRange(),
-				file: fromPath,
+				...attributedTo(entryPath, fromPath),
 			});
 			return;
 		}
@@ -449,7 +460,7 @@ export function loadExtendsChain<T extends DocWithFrontmatter>(
 				code: "V026",
 				message: `extends file not found: ${path}`,
 				range: zeroRange(),
-				file: fromPath,
+				...attributedTo(entryPath, fromPath),
 			});
 			return;
 		}
@@ -463,7 +474,7 @@ export function loadExtendsChain<T extends DocWithFrontmatter>(
 					code: "V026",
 					message: `invalid extends path (${resolved.reason}): ${ref}`,
 					range: zeroRange(),
-					file: path,
+					...attributedTo(entryPath, path),
 				});
 				continue;
 			}

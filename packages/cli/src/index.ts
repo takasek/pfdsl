@@ -521,8 +521,14 @@ export function runCheck(file: string, opts: CheckOptions = {}): CommandResult {
 	const extendsDiags = new Map<string, Diagnostic & { file?: string }>();
 	for (const parentPath of subflowGraph.docs.keys()) {
 		const chain = loadExtendsChain(parentPath, load);
-		for (const diagnostic of chain.diagnostics) {
-			extendsDiags.set(JSON.stringify(diagnostic), diagnostic);
+		for (const { file: holder, ...diagnostic } of chain.diagnostics) {
+			// The loader treats `parentPath` as its entry and leaves `file` off
+			// what that entry holds, so name the holder here. The file `check` was
+			// given is the one that carries no `file`.
+			const from = holder ?? parentPath;
+			const attributed =
+				from === absFile ? diagnostic : { ...diagnostic, file: from };
+			extendsDiags.set(JSON.stringify(attributed), attributed);
 		}
 		for (const path of chain.docs.keys())
 			if (path !== parentPath) presets.add(path);

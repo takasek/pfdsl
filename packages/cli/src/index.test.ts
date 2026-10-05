@@ -2903,6 +2903,89 @@ describe("multifile check — subflow", () => {
 	});
 });
 
+describe("multifile check — which file a loader diagnostic points at", () => {
+	let d: string;
+	beforeEach(() => {
+		d = mkdtempSync(join(tmpdir(), "pfdsl-mf-attr-"));
+	});
+	afterEach(() => {
+		rmSync(d, { recursive: true, force: true });
+	});
+
+	/** The `check` text lines that carry `code`. */
+	const linesFor = (stderr: string, code: string) =>
+		stderr.split("\n").filter((line) => line.includes(`[${code}]`));
+	const jsonFor = (stdout: string, code: string) =>
+		JSON.parse(stdout).diagnostics.filter(
+			(x: { code: string }) => x.code === code,
+		);
+	const prefixOf = (line: string | undefined, prefix: string) =>
+		line?.slice(0, prefix.length);
+
+	it("prints the entry's own loader diagnostics under the path as given, and leaves `file` off them in --json", async () => {
+		writeFileSync(
+			join(d, "entry.pfdsl"),
+			"---\nextends: ./gone.yaml\nprocess:\n  p:\n    subflow: ./gone.pfdsl\n---\na >> p -> b\n",
+		);
+		// `join` would normalize the `./` away, which hides the difference
+		// between the path as given and its resolved form.
+		const given = `${d}/./entry.pfdsl`;
+		const text = await run(["check", given]);
+		expect(text.exitCode).toBe(1);
+		for (const code of ["V021", "V026"]) {
+			const prefix = `${given}:1:1: error [${code}]`;
+			const [line, ...rest] = linesFor(text.stderr, code);
+			expect(rest).toEqual([]);
+			expect(prefixOf(line, prefix)).toBe(prefix);
+		}
+		const json = await run(["check", given, "--json"]);
+		for (const code of ["V021", "V026"]) {
+			const found = jsonFor(json.stdout, code);
+			expect(found).toHaveLength(1);
+			expect(found[0]).not.toHaveProperty("file");
+		}
+	});
+
+	// The loader run for a child reports that child's own reference without a
+	// `file`, so the entry would be named unless the CLI says otherwise.
+	it("keeps a child's own missing preset on the child, even when two children miss the same preset", async () => {
+		writeFileSync(
+			join(d, "entry.pfdsl"),
+			"---\nprocess:\n  p:\n    subflow: ./a.pfdsl\n  q:\n    subflow: ./b.pfdsl\n---\nin >> p -> mid\nin >> q -> out\n",
+		);
+		writeFileSync(
+			join(d, "a.pfdsl"),
+			"---\nextends: ./missing.yaml\n---\nin >> pa -> mid\n",
+		);
+		writeFileSync(
+			join(d, "b.pfdsl"),
+			"---\nextends: ./missing.yaml\n---\nin >> qb -> out\n",
+		);
+		const r = await run(["check", join(d, "entry.pfdsl"), "--json"]);
+		expect(r.exitCode).toBe(1);
+		expect(
+			jsonFor(r.stdout, "V026").map((x: { file?: string }) => x.file),
+		).toEqual([join(d, "a.pfdsl"), join(d, "b.pfdsl")]);
+	});
+
+	it("reports the entry's missing preset once when a child's preset chain reaches the entry", async () => {
+		writeFileSync(
+			join(d, "entry.pfdsl"),
+			"---\nextends: ./gone.yaml\nprocess:\n  p:\n    subflow: ./child.pfdsl\n---\nin >> p -> out\n",
+		);
+		writeFileSync(
+			join(d, "child.pfdsl"),
+			"---\nextends: ./back.yaml\n---\nin >> q -> out\n",
+		);
+		writeFileSync(join(d, "back.yaml"), "extends: ./entry.pfdsl\n");
+		const r = await run(["check", join(d, "entry.pfdsl"), "--json"]);
+		expect(r.exitCode).toBe(1);
+		const found = jsonFor(r.stdout, "V026");
+		expect(found).toHaveLength(1);
+		expect(found[0]).not.toHaveProperty("file");
+	});
+});
+
 describe("multifile check — extends", () => {
 	it.each([
 		["isolated-node", "x\n"],
