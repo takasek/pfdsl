@@ -58,7 +58,7 @@ npm install -g @pfdsl/cli
 
 | Command | Description |
 |---|---|
-| `pfdsl status ready <file\|-> [--best]` | List ready-to-start processes |
+| `pfdsl status ready <file\|-> [--no-counts]` | List ready-to-start processes |
 | `pfdsl status blocked <file\|->` | List not-ready processes and their blocking inputs |
 | `pfdsl status list <file\|-> --status <s[,s...]>` | List artifacts by status |
 | `pfdsl status gaps <roadmap> <flow> [<flow>...]` | Find todo artifacts missing from the roadmap |
@@ -66,3 +66,25 @@ npm install -g @pfdsl/cli
 <!-- gen-readme-cli:end -->
 
 Run `pfdsl --help` or `pfdsl <command> --help` for full usage and exit codes.
+
+## Planning with ready counts
+
+`pfdsl status ready roadmap.pfdsl` lists processes that can start and shows a `newly ready` count for each one.
+The count is the number of additional processes that would become ready if all of that process's outputs became `done`, compared with the current ready set.
+Already ready processes and consumers whose outputs are all `done`, `wip`, `waiting`, or `suspended` are excluded.
+Multiple outputs are completed together, and each newly ready consumer is counted once.
+The query does not modify the diagram or complete downstream processes recursively.
+
+Counts are decision material, not a priority ranking.
+A zero-count process may still deliver an important final artifact or satisfy one input of a process waiting for several inputs.
+Use project goals, deadlines, and effort alongside the counts; list order is retained without a recommended process.
+
+```sh
+pfdsl status ready roadmap.pfdsl             # List candidates with counts
+pfdsl status ready roadmap.pfdsl --no-counts # Omit counts and their explanation from text
+pfdsl status ready roadmap.pfdsl --json      # Include newlyReadyCount on every ready item
+```
+
+JSON retains `id`, `label`, `inputs`, and `outputs`, and always includes `newlyReadyCount`, even when `--no-counts` is supplied.
+The `--best` option and the `best` JSON field have been removed.
+Consumers should choose a target from the ready items rather than relying on a single recommendation.

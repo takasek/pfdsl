@@ -26,7 +26,7 @@ function pushTo(map: Map<string, string[]>, key: string, value: string): void {
  * Group normalized edges by process/artifact and edge kind. Consolidates a
  * grouping pattern that used to be reimplemented independently at each call
  * site (validator V002/V003, validator W003, cli computeReadyIdsCore, cli
- * runReady --best, audit normalConsumers) with subtly different feedback
+ * runReady completion forecasts, audit normalConsumers) with subtly different feedback
  * handling and value shapes (issue #432).
  */
 export function groupEdges(edges: NormalizedEdge[]): EdgeGroups {

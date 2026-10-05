@@ -7,6 +7,18 @@ layout:
   maxWidth: 130
 
 artifact:
+  ready_counts_cli:
+    label: 各工程の新規 ready 数を示す CLI (#1345)
+    description: 全出力完了前後の ready 集合差を各工程に表示する。単一 best 推薦を廃止し、件数の解釈と着手対象の選択を利用者へ委ねる
+    status: done
+    location: ../packages/cli/src/index.ts
+    criteria: 新規 ready 数が実際の状態更新前後の集合差と一致し、標準テキスト表示、--no-counts、JSON 常時件数、best 廃止と運用 consumer の移行がテストで検証されている
+  cli_release_ready_counts:
+    label: CLIリリース：各工程の新規 ready 数
+    description: 各工程の新規 ready 数と単一 best 推薦廃止を含む npm CLI と、同じ release tag から配布する plugin 資産
+    status: todo
+    criteria: 公開された固定 npm 版の status ready が各工程の件数を返し、同じ release tag の plugin が件数と利用者の対象選択を使う手順を配布している
+    externalStakeholders: [ CLI利用者 ]
   toolchain:
     label: ツールチェーン実装（現行）
     description: packages/（core / cli / graphviz-exporter / preview-engine / vscode-extension）全体。後続プロセスが前提にするのは「実装が存在すること」であって特定の版ではない。現行版は cli_release_* チェーンを経て進み続けており、公開版の一次情報は npm レジストリ（ここに版数を書かない — ドリフトするため）。名前と粒度は workflow.pfdsl の toolchain に揃えてある（#783）
@@ -159,6 +171,12 @@ artifact:
     location: https://github.com/takasek/pfdsl/releases
     externalStakeholders: [ macOS 利用者 ]
 process:
+  i1345_implement_ready_counts:
+    label: 各工程の新規 ready 数と対象選択を実装する
+    location: https://github.com/takasek/pfdsl/issues/1345
+    updated_at: 2026-10-05T01:03:40Z
+  publish_cli_ready_counts:
+    label: 新規 ready 数を示す CLI と plugin を公開する
   i119_publish_extension:
     label: extension自動公開実装
     location: https://github.com/takasek/pfdsl/issues/119
@@ -231,6 +249,10 @@ statusStyles:
 ---
 
 toolchain >> i119_publish_extension -> published_extension
+
+toolchain >> i1345_implement_ready_counts -> ready_counts_cli
+
+ready_counts_cli >> publish_cli_ready_counts -> cli_release_ready_counts
 
 [get_by_id_tool, mint_check_tool, spec_id_syntax, spec_v0011] >> i542_migrate_spec_id_refs -> spec_id_refs
 

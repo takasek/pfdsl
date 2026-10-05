@@ -119,7 +119,7 @@ describe("command metadata parse surface (#1050)", () => {
 			"usage: pfdsl render <file|-> [--format dot|svg|pdf|png] [--no-color]",
 		diff: "usage: pfdsl diff <a> <b> [--format text|dot|svg] [--json] [--no-color]",
 		"status ready":
-			"usage: pfdsl status ready <file|-> [--best] [--json] [--no-color]",
+			"usage: pfdsl status ready <file|-> [--no-counts] [--json] [--no-color]",
 		"status list":
 			"usage: pfdsl status list <file|-> --status <status[,status...]> [--json] [--no-color]",
 		"status blocked":
@@ -201,7 +201,7 @@ describe("command metadata parse surface (#1050)", () => {
 			"  check-links <file>                             Verify location: file paths exist",
 		],
 		status: [
-			"  ready <file|-> [--best]           List ready-to-start processes",
+			"  ready <file|-> [--no-counts]      List ready-to-start processes",
 			"  blocked <file|->                  List not-ready processes and their blocking inputs",
 			"  list <file|-> --status <s[,s...]> List artifacts by status",
 			"  gaps <roadmap> <flow> [<flow>...] Find todo artifacts missing from the roadmap",
@@ -2183,7 +2183,7 @@ describe("--help on a subcommand", () => {
 		{
 			name: "status ready",
 			argv: ["status", "ready"],
-			flags: ["--best", "--json", "--no-color"],
+			flags: ["--no-counts", "--json", "--no-color"],
 		},
 		{
 			name: "status gaps",
@@ -2894,7 +2894,7 @@ describe("multifile check — extends", () => {
 });
 
 describe("status ready", () => {
-	it("does not recommend the shipped scaffold until its milestone is activated", async () => {
+	it("does not list the shipped scaffold until its milestone is activated", async () => {
 		const scaffold = readFileSync(
 			resolve(
 				__dirname,
@@ -2907,7 +2907,7 @@ describe("status ready", () => {
 			scaffold.replace(/label: .*/g, "label: Example"),
 		]) {
 			const r = await run(
-				["status", "ready", "-", "--best", "--json"],
+				["status", "ready", "-", "--json"],
 				withStdin(source),
 			);
 			expect(r.exitCode).toBe(0);
@@ -2918,11 +2918,8 @@ describe("status ready", () => {
 			"    status: suspended",
 			"    status: todo",
 		);
-		const r = await run(
-			["status", "ready", "-", "--best", "--json"],
-			withStdin(active),
-		);
-		expect(JSON.parse(r.stdout).best.id).toBe("start_work");
+		const r = await run(["status", "ready", "-", "--json"], withStdin(active));
+		expect(JSON.parse(r.stdout).ready[0].id).toBe("start_work");
 	});
 
 	// Fixtures written in beforeAll(dir):
@@ -3025,16 +3022,16 @@ describe("status ready", () => {
 		expect(parsed.best).toBeUndefined();
 	});
 
-	it("--json --best includes best field", async () => {
+	it("--json includes each process's completion count", async () => {
 		const f = withStatus(
 			"---\nartifact:\n  req:\n    status: done\n---\nreq >> design -> spec\n",
 		);
-		const r = await run(["status", "ready", f, "--json", "--best"]);
+		const r = await run(["status", "ready", f, "--json"]);
 		expect(r.exitCode).toBe(0);
 		const parsed = JSON.parse(r.stdout);
-		expect(parsed.best).toBeDefined();
-		expect(parsed.best.id).toBe("design");
-		expect(parsed.best.outputs).toContain("spec");
+		expect(parsed.ready[0].newlyReadyCount).toBe(0);
+		expect(parsed.ready[0].id).toBe("design");
+		expect(parsed.ready[0].outputs).toContain("spec");
 	});
 
 	it("--json carries the empty-set breakdown that the human output explains", async () => {
@@ -3084,16 +3081,17 @@ describe("status ready", () => {
 		expect(JSON.parse(r.stdout).empty).toBeUndefined();
 	});
 
-	it("--best marks recommended process with *", async () => {
+	it("--no-counts keeps the ready list without recommending a process", async () => {
 		const r = await run([
 			"status",
 			"ready",
 			join(dir, "valid.pfdsl"),
-			"--best",
+			"--no-counts",
 		]);
 		expect(r.exitCode).toBe(0);
-		expect(r.stdout).toMatch(/\*/);
-		expect(r.stdout).toContain("recommended next");
+		expect(r.stdout).not.toContain("*");
+		expect(r.stdout).not.toContain("newly ready:");
+		expect(r.stdout).toContain("design");
 	});
 
 	it("rejects file with type: workflow (exit 2)", async () => {
@@ -3165,12 +3163,9 @@ describe("status ready", () => {
 		expect(r.exitCode).toBe(2);
 	});
 
-	it("--best prefers process that removes last blocker, not just any consumer", async () => {
-		// A -> x; B -> y; [x(done?), y] >> C; [x] >> D
-		// After A completes: C still needs y (todo), D immediately ready.
-		// --best should prefer A (unblocks D) over B (doesn't unblock anyone yet).
-		// But here we test the opposite: B is NOT preferred because completing A
-		// truly unblocks D while completing B only satisfies one of C's two inputs.
+	it("counts only newly ready consumers whose last blocker is removed", async () => {
+		// Both x and y are explicitly unfinished. Completing x unlocks side,
+		// while completing y alone cannot unlock merge.
 		const src = [
 			"---",
 			"artifact:",
@@ -3180,6 +3175,8 @@ describe("status ready", () => {
 			"    status: done",
 			"  y:",
 			"    status: todo",
+			"  x:",
+			"    status: todo",
 			"---",
 			"req_a >> make_x -> x",
 			"req_b >> make_y -> y",
@@ -3188,13 +3185,18 @@ describe("status ready", () => {
 		].join("\n");
 		const f = join(dir, "ready-heuristic.pfdsl");
 		writeFileSync(f, src);
-		const r = await run(["status", "ready", f, "--json", "--best"]);
+		const r = await run(["status", "ready", f, "--json"]);
 		expect(r.exitCode).toBe(0);
 		const parsed = JSON.parse(r.stdout);
-		// make_x unblocks `side` (last missing input) — 1 newly-ready process
-		// make_y unblocks nothing (merge still needs x which is todo)
-		// make_x should be chosen as best
-		expect(parsed.best.id).toBe("make_x");
+		expect(
+			parsed.ready.map((p: { id: string; newlyReadyCount: number }) => [
+				p.id,
+				p.newlyReadyCount,
+			]),
+		).toEqual([
+			["make_x", 1],
+			["make_y", 0],
+		]);
 	});
 
 	it("excludes process whose output artifacts are all done", async () => {

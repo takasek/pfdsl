@@ -3,7 +3,6 @@ import { describe, it } from "node:test";
 import {
 	buildGateCheckCommand,
 	countBehind,
-	findIssueNumberForProcess,
 	findProcessIdForIssueNumber,
 	isUnregisteredManagedIssue,
 	parsePorcelainPaths,
@@ -12,86 +11,51 @@ import {
 } from "./cycle-status.mjs";
 
 describe("parseReadyOutput", () => {
-	it("extracts ready ids, best id, and best outputs", () => {
+	it("preserves ready decision material without selecting a process", () => {
 		const json = {
 			ok: true,
 			ready: [
-				{ id: "a", label: "A" },
-				{ id: "b", label: "B" },
+				{
+					id: "a",
+					label: "A",
+					inputs: ["seed"],
+					outputs: ["a_out"],
+					newlyReadyCount: 0,
+				},
+				{
+					id: "b",
+					label: "B",
+					inputs: ["seed"],
+					outputs: ["b_out"],
+					newlyReadyCount: 2,
+				},
 			],
-			best: { id: "a", label: "A", outputs: ["a_out"] },
 		};
 		assert.deepEqual(parseReadyOutput(json), {
-			ready: ["a", "b"],
-			best: "a",
-			bestOutputs: ["a_out"],
+			ready: json.ready,
 		});
 	});
 
 	it("returns empty when ok is false", () => {
 		assert.deepEqual(parseReadyOutput({ ok: false }), {
 			ready: [],
-			best: null,
-			bestOutputs: [],
 		});
 	});
 
 	it("returns empty for missing/invalid input", () => {
 		assert.deepEqual(parseReadyOutput(null), {
 			ready: [],
-			best: null,
-			bestOutputs: [],
 		});
 		assert.deepEqual(parseReadyOutput(undefined), {
 			ready: [],
-			best: null,
-			bestOutputs: [],
 		});
 	});
 
-	it("returns null best and empty bestOutputs when absent", () => {
+	it("returns an empty ready list when no candidate exists", () => {
 		const json = { ok: true, ready: [] };
 		assert.deepEqual(parseReadyOutput(json), {
 			ready: [],
-			best: null,
-			bestOutputs: [],
 		});
-	});
-});
-
-describe("findIssueNumberForProcess", () => {
-	const pfdsl = `artifacts:
-  spec_id_syntax:
-    label: 仕様ID構文
-processes:
-  i402_implement_get_by_id:
-    label: get-by-ID ツール実装
-    location: https://github.com/takasek/pfdsl/issues/402
-  i405_implement_mint_check:
-    label: mint-check ツール実装
-    location: https://github.com/takasek/pfdsl/issues/405
-    updated_at: 2026-07-10T01:50:30Z
-  i435_implement_ansi_color:
-    label: 診断 ANSI カラー実装
-    location: https://github.com/takasek/pfdsl/issues/435
-`;
-
-	it("extracts the issue number from the process block's location", () => {
-		assert.equal(
-			findIssueNumberForProcess(pfdsl, "i405_implement_mint_check"),
-			405,
-		);
-	});
-
-	it("does not bleed into a neighboring process's location", () => {
-		assert.equal(
-			findIssueNumberForProcess(pfdsl, "i402_implement_get_by_id"),
-			402,
-		);
-	});
-
-	it("returns null for an unknown process id", () => {
-		assert.equal(findIssueNumberForProcess(pfdsl, "i999_nonexistent"), null);
 	});
 });
 

@@ -214,7 +214,7 @@ const META_CHECK_LINKS_OPTIONS = {
 };
 
 const STATUS_READY_OPTIONS = {
-	best: BOOLEAN_OPTION,
+	"no-counts": BOOLEAN_OPTION,
 	json: BOOLEAN_OPTION,
 	"no-color": BOOLEAN_OPTION,
 };
@@ -901,7 +901,7 @@ export function runGraphEdges(
 }
 
 export interface ReadyOptions {
-	best?: boolean;
+	noCounts?: boolean;
 	json?: boolean;
 	color?: boolean;
 }
@@ -911,6 +911,7 @@ export interface StatusReadyItem {
 	label: string;
 	inputs: string[];
 	outputs: string[];
+	newlyReadyCount: number;
 }
 
 /**
@@ -921,11 +922,32 @@ export interface StatusReadyItem {
 const inputSatisfied = (status: string | undefined): boolean =>
 	status === "done" || status === undefined;
 
+/** Shared by the current ready set and single-process completion forecasts. */
+function processReady(
+	inputs: string[],
+	outputs: string[],
+	statusOf: (id: string) => string | undefined,
+): boolean {
+	return (
+		inputs.every((id) => inputSatisfied(statusOf(id))) &&
+		(outputs.length === 0 ||
+			outputs.some((id) => {
+				const status = statusOf(id);
+				return (
+					status !== "done" &&
+					status !== "wip" &&
+					status !== "waiting" &&
+					status !== "suspended"
+				);
+			}))
+	);
+}
+
 /**
  * Core ready-process algorithm operating on pre-analyzed data.
  * "Ready" = all input artifacts done/undefined AND at least one output still actionable (not done/wip/suspended/waiting).
  * Returns processInputs and processOutputs maps in addition to readyIds so
- * callers (e.g. runReady --best) can reuse the already-built maps.
+ * callers can reuse the already-built maps for completion forecasts.
  */
 function computeReadyIdsCore(
 	edges: ReturnType<typeof analyze>["edges"],
@@ -938,28 +960,19 @@ function computeReadyIdsCore(
 	readyIds: string[];
 	processInputs: Map<string, string[]>;
 	processOutputs: Map<string, string[]>;
+	artifactConsumers: Map<string, string[]>;
 } {
-	const { processInputs, processOutputs } = groupEdges(edges);
+	const { processInputs, processOutputs, artifactConsumers } =
+		groupEdges(edges);
 
 	const readyIds: string[] = [];
 	for (const [pid, inputs] of processInputs) {
 		if (nodeKinds.get(pid) !== "process") continue;
-		const allInputsDone = inputs.every((aid) =>
-			inputSatisfied(artifactMeta[aid]?.status),
-		);
-		if (!allInputsDone) continue;
 		const outputs = processOutputs.get(pid) ?? [];
-		const outputsInert =
-			outputs.length > 0 &&
-			outputs.every((aid) => {
-				const s = artifactMeta[aid]?.status;
-				return (
-					s === "done" || s === "suspended" || s === "waiting" || s === "wip"
-				);
-			});
-		if (!outputsInert) readyIds.push(pid);
+		if (processReady(inputs, outputs, (id) => artifactMeta[id]?.status))
+			readyIds.push(pid);
 	}
-	return { readyIds, processInputs, processOutputs };
+	return { readyIds, processInputs, processOutputs, artifactConsumers };
 }
 
 /**
@@ -1076,64 +1089,43 @@ export function runReady(file: string, opts: ReadyOptions = {}): CommandResult {
 
 	const artifactMeta = frontmatter?.artifact ?? {};
 
-	const { readyIds, processInputs, processOutputs } = computeReadyIdsCore(
-		edges,
-		nodeKinds,
-		artifactMeta,
-	);
+	const { readyIds, processInputs, processOutputs, artifactConsumers } =
+		computeReadyIdsCore(edges, nodeKinds, artifactMeta);
 
-	// best-next: prefer the process that would actually make the most downstream processes ready.
-	// A consumer counts only if completing pid removes its LAST remaining blocker
-	// (i.e. all other inputs of that consumer are already done/undefined).
-	let bestId: string | undefined;
-	if (opts.best && readyIds.length > 0) {
-		// Precompute artifact → consuming processes (O(m) once)
-		const { artifactConsumers, processOutputs: processOutputLists } =
-			groupEdges(edges);
-		// Precompute process output artifact sets (O(m) once)
-		const processOutputSets = new Map<string, Set<string>>();
-		for (const [pid, outputs] of processOutputLists) {
-			processOutputSets.set(pid, new Set(outputs));
+	const beforeReady = new Set(readyIds);
+	const countNewlyReady = (pid: string): number => {
+		const completed = new Set(processOutputs.get(pid) ?? []);
+		// Only consumers of changed inputs can enter the ready set. The same
+		// predicate also checks output activity, including overlapping outputs.
+		const candidates = new Set<string>();
+		for (const id of completed) {
+			for (const consumer of artifactConsumers.get(id) ?? [])
+				candidates.add(consumer);
 		}
-		// Count consumers that would become ready after pid completes (O(m) per pid, but
-		// pid iterates only its own outputs × their consumers, total O(m) across all pids)
-		const countUnlocked = (pid: string): number => {
-			const outputs = processOutputSets.get(pid) ?? new Set();
-			const unlocked = new Set<string>();
-			for (const aid of outputs) {
-				for (const consumer of artifactConsumers.get(aid) ?? []) {
-					if (unlocked.has(consumer)) continue;
-					// Consumer becomes ready if all its inputs (other than ones pid outputs) are done
-					const otherInputsAllDone =
-						processInputs.get(consumer)?.every((inp) => {
-							if (outputs.has(inp)) return true; // pid will satisfy this
-							return inputSatisfied(artifactMeta[inp]?.status);
-						}) ?? true;
-					if (otherInputsAllDone) unlocked.add(consumer);
-				}
-			}
-			return unlocked.size;
-		};
-		// Precompute counts then find max in O(n) — avoid O(n log n) sort + allocation
-		const counts = new Map<string, number>(
-			readyIds.map((pid) => [pid, countUnlocked(pid)]),
-		);
-		bestId = readyIds.reduce((best, pid) => {
-			const bc = counts.get(best) ?? 0;
-			const pc = counts.get(pid) ?? 0;
-			return pc > bc || (pc === bc && pid < best) ? pid : best;
-		});
-	}
+		let count = 0;
+		for (const consumer of candidates) {
+			if (
+				!beforeReady.has(consumer) &&
+				processReady(
+					processInputs.get(consumer) ?? [],
+					processOutputs.get(consumer) ?? [],
+					(id) => (completed.has(id) ? "done" : artifactMeta[id]?.status),
+				)
+			)
+				count++;
+		}
+		return count;
+	};
 
 	const toItem = (pid: string): StatusReadyItem => ({
 		id: pid,
 		label: frontmatter?.process?.[pid]?.label ?? pid,
 		inputs: processInputs.get(pid) ?? [],
 		outputs: processOutputs.get(pid) ?? [],
+		newlyReadyCount: countNewlyReady(pid),
 	});
 
 	const readyItems = readyIds.map(toItem);
-	const bestItem = bestId ? toItem(bestId) : undefined;
 
 	const breakdown =
 		readyItems.length === 0
@@ -1147,7 +1139,6 @@ export function runReady(file: string, opts: ReadyOptions = {}): CommandResult {
 
 	if (opts.json) {
 		const payload: Record<string, unknown> = { ok: true, ready: readyItems };
-		if (opts.best && bestItem) payload.best = bestItem;
 		if (breakdown) payload.empty = breakdown;
 		if (warnings.length) payload.warnings = warnings;
 		return ok(`${JSON.stringify(payload)}\n`, warnText);
@@ -1158,17 +1149,17 @@ export function runReady(file: string, opts: ReadyOptions = {}): CommandResult {
 	}
 
 	const lines: string[] = [`Ready processes (${readyItems.length}):`];
-	for (const item of readyItems) {
-		const marker = opts.best && item.id === bestId ? "*" : " ";
-		const inputs = item.inputs.join(", ");
+	if (!opts.noCounts)
 		lines.push(
-			`  ${marker} ${item.id.padEnd(20)} "${item.label}"   inputs: [${inputs}]`,
+			"Newly ready = additional processes ready after all outputs complete; not a priority ranking. Zero does not mean unnecessary.",
 		);
-	}
-	if (opts.best && bestItem) {
-		lines.push("");
+	for (const item of readyItems) {
+		const inputs = item.inputs.join(", ");
+		const count = opts.noCounts
+			? ""
+			: `   newly ready: ${item.newlyReadyCount}`;
 		lines.push(
-			"* = recommended next (removes the last blocker for the most downstream processes)",
+			`    ${item.id.padEnd(20)} "${item.label}"   inputs: [${inputs}]${count}`,
 		);
 	}
 	return ok(`${lines.join("\n")}\n`, warnText);
@@ -3336,11 +3327,16 @@ Only applies to roadmap files (type: roadmap). Use - to read from stdin.
 Omitting type: is treated as roadmap and allowed, with a warning (W006).
 
 Options:
-  --best      highlight the process that unblocks the most downstream work
-  --json      output as JSON ({ ok, ready: [{id, label, inputs, outputs}], best?, empty?, warnings? })
+  --no-counts omit completion counts and their explanation from text only
+  --json      output as JSON ({ ok, ready: [{id, label, inputs, outputs, newlyReadyCount}], empty?, warnings? })
               empty (only when ready is []): { inProgress, parked, complete, blocked }
               on parse failure: { ok: false, diagnostics }
   --no-color  disable ANSI color codes (also: NO_COLOR env var)
+
+newlyReadyCount is the ready-set difference after this process's outputs become done.
+Already ready processes and consumers with only inert outputs are excluded.
+Counts do not rank priority, deadlines or effort; zero does not mean unnecessary.
+Existing list order is preserved. JSON always includes counts, even with --no-counts.
 `;
 
 const HELP_STATUS_LIST = `${helpUsage("status list", "<file|->", STATUS_LIST_OPTIONS)}
@@ -4383,14 +4379,14 @@ const META_COMMANDS: readonly CommandEntry[] = [
 const STATUS_COMMANDS: readonly CommandEntry[] = [
 	defineCommand(STATUS_READY_OPTIONS, {
 		name: "ready",
-		synopsis: "ready <file|-> [--best]",
+		synopsis: "ready <file|-> [--no-counts]",
 		description: ["List ready-to-start processes"],
 		help: HELP_READY,
 		run: (rest, flags) => {
 			const f = rest[0];
 			if (!f) return fail(HELP_READY, 2);
 			return runReady(f, {
-				best: flags.best === true,
+				noCounts: flags["no-counts"] === true,
 				json: flags.json === true,
 				color: resolveColor(flags),
 			});

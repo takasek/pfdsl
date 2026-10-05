@@ -4,41 +4,14 @@
  */
 
 /**
- * @param {unknown} readyJson - output of `pfdsl status ready --best --json`
- * @returns {{ready: string[], best: string | null, bestOutputs: string[]}}
+ * @param {unknown} readyJson - output of `pfdsl status ready --json`
+ * @returns {{ready: Array<{id: string, label: string, inputs: string[], outputs: string[], newlyReadyCount: number}>}}
  */
 export function parseReadyOutput(readyJson) {
 	if (!readyJson || typeof readyJson !== "object" || readyJson.ok !== true) {
-		return { ready: [], best: null, bestOutputs: [] };
+		return { ready: [] };
 	}
-	const ready = (readyJson.ready ?? []).map((p) => p.id);
-	const best = readyJson.best?.id ?? null;
-	const bestOutputs = readyJson.best?.outputs ?? [];
-	return { ready, best, bestOutputs };
-}
-
-/**
- * roadmap.pfdsl 内の `<processId>:` ブロック（次の同インデントキーまで）を抜き出す。
- * @param {string} pfdslText
- * @param {string} processId
- * @returns {string | null}
- */
-function findProcessBlock(pfdslText, processId) {
-	const re = new RegExp(`^  ${processId}:\\n([\\s\\S]*?)(?=^  \\S|^\\S)`, "m");
-	const match = pfdslText.match(re);
-	return match ? match[1] : null;
-}
-
-/**
- * @param {string} pfdslText - .pfdsl/roadmap.pfdsl の全文
- * @param {string} processId
- * @returns {number | null}
- */
-export function findIssueNumberForProcess(pfdslText, processId) {
-	const block = findProcessBlock(pfdslText, processId);
-	if (!block) return null;
-	const match = block.match(/location:\s*\S*\/issues\/(\d+)/);
-	return match ? Number(match[1]) : null;
+	return { ready: readyJson.ready ?? [] };
 }
 
 /**
@@ -56,8 +29,7 @@ function extractProcessSection(pfdslText) {
 }
 
 /**
- * `findIssueNumberForProcess` の逆方向: issue 番号から、それを `location:` に持つ
- * process の processId を返す。
+ * issue 番号から、それを `location:` に持つ process の processId を返す。
  * @param {string} pfdslText - .pfdsl/roadmap.pfdsl の全文
  * @param {number} issueNumber
  * @returns {string | null}
