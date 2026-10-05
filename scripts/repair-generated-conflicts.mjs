@@ -355,7 +355,20 @@ export function prepare(root, directory) {
 	console.log(`Verified repair commit: ${repaired}`);
 }
 
-function publication(root, directory, push) {
+function retryPublication(push) {
+	if (!push || !process.env.GITHUB_OUTPUT)
+		throw new Error(
+			"PR or conflicting main changes require fresh preparation; rerun the workflow",
+		);
+	appendFileSync(process.env.GITHUB_OUTPUT, "retry=true\n");
+	const message =
+		"Concurrent changes require fresh preparation. No changes were pushed in this attempt.";
+	console.log(message);
+	if (process.env.GITHUB_STEP_SUMMARY)
+		appendFileSync(process.env.GITHUB_STEP_SUMMARY, `${message}\n`);
+}
+
+function publication(root, directory, push, recheck = false) {
 	const value = readSnapshot(directory);
 	if (
 		value.repository !== process.env.GITHUB_REPOSITORY ||
@@ -363,15 +376,60 @@ function publication(root, directory, push) {
 	)
 		throw new Error("Artifact does not belong to the requested PR");
 	const fresh = snapshot(value.repository, value.number);
-	if (JSON.stringify(fresh) !== JSON.stringify(value))
-		throw new Error("PR or main changed; rerun the workflow");
-	git(root, [
-		"fetch",
-		resolve(directory, "repair.bundle"),
-		"refs/heads/generated-repair-result",
-	]);
-	const repaired = git(root, ["rev-parse", "FETCH_HEAD"]);
-	verifyRepair(root, value.head, value.base, repaired);
+	if (fresh.head !== value.head || fresh.branch !== value.branch) {
+		retryPublication(push || recheck);
+		return;
+	}
+	let repaired = value.head;
+	if (recheck) {
+		if (
+			spawnSync(
+				"git",
+				["merge-base", "--is-ancestor", value.base, value.head],
+				{ cwd: root },
+			).status !== 0
+		)
+			throw new Error(
+				"Unchanged preparation has not integrated its frozen main",
+			);
+	} else {
+		git(root, [
+			"fetch",
+			resolve(directory, "repair.bundle"),
+			"refs/heads/generated-repair-result",
+		]);
+		repaired = git(root, ["rev-parse", "FETCH_HEAD"]);
+		verifyRepair(root, value.head, value.base, repaired);
+	}
+	if (fresh.base !== value.base) {
+		// Fetch and inspect trusted Git objects only. Never execute the new tree.
+		execFileSync("gh", ["auth", "setup-git", "--hostname", "github.com"], {
+			cwd: root,
+			stdio: "inherit",
+		});
+		git(root, [
+			"fetch",
+			`https://github.com/${value.repository}.git`,
+			fresh.base,
+		]);
+		const merge = spawnSync(
+			"git",
+			["merge-tree", "--write-tree", repaired, fresh.base],
+			{
+				cwd: root,
+				encoding: "utf8",
+			},
+		);
+		if (merge.status === 1) {
+			retryPublication(push || recheck);
+			return;
+		}
+		if (merge.status !== 0)
+			throw new Error(`Cannot check updated main: ${merge.stderr}`);
+		console.log(
+			"Main advanced without merge conflicts. No fresh preparation is needed; use Update branch to integrate the newer main if needed.",
+		);
+	}
 	git(root, ["check-ref-format", `refs/heads/${value.branch}`]);
 	if (push) {
 		// Authentication is configured only in this fresh, trusted-code runner.
@@ -424,11 +482,16 @@ function main() {
 		);
 		appendFileSync(process.env.GITHUB_OUTPUT, `head=${value.head}\n`);
 	} else if (mode === "prepare") prepare(resolve(first), resolve(second));
-	else if (mode === "publish" || mode === "verify")
-		publication(resolve(first), resolve(second), mode === "publish");
+	else if (mode === "publish" || mode === "verify" || mode === "recheck")
+		publication(
+			resolve(first),
+			resolve(second),
+			mode === "publish",
+			mode === "recheck",
+		);
 	else
 		throw new Error(
-			"Usage: repair-generated-conflicts.mjs snapshot <repository> <PR> | prepare|verify|publish <checkout> <artifact-directory>",
+			"Usage: repair-generated-conflicts.mjs snapshot <repository> <PR> | prepare|verify|publish|recheck <checkout> <artifact-directory>",
 		);
 }
 
