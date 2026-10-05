@@ -197,15 +197,7 @@ export async function runCycleStatus({
 	// The operator selects targets explicitly from the ready decision material.
 	// These identify source material to read, not a design or approval verdict.
 	let issueError = null;
-	let targetIssues = [];
-	let targetSource = null;
-	// Read once and reused below for the gate-check artifact resolution — same
-	// file, whichever branch below (or that step) needs it first.
-	let roadmapText = null;
-	if (issueNumbers.length > 0) {
-		targetIssues = issueNumbers;
-		targetSource = "flag";
-	}
+	const targetIssues = issueNumbers;
 
 	const issueLookupFailures = [];
 	/** @type {Map<number, string[]>} label names of each issue actually fetched */
@@ -233,9 +225,9 @@ export async function runCycleStatus({
 					: issueLookupFailures
 							.map(({ issue, error }) => `issue ${issue}: ${error}`)
 							.join("; ");
-			issueError = issueError ? `${issueError}; ${lookupError}` : lookupError;
+			issueError = lookupError;
 		}
-	} else if (!issueError) {
+	} else {
 		issueError =
 			"No --issue given. Choose a target from the ready list and rerun with --issue <number>; counts do not rank priority.";
 	}
@@ -252,16 +244,14 @@ export async function runCycleStatus({
 	/** @type {number[]} target issues with no flow label and no process yet */
 	const untriagedTargetIssues = [];
 	if (targetIssues.length > 0) {
-		if (roadmapText === null) {
-			try {
-				roadmapText = readFileSync(
-					resolve(root, ".pfdsl/roadmap.pfdsl"),
-					"utf-8",
-				);
-			} catch (e) {
-				roadmapText = null;
-				gateCheckCommandError = `failed to read .pfdsl/roadmap.pfdsl: ${e.message}`;
-			}
+		let roadmapText = null;
+		try {
+			roadmapText = readFileSync(
+				resolve(root, ".pfdsl/roadmap.pfdsl"),
+				"utf-8",
+			);
+		} catch (e) {
+			gateCheckCommandError = `failed to read .pfdsl/roadmap.pfdsl: ${e.message}`;
 		}
 		if (roadmapText !== null) {
 			const processIdByIssue = new Map(
@@ -360,7 +350,7 @@ export async function runCycleStatus({
 		ready,
 		issueTargets: targetIssues.map((issue) => ({
 			issue,
-			source: targetSource,
+			source: "flag",
 		})),
 		manualChecks: [
 			"MANUAL: Before starting, read the primary issue records for every issueTargets entry and follow 適用点 1 で採用案と対案を比較して設計を決める in .pfdsl/bindings/pfd-ops.md. Resolve missing targets or failed reads first; this output does not verify design decisions or approvals.",

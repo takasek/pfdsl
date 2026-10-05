@@ -15,30 +15,6 @@ export function parseReadyOutput(readyJson) {
 }
 
 /**
- * roadmap.pfdsl 内の `<processId>:` ブロック（次の同インデントキーまで）を抜き出す。
- * @param {string} pfdslText
- * @param {string} processId
- * @returns {string | null}
- */
-function findProcessBlock(pfdslText, processId) {
-	const re = new RegExp(`^  ${processId}:\\n([\\s\\S]*?)(?=^  \\S|^\\S)`, "m");
-	const match = pfdslText.match(re);
-	return match ? match[1] : null;
-}
-
-/**
- * @param {string} pfdslText - .pfdsl/roadmap.pfdsl の全文
- * @param {string} processId
- * @returns {number | null}
- */
-export function findIssueNumberForProcess(pfdslText, processId) {
-	const block = findProcessBlock(pfdslText, processId);
-	if (!block) return null;
-	const match = block.match(/location:\s*\S*\/issues\/(\d+)/);
-	return match ? Number(match[1]) : null;
-}
-
-/**
  * roadmap.pfdsl の `process:` セクション全体を切り出す（次の非インデントキーの行まで、
  * それが無ければ文字列末尾まで）。process ブロックの列挙は、この部分文字列に対してのみ行う
  * ことで artifact: セクション側の location を誤って拾わないようにする。
@@ -53,7 +29,7 @@ function extractProcessSection(pfdslText) {
 }
 
 /**
- * `findIssueNumberForProcess` の逆方向: issue 番号から、それを `location:` に持つ
+ * issue 番号から、それを `location:` に持つ
  * process の processId を返す。
  * @param {string} pfdslText - .pfdsl/roadmap.pfdsl の全文
  * @param {number} issueNumber

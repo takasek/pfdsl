@@ -3,7 +3,6 @@ import { describe, it } from "node:test";
 import {
 	buildGateCheckCommand,
 	countBehind,
-	findIssueNumberForProcess,
 	findProcessIdForIssueNumber,
 	isUnregisteredManagedIssue,
 	parsePorcelainPaths,
@@ -57,42 +56,6 @@ describe("parseReadyOutput", () => {
 		assert.deepEqual(parseReadyOutput(json), {
 			ready: [],
 		});
-	});
-});
-
-describe("findIssueNumberForProcess", () => {
-	const pfdsl = `artifacts:
-  spec_id_syntax:
-    label: 仕様ID構文
-processes:
-  i402_implement_get_by_id:
-    label: get-by-ID ツール実装
-    location: https://github.com/takasek/pfdsl/issues/402
-  i405_implement_mint_check:
-    label: mint-check ツール実装
-    location: https://github.com/takasek/pfdsl/issues/405
-    updated_at: 2026-07-10T01:50:30Z
-  i435_implement_ansi_color:
-    label: 診断 ANSI カラー実装
-    location: https://github.com/takasek/pfdsl/issues/435
-`;
-
-	it("extracts the issue number from the process block's location", () => {
-		assert.equal(
-			findIssueNumberForProcess(pfdsl, "i405_implement_mint_check"),
-			405,
-		);
-	});
-
-	it("does not bleed into a neighboring process's location", () => {
-		assert.equal(
-			findIssueNumberForProcess(pfdsl, "i402_implement_get_by_id"),
-			402,
-		);
-	});
-
-	it("returns null for an unknown process id", () => {
-		assert.equal(findIssueNumberForProcess(pfdsl, "i999_nonexistent"), null);
 	});
 });
 
