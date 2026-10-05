@@ -51,6 +51,16 @@ function fixture() {
 	writeFileSync(join(root, "scripts/pre-commit"), "#!/bin/sh\nexit 0\n", {
 		mode: 0o755,
 	});
+	mkdirSync(join(root, "generated/skills/pfdsl"), { recursive: true });
+	writeFileSync(
+		join(root, "generated/skills/pfdsl/SKILL.md"),
+		"fixture skill\n",
+	);
+	mkdirSync(join(root, ".claude/skills"), { recursive: true });
+	symlinkSync(
+		"../../generated/skills/pfdsl",
+		join(root, ".claude/skills/pfdsl"),
+	);
 	writeSetupMarker(root);
 	return { root, env, git };
 }

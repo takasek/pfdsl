@@ -58,6 +58,9 @@ const host = vi.hoisted(() => {
 			revealRange: vi.fn(),
 		})),
 	};
+	const openTextDocument = vi.fn(async (value: ReturnType<typeof uri>) => ({
+		uri: value,
+	}));
 	function createPanel() {
 		let receive = (_message: MessageFromWebview) => {};
 		let disposed = () => {};
@@ -114,16 +117,20 @@ const host = vi.hoisted(() => {
 			},
 			workspace: {
 				applyEdit: vi.fn(async (_edit: WorkspaceEdit) => true),
+				openTextDocument,
+				fs: { stat: vi.fn(async () => ({ type: 1 })) },
 				onDidChangeTextDocument: (callback: typeof textChanged) => {
 					textChanged = callback;
 					return { dispose() {} };
 				},
 			},
 			Uri: {
+				file: uri,
 				joinPath: (base: { path: string }, ...parts: string[]) =>
 					uri([base.path, ...parts].join("/")),
 			},
 			ViewColumn: { Beside: 2 },
+			FileType: { File: 1, Directory: 2 },
 			ExtensionMode: { Development: 2 },
 		},
 		changeDocument: (document: vscode.TextDocument) =>
@@ -202,11 +209,13 @@ function setup() {
 }
 
 beforeEach(() => {
+	vi.clearAllMocks();
 	clearAnalyzeCache();
 	host.panels.length = 0;
 	host.commands.clear();
 	host.window.activeTextEditor = undefined;
 	host.api.workspace.applyEdit.mockClear();
+	host.window.visibleTextEditors = [];
 });
 
 it("focuses a selected semantic definition key and ignores an identically named field", async () => {
@@ -266,6 +275,39 @@ it("applies source-bound node creation as one WorkspaceEdit and rejects a stale 
 		otherId: "q",
 	});
 	expect(host.api.workspace.applyEdit).toHaveBeenCalledTimes(1);
+});
+
+describe("registered preview file navigation", () => {
+	it("resolves subflow openFile from the parent document and location from basePath", async () => {
+		const { open } = setup();
+		const doc = document(
+			"flows/parent",
+			"---\nbasePath: ../\nartifact:\n  b:\n    location: docs/result.md\nprocess:\n  p:\n    subflow: child.pfdsl\n---\na >> p -> b\n",
+		);
+		host.window.visibleTextEditors = [
+			{ document: doc, viewColumn: 1 },
+		] as vscode.TextEditor[];
+		const panel = await open(doc);
+		panel.receive({ type: "openFile", path: "child.pfdsl" });
+		await vi.waitFor(() => {
+			expect(host.window.showTextDocument).toHaveBeenCalledWith(
+				expect.objectContaining({
+					uri: expect.objectContaining({ fsPath: "/test/flows/child.pfdsl" }),
+				}),
+				{ viewColumn: 1 },
+			);
+		});
+		panel.receive({ type: "openLocation", nodeId: "b" });
+		await vi.waitFor(() => {
+			expect(host.window.showTextDocument).toHaveBeenCalledWith(
+				expect.objectContaining({
+					uri: expect.objectContaining({ fsPath: "/test/docs/result.md" }),
+				}),
+				{ viewColumn: 1 },
+			);
+		});
+		expect(host.api.workspace.openTextDocument).toHaveBeenCalledTimes(2);
+	});
 });
 
 describe("registered preview notification lifecycle", () => {

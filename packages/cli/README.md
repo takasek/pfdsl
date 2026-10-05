@@ -1,5 +1,9 @@
 # @pfdsl/cli
 
+For a file on disk, `check` validates reachable subflows and their preset chains as separate documents, including nested boundaries and file-local diagnostics.
+`--strict` applies to those dependencies too; shared files are analyzed once per check.
+An invalid entry document stops the check before dependencies are loaded, and stdin (`-`) skips relative dependencies.
+
 Command-line interface for the [PFDSL](https://github.com/takasek/pfdsl) toolchain.
 
 ## Requirements

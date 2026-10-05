@@ -7,6 +7,7 @@ import {
 	mkdtempSync,
 	readdirSync,
 	readFileSync,
+	readlinkSync,
 	rmSync,
 	symlinkSync,
 	utimesSync,
@@ -55,7 +56,12 @@ function fixture() {
 	writeFileSync(join(cwd, "scripts/pre-commit"), "#!/bin/sh\n", {
 		mode: 0o755,
 	});
-	writeFileSync(join(cwd, "scripts/link-repo-skill.mjs"), "// fixture\n");
+	for (const path of [
+		"scripts/link-repo-skill.mjs",
+		"scripts/lib/repo-skill-link.mjs",
+	])
+		writeFileSync(join(cwd, path), readFileSync(join(root, path)));
+	installSkill(cwd);
 	writeFileSync(
 		join(cwd, "scripts/setup-completion.mjs"),
 		readFileSync(join(root, "scripts/setup-completion.mjs")),
@@ -76,7 +82,7 @@ function fixture() {
 		cp: '#!/bin/sh\nprintf \'cp\\n\' >> "$SETUP_LOG"\n[ "$SETUP_FAIL_STAGE" = cp ] && exit 1\nexec "$REAL_CP" "$@"\n',
 		chmod:
 			'#!/bin/sh\nprintf \'chmod\\n\' >> "$SETUP_LOG"\n[ "$SETUP_FAIL_STAGE" = chmod ] && exit 1\nexec "$REAL_CHMOD" "$@"\n',
-		node: '#!/bin/sh\nif [ "$1" = scripts/setup-completion.mjs ]; then [ "$2" = write ] && [ "$SETUP_FAIL_STAGE" = write ] && exit 1; exec "$REAL_NODE" "$@"; fi\nprintf \'node\\n\' >> "$SETUP_LOG"\n[ "$SETUP_FAIL_STAGE" = node ] && exit 1\nexit 0\n',
+		node: '#!/bin/sh\nif [ "$1" = scripts/setup-completion.mjs ]; then [ "$2" = write ] && [ "$SETUP_FAIL_STAGE" = write ] && exit 1; exec "$REAL_NODE" "$@"; fi\nprintf \'node\\n\' >> "$SETUP_LOG"\n[ "$SETUP_FAIL_STAGE" = node ] && exit 1\nexec "$REAL_NODE" "$@"\n',
 	})) {
 		const command = join(bin, name);
 		writeFileSync(command, source);
@@ -84,6 +90,19 @@ function fixture() {
 	}
 
 	return { cwd, bin, log, marker: join(cwd, sentinel) };
+}
+
+function installSkill(cwd) {
+	mkdirSync(join(cwd, "generated/skills/pfdsl"), { recursive: true });
+	writeFileSync(
+		join(cwd, "generated/skills/pfdsl/SKILL.md"),
+		"fixture skill\n",
+	);
+	mkdirSync(join(cwd, ".claude/skills"), { recursive: true });
+	symlinkSync(
+		"../../generated/skills/pfdsl",
+		join(cwd, ".claude/skills/pfdsl"),
+	);
 }
 
 function writeInstalledDependency(
@@ -188,6 +207,103 @@ afterEach(() => {
 });
 
 describe("setup completion sentinel", () => {
+	for (const state of ["missing", "wrong", "legacy directory"])
+		it(`rejects and repairs a ${state} owned skill link with a current marker`, () => {
+			const context = fixture();
+			const link = join(context.cwd, ".claude/skills/pfdsl");
+			writeSetupMarker(context.cwd);
+			assert.equal(isSetupCurrent(context.cwd), true);
+			rmSync(link);
+			if (state === "wrong") symlinkSync("../../wrong-skill", link);
+			if (state === "legacy directory") {
+				mkdirSync(link);
+				writeFileSync(join(link, "SKILL.md"), "old skill\n");
+			}
+			assert.equal(isSetupCurrent(context.cwd), false);
+			assert.notEqual(runCheck(context).status, 0);
+			assertSucceeded(runSetup(context));
+			assert.equal(readlinkSync(link), "../../generated/skills/pfdsl");
+			assert.equal(isSetupCurrent(context.cwd), true);
+			assert.equal(runCheck(context).status, 0);
+		});
+
+	for (const missing of [
+		"generated/skills/pfdsl",
+		"generated/skills/pfdsl/SKILL.md",
+	])
+		it(`diagnoses missing tracked ${missing} without generating or restoring it`, () => {
+			const context = fixture();
+			writeSetupMarker(context.cwd);
+			rmSync(join(context.cwd, missing), { recursive: true });
+			assert.equal(isSetupCurrent(context.cwd), false);
+			for (const result of [runCheck(context), runSetup(context)]) {
+				assert.notEqual(result.status, 0);
+				assert.match(result.stderr, /generated\/skills\/pfdsl\/SKILL\.md/);
+				assert.match(result.stderr, /tracked|Git/);
+				assert.match(result.stderr, /gen-skill/);
+			}
+			assert.equal(existsSync(join(context.cwd, missing)), false);
+			assert.equal(existsSync(context.log), false);
+		});
+
+	it("repairs a deleted owned skill link through each SessionStart hook", () => {
+		for (const path of [".claude/settings.json", ".codex/hooks.json"]) {
+			const context = fixture();
+			writeSetupMarker(context.cwd);
+			rmSync(join(context.cwd, ".claude/skills/pfdsl"));
+			assertSucceeded(runSessionStart(context, sessionStartCommand(path)));
+			assert.equal(runCheck(context).status, 0);
+			assert.equal(
+				readlinkSync(join(context.cwd, ".claude/skills/pfdsl")),
+				"../../generated/skills/pfdsl",
+			);
+		}
+	});
+
+	for (const broken of [".claude/skills/pfdsl", "generated/skills/pfdsl"])
+		it(`rejects a successful setup stage that leaves ${broken} missing and clears its marker`, () => {
+			const context = fixture();
+			writeFileSync(
+				join(context.cwd, "scripts/link-repo-skill.mjs"),
+				`import { rmSync } from "node:fs"; rmSync(${JSON.stringify(broken)}, { recursive: true });\n`,
+			);
+			const result = runSetup(context);
+			assert.notEqual(result.status, 0);
+			assert.match(result.stderr, /skill|SKILL/);
+			assert.equal(existsSync(context.marker), false);
+			assert.equal(isSetupCurrent(context.cwd), false);
+			assert.equal(existsSync(setupLockPath(context.cwd)), false);
+		});
+
+	for (const reachable of [false, true])
+		it(`rejects an owned link through a relocated parent with a ${reachable ? "different" : "dangling"} target`, () => {
+			const context = fixture();
+			const parent = join(context.cwd, ".claude/skills");
+			const relocated = join(context.cwd, "relocated/nested/skills");
+			rmSync(parent, { recursive: true });
+			mkdirSync(relocated, { recursive: true });
+			symlinkSync("../relocated/nested/skills", parent);
+			symlinkSync("../../generated/skills/pfdsl", join(relocated, "pfdsl"));
+			if (reachable) {
+				mkdirSync(join(context.cwd, "relocated/generated/skills/pfdsl"), {
+					recursive: true,
+				});
+				writeFileSync(
+					join(context.cwd, "relocated/generated/skills/pfdsl/SKILL.md"),
+					"different skill\n",
+				);
+			}
+			writeSetupMarker(context.cwd);
+			assert.equal(isSetupCurrent(context.cwd), false);
+			for (const result of [runCheck(context), runSetup(context)]) {
+				assert.notEqual(result.status, 0);
+				assert.match(result.stderr, /\.claude\/skills/);
+				assert.match(result.stderr, /parent|directory/);
+			}
+			assert.equal(readlinkSync(parent), "../relocated/nested/skills");
+			assert.equal(existsSync(context.log), false);
+		});
+
 	it("fingerprints pnpm settings, workspace manifests, and setup runtime inputs", () => {
 		const cwd = mkdtempSync(join(tmpdir(), "setup-fingerprint-"));
 		fixtures.push(cwd);
@@ -198,6 +314,7 @@ describe("setup completion sentinel", () => {
 			"pnpm-workspace.yaml",
 			"scripts/hooks/pre-commit-shim",
 			"scripts/lib/cli-entrypoint.mjs",
+			"scripts/lib/repo-skill-link.mjs",
 			"scripts/link-repo-skill.mjs",
 			"scripts/setup-completion.mjs",
 			"packages/zeta/package.json",
@@ -220,6 +337,7 @@ describe("setup completion sentinel", () => {
 		writeFileSync(join(cwd, "scripts/pre-commit"), "#!/bin/sh\n", {
 			mode: 0o755,
 		});
+		installSkill(cwd);
 
 		const inputs = setupInputs(cwd);
 		assert.deepEqual(
@@ -236,6 +354,7 @@ describe("setup completion sentinel", () => {
 			"pnpm-workspace.yaml",
 			"scripts/hooks/pre-commit-shim",
 			"scripts/lib/cli-entrypoint.mjs",
+			"scripts/lib/repo-skill-link.mjs",
 		])
 			assert.equal(inputs.includes(path), true, path);
 

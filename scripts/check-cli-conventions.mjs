@@ -9,7 +9,8 @@
  * run says they came back.
  *
  * Use node:util's parseArgs (strict: true) for flags, and isCliEntrypoint from
- * scripts/lib/cli-entrypoint.mjs for the entrypoint check.
+ * scripts/lib/cli-entrypoint.mjs for the entrypoint check. This scanner checks
+ * only the two retired shapes; it does not prove strict argument parsing.
  *
  * Usage: node scripts/check-cli-conventions.mjs
  */
@@ -40,7 +41,7 @@ for (const file of files) {
 
 if (findings.length === 0) {
 	console.log(
-		`check-cli-conventions: all ${files.length} script(s) parse argv strictly`,
+		`check-cli-conventions: no retired argv shapes found in ${files.length} script(s)`,
 	);
 	process.exit(0);
 }

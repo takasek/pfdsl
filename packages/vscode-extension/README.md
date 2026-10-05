@@ -16,6 +16,11 @@ VSCode language support for [PFDSL](https://github.com/takasek/pfdsl), a DSL for
 
 Open any `.pfdsl` file. The preview icon appears in the editor title bar — click it to open a side-by-side SVG preview.
 
+In the preview, Cmd+click (macOS) or Ctrl+click opens a node's local location or subflow source in the editor.
+URL locations open through their URL handler.
+Double-click jumps to the node in the source.
+Each preview stays attached to its own file; to view an opened subflow, run **PFDSL: Open Preview to the Side** from that child file.
+
 Place the cursor on a node ID in the graph body or its frontmatter definition key, then run **PFDSL: Cycle Node Occurrences** from the editor context menu or press **Ctrl+K Ctrl+Alt+N** (**⌘+K ⌘+Alt+N** on macOS).
 The command selects and reveals the definition key, then every body occurrence in document order, and wraps back to the definition.
 Starting from a body occurrence advances to the next occurrence; repeating the command uses the current edited document.
@@ -34,7 +39,6 @@ Use **Fit** to see the whole diagram again, **100%** for its original size, or *
 The toolbar shows the current zoom level; **Help** lists the gestures.
 Wheel to zoom at the pointer, drag the diagram to pan, and click or drag the minimap to move.
 Double-click a node to go to its source; double-click the background to return to 100%.
-Ctrl+Click (⌘+Click on macOS) opens a node's location or subflow when available.
 Editing and error recovery preserve your zoom and pan; syntax and rendering errors appear separately at normal text size with the minimap hidden.
 
 For an undefined node, **Insert artifact/process definition** in Quick Fix inserts its frontmatter definition and selects the new label for editing.

@@ -62,12 +62,12 @@ export function registerDocumentLinks(context: vscode.ExtensionContext): void {
 						endLine ?? line,
 						endChar,
 					);
-					if (target.startsWith("file://")) {
-						const fsPath = target.slice("file://".length);
-						const uri = vscode.Uri.file(fsPath);
+					const uri = vscode.Uri.parse(target);
+					if (uri.scheme === "file") {
+						const fsPath = uri.fsPath;
 						let stat: vscode.FileStat | undefined;
 						try {
-							stat = await vscode.workspace.fs.stat(uri);
+							stat = await vscode.workspace.fs.stat(vscode.Uri.file(fsPath));
 						} catch {
 							// treat as file
 						}
@@ -80,9 +80,8 @@ export function registerDocumentLinks(context: vscode.ExtensionContext): void {
 							link.tooltip = "Open file in folder…";
 							return link;
 						}
-						return new vscode.DocumentLink(range, uri);
 					}
-					return new vscode.DocumentLink(range, vscode.Uri.parse(target));
+					return new vscode.DocumentLink(range, uri);
 				}),
 			);
 		},

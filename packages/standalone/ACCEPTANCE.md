@@ -187,6 +187,29 @@ callback 回数と破棄抑止は source の静的照合であり、production �
 変更のない共有 editor 220件と extension 137件は先の追加修正の実行を再利用し、最終版の全 workspace test を再実行したとは扱わない。
 native hover・mouse pan・source cue・folder picker・安全な window close・IME、追加 VS Code preview 操作と所有者の UI 受入は引き続き未確認である。
 
+### main の取り込み後の確認
+
+所有者の承認で、既存 PR ブランチへ main `9bcd6d6fd6711dac861adac385468aa292fd654b` を履歴を保って取り込んだ。
+extension README と preview のテストの競合は、main のファイル移動と今回の編集・フォーカスの説明・テストを両方保持して解消した。
+[独立した統合差分レビュー](evidence/2026-10-05-preview-ui/main-merge-review.md)は両親のテスト名・実装・消費者を照合し、修正必須の finding はなかった。
+表示同期の3ファイルは取り込み前の `3a5ac77e` と byte-for-byte 同一である。
+
+[統合後の全体検査](evidence/2026-10-05-preview-ui/main-merge-checks.json)は build を含む全 workspace test・型検査・lint・配置/scaffold 同期・debug .app build の成功を記録する。
+core 1123、metadata-exporter 9、graphviz-exporter 179、preview-engine 25、editor 220、CLI 844 pass / 1 skip、extension 168、standalone 5、scripts/hooks 3013 pass / 0 fail / 0 skip。
+import 171、shell 217、CLI 引数規約 216 の検査も成功した。
+これは解消済み working tree の新しい全件実行であり、先の固定版の結果を読み替えたものではない。
+
+native executable `f6005842e1a7de061d531d09da67002b46d9c9eae89ebac1a19f04bca4451412` の [23文書 corpus](evidence/2026-10-05-preview-ui/main-merge-corpus.json)はすべて成功し、failures/errors は空だった。
+[入力と build 指紋](evidence/2026-10-05-preview-ui/main-merge-fingerprints.json)は取り込み前の参照 HEAD と、main の変更を含む実際の working-tree 入力を区別する。
+親の待機処理は誤ったファイル名 `report.json` を待って失敗したが、host が出力した `native-report.json` を別途読み戻し、23入力・10 frontend ファイル・実行 binary の hash を現ファイルと照合した。
+[lifecycle 記録](evidence/2026-10-05-preview-ui/main-merge-corpus-lifecycle.json)はこの確認処理の誤りと、専用 PID 88331 の終了・wait を両方残す。
+
+[同じ統合版の blind native 追試](evidence/2026-10-05-preview-ui/main-merge-native-recheck-report.md)は、短い本文・AX・主図・minimap の identity の一致を確認した。
+長い文書の Cmd+Up は直後の採取で1行目と先頭 caret が表示され、採取前に tab 切替・Raise・前面化を挟んでいない。
+別 tab からの復帰も可視 source・主図と71 node controls が維持され、binary/fixture の前後 hash と所有 PID 93529 の終了を確認した。
+[manifest](evidence/2026-10-05-preview-ui/main-merge-native-recheck-manifest.json)は4枚の PNG、AX と report の保存 bytes を固定する。
+この観測は全 source の byte 単位の保持、極小 minimap の71 label の視認、native gestures/IME/所有者の UI 受入を認定しない。
+
 ## 検証記録と限界
 
 作業ブランチ: `codex/shared-ui-host-foundation`。

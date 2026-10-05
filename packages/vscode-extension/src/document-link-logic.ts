@@ -1,3 +1,4 @@
+import { pathToFileURL } from "node:url";
 import { analyzeSource, resolveLocationFsPath } from "@pfdsl/core";
 
 export interface LinkRange {
@@ -24,9 +25,15 @@ export function extractDocumentLinks(
 			for (const { value, range } of declaration.fields.get(key)?.values ??
 				[]) {
 				if (!value) continue;
-				const target = /^https?:\/\//.test(value)
+				const target = value.includes("://")
 					? value
-					: `file://${resolveLocationFsPath(docFsPath, value, key === "location" ? model.frontmatter.basePath : undefined)}`;
+					: pathToFileURL(
+							resolveLocationFsPath(
+								docFsPath,
+								value,
+								key === "location" ? model.frontmatter.basePath : undefined,
+							),
+						).href;
 				links.push({
 					line: range.start.line - 1,
 					startChar: range.start.column - 1,

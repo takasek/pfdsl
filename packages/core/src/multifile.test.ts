@@ -12,6 +12,7 @@ import {
 	loadSubflowGraph,
 	parentBoundaryArtifacts,
 	resolveEffectiveFrontmatter,
+	resolveLoadedPresentation,
 	resolvePresentation,
 	resolveRefPath,
 	subflowBoundaryDiagnostics,
@@ -729,6 +730,143 @@ describe("loadExtendsChain", () => {
 // ---------------------------------------------------------------------------
 
 describe("buildPresentationChain", () => {
+	it("preserves the expanded public chain for a shared DAG", () => {
+		const load = makeLoad({
+			"/p/main.pfdsl": { frontmatter: { extends: ["./a.yaml", "./b.yaml"] } },
+			"/p/a.yaml": { frontmatter: { extends: "./base.yaml" } },
+			"/p/b.yaml": { frontmatter: { extends: "./base.yaml" } },
+			"/p/base.yaml": { frontmatter: {} },
+		});
+		const { docs } = loadExtendsChain("/p/main.pfdsl", load);
+		expect(
+			buildPresentationChain("/p/main.pfdsl", docs).map(({ path }) => path),
+		).toEqual([
+			"/p/base.yaml",
+			"/p/a.yaml",
+			"/p/base.yaml",
+			"/p/b.yaml",
+			"/p/main.pfdsl",
+		]);
+	});
+
+	it("preserves first appearance of tag keys during effective DAG resolution", () => {
+		const fm: Frontmatter = { extends: ["./a.yaml", "./b.yaml"] };
+		const load = makeLoad({
+			"/p/a.yaml": {
+				frontmatter: { extends: "./base.yaml", tag: { a: { color: "blue" } } },
+			},
+			"/p/b.yaml": { frontmatter: { extends: "./base.yaml" } },
+			"/p/base.yaml": { frontmatter: { tag: { x: { color: "red" } } } },
+		});
+		expect(
+			Object.keys(
+				resolveEffectiveFrontmatter("/p/main.pfdsl", fm, load)?.tag ?? {},
+			),
+		).toEqual(["x", "a"]);
+	});
+
+	it("preserves the legacy cyclic fallback chain and effective styles", () => {
+		const files: Record<string, FakeDoc> = {
+			"/p/main.pfdsl": {
+				frontmatter: { extends: ["./a.yaml", "./c.yaml", "./b.yaml"] },
+			},
+			"/p/a.yaml": {
+				frontmatter: {
+					extends: "./b.yaml",
+					statusStyles: { done: { fillcolor: "red" } },
+					tag: { shared: { color: "red" } },
+				},
+			},
+			"/p/b.yaml": { frontmatter: { extends: "./a.yaml" } },
+			"/p/c.yaml": {
+				frontmatter: {
+					statusStyles: { done: { fillcolor: "blue" } },
+					tag: { shared: { color: "blue" } },
+				},
+			},
+		};
+		const load = makeLoad(files);
+		const { docs, diagnostics } = loadExtendsChain("/p/main.pfdsl", load);
+		expect(diagnostics.some(({ code }) => code === "V027")).toBe(true);
+		const chain = buildPresentationChain("/p/main.pfdsl", docs);
+		expect(chain.map(({ path }) => path)).toEqual([
+			"/p/b.yaml",
+			"/p/a.yaml",
+			"/p/c.yaml",
+			"/p/a.yaml",
+			"/p/b.yaml",
+			"/p/main.pfdsl",
+		]);
+		expect(resolvePresentation(chain).statusStyles?.done?.fillcolor).toBe(
+			"red",
+		);
+		expect(
+			resolveEffectiveFrontmatter(
+				"/p/main.pfdsl",
+				files["/p/main.pfdsl"]!.frontmatter,
+				load,
+			)?.tag?.shared?.color,
+		).toBe("red");
+	});
+
+	it("preserves later-parent precedence in the expanded public chain", () => {
+		const load = makeLoad({
+			"/p/main.pfdsl": {
+				frontmatter: { extends: ["./left.yaml", "./right.yaml"] },
+			},
+			"/p/left.yaml": {
+				frontmatter: {
+					extends: "./base.yaml",
+					statusStyles: { done: { fillcolor: "green", color: "black" } },
+				},
+			},
+			"/p/right.yaml": { frontmatter: { extends: "./base.yaml" } },
+			"/p/base.yaml": {
+				frontmatter: { statusStyles: { done: { fillcolor: "red" } } },
+			},
+		});
+		const { docs } = loadExtendsChain("/p/main.pfdsl", load);
+		const chain = buildPresentationChain("/p/main.pfdsl", docs);
+		expect(chain.map(({ path }) => path)).toEqual([
+			"/p/base.yaml",
+			"/p/left.yaml",
+			"/p/base.yaml",
+			"/p/right.yaml",
+			"/p/main.pfdsl",
+		]);
+		expect(resolvePresentation(chain).statusStyles?.done).toEqual({
+			fillcolor: "red",
+			color: "black",
+		});
+	});
+
+	it("bounds a layered shared DAG by distinct files rather than inheritance routes", () => {
+		const files: Record<string, FakeDoc> = {
+			"/p/base.yaml": {
+				frontmatter: { statusStyles: { done: { fillcolor: "red" } } },
+			},
+		};
+		let refs = ["./base.yaml"];
+		for (let depth = 0; depth < 18; depth++) {
+			for (const side of ["a", "b"])
+				files[`/p/${side}${depth}.yaml`] = { frontmatter: { extends: refs } };
+			refs = [`./a${depth}.yaml`, `./b${depth}.yaml`];
+		}
+		files["/p/main.pfdsl"] = { frontmatter: { extends: refs } };
+		const { load, calls } = makeCountingLoad(files);
+		const { docs } = loadExtendsChain("/p/main.pfdsl", load);
+		let reads = 0;
+		const get = docs.get.bind(docs);
+		docs.get = (path) => {
+			reads++;
+			return get(path);
+		};
+		const resolved = resolveLoadedPresentation("/p/main.pfdsl", docs);
+		expect(reads).toBe(38);
+		expect([...calls.values()].every((count) => count === 1)).toBe(true);
+		expect(resolved.statusStyles?.done?.fillcolor).toBe("red");
+	});
+
 	it("single file, no extends → chain of just the entry", () => {
 		const docs = makeLoad({
 			"/p/main.pfdsl": { frontmatter: { statusStyles: {} } },
@@ -808,6 +946,33 @@ describe("buildPresentationChain", () => {
 // ---------------------------------------------------------------------------
 
 describe("validatePresetKeys", () => {
+	it.each([
+		["an isolated node", "x\n"],
+		["graph edges", "a >> p -> b\n"],
+	])("rejects a preset with %s even without forbidden keys", (_name, body) => {
+		const doc = analyze(`---\nstatusStyles: {}\n---\n${body}`);
+		expect(
+			validatePresetKeys("/p/p.pfdsl", doc.frontmatter, doc.document),
+		).toEqual([expect.objectContaining({ code: "V028", severity: "error" })]);
+	});
+
+	it.each([
+		"",
+		"# Presentation settings only\n\n# No graph declarations\n",
+	])("accepts a presentation-only preset with body %j", (body) => {
+		const doc = analyze(`---\nstatusStyles: {}\n---\n${body}`);
+		expect(
+			validatePresetKeys("/p/p.pfdsl", doc.frontmatter, doc.document),
+		).toEqual([]);
+	});
+
+	it("rejects graph content without frontmatter", () => {
+		const doc = analyze("x\n");
+		expect(
+			validatePresetKeys("/p/p.pfdsl", doc.frontmatter, doc.document),
+		).toEqual([expect.objectContaining({ code: "V028", severity: "error" })]);
+	});
+
 	it("returns [] when fm is null", () => {
 		expect(validatePresetKeys("/p/p.yaml", null)).toEqual([]);
 	});
@@ -975,6 +1140,195 @@ describe("resolvePresentation", () => {
 // ---------------------------------------------------------------------------
 // resolveEffectiveFrontmatter
 // ---------------------------------------------------------------------------
+
+describe("resolveLoadedPresentation", () => {
+	it("preserves lenient values for a prototype-sensitive invalid status preset", () => {
+		const docs = new Map<string, FakeDoc>([
+			["/p/main.pfdsl", { frontmatter: { extends: "./a.yaml" } }],
+			[
+				"/p/a.yaml",
+				{
+					frontmatter: {
+						statusStyles: JSON.parse(
+							'{"__proto__":{"done":{"fillcolor":"red"}}}',
+						),
+					},
+				},
+			],
+		]);
+		for (const excludeEntry of [false, true]) {
+			const actual = resolveLoadedPresentation("/p/main.pfdsl", docs, {
+				excludeEntry,
+			});
+			const expected = resolvePresentation(
+				buildPresentationChain("/p/main.pfdsl", docs).filter(
+					({ path }) => !(excludeEntry && path === "/p/main.pfdsl"),
+				),
+			);
+			expect(actual.statusStyles?.done?.fillcolor).toBe("red");
+			expect(Object.getPrototypeOf(actual.statusStyles)).toEqual(
+				Object.getPrototypeOf(expected.statusStyles),
+			);
+		}
+	});
+
+	it("preserves prototype-sensitive tag and group metadata from presets", () => {
+		const docs = new Map<string, FakeDoc>([
+			["/p/main.pfdsl", { frontmatter: { extends: "./a.yaml" } }],
+			[
+				"/p/a.yaml",
+				{
+					frontmatter: {
+						tag: {
+							["__proto__"]: {
+								style: { fillcolor: "red" },
+								inherited: { label: "Inherited" },
+							},
+							inherited: { style: { color: "white" } },
+						},
+						group: {
+							["__proto__"]: { label: "Proto", inherited: { color: "blue" } },
+							inherited: { label: "Inherited" },
+						},
+					},
+				},
+			],
+		]);
+		for (const excludeEntry of [false, true]) {
+			const expected = resolvePresentation(
+				buildPresentationChain("/p/main.pfdsl", docs).filter(
+					({ path }) => !(excludeEntry && path === "/p/main.pfdsl"),
+				),
+			);
+			const actual = resolveLoadedPresentation("/p/main.pfdsl", docs, {
+				excludeEntry,
+			});
+			expect(actual.tag?.__proto__?.style?.fillcolor).toBe("red");
+			expect(actual.group?.__proto__?.label).toBe("Proto");
+			expect(actual.tag?.inherited).toEqual(expected.tag?.inherited);
+			expect(actual.group?.inherited).toEqual(expected.group?.inherited);
+			expect(Object.getPrototypeOf(actual.tag)).toEqual(
+				Object.getPrototypeOf(expected.tag),
+			);
+			expect(Object.getPrototypeOf(actual.group)).toEqual(
+				Object.getPrototypeOf(expected.group),
+			);
+			expect(Object.keys(actual.tag ?? {})).toEqual(
+				Object.keys(expected.tag ?? {}),
+			);
+		}
+	});
+
+	it("matches expanded merging for shared attributes and extension values", () => {
+		const docs = new Map<string, FakeDoc>([
+			[
+				"/p/main.pfdsl",
+				{
+					frontmatter: {
+						extends: ["./left.yaml", "./right.yaml"],
+						group: { team: { label: "Local" } },
+					},
+				},
+			],
+			[
+				"/p/left.yaml",
+				{
+					frontmatter: {
+						extends: "./base.yaml",
+						statusStyles: { done: { color: "black", fillcolor: "blue" } },
+						tag: {
+							shared: { style: { color: "blue" }, custom: ["left"] },
+							left: { label: "Left" },
+						},
+						group: { team: { color: "blue", custom: { left: true } } },
+					},
+				},
+			],
+			[
+				"/p/right.yaml",
+				{
+					frontmatter: {
+						extends: ["./base.yaml", "./missing.yaml", "/invalid.yaml"],
+					},
+				},
+			],
+			[
+				"/p/base.yaml",
+				{
+					frontmatter: {
+						statusStyles: { done: { fillcolor: "red" } },
+						tag: {
+							shared: { style: { fillcolor: "red" }, custom: { base: true } },
+						},
+						group: { team: { label: "Base", custom: ["base"] } },
+					},
+				},
+			],
+		]);
+		const expanded = buildPresentationChain("/p/main.pfdsl", docs);
+		for (const excludeEntry of [false, true]) {
+			const expected = resolvePresentation(
+				expanded.filter(
+					({ path }) => !(excludeEntry && path === "/p/main.pfdsl"),
+				),
+			);
+			const actual = resolveLoadedPresentation("/p/main.pfdsl", docs, {
+				excludeEntry,
+			});
+			expect(actual).toEqual(expected);
+			expect(Object.keys(actual.tag ?? {})).toEqual(
+				Object.keys(expected.tag ?? {}),
+			);
+		}
+		expect(
+			resolveLoadedPresentation("/p/main.pfdsl", docs).statusStyles?.done,
+		).toEqual({ fillcolor: "red", color: "black" });
+		expect(
+			resolveLoadedPresentation("/p/main.pfdsl", docs, { excludeEntry: true })
+				.group?.team?.label,
+		).toBe("Base");
+	});
+
+	it("discards partial DAG results when a later parent reaches a cycle", () => {
+		const docs = new Map<string, FakeDoc>([
+			[
+				"/p/main.pfdsl",
+				{
+					frontmatter: {
+						extends: ["./c.yaml", "./a.yaml", "./b.yaml"],
+						group: { local: { label: "Local" } },
+					},
+				},
+			],
+			[
+				"/p/a.yaml",
+				{
+					frontmatter: {
+						extends: "./b.yaml",
+						statusStyles: { done: { fillcolor: "red" } },
+					},
+				},
+			],
+			["/p/b.yaml", { frontmatter: { extends: "./a.yaml" } }],
+			[
+				"/p/c.yaml",
+				{ frontmatter: { statusStyles: { done: { fillcolor: "blue" } } } },
+			],
+		]);
+		for (const excludeEntry of [false, true]) {
+			const chain = buildPresentationChain("/p/main.pfdsl", docs).filter(
+				({ path }) => !(excludeEntry && path === "/p/main.pfdsl"),
+			);
+			expect(
+				resolveLoadedPresentation("/p/main.pfdsl", docs, { excludeEntry }),
+			).toEqual(resolvePresentation(chain));
+		}
+		expect(
+			resolveLoadedPresentation("/p/main.pfdsl", docs, { excludeEntry: true })
+				.group,
+		).toBeUndefined();
+	});
+});
 
 describe("resolveEffectiveFrontmatter", () => {
 	it("merges preset statusStyles/tag/group into the entry frontmatter", () => {
