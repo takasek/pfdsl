@@ -53,6 +53,41 @@ describe("isDistStale", () => {
 		assert.equal(isDistStale(distFile), true);
 	});
 
+	it("is fresh when dist and the newest source have equal mtimes", () => {
+		const srcFile = join(root, "src", "index.ts");
+		const distFile = join(root, "dist", "cli.js");
+		writeFileSync(srcFile, "x");
+		writeFileSync(distFile, "y");
+		const time = new Date("2020-01-01T00:00:00Z");
+		utimesSync(srcFile, time, time);
+		utimesSync(distFile, time, time);
+		assert.equal(isDistStale(distFile), false);
+	});
+
+	it("sees a nested source update even when top-level sources remain older", () => {
+		const srcDir = join(root, "src");
+		const nestedDir = join(srcDir, "nested", "deeper");
+		mkdirSync(nestedDir, { recursive: true });
+		const topLevelFile = join(srcDir, "index.ts");
+		const nestedFile = join(nestedDir, "deep.ts");
+		const distFile = join(root, "dist", "cli.js");
+		const old = new Date("2020-01-01T00:00:00Z");
+		const built = new Date("2020-01-02T00:00:00Z");
+		const updated = new Date("2020-01-03T00:00:00Z");
+		for (const file of [topLevelFile, nestedFile, distFile]) {
+			writeFileSync(file, "x");
+			utimesSync(file, old, old);
+		}
+		utimesSync(distFile, built, built);
+		// Directory timestamps must not substitute for their files' timestamps.
+		for (const dir of [srcDir, join(srcDir, "nested"), nestedDir]) {
+			utimesSync(dir, old, old);
+		}
+		assert.equal(isDistStale(distFile), false);
+		utimesSync(nestedFile, updated, updated);
+		assert.equal(isDistStale(distFile), true);
+	});
+
 	it("detects staleness from a nested src file", () => {
 		const nestedDir = join(root, "src", "nested");
 		mkdirSync(nestedDir, { recursive: true });
