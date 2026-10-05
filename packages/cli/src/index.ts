@@ -27,9 +27,11 @@ import {
 	groupEdges,
 	hasErrors,
 	type IndexChange,
+	insertDefinition,
 	isRoadmapType,
 	isUrlLike,
 	loadExtendsChain,
+	loadFrontmatter,
 	locateNode,
 	type NodeKind,
 	type PfdType,
@@ -193,6 +195,12 @@ const META_VALUES_OPTIONS = {
 const META_SET_OPTIONS = {
 	"allow-unknown": BOOLEAN_OPTION,
 	json: BOOLEAN_OPTION,
+	"no-color": BOOLEAN_OPTION,
+};
+const META_CREATE_OPTIONS = {
+	write: BOOLEAN_OPTION,
+	json: BOOLEAN_OPTION,
+	"allow-unknown": BOOLEAN_OPTION,
 	"no-color": BOOLEAN_OPTION,
 };
 const META_SORT_OPTIONS = {
@@ -1312,13 +1320,155 @@ export interface MetaSetOptions {
  */
 const STRUCTURAL_CODE = /^(?:FM|P|L|N)\d+$/;
 
-/** Fields whose values are arrays/maps — meta set only writes scalars. */
+/** Fields whose values are arrays/maps — metadata writes only accept scalars. */
 const NON_SCALAR_FIELDS = new Set([
 	"tags",
 	"parts",
 	"externalStakeholders",
 	"boundary",
 ]);
+
+function scalarFieldValueError(field: string, value: string): string | null {
+	if (field.includes("."))
+		return `'${field}' is a derived read-only field and cannot be set`;
+	if (NON_SCALAR_FIELDS.has(field)) return `'${field}' is not a scalar field`;
+	if (
+		field === "status" &&
+		!STATUS_VALUES.includes(value as (typeof STATUS_VALUES)[number])
+	)
+		return `invalid status '${value}' (valid: ${STATUS_VALUES.join(" | ")})`;
+	if (field === "index" && !/^\d+$/.test(value))
+		return `index must be a non-negative integer, got '${value}'`;
+	return null;
+}
+
+function scalarFieldKindError(
+	kind: NodeKind,
+	id: string,
+	field: string,
+	meta: Record<string, unknown> | undefined,
+	allowUnknown = false,
+): string | null {
+	const exists = meta !== undefined && Object.hasOwn(meta, field);
+	if (
+		!KNOWN_FIELDS[kind].has(field) &&
+		exists &&
+		meta[field] !== null &&
+		typeof meta[field] === "object"
+	)
+		return `'${field}' is not a scalar field (id: ${id})`;
+	if (
+		!exists &&
+		!KNOWN_FIELDS[kind].has(field) &&
+		Object.values(KNOWN_FIELDS).some((fields) => fields.has(field))
+	)
+		return `'${field}' is not a valid ${kind} field (id: ${id})`;
+	if (!KNOWN_FIELDS[kind].has(field) && !exists && !allowUnknown)
+		return `unknown ${kind} field '${field}' (id: ${id}); use --allow-unknown to add it`;
+	return null;
+}
+
+export interface MetaCreateOptions extends MetaSetOptions {
+	write?: boolean;
+}
+
+/** Create one body node's local definition through core's CST insertion. */
+export function runMetaCreate(
+	file: string,
+	id: string,
+	assignments: readonly string[] = [],
+	opts: MetaCreateOptions = {},
+): CommandResult {
+	const reject = (error: string, exitCode = 1): CommandResult =>
+		opts.json
+			? failJson({ error: `meta create: ${error}` }, exitCode)
+			: fail(`meta create: ${error}\n`, exitCode);
+	if (file === "-") return reject("cannot be used with stdin (-)", 2);
+	const fields = new Map<string, string | number>();
+	for (const assignment of assignments) {
+		const equal = assignment.indexOf("=");
+		if (equal < 1)
+			return reject(`expected field=value, got '${assignment}'`, 2);
+		const field = assignment.slice(0, equal);
+		const value = assignment.slice(equal + 1);
+		if (fields.has(field)) return reject(`duplicate field '${field}'`, 2);
+		const error = scalarFieldValueError(field, value);
+		if (error) return reject(error, 2);
+		fields.set(field, field === "index" ? Number(value) : value);
+	}
+	const src = readSource(file);
+	if (isCommandResult(src))
+		return opts.json
+			? failJson({ error: src.stderr.trimEnd() }, src.exitCode)
+			: src;
+	const authored = analyze(src);
+	const structural = authored.diagnostics.filter(
+		(d) => d.severity === "error" && STRUCTURAL_CODE.test(String(d.code)),
+	);
+	if (structural.length > 0) {
+		const reason = structural.some((d) => String(d.code).startsWith("FM"))
+			? "cannot parse frontmatter"
+			: structural.some(
+						(d) => d.code === "N001" || d.code === "N002" || d.code === "N004",
+					)
+				? `ambiguous node kind for '${id}'`
+				: "cannot create a definition in a document with structural errors";
+		return refuseWith(
+			`meta create: ${reason}; nothing was written`,
+			file,
+			structural,
+			opts.json,
+			opts.color,
+		);
+	}
+	const kind = authored.nodeKinds.get(id);
+	if (kind === undefined) return reject(`id '${id}' not found in ${file}`);
+	if (Object.hasOwn(authored.frontmatter?.[kind] ?? {}, id))
+		return reject(`'${id}' already has a frontmatter definition in ${file}`);
+	if (kind !== "artifact" && kind !== "process")
+		return reject(`cannot infer artifact or process kind for '${id}'`);
+	for (const field of fields.keys()) {
+		const error = scalarFieldKindError(
+			kind,
+			id,
+			field,
+			undefined,
+			opts.allowUnknown,
+		);
+		if (error) return reject(error, 2);
+	}
+	if (fields.has("status")) {
+		const failed = requireRoadmapType(
+			authored.frontmatter?.type,
+			"setting status",
+		);
+		if (failed) return reject(failed.stderr.trimEnd(), failed.exitCode);
+	}
+	const inserted = insertDefinition(src, kind, id, Object.fromEntries(fields));
+	if (!inserted.inserted)
+		return reject(
+			`could not create the frontmatter definition of '${id}' in ${file}; expand aliased or non-map sections first; nothing was written`,
+		);
+	const newSrc = inserted.output + loadFrontmatter(src).body;
+	const resulting = analyze(newSrc);
+	if (hasErrors(resulting.diagnostics))
+		return refuseWith(
+			`meta create: refusing to write ${file}: the result would have errors; nothing was written`,
+			file,
+			resulting.diagnostics.filter((d) => d.severity === "error"),
+			opts.json,
+			opts.color,
+		);
+	const line = locateNode(resulting.document, newSrc, id, kind).declarationLine;
+	if (opts.write) writeFileSync(file, newSrc, "utf-8");
+	if (opts.json)
+		return ok(
+			`${JSON.stringify({ ok: true, id, kind, created: true, written: opts.write === true, line, ...(opts.write ? {} : { output: newSrc }) })}\n`,
+		);
+	return opts.write
+		? ok(`created ${kind} '${id}' at ${file}:${line}\n`)
+		: ok(newSrc);
+}
 
 export function runMetaSet(
 	file: string,
@@ -1330,30 +1480,8 @@ export function runMetaSet(
 	if (file === "-") {
 		return fail("meta set cannot be used with stdin (-)\n", 2);
 	}
-	if (field.includes(".")) {
-		return fail(
-			`meta set: '${field}' is a derived read-only field and cannot be set\n`,
-			2,
-		);
-	}
-	if (NON_SCALAR_FIELDS.has(field)) {
-		return fail(`meta set: '${field}' is not a scalar field\n`, 2);
-	}
-	if (
-		field === "status" &&
-		!STATUS_VALUES.includes(value as (typeof STATUS_VALUES)[number])
-	) {
-		return fail(
-			`meta set: invalid status '${value}' (valid: ${STATUS_VALUES.join(" | ")})\n`,
-			2,
-		);
-	}
-	if (field === "index" && !/^\d+$/.test(value)) {
-		return fail(
-			`meta set: index must be a non-negative integer, got '${value}'\n`,
-			2,
-		);
-	}
+	const valueError = scalarFieldValueError(field, value);
+	if (valueError) return fail(`meta set: ${valueError}\n`, 2);
 	const ids = parseIdList(idList);
 	if (ids.length === 0) return fail(HELP_META_SET, 2);
 
@@ -1404,7 +1532,7 @@ export function runMetaSet(
 	if (undefinedIds.length > 0) {
 		const messages = undefinedIds.map(
 			({ id, kind }) =>
-				`'${id}' has no frontmatter definition in ${file}. Add an entry under ${kind}: before using meta set.`,
+				`'${id}' has no frontmatter definition in ${file}. Run pfdsl meta create ${file} ${id}${kind === "artifact" && frontmatter?.type === "roadmap" ? " status=todo" : ""} --write before using meta set.`,
 		);
 		if (missing.length > 0)
 			messages.push(`id(s) not found in ${file}: ${missing.join(", ")}`);
@@ -1416,35 +1544,14 @@ export function runMetaSet(
 	for (const id of ids) {
 		const kind = nodeKinds.get(id);
 		if (kind !== "artifact" && kind !== "process" && kind !== "group") continue;
-		const meta = frontmatter?.[kind]?.[id];
-		const exists = meta !== undefined && Object.hasOwn(meta, field);
-		if (
-			!KNOWN_FIELDS[kind].has(field) &&
-			exists &&
-			meta[field] !== null &&
-			typeof meta[field] === "object"
-		) {
-			return fail(
-				`meta set: '${field}' is not a scalar field (id: ${id})\n`,
-				2,
-			);
-		}
-		if (
-			!exists &&
-			!KNOWN_FIELDS[kind].has(field) &&
-			Object.values(KNOWN_FIELDS).some((fields) => fields.has(field))
-		) {
-			return fail(
-				`meta set: '${field}' is not a valid ${kind} field (id: ${id})\n`,
-				2,
-			);
-		}
-		if (!KNOWN_FIELDS[kind].has(field) && !exists && !opts.allowUnknown) {
-			return fail(
-				`meta set: unknown ${kind} field '${field}' (id: ${id}); use --allow-unknown to add it\n`,
-				2,
-			);
-		}
+		const error = scalarFieldKindError(
+			kind,
+			id,
+			field,
+			frontmatter?.[kind]?.[id],
+			opts.allowUnknown,
+		);
+		if (error) return fail(`meta set: ${error}\n`, 2);
 	}
 
 	// Snapshot ready set before mutation (roadmap only). Computed directly
@@ -3377,6 +3484,43 @@ Exit codes:
   2  invalid usage
 `;
 
+const HELP_META_CREATE = `${helpUsage("meta create", "<file> <id> [field=value ...]", META_CREATE_OPTIONS)}
+
+Create a frontmatter definition for one node already present in the body.
+The artifact or process kind is inferred from the authored graph. Existing
+definitions, absent ids, ambiguous kinds and unreadable frontmatter are
+refused. The default label is the id; label=value replaces that initial label.
+Without --write, print the completed source as a preview. With --write, report
+the created definition's file and line. Comments, quotes, folded line breaks,
+the source's line endings and the body are preserved by the core CST writer.
+
+Initial fields use positional field=value arguments, split at the first =.
+Commas and further = characters in values are preserved. Quote arguments
+containing spaces. Duplicate fields are refused. Fields follow meta set's
+scalar, known-kind, derived-field, status and index validation. Unknown fields
+require --allow-unknown; it cannot bypass known field validation. Only index
+is stored as a number; other values are strings. For a roadmap artifact,
+provide status=todo or another valid status explicitly. Status requires a
+roadmap file. The completed source must have no errors before any write;
+every failure leaves the original file unchanged.
+
+Examples:
+  pfdsl meta create plan.pfdsl build location=src/build.ts updated_at=2026-10-05 --allow-unknown --write
+  pfdsl meta create plan.pfdsl release status=todo --write
+
+  --write          write the completed source in place
+  --json           output { ok, id, kind, created, written, line, output? }
+                   output is the complete source when previewing;
+                   failures return { ok: false, error, diagnostics? }
+  --allow-unknown  permit new extension scalar fields
+  --no-color       disable ANSI color codes
+
+Exit codes:
+  0  success
+  1  creation refused or resulting source has errors
+  2  invalid usage or field value
+`;
+
 const HELP_META_SET = `${helpUsage("meta set", "<file> <id[,id...]> <field> <value>", META_SET_OPTIONS)}
 
 Set a scalar frontmatter field on one or more nodes, rewriting the file in
@@ -3397,8 +3541,9 @@ boundary) and derived read-only fields (location.resolved, command.cwd)
 cannot be set, and existing extension arrays/maps cannot be overwritten.
 
 Each id needs a local frontmatter definition. An id used only in the body is
-reported separately from an id absent from the file. Add its artifact: or
-process: entry first; meta set never creates a definition implicitly.
+reported separately from an id absent from the file. Use pfdsl meta create
+<file> <id> [field=value ...] --write first; meta set never creates a definition
+implicitly.
 Empty definitions can receive fields. A definition accessed through a YAML
 alias must be expanded first. Editing the original anchored definition also
 changes values read through its aliases, following YAML's shared-value behavior.
@@ -4245,6 +4390,22 @@ const GRAPH_COMMANDS: readonly CommandEntry[] = [
 ];
 
 const META_COMMANDS: readonly CommandEntry[] = [
+	defineCommand(META_CREATE_OPTIONS, {
+		name: "create",
+		synopsis: "create <file> <id> [field=value ...]",
+		description: ["Create a body node's frontmatter definition"],
+		help: HELP_META_CREATE,
+		run: (rest, flags) => {
+			const [file, id, ...fields] = rest;
+			if (!file || !id) return fail(HELP_META_CREATE, 2);
+			return runMetaCreate(file, id, fields, {
+				write: flags.write === true,
+				json: flags.json === true,
+				allowUnknown: flags["allow-unknown"] === true,
+				color: resolveColor(flags),
+			});
+		},
+	}),
 	defineCommand(META_GET_OPTIONS, {
 		name: "get",
 		synopsis: "get <file|-> <id[,id...]> [field[,field...]]",

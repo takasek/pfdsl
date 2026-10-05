@@ -3,6 +3,61 @@ import { analyze } from "./index.js";
 import { insertDefinition } from "./insert-definition.js";
 
 describe("insertDefinition", () => {
+	it("inserts initial scalar fields with an explicit label and numeric index", () => {
+		const result = insertDefinition("a >> p -> b\n", "process", "p", {
+			label: "Build: release",
+			location: "src/a,b=c.ts",
+			updated_at: "2026-10-05",
+			index: 3,
+		});
+		expect(result.inserted).toBe(true);
+		expect(
+			analyze(`${result.output}a >> p -> b\n`).frontmatter?.process?.p,
+		).toMatchObject({
+			label: "Build: release",
+			location: "src/a,b=c.ts",
+			updated_at: "2026-10-05",
+			index: 3,
+		});
+	});
+
+	it("preserves unrelated comments, quotes, folds and CRLF when inserting initial fields", () => {
+		const src =
+			"---\r\n# Keep this\r\nartifact:\r\n  a:\r\n    label: 'Input' # keep quote\r\n    description: >\r\n      First\r\n      second.\r\n---\r\na >> p -> b\r\n";
+		const result = insertDefinition(src, "process", "p", {
+			location: "src/build.ts",
+		});
+		expect(result.inserted).toBe(true);
+		expect(result.output).toContain("# Keep this\r\n");
+		expect(result.output).toContain("label: 'Input' # keep quote\r\n");
+		expect(result.output).toContain(
+			"description: >\r\n      First\r\n      second.\r\n",
+		);
+		expect(result.output.replace(/\r\n/g, "")).not.toContain("\n");
+	});
+
+	it("does not apply initial fields to an existing definition", () => {
+		const src = "---\nprocess:\n  p: { label: Original }\n---\na >> p -> b\n";
+		const result = insertDefinition(src, "process", "p", { label: "Changed" });
+		expect(result.inserted).toBe(false);
+		expect(result.output).toContain("label: Original");
+		expect(result.output).not.toContain("Changed");
+	});
+
+	it.each([
+		"process: scalar",
+		"process: [one, two]",
+		"template: &section {}\nprocess: *section",
+	])("safely refuses an unsupported section: %s", (yaml) => {
+		const src = `---\n${yaml}\n---\na >> p -> b\n`;
+		expect(() =>
+			insertDefinition(src, "process", "p", { location: "build.ts" }),
+		).not.toThrow();
+		expect(
+			insertDefinition(src, "process", "p", { location: "build.ts" }),
+		).toEqual({ output: "", inserted: false });
+	});
+
 	it("inserts a new block into an existing section", () => {
 		const src = `---
 artifact:

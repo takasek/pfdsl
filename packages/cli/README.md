@@ -46,6 +46,7 @@ npm install -g @pfdsl/cli
 
 | Command | Description |
 |---|---|
+| `pfdsl meta create <file> <id> [field=value ...]` | Create a body node's frontmatter definition |
 | `pfdsl meta get <file\|-> <id[,id...]> [field[,field...]]` | Print field values |
 | `pfdsl meta list <file\|-> [--tag\|--group\|--producer] [field[,field...]]` | Print field values for nodes matching selectors |
 | `pfdsl meta values <file\|-> <field[,field...]>` | Print a field's values in use, with counts |
@@ -66,6 +67,23 @@ npm install -g @pfdsl/cli
 <!-- gen-readme-cli:end -->
 
 Run `pfdsl --help` or `pfdsl <command> --help` for full usage and exit codes.
+
+## Creating node definitions
+
+`meta create` creates a frontmatter entry for an artifact or process already present in the graph body.
+It previews the complete result by default; add `--write` to update the file.
+Supply initial scalar fields as `field=value`, using the same field rules as `meta set`.
+For a roadmap artifact, supply a valid status explicitly; for a produced artifact, supply completion criteria.
+
+```sh
+pfdsl meta create plan.pfdsl result status=todo 'criteria=The report is reviewed'
+pfdsl meta create plan.pfdsl result status=todo 'criteria=The report is reviewed' --write
+```
+
+The command preserves the graph body and existing YAML comments and quoting.
+Existing definitions, invalid fields, unsafe YAML structures, or a result with error diagnostics leave the file unchanged.
+`--json` reports whether the definition was created and written, its kind and line, and the complete output when previewing.
+Use `--allow-unknown` to add an extension scalar field; it does not bypass validation of known fields.
 
 ## Planning with ready counts
 

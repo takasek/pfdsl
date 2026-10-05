@@ -126,6 +126,8 @@ describe("command metadata parse surface (#1050)", () => {
 			"usage: pfdsl status blocked <file|-> [--json] [--no-color]",
 		"meta set":
 			"usage: pfdsl meta set <file> <id[,id...]> <field> <value> [--allow-unknown] [--json] [--no-color]",
+		"meta create":
+			"usage: pfdsl meta create <file> <id> [field=value ...] [--write] [--json] [--allow-unknown] [--no-color]",
 		"meta check-links":
 			"usage: pfdsl meta check-links <file> [--json] [--no-color]",
 		"meta get":
@@ -192,6 +194,7 @@ describe("command metadata parse surface (#1050)", () => {
 			"  orphans <file|->            Nodes with neither predecessor nor successor",
 		],
 		meta: [
+			"  create <file> <id> [field=value ...]           Create a body node's frontmatter definition",
 			"  get <file|-> <id[,id...]> [field[,field...]]   Print field values",
 			"  list <file|-> [--tag|--group|--producer] [field[,field...]]",
 			"  values <file|-> <field[,field...]>             Print a field's values in use, with counts",
@@ -214,8 +217,8 @@ describe("command metadata parse surface (#1050)", () => {
 		options: Record<string, unknown>;
 	}) => new Set(Object.keys(entry.options).map((name) => `--${name}`));
 
-	it("covers exactly 29 dispatchable command entries", () => {
-		expect(commandTargets).toHaveLength(29);
+	it("covers exactly 30 dispatchable command entries", () => {
+		expect(commandTargets).toHaveLength(30);
 	});
 
 	it.each(
@@ -3258,8 +3261,7 @@ req >> design -> spec
 		const r = await run(["meta", "set", f, "spec", "status", "done"]);
 		expect(r.exitCode).toBe(1);
 		expect(r.stderr).toContain("'spec' has no frontmatter definition");
-		expect(r.stderr).toContain("artifact:");
-		expect(r.stderr).toContain("Add");
+		expect(r.stderr).toContain(`pfdsl meta create ${f} spec --write`);
 		expect(readFileSync(f, "utf-8")).toBe("req >> design -> spec\n");
 	});
 
@@ -3272,7 +3274,7 @@ req >> design -> spec
 			ok: false,
 			missing: [],
 			undefinedIds: [{ id: "spec", kind: "artifact" }],
-			error: expect.stringContaining("Add"),
+			error: expect.stringContaining(`pfdsl meta create ${f} spec --write`),
 		});
 	});
 
