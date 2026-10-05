@@ -602,61 +602,6 @@ export async function fetchAllIssues(
  * @param {string} owner
  * @param {string} repo
  * @param {string} token
- * @param {string} name
- * @param {string} [description]
- * @param {string} [color]
- * @param {typeof fetch} [fetchImpl]
- */
-export async function createLabel(
-	owner,
-	repo,
-	token,
-	name,
-	description,
-	color,
-	fetchImpl = proxyAwareFetch,
-) {
-	await request(fetchImpl, `${API_ROOT}/repos/${owner}/${repo}/labels`, {
-		method: "POST",
-		headers: { ...authHeaders({ token }), "Content-Type": "application/json" },
-		body: JSON.stringify({ name, description, color }),
-	});
-}
-
-/**
- * @param {string} owner
- * @param {string} repo
- * @param {string} token
- * @param {string} name
- * @param {string} [description]
- * @param {typeof fetch} [fetchImpl]
- */
-export async function editLabel(
-	owner,
-	repo,
-	token,
-	name,
-	description,
-	fetchImpl = proxyAwareFetch,
-) {
-	await request(
-		fetchImpl,
-		`${API_ROOT}/repos/${owner}/${repo}/labels/${encodeURIComponent(name)}`,
-		{
-			method: "PATCH",
-			headers: {
-				...authHeaders({ token }),
-				"Content-Type": "application/json",
-			},
-			body: JSON.stringify({ description }),
-		},
-	);
-}
-
-/**
- * @param {string} owner
- * @param {string} repo
- * @param {string} token
  * @param {number} issueNumber
  * @param {string} label
  * @param {typeof fetch} [fetchImpl]
