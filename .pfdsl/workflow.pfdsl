@@ -435,6 +435,7 @@ process:
       decisions が指名した repo-local な binding・guard・companion の正本を改訂する。
       prose_mechanization_sweep_record の散文・機構矛盾、retro_findings の運用実態との不一致を binding 文言・guard 規則・説明へ反映する。
       workflow_md の改訂では workflow_pfdsl を突合相手として読み、図の改訂で名指しが食い違った箇所を追随させる。
+      bindings_pfd_ops の改訂では ops_skill_general の現行 SKILL.md・work-cycle.md を突合相手として読み、配布層とリポ固有手順の契約を揃える。
       検証コマンドは正本ごとに異なり、各出力 artifact の criteria が一次情報である。
     group: generation
     tags: [ knowledge_maintenance ]

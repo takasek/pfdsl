@@ -9,6 +9,7 @@ Run applicable steps in the adopting repository, preserving local changes and fo
 Record both the installed and target CLI/plugin releases, including the bundle revision when package versions alone are ambiguous.
 Read the entries introduced after the installed release and through the target release, in release order; skip entries outside that interval.
 Changing a version number alone is not evidence that old local copies have been cleaned up.
+Apply the applicable release-specific changes first, complete the shared [Verify the cleanup](#verify-the-cleanup) step, and only then record the applied migration state when that feature is available.
 
 Run `pfdsl --version` using the CLI selected by the adopting repository and read the installed plugin's `.claude-plugin/plugin.json` or `.codex-plugin/plugin.json` for its current version.
 For a Git checkout, record its commit ID with `git rev-parse HEAD`; retain the Claude plugin's `.claude-plugin/bundle-manifest.sha256` when present, because a package version alone does not distinguish development bundles.
@@ -23,39 +24,8 @@ Record the target only after all potentially applicable steps have been resolved
 
 ## Unreleased — after CLI/plugin v0.1.0
 
-
 This section covers the changes after CLI/plugin v0.1.0 that need action in an adopting repository.
 The destination release is assigned during release preparation; do not infer it.
-
-### Record the applied migration state
-
-pfd-ops now compares the running plugin with `appliedMigration` in the repository's `.pfdsl/config.json`: the plugin release the repository has finished migrating to ([ADR-0043](adr/0043-applied-migration-state.md)).
-The comparison runs on every pfd-ops start (`check-install-sync.mjs`) in every repository that has a `.pfdsl/` directory, with or without `--upstream`, and it only reads the record.
-
-Until the key exists, every run prints a notice that the repository predates migration-state tracking and points back to "Choosing the update range" above.
-The notice is not a failure.
-
-After you finish applying this guide, record the state once your checks pass (see "Verify the cleanup").
-Run the following from the repository root, with the pfd-ops skill root of the plugin you are migrating to (`${CLAUDE_PLUGIN_ROOT}/skills/pfd-ops` in Claude Code, the installed plugin's `skills/pfd-ops` in Codex):
-
-```sh
-node <pfd-ops skill root>/scripts/check-install-sync.mjs --record-migration
-```
-
-The command writes the running plugin's version, and its bundle hash where the plugin has one, into `.pfdsl/config.json` and keeps every other key.
-Commit that change together with the migration it records.
-It cannot be combined with `--deploy`, `--overwrite-local-edits` or `--delete-edited-orphans` (exit 2), and it writes nothing, exiting with 3 after saying why, when the running plugin's version is unknown (a repo-local copy), when the plugin is older than the recorded state, or when `.pfdsl/config.json` is not valid JSON or does not contain a JSON object.
-A malformed `appliedMigration` does not stop it: the command overwrites that key, and a plain run or `--deploy` keeps failing on such a record until you do.
-You may write the key by hand, in the form `{"appliedMigration": {"pluginVersion": "0.1.0", "bundleHash": "<64 hex digits>"}}`, but the command computes the hash for you.
-A Codex plugin has no bundle manifest, so its record has no `bundleHash`.
-
-Once recorded, later runs say nothing while the plugin matches the record.
-A newer plugin prints the range of this guide to read, which is the cue to migrate and record again.
-A plugin older than the record is told to update, and `--deploy` and `--record-migration` are refused with exit 3 until it does, so an old `install/` cannot roll back files a newer release placed.
-If `.pfdsl/config.json` is not valid JSON or has a malformed `appliedMigration`, the run fails naming the file instead of ignoring it.
-
-Verify by running `check-install-sync.mjs` again: it prints no migration notice.
-Source: [#1319](https://github.com/takasek/pfdsl/issues/1319).
 
 ### GitHub operation availability
 
@@ -104,6 +74,36 @@ Failures with exit code 1 return JSON when `--json` is set; invalid usage with e
 When an ID exists in the body without a frontmatter definition, the failure payload instead includes `undefinedIds: [{id, kind}]`, `missing`, and a recovery message in `error`.
 Add the definition before retrying; `meta set` does not create it implicitly.
 Definition creation from the preview and CLI remains tracked separately in [Issue #1282](https://github.com/takasek/pfdsl/issues/1282).
+
+### Record the applied migration state
+
+pfd-ops now compares the running plugin with `appliedMigration` in the repository's `.pfdsl/config.json`: the plugin release the repository has finished migrating to ([ADR-0043](adr/0043-applied-migration-state.md)).
+The comparison runs on every pfd-ops start (`check-install-sync.mjs`) in every repository that has a `.pfdsl/` directory, with or without `--upstream`, and it only reads the record.
+
+Until the key exists, every run prints a notice that the repository predates migration-state tracking and points back to "Choosing the update range" above.
+The notice is not a failure.
+
+After you finish applying this guide, record the state once your checks pass (see [Verify the cleanup](#verify-the-cleanup), which applies to every update range).
+Run the following from the repository root, with the pfd-ops skill root of the plugin you are migrating to (`${CLAUDE_PLUGIN_ROOT}/skills/pfd-ops` in Claude Code, the installed plugin's `skills/pfd-ops` in Codex):
+
+```sh
+node <pfd-ops skill root>/scripts/check-install-sync.mjs --record-migration
+```
+
+The command writes the running plugin's version, and its bundle hash where the plugin has one, into `.pfdsl/config.json` and keeps every other key.
+Commit that change together with the migration it records.
+It cannot be combined with `--deploy`, `--overwrite-local-edits` or `--delete-edited-orphans` (exit 2), and it writes nothing, exiting with 3 after saying why, when the running plugin's version is unknown (a repo-local copy), when the plugin is older than the recorded state, or when `.pfdsl/config.json` is not valid JSON or does not contain a JSON object.
+A malformed `appliedMigration` does not stop it: the command overwrites that key, and a plain run or `--deploy` keeps failing on such a record until you do.
+You may write the key by hand, in the form `{"appliedMigration": {"pluginVersion": "0.1.0", "bundleHash": "<64 hex digits>"}}`, but the command computes the hash for you.
+A Codex plugin has no bundle manifest, so its record has no `bundleHash`.
+
+Once recorded, later runs say nothing while the plugin matches the record.
+A newer plugin prints the range of this guide to read, which is the cue to migrate and record again.
+A plugin older than the record is told to update, and `--deploy` and `--record-migration` are refused with exit 3 until it does, so an old `install/` cannot roll back files a newer release placed.
+If `.pfdsl/config.json` is not valid JSON or has a malformed `appliedMigration`, the run fails naming the file instead of ignoring it.
+
+Verify by running `check-install-sync.mjs` again: it prints no migration notice.
+Source: [#1319](https://github.com/takasek/pfdsl/issues/1319).
 
 ## CLI/plugin v0.1.0 — after CLI/plugin v0.0.26
 
@@ -333,7 +333,7 @@ Points to settle before enabling:
 To stop a sweep that was enabled, set `enabled` to `false` or remove the key.
 To also stop the workflow from starting at all, disable it on GitHub ([Disabling and enabling a workflow](https://docs.github.com/en/actions/how-tos/manage-workflow-runs/disable-and-enable-workflows)); do not delete the deployed file, because the next deploy copies it again.
 
-### Verify the cleanup
+## Verify the cleanup
 
 Validate affected diagrams with the intended CLI and run the repository's relevant checks.
 Report the before/after diagnostics, changed files, inapplicable steps, and unresolved decisions.
