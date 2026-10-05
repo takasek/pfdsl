@@ -5,6 +5,7 @@ import {
 	buildProcessOutputs,
 	computeFindings,
 	computeLabelFindings,
+	FLOW_LABELS,
 	parseIssueProcesses,
 	partitionFindings,
 } from "./issues-flow-audit.mjs";
@@ -663,7 +664,10 @@ describe("partitionFindings", () => {
 		assert.deepEqual(parts.advisory, [unrelated]);
 	});
 	it("leaves unrelated conflicts advisory in a scoped gate while retaining global label prerequisites", () => {
-		const prerequisite = { type: "missing_flow_label" };
+		// The finding the label check really returns when flow:exempt is absent.
+		const [managed] = FLOW_LABELS;
+		const [prerequisite] = computeLabelFindings(FLOW_LABELS, [managed]);
+		assert.equal(prerequisite.type, "label_missing");
 		const parts = partitionFindings([blocking, prerequisite], {
 			enforcedIssues: [3],
 		});
