@@ -1,5 +1,11 @@
+import { formatId } from "./formatter.js";
 import { resolveMeta } from "./meta.js";
-import type { Frontmatter, Graph } from "./types/index.js";
+import type {
+	FeedbackEdge,
+	Frontmatter,
+	Graph,
+	PrimaryEdge,
+} from "./types/index.js";
 
 export interface DiffReport {
 	addedNodes: string[];
@@ -11,8 +17,51 @@ export interface DiffReport {
 	removedFeedback: string[];
 }
 
-function edgeKey(from: string, to: string): string {
-	return `${from} -> ${to}`;
+export type EdgeDiffStatus = "added" | "removed" | "unchanged";
+
+export type ClassifiedPrimaryEdge = Pick<PrimaryEdge, "from" | "to"> & {
+	status: EdgeDiffStatus;
+};
+export type ClassifiedFeedbackEdge = FeedbackEdge & { status: EdgeDiffStatus };
+
+/** Endpoint classifications for renderers, alongside the compatible display report. */
+export interface DetailedDiffReport {
+	report: DiffReport;
+	primaryEdges: ClassifiedPrimaryEdge[];
+	feedbackEdges: ClassifiedFeedbackEdge[];
+}
+
+function classifyEdges<E>(
+	a: E[],
+	b: E[],
+	endpoints: (edge: E) => [string, string],
+): (E & { status: EdgeDiffStatus })[] {
+	// JSON tuples are identity keys only; display spelling never determines identity.
+	const key = (edge: E) => JSON.stringify(endpoints(edge));
+	const before = new Map(a.map((edge) => [key(edge), edge]));
+	const after = new Map(b.map((edge) => [key(edge), edge]));
+	const result: (E & { status: EdgeDiffStatus })[] = [];
+	for (const [id, edge] of before) {
+		result.push({ ...edge, status: after.has(id) ? "unchanged" : "removed" });
+	}
+	for (const [id, edge] of after) {
+		if (!before.has(id)) result.push({ ...edge, status: "added" });
+	}
+	return result;
+}
+
+function displayEdges<E extends { status: EdgeDiffStatus }>(
+	edges: E[],
+	status: EdgeDiffStatus,
+	endpoints: (edge: E) => [string, string],
+): string[] {
+	return edges
+		.filter((edge) => edge.status === status)
+		.map((edge) => {
+			const [from, to] = endpoints(edge);
+			return `${formatId(from)} -> ${formatId(to)}`;
+		})
+		.sort();
 }
 
 function setDiff(lhs: Set<string>, rhs: Set<string>): string[] {
@@ -47,15 +96,34 @@ export function diffGraphs(
 	fmA?: Frontmatter | null,
 	fmB?: Frontmatter | null,
 ): DiffReport {
+	return diffGraphsDetailed(a, b, fmA, fmB).report;
+}
+
+/** Compute edge identity and classification once for both display and rendering. */
+export function diffGraphsDetailed(
+	a: Graph,
+	b: Graph,
+	fmA?: Frontmatter | null,
+	fmB?: Frontmatter | null,
+): DetailedDiffReport {
 	const aNodes = new Set(a.nodes.keys());
 	const bNodes = new Set(b.nodes.keys());
-	const aEdges = new Set(a.primaryEdges.map((e) => edgeKey(e.from, e.to)));
-	const bEdges = new Set(b.primaryEdges.map((e) => edgeKey(e.from, e.to)));
-	const aFb = new Set(
-		a.feedbackEdges.map((e) => edgeKey(e.artifact, e.process)),
+	const primaryEndpoints = (
+		edge: Pick<PrimaryEdge, "from" | "to">,
+	): [string, string] => [edge.from, edge.to];
+	const feedbackEndpoints = (edge: FeedbackEdge): [string, string] => [
+		edge.artifact,
+		edge.process,
+	];
+	const primaryEdges = classifyEdges(
+		a.primaryEdges,
+		b.primaryEdges,
+		primaryEndpoints,
 	);
-	const bFb = new Set(
-		b.feedbackEdges.map((e) => edgeKey(e.artifact, e.process)),
+	const feedbackEdges = classifyEdges(
+		a.feedbackEdges,
+		b.feedbackEdges,
+		feedbackEndpoints,
 	);
 
 	// Nodes present in both graphs (not added/removed)
@@ -86,12 +154,20 @@ export function diffGraphs(
 	changedNodes.sort();
 
 	return {
-		addedNodes: setDiff(aNodes, bNodes),
-		removedNodes: setDiff(bNodes, aNodes),
-		changedNodes,
-		addedEdges: setDiff(aEdges, bEdges),
-		removedEdges: setDiff(bEdges, aEdges),
-		addedFeedback: setDiff(aFb, bFb),
-		removedFeedback: setDiff(bFb, aFb),
+		report: {
+			addedNodes: setDiff(aNodes, bNodes),
+			removedNodes: setDiff(bNodes, aNodes),
+			changedNodes,
+			addedEdges: displayEdges(primaryEdges, "added", primaryEndpoints),
+			removedEdges: displayEdges(primaryEdges, "removed", primaryEndpoints),
+			addedFeedback: displayEdges(feedbackEdges, "added", feedbackEndpoints),
+			removedFeedback: displayEdges(
+				feedbackEdges,
+				"removed",
+				feedbackEndpoints,
+			),
+		},
+		primaryEdges,
+		feedbackEdges,
 	};
 }

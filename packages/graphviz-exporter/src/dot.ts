@@ -1,5 +1,5 @@
 import type { Frontmatter, Graph, NodeKind } from "@pfdsl/core";
-import { compareIds, diffGraphs, resolveMeta } from "@pfdsl/core";
+import { compareIds, diffGraphsDetailed, resolveMeta } from "@pfdsl/core";
 import { wrapLabel } from "./label.js";
 import {
 	calcMinWidth,
@@ -152,77 +152,26 @@ export function exportDiffDot(
 	fmB: Frontmatter | null,
 	options: ExportOptions = {},
 ): string {
-	const report = diffGraphs(a, b, fmA, fmB);
+	const { report, primaryEdges, feedbackEdges } = diffGraphsDetailed(
+		a,
+		b,
+		fmA,
+		fmB,
+	);
 
 	const added = new Set(report.addedNodes);
 	const removed = new Set(report.removedNodes);
 	const changed = new Set(report.changedNodes);
 
-	// Build edge classifications — primary edges
-	const primaryEdgeMap = new Map<
-		string,
-		{ from: string; to: string; status: "added" | "removed" | "unchanged" }
-	>();
-	for (const e of a.primaryEdges) {
-		const key = `${e.from} -> ${e.to}`;
-		if (!primaryEdgeMap.has(key))
-			primaryEdgeMap.set(key, { from: e.from, to: e.to, status: "unchanged" });
-	}
-	for (const e of b.primaryEdges) {
-		const key = `${e.from} -> ${e.to}`;
-		if (!primaryEdgeMap.has(key))
-			primaryEdgeMap.set(key, { from: e.from, to: e.to, status: "unchanged" });
-	}
-	const addedEdgesSet = new Set(report.addedEdges);
-	const removedEdgesSet = new Set(report.removedEdges);
-	for (const [key, val] of primaryEdgeMap) {
-		if (addedEdgesSet.has(key)) val.status = "added";
-		else if (removedEdgesSet.has(key)) val.status = "removed";
-	}
-
-	// Feedback edges
-	const feedbackEdgeMap = new Map<
-		string,
-		{
-			artifact: string;
-			process: string;
-			status: "added" | "removed" | "unchanged";
-		}
-	>();
-	for (const e of a.feedbackEdges) {
-		const key = `${e.artifact} -> ${e.process}`;
-		if (!feedbackEdgeMap.has(key))
-			feedbackEdgeMap.set(key, {
-				artifact: e.artifact,
-				process: e.process,
-				status: "unchanged",
-			});
-	}
-	for (const e of b.feedbackEdges) {
-		const key = `${e.artifact} -> ${e.process}`;
-		if (!feedbackEdgeMap.has(key))
-			feedbackEdgeMap.set(key, {
-				artifact: e.artifact,
-				process: e.process,
-				status: "unchanged",
-			});
-	}
-	const addedFeedbackSet = new Set(report.addedFeedback);
-	const removedFeedbackSet = new Set(report.removedFeedback);
-	for (const [key, val] of feedbackEdgeMap) {
-		if (addedFeedbackSet.has(key)) val.status = "added";
-		else if (removedFeedbackSet.has(key)) val.status = "removed";
-	}
-
 	// Visible nodes
 	const visibleNodes = new Set<string>([...added, ...removed, ...changed]);
-	for (const [, val] of primaryEdgeMap) {
+	for (const val of primaryEdges) {
 		if (val.status === "added" || val.status === "removed") {
 			visibleNodes.add(val.from);
 			visibleNodes.add(val.to);
 		}
 	}
-	for (const [, val] of feedbackEdgeMap) {
+	for (const val of feedbackEdges) {
 		if (val.status === "added" || val.status === "removed") {
 			visibleNodes.add(val.artifact);
 			visibleNodes.add(val.process);
@@ -230,13 +179,26 @@ export function exportDiffDot(
 	}
 
 	// Visible edges (added & removed only)
-	const visiblePrimaryEdges = [...primaryEdgeMap.entries()]
-		.filter(([, val]) => val.status === "added" || val.status === "removed")
-		.sort(([a], [b]) => compareIds(a, b));
+	const visiblePrimaryEdges = primaryEdges
+		.filter((val) => val.status !== "unchanged")
+		.sort(
+			(a, b) =>
+				compareIds(`${a.from} -> ${a.to}`, `${b.from} -> ${b.to}`) ||
+				compareIds(a.from, b.from) ||
+				compareIds(a.to, b.to),
+		);
 
-	const visibleFeedbackEdges = [...feedbackEdgeMap.entries()]
-		.filter(([, val]) => val.status === "added" || val.status === "removed")
-		.sort(([a], [b]) => compareIds(a, b));
+	const visibleFeedbackEdges = feedbackEdges
+		.filter((val) => val.status !== "unchanged")
+		.sort(
+			(a, b) =>
+				compareIds(
+					`${a.artifact} -> ${a.process}`,
+					`${b.artifact} -> ${b.process}`,
+				) ||
+				compareIds(a.artifact, b.artifact) ||
+				compareIds(a.process, b.process),
+		);
 
 	// Graph header
 	const rankdir =
@@ -255,7 +217,11 @@ export function exportDiffDot(
 	lines.push("");
 
 	// Empty diff
-	if (added.size === 0 && removed.size === 0 && changed.size === 0) {
+	if (
+		visibleNodes.size === 0 &&
+		visiblePrimaryEdges.length === 0 &&
+		visibleFeedbackEdges.length === 0
+	) {
 		lines.push(
 			'  "_nodiff" [shape=note, label="No structural or metadata changes"];',
 		);
@@ -310,7 +276,7 @@ export function exportDiffDot(
 	// Emit visible primary edges
 	if (visiblePrimaryEdges.length > 0) {
 		lines.push("");
-		for (const [, val] of visiblePrimaryEdges) {
+		for (const val of visiblePrimaryEdges) {
 			if (val.status === "added") {
 				lines.push(
 					`  ${quote(val.from)} -> ${quote(val.to)} [color="#28a745"];`,
@@ -326,7 +292,7 @@ export function exportDiffDot(
 	// Emit visible feedback edges
 	if (visibleFeedbackEdges.length > 0) {
 		if (visiblePrimaryEdges.length === 0) lines.push("");
-		for (const [, val] of visibleFeedbackEdges) {
+		for (const val of visibleFeedbackEdges) {
 			if (val.status === "added") {
 				lines.push(
 					`  ${quote(val.artifact)} -> ${quote(val.process)} [style=dashed, color="#28a745", constraint=false];`,

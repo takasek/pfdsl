@@ -624,7 +624,7 @@
 <!-- diff_graphs -->
 <g id="node68" class="node">
 <title>diff_graphs</title>
-<g id="a_node68"><a xlink:title="差分算出&#10;&#10;2つの正準化グラフ（とそれぞれのfrontmatter）の構造差分を計算する&#10;command: node packages/cli/dist/cli.js diff&#10;location: packages/core/src/diff.ts">
+<g id="a_node68"><a xlink:title="差分算出&#10;&#10;2つの正準化グラフ（とそれぞれのfrontmatter）の構造差分を計算する。エッジ種別ごとに端点組で同一性を判断し、coreの分類をDOTと共有する。表示用のID引用は同一性と分離する&#10;command: node packages/cli/dist/cli.js diff&#10;location: packages/core/src/diff.ts">
 <ellipse fill="none" stroke="#27ae60" cx="1396.24" cy="-673.22" rx="56.95" ry="29.42"/>
 <text xml:space="preserve" text-anchor="middle" x="1396.24" y="-677.42" font-family="Times,serif" font-size="14.00">diff_graphs</text>
 <text xml:space="preserve" text-anchor="middle" x="1396.24" y="-660.62" font-family="Times,serif" font-size="14.00">差分算出</text>
@@ -1239,7 +1239,7 @@
 <!-- diff_report -->
 <g id="node48" class="node">
 <title>diff_report</title>
-<g id="a_node48"><a xlink:title="差分レポート&#10;&#10;元の文書と比較対象文書のグラフ・frontmatterを比較した構造差分（追加・削除・改名ノード等）&#10;criteria: node packages/cli/dist/cli.js diff が実装され動作確認済み&#10;externalStakeholders: CLIユーザー, VSCode拡張ユーザー">
+<g id="a_node48"><a xlink:title="差分レポート&#10;&#10;元の文書と比較対象文書のグラフ・frontmatterを比較したノード・エッジ差分。端点を保持したprimary/feedbackの分類から、表示用DiffReportとDOT差分を生成する&#10;criteria: packages/core/src/diff.test.ts、packages/graphviz&#45;exporter/src/index.test.ts、packages/cli/src/index.test.ts、packages/editor/src/diff&#45;panel.test.tsで、区切り文字を含むIDの識別・表示とノード集合を保ったエッジ変更の描画を検証する&#10;externalStakeholders: CLIユーザー, VSCode拡張ユーザー">
 <polygon fill="none" stroke="black" stroke-width="2" points="1706.73,-449.02 1598.73,-449.02 1598.73,-407.42 1706.73,-407.42 1706.73,-449.02"/>
 <text xml:space="preserve" text-anchor="middle" x="1652.73" y="-432.42" font-family="Times,serif" font-size="14.00">diff_report</text>
 <text xml:space="preserve" text-anchor="middle" x="1652.73" y="-415.62" font-family="Times,serif" font-size="14.00">差分レポート</text>
