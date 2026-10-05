@@ -17,6 +17,11 @@ import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
 import {
+	CLAUDE_PLUGIN_ROOT,
+	CODEX_PLUGIN_ROOT,
+	DISTRIBUTION_ROOTS,
+} from "./distribution-roots.mjs";
+import {
 	canonicalPluginSkillSource,
 	GENERATED_DISTRIBUTION_SOURCES,
 } from "./distribution-sources.mjs";
@@ -35,14 +40,11 @@ import { gitDiffNames, tryGit } from "./run-exec.mjs";
 // Re-exported so this module's existing importers (this file's own test,
 // canonicalSourceOf callers, etc.) keep working unchanged — the empty-tree
 // constant and the base-selection function live in review-record-gate.mjs.
-export { diffBase, EMPTY_TREE };
+export { DISTRIBUTION_ROOTS, diffBase, EMPTY_TREE };
 
-const CLAUDE_PLUGIN_ROOT = "plugin/pfdsl/";
-const CODEX_PLUGIN_ROOT = "plugin/pfdsl-codex/";
-const DIST_ROOTS = [CLAUDE_PLUGIN_ROOT, CODEX_PLUGIN_ROOT];
-export const DISTRIBUTION_ROOTS = DIST_ROOTS.map((root) => root.slice(0, -1));
-const CLAUDE_SKILLS_ROOT = `${CLAUDE_PLUGIN_ROOT}skills/`;
-const CODEX_SKILLS_ROOT = `${CODEX_PLUGIN_ROOT}skills/`;
+const DIST_ROOTS = DISTRIBUTION_ROOTS.map((root) => `${root}/`);
+const CLAUDE_SKILLS_ROOT = `${CLAUDE_PLUGIN_ROOT}/skills/`;
+const CODEX_SKILLS_ROOT = `${CODEX_PLUGIN_ROOT}/skills/`;
 
 /**
  * Bundled markdown held out of review, each with why. These three are
@@ -117,8 +119,10 @@ export function canonicalSourceOf(distPath) {
 	// The inverse of the assembly's own manifest: find the bundle root this
 	// path sits under, check the file is one gen-plugin actually copies there,
 	// and swap the root back. Nothing about the layout is restated here.
-	if (distPath.startsWith(CLAUDE_PLUGIN_ROOT)) {
-		const [dir, ...tail] = distPath.slice(CLAUDE_PLUGIN_ROOT.length).split("/");
+	if (distPath.startsWith(`${CLAUDE_PLUGIN_ROOT}/`)) {
+		const [dir, ...tail] = distPath
+			.slice(CLAUDE_PLUGIN_ROOT.length + 1)
+			.split("/");
 		const mirror = PLUGIN_MIRRORS.find((m) => m.dest === dir);
 		const relative = tail.join("/");
 		if (mirror && relative) {
