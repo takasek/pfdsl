@@ -3032,6 +3032,66 @@ describe("multifile check — which file a loader diagnostic points at", () => {
 	});
 });
 
+describe("a refused edit names the file each diagnostic belongs to", () => {
+	let d: string;
+	beforeEach(() => {
+		d = mkdtempSync(join(tmpdir(), "pfdsl-refuse-attr-"));
+	});
+	afterEach(() => {
+		rmSync(d, { recursive: true, force: true });
+	});
+
+	const lineFor = (stderr: string, code: string) =>
+		stderr.split("\n").find((line) => line.includes(`[${code}]`));
+	const startOf = (line: string | undefined, prefix: string) =>
+		line?.slice(0, prefix.length);
+
+	it("rename reports a nested file's boundary error under that file, not the entry", async () => {
+		const entry = join(d, "entry.pfdsl");
+		const child = join(d, "child.pfdsl");
+		writeFileSync(
+			entry,
+			"---\nprocess:\n  p:\n    subflow: ./child.pfdsl\n---\na >> p -> b\nb >> p2 -> c\n",
+		);
+		writeFileSync(
+			child,
+			"---\nprocess:\n  q:\n    subflow: ./grandchild.pfdsl\n---\na >> q -> b\n",
+		);
+		writeFileSync(join(d, "grandchild.pfdsl"), "wrong >> r -> b\n");
+		const r = await run(["rename", entry, "p2", "p3"]);
+		expect(r.exitCode).toBe(1);
+		const prefix = `${child}:1:1: error [V034]`;
+		expect(startOf(lineFor(r.stderr, "V034"), prefix)).toBe(prefix);
+	});
+
+	// The loader leaves V028 off the preset diagnostics it returns, so each
+	// command that validates presets names the preset itself.
+	const presetEntry = (extra: string) =>
+		`---\nextends: ./preset.yaml\n${extra}---\na >> p -> b\n`;
+
+	it.each([
+		["rename", presetEntry("artifact:\n  a: {}\n"), ["rename", "a", "c"]],
+		["delete", presetEntry("group:\n  g: { label: G }\n"), ["delete", "g"]],
+	])("%s reports a preset's forbidden key under the preset", async (_name, source, [
+		command,
+		...args
+	]) => {
+		const entry = join(d, "entry.pfdsl");
+		const preset = join(d, "preset.yaml");
+		writeFileSync(entry, source);
+		writeFileSync(preset, "title: not allowed\n");
+		const text = await run([command!, entry, ...args]);
+		expect(text.exitCode).toBe(1);
+		const prefix = `${preset}:1:1: error [V028]`;
+		expect(startOf(lineFor(text.stderr, "V028"), prefix)).toBe(prefix);
+		const json = await run([command!, entry, ...args, "--json"]);
+		expect(json.exitCode).toBe(1);
+		expect(JSON.parse(json.stdout).diagnostics).toContainEqual(
+			expect.objectContaining({ code: "V028", file: preset }),
+		);
+	});
+});
+
 describe("multifile check — extends", () => {
 	it.each([
 		["isolated-node", "x\n"],

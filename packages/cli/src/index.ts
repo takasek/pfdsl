@@ -387,8 +387,16 @@ function fileLoader(
 	}
 }
 
-function diagText(diags: Diagnostic[], file: string, color = false): string {
-	return `${diags.map((d) => formatDiagnostic(d, file, color)).join("\n")}\n`;
+/**
+ * One line per diagnostic. A diagnostic that carries a `file` belongs to that
+ * file; the rest belong to `file`, the one the command was given.
+ */
+function diagText(
+	diags: (Diagnostic & { file?: string })[],
+	file: string,
+	color = false,
+): string {
+	return `${diags.map((d) => formatDiagnostic(d, d.file ?? file, color)).join("\n")}\n`;
 }
 
 /**
@@ -407,7 +415,7 @@ function failJson(
 }
 
 function failIfErrors(
-	diags: Diagnostic[],
+	diags: (Diagnostic & { file?: string })[],
 	file: string,
 	json = false,
 	color = false,
@@ -426,7 +434,7 @@ function failIfErrors(
 function refuseWith(
 	message: string,
 	file: string,
-	errs: Diagnostic[] | undefined,
+	errs: (Diagnostic & { file?: string })[] | undefined,
 	json = false,
 	color = false,
 ): CommandResult {
@@ -713,7 +721,9 @@ export function runDelete(
 		const presetKeyDiagnostics = [...docs]
 			.filter(([path]) => path !== absFile)
 			.flatMap(([path, doc]) =>
-				validatePresetKeys(path, doc.frontmatter, doc.document),
+				validatePresetKeys(path, doc.frontmatter, doc.document).map(
+					(diagnostic) => ({ ...diagnostic, file: path }),
+				),
 			);
 		const presetDiagnostics = [...docs]
 			.filter(([path]) => path !== absFile)
@@ -1619,7 +1629,9 @@ export function runRename(
 		const presetKeyDiagnostics = [...docs]
 			.filter(([path]) => path !== absFile)
 			.flatMap(([path, doc]) =>
-				validatePresetKeys(path, doc.frontmatter, doc.document),
+				validatePresetKeys(path, doc.frontmatter, doc.document).map(
+					(diagnostic) => ({ ...diagnostic, file: path }),
+				),
 			);
 		const failedExtends = failIfErrors(
 			[...extendsDiagnostics, ...presetKeyDiagnostics],
