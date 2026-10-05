@@ -60,7 +60,7 @@ function namedOpsBindingReferences(markdown, sourcePath) {
 
 describe("pfd-ops entry routing", () => {
 	it("keeps work-cycle CLI arguments and graph result keys", () => {
-		assert.ok(workCycle.includes("status ready <roadmap.pfdsl> --best --json"));
+		assert.ok(workCycle.includes("status ready <roadmap.pfdsl> --json"));
 		assert.match(workCycle, /\bterminals\b/);
 		assert.match(workCycle, /\bexternalTerminals\b/);
 	});
@@ -96,10 +96,7 @@ describe("pfd-ops entry routing", () => {
 		);
 		assert.ok(inspectionRoute);
 		assert.doesNotMatch(inspectionRoute[0], /references\/work-cycle\.md/);
-		assert.match(
-			inspectionRoute[0],
-			/status ready <roadmap\.pfdsl> --best --json/,
-		);
+		assert.match(inspectionRoute[0], /status ready <roadmap\.pfdsl> --json/);
 	});
 
 	it("resolves active named binding references to existing headings", () => {

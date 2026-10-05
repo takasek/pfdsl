@@ -10,7 +10,7 @@ artifact:
   ready_counts_cli:
     label: 各工程の新規 ready 数を示す CLI (#1345)
     description: 全出力完了前後の ready 集合差を各工程に表示する。単一 best 推薦を廃止し、件数の解釈と着手対象の選択を利用者へ委ねる
-    status: wip
+    status: done
     location: ../packages/cli/src/index.ts
     criteria: 新規 ready 数が実際の状態更新前後の集合差と一致し、標準テキスト表示、--no-counts、JSON 常時件数、best 廃止と運用 consumer の移行がテストで検証されている
   cli_release_ready_counts:

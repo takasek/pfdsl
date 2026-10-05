@@ -4,17 +4,14 @@
  */
 
 /**
- * @param {unknown} readyJson - output of `pfdsl status ready --best --json`
- * @returns {{ready: string[], best: string | null, bestOutputs: string[]}}
+ * @param {unknown} readyJson - output of `pfdsl status ready --json`
+ * @returns {{ready: Array<{id: string, label: string, inputs: string[], outputs: string[], newlyReadyCount: number}>}}
  */
 export function parseReadyOutput(readyJson) {
 	if (!readyJson || typeof readyJson !== "object" || readyJson.ok !== true) {
-		return { ready: [], best: null, bestOutputs: [] };
+		return { ready: [] };
 	}
-	const ready = (readyJson.ready ?? []).map((p) => p.id);
-	const best = readyJson.best?.id ?? null;
-	const bestOutputs = readyJson.best?.outputs ?? [];
-	return { ready, best, bestOutputs };
+	return { ready: readyJson.ready ?? [] };
 }
 
 /**

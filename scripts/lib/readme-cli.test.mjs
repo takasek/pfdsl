@@ -48,7 +48,7 @@ All subcommands accept --json and --no-color.
 const STATUS_HELP = `usage: pfdsl status <subcommand> ...
 
 Subcommands:
-  ready <file|-> [--best]           List ready-to-start processes
+  ready <file|-> [--no-counts]      List ready-to-start processes
   list <file|-> --status <s[,s...]> List artifacts by status
 
 All subcommands accept --json and --no-color.
@@ -58,7 +58,7 @@ describe("parseCommandSection", () => {
 	it("splits at the description column even when one space separates them", () => {
 		assert.deepEqual(parseCommandSection(STATUS_HELP, "Subcommands:"), [
 			{
-				usage: "ready <file|-> [--best]",
+				usage: "ready <file|-> [--no-counts]",
 				description: "List ready-to-start processes",
 			},
 			{

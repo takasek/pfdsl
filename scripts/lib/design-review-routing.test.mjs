@@ -5,7 +5,7 @@ import { cycleStatusExitCode, runCycleStatus } from "./cycle-status-steps.mjs";
 
 function preflight({
 	issues = [1208],
-	best = null,
+	ready = [],
 	roadmap = "",
 	fail = [],
 } = {}) {
@@ -18,8 +18,7 @@ function preflight({
 			if (args.includes("ready"))
 				return JSON.stringify({
 					ok: true,
-					ready: [],
-					best: best ? { id: best } : null,
+					ready,
 				});
 			if (args.includes("neighbors"))
 				return JSON.stringify({
@@ -116,32 +115,30 @@ describe("cycle preflight routes issue records to human review", () => {
 		});
 	}
 
-	it("resolves the best process when no issue is specified", async () => {
+	it("preserves candidates without selecting an issue automatically", async () => {
+		const ready = [{ id: "develop", newlyReadyCount: 2 }];
 		const { deps, reads } = preflight({
 			issues: [],
-			best: "develop",
+			ready,
 			roadmap:
 				"process:\n  develop:\n    location: https://github.com/takasek/pfdsl/issues/42\nartifact:\n",
 		});
 		const result = await runCycleStatus(deps);
-		assert.deepEqual(result.issueTargets, [
-			{ issue: 42, source: "best-process" },
-		]);
-		assert.deepEqual(
-			reads.map(({ number }) => number),
-			[42],
-		);
-		assert.match(result.gateCheckCommand, /--issue 42/);
+		assert.deepEqual(result.ready, ready);
+		assert.deepEqual(result.issueTargets, []);
+		assert.deepEqual(reads, []);
+		assert.equal(result.gateCheckCommand, null);
+		assert.match(result.issueError, /Choose a target from the ready list/);
 		assertNoRecordVerdict(result);
 	});
 
-	for (const best of [null, "unresolved"]) {
-		it(`reports an unresolved target (${best}) without claiming review completion`, async () => {
-			const { deps, reads } = preflight({ issues: [], best });
+	for (const ready of [[], [{ id: "unresolved", newlyReadyCount: 0 }]]) {
+		it(`reports a missing target with ${ready.length} candidates without claiming review completion`, async () => {
+			const { deps, reads } = preflight({ issues: [], ready });
 			const result = await runCycleStatus(deps);
 			assert.deepEqual(result.issueTargets, []);
 			assert.deepEqual(reads, []);
-			assert.match(result.issueError, /no .*issue|no --issue/);
+			assert.match(result.issueError, /No --issue given/);
 			assert.equal(result.gateCheckCommand, null);
 			assertNoRecordVerdict(result);
 		});

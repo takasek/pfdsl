@@ -12,49 +12,50 @@ import {
 } from "./cycle-status.mjs";
 
 describe("parseReadyOutput", () => {
-	it("extracts ready ids, best id, and best outputs", () => {
+	it("preserves ready decision material without selecting a process", () => {
 		const json = {
 			ok: true,
 			ready: [
-				{ id: "a", label: "A" },
-				{ id: "b", label: "B" },
+				{
+					id: "a",
+					label: "A",
+					inputs: ["seed"],
+					outputs: ["a_out"],
+					newlyReadyCount: 0,
+				},
+				{
+					id: "b",
+					label: "B",
+					inputs: ["seed"],
+					outputs: ["b_out"],
+					newlyReadyCount: 2,
+				},
 			],
-			best: { id: "a", label: "A", outputs: ["a_out"] },
 		};
 		assert.deepEqual(parseReadyOutput(json), {
-			ready: ["a", "b"],
-			best: "a",
-			bestOutputs: ["a_out"],
+			ready: json.ready,
 		});
 	});
 
 	it("returns empty when ok is false", () => {
 		assert.deepEqual(parseReadyOutput({ ok: false }), {
 			ready: [],
-			best: null,
-			bestOutputs: [],
 		});
 	});
 
 	it("returns empty for missing/invalid input", () => {
 		assert.deepEqual(parseReadyOutput(null), {
 			ready: [],
-			best: null,
-			bestOutputs: [],
 		});
 		assert.deepEqual(parseReadyOutput(undefined), {
 			ready: [],
-			best: null,
-			bestOutputs: [],
 		});
 	});
 
-	it("returns null best and empty bestOutputs when absent", () => {
+	it("returns an empty ready list when no candidate exists", () => {
 		const json = { ok: true, ready: [] };
 		assert.deepEqual(parseReadyOutput(json), {
 			ready: [],
-			best: null,
-			bestOutputs: [],
 		});
 	});
 });
