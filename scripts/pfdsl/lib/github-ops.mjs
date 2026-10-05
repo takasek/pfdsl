@@ -209,7 +209,7 @@ export function createGitHubOps({
 					),
 			),
 
-		/** @returns {Promise<Array<{number: number, state: string, stateReason: string|null, labels: {name:string}[], updatedAt: string}>>} */
+		/** @returns {Promise<Array<{number: number, state: string, stateReason: string|null, labels: {name:string}[]}>>} */
 		listIssues: () =>
 			withListFallback(
 				"listIssues",
@@ -221,7 +221,7 @@ export function createGitHubOps({
 						"--state",
 						"all",
 						"--json",
-						"number,state,stateReason,labels,updatedAt",
+						"number,state,stateReason,labels",
 						"--limit",
 						String(ISSUE_LIST_LIMIT),
 					]);
