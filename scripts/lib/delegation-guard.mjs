@@ -127,26 +127,137 @@ const GH_VALUE_FLAGS = new Set([
 	"--name",
 ]);
 
+const GH_COMMAND_HELP_FLAGS = {
+	"label create": {
+		value: new Set(["--color", "-c", "--description", "-d"]),
+		boolean: new Set(["--force", "-f"]),
+	},
+	"label edit": {
+		value: new Set(["--color", "-c", "--description", "-d", "--name", "-n"]),
+		boolean: new Set(),
+	},
+	"issue edit": {
+		value: new Set([
+			"--add-assignee",
+			"--add-blocked-by",
+			"--add-blocking",
+			"--add-label",
+			"--add-project",
+			"--add-sub-issue",
+			"--attach",
+			"--parent",
+			"--remove-assignee",
+			"--remove-blocked-by",
+			"--remove-blocking",
+			"--remove-label",
+			"--remove-project",
+			"--remove-sub-issue",
+			"--type",
+		]),
+		boolean: new Set([
+			"--remove-milestone",
+			"--remove-parent",
+			"--remove-type",
+		]),
+	},
+	"issue close": {
+		value: new Set(["--comment", "-c", "--duplicate-of", "--reason", "-r"]),
+		boolean: new Set([]),
+	},
+	"pr edit": {
+		value: new Set([
+			"--add-assignee",
+			"--add-label",
+			"--add-project",
+			"--add-reviewer",
+			"--attach",
+			"--remove-assignee",
+			"--remove-label",
+			"--remove-project",
+			"--remove-reviewer",
+		]),
+		boolean: new Set(["--remove-milestone"]),
+	},
+	"release create": {
+		value: new Set([
+			"--discussion-category",
+			"--notes",
+			"-n",
+			"--notes-file",
+			"--notes-start-tag",
+			"--target",
+		]),
+		boolean: new Set([
+			"-d",
+			"--draft",
+			"--fail-on-no-commits",
+			"--generate-notes",
+			"--latest",
+			"--notes-from-tag",
+			"-p",
+			"--prerelease",
+			"--verify-tag",
+		]),
+	},
+	"repo create": {
+		value: new Set([
+			"--description",
+			"-d",
+			"--gitignore",
+			"-g",
+			"--homepage",
+			"-h",
+			"--license",
+			"-l",
+			"--remote",
+			"-r",
+			"--source",
+			"-s",
+			"--team",
+			"-t",
+			"--template",
+			"-p",
+		]),
+		boolean: new Set([
+			"--add-readme",
+			"--clone",
+			"-c",
+			"--disable-issues",
+			"--disable-wiki",
+			"--include-all-branches",
+			"--internal",
+			"--private",
+			"--public",
+			"--push",
+		]),
+	},
+	"label clone": {
+		value: new Set([]),
+		boolean: new Set(["--force", "-f"]),
+	},
+	"pr merge": {
+		value: new Set([]),
+		boolean: new Set([
+			"--auto",
+			"--admin",
+			"-d",
+			"--delete-branch",
+			"--disable-auto",
+			"-m",
+			"--merge",
+			"-r",
+			"--rebase",
+			"-s",
+			"--squash",
+		]),
+	},
+};
+
 function hasHelpOption(parsed) {
 	if (!BUILTIN_GH_GROUPS.has(parsed.group)) return false;
 	// `extension exec` forwards the remaining argv to arbitrary extension code.
 	if (parsed.group === "extension" && parsed.verb === "exec") return false;
-	const mergeFlags =
-		parsed.group === "pr" && parsed.verb === "merge"
-			? new Set([
-					"--auto",
-					"--admin",
-					"-d",
-					"--delete-branch",
-					"--disable-auto",
-					"-m",
-					"--merge",
-					"-r",
-					"--rebase",
-					"-s",
-					"--squash",
-				])
-			: new Set();
+	const commandFlags = GH_COMMAND_HELP_FLAGS[`${parsed.group} ${parsed.verb}`];
 	for (let i = 0; i < parsed.args.length; i++) {
 		const arg = parsed.args[i];
 		if (arg === "--") break;
@@ -154,7 +265,12 @@ function hasHelpOption(parsed) {
 		// (--homepage on repo create/edit, --hostname on auth logout).
 		if (arg === "--help") return true;
 		const name = arg.split("=", 1)[0];
-		if (mergeFlags.has(name) || GH_BOOLEAN_FLAGS.has(name)) continue;
+		if (commandFlags?.value.has(name)) {
+			if (arg === name) i++;
+			continue;
+		}
+		if (commandFlags?.boolean.has(name)) continue;
+		if (GH_BOOLEAN_FLAGS.has(name)) continue;
 		if (GH_VALUE_FLAGS.has(arg)) {
 			i++;
 			continue;

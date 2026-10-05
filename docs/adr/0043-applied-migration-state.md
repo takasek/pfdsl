@@ -58,7 +58,7 @@ hash を人手で計算させないためにコマンドを用意するが、キ
 
 `check-install-sync.mjs` が target を採用先と分類した場合に、`.pfdsl/config.json` の `appliedMigration` だけを読んで行う。
 GitHub Issues バックエンドの採否にも `--upstream` の有無にも依存させない。
-`--deploy` の拒否が `--upstream` なしの実行でも効く必要があり、pfd-ops の発火時セルフチェックは既定で `--upstream` 付きで同じスクリプトを実行するので、Claude Code と Codex の両方で pfd-ops の起動時に走る。
+`--deploy` の拒否が通常の実行でも効く必要があり、pfd-ops の発火時セルフチェックは同じスクリプトを実行するので、Claude Code と Codex の両方で pfd-ops の起動時に走る。
 
 - `.pfdsl/` が無い: 何もしない。plugin はユーザー単位で入るため、無関係なリポでも起動する（ADR-0028）。
 - `appliedMigration` が無い: 仕組みの導入前の採用先として、移行ガイドの「Choosing the update range」を案内し、適用後に `--record-migration` を実行するよう示す。実行中の plugin の版を決められない場合（repo-local の旧配置など）は、そのコマンドが exit 3 で拒否されるため出さず、記録には plugin（Claude Code または Codex）経由の実行が要る旨を示す。失敗にはしない。
@@ -73,13 +73,22 @@ older の状態で、`--deploy` を指さない通常の実行は失敗にしな
 
 ### Codex
 
-既存の `checkUpstreamVersion` は `.claude-plugin/plugin.json` だけを読み、Codex の plugin（`.codex-plugin/plugin.json`、`bundle-manifest.sha256` なし）では何も出さない。
 移行状態の照合は、両方の plugin manifest を読む `readPluginIdentity` で実行中の plugin の版を読む。
-`checkUpstreamVersion` は変えない。`--upstream` の上流との版ずれ警告は、引き続き Claude Code の manifest だけを読み、Codex では何も出さない。
 `bundleHash` は、`.claude-plugin/bundle-manifest.sha256` がある plugin でだけ読み、無ければ持たない。
 plugin の外で動いていて、どちらの manifest も版を持たない場合は、版が不明として扱う。
 
 ### 範囲
+
+2026-10-05 の方針更新（#1379）: 既知の v0.0.26 採用リポは所有者が把握しており、#1319 を個別に読ませて移行する。
+この既知採用先への対応は一時的な内部運用であり、公開の移行ガイドに採用先管理や削除条件を載せない。
+#1319 の対象先すべての適用・検証・必要な `appliedMigration` 記録を確認して完了と判断したら、本節の既知採用先に関する説明とその削除条件を削除する。
+issue の close だけを採用先の移行完了の証明にしない。
+
+上流 main との版差・bundle 内容差を毎回通知する恒久的な導線は置かない。
+`checkUpstreamVersion` とネットワーク比較を廃止し、移行が必要かどうかの信号は `appliedMigration` と実行中 plugin の照合が担う。
+これは ADR-0028 論点4の上流版差通知と、本 ADR の当初の「上流版差通知は変えない」という判断を置き換える。
+既存の呼出しを壊さないため `--upstream` は無作用の互換 flag として受け付けるが、現行の手順では付けない。
+配置ファイルの同梱 canonical との drift、未記録・版差・内容差の移行照合、古い plugin の書込み拒否は維持する。
 
 この仕組みより前の版の道具は `appliedMigration` を読めないため、守る対象にしない。
 `.pfdsl/config.json` は `--target`（既定は cwd）の直下で探す。install/ の配置先と同じ基準である。

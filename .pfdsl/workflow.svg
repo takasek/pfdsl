@@ -219,7 +219,7 @@
 <!-- maintain_repo_bindings -->
 <g id="node36" class="node">
 <title>maintain_repo_bindings</title>
-<g id="a_node36"><a xlink:title="repo binding・guard・companion整備&#10;&#10;decisions が指名した repo&#45;local な binding・guard・companion の正本を改訂する。 prose_mechanization_sweep_record の散文・機構矛盾、retro_findings の運用実態との不一致を binding 文言・guard 規則・説明へ反映する。 workflow_md の改訂では workflow_pfdsl を突合相手として読み、図の改訂で名指しが食い違った箇所を追随させる。 検証コマンドは正本ごとに異なり、各出力 artifact の criteria が一次情報である。&#10;">
+<g id="a_node36"><a xlink:title="repo binding・guard・companion整備&#10;&#10;decisions が指名した repo&#45;local な binding・guard・companion の正本を改訂する。 prose_mechanization_sweep_record の散文・機構矛盾、retro_findings の運用実態との不一致を binding 文言・guard 規則・説明へ反映する。 workflow_md の改訂では workflow_pfdsl を突合相手として読み、図の改訂で名指しが食い違った箇所を追随させる。 bindings_pfd_ops の改訂では ops_skill_general の現行 SKILL.md・work&#45;cycle.md を突合相手として読み、配布層とリポ固有手順の契約を揃える。 検証コマンドは正本ごとに異なり、各出力 artifact の criteria が一次情報である。&#10;">
 <ellipse fill="none" stroke="black" cx="2666.43" cy="-1792.39" rx="107.54" ry="41.3"/>
 <text xml:space="preserve" text-anchor="middle" x="2666.43" y="-1804.99" font-family="Times,serif" font-size="14.00">maintain_repo_bindings</text>
 <text xml:space="preserve" text-anchor="middle" x="2666.43" y="-1788.19" font-family="Times,serif" font-size="14.00">repo binding・guard</text>
@@ -612,7 +612,7 @@
 </g>
 </g>
 <!-- bindings_pfd_ops&#45;&gt;develop -->
-<g id="edge172" class="edge">
+<g id="edge173" class="edge">
 <title>bindings_pfd_ops&#45;&gt;develop</title>
 <path fill="none" stroke="#888888" stroke-dasharray="5,2" d="M2892.99,-1783.17C2879.29,-1778.22 2866.33,-1770.72 2857.27,-1759.39 2799.87,-1687.61 2881.42,-1416.88 2821.27,-1347.39 2773.93,-1292.7 2259.44,-1206.72 2187.59,-1198.39 2061.58,-1183.77 2021.51,-1155.38 1902.17,-1198.39 1792.72,-1237.84 1800.51,-1305.81 1700.57,-1365.39 1694.03,-1369.29 1686.95,-1372.92 1679.78,-1376.23"/>
 <polygon fill="#888888" stroke="#888888" points="1678.39,-1373.02 1670.65,-1380.26 1681.21,-1379.43 1678.39,-1373.02"/>
@@ -642,7 +642,7 @@
 <polygon fill="#888888" stroke="#888888" points="2760.36,-1819.18 2749.79,-1819.87 2758.49,-1825.92 2760.36,-1819.18"/>
 </g>
 <!-- bindings_pfd_retro&#45;&gt;develop -->
-<g id="edge173" class="edge">
+<g id="edge174" class="edge">
 <title>bindings_pfd_retro&#45;&gt;develop</title>
 <path fill="none" stroke="#888888" stroke-dasharray="5,2" d="M2885.68,-1856.47C2874.7,-1851.6 2864.63,-1844.82 2857.27,-1835.39 2779.86,-1736.21 2908.71,-1360.85 2821.27,-1270.39 2772.72,-1220.17 2108.6,-1143.28 1902.17,-1208.39 1816.47,-1235.42 1803.5,-1264.42 1736.57,-1324.39 1718.51,-1340.57 1720.35,-1351.36 1700.57,-1365.39 1694.45,-1369.73 1687.67,-1373.62 1680.71,-1377.08"/>
 <polygon fill="#888888" stroke="#888888" points="1679.42,-1373.82 1671.81,-1381.19 1682.36,-1380.17 1679.42,-1373.82"/>
@@ -670,7 +670,7 @@
 <polygon fill="#888888" stroke="#888888" points="2719.9,-1835.01 2709.82,-1831.74 2715.66,-1840.58 2719.9,-1835.01"/>
 </g>
 <!-- delegation_guard&#45;&gt;develop -->
-<g id="edge182" class="edge">
+<g id="edge183" class="edge">
 <title>delegation_guard&#45;&gt;develop</title>
 <path fill="none" stroke="#888888" stroke-dasharray="5,2" d="M2892.79,-1932.76C2879.19,-1928.84 2866.31,-1922.24 2857.27,-1911.39 2765.92,-1801.8 2917.04,-1376.13 2821.27,-1270.39 2683.37,-1118.13 2106.23,-1147.69 1902.17,-1171.39 1827.07,-1180.11 1789.96,-1156.84 1736.57,-1210.39 1686.64,-1260.47 1746.55,-1311.65 1700.57,-1365.39 1695.94,-1370.81 1690.28,-1375.35 1684.12,-1379.15"/>
 <polygon fill="#888888" stroke="#888888" points="1682.59,-1376 1675.45,-1383.82 1685.91,-1382.16 1682.59,-1376"/>
@@ -715,7 +715,7 @@
 <polygon fill="#888888" stroke="#888888" points="2196.84,-2251.66 2187.23,-2256.12 2197.52,-2258.63 2196.84,-2251.66"/>
 </g>
 <!-- distribution_review_perspectives&#45;&gt;develop -->
-<g id="edge183" class="edge">
+<g id="edge184" class="edge">
 <title>distribution_review_perspectives&#45;&gt;develop</title>
 <path fill="none" stroke="#888888" stroke-dasharray="5,2" d="M2227.25,-2212.2C2225.98,-2210.99 2224.76,-2209.72 2223.59,-2208.39 2149.5,-2124.32 2232.49,-1808.07 2187.59,-1705.39 2103.9,-1513.97 2057.86,-1445.46 1866.17,-1362.39 1813.32,-1339.49 1793.54,-1353.88 1736.57,-1362.39 1717.31,-1365.27 1696.83,-1370.66 1678.45,-1376.41"/>
 <polygon fill="#888888" stroke="#888888" points="1677.48,-1373.04 1669.04,-1379.45 1679.64,-1379.7 1677.48,-1373.04"/>
@@ -754,7 +754,7 @@
 <polygon fill="#888888" stroke="#888888" points="2183.88,-2280.27 2173.57,-2282.72 2183.16,-2287.24 2183.88,-2280.27"/>
 </g>
 <!-- distribution_review_skill&#45;&gt;review_distribution -->
-<g id="edge189" class="edge">
+<g id="edge190" class="edge">
 <title>distribution_review_skill&#45;&gt;review_distribution</title>
 <path fill="none" stroke="#888888" stroke-dasharray="5,2" d="M2451.15,-2286.56C2460.48,-2282.26 2468.92,-2276.37 2475.59,-2268.39 2539.25,-2192.32 2471.05,-573.91 2511.59,-483.39 2530.68,-440.77 2569.16,-405.01 2602.86,-379.91"/>
 <polygon fill="#888888" stroke="#888888" points="2604.51,-383.04 2610.54,-374.33 2600.39,-377.37 2604.51,-383.04"/>
@@ -864,7 +864,7 @@
 <polygon fill="#888888" stroke="#888888" points="2810.46,-2364.2 2800.11,-2366.49 2809.63,-2371.15 2810.46,-2364.2"/>
 </g>
 <!-- implementer_agent&#45;&gt;develop -->
-<g id="edge184" class="edge">
+<g id="edge185" class="edge">
 <title>implementer_agent&#45;&gt;develop</title>
 <path fill="none" stroke="#888888" stroke-dasharray="5,2" d="M2888.9,-2373.76C2876.7,-2369.73 2865.37,-2363.34 2857.27,-2353.39 2781.24,-2260.03 2901.62,-1360.05 2821.27,-1270.39 2684.29,-1117.54 2106.04,-1155.71 1902.17,-1179.39 1827.07,-1188.11 1790.28,-1165.16 1736.57,-1218.39 1688.8,-1265.74 1744.61,-1314.54 1700.57,-1365.39 1695.9,-1370.78 1690.22,-1375.31 1684.06,-1379.1"/>
 <polygon fill="#888888" stroke="#888888" points="1682.53,-1375.94 1675.37,-1383.76 1685.84,-1382.11 1682.53,-1375.94"/>
@@ -887,7 +887,7 @@
 <polygon fill="#888888" stroke="#888888" points="2773.39,-1767.84 2764.51,-1773.62 2775.06,-1774.63 2773.39,-1767.84"/>
 </g>
 <!-- main_branch_guard&#45;&gt;develop -->
-<g id="edge185" class="edge">
+<g id="edge186" class="edge">
 <title>main_branch_guard&#45;&gt;develop</title>
 <path fill="none" stroke="#888888" stroke-dasharray="5,2" d="M2885.73,-1704.44C2874.74,-1699.58 2864.65,-1692.8 2857.27,-1683.39 2785.48,-1591.92 2896.13,-1250.36 2821.27,-1161.39 2730.02,-1052.95 2635.07,-1154.95 2511.59,-1085.39 2491.88,-1074.28 2496.48,-1058.08 2475.59,-1049.39 2323.98,-986.28 1859.06,-937.99 1736.57,-1047.39 1683.53,-1094.76 1743.62,-1308.77 1700.57,-1365.39 1696.26,-1371.07 1690.8,-1375.77 1684.76,-1379.67"/>
 <polygon fill="#888888" stroke="#888888" points="1683.25,-1376.51 1676.2,-1384.42 1686.65,-1382.63 1683.25,-1376.51"/>
@@ -1192,8 +1192,14 @@
 <path fill="none" stroke="#888888" stroke-dasharray="5,2" d="M2938.87,-2093.93C2915.94,-2121.37 2880.1,-2163.63 2857.27,-2205.39 2834,-2247.94 2856.43,-2275 2821.27,-2308.39 2817.8,-2311.68 2814.12,-2314.73 2810.25,-2317.55"/>
 <polygon fill="#888888" stroke="#888888" points="2808.57,-2314.46 2802.17,-2322.91 2812.44,-2320.3 2808.57,-2314.46"/>
 </g>
+<!-- ops_skill_general&#45;&gt;maintain_repo_bindings -->
+<g id="edge160" class="edge">
+<title>ops_skill_general&#45;&gt;maintain_repo_bindings</title>
+<path fill="none" stroke="#888888" stroke-dasharray="5,2" d="M2889.36,-2047.8C2878.08,-2043.47 2866.96,-2038.08 2857.27,-2031.39 2785.43,-1981.79 2727.43,-1897.05 2695.21,-1842.94"/>
+<polygon fill="#888888" stroke="#888888" points="2698.35,-1841.36 2690.26,-1834.51 2692.31,-1844.91 2698.35,-1841.36"/>
+</g>
 <!-- ops_skill_general&#45;&gt;develop -->
-<g id="edge174" class="edge">
+<g id="edge175" class="edge">
 <title>ops_skill_general&#45;&gt;develop</title>
 <path fill="none" stroke="#888888" stroke-dasharray="5,2" d="M2889.41,-2054.27C2876.93,-2049.31 2865.37,-2042.03 2857.27,-2031.39 2796.1,-1951.06 2885.14,-1201.59 2821.27,-1123.39 2731.62,-1013.63 2635.07,-1116.95 2511.59,-1047.39 2491.88,-1036.28 2496.47,-1020.12 2475.59,-1011.39 2225.71,-906.87 2137.03,-1008.23 1866.17,-1007.39 1808.57,-1007.21 1779.29,-968.75 1736.57,-1007.39 1677.28,-1061.02 1748.57,-1301.44 1700.57,-1365.39 1696.29,-1371.1 1690.86,-1375.82 1684.84,-1379.73"/>
 <polygon fill="#888888" stroke="#888888" points="1683.32,-1376.56 1676.29,-1384.48 1686.73,-1382.68 1683.32,-1376.56"/>
@@ -1211,7 +1217,7 @@
 <polygon fill="#888888" stroke="#888888" points="2804.99,-2313.49 2797.45,-2320.93 2807.98,-2319.81 2804.99,-2313.49"/>
 </g>
 <!-- ops_skill_l3&#45;&gt;develop -->
-<g id="edge175" class="edge">
+<g id="edge176" class="edge">
 <title>ops_skill_l3&#45;&gt;develop</title>
 <path fill="none" stroke="#888888" stroke-dasharray="5,2" d="M2885.68,-2131.23C2874.55,-2125.37 2864.43,-2117.63 2857.27,-2107.39 2794.52,-2017.76 2887.22,-1210.68 2821.27,-1123.39 2723.92,-994.53 2633.41,-1045.64 2475.59,-1011.39 2349.69,-984.06 2316.22,-985.73 2187.59,-978.39 2060.95,-971.16 2028.93,-973.42 1902.17,-978.39 1828.4,-981.28 1789.24,-939.65 1736.57,-991.39 1677.02,-1049.91 1750.55,-1298.5 1700.57,-1365.39 1696.3,-1371.1 1690.88,-1375.83 1684.86,-1379.74"/>
 <polygon fill="#888888" stroke="#888888" points="1683.35,-1376.58 1676.32,-1384.5 1686.76,-1382.69 1683.35,-1376.58"/>
@@ -1268,7 +1274,7 @@
 <polygon fill="#888888" stroke="#888888" points="2129.13,-2300.36 2118.54,-2299.94 2126.56,-2306.87 2129.13,-2300.36"/>
 </g>
 <!-- prose_mechanization_audit_skill&#45;&gt;sweep_prose_mechanization -->
-<g id="edge190" class="edge">
+<g id="edge191" class="edge">
 <title>prose_mechanization_audit_skill&#45;&gt;sweep_prose_mechanization</title>
 <path fill="none" stroke="#888888" stroke-dasharray="5,2" d="M2472.99,-2331.45C2473.88,-2330.46 2474.75,-2329.44 2475.59,-2328.39 2549.15,-2236.17 2477.56,-1380.33 2511.59,-1267.39 2596.2,-986.62 2623.3,-882.17 2857.27,-705.39 2927.1,-652.62 3022.56,-626.62 3098.88,-613.82"/>
 <polygon fill="#888888" stroke="#888888" points="3099.19,-617.31 3108.5,-612.26 3098.07,-610.4 3099.19,-617.31"/>
@@ -1280,19 +1286,19 @@
 <polygon fill="#888888" stroke="#888888" points="2138.74,-1731.72 2129.3,-1736.54 2139.68,-1738.65 2138.74,-1731.72"/>
 </g>
 <!-- retro_skill&#45;&gt;collect_activity -->
-<g id="edge163" class="edge">
+<g id="edge164" class="edge">
 <title>retro_skill&#45;&gt;collect_activity</title>
 <path fill="none" stroke="#888888" stroke-dasharray="5,2" d="M2917.47,-2536.49C2895.93,-2553.83 2871.51,-2577.51 2857.27,-2604.39 2810.88,-2691.94 2889.58,-2752.63 2821.27,-2824.39 2802.89,-2843.69 2776.18,-2853.07 2750.15,-2857.29"/>
 <polygon fill="#888888" stroke="#888888" points="2750,-2853.78 2740.57,-2858.6 2750.95,-2860.72 2750,-2853.78"/>
 </g>
 <!-- retro_skill&#45;&gt;plan_retro -->
-<g id="edge164" class="edge">
+<g id="edge165" class="edge">
 <title>retro_skill&#45;&gt;plan_retro</title>
 <path fill="none" stroke="#888888" stroke-dasharray="5,2" d="M2999.09,-2536.38C3021.38,-2555.23 3050.12,-2580.43 3074.07,-2604.39 3119.03,-2649.37 3166.83,-2705.22 3196.59,-2741.08"/>
 <polygon fill="#888888" stroke="#888888" points="3193.72,-2743.11 3202.79,-2748.59 3199.12,-2738.65 3193.72,-2743.11"/>
 </g>
 <!-- retro_skill&#45;&gt;run_retro -->
-<g id="edge165" class="edge">
+<g id="edge166" class="edge">
 <title>retro_skill&#45;&gt;run_retro</title>
 <path fill="none" stroke="#888888" stroke-dasharray="5,2" d="M3038.2,-2524.57C3167.8,-2557.47 3438.78,-2633.77 3648.3,-2743.39 3665.82,-2752.56 3683.69,-2764.88 3698.86,-2776.39"/>
 <polygon fill="#888888" stroke="#888888" points="3696.69,-2779.13 3706.73,-2782.49 3700.97,-2773.6 3696.69,-2779.13"/>
@@ -1358,7 +1364,7 @@
 <polygon fill="#888888" stroke="#888888" points="2166.12,-2230.62 2157.48,-2236.75 2168.06,-2237.35 2166.12,-2230.62"/>
 </g>
 <!-- spec_stress_skill&#45;&gt;maintain_spec -->
-<g id="edge162" class="edge">
+<g id="edge163" class="edge">
 <title>spec_stress_skill&#45;&gt;maintain_spec</title>
 <path fill="none" stroke="#888888" stroke-dasharray="5,2" d="M2262.48,-2168.48C2105.37,-2155.85 1767.06,-2111.32 1534.98,-1956.39 1424.51,-1882.64 1326.89,-1756.67 1282.24,-1694.04"/>
 <polygon fill="#888888" stroke="#888888" points="1285.3,-1692.29 1276.67,-1686.14 1279.58,-1696.33 1285.3,-1692.29"/>
@@ -1370,7 +1376,7 @@
 <polygon fill="#888888" stroke="#888888" points="2170.46,-2231.44 2162.55,-2238.49 2173.13,-2237.91 2170.46,-2231.44"/>
 </g>
 <!-- vscode_ext_debug_skill&#45;&gt;develop -->
-<g id="edge180" class="edge">
+<g id="edge181" class="edge">
 <title>vscode_ext_debug_skill&#45;&gt;develop</title>
 <path fill="none" stroke="#888888" stroke-dasharray="5,2" d="M2258.7,-2096.5C2245.17,-2091.31 2232.71,-2083.64 2223.59,-2072.39 2172.87,-2009.82 2245.94,-1403.91 2187.59,-1348.39 2042.3,-1210.15 1933.5,-1324.42 1736.57,-1362.39 1717.71,-1366.03 1697.57,-1371.55 1679.38,-1377.18"/>
 <polygon fill="#888888" stroke="#888888" points="1678.55,-1373.77 1670.07,-1380.13 1680.66,-1380.44 1678.55,-1373.77"/>
@@ -1382,7 +1388,7 @@
 <polygon fill="#888888" stroke="#888888" points="2776.8,-1770.54 2768.36,-1776.94 2778.95,-1777.2 2776.8,-1770.54"/>
 </g>
 <!-- workflow_md&#45;&gt;develop -->
-<g id="edge186" class="edge">
+<g id="edge187" class="edge">
 <title>workflow_md&#45;&gt;develop</title>
 <path fill="none" stroke="#888888" stroke-dasharray="5,2" d="M2892.81,-1644.74C2879.2,-1640.83 2866.33,-1634.23 2857.27,-1623.39 2769.63,-1518.51 2908.73,-1114.42 2821.27,-1009.39 2730.58,-900.48 2635.07,-1002.95 2511.59,-933.39 2491.88,-922.28 2496.1,-906.94 2475.59,-897.39 2326.53,-827.94 1856.91,-747.31 1736.57,-859.39 1654.08,-936.22 1766.91,-1274.25 1700.57,-1365.39 1696.38,-1371.16 1691,-1375.92 1685,-1379.85"/>
 <polygon fill="#888888" stroke="#888888" points="1683.5,-1376.68 1676.49,-1384.63 1686.92,-1382.79 1683.5,-1376.68"/>
@@ -1487,7 +1493,7 @@
 <polygon fill="black" stroke="black" points="3221.16,-2736.39 3225.04,-2746.25 3228.15,-2736.12 3221.16,-2736.39"/>
 </g>
 <!-- integrated_repository&#45;&gt;develop -->
-<g id="edge179" class="edge">
+<g id="edge180" class="edge">
 <title>integrated_repository&#45;&gt;develop</title>
 <path fill="none" stroke="#888888" stroke-dasharray="5,2" d="M2332.41,-1329.68C2306.2,-1362.21 2250.95,-1422.95 2187.59,-1446.39 2012.09,-1511.31 1786.04,-1454.35 1679.48,-1419.98"/>
 <polygon fill="#888888" stroke="#888888" points="1680.65,-1416.69 1670.06,-1416.9 1678.47,-1423.34 1680.65,-1416.69"/>
@@ -1541,7 +1547,7 @@
 </g>
 </g>
 <!-- issue_updates&#45;&gt;file_issues -->
-<g id="edge187" class="edge">
+<g id="edge188" class="edge">
 <title>issue_updates&#45;&gt;file_issues</title>
 <path fill="none" stroke="#888888" stroke-dasharray="5,2" d="M2334.4,-1407.91C2309.6,-1443.33 2254.56,-1512.65 2187.59,-1539.39 2069.79,-1586.44 2028.67,-1548.88 1902.17,-1539.39 1827.95,-1533.82 1809.05,-1531.37 1736.57,-1514.39 1518.39,-1463.28 1480.56,-1360.39 1256.47,-1360.39 1082.96,-1360.39 1082.96,-1360.39 1082.96,-1360.39 919.46,-1360.39 727.75,-1382.77 631.24,-1395.61"/>
 <polygon fill="#888888" stroke="#888888" points="630.9,-1392.12 621.45,-1396.92 631.83,-1399.06 630.9,-1392.12"/>
@@ -1556,624 +1562,4 @@
 </a>
 </g>
 </g>
-<!-- map_transform_boundaries&#45;&gt;pipeline_md -->
-<g id="edge67" class="edge">
-<title>map_transform_boundaries&#45;&gt;pipeline_md</title>
-<path fill="none" stroke="black" d="M2783.32,-1392.61C2813.71,-1395.96 2845.94,-1399.95 2874.47,-1403.89"/>
-<polygon fill="black" stroke="black" points="2873.73,-1407.32 2884.12,-1405.24 2874.71,-1400.39 2873.73,-1407.32"/>
-</g>
-<!-- pipeline_pfdsl -->
-<g id="node64" class="node">
-<title>pipeline_pfdsl</title>
-<g id="a_node64"><a xlink:title="変換パイプライン図&#10;&#10;integrated_repository の実装にある実行時データ変換と生成・検査・公開処理の境界。変換コンポーネント追加・変更・削除時に更新（ADR&#45;0018 門番）&#10;criteria: check がエラーなし、meta check&#45;links が通過する。対象とする各変換段が integrated_repository の実装に対応したノード・エッジとして現れる&#10;location: .pfdsl/pipeline.pfdsl">
-<polygon fill="none" stroke="black" stroke-width="2" points="3037.27,-1381.19 2886.07,-1381.19 2886.07,-1339.59 3037.27,-1339.59 3037.27,-1381.19"/>
-<text xml:space="preserve" text-anchor="middle" x="2961.67" y="-1364.59" font-family="Times,serif" font-size="14.00">pipeline_pfdsl</text>
-<text xml:space="preserve" text-anchor="middle" x="2961.67" y="-1347.79" font-family="Times,serif" font-size="14.00">変換パイプライン図</text>
-</a>
-</g>
-</g>
-<!-- map_transform_boundaries&#45;&gt;pipeline_pfdsl -->
-<g id="edge68" class="edge">
-<title>map_transform_boundaries&#45;&gt;pipeline_pfdsl</title>
-<path fill="none" stroke="black" d="M2769.99,-1370.17C2803.97,-1366.83 2841.43,-1363.73 2874.09,-1361.55"/>
-<polygon fill="black" stroke="black" points="2874.16,-1365.05 2883.91,-1360.92 2873.71,-1358.07 2874.16,-1365.05"/>
-</g>
-<!-- workflow_pfdsl -->
-<g id="node70" class="node">
-<title>workflow_pfdsl</title>
-<g id="a_node70"><a xlink:title="ワークフロー図&#10;&#10;この図そのもの。対話から公開までのサイクル全体を変換グラフとして持つ。roadmap_pfdsl（issue 依存）・pipeline_pfdsl（変換境界）と並ぶ3つ目の運用 PFD で、3つとも専用の整理プロセスが生産する。自分の companion（workflow_md）だけが artifact で図が無い状態を解消した（#904）&#10;criteria: check がエラーなし、meta check&#45;links が通過する。workflow_md が名指すノード・エッジを graph describe で引いて食い違いがない&#10;location: .pfdsl/workflow.pfdsl">
-<polygon fill="none" stroke="black" stroke-width="2" points="3022.87,-1542.19 2900.47,-1542.19 2900.47,-1500.59 3022.87,-1500.59 3022.87,-1542.19"/>
-<text xml:space="preserve" text-anchor="middle" x="2961.67" y="-1525.59" font-family="Times,serif" font-size="14.00">workflow_pfdsl</text>
-<text xml:space="preserve" text-anchor="middle" x="2961.67" y="-1508.79" font-family="Times,serif" font-size="14.00">ワークフロー図</text>
-</a>
-</g>
-</g>
-<!-- map_workflow&#45;&gt;workflow_pfdsl -->
-<g id="edge71" class="edge">
-<title>map_workflow&#45;&gt;workflow_pfdsl</title>
-<path fill="none" stroke="black" d="M2737.29,-1515.54C2782.9,-1514.36 2842.29,-1514.34 2888.37,-1515.48"/>
-<polygon fill="black" stroke="black" points="2888.18,-1518.97 2898.27,-1515.75 2888.37,-1511.98 2888.18,-1518.97"/>
-</g>
-<!-- merge_pr -->
-<g id="node62" class="node">
-<title>merge_pr</title>
-<g id="a_node62"><a xlink:title="レビュー・マージ&#10;&#10;PR をレビューし main へ統合する。成果物はマージで正本になり、進捗・issue 更新もここで確定する。location はこのプロセスのうち機械化されている部分を指す — pr_diagrams の生成・配送がそれにあたり、その location（外部リポの URL）からは実装へ辿れないため、実装パスはこちらが持つ&#10;location: .github/workflows/pr&#45;diff&#45;images.yml">
-<ellipse fill="none" stroke="black" cx="2044.88" cy="-1386.39" rx="70.71" ry="29.42"/>
-<text xml:space="preserve" text-anchor="middle" x="2044.88" y="-1390.59" font-family="Times,serif" font-size="14.00">merge_pr</text>
-<text xml:space="preserve" text-anchor="middle" x="2044.88" y="-1373.79" font-family="Times,serif" font-size="14.00">レビュー・マージ</text>
-</a>
-</g>
-</g>
-<!-- merge_pr&#45;&gt;integrated_repository -->
-<g id="edge77" class="edge">
-<title>merge_pr&#45;&gt;integrated_repository</title>
-<path fill="none" stroke="black" d="M2107.76,-1372.6C2132.63,-1366.89 2161.53,-1360.06 2187.59,-1353.39 2212.57,-1346.99 2239.61,-1339.62 2264.26,-1332.71"/>
-<polygon fill="black" stroke="black" points="2264.9,-1336.16 2273.58,-1330.09 2263,-1329.43 2264.9,-1336.16"/>
-</g>
-<!-- merge_pr&#45;&gt;issue_updates -->
-<g id="edge78" class="edge">
-<title>merge_pr&#45;&gt;issue_updates</title>
-<path fill="none" stroke="black" d="M2116.09,-1386.39C2164.11,-1386.39 2227.61,-1386.39 2276.11,-1386.39"/>
-<polygon fill="black" stroke="black" points="2275.96,-1389.89 2285.96,-1386.39 2275.96,-1382.89 2275.96,-1389.89"/>
-</g>
-<!-- pr_diagrams -->
-<g id="node87" class="node">
-<title>pr_diagrams</title>
-<g id="a_node87"><a xlink:href="https://github.com/takasek/ci-image-store" xlink:title="PR差分ダイアグラム&#10;&#10;merged PR が .pfdsl を変更した際に CI（pr&#45;diff&#45;images.yml）が before/after/diff SVG を自動生成し takasek/ci&#45;image&#45;store へ push する。base revision を現行 CLI が受理できない場合は before/diff を省略し、after と診断コード・要約の注記を PR description に残す。画像と診断 sidecar は pfdsl/pr&#45;&lt;PR番号&gt;/&lt;元の .pfdsl パスから拡張子を除いた相対パス&gt;.{before.svg,after.svg,diff.svg,before&#45;unavailable.txt} に置き、注記は対応する GitHub PR の pfdsl&#45;diff&#45;images marker 内に置く。PR ごとに蓄積し、同じ PR の再実行ではその PR の成果物一式を置換する&#10;criteria: PR マージ後に .github/workflows/pr&#45;diff&#45;images.yml が生成可能な SVG を ci&#45;image&#45;store へ push する。同じ PR の再実行では pfdsl/pr&#45;&lt;PR番号&gt; の内容が今回の生成結果だけに置換され、不要になった before/diff が残らない。base revision が現行 CLI で受理されない場合も after SVG と before&#45;unavailable.txt が push され、対応する PR description にサニタイズ済み診断注記が表示される&#10;location: https://github.com/takasek/ci&#45;image&#45;store">
-<polygon fill="none" stroke="black" stroke-width="2" points="2425.19,-245.19 2273.99,-245.19 2273.99,-203.59 2425.19,-203.59 2425.19,-245.19"/>
-<text xml:space="preserve" text-anchor="middle" x="2349.59" y="-228.59" font-family="Times,serif" font-size="14.00">pr_diagrams</text>
-<text xml:space="preserve" text-anchor="middle" x="2349.59" y="-211.79" font-family="Times,serif" font-size="14.00">PR差分ダイアグラム</text>
-</a>
-</g>
-</g>
-<!-- merge_pr&#45;&gt;pr_diagrams -->
-<g id="edge79" class="edge">
-<title>merge_pr&#45;&gt;pr_diagrams</title>
-<path fill="none" stroke="black" d="M2115.85,-1387.2C2142.36,-1383.64 2170.28,-1374.48 2187.59,-1353.39 2265.11,-1258.96 2146.39,-349.08 2223.59,-254.39 2233.47,-242.28 2247.29,-234.55 2262.16,-229.71"/>
-<polygon fill="black" stroke="black" points="2262.97,-233.12 2271.67,-227.08 2261.1,-226.37 2262.97,-233.12"/>
-</g>
-<!-- pipeline_md&#45;&gt;develop -->
-<g id="edge176" class="edge">
-<title>pipeline_md&#45;&gt;develop</title>
-<path fill="none" stroke="#888888" stroke-dasharray="5,2" d="M2885.87,-1430.33C2712.73,-1452.03 2271.01,-1499.78 1902.17,-1475.39 1828.09,-1470.49 1807.84,-1474.22 1736.57,-1453.39 1713.79,-1446.73 1689.85,-1436.26 1669.54,-1426.23"/>
-<polygon fill="#888888" stroke="#888888" points="1671.14,-1423.12 1660.63,-1421.73 1667.98,-1429.36 1671.14,-1423.12"/>
-</g>
-<!-- pipeline_md&#45;&gt;map_transform_boundaries -->
-<g id="edge169" class="edge">
-<title>pipeline_md&#45;&gt;map_transform_boundaries</title>
-<path fill="none" stroke="#888888" stroke-dasharray="5,2" d="M2885.63,-1417.41C2851.82,-1414.17 2811.28,-1409.51 2774.37,-1404.68"/>
-<polygon fill="#888888" stroke="#888888" points="2774.91,-1401.22 2764.54,-1403.37 2773.99,-1408.16 2774.91,-1401.22"/>
-</g>
-<!-- pipeline_md&#45;&gt;sweep_prose_mechanization -->
-<g id="edge98" class="edge">
-<title>pipeline_md&#45;&gt;sweep_prose_mechanization</title>
-<path fill="none" stroke="black" d="M3037.49,-1417.39C3051.51,-1413.35 3064.69,-1406.54 3074.07,-1395.39 3115.31,-1346.35 3084.17,-880.91 3102.07,-819.39 3121.87,-751.3 3166.69,-681.64 3196.69,-639.95"/>
-<polygon fill="black" stroke="black" points="3199.46,-642.09 3202.52,-631.95 3193.8,-637.97 3199.46,-642.09"/>
-</g>
-<!-- pipeline_pfdsl&#45;&gt;draft_adrs -->
-<g id="edge121" class="edge">
-<title>pipeline_pfdsl&#45;&gt;draft_adrs</title>
-<path fill="none" stroke="#888888" stroke-dasharray="5,2" d="M2885.27,-1350.03C2875.24,-1346.46 2865.57,-1341.71 2857.27,-1335.39 2831,-1315.37 2849.72,-1287.15 2821.27,-1270.39 2818.65,-1268.85 2239.46,-1262.47 2223.59,-1278.39 2166,-1336.17 2239.1,-2683.12 2187.59,-2746.39 2168.59,-2769.74 2136.56,-2778.5 2107.76,-2781.19"/>
-<polygon fill="#888888" stroke="#888888" points="2107.75,-2777.69 2098.01,-2781.86 2108.23,-2784.67 2107.75,-2777.69"/>
-</g>
-<!-- pipeline_pfdsl&#45;&gt;develop -->
-<g id="edge177" class="edge">
-<title>pipeline_pfdsl&#45;&gt;develop</title>
-<path fill="none" stroke="#888888" stroke-dasharray="5,2" d="M2934.54,-1382.03C2907.85,-1402.82 2864.34,-1433.26 2821.27,-1448.39 2690.59,-1494.3 2645.25,-1447.06 2511.59,-1483.39 2494.7,-1487.98 2492.72,-1495.75 2475.59,-1499.39 2226.29,-1552.3 2156.42,-1513.03 1902.17,-1495.39 1828.16,-1490.25 1806.28,-1499.8 1736.57,-1474.39 1708.69,-1464.22 1680.64,-1446.5 1658.91,-1430.72"/>
-<polygon fill="#888888" stroke="#888888" points="1661.03,-1427.93 1650.91,-1424.78 1656.85,-1433.55 1661.03,-1427.93"/>
-</g>
-<!-- pipeline_pfdsl&#45;&gt;map_transform_boundaries -->
-<g id="edge170" class="edge">
-<title>pipeline_pfdsl&#45;&gt;map_transform_boundaries</title>
-<path fill="none" stroke="#888888" stroke-dasharray="5,2" d="M2885.45,-1372.78C2858.7,-1375.69 2827.75,-1378.57 2797.73,-1380.99"/>
-<polygon fill="#888888" stroke="#888888" points="2797.48,-1377.5 2787.79,-1381.78 2798.03,-1384.48 2797.48,-1377.5"/>
-</g>
-<!-- toolchain -->
-<g id="node69" class="node">
-<title>toolchain</title>
-<g id="a_node69"><a xlink:title="ツールチェーン&#10;&#10;integrated_repository の packages/（core / cli / graphviz&#45;exporter / preview&#45;engine / vscode&#45;extension）の現行状態&#10;criteria: gh pr view &lt;PR番号&gt; &#45;&#45;json mergeCommit &#45;&#45;jq &#39;.mergeCommit.oid&#39; で merge commit C を得て、git rev&#45;parse origin/main:packages と git rev&#45;parse C:packages が同じ tree object ID を返す&#10;location: packages/">
-<polygon fill="none" stroke="black" points="3022.87,-1321.19 2900.47,-1321.19 2900.47,-1279.59 3022.87,-1279.59 3022.87,-1321.19"/>
-<text xml:space="preserve" text-anchor="middle" x="2961.67" y="-1304.59" font-family="Times,serif" font-size="14.00">toolchain</text>
-<text xml:space="preserve" text-anchor="middle" x="2961.67" y="-1287.79" font-family="Times,serif" font-size="14.00">ツールチェーン</text>
-</a>
-</g>
-</g>
-<!-- project_toolchain&#45;&gt;toolchain -->
-<g id="edge81" class="edge">
-<title>project_toolchain&#45;&gt;toolchain</title>
-<path fill="none" stroke="black" d="M2747.17,-1306.21C2791.29,-1305.01 2845.69,-1303.53 2888.54,-1302.36"/>
-<polygon fill="black" stroke="black" points="2888.6,-1305.86 2898.5,-1302.08 2888.41,-1298.86 2888.6,-1305.86"/>
-</g>
-<!-- pull_request&#45;&gt;merge_pr -->
-<g id="edge76" class="edge">
-<title>pull_request&#45;&gt;merge_pr</title>
-<path fill="none" stroke="black" d="M1845.27,-1391.32C1877.72,-1390.52 1923.24,-1389.39 1962.51,-1388.41"/>
-<polygon fill="black" stroke="black" points="1962.52,-1391.91 1972.43,-1388.16 1962.35,-1384.91 1962.52,-1391.91"/>
-</g>
-<!-- roadmap_md -->
-<g id="node67" class="node">
-<title>roadmap_md</title>
-<g id="a_node67"><a xlink:title="計画 companion&#10;&#10;roadmap.pfdsl の sibling。このリポの issue 管理バインディング（GitHub backend、監査スクリプト実パス、L3 reference ポインタ、運用対象の計画 PFD 一覧、issue 固有の終端ゲート項目）。pfd&#45;ops skill が読む L4 ホスト&#10;criteria: check&#45;companion&#45;bindings と audit&#45;issues&#45;flow.mjs が差分なしで通過する。散文が名指す roadmap.pfdsl のノード・エッジを graph describe で引いて食い違いがない&#10;location: .pfdsl/roadmap.md">
-<polygon fill="none" stroke="black" points="1678.98,-1321.19 1556.58,-1321.19 1556.58,-1279.59 1678.98,-1279.59 1678.98,-1321.19"/>
-<text xml:space="preserve" text-anchor="middle" x="1617.78" y="-1304.59" font-family="Times,serif" font-size="14.00">roadmap_md</text>
-<text xml:space="preserve" text-anchor="middle" x="1617.78" y="-1287.79" font-family="Times,serif" font-size="14.00">計画 companion</text>
-</a>
-</g>
-</g>
-<!-- roadmap_md&#45;&gt;develop -->
-<g id="edge178" class="edge">
-<title>roadmap_md&#45;&gt;develop</title>
-<path fill="none" stroke="#888888" stroke-dasharray="5,2" d="M1617.78,-1321.44C1617.78,-1333.36 1617.78,-1345.28 1617.78,-1357.2"/>
-<polygon fill="#888888" stroke="#888888" points="1614.28,-1357.12 1617.78,-1367.12 1621.28,-1357.12 1614.28,-1357.12"/>
-</g>
-<!-- roadmap_md&#45;&gt;sweep_prose_mechanization -->
-<g id="edge99" class="edge">
-<title>roadmap_md&#45;&gt;sweep_prose_mechanization</title>
-<path fill="none" stroke="black" d="M1679.41,-1291.09C1687.55,-1287.41 1695,-1282.34 1700.57,-1275.39 1765.93,-1193.81 1705.91,-906.32 1736.57,-806.39 1780.11,-664.5 1778.54,-598.51 1902.17,-516.39 2101.23,-384.16 2847.44,-522.13 3123.05,-579.15"/>
-<polygon fill="black" stroke="black" points="3122.25,-582.56 3132.76,-581.17 3123.68,-575.71 3122.25,-582.56"/>
-</g>
-<!-- roadmap_md&#45;&gt;map_deps -->
-<g id="edge167" class="edge">
-<title>roadmap_md&#45;&gt;map_deps</title>
-<path fill="none" stroke="#888888" stroke-dasharray="5,2" d="M1556.11,-1302.95C1503.88,-1303.65 1426.94,-1301.08 1362.18,-1284.39 1361.98,-1284.34 1333.45,-1270.84 1306.09,-1257.89"/>
-<polygon fill="#888888" stroke="#888888" points="1307.62,-1254.74 1297.09,-1253.62 1304.63,-1261.07 1307.62,-1254.74"/>
-</g>
-<!-- roadmap_pfdsl -->
-<g id="node68" class="node">
-<title>roadmap_pfdsl</title>
-<g id="a_node68"><a xlink:title="issue 依存グラフ&#10;&#10;着手可能順序の導出。issue 追加時に更新&#10;criteria: check がエラーなし、audit&#45;issues&#45;flow.mjs が差分なし。&#10;location: .pfdsl/roadmap.pfdsl">
-<polygon fill="none" stroke="black" points="1498.98,-1421.19 1362.18,-1421.19 1362.18,-1379.59 1498.98,-1379.59 1498.98,-1421.19"/>
-<text xml:space="preserve" text-anchor="middle" x="1430.58" y="-1404.59" font-family="Times,serif" font-size="14.00">roadmap_pfdsl</text>
-<text xml:space="preserve" text-anchor="middle" x="1430.58" y="-1387.79" font-family="Times,serif" font-size="14.00">issue 依存グラフ</text>
-</a>
-</g>
-</g>
-<!-- roadmap_pfdsl&#45;&gt;draft_adrs -->
-<g id="edge122" class="edge">
-<title>roadmap_pfdsl&#45;&gt;draft_adrs</title>
-<path fill="none" stroke="#888888" stroke-dasharray="5,2" d="M1433.49,-1421.44C1447.75,-1574.43 1542.64,-2514.85 1736.57,-2708.39 1801.47,-2773.15 1912.93,-2783.57 1982.28,-2783.03"/>
-<polygon fill="#888888" stroke="#888888" points="1982.01,-2786.53 1991.95,-2782.87 1981.89,-2779.54 1982.01,-2786.53"/>
-</g>
-<!-- roadmap_pfdsl&#45;&gt;develop -->
-<g id="edge73" class="edge">
-<title>roadmap_pfdsl&#45;&gt;develop</title>
-<path fill="none" stroke="black" d="M1499.23,-1399.66C1513.42,-1399.51 1528.45,-1399.34 1542.85,-1399.19"/>
-<polygon fill="black" stroke="black" points="1542.76,-1402.69 1552.72,-1399.08 1542.69,-1395.69 1542.76,-1402.69"/>
-</g>
-<!-- roadmap_pfdsl&#45;&gt;map_deps -->
-<g id="edge168" class="edge">
-<title>roadmap_pfdsl&#45;&gt;map_deps</title>
-<path fill="none" stroke="#888888" stroke-dasharray="5,2" d="M1384.93,-1379.13C1376.93,-1375.61 1368.98,-1371.47 1362.18,-1366.39 1327.82,-1340.74 1299.4,-1300.91 1280.71,-1271.59"/>
-<polygon fill="#888888" stroke="#888888" points="1283.84,-1269.99 1275.56,-1263.37 1277.91,-1273.7 1283.84,-1269.99"/>
-</g>
-<!-- toolchain&#45;&gt;draft_adrs -->
-<g id="edge123" class="edge">
-<title>toolchain&#45;&gt;draft_adrs</title>
-<path fill="none" stroke="#888888" stroke-dasharray="5,2" d="M2900.05,-1284.42C2875.74,-1278.79 2847.36,-1273.16 2821.27,-1270.39 2817.52,-1269.99 2238.4,-1263.53 2223.59,-1278.39 2166,-1336.17 2239.1,-2683.12 2187.59,-2746.39 2168.59,-2769.74 2136.56,-2778.5 2107.76,-2781.19"/>
-<polygon fill="#888888" stroke="#888888" points="2107.75,-2777.69 2098.01,-2781.86 2108.23,-2784.67 2107.75,-2777.69"/>
-</g>
-<!-- toolchain&#45;&gt;review_examples -->
-<g id="edge134" class="edge">
-<title>toolchain&#45;&gt;review_examples</title>
-<path fill="none" stroke="#888888" stroke-dasharray="5,2" d="M2900.08,-1289.71C2885.7,-1286.1 2870.66,-1281.41 2857.27,-1275.39 2526.56,-1126.68 2500.12,-993.25 2187.59,-809.39 1995.19,-696.2 1887.76,-752.62 1736.57,-588.39 1706.84,-556.09 1722.45,-534.46 1700.57,-496.39 1641.53,-393.63 1586.99,-393.88 1534.98,-287.39 1505.28,-226.56 1552.21,-181.22 1498.98,-139.39 1457.07,-106.45 1059.22,-104.2 1019.16,-139.39 972.53,-180.36 999.58,-356.53 983.16,-416.39 968.85,-468.56 942.77,-525.25 924.37,-561.93"/>
-<polygon fill="#888888" stroke="#888888" points="921.26,-560.34 919.85,-570.84 927.5,-563.51 921.26,-560.34"/>
-</g>
-<!-- decide_cli_release -->
-<g id="node80" class="node">
-<title>decide_cli_release</title>
-<g id="a_node80"><a xlink:title="CLIリリース判断&#10;&#10;make release&#45;statusで@pfdsl/cliとplugin同梱物のbehindを確認し、公開するか・どの版で切るかを判断する。版数準備は通常PRで行い、判断後の明示SHAへのv* tag push・npm publish・marketplace参照更新はpipeline.pfdslが持つ。runnerのready表示は候補に留め、公開物・mainのpin反映・取得を確認したartifactだけをroadmap同期PRでdoneへ更新する&#10;command: make release&#45;status">
-<ellipse fill="none" stroke="black" cx="3227.18" cy="-352.39" rx="84.41" ry="29.42"/>
-<text xml:space="preserve" text-anchor="middle" x="3227.18" y="-356.59" font-family="Times,serif" font-size="14.00">decide_cli_release</text>
-<text xml:space="preserve" text-anchor="middle" x="3227.18" y="-339.79" font-family="Times,serif" font-size="14.00">CLIリリース判断</text>
-</a>
-</g>
-</g>
-<!-- toolchain&#45;&gt;decide_cli_release -->
-<g id="edge107" class="edge">
-<title>toolchain&#45;&gt;decide_cli_release</title>
-<path fill="none" stroke="black" d="M3023.09,-1300.68C3042.2,-1297.55 3061.57,-1290.39 3074.07,-1275.39 3124.96,-1214.3 3079.44,-636.61 3102.07,-560.39 3121.4,-495.26 3165.76,-429.5 3195.86,-389.84"/>
-<polygon fill="black" stroke="black" points="3198.55,-392.08 3201.88,-382.02 3193.01,-387.81 3198.55,-392.08"/>
-</g>
-<!-- decide_libraries_release -->
-<g id="node81" class="node">
-<title>decide_libraries_release</title>
-<g id="a_node81"><a xlink:title="ライブラリリリース判断&#10;&#10;make release&#45;statusでcore・graphviz&#45;exporter・preview&#45;engineのbehindを確認し、3ライブラリを公開するか・どの共通版で切るかを判断する。版数準備は通常PRで行い、判断後の明示SHAへのlib&#45;v* tag push・npm publishはpipeline.pfdslが持つ&#10;command: make release&#45;status">
-<ellipse fill="none" stroke="black" cx="3227.18" cy="-162.39" rx="106.95" ry="41.3"/>
-<text xml:space="preserve" text-anchor="middle" x="3227.18" y="-174.99" font-family="Times,serif" font-size="14.00">decide_libraries_release</text>
-<text xml:space="preserve" text-anchor="middle" x="3227.18" y="-158.19" font-family="Times,serif" font-size="14.00">ライブラリリリース</text>
-<text xml:space="preserve" text-anchor="middle" x="3227.18" y="-141.39" font-family="Times,serif" font-size="14.00">判断</text>
-</a>
-</g>
-</g>
-<!-- toolchain&#45;&gt;decide_libraries_release -->
-<g id="edge111" class="edge">
-<title>toolchain&#45;&gt;decide_libraries_release</title>
-<path fill="none" stroke="black" d="M3023.2,-1300.77C3042.32,-1297.65 3061.67,-1290.47 3074.07,-1275.39 3149.04,-1184.22 3035.06,-310.57 3102.07,-213.39 3108.51,-204.04 3117.01,-196.4 3126.53,-190.16"/>
-<polygon fill="black" stroke="black" points="3128.21,-193.23 3135.06,-185.14 3124.66,-187.2 3128.21,-193.23"/>
-</g>
-<!-- decide_vscode_release -->
-<g id="node82" class="node">
-<title>decide_vscode_release</title>
-<g id="a_node82"><a xlink:title="VSCode拡張リリース判断&#10;&#10;make release&#45;statusでtakasek.pfdslのbehindを確認し、拡張をパッケージするか・どの版で切るかを判断する。版数準備は通常PRで行い、判断後の明示SHAからの.vsix生成・vscode&#45;v* tag push・marketplaceアップロードはpipeline.pfdslが持つ&#10;command: make release&#45;status">
-<ellipse fill="none" stroke="black" cx="3227.18" cy="-263.39" rx="102.01" ry="41.3"/>
-<text xml:space="preserve" text-anchor="middle" x="3227.18" y="-275.99" font-family="Times,serif" font-size="14.00">decide_vscode_release</text>
-<text xml:space="preserve" text-anchor="middle" x="3227.18" y="-259.19" font-family="Times,serif" font-size="14.00">VSCode拡張リリー</text>
-<text xml:space="preserve" text-anchor="middle" x="3227.18" y="-242.39" font-family="Times,serif" font-size="14.00">ス判断</text>
-</a>
-</g>
-</g>
-<!-- toolchain&#45;&gt;decide_vscode_release -->
-<g id="edge115" class="edge">
-<title>toolchain&#45;&gt;decide_vscode_release</title>
-<path fill="none" stroke="black" d="M3023.18,-1300.75C3042.29,-1297.62 3061.65,-1290.45 3074.07,-1275.39 3142.03,-1192.97 3041.31,-402.25 3102.07,-314.39 3109.02,-304.34 3118.33,-296.27 3128.74,-289.78"/>
-<polygon fill="black" stroke="black" points="3130.25,-292.95 3137.26,-285.01 3126.82,-286.85 3130.25,-292.95"/>
-</g>
-<!-- workflow_pfdsl&#45;&gt;draft_adrs -->
-<g id="edge124" class="edge">
-<title>workflow_pfdsl&#45;&gt;draft_adrs</title>
-<path fill="none" stroke="#888888" stroke-dasharray="5,2" d="M2899.5,-1518.58C2883.78,-1514.94 2868.23,-1508.26 2857.27,-1496.39 2788.25,-1421.68 2898.64,-1336.41 2821.27,-1270.39 2819.03,-1268.48 2239.81,-1262.12 2223.59,-1278.39 2166,-1336.17 2239.1,-2683.12 2187.59,-2746.39 2168.59,-2769.74 2136.56,-2778.5 2107.76,-2781.19"/>
-<polygon fill="#888888" stroke="#888888" points="2107.75,-2777.69 2098.01,-2781.86 2108.23,-2784.67 2107.75,-2777.69"/>
-</g>
-<!-- workflow_pfdsl&#45;&gt;maintain_repo_bindings -->
-<g id="edge161" class="edge">
-<title>workflow_pfdsl&#45;&gt;maintain_repo_bindings</title>
-<path fill="none" stroke="#888888" stroke-dasharray="5,2" d="M2928.61,-1542.87C2905.53,-1559.94 2875.39,-1585.81 2857.27,-1615.39 2825.5,-1667.24 2863.87,-1704 2821.27,-1747.39 2809.43,-1759.44 2794.56,-1768.31 2778.76,-1774.82"/>
-<polygon fill="#888888" stroke="#888888" points="2777.8,-1771.44 2769.68,-1778.24 2780.27,-1777.99 2777.8,-1771.44"/>
-</g>
-<!-- workflow_pfdsl&#45;&gt;develop -->
-<g id="edge181" class="edge">
-<title>workflow_pfdsl&#45;&gt;develop</title>
-<path fill="none" stroke="#888888" stroke-dasharray="5,2" d="M2899.8,-1523.38C2807.91,-1526.27 2628.27,-1531.5 2475.59,-1533.39 2220.63,-1536.54 2156.1,-1538.57 1902.17,-1515.39 1828.29,-1508.64 1804.76,-1523.62 1736.57,-1494.39 1704.11,-1480.47 1673.38,-1454.85 1651.45,-1433.58"/>
-<polygon fill="#888888" stroke="#888888" points="1654.13,-1431.3 1644.57,-1426.74 1649.19,-1436.27 1654.13,-1431.3"/>
-</g>
-<!-- workflow_pfdsl&#45;&gt;map_workflow -->
-<g id="edge171" class="edge">
-<title>workflow_pfdsl&#45;&gt;map_workflow</title>
-<path fill="none" stroke="#888888" stroke-dasharray="5,2" d="M2899.78,-1526.99C2855.97,-1528.33 2796.41,-1528.5 2748.56,-1527.5"/>
-<polygon fill="#888888" stroke="#888888" points="2748.89,-1524.01 2738.81,-1527.27 2748.72,-1531.01 2748.89,-1524.01"/>
-</g>
-<!-- examples -->
-<g id="node71" class="node">
-<title>examples</title>
-<g id="a_node71"><a xlink:title="実践例&#10;&#10;品質ガイドの実証とレビュー素材。スキル参照への採録候補&#10;criteria: check がエラーなし、レビュー結果が pfd&#45;retro の出力表に finding として記録されている&#10;location: docs/examples/">
-<polygon fill="none" stroke="black" points="771.6,-622.19 692.4,-622.19 692.4,-580.59 771.6,-580.59 771.6,-622.19"/>
-<text xml:space="preserve" text-anchor="middle" x="732" y="-605.59" font-family="Times,serif" font-size="14.00">examples</text>
-<text xml:space="preserve" text-anchor="middle" x="732" y="-588.79" font-family="Times,serif" font-size="14.00">実践例</text>
-</a>
-</g>
-</g>
-<!-- examples&#45;&gt;review_examples -->
-<g id="edge22" class="edge">
-<title>examples&#45;&gt;review_examples</title>
-<path fill="none" stroke="black" d="M772.1,-601.39C783.73,-601.39 796.98,-601.39 810.47,-601.39"/>
-<polygon fill="black" stroke="black" points="810.31,-604.89 820.31,-601.39 810.31,-597.89 810.31,-604.89"/>
-</g>
-<!-- findings -->
-<g id="node72" class="node">
-<title>findings</title>
-<g id="a_node72"><a xlink:title="レビュー知見&#10;&#10;実践例レビューで得た品質知見。次世代の対話・整備への還流入力（消費先の一次情報は本図のエッジ）&#10;criteria: 各 finding の振り分け先が本図のエッジのいずれかに定まり、pfd&#45;retro の出力表に未振り分けの行が残っていない">
-<polygon fill="none" stroke="black" stroke-width="2" points="1137.96,-622.19 1029.96,-622.19 1029.96,-580.59 1137.96,-580.59 1137.96,-622.19"/>
-<text xml:space="preserve" text-anchor="middle" x="1083.96" y="-605.59" font-family="Times,serif" font-size="14.00">findings</text>
-<text xml:space="preserve" text-anchor="middle" x="1083.96" y="-588.79" font-family="Times,serif" font-size="14.00">レビュー知見</text>
-</a>
-</g>
-</g>
-<!-- findings&#45;&gt;discuss -->
-<g id="edge118" class="edge">
-<title>findings&#45;&gt;discuss</title>
-<path fill="none" stroke="#888888" stroke-dasharray="5,2" d="M1060.38,-579.77C1041.35,-562.89 1012.59,-540.36 983.16,-528.39 846.45,-472.78 429.57,-374.18 321.22,-474.39 251.88,-538.53 245.67,-1229.25 245.22,-1406.25"/>
-<polygon fill="#888888" stroke="#888888" points="241.72,-1406.11 245.2,-1416.11 248.72,-1406.12 241.72,-1406.11"/>
-</g>
-<!-- findings&#45;&gt;maintain_template -->
-<g id="edge127" class="edge">
-<title>findings&#45;&gt;maintain_template</title>
-<path fill="none" stroke="#888888" stroke-dasharray="5,2" d="M1109.2,-623.03C1197.04,-702.32 1503.88,-987.05 1700.57,-1267.39 1792.55,-1398.48 1806.61,-1438.74 1866.17,-1587.39 1887.36,-1640.26 1860.79,-1671.25 1902.17,-1710.39 1915.32,-1722.82 1932.21,-1730.88 1949.71,-1736.04"/>
-<polygon fill="#888888" stroke="#888888" points="1948.63,-1739.38 1959.19,-1738.51 1950.4,-1732.6 1948.63,-1739.38"/>
-</g>
-<!-- findings&#45;&gt;file_issues -->
-<g id="edge166" class="edge">
-<title>findings&#45;&gt;file_issues</title>
-<path fill="none" stroke="#888888" stroke-dasharray="5,2" d="M1038.66,-579.63C954.62,-541.83 771.38,-476.68 670,-571.39 640.6,-598.86 586.71,-1199.54 572.52,-1363.41"/>
-<polygon fill="#888888" stroke="#888888" points="569.03,-1363.1 571.66,-1373.37 576,-1363.71 569.03,-1363.1"/>
-</g>
-<!-- prose_mechanization_sweep_record -->
-<g id="node73" class="node">
-<title>prose_mechanization_sweep_record</title>
-<g id="a_node73"><a xlink:title="散文機械化棚卸し記録&#10;&#10;要求時に行った散文・機構監査の commit hash（docs/asset&#45;sweep/prose&#45;mechanization.json）と実行記録。次回の監査範囲を絞るために使い、release 判断は止めない。監査対象は現行の散文と機構で、歴史資料の事例は含めない&#10;criteria: prose&#45;mechanization.json が実在する監査済み commit と実行記録を指し、記録に対象範囲・所見・処遇がある&#10;location: docs/asset&#45;sweep/">
-<polygon fill="none" stroke="black" stroke-width="2" points="3640.3,-630.59 3388.3,-630.59 3388.3,-572.19 3640.3,-572.19 3640.3,-630.59"/>
-<text xml:space="preserve" text-anchor="middle" x="3514.3" y="-613.99" font-family="Times,serif" font-size="14.00">prose_mechanization_sweep_record</text>
-<text xml:space="preserve" text-anchor="middle" x="3514.3" y="-597.19" font-family="Times,serif" font-size="14.00">散文機械化棚卸し記</text>
-<text xml:space="preserve" text-anchor="middle" x="3514.3" y="-580.39" font-family="Times,serif" font-size="14.00">録</text>
-</a>
-</g>
-</g>
-<!-- prose_mechanization_sweep_record&#45;&gt;maintain_repo_bindings -->
-<g id="edge160" class="edge">
-<title>prose_mechanization_sweep_record&#45;&gt;maintain_repo_bindings</title>
-<path fill="none" stroke="#888888" stroke-dasharray="5,2" d="M3400.41,-571.28C3384.36,-568.01 3367.99,-565.22 3352.3,-563.39 3124.95,-536.92 2974.92,-509.05 2857.27,-705.39 2797.72,-804.76 2892.33,-1655.9 2821.27,-1747.39 2810.83,-1760.82 2796.62,-1770.4 2781.01,-1777.21"/>
-<polygon fill="#888888" stroke="#888888" points="2780.03,-1773.84 2772,-1780.74 2782.58,-1780.35 2780.03,-1773.84"/>
-</g>
-<!-- prose_mechanization_sweep_record&#45;&gt;sweep_prose_mechanization -->
-<g id="edge191" class="edge">
-<title>prose_mechanization_sweep_record&#45;&gt;sweep_prose_mechanization</title>
-<path fill="none" stroke="#888888" stroke-dasharray="5,2" d="M3387.52,-608.1C3378.64,-608.14 3369.68,-608.15 3360.76,-608.12"/>
-<polygon fill="#888888" stroke="#888888" points="3361.04,-604.63 3351.02,-608.08 3361.01,-611.63 3361.04,-604.63"/>
-</g>
-<!-- review_examples&#45;&gt;findings -->
-<g id="edge23" class="edge">
-<title>review_examples&#45;&gt;findings</title>
-<path fill="none" stroke="black" d="M983.57,-601.39C995.01,-601.39 1006.66,-601.39 1017.77,-601.39"/>
-<polygon fill="black" stroke="black" points="1017.61,-604.89 1027.61,-601.39 1017.61,-597.89 1017.61,-604.89"/>
-</g>
-<!-- sweep_prose_mechanization&#45;&gt;prose_mechanization_sweep_record -->
-<g id="edge101" class="edge">
-<title>sweep_prose_mechanization&#45;&gt;prose_mechanization_sweep_record</title>
-<path fill="none" stroke="black" d="M3349.51,-594.71C3358.35,-594.65 3367.31,-594.63 3376.24,-594.64"/>
-<polygon fill="black" stroke="black" points="3376,-598.14 3386.01,-594.68 3376.02,-591.14 3376,-598.14"/>
-</g>
-<!-- write_examples&#45;&gt;examples -->
-<g id="edge21" class="edge">
-<title>write_examples&#45;&gt;examples</title>
-<path fill="none" stroke="black" d="M642.42,-601.39C655.36,-601.39 668.57,-601.39 680.69,-601.39"/>
-<polygon fill="black" stroke="black" points="680.43,-604.89 690.43,-601.39 680.43,-597.89 680.43,-604.89"/>
-</g>
-<!-- claude_plugin_dist -->
-<g id="node77" class="node">
-<title>claude_plugin_dist</title>
-<g id="a_node77"><a xlink:title="Claude Code配布plugin root&#10;&#10;pipeline.pfdsl のClaude Code root組み立てと結合drift検査が生産する。既存marketplace経路を保つplugin/pfdsl/で、この図ではREADME更新と配布レビューの入力に現れる&#10;location: plugin/pfdsl/">
-<polygon fill="none" stroke="black" stroke-width="2" points="2428.79,-381.59 2270.39,-381.59 2270.39,-323.19 2428.79,-323.19 2428.79,-381.59"/>
-<text xml:space="preserve" text-anchor="middle" x="2349.59" y="-364.99" font-family="Times,serif" font-size="14.00">claude_plugin_dist</text>
-<text xml:space="preserve" text-anchor="middle" x="2349.59" y="-348.19" font-family="Times,serif" font-size="14.00">Claude</text>
-<text xml:space="preserve" text-anchor="middle" x="2349.59" y="-331.39" font-family="Times,serif" font-size="14.00">Code配布plugin root</text>
-</a>
-</g>
-</g>
-<!-- claude_plugin_dist&#45;&gt;review_distribution -->
-<g id="edge87" class="edge">
-<title>claude_plugin_dist&#45;&gt;review_distribution</title>
-<path fill="none" stroke="black" d="M2429.63,-349.38C2471.02,-347.8 2522.11,-345.85 2566.15,-344.17"/>
-<polygon fill="black" stroke="black" points="2566.1,-347.68 2575.96,-343.8 2565.84,-340.68 2566.1,-347.68"/>
-</g>
-<!-- update_readme -->
-<g id="node92" class="node">
-<title>update_readme</title>
-<g id="a_node92"><a xlink:title="README 更新&#10;&#10;CLI の提供形態・サンプル構成の変更を導入文書に反映する。CLI コマンドリファレンスは gen&#45;readme&#45;cli が自動化済みのため対象外">
-<ellipse fill="none" stroke="black" cx="2666.43" cy="-150.39" rx="71.78" ry="29.42"/>
-<text xml:space="preserve" text-anchor="middle" x="2666.43" y="-154.59" font-family="Times,serif" font-size="14.00">update_readme</text>
-<text xml:space="preserve" text-anchor="middle" x="2666.43" y="-137.79" font-family="Times,serif" font-size="14.00">README 更新</text>
-</a>
-</g>
-</g>
-<!-- claude_plugin_dist&#45;&gt;update_readme -->
-<g id="edge82" class="edge">
-<title>claude_plugin_dist&#45;&gt;update_readme</title>
-<path fill="none" stroke="black" d="M2429.52,-341.21C2446.51,-335.55 2463.1,-327.07 2475.59,-314.39 2516.17,-273.21 2470.06,-229.61 2511.59,-189.39 2530.9,-170.69 2557.84,-160.58 2583.78,-155.23"/>
-<polygon fill="black" stroke="black" points="2584.12,-158.72 2593.33,-153.48 2582.86,-151.84 2584.12,-158.72"/>
-</g>
-<!-- cli_release_request -->
-<g id="node78" class="node">
-<title>cli_release_request</title>
-<g id="a_node78"><a xlink:title="CLIリリース要求&#10;&#10;make release&#45;status の @pfdsl/cli 欄を材料に、公開する版と make release を実行する判断を外化した入力。pipeline.pfdsl が v* tag と npm 公開へ変換する&#10;criteria: @pfdsl/cliの公開要否と版が決まり、make release&#45;prepare VERSION=&lt;VERSION&gt;の差分を通常PRへまとめ、merge後の明示SHAをmake release COMMIT=&lt;SHA&gt;へ渡せる">
-<polygon fill="none" stroke="black" stroke-width="2" points="3593.5,-373.19 3435.1,-373.19 3435.1,-331.59 3593.5,-331.59 3593.5,-373.19"/>
-<text xml:space="preserve" text-anchor="middle" x="3514.3" y="-356.59" font-family="Times,serif" font-size="14.00">cli_release_request</text>
-<text xml:space="preserve" text-anchor="middle" x="3514.3" y="-339.79" font-family="Times,serif" font-size="14.00">CLIリリース要求</text>
-</a>
-</g>
-</g>
-<!-- codex_plugin_dist -->
-<g id="node79" class="node">
-<title>codex_plugin_dist</title>
-<g id="a_node79"><a xlink:title="Codex配布plugin root&#10;&#10;pipeline.pfdsl のCodex root組み立てと結合drift検査が生産する。公式Codex validator/runtimeのskills固定に従うnative rootのplugin/pfdsl&#45;codex/で、この図ではREADME更新と配布レビューの入力に現れる&#10;location: plugin/pfdsl&#45;codex/">
-<polygon fill="none" stroke="black" stroke-width="2" points="2432.39,-305.19 2266.79,-305.19 2266.79,-263.59 2432.39,-263.59 2432.39,-305.19"/>
-<text xml:space="preserve" text-anchor="middle" x="2349.59" y="-288.59" font-family="Times,serif" font-size="14.00">codex_plugin_dist</text>
-<text xml:space="preserve" text-anchor="middle" x="2349.59" y="-271.79" font-family="Times,serif" font-size="14.00">Codex配布plugin root</text>
-</a>
-</g>
-</g>
-<!-- codex_plugin_dist&#45;&gt;review_distribution -->
-<g id="edge88" class="edge">
-<title>codex_plugin_dist&#45;&gt;review_distribution</title>
-<path fill="none" stroke="black" d="M2433.31,-299.1C2475.8,-306.66 2527.74,-315.9 2571.7,-323.72"/>
-<polygon fill="black" stroke="black" points="2571.04,-327.15 2581.5,-325.46 2572.27,-320.26 2571.04,-327.15"/>
-</g>
-<!-- codex_plugin_dist&#45;&gt;update_readme -->
-<g id="edge83" class="edge">
-<title>codex_plugin_dist&#45;&gt;update_readme</title>
-<path fill="none" stroke="black" d="M2433.3,-274.77C2448.39,-270.28 2463.25,-263.78 2475.59,-254.39 2501.88,-234.4 2485.44,-209.55 2511.59,-189.39 2532.5,-173.27 2559.31,-163.76 2584.68,-158.16"/>
-<polygon fill="black" stroke="black" points="2585.22,-161.62 2594.33,-156.22 2583.84,-154.76 2585.22,-161.62"/>
-</g>
-<!-- decide_cli_release&#45;&gt;cli_release_request -->
-<g id="edge108" class="edge">
-<title>decide_cli_release&#45;&gt;cli_release_request</title>
-<path fill="none" stroke="black" d="M3311.8,-352.39C3346.79,-352.39 3387.53,-352.39 3423.19,-352.39"/>
-<polygon fill="black" stroke="black" points="3423.06,-355.89 3433.06,-352.39 3423.06,-348.89 3423.06,-355.89"/>
-</g>
-<!-- libraries_release_request -->
-<g id="node84" class="node">
-<title>libraries_release_request</title>
-<g id="a_node84"><a xlink:title="ライブラリリリース要求&#10;&#10;make release&#45;status の3ライブラリ欄を材料に、公開する版と make release&#45;libs を実行する判断を外化した入力。pipeline.pfdsl が lib&#45;v* tag と npm 公開へ変換する&#10;criteria: 3ライブラリの公開要否と共通版が決まり、make release&#45;libs&#45;prepare VERSION=&lt;VERSION&gt;の差分を通常PRへまとめ、merge後の明示SHAをmake release&#45;libs COMMIT=&lt;SHA&gt;へ渡せる">
-<polygon fill="none" stroke="black" stroke-width="2" points="3615.1,-191.59 3413.5,-191.59 3413.5,-133.19 3615.1,-133.19 3615.1,-191.59"/>
-<text xml:space="preserve" text-anchor="middle" x="3514.3" y="-174.99" font-family="Times,serif" font-size="14.00">libraries_release_request</text>
-<text xml:space="preserve" text-anchor="middle" x="3514.3" y="-158.19" font-family="Times,serif" font-size="14.00">ライブラリリリース</text>
-<text xml:space="preserve" text-anchor="middle" x="3514.3" y="-141.39" font-family="Times,serif" font-size="14.00">要求</text>
-</a>
-</g>
-</g>
-<!-- decide_libraries_release&#45;&gt;libraries_release_request -->
-<g id="edge112" class="edge">
-<title>decide_libraries_release&#45;&gt;libraries_release_request</title>
-<path fill="none" stroke="black" d="M3334.35,-162.39C3356.19,-162.39 3379.25,-162.39 3401.29,-162.39"/>
-<polygon fill="black" stroke="black" points="3401.2,-165.89 3411.2,-162.39 3401.2,-158.89 3401.2,-165.89"/>
-</g>
-<!-- vscode_release_request -->
-<g id="node93" class="node">
-<title>vscode_release_request</title>
-<g id="a_node93"><a xlink:title="VSCode拡張リリース要求&#10;&#10;make release&#45;status の takasek.pfdsl 欄を材料に、パッケージする版と make vscode&#45;package を実行する判断を外化した入力。pipeline.pfdsl の単一変換が .vsix を生成した後に vscode&#45;v* tag を push する&#10;criteria: VSCode拡張のパッケージ要否と版が決まり、make vscode&#45;prepare VERSION=&lt;VERSION&gt;の差分を通常PRへまとめ、merge後の明示SHAをmake vscode&#45;package COMMIT=&lt;SHA&gt;へ渡せる">
-<polygon fill="none" stroke="black" stroke-width="2" points="3604.3,-292.59 3424.3,-292.59 3424.3,-234.19 3604.3,-234.19 3604.3,-292.59"/>
-<text xml:space="preserve" text-anchor="middle" x="3514.3" y="-275.99" font-family="Times,serif" font-size="14.00">vscode_release_request</text>
-<text xml:space="preserve" text-anchor="middle" x="3514.3" y="-259.19" font-family="Times,serif" font-size="14.00">VSCode拡張リリー</text>
-<text xml:space="preserve" text-anchor="middle" x="3514.3" y="-242.39" font-family="Times,serif" font-size="14.00">ス要求</text>
-</a>
-</g>
-</g>
-<!-- decide_vscode_release&#45;&gt;vscode_release_request -->
-<g id="edge116" class="edge">
-<title>decide_vscode_release&#45;&gt;vscode_release_request</title>
-<path fill="none" stroke="black" d="M3329.5,-263.39C3356.39,-263.39 3385.43,-263.39 3412.3,-263.39"/>
-<polygon fill="black" stroke="black" points="3412.16,-266.89 3422.16,-263.39 3412.16,-259.89 3412.16,-266.89"/>
-</g>
-<!-- distribution_review_record -->
-<g id="node83" class="node">
-<title>distribution_review_record</title>
-<g id="a_node83"><a xlink:title="配布レビュー記録&#10;&#10;承認済み commit hash（reviewed.json）と回ごとの実行記録。hash を進めるのは差分モードだけで、全文モードは記録だけを残す。check&#45;distribution&#45;review.mjs が記録と配布ツリーの齟齬を判定し、各 release 判断の pre&#45;tag checks で release を止める&#10;criteria: reviewed.json の commit と HEAD の間に、レビュー対象スコープの差分が無い&#10;location: docs/distribution&#45;review/">
-<polygon fill="none" stroke="black" points="3066.07,-350.19 2857.27,-350.19 2857.27,-308.59 3066.07,-308.59 3066.07,-350.19"/>
-<text xml:space="preserve" text-anchor="middle" x="2961.67" y="-333.59" font-family="Times,serif" font-size="14.00">distribution_review_record</text>
-<text xml:space="preserve" text-anchor="middle" x="2961.67" y="-316.79" font-family="Times,serif" font-size="14.00">配布レビュー記録</text>
-</a>
-</g>
-</g>
-<!-- distribution_review_record&#45;&gt;maintain_distributed_prompt_assets -->
-<g id="edge158" class="edge">
-<title>distribution_review_record&#45;&gt;maintain_distributed_prompt_assets</title>
-<path fill="none" stroke="#888888" stroke-dasharray="5,2" d="M2953.58,-350.61C2933.78,-411.11 2877.94,-589.94 2857.27,-743.39 2845.72,-829.08 2873.92,-2230.8 2821.27,-2299.39 2816.6,-2305.47 2811.15,-2310.76 2805.15,-2315.37"/>
-<polygon fill="#888888" stroke="#888888" points="2803.52,-2312.24 2797.24,-2320.78 2807.47,-2318.02 2803.52,-2312.24"/>
-</g>
-<!-- distribution_review_record&#45;&gt;maintain_repo_local_capabilities -->
-<g id="edge159" class="edge">
-<title>distribution_review_record&#45;&gt;maintain_repo_local_capabilities</title>
-<path fill="none" stroke="#888888" stroke-dasharray="5,2" d="M2894.16,-308.22C2880.23,-301.03 2866.88,-291.62 2857.27,-279.39 2810.33,-219.7 2876.47,-164.52 2821.27,-112.39 2811.05,-102.74 2296.05,12.87 2223.59,-58.39 2138.02,-142.54 2259.26,-2122.12 2187.59,-2218.39 2183.29,-2224.16 2178.25,-2229.21 2172.67,-2233.63"/>
-<polygon fill="#888888" stroke="#888888" points="2170.92,-2230.58 2164.74,-2239.19 2174.94,-2236.32 2170.92,-2230.58"/>
-</g>
-<!-- distribution_review_record&#45;&gt;decide_cli_release -->
-<g id="edge105" class="edge">
-<title>distribution_review_record&#45;&gt;decide_cli_release</title>
-<path fill="none" stroke="black" d="M3066.44,-338.45C3088.64,-340.38 3111.95,-342.42 3133.69,-344.32"/>
-<polygon fill="black" stroke="black" points="3133.12,-347.78 3143.39,-345.16 3133.73,-340.81 3133.12,-347.78"/>
-</g>
-<!-- distribution_review_record&#45;&gt;decide_libraries_release -->
-<g id="edge109" class="edge">
-<title>distribution_review_record&#45;&gt;decide_libraries_release</title>
-<path fill="none" stroke="black" d="M3031.4,-308.16C3046.87,-300.93 3062.2,-291.5 3074.07,-279.39 3096.36,-256.63 3079.41,-235.79 3102.07,-213.39 3110.35,-205.2 3120.14,-198.26 3130.52,-192.4"/>
-<polygon fill="black" stroke="black" points="3132.05,-195.55 3139.29,-187.81 3128.81,-189.35 3132.05,-195.55"/>
-</g>
-<!-- distribution_review_record&#45;&gt;decide_vscode_release -->
-<g id="edge113" class="edge">
-<title>distribution_review_record&#45;&gt;decide_vscode_release</title>
-<path fill="none" stroke="black" d="M3047.49,-308.14C3073.41,-301.65 3102.12,-294.46 3128.8,-287.78"/>
-<polygon fill="black" stroke="black" points="3129.38,-291.24 3138.23,-285.42 3127.68,-284.45 3129.38,-291.24"/>
-</g>
-<!-- migration_guide -->
-<g id="node86" class="node">
-<title>migration_guide</title>
-<g id="a_node86"><a xlink:title="版別移行ガイド&#10;&#10;公開版間の変更と未公開の移行項目。採用先は更新前後の版で対象節を選び、リリース判断は対象範囲と版の確定を確認する。&#10;criteria: 更新前後の CLI/plugin 版または未公開の根拠 commit、影響、手順、検証が特定できる&#10;externalStakeholders: 採用リポの保守担当&#10;location: docs/migration&#45;guide.md">
-<polygon fill="none" stroke="black" points="3026.47,-270.19 2896.87,-270.19 2896.87,-228.59 3026.47,-228.59 3026.47,-270.19"/>
-<text xml:space="preserve" text-anchor="middle" x="2961.67" y="-253.59" font-family="Times,serif" font-size="14.00">migration_guide</text>
-<text xml:space="preserve" text-anchor="middle" x="2961.67" y="-236.79" font-family="Times,serif" font-size="14.00">版別移行ガイド</text>
-</a>
-</g>
-</g>
-<!-- maintain_adopter_guidance&#45;&gt;migration_guide -->
-<g id="edge104" class="edge">
-<title>maintain_adopter_guidance&#45;&gt;migration_guide</title>
-<path fill="none" stroke="black" d="M2787.97,-236.85C2821.03,-237.73 2855.91,-239.14 2885.61,-240.85"/>
-<polygon fill="black" stroke="black" points="2885.02,-244.32 2895.21,-241.43 2885.44,-237.33 2885.02,-244.32"/>
-</g>
-<!-- migration_guide&#45;&gt;decide_cli_release -->
-<g id="edge106" class="edge">
-<title>migration_guide&#45;&gt;decide_cli_release</title>
-<path fill="none" stroke="black" d="M3011.12,-270.61C3030.75,-279.34 3053.57,-289.67 3074.07,-299.39 3086.64,-305.35 3089.17,-308.18 3102.07,-313.39 3117.29,-319.54 3133.89,-325.35 3149.84,-330.5"/>
-<polygon fill="black" stroke="black" points="3148.72,-333.82 3159.31,-333.51 3150.84,-327.15 3148.72,-333.82"/>
-</g>
-<!-- migration_guide&#45;&gt;decide_libraries_release -->
-<g id="edge110" class="edge">
-<title>migration_guide&#45;&gt;decide_libraries_release</title>
-<path fill="none" stroke="black" d="M3026.79,-228.22C3059.1,-217.55 3098.85,-204.43 3134.33,-192.71"/>
-<polygon fill="black" stroke="black" points="3135.36,-196.06 3143.76,-189.6 3133.17,-189.41 3135.36,-196.06"/>
-</g>
-<!-- migration_guide&#45;&gt;decide_vscode_release -->
-<g id="edge114" class="edge">
-<title>migration_guide&#45;&gt;decide_vscode_release</title>
-<path fill="none" stroke="black" d="M3026.79,-252.8C3053.13,-254.2 3084.42,-255.86 3114.32,-257.45"/>
-<polygon fill="black" stroke="black" points="3114.01,-260.93 3124.18,-257.97 3114.38,-253.94 3114.01,-260.93"/>
-</g>
-<!-- migration_guide&#45;&gt;maintain_adopter_guidance -->
-<g id="edge192" class="edge">
-<title>migration_guide&#45;&gt;maintain_adopter_guidance</title>
-<path fill="none" stroke="#888888" stroke-dasharray="5,2" d="M2896.61,-252.9C2866.89,-252.74 2830.46,-251.83 2795.47,-250.46"/>
-<polygon fill="#888888" stroke="#888888" points="2795.81,-246.97 2785.68,-250.06 2795.53,-253.96 2795.81,-246.97"/>
-</g>
-<!-- published_cli -->
-<g id="node88" class="node">
-<title>published_cli</title>
-<g id="a_node88"><a xlink:href="https://www.npmjs.com/package/@pfdsl/cli" xlink:title="npm 公開 CLI&#10;&#10;pipeline.pfdsl の publish_cli が生産する。toolchain の CLI 部分または plugin 同梱物（配布スキル群と pfd&#45;* コマンド・agents）が変更されたら公開が必要という判定は decide_cli_release が担う。この図では README 更新の入力に現れる&#10;criteria: npm view @pfdsl/cli versions に packages/cli/package.json の version が含まれる&#10;location: https://www.npmjs.com/package/@pfdsl/cli">
-<polygon fill="none" stroke="black" stroke-width="2" points="2407.19,-185.19 2291.99,-185.19 2291.99,-143.59 2407.19,-143.59 2407.19,-185.19"/>
-<text xml:space="preserve" text-anchor="middle" x="2349.59" y="-168.59" font-family="Times,serif" font-size="14.00">published_cli</text>
-<text xml:space="preserve" text-anchor="middle" x="2349.59" y="-151.79" font-family="Times,serif" font-size="14.00">npm 公開 CLI</text>
-</a>
-</g>
-</g>
-<!-- published_cli&#45;&gt;update_readme -->
-<g id="edge84" class="edge">
-<title>published_cli&#45;&gt;update_readme</title>
-<path fill="none" stroke="black" d="M2407.97,-161.84C2456.99,-159.66 2528.09,-156.5 2583.16,-154.05"/>
-<polygon fill="black" stroke="black" points="2583.31,-157.54 2593.15,-153.6 2583,-150.55 2583.31,-157.54"/>
-</g>
-<!-- published_libraries -->
-<g id="node89" class="node">
-<title>published_libraries</title>
-<g id="a_node89"><a xlink:href="https://www.npmjs.com/package/@pfdsl/core" xlink:title="npm 公開ライブラリ群&#10;&#10;pipeline.pfdsl の publish_libraries が生産する。toolchain のライブラリ部分が変更されたら公開が必要という判定は decide_libraries_release が担う。この図では README 更新の入力に現れる&#10;criteria: make release&#45;libs が公開する各パッケージについて、npm view &lt;pkg&gt; versions に当該 package.json の version が含まれる&#10;location: https://www.npmjs.com/package/@pfdsl/core">
-<polygon fill="none" stroke="black" stroke-width="2" points="2428.79,-125.59 2270.39,-125.59 2270.39,-67.19 2428.79,-67.19 2428.79,-125.59"/>
-<text xml:space="preserve" text-anchor="middle" x="2349.59" y="-108.99" font-family="Times,serif" font-size="14.00">published_libraries</text>
-<text xml:space="preserve" text-anchor="middle" x="2349.59" y="-92.19" font-family="Times,serif" font-size="14.00">npm 公開ライブラリ</text>
-<text xml:space="preserve" text-anchor="middle" x="2349.59" y="-75.39" font-family="Times,serif" font-size="14.00">群</text>
-</a>
-</g>
-</g>
-<!-- published_libraries&#45;&gt;update_readme -->
-<g id="edge85" class="edge">
-<title>published_libraries&#45;&gt;update_readme</title>
-<path fill="none" stroke="black" d="M2429.63,-109.95C2478.2,-118.28 2540.13,-128.9 2588.33,-137.17"/>
-<polygon fill="black" stroke="black" points="2587.71,-140.61 2598.15,-138.85 2588.89,-133.71 2587.71,-140.61"/>
-</g>
-<!-- readme -->
-<g id="node90" class="node">
-<title>readme</title>
-<g id="a_node90"><a xlink:title="README&#10;&#10;外部利用者向けの導入文書。CLI のインストール手順・Library 節のインストール例・サンプル描画物への参照リンクを含むが、リンク先パスは安定しており sample_previews の内容更新では変化しない — 追従更新が要るのは CLI 公開形態・ライブラリ公開形態・plugin 配布物（導入手順と同梱スキル・コマンドの列挙）の変更時のみ。extension 公開（pipeline.pfdsl の published_ext。この図には置かない）は update_readme をトリガーしない — README は拡張の公開版の版数を載せないため。現在の拡張の節は packages/vscode&#45;extension/README.md への参照と開発ホストでの利用方法で、Marketplace からの導入経路も持たない。CLI コマンドリファレンス（## CLI 節）は `make gen&#45;readme&#45;cli` が `pfdsl help` 出力から自動生成し、`make check&#45;readme&#45;cli` が pre&#45;commit と CI（test.yml）でドリフトを機械検査するため update_readme の手動対象外。同じ生成器とゲートが `packages/cli/README.md`（npm パッケージページ。toolchain 側の成果物）のコマンド表も書くため、CLI コマンドの追加・変更で手を入れる先は両 README とも packages/cli/src/index.ts のコマンド定義テーブルのみ（#850・#902）。help 本文自体もそのテーブルから生成されるため、dispatcher に載って help に載らないコマンドは表現できない&#10;criteria: make check&#45;readme&#45;cli が差分なしで通過し、Library 節の pnpm add 例が published_libraries の全パッケージを名指す&#10;location: README.md">
-<polygon fill="none" stroke="black" stroke-width="2" points="2999.22,-171.19 2924.11,-171.19 2924.11,-129.59 2999.22,-129.59 2999.22,-171.19"/>
-<text xml:space="preserve" text-anchor="middle" x="2961.67" y="-154.59" font-family="Times,serif" font-size="14.00">readme</text>
-<text xml:space="preserve" text-anchor="middle" x="2961.67" y="-137.79" font-family="Times,serif" font-size="14.00">README</text>
-</a>
-</g>
-</g>
-<!-- readme&#45;&gt;update_readme -->
-<g id="edge188" class="edge">
-<title>readme&#45;&gt;update_readme</title>
-<path fill="none" stroke="#888888" stroke-dasharray="5,2" d="M2923.12,-155.08C2879.29,-157.22 2805.54,-157.69 2748.47,-156.5"/>
-<polygon fill="#888888" stroke="#888888" points="2748.89,-153.01 2738.81,-156.27 2748.72,-160.01 2748.89,-153.01"/>
-</g>
-<!-- review_distribution&#45;&gt;distribution_review_record -->
-<g id="edge90" class="edge">
-<title>review_distribution&#45;&gt;distribution_review_record</title>
-<path fill="none" stroke="black" d="M2755.41,-337.09C2783.76,-336.03 2815.61,-334.83 2845.6,-333.71"/>
-<polygon fill="black" stroke="black" points="2845.63,-337.21 2855.49,-333.33 2845.36,-330.21 2845.63,-337.21"/>
-</g>
-<!-- update_readme&#45;&gt;readme -->
-<g id="edge86" class="edge">
-<title>update_readme&#45;&gt;readme</title>
-<path fill="none" stroke="black" d="M2737.29,-144.54C2791.13,-143.15 2864.19,-143.37 2911.87,-145.21"/>
-<polygon fill="black" stroke="black" points="2911.47,-148.69 2921.61,-145.63 2911.77,-141.7 2911.47,-148.69"/>
-</g>
-<!-- map_deps&#45;&gt;roadmap_md -->
-<g id="edge64" class="edge">
-<title>map_deps&#45;&gt;roadmap_md</title>
-<path fill="none" stroke="black" d="M1305.07,-1243.29C1366.88,-1254.61 1474.12,-1274.26 1545.27,-1287.29"/>
-<polygon fill="black" stroke="black" points="1544.41,-1290.69 1554.88,-1289.05 1545.67,-1283.81 1544.41,-1290.69"/>
-</g>
-<!-- map_deps&#45;&gt;roadmap_pfdsl -->
-<g id="edge65" class="edge">
-<title>map_deps&#45;&gt;roadmap_pfdsl</title>
-<path fill="none" stroke="black" d="M1268.06,-1263.15C1283.66,-1294.55 1313.99,-1344.17 1352.95,-1377.04"/>
-<polygon fill="black" stroke="black" points="1350.74,-1379.76 1360.75,-1383.26 1355.1,-1374.29 1350.74,-1379.76"/>
-</g>
-</g>
-</svg>
+<!-- map_transform_boundarie

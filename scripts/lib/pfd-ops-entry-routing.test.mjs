@@ -64,14 +64,14 @@ describe("pfd-ops entry routing", () => {
 		assert.match(workCycle, /\bterminals\b/);
 		assert.match(workCycle, /\bexternalTerminals\b/);
 	});
-	it("keeps the plugin self-check and upstream override command arguments", () => {
+	it("keeps the plugin self-check and repo-local override without legacy flags", () => {
 		assert.match(
 			skill,
-			/node \$\{CLAUDE_PLUGIN_ROOT\}\/skills\/pfd-ops\/scripts\/check-install-sync\.mjs --upstream/,
+			/node \$\{CLAUDE_PLUGIN_ROOT\}\/skills\/pfd-ops\/scripts\/check-install-sync\.mjs\n/,
 		);
 		assert.match(
 			opsBinding,
-			/node \.claude\/skills\/pfd-ops\/scripts\/check-install-sync\.mjs --upstream/,
+			/node \.claude\/skills\/pfd-ops\/scripts\/check-install-sync\.mjs`/,
 		);
 		assert.ok(
 			read(".claude/skills/pfd-ops/scripts/check-install-sync.mjs").length > 0,

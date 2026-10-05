@@ -30,12 +30,12 @@ pfd-ops は、操作に対応する採用済み PFD ごとに適用する。対�
 
 スキル発火時に一度、まず `.pfdsl/bindings/pfd-ops.md` があれば、その見出し一覧を取り、配置ファイル鮮度セルフチェックに適用される本文を読んでから実行パスを選ぶ。
 該当する binding 本文が実行パスを指定している場合は、その指示を使う。
-該当する binding 本文に別の実行パスが指定されていない場合は、配置形態に応じたパスで `check-install-sync.mjs --upstream` を実行する。
+該当する binding 本文に別の実行パスが指定されていない場合は、配置形態に応じたパスで `check-install-sync.mjs` を実行する。
 plugin 経由では次を使い、変数が置換されていなければ repo-local の `.claude/skills/pfd-ops/scripts/check-install-sync.mjs`、それも無ければ現在読んでいるこのファイルの所在から相対で解決する。
 警告への対応、deploy flag、rename、version と bundle の差分、移行状態（`.pfdsl/config.json` の `appliedMigration`）の照合結果は `references/architecture.md` の「配置ファイルの鮮度セルフチェック」に従う。
 
 ```bash
-node ${CLAUDE_PLUGIN_ROOT}/skills/pfd-ops/scripts/check-install-sync.mjs --upstream
+node ${CLAUDE_PLUGIN_ROOT}/skills/pfd-ops/scripts/check-install-sync.mjs
 ```
 
 `.pfdsl/bindings/pfd-ops.md` はリポ固有の追加セルフチェックの一次置き場であり、本ファイルは個別スクリプト名を持たない。

@@ -460,46 +460,10 @@ describe("createGitHubOps parity: gh backend vs HTTP backend", () => {
 		assert.match(fetch.calls[0].url, /\/issues\/612\/labels$/);
 	});
 
-	it("createLabel: both backends make the same call and return void", async () => {
-		const ghOps = createGitHubOps({
-			execGhImpl: stubExecGh({ "label create": "" }),
-		});
-		const fetch = stubFetch({});
-		const httpOps = createGitHubOps({
-			execGhImpl: stubExecGh({ "label create": new Error("ENOENT") }),
-			fetchImpl: fetch,
-		});
-		await ghOps.createLabel({
-			name: "flow:exempt",
-			description: "not tracked",
-			color: "ededed",
-		});
-		await httpOps.createLabel({
-			name: "flow:exempt",
-			description: "not tracked",
-			color: "ededed",
-		});
-		assert.deepEqual(JSON.parse(fetch.calls[0].init.body), {
-			name: "flow:exempt",
-			description: "not tracked",
-			color: "ededed",
-		});
-	});
-
-	it("editLabel: both backends make the same call and return void", async () => {
-		const ghOps = createGitHubOps({
-			execGhImpl: stubExecGh({ "label edit": "" }),
-		});
-		const fetch = stubFetch({});
-		const httpOps = createGitHubOps({
-			execGhImpl: stubExecGh({ "label edit": new Error("ENOENT") }),
-			fetchImpl: fetch,
-		});
-		await ghOps.editLabel({ name: "flow:exempt", description: "reworded" });
-		await httpOps.editLabel({ name: "flow:exempt", description: "reworded" });
-		assert.deepEqual(JSON.parse(fetch.calls[0].init.body), {
-			description: "reworded",
-		});
+	it("does not expose unused label creation or editing operations", () => {
+		const ops = createGitHubOps({ execGhImpl: stubExecGh({}) });
+		assert.equal(Object.hasOwn(ops, "createLabel"), false);
+		assert.equal(Object.hasOwn(ops, "editLabel"), false);
 	});
 });
 

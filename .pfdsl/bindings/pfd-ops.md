@@ -10,7 +10,7 @@ pfd-ops 運用に紐づく、Claude へ恒常的に届けたい指示（PR 本�
 このリポは pfd-ops スキルの上流であり、`scripts/harness-template/skills/pfd-ops/` が正本、`.claude/skills/pfd-ops/` はそこから描画した生成物、plugin cache 配下（`~/.claude/plugins/cache/pfdsl/pfdsl/<version>/`）は配布済みの過去のスナップショットである。
 両方が実在して食い違う状況を SKILL.md のロード元判定が扱わないこと、古い側の報告が drift でなく陳腐化であること、`--deploy` で追随してはならないことは `.pfdsl/bindings/pfd-retro-patterns/duplicate-name-not-a-discriminator.md` が一次情報。
 
-したがってこのリポでは、pfd-ops 発火時のセルフチェックは `node .claude/skills/pfd-ops/scripts/check-install-sync.mjs --upstream` で実行する。
+したがってこのリポでは、pfd-ops 発火時のセルフチェックは `node .claude/skills/pfd-ops/scripts/check-install-sync.mjs` で実行する。
 #971 以降、向きの判定はスクリプト側が持つ — このリポを target とした実行は上流と分類され、どちらの実体から起動しても `--deploy` は案内されず明示指定でも停止する。したがってこの規約が残す指示は「repo-local 版を使う」だけで、`--deploy` を避ける判断を読み手に委ねてはいない。
 
 pfd-ops 発火時、SKILL.md の配置ファイル鮮度セルフチェックに続けて次を実行する:

@@ -162,7 +162,7 @@ pfdsl 開発リポ固有の例:
     scaffold/                  ← L4 雛形テンプレート
   scripts/
     check-install-sync.mjs     ← install/ の実配置・鮮度セルフチェック（ADR-0028）
-    plugin-version-check.mjs   ← plugin version skew チェック（install/ 同期と無関係、check-install-sync.mjs から呼ばれる）
+    plugin-version-check.mjs   ← 実行中pluginのidentity・bundle hashのローカル読取（移行照合と環境報告で共有）
   install/                     ← GitHub Issues プリセットの採用用テンプレート（リポルートへ実配置）
     .github/workflows/         ← pfdsl-sweep-completed-chains.yml
     scripts/pfdsl/             ← audit-issues-flow.mjs 等（配布物の由来を示す専用ディレクトリ、ADR-0032）
@@ -181,7 +181,7 @@ deploy 関連の対応は出力末尾が名指しするため、移行状態の�
 
 `Possible renames` は canonical 側の rename が新旧パスの `missing` と `orphaned` に分かれて見えている状態を表す。新パスを信用する前に旧パスのローカル編集を引き継ぐ。
 
-plugin version の上流差分警告は更新をユーザーに案内する。同じ version で bundle 内容だけが異なる場合は更新先 release がまだ存在しないため、その差分だけを報告する。
+上流 main との版差・bundle 内容差は取得も通知もしない。移行が必要かどうかは採用先の `appliedMigration` と実行中 plugin の照合で判断する。旧呼出しとの互換のため `--upstream` は受け付けるが、追加の処理や通知は行わない。
 
 採用先では、同じチェックが `.pfdsl/config.json` の `appliedMigration` を実行中の plugin と照合し、`--upstream` の有無や GitHub Issues バックエンドの採否によらず、出力の先頭に結果を出す。
 `appliedMigration` は、採用先が移行を適用し終えた plugin の版を `pluginVersion` に、Claude Code の plugin ではその bundle の集約 hash を `bundleHash` に持つ（Codex の plugin には bundle manifest が無いので `bundleHash` を持たない）。

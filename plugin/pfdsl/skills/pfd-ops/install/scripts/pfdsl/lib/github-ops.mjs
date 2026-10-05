@@ -27,8 +27,6 @@ import {
 	parseOwnerRepo,
 	requireGitHubViewFields,
 	addIssueLabel as restAddIssueLabel,
-	createLabel as restCreateLabel,
-	editLabel as restEditLabel,
 } from "./github-rest.mjs";
 import { proxyAwareFetch } from "./proxy-fetch.mjs";
 
@@ -312,50 +310,6 @@ export function createGitHubOps({
 				},
 				({ owner, repo, token }) =>
 					restAddIssueLabel(owner, repo, token, number, label, fetchImpl),
-			),
-
-		/**
-		 * @param {{name: string, description?: string, color?: string}} params
-		 * @returns {Promise<void>}
-		 */
-		createLabel: ({ name, description, color }) =>
-			withFallback(
-				"createLabel",
-				async () => {
-					await runGh([
-						"label",
-						"create",
-						name,
-						"--description",
-						description,
-						"--color",
-						color,
-					]);
-				},
-				({ owner, repo, token }) =>
-					restCreateLabel(
-						owner,
-						repo,
-						token,
-						name,
-						description,
-						color,
-						fetchImpl,
-					),
-			),
-
-		/**
-		 * @param {{name: string, description?: string}} params
-		 * @returns {Promise<void>}
-		 */
-		editLabel: ({ name, description }) =>
-			withFallback(
-				"editLabel",
-				async () => {
-					await runGh(["label", "edit", name, "--description", description]);
-				},
-				({ owner, repo, token }) =>
-					restEditLabel(owner, repo, token, name, description, fetchImpl),
 			),
 	};
 }

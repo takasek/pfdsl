@@ -144,9 +144,9 @@ VSIXのローカル検証・アップロードと、公開済みpluginのmarketp
 
 `decode_harness_capabilities` はテンプレート・inventory・toolchainに加え、実行時のGit ignore判定素材を読む。
 repository内のignore規則だけでなくGit indexとclone固有のinfo/excludeも回答に影響するため、`.gitignore`だけの決定論的な入力とみなさない。
-`check_install_sync --upstream` は導入済みファイル・pluginと、その実行で上流mainから取得するversion・bundle manifestを比較する。
-取得不能時やローカルClaude plugin manifestが無い場合はbest-effortで通知を省く。
-上流の二つのURLを同一commitへ固定する保証は実装にない。
+`check_install_sync` は配置済みファイルと同梱canonical、採用先の設定スナップショットにある `appliedMigration` と実行中pluginのidentityを比較する。
+上流mainとの差は取得・通知しない。
+旧呼出しとの互換で `--upstream` を付けても追加の処理は無い（ADR-0043）。
 
 - **同梱対象リストの一元化（`harness_inventory`）**: 同梱スキル・コマンド・agent・hookと生成分類の一次情報に加え、各capabilityの`claude-repository`・`claude-plugin`・`codex-repository`・`codex-plugin` mappingは`scripts/lib/harness-inventory.mjs`が持つ。スキル・agentを追加するときは四targetすべてへnative・transform・intentional exclusionのいずれか一つを宣言する。PFD側の照合先はworkflow.pfdsl companionの「配布スキルの新規追加時の横断照合」が一次情報（ADR-0035以前の二重モデル化とその乖離の経緯もそちら）。
 - **二重ハーネスのadapter境界**: `decode_harness_capabilities`が中立正本の source encoding とハーネス別の描画済み本文を中立recordへ閉じ込め、`gen_plugin`と`assemble_codex_plugin`はcontract検証済みの同じrecord objectを兄弟入力としてそれぞれのrootを作る。Claude Code rootは`plugin/pfdsl/`、Codex native rootは`plugin/pfdsl-codex/`である。Codex adapterは生成済みClaude rootやmanifestを入力にせず、run固有のtemporary siblingへstageし、rootのassembly lock下でまとめて置換する。公式Codex validator/runtimeがroot直下の`skills/`を固定するため、異なるskill treeを単一rootに置かない。Codex plugin manifestのcapabilityは現在Skillsのみだが、同梱の`hooks/hooks.json`は既定discoveryで公開され、Codex runtimeの`CLAUDE_PLUGIN_ROOT`互換環境でhook commandを解決する。native agentとrepo-local hook設定はリポジトリの`.codex/`へ出力する。command skillの所有manifestは削除・改名後のstale dirを掃除し、commandとskillの出力名が衝突する場合はcommandを`source-command-<name>`へ改名する。`codex_plugin_dist`はCodex native rootの検証済み成果物だが、repo-owned native marketplace/install pathには渡さず、現在のCodex互換導入でも使わない。外部のCodex marketplace構築者が自身のnative sourceとして扱う検証済みhandoff surfaceであり、現在のCodex互換導入は`.claude-plugin/marketplace.json`が同じClaude-compatible published artifactを指す経路を使う。

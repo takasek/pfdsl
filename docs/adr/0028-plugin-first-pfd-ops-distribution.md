@@ -28,7 +28,9 @@ issue #404 が統合と skill sync 廃止の設計論点5件を整理した。
    ローカル編集保護: deployed ファイルの hash が同梱 canonical と不一致の場合、`--force` なしでは上書きしない（skill sync の `detectLocalEdits` 相当）。
 4. **バージョン skew の trade-off**: plugin はユーザー単位インストールのため、チームメンバー・headless agent 間でスキルバージョンがずれ得る（skill sync はリポ内コミットで全員同一版だった）。
    これを許容する。
-   緩和策として、ランタイムチェックが deployed と同梱 canonical の乖離を警告し、`--upstream` で上流（GitHub main の plugin.json version）との差もベストエフォートで警告する（warning レベル、ネットワーク失敗時は沈黙）。
+   緩和策として、ランタイムチェックが deployed と同梱 canonical の乖離を警告する。
+   当初は `--upstream` で上流 main との版差も通知したが、2026-10-05 に ADR-0043 の方針更新で廃止した。
+   移行の必要性は採用先の `appliedMigration` と実行中 plugin の照合が担う。
    リポ内配布オプションは残さない。
 5. **既導入リポの移行**: 外部の既導入ユーザーは存在しないため、移行手順・移行ツールは作らない。
 

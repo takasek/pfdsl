@@ -174,13 +174,13 @@ artifact:
   examples:
     label: 実践例
     description: "品質ガイドの実証とレビュー素材。スキル参照への採録候補"
-    criteria: check がエラーなし、レビュー結果が pfd-retro の出力表に finding として記録されている
+    criteria: check がエラーなし、品質ガイドを検証する具体的な題材と成果物があり、レビューへ渡せる
     location: "docs/examples/"
     group: practice
   findings:
     label: レビュー知見
     description: "実践例レビューで得た品質知見。次世代の対話・整備への還流入力（消費先の一次情報は本図のエッジ）"
-    criteria: 各 finding の振り分け先が本図のエッジのいずれかに定まり、pfd-retro の出力表に未振り分けの行が残っていない
+    criteria: レビュー結果が pfd-retro の出力表に finding として記録され、各 finding の振り分け先が本図のエッジのいずれかに定まり、未振り分けの行が残っていない
     group: practice
   adrs:
     label: ADR
@@ -435,6 +435,7 @@ process:
       decisions が指名した repo-local な binding・guard・companion の正本を改訂する。
       prose_mechanization_sweep_record の散文・機構矛盾、retro_findings の運用実態との不一致を binding 文言・guard 規則・説明へ反映する。
       workflow_md の改訂では workflow_pfdsl を突合相手として読み、図の改訂で名指しが食い違った箇所を追随させる。
+      bindings_pfd_ops の改訂では ops_skill_general の現行 SKILL.md・work-cycle.md を突合相手として読み、配布層とリポ固有手順の契約を揃える。
       検証コマンドは正本ごとに異なり、各出力 artifact の criteria が一次情報である。
     group: generation
     tags: [ knowledge_maintenance ]
@@ -664,6 +665,7 @@ retro_findings >>? maintain_repo_local_capabilities
 distribution_review_record >>? maintain_distributed_prompt_assets
 distribution_review_record >>? maintain_repo_local_capabilities
 
+ops_skill_general >>? maintain_repo_bindings
 prose_mechanization_sweep_record >>? maintain_repo_bindings
 workflow_pfdsl >>? maintain_repo_bindings
 
