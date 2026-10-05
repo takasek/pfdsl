@@ -1,0 +1,7 @@
+{
+	"welcome": "---\ntitle: Welcome to PFDSL\n---\nidea >> design -> plan\n",
+	"oldVisible": false,
+	"restored": "---\ntitle: Experience fixture\nartifact:\n  a:\n    label: Alpha\n  lonely:\n    label: Lonely\n  b:\n    label: Beta\nprocess:\n  p:\n    label: Prepare\n  q:\n    label: Qualify\n---\na >> p -> b\nb >>? p\nb >> q -> c\nlonely\n",
+	"restoredEditedSource": true,
+	"oldAddVisible": false
+}

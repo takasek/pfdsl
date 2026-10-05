@@ -1,0 +1,41 @@
+[
+	{
+		"name": "same-node-now-defined",
+		"createVisible": false,
+		"oldButton": {
+			"x": 782.9375,
+			"y": 836,
+			"width": 109.390625,
+			"height": 26
+		},
+		"before": "---\ntitle: Experience fixture\nartifact:\n  a:\n    label: Alpha\n  lonely:\n    label: Lonely\n  b:\n    label: Beta\nprocess:\n  p:\n    label: Prepare\n  q:\n    label: Qualify\n---\na >> p -> b\nb >>? p\nb >> q -> c\nlonely\n",
+		"after": "---\ntitle: Experience fixture\nartifact:\n  a:\n    label: Alpha\n  lonely:\n    label: Lonely\n  b:\n    label: Beta\nprocess:\n  p:\n    label: Prepare\n  q:\n    label: Qualify\n---\na >> p -> b\nb >>? p\nb >> q -> c\nlonely\n",
+		"unchanged": true
+	},
+	{
+		"name": "changed-kind",
+		"createVisible": false,
+		"oldButton": {
+			"x": 782.9375,
+			"y": 836,
+			"width": 109.390625,
+			"height": 26
+		},
+		"before": "---\nartifact:\n  a:\n    label: Alpha\n---\na >> b -> c\n",
+		"after": "---\nartifact:\n  a:\n    label: Alpha\n---\na >> b -> c\n",
+		"unchanged": true
+	},
+	{
+		"name": "removed-node",
+		"createVisible": false,
+		"oldButton": {
+			"x": 782.9375,
+			"y": 836,
+			"width": 109.390625,
+			"height": 26
+		},
+		"before": "---\nartifact:\n  a:\n    label: Alpha\n---\na >> p -> c\n",
+		"after": "---\nartifact:\n  a:\n    label: Alpha\n---\na >> p -> c\n",
+		"unchanged": true
+	}
+]

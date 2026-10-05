@@ -14,9 +14,12 @@ import {
 	buildSubflows,
 } from "./location-utils.js";
 import type { MessageToWebview } from "./messages.js";
+import { buildPreviewGraph } from "./node-operations.js";
 import { blockingDiagnosticMessage } from "./preview-logic.js";
 
-export const analyzeSnapshot = analyzeSource;
+export function analyzeSnapshot(source: string) {
+	return { ...analyzeSource(source), source };
+}
 export type DocumentModel = ReturnType<typeof analyzeSnapshot>;
 export type PresetLoader = (path: string) => DocumentModel | null;
 
@@ -80,6 +83,21 @@ export function prepareDocument(
 				descriptions: buildDescriptions(model.frontmatter),
 				locations: buildLocations(model.frontmatter),
 				subflows: buildSubflows(model.frontmatter),
+				graph: buildPreviewGraph(model, frontmatter),
+				editing: {
+					source: model.source,
+					nodes: [...model.nodeKinds].flatMap(([id, kind]) =>
+						kind === "group"
+							? []
+							: [
+									{
+										id,
+										kind,
+										defined: Object.hasOwn(model.frontmatter?.[kind] ?? {}, id),
+									},
+								],
+					),
+				},
 			};
 		} catch (error) {
 			message = {

@@ -1,0 +1,131 @@
+{
+	"checkout": "<checkout>",
+	"branch": "codex/issue-1352-preview-editing",
+	"base": "f1eb449d",
+	"scope": [1352, 1282, 1283, 1284, 483],
+	"sourceSha256": {
+		"packages/cli/src/index.test.ts": "3138156bc9f455e3ec10f98549fa5bbb7beca8f47836d525e920fdf20db66f27",
+		"packages/cli/src/index.ts": "6a2eb43417811694e0449f5a9af872c5b96ceb7d5ddfdb930c9cd7142c9e4f26",
+		"packages/cli/src/meta-create.test.ts": "d52c7fd545151cc2c2f29aec2b24a71155d9dafd0ee63e185afb21806f98e7d5",
+		"packages/cli/src/option-contracts.test.ts": "345a9e0e5082a4c4d8314c14c2b694d36becf746f08c5107920a9bd4fefefdfd",
+		"packages/core/src/index.test.ts": "9277e43a8d7fe3a7657515807ad5007aa7ccb2c25225e611fc2ad4f6cdc25d07",
+		"packages/core/src/index.ts": "46afcee7577856e671184c2f1d77ad5c3f0a1891ca12f05fc4f336bb3bebe9e0",
+		"packages/core/src/insert-definition.test.ts": "f8bca3729768c61fedabf093532e1f8bd97e262ae8803f1f0c8aeda6af5501a0",
+		"packages/core/src/insert-definition.ts": "3d29f19c86c6ea5cb40a1abb533d67ed70bab2394d01edaa155df10db604eede",
+		"packages/editor/src/connector-logic.test.ts": "84b754b8f9b201b72d76bedaa78573c9a2112d84372643f5fc6f3b2dcb0c1c62",
+		"packages/editor/src/connector-logic.ts": "0b4bfac3ad3593395c0799135a44ff3dc81b9510fead8ebbadcdb98035b7c12b",
+		"packages/editor/src/def-insertion-logic.test.ts": "81ca88dcd0d773f4d518e583aee9749939a297a0bbe9ee4314f9d44e018630f0",
+		"packages/editor/src/def-insertion-logic.ts": "28a4656462044ac60eee7a6f6d7eeff5a41a4b35c1850c324b3f7daae42169b0",
+		"packages/editor/src/document.ts": "8fb6d5ffc502e83420dd49a04e79bc1262b08cd5333006ad222770c13a4f6cd2",
+		"packages/editor/src/index.ts": "26fc1e35656c6608e9f0d39dd84e9ac3ad1cbfd9d2b4064ed09f22d23b00a968",
+		"packages/editor/src/jump-logic.test.ts": "8a7adad52b6da41eae55ed8ef233face07cab4d126cdcbd35bb0556e7a48fa2e",
+		"packages/editor/src/jump-logic.ts": "018be5f5917010a226d8eda1dc3035ddf2692948e179378f7df27a7936f3ada3",
+		"packages/editor/src/location-utils.test.ts": "8fb7032fcb63db93ea25e55992581ea902d49c2c0c8337cb8cedf4cef2437e7f",
+		"packages/editor/src/location-utils.ts": "6857983dfdb58b43e29e69969726d162e2ef6af24b4b2631b2909edad4cd108d",
+		"packages/editor/src/messages.ts": "a66c89c7d8fdf9e04225bec25eb899cb1f5c001c36c7c9f8a1241784fbfefcc7",
+		"packages/editor/src/node-operations.test.ts": "b0812b56a723abf4e269a5b4baa4e26ae0ffc5de79823d22f621f8b2202678bf",
+		"packages/editor/src/node-operations.ts": "bf4c963fdaf7a7247cdf78bcee3af57eb2b3b348e5515361e318095608a87bda",
+		"packages/editor/src/preview-actions.test.ts": "69b94cf7eb246b3b83396a472b61139fc9dc5381ca94bbf28bc63bd70dfcf1d5",
+		"packages/editor/src/preview-shell.ts": "f4fba65e216c59cb1fc7f003935115608d18dfb0e370d8ee94d4f5f67565017c",
+		"packages/editor/src/preview-ux.test.ts": "da7efb5dcc5bbbcfb33b312111d0b943ba5575c0c79313968c24f2114e98a9eb",
+		"packages/editor/src/preview.test.ts": "aa8d9de2c0e2d468ddd0e5bcd29352d5b4a894c9d34c763fdc654ceb46b31f38",
+		"packages/editor/src/preview.ts": "7b4e73d75885d1ef94f04b08e8d3ba1a5307c8243501e3bf0f2ffc41a3a9c651",
+		"packages/editor/src/webview-logic.test.ts": "1f5091a321f571b1bca37f022241e0e1af6995bf8e18af6986dcdd2e4391d26f",
+		"packages/editor/src/webview-logic.ts": "454791f15a58c60510a0a80c1c62dce49917a3964a90f859a752bd7b51d8a45f",
+		"packages/standalone/src/document-tab.ts": "787c0983a0b1127aaa58cd55b83cb64dee4ce0598402ef5e2929e91a4ad97722",
+		"packages/vscode-extension/esbuild.config.mjs": "7fd6ec27dd4dbe71546bba88e35f34d49dfa292bc89a84959b781d017c255d15",
+		"packages/vscode-extension/package.json": "b2abd53f31c6d1521aa6cdf8bf72194968ee01779ede1005834fe0a4f2429a29",
+		"packages/vscode-extension/src/def-insertion.test.ts": "0fe0fb2660074b7f3708d08d37c7f66842e486bb855559ee5a4ccba093989385",
+		"packages/vscode-extension/src/def-insertion.ts": "1304f3fac9a67236085b99b1bc994387be91a412cccf269253f0b4dd8873ccc7",
+		"packages/vscode-extension/src/jump.test.ts": "7978119778c08a87ddc1389d22a465fca832a4f65b9342846b559a3a12fd065b",
+		"packages/vscode-extension/src/jump.ts": "19d3e21dfcce82a0d79944da32d3736e274faf231781aadc7b0c0adcf4f149ab",
+		"packages/vscode-extension/src/preview.test.ts": "d7e0df621da159b7bb6a98ee0e840fb05492771b5ef15315764ded2da693e974",
+		"packages/vscode-extension/src/preview.ts": "e3f5df59b8c0ddc2f1eb1c834c05171a27c2a2768d765cb6a60ad29863a767ed"
+	},
+	"test": {
+		"command": "make test",
+		"exitCode": 0,
+		"packages": {
+			"core": {
+				"passed": 1099
+			},
+			"metadata-exporter": {
+				"passed": 9
+			},
+			"graphviz-exporter": {
+				"passed": 179
+			},
+			"preview-engine": {
+				"passed": 25
+			},
+			"editor": {
+				"passed": 218
+			},
+			"cli": {
+				"passed": 835,
+				"skipped": 1
+			},
+			"vscode-extension": {
+				"passed": 137
+			},
+			"standalone": {
+				"passed": 5
+			}
+		},
+		"scriptsHooks": {
+			"passed": 2992,
+			"failed": 0
+		},
+		"conventions": {
+			"imports": 171,
+			"shell": 217,
+			"argv": 216
+		},
+		"logSha256": "872fa43b6cec4fc5dc6c2a41f63dcd2143a0932cf5c9ad8c27d15962cb6b2f4d"
+	},
+	"typecheck": {
+		"command": "pnpm -r typecheck after successful make test build",
+		"exitCode": 0,
+		"logSha256": "af3e589007b3e67b6496eceed98cfaee6c20076b1fc41eb03e325a58c6f832ed"
+	},
+	"nativeBuild": {
+		"command": "pnpm --dir packages/standalone exec tauri build --debug --bundles app",
+		"exitCode": 0,
+		"binarySha256": "842cc46e7be18eee3fdb11fcaacdaf7ca6731841dacf8c0c6d25c12a8950d558",
+		"logSha256": "ba61e0689fb5b4c60b9c2af682c7a7fe1b52a960491d848ac4a44ed85278ee4b",
+		"corpus": {
+			"count": 23,
+			"passed": true,
+			"failures": [],
+			"errors": [],
+			"report": "native-final-corpus-report.json"
+		},
+		"rustUnits": {
+			"passed": 2,
+			"failed": 0,
+			"logSha256": "ba7c18083a189b119fd799d996e87f563eee7fe95338d6a547966af0e7851aa3"
+		}
+	},
+	"proofLimits": [
+		"Owner GUI acceptance pending",
+		"Native ordinary GUI frozen at d005c101; final 842cc46e binary has build/corpus evidence, not repeated full GUI acceptance",
+		"Native visible editor and final minimap mismatch unresolved; hover/pan/cue/folder/close/IME unverified",
+		"Additional VS Code preview editing/hover/cue unverified; actual navigation commands/chords observed",
+		"No Marketplace/npm/DMG publication",
+		"Artifacts remain wip; no issue closure or cycle closure",
+		"Corpus inputs are recorded snapshots; roadmap updated_at was synchronized afterward without a runtime-code change"
+	],
+	"browserRecheck": {
+		"beforeFixErrors": 3,
+		"afterFixIterations": 3,
+		"afterFixErrors": 0,
+		"newQuotedConnectorUndoRedo": true,
+		"minimapNodeIdsMatch": true,
+		"parentSupplementary": "browser-parent-recheck-after-fix.json"
+	},
+	"releaseStatus": {
+		"exitCode": 1,
+		"meaning": "published packages and extension have unreleased commits; release preparation/review required, no publish performed",
+		"logSha256": "17045ccefd1781fc60df6fbcd15c707562faf6013e8605c1bb6290484aa9bafb"
+	}
+}

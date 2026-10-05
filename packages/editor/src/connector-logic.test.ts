@@ -1,4 +1,4 @@
-import type { NormalizedEdge } from "@pfdsl/core";
+import { analyzeSource, type NormalizedEdge } from "@pfdsl/core";
 import { describe, expect, it } from "vitest";
 import {
 	buildConnectorEdgeLine,
@@ -8,6 +8,48 @@ import {
 } from "./connector-logic.js";
 
 describe("buildConnectorEdgeLine", () => {
+	it.each([
+		["my input", "artifact", ">>", "q", '"my input" >> q'],
+		["p", "process", ">>", "my result", '"my result" >> p'],
+		[
+			"my process",
+			"process",
+			">>?",
+			'my "input"\\draft',
+			'"my \\"input\\"\\\\draft" >>? "my process"',
+		],
+		[
+			"my input",
+			"artifact",
+			">>?",
+			"my process",
+			'"my input" >>? "my process"',
+		],
+		["my process", "process", "->", "my result", '"my process" -> "my result"'],
+		[
+			"my result",
+			"artifact",
+			"->",
+			"my process",
+			'"my process" -> "my result"',
+		],
+	] as const)("serializes semantic IDs for %s (%s %s %s)", (nodeId, role, connector, otherId, expected) => {
+		const line = buildConnectorEdgeLine(nodeId, role, connector, otherId);
+		expect(line).toBe(expected);
+		const model = analyzeSource(`${line}\n`);
+		expect(model.edges).toEqual([
+			{
+				kind:
+					connector === "->"
+						? "output"
+						: connector === ">>?"
+							? "feedback"
+							: "input",
+				artifact: role === "artifact" ? nodeId : otherId,
+				process: role === "process" ? nodeId : otherId,
+			},
+		]);
+	});
 	describe("when the current node is a process", () => {
 		it("places the other node before it for '>>'", () => {
 			expect(buildConnectorEdgeLine("build", "process", ">>", "spec_doc")).toBe(
@@ -50,6 +92,32 @@ describe("buildConnectorEdgeLine", () => {
 });
 
 describe("insertConnectorEdge", () => {
+	it("uses CRLF for an anchored line while preserving authored comments and blank lines", () => {
+		const source = "a >> p -> b\r\n# keep this comment\r\n\r\n";
+		expect(insertConnectorEdge(source, "c >> p", "p")).toEqual({
+			text: "a >> p -> b\r\nc >> p\r\n# keep this comment\r\n\r\n",
+			insertedLine: 1,
+			anchored: true,
+		});
+	});
+
+	it("uses CRLF for a fallback append and retains the existing blank-line trimming", () => {
+		expect(insertConnectorEdge("a >> p -> b\r\n\r\n", "c >> q", "q")).toEqual({
+			text: "a >> p -> b\r\nc >> q\r\n",
+			insertedLine: 1,
+			anchored: false,
+		});
+	});
+
+	it.each([
+		"\n",
+		"\r\n",
+	])("preserves an unterminated final line when anchoring with %j", (newline) => {
+		const source = `# keep this comment${newline}a >> p -> b`;
+		expect(insertConnectorEdge(source, "c >> p", "p").text).toBe(
+			`${source}${newline}c >> p`,
+		);
+	});
 	it("appends the edge line after the last non-blank line", () => {
 		const source = "A >> P -> B\n";
 		const { text, insertedLine, anchored } = insertConnectorEdge(
@@ -281,6 +349,39 @@ describe("validateNewNodeId", () => {
 				kindOfExisting: () => "process",
 			}),
 		).toBeUndefined();
+	});
+
+	it.each([
+		"my result",
+		'my "result"\\draft',
+	])("accepts existing quoted semantic ID %j of the wanted kind", (value) => {
+		expect(
+			validateNewNodeId({
+				...base,
+				value,
+				wantedKind: "artifact",
+				kindOfExisting: () => "artifact",
+			}),
+		).toBeUndefined();
+		expect(validateNewNodeId({ ...base, value })).toMatch(/Invalid ID/);
+	});
+
+	it("keeps self-connection and kind checks for existing quoted IDs", () => {
+		expect(
+			validateNewNodeId({
+				...base,
+				value: "my process",
+				currentNodeId: "my process",
+				kindOfExisting: () => "process",
+			}),
+		).toBe("Cannot connect a node to itself");
+		expect(
+			validateNewNodeId({
+				...base,
+				value: "my result",
+				kindOfExisting: () => "artifact",
+			}),
+		).toBe('"my result" is already an artifact, not a process');
 	});
 
 	it("picks the article from the kind word, so 'artifact' reads 'an'", () => {

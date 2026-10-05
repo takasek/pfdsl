@@ -1,0 +1,259 @@
+{
+	"review": "independent ordinary native GUI experience",
+	"scope": "No implementation source, diff, design records, or existing ACCEPTANCE conclusions read. No Git metadata or publication operations. Only own disposable corpus and own native app process changed.",
+	"binary": "<checkout>/packages/standalone/src-tauri/target/debug/bundle/macos/PFDSL.app/Contents/MacOS/pfdsl-desktop",
+	"binarySha256": "d005c101d6154b81f7fdcc7eabd0d73ed0e2f940100f723f98268224d3c620b2",
+	"frontendBuildInputFingerprints": [
+		{
+			"file": "packages/standalone/dist/assets/base91-DOY1bT5-.js",
+			"sha256": "ef188a16e7ad9e0a356d435fb40ddb8fa04edb7b0428a5e6abd1d2b805347bab"
+		},
+		{
+			"file": "packages/standalone/dist/assets/duckdb-BzlFElZV.js",
+			"sha256": "eaf3ce6bb5425dcfd5ba4f86e1a9a20fea83a2faf3aff6c270bfd6f3238a3861"
+		},
+		{
+			"file": "packages/standalone/dist/assets/editor.worker-DWPaKKV_.js",
+			"sha256": "9ae6f27737ab392047db742b346c1711b685cee3b38b0fe04718eb9a9de6e0a2"
+		},
+		{
+			"file": "packages/standalone/dist/assets/expat-CX7Bg68x.js",
+			"sha256": "8d79780e091dfac1e6c221bb34d7ac58e72934b7e308c8814068af3c44e3022b"
+		},
+		{
+			"file": "packages/standalone/dist/assets/graphviz-BKX3zE1B.js",
+			"sha256": "136af8b7680116ce7458c02e8a9e1579ccf22506911ced8df37227b4d6fa4428"
+		},
+		{
+			"file": "packages/standalone/dist/assets/index-Bhq5YRen.js",
+			"sha256": "30862c67c53eef585d8c2b0a416cb9c953a78f27b07a24991817dbc93e8d8abf"
+		},
+		{
+			"file": "packages/standalone/dist/assets/index-BuKc0sUX.css",
+			"sha256": "4e732cd5d308344fde1323f1682b7b6331bc62bc3e317d3c9d54ac269f7a5265"
+		},
+		{
+			"file": "packages/standalone/dist/assets/zstd-Dx_4Lof7.js",
+			"sha256": "892c4e85dd6eea08a14eaf34b66cf2d16695806146acb015fa40eec3860e4312"
+		},
+		{
+			"file": "packages/standalone/dist/index.html",
+			"sha256": "b5ffe748c7833ee7cb9702c16852c6a31dce70aa9aba3002ea5cdf7107373e72"
+		},
+		{
+			"file": "packages/standalone/dist/processing.js",
+			"sha256": "e47e466423787349603a154ea29913586e354bc4eee1abae6139a25f5645f809"
+		}
+	],
+	"frontendBuildInputFingerprintListSha256": "602f845412b160ad61a09430b3e4d13415075deee84fbc52d3db7a6761b1fe9e",
+	"frontendProofLimit": "Input fingerprints supplied from preparation baseline; Tauri embeds these assets in executable. No independent extraction of embedded frontend. Executable hash verified before/after.",
+	"normalNativePid": 70217,
+	"directLaunchPid": 70127,
+	"largeGraphObservedNodeCount": 71,
+	"results": [
+		{
+			"scenario": "undefined process Create definition",
+			"status": "observed pass",
+			"evidence": ["native-gui-ax.txt"],
+			"observation": "Node actions process:draft offered Create definition; created process draft with label:draft. One Cmd+Z removed entire definition and one Cmd+Shift+Z restored it.",
+			"originalEvidenceNames": [
+				"04-definition-created.ax.txt",
+				"04-definition-created.png",
+				"05-definition-undo.ax.txt"
+			]
+		},
+		{
+			"scenario": "label editing and one-step Undo/Redo",
+			"status": "observed pass with editor visual capture limit",
+			"evidence": ["native-gui-ax.txt", "native-gui-06-label-edited.png"],
+			"observation": "Replaced label with Draft document through native editor keyboard/paste. AX source and rendered diagram changed. One Undo restored label:draft; one Redo restored Draft document.",
+			"originalEvidenceNames": [
+				"06-label-edited.ax.txt",
+				"06-label-edited.png",
+				"07-label-undo.ax.txt"
+			]
+		},
+		{
+			"scenario": "normal input using new and existing artifact",
+			"status": "observed pass",
+			"evidence": ["native-gui-ax.txt"],
+			"observation": "new_brief >> draft and reserve >> draft appeared in actual native editor AX source, with corresponding native graph updates. Each case was undone before next case.",
+			"originalEvidenceNames": [
+				"08-input-new.ax.txt",
+				"09-input-existing.ax.txt"
+			]
+		},
+		{
+			"scenario": "feedback input using new and existing artifact",
+			"status": "observed pass",
+			"evidence": ["native-gui-ax.txt"],
+			"observation": "new_notes >>? draft and manuscript >>? draft appeared in actual native editor AX source, with native graph updates. Each case was undone before next case.",
+			"originalEvidenceNames": [
+				"10-feedback-new.ax.txt",
+				"11-feedback-existing.ax.txt"
+			]
+		},
+		{
+			"scenario": "output using new and existing artifact",
+			"status": "observed pass",
+			"evidence": ["native-gui-ax.txt", "native-gui-14-output-fit.png"],
+			"observation": "draft -> new_result and draft -> reserve appeared in actual native editor AX source. Fit screenshot shows draft branching to manuscript and reserve.",
+			"originalEvidenceNames": [
+				"12-output-new.ax.txt",
+				"13-output-existing.ax.txt",
+				"14-output-fit.png"
+			]
+		},
+		{
+			"scenario": "two-tab source and zoom separation",
+			"status": "observed pass",
+			"evidence": ["native-gui-ax.txt"],
+			"observation": "Tab two retained Separate tab and 110% zoom; Welcome retained edited Native action review source and 68.5% zoom after switching in both directions.",
+			"originalEvidenceNames": [
+				"15-tab-two.ax.txt",
+				"16-tab-one-restored.ax.txt"
+			]
+		},
+		{
+			"scenario": "normal to error to normal recovery",
+			"status": "observed pass",
+			"evidence": [
+				"native-gui-ax.txt",
+				"native-gui-18-recovery-error.png",
+				"native-gui-19-recovery-restored.png"
+			],
+			"observation": "Malformed artifact:[ produced FM002 and disabled diagram actions. Restoring original valid text removed diagnostic, restored raw->refine->final diagram and enabled controls.",
+			"originalEvidenceNames": [
+				"17-recovery-normal.ax.txt",
+				"18-recovery-error.ax.txt",
+				"18-recovery-error.png",
+				"19-recovery-restored.ax.txt",
+				"19-recovery-restored.png"
+			]
+		},
+		{
+			"scenario": "large diagram Fit and 100%",
+			"status": "observed pass",
+			"evidence": ["native-gui-ax.txt", "native-gui-21-final-raised.png"],
+			"observation": "71 native node buttons observed. Fit displayed 6.2% and complete long chain; 100% displayed middle chain nodes at readable scale.",
+			"originalEvidenceNames": [
+				"20-large-fit.ax.txt",
+				"20-large-fit.png",
+				"21-final-raised.ax.txt",
+				"21-final-raised.png"
+			]
+		}
+	],
+	"limits": [
+		"Coordinate click and scroll returned Computer Use server error -10005: noWindowsAvailable while native PID70217 remained alive and AX app reacquisition succeeded. Hover neighborhood, neighbor SVG movement/cue, mouse pan, minimap pointer navigation and double-click source navigation unverified.",
+		"Editor-to-preview target cue unverified. Keyboard source-position selection successfully selected process:draft for Node actions, but no source-to-preview visual cue was certified.",
+		"Native Open folder picker reached Where: corpus yet Open was disabled and AX column contents were empty. Go-to-path entry via both setValue and paste did not complete; picker canceled. Folder listing is unverified. Test fixtures were pasted into this newly launched app's built-in disposable tabs.",
+		"Native app capture showed stale Monaco visible text (initial Welcome, later Separate tab) while actual editor AX source, graph and minimap changed. Explicit AX Raise and reacquisition did not resolve screenshot mismatch. Capture/compositor versus user-visible product cause unconfirmed; no full visual editor rendering claim.",
+		"Cmd+Q quit the dirty test app without an observed discard confirmation. Window-close button pathway was not tested, so normal window close safety is unverified.",
+		"IME composition/commit was not exercised. No installation/distribution/signing claim."
+	],
+	"startup": {
+		"directExecutableLaunch": "Python subprocess.Popen of .app Contents/MacOS binary, normal mode, PID70127; matched supplied crash at 2026-10-05 13:56:48 +0900, 0.197s after launch, EXC_CRASH SIGABRT, Thread0 HIServices ___RegisterApplication -> AppKit NSApplication sharedApplication -> tao eventloop init -> tauriBuilder.run, LaunchServicesDatabase context. Not repeated.",
+		"ordinaryAppLaunch": "cua.getApp(PFDSL), then exact full .app path reacquisition. PID70217 running specified binary; initial Japanese native document and rendered graph observed."
+	},
+	"cleanup": {
+		"requested": "Cmd+Q through documented native CUA app API",
+		"toolResult": "Computer Use server error -10005: App quit",
+		"processReadbackExitCode": 1,
+		"processReadbackStdout": "",
+		"directLaunchPid": 70127,
+		"normalAppPid": 70217,
+		"binarySha256After": "d005c101d6154b81f7fdcc7eabd0d73ed0e2f940100f723f98268224d3c620b2",
+		"fixtureUnchanged": {
+			"01-actions.pfdsl": true,
+			"02-separate-tab.pfdsl": true,
+			"04-error-recovery.pfdsl": true,
+			"03-large.pfdsl": true
+		}
+	},
+	"evidencePreservation": {
+		"frozenOriginalReportSha256": "2b8c973d39dd60f98fba9df6fe474a13e884d24e5a4dcd11857734724c606c80",
+		"pathNormalization": "Host user and checkout/corpus absolute paths replaced by explicit placeholders. Conclusions unchanged. Selected original AX snapshots consolidated in native-gui-ax.txt; selected screenshots retain original bytes.",
+		"omittedImages": "Unselected originals retained in temporary frozen review. Folder-picker image omitted because sidebar includes unrelated host identifiers.",
+		"axSnapshots": [
+			{
+				"snapshot": "04-definition-created.ax.txt",
+				"sourceSha256": "49ec2ff9f0daddbe838ebbc07aa248b0ba60ffb328a1a4536beda591c65fd4c5"
+			},
+			{
+				"snapshot": "05-definition-undo.ax.txt",
+				"sourceSha256": "0fdd25e44e7b2fd4f9130067b12b6c09fe2b5f9416cfea6ea8faba32da84f036"
+			},
+			{
+				"snapshot": "06-label-edited.ax.txt",
+				"sourceSha256": "a73076635d1067679afa8c5792254fce4bffa69785a3b591cef4f292de6ef4bf"
+			},
+			{
+				"snapshot": "07-label-undo.ax.txt",
+				"sourceSha256": "49ec2ff9f0daddbe838ebbc07aa248b0ba60ffb328a1a4536beda591c65fd4c5"
+			},
+			{
+				"snapshot": "08-input-new.ax.txt",
+				"sourceSha256": "92528c21e225b88f0cc02d0120a804206fa15c26ce7e5c96c060600af17e772a"
+			},
+			{
+				"snapshot": "09-input-existing.ax.txt",
+				"sourceSha256": "be516e97bebb3cce6bc9c84c966e3f38f8462661141b797ab7690f21920355de"
+			},
+			{
+				"snapshot": "10-feedback-new.ax.txt",
+				"sourceSha256": "12cd8193f2f728cc9e197d594eb8ecb28d0a5e18d5eefab55949585056ed2b46"
+			},
+			{
+				"snapshot": "11-feedback-existing.ax.txt",
+				"sourceSha256": "bab77acd8c138ebcab76b6fedf720e53d532189060656016c97266a4fb3a9682"
+			},
+			{
+				"snapshot": "12-output-new.ax.txt",
+				"sourceSha256": "d85c121191197c8939fddd3b4b0aedc07c1465cda9320f8ce4b2a185d948ac87"
+			},
+			{
+				"snapshot": "13-output-existing.ax.txt",
+				"sourceSha256": "2af1e8f81dfbc2504cc0bac26f0a1192d37008df762e78994f15d9aef8409251"
+			},
+			{
+				"snapshot": "15-tab-two.ax.txt",
+				"sourceSha256": "a087e84a0c12ea589128a321cf502602c4bec89dcbe283d44b145845521a0276"
+			},
+			{
+				"snapshot": "16-tab-one-restored.ax.txt",
+				"sourceSha256": "c7ce10fa2d8d4cb2e90912c324ebce877445ab580bc6b675cc8b9322d1e2ffab"
+			},
+			{
+				"snapshot": "17-recovery-normal.ax.txt",
+				"sourceSha256": "1f10d5b1585124c1361a0603e56649b207bf8b4081729ed0259ee6e962ba49fb"
+			},
+			{
+				"snapshot": "18-recovery-error.ax.txt",
+				"sourceSha256": "5060ff6d009900ad5652b16159b62c32de0662bff783ccf6bcbfc764da5a3c87"
+			},
+			{
+				"snapshot": "19-recovery-restored.ax.txt",
+				"sourceSha256": "06563724101ba4ab18c1e0e6990bdb5ad939e883d63550c7b22198d55b3ddfcd"
+			},
+			{
+				"snapshot": "20-large-fit.ax.txt",
+				"sourceSha256": "6d54338ba11c8cfd5b65a91c9a1eba37f0a83eaeade9f41eb30fa67c1c2deb1a"
+			},
+			{
+				"snapshot": "21-final-raised.ax.txt",
+				"sourceSha256": "43362cb54065086e4357c60545cfac8ca79e2e809f8364a0b2e9ba1447263398"
+			}
+		],
+		"clarifications": [
+			{
+				"observation": "In the final large-graph observation, the main diagram is Large native pan exercise while screenshot and AX minimap content retain the previous Recovery exercise graph. Earlier wording about changed minimap content does not certify continuous synchronization.",
+				"evidence": [
+					"native-gui-21-final-raised.png",
+					"native-gui-ax.txt: sections 20-large-fit.ax.txt and 21-final-raised.ax.txt"
+				],
+				"boundary": "Visible editor rendering and minimap synchronization remain unverified. Original review conclusions retained with this narrower evidence clarification."
+			}
+		]
+	}
+}

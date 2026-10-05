@@ -12,13 +12,14 @@ export function findUndefinedNodeKind(
 ): "artifact" | "process" | undefined {
 	const kind = nodeKinds.get(id);
 	if (kind !== "artifact" && kind !== "process") return undefined;
-	if (frontmatter?.[kind]?.[id]) return undefined;
+	const definitions = frontmatter?.[kind];
+	if (definitions && Object.hasOwn(definitions, id)) return undefined;
 	return kind;
 }
 
 /** The current authored label value and any completion guidance for that definition. */
 export function findDefinitionEditTarget(
-	model: DocumentModel,
+	model: Pick<DocumentModel, "sourceMap" | "edges" | "diagnostics">,
 	kind: "artifact" | "process",
 	id: string,
 ): { labelRange: Range; needsCriteria: boolean } | undefined {

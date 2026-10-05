@@ -1,0 +1,85 @@
+{
+	"hover": [
+		{
+			"id": "p",
+			"display": "block",
+			"text": "Prepare\n\n\n\n\n\nPFDSL\n\n\n\n\n\na\nAlpha\n\n\n\n\n\np\nPrepare\n\n\n\na->p\n\n\n\n\n\n\n\nb\nBeta\n\n\n\nb->p\n\n\n\n\n\np->b\n\n\n\n\n\n",
+			"rect": {
+				"x": 951,
+				"y": 623,
+				"width": 358,
+				"height": 125.328125,
+				"top": 623,
+				"right": 1309,
+				"bottom": 748.328125,
+				"left": 951
+			},
+			"ids": ["a", "p", "b"],
+			"edges": ["a->p", "b->p", "p->b"]
+		},
+		{
+			"id": "c",
+			"display": "block",
+			"text": "\n\n\n\n\n\nPFDSL\n\n\n\n\n\nc\n\n\n\n\n\nq\nQualify\n\n\n\nq->c\n\n\n\n\n\n",
+			"rect": {
+				"x": 1232.671875,
+				"y": 623,
+				"width": 259.328125,
+				"height": 105.328125,
+				"top": 623,
+				"right": 1492,
+				"bottom": 728.328125,
+				"left": 1232.671875
+			},
+			"ids": ["c", "q"],
+			"edges": ["q->c"]
+		},
+		{
+			"id": "lonely",
+			"display": "block",
+			"text": "Lonely\n\n\n\n\n\nPFDSL\n\n\n\n\n\nlonely\nLonely\n\n\n\n",
+			"rect": {
+				"x": 811,
+				"y": 543,
+				"width": 103.328125,
+				"height": 102.65625,
+				"top": 543,
+				"right": 914.328125,
+				"bottom": 645.65625,
+				"left": 811
+			},
+			"ids": ["lonely"],
+			"edges": []
+		}
+	],
+	"enterTooltip": {
+		"stillVisible": true,
+		"beforeScroll": 0,
+		"afterScroll": 60,
+		"clickCue": ["q"]
+	},
+	"gestures": {
+		"beforeWheel": "translate(102.5px, 343px) scale(1)",
+		"afterWheel": "translate(98.2719px, 328.4px) scale(1.1)",
+		"afterPan": "translate(138.272px, 363.4px) scale(1.1)",
+		"afterBackgroundDouble": "translate(102.5px, 343px) scale(1)",
+		"sourceUnchanged": true
+	},
+	"edgeTooltip": {
+		"rect": {
+			"x": 1232.671875,
+			"y": 886.671875,
+			"width": 259.328125,
+			"height": 105.328125,
+			"top": 886.671875,
+			"right": 1492,
+			"bottom": 992,
+			"left": 1232.671875
+		},
+		"viewport": {
+			"width": 1500,
+			"height": 1000
+		}
+	},
+	"errors": []
+}

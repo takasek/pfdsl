@@ -1,5 +1,6 @@
 import {
 	escapeRe,
+	formatId,
 	ID_PATTERN,
 	loadFrontmatter,
 	type NodeKind,
@@ -23,14 +24,16 @@ export function buildConnectorEdgeLine(
 	connector: ConnectorKind,
 	otherId: string,
 ): string {
+	const node = formatId(nodeId);
+	const other = formatId(otherId);
 	if (connector === "->") {
 		return nodeRole === "process"
-			? `${nodeId} -> ${otherId}`
-			: `${otherId} -> ${nodeId}`;
+			? `${node} -> ${other}`
+			: `${other} -> ${node}`;
 	}
 	return nodeRole === "artifact"
-		? `${nodeId} ${connector} ${otherId}`
-		: `${otherId} ${connector} ${nodeId}`;
+		? `${node} ${connector} ${other}`
+		: `${other} ${connector} ${node}`;
 }
 
 export interface ConnectorInsertion {
@@ -107,19 +110,27 @@ export function insertConnectorEdge(
 	nodeId?: string,
 	cursorLine?: number,
 ): ConnectorInsertion {
+	const newline = source.includes("\r\n") ? "\r\n" : "\n";
 	if (nodeId) {
 		const anchor = findRelatedLineIndex(source, nodeId, cursorLine);
 		if (anchor !== undefined) {
 			const lines = source.split("\n");
 			const insertedLine = anchor + 1;
-			lines.splice(insertedLine, 0, edgeLine);
-			return { text: lines.join("\n"), insertedLine, anchored: true };
+			const insertionOffset =
+				lines.slice(0, insertedLine).join("\n").length + 1;
+			const text =
+				insertionOffset <= source.length
+					? `${source.slice(0, insertionOffset)}${edgeLine}${newline}${source.slice(insertionOffset)}`
+					: `${source}${newline}${edgeLine}`;
+			return { text, insertedLine, anchored: true };
 		}
 	}
 	const trimmed = source.replace(/\s+$/, "");
 	const insertedLine = trimmed.length > 0 ? trimmed.split("\n").length : 0;
 	const text =
-		trimmed.length > 0 ? `${trimmed}\n${edgeLine}\n` : `${edgeLine}\n`;
+		trimmed.length > 0
+			? `${trimmed}${newline}${edgeLine}${newline}`
+			: `${edgeLine}${newline}`;
 	return { text, insertedLine, anchored: false };
 }
 
@@ -171,6 +182,7 @@ export interface NewNodeIdCheck {
  * The message to show under the connector's id input box, or undefined when
  * the id is usable. Written as a predicate rather than inline in the
  * showInputBox options so the three refusals are testable (#611).
+ * Existing IDs use their semantic spelling; new IDs retain the bare-ID constraint.
  */
 export function validateNewNodeId({
 	value,
@@ -178,14 +190,16 @@ export function validateNewNodeId({
 	wantedKind,
 	kindOfExisting,
 }: NewNodeIdCheck): string | undefined {
-	const fullIdPattern = new RegExp(`^(?:${ID_PATTERN.source})$`, "u");
-	if (!fullIdPattern.test(value)) {
-		return "Invalid ID — use letters, numbers, _ or - (must start with a letter, number, or _)";
-	}
 	if (value === currentNodeId) return "Cannot connect a node to itself";
 	const existingKind = kindOfExisting(value);
 	if (existingKind && existingKind !== wantedKind) {
 		return `"${value}" is already ${articleFor(existingKind)} ${existingKind}, not ${articleFor(wantedKind)} ${wantedKind}`;
+	}
+	if (!existingKind) {
+		const fullIdPattern = new RegExp(`^(?:${ID_PATTERN.source})$`, "u");
+		if (!fullIdPattern.test(value)) {
+			return "Invalid ID — use letters, numbers, _ or - (must start with a letter, number, or _)";
+		}
 	}
 	return undefined;
 }

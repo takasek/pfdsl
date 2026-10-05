@@ -14,7 +14,29 @@ const host = vi.hoisted(() => {
 	});
 	const commands = new Map<string, () => unknown>();
 	const panels: ReturnType<typeof createPanel>[] = [];
+	class Position {
+		constructor(
+			public line: number,
+			public character: number,
+		) {}
+	}
+	class Range {
+		constructor(
+			public start: Position,
+			public end: Position,
+		) {}
+	}
+	class WorkspaceEdit {
+		replacements: Array<{ uri: unknown; range: Range; text: string }> = [];
+		replace(uri: unknown, range: Range, text: string) {
+			this.replacements.push({ uri, range, text });
+		}
+	}
 	let textChanged = (_event: { document: vscode.TextDocument }) => {};
+	let selectionChanged = (_event: {
+		textEditor: vscode.TextEditor;
+		selections: readonly vscode.Selection[];
+	}) => {};
 	const window = {
 		activeTextEditor: undefined as vscode.TextEditor | undefined,
 		visibleTextEditors: [] as vscode.TextEditor[],
@@ -23,8 +45,18 @@ const host = vi.hoisted(() => {
 			panels.push(panel);
 			return panel;
 		},
-		onDidChangeTextEditorSelection: vi.fn(() => ({ dispose() {} })),
+		onDidChangeTextEditorSelection: vi.fn(
+			(callback: typeof selectionChanged) => {
+				selectionChanged = callback;
+				return { dispose() {} };
+			},
+		),
 		showInformationMessage: vi.fn(),
+		showTextDocument: vi.fn(async (document: vscode.TextDocument) => ({
+			document,
+			selection: undefined,
+			revealRange: vi.fn(),
+		})),
 	};
 	function createPanel() {
 		let receive = (_message: MessageFromWebview) => {};
@@ -69,6 +101,10 @@ const host = vi.hoisted(() => {
 		panels,
 		window,
 		api: {
+			Position,
+			Range,
+			Selection: Range,
+			WorkspaceEdit,
 			window,
 			commands: {
 				registerCommand: (name: string, callback: () => unknown) => {
@@ -77,6 +113,7 @@ const host = vi.hoisted(() => {
 				},
 			},
 			workspace: {
+				applyEdit: vi.fn(async (_edit: WorkspaceEdit) => true),
 				onDidChangeTextDocument: (callback: typeof textChanged) => {
 					textChanged = callback;
 					return { dispose() {} };
@@ -91,6 +128,23 @@ const host = vi.hoisted(() => {
 		},
 		changeDocument: (document: vscode.TextDocument) =>
 			textChanged({ document }),
+		changeSelection: (
+			document: vscode.TextDocument,
+			line: number,
+			character: number,
+			startCharacter = character - 1,
+		) =>
+			selectionChanged({
+				textEditor: { document } as vscode.TextEditor,
+				selections: [
+					{
+						active: { line, character },
+						start: { line, character: startCharacter },
+						end: { line, character },
+						isEmpty: false,
+					},
+				] as vscode.Selection[],
+			}),
 	};
 });
 
@@ -113,7 +167,19 @@ function document(name: string, source = "a >> p -> b"): vscode.TextDocument {
 		uri: host.uri(`/test/${name}.pfdsl`),
 		languageId: "pfdsl",
 		version: 1,
-		getText: () => source,
+		getText: (range?: vscode.Range) => {
+			if (!range) return source;
+			const offset = ({ line, character }: vscode.Position) =>
+				source
+					.split("\n")
+					.slice(0, line)
+					.reduce((sum, text) => sum + text.length + 1, 0) + character;
+			return source.slice(offset(range.start), offset(range.end));
+		},
+		positionAt: (offset: number) => {
+			const lines = source.slice(0, offset).split("\n");
+			return new host.api.Position(lines.length - 1, lines.at(-1)!.length);
+		},
 	} as unknown as vscode.TextDocument;
 }
 
@@ -140,6 +206,66 @@ beforeEach(() => {
 	host.panels.length = 0;
 	host.commands.clear();
 	host.window.activeTextEditor = undefined;
+	host.api.workspace.applyEdit.mockClear();
+});
+
+it("focuses a selected semantic definition key and ignores an identically named field", async () => {
+	const { open } = setup();
+	const doc = document(
+		"semantic-focus",
+		"---\nartifact:\n  a: {label: A, status: todo}\n  status: {label: State}\n---\na >> p -> status\n",
+	);
+	const panel = await open(doc);
+	panel.receive({ type: "ready" });
+	host.changeSelection(doc, 2, 3);
+	expect(panel.messages.at(-1)).toEqual({ type: "focus", nodeId: "a" });
+	host.changeSelection(doc, 2, 22);
+	expect(panel.messages.at(-1)).toEqual({ type: "clearFocus" });
+	host.changeSelection(doc, 5, 16, 0);
+	expect(panel.messages.at(-1)).toEqual({ type: "clearFocus" });
+});
+
+it("focuses a quoted authored definition key selected with its quotes", async () => {
+	const { open } = setup();
+	const doc = document(
+		"quoted-focus",
+		'---\nartifact:\n  "my input": {label: Input}\n---\n"my input" >> p -> b\n',
+	);
+	const panel = await open(doc);
+	panel.receive({ type: "ready" });
+	host.changeSelection(doc, 2, 12, 2);
+	expect(panel.messages.at(-1)).toEqual({ type: "focus", nodeId: "my input" });
+});
+
+it("applies source-bound node creation as one WorkspaceEdit and rejects a stale or disposed request", async () => {
+	const { open } = setup();
+	const source = "a >> p -> b\n";
+	const doc = document("editing", source);
+	const panel = await open(doc);
+	panel.receive({ type: "ready" });
+	await panel.receive({ type: "createDefinition", nodeId: "b", source });
+	expect(host.api.workspace.applyEdit).toHaveBeenCalledTimes(1);
+	const edit = host.api.workspace.applyEdit.mock.calls[0]![0];
+	expect(edit.replacements).toHaveLength(1);
+	expect(edit.replacements[0]!.text).toContain("label: b");
+	expect(edit.replacements[0]!.text.endsWith(source)).toBe(true);
+	await panel.receive({
+		type: "addConnector",
+		nodeId: "a",
+		source: "older",
+		connector: ">>",
+		otherId: "q",
+	});
+	expect(host.api.workspace.applyEdit).toHaveBeenCalledTimes(1);
+	panel.dispose();
+	await panel.receive({
+		type: "addConnector",
+		nodeId: "a",
+		source,
+		connector: ">>",
+		otherId: "q",
+	});
+	expect(host.api.workspace.applyEdit).toHaveBeenCalledTimes(1);
 });
 
 describe("registered preview notification lifecycle", () => {

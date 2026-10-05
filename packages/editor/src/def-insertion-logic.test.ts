@@ -14,6 +14,23 @@ function analyzeFor(src: string): {
 }
 
 describe("findUndefinedNodeKind", () => {
+	it.each([
+		"constructor",
+		"toString",
+	])("does not mistake prototype name %s for an authored artifact entry", (id) => {
+		const source = `---\nartifact: {a: {label: A}}\n---\na >> p -> ${id}\n`;
+		const { nodeKinds, frontmatter } = analyzeFor(source);
+		expect(findUndefinedNodeKind(nodeKinds, frontmatter, id)).toBe("artifact");
+	});
+
+	it.each([
+		"constructor",
+		"toString",
+	])("recognizes authored prototype-name artifact %s", (id) => {
+		const source = `---\nartifact: {${id}: {label: Output}}\n---\na >> p -> ${id}\n`;
+		const { nodeKinds, frontmatter } = analyzeFor(source);
+		expect(findUndefinedNodeKind(nodeKinds, frontmatter, id)).toBeUndefined();
+	});
 	it("returns the kind for a node that only appears in edges", () => {
 		const src = `---
 artifact:

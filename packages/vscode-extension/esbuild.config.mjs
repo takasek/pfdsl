@@ -35,6 +35,8 @@ const webviewOptions = {
 	bundle: true,
 	outfile: "dist/webview.js",
 	platform: "browser",
+	// Shared graph export uses core's pure path helpers; use the same browser shim as the standalone host.
+	alias: { path: "path-browserify" },
 	format: "esm",
 	target: "es2020",
 	sourcemap: true,

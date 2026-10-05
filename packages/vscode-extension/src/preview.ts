@@ -1,10 +1,11 @@
 import { type DiffReport, resolveLocationFsPath } from "@pfdsl/core";
 import type { MessageFromWebview, MessageToWebview } from "@pfdsl/editor";
 import {
-	allIdsOfDocument,
+	applyPreviewEdit,
 	buildLocations,
 	findFrontmatterDefinitionRange,
-	nodeIdAtCursor,
+	findNodeOccurrenceRanges,
+	nodeIdAtSourcePosition,
 	positionOfNodeId,
 } from "@pfdsl/editor";
 import * as vscode from "vscode";
@@ -18,6 +19,7 @@ interface PreviewState {
 	panel: vscode.WebviewPanel;
 	doc: vscode.TextDocument;
 	controller: PreviewController;
+	disposed: boolean;
 }
 
 /** The vscode filesystem, shaped for expandDirectory: fsPaths in, fsPaths out. */
@@ -230,6 +232,7 @@ export function registerPreview(context: vscode.ExtensionContext): {
 		const state: PreviewState = {
 			panel,
 			doc,
+			disposed: false,
 			controller: new PreviewController(
 				(focus) => renderUpdate(state, focus),
 				(message) => {
@@ -239,15 +242,72 @@ export function registerPreview(context: vscode.ExtensionContext): {
 			),
 		};
 
-		panel.webview.onDidReceiveMessage((msg: MessageFromWebview) => {
+		panel.webview.onDidReceiveMessage(async (msg: MessageFromWebview) => {
+			if (state.disposed) return;
 			if (msg.type === "ready") {
 				state.controller.markReady();
+			} else if (
+				msg.type === "createDefinition" ||
+				msg.type === "addConnector"
+			) {
+				const source = state.doc.getText();
+				const version = state.doc.version;
+				const result = applyPreviewEdit(source, msg);
+				if (!result.ok) {
+					vscode.window.showInformationMessage(result.message);
+					return;
+				}
+				if (
+					state.disposed ||
+					state.doc.version !== version ||
+					state.doc.getText() !== source
+				)
+					return;
+				const edit = new vscode.WorkspaceEdit();
+				edit.replace(
+					state.doc.uri,
+					new vscode.Range(
+						new vscode.Position(0, 0),
+						state.doc.positionAt(source.length),
+					),
+					result.source,
+				);
+				if (!(await vscode.workspace.applyEdit(edit))) {
+					vscode.window.showInformationMessage(
+						"The preview edit could not be applied.",
+					);
+					return;
+				}
+				if (state.disposed || state.doc.getText() !== result.source) return;
+				if (result.selection) {
+					const { start, end } = result.selection;
+					const range = new vscode.Range(
+						new vscode.Position(start.line - 1, start.column - 1),
+						new vscode.Position(end.line - 1, end.column - 1),
+					);
+					const editor = await vscode.window.showTextDocument(state.doc, {
+						selection: range,
+						preserveFocus: false,
+					});
+					if (state.disposed || state.doc.getText() !== result.source) return;
+					editor.selection = new vscode.Selection(range.start, range.end);
+					editor.revealRange(range);
+					vscode.window.showInformationMessage(
+						result.needsCriteria
+							? "Edit the new label. Add criteria describing how this produced artifact is judged complete (W002)."
+							: "Edit the new label and complete any required metadata.",
+					);
+				}
 			} else if (msg.type === "nodeClick") {
 				const editor = vscode.window.visibleTextEditors.find(
 					(e) => e.document === state.doc,
 				);
 				const cursorId = editor
-					? nodeIdAtCursor(analyzeDocument(state.doc), editor.selection.active)
+					? nodeIdAtSourcePosition(
+							analyzeDocument(state.doc),
+							state.doc.getText(),
+							editor.selection.active,
+						)
 					: undefined;
 				jumpToNode(state.doc, msg.nodeId, cursorId === msg.nodeId);
 			} else if (msg.type === "openUrl") {
@@ -285,6 +345,7 @@ export function registerPreview(context: vscode.ExtensionContext): {
 		});
 
 		panel.onDidDispose(() => {
+			state.disposed = true;
 			state.controller.dispose();
 			panels.delete(docUri);
 			if (activePreviewDocUri === docUri) activePreviewDocUri = null;
@@ -323,7 +384,11 @@ export function registerPreview(context: vscode.ExtensionContext): {
 			}
 
 			const result = analyzeDocument(doc);
-			const focusNodeId = nodeIdAtCursor(result, editor.selection.active);
+			const focusNodeId = nodeIdAtSourcePosition(
+				result,
+				doc.getText(),
+				editor.selection.active,
+			);
 			createPanel(doc, focusNodeId);
 		}),
 
@@ -342,12 +407,24 @@ export function registerPreview(context: vscode.ExtensionContext): {
 				} satisfies MessageToWebview);
 				return;
 			}
-			const selectedText = e.textEditor.document.getText(sel);
-			const allIds = allIdsOfDocument(analyzeDocument(state.doc));
-			if (allIds.has(selectedText)) {
+			const model = analyzeDocument(state.doc);
+			const source = state.doc.getText();
+			const nodeId = nodeIdAtSourcePosition(model, source, sel.active);
+			const selectedText = state.doc.getText(sel);
+			const isNodeSelection =
+				nodeId !== undefined &&
+				(selectedText === nodeId ||
+					findNodeOccurrenceRanges(model, source, nodeId).some(
+						({ start, end }) =>
+							start.line === sel.start.line + 1 &&
+							start.column === sel.start.character + 1 &&
+							end.line === sel.end.line + 1 &&
+							end.column === sel.end.character + 1,
+					));
+			if (nodeId && isNodeSelection) {
 				state.panel.webview.postMessage({
 					type: "focus",
-					nodeId: selectedText,
+					nodeId,
 				} satisfies MessageToWebview);
 			} else {
 				state.panel.webview.postMessage({

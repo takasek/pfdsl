@@ -1,0 +1,69 @@
+{
+	"hashes": {
+		"packages/cli/src/index.ts": "6a2eb43417811694e0449f5a9af872c5b96ceb7d5ddfdb930c9cd7142c9e4f26",
+		"packages/cli/src/meta-create.test.ts": "d52c7fd545151cc2c2f29aec2b24a71155d9dafd0ee63e185afb21806f98e7d5",
+		"packages/cli/dist/cli.js": "b433c92ce8d09f0742e36f6c22221ef765a885a0c280f961a2a49fe3e9c4b007",
+		"packages/cli/dist/index.js": "87fd81c9508dd36ae762b00ba048f63e91be406237b38b9a0d289df77ec51160"
+	},
+	"results": [
+		{
+			"name": "spaces-roadmap",
+			"file": "plan with spaces.pfdsl",
+			"id": "release output",
+			"kind": "artifact",
+			"command": "pfdsl meta create --write -- 'plan with spaces.pfdsl' 'release output' status=todo",
+			"exitCode": 0,
+			"stderr": "",
+			"source": "---\ntype: roadmap\nartifact:\n  a: { status: done }\n  release output:\n    label: release output\n    status: todo\n---\na >> p -> \"release output\"\n",
+			"meta": {
+				"label": "release output",
+				"status": "todo"
+			},
+			"unexpectedMarkers": []
+		},
+		{
+			"name": "quotes-process",
+			"file": "plan's \"quoted\".pfdsl",
+			"id": "release's \"output\"",
+			"kind": "process",
+			"command": "pfdsl meta create --write -- 'plan'\\''s \"quoted\".pfdsl' 'release'\\''s \"output\"'",
+			"exitCode": 0,
+			"stderr": "",
+			"source": "---\nprocess:\n  release's \"output\":\n    label: release's \"output\"\n---\na >> \"release's \\\"output\\\"\" -> b\n",
+			"meta": {
+				"label": "release's \"output\""
+			},
+			"unexpectedMarkers": []
+		},
+		{
+			"name": "shell-special-roadmap",
+			"file": "plan $PFD_RECOVERY_TEST $(touch path-dollar) `touch path-backtick` ; * ? [x] \\.pfdsl",
+			"id": "release $PFD_RECOVERY_TEST $(touch id-dollar) `touch id-backtick` ; * ? [x] \\ output",
+			"kind": "artifact",
+			"command": "pfdsl meta create --write -- 'plan $PFD_RECOVERY_TEST $(touch path-dollar) `touch path-backtick` ; * ? [x] \\.pfdsl' 'release $PFD_RECOVERY_TEST $(touch id-dollar) `touch id-backtick` ; * ? [x] \\ output' status=todo",
+			"exitCode": 0,
+			"stderr": "",
+			"source": "---\ntype: roadmap\nartifact:\n  a: { status: done }\n  release $PFD_RECOVERY_TEST $(touch id-dollar) `touch id-backtick` ; * ? [x] \\ output:\n    label: release $PFD_RECOVERY_TEST $(touch id-dollar) `touch id-backtick` ; * ? [x] \\ output\n    status: todo\n---\na >> p -> \"release $PFD_RECOVERY_TEST $(touch id-dollar) `touch id-backtick` ; * ? [x] \\\\ output\"\n",
+			"meta": {
+				"label": "release $PFD_RECOVERY_TEST $(touch id-dollar) `touch id-backtick` ; * ? [x] \\ output",
+				"status": "todo"
+			},
+			"unexpectedMarkers": []
+		},
+		{
+			"name": "option-like-relative-file-and-id",
+			"file": "-plan with spaces.pfdsl",
+			"id": "--json",
+			"kind": "process",
+			"command": "pfdsl meta create --write -- '-plan with spaces.pfdsl' --json",
+			"exitCode": 0,
+			"stderr": "",
+			"source": "---\nprocess:\n  --json:\n    label: --json\n---\na >> \"--json\" -> b\n",
+			"meta": {
+				"label": "--json"
+			},
+			"unexpectedMarkers": []
+		}
+	],
+	"fixtureCleanup": true
+}

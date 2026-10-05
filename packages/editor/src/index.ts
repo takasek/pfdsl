@@ -5,5 +5,6 @@ export * from "./format-logic.js";
 export * from "./jump-logic.js";
 export * from "./location-utils.js";
 export * from "./messages.js";
+export * from "./node-operations.js";
 export * from "./preview-logic.js";
 export { previewMarkup, previewStyles } from "./preview-shell.js";

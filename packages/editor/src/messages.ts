@@ -1,4 +1,5 @@
 import type { DiffReport } from "@pfdsl/core";
+import type { PreviewEditRequest, PreviewGraph } from "./node-operations.js";
 
 /**
  * Shared postMessage protocol between preview.ts (extension host) and
@@ -15,6 +16,15 @@ export type MessageToWebview =
 			descriptions?: Record<string, Array<[string, string]>>;
 			locations?: Record<string, string[]>;
 			subflows?: Record<string, string>;
+			graph?: PreviewGraph;
+			editing?: {
+				source: string;
+				nodes: Array<{
+					id: string;
+					kind: "artifact" | "process";
+					defined: boolean;
+				}>;
+			};
 	  }
 	| { type: "error"; message: string }
 	| { type: "focus"; nodeId: string }
@@ -23,6 +33,7 @@ export type MessageToWebview =
 	| { type: "clearDiff" };
 
 export type MessageFromWebview =
+	| PreviewEditRequest
 	| { type: "ready" }
 	| { type: "nodeClick"; nodeId: string }
 	| { type: "openUrl"; url: string }

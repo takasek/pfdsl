@@ -1,7 +1,13 @@
 import type { DiffReport } from "@pfdsl/core";
 import { renderDotToSvg } from "@pfdsl/preview-engine/renderer";
+import {
+	buildConnectorEdgeLine,
+	type ConnectorKind,
+	compatibleOtherKind,
+} from "./connector-logic.js";
 import { buildDiffPanelHtml } from "./diff-panel.js";
 import type { MessageFromWebview, MessageToWebview } from "./messages.js";
+import { neighborhoodDot, type PreviewGraph } from "./node-operations.js";
 import { previewMarkup } from "./preview-shell.js";
 import { unwrapAnchors } from "./svg-anchors.js";
 import {
@@ -78,6 +84,189 @@ export function mountPreview(container: HTMLElement, host: PreviewHost) {
 	let locations: Record<string, string[]> = {};
 	let subflows: Record<string, string> = {};
 	let pendingFocusNodeId: string | undefined;
+	let pendingFocusCue = false;
+	let graphData: PreviewGraph | undefined;
+	let editingData: Extract<MessageToWebview, { type: "render" }>["editing"];
+	let selectedNodeId: string | undefined;
+	let hoverId: string | undefined;
+	let hoverToken = 0;
+	let hideTimer: number | undefined;
+	let cueTimer: number | undefined;
+	let cuedNode: Element | undefined;
+	const actions = container.querySelector<HTMLElement>("#node-actions")!;
+	const actionsToggle = container.querySelector<HTMLButtonElement>(
+		"#node-actions-toggle",
+	)!;
+	const createDefinition =
+		container.querySelector<HTMLButtonElement>("#create-definition")!;
+	const connectorKind =
+		container.querySelector<HTMLSelectElement>("#connector-kind")!;
+	const connectorExisting = container.querySelector<HTMLSelectElement>(
+		"#connector-existing",
+	)!;
+	const connectorTarget =
+		container.querySelector<HTMLInputElement>("#connector-target")!;
+	let actionTarget: string | undefined;
+	let actionSource: string | undefined;
+	function closeActions() {
+		actions.hidden = true;
+		actionsToggle.setAttribute("aria-expanded", "false");
+		actionTarget = actionSource = undefined;
+	}
+	function openActions(id: string) {
+		if (graphRevision !== revision) return;
+		const node = editingData?.nodes.find((n) => n.id === id);
+		if (!node || !editingData) return;
+		selectedNodeId = actionTarget = id;
+		actionSource = editingData.source;
+		container.querySelector("#node-actions-title")!.textContent =
+			`${node.kind}: ${id}`;
+		container.querySelector("#node-actions-error")!.textContent = "";
+		createDefinition.hidden = node.defined;
+		connectorKind.replaceChildren();
+		for (const connector of [">>", ">>?", "->"] as const) {
+			const option = document.createElement("option");
+			option.value = connector;
+			option.textContent = buildConnectorEdgeLine(
+				id,
+				node.kind,
+				connector,
+				"…",
+			);
+			connectorKind.append(option);
+		}
+		connectorExisting.replaceChildren();
+		const newOption = document.createElement("option");
+		newOption.value = "";
+		newOption.textContent = "New node ID…";
+		connectorExisting.append(newOption);
+		for (const other of editingData.nodes.filter(
+			(n) => n.id !== id && n.kind === compatibleOtherKind(node.kind),
+		)) {
+			const option = document.createElement("option");
+			option.value = other.id;
+			option.textContent = other.id;
+			connectorExisting.append(option);
+		}
+		connectorTarget.value = "";
+		actions.hidden = false;
+		actionsToggle.setAttribute("aria-expanded", "true");
+		(createDefinition.hidden ? connectorKind : createDefinition).focus();
+	}
+	on(actionsToggle, "click", () => {
+		const id = selectedNodeId ?? editingData?.nodes[0]?.id;
+		if (id) openActions(id);
+	});
+	on(container.querySelector("#node-actions-close")!, "click", () => {
+		closeActions();
+		actionsToggle.focus();
+	});
+	on(createDefinition, "click", () => {
+		if (!actionTarget || actionSource === undefined) return;
+		host.postMessage({
+			type: "createDefinition",
+			nodeId: actionTarget,
+			source: actionSource,
+		});
+		closeActions();
+	});
+	on(connectorExisting, "change", () => {
+		connectorTarget.value = connectorExisting.value;
+	});
+	on(container.querySelector("#connector-form")!, "submit", (e) => {
+		e.preventDefault();
+		if (!actionTarget || actionSource === undefined) return;
+		host.postMessage({
+			type: "addConnector",
+			nodeId: actionTarget,
+			source: actionSource,
+			connector: connectorKind.value as ConnectorKind,
+			otherId: connectorTarget.value,
+		});
+		closeActions();
+	});
+	on(root, "contextmenu", (e) => {
+		const id = (e.target as Element).closest<HTMLElement>("g.node")?.dataset
+			.nodeId;
+		if (id) {
+			e.preventDefault();
+			hideHover();
+			openActions(id);
+		}
+	});
+	on(root, "keydown", (e) => {
+		const id = (e.target as Element).closest<HTMLElement>("g.node")?.dataset
+			.nodeId;
+		if (id && ["Enter", " ", "ContextMenu"].includes(e.key)) {
+			e.preventDefault();
+			hideHover();
+			openActions(id);
+		}
+	});
+	on(container, "keydown", (e) => {
+		if (e.key === "Escape") {
+			hideHover();
+			closeActions();
+			actionsToggle.focus();
+		}
+	});
+	function clearCue() {
+		if (cueTimer !== undefined) window.clearTimeout(cueTimer);
+		cueTimer = undefined;
+		cuedNode?.classList.remove("pfdsl-focus-cue");
+		cuedNode = undefined;
+	}
+	function showCue(node: Element) {
+		clearCue();
+		cuedNode = node;
+		node.classList.add("pfdsl-focus-cue");
+		cueTimer = window.setTimeout(clearCue, 1500);
+	}
+	function cancelHide() {
+		if (hideTimer !== undefined) window.clearTimeout(hideTimer);
+		hideTimer = undefined;
+	}
+	function hideHover() {
+		cancelHide();
+		hoverId = undefined;
+		hoverToken++;
+		tooltip.replaceChildren();
+		tooltip.style.display = "none";
+	}
+	function scheduleHide() {
+		cancelHide();
+		hideTimer = window.setTimeout(hideHover, 180);
+	}
+	on(tooltip, "mouseenter", cancelHide);
+	on(tooltip, "mouseleave", scheduleHide);
+	on(tooltip, "focusin", cancelHide);
+	on(tooltip, "focusout", (e) => {
+		if (!tooltip.contains(e.relatedTarget as Node | null)) scheduleHide();
+	});
+	function navigateLocal(target: EventTarget | null) {
+		const id = (target as Element).closest<HTMLElement>("g.node")?.dataset
+			.nodeId;
+		if (!id) return;
+		selectedNodeId = pendingFocusNodeId = id;
+		pendingFocusCue = true;
+		positionGraph();
+		hideHover();
+		[...inner.querySelectorAll<HTMLElement>("g.node")]
+			.find((n) => n.dataset.nodeId === id)
+			?.focus();
+	}
+	on(tooltip, "click", (e) => navigateLocal(e.target));
+	on(tooltip, "keydown", (e) => {
+		if (["Enter", " "].includes(e.key)) {
+			e.preventDefault();
+			navigateLocal(e.target);
+		}
+	});
+	function clampTooltip(x: number, y: number) {
+		const rect = tooltip.getBoundingClientRect();
+		tooltip.style.left = `${Math.max(8, Math.min(x, window.innerWidth - rect.width - 8))}px`;
+		tooltip.style.top = `${Math.max(8, Math.min(y, window.innerHeight - rect.height - 8))}px`;
+	}
 
 	const diffPanel = container.querySelector("#diff-panel") as HTMLDivElement;
 	let currentDiff: DiffReport | null = null;
@@ -95,15 +284,19 @@ export function mountPreview(container: HTMLElement, host: PreviewHost) {
 
 	const modKey = window.navigator.platform.startsWith("Mac") ? "⌘" : "Ctrl";
 
-	on(root, "mousemove", (e) => {
-		const node = (e.target as Element).closest?.("g.node");
-		if (!node) {
-			tooltip.style.display = "none";
-			return;
-		}
+	async function showHover(node: Element, x: number, y: number) {
+		if (graphRevision !== revision) return;
+		cancelHide();
 		const nodeId = (node as HTMLElement).dataset.nodeId;
-		const desc = nodeId ? descriptions[nodeId] : undefined;
-		const nodeLocs = nodeId ? (locations[nodeId] ?? []) : [];
+		if (!nodeId || hoverId === nodeId) return;
+		hoverId = nodeId;
+		const token = ++hoverToken;
+		const hoverRevision = revision;
+		const localDot = graphData ? neighborhoodDot(graphData, nodeId) : undefined;
+		const desc = Object.hasOwn(descriptions, nodeId)
+			? descriptions[nodeId]
+			: undefined;
+		const nodeLocs = Object.hasOwn(locations, nodeId) ? locations[nodeId]! : [];
 		const subflow = (node as HTMLElement).dataset.subflow;
 		const hint =
 			host.canOpenRelatedFiles === false
@@ -117,8 +310,8 @@ export function mountPreview(container: HTMLElement, host: PreviewHost) {
 								? `${modKey}+Click to open URL`
 								: `${modKey}+Click to open file`
 							: null;
-		if (!desc && !hint) {
-			tooltip.style.display = "none";
+		if (!desc && !hint && !localDot) {
+			hideHover();
 			return;
 		}
 		const parts: string[] = [];
@@ -141,7 +334,7 @@ export function mountPreview(container: HTMLElement, host: PreviewHost) {
 						return `<tr><td colspan="2" class="tt-body"><strong>${vHtml}</strong>${cellExtra}</td></tr>`;
 					if (!k)
 						return `<tr><td colspan="2" class="tt-body">${vHtml}${cellExtra}</td></tr>`;
-					return `<tr><td class="tt-key">${escapeHtml(k)}</td><td class="tt-val">${vHtml}${cellExtra}</td></tr>`;
+					return `<tr><td class="tt-key">${escapeHtml(k)}</td><td class="tt-val" data-field="${escapeHtml(k)}">${vHtml}${cellExtra}</td></tr>`;
 				})
 				.join("");
 			parts.push(`<table class="tt-table">${rows}</table>`);
@@ -152,13 +345,62 @@ export function mountPreview(container: HTMLElement, host: PreviewHost) {
 			parts.push(`<div class="tt-hint">${escapeHtml(hint)}</div>`);
 		}
 		tooltip.innerHTML = parts.join("");
-		tooltip.style.left = `${e.clientX + 14}px`;
-		tooltip.style.top = `${e.clientY + 14}px`;
 		tooltip.style.display = "block";
+		clampTooltip(x + 14, y + 14);
+		if (!localDot) return;
+		try {
+			const svg = await renderDot(localDot);
+			if (
+				disposed ||
+				hoverRevision !== revision ||
+				token !== hoverToken ||
+				hoverId !== nodeId
+			)
+				return;
+			const local = document.createElement("div");
+			local.className = "tt-graph";
+			local.innerHTML = svg;
+			unwrapAnchors(local);
+			for (const node of local.querySelectorAll<HTMLElement>("g.node")) {
+				const title = node.querySelector(":scope > title");
+				const id = title?.textContent;
+				if (id) {
+					node.dataset.nodeId = id;
+					node.setAttribute("tabindex", "0");
+					node.setAttribute("role", "button");
+					node.setAttribute("aria-label", `Focus ${id}`);
+					title.remove();
+				}
+			}
+			tooltip.append(local);
+			clampTooltip(x + 14, y + 14);
+		} catch {
+			if (disposed || token !== hoverToken || hoverRevision !== revision)
+				return;
+			const message = document.createElement("p");
+			message.textContent = "Neighborhood preview could not be rendered.";
+			tooltip.append(message);
+		}
+	}
+	on(root, "mousemove", (e) => {
+		if (dragging || minimapDragging) return;
+		const node = (e.target as Element).closest?.("g.node");
+		if (!node) {
+			scheduleHide();
+			return;
+		}
+		void showHover(node, e.clientX, e.clientY);
+	});
+	on(root, "focusin", (e) => {
+		const node = (e.target as Element).closest?.("g.node");
+		if (!node) return;
+		selectedNodeId = (node as HTMLElement).dataset.nodeId;
+		const rect = node.getBoundingClientRect();
+		void showHover(node, rect.right, rect.bottom);
 	});
 
 	on(root, "mouseleave", (e) => {
-		tooltip.style.display = "none";
+		scheduleHide();
 		if (e.buttons === 0) {
 			dragging = false;
 			root.style.cursor = "grab";
@@ -208,6 +450,12 @@ export function mountPreview(container: HTMLElement, host: PreviewHost) {
 		minimap.style.width = `${scaledW}px`;
 		minimap.style.height = `${scaledH}px`;
 		const clone = svgEl.cloneNode(true) as SVGSVGElement;
+		for (const node of clone.querySelectorAll("g.node")) {
+			node.classList.remove("pfdsl-focus-cue");
+			node.removeAttribute("tabindex");
+			node.removeAttribute("role");
+			node.removeAttribute("aria-label");
+		}
 		clone.setAttribute("width", String(scaledW));
 		clone.setAttribute("height", String(scaledH));
 		clone.style.width = `${scaledW}px`;
@@ -269,7 +517,7 @@ export function mountPreview(container: HTMLElement, host: PreviewHost) {
 		applyTransform();
 	}
 
-	function focusNode(nodeId: string) {
+	function focusNode(nodeId: string, cue = false) {
 		const nodes = inner.querySelectorAll("g.node");
 		for (const node of nodes) {
 			if ((node as HTMLElement).dataset.nodeId === nodeId) {
@@ -280,6 +528,7 @@ export function mountPreview(container: HTMLElement, host: PreviewHost) {
 					{ width: root.clientWidth, height: root.clientHeight },
 				));
 				applyTransform();
+				if (cue) showCue(node);
 				return;
 			}
 		}
@@ -305,8 +554,10 @@ export function mountPreview(container: HTMLElement, host: PreviewHost) {
 			hasPositioned = true;
 		}
 		if (pendingFocusNodeId) {
-			focusNode(pendingFocusNodeId);
+			selectedNodeId = pendingFocusNodeId;
+			focusNode(pendingFocusNodeId, pendingFocusCue);
 			pendingFocusNodeId = undefined;
+			pendingFocusCue = false;
 		}
 		refreshMinimap();
 	}
@@ -397,7 +648,8 @@ export function mountPreview(container: HTMLElement, host: PreviewHost) {
 		const el = node as HTMLElement;
 		const subflow = el.dataset.subflow;
 		const nodeId = el.dataset.nodeId;
-		const nodeLocs = nodeId ? (locations[nodeId] ?? []) : [];
+		const nodeLocs =
+			nodeId && Object.hasOwn(locations, nodeId) ? locations[nodeId]! : [];
 		if (!subflow && nodeLocs.length === 0) return;
 		e.preventDefault();
 		if (e.metaKey || e.ctrlKey) {
@@ -443,6 +695,12 @@ export function mountPreview(container: HTMLElement, host: PreviewHost) {
 	}
 
 	function showError(message: string) {
+		hideHover();
+		closeActions();
+		clearCue();
+		editingData = undefined;
+		graphData = undefined;
+		actionsToggle.disabled = true;
 		error.textContent = message;
 		error.hidden = false;
 		root.hidden = true;
@@ -465,11 +723,13 @@ export function mountPreview(container: HTMLElement, host: PreviewHost) {
 		}
 		if (msg.type === "focus") {
 			pendingFocusNodeId = msg.nodeId;
+			pendingFocusCue = true;
 			positionGraph();
 			return;
 		}
 		if (msg.type === "clearFocus") {
 			pendingFocusNodeId = undefined;
+			pendingFocusCue = false;
 			return;
 		}
 		if (msg.type === "diff") {
@@ -482,15 +742,23 @@ export function mountPreview(container: HTMLElement, host: PreviewHost) {
 			return;
 		}
 		if (msg.type !== "render") return;
+		hideHover();
+		closeActions();
+		clearCue();
 		// The cursor hint supplied while opening must not displace the initial Fit.
-		if (hasPositioned && msg.focusNodeId !== undefined)
+		if (hasPositioned && msg.focusNodeId !== undefined) {
 			pendingFocusNodeId = msg.focusNodeId;
-		descriptions = msg.descriptions ?? {};
-		locations = msg.locations ?? {};
-		subflows = msg.subflows ?? {};
+			pendingFocusCue = false;
+		}
 		try {
 			const svg = await renderDot(msg.dot);
 			if (disposed || currentRevision !== revision) return;
+			descriptions = msg.descriptions ?? {};
+			locations = msg.locations ?? {};
+			subflows = msg.subflows ?? {};
+			graphData = msg.graph;
+			editingData = msg.editing;
+			actionsToggle.disabled = !editingData?.nodes.length;
 			inner.innerHTML = svg;
 			error.hidden = true;
 			error.textContent = "";
@@ -502,7 +770,13 @@ export function mountPreview(container: HTMLElement, host: PreviewHost) {
 				if (titleEl?.textContent) {
 					const id = titleEl.textContent;
 					(node as HTMLElement).dataset.nodeId = id;
-					const sf = subflows[id];
+					node.setAttribute("tabindex", "0");
+					node.setAttribute("role", "button");
+					node.setAttribute(
+						"aria-label",
+						`Node ${id}. Enter for Node actions.`,
+					);
+					const sf = Object.hasOwn(subflows, id) ? subflows[id] : undefined;
 					if (sf) (node as HTMLElement).dataset.subflow = sf;
 					titleEl.remove();
 				}
@@ -530,6 +804,9 @@ export function mountPreview(container: HTMLElement, host: PreviewHost) {
 	return {
 		receive,
 		dispose() {
+			hideHover();
+			closeActions();
+			clearCue();
 			disposed = true;
 			revision++;
 			resizeObserver?.disconnect();

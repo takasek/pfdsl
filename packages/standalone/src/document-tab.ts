@@ -1,7 +1,8 @@
 import {
+	applyPreviewEdit,
 	type DocumentModel,
 	findFrontmatterDefinitionRange,
-	nodeIdAtCursor,
+	nodeIdAtSourcePosition,
 	positionOfNodeId,
 } from "@pfdsl/editor";
 import { mountPreview } from "@pfdsl/editor/preview";
@@ -30,6 +31,7 @@ export function createDocumentTab({
 }: DocumentTabOptions) {
 	let snapshot: DocumentModel | undefined;
 	let revision = 0;
+	let disposed = false;
 	const container = document.createElement("div");
 	container.className = "document";
 	const editorElement = document.createElement("div");
@@ -56,7 +58,47 @@ export function createDocumentTab({
 	const preview = mountPreview(previewElement, {
 		canOpenRelatedFiles: false,
 		postMessage(message) {
-			if (message.type === "nodeClick" && snapshot) {
+			if (disposed) return;
+			if (
+				message.type === "createDefinition" ||
+				message.type === "addConnector"
+			) {
+				const result = applyPreviewEdit(editor.getValue(), message);
+				if (!result.ok) {
+					reportStatus(result.message);
+					return;
+				}
+				const selections = result.selection
+					? [
+							new monaco.Selection(
+								result.selection.start.line,
+								result.selection.start.column,
+								result.selection.end.line,
+								result.selection.end.column,
+							),
+						]
+					: undefined;
+				editor.pushUndoStop();
+				editor.executeEdits(
+					"pfdsl.preview",
+					[{ range: model.getFullModelRange(), text: result.source }],
+					selections,
+				);
+				editor.pushUndoStop();
+				if (result.selection) {
+					editor.revealRangeInCenter(selections![0]!);
+					editor.focus();
+				}
+				reportStatus(
+					result.needsCriteria
+						? "Edit the new label. Add criteria describing how this produced artifact is judged complete (W002)."
+						: "Preview edit applied. Complete any required metadata.",
+				);
+			} else if (
+				message.type === "nodeClick" &&
+				snapshot &&
+				snapshot.source === editor.getValue()
+			) {
 				const definition = findFrontmatterDefinitionRange(
 					snapshot,
 					message.nodeId,
@@ -83,9 +125,10 @@ export function createDocumentTab({
 	});
 
 	async function refresh() {
+		if (disposed) return;
 		const currentRevision = ++revision;
 		const result = await processSnapshot(editor.getValue(), path, read);
-		if (currentRevision !== revision) return;
+		if (disposed || currentRevision !== revision) return;
 		snapshot = result.model;
 		monaco.editor.setModelMarkers(
 			editor.getModel()!,
@@ -116,8 +159,8 @@ export function createDocumentTab({
 		requestRefresh();
 	});
 	editor.onDidChangeCursorPosition((event) => {
-		if (!snapshot) return;
-		const nodeId = nodeIdAtCursor(snapshot, {
+		if (!snapshot || snapshot.source !== editor.getValue() || disposed) return;
+		const nodeId = nodeIdAtSourcePosition(snapshot, snapshot.source, {
 			line: event.position.lineNumber - 1,
 			character: event.position.column - 1,
 		});
@@ -128,6 +171,15 @@ export function createDocumentTab({
 	return {
 		container,
 		button,
+		dispose() {
+			disposed = true;
+			revision++;
+			preview.dispose();
+			editor.dispose();
+			model.dispose();
+			container.remove();
+			button.remove();
+		},
 		activate() {
 			editor.layout();
 			requestRefresh();

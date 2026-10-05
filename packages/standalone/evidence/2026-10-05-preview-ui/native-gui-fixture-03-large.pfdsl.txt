@@ -1,0 +1,40 @@
+---
+title: Large native pan exercise
+layout:
+  direction: LR
+---
+seed >> step_01 -> artifact_01
+artifact_01 >> step_02 -> artifact_02
+artifact_02 >> step_03 -> artifact_03
+artifact_03 >> step_04 -> artifact_04
+artifact_04 >> step_05 -> artifact_05
+artifact_05 >> step_06 -> artifact_06
+artifact_06 >> step_07 -> artifact_07
+artifact_07 >> step_08 -> artifact_08
+artifact_08 >> step_09 -> artifact_09
+artifact_09 >> step_10 -> artifact_10
+artifact_10 >> step_11 -> artifact_11
+artifact_11 >> step_12 -> artifact_12
+artifact_12 >> step_13 -> artifact_13
+artifact_13 >> step_14 -> artifact_14
+artifact_14 >> step_15 -> artifact_15
+artifact_15 >> step_16 -> artifact_16
+artifact_16 >> step_17 -> artifact_17
+artifact_17 >> step_18 -> artifact_18
+artifact_18 >> step_19 -> artifact_19
+artifact_19 >> step_20 -> artifact_20
+artifact_20 >> step_21 -> artifact_21
+artifact_21 >> step_22 -> artifact_22
+artifact_22 >> step_23 -> artifact_23
+artifact_23 >> step_24 -> artifact_24
+artifact_24 >> step_25 -> artifact_25
+artifact_25 >> step_26 -> artifact_26
+artifact_26 >> step_27 -> artifact_27
+artifact_27 >> step_28 -> artifact_28
+artifact_28 >> step_29 -> artifact_29
+artifact_29 >> step_30 -> artifact_30
+artifact_30 >> step_31 -> artifact_31
+artifact_31 >> step_32 -> artifact_32
+artifact_32 >> step_33 -> artifact_33
+artifact_33 >> step_34 -> artifact_34
+artifact_34 >> step_35 -> artifact_35

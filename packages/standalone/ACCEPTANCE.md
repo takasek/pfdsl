@@ -49,14 +49,97 @@
 | Alt+F12 と既定 Peek Definition の衝突 | #1283 | 採用キーと VS Code 設定の実操作 | 未解決の既存 issue として維持 |
 | 署名・公証 DMG、更新案内、対応 OS、利用者環境 | #1262 | 配布物と実機、Git 不在、追加開発環境不要 | 未実装。local `.app` は配布受入ではない |
 
-## 未実装 UI のまとまり
+## 追加 UI の受入範囲
 
 | 要求 | 実装のまとまりと共有点 | 完了判定 |
 | --- | --- | --- |
-| #483 と #1282 の preview UI | node action・メニュー、connector / definition 計算、Undo 可能な適用を共通境界で接続 | 今回の基盤作成では未完了 |
-| #1282 の CLI 操作 | core の定義追加処理を使う独立した CLI 導線 | UI の統合だけでは完了しない |
-| #1284 と旧 #1285 の移動先強調 | 共通 preview DOM の局所 graph と移動合図。再描画による位置保持を利用者 navigation と区別 | #1285 の管理上の close と実装完了を混同しない |
-| #1283 の editor 内巡回 | sourceMap の定義 range と AST の全 ID range を共有し、巡回 command・ジェスチャーは別実装 | 同一行反復・quoted key・同名 field と既定キー衝突を検査 |
+| #483 と #1282 の preview UI | 共通 Node actions に定義作成と input/output/feedback の接続を実装。各 host の単一 Undo 操作へ適用 | 2026-10-05 の追加実装。人間の確認と native Tauri の受入は未了 |
+| #1282 の CLI 操作 | `meta create` が初期 scalar field・preview/write・完成 source 検証を core の CST writer へ接続 | CLI tests で検証。UI の受入と分ける |
+| #1284 と旧 #1285 の移動先強調 | 中心の incident primary/feedback edges に限る局所 SVG と共通 cue を実装。再描画だけでは cue を出さない | 共有 DOM と production frontend を検証。旧 #1285 の close は完成根拠にしない |
+| #1283 の editor 内巡回 | authored 定義キーと AST の全 ID range を巡回。VS Code command・context menu・chord を接続 | 同一行反復・quoted key・同名 field・alias・編集後増減を検証。アプリの専用巡回 command は範囲外 |
+
+## 2026-10-05 の編集・移動機能
+
+作業ブランチは `codex/issue-1352-preview-editing`。
+この節は上の基盤段階の記録から進んだ機能を扱い、後続の2026-10-04の native 証拠を今回の実行版の証拠として使わない。
+#1352 に加えて、所有者の指示で #1282・#1283・#1284・#483 を同じ作業範囲に含めた。
+roadmap の対応 artifact は wip を維持し、issue の元の受入条件を狭めない。
+
+共有編集要求は候補を得た source を添え、古い文書・kind・target・破棄後の要求を拒否する。
+VS Code は一つの WorkspaceEdit、アプリは Monaco の executeEdits と Undo stop を使う。
+既存 quoted ID は core の formatId で直列化し、新規 ID は従来の bare-ID 制約を持つ。
+定義作成後は authored sourceMap から label の値を選択し、produced artifact の criteria 入力を案内する。
+
+周辺図は metadata のない node と孤立 node も描き、primary と feedback の向きを保つ。
+hover target・render revision・dispose を照合し、metadata と SVG は同時に採用する。
+wire graph は表示に必要な文字列・文字列配列と style へ射影し、循環 YAML の拡張 object を配送しない。
+editor の semantic node 選択と局所図のクリックは同じ一時 cue へ接続し、reduced motion ではアニメーションを抑える。
+
+巡回は `Ctrl+K Ctrl+Alt+N`、macOS では `Cmd+K Cmd+Alt+N`。
+定義へ直接移動する command は末尾 D の別 chord に保ち、拡張の Alt+F12 割当は撤去した。
+sourceMap が alias use site や複数 ID に重なる位置しか持たない場合、巡回は本文 occurrence を使う。
+直接定義移動の alias target は従来の契約を維持する。
+
+| 検証層 | 結果と限界 |
+| --- | --- |
+| 実装・共有計算 | TDD と全 package tests が成功。core 1099、CLI 835 pass / 1 skip、editor 218、extension 137、standalone 5。scripts/hooks 2992 pass / 0 fail、import・shell・CLI 規約検査も成功 |
+| 型・生成 | 全 build/typecheck が成功。CLI help の生成 README・skill mirror、配置/scaffold 同期を確認 |
+| 独立差分レビュー | 品質・correctness・採用理由と外部 consumer を確認。quoted ID・prototype ID・循環 metadata・CRLF・選択範囲の指摘を修正して再レビュー |
+| production frontend / Monaco | 定義作成・label 編集・一段 Undo/Redo・6通りの connector・古い menu・tab 分離・1-hop SVG・tooltip 内 scroll/click・画面端・既存 zoom/pan を実操作。定義キーからの cue を修正後に再確認 |
+| VS Code の実 command | 同じ固定版1.132.1の隔離 host で、巡回 chord・同一行反復・直接定義 chord・同名 field での非移動を確認。詳細シナリオの確定記録は下の evidence に対応付ける |
+| native Tauri | 所有者の許可で Rust の最小構成を導入し、今回の debug .app build と Rust unit tests 2件が成功。[ビルド・テスト抜粋](evidence/2026-10-05-preview-ui/native-build-and-tests.txt)、[native corpus 23文書の結果](evidence/2026-10-05-preview-ui/native-corpus-report.json)、[独立した通常 GUI の記録](evidence/2026-10-05-preview-ui/native-gui-review.md)を保存。GUI の未確認項目と表示差は下記に残す |
+| 人間による受入 | 未了。最新 frontend/extension を操作した所有者の結果を得るまで、機能完成・issue close・サイクル終結と扱わない |
+
+macOS 27.0 arm64、Xcode は導入済みだった。
+最初の native build は cargo 不在で開始できず、所有者の追加許可を受けて公式 rustup の minimal profile で cargo/rustc 1.99.0 と標準ライブラリを導入した。
+shell の起動設定は変更せず、今回の build では `~/.cargo/bin` を PATH に加えた。
+debug executable の SHA-256 は `d005c101d6154b81f7fdcc7eabd0d73ed0e2f940100f723f98268224d3c620b2`。
+この binary とその frontend build 入力での独立 GUI 観測記録を固定し、後続の修正が入った実行版への読み替えはしない。
+native corpus は20 sampleと3運用図の23文書で、各比較が成功し、failures/errors は空だった。
+これは native reader・処理・描画の比較であり、GUI の操作や IME の受入とは分ける。
+[実行 report](evidence/2026-10-05-preview-ui/native-corpus-report.json)の execution に、実行中 binary の SHA-256 と path を保存した。
+[baseline の指紋要約](evidence/2026-10-05-preview-ui/native-baseline-fingerprints.json)は入力文書と expected snapshot の hash、および frontend 10ファイルの build 入力を保持し、展開済み model・DOT・SVG を含む完全な baseline とは区別する。
+Tauri は frontend を実行 binary へ組み込むため、build 入力の指紋を実行時に抽出した frontend の指紋とは扱わない。
+[corpus の lifecycle](evidence/2026-10-05-preview-ui/native-corpus-lifecycle.json)は report の存在を確認後、親が専用 PID 69017 を終了し、exitAfterCleanup が -15 だったことを示す。
+
+独立 reviewer が検証用実行ファイルを直接起動した PID 70127 は、起動から約0.2秒で SIGABRT により停止した。
+stack は HIServices のアプリ登録から AppKit/tao の window 初期化を指し、文書編集の開始前だった。
+同じ .app を正規のアプリ起動経路で取得すると別 PID 70217 で通常画面を表示できた。
+直接起動の failure と通常起動成功を区別し、根本原因が解決したとは扱わない。
+添付されたクラッシュ記録の個人・端末識別子は共有 evidence に転載しない。
+
+通常 GUI は新しい disposable corpus の文書を、その試験 app の初期タブへ UI 経由で貼り付けて観測した。
+[凍結した独立レビュー](evidence/2026-10-05-preview-ui/native-gui-review.md)、[構造化 report](evidence/2026-10-05-preview-ui/native-gui-report.json)、[統合した AX 観測](evidence/2026-10-05-preview-ui/native-gui-ax.txt)を同じ実行版の証拠とする。
+未定義 process の Create definition と label 編集は、それぞれ一回の Undo/Redo で戻し・復元した。
+input・feedback・output の各接続は新規 ID と既存 artifact の両方を追加し、計6通りの接続式を実 editor の AX 本文で確認した。
+[output の画面](evidence/2026-10-05-preview-ui/native-gui-14-output-fit.png)では、draft から manuscript と reserve への分岐も観測した。
+二つのタブは文書と zoom 値を保持し、壊れた YAML の FM002 から正常な raw→refine→final の図へ復帰した。
+[エラー時](evidence/2026-10-05-preview-ui/native-gui-18-recovery-error.png)は図の操作が disabled となり、[復帰後](evidence/2026-10-05-preview-ui/native-gui-19-recovery-restored.png)は操作が有効になった。
+71ノードの大きい図は Fit が6.2%となり、100%への切替でも図を観測した。
+
+座標 click と scroll は、専用 app が生存したまま操作基盤の `-10005: noWindowsAvailable` となった。
+hover の周辺 SVG・隣接 node の移動と cue・mouse pan・minimap のポインタ操作・node の double-click・editor→preview の cue は未確認で、実機合格とは扱わない。
+Open folder の picker は Where: corpus まで到達したが Open が disabled のままで、フォルダ一覧の操作は未確認だった。
+画面画像の editor には古い Welcome または Separate tab の文字が残り、更新後の AX 本文と主図に一致しなかった。
+大きい図の最終観測では、主図が Large native pan exercise に更新された一方、minimap の画面と AX には直前の Recovery exercise が残った。
+[正規の Raise 後の画面](evidence/2026-10-05-preview-ui/native-gui-21-final-raised.png)でも差が残ったため、画面取得・compositing と利用者に見える製品表示のどちらが原因かは確定せず、editor の可視描画と minimap の同期を認定しない。
+dirty な試験 app は Cmd+Q で終了し、確認画面は観測しなかった。
+window の close button による安全な終了と IME composition→commit は今回未確認である。
+専用 PID 70127・70217 の終了、四つの試験入力の hash 保持、実行 binary の前後 hash 一致を確認した。
+[証拠 manifest](evidence/2026-10-05-preview-ui/native-evidence-manifest.json)に原本と保存物の指紋および path 正規化の境界を記録した。
+
+独立した browser/VS Code と CLI の体験レビューは、[証拠一覧](evidence/2026-10-05-preview-ui/README.md)から凍結 report・版別 asset hash・構造化操作結果へ辿れる。
+CLI の28シナリオで見つかった回復案内の引用不足と、追加の option 形 ID の反例を修正し、実 built CLI の回復コマンドを POSIX shell へコピーする4ケースが成功した。
+browser の一度の `p.map` 例外は親の実操作追試で3回再現し、prototype名ノードの tooltip metadata を継承プロパティと取り違える条件へ特定した。
+authored metadata の producer と JSON 往復、および consumer の判定を修正し、回帰テストで Red→Green を確認した。
+別 reviewer の実 Graphviz/DOM による12ケースと、[修正後の実 browser 追試](evidence/2026-10-05-preview-ui/browser-parent-recheck-after-fix.json)の3反復で例外は観測されず、quoted current→valid new target の接続と単一 Undo/Redo、主図/minimap の node ID 一致も確認した。
+これらを native の可視描画一致や未確認操作の認定には用いない。
+
+修正後の [最終 native build](evidence/2026-10-05-preview-ui/native-final-build.txt) が成功し、executable SHA-256 は `842cc46e7be18eee3fdb11fcaacdaf7ca6731841dacf8c0c6d25c12a8950d558`。
+[最終 corpus report](evidence/2026-10-05-preview-ui/native-final-corpus-report.json)でも23文書すべてが成功し、failures/errors は空だった。
+[入力指紋](evidence/2026-10-05-preview-ui/native-final-baseline-fingerprints.json)と [専用 PID 34977 の終了記録](evidence/2026-10-05-preview-ui/native-final-corpus-lifecycle.json)を保存した。
+最終 corpus は固定した入力 snapshot を比較し、その後の GitHub updated_at 同期による運用図の日時変更は runtime code の検証と分ける。
+最終版の full native GUI 受入は実施しておらず、先の独立 GUI 観測版と区別する。
 
 ## 検証記録と限界
 

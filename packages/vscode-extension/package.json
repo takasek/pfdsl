@@ -135,12 +135,13 @@
 		"test:smoke:unit": "node --test smoke/*.test.mjs"
 	},
 	"dependencies": {
-		"@pfdsl/editor": "workspace:*",
 		"@hpcc-js/wasm": "^2.18.0",
 		"@pfdsl/core": "workspace:*",
+		"@pfdsl/editor": "workspace:*",
 		"@pfdsl/graphviz-exporter": "workspace:*",
 		"@pfdsl/metadata-exporter": "workspace:*",
-		"@pfdsl/preview-engine": "workspace:*"
+		"@pfdsl/preview-engine": "workspace:*",
+		"path-browserify": "1.0.1"
 	},
 	"peerDependencies": {
 		"puppeteer": ">=20.0.0"
