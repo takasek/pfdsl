@@ -2746,6 +2746,104 @@ describe("--json output (#181)", () => {
 });
 
 describe("multifile check — subflow", () => {
+	it("attributes a nested missing reference to its parent and reports a shared missing child once", async () => {
+		const entry = join(dir, "missing-nested-parent.pfdsl");
+		const child = join(dir, "missing-nested-child.pfdsl");
+		writeFileSync(
+			entry,
+			"---\nprocess:\n  p:\n    subflow: ./missing-nested-child.pfdsl\n---\na >> p -> b\n",
+		);
+		writeFileSync(
+			child,
+			"---\nprocess:\n  q:\n    subflow: ./absent.pfdsl\n  r:\n    subflow: ./absent.pfdsl\n---\na >> q -> b\na >> r -> c\n",
+		);
+		const r = await run(["check", entry, "--json"]);
+		expect(r.exitCode).toBe(1);
+		const errors = JSON.parse(r.stdout).diagnostics.filter(
+			(d: { code: string }) => d.code === "V021",
+		);
+		expect(errors).toHaveLength(1);
+		expect(errors[0]).toMatchObject({ file: child });
+	});
+	it("reports child-local graph errors with their source file", async () => {
+		const entry = join(dir, "closure-parent.pfdsl");
+		const child = join(dir, "closure-child.pfdsl");
+		writeFileSync(
+			entry,
+			"---\nprocess:\n  p:\n    subflow: ./closure-child.pfdsl\n---\na >> p -> b\n",
+		);
+		writeFileSync(child, "a >> q -> b\na >> r -> b\n");
+		const r = await run(["check", entry, "--json"]);
+		expect(r.exitCode).toBe(1);
+		expect(JSON.parse(r.stdout).diagnostics).toContainEqual(
+			expect.objectContaining({ code: "V001", file: child }),
+		);
+	});
+
+	it("checks a grandchild boundary even when the entry boundary matches", async () => {
+		const entry = join(dir, "nested-parent.pfdsl");
+		const child = join(dir, "nested-child.pfdsl");
+		writeFileSync(
+			entry,
+			"---\nprocess:\n  p:\n    subflow: ./nested-child.pfdsl\n---\na >> p -> b\n",
+		);
+		writeFileSync(
+			child,
+			"---\nprocess:\n  q:\n    subflow: ./nested-grandchild.pfdsl\n---\na >> q -> b\n",
+		);
+		writeFileSync(join(dir, "nested-grandchild.pfdsl"), "wrong >> r -> b\n");
+		const r = await run(["check", entry, "--json"]);
+		expect(r.exitCode).toBe(1);
+		expect(JSON.parse(r.stdout).diagnostics).toContainEqual(
+			expect.objectContaining({ code: "V034", file: child }),
+		);
+	});
+
+	it("checks child presets and reports a shared malformed preset only once", async () => {
+		const entry = join(dir, "preset-closure-parent.pfdsl");
+		const broken = join(dir, "shared-broken.yaml");
+		writeFileSync(
+			entry,
+			"---\nprocess:\n  p:\n    subflow: ./preset-closure-child.pfdsl\n  s:\n    subflow: ./preset-closure-second.pfdsl\n---\na >> p -> b\na >> s -> c\n",
+		);
+		writeFileSync(
+			join(dir, "preset-closure-child.pfdsl"),
+			"---\nextends: ./shared-broken.yaml\n---\na >> q -> b\n",
+		);
+		writeFileSync(
+			join(dir, "preset-closure-second.pfdsl"),
+			"---\nextends: ./shared-broken.yaml\n---\na >> r -> c\n",
+		);
+		writeFileSync(broken, "statusStyles: [\n");
+		const r = await run(["check", entry, "--json"]);
+		expect(r.exitCode).toBe(1);
+		expect(
+			JSON.parse(r.stdout).diagnostics.filter(
+				(d: { code: string; file: string }) =>
+					d.code === "FM002" && d.file === broken,
+			),
+		).toHaveLength(1);
+	});
+
+	it("applies strict validation to a child's warnings", async () => {
+		const entry = join(dir, "strict-closure-parent.pfdsl");
+		const child = join(dir, "strict-closure-child.pfdsl");
+		writeFileSync(
+			entry,
+			"---\nprocess:\n  p:\n    subflow: ./strict-closure-child.pfdsl\n---\na >> p -> b\n",
+		);
+		writeFileSync(
+			child,
+			"---\nprocess:\n  unused:\n    label: Unused\n---\na >> q -> b\n",
+		);
+		expect((await run(["check", entry])).exitCode).toBe(0);
+		const r = await run(["check", entry, "--strict", "--json"]);
+		expect(r.exitCode).toBe(1);
+		expect(JSON.parse(r.stdout).diagnostics).toContainEqual(
+			expect.objectContaining({ file: child, severity: "error" }),
+		);
+	});
+
 	const parentValid = [
 		"---",
 		"process:",
@@ -2806,6 +2904,58 @@ describe("multifile check — subflow", () => {
 });
 
 describe("multifile check — extends", () => {
+	it.each([
+		["isolated-node", "x\n"],
+		["edge", "x >> q -> y\n"],
+	])("rejects %s graph content in presets in check and rename's preset validation", async (name, body) => {
+		const entry = join(dir, `${name}-preset-entry.pfdsl`);
+		const preset = join(dir, `${name}-preset.pfdsl`);
+		writeFileSync(
+			entry,
+			`---\nextends: ./${name}-preset.pfdsl\nartifact:\n  a: {}\n---\na >> p -> b\n`,
+		);
+		writeFileSync(preset, `---\nstatusStyles: {}\n---\n${body}`);
+		const checked = await run(["check", entry, "--json"]);
+		expect(checked.exitCode).toBe(1);
+		expect(checked.stderr).toBe("");
+		expect(JSON.parse(checked.stdout)).toMatchObject({
+			ok: false,
+			diagnostics: expect.arrayContaining([
+				expect.objectContaining({
+					code: "V028",
+					severity: "error",
+					file: preset,
+				}),
+			]),
+		});
+		const renamed = await run(["rename", entry, "a", "c"]);
+		expect(renamed.exitCode).toBe(1);
+		expect(renamed.stderr).toContain("V028");
+		expect(renamed.stdout).toBe("");
+		expect(readFileSync(entry, "utf-8")).toContain("a >> p -> b");
+	});
+
+	it.each([
+		"",
+		"# Presentation settings only\n\n# No graph declarations\n",
+	])("accepts a presentation-only preset with body %j in check and rename", async (body) => {
+		const entry = join(dir, "presentation-preset-entry.pfdsl");
+		writeFileSync(
+			entry,
+			"---\nextends: ./presentation-preset.pfdsl\nartifact:\n  a: {}\n---\na >> p -> b\n",
+		);
+		writeFileSync(
+			join(dir, "presentation-preset.pfdsl"),
+			`---\nstatusStyles: {}\n---\n${body}`,
+		);
+		const checked = await run(["check", entry, "--json"]);
+		expect(checked.exitCode).toBe(0);
+		expect(JSON.parse(checked.stdout).ok).toBe(true);
+		const renamed = await run(["rename", entry, "a", "c"]);
+		expect(renamed.exitCode).toBe(0);
+		expect(renamed.stdout).toContain("c >> p -> b");
+	});
+
 	const presetValid = [
 		"statusStyles:",
 		"  done:",

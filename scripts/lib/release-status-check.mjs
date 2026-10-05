@@ -3,6 +3,7 @@
  * Network I/O lives in the main script; this module stays testable.
  */
 
+import { DISTRIBUTION_ROOTS } from "./distribution-roots.mjs";
 import { formatRecordStamp } from "./review-record-gate.mjs";
 
 /** @returns {'equal' | 'local-ahead' | 'published-ahead'} */
@@ -50,19 +51,44 @@ export function formatResults(results) {
 }
 
 /**
- * .claude/skills and .claude/commands are bundled into @pfdsl/cli's dist at
- * build time and only reach adopting repos via a CLI release — editing them
- * doesn't show up as a packages/cli/package.json change, so the ordinary
- * commits-ahead check misses this drift. sinceTag is null when no CLI tag
- * exists yet (nothing to compare against, so nothing to report).
- * @param {number} commitCount
+ * Plugin snapshots are distributed at the same v* tags as the CLI, separately
+ * from its npm dist. Compare the delivered outputs, not maintainer-only sources
+ * or intervening commits whose changes may have been reverted.
+ * @param {(args: string[]) => string} git
+ * @param {string | null} sinceTag
+ * @returns {{changedFiles: number | null, error?: string}}
+ */
+export function readPluginBundleStatus(git, sinceTag) {
+	if (!sinceTag)
+		return { changedFiles: null, error: "no release tag available" };
+	try {
+		const output = git([
+			"diff",
+			"--name-only",
+			"-z",
+			sinceTag,
+			"HEAD",
+			"--",
+			...DISTRIBUTION_ROOTS,
+		]);
+		return { changedFiles: output.split("\0").filter(Boolean).length };
+	} catch (error) {
+		return { changedFiles: null, error: error.message };
+	}
+}
+
+/**
+ * Report only the local plugin snapshot's difference from the release tag.
+ * Marketplace pin and remote retrieval are separate publication steps.
+ * @param {{changedFiles: number | null, error?: string}} status
  * @param {string | null} sinceTag
  * @returns {string}
  */
-export function formatSkillBundleStatus(commitCount, sinceTag) {
-	const name = "@pfdsl/cli bundle (.claude/skills, .claude/commands)";
-	if (commitCount > 0) {
-		return `  ${name} ! commits-ahead (${commitCount} commit(s) since ${sinceTag}, needs CLI release)`;
+export function formatPluginBundleStatus({ changedFiles, error }, sinceTag) {
+	const name = "plugin bundle (plugin/pfdsl, plugin/pfdsl-codex)";
+	if (changedFiles === null) return `  ${name} ! unknown (${error})`;
+	if (changedFiles > 0) {
+		return `  ${name} ! changed (${changedFiles} file(s) since ${sinceTag}, needs plugin release)`;
 	}
 	const suffix = sinceTag ? ` (no changes since ${sinceTag})` : "";
 	return `  ${name} ✓ up-to-date${suffix}`;
@@ -138,10 +164,10 @@ export function formatFullReviewStatus(date) {
  * check-docs, gen-plugin identity — are covered continuously by test.yml and
  * check-gen-plugin.yml, so a failure there is ordinary breakage rather than
  * publishing work left pending (#880).
- * @param {{results: Array<{status: string, commitsAhead?: number}>, skillBundleCommits: number, gates: Array<{ok: boolean}>}} args
+ * @param {{results: Array<{status: string, commitsAhead?: number}>, pluginChangedFiles: number | null, gates: Array<{ok: boolean}>}} args
  * @returns {boolean}
  */
-export function needsAction({ results, skillBundleCommits, gates }) {
+export function needsAction({ results, pluginChangedFiles, gates }) {
 	return (
 		results.some(
 			(r) =>
@@ -149,7 +175,7 @@ export function needsAction({ results, skillBundleCommits, gates }) {
 				r.status === "error" ||
 				r.commitsAhead > 0,
 		) ||
-		skillBundleCommits > 0 ||
+		pluginChangedFiles !== 0 ||
 		gates.some((gate) => gate.ok !== true)
 	);
 }

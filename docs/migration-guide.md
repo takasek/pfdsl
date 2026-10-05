@@ -67,7 +67,8 @@ Updating the original anchored definition retains YAML's shared-value behavior f
 Values are stored as strings, except for the existing numeric `index` field.
 For a value beginning with `-`, put options before `--` and the value after it, for example `meta set diagram.pfdsl a label --json -- --help`.
 The existing CLI rules for reserved names still apply: `status` uses the roadmap/status checks, `index` requires a number, and collection or derived field names remain unavailable through `meta set`.
-The issue audit remains read-only and prints a timestamp repair command, including the flag so an absent `updated_at` can be added.
+The issue audit remains read-only and checks issue classification and registration without requiring an `updated_at` snapshot or an exact priority match.
+Existing `updated_at` fields are ignored by the audit; they do not need to be repaired or removed.
 
 For JSON consumers, `missing` now contains only IDs absent from the file.
 Failures with exit code 1 return JSON when `--json` is set; invalid usage with exit code 2 still reports text on stderr.

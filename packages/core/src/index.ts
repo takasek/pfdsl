@@ -311,6 +311,7 @@ export {
 	loadSubflowGraph,
 	parentBoundaryArtifacts,
 	resolveEffectiveFrontmatter,
+	resolveLoadedPresentation,
 	resolvePresentation,
 	resolveRefPath,
 	subflowBoundaryDiagnostics,

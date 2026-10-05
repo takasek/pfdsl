@@ -1,11 +1,28 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import { describe, it } from "node:test";
+import { parse } from "yaml";
 
 import {
 	buildAuditArgs,
 	classifyRoadmapRegistration,
 	localClosingIssueNumbers,
 } from "./roadmap-registration.mjs";
+
+it("runs the registration workflow for a closing PR without a roadmap file change", () => {
+	const workflow = parse(
+		readFileSync(
+			new URL(
+				"../../.github/workflows/check-roadmap-registration.yml",
+				import.meta.url,
+			),
+			"utf8",
+		),
+	);
+	assert.equal(workflow.on.pull_request.paths, undefined);
+	assert.equal(workflow.on.pull_request["paths-ignore"], undefined);
+	assert.ok(workflow.on.pull_request.types.includes("edited"));
+});
 
 describe("localClosingIssueNumbers", () => {
 	const ref = (number, owner, name) => ({

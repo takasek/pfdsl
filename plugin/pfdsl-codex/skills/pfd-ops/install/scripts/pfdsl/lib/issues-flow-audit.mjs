@@ -1,10 +1,6 @@
 // Pure logic for auditing sync between GitHub issues and .pfdsl/roadmap.pfdsl.
 // Zero I/O.
 
-import { formatIdForCliArg } from "./cli-id-arg.mjs";
-
-const shellQuote = (value) => `'${value.replaceAll("'", "'\\''")}'`;
-
 export const FLOW_LABELS = [
 	{ name: "flow:managed", description: "tracked in .pfdsl/roadmap.pfdsl" },
 	{
@@ -50,28 +46,26 @@ export function computeLabelFindings(expectedLabels, actualLabels) {
 
 /**
  * @param {object} frontmatter - parsed YAML object
- * @returns {{ id: string, issueNumbers: number[], updatedAt: string|undefined, priorities: string[] }[]}
+ * @returns {{ id: string, issueNumbers: number[] }[]}
  */
 export function parseIssueProcesses(frontmatter) {
 	const process = frontmatter.process;
 	if (!process) return [];
 	const result = [];
-	for (const [id, val] of Object.entries(process)) {
+	for (const id of Object.keys(process)) {
 		const prefixMatch = id.match(/^(?:i\d+_)+/);
 		if (!prefixMatch) continue;
 		const issueNumbers = [...prefixMatch[0].matchAll(/i(\d+)_/g)].map((m) =>
 			Number(m[1]),
 		);
-		const tags = val.tags ?? [];
-		const priorities = tags.filter((t) => t.startsWith("priority:")).sort();
-		result.push({ id, issueNumbers, updatedAt: val.updated_at, priorities });
+		result.push({ id, issueNumbers });
 	}
 	return result;
 }
 
 /**
- * @param {{ processId: string, issueNumber: number, artifactId: string, updatedAt: string|undefined, priorities: string[] }[]} entries - priorities must be pre-sorted
- * @param {{ number: number, state: "OPEN"|"CLOSED", labels: string[], updatedAt: string }[]} issues
+ * @param {{ processId: string, issueNumber: number, artifactId: string }[]} entries
+ * @param {{ number: number, state: "OPEN"|"CLOSED", labels: string[] }[]} issues
  * @returns {{ type: string, issueNumber: number, processId: string|undefined, artifactId: string|undefined, detail: string, advisory?: boolean }[]}
  */
 export function computeFindings(entries, issues) {
@@ -120,33 +114,6 @@ export function computeFindings(entries, issues) {
 				processId: entry.processId,
 				artifactId: entry.artifactId,
 				detail: `open issue with tracked process is missing "flow:managed" label`,
-			});
-		}
-
-		// Freshness checks for open issues
-		if (entry.updatedAt !== iss.updatedAt) {
-			const val = entry.updatedAt ?? "(none)";
-			findings.push({
-				type: "stale_updated_at",
-				issueNumber: entry.issueNumber,
-				processId: entry.processId,
-				artifactId: entry.artifactId,
-				detail: `process: ${val}, issue: ${iss.updatedAt}`,
-				repairCommand: `pfdsl meta set .pfdsl/roadmap.pfdsl ${shellQuote(formatIdForCliArg(entry.processId))} updated_at ${shellQuote(iss.updatedAt)} --allow-unknown`,
-			});
-		}
-
-		// Priority drift
-		const issuePriorities = iss.labels
-			.filter((l) => l.startsWith("priority:"))
-			.sort();
-		if (JSON.stringify(issuePriorities) !== JSON.stringify(entry.priorities)) {
-			findings.push({
-				type: "priority_drift",
-				issueNumber: entry.issueNumber,
-				processId: entry.processId,
-				artifactId: entry.artifactId,
-				detail: `process: [${entry.priorities.join(", ")}], issue: [${issuePriorities.join(", ")}]`,
 			});
 		}
 	}
@@ -208,7 +175,10 @@ export function computeFindings(entries, issues) {
  */
 export function partitionFindings(findings, { enforcedIssues = [] } = {}) {
 	const enforced = new Set(enforcedIssues);
-	const blocking = (f) => !f.advisory || enforced.has(f.issueNumber);
+	const blocking = (f) =>
+		enforced.size > 0 && f.issueNumber !== undefined
+			? enforced.has(f.issueNumber)
+			: !f.advisory;
 	return {
 		blocking: findings.filter(blocking),
 		advisory: findings.filter((f) => !blocking(f)),

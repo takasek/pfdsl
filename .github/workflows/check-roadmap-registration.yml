@@ -8,8 +8,6 @@ on:
   # body edit is the only event that reports a change to it.
   pull_request:
     types: [opened, synchronize, reopened, edited]
-    paths:
-      - .pfdsl/roadmap.pfdsl
 
 jobs:
   check:

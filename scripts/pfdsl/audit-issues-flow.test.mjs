@@ -36,7 +36,7 @@ afterEach(() => {
 });
 
 describe("audit-issues-flow without gh", () => {
-	it("prints a copyable timestamp repair command without changing the roadmap", () => {
+	it("does not require mutable timestamp snapshots or emit repair commands", () => {
 		// Run the real entry point against a disposable repository, independent
 		// of completed-chain sweeps or other changes to the live roadmap.
 		const fixtureRoot = join(emptyBin, "repo");
@@ -79,14 +79,9 @@ process.stdout.write(JSON.stringify(result));
 			cwd: fixtureRoot,
 			env: { ...process.env, PATH: `${emptyBin}:${process.env.PATH}` },
 		});
-		assert.equal(result.status, 1, result.stderr);
-		assert.match(result.stdout, /stale_updated_at/);
+		assert.equal(result.status, 0, result.stderr);
 		assert.doesNotMatch(result.stdout, /unknown_issue|missing_process/);
-		assert.ok(
-			result.stdout.includes(
-				"pfdsl meta set .pfdsl/roadmap.pfdsl 'i1_build_output' updated_at '2099-10-03T12:00:00Z' --allow-unknown",
-			),
-		);
+		assert.doesNotMatch(result.stdout, /stale_updated_at|repair|meta set/);
 		assert.equal(readFileSync(roadmap, "utf8"), before);
 	});
 

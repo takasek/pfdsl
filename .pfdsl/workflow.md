@@ -393,7 +393,7 @@ roadmap の CLI release milestone（`cli_release_<slug>` 等）はバージョ�
 複数の実装 issue を1つの PR/リリースに束ねる場合も、milestone ノードは束ねた内容を表す1つの slug で作成すればよい。「中間バージョンをスキップ/統合するか」という判断自体が発生しない — バージョン番号を roadmap に書かないため、スキップ対象になるバージョン番号付きノードが最初から存在しない。
 
 `make release COMMIT=<SHA>`はroadmap上のreadyな`publish_cli_*`を公開候補として表示し、statusは変更しない。
-公開後はrelease担当が公開された固定npm版と、該当milestoneが要求するplugin配布を確認する。
+公開後のroadmap同期は`map_deps`が担い、release担当が`published_cli`と`plugin_marketplace_entry`を還流入力として、公開された固定npm版と該当milestoneが要求するplugin配布を確認する。
 確認済みartifactだけを通常PRでdoneへ同期し、未確認の候補は未完了のまま残す。
 marketplaceのpin反映・取得確認とroadmap同期の順序、中断時の再開手順は`pipeline.md`の「PR経由の公開と公開後同期」に従う。
 

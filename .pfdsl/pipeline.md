@@ -117,7 +117,8 @@ tagが取得できるだけの段階では、marketplace経由の配布完了と
 この経路はClaude-compatibleな`plugin/pfdsl/`を対象とし、`plugin/pfdsl-codex/`の別marketplace配布を開始しない。
 
 runnerのready表示は候補一覧であり、公開・取得・criteria確認の成功を表さない。
-release担当は公開物確認後、確認済みartifactだけをローカルCLIの`meta set <roadmap> <artifact> status done`で変更し、確認した版・tag/SHA・結果を本文へ記したroadmap同期PRを作る。
+公開物確認後のroadmap同期はworkflow.pfdslの`map_deps`が担う。
+release担当は`published_cli`と`plugin_marketplace_entry`を還流入力として、確認済みartifactだけをローカルCLIの`meta set <roadmap> <artifact> status done`で変更し、確認した版・tag/SHA・結果を本文へ記したroadmap同期PRを作る。
 後でmainのpinが進んでも再確認できるよう、配布確認時のmain commitも同じ本文へ残す。
 他のready候補と、公開または確認に失敗したartifactは未完了のまま残し、残作業を既存の追跡issueへ引き継ぐ。
 版数準備PR、marketplace pin PR、確認後のroadmap同期PRの順で進め、review・mergeは人間が行う。

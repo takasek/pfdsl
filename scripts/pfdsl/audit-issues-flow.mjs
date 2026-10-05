@@ -88,7 +88,6 @@ function normalizeIssue(i) {
 		number: i.number,
 		state: i.state,
 		labels: i.labels.map((l) => l.name),
-		updatedAt: i.updatedAt,
 	};
 }
 
@@ -108,8 +107,6 @@ for (const proc of processes) {
 				processId: proc.id,
 				issueNumber,
 				artifactId,
-				updatedAt: proc.updatedAt,
-				priorities: proc.priorities,
 			});
 		}
 	}
@@ -168,8 +165,7 @@ function printFindings(findings) {
 	function fmtFinding(f) {
 		const pid = f.processId ? ` [${f.processId}]` : "";
 		const aid = f.artifactId ? ` -> ${f.artifactId}` : "";
-		const repair = f.repairCommand ? `\n    ${f.repairCommand}` : "";
-		return `  #${f.issueNumber} ${f.type}${pid}${aid} ${f.detail}${repair}`;
+		return `  #${f.issueNumber} ${f.type}${pid}${aid} ${f.detail}`;
 	}
 
 	if (blocking.length > 0) {

@@ -140,8 +140,8 @@ export function diffGraphsDetailed(
 			continue;
 		}
 
-		// Metadata comparison — only when both frontmatters are provided
-		if (fmA != null && fmB != null && kindB != null) {
+		// Undefined omits metadata comparison; explicit null means no metadata.
+		if (fmA !== undefined && fmB !== undefined && kindB != null) {
 			const metaA = resolveMeta(fmA, kindB, id);
 			const metaB = resolveMeta(fmB, kindB, id);
 

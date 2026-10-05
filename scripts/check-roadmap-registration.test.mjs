@@ -151,7 +151,7 @@ describe("check-roadmap-registration", () => {
 		assert.doesNotMatch(result.stdout, /SKIP/);
 	});
 
-	it("keeps an unrelated unknown_issue finding and uses a generic remedy", () => {
+	it("keeps an unrelated unknown_issue visible without blocking this PR", () => {
 		const result = runWrapper({
 			roadmap: [
 				"---",
@@ -173,9 +173,9 @@ describe("check-roadmap-registration", () => {
 			],
 		});
 
-		assert.equal(result.status, 1, result.stderr);
+		assert.equal(result.status, 0, result.stderr);
 		assert.match(result.stdout, /#42 unknown_issue/);
-		assert.match(result.stderr, /See the audit findings above for details\./);
+		assert.match(result.stdout, /advisory/);
 		assert.doesNotMatch(
 			result.stderr,
 			/labelled flow:managed but has no process|Add the dependency chain in this PR|flow:exempt if it gates no other work/,

@@ -1,5 +1,5 @@
 /**
- * Detects shell-executing calls in scripts/**\/*.mjs.
+ * Detects forbidden child_process imports and literal shell: true options.
  *
  * `execSync` hands its argument to a shell, so any value spliced into it is
  * parsed as shell syntax: a space word-splits and a semicolon starts another
@@ -14,18 +14,30 @@
  * `)` inside a `--format="%h)"` string, an aliased import, `{shell: true}` on
  * a call that otherwise takes argv. Banning the import needs no such analysis
  * — `scripts/lib/run-exec.mjs` covers every use in this repo.
+ * Parsing syntax also covers whole-module imports and quoted property names
+ * without treating examples in comments or strings as executable code.
+ * This is a syntax gate, not data-flow analysis of computed module names or
+ * option values.
  */
 
-/** `shell: true` turns the argv-taking calls into shell-executing ones. */
-const SHELL_OPTION = /\bshell\s*:\s*true\b/;
+import ts from "typescript";
 
 /** Names that execute through a shell when imported from child_process. */
 const SHELL_EXECUTORS = new Set(["exec", "execSync"]);
 
-const IMPORT_FROM_CHILD_PROCESS =
-	/import\s*\{([^}]*)\}\s*from\s*["'](?:node:)?child_process["']/g;
-const REQUIRE_CHILD_PROCESS =
-	/require\(\s*["'](?:node:)?child_process["']\s*\)/;
+function isChildProcess(node) {
+	if (node) node = unwrap(node);
+	return (
+		node &&
+		ts.isStringLiteralLike(node) &&
+		(node.text === "child_process" || node.text === "node:child_process")
+	);
+}
+
+function unwrap(node) {
+	while (ts.isParenthesizedExpression(node)) node = node.expression;
+	return node;
+}
 
 /**
  * Files the gate leaves alone. Everything else tracked as `.mjs` is scanned:
@@ -58,38 +70,52 @@ export function selectScannedFiles(trackedFiles) {
  */
 export function findShellExecutors(source) {
 	const findings = [];
-
-	for (const match of source.matchAll(IMPORT_FROM_CHILD_PROCESS)) {
-		for (const clause of match[1].split(",")) {
-			// `execSync as sh` still names execSync on the left of `as`.
-			const imported = clause
-				.trim()
-				.split(/\s+as\s+/)[0]
-				.trim();
-			if (!SHELL_EXECUTORS.has(imported)) continue;
-			findings.push({
-				line: lineOf(source, match.index),
-				reason: `imports ${imported} from child_process`,
-			});
-		}
-	}
-
-	if (REQUIRE_CHILD_PROCESS.test(source)) {
-		const idx = source.search(REQUIRE_CHILD_PROCESS);
+	const file = ts.createSourceFile(
+		"script.mjs",
+		source,
+		ts.ScriptTarget.Latest,
+		true,
+		ts.ScriptKind.JS,
+	);
+	const report = (node, reason) =>
 		findings.push({
-			line: lineOf(source, idx),
-			reason: "requires child_process",
+			line: file.getLineAndCharacterOfPosition(node.getStart(file)).line + 1,
+			reason,
 		});
+	function visit(node) {
+		if (ts.isImportDeclaration(node) && isChildProcess(node.moduleSpecifier)) {
+			const clause = node.importClause;
+			const bindings = clause?.namedBindings;
+			if (clause?.name || (bindings && ts.isNamespaceImport(bindings))) {
+				report(node, "imports the child_process module");
+			} else if (bindings && ts.isNamedImports(bindings)) {
+				for (const element of bindings.elements) {
+					const imported = (element.propertyName ?? element.name).text;
+					if (SHELL_EXECUTORS.has(imported))
+						report(node, `imports ${imported} from child_process`);
+				}
+			}
+		} else if (ts.isCallExpression(node) && isChildProcess(node.arguments[0])) {
+			const expression = unwrap(node.expression);
+			if (
+				expression.kind === ts.SyntaxKind.ImportKeyword ||
+				(ts.isIdentifier(expression) && expression.text === "require")
+			) {
+				report(node, "loads the child_process module");
+			}
+		} else if (ts.isPropertyAssignment(node)) {
+			const name = ts.isComputedPropertyName(node.name)
+				? unwrap(node.name.expression)
+				: node.name;
+			if (
+				(ts.isIdentifier(name) || ts.isStringLiteralLike(name)) &&
+				name.text === "shell" &&
+				unwrap(node.initializer).kind === ts.SyntaxKind.TrueKeyword
+			)
+				report(node, "uses shell: true");
+		}
+		ts.forEachChild(node, visit);
 	}
-
-	source.split("\n").forEach((text, i) => {
-		if (SHELL_OPTION.test(text))
-			findings.push({ line: i + 1, reason: "passes shell: true" });
-	});
-
+	visit(file);
 	return findings;
-}
-
-function lineOf(source, index) {
-	return source.slice(0, index).split("\n").length;
 }

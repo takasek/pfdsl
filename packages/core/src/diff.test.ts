@@ -153,6 +153,56 @@ describe("diffGraphs", () => {
 	});
 
 	describe("changedNodes", () => {
+		const metadata = {
+			artifact: { spec: { label: "Specification" } },
+			process: { design: { label: "Design" } },
+			group: { team: { label: "Team" } },
+		};
+		const metadataGraph = analyze("req >> design -> spec\n").graph;
+		metadataGraph.nodes.set("team", "group");
+
+		it.each([
+			[null, metadata],
+			[metadata, null],
+		])("detects metadata addition or removal with an explicit null (%j → %j)", (before, after) => {
+			const detailed = diffGraphsDetailed(
+				metadataGraph,
+				metadataGraph,
+				before,
+				after,
+			);
+			expect(detailed.report.changedNodes).toEqual(["design", "spec", "team"]);
+			expect(detailed.report).toEqual(
+				diffGraphs(metadataGraph, metadataGraph, before, after),
+			);
+			expect(detailed.report.addedNodes).toEqual([]);
+			expect(detailed.report.removedNodes).toEqual([]);
+		});
+
+		it.each([
+			[null, null],
+			[null, {}],
+			[{}, null],
+		])("treats explicit null as empty metadata (%j → %j)", (before, after) => {
+			expect(
+				diffGraphsDetailed(metadataGraph, metadataGraph, before, after).report
+					.changedNodes,
+			).toEqual([]);
+		});
+
+		it.each([
+			[undefined, metadata],
+			[metadata, undefined],
+			[undefined, null],
+			[null, undefined],
+			[undefined, undefined],
+		])("skips metadata comparison when either argument is unspecified (%j → %j)", (before, after) => {
+			expect(
+				diffGraphsDetailed(metadataGraph, metadataGraph, before, after).report
+					.changedNodes,
+			).toEqual([]);
+		});
+
 		it("detects status flip via frontmatter (artifact todo→done)", () => {
 			const srcA = `---
 artifact:

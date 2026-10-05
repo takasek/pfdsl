@@ -1,5 +1,6 @@
 import { dirname, resolve } from "node:path";
 import { zeroRange } from "./position.js";
+import type { Document } from "./types/ast.js";
 import type { Diagnostic } from "./types/diagnostic.js";
 import type { Frontmatter } from "./types/frontmatter.js";
 import type { NormalizedEdge } from "./types/index.js";
@@ -61,7 +62,7 @@ export interface LoadedGraph<T> {
 	/** Resolved absolute path → loaded document, including the entry. */
 	docs: Map<string, T>;
 	/** Cross-file diagnostics: missing path (V021), circular subflow (V022). */
-	diagnostics: Diagnostic[];
+	diagnostics: (Diagnostic & { file?: string })[];
 }
 
 /**
@@ -75,27 +76,31 @@ export function loadSubflowGraph<T extends DocWithFrontmatter>(
 	load: (path: string) => T | null,
 ): LoadedGraph<T> {
 	const docs = new Map<string, T>();
-	const diagnostics: Diagnostic[] = [];
+	const diagnostics: (Diagnostic & { file?: string })[] = [];
 	const stack = new Set<string>(); // current DFS path
+	const missing = new Set<string>();
 
-	function visit(path: string): void {
+	function visit(path: string, fromPath = entryPath): void {
 		if (stack.has(path)) {
 			diagnostics.push({
 				severity: "error",
 				code: "V022",
 				message: `circular subflow reference: ${path}`,
 				range: zeroRange(),
+				file: fromPath,
 			});
 			return;
 		}
-		if (docs.has(path)) return; // already fully loaded (shared child, not a cycle)
+		if (docs.has(path) || missing.has(path)) return;
 		const doc = load(path);
 		if (doc === null) {
+			missing.add(path);
 			diagnostics.push({
 				severity: "error",
 				code: "V021",
 				message: `subflow file not found: ${path}`,
 				range: zeroRange(),
+				file: fromPath,
 			});
 			return;
 		}
@@ -109,10 +114,11 @@ export function loadSubflowGraph<T extends DocWithFrontmatter>(
 					code: "V021",
 					message: `invalid subflow path (${resolved.reason}): ${ref}`,
 					range: zeroRange(),
+					file: path,
 				});
 				continue;
 			}
-			visit(resolved.path);
+			visit(resolved.path, path);
 		}
 		stack.delete(path);
 	}
@@ -361,7 +367,7 @@ export function parentBoundaryArtifacts(
 
 /**
  * Load `entryPath`'s subflow graph through `load` and validate every
- * subflow process's boundary in `frontmatter`/`edges` against its child
+ * subflow process's boundary in every loaded parent against its child
  * (§15.11). Returns the loader's diagnostics (V021 / V022) followed by the
  * boundary ones, and the loaded documents. A child whose path is invalid or
  * whose file is missing is only reported by the loader.
@@ -373,26 +379,36 @@ export function subflowBoundaryDiagnostics<
 	edges: readonly NormalizedEdge[],
 	frontmatter: Frontmatter | null,
 	load: (path: string) => T | null,
-): { diagnostics: Diagnostic[]; docs: Map<string, T> } {
+): { diagnostics: (Diagnostic & { file?: string })[]; docs: Map<string, T> } {
 	const subflowGraph = loadSubflowGraph(entryPath, load);
-	const diagnostics: Diagnostic[] = [...subflowGraph.diagnostics];
-	for (const [pid, pmeta] of Object.entries(frontmatter?.process ?? {})) {
-		if (typeof pmeta.subflow !== "string") continue;
-		const resolved = resolveRefPath(entryPath, pmeta.subflow);
-		if (!resolved.ok) continue;
-		const childDoc = subflowGraph.docs.get(resolved.path);
-		if (!childDoc) continue;
-		const { inputs, outputs } = parentBoundaryArtifacts(edges, pid);
-		diagnostics.push(
-			...validateSubflowBoundary({
-				processId: pid,
-				parentNormalInputs: inputs,
-				parentOutputs: outputs,
-				boundaryMap: (pmeta.boundary as Record<string, string>) ?? {},
-				childOpenInputs: computeOpenInputs(childDoc.edges),
-				childTerminals: computeTerminals(childDoc.edges),
-			}),
-		);
+	const diagnostics: (Diagnostic & { file?: string })[] = [
+		...subflowGraph.diagnostics,
+	];
+	for (const [parentPath, doc] of subflowGraph.docs) {
+		const parentFm = parentPath === entryPath ? frontmatter : doc.frontmatter;
+		const parentEdges = parentPath === entryPath ? edges : doc.edges;
+		for (const [pid, pmeta] of Object.entries(parentFm?.process ?? {})) {
+			if (typeof pmeta.subflow !== "string") continue;
+			const resolved = resolveRefPath(parentPath, pmeta.subflow);
+			if (!resolved.ok) continue;
+			const childDoc = subflowGraph.docs.get(resolved.path);
+			if (!childDoc) continue;
+			const { inputs, outputs } = parentBoundaryArtifacts(parentEdges, pid);
+			diagnostics.push(
+				...validateSubflowBoundary({
+					processId: pid,
+					parentNormalInputs: inputs,
+					parentOutputs: outputs,
+					boundaryMap: (pmeta.boundary as Record<string, string>) ?? {},
+					childOpenInputs: computeOpenInputs(childDoc.edges),
+					childTerminals: computeTerminals(childDoc.edges),
+				}).map((diagnostic) =>
+					parentPath === entryPath
+						? diagnostic
+						: { ...diagnostic, file: parentPath },
+				),
+			);
+		}
 	}
 	return { diagnostics, docs: subflowGraph.docs };
 }
@@ -409,27 +425,31 @@ export function loadExtendsChain<T extends DocWithFrontmatter>(
 	load: (path: string) => T | null,
 ): LoadedGraph<T> {
 	const docs = new Map<string, T>();
-	const diagnostics: Diagnostic[] = [];
+	const diagnostics: (Diagnostic & { file?: string })[] = [];
 	const stack = new Set<string>(); // current DFS path
+	const missing = new Set<string>();
 
-	function visit(path: string): void {
+	function visit(path: string, fromPath = entryPath): void {
 		if (stack.has(path)) {
 			diagnostics.push({
 				severity: "error",
 				code: "V027",
 				message: `circular extends reference: ${path}`,
 				range: zeroRange(),
+				file: fromPath,
 			});
 			return;
 		}
-		if (docs.has(path)) return; // diamond — already loaded, not a cycle
+		if (docs.has(path) || missing.has(path)) return;
 		const doc = load(path);
 		if (doc === null) {
+			missing.add(path);
 			diagnostics.push({
 				severity: "error",
 				code: "V026",
 				message: `extends file not found: ${path}`,
 				range: zeroRange(),
+				file: fromPath,
 			});
 			return;
 		}
@@ -443,10 +463,11 @@ export function loadExtendsChain<T extends DocWithFrontmatter>(
 					code: "V026",
 					message: `invalid extends path (${resolved.reason}): ${ref}`,
 					range: zeroRange(),
+					file: path,
 				});
 				continue;
 			}
-			visit(resolved.path);
+			visit(resolved.path, path);
 		}
 		stack.delete(path);
 	}
@@ -460,15 +481,16 @@ export function loadExtendsChain<T extends DocWithFrontmatter>(
  * extends graph (§2.9.4 決定的解決アルゴリズム). `resolve(F)` merges
  * `resolve(P1) → … → resolve(Pn) → F のローカル定義`, so each preset's own
  * extends must resolve before the preset's own locals, and the entry file's
- * locals must land last — a post-order DFS over the `extends:` refs, visited
- * in list order, with the current node appended after its refs.
+ * locals must land last. This public API preserves the expanded post-order
+ * chain, including repeated presets and path-local cycle truncation.
+ * Consumers needing only merged values use `resolveLoadedPresentation`.
  */
 export function buildPresentationChain<T extends DocWithFrontmatter>(
 	entryPath: string,
 	docs: Map<string, T>,
 ): { path: string; fm: Frontmatter | null }[] {
 	const chain: { path: string; fm: Frontmatter | null }[] = [];
-	const stack = new Set<string>(); // current DFS path — guards cycles (V027 already reported)
+	const stack = new Set<string>();
 
 	function visit(path: string): void {
 		if (stack.has(path)) return;
@@ -486,6 +508,80 @@ export function buildPresentationChain<T extends DocWithFrontmatter>(
 
 	visit(entryPath);
 	return chain;
+}
+
+/**
+ * Resolve an already-loaded DAG's presentation, memoizing each file's merged
+ * values. Merge parents in declaration order and locals last, preserving both
+ * precedence and first appearance of keys. Attribute merging and summary size
+ * still cost work; only file resolution is bounded by distinct documents.
+ * A cycle or prototype-sensitive metadata aborts the memo pass and uses the
+ * legacy expanded chain, preserving lenient rendering and existing ID lookups.
+ * That fallback and the public chain retain their original
+ * route-expansion cost. `excludeEntry` omits only the entry's local values.
+ */
+export function resolveLoadedPresentation<T extends DocWithFrontmatter>(
+	entryPath: string,
+	docs: Map<string, T>,
+	options: { excludeEntry?: boolean } = {},
+): ResolvedPresentation {
+	const memo = new Map<string, ResolvedPresentation>();
+	const active = new Set<string>();
+
+	function visit(path: string): ResolvedPresentation | null {
+		const cached = memo.get(path);
+		if (cached !== undefined) return cached;
+		if (active.has(path)) return null;
+		const doc = docs.get(path);
+		if (doc === undefined) return resolvePresentation([]);
+		// The legacy merger assigns __proto__ through a plain object's setter.
+		// Its resulting prototype can also affect later ID lookups, so a merged
+		// summary is not a context-independent substitute for that source.
+		if (
+			Object.hasOwn(doc.frontmatter?.statusStyles ?? {}, "__proto__") ||
+			Object.hasOwn(doc.frontmatter?.tag ?? {}, "__proto__") ||
+			Object.hasOwn(doc.frontmatter?.group ?? {}, "__proto__")
+		) {
+			return null;
+		}
+		active.add(path);
+		try {
+			const chain: { path: string; fm: Frontmatter | null }[] = [];
+			for (const ref of collectExtendsRefs(doc.frontmatter ?? {})) {
+				const resolved = resolveRefPath(path, ref);
+				if (!resolved.ok) continue;
+				const parent = visit(resolved.path);
+				if (parent === null) return null;
+				chain.push({
+					path: resolved.path,
+					fm: {
+						...(parent.statusStyles !== undefined
+							? { statusStyles: parent.statusStyles }
+							: {}),
+						...(parent.tag !== undefined ? { tag: parent.tag } : {}),
+						...(parent.group !== undefined ? { group: parent.group } : {}),
+					},
+				});
+			}
+			if (!(options.excludeEntry && path === entryPath)) {
+				chain.push({ path, fm: doc.frontmatter ?? null });
+			}
+			const result = resolvePresentation(chain);
+			memo.set(path, result);
+			return result;
+		} finally {
+			active.delete(path);
+		}
+	}
+
+	return (
+		visit(entryPath) ??
+		resolvePresentation(
+			buildPresentationChain(entryPath, docs).filter(
+				({ path }) => !(options.excludeEntry && path === entryPath),
+			),
+		)
+	);
 }
 
 /**
@@ -519,8 +615,7 @@ export function resolveEffectiveFrontmatter<T extends DocWithFrontmatter>(
 	const { docs } = loadExtendsChain<DocWithFrontmatter>(entryPath, (path) =>
 		path === entryPath ? { frontmatter } : load(path),
 	);
-	const chain = buildPresentationChain(entryPath, docs);
-	const resolved = resolvePresentation(chain);
+	const resolved = resolveLoadedPresentation(entryPath, docs);
 	if (
 		resolved.statusStyles === undefined &&
 		resolved.tag === undefined &&
@@ -546,16 +641,23 @@ const PRESET_ALLOWED_KEYS = new Set([
 ]);
 
 /**
- * Validate that a preset file only contains presentation-layer keys (§2.9.5).
- * Returns V028 diagnostics for every forbidden key found.
+ * Validate presentation-only keys and absence of graph content (§2.9.5).
+ * Returns V028 diagnostics for forbidden keys or supplied graph statements.
  */
 export function validatePresetKeys(
 	path: string,
 	fm: Frontmatter | null,
+	document?: Document,
 ): Diagnostic[] {
-	if (fm === null) return [];
 	const diagnostics: Diagnostic[] = [];
-	for (const key of Object.keys(fm)) {
+	if (document && document.statements.length > 0)
+		diagnostics.push({
+			severity: "error",
+			code: "V028",
+			message: `preset '${path}' contains graph content`,
+			range: zeroRange(),
+		});
+	for (const key of Object.keys(fm ?? {})) {
 		if (!PRESET_ALLOWED_KEYS.has(key)) {
 			diagnostics.push({
 				severity: "error",

@@ -219,6 +219,85 @@ describe("buildHoverLines", () => {
 		expect(table).toContain("src/orders/order.ts");
 	});
 
+	it.each([
+		"https://example.com/docs",
+		"https://example.com/docs/",
+		"vscode://file/repo/a.pfdsl",
+		"ftp://example.com/docs/",
+		"custom://host/item",
+	])("keeps URL location %s as the link destination", (location) => {
+		const fm = {
+			basePath: "../",
+			artifact: { art1: { location } },
+		};
+		const table = tableContent(
+			buildHoverLines("art1", "artifact", fm, "file:///repo/sub/a.pfdsl"),
+		);
+		expect(table).toContain(`[${location}](${location})`);
+	});
+
+	it("escapes URL destination parentheses without changing the target", () => {
+		const location = "https://example.com/a)b(c";
+		const fm = { artifact: { art1: { location } } };
+		const table = tableContent(
+			buildHoverLines("art1", "artifact", fm, "file:///repo/a.pfdsl"),
+		);
+		expect(table).toContain(`[${location}](https://example.com/a\\)b\\(c)`);
+	});
+
+	it.each([
+		["docs/a]b.md", "[docs/a\\]b.md](file:///repo/docs/a%5Db.md)"],
+		["docs/a[b.md", "[docs/a\\[b.md](file:///repo/docs/a%5Bb.md)"],
+		["docs/a\\b.md", "[docs/a\\\\b.md](file:///repo/docs/a%5Cb.md)"],
+		[
+			"https://example.com/a]b",
+			"[https://example.com/a\\]b](https://example.com/a]b)",
+		],
+		[
+			"https://example.com/a[b",
+			"[https://example.com/a\\[b](https://example.com/a[b)",
+		],
+		["custom://host/a\\b", "[custom://host/a\\\\b](custom://host/a\\\\b)"],
+	])("escapes Markdown link labels for location %s", (location, expected) => {
+		const fm = { artifact: { art1: { location } } };
+		const table = tableContent(
+			buildHoverLines("art1", "artifact", fm, "file:///repo/a.pfdsl"),
+		);
+		expect(table).toContain(expected);
+	});
+
+	it("encodes local filename spaces, hashes and percent signs with a file URL", () => {
+		const location = "docs/a #100%.md";
+		const fm = { basePath: "../", artifact: { art1: { location } } };
+		const table = tableContent(
+			buildHoverLines("art1", "artifact", fm, "file:///repo/sub/a.pfdsl"),
+		);
+		expect(table).toContain(
+			`[${location}](file:///repo/docs/a%20%23100%25.md)`,
+		);
+	});
+
+	it("escapes local file URL parentheses at the Markdown destination boundary", () => {
+		const location = "docs/a)b(c.md";
+		const fm = { artifact: { art1: { location } } };
+		const table = tableContent(
+			buildHoverLines("art1", "artifact", fm, "file:///repo/a.pfdsl"),
+		);
+		expect(table).toContain(`[${location}](file:///repo/docs/a\\)b\\(c.md)`);
+	});
+
+	it("keeps directory command arguments resolved against basePath", () => {
+		const location = "docs/a #100%/";
+		const fm = { basePath: "../", artifact: { art1: { location } } };
+		const table = tableContent(
+			buildHoverLines("art1", "artifact", fm, "file:///repo/sub/a.pfdsl"),
+		);
+		const args = encodeURIComponent(JSON.stringify(["/repo/docs/a #100%"]));
+		expect(table).toContain(
+			`[${location}](command:pfdsl._openDirLocation?${args})`,
+		);
+	});
+
 	it("makes process group clickable when docUri provided", () => {
 		const fm = { process: { P1: { group: "ops" } } };
 		const lines = buildHoverLines("P1", "process", fm, "file:///repo/a.pfdsl");

@@ -1,6 +1,7 @@
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import {
 	type Frontmatter,
+	isUrlLike,
 	type NodeKind,
 	resolveLocationFsPath,
 } from "@pfdsl/core";
@@ -41,6 +42,9 @@ function nodeLink(docUri: string, nodeId: string, icon: string): string {
 }
 
 function locationLink(docUri: string, loc: string, basePath?: string): string {
+	const label = loc.replace(/[\\[\]]/g, "\\$&");
+	const link = (uri: string) => `[${label}](${uri.replace(/[\\()]/g, "\\$&")})`;
+	if (isUrlLike(loc)) return link(loc);
 	const docFsPath = fileURLToPath(docUri);
 	const isDir = loc.endsWith("/");
 	const absPath = resolveLocationFsPath(
@@ -50,9 +54,9 @@ function locationLink(docUri: string, loc: string, basePath?: string): string {
 	);
 	if (isDir) {
 		const args = encodeURIComponent(JSON.stringify([absPath]));
-		return `[${loc}](command:${OPEN_DIR_COMMAND}?${args})`;
+		return link(`command:${OPEN_DIR_COMMAND}?${args}`);
 	}
-	return `[${loc}](file://${absPath})`;
+	return link(pathToFileURL(absPath).href);
 }
 
 function groupDisplay(

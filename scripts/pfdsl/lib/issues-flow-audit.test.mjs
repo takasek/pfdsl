@@ -80,16 +80,13 @@ describe("parseIssueProcesses", () => {
 		assert.equal(result.length, 2);
 		assert.equal(result[0].id, "i4_build_lint_checker");
 		assert.deepEqual(result[0].issueNumbers, [4]);
-		assert.deepEqual(result[0].priorities, ["priority:high"]);
 		assert.deepEqual(result[1].issueNumbers, [11]);
 	});
 
-	it("updatedAt and priorities default correctly when fields absent; updatedAt extracted when present", () => {
+	it("ignores legacy timestamp snapshots when parsing registration", () => {
 		const absent = parseIssueProcesses({
 			process: { i5_draft_hierarchy_spec: { label: "H" } },
 		});
-		assert.equal(absent[0].updatedAt, undefined);
-		assert.deepEqual(absent[0].priorities, []);
 
 		const present = parseIssueProcesses({
 			process: {
@@ -99,10 +96,10 @@ describe("parseIssueProcesses", () => {
 				},
 			},
 		});
-		assert.equal(present[0].updatedAt, "2026-06-01T00:00:00Z");
+		assert.deepEqual(present, absent);
 	});
 
-	it("priorities filters only priority: tags and sorts them", () => {
+	it("ignores display priority tags when parsing registration", () => {
 		const fm = {
 			process: {
 				i5_draft_hierarchy_spec: {
@@ -112,7 +109,9 @@ describe("parseIssueProcesses", () => {
 			},
 		};
 		const result = parseIssueProcesses(fm);
-		assert.deepEqual(result[0].priorities, ["priority:high", "priority:low"]);
+		assert.deepEqual(result, [
+			{ id: "i5_draft_hierarchy_spec", issueNumbers: [5] },
+		]);
 	});
 
 	it("mixes iN_ and non-iN_ processes correctly", () => {
@@ -175,9 +174,9 @@ describe("buildProcessOutputs", () => {
 // ---------------------------------------------------------------------------
 
 describe("computeFindings", () => {
-	it("stale timestamps include a copyable command for absent and existing fields", () => {
+	it("does not offer timestamp repairs for absent or legacy fields", () => {
 		for (const updatedAt of [undefined, "old"]) {
-			const [finding] = computeFindings(
+			const findings = computeFindings(
 				[
 					{
 						processId: "i1_build",
@@ -196,10 +195,7 @@ describe("computeFindings", () => {
 					},
 				],
 			);
-			assert.equal(
-				finding.repairCommand,
-				"pfdsl meta set .pfdsl/roadmap.pfdsl 'i1_build' updated_at '2026-10-03T12:00:00Z' --allow-unknown",
-			);
+			assert.deepEqual(findings, []);
 		}
 	});
 	it("missing_label: open issue with tracked process but no flow:managed", () => {
@@ -375,7 +371,7 @@ describe("computeFindings", () => {
 		assert.equal(f.artifactId, "foo");
 	});
 
-	it("stale_updated_at: open issue with mismatched updatedAt", () => {
+	it("does not require a mutable issue timestamp snapshot", () => {
 		const entries = [
 			{
 				processId: "i5_do_foo",
@@ -395,12 +391,10 @@ describe("computeFindings", () => {
 		];
 		const findings = computeFindings(entries, issues);
 		const f = findings.find((f) => f.type === "stale_updated_at");
-		assert.ok(f);
-		assert.ok(f.detail.includes("2026-01-01T00:00:00Z"));
-		assert.ok(f.detail.includes("2026-06-01T00:00:00Z"));
+		assert.equal(f, undefined);
 	});
 
-	it("stale_updated_at: entry missing updatedAt shows (none)", () => {
+	it("accepts a tracked process without updatedAt", () => {
 		const entries = [
 			{
 				processId: "i5_do_foo",
@@ -420,8 +414,7 @@ describe("computeFindings", () => {
 		];
 		const findings = computeFindings(entries, issues);
 		const f = findings.find((f) => f.type === "stale_updated_at");
-		assert.ok(f);
-		assert.ok(f.detail.includes("(none)"));
+		assert.equal(f, undefined);
 	});
 
 	it("no stale_updated_at when updatedAt matches", () => {
@@ -446,7 +439,7 @@ describe("computeFindings", () => {
 		assert.ok(!findings.find((f) => f.type === "stale_updated_at"));
 	});
 
-	it("priority_drift: issue priority labels differ from process priorities", () => {
+	it("does not require priority label equality for registration", () => {
 		const entries = [
 			{
 				processId: "i5_do_foo",
@@ -466,7 +459,7 @@ describe("computeFindings", () => {
 		];
 		const findings = computeFindings(entries, issues);
 		const f = findings.find((f) => f.type === "priority_drift");
-		assert.ok(f);
+		assert.equal(f, undefined);
 	});
 
 	it("no priority_drift when both have no priority labels", () => {
@@ -491,7 +484,7 @@ describe("computeFindings", () => {
 		assert.ok(!findings.find((f) => f.type === "priority_drift"));
 	});
 
-	it("one pair can yield multiple findings", () => {
+	it("still reports missing classification without unrelated metadata findings", () => {
 		const entries = [
 			{
 				processId: "i5_do_foo",
@@ -511,8 +504,7 @@ describe("computeFindings", () => {
 		];
 		const findings = computeFindings(entries, issues);
 		assert.ok(findings.find((f) => f.type === "missing_label"));
-		assert.ok(findings.find((f) => f.type === "stale_updated_at"));
-		assert.ok(findings.find((f) => f.type === "priority_drift"));
+		assert.equal(findings.length, 1);
 	});
 
 	it("findings are ordered by issueNumber ascending", () => {
@@ -634,7 +626,7 @@ describe("computeLabelFindings", () => {
 // ---------------------------------------------------------------------------
 
 describe("partitionFindings", () => {
-	const blocking = { type: "stale_updated_at", issueNumber: 1 };
+	const blocking = { type: "exempt_conflict", issueNumber: 1 };
 	const advisory = { type: "missing_process", issueNumber: 3, advisory: true };
 
 	it("splits findings into blocking and advisory", () => {
@@ -669,5 +661,13 @@ describe("partitionFindings", () => {
 		});
 		assert.deepEqual(parts.blocking, [target]);
 		assert.deepEqual(parts.advisory, [unrelated]);
+	});
+	it("leaves unrelated conflicts advisory in a scoped gate while retaining global label prerequisites", () => {
+		const prerequisite = { type: "missing_flow_label" };
+		const parts = partitionFindings([blocking, prerequisite], {
+			enforcedIssues: [3],
+		});
+		assert.deepEqual(parts.blocking, [prerequisite]);
+		assert.deepEqual(parts.advisory, [blocking]);
 	});
 });
