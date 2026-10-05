@@ -6,8 +6,9 @@
 	"files": [
 		{
 			"path": "<checkout>/packages/standalone/evidence/2026-10-05-preview-ui/main-merge-native-recheck-01-short-ax.txt",
-			"bytes": 1488,
-			"sha256": "0e1bf18d1b502310d56d57796e4206a444ff8b1f9e6c4975dd81757d2f121dc9"
+			"bytes": 1487,
+			"sha256": "10d9269109e82d701f60cee7d911a5de4e15352b09d028a671c479c028f6d1f1",
+			"beforeParentWhitespaceNormalizationSha256": "0e1bf18d1b502310d56d57796e4206a444ff8b1f9e6c4975dd81757d2f121dc9"
 		},
 		{
 			"path": "<checkout>/packages/standalone/evidence/2026-10-05-preview-ui/main-merge-native-recheck-01-short.png",
@@ -16,8 +17,9 @@
 		},
 		{
 			"path": "<checkout>/packages/standalone/evidence/2026-10-05-preview-ui/main-merge-native-recheck-02-large-end-ax.txt",
-			"bytes": 6381,
-			"sha256": "17859384af1a349d818ba0e6f6cc16a0f64d3535e22e42298798f9585f175b00"
+			"bytes": 6380,
+			"sha256": "53185376eb3dde91bebd409ee3e791c8f8b080612ebd74e788d905b5c62aa52b",
+			"beforeParentWhitespaceNormalizationSha256": "17859384af1a349d818ba0e6f6cc16a0f64d3535e22e42298798f9585f175b00"
 		},
 		{
 			"path": "<checkout>/packages/standalone/evidence/2026-10-05-preview-ui/main-merge-native-recheck-02-large-end.png",
@@ -26,8 +28,9 @@
 		},
 		{
 			"path": "<checkout>/packages/standalone/evidence/2026-10-05-preview-ui/main-merge-native-recheck-03-large-cmd-up-ax.txt",
-			"bytes": 6381,
-			"sha256": "3b352430f3aac621226b43461ff9815b7d5eb47d8bb8cde1d07108795dd42839"
+			"bytes": 6380,
+			"sha256": "ca6ec8f76d6efa45c25f28ad5cc621e98616433c4c914f2348cb1483f3dcaaa4",
+			"beforeParentWhitespaceNormalizationSha256": "3b352430f3aac621226b43461ff9815b7d5eb47d8bb8cde1d07108795dd42839"
 		},
 		{
 			"path": "<checkout>/packages/standalone/evidence/2026-10-05-preview-ui/main-merge-native-recheck-03-large-cmd-up.png",
@@ -36,8 +39,9 @@
 		},
 		{
 			"path": "<checkout>/packages/standalone/evidence/2026-10-05-preview-ui/main-merge-native-recheck-04-large-return-ax.txt",
-			"bytes": 6353,
-			"sha256": "567654d240e2a0aefbcc6af55479082c479e18b64affebeba701be74401b80c2"
+			"bytes": 6352,
+			"sha256": "3578c22e40fb09a32e07c90c7952a8dfa1ead5c666f6e4401d5b1eb200ebc4ee",
+			"beforeParentWhitespaceNormalizationSha256": "567654d240e2a0aefbcc6af55479082c479e18b64affebeba701be74401b80c2"
 		},
 		{
 			"path": "<checkout>/packages/standalone/evidence/2026-10-05-preview-ui/main-merge-native-recheck-04-large-return.png",
@@ -46,8 +50,9 @@
 		},
 		{
 			"path": "<checkout>/packages/standalone/evidence/2026-10-05-preview-ui/main-merge-native-recheck-alternate-tab-ax.txt",
-			"bytes": 1406,
-			"sha256": "53e293a8a70b7749ddea322053194d211fc45f037ce780fd492d55406062e311"
+			"bytes": 1405,
+			"sha256": "d84902990e0ff582f5e4766fb39731a1778d0b83b711af4b1ab7c267cd09043b",
+			"beforeParentWhitespaceNormalizationSha256": "53e293a8a70b7749ddea322053194d211fc45f037ce780fd492d55406062e311"
 		},
 		{
 			"path": "<checkout>/packages/standalone/evidence/2026-10-05-preview-ui/main-merge-native-recheck-report.json",
@@ -57,8 +62,9 @@
 		},
 		{
 			"path": "<checkout>/packages/standalone/evidence/2026-10-05-preview-ui/main-merge-native-recheck-report.md",
-			"bytes": 5216,
-			"sha256": "f19a00890e722468de9159b9984afeafc3b7dd825b77dfcec80bbdd6a8c86abb"
+			"bytes": 5215,
+			"sha256": "56620b2b2a9667c905a40d894f89db0e68754fb2ca67b8814b63963d1cfa5eea",
+			"beforeParentWhitespaceNormalizationSha256": "f19a00890e722468de9159b9984afeafc3b7dd825b77dfcec80bbdd6a8c86abb"
 		}
 	],
 	"inputs": [
@@ -88,5 +94,16 @@
 	"parentNormalization": {
 		"files": ["main-merge-native-recheck-report.json"],
 		"reason": "Biome formatting after reviewer completion; observations and image pixels unchanged."
+	},
+	"parentWhitespaceNormalization": {
+		"files": [
+			"main-merge-native-recheck-01-short-ax.txt",
+			"main-merge-native-recheck-02-large-end-ax.txt",
+			"main-merge-native-recheck-03-large-cmd-up-ax.txt",
+			"main-merge-native-recheck-04-large-return-ax.txt",
+			"main-merge-native-recheck-alternate-tab-ax.txt",
+			"main-merge-native-recheck-report.md"
+		],
+		"reason": "Removed trailing blank lines after reviewer completion; text observations and image pixels unchanged."
 	}
 }

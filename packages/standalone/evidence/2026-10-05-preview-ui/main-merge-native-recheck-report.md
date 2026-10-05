@@ -58,4 +58,3 @@ CUA screenshot の戻り bytes は JPEG だったため、自分が新規保存�
 JSON は tab indentation、MD と AX 本文は末尾空行1つへ正規化した。
 main-merge-native-recheck-manifest.json は manifest 自身を除く、この担当が保存した11ファイルの現在の bytes と SHA256 を記録する。
 Git metadata、外部サービス、runtime source は変更していない。
-
