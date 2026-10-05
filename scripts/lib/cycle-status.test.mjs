@@ -60,6 +60,25 @@ describe("parseReadyOutput", () => {
 });
 
 describe("findProcessIdForIssueNumber", () => {
+	it("resolves every issue linked by a shared process prefix", () => {
+		const processId = "i1352_i1282_i1283_i1284_i483_improve_preview";
+		const shared = `---
+process:
+  ${processId}:
+    label: Improve preview
+    location: https://github.com/takasek/pfdsl/issues/1352
+tag:
+  preview: {}
+---
+source >> ${processId} -> preview
+`;
+		for (const issue of [1352, 1282, 1283, 1284, 483]) {
+			assert.equal(findProcessIdForIssueNumber(shared, issue), processId);
+		}
+		for (const issue of [135, 13520, 128, 12820, 48, 4830]) {
+			assert.equal(findProcessIdForIssueNumber(shared, issue), null);
+		}
+	});
 	// The top-level key is the singular `process:`, matching the real
 	// .pfdsl/roadmap.pfdsl (confirmed by reading the file directly — an earlier
 	// version of this task's brief assumed a plural `processes:` key and a

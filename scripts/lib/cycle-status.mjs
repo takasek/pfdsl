@@ -29,7 +29,7 @@ function extractProcessSection(pfdslText) {
 }
 
 /**
- * issue 番号から、それを `location:` に持つ process の processId を返す。
+ * issue 番号から、それを iN_ prefix または `location:` に持つ process の processId を返す。
  * @param {string} pfdslText - .pfdsl/roadmap.pfdsl の全文
  * @param {number} issueNumber
  * @returns {string | null}
@@ -40,6 +40,14 @@ export function findProcessIdForIssueNumber(pfdslText, issueNumber) {
 	const scanText = `${extractProcessSection(pfdslText)}\n\x00`;
 	const entryPattern = /^ {2}(\S+):\n([\s\S]*?)(?=^ {2}\S|^\S)/gm;
 	for (const [, processId, block] of scanText.matchAll(entryPattern)) {
+		const issuePrefix = processId.match(/^(?:i\d+_)+/)?.[0] ?? "";
+		if (
+			[...issuePrefix.matchAll(/i(\d+)_/g)].some(
+				([, number]) => Number(number) === issueNumber,
+			)
+		) {
+			return processId;
+		}
 		const match = block.match(/location:\s*\S*\/issues\/(\d+)/);
 		if (match && Number(match[1]) === issueNumber) return processId;
 	}
