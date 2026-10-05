@@ -8,6 +8,7 @@ import {
 import { resolve } from "node:path";
 import { isCliEntrypoint } from "./lib/cli-entrypoint.mjs";
 import { GEN_PLUGIN_OUTPUTS } from "./lib/gen-plugin-outputs.mjs";
+import { operationalSvgSource } from "./lib/operational-svg-contract.mjs";
 
 const SHA = /^[0-9a-f]{40}$/;
 const nulPaths = (text) => text.split("\0").filter(Boolean);
@@ -83,12 +84,7 @@ function operationalSvgs(entries) {
 			.map(([, path]) => path),
 	);
 	return new Set(
-		[...regular].filter(
-			(path) =>
-				/^\.pfdsl\/(?:[^/]+\/)*[^/]+\.svg$/.test(path) &&
-				!path.split("/").some((part) => part === "." || part === "..") &&
-				regular.has(path.replace(/\.svg$/, ".pfdsl")),
-		),
+		[...regular].filter((path) => regular.has(operationalSvgSource(path))),
 	);
 }
 
@@ -117,7 +113,7 @@ export function regenerateOperationalSvgs(root, tree) {
 			[
 				"packages/cli/dist/cli.js",
 				"render",
-				path.replace(/\.svg$/, ".pfdsl"),
+				operationalSvgSource(path),
 				"--format",
 				"svg",
 			],
