@@ -22,6 +22,16 @@ If the previous identity or completion is unknown, keep it unknown: inspect the 
 Do not infer a previous release or record the target merely to silence a notice.
 Record the target only after all potentially applicable steps have been resolved and their checks pass; report unresolved decisions until then.
 
+## Temporary notice for known pre-v0.1.0 adopters
+
+The maintainer handles known, maintainer-managed v0.0.26 adopters individually through [Issue #1319](https://github.com/takasek/pfdsl/issues/1319).
+This one-time migration does not require a permanent startup notice comparing the installed plugin with upstream main.
+Use the issue's initial checklist and record the completed migration and checks in each adopting repository.
+
+Remove this temporary notice and the corresponding adopter-cohort rationale in [ADR-0043](adr/0043-applied-migration-state.md#範囲) once #1319 is complete and its adoption records confirm that every in-scope repository has finished the migration, passed its checks, and recorded `appliedMigration` as required.
+Closing the upstream issue alone does not prove that an adopter has finished.
+Keep the release-specific migration entries and the ongoing `appliedMigration` comparison; only this temporary cohort notice is retired.
+
 ## Unreleased — after CLI/plugin v0.1.0
 
 This section covers the changes after CLI/plugin v0.1.0 that need action in an adopting repository.
