@@ -29,8 +29,7 @@ function extractProcessSection(pfdslText) {
 }
 
 /**
- * issue 番号から、それを `location:` に持つ
- * process の processId を返す。
+ * issue 番号から、それを `location:` に持つ process の processId を返す。
  * @param {string} pfdslText - .pfdsl/roadmap.pfdsl の全文
  * @param {number} issueNumber
  * @returns {string | null}
