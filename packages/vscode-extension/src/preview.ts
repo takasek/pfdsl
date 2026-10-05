@@ -253,12 +253,7 @@ export function registerPreview(context: vscode.ExtensionContext): {
 			} else if (msg.type === "openUrl") {
 				vscode.env.openExternal(vscode.Uri.parse(msg.url));
 			} else if (msg.type === "openFile") {
-				const { frontmatter } = analyzeDocument(state.doc);
-				const fsPath = resolveLocationFsPath(
-					state.doc.uri.fsPath,
-					msg.path,
-					frontmatter?.basePath,
-				);
+				const fsPath = resolveLocationFsPath(state.doc.uri.fsPath, msg.path);
 				const srcVc = vscode.window.visibleTextEditors.find(
 					(e) => e.document === state.doc,
 				)?.viewColumn;

@@ -16,6 +16,10 @@ VSCode language support for [PFDSL](https://github.com/takasek/pfdsl), a DSL for
 
 Open any `.pfdsl` file. The preview icon appears in the editor title bar — click it to open a side-by-side SVG preview.
 
+In the preview, Cmd+click (macOS) or Ctrl+click opens a node's location or subflow source in the editor.
+Double-click jumps to the node's definition.
+Each preview stays attached to its own file; to view an opened subflow, run **PFDSL: Open Preview to the Side** from that child file.
+
 ```pfdsl
 [requirement, constraint] >> design -> spec
 spec >>? design
