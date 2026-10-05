@@ -85,7 +85,7 @@ function operationalSvgs(entries) {
 	return new Set(
 		[...regular].filter(
 			(path) =>
-				/^\.pfdsl\/[^/]+\.svg$/.test(path) &&
+				/^\.pfdsl\/(?:[^/]+\/)*[^/]+\.svg$/.test(path) &&
 				!path.split("/").some((part) => part === "." || part === "..") &&
 				regular.has(path.replace(/\.svg$/, ".pfdsl")),
 		),

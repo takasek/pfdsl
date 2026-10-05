@@ -7,9 +7,11 @@ Validation runs the same merge, generation and verification, uploads a repair bu
 It never starts the publication job, creates an App token or pushes changes.
 Selecting another workflow branch in repair mode stops before checkout and explains how to select main or use validate instead.
 The workflow integrates the latest main into that PR and regenerates the outputs owned by `scripts/lib/gen-plugin-outputs.mjs`.
-It also repairs tracked `.pfdsl/<name>.svg` snapshots when a matching tracked, regular `.pfdsl/<name>.pfdsl` source is available without conflicts.
+It also repairs tracked `.pfdsl/**/*.svg` snapshots when a matching tracked, regular sibling `.pfdsl` source is available without conflicts, including diagrams directly inside `.pfdsl`.
+This recursive scope matches the default paths of `render-pfdsl-svg.yml`.
 After building and regenerating the plugin, it renders every eligible operational SVG from the merged sources with the built CLI.
-Nested diagrams, orphan SVGs, symbolic links, and canonical `.pfdsl` conflicts require manual resolution.
+Orphan SVGs, symbolic links, and canonical `.pfdsl` conflicts require manual resolution.
+Other generated diagrams, such as `docs/samples/` outputs owned by `make gen-samples`, are outside this renderer contract and require manual resolution.
 Plugin generation and SVG rendering have separate output checks; neither stage may modify the other stage's files or canonical sources.
 It stops if any conflict requires a canonical source or code decision.
 The job log and Actions run summary list the source files requiring manual resolution and explain the next steps.

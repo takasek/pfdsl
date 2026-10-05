@@ -80,6 +80,8 @@ test("generated ownership uses path boundaries and excludes canonical sources", 
 });
 
 function fixture(t, canonicalConflict = false, svg = false) {
+	const diagram =
+		svg === "nested" ? ".pfdsl/team/deep/pipeline" : ".pfdsl/pipeline";
 	const root = mkdtempSync(join(tmpdir(), "generated-repair-test-"));
 	t.after(() => rmSync(root, { recursive: true, force: true }));
 	const git = (...args) =>
@@ -101,16 +103,16 @@ function fixture(t, canonicalConflict = false, svg = false) {
 	put("source.txt", "original\n");
 	put("plugin/output.txt", "original\n");
 	if (svg) {
-		put(".pfdsl/pipeline.pfdsl", "first\nmiddle\nlast\n");
-		put(".pfdsl/pipeline.svg", "original svg\n");
+		put(`${diagram}.pfdsl`, "first\nmiddle\nlast\n");
+		put(`${diagram}.svg`, "original svg\n");
 	}
 	commit("initial");
 	git("switch", "-c", "feature");
 	put("plugin/output.txt", "feature\n");
 	put("feature.txt", "feature\n");
 	if (svg) {
-		put(".pfdsl/pipeline.pfdsl", "feature\nmiddle\nlast\n");
-		put(".pfdsl/pipeline.svg", "feature svg\n");
+		put(`${diagram}.pfdsl`, "feature\nmiddle\nlast\n");
+		put(`${diagram}.svg`, "feature svg\n");
 	}
 	if (canonicalConflict === true) put("source.txt", "feature\n");
 	const head = commit("feature");
@@ -118,12 +120,12 @@ function fixture(t, canonicalConflict = false, svg = false) {
 	put("plugin/output.txt", "main\n");
 	if (svg) {
 		put(
-			".pfdsl/pipeline.pfdsl",
+			`${diagram}.pfdsl`,
 			canonicalConflict === "diagram"
 				? "main\nmiddle\nlast\n"
 				: "first\nmiddle\nmain\n",
 		);
-		put(".pfdsl/pipeline.svg", "main svg\n");
+		put(`${diagram}.svg`, "main svg\n");
 	}
 	put("source.txt", "main\n");
 	const base = commit("main update");
@@ -147,6 +149,20 @@ test("operational SVG conflicts preserve automatically merged canonical source",
 	assert.doesNotThrow(() => verifyRepair(f.root, f.head, f.base, repaired));
 });
 
+test("nested SVG conflicts preserve merged source and pass independent publication checks", (t) => {
+	const f = fixture(t, false, "nested");
+	const path = ".pfdsl/team/deep/pipeline.svg";
+	assert.ok(mergeGeneratedConflicts(f.root, f.head, f.base).includes(path));
+	assert.equal(
+		readFileSync(join(f.root, path.replace(/\.svg$/, ".pfdsl")), "utf8"),
+		"feature\nmiddle\nmain\n",
+	);
+	f.put(path, "regenerated\n");
+	assert.doesNotThrow(() =>
+		verifyRepair(f.root, f.head, f.base, f.commit("nested repair")),
+	);
+});
+
 test("publisher rejects SVGs without a tracked matching operational source", (t) => {
 	const f = fixture(t);
 	mergeGeneratedConflicts(f.root, f.head, f.base);
@@ -157,7 +173,7 @@ test("publisher rejects SVGs without a tracked matching operational source", (t)
 	);
 });
 
-test("renderer consumes merged source, excludes orphan and nested SVGs, and preserves output on failure", (t) => {
+test("renderer consumes merged source recursively, excludes orphan SVGs, and preserves output on failure", (t) => {
 	const f = fixture(t, false, true);
 	mergeGeneratedConflicts(f.root, f.head, f.base);
 	f.put(".pfdsl/orphan.svg", "orphan\n");
@@ -165,6 +181,8 @@ test("renderer consumes merged source, excludes orphan and nested SVGs, and pres
 	f.put(".pfdsl/nested/diagram.svg", "nested svg\n");
 	f.put(".pfdsl/workflow.pfdsl", "workflow source\n");
 	f.put(".pfdsl/workflow.svg", "workflow svg\n");
+	f.put("docs/samples/example.pfdsl", "sample\n");
+	f.put("docs/samples/example.svg", "sample svg\n");
 	symlinkSync("../source.txt", join(f.root, ".pfdsl/linked.pfdsl"));
 	f.put(".pfdsl/linked.svg", "linked svg\n");
 	f.put(
@@ -177,6 +195,7 @@ process.stdout.write('<svg>'+fs.readFileSync(process.argv[3],'utf8')+'</svg>');`
 	f.git("add", "-A");
 	const tree = f.git("write-tree");
 	assert.deepEqual(regenerateOperationalSvgs(f.root, tree), [
+		".pfdsl/nested/diagram.svg",
 		".pfdsl/pipeline.svg",
 		".pfdsl/workflow.svg",
 	]);
@@ -187,6 +206,14 @@ process.stdout.write('<svg>'+fs.readFileSync(process.argv[3],'utf8')+'</svg>');`
 	assert.equal(
 		readFileSync(join(f.root, ".pfdsl/linked.svg"), "utf8"),
 		"linked svg\n",
+	);
+	assert.equal(
+		readFileSync(join(f.root, "docs/samples/example.svg"), "utf8"),
+		"sample svg\n",
+	);
+	assert.equal(
+		readFileSync(join(f.root, ".pfdsl/nested/diagram.svg"), "utf8"),
+		"<svg>nested\n</svg>",
 	);
 	const expected = "<svg>feature\nmiddle\nmain\n</svg>";
 	assert.equal(
@@ -214,6 +241,23 @@ test("a canonical conflict leaves the SVG unresolved and cannot be smuggled thro
 	assert.match(f.git("diff", "--name-only", "--diff-filter=U"), /pipeline.svg/);
 	assert.throws(
 		() => verifyRepair(f.root, f.head, f.base, f.commit("invalid markers")),
+		/pipeline.pfdsl/,
+	);
+});
+
+test("nested canonical conflicts stop before resolving nested SVGs", (t) => {
+	const f = fixture(t, "diagram", "nested");
+	assert.throws(
+		() => mergeGeneratedConflicts(f.root, f.head, f.base),
+		/team\/deep\/pipeline.pfdsl/,
+	);
+	assert.match(
+		f.git("diff", "--name-only", "--diff-filter=U"),
+		/team\/deep\/pipeline.svg/,
+	);
+	assert.throws(
+		() =>
+			verifyRepair(f.root, f.head, f.base, f.commit("invalid nested markers")),
 		/pipeline.pfdsl/,
 	);
 });
