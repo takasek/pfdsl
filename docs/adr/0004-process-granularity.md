@@ -46,6 +46,18 @@
 - スキル品質ガイドに4ルールとして収録
 - `docs/issues_flow.pfdsl` の「階層×プリセット仕様起草」が「並列→上流方針→共同起草」と3段階で収束した経緯が実例 （git log の `fix(docs)` 2コミット参照）
 
+## 2026-10-05: #1370 R05 の再判定
+
+`maintain_distributed_prompt_assets` は現状維持とする。
+具体例として grill の改訂（`2b1b48de`）と managed issue reminder hook の改訂（`b52a6fee`、`45a35ab7`）を比較した。
+いずれも対象を指名した `decisions` が駆動入力で、対象自身の baseline と対象固有の finding が補助入力になる。
+grill の検証は最終成果物から外部入力へ遡る対話結果と生成整合、hook の検証は両配布先のcommand解決・出力・exit 0と生成整合であり、検証依存は異なる。
+その違いは各出力 artifact の criteria に既に表れ、他の正本を改訂・検証することを先行条件にはしていない。
+baseline は `>>?` の任意入力であり、別正本の改訂が必須という依存を表していない。
+正本別に分割しても同じ `decisions` を複製するだけで、新しい駆動入力や引継ぎ契約は増えない。
+以前の21工程分割の比較は `docs/superpowers/specs/2026-08-29-retrospective-transformation-model-design.md` の85〜103行に残る。
+正本固有の外部仕様・別の駆動入力・所有権境界が現れたら、その単位で再判定する。
+
 ## References
 
 - `.claude/skills/pfdsl/SKILL.md`
