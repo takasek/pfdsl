@@ -149,6 +149,29 @@ describe("gh invocation effects", () => {
 			assert.notEqual(findOutwardCommand(command), null, command);
 	});
 	for (const command of [
+		"gh issue edit 1 --add-label x --help",
+		"gh issue close 1 --reason completed --help",
+		"gh pr edit 1 --add-reviewer x --help",
+		"gh release create v1 --notes x --help",
+		"gh repo create x --public --help",
+		"gh label clone a/b --force --help",
+		"gh repo create x -c -d text -h https://example.com --help",
+		"gh release create v1 -d -p --generate-notes --help",
+	])
+		it(`allows command-specific help: ${command}`, () =>
+			assert.equal(findOutwardCommand(command), null));
+	for (const command of [
+		"gh issue edit 1 --add-label --help",
+		"gh issue close 1 --reason --help",
+		"gh pr edit 1 --add-reviewer --help",
+		"gh release create v1 --notes --help",
+		"gh repo create x -h --help",
+		"gh repo create x -d --help",
+		"gh label clone a/b --force -- --help",
+	])
+		it(`keeps command flag data protected: ${command}`, () =>
+			assert.notEqual(findOutwardCommand(command), null));
+	for (const command of [
 		"gh workflow disable --help",
 		"gh help workflow",
 		"gh search issues foo",
