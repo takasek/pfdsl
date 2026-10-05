@@ -43,6 +43,18 @@ interface FormatResult {
 }
 ```
 
+### Graph differences
+
+`diffGraphs(a, b, fmA?, fmB?)` retains the seven `string[]` fields of `DiffReport`: added, removed and changed nodes, added and removed primary edges, and added and removed feedback edges.
+Edge strings are display values, sorted lexicographically after formatting; ordinary IDs keep their existing spelling, while IDs that need quoting use PFDSL escaping.
+For example, the distinct endpoint pairs `("a -> b", "c")` and `("a", "b -> c")` display as `"a -> b" -> c` and `a -> "b -> c"`.
+Consumers of the existing report do not need to migrate, but should not split its display strings to recover endpoints.
+
+Renderers can use the additive `diffGraphsDetailed(a, b, fmA?, fmB?)` API, returning `{ report, primaryEdges, feedbackEdges }`.
+Its `report` is the same `DiffReport`; each classified edge retains its endpoints and a `status` of `added`, `removed` or `unchanged`.
+Primary edges use `from` and `to`, and feedback edges use `artifact` and `process`.
+Identity compares endpoint pairs within each edge category, independently of display strings; duplicates and edge input order do not create differences.
+
 ### Stage-by-stage API
 
 `analyzeSource(source, options)` returns the same analysis as `analyze()` plus a `sourceMap` of frontmatter declarations and fields.

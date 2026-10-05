@@ -1085,6 +1085,47 @@ v2 >> P -> X
 });
 
 describe("exportDiffDot", () => {
+	const collisionBase =
+		'["a -> b", a] >> hub -> seed\nseed >> c -> out1\nseed >> "b -> c" -> out2\n';
+	it.each([
+		">>",
+		">>?",
+	])("renders an edge-only replacement with colliding display keys for %s", (op) => {
+		const a = analyze(`${collisionBase}"a -> b" ${op} c\n`);
+		const b = analyze(`${collisionBase}a ${op} "b -> c"\n`);
+		const dot = exportDiffDot(a.graph, a.frontmatter, b.graph, b.frontmatter);
+		expect(dot).not.toContain("_nodiff");
+		expect(dot).toContain(
+			op === ">>"
+				? '"a -> b" -> "c" [color="#dc3545", style=dashed]'
+				: '"a -> b" -> "c" [style=dashed, color="#dc3545", constraint=false]',
+		);
+		expect(dot).toContain(
+			op === ">>"
+				? '"a" -> "b -> c" [color="#28a745"]'
+				: '"a" -> "b -> c" [style=dashed, color="#28a745", constraint=false]',
+		);
+	});
+	it.each([
+		">>",
+		">>?",
+	])("renders both colliding edges added to the same graph for %s", (op) => {
+		const a = analyze(collisionBase);
+		const b = analyze(`${collisionBase}"a -> b" ${op} c\na ${op} "b -> c"\n`);
+		const dot = exportDiffDot(a.graph, a.frontmatter, b.graph, b.frontmatter);
+		expect(dot).not.toContain("_nodiff");
+		expect(dot).toContain('"a -> b" -> "c"');
+		expect(dot).toContain('"a" -> "b -> c"');
+	});
+	it("renders an edge-only change with ordinary IDs", () => {
+		const a = analyze("req >> design -> spec\nspec >> impl -> code\n");
+		const b = analyze(
+			"req >> design -> spec\nspec >> impl -> code\nreq >> impl\n",
+		);
+		const dot = exportDiffDot(a.graph, a.frontmatter, b.graph, b.frontmatter);
+		expect(dot).not.toContain("_nodiff");
+		expect(dot).toContain('"req" -> "impl" [color="#28a745"]');
+	});
 	it("added node is styled with green fillcolor", () => {
 		const a = analyze("req >> design -> spec\n");
 		const b = analyze("req >> design -> spec\nnewnode >> design\n");
