@@ -72,6 +72,10 @@
 				"title": "PFDSL: Go to Frontmatter Definition"
 			},
 			{
+				"command": "pfdsl.cycleNodeOccurrence",
+				"title": "PFDSL: Cycle Node Occurrences"
+			},
+			{
 				"command": "pfdsl.sortMeta",
 				"title": "PFDSL: Sort Node Definitions…"
 			},
@@ -82,9 +86,16 @@
 		],
 		"keybindings": [
 			{
+				"command": "pfdsl.cycleNodeOccurrence",
+				"key": "ctrl+k ctrl+alt+n",
+				"mac": "cmd+k cmd+alt+n",
+				"when": "editorLangId == pfdsl && editorTextFocus"
+			},
+			{
 				"command": "pfdsl.jumpToDefinition",
-				"key": "alt+f12",
-				"when": "editorLangId == pfdsl"
+				"key": "ctrl+k ctrl+alt+d",
+				"mac": "cmd+k cmd+alt+d",
+				"when": "editorLangId == pfdsl && editorTextFocus"
 			}
 		],
 		"menus": {
@@ -96,6 +107,11 @@
 				}
 			],
 			"editor/context": [
+				{
+					"when": "editorLangId == pfdsl",
+					"command": "pfdsl.cycleNodeOccurrence",
+					"group": "navigation"
+				},
 				{
 					"when": "editorLangId == pfdsl",
 					"command": "pfdsl.jumpToDefinition",
