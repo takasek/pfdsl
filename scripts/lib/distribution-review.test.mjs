@@ -3,7 +3,6 @@ import { existsSync, readdirSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { describe, it } from "node:test";
 import { fileURLToPath } from "node:url";
-
 import {
 	canonicalSourceOf,
 	DISTRIBUTION_ROOTS,
@@ -15,11 +14,13 @@ import {
 	SCOPE_EXCLUSIONS,
 	unreviewedFiles,
 } from "./distribution-review.mjs";
+import { DISTRIBUTION_ROOTS as SHARED_DISTRIBUTION_ROOTS } from "./distribution-roots.mjs";
 import { codexCommandSkillName, PLUGIN_COMMAND_FILES } from "./gen-plugin.mjs";
 import { git } from "./run-exec.mjs";
 
 describe("inScope", () => {
 	it("declares both plugin roots as the review diff boundary", () => {
+		assert.strictEqual(DISTRIBUTION_ROOTS, SHARED_DISTRIBUTION_ROOTS);
 		assert.deepEqual(DISTRIBUTION_ROOTS, [
 			"plugin/pfdsl",
 			"plugin/pfdsl-codex",
