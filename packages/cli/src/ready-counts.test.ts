@@ -119,6 +119,19 @@ describe("status ready newlyReadyCount (#1345)", () => {
 	});
 
 	it.each([
+		"waiting",
+		"suspended",
+	])("simulates completing every output, including one currently %s", async (status) => {
+		await verifyCounts(
+			fixture(
+				{ seed: "done", x: "todo", y: status, c: "todo" },
+				"seed >> P -> [x, y]\ny >> C -> c",
+			),
+			{ P: 1 },
+		);
+	});
+
+	it.each([
 		"done",
 		"wip",
 		"waiting",
