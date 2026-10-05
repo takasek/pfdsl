@@ -107,6 +107,29 @@ describe("findShellExecutors", () => {
 		}
 	});
 
+	// The default export of child_process is the whole module, so naming it
+	// through a specifier list hands over exec just as `import cp from` does.
+	it("flags the default export of child_process, which is the whole module", () => {
+		for (const [source, reason] of [
+			[
+				'import { default as cp } from "node:child_process";',
+				/imports the child_process module/,
+			],
+			[
+				'export { default as cp } from "node:child_process";',
+				/re-exports the child_process module/,
+			],
+			[
+				'export { default } from "child_process";',
+				/re-exports the child_process module/,
+			],
+		]) {
+			const found = findShellExecutors(source);
+			assert.equal(found.length, 1, source);
+			assert.match(found[0].reason, reason);
+		}
+	});
+
 	it("leaves a re-export alone that takes argv or comes from elsewhere", () => {
 		for (const source of [
 			'export { execFileSync } from "node:child_process";',

@@ -15,9 +15,9 @@
  * `)` inside a `--format="%h)"` string, an aliased import, `{shell: true}` on
  * a call that otherwise takes argv. Banning the import needs no such analysis
  * — `scripts/lib/run-exec.mjs` covers every use in this repo.
- * Parsing syntax also covers whole-module imports, re-exports of the module or
- * of exec / execSync, and quoted property names without treating examples in
- * comments or strings as executable code.
+ * Parsing syntax also covers whole-module imports and re-exports, including
+ * the `default` specifier, re-exports of exec / execSync, and quoted property
+ * names without treating examples in comments or strings as executable code.
  * This is a syntax gate, not data-flow analysis of computed module names or
  * option values.
  */
@@ -93,7 +93,10 @@ export function findShellExecutors(source) {
 			} else if (bindings && ts.isNamedImports(bindings)) {
 				for (const element of bindings.elements) {
 					const imported = (element.propertyName ?? element.name).text;
-					if (SHELL_EXECUTORS.has(imported))
+					// `default` is the module itself, as in `import cp from`.
+					if (imported === "default")
+						report(node, "imports the child_process module");
+					else if (SHELL_EXECUTORS.has(imported))
 						report(node, `imports ${imported} from child_process`);
 				}
 			}
@@ -107,7 +110,9 @@ export function findShellExecutors(source) {
 			} else {
 				for (const element of clause.elements) {
 					const exported = (element.propertyName ?? element.name).text;
-					if (SHELL_EXECUTORS.has(exported))
+					if (exported === "default")
+						report(node, "re-exports the child_process module");
+					else if (SHELL_EXECUTORS.has(exported))
 						report(node, `re-exports ${exported} from child_process`);
 				}
 			}
