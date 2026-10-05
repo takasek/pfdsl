@@ -7,17 +7,38 @@ Validation runs the same merge, generation and verification, uploads a repair bu
 It never starts the publication job, creates an App token or pushes changes.
 Selecting another workflow branch in repair mode stops before checkout and explains how to select main or use validate instead.
 The workflow integrates the latest main into that PR and regenerates the outputs owned by `scripts/lib/gen-plugin-outputs.mjs`.
+It also repairs tracked `.pfdsl/<name>.svg` snapshots when a matching tracked, regular `.pfdsl/<name>.pfdsl` source is available without conflicts.
+After building and regenerating the plugin, it renders every eligible operational SVG from the merged sources with the built CLI.
+Nested diagrams, orphan SVGs, symbolic links, and canonical `.pfdsl` conflicts require manual resolution.
+Plugin generation and SVG rendering have separate output checks; neither stage may modify the other stage's files or canonical sources.
 It stops if any conflict requires a canonical source or code decision.
 The job log and Actions run summary list the source files requiring manual resolution and explain the next steps.
 Merge main into the PR branch locally and resolve the listed source conflicts.
-Regenerate generated files with `make gen-plugin`, finish the merge, then commit and push.
+Regenerate plugin outputs with `make gen-plugin`.
+For operational SVGs, run `make build` and render each matching source after resolving its conflicts.
+For example, replace the pipeline snapshot only after rendering succeeds:
+
+```sh
+svg_tmp=$(mktemp)
+if node packages/cli/dist/cli.js render .pfdsl/pipeline.pfdsl --format svg > "$svg_tmp"; then
+  mv "$svg_tmp" .pfdsl/pipeline.svg
+else
+  rm "$svg_tmp"
+  exit 1
+fi
+```
+
+Finish the merge after regenerating its outputs, then commit and push.
 Rerun this workflow if generated files still need repair.
 The stopped run does not push any changes.
 It does not merge the PR into main.
 
 The preparation job runs the PR's merged generators and tests without a publication credential.
 It builds the packages, runs `make gen-plugin`, and checks the full tests, lint, typecheck, and generated drift.
+SVG rendering must succeed before its captured output replaces a snapshot.
 A fresh publication job executes only trusted main code, checks that canonical files match Git's automatic merge, and pushes one ordinary merge or repair commit to the existing PR branch.
+The publisher independently derives eligible SVG paths from Git's automatic merge tree and rejects changes to their file type.
+It verifies the change boundary, not the correctness of SVG bytes; rendering and tests run in preparation without a publication credential.
 After pushing, it verifies the branch through Git rather than the PR API, whose head information may lag behind the push.
 If that verification fails, the error states that the push already succeeded and asks you to check the branch before rerunning.
 If the PR or main changes while preparation runs, publication stops; rerun the workflow.
@@ -30,4 +51,5 @@ Its credential is used only in the fresh publication job.
 An absent or insufficient credential stops publication without switching authentication modes.
 
 The workflow must first be present on the default branch before GitHub accepts a manual dispatch.
-The first planned use is PR #1361; local preparation against its exact head can verify the repair before the workflow is integrated, but that is not an Actions execution or publication.
+An extension to the accepted generated paths must reach main before Actions can publish repairs using it.
+Before that, branch-mode validation or explicitly authorized local preparation can verify a repair, but does not count as an Actions publication.
