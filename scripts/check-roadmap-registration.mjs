@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // Roadmap-registration check for CI (#963).
 //
-// Runs on a PR that edits .pfdsl/roadmap.pfdsl, before merge. The audit treats
+// Runs on every PR before merge, including those with no roadmap diff. The audit treats
 // a `flow:managed` issue with no tracked process as advisory, because in any
 // given tree that gap usually belongs to another session's unmerged branch.
 // This check enforces it for the issues GitHub reads this PR as closing — the

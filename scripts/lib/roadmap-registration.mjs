@@ -1,4 +1,4 @@
-// Decides whether a PR that edits the roadmap registered the issues it closes
+// Decides whether a PR registered the issues it closes, with or without a roadmap diff
 // (#963).
 //
 // `missing_process` is advisory in the audit because the entry for a managed

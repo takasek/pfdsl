@@ -42,12 +42,12 @@ GitHub Issues。規約と採用手順は `scripts/harness-template/skills/pfd-op
 
 `node scripts/cycle-status.mjs` の `openPRs` で PR の番号とタイトルを確認し、今回の作業に競合するかを判断する。
 
-`.pfdsl/roadmap.pfdsl` を編集する PR には `check-roadmap-registration.yml` が付く（#963）。
-`node scripts/check-roadmap-registration.mjs --pr <n>` が PR の `closingIssuesReferences` から issue を導き、`audit-issues-flow.mjs --enforce-issue <n>` でその issue の `missing_process` だけを FAIL へ昇格させる。
+roadmap差分の有無によらず PR には `check-roadmap-registration.yml` が付く（#963）。
+`node scripts/check-roadmap-registration.mjs --pr <n>` が PR の `closingIssuesReferences` から issue を導き、`audit-issues-flow.mjs --enforce-issue <n>` でその issue の分類・登録を FAIL 対象にし、対象外issueのfindingsはadvisoryにする。
 対象集合を PR 自身から導くのは、実行主体が渡すフラグに依存させないため。
 `edited` を trigger に含めるのは `check-closes-reference.yml` と同じ理由で、PR 本文の編集が対象集合を変えるからである。
 
-**`gh` CLI が使えない環境（Claude Code Remote 等）での代替**: `cycle-status.mjs` / `gate-check.mjs`（内部の `audit-issues-flow.mjs`）は `gh` を呼ぶが、`github-ops.mjs` が `GH_TOKEN` / `GITHUB_TOKEN` のある環境では HTTP backend へ落ちる（#489・#1044）。token も無い場合は GitHub MCP server のツール（`list_pull_requests` / `issue_read` / `pull_request_read` 等）で個別に代替する: PR一覧は `list_pull_requests`、設計の確認は `issue_read` で本文とコメントを取得して読む、`audit-issues-flow` 相当は対象 issue の `location:`・`updated_at:` を roadmap.pfdsl の記載と手動突合する。
+**`gh` CLI が使えない環境（Claude Code Remote 等）での代替**: `cycle-status.mjs` / `gate-check.mjs`（内部の `audit-issues-flow.mjs`）は `gh` を呼ぶが、`github-ops.mjs` が `GH_TOKEN` / `GITHUB_TOKEN` のある環境では HTTP backend へ落ちる（#489・#1044）。token も無い場合は GitHub MCP server のツール（`list_pull_requests` / `issue_read` / `pull_request_read` 等）で個別に代替する: PR一覧は `list_pull_requests`、設計の確認は `issue_read` で本文とコメントを取得して読む、`audit-issues-flow` 相当は対象 issue の分類と `iN_` process・入出力依存を roadmap.pfdsl の記載と手動突合する。
 `github-ops.mjs` の HTTP backend は上のリポ内スクリプトが必要とする operation の互換層であり、issue コメントや PR 本文の作成・編集を代行する汎用 GitHub write adapter ではない。
 fallback の transport は REST だけではない — `closingIssuesReferences` は REST の pull request payload に存在せず、GraphQL へ直接問い合わせる（#1043）。
 GitHub 側にしか無い読みを本文の正規表現で再構成すると、Development sidebar で手動リンクされた PR が「closing issue 0件」に見える。
@@ -85,7 +85,7 @@ issue/PR view の要求フィールド欠落、closing issue の識別情報不�
 
 - [ ] このサイクルで起票した issue を `flow:managed` / `flow:exempt` に分類した（判定は L3 reference の「ラベル判定基準」。保守・基盤・修正は exempt）
 - [ ] `flow:managed` の issue がすべて roadmap.pfdsl の artifact として登録済みか確認した（exempt は登録しない）
-- [ ] `node scripts/pfdsl/audit-issues-flow.mjs` が差分なしで通過した（手動追記した `updated_at` のズレを機械的に検出する。`gate-check.mjs` 実行時はその一部として自動実行される）
+- [ ] `node scripts/pfdsl/audit-issues-flow.mjs` の分類・登録検査が通過した（更新日時・priority完全一致は要求しない。`gate-check.mjs` 実行時はその一部として自動実行される）
 
 **バージョン artifact を起こす契機と criteria の形**: 規定の一般形は `scripts/harness-template/skills/pfd-ops/references/work-cycle.md` の「成果物の門番」が一次情報（#729 で昇格）。
 ここにはこのリポのインスタンス値だけを置く。
