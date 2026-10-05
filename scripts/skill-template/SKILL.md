@@ -118,7 +118,7 @@ PFD はタスクリストではなく成果物の変換グラフ。
 
 ## 読解と点検
 
-- **読解**: 大きい PFD は全読しない。`graph io`（外部入力と終端 artifact）で輪郭を掴み、対象ノードの frontmatter だけ読む。roadmap では `status ready --best` が着手可能プロセスを返す
+- **読解**: 大きい PFD は全読しない。`graph io`（外部入力と終端 artifact）で輪郭を掴み、対象ノードの frontmatter だけ読む。roadmap では `status ready` が着手可能プロセスと全出力完了後の新規 ready 数を返す。件数は優先順位ではなく、0件でも必要な仕事がある。テキストの件数は `--no-counts` で省略でき、JSON は常に `newlyReadyCount` を含む
 - **書いた後の点検**: 同じ `graph io` で、終端が全て意図した納品物か、外部入力に生成元を持つべきものが混ざっていないかを確認。あわせて各プロセスが「この入力だけで出力を作れるか」を見る。`graph orphans` はエッジを一切持たないノード（配線忘れ）を検出する — graph io の外部入力・終端はそれぞれ片側のみの欠落なので、両方欠落した本当に浮いたノードは別途これで見る。`>>?` だけで繋がるノードと group は配線済みとして扱われるため出ない
 - **`terminal artifacts:` が空でもグラフ破損ではない**: `externalStakeholders` を宣言した artifact は外部消費者を持つとみなされ、終端一覧から外れる。最終納品物にこのフィールドを付けると終端行は空になる — グラフが壊れたのではなく、監査対象が `external-stakeholder terminals:` の行（`--json` では `externalTerminals` キー）へ移っただけ。点検の中身は「そのフィールドが妥当か（手段成果物に誤って付けていないか）」
 - roadmap と flow ファイルが併存する構成では `status gaps <roadmap> <flow>...` で、flow 側の個別追跡対象と roadmap の整合を点検する。選別子は `tags:` に `roadmap-tracked` を含むこと — flow ファイルは status を書かない（W007）ため status は選別子にならず、逆に全 artifact を突き合わせると図の大半を占める運用上の副産物まで並ぶ。**タグを付けた artifact が1件も無ければこの検査は何も見ずに緑になる**。対象0件のときは CLI 自身が「何も検証しなかった」と言うので、合格文と読み違えない。roadmap 内の artifact を status で絞り込む場合は `status list <file> --status <s[,s...]>`、着手不可なプロセスがなぜ止まっているか見るなら `status blocked <file>`

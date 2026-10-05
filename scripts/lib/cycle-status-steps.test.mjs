@@ -10,11 +10,18 @@ const TARGET_REPOSITORY = {
 	repo: "pfdsl",
 };
 
-const readyJsonOk = (best) =>
+const readyJsonOk = (id) =>
 	JSON.stringify({
 		ok: true,
-		ready: [{ id: "a" }],
-		best: best ? { id: best, outputs: [`${best}_out`] } : undefined,
+		ready: [
+			{
+				id: id ?? "a",
+				label: "Candidate",
+				inputs: ["seed"],
+				outputs: ["output"],
+				newlyReadyCount: 2,
+			},
+		],
 	});
 
 // The top-level key is the singular `process:`, matching the real
@@ -236,7 +243,7 @@ describe("runCycleStatus", () => {
 		);
 		assert.equal(result.dirtyTree, undefined);
 		assert.equal(result.uncommittedFiles, undefined);
-		assert.equal(result.best, "proc_a");
+		assert.equal(result.best, undefined);
 	});
 
 	// A tree that is both behind and dirty is reported as behind: that verdict
@@ -269,7 +276,7 @@ describe("runCycleStatus", () => {
 			}),
 		);
 		assert.equal(result.dirtyTreeError, "fatal: not a git repo");
-		assert.equal(result.best, "proc_a");
+		assert.equal(result.best, undefined);
 	});
 
 	it("sets prError and an empty PR list when gh pr list fails", async () => {
@@ -321,7 +328,7 @@ describe("runCycleStatus", () => {
 			"packages/cli/dist/cli.js not built; run 'pnpm -r build' first",
 		);
 		assert.deepEqual(result.ready, []);
-		assert.equal(result.best, null);
+		assert.equal(result.best, undefined);
 		assert.ok(!calls.some(([, args]) => args.includes(CLI_PATH)));
 	});
 
@@ -336,10 +343,10 @@ describe("runCycleStatus", () => {
 		);
 		assert.equal(result.readyError, "cli crashed");
 		assert.deepEqual(result.ready, []);
-		assert.equal(result.best, null);
+		assert.equal(result.best, undefined);
 	});
 
-	it("parses ready/best from a successful CLI call", async () => {
+	it("preserves ready completion counts from a successful CLI call", async () => {
 		const result = await runCycleStatus(
 			baseDeps({
 				sh: (_file, args) => {
@@ -348,8 +355,8 @@ describe("runCycleStatus", () => {
 				},
 			}),
 		);
-		assert.deepEqual(result.ready, ["a"]);
-		assert.equal(result.best, null);
+		assert.deepEqual(result.ready, JSON.parse(readyJsonOk(null)).ready);
+		assert.equal(result.best, undefined);
 	});
 
 	const issueJson = ({ body, comments = [], labels = [] }) =>
@@ -365,7 +372,7 @@ describe("runCycleStatus", () => {
 			}),
 		);
 
-	it("resolves the target issue from --issue when given, ignoring any best process", async () => {
+	it("resolves only the target issue explicitly given by --issue", async () => {
 		const calls = [];
 		const result = await runCycleStatus(
 			baseDeps({
@@ -508,7 +515,7 @@ describe("runCycleStatus", () => {
 		assert.equal("reviewRecordTemplate" in result, false);
 	});
 
-	it("reports issueTargets with an error when neither --issue nor a best process is available", async () => {
+	it("asks for an explicit target while still returning decision material", async () => {
 		const calls = [];
 		const result = await runCycleStatus(
 			baseDeps({
@@ -525,31 +532,32 @@ describe("runCycleStatus", () => {
 		assert.deepEqual(result.issueTargets, []);
 		assert.equal(
 			result.issueError,
-			"no --issue given and no best process to resolve an issue number from",
+			"No --issue given. Choose a target from the ready list and rerun with --issue <number>; counts do not rank priority.",
 		);
 		assert.ok(!calls.some((c) => c[0] === "issue"));
 	});
 
-	it("reports issueTargets with the roadmap error when the best process has no issue number", async () => {
+	it("does not read the roadmap to select an issue automatically", async () => {
 		const result = await runCycleStatus(
 			baseDeps({
 				sh: (_file, args) => {
 					if (args.includes(CLI_PATH)) return readyJsonOk("proc_a");
 					return "";
 				},
-				readFileSync: () => "processes:\n  proc_a:\n    label: x\n",
+				readFileSync: () => {
+					throw new Error("must not select a target");
+				},
 			}),
 		);
 		assert.deepEqual(result.issueTargets, []);
-		assert.equal(
-			result.issueError,
-			"no issue number found for process 'proc_a' in .pfdsl/roadmap.pfdsl",
-		);
+		assert.match(result.issueError, /Choose a target/);
+		assert.equal(result.ready[0].newlyReadyCount, 2);
 	});
 
-	it("preserves a best-process roadmap read failure as the gate-command error", async () => {
+	it("preserves an explicit target's roadmap read failure as the gate-command error", async () => {
 		const result = await runCycleStatus(
 			baseDeps({
+				issueNumbers: [42],
 				sh: (_file, args) => {
 					if (args.includes(CLI_PATH)) return readyJsonOk("proc_a");
 					return "";
@@ -560,7 +568,7 @@ describe("runCycleStatus", () => {
 			}),
 		);
 		assert.equal(result.gateCheckCommand, null);
-		assert.equal(result.gateCheckCommandError, "roadmap unreadable");
+		assert.match(result.gateCheckCommandError, /roadmap unreadable/);
 	});
 
 	it("reports issueTargets with the gh error when the gh issue lookup throws", async () => {
@@ -582,14 +590,12 @@ describe("runCycleStatus", () => {
 		);
 	});
 
-	// #794: the artifact named in the gate-check command comes from the process
-	// the resolved issue maps to in roadmap.pfdsl (via `graph neighbors`), not
-	// from bestOutputs — an --issue can name an issue that has nothing to do
-	// with the best process.
-	it("resolves the gate-check artifact through the process the best-process issue maps to", async () => {
+	// Resolve the artifact via the explicit issue's process and graph neighbors.
+	it("resolves the gate-check artifact through the explicit issue's process", async () => {
 		const calls = [];
 		const result = await runCycleStatus(
 			baseDeps({
+				issueNumbers: [42],
 				sh: (_file, args) => {
 					calls.push(args);
 					if (args.includes("neighbors"))
@@ -619,6 +625,7 @@ describe("runCycleStatus", () => {
 	it("takes the gate-check artifact from a primary successor, not a feedback one", async () => {
 		const result = await runCycleStatus(
 			baseDeps({
+				issueNumbers: [42],
 				sh: (_file, args) => {
 					if (args.includes("neighbors"))
 						return JSON.stringify({
@@ -769,12 +776,12 @@ describe("runCycleStatus", () => {
 		);
 	});
 
-	it("returns a null gate-check command when there is no best process", async () => {
+	it("returns a null gate-check command until a target is selected", async () => {
 		const result = await runCycleStatus(baseDeps());
 		assert.equal(result.gateCheckCommand, null);
 		assert.equal(
 			result.gateCheckCommandError,
-			"no --issue given and no best process to resolve a gate-check command",
+			"Choose a target and rerun with --issue <number> to resolve a gate-check command.",
 		);
 	});
 

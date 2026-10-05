@@ -14,8 +14,9 @@ on:
         options: [repair, validate]
         default: repair
 
+# Called jobs narrow their own permissions; only publication has write access.
 permissions:
-  contents: read
+  contents: write
   pull-requests: read
 
 concurrency:
@@ -23,125 +24,45 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  prepare:
+  attempt-1:
+    uses: ./.github/workflows/repair-generated-conflicts-attempt.yml
+    with:
+      pull-request: ${{ inputs.pull-request }}
+      mode: ${{ inputs.mode }}
+      attempt: 1
+    secrets:
+      REPO_AUTOMATION_APP_PRIVATE_KEY: ${{ secrets.REPO_AUTOMATION_APP_PRIVATE_KEY }}
+
+  attempt-2:
+    needs: attempt-1
+    if: needs.attempt-1.outputs.retry == 'true'
+    uses: ./.github/workflows/repair-generated-conflicts-attempt.yml
+    with:
+      pull-request: ${{ inputs.pull-request }}
+      mode: ${{ inputs.mode }}
+      attempt: 2
+    secrets:
+      REPO_AUTOMATION_APP_PRIVATE_KEY: ${{ secrets.REPO_AUTOMATION_APP_PRIVATE_KEY }}
+
+  attempt-3:
+    needs: attempt-2
+    if: needs.attempt-2.outputs.retry == 'true'
+    uses: ./.github/workflows/repair-generated-conflicts-attempt.yml
+    with:
+      pull-request: ${{ inputs.pull-request }}
+      mode: ${{ inputs.mode }}
+      attempt: 3
+    secrets:
+      REPO_AUTOMATION_APP_PRIVATE_KEY: ${{ secrets.REPO_AUTOMATION_APP_PRIVATE_KEY }}
+
+  retry-limit:
+    needs: attempt-3
+    if: needs.attempt-3.outputs.retry == 'true'
     runs-on: ubuntu-latest
-    timeout-minutes: 45
-    outputs:
-      changed: ${{ steps.repair.outputs.changed }}
+    permissions: {}
     steps:
-      - name: Check execution mode and workflow branch
-        env:
-          REPAIR_MODE: ${{ inputs.mode }}
+      - name: Explain repeated concurrent changes
         run: |
-          if [ "$REPAIR_MODE" != 'repair' ] && [ "$REPAIR_MODE" != 'validate' ]; then
-            echo '::error::Choose repair or validate as the execution mode.'
-            exit 1
-          fi
-          if [ "$REPAIR_MODE" = 'repair' ] && [ "$GITHUB_REF" != 'refs/heads/main' ]; then
-            echo '::error::Select main to publish a repair, or choose validate to check this workflow branch without pushing.'
-            {
-              echo '## Repair was not started'
-              echo
-              echo 'Select main in the Run workflow branch selector to publish a repair. To test a workflow branch before merge, choose validate instead.'
-              echo 'Publication must run from main so it uses trusted code. No repair was attempted and no changes were pushed.'
-            } >> "$GITHUB_STEP_SUMMARY"
-            exit 1
-          fi
-
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          path: control
-          persist-credentials: false
-
-      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
-        with:
-          package_json_file: control/package.json
-
-      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
-        with:
-          node-version: 24
-
-      - name: Freeze PR and main identities
-        id: snapshot
-        env:
-          GH_TOKEN: ${{ github.token }}
-          PR_NUMBER: ${{ inputs.pull-request }}
-        run: node control/scripts/repair-generated-conflicts.mjs snapshot "$GITHUB_REPOSITORY" "$PR_NUMBER"
-
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          ref: ${{ steps.snapshot.outputs.head }}
-          fetch-depth: 0
-          path: target
-          persist-credentials: false
-
-      # PR-controlled generators and tests execute with no publication token.
-      - name: Merge, regenerate, and verify
-        id: repair
-        run: node control/scripts/repair-generated-conflicts.mjs prepare "$GITHUB_WORKSPACE/target" "$RUNNER_TEMP/generated-repair"
-
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        if: steps.repair.outputs.changed == 'true'
-        with:
-          name: generated-repair
-          path: ${{ runner.temp }}/generated-repair/
-          retention-days: 3
-          if-no-files-found: error
-
-      - name: Summarize preparation
-        env:
-          REPAIR_MODE: ${{ inputs.mode }}
-          CHANGED: ${{ steps.repair.outputs.changed }}
-        run: |
-          {
-            if [ "$REPAIR_MODE" = 'validate' ]; then
-              echo '## Validation completed'
-              echo 'No publication token was created and no changes were pushed.'
-            else
-              echo '## Repair preparation completed'
-            fi
-            if [ "$CHANGED" = 'true' ]; then
-              echo 'The repair passed generation and verification. Its bundle is available in the generated-repair artifact.'
-            else
-              echo 'The PR is already synchronized; no repair commit is needed.'
-            fi
-          } >> "$GITHUB_STEP_SUMMARY"
-
-  publish:
-    needs: prepare
-    if: github.ref == 'refs/heads/main' && inputs.mode == 'repair' && needs.prepare.outputs.changed == 'true'
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    permissions:
-      contents: write
-      pull-requests: read
-    steps:
-      # This fresh runner executes only the workflow's trusted main code.
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          fetch-depth: 0
-          persist-credentials: false
-
-      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
-        with:
-          node-version: 24
-
-      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
-        with:
-          name: generated-repair
-          path: ${{ runner.temp }}/generated-repair
-
-      - uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
-        id: app-token
-        with:
-          client-id: ${{ vars.REPO_AUTOMATION_APP_CLIENT_ID }}
-          private-key: ${{ secrets.REPO_AUTOMATION_APP_PRIVATE_KEY }}
-          permission-contents: write
-          permission-workflows: write
-          permission-pull-requests: read
-
-      - name: Recheck identities and canonical merge, then push normally
-        env:
-          GH_TOKEN: ${{ steps.app-token.outputs.token }}
-          PR_NUMBER: ${{ inputs.pull-request }}
-        run: node scripts/repair-generated-conflicts.mjs publish "$GITHUB_WORKSPACE" "$RUNNER_TEMP/generated-repair"
+          echo '::error::The PR or conflicting main changes continued across three repair attempts. Rerun after those updates settle.'
+          echo 'Repair could not stabilize after three attempts. No repair was pushed. Rerun after the concurrent updates settle.' >> "$GITHUB_STEP_SUMMARY"
+          exit 1

@@ -17,7 +17,6 @@ import { resolve } from "node:path";
 import {
 	buildGateCheckCommand,
 	countBehind,
-	findIssueNumberForProcess,
 	findProcessIdForIssueNumber,
 	isUnregisteredManagedIssue,
 	parsePorcelainPaths,
@@ -174,7 +173,6 @@ export async function runCycleStatus({
 
 	const cliPath = resolve(root, "packages/cli/dist/cli.js");
 	let ready = [];
-	let best = null;
 	let readyError = null;
 	if (existsSync(cliPath)) {
 		try {
@@ -184,11 +182,10 @@ export async function runCycleStatus({
 					"status",
 					"ready",
 					".pfdsl/roadmap.pfdsl",
-					"--best",
 					"--json",
 				]),
 			);
-			({ ready, best } = parseReadyOutput(readyJson));
+			({ ready } = parseReadyOutput(readyJson));
 		} catch (e) {
 			readyError = e.message;
 		}
@@ -197,34 +194,10 @@ export async function runCycleStatus({
 			"packages/cli/dist/cli.js not built; run 'pnpm -r build' first";
 	}
 
-	// Explicit targets take precedence; otherwise resolve the best process.
+	// The operator selects targets explicitly from the ready decision material.
 	// These identify source material to read, not a design or approval verdict.
 	let issueError = null;
-	let targetIssues = [];
-	let targetSource = null;
-	// Read once and reused below for the gate-check artifact resolution — same
-	// file, whichever branch below (or that step) needs it first.
-	let roadmapText = null;
-	if (issueNumbers.length > 0) {
-		targetIssues = issueNumbers;
-		targetSource = "flag";
-	} else if (best) {
-		try {
-			roadmapText = readFileSync(
-				resolve(root, ".pfdsl/roadmap.pfdsl"),
-				"utf-8",
-			);
-			const found = findIssueNumberForProcess(roadmapText, best);
-			if (found) {
-				targetIssues = [found];
-				targetSource = "best-process";
-			} else {
-				issueError = `no issue number found for process '${best}' in .pfdsl/roadmap.pfdsl`;
-			}
-		} catch (e) {
-			issueError = e.message;
-		}
-	}
+	const targetIssues = issueNumbers;
 
 	const issueLookupFailures = [];
 	/** @type {Map<number, string[]>} label names of each issue actually fetched */
@@ -252,18 +225,15 @@ export async function runCycleStatus({
 					: issueLookupFailures
 							.map(({ issue, error }) => `issue ${issue}: ${error}`)
 							.join("; ");
-			issueError = issueError ? `${issueError}; ${lookupError}` : lookupError;
+			issueError = lookupError;
 		}
-	} else if (!issueError) {
+	} else {
 		issueError =
-			"no --issue given and no best process to resolve an issue number from";
+			"No --issue given. Choose a target from the ready list and rerun with --issue <number>; counts do not rank priority.";
 	}
 
-	// The artifact comes from the process each target issue maps to in
-	// roadmap.pfdsl, not from bestOutputs: an --issue may name an issue that has
-	// nothing to do with the best process, or one exempt from roadmap management
-	// entirely (the case for #800/#772/#794 themselves, all flow:exempt) — using
-	// bestOutputs there would silently attach an unrelated artifact (#794).
+	// The artifact comes from the process each explicit issue maps to in
+	// roadmap.pfdsl. Exempt issues may have no corresponding process.
 	// No resolvable process, or issues split across different processes, falls
 	// back to null rather than guessing; buildGateCheckCommand turns that into
 	// the --no-artifact equivalent.
@@ -274,16 +244,14 @@ export async function runCycleStatus({
 	/** @type {number[]} target issues with no flow label and no process yet */
 	const untriagedTargetIssues = [];
 	if (targetIssues.length > 0) {
-		if (roadmapText === null) {
-			try {
-				roadmapText = readFileSync(
-					resolve(root, ".pfdsl/roadmap.pfdsl"),
-					"utf-8",
-				);
-			} catch (e) {
-				roadmapText = null;
-				gateCheckCommandError = `failed to read .pfdsl/roadmap.pfdsl: ${e.message}`;
-			}
+		let roadmapText = null;
+		try {
+			roadmapText = readFileSync(
+				resolve(root, ".pfdsl/roadmap.pfdsl"),
+				"utf-8",
+			);
+		} catch (e) {
+			gateCheckCommandError = `failed to read .pfdsl/roadmap.pfdsl: ${e.message}`;
 		}
 		if (roadmapText !== null) {
 			const processIdByIssue = new Map(
@@ -363,9 +331,7 @@ export async function runCycleStatus({
 		}
 	} else {
 		gateCheckCommandError =
-			best && issueError
-				? issueError
-				: "no --issue given and no best process to resolve a gate-check command";
+			"Choose a target and rerun with --issue <number> to resolve a gate-check command.";
 	}
 	const gateCheckCommand = gateCheckCommandError
 		? null
@@ -382,10 +348,9 @@ export async function runCycleStatus({
 		openPRs,
 		releasePending,
 		ready,
-		best,
 		issueTargets: targetIssues.map((issue) => ({
 			issue,
-			source: targetSource,
+			source: "flag",
 		})),
 		manualChecks: [
 			"MANUAL: Before starting, read the primary issue records for every issueTargets entry and follow 適用点 1 で採用案と対案を比較して設計を決める in .pfdsl/bindings/pfd-ops.md. Resolve missing targets or failed reads first; this output does not verify design decisions or approvals.",

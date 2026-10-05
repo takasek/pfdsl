@@ -6,7 +6,7 @@
 
 ### 着手可能性と受け入れ
 
-入力 artifact が全て done の process を着手可能とし、並列着手集合は `pfdsl status ready <roadmap.pfdsl> --best --json` で機械的に導出する。roadmap 全文の目視で代用せず、優先順位の議論より先に列挙する。作業項目に着手する回は、この判断より先に下の4手順へ入り、起動口にかかわらず手順1の一部として判断する。
+入力 artifact が全て done で少なくとも1つの出力が活動可能な process を着手可能とし、並列着手集合は `pfdsl status ready <roadmap.pfdsl> --json` で機械的に導出する。roadmap 全文の目視で代用せず、優先順位の議論より先に列挙する。各工程の `newlyReadyCount` は全出力を done にした後の ready 集合から現在の集合を除いた件数であり、優先順位や重要度ではない。0件でも必要な入力を作る工程や終端納品がある。作業項目に着手する回は、この判断より先に下の4手順へ入り、起動口にかかわらず手順1の一部として判断する。
 
 新規作業は、成果物を生み他作業の着手をゲートする場合だけ依存グラフへ1チェーン追加する。他作業をゲートしないバグ修正、CI・build・tooling、図や文書の bookkeeping は載せない。backend 固有の分類は採用した L3 reference に従う。並列性・接点・合流点を確定し、方針の合否基準を下流作業なしで書けない相互依存は分割しない。
 
@@ -58,8 +58,8 @@ binding（`.pfdsl/bindings/pfd-ops.md`）に「ワークサイクルの追加手
 
 1. **選択**:
    - 手順1で CLI を使う前に pfdsl スキルの CLI プリフライトを実施し、要求版を満たす CLI の実行方法を確定する。採用リポ固有の CLI 実行規約がある場合は、その規約も適用する。
-   - `.pfdsl/roadmap.pfdsl` の着手可能プロセスを列挙する。`pfdsl status ready <roadmap.pfdsl> --best --json` で、入力 artifact が全て done のプロセス一覧と `--best` 推薦（合流点を解放するもの＝後続プロセスの最後の未完入力になっているもの）が JSON で得られる。着手可能集合が薄く「何が止めているか」を知りたい場合は `status blocked <roadmap.pfdsl>` で各未着手プロセスの未達入力 artifact を一覧できる（`graph stats` の fan-out と併せればボトルネックの優先度づけもできる）
-   - ユーザー指定があればそれを、なければ `best` の推薦を優先して1つ選ぶ。roadmap 非管理の作業項目（exempt 等）を識別子で指定された場合も本手順で処理する — ready 列挙に出ないことは cycle を通さない理由にならない（プリフライト・終端ゲート・retro は変更内容と独立に有効）。**ユーザー指定で入力 artifact が done でないプロセスを選んだ場合、「前提条件未達で着手する」とその理由を記録してから実行する**
+   - `.pfdsl/roadmap.pfdsl` の着手可能プロセスを列挙する。`pfdsl status ready <roadmap.pfdsl> --json` で、各工程の id・label・inputs・outputs・newlyReadyCount が得られる。テキストは件数を標準表示し、`--no-counts` で件数と説明だけを省略できる。JSON はこのオプションでも件数を含む。着手可能集合が薄く「何が止めているか」を知りたい場合は `status blocked <roadmap.pfdsl>` で各未着手プロセスの未達入力 artifact を一覧できる（`graph stats` の fan-out と併せればボトルネックの優先度づけもできる）
+   - ユーザー指定があればそれを、なければ目的・期限・工数と入力・出力を確認して1つ選ぶ。件数最大を自動的に選ばず、必要に応じて `meta get <roadmap.pfdsl> <process-id>` で、そのプロセスに登録された判断材料と作業項目の参照先を取得する。対象を決めた後は companion が指すプリフライトへその識別子を明示する。roadmap 非管理の作業項目（exempt 等）を識別子で指定された場合も本手順で処理する — ready 列挙に出ないことは cycle を通さない理由にならない（プリフライト・終端ゲート・retro は変更内容と独立に有効）。**ユーザー指定で入力 artifact が done でないプロセスを選んだ場合、「前提条件未達で着手する」とその理由を記録してから実行する**
    - binding の追加手順（手順 1）があればここで従う。
 2. **実行**: 作業項目の一次情報は roadmap.md が指すバックエンド。`.pfdsl/pipeline.pfdsl` が採用済み（scaffold のままでない）なら着手前に変換境界を確認し、実装スコープが境界を越えないか確かめる。scaffold のままなら該当なしとする — ファイルの実在と採用は別で、判定は上の「前提条件」と同じ scaffold 判定で行う。PFD の読み書きは pfdsl スキルの品質ガイドに従う。
    - binding の追加手順（手順 2）があればここで従う。

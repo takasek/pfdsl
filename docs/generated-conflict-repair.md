@@ -6,7 +6,7 @@ To test workflow changes before merge, select their branch and choose `validate`
 Validation runs the same merge, generation and verification, uploads a repair bundle if changes are needed, and reports the result in the Actions summary.
 It never starts the publication job, creates an App token or pushes changes.
 Selecting another workflow branch in repair mode stops before checkout and explains how to select main or use validate instead.
-The workflow integrates the latest main into that PR and regenerates the outputs owned by `scripts/lib/gen-plugin-outputs.mjs`.
+The workflow integrates main as observed at the start of preparation into that PR and regenerates the outputs owned by `scripts/lib/gen-plugin-outputs.mjs`.
 It also repairs tracked `.pfdsl/**/*.svg` snapshots when a matching tracked, regular sibling `.pfdsl` source is available without conflicts, including diagrams directly inside `.pfdsl`.
 This recursive scope matches the default paths of `render-pfdsl-svg.yml`.
 The default namespace is owned by `scripts/lib/operational-svg-contract.mjs`; CI checks the workflow's push paths, dispatch/call defaults and execution fallbacks against that contract.
@@ -45,8 +45,14 @@ The publisher independently derives eligible SVG paths from Git's automatic merg
 It verifies the change boundary, not the correctness of SVG bytes; rendering and tests run in preparation without a publication credential.
 After pushing, it verifies the branch through Git rather than the PR API, whose head information may lag behind the push.
 If that verification fails, the error states that the push already succeeded and asks you to check the branch before rerunning.
-If the PR or main changes while preparation runs, publication stops; rerun the workflow.
+If main advances while preparation runs, publication checks whether the verified repair merges cleanly with the newer main.
+When it does, the repair is published without changing its verified tree; use the standard Update branch action to integrate the newer main if needed.
+When conflicts remain, or the PR head or branch changes, the workflow automatically starts fresh preparation and verification on separate runners.
+It makes at most three attempts, using a distinct artifact for each attempt.
+If concurrent changes still prevent publication, the run reports the retry limit and asks you to rerun after the updates settle.
+Source conflicts, verification errors, authentication failures, and ambiguous post-push failures stop the run instead of retrying.
 An already synchronized PR produces no commit.
+Repair mode still rechecks concurrent updates with read-only permissions, even when preparation found no changes.
 
 Publication always uses the shared `takasek-pr-bot` GitHub App so repair pushes automatically trigger downstream PR checks.
 Configure repository variable `REPO_AUTOMATION_APP_CLIENT_ID` and secret `REPO_AUTOMATION_APP_PRIVATE_KEY` for an App installed on this repository.

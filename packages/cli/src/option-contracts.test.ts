@@ -5,7 +5,7 @@ import { COMMAND_GROUPS, run, TOP_LEVEL_COMMANDS } from "./index.js";
 // would silently bless a new, ineffective flag or a removed supported flag.
 // Effects are exercised by index.test.ts: strict/hints/JSON/TTY colour,
 // format/write/check, graph limit/field, metadata selectors/sort/reindex and
-// planning best/status. This inventory tests acceptance, not those effects.
+// planning counts/status. This inventory tests acceptance, not those effects.
 const PUBLIC_OPTIONS: Record<string, readonly string[]> = {
 	check: ["strict", "hints", "json", "no-color"],
 	explain: [],
@@ -32,7 +32,7 @@ const PUBLIC_OPTIONS: Record<string, readonly string[]> = {
 	"meta sort": ["by", "write", "check", "no-color"],
 	"meta reindex": ["write", "check", "renumber", "json", "no-color"],
 	"meta check-links": ["json", "no-color"],
-	"status ready": ["best", "json", "no-color"],
+	"status ready": ["no-counts", "json", "no-color"],
 	"status blocked": ["json", "no-color"],
 	"status list": ["status", "json", "no-color"],
 	"status gaps": ["json", "no-color"],

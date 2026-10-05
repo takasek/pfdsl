@@ -55,7 +55,7 @@ test("PR automation shares one credential and narrows token permissions per job"
 			{ contents: "write", "pull-requests": "write", workflows: "write" },
 		],
 		[
-			"repair-generated-conflicts.yml",
+			"repair-generated-conflicts-attempt.yml",
 			"publish",
 			{ contents: "write", "pull-requests": "read", workflows: "write" },
 		],

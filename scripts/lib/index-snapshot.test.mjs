@@ -143,6 +143,47 @@ it("reuses a fresh build when package inputs match the index", () =>
 		);
 	}));
 
+for (const kind of ["missing", "unstaged", "stale-entry", "stale-chunk"]) {
+	it(`reports why a ${kind} build cannot be reused`, () =>
+		fixture(({ root, write }) => {
+			const messages = [];
+			if (kind !== "missing") {
+				write(
+					"packages/core/dist/index.js",
+					'import { answer } from "./chunk.js"; console.log(answer);\n',
+				);
+				write("packages/core/dist/chunk.js", "export const answer = 42;\n");
+				const fresh = new Date(Date.now() + 2000);
+				for (const file of ["index.js", "chunk.js"])
+					utimesSync(join(root, "packages/core/dist", file), fresh, fresh);
+			}
+			if (kind === "unstaged") write("tsconfig.base.json", '{"strict":true}\n');
+			if (kind.startsWith("stale")) {
+				const file = kind === "stale-entry" ? "index.js" : "chunk.js";
+				const old = new Date("2000-01-01T00:00:00Z");
+				utimesSync(join(root, "packages/core/dist", file), old, old);
+			}
+			withIndexSnapshot(
+				root,
+				(snapshot) => {
+					assert.equal(
+						existsSync(join(snapshot, "packages/core/dist/index.js")),
+						false,
+					);
+				},
+				process.env,
+				{ onBuildDiagnostic: (message) => messages.push(message) },
+			);
+			const expected = {
+				missing: /packages\/core\/dist.*not built/,
+				unstaged: /inputs differ.*tsconfig\.base\.json/,
+				"stale-entry": /older than build inputs.*index\.js/,
+				"stale-chunk": /older than build inputs.*chunk\.js/,
+			};
+			assert.match(messages.join("\n"), expected[kind]);
+		}));
+}
+
 for (const directory of ["src", "scripts"]) {
 	for (const kind of [
 		"unstaged",
