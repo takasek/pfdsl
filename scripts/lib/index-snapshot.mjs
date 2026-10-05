@@ -88,7 +88,7 @@ export function withIndexSnapshot(
 	source,
 	run,
 	environment = process.env,
-	{ committed = false } = {},
+	{ committed = false, onBuildDiagnostic = console.error } = {},
 ) {
 	// Respect GIT_INDEX_FILE while freezing the input, then remove hook target
 	// overrides for every operation and child process inside the private repo.
@@ -141,6 +141,10 @@ export function withIndexSnapshot(
 			["ls-files", "--others", "--exclude-standard", "--", ...BUILD_INPUTS],
 			frozenEnvironment,
 		);
+		if (changedInputs || untrackedInputs)
+			onBuildDiagnostic(
+				`Build reuse rejected: inputs differ from the frozen ${committed ? "HEAD" : "index"} or are untracked: ${[changedInputs, untrackedInputs].join("\n").trim().split(/\n+/).join(", ")}. Stage or commit the intended inputs, then run 'pnpm -r build'.`,
+			);
 		if (
 			!changedInputs &&
 			!untrackedInputs &&
@@ -159,15 +163,23 @@ export function withIndexSnapshot(
 			);
 			for (const name of readdirSync(join(snapshot, "packages"))) {
 				const dist = join(source, "packages", name, "dist");
-				if (!existsSync(dist)) continue;
-				if (
-					readdirSync(dist).some(
-						(file) =>
-							isDistStale(join(dist, file)) ||
-							statSync(join(dist, file)).mtimeMs < newestInput,
-					)
-				)
+				if (!existsSync(dist)) {
+					onBuildDiagnostic(
+						`Build reuse rejected: packages/${name}/dist is not built. Run 'pnpm -r build' first.`,
+					);
 					continue;
+				}
+				const staleOutputs = readdirSync(dist).filter(
+					(file) =>
+						isDistStale(join(dist, file)) ||
+						statSync(join(dist, file)).mtimeMs < newestInput,
+				);
+				if (staleOutputs.length > 0) {
+					onBuildDiagnostic(
+						`Build reuse rejected: packages/${name}/dist has outputs older than build inputs: ${staleOutputs.join(", ")}. These can be stale referenced files or leftover outputs; freshness alone does not prove whether they are referenced. Run 'pnpm -r build' to rebuild and clean CLI outputs.`,
+					);
+					continue;
+				}
 				cpSync(dist, join(snapshot, "packages", name, "dist"), {
 					recursive: true,
 				});
