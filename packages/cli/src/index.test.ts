@@ -3261,7 +3261,7 @@ req >> design -> spec
 		const r = await run(["meta", "set", f, "spec", "status", "done"]);
 		expect(r.exitCode).toBe(1);
 		expect(r.stderr).toContain("'spec' has no frontmatter definition");
-		expect(r.stderr).toContain(`pfdsl meta create ${f} spec --write`);
+		expect(r.stderr).toContain(`pfdsl meta create --write -- ${f} spec`);
 		expect(readFileSync(f, "utf-8")).toBe("req >> design -> spec\n");
 	});
 
@@ -3274,7 +3274,7 @@ req >> design -> spec
 			ok: false,
 			missing: [],
 			undefinedIds: [{ id: "spec", kind: "artifact" }],
-			error: expect.stringContaining(`pfdsl meta create ${f} spec --write`),
+			error: expect.stringContaining(`pfdsl meta create --write -- ${f} spec`),
 		});
 	});
 

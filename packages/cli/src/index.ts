@@ -1470,6 +1470,12 @@ export function runMetaCreate(
 		: ok(newSrc);
 }
 
+/** Quote one argument for a copyable POSIX shell recovery command. */
+function quoteShellArgument(argument: string): string {
+	if (/^[A-Za-z0-9_./-]+$/.test(argument)) return argument;
+	return `'${argument.replaceAll("'", "'\\''")}'`;
+}
+
 export function runMetaSet(
 	file: string,
 	idList: string,
@@ -1532,7 +1538,7 @@ export function runMetaSet(
 	if (undefinedIds.length > 0) {
 		const messages = undefinedIds.map(
 			({ id, kind }) =>
-				`'${id}' has no frontmatter definition in ${file}. Run pfdsl meta create ${file} ${id}${kind === "artifact" && frontmatter?.type === "roadmap" ? " status=todo" : ""} --write before using meta set.`,
+				`'${id}' has no frontmatter definition in ${file}. Run pfdsl meta create --write -- ${quoteShellArgument(file)} ${quoteShellArgument(id)}${kind === "artifact" && frontmatter?.type === "roadmap" ? " status=todo" : ""} before using meta set.`,
 		);
 		if (missing.length > 0)
 			messages.push(`id(s) not found in ${file}: ${missing.join(", ")}`);

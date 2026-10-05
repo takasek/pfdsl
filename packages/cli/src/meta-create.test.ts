@@ -1,4 +1,11 @@
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { spawnSync } from "node:child_process";
+import {
+	existsSync,
+	mkdtempSync,
+	readFileSync,
+	rmSync,
+	writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { analyze } from "@pfdsl/core";
@@ -333,9 +340,105 @@ describe("meta create", () => {
 		]);
 		expect(result.exitCode).toBe(1);
 		expect(JSON.parse(result.stdout).error).toContain(
-			`pfdsl meta create ${file} p`,
+			`pfdsl meta create --write -- ${file} p`,
 		);
 		expect(readFileSync(file, "utf8")).toBe("a >> p -> b\n");
+	});
+
+	it.each([
+		{
+			name: "spaces",
+			fileName: "plan with spaces.pfdsl",
+			id: "release output",
+			kind: "artifact" as const,
+			json: false,
+		},
+		{
+			name: "single and double quotes",
+			fileName: `plan's "quoted".pfdsl`,
+			id: `release's "output"`,
+			kind: "process" as const,
+			json: true,
+		},
+		{
+			name: "option-like node IDs",
+			fileName: "option-like.pfdsl",
+			id: "--json",
+			kind: "process" as const,
+			json: true,
+		},
+		{
+			name: "shell substitutions and metacharacters",
+			fileName:
+				"plan $PFD_RECOVERY_TEST $(touch path-dollar) `touch path-backtick` ; * ? [x] \\.pfdsl",
+			id: "release $PFD_RECOVERY_TEST $(touch id-dollar) `touch id-backtick` ; * ? [x] \\ output",
+			kind: "artifact" as const,
+			json: true,
+		},
+	])("keeps $name literal when the recovery command is copied into a shell", async ({
+		fileName,
+		id,
+		kind,
+		json,
+	}) => {
+		file = join(dir, fileName);
+		const source =
+			kind === "artifact"
+				? `---\ntype: roadmap\nartifact:\n  a: { status: done }\n---\na >> p -> ${JSON.stringify(id)}\n`
+				: `a >> ${JSON.stringify(id)} -> b\n`;
+		writeFileSync(file, source);
+		const result = await run([
+			"meta",
+			"set",
+			file,
+			JSON.stringify(id),
+			"label",
+			"Created",
+			...(json ? ["--json"] : []),
+		]);
+		expect(result.exitCode).toBe(1);
+		expect(readFileSync(file, "utf8")).toBe(source);
+		const message = json ? JSON.parse(result.stdout).error : result.stderr;
+		const command = message.match(
+			/Run (pfdsl meta create --write -- [\s\S]+?) before using meta set\./,
+		)?.[1];
+		expect(command).toBeDefined();
+		// Capture the actual POSIX shell argument boundaries before running the CLI.
+		const shell = spawnSync(
+			"/bin/sh",
+			["-c", `pfdsl() { printf '%s\\0' "$@"; }\n${command}`],
+			{
+				cwd: dir,
+				encoding: "utf8",
+				env: { ...process.env, PFD_RECOVERY_TEST: "expanded" },
+			},
+		);
+		expect(shell.status, shell.stderr).toBe(0);
+		const args = shell.stdout.split("\0").slice(0, -1);
+		expect(args).toEqual([
+			"meta",
+			"create",
+			"--write",
+			"--",
+			file,
+			id,
+			...(kind === "artifact" ? ["status=todo"] : []),
+		]);
+		for (const marker of [
+			"path-dollar",
+			"path-backtick",
+			"id-dollar",
+			"id-backtick",
+		]) {
+			expect(existsSync(join(dir, marker))).toBe(false);
+		}
+		const created = await run(args);
+		expect(created.exitCode, created.stderr).toBe(0);
+		expect(
+			analyze(readFileSync(file, "utf8")).frontmatter?.[kind]?.[id],
+		).toEqual(
+			kind === "artifact" ? { label: id, status: "todo" } : { label: id },
+		);
 	});
 
 	it("documents creation, positional fields, previews and definition position", async () => {
