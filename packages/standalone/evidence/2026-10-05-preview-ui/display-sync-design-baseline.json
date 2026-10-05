@@ -1,0 +1,22 @@
+{
+	"ref": "origin/main",
+	"commit": "d1fd7d875e19c665086d6e99508fb2694ce1eac3",
+	"selectedPaths": [
+		"packages/editor/src/preview.ts",
+		"packages/standalone/src/document-tab.ts",
+		"packages/standalone/package.json",
+		"packages/editor/package.json"
+	],
+	"sourceSha256": {
+		"packages/editor/src/preview.ts": "26ee86b906cb60566e0666c0370585e3bafc2fc71db5722faae77113789f4082",
+		"packages/standalone/src/document-tab.ts": "6b080e43d6cd3492264d9bdca9b16376094c71d204b0171472560e763d9aeb6c",
+		"packages/standalone/package.json": "fd27ef5188d20693c4e3890f7b1c0a4e56bea6325ddfbe02b268356638b3b9d2",
+		"packages/editor/package.json": "94ed3999898a7a652a7364505b493d0c78ab717b9107ff40e8b28b128f6fc306"
+	},
+	"installedMonacoVersion": "0.57.0",
+	"reviewOriginalSha256": "c9de17c361af815e76126d49a90e82e37398f19916a8b7e53b941698461aeeeb",
+	"reviewStoredSha256": "2ac03c989ce5725c755702da03492f23c62c788988aab8981def61f081a29c89",
+	"normalization": "Baseline source links use exact-commit GitHub permalinks; baseline.json links point to this record; absolute checkout paths use <checkout>. This is a static independent design, not executed acceptance. Adoption review references point to the corresponding stored design/timing/Green records.",
+	"adoptionReviewOriginalSha256": "d9068a70049360aeca1a6618b91853b88f9ac7f0520e7921d23338494bbf24f2",
+	"adoptionReviewStoredSha256": "4fc41993b0f900e4351717d18ffa37fa2d7e29294c7ac5c4d912901d45ba1304"
+}

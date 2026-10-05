@@ -141,6 +141,52 @@ authored metadata の producer と JSON 往復、および consumer の判定を
 最終 corpus は固定した入力 snapshot を比較し、その後の GitHub updated_at 同期による運用図の日時変更は runtime code の検証と分ける。
 最終版の full native GUI 受入は実施しておらず、先の独立 GUI 観測版と区別する。
 
+### 2026-10-05 の表示同期の追加修正
+
+上の可視 editor と minimap の不一致は、追加の親による native 操作で `842cc46e…` の版でも再現した。
+主図と AX source は新しい Foreground redraw test へ更新された一方、可視 editor と minimap は Welcome to PFDSL のままだった。
+共有 preview の主図は同期で差し替わるが minimap は次の animation frame を待ち、Monaco の通常の行描画も frame を待つ経路だった。
+frame を実行しないテストで主図と minimap の差を再現し、hidden tab の更新で旧 minimap を残す条件も Red にした。
+修正後は render 完了時に主図と minimap を同期し、寸法を取れない hidden tab は旧 minimap を消して再表示時に現在の図から再構築する。
+standalone は対応する図を差し替える前に Monaco の公開 render API で表示用の行を更新する。
+OS 自体の repaint や、操作基盤が frame を抑制する理由まで確定した修正とは扱わない。
+
+[親の実行記録](evidence/2026-10-05-preview-ui/display-sync-parent.json)は、修正前後の binary、source の指紋、native 操作の転記、検査ログの指紋と証明範囲を保存する。
+修正後の binary は `e0a697fa4007ee13831bc79f4285264fc244048bd72f76d6ee4d23c57831a5a9`。
+同じ source 貼替えを通常起動した native app で行い、可視 editor・AX source・主図・minimap が Foreground redraw test に一致する画面を確認した。
+追加の回帰2件は Red→Green、editor 220件、extension 137件、standalone 5件、全 workspace の型検査と build、debug .app build が成功した。
+上の全体テスト（editor 218件）と23文書 corpus の記録は `dd5df03f` の固定証拠であり、追加修正後の全件実行として読み替えない。
+
+別の blind native reviewer も `e0a697fa…` で短い source の可視 editor・AX・主図・minimap の一致を確認した。
+ただし、長い現文書で Cmd+Up を実行すると論理 cursor と AX は先頭へ移る一方、可視 editor が末尾の行と caret を残す追加の反例を得た。
+[この版の native report](evidence/2026-10-05-preview-ui/native-display-recheck-report.md)は修正前の観測として凍結する。
+独立した実 Monaco と production browser でも、frame を停止した同じ先頭移動で末尾表示が残る Red を再現した。
+Monaco 0.57.0 の公開 cursor event は reveal と scroll の適用より先に届くため、cursor callback 内の直接 render だけでは旧 viewport を描く。
+content・cursor selection・scroll の公開 event を一つの microtask にまとめ、同じ操作の reveal 後に公開 render API を呼ぶよう修正した。
+破棄後の callback は抑止し、この表示更新では文書処理や Graphviz を再実行しない。
+
+[追加差分の独立レビュー](evidence/2026-10-05-preview-ui/browser-scroll-review.md)で品質・correctness と event 順序の主張を確認し、未解決の指摘はない。
+[実 browser の Red](evidence/2026-10-05-preview-ui/browser-scroll-red.json)から、同じ Cmd+Up・Cmd+Down・selection と collapse・direct wheel の [Green 4件](evidence/2026-10-05-preview-ui/browser-scroll-green.json)を確認した。
+可視行は viewport 内へ clip して物理位置で並べ、Monaco が再利用する DOM の挿入順を可視行順と取り違えた初回 checker の失敗を製品の Red と数えない。
+先頭移動後は1行目、wheel 後は3行目からの表示となり、主図/minimap の semantic ID は一致し、pageerror は空だった。
+callback 回数と破棄抑止は source の静的照合であり、production の計数実測は行っていない。
+追加修正の [独立設計](evidence/2026-10-05-preview-ui/display-sync-design-review.md)は、解答を含まない `origin/main d1fd7d87` の選択4ファイルから公開 API の同期描画と post-command の集約を導出した。
+[起点と指紋](evidence/2026-10-05-preview-ui/display-sync-design-baseline.json)に静的検討の範囲を固定し、最終差分・実行証拠のレビューと区別する。
+[採用理由の独立照合](evidence/2026-10-05-preview-ui/display-sync-adoption-review.md)では、通常の dirty flush、既存 layout の同期描画、microtask による同期再入の回避と寿命判定を installed Monaco に照合し、具体的な未解決 correctness finding はなかった。
+任意の自動 layout 条件や render 由来 event 連鎖の厳密な callback 上限は、追加実測の範囲に含めない。
+
+最終 native executable は `68a76bae1ff661517f48cbfdd07ca115fd4c9fa2b547de7cbfcf985b5c1e7a29`。
+[同じ試験入力の blind native 再実行](evidence/2026-10-05-preview-ui/native-scroll-recheck-report.md)では、Cmd+Up 直後の次の採取で可視 editor の1行目と caret が先頭へ更新し、採取前に tab 切替や Raise による修復を挟んでいない。
+短い source の一致、後続の tab 往復と現文書保持、実行 binary の前後 hash 一致、専用 process の終了も確認した。
+最初の本文・主図・minimap の版不一致と、追加の cursor/viewport の遅れは、この修正後の再現シナリオでは解消した。
+物理的な最初の frame の時刻、OS の前面状態、極小 minimap の全 label の視認性まで認定した記録ではない。
+
+[最終追加検査](evidence/2026-10-05-preview-ui/display-sync-final-checks.json)に build・全 workspace 型検査・standalone 5件・debug .app build の成功を保存した。
+[最終 native corpus](evidence/2026-10-05-preview-ui/display-sync-final-corpus.json)は同じ `68a76bae…` の23文書すべてが成功し、failures/errors は空だった。
+[入力指紋](evidence/2026-10-05-preview-ui/display-sync-final-fingerprints.json)は参照 HEAD と working-tree 入力を区別し、[専用 PID 73656 の終了記録](evidence/2026-10-05-preview-ui/display-sync-final-lifecycle.json)も残す。
+変更のない共有 editor 220件と extension 137件は先の追加修正の実行を再利用し、最終版の全 workspace test を再実行したとは扱わない。
+native hover・mouse pan・source cue・folder picker・安全な window close・IME、追加 VS Code preview 操作と所有者の UI 受入は引き続き未確認である。
+
 ## 検証記録と限界
 
 作業ブランチ: `codex/shared-ui-host-foundation`。

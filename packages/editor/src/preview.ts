@@ -416,6 +416,12 @@ export function mountPreview(container: HTMLElement, host: PreviewHost) {
 	let svgNatW = 0;
 	let svgNatH = 0;
 
+	function clearMinimap() {
+		minimapSvg.replaceChildren();
+		minimap.style.display = "none";
+		svgNatW = svgNatH = 0;
+	}
+
 	function updateMinimapVp() {
 		if (!svgNatW || !svgNatH) return;
 		const vp = minimapViewport(
@@ -705,9 +711,7 @@ export function mountPreview(container: HTMLElement, host: PreviewHost) {
 		error.hidden = false;
 		root.hidden = true;
 		inner.replaceChildren();
-		minimapSvg.replaceChildren();
-		minimap.style.display = "none";
-		svgNatW = svgNatH = 0;
+		clearMinimap();
 		tooltip.style.display = "none";
 		releaseDrag();
 		updateControls();
@@ -789,6 +793,9 @@ export function mountPreview(container: HTMLElement, host: PreviewHost) {
 				if (el.tagName === "title") el.remove();
 				else el.removeAttributeNS("http://www.w3.org/1999/xlink", "title");
 			}
+			// Keep both graphs on the same revision even when native frames pause.
+			clearMinimap();
+			positionGraph();
 			requestAnimationFrame(() => {
 				if (currentRevision !== revision) return;
 				positionGraph();

@@ -1,0 +1,129 @@
+{
+	"reviewDate": "2026-10-05",
+	"scope": "independent quality and correctness review of synchronization diff after dd5df03f and directly related consumers",
+	"unresolvedFindings": [],
+	"anchors": [
+		"packages/editor/src/preview.ts:419",
+		"packages/editor/src/preview.ts:555",
+		"packages/editor/src/preview.ts:758",
+		"packages/editor/src/preview.ts:796",
+		"packages/editor/src/preview-ux.test.ts:116",
+		"packages/editor/src/preview-ux.test.ts:137",
+		"packages/standalone/src/document-tab.ts:127",
+		"packages/standalone/src/document-tab.ts:151",
+		"packages/standalone/src/document-tab.ts:176",
+		"packages/standalone/src/document-tab.ts:185",
+		"packages/standalone/src/document-tab.ts:190",
+		"packages/standalone/src/main.ts:30"
+	],
+	"hashes": {
+		"packages/editor/src/preview.ts": "c04a17f8b43dd7c33a881cfb06e25aefae94936b1aa6a6e30164b6f6c7699bbc",
+		"packages/editor/src/preview-ux.test.ts": "1eb8bc90e8cb472b4e5889d2d72e84acd81d962f1f8292acd67121e9af982133",
+		"packages/standalone/src/document-tab.ts": "081c740651fc46bd8d74df2b3d9fbccb0e98e86b4eb676c398411bb2c994b888",
+		"packages/editor/dist/preview.js": "f3a8774c715c3fcbe132c80f4162920c1c8cf23037f835dc91fa8f33e7726b2f",
+		"packages/standalone/dist/assets/index-wCSxiLhi.js": "e1dcf67398971441d48540e8618916ca455c66e2f95793c91a3de2b5384a1463"
+	},
+	"controlledDomResults": [
+		{
+			"scenario": "paused frames commit matching main/minimap",
+			"status": "pass"
+		},
+		{
+			"scenario": "hidden update removes old minimap and show recovers new",
+			"status": "pass"
+		},
+		{
+			"scenario": "initial hidden/zero graph fits when shown",
+			"status": "pass"
+		},
+		{
+			"scenario": "zero-sized inner does not retain old minimap",
+			"status": "pass"
+		},
+		{
+			"scenario": "out-of-order graph completion retains newest pair",
+			"status": "pass"
+		},
+		{
+			"scenario": "stale renderer rejection cannot clear newer pair",
+			"status": "pass"
+		},
+		{
+			"scenario": "error invalidates deferred render and recovery restores pair",
+			"status": "pass"
+		},
+		{
+			"scenario": "dispose invalidates deferred render and queued frames",
+			"status": "pass"
+		},
+		{
+			"scenario": "manual pan/zoom survives redraw; explicit focus cue does not restart",
+			"status": "pass"
+		}
+	],
+	"productionBrowserResults": [
+		{
+			"scenario": "paused-frame edit settles visible Monaco and both SVGs",
+			"main": ["alpha_input", "alpha_output", "alpha_process"],
+			"minimap": ["alpha_input", "alpha_output", "alpha_process"],
+			"visibleSource": "alpha_input >> alpha_process -> alpha_output\n",
+			"status": "pass"
+		},
+		{
+			"scenario": "paused-frame one-step Undo/Redo restores visible source and both SVGs",
+			"status": "pass"
+		},
+		{
+			"scenario": "paused-frame tabs retain distinct visible sources and SVG pairs",
+			"status": "pass"
+		},
+		{
+			"scenario": "paused-frame error clears both SVGs and recovery restores visible source",
+			"status": "pass"
+		},
+		{
+			"scenario": "paused-frame manual pan/zoom preserved through edit after legitimate source focus; Fit usable",
+			"status": "pass",
+			"beforePan": "translate(160.55px, 405.9px) scale(1.1)",
+			"afterPan": "translate(205.55px, 435.9px) scale(1.1)",
+			"afterSourceFocus": "translate(363.03px, 407.739px) scale(1.1)",
+			"afterEdit": "translate(363.03px, 407.739px) scale(1.1)",
+			"fitTransform": "translate(144.5px, 409px) scale(1)",
+			"main": ["gamma_input", "gamma_output", "gamma_process"],
+			"minimap": ["gamma_input", "gamma_output", "gamma_process"],
+			"queuedFrameCount": 3
+		}
+	],
+	"browserPageErrors": [],
+	"invocationHistory": [
+		{ "kind": "controlled DOM", "exitCode": 0, "scenariosPassed": 9 },
+		{
+			"kind": "production browser initial fixture",
+			"exitCode": 1,
+			"stage": "startup",
+			"classification": "fixture expected Welcome IDs although the app starts on Japanese tab; timed out before stopped-frame test"
+		},
+		{
+			"kind": "production browser combined scenarios",
+			"exitCode": 1,
+			"scenariosPassed": 4,
+			"stage": "pan comparison",
+			"classification": "fixture compared before source-position focus against after edit; legitimate focus caused centering"
+		},
+		{
+			"kind": "production browser corrected pan scenario",
+			"exitCode": 0,
+			"scenariosPassed": 1,
+			"correction": "compare the redraw against the view after source-position focus/selection"
+		}
+	],
+	"monacoApiEvidence": "Installed codeEditorWidget.js:1249 calls view.render(true, forceRedraw); view.js:565 immediate branch invokes _flushAccumulatedAndRenderNow. Actual browser cases use the production Monaco lifecycle.",
+	"proofLimits": [
+		"Controlled DOM scenarios used controlled SVG promises and dimensions, not native GUI or real Graphviz.",
+		"Production browser scenarios used the actual app build, Monaco and Graphviz with deliberately queued page animation-frame callbacks.",
+		"Standalone processSnapshot revision/disposal checks were inspected; asynchronous/disposal execution directly exercised the shared preview.",
+		"Built-in browser tabs were used without native file I/O.",
+		"No native WebKit/compositor, IME, signing, distribution, all-device, or later-build certification."
+	],
+	"operations": "No checkout source or shared output edits, Git metadata operations, or external publication. Only requested temporary review artifacts were saved."
+}

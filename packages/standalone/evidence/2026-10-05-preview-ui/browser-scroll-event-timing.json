@@ -1,0 +1,759 @@
+{
+	"monacoVersion": "0.57.0",
+	"configuration": "Independent installed Monaco API harness, editContext=false; initial scheduling drained for 250ms before pausing each case",
+	"results": [
+		{
+			"mode": "none",
+			"before": {
+				"position": {
+					"lineNumber": 50,
+					"column": 1
+				},
+				"scrollTop": 655,
+				"paintedLines": [
+					"current_document_line_32",
+					"current_document_line_33",
+					"current_document_line_34",
+					"current_document_line_35",
+					"current_document_line_36",
+					"current_document_line_37",
+					"current_document_line_38",
+					"current_document_line_39",
+					"current_document_line_40",
+					"current_document_line_41",
+					"current_document_line_42",
+					"current_document_line_43",
+					"current_document_line_44",
+					"current_document_line_45",
+					"current_document_line_46",
+					"current_document_line_47",
+					"current_document_line_48",
+					"current_document_line_49",
+					"current_document_line_50"
+				]
+			},
+			"after": {
+				"snapshot": {
+					"position": {
+						"lineNumber": 1,
+						"column": 1
+					},
+					"scrollTop": 0,
+					"paintedLines": [
+						"current_document_line_32",
+						"current_document_line_33",
+						"current_document_line_34",
+						"current_document_line_35",
+						"current_document_line_36",
+						"current_document_line_37",
+						"current_document_line_38",
+						"current_document_line_39",
+						"current_document_line_40",
+						"current_document_line_41",
+						"current_document_line_42",
+						"current_document_line_43",
+						"current_document_line_44",
+						"current_document_line_45",
+						"current_document_line_46",
+						"current_document_line_47",
+						"current_document_line_48",
+						"current_document_line_49",
+						"current_document_line_50"
+					]
+				},
+				"events": [
+					{
+						"event": "cursor",
+						"before": {
+							"position": {
+								"lineNumber": 1,
+								"column": 1
+							},
+							"scrollTop": 655,
+							"paintedLines": [
+								"current_document_line_32",
+								"current_document_line_33",
+								"current_document_line_34",
+								"current_document_line_35",
+								"current_document_line_36",
+								"current_document_line_37",
+								"current_document_line_38",
+								"current_document_line_39",
+								"current_document_line_40",
+								"current_document_line_41",
+								"current_document_line_42",
+								"current_document_line_43",
+								"current_document_line_44",
+								"current_document_line_45",
+								"current_document_line_46",
+								"current_document_line_47",
+								"current_document_line_48",
+								"current_document_line_49",
+								"current_document_line_50"
+							]
+						},
+						"after": {
+							"position": {
+								"lineNumber": 1,
+								"column": 1
+							},
+							"scrollTop": 655,
+							"paintedLines": [
+								"current_document_line_32",
+								"current_document_line_33",
+								"current_document_line_34",
+								"current_document_line_35",
+								"current_document_line_36",
+								"current_document_line_37",
+								"current_document_line_38",
+								"current_document_line_39",
+								"current_document_line_40",
+								"current_document_line_41",
+								"current_document_line_42",
+								"current_document_line_43",
+								"current_document_line_44",
+								"current_document_line_45",
+								"current_document_line_46",
+								"current_document_line_47",
+								"current_document_line_48",
+								"current_document_line_49",
+								"current_document_line_50"
+							]
+						}
+					},
+					{
+						"event": "scroll",
+						"before": {
+							"position": {
+								"lineNumber": 1,
+								"column": 1
+							},
+							"scrollTop": 0,
+							"paintedLines": [
+								"current_document_line_32",
+								"current_document_line_33",
+								"current_document_line_34",
+								"current_document_line_35",
+								"current_document_line_36",
+								"current_document_line_37",
+								"current_document_line_38",
+								"current_document_line_39",
+								"current_document_line_40",
+								"current_document_line_41",
+								"current_document_line_42",
+								"current_document_line_43",
+								"current_document_line_44",
+								"current_document_line_45",
+								"current_document_line_46",
+								"current_document_line_47",
+								"current_document_line_48",
+								"current_document_line_49",
+								"current_document_line_50"
+							]
+						},
+						"after": {
+							"position": {
+								"lineNumber": 1,
+								"column": 1
+							},
+							"scrollTop": 0,
+							"paintedLines": [
+								"current_document_line_32",
+								"current_document_line_33",
+								"current_document_line_34",
+								"current_document_line_35",
+								"current_document_line_36",
+								"current_document_line_37",
+								"current_document_line_38",
+								"current_document_line_39",
+								"current_document_line_40",
+								"current_document_line_41",
+								"current_document_line_42",
+								"current_document_line_43",
+								"current_document_line_44",
+								"current_document_line_45",
+								"current_document_line_46",
+								"current_document_line_47",
+								"current_document_line_48",
+								"current_document_line_49",
+								"current_document_line_50"
+							]
+						}
+					}
+				],
+				"textarea": "current_document_line_01\ncurrent_document_line_02\ncurrent_document_line_03\ncurrent_document_line_04\ncurrent_document_line_05\ncurrent_document_line_06\ncurrent_document_line_07\ncurrent_document_line_08\ncurrent_document_line_09\ncurrent_document_line_10\ncurrent_document_line_11\ncurrent_document_line_12\ncurrent_document_line_13\ncurrent_document_line_14\ncurrent_document_line_15\ncurrent_document_line_16\ncurrent_document_line_17\ncurrent_document_line_18\ncurrent_document_line_19\ncurrent_document_line_20\n",
+				"queuedFrameCount": 1
+			}
+		},
+		{
+			"mode": "cursor",
+			"before": {
+				"position": {
+					"lineNumber": 50,
+					"column": 1
+				},
+				"scrollTop": 655,
+				"paintedLines": [
+					"current_document_line_32",
+					"current_document_line_33",
+					"current_document_line_34",
+					"current_document_line_35",
+					"current_document_line_36",
+					"current_document_line_37",
+					"current_document_line_38",
+					"current_document_line_39",
+					"current_document_line_40",
+					"current_document_line_41",
+					"current_document_line_42",
+					"current_document_line_43",
+					"current_document_line_44",
+					"current_document_line_45",
+					"current_document_line_46",
+					"current_document_line_47",
+					"current_document_line_48",
+					"current_document_line_49",
+					"current_document_line_50"
+				]
+			},
+			"after": {
+				"snapshot": {
+					"position": {
+						"lineNumber": 1,
+						"column": 1
+					},
+					"scrollTop": 0,
+					"paintedLines": [
+						"current_document_line_32",
+						"current_document_line_33",
+						"current_document_line_34",
+						"current_document_line_35",
+						"current_document_line_36",
+						"current_document_line_37",
+						"current_document_line_38",
+						"current_document_line_39",
+						"current_document_line_40",
+						"current_document_line_41",
+						"current_document_line_42",
+						"current_document_line_43",
+						"current_document_line_44",
+						"current_document_line_45",
+						"current_document_line_46",
+						"current_document_line_47",
+						"current_document_line_48",
+						"current_document_line_49",
+						"current_document_line_50"
+					]
+				},
+				"events": [
+					{
+						"event": "cursor",
+						"before": {
+							"position": {
+								"lineNumber": 1,
+								"column": 1
+							},
+							"scrollTop": 655,
+							"paintedLines": [
+								"current_document_line_32",
+								"current_document_line_33",
+								"current_document_line_34",
+								"current_document_line_35",
+								"current_document_line_36",
+								"current_document_line_37",
+								"current_document_line_38",
+								"current_document_line_39",
+								"current_document_line_40",
+								"current_document_line_41",
+								"current_document_line_42",
+								"current_document_line_43",
+								"current_document_line_44",
+								"current_document_line_45",
+								"current_document_line_46",
+								"current_document_line_47",
+								"current_document_line_48",
+								"current_document_line_49",
+								"current_document_line_50"
+							]
+						},
+						"after": {
+							"position": {
+								"lineNumber": 1,
+								"column": 1
+							},
+							"scrollTop": 655,
+							"paintedLines": [
+								"current_document_line_32",
+								"current_document_line_33",
+								"current_document_line_34",
+								"current_document_line_35",
+								"current_document_line_36",
+								"current_document_line_37",
+								"current_document_line_38",
+								"current_document_line_39",
+								"current_document_line_40",
+								"current_document_line_41",
+								"current_document_line_42",
+								"current_document_line_43",
+								"current_document_line_44",
+								"current_document_line_45",
+								"current_document_line_46",
+								"current_document_line_47",
+								"current_document_line_48",
+								"current_document_line_49",
+								"current_document_line_50"
+							]
+						}
+					},
+					{
+						"event": "scroll",
+						"before": {
+							"position": {
+								"lineNumber": 1,
+								"column": 1
+							},
+							"scrollTop": 0,
+							"paintedLines": [
+								"current_document_line_32",
+								"current_document_line_33",
+								"current_document_line_34",
+								"current_document_line_35",
+								"current_document_line_36",
+								"current_document_line_37",
+								"current_document_line_38",
+								"current_document_line_39",
+								"current_document_line_40",
+								"current_document_line_41",
+								"current_document_line_42",
+								"current_document_line_43",
+								"current_document_line_44",
+								"current_document_line_45",
+								"current_document_line_46",
+								"current_document_line_47",
+								"current_document_line_48",
+								"current_document_line_49",
+								"current_document_line_50"
+							]
+						},
+						"after": {
+							"position": {
+								"lineNumber": 1,
+								"column": 1
+							},
+							"scrollTop": 0,
+							"paintedLines": [
+								"current_document_line_32",
+								"current_document_line_33",
+								"current_document_line_34",
+								"current_document_line_35",
+								"current_document_line_36",
+								"current_document_line_37",
+								"current_document_line_38",
+								"current_document_line_39",
+								"current_document_line_40",
+								"current_document_line_41",
+								"current_document_line_42",
+								"current_document_line_43",
+								"current_document_line_44",
+								"current_document_line_45",
+								"current_document_line_46",
+								"current_document_line_47",
+								"current_document_line_48",
+								"current_document_line_49",
+								"current_document_line_50"
+							]
+						}
+					}
+				],
+				"textarea": "current_document_line_01\ncurrent_document_line_02\ncurrent_document_line_03\ncurrent_document_line_04\ncurrent_document_line_05\ncurrent_document_line_06\ncurrent_document_line_07\ncurrent_document_line_08\ncurrent_document_line_09\ncurrent_document_line_10\ncurrent_document_line_11\ncurrent_document_line_12\ncurrent_document_line_13\ncurrent_document_line_14\ncurrent_document_line_15\ncurrent_document_line_16\ncurrent_document_line_17\ncurrent_document_line_18\ncurrent_document_line_19\ncurrent_document_line_20\n",
+				"queuedFrameCount": 0
+			}
+		},
+		{
+			"mode": "scroll",
+			"before": {
+				"position": {
+					"lineNumber": 50,
+					"column": 1
+				},
+				"scrollTop": 655,
+				"paintedLines": [
+					"current_document_line_32",
+					"current_document_line_33",
+					"current_document_line_34",
+					"current_document_line_35",
+					"current_document_line_36",
+					"current_document_line_37",
+					"current_document_line_38",
+					"current_document_line_39",
+					"current_document_line_40",
+					"current_document_line_41",
+					"current_document_line_42",
+					"current_document_line_43",
+					"current_document_line_44",
+					"current_document_line_45",
+					"current_document_line_46",
+					"current_document_line_47",
+					"current_document_line_48",
+					"current_document_line_49",
+					"current_document_line_50"
+				]
+			},
+			"after": {
+				"snapshot": {
+					"position": {
+						"lineNumber": 1,
+						"column": 1
+					},
+					"scrollTop": 0,
+					"paintedLines": [
+						"current_document_line_01",
+						"current_document_line_02",
+						"current_document_line_03",
+						"current_document_line_04",
+						"current_document_line_05",
+						"current_document_line_06",
+						"current_document_line_07",
+						"current_document_line_08",
+						"current_document_line_09",
+						"current_document_line_10",
+						"current_document_line_11",
+						"current_document_line_12",
+						"current_document_line_13",
+						"current_document_line_14",
+						"current_document_line_15",
+						"current_document_line_16",
+						"current_document_line_17",
+						"current_document_line_18",
+						"current_document_line_19",
+						"current_document_line_20",
+						"current_document_line_21",
+						"current_document_line_22",
+						"current_document_line_23",
+						"current_document_line_24"
+					]
+				},
+				"events": [
+					{
+						"event": "cursor",
+						"before": {
+							"position": {
+								"lineNumber": 1,
+								"column": 1
+							},
+							"scrollTop": 655,
+							"paintedLines": [
+								"current_document_line_32",
+								"current_document_line_33",
+								"current_document_line_34",
+								"current_document_line_35",
+								"current_document_line_36",
+								"current_document_line_37",
+								"current_document_line_38",
+								"current_document_line_39",
+								"current_document_line_40",
+								"current_document_line_41",
+								"current_document_line_42",
+								"current_document_line_43",
+								"current_document_line_44",
+								"current_document_line_45",
+								"current_document_line_46",
+								"current_document_line_47",
+								"current_document_line_48",
+								"current_document_line_49",
+								"current_document_line_50"
+							]
+						},
+						"after": {
+							"position": {
+								"lineNumber": 1,
+								"column": 1
+							},
+							"scrollTop": 655,
+							"paintedLines": [
+								"current_document_line_32",
+								"current_document_line_33",
+								"current_document_line_34",
+								"current_document_line_35",
+								"current_document_line_36",
+								"current_document_line_37",
+								"current_document_line_38",
+								"current_document_line_39",
+								"current_document_line_40",
+								"current_document_line_41",
+								"current_document_line_42",
+								"current_document_line_43",
+								"current_document_line_44",
+								"current_document_line_45",
+								"current_document_line_46",
+								"current_document_line_47",
+								"current_document_line_48",
+								"current_document_line_49",
+								"current_document_line_50"
+							]
+						}
+					},
+					{
+						"event": "scroll",
+						"before": {
+							"position": {
+								"lineNumber": 1,
+								"column": 1
+							},
+							"scrollTop": 0,
+							"paintedLines": [
+								"current_document_line_32",
+								"current_document_line_33",
+								"current_document_line_34",
+								"current_document_line_35",
+								"current_document_line_36",
+								"current_document_line_37",
+								"current_document_line_38",
+								"current_document_line_39",
+								"current_document_line_40",
+								"current_document_line_41",
+								"current_document_line_42",
+								"current_document_line_43",
+								"current_document_line_44",
+								"current_document_line_45",
+								"current_document_line_46",
+								"current_document_line_47",
+								"current_document_line_48",
+								"current_document_line_49",
+								"current_document_line_50"
+							]
+						},
+						"after": {
+							"position": {
+								"lineNumber": 1,
+								"column": 1
+							},
+							"scrollTop": 0,
+							"paintedLines": [
+								"current_document_line_01",
+								"current_document_line_02",
+								"current_document_line_03",
+								"current_document_line_04",
+								"current_document_line_05",
+								"current_document_line_06",
+								"current_document_line_07",
+								"current_document_line_08",
+								"current_document_line_09",
+								"current_document_line_10",
+								"current_document_line_11",
+								"current_document_line_12",
+								"current_document_line_13",
+								"current_document_line_14",
+								"current_document_line_15",
+								"current_document_line_16",
+								"current_document_line_17",
+								"current_document_line_18",
+								"current_document_line_19",
+								"current_document_line_20",
+								"current_document_line_21",
+								"current_document_line_22",
+								"current_document_line_23",
+								"current_document_line_24"
+							]
+						}
+					}
+				],
+				"textarea": "current_document_line_01\ncurrent_document_line_02\ncurrent_document_line_03\ncurrent_document_line_04\ncurrent_document_line_05\ncurrent_document_line_06\ncurrent_document_line_07\ncurrent_document_line_08\ncurrent_document_line_09\ncurrent_document_line_10\ncurrent_document_line_11\ncurrent_document_line_12\ncurrent_document_line_13\ncurrent_document_line_14\ncurrent_document_line_15\ncurrent_document_line_16\ncurrent_document_line_17\ncurrent_document_line_18\ncurrent_document_line_19\ncurrent_document_line_20\n",
+				"queuedFrameCount": 0
+			}
+		},
+		{
+			"mode": "both",
+			"before": {
+				"position": {
+					"lineNumber": 50,
+					"column": 1
+				},
+				"scrollTop": 655,
+				"paintedLines": [
+					"current_document_line_32",
+					"current_document_line_33",
+					"current_document_line_34",
+					"current_document_line_35",
+					"current_document_line_36",
+					"current_document_line_37",
+					"current_document_line_38",
+					"current_document_line_39",
+					"current_document_line_40",
+					"current_document_line_41",
+					"current_document_line_42",
+					"current_document_line_43",
+					"current_document_line_44",
+					"current_document_line_45",
+					"current_document_line_46",
+					"current_document_line_47",
+					"current_document_line_48",
+					"current_document_line_49",
+					"current_document_line_50"
+				]
+			},
+			"after": {
+				"snapshot": {
+					"position": {
+						"lineNumber": 1,
+						"column": 1
+					},
+					"scrollTop": 0,
+					"paintedLines": [
+						"current_document_line_01",
+						"current_document_line_02",
+						"current_document_line_03",
+						"current_document_line_04",
+						"current_document_line_05",
+						"current_document_line_06",
+						"current_document_line_07",
+						"current_document_line_08",
+						"current_document_line_09",
+						"current_document_line_10",
+						"current_document_line_11",
+						"current_document_line_12",
+						"current_document_line_13",
+						"current_document_line_14",
+						"current_document_line_15",
+						"current_document_line_16",
+						"current_document_line_17",
+						"current_document_line_18",
+						"current_document_line_19",
+						"current_document_line_20",
+						"current_document_line_21",
+						"current_document_line_22",
+						"current_document_line_23",
+						"current_document_line_24"
+					]
+				},
+				"events": [
+					{
+						"event": "cursor",
+						"before": {
+							"position": {
+								"lineNumber": 1,
+								"column": 1
+							},
+							"scrollTop": 655,
+							"paintedLines": [
+								"current_document_line_32",
+								"current_document_line_33",
+								"current_document_line_34",
+								"current_document_line_35",
+								"current_document_line_36",
+								"current_document_line_37",
+								"current_document_line_38",
+								"current_document_line_39",
+								"current_document_line_40",
+								"current_document_line_41",
+								"current_document_line_42",
+								"current_document_line_43",
+								"current_document_line_44",
+								"current_document_line_45",
+								"current_document_line_46",
+								"current_document_line_47",
+								"current_document_line_48",
+								"current_document_line_49",
+								"current_document_line_50"
+							]
+						},
+						"after": {
+							"position": {
+								"lineNumber": 1,
+								"column": 1
+							},
+							"scrollTop": 655,
+							"paintedLines": [
+								"current_document_line_32",
+								"current_document_line_33",
+								"current_document_line_34",
+								"current_document_line_35",
+								"current_document_line_36",
+								"current_document_line_37",
+								"current_document_line_38",
+								"current_document_line_39",
+								"current_document_line_40",
+								"current_document_line_41",
+								"current_document_line_42",
+								"current_document_line_43",
+								"current_document_line_44",
+								"current_document_line_45",
+								"current_document_line_46",
+								"current_document_line_47",
+								"current_document_line_48",
+								"current_document_line_49",
+								"current_document_line_50"
+							]
+						}
+					},
+					{
+						"event": "scroll",
+						"before": {
+							"position": {
+								"lineNumber": 1,
+								"column": 1
+							},
+							"scrollTop": 0,
+							"paintedLines": [
+								"current_document_line_32",
+								"current_document_line_33",
+								"current_document_line_34",
+								"current_document_line_35",
+								"current_document_line_36",
+								"current_document_line_37",
+								"current_document_line_38",
+								"current_document_line_39",
+								"current_document_line_40",
+								"current_document_line_41",
+								"current_document_line_42",
+								"current_document_line_43",
+								"current_document_line_44",
+								"current_document_line_45",
+								"current_document_line_46",
+								"current_document_line_47",
+								"current_document_line_48",
+								"current_document_line_49",
+								"current_document_line_50"
+							]
+						},
+						"after": {
+							"position": {
+								"lineNumber": 1,
+								"column": 1
+							},
+							"scrollTop": 0,
+							"paintedLines": [
+								"current_document_line_01",
+								"current_document_line_02",
+								"current_document_line_03",
+								"current_document_line_04",
+								"current_document_line_05",
+								"current_document_line_06",
+								"current_document_line_07",
+								"current_document_line_08",
+								"current_document_line_09",
+								"current_document_line_10",
+								"current_document_line_11",
+								"current_document_line_12",
+								"current_document_line_13",
+								"current_document_line_14",
+								"current_document_line_15",
+								"current_document_line_16",
+								"current_document_line_17",
+								"current_document_line_18",
+								"current_document_line_19",
+								"current_document_line_20",
+								"current_document_line_21",
+								"current_document_line_22",
+								"current_document_line_23",
+								"current_document_line_24"
+							]
+						}
+					}
+				],
+				"textarea": "current_document_line_01\ncurrent_document_line_02\ncurrent_document_line_03\ncurrent_document_line_04\ncurrent_document_line_05\ncurrent_document_line_06\ncurrent_document_line_07\ncurrent_document_line_08\ncurrent_document_line_09\ncurrent_document_line_10\ncurrent_document_line_11\ncurrent_document_line_12\ncurrent_document_line_13\ncurrent_document_line_14\ncurrent_document_line_15\ncurrent_document_line_16\ncurrent_document_line_17\ncurrent_document_line_18\ncurrent_document_line_19\ncurrent_document_line_20\n",
+				"queuedFrameCount": 0
+			}
+		}
+	],
+	"proof": "Separate in-memory Monaco harness verifies event timing and queued paint; fingerprinted production Red is in report.json."
+}

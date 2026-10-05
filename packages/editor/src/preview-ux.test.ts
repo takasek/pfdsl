@@ -113,6 +113,45 @@ it("offers Fit and 100%, preserving manual view through redraw and error recover
 	expect(s.inner.style.transform).toBe("translate(16px, 58px) scale(0.23)");
 });
 
+it("commits the main graph and minimap together while animation frames are paused", async () => {
+	const s = setup();
+	await s.preview.receive({ type: "render", dot: "old" });
+	s.flush();
+	await s.preview.receive({ type: "render", dot: "new" });
+	expect(
+		s.inner.querySelector("[data-node-id]")?.getAttribute("data-node-id"),
+	).toBe("new");
+	expect(
+		s.container
+			.querySelector("#minimap-svg [data-node-id]")
+			?.getAttribute("data-node-id"),
+	).toBe("new");
+	s.flush();
+	expect(
+		s.container
+			.querySelector("#minimap-svg [data-node-id]")
+			?.getAttribute("data-node-id"),
+	).toBe("new");
+});
+
+it("does not retain a prior minimap when a new graph commits in a hidden tab", async () => {
+	const s = setup();
+	await s.preview.receive({ type: "render", dot: "old" });
+	s.flush();
+	s.hide();
+	await s.preview.receive({ type: "render", dot: "new" });
+	expect(
+		s.container.querySelector("#minimap-svg [data-node-id='old']"),
+	).toBeNull();
+	s.show();
+	window.dispatchEvent(new Event("resize"));
+	expect(
+		s.container
+			.querySelector("#minimap-svg [data-node-id]")
+			?.getAttribute("data-node-id"),
+	).toBe("new");
+});
+
 it.each([
 	"parse",
 	"renderer",

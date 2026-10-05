@@ -1,4 +1,5 @@
 {
+	"snapshotCommit": "dd5df03f5808025a527075cacc681d5aadae1c95",
 	"checkout": "<checkout>",
 	"branch": "codex/issue-1352-preview-editing",
 	"base": "f1eb449d",

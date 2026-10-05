@@ -52,6 +52,18 @@ export function createDocumentTab({
 		fontSize: 14,
 		renderWhitespace: "selection",
 	});
+	let editorRenderQueued = false;
+	function requestEditorRender() {
+		if (disposed || editorRenderQueued) return;
+		editorRenderQueued = true;
+		// Reveal/scroll events can follow cursor events within the same operation.
+		queueMicrotask(() => {
+			editorRenderQueued = false;
+			if (!disposed) editor.render();
+		});
+	}
+	editor.onDidScrollChange(requestEditorRender);
+	editor.onDidChangeCursorSelection(requestEditorRender);
 	const button = document.createElement("button");
 	button.textContent = name;
 	button.setAttribute("role", "tab");
@@ -148,6 +160,8 @@ export function createDocumentTab({
 				endColumn: d.range.end.column,
 			})),
 		);
+		// Publish the editor's visible lines before replacing the matching graph.
+		editor.render();
 		await preview.receive(result.message);
 	}
 
@@ -156,6 +170,7 @@ export function createDocumentTab({
 	}
 	editor.onDidChangeModelContent(() => {
 		button.textContent = `${name}${editor.getValue() === source ? "" : " •"}`;
+		requestEditorRender();
 		requestRefresh();
 	});
 	editor.onDidChangeCursorPosition((event) => {

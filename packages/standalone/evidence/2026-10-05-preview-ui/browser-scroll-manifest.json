@@ -1,0 +1,82 @@
+{
+	"scope": "Independent production-browser viewport Red, installed Monaco event timing, and final incremental source/Green review. Native observations are stored in separate native manifests.",
+	"normalization": "Only the absolute checkout path is replaced with <checkout>; JSON is canonically formatted. Original and stored hashes identify that boundary. Stored review copies append a note distinguishing original-directory basenames from their stored manifest names.",
+	"entries": [
+		{
+			"source": "/private/tmp/pfdsl-monaco-scroll-red-01a10a12/report.json",
+			"stored": "browser-scroll-red.json",
+			"originalSha256": "1858492e50e8a1fe5ba2688f52eff7045f1be0e8f76e6ba0e27e10b7d3878fdc",
+			"storedSha256": "2b970fabb916a6542881f32e34e627d15c1084ddf57018fa1bc38321cac3a72d",
+			"storedBytes": 13694
+		},
+		{
+			"source": "/private/tmp/pfdsl-monaco-scroll-red-01a10a12/review.md",
+			"stored": "browser-scroll-red-review.md",
+			"originalSha256": "5dae26be5369f3845b35cfee276d2f373b6721264e08fe0a07396b0fbf25f2c5",
+			"storedSha256": "1643e2bdab133ff8ff7fa898cd94a9f299c3999aaa48934cf648e3cb1f198a4f",
+			"storedBytes": 2801
+		},
+		{
+			"source": "/private/tmp/pfdsl-monaco-scroll-red-01a10a12/public-event-timing-settled.json",
+			"stored": "browser-scroll-event-timing.json",
+			"originalSha256": "03e7c1779d0c0455d7ddacbd8123ec87136cecfb998488e016e5e71332bae4a9",
+			"storedSha256": "cd0d3a77a2d2342662679de666c59061bdf1b6d9e5a0a1f44b98a742e6b80379",
+			"storedBytes": 23583
+		},
+		{
+			"source": "/private/tmp/pfdsl-monaco-scroll-red-01a10a12/01-current-tail.png",
+			"stored": "browser-scroll-red-tail.png",
+			"originalSha256": "78c8c77d9aea401b26b5559f04552bf5374b7a32424750a1a7e7ae5927d7e477",
+			"storedSha256": "78c8c77d9aea401b26b5559f04552bf5374b7a32424750a1a7e7ae5927d7e477",
+			"storedBytes": 116451
+		},
+		{
+			"source": "/private/tmp/pfdsl-monaco-scroll-red-01a10a12/02-cmd-up-paused.png",
+			"stored": "browser-scroll-red-cmd-up.png",
+			"originalSha256": "78c8c77d9aea401b26b5559f04552bf5374b7a32424750a1a7e7ae5927d7e477",
+			"storedSha256": "78c8c77d9aea401b26b5559f04552bf5374b7a32424750a1a7e7ae5927d7e477",
+			"storedBytes": 116451
+		},
+		{
+			"source": "/private/tmp/pfdsl-monaco-scroll-red-01a10a12/03-tab-return.png",
+			"stored": "browser-scroll-red-tab-return.png",
+			"originalSha256": "a3ecd11eedb3b99ef966c3dd684a2a210e3c0fa9f3a4cb1f5399be0551205922",
+			"storedSha256": "a3ecd11eedb3b99ef966c3dd684a2a210e3c0fa9f3a4cb1f5399be0551205922",
+			"storedBytes": 129161
+		},
+		{
+			"source": "/private/tmp/pfdsl-monaco-scroll-green-01a10a12-physical/report.json",
+			"stored": "browser-scroll-green.json",
+			"originalSha256": "ea97107eb4a969ab61775c190913c41f715873d3cb3512f03663af6b36c9d435",
+			"storedSha256": "20f70623bedf6ef3afec40507a9d08250199085637664e7e036e0cb34aefdf6d",
+			"storedBytes": 30701
+		},
+		{
+			"source": "/private/tmp/pfdsl-monaco-scroll-green-01a10a12-physical/review.md",
+			"stored": "browser-scroll-review.md",
+			"originalSha256": "64cf411d5f99ce71eee2fb269d4517b3a6426a5e122e254ec9bfc783d4ccda98",
+			"storedSha256": "7e94e55808b50f7376ff1095037ea429d87b7b19ec950382dae8b75c7d802b4e",
+			"storedBytes": 3463
+		},
+		{
+			"source": "/private/tmp/pfdsl-monaco-scroll-green-01a10a12-physical/01-cmd-up.png",
+			"stored": "browser-scroll-green-cmd-up.png",
+			"originalSha256": "a4f5e3179489e04379f12f0a3241f94f1654a8f02582c4b5593a2ad5ff56fcd8",
+			"storedSha256": "a4f5e3179489e04379f12f0a3241f94f1654a8f02582c4b5593a2ad5ff56fcd8",
+			"storedBytes": 129152
+		},
+		{
+			"source": "/private/tmp/pfdsl-monaco-scroll-green-01a10a12-physical/02-direct-scroll.png",
+			"stored": "browser-scroll-green-wheel.png",
+			"originalSha256": "461498835e7994ccdf64efcf811b6351a1cd486ea15e9fec01a75c3a94fd90a9",
+			"storedSha256": "461498835e7994ccdf64efcf811b6351a1cd486ea15e9fec01a75c3a94fd90a9",
+			"storedBytes": 134811
+		}
+	],
+	"limits": [
+		"The event-timing harness is separate from the production build.",
+		"The first Green checker used DOM insertion order and failed an unsuitable assertion; its history is described in the independent review and is not a product Red.",
+		"The final report clips lines to the viewport and sorts by physical top.",
+		"Callback counts and dispose suppression were reviewed statically, not instrumented in the production app."
+	]
+}
