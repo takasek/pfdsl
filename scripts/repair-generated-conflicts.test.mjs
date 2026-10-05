@@ -6,6 +6,7 @@ import {
 	mkdtempSync,
 	readFileSync,
 	rmSync,
+	symlinkSync,
 	writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
@@ -15,6 +16,7 @@ import { parse } from "yaml";
 import {
 	isGeneratedPath,
 	mergeGeneratedConflicts,
+	regenerateOperationalSvgs,
 	validatePull,
 	verifyRepair,
 } from "./repair-generated-conflicts.mjs";
@@ -77,7 +79,7 @@ test("generated ownership uses path boundaries and excludes canonical sources", 
 	}
 });
 
-function fixture(t, canonicalConflict = false) {
+function fixture(t, canonicalConflict = false, svg = false) {
 	const root = mkdtempSync(join(tmpdir(), "generated-repair-test-"));
 	t.after(() => rmSync(root, { recursive: true, force: true }));
 	const git = (...args) =>
@@ -98,19 +100,165 @@ function fixture(t, canonicalConflict = false) {
 	git("init", "-b", "main");
 	put("source.txt", "original\n");
 	put("plugin/output.txt", "original\n");
+	if (svg) {
+		put(".pfdsl/pipeline.pfdsl", "first\nmiddle\nlast\n");
+		put(".pfdsl/pipeline.svg", "original svg\n");
+	}
 	commit("initial");
 	git("switch", "-c", "feature");
 	put("plugin/output.txt", "feature\n");
 	put("feature.txt", "feature\n");
-	if (canonicalConflict) put("source.txt", "feature\n");
+	if (svg) {
+		put(".pfdsl/pipeline.pfdsl", "feature\nmiddle\nlast\n");
+		put(".pfdsl/pipeline.svg", "feature svg\n");
+	}
+	if (canonicalConflict === true) put("source.txt", "feature\n");
 	const head = commit("feature");
 	git("switch", "main");
 	put("plugin/output.txt", "main\n");
+	if (svg) {
+		put(
+			".pfdsl/pipeline.pfdsl",
+			canonicalConflict === "diagram"
+				? "main\nmiddle\nlast\n"
+				: "first\nmiddle\nmain\n",
+		);
+		put(".pfdsl/pipeline.svg", "main svg\n");
+	}
 	put("source.txt", "main\n");
 	const base = commit("main update");
 	git("switch", "feature");
 	return { root, git, put, head, base, commit };
 }
+
+test("operational SVG conflicts preserve automatically merged canonical source", (t) => {
+	const f = fixture(t, false, true);
+	assert.ok(
+		mergeGeneratedConflicts(f.root, f.head, f.base).includes(
+			".pfdsl/pipeline.svg",
+		),
+	);
+	assert.equal(
+		readFileSync(join(f.root, ".pfdsl/pipeline.pfdsl"), "utf8"),
+		"feature\nmiddle\nmain\n",
+	);
+	f.put(".pfdsl/pipeline.svg", "regenerated svg\n");
+	const repaired = f.commit("regenerate SVG");
+	assert.doesNotThrow(() => verifyRepair(f.root, f.head, f.base, repaired));
+});
+
+test("publisher rejects SVGs without a tracked matching operational source", (t) => {
+	const f = fixture(t);
+	mergeGeneratedConflicts(f.root, f.head, f.base);
+	f.put(".pfdsl/unknown.svg", "unowned\n");
+	assert.throws(
+		() => verifyRepair(f.root, f.head, f.base, f.commit("unowned output")),
+		/unknown.svg/,
+	);
+});
+
+test("renderer consumes merged source, excludes orphan and nested SVGs, and preserves output on failure", (t) => {
+	const f = fixture(t, false, true);
+	mergeGeneratedConflicts(f.root, f.head, f.base);
+	f.put(".pfdsl/orphan.svg", "orphan\n");
+	f.put(".pfdsl/nested/diagram.pfdsl", "nested\n");
+	f.put(".pfdsl/nested/diagram.svg", "nested svg\n");
+	f.put(".pfdsl/workflow.pfdsl", "workflow source\n");
+	f.put(".pfdsl/workflow.svg", "workflow svg\n");
+	symlinkSync("../source.txt", join(f.root, ".pfdsl/linked.pfdsl"));
+	f.put(".pfdsl/linked.svg", "linked svg\n");
+	f.put(
+		"packages/cli/dist/cli.js",
+		`const fs=require('node:fs');
+if(process.env.GH_TOKEN || process.env.GITHUB_TOKEN)process.exit(2);
+if(process.env.REPAIR_TEST_RENDER_FAIL)process.exit(1);
+process.stdout.write('<svg>'+fs.readFileSync(process.argv[3],'utf8')+'</svg>');`,
+	);
+	f.git("add", "-A");
+	const tree = f.git("write-tree");
+	assert.deepEqual(regenerateOperationalSvgs(f.root, tree), [
+		".pfdsl/pipeline.svg",
+		".pfdsl/workflow.svg",
+	]);
+	assert.equal(
+		readFileSync(join(f.root, ".pfdsl/workflow.svg"), "utf8"),
+		"<svg>workflow source\n</svg>",
+	);
+	assert.equal(
+		readFileSync(join(f.root, ".pfdsl/linked.svg"), "utf8"),
+		"linked svg\n",
+	);
+	const expected = "<svg>feature\nmiddle\nmain\n</svg>";
+	assert.equal(
+		readFileSync(join(f.root, ".pfdsl/pipeline.svg"), "utf8"),
+		expected,
+	);
+	assert.equal(
+		readFileSync(join(f.root, ".pfdsl/orphan.svg"), "utf8"),
+		"orphan\n",
+	);
+	f.put("packages/cli/dist/cli.js", "process.exit(1)");
+	assert.throws(() => regenerateOperationalSvgs(f.root, tree));
+	assert.equal(
+		readFileSync(join(f.root, ".pfdsl/pipeline.svg"), "utf8"),
+		expected,
+	);
+});
+
+test("a canonical conflict leaves the SVG unresolved and cannot be smuggled through publication", (t) => {
+	const f = fixture(t, "diagram", true);
+	assert.throws(
+		() => mergeGeneratedConflicts(f.root, f.head, f.base),
+		/pipeline.pfdsl/,
+	);
+	assert.match(f.git("diff", "--name-only", "--diff-filter=U"), /pipeline.svg/);
+	assert.throws(
+		() => verifyRepair(f.root, f.head, f.base, f.commit("invalid markers")),
+		/pipeline.pfdsl/,
+	);
+});
+
+test("renderer cannot modify plugin or canonical files or create new files", (t) => {
+	for (const path of ["source.txt", "plugin/output.txt", "unexpected.txt"]) {
+		const f = fixture(t, false, true);
+		mergeGeneratedConflicts(f.root, f.head, f.base);
+		f.put(
+			"packages/cli/dist/cli.js",
+			`require('node:fs').writeFileSync(${JSON.stringify(path)},'tampered');process.stdout.write('<svg/>');`,
+		);
+		f.git("add", "-A");
+		assert.throws(
+			() => regenerateOperationalSvgs(f.root, f.git("write-tree")),
+			/outside|unexpected/,
+		);
+	}
+});
+
+test("publisher rejects symlink SVG replacement and canonical diagram edits", (t) => {
+	for (const kind of ["symlink", "source"]) {
+		const f = fixture(t, false, true);
+		mergeGeneratedConflicts(f.root, f.head, f.base);
+		if (kind === "symlink") {
+			rmSync(join(f.root, ".pfdsl/pipeline.svg"));
+			symlinkSync("../source.txt", join(f.root, ".pfdsl/pipeline.svg"));
+		} else f.put(".pfdsl/pipeline.pfdsl", "tampered\n");
+		assert.throws(
+			() => verifyRepair(f.root, f.head, f.base, f.commit("invalid repair")),
+			/pipeline/,
+		);
+	}
+});
+
+test("a mixed regular and symlink SVG conflict requires manual resolution", (t) => {
+	const f = fixture(t, false, true);
+	rmSync(join(f.root, ".pfdsl/pipeline.svg"));
+	symlinkSync("../source.txt", join(f.root, ".pfdsl/pipeline.svg"));
+	const head = f.commit("symlink output");
+	assert.throws(
+		() => mergeGeneratedConflicts(f.root, head, f.base),
+		/pipeline/,
+	);
+});
 
 test("real Git merge preserves both source changes and regenerates generated conflicts", (t) => {
 	const f = fixture(t);
