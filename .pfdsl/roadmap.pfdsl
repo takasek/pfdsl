@@ -171,10 +171,6 @@ artifact:
     location: https://github.com/takasek/pfdsl/releases
     externalStakeholders: [ macOS 利用者 ]
 process:
-  i1345_implement_ready_counts:
-    label: 各工程の新規 ready 数と対象選択を実装する
-    location: https://github.com/takasek/pfdsl/issues/1345
-    updated_at: 2026-10-05T01:03:40Z
   publish_cli_ready_counts:
     label: 新規 ready 数を示す CLI と plugin を公開する
   i119_publish_extension:
@@ -249,8 +245,6 @@ statusStyles:
 ---
 
 toolchain >> i119_publish_extension -> published_extension
-
-toolchain >> i1345_implement_ready_counts -> ready_counts_cli
 
 ready_counts_cli >> publish_cli_ready_counts -> cli_release_ready_counts
 
