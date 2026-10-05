@@ -19,9 +19,10 @@ const git = (args) => rawGit(args, { captureStderr: true });
 import { runReleaseGates } from "./lib/release-gates.mjs";
 import {
 	compareVersions,
+	formatPluginBundleStatus,
 	formatResults,
-	formatSkillBundleStatus,
 	needsAction,
+	readPluginBundleStatus,
 } from "./lib/release-status-check.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -184,10 +185,7 @@ const results = await Promise.all(
 	}),
 );
 
-// .claude/skills and .claude/commands are bundled into @pfdsl/cli's dist at
-// build time (tsup.config.ts onSuccess) and only reach adopting repos via a
-// CLI release — editing them doesn't touch packages/cli/package.json, so the
-// per-package commitsAhead check above misses this drift entirely.
+// CLI and plugin releases share v* tags, but their delivered contents differ.
 function findLatestCliTag() {
 	try {
 		// 'v[0-9]*' (not 'v*') so this matches CLI tags like v0.0.17 without
@@ -205,32 +203,8 @@ function findLatestCliTag() {
 	}
 }
 
-// Keep in sync with tsup.config.ts's onSuccess allowlist — .claude/skills/
-// also holds skills that aren't bundled into the CLI (spec-stress-test,
-// vscode-ext-debug), which would be false positives here.
-const BUNDLED_SKILL_DIRS = [
-	"pfd-ops",
-	"pfd-retro",
-	"pfd-ecosystem",
-	"pfdsl",
-].map((name) => `.claude/skills/${name}`);
-
-function countSkillBundleCommits(sinceTag) {
-	if (!sinceTag) return 0;
-	try {
-		const paths = [...BUNDLED_SKILL_DIRS, ".claude/commands"];
-		const out = git(["log", `${sinceTag}..HEAD`, "--oneline", "--", ...paths]);
-		return out.trim().split("\n").filter(Boolean).length;
-	} catch (e) {
-		console.warn(
-			`warn: could not count skill bundle commits since ${sinceTag}: ${e.message}`,
-		);
-		return 0;
-	}
-}
-
-const skillBundleTag = findLatestCliTag();
-const skillBundleCommits = countSkillBundleCommits(skillBundleTag);
+const pluginBundleTag = findLatestCliTag();
+const pluginBundle = readPluginBundleStatus(git, pluginBundleTag);
 
 const gates = runReleaseGates(root, { mode: "status" });
 for (const gate of gates) {
@@ -239,12 +213,12 @@ for (const gate of gates) {
 
 console.log("release-status:");
 console.log(formatResults(results));
-console.log(formatSkillBundleStatus(skillBundleCommits, skillBundleTag));
+console.log(formatPluginBundleStatus(pluginBundle, pluginBundleTag));
 for (const gate of gates) console.log(gate.lines.join("\n"));
 
 const pending = needsAction({
 	results,
-	skillBundleCommits,
+	pluginChangedFiles: pluginBundle.changedFiles,
 	gates,
 });
 if (pending) process.exit(1);
