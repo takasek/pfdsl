@@ -4,9 +4,11 @@ import { spawn, spawnSync } from "node:child_process";
 import { createHash, randomUUID } from "node:crypto";
 import {
 	existsSync,
+	lstatSync,
 	mkdirSync,
 	readdirSync,
 	readFileSync,
+	readlinkSync,
 	realpathSync,
 	renameSync,
 	rmSync,
@@ -16,6 +18,10 @@ import {
 } from "node:fs";
 import { basename, dirname, join, resolve } from "node:path";
 import { isCliEntrypoint } from "./lib/cli-entrypoint.mjs";
+import {
+	decideSkillLinkAction,
+	SKILL_LINK_TARGET,
+} from "./lib/repo-skill-link.mjs";
 
 export const SETUP_INPUTS = [
 	".npmrc",
@@ -26,6 +32,7 @@ export const SETUP_INPUTS = [
 	"pnpm-workspace.yaml",
 	"scripts/hooks/pre-commit-shim",
 	"scripts/lib/cli-entrypoint.mjs",
+	"scripts/lib/repo-skill-link.mjs",
 	"scripts/link-repo-skill.mjs",
 	"scripts/setup-completion.mjs",
 ];
@@ -143,11 +150,60 @@ export function isSetupCurrent(root = process.cwd(), options = {}) {
 			readFileSync(join(root, MARKER), "utf8").trim() ===
 				setupFingerprint(root, inputs) &&
 			hasDeclaredDependencyLinks(root, inputs) &&
+			inspectSkillLink(root).reason === null &&
 			inspectHooksPath(root, options).reason === null
 		);
 	} catch {
 		return false;
 	}
+}
+
+function inspectSkillLink(root) {
+	const link = join(root, ".claude/skills/pfdsl");
+	const target = resolve(dirname(link), SKILL_LINK_TARGET, "SKILL.md");
+	try {
+		if (!statSync(target).isFile()) throw new Error("not a skill file");
+	} catch {
+		return {
+			managed: false,
+			reason:
+				"Cannot find the tracked skill file generated/skills/pfdsl/SKILL.md, owned by scripts/gen-skill.mjs. Restore the tracked target from Git before rerunning make setup; setup only manages the link.",
+		};
+	}
+	let state = { present: false };
+	try {
+		const stats = lstatSync(link);
+		state = {
+			present: true,
+			isSymlink: stats.isSymbolicLink(),
+			linkTarget: stats.isSymbolicLink() ? readlinkSync(link) : undefined,
+		};
+	} catch (error) {
+		if (error?.code !== "ENOENT") throw error;
+	}
+	const { action } = decideSkillLinkAction(state, SKILL_LINK_TARGET);
+	if (action === "ok") {
+		let reachesTarget = false;
+		try {
+			reachesTarget =
+				realpathSync(join(link, "SKILL.md")) === realpathSync(target);
+		} catch {
+			// A relocated parent can make the correct relative target dangling.
+		}
+		if (!reachesTarget)
+			return {
+				managed: false,
+				reason:
+					".claude/skills/pfdsl does not reach the tracked generated/skills/pfdsl/SKILL.md. Restore the repo-local .claude/skills parent directory before rerunning make setup; setup only manages the pfdsl link.",
+			};
+	}
+	return {
+		managed: true,
+		reason:
+			action === "ok"
+				? null
+				: ".claude/skills/pfdsl must link to the tracked generated skill. Run make setup to repair it.",
+	};
 }
 
 function sameDirectory(left, right) {
@@ -376,9 +432,16 @@ async function runSetup(root = process.cwd()) {
 	if (hooks.reason !== null && !hooks.managed) throw new Error(hooks.reason);
 	const lock = await acquireSetupLock(root);
 	try {
+		const skill = inspectSkillLink(root);
+		if (skill.reason !== null && !skill.managed) throw new Error(skill.reason);
 		if (isSetupCurrent(root)) return 0;
 		const status = await runSetupUnlocked(root);
 		if (status === 0) {
+			const skill = inspectSkillLink(root);
+			if (skill.reason !== null) {
+				rmSync(join(root, MARKER), { force: true });
+				throw new Error(skill.reason);
+			}
 			const checked = inspectHooksPath(root);
 			if (checked.reason !== null) throw new Error(checked.reason);
 		}
@@ -396,6 +459,12 @@ async function main(args) {
 		const hooks = inspectHooksPath();
 		if (hooks.reason !== null) {
 			console.error(hooks.reason);
+			process.exitCode = 1;
+			return;
+		}
+		const skill = inspectSkillLink(process.cwd());
+		if (skill.reason !== null) {
+			console.error(skill.reason);
 			process.exitCode = 1;
 			return;
 		}
