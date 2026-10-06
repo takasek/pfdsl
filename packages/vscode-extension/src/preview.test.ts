@@ -52,6 +52,8 @@ const host = vi.hoisted(() => {
 			},
 		),
 		showInformationMessage: vi.fn(),
+		showWarningMessage: vi.fn(),
+		showQuickPick: vi.fn(async (items: unknown[]) => items[0]),
 		showTextDocument: vi.fn(async (document: vscode.TextDocument) => ({
 			document,
 			selection: undefined,
@@ -129,10 +131,12 @@ const host = vi.hoisted(() => {
 			},
 			Uri: {
 				file: uri,
+				parse: (value: string) => ({ toString: () => value }),
 				joinPath: (base: { path: string }, ...parts: string[]) =>
 					uri([base.path, ...parts].join("/")),
 			},
 			ViewColumn: { One: 1, Beside: 2 },
+			env: { openExternal: vi.fn(async () => true) },
 			FileType: { File: 1, Directory: 2 },
 			ExtensionMode: { Development: 2 },
 		},
@@ -211,6 +215,71 @@ function setup() {
 	}
 	return { preview, open };
 }
+
+it.each([
+	["foo bar://x", "valid-location.txt"],
+	["valid-location.txt", "foo bar://x"],
+])("opens the valid preview location when another URI is invalid: %j", async (...locs) => {
+	const { open } = setup();
+	const panel = await open(
+		document(
+			"mixed",
+			`---\nartifact:\n  b:\n    location: ${JSON.stringify(locs)}\n---\na >> p -> b\n`,
+		),
+	);
+	await panel.receive({ type: "openLocation", nodeId: "b" });
+	await vi.waitFor(() =>
+		expect(host.api.workspace.openTextDocument).toHaveBeenCalledWith(
+			expect.objectContaining({ fsPath: "/test/valid-location.txt" }),
+		),
+	);
+	expect(host.window.showWarningMessage).toHaveBeenCalledWith(
+		expect.stringContaining("foo bar://x"),
+	);
+});
+
+it("reports all-invalid preview locations without opening anything", async () => {
+	const { open } = setup();
+	const panel = await open(
+		document(
+			"invalid",
+			'---\nartifact:\n  b:\n    location: ["foo bar://x", "bad url://x"]\n---\na >> p -> b\n',
+		),
+	);
+	await panel.receive({ type: "openLocation", nodeId: "b" });
+	await vi.waitFor(() =>
+		expect(host.window.showWarningMessage).toHaveBeenCalledWith(
+			expect.stringContaining("foo bar://x"),
+		),
+	);
+	expect(host.api.workspace.openTextDocument).not.toHaveBeenCalled();
+	expect(host.window.showQuickPick).not.toHaveBeenCalled();
+});
+
+it.each([
+	["valid-location.txt"],
+	["valid-location.txt", "other.txt"],
+	["https://example.com/result", "valid-location.txt"],
+])("keeps valid preview location behavior: %j", async (...locs) => {
+	const { open } = setup();
+	const panel = await open(
+		document(
+			"valid",
+			`---\nartifact:\n  b:\n    location: ${JSON.stringify(locs)}\n---\na >> p -> b\n`,
+		),
+	);
+	await panel.receive({ type: "openLocation", nodeId: "b" });
+	await vi.waitFor(() =>
+		expect(
+			host.api.workspace.openTextDocument.mock.calls.length +
+				host.api.env.openExternal.mock.calls.length,
+		).toBe(1),
+	);
+	expect(host.window.showWarningMessage).not.toHaveBeenCalled();
+	expect(host.window.showQuickPick.mock.calls.length).toBe(
+		locs.length > 1 ? 1 : 0,
+	);
+});
 
 beforeEach(() => {
 	vi.clearAllMocks();

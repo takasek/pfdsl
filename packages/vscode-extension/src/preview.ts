@@ -183,10 +183,15 @@ async function handleOpenLocation(
 	if (locs.length === 0) return;
 
 	const items: QuickPickLocationItem[] = [];
+	const invalid: string[] = [];
 	for (const loc of locs) {
 		if (loc.includes("://")) {
-			const url = new URL(loc);
-			items.push({ label: url.hostname, description: loc, url: loc });
+			try {
+				const url = new URL(loc);
+				items.push({ label: url.hostname, description: loc, url: loc });
+			} catch {
+				invalid.push(loc);
+			}
 		} else {
 			const resolvedPath = resolveLocationFsPath(docFsPath, loc, basePath);
 			const resolvedUri = vscode.Uri.file(resolvedPath);
@@ -222,6 +227,12 @@ async function handleOpenLocation(
 		}
 	}
 
+	if (invalid.length > 0) {
+		void vscode.window.showWarningMessage(
+			`Skipped invalid location URLs: ${invalid.join(", ")}`,
+		);
+	}
+	if (items.length === 0) return;
 	if (items.length === 1) {
 		const item = items[0]!;
 		if (item.url) {
@@ -418,7 +429,7 @@ export function registerPreview(context: vscode.ExtensionContext): {
 				const srcVc = vscode.window.visibleTextEditors.find(
 					(e) => e.document === state.doc,
 				)?.viewColumn;
-				handleOpenLocation(
+				await handleOpenLocation(
 					state.doc.uri.fsPath,
 					locs,
 					srcVc,
