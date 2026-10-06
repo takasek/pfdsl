@@ -8,8 +8,8 @@ import {
 	supportsPermissionAsk,
 } from "./verification-tree-guard.mjs";
 
-const WORKTREE_ROOT = "/Users/m5/works/pfdsl/.claude/worktrees/some-branch";
-const MAIN_ROOT = "/Users/m5/works/pfdsl";
+const WORKTREE_ROOT = "/repo/.worktrees/some-branch";
+const MAIN_ROOT = "/repo";
 
 function payload({ toolName = "Bash", command }) {
 	return {
@@ -88,7 +88,7 @@ describe("findVerificationSegments", () => {
 		for (const command of [
 			'node -e "console.log(1)"',
 			`node -e "import x from '/abs/path/x.mjs'"`,
-			`node --input-type=module -e "import { checkFile } from '/Users/m5/works/pfdsl/scripts/lib/md-linebreaks.mjs';"`,
+			`node --input-type=module -e "import { checkFile } from '/repo/scripts/lib/md-linebreaks.mjs';"`,
 		]) {
 			assert.deepEqual(findVerificationSegments(command), [], command);
 		}
@@ -271,10 +271,135 @@ describe("evaluateVerificationTreeGuard", () => {
 		const output = result.output.hookSpecificOutput;
 		assert.equal(output.permissionDecision, "deny");
 		assert.match(output.permissionDecisionReason, /Codex.*ask.*unsupported/i);
-		assert.match(output.permissionDecisionReason, /workdir/i);
 		assert.match(output.permissionDecisionReason, /cannot prove/i);
-		assert.doesNotMatch(output.permissionDecisionReason, /absolute path.*-C/i);
 		assert.doesNotMatch(output.permissionDecisionReason, /confirm to proceed/i);
+	});
+
+	it("explains why changing only tool workdir cannot recover an unchanged hook cwd (#1392)", () => {
+		const observedCwds = [];
+		const run = (workdir) =>
+			runVerificationTreeGuard(
+				JSON.stringify({
+					...payload({ command: "make test" }),
+					cwd: MAIN_ROOT,
+					tool_input: { command: "make test", workdir },
+				}),
+				{
+					resolveRoots: (cwd) => {
+						observedCwds.push(cwd);
+						return {
+							worktreeRoot: MAIN_ROOT,
+							mainRoot: MAIN_ROOT,
+							hasLinkedWorktrees: true,
+						};
+					},
+					supportsAsk: false,
+				},
+			);
+		const original = run(undefined);
+		const retry = run(WORKTREE_ROOT);
+		assert.deepEqual(observedCwds, [MAIN_ROOT, MAIN_ROOT]);
+		assert.deepEqual(retry, original);
+		const output = retry.output.hookSpecificOutput;
+		assert.equal(output.permissionDecision, "deny");
+		// Check the missing observable input, not a ban on explicit-target syntax.
+		assert.match(output.permissionDecisionReason, /payload\.cwd/);
+		assert.match(
+			output.permissionDecisionReason,
+			/workdir.*unchanged.*denial/i,
+		);
+	});
+
+	it("distinguishes registered wrappers from approved independent-repository commands (#1392)", () => {
+		const result = runVerificationTreeGuard(
+			JSON.stringify({ ...payload({ command: "make test" }), cwd: MAIN_ROOT }),
+			{
+				resolveRoots: () => ({
+					worktreeRoot: MAIN_ROOT,
+					mainRoot: MAIN_ROOT,
+					hasLinkedWorktrees: true,
+				}),
+				supportsAsk: false,
+			},
+		);
+		const reason = result.output.hookSpecificOutput.permissionDecisionReason;
+		// These concepts are the recovery contract; exact prose is reviewed separately.
+		assert.match(
+			reason,
+			/registered pfdsl.*wrapper.*absolute target.*expected branch.*approval/i,
+		);
+		assert.match(
+			reason,
+			/independent repositories.*registration.*approved.*explicit target/i,
+		);
+		assert.match(
+			reason,
+			/does not authorize bypassing.*ownership.*main.*trusted-root/i,
+		);
+	});
+
+	it("allows an implicit command when the hook actually observes the linked worktree cwd", () => {
+		const result = runVerificationTreeGuard(
+			JSON.stringify({
+				...payload({ command: "make test" }),
+				cwd: WORKTREE_ROOT,
+			}),
+			{
+				resolveRoots: (cwd) => ({
+					worktreeRoot: cwd,
+					mainRoot: MAIN_ROOT,
+					hasLinkedWorktrees: true,
+				}),
+				supportsAsk: false,
+			},
+		);
+		assert.deepEqual(result, { shouldOutput: false });
+	});
+
+	it("leaves explicit-target recovery commands to their own permission checks", () => {
+		for (const command of [
+			`/opt/tools/codex-git-routine.mjs test ${WORKTREE_ROOT} topic`,
+			"make -C /independent/repo test",
+			"node /independent/repo/scripts/check.mjs",
+		]) {
+			const result = runVerificationTreeGuard(
+				JSON.stringify({ ...payload({ command }), cwd: MAIN_ROOT }),
+				{
+					resolveRoots: () => ({
+						worktreeRoot: MAIN_ROOT,
+						mainRoot: MAIN_ROOT,
+						hasLinkedWorktrees: true,
+					}),
+					supportsAsk: false,
+				},
+			);
+			assert.deepEqual(result, { shouldOutput: false }, command);
+		}
+	});
+
+	it("guides a denied node-prefixed wrapper call to the direct invocation (#1392)", () => {
+		const result = runVerificationTreeGuard(
+			JSON.stringify({
+				...payload({
+					command: `node /opt/tools/codex-git-routine.mjs node-script ${WORKTREE_ROOT} topic scripts/setup-completion.mjs check`,
+				}),
+				cwd: MAIN_ROOT,
+			}),
+			{
+				resolveRoots: () => ({
+					worktreeRoot: MAIN_ROOT,
+					mainRoot: MAIN_ROOT,
+					hasLinkedWorktrees: true,
+				}),
+				supportsAsk: false,
+			},
+		);
+		const output = result.output.hookSpecificOutput;
+		assert.equal(output.permissionDecision, "deny");
+		assert.match(
+			output.permissionDecisionReason,
+			/wrapper directly.*without a node prefix/i,
+		);
 	});
 
 	it("does not claim a compound command actually targets the main tree", () => {
