@@ -122,6 +122,7 @@ const host = vi.hoisted(() => {
 				openTextDocument,
 				fs: {
 					stat: vi.fn(async () => ({ type: 1 })),
+					readDirectory: vi.fn(async () => []),
 					readFile: vi.fn(),
 				},
 				onDidChangeTextDocument: (callback: typeof textChanged) => {
@@ -254,6 +255,22 @@ it("reports all-invalid preview locations without opening anything", async () =>
 	);
 	expect(host.api.workspace.openTextDocument).not.toHaveBeenCalled();
 	expect(host.window.showQuickPick).not.toHaveBeenCalled();
+});
+
+it("continues across an empty directory and reports every invalid URL", async () => {
+	const { open } = setup();
+	host.api.workspace.fs.stat.mockResolvedValueOnce({ type: 2 });
+	const panel = await open(
+		document(
+			"empty-dir",
+			'---\nartifact:\n  b:\n    location: ["foo bar://x", "empty-dir/", "bad url://y", "https://example.com"]\n---\na >> p -> b\n',
+		),
+	);
+	await panel.receive({ type: "openLocation", nodeId: "b" });
+	expect(host.api.env.openExternal).toHaveBeenCalled();
+	expect(host.window.showWarningMessage).toHaveBeenCalledWith(
+		expect.stringContaining("foo bar://x, bad url://y"),
+	);
 });
 
 it.each([

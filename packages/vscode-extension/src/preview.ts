@@ -208,7 +208,7 @@ async function handleOpenLocation(
 				);
 				if (children.length === 0) {
 					vscode.window.showWarningMessage(`No files found in ${loc}`);
-					return;
+					continue;
 				}
 				for (const child of children) {
 					items.push({
