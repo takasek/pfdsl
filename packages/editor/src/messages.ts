@@ -1,5 +1,6 @@
 import type { DiffReport } from "@pfdsl/core";
-import type { PreviewEditRequest, PreviewGraph } from "./node-operations.js";
+import type { PreviewEditRequest } from "./preview-edit.js";
+import type { PreviewGraph } from "./preview-graph.js";
 
 /**
  * Shared postMessage protocol between preview.ts (extension host) and

@@ -14,7 +14,7 @@ import {
 	buildSubflows,
 } from "./location-utils.js";
 import type { MessageToWebview } from "./messages.js";
-import { buildPreviewGraph } from "./node-operations.js";
+import { buildPreviewGraph } from "./preview-graph.js";
 import { blockingDiagnosticMessage } from "./preview-logic.js";
 
 export function analyzeSnapshot(source: string) {

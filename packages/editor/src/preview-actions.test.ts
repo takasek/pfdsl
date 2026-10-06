@@ -1,8 +1,8 @@
 // @vitest-environment jsdom
 import { afterEach, expect, it, vi } from "vitest";
 import { analyzeSnapshot } from "./document.js";
-import { buildPreviewGraph } from "./node-operations.js";
 import { mountPreview } from "./preview.js";
+import { buildPreviewGraph } from "./preview-graph.js";
 
 const cleanups: Array<() => void> = [];
 afterEach(() => {

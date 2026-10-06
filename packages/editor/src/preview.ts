@@ -7,7 +7,7 @@ import {
 } from "./connector-logic.js";
 import { buildDiffPanelHtml } from "./diff-panel.js";
 import type { MessageFromWebview, MessageToWebview } from "./messages.js";
-import { neighborhoodDot, type PreviewGraph } from "./node-operations.js";
+import { neighborhoodDot, type PreviewGraph } from "./preview-graph.js";
 import { previewMarkup } from "./preview-shell.js";
 import { unwrapAnchors } from "./svg-anchors.js";
 import {
@@ -29,6 +29,22 @@ export interface PreviewHost {
 	canOpenRelatedFiles?: boolean;
 	renderDot?: (dot: string) => Promise<string>;
 }
+
+function prepareGraphNode(
+	node: HTMLElement,
+	label: (id: string) => string,
+): string | undefined {
+	const title = node.querySelector(":scope > title");
+	const id = title?.textContent;
+	if (!id) return undefined;
+	node.dataset.nodeId = id;
+	node.setAttribute("tabindex", "0");
+	node.setAttribute("role", "button");
+	node.setAttribute("aria-label", label(id));
+	title.remove();
+	return id;
+}
+
 /** Mount one independent preview. Transport and lifetime belong to its host. */
 export function mountPreview(container: HTMLElement, host: PreviewHost) {
 	const document = container.ownerDocument;
@@ -368,15 +384,7 @@ export function mountPreview(container: HTMLElement, host: PreviewHost) {
 			local.innerHTML = svg;
 			unwrapAnchors(local);
 			for (const node of local.querySelectorAll<HTMLElement>("g.node")) {
-				const title = node.querySelector(":scope > title");
-				const id = title?.textContent;
-				if (id) {
-					node.dataset.nodeId = id;
-					node.setAttribute("tabindex", "0");
-					node.setAttribute("role", "button");
-					node.setAttribute("aria-label", `Focus ${id}`);
-					title.remove();
-				}
+				prepareGraphNode(node, (id) => `Focus ${id}`);
 			}
 			tooltip.append(local);
 			clampTooltip(x + 14, y + 14);
@@ -801,20 +809,14 @@ export function mountPreview(container: HTMLElement, host: PreviewHost) {
 			root.hidden = false;
 			graphRevision = currentRevision;
 			updateControls();
-			for (const node of inner.querySelectorAll("g.node")) {
-				const titleEl = node.querySelector(":scope > title");
-				if (titleEl?.textContent) {
-					const id = titleEl.textContent;
-					(node as HTMLElement).dataset.nodeId = id;
-					node.setAttribute("tabindex", "0");
-					node.setAttribute("role", "button");
-					node.setAttribute(
-						"aria-label",
-						`Node ${id}. Enter for Node actions.`,
-					);
+			for (const node of inner.querySelectorAll<HTMLElement>("g.node")) {
+				const id = prepareGraphNode(
+					node,
+					(id) => `Node ${id}. Enter for Node actions.`,
+				);
+				if (id) {
 					const sf = Object.hasOwn(subflows, id) ? subflows[id] : undefined;
-					if (sf) (node as HTMLElement).dataset.subflow = sf;
-					titleEl.remove();
+					if (sf) node.dataset.subflow = sf;
 				}
 			}
 			// Unwrap graphviz URL anchors: VSCode's handleInnerClick crashes
