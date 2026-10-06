@@ -29,6 +29,7 @@ import {
 	insertDefinition,
 	isRoadmapType,
 	isUrlLike,
+	loadDependencyClosure,
 	loadExtendsChain,
 	loadFrontmatter,
 	locateNode,
@@ -514,66 +515,14 @@ export function runCheck(file: string, opts: CheckOptions = {}): CommandResult {
 		};
 	}
 	const absFile = resolve(file);
-	const multiDiags: (Diagnostic & { file?: string })[] = [];
-	const loaded = new Map<string, ReturnType<typeof analyze> | null>([
-		[absFile, entryResult],
-	]);
-	const load = (path: string) => {
-		if (!loaded.has(path)) loaded.set(path, fileLoader(path, opts.strict));
-		return loaded.get(path) ?? null;
-	};
-
-	// --- Subflow checks ---
-	const subflowGraph = subflowBoundaryDiagnostics(
-		absFile,
-		edges,
-		frontmatter,
-		load,
+	const closure = loadDependencyClosure(absFile, (path) =>
+		path === absFile ? entryResult : fileLoader(path, opts.strict),
 	);
-	multiDiags.push(...subflowGraph.diagnostics);
-
-	// --- Extends checks ---
-	const presets = new Set<string>();
-	const extendsDiags = new Map<string, Diagnostic & { file?: string }>();
-	// The file `check` was given is the one whose diagnostics carry no `file`,
-	// wherever in the graph it turns up, so every other file is named.
-	const inFile = (
-		diagnostic: Diagnostic,
-		path: string,
-	): Diagnostic & { file?: string } =>
-		path === absFile ? diagnostic : { ...diagnostic, file: path };
-	for (const parentPath of subflowGraph.docs.keys()) {
-		const chain = loadExtendsChain(parentPath, load);
-		for (const { file: holder, ...diagnostic } of chain.diagnostics) {
-			// The loader treats `parentPath` as its entry and leaves `file` off
-			// what that entry holds, so name the holder here.
-			const attributed = inFile(diagnostic, holder ?? parentPath);
-			extendsDiags.set(JSON.stringify(attributed), attributed);
-		}
-		for (const path of chain.docs.keys())
-			if (path !== parentPath) presets.add(path);
-	}
-	multiDiags.push(...extendsDiags.values());
-
-	// Analyze each dependency once under the same strictness as the entry.
-	// Keep file-local identifiers and coordinates; do not flatten the graphs.
-	for (const [path, doc] of loaded) {
-		if (doc === null) continue;
-		if (path === absFile) continue;
-		for (const diagnostic of doc.diagnostics) {
-			multiDiags.push({ ...diagnostic, file: path });
-		}
-	}
-
-	for (const path of presets) {
-		const doc = loaded.get(path);
-		if (doc)
-			multiDiags.push(
-				...validatePresetKeys(path, doc.frontmatter, doc.document).map(
-					(diagnostic) => inFile(diagnostic, path),
-				),
-			);
-	}
+	const multiDiags = [
+		...closure.diagnostics,
+		...closure.localDiagnostics.filter((d) => d.file !== undefined),
+		...closure.presetDiagnostics,
+	];
 
 	if (hasErrors(multiDiags)) {
 		const errs = multiDiags.filter((d) => d.severity === "error");

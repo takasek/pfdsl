@@ -2,6 +2,31 @@ import { describe, expect, it } from "vitest";
 import { analyzeSnapshot, preloadPresets, prepareDocument } from "./index.js";
 
 describe("shared document pipeline", () => {
+	it("loads child presets once and keeps dependency errors lenient in the preview", async () => {
+		const model = analyzeSnapshot(
+			"---\nprocess:\n  p: {subflow: child.pfdsl}\n  q: {subflow: other.pfdsl}\n---\na >> p -> b\na >> q -> b\n",
+		);
+		const reads: string[] = [];
+		const load = await preloadPresets(
+			"/project/main.pfdsl",
+			model,
+			async (path) => {
+				reads.push(path);
+				if (path.endsWith(".pfdsl"))
+					return "---\nextends: preset.yaml\n---\na >> c -> b\n";
+				return "statusStyles: {done: {fill: red}}\n";
+			},
+		);
+		expect(
+			reads.filter((path) => path === "/project/preset.yaml"),
+		).toHaveLength(1);
+		expect(reads).not.toContain("/project/main.pfdsl");
+		const result = prepareDocument(model, "/project/main.pfdsl", load);
+		expect(result.presetDiagnostics).toContainEqual(
+			expect.objectContaining({ code: "V009", file: "/project/preset.yaml" }),
+		);
+		expect(result.message.type).toBe("render");
+	});
 	it("derives presentation and diagnostics from the same dependency snapshot", () => {
 		const model = analyzeSnapshot(
 			"---\nextends: preset.yaml\n---\na >> p -> b\n",
