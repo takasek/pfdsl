@@ -1,0 +1,132 @@
+{
+	"date": "2026-10-05",
+	"preMergeHead": "3a5ac77e1a493cf287dcd8e408cd847f5a139261",
+	"integratedMain": "9bcd6d6fd6711dac861adac385468aa292fd654b",
+	"sourceSha256": {
+		"packages/editor/src/preview.ts": "c04a17f8b43dd7c33a881cfb06e25aefae94936b1aa6a6e30164b6f6c7699bbc",
+		"packages/editor/src/preview-ux.test.ts": "1eb8bc90e8cb472b4e5889d2d72e84acd81d962f1f8292acd67121e9af982133",
+		"packages/standalone/src/document-tab.ts": "6796dc21775be9a8b924b72669b5c32a550e7a1c10f7be039328add4b3f41135",
+		"packages/vscode-extension/README.md": "2650ad19e959b164cde0180563203435415dacbfb25c16b63367dee15728a0a0",
+		"packages/vscode-extension/src/preview.test.ts": "21534aa7938721d2509cdfe8858f766275edbde6d18a6225b3f8d0a8d3dd3ac4",
+		"packages/vscode-extension/src/preview.ts": "2255ad63ea6682ca944c9c631ea10654d1e6ea31e0c0434ff5fe640633d11ebe",
+		"packages/cli/src/index.ts": "87e5ce2e80531e0db84f810bc9454df9620af27f151352b0ea659bf2a58b1d5f",
+		"packages/cli/src/index.test.ts": "37f35f0cf96f88d3ba3205037b849376e18792347e22d9668454f53c5e94cff1",
+		"packages/core/src/index.ts": "fe604cfbe0107b89534853192cd18219a7ecd549d35a6a4d6120fcf3f967a77d",
+		"packages/core/src/multifile.ts": "0f2b1a5d7c9ab3942dbdfad5669644fbacaf08b5caba01a492cec24a1cd01890"
+	},
+	"unchangedDisplaySynchronizationFiles": [
+		"packages/editor/src/preview.ts",
+		"packages/editor/src/preview-ux.test.ts",
+		"packages/standalone/src/document-tab.ts"
+	],
+	"productionAsset": {
+		"path": "assets/index-Bm9V-He2.js",
+		"sha256": "95f9b4071cc8e45bc186dbe7e741f4908c2239b0dd966cdf8ab60b98c27f008b"
+	},
+	"nativeExecutableSha256": "f6005842e1a7de061d531d09da67002b46d9c9eae89ebac1a19f04bca4451412",
+	"checks": {
+		"setup": {
+			"exitCode": 0
+		},
+		"setupCompletion": {
+			"exitCode": 0
+		},
+		"fullTest": {
+			"exitCode": 0,
+			"packages": {
+				"core": 1123,
+				"metadata-exporter": 9,
+				"graphviz-exporter": 179,
+				"preview-engine": 25,
+				"editor": 220,
+				"cli": {
+					"passed": 844,
+					"skipped": 1
+				},
+				"vscode-extension": 168,
+				"standalone": 5
+			},
+			"scriptsHooks": {
+				"passed": 3013,
+				"failed": 0,
+				"skipped": 0
+			},
+			"conventions": {
+				"imports": 171,
+				"shell": 217,
+				"cli": 216
+			}
+		},
+		"typecheck": {
+			"exitCode": 0
+		},
+		"lint": {
+			"exitCode": 0,
+			"diagnostics": 0
+		},
+		"installSync": {
+			"exitCode": 0
+		},
+		"scaffoldSync": {
+			"exitCode": 0
+		},
+		"nativeBuild": {
+			"exitCode": 0
+		},
+		"nativeCorpusReadback": {
+			"passed": 23,
+			"failures": [],
+			"errors": []
+		},
+		"releaseStatus": {
+			"exitCode": 1,
+			"meaning": "Publication preparation remains pending; this read-only check did not publish.",
+			"reported": [
+				"Package commits ahead need version bumps.",
+				"Plugin bundle and distribution review need release preparation.",
+				"Migration guide Unreleased destination must be assigned before CLI/plugin release."
+			]
+		}
+	},
+	"logs": {
+		"setup": {
+			"temporaryFilename": "pfdsl-1394-main-merge-setup-01a10a12.log",
+			"sha256": "98dc450300d2aa49e0254db8117732a9dc6efd901bbafdaa5817bfa8d2bbc1da"
+		},
+		"test": {
+			"temporaryFilename": "pfdsl-1394-main-merge-test-01a10a12.log",
+			"sha256": "62de59f104f40903a992b80d48c8cf5bb5083c70a2015fc6d52f6c0a3cd95a4e"
+		},
+		"typecheck": {
+			"temporaryFilename": "pfdsl-1394-main-merge-typecheck-01a10a12.log",
+			"sha256": "a142fdf460f0fe9bae5fe3b7d3ef98dd4d42b462848e86c9c29980c3d981bc21"
+		},
+		"lint": {
+			"temporaryFilename": "pfdsl-1394-main-merge-lint-01a10a12.log",
+			"sha256": "890bcad71a3131636910eee62f234ec57a2d992b7da76b3ae6b075721f11f82f"
+		},
+		"native-build": {
+			"temporaryFilename": "pfdsl-1394-main-merge-native-build-01a10a12.log",
+			"sha256": "b6a2ce5abe22c90bcef9bca81e66ecbd6ba94078039b7df988511476ce3d7b0f"
+		},
+		"releaseStatus": {
+			"temporaryFilename": "pfdsl-1394-main-merge-release-status-01a10a12.log",
+			"sha256": "b9d7e1bf3fd2155fdae3451452f8e08bbe4951892b2f5b0341ca8753d917569a"
+		}
+	},
+	"independentReview": {
+		"storedFile": "main-merge-review.md",
+		"sha256": "dc405d75f836a58e965f89a8302b53f8f63ed7ac8a9e1273404f61faef040b2e",
+		"requiredFindings": 0,
+		"scope": "Static review of resolved conflicts, preservation of both parents, and consumers."
+	},
+	"proofLimits": [
+		"The tests and native corpus measure the resolved working tree before the merge commit; the pre-merge HEAD alone does not identify that tree.",
+		"The native corpus runner filename error is retained in main-merge-corpus-lifecycle.json; success is from a separately verified actual native report.",
+		"Full native gestures, IME and owner UI acceptance remain pending."
+	],
+	"supportingToolOutput": {
+		"file": "main-merge-support-checks.json",
+		"sha256": "e46aa6c0ffe960576d30b34ce7b2a22961a04c14b6e779ed4933e96c3547c919"
+	}
+}

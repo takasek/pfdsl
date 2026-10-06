@@ -24,6 +24,18 @@ GitHub Issues。規約と採用手順は `scripts/harness-template/skills/pfd-op
 **保持範囲**: 規則は L3 reference「完了チェーン回収」が一次情報。
 このリポで完了履歴を持つ一次情報は closed issue・git 履歴・`docs/adr/`・`docs/spec/spec-history.md`・npm レジストリ・VS Code Marketplace で、#1052 の一括回収でこれらへの写しを roadmap から落とした。
 
+## プレビュー改善の管理単位
+
+プレビューの表示・編集・移動は `i1352_i1282_i1283_i1284_i483_improve_preview` の一工程として扱う。
+関連 issue と各出力 artifact は課題・実装・確認の内訳であり、別々の作業サイクルを要求しない。
+当初の要望や criteria は見直しの対象とし、利用時の観察に合わせて改善範囲・完了条件・次に扱う課題を更新する。
+現在の範囲と完了条件は [PR #1394](https://github.com/takasek/pfdsl/pull/1394)、対象版と確認結果は [受入記録](../packages/standalone/ACCEPTANCE.md)を参照する。
+未確認を確認済みに読み替えず、今回扱うか次へ回すかをその記録で区別する。
+
+入力は既存の依存を保持したため、`editor_connector` が wip の間は束全体の ready 判定もその前提待ちになる。
+今回の先行着手は所有者が関連課題を今回の範囲に含めた指示に基づき、完了状態や依存を変更したことにはしない。
+ゲートは `preview_editing_usability` を入口にできるが、それだけで各出力の確認済みや完了を認定せず、受入記録の内訳も確認する。
+
 ## プリフライト・ゲート集約スクリプト（#354）
 
 - **選択フェーズ（pfd-ops 手順1）**: `GH_HOST=github.com node scripts/cycle-status.mjs` — fetch 実行・base への遅れコミット数・open PR の一覧・`status ready --json` の各工程の判断材料と新規 ready 数を1回の JSON 出力に集約する。`--base <branch>` で対象ブランチを変更可能（デフォルト `main`）。加えて次の情報を出力する（#461）:

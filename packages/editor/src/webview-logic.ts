@@ -32,7 +32,7 @@ export const ZOOM_STEP = 1.1;
 /**
  * Zoom about a point, keeping whatever is under the cursor under the cursor.
  * `deltaY` follows the wheel event's sign: negative scrolls zoom in.
- * The pan is computed from the unclamped factor, so at the scale limits the
+ * The pan is computed from the effective factor, so at the scale limits the
  * graph stops growing but does not drift.
  */
 export function zoomAt(
@@ -40,12 +40,17 @@ export function zoomAt(
 	pointerX: number,
 	pointerY: number,
 	deltaY: number,
+	minimumScale = MIN_SCALE,
 ): ViewTransform {
-	const factor = deltaY < 0 ? ZOOM_STEP : 1 / ZOOM_STEP;
+	const nextScale = Math.max(
+		minimumScale,
+		Math.min(MAX_SCALE, view.scale * (deltaY < 0 ? ZOOM_STEP : 1 / ZOOM_STEP)),
+	);
+	const factor = nextScale / view.scale;
 	return {
 		panX: pointerX - (pointerX - view.panX) * factor,
 		panY: pointerY - (pointerY - view.panY) * factor,
-		scale: clampScale(view.scale * factor),
+		scale: nextScale,
 	};
 }
 
@@ -63,6 +68,26 @@ export function centerPan(
 		panX: (viewport.width - graph.width * scale) / 2,
 		panY: (viewport.height - graph.height * scale) / 2,
 	};
+}
+
+/** Fit the complete graph, without enlarging small diagrams or imposing the wheel zoom floor. */
+export function fitGraph(
+	viewport: { width: number; height: number },
+	graph: { width: number; height: number },
+): ViewTransform | undefined {
+	if (
+		viewport.width <= 0 ||
+		viewport.height <= 0 ||
+		graph.width <= 0 ||
+		graph.height <= 0
+	)
+		return undefined;
+	const scale = Math.min(
+		1,
+		Math.max(1, viewport.width - 32) / graph.width,
+		Math.max(1, viewport.height - 32) / graph.height,
+	);
+	return { scale, ...centerPan(viewport, graph, scale) };
 }
 
 /**

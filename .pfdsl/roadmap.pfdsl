@@ -77,7 +77,7 @@ artifact:
   preview_connector:
     label: "Preview コネクタ生成 UI (#483)"
     description: "webview の nodeClick 基盤を拡張し、ノードクリックから前後追加・接続をテキストへ反映する。#482 の編集機構を共用"
-    status: todo
+    status: wip
     criteria: "Preview のノードクリックからコネクタ選択・生成でテキストへ反映され再描画されることが動作確認済み"
   def_insertion:
     label: "frontmatter 定義挿入 code action (#484)"
@@ -119,30 +119,36 @@ artifact:
     description: "#1278 の group 削除を含む npm CLI と、同じ release tag から配布する plugin 資産"
     status: todo
     criteria: "npm view @pfdsl/cli versions に group 削除を含む版が含まれ、その版を固定して取得した CLI で pfdsl delete <file> <group-id> が group を削除する。同じ release tag の plugin 配布について .pfdsl/workflow.md の「release milestone artifact の作成規約」と .pfdsl/pipeline.md の公開・pin・取得確認を満たす"
+  preview_editing_usability:
+    label: 図全体と編集・移動を見失わないプレビュー
+    description: "プレビューの表示・編集・移動の改善全体。関連 issue は課題の参照とし、現在の改善範囲と完了条件は roadmap.md の「プレビュー改善の管理単位」から辿る"
+    status: wip
+    criteria: "現在選んだ改善範囲の実装が完了条件を満たし、受入記録で対象版と実操作結果を確認できる。未確認範囲と次に扱う課題が区別して記録されている"
+    location: ../packages/
   node_definition_creation:
     label: プレビューと CLI から作れるノード定義
     description: "未定義ノードから共通 core 処理を使って frontmatter 定義を挿入する機能。要件は issue #1282"
-    status: todo
+    status: wip
     criteria: "Preview のノードから定義作成でき、CLI でも同じファイルに同じ定義を作れる。既存定義・不正な入力では重複や部分書込みが起きず、拡張では Undo できる"
     location: ../packages/
   node_location_cycle:
     label: 定義と本文中の同一ノード位置を巡回する操作
     description: "エディタ内で frontmatter 定義キーとグラフ本文に現れる同一ノード ID の各位置を順に巡回する機能。右クリックとショートカットから使い、Cmd+クリックの適否は既存操作との整合で判断する。要件は issue #1283"
-    status: todo
+    status: wip
     criteria: "定義キーから本文中の同一 ID の全出現箇所を文書順に巡回して定義へ戻れ、途中からも次へ進める。キー操作と右クリックから利用でき、VS Code の既存操作とのショートカット衝突が解消済み"
-    location: ../packages/vscode-extension/
+    location: ../packages/
   hover_local_graph:
     label: ホバー内の周辺グラフとノード移動
     description: "注目ノードと直接の前後ノード・エッジからなる小さな図をホバー表示内に描き、図内のノードを選んでメインのプレビューへ移動する機能。要件は issue #1284"
-    status: todo
+    status: wip
     criteria: "メタデータの有無にかかわらずホバー内に中心と直接の前後ノード・エッジだけの小さな図を表示し、feedback edge を含む接続方向を保つ。図内のノードをクリックしてメインの図でそのノードへ移動できる"
-    location: ../packages/vscode-extension/
+    location: ../packages/
   preview_focus_cue:
     label: フォーカス先ノードの一時的な強調
     description: "エディタでの選択とホバー内の周辺グラフでのクリックによってメインの図が移動した先を、短時間示す視覚的な合図。要件は issue #1284（#1285 から移管）"
-    status: todo
+    status: wip
     criteria: "エディタでのノード選択とホバー内の周辺グラフでのノードクリックのどちらでも、移動先のノードだけが短時間強調される。連続選択で古い強調が残らず、再描画だけでは点滅せず、動きを減らす設定を尊重する"
-    location: ../packages/vscode-extension/
+    location: ../packages/
   standalone_foundation:
     label: 両ホストで利用するアプリ共通基盤
     status: done
@@ -186,9 +192,6 @@ process:
   i482_implement_editor_connector:
     label: エディタ コネクタ編集実装
     location: https://github.com/takasek/pfdsl/issues/482
-  i483_implement_preview_connector:
-    label: Preview コネクタ UI 実装
-    location: https://github.com/takasek/pfdsl/issues/483
   publish_ext_editing:
     label: extension 編集支援リリース
   publish_cli_group_delete:
@@ -197,15 +200,10 @@ process:
     label: CLI 拡張フィールド更新公開
   publish_cli_group_node_clash:
     label: CLI 同名診断公開
-  i1282_create_node_definition:
-    label: ノード定義作成操作を実装する
-    location: https://github.com/takasek/pfdsl/issues/1282
-  i1283_add_node_location_cycle:
-    label: 定義と本文中のノード位置の巡回を実装する
-    location: https://github.com/takasek/pfdsl/issues/1283
-  i1284_add_hover_local_graph:
-    label: ホバー内の周辺グラフ・移動と移動先強調を実装する
-    location: https://github.com/takasek/pfdsl/issues/1284
+  i1352_i1282_i1283_i1284_i483_improve_preview:
+    label: プレビューを改善する
+    description: "表示・編集・移動を一つの改善工程として扱う。関連課題は #1352、#1282、#1283、#1284、#483。範囲と完了条件は利用時の観察に合わせて見直し、各出力は実装と確認の内訳として残す"
+    location: https://github.com/takasek/pfdsl/issues/1352
   i1258_build_standalone_documents:
     label: 文書の安全な編集・保存を完成させる
     location: https://github.com/takasek/pfdsl/issues/1258
@@ -243,8 +241,6 @@ ready_counts_cli >> publish_cli_ready_counts -> cli_release_ready_counts
 
 ext_v0015 >> i482_implement_editor_connector -> editor_connector
 
-editor_connector >> i483_implement_preview_connector -> preview_connector
-
 [def_insertion, editor_connector, preview_connector] >> publish_ext_editing -> ext_editing_release
 
 group_delete_cli >> publish_cli_group_delete -> cli_release_group_delete
@@ -252,11 +248,7 @@ group_delete_cli >> publish_cli_group_delete -> cli_release_group_delete
 meta_set_extension_fields >> publish_cli_meta_set_extension -> cli_release_meta_set_extension
 
 group_node_clash_diagnostic >> publish_cli_group_node_clash -> cli_release_group_node_clash
-def_insertion >> i1282_create_node_definition -> node_definition_creation
-
-toolchain >> i1283_add_node_location_cycle -> node_location_cycle
-
-toolchain >> i1284_add_hover_local_graph -> [hover_local_graph, preview_focus_cue]
+[def_insertion, editor_connector, toolchain] >> i1352_i1282_i1283_i1284_i483_improve_preview -> [hover_local_graph, node_definition_creation, node_location_cycle, preview_connector, preview_editing_usability, preview_focus_cue]
 
 standalone_foundation >> i1258_build_standalone_documents -> standalone_documents
 

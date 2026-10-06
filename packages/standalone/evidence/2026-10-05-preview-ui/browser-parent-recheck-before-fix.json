@@ -1,0 +1,65 @@
+{
+	"results": [
+		{
+			"iteration": 1,
+			"before": "---\nartifact:\n  \"alpha item\":\n    label: Alpha\n  \"spare item\":\n    label: Spare\nprocess:\n  \"prep task\":\n    label: Prepare\n---\n\"alpha item\" >> \"prep task\" -> \"result item\"\n\"spare item\"\n",
+			"existing": "---\nartifact:\n  \"alpha item\":\n    label: Alpha\n  \"spare item\":\n    label: Spare\nprocess:\n  \"prep task\":\n    label: Prepare\n---\n\"alpha item\" >> \"prep task\" -> \"result item\"\n\"spare item\" >> \"prep task\"\n\"spare item\"\n",
+			"existingUndoRestores": true,
+			"existingRedoRestores": true,
+			"invalidUnchanged": true,
+			"invalidStatus": "Invalid ID — use letters, numbers, _ or - (must start with a letter, number, or _)",
+			"added": "---\nartifact:\n  \"alpha item\":\n    label: Alpha\n  \"spare item\":\n    label: Spare\nprocess:\n  \"prep task\":\n    label: Prepare\n---\n\"alpha item\" >> \"prep task\" -> \"result item\"\n\"spare item\" >> \"prep task\"\n\"prep task\" -> new_target\n\"spare item\"\n",
+			"addedUndoRestores": true,
+			"addedRedoRestores": true,
+			"newCorrect": true,
+			"constructor": "---\nprocess:\n  constructor:\n    label: constructor\n---\na >> constructor -> b\n",
+			"constructorDefined": true
+		},
+		{
+			"iteration": 2,
+			"before": "---\nartifact:\n  \"alpha item\":\n    label: Alpha\n  \"spare item\":\n    label: Spare\nprocess:\n  \"prep task\":\n    label: Prepare\n---\n\"alpha item\" >> \"prep task\" -> \"result item\"\n\"spare item\"\n",
+			"existing": "---\nartifact:\n  \"alpha item\":\n    label: Alpha\n  \"spare item\":\n    label: Spare\nprocess:\n  \"prep task\":\n    label: Prepare\n---\n\"alpha item\" >> \"prep task\" -> \"result item\"\n\"spare item\" >> \"prep task\"\n\"spare item\"\n",
+			"existingUndoRestores": true,
+			"existingRedoRestores": true,
+			"invalidUnchanged": true,
+			"invalidStatus": "Invalid ID — use letters, numbers, _ or - (must start with a letter, number, or _)",
+			"added": "---\nartifact:\n  \"alpha item\":\n    label: Alpha\n  \"spare item\":\n    label: Spare\nprocess:\n  \"prep task\":\n    label: Prepare\n---\n\"alpha item\" >> \"prep task\" -> \"result item\"\n\"spare item\" >> \"prep task\"\n\"prep task\" -> new_target\n\"spare item\"\n",
+			"addedUndoRestores": true,
+			"addedRedoRestores": true,
+			"newCorrect": true,
+			"constructor": "---\nprocess:\n  constructor:\n    label: constructor\n---\na >> constructor -> b\n",
+			"constructorDefined": true
+		},
+		{
+			"iteration": 3,
+			"before": "---\nartifact:\n  \"alpha item\":\n    label: Alpha\n  \"spare item\":\n    label: Spare\nprocess:\n  \"prep task\":\n    label: Prepare\n---\n\"alpha item\" >> \"prep task\" -> \"result item\"\n\"spare item\"\n",
+			"existing": "---\nartifact:\n  \"alpha item\":\n    label: Alpha\n  \"spare item\":\n    label: Spare\nprocess:\n  \"prep task\":\n    label: Prepare\n---\n\"alpha item\" >> \"prep task\" -> \"result item\"\n\"spare item\" >> \"prep task\"\n\"spare item\"\n",
+			"existingUndoRestores": true,
+			"existingRedoRestores": true,
+			"invalidUnchanged": true,
+			"invalidStatus": "Invalid ID — use letters, numbers, _ or - (must start with a letter, number, or _)",
+			"added": "---\nartifact:\n  \"alpha item\":\n    label: Alpha\n  \"spare item\":\n    label: Spare\nprocess:\n  \"prep task\":\n    label: Prepare\n---\n\"alpha item\" >> \"prep task\" -> \"result item\"\n\"spare item\" >> \"prep task\"\n\"prep task\" -> new_target\n\"spare item\"\n",
+			"addedUndoRestores": true,
+			"addedRedoRestores": true,
+			"newCorrect": true,
+			"constructor": "---\nprocess:\n  constructor:\n    label: constructor\n---\na >> constructor -> b\n",
+			"constructorDefined": true
+		}
+	],
+	"errors": [
+		{
+			"message": "p.map is not a function",
+			"stack": "TypeError: p.map is not a function\n    at je (http://127.0.0.1:60435/assets/index-Bhq5YRen.js:237:27799)\n    at HTMLDivElement.<anonymous> (http://127.0.0.1:60435/assets/index-Bhq5YRen.js:237:29054)"
+		},
+		{
+			"message": "p.map is not a function",
+			"stack": "TypeError: p.map is not a function\n    at je (http://127.0.0.1:60435/assets/index-Bhq5YRen.js:237:27799)\n    at HTMLDivElement.<anonymous> (http://127.0.0.1:60435/assets/index-Bhq5YRen.js:237:29054)"
+		},
+		{
+			"message": "p.map is not a function",
+			"stack": "TypeError: p.map is not a function\n    at je (http://127.0.0.1:60435/assets/index-Bhq5YRen.js:237:27799)\n    at HTMLDivElement.<anonymous> (http://127.0.0.1:60435/assets/index-Bhq5YRen.js:237:29054)"
+		}
+	],
+	"cleanup": true,
+	"proof": "Real clipboard paste/selection/Undo and rendered Monaco source; parent supplementary recheck, not blind review"
+}

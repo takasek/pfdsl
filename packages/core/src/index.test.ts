@@ -52,6 +52,37 @@ function assertFormatPreservesSemantics(
 }
 
 describe("public API", () => {
+	it.each([
+		"\n",
+		"\r\n",
+	])("locates lexer diagnostics after long frontmatter with %j newlines", (newline) => {
+		const frontmatter = [
+			"---",
+			...Array.from({ length: 108 }, (_, i) => `# line ${i}`),
+			"---",
+		].join(newline);
+		for (const [body, code, column] of [
+			["a1 >> @@ -> a2", "L002", 7],
+			['a1 >> P -> "unterminated', "L001", 12],
+		] as const) {
+			const source = `${frontmatter}${newline}${newline}${body}${newline}`;
+			for (const result of [parse(source), analyze(source), format(source)]) {
+				const diagnostic = result.diagnostics.find(
+					(item) => item.code === code,
+				);
+				expect(diagnostic?.range.start).toMatchObject({ line: 112, column });
+				expect(diagnostic?.range.end.line).toBe(112);
+			}
+		}
+	});
+
+	it("keeps lexer diagnostic lines unchanged without frontmatter", () => {
+		const result = analyze("\na1 >> @@ -> a2\n");
+		expect(
+			result.diagnostics.find((item) => item.code === "L002")?.range.start,
+		).toMatchObject({ line: 2, column: 7 });
+	});
+
 	it("analyze: warns when a plain frontmatter scalar is truncated by an inline comment", () => {
 		const src =
 			"---\nartifact:\n  spec:\n    criteria: Details are in issue #123\n---\nspec >> P -> output\n";

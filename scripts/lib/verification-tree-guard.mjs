@@ -1,6 +1,5 @@
-// Asks before a command whose target tree is implicit in cwd runs while this
-// shell's cwd has drifted from its linked worktree back to the main checkout
-// (#840).
+// Asks before a command whose target tree is implicit in cwd runs while the
+// hook reports the main checkout of a repository with linked worktrees (#840).
 //
 // A worktree session's Bash cwd can revert to the main checkout between
 // calls (see CLAUDE.md "worktree でのファイル操作パス"). When that happens, a
@@ -19,19 +18,24 @@
 // Claude Code asks rather than denies: a deliberate check of the main checkout
 // itself (e.g. before a release) is a legitimate reason to run these commands
 // there. Codex does not support PreToolUse ask and continues after the hook
-// failure, so the same decision is converted to deny there (#1013). Retrying
-// with the linked worktree as harness workdir is visible to the guard and
-// allows the command. An advisory is not the alternative: what these commands
+// failure, so the same decision is converted to deny there (#1013). The guard
+// reads payload.cwd, not tool_input.workdir. A harness workdir change only
+// helps if the hook actually observes the linked worktree in payload.cwd;
+// Codex can keep reporting the session's starting cwd instead (#1392).
+// An advisory is not the alternative: what these commands
 // do in the main checkout is write to it, so a note delivered next to the
 // result arrives after the tree has already changed (see hook-io.mjs).
 //
-// The tree this reads is the payload's cwd, which is where the command
-// starts, not where it ends up: a `cd <dir> && make test` is judged on the
-// directory the shell was in before the `cd`. That misses both ways — a
-// drifted shell that cds back into the worktree is asked about anyway, and
-// one that cds out of it is not asked at all. Splitting the directory change
-// into its own call is what makes either case visible, which is why
-// the pfd-ops binding tells a cycle to do that rather than chain the two.
+// The reported cwd is also not reconstructed from shell directory changes:
+// a `cd <dir> && make test` is judged on payload.cwd. That misses both ways —
+// a main-checkout payload that cds into a worktree is asked about anyway,
+// and a worktree payload that cds out of it is not asked at all. Splitting
+// calls or setting workdir alone cannot repair a payload that stays unchanged.
+// Recovery must follow the local worktree guide and normal approvals: use a
+// configured explicit-target wrapper for registered checkouts, or explicit
+// targets in approved normal commands for independent repositories outside
+// that registration. Explicit syntax avoids cwd drift in this guard only;
+// it does not override ownership, main-checkout, or trusted-root checks.
 
 import {
 	splitSegments,
@@ -239,7 +243,8 @@ export function supportsPermissionAsk(environment = process.env) {
 /**
  * Orchestrate one hook payload while keeping harness adaptation outside the
  * semantic guard decision. Codex cannot represent ask, so convert it to a
- * retryable deny instead of letting the command execute after hook failure.
+ * deny instead of letting the command execute after hook failure. Recovery
+ * depends on observable hook inputs and the local approved execution path.
  * @param {string} inputText
  * @param {{resolveRoots: (cwd: string) => {worktreeRoot: string, mainRoot: string, hasLinkedWorktrees: boolean} | null, supportsAsk?: boolean}} io
  * @returns {{shouldOutput: boolean, output?: object}}
@@ -259,9 +264,12 @@ export function runVerificationTreeGuard(
 		: {
 				decision: "deny",
 				reason:
-					`This Bash call starts from the main checkout ('${roots.mainRoot}'), and the hook payload cannot prove that its cwd-implicit command targets the linked worktree that owns the changes. ` +
+					`The hook reports the main checkout ('${roots.mainRoot}') as payload.cwd, and cannot prove that this cwd-implicit command targets the linked worktree that owns the changes. ` +
 					"Codex PreToolUse's ask decision is unsupported, so this command is denied instead of failing open. " +
-					"Retry with the harness workdir set to that linked worktree.",
+					"The guard reads payload.cwd. Changing only tool_input.workdir while payload.cwd is unchanged repeats this denial. " +
+					"For registered pfdsl checkouts, follow your local worktree guide and invoke the configured explicit-target wrapper directly (without a node prefix), with an absolute target, the expected branch, and normal approval. " +
+					"For independent repositories outside that registration, use normal approved commands with an explicit target (for example, make -C <absolute path> test or node <absolute script path>). " +
+					"Set the execution workdir to the same checkout. This guidance does not authorize bypassing ownership, main-checkout, or trusted-root refusals; stop and check the target and permissions if they occur.",
 			};
 	return { shouldOutput: true, output: buildPermissionOutput(adapted) };
 }

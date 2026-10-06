@@ -1,0 +1,73 @@
+{
+	"schemaVersion": 1,
+	"binarySha256": "e0a697fa4007ee13831bc79f4285264fc244048bd72f76d6ee4d23c57831a5a9",
+	"pid": 84454,
+	"boundary": "Only native-display-recheck prefixed evidence from the focused ordinary native run; manifest excludes itself. AX text retains one terminal newline; extra trailing blank lines are removed from the stored transcription. Follow-up evidence review distinguishes sequential caret/menu observations from facts independently visible in retained captures.",
+	"files": [
+		{
+			"file": "native-display-recheck-02-short.png",
+			"bytes": 168155,
+			"sha256": "4040cca8b8f628388f0168dbff39b862d3707155a7b21e60336a44f13f62d0bd"
+		},
+		{
+			"file": "native-display-recheck-06-formatted.png",
+			"bytes": 166648,
+			"sha256": "354c48af0a455326211856a0b7f6986a2f6d466926552d15d85ee860fc9ce9c3"
+		},
+		{
+			"file": "native-display-recheck-14-preview-label.png",
+			"bytes": 186852,
+			"sha256": "64efd6eadd337c8961221098bcb921fec70c0b5cb8ca5697d8b73e99250288fa"
+		},
+		{
+			"file": "native-display-recheck-20-window-item.png",
+			"bytes": 384581,
+			"sha256": "51983be37ddcd197f3ca0f84a8703d3a20a41e338f79da7c684a5a511fed7179"
+		},
+		{
+			"file": "native-display-recheck-23-large-return.png",
+			"bytes": 405750,
+			"sha256": "6cd4a7c7f9823a1d7706b0bc652eadb10e67ec6fc8a564d97c34e31b145b67e5"
+		},
+		{
+			"file": "native-display-recheck-24-large-hundred.png",
+			"bytes": 427847,
+			"sha256": "7b48329aca1f5a6ecc3552ec794befc14918a7a369fa7d9bac74805ecaa855b0"
+		},
+		{
+			"file": "native-display-recheck-25-second-return.png",
+			"bytes": 177069,
+			"sha256": "71858c8eb5c07fbe4068c6b5b43a906133f4a34a1d63d036a2e6868375d65f89"
+		},
+		{
+			"file": "native-display-recheck-ax.txt",
+			"bytes": 74069,
+			"sha256": "0a429e1e19572c9a5ed51f46d3ab9e1ca209d83d18ffaacb72c36042d1e53bc3"
+		},
+		{
+			"file": "native-display-recheck-large-fixture.pfdsl.txt",
+			"bytes": 1388,
+			"sha256": "df31c828012b30c62a503753d677497b0a3e4c0010b5d7192e49483389f06ef8"
+		},
+		{
+			"file": "native-display-recheck-report.json",
+			"bytes": 8168,
+			"sha256": "8df3cdab8484456f529cef42bf381d925edc0b42640f4efc8c167661f3626578"
+		},
+		{
+			"file": "native-display-recheck-report.md",
+			"bytes": 5638,
+			"sha256": "821647fc7bbb052a928cde6131ce1db52108a8562ffcd9d13ce4c7f4588a4c19"
+		},
+		{
+			"file": "native-display-recheck-second-fixture.pfdsl.txt",
+			"bytes": 59,
+			"sha256": "305f6b4f6d043f6f29fb7cb99e749d5422536e45a23b5b43fce99a20677d0bbe"
+		},
+		{
+			"file": "native-display-recheck-short-fixture.pfdsl.txt",
+			"bytes": 61,
+			"sha256": "a26577062a828e18dcde0b95e16b33b028635a60f2c631bd21e04629a1c3aeba"
+		}
+	]
+}

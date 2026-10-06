@@ -1,5 +1,5 @@
 // Host-independent source positions and preview diagnostics.
-import type { AnalyzeResult, Diagnostic, IdNode, Statement } from "@pfdsl/core";
+import type { Diagnostic, IdNode, Statement } from "@pfdsl/core";
 
 /** A cursor position in the editor's own 0-indexed coordinates. */
 export interface CursorPosition {
@@ -26,34 +26,6 @@ export function idsOfStatement(stmt: Statement): IdNode[] {
 		case "node-decl":
 			return [stmt.id];
 	}
-}
-
-/** Every id the document mentions, in no particular order. */
-export function allIdsOfDocument(result: AnalyzeResult): Set<string> {
-	return new Set(
-		result.document.statements.flatMap(idsOfStatement).map((id) => id.value),
-	);
-}
-
-export function nodeIdAtCursor(
-	result: AnalyzeResult,
-	pos: CursorPosition,
-): string | undefined {
-	// vscode pos: 0-indexed; core positions: 1-indexed
-	const line = pos.line + 1;
-	const col = pos.character + 1;
-	for (const stmt of result.document.statements) {
-		for (const id of idsOfStatement(stmt)) {
-			if (
-				id.start.line === line &&
-				col >= id.start.column &&
-				col <= id.end.column
-			) {
-				return id.value;
-			}
-		}
-	}
-	return undefined;
 }
 
 /**

@@ -45,19 +45,23 @@ export function computeLabelFindings(expectedLabels, actualLabels) {
 }
 
 /**
- * @param {object} frontmatter - parsed YAML object
- * @returns {{ id: string, issueNumbers: number[] }[]}
+ * Leading, contiguous iN_ components are the issue references of a process ID.
+ * @param {string} id
+ * @returns {number[]}
  */
+export function issueNumbersOfProcessId(id) {
+	const prefix = id.match(/^(?:i\d+_)+/)?.[0] ?? "";
+	return [...prefix.matchAll(/i(\d+)_/g)].map((m) => Number(m[1]));
+}
+
+/** @param {object} frontmatter @returns {{ id: string, issueNumbers: number[] }[]} */
 export function parseIssueProcesses(frontmatter) {
 	const process = frontmatter.process;
 	if (!process) return [];
 	const result = [];
 	for (const id of Object.keys(process)) {
-		const prefixMatch = id.match(/^(?:i\d+_)+/);
-		if (!prefixMatch) continue;
-		const issueNumbers = [...prefixMatch[0].matchAll(/i(\d+)_/g)].map((m) =>
-			Number(m[1]),
-		);
+		const issueNumbers = issueNumbersOfProcessId(id);
+		if (issueNumbers.length === 0) continue;
 		result.push({ id, issueNumbers });
 	}
 	return result;

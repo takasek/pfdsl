@@ -88,11 +88,7 @@ describe("portable preview lifecycle", () => {
 				await first;
 			}
 			for (const callback of frames.splice(0)) callback(0);
-			expect(inner.style.transform).toBe(
-				focus
-					? "translate(350px, 250px) scale(1)"
-					: "translate(150px, 100px) scale(1)",
-			);
+			expect(inner.style.transform).toBe("translate(150px, 100px) scale(1)");
 		} finally {
 			preview.dispose();
 			container.remove();

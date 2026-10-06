@@ -1,0 +1,25 @@
+{
+	"pid": 88331,
+	"executableSha256": "f6005842e1a7de061d531d09da67002b46d9c9eae89ebac1a19f04bca4451412",
+	"actualReportFilename": "native-report.json",
+	"actualReportExistsAfterCleanup": true,
+	"actualReportSha256": "4cd41072d2011966f46b3ed89a8cfb9a404740bf7ff4b5f703313d0dbaf3222c",
+	"exitBeforeCleanup": null,
+	"exitAfterCleanup": -15,
+	"runnerResult": {
+		"exitCode": 1,
+		"reason": "The parent runner waited for report.json rather than the native host output native-report.json.",
+		"incorrectReportExists": false,
+		"originalLifecycleSha256": "5f09a31546c2ca8f20b6bba50e4795670e7d9f2fc3481c647a1c04bc77863452"
+	},
+	"parentReadback": {
+		"passed": true,
+		"documentCount": 23,
+		"failures": [],
+		"errors": []
+	},
+	"proof": [
+		"The native report was read and all 23 input and 10 frontend fingerprints matched current files after the runner exited.",
+		"The owned process was terminated and waited for by the runner; no additional native execution was needed."
+	]
+}

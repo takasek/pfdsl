@@ -1,0 +1,13 @@
+{
+	"quoted": "---\nartifact:\n  \"alpha item\":\n    label: Alpha\n  \"spare item\":\n    label: Spare\nprocess:\n  \"prep task\":\n    label: Prepare\n---\n\"alpha item\" >> \"prep task\" -> \"result item\"\n\"spare item\"\n",
+	"existing": "---\nartifact:\n  \"alpha item\":\n    label: Alpha\n  \"spare item\":\n    label: Spare\nprocess:\n  \"prep task\":\n    label: Prepare\n---\n\"alpha item\" >> \"prep task\" -> \"result item\"\n\"spare item\" >> \"prep task\"\n\"spare item\"\n",
+	"existingCorrect": true,
+	"undoRestores": true,
+	"redoRestores": true,
+	"added": "---\nartifact:\n  \"alpha item\":\n    label: Alpha\n  \"spare item\":\n    label: Spare\nprocess:\n  \"prep task\":\n    label: Prepare\n---\n\"alpha item\" >> \"prep task\" -> \"result item\"\n\"spare item\" >> \"prep task\"\n\"spare item\"\n",
+	"newCorrect": false,
+	"constructorInitiallyVisible": true,
+	"constructorSource": "---\nprocess:\n  constructor:\n    label: constructor\n---\na >> constructor -> b\n",
+	"constructorDefined": true,
+	"errors": ["p.map is not a function"]
+}

@@ -74,7 +74,11 @@ For JSON consumers, `missing` now contains only IDs absent from the file.
 Failures with exit code 1 return JSON when `--json` is set; invalid usage with exit code 2 still reports text on stderr.
 When an ID exists in the body without a frontmatter definition, the failure payload instead includes `undefinedIds: [{id, kind}]`, `missing`, and a recovery message in `error`.
 Add the definition before retrying; `meta set` does not create it implicitly.
-Definition creation from the preview and CLI remains tracked separately in [Issue #1282](https://github.com/takasek/pfdsl/issues/1282).
+Use `meta create <file> <id> [field=value ...]` to create a body node's definition explicitly, then retry `meta set`.
+The creation command previews by default and writes only with `--write` after validating the complete result.
+Include `status=todo` for a roadmap artifact and meaningful `criteria=...` for a produced artifact.
+Existing definitions and invalid requests leave the file unchanged.
+Preview definition creation remains tracked with its host UI acceptance in [Issue #1282](https://github.com/takasek/pfdsl/issues/1282).
 
 ### Record the applied migration state
 
