@@ -6,6 +6,7 @@ import {
 	findFrontmatterDefinitionRange,
 	findNodeOccurrenceRanges,
 	nodeIdAtSourcePosition,
+	type PreviewEditRequest,
 	positionOfNodeId,
 } from "@pfdsl/editor";
 import * as vscode from "vscode";
@@ -25,6 +26,135 @@ interface PreviewState {
 	sourceViewColumn: vscode.ViewColumn;
 	controller: PreviewController;
 	disposed: boolean;
+}
+
+async function prepareEditSource(state: PreviewState) {
+	if (state.doc.isClosed) {
+		let current: vscode.TextDocument;
+		try {
+			current = await vscode.workspace.openTextDocument(state.doc.uri);
+		} catch {
+			if (!state.disposed)
+				vscode.window.showInformationMessage(
+					"The source document could not be reopened.",
+				);
+			return;
+		}
+		if (state.disposed) return;
+		if (current.isClosed) {
+			vscode.window.showInformationMessage(
+				"The source document could not be reopened.",
+			);
+			return;
+		}
+		state.doc = current;
+		dropAnalyzeCache(current.uri);
+		state.controller.update();
+	}
+	const source = state.doc.getText();
+	const version = state.doc.version;
+	const isCurrent = () =>
+		!state.disposed &&
+		!state.doc.isClosed &&
+		state.doc.version === version &&
+		state.doc.getText() === source;
+	const encoding = state.doc.encoding?.replace(/bom$/, "");
+	const diskEncoding =
+		encoding === "utf8"
+			? "utf-8"
+			: encoding === "utf16le"
+				? "utf-16le"
+				: encoding === "utf16be"
+					? "utf-16be"
+					: undefined;
+	if (
+		diskEncoding &&
+		state.doc.uri.scheme === "file" &&
+		state.doc.isDirty === false &&
+		!vscode.window.visibleTextEditors.some(
+			(editor) => editor.document === state.doc,
+		)
+	) {
+		let diskSource: string;
+		try {
+			diskSource = new TextDecoder(diskEncoding, { fatal: true }).decode(
+				await vscode.workspace.fs.readFile(state.doc.uri),
+			);
+		} catch {
+			if (!state.disposed)
+				vscode.window.showInformationMessage(
+					"The source file could not be read.",
+				);
+			return;
+		}
+		if (!isCurrent()) return;
+		if (diskSource !== source) {
+			vscode.window.showInformationMessage(
+				"The file changed outside VS Code. Reload the source file before editing from the preview.",
+			);
+			return;
+		}
+	}
+	return { source, isCurrent };
+}
+
+async function editFromPreview(
+	state: PreviewState,
+	request: PreviewEditRequest,
+) {
+	const snapshot = await prepareEditSource(state);
+	if (!snapshot?.isCurrent()) return;
+	const result = applyPreviewEdit(snapshot.source, request);
+	if (!result.ok) {
+		vscode.window.showInformationMessage(result.message);
+		return;
+	}
+	if (!snapshot.isCurrent()) return;
+	const edit = new vscode.WorkspaceEdit();
+	edit.replace(
+		state.doc.uri,
+		new vscode.Range(
+			state.doc.positionAt(result.edit.startOffset),
+			state.doc.positionAt(result.edit.endOffset),
+		),
+		result.edit.text,
+	);
+	if (!(await vscode.workspace.applyEdit(edit))) {
+		vscode.window.showInformationMessage(
+			"The preview edit could not be applied.",
+		);
+		return;
+	}
+	if (state.disposed || state.doc.getText() !== result.source) return;
+	if (result.selection) {
+		const { start, end } = result.selection;
+		const range = new vscode.Range(
+			new vscode.Position(start.line - 1, start.column - 1),
+			new vscode.Position(end.line - 1, end.column - 1),
+		);
+		const sourceColumn =
+			vscode.window.visibleTextEditors.find(
+				(editor) => editor.document === state.doc,
+			)?.viewColumn ?? state.sourceViewColumn;
+		const editor = await vscode.window.showTextDocument(state.doc, {
+			viewColumn:
+				sourceColumn === state.panel.viewColumn
+					? vscode.ViewColumn.Beside
+					: sourceColumn,
+			...(request.type === "createDefinition" ? { selection: range } : {}),
+			preserveFocus: request.type === "addConnector",
+		});
+		if (state.disposed || state.doc.getText() !== result.source) return;
+		if (request.type === "createDefinition")
+			editor.selection = new vscode.Selection(range.start, range.end);
+		editor.revealRange(range);
+		if (request.type === "createDefinition")
+			vscode.window.showInformationMessage(
+				result.needsCriteria
+					? "Edit the new label. Add criteria describing how this produced artifact is judged complete (W002)."
+					: "Edit the new label and complete any required metadata.",
+			);
+	}
 }
 
 /** The vscode filesystem, shaped for expandDirectory: fsPaths in, fsPaths out. */
@@ -261,130 +391,7 @@ export function registerPreview(context: vscode.ExtensionContext): {
 				msg.type === "createDefinition" ||
 				msg.type === "addConnector"
 			) {
-				if (state.doc.isClosed) {
-					let current: vscode.TextDocument;
-					try {
-						current = await vscode.workspace.openTextDocument(state.doc.uri);
-					} catch {
-						if (!state.disposed)
-							vscode.window.showInformationMessage(
-								"The source document could not be reopened.",
-							);
-						return;
-					}
-					if (state.disposed) return;
-					if (current.isClosed) {
-						vscode.window.showInformationMessage(
-							"The source document could not be reopened.",
-						);
-						return;
-					}
-					state.doc = current;
-					dropAnalyzeCache(current.uri);
-					state.controller.update();
-				}
-				const source = state.doc.getText();
-				const version = state.doc.version;
-				const encoding = state.doc.encoding?.replace(/bom$/, "");
-				const diskEncoding =
-					encoding === "utf8"
-						? "utf-8"
-						: encoding === "utf16le"
-							? "utf-16le"
-							: encoding === "utf16be"
-								? "utf-16be"
-								: undefined;
-				if (
-					diskEncoding &&
-					state.doc.uri.scheme === "file" &&
-					state.doc.isDirty === false &&
-					!vscode.window.visibleTextEditors.some(
-						(editor) => editor.document === state.doc,
-					)
-				) {
-					let diskSource: string;
-					try {
-						diskSource = new TextDecoder(diskEncoding, { fatal: true }).decode(
-							await vscode.workspace.fs.readFile(state.doc.uri),
-						);
-					} catch {
-						if (!state.disposed)
-							vscode.window.showInformationMessage(
-								"The source file could not be read.",
-							);
-						return;
-					}
-					if (
-						state.disposed ||
-						state.doc.isClosed ||
-						state.doc.version !== version ||
-						state.doc.getText() !== source
-					)
-						return;
-					if (diskSource !== source) {
-						vscode.window.showInformationMessage(
-							"The file changed outside VS Code. Reload the source file before editing from the preview.",
-						);
-						return;
-					}
-				}
-				const result = applyPreviewEdit(source, msg);
-				if (!result.ok) {
-					vscode.window.showInformationMessage(result.message);
-					return;
-				}
-				if (
-					state.disposed ||
-					state.doc.isClosed ||
-					state.doc.version !== version ||
-					state.doc.getText() !== source
-				)
-					return;
-				const edit = new vscode.WorkspaceEdit();
-				edit.replace(
-					state.doc.uri,
-					new vscode.Range(
-						state.doc.positionAt(result.edit.startOffset),
-						state.doc.positionAt(result.edit.endOffset),
-					),
-					result.edit.text,
-				);
-				if (!(await vscode.workspace.applyEdit(edit))) {
-					vscode.window.showInformationMessage(
-						"The preview edit could not be applied.",
-					);
-					return;
-				}
-				if (state.disposed || state.doc.getText() !== result.source) return;
-				if (result.selection) {
-					const { start, end } = result.selection;
-					const range = new vscode.Range(
-						new vscode.Position(start.line - 1, start.column - 1),
-						new vscode.Position(end.line - 1, end.column - 1),
-					);
-					const sourceColumn =
-						vscode.window.visibleTextEditors.find(
-							(editor) => editor.document === state.doc,
-						)?.viewColumn ?? state.sourceViewColumn;
-					const editor = await vscode.window.showTextDocument(state.doc, {
-						viewColumn:
-							sourceColumn === state.panel.viewColumn
-								? vscode.ViewColumn.Beside
-								: sourceColumn,
-						...(msg.type === "createDefinition" ? { selection: range } : {}),
-						preserveFocus: msg.type === "addConnector",
-					});
-					if (state.disposed || state.doc.getText() !== result.source) return;
-					if (msg.type === "createDefinition")
-						editor.selection = new vscode.Selection(range.start, range.end);
-					editor.revealRange(range);
-					if (msg.type === "createDefinition")
-						vscode.window.showInformationMessage(
-							result.needsCriteria
-								? "Edit the new label. Add criteria describing how this produced artifact is judged complete (W002)."
-								: "Edit the new label and complete any required metadata.",
-						);
-				}
+				await editFromPreview(state, msg);
 			} else if (msg.type === "nodeClick") {
 				const editor = vscode.window.visibleTextEditors.find(
 					(e) => e.document === state.doc,
