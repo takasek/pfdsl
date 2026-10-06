@@ -524,7 +524,7 @@ process:
     label: 未定義ノードの定義作成
     description: 本文の解析結果から対象のartifact/process種別を推論し、frontmatterをCST経由で追加する。CLIは初期フィールド・構造・完成ソースを検証してからpreviewまたはwriteし、共有previewは同じcore処理の結果を各ホストのUndo可能な編集へ渡す
     command: node packages/cli/dist/cli.js meta create
-    location: [ "packages/core/src/insert-definition.ts", "packages/cli/src/index.ts", "packages/editor/src/node-operations.ts" ]
+    location: [ "packages/core/src/insert-definition.ts", "packages/cli/src/index.ts", "packages/editor/src/preview-edit.ts" ]
     tags: [ b ]
   reindex_meta:
     label: index採番
