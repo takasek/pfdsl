@@ -555,9 +555,8 @@ export function resolveLoadedPresentation<T extends DocWithFrontmatter>(
 		if (active.has(path)) return null;
 		const doc = docs.get(path);
 		if (doc === undefined) return resolvePresentation([]);
-		// The legacy merger assigns __proto__ through a plain object's setter.
-		// Its resulting prototype can also affect later ID lookups, so a merged
-		// summary is not a context-independent substitute for that source.
+		// Keep the expanded merge for prototype-sensitive metadata: legacy
+		// status/tag values can affect subsequent lookups through their prototype.
 		if (
 			Object.hasOwn(doc.frontmatter?.statusStyles ?? {}, "__proto__") ||
 			Object.hasOwn(doc.frontmatter?.tag ?? {}, "__proto__") ||
@@ -759,7 +758,14 @@ export function resolvePresentation(
 			}
 			for (const [id, groupMeta] of Object.entries(fm.group)) {
 				if (groupMeta === undefined) continue;
-				group[id] = { ...(group[id] ?? {}), ...groupMeta };
+				const existing = Object.hasOwn(group, id) ? group[id] : undefined;
+				// Authored IDs must be own data properties, including __proto__.
+				Object.defineProperty(group, id, {
+					value: { ...existing, ...groupMeta },
+					enumerable: true,
+					configurable: true,
+					writable: true,
+				});
 			}
 		}
 	}
