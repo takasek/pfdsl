@@ -1,11 +1,11 @@
 import {
-	escapeRe,
+	analyzeSource,
 	formatId,
 	ID_PATTERN,
-	loadFrontmatter,
 	type NodeKind,
 	type NormalizedEdge,
 } from "@pfdsl/core";
+import { idsOfStatement } from "./preview-logic.js";
 
 /** The DSL role the current node plays in the edge being built. */
 export type ConnectorRole = "artifact" | "process";
@@ -24,8 +24,29 @@ export function buildConnectorEdgeLine(
 	connector: ConnectorKind,
 	otherId: string,
 ): string {
-	const node = formatId(nodeId);
-	const other = formatId(otherId);
+	return connectorSyntax(
+		formatId(nodeId),
+		nodeRole,
+		connector,
+		formatId(otherId),
+	);
+}
+
+/** A syntax example with a placeholder rather than a literal endpoint ID. */
+export function connectorChoiceLabel(
+	nodeId: string,
+	nodeRole: ConnectorRole,
+	connector: ConnectorKind,
+): string {
+	return connectorSyntax(formatId(nodeId), nodeRole, connector, "…");
+}
+
+function connectorSyntax(
+	node: string,
+	nodeRole: ConnectorRole,
+	connector: ConnectorKind,
+	other: string,
+): string {
 	if (connector === "->") {
 		return nodeRole === "process"
 			? `${node} -> ${other}`
@@ -43,22 +64,6 @@ export interface ConnectorInsertion {
 	anchored: boolean;
 }
 
-const CONTINUATION_PREFIXES = [">>?", ">>", "->"];
-
-/**
- * Whole-ID match for nodeId, boundary-aware against the DSL's `-` arrow
- * character: a trailing `-` only breaks the match if it is NOT the start of
- * `->` (an ID's own hyphen still breaks it, e.g. nodeId "build" must not
- * match inside "build-foo", but must match in "build->x" with no space
- * before the arrow).
- */
-function wholeIdPattern(nodeId: string): RegExp {
-	return new RegExp(
-		`(?<![\\p{L}\\p{N}_-])${escapeRe(nodeId)}(?![\\p{L}\\p{N}_]|-(?!>))`,
-		"u",
-	);
-}
-
 /**
  * Body line index (0-indexed) of the nodeId occurrence nearest cursorLine
  * (nearest by line distance; ties favor the later occurrence), extended
@@ -72,30 +77,24 @@ function findRelatedLineIndex(
 	nodeId: string,
 	cursorLine?: number,
 ): number | undefined {
-	const { bodyStartLine } = loadFrontmatter(source);
-	const lines = source.split("\n");
-	const bodyStart = Math.max(bodyStartLine - 1, 0);
-	const pattern = wholeIdPattern(nodeId);
-
-	const matches: number[] = [];
-	for (let i = bodyStart; i < lines.length; i++) {
-		const line = lines[i];
-		if (line !== undefined && pattern.test(line)) matches.push(i);
-	}
+	const matches = analyzeSource(source).document.statements.flatMap(
+		(statement) =>
+			idsOfStatement(statement)
+				.filter((id) => id.value === nodeId)
+				.map((id) => ({
+					line: id.start.line - 1,
+					endLine: statement.end.line - 1,
+				})),
+	);
 	if (matches.length === 0) return undefined;
 
 	const reference = cursorLine ?? Number.POSITIVE_INFINITY;
-	const best = matches.reduce((closest, i) =>
-		Math.abs(i - reference) <= Math.abs(closest - reference) ? i : closest,
+	const best = matches.reduce((closest, match) =>
+		Math.abs(match.line - reference) <= Math.abs(closest.line - reference)
+			? match
+			: closest,
 	);
-
-	let idx = best;
-	while (idx + 1 < lines.length) {
-		const next = lines[idx + 1]?.trimStart() ?? "";
-		if (!CONTINUATION_PREFIXES.some((op) => next.startsWith(op))) break;
-		idx++;
-	}
-	return idx;
+	return best.endLine;
 }
 
 /**

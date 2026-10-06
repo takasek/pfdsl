@@ -131,9 +131,38 @@ export type PreviewEditResult =
 	| {
 			ok: true;
 			source: string;
+			edit: { startOffset: number; endOffset: number; text: string };
 			selection?: Range | undefined;
 			needsCriteria?: boolean | undefined;
 	  };
+
+/** One contiguous edit, retaining the common prefix/suffix and whole CRLF pairs. */
+function sourceEdit(before: string, after: string) {
+	let startOffset = 0;
+	while (
+		startOffset < before.length &&
+		startOffset < after.length &&
+		before[startOffset] === after[startOffset]
+	)
+		startOffset++;
+	let endOffset = before.length;
+	let afterEnd = after.length;
+	while (
+		endOffset > startOffset &&
+		afterEnd > startOffset &&
+		before[endOffset - 1] === after[afterEnd - 1]
+	) {
+		endOffset--;
+		afterEnd--;
+	}
+	if (before[startOffset - 1] === "\r" && before[startOffset] === "\n")
+		startOffset--;
+	if (before[endOffset - 1] === "\r" && before[endOffset] === "\n") {
+		endOffset++;
+		afterEnd++;
+	}
+	return { startOffset, endOffset, text: after.slice(startOffset, afterEnd) };
+}
 
 /** A menu belongs to the exact authored source from which its candidates were calculated. */
 export function applyPreviewEdit(
@@ -172,6 +201,7 @@ export function applyPreviewEdit(
 		return {
 			ok: true,
 			source: output,
+			edit: sourceEdit(source, output),
 			selection: target?.labelRange,
 			needsCriteria: target?.needsCriteria,
 		};
@@ -201,8 +231,21 @@ export function applyPreviewEdit(
 		request.connector,
 		request.otherId,
 	);
+	const inserted = insertConnectorEdge(source, edge, request.nodeId);
+	const offset =
+		inserted.text.split("\n").slice(0, inserted.insertedLine).join("\n")
+			.length +
+		(inserted.insertedLine ? 1 : 0) +
+		edge.length;
+	const caret = {
+		line: inserted.insertedLine + 1,
+		column: edge.length + 1,
+		offset,
+	};
 	return {
 		ok: true,
-		source: insertConnectorEdge(source, edge, request.nodeId).text,
+		source: inserted.text,
+		edit: sourceEdit(source, inserted.text),
+		selection: { start: caret, end: caret },
 	};
 }

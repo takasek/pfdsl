@@ -180,12 +180,14 @@ beforeEach(() => {
 function prepare(source: string, id: string) {
 	const document = host.document(source, id);
 	host.textDocuments.push(document);
+	const preceding = source.slice(0, source.lastIndexOf(id)).split("\n");
+	const position = new host.api.Position(
+		preceding.length - 1,
+		preceding.at(-1)!.length,
+	);
 	const action = host.providers[0]!.provideCodeActions(
 		document,
-		new host.api.Range(
-			new host.api.Position(0, 0),
-			new host.api.Position(0, 0),
-		),
+		new host.api.Range(position, position),
 	)![0]!;
 	return { document, action };
 }
@@ -202,6 +204,19 @@ function selectedText(editor: ReturnType<typeof host.editor>) {
 }
 
 describe("definition Quick Fix", () => {
+	it("resolves the complete quoted ID without a bare-word range", () => {
+		const source = 'a >> "my process" -> out\n';
+		const doc = host.document(source, "my process");
+		vi.spyOn(doc, "getWordRangeAtPosition").mockReturnValue(undefined);
+		const pos = new host.api.Position(0, 12);
+		const actions = host.providers[0]!.provideCodeActions(
+			doc,
+			new host.api.Range(pos, pos),
+		);
+		expect(actions?.[0]?.title).toBe(
+			'Insert process definition for "my process"',
+		);
+	});
 	it("retains one frontmatter-only WorkspaceEdit and wires its follow-up command", async () => {
 		const source =
 			'---\n# retained\nartifact: {input: {label: "Input"}}\n---\ninput >> build -> out # body remains\n';

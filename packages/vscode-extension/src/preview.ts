@@ -267,10 +267,10 @@ export function registerPreview(context: vscode.ExtensionContext): {
 				edit.replace(
 					state.doc.uri,
 					new vscode.Range(
-						new vscode.Position(0, 0),
-						state.doc.positionAt(source.length),
+						state.doc.positionAt(result.edit.startOffset),
+						state.doc.positionAt(result.edit.endOffset),
 					),
-					result.source,
+					result.edit.text,
 				);
 				if (!(await vscode.workspace.applyEdit(edit))) {
 					vscode.window.showInformationMessage(
@@ -292,11 +292,12 @@ export function registerPreview(context: vscode.ExtensionContext): {
 					if (state.disposed || state.doc.getText() !== result.source) return;
 					editor.selection = new vscode.Selection(range.start, range.end);
 					editor.revealRange(range);
-					vscode.window.showInformationMessage(
-						result.needsCriteria
-							? "Edit the new label. Add criteria describing how this produced artifact is judged complete (W002)."
-							: "Edit the new label and complete any required metadata.",
-					);
+					if (msg.type === "createDefinition")
+						vscode.window.showInformationMessage(
+							result.needsCriteria
+								? "Edit the new label. Add criteria describing how this produced artifact is judged complete (W002)."
+								: "Edit the new label and complete any required metadata.",
+						);
 				}
 			} else if (msg.type === "nodeClick") {
 				const editor = vscode.window.visibleTextEditors.find(

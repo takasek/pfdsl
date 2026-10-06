@@ -93,7 +93,15 @@ export function createDocumentTab({
 				editor.pushUndoStop();
 				editor.executeEdits(
 					"pfdsl.preview",
-					[{ range: model.getFullModelRange(), text: result.source }],
+					[
+						{
+							range: monaco.Range.fromPositions(
+								model.getPositionAt(result.edit.startOffset),
+								model.getPositionAt(result.edit.endOffset),
+							),
+							text: result.edit.text,
+						},
+					],
 					selections,
 				);
 				editor.pushUndoStop();

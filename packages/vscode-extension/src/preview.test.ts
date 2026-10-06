@@ -257,7 +257,11 @@ it("applies source-bound node creation as one WorkspaceEdit and rejects a stale 
 	const edit = host.api.workspace.applyEdit.mock.calls[0]![0];
 	expect(edit.replacements).toHaveLength(1);
 	expect(edit.replacements[0]!.text).toContain("label: b");
-	expect(edit.replacements[0]!.text.endsWith(source)).toBe(true);
+	expect(edit.replacements[0]!.range.start).toEqual(
+		new host.api.Position(0, 0),
+	);
+	expect(edit.replacements[0]!.range.end).toEqual(new host.api.Position(0, 0));
+	expect(edit.replacements[0]!.text).not.toContain("a >> p");
 	await panel.receive({
 		type: "addConnector",
 		nodeId: "a",
@@ -275,6 +279,48 @@ it("applies source-bound node creation as one WorkspaceEdit and rejects a stale 
 		otherId: "q",
 	});
 	expect(host.api.workspace.applyEdit).toHaveBeenCalledTimes(1);
+});
+
+it("inserts a preview connection locally and reveals its caret without label guidance", async () => {
+	const { open } = setup();
+	let source = "first >> task -> old\na >> p -> b\nlast >> finish -> end\n";
+	const original = source;
+	const doc = document("connection-edit", source);
+	vi.spyOn(doc, "getText").mockImplementation(() => source);
+	host.api.workspace.applyEdit.mockImplementationOnce(async (edit) => {
+		const replacement = edit.replacements[0]!;
+		const offset = (pos: { line: number; character: number }) =>
+			original
+				.split("\n")
+				.slice(0, pos.line)
+				.reduce((n, line) => n + line.length + 1, 0) + pos.character;
+		source =
+			original.slice(0, offset(replacement.range.start)) +
+			replacement.text +
+			original.slice(offset(replacement.range.end));
+		return true;
+	});
+	const panel = await open(doc);
+	await panel.receive({
+		type: "addConnector",
+		nodeId: "p",
+		source,
+		connector: "->",
+		otherId: "new_result",
+	});
+	const replacement =
+		host.api.workspace.applyEdit.mock.calls[0]![0].replacements[0]!;
+	expect(replacement.range.start.line).toBe(2);
+	expect(replacement.range.end.line).toBe(2);
+	expect(replacement.text).toBe("p -> new_result\n");
+	expect(source).toBe(
+		"first >> task -> old\na >> p -> b\np -> new_result\nlast >> finish -> end\n",
+	);
+	const editor = await host.window.showTextDocument.mock.results.at(-1)!.value;
+	expect(editor.selection!.start.line).toBe(2);
+	expect(editor.selection!.start.character).toBe("p -> new_result".length);
+	expect(editor.revealRange).toHaveBeenCalled();
+	expect(host.window.showInformationMessage).not.toHaveBeenCalled();
 });
 
 describe("registered preview file navigation", () => {

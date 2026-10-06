@@ -174,3 +174,54 @@ a >> p -> b
 	expect(dot).toContain('color="blue"');
 	expect(dot).toContain('fillcolor="green"');
 });
+
+it.each([
+	"\n",
+	"\r\n",
+])("returns a local edit and insertion caret with %j line endings", (eol) => {
+	const source = [
+		"first >> task -> old",
+		"a >> p -> b",
+		"last >> finish -> end",
+		"",
+	].join(eol);
+	const result = applyPreviewEdit(source, {
+		type: "addConnector",
+		source,
+		nodeId: "p",
+		connector: "->",
+		otherId: "new_result",
+	});
+	if (!result.ok) throw new Error(result.message);
+	expect(result.edit).toBeDefined();
+	const { startOffset, endOffset, text } = result.edit;
+	expect(source.slice(0, startOffset) + text + source.slice(endOffset)).toBe(
+		result.source,
+	);
+	expect(startOffset).toBeGreaterThan(source.indexOf("a >> p"));
+	expect(endOffset).toBeLessThanOrEqual(source.indexOf("last >>"));
+	expect(text).toContain("p -> new_result");
+	expect(result.selection?.start.line).toBe(3);
+	expect(result.selection?.start.column).toBe("p -> new_result".length + 1);
+});
+
+it.each([
+	"a >> p",
+	"a >> p\r\n",
+	"---\nprocess: {p: {label: P}}\n---\n",
+])("describes an exact edit for EOF and definition-only insertion: %j", (source) => {
+	const result = applyPreviewEdit(source, {
+		type: "addConnector",
+		source,
+		nodeId: "p",
+		connector: "->",
+		otherId: "new_result",
+	});
+	if (!result.ok) throw new Error(result.message);
+	expect(result.edit).toBeDefined();
+	const { startOffset, endOffset, text } = result.edit;
+	expect(source.slice(0, startOffset) + text + source.slice(endOffset)).toBe(
+		result.source,
+	);
+	expect(result.selection).toBeDefined();
+});

@@ -1,5 +1,9 @@
-import { ID_PATTERN, insertDefinition } from "@pfdsl/core";
-import { findDefinitionEditTarget, findUndefinedNodeKind } from "@pfdsl/editor";
+import { insertDefinition } from "@pfdsl/core";
+import {
+	findDefinitionEditTarget,
+	findUndefinedNodeKind,
+	nodeIdAtSourcePosition,
+} from "@pfdsl/editor";
 import * as vscode from "vscode";
 import { analyzeDocument, LANGUAGE_ID } from "./analyze.js";
 
@@ -64,19 +68,14 @@ export function registerDefInsertion(context: vscode.ExtensionContext): void {
 	const provider: vscode.CodeActionProvider = {
 		provideCodeActions(document, range) {
 			if (document.languageId !== LANGUAGE_ID) return;
-			const wordRange = document.getWordRangeAtPosition(
-				range.start,
-				ID_PATTERN,
-			);
-			if (!wordRange) return;
-			const id = document.getText(wordRange);
-
-			const { frontmatter, nodeKinds, bodyStartLine } =
-				analyzeDocument(document);
+			const model = analyzeDocument(document);
+			const source = document.getText();
+			const id = nodeIdAtSourcePosition(model, source, range.start);
+			if (id === undefined) return;
+			const { frontmatter, nodeKinds, bodyStartLine } = model;
 			const kind = findUndefinedNodeKind(nodeKinds, frontmatter, id);
 			if (!kind) return;
 
-			const source = document.getText();
 			const { inserted, output } = insertDefinition(source, kind, id);
 			if (!inserted) return;
 

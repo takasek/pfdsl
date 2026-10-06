@@ -92,6 +92,28 @@ describe("buildConnectorEdgeLine", () => {
 });
 
 describe("insertConnectorEdge", () => {
+	it.each([
+		'x"y',
+		"x\\y",
+		"x\ny",
+	])("anchors escaped quoted ID %j at its authored statement", (id) => {
+		const source = `a >> ${JSON.stringify(id)} -> b\nc >> q -> d\n\n\n`;
+		const edge = buildConnectorEdgeLine(id, "process", "->", "extra");
+		const result = insertConnectorEdge(source, edge, id, 0);
+		expect(result.anchored).toBe(true);
+		expect(result.insertedLine).toBe(1);
+		expect(result.text).toBe(
+			`a >> ${JSON.stringify(id)} -> b\n${edge}\nc >> q -> d\n\n\n`,
+		);
+	});
+	it("does not anchor at comments or a substring inside another quoted ID", () => {
+		const source = 'a >> build -> b\nc >> "my build" -> d # build\n';
+		const result = insertConnectorEdge(source, "build -> extra", "build");
+		expect(result.insertedLine).toBe(1);
+		expect(result.text).toBe(
+			'a >> build -> b\nbuild -> extra\nc >> "my build" -> d # build\n',
+		);
+	});
 	it("uses CRLF for an anchored line while preserving authored comments and blank lines", () => {
 		const source = "a >> p -> b\r\n# keep this comment\r\n\r\n";
 		expect(insertConnectorEdge(source, "c >> p", "p")).toEqual({

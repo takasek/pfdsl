@@ -85,13 +85,25 @@ export function nodeIdAtSourcePosition(
 	source: string,
 	position: CursorPosition,
 ): string | undefined {
+	return nodeOccurrenceAtSourcePosition(model, source, position)?.nodeId;
+}
+
+/** The full authored token used by editor commands and hover ranges. */
+export function nodeOccurrenceAtSourcePosition(
+	model: SourceModel,
+	source: string,
+	position: CursorPosition,
+): { nodeId: string; range: Range } | undefined {
 	const definition = authoredNodeDeclarations(model, source).find(({ range }) =>
 		containsPosition(range, position),
 	);
-	if (definition) return definition.id;
-	return model.document.statements
+	if (definition) return { nodeId: definition.id, range: definition.range };
+	const token = model.document.statements
 		.flatMap(idsOfStatement)
-		.find((id) => containsPosition(id, position))?.value;
+		.find((id) => containsPosition(id, position));
+	return token
+		? { nodeId: token.value, range: { start: token.start, end: token.end } }
+		: undefined;
 }
 
 /** Advance from the current occurrence, wrapping within the current snapshot. */

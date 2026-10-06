@@ -1,17 +1,16 @@
-import { ID_PATTERN } from "@pfdsl/core";
 import {
 	buildConnectorEdgeLine,
 	type ConnectorKind,
 	type ConnectorRole,
 	compatibleOtherKind,
+	connectorChoiceLabel,
 	edgeAlreadyExists,
 	insertConnectorEdge,
+	nodeIdAtSourcePosition,
 	validateNewNodeId,
 } from "@pfdsl/editor";
 import * as vscode from "vscode";
 import { analyzeDocument, LANGUAGE_ID } from "./analyze.js";
-
-const PLACEHOLDER = "…";
 
 /** Labels show the resulting edge syntax directly, adapted to the current node's role. */
 function connectorItemsFor(
@@ -22,17 +21,17 @@ function connectorItemsFor(
 		return [
 			{
 				connector: ">>",
-				label: `${nodeId} >> ${PLACEHOLDER}`,
+				label: connectorChoiceLabel(nodeId, nodeRole, ">>"),
 				description: "Add as normal input to a process",
 			},
 			{
 				connector: ">>?",
-				label: `${nodeId} >>? ${PLACEHOLDER}`,
+				label: connectorChoiceLabel(nodeId, nodeRole, ">>?"),
 				description: "Add as feedback input to a process",
 			},
 			{
 				connector: "->",
-				label: `${PLACEHOLDER} -> ${nodeId}`,
+				label: connectorChoiceLabel(nodeId, nodeRole, "->"),
 				description: "Add as the output of a process",
 			},
 		];
@@ -40,17 +39,17 @@ function connectorItemsFor(
 	return [
 		{
 			connector: ">>",
-			label: `${PLACEHOLDER} >> ${nodeId}`,
+			label: connectorChoiceLabel(nodeId, nodeRole, ">>"),
 			description: "Add a normal input",
 		},
 		{
 			connector: ">>?",
-			label: `${PLACEHOLDER} >>? ${nodeId}`,
+			label: connectorChoiceLabel(nodeId, nodeRole, ">>?"),
 			description: "Add a feedback input",
 		},
 		{
 			connector: "->",
-			label: `${nodeId} -> ${PLACEHOLDER}`,
+			label: connectorChoiceLabel(nodeId, nodeRole, "->"),
 			description: "Add an output",
 		},
 	];
@@ -60,9 +59,14 @@ function nodeIdAtCursor(
 	editor: vscode.TextEditor,
 ): { nodeId: string; line: number } | undefined {
 	const { document: doc, selection } = editor;
-	const range = doc.getWordRangeAtPosition(selection.active, ID_PATTERN);
-	if (!range) return undefined;
-	return { nodeId: doc.getText(range), line: selection.active.line };
+	const nodeId = nodeIdAtSourcePosition(
+		analyzeDocument(doc),
+		doc.getText(),
+		selection.active,
+	);
+	return nodeId === undefined
+		? undefined
+		: { nodeId, line: selection.active.line };
 }
 
 export function registerConnectorEditing(
@@ -150,7 +154,7 @@ export function registerConnectorEditing(
 
 			if (edgeAlreadyExists(edges, nodeId, nodeRole, connector, otherId)) {
 				const choice = await vscode.window.showWarningMessage(
-					`"${buildConnectorEdgeLine(nodeId, nodeRole, connector, otherId)}" already exists.`,
+					`Connection ${buildConnectorEdgeLine(nodeId, nodeRole, connector, otherId)} already exists.`,
 					{ modal: true },
 					"Add anyway",
 				);

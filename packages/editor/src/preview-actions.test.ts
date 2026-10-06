@@ -225,3 +225,116 @@ it("does not accept stale local graph completion after target change, redraw or 
 	).toBe("none");
 	expect(s.container.querySelector("#tooltip svg")).toBeNull();
 });
+
+it("keeps keyboard focus in the pan coordinate system after browser scrolling", async () => {
+	const s = setup();
+	await s.preview.receive(s.message);
+	s.root.scrollLeft = 80;
+	s.root.scrollTop = 50;
+	s.node("p").focus();
+	expect([s.root.scrollLeft, s.root.scrollTop]).toEqual([0, 0]);
+	expect(s.node("p").classList.contains("pfdsl-focus-cue")).toBe(true);
+});
+
+it.each([
+	false,
+	true,
+])("drops a removed action target after redraw (error recovery: %s)", async (recover) => {
+	const s = setup();
+	await s.preview.receive(s.message);
+	s.node("p").dispatchEvent(
+		new KeyboardEvent("keydown", { key: "Enter", bubbles: true }),
+	);
+	if (recover) await s.preview.receive({ type: "error", message: "Broken" });
+	await s.preview.receive({
+		...s.message,
+		editing: { source: "a\n", nodes: [s.message.editing.nodes[0]!] },
+	});
+	s.container.querySelector<HTMLButtonElement>("#node-actions-toggle")!.click();
+	expect(s.container.querySelector<HTMLElement>("#node-actions")!.hidden).toBe(
+		false,
+	);
+	expect(s.container.querySelector("#node-actions-title")!.textContent).toBe(
+		"artifact: a",
+	);
+});
+
+it("uses an unquoted placeholder in connection choices", async () => {
+	const s = setup();
+	await s.preview.receive(s.message);
+	s.node("p").dispatchEvent(
+		new KeyboardEvent("keydown", { key: "Enter", bubbles: true }),
+	);
+	expect(
+		[...s.container.querySelectorAll("#connector-kind option")].map(
+			(o) => o.textContent,
+		),
+	).toEqual(["… >> p", "… >>? p", "p -> …"]);
+});
+
+it("retains the minimap SVG on focus and resize, but replaces it after rendering", async () => {
+	const s = setup();
+	await s.preview.receive(s.message);
+	const clone = s.container.querySelector("#minimap-svg svg")!;
+	await s.preview.receive({ type: "focus", nodeId: "a" });
+	window.dispatchEvent(new Event("resize"));
+	expect(s.container.querySelector("#minimap-svg svg")).toBe(clone);
+	await s.preview.receive(s.message);
+	expect(s.container.querySelector("#minimap-svg svg")).not.toBe(clone);
+});
+
+it("reuses neighborhood rendering within a revision and invalidates it on redraw", async () => {
+	vi.useFakeTimers();
+	const s = setup();
+	await s.preview.receive(s.message);
+	for (const id of ["a", "p", "a"]) {
+		s.node(id).dispatchEvent(new MouseEvent("mousemove", { bubbles: true }));
+		await vi.advanceTimersByTimeAsync(1);
+	}
+	expect(s.renderDot).toHaveBeenCalledTimes(3);
+	await s.preview.receive(s.message);
+	s.node("a").dispatchEvent(new MouseEvent("mousemove", { bubbles: true }));
+	await vi.advanceTimersByTimeAsync(1);
+	expect(s.renderDot).toHaveBeenCalledTimes(5);
+});
+
+it("shares in-flight neighborhood renders and ignores completion after redraw", async () => {
+	vi.useFakeTimers();
+	const resolveLocals: Array<(value: string) => void> = [];
+	const renderDot = vi.fn(async (dot: string) =>
+		dot === "main"
+			? svg
+			: new Promise<string>((resolve) => {
+					resolveLocals.push(resolve);
+				}),
+	);
+	const s = setup(renderDot);
+	await s.preview.receive(s.message);
+	for (const id of ["a", "p", "a"]) {
+		s.node(id).dispatchEvent(new MouseEvent("mousemove", { bubbles: true }));
+		await vi.advanceTimersByTimeAsync(1);
+	}
+	expect(renderDot).toHaveBeenCalledTimes(3);
+	await s.preview.receive(s.message);
+	for (const resolve of resolveLocals) resolve(svg);
+	await vi.advanceTimersByTimeAsync(1);
+	expect(
+		s.container.querySelector("#tooltip")!.getAttribute("style"),
+	).toContain("display: none");
+});
+
+it("retries a failed neighborhood render instead of caching the rejection", async () => {
+	vi.useFakeTimers();
+	const renderDot = vi
+		.fn(async (_dot: string) => svg)
+		.mockImplementationOnce(async () => svg)
+		.mockRejectedValueOnce(new Error("layout failed"));
+	const s = setup(renderDot);
+	await s.preview.receive(s.message);
+	for (const id of ["a", "p", "a"]) {
+		s.node(id).dispatchEvent(new MouseEvent("mousemove", { bubbles: true }));
+		await vi.advanceTimersByTimeAsync(1);
+	}
+	expect(renderDot).toHaveBeenCalledTimes(4);
+	expect(s.container.querySelector("#tooltip svg")).not.toBeNull();
+});

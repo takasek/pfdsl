@@ -1,9 +1,9 @@
 import type { DiffReport } from "@pfdsl/core";
 import { renderDotToSvg } from "@pfdsl/preview-engine/renderer";
 import {
-	buildConnectorEdgeLine,
 	type ConnectorKind,
 	compatibleOtherKind,
+	connectorChoiceLabel,
 } from "./connector-logic.js";
 import { buildDiffPanelHtml } from "./diff-panel.js";
 import type { MessageFromWebview, MessageToWebview } from "./messages.js";
@@ -90,6 +90,7 @@ export function mountPreview(container: HTMLElement, host: PreviewHost) {
 	let selectedNodeId: string | undefined;
 	let hoverId: string | undefined;
 	let hoverToken = 0;
+	const hoverSvgs = new Map<string, Promise<string>>();
 	let hideTimer: number | undefined;
 	let cueTimer: number | undefined;
 	let cuedNode: Element | undefined;
@@ -127,12 +128,7 @@ export function mountPreview(container: HTMLElement, host: PreviewHost) {
 		for (const connector of [">>", ">>?", "->"] as const) {
 			const option = document.createElement("option");
 			option.value = connector;
-			option.textContent = buildConnectorEdgeLine(
-				id,
-				node.kind,
-				connector,
-				"…",
-			);
+			option.textContent = connectorChoiceLabel(id, node.kind, connector);
 			connectorKind.append(option);
 		}
 		connectorExisting.replaceChildren();
@@ -253,7 +249,7 @@ export function mountPreview(container: HTMLElement, host: PreviewHost) {
 		hideHover();
 		[...inner.querySelectorAll<HTMLElement>("g.node")]
 			.find((n) => n.dataset.nodeId === id)
-			?.focus();
+			?.focus({ preventScroll: true });
 	}
 	on(tooltip, "click", (e) => navigateLocal(e.target));
 	on(tooltip, "keydown", (e) => {
@@ -292,7 +288,14 @@ export function mountPreview(container: HTMLElement, host: PreviewHost) {
 		hoverId = nodeId;
 		const token = ++hoverToken;
 		const hoverRevision = revision;
-		const localDot = graphData ? neighborhoodDot(graphData, nodeId) : undefined;
+		let localSvg = hoverSvgs.get(nodeId);
+		if (!localSvg && graphData) {
+			const dot = neighborhoodDot(graphData, nodeId);
+			if (dot) {
+				localSvg = Promise.resolve().then(() => renderDot(dot));
+				hoverSvgs.set(nodeId, localSvg);
+			}
+		}
 		const desc = Object.hasOwn(descriptions, nodeId)
 			? descriptions[nodeId]
 			: undefined;
@@ -310,7 +313,7 @@ export function mountPreview(container: HTMLElement, host: PreviewHost) {
 								? `${modKey}+Click to open URL`
 								: `${modKey}+Click to open file`
 							: null;
-		if (!desc && !hint && !localDot) {
+		if (!desc && !hint && !localSvg) {
 			hideHover();
 			return;
 		}
@@ -347,9 +350,9 @@ export function mountPreview(container: HTMLElement, host: PreviewHost) {
 		tooltip.innerHTML = parts.join("");
 		tooltip.style.display = "block";
 		clampTooltip(x + 14, y + 14);
-		if (!localDot) return;
+		if (!localSvg) return;
 		try {
-			const svg = await renderDot(localDot);
+			const svg = await localSvg;
 			if (
 				disposed ||
 				hoverRevision !== revision ||
@@ -375,6 +378,7 @@ export function mountPreview(container: HTMLElement, host: PreviewHost) {
 			tooltip.append(local);
 			clampTooltip(x + 14, y + 14);
 		} catch {
+			if (hoverSvgs.get(nodeId) === localSvg) hoverSvgs.delete(nodeId);
 			if (disposed || token !== hoverToken || hoverRevision !== revision)
 				return;
 			const message = document.createElement("p");
@@ -395,8 +399,13 @@ export function mountPreview(container: HTMLElement, host: PreviewHost) {
 		const node = (e.target as Element).closest?.("g.node");
 		if (!node) return;
 		selectedNodeId = (node as HTMLElement).dataset.nodeId;
+		root.scrollLeft = root.scrollTop = 0;
+		if (selectedNodeId) focusNode(selectedNodeId, true);
 		const rect = node.getBoundingClientRect();
 		void showHover(node, rect.right, rect.bottom);
+	});
+	on(root, "scroll", () => {
+		root.scrollLeft = root.scrollTop = 0;
 	});
 
 	on(root, "mouseleave", (e) => {
@@ -506,6 +515,7 @@ export function mountPreview(container: HTMLElement, host: PreviewHost) {
 	}
 
 	function applyTransform() {
+		root.scrollLeft = root.scrollTop = 0;
 		inner.style.transform = `translate(${panX}px, ${panY}px) scale(${scale})`;
 		inner.style.transformOrigin = "0 0";
 		updateControls();
@@ -560,12 +570,17 @@ export function mountPreview(container: HTMLElement, host: PreviewHost) {
 			hasPositioned = true;
 		}
 		if (pendingFocusNodeId) {
-			selectedNodeId = pendingFocusNodeId;
+			selectedNodeId = editingData?.nodes.some(
+				(n) => n.id === pendingFocusNodeId,
+			)
+				? pendingFocusNodeId
+				: undefined;
 			focusNode(pendingFocusNodeId, pendingFocusCue);
 			pendingFocusNodeId = undefined;
 			pendingFocusCue = false;
 		}
-		refreshMinimap();
+		if (minimapSvg.firstElementChild) updateMinimapVp();
+		else refreshMinimap();
 	}
 	const resizeObserver =
 		typeof window.ResizeObserver === "function"
@@ -701,6 +716,8 @@ export function mountPreview(container: HTMLElement, host: PreviewHost) {
 	}
 
 	function showError(message: string) {
+		hoverSvgs.clear();
+		selectedNodeId = pendingFocusNodeId = undefined;
 		hideHover();
 		closeActions();
 		clearCue();
@@ -746,6 +763,7 @@ export function mountPreview(container: HTMLElement, host: PreviewHost) {
 			return;
 		}
 		if (msg.type !== "render") return;
+		hoverSvgs.clear();
 		hideHover();
 		closeActions();
 		clearCue();
@@ -762,6 +780,8 @@ export function mountPreview(container: HTMLElement, host: PreviewHost) {
 			subflows = msg.subflows ?? {};
 			graphData = msg.graph;
 			editingData = msg.editing;
+			if (!editingData?.nodes.some((n) => n.id === selectedNodeId))
+				selectedNodeId = undefined;
 			actionsToggle.disabled = !editingData?.nodes.length;
 			inner.innerHTML = svg;
 			error.hidden = true;
@@ -811,6 +831,7 @@ export function mountPreview(container: HTMLElement, host: PreviewHost) {
 	return {
 		receive,
 		dispose() {
+			hoverSvgs.clear();
 			hideHover();
 			closeActions();
 			clearCue();
