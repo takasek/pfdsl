@@ -21,6 +21,39 @@ beforeEach(() => {
 afterEach(() => rmSync(dir, { recursive: true, force: true }));
 
 describe("meta create", () => {
+	it.each([
+		"my process",
+		'release\'s "output"',
+		'"literal quotes"',
+	])("takes the semantic ID %j without interpreting DSL quotes", async (id) => {
+		const source = `a >> ${JSON.stringify(id)} -> b\n`;
+		writeFileSync(file, source);
+		const quoted = await run([
+			"meta",
+			"create",
+			file,
+			JSON.stringify(id),
+			"--write",
+		]);
+		expect(quoted.exitCode).toBe(1);
+		expect(readFileSync(file, "utf8")).toBe(source);
+		const raw = await run(["meta", "create", file, id, "--write"]);
+		expect(raw.exitCode).toBe(0);
+		expect(
+			Object.hasOwn(
+				analyze(readFileSync(file, "utf8")).frontmatter!.process!,
+				id,
+			),
+		).toBe(true);
+	});
+
+	it("documents the semantic-ID contract and the distinction from meta set", async () => {
+		const result = await run(["meta", "create", "--help"]);
+		expect(result.stdout).toContain(
+			"The id argument is one semantic ID, not a DSL-quoted ID list",
+		);
+		expect(result.stdout).toContain("meta set accepts a DSL-quoted ID list");
+	});
 	it("previews a process definition inferred from the body without writing", async () => {
 		const source = "a >> p -> b\n";
 		writeFileSync(file, source);

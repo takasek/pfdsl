@@ -3539,6 +3539,10 @@ Create a frontmatter definition for one node already present in the body.
 The artifact or process kind is inferred from the authored graph. Existing
 definitions, absent ids, ambiguous kinds and unreadable frontmatter are
 refused. The default label is the id; label=value replaces that initial label.
+The id argument is one semantic ID, not a DSL-quoted ID list. Use shell
+quoting to pass spaces as one argument, for example 'my process'. Do not
+include the DSL's surrounding double quotes. Literal quotes and commas
+inside the semantic ID are retained. In contrast, meta set accepts a DSL-quoted ID list.
 Without --write, print the completed source as a preview. With --write, report
 the created definition's file and line. Comments, quotes, folded line breaks,
 the source's line endings and the body are preserved by the core CST writer.
@@ -3554,6 +3558,7 @@ roadmap file. The completed source must have no errors before any write;
 every failure leaves the original file unchanged.
 
 Examples:
+  pfdsl meta create plan.pfdsl 'my process' --write
   pfdsl meta create plan.pfdsl build location=src/build.ts updated_at=2026-10-05 --allow-unknown --write
   pfdsl meta create plan.pfdsl release status=todo --write
 

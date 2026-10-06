@@ -71,6 +71,8 @@ Run `pfdsl --help` or `pfdsl <command> --help` for full usage and exit codes.
 ## Creating node definitions
 
 `meta create` creates a frontmatter entry for an artifact or process already present in the graph body.
+Its ID argument is the semantic name without DSL quotation marks; shell-quote a name with spaces, for example `pfdsl meta create plan.pfdsl 'my process' --write`.
+Literal quotes and commas inside the name remain part of the ID; unlike `meta set`, this argument is not a DSL-quoted ID list.
 It previews the complete result by default; add `--write` to update the file.
 Supply initial scalar fields as `field=value`, using the same field rules as `meta set`.
 For a roadmap artifact, supply a valid status explicitly; for a produced artifact, supply completion criteria.
