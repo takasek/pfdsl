@@ -527,15 +527,19 @@ export function runCheck(file: string, opts: CheckOptions = {}): CommandResult {
 	// --- Extends checks ---
 	const presets = new Set<string>();
 	const extendsDiags = new Map<string, Diagnostic & { file?: string }>();
+	// The file `check` was given is the one whose diagnostics carry no `file`,
+	// wherever in the graph it turns up, so every other file is named.
+	const inFile = (
+		diagnostic: Diagnostic,
+		path: string,
+	): Diagnostic & { file?: string } =>
+		path === absFile ? diagnostic : { ...diagnostic, file: path };
 	for (const parentPath of subflowGraph.docs.keys()) {
 		const chain = loadExtendsChain(parentPath, load);
 		for (const { file: holder, ...diagnostic } of chain.diagnostics) {
 			// The loader treats `parentPath` as its entry and leaves `file` off
-			// what that entry holds, so name the holder here. The file `check` was
-			// given is the one that carries no `file`.
-			const from = holder ?? parentPath;
-			const attributed =
-				from === absFile ? diagnostic : { ...diagnostic, file: from };
+			// what that entry holds, so name the holder here.
+			const attributed = inFile(diagnostic, holder ?? parentPath);
 			extendsDiags.set(JSON.stringify(attributed), attributed);
 		}
 		for (const path of chain.docs.keys())
@@ -558,7 +562,7 @@ export function runCheck(file: string, opts: CheckOptions = {}): CommandResult {
 		if (doc)
 			multiDiags.push(
 				...validatePresetKeys(path, doc.frontmatter, doc.document).map(
-					(diagnostic) => ({ ...diagnostic, file: path }),
+					(diagnostic) => inFile(diagnostic, path),
 				),
 			);
 	}

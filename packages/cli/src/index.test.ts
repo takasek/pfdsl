@@ -3014,7 +3014,8 @@ describe("multifile check — which file a loader diagnostic points at", () => {
 		expect(found[0]).toMatchObject({ file: join(d, "s.yaml") });
 	});
 
-	it("reports the entry's missing preset once when a child's preset chain reaches the entry", async () => {
+	/** A child whose preset chain comes back to the entry, which also misses a preset. */
+	const writeChainReachingEntry = () => {
 		writeFileSync(
 			join(d, "entry.pfdsl"),
 			"---\nextends: ./gone.yaml\nprocess:\n  p:\n    subflow: ./child.pfdsl\n---\nin >> p -> out\n",
@@ -3024,11 +3025,38 @@ describe("multifile check — which file a loader diagnostic points at", () => {
 			"---\nextends: ./back.yaml\n---\nin >> q -> out\n",
 		);
 		writeFileSync(join(d, "back.yaml"), "extends: ./entry.pfdsl\n");
+	};
+
+	it("reports the entry's missing preset once when a child's preset chain reaches the entry", async () => {
+		writeChainReachingEntry();
 		const r = await run(["check", join(d, "entry.pfdsl"), "--json"]);
 		expect(r.exitCode).toBe(1);
 		const found = jsonFor(r.stdout, "V026");
 		expect(found).toHaveLength(1);
 		expect(found[0]).not.toHaveProperty("file");
+	});
+
+	// The entry reached as a preset is still the file `check` was given: it is
+	// printed under the path as given and carries no `file`, like its V026.
+	it("names the entry one way when a preset chain reaches it and its own presets are validated", async () => {
+		writeChainReachingEntry();
+		const given = `${d}/./entry.pfdsl`;
+		const text = await run(["check", given]);
+		expect(text.exitCode).toBe(1);
+		for (const code of ["V026", "V028"]) {
+			const lines = linesFor(text.stderr, code);
+			expect(lines.length).toBeGreaterThan(0);
+			const prefix = `${given}:1:1: error [${code}]`;
+			expect(lines.map((line) => prefixOf(line, prefix))).toEqual(
+				lines.map(() => prefix),
+			);
+		}
+		const lines = linesFor(text.stderr, "V028");
+		const json = await run(["check", given, "--json"]);
+		const found = jsonFor(json.stdout, "V028");
+		expect(found).toHaveLength(lines.length);
+		for (const diagnostic of found)
+			expect(diagnostic).not.toHaveProperty("file");
 	});
 });
 
