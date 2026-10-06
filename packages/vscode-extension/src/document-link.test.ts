@@ -98,15 +98,18 @@ vi.mock("vscode", () => host.api);
 import { clearAnalyzeCache } from "./analyze.js";
 import { registerDocumentLinks } from "./document-link.js";
 
-async function provide(location: string) {
+/** One artifact per location, so a document can carry several links. */
+async function provideAll(locations: string[]) {
 	registerDocumentLinks({
 		subscriptions: [],
 	} as unknown as vscode.ExtensionContext);
+	const artifacts = locations
+		.map((location, i) => `  a${i}:\n    location: "${location}"\n`)
+		.join("");
 	const doc = {
 		uri: host.api.Uri.file("/repo/.pfdsl/roadmap.pfdsl"),
 		version: 1,
-		getText: () =>
-			`---\nbasePath: ../\nartifact:\n  spec:\n    location: "${location}"\n---\n`,
+		getText: () => `---\nbasePath: ../\nartifact:\n${artifacts}---\n`,
 	} as unknown as vscode.TextDocument;
 	return (
 		(await host
@@ -114,6 +117,8 @@ async function provide(location: string) {
 			.provideDocumentLinks(doc, {} as vscode.CancellationToken)) ?? []
 	);
 }
+
+const provide = (location: string) => provideAll([location]);
 
 beforeEach(() => {
 	vi.clearAllMocks();
@@ -151,6 +156,21 @@ describe("registered document link provider", () => {
 		const links = await provide(target);
 		expect(links[0]?.target?.toString()).toBe(target);
 		expect(host.stat).not.toHaveBeenCalled();
+	});
+
+	// `://` makes a value a URL, but VS Code's Uri.parse throws when the scheme
+	// has characters it does not accept. One such value must not take the other
+	// links in the document down with it.
+	it.each([
+		"foo bar://x",
+		"日本語://x",
+	])("skips only the link whose URI VS Code cannot parse: %s", async (broken) => {
+		// The fake follows VS Code in rejecting these, so the case is real.
+		expect(() => host.api.Uri.parse(broken)).toThrow();
+		const links = await provideAll([broken, "docs/ok.md"]);
+		expect(links.map((link) => link.target?.toString())).toEqual([
+			"file:///repo/docs/ok.md",
+		]);
 	});
 
 	it("keeps URI-special characters in a quoted local filename", async () => {

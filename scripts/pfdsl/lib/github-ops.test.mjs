@@ -199,14 +199,12 @@ describe("createGitHubOps parity: gh backend vs HTTP backend", () => {
 				state: "OPEN",
 				stateReason: null,
 				labels: [{ name: "flow:managed" }],
-				updatedAt: "2026-01-01T00:00:00Z",
 			},
 			{
 				number: 2,
 				state: "CLOSED",
 				stateReason: "COMPLETED",
 				labels: [],
-				updatedAt: "2026-01-02T00:00:00Z",
 			},
 		];
 		const ghOps = createGitHubOps({
@@ -220,14 +218,12 @@ describe("createGitHubOps parity: gh backend vs HTTP backend", () => {
 					state: "open",
 					state_reason: null,
 					labels: [{ name: "flow:managed" }],
-					updated_at: "2026-01-01T00:00:00Z",
 				},
 				{
 					number: 2,
 					state: "closed",
 					state_reason: "completed",
 					labels: [],
-					updated_at: "2026-01-02T00:00:00Z",
 				},
 			]),
 		});

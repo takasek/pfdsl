@@ -25,11 +25,14 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const root = resolve(__dirname, "../..");
 const githubOps = createGitHubOps({ cwd: root });
 
+// Every finding for an issue named here fails the audit.
+// Once any issue is named, the findings for all other issues only advise.
+// Label findings are not about an issue, so they keep their own severity.
+/** @type {number[]} */
+let enforcedIssues = [];
 // node:util rather than a shared helper because this file is mirrored into
 // .claude/skills/pfd-ops/install/ and runs in adopting repos, which have no
 // scripts/lib/. Strict parsing keeps removed mutation modes rejected.
-/** @type {number[]} issues whose missing_process must fail rather than advise */
-let enforcedIssues = [];
 try {
 	const { values } = parseArgs({
 		args: process.argv.slice(2),

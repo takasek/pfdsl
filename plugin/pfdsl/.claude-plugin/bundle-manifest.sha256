@@ -28,7 +28,7 @@ e07809b079ce3ef3aeb896dc070f3ac507f6fe9eb70e02938c13ca446570ca82  skills/pfd-gri
 
 f6d66d456a4484b237b6005f93fb9572246e01e3c623ce578effc17789944fe0  skills/pfd-ops/install/.github/workflows/pfdsl-sweep-completed-chains.yml
 
-fac323f2cff21f7b88dc2e6c63f6fbfe559205f00bfe77d2f2b489124edbfa15  skills/pfd-ops/install/scripts/pfdsl/audit-issues-flow.mjs
+d863baa74ca31965a69a12df59589a1c158339494cc5ed9aefa08a5a512f7aaa  skills/pfd-ops/install/scripts/pfdsl/audit-issues-flow.mjs
 
 e5e4a9e59d4a0b82d50ab9219f7b16c71cefa4f938e2feb9a62795aa7a3a4833  skills/pfd-ops/install/scripts/pfdsl/lib/chain-sweep.mjs
 
@@ -38,9 +38,9 @@ c3f2fa839ba9590b4c6ebc97746546e5b626a09435d64d012c85a65622d9c1e5  skills/pfd-ops
 
 ac6f9e9959367f8d63561cef333cb4bf42ae18d8cbf1a8879651e95ea71bfd84  skills/pfd-ops/install/scripts/pfdsl/lib/gh-exec.mjs
 
-32e369b6d8f8b32449bbf8989e7d1c62c50145ac176ecdef996d5d838a05f482  skills/pfd-ops/install/scripts/pfdsl/lib/github-ops.mjs
+80b32af418f80cae1627decbd32dc9a3c7f6b8d82b5f22632b310fcc9d5a7d52  skills/pfd-ops/install/scripts/pfdsl/lib/github-ops.mjs
 
-7bde2609a5558ef3135b5bb2316eecde245de0df036fbbe6a9a2c6fab69bc746  skills/pfd-ops/install/scripts/pfdsl/lib/github-rest.mjs
+50e114f0721dee90dc29d87a421e27cd5547dd7f50f0bf0478859c09a3c216b9  skills/pfd-ops/install/scripts/pfdsl/lib/github-rest.mjs
 
 f552eacff51d2e57e6a26078e4dd6f0d571131544124dca00fc21babc1e234ae  skills/pfd-ops/install/scripts/pfdsl/lib/issues-flow-audit.mjs
 

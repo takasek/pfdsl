@@ -1,9 +1,5 @@
 # @pfdsl/cli
 
-For a file on disk, `check` validates reachable subflows and their preset chains as separate documents, including nested boundaries and file-local diagnostics.
-`--strict` applies to those dependencies too; shared files are analyzed once per check.
-An invalid entry document stops the check before dependencies are loaded, and stdin (`-`) skips relative dependencies.
-
 Command-line interface for the [PFDSL](https://github.com/takasek/pfdsl) toolchain.
 
 ## Requirements
@@ -88,6 +84,12 @@ The command preserves the graph body and existing YAML comments and quoting.
 Existing definitions, invalid fields, unsafe YAML structures, or a result with error diagnostics leave the file unchanged.
 `--json` reports whether the definition was created and written, its kind and line, and the complete output when previewing.
 Use `--allow-unknown` to add an extension scalar field; it does not bypass validation of known fields.
+
+## Checking multi-file diagrams
+
+For a file on disk, `check` validates reachable subflows and their preset chains as separate documents, including nested boundaries and file-local diagnostics.
+`--strict` applies to those dependencies too; shared files are analyzed once per check.
+An invalid entry document stops the check before dependencies are loaded, and stdin (`-`) skips relative dependencies.
 
 ## Planning with ready counts
 

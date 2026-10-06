@@ -16,11 +16,6 @@ VSCode language support for [PFDSL](https://github.com/takasek/pfdsl), a DSL for
 
 Open any `.pfdsl` file. The preview icon appears in the editor title bar — click it to open a side-by-side SVG preview.
 
-In the preview, Cmd+click (macOS) or Ctrl+click opens a node's local location or subflow source in the editor.
-URL locations open through their URL handler.
-Double-click jumps to the node in the source.
-Each preview stays attached to its own file; to view an opened subflow, run **PFDSL: Open Preview to the Side** from that child file.
-
 Place the cursor on a node ID in the graph body or its frontmatter definition key, then run **PFDSL: Cycle Node Occurrences** from the editor context menu or press **Ctrl+K Ctrl+Alt+N** (**⌘+K ⌘+Alt+N** on macOS).
 The command selects and reveals the definition key, then every body occurrence in document order, and wraps back to the definition.
 Starting from a body occurrence advances to the next occurrence; repeating the command uses the current edited document.
@@ -62,6 +57,11 @@ spec >>? design
 [spec, codebase] >> implement -> code
 code >> review -> review_report
 ```
+
+In the preview, Cmd+click (macOS) or Ctrl+click opens a node's local location or subflow source in the editor.
+URL locations open through their URL handler.
+Double-click jumps to the node in the source.
+Each preview stays attached to its own file; to view an opened subflow, run **PFDSL: Open Preview to the Side** from that child file.
 
 ## Development
 

@@ -157,7 +157,7 @@ esac
 		rmSync(tree, { recursive: true, force: true });
 	});
 
-	function audit(labels, issueLabels) {
+	function audit(labels, issueLabels, args = []) {
 		const env = {
 			...process.env,
 			PATH: `${join(tree, "bin")}:${process.env.PATH}`,
@@ -176,7 +176,7 @@ esac
 		delete env.GITHUB_TOKEN;
 		return spawnSync(
 			process.execPath,
-			[join(tree, "scripts/pfdsl/audit-issues-flow.mjs")],
+			[join(tree, "scripts/pfdsl/audit-issues-flow.mjs"), ...args],
 			{ encoding: "utf-8", env },
 		);
 	}
@@ -211,6 +211,19 @@ esac
 		assert.equal(result.status, 1, result.stdout + result.stderr);
 		assert.match(result.stdout, /label_missing \[flow:exempt\]/);
 		assert.doesNotMatch(result.stdout, /roadmap\.pfdsl is in sync/);
+	});
+
+	// --enforce-issue scopes which issues block; it does not scope the label
+	// check, which no issue owns.
+	it("fails on a missing label under --enforce-issue, while another issue's finding only advises", () => {
+		const result = audit([managed], [], ["--enforce-issue", "9"]);
+		assert.equal(result.status, 1, result.stdout + result.stderr);
+		assert.match(result.stdout, /^label:\n {2}label_missing \[flow:exempt\]/m);
+		assert.match(
+			result.stdout,
+			/advisory \(does not fail this audit\):\n {2}#5 missing_label/,
+		);
+		assert.doesNotMatch(result.stdout, /^blocking:/m);
 	});
 
 	it("passes with matching labels and in-sync issues", () => {

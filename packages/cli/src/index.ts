@@ -395,8 +395,16 @@ function fileLoader(
 	}
 }
 
-function diagText(diags: Diagnostic[], file: string, color = false): string {
-	return `${diags.map((d) => formatDiagnostic(d, file, color)).join("\n")}\n`;
+/**
+ * One line per diagnostic. A diagnostic that carries a `file` belongs to that
+ * file; the rest belong to `file`, the one the command was given.
+ */
+function diagText(
+	diags: (Diagnostic & { file?: string })[],
+	file: string,
+	color = false,
+): string {
+	return `${diags.map((d) => formatDiagnostic(d, d.file ?? file, color)).join("\n")}\n`;
 }
 
 /**
@@ -415,7 +423,7 @@ function failJson(
 }
 
 function failIfErrors(
-	diags: Diagnostic[],
+	diags: (Diagnostic & { file?: string })[],
 	file: string,
 	json = false,
 	color = false,
@@ -434,7 +442,7 @@ function failIfErrors(
 function refuseWith(
 	message: string,
 	file: string,
-	errs: Diagnostic[] | undefined,
+	errs: (Diagnostic & { file?: string })[] | undefined,
 	json = false,
 	color = false,
 ): CommandResult {
@@ -527,10 +535,20 @@ export function runCheck(file: string, opts: CheckOptions = {}): CommandResult {
 	// --- Extends checks ---
 	const presets = new Set<string>();
 	const extendsDiags = new Map<string, Diagnostic & { file?: string }>();
+	// The file `check` was given is the one whose diagnostics carry no `file`,
+	// wherever in the graph it turns up, so every other file is named.
+	const inFile = (
+		diagnostic: Diagnostic,
+		path: string,
+	): Diagnostic & { file?: string } =>
+		path === absFile ? diagnostic : { ...diagnostic, file: path };
 	for (const parentPath of subflowGraph.docs.keys()) {
 		const chain = loadExtendsChain(parentPath, load);
-		for (const diagnostic of chain.diagnostics) {
-			extendsDiags.set(JSON.stringify(diagnostic), diagnostic);
+		for (const { file: holder, ...diagnostic } of chain.diagnostics) {
+			// The loader treats `parentPath` as its entry and leaves `file` off
+			// what that entry holds, so name the holder here.
+			const attributed = inFile(diagnostic, holder ?? parentPath);
+			extendsDiags.set(JSON.stringify(attributed), attributed);
 		}
 		for (const path of chain.docs.keys())
 			if (path !== parentPath) presets.add(path);
@@ -552,7 +570,7 @@ export function runCheck(file: string, opts: CheckOptions = {}): CommandResult {
 		if (doc)
 			multiDiags.push(
 				...validatePresetKeys(path, doc.frontmatter, doc.document).map(
-					(diagnostic) => ({ ...diagnostic, file: path }),
+					(diagnostic) => inFile(diagnostic, path),
 				),
 			);
 	}
@@ -715,7 +733,9 @@ export function runDelete(
 		const presetKeyDiagnostics = [...docs]
 			.filter(([path]) => path !== absFile)
 			.flatMap(([path, doc]) =>
-				validatePresetKeys(path, doc.frontmatter, doc.document),
+				validatePresetKeys(path, doc.frontmatter, doc.document).map(
+					(diagnostic) => ({ ...diagnostic, file: path }),
+				),
 			);
 		const presetDiagnostics = [...docs]
 			.filter(([path]) => path !== absFile)
@@ -1726,7 +1746,9 @@ export function runRename(
 		const presetKeyDiagnostics = [...docs]
 			.filter(([path]) => path !== absFile)
 			.flatMap(([path, doc]) =>
-				validatePresetKeys(path, doc.frontmatter, doc.document),
+				validatePresetKeys(path, doc.frontmatter, doc.document).map(
+					(diagnostic) => ({ ...diagnostic, file: path }),
+				),
 			);
 		const failedExtends = failIfErrors(
 			[...extendsDiagnostics, ...presetKeyDiagnostics],
