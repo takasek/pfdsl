@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
+import { parseIssueProcesses } from "../pfdsl/lib/issues-flow-audit.mjs";
 import {
 	buildGateCheckCommand,
 	countBehind,
@@ -287,4 +288,22 @@ describe("isUnregisteredManagedIssue", () => {
 	it("stays quiet for an unlabelled issue: triage is a different finding", () => {
 		assert.equal(isUnregisteredManagedIssue([], null), false);
 	});
+});
+it("preflight and flow audit agree on contiguous prefixes and reject near numbers", () => {
+	for (const id of [
+		"i1352_i1282_i483_improve_preview",
+		"i4830_near",
+		"work_i483_later",
+		"i1352_gap_i483",
+	]) {
+		const source = `process:\n  ${id}:\n    label: Work\n`;
+		const issues =
+			parseIssueProcesses({ process: { [id]: {} } })[0]?.issueNumbers ?? [];
+		for (const issue of [1352, 1282, 483, 4830, 135]) {
+			assert.equal(
+				findProcessIdForIssueNumber(source, issue),
+				issues.includes(issue) ? id : null,
+			);
+		}
+	}
 });
