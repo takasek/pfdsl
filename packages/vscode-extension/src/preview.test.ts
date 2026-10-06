@@ -332,6 +332,39 @@ it("reveals a local preview connection while preserving preview focus and source
 	expect(host.window.showInformationMessage).not.toHaveBeenCalled();
 });
 
+it("refreshes a preview edit from the replacement document after the source is closed", async () => {
+	const { preview, open } = setup();
+	const source = "a >> p -> b\n";
+	const original = document("reopened-source", source);
+	Object.assign(original, { isClosed: true });
+	const panel = await open(original, 1);
+	Object.assign(panel, { viewColumn: 1 });
+	panel.receive({ type: "ready" });
+	const reopened = document("reopened-source", `${source}p -> after_close\n`);
+	Object.assign(reopened, { version: 2 });
+	host.api.workspace.applyEdit.mockImplementationOnce(async () => {
+		host.changeDocument(reopened);
+		return true;
+	});
+	await panel.receive({
+		type: "addConnector",
+		nodeId: "p",
+		source,
+		connector: "->",
+		otherId: "after_close",
+	});
+	expect(preview.getActivePreviewDoc()).toBe(reopened);
+	expect(panel.messages.at(-1)).toMatchObject({
+		type: "render",
+		editing: { source: reopened.getText() },
+	});
+	expect(host.window.showTextDocument).toHaveBeenCalledWith(reopened, {
+		viewColumn: host.api.ViewColumn.Beside,
+		preserveFocus: true,
+	});
+	expect(original.getText()).toBe(source);
+});
+
 it.each([
 	"closed",
 	"moved",

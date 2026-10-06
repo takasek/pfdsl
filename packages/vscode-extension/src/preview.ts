@@ -406,7 +406,10 @@ export function registerPreview(context: vscode.ExtensionContext): {
 
 		vscode.workspace.onDidChangeTextDocument((e) => {
 			const state = panels.get(e.document.uri.toString());
-			state?.controller.update();
+			if (state) {
+				state.doc = e.document;
+				state.controller.update();
+			}
 		}),
 
 		vscode.window.onDidChangeTextEditorSelection((e) => {

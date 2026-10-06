@@ -973,15 +973,21 @@ async function assertPreviewEditingFocus(session) {
 	);
 	const modifier = process.platform === "darwin" ? "Meta" : "Control";
 	await page.keyboard.press(`${modifier}+s`);
+	await waitForInteraction(
+		"definition changes are saved before closing the source",
+		() => readFile(session.fixturePath, "utf8"),
+		(text) => text.includes("Smoke output"),
+		{ timeoutMs: coldRenderTimeoutMs },
+	);
+	await sourceTab.click();
 	await page.keyboard.press(`${modifier}+w`);
 	await waitForInteraction(
 		"closing the only source tab removes its editor group",
 		() => page.locator(".editor-group-container").count(),
 		(count) => count === 1,
+		{ timeoutMs: coldRenderTimeoutMs },
 	);
-	await frame
-		.locator('#inner g.node[data-node-id="p"]')
-		.click({ button: "right" });
+	await frame.locator('#inner g.node[data-node-id="p"]').press("Enter");
 	await frame.locator("#connector-kind").selectOption("->");
 	await frame.locator("#connector-target").fill("reopened_result");
 	await frame
