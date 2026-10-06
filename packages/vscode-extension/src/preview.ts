@@ -18,6 +18,7 @@ import { requireActivePfdslEditor } from "./utils.js";
 interface PreviewState {
 	panel: vscode.WebviewPanel;
 	doc: vscode.TextDocument;
+	sourceViewColumn: vscode.ViewColumn;
 	controller: PreviewController;
 	disposed: boolean;
 }
@@ -208,6 +209,11 @@ export function registerPreview(context: vscode.ExtensionContext): {
 		focusNodeId?: string,
 	): PreviewState {
 		const docUri = doc.uri.toString();
+		const sourceViewColumn =
+			vscode.window.visibleTextEditors.find((editor) => editor.document === doc)
+				?.viewColumn ??
+			vscode.window.activeTextEditor?.viewColumn ??
+			vscode.ViewColumn.One;
 		const scriptUri = vscode.Uri.joinPath(
 			context.extensionUri,
 			"dist",
@@ -232,6 +238,7 @@ export function registerPreview(context: vscode.ExtensionContext): {
 		const state: PreviewState = {
 			panel,
 			doc,
+			sourceViewColumn,
 			disposed: false,
 			controller: new PreviewController(
 				(focus) => renderUpdate(state, focus),
@@ -285,12 +292,21 @@ export function registerPreview(context: vscode.ExtensionContext): {
 						new vscode.Position(start.line - 1, start.column - 1),
 						new vscode.Position(end.line - 1, end.column - 1),
 					);
+					const sourceColumn =
+						vscode.window.visibleTextEditors.find(
+							(editor) => editor.document === state.doc,
+						)?.viewColumn ?? state.sourceViewColumn;
 					const editor = await vscode.window.showTextDocument(state.doc, {
-						selection: range,
-						preserveFocus: false,
+						viewColumn:
+							sourceColumn === state.panel.viewColumn
+								? vscode.ViewColumn.Beside
+								: sourceColumn,
+						...(msg.type === "createDefinition" ? { selection: range } : {}),
+						preserveFocus: msg.type === "addConnector",
 					});
 					if (state.disposed || state.doc.getText() !== result.source) return;
-					editor.selection = new vscode.Selection(range.start, range.end);
+					if (msg.type === "createDefinition")
+						editor.selection = new vscode.Selection(range.start, range.end);
 					editor.revealRange(range);
 					if (msg.type === "createDefinition")
 						vscode.window.showInformationMessage(

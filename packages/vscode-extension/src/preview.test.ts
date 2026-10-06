@@ -129,7 +129,7 @@ const host = vi.hoisted(() => {
 				joinPath: (base: { path: string }, ...parts: string[]) =>
 					uri([base.path, ...parts].join("/")),
 			},
-			ViewColumn: { Beside: 2 },
+			ViewColumn: { One: 1, Beside: 2 },
 			FileType: { File: 1, Directory: 2 },
 			ExtensionMode: { Development: 2 },
 		},
@@ -197,9 +197,10 @@ function setup() {
 		subscriptions: [],
 	} as unknown as vscode.ExtensionContext;
 	const preview = registerPreview(context);
-	async function open(doc: vscode.TextDocument) {
+	async function open(doc: vscode.TextDocument, viewColumn = 1) {
 		host.window.activeTextEditor = {
 			document: doc,
+			viewColumn,
 			selection: { active: { line: 0, character: 0 } },
 		} as vscode.TextEditor;
 		await host.commands.get("pfdsl.preview")!();
@@ -281,7 +282,7 @@ it("applies source-bound node creation as one WorkspaceEdit and rejects a stale 
 	expect(host.api.workspace.applyEdit).toHaveBeenCalledTimes(1);
 });
 
-it("inserts a preview connection locally and reveals its caret without label guidance", async () => {
+it("reveals a local preview connection while preserving preview focus and source selection", async () => {
 	const { open } = setup();
 	let source = "first >> task -> old\na >> p -> b\nlast >> finish -> end\n";
 	const original = source;
@@ -317,10 +318,54 @@ it("inserts a preview connection locally and reveals its caret without label gui
 		"first >> task -> old\na >> p -> b\np -> new_result\nlast >> finish -> end\n",
 	);
 	const editor = await host.window.showTextDocument.mock.results.at(-1)!.value;
-	expect(editor.selection!.start.line).toBe(2);
-	expect(editor.selection!.start.character).toBe("p -> new_result".length);
-	expect(editor.revealRange).toHaveBeenCalled();
+	expect(host.window.showTextDocument).toHaveBeenCalledWith(doc, {
+		viewColumn: 1,
+		preserveFocus: true,
+	});
+	expect(editor.selection).toBeUndefined();
+	expect(editor.revealRange).toHaveBeenCalledWith(
+		new host.api.Range(
+			new host.api.Position(2, "p -> new_result".length),
+			new host.api.Position(2, "p -> new_result".length),
+		),
+	);
 	expect(host.window.showInformationMessage).not.toHaveBeenCalled();
+});
+
+it.each([
+	"closed",
+	"moved",
+	"group removed",
+])("keeps definition creation outside the preview column (source: %s)", async (state) => {
+	const { open } = setup();
+	const source = "a >> p -> b\n";
+	const doc = document("definition-column", source);
+	const panel = await open(doc, 3);
+	if (state === "moved")
+		host.window.visibleTextEditors = [
+			{ document: doc, viewColumn: 4 },
+		] as vscode.TextEditor[];
+	if (state === "group removed") Object.assign(panel, { viewColumn: 3 });
+	host.api.workspace.applyEdit.mockImplementationOnce(async (edit) => {
+		vi.spyOn(doc, "getText").mockReturnValue(
+			edit.replacements[0]!.text + source,
+		);
+		return true;
+	});
+	await panel.receive({ type: "createDefinition", nodeId: "b", source });
+	expect(host.window.showTextDocument).toHaveBeenCalledWith(
+		doc,
+		expect.objectContaining({
+			viewColumn:
+				state === "moved"
+					? 4
+					: state === "group removed"
+						? host.api.ViewColumn.Beside
+						: 3,
+			preserveFocus: false,
+			selection: expect.any(host.api.Range),
+		}),
+	);
 });
 
 describe("registered preview file navigation", () => {

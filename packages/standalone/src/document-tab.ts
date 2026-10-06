@@ -102,12 +102,12 @@ export function createDocumentTab({
 							text: result.edit.text,
 						},
 					],
-					selections,
+					message.type === "createDefinition" ? selections : undefined,
 				);
 				editor.pushUndoStop();
 				if (result.selection) {
 					editor.revealRangeInCenter(selections![0]!);
-					editor.focus();
+					if (message.type === "createDefinition") editor.focus();
 				}
 				reportStatus(
 					result.needsCriteria

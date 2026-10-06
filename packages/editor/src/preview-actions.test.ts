@@ -226,6 +226,30 @@ it("does not accept stale local graph completion after target change, redraw or 
 	expect(s.container.querySelector("#tooltip svg")).toBeNull();
 });
 
+it("keeps a right-clicked node stationary until its context menu opens", async () => {
+	const s = setup();
+	await s.preview.receive(s.message);
+	const inner = s.container.querySelector<HTMLElement>("#inner")!;
+	const transform = inner.style.transform;
+	const press = new MouseEvent("mousedown", {
+		bubbles: true,
+		cancelable: true,
+		button: 2,
+	});
+	s.node("a").dispatchEvent(press);
+	expect(press.defaultPrevented).toBe(true);
+	expect(inner.style.transform).toBe(transform);
+	s.node("a").dispatchEvent(
+		new MouseEvent("contextmenu", { bubbles: true, cancelable: true }),
+	);
+	expect(s.container.querySelector<HTMLElement>("#node-actions")!.hidden).toBe(
+		false,
+	);
+	expect(s.container.querySelector("#node-actions-title")!.textContent).toBe(
+		"artifact: a",
+	);
+});
+
 it("keeps keyboard focus in the pan coordinate system after browser scrolling", async () => {
 	const s = setup();
 	await s.preview.receive(s.message);
@@ -234,6 +258,50 @@ it("keeps keyboard focus in the pan coordinate system after browser scrolling", 
 	s.node("p").focus();
 	expect([s.root.scrollLeft, s.root.scrollTop]).toEqual([0, 0]);
 	expect(s.node("p").classList.contains("pfdsl-focus-cue")).toBe(true);
+});
+
+it("keeps manual pan when the same node regains focus, but reveals a different focused node", async () => {
+	const s = setup();
+	await s.preview.receive(s.message);
+	s.node("p").focus();
+	s.root.dispatchEvent(
+		new MouseEvent("mousedown", {
+			bubbles: true,
+			button: 0,
+			clientX: 10,
+			clientY: 20,
+		}),
+	);
+	window.dispatchEvent(
+		new MouseEvent("mousemove", { buttons: 1, clientX: 60, clientY: 50 }),
+	);
+	window.dispatchEvent(new MouseEvent("mouseup"));
+	const inner = s.container.querySelector<HTMLElement>("#inner")!;
+	const panned = inner.style.transform;
+	s.container.querySelector<HTMLButtonElement>("#preview-help-toggle")!.focus();
+	s.root.scrollLeft = 30;
+	s.node("p").focus();
+	expect(inner.style.transform).toBe(panned);
+	expect(s.root.scrollLeft).toBe(0);
+	s.node("a").focus();
+	expect(inner.style.transform).not.toBe(panned);
+});
+
+it("returns connection submission to the preview toolbar across redraw", async () => {
+	const s = setup();
+	await s.preview.receive(s.message);
+	s.node("p").dispatchEvent(
+		new KeyboardEvent("keydown", { key: "Enter", bubbles: true }),
+	);
+	s.container.querySelector<HTMLInputElement>("#connector-target")!.value =
+		"extra";
+	s.container
+		.querySelector<HTMLButtonElement>("#connector-form button[type=submit]")!
+		.click();
+	await s.preview.receive(s.message);
+	expect(document.activeElement).toBe(
+		s.container.querySelector("#node-actions-toggle"),
+	);
 });
 
 it.each([

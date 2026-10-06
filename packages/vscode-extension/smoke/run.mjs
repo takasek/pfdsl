@@ -904,6 +904,117 @@ async function assertDefinitionQuickFix(session) {
 	);
 }
 
+async function assertPreviewEditingFocus(session) {
+	const { frame, page } = session;
+	const sourceTab = page.getByRole("tab", {
+		name: /^01-simple-chain\.pfdsl(?:, Editor Group \d+)?$/,
+	});
+	const previewTab = page.getByRole("tab", { name: /^PFDSL Preview/ });
+	await editFixture(session, "a >> p -> b\n");
+	await waitForColdRender(
+		frame.locator('#inner g.node[data-node-id="p"]'),
+		1,
+		"editing fixture",
+	);
+	await frame.locator("#fit-graph").click();
+	await frame
+		.locator('#inner g.node[data-node-id="p"]')
+		.click({ button: "right" });
+	for (const target of ["first_result", "second_result"]) {
+		await frame.locator("#connector-kind").selectOption("->");
+		await frame.locator("#connector-target").fill(target);
+		await frame
+			.getByRole("button", { name: "Add connection", exact: true })
+			.click();
+		await waitForColdRender(
+			frame.locator(`#inner g.node[data-node-id="${target}"]`),
+			1,
+			`connection ${target}`,
+		);
+		assert.equal(
+			await previewTab.getAttribute("aria-selected"),
+			"true",
+			"connection leaves the preview tab selected",
+		);
+		assert.equal(
+			await frame
+				.locator("#node-actions-toggle")
+				.evaluate(
+					(button) => document.activeElement === button && document.hasFocus(),
+				),
+			true,
+			"connection keeps keyboard focus in the preview",
+		);
+		assert.equal(
+			await sourceTab.getAttribute("aria-selected"),
+			"true",
+			"source remains simultaneously visible in its own group",
+		);
+		await frame.locator("#node-actions-toggle").click();
+	}
+	await frame.locator("#node-actions-close").click();
+	await frame
+		.locator('#inner g.node[data-node-id="b"]')
+		.click({ button: "right" });
+	await frame
+		.getByRole("button", { name: "Create definition", exact: true })
+		.click();
+	await waitForInteraction(
+		"definition focuses its source label without covering the preview",
+		() => page.locator(".monaco-editor.focused").count(),
+		(count) => count > 0,
+	);
+	assert.equal(await previewTab.getAttribute("aria-selected"), "true");
+	await page.keyboard.insertText("Smoke output");
+	await waitForInteraction(
+		"definition label accepts typing in the source editor",
+		() => frame.locator('#inner g.node[data-node-id="b"]').textContent(),
+		(text) => text.includes("Smoke output"),
+	);
+	const modifier = process.platform === "darwin" ? "Meta" : "Control";
+	await page.keyboard.press(`${modifier}+s`);
+	await page.keyboard.press(`${modifier}+w`);
+	await waitForInteraction(
+		"closing the only source tab removes its editor group",
+		() => page.locator(".editor-group-container").count(),
+		(count) => count === 1,
+	);
+	await frame
+		.locator('#inner g.node[data-node-id="p"]')
+		.click({ button: "right" });
+	await frame.locator("#connector-kind").selectOption("->");
+	await frame.locator("#connector-target").fill("reopened_result");
+	await frame
+		.getByRole("button", { name: "Add connection", exact: true })
+		.click();
+	await waitForColdRender(
+		frame.locator('#inner g.node[data-node-id="reopened_result"]'),
+		1,
+		"reopened source connection",
+	);
+	await waitForInteraction(
+		"a removed source group reopens beside the focused preview",
+		async () => ({
+			groups: await page.locator(".editor-group-container").count(),
+			sourceSelected: await sourceTab.getAttribute("aria-selected"),
+			previewSelected: await previewTab.getAttribute("aria-selected"),
+			previewFocused: await frame
+				.locator("#node-actions-toggle")
+				.evaluate(
+					(button) => document.activeElement === button && document.hasFocus(),
+				),
+		}),
+		(state) =>
+			state.groups === 2 &&
+			state.sourceSelected === "true" &&
+			state.previewSelected === "true" &&
+			state.previewFocused,
+	);
+	console.log(
+		"preview editing: repeated connections preserve preview focus; definition editing preserves columns; removed source group reopens beside preview",
+	);
+}
+
 export async function launchSmokeSession() {
 	const runDir = await createRunDirectory();
 	const profileDir = join(runDir, "profile");
@@ -1032,6 +1143,7 @@ async function main() {
 		await assertPreviewInteractions(session);
 		await assertPreviewUsability(session);
 		await assertDefinitionQuickFix(session);
+		await assertPreviewEditingFocus(session);
 	} catch (error) {
 		if (!session) {
 			failure = error;

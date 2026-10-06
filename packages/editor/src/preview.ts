@@ -88,6 +88,7 @@ export function mountPreview(container: HTMLElement, host: PreviewHost) {
 	let graphData: PreviewGraph | undefined;
 	let editingData: Extract<MessageToWebview, { type: "render" }>["editing"];
 	let selectedNodeId: string | undefined;
+	let lastFocusedNodeId: string | undefined;
 	let hoverId: string | undefined;
 	let hoverToken = 0;
 	const hoverSvgs = new Map<string, Promise<string>>();
@@ -172,14 +173,16 @@ export function mountPreview(container: HTMLElement, host: PreviewHost) {
 	on(container.querySelector("#connector-form")!, "submit", (e) => {
 		e.preventDefault();
 		if (!actionTarget || actionSource === undefined) return;
-		host.postMessage({
+		const message: MessageFromWebview = {
 			type: "addConnector",
 			nodeId: actionTarget,
 			source: actionSource,
 			connector: connectorKind.value as ConnectorKind,
 			otherId: connectorTarget.value,
-		});
+		};
 		closeActions();
+		actionsToggle.focus({ preventScroll: true });
+		host.postMessage(message);
 	});
 	on(root, "contextmenu", (e) => {
 		const id = (e.target as Element).closest<HTMLElement>("g.node")?.dataset
@@ -400,7 +403,9 @@ export function mountPreview(container: HTMLElement, host: PreviewHost) {
 		if (!node) return;
 		selectedNodeId = (node as HTMLElement).dataset.nodeId;
 		root.scrollLeft = root.scrollTop = 0;
-		if (selectedNodeId) focusNode(selectedNodeId, true);
+		if (selectedNodeId && selectedNodeId !== lastFocusedNodeId)
+			focusNode(selectedNodeId, true);
+		lastFocusedNodeId = selectedNodeId;
 		const rect = node.getBoundingClientRect();
 		void showHover(node, rect.right, rect.bottom);
 	});
@@ -626,6 +631,10 @@ export function mountPreview(container: HTMLElement, host: PreviewHost) {
 	);
 
 	on(root, "mousedown", (e) => {
+		if (e.button === 2 && (e.target as Element).closest?.("g.node")) {
+			e.preventDefault();
+			return;
+		}
 		if (e.button !== 0) return;
 		e.preventDefault();
 		dragging = true;
@@ -718,6 +727,7 @@ export function mountPreview(container: HTMLElement, host: PreviewHost) {
 	function showError(message: string) {
 		hoverSvgs.clear();
 		selectedNodeId = pendingFocusNodeId = undefined;
+		lastFocusedNodeId = undefined;
 		hideHover();
 		closeActions();
 		clearCue();
@@ -782,6 +792,8 @@ export function mountPreview(container: HTMLElement, host: PreviewHost) {
 			editingData = msg.editing;
 			if (!editingData?.nodes.some((n) => n.id === selectedNodeId))
 				selectedNodeId = undefined;
+			if (!editingData?.nodes.some((n) => n.id === lastFocusedNodeId))
+				lastFocusedNodeId = undefined;
 			actionsToggle.disabled = !editingData?.nodes.length;
 			inner.innerHTML = svg;
 			error.hidden = true;
