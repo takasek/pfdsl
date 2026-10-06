@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
+import { parseIssueProcesses } from "../pfdsl/lib/issues-flow-audit.mjs";
 import {
 	buildGateCheckCommand,
 	countBehind,
@@ -60,6 +61,25 @@ describe("parseReadyOutput", () => {
 });
 
 describe("findProcessIdForIssueNumber", () => {
+	it("resolves every issue linked by a shared process prefix", () => {
+		const processId = "i1352_i1282_i1283_i1284_i483_improve_preview";
+		const shared = `---
+process:
+  ${processId}:
+    label: Improve preview
+    location: https://github.com/takasek/pfdsl/issues/1352
+tag:
+  preview: {}
+---
+source >> ${processId} -> preview
+`;
+		for (const issue of [1352, 1282, 1283, 1284, 483]) {
+			assert.equal(findProcessIdForIssueNumber(shared, issue), processId);
+		}
+		for (const issue of [135, 13520, 128, 12820, 48, 4830]) {
+			assert.equal(findProcessIdForIssueNumber(shared, issue), null);
+		}
+	});
 	// The top-level key is the singular `process:`, matching the real
 	// .pfdsl/roadmap.pfdsl (confirmed by reading the file directly — an earlier
 	// version of this task's brief assumed a plural `processes:` key and a
@@ -268,4 +288,22 @@ describe("isUnregisteredManagedIssue", () => {
 	it("stays quiet for an unlabelled issue: triage is a different finding", () => {
 		assert.equal(isUnregisteredManagedIssue([], null), false);
 	});
+});
+it("preflight and flow audit agree on contiguous prefixes and reject near numbers", () => {
+	for (const id of [
+		"i1352_i1282_i483_improve_preview",
+		"i4830_near",
+		"work_i483_later",
+		"i1352_gap_i483",
+	]) {
+		const source = `process:\n  ${id}:\n    label: Work\n`;
+		const issues =
+			parseIssueProcesses({ process: { [id]: {} } })[0]?.issueNumbers ?? [];
+		for (const issue of [1352, 1282, 483, 4830, 135]) {
+			assert.equal(
+				findProcessIdForIssueNumber(source, issue),
+				issues.includes(issue) ? id : null,
+			);
+		}
+	}
 });

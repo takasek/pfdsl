@@ -1,0 +1,44 @@
+Window: "PFDSL", App: PFDSL.
+0 standard window PFDSL, Secondary Actions: Raise
+	1 scroll area
+		2 HTML content Description: PFDSL, URL: tauri://localhost
+			3 container
+				4 text PFDSL
+				5 button Open folder…
+				6 button Format
+				7 text Changes stay in this window.
+			8 container
+				9 container PFD files
+				10 container Documents
+					11 tab (selectable) Welcome •
+					12 tab (selected) 日本語, Value: on
+				13 menu Secondary Actions: Cancel
+				14 menu Secondary Actions: Cancel
+				15 editor (settable) Editor content, Value: [editor: Editor content]
+				16 container Diagram view
+					17 button Zoom out
+					18 container Zoom level
+						19 text 100%
+					20 button Zoom in
+					21 button Fit
+					22 button 100%
+					23 button (collapsed) Node actions, Secondary Actions: Expand
+					24 button (collapsed) Help, Secondary Actions: Expand
+				25 container
+					26 text 日本語のフロー
+					27 button Node build. Enter for Node actions.
+					28 button Node output. Enter for Node actions.
+					29 button Node input. Enter for Node actions.
+				30 container
+					31 text 日本語のフロー build 作成する output 成果物 input 入力
+	32 close button
+	33 full screen button Help: this button also has an action to zoom the window, Secondary Actions: zoom the window
+	34 minimize button
+	35 text PFDSL
+36 menu bar
+	37 PFDSL
+	38 File
+	39 Edit
+	40 View
+	41 Window
+	42 Help

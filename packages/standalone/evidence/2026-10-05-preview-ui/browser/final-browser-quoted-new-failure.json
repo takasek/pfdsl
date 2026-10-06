@@ -1,0 +1,5 @@
+{
+	"before": "---\nartifact:\n  \"alpha item\":\n    label: Alpha\n  \"spare item\":\n    label: Spare\nprocess:\n  \"prep task\":\n    label: Prepare\n---\n\"alpha item\" >> \"prep task\" -> \"result item\"\n\"spare item\"\n",
+	"after": "---\nartifact:\n  \"alpha item\":\n    label: Alpha\n  \"spare item\":\n    label: Spare\nprocess:\n  \"prep task\":\n    label: Prepare\n---\n\"alpha item\" >> \"prep task\" -> \"result item\"\n\"spare item\"\n",
+	"errors": ["p.map is not a function"]
+}

@@ -16,6 +16,41 @@ VSCode language support for [PFDSL](https://github.com/takasek/pfdsl), a DSL for
 
 Open any `.pfdsl` file. The preview icon appears in the editor title bar — click it to open a side-by-side SVG preview.
 
+Place the cursor on a node ID in the graph body or its frontmatter definition key, then run **PFDSL: Cycle Node Occurrences** from the editor context menu or press **Ctrl+K Ctrl+Alt+N** (**⌘+K ⌘+Alt+N** on macOS).
+The command selects and reveals the definition key, then every body occurrence in document order, and wraps back to the definition.
+Starting from a body occurrence advances to the next occurrence; repeating the command uses the current edited document.
+Quoted definition keys work, and metadata field names such as another node's `status` do not identify nodes.
+Without a definition it cycles through the body only; without body occurrences it stays on the definition.
+Alias-only or ambiguous definition ranges do not identify a unique authored node key, so cycling uses body occurrences only for those IDs.
+
+**PFDSL: Go to Frontmatter Definition** still jumps directly to the definition, using **Ctrl+K Ctrl+Alt+D** (**⌘+K ⌘+Alt+D** on macOS) or the editor context menu.
+It preserves the existing target at an alias use site when the definition comes from an aliased section.
+Both shortcuts apply while a PFDSL editor has text focus.
+The extension no longer assigns Alt+F12, which is VS Code's [default Peek Definition shortcut on Windows and macOS](https://code.visualstudio.com/docs/reference/default-keybindings).
+Cmd/Ctrl+Click keeps VS Code's existing [definition and multiple-cursor behavior](https://code.visualstudio.com/docs/editing/codebasics#_multicursor-modifier), controlled by `editor.multiCursorModifier`.
+
+The first visible preview fits the complete diagram, without enlarging a small diagram.
+Use **Fit** to see the whole diagram again, **100%** for its original size, or **− / +** to zoom around the viewport center.
+The toolbar shows the current zoom level; **Help** lists the gestures.
+Wheel to zoom at the pointer, drag the diagram to pan, and click or drag the minimap to move.
+Double-click a node to go to its source; double-click the background to return to 100%.
+Editing and error recovery preserve your zoom and pan; syntax and rendering errors appear separately at normal text size with the minimap hidden.
+
+For an undefined node, **Insert artifact/process definition** in Quick Fix inserts its frontmatter definition and selects the new label for editing.
+A produced artifact should also declare meaningful completion `criteria` (W002 warns when absent; strict validation treats it as an error).
+The Quick Fix keeps that diagnostic until you supply a criterion, and the insertion can be undone in one step.
+
+Right-click a preview node, or focus it with Tab and press Enter, to open **Node actions**.
+The toolbar button opens actions for the focused node and shows its ID.
+For an undefined node, **Create definition** inserts its frontmatter entry and selects the label in the editor.
+Choose an input, feedback, or output connection, then select an existing compatible node or enter a new ID.
+Each edit is one Undo step; a menu from an older document revision refuses to apply.
+
+Hover over a node to see its direct neighbors as a small graph, including feedback edges.
+Move into the hover and click a node to center it in the main preview.
+This navigation and editor selections briefly outline the destination; redraws preserve position without repeating the cue.
+Press Escape to close the hover or Node actions.
+
 ```pfdsl
 [requirement, constraint] >> design -> spec
 spec >>? design
@@ -33,8 +68,11 @@ Each preview stays attached to its own file; to view an opened subflow, run **PF
 From the repo root (a **worktree** root if you use one — not the main checkout, or you debug stale code):
 
 ```bash
+make setup
 make vscode-dev
 ```
+
+VS Code's `code` command must be available on your PATH before starting the development session.
 
 This builds the extension and its `@pfdsl/*` deps, opens `packages/vscode-extension` as its own VS Code window, and then watches for changes in the foreground (Ctrl+C to stop). Press `F5` in that window to launch an Extension Development Host with the extension loaded. F5 is backed by a committed `.vscode/launch.json` whose `preLaunchTask` rebuilds `dist/`, so the Dev Host always loads fresh code regardless of which worktree you opened.
 

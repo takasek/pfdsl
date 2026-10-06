@@ -228,6 +228,9 @@ importers:
       '@pfdsl/preview-engine':
         specifier: workspace:*
         version: link:../preview-engine
+      path-browserify:
+        specifier: 1.0.1
+        version: 1.0.1
       puppeteer:
         specifier: '>=20.0.0'
         version: 25.1.0

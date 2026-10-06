@@ -12,7 +12,7 @@ export function normalizeLocation(loc: unknown): string[] {
 export function buildDescriptions(
 	fm: Frontmatter | null,
 ): Record<string, Array<[string, string]>> {
-	const result: Record<string, Array<[string, string]>> = {};
+	const result: Record<string, Array<[string, string]>> = Object.create(null);
 	if (!fm) return result;
 	for (const id of Object.keys(fm.artifact ?? {})) {
 		const meta = fm.artifact?.[id];
@@ -56,7 +56,7 @@ export function buildDescriptions(
 export function buildLocations(
 	fm: Frontmatter | null,
 ): Record<string, string[]> {
-	const result: Record<string, string[]> = {};
+	const result: Record<string, string[]> = Object.create(null);
 	if (!fm) return result;
 	for (const id of Object.keys(fm.artifact ?? {})) {
 		const locs = normalizeLocation(fm.artifact?.[id]?.location);
@@ -75,7 +75,7 @@ export function buildLocations(
 }
 
 export function buildSubflows(fm: Frontmatter | null): Record<string, string> {
-	const result: Record<string, string> = {};
+	const result: Record<string, string> = Object.create(null);
 	if (!fm) return result;
 	for (const id of Object.keys(fm.process ?? {})) {
 		const meta = fm.process?.[id];

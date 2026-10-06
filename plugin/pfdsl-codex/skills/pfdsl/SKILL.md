@@ -106,7 +106,7 @@ pfdsl rename <file|-> <old> <new> [--write] [--json] [--no-color]   # Rename an 
 pfdsl render <file|-> [--format dot|svg|pdf|png] [--no-color]   # Render as Graphviz DOT (default), SVG, PDF, or PNG (- = stdin)
 pfdsl diff <a> <b> [--format text|dot|svg] [--json] [--no-color]   # Structural diff (text), or visual diff DOT/SVG
 pfdsl graph summary|io|stats|neighbors|locate|describe|impact|depends-on|path|edges|orphans   # Read-only queries on the graph topology
-pfdsl meta get|list|values|set|sort|reindex|check-links   # Read and write frontmatter metadata
+pfdsl meta create|get|list|values|set|sort|reindex|check-links   # Read and write frontmatter metadata
 pfdsl status ready|blocked|list|gaps   # Planning queries derived from artifact status
 pfdsl help   # Show this help
 ```
