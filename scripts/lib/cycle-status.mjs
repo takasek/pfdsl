@@ -3,6 +3,8 @@
  * git/gh I/O lives in the main script; this module stays testable.
  */
 
+import { issueNumbersOfProcessId } from "../pfdsl/lib/issues-flow-audit.mjs";
+
 /**
  * @param {unknown} readyJson - output of `pfdsl status ready --json`
  * @returns {{ready: Array<{id: string, label: string, inputs: string[], outputs: string[], newlyReadyCount: number}>}}
@@ -40,12 +42,7 @@ export function findProcessIdForIssueNumber(pfdslText, issueNumber) {
 	const scanText = `${extractProcessSection(pfdslText)}\n\x00`;
 	const entryPattern = /^ {2}(\S+):\n([\s\S]*?)(?=^ {2}\S|^\S)/gm;
 	for (const [, processId, block] of scanText.matchAll(entryPattern)) {
-		const issuePrefix = processId.match(/^(?:i\d+_)+/)?.[0] ?? "";
-		if (
-			[...issuePrefix.matchAll(/i(\d+)_/g)].some(
-				([, number]) => Number(number) === issueNumber,
-			)
-		) {
+		if (issueNumbersOfProcessId(processId).includes(issueNumber)) {
 			return processId;
 		}
 		const match = block.match(/location:\s*\S*\/issues\/(\d+)/);
