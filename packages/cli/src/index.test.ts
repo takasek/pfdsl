@@ -733,14 +733,16 @@ describe("rename", () => {
 		expect(r.exitCode).toBe(0);
 		expect(r.stdout).toContain("boundary: { <new>: <old> }");
 		expect(r.stdout).toContain("both a group and an artifact/process");
-		expect(r.stdout).toContain("invisible here and is never rewritten");
+		expect(r.stdout).toContain(
+			"outside the reachable dependencies is not inspected or rewritten",
+		);
 	});
 
-	it("--help says a stdin (-) preview skips the extends: and subflow checks a file path gets", async () => {
+	it("--help says a stdin (-) preview skips the extends checks a file path gets", async () => {
 		const r = await run(["rename", "--help"]);
 		const prose = r.stdout.replace(/\s+/g, " ");
 		expect(prose).toContain(
-			"With -, the extends: and subflow checks are skipped because relative paths cannot be resolved",
+			"With -, the extends: checks are skipped because relative paths cannot be resolved",
 		);
 		expect(prose).toContain(
 			"a preview from stdin can succeed where the same file path is refused",
@@ -1229,7 +1231,7 @@ a
 			expect(readFileSync(f, "utf-8")).toBe(missingPreset);
 		});
 
-		it("refuses (V028), as check does, when the extends: preset carries a non-presentation key", async () => {
+		it("allows rename with a readable preset's unrelated V028 while check still rejects it", async () => {
 			const f = write("main.pfdsl", withExtends);
 			write("preset.yaml", `${preset}artifact:\n  x: { label: X }\n`);
 			const checked = await run(["check", f]);
@@ -1237,16 +1239,15 @@ a
 			expect(checked.stderr).toContain("V028");
 
 			const r = await run(["rename", f, "local", "renamed", "--write"]);
-			expect(r.exitCode).toBe(1);
-			expect(r.stderr).toContain("V028");
-			expect(r.stderr).toContain("non-presentation key 'artifact'");
-			expect(readFileSync(f, "utf-8")).toBe(withExtends);
-
+			expect(r.exitCode).toBe(0);
+			expect(readFileSync(f, "utf-8")).toContain("renamed:");
+			writeFileSync(f, withExtends);
 			const json = await run(["rename", f, "local", "renamed", "--json"]);
-			expect(json.exitCode).toBe(1);
+			expect(json.exitCode).toBe(0);
 			expect(JSON.parse(json.stdout)).toMatchObject({
-				ok: false,
-				diagnostics: [{ code: "V028" }],
+				ok: true,
+				from: "local",
+				to: "renamed",
 			});
 		});
 	});
@@ -1343,7 +1344,7 @@ a
 			expect(checkResult.exitCode).toBe(0);
 		});
 
-		it("refuses a rename when the input already has an unrelated subflow boundary error (V034), leaving the file untouched", async () => {
+		it("allows a rename unrelated to an existing subflow boundary error (V034)", async () => {
 			// The child's terminal is `shipment`; the parent's output `z`
 			// does not match it — a V034 the input already has, unrelated to
 			// the `q` being renamed.
@@ -1360,17 +1361,12 @@ a
 			write("child.pfdsl", child);
 
 			const r = await run(["rename", parentFile, "q", "q2", "--write"]);
-			expect(r.exitCode).toBe(1);
-			expect(r.stderr).toContain("[V034]");
-			expect(r.stderr).toContain(
-				`rename: refusing to write ${parentFile}: the result would have errors (an error already in the input also blocks the rename)`,
-			);
-			expect(readFileSync(parentFile, "utf-8")).toBe(parent);
+			expect(r.exitCode).toBe(0);
+			expect(readFileSync(parentFile, "utf-8")).toContain("q2 >> r -> s");
+			expect((await run(["check", parentFile])).stderr).toContain("[V034]");
 		});
 
-		// The post-write gate's subflow half is covered by the V034 test above;
-		// this one pins that a boundary artifact is still subject to the
-		// earlier <new>-already-exists refusal.
+		// A boundary artifact is still subject to the new-ID collision refusal.
 		it("refuses renaming a boundary artifact onto another boundary artifact's id (new already exists), leaving the file untouched", async () => {
 			const parent = [
 				"---",
@@ -3077,7 +3073,7 @@ describe("a refused edit names the file each diagnostic belongs to", () => {
 	const startOf = (line: string | undefined, prefix: string) =>
 		line?.slice(0, prefix.length);
 
-	it("rename reports a nested file's boundary error under that file, not the entry", async () => {
+	it("check attributes a nested boundary error while unrelated rename remains allowed", async () => {
 		const entry = join(d, "entry.pfdsl");
 		const child = join(d, "child.pfdsl");
 		writeFileSync(
@@ -3090,35 +3086,36 @@ describe("a refused edit names the file each diagnostic belongs to", () => {
 		);
 		writeFileSync(join(d, "grandchild.pfdsl"), "wrong >> r -> b\n");
 		const r = await run(["rename", entry, "p2", "p3"]);
-		expect(r.exitCode).toBe(1);
+		expect(r.exitCode).toBe(0);
+		expect(r.stdout).toContain("p3");
+		const checked = await run(["check", entry]);
+		expect(checked.exitCode).toBe(1);
 		const prefix = `${child}:1:1: error [V034]`;
-		expect(startOf(lineFor(r.stderr, "V034"), prefix)).toBe(prefix);
+		expect(startOf(lineFor(checked.stderr, "V034"), prefix)).toBe(prefix);
 	});
 
-	// The loader leaves V028 off the preset diagnostics it returns, so each
-	// command that validates presets names the preset itself.
+	// Unreadable preset metadata prevents safe group classification.
 	const presetEntry = (extra: string) =>
 		`---\nextends: ./preset.yaml\n${extra}---\na >> p -> b\n`;
 
 	it.each([
 		["rename", presetEntry("artifact:\n  a: {}\n"), ["rename", "a", "c"]],
 		["delete", presetEntry("group:\n  g: { label: G }\n"), ["delete", "g"]],
-	])("%s reports a preset's forbidden key under the preset", async (_name, source, [
+	])("%s reports a preset's unreadable metadata under the preset", async (_name, source, [
 		command,
 		...args
 	]) => {
 		const entry = join(d, "entry.pfdsl");
 		const preset = join(d, "preset.yaml");
 		writeFileSync(entry, source);
-		writeFileSync(preset, "title: not allowed\n");
+		writeFileSync(preset, "statusStyles: {done: {fillcolor: 42}}\n");
 		const text = await run([command!, entry, ...args]);
 		expect(text.exitCode).toBe(1);
-		const prefix = `${preset}:1:1: error [V028]`;
-		expect(startOf(lineFor(text.stderr, "V028"), prefix)).toBe(prefix);
+		expect(lineFor(text.stderr, "FM004")).toContain(`${preset}:`);
 		const json = await run([command!, entry, ...args, "--json"]);
 		expect(json.exitCode).toBe(1);
 		expect(JSON.parse(json.stdout).diagnostics).toContainEqual(
-			expect.objectContaining({ code: "V028", file: preset }),
+			expect.objectContaining({ code: "FM004", file: preset }),
 		);
 	});
 });
@@ -3127,7 +3124,7 @@ describe("multifile check — extends", () => {
 	it.each([
 		["isolated-node", "x\n"],
 		["edge", "x >> q -> y\n"],
-	])("rejects %s graph content in presets in check and rename's preset validation", async (name, body) => {
+	])("check rejects %s graph content in presets without blocking a safe rename", async (name, body) => {
 		const entry = join(dir, `${name}-preset-entry.pfdsl`);
 		const preset = join(dir, `${name}-preset.pfdsl`);
 		writeFileSync(
@@ -3149,9 +3146,8 @@ describe("multifile check — extends", () => {
 			]),
 		});
 		const renamed = await run(["rename", entry, "a", "c"]);
-		expect(renamed.exitCode).toBe(1);
-		expect(renamed.stderr).toContain("V028");
-		expect(renamed.stdout).toBe("");
+		expect(renamed.exitCode).toBe(0);
+		expect(renamed.stdout).toContain("c >> p -> b");
 		expect(readFileSync(entry, "utf-8")).toContain("a >> p -> b");
 	});
 

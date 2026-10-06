@@ -55,6 +55,19 @@ Group deletion with `extends` requires a file path so ancestors can be resolved.
 `delete` refuses YAML anchors, aliases and merge keys; expand them before retrying.
 Preview the change before using `--write`, including when deleting several groups at once.
 
+### Dependency checks during edits
+
+`check` validates the complete reachable dependency graph, including child diagrams, presets and nested boundaries.
+`rename` and `delete` use the same dependency loader but refuse only dependencies needed to safely perform the edit.
+Readable preset style errors and unrelated child errors no longer block these commands; run `check` separately for full validation.
+Missing or unreadable presets still prevent reliable group classification.
+Deleting a preset-only group now exits with code 1 and asks you to edit its preset declaration; a batch containing such a group writes nothing.
+Deleting an artifact that changes a surviving subflow boundary requires a readable child and a valid resulting boundary.
+Deleting the process that owns a broken subflow reference remains allowed, as does deleting a surplus boundary artifact that repairs the mismatch.
+Group renaming refuses inherited child-parent relationships that cannot be updated in the local file.
+If an edit changes the file's exposed boundary, a subflow that remains reachable and refers back to this file must not gain new boundary errors.
+Parents outside the reachable dependency graph are not inspected or rewritten; check them separately.
+
 ### Metadata extension fields
 
 `meta set` updates an existing extension scalar field without an additional flag.

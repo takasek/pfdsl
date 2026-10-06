@@ -1,18 +1,22 @@
-import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { parseArgs as parseNodeArgs } from "node:util";
 import {
 	analyze,
 	auditGraph,
 	type ConsumerAsymmetryHint,
+	collectSubflowRefs,
 	compareIds,
 	computeDependsOn,
 	computeImpact,
 	computeNeighbors,
+	computeOpenInputs,
 	computeOrphans,
 	computePaths,
 	computeStats,
+	computeTerminals,
 	diffGraphs as coreDiffGraphs,
+	type DependencyClosure,
 	DIAGNOSTIC_REGISTRY,
 	type Diagnostic,
 	type DiagnosticRegistryEntry,
@@ -30,11 +34,11 @@ import {
 	isRoadmapType,
 	isUrlLike,
 	loadDependencyClosure,
-	loadExtendsChain,
 	loadFrontmatter,
 	locateNode,
 	type NodeKind,
 	type PfdType,
+	parentBoundaryArtifacts,
 	parseIdList,
 	reindex,
 	rename,
@@ -46,8 +50,7 @@ import {
 	setFrontmatterField,
 	sort,
 	sortEdges,
-	subflowBoundaryDiagnostics,
-	validatePresetKeys,
+	validateSubflowBoundary,
 	wrapPresetSource,
 } from "@pfdsl/core";
 import { type BinaryFormat, svgToBinary } from "@pfdsl/graphviz-exporter";
@@ -632,14 +635,111 @@ export interface DeleteOptions {
 	color?: boolean;
 }
 
+/** Only missing or unreadable presentation sources prevent reliable group classification. */
+function unsafePresentationDiagnostics(
+	closure: DependencyClosure<ReturnType<typeof analyze>>,
+) {
+	return [
+		...closure.diagnostics.filter((d) => d.code === "V026"),
+		...closure.localDiagnostics.filter(
+			(d) =>
+				d.file !== undefined && closure.docs.get(d.file)?.frontmatter === null,
+		),
+	].filter((d) => d.severity === "error");
+}
+
+/** Use the edited snapshot for every disk alias affected by this file's write. */
+function editedDependencyLoader(
+	entry: string,
+	after: ReturnType<typeof analyze>,
+	load: (path: string) => ReturnType<typeof analyze> | null,
+) {
+	// Writes also affect symlinks and hardlinks to the edited file. Use the
+	// result snapshot for those aliases, rather than reading their old bytes.
+	const identity = (path: string) => {
+		try {
+			const stat = statSync(path);
+			return `${stat.dev}:${stat.ino}`;
+		} catch {
+			return null;
+		}
+	};
+	const entryIdentity = identity(entry);
+	const aliases = new Map<string, boolean>([[entry, true]]);
+	const isEntry = (path: string) => {
+		if (!aliases.has(path))
+			aliases.set(
+				path,
+				entryIdentity !== null && identity(path) === entryIdentity,
+			);
+		return aliases.get(path)!;
+	};
+	return {
+		isEntry,
+		load: (path: string) => (isEntry(path) ? after : load(path)),
+	};
+}
+
+/** Compare only reachable references back to an entry whose exposed boundary changed. */
+function introducedReturnBoundaryErrors(
+	entry: string,
+	before: ReturnType<typeof analyze>,
+	after: ReturnType<typeof analyze>,
+	load: (path: string) => ReturnType<typeof analyze> | null,
+): Diagnostic[] {
+	const signature = (doc: typeof before) =>
+		JSON.stringify([
+			[...computeOpenInputs(doc.edges)].sort(),
+			[...computeTerminals(doc.edges)].sort(),
+		]);
+	if (
+		signature(before) === signature(after) ||
+		collectSubflowRefs(after.frontmatter ?? {}).length === 0
+	)
+		return [];
+	const reader = editedDependencyLoader(entry, after, load);
+	const { isEntry } = reader;
+	const closure = loadDependencyClosure(entry, reader.load);
+	const errors: Diagnostic[] = [];
+	for (const ref of closure.references) {
+		if (
+			ref.kind !== "subflow" ||
+			ref.to === undefined ||
+			!isEntry(ref.to) ||
+			ref.process === undefined
+		)
+			continue;
+		const pid = ref.process;
+		const savedParent = closure.docs.get(ref.from)!;
+		const validate = (parent: typeof before, child: typeof before) => {
+			const { inputs, outputs } = parentBoundaryArtifacts(parent.edges, pid);
+			return validateSubflowBoundary({
+				processId: pid,
+				parentNormalInputs: inputs,
+				parentOutputs: outputs,
+				boundaryMap: parent.frontmatter?.process?.[pid]?.boundary ?? {},
+				childOpenInputs: computeOpenInputs(child.edges),
+				childTerminals: computeTerminals(child.edges),
+			});
+		};
+		const previous = new Set(
+			validate(isEntry(ref.from) ? before : savedParent, before).map((d) =>
+				JSON.stringify([d.code, d.message]),
+			),
+		);
+		errors.push(
+			...validate(savedParent, after)
+				.filter((d) => !previous.has(JSON.stringify([d.code, d.message])))
+				.map((d) => (ref.from === entry ? d : { ...d, file: ref.from })),
+		);
+	}
+	return errors;
+}
+
 /**
- * `deleteNodes` (packages/core) leaves `output` as the untouched original and
- * fills `notFound` with every requested id when `source` already carries a
- * parse/validation error (there is nothing safe to rewrite) — that `notFound`
- * is a side effect of not having processed the document at all, not a report
- * that the ids are absent, so it is never surfaced. `failIfErrors` covers
- * both text and --json the same way the rest of the CLI's diagnostic-emitting
- * commands do (#508), and takes over here before `deleted`/`notFound` are read.
+ * `deleteNodes` leaves output untouched when the input already has an error.
+ * Its resulting notFound is not evidence that the requested IDs are absent,
+ * so failIfErrors takes over before deleted/notFound are read.
  */
 export function runDelete(
 	file: string,
@@ -656,6 +756,13 @@ export function runDelete(
 	if (isCommandResult(source)) return source;
 
 	const analysis = analyze(source);
+	const absFile = file === "-" ? null : resolve(file);
+	const loaded = new Map<string, ReturnType<typeof analyze> | null>();
+	const load = (path: string) => {
+		if (path === absFile) return analysis;
+		if (!loaded.has(path)) loaded.set(path, fileLoader(path));
+		return loaded.get(path) ?? null;
+	};
 	const failedInput = failIfErrors(
 		analysis.diagnostics,
 		file,
@@ -663,39 +770,22 @@ export function runDelete(
 		opts.color,
 	);
 	if (failedInput) return failedInput;
-	const refuse = (error: string): CommandResult =>
-		opts.json ? failJson({ error }) : fail(`${error}\n`);
+	const refuse = (error: string, errs?: Diagnostic[]): CommandResult =>
+		refuseWith(error, file, errs, opts.json, opts.color);
 	let groups: Record<string, GroupMeta> | undefined;
 	const deletedGroupIds = new Set(
 		ids.filter((id) => Object.hasOwn(analysis.frontmatter?.group ?? {}, id)),
 	);
-	if (analysis.frontmatter?.extends !== undefined && deletedGroupIds.size > 0) {
-		if (file === "-")
+	const needsPresetGroups =
+		deletedGroupIds.size > 0 || ids.some((id) => !analysis.nodeKinds.has(id));
+	if (analysis.frontmatter?.extends !== undefined && needsPresetGroups) {
+		if (absFile === null)
 			return refuse(
 				"delete: group deletion with extends requires a file path so preset ancestors can be resolved",
 			);
-		const absFile = resolve(file);
-		const { docs, diagnostics: extendsDiagnostics } = loadExtendsChain(
-			absFile,
-			(path) => (path === absFile ? analysis : fileLoader(path)),
-		);
-		const presetKeyDiagnostics = [...docs]
-			.filter(([path]) => path !== absFile)
-			.flatMap(([path, doc]) =>
-				validatePresetKeys(path, doc.frontmatter, doc.document).map(
-					(diagnostic) => ({ ...diagnostic, file: path }),
-				),
-			);
-		const presetDiagnostics = [...docs]
-			.filter(([path]) => path !== absFile)
-			.flatMap(([path, doc]) =>
-				doc.diagnostics.map((diagnostic) => ({ ...diagnostic, file: path })),
-			);
-		const errors: (Diagnostic & { file?: string })[] = [
-			...extendsDiagnostics,
-			...presetKeyDiagnostics,
-			...presetDiagnostics,
-		].filter((d) => d.severity === "error");
+		const closure = loadDependencyClosure(absFile, load, { subflows: false });
+		const { docs } = closure;
+		const errors = unsafePresentationDiagnostics(closure);
 		if (errors.length > 0) {
 			return opts.json
 				? failJson({ diagnostics: errors })
@@ -708,6 +798,11 @@ export function runDelete(
 				excludeEntry: true,
 			}).group ?? {};
 		for (const id of ids) {
+			if (Object.hasOwn(presetGroups, id) && !analysis.nodeKinds.has(id)) {
+				return refuse(
+					`delete: '${id}' comes from a preset and cannot be deleted in this file; edit its declaration in the preset`,
+				);
+			}
 			if (
 				Object.hasOwn(analysis.frontmatter.group ?? {}, id) &&
 				Object.hasOwn(presetGroups, id)
@@ -726,8 +821,15 @@ export function runDelete(
 			)
 				continue;
 			let ancestor = groups?.[parent]?.parent;
-			while (ancestor !== undefined && deletedGroupIds.has(ancestor))
+			const visited = new Set<string>();
+			while (ancestor !== undefined && deletedGroupIds.has(ancestor)) {
+				if (visited.has(ancestor))
+					return refuse(
+						"delete: the affected group parent chain is circular; update the preset relationship first",
+					);
+				visited.add(ancestor);
 				ancestor = groups?.[ancestor]?.parent;
+			}
 			const localParent = Object.hasOwn(
 				analysis.frontmatter.group?.[childId] ?? {},
 				"parent",
@@ -754,6 +856,79 @@ export function runDelete(
 		return refuse(
 			`delete: YAML anchors, aliases and merge keys (<<) are not supported; expand them before deleting IDs in ${file}; nothing was written`,
 		);
+	if (absFile !== null && deleted.length > 0) {
+		const resultAnalysis = analyze(output);
+		const changed = Object.entries(
+			resultAnalysis.frontmatter?.process ?? {},
+		).filter(([pid, meta]) => {
+			if (typeof meta.subflow !== "string") return false;
+			const before = parentBoundaryArtifacts(analysis.edges, pid);
+			const after = parentBoundaryArtifacts(resultAnalysis.edges, pid);
+			const signature = (
+				boundary: ReturnType<typeof parentBoundaryArtifacts>,
+			) =>
+				JSON.stringify([
+					[...boundary.inputs].sort(),
+					[...boundary.outputs].sort(),
+				]);
+			return (
+				signature(before) !== signature(after) ||
+				JSON.stringify(analysis.frontmatter?.process?.[pid]?.boundary ?? {}) !==
+					JSON.stringify(meta.boundary ?? {})
+			);
+		});
+		if (changed.length > 0) {
+			const reader = editedDependencyLoader(absFile, resultAnalysis, load);
+			const closure = loadDependencyClosure(absFile, reader.load);
+			const errors: Diagnostic[] = [];
+			for (const [pid, meta] of changed) {
+				const childRef = closure.references.find(
+					(ref) =>
+						ref.kind === "subflow" &&
+						ref.from === absFile &&
+						ref.process === pid,
+				);
+				const child = childRef?.to ? closure.docs.get(childRef.to) : undefined;
+				if (
+					!child ||
+					child.diagnostics.some(
+						(d) => d.severity === "error" && /^[LPN]/.test(d.code),
+					)
+				) {
+					return refuse(
+						`delete: cannot validate the changed boundary of '${pid}'; its subflow is missing or cannot be parsed; nothing was written`,
+					);
+				}
+				const { inputs, outputs } = parentBoundaryArtifacts(
+					resultAnalysis.edges,
+					pid,
+				);
+				errors.push(
+					...validateSubflowBoundary({
+						processId: pid,
+						parentNormalInputs: inputs,
+						parentOutputs: outputs,
+						boundaryMap: meta.boundary ?? {},
+						childOpenInputs: computeOpenInputs(child.edges),
+						childTerminals: computeTerminals(child.edges),
+					}),
+				);
+			}
+			const failedBoundary = failIfErrors(errors, file, opts.json, opts.color);
+			if (failedBoundary) return failedBoundary;
+		}
+		const returnErrors = introducedReturnBoundaryErrors(
+			absFile,
+			analysis,
+			resultAnalysis,
+			load,
+		);
+		if (returnErrors.length > 0)
+			return refuse(
+				"delete: the edited file is also a reachable subflow; its changed boundary would break a referring process; nothing was written",
+				returnErrors,
+			);
+	}
 
 	if (opts.write) writeFileSync(file, output, "utf-8");
 
@@ -1641,10 +1816,10 @@ export interface RenameOptions {
  *
  * Core `rename` resolves `<old>`'s kind and refuses what this one file
  * shows. This command adds what needs other files, for a file on disk: a
- * group `<old>` or `<new>` an `extends:` preset declares (§2.9.4), and the
- * subflow-boundary check `check` runs. The result is re-validated before it
- * is emitted or written; a result with any error is refused, including an
- * error the input already had, since a rename does not cure it.
+ * group `<old>` or `<new>` an `extends:` preset declares (§2.9.4), and
+ * inherited child-parent relationships the local rewrite cannot update.
+ * The local result is re-validated before it is emitted or written;
+ * unrelated dependency errors remain the responsibility of `check`.
  *
  * A file that references this one from outside — a parent's
  * `subflow:`/`boundary:`, another file's `extends:` — is never rewritten.
@@ -1684,23 +1859,19 @@ export function runRename(
 	// ref cannot be resolved from stdin, the same reason runCheck skips its
 	// multi-file checks there).
 	const absFile = file === "-" ? null : resolve(file);
+	const loaded = new Map<string, ReturnType<typeof analyze> | null>();
+	const load = (path: string) => {
+		if (path === absFile) return analysis;
+		if (!loaded.has(path)) loaded.set(path, fileLoader(path));
+		return loaded.get(path) ?? null;
+	};
 	let presetGroup: Record<string, unknown> | undefined;
 	if (absFile !== null && analysis.frontmatter?.extends !== undefined) {
 		// The entry file is already read and analyzed; only presets are loaded.
-		const { docs, diagnostics: extendsDiagnostics } = loadExtendsChain(
-			absFile,
-			(p) => (p === absFile ? analysis : fileLoader(p)),
-		);
-		// check's V028 on each loaded preset, which loadExtendsChain leaves out.
-		const presetKeyDiagnostics = [...docs]
-			.filter(([path]) => path !== absFile)
-			.flatMap(([path, doc]) =>
-				validatePresetKeys(path, doc.frontmatter, doc.document).map(
-					(diagnostic) => ({ ...diagnostic, file: path }),
-				),
-			);
+		const closure = loadDependencyClosure(absFile, load, { subflows: false });
+		const { docs } = closure;
 		const failedExtends = failIfErrors(
-			[...extendsDiagnostics, ...presetKeyDiagnostics],
+			unsafePresentationDiagnostics(closure),
 			file,
 			opts.json,
 			opts.color,
@@ -1709,6 +1880,19 @@ export function runRename(
 		presetGroup = resolveLoadedPresentation(absFile, docs, {
 			excludeEntry: true,
 		}).group;
+		if (result.ok && result.kind === "group") {
+			const groups = resolveLoadedPresentation(absFile, docs).group ?? {};
+			for (const [childId, meta] of Object.entries(groups)) {
+				if (
+					meta.parent === oldId &&
+					!Object.hasOwn(analysis.frontmatter?.group?.[childId] ?? {}, "parent")
+				) {
+					return refuse(
+						`rename: '${childId}' has a parent relationship supplied by a preset that cannot be renamed here; update that preset relationship first`,
+					);
+				}
+			}
+		}
 	}
 	const presetDeclares = (id: string): boolean =>
 		presetGroup !== undefined && Object.hasOwn(presetGroup, id);
@@ -1744,27 +1928,28 @@ export function runRename(
 		return refuse(`rename: '${newId}' already exists as a group id in ${file}`);
 	}
 
-	// The gate on the write, same contract as runMetaSet: any error on the
-	// result refuses, whether the rewrite introduced it or the input already
-	// had it. For a file on disk this includes the subflow-boundary check.
+	// The local result must remain valid. Ordinary child mappings survive the
+	// rename, but a reachable child may refer back to this edited file.
 	const { output } = result;
 	const resultAnalysis = analyze(output);
 	const resultDiags = [...resultAnalysis.diagnostics];
-	if (absFile !== null) {
-		resultDiags.push(
-			...subflowBoundaryDiagnostics(
-				absFile,
-				resultAnalysis.edges,
-				resultAnalysis.frontmatter,
-				// The entry is the rewritten result, not the file on disk.
-				(p) => (p === absFile ? resultAnalysis : fileLoader(p)),
-			).diagnostics,
-		);
-	}
 	if (hasErrors(resultDiags)) {
 		const errs = resultDiags.filter((d) => d.severity === "error");
 		const message = `rename: refusing to write ${file}: the result would have errors (an error already in the input also blocks the rename)`;
 		return refuse(message, errs);
+	}
+	if (absFile !== null) {
+		const returnErrors = introducedReturnBoundaryErrors(
+			absFile,
+			analysis,
+			resultAnalysis,
+			load,
+		);
+		if (returnErrors.length > 0)
+			return refuse(
+				"rename: the edited file is also a reachable subflow; its changed boundary would break a referring process; nothing was written",
+				returnErrors,
+			);
 	}
 
 	if (opts.write) writeFileSync(file, output, "utf-8");
@@ -3249,10 +3434,15 @@ unchanged.
 Preset ancestors are resolved for files on disk. A local override of a preset
 group cannot delete that group; edit its preset declaration instead. Group
 deletion with extends requires a file path, rather than stdin.
+A preset-only group is also refused; edit its declaration in the preset.
 A child relationship inherited from a preset must be updated in that preset
 before its parent group can be deleted.
 An explicit local child parent can be promoted to a surviving ancestor, but
 cannot be cleared when a preset would supply a parent again.
+Deleting an artifact that changes a surviving subflow boundary requires that
+child to be readable and the resulting boundary to match. Removing a process
+with a broken subflow reference is allowed. Unrelated dependency errors do
+not block deletion; use check for full dependency validation.
 YAML anchors, aliases and merge keys (<<) are unsupported; expand them first.
 An id that exists nowhere in the file is a no-op, not an error — it is
 reported in notFound rather than failing the call. Use - to read from stdin
@@ -3310,16 +3500,19 @@ A frontmatter using YAML anchors, aliases or merge keys (<<) anywhere is
 refused: a rewrite through a shared node would miss a reference or change
 every place that shares it. Edit such a file by hand, or expand them first.
 
-This is a one-file command: a parent file's subflow:/boundary: naming an id
-in this file, or another file's extends: naming this file as a preset, is
-invisible here and is never rewritten — check that file separately.
+This is a one-file command. A parent outside the reachable dependencies is not inspected or rewritten;
+check it separately. Other files' subflow:/boundary: references and extends:
+references naming this file are never rewritten.
 
-After the rewrite, the result is validated the same way check validates
-this file (including the subflow-boundary check, for a file on disk); a
-result with any error is refused, not printed or written. That includes an
-error the input already had: fix it first, then rename.
+After the rewrite, local result errors prevent output or writing. Inherited
+group collisions and child-parent relationships that cannot be updated here
+are refused. Missing or unreadable presets prevent reliable group checks.
+Unrelated child errors and readable preset style errors do not block rename;
+use check for full dependency validation. Child paths and ordinary boundary
+mappings are preserved. If the renamed boundary belongs to a file also used
+as a reachable subflow, new errors in those referring boundaries are refused.
 
-With -, the extends: and subflow checks are skipped because relative paths
+With -, the extends: checks are skipped because relative paths
 cannot be resolved without a file on disk, so a preview from stdin can
 succeed where the same file path is refused.
 
