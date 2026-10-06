@@ -61,6 +61,85 @@ describe("findShellExecutors", () => {
 			assert.equal(findShellExecutors(source).length, 1, source);
 	});
 
+	// Node takes a shell path for `shell` too, and any truthy value turns the
+	// shell on, so a non-empty string is the same hazard as `true`.
+	it("flags a non-empty string shell option, which names the shell to run through", () => {
+		for (const source of [
+			'execFileSync(cmd, { shell: "/bin/sh" });',
+			"execFileSync(cmd, { shell: '/bin/sh' });",
+			"execFileSync(cmd, { shell: `/bin/sh` });",
+			'execFileSync(cmd, { shell: ("/bin/sh") });',
+			'execFileSync(cmd, { "shell": "/bin/sh" });',
+			'execFileSync(cmd, { ["shell"]: "/bin/sh" });',
+		])
+			assert.equal(findShellExecutors(source).length, 1, source);
+	});
+
+	it("leaves shell options alone that Node treats as no shell", () => {
+		for (const source of [
+			"execFileSync(cmd, { shell: false });",
+			'execFileSync(cmd, { shell: "" });',
+		])
+			assert.deepEqual(findShellExecutors(source), [], source);
+	});
+
+	it("flags re-exporting the entire child_process module", () => {
+		for (const source of [
+			'export * from "node:child_process";',
+			'export * from "child_process";',
+			'export * as cp from "node:child_process";',
+		]) {
+			const found = findShellExecutors(source);
+			assert.equal(found.length, 1, source);
+			assert.match(found[0].reason, /re-exports the child_process module/);
+		}
+	});
+
+	it("flags re-exporting a shell-executing name, under any alias", () => {
+		for (const [source, name] of [
+			['export { exec } from "node:child_process";', "exec"],
+			['export { execSync } from "child_process";', "execSync"],
+			['export { execSync as run } from "node:child_process";', "execSync"],
+		]) {
+			const found = findShellExecutors(source);
+			assert.equal(found.length, 1, source);
+			assert.match(found[0].reason, new RegExp(`re-exports ${name} from`));
+		}
+	});
+
+	// The default export of child_process is the whole module, so naming it
+	// through a specifier list hands over exec just as `import cp from` does.
+	it("flags the default export of child_process, which is the whole module", () => {
+		for (const [source, reason] of [
+			[
+				'import { default as cp } from "node:child_process";',
+				/imports the child_process module/,
+			],
+			[
+				'export { default as cp } from "node:child_process";',
+				/re-exports the child_process module/,
+			],
+			[
+				'export { default } from "child_process";',
+				/re-exports the child_process module/,
+			],
+		]) {
+			const found = findShellExecutors(source);
+			assert.equal(found.length, 1, source);
+			assert.match(found[0].reason, reason);
+		}
+	});
+
+	it("leaves a re-export alone that takes argv or comes from elsewhere", () => {
+		for (const source of [
+			'export { execFileSync } from "node:child_process";',
+			'export { execFileSync, spawnSync } from "node:child_process";',
+			'export { exec } from "./not-child-process.mjs";',
+			"const exec = 1;\nexport { exec };",
+		])
+			assert.deepEqual(findShellExecutors(source), [], source);
+	});
+
 	it("does not interpret comments or strings as executable syntax", () => {
 		assert.deepEqual(
 			findShellExecutors(`

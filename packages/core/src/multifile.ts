@@ -61,15 +61,27 @@ export interface DocWithFrontmatter {
 export interface LoadedGraph<T> {
 	/** Resolved absolute path → loaded document, including the entry. */
 	docs: Map<string, T>;
-	/** Cross-file diagnostics: missing path (V021), circular subflow (V022). */
+	/**
+	 * Cross-file diagnostics: missing path (V021 / V026), circular reference
+	 * (V022 / V027). `file` names the file that holds the reference and is
+	 * absent when that file is the entry, the same convention
+	 * `subflowBoundaryDiagnostics` uses, so a diagnostic without `file` belongs
+	 * to whatever the caller passed as the entry.
+	 */
 	diagnostics: (Diagnostic & { file?: string })[];
+}
+
+/** The `file` of a loader diagnostic raised in `from`: absent for the entry. */
+function attributedTo(entryPath: string, from: string): { file?: string } {
+	return from === entryPath ? {} : { file: from };
 }
 
 /**
  * Recursively load an entry .pfdsl and its `subflow:` children (§2.9.3 / §15.11).
  * `load` reads + analyzes a file by absolute path, returning null when absent.
  * Detects self-referential and multi-hop subflow cycles (V022) and missing
- * paths (V021). Shared children reached by multiple parents load once.
+ * paths (V021). Shared children reached by multiple parents load once. A
+ * missing path is reported once for each file that references it.
  */
 export function loadSubflowGraph<T extends DocWithFrontmatter>(
 	entryPath: string,
@@ -78,7 +90,8 @@ export function loadSubflowGraph<T extends DocWithFrontmatter>(
 	const docs = new Map<string, T>();
 	const diagnostics: (Diagnostic & { file?: string })[] = [];
 	const stack = new Set<string>(); // current DFS path
-	const missing = new Set<string>();
+	const missing = new Set<string>(); // already asked `load`; never asked again
+	const reported = new Set<string>(); // one V021 per (referencing file, path)
 
 	function visit(path: string, fromPath = entryPath): void {
 		if (stack.has(path)) {
@@ -87,20 +100,23 @@ export function loadSubflowGraph<T extends DocWithFrontmatter>(
 				code: "V022",
 				message: `circular subflow reference: ${path}`,
 				range: zeroRange(),
-				file: fromPath,
+				...attributedTo(entryPath, fromPath),
 			});
 			return;
 		}
-		if (docs.has(path) || missing.has(path)) return;
-		const doc = load(path);
+		if (docs.has(path)) return;
+		const doc = missing.has(path) ? null : load(path);
 		if (doc === null) {
 			missing.add(path);
+			const key = `${fromPath}\0${path}`;
+			if (reported.has(key)) return;
+			reported.add(key);
 			diagnostics.push({
 				severity: "error",
 				code: "V021",
 				message: `subflow file not found: ${path}`,
 				range: zeroRange(),
-				file: fromPath,
+				...attributedTo(entryPath, fromPath),
 			});
 			return;
 		}
@@ -114,7 +130,7 @@ export function loadSubflowGraph<T extends DocWithFrontmatter>(
 					code: "V021",
 					message: `invalid subflow path (${resolved.reason}): ${ref}`,
 					range: zeroRange(),
-					file: path,
+					...attributedTo(entryPath, path),
 				});
 				continue;
 			}
@@ -418,7 +434,8 @@ export function subflowBoundaryDiagnostics<
  * `load` reads + analyzes a file by absolute path, returning null when absent.
  * Detects self-referential and multi-hop extends cycles (V027) and missing
  * paths / invalid paths (V026). Diamond-shaped presets (same file reachable via
- * multiple paths) are loaded only once — not treated as a cycle.
+ * multiple paths) are loaded only once — not treated as a cycle. A missing
+ * path is reported once for each file that references it.
  */
 export function loadExtendsChain<T extends DocWithFrontmatter>(
 	entryPath: string,
@@ -427,7 +444,8 @@ export function loadExtendsChain<T extends DocWithFrontmatter>(
 	const docs = new Map<string, T>();
 	const diagnostics: (Diagnostic & { file?: string })[] = [];
 	const stack = new Set<string>(); // current DFS path
-	const missing = new Set<string>();
+	const missing = new Set<string>(); // already asked `load`; never asked again
+	const reported = new Set<string>(); // one V026 per (referencing file, path)
 
 	function visit(path: string, fromPath = entryPath): void {
 		if (stack.has(path)) {
@@ -436,20 +454,23 @@ export function loadExtendsChain<T extends DocWithFrontmatter>(
 				code: "V027",
 				message: `circular extends reference: ${path}`,
 				range: zeroRange(),
-				file: fromPath,
+				...attributedTo(entryPath, fromPath),
 			});
 			return;
 		}
-		if (docs.has(path) || missing.has(path)) return;
-		const doc = load(path);
+		if (docs.has(path)) return;
+		const doc = missing.has(path) ? null : load(path);
 		if (doc === null) {
 			missing.add(path);
+			const key = `${fromPath}\0${path}`;
+			if (reported.has(key)) return;
+			reported.add(key);
 			diagnostics.push({
 				severity: "error",
 				code: "V026",
 				message: `extends file not found: ${path}`,
 				range: zeroRange(),
-				file: fromPath,
+				...attributedTo(entryPath, fromPath),
 			});
 			return;
 		}
@@ -463,7 +484,7 @@ export function loadExtendsChain<T extends DocWithFrontmatter>(
 					code: "V026",
 					message: `invalid extends path (${resolved.reason}): ${ref}`,
 					range: zeroRange(),
-					file: path,
+					...attributedTo(entryPath, path),
 				});
 				continue;
 			}

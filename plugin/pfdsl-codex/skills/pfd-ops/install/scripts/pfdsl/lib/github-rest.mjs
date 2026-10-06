@@ -73,11 +73,11 @@ export function mapLabelsResponse(apiLabels) {
 
 /**
  * Maps GitHub REST `GET /issues` entries to the shape gh CLI's
- * `issue list --json number,state,stateReason,labels,updatedAt` produces.
+ * `issue list --json number,state,stateReason,labels` produces.
  * The REST issues endpoint also returns pull requests — those carry a
  * `pull_request` key and are filtered out, matching gh's own `issue list`.
  * @param {Array<Record<string, unknown>>} apiIssues
- * @returns {Array<{number: number, state: string, stateReason: string|null, labels: {name: string}[], updatedAt: string}>}
+ * @returns {Array<{number: number, state: string, stateReason: string|null, labels: {name: string}[]}>}
  */
 export function mapIssuesResponse(apiIssues) {
 	return apiIssues
@@ -89,7 +89,6 @@ export function mapIssuesResponse(apiIssues) {
 			labels: (i.labels ?? []).map((l) => ({
 				name: typeof l === "string" ? l : l.name,
 			})),
-			updatedAt: i.updated_at,
 		}));
 }
 

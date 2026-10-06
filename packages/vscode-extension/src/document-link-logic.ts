@@ -1,5 +1,5 @@
 import { pathToFileURL } from "node:url";
-import { analyzeSource, resolveLocationFsPath } from "@pfdsl/core";
+import { analyzeSource, isUrlLike, resolveLocationFsPath } from "@pfdsl/core";
 
 export interface LinkRange {
 	line: number;
@@ -25,7 +25,7 @@ export function extractDocumentLinks(
 			for (const { value, range } of declaration.fields.get(key)?.values ??
 				[]) {
 				if (!value) continue;
-				const target = value.includes("://")
+				const target = isUrlLike(value)
 					? value
 					: pathToFileURL(
 							resolveLocationFsPath(

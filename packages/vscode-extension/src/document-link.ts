@@ -54,7 +54,7 @@ export function registerDocumentLinks(context: vscode.ExtensionContext): void {
 	const provider: vscode.DocumentLinkProvider = {
 		async provideDocumentLinks(doc) {
 			const links = extractDocumentLinks(analyzeDocument(doc), doc.uri.fsPath);
-			return await Promise.all(
+			const resolved = await Promise.all(
 				links.map(async ({ line, startChar, endLine, endChar, target }) => {
 					const range = new vscode.Range(
 						line,
@@ -62,7 +62,14 @@ export function registerDocumentLinks(context: vscode.ExtensionContext): void {
 						endLine ?? line,
 						endChar,
 					);
-					const uri = vscode.Uri.parse(target);
+					let uri: vscode.Uri;
+					try {
+						uri = vscode.Uri.parse(target);
+					} catch {
+						// VS Code rejects a URI with characters its scheme does not
+						// accept. That value has no link; the others still do.
+						return undefined;
+					}
 					if (uri.scheme === "file") {
 						const fsPath = uri.fsPath;
 						let stat: vscode.FileStat | undefined;
@@ -84,6 +91,7 @@ export function registerDocumentLinks(context: vscode.ExtensionContext): void {
 					return new vscode.DocumentLink(range, uri);
 				}),
 			);
+			return resolved.filter((link) => link !== undefined);
 		},
 	};
 
