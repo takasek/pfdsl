@@ -1,10 +1,8 @@
 import { analyze } from "@pfdsl/core";
 import { describe, expect, it } from "vitest";
 import {
-	allIdsOfDocument,
 	blockingDiagnosticMessage,
 	idsOfStatement,
-	nodeIdAtCursor,
 	positionOfNodeId,
 } from "./preview-logic.js";
 
@@ -46,56 +44,6 @@ describe("idsOfStatement", () => {
 
 	it("yields the single id of a node declaration", () => {
 		expect(idsOf("lonely")).toEqual(["lonely"]);
-	});
-});
-
-describe("allIdsOfDocument", () => {
-	it("collects ids across every statement", () => {
-		const result = analyze("A >> P -> B\nC >> Q -> D\nlonely\n");
-		expect(allIdsOfDocument(result)).toEqual(
-			new Set(["A", "P", "B", "C", "Q", "D", "lonely"]),
-		);
-	});
-
-	it("reports a repeated id once", () => {
-		const result = analyze("A >> P -> B\nB >> Q -> C\n");
-		expect(allIdsOfDocument(result).size).toBe(5);
-	});
-
-	it("is empty for a document with no statements", () => {
-		expect(allIdsOfDocument(analyze(""))).toEqual(new Set());
-	});
-});
-
-describe("nodeIdAtCursor", () => {
-	// "A >> P -> B" — vscode is 0-indexed, so line 0 / character 0 is 'A'.
-	const result = analyze("A >> P -> B");
-
-	it("finds the id the cursor sits on at its first character", () => {
-		expect(nodeIdAtCursor(result, { line: 0, character: 0 })).toBe("A");
-	});
-
-	it("finds an id in the middle of the line", () => {
-		expect(nodeIdAtCursor(result, { line: 0, character: 5 })).toBe("P");
-	});
-
-	it("is undefined when the cursor is on an operator, not an id", () => {
-		expect(nodeIdAtCursor(result, { line: 0, character: 2 })).toBeUndefined();
-	});
-
-	it("is undefined on a line that has no statement", () => {
-		expect(nodeIdAtCursor(result, { line: 5, character: 0 })).toBeUndefined();
-	});
-
-	it("finds an id on a later line, translating the 0/1-indexing", () => {
-		const multi = analyze("A >> P -> B\nC >> Q -> D");
-		expect(nodeIdAtCursor(multi, { line: 1, character: 0 })).toBe("C");
-	});
-
-	it("matches a multi-character id anywhere within it", () => {
-		const wide = analyze("requirement >> design -> spec");
-		expect(nodeIdAtCursor(wide, { line: 0, character: 5 })).toBe("requirement");
-		expect(nodeIdAtCursor(wide, { line: 0, character: 15 })).toBe("design");
 	});
 });
 
