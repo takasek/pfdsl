@@ -75,7 +75,7 @@
 <!-- i1282_create_node_definition -->
 <g id="node19" class="node">
 <title>i1282_create_node_definition</title>
-<g id="a_node19"><a xlink:href="https://github.com/takasek/pfdsl/issues/1282" xlink:title="ノード定義作成操作を実装する&#10;updated_at: 2026&#45;10&#45;04T09:05:16Z&#10;location: https://github.com/takasek/pfdsl/issues/1282">
+<g id="a_node19"><a xlink:href="https://github.com/takasek/pfdsl/issues/1282" xlink:title="ノード定義作成操作を実装する&#10;location: https://github.com/takasek/pfdsl/issues/1282">
 <ellipse fill="none" stroke="black" cx="1636.46" cy="-574" rx="130.07" ry="41.3"/>
 <text xml:space="preserve" text-anchor="middle" x="1636.46" y="-586.6" font-family="Times,serif" font-size="14.00">i1282_create_node_definition</text>
 <text xml:space="preserve" text-anchor="middle" x="1636.46" y="-569.8" font-family="Times,serif" font-size="14.00">ノード定義作成操作</text>
@@ -122,7 +122,7 @@
 <!-- i483_implement_preview_connector -->
 <g id="node23" class="node">
 <title>i483_implement_preview_connector</title>
-<g id="a_node23"><a xlink:href="https://github.com/takasek/pfdsl/issues/483" xlink:title="Preview コネクタ UI 実装&#10;updated_at: 2026&#45;10&#45;04T09:05:14Z&#10;location: https://github.com/takasek/pfdsl/issues/483">
+<g id="a_node23"><a xlink:href="https://github.com/takasek/pfdsl/issues/483" xlink:title="Preview コネクタ UI 実装&#10;location: https://github.com/takasek/pfdsl/issues/483">
 <ellipse fill="none" stroke="black" cx="1058.26" cy="-482" rx="157.01" ry="41.3"/>
 <text xml:space="preserve" text-anchor="middle" x="1058.26" y="-494.6" font-family="Times,serif" font-size="14.00">i483_implement_preview_connector</text>
 <text xml:space="preserve" text-anchor="middle" x="1058.26" y="-477.8" font-family="Times,serif" font-size="14.00">Preview コネクタ UI</text>
@@ -198,7 +198,7 @@
 <!-- i542_migrate_spec_id_refs -->
 <g id="node24" class="node">
 <title>i542_migrate_spec_id_refs</title>
-<g id="a_node24"><a xlink:href="https://github.com/takasek/pfdsl/issues/542" xlink:title="spec.md 仕様ID参照移行&#10;&#10;spec.md の節番号相互参照を仕様ID参照へ段階移行する。クラスタ単位の段階計画（§15 制約 → §2.x 意味論 → 残り）は #542 が一次情報&#10;updated_at: 2026&#45;07&#45;23T14:54:12Z&#10;location: https://github.com/takasek/pfdsl/issues/542">
+<g id="a_node24"><a xlink:href="https://github.com/takasek/pfdsl/issues/542" xlink:title="spec.md 仕様ID参照移行&#10;&#10;spec.md の節番号相互参照を仕様ID参照へ段階移行する。クラスタ単位の段階計画（§15 制約 → §2.x 意味論 → 残り）は #542 が一次情報&#10;location: https://github.com/takasek/pfdsl/issues/542">
 <ellipse fill="none" stroke="black" cx="433.5" cy="-659" rx="119.08" ry="41.3"/>
 <text xml:space="preserve" text-anchor="middle" x="433.5" y="-671.6" font-family="Times,serif" font-size="14.00">i542_migrate_spec_id_refs</text>
 <text xml:space="preserve" text-anchor="middle" x="433.5" y="-654.8" font-family="Times,serif" font-size="14.00">spec.md</text>
@@ -278,7 +278,7 @@
 <!-- i119_publish_extension -->
 <g id="node13" class="node">
 <title>i119_publish_extension</title>
-<g id="a_node13"><a xlink:href="https://github.com/takasek/pfdsl/issues/119" xlink:title="extension自動公開実装&#10;updated_at: 2026&#45;06&#45;29T01:43:14Z&#10;location: https://github.com/takasek/pfdsl/issues/119">
+<g id="a_node13"><a xlink:href="https://github.com/takasek/pfdsl/issues/119" xlink:title="extension自動公開実装&#10;location: https://github.com/takasek/pfdsl/issues/119">
 <ellipse fill="none" stroke="black" cx="433.5" cy="-1027" rx="105.91" ry="41.3"/>
 <text xml:space="preserve" text-anchor="middle" x="433.5" y="-1039.6" font-family="Times,serif" font-size="14.00">i119_publish_extension</text>
 <text xml:space="preserve" text-anchor="middle" x="433.5" y="-1022.8" font-family="Times,serif" font-size="14.00">extension自動公開実</text>
@@ -307,7 +307,7 @@
 <!-- i1258_build_standalone_documents -->
 <g id="node14" class="node">
 <title>i1258_build_standalone_documents</title>
-<g id="a_node14"><a xlink:href="https://github.com/takasek/pfdsl/issues/1258" xlink:title="文書の安全な編集・保存を完成させる&#10;updated_at: 2026&#45;10&#45;04T09:05:24Z&#10;location: https://github.com/takasek/pfdsl/issues/1258">
+<g id="a_node14"><a xlink:href="https://github.com/takasek/pfdsl/issues/1258" xlink:title="文書の安全な編集・保存を完成させる&#10;location: https://github.com/takasek/pfdsl/issues/1258">
 <ellipse fill="none" stroke="black" cx="433.5" cy="-1128" rx="154.29" ry="41.3"/>
 <text xml:space="preserve" text-anchor="middle" x="433.5" y="-1140.6" font-family="Times,serif" font-size="14.00">i1258_build_standalone_documents</text>
 <text xml:space="preserve" text-anchor="middle" x="433.5" y="-1123.8" font-family="Times,serif" font-size="14.00">文書の安全な編集・</text>
@@ -336,7 +336,7 @@
 <!-- i1259_build_standalone_pfd_features -->
 <g id="node15" class="node">
 <title>i1259_build_standalone_pfd_features</title>
-<g id="a_node15"><a xlink:href="https://github.com/takasek/pfdsl/issues/1259" xlink:title="PFD 編集・閲覧機能を両版で揃える&#10;updated_at: 2026&#45;10&#45;04T09:05:27Z&#10;location: https://github.com/takasek/pfdsl/issues/1259">
+<g id="a_node15"><a xlink:href="https://github.com/takasek/pfdsl/issues/1259" xlink:title="PFD 編集・閲覧機能を両版で揃える&#10;location: https://github.com/takasek/pfdsl/issues/1259">
 <ellipse fill="none" stroke="black" cx="1058.26" cy="-1128" rx="160.87" ry="41.3"/>
 <text xml:space="preserve" text-anchor="middle" x="1058.26" y="-1140.6" font-family="Times,serif" font-size="14.00">i1259_build_standalone_pfd_features</text>
 <text xml:space="preserve" text-anchor="middle" x="1058.26" y="-1123.8" font-family="Times,serif" font-size="14.00">PFD 編集・閲覧機能</text>
@@ -365,7 +365,7 @@
 <!-- i1260_build_standalone_integrations -->
 <g id="node16" class="node">
 <title>i1260_build_standalone_integrations</title>
-<g id="a_node16"><a xlink:href="https://github.com/takasek/pfdsl/issues/1260" xlink:title="関連参照・差分・外部実行を接続する&#10;updated_at: 2026&#45;10&#45;04T09:05:30Z&#10;location: https://github.com/takasek/pfdsl/issues/1260">
+<g id="a_node16"><a xlink:href="https://github.com/takasek/pfdsl/issues/1260" xlink:title="関連参照・差分・外部実行を接続する&#10;location: https://github.com/takasek/pfdsl/issues/1260">
 <ellipse fill="none" stroke="black" cx="1636.46" cy="-1178" rx="158.13" ry="41.3"/>
 <text xml:space="preserve" text-anchor="middle" x="1636.46" y="-1190.6" font-family="Times,serif" font-size="14.00">i1260_build_standalone_integrations</text>
 <text xml:space="preserve" text-anchor="middle" x="1636.46" y="-1173.8" font-family="Times,serif" font-size="14.00">関連参照・差分・外</text>
@@ -395,7 +395,7 @@
 <!-- i1261_build_standalone_exports -->
 <g id="node17" class="node">
 <title>i1261_build_standalone_exports</title>
-<g id="a_node17"><a xlink:href="https://github.com/takasek/pfdsl/issues/1261" xlink:title="全形式の書き出しを完成させる&#10;updated_at: 2026&#45;10&#45;04T09:05:34Z&#10;location: https://github.com/takasek/pfdsl/issues/1261">
+<g id="a_node17"><a xlink:href="https://github.com/takasek/pfdsl/issues/1261" xlink:title="全形式の書き出しを完成させる&#10;location: https://github.com/takasek/pfdsl/issues/1261">
 <ellipse fill="none" stroke="black" cx="1636.46" cy="-1077" rx="140.54" ry="41.3"/>
 <text xml:space="preserve" text-anchor="middle" x="1636.46" y="-1089.6" font-family="Times,serif" font-size="14.00">i1261_build_standalone_exports</text>
 <text xml:space="preserve" text-anchor="middle" x="1636.46" y="-1072.8" font-family="Times,serif" font-size="14.00">全形式の書き出しを</text>
@@ -424,7 +424,7 @@
 <!-- i1262_publish_standalone -->
 <g id="node18" class="node">
 <title>i1262_publish_standalone</title>
-<g id="a_node18"><a xlink:href="https://github.com/takasek/pfdsl/issues/1262" xlink:title="配布物の全体受入を完了して公開する&#10;updated_at: 2026&#45;10&#45;04T09:05:37Z&#10;location: https://github.com/takasek/pfdsl/issues/1262">
+<g id="a_node18"><a xlink:href="https://github.com/takasek/pfdsl/issues/1262" xlink:title="配布物の全体受入を完了して公開する&#10;location: https://github.com/takasek/pfdsl/issues/1262">
 <ellipse fill="none" stroke="black" cx="2176.24" cy="-1123" rx="115.25" ry="41.3"/>
 <text xml:space="preserve" text-anchor="middle" x="2176.24" y="-1135.6" font-family="Times,serif" font-size="14.00">i1262_publish_standalone</text>
 <text xml:space="preserve" text-anchor="middle" x="2176.24" y="-1118.8" font-family="Times,serif" font-size="14.00">配布物の全体受入を</text>
@@ -473,7 +473,7 @@
 <!-- i1283_add_node_location_cycle -->
 <g id="node20" class="node">
 <title>i1283_add_node_location_cycle</title>
-<g id="a_node20"><a xlink:href="https://github.com/takasek/pfdsl/issues/1283" xlink:title="定義と本文中のノード位置の巡回を実装する&#10;updated_at: 2026&#45;10&#45;04T09:05:19Z&#10;location: https://github.com/takasek/pfdsl/issues/1283">
+<g id="a_node20"><a xlink:href="https://github.com/takasek/pfdsl/issues/1283" xlink:title="定義と本文中のノード位置の巡回を実装する&#10;location: https://github.com/takasek/pfdsl/issues/1283">
 <ellipse fill="none" stroke="black" cx="433.5" cy="-915" rx="139.97" ry="53.17"/>
 <text xml:space="preserve" text-anchor="middle" x="433.5" y="-936" font-family="Times,serif" font-size="14.00">i1283_add_node_location_cycle</text>
 <text xml:space="preserve" text-anchor="middle" x="433.5" y="-919.2" font-family="Times,serif" font-size="14.00">定義と本文中のノー</text>
@@ -504,7 +504,7 @@
 <!-- i1284_add_hover_local_graph -->
 <g id="node21" class="node">
 <title>i1284_add_hover_local_graph</title>
-<g id="a_node21"><a xlink:href="https://github.com/takasek/pfdsl/issues/1284" xlink:title="ホバー内の周辺グラフ・移動と移動先強調を実装する&#10;updated_at: 2026&#45;10&#45;04T09:05:21Z&#10;location: https://github.com/takasek/pfdsl/issues/1284">
+<g id="a_node21"><a xlink:href="https://github.com/takasek/pfdsl/issues/1284" xlink:title="ホバー内の周辺グラフ・移動と移動先強調を実装する&#10;location: https://github.com/takasek/pfdsl/issues/1284">
 <ellipse fill="none" stroke="black" cx="433.5" cy="-791" rx="132.27" ry="53.17"/>
 <text xml:space="preserve" text-anchor="middle" x="433.5" y="-812" font-family="Times,serif" font-size="14.00">i1284_add_hover_local_graph</text>
 <text xml:space="preserve" text-anchor="middle" x="433.5" y="-795.2" font-family="Times,serif" font-size="14.00">ホバー内の周辺グラ</text>
