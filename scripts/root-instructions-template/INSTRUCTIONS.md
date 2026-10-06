@@ -68,7 +68,7 @@ t-wadaのTDDで。適切な粒度でコミットすること。
 
 変更束はブランチで作業し PR で main に統合する（main 直コミットしない。生態系図の develop→PR→merge_pr が正規経路）。`scripts/main-commit-guard.mjs`（PreToolUse(Bash) hook）は、mainまたはsibling worktreeを対象にする変更系Gitを保護する。ツールに渡すパスと実行worktreeを一致させる。
 main上では新しい状態を作る操作をdenyとし、破壊・復元操作はClaude Codeでask、askを表現できないCodexでfail-closed denyとする。
-sessionのrootと異なるworktreeを対象にする場合は操作の種類によらずClaude Codeでask、Codexでfail-closed denyとする（hookはsession自身のworktreeを他sessionのものと区別できず、session移動後もharnessは起動時のrootを報告し続けるため、所有権の確認を人間に委ねる）。
+sessionのrootと異なる同一repositoryのworktreeは、native所有証拠を確認できる場合だけownへ補正する（ADR-0045）。ClaudeはlockのPID・UTC起動時刻とhookの直接親、Codexはversion 1のownerThreadIdとhook.session_idの一致を使う。確認できなければClaude Codeでask、Codexでfail-closed denyとする。cwdへの移動だけでは所有者の根拠にならない。この補正はmain/default branchや検査回避の保護を免除しない。
 保護の範囲はこのリポジトリのcheckoutに限る。targetのgit common dirがsessionのものと異なれば、ブランチ名が `main` でも素通しする（使い捨てsandboxの既定ブランチが `main` になるため）。
 変更系Gitの実効targetをshell構文から確定できない場合はfail closedとする。
 検査を飛ばすコマンド（`--no-verify`/`-n`、`-c`・`--config-env`・`git config` 経由の `core.hooksPath` 上書き）はforeign target以外、branch・worktreeを問わずdenyとし、`git config` の `--global`/`--system`/`--file`・`-f`（`--file`・`-f` は指す先を問わず対象）はforeign targetでもdenyとする（#1232）。

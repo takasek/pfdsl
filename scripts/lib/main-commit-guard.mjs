@@ -42,9 +42,9 @@ import {
 import { buildPermissionOutput, parseHookPayload } from "./hook-io.mjs";
 
 // The decision splits by target before it splits by subcommand. Against a
-// worktree other than the session's own reported root it is always ask (#1201):
-// the guard cannot separate the session's own worktree from another session's,
-// so the grading below would deny the very arrangement the workflow mandates.
+// sibling whose native ownership was not confirmed by the entrypoint it is
+// ask (#1201, ADR-0045). A reported root alone cannot separate the session's
+// worktree from another session's. Codex converts ask to deny.
 // On the default branch the subcommand decides.
 //
 // Which subcommands land in which decision follows one rule (#777): deny the
@@ -963,13 +963,10 @@ function evaluateGuardedCommand(
 
 	const command = `git ${guarded.subcommand}`;
 	// A cross-worktree target is asked about rather than denied, whatever the
-	// subcommand: the guard cannot tell the session's own worktree from another
-	// session's, and the harness keeps reporting the root a session started with,
-	// so a session that moved into its worktree reads as a sibling (#1201). The
-	// old deny named a remediation — reopen the session there — that entering the
-	// worktree does not deliver, which left the mandated workflow with no way to
-	// commit at all. Ownership is a fact only the human has, so the human is
-	// asked. Codex, where ask is unsupported, still falls closed to deny in
+	// subcommand when the entrypoint cannot confirm native ownership. The
+	// harness may keep reporting the initial root after entering a worktree
+	// (#1201); cwd alone does not establish ownership. Claude can ask the human
+	// to check. Codex, where ask is unsupported, still falls closed to deny in
 	// runMainCommitGuard.
 	if (
 		guarded.decision === "deny" &&
@@ -988,7 +985,7 @@ function evaluateGuardedCommand(
 		decision: "ask",
 		reason:
 			crossesWorktree && !targetsDefaultBranch
-				? `'${command}' targets a worktree other than the one this session reports as its root, which can discard another session's uncommitted edits. Confirm only if this session owns that target worktree — which it does when the session is working in it, even though the harness still reports the root it started with.`
+				? `'${command}' targets a worktree other than the one this session reports as its root, and the hook could not confirm this session as its native owner. This can discard another session's uncommitted edits. Confirm ownership before proceeding; working in that directory alone does not establish ownership.`
 				: `'${command}' on '${mainBranch}' would change the main checkout's working tree, which every session ` +
 					"shares — it can discard another session's uncommitted edits. It is also how CLAUDE.md says to repair " +
 					"a tree that was written to by mistake, and this hook cannot tell the two apart. Confirm only if this " +
