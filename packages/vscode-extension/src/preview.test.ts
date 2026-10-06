@@ -118,7 +118,10 @@ const host = vi.hoisted(() => {
 			workspace: {
 				applyEdit: vi.fn(async (_edit: WorkspaceEdit) => true),
 				openTextDocument,
-				fs: { stat: vi.fn(async () => ({ type: 1 })) },
+				fs: {
+					stat: vi.fn(async () => ({ type: 1 })),
+					readFile: vi.fn(),
+				},
 				onDidChangeTextDocument: (callback: typeof textChanged) => {
 					textChanged = callback;
 					return { dispose() {} };
@@ -216,6 +219,10 @@ beforeEach(() => {
 	host.commands.clear();
 	host.window.activeTextEditor = undefined;
 	host.api.workspace.applyEdit.mockClear();
+	host.api.workspace.fs.readFile.mockReset();
+	host.api.workspace.openTextDocument
+		.mockReset()
+		.mockImplementation(async (value) => ({ uri: value }));
 	host.window.visibleTextEditors = [];
 });
 
@@ -336,10 +343,13 @@ it("refreshes a preview edit from the replacement document after the source is c
 	const { preview, open } = setup();
 	const source = "a >> p -> b\n";
 	const original = document("reopened-source", source);
-	Object.assign(original, { isClosed: true });
 	const panel = await open(original, 1);
 	Object.assign(panel, { viewColumn: 1 });
 	panel.receive({ type: "ready" });
+	Object.assign(original, { isClosed: true });
+	host.api.workspace.openTextDocument.mockResolvedValueOnce(
+		document("reopened-source", source),
+	);
 	const reopened = document("reopened-source", `${source}p -> after_close\n`);
 	Object.assign(reopened, { version: 2 });
 	host.api.workspace.applyEdit.mockImplementationOnce(async () => {
@@ -363,6 +373,175 @@ it("refreshes a preview edit from the replacement document after the source is c
 		preserveFocus: true,
 	});
 	expect(original.getText()).toBe(source);
+});
+
+it.each([
+	"addConnector",
+	"createDefinition",
+] as const)("rejects %s from a closed preview when the file changed outside the editor", async (type) => {
+	const { preview, open } = setup();
+	const source = "a >> p -> b\n";
+	const original = document(`external-${type}`, source);
+	const panel = await open(original);
+	panel.receive({ type: "ready" });
+	Object.assign(original, { isClosed: true });
+	const diskSource = `external >> rebuild -> result\n${source}`;
+	const current = document(`external-${type}`, diskSource);
+	host.api.workspace.openTextDocument.mockResolvedValueOnce(current);
+	await panel.receive(
+		type === "addConnector"
+			? { type, nodeId: "p", source, connector: "->", otherId: "new_result" }
+			: { type, nodeId: "b", source },
+	);
+	expect(host.api.workspace.applyEdit).not.toHaveBeenCalled();
+	expect(host.api.workspace.openTextDocument).toHaveBeenCalledWith(
+		original.uri,
+	);
+	expect(preview.getActivePreviewDoc()).toBe(current);
+	expect(panel.messages.at(-1)).toMatchObject({
+		type: "render",
+		editing: { source: diskSource },
+	});
+	expect(host.window.showInformationMessage).toHaveBeenCalledWith(
+		"The document changed. Reopen Node actions and try again.",
+	);
+	expect(host.window.showTextDocument).not.toHaveBeenCalled();
+	expect(current.getText()).toBe(diskSource);
+});
+
+it.each([
+	"unavailable",
+	"disposed",
+	"closed",
+])("does not edit while reopening a source that becomes %s", async (state) => {
+	const { open } = setup();
+	const source = "a >> p -> b\n";
+	const original = document(`reopen-${state}`, source);
+	const panel = await open(original);
+	panel.receive({ type: "ready" });
+	Object.assign(original, { isClosed: true });
+	if (state === "unavailable")
+		host.api.workspace.openTextDocument.mockRejectedValueOnce(
+			new Error("File not found"),
+		);
+	else if (state === "disposed")
+		host.api.workspace.openTextDocument.mockImplementationOnce(async () => {
+			panel.dispose();
+			return original;
+		});
+	else host.api.workspace.openTextDocument.mockResolvedValueOnce(original);
+	await panel.receive({
+		type: "addConnector",
+		nodeId: "p",
+		source,
+		connector: "->",
+		otherId: "new_result",
+	});
+	expect(host.api.workspace.applyEdit).not.toHaveBeenCalled();
+	expect(host.window.showTextDocument).not.toHaveBeenCalled();
+	expect(panel.messages).toHaveLength(1);
+	if (state !== "disposed")
+		expect(host.window.showInformationMessage).toHaveBeenCalledWith(
+			"The source document could not be reopened.",
+		);
+	else expect(host.window.showInformationMessage).not.toHaveBeenCalled();
+});
+
+it.each([
+	"utf8",
+	"utf8bom",
+	"utf16le",
+	"utf16be",
+])("rejects an external file change while a hidden clean %s document is retained", async (encoding) => {
+	const { open } = setup();
+	const source = "a >> p -> b\n";
+	const doc = document(`retained-${encoding}`, source);
+	const panel = await open(doc);
+	Object.assign(doc, { isDirty: false, isClosed: false, encoding });
+	host.window.activeTextEditor = undefined;
+	const diskSource = `external >> rebuild -> result\n${source}`;
+	const bytes = Buffer.from(
+		diskSource,
+		encoding.startsWith("utf16") ? "utf16le" : "utf8",
+	);
+	if (encoding === "utf16be") bytes.swap16();
+	host.api.workspace.fs.readFile.mockResolvedValueOnce(bytes);
+	await panel.receive({
+		type: "addConnector",
+		nodeId: "p",
+		source,
+		connector: "->",
+		otherId: "new_result",
+	});
+	expect(host.api.workspace.applyEdit).not.toHaveBeenCalled();
+	expect(host.window.showInformationMessage).toHaveBeenCalledWith(
+		"The file changed outside VS Code. Reload the source file before editing from the preview.",
+	);
+	expect(host.api.workspace.fs.readFile).toHaveBeenCalledWith(doc.uri);
+});
+
+it.each([
+	"clean",
+	"dirty",
+	"bom",
+	"unknown-encoding",
+])("keeps hidden source editing when the buffer is %s", async (state) => {
+	const { open } = setup();
+	const source = "a >> p -> b\n";
+	const doc = document(`hidden-${state}`, source);
+	const panel = await open(doc);
+	Object.assign(doc, {
+		isDirty: state === "dirty",
+		isClosed: false,
+		encoding: state === "unknown-encoding" ? undefined : "utf8",
+	});
+	host.api.workspace.fs.readFile.mockResolvedValueOnce(
+		Buffer.from(
+			`${state === "bom" ? "\ufeff" : ""}${source}`,
+			state === "unknown-encoding" ? "utf16le" : "utf8",
+		),
+	);
+	host.api.workspace.applyEdit.mockImplementationOnce(async () => {
+		vi.spyOn(doc, "getText").mockReturnValue(`${source}p -> new_result\n`);
+		return true;
+	});
+	await panel.receive({
+		type: "addConnector",
+		nodeId: "p",
+		source,
+		connector: "->",
+		otherId: "new_result",
+	});
+	expect(host.api.workspace.applyEdit).toHaveBeenCalledTimes(1);
+	expect(host.window.showTextDocument).toHaveBeenCalledWith(doc, {
+		viewColumn: 1,
+		preserveFocus: true,
+	});
+	if (state === "dirty" || state === "unknown-encoding")
+		expect(host.api.workspace.fs.readFile).not.toHaveBeenCalled();
+	else expect(host.api.workspace.fs.readFile).toHaveBeenCalledWith(doc.uri);
+});
+
+it("stops a hidden clean preview edit if its file cannot be read", async () => {
+	const { open } = setup();
+	const source = "a >> p -> b\n";
+	const doc = document("unreadable-hidden", source);
+	const panel = await open(doc);
+	Object.assign(doc, { isDirty: false, encoding: "utf8" });
+	host.api.workspace.fs.readFile.mockRejectedValueOnce(
+		new Error("File not found"),
+	);
+	await panel.receive({
+		type: "addConnector",
+		nodeId: "p",
+		source,
+		connector: "->",
+		otherId: "new_result",
+	});
+	expect(host.api.workspace.applyEdit).not.toHaveBeenCalled();
+	expect(host.window.showInformationMessage).toHaveBeenCalledWith(
+		"The source file could not be read.",
+	);
 });
 
 it.each([

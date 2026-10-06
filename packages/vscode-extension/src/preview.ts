@@ -9,7 +9,11 @@ import {
 	positionOfNodeId,
 } from "@pfdsl/editor";
 import * as vscode from "vscode";
-import { analyzeDocument, preparePreviewForDocument } from "./analyze.js";
+import {
+	analyzeDocument,
+	dropAnalyzeCache,
+	preparePreviewForDocument,
+} from "./analyze.js";
 import { type DirectoryAccess, expandDirectory } from "./expand-directory.js";
 import { PreviewController } from "./preview-controller.js";
 import { buildHtml } from "./preview-logic.js";
@@ -257,8 +261,73 @@ export function registerPreview(context: vscode.ExtensionContext): {
 				msg.type === "createDefinition" ||
 				msg.type === "addConnector"
 			) {
+				if (state.doc.isClosed) {
+					let current: vscode.TextDocument;
+					try {
+						current = await vscode.workspace.openTextDocument(state.doc.uri);
+					} catch {
+						if (!state.disposed)
+							vscode.window.showInformationMessage(
+								"The source document could not be reopened.",
+							);
+						return;
+					}
+					if (state.disposed) return;
+					if (current.isClosed) {
+						vscode.window.showInformationMessage(
+							"The source document could not be reopened.",
+						);
+						return;
+					}
+					state.doc = current;
+					dropAnalyzeCache(current.uri);
+					state.controller.update();
+				}
 				const source = state.doc.getText();
 				const version = state.doc.version;
+				const encoding = state.doc.encoding?.replace(/bom$/, "");
+				const diskEncoding =
+					encoding === "utf8"
+						? "utf-8"
+						: encoding === "utf16le"
+							? "utf-16le"
+							: encoding === "utf16be"
+								? "utf-16be"
+								: undefined;
+				if (
+					diskEncoding &&
+					state.doc.uri.scheme === "file" &&
+					state.doc.isDirty === false &&
+					!vscode.window.visibleTextEditors.some(
+						(editor) => editor.document === state.doc,
+					)
+				) {
+					let diskSource: string;
+					try {
+						diskSource = new TextDecoder(diskEncoding, { fatal: true }).decode(
+							await vscode.workspace.fs.readFile(state.doc.uri),
+						);
+					} catch {
+						if (!state.disposed)
+							vscode.window.showInformationMessage(
+								"The source file could not be read.",
+							);
+						return;
+					}
+					if (
+						state.disposed ||
+						state.doc.isClosed ||
+						state.doc.version !== version ||
+						state.doc.getText() !== source
+					)
+						return;
+					if (diskSource !== source) {
+						vscode.window.showInformationMessage(
+							"The file changed outside VS Code. Reload the source file before editing from the preview.",
+						);
+						return;
+					}
+				}
 				const result = applyPreviewEdit(source, msg);
 				if (!result.ok) {
 					vscode.window.showInformationMessage(result.message);
@@ -266,6 +335,7 @@ export function registerPreview(context: vscode.ExtensionContext): {
 				}
 				if (
 					state.disposed ||
+					state.doc.isClosed ||
 					state.doc.version !== version ||
 					state.doc.getText() !== source
 				)

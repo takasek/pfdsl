@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
 import { existsSync } from "node:fs";
-import { copyFile, readdir, readFile } from "node:fs/promises";
+import { copyFile, readdir, readFile, writeFile } from "node:fs/promises";
 import { createServer } from "node:net";
 import { basename, dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -1021,6 +1021,97 @@ async function assertPreviewEditingFocus(session) {
 	);
 }
 
+async function assertHiddenSourceExternalChange(session) {
+	const { frame, page } = session;
+	const source = "closed_input >> hidden_source_process -> closed_output\n";
+	const sourceTab = page
+		.getByRole("tab", {
+			name: /^01-simple-chain\.pfdsl(?:, Editor Group \d+)?$/,
+		})
+		.last();
+	const modifier = process.platform === "darwin" ? "Meta" : "Control";
+	await editFixture(session, source);
+	await page.keyboard.press(`${modifier}+s`);
+	await waitForInteraction(
+		"fixture saved",
+		() => readFile(session.fixturePath, "utf8"),
+		(text) => text === source,
+		{ timeoutMs: coldRenderTimeoutMs },
+	);
+	await waitForColdRender(
+		frame.locator('#inner g.node[data-node-id="hidden_source_process"]'),
+		1,
+		"hidden source fixture rendered",
+	);
+	await sourceTab.click();
+	await page.keyboard.press(`${modifier}+w`);
+	await waitForInteraction(
+		"source hidden",
+		() => page.locator(".editor-group-container").count(),
+		(count) => count === 1,
+		{ timeoutMs: coldRenderTimeoutMs },
+	);
+	await frame
+		.locator('#inner g.node[data-node-id="hidden_source_process"]')
+		.press("Enter");
+	const diskSource = `external >> rebuild -> result\n${source}`;
+	await writeFile(session.fixturePath, diskSource, "utf8");
+	await frame.locator("#connector-kind").selectOption("->");
+	await frame.locator("#connector-target").fill("stale_result");
+	await frame
+		.getByRole("button", { name: "Add connection", exact: true })
+		.click();
+	await page
+		.getByText(
+			/The (?:document changed\. Reopen Node actions and try again\.|file changed outside VS Code\. Reload the source file before editing from the preview\.)/,
+			{ exact: true },
+		)
+		.waitFor({ state: "visible" });
+	assert.equal(await readFile(session.fixturePath, "utf8"), diskSource);
+	assert.equal(
+		await frame.locator('#inner g.node[data-node-id="stale_result"]').count(),
+		0,
+	);
+	await page.keyboard.press(`${modifier}+p`);
+	const quickInput = page.locator(".quick-input-widget input:visible");
+	await quickInput.fill(session.fixturePath);
+	await quickInput.press("Enter");
+	await sourceTab.click();
+	await page.keyboard.press(`${modifier}+Shift+p`);
+	await quickInput.fill("File: Revert File");
+	await quickInput.press("Enter");
+	await page.getByRole("tab", { name: /^PFDSL Preview/ }).click();
+	await waitForColdRender(
+		frame.locator('#inner g.node[data-node-id="external"]'),
+		1,
+		"source reloaded",
+	);
+	await frame
+		.locator('#inner g.node[data-node-id="hidden_source_process"]')
+		.press("Enter");
+	await frame.locator("#connector-kind").selectOption("->");
+	await frame.locator("#connector-target").fill("fresh_result");
+	await frame
+		.getByRole("button", { name: "Add connection", exact: true })
+		.click();
+	await waitForColdRender(
+		frame.locator('#inner g.node[data-node-id="fresh_result"]'),
+		1,
+		"fresh connection",
+	);
+	await sourceTab.click();
+	await page.keyboard.press(`${modifier}+s`);
+	await waitForInteraction(
+		"fresh retry saved without losing external changes",
+		() => readFile(session.fixturePath, "utf8"),
+		(text) => text === `${diskSource}hidden_source_process -> fresh_result\n`,
+		{ timeoutMs: coldRenderTimeoutMs },
+	);
+	console.log(
+		"hidden source external change: stale edit rejected; reload and fresh retry preserved exact source",
+	);
+}
+
 export async function launchSmokeSession() {
 	const runDir = await createRunDirectory();
 	const profileDir = join(runDir, "profile");
@@ -1150,6 +1241,7 @@ async function main() {
 		await assertPreviewUsability(session);
 		await assertDefinitionQuickFix(session);
 		await assertPreviewEditingFocus(session);
+		await assertHiddenSourceExternalChange(session);
 	} catch (error) {
 		if (!session) {
 			failure = error;
