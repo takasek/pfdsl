@@ -22,6 +22,32 @@ export function analyzeSnapshot(source: string) {
 export type DocumentModel = ReturnType<typeof analyzeSnapshot>;
 export type PresetLoader = (path: string) => DocumentModel | null;
 
+/** Dependency diagnostics retain coordinates in the host's original saved file. */
+export function analyzeDependencySnapshot(
+	path: string,
+	source: string,
+): DocumentModel {
+	const wrapped = wrapPresetSource(path, source);
+	const model = analyzeSnapshot(wrapped);
+	if (wrapped !== source)
+		model.diagnostics = model.diagnostics.map((d) => ({
+			...d,
+			range: {
+				start: {
+					...d.range.start,
+					line: Math.max(1, d.range.start.line - 1),
+					offset: Math.max(0, d.range.start.offset - 4),
+				},
+				end: {
+					...d.range.end,
+					line: Math.max(1, d.range.end.line - 1),
+					offset: Math.max(0, d.range.end.offset - 4),
+				},
+			},
+		}));
+	return model;
+}
+
 /** Saved dependency sources are supplied by the host; the entry is always its editor snapshot. */
 export async function preloadPresets(
 	path: string,
@@ -32,9 +58,7 @@ export async function preloadPresets(
 		if (file === path) return model;
 		try {
 			const source = await read(file);
-			return source === null
-				? null
-				: analyzeSnapshot(wrapPresetSource(file, source));
+			return source === null ? null : analyzeDependencySnapshot(file, source);
 		} catch {
 			return null;
 		}

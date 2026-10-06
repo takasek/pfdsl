@@ -2,9 +2,26 @@ import { describe, expect, it } from "vitest";
 import { analyzeSnapshot, preloadPresets, prepareDocument } from "./index.js";
 
 describe("shared document pipeline", () => {
+	it("reports raw YAML dependency positions in the original file", async () => {
+		const source = "group:\n  g: {parent: 2}\n";
+		const model = analyzeSnapshot("---\nextends: preset.yaml\n---\na\n");
+		const load = await preloadPresets(
+			"/project/main.pfdsl",
+			model,
+			async () => source,
+		);
+		const result = prepareDocument(model, "/project/main.pfdsl", load);
+		const diagnostic = result.presetDiagnostics.find(
+			(d) => d.code === "FM004",
+		)!;
+		expect(diagnostic.range.start.line).toBe(2);
+		expect(
+			source.slice(diagnostic.range.start.offset, diagnostic.range.end.offset),
+		).toBe("2");
+	});
 	it("loads child presets once and keeps dependency errors lenient in the preview", async () => {
 		const model = analyzeSnapshot(
-			"---\nprocess:\n  p: {subflow: child.pfdsl}\n  q: {subflow: other.pfdsl}\n---\na >> p -> b\na >> q -> b\n",
+			"---\nprocess:\n  p: {subflow: child.pfdsl}\n  q: {subflow: other.pfdsl}\n---\na >> p -> b\na >> q -> d\n",
 		);
 		const reads: string[] = [];
 		const load = await preloadPresets(
