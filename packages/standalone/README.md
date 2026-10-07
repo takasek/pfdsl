@@ -84,6 +84,37 @@ A headless container alone does not provide the desktop session needed for GUI a
 An arm64 container build also does not verify a cloud desktop running x86_64.
 Container setup is optional; this procedure can be used directly on the target Linux desktop.
 
+### Use a CI executable when development dependencies are unavailable
+
+The `desktop` workflow's `linux-native` job tests and builds the PR head commit on x86_64 in a pinned Debian 13 container.
+After that job succeeds, download its `pfdsl-linux-x64-<source-commit>` artifact from the workflow run.
+It contains `pfdsl-linux-x64.tar.gz`; extract it into a new directory, then check its contents:
+
+```sh
+mkdir /absolute/new/linux-verification
+tar -xzf /path/to/pfdsl-linux-x64.tar.gz -C /absolute/new/linux-verification
+cd /absolute/new/linux-verification
+sha256sum -c SHA256SUMS
+cat SOURCE_COMMIT
+cat build-environment.txt
+ldd ./pfdsl-desktop
+```
+
+Compare `SOURCE_COMMIT` with the PR head you intend to verify.
+The archive preserves executable permissions and includes the executable, the frontend built into it, the source commit, build-environment versions, and hashes of those files.
+The frontend files are included for identification; the executable already embeds the frontend and does not need a separate web server.
+Download artifacts only from the expected repository, run, and commit; the included hashes detect changed files but do not authenticate their origin.
+
+The target does not need Rust, Cargo, or development headers to run this executable.
+It still needs compatible runtime libraries and a graphical desktop session.
+If `ldd` reports `not found`, retain that output and resolve the listed runtime dependencies before attempting GUI acceptance.
+The build uses Debian 13; compatibility with older distributions is not certified.
+With those checks satisfied, launch `./pfdsl-desktop` for the normal folder-picker and dirty-close scenarios.
+For corpus preparation, use a checkout and local JS build at `SOURCE_COMMIT`, and pass the absolute path of this executable to `prepare-native.mjs`.
+Compare the archive's `frontend/` hashes with that checkout's `packages/standalone/dist/` before treating locally prepared frontend metadata as identifying this executable.
+CI unit tests and compilation do not certify native startup, dialogs, GUI operations, or corpus acceptance on the target desktop.
+If runtime dependencies cannot be installed, a verification-only AppImage is a follow-up option; this job does not build one.
+
 ## Application behavior
 
 Each tab pairs its editor and preview.

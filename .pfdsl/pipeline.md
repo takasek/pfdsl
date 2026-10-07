@@ -18,6 +18,15 @@
 ファイルが実用上の限界に近づいた場合の分割候補は「読み手が完全に別」の線であり、b層（読み手は CLI ユーザー・VSCode 拡張ユーザー）と生成・配布（読み手はメンテナ・採用リポ）の間に入る。
 現時点では分割していない。
 
+## Linux native の検証用ビルドと受渡し
+
+`.github/workflows/desktop.yml` の `linux-native` は、PR head または main push の source commit を checkout し、Debian 13 / x86_64 で frontend・Rust unit・no-bundle native build を実行する。
+成功時だけ、native executable、同じ build の frontend、source commit、依存版、各ファイルの SHA-256 を tar.gz にまとめ、14日保持の Actions artifact として検証担当へ渡す。
+これは d 層の開発用ビルドを対象環境へ渡す経路であり、npm・Marketplace・macOS 配布の release request や公開タグを消費・生成しない。
+検証担当は source commit と hash を照合し、対象 Linux の実行依存を確認して GUI 操作・native corpus の受入を行う。
+CI の unit・compile 成功と対象 desktop の実操作結果は別に記録する。
+現在の pipeline 図は d 層ホストのビルド・受入を変換ノードとしてモデル化していないため、その生成・配送境界を本節で明示する。
+
 ## a-g 層との対応
 
 - **a（言語仕様）**: `docs/spec/spec.md`。図に現れない — validate が適用する V/W ルールの根拠だが、実装へ反映されるのは設計時であり、実行時に読まれる入力ではないため

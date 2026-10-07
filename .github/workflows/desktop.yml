@@ -6,6 +6,81 @@ on:
     branches: [main]
 
 jobs:
+  linux-native:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    container:
+      image: debian:13-slim@sha256:a29215f6a35e51e22adffa17f89e9d2ef06214e64a2bad10d765c46aea49f11f
+    defaults:
+      run:
+        shell: bash
+    env:
+      CARGO_TERM_COLOR: never
+    steps:
+      - name: Install Debian build dependencies
+        run: |
+          test "$(uname -m)" = x86_64
+          apt-get update
+          apt-get install -y --no-install-recommends \
+            build-essential pkg-config git ca-certificates curl wget file \
+            libgtk-3-dev libwebkit2gtk-4.1-dev libssl-dev \
+            libxdo-dev libayatana-appindicator3-dev librsvg2-dev
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+          cache: pnpm
+      - name: Install stable Rust
+        run: |
+          curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs -o "$RUNNER_TEMP/rustup-init.sh"
+          sh "$RUNNER_TEMP/rustup-init.sh" -y --profile minimal --default-toolchain stable
+          echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm -r build
+      - name: Test the Linux native library
+        run: cargo +stable test --manifest-path packages/standalone/src-tauri/Cargo.toml --locked --lib
+      - name: Build the Linux native executable without packaging
+        run: pnpm --filter @pfdsl/standalone tauri build --no-bundle -- --locked
+      - name: Prepare verification files
+        run: |
+          git diff --exit-code
+          mkdir "$RUNNER_TEMP/pfdsl-linux-x64"
+          install -m 755 packages/standalone/src-tauri/target/release/pfdsl-desktop "$RUNNER_TEMP/pfdsl-linux-x64/pfdsl-desktop"
+          cp -R packages/standalone/dist "$RUNNER_TEMP/pfdsl-linux-x64/frontend"
+          git rev-parse HEAD > "$RUNNER_TEMP/pfdsl-linux-x64/SOURCE_COMMIT"
+          {
+            cat /etc/os-release
+            uname -m
+            printf 'github_run_id=%s\ngithub_run_attempt=%s\n' "$GITHUB_RUN_ID" "$GITHUB_RUN_ATTEMPT"
+            node --version
+            pnpm --version
+            rustc --version
+            cargo --version
+            pkg-config --modversion gtk+-3.0 webkit2gtk-4.1
+            dpkg-query -W libc6 libgtk-3-0t64 libwebkit2gtk-4.1-0
+            file packages/standalone/src-tauri/target/release/pfdsl-desktop
+            ldd packages/standalone/src-tauri/target/release/pfdsl-desktop
+          } > "$RUNNER_TEMP/pfdsl-linux-x64/build-environment.txt"
+      - name: Archive verification files with checksums and executable permissions
+        working-directory: ${{ runner.temp }}/pfdsl-linux-x64
+        run: |
+          find pfdsl-desktop frontend SOURCE_COMMIT build-environment.txt -type f -print0 \
+            | LC_ALL=C sort -z | xargs -0 sha256sum > SHA256SUMS
+          tar -czf "$RUNNER_TEMP/pfdsl-linux-x64.tar.gz" .
+          sha256sum "$RUNNER_TEMP/pfdsl-linux-x64.tar.gz"
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: pfdsl-linux-x64-${{ github.event.pull_request.head.sha || github.sha }}
+          path: ${{ runner.temp }}/pfdsl-linux-x64.tar.gz
+          if-no-files-found: error
+          retention-days: 14
+
   macos-app:
     runs-on: macos-15
     timeout-minutes: 30
