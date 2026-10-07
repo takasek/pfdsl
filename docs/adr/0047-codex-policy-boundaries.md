@@ -25,10 +25,18 @@ detached HEAD は Git が正常に空の branch 名を返した場合と区別�
 update-ref、symbolic-ref の変更、branch の強制変更・削除・他 branch 改名、worktree の追加・保守、明示的なローカル ref 宛て fetch を確認する。
 worktree add は detached・既存 branch・新規 branch のいずれも共有 metadata を変更するため、Claude では ask、Codex では deny とし、native の worktree 作成入口とは区別する。
 default branch の作成・切替と、switch/checkout の分離・短縮・等号付き option を扱う。
+switch の `--` 後の operand と、checkout の後続 path の無い `--` は切替先として扱い、`--ignore-other-worktrees` は他 checkout の branch へ入るため共有作用とする。
+fetch の `-n` は `--no-tags` なので、免除は `--dry-run` の完全一致に限る。
+refspec を stdin から読む `fetch --stdin` は境界で解決できないため拒否する。
+読取以外の `git config` は、remote の refspec 等を通じて後続の通常操作の作用先を変えるため共有作用とする。
+Git の parse-options は long option の一意な接頭辞を受け付けるので、危険な option の接頭辞はその option として扱い、免除と読取判定には完全一致を要求する。
+branch は Git と同じく list mode を判定し、`-v`・`--format`・`--sort` だけでは一覧にならず作成になる形を区別する。
+これらの分類は使い捨て fixture で Git 自身に実行させた作用を正とする検査で照合する。
 非 default の隔離 branch 作成と自分の branch の非強制改名、通常の読取は維持する。
+誰も checkout していない既存の非 default branch を `-B`/`-C` で付け替える形は、隔離 branch 作成として許可したままにする。
 共有保守は Claude で ask、Codex で deny とし、自分の terminal に戻す。
 foreign repository の既存境界と検査回避の規則は維持する。
-任意スクリプト内部、Git alias、設定済み remote の特殊 refspec 全般を監視する仕組みではない。
+任意スクリプト内部、Git alias、書込み済みの remote 設定が持つ特殊 refspec 全般を監視する仕組みではない。
 
 Edit・Write・apply_patch は全 target を物理パスへ正規化する。
 symlink を先に辿ってから `..` を処理し、新規ファイルは既存親を調べる。
@@ -46,10 +54,12 @@ Git common dir は Git 自身に絶対パスで取得させ、symlink cwd の論
 Codex の hook.agent_id がある子には、Git metadata 変更と外向き書込みを拒否する。
 親は stage・commit・fetch・push・PR 更新を担当する。
 子の status・diff・log・branch 一覧・remote/config の読取等は明示的な読取表で許可する。
+子が Codex Git routine を直接または `node` 経由で呼ぶ場合は、test・build・typecheck・node-test・node-script 以外の verb を拒否する。
 Claude の issue-worker 例外を Codex の子へ引き継がない。
 
 親を含め gh pr merge・auto-merge、REST の merge endpoint、GraphQL の merge mutation を保護する。
 内容を検査できない GraphQL ファイル入力も保守的に確認対象とする。
+`--help` は gh の flag 表で単独の flag と判定できた場合だけ help として除外し、値 flag に消費される形・`--` 後・未知 flag 後は merge として扱う。
 GitHub MCP は既知の読取表と、未知または変更系の操作を分ける。
 Codex の MCP 書込みは親を含め deny とする。
 MCP の親判別を実入口で受入していないため、未知の主体を親とみなして許可しない。
