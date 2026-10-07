@@ -113,7 +113,43 @@ With those checks satisfied, launch `./pfdsl-desktop` for the normal folder-pick
 For corpus preparation, use a checkout and local JS build at `SOURCE_COMMIT`, and pass the absolute path of this executable to `prepare-native.mjs`.
 Compare the archive's `frontend/` hashes with that checkout's `packages/standalone/dist/` before treating locally prepared frontend metadata as identifying this executable.
 CI unit tests and compilation do not certify native startup, dialogs, GUI operations, or corpus acceptance on the target desktop.
-If runtime dependencies cannot be installed, a verification-only AppImage is a follow-up option; this job does not build one.
+
+### Use the verification AppImage when WebKitGTK runtime is unavailable
+
+The same job also packages a verification-only [AppImage](https://v2.tauri.app/distribute/appimage/) and uploads `pfdsl-linux-appimage-x64-<source-commit>`.
+This is an Actions artifact for acceptance work, not a signed release.
+The job extracts the built image and requires both `libwebkit2gtk-4.1.so.0` and `libjavascriptcoregtk-4.1.so.0` inside it before uploading.
+The archive also includes the frontend, source commit, build environment, outer checksums, and checksums of the extracted image's regular files.
+That inspection proves inclusion; compatibility and startup on the target desktop still need verification.
+The builder is Debian 13 x86_64; older systems are not certified, and the AppImage still needs a compatible kernel, glibc, graphics stack, and graphical session.
+
+Check the artifact's repository, run, and source commit as above, then extract its `pfdsl-linux-appimage-x64.tar.gz` into a new directory.
+Use AppImage extraction to avoid requiring FUSE or installation privileges:
+
+```sh
+cd /absolute/new/appimage-verification
+sha256sum -c SHA256SUMS
+cat SOURCE_COMMIT
+cat build-environment.txt
+./PFDSL.AppImage --appimage-extract
+cd squashfs-root
+sha256sum -c ../APPDIR_SHA256SUMS
+test -x AppRun
+test -x usr/bin/pfdsl-desktop
+LD_LIBRARY_PATH="$PWD/usr/lib:$PWD/usr/lib/x86_64-linux-gnu:$PWD/usr/lib64" \
+  ldd ./usr/bin/pfdsl-desktop
+```
+
+Record any `not found` or version error and stop before GUI/corpus acceptance if dependencies remain unresolved.
+This library-path check is a preflight; launching through `AppRun` also supplies the bundled GTK/WebKit resources and environment.
+When preflight succeeds, run `./AppRun` from the extracted directory for folder selection, cancellation, and dirty-close checks.
+Do not launch `usr/bin/pfdsl-desktop` directly for these checks.
+
+For corpus preparation, build the JS workspace at `SOURCE_COMMIT` and compare the archive's `frontend/` hashes with the checkout's standalone `dist/` first.
+Pass `/absolute/new/appimage-verification/squashfs-root/usr/bin/pfdsl-desktop` to `prepare-native.mjs`, then run `PFDSL_ACCEPTANCE_ROOT=/absolute/new/corpus ./AppRun` from the extracted directory.
+Preparation must hash the inner native executable because the native host fingerprints the running executable; the outer AppImage and `AppRun` have different hashes.
+Record the outer AppImage and inner executable hashes separately.
+An AppImage dependency check does not certify folder dialogs, GUI interaction, or native corpus acceptance.
 
 ## Application behavior
 

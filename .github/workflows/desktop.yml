@@ -80,6 +80,44 @@ jobs:
           path: ${{ runner.temp }}/pfdsl-linux-x64.tar.gz
           if-no-files-found: error
           retention-days: 14
+      - name: Bundle a verification-only AppImage
+        env:
+          # Keep modern Debian ELF sections intact in linuxdeploy's older tools.
+          NO_STRIP: "1"
+        run: >-
+          pnpm --filter @pfdsl/standalone tauri bundle --bundles appimage --ci --no-sign
+          --config '{"bundle":{"icon":["icons/icon.png"]}}'
+      - name: Inspect and archive the AppImage
+        run: |
+          git -C "$GITHUB_WORKSPACE" -c safe.directory="$GITHUB_WORKSPACE" diff --exit-code HEAD
+          appimages=(packages/standalone/src-tauri/target/release/bundle/appimage/*.AppImage)
+          test "${#appimages[@]}" = 1
+          mkdir "$RUNNER_TEMP/pfdsl-linux-appimage-x64"
+          install -m 755 "${appimages[0]}" "$RUNNER_TEMP/pfdsl-linux-appimage-x64/PFDSL.AppImage"
+          cp "$RUNNER_TEMP/pfdsl-linux-x64/SOURCE_COMMIT" "$RUNNER_TEMP/pfdsl-linux-appimage-x64/"
+          cp "$RUNNER_TEMP/pfdsl-linux-x64/build-environment.txt" "$RUNNER_TEMP/pfdsl-linux-appimage-x64/"
+          cp -R "$RUNNER_TEMP/pfdsl-linux-x64/frontend" "$RUNNER_TEMP/pfdsl-linux-appimage-x64/"
+          cd "$RUNNER_TEMP/pfdsl-linux-appimage-x64"
+          ./PFDSL.AppImage --appimage-extract > /dev/null
+          test -x squashfs-root/AppRun
+          test -x squashfs-root/usr/bin/pfdsl-desktop
+          test -f squashfs-root/usr/lib/libwebkit2gtk-4.1.so.0
+          test -f squashfs-root/usr/lib/libjavascriptcoregtk-4.1.so.0
+          (
+            cd squashfs-root
+            find . -type f -print0 | LC_ALL=C sort -z | xargs -0 sha256sum
+          ) > APPDIR_SHA256SUMS
+          find PFDSL.AppImage frontend SOURCE_COMMIT build-environment.txt APPDIR_SHA256SUMS -type f -print0 \
+            | LC_ALL=C sort -z | xargs -0 sha256sum > SHA256SUMS
+          tar -czf "$RUNNER_TEMP/pfdsl-linux-appimage-x64.tar.gz" \
+            PFDSL.AppImage frontend SOURCE_COMMIT build-environment.txt APPDIR_SHA256SUMS SHA256SUMS
+          sha256sum "$RUNNER_TEMP/pfdsl-linux-appimage-x64.tar.gz"
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: pfdsl-linux-appimage-x64-${{ github.event.pull_request.head.sha || github.sha }}
+          path: ${{ runner.temp }}/pfdsl-linux-appimage-x64.tar.gz
+          if-no-files-found: error
+          retention-days: 14
 
   macos-app:
     runs-on: macos-15

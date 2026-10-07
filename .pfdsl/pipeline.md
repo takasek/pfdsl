@@ -22,6 +22,9 @@
 
 `.github/workflows/desktop.yml` の `linux-native` は、PR head または main push の source commit を checkout し、Debian 13 / x86_64 で frontend・Rust unit・no-bundle native build を実行する。
 成功時だけ、native executable、同じ build の frontend、source commit、依存版、各ファイルの SHA-256 を tar.gz にまとめ、14日保持の Actions artifact として検証担当へ渡す。
+同じ job はビルド済み native を検証用 AppImage にまとめ、展開物に WebKitGTK 4.1 と JavaScriptCoreGTK 4.1 があることを確認して別 artifact に渡す。
+AppImage、frontend、source commit、外側と展開後の regular file の hash を配送し、対象環境では FUSE を使わず展開した AppRun から起動できる。
+corpus の fingerprint は外側 AppImage でなく内側 native executable に合わせ、対象 desktop の依存解決・起動・実操作を同梱検査の成功から推定しない。
 これは d 層の開発用ビルドを対象環境へ渡す経路であり、npm・Marketplace・macOS 配布の release request や公開タグを消費・生成しない。
 検証担当は source commit と hash を照合し、対象 Linux の実行依存を確認して GUI 操作・native corpus の受入を行う。
 CI の unit・compile 成功と対象 desktop の実操作結果は別に記録する。
