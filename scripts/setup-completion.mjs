@@ -22,19 +22,14 @@ import {
 	decideSkillLinkAction,
 	SKILL_LINK_TARGET,
 } from "./lib/repo-skill-link.mjs";
+import { isCompatibleShim } from "./shared-hooks.mjs";
 
 export const SETUP_INPUTS = [
 	".npmrc",
 	".pnpmfile.cjs",
-	"Makefile",
 	"package.json",
 	"pnpm-lock.yaml",
 	"pnpm-workspace.yaml",
-	"scripts/hooks/pre-commit-shim",
-	"scripts/lib/cli-entrypoint.mjs",
-	"scripts/lib/repo-skill-link.mjs",
-	"scripts/link-repo-skill.mjs",
-	"scripts/setup-completion.mjs",
 ];
 
 const MARKER = "node_modules/.pfdsl-setup-complete";
@@ -143,19 +138,25 @@ function isExecutableShim(path) {
 	}
 }
 
-export function isSetupCurrent(root = process.cwd(), options = {}) {
+export function areDependenciesCurrent(root = process.cwd()) {
 	try {
 		const inputs = setupInputs(root);
 		return (
 			readFileSync(join(root, MARKER), "utf8").trim() ===
 				setupFingerprint(root, inputs) &&
-			hasDeclaredDependencyLinks(root, inputs) &&
-			inspectSkillLink(root).reason === null &&
-			inspectHooksPath(root, options).reason === null
+			hasDeclaredDependencyLinks(root, inputs)
 		);
 	} catch {
 		return false;
 	}
+}
+
+export function isSetupCurrent(root = process.cwd(), options = {}) {
+	return (
+		areDependenciesCurrent(root) &&
+		inspectSkillLink(root).reason === null &&
+		inspectHooksPath(root, options).reason === null
+	);
 }
 
 function inspectSkillLink(root) {
@@ -273,12 +274,13 @@ export function inspectHooksPath(
 		return failed("The effective pre-commit is missing or not executable.");
 	try {
 		if (
-			!readFileSync(path).equals(
-				readFileSync(join(root, "scripts/hooks/pre-commit-shim")),
+			!isCompatibleShim(
+				readFileSync(path, "utf8"),
+				readFileSync(join(root, "scripts/hooks/pre-commit-shim"), "utf8"),
 			)
 		)
 			return failed(
-				"The effective hook differs from the repo shim; cannot verify that it runs the gate.",
+				"The effective hook differs from a compatible repo shim; cannot verify that it runs the gate.",
 			);
 	} catch {
 		return failed("Cannot read the effective pre-commit shim.");
@@ -413,13 +415,12 @@ export function writeSetupMarker(
 	}
 }
 
-function runSetupUnlocked(root) {
+function runSetupUnlocked(root, target = "setup-unlocked") {
 	return new Promise((resolveRun, rejectRun) => {
-		const child = spawn(
-			"make",
-			["-f", join(root, "Makefile"), "setup-unlocked"],
-			{ cwd: root, stdio: "inherit" },
-		);
+		const child = spawn("make", ["-f", join(root, "Makefile"), target], {
+			cwd: root,
+			stdio: "inherit",
+		});
 		child.once("error", rejectRun);
 		child.once("close", (status) => resolveRun(status ?? 1));
 	});
@@ -435,7 +436,11 @@ async function runSetup(root = process.cwd()) {
 		const skill = inspectSkillLink(root);
 		if (skill.reason !== null && !skill.managed) throw new Error(skill.reason);
 		if (isSetupCurrent(root)) return 0;
-		const status = await runSetupUnlocked(root);
+		const dependenciesCurrent = areDependenciesCurrent(root);
+		const status = await runSetupUnlocked(
+			root,
+			dependenciesCurrent ? "setup-artifacts" : "setup-unlocked",
+		);
 		if (status === 0) {
 			const skill = inspectSkillLink(root);
 			if (skill.reason !== null) {

@@ -150,6 +150,16 @@ describe("effective core.hooksPath", () => {
 	});
 });
 describe("setup-managed pre-commit", () => {
+	it("accepts a compatible newer shared shim without marking dependencies stale", () => {
+		const { root, env } = fixture();
+		install(
+			root,
+			".git/hooks",
+			shim.toString().replace("shim-version: 1", "shim-version: 2"),
+		);
+		assert.equal(inspectHooksPath(root, { env }).reason, null);
+		assert.equal(isSetupCurrent(root, { env }), true);
+	});
 	it("requires the shim in the common-dir hooks when core.hooksPath is unset", () => {
 		const { root, env } = fixture();
 		const missing = inspectHooksPath(root, { env });
@@ -172,12 +182,28 @@ describe("setup-managed pre-commit", () => {
 });
 describe("pre-commit shim", () => {
 	it("fails the commit when the checkout has no scripts/pre-commit", () => {
-		const root = mkdtempSync(join(tmpdir(), "pfdsl-shim-"));
-		fixtures.push(root);
+		const { root, git, env } = fixture();
+		rmSync(join(root, "scripts/pre-commit"));
+		git(
+			"-c",
+			"user.name=Fixture",
+			"-c",
+			"user.email=fixture@example.invalid",
+			"commit",
+			"--allow-empty",
+			"-qm",
+			"fixture",
+		);
+		git("update-ref", "refs/remotes/origin/default", "HEAD");
+		git(
+			"symbolic-ref",
+			"refs/remotes/origin/HEAD",
+			"refs/remotes/origin/default",
+		);
 		const result = spawnSync(
 			"/bin/sh",
 			[fileURLToPath(new URL("../hooks/pre-commit-shim", import.meta.url))],
-			{ cwd: root, encoding: "utf8" },
+			{ cwd: root, env, encoding: "utf8" },
 		);
 		assert.notEqual(result.status, 0);
 		assert.match(result.stderr, /scripts\/pre-commit/);

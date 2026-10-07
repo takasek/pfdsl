@@ -1,4 +1,7 @@
 #!/bin/sh
+# Repair a historical setup's shared shim downgrade before running gates.
+node scripts/shared-hooks.mjs install || exit 1
+scripts/hooks/pre-commit-shim --check-default-branch || exit 1
 # Biome's own exit code decides the outcome (#723). The previous shape wrote
 # fixes and then inferred failure from "did a staged file change", which a
 # syntax error slips through: biome can't parse the file, so it can't format

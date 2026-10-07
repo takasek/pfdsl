@@ -1,7 +1,33 @@
 #!/bin/sh
+# pfdsl-pre-commit-shim-version: 1
 # Thin shim installed at .git/hooks/pre-commit by `make setup`.
 # Always execs the checked-out scripts/pre-commit so the check logic stays in
 # sync with the branch's tree instead of a stale copy from setup time (#411).
+default_ref=$(git symbolic-ref --quiet refs/remotes/origin/HEAD) || {
+  echo "error: cannot resolve origin/HEAD; default branch protection refuses this commit." >&2
+  exit 1
+}
+case "$default_ref" in
+  refs/remotes/origin/?*) default_branch=${default_ref#refs/remotes/origin/} ;;
+  *) echo "error: invalid origin/HEAD; default branch protection refuses this commit." >&2; exit 1 ;;
+esac
+git rev-parse --verify "$default_ref^{commit}" >/dev/null 2>&1 || {
+  echo "error: origin/HEAD does not resolve to a commit; default branch protection refuses this commit." >&2
+  exit 1
+}
+head_ref=$(git symbolic-ref --quiet HEAD)
+head_status=$?
+if [ "$head_status" -gt 1 ]; then
+  echo "error: cannot resolve HEAD; default branch protection refuses this commit." >&2
+  exit 1
+fi
+if [ "$head_ref" = "refs/heads/$default_branch" ]; then
+  echo "error: commits on the default branch '$default_branch' are refused. Use a feature worktree and a pull request." >&2
+  exit 1
+fi
+if [ "${1-}" = "--check-default-branch" ]; then
+  exit 0
+fi
 if [ -x ./scripts/pre-commit ]; then
   exec ./scripts/pre-commit
 fi

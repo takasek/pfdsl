@@ -25,9 +25,14 @@ Claude Code のコード変更では自己レビューに加えて別主体の�
 
 Claude CodeとCodexのSessionStart hookが、このworktreeのセットアップを検査し、未完了または古い場合は `make setup` を実行する。
 手動でworktreeを作成した場合など、hookによるセットアップが完了していない場合は `make setup` を実行し、`node scripts/setup-completion.mjs check` の成功を確認してから作業する。
-`make setup` は依存関係とスキルリンクを整え、コミット先worktreeの `scripts/pre-commit` を実行するhook shimを導入する。
+`make setup` は依存関係の準備と、共有hook shim・worktreeのスキルリンクの配置を分ける。
+依存のmarkerが有効ならhook・リンクだけを修復し、依存を再installしない。
+版付きhook shimはorigin/HEADが示すdefault branchのcommitとdefault branch取得不能を拒否してから、コミット先worktreeの `scripts/pre-commit` を実行する。
+共有shimはcommon dirのlock内で版を確認し、実行可能な一時ファイルをatomicに置換する。
+互換な新版を降格せず、未知のhookとcustom hooksPathを自動上書きしない。
+歴史的な旧setupのコピーによる巻戻りは、新しいpreflight・pre-commitで修復する。
 Biomeの指摘は自動修正されないため、失敗時は `make format` を実行して再stageする。
-完了判定・依存検査・並行実行制御の詳細は `scripts/setup-completion.mjs`、セットアップ内容は `Makefile` の `setup` / `setup-unlocked` を参照する。
+完了判定・依存検査は `scripts/setup-completion.mjs`、共有shimの版・排他・修復は `scripts/shared-hooks.mjs`、配置と検査の入口は `Makefile` の `setup` / `setup-deps` / `setup-artifacts` / `preflight` を参照する。
 
 ## 検査コマンド
 

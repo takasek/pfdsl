@@ -40,6 +40,13 @@ describe("Markdown checks against the Git index", () => {
 			"-qm",
 			"test: establish the indexed checkers",
 		]);
+		git(["update-ref", "refs/remotes/origin/main", "HEAD"]);
+		git([
+			"symbolic-ref",
+			"refs/remotes/origin/HEAD",
+			"refs/remotes/origin/main",
+		]);
+		git(["switch", "-c", "feature-index-checks"]);
 	});
 	after(() => rmSync(root, { recursive: true, force: true }));
 
@@ -149,7 +156,7 @@ describe("Markdown checks against the Git index", () => {
 			"fixture auto",
 		]);
 		const hook = join(root, ".git", "hooks", "pre-commit");
-		writeFileSync(hook, "#!/bin/sh\nexec /bin/sh scripts/pre-commit\n");
+		cpSync(join(root, "scripts/hooks/pre-commit-shim"), hook);
 		chmodSync(hook, 0o755);
 		try {
 			writeFileSync(join(root, "auto.md"), bad);

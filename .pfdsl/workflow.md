@@ -42,6 +42,16 @@ worktree を既定とする理由は `.pfdsl/bindings/pfd-ops.md`「ワークサ
 **worktree 前提**: 新規 worktree では CLI/core が未ビルドのため `check` が失敗する。ゲート実行前に `pnpm install && pnpm -r build` を済ませる。
 `.claude/skills/pfdsl` は gitignore 済の symlink（#348・#714）のため新規 worktree に存在せず、そのままでは `make check-docs` が companion-bindings の dead path で失敗する — `make setup`（または `node scripts/link-repo-skill.mjs`）を先に実行する（ビルドは不要）。
 `make setup` が入れる pre-commit hook のシムについては CLAUDE.md「セットアップ」節が一次情報。
+`build`（したがって `test`・`typecheck`）は `preflight` で共有shimとスキルリンクを修復し、依存markerを検査してから実行する。
+依存が未準備なら `make setup` を先に実行する。
+`cycle-status.mjs` と新しい `scripts/pre-commit` も、依存の再installをせず共有shimの旧版を修復する。
+未変更の歴史的なsetupは新版を無条件コピーで戻せるため、全旧版の非降格・並行安全性を保証しない。
+新installer同士はcommon dirのlock内で版を再読し、互換な新版を保持する。
+より新しい版でもdispatch契約が異なる場合は上書きせず停止する。
+共有lockの待機は5秒で打ち切る。
+異常終了でlockが残った場合は、installerが実行中でないことを確認してから診断に表示されたlockだけを除去し、再実行する。
+default branchの判定はref名の比較であり、同じcommitを指すfeature branchと解決可能なdetached HEADは許可する。
+pre-commitを経由しないref操作の保護と、repo policyのロード失敗・timeoutは #1404 の別受入である。
 
 **worktree での git 操作**: `git commit` など git コマンドは worktree ディレクトリを指して実行する（理由は `.pfdsl/bindings/pfd-ops.md`「ワークサイクルの追加手順」の「手順 2 の追加で worktree 上の変更を検証する」が一次情報）。
 **worktree のパスはシェル変数に入れず literal で書く**。
