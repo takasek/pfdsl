@@ -172,12 +172,25 @@ describe("setup-managed pre-commit", () => {
 });
 describe("pre-commit shim", () => {
 	it("fails the commit when the checkout has no scripts/pre-commit", () => {
-		const root = mkdtempSync(join(tmpdir(), "pfdsl-shim-"));
-		fixtures.push(root);
+		const { root, env, git } = fixture();
+		git(
+			"-c",
+			"user.name=Fixture",
+			"-c",
+			"user.email=fixture@example.invalid",
+			"commit",
+			"--allow-empty",
+			"-qm",
+			"fixture",
+		);
+		git("update-ref", "refs/remotes/origin/main", "HEAD");
+		git("symbolic-ref", "refs/remotes/origin/HEAD", "refs/remotes/origin/main");
+		git("switch", "-qc", "feature");
+		rmSync(join(root, "scripts/pre-commit"));
 		const result = spawnSync(
 			"/bin/sh",
 			[fileURLToPath(new URL("../hooks/pre-commit-shim", import.meta.url))],
-			{ cwd: root, encoding: "utf8" },
+			{ cwd: root, env, encoding: "utf8" },
 		);
 		assert.notEqual(result.status, 0);
 		assert.match(result.stderr, /scripts\/pre-commit/);
