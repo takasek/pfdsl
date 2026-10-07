@@ -375,10 +375,19 @@ export function classifySharedGitEffect(subcommand, args) {
 			(subcommand === "checkout" && afterSeparator.length > 0)
 		)
 			return null;
-		const ref =
-			options.find((arg) => !arg.startsWith("-")) ??
-			(subcommand === "switch" ? afterSeparator[0] : undefined);
-		if (ref) return { kind: "enter-branch", ref };
+		const operands = [
+			...options,
+			...(subcommand === "switch" ? afterSeparator : []),
+		];
+		// The previous branch (`-`, `@{-N}`) resolves at run time to whatever
+		// this checkout was on, possibly the default branch.
+		if (operands.some((arg) => arg === "-" || arg.includes("@{-")))
+			return { kind: "shared" };
+		// Option arity is not modeled, so an option value (`--conflict merge main`)
+		// cannot be told from the branch: every operand is a candidate.
+		const refs = operands.filter((arg) => !arg.startsWith("-"));
+		if (refs.length === 1) return { kind: "enter-branch", ref: refs[0] };
+		if (refs.length) return { kind: "enter-branch", ref: refs[0], refs };
 	}
 	if (subcommand === "fetch") {
 		// No `--dry-run` exemption: `--no-dry-run` can cancel it later in the
@@ -429,12 +438,14 @@ export function evaluateSharedGitEffect(
 		effect.names.every((name) => name !== mainBranch && !/[$`*?]/.test(name))
 	)
 		return { decision: "allow" };
+	const refs = effect.refs ?? [effect.ref];
 	if (
 		["create-branch", "enter-branch"].includes(effect.kind) &&
-		effect.ref !== mainBranch &&
-		effect.ref !== `refs/heads/${mainBranch}`
+		refs.every(
+			(ref) => ref !== mainBranch && ref !== `refs/heads/${mainBranch}`,
+		)
 	) {
-		if (!/[$`*?]/.test(effect.ref)) return { decision: "allow" };
+		if (!refs.some((ref) => /[$`*?]/.test(ref))) return { decision: "allow" };
 	}
 	return {
 		decision:
