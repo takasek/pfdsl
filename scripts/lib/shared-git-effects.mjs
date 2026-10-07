@@ -10,8 +10,12 @@ const CODEX_ROUTINE_GIT_MUTATIONS = new Map([
 	["commit", "commit"],
 	["branch-rename", "branch"],
 ]);
-// Verification verbs only: every other verb (fetch-origin, worktree-add,
-// stage-all, setup, commit, branch-rename) changes shared Git state or hooks.
+// The verbs a child may run: test, build, typecheck, node-test and node-script.
+// These are not free of side effects (`make build` reaches preflight and the
+// shared pre-commit hook install), but a child can already run `make` and node
+// scripts directly, so the wrapper adds no capability for them. Every other
+// verb (fetch-origin, worktree-add, stage-all, setup, commit, branch-rename)
+// changes shared Git state through the wrapper's own authority.
 const CODEX_ROUTINE_CHILD_VERBS = new Set([
 	"test",
 	"build",
