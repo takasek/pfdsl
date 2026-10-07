@@ -31,7 +31,10 @@ import {
 } from "./external-operation-policy.mjs";
 import { parseGhCommand } from "./gh-command.mjs";
 import { buildPermissionOutput, parseHookPayload } from "./hook-io.mjs";
-import { classifySharedGitEffect } from "./shared-git-effects.mjs";
+import {
+	classifySharedGitEffect,
+	hasGitHelpOption,
+} from "./shared-git-effects.mjs";
 import { prepareHeredocs } from "./shell-heredoc.mjs";
 
 /** Agents permitted to perform outward-facing actions. Publishing is their job. */
@@ -1187,6 +1190,105 @@ export function findOutwardCommand(command) {
 	return null;
 }
 
+function isReadOnlyGitConfig(args) {
+	// Modern verbs are recognized only in the first position. In legacy mode,
+	// Git stops parsing options at the first key (or --), so later flag-looking
+	// strings are values. Consume option arguments before looking for markers.
+	if (["get", "list"].includes(args[0])) return true;
+	let write = [
+		"set",
+		"unset",
+		"edit",
+		"rename-section",
+		"remove-section",
+	].includes(args[0]);
+	let read = false;
+	let i = write ? 1 : 0;
+	for (; i < args.length; i++) {
+		const arg = args[i];
+		if (arg === "--") {
+			i++;
+			break;
+		}
+		if (!arg.startsWith("-") || arg === "-") break;
+		if (["--help", "-h"].includes(arg)) return true;
+		if (
+			[
+				"--add",
+				"--unset",
+				"--unset-all",
+				"--replace-all",
+				"--edit",
+				"-e",
+				"--rename-section",
+				"--remove-section",
+				"--append",
+				"--all",
+			].includes(arg)
+		) {
+			write = true;
+			continue;
+		}
+		if (
+			[
+				"--file",
+				"-f",
+				"--blob",
+				"--type",
+				"-t",
+				"--default",
+				"--value",
+				"--comment",
+			].includes(arg)
+		) {
+			i++;
+			continue;
+		}
+		if (/^(?:--(?:file|blob|type|default|value|comment)=|-[ft].+)/.test(arg))
+			continue;
+		if (
+			[
+				"--get",
+				"--get-all",
+				"--get-regexp",
+				"--get-urlmatch",
+				"--list",
+				"-l",
+			].includes(arg)
+		) {
+			read = true;
+			continue;
+		}
+		if (
+			!/^--no-(?:global|system|local|worktree|file|blob|type|default|value|comment|all|append|fixed-value|includes|show-origin|show-scope)$/.test(
+				arg,
+			) &&
+			![
+				"--global",
+				"--system",
+				"--local",
+				"--worktree",
+				"--null",
+				"-z",
+				"--show-origin",
+				"--show-scope",
+				"--includes",
+				"--no-includes",
+				"--fixed-value",
+				"--name-only",
+				"--bool",
+				"--int",
+				"--bool-or-int",
+				"--bool-or-str",
+				"--path",
+				"--expiry-date",
+			].includes(arg)
+		)
+			return false;
+	}
+	return !write && (read || args.length - i === 1);
+}
+
 /**
  * Decide whether a PreToolUse Bash invocation may proceed.
  * @param {object} payload PreToolUse hook payload
@@ -1273,32 +1375,10 @@ export function evaluateDelegationGuard(
 						)[0];
 						return action === undefined || ["show", "get-url"].includes(action);
 					})()) ||
-				(sub === "config" &&
-					args.some((arg) =>
-						[
-							"--get",
-							"--get-all",
-							"--get-regexp",
-							"--get-urlmatch",
-							"--list",
-							"-l",
-						].includes(arg),
-					) &&
-					!args.some((arg) =>
-						[
-							"--add",
-							"--unset",
-							"--unset-all",
-							"--replace-all",
-							"--edit",
-							"-e",
-							"--rename-section",
-							"--remove-section",
-						].includes(arg),
-					)) ||
+				(sub === "config" && isReadOnlyGitConfig(args)) ||
 				(sub === "stash" && ["list", "show"].includes(args[0])) ||
 				(sub === "worktree" && args[0] === "list") ||
-				args.includes("--help");
+				(sub !== "config" && hasGitHelpOption(sub, args));
 			if (!read)
 				return {
 					decision: "deny",

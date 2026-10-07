@@ -1,8 +1,56 @@
 // Shared refs and other checkout effects are independent of executor ownership.
 // These are command-boundary safeguards, not a general Git transaction monitor.
 
+export function hasGitHelpOption(subcommand, args) {
+	// Only waive protection for an unambiguous option, never an operand or an
+	// option's value. Other command forms conservatively retain their guard.
+	let i = subcommand === "worktree" && !args[0]?.startsWith("-") ? 1 : 0;
+	while (i < args.length) {
+		const arg = args[i];
+		if (arg === "--help" || arg === "-h") return true;
+		if (subcommand !== "worktree") return false;
+		if (arg === "--") return false;
+		// worktree parse-options permits options after ordinary operands.
+		if (!arg.startsWith("-") || arg === "-") {
+			i++;
+			continue;
+		}
+		if (/^-[^-]/.test(arg)) {
+			let consumesNext = false;
+			for (let j = 1; j < arg.length; j++) {
+				if (arg[j] === "h") return true;
+				if (arg[j] === "b" || arg[j] === "B") {
+					consumesNext = j === arg.length - 1;
+					break;
+				}
+				if (!"fdqnv".includes(arg[j])) return false;
+			}
+			i += consumesNext ? 2 : 1;
+			continue;
+		}
+		if (["--reason", "--expire"].includes(arg)) {
+			i += 2;
+			continue;
+		}
+		if (/^--(?:reason|expire)=/.test(arg)) {
+			i++;
+			continue;
+		}
+		if (
+			!/^--(?:no-)?(?:force|detach|lock|checkout|quiet|guess-remote|orphan|track|relative-paths|dry-run|verbose)$/.test(
+				arg,
+			) &&
+			!/^--track=/.test(arg) &&
+			!["--no-reason", "--no-expire"].includes(arg)
+		)
+			return false;
+		i++;
+	}
+	return false;
+}
+
 export function classifySharedGitEffect(subcommand, args) {
-	if (args.includes("--help") || args.includes("-h")) return null;
+	if (hasGitHelpOption(subcommand, args)) return null;
 	if (subcommand === "update-ref")
 		return { kind: "shared", unresolved: args.includes("--stdin") };
 	if (subcommand === "symbolic-ref") {
