@@ -22,21 +22,35 @@ Git の実入口で session/target roots、current branch、同一 repo の orig
 detached HEAD は Git が正常に空の branch 名を返した場合と区別する。
 
 共有 ref・stash・worktree metadata の作用先を executor の所有者から分ける。
+保護契約は次の4項で定め、指摘の採否はこの契約に照らして決める。
+保護対象は、default branch と既存の他 branch の ref、他 checkout の HEAD・index、stash の ref と reflog、worktree metadata、リポジトリ設定である。
+remote-tracking ref と tag は対象外とし、notes と replace は現時点の対象に含めない。
+観測する入口は、Bash の argv に現れる Git の直接呼出し・global option・可視の環境変数代入と、既知の wrapper である。
+分類器が作用先を確定できない形は、作用なしと扱わず共有作用または拒否とする。
+
 update-ref、symbolic-ref の変更、branch の強制変更・削除・他 branch 改名、worktree の追加・保守、明示的なローカル ref 宛て fetch を確認する。
+同一 repository を宛先とする push（`push .` やローカルパス）と、pull の明示的なローカル ref 宛て refspec は、update-ref・fetch と同じ作用として確認する。
+reflog の expire・delete は stash の回復情報を消すため共有保守とする。
 worktree add は detached・既存 branch・新規 branch のいずれも共有 metadata を変更するため、Claude では ask、Codex では deny とし、native の worktree 作成入口とは区別する。
 default branch の作成・切替と、switch/checkout の分離・短縮・等号付き option を扱う。
+default branch の名前は大文字小文字を区別せずに照合し、checkout/switch では option の値に消費されうる語を含めて全 operand を切替先の候補とする。
+`-`・`@{-N}` による直前 branch への切替は、切替先を argv から確定できないため共有作用とする。
 switch の `--` 後の operand と、checkout の後続 path の無い `--` は切替先として扱い、`--ignore-other-worktrees` は他 checkout の branch へ入るため共有作用とする。
-fetch の `-n` は `--no-tags` なので、免除は `--dry-run` の完全一致に限る。
+既存 branch を付け替えうる `-B`・`-C`・`--force-create` は、branch の強制変更と同じく共有作用とし、新規作成には `-b`・`-c` を使う。
+fetch の `--dry-run` は `--no-dry-run` や option の値への消費で打ち消せるため免除しない。
+fetch の `-u`（`--update-head-ok`）は Git 自身の checkout 中 branch の保護を外すため共有作用とする。
 refspec を stdin から読む `fetch --stdin` は境界で解決できないため拒否する。
-読取以外の `git config` は、remote の refspec 等を通じて後続の通常操作の作用先を変えるため共有作用とする。
-Git の parse-options は long option の一意な接頭辞を受け付けるので、危険な option の接頭辞はその option として扱い、免除と読取判定には完全一致を要求する。
-branch は Git と同じく list mode を判定し、`-v`・`--format`・`--sort` だけでは一覧にならず作成になる形を区別する。
-これらの分類は使い捨て fixture で Git 自身に実行させた作用を正とする検査で照合する。
+読取以外の `git config` は、共有の設定ファイルを書き換えるため共有作用とする。
+`-c`・`--config-env`・可視の `GIT_CONFIG_*` 代入は実行中の Git 呼出しの作用先を変える入力であり、無害に見える key も `include.path` で任意の設定を読み込めるため、読取以外の呼出しに付けば共有作用とする。
+Git の parse-options は long option の一意な接頭辞を受け付けるので、危険な option の接頭辞はその option として扱い、読取判定には完全一致を要求する。
+branch は Git と同じく list mode を判定し、`-v`・`--format`・`--sort` だけでは一覧にならず作成になる形を区別し、作成形に未知の option が伴えば共有作用とする。
+これらの分類は、default branch を空けた配置と primary が checkout した配置の使い捨て fixture で、Git 自身に実行させた作用を正とする検査で照合する。
 非 default の隔離 branch 作成と自分の branch の非強制改名、通常の読取は維持する。
-誰も checkout していない既存の非 default branch を `-B`/`-C` で付け替える形は、隔離 branch 作成として許可したままにする。
 共有保守は Claude で ask、Codex で deny とし、自分の terminal に戻す。
 foreign repository の既存境界と検査回避の規則は維持する。
-任意スクリプト内部、Git alias、書込み済みの remote 設定が持つ特殊 refspec 全般を監視する仕組みではない。
+任意スクリプト内部、Git alias、書込み済みの remote 設定（include を含む）が持つ特殊 refspec 全般を監視する仕組みではない。
+例えば mirror 設定の remote に対する素の `git pull` は、内部で `--update-head-ok` を使うため checkout 中の default branch を書き換えうるが、argv では閉じない。
+この残余は、ref の更新を観測する層（reference-transaction hook）で扱う後続課題とする。
 
 Edit・Write・apply_patch は全 target を物理パスへ正規化する。
 symlink を先に辿ってから `..` を処理し、新規ファイルは既存親を調べる。
