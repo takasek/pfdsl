@@ -36,6 +36,7 @@ import {
 	hasGitHelpOption,
 	isReadOnlyGitBranch,
 	isReadOnlyGitConfig,
+	isReadOnlyGitReflog,
 } from "./shared-git-effects.mjs";
 import { prepareHeredocs } from "./shell-heredoc.mjs";
 
@@ -1277,6 +1278,7 @@ export function evaluateDelegationGuard(
 						return action === undefined || ["show", "get-url"].includes(action);
 					})()) ||
 				(sub === "config" && isReadOnlyGitConfig(args)) ||
+				(sub === "reflog" && isReadOnlyGitReflog(args)) ||
 				(sub === "stash" && ["list", "show"].includes(args[0])) ||
 				(sub === "worktree" && args[0] === "list") ||
 				(sub !== "config" && hasGitHelpOption(sub, args));

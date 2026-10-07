@@ -305,8 +305,18 @@ export function isReadOnlyGitConfig(args) {
 	return !write && (read || args.length - i === 1);
 }
 
+/**
+ * Whether `git reflog <args>` only reads. `expire`, `delete` and `drop` remove
+ * reflog entries, which includes the stash's recovery information.
+ */
+export function isReadOnlyGitReflog(args) {
+	return !["expire", "delete", "drop"].includes(args[0]);
+}
+
 export function classifySharedGitEffect(subcommand, args) {
 	if (hasGitHelpOption(subcommand, args)) return null;
+	if (subcommand === "reflog")
+		return isReadOnlyGitReflog(args) ? null : { kind: "shared" };
 	// A written setting (remote.<name>.fetch, core.*, ...) changes what later
 	// commands do to shared refs, so a non-read config call is itself shared.
 	if (subcommand === "config")
