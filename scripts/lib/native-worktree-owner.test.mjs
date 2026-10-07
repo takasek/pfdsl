@@ -43,6 +43,20 @@ describe("native worktree owner", () => {
 			"sibling",
 		);
 	});
+	it("keeps an agent worktree sibling even when its lock PID and start match the direct parent", () => {
+		assert.equal(
+			refineNativeWorktreeRelation(
+				"sibling",
+				claude({
+					execGit: () => ({
+						ok: true,
+						out: listing.replace("claude session topic", "claude agent topic"),
+					}),
+				}),
+			),
+			"sibling",
+		);
+	});
 	it("keeps sibling for missing, broken, stale or unreadable Claude evidence", () => {
 		for (const options of [
 			{ execGit: () => ({ ok: false, out: "failed" }) },
