@@ -49,6 +49,14 @@ export function hasGitHelpOption(subcommand, args) {
 	return false;
 }
 
+// parse-options accepts any unique prefix of a long option, so an argument
+// whose name part (before `=`) is a prefix of a dangerous option must be read
+// as that option. Exemptions, by contrast, require the exact spelling.
+function isLongOptionPrefix(arg, name) {
+	const given = arg.split("=", 1)[0];
+	return given.startsWith("--") && given.length > 2 && name.startsWith(given);
+}
+
 export function classifySharedGitEffect(subcommand, args) {
 	if (hasGitHelpOption(subcommand, args)) return null;
 	if (subcommand === "update-ref")
@@ -166,10 +174,14 @@ export function classifySharedGitEffect(subcommand, args) {
 		if (ref) return { kind: "enter-branch", ref };
 	}
 	if (subcommand === "fetch") {
-		if (args.includes("--dry-run") || args.includes("-n")) return null;
+		// `-n` is `--no-tags` here; only the exact long spelling is a dry run.
+		if (args.includes("--dry-run")) return null;
+		// Refspecs read from stdin are unresolvable at this boundary.
+		if (args.some((arg) => isLongOptionPrefix(arg, "--stdin")))
+			return { kind: "shared", unresolved: true };
 		// Explicit local destinations / refmaps can replace a default or another
 		// checkout's branch, even when Git is launched from an own feature tree.
-		if (args.some((arg) => arg === "--refmap" || arg.startsWith("--refmap=")))
+		if (args.some((arg) => isLongOptionPrefix(arg, "--refmap")))
 			return { kind: "shared" };
 		let repository = false;
 		for (const arg of args) {
