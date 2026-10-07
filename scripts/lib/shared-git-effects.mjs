@@ -150,8 +150,111 @@ export function isReadOnlyGitBranch(args) {
 	);
 }
 
+export function isReadOnlyGitConfig(args) {
+	// Modern verbs are recognized only in the first position. In legacy mode,
+	// Git stops parsing options at the first key (or --), so later flag-looking
+	// strings are values. Consume option arguments before looking for markers.
+	if (["get", "list"].includes(args[0])) return true;
+	let write = [
+		"set",
+		"unset",
+		"edit",
+		"rename-section",
+		"remove-section",
+	].includes(args[0]);
+	let read = false;
+	let i = write ? 1 : 0;
+	for (; i < args.length; i++) {
+		const arg = args[i];
+		if (arg === "--") {
+			i++;
+			break;
+		}
+		if (!arg.startsWith("-") || arg === "-") break;
+		if (["--help", "-h"].includes(arg)) return true;
+		if (
+			[
+				"--add",
+				"--unset",
+				"--unset-all",
+				"--replace-all",
+				"--edit",
+				"-e",
+				"--rename-section",
+				"--remove-section",
+				"--append",
+				"--all",
+			].includes(arg)
+		) {
+			write = true;
+			continue;
+		}
+		if (
+			[
+				"--file",
+				"-f",
+				"--blob",
+				"--type",
+				"-t",
+				"--default",
+				"--value",
+				"--comment",
+			].includes(arg)
+		) {
+			i++;
+			continue;
+		}
+		if (/^(?:--(?:file|blob|type|default|value|comment)=|-[ft].+)/.test(arg))
+			continue;
+		if (
+			[
+				"--get",
+				"--get-all",
+				"--get-regexp",
+				"--get-urlmatch",
+				"--list",
+				"-l",
+			].includes(arg)
+		) {
+			read = true;
+			continue;
+		}
+		if (
+			!/^--no-(?:global|system|local|worktree|file|blob|type|default|value|comment|all|append|fixed-value|includes|show-origin|show-scope)$/.test(
+				arg,
+			) &&
+			![
+				"--global",
+				"--system",
+				"--local",
+				"--worktree",
+				"--null",
+				"-z",
+				"--show-origin",
+				"--show-scope",
+				"--includes",
+				"--no-includes",
+				"--fixed-value",
+				"--name-only",
+				"--bool",
+				"--int",
+				"--bool-or-int",
+				"--bool-or-str",
+				"--path",
+				"--expiry-date",
+			].includes(arg)
+		)
+			return false;
+	}
+	return !write && (read || args.length - i === 1);
+}
+
 export function classifySharedGitEffect(subcommand, args) {
 	if (hasGitHelpOption(subcommand, args)) return null;
+	// A written setting (remote.<name>.fetch, core.*, ...) changes what later
+	// commands do to shared refs, so a non-read config call is itself shared.
+	if (subcommand === "config")
+		return isReadOnlyGitConfig(args) ? null : { kind: "shared" };
 	if (subcommand === "update-ref")
 		return { kind: "shared", unresolved: args.includes("--stdin") };
 	if (subcommand === "symbolic-ref") {

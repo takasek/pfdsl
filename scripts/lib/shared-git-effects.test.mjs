@@ -61,6 +61,13 @@ for (const command of [
 	"git fetch --stdin origin",
 	"git fetch --std origin",
 	"git fetch --refm=+refs/heads/*:refs/heads/* origin",
+	"git config remote.origin.fetch +refs/heads/*:refs/heads/*",
+	"git config user.name someone",
+	"git config --add x.y 1",
+	"git config --ad x.y 1",
+	"git config set x.y 1",
+	"git config --unset x.y",
+	"git config --unset-a x.y",
 	"git worktree remove ../other",
 	"git worktree add --detach ../review HEAD",
 	"git worktree add -- -h HEAD",
@@ -137,6 +144,11 @@ for (const command of [
 	"git fetch origin topic:refs/remotes/origin/topic",
 	"git fetch --dry-run origin HEAD:trunk",
 	"git fetch -n origin",
+	"git config --get user.name",
+	"git config user.name",
+	"git config --list",
+	"git config get user.name",
+	"git config --help",
 	"git worktree list",
 	"git worktree add -h",
 	"git worktree add --help",
@@ -169,6 +181,17 @@ test("protects effects behind cwd/prefixes and uses the resolved default name", 
 		),
 		"deny",
 	);
+});
+
+test("a config write cannot be told apart from the plain fetch it arms", () => {
+	// Once remote.origin.fetch maps a remote branch onto a local one, the plain
+	// fetch has the effect of --refmap and looks harmless, so the write stops.
+	const write =
+		"git config remote.origin.fetch +refs/heads/main:refs/heads/main";
+	assert.equal(decision("git fetch origin"), "allow");
+	assert.notEqual(decision(write), "allow");
+	assert.notEqual(decision(write, "own", "main", true), "allow");
+	assert.equal(decision(write, "foreign", "main"), "allow");
 });
 
 test("Claude asks for every worktree add form even from an owned feature", () => {
