@@ -413,27 +413,52 @@ export function classifySharedGitEffect(subcommand, args) {
 		// checkout's branch, even when Git is launched from an own feature tree.
 		if (args.some((arg) => isLongOptionPrefix(arg, "--refmap")))
 			return { kind: "shared" };
-		let repository = false;
-		for (const arg of args) {
-			if (arg.startsWith("-")) continue;
-			if (!repository) {
-				repository = true;
-				continue;
-			}
-			const colon = arg.indexOf(":");
-			if (colon < 0 || arg.startsWith("-")) continue;
-			const destination = arg.slice(colon + 1);
-			if (
-				!destination ||
-				destination.startsWith("//") ||
-				destination.startsWith("refs/remotes/") ||
-				destination.startsWith("refs/tags/")
-			)
-				continue;
+		if (writesLocalRefDestination(args)) return { kind: "shared" };
+	}
+	// `pull` fetches with its own refspecs, so a local destination writes the
+	// same refs a fetch would.
+	if (subcommand === "pull" && writesLocalRefDestination(args))
+		return { kind: "shared" };
+	// A push whose repository is this one (`.`, a path) writes local branches
+	// just as update-ref does; pushes to remote names keep their handling.
+	if (subcommand === "push") {
+		const repository = args.find((arg) => !arg.startsWith("-"));
+		if (
+			repository !== undefined &&
+			/^(?:[./~]|file:\/\/)/.test(repository) &&
+			writesLocalRefDestination(args, { bareIsDestination: true })
+		)
 			return { kind: "shared" };
-		}
 	}
 	return null;
+}
+
+/**
+ * Whether the refspecs after the repository operand name a local ref as their
+ * destination (remote-tracking refs, tags, and URL-like operands excluded).
+ * For push, a refspec with no colon is its own destination.
+ */
+function writesLocalRefDestination(args, { bareIsDestination = false } = {}) {
+	let repository = false;
+	for (const arg of args) {
+		if (arg.startsWith("-")) continue;
+		if (!repository) {
+			repository = true;
+			continue;
+		}
+		const colon = arg.indexOf(":");
+		if (colon < 0 && !bareIsDestination) continue;
+		const destination = colon < 0 ? arg : arg.slice(colon + 1);
+		if (
+			!destination ||
+			destination.startsWith("//") ||
+			destination.startsWith("refs/remotes/") ||
+			destination.startsWith("refs/tags/")
+		)
+			continue;
+		return true;
+	}
+	return false;
 }
 
 /**
