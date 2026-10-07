@@ -14,20 +14,8 @@ export function classifySharedGitEffect(subcommand, args) {
 			: null;
 	}
 	if (subcommand === "worktree") {
-		if (args[0] === "add") {
-			for (let i = 1; i < args.length; i++) {
-				if (
-					args[i] === "-B" ||
-					args[i].startsWith("-B") ||
-					["--force", "-f"].includes(args[i])
-				)
-					return { kind: "shared" };
-				if (args[i] === "-b")
-					return { kind: "create-branch", ref: args[i + 1] ?? "$unknown" };
-				if (args[i].startsWith("-b"))
-					return { kind: "create-branch", ref: args[i].slice(2) };
-			}
-		}
+		// Even detached or existing-branch adds register shared worktree metadata.
+		if (args[0] === "add") return { kind: "shared" };
 		if (
 			args[0] === "prune" &&
 			(args.includes("--dry-run") || args.includes("-n"))

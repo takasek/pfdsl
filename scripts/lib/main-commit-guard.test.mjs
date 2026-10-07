@@ -155,7 +155,7 @@ describe("classifyGitCommand", () => {
 		assert.deepEqual(classifyGitCommand("git worktree add ../w -b topic"), {
 			subcommand: "worktree",
 			decision: "ask",
-			effect: { kind: "create-branch", ref: "topic" },
+			effect: { kind: "shared" },
 		});
 	});
 

@@ -6,7 +6,12 @@ import { join } from "node:path";
 import { test } from "node:test";
 import { runMainCommitGuard } from "./main-commit-guard.mjs";
 
-function decision(command, relation = "own", mainBranch = "trunk") {
+function decision(
+	command,
+	relation = "own",
+	mainBranch = "trunk",
+	supportsAsk = false,
+) {
 	const result = runMainCommitGuard(
 		JSON.stringify({
 			tool_name: "Bash",
@@ -19,7 +24,7 @@ function decision(command, relation = "own", mainBranch = "trunk") {
 				mainBranch,
 				targetRelation: relation,
 			}),
-			supportsAsk: false,
+			supportsAsk,
 		},
 	);
 	return result.output?.hookSpecificOutput.permissionDecision ?? "allow";
@@ -39,6 +44,11 @@ for (const command of [
 	"git fetch origin +refs/heads/*:refs/heads/*",
 	"git fetch origin HEAD:trunk",
 	"git worktree remove ../other",
+	"git worktree add --detach ../review HEAD",
+	"git worktree add ../review topic",
+	"git worktree add ../review",
+	"git worktree add -b new-topic ../review HEAD",
+	"git worktree add -bnew-topic ../review HEAD",
 	"git worktree add -B trunk ../other HEAD",
 	"git worktree add -b trunk ../other HEAD",
 	"git switch -C trunk HEAD",
@@ -80,6 +90,7 @@ for (const command of [
 	"git fetch origin topic:refs/remotes/origin/topic",
 	"git fetch --dry-run origin HEAD:trunk",
 	"git worktree list",
+	"git worktree add -h",
 	"git worktree prune --dry-run",
 	"git stash list",
 	"git stash show",
@@ -103,6 +114,18 @@ test("protects effects behind cwd/prefixes and uses the resolved default name", 
 		),
 		"deny",
 	);
+});
+
+test("Claude asks for every worktree add form even from an owned feature", () => {
+	for (const command of [
+		"git worktree add --detach ../review HEAD",
+		"git worktree add ../review topic",
+		"git worktree add ../review",
+		"git worktree add -b new-topic ../review HEAD",
+		"git worktree add -bnew-topic ../review HEAD",
+	]) {
+		assert.equal(decision(command, "own", "trunk", true), "ask", command);
+	}
 });
 
 test("isolated creation cannot waive a sibling executor's ownership check", () => {

@@ -22,7 +22,8 @@ Git の実入口で session/target roots、current branch、同一 repo の orig
 detached HEAD は Git が正常に空の branch 名を返した場合と区別する。
 
 共有 ref・stash・worktree metadata の作用先を executor の所有者から分ける。
-update-ref、symbolic-ref の変更、branch の強制変更・削除・他 branch 改名、worktree の保守、明示的なローカル ref 宛て fetch を確認する。
+update-ref、symbolic-ref の変更、branch の強制変更・削除・他 branch 改名、worktree の追加・保守、明示的なローカル ref 宛て fetch を確認する。
+worktree add は detached・既存 branch・新規 branch のいずれも共有 metadata を変更するため、Claude では ask、Codex では deny とし、native の worktree 作成入口とは区別する。
 default branch の作成・切替と、switch/checkout の分離・短縮・等号付き option を扱う。
 非 default の隔離 branch 作成と自分の branch の非強制改名、通常の読取は維持する。
 共有保守は Claude で ask、Codex で deny とし、自分の terminal に戻す。
