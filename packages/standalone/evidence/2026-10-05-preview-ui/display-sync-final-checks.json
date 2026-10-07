@@ -1,0 +1,60 @@
+{
+	"date": "2026-10-05",
+	"sourceSha256": {
+		"packages/editor/src/preview.ts": "c04a17f8b43dd7c33a881cfb06e25aefae94936b1aa6a6e30164b6f6c7699bbc",
+		"packages/editor/src/preview-ux.test.ts": "1eb8bc90e8cb472b4e5889d2d72e84acd81d962f1f8292acd67121e9af982133",
+		"packages/standalone/src/document-tab.ts": "6796dc21775be9a8b924b72669b5c32a550e7a1c10f7be039328add4b3f41135"
+	},
+	"productionAsset": {
+		"path": "assets/index-CTNe7B5u.js",
+		"sha256": "202275cb1c4132cf3fbbab165657409d61e16aebd61f9576a02c081662973142"
+	},
+	"nativeExecutableSha256": "68a76bae1ff661517f48cbfdd07ca115fd4c9fa2b547de7cbfcf985b5c1e7a29",
+	"checks": {
+		"build": {
+			"exitCode": 0
+		},
+		"typecheck": {
+			"exitCode": 0
+		},
+		"standalone": {
+			"exitCode": 0,
+			"passed": 5
+		},
+		"nativeBuild": {
+			"exitCode": 0
+		},
+		"nativeCorpus": {
+			"exitCode": 0,
+			"passed": 23,
+			"failures": [],
+			"errors": []
+		}
+	},
+	"logs": {
+		"build": {
+			"temporaryFilename": "pfdsl-native-display-build2-01a10a12.log",
+			"sha256": "c416db6cc6cf8ad66109a8b0fd7b66641e8885cd229a1bf01ce478484b9c034b"
+		},
+		"typecheck": {
+			"temporaryFilename": "pfdsl-native-display-typecheck2-01a10a12.log",
+			"sha256": "e9c66ad65cf50afd300808872389f4bb08cf721e5ca04a73921f266ba59550ef"
+		},
+		"standalone": {
+			"temporaryFilename": "pfdsl-native-display-standalone-test2-01a10a12.log",
+			"sha256": "fcab9b129004240a201ca8cfcc3b19d805988f93511b8a22eba9cb93585e7248"
+		},
+		"nativeBuild": {
+			"temporaryFilename": "pfdsl-native-display-app-build2-01a10a12.log",
+			"sha256": "69ef7f2621de6e7026e503c3e36d4627f75ce02aa65a865936e0343e875020e0"
+		}
+	},
+	"reuse": [
+		"Editor 220 tests and extension 137 tests measure unchanged shared preview/test source from the first synchronization repair.",
+		"Initial complete-workspace results remain a dd5df03f snapshot and are not relabeled as a new full run."
+	],
+	"proofLimits": [
+		"Build/input hashes do not certify extracted embedded frontend bytes.",
+		"Native corpus checks processing and mounted graphs; native visible cursor/viewport checks are recorded by the independent UI reviewer."
+	]
+}

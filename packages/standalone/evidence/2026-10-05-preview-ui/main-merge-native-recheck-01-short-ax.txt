@@ -1,0 +1,49 @@
+Window: "PFDSL", App: PFDSL.
+0 standard window PFDSL, Secondary Actions: Raise
+	1 scroll area
+		2 HTML content Description: PFDSL, URL: tauri://localhost
+			3 container
+				4 text PFDSL
+				5 button Open folder…
+				6 button Format
+				7 text Changes stay in this window.
+			8 container
+				9 container PFD files
+				10 container Documents
+					11 tab (selected) Welcome •
+					12 tab (selectable) 日本語
+				13 editor (settable) Editor content, Value: [editor: Editor content], Secondary Actions: Show Writing Tools
+					14 text (settable) ---
+title: Foreground redraw test
+---
+raw >> refine -> final
+
+				15 container Diagram view
+					16 button Zoom out
+					17 container Zoom level
+						18 text 100%
+					19 button Zoom in
+					20 button Fit
+					21 button 100%
+					22 button (collapsed) Node actions, Secondary Actions: Expand
+					23 button (collapsed) Help, Secondary Actions: Expand
+				24 container
+					25 text Foreground redraw test
+					26 button Node final. Enter for Node actions.
+					27 button Node raw. Enter for Node actions.
+					28 button Node refine. Enter for Node actions.
+				29 container
+					30 text Foreground redraw test final raw refine
+				31 menu Secondary Actions: Cancel
+				32 menu Secondary Actions: Cancel
+	33 close button
+	34 full screen button Help: this button also has an action to zoom the window, Secondary Actions: zoom the window
+	35 minimize button
+	36 text PFDSL
+37 menu bar
+	38 PFDSL
+	39 File
+	40 Edit
+	41 View
+	42 Window
+	43 Help

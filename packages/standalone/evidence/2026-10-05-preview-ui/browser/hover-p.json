@@ -1,0 +1,9 @@
+{
+	"ids": ["a", "p", "b"],
+	"edges": ["a->p", "b->p", "p->b"],
+	"b": {
+		"class": "node pfdsl-focus-cue",
+		"outline": "rgb(0, 127, 212) solid 2px",
+		"style": "<g id=\"node2\" class=\"node pfdsl-focus-cue\" data-node-id=\"b\" tabindex=\"0\" role=\"button\" aria-label=\"Node b. Enter for Node actions.\">\n\n<polygon fill=\"none\" stroke=\"black\" points=\"264.74,-50.22 210.74,-50.22 210.74,-8.62 264.74,-8.62 264.74,-50.22\"></polygon>\n<text xml:space=\"preserve\" text-anchor=\"middle\" x=\"237.74\" y=\"-33.62\" font-family=\"Times,ser"
+	}
+}

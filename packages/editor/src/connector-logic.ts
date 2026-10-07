@@ -1,10 +1,11 @@
 import {
-	escapeRe,
+	analyzeSource,
+	formatId,
 	ID_PATTERN,
-	loadFrontmatter,
 	type NodeKind,
 	type NormalizedEdge,
 } from "@pfdsl/core";
+import { idsOfStatement } from "./preview-logic.js";
 
 /** The DSL role the current node plays in the edge being built. */
 export type ConnectorRole = "artifact" | "process";
@@ -23,14 +24,37 @@ export function buildConnectorEdgeLine(
 	connector: ConnectorKind,
 	otherId: string,
 ): string {
+	return connectorSyntax(
+		formatId(nodeId),
+		nodeRole,
+		connector,
+		formatId(otherId),
+	);
+}
+
+/** A syntax example with a placeholder rather than a literal endpoint ID. */
+export function connectorChoiceLabel(
+	nodeId: string,
+	nodeRole: ConnectorRole,
+	connector: ConnectorKind,
+): string {
+	return connectorSyntax(formatId(nodeId), nodeRole, connector, "…");
+}
+
+function connectorSyntax(
+	node: string,
+	nodeRole: ConnectorRole,
+	connector: ConnectorKind,
+	other: string,
+): string {
 	if (connector === "->") {
 		return nodeRole === "process"
-			? `${nodeId} -> ${otherId}`
-			: `${otherId} -> ${nodeId}`;
+			? `${node} -> ${other}`
+			: `${other} -> ${node}`;
 	}
 	return nodeRole === "artifact"
-		? `${nodeId} ${connector} ${otherId}`
-		: `${otherId} ${connector} ${nodeId}`;
+		? `${node} ${connector} ${other}`
+		: `${other} ${connector} ${node}`;
 }
 
 export interface ConnectorInsertion {
@@ -38,22 +62,6 @@ export interface ConnectorInsertion {
 	insertedLine: number;
 	/** True when anchored next to an existing statement (safe to insert as a single line); false for the end-of-document fallback, which also trims trailing blank lines and so needs a full-text replace. */
 	anchored: boolean;
-}
-
-const CONTINUATION_PREFIXES = [">>?", ">>", "->"];
-
-/**
- * Whole-ID match for nodeId, boundary-aware against the DSL's `-` arrow
- * character: a trailing `-` only breaks the match if it is NOT the start of
- * `->` (an ID's own hyphen still breaks it, e.g. nodeId "build" must not
- * match inside "build-foo", but must match in "build->x" with no space
- * before the arrow).
- */
-function wholeIdPattern(nodeId: string): RegExp {
-	return new RegExp(
-		`(?<![\\p{L}\\p{N}_-])${escapeRe(nodeId)}(?![\\p{L}\\p{N}_]|-(?!>))`,
-		"u",
-	);
 }
 
 /**
@@ -69,30 +77,24 @@ function findRelatedLineIndex(
 	nodeId: string,
 	cursorLine?: number,
 ): number | undefined {
-	const { bodyStartLine } = loadFrontmatter(source);
-	const lines = source.split("\n");
-	const bodyStart = Math.max(bodyStartLine - 1, 0);
-	const pattern = wholeIdPattern(nodeId);
-
-	const matches: number[] = [];
-	for (let i = bodyStart; i < lines.length; i++) {
-		const line = lines[i];
-		if (line !== undefined && pattern.test(line)) matches.push(i);
-	}
+	const matches = analyzeSource(source).document.statements.flatMap(
+		(statement) =>
+			idsOfStatement(statement)
+				.filter((id) => id.value === nodeId)
+				.map((id) => ({
+					line: id.start.line - 1,
+					endLine: statement.end.line - 1,
+				})),
+	);
 	if (matches.length === 0) return undefined;
 
 	const reference = cursorLine ?? Number.POSITIVE_INFINITY;
-	const best = matches.reduce((closest, i) =>
-		Math.abs(i - reference) <= Math.abs(closest - reference) ? i : closest,
+	const best = matches.reduce((closest, match) =>
+		Math.abs(match.line - reference) <= Math.abs(closest.line - reference)
+			? match
+			: closest,
 	);
-
-	let idx = best;
-	while (idx + 1 < lines.length) {
-		const next = lines[idx + 1]?.trimStart() ?? "";
-		if (!CONTINUATION_PREFIXES.some((op) => next.startsWith(op))) break;
-		idx++;
-	}
-	return idx;
+	return best.endLine;
 }
 
 /**
@@ -107,19 +109,27 @@ export function insertConnectorEdge(
 	nodeId?: string,
 	cursorLine?: number,
 ): ConnectorInsertion {
+	const newline = source.includes("\r\n") ? "\r\n" : "\n";
 	if (nodeId) {
 		const anchor = findRelatedLineIndex(source, nodeId, cursorLine);
 		if (anchor !== undefined) {
 			const lines = source.split("\n");
 			const insertedLine = anchor + 1;
-			lines.splice(insertedLine, 0, edgeLine);
-			return { text: lines.join("\n"), insertedLine, anchored: true };
+			const insertionOffset =
+				lines.slice(0, insertedLine).join("\n").length + 1;
+			const text =
+				insertionOffset <= source.length
+					? `${source.slice(0, insertionOffset)}${edgeLine}${newline}${source.slice(insertionOffset)}`
+					: `${source}${newline}${edgeLine}`;
+			return { text, insertedLine, anchored: true };
 		}
 	}
 	const trimmed = source.replace(/\s+$/, "");
 	const insertedLine = trimmed.length > 0 ? trimmed.split("\n").length : 0;
 	const text =
-		trimmed.length > 0 ? `${trimmed}\n${edgeLine}\n` : `${edgeLine}\n`;
+		trimmed.length > 0
+			? `${trimmed}${newline}${edgeLine}${newline}`
+			: `${edgeLine}${newline}`;
 	return { text, insertedLine, anchored: false };
 }
 
@@ -171,6 +181,7 @@ export interface NewNodeIdCheck {
  * The message to show under the connector's id input box, or undefined when
  * the id is usable. Written as a predicate rather than inline in the
  * showInputBox options so the three refusals are testable (#611).
+ * Existing IDs use their semantic spelling; new IDs retain the bare-ID constraint.
  */
 export function validateNewNodeId({
 	value,
@@ -178,14 +189,16 @@ export function validateNewNodeId({
 	wantedKind,
 	kindOfExisting,
 }: NewNodeIdCheck): string | undefined {
-	const fullIdPattern = new RegExp(`^(?:${ID_PATTERN.source})$`, "u");
-	if (!fullIdPattern.test(value)) {
-		return "Invalid ID — use letters, numbers, _ or - (must start with a letter, number, or _)";
-	}
 	if (value === currentNodeId) return "Cannot connect a node to itself";
 	const existingKind = kindOfExisting(value);
 	if (existingKind && existingKind !== wantedKind) {
 		return `"${value}" is already ${articleFor(existingKind)} ${existingKind}, not ${articleFor(wantedKind)} ${wantedKind}`;
+	}
+	if (!existingKind) {
+		const fullIdPattern = new RegExp(`^(?:${ID_PATTERN.source})$`, "u");
+		if (!fullIdPattern.test(value)) {
+			return "Invalid ID — use letters, numbers, _ or - (must start with a letter, number, or _)";
+		}
 	}
 	return undefined;
 }

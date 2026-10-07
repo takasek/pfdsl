@@ -1,10 +1,32 @@
 import { describe, expect, it } from "vitest";
+import { analyzeSnapshot } from "./document.js";
 import {
 	buildDescriptions,
 	buildLocations,
 	buildSubflows,
 	normalizeLocation,
 } from "./location-utils.js";
+
+it.each([
+	"constructor",
+	"toString",
+	"__proto__",
+])("keeps authored %s metadata through preview message serialization", (id) => {
+	const source = `---\nprocess:\n  ${id}:\n    label: Authored\n    subflow: child.pfdsl\n---\na >> ${id} -> b\n`;
+	const fm = analyzeSnapshot(source).frontmatter;
+	expect(JSON.parse(JSON.stringify(buildDescriptions(fm)))).toEqual({
+		[id]: [
+			["**", "Authored"],
+			["subflow", "child.pfdsl"],
+		],
+	});
+	expect(JSON.parse(JSON.stringify(buildLocations(fm)))).toEqual({
+		[id]: ["child.pfdsl"],
+	});
+	expect(JSON.parse(JSON.stringify(buildSubflows(fm)))).toEqual({
+		[id]: "child.pfdsl",
+	});
+});
 
 describe("normalizeLocation", () => {
 	it("wraps a non-empty string in an array", () => {

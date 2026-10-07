@@ -1,0 +1,58 @@
+{
+	"schemaVersion": 1,
+	"binarySha256": "68a76bae1ff661517f48cbfdd07ca115fd4c9fa2b547de7cbfcf985b5c1e7a29",
+	"pid": 70623,
+	"boundary": "Only native-scroll-recheck prefixed focused native replay evidence; excludes this manifest. AX text retains one terminal newline; extra trailing blank lines are removed from the stored transcription.",
+	"files": [
+		{
+			"file": "native-scroll-recheck-02-short.png",
+			"bytes": 167912,
+			"sha256": "ba44bb30c117ff1a86cd725c120595e1159a1155786a654d42d0351b786cdab0"
+		},
+		{
+			"file": "native-scroll-recheck-03-before-cmd-up.png",
+			"bytes": 387163,
+			"sha256": "e45709005e002d5733d3c83ae216d4f840b2c162e37267b8d29e0e70e91a566b"
+		},
+		{
+			"file": "native-scroll-recheck-04-immediately-after-cmd-up.png",
+			"bytes": 407553,
+			"sha256": "f19626a94f57a8123bbe06f209baf18f683030677f34c1bc19f8c71ed0c7adfc"
+		},
+		{
+			"file": "native-scroll-recheck-05-other-tab.png",
+			"bytes": 164985,
+			"sha256": "2dfac0be0ad047628f0b502d53bd400a9c2b1ac35c9c97a0e10d02f3e97824c3"
+		},
+		{
+			"file": "native-scroll-recheck-06-large-tab-return.png",
+			"bytes": 408764,
+			"sha256": "c8585367007a103687214ccdd614d6bfeeefd9b692b6dc3e1384f7415d64b94b"
+		},
+		{
+			"file": "native-scroll-recheck-ax.txt",
+			"bytes": 23235,
+			"sha256": "e4f3f11c32fe654f5ccc9691dcaf552e981d540f0fbf1a8db3632957d893a6f5"
+		},
+		{
+			"file": "native-scroll-recheck-large-fixture.pfdsl.txt",
+			"bytes": 1388,
+			"sha256": "df31c828012b30c62a503753d677497b0a3e4c0010b5d7192e49483389f06ef8"
+		},
+		{
+			"file": "native-scroll-recheck-report.json",
+			"bytes": 5826,
+			"sha256": "9558ef2d6f08f5ae5674af26fb2c32dc30aa22f3280b6ccec5ec468c8a5eef63"
+		},
+		{
+			"file": "native-scroll-recheck-report.md",
+			"bytes": 4028,
+			"sha256": "67791e44627b4b018aeced56f651c17ebc4653178a420a2e3257e71764c6b968"
+		},
+		{
+			"file": "native-scroll-recheck-short-fixture.pfdsl.txt",
+			"bytes": 61,
+			"sha256": "a26577062a828e18dcde0b95e16b33b028635a60f2c631bd21e04629a1c3aeba"
+		}
+	]
+}

@@ -1,0 +1,8 @@
+{
+	"statusChord": "Ln 3, Col 9 (6 selected)",
+	"sameLineFirst": "Ln 12, Col 2 (1 selected)",
+	"sameLineSecond": "Ln 12, Col 12 (1 selected)",
+	"direct": "Ln 5, Col 4 (1 selected)",
+	"unrelatedBefore": "Ln 7, Col 7",
+	"unrelatedAfter": "Ln 7, Col 7"
+}

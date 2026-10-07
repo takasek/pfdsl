@@ -1,0 +1,1202 @@
+===== 04-definition-created.ax.txt =====
+Window: "PFDSL", App: PFDSL.
+0 standard window PFDSL, Secondary Actions: Raise
+	1 scroll area
+		2 HTML content Description: PFDSL, URL: tauri://localhost
+			3 container
+				4 text PFDSL
+				5 button Open folder…
+				6 button Format
+				7 text Preview edit applied. Complete any required metadata.
+			8 container
+				9 container PFD files
+				10 container Documents
+					11 tab (selected) Welcome •
+					12 tab (selectable) 日本語
+				13 editor (settable) Editor content, Value: [editor: Editor content], Secondary Actions: Show Writing Tools
+					14 text (settable) ---
+title: Native action review
+artifact:
+  review:
+    label: Review record
+  reserve:
+    label: Reserved output
+process:
+  inspect:
+    label: Inspect manuscript
+  draft:
+    label: draft
+---
+brief >> draft -> manuscript >> inspect -> review
+review >>? draft
+reserve
+
+				15 container Diagram view
+					16 button Zoom out
+					17 container Zoom level
+						18 text 75.3%
+					19 button Zoom in
+					20 button Fit
+					21 button 100%
+					22 button (collapsed) Node actions, Secondary Actions: Expand
+					23 button (collapsed) Help, Secondary Actions: Expand
+				24 container
+					25 text Native action review
+					26 button Node brief. Enter for Node actions.
+					27 button Node draft. Enter for Node actions.
+					28 button Node manuscript. Enter for Node actions.
+					29 button Node inspect. Enter for Node actions.
+					30 button Node review. Enter for Node actions.
+					31 button Node reserve. Enter for Node actions.
+				32 container
+					33 text Native action review brief draft draft manuscript inspect Inspect manuscript review Review record reserve Reserved output
+				34 menu Secondary Actions: Cancel
+				35 menu Secondary Actions: Cancel
+	36 close button
+	37 full screen button Help: this button also has an action to zoom the window, Secondary Actions: zoom the window
+	38 minimize button
+	39 text PFDSL
+40 menu bar
+	41 PFDSL
+	42 File
+	43 Edit
+	44 View
+	45 Window
+	46 Help
+
+===== 05-definition-undo.ax.txt =====
+Window: "PFDSL", App: PFDSL.
+0 standard window PFDSL, Secondary Actions: Raise
+	1 scroll area
+		2 HTML content Description: PFDSL, URL: tauri://localhost
+			3 container
+				4 text PFDSL
+				5 button Open folder…
+				6 button Format
+				7 text Preview edit applied. Complete any required metadata.
+			8 container
+				9 container PFD files
+				10 container Documents
+					11 tab (selected) Welcome •
+					12 tab (selectable) 日本語
+				13 editor (settable) Editor content, Value: [editor: Editor content], Secondary Actions: Show Writing Tools
+					14 text (settable) ---
+title: Native action review
+artifact:
+  review:
+    label: Review record
+  reserve:
+    label: Reserved output
+process:
+  inspect:
+    label: Inspect manuscript
+---
+brief >> draft -> manuscript >> inspect -> review
+review >>? draft
+reserve
+
+				15 container Diagram view
+					16 button Zoom out
+					17 container Zoom level
+						18 text 75.3%
+					19 button Zoom in
+					20 button Fit
+					21 button 100%
+					22 button (collapsed) Node actions, Secondary Actions: Expand
+					23 button (collapsed) Help, Secondary Actions: Expand
+				24 container
+					25 text Native action review
+					26 button Node brief. Enter for Node actions.
+					27 button Node draft. Enter for Node actions.
+					28 button Node manuscript. Enter for Node actions.
+					29 button Node inspect. Enter for Node actions.
+					30 button Node review. Enter for Node actions.
+					31 button Node reserve. Enter for Node actions.
+				32 container
+					33 text Native action review brief draft draft manuscript inspect Inspect manuscript review Review record reserve Reserved output
+				34 menu Secondary Actions: Cancel
+				35 menu Secondary Actions: Cancel
+	36 close button
+	37 full screen button Help: this button also has an action to zoom the window, Secondary Actions: zoom the window
+	38 minimize button
+	39 text PFDSL
+40 menu bar
+	41 PFDSL
+	42 File
+	43 Edit
+	44 View
+	45 Window
+	46 Help
+
+===== 06-label-edited.ax.txt =====
+Window: "PFDSL", App: PFDSL.
+0 standard window PFDSL, Secondary Actions: Raise
+	1 scroll area
+		2 HTML content Description: PFDSL, URL: tauri://localhost
+			3 container
+				4 text PFDSL
+				5 button Open folder…
+				6 button Format
+				7 text Preview edit applied. Complete any required metadata.
+			8 container
+				9 container PFD files
+				10 container Documents
+					11 tab (selected) Welcome •
+					12 tab (selectable) 日本語
+				13 editor (settable) Editor content, Value: [editor: Editor content], Secondary Actions: Show Writing Tools
+					14 text (settable) ---
+title: Native action review
+artifact:
+  review:
+    label: Review record
+  reserve:
+    label: Reserved output
+process:
+  inspect:
+    label: Inspect manuscript
+  draft:
+        label: Draft document
+---
+brief >> draft -> manuscript >> inspect -> review
+review >>? draft
+reserve
+
+				15 container Diagram view
+					16 button Zoom out
+					17 container Zoom level
+						18 text 75.3%
+					19 button Zoom in
+					20 button Fit
+					21 button 100%
+					22 button (collapsed) Node actions, Secondary Actions: Expand
+					23 button (collapsed) Help, Secondary Actions: Expand
+				24 container
+					25 text Native action review
+					26 button Node brief. Enter for Node actions.
+					27 button Node draft. Enter for Node actions.
+					28 button Node manuscript. Enter for Node actions.
+					29 button Node inspect. Enter for Node actions.
+					30 button Node review. Enter for Node actions.
+					31 button Node reserve. Enter for Node actions.
+				32 container
+					33 text Native action review brief draft draft manuscript inspect Inspect manuscript review Review record reserve Reserved output
+				34 menu Secondary Actions: Cancel
+				35 menu Secondary Actions: Cancel
+	36 close button
+	37 full screen button Help: this button also has an action to zoom the window, Secondary Actions: zoom the window
+	38 minimize button
+	39 text PFDSL
+40 menu bar
+	41 PFDSL
+	42 File
+	43 Edit
+	44 View
+	45 Window
+	46 Help
+
+===== 07-label-undo.ax.txt =====
+Window: "PFDSL", App: PFDSL.
+0 standard window PFDSL, Secondary Actions: Raise
+	1 scroll area
+		2 HTML content Description: PFDSL, URL: tauri://localhost
+			3 container
+				4 text PFDSL
+				5 button Open folder…
+				6 button Format
+				7 text Preview edit applied. Complete any required metadata.
+			8 container
+				9 container PFD files
+				10 container Documents
+					11 tab (selected) Welcome •
+					12 tab (selectable) 日本語
+				13 editor (settable) Editor content, Value: [editor: Editor content], Secondary Actions: Show Writing Tools
+					14 text (settable) ---
+title: Native action review
+artifact:
+  review:
+    label: Review record
+  reserve:
+    label: Reserved output
+process:
+  inspect:
+    label: Inspect manuscript
+  draft:
+    label: draft
+---
+brief >> draft -> manuscript >> inspect -> review
+review >>? draft
+reserve
+
+				15 container Diagram view
+					16 button Zoom out
+					17 container Zoom level
+						18 text 75.3%
+					19 button Zoom in
+					20 button Fit
+					21 button 100%
+					22 button (collapsed) Node actions, Secondary Actions: Expand
+					23 button (collapsed) Help, Secondary Actions: Expand
+				24 container
+					25 text Native action review
+					26 button Node brief. Enter for Node actions.
+					27 button Node draft. Enter for Node actions.
+					28 button Node manuscript. Enter for Node actions.
+					29 button Node inspect. Enter for Node actions.
+					30 button Node review. Enter for Node actions.
+					31 button Node reserve. Enter for Node actions.
+				32 container
+					33 text Native action review brief draft draft manuscript inspect Inspect manuscript review Review record reserve Reserved output
+				34 menu Secondary Actions: Cancel
+				35 menu Secondary Actions: Cancel
+	36 close button
+	37 full screen button Help: this button also has an action to zoom the window, Secondary Actions: zoom the window
+	38 minimize button
+	39 text PFDSL
+40 menu bar
+	41 PFDSL
+	42 File
+	43 Edit
+	44 View
+	45 Window
+	46 Help
+
+===== 08-input-new.ax.txt =====
+Window: "PFDSL", App: PFDSL.
+0 standard window PFDSL, Secondary Actions: Raise
+	1 scroll area
+		2 HTML content Description: PFDSL, URL: tauri://localhost
+			3 container
+				4 text PFDSL
+				5 button Open folder…
+				6 button Format
+				7 text Preview edit applied. Complete any required metadata.
+			8 container
+				9 container PFD files
+				10 container Documents
+					11 tab (selected) Welcome •
+					12 tab (selectable) 日本語
+				13 editor (settable) Editor content, Value: [editor: Editor content], Secondary Actions: Show Writing Tools
+					14 text (settable) ---
+title: Native action review
+artifact:
+  review:
+    label: Review record
+  reserve:
+    label: Reserved output
+process:
+  inspect:
+    label: Inspect manuscript
+  draft:
+        label: Draft document
+---
+brief >> draft -> manuscript >> inspect -> review
+review >>? draft
+new_brief >> draft
+reserve
+
+				15 container Diagram view
+					16 button Zoom out
+					17 container Zoom level
+						18 text 75.3%
+					19 button Zoom in
+					20 button Fit
+					21 button 100%
+					22 button (collapsed) Node actions, Secondary Actions: Expand
+					23 button (collapsed) Help, Secondary Actions: Expand
+				24 container
+					25 text Native action review
+					26 button Node brief. Enter for Node actions.
+					27 button Node draft. Enter for Node actions.
+					28 button Node manuscript. Enter for Node actions.
+					29 button Node inspect. Enter for Node actions.
+					30 button Node review. Enter for Node actions.
+					31 button Node new_brief. Enter for Node actions.
+					32 button Node reserve. Enter for Node actions.
+				33 container
+					34 text Native action review brief draft Draft document manuscript inspect Inspect manuscript review Review record new_brief reserve Reserved output
+				35 menu Secondary Actions: Cancel
+				36 menu Secondary Actions: Cancel
+	37 close button
+	38 full screen button Help: this button also has an action to zoom the window, Secondary Actions: zoom the window
+	39 minimize button
+	40 text PFDSL
+41 menu bar
+	42 PFDSL
+	43 File
+	44 Edit
+	45 View
+	46 Window
+	47 Help
+
+===== 09-input-existing.ax.txt =====
+Window: "PFDSL", App: PFDSL.
+0 standard window PFDSL, Secondary Actions: Raise
+	1 scroll area
+		2 HTML content Description: PFDSL, URL: tauri://localhost
+			3 container
+				4 text PFDSL
+				5 button Open folder…
+				6 button Format
+				7 text Preview edit applied. Complete any required metadata.
+			8 container
+				9 container PFD files
+				10 container Documents
+					11 tab (selected) Welcome •
+					12 tab (selectable) 日本語
+				13 editor (settable) Editor content, Value: [editor: Editor content], Secondary Actions: Show Writing Tools
+					14 text (settable) ---
+title: Native action review
+artifact:
+  review:
+    label: Review record
+  reserve:
+    label: Reserved output
+process:
+  inspect:
+    label: Inspect manuscript
+  draft:
+        label: Draft document
+---
+brief >> draft -> manuscript >> inspect -> review
+review >>? draft
+reserve >> draft
+reserve
+
+				15 container Diagram view
+					16 button Zoom out
+					17 container Zoom level
+						18 text 75.3%
+					19 button Zoom in
+					20 button Fit
+					21 button 100%
+					22 button (collapsed) Node actions, Secondary Actions: Expand
+					23 button (collapsed) Help, Secondary Actions: Expand
+				24 container
+					25 text Native action review
+					26 button Node brief. Enter for Node actions.
+					27 button Node draft. Enter for Node actions.
+					28 button Node manuscript. Enter for Node actions.
+					29 button Node inspect. Enter for Node actions.
+					30 button Node review. Enter for Node actions.
+					31 button Node reserve. Enter for Node actions.
+				32 container
+					33 text Native action review brief draft Draft document manuscript inspect Inspect manuscript review Review record reserve Reserved output
+				34 menu Secondary Actions: Cancel
+				35 menu Secondary Actions: Cancel
+	36 close button
+	37 full screen button Help: this button also has an action to zoom the window, Secondary Actions: zoom the window
+	38 minimize button
+	39 text PFDSL
+40 menu bar
+	41 PFDSL
+	42 File
+	43 Edit
+	44 View
+	45 Window
+	46 Help
+
+===== 10-feedback-new.ax.txt =====
+Window: "PFDSL", App: PFDSL.
+0 standard window PFDSL, Secondary Actions: Raise
+	1 scroll area
+		2 HTML content Description: PFDSL, URL: tauri://localhost
+			3 container
+				4 text PFDSL
+				5 button Open folder…
+				6 button Format
+				7 text Preview edit applied. Complete any required metadata.
+			8 container
+				9 container PFD files
+				10 container Documents
+					11 tab (selected) Welcome •
+					12 tab (selectable) 日本語
+				13 editor (settable) Editor content, Value: [editor: Editor content], Secondary Actions: Show Writing Tools
+					14 text (settable) ---
+title: Native action review
+artifact:
+  review:
+    label: Review record
+  reserve:
+    label: Reserved output
+process:
+  inspect:
+    label: Inspect manuscript
+  draft:
+        label: Draft document
+---
+brief >> draft -> manuscript >> inspect -> review
+review >>? draft
+new_notes >>? draft
+reserve
+
+				15 container Diagram view
+					16 button Zoom out
+					17 container Zoom level
+						18 text 75.3%
+					19 button Zoom in
+					20 button Fit
+					21 button 100%
+					22 button (collapsed) Node actions, Secondary Actions: Expand
+					23 button (collapsed) Help, Secondary Actions: Expand
+				24 container
+					25 text Native action review
+					26 button Node brief. Enter for Node actions.
+					27 button Node draft. Enter for Node actions.
+					28 button Node manuscript. Enter for Node actions.
+					29 button Node inspect. Enter for Node actions.
+					30 button Node review. Enter for Node actions.
+					31 button Node new_notes. Enter for Node actions.
+					32 button Node reserve. Enter for Node actions.
+				33 container
+					34 text Native action review brief draft Draft document manuscript inspect Inspect manuscript review Review record new_notes reserve Reserved output
+				35 menu Secondary Actions: Cancel
+				36 menu Secondary Actions: Cancel
+	37 close button
+	38 full screen button Help: this button also has an action to zoom the window, Secondary Actions: zoom the window
+	39 minimize button
+	40 text PFDSL
+41 menu bar
+	42 PFDSL
+	43 File
+	44 Edit
+	45 View
+	46 Window
+	47 Help
+
+===== 11-feedback-existing.ax.txt =====
+Window: "PFDSL", App: PFDSL.
+0 standard window PFDSL, Secondary Actions: Raise
+	1 scroll area
+		2 HTML content Description: PFDSL, URL: tauri://localhost
+			3 container
+				4 text PFDSL
+				5 button Open folder…
+				6 button Format
+				7 text Preview edit applied. Complete any required metadata.
+			8 container
+				9 container PFD files
+				10 container Documents
+					11 tab (selected) Welcome •
+					12 tab (selectable) 日本語
+				13 editor (settable) Editor content, Value: [editor: Editor content], Secondary Actions: Show Writing Tools
+					14 text (settable) ---
+title: Native action review
+artifact:
+  review:
+    label: Review record
+  reserve:
+    label: Reserved output
+process:
+  inspect:
+    label: Inspect manuscript
+  draft:
+        label: Draft document
+---
+brief >> draft -> manuscript >> inspect -> review
+review >>? draft
+manuscript >>? draft
+reserve
+
+				15 container Diagram view
+					16 button Zoom out
+					17 container Zoom level
+						18 text 75.3%
+					19 button Zoom in
+					20 button Fit
+					21 button 100%
+					22 button (collapsed) Node actions, Secondary Actions: Expand
+					23 button (collapsed) Help, Secondary Actions: Expand
+				24 container
+					25 text Native action review
+					26 button Node brief. Enter for Node actions.
+					27 button Node draft. Enter for Node actions.
+					28 button Node manuscript. Enter for Node actions.
+					29 button Node inspect. Enter for Node actions.
+					30 button Node review. Enter for Node actions.
+					31 button Node reserve. Enter for Node actions.
+				32 container
+					33 text Native action review brief draft Draft document manuscript inspect Inspect manuscript review Review record reserve Reserved output
+				34 menu Secondary Actions: Cancel
+				35 menu Secondary Actions: Cancel
+	36 close button
+	37 full screen button Help: this button also has an action to zoom the window, Secondary Actions: zoom the window
+	38 minimize button
+	39 text PFDSL
+40 menu bar
+	41 PFDSL
+	42 File
+	43 Edit
+	44 View
+	45 Window
+	46 Help
+
+===== 12-output-new.ax.txt =====
+Window: "PFDSL", App: PFDSL.
+0 standard window PFDSL, Secondary Actions: Raise
+	1 scroll area
+		2 HTML content Description: PFDSL, URL: tauri://localhost
+			3 container
+				4 text PFDSL
+				5 button Open folder…
+				6 button Format
+				7 text Preview edit applied. Complete any required metadata.
+			8 container
+				9 container PFD files
+				10 container Documents
+					11 tab (selected) Welcome •
+					12 tab (selectable) 日本語
+				13 editor (settable) Editor content, Value: [editor: Editor content], Secondary Actions: Show Writing Tools
+					14 text (settable) ---
+title: Native action review
+artifact:
+  review:
+    label: Review record
+  reserve:
+    label: Reserved output
+process:
+  inspect:
+    label: Inspect manuscript
+  draft:
+        label: Draft document
+---
+brief >> draft -> manuscript >> inspect -> review
+review >>? draft
+draft -> new_result
+reserve
+
+				15 container Diagram view
+					16 button Zoom out
+					17 container Zoom level
+						18 text 75.3%
+					19 button Zoom in
+					20 button Fit
+					21 button 100%
+					22 button (collapsed) Node actions, Secondary Actions: Expand
+					23 button (collapsed) Help, Secondary Actions: Expand
+				24 container
+					25 text Native action review
+					26 button Node brief. Enter for Node actions.
+					27 button Node draft. Enter for Node actions.
+					28 button Node manuscript. Enter for Node actions.
+					29 button Node new_result. Enter for Node actions.
+					30 button Node inspect. Enter for Node actions.
+					31 button Node review. Enter for Node actions.
+					32 button Node reserve. Enter for Node actions.
+				33 container
+					34 text Native action review brief draft Draft document manuscript new_result inspect Inspect manuscript review Review record reserve Reserved output
+				35 menu Secondary Actions: Cancel
+				36 menu Secondary Actions: Cancel
+	37 close button
+	38 full screen button Help: this button also has an action to zoom the window, Secondary Actions: zoom the window
+	39 minimize button
+	40 text PFDSL
+41 menu bar
+	42 PFDSL
+	43 File
+	44 Edit
+	45 View
+	46 Window
+	47 Help
+
+===== 13-output-existing.ax.txt =====
+Window: "PFDSL", App: PFDSL.
+0 standard window PFDSL, Secondary Actions: Raise
+	1 scroll area
+		2 HTML content Description: PFDSL, URL: tauri://localhost
+			3 container
+				4 text PFDSL
+				5 button Open folder…
+				6 button Format
+				7 text Preview edit applied. Complete any required metadata.
+			8 container
+				9 container PFD files
+				10 container Documents
+					11 tab (selected) Welcome •
+					12 tab (selectable) 日本語
+				13 editor (settable) Editor content, Value: [editor: Editor content], Secondary Actions: Show Writing Tools
+					14 text (settable) ---
+title: Native action review
+artifact:
+  review:
+    label: Review record
+  reserve:
+    label: Reserved output
+process:
+  inspect:
+    label: Inspect manuscript
+  draft:
+        label: Draft document
+---
+brief >> draft -> manuscript >> inspect -> review
+review >>? draft
+draft -> reserve
+reserve
+
+				15 container Diagram view
+					16 button Zoom out
+					17 container Zoom level
+						18 text 75.3%
+					19 button Zoom in
+					20 button Fit
+					21 button 100%
+					22 button (collapsed) Node actions, Secondary Actions: Expand
+					23 button (collapsed) Help, Secondary Actions: Expand
+				24 container
+					25 text Native action review
+					26 button Node brief. Enter for Node actions.
+					27 button Node draft. Enter for Node actions.
+					28 button Node manuscript. Enter for Node actions.
+					29 button Node reserve. Enter for Node actions.
+					30 button Node inspect. Enter for Node actions.
+					31 button Node review. Enter for Node actions.
+				32 container
+					33 text Native action review brief draft Draft document manuscript reserve Reserved output inspect Inspect manuscript review Review record
+				34 menu Secondary Actions: Cancel
+				35 menu Secondary Actions: Cancel
+	36 close button
+	37 full screen button Help: this button also has an action to zoom the window, Secondary Actions: zoom the window
+	38 minimize button
+	39 text PFDSL
+40 menu bar
+	41 PFDSL
+	42 File
+	43 Edit
+	44 View
+	45 Window
+	46 Help
+
+===== 15-tab-two.ax.txt =====
+Window: "PFDSL", App: PFDSL.
+0 standard window PFDSL, Secondary Actions: Raise
+	1 scroll area
+		2 HTML content Description: PFDSL, URL: tauri://localhost
+			3 container
+				4 text PFDSL
+				5 button Open folder…
+				6 button Format
+				7 text Preview edit applied. Complete any required metadata.
+			8 container
+				9 container PFD files
+				10 container Documents
+					11 tab (selectable) Welcome •
+					12 tab (selected) 日本語 •
+				13 menu Secondary Actions: Cancel
+				14 menu Secondary Actions: Cancel
+				15 editor (settable) Editor content, Value: [editor: Editor content]
+					16 text (settable) ---
+title: Separate tab
+artifact:
+  demand:
+    label: Tab two demand
+  invoice:
+    label: Tab two invoice
+process:
+  bill:
+    label: Bill customer
+---
+demand >> bill -> invoice
+
+				17 container Diagram view
+					18 button Zoom out
+					19 container Zoom level
+						20 text 110%
+					21 button Zoom in
+					22 button Fit
+					23 button 100%
+					24 button (collapsed) Node actions, Secondary Actions: Expand
+					25 button (collapsed) Help, Secondary Actions: Expand
+				26 container
+					27 text Separate tab
+					28 button Node bill. Enter for Node actions.
+					29 button Node invoice. Enter for Node actions.
+					30 button Node demand. Enter for Node actions.
+				31 container
+					32 text 日本語のフロー build 作成する output 成果物 input 入力
+	33 close button
+	34 full screen button Help: this button also has an action to zoom the window, Secondary Actions: zoom the window
+	35 minimize button
+	36 text PFDSL
+37 menu bar
+	38 PFDSL
+	39 File
+	40 Edit
+	41 View
+	42 Window
+	43 Help
+
+===== 16-tab-one-restored.ax.txt =====
+Window: "PFDSL", App: PFDSL.
+0 standard window PFDSL, Secondary Actions: Raise
+	1 scroll area
+		2 HTML content Description: PFDSL, URL: tauri://localhost
+			3 container
+				4 text PFDSL
+				5 button Open folder…
+				6 button Format
+				7 text Preview edit applied. Complete any required metadata.
+			8 container
+				9 container PFD files
+				10 container Documents
+					11 tab (selected) Welcome •, Value: on
+					12 tab (selectable) 日本語 •
+				13 editor (settable) Editor content, Value: [editor: Editor content]
+					14 text (settable) ---
+title: Native action review
+artifact:
+  review:
+    label: Review record
+  reserve:
+    label: Reserved output
+process:
+  inspect:
+    label: Inspect manuscript
+  draft:
+        label: Draft document
+---
+brief >> draft -> manuscript >> inspect -> review
+review >>? draft
+draft -> reserve
+reserve
+
+				15 container Diagram view
+					16 button Zoom out
+					17 container Zoom level
+						18 text 68.5%
+					19 button Zoom in
+					20 button Fit
+					21 button 100%
+					22 button (collapsed) Node actions, Secondary Actions: Expand
+					23 button (collapsed) Help, Secondary Actions: Expand
+				24 container
+					25 text Native action review
+					26 button Node brief. Enter for Node actions.
+					27 button Node draft. Enter for Node actions.
+					28 button Node manuscript. Enter for Node actions.
+					29 button Node reserve. Enter for Node actions.
+					30 button Node inspect. Enter for Node actions.
+					31 button Node review. Enter for Node actions.
+				32 container
+					33 text Native action review brief draft Draft document manuscript reserve Reserved output inspect Inspect manuscript review Review record
+				34 menu Secondary Actions: Cancel
+				35 menu Secondary Actions: Cancel
+	36 close button
+	37 full screen button Help: this button also has an action to zoom the window, Secondary Actions: zoom the window
+	38 minimize button
+	39 text PFDSL
+40 menu bar
+	41 PFDSL
+	42 File
+	43 Edit
+	44 View
+	45 Window
+	46 Help
+
+===== 17-recovery-normal.ax.txt =====
+Window: "PFDSL", App: PFDSL.
+0 standard window PFDSL, Secondary Actions: Raise
+	1 scroll area
+		2 HTML content Description: PFDSL, URL: tauri://localhost
+			3 container
+				4 text PFDSL
+				5 button Open folder…
+				6 button Format
+				7 text Preview edit applied. Complete any required metadata.
+			8 container
+				9 container PFD files
+				10 container Documents
+					11 tab (selectable) Welcome •
+					12 tab (selected) 日本語 •
+				13 menu Secondary Actions: Cancel
+				14 menu Secondary Actions: Cancel
+				15 editor (settable) Editor content, Value: [editor: Editor content], Secondary Actions: Show Writing Tools
+					16 text (settable) ---
+title: Recovery exercise
+---
+raw >> refine -> final
+
+				17 container Diagram view
+					18 button Zoom out
+					19 container Zoom level
+						20 text 110%
+					21 button Zoom in
+					22 button Fit
+					23 button 100%
+					24 button (collapsed) Node actions, Secondary Actions: Expand
+					25 button (collapsed) Help, Secondary Actions: Expand
+				26 container
+					27 text Recovery exercise
+					28 button Node final. Enter for Node actions.
+					29 button Node raw. Enter for Node actions.
+					30 button Node refine. Enter for Node actions.
+				31 container
+					32 text Separate tab bill Bill customer invoice Tab two invoice demand Tab two demand
+	33 close button
+	34 full screen button Help: this button also has an action to zoom the window, Secondary Actions: zoom the window
+	35 minimize button
+	36 text PFDSL
+37 menu bar
+	38 PFDSL
+	39 File
+	40 Edit
+	41 View
+	42 Window
+	43 Help
+
+===== 18-recovery-error.ax.txt =====
+Window: "PFDSL", App: PFDSL.
+0 standard window PFDSL, Secondary Actions: Raise
+	1 scroll area
+		2 HTML content Description: PFDSL, URL: tauri://localhost
+			3 container
+				4 text PFDSL
+				5 button Open folder…
+				6 button Format
+				7 text Preview edit applied. Complete any required metadata.
+			8 container
+				9 container PFD files
+				10 container Documents
+					11 tab (selectable) Welcome •
+					12 tab (selected) 日本語 •
+				13 menu Secondary Actions: Cancel
+				14 menu Secondary Actions: Cancel
+				15 editor (settable) Editor content, Value: [editor: Editor content], Secondary Actions: Show Writing Tools
+					16 text (settable) ---
+title: Recovery exercise
+artifact: [
+---
+raw >> refine -> final
+
+				17 container Diagram view
+					18 button (disabled) Zoom out
+					19 container Zoom level
+						20 text 110%
+					21 button (disabled) Zoom in
+					22 button (disabled) Fit
+					23 button (disabled) 100%
+					24 button (disabled, collapsed) Node actions, Secondary Actions: Expand
+					25 button (collapsed) Help, Secondary Actions: Expand
+				26 text FM002: Invalid YAML in front matter: Flow sequence in block collection must be sufficiently indented and end with a ] at line 2, column 12:
+
+artifact: [
+           ^
+
+	27 close button
+	28 full screen button Help: this button also has an action to zoom the window, Secondary Actions: zoom the window
+	29 minimize button
+	30 text PFDSL
+31 menu bar
+	32 PFDSL
+	33 File
+	34 Edit
+	35 View
+	36 Window
+	37 Help
+
+===== 19-recovery-restored.ax.txt =====
+Window: "PFDSL", App: PFDSL.
+0 standard window PFDSL, Secondary Actions: Raise
+	1 scroll area
+		2 HTML content Description: PFDSL, URL: tauri://localhost
+			3 container
+				4 text PFDSL
+				5 button Open folder…
+				6 button Format
+				7 text Preview edit applied. Complete any required metadata.
+			8 container
+				9 container PFD files
+				10 container Documents
+					11 tab (selectable) Welcome •
+					12 tab (selected) 日本語 •
+				13 menu Secondary Actions: Cancel
+				14 menu Secondary Actions: Cancel
+				15 editor (settable) Editor content, Value: [editor: Editor content], Secondary Actions: Show Writing Tools
+					16 text (settable) ---
+title: Recovery exercise
+---
+raw >> refine -> final
+
+				17 container Diagram view
+					18 button Zoom out
+					19 container Zoom level
+						20 text 110%
+					21 button Zoom in
+					22 button Fit
+					23 button 100%
+					24 button (collapsed) Node actions, Secondary Actions: Expand
+					25 button (collapsed) Help, Secondary Actions: Expand
+				26 container
+					27 text Recovery exercise
+					28 button Node final. Enter for Node actions.
+					29 button Node raw. Enter for Node actions.
+					30 button Node refine. Enter for Node actions.
+				31 container
+					32 text Recovery exercise final raw refine
+	33 close button
+	34 full screen button Help: this button also has an action to zoom the window, Secondary Actions: zoom the window
+	35 minimize button
+	36 text PFDSL
+37 menu bar
+	38 PFDSL
+	39 File
+	40 Edit
+	41 View
+	42 Window
+	43 Help
+
+===== 20-large-fit.ax.txt =====
+Window: "PFDSL", App: PFDSL.
+0 standard window PFDSL, Secondary Actions: Raise
+	1 scroll area
+		2 HTML content Description: PFDSL, URL: tauri://localhost
+			3 container
+				4 text PFDSL
+				5 button Open folder…
+				6 button Format
+				7 text Preview edit applied. Complete any required metadata.
+			8 container
+				9 container PFD files
+				10 container Documents
+					11 tab (selectable) Welcome •
+					12 tab (selected) 日本語 •
+				13 menu Secondary Actions: Cancel
+				14 menu Secondary Actions: Cancel
+				15 editor (settable) Editor content, Value: [editor: Editor content]
+					16 text (settable) ct_22
+artifact_22 >> step_23 -> artifact_23
+artifact_23 >> step_24 -> artifact_24
+artifact_24 >> step_25 -> artifact_25
+artifact_25 >> step_26 -> artifact_26
+artifact_26 >> step_27 -> artifact_27
+artifact_27 >> step_28 -> artifact_28
+artifact_28 >> step_29 -> artifact_29
+artifact_29 >> step_30 -> artifact_30
+artifact_30 >> step_31 -> artifact_31
+artifact_31 >> step_32 -> artifact_32
+artifact_32 >> step_33 -> artifact_33
+artifact_33 >> step_34 -> artifact_34
+artifact_34 >> step_35 -> artifact_35
+
+				17 container Diagram view
+					18 button Zoom out
+					19 container Zoom level
+						20 text 6.2%
+					21 button Zoom in
+					22 button Fit
+					23 button 100%
+					24 button (collapsed) Node actions, Secondary Actions: Expand
+					25 button (collapsed) Help, Secondary Actions: Expand
+				26 container
+					27 text Large native pan exercise
+					28 button Node artifact_01. Enter for Node actions.
+					29 button Node step_02. Enter for Node actions.
+					30 button Node artifact_02. Enter for Node actions.
+					31 button Node step_03. Enter for Node actions.
+					32 button Node artifact_03. Enter for Node actions.
+					33 button Node step_04. Enter for Node actions.
+					34 button Node artifact_04. Enter for Node actions.
+					35 button Node step_05. Enter for Node actions.
+					36 button Node artifact_05. Enter for Node actions.
+					37 button Node step_06. Enter for Node actions.
+					38 button Node artifact_06. Enter for Node actions.
+					39 button Node step_07. Enter for Node actions.
+					40 button Node artifact_07. Enter for Node actions.
+					41 button Node step_08. Enter for Node actions.
+					42 button Node artifact_08. Enter for Node actions.
+					43 button Node step_09. Enter for Node actions.
+					44 button Node artifact_09. Enter for Node actions.
+					45 button Node step_10. Enter for Node actions.
+					46 button Node artifact_10. Enter for Node actions.
+					47 button Node step_11. Enter for Node actions.
+					48 button Node artifact_11. Enter for Node actions.
+					49 button Node step_12. Enter for Node actions.
+					50 button Node artifact_12. Enter for Node actions.
+					51 button Node step_13. Enter for Node actions.
+					52 button Node artifact_13. Enter for Node actions.
+					53 button Node step_14. Enter for Node actions.
+					54 button Node artifact_14. Enter for Node actions.
+					55 button Node step_15. Enter for Node actions.
+					56 button Node artifact_15. Enter for Node actions.
+					57 button Node step_16. Enter for Node actions.
+					58 button Node artifact_16. Enter for Node actions.
+					59 button Node step_17. Enter for Node actions.
+					60 button Node artifact_17. Enter for Node actions.
+					61 button Node step_18. Enter for Node actions.
+					62 button Node artifact_18. Enter for Node actions.
+					63 button Node step_19. Enter for Node actions.
+					64 button Node artifact_19. Enter for Node actions.
+					65 button Node step_20. Enter for Node actions.
+					66 button Node artifact_20. Enter for Node actions.
+					67 button Node step_21. Enter for Node actions.
+					68 button Node artifact_21. Enter for Node actions.
+					69 button Node step_22. Enter for Node actions.
+					70 button Node artifact_22. Enter for Node actions.
+					71 button Node step_23. Enter for Node actions.
+					72 button Node artifact_23. Enter for Node actions.
+					73 button Node step_24. Enter for Node actions.
+					74 button Node artifact_24. Enter for Node actions.
+					75 button Node step_25. Enter for Node actions.
+					76 button Node artifact_25. Enter for Node actions.
+					77 button Node step_26. Enter for Node actions.
+					78 button Node artifact_26. Enter for Node actions.
+					79 button Node step_27. Enter for Node actions.
+					80 button Node artifact_27. Enter for Node actions.
+					81 button Node step_28. Enter for Node actions.
+					82 button Node artifact_28. Enter for Node actions.
+					83 button Node step_29. Enter for Node actions.
+					84 button Node artifact_29. Enter for Node actions.
+					85 button Node step_30. Enter for Node actions.
+					86 button Node artifact_30. Enter for Node actions.
+					87 button Node step_31. Enter for Node actions.
+					88 button Node artifact_31. Enter for Node actions.
+					89 button Node step_32. Enter for Node actions.
+					90 button Node artifact_32. Enter for Node actions.
+					91 button Node step_33. Enter for Node actions.
+					92 button Node artifact_33. Enter for Node actions.
+					93 button Node step_34. Enter for Node actions.
+					94 button Node artifact_34. Enter for Node actions.
+					95 button Node step_35. Enter for Node actions.
+					96 button Node artifact_35. Enter for Node actions.
+					97 button Node seed. Enter for Node actions.
+					98 button Node step_01. Enter for Node actions.
+				99 container
+					100 text Recovery exercise final raw refine
+	101 close button
+	102 full screen button Help: this button also has an action to zoom the window, Secondary Actions: zoom the window
+	103 minimize button
+	104 text PFDSL
+105 menu bar
+	106 PFDSL
+	107 File
+	108 Edit
+	109 View
+	110 Window
+	111 Help
+
+===== 21-final-raised.ax.txt =====
+Window: "PFDSL", App: PFDSL.
+0 standard window PFDSL, Secondary Actions: Raise
+	1 scroll area
+		2 HTML content Description: PFDSL, URL: tauri://localhost
+			3 container
+				4 text PFDSL
+				5 button Open folder…
+				6 button Format
+				7 text Preview edit applied. Complete any required metadata.
+			8 container
+				9 container PFD files
+				10 container Documents
+					11 tab (selectable) Welcome •
+					12 tab (selected) 日本語 •
+				13 menu Secondary Actions: Cancel
+				14 menu Secondary Actions: Cancel
+				15 editor (settable) Editor content, Value: [editor: Editor content]
+					16 text (settable) ct_22
+artifact_22 >> step_23 -> artifact_23
+artifact_23 >> step_24 -> artifact_24
+artifact_24 >> step_25 -> artifact_25
+artifact_25 >> step_26 -> artifact_26
+artifact_26 >> step_27 -> artifact_27
+artifact_27 >> step_28 -> artifact_28
+artifact_28 >> step_29 -> artifact_29
+artifact_29 >> step_30 -> artifact_30
+artifact_30 >> step_31 -> artifact_31
+artifact_31 >> step_32 -> artifact_32
+artifact_32 >> step_33 -> artifact_33
+artifact_33 >> step_34 -> artifact_34
+artifact_34 >> step_35 -> artifact_35
+
+				17 container Diagram view
+					18 button Zoom out
+					19 container Zoom level
+						20 text 100%
+					21 button Zoom in
+					22 button Fit
+					23 button 100%
+					24 button (collapsed) Node actions, Secondary Actions: Expand
+					25 button (collapsed) Help, Secondary Actions: Expand
+				26 container
+					27 text Large native pan exercise
+					28 button Node artifact_01. Enter for Node actions.
+					29 button Node step_02. Enter for Node actions.
+					30 button Node artifact_02. Enter for Node actions.
+					31 button Node step_03. Enter for Node actions.
+					32 button Node artifact_03. Enter for Node actions.
+					33 button Node step_04. Enter for Node actions.
+					34 button Node artifact_04. Enter for Node actions.
+					35 button Node step_05. Enter for Node actions.
+					36 button Node artifact_05. Enter for Node actions.
+					37 button Node step_06. Enter for Node actions.
+					38 button Node artifact_06. Enter for Node actions.
+					39 button Node step_07. Enter for Node actions.
+					40 button Node artifact_07. Enter for Node actions.
+					41 button Node step_08. Enter for Node actions.
+					42 button Node artifact_08. Enter for Node actions.
+					43 button Node step_09. Enter for Node actions.
+					44 button Node artifact_09. Enter for Node actions.
+					45 button Node step_10. Enter for Node actions.
+					46 button Node artifact_10. Enter for Node actions.
+					47 button Node step_11. Enter for Node actions.
+					48 button Node artifact_11. Enter for Node actions.
+					49 button Node step_12. Enter for Node actions.
+					50 button Node artifact_12. Enter for Node actions.
+					51 button Node step_13. Enter for Node actions.
+					52 button Node artifact_13. Enter for Node actions.
+					53 button Node step_14. Enter for Node actions.
+					54 button Node artifact_14. Enter for Node actions.
+					55 button Node step_15. Enter for Node actions.
+					56 button Node artifact_15. Enter for Node actions.
+					57 button Node step_16. Enter for Node actions.
+					58 button Node artifact_16. Enter for Node actions.
+					59 button Node step_17. Enter for Node actions.
+					60 button Node artifact_17. Enter for Node actions.
+					61 button Node step_18. Enter for Node actions.
+					62 button Node artifact_18. Enter for Node actions.
+					63 button Node step_19. Enter for Node actions.
+					64 button Node artifact_19. Enter for Node actions.
+					65 button Node step_20. Enter for Node actions.
+					66 button Node artifact_20. Enter for Node actions.
+					67 button Node step_21. Enter for Node actions.
+					68 button Node artifact_21. Enter for Node actions.
+					69 button Node step_22. Enter for Node actions.
+					70 button Node artifact_22. Enter for Node actions.
+					71 button Node step_23. Enter for Node actions.
+					72 button Node artifact_23. Enter for Node actions.
+					73 button Node step_24. Enter for Node actions.
+					74 button Node artifact_24. Enter for Node actions.
+					75 button Node step_25. Enter for Node actions.
+					76 button Node artifact_25. Enter for Node actions.
+					77 button Node step_26. Enter for Node actions.
+					78 button Node artifact_26. Enter for Node actions.
+					79 button Node step_27. Enter for Node actions.
+					80 button Node artifact_27. Enter for Node actions.
+					81 button Node step_28. Enter for Node actions.
+					82 button Node artifact_28. Enter for Node actions.
+					83 button Node step_29. Enter for Node actions.
+					84 button Node artifact_29. Enter for Node actions.
+					85 button Node step_30. Enter for Node actions.
+					86 button Node artifact_30. Enter for Node actions.
+					87 button Node step_31. Enter for Node actions.
+					88 button Node artifact_31. Enter for Node actions.
+					89 button Node step_32. Enter for Node actions.
+					90 button Node artifact_32. Enter for Node actions.
+					91 button Node step_33. Enter for Node actions.
+					92 button Node artifact_33. Enter for Node actions.
+					93 button Node step_34. Enter for Node actions.
+					94 button Node artifact_34. Enter for Node actions.
+					95 button Node step_35. Enter for Node actions.
+					96 button Node artifact_35. Enter for Node actions.
+					97 button Node seed. Enter for Node actions.
+					98 button Node step_01. Enter for Node actions.
+				99 container
+					100 text Recovery exercise final raw refine
+	101 close button
+	102 full screen button Help: this button also has an action to zoom the window, Secondary Actions: zoom the window
+	103 minimize button
+	104 text PFDSL
+105 menu bar
+	106 PFDSL
+	107 File
+	108 Edit
+	109 View
+	110 Window
+	111 Help

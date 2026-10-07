@@ -1,14 +1,20 @@
 import { type DiffReport, resolveLocationFsPath } from "@pfdsl/core";
 import type { MessageFromWebview, MessageToWebview } from "@pfdsl/editor";
 import {
-	allIdsOfDocument,
+	applyPreviewEdit,
 	buildLocations,
 	findFrontmatterDefinitionRange,
-	nodeIdAtCursor,
+	findNodeOccurrenceRanges,
+	nodeIdAtSourcePosition,
+	type PreviewEditRequest,
 	positionOfNodeId,
 } from "@pfdsl/editor";
 import * as vscode from "vscode";
-import { analyzeDocument, preparePreviewForDocument } from "./analyze.js";
+import {
+	analyzeDocument,
+	dropAnalyzeCache,
+	preparePreviewForDocument,
+} from "./analyze.js";
 import { type DirectoryAccess, expandDirectory } from "./expand-directory.js";
 import { PreviewController } from "./preview-controller.js";
 import { buildHtml } from "./preview-logic.js";
@@ -17,7 +23,138 @@ import { requireActivePfdslEditor } from "./utils.js";
 interface PreviewState {
 	panel: vscode.WebviewPanel;
 	doc: vscode.TextDocument;
+	sourceViewColumn: vscode.ViewColumn;
 	controller: PreviewController;
+	disposed: boolean;
+}
+
+async function prepareEditSource(state: PreviewState) {
+	if (state.doc.isClosed) {
+		let current: vscode.TextDocument;
+		try {
+			current = await vscode.workspace.openTextDocument(state.doc.uri);
+		} catch {
+			if (!state.disposed)
+				vscode.window.showInformationMessage(
+					"The source document could not be reopened.",
+				);
+			return;
+		}
+		if (state.disposed) return;
+		if (current.isClosed) {
+			vscode.window.showInformationMessage(
+				"The source document could not be reopened.",
+			);
+			return;
+		}
+		state.doc = current;
+		dropAnalyzeCache(current.uri);
+		state.controller.update();
+	}
+	const source = state.doc.getText();
+	const version = state.doc.version;
+	const isCurrent = () =>
+		!state.disposed &&
+		!state.doc.isClosed &&
+		state.doc.version === version &&
+		state.doc.getText() === source;
+	const encoding = state.doc.encoding?.replace(/bom$/, "");
+	const diskEncoding =
+		encoding === "utf8"
+			? "utf-8"
+			: encoding === "utf16le"
+				? "utf-16le"
+				: encoding === "utf16be"
+					? "utf-16be"
+					: undefined;
+	if (
+		diskEncoding &&
+		state.doc.uri.scheme === "file" &&
+		state.doc.isDirty === false &&
+		!vscode.window.visibleTextEditors.some(
+			(editor) => editor.document === state.doc,
+		)
+	) {
+		let diskSource: string;
+		try {
+			diskSource = new TextDecoder(diskEncoding, { fatal: true }).decode(
+				await vscode.workspace.fs.readFile(state.doc.uri),
+			);
+		} catch {
+			if (!state.disposed)
+				vscode.window.showInformationMessage(
+					"The source file could not be read.",
+				);
+			return;
+		}
+		if (!isCurrent()) return;
+		if (diskSource !== source) {
+			vscode.window.showInformationMessage(
+				"The file changed outside VS Code. Reload the source file before editing from the preview.",
+			);
+			return;
+		}
+	}
+	return { source, isCurrent };
+}
+
+async function editFromPreview(
+	state: PreviewState,
+	request: PreviewEditRequest,
+) {
+	const snapshot = await prepareEditSource(state);
+	if (!snapshot?.isCurrent()) return;
+	const result = applyPreviewEdit(snapshot.source, request);
+	if (!result.ok) {
+		vscode.window.showInformationMessage(result.message);
+		return;
+	}
+	if (!snapshot.isCurrent()) return;
+	const edit = new vscode.WorkspaceEdit();
+	edit.replace(
+		state.doc.uri,
+		new vscode.Range(
+			state.doc.positionAt(result.edit.startOffset),
+			state.doc.positionAt(result.edit.endOffset),
+		),
+		result.edit.text,
+	);
+	if (!(await vscode.workspace.applyEdit(edit))) {
+		vscode.window.showInformationMessage(
+			"The preview edit could not be applied.",
+		);
+		return;
+	}
+	if (state.disposed || state.doc.getText() !== result.source) return;
+	if (result.selection) {
+		const { start, end } = result.selection;
+		const range = new vscode.Range(
+			new vscode.Position(start.line - 1, start.column - 1),
+			new vscode.Position(end.line - 1, end.column - 1),
+		);
+		const sourceColumn =
+			vscode.window.visibleTextEditors.find(
+				(editor) => editor.document === state.doc,
+			)?.viewColumn ?? state.sourceViewColumn;
+		const editor = await vscode.window.showTextDocument(state.doc, {
+			viewColumn:
+				sourceColumn === state.panel.viewColumn
+					? vscode.ViewColumn.Beside
+					: sourceColumn,
+			...(request.type === "createDefinition" ? { selection: range } : {}),
+			preserveFocus: request.type === "addConnector",
+		});
+		if (state.disposed || state.doc.getText() !== result.source) return;
+		if (request.type === "createDefinition")
+			editor.selection = new vscode.Selection(range.start, range.end);
+		editor.revealRange(range);
+		if (request.type === "createDefinition")
+			vscode.window.showInformationMessage(
+				result.needsCriteria
+					? "Edit the new label. Add criteria describing how this produced artifact is judged complete (W002)."
+					: "Edit the new label and complete any required metadata.",
+			);
+	}
 }
 
 /** The vscode filesystem, shaped for expandDirectory: fsPaths in, fsPaths out. */
@@ -206,6 +343,11 @@ export function registerPreview(context: vscode.ExtensionContext): {
 		focusNodeId?: string,
 	): PreviewState {
 		const docUri = doc.uri.toString();
+		const sourceViewColumn =
+			vscode.window.visibleTextEditors.find((editor) => editor.document === doc)
+				?.viewColumn ??
+			vscode.window.activeTextEditor?.viewColumn ??
+			vscode.ViewColumn.One;
 		const scriptUri = vscode.Uri.joinPath(
 			context.extensionUri,
 			"dist",
@@ -230,6 +372,8 @@ export function registerPreview(context: vscode.ExtensionContext): {
 		const state: PreviewState = {
 			panel,
 			doc,
+			sourceViewColumn,
+			disposed: false,
 			controller: new PreviewController(
 				(focus) => renderUpdate(state, focus),
 				(message) => {
@@ -239,15 +383,25 @@ export function registerPreview(context: vscode.ExtensionContext): {
 			),
 		};
 
-		panel.webview.onDidReceiveMessage((msg: MessageFromWebview) => {
+		panel.webview.onDidReceiveMessage(async (msg: MessageFromWebview) => {
+			if (state.disposed) return;
 			if (msg.type === "ready") {
 				state.controller.markReady();
+			} else if (
+				msg.type === "createDefinition" ||
+				msg.type === "addConnector"
+			) {
+				await editFromPreview(state, msg);
 			} else if (msg.type === "nodeClick") {
 				const editor = vscode.window.visibleTextEditors.find(
 					(e) => e.document === state.doc,
 				);
 				const cursorId = editor
-					? nodeIdAtCursor(analyzeDocument(state.doc), editor.selection.active)
+					? nodeIdAtSourcePosition(
+							analyzeDocument(state.doc),
+							state.doc.getText(),
+							editor.selection.active,
+						)
 					: undefined;
 				jumpToNode(state.doc, msg.nodeId, cursorId === msg.nodeId);
 			} else if (msg.type === "openUrl") {
@@ -280,6 +434,7 @@ export function registerPreview(context: vscode.ExtensionContext): {
 		});
 
 		panel.onDidDispose(() => {
+			state.disposed = true;
 			state.controller.dispose();
 			panels.delete(docUri);
 			if (activePreviewDocUri === docUri) activePreviewDocUri = null;
@@ -318,13 +473,20 @@ export function registerPreview(context: vscode.ExtensionContext): {
 			}
 
 			const result = analyzeDocument(doc);
-			const focusNodeId = nodeIdAtCursor(result, editor.selection.active);
+			const focusNodeId = nodeIdAtSourcePosition(
+				result,
+				doc.getText(),
+				editor.selection.active,
+			);
 			createPanel(doc, focusNodeId);
 		}),
 
 		vscode.workspace.onDidChangeTextDocument((e) => {
 			const state = panels.get(e.document.uri.toString());
-			state?.controller.update();
+			if (state) {
+				state.doc = e.document;
+				state.controller.update();
+			}
 		}),
 
 		vscode.window.onDidChangeTextEditorSelection((e) => {
@@ -337,12 +499,24 @@ export function registerPreview(context: vscode.ExtensionContext): {
 				} satisfies MessageToWebview);
 				return;
 			}
-			const selectedText = e.textEditor.document.getText(sel);
-			const allIds = allIdsOfDocument(analyzeDocument(state.doc));
-			if (allIds.has(selectedText)) {
+			const model = analyzeDocument(state.doc);
+			const source = state.doc.getText();
+			const nodeId = nodeIdAtSourcePosition(model, source, sel.active);
+			const selectedText = state.doc.getText(sel);
+			const isNodeSelection =
+				nodeId !== undefined &&
+				(selectedText === nodeId ||
+					findNodeOccurrenceRanges(model, source, nodeId).some(
+						({ start, end }) =>
+							start.line === sel.start.line + 1 &&
+							start.column === sel.start.character + 1 &&
+							end.line === sel.end.line + 1 &&
+							end.column === sel.end.character + 1,
+					));
+			if (nodeId && isNodeSelection) {
 				state.panel.webview.postMessage({
 					type: "focus",
-					nodeId: selectedText,
+					nodeId,
 				} satisfies MessageToWebview);
 			} else {
 				state.panel.webview.postMessage({

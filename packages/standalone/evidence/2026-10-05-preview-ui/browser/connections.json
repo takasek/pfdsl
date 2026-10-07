@@ -1,0 +1,119 @@
+[
+	{
+		"kind": ">>",
+		"mode": "existing",
+		"id": "lonely",
+		"expected": "lonely >> p",
+		"changed": "---\ntitle: Experience fixture\nartifact:\n  a:\n    label: Alpha\n  lonely:\n    label: Lonely\n  b:\n    label: Beta\nprocess:\n  p:\n    label: Prepare\n  q:\n    label: Qualify\n---\na >> p -> b\nb >>? p\nlonely >> p\nb >> q -> c\nlonely\n",
+		"rendered": [
+			"\n\n\na\nAlpha\n",
+			"\n\n\np\nPrepare\n",
+			"\n\n\nb\nBeta\n",
+			"\n\n\nq\nQualify\n",
+			"\n\n\nc\n",
+			"\n\n\nlonely\nLonely\n"
+		],
+		"correctBody": true,
+		"oneUndoRestores": true,
+		"redoRestores": true,
+		"errors": []
+	},
+	{
+		"kind": "->",
+		"mode": "existing",
+		"id": "lonely",
+		"expected": "p -> lonely",
+		"changed": "---\ntitle: Experience fixture\nartifact:\n  a:\n    label: Alpha\n  lonely:\n    label: Lonely\n  b:\n    label: Beta\nprocess:\n  p:\n    label: Prepare\n  q:\n    label: Qualify\n---\na >> p -> b\nb >>? p\np -> lonely\nb >> q -> c\nlonely\n",
+		"rendered": [
+			"\n\n\na\nAlpha\n",
+			"\n\n\np\nPrepare\n",
+			"\n\n\nb\nBeta\n",
+			"\n\n\nq\nQualify\n",
+			"\n\n\nc\n",
+			"\n\n\nlonely\nLonely\n"
+		],
+		"correctBody": true,
+		"oneUndoRestores": true,
+		"redoRestores": true,
+		"errors": []
+	},
+	{
+		"kind": ">>?",
+		"mode": "existing",
+		"id": "lonely",
+		"expected": "lonely >>? p",
+		"changed": "---\ntitle: Experience fixture\nartifact:\n  a:\n    label: Alpha\n  lonely:\n    label: Lonely\n  b:\n    label: Beta\nprocess:\n  p:\n    label: Prepare\n  q:\n    label: Qualify\n---\na >> p -> b\nb >>? p\nlonely >>? p\nb >> q -> c\nlonely\n",
+		"rendered": [
+			"\n\n\na\nAlpha\n",
+			"\n\n\np\nPrepare\n",
+			"\n\n\nb\nBeta\n",
+			"\n\n\nq\nQualify\n",
+			"\n\n\nc\n",
+			"\n\n\nlonely\nLonely\n"
+		],
+		"correctBody": true,
+		"oneUndoRestores": true,
+		"redoRestores": true,
+		"errors": []
+	},
+	{
+		"kind": ">>",
+		"mode": "new",
+		"id": "incoming",
+		"expected": "incoming >> p",
+		"changed": "---\ntitle: Experience fixture\nartifact:\n  a:\n    label: Alpha\n  lonely:\n    label: Lonely\n  b:\n    label: Beta\nprocess:\n  p:\n    label: Prepare\n  q:\n    label: Qualify\n---\na >> p -> b\nb >>? p\nincoming >> p\nb >> q -> c\nlonely\n",
+		"rendered": [
+			"\n\n\na\nAlpha\n",
+			"\n\n\np\nPrepare\n",
+			"\n\n\nb\nBeta\n",
+			"\n\n\nq\nQualify\n",
+			"\n\n\nc\n",
+			"\n\n\nincoming\n",
+			"\n\n\nlonely\nLonely\n"
+		],
+		"correctBody": true,
+		"oneUndoRestores": true,
+		"redoRestores": true,
+		"errors": []
+	},
+	{
+		"kind": "->",
+		"mode": "new",
+		"id": "outgoing",
+		"expected": "p -> outgoing",
+		"changed": "---\ntitle: Experience fixture\nartifact:\n  a:\n    label: Alpha\n  lonely:\n    label: Lonely\n  b:\n    label: Beta\nprocess:\n  p:\n    label: Prepare\n  q:\n    label: Qualify\n---\na >> p -> b\nb >>? p\np -> outgoing\nb >> q -> c\nlonely\n",
+		"rendered": [
+			"\n\n\na\nAlpha\n",
+			"\n\n\np\nPrepare\n",
+			"\n\n\nb\nBeta\n",
+			"\n\n\nq\nQualify\n",
+			"\n\n\nc\n",
+			"\n\n\nlonely\nLonely\n",
+			"\n\n\noutgoing\n"
+		],
+		"correctBody": true,
+		"oneUndoRestores": true,
+		"redoRestores": true,
+		"errors": []
+	},
+	{
+		"kind": ">>?",
+		"mode": "new",
+		"id": "feedback",
+		"expected": "feedback >>? p",
+		"changed": "---\ntitle: Experience fixture\nartifact:\n  a:\n    label: Alpha\n  lonely:\n    label: Lonely\n  b:\n    label: Beta\nprocess:\n  p:\n    label: Prepare\n  q:\n    label: Qualify\n---\na >> p -> b\nb >>? p\nfeedback >>? p\nb >> q -> c\nlonely\n",
+		"rendered": [
+			"\n\n\na\nAlpha\n",
+			"\n\n\np\nPrepare\n",
+			"\n\n\nb\nBeta\n",
+			"\n\n\nq\nQualify\n",
+			"\n\n\nc\n",
+			"\n\n\nfeedback\n",
+			"\n\n\nlonely\nLonely\n"
+		],
+		"correctBody": true,
+		"oneUndoRestores": true,
+		"redoRestores": true,
+		"errors": []
+	}
+]

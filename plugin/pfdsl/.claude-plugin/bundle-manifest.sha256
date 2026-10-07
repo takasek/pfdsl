@@ -42,7 +42,7 @@ ac6f9e9959367f8d63561cef333cb4bf42ae18d8cbf1a8879651e95ea71bfd84  skills/pfd-ops
 
 50e114f0721dee90dc29d87a421e27cd5547dd7f50f0bf0478859c09a3c216b9  skills/pfd-ops/install/scripts/pfdsl/lib/github-rest.mjs
 
-f552eacff51d2e57e6a26078e4dd6f0d571131544124dca00fc21babc1e234ae  skills/pfd-ops/install/scripts/pfdsl/lib/issues-flow-audit.mjs
+4c805c89a3888800aa458b6edd322f1bbcc2446aa49bb1035395be3571e95c65  skills/pfd-ops/install/scripts/pfdsl/lib/issues-flow-audit.mjs
 
 0c315f0afc41f21ee0b4914131159b85064b3a39ea633c5b695498c6c41c427e  skills/pfd-ops/install/scripts/pfdsl/lib/proxy-fetch-worker.mjs
 
@@ -100,7 +100,7 @@ c8a84302faab507a4fadfee9ae2d06c4ac89dc64e29dcd7025a65ceebe98162b  skills/pfd-ops
 
 5d946e545b1dd9f84f3f74953c2d3ccfc55cd7c169d3b5ae4040dff1b4e62a26  skills/pfd-upstream-report/SKILL.md
 
-407662c9df52c936af1a2da5634718955e384d9301f4e7fd11ff721abc8b9cb9  skills/pfdsl/SKILL.md
+6fc103bd954c2457c73d1592b3c970bf30c049f0066821e28a8e8a886313e0ab  skills/pfdsl/SKILL.md
 
 cd3b49619550799898858fe1fec583816c00a335f3e70fa20fdfa8e1a2dc1a8d  skills/pfdsl/references/examples.md
 

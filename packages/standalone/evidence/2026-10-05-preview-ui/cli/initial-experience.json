@@ -1,0 +1,1295 @@
+{
+	"cli": "<checkout>/packages/cli/dist/cli.js",
+	"version": "0.1.0",
+	"fixture_root": "<temporary>/pfdsl-cli-experience-01a10a12-g815l29a",
+	"review_basis": [
+		"packages/cli/README.md:71-88",
+		"docs/migration-guide.md:72-80",
+		"CLI help and real CLI output"
+	],
+	"findings": [
+		{
+			"priority": "P2",
+			"title": "Recovery command does not quote filenames containing spaces",
+			"scenario": "Run meta set on a body-only artifact in team report.pfdsl, then copy the suggested meta create command into a shell.",
+			"observed": "The unquoted path splits into two arguments. meta create exits 2 with stderr: expected field=value, got 'output'. Source remains unchanged.",
+			"expected": "The displayed recovery command should be executable with the same file argument.",
+			"evidence_records": [
+				"spaced-path-meta-set-recovery",
+				"copied-spaced-path-recovery",
+				"quoted-spaced-path-recovery",
+				"spaced-path-meta-set-retry"
+			],
+			"source_anchor": "Implementation source deliberately not inspected; observe report.md lines 7-12 and evidence.json records named above."
+		}
+	],
+	"totals": {
+		"scenarios": 28,
+		"passed": 27,
+		"failed": 1
+	},
+	"scenarios": [
+		{
+			"name": "existing meta set reports body-only recovery",
+			"record": "body-only-meta-set-recovery",
+			"passed": true,
+			"assertions": {
+				"refused": true,
+				"JSON recovery": true,
+				"source retained": true
+			}
+		},
+		{
+			"name": "artifact preview keeps file and complete values",
+			"record": "artifact-preview-json",
+			"passed": true,
+			"assertions": {
+				"exit 0": true,
+				"kind artifact": true,
+				"created true written false": true,
+				"complete output": true,
+				"source retained": true,
+				"comma and equals retained": true
+			}
+		},
+		{
+			"name": "text preview matches JSON preview",
+			"record": "artifact-preview-text",
+			"passed": true,
+			"assertions": {
+				"exit 0": true,
+				"source retained": true,
+				"same preview": true
+			}
+		},
+		{
+			"name": "artifact write preserves authored source",
+			"record": "artifact-write-json",
+			"passed": true,
+			"assertions": {
+				"exit 0": true,
+				"created written true": true,
+				"no preview payload": true,
+				"exact preview written": true,
+				"original comment and quoting": true,
+				"folded breaks retained": true,
+				"only CRLF": true
+			}
+		},
+		{
+			"name": "reader exposes exact initial fields",
+			"record": "read-created-artifact",
+			"passed": true,
+			"assertions": {
+				"exit 0": true,
+				"value retained": true
+			}
+		},
+		{
+			"name": "body process inferred and created",
+			"record": "body-only-process-create",
+			"passed": true,
+			"assertions": {
+				"exit 0": true,
+				"kind process": true,
+				"written": true,
+				"source includes values": true
+			}
+		},
+		{
+			"name": "meta set recovers after explicit creation",
+			"record": "retry-existing-meta-set",
+			"passed": true,
+			"assertions": {
+				"exit 0": true,
+				"label updated": true
+			}
+		},
+		{
+			"name": "final diagram validates in real checker",
+			"record": "check-final-roadmap",
+			"passed": true,
+			"assertions": {
+				"exit 0": true
+			}
+		},
+		{
+			"name": "existing-definition retains source",
+			"record": "existing-definition",
+			"passed": true,
+			"assertions": {
+				"refused": true,
+				"source retained": true
+			}
+		},
+		{
+			"name": "absent-node retains source",
+			"record": "absent-node",
+			"passed": true,
+			"assertions": {
+				"refused": true,
+				"source retained": true
+			}
+		},
+		{
+			"name": "missing-roadmap-status retains source",
+			"record": "missing-roadmap-status",
+			"passed": true,
+			"assertions": {
+				"refused": true,
+				"source retained": true
+			}
+		},
+		{
+			"name": "body-only source gets default process label",
+			"record": "body-only-no-frontmatter-process",
+			"passed": true,
+			"assertions": {
+				"exit 0": true,
+				"process inferred": true,
+				"default label": true,
+				"body retained": true
+			}
+		},
+		{
+			"name": "status outside roadmap is refused",
+			"record": "status-in-workflow",
+			"passed": true,
+			"assertions": {
+				"refused": true,
+				"source retained": true
+			}
+		},
+		{
+			"name": "ambiguous node role is refused without write",
+			"record": "ambiguous-role",
+			"passed": true,
+			"assertions": {
+				"refused": true,
+				"source retained": true
+			}
+		},
+		{
+			"name": "unsafe duplicate YAML retains source",
+			"record": "unsafe-duplicate-yaml",
+			"passed": true,
+			"assertions": {
+				"refused": true,
+				"source retained": true
+			}
+		},
+		{
+			"name": "isolated-unknown-field",
+			"record": "isolated-unknown-field",
+			"passed": true,
+			"assertions": {
+				"exit 2": true,
+				"JSON error": true,
+				"source retained": true
+			}
+		},
+		{
+			"name": "isolated-wrong-kind-with-allow-unknown",
+			"record": "isolated-wrong-kind-with-allow-unknown",
+			"passed": true,
+			"assertions": {
+				"exit 2": true,
+				"JSON error": true,
+				"source retained": true
+			}
+		},
+		{
+			"name": "isolated-invalid-status",
+			"record": "isolated-invalid-status",
+			"passed": true,
+			"assertions": {
+				"exit 2": true,
+				"JSON error": true,
+				"source retained": true
+			}
+		},
+		{
+			"name": "isolated-duplicate-field",
+			"record": "isolated-duplicate-field",
+			"passed": true,
+			"assertions": {
+				"exit 2": true,
+				"JSON error": true,
+				"source retained": true
+			}
+		},
+		{
+			"name": "isolated-collection-field",
+			"record": "isolated-collection-field",
+			"passed": true,
+			"assertions": {
+				"exit 2": true,
+				"JSON error": true,
+				"source retained": true
+			}
+		},
+		{
+			"name": "isolated-process-status",
+			"record": "isolated-process-status",
+			"passed": true,
+			"assertions": {
+				"exit 2": true,
+				"JSON error": true,
+				"source retained": true
+			}
+		},
+		{
+			"name": "explicit extension scalar",
+			"record": "isolated-extension",
+			"passed": true,
+			"assertions": {
+				"exit 0": true,
+				"written": true,
+				"field created": true
+			}
+		},
+		{
+			"name": "extension date remains string",
+			"record": "read-extension",
+			"passed": true,
+			"assertions": {
+				"exit 0": true,
+				"exact scalar": true
+			}
+		},
+		{
+			"name": "default artifact label with no existing frontmatter",
+			"record": "no-frontmatter-artifact",
+			"passed": true,
+			"assertions": {
+				"exit 0": true,
+				"kind artifact": true,
+				"default label": true,
+				"body retained": true
+			}
+		},
+		{
+			"name": "text error reports on stderr",
+			"record": "text-error",
+			"passed": true,
+			"assertions": {
+				"exit 2": true,
+				"empty stdout": true,
+				"stderr message": true,
+				"source retained": true
+			}
+		},
+		{
+			"name": "copy-paste recovery works for a spaced filename",
+			"record": "copied-spaced-path-recovery",
+			"passed": false,
+			"assertions": {
+				"exit 0": false,
+				"definition written": false
+			}
+		},
+		{
+			"name": "quoted path workaround creates definition",
+			"record": "quoted-spaced-path-recovery",
+			"passed": true,
+			"assertions": {
+				"exit 0": true,
+				"written": true
+			}
+		},
+		{
+			"name": "meta set then updates spaced path",
+			"record": "spaced-path-meta-set-retry",
+			"passed": true,
+			"assertions": {
+				"exit 0": true,
+				"label written": true
+			}
+		}
+	],
+	"records": [
+		{
+			"name": "body-only-meta-set-recovery",
+			"argv": [
+				"/opt/homebrew/bin/node",
+				"<checkout>/packages/cli/dist/cli.js",
+				"meta",
+				"set",
+				"<temporary>/pfdsl-cli-experience-01a10a12-g815l29a/report-roadmap.pfdsl",
+				"report",
+				"label",
+				"Monthly report",
+				"--json"
+			],
+			"exit": 1,
+			"stdout": "{\"ok\":false,\"missing\":[],\"undefinedIds\":[{\"id\":\"report\",\"kind\":\"artifact\"}],\"error\":\"'report' has no frontmatter definition in <temporary>/pfdsl-cli-experience-01a10a12-g815l29a/report-roadmap.pfdsl. Run pfdsl meta create <temporary>/pfdsl-cli-experience-01a10a12-g815l29a/report-roadmap.pfdsl report status=todo --write before using meta set.\"}\n",
+			"stderr": "",
+			"source_unchanged": true,
+			"file": "<temporary>/pfdsl-cli-experience-01a10a12-g815l29a/report-roadmap.pfdsl",
+			"before": "---\r\ntitle: \"Monthly report\" # Keep title quoting.\r\ntype: roadmap\r\nartifact:\r\n  source:\r\n    label: 'Source material' # Keep input quoting.\r\n    status: done\r\n    description: >\r\n      Reviewed source material.\r\n      Includes all original tables.\r\n---\r\n# Body comment stays intact.\r\nsource >> compile -> report\r\n",
+			"after": "---\r\ntitle: \"Monthly report\" # Keep title quoting.\r\ntype: roadmap\r\nartifact:\r\n  source:\r\n    label: 'Source material' # Keep input quoting.\r\n    status: done\r\n    description: >\r\n      Reviewed source material.\r\n      Includes all original tables.\r\n---\r\n# Body comment stays intact.\r\nsource >> compile -> report\r\n",
+			"before_sha256": "5c666a55b4c7f0c707579cd4b675c47bb89db9a9f669958e964ddd1817bc96d0",
+			"after_sha256": "5c666a55b4c7f0c707579cd4b675c47bb89db9a9f669958e964ddd1817bc96d0",
+			"json": {
+				"ok": false,
+				"missing": [],
+				"undefinedIds": [
+					{
+						"id": "report",
+						"kind": "artifact"
+					}
+				],
+				"error": "'report' has no frontmatter definition in <temporary>/pfdsl-cli-experience-01a10a12-g815l29a/report-roadmap.pfdsl. Run pfdsl meta create <temporary>/pfdsl-cli-experience-01a10a12-g815l29a/report-roadmap.pfdsl report status=todo --write before using meta set."
+			}
+		},
+		{
+			"name": "artifact-preview-json",
+			"argv": [
+				"/opt/homebrew/bin/node",
+				"<checkout>/packages/cli/dist/cli.js",
+				"meta",
+				"create",
+				"<temporary>/pfdsl-cli-experience-01a10a12-g815l29a/report-roadmap.pfdsl",
+				"report",
+				"status=todo",
+				"label=Monthly, report = final",
+				"criteria=Reviewed, signed=accepted",
+				"--json"
+			],
+			"exit": 0,
+			"stdout": "{\"ok\":true,\"id\":\"report\",\"kind\":\"artifact\",\"created\":true,\"written\":false,\"line\":11,\"output\":\"---\\r\\ntitle: \\\"Monthly report\\\" # Keep title quoting.\\r\\ntype: roadmap\\r\\nartifact:\\r\\n  source:\\r\\n    label: 'Source material' # Keep input quoting.\\r\\n    status: done\\r\\n    description: >\\r\\n      Reviewed source material.\\r\\n      Includes all original tables.\\r\\n  report:\\r\\n    label: Monthly, report = final\\r\\n    status: todo\\r\\n    criteria: Reviewed, signed=accepted\\r\\n---\\r\\n# Body comment stays intact.\\r\\nsource >> compile -> report\\r\\n\"}\n",
+			"stderr": "",
+			"source_unchanged": true,
+			"file": "<temporary>/pfdsl-cli-experience-01a10a12-g815l29a/report-roadmap.pfdsl",
+			"before": "---\r\ntitle: \"Monthly report\" # Keep title quoting.\r\ntype: roadmap\r\nartifact:\r\n  source:\r\n    label: 'Source material' # Keep input quoting.\r\n    status: done\r\n    description: >\r\n      Reviewed source material.\r\n      Includes all original tables.\r\n---\r\n# Body comment stays intact.\r\nsource >> compile -> report\r\n",
+			"after": "---\r\ntitle: \"Monthly report\" # Keep title quoting.\r\ntype: roadmap\r\nartifact:\r\n  source:\r\n    label: 'Source material' # Keep input quoting.\r\n    status: done\r\n    description: >\r\n      Reviewed source material.\r\n      Includes all original tables.\r\n---\r\n# Body comment stays intact.\r\nsource >> compile -> report\r\n",
+			"before_sha256": "5c666a55b4c7f0c707579cd4b675c47bb89db9a9f669958e964ddd1817bc96d0",
+			"after_sha256": "5c666a55b4c7f0c707579cd4b675c47bb89db9a9f669958e964ddd1817bc96d0",
+			"json": {
+				"ok": true,
+				"id": "report",
+				"kind": "artifact",
+				"created": true,
+				"written": false,
+				"line": 11,
+				"output": "---\r\ntitle: \"Monthly report\" # Keep title quoting.\r\ntype: roadmap\r\nartifact:\r\n  source:\r\n    label: 'Source material' # Keep input quoting.\r\n    status: done\r\n    description: >\r\n      Reviewed source material.\r\n      Includes all original tables.\r\n  report:\r\n    label: Monthly, report = final\r\n    status: todo\r\n    criteria: Reviewed, signed=accepted\r\n---\r\n# Body comment stays intact.\r\nsource >> compile -> report\r\n"
+			}
+		},
+		{
+			"name": "artifact-preview-text",
+			"argv": [
+				"/opt/homebrew/bin/node",
+				"<checkout>/packages/cli/dist/cli.js",
+				"meta",
+				"create",
+				"<temporary>/pfdsl-cli-experience-01a10a12-g815l29a/report-roadmap.pfdsl",
+				"report",
+				"status=todo",
+				"label=Monthly, report = final",
+				"criteria=Reviewed, signed=accepted"
+			],
+			"exit": 0,
+			"stdout": "---\ntitle: \"Monthly report\" # Keep title quoting.\ntype: roadmap\nartifact:\n  source:\n    label: 'Source material' # Keep input quoting.\n    status: done\n    description: >\n      Reviewed source material.\n      Includes all original tables.\n  report:\n    label: Monthly, report = final\n    status: todo\n    criteria: Reviewed, signed=accepted\n---\n# Body comment stays intact.\nsource >> compile -> report\n",
+			"stderr": "",
+			"source_unchanged": true,
+			"file": "<temporary>/pfdsl-cli-experience-01a10a12-g815l29a/report-roadmap.pfdsl",
+			"before": "---\r\ntitle: \"Monthly report\" # Keep title quoting.\r\ntype: roadmap\r\nartifact:\r\n  source:\r\n    label: 'Source material' # Keep input quoting.\r\n    status: done\r\n    description: >\r\n      Reviewed source material.\r\n      Includes all original tables.\r\n---\r\n# Body comment stays intact.\r\nsource >> compile -> report\r\n",
+			"after": "---\r\ntitle: \"Monthly report\" # Keep title quoting.\r\ntype: roadmap\r\nartifact:\r\n  source:\r\n    label: 'Source material' # Keep input quoting.\r\n    status: done\r\n    description: >\r\n      Reviewed source material.\r\n      Includes all original tables.\r\n---\r\n# Body comment stays intact.\r\nsource >> compile -> report\r\n",
+			"before_sha256": "5c666a55b4c7f0c707579cd4b675c47bb89db9a9f669958e964ddd1817bc96d0",
+			"after_sha256": "5c666a55b4c7f0c707579cd4b675c47bb89db9a9f669958e964ddd1817bc96d0"
+		},
+		{
+			"name": "artifact-write-json",
+			"argv": [
+				"/opt/homebrew/bin/node",
+				"<checkout>/packages/cli/dist/cli.js",
+				"meta",
+				"create",
+				"<temporary>/pfdsl-cli-experience-01a10a12-g815l29a/report-roadmap.pfdsl",
+				"report",
+				"status=todo",
+				"label=Monthly, report = final",
+				"criteria=Reviewed, signed=accepted",
+				"--write",
+				"--json"
+			],
+			"exit": 0,
+			"stdout": "{\"ok\":true,\"id\":\"report\",\"kind\":\"artifact\",\"created\":true,\"written\":true,\"line\":11}\n",
+			"stderr": "",
+			"source_unchanged": false,
+			"file": "<temporary>/pfdsl-cli-experience-01a10a12-g815l29a/report-roadmap.pfdsl",
+			"before": "---\r\ntitle: \"Monthly report\" # Keep title quoting.\r\ntype: roadmap\r\nartifact:\r\n  source:\r\n    label: 'Source material' # Keep input quoting.\r\n    status: done\r\n    description: >\r\n      Reviewed source material.\r\n      Includes all original tables.\r\n---\r\n# Body comment stays intact.\r\nsource >> compile -> report\r\n",
+			"after": "---\r\ntitle: \"Monthly report\" # Keep title quoting.\r\ntype: roadmap\r\nartifact:\r\n  source:\r\n    label: 'Source material' # Keep input quoting.\r\n    status: done\r\n    description: >\r\n      Reviewed source material.\r\n      Includes all original tables.\r\n  report:\r\n    label: Monthly, report = final\r\n    status: todo\r\n    criteria: Reviewed, signed=accepted\r\n---\r\n# Body comment stays intact.\r\nsource >> compile -> report\r\n",
+			"before_sha256": "5c666a55b4c7f0c707579cd4b675c47bb89db9a9f669958e964ddd1817bc96d0",
+			"after_sha256": "64052b9309f9428ca98dcd22cf290dfa63d184348a2cfe9a0d9beb6d2a032054",
+			"json": {
+				"ok": true,
+				"id": "report",
+				"kind": "artifact",
+				"created": true,
+				"written": true,
+				"line": 11
+			}
+		},
+		{
+			"name": "read-created-artifact",
+			"argv": [
+				"/opt/homebrew/bin/node",
+				"<checkout>/packages/cli/dist/cli.js",
+				"meta",
+				"get",
+				"<temporary>/pfdsl-cli-experience-01a10a12-g815l29a/report-roadmap.pfdsl",
+				"report",
+				"label,criteria,status",
+				"--json"
+			],
+			"exit": 0,
+			"stdout": "{\"ok\":true,\"values\":{\"report\":{\"label\":\"Monthly, report = final\",\"criteria\":\"Reviewed, signed=accepted\",\"status\":\"todo\"}}}\n",
+			"stderr": "",
+			"source_unchanged": true,
+			"file": "<temporary>/pfdsl-cli-experience-01a10a12-g815l29a/report-roadmap.pfdsl",
+			"before": "---\r\ntitle: \"Monthly report\" # Keep title quoting.\r\ntype: roadmap\r\nartifact:\r\n  source:\r\n    label: 'Source material' # Keep input quoting.\r\n    status: done\r\n    description: >\r\n      Reviewed source material.\r\n      Includes all original tables.\r\n  report:\r\n    label: Monthly, report = final\r\n    status: todo\r\n    criteria: Reviewed, signed=accepted\r\n---\r\n# Body comment stays intact.\r\nsource >> compile -> report\r\n",
+			"after": "---\r\ntitle: \"Monthly report\" # Keep title quoting.\r\ntype: roadmap\r\nartifact:\r\n  source:\r\n    label: 'Source material' # Keep input quoting.\r\n    status: done\r\n    description: >\r\n      Reviewed source material.\r\n      Includes all original tables.\r\n  report:\r\n    label: Monthly, report = final\r\n    status: todo\r\n    criteria: Reviewed, signed=accepted\r\n---\r\n# Body comment stays intact.\r\nsource >> compile -> report\r\n",
+			"before_sha256": "64052b9309f9428ca98dcd22cf290dfa63d184348a2cfe9a0d9beb6d2a032054",
+			"after_sha256": "64052b9309f9428ca98dcd22cf290dfa63d184348a2cfe9a0d9beb6d2a032054",
+			"json": {
+				"ok": true,
+				"values": {
+					"report": {
+						"label": "Monthly, report = final",
+						"criteria": "Reviewed, signed=accepted",
+						"status": "todo"
+					}
+				}
+			}
+		},
+		{
+			"name": "body-only-process-create",
+			"argv": [
+				"/opt/homebrew/bin/node",
+				"<checkout>/packages/cli/dist/cli.js",
+				"meta",
+				"create",
+				"<temporary>/pfdsl-cli-experience-01a10a12-g815l29a/report-roadmap.pfdsl",
+				"compile",
+				"label=Compile report",
+				"command=tool --mode=preview",
+				"owner=Research, QA",
+				"index=2",
+				"--write",
+				"--json"
+			],
+			"exit": 0,
+			"stdout": "{\"ok\":true,\"id\":\"compile\",\"kind\":\"process\",\"created\":true,\"written\":true,\"line\":16}\n",
+			"stderr": "",
+			"source_unchanged": false,
+			"file": "<temporary>/pfdsl-cli-experience-01a10a12-g815l29a/report-roadmap.pfdsl",
+			"before": "---\r\ntitle: \"Monthly report\" # Keep title quoting.\r\ntype: roadmap\r\nartifact:\r\n  source:\r\n    label: 'Source material' # Keep input quoting.\r\n    status: done\r\n    description: >\r\n      Reviewed source material.\r\n      Includes all original tables.\r\n  report:\r\n    label: Monthly, report = final\r\n    status: todo\r\n    criteria: Reviewed, signed=accepted\r\n---\r\n# Body comment stays intact.\r\nsource >> compile -> report\r\n",
+			"after": "---\r\ntitle: \"Monthly report\" # Keep title quoting.\r\ntype: roadmap\r\nartifact:\r\n  source:\r\n    label: 'Source material' # Keep input quoting.\r\n    status: done\r\n    description: >\r\n      Reviewed source material.\r\n      Includes all original tables.\r\n  report:\r\n    label: Monthly, report = final\r\n    status: todo\r\n    criteria: Reviewed, signed=accepted\r\nprocess:\r\n  compile:\r\n    label: Compile report\r\n    command: tool --mode=preview\r\n    owner: Research, QA\r\n    index: 2\r\n---\r\n# Body comment stays intact.\r\nsource >> compile -> report\r\n",
+			"before_sha256": "64052b9309f9428ca98dcd22cf290dfa63d184348a2cfe9a0d9beb6d2a032054",
+			"after_sha256": "87b281f9dbd9e5fccfc93a2e4931205dad050fbedad862d3e66fab5ece78da4a",
+			"json": {
+				"ok": true,
+				"id": "compile",
+				"kind": "process",
+				"created": true,
+				"written": true,
+				"line": 16
+			}
+		},
+		{
+			"name": "retry-existing-meta-set",
+			"argv": [
+				"/opt/homebrew/bin/node",
+				"<checkout>/packages/cli/dist/cli.js",
+				"meta",
+				"set",
+				"<temporary>/pfdsl-cli-experience-01a10a12-g815l29a/report-roadmap.pfdsl",
+				"report",
+				"label",
+				"Approved report",
+				"--json"
+			],
+			"exit": 0,
+			"stdout": "{\"ok\":true,\"newlyReady\":[]}\n",
+			"stderr": "",
+			"source_unchanged": false,
+			"file": "<temporary>/pfdsl-cli-experience-01a10a12-g815l29a/report-roadmap.pfdsl",
+			"before": "---\r\ntitle: \"Monthly report\" # Keep title quoting.\r\ntype: roadmap\r\nartifact:\r\n  source:\r\n    label: 'Source material' # Keep input quoting.\r\n    status: done\r\n    description: >\r\n      Reviewed source material.\r\n      Includes all original tables.\r\n  report:\r\n    label: Monthly, report = final\r\n    status: todo\r\n    criteria: Reviewed, signed=accepted\r\nprocess:\r\n  compile:\r\n    label: Compile report\r\n    command: tool --mode=preview\r\n    owner: Research, QA\r\n    index: 2\r\n---\r\n# Body comment stays intact.\r\nsource >> compile -> report\r\n",
+			"after": "---\r\ntitle: \"Monthly report\" # Keep title quoting.\r\ntype: roadmap\r\nartifact:\r\n  source:\r\n    label: 'Source material' # Keep input quoting.\r\n    status: done\r\n    description: >\r\n      Reviewed source material.\r\n      Includes all original tables.\r\n  report:\r\n    label: Approved report\r\n    status: todo\r\n    criteria: Reviewed, signed=accepted\r\nprocess:\r\n  compile:\r\n    label: Compile report\r\n    command: tool --mode=preview\r\n    owner: Research, QA\r\n    index: 2\r\n---\r\n# Body comment stays intact.\r\nsource >> compile -> report\r\n",
+			"before_sha256": "87b281f9dbd9e5fccfc93a2e4931205dad050fbedad862d3e66fab5ece78da4a",
+			"after_sha256": "244559c6e96285d9b5edb6836be0b45d2c886ec9d9c652d727489064c64316e1",
+			"json": {
+				"ok": true,
+				"newlyReady": []
+			}
+		},
+		{
+			"name": "check-final-roadmap",
+			"argv": [
+				"/opt/homebrew/bin/node",
+				"<checkout>/packages/cli/dist/cli.js",
+				"check",
+				"<temporary>/pfdsl-cli-experience-01a10a12-g815l29a/report-roadmap.pfdsl",
+				"--json"
+			],
+			"exit": 0,
+			"stdout": "{\"ok\":true,\"diagnostics\":[]}\n",
+			"stderr": "",
+			"source_unchanged": true,
+			"file": "<temporary>/pfdsl-cli-experience-01a10a12-g815l29a/report-roadmap.pfdsl",
+			"before": "---\r\ntitle: \"Monthly report\" # Keep title quoting.\r\ntype: roadmap\r\nartifact:\r\n  source:\r\n    label: 'Source material' # Keep input quoting.\r\n    status: done\r\n    description: >\r\n      Reviewed source material.\r\n      Includes all original tables.\r\n  report:\r\n    label: Approved report\r\n    status: todo\r\n    criteria: Reviewed, signed=accepted\r\nprocess:\r\n  compile:\r\n    label: Compile report\r\n    command: tool --mode=preview\r\n    owner: Research, QA\r\n    index: 2\r\n---\r\n# Body comment stays intact.\r\nsource >> compile -> report\r\n",
+			"after": "---\r\ntitle: \"Monthly report\" # Keep title quoting.\r\ntype: roadmap\r\nartifact:\r\n  source:\r\n    label: 'Source material' # Keep input quoting.\r\n    status: done\r\n    description: >\r\n      Reviewed source material.\r\n      Includes all original tables.\r\n  report:\r\n    label: Approved report\r\n    status: todo\r\n    criteria: Reviewed, signed=accepted\r\nprocess:\r\n  compile:\r\n    label: Compile report\r\n    command: tool --mode=preview\r\n    owner: Research, QA\r\n    index: 2\r\n---\r\n# Body comment stays intact.\r\nsource >> compile -> report\r\n",
+			"before_sha256": "244559c6e96285d9b5edb6836be0b45d2c886ec9d9c652d727489064c64316e1",
+			"after_sha256": "244559c6e96285d9b5edb6836be0b45d2c886ec9d9c652d727489064c64316e1",
+			"json": {
+				"ok": true,
+				"diagnostics": []
+			}
+		},
+		{
+			"name": "existing-definition",
+			"argv": [
+				"/opt/homebrew/bin/node",
+				"<checkout>/packages/cli/dist/cli.js",
+				"meta",
+				"create",
+				"<temporary>/pfdsl-cli-experience-01a10a12-g815l29a/report-roadmap.pfdsl",
+				"report",
+				"label=Overwrite attempt",
+				"--write",
+				"--json"
+			],
+			"exit": 1,
+			"stdout": "{\"ok\":false,\"error\":\"meta create: 'report' already has a frontmatter definition in <temporary>/pfdsl-cli-experience-01a10a12-g815l29a/report-roadmap.pfdsl\"}\n",
+			"stderr": "",
+			"source_unchanged": true,
+			"file": "<temporary>/pfdsl-cli-experience-01a10a12-g815l29a/report-roadmap.pfdsl",
+			"before": "---\r\ntitle: \"Monthly report\" # Keep title quoting.\r\ntype: roadmap\r\nartifact:\r\n  source:\r\n    label: 'Source material' # Keep input quoting.\r\n    status: done\r\n    description: >\r\n      Reviewed source material.\r\n      Includes all original tables.\r\n  report:\r\n    label: Approved report\r\n    status: todo\r\n    criteria: Reviewed, signed=accepted\r\nprocess:\r\n  compile:\r\n    label: Compile report\r\n    command: tool --mode=preview\r\n    owner: Research, QA\r\n    index: 2\r\n---\r\n# Body comment stays intact.\r\nsource >> compile -> report\r\n",
+			"after": "---\r\ntitle: \"Monthly report\" # Keep title quoting.\r\ntype: roadmap\r\nartifact:\r\n  source:\r\n    label: 'Source material' # Keep input quoting.\r\n    status: done\r\n    description: >\r\n      Reviewed source material.\r\n      Includes all original tables.\r\n  report:\r\n    label: Approved report\r\n    status: todo\r\n    criteria: Reviewed, signed=accepted\r\nprocess:\r\n  compile:\r\n    label: Compile report\r\n    command: tool --mode=preview\r\n    owner: Research, QA\r\n    index: 2\r\n---\r\n# Body comment stays intact.\r\nsource >> compile -> report\r\n",
+			"before_sha256": "244559c6e96285d9b5edb6836be0b45d2c886ec9d9c652d727489064c64316e1",
+			"after_sha256": "244559c6e96285d9b5edb6836be0b45d2c886ec9d9c652d727489064c64316e1",
+			"json": {
+				"ok": false,
+				"error": "meta create: 'report' already has a frontmatter definition in <temporary>/pfdsl-cli-experience-01a10a12-g815l29a/report-roadmap.pfdsl"
+			}
+		},
+		{
+			"name": "absent-node",
+			"argv": [
+				"/opt/homebrew/bin/node",
+				"<checkout>/packages/cli/dist/cli.js",
+				"meta",
+				"create",
+				"<temporary>/pfdsl-cli-experience-01a10a12-g815l29a/report-roadmap.pfdsl",
+				"ghost",
+				"label=Unknown",
+				"--write",
+				"--json"
+			],
+			"exit": 1,
+			"stdout": "{\"ok\":false,\"error\":\"meta create: id 'ghost' not found in <temporary>/pfdsl-cli-experience-01a10a12-g815l29a/report-roadmap.pfdsl\"}\n",
+			"stderr": "",
+			"source_unchanged": true,
+			"file": "<temporary>/pfdsl-cli-experience-01a10a12-g815l29a/report-roadmap.pfdsl",
+			"before": "---\r\ntitle: \"Monthly report\" # Keep title quoting.\r\ntype: roadmap\r\nartifact:\r\n  source:\r\n    label: 'Source material' # Keep input quoting.\r\n    status: done\r\n    description: >\r\n      Reviewed source material.\r\n      Includes all original tables.\r\n  report:\r\n    label: Approved report\r\n    status: todo\r\n    criteria: Reviewed, signed=accepted\r\nprocess:\r\n  compile:\r\n    label: Compile report\r\n    command: tool --mode=preview\r\n    owner: Research, QA\r\n    index: 2\r\n---\r\n# Body comment stays intact.\r\nsource >> compile -> report\r\n",
+			"after": "---\r\ntitle: \"Monthly report\" # Keep title quoting.\r\ntype: roadmap\r\nartifact:\r\n  source:\r\n    label: 'Source material' # Keep input quoting.\r\n    status: done\r\n    description: >\r\n      Reviewed source material.\r\n      Includes all original tables.\r\n  report:\r\n    label: Approved report\r\n    status: todo\r\n    criteria: Reviewed, signed=accepted\r\nprocess:\r\n  compile:\r\n    label: Compile report\r\n    command: tool --mode=preview\r\n    owner: Research, QA\r\n    index: 2\r\n---\r\n# Body comment stays intact.\r\nsource >> compile -> report\r\n",
+			"before_sha256": "244559c6e96285d9b5edb6836be0b45d2c886ec9d9c652d727489064c64316e1",
+			"after_sha256": "244559c6e96285d9b5edb6836be0b45d2c886ec9d9c652d727489064c64316e1",
+			"json": {
+				"ok": false,
+				"error": "meta create: id 'ghost' not found in <temporary>/pfdsl-cli-experience-01a10a12-g815l29a/report-roadmap.pfdsl"
+			}
+		},
+		{
+			"name": "missing-roadmap-status",
+			"argv": [
+				"/opt/homebrew/bin/node",
+				"<checkout>/packages/cli/dist/cli.js",
+				"meta",
+				"create",
+				"<temporary>/pfdsl-cli-experience-01a10a12-g815l29a/fresh-roadmap.pfdsl",
+				"output",
+				"criteria=Reviewed",
+				"--write",
+				"--json"
+			],
+			"exit": 1,
+			"stdout": "{\"ok\":false,\"error\":\"meta create: refusing to write <temporary>/pfdsl-cli-experience-01a10a12-g815l29a/fresh-roadmap.pfdsl: the result would have errors; nothing was written\",\"diagnostics\":[{\"severity\":\"error\",\"code\":\"V035\",\"message\":\"Artifact 'output' appears on an edge but its frontmatter declaration has no 'status' field\",\"range\":{\"start\":{\"offset\":73,\"line\":7,\"column\":3},\"end\":{\"offset\":79,\"line\":7,\"column\":9}}}]}\n",
+			"stderr": "",
+			"source_unchanged": true,
+			"file": "<temporary>/pfdsl-cli-experience-01a10a12-g815l29a/fresh-roadmap.pfdsl",
+			"before": "---\ntype: roadmap\nartifact:\n  input:\n    label: Input\n    status: done\n---\ninput >> build -> output\n",
+			"after": "---\ntype: roadmap\nartifact:\n  input:\n    label: Input\n    status: done\n---\ninput >> build -> output\n",
+			"before_sha256": "8d27949923533cff6768e8b206fb6879c759b9a16fae87015b0e56d4608d1c80",
+			"after_sha256": "8d27949923533cff6768e8b206fb6879c759b9a16fae87015b0e56d4608d1c80",
+			"json": {
+				"ok": false,
+				"error": "meta create: refusing to write <temporary>/pfdsl-cli-experience-01a10a12-g815l29a/fresh-roadmap.pfdsl: the result would have errors; nothing was written",
+				"diagnostics": [
+					{
+						"severity": "error",
+						"code": "V035",
+						"message": "Artifact 'output' appears on an edge but its frontmatter declaration has no 'status' field",
+						"range": {
+							"start": {
+								"offset": 73,
+								"line": 7,
+								"column": 3
+							},
+							"end": {
+								"offset": 79,
+								"line": 7,
+								"column": 9
+							}
+						}
+					}
+				]
+			}
+		},
+		{
+			"name": "body-only-no-frontmatter-process",
+			"argv": [
+				"/opt/homebrew/bin/node",
+				"<checkout>/packages/cli/dist/cli.js",
+				"meta",
+				"create",
+				"<temporary>/pfdsl-cli-experience-01a10a12-g815l29a/body-only.pfdsl",
+				"build",
+				"--write",
+				"--json"
+			],
+			"exit": 0,
+			"stdout": "{\"ok\":true,\"id\":\"build\",\"kind\":\"process\",\"created\":true,\"written\":true,\"line\":3}\n",
+			"stderr": "",
+			"source_unchanged": false,
+			"file": "<temporary>/pfdsl-cli-experience-01a10a12-g815l29a/body-only.pfdsl",
+			"before": "source >> build -> package\n",
+			"after": "---\nprocess:\n  build:\n    label: build\n---\nsource >> build -> package\n",
+			"before_sha256": "3e1c90537d9ee2d925f42943e0f4b6b29ace7e3e0b369088b586da4ebacc3b03",
+			"after_sha256": "2a1b27c6eb38afd5aceb3477c894e140bf6fc01b7c2b8e289c07168ac09474ae",
+			"json": {
+				"ok": true,
+				"id": "build",
+				"kind": "process",
+				"created": true,
+				"written": true,
+				"line": 3
+			}
+		},
+		{
+			"name": "status-in-workflow",
+			"argv": [
+				"/opt/homebrew/bin/node",
+				"<checkout>/packages/cli/dist/cli.js",
+				"meta",
+				"create",
+				"<temporary>/pfdsl-cli-experience-01a10a12-g815l29a/workflow.pfdsl",
+				"output",
+				"status=todo",
+				"criteria=Reviewed",
+				"--write",
+				"--json"
+			],
+			"exit": 2,
+			"stdout": "{\"ok\":false,\"error\":\"meta create: setting status requires a roadmap file (type: roadmap). This file has type: workflow\"}\n",
+			"stderr": "",
+			"source_unchanged": true,
+			"file": "<temporary>/pfdsl-cli-experience-01a10a12-g815l29a/workflow.pfdsl",
+			"before": "---\ntype: workflow\n---\nsource >> build -> output\n",
+			"after": "---\ntype: workflow\n---\nsource >> build -> output\n",
+			"before_sha256": "c39bbe1ffaeda7cc6a01fa0a31510c9880937ab9f0bb2978ac635c02d50cb3f1",
+			"after_sha256": "c39bbe1ffaeda7cc6a01fa0a31510c9880937ab9f0bb2978ac635c02d50cb3f1",
+			"json": {
+				"ok": false,
+				"error": "meta create: setting status requires a roadmap file (type: roadmap). This file has type: workflow"
+			}
+		},
+		{
+			"name": "ambiguous-role",
+			"argv": [
+				"/opt/homebrew/bin/node",
+				"<checkout>/packages/cli/dist/cli.js",
+				"meta",
+				"create",
+				"<temporary>/pfdsl-cli-experience-01a10a12-g815l29a/ambiguous-role.pfdsl",
+				"mixed",
+				"label=Mixed role",
+				"--write",
+				"--json"
+			],
+			"exit": 1,
+			"stdout": "{\"ok\":false,\"error\":\"meta create: ambiguous node kind for 'mixed'; nothing was written\",\"diagnostics\":[{\"severity\":\"error\",\"code\":\"N002\",\"message\":\"'mixed' used as both artifact and process\",\"range\":{\"start\":{\"line\":1,\"column\":1,\"offset\":0},\"end\":{\"line\":1,\"column\":1,\"offset\":0}}}]}\n",
+			"stderr": "",
+			"source_unchanged": true,
+			"file": "<temporary>/pfdsl-cli-experience-01a10a12-g815l29a/ambiguous-role.pfdsl",
+			"before": "source >> mixed -> report\nmixed >> publish -> release\n",
+			"after": "source >> mixed -> report\nmixed >> publish -> release\n",
+			"before_sha256": "89a29c4fd3fca2d0ae2101b7c757ad291ae541828c4be7778649e059d07f80c2",
+			"after_sha256": "89a29c4fd3fca2d0ae2101b7c757ad291ae541828c4be7778649e059d07f80c2",
+			"json": {
+				"ok": false,
+				"error": "meta create: ambiguous node kind for 'mixed'; nothing was written",
+				"diagnostics": [
+					{
+						"severity": "error",
+						"code": "N002",
+						"message": "'mixed' used as both artifact and process",
+						"range": {
+							"start": {
+								"line": 1,
+								"column": 1,
+								"offset": 0
+							},
+							"end": {
+								"line": 1,
+								"column": 1,
+								"offset": 0
+							}
+						}
+					}
+				]
+			}
+		},
+		{
+			"name": "unsafe-duplicate-yaml",
+			"argv": [
+				"/opt/homebrew/bin/node",
+				"<checkout>/packages/cli/dist/cli.js",
+				"meta",
+				"create",
+				"<temporary>/pfdsl-cli-experience-01a10a12-g815l29a/unsafe-yaml.pfdsl",
+				"output",
+				"status=todo",
+				"criteria=Reviewed",
+				"--write",
+				"--json"
+			],
+			"exit": 1,
+			"stdout": "{\"ok\":false,\"error\":\"meta create: cannot parse frontmatter; nothing was written\",\"diagnostics\":[{\"severity\":\"error\",\"code\":\"FM002\",\"message\":\"Invalid YAML in front matter: Map keys must be unique at line 3, column 1:\\n\\nartifact: {}\\nartifact: {}\\n^\\n\",\"range\":{\"start\":{\"line\":2,\"column\":1,\"offset\":4},\"end\":{\"line\":2,\"column\":1,\"offset\":4}}}]}\n",
+			"stderr": "",
+			"source_unchanged": true,
+			"file": "<temporary>/pfdsl-cli-experience-01a10a12-g815l29a/unsafe-yaml.pfdsl",
+			"before": "---\ntype: roadmap\nartifact: {}\nartifact: {}\n---\nsource >> build -> output\n",
+			"after": "---\ntype: roadmap\nartifact: {}\nartifact: {}\n---\nsource >> build -> output\n",
+			"before_sha256": "27c8d267f522a30f3cb98f89a00ae485d6dd400a1b791dcf2cba8e66689096ad",
+			"after_sha256": "27c8d267f522a30f3cb98f89a00ae485d6dd400a1b791dcf2cba8e66689096ad",
+			"json": {
+				"ok": false,
+				"error": "meta create: cannot parse frontmatter; nothing was written",
+				"diagnostics": [
+					{
+						"severity": "error",
+						"code": "FM002",
+						"message": "Invalid YAML in front matter: Map keys must be unique at line 3, column 1:\n\nartifact: {}\nartifact: {}\n^\n",
+						"range": {
+							"start": {
+								"line": 2,
+								"column": 1,
+								"offset": 4
+							},
+							"end": {
+								"line": 2,
+								"column": 1,
+								"offset": 4
+							}
+						}
+					}
+				]
+			}
+		},
+		{
+			"name": "isolated-unknown-field",
+			"argv": [
+				"/opt/homebrew/bin/node",
+				"<checkout>/packages/cli/dist/cli.js",
+				"meta",
+				"create",
+				"<temporary>/pfdsl-cli-experience-01a10a12-g815l29a/isolated-unknown-field.pfdsl",
+				"output",
+				"status=todo",
+				"criteria=Reviewed",
+				"updated_at=2026-10-05",
+				"--write",
+				"--json"
+			],
+			"exit": 2,
+			"stdout": "{\"ok\":false,\"error\":\"meta create: unknown artifact field 'updated_at' (id: output); use --allow-unknown to add it\"}\n",
+			"stderr": "",
+			"file": "<temporary>/pfdsl-cli-experience-01a10a12-g815l29a/isolated-unknown-field.pfdsl",
+			"source_unchanged": true,
+			"before": "---\ntype: roadmap\nartifact:\n  input:\n    label: Input\n    status: done\n---\ninput >> build -> output\n",
+			"after": "---\ntype: roadmap\nartifact:\n  input:\n    label: Input\n    status: done\n---\ninput >> build -> output\n",
+			"before_sha256": "8d27949923533cff6768e8b206fb6879c759b9a16fae87015b0e56d4608d1c80",
+			"after_sha256": "8d27949923533cff6768e8b206fb6879c759b9a16fae87015b0e56d4608d1c80",
+			"json": {
+				"ok": false,
+				"error": "meta create: unknown artifact field 'updated_at' (id: output); use --allow-unknown to add it"
+			}
+		},
+		{
+			"name": "isolated-wrong-kind-with-allow-unknown",
+			"argv": [
+				"/opt/homebrew/bin/node",
+				"<checkout>/packages/cli/dist/cli.js",
+				"meta",
+				"create",
+				"<temporary>/pfdsl-cli-experience-01a10a12-g815l29a/isolated-wrong-kind-with-allow-unknown.pfdsl",
+				"output",
+				"status=todo",
+				"criteria=Reviewed",
+				"command=make report",
+				"--allow-unknown",
+				"--write",
+				"--json"
+			],
+			"exit": 2,
+			"stdout": "{\"ok\":false,\"error\":\"meta create: 'command' is not a valid artifact field (id: output)\"}\n",
+			"stderr": "",
+			"file": "<temporary>/pfdsl-cli-experience-01a10a12-g815l29a/isolated-wrong-kind-with-allow-unknown.pfdsl",
+			"source_unchanged": true,
+			"before": "---\ntype: roadmap\nartifact:\n  input:\n    label: Input\n    status: done\n---\ninput >> build -> output\n",
+			"after": "---\ntype: roadmap\nartifact:\n  input:\n    label: Input\n    status: done\n---\ninput >> build -> output\n",
+			"before_sha256": "8d27949923533cff6768e8b206fb6879c759b9a16fae87015b0e56d4608d1c80",
+			"after_sha256": "8d27949923533cff6768e8b206fb6879c759b9a16fae87015b0e56d4608d1c80",
+			"json": {
+				"ok": false,
+				"error": "meta create: 'command' is not a valid artifact field (id: output)"
+			}
+		},
+		{
+			"name": "isolated-invalid-status",
+			"argv": [
+				"/opt/homebrew/bin/node",
+				"<checkout>/packages/cli/dist/cli.js",
+				"meta",
+				"create",
+				"<temporary>/pfdsl-cli-experience-01a10a12-g815l29a/isolated-invalid-status.pfdsl",
+				"output",
+				"status=unknown",
+				"criteria=Reviewed",
+				"--write",
+				"--json"
+			],
+			"exit": 2,
+			"stdout": "{\"ok\":false,\"error\":\"meta create: invalid status 'unknown' (valid: done | wip | todo | waiting | suspended)\"}\n",
+			"stderr": "",
+			"file": "<temporary>/pfdsl-cli-experience-01a10a12-g815l29a/isolated-invalid-status.pfdsl",
+			"source_unchanged": true,
+			"before": "---\ntype: roadmap\nartifact:\n  input:\n    label: Input\n    status: done\n---\ninput >> build -> output\n",
+			"after": "---\ntype: roadmap\nartifact:\n  input:\n    label: Input\n    status: done\n---\ninput >> build -> output\n",
+			"before_sha256": "8d27949923533cff6768e8b206fb6879c759b9a16fae87015b0e56d4608d1c80",
+			"after_sha256": "8d27949923533cff6768e8b206fb6879c759b9a16fae87015b0e56d4608d1c80",
+			"json": {
+				"ok": false,
+				"error": "meta create: invalid status 'unknown' (valid: done | wip | todo | waiting | suspended)"
+			}
+		},
+		{
+			"name": "isolated-duplicate-field",
+			"argv": [
+				"/opt/homebrew/bin/node",
+				"<checkout>/packages/cli/dist/cli.js",
+				"meta",
+				"create",
+				"<temporary>/pfdsl-cli-experience-01a10a12-g815l29a/isolated-duplicate-field.pfdsl",
+				"output",
+				"status=todo",
+				"criteria=Reviewed",
+				"label=First",
+				"label=Second",
+				"--write",
+				"--json"
+			],
+			"exit": 2,
+			"stdout": "{\"ok\":false,\"error\":\"meta create: duplicate field 'label'\"}\n",
+			"stderr": "",
+			"file": "<temporary>/pfdsl-cli-experience-01a10a12-g815l29a/isolated-duplicate-field.pfdsl",
+			"source_unchanged": true,
+			"before": "---\ntype: roadmap\nartifact:\n  input:\n    label: Input\n    status: done\n---\ninput >> build -> output\n",
+			"after": "---\ntype: roadmap\nartifact:\n  input:\n    label: Input\n    status: done\n---\ninput >> build -> output\n",
+			"before_sha256": "8d27949923533cff6768e8b206fb6879c759b9a16fae87015b0e56d4608d1c80",
+			"after_sha256": "8d27949923533cff6768e8b206fb6879c759b9a16fae87015b0e56d4608d1c80",
+			"json": {
+				"ok": false,
+				"error": "meta create: duplicate field 'label'"
+			}
+		},
+		{
+			"name": "isolated-collection-field",
+			"argv": [
+				"/opt/homebrew/bin/node",
+				"<checkout>/packages/cli/dist/cli.js",
+				"meta",
+				"create",
+				"<temporary>/pfdsl-cli-experience-01a10a12-g815l29a/isolated-collection-field.pfdsl",
+				"output",
+				"status=todo",
+				"criteria=Reviewed",
+				"tags=reviewed,published",
+				"--allow-unknown",
+				"--write",
+				"--json"
+			],
+			"exit": 2,
+			"stdout": "{\"ok\":false,\"error\":\"meta create: 'tags' is not a scalar field\"}\n",
+			"stderr": "",
+			"file": "<temporary>/pfdsl-cli-experience-01a10a12-g815l29a/isolated-collection-field.pfdsl",
+			"source_unchanged": true,
+			"before": "---\ntype: roadmap\nartifact:\n  input:\n    label: Input\n    status: done\n---\ninput >> build -> output\n",
+			"after": "---\ntype: roadmap\nartifact:\n  input:\n    label: Input\n    status: done\n---\ninput >> build -> output\n",
+			"before_sha256": "8d27949923533cff6768e8b206fb6879c759b9a16fae87015b0e56d4608d1c80",
+			"after_sha256": "8d27949923533cff6768e8b206fb6879c759b9a16fae87015b0e56d4608d1c80",
+			"json": {
+				"ok": false,
+				"error": "meta create: 'tags' is not a scalar field"
+			}
+		},
+		{
+			"name": "isolated-process-status",
+			"argv": [
+				"/opt/homebrew/bin/node",
+				"<checkout>/packages/cli/dist/cli.js",
+				"meta",
+				"create",
+				"<temporary>/pfdsl-cli-experience-01a10a12-g815l29a/isolated-process-status.pfdsl",
+				"build",
+				"status=todo",
+				"--write",
+				"--json"
+			],
+			"exit": 2,
+			"stdout": "{\"ok\":false,\"error\":\"meta create: 'status' is not a valid process field (id: build)\"}\n",
+			"stderr": "",
+			"file": "<temporary>/pfdsl-cli-experience-01a10a12-g815l29a/isolated-process-status.pfdsl",
+			"source_unchanged": true,
+			"before": "---\ntype: roadmap\nartifact:\n  input:\n    label: Input\n    status: done\n---\ninput >> build -> output\n",
+			"after": "---\ntype: roadmap\nartifact:\n  input:\n    label: Input\n    status: done\n---\ninput >> build -> output\n",
+			"before_sha256": "8d27949923533cff6768e8b206fb6879c759b9a16fae87015b0e56d4608d1c80",
+			"after_sha256": "8d27949923533cff6768e8b206fb6879c759b9a16fae87015b0e56d4608d1c80",
+			"json": {
+				"ok": false,
+				"error": "meta create: 'status' is not a valid process field (id: build)"
+			}
+		},
+		{
+			"name": "isolated-extension",
+			"argv": [
+				"/opt/homebrew/bin/node",
+				"<checkout>/packages/cli/dist/cli.js",
+				"meta",
+				"create",
+				"<temporary>/pfdsl-cli-experience-01a10a12-g815l29a/isolated-extension.pfdsl",
+				"output",
+				"status=todo",
+				"criteria=Reviewed",
+				"updated_at=2026-10-05",
+				"--allow-unknown",
+				"--write",
+				"--json"
+			],
+			"exit": 0,
+			"stdout": "{\"ok\":true,\"id\":\"output\",\"kind\":\"artifact\",\"created\":true,\"written\":true,\"line\":7}\n",
+			"stderr": "",
+			"file": "<temporary>/pfdsl-cli-experience-01a10a12-g815l29a/isolated-extension.pfdsl",
+			"source_unchanged": false,
+			"before": "---\ntype: roadmap\nartifact:\n  input:\n    label: Input\n    status: done\n---\ninput >> build -> output\n",
+			"after": "---\ntype: roadmap\nartifact:\n  input:\n    label: Input\n    status: done\n  output:\n    label: output\n    status: todo\n    criteria: Reviewed\n    updated_at: 2026-10-05\n---\ninput >> build -> output\n",
+			"before_sha256": "8d27949923533cff6768e8b206fb6879c759b9a16fae87015b0e56d4608d1c80",
+			"after_sha256": "d8dce5dedd862c04cea5177c04f00f603eb0f8564590568467d4ad1f6fc0c3c5",
+			"json": {
+				"ok": true,
+				"id": "output",
+				"kind": "artifact",
+				"created": true,
+				"written": true,
+				"line": 7
+			}
+		},
+		{
+			"name": "read-extension",
+			"argv": [
+				"/opt/homebrew/bin/node",
+				"<checkout>/packages/cli/dist/cli.js",
+				"meta",
+				"get",
+				"<temporary>/pfdsl-cli-experience-01a10a12-g815l29a/isolated-extension.pfdsl",
+				"output",
+				"updated_at",
+				"--json"
+			],
+			"exit": 0,
+			"stdout": "{\"ok\":true,\"values\":{\"output\":{\"updated_at\":\"2026-10-05\"}}}\n",
+			"stderr": "warning: 'updated_at' is not a recognized field for 'output' (possible typo?)\n",
+			"file": "<temporary>/pfdsl-cli-experience-01a10a12-g815l29a/isolated-extension.pfdsl",
+			"source_unchanged": true,
+			"before": "---\ntype: roadmap\nartifact:\n  input:\n    label: Input\n    status: done\n  output:\n    label: output\n    status: todo\n    criteria: Reviewed\n    updated_at: 2026-10-05\n---\ninput >> build -> output\n",
+			"after": "---\ntype: roadmap\nartifact:\n  input:\n    label: Input\n    status: done\n  output:\n    label: output\n    status: todo\n    criteria: Reviewed\n    updated_at: 2026-10-05\n---\ninput >> build -> output\n",
+			"before_sha256": "d8dce5dedd862c04cea5177c04f00f603eb0f8564590568467d4ad1f6fc0c3c5",
+			"after_sha256": "d8dce5dedd862c04cea5177c04f00f603eb0f8564590568467d4ad1f6fc0c3c5",
+			"json": {
+				"ok": true,
+				"values": {
+					"output": {
+						"updated_at": "2026-10-05"
+					}
+				}
+			}
+		},
+		{
+			"name": "no-frontmatter-artifact",
+			"argv": [
+				"/opt/homebrew/bin/node",
+				"<checkout>/packages/cli/dist/cli.js",
+				"meta",
+				"create",
+				"<temporary>/pfdsl-cli-experience-01a10a12-g815l29a/no-frontmatter-artifact.pfdsl",
+				"source",
+				"--write",
+				"--json"
+			],
+			"exit": 0,
+			"stdout": "{\"ok\":true,\"id\":\"source\",\"kind\":\"artifact\",\"created\":true,\"written\":true,\"line\":3}\n",
+			"stderr": "",
+			"file": "<temporary>/pfdsl-cli-experience-01a10a12-g815l29a/no-frontmatter-artifact.pfdsl",
+			"source_unchanged": false,
+			"before": "source >> build -> package\n",
+			"after": "---\nartifact:\n  source:\n    label: source\n---\nsource >> build -> package\n",
+			"before_sha256": "3e1c90537d9ee2d925f42943e0f4b6b29ace7e3e0b369088b586da4ebacc3b03",
+			"after_sha256": "7b92434cf16d7234327b5163bd8b46b5662df225248c6eae2e7c77068a62fc00",
+			"json": {
+				"ok": true,
+				"id": "source",
+				"kind": "artifact",
+				"created": true,
+				"written": true,
+				"line": 3
+			}
+		},
+		{
+			"name": "text-error",
+			"argv": [
+				"/opt/homebrew/bin/node",
+				"<checkout>/packages/cli/dist/cli.js",
+				"meta",
+				"create",
+				"<temporary>/pfdsl-cli-experience-01a10a12-g815l29a/text-error.pfdsl",
+				"output",
+				"status=unknown",
+				"criteria=Reviewed",
+				"--write"
+			],
+			"exit": 2,
+			"stdout": "",
+			"stderr": "meta create: invalid status 'unknown' (valid: done | wip | todo | waiting | suspended)\n",
+			"file": "<temporary>/pfdsl-cli-experience-01a10a12-g815l29a/text-error.pfdsl",
+			"source_unchanged": true,
+			"before": "---\ntype: roadmap\nartifact:\n  input:\n    label: Input\n    status: done\n---\ninput >> build -> output\n",
+			"after": "---\ntype: roadmap\nartifact:\n  input:\n    label: Input\n    status: done\n---\ninput >> build -> output\n",
+			"before_sha256": "8d27949923533cff6768e8b206fb6879c759b9a16fae87015b0e56d4608d1c80",
+			"after_sha256": "8d27949923533cff6768e8b206fb6879c759b9a16fae87015b0e56d4608d1c80"
+		},
+		{
+			"name": "missing-criteria-observation",
+			"argv": [
+				"/opt/homebrew/bin/node",
+				"<checkout>/packages/cli/dist/cli.js",
+				"meta",
+				"create",
+				"<temporary>/pfdsl-cli-experience-01a10a12-g815l29a/missing-criteria-observation.pfdsl",
+				"output",
+				"status=todo",
+				"--write",
+				"--json"
+			],
+			"exit": 0,
+			"stdout": "{\"ok\":true,\"id\":\"output\",\"kind\":\"artifact\",\"created\":true,\"written\":true,\"line\":7}\n",
+			"stderr": "",
+			"file": "<temporary>/pfdsl-cli-experience-01a10a12-g815l29a/missing-criteria-observation.pfdsl",
+			"source_unchanged": false,
+			"before": "---\ntype: roadmap\nartifact:\n  input:\n    label: Input\n    status: done\n---\ninput >> build -> output\n",
+			"after": "---\ntype: roadmap\nartifact:\n  input:\n    label: Input\n    status: done\n  output:\n    label: output\n    status: todo\n---\ninput >> build -> output\n",
+			"before_sha256": "8d27949923533cff6768e8b206fb6879c759b9a16fae87015b0e56d4608d1c80",
+			"after_sha256": "46a88055c7b24f6e51b4ef41a7d6478ca37d1f6f681f23d382cf73da619d5f24",
+			"json": {
+				"ok": true,
+				"id": "output",
+				"kind": "artifact",
+				"created": true,
+				"written": true,
+				"line": 7
+			}
+		},
+		{
+			"name": "missing-criteria-real-checker",
+			"argv": [
+				"/opt/homebrew/bin/node",
+				"<checkout>/packages/cli/dist/cli.js",
+				"check",
+				"<temporary>/pfdsl-cli-experience-01a10a12-g815l29a/missing-criteria-observation.pfdsl",
+				"--json"
+			],
+			"exit": 0,
+			"stdout": "{\"ok\":true,\"diagnostics\":[{\"severity\":\"warning\",\"code\":\"W002\",\"message\":\"Artifact 'output' has no 'criteria' field\",\"range\":{\"start\":{\"offset\":73,\"line\":7,\"column\":3},\"end\":{\"offset\":79,\"line\":7,\"column\":9}}}]}\n",
+			"stderr": "",
+			"file": "<temporary>/pfdsl-cli-experience-01a10a12-g815l29a/missing-criteria-observation.pfdsl",
+			"source_unchanged": true,
+			"before": "---\ntype: roadmap\nartifact:\n  input:\n    label: Input\n    status: done\n  output:\n    label: output\n    status: todo\n---\ninput >> build -> output\n",
+			"after": "---\ntype: roadmap\nartifact:\n  input:\n    label: Input\n    status: done\n  output:\n    label: output\n    status: todo\n---\ninput >> build -> output\n",
+			"before_sha256": "46a88055c7b24f6e51b4ef41a7d6478ca37d1f6f681f23d382cf73da619d5f24",
+			"after_sha256": "46a88055c7b24f6e51b4ef41a7d6478ca37d1f6f681f23d382cf73da619d5f24",
+			"json": {
+				"ok": true,
+				"diagnostics": [
+					{
+						"severity": "warning",
+						"code": "W002",
+						"message": "Artifact 'output' has no 'criteria' field",
+						"range": {
+							"start": {
+								"offset": 73,
+								"line": 7,
+								"column": 3
+							},
+							"end": {
+								"offset": 79,
+								"line": 7,
+								"column": 9
+							}
+						}
+					}
+				]
+			}
+		},
+		{
+			"name": "spaced-path-meta-set-recovery",
+			"argv": [
+				"/opt/homebrew/bin/node",
+				"<checkout>/packages/cli/dist/cli.js",
+				"meta",
+				"set",
+				"<temporary>/pfdsl-cli-experience-01a10a12-g815l29a/team report.pfdsl",
+				"output",
+				"label",
+				"Output report",
+				"--json"
+			],
+			"exit": 1,
+			"stdout": "{\"ok\":false,\"missing\":[],\"undefinedIds\":[{\"id\":\"output\",\"kind\":\"artifact\"}],\"error\":\"'output' has no frontmatter definition in <temporary>/pfdsl-cli-experience-01a10a12-g815l29a/team report.pfdsl. Run pfdsl meta create <temporary>/pfdsl-cli-experience-01a10a12-g815l29a/team report.pfdsl output status=todo --write before using meta set.\"}\n",
+			"stderr": "",
+			"file": "<temporary>/pfdsl-cli-experience-01a10a12-g815l29a/team report.pfdsl",
+			"source_unchanged": true,
+			"before": "---\ntype: roadmap\nartifact:\n  input:\n    label: Input\n    status: done\n---\ninput >> build -> output\n",
+			"after": "---\ntype: roadmap\nartifact:\n  input:\n    label: Input\n    status: done\n---\ninput >> build -> output\n",
+			"before_sha256": "8d27949923533cff6768e8b206fb6879c759b9a16fae87015b0e56d4608d1c80",
+			"after_sha256": "8d27949923533cff6768e8b206fb6879c759b9a16fae87015b0e56d4608d1c80",
+			"json": {
+				"ok": false,
+				"missing": [],
+				"undefinedIds": [
+					{
+						"id": "output",
+						"kind": "artifact"
+					}
+				],
+				"error": "'output' has no frontmatter definition in <temporary>/pfdsl-cli-experience-01a10a12-g815l29a/team report.pfdsl. Run pfdsl meta create <temporary>/pfdsl-cli-experience-01a10a12-g815l29a/team report.pfdsl output status=todo --write before using meta set."
+			}
+		},
+		{
+			"name": "copied-spaced-path-recovery",
+			"argv": [
+				"/opt/homebrew/bin/node",
+				"<checkout>/packages/cli/dist/cli.js",
+				"meta",
+				"create",
+				"<temporary>/pfdsl-cli-experience-01a10a12-g815l29a/team",
+				"report.pfdsl",
+				"output",
+				"status=todo",
+				"--write"
+			],
+			"exit": 2,
+			"stdout": "",
+			"stderr": "meta create: expected field=value, got 'output'\n",
+			"file": "<temporary>/pfdsl-cli-experience-01a10a12-g815l29a/team report.pfdsl",
+			"source_unchanged": true,
+			"before": "---\ntype: roadmap\nartifact:\n  input:\n    label: Input\n    status: done\n---\ninput >> build -> output\n",
+			"after": "---\ntype: roadmap\nartifact:\n  input:\n    label: Input\n    status: done\n---\ninput >> build -> output\n",
+			"before_sha256": "8d27949923533cff6768e8b206fb6879c759b9a16fae87015b0e56d4608d1c80",
+			"after_sha256": "8d27949923533cff6768e8b206fb6879c759b9a16fae87015b0e56d4608d1c80",
+			"copied_command": "pfdsl meta create <temporary>/pfdsl-cli-experience-01a10a12-g815l29a/team report.pfdsl output status=todo --write"
+		},
+		{
+			"name": "quoted-spaced-path-recovery",
+			"argv": [
+				"/opt/homebrew/bin/node",
+				"<checkout>/packages/cli/dist/cli.js",
+				"meta",
+				"create",
+				"<temporary>/pfdsl-cli-experience-01a10a12-g815l29a/team report.pfdsl",
+				"output",
+				"status=todo",
+				"criteria=Reviewed",
+				"--write",
+				"--json"
+			],
+			"exit": 0,
+			"stdout": "{\"ok\":true,\"id\":\"output\",\"kind\":\"artifact\",\"created\":true,\"written\":true,\"line\":7}\n",
+			"stderr": "",
+			"file": "<temporary>/pfdsl-cli-experience-01a10a12-g815l29a/team report.pfdsl",
+			"source_unchanged": false,
+			"before": "---\ntype: roadmap\nartifact:\n  input:\n    label: Input\n    status: done\n---\ninput >> build -> output\n",
+			"after": "---\ntype: roadmap\nartifact:\n  input:\n    label: Input\n    status: done\n  output:\n    label: output\n    status: todo\n    criteria: Reviewed\n---\ninput >> build -> output\n",
+			"before_sha256": "8d27949923533cff6768e8b206fb6879c759b9a16fae87015b0e56d4608d1c80",
+			"after_sha256": "42a17bafc50707d2f93dbfc65dbb2af5b45706e4331dfbc2502a3df77dbab657",
+			"json": {
+				"ok": true,
+				"id": "output",
+				"kind": "artifact",
+				"created": true,
+				"written": true,
+				"line": 7
+			}
+		},
+		{
+			"name": "spaced-path-meta-set-retry",
+			"argv": [
+				"/opt/homebrew/bin/node",
+				"<checkout>/packages/cli/dist/cli.js",
+				"meta",
+				"set",
+				"<temporary>/pfdsl-cli-experience-01a10a12-g815l29a/team report.pfdsl",
+				"output",
+				"label",
+				"Output report",
+				"--json"
+			],
+			"exit": 0,
+			"stdout": "{\"ok\":true,\"newlyReady\":[]}\n",
+			"stderr": "",
+			"file": "<temporary>/pfdsl-cli-experience-01a10a12-g815l29a/team report.pfdsl",
+			"source_unchanged": false,
+			"before": "---\ntype: roadmap\nartifact:\n  input:\n    label: Input\n    status: done\n  output:\n    label: output\n    status: todo\n    criteria: Reviewed\n---\ninput >> build -> output\n",
+			"after": "---\ntype: roadmap\nartifact:\n  input:\n    label: Input\n    status: done\n  output:\n    label: Output report\n    status: todo\n    criteria: Reviewed\n---\ninput >> build -> output\n",
+			"before_sha256": "42a17bafc50707d2f93dbfc65dbb2af5b45706e4331dfbc2502a3df77dbab657",
+			"after_sha256": "7f2fcc505269090040fa6000f4c040be1c8a1937ff04615c170c2b069ef5195d",
+			"json": {
+				"ok": true,
+				"newlyReady": []
+			}
+		}
+	],
+	"observations": [
+		{
+			"record": "missing-criteria-observation",
+			"description": "status-only creation succeeds; check subsequently reports W002 as a warning. This is consistent with refusing error diagnostics, and is not counted as a failure."
+		}
+	],
+	"unverified": [
+		"VS Code or web host UI",
+		"cross-platform shells and Windows paths",
+		"public package installation",
+		"symlinks and broader YAML structures beyond duplicate mappings",
+		"implementation source, tests, design records, git diff"
+	]
+}

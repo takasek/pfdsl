@@ -1,5 +1,9 @@
-import { ID_PATTERN } from "@pfdsl/core";
-import { findFrontmatterDefinitionRange } from "@pfdsl/editor";
+import type { Range } from "@pfdsl/core";
+import {
+	findFrontmatterDefinitionRange,
+	nextNodeOccurrenceRange,
+	nodeIdAtSourcePosition,
+} from "@pfdsl/editor";
 import * as vscode from "vscode";
 import { analyzeDocument } from "./analyze.js";
 
@@ -21,30 +25,41 @@ export function registerDefinitionJump(context: vscode.ExtensionContext): void {
 			const editor = vscode.window.activeTextEditor;
 			if (!editor || editor.document.languageId !== "pfdsl") return;
 			const { document: doc, selection } = editor;
-			const wordRange = doc.getWordRangeAtPosition(
+			const model = analyzeDocument(doc);
+			const nodeId = nodeIdAtSourcePosition(
+				model,
+				doc.getText(),
 				selection.active,
-				ID_PATTERN,
 			);
-			if (!wordRange) return;
-			const nodeId = doc.getText(wordRange);
-			const range = findFrontmatterDefinitionRange(
-				analyzeDocument(doc),
-				nodeId,
-			);
+			if (nodeId === undefined) return;
+			const range = findFrontmatterDefinitionRange(model, nodeId);
 			if (!range) {
 				vscode.window.showInformationMessage(
 					`No frontmatter definition found for "${nodeId}"`,
 				);
 				return;
 			}
-			const pos = new vscode.Position(
-				range.start.line - 1,
-				range.start.column - 1,
+			selectSourceRange(editor, range);
+		}),
+		vscode.commands.registerCommand("pfdsl.cycleNodeOccurrence", () => {
+			const editor = vscode.window.activeTextEditor;
+			if (!editor || editor.document.languageId !== "pfdsl") return;
+			const range = nextNodeOccurrenceRange(
+				analyzeDocument(editor.document),
+				editor.document.getText(),
+				editor.selection.active,
 			);
-			const end = new vscode.Position(range.end.line - 1, range.end.column - 1);
-			const defRange = new vscode.Range(pos, end);
-			editor.selection = new vscode.Selection(pos, end);
-			editor.revealRange(defRange);
+			if (range) selectSourceRange(editor, range);
 		}),
 	);
+}
+
+function selectSourceRange(editor: vscode.TextEditor, range: Range): void {
+	const start = new vscode.Position(
+		range.start.line - 1,
+		range.start.column - 1,
+	);
+	const end = new vscode.Position(range.end.line - 1, range.end.column - 1);
+	editor.selection = new vscode.Selection(start, end);
+	editor.revealRange(new vscode.Range(start, end));
 }

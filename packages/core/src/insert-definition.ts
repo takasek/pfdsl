@@ -10,15 +10,17 @@ export interface InsertDefinitionResult {
 	 * The frontmatter block (fenced `---`s included) after inserting the
 	 * definition, or unchanged (the original block text) when `inserted` is
 	 * false. `""` when the source had no frontmatter, or when its fences were
-	 * well-formed but the YAML was invalid (FM002) or ID keys were not strings (FM004) — neither has
-	 * anything safe to rewrite.
+	 * well-formed but the YAML was invalid (FM002), ID keys were not strings
+	 * (FM004), or the target section could not be extended — none has anything
+	 * safe to rewrite.
 	 */
 	output: string;
 	inserted: boolean;
 }
 
 /**
- * Insert a `label: <id>` definition block for a node that appears only in
+ * Insert a `label: <id>` definition block, optionally with initial scalar
+ * fields (including an explicit label), for a node that appears only in
  * edges. Applied through the frontmatter yaml CST (ADR-0034), so unrelated
  * comments, quote style, and flow-vs-block choice survive untouched; a
  * no-op (and idempotent) when `id` is already defined under `kind`.
@@ -32,6 +34,7 @@ export function insertDefinition(
 	source: string,
 	kind: "artifact" | "process",
 	id: string,
+	fields: Readonly<Record<string, string | number>> = {},
 ): InsertDefinitionResult {
 	const cst = parseFrontmatterCst(source);
 	if (
@@ -52,9 +55,17 @@ export function insertDefinition(
 		};
 	}
 
-	doc.setIn([kind, id, "label"], id);
-	return {
-		output: renderFrontmatterCst(doc, cst.newline, cst.yamlText),
-		inserted: true,
-	};
+	try {
+		doc.setIn([kind, id, "label"], id);
+		for (const [field, value] of Object.entries(fields)) {
+			doc.setIn([kind, id, field], value);
+		}
+		return {
+			output: renderFrontmatterCst(doc, cst.newline, cst.yamlText),
+			inserted: true,
+		};
+	} catch {
+		// An aliased or non-map section cannot be extended through this path.
+		return { output: "", inserted: false };
+	}
 }

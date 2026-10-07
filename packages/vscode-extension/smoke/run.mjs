@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
 import { existsSync } from "node:fs";
-import { readdir, readFile } from "node:fs/promises";
+import { copyFile, readdir, readFile, writeFile } from "node:fs/promises";
 import { createServer } from "node:net";
 import { basename, dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -513,7 +513,9 @@ export async function collectWebviewFailureSnapshot(frame) {
 			minimap: rect(root.querySelector("#minimap")),
 			minimapViewport: rect(root.querySelector("#minimap-vp")),
 			err: (() => {
-				const error = root.querySelector(".err");
+				const error =
+					root.parentElement?.querySelector(".err") ??
+					root.querySelector(".err");
 				return {
 					visible: error ? error.getClientRects().length > 0 : false,
 					text: error?.textContent ?? null,
@@ -724,6 +726,392 @@ async function assertPreviewInteractions(session) {
 	assert.ok(afterZoom.scale > beforeZoom.scale, "zoom scale must increase");
 }
 
+async function assertGraphFits(frame) {
+	await expectEventually(
+		"Fit keeps all four SVG edges inside the viewport",
+		async () => ({
+			root: await readBoundingBox(frame.locator("#root"), "root"),
+			svg: await readBoundingBox(frame.locator("#inner svg"), "SVG"),
+		}),
+		({ root, svg }) =>
+			svg.x >= root.x - 1 &&
+			svg.y >= root.y - 1 &&
+			svg.x + svg.width <= root.x + root.width + 1 &&
+			svg.y + svg.height <= root.y + root.height + 1,
+	);
+}
+
+async function editFixture(session, text) {
+	await session.page
+		.getByRole("tab", {
+			name: /^01-simple-chain\.pfdsl(?:, Editor Group \d+)?$/,
+		})
+		.click();
+	await session.page.keyboard.press(
+		process.platform === "darwin" ? "Meta+a" : "Control+a",
+	);
+	await session.page.keyboard.insertText(text);
+}
+
+async function assertPreviewUsability(session) {
+	const { frame } = session;
+	await frame.locator("#fit-graph").click();
+	await assertGraphFits(frame);
+	await frame.locator("#actual-size").click();
+	assert.equal(
+		(await readTransform(frame)).scale,
+		1,
+		"100% restores native scale",
+	);
+	await frame.locator("#zoom-in").click();
+	assert.equal(
+		(await frame.locator("#zoom-level").textContent()).trim(),
+		"110%",
+	);
+	await frame.locator("#preview-help-toggle").click();
+	assert.match(
+		await frame.locator("#preview-help").textContent(),
+		/Wheel:.*Drag:.*Minimap:/,
+	);
+	await frame.locator("#preview-help-toggle").click();
+	const view = await readTransform(frame);
+	await editFixture(session, "requirements >> design ->");
+	await waitForColdRender(frame.locator("#preview-error"), 1, "syntax error");
+	const errorGeometry = await frame
+		.locator("#preview-error")
+		.evaluate((error) => ({
+			text: error.textContent,
+			fontSize: getComputedStyle(error).fontSize,
+			transform: getComputedStyle(error).transform,
+			whiteSpace: getComputedStyle(error).whiteSpace,
+			overflowWrap: getComputedStyle(error).overflowWrap,
+			outsideGraph: !error.closest("#inner"),
+		}));
+	assert.match(
+		errorGeometry.text,
+		/P007: Expected artifact expression after ->/,
+	);
+	assert.equal(errorGeometry.fontSize, "13px");
+	assert.equal(errorGeometry.transform, "none");
+	assert.equal(errorGeometry.whiteSpace, "pre-wrap");
+	assert.equal(errorGeometry.overflowWrap, "anywhere");
+	assert.equal(errorGeometry.outsideGraph, true);
+	assert.equal(await frame.locator("#minimap").isVisible(), false);
+	assert.equal(await frame.locator("#minimap-svg svg").count(), 0);
+	assert.equal(await frame.locator("#zoom-in").isDisabled(), true);
+	await editFixture(session, "requirements >> design -> recovered\n");
+	await waitForColdRender(
+		frame.locator('#inner g.node[data-node-id="recovered"]'),
+		1,
+		"recovered diagram",
+	);
+	await waitForColdRender(
+		frame.locator('#minimap-svg g.node[data-node-id="recovered"]'),
+		1,
+		"recovered minimap",
+	);
+	assert.ok(
+		transformsMatch(await readTransform(frame), view),
+		"error recovery preserves the view",
+	);
+	await editFixture(session, "requirements >> design -> edited\n");
+	await waitForColdRender(
+		frame.locator('#inner g.node[data-node-id="edited"]'),
+		1,
+		"live edit",
+	);
+	assert.ok(
+		transformsMatch(await readTransform(frame), view),
+		"ordinary edits preserve the view",
+	);
+	// A wide fixture exercises real SVG/CSS geometry.
+	const wide = Array.from(
+		{ length: 24 },
+		(_, i) => `a${i} >> p${i} -> a${i + 1}`,
+	).join("\n");
+	await editFixture(session, wide);
+	await waitForColdRender(
+		frame.locator('#inner g.node[data-node-id="a24"]'),
+		1,
+		"wide diagram",
+	);
+	await frame.locator("#fit-graph").click();
+	await assertGraphFits(frame);
+	await editFixture(session, await readFile(session.fixturePath, "utf8"));
+	await waitForColdRender(
+		frame.locator('#inner g.node[data-node-id="spec"]'),
+		1,
+		"restored fixture",
+	);
+	await frame.locator("#fit-graph").click();
+	console.log(
+		"preview usability: Fit/100%/zoom/help, error recovery and live-edit view preservation passed",
+	);
+}
+
+async function assertDefinitionQuickFix(session) {
+	const modifier = process.platform === "darwin" ? "Meta" : "Control";
+	await editFixture(session, "requirements >> design -> smoke_output");
+	await waitForColdRender(
+		session.frame.locator('#inner g.node[data-node-id="smoke_output"]'),
+		1,
+		"Quick Fix input",
+	);
+	await session.page.keyboard.press("ArrowLeft");
+	await session.page.keyboard.press(`${modifier}+.`);
+	await session.page
+		.getByText('Insert artifact definition for "smoke_output"', { exact: true })
+		.waitFor({ state: "visible" });
+	await session.page.keyboard.press("Enter");
+	await waitForInteraction(
+		"Quick Fix moved to the new label selection",
+		() => readStatusText(session.page),
+		(text) => /Ln 4, Col 24 \(12 selected\)/.test(text),
+	);
+	await session.page.keyboard.insertText("FriendlyResult");
+	await expectEventually(
+		"Quick Fix selected the inserted label value",
+		() =>
+			session.frame
+				.locator('#inner g.node[data-node-id="smoke_output"] text')
+				.allTextContents(),
+		(texts) => texts.some((text) => text.trim() === "FriendlyResult"),
+	);
+	await session.page.keyboard.press(`${modifier}+z`);
+	await expectEventually(
+		"Undo restores the selected label",
+		() =>
+			session.frame
+				.locator('#inner g.node[data-node-id="smoke_output"]')
+				.textContent(),
+		(text) => text && !text.includes("FriendlyResult"),
+	);
+	await session.page.keyboard.press(`${modifier}+z`);
+	const source = session.page.locator(".monaco-editor .view-lines").first();
+	await expectEventually(
+		"one Undo removes the definition insertion",
+		() => source.textContent(),
+		(text) => text && !text.includes("artifact:") && !text.includes("label:"),
+	);
+	await editFixture(session, await readFile(session.fixturePath, "utf8"));
+	await waitForColdRender(
+		session.frame.locator('#inner g.node[data-node-id="spec"]'),
+		1,
+		"fixture after Quick Fix Undo",
+	);
+	console.log(
+		"definition Quick Fix: label selection and single-edit Undo passed",
+	);
+}
+
+async function assertPreviewEditingFocus(session) {
+	const { frame, page } = session;
+	const sourceTab = page.getByRole("tab", {
+		name: /^01-simple-chain\.pfdsl(?:, Editor Group \d+)?$/,
+	});
+	const previewTab = page.getByRole("tab", { name: /^PFDSL Preview/ });
+	await editFixture(session, "a >> p -> b\n");
+	await waitForColdRender(
+		frame.locator('#inner g.node[data-node-id="p"]'),
+		1,
+		"editing fixture",
+	);
+	await frame.locator("#fit-graph").click();
+	await frame
+		.locator('#inner g.node[data-node-id="p"]')
+		.click({ button: "right" });
+	for (const target of ["first_result", "second_result"]) {
+		await frame.locator("#connector-kind").selectOption("->");
+		await frame.locator("#connector-target").fill(target);
+		await frame
+			.getByRole("button", { name: "Add connection", exact: true })
+			.click();
+		await waitForColdRender(
+			frame.locator(`#inner g.node[data-node-id="${target}"]`),
+			1,
+			`connection ${target}`,
+		);
+		assert.equal(
+			await previewTab.getAttribute("aria-selected"),
+			"true",
+			"connection leaves the preview tab selected",
+		);
+		assert.equal(
+			await frame
+				.locator("#node-actions-toggle")
+				.evaluate(
+					(button) => document.activeElement === button && document.hasFocus(),
+				),
+			true,
+			"connection keeps keyboard focus in the preview",
+		);
+		assert.equal(
+			await sourceTab.getAttribute("aria-selected"),
+			"true",
+			"source remains simultaneously visible in its own group",
+		);
+		await frame.locator("#node-actions-toggle").click();
+	}
+	await frame.locator("#node-actions-close").click();
+	await frame
+		.locator('#inner g.node[data-node-id="b"]')
+		.click({ button: "right" });
+	await frame
+		.getByRole("button", { name: "Create definition", exact: true })
+		.click();
+	await waitForInteraction(
+		"definition focuses its source label without covering the preview",
+		() => page.locator(".monaco-editor.focused").count(),
+		(count) => count > 0,
+	);
+	assert.equal(await previewTab.getAttribute("aria-selected"), "true");
+	await page.keyboard.insertText("Smoke output");
+	await waitForInteraction(
+		"definition label accepts typing in the source editor",
+		() => frame.locator('#inner g.node[data-node-id="b"]').textContent(),
+		(text) => text.includes("Smoke output"),
+	);
+	const modifier = process.platform === "darwin" ? "Meta" : "Control";
+	await page.keyboard.press(`${modifier}+s`);
+	await waitForInteraction(
+		"definition changes are saved before closing the source",
+		() => readFile(session.fixturePath, "utf8"),
+		(text) => text.includes("Smoke output"),
+		{ timeoutMs: coldRenderTimeoutMs },
+	);
+	await sourceTab.click();
+	await page.keyboard.press(`${modifier}+w`);
+	await waitForInteraction(
+		"closing the only source tab removes its editor group",
+		() => page.locator(".editor-group-container").count(),
+		(count) => count === 1,
+		{ timeoutMs: coldRenderTimeoutMs },
+	);
+	await frame.locator('#inner g.node[data-node-id="p"]').press("Enter");
+	await frame.locator("#connector-kind").selectOption("->");
+	await frame.locator("#connector-target").fill("reopened_result");
+	await frame
+		.getByRole("button", { name: "Add connection", exact: true })
+		.click();
+	await waitForColdRender(
+		frame.locator('#inner g.node[data-node-id="reopened_result"]'),
+		1,
+		"reopened source connection",
+	);
+	await waitForInteraction(
+		"a removed source group reopens beside the focused preview",
+		async () => ({
+			groups: await page.locator(".editor-group-container").count(),
+			sourceSelected: await sourceTab.getAttribute("aria-selected"),
+			previewSelected: await previewTab.getAttribute("aria-selected"),
+			previewFocused: await frame
+				.locator("#node-actions-toggle")
+				.evaluate(
+					(button) => document.activeElement === button && document.hasFocus(),
+				),
+		}),
+		(state) =>
+			state.groups === 2 &&
+			state.sourceSelected === "true" &&
+			state.previewSelected === "true" &&
+			state.previewFocused,
+	);
+	console.log(
+		"preview editing: repeated connections preserve preview focus; definition editing preserves columns; removed source group reopens beside preview",
+	);
+}
+
+async function assertHiddenSourceExternalChange(session) {
+	const { frame, page } = session;
+	const source = "closed_input >> hidden_source_process -> closed_output\n";
+	const sourceTab = page
+		.getByRole("tab", {
+			name: /^01-simple-chain\.pfdsl(?:, Editor Group \d+)?$/,
+		})
+		.last();
+	const modifier = process.platform === "darwin" ? "Meta" : "Control";
+	await editFixture(session, source);
+	await page.keyboard.press(`${modifier}+s`);
+	await waitForInteraction(
+		"fixture saved",
+		() => readFile(session.fixturePath, "utf8"),
+		(text) => text === source,
+		{ timeoutMs: coldRenderTimeoutMs },
+	);
+	await waitForColdRender(
+		frame.locator('#inner g.node[data-node-id="hidden_source_process"]'),
+		1,
+		"hidden source fixture rendered",
+	);
+	await sourceTab.click();
+	await page.keyboard.press(`${modifier}+w`);
+	await waitForInteraction(
+		"source hidden",
+		() => page.locator(".editor-group-container").count(),
+		(count) => count === 1,
+		{ timeoutMs: coldRenderTimeoutMs },
+	);
+	await frame
+		.locator('#inner g.node[data-node-id="hidden_source_process"]')
+		.press("Enter");
+	const diskSource = `external >> rebuild -> result\n${source}`;
+	await writeFile(session.fixturePath, diskSource, "utf8");
+	await frame.locator("#connector-kind").selectOption("->");
+	await frame.locator("#connector-target").fill("stale_result");
+	await frame
+		.getByRole("button", { name: "Add connection", exact: true })
+		.click();
+	await page
+		.getByText(
+			/The (?:document changed\. Reopen Node actions and try again\.|file changed outside VS Code\. Reload the source file before editing from the preview\.)/,
+			{ exact: true },
+		)
+		.waitFor({ state: "visible" });
+	assert.equal(await readFile(session.fixturePath, "utf8"), diskSource);
+	assert.equal(
+		await frame.locator('#inner g.node[data-node-id="stale_result"]').count(),
+		0,
+	);
+	await page.keyboard.press(`${modifier}+p`);
+	const quickInput = page.locator(".quick-input-widget input:visible");
+	await quickInput.fill(session.fixturePath);
+	await quickInput.press("Enter");
+	await sourceTab.click();
+	await page.keyboard.press(`${modifier}+Shift+p`);
+	await quickInput.fill("File: Revert File");
+	await quickInput.press("Enter");
+	await page.getByRole("tab", { name: /^PFDSL Preview/ }).click();
+	await waitForColdRender(
+		frame.locator('#inner g.node[data-node-id="external"]'),
+		1,
+		"source reloaded",
+	);
+	await frame
+		.locator('#inner g.node[data-node-id="hidden_source_process"]')
+		.press("Enter");
+	await frame.locator("#connector-kind").selectOption("->");
+	await frame.locator("#connector-target").fill("fresh_result");
+	await frame
+		.getByRole("button", { name: "Add connection", exact: true })
+		.click();
+	await waitForColdRender(
+		frame.locator('#inner g.node[data-node-id="fresh_result"]'),
+		1,
+		"fresh connection",
+	);
+	await sourceTab.click();
+	await page.keyboard.press(`${modifier}+s`);
+	await waitForInteraction(
+		"fresh retry saved without losing external changes",
+		() => readFile(session.fixturePath, "utf8"),
+		(text) => text === `${diskSource}hidden_source_process -> fresh_result\n`,
+		{ timeoutMs: coldRenderTimeoutMs },
+	);
+	console.log(
+		"hidden source external change: stale edit rejected; reload and fresh retry preserved exact source",
+	);
+}
+
 export async function launchSmokeSession() {
 	const runDir = await createRunDirectory();
 	const profileDir = join(runDir, "profile");
@@ -752,7 +1140,11 @@ export async function launchSmokeSession() {
 			cachedExecutablePath ??
 				(await downloadAndUnzipVSCode({ version: vscodeVersion, cachePath })),
 		);
-		const fixturePath = join(repoRoot, "docs/samples/01-simple-chain.pfdsl");
+		const fixturePath = join(runDir, "01-simple-chain.pfdsl");
+		await copyFile(
+			join(repoRoot, "docs/samples/01-simple-chain.pfdsl"),
+			fixturePath,
+		);
 		vscodeProcess = spawn(
 			vscodeExecutablePath,
 			makeLaunchArgs({
@@ -844,11 +1236,27 @@ async function main() {
 			"sample nodes",
 		);
 		console.log(`sample nodes: ${nodeCount}`);
+		await assertGraphFits(session.frame);
 		await assertPreviewInteractions(session);
+		await assertPreviewUsability(session);
+		await assertDefinitionQuickFix(session);
+		await assertPreviewEditingFocus(session);
+		await assertHiddenSourceExternalChange(session);
 	} catch (error) {
 		if (!session) {
 			failure = error;
 		} else {
+			console.error(
+				"Workbench interaction state:",
+				JSON.stringify(
+					await session.page
+						.locator(
+							".quick-input-widget, .monaco-menu, .action-widget, .monaco-editor .view-lines",
+						)
+						.allTextContents()
+						.catch(() => []),
+				),
+			);
 			failure = await appendWebviewFailureSnapshot(
 				new Error(
 					formatDiagnostic(error.message, {

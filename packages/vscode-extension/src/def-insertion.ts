@@ -1,25 +1,81 @@
-import { ID_PATTERN, insertDefinition } from "@pfdsl/core";
-import { findUndefinedNodeKind } from "@pfdsl/editor";
+import { insertDefinition } from "@pfdsl/core";
+import {
+	findDefinitionEditTarget,
+	findUndefinedNodeKind,
+	nodeIdAtSourcePosition,
+} from "@pfdsl/editor";
 import * as vscode from "vscode";
 import { analyzeDocument, LANGUAGE_ID } from "./analyze.js";
 
+const EDIT_DEFINITION_COMMAND = "pfdsl._editInsertedDefinition";
+
 export function registerDefInsertion(context: vscode.ExtensionContext): void {
+	context.subscriptions.push(
+		vscode.commands.registerCommand(
+			EDIT_DEFINITION_COMMAND,
+			async (uri: string, kind: "artifact" | "process", id: string) => {
+				const document = vscode.workspace.textDocuments.find(
+					(doc) =>
+						doc.uri.toString() === uri &&
+						!doc.isClosed &&
+						doc.languageId === LANGUAGE_ID,
+				);
+				if (
+					!document ||
+					!findDefinitionEditTarget(analyzeDocument(document), kind, id)
+				)
+					return;
+				const existing = vscode.window.visibleTextEditors.find(
+					(editor) => editor.document.uri.toString() === uri,
+				);
+				const options: vscode.TextDocumentShowOptions = {
+					preserveFocus: false,
+				};
+				if (existing?.viewColumn !== undefined)
+					options.viewColumn = existing.viewColumn;
+				let editor: vscode.TextEditor;
+				try {
+					editor = await vscode.window.showTextDocument(document, options);
+				} catch {
+					return;
+				}
+				if (document.isClosed || editor.document !== document) return;
+				// Showing the editor is asynchronous; use its current snapshot rather
+				// than positions computed before the WorkspaceEdit or while it opened.
+				const target = findDefinitionEditTarget(
+					analyzeDocument(document),
+					kind,
+					id,
+				);
+				if (!target) return;
+				const { start, end } = target.labelRange;
+				const range = new vscode.Range(
+					new vscode.Position(start.line - 1, start.column - 1),
+					new vscode.Position(end.line - 1, end.column - 1),
+				);
+				editor.selection = new vscode.Selection(range.start, range.end);
+				editor.revealRange(range);
+				const hint = `Edit the label for ${kind} "${id}".`;
+				vscode.window.showInformationMessage(
+					target.needsCriteria
+						? `${hint} Add criteria describing how this produced artifact is judged complete (W002).`
+						: hint,
+				);
+			},
+		),
+	);
+
 	const provider: vscode.CodeActionProvider = {
 		provideCodeActions(document, range) {
 			if (document.languageId !== LANGUAGE_ID) return;
-			const wordRange = document.getWordRangeAtPosition(
-				range.start,
-				ID_PATTERN,
-			);
-			if (!wordRange) return;
-			const id = document.getText(wordRange);
-
-			const { frontmatter, nodeKinds, bodyStartLine } =
-				analyzeDocument(document);
+			const model = analyzeDocument(document);
+			const source = document.getText();
+			const id = nodeIdAtSourcePosition(model, source, range.start);
+			if (id === undefined) return;
+			const { frontmatter, nodeKinds, bodyStartLine } = model;
 			const kind = findUndefinedNodeKind(nodeKinds, frontmatter, id);
 			if (!kind) return;
 
-			const source = document.getText();
 			const { inserted, output } = insertDefinition(source, kind, id);
 			if (!inserted) return;
 
@@ -43,6 +99,11 @@ export function registerDefInsertion(context: vscode.ExtensionContext): void {
 				),
 				output,
 			);
+			action.command = {
+				command: EDIT_DEFINITION_COMMAND,
+				title: "Edit inserted definition",
+				arguments: [document.uri.toString(), kind, id],
+			};
 			return [action];
 		},
 	};

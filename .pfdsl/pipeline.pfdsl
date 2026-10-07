@@ -60,6 +60,9 @@ artifact:
   pfdsl_source:
     label: .pfdslソースファイル
     description: ユーザーが記述するfrontmatter+bodyのテキスト
+  definition_creation_request:
+    label: 定義を作る対象と初期フィールド
+    description: CLIの引数またはpreviewの利用者操作で指定する対象IDと初期scalarフィールド。previewでは候補を得たsource snapshotも要求へ添え、ホストが現在文書との一致を検証する
   comparison_source:
     label: 比較対象の.pfdslソース
     description: diff の第2引数で指定する、比較対象文書のfrontmatter+bodyのテキスト
@@ -149,6 +152,12 @@ artifact:
     description: ローカルfrontmatterに定義されたノードの指定フィールドを書き換えた.pfdslテキスト。定義が無いノードは追加を案内し、エラー時はファイルを書き換えない
     criteria: meta setコマンドが実装され、定義済みノードの更新と未定義ノードの非書込みが動作確認済み
     externalStakeholders: [ CLIユーザー ]
+    group: run_outputs
+  definition_created_source:
+    label: ノード定義作成済みソース
+    description: 本文に存在する未定義ノードへ、種別を推論して初期フィールド付きのfrontmatter定義をCSTで追加した.pfdslテキスト。本文・既存定義・コメントを保持し、CLIは完成ソースの検証後だけ書き込む
+    criteria: packages/cli/src/meta-create.test.tsで、初期フィールド・CRLF・既存定義・不正入力の非書込みとpreview/writeの一致が検証される
+    externalStakeholders: [ CLIユーザー, VSCode拡張ユーザー, アプリユーザー ]
     group: run_outputs
   reindexed_source:
     label: index採番済みソース
@@ -511,6 +520,12 @@ process:
     command: node packages/cli/dist/cli.js meta set
     location: "packages/core/src/frontmatter-cst.ts"
     tags: [ b ]
+  create_node_definition:
+    label: 未定義ノードの定義作成
+    description: 本文の解析結果から対象のartifact/process種別を推論し、frontmatterをCST経由で追加する。CLIは初期フィールド・構造・完成ソースを検証してからpreviewまたはwriteし、共有previewは同じcore処理の結果を各ホストのUndo可能な編集へ渡す
+    command: node packages/cli/dist/cli.js meta create
+    location: [ "packages/core/src/insert-definition.ts", "packages/cli/src/index.ts", "packages/editor/src/preview-edit.ts" ]
+    tags: [ b ]
   reindex_meta:
     label: index採番
     description: "frontmatterをyaml CSTとして再parseし、トポロジ順に沿ってindexフィールドを採番し直したテキストを生成する（ADR-0034）。出力はソースの改行スタイル（LF/CRLF）を保つ（#644）"
@@ -645,6 +660,8 @@ pfdsl_source >> format -> [format_diagnostics, formatted_source]
 pfdsl_source >> sort_meta -> sorted_source
 
 pfdsl_source >> set_meta -> updated_source
+
+[definition_creation_request, pfdsl_source] >> create_node_definition -> definition_created_source
 
 pfdsl_source >> reindex_meta -> reindexed_source
 
