@@ -3,234 +3,22 @@
 // not a description of the parser, decides what the guards must return.
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import {
-	cpSync,
-	existsSync,
-	mkdirSync,
-	mkdtempSync,
-	readdirSync,
-	readFileSync,
-	rmSync,
-	writeFileSync,
-} from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
 import {
-	evaluateDelegationGuard,
 	splitSegments,
 	stripLeadingNoise,
 	tokenize,
 } from "./delegation-guard.mjs";
 import { findMergeCommand } from "./external-operation-policy.mjs";
-import { runMainCommitGuard } from "./main-commit-guard.mjs";
-
-const GIT_ENV = {
-	...process.env,
-	GIT_CONFIG_NOSYSTEM: "1",
-	GIT_CONFIG_GLOBAL: "/dev/null",
-	GIT_AUTHOR_NAME: "Fixture",
-	GIT_AUTHOR_EMAIL: "fixture@example.test",
-	GIT_COMMITTER_NAME: "Fixture",
-	GIT_COMMITTER_EMAIL: "fixture@example.test",
-	GIT_TERMINAL_PROMPT: "0",
-	GIT_EDITOR: "true",
-};
-
-function run(cwd, args, input) {
-	return spawnSync("git", args, {
-		cwd,
-		env: GIT_ENV,
-		encoding: "utf8",
-		input: input ?? "",
-	});
-}
-
-function must(cwd, ...args) {
-	const result = run(cwd, args);
-	assert.equal(result.status, 0, `${args.join(" ")}: ${result.stderr}`);
-	return result.stdout.trim();
-}
-
-// The default branch `main` is free (not checked out anywhere), so a command
-// that enters or rewrites it is observable instead of failing on Git's own
-// checked-out-elsewhere refusal.
-function buildFixture(root) {
-	const origin = join(root, "origin.git");
-	const primary = join(root, "primary");
-	must(root, "init", "-q", "--bare", "-b", "main", origin);
-	must(root, "init", "-q", "-b", "main", primary);
-	writeFileSync(join(primary, "file.txt"), "one\n");
-	writeFileSync(join(primary, "main"), "path named like the branch\n");
-	must(primary, "add", "-A");
-	must(primary, "commit", "-qm", "one");
-	must(primary, "tag", "v1");
-	must(primary, "remote", "add", "origin", origin);
-	must(primary, "push", "-q", "origin", "main", "v1");
-	must(primary, "commit", "-q", "--allow-empty", "-m", "origin-only");
-	must(primary, "push", "-q", "origin", "main");
-	must(primary, "reset", "-q", "--hard", "HEAD~1");
-	must(primary, "fetch", "-q", "origin");
-	must(primary, "branch", "other");
-	must(primary, "branch", "sib");
-	must(primary, "switch", "-q", "-c", "home");
-	must(primary, "worktree", "add", "-q", "-b", "topic", "../feature");
-	must(primary, "worktree", "add", "-q", "../sibling", "sib");
-	const feature = join(root, "feature");
-	must(feature, "commit", "-q", "--allow-empty", "-m", "topic work");
-	writeFileSync(join(feature, "file.txt"), "stashed\n");
-	must(feature, "stash", "push", "-q");
-	writeFileSync(join(feature, "file.txt"), "dirty\n");
-	return { primary, feature, sibling: join(root, "sibling") };
-}
-
-function readIf(path) {
-	return existsSync(path) ? readFileSync(path, "utf8") : null;
-}
-
-function snapshot({ primary, feature, sibling }) {
-	const gitDir = join(primary, ".git");
-	const refs = new Map(
-		must(primary, "for-each-ref", "--format=%(refname) %(objectname)")
-			.split("\n")
-			.filter(Boolean)
-			.map((line) => line.split(" ")),
-	);
-	const worktreesDir = join(gitDir, "worktrees");
-	const worktrees = existsSync(worktreesDir)
-		? readdirSync(worktreesDir)
-				.sort()
-				.map((name) =>
-					[
-						name,
-						readIf(join(worktreesDir, name, "gitdir")),
-						readIf(join(worktreesDir, name, "locked")),
-					].join("|"),
-				)
-		: [];
-	const index = (wt) =>
-		existsSync(wt) ? run(wt, ["ls-files", "-s"]).stdout : null;
-	return {
-		refs,
-		featureHead: readIf(join(worktreesDir, "feature", "HEAD")),
-		otherHeads: [
-			readIf(join(gitDir, "HEAD")),
-			readIf(join(worktreesDir, "sibling", "HEAD")),
-		].join("|"),
-		worktrees: worktrees.join("\n"),
-		config: readIf(join(gitDir, "config")),
-		stashLog: readIf(join(gitDir, "logs", "refs", "stash")),
-		otherIndexes: [index(primary), index(sibling)].join("|"),
-		featureIndex: index(feature),
-		featureFiles: readdirSync(feature)
-			.filter((name) => name !== ".git")
-			.sort()
-			.map((name) => `${name}=${readIf(join(feature, name))}`)
-			.join("|"),
-	};
-}
-
-const OWN = "refs/heads/topic";
-
-// Shared state is what an own-feature executor must not change: existing
-// local branches other than its own, other checkouts, worktree metadata,
-// stash, and repository configuration beyond a branch it just created.
-// Remote-tracking refs and tags are outside the guard's policy.
-function compare(before, after) {
-	const changes = [];
-	const shared = [];
-	for (const name of new Set([...before.refs.keys(), ...after.refs.keys()])) {
-		if (before.refs.get(name) === after.refs.get(name)) continue;
-		changes.push(name);
-		if (!name.startsWith("refs/heads/") && name !== "refs/stash") continue;
-		const created = !before.refs.has(name);
-		if (name === OWN || (created && name !== "refs/heads/main")) continue;
-		shared.push(name);
-	}
-	const createdBranches = [...after.refs.keys()]
-		.filter((name) => name.startsWith("refs/heads/") && !before.refs.has(name))
-		.map((name) => name.slice("refs/heads/".length));
-	if (before.featureHead !== after.featureHead) {
-		changes.push("feature HEAD");
-		// Entering the default branch, or a branch another checkout holds, lets
-		// later commits move a ref this executor does not own.
-		const entered = after.featureHead
-			?.trim()
-			.replace(/^ref: refs\/heads\//, "");
-		if (["main", "home", "sib"].includes(entered))
-			shared.push(`feature HEAD entered ${entered}`);
-	}
-	if (before.featureIndex !== after.featureIndex) changes.push("feature index");
-	if (before.featureFiles !== after.featureFiles) changes.push("feature files");
-	for (const key of ["otherHeads", "worktrees", "stashLog", "otherIndexes"])
-		if (before[key] !== after[key]) {
-			changes.push(key);
-			shared.push(key);
-		}
-	if (before.config !== after.config) {
-		changes.push("config");
-		const ownSection = (line) =>
-			createdBranches.some((name) => line.startsWith(`[branch "${name}"]`));
-		const strip = (text) => {
-			// Drop the sections of branches this command created; they are own.
-			const out = [];
-			let skipping = false;
-			for (const line of (text ?? "").split("\n")) {
-				if (line.startsWith("[")) skipping = ownSection(line);
-				if (!skipping && line.trim()) out.push(line);
-			}
-			return out.join("\n");
-		};
-		if (strip(before.config) !== strip(after.config)) shared.push("config");
-	}
-	return { changes, shared };
-}
-
-const quote = (arg) =>
-	/^[A-Za-z0-9_./:=@%+,^~-]+$/.test(arg)
-		? arg
-		: `'${arg.replace(/'/g, `'\\''`)}'`;
-
-function commandText(args, input) {
-	const git = ["git", ...args].map(quote).join(" ");
-	return input === undefined
-		? git
-		: `printf '%s\\n' ${quote(input.trimEnd())} | ${git}`;
-}
-
-function parentDecision(command, cwd) {
-	const result = runMainCommitGuard(
-		JSON.stringify({ tool_name: "Bash", cwd, tool_input: { command } }),
-		{
-			resolveBranches: () => ({
-				currentBranch: "topic",
-				mainBranch: "main",
-				targetRelation: "own",
-			}),
-			supportsAsk: true,
-		},
-	);
-	return result.output?.hookSpecificOutput.permissionDecision ?? "allow";
-}
-
-function childDecision(command) {
-	return evaluateDelegationGuard(
-		{
-			hook_event_name: "PreToolUse",
-			tool_name: "Bash",
-			agent_id: "agent_child",
-			agent_type: "worker",
-			tool_input: { command },
-		},
-		{ supportsAsk: false },
-	).decision;
-}
-
-const cross = (...lists) =>
-	lists.reduce(
-		(acc, list) => acc.flatMap((a) => list.map((b) => [...a, ...b])),
-		[[]],
-	);
+import {
+	cross,
+	observeForms,
+	optionSpellings,
+	quote,
+} from "./guard-effect-oracle-harness.mjs";
 
 // Read forms a Codex child must be able to run (each is also checked against
 // the oracle for being free of effects).
@@ -424,49 +212,48 @@ const FORMS = [
 	...CHILD_READS,
 ];
 
-test("guards agree with Git's observed effects for every command form", () => {
+// The forms above are hand-picked; these come from Git's own option tables,
+// so an option value read as the operand, a negation that cancels an
+// exemption, or an option nobody listed is covered without being named.
+const OPTION_FORMS = [
+	...["checkout", "switch"].flatMap((subcommand) =>
+		cross([[subcommand]], optionSpellings(subcommand), [
+			["main"],
+			["MAIN"],
+			["-"],
+			["@{-1}"],
+			["main", "--"],
+		]),
+	),
+	...cross([["fetch"]], [[], ["--dry-run"]], optionSpellings("fetch"), [
+		["origin", "main:other"],
+	]),
+	...cross([["branch"]], optionSpellings("branch"), [
+		["other", "HEAD"],
+		["newb"],
+	]),
+].map((args) => ({ args }));
+
+async function withRoot(run) {
 	const root = mkdtempSync(join(tmpdir(), "pfdsl-guard-oracle-"));
-	const template = join(root, "template");
-	const work = join(root, "work");
 	try {
-		mkdirSync(work);
-		const paths = buildFixture(work);
-		cpSync(work, template, { recursive: true });
-		const pristine = snapshot(paths);
-		const violations = [];
-		const seen = new Set();
-		let dirty = false;
-		for (const { args, input } of FORMS) {
-			const command = commandText(args, input);
-			if (seen.has(command)) continue;
-			seen.add(command);
-			// Most forms fail or only read, so restore only after an observed change.
-			if (dirty) {
-				rmSync(work, { recursive: true, force: true });
-				cpSync(template, work, { recursive: true });
-			}
-			const result = run(paths.feature, args, input);
-			const { changes, shared } = compare(pristine, snapshot(paths));
-			dirty = changes.length > 0;
-			const parent = parentDecision(command, paths.feature);
-			const child = childDecision(command);
-			const observed = `exit ${result.status}; changed [${changes.join(", ")}]`;
-			if (shared.length && parent === "allow")
-				violations.push(
-					`parent allows shared effect [${shared.join(", ")}]: ${command} (${observed})`,
-				);
-			if (changes.length && child === "allow")
-				violations.push(`child allows effect: ${command} (${observed})`);
-		}
-		for (const { args } of CHILD_READS) {
-			const command = commandText(args);
-			if (childDecision(command) !== "allow")
-				violations.push(`child denies read: ${command}`);
-		}
-		assert.deepEqual(violations, []);
+		return await run(root);
 	} finally {
 		rmSync(root, { recursive: true, force: true });
 	}
+}
+
+test("guards agree with Git's observed effects for every listed form", async () => {
+	const violations = await withRoot((root) =>
+		observeForms(root, FORMS, { childReads: CHILD_READS }),
+	);
+	assert.deepEqual(violations, []);
+});
+
+test("guards agree with Git's observed effects for every documented option", async () => {
+	assert.ok(OPTION_FORMS.length > 500, "Git's option tables were not read");
+	const violations = await withRoot((root) => observeForms(root, OPTION_FORMS));
+	assert.deepEqual(violations, []);
 });
 
 // gh decides by its own flag parser whether `--help` is a help request or an
