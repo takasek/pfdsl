@@ -46,9 +46,9 @@ function must(cwd, ...args) {
 	return result.stdout.trim();
 }
 
-function runGit(cwd, args, input = "") {
+function runGit(cwd, args, input = "", env = {}) {
 	return new Promise((resolve) => {
-		const child = spawn("git", args, { cwd, env: GIT_ENV });
+		const child = spawn("git", args, { cwd, env: { ...GIT_ENV, ...env } });
 		let stdout = "";
 		child.stdout.on("data", (chunk) => {
 			stdout += chunk;
@@ -64,11 +64,14 @@ function runGit(cwd, args, input = "") {
 	});
 }
 
-// The default branch `main` is free (not checked out anywhere), so a command
-// that enters or rewrites it is observable instead of failing on Git's own
-// checked-out-elsewhere refusal. The feature checkout's previous branch is
-// main, so `-` and `@{-1}` name it.
-export function buildFixture(root) {
+// By default `main` is free (not checked out anywhere), so a command that
+// enters or rewrites it is observable instead of failing on Git's own
+// checked-out-elsewhere refusal, and the feature checkout's previous branch is
+// main, so `-` and `@{-1}` name it. With `mainCheckedOut` the primary holds
+// main as in a real clone, which is where options that lift Git's own
+// protection (`fetch -u`, `pull`) matter. `inc.cfg` beside the checkouts is a
+// config file for `-c include.path=` forms.
+export function buildFixture(root, { mainCheckedOut = false } = {}) {
 	const origin = join(root, "origin.git");
 	const primary = join(root, "primary");
 	mkdirSync(root, { recursive: true });
@@ -81,18 +84,27 @@ export function buildFixture(root) {
 	must(primary, "tag", "v1");
 	must(primary, "remote", "add", "origin", origin);
 	must(primary, "push", "-q", "origin", "main", "v1");
-	must(primary, "commit", "-q", "--allow-empty", "-m", "origin-only");
+	// Origin's main changes file contents, so a forced update of a checked-out
+	// main leaves its index and files out of step and is observable there too.
+	writeFileSync(join(primary, "file.txt"), "origin\n");
+	must(primary, "commit", "-qam", "origin-only");
 	must(primary, "push", "-q", "origin", "main");
 	must(primary, "reset", "-q", "--hard", "HEAD~1");
 	must(primary, "fetch", "-q", "origin");
 	must(primary, "branch", "other");
 	must(primary, "branch", "sib");
-	must(primary, "switch", "-q", "-c", "home");
+	if (!mainCheckedOut) must(primary, "switch", "-q", "-c", "home");
 	must(primary, "worktree", "add", "-q", "-b", "topic", "../feature");
 	must(primary, "worktree", "add", "-q", "../sibling", "sib");
+	writeFileSync(
+		join(root, "inc.cfg"),
+		'[remote "origin"]\n\tfetch = +refs/heads/*:refs/heads/*\n',
+	);
 	const feature = join(root, "feature");
-	must(feature, "switch", "-q", "main");
-	must(feature, "switch", "-q", "topic");
+	if (!mainCheckedOut) {
+		must(feature, "switch", "-q", "main");
+		must(feature, "switch", "-q", "topic");
+	}
 	must(feature, "commit", "-q", "--allow-empty", "-m", "topic work");
 	writeFileSync(join(feature, "file.txt"), "stashed\n");
 	must(feature, "stash", "push", "-q");
@@ -220,12 +232,18 @@ export const quote = (arg) =>
 		? arg
 		: `'${arg.replace(/'/g, `'\\''`)}'`;
 
-export function commandText(args, input) {
-	const git = ["git", ...args].map(quote).join(" ");
+export function commandText(args, input, env = {}) {
+	const git = [
+		...Object.entries(env).map(([name, value]) => `${name}=${quote(value)}`),
+		["git", ...args].map(quote).join(" "),
+	].join(" ");
 	return input === undefined
 		? git
 		: `printf '%s\\n' ${quote(input.trimEnd())} | ${git}`;
 }
+
+// Forms name the fixture root as `{root}`; each worker substitutes its own.
+const atRoot = (value, root) => value.replaceAll("{root}", root);
 
 export function parentDecision(command, cwd) {
 	const result = runMainCommitGuard(
@@ -318,47 +336,68 @@ export function optionSpellings(subcommand, values = ["x", "1", "merge"]) {
 /**
  * Runs every form in a fresh-state fixture and returns the invariant
  * violations: a shared effect the parent allows, any effect the child allows,
- * and a listed read the child denies.
+ * a listed read the child denies, and a form Git did not finish (a timeout
+ * observes nothing, so it must not count as safe). `sharedObserved` lists the
+ * kinds of shared effect some form actually produced, so a caller can require
+ * that its forms exercised what they claim to protect.
  */
-export async function observeForms(root, forms, { childReads = [] } = {}) {
+export async function observeForms(
+	root,
+	forms,
+	{ childReads = [], mainCheckedOut = false } = {},
+) {
 	const unique = [];
 	const seen = new Set();
 	for (const form of forms) {
-		const command = commandText(form.args, form.input);
+		const command = commandText(form.args, form.input, form.env);
 		if (seen.has(command)) continue;
 		seen.add(command);
 		unique.push({ ...form, command });
 	}
 	const workers = Math.max(1, Math.min(8, unique.length));
 	const violations = [];
+	const sharedObserved = new Set();
 	let next = 0;
 	await Promise.all(
 		Array.from({ length: workers }, async (_, id) => {
-			const work = join(root, `w${id}`, "work");
-			const template = join(root, `w${id}`, "template");
-			const paths = buildFixture(work);
+			const base = join(root, `w${id}`);
+			const work = join(base, "work");
+			const template = join(base, "template");
+			const paths = buildFixture(work, { mainCheckedOut });
 			await cp(work, template, { recursive: true });
 			const pristine = await snapshot(paths);
 			let dirty = false;
 			while (next < unique.length) {
-				const { args, input, command } = unique[next++];
+				const form = unique[next++];
+				const args = form.args.map((arg) => atRoot(arg, work));
+				const env = Object.fromEntries(
+					Object.entries(form.env ?? {}).map(([name, value]) => [
+						name,
+						atRoot(value, work),
+					]),
+				);
+				const command = commandText(args, form.input, env);
 				// Most forms fail or only read, so restore only after a change.
 				if (dirty) {
 					await rm(work, { recursive: true, force: true });
 					await cp(template, work, { recursive: true });
 				}
-				const result = await runGit(paths.feature, args, input);
+				const result = await runGit(paths.feature, args, form.input, env);
 				const { changes, shared } = compare(pristine, await snapshot(paths));
 				dirty = changes.length > 0;
+				for (const kind of shared)
+					sharedObserved.add(kind.replace(/^feature HEAD entered /, "enter "));
 				const parent = parentDecision(command, paths.feature);
 				const child = childDecision(command);
 				const observed = `exit ${result.status}; changed [${changes.join(", ")}]`;
+				if (typeof result.status !== "number")
+					violations.push(`Git did not finish: ${form.command} (${observed})`);
 				if (shared.length && parent === "allow")
 					violations.push(
-						`parent allows shared effect [${shared.join(", ")}]: ${command} (${observed})`,
+						`parent allows shared effect [${shared.join(", ")}]: ${form.command} (${observed})`,
 					);
 				if (changes.length && child === "allow")
-					violations.push(`child allows effect: ${command} (${observed})`);
+					violations.push(`child allows effect: ${form.command} (${observed})`);
 			}
 		}),
 	);
@@ -367,5 +406,5 @@ export async function observeForms(root, forms, { childReads = [] } = {}) {
 		if (childDecision(command) !== "allow")
 			violations.push(`child denies read: ${command}`);
 	}
-	return violations.sort();
+	return { violations: violations.sort(), sharedObserved: [...sharedObserved] };
 }

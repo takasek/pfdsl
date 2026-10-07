@@ -243,17 +243,117 @@ async function withRoot(run) {
 	}
 }
 
-test("guards agree with Git's observed effects for every listed form", async () => {
-	const violations = await withRoot((root) =>
-		observeForms(root, FORMS, { childReads: CHILD_READS }),
+// Configuration supplied on the command line changes what this very call
+// writes; an innocuous-looking key can pull in any setting through include.
+const REFSPEC = "+refs/heads/*:refs/heads/*";
+const INJECTIONS = [
+	{ pre: [] },
+	{ pre: ["-c", `remote.origin.fetch=${REFSPEC}`] },
+	{ pre: ["-c", "include.path={root}/inc.cfg"] },
+	{ pre: ["--config-env=remote.origin.fetch=RS"], env: { RS: REFSPEC } },
+	{
+		pre: [],
+		env: {
+			GIT_CONFIG_COUNT: "1",
+			GIT_CONFIG_KEY_0: "remote.origin.fetch",
+			GIT_CONFIG_VALUE_0: REFSPEC,
+		},
+	},
+];
+const FETCHES = [
+	["fetch", "origin"],
+	["fetch", "-u", "origin"],
+	["fetch", "-qu", "origin"],
+	["fetch", "--update-head-ok", "origin"],
+	["pull", "--no-rebase", "origin"],
+	["pull", "--no-rebase", "origin", "main"],
+];
+// Writers of the protected refs other than the branch/checkout/fetch forms.
+const LOCAL_WRITERS = [
+	["push", ".", "HEAD:other"],
+	["push", ".", "+HEAD:other"],
+	["push", ".", ":other"],
+	["push", ".", "+HEAD:main"],
+	["push", "../primary", "+HEAD:other"],
+	["pull", "--no-rebase", "origin", "main:other"],
+	["pull", "--no-rebase", ".", "topic:other"],
+	["reflog", "expire", "--expire=now", "--all"],
+	["reflog", "expire", "--expire=now", "refs/stash"],
+	["reflog", "delete", "refs/stash@{0}"],
+	["checkout", "-B", "other"],
+	["checkout", "-B", "other", "HEAD"],
+	["switch", "-C", "other"],
+	["switch", "--force-create", "other"],
+	// Outside the protected set for now, but a child must still not run them.
+	["notes", "add", "-m", "x"],
+	["replace", "HEAD", "HEAD~1"],
+];
+const LAYOUT_FORMS = [
+	...INJECTIONS.flatMap(({ pre, env }) =>
+		FETCHES.map((rest) => ({ args: [...pre, ...rest], env })),
+	),
+	...LOCAL_WRITERS.map((args) => ({ args })),
+];
+
+async function observe(forms, options) {
+	return withRoot((root) => observeForms(root, forms, options));
+}
+
+// Each test also requires that its forms actually produced the shared effects
+// it exists to guard, so a fixture that no longer exercises them fails.
+function assertExercised(sharedObserved, required) {
+	assert.deepEqual(
+		required.filter((kind) => !sharedObserved.includes(kind)),
+		[],
+		`forms no longer produce these shared effects: observed ${sharedObserved.join(", ")}`,
 	);
+}
+
+test("guards agree with Git's observed effects for every listed form", async () => {
+	const { violations, sharedObserved } = await observe(FORMS, {
+		childReads: CHILD_READS,
+	});
 	assert.deepEqual(violations, []);
+	assertExercised(sharedObserved, [
+		"refs/heads/main",
+		"refs/heads/other",
+		"refs/heads/sib",
+		"refs/stash",
+		"enter main",
+		"enter sib",
+		"worktrees",
+		"stashLog",
+		"config",
+	]);
 });
 
 test("guards agree with Git's observed effects for every documented option", async () => {
 	assert.ok(OPTION_FORMS.length > 500, "Git's option tables were not read");
-	const violations = await withRoot((root) => observeForms(root, OPTION_FORMS));
+	const { violations, sharedObserved } = await observe(OPTION_FORMS);
 	assert.deepEqual(violations, []);
+	assertExercised(sharedObserved, ["refs/heads/other", "enter main"]);
+});
+
+test("guards agree with Git's observed effects when main is free", async () => {
+	const { violations, sharedObserved } = await observe(LAYOUT_FORMS);
+	assert.deepEqual(violations, []);
+	assertExercised(sharedObserved, [
+		"refs/heads/main",
+		"refs/heads/other",
+		"stashLog",
+	]);
+});
+
+test("guards agree with Git's observed effects when the primary holds main", async () => {
+	const { violations, sharedObserved } = await observe(LAYOUT_FORMS, {
+		mainCheckedOut: true,
+	});
+	assert.deepEqual(violations, []);
+	assertExercised(sharedObserved, [
+		"refs/heads/main",
+		"refs/heads/other",
+		"stashLog",
+	]);
 });
 
 // gh decides by its own flag parser whether `--help` is a help request or an
