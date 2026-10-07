@@ -32,6 +32,7 @@ import {
 	appendWebviewFailureSnapshot,
 	assertVisibleCount,
 	cleanupSmokeSession,
+	closeSourceTab,
 	coldRenderTimeoutMs,
 	collectWebviewFailureSnapshot,
 	findTextEndPosition,
@@ -40,12 +41,112 @@ import {
 	minimapClickChangesPan,
 	minimapDragChangesPan,
 	parseStatusCursorPosition,
+	quickInputValue,
 	resolveVSCodeExecutablePath,
 	waitForColdRender,
 	waitForStatusCursorPosition,
 	waitForVisibleCount,
 	waitForWorkbenchPage,
+	withWorkbenchOperation,
 } from "./run.mjs";
+
+test("command palette replacement keeps the command provider prefix", () => {
+	assert.equal(
+		quickInputValue("command", "File: Revert File"),
+		">File: Revert File",
+	);
+	assert.equal(
+		quickInputValue("file", "/tmp/fixture.pfdsl"),
+		"/tmp/fixture.pfdsl",
+	);
+});
+
+test("source close targets its own close button and checks tab and preview survival", async () => {
+	const observations = [
+		{ sourceTabs: 1, previewTabs: 1, groups: 2 },
+		{ sourceTabs: 0, previewTabs: 1, groups: 1 },
+	];
+	const clicks = [];
+	const sourceTab = {
+		getByRole: (role, options) => ({
+			click: async () => clicks.push({ role, options }),
+		}),
+	};
+	const state = await closeSourceTab({}, sourceTab, {
+		readState: async () => observations.shift(),
+		log: () => {},
+	});
+	assert.deepEqual(clicks, [
+		{ role: "button", options: { name: /^Close \(/ } },
+	]);
+	assert.deepEqual(state, { sourceTabs: 0, previewTabs: 1, groups: 1 });
+});
+
+test("an absent source and one group do not pass when the preview was closed", async () => {
+	await assert.rejects(
+		closeSourceTab(
+			{},
+			{ getByRole: () => ({ click: async () => {} }) },
+			{
+				readState: async () => ({ sourceTabs: 0, previewTabs: 0, groups: 1 }),
+				log: () => {},
+				timeoutMs: 1,
+			},
+		),
+		/sourceTabs.*previewTabs/,
+	);
+});
+
+test("workbench operation diagnostics identify the failing step and preserve its stack", async () => {
+	const original = new Error("input disappeared");
+	original.stack =
+		"Error: input disappeared\n    at fixtureReload (smoke/run.mjs:1078:2)";
+	const events = [];
+	await assert.rejects(
+		withWorkbenchOperation(
+			{},
+			"reload: quick open fill",
+			async () => {
+				throw original;
+			},
+			{
+				readState: async () => ({ documentFocused: false, quickInputs: [] }),
+				log: (event) => events.push(event),
+			},
+		),
+		(error) => {
+			assert.equal(error.cause, original);
+			assert.match(error.message, /reload: quick open fill/);
+			assert.match(error.message, /smoke\/run.mjs:1078:2/);
+			return true;
+		},
+	);
+	assert.deepEqual(
+		events.map((event) => event.phase),
+		["before", "failed"],
+	);
+});
+
+test("state collection failures do not replace the original workbench failure", async () => {
+	const original = new Error("close failed");
+	await assert.rejects(
+		withWorkbenchOperation(
+			{},
+			"source close",
+			async () => {
+				throw original;
+			},
+			{
+				readState: async () => {
+					throw new Error("page closed");
+				},
+				log: () => {},
+			},
+		),
+		(error) =>
+			error.cause === original && error.message.includes("page closed"),
+	);
+});
 
 function minimumNodeMajor(engineRange) {
 	const match = /^>=\s*(\d+)(?:\.\d+\.\d+)?$/.exec(engineRange);
@@ -132,7 +233,7 @@ test("makeVSCodeCachePath keeps a stable worktree-specific cache outside the rep
 	assert.match(first, /^\/tmp\/pfdsl-vscode-smoke-cache\//);
 	assert.doesNotMatch(first, /^\/repo\//);
 	assert.equal(
-		makeVSCodeCachePath("/home/runner/work/pfdsl/pfdsl", {
+		makeVSCodeCachePath("/ci/work/pfdsl/pfdsl", {
 			temporaryDirectory: "/tmp",
 		}),
 		"/tmp/pfdsl-vscode-smoke-cache/pfdsl",
