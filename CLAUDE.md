@@ -77,7 +77,7 @@ sessionのrootと異なる同一repositoryのworktreeは、native所有証拠を
 保護の範囲はこのリポジトリのcheckoutに限る。targetのgit common dirがsessionのものと異なれば、ブランチ名が `main` でも素通しする（使い捨てsandboxの既定ブランチが `main` になるため）。
 変更系Gitの実効targetをshell構文から確定できない場合はfail closedとする。
 検査を飛ばすコマンド（`--no-verify`/`-n`、`-c`・`--config-env`・`git config` 経由の `core.hooksPath` 上書き）はforeign target以外、branch・worktreeを問わずdenyとし、`git config` の `--global`/`--system`/`--file`・`-f`（`--file`・`-f` は指す先を問わず対象）はforeign targetでもdenyとする（#1232）。
-session/targetのgit roots、current branch、同一repoのorigin/HEADによるdefault branchを取得できない変更系Gitは、実入口でdenyとする。正常に空のbranch名が返るdetached HEADは取得失敗と区別する。共有ref・stash・worktree metadataへの保守はexecutor所有権だけで許可しない。Codexでは親を含むmerge・auto-mergeとGitHub MCPの変更系・未知操作をdenyとし、親の通常のBash公開経路を残す。Codexの子はGit metadata変更・外向き書込みを行わない。分類と構文対応の一次情報は `scripts/lib/main-commit-guard.mjs` とする。
+session/targetのgit roots、current branch、同一repoのorigin/HEADによるdefault branchを取得できない変更系Gitは、実入口でdenyとする。正常に空のbranch名が返るdetached HEADは取得失敗と区別する。共有ref・stash・worktree metadataへの保守はexecutor所有権だけで許可しない。Codexでは親を含むmerge・auto-mergeとGitHub MCPの変更系・未知操作をdenyとし、親の通常のBash公開経路を残す。Codexの子はGit metadata変更・外向き書込みを行わない。分類と構文対応の一次情報は `scripts/lib/main-commit-guard.mjs` と共有効果の分類を担う `scripts/lib/shared-git-effects.mjs` とする。
 
 Edit・Write・apply_patchは全targetの物理パスを確認し、primary checkoutやnative所有者を確認できない同一repositoryのlinked checkoutへの書込みを拒否する。生成root instructionsの正本案内を維持する。roadmapの公開宣言はCodexではadvisoryであり、通常の公開承認と人間のPRレビューを維持する。policyのロード・実行失敗、不正入力・応答、内部deadline超過は修復案内付きdenyとする。bootstrap自身の故障・host timeout・trust skipの保証とは区別する。
 
