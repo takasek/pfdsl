@@ -153,8 +153,11 @@ it("replaces the cue and clears its timer; a redraw never starts another cue", a
 	await s.preview.receive(s.message);
 	await s.preview.receive({ type: "focus", nodeId: "a" });
 	expect(s.node("a").classList.contains("pfdsl-focus-cue")).toBe(true);
+	await vi.advanceTimersByTimeAsync(1000);
 	await s.preview.receive({ type: "focus", nodeId: "p" });
 	expect(s.node("a").classList.contains("pfdsl-focus-cue")).toBe(false);
+	expect(s.node("p").classList.contains("pfdsl-focus-cue")).toBe(true);
+	await vi.advanceTimersByTimeAsync(600);
 	expect(s.node("p").classList.contains("pfdsl-focus-cue")).toBe(true);
 	await s.preview.receive(s.message);
 	expect(s.container.querySelector(".pfdsl-focus-cue")).toBeNull();
@@ -204,7 +207,7 @@ it("opens the shared node panel from context/keyboard and emits source-bound cre
 	expect(panel.hidden).toBe(true);
 });
 
-it("does not accept stale local graph completion after target change, redraw or dispose", async () => {
+it("does not accept stale local graph completion after an error", async () => {
 	let resolve!: (value: string) => void;
 	const renderer = vi.fn((dot: string) =>
 		dot === "main"
@@ -224,6 +227,87 @@ it("does not accept stale local graph completion after target change, redraw or 
 		s.container.querySelector<HTMLElement>("#tooltip")!.style.display,
 	).toBe("none");
 	expect(s.container.querySelector("#tooltip svg")).toBeNull();
+});
+
+it("keeps the current hover when the previous neighborhood completes last", async () => {
+	vi.useFakeTimers();
+	const completions: Array<(value: string) => void> = [];
+	const s = setup(
+		vi.fn((dot: string) =>
+			dot === "main"
+				? Promise.resolve(svg)
+				: new Promise<string>((resolve) => completions.push(resolve)),
+		),
+	);
+	await s.preview.receive(s.message);
+	s.node("a").dispatchEvent(new MouseEvent("mousemove", { bubbles: true }));
+	await Promise.resolve();
+	s.node("p").dispatchEvent(new MouseEvent("mousemove", { bubbles: true }));
+	await Promise.resolve();
+	expect(completions).toHaveLength(2);
+	completions[1]!(svg.replace("<svg ", '<svg data-render="current" '));
+	await vi.advanceTimersByTimeAsync(0);
+	const tooltip = s.container.querySelector<HTMLElement>("#tooltip")!;
+	expect(tooltip.querySelector("svg")?.getAttribute("data-render")).toBe(
+		"current",
+	);
+	completions[0]!(svg.replace("<svg ", '<svg data-render="stale" '));
+	await vi.advanceTimersByTimeAsync(0);
+	expect(tooltip.querySelectorAll("svg")).toHaveLength(1);
+	expect(tooltip.querySelector("svg")?.getAttribute("data-render")).toBe(
+		"current",
+	);
+});
+
+it("isolates pending hover and cue timers when a disposed container is remounted", async () => {
+	vi.useFakeTimers();
+	let completeHover!: (value: string) => void;
+	const s = setup(
+		vi.fn((dot: string) =>
+			dot === "main"
+				? Promise.resolve(svg)
+				: new Promise<string>((resolve) => {
+						completeHover = resolve;
+					}),
+		),
+	);
+	await s.preview.receive(s.message);
+	await s.preview.receive({ type: "focus", nodeId: "a" });
+	s.node("p").dispatchEvent(new MouseEvent("mousemove", { bubbles: true }));
+	await Promise.resolve();
+	const oldTooltip = s.container.querySelector<HTMLElement>("#tooltip")!;
+	const oldNode = s.node("a");
+	await vi.advanceTimersByTimeAsync(500);
+	s.preview.dispose();
+	expect(oldNode.classList.contains("pfdsl-focus-cue")).toBe(false);
+	const next = mountPreview(s.container, {
+		postMessage: vi.fn(),
+		renderDot: async () => svg.replace("<svg ", '<svg data-render="next" '),
+	});
+	cleanups.push(() => next.dispose());
+	Object.defineProperties(s.container.querySelector("#root")!, {
+		clientWidth: { value: 400 },
+		clientHeight: { value: 300 },
+	});
+	Object.defineProperties(s.container.querySelector("#inner")!, {
+		offsetWidth: { value: 200 },
+		offsetHeight: { value: 100 },
+	});
+	await next.receive(s.message);
+	await next.receive({ type: "focus", nodeId: "p" });
+	completeHover(svg.replace("<svg ", '<svg data-render="disposed" '));
+	await Promise.resolve();
+	await Promise.resolve();
+	expect(oldTooltip.style.display).toBe("none");
+	expect(oldTooltip.querySelector("svg")).toBeNull();
+	expect(s.container.querySelector("#tooltip svg")).toBeNull();
+	expect(
+		s.container.querySelector("#inner svg")?.getAttribute("data-render"),
+	).toBe("next");
+	await vi.advanceTimersByTimeAsync(1000);
+	expect(s.node("p").classList.contains("pfdsl-focus-cue")).toBe(true);
+	await vi.advanceTimersByTimeAsync(500);
+	expect(s.container.querySelector(".pfdsl-focus-cue")).toBeNull();
 });
 
 it("keeps a right-clicked node stationary until its context menu opens", async () => {

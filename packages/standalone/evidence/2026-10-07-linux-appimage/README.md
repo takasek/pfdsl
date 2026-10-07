@@ -142,6 +142,13 @@ Code binary と復元 source の指紋一致だけで前回の Host や今回の
 原本と追補を混ぜず、画像・時刻・詳細 JSON と実行ログは追補 ZIP に保持する。
 F-001 の契約整理と旧失敗履歴、O-001 の仕様判断、全 issue の未完了を維持し、製品 source・runner・設定は変更しない。
 
+## 検収継続の自動検査
+
+[Lifecycle 検証記録](lifecycle-verification.md)に、共有 preview の31件と実 standalone host adapter の1件の成功を追加した。
+pending hover の完了逆転、dispose後の同container再利用、旧cue timer、pending snapshotとqueued editor repaintの隔離を直接検査する。
+Monaco seam / jsdomでの自動検査として区分し、通常GUIの未確認8セル（native6、VS Code2）や元の399セル集計は変更しない。
+検収は継続し、必要な環境準備と残る実画面確認を完了するまで束の成功を認定しない。
+
 ## CI と履歴の境界
 
 [Test run 37574418226](https://github.com/takasek/pfdsl/actions/runs/37574418226) の実 checkout は synthetic merge `96a306ac87951d6b050d83aed9770875025deaa9`。

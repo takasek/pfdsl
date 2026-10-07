@@ -254,6 +254,8 @@ dot の通常 native 操作が成功し、[native corpus report](evidence/2026-1
 
 同じ8261固定版の追補では、I1284-012 / native の右端 tooltip を物理 pointer で開き内部を click する入口が成功した。
 [追補と累積記録](evidence/2026-10-07-linux-appimage/README.md#同じ固定版の追補検収)は成功201・旧失敗履歴3・未確認8・対象外187。
+検収継続では、[lifecycle 自動検査](evidence/2026-10-07-linux-appimage/lifecycle-verification.md)として共有 preview 31件と実 standalone host adapter 1件が成功。
+通常 native GUI の未確認判定とは分け、束の完了まで残る実画面確認を続ける。
 初回の133条件 / 399セルの判定を保持し、唯一の status 変更を分けて記録した。
 cue の4条件、同 process dispose、両 GUI の reduced motion、VS Code の組込 definition / Peek 対照は未確認のまま維持する。
 通常 Save 入口がない native の raw CRLF 保存 bytes も未確認で、全 issue の一括完了を認定しない。
