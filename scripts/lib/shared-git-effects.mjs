@@ -398,6 +398,14 @@ export function classifySharedGitEffect(subcommand, args) {
 	if (subcommand === "fetch") {
 		// No `--dry-run` exemption: `--no-dry-run` can cancel it later in the
 		// arguments, and an option value (`-o --dry-run`) can consume it.
+		// `-u` lifts Git's own refusal to update the checked-out branch.
+		if (
+			args.some(
+				(arg) =>
+					/^-[^-]*u/.test(arg) || isLongOptionPrefix(arg, "--update-head-ok"),
+			)
+		)
+			return { kind: "shared" };
 		// Refspecs read from stdin are unresolvable at this boundary.
 		if (args.some((arg) => isLongOptionPrefix(arg, "--stdin")))
 			return { kind: "shared", unresolved: true };
