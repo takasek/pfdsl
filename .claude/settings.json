@@ -27,11 +27,6 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node scripts/delegation-guard.mjs",
-            "timeout": 10
-          },
-          {
-            "type": "command",
             "command": "node scripts/main-commit-guard.mjs",
             "timeout": 10
           },
@@ -48,6 +43,16 @@
           {
             "type": "command",
             "command": "node scripts/closes-create-guard.mjs",
+            "timeout": 10
+          }
+        ]
+      },
+      {
+        "matcher": "Bash|mcp__.*github.*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node scripts/delegation-guard.mjs",
             "timeout": 10
           }
         ]

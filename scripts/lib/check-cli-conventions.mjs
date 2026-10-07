@@ -48,6 +48,8 @@ const SKILL_MIRROR_ROOTS = [
 const FOREIGN_ARGV_GUARDS = new Set([
 	"scripts/lib/delegation-guard.mjs",
 	"scripts/lib/main-commit-guard.mjs",
+	"scripts/lib/shared-git-effects.mjs",
+	"scripts/lib/external-operation-policy.mjs",
 ]);
 
 // Its one flag-name lookup is the --force deprecation hint that #631 put

@@ -68,6 +68,7 @@ export function tryRun(file, args, opts = {}) {
 			ok: false,
 			out: e.stdout || e.stderr || e.message,
 			status: e.status ?? null,
+			...(e.code === "ETIMEDOUT" ? { timedOut: true } : {}),
 		};
 	}
 }

@@ -371,26 +371,36 @@ worktree 作成から PR 作成までを一気通貫でやらせる場合のみ 
 
 **3. 戻り時の検出。** 汎用手順のまま（`git log origin/<branch>..HEAD` と open PR 一覧の突合）。このリポ固有の追加値はない。
 
-## policy のロード失敗と段階的な受入（#1404）
+## Codex の policy 境界と段階的な受入（#1404）
 
-main-commit、delegation、verification-tree、closes-create、worktree-write、generated-root-instructions、roadmap-publish の既存入口は、同じprocessのtry/catch内でpolicyとhelperを動的importする。
-catchまで届くロード失敗・構文エラー・未処理例外は、deny JSONとstderrを出してexit 2にする。
-正常な判定は従来どおりexit 0とし、既存のask・deny・無出力を維持する。
-command-usageとPostToolUseのadvisoryは今回の変更に含めない。
-入口名とmatcherを維持し、起動済みsessionの既存配線からも同じ入口を呼べる構成にする。
-子processのrunnerを追加しないため、ADR-0046のClaude直接親PIDの照合元は変わらない。
-native所有証拠の欠落をsibling判断へ戻す処理と、policyを実行できない失敗を拒否する処理は区別する。
+最終方式の実装案・旧判断から変える範囲・対案・受入限界は [ADR-0047](../docs/adr/0047-codex-policy-boundaries.md) に記録する。
+main-commit、delegation、verification-tree、closes-create、worktree-write、generated-root-instructions、roadmap-publish の既存入口を保持し、同じ process 内の worker thread で policy/helper を動的 import する。
+stdin を含む内部 deadline は 5 秒、payload は 1 MiB、応答と診断は各 64 KiB、Git probe は合計 3 秒・一回最大 500 ms とする。
+ロード・同期/非同期例外、不正 payload/応答、期限超過は deny JSON・stderr・exit 2 とする。
+正常判定は exit 0 とし、Codex の ask は deny に変換する。
+worker thread は process.ppid を変えず、Claude の直接親照合条件を維持する。
+command-usage と PostToolUse の advisory はこの失敗拒否の対象ではない。
+bootstrap 自身の欠落・構文エラー、host timeout、trust skip は内部監督が起動しないため保証範囲に含めない。
 
-今回の拒否はentrypointのNode実行で確認する。
-harnessにhookが起動・尊重されること、host timeout、bootstrap自身の欠落・構文エラー、trust skipまで保証したとは扱わない。
-既存parserが不正payloadを無出力にする経路も変更していない。
-同一processのtry/catchは同期停止・終わらないstdin・probeを打ち切れないため、内部の実行予算と実harnessの失敗受入は後続に残す。
+共有 Git 効果、親の merge/auto-merge、GitHub MCP、子の Git metadata 変更、全 file target の物理パスをそれぞれ確認する。
+Codex の linked checkout は cwd と一致しても操作時の native owner 証拠を要求し、main/default・検査回避・共有作用先の拒否を免除しない。
+Edit/Write と apply_patch の追加・削除・移動元/先を全件調べ、primary・別 owner・解決不能 target・dangling symlink を保護する。
+GitHub MCP は既知の読取を許可し、Codex では親を含め変更系・未知の操作を拒否する。
+親の通常の Bash 公開経路は残す。
+roadmap の公開宣言は Claude ask を維持し、Codex は additionalContext による advisory とする。
+Codex の公開宣言を事前拒否したという保証を持たず、通常の公開承認と人間の PR レビューを維持する。
 
-残る保護は、default refへのbranch・update-ref等の作用先、親のmerge・auto-merge、MCP、apply_patch、物理パスとsymlink、未知target、Codexでのask変換をそれぞれ独立に確認する。
-pre-commitを経由しないref操作を #1403 のcommit拒否で覆ったと主張しない。
-shared runnerや配線の縮小を採る場合は、元hookの直接親条件を保った所有者補正の正例・別所有者の陰性を同じ変更単位で確認する。
-verification-tree・closes-create等の削除とSessionStart自動setupの廃止は、この部分変更では決定していない。
-個人wrapper・trusted rootsをrepo fixtureの前提にせず、保護の代替を実入口で確認してから判断する。
+pre-commit が走らない ref 操作を #1403 の commit 拒否で覆ったとは扱わない。
+verification-tree・closes-create は代替による事前保護の受入がないため残す。
+SessionStart は #1403 の setup・版付き shim・preflight に接続したまま残す。
+個人 wrapper・trusted roots を repo fixture の前提にしない。
+
+同梱 Codex CLI 0.160.0 の実入口で通常読取と merge の help を確認し、親の merge、default ref 更新、primary への no-op apply_patch は hook が下流実行前に拒否した。
+生入力で apply_patch の command 形式、親と子で共通の session_id、子の別 agent_id を観測した。
+子の add --dry-run は親担当の案内付きで下流実行前に拒否された。
+一時的な helper 欠落時は通常読取も拒否され、元の helper の復元後は同じ読取が exit 0 に回復した。
+hooks/list の sourcePath は primary の .codex/hooks.json で、新しい MCP matcher の実配線は未受入である。
+Node 入口の再生・失敗注入、CLI の実操作、Desktop の実操作は別の根拠として扱う。
 
 ## native 所有者の受入継続（#1398）
 
@@ -401,7 +411,8 @@ hookの生stdinは今回も保存していないため、事後のGit成功を�
 
 残る受入はClaude Desktopの実Git・親とsubagentの区別、別生存所有者、移動先に留まったcd後の操作、再開・fork・handoff、native隔離だけに委ねる場合の同一陰性入力である。
 nodeによる最終entrypointの実行と合成metadataの回帰テストは、live harnessのhook受入と区別する。
-#1404のロード失敗修正でもADR-0046の所有者条件は変えず、上記未確認を完了へ読み替えない。
+#1404 の Codex linked checkout・file・主体別 Git policy の拡張案は ADR-0047 に従う。
+Claude の直接親条件と上記未確認を完了へ読み替えない。
 
 ## hook の artifact 登録基準（#854）
 

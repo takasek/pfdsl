@@ -58,7 +58,13 @@ describe("classifyGitCommand", () => {
 		]) {
 			assert.deepEqual(
 				classifyGitCommand(`git ${sub} x`),
-				{ subcommand: sub, decision: "ask" },
+				{
+					subcommand: sub,
+					decision: "ask",
+					...(["checkout", "switch"].includes(sub)
+						? { effect: { kind: "enter-branch", ref: "x" } }
+						: {}),
+				},
 				sub,
 			);
 		}
@@ -115,15 +121,15 @@ describe("classifyGitCommand", () => {
 	it("classifies the targeted Codex routine wrapper as its Git mutation", () => {
 		for (const [command, subcommand] of [
 			[
-				"/Users/example/.codex/bin/codex-git-routine.mjs stage-all /repo/worktree topic",
+				"/opt/codex/bin/codex-git-routine.mjs stage-all /repo/worktree topic",
 				"add",
 			],
 			[
-				"/Users/example/.codex/bin/codex-git-routine.mjs commit /repo/worktree topic message",
+				"/opt/codex/bin/codex-git-routine.mjs commit /repo/worktree topic message",
 				"commit",
 			],
 			[
-				"/Users/example/.codex/bin/codex-git-routine.mjs branch-rename /repo/worktree old new",
+				"/opt/codex/bin/codex-git-routine.mjs branch-rename /repo/worktree old new",
 				"branch",
 			],
 		]) {
@@ -146,7 +152,11 @@ describe("classifyGitCommand", () => {
 		assert.equal(classifyGitCommand("git status --short"), null);
 		assert.equal(classifyGitCommand("git log --oneline -5"), null);
 		assert.equal(classifyGitCommand("git fetch origin"), null);
-		assert.equal(classifyGitCommand("git worktree add ../w -b topic"), null);
+		assert.deepEqual(classifyGitCommand("git worktree add ../w -b topic"), {
+			subcommand: "worktree",
+			decision: "ask",
+			effect: { kind: "create-branch", ref: "topic" },
+		});
 	});
 
 	it("leaves the read-only stash forms alone, since they diagnose a loss", () => {
@@ -671,7 +681,7 @@ describe("resolveCommandCwd", () => {
 	it("reads the explicit target carried by the Codex routine wrapper", () => {
 		assert.equal(
 			resolveCommandCwd(
-				"/Users/example/.codex/bin/codex-git-routine.mjs stage-all /repo/sibling sibling",
+				"/opt/codex/bin/codex-git-routine.mjs stage-all /repo/sibling sibling",
 				HOOK_CWD,
 			),
 			"/repo/sibling",
@@ -1236,6 +1246,14 @@ describe("main-commit-guard wrapper", () => {
 		]);
 		git(repo, ["worktree", "add", "-b", "session", session]);
 		git(repo, ["worktree", "add", "-b", "sibling", sibling]);
+		mkdirSync(join(session, "sibling"));
+		writeFileSync(
+			resolve(
+				session,
+				git(session, ["rev-parse", "--git-path", "codex-thread.json"]).trim(),
+			),
+			JSON.stringify({ version: 1, ownerThreadId: "fixture-session" }),
+		);
 
 		// A throwaway sandbox of the shape distribution-review's probes create:
 		// its own .git, no remote, and the `main` that `git init` hands out
@@ -1251,16 +1269,31 @@ describe("main-commit-guard wrapper", () => {
 
 	function runWrapper(
 		command,
-		{ payloadCwd = session, claudeProjectDir = session, environment = {} } = {},
+		{
+			payloadCwd = session,
+			claudeProjectDir = session,
+			environment = {},
+			expectFailure = false,
+		} = {},
 	) {
 		const env = { ...process.env, ...environment };
 		if (claudeProjectDir === null) delete env.CLAUDE_PROJECT_DIR;
 		else env.CLAUDE_PROJECT_DIR = claudeProjectDir;
-		return execFileSync(process.execPath, [script], {
-			encoding: "utf8",
-			env,
-			input: JSON.stringify(payload({ command, cwd: payloadCwd })),
-		}).trim();
+		try {
+			return execFileSync(process.execPath, [script], {
+				encoding: "utf8",
+				env,
+				input: JSON.stringify({
+					...payload({ command, cwd: payloadCwd }),
+					session_id: "fixture-session",
+				}),
+			}).trim();
+		} catch (error) {
+			if (!expectFailure) throw error;
+			assert.equal(error.status, 2);
+			assert.match(error.stdout, /"permissionDecision":"deny"/);
+			return error.stdout.trim();
+		}
 	}
 
 	it("stays silent on an unrelated repository's main while still guarding a sibling (#1221)", () => {
@@ -1277,18 +1310,18 @@ describe("main-commit-guard wrapper", () => {
 		// the grounds that nothing distinguishes it.
 		const output = runWrapper(`git -C ${repo} add -A`, {
 			claudeProjectDir: join(root, "no-such-session-dir"),
+			expectFailure: true,
 		});
 		assert.match(output, /"permissionDecision":"deny"/);
 	});
 
-	it("stays silent when the target is not a git repository at all (#1221)", () => {
-		// The git-is-broken shape: no roots *and* no branch. The branch-name
-		// rule cannot fire without a branch, so this allows — which is what the
-		// guard did before #1221 too. Recorded so the prose describing
-		// `unknown` is not read as covering this case.
+	it("denies when a mutation target cannot establish a repository (#1404)", () => {
 		const notARepo = join(root, "not-a-repo");
 		mkdirSync(notARepo, { recursive: true });
-		assert.equal(runWrapper(`git -C ${notARepo} add -A`), "");
+		assert.match(
+			runWrapper(`git -C ${notARepo} add -A`, { expectFailure: true }),
+			/"permissionDecision":"deny"/,
+		);
 	});
 
 	it("uses the payload cwd as the session worktree in Codex (#784)", () => {
@@ -1303,7 +1336,7 @@ describe("main-commit-guard wrapper", () => {
 	});
 
 	it("guards the explicit wrapper target instead of invisible exec workdir", () => {
-		const routine = "/Users/example/.codex/bin/codex-git-routine.mjs";
+		const routine = "/opt/codex/bin/codex-git-routine.mjs";
 		for (const [target, branch, expected] of [
 			[sibling, "sibling", "deny"],
 			[repo, "main", "deny"],

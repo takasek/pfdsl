@@ -24,9 +24,14 @@
 // delegation returns.
 
 import { basename } from "node:path";
-
+import {
+	findMergeCommand,
+	githubToolEffect,
+	mergeDecision,
+} from "./external-operation-policy.mjs";
 import { parseGhCommand } from "./gh-command.mjs";
 import { buildPermissionOutput, parseHookPayload } from "./hook-io.mjs";
+import { classifySharedGitEffect } from "./shared-git-effects.mjs";
 import { prepareHeredocs } from "./shell-heredoc.mjs";
 
 /** Agents permitted to perform outward-facing actions. Publishing is their job. */
@@ -1190,18 +1195,125 @@ export function findOutwardCommand(command) {
  */
 export function evaluateDelegationGuard(
 	payload,
-	{ allowedAgents = DEFAULT_ALLOWED_AGENTS } = {},
+	{ allowedAgents = DEFAULT_ALLOWED_AGENTS, supportsAsk = true } = {},
 ) {
+	const effect = githubToolEffect(payload?.tool_name);
+	const merge =
+		effect === "merge"
+			? payload.tool_name
+			: payload?.tool_name === "Bash"
+				? findMergeCommand(payload?.tool_input?.command, {
+						splitSegments,
+						tokenize,
+						stripLeadingNoise,
+					})
+				: null;
+	if (merge) return mergeDecision(merge, supportsAsk);
+	if (effect && effect !== "read") {
+		if (
+			!supportsAsk ||
+			(payload?.agent_id && !allowedAgents.includes(payload.agent_type))
+		)
+			return {
+				decision: "deny",
+				matched: payload.tool_name,
+				reason:
+					"GitHub MCP writes require a verified parent identity. This hook cannot establish that identity on Codex. Have the parent use its reviewed command publication route; do not route around a delegated-write rejection.",
+			};
+	}
 	if (payload?.tool_name !== "Bash") return { decision: "allow" };
 
 	// No agent_id means the caller itself, which owns review and publishing.
 	// See the module header for why agent_id and not agent_type (#932).
 	if (!payload?.agent_id) return { decision: "allow" };
+	if (!supportsAsk) {
+		for (const segment of splitSegments(payload?.tool_input?.command ?? "")) {
+			const tokens = stripLeadingNoise(tokenize(segment));
+			if (!tokens.length || basename(tokens[0].value) !== "git") continue;
+			const sub = gitSubcommand(tokens);
+			const args = tokens
+				.slice(gitSubcommandIndex(tokens) + 1)
+				.map((token) => token.value);
+			const read =
+				[
+					"status",
+					"diff",
+					"log",
+					"show",
+					"rev-parse",
+					"ls-files",
+					"ls-tree",
+					"show-ref",
+					"for-each-ref",
+					"cat-file",
+					"rev-list",
+					"merge-base",
+					"describe",
+					"help",
+				].includes(sub) ||
+				(sub === "branch" &&
+					!classifySharedGitEffect(sub, args) &&
+					(args.length === 0 ||
+						args.some((arg) =>
+							[
+								"--show-current",
+								"--list",
+								"-a",
+								"--all",
+								"-r",
+								"--remotes",
+								"-v",
+								"-vv",
+							].includes(arg),
+						))) ||
+				(sub === "remote" &&
+					(() => {
+						const action = args.filter(
+							(arg) => !["-v", "--verbose"].includes(arg),
+						)[0];
+						return action === undefined || ["show", "get-url"].includes(action);
+					})()) ||
+				(sub === "config" &&
+					args.some((arg) =>
+						[
+							"--get",
+							"--get-all",
+							"--get-regexp",
+							"--get-urlmatch",
+							"--list",
+							"-l",
+						].includes(arg),
+					) &&
+					!args.some((arg) =>
+						[
+							"--add",
+							"--unset",
+							"--unset-all",
+							"--replace-all",
+							"--edit",
+							"-e",
+							"--rename-section",
+							"--remove-section",
+						].includes(arg),
+					)) ||
+				(sub === "stash" && ["list", "show"].includes(args[0])) ||
+				(sub === "worktree" && args[0] === "list") ||
+				args.includes("--help");
+			if (!read)
+				return {
+					decision: "deny",
+					matched: `git ${sub ?? "unknown"}`,
+					reason:
+						"Codex Git metadata operations belong to the parent. Report the needed operation to the parent; continue with file edits and tests only.",
+				};
+		}
+	}
 
 	// agent_type names which agent it is; the contract has it present whenever
 	// agent_id is, so it needs no absence handling here.
 	const agentType = payload?.agent_type;
-	if (allowedAgents.includes(agentType)) return { decision: "allow" };
+	if (supportsAsk && allowedAgents.includes(agentType))
+		return { decision: "allow" };
 
 	const matched = findOutwardCommand(payload?.tool_input?.command);
 	if (!matched) return { decision: "allow" };
@@ -1224,12 +1336,12 @@ export function evaluateDelegationGuard(
  * @param {string} inputText - raw stdin payload
  * @returns {{shouldOutput: boolean, output?: object}}
  */
-export function runDelegationGuard(inputText) {
+export function runDelegationGuard(inputText, options = {}) {
 	const payload = parseHookPayload(inputText);
 	if (!payload) return { shouldOutput: false };
 
-	const result = evaluateDelegationGuard(payload);
-	if (result.decision === "deny") {
+	const result = evaluateDelegationGuard(payload, options);
+	if (result.decision !== "allow") {
 		return { shouldOutput: true, output: buildPermissionOutput(result) };
 	}
 	return { shouldOutput: false };

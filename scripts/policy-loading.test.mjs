@@ -10,7 +10,7 @@ import {
 	writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 import { test } from "node:test";
 
 const policies = [
@@ -28,13 +28,15 @@ const exportsByPolicy = {
 	delegation: ["runDelegationGuard"],
 	"verification-tree": ["runVerificationTreeGuard", "supportsPermissionAsk"],
 	"closes-create": ["runClosesCreateGuard"],
-	"worktree-write": ["evaluateWorktreeWriteGuard"],
+	"worktree-write": ["evaluatePhysicalWrites", "normalizeFileOperations"],
 	"generated-root-instructions": [
 		"evaluateGeneratedRootInstructionsGuard",
 		"mayTargetGeneratedRootInstructions",
 	],
-	"roadmap-publish": ["runRoadmapPublishGuard"],
+	"roadmap-publish": ["evaluateRoadmapPublishGuard"],
 };
+const policyModule = (policy) =>
+	policy === "worktree-write" ? "file-operation-policy" : `${policy}-guard`;
 for (const policy of policies)
 	for (const failure of [
 		"missing",
@@ -55,6 +57,14 @@ for (const policy of policies)
 				for (const [path, text] of [
 					["lib/hook-io.mjs", readFileSync(new URL("lib/hook-io.mjs", source))],
 					[
+						"lib/guard-probe.mjs",
+						readFileSync(new URL("lib/guard-probe.mjs", source)),
+					],
+					[
+						"lib/file-operation-policy.mjs",
+						"export const normalizeFileOperations = (p) => p.tool_name === 'Bash' ? [{tool_name:'Write',tool_input:{file_path:'/fixture/AGENTS.md'}}] : []; export const evaluatePhysicalWrites = () => ({decision:'allow'});\n",
+					],
+					[
 						"lib/run-exec.mjs",
 						"export const resolveGitRoots = () => null; export const tryGit = () => ({ok:false}); export const hasGitTargetEnvironment = () => false; export const withoutGitTargetEnvironment = () => ({});\n",
 					],
@@ -64,16 +74,18 @@ for (const policy of policies)
 					],
 				])
 					writeFileSync(join(root, path), text);
+				if (failure === "missing" && policy === "worktree-write")
+					rmSync(join(root, "lib/file-operation-policy.mjs"));
 				if (failure !== "missing")
 					writeFileSync(
-						join(root, `lib/${policy}-guard.mjs`),
+						join(root, `lib/${policyModule(policy)}.mjs`),
 						failure === "syntax"
 							? "export {\n"
 							: failure === "runtime" || failure.startsWith("helper-")
 								? exportsByPolicy[policy]
 										.map((name) =>
 											failure.startsWith("helper-")
-												? `export const ${name} = () => ({shouldOutput:false, decision:'allow'});`
+												? `export const ${name} = () => (${name === "normalizeFileOperations" ? "[]" : "{shouldOutput:false, decision:'allow'}"});`
 												: `export const ${name} = () => { throw new Error('fixture-policy-runtime-error'); };`,
 										)
 										.join("\n")
@@ -118,7 +130,13 @@ for (const policy of policies)
 					const repaired = spawnSync(
 						process.execPath,
 						[join(root, `${policy}-guard.mjs`)],
-						{ input: "{}", encoding: "utf8" },
+						{
+							input: JSON.stringify({
+								tool_name: "Read",
+								tool_input: { file_path: "/fixture/source" },
+							}),
+							encoding: "utf8",
+						},
 					);
 					assert.equal(repaired.status, 0, repaired.stdout + repaired.stderr);
 					assert.equal(repaired.stdout, "");
@@ -164,7 +182,7 @@ for (const tool of ["Edit", "Write"])
 					encoding: "utf8",
 				});
 				assert.equal(init.status, 0, init.stderr);
-				if (policy === "worktree-write" && decision === "deny") {
+				if (policy === "worktree-write") {
 					const commit = spawnSync(
 						"git",
 						[
@@ -189,6 +207,16 @@ for (const tool of ["Edit", "Write"])
 						{ encoding: "utf8" },
 					);
 					assert.equal(linked.status, 0, linked.stderr);
+					const metadata = spawnSync(
+						"git",
+						["-C", root, "rev-parse", "--git-path", "codex-thread.json"],
+						{ encoding: "utf8" },
+					);
+					assert.equal(metadata.status, 0, metadata.stderr);
+					writeFileSync(
+						resolve(root, metadata.stdout.trim()),
+						JSON.stringify({ version: 1, ownerThreadId: "fixture-session" }),
+					);
 				}
 				const result = spawnSync(
 					process.execPath,
@@ -196,6 +224,7 @@ for (const tool of ["Edit", "Write"])
 					{
 						input: JSON.stringify({
 							tool_name: tool,
+							session_id: "fixture-session",
 							tool_input: {
 								file_path:
 									policy === "worktree-write" && decision === "deny"

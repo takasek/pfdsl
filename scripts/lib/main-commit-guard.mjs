@@ -40,6 +40,10 @@ import {
 	updateProtectedShellState,
 } from "./delegation-guard.mjs";
 import { buildPermissionOutput, parseHookPayload } from "./hook-io.mjs";
+import {
+	classifySharedGitEffect,
+	evaluateSharedGitEffect,
+} from "./shared-git-effects.mjs";
 
 // The decision splits by target before it splits by subcommand. Against a
 // sibling whose native ownership was not confirmed by the entrypoint it is
@@ -595,6 +599,11 @@ function classifySegment(tokens) {
 
 	const sub = gitSubcommand(tokens);
 	if (!sub) return null;
+	const effect = classifySharedGitEffect(
+		sub,
+		tokens.slice(gitSubcommandIndex(tokens) + 1).map((token) => token.value),
+	);
+	if (effect) return { subcommand: sub, decision: "ask", effect };
 	if (DENIED_SUBCOMMANDS.has(sub)) {
 		if (
 			sub === "apply" &&
@@ -953,6 +962,21 @@ function evaluateGuardedCommand(
 				"needed (e.g. to debug a hook), run the command in your own terminal instead.",
 		};
 	}
+	if (guarded.effect) {
+		const effectResult = evaluateSharedGitEffect(
+			guarded.effect,
+			mainBranch,
+			currentBranch,
+			targetRelation,
+		);
+		if (
+			effectResult.decision !== "allow" ||
+			!["enter-branch", "create-branch"].includes(guarded.effect.kind)
+		)
+			return effectResult;
+	}
+	if (guarded.subcommand === "stash")
+		return evaluateSharedGitEffect({ kind: "shared" }, mainBranch);
 
 	// `unknown` rides with `own`, which is where it already sat before the
 	// relation had a name — the branch-name rule still applies, and reaching a

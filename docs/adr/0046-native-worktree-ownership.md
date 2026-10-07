@@ -4,6 +4,9 @@
 - Date: 2026-10-07
 - 対象: #1398。判断記録: https://github.com/takasek/pfdsl/issues/1398#issuecomment-6022222988
 
+PR #1413 の拡張案は [ADR-0047](0047-codex-policy-boundaries.md) に記録する。
+以下は限定実装時の判断と受入履歴であり、Codex linked checkout の own・file・主体別 Git policy の拡張と区別する。
+
 ## Context
 
 起動元を基準にした既存の guard は、同じリポジトリの別 worktree を sibling と分類する。

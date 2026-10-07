@@ -71,7 +71,7 @@ function resolveBodyText(args, readFile) {
  */
 export function evaluateClosesCreateGuard(
 	payload,
-	{ getDefaultBranch, readFile },
+	{ getDefaultBranch, readFile, supportsAsk = true },
 ) {
 	if (payload?.tool_name !== "Bash") return { decision: "allow" };
 	const command = payload?.tool_input?.command;
@@ -98,8 +98,11 @@ export function evaluateClosesCreateGuard(
 			reason:
 				`This 'gh pr create' targets ${defaultBranch} and its body has no closing keyword ` +
 				"(e.g. 'Closes #<n>') and no exemption declaration. If an issue exists, add 'Closes #<n>' to the " +
-				"body. If not, add a line-head 'no-issue: <reason>' declaration, or approve this once to proceed " +
-				"as-is. CI's check-closes-reference still runs after the PR is opened either way.",
+				"body. If not, add a line-head 'no-issue: <reason>' declaration." +
+				(supportsAsk
+					? " You may approve this once to proceed as-is."
+					: " Repair the body before retrying.") +
+				" CI's check-closes-reference still runs after the PR is opened either way.",
 		};
 	}
 
