@@ -1,0 +1,200 @@
+{
+	"reference": "8261f877d5cae8aa653a5310edfbd9e387acb116",
+	"build": {
+		"frontend": [
+			{
+				"file": "packages/standalone/dist/assets/base91-DOY1bT5-.js",
+				"sha256": "ef188a16e7ad9e0a356d435fb40ddb8fa04edb7b0428a5e6abd1d2b805347bab"
+			},
+			{
+				"file": "packages/standalone/dist/assets/duckdb-BzlFElZV.js",
+				"sha256": "eaf3ce6bb5425dcfd5ba4f86e1a9a20fea83a2faf3aff6c270bfd6f3238a3861"
+			},
+			{
+				"file": "packages/standalone/dist/assets/editor.worker-DWPaKKV_.js",
+				"sha256": "9ae6f27737ab392047db742b346c1711b685cee3b38b0fe04718eb9a9de6e0a2"
+			},
+			{
+				"file": "packages/standalone/dist/assets/expat-CX7Bg68x.js",
+				"sha256": "8d79780e091dfac1e6c221bb34d7ac58e72934b7e308c8814068af3c44e3022b"
+			},
+			{
+				"file": "packages/standalone/dist/assets/graphviz-BKX3zE1B.js",
+				"sha256": "136af8b7680116ce7458c02e8a9e1579ccf22506911ced8df37227b4d6fa4428"
+			},
+			{
+				"file": "packages/standalone/dist/assets/index-BuKc0sUX.css",
+				"sha256": "4e732cd5d308344fde1323f1682b7b6331bc62bc3e317d3c9d54ac269f7a5265"
+			},
+			{
+				"file": "packages/standalone/dist/assets/index-D1tKYltr.js",
+				"sha256": "4e8151f1ce28c79626305503e720e83caef2727ea9a8b0a47fb90254996fc704"
+			},
+			{
+				"file": "packages/standalone/dist/assets/zstd-Dx_4Lof7.js",
+				"sha256": "892c4e85dd6eea08a14eaf34b66cf2d16695806146acb015fa40eec3860e4312"
+			},
+			{
+				"file": "packages/standalone/dist/index.html",
+				"sha256": "dc3828951f456a3ef2efeb33a29eec7fec0f92b577c94f71bc2079b67044e9a4"
+			},
+			{
+				"file": "packages/standalone/dist/processing.js",
+				"sha256": "e47e466423787349603a154ea29913586e354bc4eee1abae6139a25f5645f809"
+			}
+		],
+		"nativeExecutable": {
+			"path": "/workspace/shared/pfdsl-appimage-8261f87-0522/app/squashfs-root/usr/bin/pfdsl-desktop",
+			"sha256": "10fdeff86b2a48e11948f40cbf99a7207e70c91e7c19f1f064c61bb38f441495"
+		}
+	},
+	"execution": {
+		"path": "/workspace/shared/pfdsl-appimage-8261f87-0522/app/squashfs-root/usr/bin/pfdsl-desktop",
+		"sha256": "10fdeff86b2a48e11948f40cbf99a7207e70c91e7c19f1f064c61bb38f441495"
+	},
+	"userAgent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/60.5 Safari/605.1.15",
+	"documentCount": 23,
+	"passed": true,
+	"results": [
+		{
+			"file": "docs/samples/01-simple-chain.pfdsl",
+			"inputSha256": "8ae485923230f1ebf878879b2be8167e0982f11b9b5b8800c2e20ccb2e938f14",
+			"passed": true,
+			"checks": []
+		},
+		{
+			"file": "docs/samples/02-feedback.pfdsl",
+			"inputSha256": "27ed17c9d7d668da8e28dc4eb655ba65d8e88f81e4401f7f9a5aa89364fc22c0",
+			"passed": true,
+			"checks": []
+		},
+		{
+			"file": "docs/samples/03-set-input.pfdsl",
+			"inputSha256": "c90198977cc07611e4a68a7d5807fcf299bd3009ee3d85319501e365c0d470dc",
+			"passed": true,
+			"checks": []
+		},
+		{
+			"file": "docs/samples/04-set-output.pfdsl",
+			"inputSha256": "9e8996b2fa27afb24f9054e16d8a48fbf418d815319775a6199ff84834fcc9fb",
+			"passed": true,
+			"checks": []
+		},
+		{
+			"file": "docs/samples/05-label-cjk.pfdsl",
+			"inputSha256": "455c875a2855c2275f04489712ea167a7fcacfe8b7e74528abff5f956ba4e347",
+			"passed": true,
+			"checks": []
+		},
+		{
+			"file": "docs/samples/06-status-styles.pfdsl",
+			"inputSha256": "c8149520105a4e638e2ca7491677742fa380586c00da5a546d35ca364f335b9f",
+			"passed": true,
+			"checks": []
+		},
+		{
+			"file": "docs/samples/08-groups.pfdsl",
+			"inputSha256": "0d16be3f585aab54a96e41250fe30fc91cf6947c6c451f3af501a1d7e87115d4",
+			"passed": true,
+			"checks": []
+		},
+		{
+			"file": "docs/samples/09-parts.pfdsl",
+			"inputSha256": "b90c34658274f5c59f6f20e94ac6e795e69b0474e3653fe085ca6bfc4562f8c1",
+			"passed": true,
+			"checks": []
+		},
+		{
+			"file": "docs/samples/10-layout-tb.pfdsl",
+			"inputSha256": "6770b007867ff30fefbd65110d7a87989b5986f15d72fba05865832468f602c5",
+			"passed": true,
+			"checks": []
+		},
+		{
+			"file": "docs/samples/11-external-stakeholders.pfdsl",
+			"inputSha256": "2882a9c494d37bef42a578577400d18677592e2b05d284ceb808b75cae88ecc4",
+			"passed": true,
+			"checks": []
+		},
+		{
+			"file": "docs/samples/12-subflow-detail.pfdsl",
+			"inputSha256": "5a3c38cca3c0e6a16f6293256ca70aebeed3194ccd5311107650cc1ef712be4f",
+			"passed": true,
+			"checks": []
+		},
+		{
+			"file": "docs/samples/12-subflow.pfdsl",
+			"inputSha256": "1af6b5abd702b156697a04e60b5e3b8fcaff2929b109555cc8668991a845039d",
+			"passed": true,
+			"checks": []
+		},
+		{
+			"file": "docs/samples/13-preset-base.pfdsl",
+			"inputSha256": "4dc9dd763a0cdf98a8447efd4ce8d8aa2e270fc58ec91f192973c0e434aa7a92",
+			"passed": true,
+			"checks": []
+		},
+		{
+			"file": "docs/samples/13-preset.pfdsl",
+			"inputSha256": "09bc5ce8e9ea74fbcedc415de15eb98f15cf7c86a3e62249accaae3a91592913",
+			"passed": true,
+			"checks": []
+		},
+		{
+			"file": "docs/samples/14-boundary-detail.pfdsl",
+			"inputSha256": "636ea5a5bea8f7b026e6866775b64d4711156f5d2e6ab5933009431d1184ffbd",
+			"passed": true,
+			"checks": []
+		},
+		{
+			"file": "docs/samples/14-boundary.pfdsl",
+			"inputSha256": "ec8409d4ca03c9b3f36f0af57fd9c2ecdc07f13544c229795e431d14f1b41212",
+			"passed": true,
+			"checks": []
+		},
+		{
+			"file": "docs/samples/15-index.pfdsl",
+			"inputSha256": "89de3ef7988d4de5c96bd69722df21ae29849bea72c318556de6578ae5f90a4e",
+			"passed": true,
+			"checks": []
+		},
+		{
+			"file": "docs/samples/16-basepath.pfdsl",
+			"inputSha256": "a847a4c6f4a6cb9a44bac07bfc45d798490e6c3da891525067e313952bd9a714",
+			"passed": true,
+			"checks": []
+		},
+		{
+			"file": "docs/samples/17-type.pfdsl",
+			"inputSha256": "46464f87a14fa6d909b4727fe3be19e732743b0d1efedde72ea9c22f1ab19683",
+			"passed": true,
+			"checks": []
+		},
+		{
+			"file": "docs/samples/pfdsl_implementation_flow.pfdsl",
+			"inputSha256": "e5502371d8b442d16257f04c1b6743e3b7f196e3b12673d18333bd494b4ea9df",
+			"passed": true,
+			"checks": []
+		},
+		{
+			"file": ".pfdsl/roadmap.pfdsl",
+			"inputSha256": "0a726cc4e580a903701de767ea3d1796566a82f2736ae21a425016c74752157d",
+			"passed": true,
+			"checks": []
+		},
+		{
+			"file": ".pfdsl/workflow.pfdsl",
+			"inputSha256": "f084a1d2a265429db589fb658cf7edd1c55e7bd791c7e39820eab86b58523002",
+			"passed": true,
+			"checks": []
+		},
+		{
+			"file": ".pfdsl/pipeline.pfdsl",
+			"inputSha256": "b955b11343fc71b2e4330c60120b3f6a65d6aec35b11c19a450498a1337c392e",
+			"passed": true,
+			"checks": []
+		}
+	],
+	"failures": [],
+	"errors": []
+}
