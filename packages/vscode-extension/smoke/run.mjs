@@ -28,6 +28,160 @@ const maxExtensionHostLogFiles = 4;
 const maxExtensionHostLogEntries = 200;
 const maxExtensionHostLogTailBytes = 4_096;
 
+export async function collectWorkbenchInteractionState(page) {
+	return page.evaluate(() => {
+		const describe = (element) =>
+			element
+				? {
+						tag: element.tagName,
+						id: element.id.slice(0, 100),
+						class: String(element.className).slice(0, 160),
+						role: element.getAttribute("role"),
+					}
+				: null;
+		return {
+			documentFocused: document.hasFocus(),
+			activeElement: describe(document.activeElement),
+			groups: document.querySelectorAll(".editor-group-container").length,
+			tabs: [
+				...document.querySelectorAll('.editor-group-container [role="tab"]'),
+			]
+				.slice(0, 8)
+				.map((tab) => ({
+					selected: tab.getAttribute("aria-selected"),
+					label: tab.getAttribute("aria-label")?.slice(0, 160),
+				})),
+			quickInputs: [...document.querySelectorAll(".quick-input-widget input")]
+				.slice(0, 4)
+				.map((input) => ({
+					...describe(input),
+					visible:
+						input.getClientRects().length > 0 &&
+						getComputedStyle(input).visibility !== "hidden",
+					disabled: input.disabled,
+					readOnly: input.readOnly,
+					inert: !!input.closest("[inert]"),
+					focused: input === document.activeElement,
+					mode: input.value.startsWith(">") ? "command" : "file",
+				})),
+		};
+	});
+}
+
+export async function withWorkbenchOperation(
+	page,
+	label,
+	operation,
+	{
+		readState = collectWorkbenchInteractionState,
+		log = (event) => console.log("Workbench operation:", JSON.stringify(event)),
+	} = {},
+) {
+	const snapshot = async () => {
+		try {
+			return await readState(page);
+		} catch (error) {
+			return { unavailable: error.message };
+		}
+	};
+	log({ label, phase: "before", state: await snapshot() });
+	try {
+		const result = await operation();
+		log({ label, phase: "after", state: await snapshot() });
+		return result;
+	} catch (error) {
+		const state = await snapshot();
+		log({ label, phase: "failed", state });
+		throw new Error(
+			`${label}: ${error.stack ?? error}\nWorkbench state: ${JSON.stringify(state)}`,
+			{ cause: error },
+		);
+	}
+}
+
+export function quickInputValue(mode, text) {
+	return mode === "command" ? `>${text}` : text;
+}
+
+export async function closeSourceTab(
+	page,
+	sourceTab,
+	{
+		readState = async () => ({
+			sourceTabs: await sourceTab.count(),
+			previewTabs: await page
+				.getByRole("tab", { name: /^PFDSL Preview/ })
+				.count(),
+			groups: await page.locator(".editor-group-container").count(),
+		}),
+		log,
+		timeoutMs = coldRenderTimeoutMs,
+	} = {},
+) {
+	return withWorkbenchOperation(
+		page,
+		"close source tab",
+		async () => {
+			await sourceTab.getByRole("button", { name: /^Close \(/ }).click();
+			return expectEventually(
+				"source hidden and preview retained",
+				readState,
+				(state) =>
+					state.sourceTabs === 0 &&
+					state.previewTabs === 1 &&
+					state.groups === 1,
+				{ timeoutMs },
+			);
+		},
+		{ ...(log ? { log } : {}), ...(log ? { readState } : {}) },
+	);
+}
+
+async function submitQuickInput(page, focusTarget, shortcut, mode, text) {
+	return withWorkbenchOperation(
+		page,
+		`${mode} picker: ${mode === "command" ? text : "open fixture"}`,
+		async () => {
+			// Focus the workbench tab without clicking it and scheduling editor/webview focus.
+			await focusTarget.focus();
+			await focusTarget.press(shortcut);
+			const input = page.locator(
+				".quick-input-widget:not([inert]) input:visible",
+			);
+			await waitForInteraction(
+				`${mode} picker ready`,
+				async () => {
+					if ((await input.count()) !== 1) return false;
+					return input.evaluate(
+						(element, expectedMode) =>
+							document.hasFocus() &&
+							document.activeElement === element &&
+							!element.disabled &&
+							!element.readOnly &&
+							!element.closest("[inert]") &&
+							(element.value.startsWith(">") ? "command" : "file") ===
+								expectedMode,
+						mode,
+					);
+				},
+				(ready) => ready,
+				{ timeoutMs: coldRenderTimeoutMs },
+			);
+			const value = quickInputValue(mode, text);
+			await input.fill(value);
+			assert.equal(await input.inputValue(), value);
+			if (mode === "command") {
+				await page
+					.locator(".quick-input-widget .label-name")
+					.getByText(text, { exact: true })
+					.waitFor({ state: "visible" });
+			}
+			await input.press("Enter");
+			await page.locator(".quick-input-widget").waitFor({ state: "hidden" });
+		},
+	);
+}
+
 export function resolveVSCodeExecutablePath(
 	vscodeExecutablePath,
 	{ exists = existsSync, platform = process.platform } = {},
@@ -979,14 +1133,7 @@ async function assertPreviewEditingFocus(session) {
 		(text) => text.includes("Smoke output"),
 		{ timeoutMs: coldRenderTimeoutMs },
 	);
-	await sourceTab.click();
-	await page.keyboard.press(`${modifier}+w`);
-	await waitForInteraction(
-		"closing the only source tab removes its editor group",
-		() => page.locator(".editor-group-container").count(),
-		(count) => count === 1,
-		{ timeoutMs: coldRenderTimeoutMs },
-	);
+	await closeSourceTab(page, sourceTab);
 	await frame.locator('#inner g.node[data-node-id="p"]').press("Enter");
 	await frame.locator("#connector-kind").selectOption("->");
 	await frame.locator("#connector-target").fill("reopened_result");
@@ -1043,14 +1190,7 @@ async function assertHiddenSourceExternalChange(session) {
 		1,
 		"hidden source fixture rendered",
 	);
-	await sourceTab.click();
-	await page.keyboard.press(`${modifier}+w`);
-	await waitForInteraction(
-		"source hidden",
-		() => page.locator(".editor-group-container").count(),
-		(count) => count === 1,
-		{ timeoutMs: coldRenderTimeoutMs },
-	);
+	await closeSourceTab(page, sourceTab);
 	await frame
 		.locator('#inner g.node[data-node-id="hidden_source_process"]')
 		.press("Enter");
@@ -1073,14 +1213,22 @@ async function assertHiddenSourceExternalChange(session) {
 		await frame.locator('#inner g.node[data-node-id="stale_result"]').count(),
 		0,
 	);
-	await page.keyboard.press(`${modifier}+p`);
-	const quickInput = page.locator(".quick-input-widget input:visible");
-	await quickInput.fill(session.fixturePath);
-	await quickInput.press("Enter");
-	await sourceTab.click();
-	await page.keyboard.press(`${modifier}+Shift+p`);
-	await quickInput.fill("File: Revert File");
-	await quickInput.press("Enter");
+	await submitQuickInput(
+		page,
+		page.getByRole("tab", { name: /^PFDSL Preview/ }),
+		`${modifier}+p`,
+		"file",
+		session.fixturePath,
+	);
+	await sourceTab.waitFor({ state: "visible" });
+	assert.equal(await sourceTab.getAttribute("aria-selected"), "true");
+	await submitQuickInput(
+		page,
+		sourceTab,
+		`${modifier}+Shift+p`,
+		"command",
+		"File: Revert File",
+	);
 	await page.getByRole("tab", { name: /^PFDSL Preview/ }).click();
 	await waitForColdRender(
 		frame.locator('#inner g.node[data-node-id="external"]'),
@@ -1250,12 +1398,9 @@ async function main() {
 			console.error(
 				"Workbench interaction state:",
 				JSON.stringify(
-					await session.page
-						.locator(
-							".quick-input-widget, .monaco-menu, .action-widget, .monaco-editor .view-lines",
-						)
-						.allTextContents()
-						.catch(() => []),
+					await collectWorkbenchInteractionState(session.page).catch(
+						(stateError) => ({ unavailable: stateError.message }),
+					),
 				),
 			);
 			failure = await appendWebviewFailureSnapshot(
