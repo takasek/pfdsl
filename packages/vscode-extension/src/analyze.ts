@@ -1,10 +1,7 @@
 import { readFileSync } from "node:fs";
+import { type Frontmatter, resolveEffectiveFrontmatter } from "@pfdsl/core";
 import {
-	type Frontmatter,
-	resolveEffectiveFrontmatter,
-	wrapPresetSource,
-} from "@pfdsl/core";
-import {
+	analyzeDependencySnapshot,
 	analyzeSnapshot as analyzeSource,
 	prepareDocument,
 } from "@pfdsl/editor";
@@ -34,7 +31,7 @@ export function analyzeDocument(
 function extendsLoader(path: string): ReturnType<typeof analyzeSource> | null {
 	try {
 		const src = readFileSync(path, "utf-8");
-		return analyzeSource(wrapPresetSource(path, src));
+		return analyzeDependencySnapshot(path, src);
 	} catch {
 		return null;
 	}
