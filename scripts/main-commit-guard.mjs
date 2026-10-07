@@ -14,6 +14,8 @@
 // CLAUDE_PROJECT_DIR remains authoritative in Claude Code, while Codex falls
 // back to the PreToolUse payload cwd. None of these are read unless the command
 // turns out to be guarded — the lib calls resolveBranches only then.
+// A resolved sibling can be refined by optional native ownership evidence
+// (ADR-0046); this never removes branch or hook-bypass checks.
 //
 // Always exits 0 — a crash here, or a `git` failure, must not wedge every Bash
 // call.
@@ -25,6 +27,7 @@ import {
 	classifyTargetRepository,
 	runMainCommitGuard,
 } from "./lib/main-commit-guard.mjs";
+import { refineNativeWorktreeRelation } from "./lib/native-worktree-owner.mjs";
 import {
 	hasGitTargetEnvironment,
 	resolveGitRoots,
@@ -66,7 +69,10 @@ function resolveBranches(payload, targetCwd) {
 	return {
 		currentBranch: current.ok ? current.out.trim() : undefined,
 		mainBranch: head.ok ? head.out.trim().replace(/^origin\//, "") : "main",
-		targetRelation: classifyTargetRepository(sessionRoots, targetRoots),
+		targetRelation: refineNativeWorktreeRelation(
+			classifyTargetRepository(sessionRoots, targetRoots),
+			{ targetRoot: targetRoots?.worktreeRoot, payload },
+		),
 	};
 }
 

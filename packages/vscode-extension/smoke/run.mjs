@@ -1062,8 +1062,9 @@ async function assertHiddenSourceExternalChange(session) {
 		.getByRole("button", { name: "Add connection", exact: true })
 		.click();
 	await page
+		.getByLabel(/, source: PFDSL, notification,/)
 		.getByText(
-			/The (?:document changed\. Reopen Node actions and try again\.|file changed outside VS Code\. Reload the source file before editing from the preview\.)/,
+			/^The (?:document changed\. Reopen Node actions and try again\.|file changed outside VS Code\. Reload the source file before editing from the preview\.)$/,
 			{ exact: true },
 		)
 		.waitFor({ state: "visible" });

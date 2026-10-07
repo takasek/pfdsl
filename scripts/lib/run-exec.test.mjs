@@ -19,6 +19,15 @@ import {
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 
 describe("run-exec", () => {
+	it("bounds an optional probe without changing other runners", () => {
+		const result = tryRun(
+			process.execPath,
+			["-e", "setTimeout(() => {}, 150)"],
+			{ cwd: root, timeout: 50, captureStderr: true },
+		);
+		assert.equal(result.ok, false);
+		assert.equal(result.status, null);
+	});
 	it("does not treat empty Git target variables as target overrides", () => {
 		assert.equal(
 			hasGitTargetEnvironment({ GIT_DIR: "", GIT_WORK_TREE: "" }),
