@@ -57,6 +57,8 @@ function isLongOptionPrefix(arg, name) {
 	return given.startsWith("--") && given.length > 2 && name.startsWith(given);
 }
 
+const CREATE_LONG_OPTIONS = ["--create", "--force-create", "--orphan"];
+
 export function classifySharedGitEffect(subcommand, args) {
 	if (hasGitHelpOption(subcommand, args)) return null;
 	if (subcommand === "update-ref")
@@ -138,39 +140,44 @@ export function classifySharedGitEffect(subcommand, args) {
 		return operands.length ? { kind: "create-branch", ref: operands[0] } : null;
 	}
 	if (subcommand === "checkout" || subcommand === "switch") {
-		const attached = args
-			.map((arg) => arg.match(/^-[^-]*?[bBcC](.+)$/))
-			.find(Boolean);
-		if (attached) return { kind: "enter-branch", ref: attached[1] };
-		const inline = args.find((arg) =>
-			/^--(?:create|force-create|orphan)=/.test(arg),
-		);
-		if (inline)
-			return {
-				kind: "enter-branch",
-				ref: inline.slice(inline.indexOf("=") + 1),
-			};
+		// Everything after `--` is a path, except that `switch` has no path
+		// restore form: its operand after `--` is still the branch.
+		const separator = args.indexOf("--");
+		const options = separator >= 0 ? args.slice(0, separator) : args;
+		const afterSeparator = separator >= 0 ? args.slice(separator + 1) : [];
+		// Entering a branch another checkout holds is a shared effect even when
+		// Git is told to allow it.
 		if (
-			args.includes("--") ||
-			args.includes("--detach") ||
-			(subcommand === "switch" && args.includes("-d"))
+			options.some((arg) => isLongOptionPrefix(arg, "--ignore-other-worktrees"))
+		)
+			return { kind: "shared" };
+		for (let i = 0; i < options.length; i++) {
+			const arg = options[i];
+			const attached = arg.match(/^-[^-]*?[bBcC](.+)$/);
+			let ref;
+			if (attached) ref = attached[1];
+			else if (["-b", "-B", "-c", "-C"].includes(arg)) ref = options[i + 1];
+			else if (
+				// `--force` is its own exact option, not an abbreviation of
+				// `--force-create`.
+				arg !== "--force" &&
+				CREATE_LONG_OPTIONS.some((name) => isLongOptionPrefix(arg, name))
+			)
+				ref = arg.includes("=")
+					? arg.slice(arg.indexOf("=") + 1)
+					: options[i + 1];
+			else continue;
+			return ref ? { kind: "enter-branch", ref } : null;
+		}
+		if (
+			options.includes("--detach") ||
+			(subcommand === "switch" && options.includes("-d")) ||
+			(subcommand === "checkout" && afterSeparator.length > 0)
 		)
 			return null;
-		const branchFlag = args.findIndex((arg) =>
-			[
-				"-b",
-				"-B",
-				"-c",
-				"-C",
-				"--orphan",
-				"--create",
-				"--force-create",
-			].includes(arg),
-		);
 		const ref =
-			branchFlag >= 0
-				? args[branchFlag + 1]
-				: args.find((arg) => !arg.startsWith("-"));
+			options.find((arg) => !arg.startsWith("-")) ??
+			(subcommand === "switch" ? afterSeparator[0] : undefined);
 		if (ref) return { kind: "enter-branch", ref };
 	}
 	if (subcommand === "fetch") {
