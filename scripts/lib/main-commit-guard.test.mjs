@@ -141,6 +141,39 @@ describe("classifyGitCommand", () => {
 		}
 	});
 
+	it("classifies the node-launched Codex routine wrapper the same way", () => {
+		for (const [command, subcommand] of [
+			[
+				"node /opt/codex/bin/codex-git-routine.mjs stage-all /repo/worktree topic",
+				"add",
+			],
+			[
+				"/usr/bin/node /opt/codex/bin/codex-git-routine.mjs commit /repo/worktree topic message",
+				"commit",
+			],
+			[
+				"node /opt/codex/bin/codex-git-routine.mjs branch-rename /repo/worktree old new",
+				"branch",
+			],
+		]) {
+			assert.deepEqual(
+				classifyGitCommand(command),
+				{ subcommand, decision: "deny" },
+				command,
+			);
+		}
+	});
+
+	it("leaves routine verbs and node scripts that are not Git mutations unclassified", () => {
+		for (const command of [
+			"/opt/codex/bin/codex-git-routine.mjs test /repo/worktree topic",
+			"node /opt/codex/bin/codex-git-routine.mjs node-test /repo/worktree topic a.test.mjs",
+			"node /opt/codex/bin/other-script.mjs commit /repo/worktree topic message",
+			"node scripts/check.mjs stage-all",
+		])
+			assert.equal(classifyGitCommand(command), null, command);
+	});
+
 	it("prefers the denied subcommand over an asked one in a compound", () => {
 		assert.deepEqual(classifyGitCommand("git checkout main && git add -A"), {
 			subcommand: "add",
@@ -682,6 +715,16 @@ describe("resolveCommandCwd", () => {
 		assert.equal(
 			resolveCommandCwd(
 				"/opt/codex/bin/codex-git-routine.mjs stage-all /repo/sibling sibling",
+				HOOK_CWD,
+			),
+			"/repo/sibling",
+		);
+	});
+
+	it("reads the explicit target of the node-launched routine wrapper", () => {
+		assert.equal(
+			resolveCommandCwd(
+				"node /opt/codex/bin/codex-git-routine.mjs stage-all /repo/sibling sibling",
 				HOOK_CWD,
 			),
 			"/repo/sibling",
@@ -1337,22 +1380,24 @@ describe("main-commit-guard wrapper", () => {
 
 	it("guards the explicit wrapper target instead of invisible exec workdir", () => {
 		const routine = "/opt/codex/bin/codex-git-routine.mjs";
-		for (const [target, branch, expected] of [
-			[sibling, "sibling", "deny"],
-			[repo, "main", "deny"],
-			[session, "session", null],
-		]) {
-			const output = runWrapper(`${routine} stage-all ${target} ${branch}`, {
-				claudeProjectDir: null,
-			});
-			if (expected === null) assert.equal(output, "");
-			else
-				assert.equal(
-					JSON.parse(output).hookSpecificOutput.permissionDecision,
-					expected,
-					target,
+		for (const launcher of ["", "node "])
+			for (const [target, branch, expected] of [
+				[sibling, "sibling", "deny"],
+				[repo, "main", "deny"],
+				[session, "session", null],
+			]) {
+				const output = runWrapper(
+					`${launcher}${routine} stage-all ${target} ${branch}`,
+					{ claudeProjectDir: null },
 				);
-		}
+				if (expected === null) assert.equal(output, "");
+				else
+					assert.equal(
+						JSON.parse(output).hookSpecificOutput.permissionDecision,
+						expected,
+						`${launcher}${target}`,
+					);
+			}
 	});
 
 	it("converts an unsupported Codex ask into a fail-closed deny", () => {

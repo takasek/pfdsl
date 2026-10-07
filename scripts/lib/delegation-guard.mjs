@@ -32,6 +32,7 @@ import {
 import { parseGhCommand } from "./gh-command.mjs";
 import { buildPermissionOutput, parseHookPayload } from "./hook-io.mjs";
 import {
+	classifyCodexGitRoutine,
 	hasGitHelpOption,
 	isReadOnlyGitBranch,
 	isReadOnlyGitConfig,
@@ -1233,6 +1234,18 @@ export function evaluateDelegationGuard(
 	if (!supportsAsk) {
 		for (const segment of splitSegments(payload?.tool_input?.command ?? "")) {
 			const tokens = stripLeadingNoise(tokenize(segment));
+			const routine = classifyCodexGitRoutine(
+				tokens.map((token) => token.value),
+			);
+			if (routine) {
+				if (routine.childAllowed) continue;
+				return {
+					decision: "deny",
+					matched: `codex-git-routine ${routine.verb ?? "unknown"}`,
+					reason:
+						"Codex Git metadata operations belong to the parent. Report the needed operation to the parent; continue with file edits and tests only.",
+				};
+			}
 			if (!tokens.length || basename(tokens[0].value) !== "git") continue;
 			const sub = gitSubcommand(tokens);
 			const args = tokens

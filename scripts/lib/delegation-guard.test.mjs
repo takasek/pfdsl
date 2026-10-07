@@ -245,6 +245,66 @@ describe("findOutwardCommand — unrelated commands", () => {
 	});
 });
 
+describe("evaluateDelegationGuard — Codex child routine wrapper", () => {
+	const routine = "/opt/codex/bin/codex-git-routine.mjs";
+	const child = (command) =>
+		evaluateDelegationGuard(payload({ agentType: "worker", command }), {
+			supportsAsk: false,
+		}).decision;
+	const forms = (verb, rest = "/repo/topic topic") => [
+		`${routine} ${verb} ${rest}`,
+		`node ${routine} ${verb} ${rest}`,
+		`/usr/local/bin/node ${routine} ${verb} ${rest}`,
+	];
+
+	it("denies every routine verb that touches shared Git state", () => {
+		for (const verb of [
+			"fetch-origin",
+			"worktree-add",
+			"stage-all",
+			"setup",
+			"commit",
+			"branch-rename",
+			"unknown-verb",
+		])
+			for (const command of forms(verb, "/repo/topic topic message"))
+				assert.equal(child(command), "deny", command);
+		assert.equal(child(routine), "deny");
+		assert.equal(child(`node ${routine}`), "deny");
+	});
+
+	it("keeps the verification verbs usable in both forms", () => {
+		for (const verb of [
+			"test",
+			"build",
+			"typecheck",
+			"node-test",
+			"node-script",
+		])
+			for (const command of forms(verb))
+				assert.equal(child(command), "allow", command);
+	});
+
+	it("does not mistake other node scripts for the routine", () => {
+		assert.equal(child("node scripts/check.mjs commit"), "allow");
+		assert.equal(child("node /opt/other/helper.mjs setup"), "allow");
+	});
+
+	it("does not restrict the parent, which has no agent_id", () => {
+		assert.equal(
+			evaluateDelegationGuard(
+				{
+					hook_event_name: "PreToolUse",
+					tool_name: "Bash",
+					tool_input: { command: `${routine} commit /repo/topic topic m` },
+				},
+				{ supportsAsk: false },
+			).decision,
+			"allow",
+		);
+	});
+});
+
 describe("runDelegationGuard", () => {
 	it("prints a deny payload for a deny decision", () => {
 		const input = JSON.stringify(

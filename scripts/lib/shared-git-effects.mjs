@@ -1,6 +1,50 @@
 // Shared refs and other checkout effects are independent of executor ownership.
 // These are command-boundary safeguards, not a general Git transaction monitor.
 
+import { basename } from "node:path";
+
+const CODEX_ROUTINE = "codex-git-routine.mjs";
+// The Git mutations the routine performs, by the subcommand the guards use.
+const CODEX_ROUTINE_GIT_MUTATIONS = new Map([
+	["stage-all", "add"],
+	["commit", "commit"],
+	["branch-rename", "branch"],
+]);
+// Verification verbs only: every other verb (fetch-origin, worktree-add,
+// stage-all, setup, commit, branch-rename) changes shared Git state or hooks.
+const CODEX_ROUTINE_CHILD_VERBS = new Set([
+	"test",
+	"build",
+	"typecheck",
+	"node-test",
+	"node-script",
+]);
+
+/**
+ * The Codex Git routine a command's words invoke, or null. Both the direct
+ * form (`<path>/codex-git-routine.mjs <verb> ...`) and the node-launched form
+ * (`node <path>/codex-git-routine.mjs <verb> ...`) are recognized.
+ * @param {string[]} values the command words, quoting stripped
+ * @returns {{verb: string | undefined, targetAt: number, gitSubcommand: string | null, childAllowed: boolean} | null}
+ */
+export function classifyCodexGitRoutine(values) {
+	let at;
+	if (basename(values[0] ?? "") === CODEX_ROUTINE) at = 0;
+	else if (
+		basename(values[0] ?? "") === "node" &&
+		basename(values[1] ?? "") === CODEX_ROUTINE
+	)
+		at = 1;
+	else return null;
+	const verb = values[at + 1];
+	return {
+		verb,
+		targetAt: at + 2,
+		gitSubcommand: CODEX_ROUTINE_GIT_MUTATIONS.get(verb) ?? null,
+		childAllowed: CODEX_ROUTINE_CHILD_VERBS.has(verb),
+	};
+}
+
 export function hasGitHelpOption(subcommand, args) {
 	// Only waive protection for an unambiguous option, never an operand or an
 	// option's value. Other command forms conservatively retain their guard.

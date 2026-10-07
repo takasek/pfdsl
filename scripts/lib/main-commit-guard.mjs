@@ -41,6 +41,7 @@ import {
 } from "./delegation-guard.mjs";
 import { buildPermissionOutput, parseHookPayload } from "./hook-io.mjs";
 import {
+	classifyCodexGitRoutine,
 	classifySharedGitEffect,
 	evaluateSharedGitEffect,
 } from "./shared-git-effects.mjs";
@@ -561,17 +562,6 @@ function classifyBypass(tokens) {
 	return null;
 }
 
-const CODEX_ROUTINE_MUTATIONS = new Map([
-	["stage-all", "add"],
-	["commit", "commit"],
-	["branch-rename", "branch"],
-]);
-
-function codexRoutineSubcommand(tokens) {
-	if (basename(tokens[0]?.value ?? "") !== "codex-git-routine.mjs") return null;
-	return CODEX_ROUTINE_MUTATIONS.get(tokens[1]?.value) ?? null;
-}
-
 /**
  * The guarded git subcommand one already-tokenized segment runs, or null.
  * @param {{value: string, quoted: boolean}[]} tokens
@@ -581,8 +571,10 @@ function classifySegment(tokens) {
 	if (tokens.length === 0) return null;
 	const head = tokens[0];
 	if (basename(head.value) !== "git") {
-		const subcommand = codexRoutineSubcommand(tokens);
-		return subcommand === null ? null : { subcommand, decision: "deny" };
+		const subcommand = classifyCodexGitRoutine(
+			tokens.map((token) => token.value),
+		)?.gitSubcommand;
+		return subcommand ? { subcommand, decision: "deny" } : null;
 	}
 
 	const bypass = classifyBypass(tokens);
@@ -710,7 +702,8 @@ function resolveEnvCwd(tokens, shellCwd) {
 }
 
 function resolveCodexRoutineCwd(tokens) {
-	const target = staticPath(tokens[2]);
+	const routine = classifyCodexGitRoutine(tokens.map((token) => token.value));
+	const target = routine ? staticPath(tokens[routine.targetAt]) : null;
 	return target === null ? null : resolve(target);
 }
 
