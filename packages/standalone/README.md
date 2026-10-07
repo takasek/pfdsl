@@ -118,7 +118,9 @@ CI unit tests and compilation do not certify native startup, dialogs, GUI operat
 
 The same job also packages a verification-only [AppImage](https://v2.tauri.app/distribute/appimage/) and uploads `pfdsl-linux-appimage-x64-<source-commit>`.
 This is an Actions artifact for acceptance work, not a signed release.
-The job extracts the built image and requires both `libwebkit2gtk-4.1.so.0` and `libjavascriptcoregtk-4.1.so.0` inside it before uploading.
+The job extracts the built image and requires `libwebkit2gtk-4.1.so.0`, `libjavascriptcoregtk-4.1.so.0`, `libGLESv2.so.2`, and its GL dispatch library inside it before uploading.
+GLES is explicitly included because libraries loaded at startup with `dlopen` can be absent even when the native executable's `ldd` output resolves every dependency.
+An independent Debian 13 CI job without system WebKitGTK or GLES checks the native executable's linked dependencies and performs a GLES `dlopen` and symbol lookup using the extracted bundle.
 The archive also includes the frontend, source commit, build environment, outer checksums, and checksums of the extracted image's regular files.
 That inspection proves inclusion; compatibility and startup on the target desktop still need verification.
 The builder is Debian 13 x86_64; older systems are not certified, and the AppImage still needs a compatible kernel, glibc, graphics stack, and graphical session.
@@ -136,13 +138,19 @@ cd squashfs-root
 sha256sum -c ../APPDIR_SHA256SUMS
 test -x AppRun
 test -x usr/bin/pfdsl-desktop
+test -f usr/lib/libGLESv2.so.2
+test -f usr/lib/libGLdispatch.so.0
 LD_LIBRARY_PATH="$PWD/usr/lib:$PWD/usr/lib/x86_64-linux-gnu:$PWD/usr/lib64" \
   ldd ./usr/bin/pfdsl-desktop
+LD_LIBRARY_PATH="$PWD/usr/lib:$PWD/usr/lib/x86_64-linux-gnu:$PWD/usr/lib64" \
+  ldd ./usr/lib/libGLESv2.so.2
 ```
 
 Record any `not found` or version error and stop before GUI/corpus acceptance if dependencies remain unresolved.
 This library-path check is a preflight; launching through `AppRun` also supplies the bundled GTK/WebKit resources and environment.
+Neither `ldd` nor the CI GLES load check covers every dynamically loaded dependency or validates the target graphics driver.
 When preflight succeeds, run `./AppRun` from the extracted directory for folder selection, cancellation, and dirty-close checks.
+If startup reports a missing library or aborts before showing a window, record the full output and exit status, then stop GUI/corpus acceptance without installing packages or adjusting launch settings.
 Do not launch `usr/bin/pfdsl-desktop` directly for these checks.
 
 For corpus preparation, build the JS workspace at `SOURCE_COMMIT` and compare the archive's `frontend/` hashes with the checkout's standalone `dist/` first.

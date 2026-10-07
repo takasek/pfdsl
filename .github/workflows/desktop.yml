@@ -26,7 +26,7 @@ jobs:
           apt-get install -y --no-install-recommends \
             build-essential pkg-config git ca-certificates curl wget file \
             libgtk-3-dev libwebkit2gtk-4.1-dev libssl-dev \
-            libxdo-dev libayatana-appindicator3-dev librsvg2-dev
+            libxdo-dev libayatana-appindicator3-dev librsvg2-dev libgles2
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
@@ -86,7 +86,7 @@ jobs:
           NO_STRIP: "1"
         run: >-
           pnpm --filter @pfdsl/standalone tauri bundle --bundles appimage --ci --no-sign
-          --config '{"bundle":{"icon":["icons/icon.png"]}}'
+          --config '{"bundle":{"icon":["icons/icon.png"],"linux":{"appimage":{"files":{"usr/lib/libGLESv2.so.2":"/usr/lib/x86_64-linux-gnu/libGLESv2.so.2","usr/lib/libGLdispatch.so.0":"/usr/lib/x86_64-linux-gnu/libGLdispatch.so.0"}}}}}'
       - name: Inspect and archive the AppImage
         run: |
           git -C "$GITHUB_WORKSPACE" -c safe.directory="$GITHUB_WORKSPACE" diff --exit-code HEAD
@@ -103,6 +103,8 @@ jobs:
           test -x squashfs-root/usr/bin/pfdsl-desktop
           test -f squashfs-root/usr/lib/libwebkit2gtk-4.1.so.0
           test -f squashfs-root/usr/lib/libjavascriptcoregtk-4.1.so.0
+          test -f squashfs-root/usr/lib/libGLESv2.so.2
+          test -f squashfs-root/usr/lib/libGLdispatch.so.0
           (
             cd squashfs-root
             find . -type f -print0 | LC_ALL=C sort -z | xargs -0 sha256sum
@@ -118,6 +120,61 @@ jobs:
           path: ${{ runner.temp }}/pfdsl-linux-appimage-x64.tar.gz
           if-no-files-found: error
           retention-days: 14
+
+  linux-appimage-runtime:
+    needs: linux-native
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    container:
+      image: debian:13-slim@sha256:a29215f6a35e51e22adffa17f89e9d2ef06214e64a2bad10d765c46aea49f11f
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Prepare a desktop runtime without system WebKitGTK or GLES
+        run: |
+          apt-get update
+          apt-get install -y --no-install-recommends \
+            python3 libgtk-3-0t64 libsoup-3.0-0 libxdo3 libayatana-appindicator3-1 \
+            libgpg-error0 libgbm1 libdrm2 libgl1 libegl1 libx11-xcb1 libasound2t64
+          if /sbin/ldconfig -p | grep -E 'libwebkit2gtk-4\.1|libjavascriptcoregtk-4\.1|libGLESv2'; then
+            echo 'Unexpected system WebKitGTK or GLES runtime' >&2
+            exit 1
+          fi
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: pfdsl-linux-appimage-x64-${{ github.event.pull_request.head.sha || github.sha }}
+          path: ${{ runner.temp }}/appimage-runtime
+      - name: Check the extracted runtime and dynamically loaded GLES
+        working-directory: ${{ runner.temp }}/appimage-runtime
+        env:
+          SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          tar -xzf pfdsl-linux-appimage-x64.tar.gz
+          sha256sum -c SHA256SUMS
+          test "$(cat SOURCE_COMMIT)" = "$SOURCE_SHA"
+          ./PFDSL.AppImage --appimage-extract > /dev/null
+          cd squashfs-root
+          sha256sum -c ../APPDIR_SHA256SUMS
+          test -x AppRun
+          test -x usr/bin/pfdsl-desktop
+          test -f usr/lib/libGLESv2.so.2
+          test -f usr/lib/libGLdispatch.so.0
+          export LD_LIBRARY_PATH="$PWD/usr/lib:$PWD/usr/lib/x86_64-linux-gnu:$PWD/usr/lib64"
+          ldd usr/bin/pfdsl-desktop > native-ldd.txt
+          cat native-ldd.txt
+          if grep -E 'not found|version .* not found' native-ldd.txt; then
+            exit 1
+          fi
+          python3 - <<'PY'
+          import ctypes
+          import os
+          library = ctypes.CDLL("libGLESv2.so.2", mode=os.RTLD_NOW | os.RTLD_LOCAL)
+          getattr(library, "glGetString")
+          print("GLES dlopen and symbol lookup succeeded; GUI startup remains unverified.")
+          PY
 
   macos-app:
     runs-on: macos-15

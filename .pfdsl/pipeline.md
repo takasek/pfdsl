@@ -22,7 +22,9 @@
 
 `.github/workflows/desktop.yml` の `linux-native` は、PR head または main push の source commit を checkout し、Debian 13 / x86_64 で frontend・Rust unit・no-bundle native build を実行する。
 成功時だけ、native executable、同じ build の frontend、source commit、依存版、各ファイルの SHA-256 を tar.gz にまとめ、14日保持の Actions artifact として検証担当へ渡す。
-同じ job はビルド済み native を検証用 AppImage にまとめ、展開物に WebKitGTK 4.1 と JavaScriptCoreGTK 4.1 があることを確認して別 artifact に渡す。
+同じ job はビルド済み native を検証用 AppImage にまとめ、展開物に WebKitGTK 4.1・JavaScriptCoreGTK 4.1・GLESv2・GL dispatch があることを確認して別 artifact に渡す。
+別の Debian 13 job は system WebKitGTK/GLES がない条件で展開物の native `ldd` と GLES の実 `dlopen`・symbol lookup を検査する。
+起動時の動的依存は native の `ldd` だけでは網羅できず、今回の GLES 検査も target graphics driver や GUI 起動の成功を意味しない。
 AppImage、frontend、source commit、外側と展開後の regular file の hash を配送し、対象環境では FUSE を使わず展開した AppRun から起動できる。
 corpus の fingerprint は外側 AppImage でなく内側 native executable に合わせ、対象 desktop の依存解決・起動・実操作を同梱検査の成功から推定しない。
 これは d 層の開発用ビルドを対象環境へ渡す経路であり、npm・Marketplace・macOS 配布の release request や公開タグを消費・生成しない。
