@@ -369,20 +369,28 @@ export function classifySharedGitEffect(subcommand, args) {
 			return { kind: "shared" };
 		for (let i = 0; i < options.length; i++) {
 			const arg = options[i];
-			const attached = arg.match(/^-[^-]*?[bBcC](.+)$/);
+			// A short cluster ends at its first creating letter: the rest of the
+			// token is the value, or the next token when nothing follows.
+			const cluster = arg.match(/^-[^-]*?([bBcC])(.*)$/);
 			let ref;
-			if (attached) ref = attached[1];
-			else if (["-b", "-B", "-c", "-C"].includes(arg)) ref = options[i + 1];
-			else if (
+			let forced = false;
+			if (cluster) {
+				forced = "BC".includes(cluster[1]);
+				ref = cluster[2] || options[i + 1];
+			} else if (
 				// `--force` is its own exact option, not an abbreviation of
 				// `--force-create`.
 				arg !== "--force" &&
 				CREATE_LONG_OPTIONS.some((name) => isLongOptionPrefix(arg, name))
-			)
+			) {
+				forced = isLongOptionPrefix(arg, "--force-create");
 				ref = arg.includes("=")
 					? arg.slice(arg.indexOf("=") + 1)
 					: options[i + 1];
-			else continue;
+			} else continue;
+			// -B, -C and --force-create can reset an existing branch (another
+			// checkout's, or the default), so they are a forced change, not creation.
+			if (forced) return { kind: "shared" };
 			return ref ? { kind: "enter-branch", ref } : null;
 		}
 		if (
