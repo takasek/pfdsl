@@ -152,6 +152,14 @@ describe("classifyGitCommand", () => {
 				"commit",
 			],
 			[
+				"node --no-warnings /opt/codex/bin/codex-git-routine.mjs stage-all /repo/worktree topic",
+				"add",
+			],
+			[
+				"node -- /opt/codex/bin/codex-git-routine.mjs commit /repo/worktree topic message",
+				"commit",
+			],
+			[
 				"node /opt/codex/bin/codex-git-routine.mjs branch-rename /repo/worktree old new",
 				"branch",
 			],
@@ -719,6 +727,18 @@ describe("resolveCommandCwd", () => {
 			),
 			"/repo/sibling",
 		);
+	});
+
+	it("reads the target of the routine wrapper behind node options", () => {
+		for (const launcher of ["node --no-warnings", "node --"])
+			assert.equal(
+				resolveCommandCwd(
+					`${launcher} /opt/codex/bin/codex-git-routine.mjs stage-all /repo/sibling sibling`,
+					HOOK_CWD,
+				),
+				"/repo/sibling",
+				launcher,
+			);
 	});
 
 	it("reads the explicit target of the node-launched routine wrapper", () => {
@@ -1390,7 +1410,7 @@ describe("main-commit-guard wrapper", () => {
 
 	it("guards the explicit wrapper target instead of invisible exec workdir", () => {
 		const routine = "/opt/codex/bin/codex-git-routine.mjs";
-		for (const launcher of ["", "node "])
+		for (const launcher of ["", "node ", "node --no-warnings ", "node -- "])
 			for (const [target, branch, expected] of [
 				[sibling, "sibling", "deny"],
 				[repo, "main", "deny"],

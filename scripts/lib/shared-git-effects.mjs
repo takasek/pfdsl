@@ -23,19 +23,21 @@ const CODEX_ROUTINE_CHILD_VERBS = new Set([
 /**
  * The Codex Git routine a command's words invoke, or null. Both the direct
  * form (`<path>/codex-git-routine.mjs <verb> ...`) and the node-launched form
- * (`node <path>/codex-git-routine.mjs <verb> ...`) are recognized.
+ * (`node [options] [--] <path>/codex-git-routine.mjs <verb> ...`) are recognized.
  * @param {string[]} values the command words, quoting stripped
  * @returns {{verb: string | undefined, targetAt: number, gitSubcommand: string | null, childAllowed: boolean} | null}
  */
 export function classifyCodexGitRoutine(values) {
 	let at;
 	if (basename(values[0] ?? "") === CODEX_ROUTINE) at = 0;
-	else if (
-		basename(values[0] ?? "") === "node" &&
-		basename(values[1] ?? "") === CODEX_ROUTINE
-	)
-		at = 1;
-	else return null;
+	else if (basename(values[0] ?? "") === "node") {
+		// Node options, their values and `--` may precede the script; the first
+		// word that is the routine is the script, whatever arity those options have.
+		at = values.findIndex(
+			(value, index) => index > 0 && basename(value) === CODEX_ROUTINE,
+		);
+		if (at < 0) return null;
+	} else return null;
 	const verb = values[at + 1];
 	return {
 		verb,

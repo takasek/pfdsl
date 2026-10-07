@@ -255,6 +255,8 @@ describe("evaluateDelegationGuard — Codex child routine wrapper", () => {
 		`${routine} ${verb} ${rest}`,
 		`node ${routine} ${verb} ${rest}`,
 		`/usr/local/bin/node ${routine} ${verb} ${rest}`,
+		`node --no-warnings ${routine} ${verb} ${rest}`,
+		`node --max-old-space-size=512 -- ${routine} ${verb} ${rest}`,
 	];
 
 	it("denies every routine verb that touches shared Git state", () => {
