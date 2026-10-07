@@ -49,11 +49,11 @@ jobs:
         run: pnpm --filter @pfdsl/standalone tauri build --no-bundle -- --locked
       - name: Prepare verification files
         run: |
-          git diff --exit-code
+          git -C "$GITHUB_WORKSPACE" -c safe.directory="$GITHUB_WORKSPACE" diff --exit-code HEAD
           mkdir "$RUNNER_TEMP/pfdsl-linux-x64"
           install -m 755 packages/standalone/src-tauri/target/release/pfdsl-desktop "$RUNNER_TEMP/pfdsl-linux-x64/pfdsl-desktop"
           cp -R packages/standalone/dist "$RUNNER_TEMP/pfdsl-linux-x64/frontend"
-          git rev-parse HEAD > "$RUNNER_TEMP/pfdsl-linux-x64/SOURCE_COMMIT"
+          git -C "$GITHUB_WORKSPACE" -c safe.directory="$GITHUB_WORKSPACE" rev-parse HEAD > "$RUNNER_TEMP/pfdsl-linux-x64/SOURCE_COMMIT"
           {
             cat /etc/os-release
             uname -m
