@@ -210,6 +210,47 @@ native executable `f6005842e1a7de061d531d09da67002b46d9c9eae89ebac1a19f04bca4451
 [manifest](evidence/2026-10-05-preview-ui/main-merge-native-recheck-manifest.json)は4枚の PNG、AX と report の保存 bytes を固定する。
 この観測は全 source の byte 単位の保持、極小 minimap の71 label の視認、native gestures/IME/所有者の UI 受入を認定しない。
 
+## Linux verification and grouped preview acceptance
+
+2026-10-07、所有者が #1408 と #1352・#1282・#1283・#1284・#483 をまとめて検収する方針を承認した。
+今回は Linux の実起動・操作を PR 作成後に確認する指定であり、起動手順とローカル検査までを準備範囲とする。
+既存5件の実装は PR #1394 から引き継ぎ、新規実装からやり直さない。
+[Linux の依存・ビルド・起動手順](README.md#linux-verification)を用い、確認した版と未確認条件を以下の各行へ対応付ける。
+
+| 対象 | 実操作で確認する内容 | 今回の状態 |
+| --- | --- | --- |
+| #1408 の起動・読取 | 通常起動で native window を表示し、Open folder で使い捨てフォルダを選び、Rust host 経由で文書を editor と preview へ表示。選択キャンセル後も操作を継続 | 対象 cloud Linux で PR 後に確認 |
+| #1408 の終了・原本 | dirty な文書で window close → Keep Editing による編集保持 → 再 close → Discard による終了。検証用原本の前後 hash 一致を確認 | 対象 cloud Linux で PR 後に確認 |
+| #1352 の表示・回復 | 初回 Fit、100%、倍率と Help、zoom/pan 後の正常→エラー→正常、主図と minimap の整合、定義挿入後の編集案内。VS Code の起動手順と既存動線も確認 | 既存証拠を保持し、現在版の未確認操作を検収 |
+| #1282 の定義作成 | 両ホストの Node actions から作成・作成位置への移動・単一 Undo/Redo。CLI の成功・拒否・初期 field・無書込みを別入口で確認 | 既存実装を検査し、UI 検収を継続 |
+| #1283 の巡回 | VS Code の context menu と chord で定義→全本文 occurrence→定義を巡回。引用キー・同名 field・編集後の増減と既存直接移動を確認 | VS Code で検収。standalone の巡回 UI は追加しない |
+| #1284 の周辺図・強調 | 両ホストで hover の局所 SVG、画面端・内部 scroll/click、editor と局所図からの移動、連続移動の cue、reduced motion、既存 pan/zoom を確認 | 特に native の未確認操作を PR 後に検収 |
+| #483 の接続編集 | 両ホストで input/feedback/output × 既存/新規 target の6通り、単一 Undo/Redo、再描画、既存 double click・pan を確認 | 既存実装を検査し、現在版の操作を検収 |
+
+同じ source commit と検証用文書を使って操作をまとめるが、各 issue の全受入条件とホスト別の結果を保持する。
+通常の folder picker と close は、初期フォルダを自動選択する corpus mode の成功だけでは認定しない。
+Linux の native 操作、VS Code、CLI、macOS 固有の操作、人間の UI 受入はそれぞれの実行版と証拠で判定する。
+この準備だけでは issue を close せず、対応 artifact の wip と元の criteria を維持する。
+実行時は commit・未コミット差分の有無・executable と frontend の識別情報・OS/CPU・依存版・操作・期待/実結果・証拠・原本 hash・未確認条件を記録する。
+
+### PR 前のローカル検査
+
+製品 source の基準は `52ea0dc14491ea21d2b5fa57db2ce3d364d05a2b`。
+今回の差分は README と受入記録のみで、製品 source・Tauri 設定・macOS CI は変更していない。
+macOS 27.0 / arm64、Node.js 26.5.0、pnpm 10.33.2、cargo/rustc 1.99.0 で以下を実行した。
+Linux 手順が案内する Node.js 24 は既存 CI の指定であり、今回のローカル実行版とは区別する。
+
+| 検査 | 実結果と証明範囲 |
+| --- | --- |
+| `make setup` と `node scripts/setup-completion.mjs check` | 成功。専用 worktree の依存とセットアップ完了を確認 |
+| `make build` と `make test` | 成功。core 1137、metadata-exporter 9、graphviz-exporter 179、preview-engine 25、editor 233、CLI 882 pass / 1 skip、extension 200、standalone 5、scripts/hooks 等 3027 pass / 0 fail / 0 skip。import 171、shell 217、CLI 引数規約 216 の検査も成功 |
+| `cargo test --manifest-path packages/standalone/src-tauri/Cargo.toml --locked --lib` | 2 pass / 0 fail。選択フォルダの pathname 置換と範囲外読取の拒否を Mac 上で確認 |
+| `pnpm --filter @pfdsl/standalone tauri build --help` | 導入済み CLI の `--no-bundle` と runner への追加引数境界を確認。Linux ビルドを実行した証拠ではない |
+| `node scripts/check-md-linebreaks.mjs packages/standalone/README.md packages/standalone/ACCEPTANCE.md` | 成功。文書の文境界規約を確認 |
+
+Linux の依存導入・Rust unit・no-bundle build・native 起動・GUI 操作、Apple container 内での実行は未確認。
+GUI smoke、macOS の新しい native GUI/IME 受入、所有者による UI 受入も今回の実行範囲に含めない。
+
 ## 検証記録と限界
 
 作業ブランチ: `codex/shared-ui-host-foundation`。
