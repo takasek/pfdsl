@@ -95,7 +95,8 @@ export function hasGitHelpOption(subcommand, args) {
 
 // parse-options accepts any unique prefix of a long option, so an argument
 // whose name part (before `=`) is a prefix of a dangerous option must be read
-// as that option. Exemptions, by contrast, require the exact spelling.
+// as that option. An exemption is only as safe as the exact option it names:
+// a later option can cancel it or an option value can consume it.
 function isLongOptionPrefix(arg, name) {
 	const given = arg.split("=", 1)[0];
 	return given.startsWith("--") && given.length > 2 && name.startsWith(given);
@@ -380,8 +381,8 @@ export function classifySharedGitEffect(subcommand, args) {
 		if (ref) return { kind: "enter-branch", ref };
 	}
 	if (subcommand === "fetch") {
-		// `-n` is `--no-tags` here; only the exact long spelling is a dry run.
-		if (args.includes("--dry-run")) return null;
+		// No `--dry-run` exemption: `--no-dry-run` can cancel it later in the
+		// arguments, and an option value (`-o --dry-run`) can consume it.
 		// Refspecs read from stdin are unresolvable at this boundary.
 		if (args.some((arg) => isLongOptionPrefix(arg, "--stdin")))
 			return { kind: "shared", unresolved: true };
