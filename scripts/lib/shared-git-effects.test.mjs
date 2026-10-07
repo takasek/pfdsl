@@ -5,6 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
 import { runMainCommitGuard } from "./main-commit-guard.mjs";
+import { isReadOnlyGitBranch } from "./shared-git-effects.mjs";
 
 function decision(
 	command,
@@ -35,6 +36,18 @@ for (const command of [
 	"git branch trunk HEAD",
 	"git branch -M topic trunk",
 	"git branch -D trunk",
+	"git branch --del trunk",
+	"git branch --forc trunk HEAD",
+	"git branch --mov topic trunk",
+	"git branch --cop topic trunk",
+	"git branch --set-u=trunk",
+	"git branch --unset-up",
+	"git branch --edit-d",
+	"git branch -v trunk",
+	"git branch -vv trunk HEAD",
+	"git branch '--format=%(refname)' trunk",
+	"git branch --sort refname trunk",
+	"git branch --column trunk",
 	"git update-ref refs/heads/trunk HEAD",
 	"git update-ref HEAD HEAD",
 	"git update-ref --stdin",
@@ -96,6 +109,13 @@ for (const command of [
 for (const command of [
 	"git branch",
 	"git branch --list trunk",
+	"git branch --merged HEAD trunk",
+	"git branch --contains HEAD",
+	"git branch --sort -committerdate",
+	"git branch --format '%(refname)'",
+	"git branch -vv",
+	"git branch -v new-topic",
+	"git branch '--form=%(refname)'",
 	"git branch -a",
 	"git branch new-topic HEAD",
 	"git branch -m renamed-topic",
@@ -221,4 +241,37 @@ test("Git accepts clustered force/create branch options", () => {
 	} finally {
 		rmSync(root, { recursive: true, force: true });
 	}
+});
+
+test("isReadOnlyGitBranch accepts only list mode with known read options", () => {
+	for (const args of [
+		[],
+		["--list"],
+		["-l", "main"],
+		["-avv"],
+		["--show-current"],
+		["--format", "%(refname)"],
+		["--sort", "-committerdate"],
+		["--merged"],
+		["--merged", "HEAD", "topic"],
+		["--contains", "HEAD"],
+		["--color=always", "--no-column", "--abbrev=7", "--omit-empty", "-i"],
+	])
+		assert.equal(isReadOnlyGitBranch(args), true, args.join(" "));
+	for (const args of [
+		["-v", "newb"],
+		["--format=x", "newb"],
+		["--sort", "refname", "newb"],
+		["--column", "newb"],
+		["--del", "other"],
+		["--list", "-d", "other"],
+		["--merged", "HEAD", "--set-u=main"],
+		["--abbrev", "3"],
+		["--track"],
+		["--unknown"],
+		["-m", "topic", "renamed"],
+		["-f"],
+		["--", "newb"],
+	])
+		assert.equal(isReadOnlyGitBranch(args), false, args.join(" "));
 });

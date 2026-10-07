@@ -32,8 +32,8 @@ import {
 import { parseGhCommand } from "./gh-command.mjs";
 import { buildPermissionOutput, parseHookPayload } from "./hook-io.mjs";
 import {
-	classifySharedGitEffect,
 	hasGitHelpOption,
+	isReadOnlyGitBranch,
 } from "./shared-git-effects.mjs";
 import { prepareHeredocs } from "./shell-heredoc.mjs";
 
@@ -1353,21 +1353,7 @@ export function evaluateDelegationGuard(
 					"describe",
 					"help",
 				].includes(sub) ||
-				(sub === "branch" &&
-					!classifySharedGitEffect(sub, args) &&
-					(args.length === 0 ||
-						args.some((arg) =>
-							[
-								"--show-current",
-								"--list",
-								"-a",
-								"--all",
-								"-r",
-								"--remotes",
-								"-v",
-								"-vv",
-							].includes(arg),
-						))) ||
+				(sub === "branch" && isReadOnlyGitBranch(args)) ||
 				(sub === "remote" &&
 					(() => {
 						const action = args.filter(

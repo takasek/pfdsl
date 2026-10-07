@@ -59,6 +59,97 @@ function isLongOptionPrefix(arg, name) {
 
 const CREATE_LONG_OPTIONS = ["--create", "--force-create", "--orphan"];
 
+const BRANCH_MODIFYING_OPTIONS = [
+	"--delete",
+	"--delete-merged",
+	"--move",
+	"--copy",
+	"--force",
+	"--edit-description",
+	"--set-upstream-to",
+	"--unset-upstream",
+];
+// Filters take a commit argument (separated or attached) and imply list mode.
+const BRANCH_FILTER_OPTIONS = [
+	"--contains",
+	"--no-contains",
+	"--merged",
+	"--no-merged",
+	"--points-at",
+];
+const BRANCH_READ_OPTIONS = new Set([
+	"--all",
+	"--remotes",
+	"--verbose",
+	"--column",
+	"--no-column",
+	"--color",
+	"--no-color",
+	"--ignore-case",
+	"--abbrev",
+	"--no-abbrev",
+	"--omit-empty",
+]);
+
+// Mirrors how `git branch` parses its arguments: it lists only for the list
+// options, a filter, or when no operand is left; `-v`, `--format` and `--sort`
+// alone do not, so `git branch -v newb` still creates `newb`.
+function parseBranchArgs(args) {
+	const parsed = {
+		modifying: false,
+		list: false,
+		unknown: false,
+		operands: [],
+	};
+	for (let i = 0; i < args.length; i++) {
+		const arg = args[i];
+		if (arg === "--") {
+			parsed.operands.push(...args.slice(i + 1));
+			break;
+		}
+		if (!arg.startsWith("-") || arg === "-") {
+			parsed.operands.push(arg);
+			continue;
+		}
+		if (!arg.startsWith("--")) {
+			for (const letter of arg.slice(1)) {
+				if ("dDmMcCfu".includes(letter)) parsed.modifying = true;
+				else if (letter === "l") parsed.list = true;
+				else if (!"arvqi".includes(letter)) parsed.unknown = true;
+			}
+			continue;
+		}
+		const name = arg.split("=", 1)[0];
+		const attached = arg.includes("=");
+		if (
+			BRANCH_MODIFYING_OPTIONS.some((option) => isLongOptionPrefix(arg, option))
+		)
+			parsed.modifying = true;
+		else if (name === "--list" || name === "--show-current") parsed.list = true;
+		else if (BRANCH_FILTER_OPTIONS.includes(name)) {
+			parsed.list = true;
+			if (!attached) i++;
+		} else if (name === "--format" || name === "--sort") {
+			if (!attached) i++;
+		} else if (name === "--abbrev" ? !attached : !BRANCH_READ_OPTIONS.has(name))
+			parsed.unknown = true;
+	}
+	return parsed;
+}
+
+/**
+ * Whether `git branch <args>` only lists: list mode, no modifying option and
+ * only options known to be read-only. Anything else is not read-only.
+ */
+export function isReadOnlyGitBranch(args) {
+	const parsed = parseBranchArgs(args);
+	return (
+		!parsed.modifying &&
+		!parsed.unknown &&
+		(parsed.list || parsed.operands.length === 0)
+	);
+}
+
 export function classifySharedGitEffect(subcommand, args) {
 	if (hasGitHelpOption(subcommand, args)) return null;
 	if (subcommand === "update-ref")
@@ -88,56 +179,17 @@ export function classifySharedGitEffect(subcommand, args) {
 	if (subcommand === "branch") {
 		if (
 			args[0] === "-m" ||
-			args[0] === "--move" ||
 			args[0] === "-c" ||
-			args[0] === "--copy"
+			isLongOptionPrefix(args[0] ?? "", "--move") ||
+			isLongOptionPrefix(args[0] ?? "", "--copy")
 		)
 			return { kind: "rename-own", names: args.slice(1) };
-		const modifying = args.some(
-			(arg) =>
-				/^-(?:[dDmMcCf]+)$/.test(arg) ||
-				[
-					"--delete",
-					"--delete-merged",
-					"--move",
-					"--copy",
-					"--force",
-					"--edit-description",
-					"--set-upstream-to",
-					"--unset-upstream",
-					"-u",
-				].includes(arg) ||
-				arg.startsWith("--set-upstream-to="),
-		);
-		if (modifying) return { kind: "shared" };
-		if (
-			args.some(
-				(arg) =>
-					[
-						"--list",
-						"-l",
-						"--show-current",
-						"-a",
-						"--all",
-						"-r",
-						"--remotes",
-						"-v",
-						"-vv",
-						"--contains",
-						"--no-contains",
-						"--merged",
-						"--no-merged",
-						"--points-at",
-					].includes(arg) || arg.startsWith("--format="),
-			)
-		)
-			return null;
-		const operands = [];
-		for (let i = 0; i < args.length; i++) {
-			if (["--track"].includes(args[i])) continue;
-			if (!args[i].startsWith("-")) operands.push(args[i]);
-		}
-		return operands.length ? { kind: "create-branch", ref: operands[0] } : null;
+		const parsed = parseBranchArgs(args);
+		if (parsed.modifying) return { kind: "shared" };
+		if (parsed.list) return null;
+		return parsed.operands.length
+			? { kind: "create-branch", ref: parsed.operands[0] }
+			: null;
 	}
 	if (subcommand === "checkout" || subcommand === "switch") {
 		// Everything after `--` is a path, except that `switch` has no path
