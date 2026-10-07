@@ -26,6 +26,60 @@ for (const command of [
 	test(`parent merge stops before execution: ${command}`, () =>
 		assert.equal(evaluate("Bash", { command }).decision, "deny"));
 
+// gh reads --help here as a flag's value, a positional, or as a flag it
+// rejects, so the command still runs.
+for (const command of [
+	"gh pr merge 1 --body --help",
+	"gh pr merge 1 -b --help",
+	"gh pr merge 1 --subject --help",
+	"gh pr merge 1 -t --help",
+	"gh pr merge 1 -A --help",
+	"gh pr merge 1 --author-email --help",
+	"gh pr merge 1 -F --help",
+	"gh pr merge 1 --match-head-commit --help",
+	"gh pr merge 1 --repo --help",
+	"gh pr merge 1 -sb --help",
+	"gh pr merge 1 -- --help",
+	"gh pr merge 1 --unknown-flag --help",
+	"gh pr merge 1 --bod --help",
+	"gh api repos/o/r/pulls/1/merge -X --help",
+	"gh api repos/o/r/pulls/1/merge --method --help",
+	"gh api repos/o/r/pulls/1/merge -X PUT --jq --help",
+	"gh api repos/o/r/pulls/1/merge -X PUT -q --help",
+	"gh api repos/o/r/pulls/1/merge -X PUT -H --help",
+	"gh api repos/o/r/pulls/1/merge -X PUT -f --help",
+	"gh api repos/o/r/pulls/1/merge -X PUT --input --help",
+	"gh api repos/o/r/pulls/1/merge -X PUT -- --help",
+	"gh api repos/o/r/pulls/1/merge -X PUT --unknown --help",
+])
+	test(`merge is not hidden by a --help that gh reads as data: ${command}`, () =>
+		assert.equal(evaluate("Bash", { command }).decision, "deny"));
+
+for (const command of [
+	"gh pr merge --help",
+	"gh pr merge 1 --help",
+	"gh pr merge --help 1",
+	"gh pr --help merge 1",
+	"gh --help pr merge 1",
+	"gh -R o/r pr merge 1 --help",
+	"gh pr merge 1 -s --help",
+	"gh pr merge 1 -sd --help",
+	"gh pr merge 1 --squash --delete-branch=false --help",
+	"gh pr merge 1 --body x --help",
+	"gh pr merge 1 -b x --help",
+	"gh pr merge 1 -bx --help",
+	"gh pr merge 1 --body=x --help",
+	"gh pr merge 1 -R o/r --help",
+	"gh api repos/o/r/pulls/1/merge --help",
+	"gh api -X PUT repos/o/r/pulls/1/merge --help",
+	"gh api repos/o/r/pulls/1/merge -X PUT --paginate --help",
+	"gh api repos/o/r/pulls/1/merge --hostname=h.example -XPUT --help",
+	"gh api --hostname h.example repos/o/r/pulls/1/merge --help",
+	"gh api repos/o/r/pulls/1/merge -iX PUT --help",
+])
+	test(`a real help request is not a merge: ${command}`, () =>
+		assert.equal(evaluate("Bash", { command }).decision, "allow"));
+
 for (const name of [
 	"mcp__github__merge_pull_request",
 	"mcp__codex_apps__github_enable_auto_merge",

@@ -20,7 +20,7 @@
 // (--hostname is a command flag, valid only after the group, e.g. `gh api
 // --hostname ...`). If gh ever promotes another value-taking flag to
 // persistent, its value would read as the group here.
-const GLOBAL_FLAGS_WITH_VALUE = new Set(["-R", "--repo"]);
+export const GLOBAL_FLAGS_WITH_VALUE = new Set(["-R", "--repo"]);
 
 /**
  * The group, verb and argument values of a `gh` call, or null when the segment

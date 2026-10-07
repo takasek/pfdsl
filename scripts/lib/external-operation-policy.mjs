@@ -1,5 +1,5 @@
 import { basename } from "node:path";
-import { parseGhCommand } from "./gh-command.mjs";
+import { GLOBAL_FLAGS_WITH_VALUE, parseGhCommand } from "./gh-command.mjs";
 
 // Explicitly reviewed read capabilities. Unknown/compound names fail closed.
 const READ_GITHUB_TOOLS = new Set([
@@ -86,6 +86,107 @@ export function githubToolEffect(name) {
 	return READ_GITHUB_TOOLS.has(verb) ? "read" : "write-or-unknown";
 }
 
+// Flag tables from the gh 2.102 help output. pflag has no abbreviations, so
+// only exact names are flags.
+const GH_MERGE_HELP_FLAGS = {
+	"pr merge": {
+		booleans: [
+			"--admin",
+			"--auto",
+			"-d",
+			"--delete-branch",
+			"--disable-auto",
+			"-m",
+			"--merge",
+			"-r",
+			"--rebase",
+			"-s",
+			"--squash",
+		],
+		values: [
+			"-A",
+			"--author-email",
+			"-b",
+			"--body",
+			"-F",
+			"--body-file",
+			"--match-head-commit",
+			"-t",
+			"--subject",
+			"-R",
+			"--repo",
+		],
+	},
+	api: {
+		booleans: [
+			"--allow-escape-sequences",
+			"-i",
+			"--include",
+			"--paginate",
+			"--silent",
+			"--slurp",
+			"--verbose",
+		],
+		values: [
+			"--cache",
+			"-F",
+			"--field",
+			"-H",
+			"--header",
+			"--hostname",
+			"--input",
+			"-q",
+			"--jq",
+			"-X",
+			"--method",
+			"-p",
+			"--preview",
+			"-f",
+			"--raw-field",
+			"-t",
+			"--template",
+		],
+	},
+};
+
+/**
+ * Whether gh would print usage for `args` instead of running the command:
+ * `--help` counts only as a standalone flag, reached while every earlier token
+ * is a positional, a known boolean flag, a known value flag with its value, or
+ * a `--flag=value` form of a known flag. A value flag consumes `--help` as its
+ * value, and `--` or an unknown flag stops the scan (gh then runs or rejects
+ * the command). Only the long form is honored: gh binds `-h` to value flags on
+ * some commands and to help on others.
+ * @param {string[]} args every token after `gh`
+ * @param {{booleans: string[], values: string[]}} table
+ */
+function hasStandaloneHelp(args, table) {
+	const booleans = new Set(table.booleans);
+	const values = new Set([...table.values, ...GLOBAL_FLAGS_WITH_VALUE]);
+	for (let i = 0; i < args.length; i++) {
+		const arg = args[i];
+		if (arg === "--") return false;
+		if (arg === "--help") return true;
+		if (!arg.startsWith("-") || arg === "-") continue;
+		if (arg.startsWith("--")) {
+			const name = arg.split("=", 1)[0];
+			if (!booleans.has(name) && !values.has(name)) return false;
+			if (arg === name && !booleans.has(name)) i++;
+			continue;
+		}
+		// A shorthand cluster: booleans may combine, and a value flag takes the
+		// rest of the token or, at the end, the next one.
+		for (let j = 1; j < arg.length; j++) {
+			const flag = `-${arg[j]}`;
+			if (booleans.has(flag)) continue;
+			if (!values.has(flag)) return false;
+			if (j === arg.length - 1) i++;
+			break;
+		}
+	}
+	return false;
+}
+
 export function findMergeCommand(
 	command,
 	{ splitSegments, tokenize, stripLeadingNoise },
@@ -98,9 +199,14 @@ export function findMergeCommand(
 			{ ...tokens[0], value: "gh", quoted: false },
 			...tokens.slice(1),
 		]);
-		if (!parsed || parsed.args.some((arg) => arg === "--help")) continue;
-		if (parsed.group === "pr" && parsed.verb === "merge") return "gh pr merge";
+		if (!parsed) continue;
+		if (parsed.group === "pr" && parsed.verb === "merge") {
+			if (hasStandaloneHelp(parsed.args, GH_MERGE_HELP_FLAGS["pr merge"]))
+				continue;
+			return "gh pr merge";
+		}
 		if (parsed.group !== "api") continue;
+		if (hasStandaloneHelp(parsed.args, GH_MERGE_HELP_FLAGS.api)) continue;
 		if (
 			parsed.args.some((arg) => /(?:^|\/)pulls\/[^/]+\/merge(?:$|\?)/.test(arg))
 		)
