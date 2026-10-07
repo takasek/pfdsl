@@ -43,7 +43,7 @@ import { buildPermissionOutput, parseHookPayload } from "./hook-io.mjs";
 
 // The decision splits by target before it splits by subcommand. Against a
 // sibling whose native ownership was not confirmed by the entrypoint it is
-// ask (#1201, ADR-0045). A reported root alone cannot separate the session's
+// ask (#1201, ADR-0046). A reported root alone cannot separate the session's
 // worktree from another session's. Codex converts ask to deny.
 // On the default branch the subcommand decides.
 //

@@ -14,7 +14,7 @@ function readMetadata(path) {
 /**
  * Optional native evidence for an already resolved sibling, never a target
  * resolver or an execution permission. These private formats were observed
- * in Claude 2.1.286 and Codex managed-worktree metadata v1 (ADR-0045).
+ * in Claude 2.1.286 and Codex managed-worktree metadata v1 (ADR-0046).
  * Missing, unsupported or failed evidence preserves the existing decision.
  * No success is cached across operations.
  */

@@ -15,7 +15,7 @@
 // back to the PreToolUse payload cwd. None of these are read unless the command
 // turns out to be guarded — the lib calls resolveBranches only then.
 // A resolved sibling can be refined by optional native ownership evidence
-// (ADR-0045); this never removes branch or hook-bypass checks.
+// (ADR-0046); this never removes branch or hook-bypass checks.
 //
 // Always exits 0 — a crash here, or a `git` failure, must not wedge every Bash
 // call.

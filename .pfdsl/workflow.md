@@ -46,7 +46,7 @@ worktree を既定とする理由は `.pfdsl/bindings/pfd-ops.md`「ワークサ
 **worktree での git 操作**: `git commit` など git コマンドは worktree ディレクトリを指して実行する（理由は `.pfdsl/bindings/pfd-ops.md`「ワークサイクルの追加手順」の「手順 2 の追加で worktree 上の変更を検証する」が一次情報）。
 **worktree のパスはシェル変数に入れず literal で書く**。
 `scripts/main-commit-guard.mjs`（#777。deny / ask の割り当ては CLAUDE.md「コミット粒度」節が一次情報）の command target 解決は静的解析なので `git -C $W commit` の `$W` を解決できず、fail closed して deny する。
-`git -C /workspace/.claude/worktrees/<name> commit` と literal で書けば target が解決される。session の root と一致するか、同一 repository の sibling で native 所有者を確認できれば own として判定する（ADR-0045）。native 所有証拠を確認できなければ Claude Code では ask、Codex では deny を維持する。cwd への移動だけで所有者と判断しない。main/default branch と検査回避は own でも保護する。
+`git -C /workspace/.claude/worktrees/<name> commit` と literal で書けば target が解決される。session の root と一致するか、同一 repository の sibling で native 所有者を確認できれば own として判定する（ADR-0046）。native 所有証拠を確認できなければ Claude Code では ask、Codex では deny を維持する。cwd への移動だけで所有者と判断しない。main/default branch と検査回避は own でも保護する。
 なお deny は Bash 呼び出し全体を止めるため、`git -C $W add … && git -C $W commit …` が弾かれたときは add も実行されていない。
 
 ## develop のレビュー

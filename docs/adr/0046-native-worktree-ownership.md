@@ -1,4 +1,4 @@
-# ADR-0045: native 所有者の肯定証拠で sibling 誤判定を補正する
+# ADR-0046: native 所有者の肯定証拠で sibling 誤判定を補正する
 
 - Status: Accepted（変更系 Git の限定補正。#1398 全体の受入は未了）
 - Date: 2026-10-07
@@ -11,7 +11,8 @@ native 操作で作成した自分の worktree でも起動元が変わらない
 他セッションの誤変更を防ぎつつ、この正常経路を改善する。
 
 Claude 2.1.286 の Desktop と CLI では、対象 worktree の native lock の PID と UTC 起動時刻が、hook プロセスの直接の親と一致した。
-Desktop の親・subagent の hook 入力を観測し、CLI の親では候補 hook を通した実 add/commit を確認した。
+Desktop の親・subagent の hook 入力から直接親照合の材料を観測し、CLI の親では候補 hook を通した実 add/commit を確認した。
+subagent の hook 観測は、subagent の隔離 worktree にある agent 種別の lock を補正できるという受入ではない。
 Codex では native managed worktree の version 1 metadata にある ownerThreadId と hook.session_id が一致し、Desktop の親から候補 hook を通した実 add/commit を確認した。
 Claude CLI の生存別所有者・main と、Codex CLI の別 owner identity への add は候補 hook により止まり、対象の HEAD・index・試験ファイルは不変だった。
 
@@ -19,7 +20,8 @@ Claude CLI の生存別所有者・main と、Codex CLI の別 owner identity �
 Claude Desktop の実 Git、変更後の全ライフサイクル、Codex の別所有者の同時稼働を確認したものではない。
 cd の CLI 試行は harness が own worktree へ cwd を戻したため、移動先に留まった状態での Git 操作には到達していない。
 肯定側の baseline ask/deny は同じ入力の比較計算であり、baseline を有効にした別試行ではない。
-Claude の成功 pilot は任意祖先探索版であり、本 ADR が提案する直接親限定版を接続した実 Git 成功ではない。
+決定前の Claude 成功 pilot は任意祖先探索版であり、その時点では直接親限定版を接続した実 Git 成功を確認していなかった。
+その後、直接親限定の最終ソースを接続した CLI 親の実 add/commit を確認した（後述「この限定実装の検証」）。
 比較の公開記録は上記 issue コメントに残す。
 2026-10-06〜07 の Claude Desktop/CLI 2.1.286、Codex Desktop/CLI の native metadata version 1 が根拠であり、Claude の保存観測では Desktop 親・subagent と CLI 親の hook 直接親が lock と一致した。
 陰性側の native 実測は Claude CLI の生存別所有者・main、Codex CLI の別 owner identity の3ケースである。
@@ -41,16 +43,21 @@ main/default branch、検査回避、作用先の既存判定は維持する。
 既存の作用先判定を適用するが、repository 全体への影響をすべて拒否できるとは主張しない。
 例えば feature checkout を own とした場合の `git stash clear` は現行 parser では allow となり、共通の `refs/stash` に作用する。
 この既存の own policy による限界は sibling を own に補正した対象にも生じる。
+また `git branch -f main` や `git update-ref refs/heads/main` は現行 parser の guard 対象外であり、feature checkout から共有 default branch の ref を変更する操作まで保護していない。
+これらは補正前から relation によらず allow であり、本変更による新たな対象外化ではない。
 共有 ref の操作を別 policy として厳格化する判断は #1404 に残し、本変更の受入から一般的な共有状態保護を導かない。
 個人の wrapper、trusted roots、承認規則を repo の導入要件にしない。
 
 ### Claude の対応条件
 
-初版は、native lock に記録された PID と UTC 起動時刻が hook プロセスの直接の親に一致する場合だけ補正する。
+初版は、`claude session <name> (pid P start S)` 形式の native lock に記録された PID と UTC 起動時刻が hook プロセスの直接の親に一致する場合だけ補正する。
+`claude agent <name> (pid P start S)` の agent 種別は意図して除外し、PID と起動時刻が一致しても確定済み sibling を補正しない。
+親セッションと subagent の隔離 worktree が同じ PID を記録する場合でも、親からその隔離 worktree を own と扱う根拠にはしない。
 任意の祖先まで一致を探索しない。
 Claude A が別セッション B を子プロセスとして起動した構成で、B の hook の遠い祖先に A があることを A の worktree の所有証拠にしないためである。
 
-この条件は保存した CLI・Desktop の親と subagent の hook 観測に一致する。
+直接親の照合は保存した CLI・Desktop の親と subagent の hook 観測に一致するが、session 種別の lock への限定を含めて適用する。
+subagent が親セッションの session 種別 worktree を対象にする場合と、自分の agent 種別隔離 worktree を対象にする場合を区別し、後者の sibling 補正は行わない。
 追加の shell・wrapper・未知の中継プロセスが入る構成は、初版では補正しない。
 lock の欠落・読取不能・形式不明、開始時刻不一致、ps 取得失敗、再開後の stale lock は従来の sibling 判断へ戻す。
 native 観測で条件を絞った結果であり、全 Claude 起動方式への互換性は主張しない。
@@ -132,7 +139,7 @@ Claude CLI の生 stdout/stderr と hook 観測、Codex Desktop の実 command �
 ### 残る受入
 
 補正のない場合の既存挙動と、補正があっても残る main・検査回避等を、先に失敗するテストから固定する。
-直接親と遠い祖先の区別、PID 開始時刻、native metadata の形式と失敗、非 ASCII を含む target、環境による Git target の混入を扱う。
+session と agent の区別、直接親と遠い祖先の区別、PID 開始時刻、native metadata の形式と失敗、非 ASCII を含む target、環境による Git target の混入を扱う。
 最終実装を接続した実入口で、両 harness の対象経路を確認する。
 prototype の成功や保存入力の再生を、最終実装の native 実行へ格上げしない。
 
