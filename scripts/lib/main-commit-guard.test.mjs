@@ -985,6 +985,16 @@ describe("evaluateMainCommitGuard", () => {
 		assert.equal(result.decision, "deny");
 	});
 
+	it("treats a checkout sitting on MAIN as on the default branch (case-insensitive filesystems)", () => {
+		for (const currentBranch of ["MAIN", "Main"]) {
+			const result = evaluateMainCommitGuard(
+				payload({ command: "git commit -m 'x'" }),
+				{ currentBranch, mainBranch: "main" },
+			);
+			assert.equal(result.decision, "deny", currentBranch);
+		}
+	});
+
 	it("allows when currentBranch is unknown (detached HEAD, detection failure)", () => {
 		const result = evaluateMainCommitGuard(
 			payload({ command: "git commit -m 'x'" }),

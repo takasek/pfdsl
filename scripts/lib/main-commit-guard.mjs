@@ -44,6 +44,7 @@ import {
 	classifyCodexGitRoutine,
 	classifySharedGitEffect,
 	evaluateSharedGitEffect,
+	sameBranchName,
 } from "./shared-git-effects.mjs";
 
 // The decision splits by target before it splits by subcommand. Against a
@@ -975,7 +976,7 @@ function evaluateGuardedCommand(
 	// relation had a name — the branch-name rule still applies, and reaching a
 	// deny through it requires the target's branch to be readable.
 	const crossesWorktree = targetRelation === "sibling";
-	const targetsDefaultBranch = currentBranch === mainBranch;
+	const targetsDefaultBranch = sameBranchName(currentBranch, mainBranch);
 	if (!targetsDefaultBranch && !crossesWorktree) return { decision: "allow" };
 
 	const command = `git ${guarded.subcommand}`;

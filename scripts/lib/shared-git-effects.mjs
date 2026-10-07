@@ -422,6 +422,25 @@ export function classifySharedGitEffect(subcommand, args) {
 	return null;
 }
 
+/**
+ * Whether two branch names are the same ref. A case-insensitive filesystem
+ * resolves `MAIN` to the loose `refs/heads/main`, so case never separates them.
+ */
+export function sameBranchName(a, b) {
+	return (
+		typeof a === "string" &&
+		typeof b === "string" &&
+		a.toLowerCase() === b.toLowerCase()
+	);
+}
+
+function namesDefaultBranch(ref, mainBranch) {
+	return (
+		sameBranchName(ref, mainBranch) ||
+		sameBranchName(ref, `refs/heads/${mainBranch}`)
+	);
+}
+
 export function evaluateSharedGitEffect(
 	effect,
 	mainBranch,
@@ -432,18 +451,18 @@ export function evaluateSharedGitEffect(
 		effect.kind === "rename-own" &&
 		relation === "own" &&
 		currentBranch &&
-		currentBranch !== mainBranch &&
+		!sameBranchName(currentBranch, mainBranch) &&
 		(effect.names.length === 1 ||
 			(effect.names.length === 2 && effect.names[0] === currentBranch)) &&
-		effect.names.every((name) => name !== mainBranch && !/[$`*?]/.test(name))
+		effect.names.every(
+			(name) => !namesDefaultBranch(name, mainBranch) && !/[$`*?]/.test(name),
+		)
 	)
 		return { decision: "allow" };
 	const refs = effect.refs ?? [effect.ref];
 	if (
 		["create-branch", "enter-branch"].includes(effect.kind) &&
-		refs.every(
-			(ref) => ref !== mainBranch && ref !== `refs/heads/${mainBranch}`,
-		)
+		refs.every((ref) => !namesDefaultBranch(ref, mainBranch))
 	) {
 		if (!refs.some((ref) => /[$`*?]/.test(ref))) return { decision: "allow" };
 	}
