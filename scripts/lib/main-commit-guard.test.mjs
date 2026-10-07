@@ -1015,6 +1015,46 @@ describe("evaluateMainCommitGuard", () => {
 		}
 	});
 
+	it("keeps the default-branch deny when a config override rides on the commit", () => {
+		for (const command of [
+			"git -c user.name=x commit -m 'x'",
+			"GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=a.b GIT_CONFIG_VALUE_0=c git commit -m 'x'",
+		]) {
+			const result = evaluateMainCommitGuard(payload({ command }), {
+				currentBranch: "main",
+			});
+			assert.equal(result.decision, "deny", command);
+			assert.match(result.reason, /Blocked 'git commit' on 'main'/, command);
+		}
+	});
+
+	it("asks for a config override on a feature branch, but not for a read or a foreign target", () => {
+		for (const command of [
+			"git -c user.name=x commit -m 'x'",
+			"git --config-env=a.b=ENV fetch origin",
+			"GIT_CONFIG_PARAMETERS=x git fetch origin",
+		]) {
+			const result = evaluateMainCommitGuard(payload({ command }), {
+				currentBranch: "topic",
+			});
+			assert.equal(result.decision, "ask", command);
+			assert.equal(
+				evaluateMainCommitGuard(payload({ command }), {
+					currentBranch: "topic",
+					targetRelation: "foreign",
+				}).decision,
+				"allow",
+				command,
+			);
+		}
+		assert.equal(
+			evaluateMainCommitGuard(payload({ command: "git -c k=v log -1" }), {
+				currentBranch: "topic",
+			}).decision,
+			"allow",
+		);
+	});
+
 	it("allows when currentBranch is unknown (detached HEAD, detection failure)", () => {
 		const result = evaluateMainCommitGuard(
 			payload({ command: "git commit -m 'x'" }),

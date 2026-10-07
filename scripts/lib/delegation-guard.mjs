@@ -33,10 +33,7 @@ import { parseGhCommand } from "./gh-command.mjs";
 import { buildPermissionOutput, parseHookPayload } from "./hook-io.mjs";
 import {
 	classifyCodexGitRoutine,
-	hasGitHelpOption,
-	isReadOnlyGitBranch,
-	isReadOnlyGitConfig,
-	isReadOnlyGitReflog,
+	isReadOnlyGitInvocation,
 } from "./shared-git-effects.mjs";
 import { prepareHeredocs } from "./shell-heredoc.mjs";
 
@@ -545,6 +542,11 @@ function isGitTargetAssignment(value) {
 	);
 }
 
+/** A visible `GIT_CONFIG_*` assignment: it injects settings into the Git call. */
+function isGitConfigAssignment(value) {
+	return /^GIT_CONFIG[A-Za-z0-9_]*=/.test(value);
+}
+
 function isNonemptyCdPathAssignment(value) {
 	return value.startsWith("CDPATH=") && value.slice("CDPATH=".length) !== "";
 }
@@ -837,15 +839,23 @@ export function parseEnvPrefix(tokens, start = 0) {
 	let chdir;
 	let malformed = false;
 	let gitTargetOverride = false;
+	let gitConfigOverride = false;
 	while (i < tokens.length) {
 		const value = tokens[i].value;
 		if (/^[A-Za-z_][A-Za-z0-9_]*=/.test(value)) {
 			gitTargetOverride ||= isGitTargetAssignment(value);
+			gitConfigOverride ||= isGitConfigAssignment(value);
 			i++;
 			continue;
 		}
 		if (value === "--")
-			return { end: i + 1, chdir, malformed, gitTargetOverride };
+			return {
+				end: i + 1,
+				chdir,
+				malformed,
+				gitTargetOverride,
+				gitConfigOverride,
+			};
 		if (value === "-C" || value === "--chdir") {
 			if (!tokens[i + 1]) malformed = true;
 			else chdir = tokens[i + 1];
@@ -883,7 +893,7 @@ export function parseEnvPrefix(tokens, start = 0) {
 		}
 		break;
 	}
-	return { end: i, chdir, malformed, gitTargetOverride };
+	return { end: i, chdir, malformed, gitTargetOverride, gitConfigOverride };
 }
 
 const LEADING_REDIRECTION = /^(?:[0-9]*(?:<<<|<<|<>|<&|>&|>>?|<)|&>>?)/;
@@ -1032,6 +1042,7 @@ export function parseLeadingShellPrefix(tokens) {
 	let i = 0;
 	let unresolved = false;
 	let gitTargetOverride = false;
+	let gitConfigOverride = false;
 	let cdPathOverride = false;
 	const envs = [];
 	while (i < tokens.length) {
@@ -1044,6 +1055,7 @@ export function parseLeadingShellPrefix(tokens) {
 		}
 		if (/^[A-Za-z_][A-Za-z0-9_]*=/.test(value)) {
 			gitTargetOverride ||= isGitTargetAssignment(value);
+			gitConfigOverride ||= isGitConfigAssignment(value);
 			cdPathOverride ||= isNonemptyCdPathAssignment(value);
 			i++;
 			continue;
@@ -1053,6 +1065,7 @@ export function parseLeadingShellPrefix(tokens) {
 			envs.push(env);
 			unresolved ||= env.malformed;
 			gitTargetOverride ||= env.gitTargetOverride;
+			gitConfigOverride ||= env.gitConfigOverride;
 			i = env.end;
 			continue;
 		}
@@ -1065,6 +1078,7 @@ export function parseLeadingShellPrefix(tokens) {
 					envs,
 					unresolved,
 					gitTargetOverride,
+					gitConfigOverride,
 					cdPathOverride,
 				};
 			i = command.end;
@@ -1088,7 +1102,14 @@ export function parseLeadingShellPrefix(tokens) {
 		}
 		break;
 	}
-	return { end: i, envs, unresolved, gitTargetOverride, cdPathOverride };
+	return {
+		end: i,
+		envs,
+		unresolved,
+		gitTargetOverride,
+		gitConfigOverride,
+		cdPathOverride,
+	};
 }
 
 // `FOO=bar cmd` and executable command prefixes still run cmd.
@@ -1252,37 +1273,7 @@ export function evaluateDelegationGuard(
 			const args = tokens
 				.slice(gitSubcommandIndex(tokens) + 1)
 				.map((token) => token.value);
-			const read =
-				[
-					"status",
-					"diff",
-					"log",
-					"show",
-					"rev-parse",
-					"ls-files",
-					"ls-tree",
-					"show-ref",
-					"for-each-ref",
-					"cat-file",
-					"rev-list",
-					"merge-base",
-					"describe",
-					"help",
-				].includes(sub) ||
-				(sub === "branch" && isReadOnlyGitBranch(args)) ||
-				(sub === "remote" &&
-					(() => {
-						const action = args.filter(
-							(arg) => !["-v", "--verbose"].includes(arg),
-						)[0];
-						return action === undefined || ["show", "get-url"].includes(action);
-					})()) ||
-				(sub === "config" && isReadOnlyGitConfig(args)) ||
-				(sub === "reflog" && isReadOnlyGitReflog(args)) ||
-				(sub === "stash" && ["list", "show"].includes(args[0])) ||
-				(sub === "worktree" && args[0] === "list") ||
-				(sub !== "config" && hasGitHelpOption(sub, args));
-			if (!read)
+			if (!isReadOnlyGitInvocation(sub, args))
 				return {
 					decision: "deny",
 					matched: `git ${sub ?? "unknown"}`,

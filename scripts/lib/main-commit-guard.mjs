@@ -42,6 +42,7 @@ import {
 import { buildPermissionOutput, parseHookPayload } from "./hook-io.mjs";
 import {
 	classifyCodexGitRoutine,
+	classifyGitConfigOverride,
 	classifySharedGitEffect,
 	evaluateSharedGitEffect,
 	sameBranchName,
@@ -564,11 +565,48 @@ function classifyBypass(tokens) {
 }
 
 /**
+ * Whether the global options ahead of the subcommand at `subAt` carry a
+ * command-line config override (`-c`, `--config-env`), whatever its key:
+ * `include.path` can load arbitrary settings.
+ */
+function hasGlobalConfigOverride(tokens, subAt) {
+	for (let i = 1; i < subAt; i++) {
+		const value = tokens[i].value;
+		if (
+			value === "-c" ||
+			value === "--config-env" ||
+			value.startsWith("--config-env=")
+		)
+			return true;
+		if (GIT_GLOBAL_FLAGS_WITH_VALUE.has(value)) i++;
+	}
+	return false;
+}
+
+/**
  * The guarded git subcommand one already-tokenized segment runs, or null.
+ * A config override (`-c`, `--config-env`, or `configOverride` for a visible
+ * `GIT_CONFIG_*` assignment before the command) on anything but a read marks
+ * the result `configOverride`, which evaluation turns into a shared effect.
  * @param {{value: string, quoted: boolean}[]} tokens
  * @returns {{subcommand: string, decision: "deny" | "ask", bypass?: boolean, flag?: string, outsideTarget?: boolean, outsideTargetFlag?: string, outsideTargetName?: string} | null}
  */
-function classifySegment(tokens) {
+function classifySegment(tokens, { configOverride = false } = {}) {
+	const found = classifyGuardedSegment(tokens);
+	if (found?.bypass) return found;
+	if (tokens.length === 0 || basename(tokens[0].value) !== "git") return found;
+	const sub = gitSubcommand(tokens);
+	const subAt = gitSubcommandIndex(tokens);
+	if (!sub || subAt === null) return found;
+	if (!configOverride && !hasGlobalConfigOverride(tokens, subAt)) return found;
+	const args = tokens.slice(subAt + 1).map((token) => token.value);
+	if (!classifyGitConfigOverride(sub, args)) return found;
+	return found
+		? { ...found, configOverride: true }
+		: { subcommand: sub, decision: "ask", configOverride: true };
+}
+
+function classifyGuardedSegment(tokens) {
 	if (tokens.length === 0) return null;
 	const head = tokens[0];
 	if (basename(head.value) !== "git") {
@@ -632,7 +670,10 @@ export function classifyGitCommand(command) {
 	/** @type {{subcommand: string, decision: "deny" | "ask", bypass?: boolean, flag?: string, outsideTarget?: boolean, outsideTargetFlag?: string, outsideTargetName?: string} | null} */
 	let asked = null;
 	for (const segment of splitSegments(command)) {
-		const found = classifySegment(stripLeadingNoise(tokenize(segment)));
+		const rawTokens = tokenize(segment);
+		const found = classifySegment(stripLeadingNoise(rawTokens), {
+			configOverride: parseLeadingShellPrefix(rawTokens).gitConfigOverride,
+		});
 		if (found?.decision === "deny") return found;
 		if (found) asked ??= found;
 	}
@@ -708,9 +749,9 @@ function resolveCodexRoutineCwd(tokens) {
 	return target === null ? null : resolve(target);
 }
 
-function guardedSuffix(tokens) {
+function guardedSuffix(tokens, options) {
 	for (let i = 0; i < tokens.length; i++) {
-		const guarded = classifySegment(tokens.slice(i));
+		const guarded = classifySegment(tokens.slice(i), options);
 		if (guarded) return guarded;
 	}
 	return null;
@@ -822,8 +863,10 @@ function analyzeCommand(
 		}
 
 		const guarded =
-			classifySegment(tokens) ??
-			(prefix.unresolved ? guardedSuffix(tokens) : null);
+			classifySegment(tokens, { configOverride: prefix.gitConfigOverride }) ??
+			(prefix.unresolved
+				? guardedSuffix(tokens, { configOverride: prefix.gitConfigOverride })
+				: null);
 		if (!guarded) {
 			finish();
 			continue;
@@ -906,7 +949,24 @@ export function evaluateMainCommitGuard(
 	});
 }
 
-function evaluateGuardedCommand(
+// A config override on a non-read call is a shared effect, but it must not
+// soften what the call is already guarded for (a deny on the default branch),
+// so it only replaces an allow.
+function evaluateGuardedCommand(guarded, context = {}) {
+	const result = evaluateGuardedCore(guarded, context);
+	if (
+		!guarded.configOverride ||
+		result.decision !== "allow" ||
+		context.targetRelation === "foreign"
+	)
+		return result;
+	return evaluateSharedGitEffect(
+		{ kind: "shared" },
+		context.mainBranch ?? "main",
+	);
+}
+
+function evaluateGuardedCore(
 	guarded,
 	{ currentBranch, mainBranch = "main", targetRelation = "own" } = {},
 ) {

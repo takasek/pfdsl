@@ -317,6 +317,54 @@ export function isReadOnlyGitReflog(args) {
 	return !["expire", "delete", "drop"].includes(args[0]);
 }
 
+const READ_ONLY_GIT_SUBCOMMANDS = new Set([
+	"status",
+	"diff",
+	"log",
+	"show",
+	"rev-parse",
+	"ls-files",
+	"ls-tree",
+	"show-ref",
+	"for-each-ref",
+	"cat-file",
+	"rev-list",
+	"merge-base",
+	"describe",
+	"help",
+]);
+
+/**
+ * Whether `git <subcommand> <args>` only reads: the table of invocations a
+ * Codex child may run, shared so that the parent classifies a read the same
+ * way.
+ */
+export function isReadOnlyGitInvocation(subcommand, args) {
+	if (READ_ONLY_GIT_SUBCOMMANDS.has(subcommand)) return true;
+	if (subcommand === "branch" && isReadOnlyGitBranch(args)) return true;
+	if (subcommand === "remote") {
+		const action = args.find((arg) => !["-v", "--verbose"].includes(arg));
+		if (action === undefined || ["show", "get-url"].includes(action))
+			return true;
+	}
+	if (subcommand === "config") return isReadOnlyGitConfig(args);
+	if (subcommand === "reflog" && isReadOnlyGitReflog(args)) return true;
+	if (subcommand === "stash" && ["list", "show"].includes(args[0])) return true;
+	if (subcommand === "worktree" && args[0] === "list") return true;
+	return hasGitHelpOption(subcommand, args);
+}
+
+/**
+ * The effect of a command-line configuration override (`git -c`,
+ * `--config-env`, a visible `GIT_CONFIG_*` assignment) on `subcommand`. Any
+ * key can matter, since `include.path` loads arbitrary settings, so every
+ * invocation that is not a read is shared. The caller supplies the fact that
+ * an override is present.
+ */
+export function classifyGitConfigOverride(subcommand, args) {
+	return isReadOnlyGitInvocation(subcommand, args) ? null : { kind: "shared" };
+}
+
 export function classifySharedGitEffect(subcommand, args) {
 	if (hasGitHelpOption(subcommand, args)) return null;
 	if (subcommand === "reflog")
