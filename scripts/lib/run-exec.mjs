@@ -11,7 +11,7 @@
  */
 
 import { execFileSync } from "node:child_process";
-import { dirname, resolve } from "node:path";
+import { dirname, isAbsolute } from "node:path";
 
 import {
 	hasGitTargetEnvironment,
@@ -95,10 +95,16 @@ export function resolveGitRoots(
 ) {
 	const env = withoutGitTargetEnvironment(environment);
 	const toplevel = exec(["rev-parse", "--show-toplevel"], { cwd, env });
-	const common = exec(["rev-parse", "--git-common-dir"], { cwd, env });
+	// Git resolves its relative output against the physical cwd, which can differ
+	// from a symlink spelling supplied by the caller. Ask Git for that identity.
+	const common = exec(
+		["rev-parse", "--path-format=absolute", "--git-common-dir"],
+		{ cwd, env },
+	);
 	if (!toplevel.ok || !common.ok) return null;
 
-	const commonDir = resolve(cwd, common.out.trim());
+	const commonDir = common.out.trim();
+	if (!isAbsolute(commonDir)) return null;
 	return {
 		worktreeRoot: toplevel.out.trim(),
 		commonDir,

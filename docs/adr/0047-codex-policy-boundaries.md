@@ -38,6 +38,8 @@ patch の追加・変更・削除・移動元と移動先を全件確認し、�
 既知の root prefix 外でも祖先に .git marker がある probe 失敗は scratch と区別して拒否する。
 Git common dir が異なる repository と repo 外の scratch は既存の管轄外として扱う。
 生成 root instructions の正本案内を維持する。
+生成物の保護は session と同じ Git common dir の checkout root に限定し、foreign repository と scratch の同名ファイルを生成物と誤認しない。
+Git common dir は Git 自身に絶対パスで取得させ、symlink cwd の論理パスへ相対出力を結合して所有境界を誤認しない。
 
 ### 操作主体と外向き操作
 
@@ -113,7 +115,10 @@ bootstrap 故障や trust skip の試行ではなく、既存 trusted 入口か�
 
 hooks/list は候補 worktree を cwd にしても primary の .codex/hooks.json を sourcePath として返した。
 既存の Bash/Edit 入口は候補コードを実行したが、新しい MCP matcher はその定義にない。
-MCP の実配線、Desktop の最終版受入、別生存 owner、移動先に留まる cd、再開・fork・handoff は別の受入として残る。
+Codex Desktop の native managed worktree では、親の実 add/commit と clean を確認済みであり、workflow companion に記録している。
+今回追加した MCP matcher は、最終設定を正式に読み込んだ Codex の実入口で、読取の通過と変更の拒否を確認する受入が残る。
+Claude 側は、最終 hook を接続した Desktop の親・subagent の実 Git と、他セッションの worktree・cd 後の陰性経路が未確認である。
+別生存 owner、移動先に留まる cd、再開・fork・handoff、native 隔離へ委ねる場合の陰性対照は #1398 全体の受入として残る。
 Node 入口の失敗注入・再生をこれらの live 受入へ格上げしない。
 bootstrap 自身の欠落・構文エラー、host timeout、trust skip は、この builtin 監督が起動しないため repo 側で保証しない。
 稼働設定の通常の信頼レビューを経ずに primary・信頼 hash・metadata を手修正しない。

@@ -120,7 +120,7 @@ if (isMainThread) {
 // convention.
 //
 // Reads the hook payload on stdin. Prints a deny decision only when the
-// target is the session's own worktree-root CLAUDE.md or AGENTS.md; stays
+// target is a worktree-root CLAUDE.md or AGENTS.md in the session repository; stays
 // silent otherwise. Normal decisions exit 0.
 // Uncaught policy loading or execution errors block with exit 2.
 //
@@ -143,17 +143,25 @@ try {
 	const payload = parseHookPayload(await readStdinText());
 	if (!payload) process.exit(0);
 
-	// Name check first: resolving the worktree root costs two git subprocesses,
-	// paid synchronously on every Edit/Write, and only two filenames can ever
-	// reach a deny.
-	for (const operation of normalizeFileOperations(payload)) {
-		if (!mayTargetGeneratedRootInstructions(operation.tool_input.file_path))
-			continue;
+	// Name check first: only generated filenames need the session/target Git
+	// boundary probes, which are synchronous and share the guard's budget.
+	const operations = normalizeFileOperations(payload).filter((operation) =>
+		mayTargetGeneratedRootInstructions(operation.tool_input.file_path),
+	);
+	if (!operations.length) process.exit(0);
+	const cwd = process.env.CLAUDE_PROJECT_DIR?.trim() || payload.cwd;
+	const sessionRoots =
+		typeof cwd === "string" ? resolveGitRoots(cwd, { exec: probeGit }) : null;
+	if (!sessionRoots)
+		throw new Error("Cannot resolve generated instruction session repository");
+	for (const operation of operations) {
 		const { dirname } = await import("node:path");
 		const roots = resolveGitRoots(dirname(operation.tool_input.file_path), {
 			exec: probeGit,
 		});
-		if (!roots) throw new Error("Cannot resolve generated instruction target");
+		// Scratch files and foreign repositories do not use this repo's template.
+		// Unknown write boundaries remain the worktree-write policy's responsibility.
+		if (!roots || roots.commonDir !== sessionRoots.commonDir) continue;
 		const result = await evaluateGeneratedRootInstructionsGuard(
 			operation,
 			roots.worktreeRoot,

@@ -400,6 +400,8 @@ SessionStart は #1403 の setup・版付き shim・preflight に接続したま
 子の add --dry-run は親担当の案内付きで下流実行前に拒否された。
 一時的な helper 欠落時は通常読取も拒否され、元の helper の復元後は同じ読取が exit 0 に回復した。
 hooks/list の sourcePath は primary の .codex/hooks.json で、新しい MCP matcher の実配線は未受入である。
+これは追加 matcher を最終設定から読み込んだ実入口で、読取の通過と変更の拒否を確認する項目である。
+Codex Desktop の親の実 add/commit は下記の native 所有者の記録で確認済みであり、未確認へ戻さない。
 Node 入口の再生・失敗注入、CLI の実操作、Desktop の実操作は別の根拠として扱う。
 
 ## native 所有者の受入継続（#1398）

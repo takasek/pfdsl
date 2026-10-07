@@ -6,7 +6,7 @@
 // template instead) is a single retry with the message's own path, so there
 // is no ask-worthy judgment call to defer to a human.
 //
-// Scoped to the session's own worktree root exactly — not any path merely
+// Scoped to a worktree root inside the session repository — not any path merely
 // named CLAUDE.md/AGENTS.md — so a legitimate hand-authored file that happens
 // to share the name (e.g. scripts/skill-template/CLAUDE.md, a dev-only guard
 // for a different directory) is never blocked.
@@ -45,10 +45,10 @@ export function mayTargetGeneratedRootInstructions(filePath) {
 /**
  * Decide whether a PreToolUse Edit/Write invocation may proceed.
  * @param {object} payload PreToolUse hook payload
- * @param {string | null} worktreeRoot the session's git worktree root
- *   (`git rev-parse --show-toplevel` at payload.cwd), or null when it could
- *   not be resolved (cwd missing, not a git repo, git failure) — nothing
- *   rules the target out then, so allow.
+ * @param {string | null} worktreeRoot the target's git worktree root, after
+ *   the caller confirms that it shares the session's repository identity.
+ *   Null means no applicable target root was established; allow here and
+ *   leave unknown write boundaries to the worktree-write policy.
  * @returns {{decision: "allow"} | {decision: "deny", reason: string}}
  */
 export function evaluateGeneratedRootInstructionsGuard(payload, worktreeRoot) {
