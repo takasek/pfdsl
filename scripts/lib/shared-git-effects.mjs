@@ -110,11 +110,12 @@ function isLongOptionPrefix(arg, name) {
 
 const CREATE_LONG_OPTIONS = ["--create", "--force-create", "--orphan"];
 
+// `-m`/`-c` and these only rename or copy the branch they name; everything
+// else that modifies can reach another branch's ref.
+const BRANCH_RENAME_OPTIONS = ["--move", "--copy"];
 const BRANCH_MODIFYING_OPTIONS = [
 	"--delete",
 	"--delete-merged",
-	"--move",
-	"--copy",
 	"--force",
 	"--edit-description",
 	"--set-upstream-to",
@@ -147,6 +148,7 @@ const BRANCH_READ_OPTIONS = new Set([
 // alone do not, so `git branch -v newb` still creates `newb`.
 function parseBranchArgs(args) {
 	const parsed = {
+		rename: false,
 		modifying: false,
 		list: false,
 		unknown: false,
@@ -164,7 +166,8 @@ function parseBranchArgs(args) {
 		}
 		if (!arg.startsWith("--")) {
 			for (const letter of arg.slice(1)) {
-				if ("dDmMcCfu".includes(letter)) parsed.modifying = true;
+				if ("mc".includes(letter)) parsed.rename = true;
+				else if ("dDMCfu".includes(letter)) parsed.modifying = true;
 				else if (letter === "l") parsed.list = true;
 				else if (!"arvqi".includes(letter)) parsed.unknown = true;
 			}
@@ -172,7 +175,9 @@ function parseBranchArgs(args) {
 		}
 		const name = arg.split("=", 1)[0];
 		const attached = arg.includes("=");
-		if (
+		if (BRANCH_RENAME_OPTIONS.some((option) => isLongOptionPrefix(arg, option)))
+			parsed.rename = true;
+		else if (
 			BRANCH_MODIFYING_OPTIONS.some((option) => isLongOptionPrefix(arg, option))
 		)
 			parsed.modifying = true;
@@ -182,8 +187,7 @@ function parseBranchArgs(args) {
 			if (!attached) i++;
 		} else if (name === "--format" || name === "--sort") {
 			if (!attached) i++;
-		} else if (name === "--abbrev" ? !attached : !BRANCH_READ_OPTIONS.has(name))
-			parsed.unknown = true;
+		} else if (!BRANCH_READ_OPTIONS.has(name)) parsed.unknown = true;
 	}
 	return parsed;
 }
@@ -195,6 +199,7 @@ function parseBranchArgs(args) {
 export function isReadOnlyGitBranch(args) {
 	const parsed = parseBranchArgs(args);
 	return (
+		!parsed.rename &&
 		!parsed.modifying &&
 		!parsed.unknown &&
 		(parsed.list || parsed.operands.length === 0)
@@ -331,15 +336,10 @@ export function classifySharedGitEffect(subcommand, args) {
 			: null;
 	}
 	if (subcommand === "branch") {
-		if (
-			args[0] === "-m" ||
-			args[0] === "-c" ||
-			isLongOptionPrefix(args[0] ?? "", "--move") ||
-			isLongOptionPrefix(args[0] ?? "", "--copy")
-		)
-			return { kind: "rename-own", names: args.slice(1) };
 		const parsed = parseBranchArgs(args);
 		if (parsed.modifying) return { kind: "shared" };
+		// A rename or copy is own work wherever the flag sits among the options.
+		if (parsed.rename) return { kind: "rename-own", names: parsed.operands };
 		if (parsed.list) return null;
 		return parsed.operands.length
 			? { kind: "create-branch", ref: parsed.operands[0] }
