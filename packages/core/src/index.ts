@@ -310,6 +310,18 @@ export interface FormatOptions {
 }
 
 export type {
+	DependencyClosure,
+	DependencyDiagnostic,
+	DependencyDocument,
+	DependencyOptions,
+	DependencyReference,
+	DependencyRole,
+} from "./dependency-closure.js";
+export {
+	loadDependencyClosure,
+	loadDependencyClosureAsync,
+} from "./dependency-closure.js";
+export type {
 	DocWithFrontmatter,
 	LoadedGraph,
 	ResolvedPresentation,
