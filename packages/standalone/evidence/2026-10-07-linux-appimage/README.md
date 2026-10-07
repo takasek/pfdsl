@@ -98,7 +98,7 @@ CLI は exit 0、stderr 空、created / written は成功。
 厳密なコメント位置保存を新しい契約にする場合は別途判断が必要。
 この記録更新は formatter / CST writer / CLI / UI の実装や仕様を変更しない。
 
-## 残る確認と仕様判断
+## 初回検収時の残る確認と仕様判断
 
 | Row / host | 残る条件 |
 | --- | --- |
@@ -108,10 +108,39 @@ CLI は exit 0、stderr 空、created / written は成功。
 | I1284-021 / native | 同 process の document / preview dispose 後の旧結果隔離。現 UI にない入口を追加・合成して代替しない |
 | I1284-022 / 両 GUI | 実効 reduced-motion 設定が確認できる環境でアニメーション抑制を確認 |
 
-上表は未確認9セル。
+上表は初回検収時の未確認9セルであり、追補結果は次節に分けて保持する。
 追加で native の raw CRLF bytes は clipboard / Mousepad / AX の正規化により未確認で、テキスト比較から保存 bytes を認定しない。
 O-001 は既に producer を持つ既存 output を選んだ際の V001 と Undo/Redo による復帰・再現の観測であり、semantic-invalid な全候補の事前除外を求めるかは未決。
 有効な既存 target の6ケース成功と混同せず、仕様判断をせずに新たな確定不具合へ転写しない。
+
+## 同じ固定版の追補検収
+
+所有者から `pfdsl-1411-8261-supplement-report.md` と `pfdsl-1411-8261-supplement-evidence.zip` を受領した。
+追補 ZIP は1,620,351 bytes、SHA256 `7fd509974e7aa87b7e315a9d17ed12f67c499a469170b8b77b63adaee900b5bc`。
+親は ZIP の69 entries の path / link / duplicate / CRC と、最上位 SHA256SUMS の68ファイルを照合した。
+内側の artifact-identification にある manifests は検証先の payload の記録であり、追補 ZIP に同梱していない AppImage の再検証としては扱わない。
+実行 source は引き続き `8261f877d5cae8aa653a5310edfbd9e387acb116`、文書だけの参照は `d297e0d38cc7f3160b9a0fb217dc53d288e1cfa6`。
+native executable と AppImage は上記と同じ指紋で、dot は通常の同じ AppRun を用い、manifest・frontend・入力保持・exit 0 と空の launch log を再確認した。
+
+I1284-012 / native は、右端 input node から物理 pointer で tooltip 内へ入り、build を click して主図へ移動する入口を確認し、成功へ更新した。
+description 全文と status done が右端の内側へ折り返され、pointer が tooltip 内へ入った後も表示を保持した。
+親は `native/limitrightpointer.png`、`native/limitinside.png`、`native/limithoverframe0.png` の画面と操作記録を照合した。
+これにより、今回9セルは1成功・8未確認、[累積399セル](supplement/cumulative-matrix.csv)は成功201・旧失敗履歴3・未確認8・対象外187となる。
+native は72成功 / 1旧失敗 / 6未確認、VS Code は106 / 1 / 2、CLI は23 / 1 / 0。
+未変更390セルの元 CSV の値、旧失敗3セル、対象セルの元結果 history を親が照合し、唯一の status 変更が I1284-012 / native であることを確認した。
+元 CSV の2 review notes は累積 JSON の history に保持されている。
+元の全量 JSON と ZIP は今回の親環境には残っていないため、dot が報告した原本1,133ファイルの再照合と全 JSON 値の不変は、今回の親による独立な全量再照合とは区別する。
+
+残る8セルは I1283-019 / VS Code、I1284-014〜017 / native、I1284-021 / native、I1284-022 / 両 GUI。
+native cue は click 後18〜435 ms の8画像と181 ms 間隔の連続選択でも明瞭に確証できず、主図移動を成功の代替にせず、不具合とも断定しない。
+同 process dispose と通常 Save は現 native UI に入口がなく、CRLF 保存 bytes は399セル外の未確認として維持する。
+native の OS 読取は xfconf property 不在・gsettings 不在のため実効 reduced-motion 値を確証できなかった。
+VS Code は前回の8261実行 payload と隔離 profile が残っておらず、許可済み trusted workspace を確認できないため、GUI 起動前に停止した。
+Code binary と復元 source の指紋一致だけで前回の Host や今回の2条件成功を認定しない。
+
+累積 CSV の `evidence_origin` が `original ZIP 25624580…` の参照は元 ZIP、`addendum` の参照は追補 ZIP 内の相対 path である。
+原本と追補を混ぜず、画像・時刻・詳細 JSON と実行ログは追補 ZIP に保持する。
+F-001 の契約整理と旧失敗履歴、O-001 の仕様判断、全 issue の未完了を維持し、製品 source・runner・設定は変更しない。
 
 ## CI と履歴の境界
 

@@ -252,6 +252,12 @@ dot の通常 native 操作が成功し、[native corpus report](evidence/2026-1
 位置の固定保存を新たに要求する場合は、既存契約の変更として別途判断する。
 未確認9セル、native raw CRLF bytes、semantic-invalid な接続候補の扱いも、この解釈だけで成功へ変更しない。
 
+同じ8261固定版の追補では、I1284-012 / native の右端 tooltip を物理 pointer で開き内部を click する入口が成功した。
+[追補と累積記録](evidence/2026-10-07-linux-appimage/README.md#同じ固定版の追補検収)は成功201・旧失敗履歴3・未確認8・対象外187。
+初回の133条件 / 399セルの判定を保持し、唯一の status 変更を分けて記録した。
+cue の4条件、同 process dispose、両 GUI の reduced motion、VS Code の組込 definition / Peek 対照は未確認のまま維持する。
+通常 Save 入口がない native の raw CRLF 保存 bytes も未確認で、全 issue の一括完了を認定しない。
+
 test run `37574418226` は commit-associated run だが、実際の checkout は synthetic merge `96a306ac87951d6b050d83aed9770875025deaa9`。
 固定 HEAD との差は VS Code smoke の2ファイルであり、同じ product / unit source の補助証拠と別 runner の smoke 成功を分ける。
 実 Extension Development Host の操作結果は別の GUI 証拠として受領した。
