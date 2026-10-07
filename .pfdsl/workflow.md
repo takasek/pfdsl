@@ -371,6 +371,38 @@ worktree 作成から PR 作成までを一気通貫でやらせる場合のみ 
 
 **3. 戻り時の検出。** 汎用手順のまま（`git log origin/<branch>..HEAD` と open PR 一覧の突合）。このリポ固有の追加値はない。
 
+## policy のロード失敗と段階的な受入（#1404）
+
+main-commit、delegation、verification-tree、closes-create、worktree-write、generated-root-instructions、roadmap-publish の既存入口は、同じprocessのtry/catch内でpolicyとhelperを動的importする。
+catchまで届くロード失敗・構文エラー・未処理例外は、deny JSONとstderrを出してexit 2にする。
+正常な判定は従来どおりexit 0とし、既存のask・deny・無出力を維持する。
+command-usageとPostToolUseのadvisoryは今回の変更に含めない。
+入口名とmatcherを維持し、起動済みsessionの既存配線からも同じ入口を呼べる構成にする。
+子processのrunnerを追加しないため、ADR-0046のClaude直接親PIDの照合元は変わらない。
+native所有証拠の欠落をsibling判断へ戻す処理と、policyを実行できない失敗を拒否する処理は区別する。
+
+今回の拒否はentrypointのNode実行で確認する。
+harnessにhookが起動・尊重されること、host timeout、bootstrap自身の欠落・構文エラー、trust skipまで保証したとは扱わない。
+既存parserが不正payloadを無出力にする経路も変更していない。
+同一processのtry/catchは同期停止・終わらないstdin・probeを打ち切れないため、内部の実行予算と実harnessの失敗受入は後続に残す。
+
+残る保護は、default refへのbranch・update-ref等の作用先、親のmerge・auto-merge、MCP、apply_patch、物理パスとsymlink、未知target、Codexでのask変換をそれぞれ独立に確認する。
+pre-commitを経由しないref操作を #1403 のcommit拒否で覆ったと主張しない。
+shared runnerや配線の縮小を採る場合は、元hookの直接親条件を保った所有者補正の正例・別所有者の陰性を同じ変更単位で確認する。
+verification-tree・closes-create等の削除とSessionStart自動setupの廃止は、この部分変更では決定していない。
+個人wrapper・trusted rootsをrepo fixtureの前提にせず、保護の代替を実入口で確認してから判断する。
+
+## native 所有者の受入継続（#1398）
+
+PR #1410の限定実装とADR-0046は、2026-10-07のorigin/main `a4297156e724c9d0e0f22b61c043543aa7e98a0e` で確認済みである。
+今回のCodex Desktop親チャットからnative create_worktreeで作った2つのworktreeは、version 1のownerThreadIdがともに `01a11446-defe-7c20-9ae7-a81cf42b2efa` だった。
+一つ目の `codex/issue-1403-setup-safety` で実switch・stage・通常pre-commit付きcommit `108ca389` が成功し、commit直後のcleanを確認した。
+hookの生stdinは今回も保存していないため、事後のGit成功を所有者補正callbackの発火や、native隔離の一般保証とは扱わない。
+
+残る受入はClaude Desktopの実Git・親とsubagentの区別、別生存所有者、移動先に留まったcd後の操作、再開・fork・handoff、native隔離だけに委ねる場合の同一陰性入力である。
+nodeによる最終entrypointの実行と合成metadataの回帰テストは、live harnessのhook受入と区別する。
+#1404のロード失敗修正でもADR-0046の所有者条件は変えず、上記未確認を完了へ読み替えない。
+
 ## hook の artifact 登録基準（#854）
 
 一般形は上の「workflow.pfdsl に登録する agent の範囲」と同じく、pfd-ops の `references/work-cycle.md`「成果物の門番」が一次情報。
