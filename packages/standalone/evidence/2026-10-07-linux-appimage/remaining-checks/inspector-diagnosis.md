@@ -2,6 +2,7 @@
 
 This is a separate diagnostic build for the remaining PR #1411 checks.
 It does not replace the accepted AppImage or certify the remaining GUI conditions.
+The [returned diagnosis](inspector-results/README.md) records the completed run, primary evidence and remaining product/environment boundaries.
 
 ## Build identity
 

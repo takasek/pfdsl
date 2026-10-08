@@ -260,10 +260,21 @@ dot の通常 native 操作が成功し、[native corpus report](evidence/2026-1
 通常 native GUI の未確認判定とは分け、束の完了まで残る実画面確認を続ける。
 初回と前追補の133条件 / 399セルの判定を保持し、各追補の status 変更を分けて記録した。
 cue の4条件、同 process dispose、両 GUI の reduced motion は未確認のまま維持する。
-native の実 Monaco model の編集 / Undo / Redo による raw CRLF 保持も未確認で、通常 Save UI の追加は要求せず、全 issue の一括完了を認定しない。
-今回の連続録画でも native cue が見えず、正規 Inspector がないため class / computed style を取得できていない。
-OS setting の変更後も実効 GTK / VS Code webview は reduce へ切り替わらず、GNOME setting は元の明示 override の存在を記録しなかったため厳密な復元を証明できない。
+この production artifact 試行では native の実 Monaco model の raw CRLF 保持も未確認で、通常 Save UI の追加は要求せず、全 issue の一括完了を認定しない。
+同試行の連続録画でも native cue が見えず、正規 Inspector がないため class / computed style を取得できなかった。
+同試行の OS setting 変更後も実効 GTK / VS Code webview は reduce へ切り替わらず、GNOME setting は元の明示 override の存在を記録しなかったため厳密な復元を証明できない。
 値 true / 型 b への復帰と、元状態までの復元完了は区別する。
+
+2026-10-08 UTC の[別 Inspector binary 診断](evidence/2026-10-07-linux-appimage/remaining-checks/inspector-results/README.md)を受領し、136件の manifest と原399セルの bytes 不変を照合した。
+同じ製品 source / frontend の別 release binary では、class / selector / computed style と約1.5秒の解除が成立した一方、録画に期待する持続的な青い cue が現れず、computed state と captured presentation の境界に不一致がある。
+SVG paint / clipping / compositor / capture 等の根本原因は未確定で、元 binary の4条件へ合否を転写しない。
+実 Monaco model の定義作成前 / 後 / Undo / Redo は4状態すべて CRLF で、前と Undo、後と Redo の内容が一致した。
+これは399セル外の診断 model の証拠であり、元 binary の保存 bytes や editor painting を認定しない。
+breakpoint 付き model 操作中の Trusted Types 描画エラーは別観測として保持し、通常版での再現は未確認。
+active xfsettingsd を特定したが、正規 xfconf write は publisher の blob / serial を変えず、実効 GTK / 両 webview は reduce に到達しなかった。
+今回作成した property は現在 baseline の不存在へ厳密に復元され、GNOME は変更せず値 / 型 / override 存在も前後一致した。
+現在 baseline の復元成功と、前試行の失われた歴史的 baseline を証明できないことは分ける。
+既存の受入集計202 / 3 / 7 / 187と元判定は保持し、製品の描画問題とdot環境の設定伝播を別々に引き継ぐ。
 
 test run `37574418226` は commit-associated run だが、実際の checkout は synthetic merge `96a306ac87951d6b050d83aed9770875025deaa9`。
 固定 HEAD との差は VS Code smoke の2ファイルであり、同じ product / unit source の補助証拠と別 runner の smoke 成功を分ける。

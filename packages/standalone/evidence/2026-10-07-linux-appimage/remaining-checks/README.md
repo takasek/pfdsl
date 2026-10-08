@@ -1,5 +1,8 @@
 # Fixed-source remaining checks — 2026-10-08 UTC
 
+このページは指定 production AppImage の受入判定を保持する。
+後続の[別 Inspector binary の診断結果](inspector-results/README.md)では、class / computed と captured presentation の不一致、実 model の CRLF 保持、現在 baseline の設定復元を確認したが、このページの399セルを変更していない。
+
 所有者から dot の残件報告と4分割の証拠 ZIP を受領した。
 製品 source は `8261f877d5cae8aa653a5310edfbd9e387acb116`、指定 AppImage / inner executable は前段と同じ指紋である。
 新しい専用 checkout / workspace / VS Code profile で検査し、親は証拠を照合したが、Linux GUI を自ら再実行してはいない。
@@ -51,16 +54,18 @@ encoded frame cadence は実アプリの paint 完了時刻ではない。
 production artifact の通常 Inspector が開かなかったことが、次の診断上の具体的な阻害点である。
 [固定版の診断用 Inspector 手順](inspector-diagnosis.md)に、別 binary の来歴検査と読み取り対象をまとめた。
 通常 Inspector を利用できる別 Linux binary の診断では、同じ source / lock / frontend と build 条件、変更箇所、外側・内側 hash を記録し、指定 artifact の合格へ混ぜない。
-native raw CRLF は399セル外の未確認であり、保存 UI の追加を求めず、実 Monaco model の編集 / Undo / Redo を非正規化の値で読む必要がある。
+この production artifact 試行では native raw CRLF は399セル外の未確認だった。
+後続の診断 binary では実 model の4状態を読み CRLF 保持を確認したが、元 binary の保存 bytes 成功へ転写しない。
 
 ## 設定復元の未完了
 
 workspace trust / modifier / 今回作った xfconf property は元の状態へ復元した。
 GNOME `enable-animations` は実効 true / 型 b に戻したが、変更前の明示 user override の有無を取得していない。
-現在は明示 override true があり、元も存在したか、元は不存在だったかを復元できた証拠はない。
+この試行の終了時は明示 override true があり、元も存在したか、元は不存在だったかを復元できた証拠はない。
 これは許可された「存在・型・値まで元どおりにする」復元条件の未充足であり、設定復元完了とは報告しない。
 元 DB snapshot / backup はなく、unknown baseline を推測して reset する操作もしない。
-次の検査では現在の状態を値・型・user override の有無を含めて記録し、取得できない場合は変更前に停止する。
+後続の診断では現在の状態を値・型・user override の有無を含めて記録し、その現在 baseline への厳密な復元が成功した。
+後続開始時の GNOME override は不存在であり、前試行終了時との差がいつ・なぜ生じたかは断定しない。
 この記録は次回の baseline であり、失われた前回の状態を復元したことにはならない。
 XSettings の selection owner は存在するが、xfconf / gsettings と実効 GTK の不一致の原因は未確定。
 正規の manager 設定経路を識別してから実効値を確認し、manager の差替えや property blob 直接書換えで検査を成立させない。
