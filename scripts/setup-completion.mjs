@@ -22,7 +22,6 @@ import {
 	decideSkillLinkAction,
 	SKILL_LINK_TARGET,
 } from "./lib/repo-skill-link.mjs";
-import { isCompatibleShim } from "./shared-hooks.mjs";
 
 export const SETUP_INPUTS = [
 	".npmrc",
@@ -274,25 +273,24 @@ export function inspectHooksPath(
 		return failed("The effective pre-commit is missing or not executable.");
 	try {
 		if (
-			!isCompatibleShim(
-				readFileSync(path, "utf8"),
-				readFileSync(join(root, "scripts/hooks/pre-commit-shim"), "utf8"),
-			)
+			readFileSync(path, "utf8") !==
+			readFileSync(join(root, "scripts/hooks/pre-commit-shim"), "utf8")
 		)
 			return failed(
-				"The effective hook differs from a compatible repo shim; cannot verify that it runs the gate.",
+				"The effective hook differs from the checkout's repo shim; cannot verify that it runs the gate.",
 			);
 	} catch {
 		return failed("Cannot read the effective pre-commit shim.");
 	}
 	for (const entry of [
-		"scripts/pre-commit-entry",
 		"scripts/hooks/check-default-branch",
-		"scripts/pre-commit-gates",
 		"scripts/pre-commit",
 	]) {
 		if (!isExecutableShim(join(root, entry)))
-			return failed(`The checkout's ${entry} is missing or not executable.`);
+			return {
+				reason: `The checkout's ${entry} is missing or not executable. Restore this checkout's repository files and executable modes before retrying setup.`,
+				managed,
+			};
 	}
 	return { reason: null, managed };
 }

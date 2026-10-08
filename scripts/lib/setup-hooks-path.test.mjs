@@ -51,11 +51,7 @@ function fixture() {
 	writeFileSync(join(root, "scripts/pre-commit"), "#!/bin/sh\nexit 0\n", {
 		mode: 0o755,
 	});
-	for (const entry of [
-		"scripts/pre-commit-entry",
-		"scripts/hooks/check-default-branch",
-		"scripts/pre-commit-gates",
-	]) {
+	for (const entry of ["scripts/hooks/check-default-branch"]) {
 		writeFileSync(join(root, entry), "#!/bin/sh\nexit 0\n", { mode: 0o755 });
 	}
 	mkdirSync(join(root, "generated/skills/pfdsl"), { recursive: true });
@@ -151,11 +147,7 @@ describe("effective core.hooksPath", () => {
 		writeFileSync(join(linked, "scripts/pre-commit"), "#!/bin/sh\nexit 0\n", {
 			mode: 0o755,
 		});
-		for (const entry of [
-			"scripts/pre-commit-entry",
-			"scripts/hooks/check-default-branch",
-			"scripts/pre-commit-gates",
-		]) {
+		for (const entry of ["scripts/hooks/check-default-branch"]) {
 			writeFileSync(join(linked, entry), "#!/bin/sh\nexit 0\n", {
 				mode: 0o755,
 			});
@@ -166,15 +158,11 @@ describe("effective core.hooksPath", () => {
 	});
 });
 describe("setup-managed pre-commit", () => {
-	it("accepts a compatible newer shared shim without marking dependencies stale", () => {
+	it("rejects a different shared shim even with a version comment", () => {
 		const { root, env } = fixture();
-		install(
-			root,
-			".git/hooks",
-			shim.toString().replace("shim-version: 2", "shim-version: 3"),
-		);
-		assert.equal(inspectHooksPath(root, { env }).reason, null);
-		assert.equal(isSetupCurrent(root, { env }), true);
+		install(root, ".git/hooks", `${shim}# pfdsl-pre-commit-shim-version: 99\n`);
+		assert.notEqual(inspectHooksPath(root, { env }).reason, null);
+		assert.equal(isSetupCurrent(root, { env }), false);
 	});
 	it("requires the shim in the common-dir hooks when core.hooksPath is unset", () => {
 		const { root, env } = fixture();
@@ -197,9 +185,9 @@ describe("setup-managed pre-commit", () => {
 	});
 });
 describe("pre-commit shim", () => {
-	it("fails the commit when the checkout has no scripts/pre-commit-entry", () => {
+	it("fails the commit when the checkout has no scripts/pre-commit", () => {
 		const { root, git, env } = fixture();
-		rmSync(join(root, "scripts/pre-commit-entry"));
+		rmSync(join(root, "scripts/pre-commit"));
 		git(
 			"-c",
 			"user.name=Fixture",

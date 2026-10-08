@@ -27,17 +27,14 @@ Claude CodeとCodexのSessionStart hookが、このworktreeのセットアップ
 手動でworktreeを作成した場合など、hookによるセットアップが完了していない場合は `make setup` を実行し、`node scripts/setup-completion.mjs check` の成功を確認してから作業する。
 `make setup` は依存関係の準備と、共有hook shim・worktreeのスキルリンクの配置を分ける。
 依存のmarkerが有効ならhook・リンクだけを修復し、依存を再installしない。
-版付き共有hook shimはコミット先worktreeの `scripts/pre-commit-entry` だけを呼び、入口のない旧checkoutはcommitを拒否する。
-checkout側の `scripts/hooks/check-default-branch` がorigin/HEAD・HEADを検証してdefault branchと不明・異常な参照を拒否し、`scripts/pre-commit-gates` が通常検査を実行する。
-`scripts/pre-commit` は歴史的shimと直接実行のための互換入口で、同じ保護を通る。
-共有shimはcommon dirのlock内で版を確認し、実行可能な一時ファイルをatomicに置換する。
-互換な新版を降格せず、未知のhookとcustom hooksPathを自動上書きしない。
-新しい呼出し契約を持つ版同士では、checkout側の判定・gateが異なっても互換な共有入口を保持する。
-未移行の旧checkerとのreadiness成功は保証せず、旧checkoutを更新する。
-歴史的な旧setupのコピーによる巻戻りは、新しいpreflight・pre-commitで修復する。
-無条件コピーする旧setupまで含む非降格と、巻戻り後に旧checkout自身がcommitする間隙の保護は保証しない。
+共有hook shimはコミット先worktreeの `scripts/pre-commit` だけを呼ぶ。
+checkout側の `scripts/hooks/check-default-branch` がorigin/HEAD・HEADを検証してdefault branchと不明・異常な参照を拒否し、続いて `scripts/pre-commit` が通常検査を実行する。
+共有shimはcommon dirのlock内で実行可能な一時ファイルをatomicに置換し、setup判定はcheckoutのshimとの完全一致を要求する。
+異なる内容の既存hookとcustom hooksPathを自動上書きしない。
+既存hookが異なる場合は、内容と対象を確認して現行shimへ明示的に置き換えてからsetupする。
+旧checkout・旧shimとの後方互換や自動移行は提供しない。
 Biomeの指摘は自動修正されないため、失敗時は `make format` を実行して再stageする。
-完了判定・依存検査は `scripts/setup-completion.mjs`、共有shimの版・排他・修復は `scripts/shared-hooks.mjs`、配置と検査の入口は `Makefile` の `setup` / `setup-deps` / `setup-artifacts` / `preflight` を参照する。
+完了判定・依存検査は `scripts/setup-completion.mjs`、共有shimの排他・配置は `scripts/shared-hooks.mjs`、配置と検査の入口は `Makefile` の `setup` / `setup-deps` / `setup-artifacts` / `preflight` を参照する。
 
 ## 検査コマンド
 

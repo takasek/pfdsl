@@ -1,8 +1,7 @@
 #!/bin/sh
-# pfdsl-pre-commit-shim-version: 2
 # Stable dispatch contract: policy and gates belong to the executing checkout.
-if [ -x ./scripts/pre-commit-entry ]; then
-  exec ./scripts/pre-commit-entry
+if [ -x ./scripts/pre-commit ]; then
+  exec ./scripts/pre-commit
 fi
-echo "error: scripts/pre-commit-entry is missing or not executable; update this checkout before committing." >&2
+echo "error: scripts/pre-commit is missing or not executable in this checkout." >&2
 exit 1

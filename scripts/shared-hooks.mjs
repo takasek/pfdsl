@@ -1,8 +1,9 @@
 import { spawnSync } from "node:child_process";
-import { createHash, randomUUID } from "node:crypto";
+import { randomUUID } from "node:crypto";
 import {
 	accessSync,
 	constants,
+	lstatSync,
 	mkdirSync,
 	readFileSync,
 	realpathSync,
@@ -12,39 +13,6 @@ import {
 } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { isCliEntrypoint } from "./lib/cli-entrypoint.mjs";
-
-export const LEGACY_SHIM = `#!/bin/sh
-# Thin shim installed at .git/hooks/pre-commit by \`make setup\`.
-# Always execs the checked-out scripts/pre-commit so the check logic stays in
-# sync with the branch's tree instead of a stale copy from setup time (#411).
-if [ -x ./scripts/pre-commit ]; then
-  exec ./scripts/pre-commit
-fi
-echo "error: scripts/pre-commit is missing or not executable in this checkout, so the repository's pre-commit checks cannot run." >&2
-exit 1
-`;
-// Exact protected v1 bytes from PR #1412 (851f213c) and PR #1411 (365bcf1b).
-// Migration only: these policy snapshots are never executed here.
-const PROTECTED_V1_SHA256 = new Set([
-	"2023055bc9becaabbfd4316ad73e1a32102e613e1a017a739a4ec3e1cbf1233a",
-	"1f81c9097e049181ff60620e394630f43a9f39e3faa3d3af4f3cd5499460a0f0",
-]);
-const VERSION_LINE = /^# pfdsl-pre-commit-shim-version: ([1-9][0-9]*)$/m;
-function version(text) {
-	const matched = text.match(VERSION_LINE);
-	const value = matched ? Number(matched[1]) : 0;
-	return Number.isSafeInteger(value) ? value : 0;
-}
-
-// Future versions with a different dispatch contract require an explicit
-// compatibility change; a version comment alone does not authorize a hook.
-export function isCompatibleShim(installed, source) {
-	return (
-		version(installed) >= version(source) &&
-		version(source) > 0 &&
-		installed.replace(VERSION_LINE, "") === source.replace(VERSION_LINE, "")
-	);
-}
 
 export function resolveHookPaths(root, env = process.env) {
 	const git = (...args) =>
@@ -87,18 +55,15 @@ export async function ensureSharedHook(
 		join(root, "scripts/hooks/pre-commit-shim"),
 		"utf8",
 	);
-	if (!version(source))
-		throw new Error("The checkout's pre-commit shim has no valid version.");
 	if (!isManagedPath(paths)) {
 		try {
 			accessSync(paths.effective, constants.X_OK);
-			if (isCompatibleShim(readFileSync(paths.effective, "utf8"), source))
-				return;
+			if (readFileSync(paths.effective, "utf8") === source) return;
 		} catch {
 			/* A custom hook is diagnosed, never replaced. */
 		}
 		throw new Error(
-			`custom core.hooksPath selects ${paths.effective}; install a compatible executable repository shim there or resolve the override explicitly. Setup will not change it.`,
+			`custom core.hooksPath selects ${paths.effective}; install the checkout's executable repository shim there or resolve the override explicitly. Setup will not change it.`,
 		);
 	}
 	mkdirSync(dirname(paths.managed), { recursive: true });
@@ -124,38 +89,29 @@ export async function ensureSharedHook(
 			installed = readFileSync(paths.managed, "utf8");
 		} catch (error) {
 			if (error.code !== "ENOENT") throw error;
+			// A dangling symlink is an existing hook, not an empty install target.
+			try {
+				lstatSync(paths.managed);
+				throw new Error(
+					`The managed hook ${paths.managed} is unreadable; refusing to overwrite it.`,
+				);
+			} catch (missing) {
+				if (missing.code !== "ENOENT") throw missing;
+			}
 		}
-		if (installed !== undefined && isCompatibleShim(installed, source)) {
+		if (installed === source) {
 			try {
 				accessSync(paths.managed, constants.X_OK);
 				return;
 			} catch {
 				/* Restore executable mode through the same atomic install. */
 			}
-		} else if (
-			installed !== undefined &&
-			installed !== LEGACY_SHIM &&
-			!(
-				version(source) >= 2 &&
-				PROTECTED_V1_SHA256.has(
-					createHash("sha256").update(installed).digest("hex"),
-				)
-			) &&
-			!(
-				version(installed) > 0 &&
-				version(installed) < version(source) &&
-				installed.replace(VERSION_LINE, "") === source.replace(VERSION_LINE, "")
-			)
-		) {
+		} else if (installed !== undefined) {
 			throw new Error(
-				`The managed hook ${paths.managed} is not a compatible repository shim; refusing to overwrite it.`,
+				`The managed hook ${paths.managed} differs from the checkout's repository shim; refusing to overwrite it. Inspect and replace it explicitly before running setup.`,
 			);
 		}
-		writeFileSync(
-			temporary,
-			installed && isCompatibleShim(installed, source) ? installed : source,
-			{ mode: 0o755, flag: "wx" },
-		);
+		writeFileSync(temporary, source, { mode: 0o755, flag: "wx" });
 		renameSync(temporary, paths.managed);
 	} finally {
 		rmSync(temporary, { force: true });

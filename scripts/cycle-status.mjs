@@ -14,7 +14,6 @@ import {
 import { parseIssueNumbers } from "./lib/issue-args.mjs";
 import { run, tryRun } from "./lib/run-exec.mjs";
 import { createGitHubOps } from "./pfdsl/lib/github-ops.mjs";
-import { ensureSharedHook } from "./shared-hooks.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const root = resolve(__dirname, "..");
@@ -45,9 +44,6 @@ if (!parsedIssues.ok) {
 	process.exit(2);
 }
 const issueNumbers = parsedIssues.numbers;
-
-// Repair shared shim downgrades without reinstalling dependencies.
-await ensureSharedHook(root);
 
 // `base` comes from argv; naming the executable and arguments separately keeps
 // it out of a shell (#572).

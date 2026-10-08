@@ -15,13 +15,12 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { afterEach, test } from "node:test";
 import { inspectHooksPath } from "../setup-completion.mjs";
-import { ensureSharedHook, LEGACY_SHIM } from "../shared-hooks.mjs";
+import { ensureSharedHook } from "../shared-hooks.mjs";
 
 const source = new URL("../../", import.meta.url);
 const roots = [];
 const localFiles = [
 	"scripts/pre-commit",
-	"scripts/pre-commit-entry",
 	"scripts/hooks/check-default-branch",
 	"scripts/shared-hooks.mjs",
 	"scripts/setup-completion.mjs",
@@ -31,31 +30,22 @@ const localFiles = [
 	"scripts/hooks/pre-commit-shim",
 	"Makefile",
 ];
-function checkout(root, label = "gate-new", revision) {
+function checkout(root, label = "gate-new") {
 	for (const file of localFiles) {
 		const input = new URL(file, source);
 		if (!existsSync(input)) continue;
 		mkdirSync(dirname(join(root, file)), { recursive: true });
 		copyFileSync(input, join(root, file));
 	}
-	const gate = existsSync(join(root, "scripts/pre-commit-entry"))
-		? "scripts/pre-commit-gates"
-		: "scripts/pre-commit";
+	const prefix = readFileSync(
+		new URL("scripts/pre-commit", source),
+		"utf8",
+	).split("# Biome's own exit code")[0];
 	writeFileSync(
-		join(root, gate),
-		`#!/bin/sh\necho ${label}\nexit \${GATE_EXIT:-0}\n`,
+		join(root, "scripts/pre-commit"),
+		`${prefix}echo ${label}\nexit \${GATE_EXIT:-0}\n`,
 		{ mode: 0o755 },
 	);
-	if (revision) {
-		const file = join(root, "scripts/hooks/pre-commit-shim");
-		writeFileSync(
-			file,
-			readFileSync(file, "utf8").replace(
-				/shim-version: [0-9]+/,
-				`shim-version: ${revision}`,
-			),
-		);
-	}
 	mkdirSync(join(root, "generated/skills/pfdsl"), { recursive: true });
 	writeFileSync(
 		join(root, "generated/skills/pfdsl/SKILL.md"),
@@ -121,14 +111,9 @@ afterEach(() => {
 		rmSync(root, { recursive: true, force: true });
 });
 
-test("shared bootstrap refuses legacy checkout on feature and default branches before old gates", () => {
+test("shared bootstrap refuses a missing checkout entry on feature and default branches", () => {
 	const { root, git, commit } = fixture();
-	rmSync(join(root, "scripts/pre-commit-entry"), { force: true });
-	writeFileSync(
-		join(root, "scripts/pre-commit"),
-		"#!/bin/sh\necho unprotected-old-gate\n",
-		{ mode: 0o755 },
-	);
+	rmSync(join(root, "scripts/pre-commit"));
 	for (const branch of ["feature", "main"]) {
 		if (branch === "main") assert.equal(git("switch", "-c", branch).status, 0);
 		writeFileSync(join(root, "staged.txt"), branch);
@@ -137,38 +122,24 @@ test("shared bootstrap refuses legacy checkout on feature and default branches b
 		const index = git("ls-files", "--stage", "-z").stdout;
 		const result = commit();
 		assert.notEqual(result.status, 0, result.stdout + result.stderr);
-		assert.match(
-			result.stderr,
-			/pre-commit-entry.*missing|update this checkout/i,
-		);
-		assert.doesNotMatch(result.stdout, /unprotected-old-gate/);
+		assert.match(result.stderr, /pre-commit.*missing/i);
+		assert.doesNotMatch(result.stdout + result.stderr, /gate-new/);
 		assert.equal(git("rev-parse", "HEAD").stdout, head);
 		assert.equal(git("ls-files", "--stage", "-z").stdout, index);
 	}
 });
 
-test("checkout entry uses its own guard even if shim receives the historical check-only option", () => {
-	const { root, git, hook, env } = fixture();
-	assert.equal(git("switch", "-c", "main").status, 0);
-	const result = spawnSync(hook, ["--check-default-branch"], {
-		cwd: root,
-		env,
-		encoding: "utf8",
-	});
-	assert.notEqual(result.status, 0);
-	assert.doesNotMatch(result.stdout, /gate-new/);
-});
-
 for (const path of [
-	"scripts/pre-commit-entry",
+	"scripts/pre-commit",
 	"scripts/hooks/check-default-branch",
-	"scripts/pre-commit-gates",
 ]) {
 	test(`missing or non-executable ${path} fails both readiness and Git commit`, () => {
 		const { root, commit, env } = fixture();
 		const target = join(root, path);
 		if (existsSync(target)) chmodSync(target, 0o644);
-		assert.notEqual(inspectHooksPath(root, { env }).reason, null);
+		const reason = inspectHooksPath(root, { env }).reason;
+		assert.match(reason, /Restore.*repository files.*executable modes/);
+		assert.doesNotMatch(reason, /Run 'make setup' to install/);
 		assert.notEqual(commit().status, 0);
 		rmSync(target, { force: true });
 		assert.notEqual(inspectHooksPath(root, { env }).reason, null);
@@ -248,35 +219,28 @@ test("feature and valid detached commits execute their checkout gate once and pr
 	}
 });
 
-test("migration recognizes exact protected v1 and repairs legacy downgrades through old pre-commit entry", async () => {
-	const { root, hook, commit, git, env } = fixture();
-	for (const historical of [
-		"pre-commit-shim-v1",
-		"pre-commit-shim-v1-head-checks",
-	]) {
-		const protectedShim = readFileSync(
-			new URL(`scripts/lib/fixtures/${historical}`, source),
-			"utf8",
-		);
-		writeFileSync(hook, protectedShim, { mode: 0o755 });
-		await ensureSharedHook(root, { env });
-		assert.match(readFileSync(hook, "utf8"), /shim-version: 2/);
-	}
-
-	writeFileSync(hook, LEGACY_SHIM, { mode: 0o755 });
-	assert.equal(commit().status, 0);
-	assert.match(readFileSync(hook, "utf8"), /shim-version: 2/);
-	git("switch", "-c", "main");
-	writeFileSync(hook, LEGACY_SHIM, { mode: 0o755 });
-	const refused = commit();
-	assert.notEqual(refused.status, 0);
-	assert.doesNotMatch(refused.stdout, /gate-new/);
-	// Both compatibility entry and preflight repair the historical downgrade.
-	await ensureSharedHook(root, { env });
-	assert.match(readFileSync(hook, "utf8"), /shim-version: 2/);
+test("commit needs no installer", () => {
+	const { root, commit, env } = fixture();
+	rmSync(join(root, "scripts/shared-hooks.mjs"));
+	assert.equal(inspectHooksPath(root, { env }).reason, null);
+	const result = commit();
+	assert.equal(result.status, 0, result.stdout + result.stderr);
+	assert.match(result.stdout + result.stderr, /gate-new/);
 });
 
-test("alternating and parallel actual setup keeps newer bootstrap and both checkout-specific gates", async () => {
+test("setup and readiness reject a different shim even when its version comment is newer", async () => {
+	const { root, hook, env } = fixture();
+	const changed = `${readFileSync(hook, "utf8")}# pfdsl-pre-commit-shim-version: 99\n`;
+	writeFileSync(hook, changed);
+	assert.notEqual(inspectHooksPath(root, { env }).reason, null);
+	await assert.rejects(
+		ensureSharedHook(root, { env }),
+		/refusing to overwrite/,
+	);
+	assert.equal(readFileSync(hook, "utf8"), changed);
+});
+
+test("alternating and parallel setup keeps the same bootstrap and different checkout-specific gates", async () => {
 	const { root, env, git, hook, commit } = fixture();
 	assert.equal(
 		git(
@@ -293,7 +257,7 @@ test("alternating and parallel actual setup keeps newer bootstrap and both check
 	const rootVersion = git("rev-parse", "HEAD").stdout;
 	const linked = join(root, "linked");
 	assert.equal(git("worktree", "add", "-b", "other", linked).status, 0);
-	checkout(linked, "gate-other", 3);
+	checkout(linked, "gate-other");
 	const guard = join(linked, "scripts/hooks/check-default-branch");
 	writeFileSync(guard, `${readFileSync(guard, "utf8")}echo guard-other\n`);
 	assert.equal(git("-C", linked, "add", "scripts").status, 0);
@@ -326,7 +290,10 @@ test("alternating and parallel actual setup keeps newer bootstrap and both check
 		});
 	for (const cwd of [root, linked, root, linked, root]) await setup(cwd);
 	await Promise.all([setup(root), setup(linked)]);
-	assert.match(readFileSync(hook, "utf8"), /shim-version: 3/);
+	assert.equal(
+		readFileSync(hook, "utf8"),
+		readFileSync(join(root, "scripts/hooks/pre-commit-shim"), "utf8"),
+	);
 	assert.ok(statSync(hook).mode & 0o111);
 	assert.equal(existsSync(`${hook}.pfdsl-lock`), false);
 	for (const [cwd, label] of [
@@ -347,9 +314,22 @@ test("alternating and parallel actual setup keeps newer bootstrap and both check
 			1,
 		);
 	}
+	const installed = readFileSync(hook, "utf8");
+	const gate = join(linked, "scripts/pre-commit");
+	writeFileSync(
+		gate,
+		readFileSync(gate, "utf8")
+			.replace("gate-other", "gate-changed")
+			.replace(/exit \$\{GATE_EXIT:-0\}/, "exit 73"),
+	);
+	const failed = commit(linked);
+	assert.notEqual(failed.status, 0);
+	assert.match(failed.stdout + failed.stderr, /gate-changed/);
+	assert.equal(commit(root).status, 0);
+	assert.equal(readFileSync(hook, "utf8"), installed);
 });
 
-test("custom hook content, mode and configuration remain unchanged on incompatible migration", async () => {
+test("custom hook content, mode and configuration remain unchanged", async () => {
 	const { root, env, git } = fixture();
 	mkdirSync(join(root, "custom"));
 	const custom = join(root, "custom/pre-commit");
