@@ -310,11 +310,17 @@ export function isReadOnlyGitConfig(args) {
 }
 
 /**
- * Whether `git reflog <args>` only reads. `expire`, `delete` and `drop` remove
- * reflog entries, which includes the stash's recovery information.
+ * Whether `git reflog <args>` only reads: no verb (options only, which is
+ * `show`), `show`, `list` or `exists`. Every other verb writes — `write`
+ * can inject an entry, `expire`, `delete` and `drop` remove them — and the
+ * stash reflog is its recovery information, so an unknown verb is not a read.
  */
 export function isReadOnlyGitReflog(args) {
-	return !["expire", "delete", "drop"].includes(args[0]);
+	return (
+		args[0] === undefined ||
+		args[0].startsWith("-") ||
+		["show", "list", "exists"].includes(args[0])
+	);
 }
 
 const READ_ONLY_GIT_SUBCOMMANDS = new Set([
