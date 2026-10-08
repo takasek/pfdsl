@@ -2,6 +2,7 @@
 
 このページは指定 production AppImage の受入判定を保持する。
 後続の[別 Inspector binary の診断結果](inspector-results/README.md)では、class / computed と captured presentation の不一致、実 model の CRLF 保持、現在 baseline の設定復元を確認したが、このページの399セルを変更していない。
+[さらに後続の A / B / C 診断](abc-results/README.md)では独立 SVG paint と通常/停止編集を対照し、設定 write 0件・受入集計不変を保持している。
 
 所有者から dot の残件報告と4分割の証拠 ZIP を受領した。
 製品 source は `8261f877d5cae8aa653a5310edfbd9e387acb116`、指定 AppImage / inner executable は前段と同じ指紋である。

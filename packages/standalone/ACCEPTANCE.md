@@ -276,6 +276,13 @@ active xfsettingsd を特定したが、正規 xfconf write は publisher の bl
 現在 baseline の復元成功と、前試行の失われた歴史的 baseline を証明できないことは分ける。
 既存の受入集計202 / 3 / 7 / 187と元判定は保持し、製品の描画問題とdot環境の設定伝播を別々に引き継ぐ。
 
+続く[A / B / C の追加診断](evidence/2026-10-07-linux-appimage/remaining-checks/abc-results/README.md)では、独立 WebKitGTK 最小再現の SVG outline/drop-shadow が computed に現れながら renderer snapshot に描かれず、直接 SVG stroke と HTML の正対照は描かれた。
+製品の特定 paint/compositor 原因は同定せず、明示的 shape stroke / overlay を未実装の修正候補として分ける。
+active XSettings publisher に届く正規設定経路は見つからず、設定 write 0件、初期/終了8項目は一致し、両 GUI の reduced-motion 受入は未確認のまま。
+production・diagnostic の未停止 create/Undo/Redo は正常描画、停止区間では getter 評価前の Trusted Types エラーと保存画像の一時的な行欠落を観測し、その後の Undo/Redo 画像は回復している。
+親は124件の manifest、独立 snapshot の画素、raw Undo/Redo の旧値一致、設定8比較、原399セルの bytes 不変を照合した。
+この追加診断で受入集計や製品 source を変更せず、通常版の regression や持続的 blank editor を認定しない。
+
 test run `37574418226` は commit-associated run だが、実際の checkout は synthetic merge `96a306ac87951d6b050d83aed9770875025deaa9`。
 固定 HEAD との差は VS Code smoke の2ファイルであり、同じ product / unit source の補助証拠と別 runner の smoke 成功を分ける。
 実 Extension Development Host の操作結果は別の GUI 証拠として受領した。

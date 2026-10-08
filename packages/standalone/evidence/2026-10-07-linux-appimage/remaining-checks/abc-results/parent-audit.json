@@ -1,0 +1,94 @@
+{
+	"evidence_zip": {
+		"zipBytes": 4517604,
+		"zipSha256": "ada89fd42747f47bca927002d7c106be1f302c16eef17a2eb81d7c36e168778b",
+		"entries": 125,
+		"manifestVerified": 124,
+		"unmanifested": ["SHA256SUMS"],
+		"reportExactMatch": true
+	},
+	"layer": "Additional diagnosis, not acceptance of a new product artifact",
+	"source_commit": "8261f877d5cae8aa653a5310edfbd9e387acb116",
+	"production_artifact": 11461844652,
+	"diagnostic_artifact": 11525926292,
+	"original_checklist_bytes_unchanged": true,
+	"original_checklist_sha256": "41c07ec2bb794013063207a827e0da7962a30389345c5d8b35b4a0f6a1026ceb",
+	"original_matrix": {
+		"conditions": 133,
+		"host_cells": 399,
+		"passed": 202,
+		"historical_failed": 3,
+		"unverified": 7,
+		"not_applicable": 187
+	},
+	"A_independent_snapshot_audit": {
+		"bluePixels": {
+			"g-outline": 0,
+			"g-shadow": 0,
+			"rect-shadow": 0,
+			"rect-stroke": 1600,
+			"html-control": 2960,
+			"animated": 0
+		},
+		"snapshotsByteIdentical": true,
+		"snapshotSha256": "7ea70f3adf13b3e56b55a0ad911f3dfff2a6294b402bc17448ddfd0638e8b3fd"
+	},
+	"B_current_baseline_comparison": {
+		"owner": true,
+		"owner_properties": true,
+		"xfconf_property": true,
+		"xfconf_theme": true,
+		"xfconf_font": true,
+		"gtk_enable_animations": true,
+		"gnome": true,
+		"xfconf_settings_file": true
+	},
+	"B_settings_writes_reported": 0,
+	"B_publisher_route_identified": false,
+	"B_reduced_motion_effective": false,
+	"B_prior_historical_restoration_proven": false,
+	"C_current_raw_model": {
+		"undo": {
+			"bytes": 481,
+			"crlf": 21,
+			"loneLF": 0,
+			"sha256": "ac2c1375c5dde8b7f5ab3f39713f7b7a80fd833a42e4bfc52ad936e9fbb1ad90",
+			"sameAsPrevious": true
+		},
+		"redo": {
+			"bytes": 522,
+			"crlf": 24,
+			"loneLF": 0,
+			"sha256": "ab5a42759973773166fa161e5adaf0ff39af2e280bdc0a6fe38cf4452203dfc6",
+			"sameAsPrevious": true
+		}
+	},
+	"C_saved_paint_evidence": {
+		"missing_lines_after_pause": "evidence/C-paused-resumed-after.jpg",
+		"recovered_after_unpaused_undo_redo": [
+			"evidence/C-paused-undo.jpg",
+			"evidence/C-paused-redo.jpg"
+		],
+		"production_console_observed": false,
+		"root_cause_confirmed": false
+	},
+	"proof_limits": {
+		"linux_gui_rerun_by_parent": false,
+		"submitted_repro_script_executed_by_parent": false,
+		"live_settings_audited_by_parent": false,
+		"product_source_modified": false
+	},
+	"independent_evidence_review": {
+		"required_findings": 0,
+		"control_video_frames": {
+			"input": 63,
+			"build": 63
+		},
+		"control_video_blue_pixels": {
+			"input": 0,
+			"build": 0
+		},
+		"previous_raw_four_states_bytes_unchanged": true,
+		"report_navigation_correction": "Saved C-paused-resumed-after.jpg shows temporary missing text; subsequent Undo/Redo images show recovery"
+	}
+}

@@ -4,6 +4,7 @@ The owner returned the separate Inspector diagnosis from dot's Debian 13.6 / x86
 This closes that diagnostic attempt, not the original grouped acceptance.
 The original 133-condition / 399-host-cell checklist is byte-for-byte unchanged: 202 passed, 3 historical failures, 7 unverified and 187 not applicable.
 The parent checked the submitted evidence and an independent reviewer inspected its primary records; neither performed a new Linux GUI run.
+The [subsequent A / B / C diagnosis](../abc-results/README.md) adds independent SVG paint and unpaused/paused editing controls without changing this attempt's evidence or the original checklist.
 
 ## Execution identity and preservation
 

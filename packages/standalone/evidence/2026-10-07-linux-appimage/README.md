@@ -5,6 +5,7 @@ Linux GUI の実操作は dot の報告に基づき、親による GUI 再実行
 検収対象は以下の固定版であり、この受入記録の追加 commit を測ったことにはしない。
 2026-10-08 UTC の[最新の残件追補](remaining-checks/README.md)では I1283-019 / VS Code が成功し、累積は202成功・旧失敗履歴3・未確認7・対象外187。
 続く[別 Inspector binary の診断](remaining-checks/inspector-results/README.md)で computed state と captured presentation の不一致、実 model CRLF、現在 baseline の復元を確認したが、元399セルは不変。
+さらに[A / B / C の追加診断](remaining-checks/abc-results/README.md)で独立 WebKitGTK の SVG paint 対照と通常/停止編集対照を確認し、設定経路は未到達、受入集計は不変のまま保持した。
 以下の初回・前追補・自動検査の数字は各時点の履歴として保持し、全体の完了認定とは区別する。
 
 ## 来歴と識別情報
