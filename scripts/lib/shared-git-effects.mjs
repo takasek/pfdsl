@@ -359,6 +359,17 @@ export function isReadOnlyGitReflog(args) {
 // (attribute queries), count-objects, verify-commit and verify-tag (reports),
 // and version and var (print constants). Each only reads, so a child may run it
 // and a config override on it is not a shared effect.
+/**
+ * Whether `git remote <args>` only reads: no verb, `-v`/`--verbose`, `show`
+ * or `get-url`. Every other verb (add, rename, remove, set-url, set-branches,
+ * set-head, prune, update) writes repository config or refs; a mirror remote or
+ * a rewritten `remote.<name>.fetch` changes what a later plain fetch does.
+ */
+export function isReadOnlyGitRemote(args) {
+	const action = args.find((arg) => !["-v", "--verbose"].includes(arg));
+	return action === undefined || ["show", "get-url"].includes(action);
+}
+
 const READ_ONLY_GIT_SUBCOMMANDS = new Set([
 	"grep",
 	"blame",
@@ -404,11 +415,7 @@ const READ_ONLY_GIT_SUBCOMMANDS = new Set([
 export function isReadOnlyGitInvocation(subcommand, args) {
 	if (READ_ONLY_GIT_SUBCOMMANDS.has(subcommand)) return true;
 	if (subcommand === "branch" && isReadOnlyGitBranch(args)) return true;
-	if (subcommand === "remote") {
-		const action = args.find((arg) => !["-v", "--verbose"].includes(arg));
-		if (action === undefined || ["show", "get-url"].includes(action))
-			return true;
-	}
+	if (subcommand === "remote" && isReadOnlyGitRemote(args)) return true;
 	if (subcommand === "config") return isReadOnlyGitConfig(args);
 	if (subcommand === "reflog" && isReadOnlyGitReflog(args)) return true;
 	if (subcommand === "stash" && ["list", "show"].includes(args[0])) return true;
@@ -433,6 +440,8 @@ export function classifySharedGitEffect(subcommand, args) {
 	if (hasGitHelpOption(subcommand, args)) return null;
 	if (subcommand === "reflog")
 		return isReadOnlyGitReflog(args) ? null : { kind: "shared" };
+	if (subcommand === "remote")
+		return isReadOnlyGitRemote(args) ? null : { kind: "shared" };
 	// A written setting (remote.<name>.fetch, core.*, ...) changes what later
 	// commands do to shared refs, so a non-read config call is itself shared.
 	if (subcommand === "config")
