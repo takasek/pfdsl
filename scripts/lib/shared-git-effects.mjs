@@ -631,9 +631,13 @@ function isLocalRefDestination(refspec, bareIsDestination) {
 	);
 }
 
-/** A repository spelled as a path in this filesystem: `.`, `..`, `./x`, `/x`, `~`, `file://`. */
+/**
+ * A repository spelled as a path in this filesystem: any word starting with `.`
+ * (`.`, `..`, `./x`, `.git`), `/` or `~`, or with `file://`. A remote name cannot
+ * start with `.`, so the broad rule costs nothing.
+ */
 function isLocalRepositorySpelling(value) {
-	return /^(?:\.\.?$|\.\.?\/|\/|~|file:\/\/)/.test(value);
+	return /^(?:[./~]|file:\/\/)/.test(value);
 }
 
 /**
