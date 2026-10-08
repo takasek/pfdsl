@@ -43,9 +43,9 @@ import {
 import { buildPermissionOutput, parseHookPayload } from "./hook-io.mjs";
 import {
 	classifyCodexGitRoutine,
-	classifyGitConfigOverride,
 	classifySharedGitEffect,
 	evaluateSharedGitEffect,
+	isConfigOverrideEffect,
 	sameBranchName,
 } from "./shared-git-effects.mjs";
 
@@ -193,28 +193,35 @@ function isHooksPathAssignment(raw) {
 }
 
 /**
- * Whether tokens `1..subAt` (a whole `git ...` segment's global-option span,
- * ahead of its subcommand at `subAt`) carry a `-c core.hooksPath=<v>` or
- * `--config-env[=]core.hooksPath=<env>` override, any value.
+ * The `key=value` (or `key=ENV`) operands of every `-c` and
+ * `--config-env[=]` in tokens `1..subAt`, a whole `git ...` segment's
+ * global-option span ahead of its subcommand at `subAt`. The one walk over
+ * Git's global options, so a value-taking flag's value is never read as an
+ * option.
  */
-function hasHooksPathGlobalOverride(tokens, subAt) {
+function globalConfigAssignments(tokens, subAt) {
+	const assignments = [];
 	for (let i = 1; i < subAt; i++) {
 		const value = tokens[i].value;
 		if (value === "-c" || value === "--config-env") {
-			if (isHooksPathAssignment(tokens[i + 1]?.value)) return true;
+			assignments.push(tokens[i + 1]?.value ?? "");
 			i++;
 			continue;
 		}
 		if (value.startsWith("--config-env=")) {
-			if (isHooksPathAssignment(value.slice("--config-env=".length)))
-				return true;
+			assignments.push(value.slice("--config-env=".length));
 			continue;
 		}
 		if (GIT_GLOBAL_FLAGS_WITH_VALUE.has(value)) {
 			i++;
 		}
 	}
-	return false;
+	return assignments;
+}
+
+/** Whether a global `-c`/`--config-env` sets `core.hooksPath`, any value. */
+function hasHooksPathGlobalOverride(tokens, subAt) {
+	return globalConfigAssignments(tokens, subAt).some(isHooksPathAssignment);
 }
 
 /** Whether a `-n`/clustered short option means `--no-verify` for `sub`. */
@@ -571,18 +578,10 @@ function classifyBypass(tokens) {
  * `include.path` can load arbitrary settings.
  */
 function hasGlobalConfigOverride(tokens, subAt) {
-	for (let i = 1; i < subAt; i++) {
-		const value = tokens[i].value;
-		if (
-			value === "-c" ||
-			value === "--config-env" ||
-			value.startsWith("--config-env=")
-		)
-			return true;
-		if (GIT_GLOBAL_FLAGS_WITH_VALUE.has(value)) i++;
-	}
-	return false;
+	return globalConfigAssignments(tokens, subAt).length > 0;
 }
+
+/** @typedef {{subcommand: string, decision: "deny" | "ask", bypass?: boolean, flag?: string, outsideTarget?: boolean, outsideTargetFlag?: string, outsideTargetName?: string, effect?: {kind: string, ref?: string, refs?: string[], names?: string[], unresolved?: boolean}, configOverride?: boolean}} GuardedGit */
 
 /**
  * The guarded git subcommand one already-tokenized segment runs, or null.
@@ -590,7 +589,7 @@ function hasGlobalConfigOverride(tokens, subAt) {
  * `GIT_CONFIG_*` assignment before the command) on anything but a read marks
  * the result `configOverride`, which evaluation turns into a shared effect.
  * @param {{value: string, quoted: boolean}[]} tokens
- * @returns {{subcommand: string, decision: "deny" | "ask", bypass?: boolean, flag?: string, outsideTarget?: boolean, outsideTargetFlag?: string, outsideTargetName?: string} | null}
+ * @returns {GuardedGit | null}
  */
 function classifySegment(tokens, { configOverride = false } = {}) {
 	const found = classifyGuardedSegment(tokens);
@@ -601,7 +600,7 @@ function classifySegment(tokens, { configOverride = false } = {}) {
 	if (!sub || subAt === null) return found;
 	if (!configOverride && !hasGlobalConfigOverride(tokens, subAt)) return found;
 	const args = tokens.slice(subAt + 1).map((token) => token.value);
-	if (!classifyGitConfigOverride(sub, args)) return found;
+	if (!isConfigOverrideEffect(sub, args)) return found;
 	return found
 		? { ...found, configOverride: true }
 		: { subcommand: sub, decision: "ask", configOverride: true };
@@ -663,12 +662,12 @@ function classifyGuardedSegment(tokens) {
  * add y` is a deny, since letting the ask through would put the add on the
  * default branch behind a prompt that names the checkout.
  * @param {string} command
- * @returns {{subcommand: string, decision: "deny" | "ask", bypass?: boolean, flag?: string, outsideTarget?: boolean, outsideTargetFlag?: string, outsideTargetName?: string} | null}
+ * @returns {GuardedGit | null}
  */
 export function classifyGitCommand(command) {
 	if (typeof command !== "string" || command.trim() === "") return null;
 
-	/** @type {{subcommand: string, decision: "deny" | "ask", bypass?: boolean, flag?: string, outsideTarget?: boolean, outsideTargetFlag?: string, outsideTargetName?: string} | null} */
+	/** @type {GuardedGit | null} */
 	let asked = null;
 	const state = createProtectedShellState();
 	for (const segment of splitSegments(command)) {

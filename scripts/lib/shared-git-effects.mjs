@@ -420,16 +420,16 @@ export function isReadOnlyGitInvocation(subcommand, args) {
 }
 
 /**
- * The effect of a command-line configuration override (`git -c`,
- * `--config-env`, a visible `GIT_CONFIG_*` assignment) on `subcommand`. Any
+ * Whether a command-line configuration override (`git -c`, `--config-env`, a
+ * visible `GIT_CONFIG_*` assignment) makes `subcommand` a shared effect. Any
  * key can matter, since `include.path` loads arbitrary settings, so every
- * invocation that is not a read is shared. The caller supplies the fact that
- * an override is present. "Read" is `isReadOnlyGitInvocation`, whose table
+ * invocation that is not a read is. The caller supplies the fact that an
+ * override is present. "Read" is `isReadOnlyGitInvocation`, whose table
  * covers ordinary reads such as grep and blame; an earlier, narrower table
  * made `git -c color.ui=never grep` ask.
  */
-export function classifyGitConfigOverride(subcommand, args) {
-	return isReadOnlyGitInvocation(subcommand, args) ? null : { kind: "shared" };
+export function isConfigOverrideEffect(subcommand, args) {
+	return !isReadOnlyGitInvocation(subcommand, args);
 }
 
 export function classifySharedGitEffect(subcommand, args) {
