@@ -442,6 +442,16 @@ export function classifySharedGitEffect(subcommand, args) {
 		return isReadOnlyGitReflog(args) ? null : { kind: "shared" };
 	if (subcommand === "remote")
 		return isReadOnlyGitRemote(args) ? null : { kind: "shared" };
+	// `rebase --update-refs` moves the other branches that point into the
+	// rebased range; the last toggle wins, and a prefix counts as the option.
+	if (subcommand === "rebase") {
+		let updatesRefs = false;
+		for (const arg of args) {
+			if (isLongOptionPrefix(arg, "--update-refs")) updatesRefs = true;
+			else if (isLongOptionPrefix(arg, "--no-update-refs")) updatesRefs = false;
+		}
+		return updatesRefs ? { kind: "shared" } : null;
+	}
 	// A written setting (remote.<name>.fetch, core.*, ...) changes what later
 	// commands do to shared refs, so a non-read config call is itself shared.
 	if (subcommand === "config")
