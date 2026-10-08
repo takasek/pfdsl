@@ -1,7 +1,27 @@
 #!/bin/sh
-# Repair a historical setup's shared shim downgrade before running gates.
-node scripts/shared-hooks.mjs install || exit 1
-scripts/hooks/pre-commit-shim --check-default-branch || exit 1
+# Branch policy comes from this checkout's HEAD; gates use the working tree.
+if [ ! -x ./scripts/hooks/check-default-branch ]; then
+  echo "error: scripts/hooks/check-default-branch is missing or not executable." >&2
+  exit 1
+fi
+guard=$(git show HEAD:scripts/hooks/check-default-branch) || {
+  echo "error: cannot read scripts/hooks/check-default-branch from HEAD; default branch protection refuses this commit." >&2
+  exit 1
+}
+printf '%s\n' "$guard" | sh || exit 1
+
+# Validate the exact guard being committed before it becomes the next HEAD.
+case "$(git ls-files --stage -- scripts/hooks/check-default-branch)" in
+  "100755 "*) ;;
+  *) echo "error: the indexed scripts/hooks/check-default-branch must be an executable regular file." >&2; exit 1 ;;
+esac
+proposed_guard=$(git show :scripts/hooks/check-default-branch) || {
+  echo "error: cannot read scripts/hooks/check-default-branch from the index; refusing to commit an unvalidated guard." >&2
+  exit 1
+}
+printf '%s\n' "$proposed_guard" | sh -n || exit 1
+printf '%s\n' "$proposed_guard" | sh || exit 1
+
 # Biome's own exit code decides the outcome (#723). The previous shape wrote
 # fixes and then inferred failure from "did a staged file change", which a
 # syntax error slips through: biome can't parse the file, so it can't format
@@ -14,7 +34,7 @@ scripts/hooks/pre-commit-shim --check-default-branch || exit 1
 # and exited 0, accumulating until they drowned the new ones. The wrapper
 # reports the failure itself, including what to run.
 # Biome checks index-exported files too: --staged alone chooses paths but reads
-# their worktree content. The shared entrance runs Biome first in isolation.
+# their worktree content. check-drift-gates runs Biome first in isolation.
 
 # Every remaining gate: .pfdsl canonical format, markdown
 # line breaks, and the "regenerate the derived output, fail if it changed"
@@ -24,7 +44,7 @@ scripts/hooks/pre-commit-shim --check-default-branch || exit 1
 # second (#755, #759). Their declaration order, triggers and hints are
 # documented there.
 #
-# biome, above, stays an immediate exit: with a file it cannot parse, the later
+# Biome stays an immediate exit: with a file it cannot parse, the later
 # checks' verdicts are not trustworthy, and a generator crashing on the broken
 # file would be reported as drift.
 if ! node scripts/check-drift-gates.mjs --with-biome; then

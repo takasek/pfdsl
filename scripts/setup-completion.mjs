@@ -22,7 +22,6 @@ import {
 	decideSkillLinkAction,
 	SKILL_LINK_TARGET,
 } from "./lib/repo-skill-link.mjs";
-import { isCompatibleShim } from "./shared-hooks.mjs";
 
 export const SETUP_INPUTS = [
 	".npmrc",
@@ -269,26 +268,45 @@ export function inspectHooksPath(
 	const repair = managed
 		? `Run 'make setup' to install the repo's scripts/hooks/pre-commit-shim at ${path}.`
 		: `core.hooksPath (${configured.stdout.trim()}) selects ${path}. Install the repo's executable scripts/hooks/pre-commit-shim there or resolve the override explicitly; setup will not change Git configuration or custom hooks.`;
-	const failed = (problem) => ({ reason: `${problem} ${repair}`, managed });
-	if (!isExecutableShim(path))
+	const failed = (problem, hint = repair) => ({
+		reason: `${problem} ${hint}`,
+		managed,
+	});
+	const replace = managed
+		? `Inspect ${path} and replace it explicitly with the checkout's executable scripts/hooks/pre-commit-shim before running setup.`
+		: repair;
+	try {
+		if (!statSync(path).isFile())
+			return failed("The effective pre-commit is not a regular file.", replace);
+	} catch {
 		return failed("The effective pre-commit is missing or not executable.");
+	}
 	try {
 		if (
-			!isCompatibleShim(
-				readFileSync(path, "utf8"),
-				readFileSync(join(root, "scripts/hooks/pre-commit-shim"), "utf8"),
-			)
+			readFileSync(path, "utf8") !==
+			readFileSync(join(root, "scripts/hooks/pre-commit-shim"), "utf8")
 		)
 			return failed(
-				"The effective hook differs from a compatible repo shim; cannot verify that it runs the gate.",
+				"The effective hook differs from the checkout's repo shim; cannot verify that it runs the gate.",
+				replace,
 			);
 	} catch {
+		if (!isExecutableShim(path))
+			return failed("The effective pre-commit is missing or not executable.");
 		return failed("Cannot read the effective pre-commit shim.");
 	}
-	if (!isExecutableShim(join(root, "scripts/pre-commit")))
-		return failed(
-			"The checkout's scripts/pre-commit is missing or not executable.",
-		);
+	if (!isExecutableShim(path))
+		return failed("The effective pre-commit is missing or not executable.");
+	for (const entry of [
+		"scripts/hooks/check-default-branch",
+		"scripts/pre-commit",
+	]) {
+		if (!isExecutableShim(join(root, entry)))
+			return {
+				reason: `The checkout's ${entry} is missing or not executable. Restore this checkout's repository files and executable modes before retrying setup.`,
+				managed,
+			};
+	}
 	return { reason: null, managed };
 }
 
