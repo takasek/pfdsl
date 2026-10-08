@@ -46,7 +46,8 @@ documentCount 23、全23文書 passed、全体 passed、failures / errors は空
 corpus window の通常 close は exit 0、stderr は空。
 入力23文書と payload の実行後保持も dot が確認している。
 親は添付された report の reference・execution SHA256・件数・合否を照合した。
-desktop CI の linux-native / linux-appimage-runtime / macos-app も同 source HEAD で成功している。
+desktop run `37574418253` の linux-native / linux-appimage-runtime は同 source HEAD の build / runtime 検査に成功している。
+同 run の macos-app も成功したが、checkout ログが示す対象は synthetic merge `96a306ac87951d6b050d83aed9770875025deaa9` であり、固定 source HEAD `8261f877` の検査とは区別する。
 
 ## 既存5件の元集計と範囲
 

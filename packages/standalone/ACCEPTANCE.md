@@ -279,14 +279,17 @@ active xfsettingsd を特定したが、正規 xfconf write は publisher の bl
 test run `37574418226` は commit-associated run だが、実際の checkout は synthetic merge `96a306ac87951d6b050d83aed9770875025deaa9`。
 固定 HEAD との差は VS Code smoke の2ファイルであり、同じ product / unit source の補助証拠と別 runner の smoke 成功を分ける。
 実 Extension Development Host の操作結果は別の GUI 証拠として受領した。
-desktop run `37574418253` の macOS native build は成功しているが、macOS IME・shortcut・新しい実機 GUI、Linux 正式配布、他 distro は認定しない。
+desktop run `37574418253` の macOS native build は synthetic merge `96a306ac87951d6b050d83aed9770875025deaa9` で成功しており、固定 source HEAD `8261f877` の検査とは区別する。
+macOS IME・shortcut・新しい実機 GUI、Linux 正式配布、他 distro は認定しない。
 過去の `c42367f8` の WebKit 不足と `07f541ff` の GLES 不足は別試行として保持する。
 後続の記録更新だけで PR HEAD が進んでも、native 検収済みの source / artifact は `8261f877` のままとする。
 
 ### PR 前のローカル検査
 
 製品 source の基準は `52ea0dc14491ea21d2b5fa57db2ce3d364d05a2b`。
-今回の差分は README と受入記録のみで、製品 source・Tauri 設定・macOS CI は変更していない。
+初期 PR 差分は README・受入記録に加え、desktop CI の linux-native job と pipeline companion の手順を含む。
+この表は初期 PR 前のローカル検査であり、後続の AppImage / runtime / Inspector CI・hook・回帰テスト追加や dot 検収の検証範囲とは分ける。
+製品 source・Tauri 設定・macOS CI は変更していない。
 macOS 27.0 / arm64、Node.js 26.5.0、pnpm 10.33.2、cargo/rustc 1.99.0 で以下を実行した。
 Linux 手順が案内する Node.js 24 は既存 CI の指定であり、今回のローカル実行版とは区別する。
 
