@@ -108,6 +108,22 @@ function isLongOptionPrefix(arg, name) {
 	return given.startsWith("--") && given.length > 2 && name.startsWith(given);
 }
 
+// A toggle option (`--detach` / `--no-detach`) is honored only while the last
+// occurrence is the exact positive spelling. A negation or any other prefix of
+// either name, however it is abbreviated, cancels it.
+function toggleIsOn(args, positives, positiveName, negativeName) {
+	let on = false;
+	for (const arg of args) {
+		if (positives.includes(arg)) on = true;
+		else if (
+			isLongOptionPrefix(arg, negativeName) ||
+			isLongOptionPrefix(arg, positiveName)
+		)
+			on = false;
+	}
+	return on;
+}
+
 const CREATE_LONG_OPTIONS = ["--create", "--force-create", "--orphan"];
 
 // `-m`/`-c` and these only rename or copy the branch they name; everything
@@ -436,7 +452,7 @@ export function classifySharedGitEffect(subcommand, args) {
 		if (args[0] === "add") return { kind: "shared" };
 		if (
 			args[0] === "prune" &&
-			(args.includes("--dry-run") || args.includes("-n"))
+			toggleIsOn(args, ["--dry-run", "-n"], "--dry-run", "--no-dry-run")
 		)
 			return null;
 		return ["remove", "move", "prune", "repair", "lock", "unlock"].includes(
@@ -497,8 +513,12 @@ export function classifySharedGitEffect(subcommand, args) {
 			return ref ? { kind: "enter-branch", ref } : null;
 		}
 		if (
-			options.includes("--detach") ||
-			(subcommand === "switch" && options.includes("-d")) ||
+			toggleIsOn(
+				options,
+				subcommand === "switch" ? ["--detach", "-d"] : ["--detach"],
+				"--detach",
+				"--no-detach",
+			) ||
 			(subcommand === "checkout" && afterSeparator.length > 0)
 		)
 			return null;
