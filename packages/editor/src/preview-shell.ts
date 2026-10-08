@@ -6,9 +6,9 @@ const previewControlsStyles = `
 .tt-graph { max-width: 340px; max-height: 230px; overflow: auto; margin-top: 6px; }
 .tt-graph svg { display: block; }
 .tt-graph g.node { cursor: pointer; }
-.pfdsl-focus-cue { filter: drop-shadow(0 0 6px var(--pfdsl-focusBorder, #007fd4)); outline: 2px solid var(--pfdsl-focusBorder, #007fd4); animation: pfdsl-cue 1.5s ease-out; }
-@keyframes pfdsl-cue { from { filter: drop-shadow(0 0 12px var(--pfdsl-focusBorder, #007fd4)); } to { filter: drop-shadow(0 0 4px var(--pfdsl-focusBorder, #007fd4)); } }
-@media (prefers-reduced-motion: reduce) { .pfdsl-focus-cue { animation: none; } }
+.pfdsl-focus-ring { position: absolute; pointer-events: none; outline: 2px solid var(--pfdsl-focusBorder, #007fd4); animation: pfdsl-cue 1.5s ease-out; }
+@keyframes pfdsl-cue { from { opacity: 1; } to { opacity: 0.35; } }
+@media (prefers-reduced-motion: reduce) { .pfdsl-focus-ring { animation: none; } }
 #node-actions { flex-shrink: 0; padding: 8px; max-height: 40%; overflow: auto; font: 12px var(--pfdsl-editor-font-family, sans-serif); border-top: 1px solid var(--pfdsl-panel-border, #555); }
 #node-actions button, #node-actions input, #node-actions select { color: inherit; background: var(--pfdsl-editor-background, #fff); font: inherit; margin: 4px; }
 #node-actions label { display: block; }
