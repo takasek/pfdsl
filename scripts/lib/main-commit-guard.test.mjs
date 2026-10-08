@@ -690,159 +690,31 @@ describe("git global-option bypass invariant (#1232)", () => {
 
 describe("resolveCommandCwd", () => {
 	const HOOK_CWD = "/repo";
-
-	it("keeps the hook's cwd for a plain commit", () => {
-		assert.equal(resolveCommandCwd("git commit -m 'x'", HOOK_CWD), HOOK_CWD);
+	it("resolves literal per-command targets without interpreting shell cwd", () => {
+		for (const [command, expected] of [
+			["git commit -m x", HOOK_CWD],
+			["git -C /elsewhere/w commit -m x", "/elsewhere/w"],
+			["git -C /worktrees/session -C ../sibling add -A", "/worktrees/sibling"],
+			["cd /a && git -C /b commit -m x", "/b"],
+			["echo 'cd /a' && git commit -m x", HOOK_CWD],
+			["cd /a && git add -A", null],
+			["cd '$SIBLING' && git commit -m x", null],
+			["cd $WORKTREE && git commit -m x", null],
+			["cd -- /a >/dev/null && git add -A", null],
+			["cd && git commit -m x", null],
+		])
+			assert.equal(resolveCommandCwd(command, HOOK_CWD), expected, command);
 	});
-
-	it("follows a leading cd into the tree the commit lands in (#751)", () => {
-		assert.equal(
-			resolveCommandCwd(
-				"cd .claude/worktrees/w && git commit -m 'x'",
-				HOOK_CWD,
-			),
-			"/repo/.claude/worktrees/w",
-		);
-	});
-
-	it("follows an absolute cd", () => {
-		assert.equal(
-			resolveCommandCwd("cd /elsewhere/w && git commit -m 'x'", HOOK_CWD),
-			"/elsewhere/w",
-		);
-	});
-
-	it("reads git -C, which used to bypass the guard entirely (#751)", () => {
-		assert.equal(
-			resolveCommandCwd("git -C /elsewhere/w commit -m 'x'", HOOK_CWD),
-			"/elsewhere/w",
-		);
-	});
-
-	it("reads the explicit target carried by the Codex routine wrapper", () => {
-		assert.equal(
-			resolveCommandCwd(
-				"/opt/codex/bin/codex-git-routine.mjs stage-all /repo/sibling sibling",
-				HOOK_CWD,
-			),
-			"/repo/sibling",
-		);
-	});
-
-	it("reads the target of the routine wrapper behind node options", () => {
-		for (const launcher of ["node --no-warnings", "node --"])
+	it("resolves the routine wrapper's explicit target behind supported launchers", () => {
+		for (const launcher of ["", "node ", "node --no-warnings ", "node -- "])
 			assert.equal(
 				resolveCommandCwd(
-					`${launcher} /opt/codex/bin/codex-git-routine.mjs stage-all /repo/sibling sibling`,
+					`${launcher}/opt/codex/bin/codex-git-routine.mjs stage-all /repo/sibling sibling`,
 					HOOK_CWD,
 				),
 				"/repo/sibling",
 				launcher,
 			);
-	});
-
-	it("reads the explicit target of the node-launched routine wrapper", () => {
-		assert.equal(
-			resolveCommandCwd(
-				"node /opt/codex/bin/codex-git-routine.mjs stage-all /repo/sibling sibling",
-				HOOK_CWD,
-			),
-			"/repo/sibling",
-		);
-	});
-
-	it("applies repeated git -C options from left to right (#784)", () => {
-		assert.equal(
-			resolveCommandCwd(
-				"git -C /worktrees/session -C ../sibling add -A",
-				HOOK_CWD,
-			),
-			"/worktrees/sibling",
-		);
-	});
-
-	it("resolves the tree for guarded subcommands other than commit (#777)", () => {
-		assert.equal(resolveCommandCwd("cd /a && git add -A", HOOK_CWD), "/a");
-		assert.equal(resolveCommandCwd("git -C /b stash push", HOOK_CWD), "/b");
-	});
-
-	it("stops at the first guarded subcommand, not a later one", () => {
-		assert.equal(
-			resolveCommandCwd(
-				"cd /a && git add -A && cd /b && git commit -m 'x'",
-				HOOK_CWD,
-			),
-			"/a",
-		);
-	});
-
-	it("lets git -C win over an earlier cd, since git resolves last", () => {
-		assert.equal(
-			resolveCommandCwd("cd /a && git -C /b commit -m 'x'", HOOK_CWD),
-			"/b",
-		);
-	});
-
-	it("uses the cd in effect where the commit runs, not a later one", () => {
-		assert.equal(
-			resolveCommandCwd("cd /a && git commit -m 'x' && cd /b", HOOK_CWD),
-			"/a",
-		);
-	});
-
-	it("strips quotes around a cd path", () => {
-		assert.equal(
-			resolveCommandCwd("cd '/a b/w' && git commit -m 'x'", HOOK_CWD),
-			"/a b/w",
-		);
-	});
-
-	it("keeps shell syntax literal inside single-quoted cd paths", () => {
-		assert.equal(
-			resolveCommandCwd("cd '$SIBLING' && git commit -m 'x'", HOOK_CWD),
-			"/repo/$SIBLING",
-		);
-		assert.equal(
-			resolveCommandCwd("cd -- '/tmp/`literal`' && git add -A", HOOK_CWD),
-			"/tmp/`literal`",
-		);
-	});
-
-	it("leaves the cwd unresolved when the path is not statically known", () => {
-		assert.equal(
-			resolveCommandCwd("cd $WORKTREE && git commit -m 'x'", HOOK_CWD),
-			null,
-		);
-		assert.equal(
-			resolveCommandCwd("cd ~/works/x && git commit -m 'x'", HOOK_CWD),
-			null,
-		);
-		assert.equal(
-			resolveCommandCwd("cd \"$WORKTREE\" && git commit -m 'x'", HOOK_CWD),
-			null,
-		);
-	});
-
-	it("follows cd with an end-of-options marker or a redirection", () => {
-		assert.equal(
-			resolveCommandCwd("cd -- /elsewhere/w && git add -A", HOOK_CWD),
-			"/elsewhere/w",
-		);
-		assert.equal(
-			resolveCommandCwd("cd /elsewhere/w >/dev/null && git add -A", HOOK_CWD),
-			"/elsewhere/w",
-		);
-	});
-
-	it("leaves the cwd unresolved for a bare cd, which means the home directory", () => {
-		assert.equal(resolveCommandCwd("cd && git commit -m 'x'", HOOK_CWD), null);
-	});
-
-	it("ignores a cd inside a quoted string", () => {
-		assert.equal(
-			resolveCommandCwd("echo 'cd /a' && git commit -m 'x'", HOOK_CWD),
-			HOOK_CWD,
-		);
 	});
 });
 
@@ -1055,7 +927,7 @@ describe("evaluateMainCommitGuard", () => {
 		);
 	});
 
-	it("remembers an exported or assigned GIT_CONFIG variable for later Git calls", () => {
+	it("classifies visible config setters conservatively without unset recovery", () => {
 		for (const command of [
 			"export GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=a.b GIT_CONFIG_VALUE_0=c; git fetch origin",
 			"GIT_CONFIG_PARAMETERS=x; git fetch origin",
@@ -1075,7 +947,7 @@ describe("evaluateMainCommitGuard", () => {
 				}),
 				{ currentBranch: "topic" },
 			).decision,
-			"allow",
+			"ask",
 		);
 	});
 
@@ -1236,7 +1108,7 @@ describe("runMainCommitGuard", () => {
 
 	it("evaluates every guarded segment in its own effective cwd (#784)", () => {
 		for (const command of [
-			"git add -A && cd /worktrees/sibling && git add -A",
+			"git -C /worktrees/session add -A && git -C /worktrees/sibling add -A",
 			"git add -A && git -C /worktrees/sibling add -A",
 		]) {
 			const visited = [];
@@ -1340,7 +1212,7 @@ describe("runMainCommitGuard", () => {
 		});
 		assert.equal(shouldOutput, true);
 		const reason = output.hookSpecificOutput.permissionDecisionReason;
-		assert.match(reason, /cwd cannot be resolved/);
+		assert.match(reason, /Git target cannot be resolved/);
 		assert.match(reason, /--no-verify/);
 		assert.match(reason, /drop/i);
 	});
@@ -1574,193 +1446,9 @@ describe("main-commit-guard wrapper", () => {
 		);
 	});
 
-	it("fails closed when CDPATH can redirect a relative cd", () => {
-		for (const command of [
-			`CDPATH=${root} cd sibling && git add -A`,
-			`export CDPATH=${root}; cd sibling && git add -A`,
-		]) {
-			const output = runWrapper(command);
-			assert.notEqual(output, "", command);
-			assert.equal(
-				JSON.parse(output).hookSpecificOutput.permissionDecision,
-				"deny",
-				command,
-			);
-		}
-
-		const ambient = runWrapper("cd sibling && git add -A", {
-			environment: { CDPATH: root },
-		});
-		assert.equal(
-			JSON.parse(ambient).hookSpecificOutput.permissionDecision,
-			"deny",
-		);
-
-		assert.equal(runWrapper(`CDPATH=${root} cd ${session} && git add -A`), "");
-		assert.equal(runWrapper("CDPATH= cd sibling && git add -A"), "");
-		assert.equal(
-			runWrapper("cd sibling && git status", { environment: { CDPATH: root } }),
-			"",
-		);
-	});
-
-	it("does not treat unset function options as clearing CDPATH", () => {
-		const blocked = runWrapper(
-			`CDPATH=${root}; unset -f CDPATH; cd sibling; git add -A`,
-		);
-		assert.notEqual(blocked, "");
-		assert.equal(
-			JSON.parse(blocked).hookSpecificOutput.permissionDecision,
-			"deny",
-		);
-
-		for (const command of [
-			`CDPATH=${root}; unset CDPATH; cd sibling && git add -A`,
-			`CDPATH=${root}; unset -v CDPATH; cd sibling && git add -A`,
-			`CDPATH=${root}; unset -- CDPATH; cd sibling && git add -A`,
-		]) {
-			assert.equal(runWrapper(command), "", command);
-		}
-	});
-
-	it("fails closed after cwd-changing control flow the parser cannot model", () => {
-		for (const command of [
-			`cd ${repo} || cd ${session}; git add -A`,
-			`cd ${repo}; cd ${session} | cat; git add -A`,
-			`cd ${repo}; (cd ${session}); git add -A`,
-			`cd ${repo}; cd ${session} & git add -A`,
-			`cd ${repo} && cd ${session}; git add -A`,
-		]) {
-			const output = runWrapper(command);
-			assert.notEqual(output, "", command);
-			assert.equal(
-				JSON.parse(output).hookSpecificOutput.permissionDecision,
-				"deny",
-				command,
-			);
-		}
-
-		assert.equal(runWrapper(`cd ${session} && git add -A`), "");
-		assert.equal(runWrapper(`cd ${repo} || cd ${session}; git status`), "");
-		assert.equal(runWrapper(`cd ${session} && git add -A; echo done`), "");
-		assert.equal(runWrapper("git add -A; false || echo later"), "");
-	});
-
-	it("decodes literal escapes and fails closed for dynamic protected setters", () => {
-		for (const command of [
-			`g\\it -C ${repo} add -A`,
-			`GIT\\_DIR=${join(repo, ".git")} g\\it add -A`,
-			'export "$d=/override"; git add -A',
-			'printf -v "$d" %s /override; git add -A',
-			'read "$n"; git add -A',
-		]) {
-			const output = runWrapper(command);
-			assert.notEqual(output, "", command);
-			assert.equal(
-				JSON.parse(output).hookSpecificOutput.permissionDecision,
-				"deny",
-				command,
-			);
-		}
-	});
-
-	it("parses read options before deciding which operands set state", () => {
-		assert.equal(runWrapper("read -p CDPATH REPLY; git add -A"), "");
-		for (const command of ["read -p; git add -A", 'read "$n"; git add -A']) {
-			const output = runWrapper(command);
-			assert.notEqual(output, "", command);
-			assert.equal(
-				JSON.parse(output).hookSpecificOutput.permissionDecision,
-				"deny",
-				command,
-			);
-		}
-	});
-
-	it("does not unexport ambient Git targets after export option termination", () => {
-		const output = runWrapper(
-			"export -- -n GIT_DIR GIT_WORK_TREE; git add -A",
-			{
-				environment: {
-					GIT_DIR: join(sibling, ".git"),
-					GIT_WORK_TREE: sibling,
-				},
-			},
-		);
-		assert.notEqual(output, "");
-		assert.equal(
-			JSON.parse(output).hookSpecificOutput.permissionDecision,
-			"deny",
-		);
-	});
-
-	it("treats read array output variables as protected setters", () => {
-		for (const command of [
-			"read -a CDPATH <<< x; cd sibling; git add -A",
-			"read -aCDPATH <<< x; cd sibling; git add -A",
-			'read -a"$name" <<< x; cd sibling; git add -A',
-		]) {
-			const output = runWrapper(command);
-			assert.notEqual(output, "", command);
-			assert.equal(
-				JSON.parse(output).hookSpecificOutput.permissionDecision,
-				"deny",
-				command,
-			);
-		}
-	});
-
-	it("does not clear protected state through conflicting unset or export options", () => {
-		for (const command of [
-			`CDPATH=${root}; unset -f -v CDPATH; cd sibling; git add -A`,
-			`export GIT_NAMESPACE; export -n -f GIT_NAMESPACE; printf -v GIT_NAMESPACE %s /override; git add -A`,
-		]) {
-			const output = runWrapper(command);
-			assert.notEqual(output, "", command);
-			assert.equal(
-				JSON.parse(output).hookSpecificOutput.permissionDecision,
-				"deny",
-				command,
-			);
-		}
-	});
-
-	it("fails closed after brace and reserved compounds", () => {
-		for (const command of [
-			`{ cd ${session}; }; git add -A`,
-			`if true; then cd ${session}; fi; git add -A`,
-		]) {
-			const output = runWrapper(command);
-			assert.notEqual(output, "", command);
-			assert.equal(
-				JSON.parse(output).hookSpecificOutput.permissionDecision,
-				"deny",
-				command,
-			);
-		}
-	});
-
 	it("only treats reserved words in command position as compounds", () => {
 		assert.equal(runWrapper("git commit -m if"), "");
 		assert.equal(runWrapper("echo if; git add -A"), "");
-	});
-
-	it("parses clustered read options before protected variable operands", () => {
-		for (const command of [
-			"read -rp CDPATH REPLY <<< x; cd . && git add -A",
-			"read -pCDPATH REPLY <<< x; cd . && git add -A",
-		]) {
-			assert.equal(runWrapper(command), "", command);
-		}
-	});
-
-	it("recognizes printf setters only in its option phase", () => {
-		for (const command of [
-			"export GIT_NAMESPACE; printf -- -v GIT_NAMESPACE; git add -A",
-			"export GIT_NAMESPACE; printf %s -v GIT_NAMESPACE; git add -A",
-		]) {
-			assert.equal(runWrapper(command), "", command);
-		}
 	});
 
 	it("removes unquoted backslash-newline continuations", () => {
@@ -1783,175 +1471,18 @@ describe("main-commit-guard wrapper", () => {
 		);
 	});
 
-	it("preserves Git export state across assignment-only segments", () => {
-		assert.equal(runWrapper("GIT_NAMESPACE=/override; git add -A"), "");
-		assert.equal(runWrapper("GIT_NAMESPACE= git add -A"), "");
-	});
-
 	it("does not taint control flow without target-affecting commands", () => {
 		for (const command of [
 			"printf x | cat; git add -A",
 			"test -f package.json && printf ok; git add -A",
-			`printf x | cat; cd ${session} && git add -A`,
+			`printf x | cat; git -C ${session} add -A`,
 		]) {
 			assert.equal(runWrapper(command), "", command);
 		}
 	});
-
-	it("fails closed when read makes CDPATH dynamically unknown", () => {
-		const output = runWrapper(
-			`read -r CDPATH <<< ${root}; cd sibling; git add -A`,
-		);
-		assert.notEqual(output, "");
-		assert.equal(
-			JSON.parse(output).hookSpecificOutput.permissionDecision,
-			"deny",
-		);
-
-		assert.equal(
-			runWrapper(`read -r CDPATH <<< ${root}; cd ${session} && git add -A`),
-			"",
-		);
-		assert.equal(
-			runWrapper(`read -r CDPATH <<< ${root}; cd sibling; git status`),
-			"",
-		);
-	});
-
-	it("fails closed when printf -v writes exported Git targets", () => {
-		const output = runWrapper(
-			`export GIT_DIR GIT_WORK_TREE; printf -v GIT_DIR %s ${join(sibling, ".git")}; printf -v GIT_WORK_TREE %s ${sibling}; git add -A`,
-		);
-		assert.notEqual(output, "");
-		assert.equal(
-			JSON.parse(output).hookSpecificOutput.permissionDecision,
-			"deny",
-		);
-
-		assert.equal(
-			runWrapper(
-				`export GIT_DIR GIT_WORK_TREE; printf -v GIT_DIR %s ${join(sibling, ".git")}; printf -v GIT_WORK_TREE %s ${sibling}; git status`,
-			),
-			"",
-		);
-	});
-
-	it("fails closed when dynamic builtins write protected state", () => {
-		for (const variable of [
-			"GIT_DIR",
-			"GIT_WORK_TREE",
-			"GIT_INDEX_FILE",
-			"GIT_COMMON_DIR",
-			"GIT_OBJECT_DIRECTORY",
-			"GIT_ALTERNATE_OBJECT_DIRECTORIES",
-			"GIT_NAMESPACE",
-		]) {
-			const output = runWrapper(
-				`export ${variable}; read -r ${variable} <<< /override; git add -A`,
-			);
-			assert.notEqual(output, "", variable);
-			assert.equal(
-				JSON.parse(output).hookSpecificOutput.permissionDecision,
-				"deny",
-				variable,
-			);
-		}
-
-		for (const command of [
-			"source guard-state.sh; git add -A",
-			". guard-state.sh; git add -A",
-			"eval guard_state; git add -A",
-		]) {
-			const output = runWrapper(command);
-			assert.notEqual(output, "", command);
-			assert.equal(
-				JSON.parse(output).hookSpecificOutput.permissionDecision,
-				"deny",
-				command,
-			);
-		}
-
-		assert.equal(runWrapper("source guard-state.sh; git status"), "");
-	});
-
-	it("recovers only after protected state is literally cleared", () => {
-		const targetVariables = [
-			"GIT_DIR",
-			"GIT_WORK_TREE",
-			"GIT_INDEX_FILE",
-			"GIT_COMMON_DIR",
-			"GIT_OBJECT_DIRECTORY",
-			"GIT_ALTERNATE_OBJECT_DIRECTORIES",
-			"GIT_NAMESPACE",
-		].join(" ");
-		assert.equal(
-			runWrapper(
-				`source guard-state.sh; unset CDPATH ${targetVariables}; cd . && git add -A`,
-			),
-			"",
-		);
-		const unsafeCdPath = runWrapper("cd sibling; git add -A", {
-			environment: { CDPATH: root },
-		});
-		assert.notEqual(unsafeCdPath, "");
-		assert.equal(
-			runWrapper("unset CDPATH; cd sibling && git add -A", {
-				environment: { CDPATH: root },
-			}),
-			"",
-		);
-		assert.equal(
-			runWrapper("CDPATH=; cd sibling && git add -A", {
-				environment: { CDPATH: root },
-			}),
-			"",
-		);
-	});
-
-	it("distinguishes Git export state from CDPATH shell state", () => {
-		assert.equal(runWrapper("export GIT_DIR; git add -A"), "");
-		assert.equal(
-			runWrapper(
-				`export -n GIT_DIR; printf -v GIT_DIR %s ${join(sibling, ".git")}; git add -A`,
-			),
-			"",
-		);
-		const output = runWrapper("export -n CDPATH; cd sibling; git add -A", {
-			environment: { CDPATH: root },
-		});
-		assert.notEqual(output, "");
-		assert.equal(
-			JSON.parse(output).hookSpecificOutput.permissionDecision,
-			"deny",
-		);
-	});
-
-	it("recovers each concrete ambient Git target independently", () => {
-		assert.equal(
-			runWrapper("unset GIT_NAMESPACE; git add -A", {
-				environment: { GIT_NAMESPACE: "/x" },
-			}),
-			"",
-		);
-		const blocked = runWrapper("unset GIT_NAMESPACE; git add -A", {
-			environment: { GIT_DIR: "/override", GIT_NAMESPACE: "/x" },
-		});
-		assert.notEqual(blocked, "");
-		assert.equal(
-			JSON.parse(blocked).hookSpecificOutput.permissionDecision,
-			"deny",
-		);
-		assert.equal(
-			runWrapper("git add -A", { environment: { GIT_NAMESPACE: "" } }),
-			"",
-		);
-	});
-
 	it("catches compound and repeated-C sibling mutations end to end (#784)", () => {
 		for (const command of [
-			`git add -A && cd ${sibling} && git add -A`,
-			`cd -- ${sibling} && git add -A`,
-			`cd ${sibling} >/dev/null && git add -A`,
+			`git -C ${session} add -A && git -C ${sibling} add -A`,
 			`git add -A && git -C ${sibling} add -A`,
 			`git -C ${session} -C ../sibling add -A`,
 		]) {
@@ -1968,7 +1499,7 @@ describe("main-commit-guard wrapper", () => {
 	it("fails closed when cd requires shell expansion", () => {
 		for (const [command, decision] of [
 			[`SIBLING=${sibling}; cd "$SIBLING" && git add -A`, "deny"],
-			[`SIBLING=${sibling}; cd "$SIBLING" && git restore tracked.txt`, "ask"],
+			[`SIBLING=${sibling}; cd "$SIBLING" && git restore tracked.txt`, "deny"],
 		]) {
 			const output = runWrapper(command);
 			assert.notEqual(output, "", command);
@@ -1976,7 +1507,7 @@ describe("main-commit-guard wrapper", () => {
 			assert.equal(result.permissionDecision, decision, command);
 			assert.match(
 				result.permissionDecisionReason,
-				/literal path or harness workdir/,
+				/absolute literal path.*separate invocation with harness workdir/,
 				command,
 			);
 		}
@@ -1985,11 +1516,10 @@ describe("main-commit-guard wrapper", () => {
 	it("fails closed for cwd-changing shell builtins the parser cannot model", () => {
 		for (const [command, decision] of [
 			[`builtin cd "${sibling}" && git add -A`, "deny"],
-			// `command cd` resolves to a literal target, so it lands on the
-			// cross-worktree ask rather than the unresolved-cwd deny (#1201).
-			[`command cd "${sibling}" && git add -A`, "ask"],
+			// Cwd-changing builtins require an explicit target regardless of wrapper.
+			[`command cd "${sibling}" && git add -A`, "deny"],
 			[`pushd "${sibling}" && git add -A`, "deny"],
-			["popd && git restore tracked.txt", "ask"],
+			["popd && git restore tracked.txt", "deny"],
 		]) {
 			const output = runWrapper(command);
 			assert.notEqual(output, "", command);

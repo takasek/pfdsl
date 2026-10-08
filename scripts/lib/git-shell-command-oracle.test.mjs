@@ -155,7 +155,10 @@ for (const shell of ["/bin/bash", "/bin/zsh"]) {
 					if (
 						child !== expected ||
 						parent !==
-							(unsupported || (changed && branch === "main") ? "deny" : "allow")
+							(unsupported ||
+							(changed && (branch === "main" || command.includes("; cd .")))
+								? "deny"
+								: "allow")
 					)
 						violations.push({ branch, command, changed, child, parent });
 				}

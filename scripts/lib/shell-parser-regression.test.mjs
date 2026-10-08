@@ -48,7 +48,8 @@ test("failed cd and pipeline cwd cannot authorize an own-tree mutation", () => {
 				}),
 			},
 		).output?.hookSpecificOutput.permissionDecision ?? "allow";
-	assert.equal(decision("cd /fixture/topic && git add file"), "allow");
+	assert.equal(decision("git -C /fixture/topic add file"), "allow");
+	assert.equal(decision("cd /fixture/topic && git add file"), "deny");
 	assert.equal(decision("cd /fixture/topic; git add file"), "deny");
 	assert.equal(decision("cd /fixture/topic | git add file"), "deny");
 	assert.equal(decision("! cd /fixture/topic && git add file"), "deny");

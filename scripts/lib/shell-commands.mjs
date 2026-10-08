@@ -1,5 +1,5 @@
 // Grammar comes exclusively from mvdan/sh. This adapter exposes executable
-// commands and their scopes; it never executes or expands the submitted shell.
+// commands; it never executes or expands the submitted shell.
 import { fileURLToPath } from "node:url";
 import { run } from "./run-exec.mjs";
 import { shellParserPath } from "./shell-parser-tool.mjs";
@@ -13,7 +13,7 @@ export function readShell(
 	{ parserPath = shellParserPath(root) } = {},
 ) {
 	if (typeof command !== "string" || command.trim() === "")
-		return { flow: { kind: "sequence", children: [] }, commands: [] };
+		return { commands: [] };
 	if (parserPath === shellParserPath(root) && command === cachedSource)
 		return cachedResult;
 	let result;
@@ -65,8 +65,6 @@ function adaptShell(ast, source) {
 	const text = (node) =>
 		bytes.subarray(node.Pos.Offset, node.End.Offset).toString();
 	const commands = [];
-	const sequence = (children) => ({ kind: "sequence", children });
-	const scope = (kind, children) => ({ kind, children });
 	const fail = (type) => {
 		throw new Error(`Unsupported shell construct ${type}.`);
 	};
@@ -133,14 +131,15 @@ function adaptShell(ast, source) {
 	// Only substitutions contain executable statements inside words. Patterns,
 	// quoted heredoc text and ordinary literal arguments never become commands.
 	function substitutions(node) {
-		if (!node || typeof node !== "object") return [];
-		if (["CmdSubst", "ProcSubst"].includes(node.Type))
-			return [scope("isolated", (node.Stmts ?? []).map(statement))];
-		return Object.values(node).flatMap((value) =>
-			Array.isArray(value)
-				? value.flatMap(substitutions)
-				: substitutions(value),
-		);
+		if (!node || typeof node !== "object") return;
+		if (["CmdSubst", "ProcSubst"].includes(node.Type)) {
+			(node.Stmts ?? []).forEach(statement);
+			return;
+		}
+		for (const value of Object.values(node)) {
+			if (Array.isArray(value)) value.forEach(substitutions);
+			else substitutions(value);
+		}
 	}
 
 	function hasNode(node, type) {
@@ -159,21 +158,20 @@ function adaptShell(ast, source) {
 		const prefix = tokens.findIndex(
 			(token) =>
 				!["noglob", "nocorrect"].includes(token.value) &&
-				!/^[A-Za-z_][A-Za-z0-9_]*=/.test(token.value),
+				!/^[A-Za-z_][A-Za-z0-9_]*\+?=/.test(token.value),
 		);
 		if (["repeat", "always", "coproc", "-"].includes(tokens[prefix]?.value))
 			fail(tokens[prefix].value);
 		if (tokens[prefix]?.dynamic)
 			fail("dynamic executable; use a literal command name");
-		const command = { kind: "command", tokens, command: text(node) };
+		const command = { tokens, command: text(node) };
 		commands.push(command);
-		return command;
 	}
 
 	function statement(stmt) {
 		const cmd = stmt.Cmd;
-		if (!cmd) return sequence(substitutions(stmt.Redirs));
-		const children = substitutions(stmt.Redirs);
+		substitutions(stmt.Redirs);
+		if (!cmd) return;
 		for (const redir of stmt.Redirs ?? []) {
 			if (!redir.Hdoc) continue;
 			const head = cmd.Args?.[0] ? word(cmd.Args[0]).value : "";
@@ -201,80 +199,60 @@ function adaptShell(ast, source) {
 			)
 				fail("executable or unknown heredoc; use a script file");
 		}
-		let flow;
 		switch (cmd.Type) {
 			case "CallExpr":
-				children.push(
-					...substitutions(cmd.Assigns),
-					...substitutions(cmd.Args),
-				);
-				flow = leaf(cmd, [
+				substitutions(cmd.Assigns);
+				substitutions(cmd.Args);
+				leaf(cmd, [
 					...(cmd.Assigns ?? []).map(assign),
 					...(cmd.Args ?? []).map(word),
 				]);
 				break;
 			case "DeclClause":
-				children.push(...substitutions(cmd.Args));
-				flow = leaf(cmd, [
+				substitutions(cmd.Args);
+				leaf(cmd, [
 					{ value: cmd.Variant.Value, quoted: false },
 					...(cmd.Args ?? []).map(assign),
 				]);
 				break;
-			case "BinaryCmd":
+			case "BinaryCmd": {
+				const right = cmd.Y.Cmd?.Args?.[0];
 				if (
 					["|", "|&"].includes(cmd.Op) &&
-					JSON.stringify(cmd).includes('"Hdoc"')
-				) {
-					const right = cmd.Y.Cmd?.Args?.[0];
-					if (
-						!right ||
-						!["cat", "tee", "git", "gh"].includes(word(right).value)
-					)
-						fail("heredoc pipeline into an unknown program; use a script file");
-				}
-				flow = scope(
-					cmd.Op === "&&" ? "and" : cmd.Op === "||" ? "uncertain" : "pipeline",
-					[statement(cmd.X), statement(cmd.Y)],
-				);
+					JSON.stringify(cmd).includes('"Hdoc"') &&
+					(!right || !["cat", "tee", "git", "gh"].includes(word(right).value))
+				)
+					fail("heredoc pipeline into an unknown program; use a script file");
+				statement(cmd.X);
+				statement(cmd.Y);
 				break;
+			}
 			case "Block":
-				flow = scope("uncertain", (cmd.Stmts ?? []).map(statement));
-				break;
 			case "Subshell":
-				flow = scope("isolated", (cmd.Stmts ?? []).map(statement));
+				(cmd.Stmts ?? []).forEach(statement);
 				break;
 			case "IfClause":
-				flow = scope("uncertain", [
-					...(cmd.Cond ?? []).map(statement),
-					...(cmd.Then ?? []).map(statement),
-					...(cmd.Else
-						? [statement({ Cmd: { ...cmd.Else, Type: "IfClause" } })]
-						: []),
-				]);
+				(cmd.Cond ?? []).forEach(statement);
+				(cmd.Then ?? []).forEach(statement);
+				if (cmd.Else) statement({ Cmd: { ...cmd.Else, Type: "IfClause" } });
 				break;
 			case "WhileClause":
-				flow = scope("uncertain", [
-					...(cmd.Cond ?? []).map(statement),
-					...(cmd.Do ?? []).map(statement),
-				]);
+				(cmd.Cond ?? []).forEach(statement);
+				(cmd.Do ?? []).forEach(statement);
 				break;
 			case "ForClause":
-				flow = scope("uncertain", [
-					...substitutions(cmd.Loop),
-					...(cmd.Do ?? []).map(statement),
-				]);
+				substitutions(cmd.Loop);
+				(cmd.Do ?? []).forEach(statement);
 				break;
 			case "CaseClause":
-				flow = scope("uncertain", [
-					...substitutions(cmd.Word),
-					...(cmd.Items ?? []).flatMap((item) => [
-						...substitutions(item.Patterns),
-						...(item.Stmts ?? []).map(statement),
-					]),
-				]);
+				substitutions(cmd.Word);
+				for (const item of cmd.Items ?? []) {
+					substitutions(item.Patterns);
+					(item.Stmts ?? []).forEach(statement);
+				}
 				break;
 			case "FuncDecl":
-				flow = scope("definition", [statement(cmd.Body)]);
+				statement(cmd.Body);
 				break;
 			case "TimeClause":
 				if (
@@ -282,34 +260,25 @@ function adaptShell(ast, source) {
 					cmd.Stmt.Cmd.Args?.[0] &&
 					word(cmd.Stmt.Cmd.Args[0]).value.startsWith("-")
 				) {
-					flow = leaf(cmd, [
+					leaf(cmd, [
 						{ value: "time", quoted: false },
 						...cmd.Stmt.Cmd.Args.map(word),
 					]);
-					children.push(...substitutions(cmd.Stmt));
-				} else flow = statement(cmd.Stmt);
+					substitutions(cmd.Stmt);
+				} else statement(cmd.Stmt);
 				break;
 			case "CoprocClause":
-				flow = scope(cmd.Type === "CoprocClause" ? "isolated" : "sequence", [
-					statement(cmd.Stmt),
-				]);
+				statement(cmd.Stmt);
 				break;
 			case "TestClause":
 			case "ArithmCmd":
-				flow = sequence(substitutions(cmd));
+				substitutions(cmd);
 				break;
 			default:
 				fail(cmd.Type);
 		}
-		children.push(flow);
-		return stmt.Background
-			? scope("isolated", children)
-			: stmt.Negated
-				? scope("uncertain", children)
-				: children.length === 1
-					? children[0]
-					: sequence(children);
 	}
-	const flow = sequence((ast.Stmts ?? []).map(statement));
-	return { flow, commands };
+
+	(ast.Stmts ?? []).forEach(statement);
+	return { commands };
 }

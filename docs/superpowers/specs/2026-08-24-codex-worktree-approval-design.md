@@ -28,7 +28,14 @@ wrapperの `worktree-add` は `git rev-parse --path-format=absolute --git-common
 
 認証、権限、ネットワーク、必須tool不在、破壊的操作、新しい公開先、 materially different な代替方式が必要な場合だけ停止してユーザー判断を求める。
 
-pfdslのshared guardは空白でない `CLAUDE_PROJECT_DIR` が存在すれば従来どおりそれを優先し、存在しない場合だけ空白でないPreToolUse payloadの `cwd` をsession worktreeの根として使う。これは任意のBashを完全に解釈するsecurity boundaryではなく、両harnessで直接記述された既知形を止める事故防止guardである。quotedまたはescaped literal argv、literalな `cd`、inputを含む先頭redirection、`git -C`、`env -C/--chdir`、Codex wrapperの明示targetを実行順に解決する。`--git-dir`・`--work-tree`、Gitのrepository・index・object・ref namespaceを変える非空のcommand内またはambient環境変数、shell展開、cwdを変えるbuiltin、未知または不完全なcommand/sudo/time prefix等でeffective cwdを確定できない変更系commandは元のcwdへfallbackせずfail closedする。identity取得用Git subprocessは7種類のGit target環境変数を除去し、明示cwdからrootとbranchを解決する。protected shell stateはGit target変数ごとの値・export状態とshellが直接読むCDPATHを分けて追跡する。literalな空代入・有効な変数 `unset`・Git target変数の `export -n` は安全状態を回復するが、function optionやoption terminator後のinvalid operandを変数解除として扱わない。対応する `read` output、`printf -v`、`source`・`.`・`eval` の動的書込先と、targetに影響する `||`・pipeline・background・subshell・AND-listは変更系Gitをfail closedする。ambientまたはcommand stateに非空 `CDPATH` があるrelative `cd` も到達先不明としてfail closedするが、絶対 `cd`、確実に空の `CDPATH`、単純なsuccess-pathの `cd <target> && git <mutation>`、targetに影響しないpipeline・AND-list、変更系Gitより後ろにだけ現れるcontrol flowは静的解決を維持する。対応外のcompound構文は無害でもfail closedしうるため、raw変更系Gitは単純commandへ分ける。`command -p` は実行prefix、`command -v/-V` はpath queryとして区別する。
+pfdslのshared guardは空白でない `CLAUDE_PROJECT_DIR` が存在すれば従来どおりそれを優先し、存在しない場合だけ空白でないPreToolUse payloadの `cwd` をsession worktreeの根として使う。
+これは任意のBashを完全に解釈するsecurity boundaryではなく、両harnessで直接記述された既知形を止める事故防止guardである。
+現在の shell 解析と静的 target の契約は [ADR-0047](../../adr/0047-codex-policy-boundaries.md) を正本とする。
+quotedまたはescaped literal argv、先頭redirection、`git -C`、`env -C/--chdir`、Codex wrapperの明示targetを解析するが、cdの成功経路やprotected shell stateの値・export属性・unsetによる回復は追跡しない。
+入力内のcwd変更に依存する変更系Gitには絶対literal targetを要求し、環境setterと変更系Gitの組合せは別呼出しへ分けるよう案内する。
+`--git-dir`・`--work-tree`、Git targetを変える非空のcommand内またはambient環境変数、展開、未知または不完全なprefixによる未解決targetを元のcwdへfallbackさせない。
+identity取得用Git subprocessは7種類のGit target環境変数を除去し、明示cwdからrootとbranchを解決する。
+`command -p` は実行prefix、`command -v/-V` はpath queryとして区別する。
 
 Codexで承認なしに通す機械的安全境界はshared guard単体ではなく、trusted-rootと登録worktree identityを検証するuser-level wrapper、raw Git変更を永続allowしないexecpolicy、sandboxの組合せである。Claude CodeにはCodex専用user-level wrapperを前提化せず、同じrepo hookの事故防止と通常の権限境界を維持する。この非対称性を隠して両harnessが同じsecurity guaranteeを持つとは主張しない。
 

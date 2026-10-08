@@ -26,16 +26,11 @@
 
 import { basename, resolve } from "node:path";
 import {
-	createProtectedShellState,
 	GIT_GLOBAL_FLAGS_WITH_VALUE,
 	gitSubcommand,
 	gitSubcommandIndex,
-	hasProtectedCdPathOverride,
-	hasProtectedGitConfigOverride,
-	hasProtectedGitTargetOverride,
 	parseLeadingShellPrefix,
 	shellParseDecision,
-	updateProtectedShellState,
 } from "./delegation-guard.mjs";
 import { buildPermissionOutput, parseHookPayload } from "./hook-io.mjs";
 import {
@@ -684,19 +679,6 @@ function staticPath(token) {
 	return token.dynamic ? null : token.value;
 }
 
-/** A literal target from the supported `cd` forms, or null when it is dynamic. */
-function cdPath(tokens) {
-	let targetAt = 1;
-	if (!tokens[targetAt]?.quoted && tokens[targetAt]?.value === "--") targetAt++;
-	const target = staticPath(tokens[targetAt]);
-	if (target === null) return null;
-	return tokens
-		.slice(targetAt + 1)
-		.every((token) => !token.quoted && /^(?:[0-9]*>>?|&>>?)/.test(token.value))
-		? target
-		: null;
-}
-
 /** Resolve every pre-subcommand `git -C` in the order Git applies them. */
 function resolveGitCwd(tokens, shellCwd) {
 	const subcommandAt = gitSubcommandIndex(tokens);
@@ -751,17 +733,13 @@ function guardedSuffix(tokens, options) {
 	return null;
 }
 
-/**
- * Track the shell cwd and retain each guarded Git segment with its own target.
- * A PreToolUse hook fires before the shell does, so `payload.cwd` does not yet
- * reflect `cd` or `git -C` inside the command (#751). Keeping every target is
- * also necessary because one Bash invocation can move between worktrees
- * before running another guarded Git command (#784).
- */
+// Do not emulate shell state. A cwd-changing command anywhere in the input
+// makes implicit/relative targets unknown; environment setters make all Git
+// mutation targets unknown. Absolute per-command targets can recover only cwd.
 function analyzeCommand(
 	command,
 	hookCwd,
-	{ ambientCdPath = false, ambientGitTargetOverride = false } = {},
+	{ ambientGitTargetOverride = false } = {},
 ) {
 	const shell = readShell(command);
 	if (shell.error)
@@ -776,106 +754,71 @@ function analyzeCommand(
 			],
 			finalCwd: null,
 		};
+	const commands = shell.commands.map(({ tokens }) => {
+		const prefix = parseLeadingShellPrefix(tokens);
+		const argv = tokens.slice(prefix.end);
+		const stateTokens =
+			argv[0]?.value === "builtin"
+				? argv.slice(argv[1]?.value === "--" ? 2 : 1)
+				: argv;
+		return { raw: tokens, prefix, tokens: argv, stateTokens };
+	});
+	const changesCwd = commands.some(({ stateTokens }) =>
+		["cd", "pushd", "popd"].includes(stateTokens[0]?.value),
+	);
+	const changesEnvironment = commands.some(({ raw, stateTokens: tokens }) => {
+		const head = tokens[0]?.value;
+		const setter = [
+			"export",
+			"readonly",
+			"typeset",
+			"declare",
+			"local",
+			"unset",
+		].includes(head);
+		const protectedOperand = tokens.some(
+			({ value, dynamic }) =>
+				dynamic ||
+				/^(?:GIT_[A-Za-z0-9_]*|CDPATH)(?:\+?=|$)/.test(value) ||
+				/^[+-][^+-]*n/.test(value),
+		);
+		return (
+			(setter && protectedOperand) ||
+			["read", "source", ".", "eval"].includes(head) ||
+			(head === "printf" &&
+				tokens.some(({ value }) => value.startsWith("-v"))) ||
+			(raw.length > 0 &&
+				raw.every(({ value }) => /^[A-Za-z_][A-Za-z0-9_]*\+?=/.test(value)) &&
+				raw.some(({ value }) =>
+					/^(?:GIT_[A-Za-z0-9_]*|CDPATH)\+?=/.test(value),
+				))
+		);
+	});
 	const targets = [];
-	const definitions = [];
-	const state = {
-		cwd: hookCwd,
-		uncertain: false,
-		protected: createProtectedShellState({
-			ambientCdPath,
-			ambientGitTargetOverride,
-		}),
+	for (const { raw, prefix, tokens } of commands) {
+		const configOverride = prefix.gitConfigOverride || changesEnvironment;
+		const baseCwd = changesCwd ? null : hookCwd;
+		const envCwd = resolveEnvCwd(raw, baseCwd);
+		const cwd =
+			ambientGitTargetOverride ||
+			changesEnvironment ||
+			prefix.unresolved ||
+			prefix.gitTargetOverride
+				? null
+				: basename(tokens[0]?.value ?? "") === "git"
+					? resolveGitCwd(tokens, envCwd)
+					: resolveCodexRoutineCwd(tokens);
+		const guarded =
+			classifySegment(tokens, { configOverride, cwd }) ??
+			(prefix.unresolved
+				? guardedSuffix(tokens, { configOverride, cwd: null })
+				: null);
+		if (guarded) targets.push({ ...guarded, cwd });
+	}
+	return {
+		targets,
+		finalCwd: changesCwd || changesEnvironment ? null : hookCwd,
 	};
-	function commandTarget(rawTokens, state) {
-		const prefix = parseLeadingShellPrefix(rawTokens);
-		const envCwd = resolveEnvCwd(rawTokens, state.cwd);
-		const tokens = rawTokens.slice(prefix.end);
-		if (!tokens.length)
-			return updateProtectedShellState(state.protected, rawTokens);
-		const head = basename(tokens[0].value);
-		let affects = false;
-		if (
-			(head === "builtin" &&
-				["cd", "pushd", "popd"].includes(tokens[1]?.value)) ||
-			["pushd", "popd"].includes(head)
-		) {
-			state.cwd = null;
-			affects = true;
-		} else if (head === "cd") {
-			state.pendingCd = true;
-			const target = cdPath(tokens);
-			if (target === null || state.uncertain) state.cwd = null;
-			else if (target.startsWith("/")) state.cwd = resolve(target);
-			else if (
-				hasProtectedCdPathOverride(state.protected) ||
-				prefix.cdPathOverride
-			)
-				state.cwd = null;
-			else if (state.cwd !== null) state.cwd = resolve(state.cwd, target);
-			affects = true;
-		} else {
-			const configOverride =
-				prefix.gitConfigOverride ||
-				hasProtectedGitConfigOverride(state.protected);
-			const cwd =
-				state.uncertain ||
-				prefix.unresolved ||
-				hasProtectedGitTargetOverride(state.protected) ||
-				prefix.gitTargetOverride
-					? null
-					: head === "git"
-						? resolveGitCwd(tokens, envCwd)
-						: resolveCodexRoutineCwd(tokens);
-			const guarded =
-				classifySegment(tokens, { configOverride, cwd }) ??
-				(prefix.unresolved
-					? guardedSuffix(tokens, { configOverride, cwd: null })
-					: null);
-			if (guarded) targets.push({ ...guarded, cwd });
-		}
-		affects = updateProtectedShellState(state.protected, rawTokens) || affects;
-		if (affects)
-			for (const start of definitions)
-				for (const target of targets.slice(start)) target.cwd = null;
-		return affects;
-	}
-	function visit(flow, state) {
-		if (flow.kind === "command") return commandTarget(flow.tokens, state);
-		if (flow.kind === "pipeline") {
-			let changed = false;
-			for (const child of flow.children)
-				changed = visit(child, structuredClone(state)) || changed;
-			state.uncertain ||= changed;
-			return changed;
-		}
-		if (flow.kind === "isolated") {
-			const local = structuredClone(state);
-			for (const child of flow.children) visit(child, local);
-			return false;
-		}
-		const start = targets.length;
-		if (flow.kind === "definition") definitions.push(start);
-		let affects = false;
-		for (const child of flow.children) {
-			const changed = visit(child, state);
-			affects ||= changed;
-			// Within &&, a successful cd establishes the RHS cwd. After that list,
-			// success is conditional and must not authorize the next statement.
-			if (child.kind === "and" && changed && flow.kind !== "and")
-				state.uncertain = true;
-			if (state.pendingCd && flow.kind !== "and") {
-				state.uncertain = true;
-				state.pendingCd = false;
-			}
-		}
-		if (["uncertain", "definition"].includes(flow.kind) && affects) {
-			state.uncertain = true;
-			for (const target of targets.slice(start)) target.cwd = null;
-		}
-		return affects;
-	}
-	visit(shell.flow, state);
-	return { targets, finalCwd: state.cwd };
 }
 
 /** Every guarded Git segment with the cwd in which Git will run it. */
@@ -889,7 +832,7 @@ export function resolveGuardedGitCommands(command, hookCwd, options) {
  */
 export function resolveCommandCwd(command, hookCwd, options) {
 	const analysis = analyzeCommand(command, hookCwd, options);
-	return analysis.targets[0]?.cwd ?? analysis.finalCwd;
+	return analysis.targets.length ? analysis.targets[0].cwd : analysis.finalCwd;
 }
 
 /**
@@ -1076,10 +1019,10 @@ function evaluateUnresolvedCwd(guarded) {
 		? ` It also uses '${guarded.flag}', which skips this repo's git hooks — drop that too.`
 		: "";
 	return {
-		decision: guarded.decision,
+		decision: "deny",
 		reason:
-			`Blocked '${command}': its effective cwd cannot be resolved without shell expansion. ` +
-			`Use a literal path or harness workdir.${bypassNote}`,
+			`Blocked '${command}': its Git target cannot be resolved without interpreting shell state or expansion. ` +
+			`Use git -C with an absolute literal path, or run Git in a separate invocation with harness workdir. Run Git separately from shell environment setters.${bypassNote}`,
 	};
 }
 
@@ -1098,12 +1041,7 @@ function evaluateUnresolvedCwd(guarded) {
  */
 export function runMainCommitGuard(
 	inputText,
-	{
-		resolveBranches,
-		supportsAsk = true,
-		ambientGitTargetOverride = false,
-		ambientCdPath = false,
-	},
+	{ resolveBranches, supportsAsk = true, ambientGitTargetOverride = false },
 ) {
 	const payload = parseHookPayload(inputText);
 	if (!payload) return { shouldOutput: false };
@@ -1119,7 +1057,7 @@ export function runMainCommitGuard(
 	const targets = resolveGuardedGitCommands(
 		payload?.tool_input?.command,
 		hookCwd,
-		{ ambientCdPath, ambientGitTargetOverride },
+		{ ambientGitTargetOverride },
 	);
 	if (targets.length === 0) return { shouldOutput: false };
 

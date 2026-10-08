@@ -157,8 +157,7 @@ try {
 	 * @returns {{currentBranch: string | undefined, mainBranch: string, targetRelation: "own" | "sibling" | "foreign" | "unknown"}}
 	 */
 	function resolveBranches(payload, targetCwd) {
-		// Each guarded segment supplies its own target, so a compound command that
-		// changes cwd is checked against every worktree it reaches (#751, #784).
+		// Each guarded segment supplies its own statically resolved target (#751, #784).
 		const targetRoots = resolveGitRoots(targetCwd, { exec: probeGit });
 		const projectDir = process.env.CLAUDE_PROJECT_DIR;
 		const payloadCwd = payload?.cwd;
@@ -221,8 +220,6 @@ try {
 		{
 			resolveBranches,
 			ambientGitTargetOverride: hasGitTargetEnvironment(),
-			ambientCdPath:
-				typeof process.env.CDPATH === "string" && process.env.CDPATH !== "",
 			supportsAsk:
 				typeof process.env.CLAUDE_PROJECT_DIR === "string" &&
 				process.env.CLAUDE_PROJECT_DIR.trim() !== "",

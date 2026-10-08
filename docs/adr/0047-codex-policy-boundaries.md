@@ -27,11 +27,14 @@ repeat・always・coproc 等の未対応構文、動的な実行名、解析不�
 parser は make setup で公式 release の SHA-256 を照合して導入する。
 hook 実行中はネットワークから取得せず、欠落・異常終了・timeout は修復案内を伴う拒否にする。
 
-作業先は構文木の scope から追跡する。
-cd の成功時だけ右辺が動く `cd <literal> && git ...` と、`git -C <literal> ...` は明示された作業先を使える。
-移動失敗時も続く `cd <literal>; git ...`、分岐や loop の状態変更は作業先不明として扱う。
-否定付き cd は成功時の作業先を右辺へ引き継がない。
-命令置換・subshell の状態を親へ流出させず、pipeline の左右を同じ作業先状態として更新しない。
+シェルの作業先・export 属性・readonly・unset の成功・分岐の状態は解釈しない。
+通常の Git 呼出しは harness workdir を使い、各命令の `git -C <literal>`、`env -C <literal>`、既知 wrapper の明示 target は直接解決する。
+入力内に cd・pushd・popd があれば、暗黙または相対的な Git 宛先は拒否する。
+その場合は `git -C <absolute literal>` または wrapper の絶対 target を指定する。
+Git/CDPATH の可視代入・環境 setter・read・printf -v・source・eval と変更系 Git の組合せは、状態の回復を推測せず拒否し、Git の呼出しを環境 setter から分けるよう案内する。
+命令置換・subshell・function 内の状態変更も同じ入力を保守的に制限する。
+読取 Git と、状態変更を含まない if/for/while・pipeline・命令置換は引き続き解析する。
+引用・heredoc・動的 executable・解析失敗の退行検知は、固定 parser と各 guard の接続部分の検査として残す。
 汎用の shell 実行機や、稀な構文の独自補完には拡張しない。
 複数 agent・worktree に共通する仕組みの汎用化は将来課題とし、今回の導入理由にはしない。
 

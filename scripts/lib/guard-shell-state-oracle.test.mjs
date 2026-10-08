@@ -3,7 +3,7 @@ import { spawnSync } from "node:child_process";
 import { test } from "node:test";
 import { parentDecision } from "./guard-effect-oracle-harness.mjs";
 
-test("config tracking agrees with failed readonly unsets in the shell", () => {
+test("readonly and unset spellings cannot recover a guarded Git invocation", () => {
 	const violations = [];
 	for (const declaration of [
 		"readonly GIT_CONFIG_COUNT",
@@ -76,7 +76,8 @@ test("config tracking agrees with failed readonly unsets in the shell", () => {
 				`${prefix}git fetch origin`,
 				"/repo/feature",
 			);
-			const expected = remaining === "unset" ? "allow" : "ask";
+			assert.ok(["unset", "1"].includes(remaining), actual.stdout);
+			const expected = "deny";
 			if (decision !== expected)
 				violations.push({ prefix, decision, expected });
 		}

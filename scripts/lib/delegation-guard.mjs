@@ -370,18 +370,11 @@ const GIT_TARGET_VARIABLES = new Set([
 	"GIT_ALTERNATE_OBJECT_DIRECTORIES",
 	"GIT_NAMESPACE",
 ]);
-const STATEFUL_ASSIGNMENT_BUILTINS = new Set([
-	"export",
-	"readonly",
-	"typeset",
-	"declare",
-	"local",
-]);
 
 function protectedAssignment(value) {
 	const equals = value.indexOf("=");
 	if (equals === -1) return null;
-	const name = value.slice(0, equals);
+	const name = value.slice(0, equals).replace(/\+$/, "");
 	if (name === "CDPATH" || GIT_TARGET_VARIABLES.has(name))
 		return { name, value: value.slice(equals + 1) };
 	return null;
@@ -398,355 +391,7 @@ function isGitTargetAssignment(value) {
 
 /** A visible `GIT_CONFIG_*` assignment: it injects settings into the Git call. */
 function isGitConfigAssignment(value) {
-	return /^GIT_CONFIG[A-Za-z0-9_]*=/.test(value);
-}
-
-function isNonemptyCdPathAssignment(value) {
-	return value.startsWith("CDPATH=") && value.slice("CDPATH=".length) !== "";
-}
-
-function persistsShellAssignment(tokens, isAssignment) {
-	const prefix = parseLeadingShellPrefix(tokens);
-	const head = basename(tokens[prefix.end]?.value ?? "");
-	const assignment = tokens.some(({ value }) => isAssignment(value));
-	if (STATEFUL_ASSIGNMENT_BUILTINS.has(head)) return assignment;
-	return prefix.end === tokens.length && assignment;
-}
-
-/** Whether a segment changes a Git target variable for later shell commands. */
-export function persistsGitTargetOverride(tokens) {
-	return persistsShellAssignment(tokens, isGitTargetAssignment);
-}
-
-/** Whether a segment gives later relative `cd` calls a nonempty CDPATH. */
-export function persistsCdPathOverride(tokens) {
-	return persistsShellAssignment(tokens, isNonemptyCdPathAssignment);
-}
-
-function isGitConfigName(name) {
-	return /^GIT_CONFIG[A-Za-z0-9_]*$/.test(name);
-}
-
-// Config variables set earlier on the command line (plainly or exported) still
-// inject settings into a later Git call, so remember them until they are unset.
-function noteGitConfigAssignments(state, tokens, readOnly = false) {
-	for (const { value } of tokens) {
-		const name = value.split("=", 1)[0];
-		if (isGitConfigName(name)) {
-			state.gitConfig.add(name);
-			if (readOnly) state.readOnlyGitConfig.add(name);
-		}
-	}
-}
-
-function declaresReadOnlyVariables(head, tokens) {
-	let readOnly = head === "readonly";
-	let removesReadOnly = false;
-	for (const { value } of tokens) {
-		if (value === "--" || !/^[+-]/.test(value)) break;
-		// readonly accepts only '-' options; '+r' is an invalid name, but
-		// does not prevent the remaining valid names from becoming readonly.
-		if (head === "readonly" && value.startsWith("+")) break;
-		if (head === "readonly" && !/^-[afp]+$/.test(value)) return false;
-		// Function declarations do not make variables readonly. A readonly
-		// command still sets the attribute with -p and explicit names; declare's
-		// -p only lists attributes. In declare/typeset, +r cancels -r in the
-		// same invocation in Bash, regardless of option order. Earlier readonly
-		// state may persist: Bash cannot remove it, while zsh can. Without a
-		// trusted shell identity, keep that uncertain state for later Git calls.
-		if (/^-[^-]*f/.test(value)) return false;
-		if (head !== "readonly" && /^[+-][^+-]*p/.test(value)) return false;
-		if (/^-[^-]*r/.test(value)) readOnly = true;
-		if (/^\+[^+]*r/.test(value)) removesReadOnly = true;
-	}
-	return readOnly && !removesReadOnly;
-}
-
-/** Whether an earlier segment left a `GIT_CONFIG*` variable set for later Git calls. */
-export function hasProtectedGitConfigOverride(state) {
-	return state.gitConfig.size > 0;
-}
-
-/** State that matters to commands guarded for cross-worktree mutations. */
-export function createProtectedShellState({
-	ambientGitTargetOverride = false,
-	ambientGitTargetVariables,
-	ambientCdPath = false,
-} = {}) {
-	const ambientGitTargets =
-		ambientGitTargetVariables ??
-		(ambientGitTargetOverride
-			? [...GIT_TARGET_VARIABLES].filter(
-					(name) => process.env[name] !== undefined && process.env[name] !== "",
-				)
-			: []);
-	const fallbackGitTargets =
-		ambientGitTargetOverride && ambientGitTargets.length === 0
-			? GIT_TARGET_VARIABLES
-			: new Set(ambientGitTargets);
-	return {
-		gitConfig: new Set(),
-		readOnlyGitConfig: new Set(),
-		cdPath: ambientCdPath ? "unknown" : "safe",
-		gitTargets: new Map(
-			[...GIT_TARGET_VARIABLES].map((name) => [
-				name,
-				{
-					exported: fallbackGitTargets.has(name),
-					value: fallbackGitTargets.has(name) ? "unknown" : "safe",
-				},
-			]),
-		),
-	};
-}
-
-export function hasProtectedGitTargetOverride(state) {
-	return [...state.gitTargets.values()].some(
-		({ exported, value }) => exported && value !== "safe",
-	);
-}
-
-export function hasProtectedCdPathOverride(state) {
-	return state.cdPath !== "safe";
-}
-
-function setProtectedValue(state, name, value, exported) {
-	if (name === "CDPATH") {
-		state.cdPath = value === "" ? "safe" : "unknown";
-		return;
-	}
-	const target = state.gitTargets.get(name);
-	if (!target) return;
-	target.value = value === "" ? "safe" : "unknown";
-	if (exported !== undefined) target.exported = exported;
-}
-
-function setProtectedUnknown(state, name) {
-	if (name === "CDPATH") {
-		state.cdPath = "unknown";
-		return;
-	}
-	const target = state.gitTargets.get(name);
-	if (target) target.value = "unknown";
-}
-
-function setAllProtectedUnknown(state) {
-	state.cdPath = "unknown";
-	for (const name of GIT_TARGET_VARIABLES)
-		setProtectedValue(state, name, "unknown", true);
-}
-
-function isDynamicSetterName(token) {
-	return (
-		(token.quote !== "'" && /[$`]/.test(token.value)) ||
-		/\[|\]/.test(token.value)
-	);
-}
-
-function unsetProtectedValue(state, name) {
-	if (name === "CDPATH") {
-		state.cdPath = "safe";
-		return;
-	}
-	const target = state.gitTargets.get(name);
-	if (!target) return;
-	target.value = "safe";
-	target.exported = false;
-}
-
-function protectedName(value) {
-	return value === "CDPATH" || GIT_TARGET_VARIABLES.has(value) ? value : null;
-}
-
-function applyAssignments(state, tokens, exported) {
-	let changed = false;
-	for (const token of tokens) {
-		const assignment = protectedAssignment(token.value);
-		if (assignment) {
-			setProtectedValue(state, assignment.name, assignment.value, exported);
-			changed = true;
-		}
-	}
-	return changed;
-}
-
-function applyExport(state, tokens) {
-	let unexport = false;
-	let functionMode = false;
-	let valid = true;
-	let options = true;
-	for (const token of tokens) {
-		const { value } = token;
-		if (options && value === "--") {
-			options = false;
-			continue;
-		}
-		if (options && value.startsWith("-")) {
-			for (const option of value.slice(1)) {
-				if (option === "n") unexport = true;
-				else if (option === "f") functionMode = true;
-				else valid = false;
-			}
-			continue;
-		}
-		if (isDynamicSetterName(token)) {
-			setAllProtectedUnknown(state);
-			return true;
-		}
-	}
-	if (!valid || functionMode) return false;
-	let changed = false;
-	options = true;
-	for (const { value } of tokens) {
-		if (options && value === "--") {
-			options = false;
-			continue;
-		}
-		if (options && value.startsWith("-")) continue;
-		const assignment = protectedAssignment(value);
-		if (assignment) {
-			setProtectedValue(state, assignment.name, assignment.value, !unexport);
-			changed = true;
-			continue;
-		}
-		const name = protectedName(value);
-		if (name && name !== "CDPATH") {
-			state.gitTargets.get(name).exported = !unexport;
-			changed = true;
-		}
-	}
-	return changed;
-}
-
-function applyUnset(state, tokens) {
-	let variables = true;
-	let options = true;
-	for (const { value } of tokens) {
-		if (options && value === "--") {
-			options = false;
-			continue;
-		}
-		if (options && value.startsWith("-")) {
-			variables &&= value === "-v";
-			continue;
-		}
-		if (!variables) continue;
-		if (!state.readOnlyGitConfig.has(value)) state.gitConfig.delete(value);
-		const name = protectedName(value);
-		if (name) unsetProtectedValue(state, name);
-	}
-	return variables;
-}
-
-function readProtectedNames(tokens) {
-	const valueOptions = new Set(["a", "d", "i", "n", "N", "p", "t", "u"]);
-	const flagOptions = new Set(["e", "r", "s"]);
-	const names = [];
-	let options = true;
-	for (let i = 0; i < tokens.length; i++) {
-		const token = tokens[i];
-		if (options && token.value === "--") {
-			options = false;
-			continue;
-		}
-		if (options && token.value.startsWith("-") && token.value !== "-") {
-			const cluster = token.value.slice(1);
-			for (let index = 0; index < cluster.length; index++) {
-				const option = cluster[index];
-				if (flagOptions.has(option)) continue;
-				if (!valueOptions.has(option)) return { names, unknown: true };
-				const value =
-					index + 1 < cluster.length
-						? { ...token, value: cluster.slice(index + 1) }
-						: tokens[++i];
-				if (!value) return { names, unknown: true };
-				if (option === "a") {
-					if (isDynamicSetterName(value)) return { names, unknown: true };
-					const name = protectedName(value.value);
-					if (name) names.push(name);
-				}
-				break;
-			}
-			continue;
-		}
-		if (isDynamicSetterName(token)) return { names, unknown: true };
-		const name = protectedName(token.value);
-		if (name) names.push(name);
-	}
-	return { names, unknown: false };
-}
-
-function dynamicallyWrittenProtectedNames(head, tokens) {
-	if (head === "read") return readProtectedNames(tokens);
-	if (head !== "printf") return { names: [], unknown: false };
-	let options = true;
-	for (let i = 0; i < tokens.length; i++) {
-		const token = tokens[i];
-		if (options && token.value === "--") {
-			options = false;
-			continue;
-		}
-		if (!options || !token.value.startsWith("-") || token.value === "-")
-			return { names: [], unknown: false };
-		if (token.value === "-v") {
-			const name = tokens[i + 1];
-			if (!name || isDynamicSetterName(name))
-				return { names: [], unknown: true };
-			return {
-				names: [protectedName(name.value)].filter(Boolean),
-				unknown: false,
-			};
-		}
-		if (token.value.startsWith("-v"))
-			return {
-				names: [protectedName(token.value.slice(2))].filter(Boolean),
-				unknown: false,
-			};
-	}
-	return { names: [], unknown: false };
-}
-
-/** Update state after one shell command segment has run. */
-export function updateProtectedShellState(state, tokens) {
-	const prefix = parseLeadingShellPrefix(tokens);
-	const head = basename(tokens[prefix.end]?.value ?? "");
-	const arguments_ = tokens.slice(prefix.end + 1);
-	const assignments = prefix.assignments;
-	if (prefix.end === tokens.length) {
-		noteGitConfigAssignments(state, assignments);
-		return applyAssignments(state, assignments);
-	}
-	if (STATEFUL_ASSIGNMENT_BUILTINS.has(head)) {
-		noteGitConfigAssignments(state, assignments);
-		applyAssignments(state, assignments, true);
-	}
-
-	if (head === "source" || head === "." || head === "eval") {
-		setAllProtectedUnknown(state);
-		return true;
-	}
-	if (head === "unset") {
-		// Only variables are removed: `-f` removes functions and `-n` a name
-		// reference, so neither clears a tracked GIT_CONFIG* variable.
-		return applyUnset(state, arguments_);
-	}
-	if (head === "export" || STATEFUL_ASSIGNMENT_BUILTINS.has(head))
-		noteGitConfigAssignments(
-			state,
-			arguments_,
-			declaresReadOnlyVariables(head, arguments_),
-		);
-	if (head === "export") return applyExport(state, arguments_);
-	if (STATEFUL_ASSIGNMENT_BUILTINS.has(head)) {
-		return applyAssignments(state, arguments_, true);
-	}
-	const { names, unknown } = dynamicallyWrittenProtectedNames(head, arguments_);
-	if (unknown) {
-		setAllProtectedUnknown(state);
-		return true;
-	}
-	for (const name of names) setProtectedUnknown(state, name);
-	return names.length > 0;
+	return /^GIT_CONFIG[A-Za-z0-9_]*\+?=/.test(value);
 }
 
 export function parseEnvPrefix(tokens, start = 0) {
@@ -758,7 +403,7 @@ export function parseEnvPrefix(tokens, start = 0) {
 	let gitConfigOverride = false;
 	while (i < tokens.length) {
 		const value = tokens[i].value;
-		if (/^[A-Za-z_][A-Za-z0-9_]*=/.test(value)) {
+		if (/^[A-Za-z_][A-Za-z0-9_]*\+?=/.test(value)) {
 			gitTargetOverride ||= isGitTargetAssignment(value);
 			gitConfigOverride ||= isGitConfigAssignment(value);
 			i++;
@@ -982,10 +627,7 @@ export function parseLeadingShellPrefix(tokens) {
 	let unresolved = false;
 	let gitTargetOverride = false;
 	let gitConfigOverride = false;
-	let cdPathOverride = false;
 	const envs = [];
-	const assignments = [];
-	const controlWords = [];
 	while (i < tokens.length) {
 		const value = tokens[i].value;
 		const executable = basename(value);
@@ -998,11 +640,9 @@ export function parseLeadingShellPrefix(tokens) {
 			i += redirection;
 			continue;
 		}
-		if (/^[A-Za-z_][A-Za-z0-9_]*=/.test(value)) {
-			assignments.push(tokens[i]);
+		if (/^[A-Za-z_][A-Za-z0-9_]*\+?=/.test(value)) {
 			gitTargetOverride ||= isGitTargetAssignment(value);
 			gitConfigOverride ||= isGitConfigAssignment(value);
-			cdPathOverride ||= isNonemptyCdPathAssignment(value);
 			i++;
 			continue;
 		}
@@ -1021,13 +661,10 @@ export function parseLeadingShellPrefix(tokens) {
 			if (command.query)
 				return {
 					end: tokens.length,
-					assignments,
-					controlWords,
 					envs,
 					unresolved,
 					gitTargetOverride,
 					gitConfigOverride,
-					cdPathOverride,
 				};
 			i = command.end;
 			continue;
@@ -1065,13 +702,10 @@ export function parseLeadingShellPrefix(tokens) {
 	}
 	return {
 		end: i,
-		assignments,
-		controlWords,
 		envs,
 		unresolved,
 		gitTargetOverride,
 		gitConfigOverride,
-		cdPathOverride,
 	};
 }
 

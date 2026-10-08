@@ -68,8 +68,6 @@ for (const command of [
 	"git fetch -o --dry-run origin HEAD:trunk",
 	"git fetch -qn origin HEAD:trunk",
 	"git fetch -u origin",
-	"export GIT_CONFIG_COUNT=1; unset -f GIT_CONFIG_COUNT; git fetch origin",
-	"export GIT_CONFIG_COUNT=1; unset -n GIT_CONFIG_COUNT; git fetch origin",
 	"git -c k=v tag newtag",
 	"git -c k=v tag -d v1",
 	"git -c k=v tag -a v1 -m message",
@@ -90,12 +88,6 @@ for (const command of [
 	"git rebase --update-r trunk",
 	"git rebase --no-update-refs --update-refs trunk",
 	"git rebase --update-refs --no-update-refs --update-refs trunk",
-	"export GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=a.b GIT_CONFIG_VALUE_0=c; git fetch origin",
-	"export GIT_CONFIG_PARAMETERS=x && git fetch origin",
-	"GIT_CONFIG_COUNT=1; export GIT_CONFIG_COUNT; git fetch origin",
-	"GIT_CONFIG_COUNT=1; git fetch origin",
-	"declare -x GIT_CONFIG_COUNT=1; git branch new-topic",
-	"export GIT_CONFIG_GLOBAL=/tmp/inc.cfg; git pull origin",
 	"git symbolic-ref --d refs/heads/alias",
 	"git symbolic-ref --del refs/heads/alias",
 	"git symbolic-ref --delete refs/heads/alias",
@@ -297,8 +289,6 @@ for (const command of [
 	"git fetch origin topic:refs/remotes/origin/topic",
 	"git fetch -n origin",
 	"git fetch -q origin",
-	"export GIT_CONFIG_COUNT=1; unset -v GIT_CONFIG_COUNT; git fetch origin",
-	"export GIT_CONFIG_COUNT=1; unset GIT_CONFIG_COUNT; git fetch origin",
 	"git -c pager.tag=false tag -l",
 	"git -c k=v tag",
 	"git -c k=v tag -l 'v*'",
@@ -318,7 +308,6 @@ for (const command of [
 	"git rebase --update-refs --no-update-refs trunk",
 	"git rebase --update-refs --no-update-r trunk",
 	"export GIT_CONFIG_COUNT=1; git status",
-	"export GIT_CONFIG_COUNT=1; unset GIT_CONFIG_COUNT; git fetch origin",
 	"export OTHER_VARIABLE=1; git fetch origin",
 	"git symbolic-ref --short HEAD",
 	"git symbolic-ref --quiet HEAD",
@@ -419,6 +408,24 @@ for (const command of [
 ])
 	test(`keeps read or isolated creation: ${command}`, () =>
 		assert.equal(decision(command), "allow"));
+
+test("persistent config setters cannot use the foreign-target exemption or unset recovery", () => {
+	for (const command of [
+		"export GIT_CONFIG_COUNT=1; unset -f GIT_CONFIG_COUNT; git fetch origin",
+		"export GIT_CONFIG_COUNT=1; unset -n GIT_CONFIG_COUNT; git fetch origin",
+		"export GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=a.b GIT_CONFIG_VALUE_0=c; git fetch origin",
+		"export GIT_CONFIG_PARAMETERS=x && git fetch origin",
+		"GIT_CONFIG_COUNT=1; export GIT_CONFIG_COUNT; git fetch origin",
+		"GIT_CONFIG_COUNT=1; git fetch origin",
+		"declare -x GIT_CONFIG_COUNT=1; git branch new-topic",
+		"export GIT_CONFIG_GLOBAL=/tmp/inc.cfg; git pull origin",
+		"export GIT_CONFIG_COUNT=1; unset -v GIT_CONFIG_COUNT; git fetch origin",
+		"export GIT_CONFIG_COUNT=1; unset GIT_CONFIG_COUNT; git fetch origin",
+	]) {
+		assert.equal(decision(command), "deny", command);
+		assert.equal(decision(command, "foreign"), "deny", command);
+	}
+});
 
 test("protects effects behind cwd/prefixes and uses the resolved default name", () => {
 	assert.equal(

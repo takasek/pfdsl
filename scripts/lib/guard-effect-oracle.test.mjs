@@ -441,7 +441,7 @@ test("guards agree with Git's observed effects when the primary holds main", asy
 	]);
 });
 
-test("config tracking agrees with the shell's unset variable modes", () => {
+test("config setters remain unsupported even when the shell clears the variable", () => {
 	for (const options of [
 		[],
 		["-v"],
@@ -471,7 +471,7 @@ test("config tracking agrees with the shell's unset variable modes", () => {
 		assert.equal(actual.status, 0, actual.stderr);
 		assert.equal(
 			parentDecision(`${prefix}git fetch origin`, "/repo/feature"),
-			actual.stdout === "unset" ? "allow" : "ask",
+			"deny",
 			prefix,
 		);
 	}
