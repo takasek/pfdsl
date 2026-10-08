@@ -224,8 +224,8 @@ native executable `f6005842e1a7de061d531d09da67002b46d9c9eae89ebac1a19f04bca4451
 | #1408 の終了・原本 | dirty な文書で window close → Keep Editing による編集保持 → 再 close → Discard による終了。検証用原本の前後 hash 一致を確認 | 同じ AppImage の通常操作で成功、process exit 0、原本 hash 一致 |
 | #1352 の表示・回復 | 初回 Fit、100%、倍率と Help、zoom/pan 後の正常→エラー→正常、主図と minimap の整合、定義挿入後の編集案内。VS Code の起動手順と既存動線も確認 | native 17 / VS Code 27 条件成功。関連 issue の未確認と元 issue の検査追加条件は別に保持 |
 | #1282 の定義作成 | 両ホストの Node actions から作成・作成位置への移動・単一 Undo/Redo。CLI の成功・拒否・初期 field・無書込みを別入口で確認 | native 9 / VS Code 9 / CLI 23 条件成功。コメント位置の厳格保持3セルは仕様との関係を下記で整理し、native raw CRLF bytes は未確認 |
-| #1283 の巡回 | VS Code の context menu と chord で定義→全本文 occurrence→定義を巡回。引用キー・同名 field・編集後の増減と既存直接移動を確認 | VS Code 19 条件成功、組込定義・Peek との対照1条件未確認。standalone の巡回 UI は対象外 |
-| #1284 の周辺図・強調 | 両ホストで hover の局所 SVG、画面端・内部 scroll/click、editor と局所図からの移動、連続移動の cue、reduced motion、既存 pan/zoom を確認 | native 15 / VS Code 21 条件成功、native 7 / VS Code 1 条件未確認 |
+| #1283 の巡回 | VS Code の context menu と chord で定義→全本文 occurrence→定義を巡回。引用キー・同名 field・編集後の増減と既存直接移動を確認 | 2026-10-08 UTC の追補で組込定義・Peek 対照も成功し、VS Code 20条件成功。standalone の巡回 UI は対象外 |
+| #1284 の周辺図・強調 | 両ホストで hover の局所 SVG、画面端・内部 scroll/click、editor と局所図からの移動、連続移動の cue、reduced motion、既存 pan/zoom を確認 | 右端 pointer 追補を含め native 16 / VS Code 21 条件成功、native 6 / VS Code 1 条件未確認 |
 | #483 の接続編集 | 両ホストで input/feedback/output × 既存/新規 target の6通り、単一 Undo/Redo、再描画、既存 double click・pan を確認 | native / VS Code 各30条件成功。semantic-invalid な existing output 候補は別の仕様判断として保持 |
 
 同じ source commit と検証用文書を使って操作をまとめるが、各 issue の全受入条件とホスト別の結果を保持する。
@@ -253,12 +253,17 @@ dot の通常 native 操作が成功し、[native corpus report](evidence/2026-1
 未確認9セル、native raw CRLF bytes、semantic-invalid な接続候補の扱いも、この解釈だけで成功へ変更しない。
 
 同じ8261固定版の追補では、I1284-012 / native の右端 tooltip を物理 pointer で開き内部を click する入口が成功した。
-[追補と累積記録](evidence/2026-10-07-linux-appimage/README.md#同じ固定版の追補検収)は成功201・旧失敗履歴3・未確認8・対象外187。
+[最初の追補](evidence/2026-10-07-linux-appimage/README.md#同じ固定版の追補検収)時点では成功201・旧失敗履歴3・未確認8・対象外187。
+2026-10-08 UTC の[残件追補](evidence/2026-10-07-linux-appimage/remaining-checks/README.md)で、所有者が許可した workspace-only trust と専用 profile による組込 definition / Peek 対照が成功し、I1283-019 / VS Code を更新した。
+最新の累積は成功202・旧失敗履歴3・未確認7・対象外187であり、今回の変更はこの1セルだけ。
 検収継続では、[lifecycle 自動検査](evidence/2026-10-07-linux-appimage/lifecycle-verification.md)として共有 preview 31件と実 standalone host adapter 1件が成功。
 通常 native GUI の未確認判定とは分け、束の完了まで残る実画面確認を続ける。
-初回の133条件 / 399セルの判定を保持し、唯一の status 変更を分けて記録した。
-cue の4条件、同 process dispose、両 GUI の reduced motion、VS Code の組込 definition / Peek 対照は未確認のまま維持する。
-通常 Save 入口がない native の raw CRLF 保存 bytes も未確認で、全 issue の一括完了を認定しない。
+初回と前追補の133条件 / 399セルの判定を保持し、各追補の status 変更を分けて記録した。
+cue の4条件、同 process dispose、両 GUI の reduced motion は未確認のまま維持する。
+native の実 Monaco model の編集 / Undo / Redo による raw CRLF 保持も未確認で、通常 Save UI の追加は要求せず、全 issue の一括完了を認定しない。
+今回の連続録画でも native cue が見えず、正規 Inspector がないため class / computed style を取得できていない。
+OS setting の変更後も実効 GTK / VS Code webview は reduce へ切り替わらず、GNOME setting は元の明示 override の存在を記録しなかったため厳密な復元を証明できない。
+値 true / 型 b への復帰と、元状態までの復元完了は区別する。
 
 test run `37574418226` は commit-associated run だが、実際の checkout は synthetic merge `96a306ac87951d6b050d83aed9770875025deaa9`。
 固定 HEAD との差は VS Code smoke の2ファイルであり、同じ product / unit source の補助証拠と別 runner の smoke 成功を分ける。

@@ -3,6 +3,8 @@
 2026-10-07 UTC の dot 検収報告を受領し、親が添付証拠を照合した記録。
 Linux GUI の実操作は dot の報告に基づき、親による GUI 再実行ではない。
 検収対象は以下の固定版であり、この受入記録の追加 commit を測ったことにはしない。
+2026-10-08 UTC の[最新の残件追補](remaining-checks/README.md)では I1283-019 / VS Code が成功し、累積は202成功・旧失敗履歴3・未確認7・対象外187。
+以下の初回・前追補・自動検査の数字は各時点の履歴として保持し、全体の完了認定とは区別する。
 
 ## 来歴と識別情報
 
@@ -146,8 +148,16 @@ F-001 の契約整理と旧失敗履歴、O-001 の仕様判断、全 issue の�
 
 [Lifecycle 検証記録](lifecycle-verification.md)に、共有 preview の31件と実 standalone host adapter の1件の成功を追加した。
 pending hover の完了逆転、dispose後の同container再利用、旧cue timer、pending snapshotとqueued editor repaintの隔離を直接検査する。
-Monaco seam / jsdomでの自動検査として区分し、通常GUIの未確認8セル（native6、VS Code2）や元の399セル集計は変更しない。
+Monaco seam / jsdomでの自動検査として区分し、当時の通常GUIの未確認8セル（native6、VS Code2）や元の399セル集計は変更しなかった。
 検収は継続し、必要な環境準備と残る実画面確認を完了するまで束の成功を認定しない。
+
+## 残件検収の再実操作
+
+[2026-10-08 UTC の残件追補](remaining-checks/README.md)に、4分割 ZIP の再構成 /237件の照合、同梱された元検収1,133件と前追補68件の再照合、全399セルの差分、通常 Host の組込定義 / Peek の成功を記録した。
+最新は native72 / VS Code107 / CLI23成功、旧失敗履歴3、native6 / VS Code1未確認。
+native cue の負の画面観測と Inspector 不在、reduce が実効にならなかった環境、GNOME setting の厳密な復元未証明を分けて保持する。
+原要求にない Save / tab-close UI は追加せず、実 model の CRLF と共有 / host / GUI の証拠層を照合する。
+設定復元も束の検収も未完了であり、今回の成功1セルから残件の成功を推定しない。
 
 ## CI と履歴の境界
 

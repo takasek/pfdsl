@@ -1,5 +1,9 @@
 # Remaining lifecycle contract verification
 
+本書の集計と実操作残件は、自動検査を追加した2026-10-07 UTC 時点の記録。
+その後の[2026-10-08 UTC の追補](remaining-checks/README.md)で VS Code の対照が成功し、最新は202成功・旧失敗履歴3・未確認7。
+本書の自動検査結果を通常 native GUI の成功へ置換してはいない。
+
 ## 対象と判定の層
 
 既存5件の実操作検収を続けるため、I1284-021 の dispose / 旧結果隔離を共有 DOM と standalone host adapter で直接検査した。
