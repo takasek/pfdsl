@@ -323,7 +323,38 @@ export function isReadOnlyGitReflog(args) {
 	);
 }
 
+// Subcommands with no mode that writes a ref, the index, the config or a
+// reflog: they print from the object database, refs, index or working tree.
+// The second block is the ordinary search and inspection commands a command-line
+// config such as `-c color.ui=never` is routinely paired with — grep, blame and
+// annotate (history and content search), shortlog and cherry (log summaries),
+// ls-remote (lists a remote's refs), diff-tree, diff-index and diff-files
+// (plumbing diffs), name-rev, show-branch and range-diff (ref and range
+// inspection), whatchanged (a log variant), check-ignore and check-attr
+// (attribute queries), count-objects, verify-commit and verify-tag (reports),
+// and version and var (print constants). Each only reads, so a child may run it
+// and a config override on it is not a shared effect.
 const READ_ONLY_GIT_SUBCOMMANDS = new Set([
+	"grep",
+	"blame",
+	"annotate",
+	"shortlog",
+	"cherry",
+	"ls-remote",
+	"diff-tree",
+	"diff-index",
+	"diff-files",
+	"name-rev",
+	"show-branch",
+	"range-diff",
+	"whatchanged",
+	"check-ignore",
+	"check-attr",
+	"count-objects",
+	"verify-commit",
+	"verify-tag",
+	"version",
+	"var",
 	"status",
 	"diff",
 	"log",
@@ -365,7 +396,9 @@ export function isReadOnlyGitInvocation(subcommand, args) {
  * `--config-env`, a visible `GIT_CONFIG_*` assignment) on `subcommand`. Any
  * key can matter, since `include.path` loads arbitrary settings, so every
  * invocation that is not a read is shared. The caller supplies the fact that
- * an override is present.
+ * an override is present. "Read" is `isReadOnlyGitInvocation`, whose table
+ * covers ordinary reads such as grep and blame; an earlier, narrower table
+ * made `git -c color.ui=never grep` ask.
  */
 export function classifyGitConfigOverride(subcommand, args) {
 	return isReadOnlyGitInvocation(subcommand, args) ? null : { kind: "shared" };
