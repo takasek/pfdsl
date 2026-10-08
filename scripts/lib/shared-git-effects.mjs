@@ -357,6 +357,54 @@ function remoteVerb(args) {
 	return args.find((arg) => !["-v", "--verbose"].includes(arg));
 }
 
+const TAG_LIST_FILTERS = [
+	"--contains",
+	"--no-contains",
+	"--points-at",
+	"--merged",
+	"--no-merged",
+];
+const TAG_LIST_FLAGS = new Set([
+	"--list",
+	"--ignore-case",
+	"--column",
+	"--no-column",
+	"--color",
+	"--no-color",
+	"--omit-empty",
+]);
+
+/**
+ * Whether `git tag <args>` only lists: no arguments, or list mode (`-l`,
+ * `-n`, or a filter such as `--contains`) with only list options and patterns.
+ * Any other option, or operands without list mode (`git tag v1`), create or
+ * change a tag, so they are not modeled as reads.
+ */
+export function isReadOnlyGitTag(args) {
+	if (args.length === 0) return true;
+	let list = false;
+	for (let i = 0; i < args.length; i++) {
+		const arg = args[i];
+		if (!arg.startsWith("-") || arg === "-") continue;
+		const name = arg.split("=", 1)[0];
+		const attached = arg.includes("=");
+		if (arg === "-l" || name === "--list") list = true;
+		else if (/^-n[0-9]*$/.test(arg)) list = true;
+		else if (TAG_LIST_FILTERS.includes(name)) {
+			list = true;
+			if (!attached) i++;
+		} else if (name === "--sort" || name === "--format") {
+			if (!attached) i++;
+		} else if (arg !== "-i" && !TAG_LIST_FLAGS.has(name)) return false;
+	}
+	return list;
+}
+
+/** Whether `git notes <args>` only reads: no verb, `list` or `show`. */
+export function isReadOnlyGitNotes(args) {
+	return args[0] === undefined || ["list", "show"].includes(args[0]);
+}
+
 /**
  * Whether `git remote <args>` only reads: no verb, `-v`/`--verbose`, `show`
  * or `get-url`. This is the narrow table a Codex child may run; `update`,
@@ -426,6 +474,8 @@ export function isReadOnlyGitInvocation(subcommand, args) {
 	if (READ_ONLY_GIT_SUBCOMMANDS.has(subcommand)) return true;
 	if (subcommand === "branch" && isReadOnlyGitBranch(args)) return true;
 	if (subcommand === "remote" && isReadOnlyGitRemote(args)) return true;
+	if (subcommand === "tag" && isReadOnlyGitTag(args)) return true;
+	if (subcommand === "notes" && isReadOnlyGitNotes(args)) return true;
 	if (subcommand === "config") return isReadOnlyGitConfig(args);
 	if (subcommand === "reflog" && isReadOnlyGitReflog(args)) return true;
 	if (subcommand === "stash" && ["list", "show"].includes(args[0])) return true;
