@@ -49,6 +49,7 @@ encoded frame cadence は実アプリの paint 完了時刻ではない。
 意味を変えない編集による raster 差は、新 SVG の採用を直接証明するものではない。
 この負の観測は保持するが、native WebView の class / computed style / media query が取れないため根本原因を確定していない。
 production artifact の通常 Inspector が開かなかったことが、次の診断上の具体的な阻害点である。
+[固定版の診断用 Inspector 手順](inspector-diagnosis.md)に、別 binary の来歴検査と読み取り対象をまとめた。
 通常 Inspector を利用できる別 Linux binary の診断では、同じ source / lock / frontend と build 条件、変更箇所、外側・内側 hash を記録し、指定 artifact の合格へ混ぜない。
 native raw CRLF は399セル外の未確認であり、保存 UI の追加を求めず、実 Monaco model の編集 / Undo / Redo を非正規化の値で読む必要がある。
 
