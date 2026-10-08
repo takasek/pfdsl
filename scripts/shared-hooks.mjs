@@ -9,6 +9,7 @@ import {
 	realpathSync,
 	renameSync,
 	rmSync,
+	statSync,
 	writeFileSync,
 } from "node:fs";
 import { dirname, join, resolve } from "node:path";
@@ -57,6 +58,7 @@ export async function ensureSharedHook(
 	);
 	if (!isManagedPath(paths)) {
 		try {
+			if (!statSync(paths.effective).isFile()) throw new Error("not a file");
 			accessSync(paths.effective, constants.X_OK);
 			if (readFileSync(paths.effective, "utf8") === source) return;
 		} catch {
@@ -86,6 +88,10 @@ export async function ensureSharedHook(
 	try {
 		let installed;
 		try {
+			if (!statSync(paths.managed).isFile())
+				throw new Error(
+					`The managed hook ${paths.managed} is not a regular file; refusing to overwrite it.`,
+				);
 			installed = readFileSync(paths.managed, "utf8");
 		} catch (error) {
 			if (error.code !== "ENOENT") throw error;

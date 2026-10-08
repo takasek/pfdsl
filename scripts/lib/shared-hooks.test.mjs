@@ -63,6 +63,19 @@ function fixture() {
 		join(root, "scripts/hooks/pre-commit-shim"),
 	);
 	installCheckout(root);
+	assert.equal(git("add", "scripts").status, 0);
+	assert.equal(
+		git(
+			"-c",
+			"user.name=Fixture",
+			"-c",
+			"user.email=fixture@example.invalid",
+			"commit",
+			"-qm",
+			"install checkout guard",
+		).status,
+		0,
+	);
 	const hook = join(root, ".git/hooks/pre-commit");
 	return { root, env, git, hook };
 }
@@ -185,6 +198,27 @@ test("installer preserves a dangling hook symlink", async () => {
 	);
 	assert.equal(readlinkSync(hook), "missing-custom-hook");
 });
+
+for (const custom of [false, true])
+	test(`installer refuses ${custom ? "custom" : "managed"} FIFO without blocking`, () => {
+		const { root, env, git, hook } = fixture();
+		const target = custom ? join(root, "custom-hooks/pre-commit") : hook;
+		mkdirSync(join(root, "custom-hooks"));
+		assert.equal(spawnSync("mkfifo", [target]).status, 0);
+		chmodSync(target, 0o755);
+		if (custom)
+			assert.equal(git("config", "core.hooksPath", "custom-hooks").status, 0);
+		const result = spawnSync(
+			process.execPath,
+			[new URL("scripts/shared-hooks.mjs", sourceRoot).pathname, "install"],
+			{ cwd: root, env, encoding: "utf8", timeout: 1000 },
+		);
+		assert.equal(result.error, undefined, result.error?.message);
+		assert.notEqual(result.status, 0);
+		assert.match(result.stderr, /refusing to overwrite|custom core.hooksPath/);
+		assert.ok(statSync(target).isFIFO());
+		assert.equal(statSync(target).mode & 0o777, 0o755);
+	});
 
 test("refuses unknown or incompatible newer hooks and bounds shared lock waiting", async () => {
 	const { ensureSharedHook } = await import("../shared-hooks.mjs");

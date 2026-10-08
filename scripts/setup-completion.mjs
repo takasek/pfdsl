@@ -268,9 +268,19 @@ export function inspectHooksPath(
 	const repair = managed
 		? `Run 'make setup' to install the repo's scripts/hooks/pre-commit-shim at ${path}.`
 		: `core.hooksPath (${configured.stdout.trim()}) selects ${path}. Install the repo's executable scripts/hooks/pre-commit-shim there or resolve the override explicitly; setup will not change Git configuration or custom hooks.`;
-	const failed = (problem) => ({ reason: `${problem} ${repair}`, managed });
-	if (!isExecutableShim(path))
+	const failed = (problem, hint = repair) => ({
+		reason: `${problem} ${hint}`,
+		managed,
+	});
+	const replace = managed
+		? `Inspect ${path} and replace it explicitly with the checkout's executable scripts/hooks/pre-commit-shim before running setup.`
+		: repair;
+	try {
+		if (!statSync(path).isFile())
+			return failed("The effective pre-commit is not a regular file.", replace);
+	} catch {
 		return failed("The effective pre-commit is missing or not executable.");
+	}
 	try {
 		if (
 			readFileSync(path, "utf8") !==
@@ -278,10 +288,15 @@ export function inspectHooksPath(
 		)
 			return failed(
 				"The effective hook differs from the checkout's repo shim; cannot verify that it runs the gate.",
+				replace,
 			);
 	} catch {
+		if (!isExecutableShim(path))
+			return failed("The effective pre-commit is missing or not executable.");
 		return failed("Cannot read the effective pre-commit shim.");
 	}
+	if (!isExecutableShim(path))
+		return failed("The effective pre-commit is missing or not executable.");
 	for (const entry of [
 		"scripts/hooks/check-default-branch",
 		"scripts/pre-commit",

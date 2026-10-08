@@ -64,10 +64,12 @@ hook には、コマンド文字列だけで判定できるものを担わせる
 
 - pre-commit は、HEAD が default branch（origin/HEAD から取得）なら commit を拒否する。取得できない場合も拒否する。
 - 共有 shim は、安定した薄い入口として実行 checkout の `scripts/pre-commit` だけを呼ぶ（#1415）。実行先が無い・実行できない場合は commit を拒否する。
-- 更新される判定は checkout の `scripts/hooks/check-default-branch` が持ち、origin/HEAD の名前・参照先 commit と named/detached HEAD の有効性を検証する。`scripts/pre-commit` はこの判定を先に実行してから通常 gate を実行する。commit 内で installer を呼ばない。
+- 更新される判定は checkout の `scripts/hooks/check-default-branch` が持ち、origin/HEAD の名前・参照先 commit と named/detached HEAD の有効性を検証する。`scripts/pre-commit` は現在の HEAD に記録された guard を読み出して先に実行してから、作業ツリーの通常 gate を実行する。作業ツリーや index の guard を編集中でも、まだ commit されていない判定では保護を解除しない。HEAD の guard を読めない場合は拒否し、旧版の fallback や commit 内の installer 呼出しは設けない。
 - setup は、管理先の shim を配置してから実効 hook を検査する。`core.hooksPath` が未設定でも、default の shim の実在と内容を確かめる。custom の hooksPath と異なる既存 hook は自動上書きせず失敗にする。内容と対象を確認し、現行 shim へ明示的に置き換えてから setup を行う。
 - installer は common dir の lock 内で既存内容を再読し、checkout の shim と完全一致する内容だけを受理する。欠落時の配置と同じ内容の実行可能 mode の修復は、一時ファイルから atomic に置き換える。
 - 共有 shim が同一なら、checkout の判定・gate を変えても共有 hook の再配置は要らない。交互・並行 setup でも同じ shim を保つ。
+- 共有 shim の bytes は main の `8f81899b` と一致させる。判定・gate の変更に不要なコメント・診断文言の差を作らず、その shim を無条件コピーする main 系 setup との往復を避ける。異なる歴史的 shim の自動移行は追加しない。
+- HEAD が commit に解決できない場合は拒否するため、`git checkout --orphan` 直後の初回 commit も対象になる。既存の commit を持つ有効な detached HEAD とは分ける。
 - 旧 checkout・旧 shim との後方互換や自動移行は提供しない。旧版との併用で default branch 保護・setup 成功・非降格を保証しない。
 - 依存の準備と、共有 shim・skill link の配置は分ける。
 
