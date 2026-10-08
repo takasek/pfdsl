@@ -360,8 +360,7 @@ export function optionSpellings(subcommand, values = ["x", "1", "merge"]) {
 	const flags = options
 		.filter(({ short, arity }) => short && arity === "none")
 		.map(({ short }) => short.slice(1));
-	for (const a of flags)
-		for (const b of flags) if (a !== b) spellings.push([`-${a}${b}`]);
+	for (const a of flags) for (const b of flags) spellings.push([`-${a}${b}`]);
 	for (const { short, long, negatable, arity } of options) {
 		// parse-options accepts the shortest prefix no other long option shares.
 		const prefix = long

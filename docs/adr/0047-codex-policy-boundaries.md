@@ -31,7 +31,9 @@ remote-tracking ref と tag は対象外とし、notes と replace は現時点�
 update-ref、symbolic-ref の変更、branch の強制変更・削除・他 branch 改名、worktree の追加・保守、明示的なローカル ref 宛て fetch を確認する。
 同一 repository を宛先とする push（`push .` やローカルパス）と、pull の明示的なローカル ref 宛て refspec は、update-ref・fetch と同じ作用として確認する。
 reflog の write・expire・delete・drop は stash の回復情報を書き換えうるため共有保守とし、Git の reflog の verb は閉じた集合なので、それ以外の最初の語は show へ渡す ref として表示に扱う。
-`git remote` の add・rename・remove・set-url・set-branches はリポジトリ設定の書込みとして共有作用とし、update・prune・set-head は remote-tracking ref だけを動かすため対象外とする。
+reflog の表示でも `--output` はファイルを書き、後続の不正 option による失敗前にも出力先を変更するため、読取の免除から外す。
+`git remote` の add・rename・remove・set-url・set-branches は前置の verbosity option を含めリポジトリ設定の書込みとして共有作用とし、前置 option を解決できなければ共有作用とする。
+通常の refspec で update・prune・set-head が動かす remote-tracking ref は対象外とし、保存済みの特殊 refspec の残余は下記の境界に従う。
 push の宛先 repository は option の arity を模倣せず、ローカルの repository を示す語が1つでもあれば同一 repository 宛てとして扱う。
 `rebase --update-refs` は他 branch を動かすため共有作用とする。
 worktree add は detached・既存 branch・新規 branch のいずれも共有 metadata を変更するため、Claude では ask、Codex では deny とし、native の worktree 作成入口とは区別する。

@@ -575,11 +575,37 @@ function isGitConfigName(name) {
 
 // Config variables set earlier on the command line (plainly or exported) still
 // inject settings into a later Git call, so remember them until they are unset.
-function noteGitConfigAssignments(state, tokens) {
+function noteGitConfigAssignments(state, tokens, readOnly = false) {
 	for (const { value } of tokens) {
 		const name = value.split("=", 1)[0];
-		if (isGitConfigName(name)) state.gitConfig.add(name);
+		if (isGitConfigName(name)) {
+			state.gitConfig.add(name);
+			if (readOnly) state.readOnlyGitConfig.add(name);
+		}
 	}
+}
+
+function declaresReadOnlyVariables(head, tokens) {
+	let readOnly = head === "readonly";
+	let removesReadOnly = false;
+	for (const { value } of tokens) {
+		if (value === "--" || !/^[+-]/.test(value)) break;
+		// readonly accepts only '-' options; '+r' is an invalid name, but
+		// does not prevent the remaining valid names from becoming readonly.
+		if (head === "readonly" && value.startsWith("+")) break;
+		if (head === "readonly" && !/^-[afp]+$/.test(value)) return false;
+		// Function declarations do not make variables readonly. A readonly
+		// command still sets the attribute with -p and explicit names; declare's
+		// -p only lists attributes. In declare/typeset, +r cancels -r in the
+		// same invocation in Bash, regardless of option order. Earlier readonly
+		// state may persist: Bash cannot remove it, while zsh can. Without a
+		// trusted shell identity, keep that uncertain state for later Git calls.
+		if (/^-[^-]*f/.test(value)) return false;
+		if (head !== "readonly" && /^[+-][^+-]*p/.test(value)) return false;
+		if (/^-[^-]*r/.test(value)) readOnly = true;
+		if (/^\+[^+]*r/.test(value)) removesReadOnly = true;
+	}
+	return readOnly && !removesReadOnly;
 }
 
 /** Whether an earlier segment left a `GIT_CONFIG*` variable set for later Git calls. */
@@ -606,6 +632,7 @@ export function createProtectedShellState({
 			: new Set(ambientGitTargets);
 	return {
 		gitConfig: new Set(),
+		readOnlyGitConfig: new Set(),
 		cdPath: ambientCdPath ? "unknown" : "safe",
 		gitTargets: new Map(
 			[...GIT_TARGET_VARIABLES].map((name) => [
@@ -750,6 +777,7 @@ function applyUnset(state, tokens) {
 			continue;
 		}
 		if (!variables) continue;
+		if (!state.readOnlyGitConfig.has(value)) state.gitConfig.delete(value);
 		const name = protectedName(value);
 		if (name) unsetProtectedValue(state, name);
 	}
@@ -846,14 +874,14 @@ export function updateProtectedShellState(state, tokens) {
 	if (head === "unset") {
 		// Only variables are removed: `-f` removes functions and `-n` a name
 		// reference, so neither clears a tracked GIT_CONFIG* variable.
-		if (
-			arguments_.every(({ value }) => !value.startsWith("-") || value === "-v")
-		)
-			for (const { value } of arguments_) state.gitConfig.delete(value);
 		return applyUnset(state, arguments_);
 	}
 	if (head === "export" || STATEFUL_ASSIGNMENT_BUILTINS.has(head))
-		noteGitConfigAssignments(state, arguments_);
+		noteGitConfigAssignments(
+			state,
+			arguments_,
+			declaresReadOnlyVariables(head, arguments_),
+		);
 	if (head === "export") return applyExport(state, arguments_);
 	if (STATEFUL_ASSIGNMENT_BUILTINS.has(head)) {
 		return applyAssignments(state, arguments_, true);

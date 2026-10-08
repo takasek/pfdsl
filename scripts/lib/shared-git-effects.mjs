@@ -337,13 +337,28 @@ export function isReadOnlyGitConfig(args) {
  * `reflog --date=iso expire` is a failed show). The writers are exactly a first
  * argument of `write`, which can inject an entry, or `expire`, `delete` and
  * `drop`, which remove entries, including the stash's recovery information.
+ * Display with `--output` writes a file, including before a later error.
  */
 export function isReadOnlyGitReflog(args) {
-	return !["expire", "delete", "drop", "write"].includes(args[0]);
+	return (
+		!["expire", "delete", "drop", "write"].includes(args[0]) &&
+		!args.some((arg) => arg === "--output" || arg.startsWith("--output="))
+	);
 }
 
 function remoteVerb(args) {
-	return args.find((arg) => !["-v", "--verbose"].includes(arg));
+	for (const arg of args) {
+		if (
+			/^-v+$/.test(arg) ||
+			(!arg.includes("=") &&
+				(isLongOptionPrefix(arg, "--verbose") ||
+					isLongOptionPrefix(arg, "--no-verbose")))
+		)
+			continue;
+		// An unrecognized option cannot establish a harmless action.
+		return arg.startsWith("-") ? null : arg;
+	}
+	return undefined;
 }
 
 const TAG_LIST_FILTERS = [
@@ -366,8 +381,8 @@ const TAG_LIST_FLAGS = new Set([
 /**
  * Whether `git tag <args>` only lists: no arguments, or list mode (`-l`,
  * `-n`, or a filter such as `--contains`) with only list options and patterns.
- * Any other option, or operands without list mode (`git tag v1`), create or
- * change a tag, so they are not modeled as reads.
+ * Other modes are conservatively outside this read table: they include
+ * creation/deletion and unmodeled verification such as `git tag -v`.
  */
 export function isReadOnlyGitTag(args) {
 	if (args.length === 0) return true;
@@ -395,7 +410,7 @@ export function isReadOnlyGitNotes(args) {
 }
 
 /**
- * Whether `git remote <args>` only reads: no verb, `-v`/`--verbose`, `show`
+ * Whether `git remote <args>` only reads: no verb, verbosity options, `show`
  * or `get-url`. This is the narrow table a Codex child may run; `update`,
  * `prune` and `set-head` move refs, so they are not reads for it.
  */
@@ -408,17 +423,20 @@ export function isReadOnlyGitRemote(args) {
  * Whether `git remote <args>` writes repository config: `add` (including
  * `--mirror`), `rename`, `remove`/`rm`, `set-url` and `set-branches`. A mirror
  * remote or a rewritten `remote.<name>.fetch` changes what a later plain fetch
- * does. `update`, `prune` and `set-head` touch only `refs/remotes/*`, which
- * is outside the protected set.
+ * does. With ordinary refspecs, `update`, `prune` and `set-head` touch only
+ * `refs/remotes/*`, which is outside the protected set. An unknown action is
+ * conservatively shared, rather than proof that no configuration is written.
  */
 function writesGitRemoteConfig(args) {
-	return ["add", "rename", "remove", "rm", "set-url", "set-branches"].includes(
-		remoteVerb(args),
+	const action = remoteVerb(args);
+	return (
+		action !== undefined &&
+		!["show", "get-url", "update", "prune", "set-head"].includes(action)
 	);
 }
 
-// Subcommands with no mode that writes a ref, the index, the config or a
-// reflog: they print from the object database, refs, index or working tree.
+// Baseline read subcommands: their ordinary modes print from the object
+// database, refs, index or working tree.
 // Besides the basic status, diff, log and rev-parse family, the set holds the
 // ordinary search and inspection commands a command-line config such as
 // `-c color.ui=never` is routinely paired with: grep, blame and annotate
@@ -427,8 +445,10 @@ function writesGitRemoteConfig(args) {
 // diffs), name-rev, show-branch and range-diff (ref and range inspection),
 // whatchanged (a log variant), check-ignore and check-attr (attribute
 // queries), count-objects, verify-commit and verify-tag (reports), and version
-// and var (print constants). Each only reads, so a child may run it and a
-// config override on it is not a shared effect. Subcommands with both read and
+// and var (print constants). The table allows a child to run them and exempts
+// their config overrides. It does not prove every option is free of effects:
+// output modes such as log/show --output remain a pre-existing gap.
+// Subcommands with both read and
 // write modes (branch, remote, config, reflog, stash, tag, notes, worktree) are
 // decided per invocation in isReadOnlyGitInvocation instead.
 const READ_ONLY_GIT_SUBCOMMANDS = new Set([

@@ -17,6 +17,7 @@ import {
 	cross,
 	observeForms,
 	optionSpellings,
+	parentDecision,
 	quote,
 } from "./guard-effect-oracle-harness.mjs";
 
@@ -280,6 +281,11 @@ const OPTION_FORMS = [
 		["refs/heads/alias"],
 		["HEAD", "refs/heads/main"],
 	]),
+	...cross([["remote"]], optionSpellings("remote"), [
+		["add", "newremote", "{root}/origin.git"],
+		["set-url", "origin", "{root}/elsewhere.git"],
+		["remove", "origin"],
+	]),
 	...cross([["worktree", "prune"]], optionSpellings(["worktree", "prune"]), [
 		[],
 	]),
@@ -320,8 +326,8 @@ const FETCHES = [
 	["pull", "--no-rebase", "origin"],
 	["pull", "--no-rebase", "origin", "main"],
 ];
-// Every way to name this repository as a push destination from the feature
-// checkout: its own gitfile, relative and absolute paths, and a file URL.
+// Representative spellings of this repository as a push destination from the
+// feature checkout: its gitfile, relative and absolute paths, and a file URL.
 const LOCAL_REPOSITORIES = [
 	".",
 	"./",
@@ -347,6 +353,16 @@ const LOCAL_WRITERS = [
 	["reflog", "delete", "refs/stash@{0}"],
 	["reflog", "write", "refs/stash", "{oid:stash}", "{oid:HEAD}", "injected"],
 	["reflog", "write", "refs/heads/other", "{oid:other}", "{oid:HEAD}", "x"],
+	// Display options can write directly to protected files, even on failure.
+	...cross(
+		[["reflog"]],
+		[[], ["show"], ["HEAD"], ["main"], ["refs/stash"]],
+		[
+			["--output={root}/primary/.git/config"],
+			["--output", "{root}/primary/.git/config"],
+			["--output={root}/primary/.git/config", "--no-output"],
+		],
+	),
 	// Remote settings written outside `git config` are repository config too.
 	["remote", "add", "--mirror=fetch", "m", "{root}/origin.git"],
 	["remote", "set-url", "origin", "{root}/elsewhere.git"],
@@ -426,6 +442,42 @@ test("guards agree with Git's observed effects when the primary holds main", asy
 		"refs/heads/other",
 		"stashLog",
 	]);
+});
+
+test("config tracking agrees with the shell's unset variable modes", () => {
+	for (const options of [
+		[],
+		["-v"],
+		["--"],
+		["-v", "--"],
+		["-f"],
+		["-f", "--"],
+	]) {
+		const prefix = `export GIT_CONFIG_COUNT=1; unset ${options.join(" ")} GIT_CONFIG_COUNT; `;
+		const actual = spawnSync(
+			"bash",
+			[
+				"--noprofile",
+				"--norc",
+				"-c",
+				`${prefix}printf '%s' "\${GIT_CONFIG_COUNT-unset}"`,
+			],
+			{
+				env: Object.fromEntries(
+					Object.entries(process.env).filter(
+						([name]) => !name.startsWith("GIT_"),
+					),
+				),
+				encoding: "utf8",
+			},
+		);
+		assert.equal(actual.status, 0, actual.stderr);
+		assert.equal(
+			parentDecision(`${prefix}git fetch origin`, "/repo/feature"),
+			actual.stdout === "unset" ? "allow" : "ask",
+			prefix,
+		);
+	}
 });
 
 // gh decides by its own flag parser whether `--help` is a help request or an
