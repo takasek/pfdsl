@@ -87,7 +87,8 @@ Container setup is optional; this procedure can be used directly on the target L
 ### Use a CI executable when development dependencies are unavailable
 
 The `desktop` workflow's `linux-native` job tests and builds the PR head commit on x86_64 in a pinned Debian 13 container.
-After that job succeeds, download its `pfdsl-linux-x64-<source-commit>` artifact from the workflow run.
+After that job succeeds, download its `pfdsl-linux-x64-<source-commit>-attempt-<run-attempt>` artifact from the workflow run.
+The attempt suffix keeps earlier artifacts when a job is rerun; choose the producer attempt you intend to verify.
 It contains `pfdsl-linux-x64.tar.gz`; extract it into a new directory, then check its contents:
 
 ```sh
@@ -116,11 +117,12 @@ CI unit tests and compilation do not certify native startup, dialogs, GUI operat
 
 ### Use the verification AppImage when WebKitGTK runtime is unavailable
 
-The same job also packages a verification-only [AppImage](https://v2.tauri.app/distribute/appimage/) and uploads `pfdsl-linux-appimage-x64-<source-commit>`.
+The same job also packages a verification-only [AppImage](https://v2.tauri.app/distribute/appimage/) and uploads `pfdsl-linux-appimage-x64-<source-commit>-attempt-<run-attempt>`.
 This is an Actions artifact for acceptance work, not a signed release.
 The job extracts the built image and requires `libwebkit2gtk-4.1.so.0`, `libjavascriptcoregtk-4.1.so.0`, `libGLESv2.so.2`, and its GL dispatch library inside it before uploading.
 GLES is explicitly included because libraries loaded at startup with `dlopen` can be absent even when the native executable's `ldd` output resolves every dependency.
 An independent Debian 13 CI job without system WebKitGTK or GLES checks the native executable's linked dependencies and performs a GLES `dlopen` and symbol lookup using the extracted bundle.
+It downloads the producer's artifact ID, so rerunning only the runtime job keeps using the successful producer's artifact.
 The archive also includes the frontend, source commit, build environment, outer checksums, and checksums of the extracted image's regular files.
 That inspection proves inclusion; compatibility and startup on the target desktop still need verification.
 The builder is Debian 13 x86_64; older systems are not certified, and the AppImage still needs a compatible kernel, glibc, graphics stack, and graphical session.

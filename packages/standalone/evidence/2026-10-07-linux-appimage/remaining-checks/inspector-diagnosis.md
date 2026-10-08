@@ -21,7 +21,8 @@ The diagnostic binary includes Tauri's Inspector support and may differ from the
 
 The job downloads accepted artifact `11461844652` from run `37574418253`, verifies its metadata and known AppImage/native hashes, and requires identical frontend file sets and all ten SHA256 values.
 It records both lock hashes before and after building, the resolved Cargo feature tree, all AppDir entry differences including type/mode/link target, the product source and immutable workflow commit, and both build environments.
-The artifact is named `pfdsl-linux-inspector-x64-8261f877d5cae8aa653a5310edfbd9e387acb116-<run-id>`.
+New artifacts are named `pfdsl-linux-inspector-x64-8261f877d5cae8aa653a5310edfbd9e387acb116-<run-id>-attempt-<run-attempt>` to preserve earlier attempts.
+The previously inspected artifact `11525926292` retains its original name without the attempt suffix.
 Its archive contains `PFDSL-Inspector.AppImage`, `frontend/`, `SOURCE_COMMIT`, `DIAGNOSTIC_BUILD.json`, `source-locks.txt`, `build-environment.txt`, `accepted-build-environment.txt`, `cargo-features.txt`, `APPDIR_SHA256SUMS`, and `SHA256SUMS`.
 GUI Inspector availability and Monaco model access are explicitly recorded as unverified by CI.
 An expired or mismatched baseline artifact stops this job; it does not silently use a different product version.
