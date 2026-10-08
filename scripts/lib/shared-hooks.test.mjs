@@ -8,8 +8,10 @@ import {
 	mkdtempSync,
 	readdirSync,
 	readFileSync,
+	readlinkSync,
 	rmSync,
 	statSync,
+	symlinkSync,
 	writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
@@ -60,13 +62,41 @@ function fixture() {
 		new URL("scripts/hooks/pre-commit-shim", sourceRoot),
 		join(root, "scripts/hooks/pre-commit-shim"),
 	);
-	writeFileSync(
-		join(root, "scripts/pre-commit"),
-		"#!/bin/sh\necho gate-ran\n",
-		{ mode: 0o755 },
+	installCheckout(root);
+	assert.equal(git("add", "scripts").status, 0);
+	assert.equal(
+		git(
+			"-c",
+			"user.name=Fixture",
+			"-c",
+			"user.email=fixture@example.invalid",
+			"commit",
+			"-qm",
+			"install checkout guard",
+		).status,
+		0,
 	);
 	const hook = join(root, ".git/hooks/pre-commit");
 	return { root, env, git, hook };
+}
+function installCheckout(root) {
+	mkdirSync(join(root, "scripts/lib"), { recursive: true });
+	mkdirSync(join(root, "scripts/hooks"), { recursive: true });
+	for (const path of [
+		"scripts/pre-commit",
+		"scripts/hooks/check-default-branch",
+		"scripts/shared-hooks.mjs",
+		"scripts/lib/cli-entrypoint.mjs",
+		"scripts/hooks/pre-commit-shim",
+	])
+		copyFileSync(new URL(path, sourceRoot), join(root, path));
+	const prefix = readFileSync(
+		new URL("scripts/pre-commit", sourceRoot),
+		"utf8",
+	).split("# Biome's own exit code")[0];
+	writeFileSync(join(root, "scripts/pre-commit"), `${prefix}echo gate-ran\n`, {
+		mode: 0o755,
+	});
 }
 afterEach(() => {
 	for (const root of roots.splice(0))
@@ -104,33 +134,32 @@ test("actual Git pre-commit refuses default branch and missing origin/HEAD befor
 	assert.notEqual(commit().status, 0);
 });
 
-test("installer repairs legacy shim, preserves compatible newer versions and refuses custom hooks", async () => {
-	const { ensureSharedHook, LEGACY_SHIM } = await import("../shared-hooks.mjs");
+test("installer installs the exact shim, repairs its mode and refuses custom hooks", async () => {
+	const { ensureSharedHook } = await import("../shared-hooks.mjs");
 	const { root, env, hook, git } = fixture();
-	writeFileSync(hook, LEGACY_SHIM, { mode: 0o755 });
 	await ensureSharedHook(root, { env });
 	const current = readFileSync(hook, "utf8");
-	assert.match(current, /pfdsl-pre-commit-shim-version: 1/);
-	const newer = current.replace("shim-version: 1", "shim-version: 2");
-	writeFileSync(hook, newer, { mode: 0o755 });
+	assert.equal(
+		current,
+		readFileSync(join(root, "scripts/hooks/pre-commit-shim"), "utf8"),
+	);
+	chmodSync(hook, 0o644);
 	await ensureSharedHook(root, { env });
-	assert.equal(readFileSync(hook, "utf8"), newer);
+	assert.equal(readFileSync(hook, "utf8"), current);
+	assert.ok(statSync(hook).mode & 0o111);
 	git("config", "core.hooksPath", "custom-hooks");
 	await assert.rejects(ensureSharedHook(root, { env }), /custom|hooksPath/);
-	assert.equal(readFileSync(hook, "utf8"), newer);
+	assert.equal(readFileSync(hook, "utf8"), current);
 });
 
-test("parallel installers serialize version comparisons and leave executable complete shim", async () => {
+test("parallel installers leave one executable complete shim", async () => {
 	await import("../shared-hooks.mjs");
 	const { root, env, hook, git } = fixture();
 	const linked = join(root, "linked");
 	assert.equal(git("worktree", "add", "-b", "other", linked).status, 0);
 	mkdirSync(join(linked, "scripts/hooks"), { recursive: true });
 	const old = readFileSync(join(root, "scripts/hooks/pre-commit-shim"), "utf8");
-	writeFileSync(
-		join(linked, "scripts/hooks/pre-commit-shim"),
-		old.replace("shim-version: 1", "shim-version: 2"),
-	);
+	writeFileSync(join(linked, "scripts/hooks/pre-commit-shim"), old);
 	const script = new URL("scripts/shared-hooks.mjs", sourceRoot).pathname;
 	const run = (cwd) =>
 		new Promise((resolve, reject) => {
@@ -150,10 +179,7 @@ test("parallel installers serialize version comparisons and leave executable com
 		});
 	for (let i = 0; i < 3; i++)
 		await Promise.all([run(root), run(linked), run(root), run(linked)]);
-	assert.equal(
-		readFileSync(hook, "utf8"),
-		old.replace("shim-version: 1", "shim-version: 2"),
-	);
+	assert.equal(readFileSync(hook, "utf8"), old);
 	assert.ok(statSync(hook).mode & 0o111);
 	assert.equal(existsSync(`${hook}.pfdsl-lock`), false);
 	assert.equal(
@@ -162,36 +188,37 @@ test("parallel installers serialize version comparisons and leave executable com
 	);
 });
 
-test("new checkout pre-commit repairs a historical downgrade before default branch refusal", async () => {
-	const { LEGACY_SHIM } = await import("../shared-hooks.mjs");
-	const { root, hook, git } = fixture();
-	for (const path of ["scripts/pre-commit", "scripts/shared-hooks.mjs"])
-		copyFileSync(new URL(path, sourceRoot), join(root, path));
-	mkdirSync(join(root, "scripts/lib"));
-	copyFileSync(
-		new URL("scripts/lib/cli-entrypoint.mjs", sourceRoot),
-		join(root, "scripts/lib/cli-entrypoint.mjs"),
+test("installer preserves a dangling hook symlink", async () => {
+	const { ensureSharedHook } = await import("../shared-hooks.mjs");
+	const { root, env, hook } = fixture();
+	symlinkSync("missing-custom-hook", hook);
+	await assert.rejects(
+		ensureSharedHook(root, { env }),
+		/refusing to overwrite/,
 	);
-	chmodSync(join(root, "scripts/pre-commit"), 0o755);
-	chmodSync(join(root, "scripts/hooks/pre-commit-shim"), 0o755);
-	writeFileSync(hook, LEGACY_SHIM, { mode: 0o755 });
-	assert.equal(git("switch", "-c", "main").status, 0);
-	const before = git("rev-parse", "HEAD").stdout;
-	const result = git(
-		"-c",
-		"user.name=Fixture",
-		"-c",
-		"user.email=fixture@example.invalid",
-		"commit",
-		"--allow-empty",
-		"-qm",
-		"probe",
-	);
-	assert.notEqual(result.status, 0);
-	assert.match(result.stderr, /default branch/);
-	assert.equal(git("rev-parse", "HEAD").stdout, before);
-	assert.match(readFileSync(hook, "utf8"), /shim-version: 1/);
+	assert.equal(readlinkSync(hook), "missing-custom-hook");
 });
+
+for (const custom of [false, true])
+	test(`installer refuses ${custom ? "custom" : "managed"} FIFO without blocking`, () => {
+		const { root, env, git, hook } = fixture();
+		const target = custom ? join(root, "custom-hooks/pre-commit") : hook;
+		mkdirSync(join(root, "custom-hooks"));
+		assert.equal(spawnSync("mkfifo", [target]).status, 0);
+		chmodSync(target, 0o755);
+		if (custom)
+			assert.equal(git("config", "core.hooksPath", "custom-hooks").status, 0);
+		const result = spawnSync(
+			process.execPath,
+			[new URL("scripts/shared-hooks.mjs", sourceRoot).pathname, "install"],
+			{ cwd: root, env, encoding: "utf8", timeout: 1000 },
+		);
+		assert.equal(result.error, undefined, result.error?.message);
+		assert.notEqual(result.status, 0);
+		assert.match(result.stderr, /refusing to overwrite|custom core.hooksPath/);
+		assert.ok(statSync(target).isFIFO());
+		assert.equal(statSync(target).mode & 0o777, 0o755);
+	});
 
 test("refuses unknown or incompatible newer hooks and bounds shared lock waiting", async () => {
 	const { ensureSharedHook } = await import("../shared-hooks.mjs");
@@ -244,6 +271,7 @@ test("default-branch linked checkout commit leaves HEAD and staged index unchang
 	chmodSync(hook, 0o755);
 	const linked = join(root, "linked");
 	assert.equal(git("worktree", "add", "-b", "main", linked).status, 0);
+	installCheckout(linked);
 	writeFileSync(join(linked, "probe.txt"), "keep this staged\n");
 	assert.equal(git("-C", linked, "add", "probe.txt").status, 0);
 	const beforeHead = git("-C", linked, "rev-parse", "HEAD").stdout;

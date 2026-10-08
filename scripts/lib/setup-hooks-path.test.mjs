@@ -51,6 +51,9 @@ function fixture() {
 	writeFileSync(join(root, "scripts/pre-commit"), "#!/bin/sh\nexit 0\n", {
 		mode: 0o755,
 	});
+	for (const entry of ["scripts/hooks/check-default-branch"]) {
+		writeFileSync(join(root, entry), "#!/bin/sh\nexit 0\n", { mode: 0o755 });
+	}
 	mkdirSync(join(root, "generated/skills/pfdsl"), { recursive: true });
 	writeFileSync(
 		join(root, "generated/skills/pfdsl/SKILL.md"),
@@ -144,21 +147,52 @@ describe("effective core.hooksPath", () => {
 		writeFileSync(join(linked, "scripts/pre-commit"), "#!/bin/sh\nexit 0\n", {
 			mode: 0o755,
 		});
+		for (const entry of ["scripts/hooks/check-default-branch"]) {
+			writeFileSync(join(linked, entry), "#!/bin/sh\nexit 0\n", {
+				mode: 0o755,
+			});
+		}
 		assert.match(inspectHooksPath(linked, { env }).reason, /core.hooksPath/);
 		install(linked, "custom-hooks");
 		assert.equal(inspectHooksPath(linked, { env }).reason, null);
 	});
 });
 describe("setup-managed pre-commit", () => {
-	it("accepts a compatible newer shared shim without marking dependencies stale", () => {
+	for (const location of [".git/hooks", "custom-hooks"])
+		it(`rejects a FIFO in ${location} without blocking the checker`, () => {
+			const { root, env, git } = fixture();
+			mkdirSync(join(root, location), { recursive: true });
+			const fifo = spawnSync("mkfifo", [join(root, location, "pre-commit")]);
+			assert.equal(fifo.status, 0, fifo.stderr?.toString());
+			if (location === "custom-hooks")
+				git("config", "core.hooksPath", location);
+			const result = spawnSync(
+				process.execPath,
+				[
+					fileURLToPath(new URL("../setup-completion.mjs", import.meta.url)),
+					"check",
+				],
+				{ cwd: root, env, encoding: "utf8", timeout: 1000 },
+			);
+			assert.equal(result.error, undefined, result.error?.message);
+			assert.notEqual(result.status, 0);
+			assert.match(result.stderr, /not executable|regular file/);
+		});
+	it("directs a differing managed hook to explicit replacement before setup", () => {
+		for (const mode of [0o755, 0o644]) {
+			const { root, env } = fixture();
+			install(root, ".git/hooks", "#!/bin/sh\nexit 0\n");
+			chmodSync(join(root, ".git/hooks/pre-commit"), mode);
+			const reason = inspectHooksPath(root, { env }).reason;
+			assert.match(reason, /Inspect.*replace.*before running setup/);
+			assert.doesNotMatch(reason, /Run 'make setup' to install/);
+		}
+	});
+	it("rejects a different shared shim even with a version comment", () => {
 		const { root, env } = fixture();
-		install(
-			root,
-			".git/hooks",
-			shim.toString().replace("shim-version: 1", "shim-version: 2"),
-		);
-		assert.equal(inspectHooksPath(root, { env }).reason, null);
-		assert.equal(isSetupCurrent(root, { env }), true);
+		install(root, ".git/hooks", `${shim}# pfdsl-pre-commit-shim-version: 99\n`);
+		assert.notEqual(inspectHooksPath(root, { env }).reason, null);
+		assert.equal(isSetupCurrent(root, { env }), false);
 	});
 	it("requires the shim in the common-dir hooks when core.hooksPath is unset", () => {
 		const { root, env } = fixture();
