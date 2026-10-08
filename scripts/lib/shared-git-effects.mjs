@@ -10,19 +10,15 @@ const CODEX_ROUTINE_GIT_MUTATIONS = new Map([
 	["commit", "commit"],
 	["branch-rename", "branch"],
 ]);
-// The verbs a child may run: test, build, typecheck, node-test and node-script.
-// These are not free of side effects (`make build` reaches preflight and the
-// shared pre-commit hook install), but a child can already run `make` and node
-// scripts directly, so the wrapper adds no capability for them. Every other
-// verb (fetch-origin, worktree-add, stage-all, setup, commit, branch-rename)
-// changes shared Git state through the wrapper's own authority.
-const CODEX_ROUTINE_CHILD_VERBS = new Set([
-	"test",
-	"build",
-	"typecheck",
-	"node-test",
-	"node-script",
-]);
+// The verbs a child may run: node-test and node-script only. The routine's
+// `test`, `build` and `typecheck` verbs are pre-approved by the Codex rules
+// (`decision = "allow"`), and `make test` / `make typecheck` run `build`,
+// which reaches preflight and the shared pre-commit hook install in the common
+// git dir. Through the wrapper a child would do that outside what its own
+// sandboxed `make` could, so those verbs are denied for it. node-test and
+// node-script have no such rule. Every other verb (fetch-origin, worktree-add,
+// stage-all, setup, commit, branch-rename) changes shared Git state.
+const CODEX_ROUTINE_CHILD_VERBS = new Set(["node-test", "node-script"]);
 
 /**
  * The Codex Git routine a command's words invoke, or null. Both the direct

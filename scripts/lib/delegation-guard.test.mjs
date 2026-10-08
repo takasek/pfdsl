@@ -259,7 +259,7 @@ describe("evaluateDelegationGuard — Codex child routine wrapper", () => {
 		`node --max-old-space-size=512 -- ${routine} ${verb} ${rest}`,
 	];
 
-	it("denies every routine verb that touches shared Git state", () => {
+	it("denies every routine verb except node-test and node-script", () => {
 		for (const verb of [
 			"fetch-origin",
 			"worktree-add",
@@ -267,6 +267,9 @@ describe("evaluateDelegationGuard — Codex child routine wrapper", () => {
 			"setup",
 			"commit",
 			"branch-rename",
+			"test",
+			"build",
+			"typecheck",
 			"unknown-verb",
 		])
 			for (const command of forms(verb, "/repo/topic topic message"))
@@ -275,14 +278,8 @@ describe("evaluateDelegationGuard — Codex child routine wrapper", () => {
 		assert.equal(child(`node ${routine}`), "deny");
 	});
 
-	it("keeps the verification verbs usable in both forms", () => {
-		for (const verb of [
-			"test",
-			"build",
-			"typecheck",
-			"node-test",
-			"node-script",
-		])
+	it("keeps node-test and node-script usable in both forms", () => {
+		for (const verb of ["node-test", "node-script"])
 			for (const command of forms(verb))
 				assert.equal(child(command), "allow", command);
 	});
