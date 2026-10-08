@@ -29,7 +29,11 @@ import {
 	githubToolEffect,
 	mergeDecision,
 } from "./external-operation-policy.mjs";
-import { ghCommandSelectorTokens, parseGhCommand } from "./gh-command.mjs";
+import {
+	ghCommandSelectorTokens,
+	isBuiltinGhCommand,
+	parseGhCommand,
+} from "./gh-command.mjs";
 import { buildPermissionOutput, parseHookPayload } from "./hook-io.mjs";
 import {
 	classifyCodexGitRoutine,
@@ -387,6 +391,13 @@ export function shellParseDecision(command) {
 				matched: "command selector",
 				reason:
 					"Cannot inspect a dynamic Git or GitHub command selector or API request. Use literal subcommands and API arguments.",
+			};
+		if (invocation[0]?.value === "gh" && !isBuiltinGhCommand(invocation))
+			return {
+				decision: "deny",
+				matched: "GitHub command name",
+				reason:
+					"Cannot inspect a GitHub CLI alias, extension, or unsupported command name. Use an explicit supported built-in gh command.",
 			};
 	}
 	return null;

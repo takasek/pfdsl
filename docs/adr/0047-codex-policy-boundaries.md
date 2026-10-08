@@ -127,6 +127,12 @@ test・build・typecheck は Codex の rule で事前に許可され、build が
 Claude の issue-worker 例外を Codex の子へ引き継がない。
 
 親を含め gh pr merge・auto-merge、REST の merge endpoint、GraphQL の merge mutation を保護する。
+gh の built-in namespace と command 名の小さな表を共有 preflight で確認し、設定 alias・extension 名・未対応名を親子とも拒否する。
+`gh land`・`gh pr land`・`gh repo autolink land` 等は展開せず停止し、検査できる明示的な built-in command を案内する。
+GitHub CLI は既存 built-in の上書きと実行可能な command の下への alias 登録を認めないため、既知 leaf に続く通常の引数は維持する。
+一覧にない新しい built-in も停止する制限があり、CLI の変更時には command 表と通常動線を確認する。
+暗黙の `help` は alias 登録後に CLI へ追加されるため、`gh help` 自体も拒否し、`gh pr --help` 等を案内する。
+明示的な `gh extension exec` や任意 script 内部まで解析する方式ではない。
 内容を検査できない GraphQL ファイル入力も保守的に確認対象とする。
 `--help` は gh の flag 表で単独の flag と判定できた場合だけ help として除外し、値 flag に消費される形・`--` 後・未知 flag 後は merge として扱う。
 GitHub MCP は既知の読取表と、未知または変更系の操作を分ける。
