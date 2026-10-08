@@ -331,17 +331,15 @@ export function isReadOnlyGitConfig(args) {
 }
 
 /**
- * Whether `git reflog <args>` only reads: no verb (options only, which is
- * `show`), `show`, `list` or `exists`. Every other verb writes — `write`
- * can inject an entry, `expire`, `delete` and `drop` remove them — and the
- * stash reflog is its recovery information, so an unknown verb is not a read.
+ * Whether `git reflog <args>` only reads. Git's reflog verbs are a closed set
+ * (show, list, exists, expire, delete, drop, write); any other first word is a
+ * ref handed to `show`, and a leading option also means `show` (so
+ * `reflog --date=iso expire` is a failed show). The writers are exactly a first
+ * argument of `write`, which can inject an entry, or `expire`, `delete` and
+ * `drop`, which remove entries, including the stash's recovery information.
  */
 export function isReadOnlyGitReflog(args) {
-	return (
-		args[0] === undefined ||
-		args[0].startsWith("-") ||
-		["show", "list", "exists"].includes(args[0])
-	);
+	return !["expire", "delete", "drop", "write"].includes(args[0]);
 }
 
 // Subcommands with no mode that writes a ref, the index, the config or a
