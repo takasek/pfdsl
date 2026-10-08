@@ -60,13 +60,27 @@ function fixture() {
 		new URL("scripts/hooks/pre-commit-shim", sourceRoot),
 		join(root, "scripts/hooks/pre-commit-shim"),
 	);
+	installCheckout(root);
+	const hook = join(root, ".git/hooks/pre-commit");
+	return { root, env, git, hook };
+}
+function installCheckout(root) {
+	mkdirSync(join(root, "scripts/lib"), { recursive: true });
+	mkdirSync(join(root, "scripts/hooks"), { recursive: true });
+	for (const path of [
+		"scripts/pre-commit",
+		"scripts/pre-commit-entry",
+		"scripts/hooks/check-default-branch",
+		"scripts/shared-hooks.mjs",
+		"scripts/lib/cli-entrypoint.mjs",
+		"scripts/hooks/pre-commit-shim",
+	])
+		copyFileSync(new URL(path, sourceRoot), join(root, path));
 	writeFileSync(
-		join(root, "scripts/pre-commit"),
+		join(root, "scripts/pre-commit-gates"),
 		"#!/bin/sh\necho gate-ran\n",
 		{ mode: 0o755 },
 	);
-	const hook = join(root, ".git/hooks/pre-commit");
-	return { root, env, git, hook };
 }
 afterEach(() => {
 	for (const root of roots.splice(0))
@@ -110,8 +124,8 @@ test("installer repairs legacy shim, preserves compatible newer versions and ref
 	writeFileSync(hook, LEGACY_SHIM, { mode: 0o755 });
 	await ensureSharedHook(root, { env });
 	const current = readFileSync(hook, "utf8");
-	assert.match(current, /pfdsl-pre-commit-shim-version: 1/);
-	const newer = current.replace("shim-version: 1", "shim-version: 2");
+	assert.match(current, /pfdsl-pre-commit-shim-version: 2/);
+	const newer = current.replace("shim-version: 2", "shim-version: 3");
 	writeFileSync(hook, newer, { mode: 0o755 });
 	await ensureSharedHook(root, { env });
 	assert.equal(readFileSync(hook, "utf8"), newer);
@@ -129,7 +143,7 @@ test("parallel installers serialize version comparisons and leave executable com
 	const old = readFileSync(join(root, "scripts/hooks/pre-commit-shim"), "utf8");
 	writeFileSync(
 		join(linked, "scripts/hooks/pre-commit-shim"),
-		old.replace("shim-version: 1", "shim-version: 2"),
+		old.replace("shim-version: 2", "shim-version: 3"),
 	);
 	const script = new URL("scripts/shared-hooks.mjs", sourceRoot).pathname;
 	const run = (cwd) =>
@@ -152,7 +166,7 @@ test("parallel installers serialize version comparisons and leave executable com
 		await Promise.all([run(root), run(linked), run(root), run(linked)]);
 	assert.equal(
 		readFileSync(hook, "utf8"),
-		old.replace("shim-version: 1", "shim-version: 2"),
+		old.replace("shim-version: 2", "shim-version: 3"),
 	);
 	assert.ok(statSync(hook).mode & 0o111);
 	assert.equal(existsSync(`${hook}.pfdsl-lock`), false);
@@ -167,7 +181,7 @@ test("new checkout pre-commit repairs a historical downgrade before default bran
 	const { root, hook, git } = fixture();
 	for (const path of ["scripts/pre-commit", "scripts/shared-hooks.mjs"])
 		copyFileSync(new URL(path, sourceRoot), join(root, path));
-	mkdirSync(join(root, "scripts/lib"));
+	mkdirSync(join(root, "scripts/lib"), { recursive: true });
 	copyFileSync(
 		new URL("scripts/lib/cli-entrypoint.mjs", sourceRoot),
 		join(root, "scripts/lib/cli-entrypoint.mjs"),
@@ -190,7 +204,7 @@ test("new checkout pre-commit repairs a historical downgrade before default bran
 	assert.notEqual(result.status, 0);
 	assert.match(result.stderr, /default branch/);
 	assert.equal(git("rev-parse", "HEAD").stdout, before);
-	assert.match(readFileSync(hook, "utf8"), /shim-version: 1/);
+	assert.match(readFileSync(hook, "utf8"), /shim-version: 2/);
 });
 
 test("refuses unknown or incompatible newer hooks and bounds shared lock waiting", async () => {
@@ -244,6 +258,7 @@ test("default-branch linked checkout commit leaves HEAD and staged index unchang
 	chmodSync(hook, 0o755);
 	const linked = join(root, "linked");
 	assert.equal(git("worktree", "add", "-b", "main", linked).status, 0);
+	installCheckout(linked);
 	writeFileSync(join(linked, "probe.txt"), "keep this staged\n");
 	assert.equal(git("-C", linked, "add", "probe.txt").status, 0);
 	const beforeHead = git("-C", linked, "rev-parse", "HEAD").stdout;

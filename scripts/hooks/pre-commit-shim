@@ -1,35 +1,8 @@
 #!/bin/sh
-# pfdsl-pre-commit-shim-version: 1
-# Thin shim installed at .git/hooks/pre-commit by `make setup`.
-# Always execs the checked-out scripts/pre-commit so the check logic stays in
-# sync with the branch's tree instead of a stale copy from setup time (#411).
-default_ref=$(git symbolic-ref --quiet refs/remotes/origin/HEAD) || {
-  echo "error: cannot resolve origin/HEAD; default branch protection refuses this commit." >&2
-  exit 1
-}
-case "$default_ref" in
-  refs/remotes/origin/?*) default_branch=${default_ref#refs/remotes/origin/} ;;
-  *) echo "error: invalid origin/HEAD; default branch protection refuses this commit." >&2; exit 1 ;;
-esac
-git rev-parse --verify "$default_ref^{commit}" >/dev/null 2>&1 || {
-  echo "error: origin/HEAD does not resolve to a commit; default branch protection refuses this commit." >&2
-  exit 1
-}
-head_ref=$(git symbolic-ref --quiet HEAD)
-head_status=$?
-if [ "$head_status" -gt 1 ]; then
-  echo "error: cannot resolve HEAD; default branch protection refuses this commit." >&2
-  exit 1
+# pfdsl-pre-commit-shim-version: 2
+# Stable dispatch contract: policy and gates belong to the executing checkout.
+if [ -x ./scripts/pre-commit-entry ]; then
+  exec ./scripts/pre-commit-entry
 fi
-if [ "$head_ref" = "refs/heads/$default_branch" ]; then
-  echo "error: commits on the default branch '$default_branch' are refused. Use a feature worktree and a pull request." >&2
-  exit 1
-fi
-if [ "${1-}" = "--check-default-branch" ]; then
-  exit 0
-fi
-if [ -x ./scripts/pre-commit ]; then
-  exec ./scripts/pre-commit
-fi
-echo "error: scripts/pre-commit is missing or not executable in this checkout, so the repository's pre-commit checks cannot run." >&2
+echo "error: scripts/pre-commit-entry is missing or not executable; update this checkout before committing." >&2
 exit 1

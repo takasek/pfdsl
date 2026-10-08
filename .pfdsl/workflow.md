@@ -44,7 +44,10 @@ worktree を既定とする理由は `.pfdsl/bindings/pfd-ops.md`「ワークサ
 `make setup` が入れる pre-commit hook のシムについては CLAUDE.md「セットアップ」節が一次情報。
 `build`（したがって `test`・`typecheck`）は `preflight` で共有shimとスキルリンクを修復し、依存markerを検査してから実行する。
 依存が未準備なら `make setup` を先に実行する。
-`cycle-status.mjs` と新しい `scripts/pre-commit` も、依存の再installをせず共有shimの旧版を修復する。
+`cycle-status.mjs` と checkout の `scripts/pre-commit-entry`（互換入口 `scripts/pre-commit` からも呼ぶ）も、依存の再installをせず共有shimの旧版を修復する。
+共有shimは専用入口へ委譲するだけで、default branch判定は `scripts/hooks/check-default-branch`、通常gateは `scripts/pre-commit-gates` が持つ。
+専用入口のない旧checkoutはcommitを拒否し、未移行の旧checkerとのreadiness成功は保証しない。
+交互setupの互換性は新しい呼出し契約を導入済みの版同士で検証する（#1415、ADR-0044「Git層」）。
 未変更の歴史的なsetupは新版を無条件コピーで戻せるため、全旧版の非降格・並行安全性を保証しない。
 新installer同士はcommon dirのlock内で版を再読し、互換な新版を保持する。
 より新しい版でもdispatch契約が異なる場合は上書きせず停止する。
@@ -203,7 +206,7 @@ Codex pluginのmanifestは`plugin/pfdsl-codex/.codex-plugin/plugin.json`にあ�
 
 `.claude/skills`・`.claude/commands`・`.claude/agents` の配布対象も生成物であり、手編集しない。メンテナ専用の非配布資産は既存の `.claude/` 正本に残す。`install/` の一次情報は repo ルートの明示リストであり、中立テンプレートへ複製しない。
 
-再生成漏れは機械的に検出されるため手動チェックは不要である。gen-skill / gen-plugin の identity はpre-commit（各々の入力 staged 時）とCI（check-gen-plugin.yml）、`.dot` / README のドリフトはgraphviz-exporterのvitestテスト、`.svg` のドリフトはpreview-engineのvitestテスト（いずれもpre-commitの`docs/samples/` staged時とCI test）、README `## CLI` セクションのドリフトは`make check-readme-cli`（pre-commitの`packages/cli/src/` / `README.md` staged時とCI test.yml）が検査する。`references/*.md`を含むpluginのdist非依存部分は`scripts/gen-plugin-dist-independent.mjs`が生成し、pre-commitの結合`gen-plugin-bulk` gateはClaude rootの`plugin/pfdsl/`、Codex rootの`plugin/pfdsl-codex/`、`AGENTS.md`、`.agents/`、`.codex/`を同時に比較する。distがstaleでClaude pfdsl SKILL.md部分の検査がskipされても、このdriftはここで止まる（#593。前身は#586のreferences専用検査で、粒度拡張の経緯は`scripts/pre-commit`の当該コメントが一次情報）。
+再生成漏れは機械的に検出されるため手動チェックは不要である。gen-skill / gen-plugin の identity はpre-commit（各々の入力 staged 時）とCI（check-gen-plugin.yml）、`.dot` / README のドリフトはgraphviz-exporterのvitestテスト、`.svg` のドリフトはpreview-engineのvitestテスト（いずれもpre-commitの`docs/samples/` staged時とCI test）、README `## CLI` セクションのドリフトは`make check-readme-cli`（pre-commitの`packages/cli/src/` / `README.md` staged時とCI test.yml）が検査する。`references/*.md`を含むpluginのdist非依存部分は`scripts/gen-plugin-dist-independent.mjs`が生成し、pre-commitの結合`gen-plugin-bulk` gateはClaude rootの`plugin/pfdsl/`、Codex rootの`plugin/pfdsl-codex/`、`AGENTS.md`、`.agents/`、`.codex/`を同時に比較する。distがstaleでClaude pfdsl SKILL.md部分の検査がskipされても、このdriftはここで止まる（#593。前身は#586のreferences専用検査で、粒度拡張の経緯は`scripts/pre-commit-gates`の当該コメントが一次情報）。
 
 **dist 鮮度の機械検査**: pre-commit の drift 検査（README `## CLI` セクション・gen-skill の SKILL.md 部分・gen-plugin）は対象 dist（`packages/cli/dist/cli.js` 等）を実行または import して出力を取得する。`scripts/lib/dist-freshness.mjs` が dist の mtime を sibling `src/` の最新 mtime と比較し、dist が存在しない場合と同様に古い場合も検査を skip して「run 'pnpm -r build'」を促す（#450/#452）。skip は「検査対象が信頼できないので判定を CI に委ねる」意味であり、ローカルで検査 PASS しなかったからといって drift が無いとは限らない — コミット前に `pnpm -r build` を済ませて skip を解消してから判断する。gen-skill の `references/*.md` 部分と gen-plugin の SKILL.md 以外の部分は dist に触れないため、この skip の影響を受けない（#586 / #593）。
 

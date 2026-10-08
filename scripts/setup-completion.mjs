@@ -285,10 +285,15 @@ export function inspectHooksPath(
 	} catch {
 		return failed("Cannot read the effective pre-commit shim.");
 	}
-	if (!isExecutableShim(join(root, "scripts/pre-commit")))
-		return failed(
-			"The checkout's scripts/pre-commit is missing or not executable.",
-		);
+	for (const entry of [
+		"scripts/pre-commit-entry",
+		"scripts/hooks/check-default-branch",
+		"scripts/pre-commit-gates",
+		"scripts/pre-commit",
+	]) {
+		if (!isExecutableShim(join(root, entry)))
+			return failed(`The checkout's ${entry} is missing or not executable.`);
+	}
 	return { reason: null, managed };
 }
 

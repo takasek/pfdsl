@@ -57,6 +57,13 @@ function fixture() {
 	writeFileSync(join(cwd, "scripts/pre-commit"), "#!/bin/sh\n", {
 		mode: 0o755,
 	});
+	for (const entry of [
+		"scripts/pre-commit-entry",
+		"scripts/hooks/check-default-branch",
+		"scripts/pre-commit-gates",
+	]) {
+		writeFileSync(join(cwd, entry), "#!/bin/sh\nexit 0\n", { mode: 0o755 });
+	}
 	for (const path of [
 		"scripts/shared-hooks.mjs",
 		"scripts/link-repo-skill.mjs",
@@ -348,6 +355,13 @@ describe("setup completion sentinel", () => {
 		writeFileSync(join(cwd, "scripts/pre-commit"), "#!/bin/sh\n", {
 			mode: 0o755,
 		});
+		for (const entry of [
+			"scripts/pre-commit-entry",
+			"scripts/hooks/check-default-branch",
+			"scripts/pre-commit-gates",
+		]) {
+			writeFileSync(join(cwd, entry), "#!/bin/sh\nexit 0\n", { mode: 0o755 });
+		}
 		installSkill(cwd);
 
 		const inputs = setupInputs(cwd);

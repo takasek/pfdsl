@@ -1,5 +1,5 @@
 import { spawnSync } from "node:child_process";
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import {
 	accessSync,
 	constants,
@@ -23,6 +23,12 @@ fi
 echo "error: scripts/pre-commit is missing or not executable in this checkout, so the repository's pre-commit checks cannot run." >&2
 exit 1
 `;
+// Exact protected v1 bytes from PR #1412 (851f213c) and PR #1411 (365bcf1b).
+// Migration only: these policy snapshots are never executed here.
+const PROTECTED_V1_SHA256 = new Set([
+	"2023055bc9becaabbfd4316ad73e1a32102e613e1a017a739a4ec3e1cbf1233a",
+	"1f81c9097e049181ff60620e394630f43a9f39e3faa3d3af4f3cd5499460a0f0",
+]);
 const VERSION_LINE = /^# pfdsl-pre-commit-shim-version: ([1-9][0-9]*)$/m;
 function version(text) {
 	const matched = text.match(VERSION_LINE);
@@ -129,6 +135,12 @@ export async function ensureSharedHook(
 		} else if (
 			installed !== undefined &&
 			installed !== LEGACY_SHIM &&
+			!(
+				version(source) >= 2 &&
+				PROTECTED_V1_SHA256.has(
+					createHash("sha256").update(installed).digest("hex"),
+				)
+			) &&
 			!(
 				version(installed) > 0 &&
 				version(installed) < version(source) &&

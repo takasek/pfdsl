@@ -51,6 +51,13 @@ function fixture() {
 	writeFileSync(join(root, "scripts/pre-commit"), "#!/bin/sh\nexit 0\n", {
 		mode: 0o755,
 	});
+	for (const entry of [
+		"scripts/pre-commit-entry",
+		"scripts/hooks/check-default-branch",
+		"scripts/pre-commit-gates",
+	]) {
+		writeFileSync(join(root, entry), "#!/bin/sh\nexit 0\n", { mode: 0o755 });
+	}
 	mkdirSync(join(root, "generated/skills/pfdsl"), { recursive: true });
 	writeFileSync(
 		join(root, "generated/skills/pfdsl/SKILL.md"),
@@ -144,6 +151,15 @@ describe("effective core.hooksPath", () => {
 		writeFileSync(join(linked, "scripts/pre-commit"), "#!/bin/sh\nexit 0\n", {
 			mode: 0o755,
 		});
+		for (const entry of [
+			"scripts/pre-commit-entry",
+			"scripts/hooks/check-default-branch",
+			"scripts/pre-commit-gates",
+		]) {
+			writeFileSync(join(linked, entry), "#!/bin/sh\nexit 0\n", {
+				mode: 0o755,
+			});
+		}
 		assert.match(inspectHooksPath(linked, { env }).reason, /core.hooksPath/);
 		install(linked, "custom-hooks");
 		assert.equal(inspectHooksPath(linked, { env }).reason, null);
@@ -155,7 +171,7 @@ describe("setup-managed pre-commit", () => {
 		install(
 			root,
 			".git/hooks",
-			shim.toString().replace("shim-version: 1", "shim-version: 2"),
+			shim.toString().replace("shim-version: 2", "shim-version: 3"),
 		);
 		assert.equal(inspectHooksPath(root, { env }).reason, null);
 		assert.equal(isSetupCurrent(root, { env }), true);
@@ -181,9 +197,9 @@ describe("setup-managed pre-commit", () => {
 	});
 });
 describe("pre-commit shim", () => {
-	it("fails the commit when the checkout has no scripts/pre-commit", () => {
+	it("fails the commit when the checkout has no scripts/pre-commit-entry", () => {
 		const { root, git, env } = fixture();
-		rmSync(join(root, "scripts/pre-commit"));
+		rmSync(join(root, "scripts/pre-commit-entry"));
 		git(
 			"-c",
 			"user.name=Fixture",

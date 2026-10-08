@@ -63,9 +63,13 @@ hook には、コマンド文字列だけで判定できるものを担わせる
 ### Git 層
 
 - pre-commit は、HEAD が default branch（origin/HEAD から取得）なら commit を拒否する。取得できない場合も拒否する。
-- shim は、`scripts/pre-commit` が無い・実行できない場合に非0で終える。shim は版の行を持つ。
+- 共有 shim は、版付きの安定した薄い入口として実行 checkout の `scripts/pre-commit-entry` だけを呼ぶ（#1415）。専用入口が無い・実行できない旧 checkout は feature branch を含め commit を拒否し、保護のない旧 gate へ fallback しない。
+- 更新される判定は checkout の `scripts/hooks/check-default-branch` が持ち、origin/HEAD の名前・参照先 commit と named/detached HEAD の有効性を検証する。通常 gate は `scripts/pre-commit-gates` に置く。`scripts/pre-commit` は歴史的 shim と直接呼出しの互換入口として専用入口へ転送する。
 - setup は、管理先の shim を配置してから実効 hook を検査する。`core.hooksPath` が未設定でも、default の shim の実在と内容を確かめる。custom の hooksPath は上書きせず失敗にする。共有 shim の更新は lock するか atomic に置き換え、新しい setup は shim を降格しない。
 - 旧 checkout の `make setup` は、共有 shim を無条件にコピーして旧版へ戻せる。preflight と新しい pre-commit は、導入済み shim の版を確かめ、古ければ置き直す。
+- 共有 shim の版と checkout の判定・gate の版は独立させる。同じ呼出し契約の本文（版行を除いた bytes）が一致する新版を保持し、版コメントだけで未知のコードを互換と認めない。新しい契約を導入済みの2版が交互 setup する場合に readiness を保つ。
+- PR #1412 の旧 checker は共有 shim の本文変更を拒否するため、未変更の旧版との readiness 成功は保証しない。旧 legacy shim と #1412 および #1411 の protected v1 の既知の完全な bytes は新 installer の移行対象とし、未知の hook と custom hooksPath は上書きしない。
+- 無条件コピーする旧 setup は新 installer の lock を使わないため、全旧版を含む非降格・並行安全性は保証しない。旧 setup の巻戻り後に旧 checkout 自身が commit する間隙も残る。commit と setup を続ける旧 checkout は本変更を含む版へ移行する。
 - 依存の準備と、共有 shim・skill link の配置は分ける。
 
 ### GitHub
