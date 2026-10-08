@@ -129,8 +129,15 @@ const BRANCH_FILTER_OPTIONS = [
 	"--no-merged",
 	"--points-at",
 ];
+const BRANCH_CREATION_OPTIONS = [
+	"--track",
+	"--no-track",
+	"--create-reflog",
+	"--no-create-reflog",
+];
 const BRANCH_READ_OPTIONS = new Set([
 	"--all",
+	"--quiet",
 	"--remotes",
 	"--verbose",
 	"--column",
@@ -149,7 +156,7 @@ const BRANCH_READ_OPTIONS = new Set([
 function parseBranchArgs(args) {
 	const parsed = {
 		rename: false,
-		track: false,
+		creationOption: false,
 		modifying: false,
 		list: false,
 		unknown: false,
@@ -170,7 +177,7 @@ function parseBranchArgs(args) {
 				if ("mc".includes(letter)) parsed.rename = true;
 				else if ("dDMCfu".includes(letter)) parsed.modifying = true;
 				else if (letter === "l") parsed.list = true;
-				else if (letter === "t") parsed.track = true;
+				else if (letter === "t") parsed.creationOption = true;
 				else if (!"arvqi".includes(letter)) parsed.unknown = true;
 			}
 			continue;
@@ -184,7 +191,9 @@ function parseBranchArgs(args) {
 		)
 			parsed.modifying = true;
 		else if (name === "--list" || name === "--show-current") parsed.list = true;
-		else if (name === "--track" || name === "--no-track") parsed.track = true;
+		// Documented creation options: known, but not a read.
+		else if (BRANCH_CREATION_OPTIONS.includes(name))
+			parsed.creationOption = true;
 		else if (BRANCH_FILTER_OPTIONS.includes(name)) {
 			parsed.list = true;
 			if (!attached) i++;
@@ -203,7 +212,7 @@ export function isReadOnlyGitBranch(args) {
 	const parsed = parseBranchArgs(args);
 	return (
 		!parsed.rename &&
-		!parsed.track &&
+		!parsed.creationOption &&
 		!parsed.modifying &&
 		!parsed.unknown &&
 		(parsed.list || parsed.operands.length === 0)
