@@ -153,6 +153,8 @@ for (const command of [
 	"git branch -a --del other",
 	"git remote set-url origin /repo/other",
 	"git remote update",
+	"git remote prune origin",
+	"git remote set-head origin -a",
 	"git -c include.path=/tmp/x fetch origin",
 	"git --config-env=a.b=ENV branch new-topic",
 	"git reflog expire --all",

@@ -353,15 +353,31 @@ export function isReadOnlyGitReflog(args) {
 // (attribute queries), count-objects, verify-commit and verify-tag (reports),
 // and version and var (print constants). Each only reads, so a child may run it
 // and a config override on it is not a shared effect.
+function remoteVerb(args) {
+	return args.find((arg) => !["-v", "--verbose"].includes(arg));
+}
+
 /**
  * Whether `git remote <args>` only reads: no verb, `-v`/`--verbose`, `show`
- * or `get-url`. Every other verb (add, rename, remove, set-url, set-branches,
- * set-head, prune, update) writes repository config or refs; a mirror remote or
- * a rewritten `remote.<name>.fetch` changes what a later plain fetch does.
+ * or `get-url`. This is the narrow table a Codex child may run; `update`,
+ * `prune` and `set-head` move refs, so they are not reads for it.
  */
 export function isReadOnlyGitRemote(args) {
-	const action = args.find((arg) => !["-v", "--verbose"].includes(arg));
+	const action = remoteVerb(args);
 	return action === undefined || ["show", "get-url"].includes(action);
+}
+
+/**
+ * Whether `git remote <args>` writes repository config: `add` (including
+ * `--mirror`), `rename`, `remove`/`rm`, `set-url` and `set-branches`. A mirror
+ * remote or a rewritten `remote.<name>.fetch` changes what a later plain fetch
+ * does. `update`, `prune` and `set-head` touch only `refs/remotes/*`, which
+ * is outside the protected set.
+ */
+function writesGitRemoteConfig(args) {
+	return ["add", "rename", "remove", "rm", "set-url", "set-branches"].includes(
+		remoteVerb(args),
+	);
 }
 
 const READ_ONLY_GIT_SUBCOMMANDS = new Set([
@@ -435,7 +451,7 @@ export function classifySharedGitEffect(subcommand, args) {
 	if (subcommand === "reflog")
 		return isReadOnlyGitReflog(args) ? null : { kind: "shared" };
 	if (subcommand === "remote")
-		return isReadOnlyGitRemote(args) ? null : { kind: "shared" };
+		return writesGitRemoteConfig(args) ? { kind: "shared" } : null;
 	// `rebase --update-refs` moves the other branches that point into the
 	// rebased range; the last toggle wins, and a prefix counts as the option.
 	if (subcommand === "rebase") {
