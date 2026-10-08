@@ -519,22 +519,112 @@ export function isConfigOverrideEffect(subcommand, args) {
 	return !isReadOnlyGitInvocation(subcommand, args);
 }
 
+// Arity from git rebase's options: only a parsed option can toggle update-refs.
+// Unknown or ambiguous options keep a shared effect rather than letting their
+// possible value masquerade as --no-update-refs. Optional values are attached.
+const REBASE_VALUE_OPTIONS = [
+	"onto",
+	"whitespace",
+	"empty",
+	"exec",
+	"strategy",
+	"strategy-option",
+	"trailer",
+];
+const REBASE_OPTIONAL_VALUE_OPTIONS = ["gpg-sign", "rebase-merges"];
+const REBASE_BOOLEAN_OPTIONS = [
+	"keep-base",
+	"verify",
+	"quiet",
+	"verbose",
+	"stat",
+	"signoff",
+	"committer-date-is-author-date",
+	"reset-author-date",
+	"ignore-date",
+	"ignore-whitespace",
+	"force-rebase",
+	"ff",
+	"continue",
+	"skip",
+	"abort",
+	"quit",
+	"edit-todo",
+	"show-current-patch",
+	"apply",
+	"merge",
+	"interactive",
+	"rerere-autoupdate",
+	"autosquash",
+	"autostash",
+	"update-refs",
+	"fork-point",
+	"root",
+	"reschedule-failed-exec",
+	"reapply-cherry-picks",
+	"keep-empty",
+	"allow-empty-message",
+];
+const REBASE_LONG_OPTIONS = [
+	...REBASE_VALUE_OPTIONS.map((name) => ({ name: `--${name}`, value: true })),
+	...[
+		...REBASE_VALUE_OPTIONS,
+		...REBASE_OPTIONAL_VALUE_OPTIONS,
+		...REBASE_BOOLEAN_OPTIONS,
+	].map((name) => ({ name: `--no-${name}`, value: false })),
+	...[...REBASE_OPTIONAL_VALUE_OPTIONS, ...REBASE_BOOLEAN_OPTIONS].map(
+		(name) => ({ name: `--${name}`, value: false }),
+	),
+];
+
+function rebaseUpdatesRefs(args) {
+	let updatesRefs = false;
+	let unresolved = false;
+	for (let i = 0; i < args.length; i++) {
+		const arg = args[i];
+		if (arg === "--") break;
+		if (arg.startsWith("--")) {
+			const given = arg.split("=", 1)[0];
+			const exact = REBASE_LONG_OPTIONS.find((option) => option.name === given);
+			const matches = exact
+				? [exact]
+				: REBASE_LONG_OPTIONS.filter((option) =>
+						isLongOptionPrefix(arg, option.name),
+					);
+			if (matches.length !== 1) {
+				unresolved = true;
+				continue;
+			}
+			const option = matches[0];
+			if (option.name === "--update-refs") updatesRefs = true;
+			else if (option.name === "--no-update-refs") updatesRefs = false;
+			if (option.value && !arg.includes("=")) i++;
+		} else if (arg.startsWith("-") && arg !== "-") {
+			for (let j = 1; j < arg.length; j++) {
+				if ("CxsX".includes(arg[j])) {
+					if (j === arg.length - 1) i++;
+					break;
+				}
+				if ("rS".includes(arg[j])) break;
+				if (!"qvnfmikh".includes(arg[j])) {
+					unresolved = true;
+					break;
+				}
+			}
+		}
+	}
+	return updatesRefs || unresolved;
+}
+
 export function classifySharedGitEffect(subcommand, args) {
 	if (hasGitHelpOption(subcommand, args)) return null;
 	if (subcommand === "reflog")
 		return isReadOnlyGitReflog(args) ? null : { kind: "shared" };
 	if (subcommand === "remote")
 		return writesGitRemoteConfig(args) ? { kind: "shared" } : null;
-	// `rebase --update-refs` moves the other branches that point into the
-	// rebased range; the last toggle wins, and a prefix counts as the option.
-	if (subcommand === "rebase") {
-		let updatesRefs = false;
-		for (const arg of args) {
-			if (isLongOptionPrefix(arg, "--update-refs")) updatesRefs = true;
-			else if (isLongOptionPrefix(arg, "--no-update-refs")) updatesRefs = false;
-		}
-		return updatesRefs ? { kind: "shared" } : null;
-	}
+	// The last actual toggle wins, after consuming required option values.
+	if (subcommand === "rebase")
+		return rebaseUpdatesRefs(args) ? { kind: "shared" } : null;
 	// A written setting (remote.<name>.fetch, core.*, ...) changes what later
 	// commands do to shared refs, so a non-read config call is itself shared.
 	if (subcommand === "config")

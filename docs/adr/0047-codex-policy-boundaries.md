@@ -36,6 +36,8 @@ reflog の表示でも `--output` はファイルを書き、後続の不正 opt
 通常の refspec で update・prune・set-head が動かす remote-tracking ref は対象外とし、保存済みの特殊 refspec の残余は下記の境界に従う。
 push の宛先 repository は option の arity を模倣せず、ローカルの repository を示す語が1つでもあれば同一 repository 宛てとして扱う。
 `rebase --update-refs` は他 branch を動かすため共有作用とする。
+rebase の値を取る option は、分離・等号付き・短縮 cluster の形を含めて値を消費し、実際の update-refs option の最後の指定だけを toggle とする。
+未知・曖昧な option の後の値を否定 option として免除せず、共有作用として停止する。
 worktree add は detached・既存 branch・新規 branch のいずれも共有 metadata を変更するため、Claude では ask、Codex では deny とし、native の worktree 作成入口とは区別する。
 default branch の作成・切替と、switch/checkout の分離・短縮・等号付き option を扱う。
 default branch の名前は大文字小文字を区別せずに照合し、checkout/switch では option の値に消費されうる語を含めて全 operand を切替先の候補とする。
