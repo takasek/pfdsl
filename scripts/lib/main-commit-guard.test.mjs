@@ -1615,9 +1615,9 @@ describe("main-commit-guard wrapper", () => {
 		);
 
 		for (const command of [
-			`CDPATH=${root}; unset CDPATH; cd sibling; git add -A`,
-			`CDPATH=${root}; unset -v CDPATH; cd sibling; git add -A`,
-			`CDPATH=${root}; unset -- CDPATH; cd sibling; git add -A`,
+			`CDPATH=${root}; unset CDPATH; cd sibling && git add -A`,
+			`CDPATH=${root}; unset -v CDPATH; cd sibling && git add -A`,
+			`CDPATH=${root}; unset -- CDPATH; cd sibling && git add -A`,
 		]) {
 			assert.equal(runWrapper(command), "", command);
 		}
@@ -1747,8 +1747,8 @@ describe("main-commit-guard wrapper", () => {
 
 	it("parses clustered read options before protected variable operands", () => {
 		for (const command of [
-			"read -rp CDPATH REPLY <<< x; cd .; git add -A",
-			"read -pCDPATH REPLY <<< x; cd .; git add -A",
+			"read -rp CDPATH REPLY <<< x; cd . && git add -A",
+			"read -pCDPATH REPLY <<< x; cd . && git add -A",
 		]) {
 			assert.equal(runWrapper(command), "", command);
 		}
@@ -1792,7 +1792,7 @@ describe("main-commit-guard wrapper", () => {
 		for (const command of [
 			"printf x | cat; git add -A",
 			"test -f package.json && printf ok; git add -A",
-			`printf x | cat; cd ${session}; git add -A`,
+			`printf x | cat; cd ${session} && git add -A`,
 		]) {
 			assert.equal(runWrapper(command), "", command);
 		}
@@ -1809,7 +1809,7 @@ describe("main-commit-guard wrapper", () => {
 		);
 
 		assert.equal(
-			runWrapper(`read -r CDPATH <<< ${root}; cd ${session}; git add -A`),
+			runWrapper(`read -r CDPATH <<< ${root}; cd ${session} && git add -A`),
 			"",
 		);
 		assert.equal(
@@ -1886,7 +1886,7 @@ describe("main-commit-guard wrapper", () => {
 		].join(" ");
 		assert.equal(
 			runWrapper(
-				`source guard-state.sh; unset CDPATH ${targetVariables}; cd .; git add -A`,
+				`source guard-state.sh; unset CDPATH ${targetVariables}; cd . && git add -A`,
 			),
 			"",
 		);
@@ -1895,13 +1895,13 @@ describe("main-commit-guard wrapper", () => {
 		});
 		assert.notEqual(unsafeCdPath, "");
 		assert.equal(
-			runWrapper("unset CDPATH; cd sibling; git add -A", {
+			runWrapper("unset CDPATH; cd sibling && git add -A", {
 				environment: { CDPATH: root },
 			}),
 			"",
 		);
 		assert.equal(
-			runWrapper("CDPATH=; cd sibling; git add -A", {
+			runWrapper("CDPATH=; cd sibling && git add -A", {
 				environment: { CDPATH: root },
 			}),
 			"",

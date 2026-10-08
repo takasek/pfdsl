@@ -28,7 +28,6 @@ import {
 	findMergeCommand,
 	githubToolEffect,
 	mergeDecision,
-	shellCommandStart,
 } from "./external-operation-policy.mjs";
 import { parseGhCommand } from "./gh-command.mjs";
 import { buildPermissionOutput, parseHookPayload } from "./hook-io.mjs";
@@ -36,7 +35,10 @@ import {
 	classifyCodexGitRoutine,
 	isReadOnlyGitInvocation,
 } from "./shared-git-effects.mjs";
-import { prepareHeredocs } from "./shell-heredoc.mjs";
+import {
+	readShellCommands,
+	shellParseDecision as syntaxDecision,
+} from "./shell-commands.mjs";
 
 /** Agents permitted to perform outward-facing actions. Publishing is their job. */
 export const DEFAULT_ALLOWED_AGENTS = ["issue-worker"];
@@ -313,189 +315,40 @@ export const GIT_GLOBAL_FLAGS_WITH_VALUE = new Set([
 	"--attr-source",
 ]);
 
-const readsStdinFile = (tokens, flags) =>
-	tokens.some(
-		({ value }, i) =>
-			(flags.includes(value) && tokens[i + 1]?.value === "-") ||
-			flags.some((flag) => value === `${flag}=-`),
-	);
-
-/** Commands that read stdin only as data, never as a program. */
-const STDIN_DATA_READERS = {
-	cat: () => true,
-	tee: () => true,
-	git: (tokens) =>
-		["commit", "tag"].includes(gitSubcommand(tokens)) &&
-		readsStdinFile(tokens, ["-F", "--file"]),
-	// Only where gh itself reads the body: an alias may run a shell.
-	gh: (tokens) => {
-		const group = parseGhCommand(tokens)?.group;
-		return ["issue", "pr"].includes(group)
-			? readsStdinFile(tokens, ["--body-file", "-F"])
-			: group === "api" && readsStdinFile(tokens, ["--input"]);
-	},
-};
-
-/**
- * Whether every command that reads the heredocs opened on `header` is a known
- * data reader: the command carrying `<<` and the pipeline it feeds. Anything
- * else may run the body: a header that continues past the body, or one with a
- * process or command substitution, whose program can receive a reader's output.
- */
-function isDataReader(header) {
-	if (/(?:\|\|?|&&|\\)\s*$/.test(header)) return false;
-	let reading = false;
-	for (const { command: segment, separatorBefore } of splitCommandFlow(
-		header,
-	)) {
-		if (separatorBefore === "(") return false;
-		reading = segment.includes("<<") || (reading && separatorBefore === "|");
-		if (!reading) continue;
-		const raw = tokenize(segment);
-		const prefix = parseLeadingShellPrefix(raw);
-		const tokens = raw.slice(prefix.end);
-		const reader = STDIN_DATA_READERS[basename(tokens[0]?.value ?? "")];
-		if (prefix.unresolved || !reader?.(tokens)) return false;
-	}
-	return true;
+// Compatibility helper for consumers that inspect a standalone word list.
+// Production guards consume the parser's structured commands directly.
+export function tokenize(source) {
+	return readShellCommands(source)[0]?.tokens ?? [];
 }
 
-// Split on shell separators that start a new command, ignoring separators
-// inside quotes. Quote tracking is what keeps `echo "git push"` from being
-// read as a push.
-//
-// Exported so other command-inspecting guards (main-commit-guard.mjs) reuse
-// this parsing instead of re-implementing quote/segment handling.
-export function splitCommandFlow(command) {
-	command = prepareHeredocs(command, { isDataReader });
-	const segments = [];
-	let current = "";
-	let quote = null;
-	let separatorBefore = null;
-	const split = (separator) => {
-		segments.push({ command: current, separatorBefore });
-		current = "";
-		separatorBefore = separator;
-	};
-	for (let i = 0; i < command.length; i++) {
-		const ch = command[i];
-		if (quote) {
-			if (ch === "\\" && quote === '"') {
-				if (command[i + 1] === "\n") {
-					i++;
-					continue;
-				}
-				current += ch + (command[i + 1] ?? "");
-				i++;
-				continue;
-			}
-			if (ch === quote) quote = null;
-			current += ch;
-			continue;
-		}
-		if (ch === '"' || ch === "'") {
-			quote = ch;
-			current += ch;
-			continue;
-		}
-		if (ch === "\\") {
-			if (command[i + 1] === "\n") {
-				i++;
-				continue;
-			}
-			current += ch;
-			if (command[i + 1] !== undefined) current += command[++i];
-			continue;
-		}
-		const two = command.slice(i, i + 2);
-		if (two === "&&" || two === "||") {
-			split(two);
-			i++;
-			continue;
-		}
-		if (ch === "&" && (command[i - 1] === "<" || command[i - 1] === ">")) {
-			current += ch;
-			continue;
-		}
-		if (ch === ";" || ch === "|" || ch === "&" || ch === "\n") {
-			split(ch);
-			continue;
-		}
-		if (ch === "(" || ch === ")") {
-			split(ch);
-			continue;
-		}
-		current += ch;
-	}
-	segments.push({ command: current, separatorBefore });
-	return segments;
+export function splitCommandFlow(source) {
+	return readShellCommands(source);
 }
 
-export function splitSegments(command) {
-	return splitCommandFlow(command).map(({ command: segment }) => segment);
+export function splitSegments(source) {
+	return readShellCommands(source).map(({ command }) => command);
 }
 
-// Tokens are only inspected when unquoted, so a quoted argument can never be
-// mistaken for a subcommand.
-export function tokenize(segment) {
-	const tokens = [];
-	let current = "";
-	let quote = null;
-	let quoted = false;
-	let tokenQuote;
-	let hasUnquotedText = false;
-	const flush = () => {
-		if (current !== "" || quoted) {
-			const token = { value: current, quoted };
-			if (tokenQuote !== undefined && !hasUnquotedText)
-				token.quote = tokenQuote;
-			tokens.push(token);
-		}
-		current = "";
-		quoted = false;
-		tokenQuote = undefined;
-		hasUnquotedText = false;
-	};
-	for (let i = 0; i < segment.length; i++) {
-		const ch = segment[i];
-		if (quote) {
-			if (ch === "\\" && quote === '"' && segment[i + 1] === "\n") {
-				i++;
-				continue;
-			}
-			if (ch === quote) {
-				quote = null;
-				continue;
-			}
-			current += ch;
-			continue;
-		}
-		if (ch === '"' || ch === "'") {
-			quote = ch;
-			quoted = true;
-			if (tokenQuote === undefined) tokenQuote = ch;
-			else if (tokenQuote !== ch) tokenQuote = null;
-			continue;
-		}
-		if (ch === "\\") {
-			if (segment[i + 1] === "\n") {
-				i++;
-				continue;
-			}
-			if (segment[i + 1] === undefined) current += ch;
-			else current += segment[++i];
-			hasUnquotedText = true;
-			continue;
-		}
-		if (/\s/.test(ch)) {
-			flush();
-			continue;
-		}
-		current += ch;
-		hasUnquotedText = true;
+/** Grammar and executable-prefix checks are shared by every Bash guard. */
+export function shellParseDecision(command) {
+	const failure = syntaxDecision(command);
+	if (failure) return failure;
+	for (const { tokens } of readShellCommands(command)) {
+		const { end } = parseLeadingShellPrefix(tokens);
+		const executable = tokens[end];
+		const builtinName =
+			executable?.value === "builtin"
+				? tokens[end + (tokens[end + 1]?.value === "--" ? 2 : 1)]
+				: null;
+		if (executable?.dynamic || builtinName?.dynamic)
+			return {
+				decision: "deny",
+				matched: "shell executable",
+				reason:
+					"Cannot inspect a dynamic executable. Rewrite it using a literal command name.",
+			};
 	}
-	flush();
-	return tokens;
+	return null;
 }
 
 const ENV_FLAGS_WITH_VALUE = new Set([
@@ -1134,13 +987,12 @@ export function parseLeadingShellPrefix(tokens) {
 	const assignments = [];
 	const controlWords = [];
 	while (i < tokens.length) {
-		const grammar = shellCommandStart(tokens.slice(i), controlWords);
-		if (grammar > 0) {
-			i += grammar;
-			continue;
-		}
 		const value = tokens[i].value;
 		const executable = basename(value);
+		if (["noglob", "nocorrect"].includes(value) && !tokens[i].quoted) {
+			i++;
+			continue;
+		}
 		const redirection = leadingRedirectionLength(tokens, i);
 		if (redirection > 0) {
 			i += redirection;
@@ -1278,9 +1130,10 @@ function ghApiMethod(args) {
  */
 export function findOutwardCommand(command) {
 	if (typeof command !== "string" || command.trim() === "") return null;
+	if (shellParseDecision(command)) return "unsupported shell syntax";
 
-	for (const segment of splitSegments(command)) {
-		const tokens = stripLeadingNoise(tokenize(segment));
+	for (const { tokens: raw } of readShellCommands(command)) {
+		const tokens = stripLeadingNoise(raw);
 		if (tokens.length === 0) continue;
 		const head = tokens[0];
 		const executable = basename(head.value);
@@ -1335,14 +1188,17 @@ export function evaluateDelegationGuard(
 	payload,
 	{ allowedAgents = DEFAULT_ALLOWED_AGENTS, supportsAsk = true } = {},
 ) {
+	if (payload?.tool_name === "Bash") {
+		const failure = shellParseDecision(payload?.tool_input?.command);
+		if (failure) return failure;
+	}
 	const effect = githubToolEffect(payload?.tool_name);
 	const merge =
 		effect === "merge"
 			? payload.tool_name
 			: payload?.tool_name === "Bash"
 				? findMergeCommand(payload?.tool_input?.command, {
-						splitSegments,
-						tokenize,
+						readShellCommands,
 						stripLeadingNoise,
 					})
 				: null;
@@ -1365,8 +1221,10 @@ export function evaluateDelegationGuard(
 	// See the module header for why agent_id and not agent_type (#932).
 	if (!payload?.agent_id) return { decision: "allow" };
 	if (!supportsAsk) {
-		for (const segment of splitSegments(payload?.tool_input?.command ?? "")) {
-			const tokens = stripLeadingNoise(tokenize(segment));
+		for (const { tokens: raw } of readShellCommands(
+			payload?.tool_input?.command,
+		)) {
+			const tokens = stripLeadingNoise(raw);
 			const routine = classifyCodexGitRoutine(
 				tokens.map((token) => token.value),
 			);

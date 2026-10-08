@@ -25,7 +25,10 @@ describe("heredoc command boundaries", () => {
 			),
 			null,
 		);
-		assert.equal(findOutwardCommand("cat <<'EOF'\ngit push"), null);
+		assert.equal(
+			findOutwardCommand("cat <<'EOF'\ngit push"),
+			"unsupported shell syntax",
+		);
 	});
 	it("still inspects real commands after and on the heredoc header", () => {
 		assert.equal(
@@ -52,20 +55,23 @@ describe("heredoc command boundaries", () => {
 		);
 	});
 	it("does not hide scripts passed to shell stdin", () => {
-		assert.equal(findOutwardCommand("bash <<'EOF'\ngit push\nEOF"), "git push");
+		assert.equal(
+			findOutwardCommand("bash <<'EOF'\ngit push\nEOF"),
+			"unsupported shell syntax",
+		);
 		assert.equal(
 			findOutwardCommand("sudo env sh <<'EOF'\ngit push\nEOF"),
-			"git push",
+			"unsupported shell syntax",
 		);
 		assert.equal(
 			findOutwardCommand("bash --rcfile -c <<'EOF'\ngit push\nEOF"),
-			"git push",
+			"unsupported shell syntax",
 		);
 	});
 	it("handles delimiter continuation, quoted backslashes and literal-dollar delimiters", () => {
 		assert.equal(
 			findOutwardCommand("cat <<EOF\ndata\nEO\\\nF\ngit push"),
-			"git push",
+			"unsupported shell syntax",
 		);
 		assert.equal(
 			findOutwardCommand('cat <<"\\EOF"\ndata\n\\EOF\ngit push'),
@@ -73,7 +79,7 @@ describe("heredoc command boundaries", () => {
 		);
 		assert.equal(
 			findOutwardCommand("cat <<$END\ndata\n$END\ngit push"),
-			"git push",
+			"unsupported shell syntax",
 		);
 	});
 	it("does not hide commands after ANSI-C quoted delimiters", () => {
@@ -83,11 +89,11 @@ describe("heredoc command boundaries", () => {
 		);
 		assert.equal(
 			findOutwardCommand("cat <<$'\\x45OF'\ndata\nEOF\ngit push"),
-			"git push",
+			"unsupported shell syntax",
 		);
 		assert.equal(
 			findOutwardCommand("cat <<$'\\400'\ndata\n\ngit push"),
-			"git push",
+			"unsupported shell syntax",
 		);
 		assert.equal(
 			findOutwardCommand("cat <<EO\\\nF\n$(git push)\nEOF"),
@@ -220,3 +226,20 @@ describe("gh invocation effects", () => {
 		);
 	});
 });
+
+for (const command of ["echo $[1<<2]\ngit push"]) {
+	it(`stops unsupported document syntax: ${JSON.stringify(command)}`, () =>
+		assert.equal(
+			evaluateMainCommitGuard(
+				{ tool_name: "Bash", tool_input: { command } },
+				{ currentBranch: "main" },
+			).decision,
+			"deny",
+		));
+}
+
+it("does not turn literal text in a substitution heredoc into an executable command", () =>
+	assert.equal(findOutwardCommand("echo $(cat <<b)\ngit push\nb"), null));
+
+it("keeps literal text in a backtick heredoc as data", () =>
+	assert.equal(findOutwardCommand("x=`cat <<b`\ngit push\nb"), null));

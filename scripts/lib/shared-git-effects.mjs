@@ -1,7 +1,9 @@
 // Shared refs and other checkout effects are independent of executor ownership.
 // These are command-boundary safeguards, not a general Git transaction monitor.
 
-import { basename } from "node:path";
+import { existsSync, realpathSync } from "node:fs";
+import { basename, isAbsolute } from "node:path";
+import { tryGit, withoutGitTargetEnvironment } from "./run-exec.mjs";
 
 const CODEX_ROUTINE = "codex-git-routine.mjs";
 // The Git mutations the routine performs, by the subcommand the guards use.
@@ -616,7 +618,100 @@ function rebaseUpdatesRefs(args) {
 	return updatesRefs || unresolved;
 }
 
-export function classifySharedGitEffect(subcommand, args) {
+// Push options must be consumed before choosing the repository operand. A
+// refspec can name an existing file without becoming the push repository.
+const PUSH_VALUE_OPTIONS = [
+	"repo",
+	"receive-pack",
+	"exec",
+	"push-option",
+	"recurse-submodules",
+];
+const PUSH_OTHER_OPTIONS = [
+	"verbose",
+	"quiet",
+	"all",
+	"branches",
+	"mirror",
+	"delete",
+	"tags",
+	"dry-run",
+	"porcelain",
+	"force",
+	"force-with-lease",
+	"force-if-includes",
+	"thin",
+	"set-upstream",
+	"progress",
+	"prune",
+	"verify",
+	"follow-tags",
+	"signed",
+	"atomic",
+	"ipv4",
+	"ipv6",
+];
+const PUSH_LONG_OPTIONS = [
+	...PUSH_VALUE_OPTIONS.map((name) => ({ name: `--${name}`, value: true })),
+	...PUSH_OTHER_OPTIONS.map((name) => ({ name: `--${name}`, value: false })),
+	...[...PUSH_VALUE_OPTIONS, ...PUSH_OTHER_OPTIONS].map((name) => ({
+		name: `--no-${name}`,
+		value: false,
+	})),
+];
+
+function pushRepositoryAndRefspecs(args) {
+	const operands = [];
+	let repoOption;
+	let options = true;
+	for (let i = 0; i < args.length; i++) {
+		const arg = args[i];
+		if (!options || !arg.startsWith("-") || arg === "-") {
+			operands.push(arg);
+			continue;
+		}
+		if (arg === "--") {
+			options = false;
+			continue;
+		}
+		if (arg.startsWith("--")) {
+			const given = arg.split("=", 1)[0];
+			const exact = PUSH_LONG_OPTIONS.find((option) => option.name === given);
+			const matches = exact
+				? [exact]
+				: PUSH_LONG_OPTIONS.filter((option) => option.name.startsWith(given));
+			if (matches.length !== 1) return null;
+			const option = matches[0];
+			let value = arg.includes("=")
+				? arg.slice(arg.indexOf("=") + 1)
+				: undefined;
+			if (option.value && value === undefined) value = args[++i];
+			if (option.value && value === undefined) return null;
+			if (option.name === "--repo") repoOption = value;
+			if (option.name === "--no-repo") repoOption = undefined;
+			continue;
+		}
+		for (let at = 1; at < arg.length; at++) {
+			if (arg[at] === "o") {
+				if (at + 1 === arg.length && args[++i] === undefined) return null;
+				break;
+			}
+			if (!"vqdnfu46".includes(arg[at])) return null;
+		}
+	}
+	return {
+		repository: operands[0] ?? repoOption,
+		refspecs: operands.slice(1),
+		repoOption,
+		operands,
+	};
+}
+
+export function classifySharedGitEffect(
+	subcommand,
+	args,
+	{ cwd, exec = tryGit } = {},
+) {
 	if (hasGitHelpOption(subcommand, args)) return null;
 	if (subcommand === "reflog")
 		return isReadOnlyGitReflog(args) ? null : { kind: "shared" };
@@ -756,24 +851,24 @@ export function classifySharedGitEffect(subcommand, args) {
 	// A push whose repository is this one (`.`, a path) writes local branches
 	// just as update-ref does; pushes to remote names keep their handling.
 	if (subcommand === "push") {
-		// Option arity is not modeled (`--receive-pack <cmd>`, `--repo <r>`), so a
-		// local repository spelling anywhere among the operands, or as a
-		// `--repo` value, makes the push same-repository; every other operand
-		// is then a refspec candidate.
-		const operands = args.filter((arg) => !arg.startsWith("-"));
-		const repoValues = args.flatMap((arg, index) => {
-			if (!isLongOptionPrefix(arg, "--repo")) return [];
-			return arg.includes("=")
-				? [arg.slice(arg.indexOf("=") + 1)]
-				: [args[index + 1] ?? ""];
-		});
-		if (
-			[...operands, ...repoValues].some(isLocalRepositorySpelling) &&
-			operands
-				.filter((operand) => !isLocalRepositorySpelling(operand))
-				.some((refspec) => isLocalRefDestination(refspec, true))
-		)
-			return { kind: "shared" };
+		if (cwd === null) return { kind: "shared", unresolved: true };
+		const parsed = pushRepositoryAndRefspecs(args);
+		if (!parsed) return { kind: "shared", unresolved: true };
+		// Retain the prior conservative --repo boundary even when a positional
+		// repository is also supplied. Its value is not a receive-pack argument.
+		for (const [repository, refspecs] of [
+			[parsed.repository, parsed.refspecs],
+			[parsed.repoOption, parsed.operands],
+		]) {
+			if (
+				repository === undefined ||
+				!refspecs.some((refspec) => isLocalRefDestination(refspec, true))
+			)
+				continue;
+			const local = isLocalRepositorySpelling(repository, cwd, exec);
+			if (local === null) return { kind: "shared", unresolved: true };
+			if (local) return { kind: "shared" };
+		}
 	}
 	return null;
 }
@@ -809,13 +904,142 @@ function isLocalRefDestination(refspec, bareIsDestination) {
 	);
 }
 
-/**
- * A repository spelled as a path in this filesystem: any word starting with `.`
- * (`.`, `..`, `./x`, `.git`), `/` or `~`, or with `file://`. A remote name cannot
- * start with `.`, so the broad rule costs nothing.
- */
-function isLocalRepositorySpelling(value) {
-	return /^(?:[./~]|file:\/\/)/.test(value);
+/** Resolve push URL rewriting and repository identity through read-only Git queries. */
+function isLocalRepositorySpelling(value, cwd, exec) {
+	if (value.includes("\n") || value.includes("\0")) return null;
+	if (typeof cwd !== "string") return /^(?:[./~]|file:\/\/)/.test(value);
+	if (!existsSync(cwd)) return /^(?:[./~]|file:\/\/)/.test(value);
+	const opts = {
+		cwd,
+		env: withoutGitTargetEnvironment(process.env),
+		captureStderr: true,
+		timeout: 1000,
+	};
+	const remotes = exec(["remote"], opts);
+	if (!remotes.ok) return null;
+	const named = remotes.out.trim().split("\n").includes(value);
+	if (!named) {
+		// ls-remote --get-url expands insteadOf without connecting. Git has no
+		// equivalent raw-operand query for pushInsteadOf; use a configured remote
+		// when that policy is present rather than reconstructing Git's rewrite rules.
+		const pushRewrite = exec(
+			["config", "--get-regexp", "^url\\..*\\.pushinsteadof$"],
+			opts,
+		);
+		if (pushRewrite.ok || pushRewrite.status !== 1) return null;
+	}
+	const urls = exec(
+		named
+			? ["remote", "get-url", "--push", "--all", value]
+			: ["ls-remote", "--get-url", value],
+		opts,
+	);
+	if (!urls.ok) return null;
+	// get-url is line-delimited. Use NUL-separated values for this remote to
+	// check that one URL stays one line, including after Git's URL rewriting.
+	let expectedUrls = 1;
+	if (named) {
+		let configured = exec(
+			["config", "--null", "--get-all", `remote.${value}.pushurl`],
+			opts,
+		);
+		if (configured.status === 1)
+			configured = exec(
+				["config", "--null", "--get-all", `remote.${value}.url`],
+				opts,
+			);
+		if (!configured.ok) return null;
+		const values = configured.out.split("\0").filter(Boolean);
+		if (values.some((url) => url.includes("\n"))) return null;
+		expectedUrls = values.length;
+	}
+	const resolvedUrls = urls.out.replace(/\n$/, "").split("\n");
+	if (resolvedUrls.length !== expectedUrls) return null;
+	const root = exec(["rev-parse", "--show-toplevel"], opts);
+	const common = exec(
+		["rev-parse", "--path-format=absolute", "--git-common-dir"],
+		opts,
+	);
+	if (!root.ok || !common.ok) return null;
+	const rootPath = root.out.replace(/\n$/, "");
+	const commonPath = common.out.replace(/\n$/, "");
+	if (rootPath.includes("\n") || commonPath.includes("\n")) return null;
+	let sourceCommon;
+	try {
+		sourceCommon = realpathSync(commonPath);
+	} catch {
+		return null;
+	}
+	for (let url of resolvedUrls) {
+		if (url.startsWith("file://")) {
+			try {
+				const parsed = new URL(url);
+				if (parsed.hostname && parsed.hostname !== "localhost") return null;
+				// Git's local transport does not apply WHATWG fragment removal,
+				// whitespace trimming or dot-segment normalization. Inspect only
+				// file URLs whose representation survives the standard parser intact.
+				if (
+					parsed.href !== url ||
+					parsed.search ||
+					parsed.hash ||
+					url.includes("%")
+				)
+					return null;
+				url = parsed.pathname;
+			} catch {
+				return null;
+			}
+		} else if (/^[A-Za-z][A-Za-z0-9+.-]*:\/\//.test(url)) continue;
+		else if (
+			!isAbsolute(url) &&
+			url.includes(":") &&
+			!url.slice(0, url.indexOf(":")).includes("/")
+		)
+			continue;
+		if (/[$~*?`]/.test(url)) return null;
+		// Local transport removes trailing slashes before opening a gitfile.
+		const localUrl = url.replace(/\/+$/, "") || "/";
+		const path = isAbsolute(localUrl) ? localUrl : `${rootPath}/${localUrl}`;
+		// Git's local transport also searches .git spellings. Keep symlinks and
+		// .. intact until Git and the filesystem have resolved each candidate.
+		for (const candidate of [
+			path,
+			`${path}/.git`,
+			`${path}.git`,
+			`${path}.git/.git`,
+		]) {
+			if (!existsSync(candidate)) continue;
+			const gitDir = exec(["rev-parse", "--resolve-git-dir", candidate], opts);
+			if (!gitDir.ok) {
+				if (gitDir.timedOut || gitDir.status === null) return null;
+				continue;
+			}
+			const gitDirPath = gitDir.out.replace(/\n$/, "");
+			if (gitDirPath.includes("\n")) return null;
+			const target = exec(
+				[
+					"-C",
+					gitDirPath,
+					"rev-parse",
+					"--path-format=absolute",
+					"--git-common-dir",
+				],
+				opts,
+			);
+			if (!target.ok) {
+				if (target.timedOut || target.status === null) return null;
+				continue;
+			}
+			try {
+				const targetPath = target.out.replace(/\n$/, "");
+				if (targetPath.includes("\n")) return null;
+				if (realpathSync(targetPath) === sourceCommon) return true;
+			} catch {
+				return null;
+			}
+		}
+	}
+	return false;
 }
 
 /**

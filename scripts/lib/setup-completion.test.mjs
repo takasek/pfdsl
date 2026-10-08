@@ -27,6 +27,8 @@ import {
 	writeSetupMarker,
 } from "../setup-completion.mjs";
 
+import { shellParserPath } from "./shell-parser-tool.mjs";
+
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 const makefile = join(root, "Makefile");
 const sentinel = "node_modules/.pfdsl-setup-complete";
@@ -62,10 +64,16 @@ function fixture() {
 	}
 	for (const path of [
 		"scripts/shared-hooks.mjs",
+		"scripts/setup-shell-parser.mjs",
+		"scripts/lib/shell-parser-tool.mjs",
 		"scripts/link-repo-skill.mjs",
 		"scripts/lib/repo-skill-link.mjs",
 	])
 		writeFileSync(join(cwd, path), readFileSync(join(root, path)));
+	mkdirSync(dirname(shellParserPath(cwd)), { recursive: true });
+	writeFileSync(shellParserPath(cwd), readFileSync(shellParserPath(root)), {
+		mode: 0o755,
+	});
 	installSkill(cwd);
 	writeFileSync(
 		join(cwd, "scripts/setup-completion.mjs"),
@@ -567,7 +575,7 @@ describe("setup completion sentinel", () => {
 				SETUP_LINK_PATH: join(context.cwd, "node_modules/fixture-dependency"),
 			}),
 		);
-		assert.equal(readFileSync(context.log, "utf8"), "pnpm\nnode\nnode\n");
+		assert.equal(readFileSync(context.log, "utf8"), "pnpm\nnode\nnode\nnode\n");
 		assert.equal(isSetupCurrent(context.cwd), true);
 	});
 
@@ -665,7 +673,7 @@ describe("setup completion sentinel", () => {
 		]);
 		assertSucceeded(firstResult);
 		assertSucceeded(secondResult);
-		assert.equal(readFileSync(context.log, "utf8"), "pnpm\nnode\nnode\n");
+		assert.equal(readFileSync(context.log, "utf8"), "pnpm\nnode\nnode\nnode\n");
 		assert.equal(isSetupCurrent(context.cwd), true);
 	});
 
@@ -762,7 +770,7 @@ describe("setup completion sentinel", () => {
 				`${path} should run setup without a marker`,
 			);
 			const log = readFileSync(context.log, "utf8");
-			assert.equal(log, "pnpm\nnode\nnode\n");
+			assert.equal(log, "pnpm\nnode\nnode\nnode\n");
 			assertSucceeded(runSessionStart(context, sessionStartCommand(path)));
 			assert.equal(
 				readFileSync(context.log, "utf8"),

@@ -13,6 +13,28 @@ policy のロード失敗への try/catch だけでは、同期停止や終わ�
 
 ## Decision
 
+### Shell 解析の範囲
+
+命令の構造・引用・命令置換・heredoc は、固定版 mvdan/sh v3.14.1 の公式 shfmt が返す構文木で解析する。
+独自の文字列分割・tokenizer・heredoc scanner と、それらへの fallback は使わない。
+各 guard は同じ解析結果の実行位置を読む。
+case の pattern と引用された本文は命令にせず、引用内や非引用 heredoc 内の命令置換は検査する。
+構文を解析する機能と、Git・gh の option や操作の効果を判断する機能を分ける。
+
+Zsh モードは upstream でも実験的なため、全 Zsh 構文の対応は要求しない。
+repeat・always・coproc 等の未対応構文、動的な実行名、解析不能な入力は明示して拒否し、通常の for/while/if、単純命令や script file への書換えを案内する。
+未知の program が heredoc を実行する場合も、その言語を shell と推測せず明示して止める。
+parser は make setup で公式 release の SHA-256 を照合して導入する。
+hook 実行中はネットワークから取得せず、欠落・異常終了・timeout は修復案内を伴う拒否にする。
+
+作業先は構文木の scope から追跡する。
+cd の成功時だけ右辺が動く `cd <literal> && git ...` と、`git -C <literal> ...` は明示された作業先を使える。
+移動失敗時も続く `cd <literal>; git ...`、分岐や loop の状態変更は作業先不明として扱う。
+否定付き cd は成功時の作業先を右辺へ引き継がない。
+命令置換・subshell の状態を親へ流出させず、pipeline の左右を同じ作業先状態として更新しない。
+汎用の shell 実行機や、稀な構文の独自補完には拡張しない。
+複数 agent・worktree に共通する仕組みの汎用化は将来課題とし、今回の導入理由にはしない。
+
 ### 所有者と作用先
 
 Codex の linked checkout は、payload.cwd と一致していても操作時の native ownerThreadId と hook.session_id の一致を要求する。
@@ -34,7 +56,18 @@ reflog の write・expire・delete・drop は stash の回復情報を書き換�
 reflog の表示でも `--output` はファイルを書き、後続の不正 option による失敗前にも出力先を変更するため、読取の免除から外す。
 `git remote` の add・rename・remove・set-url・set-branches は前置の verbosity option を含めリポジトリ設定の書込みとして共有作用とし、前置 option を解決できなければ共有作用とする。
 通常の refspec で update・prune・set-head が動かす remote-tracking ref は対象外とし、保存済みの特殊 refspec の残余は下記の境界に従う。
-push の宛先 repository は option の arity を模倣せず、ローカルの repository を示す語が1つでもあれば同一 repository 宛てとして扱う。
+push の宛先 repository は、値を取る option を消費してから最初の operand と後続 refspec を分ける。
+未知・曖昧な option は共有作用として停止し、`--repo` のローカル値は positional repository が併記されても従来の保守的な境界を維持する。
+同名の設定済み remote を優先し、Git の `remote get-url --push --all` で全 push URL と URL 書換えを得る。
+生の operand の insteadOf 展開は、相手に接続しない `ls-remote --get-url` に委ねる。
+生の operand に対する pushInsteadOf を得る同等の query はないため、その設定がある場合は作用先不明として止め、設定済み remote の明示を使う。
+相対パスは Git の worktree root を基点とし、local transport の .git 接尾辞の候補も調べ、Git が返す common directory を物理パスで照合する。
+gitfile の解決は `rev-parse --resolve-git-dir` に委ね、local transport が受け付ける末尾 slash、colon、空白を含む path を保持する。
+URL の行区切り出力では表せない値は、対象 remote の NUL 区切り config query と展開後の件数照合で検出して作用先不明として止める。
+file URL は標準 URL parser が表現を変えない形式だけを検査し、percent encoding・fragment・query・空白削除・dot segment 正準化を伴う形式は、Git local transport との解釈差を補完せず停止し、通常の local path へ書き換える。
+同一 repository の ref を書く宛先は共有作用とし、他 repository への通常の push は維持する。
+実在する cwd で必要な URL/root/common directory の読取が失敗した場合は、作用先不明として停止する。
+保存済みの特殊 refspec 全般は下記の既存境界に従う。
 `rebase --update-refs` は他 branch を動かすため共有作用とする。
 rebase の値を取る option は、分離・等号付き・短縮 cluster の形を含めて値を消費し、実際の update-refs option の最後の指定だけを toggle とする。
 未知・曖昧な option の後の値を否定 option として免除せず、共有作用として停止する。

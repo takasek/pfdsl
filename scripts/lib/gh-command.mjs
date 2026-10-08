@@ -25,13 +25,13 @@ export const GLOBAL_FLAGS_WITH_VALUE = new Set(["-R", "--repo"]);
 /**
  * The group, verb and argument values of a `gh` call, or null when the segment
  * does not run `gh`. `args` is every token after the head, quoting stripped.
- * @param {Array<{value: string, quoted: boolean}>} tokens output of tokenize()
+ * @param {Array<{value: string, quoted: boolean, dynamic?: boolean}>} tokens command words from the shell syntax tree
  * @returns {{group: string, verb: string | null, args: string[]} | null}
  */
 export function parseGhCommand(tokens) {
 	if (tokens.length === 0) return null;
 	const head = tokens[0];
-	if (head.quoted || head.value !== "gh") return null;
+	if (head.dynamic || head.value !== "gh") return null;
 
 	const args = tokens.slice(1).map((token) => token.value);
 

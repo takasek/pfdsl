@@ -29,13 +29,10 @@
 // nothing else — and unlike C there is no case where dropping the body silently
 // is what was wanted.
 
-import {
-	splitSegments,
-	stripLeadingNoise,
-	tokenize,
-} from "./delegation-guard.mjs";
+import { shellParseDecision, stripLeadingNoise } from "./delegation-guard.mjs";
 import { parseGhCommand } from "./gh-command.mjs";
 import { buildPermissionOutput, parseHookPayload } from "./hook-io.mjs";
+import { readShellCommands } from "./shell-commands.mjs";
 
 /** `@pfdsl/cli`, optionally with a version spec. */
 const PUBLISHED_CLI_SPEC = /^@pfdsl\/cli(@.+)?$/;
@@ -45,15 +42,14 @@ const VIEW_GROUPS = new Set(["issue", "pr"]);
 
 /**
  * The tokens of each command segment, leading `FOO=bar`/`sudo` noise stripped.
- * Quoting is preserved so callers can require an unquoted head — that is what
- * keeps a command mentioned inside a string from tripping a rule, while its
- * arguments are matched however they are quoted.
+ * Executable position comes from the syntax tree, including quoted names.
+ * Literal strings mentioned as arguments never become commands.
  * @param {string} command
  * @returns {Array<Array<{value: string, quoted: boolean}>>}
  */
 function commandSegments(command) {
-	return splitSegments(command).map((segment) =>
-		stripLeadingNoise(tokenize(segment)),
+	return readShellCommands(command).map(({ tokens }) =>
+		stripLeadingNoise(tokens),
 	);
 }
 
@@ -71,7 +67,7 @@ export function usesPublishedCli(command) {
 
 	for (const tokens of commandSegments(command)) {
 		const head = tokens[0];
-		if (!head || head.quoted) continue;
+		if (!head || head.dynamic) continue;
 		if (head.value === "pfdsl") return true;
 		const values = tokens.map((token) => token.value);
 		const runsFromRegistry =
@@ -113,6 +109,8 @@ export function usesBodyDroppingView(command) {
  */
 export function evaluateCommandUsageGuard(payload) {
 	if (payload?.tool_name !== "Bash") return { decision: "allow" };
+	const failure = shellParseDecision(payload?.tool_input?.command);
+	if (failure) return failure;
 	const command = payload?.tool_input?.command;
 
 	if (usesBodyDroppingView(command)) {

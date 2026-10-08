@@ -14,8 +14,10 @@ import {
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { afterEach, test } from "node:test";
+import { fileURLToPath } from "node:url";
 import { inspectHooksPath } from "../setup-completion.mjs";
 import { ensureSharedHook } from "../shared-hooks.mjs";
+import { shellParserPath } from "./shell-parser-tool.mjs";
 
 const source = new URL("../../", import.meta.url);
 const roots = [];
@@ -27,6 +29,8 @@ const localFiles = [
 	"scripts/link-repo-skill.mjs",
 	"scripts/lib/cli-entrypoint.mjs",
 	"scripts/lib/repo-skill-link.mjs",
+	"scripts/lib/shell-parser-tool.mjs",
+	"scripts/setup-shell-parser.mjs",
 	"scripts/hooks/pre-commit-shim",
 	"Makefile",
 ];
@@ -54,6 +58,10 @@ function checkout(root, label = "gate-new") {
 	writeFileSync(join(root, "package.json"), "{}\n");
 	writeFileSync(join(root, "pnpm-workspace.yaml"), "packages: []\n");
 	writeFileSync(join(root, "pnpm-lock.yaml"), "lockfileVersion: '9.0'\n");
+	const parser = shellParserPath(root);
+	mkdirSync(dirname(parser), { recursive: true });
+	copyFileSync(shellParserPath(fileURLToPath(source)), parser);
+	chmodSync(parser, 0o755);
 }
 function fixture({ guardInHead = true } = {}) {
 	const root = mkdtempSync(join(tmpdir(), "pfdsl-1415-"));

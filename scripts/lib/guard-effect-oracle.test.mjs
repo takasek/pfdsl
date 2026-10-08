@@ -7,11 +7,7 @@ import { mkdirSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
-import {
-	splitSegments,
-	stripLeadingNoise,
-	tokenize,
-} from "./delegation-guard.mjs";
+import { stripLeadingNoise } from "./delegation-guard.mjs";
 import { findMergeCommand } from "./external-operation-policy.mjs";
 import {
 	cross,
@@ -20,6 +16,7 @@ import {
 	parentDecision,
 	quote,
 } from "./guard-effect-oracle-harness.mjs";
+import { readShellCommands } from "./shell-commands.mjs";
 
 // Read forms a Codex child must be able to run (each is also checked against
 // the oracle for being free of effects).
@@ -569,8 +566,7 @@ test("merge detection agrees with gh's own help parsing", {
 			const help = result.status === 0 && /USAGE/.test(result.stdout);
 			const command = ["gh", ...args].map(quote).join(" ");
 			const detected = findMergeCommand(command, {
-				splitSegments,
-				tokenize,
+				readShellCommands,
 				stripLeadingNoise,
 			});
 			if (!help && !detected)

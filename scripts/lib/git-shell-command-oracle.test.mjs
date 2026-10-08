@@ -147,10 +147,15 @@ for (const shell of ["/bin/bash", "/bin/zsh"]) {
 					);
 					const parent =
 						result.output?.hookSpecificOutput.permissionDecision ?? "allow";
-					const expected = changed ? "deny" : "allow";
+					const unsupported =
+						/\b(?:repeat|always|coproc)\b|time (?:-p )?!|^-(?:\s)/.test(
+							command,
+						);
+					const expected = changed || unsupported ? "deny" : "allow";
 					if (
 						child !== expected ||
-						parent !== (changed && branch === "main" ? "deny" : "allow")
+						parent !==
+							(unsupported || (changed && branch === "main") ? "deny" : "allow")
 					)
 						violations.push({ branch, command, changed, child, parent });
 				}

@@ -37,12 +37,9 @@
 // that registration. Explicit syntax avoids cwd drift in this guard only;
 // it does not override ownership, main-checkout, or trusted-root checks.
 
-import {
-	splitSegments,
-	stripLeadingNoise,
-	tokenize,
-} from "./delegation-guard.mjs";
+import { shellParseDecision, stripLeadingNoise } from "./delegation-guard.mjs";
 import { buildPermissionOutput, parseHookPayload } from "./hook-io.mjs";
+import { readShellCommands } from "./shell-commands.mjs";
 
 /** `-C`/`--directory` forms that make `make`'s cwd explicit, so drift cannot
  * affect it. */
@@ -156,10 +153,10 @@ function isVerificationNode(rest) {
 
 /** Whether one already-split segment is a verification command. */
 function isVerificationSegment(segment) {
-	const tokens = stripLeadingNoise(tokenize(segment));
+	const tokens = stripLeadingNoise(segment.tokens);
 	if (tokens.length === 0) return false;
 	const head = tokens[0];
-	if (head.quoted) return false;
+	if (head.dynamic) return false;
 	const rest = tokens.slice(1);
 
 	if (head.value === "make") return isVerificationMake(rest);
@@ -185,9 +182,9 @@ function isVerificationSegment(segment) {
  */
 export function findVerificationSegments(command) {
 	if (typeof command !== "string" || command.trim() === "") return [];
-	return splitSegments(command)
+	return readShellCommands(command)
 		.filter((segment) => isVerificationSegment(segment))
-		.map((segment) => segment.trim());
+		.map((segment) => segment.command.trim());
 }
 
 function verificationRiskReason(mainRoot) {
@@ -209,6 +206,8 @@ function verificationRiskReason(mainRoot) {
  */
 export function evaluateVerificationTreeGuard(payload, roots) {
 	if (payload?.tool_name !== "Bash") return { decision: "allow" };
+	const failure = shellParseDecision(payload?.tool_input?.command);
+	if (failure) return failure;
 
 	const command = payload?.tool_input?.command;
 	if (typeof command !== "string") return { decision: "allow" };

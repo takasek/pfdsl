@@ -41,6 +41,7 @@ describe("tokenize", () => {
 			value: "$SIBLING",
 			quoted: true,
 			quote: '"',
+			dynamic: true,
 		});
 	});
 });

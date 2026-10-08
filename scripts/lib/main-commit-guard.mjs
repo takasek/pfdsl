@@ -12,7 +12,7 @@
 //
 // currentBranch is passed in rather than read here, since a PreToolUse hook
 // payload does not carry it — the hook wrapper resolves it once via `git
-// branch --show-current` and this stays a pure function.
+// branch --show-current`. Local push paths are inspected at the resolved cwd.
 //
 // A second, independent deny axis (#1232) catches commands that skip this
 // repo's pre-commit checks — `--no-verify`/`-n` and a `core.hooksPath`
@@ -34,10 +34,7 @@ import {
 	hasProtectedGitConfigOverride,
 	hasProtectedGitTargetOverride,
 	parseLeadingShellPrefix,
-	splitCommandFlow,
-	splitSegments,
-	stripLeadingNoise,
-	tokenize,
+	shellParseDecision,
 	updateProtectedShellState,
 } from "./delegation-guard.mjs";
 import { buildPermissionOutput, parseHookPayload } from "./hook-io.mjs";
@@ -48,6 +45,7 @@ import {
 	isConfigOverrideEffect,
 	sameBranchName,
 } from "./shared-git-effects.mjs";
+import { readShell } from "./shell-commands.mjs";
 
 // The decision splits by target before it splits by subcommand. Against a
 // sibling whose native ownership was not confirmed by the entrypoint it is
@@ -591,8 +589,8 @@ function hasGlobalConfigOverride(tokens, subAt) {
  * @param {{value: string, quoted: boolean}[]} tokens
  * @returns {GuardedGit | null}
  */
-function classifySegment(tokens, { configOverride = false } = {}) {
-	const found = classifyGuardedSegment(tokens);
+function classifySegment(tokens, { configOverride = false, cwd } = {}) {
+	const found = classifyGuardedSegment(tokens, { cwd });
 	if (found?.bypass) return found;
 	if (tokens.length === 0 || basename(tokens[0].value) !== "git") return found;
 	const sub = gitSubcommand(tokens);
@@ -606,7 +604,7 @@ function classifySegment(tokens, { configOverride = false } = {}) {
 		: { subcommand: sub, decision: "ask", configOverride: true };
 }
 
-function classifyGuardedSegment(tokens) {
+function classifyGuardedSegment(tokens, { cwd } = {}) {
 	if (tokens.length === 0) return null;
 	const head = tokens[0];
 	if (basename(head.value) !== "git") {
@@ -633,6 +631,7 @@ function classifyGuardedSegment(tokens) {
 	const effect = classifySharedGitEffect(
 		sub,
 		tokens.slice(gitSubcommandIndex(tokens) + 1).map((token) => token.value),
+		{ cwd },
 	);
 	if (effect) return { subcommand: sub, decision: "ask", effect };
 	if (DENIED_SUBCOMMANDS.has(sub)) {
@@ -664,20 +663,15 @@ function classifyGuardedSegment(tokens) {
  * @param {string} command
  * @returns {GuardedGit | null}
  */
-export function classifyGitCommand(command) {
+export function classifyGitCommand(command, hookCwd = process.cwd()) {
 	if (typeof command !== "string" || command.trim() === "") return null;
+	const failure = shellParseDecision(command);
+	if (failure) return { ...failure, subcommand: "shell syntax" };
 
 	/** @type {GuardedGit | null} */
 	let asked = null;
-	const state = createProtectedShellState();
-	for (const segment of splitSegments(command)) {
-		const rawTokens = tokenize(segment);
-		const found = classifySegment(stripLeadingNoise(rawTokens), {
-			configOverride:
-				parseLeadingShellPrefix(rawTokens).gitConfigOverride ||
-				hasProtectedGitConfigOverride(state),
-		});
-		updateProtectedShellState(state, rawTokens);
+	for (const { cwd: _cwd, ...found } of analyzeCommand(command, hookCwd)
+		.targets) {
 		if (found?.decision === "deny") return found;
 		if (found) asked ??= found;
 	}
@@ -687,11 +681,7 @@ export function classifyGitCommand(command) {
 /** A path this layer can resolve without running a shell. */
 function staticPath(token) {
 	if (!token) return null;
-	if (token.quoted)
-		return token.quote === "'" || !/[$`]/.test(token.value)
-			? token.value
-			: null;
-	return /[$~*?`]/.test(token.value) ? null : token.value;
+	return token.dynamic ? null : token.value;
 }
 
 /** A literal target from the supported `cd` forms, or null when it is dynamic. */
@@ -761,17 +751,6 @@ function guardedSuffix(tokens, options) {
 	return null;
 }
 
-const COMPOUND_END = {
-	"{": "}",
-	if: "fi",
-	for: "done",
-	while: "done",
-	until: "done",
-	case: "esac",
-	select: "done",
-	repeat: "done",
-};
-
 /**
  * Track the shell cwd and retain each guarded Git segment with its own target.
  * A PreToolUse hook fires before the shell does, so `payload.cwd` does not yet
@@ -784,144 +763,119 @@ function analyzeCommand(
 	hookCwd,
 	{ ambientCdPath = false, ambientGitTargetOverride = false } = {},
 ) {
-	if (typeof command !== "string") return { targets: [], finalCwd: hookCwd };
-
-	/** Where the shell stands, or null once a `cd` moved it somewhere unknown. */
-	let cwd = hookCwd;
-	const protectedState = createProtectedShellState({
-		ambientCdPath,
-		ambientGitTargetOverride,
-	});
-	let unresolvedControlFlow = false;
-	const compounds = [];
-	let functionStart = null;
-	let andListAffects = false;
-	let previousAffects = false;
-	const targets = [];
-
-	for (const { command: segment, separatorBefore } of splitCommandFlow(
-		command,
-	)) {
-		if (separatorBefore === "&&") andListAffects ||= previousAffects;
-		else if (separatorBefore === ";" || separatorBefore === "\n") {
-			unresolvedControlFlow ||= andListAffects;
-			andListAffects = false;
-		} else if (["(", ")"].includes(separatorBefore)) {
-			unresolvedControlFlow = true;
-			andListAffects = false;
-		} else if (["||", "|", "&"].includes(separatorBefore)) {
-			unresolvedControlFlow ||= previousAffects;
-			andListAffects = false;
-		}
-		const rawTokens = tokenize(segment);
-		const prefix = parseLeadingShellPrefix(rawTokens);
-		const headToken = rawTokens[prefix.end];
-		const shortRepeatBody =
-			prefix.controlWords.includes("repeat") &&
-			!prefix.controlWords.includes("do");
-		const repeatCompoundBody =
-			prefix.controlWords.some(
-				(word) => word !== "repeat" && Object.hasOwn(COMPOUND_END, word),
-			) ||
-			(!headToken?.quoted &&
-				headToken &&
-				Object.hasOwn(COMPOUND_END, headToken.value));
-		for (const word of [
-			...prefix.controlWords,
-			...(!headToken?.quoted && headToken ? [headToken.value] : []),
-		]) {
-			if (word === "function") functionStart ??= targets.length;
-			if (compounds.at(-1)?.end === word) compounds.pop();
-			if (word === "repeat" && shortRepeatBody && repeatCompoundBody) continue;
-			if (Object.hasOwn(COMPOUND_END, word))
-				compounds.push({ end: COMPOUND_END[word], start: targets.length });
-		}
-		const shortRepeat =
-			shortRepeatBody && !repeatCompoundBody ? compounds.at(-1) : null;
-		const envCwd = resolveEnvCwd(rawTokens, cwd);
-		const tokens = rawTokens.slice(prefix.end);
-		const finish = (cwdAffects = false) => {
-			const affects =
-				cwdAffects || updateProtectedShellState(protectedState, rawTokens);
-			// Coprocess state belongs to a different shell. Do not use its
-			// apparent cwd/environment changes to authorize the parent target.
-			if (affects && prefix.controlWords.includes("coproc"))
-				unresolvedControlFlow = true;
-			// A later loop iteration can execute an earlier Git command after a
-			// conditional cwd/environment change. Keep simple compounds usable,
-			// but invalidate their earlier targets when such state changes occur.
-			if (affects && (compounds.length > 0 || functionStart !== null)) {
-				unresolvedControlFlow = true;
-				// Named functions can be called later, after their definition's
-				// brace closes and the caller's cwd/environment has changed.
-				const start = Math.min(
-					compounds[0]?.start ?? targets.length,
-					functionStart ?? targets.length,
-				);
-				for (const target of targets.slice(start)) target.cwd = null;
-			}
-			if (shortRepeat && compounds.at(-1) === shortRepeat) compounds.pop();
-			if (separatorBefore === "&&") andListAffects ||= affects;
-			if (["||", "|", "&"].includes(separatorBefore))
-				unresolvedControlFlow ||= affects;
-			previousAffects = affects;
+	const shell = readShell(command);
+	if (shell.error)
+		return {
+			targets: [
+				{
+					decision: "deny",
+					subcommand: "shell syntax",
+					reason: shell.error,
+					cwd: null,
+				},
+			],
+			finalCwd: null,
 		};
-		if (tokens.length === 0) {
-			finish();
-			continue;
-		}
+	const targets = [];
+	const definitions = [];
+	const state = {
+		cwd: hookCwd,
+		uncertain: false,
+		protected: createProtectedShellState({
+			ambientCdPath,
+			ambientGitTargetOverride,
+		}),
+	};
+	function commandTarget(rawTokens, state) {
+		const prefix = parseLeadingShellPrefix(rawTokens);
+		const envCwd = resolveEnvCwd(rawTokens, state.cwd);
+		const tokens = rawTokens.slice(prefix.end);
+		if (!tokens.length)
+			return updateProtectedShellState(state.protected, rawTokens);
 		const head = basename(tokens[0].value);
-
+		let affects = false;
 		if (
 			(head === "builtin" &&
 				["cd", "pushd", "popd"].includes(tokens[1]?.value)) ||
-			head === "pushd" ||
-			head === "popd"
+			["pushd", "popd"].includes(head)
 		) {
-			cwd = null;
-			finish(true);
-			continue;
-		}
-
-		if (head === "cd") {
+			state.cwd = null;
+			affects = true;
+		} else if (head === "cd") {
+			state.pendingCd = true;
 			const target = cdPath(tokens);
-			if (target === null) cwd = null;
-			// An absolute target restores a trail lost to an unresolvable earlier cd.
-			else if (target.startsWith("/")) cwd = resolve(target);
+			if (target === null || state.uncertain) state.cwd = null;
+			else if (target.startsWith("/")) state.cwd = resolve(target);
 			else if (
-				hasProtectedCdPathOverride(protectedState) ||
+				hasProtectedCdPathOverride(state.protected) ||
 				prefix.cdPathOverride
 			)
-				cwd = null;
-			else if (cwd !== null) cwd = resolve(cwd, target);
-			finish(true);
-			continue;
-		}
-
-		const configOverride =
-			prefix.gitConfigOverride || hasProtectedGitConfigOverride(protectedState);
-		const guarded =
-			classifySegment(tokens, { configOverride }) ??
-			(prefix.unresolved ? guardedSuffix(tokens, { configOverride }) : null);
-		if (!guarded) {
-			finish();
-			continue;
-		}
-		targets.push({
-			...guarded,
-			cwd:
-				unresolvedControlFlow ||
+				state.cwd = null;
+			else if (state.cwd !== null) state.cwd = resolve(state.cwd, target);
+			affects = true;
+		} else {
+			const configOverride =
+				prefix.gitConfigOverride ||
+				hasProtectedGitConfigOverride(state.protected);
+			const cwd =
+				state.uncertain ||
 				prefix.unresolved ||
-				hasProtectedGitTargetOverride(protectedState) ||
+				hasProtectedGitTargetOverride(state.protected) ||
 				prefix.gitTargetOverride
 					? null
 					: head === "git"
 						? resolveGitCwd(tokens, envCwd)
-						: resolveCodexRoutineCwd(tokens),
-		});
-		finish();
+						: resolveCodexRoutineCwd(tokens);
+			const guarded =
+				classifySegment(tokens, { configOverride, cwd }) ??
+				(prefix.unresolved
+					? guardedSuffix(tokens, { configOverride, cwd: null })
+					: null);
+			if (guarded) targets.push({ ...guarded, cwd });
+		}
+		affects = updateProtectedShellState(state.protected, rawTokens) || affects;
+		if (affects)
+			for (const start of definitions)
+				for (const target of targets.slice(start)) target.cwd = null;
+		return affects;
 	}
-	return { targets, finalCwd: cwd };
+	function visit(flow, state) {
+		if (flow.kind === "command") return commandTarget(flow.tokens, state);
+		if (flow.kind === "pipeline") {
+			let changed = false;
+			for (const child of flow.children)
+				changed = visit(child, structuredClone(state)) || changed;
+			state.uncertain ||= changed;
+			return changed;
+		}
+		if (flow.kind === "isolated") {
+			const local = structuredClone(state);
+			for (const child of flow.children) visit(child, local);
+			return false;
+		}
+		const start = targets.length;
+		if (flow.kind === "definition") definitions.push(start);
+		let affects = false;
+		for (const child of flow.children) {
+			const changed = visit(child, state);
+			affects ||= changed;
+			// Within &&, a successful cd establishes the RHS cwd. After that list,
+			// success is conditional and must not authorize the next statement.
+			if (child.kind === "and" && changed && flow.kind !== "and")
+				state.uncertain = true;
+			if (state.pendingCd && flow.kind !== "and") {
+				state.uncertain = true;
+				state.pendingCd = false;
+			}
+		}
+		if (["uncertain", "definition"].includes(flow.kind) && affects) {
+			state.uncertain = true;
+			for (const target of targets.slice(start)) target.cwd = null;
+		}
+		return affects;
+	}
+	visit(shell.flow, state);
+	return { targets, finalCwd: state.cwd };
 }
 
 /** Every guarded Git segment with the cwd in which Git will run it. */
@@ -976,7 +930,12 @@ export function evaluateMainCommitGuard(
 	{ currentBranch, mainBranch = "main", targetRelation = "own" } = {},
 ) {
 	if (payload?.tool_name !== "Bash") return { decision: "allow" };
-	const guarded = classifyGitCommand(payload?.tool_input?.command);
+	const failure = shellParseDecision(payload?.tool_input?.command);
+	if (failure) return failure;
+	const guarded = classifyGitCommand(
+		payload?.tool_input?.command,
+		payload?.cwd ?? process.cwd(),
+	);
 	if (!guarded) return { decision: "allow" };
 	return evaluateGuardedCommand(guarded, {
 		currentBranch,
@@ -1149,6 +1108,9 @@ export function runMainCommitGuard(
 	const payload = parseHookPayload(inputText);
 	if (!payload) return { shouldOutput: false };
 	if (payload?.tool_name !== "Bash") return { shouldOutput: false };
+	const failure = shellParseDecision(payload?.tool_input?.command);
+	if (failure)
+		return { shouldOutput: true, output: buildPermissionOutput(failure) };
 	const payloadCwd = payload?.cwd;
 	const hookCwd =
 		typeof payloadCwd === "string" && payloadCwd.trim() !== ""

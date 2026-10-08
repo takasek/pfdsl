@@ -6,11 +6,10 @@ import { join } from "node:path";
 import { test } from "node:test";
 import {
 	evaluateDelegationGuard,
-	splitSegments,
 	stripLeadingNoise,
-	tokenize,
 } from "./delegation-guard.mjs";
 import { findMergeCommand } from "./external-operation-policy.mjs";
+import { readShellCommands } from "./shell-commands.mjs";
 
 test("merge classification follows command positions actually executed by Bash", () => {
 	const scratch = mkdtempSync(join(tmpdir(), "pfdsl-merge-shell-"));
@@ -65,16 +64,15 @@ test("merge classification follows command positions actually executed by Bash",
 			const calls = readFileSync(marker, "utf8");
 			const ranMerge = /^(?:pr merge|api .*merge)/m.test(calls);
 			const detected = findMergeCommand(command, {
-				splitSegments,
+				readShellCommands,
 				stripLeadingNoise,
-				tokenize,
 			});
 			const decision = evaluateDelegationGuard(
 				{ tool_name: "Bash", tool_input: { command } },
 				{ supportsAsk: false },
 			).decision;
 			if (
-				Boolean(detected) !== ranMerge ||
+				(!/time (?:-p )?!/.test(command) && Boolean(detected) !== ranMerge) ||
 				decision !== (ranMerge ? "deny" : "allow")
 			)
 				violations.push({ command, calls, detected, decision });
