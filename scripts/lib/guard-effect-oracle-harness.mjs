@@ -356,6 +356,12 @@ export function optionSpellings(subcommand, values = ["x", "1", "merge"]) {
 	const longs = options.flatMap(({ long, negatable }) =>
 		long ? [long, ...(negatable ? [`--no-${long.slice(2)}`] : [])] : [],
 	);
+	// Short options without a value combine into one cluster, in either order.
+	const flags = options
+		.filter(({ short, arity }) => short && arity === "none")
+		.map(({ short }) => short.slice(1));
+	for (const a of flags)
+		for (const b of flags) if (a !== b) spellings.push([`-${a}${b}`]);
 	for (const { short, long, negatable, arity } of options) {
 		// parse-options accepts the shortest prefix no other long option shares.
 		const prefix = long

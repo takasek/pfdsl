@@ -69,6 +69,20 @@ const ORDINARY = [
 	["push", "origin", "topic"],
 	["reflog"],
 	["reflog", "show"],
+	// Git's reflog verbs are a closed set; any other first word is a ref to show.
+	["reflog", "HEAD"],
+	["reflog", "main"],
+	["reflog", "refs/stash"],
+	// These move only remote-tracking refs, which the contract leaves out.
+	["remote", "update"],
+	["remote", "prune", "origin"],
+	["remote", "prune", "-n", "origin"],
+	["fetch", "--prune", "origin"],
+	["tag"],
+	["tag", "-l"],
+	["notes", "list"],
+	["-c", "pager.tag=false", "tag", "-l"],
+	["-c", "color.ui=never", "notes", "list"],
 ].map((args) => ({ args, parentAllows: true }));
 
 const BRANCH_OPTIONS = [
@@ -306,13 +320,26 @@ const FETCHES = [
 	["pull", "--no-rebase", "origin"],
 	["pull", "--no-rebase", "origin", "main"],
 ];
+// Every way to name this repository as a push destination from the feature
+// checkout: its own gitfile, relative and absolute paths, and a file URL.
+const LOCAL_REPOSITORIES = [
+	".",
+	"./",
+	".git",
+	".git/",
+	"./.git",
+	"../primary",
+	"../primary/.git",
+	"{root}/primary",
+	"file://{root}/primary",
+];
 // Writers of the protected refs other than the branch/checkout/fetch forms.
 const LOCAL_WRITERS = [
-	["push", ".", "HEAD:other"],
-	["push", ".", "+HEAD:other"],
-	["push", ".", ":other"],
-	["push", ".", "+HEAD:main"],
-	["push", "../primary", "+HEAD:other"],
+	...cross(
+		[["push"]],
+		LOCAL_REPOSITORIES.map((repository) => [repository]),
+		[["HEAD:other"], ["+HEAD:other"], [":other"], ["+HEAD:main"]],
+	),
 	["pull", "--no-rebase", "origin", "main:other"],
 	["pull", "--no-rebase", ".", "topic:other"],
 	["reflog", "expire", "--expire=now", "--all"],
