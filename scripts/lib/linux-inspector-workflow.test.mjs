@@ -4,6 +4,19 @@ import { readFileSync } from "node:fs";
 import { test } from "node:test";
 import YAML from "yaml";
 
+test("job environment uses only contexts available before a runner exists", () => {
+	const workflow = YAML.parse(
+		readFileSync(
+			new URL("../../.github/workflows/linux-inspector.yml", import.meta.url),
+			"utf8",
+		),
+	);
+	assert.doesNotMatch(
+		JSON.stringify(workflow.jobs["fixed-source-inspector"].env),
+		/\$\{\{\s*(runner|job|env|steps)\./,
+	);
+});
+
 test("diagnostic AppDir comparison detects same-content link, mode, and entry-type changes", () => {
 	const workflow = YAML.parse(
 		readFileSync(
