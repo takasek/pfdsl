@@ -30,7 +30,10 @@ remote-tracking ref と tag は対象外とし、notes と replace は現時点�
 
 update-ref、symbolic-ref の変更、branch の強制変更・削除・他 branch 改名、worktree の追加・保守、明示的なローカル ref 宛て fetch を確認する。
 同一 repository を宛先とする push（`push .` やローカルパス）と、pull の明示的なローカル ref 宛て refspec は、update-ref・fetch と同じ作用として確認する。
-reflog の expire・delete は stash の回復情報を消すため共有保守とする。
+reflog は表示（verb なし・show・list・exists）以外の verb を、stash の回復情報を書き換えうるため共有保守とし、表示の判定は許可する形の列挙で行う。
+`git remote` の表示（verb なし・`-v`・show・get-url）以外は、リポジトリ設定の書込みとして共有作用とする。
+push の宛先 repository は option の arity を模倣せず、ローカルの repository を示す語が1つでもあれば同一 repository 宛てとして扱う。
+`rebase --update-refs` は他 branch を動かすため共有作用とする。
 worktree add は detached・既存 branch・新規 branch のいずれも共有 metadata を変更するため、Claude では ask、Codex では deny とし、native の worktree 作成入口とは区別する。
 default branch の作成・切替と、switch/checkout の分離・短縮・等号付き option を扱う。
 default branch の名前は大文字小文字を区別せずに照合し、checkout/switch では option の値に消費されうる語を含めて全 operand を切替先の候補とする。
@@ -38,10 +41,12 @@ default branch の名前は大文字小文字を区別せずに照合し、check
 switch の `--` 後の operand と、checkout の後続 path の無い `--` は切替先として扱い、`--ignore-other-worktrees` は他 checkout の branch へ入るため共有作用とする。
 既存 branch を付け替えうる `-B`・`-C`・`--force-create` は、branch の強制変更と同じく共有作用とし、新規作成には `-b`・`-c` を使う。
 fetch の `--dry-run` は `--no-dry-run` や option の値への消費で打ち消せるため免除しない。
+他の免除（checkout/switch の `--detach`・switch の `-d`、`worktree prune` の `--dry-run`・`-n`）は、同じ toggle の最後の指定が肯定の完全一致である場合に限って有効とする。
 fetch の `-u`（`--update-head-ok`）は Git 自身の checkout 中 branch の保護を外すため共有作用とする。
 refspec を stdin から読む `fetch --stdin` は境界で解決できないため拒否する。
 読取以外の `git config` は、共有の設定ファイルを書き換えるため共有作用とする。
-`-c`・`--config-env`・可視の `GIT_CONFIG_*` 代入は実行中の Git 呼出しの作用先を変える入力であり、無害に見える key も `include.path` で任意の設定を読み込めるため、読取以外の呼出しに付けば共有作用とする。
+`-c`・`--config-env`・可視の `GIT_CONFIG_*` 代入（同じ command 行の前の文での export を含む）は実行中の Git 呼出しの作用先を変える入力であり、無害に見える key も `include.path` で任意の設定を読み込めるため、読取以外の呼出しに付けば共有作用とする。
+grep・blame 等の読取に付いた設定注入は共有作用としない。
 Git の parse-options は long option の一意な接頭辞を受け付けるので、危険な option の接頭辞はその option として扱い、読取判定には完全一致を要求する。
 branch は Git と同じく list mode を判定し、`-v`・`--format`・`--sort` だけでは一覧にならず作成になる形を区別し、作成形に未知の option が伴えば共有作用とする。
 これらの分類は、default branch を空けた配置と primary が checkout した配置の使い捨て fixture で、Git 自身に実行させた作用を正とする検査で照合する。
@@ -68,7 +73,8 @@ Git common dir は Git 自身に絶対パスで取得させ、symlink cwd の論
 Codex の hook.agent_id がある子には、Git metadata 変更と外向き書込みを拒否する。
 親は stage・commit・fetch・push・PR 更新を担当する。
 子の status・diff・log・branch 一覧・remote/config の読取等は明示的な読取表で許可する。
-子が Codex Git routine を直接または `node` 経由で呼ぶ場合は、test・build・typecheck・node-test・node-script 以外の verb を拒否する。
+子が Codex Git routine を直接または `node` 経由で呼ぶ場合は、node-test・node-script 以外の verb を拒否する。
+test・build・typecheck は Codex の rule で事前に許可され、build が共有 hook shim を配置するため、子が自分の sandbox で `make` を実行する場合より広い作用を持ちうる。
 Claude の issue-worker 例外を Codex の子へ引き継がない。
 
 親を含め gh pr merge・auto-merge、REST の merge endpoint、GraphQL の merge mutation を保護する。
@@ -122,6 +128,9 @@ SessionStart setup は PR #1412 の版付き shim と preflight に接続した�
 ADR-0044 の payload.cwd による file 所有者判断、Codex 照合の repo 外への撤去、dispatch の本数、guard 削除、SessionStart 廃止を既定とする条項を本案で置き換える。
 ADR-0046 の「own 自体は補正しない」「file policy と主体別 Git policy は含めない」という適用範囲を、Codex の linked checkout・file 操作・子の責務に限って拡張する。
 Claude の native lock 条件と過去の受入記録は変更しない。
+ADR-0044 は `GIT_CONFIG_*` を対象 repository の解決に使う target 環境変数として扱う変更を採らなかった。
+本 ADR はそれを作用の分類の入力として扱うだけであり、target の解決には使わない。
+ADR-0044 が定める、hook を走らせる subcommand の前の `GIT_CONFIG_*` 代入の deny は未実装のまま残し、後続課題とする。
 旧本文は判断履歴として保持し、#1398 全体の受入をこの PR だけで完了へ読み替えない。
 
 ## 実入口の記録と限界
