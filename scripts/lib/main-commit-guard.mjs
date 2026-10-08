@@ -761,26 +761,16 @@ function guardedSuffix(tokens, options) {
 	return null;
 }
 
-const COMPOUND_TOKENS = new Set([
-	"{",
-	"}",
-	"if",
-	"then",
-	"elif",
-	"else",
-	"fi",
-	"for",
-	"while",
-	"until",
-	"case",
-	"esac",
-	"do",
-	"done",
-	"select",
-	"function",
-	"coproc",
-	"!",
-]);
+const COMPOUND_END = {
+	"{": "}",
+	if: "fi",
+	for: "done",
+	while: "done",
+	until: "done",
+	case: "esac",
+	select: "done",
+	repeat: "done",
+};
 
 /**
  * Track the shell cwd and retain each guarded Git segment with its own target.
@@ -803,6 +793,8 @@ function analyzeCommand(
 		ambientGitTargetOverride,
 	});
 	let unresolvedControlFlow = false;
+	const compounds = [];
+	let functionStart = null;
 	let andListAffects = false;
 	let previousAffects = false;
 	const targets = [];
@@ -823,11 +815,52 @@ function analyzeCommand(
 		}
 		const rawTokens = tokenize(segment);
 		const prefix = parseLeadingShellPrefix(rawTokens);
+		const headToken = rawTokens[prefix.end];
+		const shortRepeatBody =
+			prefix.controlWords.includes("repeat") &&
+			!prefix.controlWords.includes("do");
+		const repeatCompoundBody =
+			prefix.controlWords.some(
+				(word) => word !== "repeat" && Object.hasOwn(COMPOUND_END, word),
+			) ||
+			(!headToken?.quoted &&
+				headToken &&
+				Object.hasOwn(COMPOUND_END, headToken.value));
+		for (const word of [
+			...prefix.controlWords,
+			...(!headToken?.quoted && headToken ? [headToken.value] : []),
+		]) {
+			if (word === "function") functionStart ??= targets.length;
+			if (compounds.at(-1)?.end === word) compounds.pop();
+			if (word === "repeat" && shortRepeatBody && repeatCompoundBody) continue;
+			if (Object.hasOwn(COMPOUND_END, word))
+				compounds.push({ end: COMPOUND_END[word], start: targets.length });
+		}
+		const shortRepeat =
+			shortRepeatBody && !repeatCompoundBody ? compounds.at(-1) : null;
 		const envCwd = resolveEnvCwd(rawTokens, cwd);
 		const tokens = rawTokens.slice(prefix.end);
 		const finish = (cwdAffects = false) => {
 			const affects =
 				cwdAffects || updateProtectedShellState(protectedState, rawTokens);
+			// Coprocess state belongs to a different shell. Do not use its
+			// apparent cwd/environment changes to authorize the parent target.
+			if (affects && prefix.controlWords.includes("coproc"))
+				unresolvedControlFlow = true;
+			// A later loop iteration can execute an earlier Git command after a
+			// conditional cwd/environment change. Keep simple compounds usable,
+			// but invalidate their earlier targets when such state changes occur.
+			if (affects && (compounds.length > 0 || functionStart !== null)) {
+				unresolvedControlFlow = true;
+				// Named functions can be called later, after their definition's
+				// brace closes and the caller's cwd/environment has changed.
+				const start = Math.min(
+					compounds[0]?.start ?? targets.length,
+					functionStart ?? targets.length,
+				);
+				for (const target of targets.slice(start)) target.cwd = null;
+			}
+			if (shortRepeat && compounds.at(-1) === shortRepeat) compounds.pop();
 			if (separatorBefore === "&&") andListAffects ||= affects;
 			if (["||", "|", "&"].includes(separatorBefore))
 				unresolvedControlFlow ||= affects;
@@ -838,7 +871,6 @@ function analyzeCommand(
 			continue;
 		}
 		const head = basename(tokens[0].value);
-		if (COMPOUND_TOKENS.has(head)) unresolvedControlFlow = true;
 
 		if (
 			(head === "builtin" &&

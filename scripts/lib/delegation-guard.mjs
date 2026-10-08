@@ -28,6 +28,7 @@ import {
 	findMergeCommand,
 	githubToolEffect,
 	mergeDecision,
+	shellCommandStart,
 } from "./external-operation-policy.mjs";
 import { parseGhCommand } from "./gh-command.mjs";
 import { buildPermissionOutput, parseHookPayload } from "./hook-io.mjs";
@@ -857,7 +858,7 @@ export function updateProtectedShellState(state, tokens) {
 	const prefix = parseLeadingShellPrefix(tokens);
 	const head = basename(tokens[prefix.end]?.value ?? "");
 	const arguments_ = tokens.slice(prefix.end + 1);
-	const assignments = tokens.slice(0, prefix.end);
+	const assignments = prefix.assignments;
 	if (prefix.end === tokens.length) {
 		noteGitConfigAssignments(state, assignments);
 		return applyAssignments(state, assignments);
@@ -1100,6 +1101,29 @@ function parseCommandPrefix(tokens, start) {
 	return { end: i, query, unresolved };
 }
 
+function parseExecPrefix(tokens, start) {
+	if (tokens[start]?.value !== "exec") return null;
+	let i = start + 1;
+	let unresolved = false;
+	while (i < tokens.length) {
+		const value = tokens[i].value;
+		if (value === "--") return { end: i + 1, unresolved };
+		if (!value.startsWith("-") || value === "-") break;
+		for (let j = 1; j < value.length; j++) {
+			if (value[j] === "a") {
+				if (j === value.length - 1) {
+					if (!tokens[i + 1]) unresolved = true;
+					i++;
+				}
+				break;
+			}
+			if (!"cl".includes(value[j])) unresolved = true;
+		}
+		i++;
+	}
+	return { end: i, unresolved };
+}
+
 export function parseLeadingShellPrefix(tokens) {
 	let i = 0;
 	let unresolved = false;
@@ -1107,7 +1131,14 @@ export function parseLeadingShellPrefix(tokens) {
 	let gitConfigOverride = false;
 	let cdPathOverride = false;
 	const envs = [];
+	const assignments = [];
+	const controlWords = [];
 	while (i < tokens.length) {
+		const grammar = shellCommandStart(tokens.slice(i), controlWords);
+		if (grammar > 0) {
+			i += grammar;
+			continue;
+		}
 		const value = tokens[i].value;
 		const executable = basename(value);
 		const redirection = leadingRedirectionLength(tokens, i);
@@ -1116,6 +1147,7 @@ export function parseLeadingShellPrefix(tokens) {
 			continue;
 		}
 		if (/^[A-Za-z_][A-Za-z0-9_]*=/.test(value)) {
+			assignments.push(tokens[i]);
 			gitTargetOverride ||= isGitTargetAssignment(value);
 			gitConfigOverride ||= isGitConfigAssignment(value);
 			cdPathOverride ||= isNonemptyCdPathAssignment(value);
@@ -1137,6 +1169,8 @@ export function parseLeadingShellPrefix(tokens) {
 			if (command.query)
 				return {
 					end: tokens.length,
+					assignments,
+					controlWords,
 					envs,
 					unresolved,
 					gitTargetOverride,
@@ -1150,6 +1184,19 @@ export function parseLeadingShellPrefix(tokens) {
 		if (sudo !== null) {
 			unresolved ||= sudo.unresolved;
 			i = sudo.end;
+			continue;
+		}
+		if (value === "builtin") {
+			const next = i + (tokens[i + 1]?.value === "--" ? 2 : 1);
+			if (["builtin", "command", "exec"].includes(tokens[next]?.value)) {
+				i = next;
+				continue;
+			}
+		}
+		const exec = parseExecPrefix(tokens, i);
+		if (exec !== null) {
+			unresolved ||= exec.unresolved;
+			i = exec.end;
 			continue;
 		}
 		const time = parseTimePrefix(tokens, i);
@@ -1166,6 +1213,8 @@ export function parseLeadingShellPrefix(tokens) {
 	}
 	return {
 		end: i,
+		assignments,
+		controlWords,
 		envs,
 		unresolved,
 		gitTargetOverride,
