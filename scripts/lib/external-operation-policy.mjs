@@ -193,7 +193,40 @@ export function findMergeCommand(
 ) {
 	if (typeof command !== "string") return null;
 	for (const segment of splitSegments(command)) {
-		const tokens = stripLeadingNoise(tokenize(segment));
+		const words = tokenize(segment);
+		let at = 0;
+		// These unquoted grammar words put the following words in command
+		// position. Do not search arbitrary arguments, loop lists or case data.
+		while (words[at] && !words[at].quoted) {
+			if (
+				[
+					"if",
+					"then",
+					"elif",
+					"else",
+					"while",
+					"until",
+					"do",
+					"!",
+					"{",
+				].includes(words[at].value)
+			) {
+				at++;
+				continue;
+			}
+			// Bare time is a grammar prefix and may precede !. An executable
+			// /usr/bin/time stays in the ordinary wrapper parser instead.
+			if (
+				words[at].value === "time" &&
+				(!words[at + 1]?.value.startsWith("-") || words[at + 1].value === "-p")
+			) {
+				at++;
+				if (words[at]?.value === "-p" && !words[at].quoted) at++;
+				continue;
+			}
+			break;
+		}
+		const tokens = stripLeadingNoise(words.slice(at));
 		if (!tokens.length || basename(tokens[0].value) !== "gh") continue;
 		const parsed = parseGhCommand([
 			{ ...tokens[0], value: "gh", quoted: false },
