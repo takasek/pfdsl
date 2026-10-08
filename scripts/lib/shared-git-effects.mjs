@@ -471,8 +471,9 @@ export function classifySharedGitEffect(subcommand, args) {
 	if (subcommand === "symbolic-ref") {
 		const operands = args.filter((arg) => !arg.startsWith("-"));
 		return operands.length > 1 ||
-			args.some((arg) => isLongOptionPrefix(arg, "--delete")) ||
-			args.includes("-d")
+			args.some(
+				(arg) => isLongOptionPrefix(arg, "--delete") || /^-[^-]*d/.test(arg),
+			)
 			? { kind: "shared" }
 			: null;
 	}
