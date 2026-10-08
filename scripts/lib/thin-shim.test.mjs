@@ -55,7 +55,7 @@ function checkout(root, label = "gate-new") {
 	writeFileSync(join(root, "pnpm-workspace.yaml"), "packages: []\n");
 	writeFileSync(join(root, "pnpm-lock.yaml"), "lockfileVersion: '9.0'\n");
 }
-function fixture() {
+function fixture({ guardInHead = true } = {}) {
 	const root = mkdtempSync(join(tmpdir(), "pfdsl-1415-"));
 	roots.push(root);
 	const env = { ...process.env };
@@ -87,6 +87,11 @@ function fixture() {
 	);
 	checkout(root);
 	assert.equal(git("add", "scripts").status, 0);
+	if (!guardInHead)
+		assert.equal(
+			git("rm", "--cached", "scripts/hooks/check-default-branch").status,
+			0,
+		);
 	assert.equal(
 		git(
 			"-c",
@@ -150,10 +155,13 @@ for (const staged of [false, true]) {
 	});
 }
 
-test("feature guard edits take effect only after commit while gates use the working tree", () => {
+test("a valid indexed guard is checked before commit while gates use the working tree", () => {
 	const { root, git, commit } = fixture();
 	const guard = join(root, "scripts/hooks/check-default-branch");
-	writeFileSync(guard, "#!/bin/sh\necho committed-guard >&2\nexit 1\n");
+	writeFileSync(
+		guard,
+		`${readFileSync(guard, "utf8")}echo proposed-guard >&2\n`,
+	);
 	const gate = join(root, "scripts/pre-commit");
 	writeFileSync(
 		gate,
@@ -163,29 +171,95 @@ test("feature guard edits take effect only after commit while gates use the work
 	const first = commit();
 	assert.equal(first.status, 0, first.stderr);
 	assert.match(first.stdout + first.stderr, /gate-edited/);
-	assert.doesNotMatch(first.stdout + first.stderr, /committed-guard/);
+	assert.match(first.stdout + first.stderr, /proposed-guard/);
 	const second = commit();
-	assert.notEqual(second.status, 0);
-	assert.match(second.stderr, /committed-guard/);
-	assert.doesNotMatch(second.stdout + second.stderr, /gate-edited/);
+	assert.equal(second.status, 0, second.stderr);
+	assert.match(second.stderr, /proposed-guard/);
+	assert.match(second.stdout + second.stderr, /gate-edited/);
 });
 
 test("a missing guard in HEAD refuses commit without a working-tree fallback", () => {
-	const { root, git, commit } = fixture();
-	const saved = readFileSync(join(root, "scripts/hooks/check-default-branch"));
-	assert.equal(
-		git("rm", "--cached", "scripts/hooks/check-default-branch").status,
-		0,
-	);
-	assert.equal(commit().status, 0);
-	assert.deepEqual(
-		readFileSync(join(root, "scripts/hooks/check-default-branch")),
-		saved,
-	);
+	const { commit } = fixture({ guardInHead: false });
 	const failed = commit();
 	assert.notEqual(failed.status, 0);
 	assert.match(failed.stderr, /cannot read.*check-default-branch from HEAD/);
 	assert.doesNotMatch(failed.stdout + failed.stderr, /gate-new/);
+});
+
+for (const detached of [false, true]) {
+	for (const fault of ["syntax", "nonzero"]) {
+		test(`${detached ? "detached" : "feature"} commit refuses an indexed ${fault} guard and accepts its correction`, () => {
+			const { root, git, commit } = fixture();
+			if (detached) assert.equal(git("switch", "--detach").status, 0);
+			const guard = join(root, "scripts/hooks/check-default-branch");
+			const valid = readFileSync(guard, "utf8");
+			writeFileSync(
+				guard,
+				fault === "syntax"
+					? "#!/bin/sh\nexit 0\nif then\n"
+					: "#!/bin/sh\nexit 23\n",
+			);
+			assert.equal(git("add", "scripts/hooks/check-default-branch").status, 0);
+			// A corrected worktree must not hide the broken version in the index.
+			writeFileSync(guard, valid);
+			const head = git("rev-parse", "HEAD").stdout;
+			const index = git("ls-files", "--stage", "-z").stdout;
+			const failed = commit();
+			assert.notEqual(failed.status, 0, failed.stdout + failed.stderr);
+			assert.doesNotMatch(failed.stdout + failed.stderr, /gate-new/);
+			assert.equal(git("rev-parse", "HEAD").stdout, head);
+			assert.equal(git("ls-files", "--stage", "-z").stdout, index);
+			assert.equal(git("add", "scripts/hooks/check-default-branch").status, 0);
+			const corrected = commit();
+			assert.equal(corrected.status, 0, corrected.stderr);
+			assert.match(corrected.stdout + corrected.stderr, /gate-new/);
+		});
+	}
+}
+
+test("an indexed guard deletion is refused before it can break subsequent commits", () => {
+	const { git, commit } = fixture();
+	assert.equal(
+		git("rm", "--cached", "scripts/hooks/check-default-branch").status,
+		0,
+	);
+	const head = git("rev-parse", "HEAD").stdout;
+	assert.notEqual(commit().status, 0);
+	assert.equal(git("rev-parse", "HEAD").stdout, head);
+	assert.equal(git("add", "scripts/hooks/check-default-branch").status, 0);
+	assert.equal(commit().status, 0);
+});
+
+test("an indexed non-executable guard is refused even with an executable working copy", () => {
+	const { root, git, commit } = fixture();
+	assert.equal(
+		git("update-index", "--chmod=-x", "scripts/hooks/check-default-branch")
+			.status,
+		0,
+	);
+	assert.ok(
+		statSync(join(root, "scripts/hooks/check-default-branch")).mode & 0o111,
+	);
+	const head = git("rev-parse", "HEAD").stdout;
+	assert.notEqual(commit().status, 0);
+	assert.equal(git("rev-parse", "HEAD").stdout, head);
+	assert.equal(
+		git("update-index", "--chmod=+x", "scripts/hooks/check-default-branch")
+			.status,
+		0,
+	);
+	assert.equal(commit().status, 0);
+});
+
+test("an unstaged broken guard is not the proposed guard", () => {
+	const { root, commit } = fixture();
+	writeFileSync(
+		join(root, "scripts/hooks/check-default-branch"),
+		"#!/bin/sh\nexit 23\n",
+	);
+	const result = commit();
+	assert.equal(result.status, 0, result.stderr);
+	assert.match(result.stdout + result.stderr, /gate-new/);
 });
 
 test("shared bootstrap refuses a missing checkout entry on feature and default branches", () => {

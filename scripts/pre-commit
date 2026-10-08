@@ -10,6 +10,18 @@ guard=$(git show HEAD:scripts/hooks/check-default-branch) || {
 }
 printf '%s\n' "$guard" | sh || exit 1
 
+# Validate the exact guard being committed before it becomes the next HEAD.
+case "$(git ls-files --stage -- scripts/hooks/check-default-branch)" in
+  "100755 "*) ;;
+  *) echo "error: the indexed scripts/hooks/check-default-branch must be an executable regular file." >&2; exit 1 ;;
+esac
+proposed_guard=$(git show :scripts/hooks/check-default-branch) || {
+  echo "error: cannot read scripts/hooks/check-default-branch from the index; refusing to commit an unvalidated guard." >&2
+  exit 1
+}
+printf '%s\n' "$proposed_guard" | sh -n || exit 1
+printf '%s\n' "$proposed_guard" | sh || exit 1
+
 # Biome's own exit code decides the outcome (#723). The previous shape wrote
 # fixes and then inferred failure from "did a staged file change", which a
 # syntax error slips through: biome can't parse the file, so it can't format
