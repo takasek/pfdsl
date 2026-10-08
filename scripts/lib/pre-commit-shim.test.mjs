@@ -108,12 +108,50 @@ describe("protected pre-commit shim", () => {
 		git("commit", "--allow-empty", "-qm", "allowed");
 		assert.equal(gateRan(), true);
 	});
-	for (const refState of ["missing", "dangling", "non-origin"]) {
-		it(`fails closed when origin/HEAD is ${refState}`, () => {
+	for (const branch of ["feature", "main"]) {
+		it(`uses the known main default without origin/HEAD on ${branch}`, () => {
 			const { git, runGit, gateRan } = fixture();
+			if (branch === "feature") git("switch", "-qc", branch);
+			git("symbolic-ref", "--delete", "refs/remotes/origin/HEAD");
+			const before = git("rev-parse", "HEAD");
+			const result = runGit("commit", "--allow-empty", "-qm", "fallback");
+			assert.equal(result.status === 0, branch === "feature", result.stderr);
+			if (branch === "main")
+				assert.match(result.stderr, /default branch 'main'/);
+			assert.equal(gateRan(), branch === "feature");
+			assert.equal(git("rev-parse", "HEAD") === before, branch === "main");
+		});
+	}
+	it("propagates the gate failure without origin/HEAD", () => {
+		const { git, runGit, gateRan } = fixture("main", 23);
+		git("switch", "-qc", "feature");
+		git("symbolic-ref", "--delete", "refs/remotes/origin/HEAD");
+		const before = git("rev-parse", "HEAD");
+		assert.notEqual(
+			runGit("commit", "--allow-empty", "-qm", "blocked").status,
+			0,
+		);
+		assert.equal(gateRan(), true);
+		assert.equal(git("rev-parse", "HEAD"), before);
+	});
+	it("uses the known default without any remote-tracking refs", () => {
+		const { git, gateRan } = fixture();
+		git("switch", "-qc", "feature");
+		git("symbolic-ref", "--delete", "refs/remotes/origin/HEAD");
+		git("update-ref", "-d", "refs/remotes/origin/main");
+		git("commit", "--allow-empty", "-qm", "allowed");
+		assert.equal(gateRan(), true);
+	});
+	for (const refState of ["direct", "malformed", "dangling", "non-origin"]) {
+		it(`fails closed when origin/HEAD is ${refState}`, () => {
+			const { root, git, runGit, gateRan } = fixture();
 			git("switch", "-qc", "feature");
-			if (refState === "missing")
+			if (refState === "direct") {
 				git("symbolic-ref", "--delete", "refs/remotes/origin/HEAD");
+				git("update-ref", "refs/remotes/origin/HEAD", "HEAD");
+			}
+			if (refState === "malformed")
+				writeFileSync(join(root, ".git/refs/remotes/origin/HEAD"), "invalid\n");
 			if (refState === "dangling")
 				git("update-ref", "-d", "refs/remotes/origin/main");
 			if (refState === "non-origin")
