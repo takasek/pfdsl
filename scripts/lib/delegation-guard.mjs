@@ -844,7 +844,12 @@ export function updateProtectedShellState(state, tokens) {
 		return true;
 	}
 	if (head === "unset") {
-		for (const { value } of arguments_) state.gitConfig.delete(value);
+		// Only variables are removed: `-f` removes functions and `-n` a name
+		// reference, so neither clears a tracked GIT_CONFIG* variable.
+		if (
+			arguments_.every(({ value }) => !value.startsWith("-") || value === "-v")
+		)
+			for (const { value } of arguments_) state.gitConfig.delete(value);
 		return applyUnset(state, arguments_);
 	}
 	if (head === "export" || STATEFUL_ASSIGNMENT_BUILTINS.has(head))
