@@ -7,6 +7,7 @@ import {
 	mkdirSync,
 	readdirSync,
 	readFileSync,
+	rmSync,
 	writeFileSync,
 } from "node:fs";
 import { cp, rm } from "node:fs/promises";
@@ -96,6 +97,11 @@ export function buildFixture(root, { mainCheckedOut = false } = {}) {
 	if (!mainCheckedOut) must(primary, "switch", "-q", "-c", "home");
 	must(primary, "worktree", "add", "-q", "-b", "topic", "../feature");
 	must(primary, "worktree", "add", "-q", "../sibling", "sib");
+	// Stale metadata for `worktree prune`, and a symbolic ref for
+	// `symbolic-ref --delete`, so their forms have something to remove.
+	must(primary, "worktree", "add", "-q", "--detach", "../gone");
+	rmSync(join(root, "gone"), { recursive: true, force: true });
+	must(primary, "symbolic-ref", "refs/heads/alias", "refs/heads/other");
 	writeFileSync(
 		join(root, "inc.cfg"),
 		'[remote "origin"]\n\tfetch = +refs/heads/*:refs/heads/*\n',
@@ -113,7 +119,12 @@ export function buildFixture(root, { mainCheckedOut = false } = {}) {
 }
 
 function readIf(path) {
-	return existsSync(path) ? readFileSync(path, "utf8") : null;
+	try {
+		return readFileSync(path, "utf8");
+	} catch {
+		// Missing, or a directory such as a slash-separated branch's parent.
+		return null;
+	}
 }
 
 async function snapshot({ primary, feature, sibling }) {
@@ -156,6 +167,17 @@ async function snapshot({ primary, feature, sibling }) {
 		worktrees: worktrees.join("\n"),
 		config: readIf(join(gitDir, "config")),
 		stashLog: readIf(join(gitDir, "logs", "refs", "stash")),
+		// Any branch reflog, so a reflog-only write is still an effect.
+		branchLogs: existsSync(join(gitDir, "logs", "refs", "heads"))
+			? readdirSync(join(gitDir, "logs", "refs", "heads"), { recursive: true })
+					.sort()
+					.map((name) =>
+						[name, readIf(join(gitDir, "logs", "refs", "heads", name))].join(
+							"=",
+						),
+					)
+					.join("|")
+			: null,
 		otherIndexes: [primaryIndex, siblingIndex].join("|"),
 		featureIndex,
 		featureFiles: existsSync(feature)
@@ -203,6 +225,7 @@ export function compare(before, after) {
 	}
 	if (before.featureIndex !== after.featureIndex) changes.push("feature index");
 	if (before.featureFiles !== after.featureFiles) changes.push("feature files");
+	if (before.branchLogs !== after.branchLogs) changes.push("branch reflogs");
 	for (const key of ["otherHeads", "worktrees", "stashLog", "otherIndexes"])
 		if (before[key] !== after[key]) {
 			changes.push(key);
@@ -232,18 +255,29 @@ export const quote = (arg) =>
 		? arg
 		: `'${arg.replace(/'/g, `'\\''`)}'`;
 
-export function commandText(args, input, env = {}) {
-	const git = [
-		...Object.entries(env).map(([name, value]) => `${name}=${quote(value)}`),
-		["git", ...args].map(quote).join(" "),
-	].join(" ");
+// `env` is written as a prefix assignment, or with `exported` as an earlier
+// `export` statement in the same command line.
+export function commandText(args, input, env = {}, exported = false) {
+	const assignments = Object.entries(env).map(
+		([name, value]) => `${name}=${quote(value)}`,
+	);
+	const call = ["git", ...args].map(quote).join(" ");
+	const git =
+		exported && assignments.length
+			? `export ${assignments.join(" ")}; ${call}`
+			: [...assignments, call].join(" ");
 	return input === undefined
 		? git
 		: `printf '%s\\n' ${quote(input.trimEnd())} | ${git}`;
 }
 
-// Forms name the fixture root as `{root}`; each worker substitutes its own.
-const atRoot = (value, root) => value.replaceAll("{root}", root);
+// Forms name the fixture root as `{root}` and an object as `{oid:<rev>}`;
+// each worker substitutes its own.
+function substitute(value, root, primary) {
+	return value
+		.replaceAll("{root}", root)
+		.replace(/\{oid:([^}]+)\}/g, (_, rev) => must(primary, "rev-parse", rev));
+}
 
 export function parentDecision(command, cwd) {
 	const result = runMainCommitGuard(
@@ -285,7 +319,7 @@ export const cross = (...lists) =>
  * @returns {{long?: string, short?: string, negatable: boolean, arity: "none" | "required" | "optional"}[]}
  */
 export function gitOptions(subcommand) {
-	const help = runSync(process.cwd(), [subcommand, "-h"]).stdout;
+	const help = runSync(process.cwd(), [...[subcommand].flat(), "-h"]).stdout;
 	const options = [];
 	for (const line of help.split("\n")) {
 		const match = line.match(
@@ -310,13 +344,35 @@ export function gitOptions(subcommand) {
 /**
  * Each documented option spelled every way Git accepts it, placed before the
  * operands: alone, consuming the next token as its value, attached, and
- * negated. Values are plain words the guard might mistake for an operand,
- * one free-form, one numeric and one enum value (`--conflict merge`) so that
- * Git accepts the option instead of rejecting the whole command.
+ * negated, and followed by its own negation, since the last occurrence wins
+ * and cancels any exemption granted for the first. Values are plain words the
+ * guard might mistake for an operand, one free-form, one numeric and one enum
+ * value (`--conflict merge`) so that Git accepts the option instead of
+ * rejecting the whole command.
  */
 export function optionSpellings(subcommand, values = ["x", "1", "merge"]) {
 	const spellings = [];
-	for (const { short, long, negatable, arity } of gitOptions(subcommand)) {
+	const options = gitOptions(subcommand);
+	const longs = options.flatMap(({ long, negatable }) =>
+		long ? [long, ...(negatable ? [`--no-${long.slice(2)}`] : [])] : [],
+	);
+	for (const { short, long, negatable, arity } of options) {
+		// parse-options accepts the shortest prefix no other long option shares.
+		const prefix = long
+			? Array.from({ length: long.length - 3 }, (_, i) =>
+					long.slice(0, i + 3),
+				).find(
+					(candidate) =>
+						longs.filter((name) => name.startsWith(candidate)).length === 1,
+				)
+			: undefined;
+		if (prefix)
+			spellings.push(arity === "required" ? [prefix, values[0]] : [prefix]);
+		if (negatable && long && arity !== "required") {
+			const negation = `--no-${long.slice(2)}`;
+			spellings.push([long, negation]);
+			if (short) spellings.push([short, negation]);
+		}
 		if (arity === "required") {
 			for (const value of values) {
 				if (long) spellings.push([long, value], [`${long}=${value}`]);
@@ -339,7 +395,8 @@ export function optionSpellings(subcommand, values = ["x", "1", "merge"]) {
  * a listed read the child denies, and a form Git did not finish (a timeout
  * observes nothing, so it must not count as safe). `sharedObserved` lists the
  * kinds of shared effect some form actually produced, so a caller can require
- * that its forms exercised what they claim to protect.
+ * that its forms exercised what they claim to protect. A form marked
+ * `parentAllows` is ordinary work the parent must not ask about or deny.
  */
 export async function observeForms(
 	root,
@@ -349,7 +406,7 @@ export async function observeForms(
 	const unique = [];
 	const seen = new Set();
 	for (const form of forms) {
-		const command = commandText(form.args, form.input, form.env);
+		const command = commandText(form.args, form.input, form.env, form.exported);
 		if (seen.has(command)) continue;
 		seen.add(command);
 		unique.push({ ...form, command });
@@ -369,19 +426,21 @@ export async function observeForms(
 			let dirty = false;
 			while (next < unique.length) {
 				const form = unique[next++];
-				const args = form.args.map((arg) => atRoot(arg, work));
-				const env = Object.fromEntries(
-					Object.entries(form.env ?? {}).map(([name, value]) => [
-						name,
-						atRoot(value, work),
-					]),
-				);
-				const command = commandText(args, form.input, env);
 				// Most forms fail or only read, so restore only after a change.
 				if (dirty) {
 					await rm(work, { recursive: true, force: true });
 					await cp(template, work, { recursive: true });
 				}
+				const args = form.args.map((arg) =>
+					substitute(arg, work, paths.primary),
+				);
+				const env = Object.fromEntries(
+					Object.entries(form.env ?? {}).map(([name, value]) => [
+						name,
+						substitute(value, work, paths.primary),
+					]),
+				);
+				const command = commandText(args, form.input, env, form.exported);
 				const result = await runGit(paths.feature, args, form.input, env);
 				const { changes, shared } = compare(pristine, await snapshot(paths));
 				dirty = changes.length > 0;
@@ -392,6 +451,10 @@ export async function observeForms(
 				const observed = `exit ${result.status}; changed [${changes.join(", ")}]`;
 				if (typeof result.status !== "number")
 					violations.push(`Git did not finish: ${form.command} (${observed})`);
+				if (form.parentAllows && parent !== "allow")
+					violations.push(
+						`parent ${parent}s ordinary work: ${form.command} (${observed})`,
+					);
 				if (shared.length && parent === "allow")
 					violations.push(
 						`parent allows shared effect [${shared.join(", ")}]: ${form.command} (${observed})`,

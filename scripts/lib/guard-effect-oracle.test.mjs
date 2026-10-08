@@ -45,7 +45,31 @@ const CHILD_READS = [
 	...[["get", "user.name"], ["list"], ["--get", "user.name"], ["--list"]].map(
 		(rest) => ({ args: ["config", ...rest] }),
 	),
+	...[
+		["reflog"],
+		["reflog", "show"],
+		["-c", "color.ui=never", "log", "-1"],
+	].map((args) => ({ args })),
 ];
+
+// Ordinary parent work: reads that carry `-c`, and isolated creation spelled
+// with long options. The parent must not ask about or deny any of these.
+const ORDINARY = [
+	["-c", "color.ui=never", "grep", "one"],
+	["-c", "color.ui=never", "blame", "file.txt"],
+	["-c", "color.ui=never", "shortlog", "-sn", "HEAD"],
+	["-c", "color.ui=never", "ls-remote", "origin"],
+	["-c", "color.ui=never", "log", "-1"],
+	["branch", "-q", "newb"],
+	["branch", "--quiet", "newb"],
+	["branch", "--create-reflog", "newb"],
+	["switch", "-c", "newb"],
+	["checkout", "-b", "newb"],
+	["fetch", "origin"],
+	["push", "origin", "topic"],
+	["reflog"],
+	["reflog", "show"],
+].map((args) => ({ args, parentAllows: true }));
 
 const BRANCH_OPTIONS = [
 	[],
@@ -210,6 +234,7 @@ const FORMS = [
 		["log", "-1", "--oneline"],
 	].map((args) => ({ args })),
 	...CHILD_READS,
+	...ORDINARY,
 ];
 
 // The forms above are hand-picked; these come from Git's own option tables,
@@ -232,6 +257,18 @@ const OPTION_FORMS = [
 		["other", "HEAD"],
 		["newb"],
 	]),
+	// A value that names a real program lets `--receive-pack`/`--exec` run.
+	...cross([["push"]], optionSpellings("push", ["x", "git-receive-pack"]), [
+		[".", "+HEAD:other"],
+		["../primary", "+HEAD:other"],
+	]),
+	...cross([["symbolic-ref"]], optionSpellings("symbolic-ref"), [
+		["refs/heads/alias"],
+		["HEAD", "refs/heads/main"],
+	]),
+	...cross([["worktree", "prune"]], optionSpellings(["worktree", "prune"]), [
+		[],
+	]),
 ].map((args) => ({ args }));
 
 async function withRoot(run) {
@@ -251,14 +288,15 @@ const INJECTIONS = [
 	{ pre: ["-c", `remote.origin.fetch=${REFSPEC}`] },
 	{ pre: ["-c", "include.path={root}/inc.cfg"] },
 	{ pre: ["--config-env=remote.origin.fetch=RS"], env: { RS: REFSPEC } },
-	{
+	...[false, true].map((exported) => ({
 		pre: [],
 		env: {
 			GIT_CONFIG_COUNT: "1",
 			GIT_CONFIG_KEY_0: "remote.origin.fetch",
 			GIT_CONFIG_VALUE_0: REFSPEC,
 		},
-	},
+		exported,
+	})),
 ];
 const FETCHES = [
 	["fetch", "origin"],
@@ -280,6 +318,13 @@ const LOCAL_WRITERS = [
 	["reflog", "expire", "--expire=now", "--all"],
 	["reflog", "expire", "--expire=now", "refs/stash"],
 	["reflog", "delete", "refs/stash@{0}"],
+	["reflog", "write", "refs/stash", "{oid:stash}", "{oid:HEAD}", "injected"],
+	["reflog", "write", "refs/heads/other", "{oid:other}", "{oid:HEAD}", "x"],
+	// Remote settings written outside `git config` are repository config too.
+	["remote", "add", "--mirror=fetch", "m", "{root}/origin.git"],
+	["remote", "set-url", "origin", "{root}/elsewhere.git"],
+	["remote", "rename", "origin", "renamed"],
+	["remote", "remove", "origin"],
 	["checkout", "-B", "other"],
 	["checkout", "-B", "other", "HEAD"],
 	["switch", "-C", "other"],
@@ -289,8 +334,8 @@ const LOCAL_WRITERS = [
 	["replace", "HEAD", "HEAD~1"],
 ];
 const LAYOUT_FORMS = [
-	...INJECTIONS.flatMap(({ pre, env }) =>
-		FETCHES.map((rest) => ({ args: [...pre, ...rest], env })),
+	...INJECTIONS.flatMap(({ pre, env, exported }) =>
+		FETCHES.map((rest) => ({ args: [...pre, ...rest], env, exported })),
 	),
 	...LOCAL_WRITERS.map((args) => ({ args })),
 ];
