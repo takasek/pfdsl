@@ -342,17 +342,6 @@ export function isReadOnlyGitReflog(args) {
 	return !["expire", "delete", "drop", "write"].includes(args[0]);
 }
 
-// Subcommands with no mode that writes a ref, the index, the config or a
-// reflog: they print from the object database, refs, index or working tree.
-// The second block is the ordinary search and inspection commands a command-line
-// config such as `-c color.ui=never` is routinely paired with — grep, blame and
-// annotate (history and content search), shortlog and cherry (log summaries),
-// ls-remote (lists a remote's refs), diff-tree, diff-index and diff-files
-// (plumbing diffs), name-rev, show-branch and range-diff (ref and range
-// inspection), whatchanged (a log variant), check-ignore and check-attr
-// (attribute queries), count-objects, verify-commit and verify-tag (reports),
-// and version and var (print constants). Each only reads, so a child may run it
-// and a config override on it is not a shared effect.
 function remoteVerb(args) {
 	return args.find((arg) => !["-v", "--verbose"].includes(arg));
 }
@@ -428,6 +417,20 @@ function writesGitRemoteConfig(args) {
 	);
 }
 
+// Subcommands with no mode that writes a ref, the index, the config or a
+// reflog: they print from the object database, refs, index or working tree.
+// Besides the basic status, diff, log and rev-parse family, the set holds the
+// ordinary search and inspection commands a command-line config such as
+// `-c color.ui=never` is routinely paired with: grep, blame and annotate
+// (history and content search), shortlog and cherry (log summaries), ls-remote
+// (lists a remote's refs), diff-tree, diff-index and diff-files (plumbing
+// diffs), name-rev, show-branch and range-diff (ref and range inspection),
+// whatchanged (a log variant), check-ignore and check-attr (attribute
+// queries), count-objects, verify-commit and verify-tag (reports), and version
+// and var (print constants). Each only reads, so a child may run it and a
+// config override on it is not a shared effect. Subcommands with both read and
+// write modes (branch, remote, config, reflog, stash, tag, notes, worktree) are
+// decided per invocation in isReadOnlyGitInvocation instead.
 const READ_ONLY_GIT_SUBCOMMANDS = new Set([
 	"grep",
 	"blame",
