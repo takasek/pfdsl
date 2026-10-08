@@ -29,7 +29,7 @@ import {
 	githubToolEffect,
 	mergeDecision,
 } from "./external-operation-policy.mjs";
-import { parseGhCommand } from "./gh-command.mjs";
+import { ghCommandSelectorTokens, parseGhCommand } from "./gh-command.mjs";
 import { buildPermissionOutput, parseHookPayload } from "./hook-io.mjs";
 import {
 	classifyCodexGitRoutine,
@@ -333,8 +333,17 @@ export function splitSegments(source) {
 export function shellParseDecision(command) {
 	const failure = syntaxDecision(command);
 	if (failure) return failure;
+	const ambiguousWord = (token) =>
+		token.multipleWords || (token.dynamic && /^-[^-]/.test(token.value));
 	for (const { tokens } of readShellCommands(command)) {
-		const { end } = parseLeadingShellPrefix(tokens);
+		const { end, unresolved } = parseLeadingShellPrefix(tokens);
+		if (unresolved || tokens.slice(0, end).some(ambiguousWord))
+			return {
+				decision: "deny",
+				matched: "shell prefix",
+				reason:
+					"Cannot inspect this executable prefix. Use supported literal options or run the command separately.",
+			};
 		const executable = tokens[end];
 		const builtinName =
 			executable?.value === "builtin"
@@ -347,19 +356,43 @@ export function shellParseDecision(command) {
 				reason:
 					"Cannot inspect a dynamic executable. Rewrite it using a literal command name.",
 			};
+		const invocation = tokens.slice(end);
+		if (invocation.length)
+			invocation[0] = {
+				...invocation[0],
+				value: basename(invocation[0].value),
+			};
+		if (
+			["git", "gh"].includes(invocation[0]?.value) &&
+			invocation.some(ambiguousWord)
+		)
+			return {
+				decision: "deny",
+				matched: "command words",
+				reason:
+					"Cannot inspect argument expansion that may change command words. Use separate options with quoted scalar values and literal command selectors.",
+			};
+		const selectors =
+			invocation[0]?.value === "git"
+				? [invocation[gitSubcommandIndex(invocation)]]
+				: (ghCommandSelectorTokens(invocation) ?? []);
+		// API endpoints, methods and GraphQL fields can all encode a merge.
+		if (
+			selectors.some((token) => token?.dynamic) ||
+			(selectors[0]?.value === "api" &&
+				invocation.some((token) => token.dynamic))
+		)
+			return {
+				decision: "deny",
+				matched: "command selector",
+				reason:
+					"Cannot inspect a dynamic Git or GitHub command selector or API request. Use literal subcommands and API arguments.",
+			};
 	}
 	return null;
 }
 
-const ENV_FLAGS_WITH_VALUE = new Set([
-	"-u",
-	"--unset",
-	"-C",
-	"--chdir",
-	"-S",
-	"--split-string",
-	"-P",
-]);
+const ENV_FLAGS_WITH_VALUE = new Set(["-u", "--unset", "-C", "--chdir", "-P"]);
 
 const GIT_TARGET_VARIABLES = new Set([
 	"GIT_DIR",
@@ -436,6 +469,7 @@ export function parseEnvPrefix(tokens, start = 0) {
 			continue;
 		}
 		if (ENV_FLAGS_WITH_VALUE.has(value)) {
+			if (!tokens[i + 1]) malformed = true;
 			i += 2;
 			continue;
 		}
@@ -446,12 +480,14 @@ export function parseEnvPrefix(tokens, start = 0) {
 			value === "--null" ||
 			value === "-v" ||
 			value === "--debug" ||
-			/^-(?:u|C|S|P).+/.test(value) ||
-			/^--(?:unset|chdir|split-string)=/.test(value)
+			/^-(?:u|C|P).+/.test(value) ||
+			/^--(?:unset|chdir)=/.test(value)
 		) {
 			i++;
 			continue;
 		}
+		// Split-string and unknown options can supply or hide executable words.
+		if (value.startsWith("-")) malformed = true;
 		break;
 	}
 	return { end: i, chdir, malformed, gitTargetOverride, gitConfigOverride };
@@ -696,6 +732,8 @@ export function parseLeadingShellPrefix(tokens) {
 		}
 		if (executable === "nohup") {
 			i++;
+			if (tokens[i]?.value === "--") i++;
+			else if (tokens[i]?.value.startsWith("-")) unresolved = true;
 			continue;
 		}
 		break;
@@ -717,6 +755,18 @@ export function stripLeadingNoise(tokens) {
 export function gitSubcommandIndex(tokens) {
 	for (let i = 1; i < tokens.length; i++) {
 		const { value } = tokens[i];
+		if (
+			[...GIT_GLOBAL_FLAGS_WITH_VALUE].some(
+				(flag) =>
+					value.startsWith(`${flag}=`) ||
+					(!tokens[i].dynamic &&
+						["-C", "-c"].includes(flag) &&
+						value.startsWith(flag) &&
+						value.length > 2),
+			)
+		)
+			continue;
+		if (tokens[i].dynamic) return i;
 		if (GIT_GLOBAL_FLAGS_WITH_VALUE.has(value)) {
 			i++;
 			continue;

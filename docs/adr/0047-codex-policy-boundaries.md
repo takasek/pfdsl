@@ -23,12 +23,18 @@ case の pattern と引用された本文は命令にせず、引用内や非引
 
 Zsh モードは upstream でも実験的なため、全 Zsh 構文の対応は要求しない。
 repeat・always・coproc 等の未対応構文、動的な実行名、解析不能な入力は明示して拒否し、通常の for/while/if、単純命令や script file への書換えを案内する。
+Git の subcommand と gh の group・verb が動的な場合も拒否する。
+前置 option の値や Git・gh の引数で配列展開・未引用展開が複数語を差し込む可能性も推測せず停止し、引用した scalar 値へ書き換える。
+短縮 option へ動的値を直結する形は、空値で次の引数を消費するため停止し、`-R "$REPO"`・`-c "$CONFIG"` 等の分離した値へ書き換える。
+gh api の動的引数は endpoint・method・GraphQL 本文に merge が隠れうるため停止し、通常の pr view/create の番号・本文・repository 指定等の値は引き続き使える。
+env の split-string と未知の前置 option は実行命令を確定できないため停止し、nohup の `--` は通常の命令位置として扱う。
 未知の program が heredoc を実行する場合も、その言語を shell と推測せず明示して止める。
 parser は make setup で公式 release の SHA-256 を照合して導入する。
 hook 実行中はネットワークから取得せず、欠落・異常終了・timeout は修復案内を伴う拒否にする。
 
 シェルの作業先・export 属性・readonly・unset の成功・分岐の状態は解釈しない。
 通常の Git 呼出しは harness workdir を使い、各命令の `git -C <literal>`、`env -C <literal>`、既知 wrapper の明示 target は直接解決する。
+明示 target の path は symlink を先に辿ってから `..` を処理し、lexical な正準化で別 checkout へ読み替えない。
 入力内に cd・pushd・popd があれば、暗黙または相対的な Git 宛先は拒否する。
 その場合は `git -C <absolute literal>` または wrapper の絶対 target を指定する。
 Git/CDPATH の可視代入・環境 setter・read・printf -v・source・eval と変更系 Git の組合せは、状態の回復を推測せず拒否し、Git の呼出しを環境 setter から分けるよう案内する。
@@ -101,7 +107,10 @@ Edit・Write・apply_patch は全 target を物理パスへ正規化する。
 symlink を先に辿ってから `..` を処理し、新規ファイルは既存親を調べる。
 patch の追加・変更・削除・移動元と移動先を全件確認し、一つでも拒否なら patch 全体を拒否する。
 同じ repository の primary checkout への書込みを拒否し、Codex の linked checkout には上記 native 所有証拠を要求する。
-不正 patch、dangling symlink、repo 内の解決不能 target は拒否する。
+Delete は末尾 symlink を辿らず directory entry の所在を検査する。
+Move は削除する source entry を検査し、destination は書き込む内容の所在を検査する。
+同一パスの Move to でも削除と内容書込みの両方を確認する。
+不正 patch、内容を辿る際の dangling symlink、repo 内の解決不能 target は拒否する。
 既知の root prefix 外でも祖先に .git marker がある probe 失敗は scratch と区別して拒否する。
 Git common dir が異なる repository と repo 外の scratch は既存の管轄外として扱う。
 生成 root instructions の正本案内を維持する。

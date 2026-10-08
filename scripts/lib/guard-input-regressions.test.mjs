@@ -1,7 +1,101 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { findOutwardCommand, splitCommandFlow } from "./delegation-guard.mjs";
+import {
+	evaluateDelegationGuard,
+	findOutwardCommand,
+	splitCommandFlow,
+} from "./delegation-guard.mjs";
 import { evaluateMainCommitGuard } from "./main-commit-guard.mjs";
+
+describe("opaque command selectors and executable prefixes", () => {
+	for (const command of [
+		'op=update-ref; git "$op" refs/heads/main HEAD',
+		'git -C /repo "$OP" refs/heads/main HEAD',
+		"git --$OPTION status",
+		'group=pr; verb=merge; gh "$group" "$verb" 123',
+		'gh -R "$REPO" pr "$VERB" 123',
+		'gh api "$ENDPOINT" -X PUT',
+		'gh api -X PUT "$ENDPOINT"',
+		'gh api graphql -f query="$QUERY"',
+		'/usr/bin/gh pr "$VERB" 123',
+		'EMPTY=""; gh -R"$EMPTY" owner/repo pr merge 123',
+		'EMPTY=""; env -u"$EMPTY" UNUSED git update-ref refs/heads/main HEAD',
+		'EMPTY=""; git -c"$EMPTY" x=y update-ref refs/heads/main HEAD',
+		'EMPTY=""; exec -a"$EMPTY" dummy gh pr merge 123',
+		'EMPTY=""; sudo -u"$EMPTY" user gh pr merge 123',
+		'EMPTY=""; time -f"$EMPTY" format gh pr merge 123',
+		'EMPTY=""; gh pr merge -b"$EMPTY" --help',
+		'gh -R"$REPO" pr view "$NUMBER"',
+		`args=(owner/repo pr merge 123); gh -R "\${args[@]}"`,
+		`args=(UNUSED git update-ref refs/heads/main HEAD); env -u "\${args[@]}"`,
+		`args=(x=y update-ref refs/heads/main HEAD); git -c "\${args[@]}"`,
+		'gh -R "$@"',
+		"env -u $OPTIONS",
+		"git -c $OPTIONS status",
+		"env -S 'git commit -m x'",
+		"env --split-string='gh pr merge 123'",
+		"env -Sgit update-ref refs/heads/main HEAD",
+		"env --ignore-signal=PIPE gh api -X PUT repos/O/R/pulls/123/merge",
+		"env --ignore-signal=PIPE git update-ref refs/heads/main HEAD",
+		'env "$OPTIONS" git commit -m x',
+	]) {
+		it(`rejects an unresolved invocation in every caller: ${command}`, () => {
+			const payload = { tool_name: "Bash", tool_input: { command } };
+			assert.equal(
+				evaluateDelegationGuard(payload, { supportsAsk: false }).decision,
+				"deny",
+			);
+			assert.equal(
+				evaluateDelegationGuard(
+					{ ...payload, agent_id: "child" },
+					{ supportsAsk: false },
+				).decision,
+				"deny",
+			);
+			assert.equal(
+				evaluateMainCommitGuard(payload, { currentBranch: "main" }).decision,
+				"deny",
+			);
+		});
+	}
+	it("recognizes nohup's option terminator and actual shell command positions", () => {
+		for (const command of [
+			"nohup -- git commit -m x",
+			"exec git commit -m x",
+			"if git commit -m x; then :; fi",
+		]) {
+			const payload = { tool_name: "Bash", tool_input: { command } };
+			assert.equal(
+				evaluateDelegationGuard(
+					{ ...payload, agent_id: "child" },
+					{ supportsAsk: false },
+				).decision,
+				"deny",
+				command,
+			);
+			assert.equal(
+				evaluateMainCommitGuard(payload, { currentBranch: "main" }).decision,
+				"deny",
+				command,
+			);
+		}
+	});
+	it("keeps ordinary dynamic option values and literal read commands usable", () => {
+		for (const command of [
+			'git log -1 --format="$FORMAT"',
+			'git --config-env=core.pager="$PAGER_ENV" log -1',
+			'git -c "user.name=$NAME" log -1',
+			'gh -R "$REPO" pr view "$NUMBER"',
+			'gh --repo="$REPO" pr view "$NUMBER"',
+			"env -i nohup -- git status",
+			"env -u UNUSED git status",
+			'gh pr create --title "$TITLE" --body "$BODY"',
+		]) {
+			const payload = { tool_name: "Bash", tool_input: { command } };
+			assert.equal(evaluateDelegationGuard(payload).decision, "allow", command);
+		}
+	});
+});
 
 describe("heredoc command boundaries", () => {
 	for (const delimiter of ["EOF", "'EOF'", '"EOF"', "E'O'F", "\\EOF"]) {

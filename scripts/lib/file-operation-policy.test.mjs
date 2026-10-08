@@ -26,6 +26,10 @@ writeFileSync(join(main, "AGENTS.md"), "generated");
 symlinkSync(join(main, "dir"), join(own, "alias"));
 symlinkSync(join(main, "AGENTS.md"), join(own, "instructions"));
 symlinkSync(join(root, "missing"), join(own, "dangling"));
+for (const directory of [main, own, other]) {
+	symlinkSync(join(root, "scratch.txt"), join(directory, "scratch-link"));
+}
+writeFileSync(join(root, "scratch.txt"), "old");
 after(() => rmSync(root, { recursive: true, force: true }));
 
 test("a broken repository outside the known root prefixes is not scratch", () => {
@@ -129,6 +133,70 @@ test("Delete paths and unknown/malformed patch inputs cannot escape checks", () 
 			tool_name: "Write",
 			tool_input: { file_path: "relative" },
 		}),
+	);
+});
+
+test("patch deletion checks the symlink entry rather than its referent", () => {
+	for (const [path, decision] of [
+		[join(main, "scratch-link"), "deny"],
+		[join(other, "scratch-link"), "deny"],
+		[join(own, "scratch-link"), "allow"],
+		[join(own, "instructions"), "allow"],
+		[join(own, "dangling"), "allow"],
+		[`${own}/alias/../scratch-link`, "deny"],
+	]) {
+		const input = patch(`*** Delete File: ${path}`);
+		assert.equal(
+			evaluatePhysicalWrites(input, roots, io).decision,
+			decision,
+			path,
+		);
+	}
+});
+
+test("patch moves check source entries and destination content writes", () => {
+	const move = (source, destination) =>
+		patch(
+			`*** Update File: ${source}\n*** Move to: ${destination}\n@@\n-old\n+new`,
+		);
+	for (const input of [
+		move(join(main, "scratch-link"), join(own, "moved.txt")),
+		move(join(main, "scratch-link"), join(main, "scratch-link")),
+		move(join(other, "scratch-link"), join(own, "moved.txt")),
+		move(join(own, "old.txt"), join(own, "instructions")),
+	])
+		assert.equal(evaluatePhysicalWrites(input, roots, io).decision, "deny");
+	assert.equal(
+		evaluatePhysicalWrites(
+			move(join(own, "instructions"), join(own, "moved.txt")),
+			roots,
+			io,
+		).decision,
+		"allow",
+	);
+	assert.equal(
+		evaluatePhysicalWrites(
+			move(join(own, "scratch-link"), join(own, "moved.txt")),
+			roots,
+			io,
+		).decision,
+		"allow",
+	);
+	assert.equal(
+		evaluatePhysicalWrites(
+			move(join(own, "old.txt"), join(main, "scratch-link")),
+			roots,
+			io,
+		).decision,
+		"allow",
+	);
+	assert.equal(
+		evaluatePhysicalWrites(
+			patch(`*** Update File: ${main}/scratch-link\n@@\n-old\n+new`),
+			roots,
+			io,
+		).decision,
+		"allow",
 	);
 });
 

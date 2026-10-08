@@ -4,20 +4,27 @@ import { refineNativeWorktreeRelation } from "./native-worktree-owner.mjs";
 import { resolveGitRoots } from "./run-exec.mjs";
 
 /** Resolve components in order: resolving '..' before symlinks changes meaning. */
-export function resolvePhysicalPath(path, cwd) {
+export function resolvePhysicalPath(
+	path,
+	cwd,
+	{ followFinalSymlink = true } = {},
+) {
 	if (typeof path !== "string" || !path || path.includes("\0"))
 		throw new Error("Cannot resolve file target");
 	if (!isAbsolute(path) && (typeof cwd !== "string" || !isAbsolute(cwd)))
 		throw new Error("Relative file target has no absolute cwd");
 	const absolute = isAbsolute(path) ? path : `${cwd}/${path}`;
 	let current = "/";
-	for (const part of absolute.split("/")) {
+	const parts = absolute.split("/");
+	for (let index = 0; index < parts.length; index++) {
+		const part = parts[index];
 		if (!part || part === ".") continue;
 		if (part === "..") {
 			current = dirname(current);
 			continue;
 		}
 		const next = join(current, part);
+		if (!followFinalSymlink && index === parts.length - 1) return next;
 		try {
 			lstatSync(next);
 		} catch (error) {
@@ -39,10 +46,13 @@ export function normalizeFileOperations(
 	const name = payload?.tool_name;
 	if (!["Edit", "Write", "apply_patch"].includes(name)) return [];
 	const input = payload?.tool_input;
-	const operation = (tool, path, text = {}) => ({
+	const operation = (tool, path, text = {}, followFinalSymlink = true) => ({
 		...payload,
 		tool_name: tool,
-		tool_input: { ...text, file_path: physicalPath(path, payload.cwd) },
+		tool_input: {
+			...text,
+			file_path: physicalPath(path, payload.cwd, { followFinalSymlink }),
+		},
 	});
 	if (name !== "apply_patch") return [operation(name, input?.file_path, input)];
 	const text = input?.command;
@@ -58,13 +68,13 @@ export function normalizeFileOperations(
 		const [, kind, path] = header;
 		if (kind === "Delete") {
 			operations.push(
-				operation("Edit", path, { old_string: "", new_string: "" }),
+				operation("Edit", path, { old_string: "", new_string: "" }, false),
 			);
 			continue;
 		}
 		let destination = path;
-		if (kind === "Update" && lines[i]?.startsWith("*** Move to: "))
-			destination = lines[i++].slice("*** Move to: ".length);
+		const moved = kind === "Update" && lines[i]?.startsWith("*** Move to: ");
+		if (moved) destination = lines[i++].slice("*** Move to: ".length);
 		const before = [],
 			after = [];
 		let hunk = kind === "Add";
@@ -94,9 +104,13 @@ export function normalizeFileOperations(
 				old_string: before.join("\n"),
 				new_string: after.join("\n"),
 			};
-			operations.push(operation("Edit", path, changes));
-			if (destination !== path)
+			const source = operation("Edit", path, changes, !moved);
+			operations.push(source);
+			if (moved) {
+				// Move reads source content, writes destination content, then unlinks
+				// the source entry, even when both directive paths are identical.
 				operations.push(operation("Edit", destination, changes));
+			}
 		}
 	}
 	if (!operations.length)

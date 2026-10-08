@@ -8,10 +8,8 @@
 // value-taking global flag has to be skipped too, or `owner/repo` reads as
 // the group.
 //
-// Quoting is not inspected past the head. Whether an argument arrives as
-// --label flow:managed or --label "flow:managed" does not change what gh does,
-// and the head check (an unquoted `gh`) is already what keeps
-// `echo "gh issue create ..."` from matching.
+// Literal quoting does not change the argv values; dynamic markers remain
+// available for guards that must inspect selectors before allowing a command.
 
 // Global flags that consume the following token. `-R`/`--repo` are the only
 // value-taking flags gh accepts before the group: measured against gh 2.96.0
@@ -23,36 +21,49 @@
 export const GLOBAL_FLAGS_WITH_VALUE = new Set(["-R", "--repo"]);
 
 /**
- * The group, verb and argument values of a `gh` call, or null when the segment
- * does not run `gh`. `args` is every token after the head, quoting stripped.
+ * The group and next operand tokens of a `gh` call, retaining dynamic markers.
+ * An unresolved option is also a selector: expansion can introduce operands.
  * @param {Array<{value: string, quoted: boolean, dynamic?: boolean}>} tokens command words from the shell syntax tree
- * @returns {{group: string, verb: string | null, args: string[]} | null}
+ * @returns {Array<{value: string, quoted: boolean, dynamic?: boolean} | null> | null}
  */
-export function parseGhCommand(tokens) {
+export function ghCommandSelectorTokens(tokens) {
 	if (tokens.length === 0) return null;
 	const head = tokens[0];
 	if (head.dynamic || head.value !== "gh") return null;
 
-	const args = tokens.slice(1).map((token) => token.value);
-
 	/** The index of the next token that is not a flag or a flag's value. */
 	const nextOperand = (from) => {
-		for (let i = from; i < args.length; i++) {
-			const value = args[i];
+		for (let i = from; i < tokens.length; i++) {
+			const { value, dynamic } = tokens[i];
+			if (
+				(!dynamic && value.startsWith("-R") && value.length > 2) ||
+				[...GLOBAL_FLAGS_WITH_VALUE].some((flag) =>
+					value.startsWith(`${flag}=`),
+				)
+			)
+				continue;
+			if (dynamic) return i;
 			if (!value.startsWith("-")) return i;
 			if (GLOBAL_FLAGS_WITH_VALUE.has(value)) i++;
 		}
 		return -1;
 	};
 
-	const groupIndex = nextOperand(0);
+	const groupIndex = nextOperand(1);
 	if (groupIndex === -1) return null;
 	const verbIndex = nextOperand(groupIndex + 1);
 
+	return [tokens[groupIndex], verbIndex === -1 ? null : tokens[verbIndex]];
+}
+
+/** Group/verb values and every argument after the executable. */
+export function parseGhCommand(tokens) {
+	const selectors = ghCommandSelectorTokens(tokens);
+	if (!selectors) return null;
 	return {
-		group: args[groupIndex],
-		verb: verbIndex === -1 ? null : args[verbIndex],
-		args,
+		group: selectors[0].value,
+		verb: selectors[1]?.value ?? null,
+		args: tokens.slice(1).map((token) => token.value),
 	};
 }
 

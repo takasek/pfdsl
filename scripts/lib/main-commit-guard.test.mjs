@@ -7,6 +7,7 @@ import {
 	readFileSync,
 	realpathSync,
 	rmSync,
+	symlinkSync,
 	writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
@@ -31,6 +32,72 @@ function payload({ toolName = "Bash", command, cwd }) {
 	if (cwd !== undefined) value.cwd = cwd;
 	return value;
 }
+
+it("resolves attached literal -C targets without consuming other option values", () => {
+	for (const [command, cwd, decision] of [
+		["git -C/fixture/main commit -m x", "/fixture/topic", "deny"],
+		["git -C/fixture/topic commit -m x", "/fixture/main", "allow"],
+		["git -C '' commit -m x", "/fixture/topic", "allow"],
+		["git --namespace -C/fixture/topic commit -m x", "/fixture/main", "deny"],
+	]) {
+		const result = runMainCommitGuard(
+			JSON.stringify(payload({ command, cwd })),
+			{
+				supportsAsk: false,
+				resolveBranches: (_, target) => ({
+					currentBranch: target === "/fixture/main" ? "main" : "topic",
+					mainBranch: "main",
+					targetRelation: "own",
+				}),
+			},
+		);
+		assert.equal(
+			result.output?.hookSpecificOutput.permissionDecision ?? "allow",
+			decision,
+			command,
+		);
+	}
+});
+
+it("resolves symlink/.. targets in filesystem order for Git and env chdir", () => {
+	const root = realpathSync(mkdtempSync(join(tmpdir(), "pfdsl-git-path-")));
+	try {
+		const main = join(root, "main"),
+			own = join(root, "own");
+		mkdirSync(join(main, "dir"), { recursive: true });
+		mkdirSync(own);
+		symlinkSync(join(main, "dir"), join(own, "alias"));
+		const target = `${own}/alias/..`;
+		assert.equal(
+			execFileSync("pwd", ["-P"], { cwd: target, encoding: "utf8" }).trim(),
+			main,
+		);
+		for (const command of [
+			`git -C ${target} commit -m x`,
+			`git -C${target} commit -m x`,
+			`env -C ${target} git commit -m x`,
+		]) {
+			const result = runMainCommitGuard(
+				JSON.stringify(payload({ command, cwd: own })),
+				{
+					supportsAsk: false,
+					resolveBranches: (_, path) => ({
+						currentBranch: path === main ? "main" : "topic",
+						mainBranch: "main",
+						targetRelation: "own",
+					}),
+				},
+			);
+			assert.equal(
+				result.output?.hookSpecificOutput.permissionDecision,
+				"deny",
+				command,
+			);
+		}
+	} finally {
+		rmSync(root, { recursive: true, force: true });
+	}
+});
 
 describe("classifyGitCommand", () => {
 	it("denies subcommands that create new state on the branch", () => {
@@ -1201,7 +1268,7 @@ describe("runMainCommitGuard", () => {
 		assert.equal(output.hookSpecificOutput.permissionDecision, "deny");
 	});
 
-	it("names the bypass flag too when the cwd is unresolved, so one retry fixes both (#1232)", () => {
+	it("rejects unquoted target expansion before any branch probe (#1232)", () => {
 		const input = JSON.stringify(
 			payload({ command: "git -C $W commit --no-verify -m x" }),
 		);
@@ -1212,9 +1279,8 @@ describe("runMainCommitGuard", () => {
 		});
 		assert.equal(shouldOutput, true);
 		const reason = output.hookSpecificOutput.permissionDecisionReason;
-		assert.match(reason, /Git target cannot be resolved/);
-		assert.match(reason, /--no-verify/);
-		assert.match(reason, /drop/i);
+		assert.match(reason, /may change command words/);
+		assert.match(reason, /quoted scalar/);
 	});
 });
 

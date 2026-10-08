@@ -24,7 +24,7 @@
 // lands outside the target repo (`--global`/`--system`/`--file`), which a
 // foreign target does not excuse either.
 
-import { basename, resolve } from "node:path";
+import { basename } from "node:path";
 import {
 	GIT_GLOBAL_FLAGS_WITH_VALUE,
 	gitSubcommand,
@@ -32,6 +32,7 @@ import {
 	parseLeadingShellPrefix,
 	shellParseDecision,
 } from "./delegation-guard.mjs";
+import { resolvePhysicalPath } from "./file-operation-policy.mjs";
 import { buildPermissionOutput, parseHookPayload } from "./hook-io.mjs";
 import {
 	classifyCodexGitRoutine,
@@ -679,6 +680,14 @@ function staticPath(token) {
 	return token.dynamic ? null : token.value;
 }
 
+function physicalCwd(target, cwd) {
+	try {
+		return resolvePhysicalPath(target, cwd);
+	} catch {
+		return null;
+	}
+}
+
 /** Resolve every pre-subcommand `git -C` in the order Git applies them. */
 function resolveGitCwd(tokens, shellCwd) {
 	const subcommandAt = gitSubcommandIndex(tokens);
@@ -694,12 +703,18 @@ function resolveGitCwd(tokens, shellCwd) {
 			token.value.startsWith("--work-tree=")
 		)
 			return null;
-		if (token.value !== "-C") continue;
-		const target = staticPath(tokens[i + 1]);
+		if (token.value !== "-C" && !token.value.startsWith("-C")) {
+			if (GIT_GLOBAL_FLAGS_WITH_VALUE.has(token.value)) i++;
+			continue;
+		}
+		const target =
+			token.value === "-C"
+				? staticPath(tokens[++i])
+				: staticPath({ ...token, value: token.value.slice(2) });
 		if (target === null) cwd = null;
-		else if (target.startsWith("/")) cwd = resolve(target);
-		else if (cwd !== null) cwd = resolve(cwd, target);
-		i++;
+		else if (target === "") continue;
+		else if (target.startsWith("/") || cwd !== null)
+			cwd = physicalCwd(target, cwd);
 	}
 	return cwd;
 }
@@ -712,8 +727,8 @@ function resolveEnvCwd(tokens, shellCwd) {
 		if (env.chdir !== undefined) {
 			const target = staticPath(env.chdir);
 			if (target === null) cwd = null;
-			else if (target.startsWith("/")) cwd = resolve(target);
-			else if (cwd !== null) cwd = resolve(cwd, target);
+			else if (target.startsWith("/") || cwd !== null)
+				cwd = physicalCwd(target, cwd);
 		}
 	}
 	return cwd;
@@ -722,7 +737,7 @@ function resolveEnvCwd(tokens, shellCwd) {
 function resolveCodexRoutineCwd(tokens) {
 	const routine = classifyCodexGitRoutine(tokens.map((token) => token.value));
 	const target = routine ? staticPath(tokens[routine.targetAt]) : null;
-	return target === null ? null : resolve(target);
+	return target === null ? null : physicalCwd(target);
 }
 
 function guardedSuffix(tokens, options) {

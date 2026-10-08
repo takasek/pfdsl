@@ -72,12 +72,20 @@ function adaptShell(ast, source) {
 	function word(node) {
 		let quoted = false;
 		let dynamic = false;
+		let multipleWords = false;
 		let quote;
 		function part(p, inDouble = false) {
 			switch (p.Type) {
 				case "Lit":
-					if (!inDouble && /[~*?[\]{}]/.test(p.Value.replace(/\\[\s\S]/g, "")))
+					if (
+						!inDouble &&
+						/[~*?[\]{}]/.test(p.Value.replace(/\\[\s\S]/g, ""))
+					) {
 						dynamic = true;
+						multipleWords ||= /[*?[]|\{[^}]*[,.][^}]*\}/.test(
+							p.Value.replace(/\\[\s\S]/g, ""),
+						);
+					}
 					return p.Value.replace(
 						inDouble ? /\\([\\$`"\n])/g : /\\([\s\S])/g,
 						(_, ch) => (ch === "\n" ? "" : ch),
@@ -98,8 +106,18 @@ function adaptShell(ast, source) {
 						return text(p);
 					}
 					return (p.Parts ?? []).map((p) => part(p, true)).join("");
+				case "ParamExp":
+					dynamic = true;
+					multipleWords ||=
+						!inDouble ||
+						Boolean(p.Index || p.Excl || p.Names) ||
+						p.Param?.Value === "@";
+					for (const nested of p.Exp?.Word?.Parts ?? []) part(nested, inDouble);
+					return text(p);
 				default:
 					dynamic = true;
+					multipleWords ||=
+						!inDouble && !["ArithmExp", "ProcSubst"].includes(p.Type);
 					return text(p);
 			}
 		}
@@ -107,6 +125,7 @@ function adaptShell(ast, source) {
 		const token = { value, quoted };
 		if (node.Parts?.length === 1 && quoted) token.quote = quote;
 		if (dynamic) token.dynamic = true;
+		if (multipleWords) token.multipleWords = true;
 		return token;
 	}
 
@@ -122,6 +141,8 @@ function adaptShell(ast, source) {
 				dynamic: true,
 			};
 		const value = node.Value ? word(node.Value) : { value: "", quoted: false };
+		// Assignment values are not argv words and do not undergo word splitting.
+		delete value.multipleWords;
 		return {
 			...value,
 			value: `${node.Name.Value}${node.Append ? "+=" : "="}${value.value}`,
