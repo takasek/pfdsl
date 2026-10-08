@@ -572,11 +572,22 @@ export function classifySharedGitEffect(subcommand, args) {
 	// A push whose repository is this one (`.`, a path) writes local branches
 	// just as update-ref does; pushes to remote names keep their handling.
 	if (subcommand === "push") {
-		const repository = args.find((arg) => !arg.startsWith("-"));
+		// Option arity is not modeled (`--receive-pack <cmd>`, `--repo <r>`), so a
+		// local repository spelling anywhere among the operands, or as a
+		// `--repo` value, makes the push same-repository; every other operand
+		// is then a refspec candidate.
+		const operands = args.filter((arg) => !arg.startsWith("-"));
+		const repoValues = args.flatMap((arg, index) => {
+			if (!isLongOptionPrefix(arg, "--repo")) return [];
+			return arg.includes("=")
+				? [arg.slice(arg.indexOf("=") + 1)]
+				: [args[index + 1] ?? ""];
+		});
 		if (
-			repository !== undefined &&
-			/^(?:[./~]|file:\/\/)/.test(repository) &&
-			writesLocalRefDestination(args, { bareIsDestination: true })
+			[...operands, ...repoValues].some(isLocalRepositorySpelling) &&
+			operands
+				.filter((operand) => !isLocalRepositorySpelling(operand))
+				.some((refspec) => isLocalRefDestination(refspec, true))
 		)
 			return { kind: "shared" };
 	}
@@ -588,7 +599,7 @@ export function classifySharedGitEffect(subcommand, args) {
  * destination (remote-tracking refs, tags, and URL-like operands excluded).
  * For push, a refspec with no colon is its own destination.
  */
-function writesLocalRefDestination(args, { bareIsDestination = false } = {}) {
+function writesLocalRefDestination(args) {
 	let repository = false;
 	for (const arg of args) {
 		if (arg.startsWith("-")) continue;
@@ -596,19 +607,27 @@ function writesLocalRefDestination(args, { bareIsDestination = false } = {}) {
 			repository = true;
 			continue;
 		}
-		const colon = arg.indexOf(":");
-		if (colon < 0 && !bareIsDestination) continue;
-		const destination = colon < 0 ? arg : arg.slice(colon + 1);
-		if (
-			!destination ||
-			destination.startsWith("//") ||
-			destination.startsWith("refs/remotes/") ||
-			destination.startsWith("refs/tags/")
-		)
-			continue;
-		return true;
+		if (isLocalRefDestination(arg, false)) return true;
 	}
 	return false;
+}
+
+/** Whether one refspec writes a local ref (not remote-tracking, tag or URL). */
+function isLocalRefDestination(refspec, bareIsDestination) {
+	const colon = refspec.indexOf(":");
+	if (colon < 0 && !bareIsDestination) return false;
+	const destination = colon < 0 ? refspec : refspec.slice(colon + 1);
+	return !(
+		!destination ||
+		destination.startsWith("//") ||
+		destination.startsWith("refs/remotes/") ||
+		destination.startsWith("refs/tags/")
+	);
+}
+
+/** A repository spelled as a path in this filesystem: `.`, `..`, `./x`, `/x`, `~`, `file://`. */
+function isLocalRepositorySpelling(value) {
+	return /^(?:\.\.?$|\.\.?\/|\/|~|file:\/\/)/.test(value);
 }
 
 /**
