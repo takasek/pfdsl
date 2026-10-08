@@ -569,6 +569,24 @@ export function persistsCdPathOverride(tokens) {
 	return persistsShellAssignment(tokens, isNonemptyCdPathAssignment);
 }
 
+function isGitConfigName(name) {
+	return /^GIT_CONFIG[A-Za-z0-9_]*$/.test(name);
+}
+
+// Config variables set earlier on the command line (plainly or exported) still
+// inject settings into a later Git call, so remember them until they are unset.
+function noteGitConfigAssignments(state, tokens) {
+	for (const { value } of tokens) {
+		const name = value.split("=", 1)[0];
+		if (isGitConfigName(name)) state.gitConfig.add(name);
+	}
+}
+
+/** Whether an earlier segment left a `GIT_CONFIG*` variable set for later Git calls. */
+export function hasProtectedGitConfigOverride(state) {
+	return state.gitConfig.size > 0;
+}
+
 /** State that matters to commands guarded for cross-worktree mutations. */
 export function createProtectedShellState({
 	ambientGitTargetOverride = false,
@@ -587,6 +605,7 @@ export function createProtectedShellState({
 			? GIT_TARGET_VARIABLES
 			: new Set(ambientGitTargets);
 	return {
+		gitConfig: new Set(),
 		cdPath: ambientCdPath ? "unknown" : "safe",
 		gitTargets: new Map(
 			[...GIT_TARGET_VARIABLES].map((name) => [
@@ -811,15 +830,25 @@ export function updateProtectedShellState(state, tokens) {
 	const head = basename(tokens[prefix.end]?.value ?? "");
 	const arguments_ = tokens.slice(prefix.end + 1);
 	const assignments = tokens.slice(0, prefix.end);
-	if (prefix.end === tokens.length) return applyAssignments(state, assignments);
-	else if (STATEFUL_ASSIGNMENT_BUILTINS.has(head))
+	if (prefix.end === tokens.length) {
+		noteGitConfigAssignments(state, assignments);
+		return applyAssignments(state, assignments);
+	}
+	if (STATEFUL_ASSIGNMENT_BUILTINS.has(head)) {
+		noteGitConfigAssignments(state, assignments);
 		applyAssignments(state, assignments, true);
+	}
 
 	if (head === "source" || head === "." || head === "eval") {
 		setAllProtectedUnknown(state);
 		return true;
 	}
-	if (head === "unset") return applyUnset(state, arguments_);
+	if (head === "unset") {
+		for (const { value } of arguments_) state.gitConfig.delete(value);
+		return applyUnset(state, arguments_);
+	}
+	if (head === "export" || STATEFUL_ASSIGNMENT_BUILTINS.has(head))
+		noteGitConfigAssignments(state, arguments_);
 	if (head === "export") return applyExport(state, arguments_);
 	if (STATEFUL_ASSIGNMENT_BUILTINS.has(head)) {
 		return applyAssignments(state, arguments_, true);

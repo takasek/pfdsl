@@ -31,6 +31,7 @@ import {
 	gitSubcommand,
 	gitSubcommandIndex,
 	hasProtectedCdPathOverride,
+	hasProtectedGitConfigOverride,
 	hasProtectedGitTargetOverride,
 	parseLeadingShellPrefix,
 	splitCommandFlow,
@@ -669,11 +670,15 @@ export function classifyGitCommand(command) {
 
 	/** @type {{subcommand: string, decision: "deny" | "ask", bypass?: boolean, flag?: string, outsideTarget?: boolean, outsideTargetFlag?: string, outsideTargetName?: string} | null} */
 	let asked = null;
+	const state = createProtectedShellState();
 	for (const segment of splitSegments(command)) {
 		const rawTokens = tokenize(segment);
 		const found = classifySegment(stripLeadingNoise(rawTokens), {
-			configOverride: parseLeadingShellPrefix(rawTokens).gitConfigOverride,
+			configOverride:
+				parseLeadingShellPrefix(rawTokens).gitConfigOverride ||
+				hasProtectedGitConfigOverride(state),
 		});
+		updateProtectedShellState(state, rawTokens);
 		if (found?.decision === "deny") return found;
 		if (found) asked ??= found;
 	}
@@ -862,11 +867,11 @@ function analyzeCommand(
 			continue;
 		}
 
+		const configOverride =
+			prefix.gitConfigOverride || hasProtectedGitConfigOverride(protectedState);
 		const guarded =
-			classifySegment(tokens, { configOverride: prefix.gitConfigOverride }) ??
-			(prefix.unresolved
-				? guardedSuffix(tokens, { configOverride: prefix.gitConfigOverride })
-				: null);
+			classifySegment(tokens, { configOverride }) ??
+			(prefix.unresolved ? guardedSuffix(tokens, { configOverride }) : null);
 		if (!guarded) {
 			finish();
 			continue;

@@ -1055,6 +1055,30 @@ describe("evaluateMainCommitGuard", () => {
 		);
 	});
 
+	it("remembers an exported or assigned GIT_CONFIG variable for later Git calls", () => {
+		for (const command of [
+			"export GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=a.b GIT_CONFIG_VALUE_0=c; git fetch origin",
+			"GIT_CONFIG_PARAMETERS=x; git fetch origin",
+		])
+			assert.equal(
+				evaluateMainCommitGuard(payload({ command }), {
+					currentBranch: "topic",
+				}).decision,
+				"ask",
+				command,
+			);
+		assert.equal(
+			evaluateMainCommitGuard(
+				payload({
+					command:
+						"export GIT_CONFIG_COUNT=1; unset GIT_CONFIG_COUNT; git fetch origin",
+				}),
+				{ currentBranch: "topic" },
+			).decision,
+			"allow",
+		);
+	});
+
 	it("allows when currentBranch is unknown (detached HEAD, detection failure)", () => {
 		const result = evaluateMainCommitGuard(
 			payload({ command: "git commit -m 'x'" }),
