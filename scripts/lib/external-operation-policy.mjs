@@ -208,7 +208,9 @@ export function findMergeCommand(
 		if (parsed.group !== "api") continue;
 		if (hasStandaloneHelp(parsed.args, GH_MERGE_HELP_FLAGS.api)) continue;
 		if (
-			parsed.args.some((arg) => /(?:^|\/)pulls\/[^/]+\/merge(?:$|\?)/.test(arg))
+			parsed.args.some((arg) =>
+				/(?:^|\/)pulls\/[^/]+\/merge(?:$|[?#])/.test(arg),
+			)
 		)
 			return "gh api pull request merge";
 		if (parsed.args.includes("graphql")) {
