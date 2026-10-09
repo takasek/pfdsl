@@ -41,6 +41,7 @@ import {
 	isReadOnlyGitInvocation,
 } from "./shared-git-effects.mjs";
 import {
+	executableName,
 	readShellCommands,
 	shellParseDecision as syntaxDecision,
 } from "./shell-commands.mjs";
@@ -367,7 +368,7 @@ export function shellParseDecision(command, { supportsAsk = true } = {}) {
 		if (invocation.length)
 			invocation[0] = {
 				...invocation[0],
-				value: basename(invocation[0].value),
+				value: executableName(invocation[0].value),
 			};
 		if (
 			["git", "gh"].includes(invocation[0]?.value) &&
@@ -810,7 +811,7 @@ export function findOutwardCommand(command) {
 		const tokens = stripLeadingNoise(raw);
 		if (tokens.length === 0) continue;
 		const head = tokens[0];
-		const executable = basename(head.value);
+		const executable = executableName(head.value);
 
 		if (executable === "git") {
 			const sub = gitSubcommand(tokens);
@@ -874,6 +875,7 @@ export function evaluateDelegationGuard(
 			? payload.tool_name
 			: payload?.tool_name === "Bash"
 				? findMergeCommand(payload?.tool_input?.command, {
+						executableName,
 						readShellCommands,
 						stripLeadingNoise,
 					})
@@ -913,7 +915,7 @@ export function evaluateDelegationGuard(
 						"Codex Git metadata operations belong to the parent. Report the needed operation to the parent; continue with file edits and tests only.",
 				};
 			}
-			if (!tokens.length || basename(tokens[0].value) !== "git") continue;
+			if (!tokens.length || executableName(tokens[0].value) !== "git") continue;
 			const sub = gitSubcommand(tokens);
 			const args = tokens
 				.slice(gitSubcommandIndex(tokens) + 1)

@@ -12,6 +12,32 @@ const evaluate = (name, input = {}, agent = null) =>
 		{ supportsAsk: false },
 	);
 
+test("Windows GitHub executable names retain merge and child boundaries", () => {
+	assert.equal(
+		evaluate("Bash", { command: "gh.exe pr merge 1" }).decision,
+		"deny",
+	);
+	assert.equal(
+		evaluate(
+			"Bash",
+			{
+				command:
+					'"C:/Program Files/GitHub CLI/GH.EXE" issue create --title x --body y',
+			},
+			"worker",
+		).decision,
+		"deny",
+	);
+	assert.equal(
+		evaluate("Bash", { command: "GH.EXE issue ls" }, "worker").decision,
+		"allow",
+	);
+	assert.equal(
+		evaluate("Bash", { command: "git.exe add file" }, "worker").decision,
+		"deny",
+	);
+});
+
 test("REST merge status GET remains a read for parent and child", () => {
 	for (const agent of [null, "worker"]) {
 		for (const command of [

@@ -1,3 +1,5 @@
+import { executableName } from "./shell-commands.mjs";
+
 // Locates the group and verb of a `gh` call, for the guards that decide on one
 // (delegation-guard and command-usage-guard).
 //
@@ -117,7 +119,7 @@ export function isBuiltinGhCommand(tokens) {
 export function ghCommandSelectorTokens(tokens) {
 	if (tokens.length === 0) return null;
 	const head = tokens[0];
-	if (head.dynamic || head.value !== "gh") return null;
+	if (head.dynamic || executableName(head.value) !== "gh") return null;
 
 	const groupIndex = nextGhOperand(tokens, 1);
 	if (groupIndex === -1) return null;

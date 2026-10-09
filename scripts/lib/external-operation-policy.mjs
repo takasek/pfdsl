@@ -1,5 +1,5 @@
-import { basename } from "node:path";
 import { GLOBAL_FLAGS_WITH_VALUE, parseGhCommand } from "./gh-command.mjs";
+import { executableName } from "./shell-commands.mjs";
 
 // Explicitly reviewed read capabilities. Unknown/compound names fail closed.
 const READ_GITHUB_TOOLS = new Set([
@@ -233,7 +233,7 @@ export function findMergeCommand(
 	if (typeof command !== "string") return null;
 	for (const { tokens: raw } of readShellCommands(command)) {
 		const tokens = stripLeadingNoise(raw);
-		if (!tokens.length || basename(tokens[0].value) !== "gh") continue;
+		if (!tokens.length || executableName(tokens[0].value) !== "gh") continue;
 		const parsed = parseGhCommand([
 			{ ...tokens[0], value: "gh", quoted: false },
 			...tokens.slice(1),

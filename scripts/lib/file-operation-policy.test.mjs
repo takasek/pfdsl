@@ -81,6 +81,31 @@ const io = {
 	ownerRelation: (target) => (target === own ? "own" : "sibling"),
 };
 
+test("a child cannot rewrite or delete a linked checkout's Git pointer", () => {
+	writeFileSync(join(own, ".git"), "gitdir: /fixture/metadata\n");
+	for (const p of [
+		{
+			tool_name: "Write",
+			cwd: own,
+			tool_input: { file_path: join(own, ".git"), content: "changed" },
+		},
+		patch("*** Delete File: .git"),
+	]) {
+		assert.equal(
+			evaluatePhysicalWrites({ ...p, agent_id: "child" }, roots, io).decision,
+			"deny",
+		);
+	}
+	assert.equal(
+		evaluatePhysicalWrites(
+			{ ...patch("*** Add File: ordinary.txt\n+ok"), agent_id: "child" },
+			roots,
+			io,
+		).decision,
+		"allow",
+	);
+});
+
 test("all patch source/destination paths participate in one decision", () => {
 	const p = patch(
 		`*** Add File: safe.txt\n+ok\n*** Update File: old.txt\n*** Move to: ${other}/new.txt\n@@\n-old\n+new`,

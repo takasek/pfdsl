@@ -1,5 +1,7 @@
 // Grammar comes exclusively from mvdan/sh. This adapter exposes executable
 // commands; it never executes or expands the submitted shell.
+
+import { basename } from "node:path";
 import { fileURLToPath } from "node:url";
 import { run } from "./run-exec.mjs";
 import { shellParserPath } from "./shell-parser-tool.mjs";
@@ -7,6 +9,14 @@ import { shellParserPath } from "./shell-parser-tool.mjs";
 const root = fileURLToPath(new URL("../../", import.meta.url));
 let cachedSource;
 let cachedResult;
+
+/** Literal Git/GitHub CLI names, including Windows executable spelling. */
+export function executableName(value) {
+	const name = basename(value.replaceAll("\\", "/"));
+	return /^(?:git|gh)(?:\.exe)?$/i.test(name)
+		? name.toLowerCase().replace(/\.exe$/, "")
+		: name;
+}
 
 export function readShell(
 	command,

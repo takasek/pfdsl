@@ -24,7 +24,6 @@
 // scoped to `--global`/`--system`/`--file` is denied independently of the
 // setting name: these settings may affect this repository too.
 
-import { basename } from "node:path";
 import {
 	GIT_GLOBAL_FLAGS_WITH_VALUE,
 	gitSubcommand,
@@ -42,7 +41,7 @@ import {
 	isReadOnlyGitConfig,
 	sameBranchName,
 } from "./shared-git-effects.mjs";
-import { readShell } from "./shell-commands.mjs";
+import { executableName, readShell } from "./shell-commands.mjs";
 
 // The decision splits by target before it splits by subcommand. Against a
 // sibling whose native ownership was not confirmed by the entrypoint it is
@@ -589,7 +588,8 @@ function hasGlobalConfigOverride(tokens, subAt) {
 function classifySegment(tokens, { configOverride = false, cwd } = {}) {
 	const found = classifyGuardedSegment(tokens, { cwd });
 	if (found?.bypass) return found;
-	if (tokens.length === 0 || basename(tokens[0].value) !== "git") return found;
+	if (tokens.length === 0 || executableName(tokens[0].value) !== "git")
+		return found;
 	const sub = gitSubcommand(tokens);
 	const subAt = gitSubcommandIndex(tokens);
 	if (!sub || subAt === null) return found;
@@ -604,7 +604,7 @@ function classifySegment(tokens, { configOverride = false, cwd } = {}) {
 function classifyGuardedSegment(tokens, { cwd } = {}) {
 	if (tokens.length === 0) return null;
 	const head = tokens[0];
-	if (basename(head.value) !== "git") {
+	if (executableName(head.value) !== "git") {
 		const subcommand = classifyCodexGitRoutine(
 			tokens.map((token) => token.value),
 		)?.gitSubcommand;
@@ -843,7 +843,7 @@ function analyzeCommand(
 			prefix.unresolved ||
 			prefix.gitTargetOverride
 				? null
-				: basename(tokens[0]?.value ?? "") === "git"
+				: executableName(tokens[0]?.value ?? "") === "git"
 					? resolveGitCwd(tokens, envCwd)
 					: resolveCodexRoutineCwd(tokens);
 		const guarded =

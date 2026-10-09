@@ -182,6 +182,12 @@ export function evaluatePhysicalWrites(
 			continue;
 		}
 		if (target.commonDir !== sessionRoots.commonDir) continue;
+		if (payload?.agent_id && isUnder(path, join(target.worktreeRoot, ".git")))
+			return {
+				decision: "deny",
+				reason:
+					"Git metadata changes belong to the parent. Continue with ordinary files and report the needed Git operation.",
+			};
 		if (target.worktreeRoot === target.mainRoot)
 			return {
 				decision: "deny",

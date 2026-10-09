@@ -786,6 +786,15 @@ describe("resolveCommandCwd", () => {
 });
 
 describe("evaluateMainCommitGuard", () => {
+	it("recognizes Windows Git names for default branch protection", () => {
+		assert.equal(
+			evaluateMainCommitGuard(
+				payload({ command: '"C:/Program Files/Git/bin/GIT.EXE" add file' }),
+				{ currentBranch: "main" },
+			).decision,
+			"deny",
+		);
+	});
 	it("tells the session's own worktree, a sibling, an unrelated repository and an unresolved target apart (#1221)", () => {
 		const session = {
 			worktreeRoot: "/repo/.claude/worktrees/a",

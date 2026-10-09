@@ -186,6 +186,10 @@ GitHub MCP は既知の読取表と、未知または変更系の操作を分け
 Codex の MCP 書込みは親を含め deny とする。
 MCP の親判別を実入口で受入していないため、未知の主体を親とみなして許可しない。
 親の通常の Bash 公開経路は残す。
+Git/GitHub CLI の実行名は共通 helper で比較し、Windows の `git.exe`・`gh.exe` と大文字小文字を認識する。
+これは既知の実行名の表記を揃える処理であり、shell 言語や任意の launcher の対応範囲を広げない。
+子の file 書込みでも、linked checkout の root `.git` 管理ファイルを含む Git metadata は許可しない。
+通常の所有 worktree のソース編集は維持する。
 これは MCP の書込みが親でも利用できるという互換性保証ではない。
 任意 HTTP client 内部の通信全般を解析する方式ではない。
 
