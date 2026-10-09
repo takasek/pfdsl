@@ -21,7 +21,7 @@ elif [ "$ref_status" -eq 1 ]; then
     exit 1
   fi
   # This repository's default is main. Only a missing ref uses this fallback;
-  # an explicit origin/HEAD still takes precedence for other default names.
+  # an explicit origin/HEAD also protects other default names.
   default_branch=main
 else
   echo "error: cannot resolve origin/HEAD; default branch protection refuses this commit." >&2
@@ -44,8 +44,9 @@ else
     exit 1
   }
 fi
-if [ "$head_ref" = "refs/heads/$default_branch" ]; then
-  echo "error: commits on the default branch '$default_branch' are refused. Use a feature worktree and a pull request." >&2
+if [ "$head_ref" = refs/heads/main ] || [ "$head_ref" = "refs/heads/$default_branch" ]; then
+  protected_branch=${head_ref#refs/heads/}
+  echo "error: commits on main/default branch '$protected_branch' are refused. Use a feature worktree and a pull request." >&2
   exit 1
 fi
 if [ "${1-}" = "--check-default-branch" ]; then
