@@ -34,6 +34,15 @@ jobs:
         run: echo "CARGO_TARGET_DIR=$RUNNER_TEMP/inspector-target" >> "$GITHUB_ENV"
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - name: Preserve the control helper before checking out the fixed product source
+        run: |
+          mkdir "$RUNNER_TEMP/inspector-tools"
+          cp scripts/lib/appdir_inventory.py "$RUNNER_TEMP/inspector-tools/"
+          git -c safe.directory="$GITHUB_WORKSPACE" rev-parse HEAD > "$RUNNER_TEMP/inspector-tools/CONTROL_COMMIT"
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
           ref: 8261f877d5cae8aa653a5310edfbd9e387acb116
           persist-credentials: false
       - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
@@ -69,6 +78,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           WORKFLOW_HEAD: ${{ github.event.pull_request.head.sha }}
+          PYTHONDONTWRITEBYTECODE: "1"
         run: |
           curl -fsSL -H "Authorization: Bearer $GH_TOKEN" \
             https://api.github.com/repos/takasek/pfdsl/actions/artifacts/11461844652 \
@@ -102,6 +112,7 @@ jobs:
           cp -R packages/standalone/dist "$RUNNER_TEMP/pfdsl-linux-inspector-x64/frontend"
           cp "$RUNNER_TEMP/inspector-locks.txt" "$RUNNER_TEMP/pfdsl-linux-inspector-x64/source-locks.txt"
           cp "$RUNNER_TEMP/accepted-artifact/build-environment.txt" "$RUNNER_TEMP/pfdsl-linux-inspector-x64/accepted-build-environment.txt"
+          cp "$RUNNER_TEMP/inspector-tools/appdir_inventory.py" "$RUNNER_TEMP/pfdsl-linux-inspector-x64/"
           printf '%s\n' "$SOURCE_SHA" > "$RUNNER_TEMP/pfdsl-linux-inspector-x64/SOURCE_COMMIT"
           {
             cat /etc/os-release
@@ -125,8 +136,11 @@ jobs:
           done
           (cd squashfs-root && find . -type f -print0 | LC_ALL=C sort -z | xargs -0 sha256sum) > APPDIR_SHA256SUMS
           python3 - <<'PY'
-          import hashlib, json, os, stat
+          import hashlib, json, os
           from pathlib import Path
+          from appdir_inventory import appdir_entries
+          control_commit = (Path(os.environ['RUNNER_TEMP']) / 'inspector-tools/CONTROL_COMMIT').read_text().strip()
+          assert control_commit == os.environ['WORKFLOW_HEAD']
           accepted = Path(os.environ['RUNNER_TEMP']) / 'accepted-artifact'
           metadata = json.loads((accepted / 'metadata.json').read_text())
           assert metadata['id'] == 11461844652 and not metadata['expired']
@@ -139,20 +153,6 @@ jobs:
                       for p in sorted(root.rglob('*')) if p.is_file()}
           old_frontend, new_frontend = hashes(accepted / 'frontend'), hashes(Path('frontend'))
           assert len(old_frontend) == 10 and old_frontend == new_frontend
-          def appdir_entries(root):
-              entries = {}
-              for path in sorted(root.rglob('*')):
-                  info = path.lstat()
-                  entry = {'mode': oct(stat.S_IMODE(info.st_mode))}
-                  if stat.S_ISLNK(info.st_mode):
-                      entry.update(type='symlink', target=os.readlink(path))
-                  elif stat.S_ISREG(info.st_mode):
-                      entry.update(type='file', sha256=hashlib.sha256(path.read_bytes()).hexdigest())
-                  else:
-                      assert stat.S_ISDIR(info.st_mode), str(path)
-                      entry.update(type='directory')
-                  entries[str(path.relative_to(root))] = entry
-              return entries
           old, new = appdir_entries(accepted / 'squashfs-root'), appdir_entries(Path('squashfs-root'))
           assert old['usr/bin/pfdsl-desktop']['sha256'] == '10fdeff86b2a48e11948f40cbf99a7207e70c91e7c19f1f064c61bb38f441495'
           assert old['usr/bin/pfdsl-desktop']['sha256'] != new['usr/bin/pfdsl-desktop']['sha256']
@@ -163,6 +163,9 @@ jobs:
                     'workflow_head': os.environ['WORKFLOW_HEAD'],
                     'workflow_ref': os.environ['GITHUB_WORKFLOW_REF'],
                     'workflow_sha': os.environ['GITHUB_WORKFLOW_SHA'],
+                    'inventory_helper': {
+                        'control_commit': control_commit,
+                        'sha256': hashlib.sha256(Path('appdir_inventory.py').read_bytes()).hexdigest()},
                     'run_id': os.environ['GITHUB_RUN_ID'], 'run_attempt': os.environ['GITHUB_RUN_ATTEMPT'],
                     'profile': 'release', 'cargo_feature': 'tauri/devtools',
                     'product_source_changes': [], 'frontend_files': new_frontend,
@@ -172,12 +175,12 @@ jobs:
                     'inspector_gui_verified': False, 'monaco_model_access_verified': False}
           Path('DIAGNOSTIC_BUILD.json').write_text(json.dumps(record, indent=2) + '\n')
           PY
-          find PFDSL-Inspector.AppImage frontend SOURCE_COMMIT source-locks.txt build-environment.txt accepted-build-environment.txt \
-            cargo-features.txt APPDIR_SHA256SUMS DIAGNOSTIC_BUILD.json -type f -print0 \
+          payload=(PFDSL-Inspector.AppImage frontend SOURCE_COMMIT source-locks.txt build-environment.txt
+            accepted-build-environment.txt cargo-features.txt APPDIR_SHA256SUMS DIAGNOSTIC_BUILD.json appdir_inventory.py)
+          find "${payload[@]}" -type f -print0 \
             | LC_ALL=C sort -z | xargs -0 sha256sum > SHA256SUMS
           tar -czf "$RUNNER_TEMP/pfdsl-linux-inspector-x64.tar.gz" \
-            PFDSL-Inspector.AppImage frontend SOURCE_COMMIT source-locks.txt build-environment.txt accepted-build-environment.txt \
-            cargo-features.txt APPDIR_SHA256SUMS DIAGNOSTIC_BUILD.json SHA256SUMS
+            "${payload[@]}" SHA256SUMS
           sha256sum "$RUNNER_TEMP/pfdsl-linux-inspector-x64.tar.gz"
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:

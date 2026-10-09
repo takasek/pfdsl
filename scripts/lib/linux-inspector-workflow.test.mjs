@@ -1,7 +1,10 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { readFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { test } from "node:test";
+import { fileURLToPath } from "node:url";
 import YAML from "yaml";
 
 test("job environment uses only contexts available before a runner exists", () => {
@@ -18,34 +21,15 @@ test("job environment uses only contexts available before a runner exists", () =
 });
 
 test("diagnostic AppDir comparison detects same-content link, mode, and entry-type changes", () => {
-	const workflow = YAML.parse(
-		readFileSync(
-			new URL("../../.github/workflows/linux-inspector.yml", import.meta.url),
-			"utf8",
-		),
-	);
-	const run = workflow.jobs["fixed-source-inspector"].steps.find((step) =>
-		step.run?.includes("appdir_differences"),
-	).run;
-	const python = [...run.matchAll(/python3 - <<'PY'\n([\s\S]*?)\nPY/g)].at(
-		-1,
-	)[1];
 	const result = spawnSync(
 		"python3",
 		[
 			"-c",
 			`
-import ast, hashlib, os, stat, sys, tempfile
+import os, sys, tempfile
 from pathlib import Path
-source = sys.stdin.read()
-tree = ast.parse(source)
-comparison = next(node for node in tree.body if isinstance(node, ast.Assign)
-                  and isinstance(node.targets[0], ast.Tuple)
-                  and [getattr(v, 'id', '') for v in node.targets[0].elts] == ['old', 'new'])
-name = comparison.value.elts[0].func.id
-function = next(node for node in tree.body if isinstance(node, ast.FunctionDef) and node.name == name)
-exec(compile(ast.Module(body=[function], type_ignores=[]), '<actual AppDir comparison>', 'exec'))
-inspect = globals()[name]
+sys.path.insert(0, sys.argv[1])
+from appdir_inventory import appdir_entries as inspect
 with tempfile.TemporaryDirectory(prefix='pfdsl-inspector-inventory-') as temporary:
     root = Path(temporary)
     (root/'a').write_bytes(b'identical')
@@ -61,10 +45,64 @@ with tempfile.TemporaryDirectory(prefix='pfdsl-inspector-inventory-') as tempora
     before = inspect(root)
     link.unlink(); link.write_bytes(b'identical')
     assert before != inspect(root), 'symlink-to-file change was lost'
+    before = inspect(root)
+    (root/'extra').mkdir()
+    assert before != inspect(root), 'directory addition was lost'
+    (root/'extra').rmdir()
+    assert before == inspect(root), 'directory removal did not restore inventory'
 print('actual AppDir comparison preserves link target, mode and entry type')
 `,
+			fileURLToPath(new URL("./", import.meta.url)),
 		],
-		{ input: python, encoding: "utf8" },
+		{ encoding: "utf8", env: { ...process.env, PYTHONDONTWRITEBYTECODE: "1" } },
 	);
 	assert.equal(result.status, 0, result.stderr);
+});
+
+test("the fixed-source job preserves the control helper outside the product checkout", () => {
+	const root = fileURLToPath(new URL("../../", import.meta.url));
+	const workflow = YAML.parse(
+		readFileSync(join(root, ".github/workflows/linux-inspector.yml"), "utf8"),
+	);
+	const steps = workflow.jobs["fixed-source-inspector"].steps;
+	const preservation = steps.findIndex(
+		(s) =>
+			s.name ===
+			"Preserve the control helper before checking out the fixed product source",
+	);
+	assert.ok(preservation > 0);
+	assert.match(
+		steps[preservation - 1].with.ref,
+		/^\$\{\{\s*github\.event\.pull_request\.head\.sha\s*\}\}$/,
+	);
+	assert.equal(
+		steps[preservation + 1].with.ref,
+		"8261f877d5cae8aa653a5310edfbd9e387acb116",
+	);
+	const temporary = mkdtempSync(join(tmpdir(), "pfdsl-inspector-helper-"));
+	try {
+		const result = spawnSync("bash", ["-e", "-c", steps[preservation].run], {
+			cwd: root,
+			encoding: "utf8",
+			env: { ...process.env, RUNNER_TEMP: temporary, GITHUB_WORKSPACE: root },
+		});
+		assert.equal(result.status, 0, result.stderr);
+		assert.equal(
+			readFileSync(
+				join(temporary, "inspector-tools/appdir_inventory.py"),
+				"utf8",
+			),
+			readFileSync(join(root, "scripts/lib/appdir_inventory.py"), "utf8"),
+		);
+		const head = spawnSync("git", ["rev-parse", "HEAD"], {
+			cwd: root,
+			encoding: "utf8",
+		});
+		assert.equal(
+			readFileSync(join(temporary, "inspector-tools/CONTROL_COMMIT"), "utf8"),
+			head.stdout,
+		);
+	} finally {
+		rmSync(temporary, { recursive: true, force: true });
+	}
 });

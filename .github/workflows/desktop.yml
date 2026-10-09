@@ -72,9 +72,10 @@ jobs:
       - name: Archive verification files with checksums and executable permissions
         working-directory: ${{ runner.temp }}/pfdsl-linux-x64
         run: |
-          find pfdsl-desktop frontend SOURCE_COMMIT build-environment.txt -type f -print0 \
+          payload=(pfdsl-desktop frontend SOURCE_COMMIT build-environment.txt)
+          find "${payload[@]}" -type f -print0 \
             | LC_ALL=C sort -z | xargs -0 sha256sum > SHA256SUMS
-          tar -czf "$RUNNER_TEMP/pfdsl-linux-x64.tar.gz" .
+          tar -czf "$RUNNER_TEMP/pfdsl-linux-x64.tar.gz" "${payload[@]}" SHA256SUMS
           sha256sum "$RUNNER_TEMP/pfdsl-linux-x64.tar.gz"
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
@@ -111,10 +112,11 @@ jobs:
             cd squashfs-root
             find . -type f -print0 | LC_ALL=C sort -z | xargs -0 sha256sum
           ) > APPDIR_SHA256SUMS
-          find PFDSL.AppImage frontend SOURCE_COMMIT build-environment.txt APPDIR_SHA256SUMS -type f -print0 \
+          payload=(PFDSL.AppImage frontend SOURCE_COMMIT build-environment.txt APPDIR_SHA256SUMS)
+          find "${payload[@]}" -type f -print0 \
             | LC_ALL=C sort -z | xargs -0 sha256sum > SHA256SUMS
           tar -czf "$RUNNER_TEMP/pfdsl-linux-appimage-x64.tar.gz" \
-            PFDSL.AppImage frontend SOURCE_COMMIT build-environment.txt APPDIR_SHA256SUMS SHA256SUMS
+            "${payload[@]}" SHA256SUMS
           sha256sum "$RUNNER_TEMP/pfdsl-linux-appimage-x64.tar.gz"
       - id: upload-appimage
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
