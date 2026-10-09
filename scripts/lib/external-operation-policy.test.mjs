@@ -73,6 +73,8 @@ for (const command of [
 	"gh -R takasek/pfdsl pr merge 1413 --auto",
 	"/opt/homebrew/bin/gh pr merge 1413",
 	"gh api -X PUT repos/o/r/pulls/1/merge",
+	"gh api /graphql -f 'query=mutation { mergePullRequest(input:{pullRequestId:\"fixture\"}) {clientMutationId} }'",
+	"gh api https://api.github.com/graphql -f 'query=mutation { mergePullRequest(input:{pullRequestId:\"fixture\"}) {clientMutationId} }'",
 	"gh api -X PUT 'repos/o/r/pulls/1/merge#fragment'",
 	"gh api -X PUT 'https://api.github.com/repos/o/r/pulls/1/merge#fragment'",
 	"gh api -h github.com -X PUT repos/o/r/pulls/1/merge",

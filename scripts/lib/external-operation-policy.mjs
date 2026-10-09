@@ -149,6 +149,14 @@ const GH_MERGE_HELP_FLAGS = {
 	},
 };
 
+export function isGraphqlEndpoint(value) {
+	try {
+		return new URL(value, "https://api.github.com/").pathname === "/graphql";
+	} catch {
+		return false;
+	}
+}
+
 export function ghApiMethod(args) {
 	let method = null;
 	let input = false;
@@ -253,7 +261,7 @@ export function findMergeCommand(
 			ghApiMethod(parsed.args).toUpperCase() !== "GET"
 		)
 			return "gh api pull request merge";
-		if (parsed.args.includes("graphql")) {
+		if (parsed.args.some(isGraphqlEndpoint)) {
 			if (
 				parsed.args.some(
 					(arg) =>

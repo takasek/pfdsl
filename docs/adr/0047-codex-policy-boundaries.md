@@ -174,6 +174,7 @@ Claude の issue-worker 例外を Codex の子へ引き継がない。
 
 親を含め gh pr merge・auto-merge、REST の merge endpoint の変更 method、GraphQL の merge mutation を保護する。
 REST の GET は merge 状態の読取として維持し、method を確定できない option 列は読取免除にしない。
+GraphQL endpoint は Node 標準 URL の pathname で比較し、`graphql`・`/graphql`・完全 URL の通常表記を同じ保護へ接続する。
 gh の built-in namespace と command 名の小さな表を共有 preflight で確認し、設定 alias・extension 名・未対応名は親子ともClaudeでask、Codexで拒否とする。
 `gh land`・`gh pr land`・`gh repo autolink land` 等は展開せず停止し、検査できる明示的な built-in command を案内する。
 GitHub CLI は既存 built-in の上書きと実行可能な command の下への alias 登録を認めないため、既知 leaf に続く通常の引数は維持する。
