@@ -583,15 +583,22 @@ const REBASE_LONG_OPTIONS = [
 	),
 ];
 
-function rebaseUpdatesRefs(args) {
+function rebaseUpdatesRefs(args, isDynamic) {
 	let updatesRefs = false;
 	let unresolved = false;
 	for (let i = 0; i < args.length; i++) {
 		const arg = args[i];
 		if (arg === "--") break;
+		const given = arg.split("=", 1)[0];
+		const exact = REBASE_LONG_OPTIONS.find((option) => option.name === given);
+		// An expansion in an option position may enable updates to other refs.
+		// Only a declared static long name may carry an attached dynamic value.
+		const attachedValue =
+			arg.includes("=") &&
+			exact &&
+			(exact.value || REBASE_OPTIONAL_VALUE_OPTIONS.includes(given.slice(2)));
+		if (isDynamic(arg) && !attachedValue) return true;
 		if (arg.startsWith("--")) {
-			const given = arg.split("=", 1)[0];
-			const exact = REBASE_LONG_OPTIONS.find((option) => option.name === given);
 			const matches = exact
 				? [exact]
 				: REBASE_LONG_OPTIONS.filter((option) =>
@@ -717,7 +724,7 @@ export function classifySharedGitEffect(
 	{ cwd, exec = tryGit, argTokens = [] } = {},
 ) {
 	if (hasGitHelpOption(subcommand, args)) return null;
-	// Preserve shell provenance only where an operand selects a shared effect.
+	// Preserve shell provenance only where an argument selects a shared effect.
 	// Do not evaluate expansions or reject ordinary message/option/path values.
 	const dynamicValues = new Set(
 		argTokens.filter((token) => token.dynamic).map((token) => token.value),
@@ -729,7 +736,7 @@ export function classifySharedGitEffect(
 		return writesGitRemoteConfig(args) ? { kind: "shared" } : null;
 	// The last actual toggle wins, after consuming required option values.
 	if (subcommand === "rebase")
-		return rebaseUpdatesRefs(args) ? { kind: "shared" } : null;
+		return rebaseUpdatesRefs(args, isDynamic) ? { kind: "shared" } : null;
 	// A written setting (remote.<name>.fetch, core.*, ...) changes what later
 	// commands do to shared refs, so a non-read config call is itself shared.
 	if (subcommand === "config")

@@ -100,6 +100,8 @@ file URL は標準 URL parser が表現を変えない形式だけを検査し�
 `rebase --update-refs` は他 branch を動かすため共有作用とする。
 rebase の値を取る option は、分離・等号付き・短縮 cluster の形を含めて値を消費し、実際の update-refs option の最後の指定だけを toggle とする。
 未知・曖昧な option の後の値を否定 option として免除せず、共有作用として停止する。
+rebase の option になりうる位置の動的な語も、update-refs を差し込めるため共有作用として停止する。
+変数の内容は解釈せず、静的な option と分離した必須値、値を取ると宣言された long option の等号付き値、または `--` 後の upstream・branch を使う。
 worktree add は detached・既存 branch・新規 branch のいずれも共有 metadata を変更するため、Claude では ask、Codex では deny とし、native の worktree 作成入口とは区別する。
 default branch の作成・切替と、switch/checkout の分離・短縮・等号付き option を扱う。
 default branch の名前は大文字小文字を区別せずに照合し、checkout/switch では option の値に消費されうる語を含めて全 operand を切替先の候補とする。

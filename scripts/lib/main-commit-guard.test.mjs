@@ -1195,6 +1195,34 @@ describe("evaluateMainCommitGuard bypass axis (#1232)", () => {
 });
 
 describe("runMainCommitGuard", () => {
+	it("denies dynamic rebase option positions while preserving explicit values", () => {
+		for (const [command, denied] of [
+			['flag=--update-refs; git rebase "$flag" upstream', true],
+			['git rebase "--$FLAG" upstream', true],
+			['git rebase "$BASE"', true],
+			['git rebase -- "$BASE"', false],
+			['git rebase --onto "$ONTO" upstream', false],
+			['git rebase --onto="$ONTO" upstream', false],
+			['git rebase --rebase-merges="$MODE" upstream', false],
+			['git rebase --exec "$COMMAND" upstream', false],
+			['git rebase -s "$STRATEGY" upstream', false],
+		]) {
+			const result = runMainCommitGuard(JSON.stringify(payload({ command })), {
+				resolveBranches: () => ({
+					currentBranch: "feature/x",
+					mainBranch: "main",
+					targetRelation: "own",
+				}),
+				supportsAsk: false,
+			});
+			assert.equal(
+				result.output?.hookSpecificOutput.permissionDecision,
+				denied ? "deny" : undefined,
+				command,
+			);
+		}
+	});
+
 	it("denies dynamic shared-ref destinations and worktree actions", () => {
 		for (const command of [
 			'spec="HEAD:refs/heads/victim"; git fetch . "$spec"',

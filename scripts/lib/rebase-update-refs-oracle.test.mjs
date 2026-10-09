@@ -57,6 +57,11 @@ test("rebase option values cannot cancel observed updates to other refs", () => 
 		const original = git("rev-parse", "HEAD");
 		const cases = [
 			{
+				options: ["--update-refs"],
+				shellCommand: 'flag=--update-refs; git rebase "$flag" upstream',
+				shared: true,
+			},
+			{
 				options: ["--update-refs", "--exec", "--no-update-refs"],
 				shared: true,
 			},
@@ -90,12 +95,20 @@ test("rebase option values cannot cancel observed updates to other refs", () => 
 			{ options: ["--no-update-refs", "-k"], shared: false },
 		];
 		const violations = [];
-		for (const { options, shared } of cases) {
+		for (const { options, shared, shellCommand } of cases) {
 			git("reset", "--hard", original);
 			git("branch", "-f", "main", original);
 			git("branch", "-f", "other", original);
 			const args = ["rebase", ...options, "upstream"];
-			git(...args);
+			if (shellCommand) {
+				const result = spawnSync("/bin/sh", ["-c", shellCommand], {
+					cwd: repo,
+					env,
+					encoding: "utf8",
+					timeout: 10000,
+				});
+				assert.equal(result.status, 0, result.stderr);
+			} else git(...args);
 			const changed = ["main", "other"].filter(
 				(name) => git("rev-parse", name) !== original,
 			);
@@ -105,7 +118,7 @@ test("rebase option values cannot cancel observed updates to other refs", () => 
 				"rebase must actually run",
 			);
 			assert.equal(changed.length, shared ? 2 : 0, JSON.stringify(options));
-			const command = ["git", ...args].map(quote).join(" ");
+			const command = shellCommand ?? ["git", ...args].map(quote).join(" ");
 			const decision = parentDecision(command, repo);
 			if (decision !== (changed.length ? "ask" : "allow"))
 				violations.push({ command, changed, decision });
