@@ -45,7 +45,7 @@ try {
 	const { resolveGitRoots } = await import("./lib/run-exec.mjs");
 	const { createGuardProbe } = await import("./lib/guard-probe.mjs");
 	const probeGit = createGuardProbe();
-	const { normalizeFileOperations } = await import(
+	const { normalizeFileOperations, resolvePhysicalPath } = await import(
 		"./lib/file-operation-policy.mjs"
 	);
 
@@ -54,7 +54,13 @@ try {
 
 	// Name check first: only generated filenames need the session/target Git
 	// boundary probes, which are synchronous and share the guard's budget.
-	const operations = normalizeFileOperations(payload).filter((operation) =>
+	const operations = [
+		...normalizeFileOperations(payload),
+		...normalizeFileOperations(payload, {
+			physicalPath: (path, cwd) =>
+				resolvePhysicalPath(path, cwd, { followFinalSymlink: false }),
+		}),
+	].filter((operation) =>
 		mayTargetGeneratedRootInstructions(operation.tool_input.file_path),
 	);
 	if (!operations.length) process.exit(0);

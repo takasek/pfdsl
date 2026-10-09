@@ -6,6 +6,7 @@ import {
 	realpathSync,
 	rmSync,
 	symlinkSync,
+	writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -160,5 +161,22 @@ describe("generated root instructions repository scope at the entrypoint", () =>
 			run("apply_patch", undefined, { command })?.permissionDecision,
 			"deny",
 		);
+	});
+	it("checks the generated directive name before following its final symlink", () => {
+		const path = join(linked, "AGENTS.md");
+		writeFileSync(join(scratch, "instructions.md"), "old");
+		symlinkSync(join(scratch, "instructions.md"), path);
+		assert.equal(run("Edit", path)?.permissionDecision, "deny");
+		const command = `*** Begin Patch\n*** Update File: ${path}\n@@\n-old\n+new\n*** End Patch`;
+		assert.equal(
+			run("apply_patch", undefined, { command })?.permissionDecision,
+			"deny",
+		);
+	});
+	it("keeps checking an alias whose referent is a generated root file", () => {
+		const path = join(scratch, "instruction-alias");
+		writeFileSync(join(primary, "CLAUDE.md"), "old");
+		symlinkSync(join(primary, "CLAUDE.md"), path);
+		assert.equal(run("Edit", path)?.permissionDecision, "deny");
 	});
 });
