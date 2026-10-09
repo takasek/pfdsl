@@ -211,6 +211,14 @@ describe("classifyGitCommand", () => {
 	it("classifies the node-launched Codex routine wrapper the same way", () => {
 		for (const [command, subcommand] of [
 			[
+				'node.exe "C:/Codex/bin/codex-git-routine.mjs" stage-all /repo/worktree topic',
+				"add",
+			],
+			[
+				'NODE.EXE "C:/Codex/bin/CODEX-GIT-ROUTINE.MJS" commit /repo/worktree topic message',
+				"commit",
+			],
+			[
 				"node /opt/codex/bin/codex-git-routine.mjs stage-all /repo/worktree topic",
 				"add",
 			],

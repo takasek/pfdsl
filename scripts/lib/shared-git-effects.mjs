@@ -2,8 +2,9 @@
 // These are command-boundary safeguards, not a general Git transaction monitor.
 
 import { existsSync, realpathSync } from "node:fs";
-import { basename, isAbsolute } from "node:path";
+import { isAbsolute } from "node:path";
 import { tryGit, withoutGitTargetEnvironment } from "./run-exec.mjs";
+import { executableName } from "./shell-commands.mjs";
 
 const CODEX_ROUTINE = "codex-git-routine.mjs";
 // The Git mutations the routine performs, by the subcommand the guards use.
@@ -31,12 +32,13 @@ const CODEX_ROUTINE_CHILD_VERBS = new Set(["node-test", "node-script"]);
  */
 export function classifyCodexGitRoutine(values) {
 	let at;
-	if (basename(values[0] ?? "") === CODEX_ROUTINE) at = 0;
-	else if (basename(values[0] ?? "") === "node") {
+	if (executableName(values[0] ?? "").toLowerCase() === CODEX_ROUTINE) at = 0;
+	else if (executableName(values[0] ?? "") === "node") {
 		// Node options, their values and `--` may precede the script; the first
 		// word that is the routine is the script, whatever arity those options have.
 		at = values.findIndex(
-			(value, index) => index > 0 && basename(value) === CODEX_ROUTINE,
+			(value, index) =>
+				index > 0 && executableName(value).toLowerCase() === CODEX_ROUTINE,
 		);
 		if (at < 0) return null;
 	} else return null;

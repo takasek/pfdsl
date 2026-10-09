@@ -591,7 +591,7 @@ function parseSudoPrefix(tokens, start) {
 }
 
 function parseTimePrefix(tokens, start) {
-	if (basename(tokens[start]?.value ?? "") !== "time") return null;
+	if (executableName(tokens[start]?.value ?? "") !== "time") return null;
 	let i = start + 1;
 	let unresolved = false;
 	while (i < tokens.length) {

@@ -381,6 +381,8 @@ test("Windows executable prefixes expose protected inner commands and normal rea
 		"ENV.EXE gh.exe pr merge 123",
 		'"C:/Program Files/Git/usr/bin/env.exe" gh.exe pr merge 123',
 		"sudo.exe git.exe update-ref refs/heads/main HEAD",
+		"/usr/bin/time.exe git.exe update-ref refs/heads/main HEAD",
+		"TIME.EXE gh.exe pr merge 123",
 	])
 		assert.equal(
 			evaluate("Bash", { command }, "worker").decision,
@@ -391,7 +393,11 @@ test("Windows executable prefixes expose protected inner commands and normal rea
 		evaluate("Bash", { command: "env.exe gh.exe pr merge 123" }).decision,
 		"deny",
 	);
-	for (const command of ["env.exe git.exe status", "ENV.EXE gh.exe issue ls"])
+	for (const command of [
+		"env.exe git.exe status",
+		"ENV.EXE gh.exe issue ls",
+		"time.exe git.exe status",
+	])
 		assert.equal(
 			evaluate("Bash", { command }, "worker").decision,
 			"allow",

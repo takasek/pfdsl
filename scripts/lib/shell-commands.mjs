@@ -13,7 +13,7 @@ let cachedResult;
 /** Literal guarded executables and prefixes, including Windows spelling. */
 export function executableName(value) {
 	const name = basename(value.replaceAll("\\", "/"));
-	return /^(?:git|gh|env|sudo|nohup)(?:\.exe)?$/i.test(name)
+	return /^(?:git|gh|env|sudo|nohup|time|node)(?:\.exe)?$/i.test(name)
 		? name.toLowerCase().replace(/\.exe$/, "")
 		: name;
 }

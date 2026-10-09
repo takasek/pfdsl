@@ -266,6 +266,8 @@ describe("evaluateDelegationGuard — Codex child routine wrapper", () => {
 		`${routine} ${verb} ${rest}`,
 		`node ${routine} ${verb} ${rest}`,
 		`/usr/local/bin/node ${routine} ${verb} ${rest}`,
+		`node.exe ${routine} ${verb} ${rest}`,
+		`NODE.EXE "C:/Codex/bin/CODEX-GIT-ROUTINE.MJS" ${verb} ${rest}`,
 		`node --no-warnings ${routine} ${verb} ${rest}`,
 		`node --max-old-space-size=512 -- ${routine} ${verb} ${rest}`,
 	];
