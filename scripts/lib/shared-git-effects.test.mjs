@@ -60,6 +60,8 @@ for (const command of [
 	"git symbolic-ref HEAD refs/heads/trunk",
 	"git fetch origin HEAD:refs/heads/trunk",
 	"git fetch '--refmap=+refs/*:refs/*' origin",
+	"git pull --no-rebase --refmap=+refs/heads/main:refs/heads/main origin main",
+	"git pull --no-rebase --refmap +refs/heads/main:refs/heads/main origin main",
 	"git fetch origin '+refs/heads/*:refs/heads/*'",
 	"git fetch origin HEAD:trunk",
 	"git fetch -n origin HEAD:trunk",

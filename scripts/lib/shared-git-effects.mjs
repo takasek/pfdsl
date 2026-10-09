@@ -849,6 +849,13 @@ export function classifySharedGitEffect(
 		if (refs.length === 1) return { kind: "enter-branch", ref: refs[0] };
 		if (refs.length) return { kind: "enter-branch", ref: refs[0], refs };
 	}
+	// Explicit refmaps can replace a default or another checkout's branch;
+	// pull passes them to its fetch before merging or rebasing.
+	if (
+		["fetch", "pull"].includes(subcommand) &&
+		args.some((arg) => isLongOptionPrefix(arg, "--refmap"))
+	)
+		return { kind: "shared" };
 	if (subcommand === "fetch") {
 		// No `--dry-run` exemption: `--no-dry-run` can cancel it later in the
 		// arguments, and an option value (`-o --dry-run`) can consume it.
@@ -863,10 +870,6 @@ export function classifySharedGitEffect(
 		// Refspecs read from stdin are unresolvable at this boundary.
 		if (args.some((arg) => isLongOptionPrefix(arg, "--stdin")))
 			return { kind: "shared", unresolved: true };
-		// Explicit local destinations / refmaps can replace a default or another
-		// checkout's branch, even when Git is launched from an own feature tree.
-		if (args.some((arg) => isLongOptionPrefix(arg, "--refmap")))
-			return { kind: "shared" };
 		if (writesLocalRefDestination(args, isDynamic, subcommand))
 			return { kind: "shared", unresolved: true };
 		if (writesLocalRefDestination(args)) return { kind: "shared" };

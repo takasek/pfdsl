@@ -441,6 +441,25 @@ test("guards agree with Git's observed effects when the primary holds main", asy
 	]);
 });
 
+test("pull refmap updates main while the primary holds it", async () => {
+	const { violations, sharedObserved } = await observe(
+		[
+			{
+				args: [
+					"pull",
+					"--no-rebase",
+					"--refmap=+refs/heads/main:refs/heads/main",
+					"origin",
+					"main",
+				],
+			},
+		],
+		{ mainCheckedOut: true },
+	);
+	assertExercised(sharedObserved, ["refs/heads/main"]);
+	assert.deepEqual(violations, []);
+});
+
 test("config setters remain unsupported even when the shell clears the variable", () => {
 	for (const options of [
 		[],

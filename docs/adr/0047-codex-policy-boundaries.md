@@ -80,7 +80,7 @@ remote-tracking ref と tag は対象外とし、notes と replace は現時点�
 分類器が作用先を確定できない形は、作用なしと扱わず共有作用または拒否とする。
 
 update-ref、symbolic-ref の変更、branch の強制変更・削除・他 branch 改名、worktree の追加・保守、明示的なローカル ref 宛て fetch を確認する。
-同一 repository を宛先とする push（`push .` やローカルパス）と、pull の明示的なローカル ref 宛て refspec は、update-ref・fetch と同じ作用として確認する。
+同一 repository を宛先とする push（`push .` やローカルパス）と、pull の明示的なローカル ref 宛て refspec・refmap は、update-ref・fetch と同じ作用として確認する。
 reflog の write・expire・delete・drop は stash の回復情報を書き換えうるため共有保守とし、Git の reflog の verb は閉じた集合なので、それ以外の最初の語は show へ渡す ref として表示に扱う。
 reflog の表示でも `--output` はファイルを書き、後続の不正 option による失敗前にも出力先を変更するため、読取の免除から外す。
 `git remote` の add・rename・remove・set-url・set-branches は前置の verbosity option を含めリポジトリ設定の書込みとして共有作用とし、前置 option を解決できなければ共有作用とする。
