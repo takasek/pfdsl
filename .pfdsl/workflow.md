@@ -377,11 +377,14 @@ worktree 作成から PR 作成までを一気通貫でやらせる場合のみ 
 
 最終方式の実装案・旧判断から変える範囲・対案・受入限界は [ADR-0047](../docs/adr/0047-codex-policy-boundaries.md) に記録する。
 追加の保護・試験・簡素化は、同 ADR の「簡素化を判断する基準と今後の候補」に従い、通常作業での発生可能性と保守負担で判断する。
-親 gh、rebase、help、直積試験の縮小や追加機構は未採用の候補として #1404 から追跡し、今回の PR の受入へ追加しない。
+通常読取の別名・診断 help/version・REST merge 状態 GET・help 誤発火は PR #1413 で修復し、未判定入力の確認は代表例で検査する。
+親 gh 表、rebase、残る help 判定・重複試験の縮小や追加機構は未採用の候補として #1404 から追跡し、今回の PR の受入へ追加しない。
 汎用化と Jev 連携は今回の範囲に含めない。
 main-commit、delegation、verification-tree、closes-create、worktree-write、generated-root-instructions、roadmap-publish の既存入口を保持し、短い bootstrap から共通の `scripts/lib/policy-supervisor.mjs` を読み込む。
 同じ process 内の worker thread で policy/helper を動的 import し、監督の欠落・構文エラーは各入口で拒否する。
-stdin を含む内部 deadline は 5 秒、payload は 1 MiB、応答と診断は各 64 KiB、Git probe は合計 3 秒・一回最大 500 ms とする。
+stdin を含む内部 deadline は 5 秒、payload は 1 MiB、応答と診断は各 64 KiB とする。
+root・branch・owner 等の `createGuardProbe` 経由の Git probe は合計 3 秒・一回最大 500 ms とする。
+push の URL・repository 解決の読取 query は一回最大 1 秒で、3 秒の probe 予算の外だが policy 全体の 5 秒 deadline 内にある。
 ロード・同期/非同期例外、不正 payload/応答、期限超過は deny JSON・stderr・exit 2 とする。
 正常判定は exit 0 とし、Codex の ask は deny に変換する。
 worker thread は process.ppid を変えず、Claude の直接親照合条件を維持する。

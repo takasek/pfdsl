@@ -27,7 +27,7 @@ PR #1413 は、既知の gh 読取別名と version、単独の検査コマン�
 受入は報告された通常例の通過と近い保護対象の停止で確認し、直積試験や全構文対応を追加しない。
 
 ユーザー共通の publication guard は別管理であり、PR #1413 に配布しない。
-検査可能な送信内容の scanner 再利用、sender の重複検査、percent 表記と確認済み SVG の過剰制限をローカルで修正する。
+検査可能な送信内容の scanner 再利用、sender の重複検査、percent 表記と確認済み SVG の過剰制限はローカルで修正済みである。
 metadata 操作か本文投稿かだけで拒否せず、未知の入力には実際に利用できる通常 gh または対応 sender の回復経路を示す。
 内容検査は外部書込みの承認や、この repository の責務・merge 保護を代替しない。
 
@@ -94,7 +94,8 @@ detached HEAD は Git が正常に空の branch 名を返した場合と区別�
 保護対象は、default branch と既存の他 branch の ref、他 checkout の HEAD・index、stash の ref と reflog、worktree metadata、リポジトリ設定である。
 remote-tracking ref と tag は対象外とし、notes と replace は現時点の対象に含めない。
 観測する入口は、Bash の argv に現れる Git の直接呼出し・global option・可視の環境変数代入と、既知の wrapper である。
-分類器が作用先を確定できない形は、作用なしと扱わず共有作用または拒否とする。
+分類器が branch/refspec 等の作用先を確定できない形は、作用なしと扱わず Claude で命令全体を ask、Codex で deny とする。
+管轄外と確認できた foreign repository の既存境界は維持する。
 
 update-ref、symbolic-ref の変更、branch の強制変更・削除・他 branch 改名、worktree の追加・保守、明示的なローカル ref 宛て fetch を確認する。
 同一 repository を宛先とする push（`push .` やローカルパス）と、pull の明示的なローカル ref 宛て refspec・refmap は、update-ref・fetch と同じ作用として確認する。
@@ -174,7 +175,7 @@ Claude の issue-worker 例外を Codex の子へ引き継がない。
 
 親を含め gh pr merge・auto-merge、REST の merge endpoint の変更 method、GraphQL の merge mutation を保護する。
 REST の GET は merge 状態の読取として維持し、method を確定できない option 列は読取免除にしない。
-GraphQL endpoint は Node 標準 URL の pathname で比較し、`graphql`・`/graphql`・完全 URL の通常表記を同じ保護へ接続する。
+GraphQL endpoint は Node 標準 URL の pathname で比較し、`graphql`・`/graphql`・完全 URL と、[GitHub Enterprise Server 標準の `/api/graphql`](https://docs.github.com/en/enterprise-server@3.20/graphql/guides/forming-calls-with-graphql#the-graphql-endpoint) を同じ保護へ接続する。
 gh の built-in namespace と command 名の小さな表を共有 preflight で確認し、設定 alias・extension 名・未対応名は親子ともClaudeでask、Codexで拒否とする。
 `gh land`・`gh pr land`・`gh repo autolink land` 等は展開せず停止し、検査できる明示的な built-in command を案内する。
 GitHub CLI は既存 built-in の上書きと実行可能な command の下への alias 登録を認めないため、既知 leaf に続く通常の引数は維持する。
@@ -203,7 +204,9 @@ Git/GitHub CLI の実行名は共通 helper で比較し、Windows の `git.exe`
 worker を撤去する案は、host timeout の拒否動作を未確認であり、通常のロード失敗と同期停止の扱いを維持する今回は採らない。
 同じ process 内で policy を実行し、process.ppid の直接親条件を変えずに同期停止を監督する。
 stdin を含む内部 deadline は 5 秒、payload は 1 MiB、応答・診断は各 64 KiB とする。
-Git probe は合計 3 秒、一回最大 500 ms とし、timeout を正常な欠落と区別する。
+root・branch・owner 等の `createGuardProbe` 経由の Git probe は合計 3 秒、一回最大 500 ms とし、timeout を正常な欠落と区別する。
+push の URL・repository 解決は別の読取 query を一回最大 1 秒で実行し、3 秒の probe 予算には含まれない。
+これらも policy 全体の 5 秒 deadline に含まれる。
 ロード・同期/非同期例外、不正 payload/応答、期限超過は deny JSON・stderr・exit 2 にする。
 正常な allow/deny/無出力は exit 0 とする。
 Codex が表現できない ask は deny に変換し、条件の修復後に再試行する案内を出す。
