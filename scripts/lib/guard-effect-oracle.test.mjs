@@ -460,37 +460,14 @@ test("pull refmap updates main while the primary holds it", async () => {
 	assert.deepEqual(violations, []);
 });
 
-test("config setters remain unsupported even when the shell clears the variable", () => {
-	for (const options of [
-		[],
-		["-v"],
-		["--"],
-		["-v", "--"],
-		["-f"],
-		["-f", "--"],
+test("config setters require confirmation without interpreting readonly or unset", () => {
+	for (const prefix of [
+		"export GIT_CONFIG_COUNT=1; unset GIT_CONFIG_COUNT; ",
+		"export GIT_CONFIG_COUNT=1; readonly GIT_CONFIG_COUNT; unset GIT_CONFIG_COUNT; ",
 	]) {
-		const prefix = `export GIT_CONFIG_COUNT=1; unset ${options.join(" ")} GIT_CONFIG_COUNT; `;
-		const actual = spawnSync(
-			"bash",
-			[
-				"--noprofile",
-				"--norc",
-				"-c",
-				`${prefix}printf '%s' "\${GIT_CONFIG_COUNT-unset}"`,
-			],
-			{
-				env: Object.fromEntries(
-					Object.entries(process.env).filter(
-						([name]) => !name.startsWith("GIT_"),
-					),
-				),
-				encoding: "utf8",
-			},
-		);
-		assert.equal(actual.status, 0, actual.stderr);
 		assert.equal(
 			parentDecision(`${prefix}git fetch origin`, "/repo/feature"),
-			"deny",
+			"ask",
 			prefix,
 		);
 	}
