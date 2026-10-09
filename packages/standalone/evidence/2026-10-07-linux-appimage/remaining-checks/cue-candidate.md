@@ -46,11 +46,12 @@ Reduced-motion acceptance remains a separate branch of the work.
 First reach the supported settings service for the actual desktop session and record the baseline value/type/override existence.
 The owner's prior permission covers a temporary animation-setting change followed by exact restoration; it does not cover replacing the settings manager, direct XSettings writes or forcing namespace access.
 If that route is unavailable, report the missing environment capability and continue the independent normal-motion cue checks.
-Also establish a normal read-only way to inspect the target production webview's media query before changing settings.
-If that production query is unavailable, keep its condition unverified, restore any temporary change and continue the independent cue checks; an old diagnostic binary's value does not prove this production binary's preference.
+The original direct-query method also required a normal read-only way to inspect the target production webview's media query before changing settings.
+If that query was unavailable, its condition stayed unverified; an old diagnostic binary's value does not prove this production binary's preference.
+The [follow-up decision](production-151d393/next-method.md) specifies a separate normal/reduce/restored-normal recording method for the original behavior requirement; it does not certify the earlier direct-query test or rewrite its result.
 Do not repeat the paused Inspector/Trusted Types diagnosis as part of this cue acceptance.
 
 Before the dot run, an attempted independent local browser scenario could not start because no browser surface was connected to the automation API.
 Dot subsequently supplied normal GUI cue and geometry evidence; the parent and independent reviewer inspect that evidence rather than rerunning the Linux GUI.
-Effective reduced motion still awaits the supported desktop setting and production-query prerequisites.
+The earlier direct-query method remains unverified; the separate behavior comparison for the original reduced-motion requirement follows the supported-setting prerequisites in [next-method.md](production-151d393/next-method.md).
 The existing same-process document-disposal cell also remains unverified unless a normal UI path is available; a whole-process restart is not that proof.

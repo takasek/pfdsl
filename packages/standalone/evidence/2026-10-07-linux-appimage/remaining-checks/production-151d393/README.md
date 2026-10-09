@@ -77,6 +77,10 @@ The old fixed `8261f877` 133-condition / 399-host-cell matrix remains **202 pass
 Old raw CRLF and paused Inspector/Trusted Types observations are retained as separate diagnostics, not rerun or promoted into new production success.
 The grouped five issues are not certified as wholly complete.
 
+The [follow-up method and disposal disposition](next-method.md) keep these original statuses and specify the next reduced-motion comparison in a separate, supported desktop session if installed capabilities permit it.
+The original direct-query test remains unverified; an alternative OS-preference and recorded normal/reduce/restored-normal comparison may establish the original behavior requirement without adding a query UI.
+Native disposal remains unverified until a normal same-process disposal path is introduced; no testing-only UI is requested.
+
 ## Preservation and review
 
 The final supplied checks retain outer 14/14, AppDir 304/304, ZIP/AppImage/inner hashes, the three fixture originals and previous evidence.
