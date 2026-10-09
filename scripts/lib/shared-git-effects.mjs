@@ -735,7 +735,8 @@ export function classifySharedGitEffect(
 	);
 	const isDynamic = (value) => dynamicValues.has(value);
 	if (subcommand === "reflog") {
-		if (isDynamic(args[0])) return { kind: "shared", unresolved: true };
+		if (isDynamic(args[0]) && !/^--[A-Za-z0-9][A-Za-z0-9-]*=/.test(args[0]))
+			return { kind: "shared", unresolved: true };
 		return isReadOnlyGitReflog(args) ? null : { kind: "shared" };
 	}
 	if (subcommand === "remote")

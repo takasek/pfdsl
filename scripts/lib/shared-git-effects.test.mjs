@@ -574,6 +574,7 @@ test("dynamic fetch options and reflog verbs require a whole-command decision", 
 		'git fetch --verbose "$flag" origin main',
 		'git pull "$flag" origin main',
 		'verb=expire; git reflog "$verb" --expire=now --all',
+		'git reflog --"$flag"=out.log',
 	]) {
 		assert.equal(decision(command, "own", "main", true), "ask", command);
 		assert.equal(decision(command), "deny", command);
@@ -583,6 +584,8 @@ test("dynamic fetch options and reflog verbs require a whole-command decision", 
 		'git fetch --depth "$depth" origin main',
 		'git fetch --depth="$depth" origin main',
 		'git reflog --date=iso "$ref"',
+		'git reflog --format="$format"',
+		'git reflog --date="$date"',
 	])
 		assert.equal(decision(command), "allow", command);
 });
