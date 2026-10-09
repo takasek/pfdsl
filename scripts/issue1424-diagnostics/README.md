@@ -2,7 +2,7 @@
 
 This job observes issue #1424 on the original synthetic merge `526e17c070bb1447ebf3f74192db2fef391b60a8`.
 It runs the original full smoke sequence, with VS Code 1.132.1, Node 24.21.0, pnpm 10.33.2, and Xvfb on Ubuntu 24.04.
-The original download, launch arguments, predicates, deadlines, and scenario order are retained.
+The original download, launch arguments, close predicates, deadlines, and scenario order are retained.
 The fixed checkout basename and VS Code cache restore key/path match the original failing job.
 The hosted runner image is recorded because its contents can change independently of the source revision.
 
@@ -10,6 +10,15 @@ The workflow runs three independent trials, once each, on changes to this diagno
 It does not retry a failed operation or turn a failed smoke into a passing job.
 Successful diagnostic trials do not establish a fix, failure frequency, or equivalence to the historical runner image.
 Synchronous API logging and DOM checkpoints can change timing.
+
+The first observation-only run, 37910383184, produced two successful trials and one failure on the first Close.
+Its failed click reached the Close button before the API save event; no tab closure or later PFDSL reopen request was recorded.
+The historical issue failed on the second Close, so the two failures are not assumed to have the same cause.
+The current job is explicitly labeled `save-completion` and adds one precondition before each of the two saved-source closes.
+It retains the existing disk-content checks and waits for a save event matching the current document version, with the document and tab both clean in the latest API snapshot.
+This is a diagnostic comparison, not an unmodified trial or a shipped fix.
+The tab's visual dirty class alone is insufficient as a save-completion assertion: VS Code also hides it while saving.
+Missing API evidence fails the precondition; the observer's evidence is mandatory for this comparison.
 
 `prepare.mjs` checks six baseline file hashes before writing into the separate fixed-source checkout.
 It adds API tab/document/save events and observes all ten PFDSL `showTextDocument` call sites, including definition insertion and node navigation.

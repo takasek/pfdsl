@@ -32,6 +32,8 @@ await assertPreviewUsability(session);
 await assertDefinitionQuickFix(session);
 await assertPreviewEditingFocus(session);
 await assertHiddenSourceExternalChange(session);
+await closeSourceTab(page, sourceTab);
+await closeSourceTab(page, sourceTab);
 const cleanupErrors = await cleanupSmokeSession({ browser, runDir, vscodeProcess });
 if (session) {
 			const cleanupErrors = await cleanupSmokeSession(session);
@@ -55,6 +57,22 @@ if (session) {
 	);
 	assert.ok(!result.includes("PFDSL_DIAG_VSCODE"));
 	assert.ok(!result.includes(".filter((arg)"));
+	assert.ok(!result.includes("waitForSavedSource"));
+	const comparison = instrumentRunner(fixture, { waitForSave: true });
+	assert.equal(comparison.split("await waitForSavedSource(").length - 1, 2);
+	assert.equal(
+		comparison.split("await closeSourceTab(page, sourceTab);").length - 1,
+		2,
+	);
+	assert.ok(comparison.includes("originalPredicate, { timeoutMs }"));
+	assert.throws(
+		() =>
+			instrumentRunner(
+				fixture.replaceAll("await closeSourceTab(page, sourceTab);", ""),
+				{ waitForSave: true },
+			),
+		/exactly two/,
+	);
 });
 
 test("CI records failed runs without converting them into success", () => {

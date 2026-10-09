@@ -32,7 +32,7 @@ function diagnosticImport(symbols, modulePath) {
 	return `import { ${symbols} } from ${JSON.stringify(modulePath)};\n`;
 }
 
-export function instrumentRunner(source) {
+export function instrumentRunner(source, { waitForSave = false } = {}) {
 	let result = source;
 	const start = result.indexOf("export async function closeSourceTab(");
 	const end = result.indexOf("\nasync function submitQuickInput", start);
@@ -65,6 +65,18 @@ export function instrumentRunner(source) {
 		"const cleanupErrors = await cleanupSmokeSession(session);",
 		"await preserveSession(session);\n\t\t\tconst cleanupErrors = await cleanupSmokeSession(session);",
 	);
+	if (waitForSave) {
+		const closeCall = "await closeSourceTab(page, sourceTab);";
+		if (result.split(closeCall).length !== 3)
+			throw new Error("Expected exactly two saved-source closes");
+		result =
+			diagnosticImport("waitForSavedSource", "./save-completion.mjs") +
+			result.replaceAll(
+				closeCall,
+				"await waitForSavedSource(session, expectEventually, coldRenderTimeoutMs);\n\t" +
+					closeCall,
+			);
+	}
 	return (
 		diagnosticImport(
 			"installTrace, closeTrace, checkpoint, preserveSession",
@@ -73,7 +85,7 @@ export function instrumentRunner(source) {
 	);
 }
 
-export function prepare(root) {
+export function prepare(root, { waitForSave = false } = {}) {
 	const extensionRoot = join(root, "packages/vscode-extension");
 	// Check every input before writing any of them. This diagnostic is tied to one source revision.
 	const sources = Object.entries(expectedHashes).map(([path, expected]) => {
@@ -84,7 +96,8 @@ export function prepare(root) {
 		return [path, source];
 	});
 	const outputs = sources.map(([path, source]) => {
-		if (path === "smoke/run.mjs") return [path, instrumentRunner(source)];
+		if (path === "smoke/run.mjs")
+			return [path, instrumentRunner(source, { waitForSave })];
 		if (path === "src/extension.ts") {
 			return [
 				path,
@@ -116,11 +129,20 @@ export function prepare(root) {
 		new URL("trace-workbench.mjs", import.meta.url),
 		join(extensionRoot, "smoke/trace-workbench.mjs"),
 	);
+	if (waitForSave)
+		copyFileSync(
+			new URL("save-completion.mjs", import.meta.url),
+			join(extensionRoot, "smoke/save-completion.mjs"),
+		);
 }
 
 if (isCliEntrypoint(import.meta.url, process.argv[1])) {
-	const { positionals } = parseArgs({ allowPositionals: true, strict: true });
+	const { positionals, values } = parseArgs({
+		allowPositionals: true,
+		strict: true,
+		options: { "wait-for-save": { type: "boolean", default: false } },
+	});
 	if (positionals.length !== 1)
-		throw new Error("Usage: prepare.mjs <fixed-source-root>");
-	prepare(positionals[0]);
+		throw new Error("Usage: prepare.mjs [--wait-for-save] <fixed-source-root>");
+	prepare(positionals[0], { waitForSave: values["wait-for-save"] });
 }
