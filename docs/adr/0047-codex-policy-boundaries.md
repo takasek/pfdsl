@@ -64,6 +64,10 @@ Git/CDPATH の可視代入・環境 setter・read・printf -v・source・eval �
 読取 Git と、状態変更を含まない if/for/while・pipeline・命令置換は引き続き解析する。
 引用・heredoc・動的 executable・解析失敗の退行検知は、固定 parser と各 guard の接続部分の検査として残す。
 汎用の shell 実行機や、稀な構文の独自補完には拡張しない。
+`bash -c`・`eval` の実行文字列や script file の内容は再帰解析しない。
+内側で行う親の merge や子の Git metadata 変更にも、直接 argv の保護は及ばない。
+これは未判定となった入力を ask にする規則とは別の、解析対象の境界である。
+この表記を悪意とはみなさず、通常作業で保護の取りこぼしが発生した証拠が得られた場合に対応範囲を再評価する。
 複数 agent・worktree に共通する仕組みの汎用化は将来課題とし、今回の導入理由にはしない。
 
 ### 所有者と作用先
