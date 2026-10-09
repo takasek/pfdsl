@@ -1061,7 +1061,7 @@ function evaluateUnresolvedCwd(guarded) {
 		decision: "ask",
 		reason:
 			`Cannot determine the target of '${command}' without interpreting shell state or expansion. Review the whole command before approving. ` +
-			`Use git -C with an absolute literal path, or run Git in a separate invocation with harness workdir. Run Git separately from shell environment setters.${bypassNote}`,
+			`Use git -C with an absolute literal path, or run Git in a separate invocation with harness workdir. Use literal branch names and refspecs. Run Git separately from shell environment setters.${bypassNote}`,
 	};
 }
 
@@ -1101,7 +1101,18 @@ export function runMainCommitGuard(
 		{ ambientGitTargetOverride },
 	);
 	if (targets.length === 0) return { shouldOutput: false };
-	const unresolved = targets.find((target) => target.cwd === null);
+	const contexts = new Map();
+	const contextFor = (target) => {
+		if (!contexts.has(target))
+			contexts.set(target, resolveBranches(payload, target.cwd));
+		return contexts.get(target);
+	};
+	const unresolved = targets.find(
+		(target) =>
+			target.cwd === null ||
+			(target.effect?.unresolved &&
+				contextFor(target).targetRelation !== "foreign"),
+	);
 	if (unresolved)
 		return {
 			shouldOutput: true,
@@ -1113,10 +1124,7 @@ export function runMainCommitGuard(
 
 	let asked = null;
 	for (const target of targets) {
-		const result = evaluateGuardedCommand(
-			target,
-			resolveBranches(payload, target.cwd),
-		);
+		const result = evaluateGuardedCommand(target, contextFor(target));
 		if (result.decision === "deny") {
 			return { shouldOutput: true, output: buildPermissionOutput(result) };
 		}

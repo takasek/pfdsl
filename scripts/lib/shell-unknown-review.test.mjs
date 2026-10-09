@@ -150,3 +150,16 @@ test("a dynamic config assignment is confirmed instead of interpreted", () => {
 	assert.equal(guards.main(command, true), "ask");
 	assert.equal(guards.main(command, false), "deny");
 });
+
+test("unresolved Git effects defer the whole call on Claude", () => {
+	for (const command of [
+		'git switch "$BRANCH"',
+		'git fetch origin "$REFSPEC"',
+		'git push origin "$REFSPEC"',
+		'git commit --no-verify -m x; git switch "$BRANCH"',
+		'git switch "$BRANCH"; git commit --no-verify -m x',
+	]) {
+		assert.equal(guards.main(command, true), "ask", command);
+		assert.equal(guards.main(command, false), "deny", command);
+	}
+});
