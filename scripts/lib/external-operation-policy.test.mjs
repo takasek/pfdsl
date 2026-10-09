@@ -75,6 +75,7 @@ for (const command of [
 	"gh api -X PUT repos/o/r/pulls/1/merge",
 	"gh api /graphql -f 'query=mutation { mergePullRequest(input:{pullRequestId:\"fixture\"}) {clientMutationId} }'",
 	"gh api https://api.github.com/graphql -f 'query=mutation { mergePullRequest(input:{pullRequestId:\"fixture\"}) {clientMutationId} }'",
+	"gh api https://ghe.example/api/graphql -f 'query=mutation { mergePullRequest(input:{pullRequestId:\"fixture\"}) {clientMutationId} }'",
 	"gh api -X PUT 'repos/o/r/pulls/1/merge#fragment'",
 	"gh api -X PUT 'https://api.github.com/repos/o/r/pulls/1/merge#fragment'",
 	"gh api -h github.com -X PUT repos/o/r/pulls/1/merge",
@@ -85,6 +86,13 @@ for (const command of [
 ])
 	test(`parent merge stops before execution: ${command}`, () =>
 		assert.equal(evaluate("Bash", { command }).decision, "deny"));
+
+test("a GHES GraphQL query retains the parent read and child POST boundaries", () => {
+	const command =
+		"gh api https://ghe.example/api/graphql -f 'query=query { viewer { login } }'";
+	assert.equal(evaluate("Bash", { command }).decision, "allow");
+	assert.equal(evaluate("Bash", { command }, "worker").decision, "deny");
+});
 
 // gh reads --help here as a flag's value, a positional, or as a flag it
 // rejects, so the command still runs.

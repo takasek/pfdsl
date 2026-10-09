@@ -151,7 +151,8 @@ const GH_MERGE_HELP_FLAGS = {
 
 export function isGraphqlEndpoint(value) {
 	try {
-		return new URL(value, "https://api.github.com/").pathname === "/graphql";
+		const pathname = new URL(value, "https://api.github.com/").pathname;
+		return pathname === "/graphql" || pathname === "/api/graphql";
 	} catch {
 		return false;
 	}
