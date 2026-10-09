@@ -210,6 +210,119 @@ native executable `f6005842e1a7de061d531d09da67002b46d9c9eae89ebac1a19f04bca4451
 [manifest](evidence/2026-10-05-preview-ui/main-merge-native-recheck-manifest.json)は4枚の PNG、AX と report の保存 bytes を固定する。
 この観測は全 source の byte 単位の保持、極小 minimap の71 label の視認、native gestures/IME/所有者の UI 受入を認定しない。
 
+## Linux verification and grouped preview acceptance
+
+2026-10-07、所有者が #1408 と #1352・#1282・#1283・#1284・#483 をまとめて検収する方針を承認した。
+当初は Linux の実起動・操作を PR 作成後に確認する指定であり、起動手順とローカル検査までを準備範囲とした。
+同日、固定 HEAD `8261f877d5cae8aa653a5310edfbd9e387acb116` の Linux native 起動・folder picker・dirty close・corpus の成功と、既存5件の追加検収報告を受領した。
+既存5件の実装は PR #1394 から引き継ぎ、新規実装からやり直さない。
+[Linux の依存・ビルド・起動手順](README.md#linux-verification)を用い、確認した版と未確認条件を以下の各行へ対応付ける。
+
+| 対象 | 実操作で確認する内容 | 今回の状態 |
+| --- | --- | --- |
+| #1408 の起動・読取 | 通常起動で native window を表示し、Open folder で使い捨てフォルダを選び、Rust host 経由で文書を editor と preview へ表示。選択キャンセル後も操作を継続 | 固定版 `8261f877` の dot Debian 13.6 で成功 |
+| #1408 の終了・原本 | dirty な文書で window close → Keep Editing による編集保持 → 再 close → Discard による終了。検証用原本の前後 hash 一致を確認 | 同じ AppImage の通常操作で成功、process exit 0、原本 hash 一致 |
+| #1352 の表示・回復 | 初回 Fit、100%、倍率と Help、zoom/pan 後の正常→エラー→正常、主図と minimap の整合、定義挿入後の編集案内。VS Code の起動手順と既存動線も確認 | native 17 / VS Code 27 条件成功。関連 issue の未確認と元 issue の検査追加条件は別に保持 |
+| #1282 の定義作成 | 両ホストの Node actions から作成・作成位置への移動・単一 Undo/Redo。CLI の成功・拒否・初期 field・無書込みを別入口で確認 | native 9 / VS Code 9 / CLI 23 条件成功。コメント位置の厳格保持3セルは仕様との関係を下記で整理し、native raw CRLF bytes は未確認 |
+| #1283 の巡回 | VS Code の context menu と chord で定義→全本文 occurrence→定義を巡回。引用キー・同名 field・編集後の増減と既存直接移動を確認 | 2026-10-08 UTC の追補で組込定義・Peek 対照も成功し、VS Code 20条件成功。standalone の巡回 UI は対象外 |
+| #1284 の周辺図・強調 | 両ホストで hover の局所 SVG、画面端・内部 scroll/click、editor と局所図からの移動、連続移動の cue、reduced motion、既存 pan/zoom を確認 | 右端 pointer 追補を含め native 16 / VS Code 21 条件成功、native 6 / VS Code 1 条件未確認 |
+| #483 の接続編集 | 両ホストで input/feedback/output × 既存/新規 target の6通り、単一 Undo/Redo、再描画、既存 double click・pan を確認 | native / VS Code 各30条件成功。semantic-invalid な existing output 候補は別の仕様判断として保持 |
+
+同じ source commit と検証用文書を使って操作をまとめるが、各 issue の全受入条件とホスト別の結果を保持する。
+通常の folder picker と close は、初期フォルダを自動選択する corpus mode の成功だけでは認定しない。
+Linux の native 操作、VS Code、CLI、macOS 固有の操作、人間の UI 受入はそれぞれの実行版と証拠で判定する。
+#1408 の指定 Linux native シナリオは完了したが、束全体と既存5件の一括完了は認定しない。
+対応 artifact の wip と元の criteria は維持し、未確認条件を成功へ読み替えない。
+実行時は commit・未コミット差分の有無・executable と frontend の識別情報・OS/CPU・依存版・操作・期待/実結果・証拠・原本 hash・未確認条件を記録する。
+
+### 2026-10-07 UTC の固定版検収と受入基準
+
+対象は [run 37574418253 の AppImage artifact 11461844652](https://github.com/takasek/pfdsl/actions/runs/37574418253/artifacts/11461844652) と SOURCE_COMMIT `8261f877d5cae8aa653a5310edfbd9e387acb116`。
+[受領報告と照合結果](evidence/2026-10-07-linux-appimage/README.md)に来歴・hash・環境・操作・制約と、[399 host cells の元判定](evidence/2026-10-07-linux-appimage/host-matrix.csv)を保存した。
+dot の通常 native 操作が成功し、[native corpus report](evidence/2026-10-07-linux-appimage/native-report.json)も同じ reference と executable hash で23/23成功、failures / errors は空。
+同 HEAD のローカル JS build と artifact frontend は10/10のファイル集合・hash が一致し、実行後も外側14件・AppDir304件と原本の保持を確認したという報告を受領した。
+親は添付 ZIP の1,133 manifest entries、matrix の集計・証拠参照、corpus report の実行版を照合し、別 agent も集計と原要求への対応を確認した。
+親による Linux GUI の再実行とは区別する。
+
+追加5件の元集計は133条件 × 3 hosts = 399セル、対象212セルの成功200・失敗3・未実施9、対象外187。
+失敗3セルは同じ inline YAML comment の位置変更を native / VS Code / CLI で観測したものであり、独立した3不具合ではない。
+先の検査プロンプトは無関係なコメント位置の厳密保持を要求したが、[ADR-0034](../../docs/adr/0034-pfdsl-owns-frontmatter-format.md)は frontmatter 全体の CST 再整形を採用し、既存テストも位置変更を許容している。
+この追加の厳格条件は既存契約と整合していなかったため、現行仕様の受入ではコメント内容・無関係な値・本文・改行の保持と、許容された再整形を区別する。
+コメント位置の観測と厳格条件未達の元判定は改変せず、現行仕様違反が確定した製品不具合とは扱わない。
+位置の固定保存を新たに要求する場合は、既存契約の変更として別途判断する。
+未確認9セル、native raw CRLF bytes、semantic-invalid な接続候補の扱いも、この解釈だけで成功へ変更しない。
+
+同じ8261固定版の追補では、I1284-012 / native の右端 tooltip を物理 pointer で開き内部を click する入口が成功した。
+[最初の追補](evidence/2026-10-07-linux-appimage/README.md#同じ固定版の追補検収)時点では成功201・旧失敗履歴3・未確認8・対象外187。
+2026-10-08 UTC の[残件追補](evidence/2026-10-07-linux-appimage/remaining-checks/README.md)で、所有者が許可した workspace-only trust と専用 profile による組込 definition / Peek 対照が成功し、I1283-019 / VS Code を更新した。
+最新の累積は成功202・旧失敗履歴3・未確認7・対象外187であり、今回の変更はこの1セルだけ。
+検収継続では、[lifecycle 自動検査](evidence/2026-10-07-linux-appimage/lifecycle-verification.md)として共有 preview 31件と実 standalone host adapter 1件が成功。
+通常 native GUI の未確認判定とは分け、束の完了まで残る実画面確認を続ける。
+初回と前追補の133条件 / 399セルの判定を保持し、各追補の status 変更を分けて記録した。
+cue の4条件、同 process dispose、両 GUI の reduced motion は未確認のまま維持する。
+この production artifact 試行では native の実 Monaco model の raw CRLF 保持も未確認で、通常 Save UI の追加は要求せず、全 issue の一括完了を認定しない。
+同試行の連続録画でも native cue が見えず、正規 Inspector がないため class / computed style を取得できなかった。
+同試行の OS setting 変更後も実効 GTK / VS Code webview は reduce へ切り替わらず、GNOME setting は元の明示 override の存在を記録しなかったため厳密な復元を証明できない。
+値 true / 型 b への復帰と、元状態までの復元完了は区別する。
+
+2026-10-08 UTC の[別 Inspector binary 診断](evidence/2026-10-07-linux-appimage/remaining-checks/inspector-results/README.md)を受領し、136件の manifest と原399セルの bytes 不変を照合した。
+同じ製品 source / frontend の別 release binary では、class / selector / computed style と約1.5秒の解除が成立した一方、録画に期待する持続的な青い cue が現れず、computed state と captured presentation の境界に不一致がある。
+SVG paint / clipping / compositor / capture 等の根本原因は未確定で、元 binary の4条件へ合否を転写しない。
+実 Monaco model の定義作成前 / 後 / Undo / Redo は4状態すべて CRLF で、前と Undo、後と Redo の内容が一致した。
+これは399セル外の診断 model の証拠であり、元 binary の保存 bytes や editor painting を認定しない。
+breakpoint 付き model 操作中の Trusted Types 描画エラーは別観測として保持し、通常版での再現は未確認。
+active xfsettingsd を特定したが、正規 xfconf write は publisher の blob / serial を変えず、実効 GTK / 両 webview は reduce に到達しなかった。
+今回作成した property は現在 baseline の不存在へ厳密に復元され、GNOME は変更せず値 / 型 / override 存在も前後一致した。
+現在 baseline の復元成功と、前試行の失われた歴史的 baseline を証明できないことは分ける。
+既存の受入集計202 / 3 / 7 / 187と元判定は保持し、製品の描画問題とdot環境の設定伝播を別々に引き継ぐ。
+
+続く[A / B / C の追加診断](evidence/2026-10-07-linux-appimage/remaining-checks/abc-results/README.md)では、独立 WebKitGTK 最小再現の SVG outline/drop-shadow が computed に現れながら renderer snapshot に描かれず、直接 SVG stroke と HTML の正対照は描かれた。
+製品の特定 paint/compositor 原因は同定せず、明示的 shape stroke / overlay を未実装の修正候補として分ける。
+active XSettings publisher に届く正規設定経路は見つからず、設定 write 0件、初期/終了8項目は一致し、両 GUI の reduced-motion 受入は未確認のまま。
+production・diagnostic の未停止 create/Undo/Redo は正常描画、停止区間では getter 評価前の Trusted Types エラーと保存画像の一時的な行欠落を観測し、その後の Undo/Redo 画像は回復している。
+親は124件の manifest、独立 snapshot の画素、raw Undo/Redo の旧値一致、設定8比較、原399セルの bytes 不変を照合した。
+この追加診断で受入集計や製品 source を変更せず、通常版の regression や持続的 blank editor を認定しない。
+
+test run `37574418226` は commit-associated run だが、実際の checkout は synthetic merge `96a306ac87951d6b050d83aed9770875025deaa9`。
+固定 HEAD との差は VS Code smoke の2ファイルであり、同じ product / unit source の補助証拠と別 runner の smoke 成功を分ける。
+実 Extension Development Host の操作結果は別の GUI 証拠として受領した。
+desktop run `37574418253` の macOS native build は synthetic merge `96a306ac87951d6b050d83aed9770875025deaa9` で成功しており、固定 source HEAD `8261f877` の検査とは区別する。
+macOS IME・shortcut・新しい実機 GUI、Linux 正式配布、他 distro は認定しない。
+過去の `c42367f8` の WebKit 不足と `07f541ff` の GLES 不足は別試行として保持する。
+後続の記録更新だけで PR HEAD が進んでも、native 検収済みの source / artifact は `8261f877` のままとする。
+
+### 151d393 の通常 native cue 検証
+
+追加 A/B/C 診断の後、[共有 preview の描画候補](evidence/2026-10-07-linux-appimage/remaining-checks/cue-candidate.md)として、SVG の兄弟に一時的な HTML outline を表示する。
+元 SVG の色・点線・ラベルと minimap を保持し、既存 transform と対象切替・1500ms 解除・render/dispose の解除経路を使う。
+共有 editor の237件と座標・保持・解除の自動検査に続き、2026-10-08 UTC、dot が固定 source `151d39345c6945c3fe11a75f558068d011cbe197` の通常 AppImage を実操作した。
+[新版の受入記録](evidence/2026-10-07-linux-appimage/remaining-checks/production-151d393/README.md)の30項目は26成功・3未確認・1阻害点あり。
+native I1284-014〜017、Fit / 100% / zoom / pan / 端付近 / 長い label / 既存色・点線の保持と限定した VS Code 操作は成功し、別枠の native corpus も23/23成功した。
+両 GUI の実効 reduced-motion と native の個別 document dispose は未確認のまま。
+正規の設定サービス経路に届かず設定変更は0件で、設定9比較・payload・原本の保持とアプリの正常終了を確認した。
+固定8261の原集計202成功・旧失敗3・未確認7・対象外187は更新せず、新しい source / artifact の判定を別記録にする。
+
+### PR 前のローカル検査
+
+製品 source の基準は `52ea0dc14491ea21d2b5fa57db2ce3d364d05a2b`。
+初期 PR 差分は README・受入記録に加え、desktop CI の linux-native job と pipeline companion の手順を含む。
+この表は初期 PR 前のローカル検査であり、後続の AppImage / runtime / Inspector CI・hook・回帰テスト追加や dot 検収の検証範囲とは分ける。
+製品 source・Tauri 設定・macOS CI は変更していない。
+macOS 27.0 / arm64、Node.js 26.5.0、pnpm 10.33.2、cargo/rustc 1.99.0 で以下を実行した。
+Linux 手順が案内する Node.js 24 は既存 CI の指定であり、今回のローカル実行版とは区別する。
+
+| 検査 | 実結果と証明範囲 |
+| --- | --- |
+| `make setup` と `node scripts/setup-completion.mjs check` | 成功。専用 worktree の依存とセットアップ完了を確認 |
+| `make build` と `make test` | 成功。core 1137、metadata-exporter 9、graphviz-exporter 179、preview-engine 25、editor 233、CLI 882 pass / 1 skip、extension 200、standalone 5、scripts/hooks 等 3027 pass / 0 fail / 0 skip。import 171、shell 217、CLI 引数規約 216 の検査も成功 |
+| `cargo test --manifest-path packages/standalone/src-tauri/Cargo.toml --locked --lib` | 2 pass / 0 fail。選択フォルダの pathname 置換と範囲外読取の拒否を Mac 上で確認 |
+| `pnpm --filter @pfdsl/standalone tauri build --help` | 導入済み CLI の `--no-bundle` と runner への追加引数境界を確認。Linux ビルドを実行した証拠ではない |
+| `node scripts/check-md-linebreaks.mjs packages/standalone/README.md packages/standalone/ACCEPTANCE.md` | 成功。文書の文境界規約を確認 |
+
+この PR 前のローカル検査時点では、Linux の依存導入・Rust unit・no-bundle build・native 起動・GUI 操作、Apple container 内での実行は未確認だった。
+GUI smoke、macOS の新しい native GUI/IME 受入、所有者による UI 受入も、この PR 前の実行範囲には含めない。
+PR 後の CI と dot の Linux 実操作結果は上の固定版検収として別に記録する。
+
 ## 検証記録と限界
 
 作業ブランチ: `codex/shared-ui-host-foundation`。

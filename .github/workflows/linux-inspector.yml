@@ -1,0 +1,190 @@
+name: linux-inspector
+
+on:
+  pull_request:
+
+jobs:
+  fixed-source-inspector:
+    # This temporary diagnostic is scoped to the acceptance PR, not product builds.
+    if: github.repository == 'takasek/pfdsl' && github.event.pull_request.number == 1411
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      actions: read
+    container:
+      image: debian:13-slim@sha256:a29215f6a35e51e22adffa17f89e9d2ef06214e64a2bad10d765c46aea49f11f
+    defaults:
+      run:
+        shell: bash
+    env:
+      SOURCE_SHA: 8261f877d5cae8aa653a5310edfbd9e387acb116
+      CARGO_TERM_COLOR: never
+      NO_STRIP: "1"
+    steps:
+      - name: Install Debian build dependencies
+        run: |
+          test "$(uname -m)" = x86_64
+          apt-get update
+          apt-get install -y --no-install-recommends \
+            build-essential pkg-config git ca-certificates curl wget file python3 \
+            libgtk-3-dev libwebkit2gtk-4.1-dev libssl-dev \
+            libxdo-dev libayatana-appindicator3-dev librsvg2-dev libgles2
+      - name: Configure the diagnostic target after the runner is available
+        run: echo "CARGO_TARGET_DIR=$RUNNER_TEMP/inspector-target" >> "$GITHUB_ENV"
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - name: Preserve the control helper before checking out the fixed product source
+        run: |
+          mkdir "$RUNNER_TEMP/inspector-tools"
+          cp scripts/lib/appdir_inventory.py "$RUNNER_TEMP/inspector-tools/"
+          git -c safe.directory="$GITHUB_WORKSPACE" rev-parse HEAD > "$RUNNER_TEMP/inspector-tools/CONTROL_COMMIT"
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: 8261f877d5cae8aa653a5310edfbd9e387acb116
+          persist-credentials: false
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+          cache: pnpm
+      - name: Install stable Rust
+        run: |
+          curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs -o "$RUNNER_TEMP/rustup-init.sh"
+          sh "$RUNNER_TEMP/rustup-init.sh" -y --profile minimal --default-toolchain stable
+          echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
+      - name: Record source and lock identities
+        run: |
+          test "$(git -c safe.directory="$GITHUB_WORKSPACE" rev-parse HEAD)" = "$SOURCE_SHA"
+          sha256sum pnpm-lock.yaml packages/standalone/src-tauri/Cargo.lock > "$RUNNER_TEMP/inspector-locks.txt"
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm -r build
+      - name: Build a release executable with Inspector enabled only for this invocation
+        run: pnpm --filter @pfdsl/standalone tauri build --no-bundle --features tauri/devtools -- --locked
+      - name: Bundle the separate diagnostic AppImage
+        run: >-
+          pnpm --filter @pfdsl/standalone tauri bundle --bundles appimage --ci --no-sign --features tauri/devtools
+          --config '{"bundle":{"icon":["icons/icon.png"],"linux":{"appimage":{"files":{"usr/lib/libGLESv2.so.2":"/usr/lib/x86_64-linux-gnu/libGLESv2.so.2","usr/lib/libGLdispatch.so.0":"/usr/lib/x86_64-linux-gnu/libGLdispatch.so.0"}}}}}'
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          artifact-ids: "11461844652"
+          run-id: "37574418253"
+          github-token: ${{ github.token }}
+          path: ${{ runner.temp }}/accepted-artifact
+          merge-multiple: true
+      - name: Inspect provenance, frontend identity, and every AppDir difference
+        env:
+          GH_TOKEN: ${{ github.token }}
+          WORKFLOW_HEAD: ${{ github.event.pull_request.head.sha }}
+          PYTHONDONTWRITEBYTECODE: "1"
+        run: |
+          curl -fsSL -H "Authorization: Bearer $GH_TOKEN" \
+            https://api.github.com/repos/takasek/pfdsl/actions/artifacts/11461844652 \
+            -o "$RUNNER_TEMP/accepted-artifact/metadata.json"
+          cd "$RUNNER_TEMP/accepted-artifact"
+          python3 - <<'PY'
+          import tarfile
+          from pathlib import PurePosixPath
+          with tarfile.open('pfdsl-linux-appimage-x64.tar.gz') as archive:
+              names = set()
+              for entry in archive.getmembers():
+                  path = PurePosixPath(entry.name)
+                  assert not path.is_absolute() and '..' not in path.parts
+                  assert entry.name not in names and (entry.isfile() or entry.isdir())
+                  names.add(entry.name)
+          PY
+          tar -xzf pfdsl-linux-appimage-x64.tar.gz
+          sha256sum -c SHA256SUMS
+          test "$(cat SOURCE_COMMIT)" = "$SOURCE_SHA"
+          echo 'd86140eab278f84b29441117e86ead0a9f5be956e0cda2ce97ed29e8a8bdcc60  PFDSL.AppImage' | sha256sum -c -
+          ./PFDSL.AppImage --appimage-extract > /dev/null
+          (cd squashfs-root && sha256sum -c ../APPDIR_SHA256SUMS)
+          cd "$GITHUB_WORKSPACE"
+          sha256sum -c "$RUNNER_TEMP/inspector-locks.txt"
+          git -c safe.directory="$GITHUB_WORKSPACE" diff --exit-code HEAD
+          test -z "$(git -c safe.directory="$GITHUB_WORKSPACE" status --porcelain)"
+          appimages=("$CARGO_TARGET_DIR"/release/bundle/appimage/*.AppImage)
+          test "${#appimages[@]}" = 1
+          mkdir "$RUNNER_TEMP/pfdsl-linux-inspector-x64"
+          install -m 755 "${appimages[0]}" "$RUNNER_TEMP/pfdsl-linux-inspector-x64/PFDSL-Inspector.AppImage"
+          cp -R packages/standalone/dist "$RUNNER_TEMP/pfdsl-linux-inspector-x64/frontend"
+          cp "$RUNNER_TEMP/inspector-locks.txt" "$RUNNER_TEMP/pfdsl-linux-inspector-x64/source-locks.txt"
+          cp "$RUNNER_TEMP/accepted-artifact/build-environment.txt" "$RUNNER_TEMP/pfdsl-linux-inspector-x64/accepted-build-environment.txt"
+          cp "$RUNNER_TEMP/inspector-tools/appdir_inventory.py" "$RUNNER_TEMP/pfdsl-linux-inspector-x64/"
+          printf '%s\n' "$SOURCE_SHA" > "$RUNNER_TEMP/pfdsl-linux-inspector-x64/SOURCE_COMMIT"
+          {
+            cat /etc/os-release
+            uname -m
+            node --version
+            pnpm --version
+            rustc --version
+            cargo --version
+            pnpm --filter @pfdsl/standalone tauri --version
+            pkg-config --modversion gtk+-3.0 webkit2gtk-4.1
+            dpkg-query -W libc6 libgtk-3-0t64 libwebkit2gtk-4.1-0
+          } > "$RUNNER_TEMP/pfdsl-linux-inspector-x64/build-environment.txt"
+          cargo +stable tree --manifest-path packages/standalone/src-tauri/Cargo.toml --locked \
+            --features tauri/devtools -e features > "$RUNNER_TEMP/pfdsl-linux-inspector-x64/cargo-features.txt"
+          cd "$RUNNER_TEMP/pfdsl-linux-inspector-x64"
+          ./PFDSL-Inspector.AppImage --appimage-extract > /dev/null
+          test -x squashfs-root/AppRun
+          test -x squashfs-root/usr/bin/pfdsl-desktop
+          for lib in libwebkit2gtk-4.1.so.0 libjavascriptcoregtk-4.1.so.0 libGLESv2.so.2 libGLdispatch.so.0; do
+            test -f "squashfs-root/usr/lib/$lib"
+          done
+          (cd squashfs-root && find . -type f -print0 | LC_ALL=C sort -z | xargs -0 sha256sum) > APPDIR_SHA256SUMS
+          python3 - <<'PY'
+          import hashlib, json, os
+          from pathlib import Path
+          from appdir_inventory import appdir_entries
+          control_commit = (Path(os.environ['RUNNER_TEMP']) / 'inspector-tools/CONTROL_COMMIT').read_text().strip()
+          assert control_commit == os.environ['WORKFLOW_HEAD']
+          accepted = Path(os.environ['RUNNER_TEMP']) / 'accepted-artifact'
+          metadata = json.loads((accepted / 'metadata.json').read_text())
+          assert metadata['id'] == 11461844652 and not metadata['expired']
+          assert metadata['workflow_run']['id'] == 37574418253
+          assert metadata['workflow_run']['head_sha'] == os.environ['SOURCE_SHA']
+          assert metadata['name'] == 'pfdsl-linux-appimage-x64-' + os.environ['SOURCE_SHA']
+          assert metadata['digest'] == 'sha256:5da075978ae820742941c1295f00b2ac89ba69addb49b8388d09813b64159545'
+          def hashes(root):
+              return {str(p.relative_to(root)): hashlib.sha256(p.read_bytes()).hexdigest()
+                      for p in sorted(root.rglob('*')) if p.is_file()}
+          old_frontend, new_frontend = hashes(accepted / 'frontend'), hashes(Path('frontend'))
+          assert len(old_frontend) == 10 and old_frontend == new_frontend
+          old, new = appdir_entries(accepted / 'squashfs-root'), appdir_entries(Path('squashfs-root'))
+          assert old['usr/bin/pfdsl-desktop']['sha256'] == '10fdeff86b2a48e11948f40cbf99a7207e70c91e7c19f1f064c61bb38f441495'
+          assert old['usr/bin/pfdsl-desktop']['sha256'] != new['usr/bin/pfdsl-desktop']['sha256']
+          differences = [{'path': p, 'accepted': old.get(p), 'diagnostic': new.get(p)}
+                         for p in sorted(old.keys() | new.keys()) if old.get(p) != new.get(p)]
+          record = {'purpose': 'Inspector diagnosis only; not accepted product binary',
+                    'source_commit': os.environ['SOURCE_SHA'],
+                    'workflow_head': os.environ['WORKFLOW_HEAD'],
+                    'workflow_ref': os.environ['GITHUB_WORKFLOW_REF'],
+                    'workflow_sha': os.environ['GITHUB_WORKFLOW_SHA'],
+                    'inventory_helper': {
+                        'control_commit': control_commit,
+                        'sha256': hashlib.sha256(Path('appdir_inventory.py').read_bytes()).hexdigest()},
+                    'run_id': os.environ['GITHUB_RUN_ID'], 'run_attempt': os.environ['GITHUB_RUN_ATTEMPT'],
+                    'profile': 'release', 'cargo_feature': 'tauri/devtools',
+                    'product_source_changes': [], 'frontend_files': new_frontend,
+                    'accepted_artifact': metadata, 'appdir_differences': differences,
+                    'diagnostic_appimage_sha256': hashlib.sha256(Path('PFDSL-Inspector.AppImage').read_bytes()).hexdigest(),
+                    'accepted_appimage_sha256': 'd86140eab278f84b29441117e86ead0a9f5be956e0cda2ce97ed29e8a8bdcc60',
+                    'inspector_gui_verified': False, 'monaco_model_access_verified': False}
+          Path('DIAGNOSTIC_BUILD.json').write_text(json.dumps(record, indent=2) + '\n')
+          PY
+          payload=(PFDSL-Inspector.AppImage frontend SOURCE_COMMIT source-locks.txt build-environment.txt
+            accepted-build-environment.txt cargo-features.txt APPDIR_SHA256SUMS DIAGNOSTIC_BUILD.json appdir_inventory.py)
+          find "${payload[@]}" -type f -print0 \
+            | LC_ALL=C sort -z | xargs -0 sha256sum > SHA256SUMS
+          tar -czf "$RUNNER_TEMP/pfdsl-linux-inspector-x64.tar.gz" \
+            "${payload[@]}" SHA256SUMS
+          sha256sum "$RUNNER_TEMP/pfdsl-linux-inspector-x64.tar.gz"
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: pfdsl-linux-inspector-x64-8261f877d5cae8aa653a5310edfbd9e387acb116-${{ github.run_id }}-attempt-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/pfdsl-linux-inspector-x64.tar.gz
+          if-no-files-found: error
+          retention-days: 14

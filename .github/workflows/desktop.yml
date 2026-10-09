@@ -6,6 +6,185 @@ on:
     branches: [main]
 
 jobs:
+  linux-native:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    container:
+      image: debian:13-slim@sha256:a29215f6a35e51e22adffa17f89e9d2ef06214e64a2bad10d765c46aea49f11f
+    defaults:
+      run:
+        shell: bash
+    env:
+      CARGO_TERM_COLOR: never
+    outputs:
+      appimage-artifact-id: ${{ steps.upload-appimage.outputs.artifact-id }}
+    steps:
+      - name: Install Debian build dependencies
+        run: |
+          test "$(uname -m)" = x86_64
+          apt-get update
+          apt-get install -y --no-install-recommends \
+            build-essential pkg-config git ca-certificates curl wget file \
+            libgtk-3-dev libwebkit2gtk-4.1-dev libssl-dev \
+            libxdo-dev libayatana-appindicator3-dev librsvg2-dev libgles2
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+          cache: pnpm
+      - name: Install stable Rust
+        run: |
+          curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs -o "$RUNNER_TEMP/rustup-init.sh"
+          sh "$RUNNER_TEMP/rustup-init.sh" -y --profile minimal --default-toolchain stable
+          echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm -r build
+      - name: Test the Linux native library
+        run: cargo +stable test --manifest-path packages/standalone/src-tauri/Cargo.toml --locked --lib
+      - name: Build the Linux native executable without packaging
+        run: pnpm --filter @pfdsl/standalone tauri build --no-bundle -- --locked
+      - name: Prepare verification files
+        run: |
+          git -C "$GITHUB_WORKSPACE" -c safe.directory="$GITHUB_WORKSPACE" diff --exit-code HEAD
+          mkdir "$RUNNER_TEMP/pfdsl-linux-x64"
+          install -m 755 packages/standalone/src-tauri/target/release/pfdsl-desktop "$RUNNER_TEMP/pfdsl-linux-x64/pfdsl-desktop"
+          cp -R packages/standalone/dist "$RUNNER_TEMP/pfdsl-linux-x64/frontend"
+          git -C "$GITHUB_WORKSPACE" -c safe.directory="$GITHUB_WORKSPACE" rev-parse HEAD > "$RUNNER_TEMP/pfdsl-linux-x64/SOURCE_COMMIT"
+          {
+            cat /etc/os-release
+            uname -m
+            printf 'github_run_id=%s\ngithub_run_attempt=%s\n' "$GITHUB_RUN_ID" "$GITHUB_RUN_ATTEMPT"
+            node --version
+            pnpm --version
+            rustc --version
+            cargo --version
+            pkg-config --modversion gtk+-3.0 webkit2gtk-4.1
+            dpkg-query -W libc6 libgtk-3-0t64 libwebkit2gtk-4.1-0
+            file packages/standalone/src-tauri/target/release/pfdsl-desktop
+            ldd packages/standalone/src-tauri/target/release/pfdsl-desktop
+          } > "$RUNNER_TEMP/pfdsl-linux-x64/build-environment.txt"
+      - name: Archive verification files with checksums and executable permissions
+        working-directory: ${{ runner.temp }}/pfdsl-linux-x64
+        run: |
+          payload=(pfdsl-desktop frontend SOURCE_COMMIT build-environment.txt)
+          find "${payload[@]}" -type f -print0 \
+            | LC_ALL=C sort -z | xargs -0 sha256sum > SHA256SUMS
+          tar -czf "$RUNNER_TEMP/pfdsl-linux-x64.tar.gz" "${payload[@]}" SHA256SUMS
+          sha256sum "$RUNNER_TEMP/pfdsl-linux-x64.tar.gz"
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: pfdsl-linux-x64-${{ github.event.pull_request.head.sha || github.sha }}-attempt-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/pfdsl-linux-x64.tar.gz
+          if-no-files-found: error
+          retention-days: 14
+      - name: Bundle a verification-only AppImage
+        env:
+          # Keep modern Debian ELF sections intact in linuxdeploy's older tools.
+          NO_STRIP: "1"
+        run: >-
+          pnpm --filter @pfdsl/standalone tauri bundle --bundles appimage --ci --no-sign
+          --config '{"bundle":{"icon":["icons/icon.png"],"linux":{"appimage":{"files":{"usr/lib/libGLESv2.so.2":"/usr/lib/x86_64-linux-gnu/libGLESv2.so.2","usr/lib/libGLdispatch.so.0":"/usr/lib/x86_64-linux-gnu/libGLdispatch.so.0"}}}}}'
+      - name: Inspect and archive the AppImage
+        run: |
+          git -C "$GITHUB_WORKSPACE" -c safe.directory="$GITHUB_WORKSPACE" diff --exit-code HEAD
+          appimages=(packages/standalone/src-tauri/target/release/bundle/appimage/*.AppImage)
+          test "${#appimages[@]}" = 1
+          mkdir "$RUNNER_TEMP/pfdsl-linux-appimage-x64"
+          install -m 755 "${appimages[0]}" "$RUNNER_TEMP/pfdsl-linux-appimage-x64/PFDSL.AppImage"
+          cp "$RUNNER_TEMP/pfdsl-linux-x64/SOURCE_COMMIT" "$RUNNER_TEMP/pfdsl-linux-appimage-x64/"
+          cp "$RUNNER_TEMP/pfdsl-linux-x64/build-environment.txt" "$RUNNER_TEMP/pfdsl-linux-appimage-x64/"
+          cp -R "$RUNNER_TEMP/pfdsl-linux-x64/frontend" "$RUNNER_TEMP/pfdsl-linux-appimage-x64/"
+          cd "$RUNNER_TEMP/pfdsl-linux-appimage-x64"
+          ./PFDSL.AppImage --appimage-extract > /dev/null
+          test -x squashfs-root/AppRun
+          test -x squashfs-root/usr/bin/pfdsl-desktop
+          test -f squashfs-root/usr/lib/libwebkit2gtk-4.1.so.0
+          test -f squashfs-root/usr/lib/libjavascriptcoregtk-4.1.so.0
+          test -f squashfs-root/usr/lib/libGLESv2.so.2
+          test -f squashfs-root/usr/lib/libGLdispatch.so.0
+          (
+            cd squashfs-root
+            find . -type f -print0 | LC_ALL=C sort -z | xargs -0 sha256sum
+          ) > APPDIR_SHA256SUMS
+          payload=(PFDSL.AppImage frontend SOURCE_COMMIT build-environment.txt APPDIR_SHA256SUMS)
+          find "${payload[@]}" -type f -print0 \
+            | LC_ALL=C sort -z | xargs -0 sha256sum > SHA256SUMS
+          tar -czf "$RUNNER_TEMP/pfdsl-linux-appimage-x64.tar.gz" \
+            "${payload[@]}" SHA256SUMS
+          sha256sum "$RUNNER_TEMP/pfdsl-linux-appimage-x64.tar.gz"
+      - id: upload-appimage
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: pfdsl-linux-appimage-x64-${{ github.event.pull_request.head.sha || github.sha }}-attempt-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/pfdsl-linux-appimage-x64.tar.gz
+          if-no-files-found: error
+          retention-days: 14
+
+  linux-appimage-runtime:
+    needs: linux-native
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    container:
+      image: debian:13-slim@sha256:a29215f6a35e51e22adffa17f89e9d2ef06214e64a2bad10d765c46aea49f11f
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Prepare a desktop runtime without system WebKitGTK or GLES
+        run: |
+          apt-get update
+          apt-get install -y --no-install-recommends \
+            python3 libgtk-3-0t64 libsoup-3.0-0 libxdo3 libayatana-appindicator3-1 \
+            libgpg-error0 libgbm1 libdrm2 libgl1 libegl1 libx11-xcb1 libasound2t64
+          if /sbin/ldconfig -p | grep -E 'libwebkit2gtk-4\.1|libjavascriptcoregtk-4\.1|libGLESv2'; then
+            echo 'Unexpected system WebKitGTK or GLES runtime' >&2
+            exit 1
+          fi
+      - name: Require the producer's AppImage artifact ID
+        env:
+          APPIMAGE_ARTIFACT_ID: ${{ needs.linux-native.outputs.appimage-artifact-id }}
+        run: test -n "$APPIMAGE_ARTIFACT_ID"
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          artifact-ids: ${{ needs.linux-native.outputs.appimage-artifact-id }}
+          path: ${{ runner.temp }}/appimage-runtime
+      - name: Check the extracted runtime and dynamically loaded GLES
+        working-directory: ${{ runner.temp }}/appimage-runtime
+        env:
+          SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          tar -xzf pfdsl-linux-appimage-x64.tar.gz
+          sha256sum -c SHA256SUMS
+          test "$(cat SOURCE_COMMIT)" = "$SOURCE_SHA"
+          ./PFDSL.AppImage --appimage-extract > /dev/null
+          cd squashfs-root
+          sha256sum -c ../APPDIR_SHA256SUMS
+          test -x AppRun
+          test -x usr/bin/pfdsl-desktop
+          test -f usr/lib/libGLESv2.so.2
+          test -f usr/lib/libGLdispatch.so.0
+          export LD_LIBRARY_PATH="$PWD/usr/lib:$PWD/usr/lib/x86_64-linux-gnu:$PWD/usr/lib64"
+          ldd usr/bin/pfdsl-desktop > native-ldd.txt
+          cat native-ldd.txt
+          if grep -E 'not found|version .* not found' native-ldd.txt; then
+            exit 1
+          fi
+          python3 - <<'PY'
+          import ctypes
+          import os
+          library = ctypes.CDLL("libGLESv2.so.2", mode=os.RTLD_NOW | os.RTLD_LOCAL)
+          getattr(library, "glGetString")
+          print("GLES dlopen and symbol lookup succeeded; GUI startup remains unverified.")
+          PY
+
   macos-app:
     runs-on: macos-15
     timeout-minutes: 30

@@ -1,0 +1,59 @@
+#!/bin/sh
+# pfdsl-pre-commit-shim-version: 1
+# Thin shim installed at .git/hooks/pre-commit by `make setup`.
+# Always execs the checked-out scripts/pre-commit so the check logic stays in
+# sync with the branch's tree instead of a stale copy from setup time (#411).
+default_ref=$(git symbolic-ref --quiet refs/remotes/origin/HEAD)
+ref_status=$?
+if [ "$ref_status" -eq 0 ]; then
+  case "$default_ref" in
+    refs/remotes/origin/?*) default_branch=${default_ref#refs/remotes/origin/} ;;
+    *) echo "error: invalid origin/HEAD; default branch protection refuses this commit." >&2; exit 1 ;;
+  esac
+  git rev-parse --verify "$default_ref^{commit}" >/dev/null 2>&1 || {
+    echo "error: origin/HEAD does not resolve to a commit; default branch protection refuses this commit." >&2
+    exit 1
+  }
+elif [ "$ref_status" -eq 1 ]; then
+  git show-ref --verify --quiet refs/remotes/origin/HEAD
+  if [ "$?" -ne 1 ]; then
+    echo "error: invalid origin/HEAD; default branch protection refuses this commit." >&2
+    exit 1
+  fi
+  # This repository's default is main. Only a missing ref uses this fallback;
+  # an explicit origin/HEAD also protects other default names.
+  default_branch=main
+else
+  echo "error: cannot resolve origin/HEAD; default branch protection refuses this commit." >&2
+  exit 1
+fi
+head_ref=$(git symbolic-ref --quiet HEAD)
+head_status=$?
+if [ "$head_status" -gt 1 ]; then
+  echo "error: cannot resolve HEAD; default branch protection refuses this commit." >&2
+  exit 1
+fi
+if [ "$head_status" -eq 0 ]; then
+  case "$head_ref" in
+    refs/heads/?*) ;;
+    *) echo "error: HEAD does not name a local branch; default branch protection refuses this commit." >&2; exit 1 ;;
+  esac
+else
+  git rev-parse --verify 'HEAD^{commit}' >/dev/null 2>&1 || {
+    echo "error: detached HEAD does not resolve to a commit; default branch protection refuses this commit." >&2
+    exit 1
+  }
+fi
+if [ "$head_ref" = refs/heads/main ] || [ "$head_ref" = "refs/heads/$default_branch" ]; then
+  protected_branch=${head_ref#refs/heads/}
+  echo "error: commits on main/default branch '$protected_branch' are refused. Use a feature worktree and a pull request." >&2
+  exit 1
+fi
+if [ "${1-}" = "--check-default-branch" ]; then
+  exit 0
+fi
+if [ -x ./scripts/pre-commit ]; then
+  exec ./scripts/pre-commit
+fi
+echo "error: scripts/pre-commit is missing or not executable in this checkout, so the repository's pre-commit checks cannot run." >&2
+exit 1

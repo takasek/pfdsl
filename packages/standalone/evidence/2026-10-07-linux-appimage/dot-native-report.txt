@@ -1,0 +1,58 @@
+PR #1411 Linux native AppImage 検収結果（2026-10-07 UTC）
+
+結論: 今回指定されたLinux native起動・フォルダ選択/キャンセル・未保存変更の終了確認・native corpusはすべて成功。
+
+対象
+repository: takasek/pfdsl
+HEAD / SOURCE_COMMIT: 8261f877d5cae8aa653a5310edfbd9e387acb116
+run: 37574418253
+artifact: 11461844652
+name: pfdsl-linux-appimage-x64-8261f877d5cae8aa653a5310edfbd9e387acb116
+URL: https://github.com/takasek/pfdsl/actions/runs/37574418253/artifacts/11461844652
+
+環境
+実行先: dot cloud Debian GNU/Linux 13.6 (trixie), x86_64, uid1000, Xfce desktop, DISPLAY=:0。
+ローカルJSbuild: Node.js v24.19.0、repo指定pnpm10.33.2。
+CI builderの同梱記録: Debian13.7 x86_64、Node24.21.0、pnpm10.33.2、Rust/Cargo1.99.0、GTK3.24.49、WebKitGTK2.54.0。実行先へのRust/Cargo・開発依存導入は行っていない。
+
+SHA256（指定値・GitHub metadata/manifestと一致）
+ZIP: 5da075978ae820742941c1295f00b2ac89ba69addb49b8388d09813b64159545
+PFDSL.AppImage: d86140eab278f84b29441117e86ead0a9f5be956e0cda2ce97ed29e8a8bdcc60
+inner usr/bin/pfdsl-desktop: 10fdeff86b2a48e11948f40cbf99a7207e70c91e7c19f1f064c61bb38f441495
+
+artifact / 依存確認: 成功
+1. GitHub connectorでrepository/run/artifact/name/HEAD/期限を照合。ZIP119,953,298 bytesを取得しSHA256一致。
+2. ZIP/tarのpath・linkを検査し新規dirへ展開。sha256sum -c SHA256SUMS は14/14 OK。SOURCE_COMMIT一致、AppImage mode0755。
+3. ./PFDSL.AppImage --appimage-extract はexit0。
+4. squashfs-rootで sha256sum -c ../APPDIR_SHA256SUMS は304/304 OK。AppRun/inner native実行権限あり。
+5. usr/lib/libGLESv2.so.2 と usr/lib/libGLdispatch.so.0の存在確認。
+6. README指定LD_LIBRARY_PATH="$PWD/usr/lib:$PWD/usr/lib/x86_64-linux-gnu:$PWD/usr/lib64"でnativeとlibGLESv2のlddをそれぞれ実行。両方exit0、not found/version errorなし。GLESのGLdispatch依存は同梱usr/libへ解決。
+
+通常起動 / GUI: 成功
+- GUI terminalから展開dirの ./AppRun を通常起動。PFDSL nativeウィンドウ、エディタ・日本語図・minimapを確認。stderr空。
+- Open folderでnative picker表示 → Escapeでキャンセル → 再度Open folderを使用できた。
+- 使い捨て検証folderを選びcheck.pfdsl一覧表示 → 文書を開き、source・タイトルNative folder check 826・input/build/outputの図を確認。
+- 文書title末尾にxを追加。dirty印、sourceの826x、図の826xを確認。
+- window managerのcloseでnative破棄確認表示 → Keep Editingをクリック。編集内容・dirty印・図を保持。
+- 再度close → Discardをクリック。ウィンドウが閉じ、通常起動processはexit0。
+- 検証用check.pfdsl原本のSHA256は操作前後一致。
+- GTK pickerのRecent画面では入力pathのReturnだけで遷移しなかったためHomeからlocation入力して選択。runtimeエラーや設定変更はなく、通常操作で選択完了した。
+
+native corpus: 成功
+- exactHEADのJS make buildはexit0。
+- archive frontend/ とcheckout packages/standalone/dist/ のファイル集合・SHA256を比較し10/10一致。
+- prepare-native.mjsへ今回のinner executable絶対pathを渡して新規corpusを準備。23文書。
+- 同じ展開dirで PFDSL_ACCEPTANCE_ROOT=<prepared-corpus> ./AppRun を実行。
+- native-report.json: referenceは指定HEAD、execution.path/sha256は今回のinner executableと一致。
+- documentCount23、全23件passed=true、全体passed=true、failures=[]、errors=[]。
+- 実行後も23入力文書のhashがreportのinputSha256と一致。
+- 検証windowを通常closeしexit0。corpus起動stderr空。
+
+実行後の保持確認
+SHA256SUMS14/14、APPDIR_SHA256SUMS304/304を再検証し全件OK。outer/innerを含むpayloadの変更なし。
+
+失敗 / 未実施 / 適用範囲
+今回のartifact・runtime・要求GUI・corpusに失敗なし。
+過去c42367fのWebKit不足、07f541fのGLES不足は別試行として保持し、今回の成功で過去記録を書き換えない。
+今回の成功は当該Linux環境とartifactの指定シナリオに限る。macOS IME・ショートカット、全追加機能の操作、Linux正式配布や他distro保証は認定していない。
+VS Code smoke修正は別タスク。インストール・system/sandbox変更・描画フラグ調整・source修正・PR merge・issue closeは行っていない。

@@ -1,0 +1,9 @@
+#!/bin/sh
+# Legacy shared-dispatcher adapter; current setup uses the thin shim directly.
+# The shim reaches scripts/pre-commit, which reads branch policy from HEAD and
+# runs checkout gates. This adapter neither owns policy nor installs hooks.
+if [ ! -x ./scripts/hooks/pre-commit-shim ]; then
+  echo "error: scripts/hooks/pre-commit-shim is missing or not executable; update this checkout before committing." >&2
+  exit 1
+fi
+exec ./scripts/hooks/pre-commit-shim

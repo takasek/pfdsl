@@ -3,6 +3,7 @@ import { afterEach, expect, it, vi } from "vitest";
 import { analyzeSnapshot } from "./document.js";
 import { mountPreview } from "./preview.js";
 import { buildPreviewGraph } from "./preview-graph.js";
+import { FOCUS_CUE_DURATION_MS, previewStyles } from "./preview-shell.js";
 
 const cleanups: Array<() => void> = [];
 afterEach(() => {
@@ -12,7 +13,26 @@ afterEach(() => {
 });
 const svg =
 	'<svg width="200" height="100"><g class="node"><title>a</title><polygon points="0,0 40,0 40,30"/><text>A</text></g><g class="node"><title>p</title><text>P</text></g></svg>';
-function setup(renderDot = vi.fn(async (_dot: string) => svg)) {
+
+it("keeps the cue animation and removal deadline at 1500ms", async () => {
+	vi.useFakeTimers();
+	const s = setup();
+	await s.preview.receive(s.message);
+	await s.preview.receive({ type: "focus", nodeId: "a" });
+	expect(FOCUS_CUE_DURATION_MS).toBe(1500);
+	const ring = s.container.querySelector<HTMLElement>(".pfdsl-focus-ring")!;
+	expect(window.getComputedStyle(ring).animation).toBe(
+		"pfdsl-cue 1500ms ease-out",
+	);
+	await vi.advanceTimersByTimeAsync(1499);
+	expect(ring.isConnected).toBe(true);
+	await vi.advanceTimersByTimeAsync(1);
+	expect(ring.isConnected).toBe(false);
+});
+function setup(
+	renderDot = vi.fn(async (_dot: string) => svg),
+	graphSize = { width: 200, height: 100 },
+) {
 	const schedule = globalThis.setTimeout.bind(globalThis);
 	const cancel = globalThis.clearTimeout.bind(globalThis);
 	vi.spyOn(window, "setTimeout").mockImplementation((callback, ms) =>
@@ -27,14 +47,17 @@ function setup(renderDot = vi.fn(async (_dot: string) => svg)) {
 	document.body.append(container);
 	const postMessage = vi.fn();
 	const preview = mountPreview(container, { postMessage, renderDot });
+	const style = document.createElement("style");
+	style.textContent = previewStyles;
+	container.append(style);
 	const root = container.querySelector<HTMLElement>("#root")!;
 	Object.defineProperties(root, {
 		clientWidth: { value: 400 },
 		clientHeight: { value: 300 },
 	});
 	Object.defineProperties(container.querySelector("#inner")!, {
-		offsetWidth: { value: 200 },
-		offsetHeight: { value: 100 },
+		offsetWidth: { value: graphSize.width },
+		offsetHeight: { value: graphSize.height },
 	});
 	cleanups.push(() => {
 		preview.dispose();
@@ -84,6 +107,9 @@ it("shows a real local graph for undefined nodes and keeps it clickable across t
 		.querySelector<HTMLElement>('g[data-node-id="p"]')!
 		.dispatchEvent(new MouseEvent("click", { bubbles: true }));
 	expect(s.node("p").classList.contains("pfdsl-focus-cue")).toBe(true);
+	expect(
+		s.container.querySelector("#inner > .pfdsl-focus-ring"),
+	).not.toBeNull();
 	expect(s.postMessage).not.toHaveBeenCalledWith({
 		type: "nodeClick",
 		nodeId: "p",
@@ -147,20 +173,142 @@ it.each([
 	});
 });
 
+it.each([
+	{ width: 200, height: 100, scale: 1 },
+	{ width: 736, height: 536, scale: 0.5 },
+])("places a cue around the node at scale $scale without changing SVG paint", async (size) => {
+	const styled = svg.replace(
+		'<polygon points="0,0 40,0 40,30"/>',
+		'<polygon fill="#ffccee" stroke="#663399" stroke-width="3" stroke-dasharray="5,2" points="0,0 40,0 40,30"/>',
+	);
+	const s = setup(
+		vi.fn(async (_dot: string) => styled),
+		size,
+	);
+	await s.preview.receive(s.message);
+	const inner = s.container.querySelector<HTMLElement>("#inner")!;
+	vi.spyOn(inner, "getBoundingClientRect").mockReturnValue(
+		new DOMRect(100, 70, size.width * size.scale, size.height * size.scale),
+	);
+	vi.spyOn(s.node("a"), "getBoundingClientRect").mockReturnValue(
+		new DOMRect(
+			100 + 40 * size.scale,
+			70 + 30 * size.scale,
+			80 * size.scale,
+			30 * size.scale,
+		),
+	);
+	const original = s.node("a").innerHTML;
+	await s.preview.receive({ type: "focus", nodeId: "a" });
+	const ring = inner.querySelector<HTMLElement>(":scope > .pfdsl-focus-ring")!;
+	expect(ring).not.toBeNull();
+	expect(ring.namespaceURI).toBe("http://www.w3.org/1999/xhtml");
+	expect(ring.getAttribute("aria-hidden")).toBe("true");
+	expect(window.getComputedStyle(ring).pointerEvents).toBe("none");
+	expect(window.getComputedStyle(ring).position).toBe("absolute");
+	expect(Number.parseFloat(ring.style.left)).toBeCloseTo(40 - 4 / size.scale);
+	expect(Number.parseFloat(ring.style.top)).toBeCloseTo(30 - 4 / size.scale);
+	expect(Number.parseFloat(ring.style.width)).toBeCloseTo(80 + 8 / size.scale);
+	expect(Number.parseFloat(ring.style.height)).toBeCloseTo(30 + 8 / size.scale);
+	expect(Number.parseFloat(ring.style.outlineWidth)).toBeCloseTo(
+		2 / size.scale,
+	);
+	expect(s.node("a").innerHTML).toBe(original);
+	expect(
+		s.container.querySelector("#minimap-svg .pfdsl-focus-ring"),
+	).toBeNull();
+	const svgNode = inner.querySelector("svg")!;
+	expect(svgNode.contains(ring)).toBe(false);
+	s.container.querySelector<HTMLButtonElement>("#zoom-in")!.click();
+	expect(ring.parentElement).toBe(inner);
+	expect(Number.parseFloat(ring.style.outlineWidth)).toBeCloseTo(
+		2 / (size.scale * 1.1),
+	);
+	expect(s.node("a").innerHTML).toBe(original);
+	s.preview.dispose();
+	expect(inner.querySelector(".pfdsl-focus-ring")).toBeNull();
+});
+
+it("keeps the cue gap at four screen pixels when changing the fitted zoom", async () => {
+	vi.useFakeTimers();
+	const s = setup(
+		vi.fn(async (_dot: string) => svg),
+		{
+			width: 368 / 0.062,
+			height: 268 / 0.062,
+		},
+	);
+	await s.preview.receive(s.message);
+	const inner = s.container.querySelector<HTMLElement>("#inner")!;
+	const currentScale = () =>
+		Number(inner.style.transform.match(/scale\(([^)]+)\)/)![1]);
+	vi.spyOn(inner, "getBoundingClientRect").mockImplementation(
+		() => new DOMRect(100, 70, 200 * currentScale(), 100 * currentScale()),
+	);
+	vi.spyOn(s.node("a"), "getBoundingClientRect").mockImplementation(
+		() =>
+			new DOMRect(
+				100 + 40 * currentScale(),
+				70 + 30 * currentScale(),
+				80 * currentScale(),
+				30 * currentScale(),
+			),
+	);
+	await s.preview.receive({ type: "focus", nodeId: "a" });
+	const ring = inner.querySelector<HTMLElement>(".pfdsl-focus-ring")!;
+	const checkBox = () => {
+		const scale = currentScale();
+		expect(Number.parseFloat(ring.style.left) * scale).toBeCloseTo(
+			40 * scale - 4,
+		);
+		expect(Number.parseFloat(ring.style.top) * scale).toBeCloseTo(
+			30 * scale - 4,
+		);
+		expect(Number.parseFloat(ring.style.width) * scale).toBeCloseTo(
+			80 * scale + 8,
+		);
+		expect(Number.parseFloat(ring.style.height) * scale).toBeCloseTo(
+			30 * scale + 8,
+		);
+		expect(Number.parseFloat(ring.style.outlineWidth) * scale).toBeCloseTo(2);
+	};
+	expect(currentScale()).toBeCloseTo(0.062);
+	checkBox();
+	await vi.advanceTimersByTimeAsync(1000);
+	for (const id of ["actual-size", "zoom-in", "zoom-out", "fit-graph"]) {
+		s.container.querySelector<HTMLButtonElement>(`#${id}`)!.click();
+		checkBox();
+	}
+	await vi.advanceTimersByTimeAsync(500);
+	expect(inner.querySelector(".pfdsl-focus-ring")).toBeNull();
+});
+
 it("replaces the cue and clears its timer; a redraw never starts another cue", async () => {
 	vi.useFakeTimers();
 	const s = setup();
 	await s.preview.receive(s.message);
 	await s.preview.receive({ type: "focus", nodeId: "a" });
 	expect(s.node("a").classList.contains("pfdsl-focus-cue")).toBe(true);
+	const oldRing = s.container.querySelector(".pfdsl-focus-ring")!;
+	expect(oldRing).not.toBeNull();
+	await vi.advanceTimersByTimeAsync(1000);
 	await s.preview.receive({ type: "focus", nodeId: "p" });
 	expect(s.node("a").classList.contains("pfdsl-focus-cue")).toBe(false);
 	expect(s.node("p").classList.contains("pfdsl-focus-cue")).toBe(true);
+	expect(oldRing.isConnected).toBe(false);
+	expect(s.container.querySelectorAll(".pfdsl-focus-ring")).toHaveLength(1);
+	await vi.advanceTimersByTimeAsync(600);
+	expect(s.node("p").classList.contains("pfdsl-focus-cue")).toBe(true);
+	expect(s.container.querySelector(".pfdsl-focus-ring")).not.toBeNull();
 	await s.preview.receive(s.message);
 	expect(s.container.querySelector(".pfdsl-focus-cue")).toBeNull();
+	expect(s.container.querySelector(".pfdsl-focus-ring")).toBeNull();
 	await s.preview.receive({ type: "focus", nodeId: "a" });
-	await vi.advanceTimersByTimeAsync(1800);
+	await vi.advanceTimersByTimeAsync(1499);
+	expect(s.container.querySelector(".pfdsl-focus-ring")).not.toBeNull();
+	await vi.advanceTimersByTimeAsync(1);
 	expect(s.container.querySelector(".pfdsl-focus-cue")).toBeNull();
+	expect(s.container.querySelector(".pfdsl-focus-ring")).toBeNull();
 });
 
 it("opens the shared node panel from context/keyboard and emits source-bound creation/connection requests", async () => {
@@ -204,7 +352,7 @@ it("opens the shared node panel from context/keyboard and emits source-bound cre
 	expect(panel.hidden).toBe(true);
 });
 
-it("does not accept stale local graph completion after target change, redraw or dispose", async () => {
+it("does not accept stale local graph completion after an error", async () => {
 	let resolve!: (value: string) => void;
 	const renderer = vi.fn((dot: string) =>
 		dot === "main"
@@ -224,6 +372,87 @@ it("does not accept stale local graph completion after target change, redraw or 
 		s.container.querySelector<HTMLElement>("#tooltip")!.style.display,
 	).toBe("none");
 	expect(s.container.querySelector("#tooltip svg")).toBeNull();
+});
+
+it("keeps the current hover when the previous neighborhood completes last", async () => {
+	vi.useFakeTimers();
+	const completions: Array<(value: string) => void> = [];
+	const s = setup(
+		vi.fn((dot: string) =>
+			dot === "main"
+				? Promise.resolve(svg)
+				: new Promise<string>((resolve) => completions.push(resolve)),
+		),
+	);
+	await s.preview.receive(s.message);
+	s.node("a").dispatchEvent(new MouseEvent("mousemove", { bubbles: true }));
+	await Promise.resolve();
+	s.node("p").dispatchEvent(new MouseEvent("mousemove", { bubbles: true }));
+	await Promise.resolve();
+	expect(completions).toHaveLength(2);
+	completions[1]!(svg.replace("<svg ", '<svg data-render="current" '));
+	await vi.advanceTimersByTimeAsync(0);
+	const tooltip = s.container.querySelector<HTMLElement>("#tooltip")!;
+	expect(tooltip.querySelector("svg")?.getAttribute("data-render")).toBe(
+		"current",
+	);
+	completions[0]!(svg.replace("<svg ", '<svg data-render="stale" '));
+	await vi.advanceTimersByTimeAsync(0);
+	expect(tooltip.querySelectorAll("svg")).toHaveLength(1);
+	expect(tooltip.querySelector("svg")?.getAttribute("data-render")).toBe(
+		"current",
+	);
+});
+
+it("isolates pending hover and cue timers when a disposed container is remounted", async () => {
+	vi.useFakeTimers();
+	let completeHover!: (value: string) => void;
+	const s = setup(
+		vi.fn((dot: string) =>
+			dot === "main"
+				? Promise.resolve(svg)
+				: new Promise<string>((resolve) => {
+						completeHover = resolve;
+					}),
+		),
+	);
+	await s.preview.receive(s.message);
+	await s.preview.receive({ type: "focus", nodeId: "a" });
+	s.node("p").dispatchEvent(new MouseEvent("mousemove", { bubbles: true }));
+	await Promise.resolve();
+	const oldTooltip = s.container.querySelector<HTMLElement>("#tooltip")!;
+	const oldNode = s.node("a");
+	await vi.advanceTimersByTimeAsync(500);
+	s.preview.dispose();
+	expect(oldNode.classList.contains("pfdsl-focus-cue")).toBe(false);
+	const next = mountPreview(s.container, {
+		postMessage: vi.fn(),
+		renderDot: async () => svg.replace("<svg ", '<svg data-render="next" '),
+	});
+	cleanups.push(() => next.dispose());
+	Object.defineProperties(s.container.querySelector("#root")!, {
+		clientWidth: { value: 400 },
+		clientHeight: { value: 300 },
+	});
+	Object.defineProperties(s.container.querySelector("#inner")!, {
+		offsetWidth: { value: 200 },
+		offsetHeight: { value: 100 },
+	});
+	await next.receive(s.message);
+	await next.receive({ type: "focus", nodeId: "p" });
+	completeHover(svg.replace("<svg ", '<svg data-render="disposed" '));
+	await Promise.resolve();
+	await Promise.resolve();
+	expect(oldTooltip.style.display).toBe("none");
+	expect(oldTooltip.querySelector("svg")).toBeNull();
+	expect(s.container.querySelector("#tooltip svg")).toBeNull();
+	expect(
+		s.container.querySelector("#inner svg")?.getAttribute("data-render"),
+	).toBe("next");
+	await vi.advanceTimersByTimeAsync(1000);
+	expect(s.node("p").classList.contains("pfdsl-focus-cue")).toBe(true);
+	await vi.advanceTimersByTimeAsync(500);
+	expect(s.container.querySelector(".pfdsl-focus-cue")).toBeNull();
 });
 
 it("keeps a right-clicked node stationary until its context menu opens", async () => {
