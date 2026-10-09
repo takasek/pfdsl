@@ -437,3 +437,20 @@ test("asynchronous REST merge requires human approval while status remains reada
 		"ask",
 	);
 });
+
+test("GraphQL merge queue enqueue requires the existing merge approval", () => {
+	const command = `gh api graphql -f 'query=mutation { enqueuePullRequest(input:{pullRequestId:"fixture"}) { clientMutationId } }'`;
+	for (const agent of [null, "worker"])
+		assert.equal(evaluate("Bash", { command }, agent).decision, "deny");
+	assert.equal(
+		evaluateDelegationGuard({ tool_name: "Bash", tool_input: { command } })
+			.decision,
+		"ask",
+	);
+	assert.equal(
+		evaluate("Bash", {
+			command: `gh api graphql -f 'query=query { viewer { login } }'`,
+		}).decision,
+		"allow",
+	);
+});

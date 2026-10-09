@@ -267,7 +267,9 @@ export function findMergeCommand(
 				parsed.args.some(
 					(arg) =>
 						/\bmutation\b/.test(arg) &&
-						/\b(?:mergePullRequest|enablePullRequestAutoMerge)\b/.test(arg),
+						/\b(?:mergePullRequest|enablePullRequestAutoMerge|enqueuePullRequest)\b/.test(
+							arg,
+						),
 				)
 			)
 				return "gh api GraphQL merge";
