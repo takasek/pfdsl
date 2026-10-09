@@ -73,6 +73,13 @@ if (session) {
 			),
 		/exactly two/,
 	);
+	const candidate = instrumentRunner(fixture, { closeReady: true });
+	assert.equal(candidate.split("await waitForSourceCloseReady(").length - 1, 2);
+	assert.ok(!candidate.includes("waitForSavedSource"));
+	assert.throws(
+		() => instrumentRunner(fixture, { waitForSave: true, closeReady: true }),
+		/one comparison/,
+	);
 });
 
 test("CI records failed runs without converting them into success", () => {
@@ -84,6 +91,9 @@ test("CI records failed runs without converting them into success", () => {
 	assert.match(workflow, /set -o pipefail/);
 	assert.doesNotMatch(workflow, /continue-on-error|retry|sleep/);
 	assert.match(workflow, /526e17c070bb1447ebf3f74192db2fef391b60a8/);
+	assert.ok(
+		workflow.includes("packages/vscode-extension/smoke/save-readiness*.mjs"),
+	);
 });
 
 test("job-level env does not use the step-only runner context", () => {

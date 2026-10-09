@@ -18,6 +18,7 @@ import {
 	readTransform,
 	removeRunDirectory,
 } from "./harness.mjs";
+import { waitForSourceCloseReady } from "./save-readiness.mjs";
 
 const vscodeVersion = "1.132.1";
 const cdpTimeoutMs = 30_000;
@@ -979,6 +980,7 @@ async function assertPreviewEditingFocus(session) {
 		(text) => text.includes("Smoke output"),
 		{ timeoutMs: coldRenderTimeoutMs },
 	);
+	await waitForSourceCloseReady(sourceTab, { timeoutMs: coldRenderTimeoutMs });
 	await sourceTab.click();
 	await page.keyboard.press(`${modifier}+w`);
 	await waitForInteraction(
@@ -1043,6 +1045,7 @@ async function assertHiddenSourceExternalChange(session) {
 		1,
 		"hidden source fixture rendered",
 	);
+	await waitForSourceCloseReady(sourceTab, { timeoutMs: coldRenderTimeoutMs });
 	await sourceTab.click();
 	await page.keyboard.press(`${modifier}+w`);
 	await waitForInteraction(

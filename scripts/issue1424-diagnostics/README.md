@@ -14,11 +14,19 @@ Synchronous API logging and DOM checkpoints can change timing.
 The first observation-only run, 37910383184, produced two successful trials and one failure on the first Close.
 Its failed click reached the Close button before the API save event; no tab closure or later PFDSL reopen request was recorded.
 The historical issue failed on the second Close, so the two failures are not assumed to have the same cause.
-The current job is explicitly labeled `save-completion` and adds one precondition before each of the two saved-source closes.
+The subsequent `save-completion` run, 37912189578, succeeded in all three trials and all six closes.
+That comparison added one API-based precondition before each of the two saved-source closes.
 It retains the existing disk-content checks and waits for a save event matching the current document version, with the document and tab both clean in the latest API snapshot.
 This is a diagnostic comparison, not an unmodified trial or a shipped fix.
 The tab's visual dirty class alone is insufficient as a save-completion assertion: VS Code also hides it while saving.
 Missing API evidence fails the precondition; the observer's evidence is mandatory for this comparison.
+
+The current job is labeled `close-readiness` and validates the smoke fix's actual helper from the control checkout.
+It requires one source tab with an available class attribute and no visual unsaved indicator before either Close.
+It retains both existing disk-content checks and the original close operation, deadline, and predicate.
+This guard avoids the observed dirty-indicator Close; it does not assert API save completion because the indicator is also hidden during saving.
+API observations remain independent evidence for whether the saved-source precondition was actually reached in each candidate trial.
+The shipped extension is unchanged; only the normal smoke runner gains this readiness check.
 
 `prepare.mjs` checks six baseline file hashes before writing into the separate fixed-source checkout.
 It adds API tab/document/save events and observes all ten PFDSL `showTextDocument` call sites, including definition insertion and node navigation.

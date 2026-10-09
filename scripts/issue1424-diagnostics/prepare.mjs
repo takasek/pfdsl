@@ -32,7 +32,12 @@ function diagnosticImport(symbols, modulePath) {
 	return `import { ${symbols} } from ${JSON.stringify(modulePath)};\n`;
 }
 
-export function instrumentRunner(source, { waitForSave = false } = {}) {
+export function instrumentRunner(
+	source,
+	{ waitForSave = false, closeReady = false } = {},
+) {
+	if (waitForSave && closeReady)
+		throw new Error("Select one comparison variant");
 	let result = source;
 	const start = result.indexOf("export async function closeSourceTab(");
 	const end = result.indexOf("\nasync function submitQuickInput", start);
@@ -65,17 +70,18 @@ export function instrumentRunner(source, { waitForSave = false } = {}) {
 		"const cleanupErrors = await cleanupSmokeSession(session);",
 		"await preserveSession(session);\n\t\t\tconst cleanupErrors = await cleanupSmokeSession(session);",
 	);
-	if (waitForSave) {
+	if (waitForSave || closeReady) {
 		const closeCall = "await closeSourceTab(page, sourceTab);";
 		if (result.split(closeCall).length !== 3)
 			throw new Error("Expected exactly two saved-source closes");
+		const precondition = waitForSave
+			? "await waitForSavedSource(session, expectEventually, coldRenderTimeoutMs);"
+			: "await waitForSourceCloseReady(sourceTab, { timeoutMs: coldRenderTimeoutMs });";
 		result =
-			diagnosticImport("waitForSavedSource", "./save-completion.mjs") +
-			result.replaceAll(
-				closeCall,
-				"await waitForSavedSource(session, expectEventually, coldRenderTimeoutMs);\n\t" +
-					closeCall,
-			);
+			(waitForSave
+				? diagnosticImport("waitForSavedSource", "./save-completion.mjs")
+				: diagnosticImport("waitForSourceCloseReady", "./save-readiness.mjs")) +
+			result.replaceAll(closeCall, `${precondition}\n\t${closeCall}`);
 	}
 	return (
 		diagnosticImport(
@@ -85,7 +91,10 @@ export function instrumentRunner(source, { waitForSave = false } = {}) {
 	);
 }
 
-export function prepare(root, { waitForSave = false } = {}) {
+export function prepare(
+	root,
+	{ waitForSave = false, closeReady = false } = {},
+) {
 	const extensionRoot = join(root, "packages/vscode-extension");
 	// Check every input before writing any of them. This diagnostic is tied to one source revision.
 	const sources = Object.entries(expectedHashes).map(([path, expected]) => {
@@ -97,7 +106,7 @@ export function prepare(root, { waitForSave = false } = {}) {
 	});
 	const outputs = sources.map(([path, source]) => {
 		if (path === "smoke/run.mjs")
-			return [path, instrumentRunner(source, { waitForSave })];
+			return [path, instrumentRunner(source, { waitForSave, closeReady })];
 		if (path === "src/extension.ts") {
 			return [
 				path,
@@ -134,15 +143,31 @@ export function prepare(root, { waitForSave = false } = {}) {
 			new URL("save-completion.mjs", import.meta.url),
 			join(extensionRoot, "smoke/save-completion.mjs"),
 		);
+	if (closeReady)
+		copyFileSync(
+			new URL(
+				"../../packages/vscode-extension/smoke/save-readiness.mjs",
+				import.meta.url,
+			),
+			join(extensionRoot, "smoke/save-readiness.mjs"),
+		);
 }
 
 if (isCliEntrypoint(import.meta.url, process.argv[1])) {
 	const { positionals, values } = parseArgs({
 		allowPositionals: true,
 		strict: true,
-		options: { "wait-for-save": { type: "boolean", default: false } },
+		options: {
+			"wait-for-save": { type: "boolean", default: false },
+			"close-ready": { type: "boolean", default: false },
+		},
 	});
 	if (positionals.length !== 1)
-		throw new Error("Usage: prepare.mjs [--wait-for-save] <fixed-source-root>");
-	prepare(positionals[0], { waitForSave: values["wait-for-save"] });
+		throw new Error(
+			"Usage: prepare.mjs [--wait-for-save | --close-ready] <fixed-source-root>",
+		);
+	prepare(positionals[0], {
+		waitForSave: values["wait-for-save"],
+		closeReady: values["close-ready"],
+	});
 }
