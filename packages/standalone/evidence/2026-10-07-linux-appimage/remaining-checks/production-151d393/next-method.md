@@ -57,4 +57,6 @@ Keep the original production artifact/source/frontend identities; the already su
 
 An independent reviewer checked the issue, native main/adapter/preview and existing tests, then compared the environment choices and evidence methods.
 The disposal decision and conditional private-desktop method preserve the original requirement and proof limits.
-This documentation chooses no new product UI or source behavior, and neither the environment preparation nor the new reduced-motion comparison has run yet.
+At this method's selection, environment preparation and the new comparison had not run.
+The [2026-10-09 returned virtual-desktop result](reduced-motion/README.md) subsequently verifies native and records the VS Code visible-expiry difference separately, without changing the original method's statuses.
+This documentation chooses no new product UI or source behavior.

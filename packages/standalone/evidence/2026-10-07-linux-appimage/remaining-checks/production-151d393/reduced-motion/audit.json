@@ -1,0 +1,205 @@
+{
+	"productSource": "151d39345c6945c3fe11a75f558068d011cbe197",
+	"run": 37819347003,
+	"attempt": 1,
+	"artifact": 11569256223,
+	"method": "independent-xorg-dummy-20261009-display90",
+	"verificationDateUTC": "2026-10-09",
+	"display": ":90",
+	"environment": "Xorg dummy virtual desktop 1364x1024",
+	"productionMediaQueryDirectRead": "NOT_MEASURED",
+	"originalReport": {
+		"name": "pfdsl-151d393-reduced-motion-independent-desktop.md",
+		"bytes": 15963,
+		"sha256": "bf1972cf51c69d69c1dba1d114300ca34953c9f6092a1589a39e26c5a85abbd9"
+	},
+	"archives": [
+		{
+			"name": "pfdsl-rm-evidence.zip",
+			"bytes": 11514284,
+			"sha256": "be1c3e5781bf48f8ff0f220a8a1d4a9cda536bb25e25a4d474973a2e8da1202e",
+			"regularFileEntries": 407
+		},
+		{
+			"name": "pfdsl-rm-native-initial-recording.zip",
+			"bytes": 9727452,
+			"sha256": "a7dc9062f37fbf03a678f9e28f2da86a44b063baa9fb74b164ac6f5d3122dbcc",
+			"regularFileEntries": 2
+		},
+		{
+			"name": "pfdsl-rm-native-restart-recordings.zip",
+			"bytes": 5323149,
+			"sha256": "78d4d428f7777bf75481579b6cd3f6b9aab59395a1fe3021493b66502e815357",
+			"regularFileEntries": 3
+		},
+		{
+			"name": "pfdsl-rm-code-initial-recording.zip",
+			"bytes": 11279176,
+			"sha256": "37598eb31478b28164622ceccacb35226d9ed44d2c51c8dbba198c5729989210",
+			"regularFileEntries": 2
+		},
+		{
+			"name": "pfdsl-rm-code-restart-recordings.zip",
+			"bytes": 9545829,
+			"sha256": "4d4cf7cc785bf57439c3f1fedda3f3c0b702e9c9ffc156b1d8ce5ba59a69cffb",
+			"regularFileEntries": 3
+		}
+	],
+	"parentArchiveChecks": {
+		"crc": "passed",
+		"safePathsAndTypes": "passed",
+		"duplicateContentsConsistent": true,
+		"manifestListedFileChecksums": {
+			"SHA256SUMS-pfdsl-rm-code-initial-recording.txt": 1,
+			"SHA256SUMS-pfdsl-rm-code-restart-recordings.txt": 2,
+			"SHA256SUMS-pfdsl-rm-evidence.txt": 406,
+			"SHA256SUMS-pfdsl-rm-native-initial-recording.txt": 1,
+			"SHA256SUMS-pfdsl-rm-native-restart-recordings.txt": 2
+		},
+		"totalFileChecksums": 412,
+		"allConditionEvidenceLinksExist": true,
+		"attachedScriptsExecuted": false,
+		"linuxGUIRerun": false
+	},
+	"conditions": [
+		{
+			"method": "independent-xorg-dummy-20261009-display90",
+			"source": "151d39345c6945c3fe11a75f558068d011cbe197",
+			"artifact_id": 11569256223,
+			"run_id": 37819347003,
+			"display": ":90",
+			"desktop": "Xorg dummy virtual desktop 1364x1024",
+			"production_matchMedia_direct_query": "NOT_MEASURED",
+			"original_rows_unchanged": true,
+			"settings_restoration": "PASS",
+			"id": "B_NATIVE_REDUCE",
+			"original_requirement": "I1284-022",
+			"host": "native",
+			"status": "PASS_THIS_METHOD_WITH_NORMAL_RESTART",
+			"animation_suppression": "PASS",
+			"expiry": "PASS_APPROX_1_5_SECONDS",
+			"expiry_observed_seconds": 1.5,
+			"expiry_observation_bounds_seconds": [1.467, 1.533],
+			"target_switch": "PASS",
+			"ordinary_edit_undo": "PASS",
+			"live_toggle": "DID_NOT_SUPPRESS_IN_OBSERVED_TRIAL",
+			"A_B_A": [
+				"native-A1-confirmed",
+				"native-B-restarted",
+				"native-A-restarted"
+			],
+			"evidence": [
+				"analysis/pts_rgb/trial_summary.json",
+				"evidence/native-B-restart-observed-settings.json",
+				"evidence/private-baseline-comparison.json"
+			]
+		},
+		{
+			"method": "independent-xorg-dummy-20261009-display90",
+			"source": "151d39345c6945c3fe11a75f558068d011cbe197",
+			"artifact_id": 11569256223,
+			"run_id": 37819347003,
+			"display": ":90",
+			"desktop": "Xorg dummy virtual desktop 1364x1024",
+			"production_matchMedia_direct_query": "NOT_MEASURED",
+			"original_rows_unchanged": true,
+			"settings_restoration": "PASS",
+			"id": "B_CODE_REDUCE",
+			"original_requirement": "I1284-022",
+			"host": "Code Extension Development Host",
+			"status": "PARTIAL_EXPIRY_MISMATCH",
+			"animation_suppression": "PASS_WITH_NORMAL_RESTART",
+			"expiry": "MISMATCH_APPROX_2_03_SECONDS_IN_CLEAN_TRIAL",
+			"expiry_observed_seconds": 2.033,
+			"expiry_observation_bounds_seconds": [2.0, 2.067],
+			"target_switch": "PASS",
+			"ordinary_edit_undo": "PASS",
+			"live_toggle": "DID_NOT_SUPPRESS_IN_OBSERVED_TRIAL",
+			"A_B_A": ["code-A1", "code-B-restarted", "code-A-restarted"],
+			"evidence": [
+				"analysis/pts_rgb/trial_summary.json",
+				"analysis/pts_rgb/behavior_code_B/result.json",
+				"evidence/code-B-typed-override-settings.json",
+				"evidence/private-baseline-comparison.json"
+			]
+		}
+	],
+	"selectedOriginalEvidence": [
+		{
+			"path": "conditions.json",
+			"sha256": "51ffebad7b79501ec3146e1df2c09d50cf4afd9825200840a5d6473c8148e87d",
+			"bytes": 2349
+		},
+		{
+			"path": "analysis/pts_rgb/trial_summary.csv",
+			"sha256": "b53ba2930a664146db5f25414fb48c0c82c1d6669e90b7d12c55f9a5c57dc7b6",
+			"bytes": 2314
+		},
+		{
+			"path": "analysis/pts_rgb/trial_summary.json",
+			"sha256": "884fd7f015dee7f6c5079136baee0f0d482be1ed63a4ca0143827174f169a3de",
+			"bytes": 6337
+		},
+		{
+			"path": "analysis/pts_rgb/finalized_source_recheck.json",
+			"sha256": "d19d70b25eab0a13ab6a4dd155641c536f6f3802abe5e710fe588be45f48262e",
+			"bytes": 500
+		},
+		{
+			"path": "evidence/original-baseline-settings.json",
+			"sha256": "7f3c5a4cfca912143ffa90ecac1e3de06c1187a2148dfc43c96ac51aae429177",
+			"bytes": 4181
+		},
+		{
+			"path": "evidence/private-baseline-comparison.json",
+			"sha256": "d3b61714a9d91d6894c6c2686a3d526563d7d634ab1e01f8dec83b0a38881b75",
+			"bytes": 80
+		},
+		{
+			"path": "evidence/private-after-app-close-settings.json",
+			"sha256": "c822bcfa16f469471c5cf6abf058a29311b4c988061ed9bb18810bd103ef2aa2",
+			"bytes": 4187
+		},
+		{
+			"path": "evidence/shared-comparison-final.json",
+			"sha256": "877c5d180515c852ecd4bfb5997b690c99172e273000cbbf607caa1080873c17",
+			"bytes": 249
+		},
+		{
+			"path": "evidence/preservation-final.json",
+			"sha256": "ad16308b3849df6e95e888b407a1b3c140c2f892a21aa28ef2d399513717af4c",
+			"bytes": 1611
+		},
+		{
+			"path": "evidence/code-B-typed-override-settings.json",
+			"sha256": "851a56f7f24e396e221fb374b8af1b27768c941665656503707f556a79345d29",
+			"bytes": 4026
+		},
+		{
+			"path": "analysis/pts_rgb/behavior_code_B/result.json",
+			"sha256": "d93837db6aa96e581d5f355010bdbad14233bb603e8bdc247140fa02aa360c00",
+			"bytes": 2547
+		}
+	],
+	"sharedSettingsComparisonsUnchanged": 9,
+	"privateBaselineRestored": true,
+	"applicationSessionCount": 6,
+	"applicationExitCodes": [0, 0, 0, 0, 0, 0],
+	"recorderExitCodes": [255, 255, 255, 255, 255, 255],
+	"old399MatrixChanged": false,
+	"old30ChecklistChanged": false,
+	"nativeDisposeRetested": false,
+	"newCorpusRun": false,
+	"expiryObservation": {
+		"nativeRestartedB": {
+			"seconds": 1.5,
+			"boundsSeconds": [1.467, 1.533]
+		},
+		"codeRestartedB": {
+			"seconds": 2.033,
+			"boundsSeconds": [2.0, 2.067]
+		},
+		"timerCallbackMeasured": false,
+		"causeEstablished": false
+	}
+}

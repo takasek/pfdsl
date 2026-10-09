@@ -81,6 +81,10 @@ The [follow-up method and disposal disposition](next-method.md) keep these origi
 The original direct-query test remains unverified; an alternative OS-preference and recorded normal/reduce/restored-normal comparison may establish the original behavior requirement without adding a query UI.
 Native disposal remains unverified until a normal same-process disposal path is introduced; no testing-only UI is requested.
 
+On 2026-10-09 UTC, dot executed that [separate method on an independent Xorg dummy desktop](reduced-motion/README.md).
+Native passed the restarted normal/reduce/normal comparison; VS Code suppressed animation after restart but retains a roughly 2.03s visible-expiry difference and is partial for the complete new-method condition.
+The original shared-desktop and direct-query statuses above remain unchanged.
+
 ## Preservation and review
 
 The final supplied checks retain outer 14/14, AppDir 304/304, ZIP/AppImage/inner hashes, the three fixture originals and previous evidence.
