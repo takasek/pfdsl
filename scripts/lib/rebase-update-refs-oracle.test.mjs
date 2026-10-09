@@ -128,3 +128,67 @@ test("rebase option values cannot cancel observed updates to other refs", () => 
 		rmSync(scratch, { recursive: true, force: true });
 	}
 });
+
+test("autostash normally restores without shared stash changes, while quit stores it", () => {
+	const scratch = mkdtempSync(join(tmpdir(), "pfdsl-autostash-quit-"));
+	const env = {
+		...Object.fromEntries(
+			Object.entries(process.env).filter(([key]) => !key.startsWith("GIT_")),
+		),
+		GIT_CONFIG_NOSYSTEM: "1",
+		GIT_CONFIG_GLOBAL: "/dev/null",
+		GIT_AUTHOR_NAME: "Fixture",
+		GIT_AUTHOR_EMAIL: "fixture@example.test",
+		GIT_COMMITTER_NAME: "Fixture",
+		GIT_COMMITTER_EMAIL: "fixture@example.test",
+		GIT_EDITOR: "true",
+	};
+	try {
+		for (const conflict of [false, true]) {
+			const repo = join(scratch, conflict ? "conflict" : "normal");
+			mkdirSync(repo);
+			const run = (...args) =>
+				spawnSync("git", args, {
+					cwd: repo,
+					env,
+					encoding: "utf8",
+					timeout: 10000,
+				});
+			const git = (...args) => {
+				const result = run(...args);
+				assert.equal(result.status, 0, result.stderr);
+				return result.stdout.trim();
+			};
+			git("init", "-q", "-b", "main");
+			writeFileSync(join(repo, "file.txt"), "base\n");
+			writeFileSync(join(repo, "dirty.txt"), "base\n");
+			git("add", ".");
+			git("commit", "-qm", "base");
+			git("switch", "-qc", "upstream");
+			writeFileSync(join(repo, "file.txt"), "upstream\n");
+			git("commit", "-qam", "upstream");
+			git("switch", "-qc", "topic", "main");
+			writeFileSync(join(repo, conflict ? "file.txt" : "topic.txt"), "topic\n");
+			git("add", ".");
+			git("commit", "-qm", "topic");
+			writeFileSync(join(repo, "dirty.txt"), "uncommitted\n");
+			assert.equal(git("stash", "list"), "");
+			assert.equal(
+				parentDecision("git rebase --autostash upstream", repo),
+				"allow",
+			);
+			const rebase = run("rebase", "--autostash", "upstream");
+			assert.equal(rebase.status, conflict ? 1 : 0, rebase.stderr);
+			assert.equal(git("stash", "list"), "");
+			if (conflict) {
+				assert.equal(parentDecision("git rebase --quit", repo), "ask");
+				git("rebase", "--quit");
+				assert.match(git("stash", "list"), /autostash/);
+				assert.ok(git("rev-parse", "refs/stash"));
+				assert.match(git("reflog", "show", "refs/stash"), /autostash/);
+			}
+		}
+	} finally {
+		rmSync(scratch, { recursive: true, force: true });
+	}
+});

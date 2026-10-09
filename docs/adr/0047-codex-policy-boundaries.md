@@ -103,6 +103,9 @@ remote-tracking ref と tag は対象外とし、notes と replace は現時点�
 
 update-ref、symbolic-ref の変更、branch の強制変更・削除・他 branch 改名、worktree の追加・保守、明示的なローカル ref 宛て fetch を確認する。
 同一 repository を宛先とする push（`push .` やローカルパス）と、pull の明示的なローカル ref 宛て refspec・refmap は、update-ref・fetch と同じ作用として確認する。
+fetch/pullの未確定のoption位置とreflogの動的な先頭verbは、作用なしと推測せず命令全体のask/Codex denyへ接続する。既存optionの値位置は通常動線として維持する。
+rebaseの明示的な `--quit` は、一時autostashを共有stashへ保存しうるため既存のoption判定から共有作用へ接続する。autostashが無い場合も状態依存の免除はせず、必要なら利用者のterminalで実行する。
+通常のrebase・autostash開始・continue/skip/abortを一律停止しない。autostashの自動再適用が失敗した場合の共有stashへの退避は観測対象外とし、Git状態の再構築を追加しない。明示的なquitの保護を、autostashに伴う全stash更新の防止へ読み替えない。
 reflog の write・expire・delete・drop は stash の回復情報を書き換えうるため共有保守とし、Git の reflog の verb は閉じた集合なので、それ以外の最初の語は show へ渡す ref として表示に扱う。
 reflog の表示でも `--output` はファイルを書き、後続の不正 option による失敗前にも出力先を変更するため、読取の免除から外す。
 `git remote` の add・rename・remove・set-url・set-branches は前置の verbosity option を含めリポジトリ設定の書込みとして共有作用とし、前置 option を解決できなければ共有作用とする。

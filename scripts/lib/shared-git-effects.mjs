@@ -611,6 +611,8 @@ function rebaseUpdatesRefs(args, isDynamic) {
 				continue;
 			}
 			const option = matches[0];
+			// Quit can publish a temporary autostash to the shared stash list.
+			if (option.name === "--quit") return true;
 			if (option.name === "--update-refs") updatesRefs = true;
 			else if (option.name === "--no-update-refs") updatesRefs = false;
 			if (option.value && !arg.includes("=")) i++;
@@ -732,8 +734,10 @@ export function classifySharedGitEffect(
 		argTokens.filter((token) => token.dynamic).map((token) => token.value),
 	);
 	const isDynamic = (value) => dynamicValues.has(value);
-	if (subcommand === "reflog")
+	if (subcommand === "reflog") {
+		if (isDynamic(args[0])) return { kind: "shared", unresolved: true };
 		return isReadOnlyGitReflog(args) ? null : { kind: "shared" };
+	}
 	if (subcommand === "remote")
 		return writesGitRemoteConfig(args) ? { kind: "shared" } : null;
 	// The last actual toggle wins, after consuming required option values.
@@ -872,14 +876,14 @@ export function classifySharedGitEffect(
 		// Refspecs read from stdin are unresolvable at this boundary.
 		if (args.some((arg) => isLongOptionPrefix(arg, "--stdin")))
 			return { kind: "shared", unresolved: true };
-		if (writesLocalRefDestination(args, isDynamic, subcommand))
+		if (writesLocalRefDestination(args, isDynamic, subcommand, isDynamic))
 			return { kind: "shared", unresolved: true };
 		if (writesLocalRefDestination(args)) return { kind: "shared" };
 	}
 	// `pull` fetches with its own refspecs, so a local destination writes the
 	// same refs a fetch would.
 	if (subcommand === "pull") {
-		if (writesLocalRefDestination(args, isDynamic, subcommand))
+		if (writesLocalRefDestination(args, isDynamic, subcommand, isDynamic))
 			return { kind: "shared", unresolved: true };
 		if (writesLocalRefDestination(args, undefined, subcommand))
 			return { kind: "shared" };
@@ -946,7 +950,12 @@ function writesLocalRefDestination(
 	args,
 	writesDestination = (refspec) => isLocalRefDestination(refspec, false),
 	subcommand = "fetch",
+	isDynamic = () => false,
 ) {
+	const valueOptions = new Set([
+		...FETCH_VALUE_OPTIONS,
+		...(subcommand === "fetch" ? ["-j", "--jobs"] : PULL_MERGE_VALUE_OPTIONS),
+	]);
 	let repository = false;
 	let options = true;
 	for (let i = 0; i < args.length; i++) {
@@ -955,13 +964,19 @@ function writesLocalRefDestination(
 			options = false;
 			continue;
 		}
+		// An expanded word before `--` may be an option, even where the
+		// literal spelling looks like a repository or refspec. Static option
+		// values remain values and do not select shared effects.
+		if (options && isDynamic(arg)) {
+			const attachedValue =
+				(arg.includes("=") && valueOptions.has(arg.split("=", 1)[0])) ||
+				[...valueOptions].some(
+					(option) => /^-[^-]$/.test(option) && arg.startsWith(option),
+				);
+			if (!attachedValue) return true;
+		}
 		if (options && arg.startsWith("-")) {
-			if (
-				FETCH_VALUE_OPTIONS.has(arg) ||
-				(subcommand === "fetch" && ["-j", "--jobs"].includes(arg)) ||
-				(subcommand === "pull" && PULL_MERGE_VALUE_OPTIONS.has(arg))
-			)
-				i++;
+			if (valueOptions.has(arg)) i++;
 			continue;
 		}
 		if (!repository) {

@@ -567,3 +567,39 @@ test("isReadOnlyGitBranch accepts only list mode with known read options", () =>
 	])
 		assert.equal(isReadOnlyGitBranch(args), false, args.join(" "));
 });
+
+test("dynamic fetch options and reflog verbs require a whole-command decision", () => {
+	for (const command of [
+		'flag="--refmap=+refs/heads/main:refs/heads/other"; git fetch "$flag" origin main',
+		'git fetch --verbose "$flag" origin main',
+		'git pull "$flag" origin main',
+		'verb=expire; git reflog "$verb" --expire=now --all',
+	]) {
+		assert.equal(decision(command, "own", "main", true), "ask", command);
+		assert.equal(decision(command), "deny", command);
+		assert.equal(decision(command, "foreign", "main", true), "allow", command);
+	}
+	for (const command of [
+		'git fetch --depth "$depth" origin main',
+		'git fetch --depth="$depth" origin main',
+		'git reflog --date=iso "$ref"',
+	])
+		assert.equal(decision(command), "allow", command);
+});
+
+test("rebase quit is shared without treating autostash or exec values as quit", () => {
+	for (const command of ["git rebase --quit", "git rebase --qui"]) {
+		assert.equal(decision(command, "own", "main", true), "ask", command);
+		assert.equal(decision(command), "deny", command);
+	}
+	for (const command of [
+		"git rebase --autostash upstream",
+		"git rebase --continue",
+		"git rebase --skip",
+		"git rebase --abort",
+		"git rebase --exec '--quit' upstream",
+		"git rebase -x--quit upstream",
+		"git rebase -- --quit",
+	])
+		assert.equal(decision(command), "allow", command);
+});
