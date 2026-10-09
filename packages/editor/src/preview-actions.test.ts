@@ -3,7 +3,7 @@ import { afterEach, expect, it, vi } from "vitest";
 import { analyzeSnapshot } from "./document.js";
 import { mountPreview } from "./preview.js";
 import { buildPreviewGraph } from "./preview-graph.js";
-import { previewStyles } from "./preview-shell.js";
+import { FOCUS_CUE_DURATION_MS, previewStyles } from "./preview-shell.js";
 
 const cleanups: Array<() => void> = [];
 afterEach(() => {
@@ -13,6 +13,22 @@ afterEach(() => {
 });
 const svg =
 	'<svg width="200" height="100"><g class="node"><title>a</title><polygon points="0,0 40,0 40,30"/><text>A</text></g><g class="node"><title>p</title><text>P</text></g></svg>';
+
+it("keeps the cue animation and removal deadline at 1500ms", async () => {
+	vi.useFakeTimers();
+	const s = setup();
+	await s.preview.receive(s.message);
+	await s.preview.receive({ type: "focus", nodeId: "a" });
+	expect(FOCUS_CUE_DURATION_MS).toBe(1500);
+	const ring = s.container.querySelector<HTMLElement>(".pfdsl-focus-ring")!;
+	expect(window.getComputedStyle(ring).animation).toBe(
+		"pfdsl-cue 1500ms ease-out",
+	);
+	await vi.advanceTimersByTimeAsync(1499);
+	expect(ring.isConnected).toBe(true);
+	await vi.advanceTimersByTimeAsync(1);
+	expect(ring.isConnected).toBe(false);
+});
 function setup(
 	renderDot = vi.fn(async (_dot: string) => svg),
 	graphSize = { width: 200, height: 100 },

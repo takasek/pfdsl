@@ -8,7 +8,7 @@ import {
 import { buildDiffPanelHtml } from "./diff-panel.js";
 import type { MessageFromWebview, MessageToWebview } from "./messages.js";
 import { neighborhoodDot, type PreviewGraph } from "./preview-graph.js";
-import { previewMarkup } from "./preview-shell.js";
+import { FOCUS_CUE_DURATION_MS, previewMarkup } from "./preview-shell.js";
 import { unwrapAnchors } from "./svg-anchors.js";
 import {
 	centerPan,
@@ -258,7 +258,7 @@ export function mountPreview(container: HTMLElement, host: PreviewHost) {
 		cueRing.setAttribute("aria-hidden", "true");
 		positionCue();
 		inner.append(cueRing);
-		cueTimer = window.setTimeout(clearCue, 1500);
+		cueTimer = window.setTimeout(clearCue, FOCUS_CUE_DURATION_MS);
 	}
 	function cancelHide() {
 		if (hideTimer !== undefined) window.clearTimeout(hideTimer);
