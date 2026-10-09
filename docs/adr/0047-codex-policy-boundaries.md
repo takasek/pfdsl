@@ -2,7 +2,7 @@
 
 - Status: Proposed（PR #1413 の実装案。実入口の残る受入を含む）
 - Date: 2026-10-07
-- 対象: #1404（旧#1398の未完了受入を含む）。Git 層と setup は #1403・#1415 / PR #1412で対応済み。
+- 対象: #1404（最終file/MCP/policy設定の実入口受入）。所有者判定の受入は #1398。Git 層と setup は #1403・#1415 / PR #1412で対応済み。
 
 ## Context
 
@@ -33,8 +33,9 @@ metadata 操作か本文投稿かだけで拒否せず、未知の入力には�
 内容検査は外部書込みの承認や、この repository の責務・merge 保護を代替しない。
 
 次の候補は今回の採用済み判定変更や追加完了条件ではない。
-現行挙動は後続の各節に記録し、進行状況は [#1404](https://github.com/takasek/pfdsl/issues/1404) を入口にする。
-2026-10-09の統廃合で、旧#1398の実入口受入と#1417〜#1423の候補を#1404へ移管する。
+現行挙動は後続の各節に記録し、最終policy設定の受入は [#1404](https://github.com/takasek/pfdsl/issues/1404)、所有者判定の受入は [#1398](https://github.com/takasek/pfdsl/issues/1398) でそれぞれ追跡する。
+2026-10-09の再整理で、#1398を再開し、#1404は最終設定の実入口受入に限定する。
+未採用候補は本節と旧#1417〜#1423の履歴に保持し、両issueを閉じる条件にはしない。採否を今決める必要が生じた候補だけ、判断すべき問いと完了条件を定めてissue化する。
 以下の旧issueリンクは判断・実証の履歴であり、独立した未完了issueや必須実装の一覧として扱わない。
 
 - 親 gh の全 builtin command 表による拒否を縮小し、直接の merge 保護を残す案。子の既知読取表・未知操作拒否とは分け、通常の help と CLI 更新時の停止を評価する（[#1418](https://github.com/takasek/pfdsl/issues/1418)）。
@@ -44,7 +45,7 @@ metadata 操作か本文投稿かだけで拒否せず、未知の入力には�
 - parser の接続部分と実際の修正に対応する回帰試験を維持し、同じ構造を繰り返す直積の軸は代表ケースへ縮約する候補とする。
 
 reference-transaction hook の実証（[#1417](https://github.com/takasek/pfdsl/issues/1417)）と形式モデル（[#1422](https://github.com/takasek/pfdsl/issues/1422)）も、適用範囲・通常操作への影響・保守費用を評価する将来課題であり、網羅性を理由に必須機構へ追加しない。
-notes/replace（[#1419](https://github.com/takasek/pfdsl/issues/1419)）、設定注入の残余（[#1420](https://github.com/takasek/pfdsl/issues/1420)）、読取族のファイル出力（[#1423](https://github.com/takasek/pfdsl/issues/1423)）は#1404内の個別の判断項目として保持する。
+notes/replace（[#1419](https://github.com/takasek/pfdsl/issues/1419)）、設定注入の残余（[#1420](https://github.com/takasek/pfdsl/issues/1420)）、読取族のファイル出力（[#1423](https://github.com/takasek/pfdsl/issues/1423)）は本節の未採用候補と旧issueの履歴として保持する。
 汎用ツールへの切出しと Jev 連携は将来構想とし、今回の PR には含めない。
 
 ### Shell 解析の範囲
@@ -150,6 +151,8 @@ branch は Git と同じく list mode を判定し、`-v`・`--format`・`--sort
 共有保守は Claude で ask、Codex で deny とし、自分の terminal に戻す。
 foreign repository の既存境界と検査回避の規則は維持する。
 任意スクリプト内部、Git alias、書込み済みの remote 設定（include を含む）が持つ特殊 refspec 全般を監視する仕組みではない。
+[追加レビューの具体例](https://github.com/takasek/pfdsl/pull/1413#discussion_r4228634808) の保存済み `alias.advance=update-ref refs/heads/main HEAD` に対する `git advance` も、alias内部の作用は観測しない。
+AstraのコードとADRの独立照合で現在の保証範囲外と確認し、alias展開や全Git verb表を追加しない扱いをPRレビューへ記録した。実利用頻度・通常作業での取り違えは未確認であり、その証拠を得た場合に再評価する。
 例えば mirror 設定の remote に対する素の `git pull` は、内部で `--update-head-ok` を使うため checkout 中の default branch を書き換えうるが、argv では閉じない。
 この残余は、ref の更新を観測する層（reference-transaction hook）で扱う後続課題とする。
 
@@ -249,9 +252,9 @@ ADR-0046 の「own 自体は補正しない」「file policy と主体別 Git po
 Claude の native lock 条件と過去の受入記録は変更しない。
 ADR-0044 は `GIT_CONFIG_*` を対象 repository の解決に使う target 環境変数として扱う変更を採らなかった。
 本 ADR はそれを作用の分類の入力として扱うだけであり、target の解決には使わない。
-ADR-0044の、hookを走らせるsubcommandの前の `GIT_CONFIG_*` 代入を一律denyとする旧案は、未採用候補として#1404の設定注入の再評価へ統合する。
+ADR-0044の、hookを走らせるsubcommandの前の `GIT_CONFIG_*` 代入を一律denyとする旧案は、本節の設定注入に関する未採用候補として保持する。
 未実装の必須要件とはせず、現在のkey非依存の制限と通常動線の停止・回復を比較して採否を判断する。
-旧本文は判断履歴として保持し、#1404へ移管した所有者受入をこのPRだけで完了へ読み替えない。
+旧本文は判断履歴として保持し、#1398の所有者受入をこのPRだけで完了へ読み替えない。
 
 ## 実入口の記録と限界
 
@@ -273,7 +276,8 @@ Codex Desktop の native managed worktree では、親の実 add/commit と clea
 明示した file matcher も、最終設定の正式な読込み後に raw apply_patch で primary・別 owner の拒否と通常の書込み通過を確認する受入が残る。
 設定を選択して Node 入口を実行する回帰試験は、この live 受入の証拠にしない。
 Claude 側は、最終 hook を接続した Desktop の親・subagent の実 Git と、他セッションの worktree・cd 後の陰性経路が未確認である。
-別生存 owner、移動先に留まる cd、再開・fork・handoff、native 隔離へ委ねる場合の陰性対照は #1404の所有者受入として残る（旧#1398）。
+別生存 owner、移動先に留まる cd、再開・fork・handoff の必要経路と適用範囲・fallbackは #1398 の所有者受入として残る。
+native隔離へ保護を委ねる案は未採用であり、現方式の受入完了条件にはしない。移管を選ぶ場合に限り、repo分岐を外した同じ陰性入力で代替を確認する。
 Node 入口の失敗注入・再生をこれらの live 受入へ格上げしない。
 bootstrap 自身の欠落・構文エラー、host timeout、trust skip は、この builtin 監督が起動しないため repo 側で保証しない。
 稼働設定の通常の信頼レビューを経ずに primary・信頼 hash・metadata を手修正しない。

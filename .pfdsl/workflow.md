@@ -53,7 +53,7 @@ commit内でinstallerを呼ばず、配置はsetup・preflightが担当する。
 共有lockの待機は5秒で打ち切る。
 異常終了でlockが残った場合は、installerが実行中でないことを確認してから診断に表示されたlockだけを除去し、再実行する。
 default branchの判定はref名の比較であり、同じcommitを指すfeature branchと解決可能なdetached HEADは許可する。
-pre-commitを経由しないref操作の保護と、repo policyのロード失敗・timeoutは #1404 の別受入である。
+repo policyが直接argvで扱う共有ref操作の判定とロード失敗・timeoutは #1404 の受入である。pre-commitを通らない全ref操作の観測層はADR-0047の未採用候補とし、その導入を受入条件にしない。
 
 **worktree での git 操作**: `git commit` など git コマンドは worktree ディレクトリを指して実行する（理由は `.pfdsl/bindings/pfd-ops.md`「ワークサイクルの追加手順」の「手順 2 の追加で worktree 上の変更を検証する」が一次情報）。
 **worktree のパスはシェル変数に入れず literal で書く**。
@@ -376,11 +376,13 @@ worktree 作成から PR 作成までを一気通貫でやらせる場合のみ 
 ## Codex の policy 境界と段階的な受入（#1404）
 
 最終方式の実装案・旧判断から変える範囲・対案・受入限界は [ADR-0047](../docs/adr/0047-codex-policy-boundaries.md) に記録する。
-ガード関連の未完了受入と未採用候補は#1404へ一本化する。
-旧#1398の所有者受入と#1417〜#1423の判断・実証を保持し、統合元issueの終了を受入完了や機構の採用へ読み替えない。
+#1404は最終file/MCP/policy設定の実入口受入、#1398は所有者判定の受入として、独立した完了条件を持つ。
+#1404は所有者に依存する経路について#1398の結論と証拠を参照し、同じ観測の再実行を要求しない。
+未採用候補はADR-0047と旧#1417〜#1423の履歴に保持し、issueの終了を受入完了や機構の採用へ読み替えない。
 追加の保護・試験・簡素化は、同 ADR の「簡素化を判断する基準と今後の候補」に従い、通常作業での発生可能性と保守負担で判断する。
 通常読取の別名・診断 help/version・REST merge 状態 GET・help 誤発火は PR #1413 で修復し、未判定入力の確認は代表例で検査する。
-親 gh 表、rebase、残る help 判定・重複試験の縮小や追加機構は未採用の候補として #1404 から追跡し、今回の PR の受入へ追加しない。
+親 gh 表、rebase、残る help 判定・重複試験の縮小や追加機構はADR-0047の未採用候補として保持し、今回の PR と両issueの受入へ追加しない。採否を今決める必要が生じた候補だけ、判断すべき問いと完了条件を定めてissue化する。
+現在のPR指摘の判断・修復はPR本文とレビューを正本にし、将来候補の採否と分ける。issueには必要な受入上の依存だけを記録し、恒久的な不具合受付窓口にはしない。
 汎用化と Jev 連携は今回の範囲に含めない。
 main-commit、delegation、verification-tree、closes-create、worktree-write、generated-root-instructions、roadmap-publish の既存入口を保持し、短い bootstrap から共通の `scripts/lib/policy-supervisor.mjs` を読み込む。
 同じ process 内の worker thread で policy/helper を動的 import し、監督の欠落・構文エラーは各入口で拒否する。
@@ -419,14 +421,15 @@ hooks/list の sourcePath は primary の .codex/hooks.json で、新しい MCP 
 Codex Desktop の親の実 add/commit は下記の native 所有者の記録で確認済みであり、未確認へ戻さない。
 Node 入口の再生・失敗注入、CLI の実操作、Desktop の実操作は別の根拠として扱う。
 
-## native 所有者の受入継続（#1404、旧#1398）
+## native 所有者の受入継続（#1398）
 
 PR #1410の限定実装とADR-0046は、2026-10-07のorigin/main `a4297156e724c9d0e0f22b61c043543aa7e98a0e` で確認済みである。
 今回のCodex Desktop親チャットからnative create_worktreeで作った2つのworktreeは、version 1のownerThreadIdがともに `01a11446-defe-7c20-9ae7-a81cf42b2efa` だった。
 一つ目の `codex/issue-1403-setup-safety` で実switch・stage・通常pre-commit付きcommit `108ca389` が成功し、commit直後のcleanを確認した。
 hookの生stdinは今回も保存していないため、事後のGit成功を所有者補正callbackの発火や、native隔離の一般保証とは扱わない。
 
-残る受入はClaude Desktopの実Git・親とsubagentの区別、別生存所有者、移動先に留まったcd後の操作、再開・fork・handoff、native隔離だけに委ねる場合の同一陰性入力である。
+残る受入はClaude Desktopの実Git・親とsubagentの区別、別生存所有者、移動先に留まったcd後の操作、再開・fork・handoffの必要経路と適用範囲・fallbackである。
+native隔離へ保護を委ねる案は未採用であり、現方式の受入完了には要求しない。移管を選ぶ場合に限り、削除するrepo分岐が無い同じ陰性入力で代替を確認する。
 nodeによる最終entrypointの実行と合成metadataの回帰テストは、live harnessのhook受入と区別する。
 #1404 の Codex linked checkout・file・主体別 Git policy の拡張案は ADR-0047 に従う。
 Claude の直接親条件と上記未確認を完了へ読み替えない。
