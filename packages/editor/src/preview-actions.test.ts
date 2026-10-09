@@ -213,6 +213,60 @@ it.each([
 	expect(inner.querySelector(".pfdsl-focus-ring")).toBeNull();
 });
 
+it("keeps the cue gap at four screen pixels when changing the fitted zoom", async () => {
+	vi.useFakeTimers();
+	const s = setup(
+		vi.fn(async (_dot: string) => svg),
+		{
+			width: 368 / 0.062,
+			height: 268 / 0.062,
+		},
+	);
+	await s.preview.receive(s.message);
+	const inner = s.container.querySelector<HTMLElement>("#inner")!;
+	const currentScale = () =>
+		Number(inner.style.transform.match(/scale\(([^)]+)\)/)![1]);
+	vi.spyOn(inner, "getBoundingClientRect").mockImplementation(
+		() => new DOMRect(100, 70, 200 * currentScale(), 100 * currentScale()),
+	);
+	vi.spyOn(s.node("a"), "getBoundingClientRect").mockImplementation(
+		() =>
+			new DOMRect(
+				100 + 40 * currentScale(),
+				70 + 30 * currentScale(),
+				80 * currentScale(),
+				30 * currentScale(),
+			),
+	);
+	await s.preview.receive({ type: "focus", nodeId: "a" });
+	const ring = inner.querySelector<HTMLElement>(".pfdsl-focus-ring")!;
+	const checkBox = () => {
+		const scale = currentScale();
+		expect(Number.parseFloat(ring.style.left) * scale).toBeCloseTo(
+			40 * scale - 4,
+		);
+		expect(Number.parseFloat(ring.style.top) * scale).toBeCloseTo(
+			30 * scale - 4,
+		);
+		expect(Number.parseFloat(ring.style.width) * scale).toBeCloseTo(
+			80 * scale + 8,
+		);
+		expect(Number.parseFloat(ring.style.height) * scale).toBeCloseTo(
+			30 * scale + 8,
+		);
+		expect(Number.parseFloat(ring.style.outlineWidth) * scale).toBeCloseTo(2);
+	};
+	expect(currentScale()).toBeCloseTo(0.062);
+	checkBox();
+	await vi.advanceTimersByTimeAsync(1000);
+	for (const id of ["actual-size", "zoom-in", "zoom-out", "fit-graph"]) {
+		s.container.querySelector<HTMLButtonElement>(`#${id}`)!.click();
+		checkBox();
+	}
+	await vi.advanceTimersByTimeAsync(500);
+	expect(inner.querySelector(".pfdsl-focus-ring")).toBeNull();
+});
+
 it("replaces the cue and clears its timer; a redraw never starts another cue", async () => {
 	vi.useFakeTimers();
 	const s = setup();
