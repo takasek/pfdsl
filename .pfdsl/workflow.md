@@ -376,6 +376,8 @@ worktree 作成から PR 作成までを一気通貫でやらせる場合のみ 
 ## Codex の policy 境界と段階的な受入（#1404）
 
 最終方式の実装案・旧判断から変える範囲・対案・受入限界は [ADR-0047](../docs/adr/0047-codex-policy-boundaries.md) に記録する。
+ガード関連の未完了受入と未採用候補は#1404へ一本化する。
+旧#1398の所有者受入と#1417〜#1423の判断・実証を保持し、統合元issueの終了を受入完了や機構の採用へ読み替えない。
 追加の保護・試験・簡素化は、同 ADR の「簡素化を判断する基準と今後の候補」に従い、通常作業での発生可能性と保守負担で判断する。
 通常読取の別名・診断 help/version・REST merge 状態 GET・help 誤発火は PR #1413 で修復し、未判定入力の確認は代表例で検査する。
 親 gh 表、rebase、残る help 判定・重複試験の縮小や追加機構は未採用の候補として #1404 から追跡し、今回の PR の受入へ追加しない。
@@ -417,7 +419,7 @@ hooks/list の sourcePath は primary の .codex/hooks.json で、新しい MCP 
 Codex Desktop の親の実 add/commit は下記の native 所有者の記録で確認済みであり、未確認へ戻さない。
 Node 入口の再生・失敗注入、CLI の実操作、Desktop の実操作は別の根拠として扱う。
 
-## native 所有者の受入継続（#1398）
+## native 所有者の受入継続（#1404、旧#1398）
 
 PR #1410の限定実装とADR-0046は、2026-10-07のorigin/main `a4297156e724c9d0e0f22b61c043543aa7e98a0e` で確認済みである。
 今回のCodex Desktop親チャットからnative create_worktreeで作った2つのworktreeは、version 1のownerThreadIdがともに `01a11446-defe-7c20-9ae7-a81cf42b2efa` だった。

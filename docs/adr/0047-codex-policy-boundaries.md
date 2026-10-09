@@ -2,7 +2,7 @@
 
 - Status: Proposed（PR #1413 の実装案。実入口の残る受入を含む）
 - Date: 2026-10-07
-- 対象: #1398、#1404。Git 層と setup は #1403 / PR #1412。
+- 対象: #1404（旧#1398の未完了受入を含む）。Git 層と setup は #1403・#1415 / PR #1412で対応済み。
 
 ## Context
 
@@ -33,6 +33,8 @@ metadata 操作か本文投稿かだけで拒否せず、未知の入力には�
 
 次の候補は今回の採用済み判定変更や追加完了条件ではない。
 現行挙動は後続の各節に記録し、進行状況は [#1404](https://github.com/takasek/pfdsl/issues/1404) を入口にする。
+2026-10-09の統廃合で、旧#1398の実入口受入と#1417〜#1423の候補を#1404へ移管する。
+以下の旧issueリンクは判断・実証の履歴であり、独立した未完了issueや必須実装の一覧として扱わない。
 
 - 親 gh の全 builtin command 表による拒否を縮小し、直接の merge 保護を残す案。子の既知読取表・未知操作拒否とは分け、通常の help と CLI 更新時の停止を評価する（[#1418](https://github.com/takasek/pfdsl/issues/1418)）。
 - 通常の remote・local path への push と共有 ref 保護は維持する。稀な transport 表記は通常表記への書換えを境界とし、Git の URL 互換性を独自に広げない。
@@ -41,7 +43,7 @@ metadata 操作か本文投稿かだけで拒否せず、未知の入力には�
 - parser の接続部分と実際の修正に対応する回帰試験を維持し、同じ構造を繰り返す直積の軸は代表ケースへ縮約する候補とする。
 
 reference-transaction hook の実証（[#1417](https://github.com/takasek/pfdsl/issues/1417)）と形式モデル（[#1422](https://github.com/takasek/pfdsl/issues/1422)）も、適用範囲・通常操作への影響・保守費用を評価する将来課題であり、網羅性を理由に必須機構へ追加しない。
-notes/replace（[#1419](https://github.com/takasek/pfdsl/issues/1419)）、設定注入の残余（[#1420](https://github.com/takasek/pfdsl/issues/1420)）、読取族のファイル出力（[#1423](https://github.com/takasek/pfdsl/issues/1423)）は個別の境界判断として追跡する。
+notes/replace（[#1419](https://github.com/takasek/pfdsl/issues/1419)）、設定注入の残余（[#1420](https://github.com/takasek/pfdsl/issues/1420)）、読取族のファイル出力（[#1423](https://github.com/takasek/pfdsl/issues/1423)）は#1404内の個別の判断項目として保持する。
 汎用ツールへの切出しと Jev 連携は将来構想とし、今回の PR には含めない。
 
 ### Shell 解析の範囲
@@ -246,8 +248,9 @@ ADR-0046 の「own 自体は補正しない」「file policy と主体別 Git po
 Claude の native lock 条件と過去の受入記録は変更しない。
 ADR-0044 は `GIT_CONFIG_*` を対象 repository の解決に使う target 環境変数として扱う変更を採らなかった。
 本 ADR はそれを作用の分類の入力として扱うだけであり、target の解決には使わない。
-ADR-0044 が定める、hook を走らせる subcommand の前の `GIT_CONFIG_*` 代入の deny は未実装のまま残し、後続課題とする。
-旧本文は判断履歴として保持し、#1398 全体の受入をこの PR だけで完了へ読み替えない。
+ADR-0044の、hookを走らせるsubcommandの前の `GIT_CONFIG_*` 代入を一律denyとする旧案は、未採用候補として#1404の設定注入の再評価へ統合する。
+未実装の必須要件とはせず、現在のkey非依存の制限と通常動線の停止・回復を比較して採否を判断する。
+旧本文は判断履歴として保持し、#1404へ移管した所有者受入をこのPRだけで完了へ読み替えない。
 
 ## 実入口の記録と限界
 
@@ -269,7 +272,7 @@ Codex Desktop の native managed worktree では、親の実 add/commit と clea
 明示した file matcher も、最終設定の正式な読込み後に raw apply_patch で primary・別 owner の拒否と通常の書込み通過を確認する受入が残る。
 設定を選択して Node 入口を実行する回帰試験は、この live 受入の証拠にしない。
 Claude 側は、最終 hook を接続した Desktop の親・subagent の実 Git と、他セッションの worktree・cd 後の陰性経路が未確認である。
-別生存 owner、移動先に留まる cd、再開・fork・handoff、native 隔離へ委ねる場合の陰性対照は #1398 全体の受入として残る。
+別生存 owner、移動先に留まる cd、再開・fork・handoff、native 隔離へ委ねる場合の陰性対照は #1404の所有者受入として残る（旧#1398）。
 Node 入口の失敗注入・再生をこれらの live 受入へ格上げしない。
 bootstrap 自身の欠落・構文エラー、host timeout、trust skip は、この builtin 監督が起動しないため repo 側で保証しない。
 稼働設定の通常の信頼レビューを経ずに primary・信頼 hash・metadata を手修正しない。
