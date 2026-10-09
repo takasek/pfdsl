@@ -234,18 +234,11 @@ export function mountPreview(container: HTMLElement, host: PreviewHost) {
 		cueRing?.remove();
 		cueRing = undefined;
 	}
-	function showCue(node: Element) {
-		clearCue();
-		cuedNode = node;
-		node.classList.add("pfdsl-focus-cue");
-		// Keep the decoration outside SVG: group outline/shadow does not paint on
-		// the tested WebKitGTK runtime, and the original shape styling must survive.
-		const bounds = node.getBoundingClientRect();
+	function positionCue() {
+		if (!cuedNode || !cueRing) return;
+		const bounds = cuedNode.getBoundingClientRect();
 		const origin = inner.getBoundingClientRect();
 		const padding = 4 / scale;
-		cueRing = document.createElement("div");
-		cueRing.className = "pfdsl-focus-ring";
-		cueRing.setAttribute("aria-hidden", "true");
 		Object.assign(cueRing.style, {
 			left: `${(bounds.left - origin.left) / scale - padding}px`,
 			top: `${(bounds.top - origin.top) / scale - padding}px`,
@@ -253,6 +246,17 @@ export function mountPreview(container: HTMLElement, host: PreviewHost) {
 			height: `${bounds.height / scale + 2 * padding}px`,
 			outlineWidth: `${2 / scale}px`,
 		});
+	}
+	function showCue(node: Element) {
+		clearCue();
+		cuedNode = node;
+		node.classList.add("pfdsl-focus-cue");
+		// Keep the decoration outside SVG: group outline/shadow does not paint on
+		// the tested WebKitGTK runtime, and the original shape styling must survive.
+		cueRing = document.createElement("div");
+		cueRing.className = "pfdsl-focus-ring";
+		cueRing.setAttribute("aria-hidden", "true");
+		positionCue();
 		inner.append(cueRing);
 		cueTimer = window.setTimeout(clearCue, 1500);
 	}
@@ -550,7 +554,7 @@ export function mountPreview(container: HTMLElement, host: PreviewHost) {
 		root.scrollLeft = root.scrollTop = 0;
 		inner.style.transform = `translate(${panX}px, ${panY}px) scale(${scale})`;
 		inner.style.transformOrigin = "0 0";
-		if (cueRing) cueRing.style.outlineWidth = `${2 / scale}px`;
+		positionCue();
 		updateControls();
 		updateMinimapVp();
 	}

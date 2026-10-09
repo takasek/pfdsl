@@ -102,12 +102,17 @@ describe("protected pre-commit shim", () => {
 		assert.equal(gateRan(), true);
 		assert.equal(git("rev-parse", "HEAD"), before);
 	});
-	it("does not mistake main for the default when origin/HEAD names trunk", () => {
-		const { git, gateRan } = fixture("trunk");
-		git("switch", "-qc", "main");
-		git("commit", "--allow-empty", "-qm", "allowed");
-		assert.equal(gateRan(), true);
-	});
+	for (const branch of ["main", "feature"]) {
+		it(`keeps main protected with origin/HEAD naming trunk on ${branch}`, () => {
+			const { git, runGit, gateRan } = fixture("trunk");
+			git("switch", "-qc", branch);
+			const before = git("rev-parse", "HEAD");
+			const result = runGit("commit", "--allow-empty", "-qm", "candidate");
+			assert.equal(result.status === 0, branch === "feature", result.stderr);
+			assert.equal(gateRan(), branch === "feature");
+			assert.equal(git("rev-parse", "HEAD") === before, branch === "main");
+		});
+	}
 	for (const branch of ["feature", "main"]) {
 		it(`uses the known main default without origin/HEAD on ${branch}`, () => {
 			const { git, runGit, gateRan } = fixture();
