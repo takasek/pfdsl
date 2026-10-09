@@ -51,6 +51,11 @@ jobs:
           node-version: 24
           cache: pnpm
 
+      # checkout fetches explicit refspecs, which do not populate origin/HEAD.
+      # The pre-commit hook refuses commits without a proven default branch.
+      - name: Resolve the remote default branch
+        run: git remote set-head origin --auto
+
       - run: make setup
 
       - run: make build

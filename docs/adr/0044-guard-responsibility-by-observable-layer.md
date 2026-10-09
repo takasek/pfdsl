@@ -63,9 +63,14 @@ hook には、コマンド文字列だけで判定できるものを担わせる
 ### Git 層
 
 - pre-commit は、HEAD が default branch（origin/HEAD から取得）なら commit を拒否する。取得できない場合も拒否する。
-- shim は、`scripts/pre-commit` が無い・実行できない場合に非0で終える。shim は版の行を持つ。
-- setup は、管理先の shim を配置してから実効 hook を検査する。`core.hooksPath` が未設定でも、default の shim の実在と内容を確かめる。custom の hooksPath は上書きせず失敗にする。共有 shim の更新は lock するか atomic に置き換え、新しい setup は shim を降格しない。
-- 旧 checkout の `make setup` は、共有 shim を無条件にコピーして旧版へ戻せる。preflight と新しい pre-commit は、導入済み shim の版を確かめ、古ければ置き直す。
+- 共有 shim は、安定した薄い入口として実行 checkout の `scripts/pre-commit` だけを呼ぶ（#1415）。実行先が無い・実行できない場合は commit を拒否する。
+- 更新される判定は checkout の `scripts/hooks/check-default-branch` が持ち、origin/HEAD の名前・参照先 commit と named/detached HEAD の有効性を検証する。`scripts/pre-commit` は現在の HEAD に記録された guard を読み出して先に実行する。次に index の guard が実行可能な通常ファイルであること、全体の構文と現在の Git 状態での実行成功を確認してから、作業ツリーの通常 gate を実行する。候補が欠落・非実行可能・構文不正・失敗なら導入 commit を拒否し、修正版を stage して通常 commit できるようにする。作業ツリーや index の guard を編集中でも、まだ commit されていない判定では HEAD による保護を解除しない。HEAD の guard を読めない場合は拒否し、旧版の fallback や commit 内の installer 呼出しは設けない。
+- setup は、管理先の shim を配置してから実効 hook を検査する。`core.hooksPath` が未設定でも、default の shim の実在と内容を確かめる。custom の hooksPath と異なる既存 hook は自動上書きせず失敗にする。内容と対象を確認し、現行 shim へ明示的に置き換えてから setup を行う。
+- installer は common dir の lock 内で既存内容を再読し、checkout の shim と完全一致する内容だけを受理する。欠落時の配置と同じ内容の実行可能 mode の修復は、一時ファイルから atomic に置き換える。
+- 共有 shim が同一なら、checkout の判定・gate を変えても共有 hook の再配置は要らない。交互・並行 setup でも同じ shim を保つ。
+- 共有 shim の bytes は main の `8f81899b` と一致させる。判定・gate の変更に不要なコメント・診断文言の差を作らず、その shim を無条件コピーする main 系 setup との往復を避ける。異なる歴史的 shim の自動移行は追加しない。
+- HEAD が commit に解決できない場合は拒否するため、`git checkout --orphan` 直後の初回 commit も対象になる。既存の commit を持つ有効な detached HEAD とは分ける。
+- 旧 checkout・旧 shim との後方互換や自動移行は提供しない。旧版との併用で default branch 保護・setup 成功・非降格を保証しない。
 - 依存の準備と、共有 shim・skill link の配置は分ける。
 
 ### GitHub
@@ -116,7 +121,7 @@ SessionStart は読取りだけの表示にし、setup の自動実行はやめ�
 共有の preflight を置く。
 
 - root が primary checkout なら止まる。公開（`make release`）と監査のために明示の override を持つ。
-- setup の readiness を確かめ、shim の版を確かめる。
+- setup の readiness と、checkout の shim との完全一致を確かめる。
 - root・branch・HEAD を1行で出力する。
 
 Makefile は `build: preflight` とし、並列実行でも順序を保証する（`test: build` は既存）。
@@ -223,8 +228,8 @@ PR #1335 までの候補は、「PreToolUse hook がコマンド文字列から�
   - pre-commit が走らない Git 操作（merge、cherry-pick、rebase、reset）。
   - Codex で、別の worktree 向けのコマンド一式をコピーして実行する（primary checkout と `.claude/worktrees/` 配下への書込みを除く）。
   - Codex で hook 定義を変えた後、trust されるまでの間は hook が skip される。リポジトリは trust の状態を検出できない。
-  - 旧 checkout の setup が shim を降格させる。preflight と新しい pre-commit が置き直すまでの間に限られる。
+  - 旧 checkout の setup が shim を戻す。旧版との併用は保証せず、異なる既存 hook は明示的に置き換えるまで setup・preflight が拒否する。commit 内で自動修復しない。
   - 個別テストの preflight は報告の規約で、機械では強制しない。`build` に依存しない make の target（lint、coverage、check 系、gen-plugin）も preflight を通らない。
-- 各段階の受入条件は、後続の issue に記す。対象は、拒否と確認の境界、ロード失敗の扱い、Codex の trust、縮小後の Codex の setup → build → test、MCP の判定、shim の置き直しである。
+- 各段階の受入条件は、後続の issue に記す。対象は、拒否と確認の境界、ロード失敗の扱い、Codex の trust、縮小後の Codex の setup → build → test、MCP の判定、現行 shim の配置である。
 
 この ADR は品質ガイド（pfdsl スキル）への蒸留を要する規則を含まない。

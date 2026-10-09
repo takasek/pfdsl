@@ -49,14 +49,19 @@ function fixture() {
 	mkdirSync(join(cwd, "scripts/lib"), { recursive: true });
 	mkdirSync(bin);
 	symlinkSync(makefile, join(cwd, "Makefile"));
-	writeFileSync(join(cwd, "scripts/hooks/pre-commit-shim"), "#!/bin/sh\n");
-	writeFileSync(join(cwd, ".git/hooks/pre-commit"), "#!/bin/sh\n", {
+	const shim = readFileSync(join(root, "scripts/hooks/pre-commit-shim"));
+	writeFileSync(join(cwd, "scripts/hooks/pre-commit-shim"), shim);
+	writeFileSync(join(cwd, ".git/hooks/pre-commit"), shim, {
 		mode: 0o755,
 	});
 	writeFileSync(join(cwd, "scripts/pre-commit"), "#!/bin/sh\n", {
 		mode: 0o755,
 	});
+	for (const entry of ["scripts/hooks/check-default-branch"]) {
+		writeFileSync(join(cwd, entry), "#!/bin/sh\nexit 0\n", { mode: 0o755 });
+	}
 	for (const path of [
+		"scripts/shared-hooks.mjs",
 		"scripts/link-repo-skill.mjs",
 		"scripts/lib/repo-skill-link.mjs",
 	])
@@ -225,6 +230,11 @@ describe("setup completion sentinel", () => {
 			assert.equal(readlinkSync(link), "../../generated/skills/pfdsl");
 			assert.equal(isSetupCurrent(context.cwd), true);
 			assert.equal(runCheck(context).status, 0);
+			assert.doesNotMatch(
+				readFileSync(context.log, "utf8"),
+				/pnpm/,
+				"artifact repair must reuse prepared dependencies",
+			);
 		});
 
 	for (const missing of [
@@ -304,7 +314,7 @@ describe("setup completion sentinel", () => {
 			assert.equal(existsSync(context.log), false);
 		});
 
-	it("fingerprints pnpm settings, workspace manifests, and setup runtime inputs", () => {
+	it("fingerprints dependency inputs independently of hook and link runtime inputs", () => {
 		const cwd = mkdtempSync(join(tmpdir(), "setup-fingerprint-"));
 		fixtures.push(cwd);
 		for (const path of [
@@ -328,6 +338,10 @@ describe("setup completion sentinel", () => {
 		}
 
 		// Currency also requires the installed shim, so give the fixture one.
+		writeFileSync(
+			join(cwd, "scripts/hooks/pre-commit-shim"),
+			readFileSync(join(root, "scripts/hooks/pre-commit-shim")),
+		);
 		assert.equal(spawnSync("/usr/bin/git", ["init", "-q", cwd]).status, 0);
 		writeFileSync(
 			join(cwd, ".git/hooks/pre-commit"),
@@ -337,6 +351,9 @@ describe("setup completion sentinel", () => {
 		writeFileSync(join(cwd, "scripts/pre-commit"), "#!/bin/sh\n", {
 			mode: 0o755,
 		});
+		for (const entry of ["scripts/hooks/check-default-branch"]) {
+			writeFileSync(join(cwd, entry), "#!/bin/sh\nexit 0\n", { mode: 0o755 });
+		}
 		installSkill(cwd);
 
 		const inputs = setupInputs(cwd);
@@ -348,14 +365,7 @@ describe("setup completion sentinel", () => {
 				"packages/zeta/package.json",
 			],
 		);
-		for (const path of [
-			".npmrc",
-			".pnpmfile.cjs",
-			"pnpm-workspace.yaml",
-			"scripts/hooks/pre-commit-shim",
-			"scripts/lib/cli-entrypoint.mjs",
-			"scripts/lib/repo-skill-link.mjs",
-		])
+		for (const path of [".npmrc", ".pnpmfile.cjs", "pnpm-workspace.yaml"])
 			assert.equal(inputs.includes(path), true, path);
 
 		writeSetupMarker(cwd);
@@ -364,7 +374,6 @@ describe("setup completion sentinel", () => {
 			".npmrc",
 			".pnpmfile.cjs",
 			"packages/alpha/package.json",
-			"scripts/lib/cli-entrypoint.mjs",
 		]) {
 			writeFileSync(
 				join(cwd, path),
@@ -558,10 +567,7 @@ describe("setup completion sentinel", () => {
 				SETUP_LINK_PATH: join(context.cwd, "node_modules/fixture-dependency"),
 			}),
 		);
-		assert.equal(
-			readFileSync(context.log, "utf8"),
-			"pnpm\ngit\ncp\nchmod\nnode\n",
-		);
+		assert.equal(readFileSync(context.log, "utf8"), "pnpm\nnode\nnode\n");
 		assert.equal(isSetupCurrent(context.cwd), true);
 	});
 
@@ -659,10 +665,7 @@ describe("setup completion sentinel", () => {
 		]);
 		assertSucceeded(firstResult);
 		assertSucceeded(secondResult);
-		assert.equal(
-			readFileSync(context.log, "utf8"),
-			"pnpm\ngit\ncp\nchmod\nnode\n",
-		);
+		assert.equal(readFileSync(context.log, "utf8"), "pnpm\nnode\nnode\n");
 		assert.equal(isSetupCurrent(context.cwd), true);
 	});
 
@@ -759,7 +762,7 @@ describe("setup completion sentinel", () => {
 				`${path} should run setup without a marker`,
 			);
 			const log = readFileSync(context.log, "utf8");
-			assert.equal(log, "pnpm\ngit\ncp\nchmod\nnode\n");
+			assert.equal(log, "pnpm\nnode\nnode\n");
 			assertSucceeded(runSessionStart(context, sessionStartCommand(path)));
 			assert.equal(
 				readFileSync(context.log, "utf8"),
@@ -777,14 +780,7 @@ describe("setup completion sentinel", () => {
 	});
 
 	it("removes a stale marker when any setup stage fails and restores it only after a successful retry", () => {
-		for (const failureStage of [
-			"pnpm",
-			"git",
-			"cp",
-			"chmod",
-			"node",
-			"write",
-		]) {
+		for (const failureStage of ["pnpm", "node", "write"]) {
 			const context = fixture();
 			assert.notEqual(
 				runSetup(context, failureStage).status,
