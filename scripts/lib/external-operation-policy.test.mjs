@@ -398,3 +398,36 @@ test("Windows executable prefixes expose protected inner commands and normal rea
 			command,
 		);
 });
+
+test("asynchronous REST merge requires human approval while status remains readable", () => {
+	for (const agent of [null, "worker"]) {
+		assert.equal(
+			evaluate(
+				"Bash",
+				{
+					command:
+						"gh api -X PUT repos/o/r/pulls/1/merge-async -f merge_action=direct_merge",
+				},
+				agent,
+			).decision,
+			"deny",
+		);
+		for (const command of [
+			"gh api repos/o/r/pulls/1/merge-async/result-id",
+			"gh api -X GET repos/o/r/pulls/1/merge-async/result-id",
+		]) {
+			assert.equal(
+				evaluate("Bash", { command }, agent).decision,
+				"allow",
+				command,
+			);
+		}
+	}
+	assert.equal(
+		evaluateDelegationGuard({
+			tool_name: "Bash",
+			tool_input: { command: "gh api -X PUT repos/o/r/pulls/1/merge-async" },
+		}).decision,
+		"ask",
+	);
+});

@@ -257,7 +257,7 @@ export function findMergeCommand(
 		if (hasStandaloneHelp(parsed.args, GH_MERGE_HELP_FLAGS.api)) continue;
 		if (
 			parsed.args.some((arg) =>
-				/(?:^|\/)pulls\/[^/]+\/merge(?:$|[?#])/.test(arg),
+				/(?:^|\/)pulls\/[^/]+\/merge(?:-async)?(?:$|[?#])/.test(arg),
 			) &&
 			ghApiMethod(parsed.args).toUpperCase() !== "GET"
 		)
