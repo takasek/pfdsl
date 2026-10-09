@@ -83,6 +83,10 @@ for (const [name, body] of [
 		try {
 			mkdirSync(join(fixture, "lib"));
 			cpSync(
+				new URL("lib/policy-supervisor.mjs", root),
+				join(fixture, "lib/policy-supervisor.mjs"),
+			);
+			cpSync(
 				new URL("delegation-guard.mjs", root),
 				join(fixture, "delegation-guard.mjs"),
 			);
@@ -138,6 +142,10 @@ test("policy initialization stall is denied before the host timeout", () => {
 	const fixture = mkdtempSync(join(tmpdir(), "pfdsl-policy-stall-"));
 	try {
 		mkdirSync(join(fixture, "lib"));
+		cpSync(
+			new URL("lib/policy-supervisor.mjs", root),
+			join(fixture, "lib/policy-supervisor.mjs"),
+		);
 		cpSync(
 			new URL("delegation-guard.mjs", root),
 			join(fixture, "delegation-guard.mjs"),

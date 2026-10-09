@@ -55,6 +55,10 @@ for (const policy of policies)
 					join(root, `${policy}-guard.mjs`),
 				);
 				for (const [path, text] of [
+					[
+						"lib/policy-supervisor.mjs",
+						readFileSync(new URL("lib/policy-supervisor.mjs", source)),
+					],
 					["lib/hook-io.mjs", readFileSync(new URL("lib/hook-io.mjs", source))],
 					[
 						"lib/guard-probe.mjs",

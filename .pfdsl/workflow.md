@@ -376,13 +376,14 @@ worktree 作成から PR 作成までを一気通貫でやらせる場合のみ 
 ## Codex の policy 境界と段階的な受入（#1404）
 
 最終方式の実装案・旧判断から変える範囲・対案・受入限界は [ADR-0047](../docs/adr/0047-codex-policy-boundaries.md) に記録する。
-main-commit、delegation、verification-tree、closes-create、worktree-write、generated-root-instructions、roadmap-publish の既存入口を保持し、同じ process 内の worker thread で policy/helper を動的 import する。
+main-commit、delegation、verification-tree、closes-create、worktree-write、generated-root-instructions、roadmap-publish の既存入口を保持し、短い bootstrap から共通の `scripts/lib/policy-supervisor.mjs` を読み込む。
+同じ process 内の worker thread で policy/helper を動的 import し、監督の欠落・構文エラーは各入口で拒否する。
 stdin を含む内部 deadline は 5 秒、payload は 1 MiB、応答と診断は各 64 KiB、Git probe は合計 3 秒・一回最大 500 ms とする。
 ロード・同期/非同期例外、不正 payload/応答、期限超過は deny JSON・stderr・exit 2 とする。
 正常判定は exit 0 とし、Codex の ask は deny に変換する。
 worker thread は process.ppid を変えず、Claude の直接親照合条件を維持する。
 command-usage と PostToolUse の advisory はこの失敗拒否の対象ではない。
-bootstrap 自身の欠落・構文エラー、host timeout、trust skip は内部監督が起動しないため保証範囲に含めない。
+bootstrap 自身の欠落・構文エラー、共通監督の初期化中の同期停止、host timeout、trust skip は内部監督が起動しないため保証範囲に含めない。
 
 共有 Git 効果、親の merge/auto-merge、GitHub MCP、子の Git metadata 変更、全 file target の物理パスをそれぞれ確認する。
 Codex の linked checkout は cwd と一致しても操作時の native owner 証拠を要求し、main/default・検査回避・共有作用先の拒否を免除しない。

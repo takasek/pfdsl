@@ -144,7 +144,11 @@ MCP の親判別を実入口で受入していないため、未知の主体を�
 
 ### policy の実行予算と回復
 
-既存 7 入口それぞれに builtin のみを使う worker thread 監督を置く。
+既存 7 入口は短い bootstrap を持ち、builtin のみを依存に持つ `scripts/lib/policy-supervisor.mjs` の worker thread 監督を共有する。
+共通監督の欠落・構文エラーは各入口の小さな catch で deny JSON・stderr・exit 2 にする。
+監督モジュールの初期化は builtin import と関数定義だけとし、初期化中の同期停止は監督起動前の bootstrap 故障として保証範囲に含めない。
+同じ 112 行を 7 入口で複製する案は、修正の横展開と drift の負担があるため採らない。
+worker を撤去する案は、host timeout の拒否動作を未確認であり、通常のロード失敗と同期停止の扱いを維持する今回は採らない。
 同じ process 内で policy を実行し、process.ppid の直接親条件を変えずに同期停止を監督する。
 stdin を含む内部 deadline は 5 秒、payload は 1 MiB、応答・診断は各 64 KiB とする。
 Git probe は合計 3 秒、一回最大 500 ms とし、timeout を正常な欠落と区別する。
