@@ -1108,6 +1108,52 @@ describe("evaluateMainCommitGuard bypass axis (#1232)", () => {
 		assert.equal(result.decision, "allow");
 	});
 
+	it("denies outside-target config writes independently of the setting name", () => {
+		for (const command of [
+			"git -C /tmp/sbx config --global include.path /tmp/settings.cfg",
+			"git -C /tmp/sbx config set --system user.name Example",
+			"git -C /tmp/sbx config --file /tmp/settings.cfg --add include.path /tmp/extra.cfg",
+			"git -C /tmp/sbx config -f/tmp/settings.cfg --unset user.name",
+			"git config user.name Local && git config --global include.path /tmp/settings.cfg",
+			"git -c core.hooksPath=/tmp/hooks config --global user.name Example",
+		]) {
+			const result = evaluateMainCommitGuard(payload({ command }), {
+				currentBranch: "feature/x",
+				targetRelation: "foreign",
+			});
+			assert.equal(result.decision, "deny", command);
+			assert.match(result.reason, /outside the target repo/);
+		}
+		const own = evaluateMainCommitGuard(
+			payload({ command: "git config --global user.name Example" }),
+			{ currentBranch: "feature/x" },
+		);
+		assert.equal(own.decision, "deny");
+		assert.doesNotMatch(own.reason, /drop the scope\/file flag/);
+		assert.match(own.reason, /own terminal/);
+	});
+
+	it("preserves outside-target config reads and foreign local writes", () => {
+		for (const command of [
+			"git config --global --get include.path",
+			"git config get --system user.name",
+			"git config --file /tmp/settings.cfg --list",
+			"git config --file /tmp/settings.cfg -lz",
+			"git config --local include.path /tmp/extra.cfg",
+			"git config set --worktree user.name Example",
+			"git config user.name --global",
+		]) {
+			assert.equal(
+				evaluateMainCommitGuard(payload({ command }), {
+					currentBranch: "main",
+					targetRelation: "foreign",
+				}).decision,
+				"allow",
+				command,
+			);
+		}
+	});
+
 	it("names the scope/file flag and suggests local config or a terminal for an outsideTarget deny against a foreign target (#1232)", () => {
 		const result = evaluateMainCommitGuard(
 			payload({ command: "git config --global core.hooksPath /x" }),

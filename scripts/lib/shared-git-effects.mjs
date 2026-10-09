@@ -255,6 +255,10 @@ export function isReadOnlyGitConfig(args) {
 		}
 		if (!arg.startsWith("-") || arg === "-") break;
 		if (["--help", "-h"].includes(arg)) return true;
+		if (/^-[lz]+$/.test(arg) && arg.includes("l")) {
+			read = true;
+			continue;
+		}
 		if (
 			[
 				"--add",

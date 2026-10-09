@@ -111,6 +111,8 @@ fetch の `--dry-run` は `--no-dry-run` や option の値への消費で打ち�
 fetch の `-u`（`--update-head-ok`）は Git 自身の checkout 中 branch の保護を外すため共有作用とする。
 refspec を stdin から読む `fetch --stdin` は境界で解決できないため拒否する。
 読取以外の `git config` は、共有の設定ファイルを書き換えるため共有作用とする。
+`--global`・`--system`・`--file` / `-f` を使う書込みは、設定keyとtarget repositoryを問わず拒否する。
+別repositoryのローカル設定への書込みと、外部スコープの設定読取は維持し、明示fileの所在は解析しない。
 `-c`・`--config-env`・可視の `GIT_CONFIG_*` 代入（同じ command 行の前の文での export を含む）は実行中の Git 呼出しの作用先を変える入力であり、無害に見える key も `include.path` で任意の設定を読み込めるため、読取以外の呼出しに付けば共有作用とする。
 grep・blame 等の読取に付いた設定注入は共有作用としない。
 Git の parse-options は long option の一意な接頭辞を受け付けるので、危険な option の接頭辞はその option として扱い、読取判定には完全一致を要求する。

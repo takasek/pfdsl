@@ -20,9 +20,9 @@
 // or worktree. A commit that skipped the checks is the harm itself, with no
 // later point at which this hook could still catch it, so it denies on
 // every branch and worktree except a foreign target, which stays out of
-// scope like every other rule here — unless the `git config` write itself
-// lands outside the target repo (`--global`/`--system`/`--file`), which a
-// foreign target does not excuse either.
+// scope like every other rule here. Any mutating `git config` invocation
+// scoped to `--global`/`--system`/`--file` is denied independently of the
+// setting name: these settings may affect this repository too.
 
 import { basename } from "node:path";
 import {
@@ -39,6 +39,7 @@ import {
 	classifySharedGitEffect,
 	evaluateSharedGitEffect,
 	isConfigOverrideEffect,
+	isReadOnlyGitConfig,
 	sameBranchName,
 } from "./shared-git-effects.mjs";
 import { readShell } from "./shell-commands.mjs";
@@ -611,16 +612,23 @@ function classifyGuardedSegment(tokens, { cwd } = {}) {
 	}
 
 	const bypass = classifyBypass(tokens);
-	if (bypass)
+	if (bypass) {
+		const args = tokens.slice(gitSubcommandIndex(tokens) + 1);
+		const scope =
+			bypass.subcommand === "config" &&
+			!isReadOnlyGitConfig(args.map((token) => token.value))
+				? classifyConfigWrite(args)
+				: bypass;
 		return {
 			subcommand: bypass.subcommand,
 			decision: "deny",
 			bypass: true,
 			flag: bypass.flag,
-			outsideTarget: bypass.outsideTarget === true,
-			outsideTargetFlag: bypass.outsideTargetFlag,
-			outsideTargetName: bypass.outsideTargetName,
+			outsideTarget: scope.outsideTarget === true,
+			outsideTargetFlag: scope.outsideTargetFlag,
+			outsideTargetName: scope.outsideTargetName,
 		};
+	}
 
 	const sub = gitSubcommand(tokens);
 	if (!sub) return null;
@@ -629,7 +637,21 @@ function classifyGuardedSegment(tokens, { cwd } = {}) {
 		tokens.slice(gitSubcommandIndex(tokens) + 1).map((token) => token.value),
 		{ cwd },
 	);
-	if (effect) return { subcommand: sub, decision: "ask", effect };
+	if (effect) {
+		const guarded = { subcommand: sub, decision: "ask", effect };
+		if (sub !== "config") return guarded;
+		const { outsideTarget, outsideTargetFlag, outsideTargetName } =
+			classifyConfigWrite(tokens.slice(gitSubcommandIndex(tokens) + 1));
+		return outsideTarget
+			? {
+					...guarded,
+					decision: "deny",
+					outsideTarget,
+					outsideTargetFlag,
+					outsideTargetName,
+				}
+			: guarded;
+	}
 	if (DENIED_SUBCOMMANDS.has(sub)) {
 		if (
 			sub === "apply" &&
@@ -923,41 +945,35 @@ function evaluateGuardedCore(
 	guarded,
 	{ currentBranch, mainBranch = "main", targetRelation = "own" } = {},
 ) {
+	if (
+		guarded.outsideTarget &&
+		(!guarded.bypass || targetRelation === "foreign")
+	) {
+		const certainty =
+			guarded.outsideTargetName === "--file"
+				? "may write Git configuration outside the target repo (this parser does not check where the path points)"
+				: "writes Git configuration outside the target repo";
+		return {
+			decision: "deny",
+			reason:
+				`Blocked 'git ${guarded.subcommand}' for using '${guarded.outsideTargetFlag}': this ${certainty}, where it can affect this repo's (or another repo's) git hooks. ` +
+				(targetRelation === "foreign"
+					? "Write to the target's own local config instead (drop the scope/file flag, or use --local/--worktree). "
+					: "") +
+				"If writing outside the target is genuinely needed, run the command in your own terminal instead.",
+		};
+	}
 	// Out of scope entirely: this guard speaks for one repository's ecosystem,
 	// and another repository's branch names carry none of its meaning (#1221).
-	// A `git config` bypass that writes outside the target repo is the one
-	// exception (#1232): `--global`/`--system`/`--file` land in a config this
-	// repo's checks (or another repo's) still read, so foreign does not buy it
-	// the pass-through this rule otherwise grants.
-	if (
-		targetRelation === "foreign" &&
-		!(guarded.bypass && guarded.outsideTarget)
-	)
-		return { decision: "allow" };
+	// Outside-target config writes were handled before this exemption (#1232).
+	if (targetRelation === "foreign") return { decision: "allow" };
 
 	// See the file header for why a bypass denies independently of branch and
 	// worktree. This still sits after the foreign check above, which stays in
 	// scope for a bypass that writes outside the target (immediately above).
 	if (guarded.bypass) {
-		// The outside-target wording is only correct against a foreign target:
-		// there, "drop the scope/file flag" is the complete fix (the plain
-		// command is allowed against a foreign target, per the check above).
-		// Against own/sibling/unknown, the plain command still skips hooks and
-		// still denies, so that advice would lead to a second deny instead of
-		// fixing anything — the general message below applies there instead.
-		if (guarded.outsideTarget && targetRelation === "foreign") {
-			const certainty =
-				guarded.outsideTargetName === "--file"
-					? "may write core.hooksPath outside the target repo (this parser does not check where the path points)"
-					: "writes core.hooksPath outside the target repo";
-			return {
-				decision: "deny",
-				reason:
-					`Blocked 'git ${guarded.subcommand}' for using '${guarded.outsideTargetFlag}': this ${certainty}, where it can still skip this repo's (or another repo's) git hooks. ` +
-					"Write to the target's own local config instead (drop the scope/file flag, or use --local/--worktree). " +
-					"If writing outside the target is genuinely needed, run the command in your own terminal instead.",
-			};
-		}
+		// Own-target hooksPath writes still deny without the scope flag, so
+		// their recovery message must ask to remove the bypass itself.
 		const hookName =
 			guarded.subcommand === "commit" ? "pre-commit" : "git hooks";
 		return {
