@@ -908,10 +908,17 @@ export function classifyTargetRepository(sessionRoots, targetRoots) {
  */
 export function evaluateMainCommitGuard(
 	payload,
-	{ currentBranch, mainBranch = "main", targetRelation = "own" } = {},
+	{
+		currentBranch,
+		mainBranch = "main",
+		targetRelation = "own",
+		supportsAsk = true,
+	} = {},
 ) {
 	if (payload?.tool_name !== "Bash") return { decision: "allow" };
-	const failure = shellParseDecision(payload?.tool_input?.command);
+	const failure = shellParseDecision(payload?.tool_input?.command, {
+		supportsAsk,
+	});
 	if (failure) return failure;
 	const guarded = classifyGitCommand(
 		payload?.tool_input?.command,
@@ -1051,9 +1058,9 @@ function evaluateUnresolvedCwd(guarded) {
 		? ` It also uses '${guarded.flag}', which skips this repo's git hooks — drop that too.`
 		: "";
 	return {
-		decision: "deny",
+		decision: "ask",
 		reason:
-			`Blocked '${command}': its Git target cannot be resolved without interpreting shell state or expansion. ` +
+			`Cannot determine the target of '${command}' without interpreting shell state or expansion. Review the whole command before approving. ` +
 			`Use git -C with an absolute literal path, or run Git in a separate invocation with harness workdir. Run Git separately from shell environment setters.${bypassNote}`,
 	};
 }
@@ -1078,7 +1085,9 @@ export function runMainCommitGuard(
 	const payload = parseHookPayload(inputText);
 	if (!payload) return { shouldOutput: false };
 	if (payload?.tool_name !== "Bash") return { shouldOutput: false };
-	const failure = shellParseDecision(payload?.tool_input?.command);
+	const failure = shellParseDecision(payload?.tool_input?.command, {
+		supportsAsk,
+	});
 	if (failure)
 		return { shouldOutput: true, output: buildPermissionOutput(failure) };
 	const payloadCwd = payload?.cwd;
@@ -1092,13 +1101,22 @@ export function runMainCommitGuard(
 		{ ambientGitTargetOverride },
 	);
 	if (targets.length === 0) return { shouldOutput: false };
+	const unresolved = targets.find((target) => target.cwd === null);
+	if (unresolved)
+		return {
+			shouldOutput: true,
+			output: buildPermissionOutput({
+				...evaluateUnresolvedCwd(unresolved),
+				decision: supportsAsk ? "ask" : "deny",
+			}),
+		};
 
 	let asked = null;
 	for (const target of targets) {
-		const result =
-			target.cwd === null
-				? evaluateUnresolvedCwd(target)
-				: evaluateGuardedCommand(target, resolveBranches(payload, target.cwd));
+		const result = evaluateGuardedCommand(
+			target,
+			resolveBranches(payload, target.cwd),
+		);
 		if (result.decision === "deny") {
 			return { shouldOutput: true, output: buildPermissionOutput(result) };
 		}

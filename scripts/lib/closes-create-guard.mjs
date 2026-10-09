@@ -71,7 +71,9 @@ export function evaluateClosesCreateGuard(
 	{ getDefaultBranch, readFile, supportsAsk = true },
 ) {
 	if (payload?.tool_name !== "Bash") return { decision: "allow" };
-	const failure = shellParseDecision(payload?.tool_input?.command);
+	const failure = shellParseDecision(payload?.tool_input?.command, {
+		supportsAsk,
+	});
 	if (failure) return failure;
 	const command = payload?.tool_input?.command;
 	if (typeof command !== "string" || command.trim() === "")

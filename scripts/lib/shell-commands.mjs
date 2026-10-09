@@ -25,20 +25,29 @@ export function readShell(
 				timeout: 1000,
 			}),
 		);
+		if (
+			ast?.Type !== "File" ||
+			(ast.Stmts !== undefined && !Array.isArray(ast.Stmts))
+		)
+			throw new SyntaxError("Invalid shell parser AST root");
 		result = adaptShell(ast, command);
 	} catch (error) {
 		const unavailable = error.code === "ENOENT";
+		const parserFailure =
+			Boolean(error.code) ||
+			error instanceof SyntaxError ||
+			error instanceof TypeError ||
+			(Number.isInteger(error.status) && error.status !== 1);
+		const diagnostic = String(error.stderr || error.message)
+			.trim()
+			.slice(0, 300);
 		result = {
+			parserFailure,
 			error: unavailable
 				? "The pinned shell parser is missing. Run make setup in this checkout and retry."
-				: `Cannot parse or inspect this shell command: ${String(
-						error.stderr || error.message,
-					)
-						.trim()
-						.slice(
-							0,
-							300,
-						)} Rewrite it using ordinary simple commands, if/for/while, or explicit paths. Unsupported syntax is not allowed through.`,
+				: parserFailure
+					? `Cannot run the pinned shell parser: ${diagnostic}. Repair the parser before retrying.`
+					: `Cannot parse or inspect this shell command: ${diagnostic}. Rewrite it using ordinary simple commands, if/for/while, or explicit paths.`,
 		};
 	}
 	if (parserPath === shellParserPath(root)) {
@@ -48,10 +57,17 @@ export function readShell(
 	return result;
 }
 
-export function shellParseDecision(command) {
-	const { error } = readShell(command);
+export function shellParseDecision(
+	command,
+	{ supportsAsk = true, parserPath } = {},
+) {
+	const { error, parserFailure } = readShell(command, { parserPath });
 	return error
-		? { decision: "deny", matched: "shell syntax", reason: error }
+		? {
+				decision: supportsAsk && !parserFailure ? "ask" : "deny",
+				matched: "shell syntax",
+				reason: error,
+			}
 		: null;
 }
 

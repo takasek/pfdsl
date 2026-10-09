@@ -42,22 +42,24 @@ case の pattern と引用された本文は命令にせず、引用内や非引
 構文を解析する機能と、Git・gh の option や操作の効果を判断する機能を分ける。
 
 Zsh モードは upstream でも実験的なため、全 Zsh 構文の対応は要求しない。
-repeat・always・coproc 等の未対応構文、動的な実行名、解析不能な入力は明示して拒否し、通常の for/while/if、単純命令や script file への書換えを案内する。
-Git の subcommand と gh の group・verb が動的な場合も拒否する。
-前置 option の値や Git・gh の引数で配列展開・未引用展開が複数語を差し込む可能性も推測せず停止し、引用した scalar 値へ書き換える。
-短縮 option へ動的値を直結する形は、空値で次の引数を消費するため停止し、`-R "$REPO"`・`-c "$CONFIG"` 等の分離した値へ書き換える。
-gh api の動的引数は endpoint・method・GraphQL 本文に merge が隠れうるため停止し、通常の pr view/create の番号・本文・repository 指定等の値は引き続き使える。
-env の split-string と未知の前置 option は実行命令を確定できないため停止し、nohup の `--` は通常の命令位置として扱う。
-未知の program が heredoc を実行する場合も、その言語を shell と推測せず明示して止める。
+repeat・always・coproc 等の未対応構文、解析不能な入力は、安全・禁止と判定せず、Claude では既存の ask で命令全体を人間へ確認する。
+Codex の PreToolUse は ask を表現できないため停止し、通常の for/while/if、単純命令や script file への書換えを案内する。
+実行名・Git subcommand・gh group/verb が動的な場合や、配列展開・前置 option のため実行命令を確定できない場合もClaudeでask、Codexで拒否とする。
+通常の引用されたscalar値やpr view/createの引数は引き続き使え、未判定の形には明示的な実行名・分離した値・通常の前置optionへの書換えを案内する。
+未知の program が heredoc を実行する場合も、その言語を shell と推測せず同じ確認へ回す。
 parser は make setup で公式 release の SHA-256 を照合して導入する。
-hook 実行中はネットワークから取得せず、欠落・異常終了・timeout は修復案内を伴う拒否にする。
+hook 実行中はネットワークから取得せず、実行不能・timeout・不正なAST出力は修復案内を伴う拒否にする。
+通常の操作で判定できる禁止操作は従来どおり拒否するが、未判定の形を含む呼出しは既知の禁止操作が混在していても命令全体を人へ確認する。
+`git -c "$CONFIG"`のように設定keyを動的値へ隠した形も解釈せず確認対象とし、リテラルで確認できる検査回避は拒否する。
+混在ケースの部分解析や拒否条件の追加で網羅性を追わず、通常起こるケースで確認が頻発する場合にだけ対応範囲を再評価する。
+policyやparserの実行障害は人の確認で代替せず、修復を案内する。
 
 シェルの作業先・export 属性・readonly・unset の成功・分岐の状態は解釈しない。
 通常の Git 呼出しは harness workdir を使い、各命令の `git -C <literal>`、`env -C <literal>`、既知 wrapper の明示 target は直接解決する。
 明示 target の path は symlink を先に辿ってから `..` を処理し、lexical な正準化で別 checkout へ読み替えない。
-入力内に cd・pushd・popd があれば、暗黙または相対的な Git 宛先は拒否する。
+入力内に cd・pushd・popd があれば、暗黙または相対的な Git 宛先はClaudeでask、Codexで拒否とする。
 その場合は `git -C <absolute literal>` または wrapper の絶対 target を指定する。
-Git/CDPATH の可視代入・環境 setter・read・printf -v・source・eval と変更系 Git の組合せは、状態の回復を推測せず拒否し、Git の呼出しを環境 setter から分けるよう案内する。
+Git/CDPATH の可視代入・環境 setter・read・printf -v・source・eval と変更系 Git の組合せは、状態の回復を推測せず同じ確認へ回し、Git の呼出しを環境 setter から分けるよう案内する。
 命令置換・subshell・function 内の状態変更も同じ入力を保守的に制限する。
 読取 Git と、状態変更を含まない if/for/while・pipeline・命令置換は引き続き解析する。
 引用・heredoc・動的 executable・解析失敗の退行検知は、固定 parser と各 guard の接続部分の検査として残す。
@@ -154,11 +156,11 @@ test・build・typecheck は Codex の rule で事前に許可され、build が
 Claude の issue-worker 例外を Codex の子へ引き継がない。
 
 親を含め gh pr merge・auto-merge、REST の merge endpoint、GraphQL の merge mutation を保護する。
-gh の built-in namespace と command 名の小さな表を共有 preflight で確認し、設定 alias・extension 名・未対応名を親子とも拒否する。
+gh の built-in namespace と command 名の小さな表を共有 preflight で確認し、設定 alias・extension 名・未対応名は親子ともClaudeでask、Codexで拒否とする。
 `gh land`・`gh pr land`・`gh repo autolink land` 等は展開せず停止し、検査できる明示的な built-in command を案内する。
 GitHub CLI は既存 built-in の上書きと実行可能な command の下への alias 登録を認めないため、既知 leaf に続く通常の引数は維持する。
 一覧にない新しい built-in も停止する制限があり、CLI の変更時には command 表と通常動線を確認する。
-暗黙の `help` は alias 登録後に CLI へ追加されるため、`gh help` 自体も拒否し、`gh pr --help` 等を案内する。
+暗黙の `help` は alias 登録後に CLI へ追加されるため、`gh help` 自体も同じ確認へ回し、`gh pr --help` 等を案内する。
 明示的な `gh extension exec` や任意 script 内部まで解析する方式ではない。
 内容を検査できない GraphQL ファイル入力も保守的に確認対象とする。
 `--help` は gh の flag 表で単独の flag と判定できた場合だけ help として除外し、値 flag に消費される形・`--` 後・未知 flag 後は merge として扱う。

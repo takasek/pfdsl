@@ -204,9 +204,15 @@ function verificationRiskReason(mainRoot) {
  *   resolved (cwd missing, not a git repo, `git` failure)
  * @returns {{decision: "allow"} | {decision: "ask", reason: string}}
  */
-export function evaluateVerificationTreeGuard(payload, roots) {
+export function evaluateVerificationTreeGuard(
+	payload,
+	roots,
+	{ supportsAsk = true } = {},
+) {
 	if (payload?.tool_name !== "Bash") return { decision: "allow" };
-	const failure = shellParseDecision(payload?.tool_input?.command);
+	const failure = shellParseDecision(payload?.tool_input?.command, {
+		supportsAsk,
+	});
 	if (failure) return failure;
 
 	const command = payload?.tool_input?.command;
@@ -256,19 +262,20 @@ export function runVerificationTreeGuard(
 	if (!payload) return { shouldOutput: false };
 	const cwd = payload?.cwd;
 	const roots = typeof cwd === "string" ? resolveRoots(cwd) : null;
-	const result = evaluateVerificationTreeGuard(payload, roots);
+	const result = evaluateVerificationTreeGuard(payload, roots, { supportsAsk });
 	if (result.decision === "allow") return { shouldOutput: false };
-	const adapted = supportsAsk
-		? result
-		: {
-				decision: "deny",
-				reason:
-					`The hook reports the main checkout ('${roots.mainRoot}') as payload.cwd, and cannot prove that this cwd-implicit command targets the linked worktree that owns the changes. ` +
-					"Codex PreToolUse's ask decision is unsupported, so this command is denied instead of failing open. " +
-					"The guard reads payload.cwd. Changing only tool_input.workdir while payload.cwd is unchanged repeats this denial. " +
-					"For registered pfdsl checkouts, follow your local worktree guide and invoke the configured explicit-target wrapper directly (without a node prefix), with an absolute target, the expected branch, and normal approval. " +
-					"For independent repositories outside that registration, use normal approved commands with an explicit target (for example, make -C <absolute path> test or node <absolute script path>). " +
-					"Set the execution workdir to the same checkout. This guidance does not authorize bypassing ownership, main-checkout, or trusted-root refusals; stop and check the target and permissions if they occur.",
-			};
+	const adapted =
+		supportsAsk || result.decision === "deny"
+			? result
+			: {
+					decision: "deny",
+					reason:
+						`The hook reports the main checkout ('${roots.mainRoot}') as payload.cwd, and cannot prove that this cwd-implicit command targets the linked worktree that owns the changes. ` +
+						"Codex PreToolUse's ask decision is unsupported, so this command is denied instead of failing open. " +
+						"The guard reads payload.cwd. Changing only tool_input.workdir while payload.cwd is unchanged repeats this denial. " +
+						"For registered pfdsl checkouts, follow your local worktree guide and invoke the configured explicit-target wrapper directly (without a node prefix), with an absolute target, the expected branch, and normal approval. " +
+						"For independent repositories outside that registration, use normal approved commands with an explicit target (for example, make -C <absolute path> test or node <absolute script path>). " +
+						"Set the execution workdir to the same checkout. This guidance does not authorize bypassing ownership, main-checkout, or trusted-root refusals; stop and check the target and permissions if they occur.",
+				};
 	return { shouldOutput: true, output: buildPermissionOutput(adapted) };
 }

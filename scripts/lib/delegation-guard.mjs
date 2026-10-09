@@ -334,16 +334,17 @@ export function splitSegments(source) {
 }
 
 /** Grammar and executable-prefix checks are shared by every Bash guard. */
-export function shellParseDecision(command) {
-	const failure = syntaxDecision(command);
+export function shellParseDecision(command, { supportsAsk = true } = {}) {
+	const failure = syntaxDecision(command, { supportsAsk });
 	if (failure) return failure;
+	const decision = supportsAsk ? "ask" : "deny";
 	const ambiguousWord = (token) =>
 		token.multipleWords || (token.dynamic && /^-[^-]/.test(token.value));
 	for (const { tokens } of readShellCommands(command)) {
 		const { end, unresolved } = parseLeadingShellPrefix(tokens);
 		if (unresolved || tokens.slice(0, end).some(ambiguousWord))
 			return {
-				decision: "deny",
+				decision,
 				matched: "shell prefix",
 				reason:
 					"Cannot inspect this executable prefix. Use supported literal options or run the command separately.",
@@ -355,7 +356,7 @@ export function shellParseDecision(command) {
 				: null;
 		if (executable?.dynamic || builtinName?.dynamic)
 			return {
-				decision: "deny",
+				decision,
 				matched: "shell executable",
 				reason:
 					"Cannot inspect a dynamic executable. Rewrite it using a literal command name.",
@@ -371,7 +372,7 @@ export function shellParseDecision(command) {
 			invocation.some(ambiguousWord)
 		)
 			return {
-				decision: "deny",
+				decision,
 				matched: "command words",
 				reason:
 					"Cannot inspect argument expansion that may change command words. Use separate options with quoted scalar values and literal command selectors.",
@@ -387,14 +388,14 @@ export function shellParseDecision(command) {
 				invocation.some((token) => token.dynamic))
 		)
 			return {
-				decision: "deny",
+				decision,
 				matched: "command selector",
 				reason:
 					"Cannot inspect a dynamic Git or GitHub command selector or API request. Use literal subcommands and API arguments.",
 			};
 		if (invocation[0]?.value === "gh" && !isBuiltinGhCommand(invocation))
 			return {
-				decision: "deny",
+				decision,
 				matched: "GitHub command name",
 				reason:
 					"Cannot inspect a GitHub CLI alias, extension, or unsupported command name. Use an explicit supported built-in gh command.",
@@ -884,7 +885,9 @@ export function evaluateDelegationGuard(
 	{ allowedAgents = DEFAULT_ALLOWED_AGENTS, supportsAsk = true } = {},
 ) {
 	if (payload?.tool_name === "Bash") {
-		const failure = shellParseDecision(payload?.tool_input?.command);
+		const failure = shellParseDecision(payload?.tool_input?.command, {
+			supportsAsk,
+		});
 		if (failure) return failure;
 	}
 	const effect = githubToolEffect(payload?.tool_name);

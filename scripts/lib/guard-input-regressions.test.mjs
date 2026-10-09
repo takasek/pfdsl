@@ -54,7 +54,7 @@ describe("opaque command selectors and executable prefixes", () => {
 		"env GH_CONFIG_DIR=/tmp/other-gh gh pr land 123",
 		"gh alias set land 'pr merge'; gh land 123",
 	]) {
-		it(`rejects an unresolved invocation in every caller: ${command}`, () => {
+		it(`asks on Claude and denies on Codex for unresolved invocation: ${command}`, () => {
 			const payload = { tool_name: "Bash", tool_input: { command } };
 			assert.equal(
 				evaluateDelegationGuard(payload, { supportsAsk: false }).decision,
@@ -69,7 +69,7 @@ describe("opaque command selectors and executable prefixes", () => {
 			);
 			assert.equal(
 				evaluateMainCommitGuard(payload, { currentBranch: "main" }).decision,
-				"deny",
+				"ask",
 			);
 		});
 	}
@@ -125,7 +125,7 @@ describe("opaque command selectors and executable prefixes", () => {
 
 describe("GitHub CLI alias execution oracle", () => {
 	const ghAvailable = spawnSync("gh", ["--version"]).status === 0;
-	it("rejects root and nested aliases that the real CLI executes", {
+	it("asks about root and nested aliases that the real CLI executes", {
 		skip: !ghAvailable && "gh is not installed",
 	}, () => {
 		const scratch = mkdtempSync(join(tmpdir(), "pfdsl-gh-alias-oracle-"));
@@ -154,7 +154,7 @@ describe("GitHub CLI alias execution oracle", () => {
 						tool_name: "Bash",
 						tool_input: { command: `gh ${args.join(" ")}` },
 					}).decision,
-					"deny",
+					"ask",
 				);
 			}
 		} finally {
@@ -388,13 +388,13 @@ describe("gh invocation effects", () => {
 });
 
 for (const command of ["echo $[1<<2]\ngit push"]) {
-	it(`stops unsupported document syntax: ${JSON.stringify(command)}`, () =>
+	it(`asks about unsupported document syntax: ${JSON.stringify(command)}`, () =>
 		assert.equal(
 			evaluateMainCommitGuard(
 				{ tool_name: "Bash", tool_input: { command } },
 				{ currentBranch: "main" },
 			).decision,
-			"deny",
+			"ask",
 		));
 }
 

@@ -1615,7 +1615,7 @@ describe("main-commit-guard wrapper", () => {
 		assert.equal(claudeStillWins, "");
 	});
 
-	it("denies a guarded mutation when ambient Git target variables point at a sibling", () => {
+	it("asks about a guarded mutation when ambient Git target variables point at a sibling", () => {
 		const output = runWrapper("git add -A", {
 			environment: {
 				GIT_DIR: git(sibling, ["rev-parse", "--git-dir"]),
@@ -1625,7 +1625,7 @@ describe("main-commit-guard wrapper", () => {
 		assert.notEqual(output, "");
 		assert.equal(
 			JSON.parse(output).hookSpecificOutput.permissionDecision,
-			"deny",
+			"ask",
 		);
 
 		assert.equal(
@@ -1686,10 +1686,10 @@ describe("main-commit-guard wrapper", () => {
 		}
 	});
 
-	it("fails closed when cd requires shell expansion", () => {
+	it("asks when cd requires shell expansion", () => {
 		for (const [command, decision] of [
-			[`SIBLING=${sibling}; cd "$SIBLING" && git add -A`, "deny"],
-			[`SIBLING=${sibling}; cd "$SIBLING" && git restore tracked.txt`, "deny"],
+			[`SIBLING=${sibling}; cd "$SIBLING" && git add -A`, "ask"],
+			[`SIBLING=${sibling}; cd "$SIBLING" && git restore tracked.txt`, "ask"],
 		]) {
 			const output = runWrapper(command);
 			assert.notEqual(output, "", command);
@@ -1703,13 +1703,13 @@ describe("main-commit-guard wrapper", () => {
 		}
 	});
 
-	it("fails closed for cwd-changing shell builtins the parser cannot model", () => {
+	it("asks for cwd-changing shell builtins the parser cannot model", () => {
 		for (const [command, decision] of [
-			[`builtin cd "${sibling}" && git add -A`, "deny"],
+			[`builtin cd "${sibling}" && git add -A`, "ask"],
 			// Cwd-changing builtins require an explicit target regardless of wrapper.
-			[`command cd "${sibling}" && git add -A`, "deny"],
-			[`pushd "${sibling}" && git add -A`, "deny"],
-			["popd && git restore tracked.txt", "deny"],
+			[`command cd "${sibling}" && git add -A`, "ask"],
+			[`pushd "${sibling}" && git add -A`, "ask"],
+			["popd && git restore tracked.txt", "ask"],
 		]) {
 			const output = runWrapper(command);
 			assert.notEqual(output, "", command);
@@ -1721,12 +1721,12 @@ describe("main-commit-guard wrapper", () => {
 		}
 	});
 
-	it("tracks env chdir prefixes and fails closed for unresolved forms", () => {
+	it("tracks env chdir prefixes and asks on unsupported forms", () => {
 		for (const [command, decision] of [
 			[`env -C ${repo} git add -A`, "deny"],
 			[`env --chdir=${sibling} git add -A`, "ask"],
-			['WORKTREE=/somewhere; env -C "$WORKTREE" git add -A', "deny"],
-			["env --chdir= git add -A", "deny"],
+			['WORKTREE=/somewhere; env -C "$WORKTREE" git add -A', "ask"],
+			["env --chdir= git add -A", "ask"],
 		]) {
 			const output = runWrapper(command);
 			assert.notEqual(output, "", command);
@@ -1738,7 +1738,7 @@ describe("main-commit-guard wrapper", () => {
 		}
 	});
 
-	it("fails closed when Git environment variables override the target", () => {
+	it("asks when Git environment variables override the target", () => {
 		for (const variable of [
 			"GIT_DIR",
 			"GIT_WORK_TREE",
@@ -1756,14 +1756,14 @@ describe("main-commit-guard wrapper", () => {
 				assert.notEqual(output, "", command);
 				assert.equal(
 					JSON.parse(output).hookSpecificOutput.permissionDecision,
-					"deny",
+					"ask",
 					command,
 				);
 			}
 		}
 	});
 
-	it("fails closed after a shell builtin persists a Git target override", () => {
+	it("asks after a shell builtin persists a Git target override", () => {
 		for (const command of [
 			`export GIT_INDEX_FILE=${join(repo, ".git", "index")}; git add -A`,
 			`export GIT_DIR=${join(repo, ".git")} GIT_WORK_TREE=${repo}; git add -A`,
@@ -1775,7 +1775,7 @@ describe("main-commit-guard wrapper", () => {
 			assert.notEqual(output, "", command);
 			assert.equal(
 				JSON.parse(output).hookSpecificOutput.permissionDecision,
-				"deny",
+				"ask",
 				command,
 			);
 		}
@@ -1786,8 +1786,8 @@ describe("main-commit-guard wrapper", () => {
 
 	it("does not let Git repository-target flags or shell prefixes bypass sibling checks", () => {
 		for (const [command, decision] of [
-			[`git --git-dir=${join(repo, ".git")} add -A`, "deny"],
-			[`git --work-tree=${repo} add -A`, "deny"],
+			[`git --git-dir=${join(repo, ".git")} add -A`, "ask"],
+			[`git --work-tree=${repo} add -A`, "ask"],
 			[`command -- git -C ${sibling} add -A`, "ask"],
 			[`sudo -n git -C ${sibling} add -A`, "ask"],
 			[`>/dev/null git -C ${sibling} add -A`, "ask"],
@@ -1843,7 +1843,7 @@ describe("main-commit-guard wrapper", () => {
 		for (const [command, decision] of [
 			[`sudo -u root git -C ${sibling} add -A`, "ask"],
 			[`sudo --user=root git -C ${sibling} add -A`, "ask"],
-			["sudo -R /jail git add -A", "deny"],
+			["sudo -R /jail git add -A", "ask"],
 			[`time -o /tmp/time-output git -C ${sibling} add -A`, "ask"],
 		]) {
 			const output = runWrapper(command);
@@ -1856,7 +1856,7 @@ describe("main-commit-guard wrapper", () => {
 		}
 	});
 
-	it("fails closed when unknown shell-prefix options may hide guarded Git", () => {
+	it("asks when unknown shell-prefix options may hide guarded Git", () => {
 		for (const command of [
 			`sudo --unknown value git -C ${sibling} add -A`,
 			`time --unknown value git -C ${sibling} add -A`,
@@ -1865,7 +1865,7 @@ describe("main-commit-guard wrapper", () => {
 			assert.notEqual(output, "", command);
 			assert.equal(
 				JSON.parse(output).hookSpecificOutput.permissionDecision,
-				"deny",
+				"ask",
 				command,
 			);
 		}

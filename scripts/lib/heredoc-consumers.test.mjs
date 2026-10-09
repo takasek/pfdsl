@@ -74,7 +74,7 @@ describe("heredoc readers", () => {
 			});
 	for (const template of CODE_OR_UNKNOWN_READERS)
 		for (const delimiter of DELIMITERS)
-			it(`refuses opaque code read by ${template} with ${delimiter}`, () => {
+			it(`asks about opaque code read by ${template} with ${delimiter}`, () => {
 				assert.equal(
 					findOutwardCommand(withBody(template, delimiter, "git push")),
 					"unsupported shell syntax",
@@ -89,7 +89,7 @@ describe("heredoc readers", () => {
 						},
 						{ currentBranch: "main" },
 					).decision,
-					"deny",
+					"ask",
 				);
 			});
 	it("leaves Git after a body some program may run unresolved (split the call)", () => {
@@ -108,10 +108,7 @@ describe("heredoc readers", () => {
 					}),
 				},
 			).output?.hookSpecificOutput?.permissionDecision ?? "allow";
-		assert.equal(
-			decide("python3 - <<'EOF'\nprint(1)\nEOF\ngit add -A"),
-			"deny",
-		);
+		assert.equal(decide("python3 - <<'EOF'\nprint(1)\nEOF\ngit add -A"), "ask");
 		assert.equal(decide("cat > f <<'EOF'\nx\nEOF\ngit add -A"), "allow");
 	});
 	it("trusts gh -F - only where gh itself reads a body", () => {

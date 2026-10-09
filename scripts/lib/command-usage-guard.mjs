@@ -107,9 +107,14 @@ export function usesBodyDroppingView(command) {
  * @param {object} payload PreToolUse hook payload
  * @returns {{decision: "allow"} | {decision: "deny" | "ask", reason: string}}
  */
-export function evaluateCommandUsageGuard(payload) {
+export function evaluateCommandUsageGuard(
+	payload,
+	{ supportsAsk = true } = {},
+) {
 	if (payload?.tool_name !== "Bash") return { decision: "allow" };
-	const failure = shellParseDecision(payload?.tool_input?.command);
+	const failure = shellParseDecision(payload?.tool_input?.command, {
+		supportsAsk,
+	});
 	if (failure) return failure;
 	const command = payload?.tool_input?.command;
 
@@ -145,11 +150,11 @@ export function evaluateCommandUsageGuard(payload) {
  * @param {string} inputText raw stdin payload
  * @returns {{shouldOutput: boolean, output?: object}}
  */
-export function runCommandUsageGuard(inputText) {
+export function runCommandUsageGuard(inputText, { supportsAsk = true } = {}) {
 	const payload = parseHookPayload(inputText);
 	if (!payload) return { shouldOutput: false };
 
-	const result = evaluateCommandUsageGuard(payload);
+	const result = evaluateCommandUsageGuard(payload, { supportsAsk });
 	if (result.decision === "allow") return { shouldOutput: false };
 	return { shouldOutput: true, output: buildPermissionOutput(result) };
 }
