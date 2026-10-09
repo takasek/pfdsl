@@ -12,7 +12,11 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, it } from "node:test";
 
-const shim = readFileSync(new URL("../hooks/pre-commit-shim", import.meta.url));
+// Retain the old protected dispatcher's behavior as migration evidence.
+// Current thin-dispatch and checkout-policy behavior is covered by thin-shim/shared-hooks tests.
+const shim = readFileSync(
+	new URL("./fixtures/pre-commit-shim-protected-812b1475", import.meta.url),
+);
 const fixtures = [];
 
 function fixture(defaultBranch = "main", gateExit = 0) {
@@ -71,7 +75,7 @@ afterEach(() => {
 		rmSync(root, { recursive: true, force: true });
 });
 
-describe("protected pre-commit shim", () => {
+describe("historical protected pre-commit shim (812b1475)", () => {
 	for (const defaultBranch of ["main", "trunk"]) {
 		it(`rejects an actual commit on default branch ${defaultBranch}`, () => {
 			const { git, runGit, gateRan } = fixture(defaultBranch);
