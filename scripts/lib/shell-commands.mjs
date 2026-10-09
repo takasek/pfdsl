@@ -10,10 +10,10 @@ const root = fileURLToPath(new URL("../../", import.meta.url));
 let cachedSource;
 let cachedResult;
 
-/** Literal Git/GitHub CLI names, including Windows executable spelling. */
+/** Literal guarded executables and prefixes, including Windows spelling. */
 export function executableName(value) {
 	const name = basename(value.replaceAll("\\", "/"));
-	return /^(?:git|gh)(?:\.exe)?$/i.test(name)
+	return /^(?:git|gh|env|sudo|nohup)(?:\.exe)?$/i.test(name)
 		? name.toLowerCase().replace(/\.exe$/, "")
 		: name;
 }

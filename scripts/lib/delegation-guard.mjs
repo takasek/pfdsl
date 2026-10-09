@@ -443,7 +443,7 @@ function isGitConfigAssignment(value) {
 }
 
 export function parseEnvPrefix(tokens, start = 0) {
-	if (basename(tokens[start]?.value ?? "") !== "env") return null;
+	if (executableName(tokens[start]?.value ?? "") !== "env") return null;
 	let i = start + 1;
 	let chdir;
 	let malformed = false;
@@ -539,7 +539,7 @@ const SUDO_FLAGS_WITH_VALUE = new Set([
 const TIME_FLAGS_WITH_VALUE = new Set(["-o", "--output", "-f", "--format"]);
 
 function parseSudoPrefix(tokens, start) {
-	if (basename(tokens[start]?.value ?? "") !== "sudo") return null;
+	if (executableName(tokens[start]?.value ?? "") !== "sudo") return null;
 	let i = start + 1;
 	let unresolved = false;
 	while (i < tokens.length) {
@@ -681,7 +681,7 @@ export function parseLeadingShellPrefix(tokens) {
 	const envs = [];
 	while (i < tokens.length) {
 		const value = tokens[i].value;
-		const executable = basename(value);
+		const executable = executableName(value);
 		if (["noglob", "nocorrect"].includes(value) && !tokens[i].quoted) {
 			i++;
 			continue;

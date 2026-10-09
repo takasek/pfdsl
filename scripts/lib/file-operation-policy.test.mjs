@@ -8,7 +8,7 @@ import {
 	writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, win32 } from "node:path";
 import { after, test } from "node:test";
 import {
 	evaluatePhysicalWrites,
@@ -273,4 +273,37 @@ test("patch changes retain before/after text for roadmap detection", () => {
 	);
 	assert.equal(op.tool_input.old_string, "publish_old:\nold");
 	assert.equal(op.tool_input.new_string, "publish_old:\nnew\npublish_new:");
+});
+
+test("Windows file targets retain drive and UNC roots with native components", () => {
+	const cwd = "Z:\\pfdsl-virtual-fixture\\repo";
+	const fsApi = {
+		lstatSync: () => {
+			throw Object.assign(new Error("Absent fixture component"), {
+				code: "ENOENT",
+			});
+		},
+		realpathSync: () =>
+			assert.fail("Virtual fixture has no existing components"),
+	};
+	for (const [target, expected] of [
+		[
+			"Z:\\pfdsl-virtual-fixture\\repo\\file.txt",
+			"Z:\\pfdsl-virtual-fixture\\repo\\file.txt",
+		],
+		[
+			"Z:/pfdsl-virtual-fixture/repo/file.txt",
+			"Z:\\pfdsl-virtual-fixture\\repo\\file.txt",
+		],
+		["folder\\..\\file.txt", "Z:\\pfdsl-virtual-fixture\\repo\\file.txt"],
+		[
+			"\\\\pfdsl-virtual-server\\share\\repo\\file.txt",
+			"\\\\pfdsl-virtual-server\\share\\repo\\file.txt",
+		],
+	]) {
+		assert.equal(
+			resolvePhysicalPath(target, cwd, { pathApi: win32, fsApi }),
+			expected,
+		);
+	}
 });

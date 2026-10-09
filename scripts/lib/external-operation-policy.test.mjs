@@ -374,3 +374,27 @@ test("Claude may ask about merge and keeps its named publisher exception", () =>
 		"allow",
 	);
 });
+
+test("Windows executable prefixes expose protected inner commands and normal reads", () => {
+	for (const command of [
+		"env.exe git.exe update-ref refs/heads/main HEAD",
+		"ENV.EXE gh.exe pr merge 123",
+		'"C:/Program Files/Git/usr/bin/env.exe" gh.exe pr merge 123',
+		"sudo.exe git.exe update-ref refs/heads/main HEAD",
+	])
+		assert.equal(
+			evaluate("Bash", { command }, "worker").decision,
+			"deny",
+			command,
+		);
+	assert.equal(
+		evaluate("Bash", { command: "env.exe gh.exe pr merge 123" }).decision,
+		"deny",
+	);
+	for (const command of ["env.exe git.exe status", "ENV.EXE gh.exe issue ls"])
+		assert.equal(
+			evaluate("Bash", { command }, "worker").decision,
+			"allow",
+			command,
+		);
+});

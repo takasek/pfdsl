@@ -1,5 +1,5 @@
 import { lstatSync, realpathSync } from "node:fs";
-import { dirname, isAbsolute, join } from "node:path";
+import nativePath, { dirname, join, sep } from "node:path";
 import { refineNativeWorktreeRelation } from "./native-worktree-owner.mjs";
 import { resolveGitRoots } from "./run-exec.mjs";
 
@@ -7,15 +7,22 @@ import { resolveGitRoots } from "./run-exec.mjs";
 export function resolvePhysicalPath(
 	path,
 	cwd,
-	{ followFinalSymlink = true } = {},
+	{
+		followFinalSymlink = true,
+		pathApi = nativePath,
+		fsApi = { lstatSync, realpathSync },
+	} = {},
 ) {
+	const { isAbsolute, dirname, join, parse, sep } = pathApi;
 	if (typeof path !== "string" || !path || path.includes("\0"))
 		throw new Error("Cannot resolve file target");
 	if (!isAbsolute(path) && (typeof cwd !== "string" || !isAbsolute(cwd)))
 		throw new Error("Relative file target has no absolute cwd");
-	const absolute = isAbsolute(path) ? path : `${cwd}/${path}`;
-	let current = "/";
-	const parts = absolute.split("/");
+	const absolute = isAbsolute(path) ? path : `${cwd}${sep}${path}`;
+	let current = parse(absolute).root;
+	const parts = absolute
+		.slice(current.length)
+		.split(sep === "\\" ? /[\\/]/ : "/");
 	for (let index = 0; index < parts.length; index++) {
 		const part = parts[index];
 		if (!part || part === ".") continue;
@@ -26,14 +33,14 @@ export function resolvePhysicalPath(
 		const next = join(current, part);
 		if (!followFinalSymlink && index === parts.length - 1) return next;
 		try {
-			lstatSync(next);
+			fsApi.lstatSync(next);
 		} catch (error) {
 			if (error.code !== "ENOENT") throw error;
 			current = next;
 			continue;
 		}
 		// A dangling symlink is not an absent new file: realpath must fail.
-		current = realpathSync(next);
+		current = fsApi.realpathSync(next);
 	}
 	return current;
 }
@@ -133,7 +140,8 @@ function existingParent(path) {
 	}
 }
 
-const isUnder = (path, root) => path === root || path.startsWith(`${root}/`);
+const isUnder = (path, root) =>
+	path === root || path.startsWith(`${root}${sep}`);
 
 function hasRepositoryMarker(path) {
 	for (let current = path; ; current = dirname(current)) {
