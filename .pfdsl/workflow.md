@@ -376,6 +376,9 @@ worktree 作成から PR 作成までを一気通貫でやらせる場合のみ 
 ## Codex の policy 境界と段階的な受入（#1404）
 
 最終方式の実装案・旧判断から変える範囲・対案・受入限界は [ADR-0047](../docs/adr/0047-codex-policy-boundaries.md) に記録する。
+追加の保護・試験・簡素化は、同 ADR の「簡素化を判断する基準と今後の候補」に従い、通常作業での発生可能性と保守負担で判断する。
+親 gh、rebase、help、直積試験の縮小や追加機構は未採用の候補として #1404 から追跡し、今回の PR の受入へ追加しない。
+汎用化と Jev 連携は今回の範囲に含めない。
 main-commit、delegation、verification-tree、closes-create、worktree-write、generated-root-instructions、roadmap-publish の既存入口を保持し、短い bootstrap から共通の `scripts/lib/policy-supervisor.mjs` を読み込む。
 同じ process 内の worker thread で policy/helper を動的 import し、監督の欠落・構文エラーは各入口で拒否する。
 stdin を含む内部 deadline は 5 秒、payload は 1 MiB、応答と診断は各 64 KiB、Git probe は合計 3 秒・一回最大 500 ms とする。
@@ -388,6 +391,7 @@ bootstrap 自身の欠落・構文エラー、共通監督の初期化中の同�
 共有 Git 効果、親の merge/auto-merge、GitHub MCP、子の Git metadata 変更、全 file target の物理パスをそれぞれ確認する。
 Codex の linked checkout は cwd と一致しても操作時の native owner 証拠を要求し、main/default・検査回避・共有作用先の拒否を免除しない。
 Edit/Write と apply_patch の追加・削除・移動元/先を全件調べ、primary・別 owner・解決不能 target・dangling symlink を保護する。
+Codex の matcher は `Edit|Write|apply_patch` とし、raw tool 名の配線と入口の拒否・通常通過を回帰検査する。
 GitHub MCP は既知の読取を許可し、Codex では親を含め変更系・未知の操作を拒否する。
 親の通常の Bash 公開経路は残す。
 roadmap の公開宣言は Claude ask を維持し、Codex は additionalContext による advisory とする。
@@ -395,7 +399,8 @@ Codex の公開宣言を事前拒否したという保証を持たず、通常�
 
 pre-commit が走らない ref 操作を #1403 の commit 拒否で覆ったとは扱わない。
 verification-tree・closes-create は代替による事前保護の受入がないため残す。
-SessionStart は #1403 の setup・版付き shim・preflight に接続したまま残す。
+SessionStart は #1403・#1415 の setup・薄い共有 shim・preflight に接続したまま残す。
+共有 shim と checkout の判定の責務・旧版の保証外は本書「worktree でのサイクル実行」に従う。
 個人 wrapper・trusted roots を repo fixture の前提にしない。
 
 同梱 Codex CLI 0.160.0 の実入口で通常読取と merge の help を確認し、親の merge、default ref 更新、primary への no-op apply_patch は hook が下流実行前に拒否した。
@@ -404,6 +409,8 @@ SessionStart は #1403 の setup・版付き shim・preflight に接続したま
 一時的な helper 欠落時は通常読取も拒否され、元の helper の復元後は同じ読取が exit 0 に回復した。
 hooks/list の sourcePath は primary の .codex/hooks.json で、新しい MCP matcher の実配線は未受入である。
 これは追加 matcher を最終設定から読み込んだ実入口で、読取の通過と変更の拒否を確認する項目である。
+明示した file matcher についても、正式な読込み後の raw apply_patch で primary・別 owner の拒否と通常書込みの通過を確認する。
+設定選択と Node 入口の回帰試験を、この live 受入へ格上げしない。
 Codex Desktop の親の実 add/commit は下記の native 所有者の記録で確認済みであり、未確認へ戻さない。
 Node 入口の再生・失敗注入、CLI の実操作、Desktop の実操作は別の根拠として扱う。
 

@@ -13,6 +13,26 @@ policy のロード失敗への try/catch だけでは、同期停止や終わ�
 
 ## Decision
 
+### 簡素化を判断する基準と今後の候補
+
+目的は通常の agent の操作先・責務の取り違えを防ぐことであり、悪意のある回避や shell・Git の全構文の論理的な網羅を目指さない。
+追加する保護と試験は、具体的な作業での発生可能性、失う保護、通常動線の停止と回復方法、保守負担で判断する。
+実利用頻度は未計測であり、fixture の件数・組合せや行数を頻度・安全性・総費用の証拠にしない。
+mvdan/sh と Git 自身へ委ねる構文・宛先解決、明示 target、共通監督を今回の実装範囲とし、独自の状態解釈を再導入しない。
+
+Astra の方針レビューが挙げた次の候補は、採用済みの判定変更や PR #1413 の追加完了条件ではない。
+現行挙動は後続の各節に記録し、進行状況は [#1404](https://github.com/takasek/pfdsl/issues/1404) を入口にする。
+
+- 親 gh の全 builtin command 表による拒否を縮小し、直接の merge 保護を残す案。子の既知読取表・未知操作拒否とは分け、通常の help と CLI 更新時の停止を評価する（[#1418](https://github.com/takasek/pfdsl/issues/1418)）。
+- 通常の remote・local path への push と共有 ref 保護は維持する。稀な transport 表記は通常表記への書換えを境界とし、Git の URL 互換性を独自に広げない。
+- rebase の update-refs 打消しまで解釈する保証を縮小する案。値位置の区別と通常 rebase の通過を確認してから判断する。
+- merge の help は通常の調査動線を残し、複雑な flag 列全般の免除や command 別 flag 表の追加費用を再評価する（[#1421](https://github.com/takasek/pfdsl/issues/1421)）。
+- parser の接続部分と実際の修正に対応する回帰試験を維持し、同じ構造を繰り返す直積の軸は代表ケースへ縮約する候補とする。
+
+reference-transaction hook の実証（[#1417](https://github.com/takasek/pfdsl/issues/1417)）と形式モデル（[#1422](https://github.com/takasek/pfdsl/issues/1422)）も、適用範囲・通常操作への影響・保守費用を評価する将来課題であり、網羅性を理由に必須機構へ追加しない。
+notes/replace（[#1419](https://github.com/takasek/pfdsl/issues/1419)）、設定注入の残余（[#1420](https://github.com/takasek/pfdsl/issues/1420)）、読取族のファイル出力（[#1423](https://github.com/takasek/pfdsl/issues/1423)）は個別の境界判断として追跡する。
+汎用ツールへの切出しと Jev 連携は将来構想とし、今回の PR には含めない。
+
 ### Shell 解析の範囲
 
 命令の構造・引用・命令置換・heredoc は、固定版 mvdan/sh v3.14.1 の公式 shfmt が返す構文木で解析する。
@@ -166,9 +186,11 @@ Codex では roadmap の公開宣言を事前拒否する保証を持たず、�
 
 dispatch の本数は受入条件にしない。
 既存入口は保持し、delegation を Bash と GitHub MCP の共通 matcher に配線する。
-Edit/Write matcher は Codex の apply_patch alias で実行される。
+Codex の file matcher は `Edit|Write|apply_patch` とし、3つの既存書込み guard を raw の apply_patch 名にも明示して配線する。
+先行 CLI の apply_patch 拒否は当時の alias 配線による実操作の証拠として保持し、最終設定の正式な読込みとは区別する。
 verification-tree と closes-create は、preflight/CI だけで失う事前保護を受入していないため残す。
-SessionStart setup は PR #1412 の版付き shim と preflight に接続したまま残す。
+SessionStart setup は PR #1412 に統合された #1415 / PR #1416 の薄い共有 shim と preflight に接続したまま残す。
+default branch 判定は checkout の HEAD に記録された guard が持ち、共有 shim の版互換判定・旧版の自動修復は提供しない。
 個人 wrapper の撤去や trusted-root 拡張をこの実装の条件にしない。
 
 ## 対案
@@ -209,6 +231,8 @@ hooks/list は候補 worktree を cwd にしても primary の .codex/hooks.json
 既存の Bash/Edit 入口は候補コードを実行したが、新しい MCP matcher はその定義にない。
 Codex Desktop の native managed worktree では、親の実 add/commit と clean を確認済みであり、workflow companion に記録している。
 今回追加した MCP matcher は、最終設定を正式に読み込んだ Codex の実入口で、読取の通過と変更の拒否を確認する受入が残る。
+明示した file matcher も、最終設定の正式な読込み後に raw apply_patch で primary・別 owner の拒否と通常の書込み通過を確認する受入が残る。
+設定を選択して Node 入口を実行する回帰試験は、この live 受入の証拠にしない。
 Claude 側は、最終 hook を接続した Desktop の親・subagent の実 Git と、他セッションの worktree・cd 後の陰性経路が未確認である。
 別生存 owner、移動先に留まる cd、再開・fork・handoff、native 隔離へ委ねる場合の陰性対照は #1398 全体の受入として残る。
 Node 入口の失敗注入・再生をこれらの live 受入へ格上げしない。
