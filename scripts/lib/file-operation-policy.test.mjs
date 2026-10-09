@@ -58,6 +58,17 @@ const roots = {
 	mainRoot: main,
 	commonDir: join(main, ".git"),
 };
+
+test("patch header whitespace resolves the same symlink target as apply_patch", () => {
+	assert.equal(
+		evaluatePhysicalWrites(
+			patch("*** Update File: instructions \n@@\n-generated\n+changed"),
+			roots,
+			io,
+		).decision,
+		"deny",
+	);
+});
 const io = {
 	resolveRoots: (path) =>
 		path.startsWith(main)

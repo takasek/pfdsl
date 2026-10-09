@@ -65,7 +65,8 @@ export function normalizeFileOperations(
 	for (let i = 0; i < lines.length; ) {
 		const header = lines[i++].match(/^\*\*\* (Add|Update|Delete) File: (.+)$/);
 		if (!header) throw new Error("Unsupported apply_patch file directive");
-		const [, kind, path] = header;
+		const [, kind, rawPath] = header;
+		const path = rawPath.trim();
 		if (kind === "Delete") {
 			operations.push(
 				operation("Edit", path, { old_string: "", new_string: "" }, false),
@@ -74,7 +75,7 @@ export function normalizeFileOperations(
 		}
 		let destination = path;
 		const moved = kind === "Update" && lines[i]?.startsWith("*** Move to: ");
-		if (moved) destination = lines[i++].slice("*** Move to: ".length);
+		if (moved) destination = lines[i++].slice("*** Move to: ".length).trim();
 		const before = [],
 			after = [];
 		let hunk = kind === "Add";
