@@ -291,11 +291,15 @@ macOS IME・shortcut・新しい実機 GUI、Linux 正式配布、他 distro は
 過去の `c42367f8` の WebKit 不足と `07f541ff` の GLES 不足は別試行として保持する。
 後続の記録更新だけで PR HEAD が進んでも、native 検収済みの source / artifact は `8261f877` のままとする。
 
-### 次の native cue 検証へ渡す描画候補
+### 151d393 の通常 native cue 検証
 
 追加 A/B/C 診断の後、[共有 preview の描画候補](evidence/2026-10-07-linux-appimage/remaining-checks/cue-candidate.md)として、SVG の兄弟に一時的な HTML outline を表示する。
 元 SVG の色・点線・ラベルと minimap を保持し、既存 transform と対象切替・1500ms 解除・render/dispose の解除経路を使う。
-共有 editor の237件と座標・保持・解除の自動検査は成功しているが、新しい通常 AppImage の可視 cue・clipping・実効 reduced motion は dot の後続検証で確認する。
+共有 editor の237件と座標・保持・解除の自動検査に続き、2026-10-08 UTC、dot が固定 source `151d39345c6945c3fe11a75f558068d011cbe197` の通常 AppImage を実操作した。
+[新版の受入記録](evidence/2026-10-07-linux-appimage/remaining-checks/production-151d393/README.md)の30項目は26成功・3未確認・1阻害点あり。
+native I1284-014〜017、Fit / 100% / zoom / pan / 端付近 / 長い label / 既存色・点線の保持と限定した VS Code 操作は成功し、別枠の native corpus も23/23成功した。
+両 GUI の実効 reduced-motion と native の個別 document dispose は未確認のまま。
+正規の設定サービス経路に届かず設定変更は0件で、設定9比較・payload・原本の保持とアプリの正常終了を確認した。
 固定8261の原集計202成功・旧失敗3・未確認7・対象外187は更新せず、新しい source / artifact の判定を別記録にする。
 
 ### PR 前のローカル検査

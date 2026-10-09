@@ -27,7 +27,15 @@ Regression tests failed before implementation because the HTML decoration was ab
 The shared editor's 237 tests pass; they cover coordinate conversion at 100% and 50%, original SVG attributes, minimap isolation, zoom, replacement, redraw, disposal and the 1499/1500ms boundary.
 These are DOM/lifecycle checks, not proof of native painting or OS settings propagation.
 
-## Next verification
+## Production verification result
+
+The [fixed-source production record](production-151d393/README.md) reports dot's normal AppImage verification of `151d39345c6945c3fe11a75f558068d011cbe197` on 2026-10-08 UTC.
+Its separate 30-condition checklist has 26 passes, 3 unverified conditions and 1 blocked environment prerequisite.
+Native I1284-014 through I1284-017, tested geometry/style/editing regressions and limited VS Code actions passed; the separate native corpus passed 23/23.
+Effective reduced motion in both GUIs and normal per-document native disposal remain unverified.
+The fixed `8261f877` matrix is unchanged.
+
+## Verification boundaries
 
 Use a new normal production AppImage built from the candidate's exact source commit, with repository/run/artifact/manifest/frontend identity verified again.
 Do not use an Inspector build or mutate product DOM/styles to stand in for acceptance.
@@ -42,6 +50,7 @@ Also establish a normal read-only way to inspect the target production webview's
 If that production query is unavailable, keep its condition unverified, restore any temporary change and continue the independent cue checks; an old diagnostic binary's value does not prove this production binary's preference.
 Do not repeat the paused Inspector/Trusted Types diagnosis as part of this cue acceptance.
 
-An attempted independent local browser scenario could not start because no browser surface was connected to the automation API.
-Real GUI verification, clipping and effective reduced motion therefore remain pending with dot.
+Before the dot run, an attempted independent local browser scenario could not start because no browser surface was connected to the automation API.
+Dot subsequently supplied normal GUI cue and geometry evidence; the parent and independent reviewer inspect that evidence rather than rerunning the Linux GUI.
+Effective reduced motion still awaits the supported desktop setting and production-query prerequisites.
 The existing same-process document-disposal cell also remains unverified unless a normal UI path is available; a whole-process restart is not that proof.
