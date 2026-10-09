@@ -158,6 +158,19 @@ function isVerificationSegment(segment) {
 	const head = tokens[0];
 	if (head.dynamic) return false;
 	const rest = tokens.slice(1);
+	if (
+		["make", "pnpm", "npm", "npx", "node"].includes(head.value) &&
+		rest.length === 1 &&
+		!rest[0].dynamic &&
+		["--help", "--version"].includes(rest[0].value)
+	)
+		return false;
+	if (
+		head.value === "npm" &&
+		rest[0]?.value === "help" &&
+		rest.every((token) => !token.dynamic && !token.value.startsWith("-"))
+	)
+		return false;
 
 	if (head.value === "make") return isVerificationMake(rest);
 	if (head.value === "node") return isVerificationNode(rest);

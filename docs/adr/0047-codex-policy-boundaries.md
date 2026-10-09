@@ -20,7 +20,18 @@ policy のロード失敗への try/catch だけでは、同期停止や終わ�
 実利用頻度は未計測であり、fixture の件数・組合せや行数を頻度・安全性・総費用の証拠にしない。
 mvdan/sh と Git 自身へ委ねる構文・宛先解決、明示 target、共通監督を今回の実装範囲とし、独自の状態解釈を再導入しない。
 
-Astra の方針レビューが挙げた次の候補は、採用済みの判定変更や PR #1413 の追加完了条件ではない。
+Astra と過剰制約を再評価し、通常操作の誤拒否だけを有限の修正束として採用した。
+PR #1413 は、既知の gh 読取別名と version、単独の検査コマンドの version/help、REST merge status の GET、既存の本文・出力規約を help 表示へ適用する誤拒否を修正する。
+既存の builtin 別名・help・HTTP method 判定を共有し、未知の命令は Claude で全体を ask、Codex で deny とする境界を維持する。
+検査スクリプトへの `--help` の転送は、単独の診断表示と同一視しない。
+受入は報告された通常例の通過と近い保護対象の停止で確認し、直積試験や全構文対応を追加しない。
+
+ユーザー共通の publication guard は別管理であり、PR #1413 に配布しない。
+検査可能な送信内容の scanner 再利用、sender の重複検査、percent 表記と確認済み SVG の過剰制限をローカルで修正する。
+metadata 操作か本文投稿かだけで拒否せず、未知の入力には実際に利用できる通常 gh または対応 sender の回復経路を示す。
+内容検査は外部書込みの承認や、この repository の責務・merge 保護を代替しない。
+
+次の候補は今回の採用済み判定変更や追加完了条件ではない。
 現行挙動は後続の各節に記録し、進行状況は [#1404](https://github.com/takasek/pfdsl/issues/1404) を入口にする。
 
 - 親 gh の全 builtin command 表による拒否を縮小し、直接の merge 保護を残す案。子の既知読取表・未知操作拒否とは分け、通常の help と CLI 更新時の停止を評価する（[#1418](https://github.com/takasek/pfdsl/issues/1418)）。
@@ -124,7 +135,9 @@ fetch/pull の動的refspec、push の動的repository・refspec、branch/switch
 読取以外の `git config` は、共有の設定ファイルを書き換えるため共有作用とする。
 `--global`・`--system`・`--file` / `-f` を使う書込みは、設定keyとtarget repositoryを問わず拒否する。
 別repositoryのローカル設定への書込みと、外部スコープの設定読取は維持し、明示fileの所在は解析しない。
-`-c`・`--config-env`・可視の `GIT_CONFIG_*` 代入（同じ command 行の前の文での export を含む）は実行中の Git 呼出しの作用先を変える入力であり、無害に見える key も `include.path` で任意の設定を読み込めるため、読取以外の呼出しに付けば共有作用とする。
+`-c`・`--config-env`・可視の `GIT_CONFIG_*` 代入（同じ command 行の前の文での export を含む）が読取以外の呼出しに付けば共有作用とする。
+これは key ごとの影響を分類しない保守的な制限であり、literal な色設定 key 自体が `include.path` に変わるという説明ではない。
+無害な key の例外表は今回追加せず、この制限の縮小は通常操作の停止と保守費用を踏まえた後続判断とする。
 grep・blame 等の読取に付いた設定注入は共有作用としない。
 Git の parse-options は long option の一意な接頭辞を受け付けるので、危険な option の接頭辞はその option として扱い、読取判定には完全一致を要求する。
 branch は Git と同じく list mode を判定し、`-v`・`--format`・`--sort` だけでは一覧にならず作成になる形を区別し、作成形に未知の option が伴えば共有作用とする。
@@ -159,7 +172,8 @@ Codex の hook.agent_id がある子には、Git metadata 変更と外向き書�
 test・build・typecheck は Codex の rule で事前に許可され、build が共有 hook shim を配置するため、子が自分の sandbox で `make` を実行する場合より広い作用を持ちうる。
 Claude の issue-worker 例外を Codex の子へ引き継がない。
 
-親を含め gh pr merge・auto-merge、REST の merge endpoint、GraphQL の merge mutation を保護する。
+親を含め gh pr merge・auto-merge、REST の merge endpoint の変更 method、GraphQL の merge mutation を保護する。
+REST の GET は merge 状態の読取として維持し、method を確定できない option 列は読取免除にしない。
 gh の built-in namespace と command 名の小さな表を共有 preflight で確認し、設定 alias・extension 名・未対応名は親子ともClaudeでask、Codexで拒否とする。
 `gh land`・`gh pr land`・`gh repo autolink land` 等は展開せず停止し、検査できる明示的な built-in command を案内する。
 GitHub CLI は既存 built-in の上書きと実行可能な command の下への alias 登録を認めないため、既知 leaf に続く通常の引数は維持する。

@@ -18,7 +18,11 @@
 // human should make in the moment, not a hard stop with no path through.
 
 import { hasExemptionDeclaration } from "./closes-reference.mjs";
-import { shellParseDecision, stripLeadingNoise } from "./delegation-guard.mjs";
+import {
+	hasHelpOption,
+	shellParseDecision,
+	stripLeadingNoise,
+} from "./delegation-guard.mjs";
 import { flagValues, parseGhCommand } from "./gh-command.mjs";
 import { buildPermissionOutput, parseHookPayload } from "./hook-io.mjs";
 import { readShellCommands } from "./shell-commands.mjs";
@@ -82,6 +86,7 @@ export function evaluateClosesCreateGuard(
 	for (const { tokens: raw } of readShellCommands(command)) {
 		const tokens = stripLeadingNoise(raw);
 		const parsed = parseGhCommand(tokens);
+		if (parsed && hasHelpOption(parsed)) continue;
 		if (!parsed || parsed.group !== "pr" || parsed.verb !== "create") continue;
 
 		const bodyText = resolveBodyText(parsed.args, readFile);

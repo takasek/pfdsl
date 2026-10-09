@@ -12,6 +12,36 @@ const evaluate = (name, input = {}, agent = null) =>
 		{ supportsAsk: false },
 	);
 
+test("REST merge status GET remains a read for parent and child", () => {
+	for (const agent of [null, "worker"]) {
+		for (const command of [
+			"gh api repos/o/r/pulls/1/merge",
+			"gh api -X GET repos/o/r/pulls/1/merge",
+		]) {
+			assert.equal(
+				evaluate("Bash", { command }, agent).decision,
+				"allow",
+				command,
+			);
+		}
+	}
+});
+
+test("an unresolved API option cluster does not exempt a merge", () => {
+	assert.equal(
+		evaluate("Bash", { command: "gh api repos/o/r/pulls/1/merge -iX PUT" })
+			.decision,
+		"deny",
+	);
+});
+
+test("a known API value flag accepts its attached short value", () => {
+	assert.equal(
+		evaluate("Bash", { command: "gh api user -q.login" }, "worker").decision,
+		"allow",
+	);
+});
+
 for (const command of [
 	"gh pr merge 1413",
 	"gh -R takasek/pfdsl pr merge 1413 --auto",

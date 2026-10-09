@@ -29,7 +29,11 @@
 // nothing else — and unlike C there is no case where dropping the body silently
 // is what was wanted.
 
-import { shellParseDecision, stripLeadingNoise } from "./delegation-guard.mjs";
+import {
+	hasHelpOption,
+	shellParseDecision,
+	stripLeadingNoise,
+} from "./delegation-guard.mjs";
 import { parseGhCommand } from "./gh-command.mjs";
 import { buildPermissionOutput, parseHookPayload } from "./hook-io.mjs";
 import { readShellCommands } from "./shell-commands.mjs";
@@ -90,6 +94,7 @@ export function usesBodyDroppingView(command) {
 
 	for (const tokens of commandSegments(command)) {
 		const parsed = parseGhCommand(tokens);
+		if (parsed && hasHelpOption(parsed)) continue;
 		if (!parsed || !VIEW_GROUPS.has(parsed.group) || parsed.verb !== "view")
 			continue;
 		if (!parsed.args.includes("--comments")) continue;

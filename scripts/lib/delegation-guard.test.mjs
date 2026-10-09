@@ -30,6 +30,16 @@ function payload({
 }
 
 describe("tokenize", () => {
+	it("allows built-in read aliases and version for a child", () => {
+		for (const command of ["gh issue ls", "gh ext ls", "gh version"]) {
+			assert.equal(
+				evaluateDelegationGuard(payload({ agentType: "worker", command }))
+					.decision,
+				"allow",
+				command,
+			);
+		}
+	});
 	it("retains the type of a wholly quoted token without changing quoted", () => {
 		const [single, double] = tokenize("'$SIBLING' \"$SIBLING\"");
 		assert.deepEqual(single, {

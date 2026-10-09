@@ -130,9 +130,14 @@ export function ghCommandSelectorTokens(tokens) {
 export function parseGhCommand(tokens) {
 	const selectors = ghCommandSelectorTokens(tokens);
 	if (!selectors) return null;
+	const group = GH_GROUP_ALIASES[selectors[0].value] ?? selectors[0].value;
+	const verb = selectors[1]?.value ?? null;
 	return {
-		group: selectors[0].value,
-		verb: selectors[1]?.value ?? null,
+		group,
+		verb:
+			verb === "ls" && GH_BUILTIN_CHILDREN.get(group)?.has("ls")
+				? "list"
+				: verb,
 		args: tokens.slice(1).map((token) => token.value),
 	};
 }

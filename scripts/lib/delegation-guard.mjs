@@ -26,6 +26,7 @@
 import { basename } from "node:path";
 import {
 	findMergeCommand,
+	ghApiMethod,
 	githubToolEffect,
 	mergeDecision,
 } from "./external-operation-policy.mjs";
@@ -81,6 +82,7 @@ const BUILTIN_GH_GROUPS = new Set([
 	"completion",
 ]);
 const GH_BOOLEAN_FLAGS = new Set([
+	"--comments",
 	"--draft",
 	"--fill",
 	"--fill-first",
@@ -268,7 +270,7 @@ const GH_COMMAND_HELP_FLAGS = {
 	},
 };
 
-function hasHelpOption(parsed) {
+export function hasHelpOption(parsed) {
 	if (!BUILTIN_GH_GROUPS.has(parsed.group)) return false;
 	// `extension exec` forwards the remaining argv to arbitrary extension code.
 	if (parsed.group === "extension" && parsed.verb === "exec") return false;
@@ -794,30 +796,6 @@ export function gitSubcommand(tokens) {
 	return index === null ? null : tokens[index].value;
 }
 
-function ghApiMethod(args) {
-	let method = null;
-	let input = false;
-	for (let i = 0; i < args.length; i++) {
-		const arg = args[i];
-		if (arg === "--") break;
-		const flag = arg.split("=", 1)[0];
-		if (["-X", "--method"].includes(flag)) {
-			method = arg.includes("=") ? arg.slice(flag.length + 1) : args[++i];
-			if (method === undefined) return "UNKNOWN";
-			continue;
-		}
-		if (/^-X.+/.test(arg)) {
-			method = arg.slice(2);
-			continue;
-		}
-		input ||=
-			["-f", "-F", "--raw-field", "--field", "--input"].includes(flag) ||
-			/^-[fF].+/.test(arg);
-		if (GH_VALUE_FLAGS.has(arg)) i++;
-	}
-	return method ?? (input ? "POST" : "GET");
-}
-
 /**
  * Return a short label for the outward-facing command found in `command`, or
  * null when nothing in it publishes anything.
@@ -857,7 +835,7 @@ export function findOutwardCommand(command) {
 				return "gh";
 			}
 			if (hasHelpOption(parsed) || parsed.group === "help") continue;
-			if (parsed.group === "browse") continue;
+			if (["browse", "version"].includes(parsed.group)) continue;
 			if (parsed.group === "api") {
 				const method = ghApiMethod(parsed.args);
 				if (method.toUpperCase() !== "GET")

@@ -149,6 +149,45 @@ const GH_MERGE_HELP_FLAGS = {
 	},
 };
 
+export function ghApiMethod(args) {
+	let method = null;
+	let input = false;
+	for (let i = 0; i < args.length; i++) {
+		const arg = args[i];
+		if (arg === "--") break;
+		const flag = arg.split("=", 1)[0];
+		if (["-X", "--method"].includes(flag)) {
+			method = arg.includes("=") ? arg.slice(flag.length + 1) : args[++i];
+			if (method === undefined) return "UNKNOWN";
+			continue;
+		}
+		if (/^-X.+/.test(arg)) {
+			method = arg.slice(2);
+			continue;
+		}
+		input ||=
+			["-f", "-F", "--raw-field", "--field", "--input"].includes(flag) ||
+			/^-[fF].+/.test(arg);
+		if (
+			GH_MERGE_HELP_FLAGS.api.values.includes(arg) ||
+			GLOBAL_FLAGS_WITH_VALUE.has(arg)
+		)
+			i++;
+		else if (
+			arg.startsWith("-") &&
+			!(
+				/^-[^-].+/.test(arg) &&
+				(GH_MERGE_HELP_FLAGS.api.values.includes(arg.slice(0, 2)) ||
+					GLOBAL_FLAGS_WITH_VALUE.has(arg.slice(0, 2)))
+			) &&
+			!GH_MERGE_HELP_FLAGS.api.values.includes(flag) &&
+			!GH_MERGE_HELP_FLAGS.api.booleans.includes(flag)
+		)
+			return "UNKNOWN";
+	}
+	return method ?? (input ? "POST" : "GET");
+}
+
 /**
  * Whether gh would print usage for `args` instead of running the command:
  * `--help` counts only as a standalone flag, reached while every earlier token
@@ -210,7 +249,8 @@ export function findMergeCommand(
 		if (
 			parsed.args.some((arg) =>
 				/(?:^|\/)pulls\/[^/]+\/merge(?:$|[?#])/.test(arg),
-			)
+			) &&
+			ghApiMethod(parsed.args).toUpperCase() !== "GET"
 		)
 			return "gh api pull request merge";
 		if (parsed.args.includes("graphql")) {
