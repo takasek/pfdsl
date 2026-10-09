@@ -22,7 +22,8 @@ mvdan/sh と Git 自身へ委ねる構文・宛先解決、明示 target、共�
 
 Astra と過剰制約を再評価し、通常操作の誤拒否だけを有限の修正束として採用した。
 PR #1413 は、既知の gh 読取別名と version、単独の検査コマンドの version/help、REST merge status の GET、既存の本文・出力規約を help 表示へ適用する誤拒否を修正する。
-既存の builtin 別名・help・HTTP method 判定を共有し、未知の命令は Claude で全体を ask、Codex で deny とする境界を維持する。
+既存の builtin 別名・help・HTTP method 判定を共有し、対応する入力の実行名・selector・作用先が確定しない場合と、未対応の gh command 名は Claude で全体を ask、Codex で deny とする。
+Git alias 内部は「所有者と作用先」に記す解析対象の境界であり、親の共有作用分類では literal な未分類 Git verb を一律停止する規則は設けない。
 検査スクリプトへの `--help` の転送は、単独の診断表示と同一視しない。
 受入は報告された通常例の通過と近い保護対象の停止で確認し、直積試験や全構文対応を追加しない。
 
