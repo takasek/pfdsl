@@ -299,6 +299,8 @@ export function isReadOnlyGitConfig(args) {
 				"--get-all",
 				"--get-regexp",
 				"--get-urlmatch",
+				"--get-color",
+				"--get-colorbool",
 				"--list",
 				"-l",
 			].includes(arg)

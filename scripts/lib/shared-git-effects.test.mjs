@@ -390,6 +390,8 @@ for (const command of [
 	"git pull origin main:refs/remotes/origin/main",
 	"git fetch -f origin topic",
 	"git config --get user.name",
+	"git config --get-color color.branch.current",
+	"git config --get-colorbool color.branch.current false",
 	"git config user.name",
 	"git config --list",
 	"git config get user.name",
