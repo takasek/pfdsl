@@ -21,10 +21,13 @@ jobs:
         trial: [1, 2, 3]
     env:
       SOURCE_SHA: 526e17c070bb1447ebf3f74192db2fef391b60a8
-      PFDSL_EVIDENCE_DIR: ${{ runner.temp }}/issue1424-evidence
-      PFDSL_DIAG_LOG: ${{ runner.temp }}/issue1424-evidence/api.jsonl
-      PFDSL_DOM_LOG: ${{ runner.temp }}/issue1424-evidence/dom.json
     steps:
+      - name: Initialize evidence paths on the runner
+        run: |
+          mkdir -p "$RUNNER_TEMP/issue1424-evidence"
+          echo "PFDSL_EVIDENCE_DIR=$RUNNER_TEMP/issue1424-evidence" >> "$GITHUB_ENV"
+          echo "PFDSL_DIAG_LOG=$RUNNER_TEMP/issue1424-evidence/api.jsonl" >> "$GITHUB_ENV"
+          echo "PFDSL_DOM_LOG=$RUNNER_TEMP/issue1424-evidence/dom.json" >> "$GITHUB_ENV"
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           path: control

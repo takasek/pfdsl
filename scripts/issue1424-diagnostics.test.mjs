@@ -67,3 +67,15 @@ test("CI records failed runs without converting them into success", () => {
 	assert.doesNotMatch(workflow, /continue-on-error|retry|sleep/);
 	assert.match(workflow, /526e17c070bb1447ebf3f74192db2fef391b60a8/);
 });
+
+test("job-level env does not use the step-only runner context", () => {
+	const workflow = readFileSync(
+		new URL("../.github/workflows/issue1424-diagnostics.yml", import.meta.url),
+		"utf8",
+	);
+	const jobEnv = workflow.slice(
+		workflow.indexOf("    env:"),
+		workflow.indexOf("    steps:"),
+	);
+	assert.doesNotMatch(jobEnv, /runner\./);
+});
