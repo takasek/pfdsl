@@ -632,10 +632,11 @@ function classifyGuardedSegment(tokens, { cwd } = {}) {
 
 	const sub = gitSubcommand(tokens);
 	if (!sub) return null;
+	const argTokens = tokens.slice(gitSubcommandIndex(tokens) + 1);
 	const effect = classifySharedGitEffect(
 		sub,
-		tokens.slice(gitSubcommandIndex(tokens) + 1).map((token) => token.value),
-		{ cwd },
+		argTokens.map((token) => token.value),
+		{ cwd, argTokens },
 	);
 	if (effect) {
 		const guarded = { subcommand: sub, decision: "ask", effect };

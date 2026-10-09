@@ -110,6 +110,9 @@ fetch の `--dry-run` は `--no-dry-run` や option の値への消費で打ち�
 他の免除（checkout/switch の `--detach`・switch の `-d`、`worktree prune` の `--dry-run`・`-n`）は、同じ toggle の最後の指定が肯定の完全一致である場合に限って有効とする。
 fetch の `-u`（`--update-head-ok`）は Git 自身の checkout 中 branch の保護を外すため共有作用とする。
 refspec を stdin から読む `fetch --stdin` は境界で解決できないため拒否する。
+fetch/pull の動的refspec、push の動的repository・refspec、branch/switch/checkout の動的なbranch選択、worktree の動的actionは、parserのdynamic情報を保持して作用先不明の共有作用とする。
+変数展開の結果を解釈せずliteralな作用先・actionを使い、通常のmessage・読取pattern・option値・checkoutの明示pathを一律には拒否しない。
+この補完は明示したref・action位置に限定し、変数から任意のGit optionや他のsubcommand内actionを差し込む形式全般の解釈は行わない。
 読取以外の `git config` は、共有の設定ファイルを書き換えるため共有作用とする。
 `--global`・`--system`・`--file` / `-f` を使う書込みは、設定keyとtarget repositoryを問わず拒否する。
 別repositoryのローカル設定への書込みと、外部スコープの設定読取は維持し、明示fileの所在は解析しない。

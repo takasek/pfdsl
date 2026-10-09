@@ -714,9 +714,15 @@ function pushRepositoryAndRefspecs(args) {
 export function classifySharedGitEffect(
 	subcommand,
 	args,
-	{ cwd, exec = tryGit } = {},
+	{ cwd, exec = tryGit, argTokens = [] } = {},
 ) {
 	if (hasGitHelpOption(subcommand, args)) return null;
+	// Preserve shell provenance only where an operand selects a shared effect.
+	// Do not evaluate expansions or reject ordinary message/option/path values.
+	const dynamicValues = new Set(
+		argTokens.filter((token) => token.dynamic).map((token) => token.value),
+	);
+	const isDynamic = (value) => dynamicValues.has(value);
 	if (subcommand === "reflog")
 		return isReadOnlyGitReflog(args) ? null : { kind: "shared" };
 	if (subcommand === "remote")
@@ -740,6 +746,7 @@ export function classifySharedGitEffect(
 			: null;
 	}
 	if (subcommand === "worktree") {
+		if (isDynamic(args[0])) return { kind: "shared", unresolved: true };
 		// Even detached or existing-branch adds register shared worktree metadata.
 		if (args[0] === "add") return { kind: "shared" };
 		if (
@@ -757,9 +764,14 @@ export function classifySharedGitEffect(
 		const parsed = parseBranchArgs(args);
 		if (parsed.modifying) return { kind: "shared" };
 		// A rename or copy is own work wherever the flag sits among the options.
-		if (parsed.rename) return { kind: "rename-own", names: parsed.operands };
+		if (parsed.rename)
+			return parsed.operands.some(isDynamic)
+				? { kind: "shared", unresolved: true }
+				: { kind: "rename-own", names: parsed.operands };
 		if (parsed.list) return null;
 		if (!parsed.operands.length) return null;
+		if (isDynamic(parsed.operands[0]))
+			return { kind: "shared", unresolved: true };
 		// A creation form carrying an option this parser does not know could be
 		// a reset or a rewrite it cannot see.
 		return parsed.unknown
@@ -802,6 +814,7 @@ export function classifySharedGitEffect(
 			// -B, -C and --force-create can reset an existing branch (another
 			// checkout's, or the default), so they are a forced change, not creation.
 			if (forced) return { kind: "shared" };
+			if (isDynamic(ref)) return { kind: "shared", unresolved: true };
 			return ref ? { kind: "enter-branch", ref } : null;
 		}
 		if (
@@ -825,6 +838,7 @@ export function classifySharedGitEffect(
 		// Option arity is not modeled, so an option value (`--conflict merge main`)
 		// cannot be told from the branch: every operand is a candidate.
 		const refs = operands.filter((arg) => !arg.startsWith("-"));
+		if (refs.some(isDynamic)) return { kind: "shared", unresolved: true };
 		if (refs.length === 1) return { kind: "enter-branch", ref: refs[0] };
 		if (refs.length) return { kind: "enter-branch", ref: refs[0], refs };
 	}
@@ -846,18 +860,30 @@ export function classifySharedGitEffect(
 		// checkout's branch, even when Git is launched from an own feature tree.
 		if (args.some((arg) => isLongOptionPrefix(arg, "--refmap")))
 			return { kind: "shared" };
+		if (writesLocalRefDestination(args, isDynamic, subcommand))
+			return { kind: "shared", unresolved: true };
 		if (writesLocalRefDestination(args)) return { kind: "shared" };
 	}
 	// `pull` fetches with its own refspecs, so a local destination writes the
 	// same refs a fetch would.
-	if (subcommand === "pull" && writesLocalRefDestination(args))
-		return { kind: "shared" };
+	if (subcommand === "pull") {
+		if (writesLocalRefDestination(args, isDynamic, subcommand))
+			return { kind: "shared", unresolved: true };
+		if (writesLocalRefDestination(args, undefined, subcommand))
+			return { kind: "shared" };
+	}
 	// A push whose repository is this one (`.`, a path) writes local branches
 	// just as update-ref does; pushes to remote names keep their handling.
 	if (subcommand === "push") {
 		if (cwd === null) return { kind: "shared", unresolved: true };
 		const parsed = pushRepositoryAndRefspecs(args);
 		if (!parsed) return { kind: "shared", unresolved: true };
+		if (
+			isDynamic(parsed.repository) ||
+			isDynamic(parsed.repoOption) ||
+			parsed.refspecs.some(isDynamic)
+		)
+			return { kind: "shared", unresolved: true };
 		// Retain the prior conservative --repo boundary even when a positional
 		// repository is also supplied. Its value is not a receive-pack argument.
 		for (const [repository, refspecs] of [
@@ -882,15 +908,55 @@ export function classifySharedGitEffect(
  * destination (remote-tracking refs, tags, and URL-like operands excluded).
  * For push, a refspec with no colon is its own destination.
  */
-function writesLocalRefDestination(args) {
+// Required fetch/pull option values are not refspecs, even after the repo.
+// Optional values use the attached form and do not consume the next word.
+const FETCH_VALUE_OPTIONS = new Set([
+	"--upload-pack",
+	"--depth",
+	"--deepen",
+	"--shallow-since",
+	"--shallow-exclude",
+	"--refmap",
+	"--server-option",
+	"-o",
+	"--negotiation-tip",
+	"--filter",
+]);
+const PULL_MERGE_VALUE_OPTIONS = new Set([
+	"--cleanup",
+	"--strategy",
+	"-s",
+	"--strategy-option",
+	"-X",
+]);
+
+function writesLocalRefDestination(
+	args,
+	writesDestination = (refspec) => isLocalRefDestination(refspec, false),
+	subcommand = "fetch",
+) {
 	let repository = false;
-	for (const arg of args) {
-		if (arg.startsWith("-")) continue;
+	let options = true;
+	for (let i = 0; i < args.length; i++) {
+		const arg = args[i];
+		if (options && arg === "--") {
+			options = false;
+			continue;
+		}
+		if (options && arg.startsWith("-")) {
+			if (
+				FETCH_VALUE_OPTIONS.has(arg) ||
+				(subcommand === "fetch" && ["-j", "--jobs"].includes(arg)) ||
+				(subcommand === "pull" && PULL_MERGE_VALUE_OPTIONS.has(arg))
+			)
+				i++;
+			continue;
+		}
 		if (!repository) {
 			repository = true;
 			continue;
 		}
-		if (isLocalRefDestination(arg, false)) return true;
+		if (writesDestination(arg)) return true;
 	}
 	return false;
 }

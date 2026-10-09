@@ -1195,6 +1195,56 @@ describe("evaluateMainCommitGuard bypass axis (#1232)", () => {
 });
 
 describe("runMainCommitGuard", () => {
+	it("denies dynamic shared-ref destinations and worktree actions", () => {
+		for (const command of [
+			'spec="HEAD:refs/heads/victim"; git fetch . "$spec"',
+			'git pull origin "$SPEC"',
+			'git push . "$SPEC"',
+			'git push "$REPOSITORY" HEAD:refs/heads/victim',
+			'action=add; git worktree "$action" /tmp/new-checkout',
+			'git branch "$BRANCH" HEAD',
+			'git switch "$BRANCH"',
+		]) {
+			const result = runMainCommitGuard(JSON.stringify(payload({ command })), {
+				resolveBranches: () => ({
+					currentBranch: "feature/x",
+					mainBranch: "main",
+					targetRelation: "own",
+				}),
+				supportsAsk: false,
+			});
+			assert.equal(
+				result.output?.hookSpecificOutput.permissionDecision,
+				"deny",
+				command,
+			);
+		}
+	});
+
+	it("preserves ordinary dynamic values that do not select shared effects", () => {
+		for (const command of [
+			'git commit -m "$MESSAGE"',
+			'git log --format="$FORMAT"',
+			'git branch --list "$PATTERN"',
+			'git checkout -- "$FILE"',
+			'git fetch --depth "$DEPTH" origin main',
+			'git fetch origin --depth "$DEPTH" main',
+			'git fetch --depth 1 origin --negotiation-tip "$TIP" main',
+			'git pull origin --depth "$DEPTH" main',
+			"git worktree list --porcelain",
+		]) {
+			const result = runMainCommitGuard(JSON.stringify(payload({ command })), {
+				resolveBranches: () => ({
+					currentBranch: "feature/x",
+					mainBranch: "main",
+					targetRelation: "own",
+				}),
+				supportsAsk: false,
+			});
+			assert.equal(result.output, undefined, command);
+		}
+	});
+
 	const commit = JSON.stringify(payload({ command: "git commit -m 'x'" }));
 
 	it("denies a commit on the default branch", () => {
