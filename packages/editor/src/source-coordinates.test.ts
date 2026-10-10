@@ -7,6 +7,7 @@ import {
 	nodeIdAtSourcePosition,
 	positionOfNodeId,
 } from "./index.js";
+import { snapshotCoordinates } from "./source-coordinates.js";
 
 const ids = [
 	["ascii", "ascii"],
@@ -144,7 +145,7 @@ it.each([
 	const source = prefix + body;
 	const raw = analyzeSource(source);
 	const before = structuredClone(raw.document);
-	const model = analyzeSnapshot(source);
+	const model = snapshotCoordinates(raw, source);
 	expect(model.document.statements.map((s) => s.type)).toEqual([
 		"chain",
 		"input-edge",

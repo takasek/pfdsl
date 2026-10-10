@@ -327,10 +327,14 @@ mod tests {
         let (root, doc) = fixture("registry");
         let mut registry = Registry::default();
         let first = registry.insert(doc).unwrap().id;
+        let mut retired = std::collections::HashSet::new();
         for _ in 0..100 {
             let id = registry.insert(Document::selected(&root.join("a.pfdsl")).unwrap()).unwrap().id;
             assert_ne!(id, first);
+            assert!(!retired.contains(&id), "A released document ID must never be reused");
+            for stale in &retired { assert!(registry.get(*stale).is_none()); }
             registry.remove(id);
+            retired.insert(id);
             assert!(registry.get(id).is_none());
             assert_eq!(registry.values().count(), 1);
         }
@@ -367,11 +371,20 @@ mod tests {
         let (root, mut doc) = fixture("metadata-before-buffer"); let path = root.join("a.pfdsl");
         fs::set_permissions(&path, fs::Permissions::from_mode(0o600)).unwrap();
         let before = doc.inspect(0).unwrap();
+        let mut observed_stage = None;
         let result = doc.save_with_metadata_hook(0, "public fixture buffer", before.revision.as_deref(), || {}, |stage| {
             // Model a copier returning success without establishing the source's protection.
             // This changes only the disposable stage; no ACL or protected xattr is synthesized.
             assert_eq!(unsafe { libc::fchmod(stage.as_raw_fd(), 0o644) }, 0);
+            observed_stage = Some(stage.try_clone().unwrap());
         }, || {}, || {});
+        // Keep the stage FD across cleanup so an early write cannot hide behind unlink.
+        use std::io::{Seek, SeekFrom};
+        let mut stage = observed_stage.unwrap();
+        stage.seek(SeekFrom::Start(0)).unwrap();
+        let mut staged_content = String::new();
+        stage.read_to_string(&mut staged_content).unwrap();
+        assert!(staged_content.is_empty(), "Buffer was written before protection was established");
         assert_eq!(result.outcome, "failed-before-publication");
         assert_eq!(result.publication, "not-published");
         assert_eq!(fs::read_to_string(&path).unwrap(), "original");

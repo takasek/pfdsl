@@ -5,6 +5,7 @@ import test from "node:test";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { build } from "esbuild";
 import { JSDOM } from "jsdom";
+import { closeDocuments, DocumentSession } from "../src/document-session.ts";
 
 // Real installed Monaco modules; only CSS and unavailable DOM measurement are adapted.
 test("the production document-tab entry loads real Monaco menu contributions", async (t) => {
@@ -120,12 +121,41 @@ test("the production document-tab entry loads real Monaco menu contributions", a
 				return host.monaco.editor.getEditors().at(-1);
 			};
 			try {
-				await check(create);
+				await check(create, tabs);
 			} finally {
 				for (const tab of tabs) tab.dispose();
 				await new Promise((resolve) => setImmediate(resolve));
 			}
 		}
+		await t.test(
+			"editing then undoing invalidates a pending close decision through the production tab",
+			async () => {
+				await withEditors("a >> p", async (create, tabs) => {
+					const editor = create();
+					const tab = tabs[0];
+					const session = new DocumentSession(tab, null);
+					tab.setSource("local >> p");
+					let disposed = 0;
+					const closed = await closeDocuments(
+						[session],
+						async () => {
+							tab.setSource("newer >> p");
+							await editor.getModel().undo();
+							assert.equal(tab.getSource(), "local >> p");
+							return "discard";
+						},
+						async () => assert.fail("Discard must not save"),
+						() => {
+							disposed++;
+						},
+					);
+					assert.equal(closed, false);
+					assert.equal(disposed, 0);
+					assert.equal(session.isDirty(), true);
+					assert.equal(tab.container.isConnected, true);
+				});
+			},
+		);
 		await t.test("document models use PFDSL square brackets", async () => {
 			await withEditors("[a, b] >> p", async (create) => {
 				const model = create().getModel();
