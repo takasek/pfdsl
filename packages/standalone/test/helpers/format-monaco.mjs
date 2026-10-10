@@ -59,3 +59,6 @@ function assertFullDocument(edits, model) {
 	if (edits.length !== 1 || edits[0].range !== model.getFullModelRange())
 		throw new Error("Expected one full-model replacement");
 }
+
+// Language registration is outside this controlled editor seam.
+export const languages = { register() {}, setLanguageConfiguration() {} };

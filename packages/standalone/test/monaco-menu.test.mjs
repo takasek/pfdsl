@@ -103,6 +103,111 @@ test("the production document-tab entry loads real Monaco menu contributions", a
 			logLevel: "silent",
 		});
 		const host = await import(pathToFileURL(output).href);
+
+		async function withEditors(source, check) {
+			const tabs = [];
+			const create = () => {
+				const tab = host.createDocumentTab({
+					parent: document.querySelector("main"),
+					key: `language-${tabs.length}`,
+					name: "Language",
+					source,
+					path: null,
+					read: async () => null,
+					reportStatus() {},
+				});
+				tabs.push(tab);
+				return host.monaco.editor.getEditors().at(-1);
+			};
+			try {
+				await check(create);
+			} finally {
+				for (const tab of tabs) tab.dispose();
+				await new Promise((resolve) => setImmediate(resolve));
+			}
+		}
+		await t.test("document models use PFDSL square brackets", async () => {
+			await withEditors("[a, b] >> p", async (create) => {
+				const model = create().getModel();
+				assert.equal(model.getLanguageId(), "pfdsl");
+				assert.deepEqual(
+					model.bracketPairs.matchBracket(new host.monaco.Position(1, 1)),
+					[
+						new host.monaco.Range(1, 1, 1, 2),
+						new host.monaco.Range(1, 6, 1, 7),
+					],
+				);
+			});
+		});
+		await t.test(
+			"typing configured pairs autocloses and overtypes",
+			async () => {
+				await withEditors("", async (create) => {
+					const editor = create();
+					for (const [open, close] of [
+						["[", "]"],
+						['"', '"'],
+					]) {
+						editor.setValue("");
+						editor.setPosition(new host.monaco.Position(1, 1));
+						editor.trigger("keyboard", "type", { text: open });
+						assert.equal(editor.getValue(), open + close);
+						assert.equal(editor.getPosition().column, 2);
+						editor.trigger("keyboard", "type", { text: close });
+						assert.equal(editor.getValue(), open + close);
+						assert.equal(editor.getPosition().column, 3);
+					}
+					editor.setValue("");
+					editor.trigger("keyboard", "type", { text: "(" });
+					assert.equal(editor.getValue(), "(");
+				});
+			},
+		);
+		await t.test(
+			"configured pairs surround Unicode selections with Undo/Redo",
+			async () => {
+				await withEditors("成果𐐀", async (create) => {
+					const editor = create();
+					for (const [open, close] of [
+						["[", "]"],
+						['"', '"'],
+					]) {
+						editor.setValue("成果𐐀");
+						editor.setSelection(new host.monaco.Selection(1, 1, 1, 5));
+						editor.trigger("keyboard", "type", { text: open });
+						assert.equal(editor.getValue(), `${open}成果𐐀${close}`);
+						await editor.getModel().undo();
+						assert.equal(editor.getValue(), "成果𐐀");
+						await editor.getModel().redo();
+						assert.equal(editor.getValue(), `${open}成果𐐀${close}`);
+					}
+				});
+			},
+		);
+		await t.test(
+			"line comments toggle through a real action and stay tab-local",
+			async () => {
+				const source = "a>>p->b\nc>>q->d\n";
+				await withEditors(source, async (create) => {
+					const editor = create();
+					const other = create();
+					editor.setSelection(new host.monaco.Selection(1, 1, 2, 9));
+					const action = editor.getAction("editor.action.commentLine");
+					assert.ok(
+						action?.isSupported(),
+						"the production entry loads the comment action",
+					);
+					await action.run();
+					assert.equal(editor.getValue(), "# a>>p->b\n# c>>q->d\n");
+					assert.equal(other.getValue(), source);
+					await editor.getModel().undo();
+					assert.equal(editor.getValue(), source);
+					await editor.getModel().redo();
+					await action.run();
+					assert.equal(editor.getValue(), source);
+				});
+			},
+		);
 		await t.test("Shift+F10 has a controller and command", () => {
 			const contributions =
 				host.EditorExtensionsRegistry.getEditorContributions().map((c) => c.id);

@@ -95,3 +95,6 @@ export const editor = {
 	},
 	setModelMarkers() {},
 };
+
+// Language registration is outside this controlled editor seam.
+export const languages = { register() {}, setLanguageConfiguration() {} };

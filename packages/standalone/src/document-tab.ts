@@ -10,8 +10,10 @@ import {
 } from "@pfdsl/editor";
 import { mountPreview } from "@pfdsl/editor/preview";
 import * as monaco from "monaco-editor/editor/editor.api.js";
+import "monaco-editor/editor/contrib/comment/browser/comment.js";
 import "monaco-editor/editor/contrib/contextmenu/browser/contextmenu.js";
 import "monaco-editor/editor/standalone/browser/quickAccess/standaloneCommandsQuickAccess.js";
+import "./language.js";
 import { createNormalizedEdgesPanel } from "./normalized-edges.js";
 import { formatSnapshot, processSnapshot } from "./processing.js";
 import { registerSelectionFormatting } from "./selection-format.js";
@@ -52,7 +54,7 @@ export function createDocumentTab({
 	const normalizedEdges = createNormalizedEdgesPanel(container);
 	const model = monaco.editor.createModel(
 		source,
-		"plaintext",
+		"pfdsl",
 		monaco.Uri.parse(`inmemory://pfdsl/${encodeURIComponent(key)}`),
 	);
 	const editor = monaco.editor.create(editorElement, {

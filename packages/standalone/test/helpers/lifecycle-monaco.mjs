@@ -50,3 +50,6 @@ export const editor = {
 		markerCalls.push({ model, owner, markers });
 	},
 };
+
+// Language registration is outside this controlled editor seam.
+export const languages = { register() {}, setLanguageConfiguration() {} };

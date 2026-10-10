@@ -182,6 +182,13 @@ A selection confined to frontmatter or an unclosed frontmatter block is left unc
 The existing shared range formatter skips full-graph validation, preserves internally commented chains, and leaves selected text unchanged on formatting errors or canonical no-ops.
 These actions leave the toolbar's whole-document Format behavior unchanged.
 Native selection mapping, keyboard focus, and Undo/Redo remain to be checked in the current application.
+
+PFDSL editors support square-bracket and double-quote pairing and surrounding selected text.
+Use **Toggle Line Comment** from the editor Command Palette (F1), or Command-/ on macOS, to add or remove `#` on selected lines.
+Syntax highlighting and string-aware quote suppression remain unimplemented; quote pairing cannot distinguish existing strings yet.
+Word boundaries still use Monaco defaults while the extension’s Unicode word-pattern configuration is assessed separately.
+These language-support changes have automated editor checks; native keyboard and IME acceptance remain unverified in this candidate.
+
 The native host holds a directory capability for each folder explicitly selected for that session.
 Reads stay bound to that directory when its pathname is replaced; relative traversal and symlink escape are rejected.
 
