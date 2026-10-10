@@ -518,7 +518,13 @@ Snapshot.binding は同梱 native が必ず返す契約に揃え、欠落時の�
 ### 現在版の Mac で確認する項目
 
 同じビルドのアプリで操作し、対象版・環境・入力・期待結果・実結果を残す。
-次の項目は未確認であり、結果を受領するまで #1258 の全条件達成とはしない。
+以下は検査開始時のチェックリストである。
+通常起動の Mac アプリで親が実施した[現在版の操作結果](evidence/2026-10-10-document-lifecycle/native-acceptance.md)は、検索・置換・Undo/Redo、手動保存、新規/Open/folder/recent、タブ隔離とエラー回復、dirty close、window/Cmd-Q/menu 終了取消、複数 dirty タブの途中取消、外部変更・再競合・rename/delete・衝突・保存失敗からの回復を確認した。
+通常の mode・同じ owner/group・読取 ACL の保持と、immutable flag による保存拒否も確認した。
+IME の composition と Dock Quit は操作基盤の timeout 後に所有者へ引き継いだ。
+同じ binary の追加確認で、80行のコメントを含む文書のタブ往復後の表示範囲も確認した。
+再フォーカス時の click の影響を分離していないため、カーソル位置保持の認定には用いない。
+容量不足、複雑な ACL/ownership 等の未実測は同記録で分け、#1258 の全条件達成とはしない。
 
 - ファイルとフォルダを開く、新規作成、Save/Save As、取消、最近の対象の再アクセス、同じ文書の再 Open。
 - 2つのタブを往復して本文・表示位置・図の隔離を確認し、構文エラーから復帰する。
