@@ -68,36 +68,17 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
-      - name: Record diagnostic source and runner identities
-        if: github.head_ref == 'codex/issue-1424-close-trace'
-        env:
-          PFDSL_SMOKE_DIAGNOSTICS_DIR: ${{ format('{0}/pfdsl-smoke-diagnostics', runner.temp) }}
-        run: |
-          mkdir -p "$PFDSL_SMOKE_DIAGNOSTICS_DIR"
-          {
-            printf 'head=%s\nrun=%s\nattempt=%s\n' '${{ github.event.pull_request.head.sha }}' "$GITHUB_RUN_ID" "$GITHUB_RUN_ATTEMPT"
-            printf 'checkout='; git rev-parse HEAD
-            node --version
-            pnpm --version
-            cat /etc/os-release
-            printf 'ImageOS=%s\nImageVersion=%s\n' "$ImageOS" "$ImageVersion"
-            sha256sum pnpm-lock.yaml packages/vscode-extension/smoke/run.mjs
-          } > "$PFDSL_SMOKE_DIAGNOSTICS_DIR/identity.txt"
-
       - run: xvfb-run --auto-servernum make test-vscode-smoke
         env:
-          # runner context is available at step scope; other branches opt out.
-          PFDSL_SMOKE_DIAGNOSTICS_DIR: ${{ github.head_ref == 'codex/issue-1424-close-trace' && format('{0}/pfdsl-smoke-diagnostics', runner.temp) || '' }}
+          PFDSL_SMOKE_DIAGNOSTICS_DIR: ${{ github.head_ref == 'codex/issue-1424-close-trace' && format('{0}/pfdsl-close-snapshots', runner.temp) || '' }}
 
-      - name: Preserve bounded source-close diagnostics
+      - name: Preserve source-close snapshots
         if: always() && github.head_ref == 'codex/issue-1424-close-trace'
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: issue1424-close-trace-${{ github.event.pull_request.head.sha }}-attempt-${{ github.run_attempt }}
-          # Do not publish fixture copies, profile logs, or the full preserved directory.
+          name: issue1424-close-snapshots-${{ github.event.pull_request.head.sha }}
           path: |
-            ${{ runner.temp }}/pfdsl-smoke-diagnostics/identity.txt
-            ${{ runner.temp }}/pfdsl-smoke-diagnostics/close-*.json
-            ${{ runner.temp }}/pfdsl-smoke-diagnostics/trace/show-sites.json
-          if-no-files-found: error
+            ${{ runner.temp }}/pfdsl-close-snapshots/close-*.json
+            ${{ runner.temp }}/pfdsl-close-snapshots/close-*.png
+          if-no-files-found: warn
           retention-days: 14

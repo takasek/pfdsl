@@ -14,8 +14,6 @@ import { fileURLToPath } from "node:url";
 import { downloadAndUnzipVSCode } from "@vscode/test-electron";
 import { chromium } from "playwright-core";
 import { isCliEntrypoint } from "../../../scripts/lib/cli-entrypoint.mjs";
-import { bestEffort, startCloseTrace } from "./close-trace.mjs";
-import { captureExtensionTrace, preserveSmokeEvidence } from "./evidence.mjs";
 import {
 	createRunDirectory,
 	expectEventually,
@@ -26,8 +24,6 @@ import {
 	readTransform,
 	removeRunDirectory,
 } from "./harness.mjs";
-import { buildDiagnosticExtension } from "./instrument.mjs";
-
 import { waitForSourceCloseReady } from "./save-readiness.mjs";
 
 const vscodeVersion = "1.132.1";
@@ -88,13 +84,6 @@ export async function withWorkbenchOperation(
 		log = (event) => console.log("Workbench operation:", JSON.stringify(event)),
 	} = {},
 ) {
-	const emit = (event) => {
-		try {
-			Promise.resolve(log(event)).catch(() => {});
-		} catch {
-			// Diagnostic sinks must not change the operation being observed.
-		}
-	};
 	const snapshot = async () => {
 		try {
 			return await readState(page);
@@ -102,14 +91,14 @@ export async function withWorkbenchOperation(
 			return { unavailable: error.message };
 		}
 	};
-	emit({ label, phase: "before", state: await snapshot() });
+	log({ label, phase: "before", state: await snapshot() });
 	try {
 		const result = await operation();
-		emit({ label, phase: "after", state: await snapshot() });
+		log({ label, phase: "after", state: await snapshot() });
 		return result;
 	} catch (error) {
 		const state = await snapshot();
-		emit({ label, phase: "failed", state });
+		log({ label, phase: "failed", state });
 		throw new Error(
 			`${label}: ${error.stack ?? error}\nWorkbench state: ${JSON.stringify(state)}`,
 			{ cause: error },
@@ -120,6 +109,8 @@ export async function withWorkbenchOperation(
 export function quickInputValue(mode, text) {
 	return mode === "command" ? `>${text}` : text;
 }
+
+let closeAttempt = 0;
 
 export async function closeSourceTab(
 	page,
@@ -134,50 +125,118 @@ export async function closeSourceTab(
 		}),
 		log,
 		timeoutMs = coldRenderTimeoutMs,
-		diagnostics,
 	} = {},
 ) {
+	const directory = process.env.PFDSL_SMOKE_DIAGNOSTICS_DIR;
+	const attempt = directory ? ++closeAttempt : 0;
+	let sample = 0;
+	let clickReturned = false;
+	const snapshot = async () => {
+		const phase =
+			++sample === 1
+				? "before"
+				: clickReturned && sample === 2
+					? "click-returned"
+					: "result";
+		try {
+			const state = await sourceTab.evaluateAll((targets) => {
+				const groups = [
+					...document.querySelectorAll(".editor-group-container"),
+				];
+				const rect = (element) => {
+					const { x, y, width, height } = element.getBoundingClientRect();
+					return { x, y, width, height };
+				};
+				const describe = (element) => ({
+					tag: element.tagName,
+					label: element.getAttribute("aria-label")?.slice(0, 160),
+					groupIndex: groups.indexOf(
+						element.closest(".editor-group-container"),
+					),
+					rect: rect(element),
+				});
+				return {
+					time: Date.now(),
+					focused: document.hasFocus(),
+					active: document.activeElement
+						? describe(document.activeElement)
+						: null,
+					groups: groups
+						.slice(0, 8)
+						.map((group, index) => ({ index, rect: rect(group) })),
+					tabs: [
+						...document.querySelectorAll(
+							'.editor-group-container [role="tab"]',
+						),
+					]
+						.slice(0, 8)
+						.map((tab) => ({
+							...describe(tab),
+							selected: tab.getAttribute("aria-selected"),
+							dirty: tab.classList.contains("dirty"),
+						})),
+					targets: targets.slice(0, 2).map((tab) => ({
+						...describe(tab),
+						closeButtons: [
+							...tab.querySelectorAll('[role="button"][aria-label^="Close ("]'),
+						]
+							.slice(0, 2)
+							.map(describe),
+					})),
+					dialogs: [
+						...document.querySelectorAll('[role="dialog"], .monaco-dialog-box'),
+					]
+						.filter(
+							(element) =>
+								element.getClientRects().length > 0 &&
+								!["hidden", "collapse"].includes(
+									getComputedStyle(element).visibility,
+								),
+						)
+						.slice(0, 4)
+						.map(describe),
+				};
+			});
+			const path = join(directory, `close-${attempt}-${phase}`);
+			await mkdir(directory, { recursive: true });
+			await writeFile(
+				`${path}.json`,
+				JSON.stringify({ phase, clickReturned, state }, null, 2),
+			);
+			await page.screenshot({
+				path: `${path}.png`,
+				timeout: interactionTimeoutMs,
+			});
+			return state;
+		} catch (error) {
+			console.warn(`Source-close snapshot ${phase}: ${error.message}`);
+			return { unavailable: error.message };
+		}
+	};
 	return withWorkbenchOperation(
 		page,
 		"close source tab",
 		async () => {
-			const tracePending = diagnostics
-				? Promise.resolve().then(() =>
-						(diagnostics.start ?? startCloseTrace)(page, sourceTab),
-					)
-				: null;
-			const trace = tracePending ? await bestEffort(() => tracePending) : null;
-			let clickReturnedAt;
-			try {
-				await sourceTab.getByRole("button", { name: /^Close \(/ }).click();
-				clickReturnedAt = Date.now();
-				return await expectEventually(
-					"source hidden and preview retained",
-					readState,
-					(state) =>
-						state.sourceTabs === 0 &&
-						state.previewTabs === 1 &&
-						state.groups === 1,
-					{ timeoutMs },
-				);
-			} finally {
-				if (diagnostics) {
-					if (!trace?.stop)
-						void tracePending.then((late) => late?.stop?.()).catch(() => {});
-					const saved = await bestEffort(async () =>
-						diagnostics.finish({
-							clickReturnedAt,
-							dom: trace?.stop ? await bestEffort(() => trace.stop()) : trace,
-						}),
-					);
-					if (saved?.unavailable)
-						await bestEffort(() =>
-							console.warn("Source-close diagnostics:", JSON.stringify(saved)),
-						);
-				}
+			await sourceTab.getByRole("button", { name: /^Close \(/ }).click();
+			if (directory) {
+				clickReturned = true;
+				await snapshot();
 			}
+			return expectEventually(
+				"source hidden and preview retained",
+				readState,
+				(state) =>
+					state.sourceTabs === 0 &&
+					state.previewTabs === 1 &&
+					state.groups === 1,
+				{ timeoutMs },
+			);
 		},
-		{ ...(log ? { log } : {}), ...(log ? { readState } : {}) },
+		{
+			...(log ? { log } : {}),
+			...(log ? { readState } : {}),
+			...(directory ? { readState: snapshot } : {}),
+		},
 	);
 }
 
@@ -453,14 +512,7 @@ async function stopVSCode(vscodeProcess) {
 	}
 }
 
-export async function cleanupSmokeSession({
-	browser,
-	runDir,
-	vscodeProcess,
-	evidenceDirectory,
-	retainEvidence = false,
-	preserveEvidence = preserveSmokeEvidence,
-}) {
+export async function cleanupSmokeSession({ browser, runDir, vscodeProcess }) {
 	const cleanupErrors = [];
 	try {
 		await browser?.close();
@@ -471,18 +523,6 @@ export async function cleanupSmokeSession({
 		await stopVSCode(vscodeProcess);
 	} catch (error) {
 		cleanupErrors.push(error);
-	}
-	try {
-		if (evidenceDirectory) await preserveEvidence(runDir, evidenceDirectory);
-	} catch (error) {
-		retainEvidence = true;
-		cleanupErrors.push(error);
-	}
-	if (retainEvidence) {
-		cleanupErrors.push(
-			new Error(`Smoke evidence retained in issued directory: ${runDir}`),
-		);
-		return cleanupErrors;
 	}
 	try {
 		await removeRunDirectory(runDir);
@@ -1197,7 +1237,7 @@ async function assertPreviewEditingFocus(session) {
 		{ timeoutMs: coldRenderTimeoutMs },
 	);
 	await waitForSourceCloseReady(sourceTab, { timeoutMs: coldRenderTimeoutMs });
-	await closeSourceTab(page, sourceTab, { diagnostics: session.diagnostics });
+	await closeSourceTab(page, sourceTab);
 	await frame.locator('#inner g.node[data-node-id="p"]').press("Enter");
 	await frame.locator("#connector-kind").selectOption("->");
 	await frame.locator("#connector-target").fill("reopened_result");
@@ -1255,7 +1295,7 @@ async function assertHiddenSourceExternalChange(session) {
 		"hidden source fixture rendered",
 	);
 	await waitForSourceCloseReady(sourceTab, { timeoutMs: coldRenderTimeoutMs });
-	await closeSourceTab(page, sourceTab, { diagnostics: session.diagnostics });
+	await closeSourceTab(page, sourceTab);
 	await frame
 		.locator('#inner g.node[data-node-id="hidden_source_process"]')
 		.press("Enter");
@@ -1326,10 +1366,7 @@ async function assertHiddenSourceExternalChange(session) {
 	);
 }
 
-export async function launchSmokeSession({
-	diagnosticsDirectory,
-	launchArgs = makeLaunchArgs,
-} = {}) {
+export async function launchSmokeSession() {
 	const runDir = await createRunDirectory();
 	const profileDir = join(runDir, "profile");
 	let browser;
@@ -1362,28 +1399,16 @@ export async function launchSmokeSession({
 			join(repoRoot, "docs/samples/01-simple-chain.pfdsl"),
 			fixturePath,
 		);
-		const extensionDevelopmentPath = diagnosticsDirectory
-			? await buildDiagnosticExtension(repoRoot, runDir)
-			: undefined;
 		vscodeProcess = spawn(
 			vscodeExecutablePath,
-			launchArgs({
+			makeLaunchArgs({
 				repoRoot,
 				profileDir,
 				extensionsDir: join(runDir, "extensions"),
 				port,
 				fixturePath,
-				extensionDevelopmentPath,
 			}),
-			{
-				stdio: ["ignore", "pipe", "pipe"],
-				env: {
-					...process.env,
-					PFDSL_SMOKE_TRACE_DIRECTORY: diagnosticsDirectory
-						? join(runDir, "trace")
-						: "",
-				},
-			},
+			{ stdio: ["ignore", "pipe", "pipe"] },
 		);
 		output = {
 			stdout: collectOutput(vscodeProcess.stdout),
@@ -1401,22 +1426,6 @@ export async function launchSmokeSession({
 		page = await waitForWorkbenchPage(browser);
 		await page.getByLabel("PFDSL: Open Preview to the Side").click();
 		const frame = await findWebviewFrame(page);
-		let closeAttempt = 0;
-		const diagnostics = diagnosticsDirectory
-			? {
-					finish: async (data) => {
-						const attempt = ++closeAttempt;
-						const api = await bestEffort(() =>
-							captureExtensionTrace(runDir, `${attempt}:finished`),
-						);
-						await mkdir(diagnosticsDirectory, { recursive: true });
-						await writeFile(
-							join(diagnosticsDirectory, `close-${attempt}.json`),
-							JSON.stringify({ ...data, api }, null, 2),
-						);
-					},
-				}
-			: undefined;
 		const session = {
 			browser,
 			page,
@@ -1426,8 +1435,6 @@ export async function launchSmokeSession({
 			vscodeProcess,
 			runDir,
 			output,
-			diagnostics,
-			diagnosticsDirectory,
 		};
 		return session;
 	} catch (error) {
@@ -1441,30 +1448,20 @@ export async function launchSmokeSession({
 			new Error(diagnostic, { cause: error }),
 			profileDir,
 		);
-		const preserved = await bestEffort(
-			() => preserveSmokeEvidence(runDir, diagnosticsDirectory),
-			null,
-		);
-		primaryError.message += `\nSmoke evidence: ${JSON.stringify(preserved)}`;
 		const cleanupErrors = await cleanupSmokeSession({
 			browser,
 			runDir,
 			vscodeProcess,
-			evidenceDirectory: typeof preserved === "string" ? preserved : undefined,
-			retainEvidence: typeof preserved !== "string",
 		});
 		throw appendCleanupDiagnostics(primaryError, cleanupErrors);
 	}
 }
 
-export async function runSmoke(options = {}) {
+async function main() {
 	let session;
 	let failure;
 	try {
-		session = await launchSmokeSession({
-			diagnosticsDirectory: process.env.PFDSL_SMOKE_DIAGNOSTICS_DIR,
-			...options,
-		});
+		session = await launchSmokeSession();
 		console.log(`VS Code version: ${vscodeVersion}`);
 		console.log(`frame URL: ${session.frame.url()}`);
 		await waitForColdRender(session.frame.locator("#root"), 1, "preview root");
@@ -1529,25 +1526,7 @@ export async function runSmoke(options = {}) {
 		}
 	} finally {
 		if (session) {
-			let evidenceDirectory;
-			if (failure || session.diagnosticsDirectory) {
-				const preserved = await bestEffort(
-					() =>
-						preserveSmokeEvidence(session.runDir, session.diagnosticsDirectory),
-					null,
-				);
-				evidenceDirectory =
-					typeof preserved === "string" ? preserved : undefined;
-				if (failure)
-					failure.message += `\nSmoke evidence: ${JSON.stringify(preserved)}`;
-			}
-			const cleanupErrors = await cleanupSmokeSession({
-				...session,
-				evidenceDirectory,
-				retainEvidence: Boolean(
-					(failure || session.diagnosticsDirectory) && !evidenceDirectory,
-				),
-			});
+			const cleanupErrors = await cleanupSmokeSession(session);
 			if (cleanupErrors.length > 0) {
 				failure = appendCleanupDiagnostics(
 					failure ?? new Error("Smoke session completed but cleanup failed"),
@@ -1562,7 +1541,7 @@ export async function runSmoke(options = {}) {
 }
 
 if (isCliEntrypoint(import.meta.url, process.argv[1])) {
-	runSmoke().catch((error) => {
+	main().catch((error) => {
 		console.error(error.stack ?? error);
 		process.exitCode = 1;
 	});

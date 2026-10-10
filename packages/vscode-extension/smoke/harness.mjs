@@ -141,7 +141,6 @@ export function makeLaunchArgs({
 	extensionsDir,
 	port,
 	fixturePath,
-	extensionDevelopmentPath = `${repoRoot}/packages/vscode-extension`,
 	platform = process.platform,
 }) {
 	return [
@@ -151,7 +150,7 @@ export function makeLaunchArgs({
 		`--user-data-dir=${profileDir}`,
 		`--extensions-dir=${extensionsDir}`,
 		`--remote-debugging-port=${port}`,
-		`--extensionDevelopmentPath=${extensionDevelopmentPath}`,
+		`--extensionDevelopmentPath=${repoRoot}/packages/vscode-extension`,
 		...(platform === "linux" ? ["--no-sandbox"] : []),
 		fixturePath,
 	];
