@@ -521,10 +521,12 @@ Snapshot.binding は同梱 native が必ず返す契約に揃え、欠落時の�
 以下は検査開始時のチェックリストである。
 通常起動の Mac アプリで親が実施した[現在版の操作結果](evidence/2026-10-10-document-lifecycle/native-acceptance.md)は、検索・置換・Undo/Redo、手動保存、新規/Open/folder/recent、タブ隔離とエラー回復、dirty close、window/Cmd-Q/menu 終了取消、複数 dirty タブの途中取消、外部変更・再競合・rename/delete・衝突・保存失敗からの回復を確認した。
 通常の mode・同じ owner/group・読取 ACL の保持と、immutable flag による保存拒否も確認した。
-IME の composition と Dock Quit は操作基盤の timeout 後に所有者へ引き継いだ。
+IME の composition と Dock Quit は操作基盤の timeout 後に所有者へ引き継ぎ、同じアプリでの変換・確定→保存と、未保存文書の Dock Quit→取消→本文保持について、2026-10-10 に所有者から両方の受入成功を受領した。
 同じ binary の追加確認で、80行のコメントを含む文書のタブ往復後の表示範囲も確認した。
 再フォーカス時の click の影響を分離していないため、カーソル位置保持の認定には用いない。
-容量不足、複雑な ACL/ownership 等の未実測は同記録で分け、#1258 の全条件達成とはしない。
+容量不足、複雑な ACL/ownership 等の未実測は同記録で分ける。
+親の通常アプリ操作、所有者の受入、変更のない native 保存検査と現行 host 検査を7条件へ対応付け、独立レビューでも追加必須の欠落がないことを確認し、採用済み保存前検査の境界で #1258 を完了と判定した。
+未実測の全組合せを成功とせず、署名配布・最低 OS 保証は後続工程で扱う。
 
 - ファイルとフォルダを開く、新規作成、Save/Save As、取消、最近の対象の再アクセス、同じ文書の再 Open。
 - 2つのタブを往復して本文・表示位置・図の隔離を確認し、構文エラーから復帰する。

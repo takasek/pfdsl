@@ -134,7 +134,7 @@ artifact:
   node_location_cycle:
     label: 定義と本文中の同一ノード位置を巡回する操作
     description: "エディタ内で frontmatter 定義キーとグラフ本文に現れる同一ノード ID の各位置を順に巡回する機能。右クリックとショートカットから使い、Cmd+クリックの適否は既存操作との整合で判断する。要件は issue #1283"
-    status: wip
+    status: done
     criteria: "定義キーから本文中の同一 ID の全出現箇所を文書順に巡回して定義へ戻れ、途中からも次へ進める。キー操作と右クリックから利用でき、VS Code の既存操作とのショートカット衝突が解消済み"
     location: ../packages/
   hover_local_graph:
@@ -156,7 +156,7 @@ artifact:
     location: ../packages/standalone/
   standalone_documents:
     label: 安全に編集・保存できる文書アプリ
-    status: wip
+    status: done
     criteria: 任意 PFD の新規・開く・手動保存・別名保存とエディタ＋プレビューの組のタブ操作が実機で動き、未保存終了・外部再変更・削除・保存失敗の試験で内容を黙って失わずに解決できる
   standalone_pfd_features:
     label: PFD 編集・閲覧機能が揃ったアプリ
