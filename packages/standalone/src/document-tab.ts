@@ -229,6 +229,16 @@ export function createDocumentTab({
 		getRevision: () => model.getVersionId(),
 		setSource(value: string) {
 			editor.pushUndoStop();
+			const eol = value.includes("\r\n") ? "\r\n" : "\n";
+			if (model.getEOL() !== eol) {
+				// Keep EOL and text in separate undo entries: Monaco stores edit offsets in the old EOL.
+				model.pushEOL(
+					eol === "\r\n"
+						? monaco.editor.EndOfLineSequence.CRLF
+						: monaco.editor.EndOfLineSequence.LF,
+				);
+				editor.pushUndoStop();
+			}
 			editor.executeEdits("pfdsl.disk", [
 				{ range: model.getFullModelRange(), text: value },
 			]);

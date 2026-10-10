@@ -113,6 +113,39 @@ test("a persistent unreadable target can still be explicitly discarded after con
 	assert.equal(disposed, 1);
 });
 
+for (const failure of ["read failure", "missing"]) {
+	test(`unchanged disk recovery clears observation-only uncertainty after ${failure}`, async () => {
+		const original = snap("original");
+		const doc = new DocumentSession(view(), original);
+		await doc
+			.checkExternal(async () => {
+				if (failure === "read failure")
+					throw new Error("temporary read failure");
+				return snap(null, null);
+			})
+			.catch(() => {});
+		assert.equal(doc.isDirty(), true);
+		await doc.checkExternal(async () => original);
+		assert.equal(doc.isDirty(), false);
+		assert.equal(doc.message, "");
+		assert.equal(doc.conflict, null);
+	});
+}
+
+test("unchanged observation must not clear uncertain native save recovery", async () => {
+	const original = snap("original");
+	const doc = new DocumentSession(view(), original);
+	await doc.save(async () => ({
+		outcome: "published-but-unconfirmed",
+		current: original,
+		message: "unconfirmed save",
+	}));
+	await doc.checkExternal(async () => original);
+	assert.equal(doc.isDirty(), true);
+	assert.equal(doc.message, "unconfirmed save");
+	assert.equal(doc.pendingTarget, original);
+});
+
 test("readability recovering during a discard prompt invalidates that decision even for the same disk revision", async () => {
 	const doc = new DocumentSession(view(), snap("original"));
 	let readable = false;

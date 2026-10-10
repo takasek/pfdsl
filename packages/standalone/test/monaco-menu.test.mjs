@@ -126,6 +126,50 @@ test("the production document-tab entry loads real Monaco menu contributions", a
 				await new Promise((resolve) => setImmediate(resolve));
 			}
 		}
+		for (const [before, after] of [
+			["\r\n", "\n"],
+			["\n", "\r\n"],
+		]) {
+			await t.test(
+				`disk reload adopts EOL ${JSON.stringify(before)} -> ${JSON.stringify(after)} without dirty state`,
+				async () => {
+					await withEditors(
+						`a >> p${before}p -> b${before}`,
+						async (create, tabs) => {
+							const editor = create();
+							const tab = tabs[0];
+							const oldSource = tab.getSource();
+							const original = {
+								id: 1,
+								path: "/a.pfdsl",
+								binding: "dir:a",
+								identity: "inode:a",
+								source: oldSource,
+								revision: "old",
+							};
+							const session = new DocumentSession(tab, original);
+							const source = `a >> p${after}p -> c${after}`;
+							const replacement = { ...original, source, revision: "new" };
+							await session.checkExternal(async () => replacement);
+							assert.equal(tab.getSource(), source);
+							assert.equal(session.isDirty(), false);
+							await editor.getModel().undo();
+							await editor.getModel().undo();
+							assert.equal(tab.getSource(), oldSource);
+							assert.equal(session.isDirty(), true);
+							await editor.getModel().redo();
+							await editor.getModel().redo();
+							assert.equal(tab.getSource(), source);
+							assert.equal(session.isDirty(), false);
+							await session.save(async (text) => {
+								assert.equal(text, source);
+								return { outcome: "saved", current: replacement };
+							});
+						},
+					);
+				},
+			);
+		}
 		await t.test(
 			"editing then undoing invalidates a pending close decision through the production tab",
 			async () => {

@@ -218,6 +218,16 @@ export class DocumentSession {
 			if (current.revision === this.disk.revision) {
 				this.disk = current;
 				this.observed = current;
+				if (
+					this.view.getSource() === this.savedSource &&
+					!this.saveFailure &&
+					!this.pendingTarget
+				) {
+					this.uncertain = false;
+					this.conflict = null;
+					this.sourceConflict = null;
+					this.message = "";
+				}
 				return;
 			}
 			if (
