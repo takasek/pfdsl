@@ -8,6 +8,7 @@ import {
 	type DiskSnapshot,
 	DocumentSession,
 	type SaveResult,
+	sameDocument,
 } from "./document-session.js";
 import { createDocumentTab, type DocumentTab } from "./document-tab.js";
 import "./style.css";
@@ -28,11 +29,25 @@ interface Entry {
 	session: DocumentSession;
 	name: string;
 	navigation: HTMLElement;
-	recoveryOwners: Map<string, number>;
 	path: string | null;
 	documentID: number | undefined;
 }
 const opened = new Set<Entry>();
+const documentHandles = new Set<number>();
+async function releaseUnusedDocuments() {
+	for (const id of documentHandles) {
+		// An acceptance document can arrive while an earlier release is pending.
+		if (
+			[...opened].some(
+				({ session }) =>
+					session.disk?.id === id || session.pendingTarget?.id === id,
+			)
+		)
+			continue;
+		await invoke("release_document", { id });
+		documentHandles.delete(id);
+	}
+}
 let active: Entry | undefined;
 let serial = 0;
 let busy = false;
@@ -94,7 +109,8 @@ function run(action: () => Promise<unknown>) {
 		button.disabled = true;
 	void action()
 		.catch(report)
-		.finally(() => {
+		.finally(async () => {
+			await releaseUnusedDocuments().catch(report);
 			busy = false;
 			for (const button of document.querySelectorAll<HTMLButtonElement>(
 				"header button, #files button, #recent button, .close-document",
@@ -105,12 +121,11 @@ function run(action: () => Promise<unknown>) {
 		});
 }
 function openDocument(name: string, source: string, disk: DiskSnapshot | null) {
+	if (disk) documentHandles.add(disk.id);
 	const existing =
 		disk &&
 		[...opened].find(
-			(entry) =>
-				entry.session.disk?.path === disk.path ||
-				(disk.identity && entry.session.disk?.identity === disk.identity),
+			(entry) => entry.session.disk && sameDocument(entry.session.disk, disk),
 		);
 	if (existing) {
 		if (existing.session.rebindDisk(disk)) {
@@ -147,7 +162,6 @@ function openDocument(name: string, source: string, disk: DiskSnapshot | null) {
 		session: new DocumentSession(tab, disk),
 		name,
 		navigation,
-		recoveryOwners: new Map(),
 		path: disk?.path ?? null,
 		documentID: disk?.id,
 	};
@@ -159,6 +173,7 @@ function openDocument(name: string, source: string, disk: DiskSnapshot | null) {
 	if (disk) void remember(disk.path).catch(report);
 }
 async function openSnapshot(snapshot: DiskSnapshot) {
+	documentHandles.add(snapshot.id);
 	if (snapshot.source === null)
 		throw new Error(
 			"This file is missing. Choose its new location or save the retained editor content elsewhere.",
@@ -268,8 +283,8 @@ function otherOpenTarget(entry: Entry, target: DiskSnapshot) {
 	return [...opened].find(
 		(item) =>
 			item !== entry &&
-			(item.session.disk?.path === target.path ||
-				(target.identity && item.session.disk?.identity === target.identity)),
+			item.session.disk &&
+			sameDocument(item.session.disk, target),
 	);
 }
 function explainOpenTarget(entry: Entry, target: DiskSnapshot) {
@@ -290,12 +305,13 @@ async function saveEntry(
 			name: entry.name.endsWith(".pfdsl") ? entry.name : `${entry.name}.pfdsl`,
 		});
 		if (!target) return false;
+		documentHandles.add(target.id);
 	}
 	if (explainOpenTarget(entry, target)) return false;
 	if (target.source !== null && (as || observed || entry.session.conflict)) {
 		const decision = await choose(
 			"Review the target",
-			`Replace the observed version of ${target.path}? Its previous disk object will be retained. A new change will be reported as a conflict.`,
+			`Replace the observed version of ${target.path}? A detected external change before saving will stop the save.`,
 			[
 				["cancel", "Keep Editing"],
 				["another", "Choose Another File"],
@@ -323,8 +339,6 @@ async function saveEntry(
 			source,
 			expected: selected.revision,
 		});
-		for (const path of result.retained)
-			entry.recoveryOwners.set(path, selected.id);
 		return result;
 	}, selected);
 	if (saved && entry.session.disk) {
@@ -351,7 +365,6 @@ function renderConflict() {
 				active.session.message,
 				active.session.conflict,
 				active.session.observed,
-				active.session.retained,
 				active.session.sourceConflict,
 				active.session.saveFailure,
 				active.session.pendingTarget,
@@ -436,43 +449,6 @@ function renderConflict() {
 		const notice = document.createElement("p");
 		notice.textContent = `The original document ${entry.session.sourceConflict.path} also changed. Its disk version is preserved. Resolve the Save As target above, or save the editor elsewhere.`;
 		conflicts.append(notice);
-	}
-	if (entry.session.retained.length) {
-		const retained = document.createElement("details");
-		const summary = document.createElement("summary");
-		summary.textContent = "Retained previous disk versions";
-		retained.append(summary);
-		const notice = document.createElement("p");
-		notice.textContent =
-			"These objects are retained after manual saves, including later writes through an old file handle. They are never automatically deleted. Inspect them and remove them in Finder only when other writers are finished.";
-		retained.append(notice);
-		for (const path of entry.session.retained) {
-			const button = document.createElement("button");
-			button.textContent = path;
-			button.title = "Inspect retained version";
-			button.onclick = () =>
-				run(async () => {
-					const disk = await invoke<DiskSnapshot>("read_retained", {
-						id: entry.recoveryOwners.get(path),
-						path,
-					});
-					const decision = await choose(
-						"Retained disk version",
-						"This is the currently observed content of the retained object. Loading it changes the editor as an unsaved draft.",
-						[
-							["cancel", "Keep Editing"],
-							["draft", "Load as Draft"],
-						],
-						{ local: entry.tab.getSource(), disk: disk.source },
-					);
-					if (decision === "draft" && disk.source !== null) {
-						entry.tab.setSource(disk.source);
-						label(entry);
-					}
-				});
-			retained.append(button);
-		}
-		conflicts.append(retained);
 	}
 }
 function dispose(entry: Entry) {

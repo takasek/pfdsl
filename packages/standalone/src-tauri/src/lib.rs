@@ -11,7 +11,7 @@ use tauri_plugin_dialog::{DialogExt, MessageDialogButtons, MessageDialogResult};
 struct Folders {
     roots: Mutex<Vec<workspace::Folder>>,
     acceptance: Option<PathBuf>,
-    documents: Mutex<Vec<documents::Document>>,
+    documents: Mutex<documents::Registry>,
 }
 
 #[tauri::command]
@@ -64,7 +64,7 @@ pub fn run() {
         .manage(Folders {
             roots: Mutex::new(roots),
             acceptance,
-            documents: Mutex::new(Vec::new()),
+            documents: Mutex::new(documents::Registry::default()),
         })
         .setup(move |app| {
             exit::install(app.handle()).map_err(std::io::Error::other)?;
@@ -88,7 +88,7 @@ pub fn run() {
             save_document,
             choose_save_target,
             read_dependency,
-            read_retained,
+            release_document,
             confirm_close_document,
             list_recent,
             open_recent,
@@ -152,10 +152,7 @@ fn write_acceptance_report(report: String, folders: State<'_, Folders>) -> Resul
 
 fn add_document(document: documents::Document, folders: &Folders) -> Result<documents::Snapshot, String> {
     let mut entries = folders.documents.lock().map_err(|e| e.to_string())?;
-    let id = entries.len();
-    let snapshot = document.inspect(id)?;
-    entries.push(document);
-    Ok(snapshot)
+    entries.insert(document)
 }
 
 #[tauri::command]
@@ -193,10 +190,11 @@ fn read_dependency(id: usize, path: String, folders: State<'_, Folders>) -> Resu
     entries.get(id).ok_or("Unknown document")?.read_dependency(&PathBuf::from(path))
 }
 #[tauri::command]
-fn read_retained(id: usize, path: String, folders: State<'_, Folders>) -> Result<documents::Snapshot, String> {
-    let entries = folders.documents.lock().map_err(|e| e.to_string())?;
-    entries.get(id).ok_or("Unknown document")?.retained_snapshot(id, &path)
+fn release_document(id: usize, folders: State<'_, Folders>) -> Result<(), String> {
+    folders.documents.lock().map_err(|e| e.to_string())?.remove(id);
+    Ok(())
 }
+
 #[tauri::command]
 async fn confirm_close_document(name: String, window: tauri::Window) -> Result<String, String> {
     let decision = window.dialog().message(format!("Save changes to {name}?"))
@@ -230,7 +228,7 @@ fn list_recent(app: tauri::AppHandle) -> Result<Vec<RecentTarget>, String> { rea
 #[tauri::command]
 fn remember_document(path: String, app: tauri::AppHandle, folders: State<'_, Folders>) -> Result<(), String> {
     let entries = folders.documents.lock().map_err(|e| e.to_string())?;
-    if !entries.iter().any(|d| d.observed_path().ok().is_some_and(|p| p.to_string_lossy() == path)) { return Err("The target has not been selected".into()); }
+    if !entries.values().any(|d| d.observed_path().ok().is_some_and(|p| p.to_string_lossy() == path)) { return Err("The target has not been selected".into()); }
     remember_target(&app, "file", path)
 }
 fn remember_target(app: &tauri::AppHandle, kind: &str, path: String) -> Result<(), String> {

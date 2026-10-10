@@ -386,6 +386,9 @@ Tauri の bundle 下限だけから WebKit / Monaco の対応を推定しない�
 
 ## #1258 の隔離候補 — 2026-10-09 UTC（wip）
 
+この節と以下の保存境界・stage 保全の記録は旧候補の履歴である。
+2026-10-10 の利用者判断により、現在の保証範囲は後掲「保存保証の簡素化と編集機能の集約」に置き換えた。
+
 基準は main `7dc51a6c5bb8088bb2a3ec7513cc295c322482b4` の専用 Git clone と専用ブランチ `codex/issue-1258-documents`。
 最初の archive 候補とその v0 納品は履歴として保存し、この節は更新された候補の検証範囲を表す。
 元 checkout、元 VS Code smoke runner、既存399セルと各固定版の受入判定は変更しない。
@@ -468,3 +471,28 @@ DOM seam は実 Monaco/native window の GUI 受入ではない。
 版、Red/Green、生ログ、独立レビューは独立候補の外部報告に保存する。
 v4 の凍結 app と source は変更しておらず、この候補をその app の実測結果へ転写しない。
 GUI と rustfmt は未実施のままで、追加 install、画面ロック解除、公開操作はしていない。
+
+## 保存保証の簡素化と編集機能の集約 — 2026-10-10（wip）
+
+利用者は保存前の外部変更検査を保証する方針 C を選び、検査後の競合や旧 FD writer まで追跡する方式を廃止すると判断した。
+mode・owner/group・保護 flags・ACL の欠落は拒否し、その他の metadata は OS 標準のコピーに委ねる。
+アプリ専用の一時名に対する意図的・継続的な操作は対象外とし、排他的な一時作成と通常の失敗時 cleanup を行う。
+この判断は前節の候補に対する現在の変更方針であり、以前の保証範囲や未完了の #1258 全体の受入を満たしたという意味ではない。
+
+現在の Save は選択 directory・期待 revision を確認し、同じ directory に本文を書いて sync した後、もう一度確認してから atomic replace または exclusive create を行う。
+検知した外部変更は保存を止め、エラー時も editor buffer を残す。
+最終確認後の外部書込みは上書きされ得るし、置換前の inode を開いた writer の後続書込みも回収しない。
+正常保存後の旧 inode、旧版の比較・draft 読込 UI、全 xattr と creation time の独自一致検査は削除した。
+内容が同じ場合も期待 revision と directory を検査し、変更がなければ置換と一時ファイル作成を省く。
+
+native document registry は単調増加 ID と削除可能な map を使う。
+close、重複 Open の再接続、Save As のキャンセル・別タブ使用による拒否、保存先の採用で不要になった参照を解放し、未解決の保存先は保持する。
+表示 path が同じでも別の directory capability で選び直したファイルは別タブで開き、旧タブの編集を保持する。
+同じ binding での atomic replacement は既存タブへ接続し、dirty buffer と外部変更の比較を維持する。
+
+#1426〜#1431 の保存・座標・正規化表示・整形・選択整形・言語設定は #1431 に集約する。
+FM001 による選択整形の拒否を共通の body 境界計算へ移し、standalone 側の全体再解析と2つの整形テストに重複していた host 準備を削除した。
+実装前に無変更保存・反復保存・同じ binding の再選択・閉じていない frontmatter の失敗を再現し、修正後のテストで確認した。
+最終差分の検査と独立レビューの結果は集約 PR 本文に記録する。
+過去の固定版 native corpus・GUI 判定はこの版へ転写しない。
+実 native GUI、IME、Cmd-Q/menu/Dock Quit、Find/Replace、Undo/Redo、複雑な ACL/ownership の実機受入は残り、#1258/#1259 は未完了のままとする。

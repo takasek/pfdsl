@@ -82,7 +82,8 @@ test("Save As recovery retains target ownership and refuses intervening edits in
 		globalThis.nativeInvoke = async (command, args) => {
 			calls.push({ command, args });
 			if (command === "list_recent") return [];
-			if (command === "remember_document") return;
+			if (command === "remember_document" || command === "release_document")
+				return;
 			if (command === "select_document" || command === "open_document")
 				return selectedDocument;
 			if (command === "choose_save_target") return saveTarget;
@@ -98,13 +99,6 @@ test("Save As recovery retains target ownership and refuses intervening edits in
 				return {
 					outcome: "conflict",
 					current: published,
-					displaced: {
-						...B,
-						path: "/B/.b-retained",
-						source: "external B",
-						revision: "b-external",
-					},
-					retained: ["/B/.b-retained"],
 					message: "publication race",
 				};
 			if (command === "inspect_document") {
@@ -181,6 +175,68 @@ export function createDocumentTab(options){
 				.click();
 			await flush();
 		};
+		// Equal display paths can belong to different selected directories.
+		const baselineSelection = selectedDocument;
+		const baselineTabCount = reviewEntries.size;
+		selectedDocument = { ...A, id: 100, binding: "old-parent:a.pfdsl" };
+		await click("#open-file");
+		const oldBinding = reviewActive();
+		oldBinding.tab.setSource("keep old edits");
+		selectedDocument = {
+			...A,
+			id: 101,
+			binding: "new-parent:a.pfdsl",
+			identity: "new-inode",
+			source: "new folder content",
+		};
+		await click("#open-file");
+		const newBinding = reviewActive();
+		assert.notEqual(newBinding, oldBinding);
+		assert.equal(newBinding.tab.getSource(), "new folder content");
+		assert.equal(oldBinding.tab.getSource(), "keep old edits");
+		for (let id = 102; id < 112; id++) {
+			selectedDocument = { ...selectedDocument, id };
+			await click("#open-file");
+			assert.equal(reviewActive(), newBinding);
+			assert.equal(reviewEntries.size, baselineTabCount + 2);
+			assert.ok(
+				calls.some(
+					(call) =>
+						call.command === "release_document" && call.args.id === id - 1,
+				),
+			);
+		}
+		// A canceled Save As releases the newly selected target immediately.
+		saveTarget = { ...B, id: 112, source: "existing target" };
+		await click("#save-as");
+		await dialogClick("Keep Editing");
+		assert.ok(
+			calls.some(
+				(call) => call.command === "release_document" && call.args.id === 112,
+			),
+		);
+		// A target already open in another tab is also released after rejection.
+		saveTarget = { ...A, id: 113, binding: "old-parent:a.pfdsl" };
+		await click("#save-as");
+		assert.ok(
+			calls.some(
+				(call) => call.command === "release_document" && call.args.id === 113,
+			),
+		);
+		for (const document of [oldBinding, newBinding]) {
+			decisions = ["discard"];
+			document.navigation.querySelector(".close-document").click();
+			await flush();
+		}
+		for (const id of [100, 111])
+			assert.ok(
+				calls.some(
+					(call) => call.command === "release_document" && call.args.id === id,
+				),
+			);
+		assert.equal(reviewEntries.size, baselineTabCount);
+		selectedDocument = baselineSelection;
+		saveTarget = B;
 		await click("#open-file");
 		const entry = reviewActive();
 		entry.tab.setSource("local");
@@ -256,7 +312,7 @@ export function createDocumentTab(options){
 			);
 			assert.equal(packet.targetWasDirectory, true);
 			assert.equal(packet.observedPublishedContent, packet.buffer);
-			assert.equal(packet.observedRetainedContent, packet.baseline.source);
+
 			selectedDocument = packet.baseline;
 			saveTarget = packet.baseline;
 			saveReply = packet.result;
@@ -275,10 +331,10 @@ export function createDocumentTab(options){
 			assert.equal(nativeFailure.session.pendingTarget.id, packet.baseline.id);
 			assert.equal(nativeFailure.tab.getSource(), packet.buffer);
 			assert.equal(nativeFailure.session.isDirty(), true);
-			assert.deepEqual(nativeFailure.session.retained, packet.result.retained);
+
 			assert.match(
 				document.querySelector("#conflicts").textContent,
-				/Publication occurred/,
+				/save was published/,
 			);
 			assert.equal(
 				[...document.querySelectorAll("#conflicts button")].find(
@@ -347,7 +403,13 @@ export function createDocumentTab(options){
 			results.dependencyCall = calls.at(-1);
 		}
 		assert.equal(results.afterPoll.observed, B.path);
-		assert.equal(results.afterPoll.conflict, "/B/.b-retained");
+		assert.equal(results.afterPoll.conflict, B.path);
+		assert.ok(
+			!calls.some(
+				(call) => call.command === "release_document" && call.args.id === B.id,
+			),
+			"Unresolved Save As target must stay usable",
+		);
 		assert.equal(results.afterUseDisk.source, "typed after confirmation");
 		assert.equal(results.afterUseDisk.disk, A.path);
 		assert.equal(results.afterStableUseDisk.source, published.source);
@@ -364,6 +426,11 @@ export function createDocumentTab(options){
 		assert.equal(reviewEntries.size, beforeRenameCount);
 		assert.equal(entry.session.disk.path, selectedDocument.path);
 		assert.equal(entry.session.disk.id, 3);
+		assert.ok(
+			calls.some(
+				(call) => call.command === "release_document" && call.args.id === B.id,
+			),
+		);
 		assert.equal(entry.path, selectedDocument.path);
 		assert.equal(entry.tab.location, selectedDocument.path);
 		assert.equal(entry.name, "renamed.pfdsl");

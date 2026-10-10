@@ -13,8 +13,6 @@ export interface SaveResult {
 		| "failed-before-publication"
 		| "published-but-unconfirmed";
 	current?: DiskSnapshot | null;
-	displaced?: DiskSnapshot | null;
-	retained: string[];
 	message?: string;
 	publication?: "not-published" | "published" | "unknown";
 	targetState?: "readable" | "missing" | "unreadable";
@@ -23,6 +21,19 @@ interface DocumentView {
 	getSource(): string;
 	setSource(source: string): void;
 	getRevision?(): number | string;
+}
+
+/** Match selected capabilities, not display paths that can be rebound. */
+export function sameDocument(
+	previous: DiskSnapshot,
+	current: DiskSnapshot,
+): boolean {
+	return Boolean(
+		(previous.binding &&
+			current.binding &&
+			previous.binding === current.binding) ||
+			(previous.identity && previous.identity === current.identity),
+	);
 }
 
 /** Keeps disk acknowledgment separate from the editor's current content. */
@@ -34,7 +45,6 @@ export class DocumentSession {
 	conflict: DiskSnapshot | null = null;
 	pendingTarget: DiskSnapshot | null = null;
 	sourceConflict: DiskSnapshot | null = null;
-	retained: string[] = [];
 	message = "";
 	saveFailure: SaveResult | null = null;
 	private uncertain = false;
@@ -70,8 +80,7 @@ export class DocumentSession {
 	}
 	rebindDisk(current: DiskSnapshot) {
 		const previous = this.disk;
-		if (!previous?.identity || previous.identity !== current.identity)
-			return false;
+		if (!previous || !sameDocument(previous, current)) return false;
 		const changed = previous.revision !== current.revision;
 		const dirty = this.isDirty();
 		// Adopt the selected native capability without acknowledging unsaved text.
@@ -80,6 +89,7 @@ export class DocumentSession {
 			id: current.id,
 			path: current.path,
 			binding: current.binding,
+			identity: current.identity,
 		};
 		const oldPending = this.pendingTarget;
 		const ownsSource = (snapshot: DiskSnapshot) => {
@@ -140,20 +150,16 @@ export class DocumentSession {
 				outcome: "published-but-unconfirmed",
 				publication: "unknown",
 				targetState: "unreadable",
-				retained: [],
 				message: `The save result could not be confirmed. Editor content is retained; inspect the selected target before retrying. ${String(error)}`,
 			};
 		}
-		this.retained.push(
-			...result.retained.filter((path) => !this.retained.includes(path)),
-		);
 		this.message = result.message ?? "";
 		this.observed = result.current ?? null;
 		if (result.outcome !== "saved" || !result.current) {
 			this.uncertain = true;
 			this.saveFailure = result;
 			this.pendingTarget = result.current ?? target;
-			this.conflict = result.displaced ?? result.current ?? null;
+			this.conflict = result.current ?? null;
 			return false;
 		}
 		this.disk = result.current;

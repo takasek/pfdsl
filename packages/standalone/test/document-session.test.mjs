@@ -20,7 +20,25 @@ const snap = (source, revision = source, path = "/a.pfdsl") => ({
 	source,
 	revision,
 	identity: "file:1",
-	retained: [],
+});
+
+test("reopening the same binding after atomic replacement keeps dirty edits and adopts the selected capability", () => {
+	const editor = view();
+	const original = { ...snap("original"), binding: "directory:a.pfdsl" };
+	const doc = new DocumentSession(editor, original);
+	editor.edit("local");
+	const replacement = {
+		...original,
+		id: 2,
+		source: "external",
+		revision: "new",
+		identity: "file:2",
+	};
+	assert.equal(doc.rebindDisk(replacement), true);
+	assert.equal(doc.disk.id, 2);
+	assert.equal(editor.getSource(), "local");
+	assert.equal(doc.conflict.source, "external");
+	assert.equal(doc.isDirty(), true);
 });
 
 test("a rejected native reply preserves a clean buffer as uncertain at the selected Save As target", async () => {
@@ -52,7 +70,7 @@ test("a published native failure keeps its receipt and buffer without claiming a
 		outcome: "published-but-unconfirmed",
 		publication: "published",
 		targetState: "unreadable",
-		retained: ["/old-inode"],
+
 		message: "Publication occurred; target cannot be read.",
 	};
 	assert.equal(await doc.save(async () => result), false);
@@ -86,12 +104,10 @@ test("save acknowledges the submitted snapshot and keeps edits made during I/O d
 	release({
 		outcome: "saved",
 		current: snap("submitted"),
-		retained: ["/backup"],
 	});
 	assert.equal(await pending, true);
 	assert.equal(doc.isDirty(), true);
 	assert.equal(editor.getSource(), "newer");
-	assert.deepEqual(doc.retained, ["/backup"]);
 });
 
 test("a slow clean reload cannot replace edits made while reading", async () => {
@@ -125,16 +141,15 @@ test("clean external reload applies; dirty deletion and changed disk retain buff
 	assert.equal(doc.isDirty(), true);
 });
 
-test("a publication-time conflict keeps the buffer dirty and exposes both disk versions", async () => {
+test("a detected conflict keeps the buffer dirty and exposes the current disk version", async () => {
 	const editor = view();
 	const doc = new DocumentSession(editor, snap("original"));
 	editor.edit("local");
 	assert.equal(
 		await doc.save(async () => ({
 			outcome: "conflict",
-			current: snap("local"),
-			displaced: snap("racing writer"),
-			retained: ["/old-inode"],
+			current: snap("racing writer"),
+
 			message: "A race was observed",
 		})),
 		false,
@@ -142,7 +157,6 @@ test("a publication-time conflict keeps the buffer dirty and exposes both disk v
 	assert.equal(editor.getSource(), "local");
 	assert.equal(doc.isDirty(), true);
 	assert.equal(doc.conflict.source, "racing writer");
-	assert.deepEqual(doc.retained, ["/old-inode"]);
 });
 
 test("discard decisions are deferred until every dirty tab accepts close", async () => {
@@ -242,7 +256,6 @@ for (const decision of ["save", "discard", "cancel"]) {
 				return doc.save(async (source) => ({
 					outcome: "saved",
 					current: snap(source),
-					retained: [],
 				}));
 			},
 			() => {
@@ -316,7 +329,6 @@ for (const change of ["source", "state epoch", "edit then undo"]) {
 					return doc.save(async (source) => ({
 						outcome: "saved",
 						current: snap(source),
-						retained: [],
 					}));
 				},
 				() => {
@@ -394,7 +406,6 @@ test("an external read from before a completed save cannot rewind the saved base
 	await doc.save(async () => ({
 		outcome: "saved",
 		current: snap("local"),
-		retained: [],
 	}));
 	release(snap("older external"));
 	await check;
@@ -403,17 +414,15 @@ test("an external read from before a completed save cannot rewind the saved base
 	assert.equal(doc.conflict, null);
 });
 
-test("polling the same published target preserves the displaced conflict snapshot", async () => {
+test("polling the same target preserves the observed conflict snapshot", async () => {
 	const editor = view();
 	const doc = new DocumentSession(editor, snap("original"));
 	editor.edit("local");
 	await doc.save(async () => ({
 		outcome: "conflict",
-		current: snap("local"),
-		displaced: snap("racing external"),
-		retained: ["/retained"],
+		current: snap("racing external"),
 	}));
-	await doc.checkExternal(async () => snap("local"));
+	await doc.checkExternal(async () => snap("racing external"));
 	assert.equal(doc.conflict.source, "racing external");
 	assert.equal(doc.isDirty(), true);
 });
@@ -422,15 +431,13 @@ test("failed Save As keeps recovery target B when original A is polled", async (
 	const editor = view();
 	const original = snap("original");
 	const target = { ...snap("old B", "b0", "/B/b.pfdsl"), id: 2 };
-	const current = { ...target, source: "local", revision: "b1" };
+	const current = { ...target, source: "external B", revision: "b1" };
 	const doc = new DocumentSession(editor, original);
 	editor.edit("local");
 	await doc.save(
 		async () => ({
 			outcome: "conflict",
 			current,
-			displaced: { ...target, source: "external B" },
-			retained: ["/B/retained"],
 		}),
 		target,
 	);
@@ -454,7 +461,6 @@ test("unconfirmed Save As without a readable result still belongs to the chosen 
 	await doc.save(
 		async () => ({
 			outcome: "published-but-unconfirmed",
-			retained: ["/B/retained"],
 		}),
 		target,
 	);
@@ -579,7 +585,6 @@ test("rebinding source A preserves a separate unresolved Save As target B", asyn
 		async () => ({
 			outcome: "failed-before-publication",
 			current: B,
-			retained: [],
 		}),
 		B,
 	);
@@ -662,7 +667,6 @@ test("same-target failed Save recovery follows an explicit same-inode rename reo
 	await doc.save(async () => ({
 		outcome: "failed-before-publication",
 		current: original,
-		retained: [],
 	}));
 	const renamed = { ...original, id: 9, path: "/renamed.pfdsl" };
 	assert.equal(doc.rebindDisk(renamed), true);
@@ -688,7 +692,6 @@ test("failed Save As selecting the same source with a new native id follows a sa
 		async () => ({
 			outcome: "failed-before-publication",
 			current: selectedAgain,
-			retained: [],
 		}),
 		selectedAgain,
 	);
@@ -715,7 +718,6 @@ test("failed source Save after a parent move follows the same native capability 
 	await doc.save(async () => ({
 		outcome: "failed-before-publication",
 		current: movedParent,
-		retained: [],
 	}));
 	const renamed = { ...original, id: 9, path: "/moved-parent/c.pfdsl" };
 	assert.equal(doc.rebindDisk(renamed), true);
@@ -736,7 +738,6 @@ test("native parent-inode/leaf bindings distinguish reselected source capabiliti
 		async () => ({
 			outcome: "failed-before-publication",
 			current: selectedAgain,
-			retained: [],
 		}),
 		selectedAgain,
 	);
@@ -761,7 +762,6 @@ test("native parent-inode/leaf bindings distinguish reselected source capabiliti
 		async () => ({
 			outcome: "failed-before-publication",
 			current: alias,
-			retained: [],
 		}),
 		alias,
 	);
