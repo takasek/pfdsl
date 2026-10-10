@@ -160,7 +160,7 @@ artifact:
     criteria: 任意 PFD の新規・開く・手動保存・別名保存とエディタ＋プレビューの組のタブ操作が実機で動き、未保存終了・外部再変更・削除・保存失敗の試験で内容を黙って失わずに解決できる
   standalone_pfd_features:
     label: PFD 編集・閲覧機能が揃ったアプリ
-    status: todo
+    status: wip
     criteria: 受入対応表の言語支援・構造編集・プレビュー操作・相互移動・extends が両ホストで検証され、日本語・大きい図・不完全な文書・タブ切替の実機確認と証拠が揃っている
   standalone_integrations:
     label: 関連参照・差分・外部実行を備えたアプリ

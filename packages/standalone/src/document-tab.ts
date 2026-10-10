@@ -1,5 +1,7 @@
 import {
+	analyzeSnapshot,
 	applyPreviewEdit,
+	computeNormalizedEdgesOutput,
 	type DocumentModel,
 	findFrontmatterDefinitionRange,
 	nodeIdAtSourcePosition,
@@ -7,6 +9,7 @@ import {
 } from "@pfdsl/editor";
 import { mountPreview } from "@pfdsl/editor/preview";
 import * as monaco from "monaco-editor/editor/editor.api.js";
+import { createNormalizedEdgesPanel } from "./normalized-edges.js";
 import { formatSnapshot, processSnapshot } from "./processing.js";
 
 interface DocumentTabOptions {
@@ -42,6 +45,7 @@ export function createDocumentTab({
 	previewElement.className = "preview";
 	container.append(editorElement, previewElement);
 	parent.append(container);
+	const normalizedEdges = createNormalizedEdgesPanel(container);
 	const model = monaco.editor.createModel(
 		source,
 		"plaintext",
@@ -179,6 +183,8 @@ export function createDocumentTab({
 		void refresh().catch((error) => reportStatus(String(error)));
 	}
 	editor.onDidChangeModelContent(() => {
+		if (disposed) return;
+		normalizedEdges.clear();
 		button.textContent = `${name}${editor.getValue() === source ? "" : " •"}`;
 		requestEditorRender();
 		requestRefresh();
@@ -235,6 +241,13 @@ export function createDocumentTab({
 			button.textContent = `${name}${editor.getValue() === source ? "" : " •"}`;
 		},
 		isDirty: () => editor.getValue() !== source,
+		normalize() {
+			if (disposed) return;
+			const output = computeNormalizedEdgesOutput(
+				analyzeSnapshot(editor.getValue()),
+			);
+			normalizedEdges.show(output);
+		},
 		format() {
 			const output = formatSnapshot(editor.getValue());
 			if (output === null) return;

@@ -166,6 +166,11 @@ An AppImage dependency check does not certify folder dialogs, GUI interaction, o
 Each tab pairs its editor and preview.
 Choose **Open folder…** to list PFDs in that folder and open them as additional tabs.
 Format is an Undoable editor operation, and editor/node navigation uses the shared source positions.
+Choose **Normalized edges** to inspect the active tab’s current text without editing it.
+The read-only result uses the same edge sorting and serialization as the VS Code command; errors block the output, while warnings do not.
+Result messages belong to their tab: an empty edge set shows `No normalized edges.`, and blocked output shows `Fix errors before normalizing.`.
+Editing clears the previous result; run the action again to refresh it.
+Each tab retains its own result, and **Close** or Escape within the panel dismisses it.
 The native host holds a directory capability for each folder explicitly selected for that session.
 Reads stay bound to that directory when its pathname is replaced; relative traversal and symlink escape are rejected.
 
