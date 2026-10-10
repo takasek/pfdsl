@@ -170,6 +170,64 @@ test("the production document-tab entry loads real Monaco menu contributions", a
 				},
 			);
 		}
+		for (const before of ["\n", "\r\n"]) {
+			await t.test(
+				`mixed-EOL reload acknowledges Monaco normalization from ${JSON.stringify(before)}`,
+				async () => {
+					await withEditors(
+						`a >> p${before}p -> b${before}`,
+						async (create, tabs) => {
+							const editor = create();
+							const tab = tabs[0];
+							const original = {
+								id: 1,
+								path: "/a.pfdsl",
+								binding: "dir:a",
+								identity: "inode:a",
+								source: tab.getSource(),
+								revision: "old",
+							};
+							const session = new DocumentSession(tab, original);
+							const mixed = "a >> p\np -> c\r\n";
+							const replacement = {
+								...original,
+								source: mixed,
+								revision: "mixed",
+							};
+							const normalized = "a >> p\r\np -> c\r\n";
+							await session.checkExternal(async () => replacement);
+							assert.equal(tab.getSource(), normalized);
+							assert.equal(session.savedSource, normalized);
+							assert.equal(session.disk.source, mixed);
+							assert.equal(session.isDirty(), false);
+							await session.checkExternal(async () => replacement);
+							assert.equal(session.isDirty(), false);
+							const count = before === "\n" ? 2 : 1;
+							for (let i = 0; i < count; i++) await editor.getModel().undo();
+							assert.equal(tab.getSource(), original.source);
+							assert.equal(session.isDirty(), true);
+							for (let i = 0; i < count; i++) await editor.getModel().redo();
+							assert.equal(tab.getSource(), normalized);
+							assert.equal(session.isDirty(), false);
+							let disposed = false;
+							assert.equal(
+								await closeDocuments(
+									[session],
+									async () => assert.fail("clean reload must not prompt"),
+									async () =>
+										assert.fail("close must not rewrite mixed disk bytes"),
+									() => {
+										disposed = true;
+									},
+								),
+								true,
+							);
+							assert.equal(disposed, true);
+						},
+					);
+				},
+			);
+		}
 		await t.test(
 			"editing then undoing invalidates a pending close decision through the production tab",
 			async () => {

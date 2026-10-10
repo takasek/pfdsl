@@ -280,7 +280,8 @@ export class DocumentSession {
 		this.view.setSource(current.source);
 		this.disk = current;
 		this.observed = current;
-		this.savedSource = current.source;
+		// Monaco normalizes mixed line endings; acknowledge the applied editor value.
+		this.savedSource = this.view.getSource();
 		this.saveFailure = null;
 		this.conflict = null;
 		this.pendingTarget = null;

@@ -200,19 +200,22 @@ The recent list stores targets only, never editor content.
 Closing a dirty tab or window, or using macOS Command-Q, the application Quit menu, or Dock Quit, enters the same Save, Discard, and Cancel transaction.
 Native requests are cancelled immediately and exit is requested only after every document accepts; logout/shutdown may therefore be cancelled rather than resumed.
 The guard does not protect against Force Quit, crashes, or power loss.
-Actual AppKit Quit interactions remain unverified in this candidate.
+Owner-performed macOS Quit acceptance is recorded in [ACCEPTANCE.md](./ACCEPTANCE.md).
 A cancellation, failed save, unreadable disk state, changed tab membership, or edit during the close sequence preserves unconfirmed buffers; earlier successful saves remain on disk.
-Disk reads already in progress finish before close decisions, and an unreadable former disk version makes its surviving editor content require confirmation.
+Close finishes disk reads already in progress, starts fresh reads before decisions, and checks every target again after the last decision before disposing tabs.
+An unreadable former disk version makes its surviving editor content require confirmation.
 A decision applies only to the editor and disk state the application observed when it requested confirmation; a changed observed version requires a new decision.
-External file writes alone do not update that version, and background disk polling pauses while the confirmation is open.
-Discard can therefore close the tab after an external write the application has not observed; it leaves the external file on disk unchanged.
+Background disk polling pauses while confirmation is open, but the final checks reject the close if an observed version changed.
+External changes after those final reads are not excluded atomically; Discard leaves the disk file unchanged.
 
 Clean external changes reload automatically; dirty changes, deletion, and publication conflicts keep the editor content for review.
 The conflict panel identifies the recovery target and lets you compare its observed contents, choose another destination, or explicitly load the current disk version.
-Save As rejects a target already open by selected directory/leaf binding or file identity.
+Save As rejects a target already open by selected directory/leaf binding.
+Distinct hard-link names are separate tabs and save targets; saving atomically replaces only the selected name.
+External reloads acknowledge the text applied by Monaco, which normalizes mixed line endings to a single style; reloading or closing a clean tab does not rewrite the disk file, while a manual save writes the normalized editor text.
 After a failed Save As, the original document remains active until a target is successfully saved or explicitly adopted.
 Adoption refuses a target already open in another tab; both local buffers remain available.
-Explicitly reopening a renamed file with the same inode updates its native capability and dependency base while retaining dirty content; native parent-inode/leaf bindings keep source recovery separate from other Save As targets.
+Explicitly reopening a renamed file with the same inode updates its native capability and dependency base while retaining dirty content only after a fresh inspection confirms that the old selected name is missing; native parent-inode/leaf bindings keep source recovery separate from other Save As targets.
 
 On macOS, a save checks the selected directory and disk revision, stages and synchronizes content in that directory, checks again, then atomically replaces the file (or exclusively creates a new one).
 A detected external change stops the save and preserves editor content for review.
