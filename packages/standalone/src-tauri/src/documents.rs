@@ -98,6 +98,9 @@ impl Document {
         self.inspect_leaf(id, &self.leaf)
     }
     fn inspect_leaf(&self, id: usize, leaf: &str) -> Result<Snapshot, String> {
+        self.inspect_leaf_with_hook(id, leaf, || {})
+    }
+    fn inspect_leaf_with_hook(&self, id: usize, leaf: &str, after_read: impl FnOnce()) -> Result<Snapshot, String> {
         let path = directory_path(&self.parent, self.path.parent().unwrap())?.join(leaf).to_string_lossy().into_owned();
         let parent = self.parent.dir_metadata().map_err(|e| e.to_string())?;
         let binding = format!("{}:{}:{}", parent.dev(), parent.ino(), leaf);
@@ -116,11 +119,20 @@ impl Document {
         let metadata_before = save_metadata::capture(&file)?;
         let mut source = String::new();
         file.read_to_string(&mut source).map_err(|e| e.to_string())?;
+        after_read();
         let after = file.metadata().map_err(|e| e.to_string())?;
         #[cfg(target_os = "macos")]
         let metadata_after = save_metadata::capture(&file)?;
         #[cfg(target_os = "macos")]
         if metadata_before != metadata_after { return Err("Metadata changed while reading; editor content is retained.".into()); }
+        // The descriptor can outlive atomic replacement or deletion of the selected name.
+        let named_after = self.parent.symlink_metadata(leaf)
+            .map_err(|_| "The selected file changed while reading. Try again; editor content is retained.".to_string())?;
+        if !named_after.is_file() || named_after.file_type().is_symlink()
+            || named_after.dev() != after.dev() || named_after.ino() != after.ino()
+            || named_after.len() != after.len() || named_after.modified().ok() != after.modified().ok() {
+            return Err("The selected file changed while reading. Try again; editor content is retained.".into());
+        }
         let identity = format!("{}:{}", after.dev(), after.ino());
         if before.dev() != metadata.dev() || before.ino() != metadata.ino()
             || before.len() != after.len() || before.modified().ok() != after.modified().ok()
@@ -300,6 +312,37 @@ mod tests {
         assert_eq!(unsafe { libc::getxattr(path.as_ptr(), name.as_ptr(), bytes.as_mut_ptr().cast(), bytes.len(), 0, 0) }, size);
         bytes
     }
+    #[test] fn inspection_refuses_a_leaf_replaced_after_reading_the_open_descriptor() {
+        let (root, doc) = fixture("inspect-replacement");
+        let result = doc.inspect_leaf_with_hook(0, "a.pfdsl", || {
+            fs::write(root.join("external.pfdsl"), "external").unwrap();
+            fs::rename(root.join("external.pfdsl"), root.join("a.pfdsl")).unwrap();
+        });
+        assert!(result.is_err(), "the old descriptor must not acknowledge the new leaf");
+        assert_eq!(fs::read_to_string(root.join("a.pfdsl")).unwrap(), "external");
+        assert_eq!(doc.inspect(0).unwrap().source.as_deref(), Some("external"));
+        fs::remove_dir_all(root).unwrap();
+    }
+    #[test] fn inspection_refuses_a_leaf_deleted_after_reading_the_open_descriptor() {
+        let (root, doc) = fixture("inspect-deletion");
+        let result = doc.inspect_leaf_with_hook(0, "a.pfdsl", || {
+            fs::remove_file(root.join("a.pfdsl")).unwrap();
+        });
+        assert!(result.is_err(), "the retained descriptor must not acknowledge a missing leaf");
+        assert!(doc.inspect(0).unwrap().source.is_none());
+        fs::remove_dir_all(root).unwrap();
+    }
+    #[test] fn inspection_refuses_a_leaf_changed_to_a_symlink_after_reading() {
+        let (root, doc) = fixture("inspect-symlink");
+        let result = doc.inspect_leaf_with_hook(0, "a.pfdsl", || {
+            fs::rename(root.join("a.pfdsl"), root.join("retained.pfdsl")).unwrap();
+            std::os::unix::fs::symlink("retained.pfdsl", root.join("a.pfdsl")).unwrap();
+        });
+        assert!(result.is_err(), "a symlink to the same inode is not the selected regular leaf");
+        assert_eq!(fs::read_to_string(root.join("retained.pfdsl")).unwrap(), "original");
+        fs::remove_dir_all(root).unwrap();
+    }
+
     #[test] fn unchanged_save_keeps_identity_and_leaves_no_temporary_files() {
         let (root, mut doc) = fixture("unchanged");
         let before = doc.inspect(0).unwrap();

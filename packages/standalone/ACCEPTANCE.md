@@ -633,3 +633,18 @@ LF / CRLF の両方の初期状態から混在改行を再読込する2条件で
 混在改行の元バイト列を本文モデルへ保持する保証は追加しない。再読込や終了だけではディスクを書き換えず、手動保存を選ぶ場合はモデルの正規化済み本文を保存する。
 README の Save As 拒否条件は native directory / leaf binding の一致とし、同時に存在するハードリンクの別名は別タブ・別保存先であることと、inode による移動回復には元 leaf の消失確認が必要なことを明記した。
 追加の混在改行検査は Node / JSDOM と実 Monaco による自動検査で、前節の所有者による4種類の実機受入を追加条件の成功へ広げない。
+
+### 所有者による混在改行の追加実機受入
+
+2026-10-11、所有者から「追加確認すべて意図通り」との報告を受領した。
+引継ぎ対象は source `67d7603c8ee0928c38a99bbbcdb9e9d9e17ae343` の Mac debug app で、ローカル署名後 executable の SHA-256 は `193ab7b9006c6ef51854b24850ecdb33beb4793ea37c134e01b8ef4ae0540cbd`。
+同梱手順の初期 LF / CRLF からの混在改行再読込・clean・Undo / Redo・確認なしの終了を、所有者による実機受入完了として記録する。
+手動保存の正規化済みバイト列や全 native corpus の追加実測へは広げない。
+
+### native 読取中の選択 leaf の再検査
+
+読み取るために開いた descriptor の前後の metadata だけでは、その間に選択 leaf が置き換わったことを検出できなかった。
+読取後に選択 leaf を symlink_metadata で再検査し、regular file・device / inode・長さ・更新時刻が開いた descriptor の観測と一致しなければ snapshot を拒否する。
+読取後の決定的な fault hook で別 inode への atomic replacement・削除・同 inode を指す symlink への変更を注入し、修正前の失敗と修正後の拒否を確認する。
+保存前の再検査と終了時の inspect は同じ読取経路を使い、拒否は既存の保存・本文保持処理へ渡す。最終観測後の外部変更を原子的に排除する保証は追加しない。
+この競合の証拠は実 Rust / filesystem の決定的検査であり、所有者による混在改行の受入を競合注入の実機結果へは広げない。
