@@ -51,9 +51,6 @@ jobs:
   vscode-smoke:
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    env:
-      # This draft branch is one diagnostic trial; ordinary smoke stays opt-in.
-      PFDSL_SMOKE_DIAGNOSTICS_DIR: ${{ github.head_ref == 'codex/issue-1424-close-trace' && format('{0}/pfdsl-smoke-diagnostics', runner.temp) || '' }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
@@ -73,6 +70,8 @@ jobs:
 
       - name: Record diagnostic source and runner identities
         if: github.head_ref == 'codex/issue-1424-close-trace'
+        env:
+          PFDSL_SMOKE_DIAGNOSTICS_DIR: ${{ format('{0}/pfdsl-smoke-diagnostics', runner.temp) }}
         run: |
           mkdir -p "$PFDSL_SMOKE_DIAGNOSTICS_DIR"
           {
@@ -86,6 +85,9 @@ jobs:
           } > "$PFDSL_SMOKE_DIAGNOSTICS_DIR/identity.txt"
 
       - run: xvfb-run --auto-servernum make test-vscode-smoke
+        env:
+          # runner context is available at step scope; other branches opt out.
+          PFDSL_SMOKE_DIAGNOSTICS_DIR: ${{ github.head_ref == 'codex/issue-1424-close-trace' && format('{0}/pfdsl-smoke-diagnostics', runner.temp) || '' }}
 
       - name: Preserve bounded source-close diagnostics
         if: always() && github.head_ref == 'codex/issue-1424-close-trace'
