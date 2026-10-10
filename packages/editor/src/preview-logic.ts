@@ -42,7 +42,7 @@ export function blockingDiagnosticMessage(
 }
 
 /**
- * Where an id first appears in the body, as a zero-origin editor position.
+ * Where an id first appears in the snapshot's body, as a zero-origin UTF-16 editor position.
  * Statement order is document order, so the first hit is the topmost mention.
  */
 export function positionOfNodeId(

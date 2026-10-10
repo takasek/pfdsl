@@ -77,8 +77,14 @@ artifact:
   preview_connector:
     label: "Preview コネクタ生成 UI (#483)"
     description: "webview の nodeClick 基盤を拡張し、ノードクリックから前後追加・接続をテキストへ反映する。#482 の編集機構を共用"
-    status: wip
+    status: done
     criteria: "Preview のノードクリックからコネクタ選択・生成でテキストへ反映され再描画されることが動作確認済み"
+  connector_single_producer_guard:
+    label: 別の生成元を増やす接続の事前防止
+    description: "既存接続 UI の完了とは分け、output 追加による V001 を理由付きで防止する共有編集制約。要件は issue #1432"
+    status: todo
+    criteria: "両ホストで候補と適用時の判定が一致し、別 producer を増やす output を拒否する。本文・dirty・Undo・入力を保持し、有効な接続と既存不正図の無関係な編集を妨げないことを回帰検査と実 UI で確認する"
+    location: https://github.com/takasek/pfdsl/issues/1432
   def_insertion:
     label: "frontmatter 定義挿入 code action (#484)"
     description: "edge にのみ現れる未定義ノードへ artifact/process 定義スケルトンを挿入する"
@@ -128,13 +134,13 @@ artifact:
   node_definition_creation:
     label: プレビューと CLI から作れるノード定義
     description: "未定義ノードから共通 core 処理を使って frontmatter 定義を挿入する機能。要件は issue #1282"
-    status: wip
+    status: done
     criteria: "Preview のノードから定義作成でき、CLI でも同じファイルに同じ定義を作れる。既存定義・不正な入力では重複や部分書込みが起きず、拡張では Undo できる"
     location: ../packages/
   node_location_cycle:
     label: 定義と本文中の同一ノード位置を巡回する操作
     description: "エディタ内で frontmatter 定義キーとグラフ本文に現れる同一ノード ID の各位置を順に巡回する機能。右クリックとショートカットから使い、Cmd+クリックの適否は既存操作との整合で判断する。要件は issue #1283"
-    status: wip
+    status: done
     criteria: "定義キーから本文中の同一 ID の全出現箇所を文書順に巡回して定義へ戻れ、途中からも次へ進める。キー操作と右クリックから利用でき、VS Code の既存操作とのショートカット衝突が解消済み"
     location: ../packages/
   hover_local_graph:
@@ -156,11 +162,11 @@ artifact:
     location: ../packages/standalone/
   standalone_documents:
     label: 安全に編集・保存できる文書アプリ
-    status: todo
+    status: done
     criteria: 任意 PFD の新規・開く・手動保存・別名保存とエディタ＋プレビューの組のタブ操作が実機で動き、未保存終了・外部再変更・削除・保存失敗の試験で内容を黙って失わずに解決できる
   standalone_pfd_features:
     label: PFD 編集・閲覧機能が揃ったアプリ
-    status: todo
+    status: wip
     criteria: 受入対応表の言語支援・構造編集・プレビュー操作・相互移動・extends が両ホストで検証され、日本語・大きい図・不完全な文書・タブ切替の実機確認と証拠が揃っている
   standalone_integrations:
     label: 関連参照・差分・外部実行を備えたアプリ
@@ -204,6 +210,9 @@ process:
     label: プレビューを改善する
     description: "表示・編集・移動を一つの改善工程として扱う。関連課題は #1352、#1282、#1283、#1284、#483。範囲と完了条件は利用時の観察に合わせて見直し、各出力は実装と確認の内訳として残す"
     location: https://github.com/takasek/pfdsl/issues/1352
+  i1432_prevent_multiple_producer_connection:
+    label: 別 producer を増やす output 接続を防止する
+    location: https://github.com/takasek/pfdsl/issues/1432
   i1258_build_standalone_documents:
     label: 文書の安全な編集・保存を完成させる
     location: https://github.com/takasek/pfdsl/issues/1258
@@ -249,6 +258,8 @@ meta_set_extension_fields >> publish_cli_meta_set_extension -> cli_release_meta_
 
 group_node_clash_diagnostic >> publish_cli_group_node_clash -> cli_release_group_node_clash
 [def_insertion, editor_connector, toolchain] >> i1352_i1282_i1283_i1284_i483_improve_preview -> [hover_local_graph, node_definition_creation, node_location_cycle, preview_connector, preview_editing_usability, preview_focus_cue]
+
+preview_connector >> i1432_prevent_multiple_producer_connection -> connector_single_producer_guard
 
 standalone_foundation >> i1258_build_standalone_documents -> standalone_documents
 

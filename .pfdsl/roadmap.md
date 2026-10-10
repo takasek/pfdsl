@@ -34,6 +34,11 @@ GitHub Issues。規約と採用手順は `scripts/harness-template/skills/pfd-op
 
 入力は既存の依存を保持したため、`editor_connector` が wip の間は束全体の ready 判定もその前提待ちになる。
 今回の先行着手は所有者が関連課題を今回の範囲に含めた指示に基づき、完了状態や依存を変更したことにはしない。
+各出力の受入が揃えば個別に done とし、束全体やほかの issue の未完了から個別出力の受入未達を推定しない。
+`node_location_cycle`・`node_definition_creation`・`preview_connector` は個別の受入に基づいて done とした。
+`editor_connector` の wip と既存入力 edge を保持するため、束の保守的な依存に対する W003 が出るが、束全体を完了とする根拠には使わない。
+接続操作による V001 の事前防止は、既存の接続 UI の完了条件と分けて [#1432](https://github.com/takasek/pfdsl/issues/1432) で扱う。
+`preview_connector` から後続の `connector_single_producer_guard` を作る工程として登録し、未着手の todo を保持する。
 ゲートは `preview_editing_usability` を入口にできるが、それだけで各出力の確認済みや完了を認定せず、受入記録の内訳も確認する。
 
 ## プリフライト・ゲート集約スクリプト（#354）

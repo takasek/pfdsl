@@ -101,6 +101,38 @@ function invoke(command = "pfdsl.cycleNodeOccurrence") {
 	host.commands.get(command)!();
 }
 
+it.each([
+	["\n", false],
+	["\n", true],
+	["\r\n", false],
+	["\r\n", true],
+] as const)("cycles to the complete supplementary token with %j, frontmatter %s", (eol, withFrontmatter) => {
+	const prefix = withFrontmatter
+		? ["---", 'artifact: {"成果😀": {}}', "---", ""].join(eol)
+		: "";
+	const token = '"成果😀"';
+	const text =
+		prefix +
+		`"先行😀😀" >> p -> ${token}${eol}${token} >> next -> finish${eol}`;
+	const lines = text.split("\n");
+	const firstLine = withFrontmatter ? 3 : 0;
+	const { editor } = open(text, firstLine, lines[firstLine]!.indexOf(token));
+	invoke();
+	expect(editor.selection.start).toEqual(
+		new host.api.Position(firstLine + 1, 0),
+	);
+	expect(editor.selection.end).toEqual(
+		new host.api.Position(firstLine + 1, token.length),
+	);
+	expect(
+		lines[editor.selection.start.line]!.slice(
+			editor.selection.start.character,
+			editor.selection.end.character,
+		),
+	).toBe(token);
+	expect(editor.revealRange).toHaveBeenCalled();
+});
+
 beforeEach(() => {
 	clearAnalyzeCache();
 	documentSequence = 0;

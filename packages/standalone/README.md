@@ -166,12 +166,79 @@ An AppImage dependency check does not certify folder dialogs, GUI interaction, o
 Each tab pairs its editor and preview.
 Choose **Open folder…** to list PFDs in that folder and open them as additional tabs.
 Format is an Undoable editor operation, and editor/node navigation uses the shared source positions.
+Choose **Normalized edges** to inspect the active tab’s current text without editing it.
+The read-only result uses the same edge sorting and serialization as the VS Code command; errors block the output, while warnings do not.
+Result messages belong to their tab: an empty edge set shows `No normalized edges.`, and blocked output shows `Fix errors before normalizing.`.
+Editing clears the previous result; run the action again to refresh it.
+Each tab retains its own result, and **Close** or Escape within the panel dismisses it.
+Choose **Format flows** for per-process grouped flows or **Format flat** for one edge per line.
+The shared formatter preserves chains containing internal comments as written, including in Flat mode.
+Each action formats the active tab's current text as a whole document; selecting text does not limit the operation to that selection.
+The action leaves text that produces formatting errors or text already in the chosen canonical format unchanged.
+For selected text, use **Format selection (Flows)** or **Format selection (Flat)** in the editor context menu (Shift-F10), or open the editor Command Palette with F1.
+With multiple selections, these actions format only the primary selection, matching the existing extension command.
+Selection formatting expands to complete body lines and includes the selection's ending line, even when its end is at column one.
+A selection confined to frontmatter or an unclosed frontmatter block is left unchanged.
+The existing shared range formatter skips full-graph validation, preserves internally commented chains, and leaves selected text unchanged on formatting errors or canonical no-ops.
+These actions leave the toolbar's whole-document Format behavior unchanged.
+Native selection mapping, keyboard focus, and Undo/Redo remain to be checked in the current application.
+
+PFDSL editors support square-bracket and double-quote pairing and surrounding selected text.
+Use **Toggle Line Comment** from the editor Command Palette (F1), or Command-/ on macOS, to add or remove `#` on selected lines.
+Syntax highlighting and string-aware quote suppression remain unimplemented; quote pairing cannot distinguish existing strings yet.
+Word lookup uses the extension's shared Unicode pattern: letters, numbers, underscores and hyphens form a word, including Japanese and supplementary-plane letters.
+The pattern also permits a standalone hyphen; it is not a PFDSL tokenizer.
+Automated checks cover real Monaco word ranges and the shared regex; native selection gestures and VS Code UI behavior remain unverified.
+These language-support changes have automated editor checks; native keyboard and IME acceptance remain unverified in this candidate.
+
 The native host holds a directory capability for each folder explicitly selected for that session.
 Reads stay bound to that directory when its pathname is replaced; relative traversal and symlink escape are rejected.
 
-This foundation build keeps edited text in memory and does not save files.
-Closing after an edit asks before discarding it.
-Complete saving, external-change protection, and close recovery belong to the document-editing stage.
+Choose **New**, **Open file…**, or a recent file/folder to work with documents.
+**Save** (Command-S) and **Save As…** (Command-Shift-S) are manual operations; there is no autosave or session restoration.
+The recent list stores targets only, never editor content.
+Closing a dirty tab or window, or using macOS Command-Q, the application Quit menu, or Dock Quit, enters the same Save, Discard, and Cancel transaction.
+Native requests are cancelled immediately and exit is requested only after every document accepts; logout/shutdown may therefore be cancelled rather than resumed.
+The guard does not protect against Force Quit, crashes, or power loss.
+Owner-performed macOS Quit acceptance is recorded in [ACCEPTANCE.md](./ACCEPTANCE.md).
+A cancellation, failed save, unreadable disk state, changed tab membership, or edit during the close sequence preserves unconfirmed buffers; earlier successful saves remain on disk.
+Close finishes disk reads already in progress, starts fresh reads before decisions, and checks every target again after the last decision before disposing tabs.
+An unreadable former disk version makes its surviving editor content require confirmation.
+A decision applies only to the editor and disk state the application observed when it requested confirmation; a changed observed version requires a new decision.
+Background disk polling pauses while confirmation is open, but the final checks reject the close if an observed version changed.
+External changes after those final reads are not excluded atomically; Discard leaves the disk file unchanged.
+
+Clean external changes reload automatically; dirty changes, deletion, and publication conflicts keep the editor content for review.
+The conflict panel identifies the recovery target and lets you compare its observed contents, choose another destination, or explicitly load the current disk version.
+Save As rejects a target already open by selected directory/leaf binding.
+Distinct hard-link names are separate tabs and save targets; saving atomically replaces only the selected name.
+External reloads acknowledge the text applied by Monaco, which normalizes mixed line endings to a single style; reloading or closing a clean tab does not rewrite the disk file, while a manual save writes the normalized editor text.
+After a failed Save As, the original document remains active until a target is successfully saved or explicitly adopted.
+Adoption refuses a target already open in another tab; both local buffers remain available.
+Explicitly reopening a renamed file with the same inode updates its native capability and dependency base while retaining dirty content only after a fresh inspection confirms that the old selected name is missing; native parent-inode/leaf bindings keep source recovery separate from other Save As targets.
+
+On macOS, a save checks the selected directory and disk revision, stages and synchronizes content in that directory, checks again, then atomically replaces the file (or exclusively creates a new one).
+A detected external change stops the save and preserves editor content for review.
+Saving identical content after the initial checks does not replace the file or create a temporary file.
+Successful saves do not retain previous disk objects; unpublished temporary files are removed on failure, with a status message if cleanup fails.
+Publication can succeed before a later conflict or read error is reported; inspect the current target before retrying.
+The guarantee ends at the final pre-save check: an external write after that check can be overwritten, and later writes through an old file descriptor are not recovered.
+Deliberate manipulation of the application's exclusive temporary names is outside this guarantee.
+This is not an atomic compare-and-swap, backup history, crash-recovery, or power-loss durability guarantee.
+Save publication on other operating systems is currently refused; it never falls back to unconditional overwrite.
+
+The #1258 document-editing candidate remains under validation.
+Existing-file saving keeps the FD obtained by exclusive stage creation and copies metadata with the operating system's `fcopyfile` facility.
+It verifies owner/group, mode, protection flags, and extended ACL before writing editor content into the temporary file, and again after writing.
+Content is written after stat metadata is copied, so the saved file receives the write's modification time.
+An existing TextEncoding declaration is updated on the stage to describe the UTF-8 bytes actually written; files without that declaration do not acquire one.
+Other metadata follows the system copier's behavior; creation time and every extended attribute are not independently restored or compared.
+Copy or protection verification failures refuse publication, without a destructive fallback.
+Selected-directory moves, deletion, replacement, and observed target content or protection changes are checked before publication.
+A publication followed by an error retains a failure receipt and dirty buffer; an unreadable result is not represented by an old snapshot, and an IPC failure reports publication as unknown.
+Native document capabilities are released when tabs close, selections are superseded, or Save As targets are canceled or rejected; unresolved Save As targets remain available until resolved or closed.
+The exact bundle and nontrivial ACL/ownership and inherited ACL behavior still require acceptance; this is not proof of all-attribute preservation.
+Its current native GUI, Japanese IME, Find/Replace, Undo/Redo, and manual-save interactions still require acceptance on the exact bundle; see the appended [validation record](ACCEPTANCE.md).
 Syntax highlighting and the remaining PFD-specific language commands, external navigation, export, and distribution remain in the [acceptance matrix](ACCEPTANCE.md).
 Local `.app` builds are not signed/notarized release DMGs.
 

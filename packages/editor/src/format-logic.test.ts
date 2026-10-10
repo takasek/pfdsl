@@ -37,6 +37,11 @@ describe("computeRangeFormatOutput", () => {
 });
 
 describe("clampSelectionToBody", () => {
+	it("rejects an unterminated frontmatter even when the selection looks like a body", () => {
+		expect(
+			clampSelectionToBody("---\nname: unfinished\na>>p->b", 2, 2),
+		).toBeNull();
+	});
 	const withFrontmatter =
 		"---\nartifact:\n  req:\n    label: Req\n---\nreq >> design -> spec\n";
 	// bodyStartLine is 1-based; frontmatter above occupies lines 1-5 (0-based 0-4),

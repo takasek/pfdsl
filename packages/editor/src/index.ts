@@ -5,6 +5,7 @@ export * from "./format-logic.js";
 export * from "./jump-logic.js";
 export * from "./location-utils.js";
 export * from "./messages.js";
+export * from "./normalize-logic.js";
 export * from "./preview-edit.js";
 export * from "./preview-graph.js";
 export * from "./preview-logic.js";

@@ -15,9 +15,11 @@ import {
 import type { MessageToWebview } from "./messages.js";
 import { buildPreviewGraph } from "./preview-graph.js";
 import { blockingDiagnosticMessage } from "./preview-logic.js";
+import { snapshotCoordinates } from "./source-coordinates.js";
 
+/** Authored editor snapshot: body positions use full-source UTF-16 coordinates; metadata ranges retain core's contract. */
 export function analyzeSnapshot(source: string) {
-	return { ...analyzeSource(source), source };
+	return { ...snapshotCoordinates(analyzeSource(source), source), source };
 }
 export type DocumentModel = ReturnType<typeof analyzeSnapshot>;
 export type PresetLoader = (path: string) => DocumentModel | null;

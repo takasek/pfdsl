@@ -1,4 +1,4 @@
-import { formatEdges, sortEdges } from "@pfdsl/core";
+import { computeNormalizedEdgesOutput } from "@pfdsl/editor";
 import { exportDot, svgToBinary } from "@pfdsl/graphviz-exporter";
 import { extractMetadata, toTsv } from "@pfdsl/metadata-exporter";
 import { renderDotToSvg } from "@pfdsl/preview-engine";
@@ -142,13 +142,15 @@ export function registerExport(
 		vscode.commands.registerCommand("pfdsl.normalize", () => {
 			const editor = requireActivePfdslEditor();
 			if (!editor) return;
-			const { edges, graph, diagnostics } = analyzeDocument(editor.document);
-			if (diagnostics.some((d) => d.severity === "error")) {
+			const output = computeNormalizedEdgesOutput(
+				analyzeDocument(editor.document),
+			);
+			if (output === null) {
 				vscode.window.showErrorMessage("Fix errors before normalizing.");
 				return;
 			}
 			outputChannel.clear();
-			outputChannel.appendLine(formatEdges(sortEdges(edges, graph)));
+			outputChannel.appendLine(output);
 			outputChannel.show(true);
 		}),
 	);

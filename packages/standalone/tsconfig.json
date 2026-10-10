@@ -3,6 +3,7 @@
 	"compilerOptions": {
 		"module": "ESNext",
 		"moduleResolution": "Bundler",
+		"resolveJsonModule": true,
 		"noEmit": true,
 		"types": ["vite/client"]
 	},

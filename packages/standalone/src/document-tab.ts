@@ -1,13 +1,23 @@
 import {
+	analyzeSnapshot,
 	applyPreviewEdit,
+	computeNormalizedEdgesOutput,
 	type DocumentModel,
+	type FormatStyle,
 	findFrontmatterDefinitionRange,
 	nodeIdAtSourcePosition,
 	positionOfNodeId,
 } from "@pfdsl/editor";
 import { mountPreview } from "@pfdsl/editor/preview";
 import * as monaco from "monaco-editor/editor/editor.api.js";
+import "monaco-editor/editor/contrib/comment/browser/comment.js";
+import "monaco-editor/editor/contrib/contextmenu/browser/contextmenu.js";
+import "monaco-editor/editor/contrib/find/browser/findController.js";
+import "monaco-editor/editor/standalone/browser/quickAccess/standaloneCommandsQuickAccess.js";
+import "./language.js";
+import { createNormalizedEdgesPanel } from "./normalized-edges.js";
 import { formatSnapshot, processSnapshot } from "./processing.js";
+import { registerSelectionFormatting } from "./selection-format.js";
 
 interface DocumentTabOptions {
 	parent: HTMLElement;
@@ -17,6 +27,7 @@ interface DocumentTabOptions {
 	path: string | null;
 	read: (path: string) => Promise<string | null>;
 	reportStatus: (message: string) => void;
+	onChange?: () => void;
 }
 
 /** One Monaco editor and preview pair, with private snapshot and refresh state. */
@@ -28,6 +39,7 @@ export function createDocumentTab({
 	path,
 	read,
 	reportStatus,
+	onChange,
 }: DocumentTabOptions) {
 	let snapshot: DocumentModel | undefined;
 	let revision = 0;
@@ -40,9 +52,10 @@ export function createDocumentTab({
 	previewElement.className = "preview";
 	container.append(editorElement, previewElement);
 	parent.append(container);
+	const normalizedEdges = createNormalizedEdgesPanel(container);
 	const model = monaco.editor.createModel(
 		source,
-		"plaintext",
+		"pfdsl",
 		monaco.Uri.parse(`inmemory://pfdsl/${encodeURIComponent(key)}`),
 	);
 	const editor = monaco.editor.create(editorElement, {
@@ -52,6 +65,7 @@ export function createDocumentTab({
 		fontSize: 14,
 		renderWhitespace: "selection",
 	});
+	const selectionFormatting = registerSelectionFormatting(editor);
 	let editorRenderQueued = false;
 	function requestEditorRender() {
 		if (disposed || editorRenderQueued) return;
@@ -177,9 +191,12 @@ export function createDocumentTab({
 		void refresh().catch((error) => reportStatus(String(error)));
 	}
 	editor.onDidChangeModelContent(() => {
+		if (disposed) return;
+		normalizedEdges.clear();
 		button.textContent = `${name}${editor.getValue() === source ? "" : " •"}`;
 		requestEditorRender();
 		requestRefresh();
+		onChange?.();
 	});
 	editor.onDidChangeCursorPosition((event) => {
 		if (!snapshot || snapshot.source !== editor.getValue() || disposed) return;
@@ -197,6 +214,7 @@ export function createDocumentTab({
 		dispose() {
 			disposed = true;
 			revision++;
+			selectionFormatting.dispose();
 			preview.dispose();
 			editor.dispose();
 			model.dispose();
@@ -207,9 +225,50 @@ export function createDocumentTab({
 			editor.layout();
 			requestRefresh();
 		},
+		getSource: () => editor.getValue(),
+		getRevision: () => model.getVersionId(),
+		setSource(value: string) {
+			editor.pushUndoStop();
+			const eol = value.includes("\r\n") ? "\r\n" : "\n";
+			if (model.getEOL() !== eol) {
+				// Keep EOL and text in separate undo entries: Monaco stores edit offsets in the old EOL.
+				model.pushEOL(
+					eol === "\r\n"
+						? monaco.editor.EndOfLineSequence.CRLF
+						: monaco.editor.EndOfLineSequence.LF,
+				);
+				editor.pushUndoStop();
+			}
+			editor.executeEdits("pfdsl.disk", [
+				{ range: model.getFullModelRange(), text: value },
+			]);
+			editor.pushUndoStop();
+		},
+		setLocation(
+			nextPath: string | null,
+			nextName: string,
+			readSource?: (path: string) => Promise<string | null>,
+		) {
+			path = nextPath;
+			name = nextName;
+			if (readSource) read = readSource;
+			button.textContent = `${name}${editor.getValue() === source ? "" : " •"}`;
+			requestRefresh();
+		},
+		markSaved(value: string) {
+			source = value;
+			button.textContent = `${name}${editor.getValue() === source ? "" : " •"}`;
+		},
 		isDirty: () => editor.getValue() !== source,
-		format() {
-			const output = formatSnapshot(editor.getValue());
+		normalize() {
+			if (disposed) return;
+			const output = computeNormalizedEdgesOutput(
+				analyzeSnapshot(editor.getValue()),
+			);
+			normalizedEdges.show(output);
+		},
+		format(style: FormatStyle = "flows") {
+			const output = formatSnapshot(editor.getValue(), style);
 			if (output === null) return;
 			editor.pushUndoStop();
 			editor.executeEdits("pfdsl.format", [

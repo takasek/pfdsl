@@ -43,10 +43,10 @@
 | TSV 出力 (`pfdsl.export`) | #1261 | metadata exporter の値とタブ | 未移植 |
 | All 一括出力と部分失敗 | #1261 | 成功形式の保持、警告、失敗の内訳 | 未移植 |
 | 文書ごとの editor + preview tab | #1257 / #1258 | 実機の tab 往復、古い描画の隔離 | 基盤に接続。終了・復元契約は #1258 |
-| 新規・開く・保存・Save As・最近の文書 | #1258 | 任意文書、手動保存、Undo / Redo、close | フォルダ読取のみ。保存しないことを明示 |
-| 外部変更、dirty 衝突、保存 race の保護 | #1258 | 保存前後の独立 writer、dirty 内容保持 | 未実装。試作の保存 race を持ち込まない |
-| 検索・置換、基本 Undo / Redo、日本語 IME | #1257 / #1258 | Monaco 実操作と composition→commit | Monaco を利用、実機証拠は下記 |
-| Alt+F12 と既定 Peek Definition の衝突 | #1283 | 採用キーと VS Code 設定の実操作 | 未解決の既存 issue として維持 |
+| 新規・開く・保存・Save As・最近の文書 | #1258 | 任意文書、手動保存、Undo / Redo、close | #1431 に実装。現在版の Mac 受入は下記の残件 |
+| 外部変更、dirty 衝突、保存 race の保護 | #1258 | 保存前後の独立 writer、dirty 内容保持 | #1431 に実装。保存前検査の保証境界は「保存保証の簡素化と編集機能の集約」を参照 |
+| 検索・置換、基本 Undo / Redo、日本語 IME | #1257 / #1258 | Monaco 実操作と composition→commit | 本番タブの検索・置換を接続。自動検査と現在版の Mac 受入を分けて下記に記録 |
+| Alt+F12 と既定 Peek Definition の衝突 | #1283 | 採用キーと VS Code 設定の実操作 | 固定版 Linux VS Code の20条件成功。組込定義・Peek の対照は 2026-10-08 UTC の追補で確認。現在版への適用範囲は下記 |
 | 署名・公証 DMG、更新案内、対応 OS、利用者環境 | #1262 | 配布物と実機、Git 不在、追加開発環境不要 | 未実装。local `.app` は配布受入ではない |
 
 ## 追加 UI の受入範囲
@@ -223,10 +223,10 @@ native executable `f6005842e1a7de061d531d09da67002b46d9c9eae89ebac1a19f04bca4451
 | #1408 の起動・読取 | 通常起動で native window を表示し、Open folder で使い捨てフォルダを選び、Rust host 経由で文書を editor と preview へ表示。選択キャンセル後も操作を継続 | 固定版 `8261f877` の dot Debian 13.6 で成功 |
 | #1408 の終了・原本 | dirty な文書で window close → Keep Editing による編集保持 → 再 close → Discard による終了。検証用原本の前後 hash 一致を確認 | 同じ AppImage の通常操作で成功、process exit 0、原本 hash 一致 |
 | #1352 の表示・回復 | 初回 Fit、100%、倍率と Help、zoom/pan 後の正常→エラー→正常、主図と minimap の整合、定義挿入後の編集案内。VS Code の起動手順と既存動線も確認 | native 17 / VS Code 27 条件成功。関連 issue の未確認と元 issue の検査追加条件は別に保持 |
-| #1282 の定義作成 | 両ホストの Node actions から作成・作成位置への移動・単一 Undo/Redo。CLI の成功・拒否・初期 field・無書込みを別入口で確認 | native 9 / VS Code 9 / CLI 23 条件成功。コメント位置の厳格保持3セルは仕様との関係を下記で整理し、native raw CRLF bytes は未確認 |
+| #1282 の定義作成 | 両ホストの Node actions から作成・作成位置への移動・単一 Undo/Redo。CLI の成功・拒否・初期 field・無書込みを別入口で確認 | native 9 / VS Code 9 / CLI 23 条件成功。2026-10-11 の個別完了判断を下記に追記。旧3失敗と証拠版の制限は保持 |
 | #1283 の巡回 | VS Code の context menu と chord で定義→全本文 occurrence→定義を巡回。引用キー・同名 field・編集後の増減と既存直接移動を確認 | 2026-10-08 UTC の追補で組込定義・Peek 対照も成功し、VS Code 20条件成功。standalone の巡回 UI は対象外 |
 | #1284 の周辺図・強調 | 両ホストで hover の局所 SVG、画面端・内部 scroll/click、editor と局所図からの移動、連続移動の cue、reduced motion、既存 pan/zoom を確認 | 右端 pointer 追補を含め native 16 / VS Code 21 条件成功、native 6 / VS Code 1 条件未確認 |
-| #483 の接続編集 | 両ホストで input/feedback/output × 既存/新規 target の6通り、単一 Undo/Redo、再描画、既存 double click・pan を確認 | native / VS Code 各30条件成功。semantic-invalid な existing output 候補は別の仕様判断として保持 |
+| #483 の接続編集 | 両ホストで input/feedback/output × 既存/新規 target の6通り、単一 Undo/Redo、再描画、既存 double click・pan を確認 | native / VS Code 各30条件成功。2026-10-11 に個別完了と判断。V001 の事前防止は別 issue へ分離 |
 
 同じ source commit と検証用文書を使って操作をまとめるが、各 issue の全受入条件とホスト別の結果を保持する。
 通常の folder picker と close は、初期フォルダを自動選択する corpus mode の成功だけでは認定しない。
@@ -382,3 +382,269 @@ PDF を扱う #1261 で WKPDFConfiguration 等の制約を追加し、#1262 で�
 Tauri の bundle 下限だけから WebKit / Monaco の対応を推定しない。
 [Monaco maintainer の browser 方針](https://github.com/microsoft/monaco-editor/discussions/4283) と [WebKit の CSP 修正記録](https://webkit.org/blog/17333/webkit-features-in-safari-26-0/) を踏まえ、下限候補の実機では起動、WASM、worker、CSP、入力・IME、編集再描画と大きい図を同じ同梱版で確認する必要がある。
 今の対応を保証できる実測範囲は上記の macOS 27.0 の一台に限る。
+
+
+## #1258 の隔離候補 — 2026-10-09 UTC（wip）
+
+この節と以下の保存境界・stage 保全の記録は旧候補の履歴である。
+2026-10-10 の利用者判断により、現在の保証範囲は後掲「保存保証の簡素化と編集機能の集約」に置き換えた。
+
+基準は main `7dc51a6c5bb8088bb2a3ec7513cc295c322482b4` の専用 Git clone と専用ブランチ `codex/issue-1258-documents`。
+最初の archive 候補とその v0 納品は履歴として保存し、この節は更新された候補の検証範囲を表す。
+元 checkout、元 VS Code smoke runner、既存399セルと各固定版の受入判定は変更しない。
+新規・文書/フォルダ読取・手動 Save/Save As・target だけの recent・文書ごとの dirty close を追加した候補であり、完了や現在版の実機合格を示さない。
+
+native 保存は captured parent directory capability と単一 leaf に限定し、同一 directory 内の staging/write/sync 後に macOS RENAME_EXCL または RENAME_SWAP を使用する。
+交換で退避した inode は成功時も保持し、old FD writer の後続書込みも消さない。
+確認から公開の間の外部書込み、突然の削除/作成、別 directory への置換を異常系で検査し、公開済みなのに確認できない結果は部分成功として保持する。
+全 writer を跨ぐ atomic CAS、autosave、session restore、crash recovery、power-loss durability は保証しない。
+非 macOS には無条件 overwrite の fallback を設けない。
+retained object は明示的な比較・draft 読込が可能だが、自動削除せず利用者による確認を必要とする。
+
+独立レビューで failed Save As の A/B recovery target、disk 読込中の新しい編集、target 採用後の preview dependency capability、pathname 置換後の folder 再選択を指摘され、回帰を追加して修正した。
+品質/correctness と採用理由の確認は別 agent が実施した。
+実装を見ない体験レビューは未実施で、DOM seam の検査を実 native GUI 受入に転写しない。
+
+以下の検査の最終件数・exit code、差分と raw logs、bundle executable/frontend hash は今回の外部納品 report に保存する。
+standalone session/host 回帰、既存全 package の build/test/typecheck、native 保存 race と partial staging-write/permission failure を実行する。
+partial staging-write は child process の file-size resource limit による実 write failure であり、full-volume ENOSPC や sync failure の実測とは区別する。
+既存キャッシュの pnpm 10.33.2 を専用コピーへ移し、通常の `make setup` と setup-completion check が成功した。
+通常の Git-backed build/test/typecheck/lint、fmt/links/docs/scaffold gate が一度成功し、その後の追加修正は版を固定して再検査する。
+cycle-status は origin fetch 成功・behind 0 だが、候補に未コミット差分があるため終了 code 1 を返す。
+rustfmt は既存 toolchain に存在せず、導入や検査省略で合格扱いにしない。
+Mac はロック中で正規 app 操作の取得に失敗したため、現在 bundle の GUI/IME、Find/Replace、Undo/Redo、手動保存、close/dialog と current native corpus は未確認。
+起動した試験 process は停止し、解除の迂回・共有設定変更・外部投稿・push・PR・CI rerun は行っていない。
+#1258 は wip のままで、#1259 の製品実装を未検証保存基盤の上に積まない。
+
+通常 Quit を固定版 AppKit/Tao delegate で同期取消し、window CloseRequested と Tauri ExitRequested を同じ複数文書確認へ接続した。
+遅延・重複・busy 中の Quit は request token と IPC 応答中の claim で抑止し、確認中の文書追加は dispose 前の membership 検査で全件保全する。
+親 directory 移動後も native capability の parent inode/leaf binding を保持し、明示的な同一 inode 再 Open で source と same-target recovery を同時に再接続する。
+独立レビューの追加 P1/P2 は回帰テストで修正したが、GUI の Cmd-Q・application menu Quit・Dock Quit・window close は別々に実行して確認する必要がある。
+
+保存 metadata は未解決の P2 として残る。
+v3 baseline の mode-only 保存は ACL/xattr/ownership を保証せず、保護された文書の保存には使用しない。
+独立 SDK レビューと owned fixture により、metadata copy 後に権限を強化されると交換後に古い弱い mode が公開される反例を確認した。
+対応する ordinary metadata と保存時の競合保証の範囲は未確定で、全既存 Save 拒否を通常 Save の達成とは扱わない。
+read-only file 自体の write denial は writable parent による交換で迂回しないよう、既存 target を truncate せず write-open できることを要求する。
+この条件だけで ACL/xattr/metadata race が解決したとは扱わない。
+
+### 失敗時の stage 保全 — cleanup の独立修正
+
+外部 writer が stage の名前を独立ファイルへ差し替え、publication が失敗すると、従来の cleanup がそのファイルを unlink することを native fixture で再現した。
+metadata 方針と独立の確定不具合として、失敗時の unpublished stage unlink を撤去した。
+作成に成功した temporary leaf は manual inspection に残し、失敗説明にその leaf を示す。
+名前の identity を検査してから unlink する方式は使わず、別 writer の entry を削除しない。
+不確かな leaf を verified retained snapshot として自動読込みしない。
+native regression は独立ファイルと移動先の元/local 内容を保全することを確認し、partial staging-write は実際に five-byte prefix が stage に残ることも確認する。
+既存保存方式の mode-only metadata 問題、保存直前競合、power-loss durability をこの修正で解決したとは扱わない。
+現在版の full build/test/gates と native suite の結果は専用の納品報告に版とともに保存し、GUI 未確認は維持する。
+凍結した v2 source/app とその証拠は変更せず、cleanup 修正後の app は別の識別情報で保存する。
+
+### 独立候補の保存境界と公開後 failure
+
+2026-10-09、v3 baseline 911a2dba を基準に別 branch の候補を準備した。
+URL replacement と FD-relative clone/copy を独立比較した。
+最終レビューで clone 後の stage 名の再 open が foreign inode へ書く反例を確認し、create_new で取得した stage FD を保持する方式へ変更した。
+fcopyfile の metadata copy と fsetattrlist の creation time 復元を保持 FD に限定する。
+stat copy の後に内容を書き、mtime は今回の書込みで更新する。
+既存 file の metadata は本文 write 前にも照合し、copy 成功後の observed protection 不足で buffer を stage に残すことを避ける。
+普通 mode の不足を専用 fixture の fault hook で作り、公開拒否と stage の空内容を Red→Green で確認した。
+これは特殊 ACL 等の意味や全時点の競合に対する機密性を保証するものではない。
+owner/group、mode、flags、creation time、extended ACL text、xattr の名前と値を観測し、stage と公開結果を照合する。
+元から存在する TextEncoding は書く UTF-8 内容に一致する宣言へ更新する。
+その他の OS SAVE intent で保持対象外となる属性は、未決の方針を黙って適用せず公開前に拒否する。
+未知の内容依存属性、独自 ACL・異なる ownership・inheritance の実機受入は未完了で、全属性保証は宣言しない。
+copy または metadata の検証失敗では公開を拒否し、破壊的な fallback を使わない。
+同じ stage inode の内容差替えも公開直前の buffer 照合で拒否する。
+
+root/parent の外部移動・削除・入替、target の identity/revision/metadata と stage entry の変更を公開直前に検知した時は拒否する。
+過去の parent 移動後の保存成功テストは、今回の明示的な検知時拒否の要件に合わせて変更した。
+公開後に変化した対象は rollback や unlink をせず、published receipt と実際の観測状態を返す。
+保全した old-FD object は従来どおり残り、close/read/Save As の target ownership を維持する。
+
+host は native reply を受け取れなかった場合も、publication unknown の failure receipt、dirty、buffer、選択 target を保持する。
+current が読めなかった場合に以前の snapshot を現在値として表示しない。
+実 native の公開後 target directory 化の fault test で、published/unreadable、新内容の公開、旧 retained 内容の実物を検査した。
+その JSON receipt を production host の DOM に渡して、保存完了とならないこと、buffer/dirty、回復先、未確認 disk adoption の無効化を検査する。
+DOM seam は実 Monaco/native window の GUI 受入ではない。
+
+版、Red/Green、生ログ、独立レビューは独立候補の外部報告に保存する。
+v4 の凍結 app と source は変更しておらず、この候補をその app の実測結果へ転写しない。
+GUI と rustfmt は未実施のままで、追加 install、画面ロック解除、公開操作はしていない。
+
+## 保存保証の簡素化と編集機能の集約 — 2026-10-10（wip）
+
+利用者は保存前の外部変更検査を保証する方針 C を選び、検査後の競合や旧 FD writer まで追跡する方式を廃止すると判断した。
+mode・owner/group・保護 flags・ACL の欠落は拒否し、その他の metadata は OS 標準のコピーに委ねる。
+アプリ専用の一時名に対する意図的・継続的な操作は対象外とし、排他的な一時作成と通常の失敗時 cleanup を行う。
+この判断は前節の候補に対する現在の変更方針であり、以前の保証範囲や未完了の #1258 全体の受入を満たしたという意味ではない。
+
+現在の Save は選択 directory・期待 revision を確認し、同じ directory に本文を書いて sync した後、もう一度確認してから atomic replace または exclusive create を行う。
+検知した外部変更は保存を止め、エラー時も editor buffer を残す。
+最終確認後の外部書込みは上書きされ得るし、置換前の inode を開いた writer の後続書込みも回収しない。
+正常保存後の旧 inode、旧版の比較・draft 読込 UI、全 xattr と creation time の独自一致検査は削除した。
+内容が同じ場合も期待 revision と directory を検査し、変更がなければ置換と一時ファイル作成を省く。
+
+native document registry は単調増加 ID と削除可能な map を使う。
+close、重複 Open の再接続、Save As のキャンセル・別タブ使用による拒否、保存先の採用で不要になった参照を解放し、未解決の保存先は保持する。
+表示 path が同じでも別の directory capability で選び直したファイルは別タブで開き、旧タブの編集を保持する。
+同じ binding での atomic replacement は既存タブへ接続し、dirty buffer と外部変更の比較を維持する。
+
+#1426〜#1431 の保存・座標・正規化表示・整形・選択整形・言語設定は #1431 に集約する。
+FM001 による選択整形の拒否を共通の body 境界計算へ移し、standalone 側の全体再解析と2つの整形テストに重複していた host 準備を削除した。
+実装前に無変更保存・反復保存・同じ binding の再選択・閉じていない frontmatter の失敗を再現し、修正後のテストで確認した。
+最終差分の検査と独立レビューの結果は集約 PR 本文に記録する。
+追加監査では、本文 write 前の保護照合を除去する変異と、解放済み native ID を再利用する変異を既存テストが見逃した。
+stage の FD を cleanup 後も観測する検査と全退役 ID の検査へ補強し、各変異で該当テストだけが失敗し、復元後に native 28 件が成功することを確認した。
+本番 Monaco と DocumentSession を接続した編集→Undo 中の終了確認も追加し、getAlternativeVersionId への変異を検出した。
+座標変換の非破壊検査は実際に変換へ渡す入力を比較するよう訂正し、破壊的変換の変異を LF・CRLF の両方で検出した。
+Snapshot.binding は同梱 native が必ず返す契約に揃え、欠落時の互換分岐、空の stage hook、正規化テストの独自起動処理と実装差替え用の環境変数を削除した。
+ボタン表示の検査は本番 main のクリック・タブ切替検査へ統合し、保存・終了・整形・座標境界の異なるシナリオは維持した。
+過去の固定版 native corpus・GUI 判定はこの版へ転写しない。
+実 native GUI、IME、Cmd-Q/menu/Dock Quit、Find/Replace、Undo/Redo、複雑な ACL/ownership の実機受入は残り、#1258/#1259 は未完了のままとする。
+
+## #1431 の完遂に向けた追加確認 — 2026-10-10
+
+#1258 は部分対応を最終方針にせず、この PR で文書ライフサイクルの完遂を目指す。
+現在の本番 document-tab に Monaco の find contribution を読み込み、Find と Replace を接続した。
+実 Monaco の回帰検査は、修正前に Find action 未登録で失敗し、修正後に日本語の検索結果選択・全置換・Undo/Redo・別タブの本文保持で成功した。
+独立した体験検査は3一致の順巡回・一周・逆巡回、単発置換と全置換の別々の Undo/Redo、既存コメント切替と別タブ隔離を確認し、そのシナリオを既存の本番 Monaco 検査へ統合した。
+この検査は DOM 計測を補った Node/JSDOM 上の本番 entry 操作であり、native GUI のキー・IME・保存受入を認定しない。
+追加修正後の全体テストは5,998件成功・1件 skip、全体型検査と debug `.app` の build は成功した。
+体験シナリオ統合後の本番 Monaco 検査も13件成功した。
+受入候補の executable SHA-256 は `d8531c59661606297c0a6097c10c7f495c0b315fea69c3a154d801ef12b98f40`、build 環境は Apple Silicon / macOS 27.0.1 (26A434)。
+この候補は引継ぎ HEAD `f304626f8e8b32daef3ddc36016a2178e96ba7b4` に今回の find contribution 接続を加えてビルドし、文書・テストの統合は同梱ソースを変更しない。
+
+### 現在版の Mac で確認する項目
+
+同じビルドのアプリで操作し、対象版・環境・入力・期待結果・実結果を残す。
+以下は検査開始時のチェックリストである。
+通常起動の Mac アプリで親が実施した[現在版の操作結果](evidence/2026-10-10-document-lifecycle/native-acceptance.md)は、検索・置換・Undo/Redo、手動保存、新規/Open/folder/recent、タブ隔離とエラー回復、dirty close、window/Cmd-Q/menu 終了取消、複数 dirty タブの途中取消、外部変更・再競合・rename/delete・衝突・保存失敗からの回復を確認した。
+通常の mode・同じ owner/group・読取 ACL の保持と、immutable flag による保存拒否も確認した。
+IME の composition と Dock Quit は操作基盤の timeout 後に所有者へ引き継ぎ、同じアプリでの変換・確定→保存と、未保存文書の Dock Quit→取消→本文保持について、2026-10-10 に所有者から両方の受入成功を受領した。
+同じ binary の追加確認で、80行のコメントを含む文書のタブ往復後の表示範囲も確認した。
+再フォーカス時の click の影響を分離していないため、カーソル位置保持の認定には用いない。
+容量不足、複雑な ACL/ownership 等の未実測は同記録で分ける。
+親の通常アプリ操作、所有者の受入、変更のない native 保存検査と現行 host 検査を7条件へ対応付け、独立レビューでも追加必須の欠落がないことを確認し、採用済み保存前検査の境界で #1258 を完了と判定した。
+未実測の全組合せを成功とせず、署名配布・最低 OS 保証は後続工程で扱う。
+
+- ファイルとフォルダを開く、新規作成、Save/Save As、取消、最近の対象の再アクセス、同じ文書の再 Open。
+- 2つのタブを往復して本文・表示位置・図の隔離を確認し、構文エラーから復帰する。
+- 日本語 IME の変換確定、Find の次結果、単発置換・全置換、Undo/Redo、手動保存後のディスク本文を確認する。
+- 時間経過・タブ切替・フォーカス移動で未保存の本文がディスクへ書かれないことを確認する。
+- dirty タブの Save/Discard/Cancel、複数タブの途中取消、ウィンドウ close・Cmd-Q・メニュー Quit・Dock Quit を確認する。
+- clean 文書の外部変更を再読込し、dirty 文書ではローカル本文と外部版を比較・選択できることを確認する。
+- 外部削除・名前変更、Save As 先衝突、権限拒否等の保存失敗・再競合で、buffer と保存先を失わず回復できることを確認する。
+- 保存先の mode・owner/group・保護 flags・ACL を保持するか、保持できない場合は保存を拒否して buffer を残すことを確認する。
+
+セッション復元・未保存内容の退避・クラッシュ復旧は今回追加しない。
+保存最終検査後の race と旧 FD writer は、既に採用した保存前検査の保証範囲に従う。
+
+### #1283 の既存証拠と座標修正
+
+[累積受入表](evidence/2026-10-07-linux-appimage/remaining-checks/cumulative-matrix.csv)の #1283 / VS Code は全20条件成功である。
+対象は固定 source `8261f877d5cae8aa653a5310edfbd9e387acb116` の Linux VS Code であり、Mac のショートカットや standalone の巡回 UI の証拠ではない。
+定義・本文の全出現、途中からの巡回、quoted key・同名 field・alias・編集後増減、chord/context menu、直接定義移動、組込定義・Peek・multiCursorModifier の対照を含む。
+この固定版から引継ぎ HEAD `f304626f8e8b32daef3ddc36016a2178e96ba7b4` まで、VS Code の巡回 host、command/context menu/keybinding の契約は不変である。
+依存する analyzeSnapshot は本文 range を full-source UTF-16 座標へ正規化するよう変更され、現行 host の回帰検査は LF/CRLF・frontmatter 有無・先行する補助平面文字と完全な選択 token を確認する。
+旧版の実 UI 判定と現在版の共有計算・host 回帰検査を併用し、現在版の native UI で20条件を再実測したとは扱わない。
+
+## #483・#1282 の個別完了 — 2026-10-11
+
+所有者が既存要件による両 issue の完了と、V001 の事前防止を別 issue に分ける判断を承認した。
+#483 は固定 source `8261f877d5cae8aa653a5310edfbd9e387acb116` の native / VS Code 各30条件で、input/feedback/output × 既存/新規 target、単一 Undo/Redo、再描画、既存 double click・pan を確認している。
+現在の共有候補 UI・connector 計算・適用契約は固定版から不変で、変更された source 座標 adapter は現行回帰検査で照合した。
+O-001 の別 producer への output 追加による V001 と Undo/Redo の観測はそのまま保持する。
+V001 を増やす接続を理由付きで事前拒否する新しい編集契約は、後続 issue [#1432](https://github.com/takasek/pfdsl/issues/1432) の対象であり、今回実装・検証済みとはしない。
+
+#1282 は固定版の native 9 / VS Code 9 / CLI 23 条件、追加初期 field と安全拒否、help・例を個別に照合した。
+独立 reviewer は原 ZIP の操作・source/hash と現行コードを照合し、core・CLI・共有 preview-edit・VS Code 適用経路、standalone の定義作成 executeEdits・Undo・選択部分が固定版から不変であることを確認した。
+現行 `edit-navigation-contract.test.ts` の LF/CRLF・日本語引用 ID・作成後位置解決を含む回帰と、既存全体検査5,998成功・1 skip、型検査成功を再利用し、新しい GUI 追試や全テスト再実行とはしない。
+F-001 のコメント位置の厳格保持3セルは旧失敗履歴として残すが、ADR-0034 と既存 core テストが許容する CST 再整形であり、内容欠落とは扱わない。
+別 Inspector binary の実 Monaco model の前/後/Undo/Redo は21/24/21/24 CRLF、lone LF 0、前=Undo・後=Redoで、生 JSON の hash を独立に再計算した。
+同じ製品 source/frontend の model 証拠であり、元 binary の保存 bytes・painting・通常版と別 binary の一般的同等性を認定しない。
+これらは定義作成と Undo の完了条件を満たす証拠として利用でき、保存・cue・reduced motion 等の別 issue の未確認を完了へ転写しない。
+
+`preview_connector` と `node_definition_creation` を done とし、#1431 に Closes #483 / Closes #1282 を設定する。
+既存 matrix と過去時点の未完了記録は書き換えず、この追記を現在の個別判断とする。
+#1259 は部分対応、#1260・#1261 と束のほかの成果物は今回完了としない。
+
+## 終了直前の外部削除・移動の保護 — 2026-10-11
+
+#1431 のレビューで、最後の定期 poll の後に保存済みファイルが削除・移動され、直後に clean タブを閉じると、新しい disk 確認なしに最後の本文を破棄できる経路を確認した。
+終了前に先行 poll を待ち、その後新たな `inspect_document` を開始して完了を待つよう host の `prepareClose` を修正した。
+missing と読取失敗は既存の uncertain / dirty 判定に接続し、Save / Discard / Cancel で本文の扱いを確認する。
+確認完了後の外部操作を完全に防止する保証は追加しない。
+
+本番 main bundle と native / DocumentTab seam による回帰は、削除後の tab close、移動後の native quit、読取失敗、先行 poll と終了時の新しい read を別々に遅延させた完了待ちを確認した。
+修正前は終了時の inspect 欠落で失敗し、修正後は関連40件成功。全体検査5,998成功・1 skip、型検査成功も確認した。
+独立 reviewer は終了 transaction と native inspect の契約を照合し、修正を妨げる指摘なし。
+新しい実 GUI 受入ではない。Mac アプリの再ビルド要求は、cwd が main と扱われ explicit worktree の所有を証明できないとして保護 hook に拒否され、規定 wrapper に native build の入口がないため停止した。
+以前の Mac binary と実機受入を、この frontend 修正後の新しい executable の成功へ転写しない。
+
+同日の再調査で、既存 wrapper の `node-script` が target・branch を検証した後に通常スクリプトを実行する正規入口と確認した。
+ignored 領域の検証用 helper から公式 Tauri debug build を実行し、既存 Cargo の PATH を明示して source `72bcd20a8d66b480606e6e24ab85f3eb3b7341e6` の arm64 app をビルドした。
+元 executable の SHA-256 は `b039854001f94f18de13411df10c77be8642408f511d9285a690dd1e00331075`。
+所有者へ渡すコピーにはローカル ad-hoc 署名を付け、`codesign --verify --deep --strict` 成功後の executable SHA-256 は `97d1fb616a3211ca0efdc27df238bf80ffe2a8ade62513426c7bedda3f4265b5`。
+保護 hook・trusted root・wrapper の変更は行わず、正式署名・公証や実 GUI 成功を認定しない。
+実機確認は所有者が担当すると表明し、修正版 app と削除・移動用の使い捨てファイルを用意した。
+
+### 所有者による修正版の実機受入
+
+2026-10-11、所有者から「どちらも確認が出て、タブと本文が残った」と報告を受領した。
+上記 source・署名後 executable のアプリで、削除後の tab close と移動後の app quit の2条件を実施し、確認表示と Cancel 後のタブ・本文保持を成功と判定した。
+これにより前節で実機未確認とした2条件は受入済みとなる。親の Computer Use 追試や全 native corpus の再実行とは区別する。
+読取失敗と先行 poll / fresh read の遅延は自動検査の証拠を維持し、実機で追加実測した結果へは広げない。
+
+### 複数タブ終了とハードリンクの追加レビュー対応
+
+2026-10-11、後続タブの保存・破棄確認中に先行ファイルが削除・移動・読取不能になる条件を追加した。
+修正前は先行タブを再検査せず閉じる6条件が失敗し、修正後は全タブの最後のディスク検査と版照合で終了を中止し、本文を保持する。
+ディスク状態が変わった場合は全タブを保持して終了を中止し、利用者が改めて終了操作を行う。
+恒常的な読取失敗は同じ状態の再観測として扱い、明示した破棄を許容する。読取可否の遷移は確認を無効にする。
+同じ inode の別名を開いた際に通常保存先を変えない条件も修正前に失敗した。
+同時に存在するハードリンクは別タブとして扱い、元の native binding の新規検査でファイルの消失を確認した場合に限り inode による移動回復を許可する。
+本番 main.ts を束ねたホスト検査では、別名の2タブ保持・元の保存先 ID と、後続の確認中に先行ファイルが消えた Quit の拒否・両本文保持を確認する。
+native IPC と DocumentTab をテスト用境界に置き換えた自動検査であり、前節の所有者による単一タブの実機受入を、これらの追加条件へ広げない。
+
+### 読取復旧と外部再読込の改行形式
+
+追加レビューで、一時的な読取失敗・ファイル消失から元の revision へ復旧した際に、観測だけの uncertain / conflict / message が残る条件を修正した。
+本文が保存済み内容と一致し、saveFailure と pendingTarget がなければ観測由来の状態を解消し、未確定の保存回復は維持する。
+外部再読込で LF と CRLF が切り替わる場合は、Monaco model の EOL を本文の置換前に合わせる。
+EOL と本文の操作を同じ Undo 単位へまとめると Monaco の編集 offset と改行幅が食い違い、Undo / Redo で末尾が崩れるため、改行形式が変わる場合は EOL と本文を別々の Undo 単位にする。
+改行形式が同じ再読込は従来どおり1回の Undo で、形式が変わる再読込は2回の Undo / Redo で元の本文・形式と再読込後の本文・形式を復元する。
+修正前に復旧2条件と改行の双方向2条件が失敗し、修正後は実 Monaco の本文完全一致・clean判定・Undo / Redo・保存へ渡す文字列まで確認した。
+本文完全一致の検証範囲は一貫した LF / CRLF であり、mixed-EOL の保持を追加保証しない。
+この追加検査は Node / JSDOM と実 Monaco の証拠であり、実機 GUI / native保存の追加実測は認定しない。
+
+### 所有者による追加レビュー修正版の実機受入
+
+2026-10-11、所有者から「実機確認すべて完了。解決状態の変更承認。」との報告を受領した。
+引継ぎ対象は source `9c9b5a6745df7480527685123566e5ceb04325a7` の arm64 Mac debug app で、ローカル ad-hoc 署名後 executable の SHA-256 は `4fb5ec4dd3c79bbd31e64c7f9e9661b249a430cbe5e359a5fb931b223e39bfaf`。
+同梱手順の複数タブ終了・ハードリンクの通常保存先・外部再読込の LF / CRLF・消失した元ファイルの復旧を、所有者による実機受入完了として記録する。
+これにより上記4種の引継ぎ条件の実機未確認は解消した。親の Computer Use 追試・全 native corpus の再実行・読取失敗（一時 / 恒常）や遅延制御の実機追加実測は認定しない。
+その後に追加された混在改行の読込基準と README のハードリンク Save As 説明のレビュー指摘は、この受入の完了範囲に含めない。
+
+### 混在改行の読込基準とハードリンク説明の追加対応
+
+混在改行を含む外部再読込は、Monaco が適用した本文を savedSource として認定し、元のディスク snapshot と revision は保持する。
+LF / CRLF の両方の初期状態から混在改行を再読込する2条件で修正前の失敗を確認し、修正後は正規化された本文と基準の一致・clean・同一 revision の再観測・Undo / Redo・保存や確認なしの終了を実 Monaco で確認した。
+混在改行の元バイト列を本文モデルへ保持する保証は追加しない。再読込や終了だけではディスクを書き換えず、手動保存を選ぶ場合はモデルの正規化済み本文を保存する。
+README の Save As 拒否条件は native directory / leaf binding の一致とし、同時に存在するハードリンクの別名は別タブ・別保存先であることと、inode による移動回復には元 leaf の消失確認が必要なことを明記した。
+追加の混在改行検査は Node / JSDOM と実 Monaco による自動検査で、前節の所有者による4種類の実機受入を追加条件の成功へ広げない。
+
+### 所有者による混在改行の追加実機受入
+
+2026-10-11、所有者から「追加確認すべて意図通り」との報告を受領した。
+引継ぎ対象は source `67d7603c8ee0928c38a99bbbcdb9e9d9e17ae343` の Mac debug app で、ローカル署名後 executable の SHA-256 は `193ab7b9006c6ef51854b24850ecdb33beb4793ea37c134e01b8ef4ae0540cbd`。
+同梱手順の初期 LF / CRLF からの混在改行再読込・clean・Undo / Redo・確認なしの終了を、所有者による実機受入完了として記録する。
+手動保存の正規化済みバイト列や全 native corpus の追加実測へは広げない。
+
+### native 読取中の選択 leaf の再検査
+
+読み取るために開いた descriptor の前後の metadata だけでは、その間に選択 leaf が置き換わったことを検出できなかった。
+読取後に選択 leaf を symlink_metadata で再検査し、regular file・device / inode・長さ・更新時刻が開いた descriptor の観測と一致しなければ snapshot を拒否する。
+読取後の決定的な fault hook で別 inode への atomic replacement・削除・同 inode を指す symlink への変更を注入し、修正前の失敗と修正後の拒否を確認する。
+保存前の再検査と終了時の inspect は同じ読取経路を使い、拒否は既存の保存・本文保持処理へ渡す。最終観測後の外部変更を原子的に排除する保証は追加しない。
+この競合の証拠は実 Rust / filesystem の決定的検査であり、所有者による混在改行の受入を競合注入の実機結果へは広げない。
