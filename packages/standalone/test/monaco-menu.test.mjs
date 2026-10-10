@@ -89,9 +89,8 @@ test("the production document-tab entry loads real Monaco menu contributions", a
 				import { createDocumentTab } from "./src/document-tab.ts";
 				import * as monaco from "monaco-editor/editor/editor.api.js";
 				import { EditorExtensionsRegistry } from "monaco-editor/editor/browser/editorExtensions.js";
-				import { StandaloneServices } from "monaco-editor/editor/standalone/browser/standaloneServices.js";
-				import { IMenuService, MenuId } from "monaco-editor/platform/actions/common/actions.js";
-				export { createDocumentTab, monaco, EditorExtensionsRegistry, StandaloneServices, IMenuService, MenuId };
+				import { MenuId } from "monaco-editor/platform/actions/common/actions.js";
+				export { createDocumentTab, monaco, EditorExtensionsRegistry, MenuId };
 			`,
 				resolveDir: packageRoot,
 			},

@@ -494,5 +494,11 @@ close、重複 Open の再接続、Save As のキャンセル・別タブ使用�
 FM001 による選択整形の拒否を共通の body 境界計算へ移し、standalone 側の全体再解析と2つの整形テストに重複していた host 準備を削除した。
 実装前に無変更保存・反復保存・同じ binding の再選択・閉じていない frontmatter の失敗を再現し、修正後のテストで確認した。
 最終差分の検査と独立レビューの結果は集約 PR 本文に記録する。
+追加監査では、本文 write 前の保護照合を除去する変異と、解放済み native ID を再利用する変異を既存テストが見逃した。
+stage の FD を cleanup 後も観測する検査と全退役 ID の検査へ補強し、各変異で該当テストだけが失敗し、復元後に native 28 件が成功することを確認した。
+本番 Monaco と DocumentSession を接続した編集→Undo 中の終了確認も追加し、getAlternativeVersionId への変異を検出した。
+座標変換の非破壊検査は実際に変換へ渡す入力を比較するよう訂正し、破壊的変換の変異を LF・CRLF の両方で検出した。
+Snapshot.binding は同梱 native が必ず返す契約に揃え、欠落時の互換分岐、空の stage hook、正規化テストの独自起動処理と実装差替え用の環境変数を削除した。
+ボタン表示の検査は本番 main のクリック・タブ切替検査へ統合し、保存・終了・整形・座標境界の異なるシナリオは維持した。
 過去の固定版 native corpus・GUI 判定はこの版へ転写しない。
 実 native GUI、IME、Cmd-Q/menu/Dock Quit、Find/Replace、Undo/Redo、複雑な ACL/ownership の実機受入は残り、#1258/#1259 は未完了のままとする。

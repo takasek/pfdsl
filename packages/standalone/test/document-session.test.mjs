@@ -20,6 +20,7 @@ const snap = (source, revision = source, path = "/a.pfdsl") => ({
 	source,
 	revision,
 	identity: "file:1",
+	binding: `directory:${path}`,
 });
 
 test("reopening the same binding after atomic replacement keeps dirty edits and adopts the selected capability", () => {
@@ -668,7 +669,12 @@ test("same-target failed Save recovery follows an explicit same-inode rename reo
 		outcome: "failed-before-publication",
 		current: original,
 	}));
-	const renamed = { ...original, id: 9, path: "/renamed.pfdsl" };
+	const renamed = {
+		...original,
+		id: 9,
+		path: "/renamed.pfdsl",
+		binding: "directory:/renamed.pfdsl",
+	};
 	assert.equal(doc.rebindDisk(renamed), true);
 	assert.equal(doc.pendingTarget.id, 9);
 	assert.equal(doc.pendingTarget.path, renamed.path);
@@ -695,7 +701,12 @@ test("failed Save As selecting the same source with a new native id follows a sa
 		}),
 		selectedAgain,
 	);
-	const renamed = { ...original, id: 9, path: "/renamed.pfdsl" };
+	const renamed = {
+		...original,
+		id: 9,
+		path: "/renamed.pfdsl",
+		binding: "directory:/renamed.pfdsl",
+	};
 	assert.equal(doc.rebindDisk(renamed), true);
 	assert.equal(doc.pendingTarget.id, 9);
 	assert.equal(doc.pendingTarget.path, renamed.path);
@@ -719,7 +730,12 @@ test("failed source Save after a parent move follows the same native capability 
 		outcome: "failed-before-publication",
 		current: movedParent,
 	}));
-	const renamed = { ...original, id: 9, path: "/moved-parent/c.pfdsl" };
+	const renamed = {
+		...original,
+		id: 9,
+		path: "/moved-parent/c.pfdsl",
+		binding: "directory:/moved-parent/c.pfdsl",
+	};
 	assert.equal(doc.rebindDisk(renamed), true);
 	assert.equal(doc.pendingTarget.path, renamed.path);
 	assert.equal(doc.pendingTarget.id, 9);

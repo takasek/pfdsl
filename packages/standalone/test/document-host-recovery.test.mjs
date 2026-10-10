@@ -52,6 +52,7 @@ test("Save As recovery retains target ownership and refuses intervening edits in
 			source: "original A",
 			revision: "a0",
 			identity: "inodeA",
+			binding: "directoryA:a.pfdsl",
 		};
 		const B = {
 			id: 2,
@@ -59,6 +60,7 @@ test("Save As recovery retains target ownership and refuses intervening edits in
 			source: "old B",
 			revision: "b0",
 			identity: "inodeB",
+			binding: "directoryB:b.pfdsl",
 		};
 		const published = { ...B, source: "local", revision: "b1" };
 		let pendingInspect = null;
@@ -262,12 +264,14 @@ export function createDocumentTab(options){
 			id: 23,
 			path: "/uncertain/a.pfdsl",
 			identity: "uncertainA",
+			binding: "uncertain:a.pfdsl",
 		};
 		saveTarget = {
 			...B,
 			id: 24,
 			path: "/uncertain/b.pfdsl",
 			identity: "uncertainB",
+			binding: "uncertain:b.pfdsl",
 		};
 		saveReply = new Error("native reply lost");
 		await click("#open-file");
@@ -420,7 +424,12 @@ export function createDocumentTab(options){
 		assert.equal(results.dependencyCall.args.id, 2);
 		const beforeRenameCount = reviewEntries.size;
 		entry.tab.setSource("unsaved after rename");
-		selectedDocument = { ...published, id: 3, path: "/C/renamed.pfdsl" };
+		selectedDocument = {
+			...published,
+			id: 3,
+			path: "/C/renamed.pfdsl",
+			binding: "directoryC:renamed.pfdsl",
+		};
 		await click("#open-file");
 		assert.equal(reviewActive(), entry);
 		assert.equal(reviewEntries.size, beforeRenameCount);
@@ -487,6 +496,7 @@ export function createDocumentTab(options){
 			id: 10,
 			path: "/separate/target.pfdsl",
 			identity: "inodeC",
+			binding: "separate:target.pfdsl",
 		};
 		await click("#save-as");
 		assert.equal(reviewBusy(), true);
@@ -555,6 +565,7 @@ export function createDocumentTab(options){
 			id: 11,
 			path: "/late/d.pfdsl",
 			identity: "inodeD",
+			binding: "late:d.pfdsl",
 			source: "late disk",
 			revision: "d0",
 		};

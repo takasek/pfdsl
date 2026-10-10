@@ -4,7 +4,7 @@ export interface DiskSnapshot {
 	source: string | null;
 	revision: string | null;
 	identity: string | null;
-	binding?: string | undefined;
+	binding: string;
 }
 export interface SaveResult {
 	outcome:
@@ -29,9 +29,7 @@ export function sameDocument(
 	current: DiskSnapshot,
 ): boolean {
 	return Boolean(
-		(previous.binding &&
-			current.binding &&
-			previous.binding === current.binding) ||
+		previous.binding === current.binding ||
 			(previous.identity && previous.identity === current.identity),
 	);
 }
@@ -92,16 +90,8 @@ export class DocumentSession {
 			identity: current.identity,
 		};
 		const oldPending = this.pendingTarget;
-		const ownsSource = (snapshot: DiskSnapshot) => {
-			if (snapshot.binding && previous.binding)
-				return snapshot.binding === previous.binding;
-			return (
-				snapshot.id === previous.id ||
-				(snapshot.path === previous.path &&
-					snapshot.identity !== null &&
-					snapshot.identity === previous.identity)
-			);
-		};
+		const ownsSource = (snapshot: DiskSnapshot) =>
+			snapshot.binding === previous.binding;
 		const rebind = (snapshot: DiskSnapshot) => ({
 			...snapshot,
 			id: current.id,
@@ -111,14 +101,7 @@ export class DocumentSession {
 		if (oldPending && ownsSource(oldPending))
 			this.pendingTarget = rebind(oldPending);
 		const conflict = this.conflict;
-		if (
-			conflict &&
-			ownsSource(conflict) &&
-			((conflict.binding && previous.binding) ||
-				conflict.path === previous.path ||
-				conflict.path === oldPending?.path)
-		)
-			this.conflict = rebind(conflict);
+		if (conflict && ownsSource(conflict)) this.conflict = rebind(conflict);
 		if (this.pendingTarget && this.pendingTarget.id !== current.id) {
 			this.sourceConflict = changed ? current : null;
 			return true;

@@ -6,7 +6,13 @@ import { build } from "esbuild";
 import { JSDOM } from "jsdom";
 
 const packageRoot = fileURLToPath(new URL("../../", import.meta.url));
-export async function withFormatHost(entry, seam, instances, run) {
+export async function withFormatHost(
+	entry,
+	seam,
+	instances,
+	run,
+	html = "<main></main>",
+) {
 	const temporary = mkdtempSync(
 		join(packageRoot, "node_modules/.format-style-"),
 	);
@@ -14,7 +20,7 @@ export async function withFormatHost(entry, seam, instances, run) {
 	const dom = new JSDOM(
 		entry === "main"
 			? readFileSync(join(packageRoot, "index.html"), "utf8")
-			: "<main></main>",
+			: html,
 		{ pretendToBeVisual: true },
 	);
 	const previous = new Map(
@@ -59,7 +65,8 @@ export async function withFormatHost(entry, seam, instances, run) {
 			],
 		});
 		const module = await import(pathToFileURL(output).href);
-		const create = (source) => {
+		const create = (source, options = {}) => {
+			const statuses = [];
 			const tab = module.createDocumentTab({
 				parent: dom.window.document.querySelector("main"),
 				key: `doc-${tabs.length}`,
@@ -67,14 +74,16 @@ export async function withFormatHost(entry, seam, instances, run) {
 				source,
 				path: null,
 				read: async () => assert.fail("Formatting must not read disk"),
-				reportStatus() {},
+				reportStatus: (status) => statuses.push(status),
+				...options,
 			});
 			tabs.push(tab);
-			return { tab, editor: instances.at(-1) };
+			return { tab, editor: instances.at(-1), statuses };
 		};
 		await run({
 			create,
 			document: dom.window.document,
+			window: dom.window,
 			editors: instances.slice(start),
 		});
 		if (entry === "main") {

@@ -151,12 +151,9 @@ impl Document {
         self.save_with_hooks(id, source, expected, before_publish, || {})
     }
     fn save_with_hooks(&mut self, id: usize, source: &str, expected: Option<&str>, before_publish: impl FnOnce(), after_publish: impl FnOnce()) -> SaveResult {
-        self.save_with_stage_hook(id, source, expected, || {}, before_publish, after_publish)
+        self.save_with_metadata_hook(id, source, expected, |_| {}, before_publish, after_publish)
     }
-    fn save_with_stage_hook(&mut self, id: usize, source: &str, expected: Option<&str>, stage_prepared: impl FnOnce(), before_publish: impl FnOnce(), after_publish: impl FnOnce()) -> SaveResult {
-        self.save_with_metadata_hook(id, source, expected, stage_prepared, |_| {}, before_publish, after_publish)
-    }
-    fn save_with_metadata_hook(&mut self, id: usize, source: &str, expected: Option<&str>, stage_prepared: impl FnOnce(), metadata_copied: impl FnOnce(&cap_std::fs::File), before_publish: impl FnOnce(), after_publish: impl FnOnce()) -> SaveResult {
+    fn save_with_metadata_hook(&mut self, id: usize, source: &str, expected: Option<&str>, metadata_copied: impl FnOnce(&cap_std::fs::File), before_publish: impl FnOnce(), after_publish: impl FnOnce()) -> SaveResult {
         let result = |outcome: &str, current: Option<Snapshot>, message: String| {
             let target_state = match &current { Some(s) if s.source.is_some() => "readable", Some(_) => "missing", None => "unreadable" };
             SaveResult { outcome: outcome.into(), current, message, publication: "not-published".into(), target_state: target_state.into() }
@@ -208,7 +205,6 @@ impl Document {
             receipt
         };
         let prepared = (|| -> Result<(), String> {
-            stage_prepared();
             #[cfg(target_os = "macos")]
             if let (Some(required), Some(original)) = (&protection, &original) {
                 required.copy_to(original, &file)?;
@@ -372,7 +368,7 @@ mod tests {
         fs::set_permissions(&path, fs::Permissions::from_mode(0o600)).unwrap();
         let before = doc.inspect(0).unwrap();
         let mut observed_stage = None;
-        let result = doc.save_with_metadata_hook(0, "public fixture buffer", before.revision.as_deref(), || {}, |stage| {
+        let result = doc.save_with_metadata_hook(0, "public fixture buffer", before.revision.as_deref(), |stage| {
             // Model a copier returning success without establishing the source's protection.
             // This changes only the disposable stage; no ACL or protected xattr is synthesized.
             assert_eq!(unsafe { libc::fchmod(stage.as_raw_fd(), 0o644) }, 0);

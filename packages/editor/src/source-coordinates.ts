@@ -47,11 +47,6 @@ export function snapshotCoordinates(
 				};
 			case "input-edge":
 			case "feedback-edge":
-				return {
-					...endpoints(value),
-					artifact: artifact(value.artifact),
-					process: id(value.process),
-				};
 			case "output-edge":
 				return {
 					...endpoints(value),
