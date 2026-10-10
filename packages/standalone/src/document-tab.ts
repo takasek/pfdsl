@@ -17,6 +17,7 @@ interface DocumentTabOptions {
 	path: string | null;
 	read: (path: string) => Promise<string | null>;
 	reportStatus: (message: string) => void;
+	onChange?: () => void;
 }
 
 /** One Monaco editor and preview pair, with private snapshot and refresh state. */
@@ -28,6 +29,7 @@ export function createDocumentTab({
 	path,
 	read,
 	reportStatus,
+	onChange,
 }: DocumentTabOptions) {
 	let snapshot: DocumentModel | undefined;
 	let revision = 0;
@@ -180,6 +182,7 @@ export function createDocumentTab({
 		button.textContent = `${name}${editor.getValue() === source ? "" : " •"}`;
 		requestEditorRender();
 		requestRefresh();
+		onChange?.();
 	});
 	editor.onDidChangeCursorPosition((event) => {
 		if (!snapshot || snapshot.source !== editor.getValue() || disposed) return;
@@ -206,6 +209,30 @@ export function createDocumentTab({
 		activate() {
 			editor.layout();
 			requestRefresh();
+		},
+		getSource: () => editor.getValue(),
+		getRevision: () => model.getVersionId(),
+		setSource(value: string) {
+			editor.pushUndoStop();
+			editor.executeEdits("pfdsl.disk", [
+				{ range: model.getFullModelRange(), text: value },
+			]);
+			editor.pushUndoStop();
+		},
+		setLocation(
+			nextPath: string | null,
+			nextName: string,
+			readSource?: (path: string) => Promise<string | null>,
+		) {
+			path = nextPath;
+			name = nextName;
+			if (readSource) read = readSource;
+			button.textContent = `${name}${editor.getValue() === source ? "" : " •"}`;
+			requestRefresh();
+		},
+		markSaved(value: string) {
+			source = value;
+			button.textContent = `${name}${editor.getValue() === source ? "" : " •"}`;
 		},
 		isDirty: () => editor.getValue() !== source,
 		format() {

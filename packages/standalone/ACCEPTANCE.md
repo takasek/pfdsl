@@ -382,3 +382,89 @@ PDF を扱う #1261 で WKPDFConfiguration 等の制約を追加し、#1262 で�
 Tauri の bundle 下限だけから WebKit / Monaco の対応を推定しない。
 [Monaco maintainer の browser 方針](https://github.com/microsoft/monaco-editor/discussions/4283) と [WebKit の CSP 修正記録](https://webkit.org/blog/17333/webkit-features-in-safari-26-0/) を踏まえ、下限候補の実機では起動、WASM、worker、CSP、入力・IME、編集再描画と大きい図を同じ同梱版で確認する必要がある。
 今の対応を保証できる実測範囲は上記の macOS 27.0 の一台に限る。
+
+
+## #1258 の隔離候補 — 2026-10-09 UTC（wip）
+
+基準は main `7dc51a6c5bb8088bb2a3ec7513cc295c322482b4` の専用 Git clone と専用ブランチ `codex/issue-1258-documents`。
+最初の archive 候補とその v0 納品は履歴として保存し、この節は更新された候補の検証範囲を表す。
+元 checkout、元 VS Code smoke runner、既存399セルと各固定版の受入判定は変更しない。
+新規・文書/フォルダ読取・手動 Save/Save As・target だけの recent・文書ごとの dirty close を追加した候補であり、完了や現在版の実機合格を示さない。
+
+native 保存は captured parent directory capability と単一 leaf に限定し、同一 directory 内の staging/write/sync 後に macOS RENAME_EXCL または RENAME_SWAP を使用する。
+交換で退避した inode は成功時も保持し、old FD writer の後続書込みも消さない。
+確認から公開の間の外部書込み、突然の削除/作成、別 directory への置換を異常系で検査し、公開済みなのに確認できない結果は部分成功として保持する。
+全 writer を跨ぐ atomic CAS、autosave、session restore、crash recovery、power-loss durability は保証しない。
+非 macOS には無条件 overwrite の fallback を設けない。
+retained object は明示的な比較・draft 読込が可能だが、自動削除せず利用者による確認を必要とする。
+
+独立レビューで failed Save As の A/B recovery target、disk 読込中の新しい編集、target 採用後の preview dependency capability、pathname 置換後の folder 再選択を指摘され、回帰を追加して修正した。
+品質/correctness と採用理由の確認は別 agent が実施した。
+実装を見ない体験レビューは未実施で、DOM seam の検査を実 native GUI 受入に転写しない。
+
+以下の検査の最終件数・exit code、差分と raw logs、bundle executable/frontend hash は今回の外部納品 report に保存する。
+standalone session/host 回帰、既存全 package の build/test/typecheck、native 保存 race と partial staging-write/permission failure を実行する。
+partial staging-write は child process の file-size resource limit による実 write failure であり、full-volume ENOSPC や sync failure の実測とは区別する。
+既存キャッシュの pnpm 10.33.2 を専用コピーへ移し、通常の `make setup` と setup-completion check が成功した。
+通常の Git-backed build/test/typecheck/lint、fmt/links/docs/scaffold gate が一度成功し、その後の追加修正は版を固定して再検査する。
+cycle-status は origin fetch 成功・behind 0 だが、候補に未コミット差分があるため終了 code 1 を返す。
+rustfmt は既存 toolchain に存在せず、導入や検査省略で合格扱いにしない。
+Mac はロック中で正規 app 操作の取得に失敗したため、現在 bundle の GUI/IME、Find/Replace、Undo/Redo、手動保存、close/dialog と current native corpus は未確認。
+起動した試験 process は停止し、解除の迂回・共有設定変更・外部投稿・push・PR・CI rerun は行っていない。
+#1258 は wip のままで、#1259 の製品実装を未検証保存基盤の上に積まない。
+
+通常 Quit を固定版 AppKit/Tao delegate で同期取消し、window CloseRequested と Tauri ExitRequested を同じ複数文書確認へ接続した。
+遅延・重複・busy 中の Quit は request token と IPC 応答中の claim で抑止し、確認中の文書追加は dispose 前の membership 検査で全件保全する。
+親 directory 移動後も native capability の parent inode/leaf binding を保持し、明示的な同一 inode 再 Open で source と same-target recovery を同時に再接続する。
+独立レビューの追加 P1/P2 は回帰テストで修正したが、GUI の Cmd-Q・application menu Quit・Dock Quit・window close は別々に実行して確認する必要がある。
+
+保存 metadata は未解決の P2 として残る。
+v3 baseline の mode-only 保存は ACL/xattr/ownership を保証せず、保護された文書の保存には使用しない。
+独立 SDK レビューと owned fixture により、metadata copy 後に権限を強化されると交換後に古い弱い mode が公開される反例を確認した。
+対応する ordinary metadata と保存時の競合保証の範囲は未確定で、全既存 Save 拒否を通常 Save の達成とは扱わない。
+read-only file 自体の write denial は writable parent による交換で迂回しないよう、既存 target を truncate せず write-open できることを要求する。
+この条件だけで ACL/xattr/metadata race が解決したとは扱わない。
+
+### 失敗時の stage 保全 — cleanup の独立修正
+
+外部 writer が stage の名前を独立ファイルへ差し替え、publication が失敗すると、従来の cleanup がそのファイルを unlink することを native fixture で再現した。
+metadata 方針と独立の確定不具合として、失敗時の unpublished stage unlink を撤去した。
+作成に成功した temporary leaf は manual inspection に残し、失敗説明にその leaf を示す。
+名前の identity を検査してから unlink する方式は使わず、別 writer の entry を削除しない。
+不確かな leaf を verified retained snapshot として自動読込みしない。
+native regression は独立ファイルと移動先の元/local 内容を保全することを確認し、partial staging-write は実際に five-byte prefix が stage に残ることも確認する。
+既存保存方式の mode-only metadata 問題、保存直前競合、power-loss durability をこの修正で解決したとは扱わない。
+現在版の full build/test/gates と native suite の結果は専用の納品報告に版とともに保存し、GUI 未確認は維持する。
+凍結した v2 source/app とその証拠は変更せず、cleanup 修正後の app は別の識別情報で保存する。
+
+### 独立候補の保存境界と公開後 failure
+
+2026-10-09、v3 baseline 911a2dba を基準に別 branch の候補を準備した。
+URL replacement と FD-relative clone/copy を独立比較した。
+最終レビューで clone 後の stage 名の再 open が foreign inode へ書く反例を確認し、create_new で取得した stage FD を保持する方式へ変更した。
+fcopyfile の metadata copy と fsetattrlist の creation time 復元を保持 FD に限定する。
+stat copy の後に内容を書き、mtime は今回の書込みで更新する。
+既存 file の metadata は本文 write 前にも照合し、copy 成功後の observed protection 不足で buffer を stage に残すことを避ける。
+普通 mode の不足を専用 fixture の fault hook で作り、公開拒否と stage の空内容を Red→Green で確認した。
+これは特殊 ACL 等の意味や全時点の競合に対する機密性を保証するものではない。
+owner/group、mode、flags、creation time、extended ACL text、xattr の名前と値を観測し、stage と公開結果を照合する。
+元から存在する TextEncoding は書く UTF-8 内容に一致する宣言へ更新する。
+その他の OS SAVE intent で保持対象外となる属性は、未決の方針を黙って適用せず公開前に拒否する。
+未知の内容依存属性、独自 ACL・異なる ownership・inheritance の実機受入は未完了で、全属性保証は宣言しない。
+copy または metadata の検証失敗では公開を拒否し、破壊的な fallback を使わない。
+同じ stage inode の内容差替えも公開直前の buffer 照合で拒否する。
+
+root/parent の外部移動・削除・入替、target の identity/revision/metadata と stage entry の変更を公開直前に検知した時は拒否する。
+過去の parent 移動後の保存成功テストは、今回の明示的な検知時拒否の要件に合わせて変更した。
+公開後に変化した対象は rollback や unlink をせず、published receipt と実際の観測状態を返す。
+保全した old-FD object は従来どおり残り、close/read/Save As の target ownership を維持する。
+
+host は native reply を受け取れなかった場合も、publication unknown の failure receipt、dirty、buffer、選択 target を保持する。
+current が読めなかった場合に以前の snapshot を現在値として表示しない。
+実 native の公開後 target directory 化の fault test で、published/unreadable、新内容の公開、旧 retained 内容の実物を検査した。
+その JSON receipt を production host の DOM に渡して、保存完了とならないこと、buffer/dirty、回復先、未確認 disk adoption の無効化を検査する。
+DOM seam は実 Monaco/native window の GUI 受入ではない。
+
+版、Red/Green、生ログ、独立レビューは独立候補の外部報告に保存する。
+v4 の凍結 app と source は変更しておらず、この候補をその app の実測結果へ転写しない。
+GUI と rustfmt は未実施のままで、追加 install、画面ロック解除、公開操作はしていない。

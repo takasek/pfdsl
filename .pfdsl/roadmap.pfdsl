@@ -156,7 +156,7 @@ artifact:
     location: ../packages/standalone/
   standalone_documents:
     label: 安全に編集・保存できる文書アプリ
-    status: todo
+    status: wip
     criteria: 任意 PFD の新規・開く・手動保存・別名保存とエディタ＋プレビューの組のタブ操作が実機で動き、未保存終了・外部再変更・削除・保存失敗の試験で内容を黙って失わずに解決できる
   standalone_pfd_features:
     label: PFD 編集・閲覧機能が揃ったアプリ

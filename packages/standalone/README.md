@@ -169,9 +169,47 @@ Format is an Undoable editor operation, and editor/node navigation uses the shar
 The native host holds a directory capability for each folder explicitly selected for that session.
 Reads stay bound to that directory when its pathname is replaced; relative traversal and symlink escape are rejected.
 
-This foundation build keeps edited text in memory and does not save files.
-Closing after an edit asks before discarding it.
-Complete saving, external-change protection, and close recovery belong to the document-editing stage.
+Choose **New**, **Open file…**, or a recent file/folder to work with documents.
+**Save** (Command-S) and **Save As…** (Command-Shift-S) are manual operations; there is no autosave or session restoration.
+The recent list stores targets only, never editor content.
+Closing a dirty tab or window, or using macOS Command-Q, the application Quit menu, or Dock Quit, enters the same Save, Discard, and Cancel transaction.
+Native requests are cancelled immediately and exit is requested only after every document accepts; logout/shutdown may therefore be cancelled rather than resumed.
+The guard does not protect against Force Quit, crashes, or power loss.
+Actual AppKit Quit interactions remain unverified in this candidate.
+A cancellation, failed save, unreadable disk state, ongoing disk observation, changed tab membership, or edit during the close sequence preserves unconfirmed buffers; earlier successful saves remain on disk.
+Unresolved disk reads finish before close decisions, and an unreadable former disk version makes its surviving editor content require confirmation.
+
+Clean external changes reload automatically; dirty changes, deletion, and publication conflicts keep the editor content for review.
+The conflict panel identifies the recovery target and lets you compare its observed contents, choose another destination, or explicitly load the current disk version.
+Save As rejects a target already open by path or file identity.
+After a failed Save As, the original document remains active until a target is successfully saved or explicitly adopted.
+Adoption refuses a target already open in another tab; both local buffers remain available.
+Explicitly reopening a renamed file with the same inode updates its native capability and dependency base while retaining dirty content; native parent-inode/leaf bindings keep source recovery separate from other Save As targets.
+
+On macOS, a save stages and synchronizes content in the selected directory, then uses an exclusive create or an atomic exchange.
+The exchanged disk object is kept beside the document as `.pfdsl-save-*`, including after a successful save, because another writer can still hold its old file handle.
+The conflict panel can inspect those objects and load one as an unsaved draft.
+They are never automatically deleted: review them in Finder and remove them only when other writers have finished.
+Publication can succeed before a conflict or read error is reported; inspect both the target and retained object before retrying.
+Failures before publication also leave any created temporary leaf in the selected folder for manual inspection.
+The status message identifies that leaf; it is not presented as a verified recovery version, because another writer may have replaced its directory entry.
+Failure cleanup never unlinks the temporary name, which avoids deleting an independent writer's replacement.
+This is not an atomic compare-and-swap guarantee against every writer, nor a crash-recovery or power-loss durability guarantee.
+Save publication on other operating systems is currently refused; it never falls back to unconditional overwrite.
+
+The #1258 document-editing candidate remains under validation.
+Existing-file saving keeps the FD obtained by exclusive stage creation, copies metadata with `fcopyfile`, restores creation time with `fsetattrlist`, and compares observed owner/group, mode, flags, creation time, extended ACL text, and xattr names/values before publication and when checking the result.
+Content is written after stat metadata is copied, so the saved file receives the write's modification time.
+Existing-file metadata is verified before any editor content is written into the stage, and checked again after writing; a copy that returns success with incomplete observed protection leaves an empty stage.
+An existing TextEncoding declaration is updated on the stage to describe the UTF-8 bytes actually written; files without that declaration do not acquire one.
+Attributes that the OS marks as unsuitable for a safe save require an explicit policy, except for this encoding update; they are refused before publication rather than silently removed or preserved as stale content metadata.
+Copy or metadata verification failures also refuse publication, without a destructive fallback.
+The stage is never reopened by name for writing; detected name replacements are refused, and its content is checked against the buffer before publication.
+Selected-directory moves, deletion, replacement, and observed target/stage changes are checked before publication; detected changes are refused without changing either target directory.
+The checks do not provide an atomic transaction against every uncooperative writer.
+A publication followed by an error retains a failure receipt and dirty buffer; an unreadable result is not represented by an old snapshot, and an IPC failure reports publication as unknown.
+The exact bundle, nontrivial ACL/ownership cases, inherited ACL behavior, and remaining content-dependent metadata policies still require acceptance; this is not proof of all-attribute preservation.
+Its current native GUI, Japanese IME, Find/Replace, Undo/Redo, and manual-save interactions still require acceptance on the exact bundle; see the appended [validation record](ACCEPTANCE.md).
 Syntax highlighting and the remaining PFD-specific language commands, external navigation, export, and distribution remain in the [acceptance matrix](ACCEPTANCE.md).
 Local `.app` builds are not signed/notarized release DMGs.
 

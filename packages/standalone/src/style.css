@@ -14,6 +14,7 @@ body {
 }
 header {
 	display: flex;
+	flex-wrap: wrap;
 	gap: 12px;
 	align-items: center;
 	padding: 10px 16px;
@@ -32,6 +33,8 @@ button[aria-selected="true"] {
 	border-color: #3369a0;
 }
 #status {
+	flex-basis: 100%;
+	overflow-wrap: anywhere;
 	margin-left: auto;
 	color: #555;
 }
@@ -85,4 +88,65 @@ aside {
 .preview {
 	border-left: 1px solid #ddd;
 	box-sizing: border-box;
+}
+.document-tab {
+	display: flex;
+	flex-shrink: 0;
+}
+.close-document {
+	margin-left: 2px;
+}
+#recent button {
+	display: block;
+	width: 100%;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	text-align: left;
+	margin-bottom: 5px;
+}
+aside h2 {
+	font-size: 13px;
+}
+#conflicts {
+	max-height: 28%;
+	overflow: auto;
+	border-top: 1px solid #ddd;
+	padding: 0 8px;
+}
+#conflicts:empty {
+	display: none;
+}
+#conflicts button {
+	margin: 4px;
+	overflow-wrap: anywhere;
+}
+#conflicts pre {
+	white-space: pre-wrap;
+}
+dialog {
+	width: min(800px, 85vw);
+	max-height: 80vh;
+	overflow: auto;
+	border: 1px solid #aaa;
+	border-radius: 8px;
+}
+dialog::backdrop {
+	background: #0006;
+}
+dialog label {
+	display: block;
+	margin: 12px 0;
+}
+dialog textarea {
+	display: block;
+	width: 98%;
+	min-height: 130px;
+	resize: vertical;
+	font-family: monospace;
+}
+.dialog-actions {
+	display: flex;
+	justify-content: flex-end;
+	gap: 8px;
 }
