@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { type DiffReport, resolveLocationFsPath } from "@pfdsl/core";
 import type { MessageFromWebview, MessageToWebview } from "@pfdsl/editor";
 import {
@@ -393,6 +394,35 @@ export function registerPreview(context: vscode.ExtensionContext): {
 				focusNodeId || undefined,
 			),
 		};
+		if (process.env.PFDSL_SMOKE_DIAGNOSTICS_DIR) {
+			const producer = randomUUID();
+			let sequence = 0;
+			const log = (phase: string, changes = {}) =>
+				console.log(
+					`PFDSL_CLOSE_TAB_EVENT ${JSON.stringify({ producer, phase, sequence, time: Date.now(), ...changes })}`,
+				);
+			const columns = (tabs: readonly vscode.Tab[]) =>
+				tabs
+					.filter(
+						(tab) =>
+							tab.input instanceof vscode.TabInputText &&
+							tab.input.uri.toString() === docUri,
+					)
+					.map((tab) => tab.group.viewColumn);
+			const listener = vscode.window.tabGroups.onDidChangeTabs((event) => {
+				const opened = columns(event.opened);
+				const closed = columns(event.closed);
+				if (opened.length === 0 && closed.length === 0) return;
+				sequence++;
+				log("tabs", { opened, closed });
+			});
+			context.subscriptions.push(listener);
+			panel.onDidDispose(() => {
+				listener.dispose();
+				log("dispose");
+			});
+			log("start");
+		}
 
 		panel.webview.onDidReceiveMessage(async (msg: MessageFromWebview) => {
 			if (state.disposed) return;

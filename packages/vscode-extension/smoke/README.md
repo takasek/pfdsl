@@ -14,3 +14,14 @@ Group indices identify current physical parents only and may change when a group
 Labels are clipped to 160 characters and collections are bounded, while screenshots show the workbench viewport.
 Screenshots and snapshot writes add latency when enabled, so passing captures do not establish the original failure cause or failure frequency.
 Playwright tracing over the existing CDP connection is not validated or added in this revision.
+
+When enabled, the ordinary preview creation also logs standard VS Code tab events for that source only.
+The runner subscribes to console messages before opening the preview and saves projected fields in `close-tab-events.json`, covered by the existing artifact allowlist.
+No source text, URI, tab label or raw console decoration is retained in that file.
+Each `tabs` record is one callback containing its `opened` and `closed` view-column arrays; order between those arrays is unspecified, and view columns are not persistent group identifiers.
+`startObserved` and `sequenceContinuous` identify the received start and callback sequence; invalid messages make the sequence unverified.
+`sourceEndObserved` requires an intact start/callback sequence and a natural panel-disposal marker with its final sequence; stopping the receiver is not a producer acknowledgement.
+Each panel has an opaque random producer ID; mixed producers or starts, reordered phases, sequence gaps or invalid records leave the end unverified.
+These flags describe received callback evidence rather than guaranteed coverage of internal editor mutations.
+Normal smoke cleanup may provide no disposal marker, so `tailUnverified` remains true and a missing close event cannot establish that no close occurred.
+These callback and receive times can support observed close/reopen evidence, but do not establish internal mutation time, document disposal, failure frequency or the original failure cause.

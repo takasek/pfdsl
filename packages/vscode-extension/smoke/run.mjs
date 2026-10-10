@@ -35,6 +35,99 @@ const maxExtensionHostLogFiles = 4;
 const maxExtensionHostLogEntries = 200;
 const maxExtensionHostLogTailBytes = 4_096;
 
+export function parseSourceTabConsoleEvent(text) {
+	const marker = "PFDSL_CLOSE_TAB_EVENT ";
+	const index = text.indexOf(marker);
+	if (index < 0) return null;
+	try {
+		const payload = text.slice(index + marker.length);
+		const value = JSON.parse(
+			payload.slice(payload.indexOf("{"), payload.lastIndexOf("}") + 1),
+		);
+		const { producer, phase, sequence, time, opened, closed } = value;
+		if (
+			typeof producer !== "string" ||
+			!/^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/.test(producer) ||
+			!["start", "tabs", "dispose"].includes(phase) ||
+			!Number.isInteger(sequence) ||
+			sequence < 0 ||
+			!Number.isFinite(time)
+		)
+			return null;
+		if (phase === "start" && sequence !== 0) return null;
+		if (phase !== "tabs") return { producer, phase, sequence, time };
+		if (
+			![opened, closed].every(
+				(columns) =>
+					Array.isArray(columns) &&
+					columns.every((column) => Number.isInteger(column) && column > 0),
+			)
+		)
+			return null;
+		return { producer, phase, sequence, time, opened, closed };
+	} catch {
+		return null;
+	}
+}
+
+export function startSourceTabCapture(page) {
+	const startedAt = Date.now();
+	const events = [];
+	let invalidMessages = 0;
+	const listener = (message) => {
+		const text = message.text();
+		if (!text.includes("PFDSL_CLOSE_TAB_EVENT ")) return;
+		const event = parseSourceTabConsoleEvent(text);
+		if (event) events.push({ ...event, receivedAt: Date.now() });
+		else invalidMessages++;
+	};
+	page.on("console", listener);
+	return {
+		stop() {
+			page.off("console", listener);
+			const changes = events.filter((event) => event.phase === "tabs");
+			const startObserved = events[0]?.phase === "start";
+			const sequenceContinuous =
+				startObserved &&
+				invalidMessages === 0 &&
+				events.every((event) => event.producer === events[0].producer) &&
+				/^start(?:,tabs)*(?:,dispose)?$/.test(
+					events.map((event) => event.phase).join(","),
+				) &&
+				changes.every((event, index) => event.sequence === index + 1);
+			const sourceEndObserved =
+				sequenceContinuous &&
+				events.at(-1)?.phase === "dispose" &&
+				events.at(-1).sequence === changes.length;
+			return {
+				startedAt,
+				endedAt: Date.now(),
+				startObserved,
+				sequenceContinuous,
+				sourceEndObserved,
+				tailUnverified: !sourceEndObserved,
+				invalidMessages,
+				events,
+			};
+		},
+	};
+}
+
+export async function saveSourceTabCapture(capture) {
+	if (!capture) return;
+	try {
+		const result = capture.stop();
+		const directory = process.env.PFDSL_SMOKE_DIAGNOSTICS_DIR;
+		await mkdir(directory, { recursive: true });
+		await writeFile(
+			join(directory, "close-tab-events.json"),
+			JSON.stringify(result, null, 2),
+		);
+	} catch (error) {
+		console.warn(`Source-tab event capture: ${error.message}`);
+	}
+}
+
 export async function collectWorkbenchInteractionState(page) {
 	return page.evaluate(() => {
 		const describe = (element) =>
@@ -1371,6 +1464,7 @@ export async function launchSmokeSession() {
 	const profileDir = join(runDir, "profile");
 	let browser;
 	let page;
+	let tabCapture;
 	let processError;
 	let vscodeProcess;
 	let output;
@@ -1424,6 +1518,8 @@ export async function launchSmokeSession() {
 			vscodeProcess,
 		});
 		page = await waitForWorkbenchPage(browser);
+		if (process.env.PFDSL_SMOKE_DIAGNOSTICS_DIR)
+			tabCapture = startSourceTabCapture(page);
 		await page.getByLabel("PFDSL: Open Preview to the Side").click();
 		const frame = await findWebviewFrame(page);
 		const session = {
@@ -1435,9 +1531,11 @@ export async function launchSmokeSession() {
 			vscodeProcess,
 			runDir,
 			output,
+			tabCapture,
 		};
 		return session;
 	} catch (error) {
+		await saveSourceTabCapture(tabCapture);
 		const diagnostic = formatDiagnostic(error.message, {
 			page,
 			processError,
@@ -1526,6 +1624,7 @@ async function main() {
 		}
 	} finally {
 		if (session) {
+			await saveSourceTabCapture(session.tabCapture);
 			const cleanupErrors = await cleanupSmokeSession(session);
 			if (cleanupErrors.length > 0) {
 				failure = appendCleanupDiagnostics(

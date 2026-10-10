@@ -40,15 +40,116 @@ import {
 	isWithinScaleTolerance,
 	minimapClickChangesPan,
 	minimapDragChangesPan,
+	parseSourceTabConsoleEvent,
 	parseStatusCursorPosition,
 	quickInputValue,
 	resolveVSCodeExecutablePath,
+	startSourceTabCapture,
 	waitForColdRender,
 	waitForStatusCursorPosition,
 	waitForVisibleCount,
 	waitForWorkbenchPage,
 	withWorkbenchOperation,
 } from "./run.mjs";
+
+test("tab console events discard decoration and private fields without inventing array order", () => {
+	const producer = "00000000-0000-0000-0000-000000000001";
+	const event = {
+		producer,
+		phase: "tabs",
+		sequence: 1,
+		time: 42,
+		opened: [2],
+		closed: [1],
+		uri: "/private/source.pfdsl",
+		source: "private body",
+	};
+	const text = `%c[Extension Host] %cPFDSL_CLOSE_TAB_EVENT ${JSON.stringify(event)} color: blue (at /private/extension.js:1)`;
+	assert.deepEqual(parseSourceTabConsoleEvent(text), {
+		producer,
+		phase: "tabs",
+		sequence: 1,
+		time: 42,
+		opened: [2],
+		closed: [1],
+	});
+	assert.equal(parseSourceTabConsoleEvent("unrelated console output"), null);
+	assert.equal(
+		parseSourceTabConsoleEvent("PFDSL_CLOSE_TAB_EVENT {broken}"),
+		null,
+	);
+	assert.equal(
+		parseSourceTabConsoleEvent(
+			'PFDSL_CLOSE_TAB_EVENT {"phase":"tabs","sequence":1,"time":42,"opened":["private"],"closed":[]}',
+		),
+		null,
+	);
+});
+
+test("tab capture records start, disposal, gaps, missing tails and listener removal", () => {
+	let listener;
+	const page = {
+		on: (type, handler) => {
+			assert.equal(type, "console");
+			listener = handler;
+		},
+		off: (type, handler) => {
+			assert.equal(type, "console");
+			assert.equal(handler, listener);
+			listener = undefined;
+		},
+	};
+	const send = (event) =>
+		listener({
+			text: () =>
+				`PFDSL_CLOSE_TAB_EVENT ${JSON.stringify({ producer: "00000000-0000-0000-0000-000000000001", ...event })}`,
+		});
+	const capture = startSourceTabCapture(page);
+	send({ phase: "start", sequence: 0, time: 1 });
+	send({ phase: "tabs", sequence: 1, time: 2, opened: [2], closed: [1] });
+	send({ phase: "dispose", sequence: 1, time: 3 });
+	const result = capture.stop();
+	assert.equal(listener, undefined);
+	assert.equal(result.startObserved, true);
+	assert.equal(result.sequenceContinuous, true);
+	assert.equal(result.sourceEndObserved, true);
+	assert.equal(result.tailUnverified, false);
+	assert.equal(result.events.length, 3);
+	const incomplete = startSourceTabCapture(page);
+	send({ phase: "start", sequence: 0, time: 1 });
+	send({ phase: "tabs", sequence: 2, time: 2, opened: [], closed: [1] });
+	listener({ text: () => "PFDSL_CLOSE_TAB_EVENT malformed" });
+	send({ phase: "dispose", sequence: 1, time: 3 });
+	const missing = incomplete.stop();
+	assert.equal(missing.sequenceContinuous, false);
+	assert.equal(missing.invalidMessages, 1);
+	assert.equal(missing.sourceEndObserved, false);
+	assert.equal(missing.tailUnverified, true);
+	assert.equal(startSourceTabCapture(page).stop().startObserved, false);
+	const mixed = startSourceTabCapture(page);
+	send({ phase: "start", sequence: 0, time: 1 });
+	send({ phase: "dispose", sequence: 0, time: 2 });
+	send({ phase: "start", sequence: 0, time: 3 });
+	send({ phase: "dispose", sequence: 0, time: 4 });
+	const multiple = mixed.stop();
+	assert.equal(multiple.sequenceContinuous, false);
+	assert.equal(multiple.sourceEndObserved, false);
+	assert.equal(multiple.tailUnverified, true);
+	const foreign = startSourceTabCapture(page);
+	send({
+		phase: "start",
+		sequence: 0,
+		time: 1,
+		producer: "00000000-0000-0000-0000-000000000001",
+	});
+	send({
+		phase: "dispose",
+		sequence: 0,
+		time: 2,
+		producer: "00000000-0000-0000-0000-000000000002",
+	});
+	assert.equal(foreign.stop().sourceEndObserved, false);
+});
 
 test("command palette replacement keeps the command provider prefix", () => {
 	assert.equal(
