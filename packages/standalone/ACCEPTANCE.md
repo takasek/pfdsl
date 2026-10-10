@@ -581,3 +581,10 @@ missing と読取失敗は既存の uncertain / dirty 判定に接続し、Save 
 独立 reviewer は終了 transaction と native inspect の契約を照合し、修正を妨げる指摘なし。
 新しい実 GUI 受入ではない。Mac アプリの再ビルド要求は、cwd が main と扱われ explicit worktree の所有を証明できないとして保護 hook に拒否され、規定 wrapper に native build の入口がないため停止した。
 以前の Mac binary と実機受入を、この frontend 修正後の新しい executable の成功へ転写しない。
+
+同日の再調査で、既存 wrapper の `node-script` が target・branch を検証した後に通常スクリプトを実行する正規入口と確認した。
+ignored 領域の検証用 helper から公式 Tauri debug build を実行し、既存 Cargo の PATH を明示して source `72bcd20a8d66b480606e6e24ab85f3eb3b7341e6` の arm64 app をビルドした。
+元 executable の SHA-256 は `b039854001f94f18de13411df10c77be8642408f511d9285a690dd1e00331075`。
+所有者へ渡すコピーにはローカル ad-hoc 署名を付け、`codesign --verify --deep --strict` 成功後の executable SHA-256 は `97d1fb616a3211ca0efdc27df238bf80ffe2a8ade62513426c7bedda3f4265b5`。
+保護 hook・trusted root・wrapper の変更は行わず、正式署名・公証や実 GUI 成功を認定しない。
+実機確認は所有者が担当すると表明し、修正版 app と削除・移動用の使い捨てファイルを用意した。
