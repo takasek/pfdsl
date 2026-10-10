@@ -186,7 +186,9 @@ Native selection mapping, keyboard focus, and Undo/Redo remain to be checked in 
 PFDSL editors support square-bracket and double-quote pairing and surrounding selected text.
 Use **Toggle Line Comment** from the editor Command Palette (F1), or Command-/ on macOS, to add or remove `#` on selected lines.
 Syntax highlighting and string-aware quote suppression remain unimplemented; quote pairing cannot distinguish existing strings yet.
-Word boundaries still use Monaco defaults while the extension’s Unicode word-pattern configuration is assessed separately.
+Word lookup uses the extension's shared Unicode pattern: letters, numbers, underscores and hyphens form a word, including Japanese and supplementary-plane letters.
+The pattern also permits a standalone hyphen; it is not a PFDSL tokenizer.
+Automated checks cover real Monaco word ranges and the shared regex; native selection gestures and VS Code UI behavior remain unverified.
 These language-support changes have automated editor checks; native keyboard and IME acceptance remain unverified in this candidate.
 
 The native host holds a directory capability for each folder explicitly selected for that session.

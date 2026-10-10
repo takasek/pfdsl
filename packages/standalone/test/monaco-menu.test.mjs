@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import test from "node:test";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -139,6 +139,70 @@ test("the production document-tab entry loads real Monaco menu contributions", a
 				);
 			});
 		});
+		await t.test(
+			"shared word rules recognize Unicode letters and numbers",
+			() => {
+				const { wordPattern } = JSON.parse(
+					readFileSync(
+						new URL(
+							"../../vscode-extension/language-configuration.json",
+							import.meta.url,
+						),
+						"utf8",
+					),
+				);
+				const pattern =
+					typeof wordPattern === "string"
+						? new RegExp(wordPattern)
+						: new RegExp(wordPattern.pattern, wordPattern.flags);
+				assert.deepEqual(
+					"[入力-data_2, 𐐀node, ٣] >> 処理 -> 結果!?".match(
+						new RegExp(pattern.source, `${pattern.flags}g`),
+					),
+					["入力-data_2", "𐐀node", "٣", "処理", "-", "結果"],
+				);
+			},
+		);
+		await t.test("document word lookup uses PFDSL Unicode ranges", async () => {
+			await withEditors("[入力-data_2, 𐐀node] >> 処理", async (create) => {
+				const model = create().getModel();
+				for (const [column, expected] of [
+					[5, { word: "入力-data_2", startColumn: 2, endColumn: 11 }],
+					[14, { word: "𐐀node", startColumn: 13, endColumn: 19 }],
+					[21, null],
+				]) {
+					assert.deepEqual(
+						model.getWordAtPosition({ lineNumber: 1, column }),
+						expected,
+					);
+				}
+				assert.deepEqual(
+					model.getWordUntilPosition({ lineNumber: 1, column: 6 }),
+					{
+						word: "入力-d",
+						startColumn: 2,
+						endColumn: 6,
+					},
+				);
+			});
+		});
+		await t.test(
+			"word lookup survives edits containing incomplete quoted text",
+			async () => {
+				await withEditors("input >> process", async (create) => {
+					const editor = create();
+					editor.setValue('"未完-𐐀2');
+					assert.deepEqual(
+						editor.getModel().getWordAtPosition({ lineNumber: 1, column: 6 }),
+						{
+							word: "未完-𐐀2",
+							startColumn: 2,
+							endColumn: 8,
+						},
+					);
+				});
+			},
+		);
 		await t.test(
 			"typing configured pairs autocloses and overtypes",
 			async () => {

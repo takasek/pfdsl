@@ -8,5 +8,8 @@
 		{ "open": "\"", "close": "\"", "notIn": ["string"] }
 	],
 	"surroundingPairs": [["[", "]"], ["\"", "\""]],
-	"wordPattern": "[\\p{L}\\p{N}_-]+"
+	"wordPattern": {
+		"pattern": "[\\p{L}\\p{N}_-]+",
+		"flags": "u"
+	}
 }
