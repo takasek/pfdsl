@@ -1,4 +1,5 @@
 import { analyzeSource, type Range } from "@pfdsl/core";
+import type { DocumentModel } from "./document.js";
 import { type CursorPosition, idsOfStatement } from "./preview-logic.js";
 
 export interface FrontmatterPosition {
@@ -26,7 +27,8 @@ export function findFrontmatterDefinitionInText(
 		: undefined;
 }
 
-type SourceModel = ReturnType<typeof analyzeSource>;
+// Body navigation consumes an analyzeSnapshot model, not raw core body coordinates.
+type SourceModel = DocumentModel;
 
 function authoredNodeDeclarations(model: SourceModel, source: string) {
 	const declarations = model.sourceMap.declarations.filter(

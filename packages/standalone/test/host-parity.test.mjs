@@ -4,7 +4,11 @@ import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
-import { computeFullDocumentFormatOutput } from "@pfdsl/editor";
+import {
+	computeFullDocumentFormatOutput,
+	findNodeOccurrenceRanges,
+	positionOfNodeId,
+} from "@pfdsl/editor";
 import { mountPreview } from "@pfdsl/editor/preview";
 import { JSDOM } from "jsdom";
 import {
@@ -28,6 +32,51 @@ const read = async (path) => {
 		return null;
 	}
 };
+
+test("both production adapters locate supplementary Unicode body tokens and errors in editor coordinates", async () => {
+	for (const eol of ["\n", "\r\n"]) {
+		for (const withFrontmatter of [false, true]) {
+			const prefix = withFrontmatter
+				? ["---", 'title: "先行😀"', "---", ""].join(eol)
+				: "";
+			for (const endpoint of ["out", "@"]) {
+				const body = `"先行😀😀" >> p -> ${endpoint}`;
+				const source = prefix + body + eol;
+				clearAnalyzeCache();
+				const doc = {
+					uri: { scheme: "untitled", toString: () => "untitled:coordinates" },
+					version: 1,
+					getText: () => source,
+				};
+				const vscode = preparePreviewForDocument(doc);
+				const tauri = await processSnapshot(source, null, async () => null);
+				assert.deepEqual(tauri.model, vscode.model);
+				for (const { model } of [vscode, tauri]) {
+					const line = withFrontmatter ? 3 : 0;
+					if (endpoint === "out") {
+						assert.deepEqual(positionOfNodeId(model.document.statements, "p"), {
+							line,
+							column: body.indexOf("p"),
+						});
+						const range = findNodeOccurrenceRanges(model, source, "p")[0];
+						assert.equal(
+							source.slice(range.start.offset, range.end.offset),
+							"p",
+						);
+					} else {
+						const { range } = model.diagnostics.find((d) => d.code === "L002");
+						assert.equal(range.start.line, line + 1);
+						assert.equal(range.start.column, body.indexOf("@") + 1);
+						assert.equal(
+							source.slice(range.start.offset, range.end.offset),
+							"@",
+						);
+					}
+				}
+			}
+		}
+	}
+});
 
 test("same authored inputs reach both production snapshot adapters and shared DOM renderer", async () => {
 	assert.ok(files.length > 3);
