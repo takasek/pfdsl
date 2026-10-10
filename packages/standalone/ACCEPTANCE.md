@@ -588,3 +588,10 @@ ignored 領域の検証用 helper から公式 Tauri debug build を実行し、
 所有者へ渡すコピーにはローカル ad-hoc 署名を付け、`codesign --verify --deep --strict` 成功後の executable SHA-256 は `97d1fb616a3211ca0efdc27df238bf80ffe2a8ade62513426c7bedda3f4265b5`。
 保護 hook・trusted root・wrapper の変更は行わず、正式署名・公証や実 GUI 成功を認定しない。
 実機確認は所有者が担当すると表明し、修正版 app と削除・移動用の使い捨てファイルを用意した。
+
+### 所有者による修正版の実機受入
+
+2026-10-11、所有者から「どちらも確認が出て、タブと本文が残った」と報告を受領した。
+上記 source・署名後 executable のアプリで、削除後の tab close と移動後の app quit の2条件を実施し、確認表示と Cancel 後のタブ・本文保持を成功と判定した。
+これにより前節で実機未確認とした2条件は受入済みとなる。親の Computer Use 追試や全 native corpus の再実行とは区別する。
+読取失敗と先行 poll / fresh read の遅延は自動検査の証拠を維持し、実機で追加実測した結果へは広げない。
