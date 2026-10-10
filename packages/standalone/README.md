@@ -171,6 +171,10 @@ The read-only result uses the same edge sorting and serialization as the VS Code
 Result messages belong to their tab: an empty edge set shows `No normalized edges.`, and blocked output shows `Fix errors before normalizing.`.
 Editing clears the previous result; run the action again to refresh it.
 Each tab retains its own result, and **Close** or Escape within the panel dismisses it.
+Choose **Format flows** for per-process grouped flows or **Format flat** for one edge per line.
+The shared formatter preserves chains containing internal comments as written, including in Flat mode.
+Each action formats the active tab's current text as a whole document; selecting text does not limit the operation to that selection.
+The action leaves text that produces formatting errors or text already in the chosen canonical format unchanged.
 The native host holds a directory capability for each folder explicitly selected for that session.
 Reads stay bound to that directory when its pathname is replaced; relative traversal and symlink escape are rejected.
 

@@ -514,6 +514,9 @@ document.querySelector<HTMLButtonElement>("#new")!.onclick = () => {
 document.querySelector<HTMLButtonElement>("#format")!.onclick = () => {
 	if (!busy) active?.tab.format();
 };
+document.querySelector<HTMLButtonElement>("#format-flat")!.onclick = () => {
+	if (!busy) active?.tab.format("flat");
+};
 document.querySelector<HTMLButtonElement>("#normalize")!.onclick = () => {
 	if (!busy) active?.tab.normalize();
 };

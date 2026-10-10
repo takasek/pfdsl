@@ -111,11 +111,12 @@ test("same authored inputs reach both production snapshot adapters and shared DO
 			vscode.message,
 			`${file}: preview protocol and DOT`,
 		);
-		assert.equal(
-			formatSnapshot(source),
-			computeFullDocumentFormatOutput(doc.getText(), "flows"),
-			`${file}: formatting`,
-		);
+		for (const style of ["flows", "flat"])
+			assert.equal(
+				formatSnapshot(source, style),
+				computeFullDocumentFormatOutput(doc.getText(), style),
+				`${file}: ${style} formatting`,
+			);
 		const dom = new JSDOM("<div id='vscode'></div><div id='tauri'></div>", {
 			pretendToBeVisual: true,
 		});

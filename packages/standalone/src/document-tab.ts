@@ -3,6 +3,7 @@ import {
 	applyPreviewEdit,
 	computeNormalizedEdgesOutput,
 	type DocumentModel,
+	type FormatStyle,
 	findFrontmatterDefinitionRange,
 	nodeIdAtSourcePosition,
 	positionOfNodeId,
@@ -248,8 +249,8 @@ export function createDocumentTab({
 			);
 			normalizedEdges.show(output);
 		},
-		format() {
-			const output = formatSnapshot(editor.getValue());
+		format(style: FormatStyle = "flows") {
+			const output = formatSnapshot(editor.getValue(), style);
 			if (output === null) return;
 			editor.pushUndoStop();
 			editor.executeEdits("pfdsl.format", [
