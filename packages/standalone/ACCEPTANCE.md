@@ -223,10 +223,10 @@ native executable `f6005842e1a7de061d531d09da67002b46d9c9eae89ebac1a19f04bca4451
 | #1408 の起動・読取 | 通常起動で native window を表示し、Open folder で使い捨てフォルダを選び、Rust host 経由で文書を editor と preview へ表示。選択キャンセル後も操作を継続 | 固定版 `8261f877` の dot Debian 13.6 で成功 |
 | #1408 の終了・原本 | dirty な文書で window close → Keep Editing による編集保持 → 再 close → Discard による終了。検証用原本の前後 hash 一致を確認 | 同じ AppImage の通常操作で成功、process exit 0、原本 hash 一致 |
 | #1352 の表示・回復 | 初回 Fit、100%、倍率と Help、zoom/pan 後の正常→エラー→正常、主図と minimap の整合、定義挿入後の編集案内。VS Code の起動手順と既存動線も確認 | native 17 / VS Code 27 条件成功。関連 issue の未確認と元 issue の検査追加条件は別に保持 |
-| #1282 の定義作成 | 両ホストの Node actions から作成・作成位置への移動・単一 Undo/Redo。CLI の成功・拒否・初期 field・無書込みを別入口で確認 | native 9 / VS Code 9 / CLI 23 条件成功。コメント位置の厳格保持3セルは仕様との関係を下記で整理し、native raw CRLF bytes は未確認 |
+| #1282 の定義作成 | 両ホストの Node actions から作成・作成位置への移動・単一 Undo/Redo。CLI の成功・拒否・初期 field・無書込みを別入口で確認 | native 9 / VS Code 9 / CLI 23 条件成功。2026-10-11 の個別完了判断を下記に追記。旧3失敗と証拠版の制限は保持 |
 | #1283 の巡回 | VS Code の context menu と chord で定義→全本文 occurrence→定義を巡回。引用キー・同名 field・編集後の増減と既存直接移動を確認 | 2026-10-08 UTC の追補で組込定義・Peek 対照も成功し、VS Code 20条件成功。standalone の巡回 UI は対象外 |
 | #1284 の周辺図・強調 | 両ホストで hover の局所 SVG、画面端・内部 scroll/click、editor と局所図からの移動、連続移動の cue、reduced motion、既存 pan/zoom を確認 | 右端 pointer 追補を含め native 16 / VS Code 21 条件成功、native 6 / VS Code 1 条件未確認 |
-| #483 の接続編集 | 両ホストで input/feedback/output × 既存/新規 target の6通り、単一 Undo/Redo、再描画、既存 double click・pan を確認 | native / VS Code 各30条件成功。semantic-invalid な existing output 候補は別の仕様判断として保持 |
+| #483 の接続編集 | 両ホストで input/feedback/output × 既存/新規 target の6通り、単一 Undo/Redo、再描画、既存 double click・pan を確認 | native / VS Code 各30条件成功。2026-10-11 に個別完了と判断。V001 の事前防止は別 issue へ分離 |
 
 同じ source commit と検証用文書を使って操作をまとめるが、各 issue の全受入条件とホスト別の結果を保持する。
 通常の folder picker と close は、初期フォルダを自動選択する corpus mode の成功だけでは認定しない。
@@ -548,3 +548,23 @@ IME の composition と Dock Quit は操作基盤の timeout 後に所有者へ�
 この固定版から引継ぎ HEAD `f304626f8e8b32daef3ddc36016a2178e96ba7b4` まで、VS Code の巡回 host、command/context menu/keybinding の契約は不変である。
 依存する analyzeSnapshot は本文 range を full-source UTF-16 座標へ正規化するよう変更され、現行 host の回帰検査は LF/CRLF・frontmatter 有無・先行する補助平面文字と完全な選択 token を確認する。
 旧版の実 UI 判定と現在版の共有計算・host 回帰検査を併用し、現在版の native UI で20条件を再実測したとは扱わない。
+
+## #483・#1282 の個別完了 — 2026-10-11
+
+所有者が既存要件による両 issue の完了と、V001 の事前防止を別 issue に分ける判断を承認した。
+#483 は固定 source `8261f877d5cae8aa653a5310edfbd9e387acb116` の native / VS Code 各30条件で、input/feedback/output × 既存/新規 target、単一 Undo/Redo、再描画、既存 double click・pan を確認している。
+現在の共有候補 UI・connector 計算・適用契約は固定版から不変で、変更された source 座標 adapter は現行回帰検査で照合した。
+O-001 の別 producer への output 追加による V001 と Undo/Redo の観測はそのまま保持する。
+V001 を増やす接続を理由付きで事前拒否する新しい編集契約は、後続 issue [#1432](https://github.com/takasek/pfdsl/issues/1432) の対象であり、今回実装・検証済みとはしない。
+
+#1282 は固定版の native 9 / VS Code 9 / CLI 23 条件、追加初期 field と安全拒否、help・例を個別に照合した。
+独立 reviewer は原 ZIP の操作・source/hash と現行コードを照合し、core・CLI・共有 preview-edit・VS Code 適用経路、standalone の定義作成 executeEdits・Undo・選択部分が固定版から不変であることを確認した。
+現行 `edit-navigation-contract.test.ts` の LF/CRLF・日本語引用 ID・作成後位置解決を含む回帰と、既存全体検査5,998成功・1 skip、型検査成功を再利用し、新しい GUI 追試や全テスト再実行とはしない。
+F-001 のコメント位置の厳格保持3セルは旧失敗履歴として残すが、ADR-0034 と既存 core テストが許容する CST 再整形であり、内容欠落とは扱わない。
+別 Inspector binary の実 Monaco model の前/後/Undo/Redo は21/24/21/24 CRLF、lone LF 0、前=Undo・後=Redoで、生 JSON の hash を独立に再計算した。
+同じ製品 source/frontend の model 証拠であり、元 binary の保存 bytes・painting・通常版と別 binary の一般的同等性を認定しない。
+これらは定義作成と Undo の完了条件を満たす証拠として利用でき、保存・cue・reduced motion 等の別 issue の未確認を完了へ転写しない。
+
+`preview_connector` と `node_definition_creation` を done とし、#1431 に Closes #483 / Closes #1282 を設定する。
+既存 matrix と過去時点の未完了記録は書き換えず、この追記を現在の個別判断とする。
+#1259 は部分対応、#1260・#1261 と束のほかの成果物は今回完了としない。
