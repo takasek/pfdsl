@@ -64,6 +64,7 @@ test("Save As recovery retains target ownership and refuses intervening edits in
 		};
 		const published = { ...B, source: "local", revision: "b1" };
 		let pendingInspect = null;
+		let inspectFailure = null;
 		let selectedDocument = A;
 		let quitListener;
 		let decisions = [];
@@ -104,6 +105,7 @@ test("Save As recovery retains target ownership and refuses intervening edits in
 					message: "publication race",
 				};
 			if (command === "inspect_document") {
+				if (inspectFailure) throw inspectFailure;
 				if (pendingInspect) return pendingInspect;
 				return args.id === 1 ? A : published;
 			}
@@ -165,7 +167,7 @@ export function createDocumentTab(options){
 		});
 		await import(pathToFileURL(output).href);
 		const flush = async () => {
-			for (let i = 0; i < 20; i++) await Promise.resolve();
+			for (let i = 0; i < 100; i++) await Promise.resolve();
 		};
 		const click = async (selector) => {
 			document.querySelector(selector).click();
@@ -601,6 +603,90 @@ export function createDocumentTab(options){
 			).args.approved,
 			true,
 		);
+		// Closing must observe changes made after the last poll, even while busy.
+		for (const scenario of ["deleted tab", "moved quit", "unreadable tab"]) {
+			selectedDocument = { ...A, id: 20, identity: `inode:${scenario}` };
+			await click("#open-file");
+			const clean = reviewActive();
+			assert.equal(clean.session.isDirty(), false);
+			const start = calls.length;
+			if (scenario === "unreadable tab")
+				inspectFailure = new Error("disk cannot be inspected");
+			else
+				pendingInspect = Promise.resolve({
+					...selectedDocument,
+					source: null,
+					revision: null,
+					identity: null,
+				});
+			decisions = ["cancel"];
+			if (scenario === "moved quit") quitListener({ payload: "6" });
+			else clean.navigation.querySelector(".close-document").click();
+			await flush();
+			const closingCalls = calls.slice(start);
+			assert.ok(closingCalls.some((c) => c.command === "inspect_document"));
+			assert.ok(
+				closingCalls.some((c) => c.command === "confirm_close_document"),
+			);
+			assert.equal(clean.session.isDirty(), true);
+			assert.equal(reviewEntries.has(clean), true);
+			assert.equal(clean.tab.getSource(), A.source);
+			if (scenario === "moved quit")
+				assert.equal(
+					closingCalls.find((c) => c.command === "finish_app_exit").args
+						.approved,
+					false,
+				);
+			pendingInspect = null;
+			inspectFailure = null;
+			decisions = ["discard"];
+			clean.navigation.querySelector(".close-document").click();
+			await flush();
+			assert.equal(reviewEntries.size, 0);
+		}
+		selectedDocument = { ...A, id: 21, identity: "inode:delayed close" };
+		await click("#open-file");
+		const delayed = reviewActive();
+		let releasePoll;
+		pendingInspect = new Promise((resolve) => {
+			releasePoll = resolve;
+		});
+		const start = calls.length;
+		poll();
+		await flush();
+		delayed.navigation.querySelector(".close-document").click();
+		await flush();
+		assert.equal(reviewEntries.has(delayed), true);
+		assert.equal(
+			calls.slice(start).filter((c) => c.command === "inspect_document").length,
+			1,
+		);
+		let releaseFresh;
+		pendingInspect = new Promise((resolve) => {
+			releaseFresh = resolve;
+		});
+		releasePoll(selectedDocument);
+		await flush();
+		assert.equal(
+			calls.slice(start).filter((c) => c.command === "inspect_document").length,
+			2,
+		);
+		assert.equal(reviewEntries.has(delayed), true);
+		assert.equal(
+			calls.slice(start).some((c) => c.command === "confirm_close_document"),
+			false,
+		);
+		decisions = ["cancel"];
+		releaseFresh({
+			...selectedDocument,
+			source: null,
+			revision: null,
+			identity: null,
+		});
+		await flush();
+		assert.equal(reviewEntries.has(delayed), true);
+		assert.equal(delayed.session.isDirty(), true);
+		assert.equal(delayed.tab.getSource(), A.source);
 	} finally {
 		for (let i = 0; i < 100; i++) await Promise.resolve();
 		dom?.window.close();

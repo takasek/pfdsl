@@ -568,3 +568,16 @@ F-001 のコメント位置の厳格保持3セルは旧失敗履歴として残�
 `preview_connector` と `node_definition_creation` を done とし、#1431 に Closes #483 / Closes #1282 を設定する。
 既存 matrix と過去時点の未完了記録は書き換えず、この追記を現在の個別判断とする。
 #1259 は部分対応、#1260・#1261 と束のほかの成果物は今回完了としない。
+
+## 終了直前の外部削除・移動の保護 — 2026-10-11
+
+#1431 のレビューで、最後の定期 poll の後に保存済みファイルが削除・移動され、直後に clean タブを閉じると、新しい disk 確認なしに最後の本文を破棄できる経路を確認した。
+終了前に先行 poll を待ち、その後新たな `inspect_document` を開始して完了を待つよう host の `prepareClose` を修正した。
+missing と読取失敗は既存の uncertain / dirty 判定に接続し、Save / Discard / Cancel で本文の扱いを確認する。
+確認完了後の外部操作を完全に防止する保証は追加しない。
+
+本番 main bundle と native / DocumentTab seam による回帰は、削除後の tab close、移動後の native quit、読取失敗、先行 poll と終了時の新しい read を別々に遅延させた完了待ちを確認した。
+修正前は終了時の inspect 欠落で失敗し、修正後は関連40件成功。全体検査5,998成功・1 skip、型検査成功も確認した。
+独立 reviewer は終了 transaction と native inspect の契約を照合し、修正を妨げる指摘なし。
+新しい実 GUI 受入ではない。Mac アプリの再ビルド要求は、cwd が main と扱われ explicit worktree の所有を証明できないとして保護 hook に拒否され、規定 wrapper に native build の入口がないため停止した。
+以前の Mac binary と実機受入を、この frontend 修正後の新しい executable の成功へ転写しない。

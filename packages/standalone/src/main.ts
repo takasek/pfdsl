@@ -469,7 +469,15 @@ async function closeEntries(entries: Entry[]) {
 		entries.map((entry) =>
 			Object.assign(entry, {
 				isDirty: () => entry.session.isDirty(),
-				prepareClose: () => entry.session.prepareClose(),
+				prepareClose: async () => {
+					// Finish an older poll, then read again for this close request.
+					await entry.session.prepareClose();
+					await entry.session
+						.checkExternal((id) =>
+							invoke<DiskSnapshot>("inspect_document", { id }),
+						)
+						.catch(report);
+				},
 				closeVersion: () => entry.session.closeVersion(),
 			}),
 		),
