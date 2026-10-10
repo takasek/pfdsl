@@ -27,10 +27,13 @@ interface DocumentView {
 export function sameDocument(
 	previous: DiskSnapshot,
 	current: DiskSnapshot,
+	previousMissing = false,
 ): boolean {
 	return Boolean(
 		previous.binding === current.binding ||
-			(previous.identity && previous.identity === current.identity),
+			(previousMissing &&
+				previous.identity &&
+				previous.identity === current.identity),
 	);
 }
 
@@ -48,6 +51,7 @@ export class DocumentSession {
 	private uncertain = false;
 	private checkPromise: Promise<void> | null = null;
 	private observationVersion = 0;
+	private inspectionFailed = false;
 	private disposed = false;
 	constructor(view: DocumentView, disk: DiskSnapshot | null) {
 		this.view = view;
@@ -76,9 +80,10 @@ export class DocumentSession {
 			state(this.sourceConflict),
 		]);
 	}
-	rebindDisk(current: DiskSnapshot) {
+	rebindDisk(current: DiskSnapshot, previousMissing = false) {
 		const previous = this.disk;
-		if (!previous || !sameDocument(previous, current)) return false;
+		if (!previous || !sameDocument(previous, current, previousMissing))
+			return false;
 		const changed = previous.revision !== current.revision;
 		const dirty = this.isDirty();
 		// Adopt the selected native capability without acknowledging unsaved text.
@@ -158,9 +163,16 @@ export class DocumentSession {
 	checkExternal(read: (id: number) => Promise<DiskSnapshot>): Promise<void> {
 		if (this.checkPromise) return this.checkPromise;
 		if (!this.disk || this.disposed) return Promise.resolve();
-		this.checkPromise = this.observeExternal(read).finally(() => {
-			this.checkPromise = null;
-		});
+		this.checkPromise = this.observeExternal(read)
+			.then(() => {
+				if (this.inspectionFailed) {
+					this.inspectionFailed = false;
+					this.observationVersion++;
+				}
+			})
+			.finally(() => {
+				this.checkPromise = null;
+			});
 		return this.checkPromise;
 	}
 	async prepareClose() {
@@ -236,7 +248,9 @@ export class DocumentSession {
 				this.pendingTarget === recovery
 			) {
 				this.uncertain = true;
-				this.observationVersion++;
+				// A repeated unreadable observation is the same state the user confirmed.
+				if (!this.inspectionFailed) this.observationVersion++;
+				this.inspectionFailed = true;
 				this.message = `The disk version could not be read. Your editor content is retained. ${String(error)}`;
 			}
 			throw error;
@@ -302,6 +316,8 @@ export async function closeDocuments<T extends Closable>(
 			dirty: document.isDirty(),
 		});
 	}
+	// Later native prompts suspend polling; inspect every target again before disposal.
+	for (const document of documents) await document.prepareClose?.();
 	if (
 		documents.some(
 			(document) =>

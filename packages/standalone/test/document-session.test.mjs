@@ -1,6 +1,10 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { closeDocuments, DocumentSession } from "../src/document-session.ts";
+import {
+	closeDocuments,
+	DocumentSession,
+	sameDocument,
+} from "../src/document-session.ts";
 
 function view(source = "original") {
 	let text = source;
@@ -21,6 +25,120 @@ const snap = (source, revision = source, path = "/a.pfdsl") => ({
 	revision,
 	identity: "file:1",
 	binding: `directory:${path}`,
+});
+
+test("simultaneously valid hard-link leaves do not change the edited document's save target", async () => {
+	const original = snap("original");
+	const alias = {
+		...original,
+		id: 2,
+		path: "/alias.pfdsl",
+		binding: "directory:/alias.pfdsl",
+	};
+	const editor = view();
+	const doc = new DocumentSession(editor, original);
+	editor.edit("local");
+	assert.equal(sameDocument(original, alias), false);
+	assert.equal(doc.rebindDisk(alias), false);
+	await doc.save(async (source, target) => {
+		assert.equal(target.binding, original.binding);
+		return { outcome: "saved", current: { ...original, source } };
+	});
+});
+
+for (const failure of ["deleted", "moved", "unreadable"]) {
+	for (const decision of ["discard", "save"]) {
+		test(`close retains every tab when an earlier file becomes ${failure} during a later ${decision} prompt`, async () => {
+			const a = new DocumentSession(view(), snap("original"));
+			const b = new DocumentSession(view("B"), null);
+			b.view.edit("local B");
+			let changed = false;
+			a.prepareClose = () =>
+				a
+					.checkExternal(async () => {
+						if (changed && failure === "unreadable")
+							throw new Error("unreadable");
+						return changed ? snap(null, null) : snap("original");
+					})
+					.catch(() => {});
+			const disposed = [];
+			assert.equal(
+				await closeDocuments(
+					[a, b],
+					async () => {
+						changed = true;
+						return decision;
+					},
+					async (doc) =>
+						doc.save(async (source) => ({
+							outcome: "saved",
+							current: snap(source),
+						})),
+					(doc) => disposed.push(doc),
+				),
+				false,
+			);
+			assert.deepEqual(disposed, []);
+			assert.equal(a.view.getSource(), "original");
+			assert.equal(a.isDirty(), true);
+		});
+	}
+}
+
+test("a persistent unreadable target can still be explicitly discarded after confirmation", async () => {
+	const doc = new DocumentSession(view(), snap("original"));
+	doc.prepareClose = () =>
+		doc
+			.checkExternal(async () => {
+				throw new Error("persistent read failure");
+			})
+			.catch(() => {});
+	let prompts = 0;
+	let disposed = 0;
+	assert.equal(
+		await closeDocuments(
+			[doc],
+			async () => {
+				prompts++;
+				return "discard";
+			},
+			async () => false,
+			() => {
+				disposed++;
+			},
+		),
+		true,
+	);
+	assert.equal(prompts, 1);
+	assert.equal(disposed, 1);
+});
+
+test("readability recovering during a discard prompt invalidates that decision even for the same disk revision", async () => {
+	const doc = new DocumentSession(view(), snap("original"));
+	let readable = false;
+	doc.prepareClose = () =>
+		doc
+			.checkExternal(async () => {
+				if (!readable) throw new Error("unreadable");
+				return snap("original");
+			})
+			.catch(() => {});
+	let disposed = 0;
+	assert.equal(
+		await closeDocuments(
+			[doc],
+			async () => {
+				readable = true;
+				return "discard";
+			},
+			async () => false,
+			() => {
+				disposed++;
+			},
+		),
+		false,
+	);
+	assert.equal(disposed, 0);
 });
 
 test("reopening the same binding after atomic replacement keeps dirty edits and adopts the selected capability", () => {
@@ -552,7 +670,7 @@ test("same-inode explicit reopen rebinds a renamed dirty document without acknow
 	const doc = new DocumentSession(editor, snap("original", "r0"));
 	editor.edit("unique local edit");
 	const renamed = { ...snap("original", "r0", "/renamed.pfdsl"), id: 9 };
-	assert.equal(doc.rebindDisk(renamed), true);
+	assert.equal(doc.rebindDisk(renamed, true), true);
 	assert.equal(doc.disk.id, 9);
 	assert.equal(doc.disk.path, renamed.path);
 	assert.equal(editor.getSource(), "unique local edit");
@@ -563,13 +681,13 @@ test("same-inode explicit reopen rebinds a renamed dirty document without acknow
 test("same-inode explicit reopen reloads clean changes and exposes changed disk beside dirty edits", () => {
 	const changed = { ...snap("external", "r1", "/renamed.pfdsl"), id: 9 };
 	const clean = new DocumentSession(view(), snap("original", "r0"));
-	assert.equal(clean.rebindDisk(changed), true);
+	assert.equal(clean.rebindDisk(changed, true), true);
 	assert.equal(clean.view.getSource(), "external");
 	assert.equal(clean.isDirty(), false);
 	const editor = view();
 	const dirty = new DocumentSession(editor, snap("original", "r0"));
 	editor.edit("unique local edit");
-	assert.equal(dirty.rebindDisk(changed), true);
+	assert.equal(dirty.rebindDisk(changed, true), true);
 	assert.equal(dirty.disk.id, 9);
 	assert.equal(dirty.disk.revision, "r0");
 	assert.equal(dirty.conflict.source, "external");
@@ -590,7 +708,7 @@ test("rebinding source A preserves a separate unresolved Save As target B", asyn
 		B,
 	);
 	const renamed = { ...snap("external A", "r1", "/renamed.pfdsl"), id: 9 };
-	assert.equal(doc.rebindDisk(renamed), true);
+	assert.equal(doc.rebindDisk(renamed, true), true);
 	assert.equal(doc.disk.id, 9);
 	assert.equal(doc.pendingTarget, B);
 	assert.equal(doc.observed, B);
@@ -675,7 +793,7 @@ test("same-target failed Save recovery follows an explicit same-inode rename reo
 		path: "/renamed.pfdsl",
 		binding: "directory:/renamed.pfdsl",
 	};
-	assert.equal(doc.rebindDisk(renamed), true);
+	assert.equal(doc.rebindDisk(renamed, true), true);
 	assert.equal(doc.pendingTarget.id, 9);
 	assert.equal(doc.pendingTarget.path, renamed.path);
 	const reads = [];
@@ -707,7 +825,7 @@ test("failed Save As selecting the same source with a new native id follows a sa
 		path: "/renamed.pfdsl",
 		binding: "directory:/renamed.pfdsl",
 	};
-	assert.equal(doc.rebindDisk(renamed), true);
+	assert.equal(doc.rebindDisk(renamed, true), true);
 	assert.equal(doc.pendingTarget.id, 9);
 	assert.equal(doc.pendingTarget.path, renamed.path);
 	const reads = [];
@@ -736,7 +854,7 @@ test("failed source Save after a parent move follows the same native capability 
 		path: "/moved-parent/c.pfdsl",
 		binding: "directory:/moved-parent/c.pfdsl",
 	};
-	assert.equal(doc.rebindDisk(renamed), true);
+	assert.equal(doc.rebindDisk(renamed, true), true);
 	assert.equal(doc.pendingTarget.path, renamed.path);
 	assert.equal(doc.pendingTarget.id, 9);
 });
@@ -763,7 +881,7 @@ test("native parent-inode/leaf bindings distinguish reselected source capabiliti
 		path: "/moved-parent/c.pfdsl",
 		binding: "dir1:c.pfdsl",
 	};
-	assert.equal(doc.rebindDisk(renamed), true);
+	assert.equal(doc.rebindDisk(renamed, true), true);
 	assert.equal(doc.pendingTarget.path, renamed.path);
 	assert.equal(doc.pendingTarget.binding, renamed.binding);
 	const alias = {
@@ -781,7 +899,7 @@ test("native parent-inode/leaf bindings distinguish reselected source capabiliti
 		}),
 		alias,
 	);
-	assert.equal(other.rebindDisk(renamed), true);
+	assert.equal(other.rebindDisk(renamed, true), true);
 	assert.equal(
 		other.pendingTarget,
 		alias,

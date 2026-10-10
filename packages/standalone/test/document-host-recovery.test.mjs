@@ -65,6 +65,7 @@ test("Save As recovery retains target ownership and refuses intervening edits in
 		const published = { ...B, source: "local", revision: "b1" };
 		let pendingInspect = null;
 		let inspectFailure = null;
+		const inspectSnapshots = new Map();
 		let selectedDocument = A;
 		let quitListener;
 		let decisions = [];
@@ -105,6 +106,7 @@ test("Save As recovery retains target ownership and refuses intervening edits in
 					message: "publication race",
 				};
 			if (command === "inspect_document") {
+				if (inspectSnapshots.has(args.id)) return inspectSnapshots.get(args.id);
 				if (inspectFailure) throw inspectFailure;
 				if (pendingInspect) return pendingInspect;
 				return args.id === 1 ? A : published;
@@ -432,7 +434,14 @@ export function createDocumentTab(options){
 			path: "/C/renamed.pfdsl",
 			binding: "directoryC:renamed.pfdsl",
 		};
+		pendingInspect = Promise.resolve({
+			...published,
+			source: null,
+			revision: null,
+			identity: null,
+		});
 		await click("#open-file");
+		pendingInspect = null;
 		assert.equal(reviewActive(), entry);
 		assert.equal(reviewEntries.size, beforeRenameCount);
 		assert.equal(entry.session.disk.path, selectedDocument.path);
@@ -603,6 +612,42 @@ export function createDocumentTab(options){
 			).args.approved,
 			true,
 		);
+		// Two live hard-link names must keep separate tabs and normal-save targets.
+		selectedDocument = A;
+		inspectSnapshots.set(A.id, A);
+		await click("#open-file");
+		const originalLink = reviewActive();
+		originalLink.tab.setSource("edit original leaf");
+		const alias = {
+			...A,
+			id: 31,
+			path: "/A/alias.pfdsl",
+			binding: "directoryA:alias.pfdsl",
+		};
+		inspectSnapshots.set(alias.id, alias);
+		selectedDocument = alias;
+		await click("#open-file");
+		assert.equal(reviewEntries.size, 2);
+		assert.notEqual(reviewActive(), originalLink);
+		assert.equal(originalLink.session.disk.id, A.id);
+		assert.equal(originalLink.path, A.path);
+		originalLink.tab.button.click();
+		saveReply = {
+			outcome: "saved",
+			current: { ...A, source: "edit original leaf", revision: "a1" },
+		};
+		inspectSnapshots.set(A.id, saveReply.current);
+		await click("#save");
+		assert.equal(
+			calls.filter((c) => c.command === "save_document").at(-1).args.id,
+			A.id,
+		);
+		assert.equal(originalLink.session.isDirty(), false);
+		quitListener({ payload: "6" });
+		await flush();
+		assert.equal(reviewEntries.size, 0);
+		inspectSnapshots.clear();
+		saveReply = null;
 		// Closing must observe changes made after the last poll, even while busy.
 		for (const scenario of ["deleted tab", "moved quit", "unreadable tab"]) {
 			selectedDocument = { ...A, id: 20, identity: `inode:${scenario}` };
@@ -620,7 +665,7 @@ export function createDocumentTab(options){
 					identity: null,
 				});
 			decisions = ["cancel"];
-			if (scenario === "moved quit") quitListener({ payload: "6" });
+			if (scenario === "moved quit") quitListener({ payload: "7" });
 			else clean.navigation.querySelector(".close-document").click();
 			await flush();
 			const closingCalls = calls.slice(start);
@@ -687,6 +732,48 @@ export function createDocumentTab(options){
 		assert.equal(reviewEntries.has(delayed), true);
 		assert.equal(delayed.session.isDirty(), true);
 		assert.equal(delayed.tab.getSource(), A.source);
+		pendingInspect = null;
+		decisions = ["discard"];
+		delayed.navigation.querySelector(".close-document").click();
+		await flush();
+		assert.equal(reviewEntries.size, 0);
+		// A changes while B's confirmation is pending: the entire native quit is refused.
+		selectedDocument = A;
+		inspectSnapshots.set(A.id, A);
+		await click("#open-file");
+		const early = reviewActive();
+		selectedDocument = B;
+		inspectSnapshots.set(B.id, B);
+		await click("#open-file");
+		const later = reviewActive();
+		later.tab.setSource("dirty B during quit");
+		let releaseLater;
+		pendingClose = new Promise((resolve) => {
+			releaseLater = resolve;
+		});
+		quitListener({ payload: "21" });
+		await flush();
+		assert.equal(reviewBusy(), true);
+		inspectSnapshots.set(A.id, {
+			...A,
+			source: null,
+			revision: null,
+			identity: null,
+		});
+		releaseLater("discard");
+		pendingClose = null;
+		await flush();
+		assert.equal(reviewEntries.has(early), true);
+		assert.equal(reviewEntries.has(later), true);
+		assert.equal(early.tab.getSource(), A.source);
+		assert.equal(early.session.isDirty(), true);
+		assert.equal(later.tab.getSource(), "dirty B during quit");
+		assert.equal(
+			calls.find(
+				(c) => c.command === "finish_app_exit" && c.args.request === "21",
+			).args.approved,
+			false,
+		);
 	} finally {
 		for (let i = 0; i < 100; i++) await Promise.resolve();
 		dom?.window.close();

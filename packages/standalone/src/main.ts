@@ -178,6 +178,30 @@ async function openSnapshot(snapshot: DiskSnapshot) {
 		throw new Error(
 			"This file is missing. Choose its new location or save the retained editor content elsewhere.",
 		);
+	if (
+		![...opened].some(
+			(entry) =>
+				entry.session.disk && sameDocument(entry.session.disk, snapshot),
+		)
+	) {
+		for (const entry of opened) {
+			const previous = entry.session.disk;
+			if (!previous?.identity || previous.identity !== snapshot.identity)
+				continue;
+			// Equal inodes can be simultaneous hard links. Only a missing old leaf permits rename recovery.
+			const current = await invoke<DiskSnapshot>("inspect_document", {
+				id: previous.id,
+			}).catch(() => null);
+			if (
+				current?.source === null &&
+				entry.session.rebindDisk(snapshot, true)
+			) {
+				syncLocation(entry);
+				label(entry);
+				break;
+			}
+		}
+	}
 	openDocument(basename(snapshot.path), snapshot.source, snapshot);
 }
 async function remember(path: string) {
