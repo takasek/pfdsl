@@ -25,6 +25,9 @@ export const editor = {
 				this.renders++;
 			},
 			layout() {},
+			addAction() {
+				return { dispose() {} };
+			},
 			dispose() {
 				this.disposed = true;
 			},

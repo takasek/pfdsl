@@ -175,6 +175,13 @@ Choose **Format flows** for per-process grouped flows or **Format flat** for one
 The shared formatter preserves chains containing internal comments as written, including in Flat mode.
 Each action formats the active tab's current text as a whole document; selecting text does not limit the operation to that selection.
 The action leaves text that produces formatting errors or text already in the chosen canonical format unchanged.
+For selected text, use **Format selection (Flows)** or **Format selection (Flat)** in the editor context menu (Shift-F10), or open the editor Command Palette with F1.
+With multiple selections, these actions format only the primary selection, matching the existing extension command.
+Selection formatting expands to complete body lines and includes the selection's ending line, even when its end is at column one.
+A selection confined to frontmatter or an unclosed frontmatter block is left unchanged.
+The existing shared range formatter skips full-graph validation, preserves internally commented chains, and leaves selected text unchanged on formatting errors or canonical no-ops.
+These actions leave the toolbar's whole-document Format behavior unchanged.
+Native selection mapping, keyboard focus, and Undo/Redo remain to be checked in the current application.
 The native host holds a directory capability for each folder explicitly selected for that session.
 Reads stay bound to that directory when its pathname is replaced; relative traversal and symlink escape are rejected.
 
@@ -185,8 +192,11 @@ Closing a dirty tab or window, or using macOS Command-Q, the application Quit me
 Native requests are cancelled immediately and exit is requested only after every document accepts; logout/shutdown may therefore be cancelled rather than resumed.
 The guard does not protect against Force Quit, crashes, or power loss.
 Actual AppKit Quit interactions remain unverified in this candidate.
-A cancellation, failed save, unreadable disk state, ongoing disk observation, changed tab membership, or edit during the close sequence preserves unconfirmed buffers; earlier successful saves remain on disk.
-Unresolved disk reads finish before close decisions, and an unreadable former disk version makes its surviving editor content require confirmation.
+A cancellation, failed save, unreadable disk state, changed tab membership, or edit during the close sequence preserves unconfirmed buffers; earlier successful saves remain on disk.
+Disk reads already in progress finish before close decisions, and an unreadable former disk version makes its surviving editor content require confirmation.
+A decision applies only to the editor and disk state the application observed when it requested confirmation; a changed observed version requires a new decision.
+External file writes alone do not update that version, and background disk polling pauses while the confirmation is open.
+Discard can therefore close the tab after an external write the application has not observed; it leaves the external file on disk unchanged.
 
 Clean external changes reload automatically; dirty changes, deletion, and publication conflicts keep the editor content for review.
 The conflict panel identifies the recovery target and lets you compare its observed contents, choose another destination, or explicitly load the current disk version.

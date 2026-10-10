@@ -24,6 +24,9 @@ export const editor = {
 			getModel: () => model,
 			render() {},
 			layout() {},
+			addAction() {
+				return { dispose() {} };
+			},
 			dispose() {
 				this.disposed = true;
 			},

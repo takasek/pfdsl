@@ -10,8 +10,11 @@ import {
 } from "@pfdsl/editor";
 import { mountPreview } from "@pfdsl/editor/preview";
 import * as monaco from "monaco-editor/editor/editor.api.js";
+import "monaco-editor/editor/contrib/contextmenu/browser/contextmenu.js";
+import "monaco-editor/editor/standalone/browser/quickAccess/standaloneCommandsQuickAccess.js";
 import { createNormalizedEdgesPanel } from "./normalized-edges.js";
 import { formatSnapshot, processSnapshot } from "./processing.js";
+import { registerSelectionFormatting } from "./selection-format.js";
 
 interface DocumentTabOptions {
 	parent: HTMLElement;
@@ -59,6 +62,7 @@ export function createDocumentTab({
 		fontSize: 14,
 		renderWhitespace: "selection",
 	});
+	const selectionFormatting = registerSelectionFormatting(editor);
 	let editorRenderQueued = false;
 	function requestEditorRender() {
 		if (disposed || editorRenderQueued) return;
@@ -207,6 +211,7 @@ export function createDocumentTab({
 		dispose() {
 			disposed = true;
 			revision++;
+			selectionFormatting.dispose();
 			preview.dispose();
 			editor.dispose();
 			model.dispose();
