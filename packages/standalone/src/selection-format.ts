@@ -1,5 +1,4 @@
 import {
-	analyzeSnapshot,
 	clampSelectionToBody,
 	computeRangeFormatOutput,
 	type FormatStyle,
@@ -17,9 +16,6 @@ export function registerSelectionFormatting(
 		const model = editor.getModel();
 		if (!selection || selection.isEmpty() || !model) return;
 		const source = model.getValue();
-		// FM001 means the body boundary is unknown; never format a YAML fragment.
-		if (analyzeSnapshot(source).diagnostics.some((d) => d.code === "FM001"))
-			return;
 		const clamped = clampSelectionToBody(
 			source,
 			selection.startLineNumber - 1,
