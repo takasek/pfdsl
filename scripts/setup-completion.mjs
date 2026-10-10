@@ -22,6 +22,7 @@ import {
 	decideSkillLinkAction,
 	SKILL_LINK_TARGET,
 } from "./lib/repo-skill-link.mjs";
+import { isShellParserInstalled } from "./lib/shell-parser-tool.mjs";
 
 export const SETUP_INPUTS = [
 	".npmrc",
@@ -29,6 +30,7 @@ export const SETUP_INPUTS = [
 	"package.json",
 	"pnpm-lock.yaml",
 	"pnpm-workspace.yaml",
+	"scripts/lib/shell-parser-tool.mjs",
 ];
 
 const MARKER = "node_modules/.pfdsl-setup-complete";
@@ -143,6 +145,8 @@ export function areDependenciesCurrent(root = process.cwd()) {
 		return (
 			readFileSync(join(root, MARKER), "utf8").trim() ===
 				setupFingerprint(root, inputs) &&
+			(!existsSync(join(root, "scripts/setup-shell-parser.mjs")) ||
+				isShellParserInstalled(root)) &&
 			hasDeclaredDependencyLinks(root, inputs)
 		);
 	} catch {

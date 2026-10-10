@@ -70,11 +70,13 @@ t-wadaのTDDで。適切な粒度でコミットすること。
 
 変更束はブランチで作業し PR で main に統合する（main 直コミットしない。生態系図の develop→PR→merge_pr が正規経路）。`scripts/main-commit-guard.mjs`（PreToolUse(Bash) hook）は、mainまたはsibling worktreeを対象にする変更系Gitを保護する。ツールに渡すパスと実行worktreeを一致させる。
 main上では新しい状態を作る操作をdenyとし、破壊・復元操作はClaude Codeでask、askを表現できないCodexでfail-closed denyとする。
-sessionのrootと異なる同一repositoryのworktreeは、native所有証拠を確認できる場合だけownへ補正する。照合条件と対象範囲は [ADR-0046](docs/adr/0046-native-worktree-ownership.md) を一次情報とする。確認できなければClaude Codeでask、Codexでfail-closed denyとする。cwdへの移動だけでは所有者の根拠にならない。この補正はmain/default branchや検査回避の保護を免除しない。
+sessionのrootと異なる同一repositoryのworktreeは、native所有証拠を確認できる場合だけownへ補正する。Claudeの直接親照合は [ADR-0046](docs/adr/0046-native-worktree-ownership.md)、Codex linked checkout・file・主体別の実装案は [ADR-0047](docs/adr/0047-codex-policy-boundaries.md) を一次情報とする。Codexのlinked checkoutはcwdと一致していてもnative ownerThreadIdとhook.session_idの一致を要求する。確認できなければClaude Codeでask、Codexでfail-closed denyとする。cwdへの移動だけでは所有者の根拠にならない。この補正はmain/default branchや検査回避の保護を免除しない。
 保護の範囲はこのリポジトリのcheckoutに限る。targetのgit common dirがsessionのものと異なれば、ブランチ名が `main` でも素通しする（使い捨てsandboxの既定ブランチが `main` になるため）。
-変更系Gitの実効targetをshell構文から確定できない場合はfail closedとする。
+未対応のshell構文・動的な実行名・確定できないGit宛先は、命令全体をClaude Codeでask、Codexでdenyとする。まれな形の独自解釈や混在ケースのブラックリストを追加せず、通常操作で確認が頻発した場合に対応範囲を見直す。parser・policyの実行障害は修復を案内してdenyとする。
 検査を飛ばすコマンド（`--no-verify`/`-n`、`-c`・`--config-env`・`git config` 経由の `core.hooksPath` 上書き）はforeign target以外、branch・worktreeを問わずdenyとし、`git config` の `--global`/`--system`/`--file`・`-f`（`--file`・`-f` は指す先を問わず対象）はforeign targetでもdenyとする（#1232）。
-sessionまたはtargetのgit rootsを解決できない場合は管轄外と区別し、ブランチ名規則を適用したままにする（targetのブランチ名が読めなければそもそもブランチ名規則が発火しないため、これが保護として効くのはsession側だけが解決できない場合である）。分類と構文対応の一次情報は `scripts/lib/main-commit-guard.mjs` とする。
+session/targetのgit roots、current branch、同一repoのorigin/HEADによるdefault branchを取得できない変更系Gitは、実入口でdenyとする。正常に空のbranch名が返るdetached HEADは取得失敗と区別する。共有ref・stash・worktree metadataへの保守はexecutor所有権だけで許可しない。読取以外のGit呼出しに付くcommand-line config（`-c`・`--config-env`・`GIT_CONFIG_*`）と、読取以外の `git config` 呼出しは、自分のbranchでも共有作用とし、Claudeではask、Codexではdenyとする。Codexでは親を含むmerge・auto-mergeとGitHub MCPの変更系・未知操作をdenyとし、親の通常のBash公開経路を残す。Codexの子はGit metadata変更・外向き書込みを行わない。分類と構文対応の一次情報は `scripts/lib/main-commit-guard.mjs` と共有効果の分類を担う `scripts/lib/shared-git-effects.mjs` とする。
+
+Edit・Write・apply_patchは全targetの物理パスを確認し、primary checkoutやnative所有者を確認できない同一repositoryのlinked checkoutへの書込みを拒否する。生成root instructionsの正本案内を維持する。roadmapの公開宣言はCodexではadvisoryであり、通常の公開承認と人間のPRレビューを維持する。policyのロード・実行失敗、不正入力・応答、内部deadline超過は修復案内付きdenyとする。bootstrap自身の故障・host timeout・trust skipの保証とは区別する。
 
 コミットメッセージは**英語**。
 

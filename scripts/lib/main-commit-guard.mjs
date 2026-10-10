@@ -12,7 +12,7 @@
 //
 // currentBranch is passed in rather than read here, since a PreToolUse hook
 // payload does not carry it — the hook wrapper resolves it once via `git
-// branch --show-current` and this stays a pure function.
+// branch --show-current`. Local push paths are inspected at the resolved cwd.
 //
 // A second, independent deny axis (#1232) catches commands that skip this
 // repo's pre-commit checks — `--no-verify`/`-n` and a `core.hooksPath`
@@ -20,26 +20,28 @@
 // or worktree. A commit that skipped the checks is the harm itself, with no
 // later point at which this hook could still catch it, so it denies on
 // every branch and worktree except a foreign target, which stays out of
-// scope like every other rule here — unless the `git config` write itself
-// lands outside the target repo (`--global`/`--system`/`--file`), which a
-// foreign target does not excuse either.
+// scope like every other rule here. Any mutating `git config` invocation
+// scoped to `--global`/`--system`/`--file` is denied independently of the
+// setting name: these settings may affect this repository too.
 
-import { basename, resolve } from "node:path";
 import {
-	createProtectedShellState,
 	GIT_GLOBAL_FLAGS_WITH_VALUE,
 	gitSubcommand,
 	gitSubcommandIndex,
-	hasProtectedCdPathOverride,
-	hasProtectedGitTargetOverride,
 	parseLeadingShellPrefix,
-	splitCommandFlow,
-	splitSegments,
-	stripLeadingNoise,
-	tokenize,
-	updateProtectedShellState,
+	shellParseDecision,
 } from "./delegation-guard.mjs";
+import { resolvePhysicalPath } from "./file-operation-policy.mjs";
 import { buildPermissionOutput, parseHookPayload } from "./hook-io.mjs";
+import {
+	classifyCodexGitRoutine,
+	classifySharedGitEffect,
+	evaluateSharedGitEffect,
+	isConfigOverrideEffect,
+	isReadOnlyGitConfig,
+	sameBranchName,
+} from "./shared-git-effects.mjs";
+import { executableName, readShell } from "./shell-commands.mjs";
 
 // The decision splits by target before it splits by subcommand. Against a
 // sibling whose native ownership was not confirmed by the entrypoint it is
@@ -185,28 +187,35 @@ function isHooksPathAssignment(raw) {
 }
 
 /**
- * Whether tokens `1..subAt` (a whole `git ...` segment's global-option span,
- * ahead of its subcommand at `subAt`) carry a `-c core.hooksPath=<v>` or
- * `--config-env[=]core.hooksPath=<env>` override, any value.
+ * The `key=value` (or `key=ENV`) operands of every `-c` and
+ * `--config-env[=]` in tokens `1..subAt`, a whole `git ...` segment's
+ * global-option span ahead of its subcommand at `subAt`. The one walk over
+ * Git's global options, so a value-taking flag's value is never read as an
+ * option.
  */
-function hasHooksPathGlobalOverride(tokens, subAt) {
+function globalConfigAssignments(tokens, subAt) {
+	const assignments = [];
 	for (let i = 1; i < subAt; i++) {
 		const value = tokens[i].value;
 		if (value === "-c" || value === "--config-env") {
-			if (isHooksPathAssignment(tokens[i + 1]?.value)) return true;
+			assignments.push(tokens[i + 1]?.value ?? "");
 			i++;
 			continue;
 		}
 		if (value.startsWith("--config-env=")) {
-			if (isHooksPathAssignment(value.slice("--config-env=".length)))
-				return true;
+			assignments.push(value.slice("--config-env=".length));
 			continue;
 		}
 		if (GIT_GLOBAL_FLAGS_WITH_VALUE.has(value)) {
 			i++;
 		}
 	}
-	return false;
+	return assignments;
+}
+
+/** Whether a global `-c`/`--config-env` sets `core.hooksPath`, any value. */
+function hasHooksPathGlobalOverride(tokens, subAt) {
+	return globalConfigAssignments(tokens, subAt).some(isHooksPathAssignment);
 }
 
 /** Whether a `-n`/clustered short option means `--no-verify` for `sub`. */
@@ -557,44 +566,93 @@ function classifyBypass(tokens) {
 	return null;
 }
 
-const CODEX_ROUTINE_MUTATIONS = new Map([
-	["stage-all", "add"],
-	["commit", "commit"],
-	["branch-rename", "branch"],
-]);
-
-function codexRoutineSubcommand(tokens) {
-	if (basename(tokens[0]?.value ?? "") !== "codex-git-routine.mjs") return null;
-	return CODEX_ROUTINE_MUTATIONS.get(tokens[1]?.value) ?? null;
+/**
+ * Whether the global options ahead of the subcommand at `subAt` carry a
+ * command-line config override (`-c`, `--config-env`), whatever its key:
+ * `include.path` can load arbitrary settings.
+ */
+function hasGlobalConfigOverride(tokens, subAt) {
+	return globalConfigAssignments(tokens, subAt).length > 0;
 }
+
+/** @typedef {{subcommand: string, decision: "deny" | "ask", bypass?: boolean, flag?: string, outsideTarget?: boolean, outsideTargetFlag?: string, outsideTargetName?: string, effect?: {kind: string, ref?: string, refs?: string[], names?: string[], unresolved?: boolean}, configOverride?: boolean}} GuardedGit */
 
 /**
  * The guarded git subcommand one already-tokenized segment runs, or null.
+ * A config override (`-c`, `--config-env`, or `configOverride` for a visible
+ * `GIT_CONFIG_*` assignment before the command) on anything but a read marks
+ * the result `configOverride`, which evaluation turns into a shared effect.
  * @param {{value: string, quoted: boolean}[]} tokens
- * @returns {{subcommand: string, decision: "deny" | "ask", bypass?: boolean, flag?: string, outsideTarget?: boolean, outsideTargetFlag?: string, outsideTargetName?: string} | null}
+ * @returns {GuardedGit | null}
  */
-function classifySegment(tokens) {
+function classifySegment(tokens, { configOverride = false, cwd } = {}) {
+	const found = classifyGuardedSegment(tokens, { cwd });
+	if (found?.bypass) return found;
+	if (tokens.length === 0 || executableName(tokens[0].value) !== "git")
+		return found;
+	const sub = gitSubcommand(tokens);
+	const subAt = gitSubcommandIndex(tokens);
+	if (!sub || subAt === null) return found;
+	if (!configOverride && !hasGlobalConfigOverride(tokens, subAt)) return found;
+	const args = tokens.slice(subAt + 1).map((token) => token.value);
+	if (!isConfigOverrideEffect(sub, args)) return found;
+	return found
+		? { ...found, configOverride: true }
+		: { subcommand: sub, decision: "ask", configOverride: true };
+}
+
+function classifyGuardedSegment(tokens, { cwd } = {}) {
 	if (tokens.length === 0) return null;
 	const head = tokens[0];
-	if (basename(head.value) !== "git") {
-		const subcommand = codexRoutineSubcommand(tokens);
-		return subcommand === null ? null : { subcommand, decision: "deny" };
+	if (executableName(head.value) !== "git") {
+		const subcommand = classifyCodexGitRoutine(
+			tokens.map((token) => token.value),
+		)?.gitSubcommand;
+		return subcommand ? { subcommand, decision: "deny" } : null;
 	}
 
 	const bypass = classifyBypass(tokens);
-	if (bypass)
+	if (bypass) {
+		const args = tokens.slice(gitSubcommandIndex(tokens) + 1);
+		const scope =
+			bypass.subcommand === "config" &&
+			!isReadOnlyGitConfig(args.map((token) => token.value))
+				? classifyConfigWrite(args)
+				: bypass;
 		return {
 			subcommand: bypass.subcommand,
 			decision: "deny",
 			bypass: true,
 			flag: bypass.flag,
-			outsideTarget: bypass.outsideTarget === true,
-			outsideTargetFlag: bypass.outsideTargetFlag,
-			outsideTargetName: bypass.outsideTargetName,
+			outsideTarget: scope.outsideTarget === true,
+			outsideTargetFlag: scope.outsideTargetFlag,
+			outsideTargetName: scope.outsideTargetName,
 		};
+	}
 
 	const sub = gitSubcommand(tokens);
 	if (!sub) return null;
+	const argTokens = tokens.slice(gitSubcommandIndex(tokens) + 1);
+	const effect = classifySharedGitEffect(
+		sub,
+		argTokens.map((token) => token.value),
+		{ cwd, argTokens },
+	);
+	if (effect) {
+		const guarded = { subcommand: sub, decision: "ask", effect };
+		if (sub !== "config") return guarded;
+		const { outsideTarget, outsideTargetFlag, outsideTargetName } =
+			classifyConfigWrite(tokens.slice(gitSubcommandIndex(tokens) + 1));
+		return outsideTarget
+			? {
+					...guarded,
+					decision: "deny",
+					outsideTarget,
+					outsideTargetFlag,
+					outsideTargetName,
+				}
+			: guarded;
+	}
 	if (DENIED_SUBCOMMANDS.has(sub)) {
 		if (
 			sub === "apply" &&
@@ -622,15 +680,17 @@ function classifySegment(tokens) {
  * add y` is a deny, since letting the ask through would put the add on the
  * default branch behind a prompt that names the checkout.
  * @param {string} command
- * @returns {{subcommand: string, decision: "deny" | "ask", bypass?: boolean, flag?: string, outsideTarget?: boolean, outsideTargetFlag?: string, outsideTargetName?: string} | null}
+ * @returns {GuardedGit | null}
  */
-export function classifyGitCommand(command) {
+export function classifyGitCommand(command, hookCwd = process.cwd()) {
 	if (typeof command !== "string" || command.trim() === "") return null;
+	const failure = shellParseDecision(command);
+	if (failure) return { ...failure, subcommand: "shell syntax" };
 
-	/** @type {{subcommand: string, decision: "deny" | "ask", bypass?: boolean, flag?: string, outsideTarget?: boolean, outsideTargetFlag?: string, outsideTargetName?: string} | null} */
+	/** @type {GuardedGit | null} */
 	let asked = null;
-	for (const segment of splitSegments(command)) {
-		const found = classifySegment(stripLeadingNoise(tokenize(segment)));
+	for (const { cwd: _cwd, ...found } of analyzeCommand(command, hookCwd)
+		.targets) {
 		if (found?.decision === "deny") return found;
 		if (found) asked ??= found;
 	}
@@ -640,24 +700,15 @@ export function classifyGitCommand(command) {
 /** A path this layer can resolve without running a shell. */
 function staticPath(token) {
 	if (!token) return null;
-	if (token.quoted)
-		return token.quote === "'" || !/[$`]/.test(token.value)
-			? token.value
-			: null;
-	return /[$~*?`]/.test(token.value) ? null : token.value;
+	return token.dynamic ? null : token.value;
 }
 
-/** A literal target from the supported `cd` forms, or null when it is dynamic. */
-function cdPath(tokens) {
-	let targetAt = 1;
-	if (!tokens[targetAt]?.quoted && tokens[targetAt]?.value === "--") targetAt++;
-	const target = staticPath(tokens[targetAt]);
-	if (target === null) return null;
-	return tokens
-		.slice(targetAt + 1)
-		.every((token) => !token.quoted && /^(?:[0-9]*>>?|&>>?)/.test(token.value))
-		? target
-		: null;
+function physicalCwd(target, cwd) {
+	try {
+		return resolvePhysicalPath(target, cwd);
+	} catch {
+		return null;
+	}
 }
 
 /** Resolve every pre-subcommand `git -C` in the order Git applies them. */
@@ -675,12 +726,18 @@ function resolveGitCwd(tokens, shellCwd) {
 			token.value.startsWith("--work-tree=")
 		)
 			return null;
-		if (token.value !== "-C") continue;
-		const target = staticPath(tokens[i + 1]);
+		if (token.value !== "-C" && !token.value.startsWith("-C")) {
+			if (GIT_GLOBAL_FLAGS_WITH_VALUE.has(token.value)) i++;
+			continue;
+		}
+		const target =
+			token.value === "-C"
+				? staticPath(tokens[++i])
+				: staticPath({ ...token, value: token.value.slice(2) });
 		if (target === null) cwd = null;
-		else if (target.startsWith("/")) cwd = resolve(target);
-		else if (cwd !== null) cwd = resolve(cwd, target);
-		i++;
+		else if (target === "") continue;
+		else if (target.startsWith("/") || cwd !== null)
+			cwd = physicalCwd(target, cwd);
 	}
 	return cwd;
 }
@@ -693,153 +750,113 @@ function resolveEnvCwd(tokens, shellCwd) {
 		if (env.chdir !== undefined) {
 			const target = staticPath(env.chdir);
 			if (target === null) cwd = null;
-			else if (target.startsWith("/")) cwd = resolve(target);
-			else if (cwd !== null) cwd = resolve(cwd, target);
+			else if (target.startsWith("/") || cwd !== null)
+				cwd = physicalCwd(target, cwd);
 		}
 	}
 	return cwd;
 }
 
 function resolveCodexRoutineCwd(tokens) {
-	const target = staticPath(tokens[2]);
-	return target === null ? null : resolve(target);
+	const routine = classifyCodexGitRoutine(tokens.map((token) => token.value));
+	const target = routine ? staticPath(tokens[routine.targetAt]) : null;
+	return target === null ? null : physicalCwd(target);
 }
 
-function guardedSuffix(tokens) {
+function guardedSuffix(tokens, options) {
 	for (let i = 0; i < tokens.length; i++) {
-		const guarded = classifySegment(tokens.slice(i));
+		const guarded = classifySegment(tokens.slice(i), options);
 		if (guarded) return guarded;
 	}
 	return null;
 }
 
-const COMPOUND_TOKENS = new Set([
-	"{",
-	"}",
-	"if",
-	"then",
-	"elif",
-	"else",
-	"fi",
-	"for",
-	"while",
-	"until",
-	"case",
-	"esac",
-	"do",
-	"done",
-	"select",
-	"function",
-	"coproc",
-	"!",
-]);
-
-/**
- * Track the shell cwd and retain each guarded Git segment with its own target.
- * A PreToolUse hook fires before the shell does, so `payload.cwd` does not yet
- * reflect `cd` or `git -C` inside the command (#751). Keeping every target is
- * also necessary because one Bash invocation can move between worktrees
- * before running another guarded Git command (#784).
- */
+// Do not emulate shell state. A cwd-changing command anywhere in the input
+// makes implicit/relative targets unknown; environment setters make all Git
+// mutation targets unknown. Absolute per-command targets can recover only cwd.
 function analyzeCommand(
 	command,
 	hookCwd,
-	{ ambientCdPath = false, ambientGitTargetOverride = false } = {},
+	{ ambientGitTargetOverride = false } = {},
 ) {
-	if (typeof command !== "string") return { targets: [], finalCwd: hookCwd };
-
-	/** Where the shell stands, or null once a `cd` moved it somewhere unknown. */
-	let cwd = hookCwd;
-	const protectedState = createProtectedShellState({
-		ambientCdPath,
-		ambientGitTargetOverride,
-	});
-	let unresolvedControlFlow = false;
-	let andListAffects = false;
-	let previousAffects = false;
-	const targets = [];
-
-	for (const { command: segment, separatorBefore } of splitCommandFlow(
-		command,
-	)) {
-		if (separatorBefore === "&&") andListAffects ||= previousAffects;
-		else if (separatorBefore === ";" || separatorBefore === "\n") {
-			unresolvedControlFlow ||= andListAffects;
-			andListAffects = false;
-		} else if (["(", ")"].includes(separatorBefore)) {
-			unresolvedControlFlow = true;
-			andListAffects = false;
-		} else if (["||", "|", "&"].includes(separatorBefore)) {
-			unresolvedControlFlow ||= previousAffects;
-			andListAffects = false;
-		}
-		const rawTokens = tokenize(segment);
-		const prefix = parseLeadingShellPrefix(rawTokens);
-		const envCwd = resolveEnvCwd(rawTokens, cwd);
-		const tokens = rawTokens.slice(prefix.end);
-		const finish = (cwdAffects = false) => {
-			const affects =
-				cwdAffects || updateProtectedShellState(protectedState, rawTokens);
-			if (separatorBefore === "&&") andListAffects ||= affects;
-			if (["||", "|", "&"].includes(separatorBefore))
-				unresolvedControlFlow ||= affects;
-			previousAffects = affects;
+	const shell = readShell(command);
+	if (shell.error)
+		return {
+			targets: [
+				{
+					decision: "deny",
+					subcommand: "shell syntax",
+					reason: shell.error,
+					cwd: null,
+				},
+			],
+			finalCwd: null,
 		};
-		if (tokens.length === 0) {
-			finish();
-			continue;
-		}
-		const head = basename(tokens[0].value);
-		if (COMPOUND_TOKENS.has(head)) unresolvedControlFlow = true;
-
-		if (
-			(head === "builtin" &&
-				["cd", "pushd", "popd"].includes(tokens[1]?.value)) ||
-			head === "pushd" ||
-			head === "popd"
-		) {
-			cwd = null;
-			finish(true);
-			continue;
-		}
-
-		if (head === "cd") {
-			const target = cdPath(tokens);
-			if (target === null) cwd = null;
-			// An absolute target restores a trail lost to an unresolvable earlier cd.
-			else if (target.startsWith("/")) cwd = resolve(target);
-			else if (
-				hasProtectedCdPathOverride(protectedState) ||
-				prefix.cdPathOverride
-			)
-				cwd = null;
-			else if (cwd !== null) cwd = resolve(cwd, target);
-			finish(true);
-			continue;
-		}
-
+	const commands = shell.commands.map(({ tokens }) => {
+		const prefix = parseLeadingShellPrefix(tokens);
+		const argv = tokens.slice(prefix.end);
+		const stateTokens =
+			argv[0]?.value === "builtin"
+				? argv.slice(argv[1]?.value === "--" ? 2 : 1)
+				: argv;
+		return { raw: tokens, prefix, tokens: argv, stateTokens };
+	});
+	const changesCwd = commands.some(({ stateTokens }) =>
+		["cd", "pushd", "popd"].includes(stateTokens[0]?.value),
+	);
+	const changesEnvironment = commands.some(({ raw, stateTokens: tokens }) => {
+		const head = tokens[0]?.value;
+		const setter = [
+			"export",
+			"readonly",
+			"typeset",
+			"declare",
+			"local",
+			"unset",
+		].includes(head);
+		const protectedOperand = tokens.some(
+			({ value, dynamic }) =>
+				dynamic ||
+				/^(?:GIT_[A-Za-z0-9_]*|CDPATH)(?:\+?=|$)/.test(value) ||
+				/^[+-][^+-]*n/.test(value),
+		);
+		return (
+			(setter && protectedOperand) ||
+			["read", "source", ".", "eval"].includes(head) ||
+			(head === "printf" &&
+				tokens.some(({ value }) => value.startsWith("-v"))) ||
+			(raw.length > 0 &&
+				raw.every(({ value }) => /^[A-Za-z_][A-Za-z0-9_]*\+?=/.test(value)) &&
+				raw.some(({ value }) =>
+					/^(?:GIT_[A-Za-z0-9_]*|CDPATH)\+?=/.test(value),
+				))
+		);
+	});
+	const targets = [];
+	for (const { raw, prefix, tokens } of commands) {
+		const configOverride = prefix.gitConfigOverride || changesEnvironment;
+		const baseCwd = changesCwd ? null : hookCwd;
+		const envCwd = resolveEnvCwd(raw, baseCwd);
+		const cwd =
+			ambientGitTargetOverride ||
+			changesEnvironment ||
+			prefix.unresolved ||
+			prefix.gitTargetOverride
+				? null
+				: executableName(tokens[0]?.value ?? "") === "git"
+					? resolveGitCwd(tokens, envCwd)
+					: resolveCodexRoutineCwd(tokens);
 		const guarded =
-			classifySegment(tokens) ??
-			(prefix.unresolved ? guardedSuffix(tokens) : null);
-		if (!guarded) {
-			finish();
-			continue;
-		}
-		targets.push({
-			...guarded,
-			cwd:
-				unresolvedControlFlow ||
-				prefix.unresolved ||
-				hasProtectedGitTargetOverride(protectedState) ||
-				prefix.gitTargetOverride
-					? null
-					: head === "git"
-						? resolveGitCwd(tokens, envCwd)
-						: resolveCodexRoutineCwd(tokens),
-		});
-		finish();
+			classifySegment(tokens, { configOverride, cwd }) ??
+			(prefix.unresolved
+				? guardedSuffix(tokens, { configOverride, cwd: null })
+				: null);
+		if (guarded) targets.push({ ...guarded, cwd });
 	}
-	return { targets, finalCwd: cwd };
+	return {
+		targets,
+		finalCwd: changesCwd || changesEnvironment ? null : hookCwd,
+	};
 }
 
 /** Every guarded Git segment with the cwd in which Git will run it. */
@@ -853,7 +870,7 @@ export function resolveGuardedGitCommands(command, hookCwd, options) {
  */
 export function resolveCommandCwd(command, hookCwd, options) {
 	const analysis = analyzeCommand(command, hookCwd, options);
-	return analysis.targets[0]?.cwd ?? analysis.finalCwd;
+	return analysis.targets.length ? analysis.targets[0].cwd : analysis.finalCwd;
 }
 
 /**
@@ -891,10 +908,22 @@ export function classifyTargetRepository(sessionRoots, targetRoots) {
  */
 export function evaluateMainCommitGuard(
 	payload,
-	{ currentBranch, mainBranch = "main", targetRelation = "own" } = {},
+	{
+		currentBranch,
+		mainBranch = "main",
+		targetRelation = "own",
+		supportsAsk = true,
+	} = {},
 ) {
 	if (payload?.tool_name !== "Bash") return { decision: "allow" };
-	const guarded = classifyGitCommand(payload?.tool_input?.command);
+	const failure = shellParseDecision(payload?.tool_input?.command, {
+		supportsAsk,
+	});
+	if (failure) return failure;
+	const guarded = classifyGitCommand(
+		payload?.tool_input?.command,
+		payload?.cwd ?? process.cwd(),
+	);
 	if (!guarded) return { decision: "allow" };
 	return evaluateGuardedCommand(guarded, {
 		currentBranch,
@@ -903,45 +932,56 @@ export function evaluateMainCommitGuard(
 	});
 }
 
-function evaluateGuardedCommand(
+// A config override on a non-read call is a shared effect, but it must not
+// soften what the call is already guarded for (a deny on the default branch),
+// so it only replaces an allow.
+function evaluateGuardedCommand(guarded, context = {}) {
+	const result = evaluateGuardedCore(guarded, context);
+	if (
+		!guarded.configOverride ||
+		result.decision !== "allow" ||
+		context.targetRelation === "foreign"
+	)
+		return result;
+	return evaluateSharedGitEffect(
+		{ kind: "shared" },
+		context.mainBranch ?? "main",
+	);
+}
+
+function evaluateGuardedCore(
 	guarded,
 	{ currentBranch, mainBranch = "main", targetRelation = "own" } = {},
 ) {
+	if (
+		guarded.outsideTarget &&
+		(!guarded.bypass || targetRelation === "foreign")
+	) {
+		const certainty =
+			guarded.outsideTargetName === "--file"
+				? "may write Git configuration outside the target repo (this parser does not check where the path points)"
+				: "writes Git configuration outside the target repo";
+		return {
+			decision: "deny",
+			reason:
+				`Blocked 'git ${guarded.subcommand}' for using '${guarded.outsideTargetFlag}': this ${certainty}, where it can affect this repo's (or another repo's) git hooks. ` +
+				(targetRelation === "foreign"
+					? "Write to the target's own local config instead (drop the scope/file flag, or use --local/--worktree). "
+					: "") +
+				"If writing outside the target is genuinely needed, run the command in your own terminal instead.",
+		};
+	}
 	// Out of scope entirely: this guard speaks for one repository's ecosystem,
 	// and another repository's branch names carry none of its meaning (#1221).
-	// A `git config` bypass that writes outside the target repo is the one
-	// exception (#1232): `--global`/`--system`/`--file` land in a config this
-	// repo's checks (or another repo's) still read, so foreign does not buy it
-	// the pass-through this rule otherwise grants.
-	if (
-		targetRelation === "foreign" &&
-		!(guarded.bypass && guarded.outsideTarget)
-	)
-		return { decision: "allow" };
+	// Outside-target config writes were handled before this exemption (#1232).
+	if (targetRelation === "foreign") return { decision: "allow" };
 
 	// See the file header for why a bypass denies independently of branch and
 	// worktree. This still sits after the foreign check above, which stays in
 	// scope for a bypass that writes outside the target (immediately above).
 	if (guarded.bypass) {
-		// The outside-target wording is only correct against a foreign target:
-		// there, "drop the scope/file flag" is the complete fix (the plain
-		// command is allowed against a foreign target, per the check above).
-		// Against own/sibling/unknown, the plain command still skips hooks and
-		// still denies, so that advice would lead to a second deny instead of
-		// fixing anything — the general message below applies there instead.
-		if (guarded.outsideTarget && targetRelation === "foreign") {
-			const certainty =
-				guarded.outsideTargetName === "--file"
-					? "may write core.hooksPath outside the target repo (this parser does not check where the path points)"
-					: "writes core.hooksPath outside the target repo";
-			return {
-				decision: "deny",
-				reason:
-					`Blocked 'git ${guarded.subcommand}' for using '${guarded.outsideTargetFlag}': this ${certainty}, where it can still skip this repo's (or another repo's) git hooks. ` +
-					"Write to the target's own local config instead (drop the scope/file flag, or use --local/--worktree). " +
-					"If writing outside the target is genuinely needed, run the command in your own terminal instead.",
-			};
-		}
+		// Own-target hooksPath writes still deny without the scope flag, so
+		// their recovery message must ask to remove the bypass itself.
 		const hookName =
 			guarded.subcommand === "commit" ? "pre-commit" : "git hooks";
 		return {
@@ -953,12 +993,27 @@ function evaluateGuardedCommand(
 				"needed (e.g. to debug a hook), run the command in your own terminal instead.",
 		};
 	}
+	if (guarded.effect) {
+		const effectResult = evaluateSharedGitEffect(
+			guarded.effect,
+			mainBranch,
+			currentBranch,
+			targetRelation,
+		);
+		if (
+			effectResult.decision !== "allow" ||
+			!["enter-branch", "create-branch"].includes(guarded.effect.kind)
+		)
+			return effectResult;
+	}
+	if (guarded.subcommand === "stash")
+		return evaluateSharedGitEffect({ kind: "shared" }, mainBranch);
 
 	// `unknown` rides with `own`, which is where it already sat before the
 	// relation had a name — the branch-name rule still applies, and reaching a
 	// deny through it requires the target's branch to be readable.
 	const crossesWorktree = targetRelation === "sibling";
-	const targetsDefaultBranch = currentBranch === mainBranch;
+	const targetsDefaultBranch = sameBranchName(currentBranch, mainBranch);
 	if (!targetsDefaultBranch && !crossesWorktree) return { decision: "allow" };
 
 	const command = `git ${guarded.subcommand}`;
@@ -1003,10 +1058,10 @@ function evaluateUnresolvedCwd(guarded) {
 		? ` It also uses '${guarded.flag}', which skips this repo's git hooks — drop that too.`
 		: "";
 	return {
-		decision: guarded.decision,
+		decision: "ask",
 		reason:
-			`Blocked '${command}': its effective cwd cannot be resolved without shell expansion. ` +
-			`Use a literal path or harness workdir.${bypassNote}`,
+			`Cannot determine the target of '${command}' without interpreting shell state or expansion. Review the whole command before approving. ` +
+			`Use git -C with an absolute literal path, or run Git in a separate invocation with harness workdir. Use literal branch names and refspecs. Run Git separately from shell environment setters.${bypassNote}`,
 	};
 }
 
@@ -1025,16 +1080,16 @@ function evaluateUnresolvedCwd(guarded) {
  */
 export function runMainCommitGuard(
 	inputText,
-	{
-		resolveBranches,
-		supportsAsk = true,
-		ambientGitTargetOverride = false,
-		ambientCdPath = false,
-	},
+	{ resolveBranches, supportsAsk = true, ambientGitTargetOverride = false },
 ) {
 	const payload = parseHookPayload(inputText);
 	if (!payload) return { shouldOutput: false };
 	if (payload?.tool_name !== "Bash") return { shouldOutput: false };
+	const failure = shellParseDecision(payload?.tool_input?.command, {
+		supportsAsk,
+	});
+	if (failure)
+		return { shouldOutput: true, output: buildPermissionOutput(failure) };
 	const payloadCwd = payload?.cwd;
 	const hookCwd =
 		typeof payloadCwd === "string" && payloadCwd.trim() !== ""
@@ -1043,16 +1098,33 @@ export function runMainCommitGuard(
 	const targets = resolveGuardedGitCommands(
 		payload?.tool_input?.command,
 		hookCwd,
-		{ ambientCdPath, ambientGitTargetOverride },
+		{ ambientGitTargetOverride },
 	);
 	if (targets.length === 0) return { shouldOutput: false };
+	const contexts = new Map();
+	const contextFor = (target) => {
+		if (!contexts.has(target))
+			contexts.set(target, resolveBranches(payload, target.cwd));
+		return contexts.get(target);
+	};
+	const unresolved = targets.find(
+		(target) =>
+			target.cwd === null ||
+			(target.effect?.unresolved &&
+				contextFor(target).targetRelation !== "foreign"),
+	);
+	if (unresolved)
+		return {
+			shouldOutput: true,
+			output: buildPermissionOutput({
+				...evaluateUnresolvedCwd(unresolved),
+				decision: supportsAsk ? "ask" : "deny",
+			}),
+		};
 
 	let asked = null;
 	for (const target of targets) {
-		const result =
-			target.cwd === null
-				? evaluateUnresolvedCwd(target)
-				: evaluateGuardedCommand(target, resolveBranches(payload, target.cwd));
+		const result = evaluateGuardedCommand(target, contextFor(target));
 		if (result.decision === "deny") {
 			return { shouldOutput: true, output: buildPermissionOutput(result) };
 		}

@@ -1,8 +1,13 @@
 # ADR-0046: native 所有者の肯定証拠で sibling 誤判定を補正する
 
-- Status: Accepted（変更系 Git の限定補正。#1398 全体の受入は未了）
+- Status: Accepted（変更系 Git の限定補正。#1398の所有者受入は未了）
 - Date: 2026-10-07
 - 対象: #1398。判断記録: https://github.com/takasek/pfdsl/issues/1398#issuecomment-6022222988
+
+PR #1413 の拡張案は [ADR-0047](0047-codex-policy-boundaries.md) に記録する。
+2026-10-09の管理単位の再整理により、#1398を所有者判定の受入として再開し、#1404の最終policy設定の実入口受入から分ける。
+統合元issueの終了は受入完了を意味せず、限定実装の保証と以下の判断・実測履歴を変更しない。
+以下は限定実装時の判断と受入履歴であり、Codex linked checkout の own・file・主体別 Git policy の拡張と区別する。
 
 ## Context
 
@@ -143,7 +148,8 @@ session と agent の区別、直接親と遠い祖先の区別、PID 開始時�
 最終実装を接続した実入口で、両 harness の対象経路を確認する。
 prototype の成功や保存入力の再生を、最終実装の native 実行へ格上げしない。
 
-Claude の親・subagent、Codex の親担当への引継ぎ、別生存所有者、cd 後、Desktop、再開・fork・handoff の未確認項目を #1398 に残す。
-全条件を満たすまで本限定変更だけで #1398 を close しない。
+Claude の親・subagent、Codex の親担当への引継ぎ、別生存所有者、cd 後、Desktop、再開・fork・handoff の必要経路と適用範囲・fallbackの未確認は #1398 に保持する。
+必要経路と適用範囲・fallbackの根拠が揃うまで、本限定変更だけで所有者受入を完了と扱わない。
+native隔離へ保護を委ねてrepo guardを削除する案は未採用であり、現方式の受入完了には要求しない。移管を選ぶ場合に限り、削除対象のrepo分岐が無い同じ陰性入力で代替の実効性を確認する。
 品質・correctness・設計妥当性・既存動線のレビューを最終差分に適用する。
 この変更は repo 運用 guard の規則であり、pfdsl 記法の品質ガイドへの蒸留は不要である。

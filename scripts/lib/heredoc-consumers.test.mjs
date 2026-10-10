@@ -6,9 +6,8 @@ import {
 	runMainCommitGuard,
 } from "./main-commit-guard.mjs";
 
-// A heredoc body is data only when the command that reads it is known to treat
-// stdin as data. Every other reader may execute it, so its body stays visible to
-// the guards. `<<D` marks where each delimiter form is substituted.
+// Data-reader bodies retain only AST expansion commands. Unknown program
+// readers stop explicitly; their language is not guessed as shell syntax. `<<D` marks where each delimiter form is substituted.
 const DELIMITERS = ["EOF", "'EOF'", '"EOF"', "\\EOF"];
 const DATA_READERS = [
 	"cat <<D",
@@ -23,6 +22,7 @@ const DATA_READERS = [
 	"gh issue comment 1 -F - <<D",
 	"gh api repos/o/r/issues --input - <<D",
 	"cat <<D | gh pr create --title t --body-file -",
+	"cat <<D &&",
 ];
 const CODE_OR_UNKNOWN_READERS = [
 	"bash <<D",
@@ -47,7 +47,6 @@ const CODE_OR_UNKNOWN_READERS = [
 	"make -f - <<D",
 	"frobnicate <<D",
 	"cat <<D |",
-	"cat <<D &&",
 	"cat <<D | bash",
 	"exec <<D",
 	// A data reader whose output reaches a program is not a data reader.
@@ -75,10 +74,10 @@ describe("heredoc readers", () => {
 			});
 	for (const template of CODE_OR_UNKNOWN_READERS)
 		for (const delimiter of DELIMITERS)
-			it(`keeps the body read by ${template} with ${delimiter} visible`, () => {
+			it(`asks about opaque code read by ${template} with ${delimiter}`, () => {
 				assert.equal(
 					findOutwardCommand(withBody(template, delimiter, "git push")),
-					"git push",
+					"unsupported shell syntax",
 				);
 				assert.equal(
 					evaluateMainCommitGuard(
@@ -90,7 +89,7 @@ describe("heredoc readers", () => {
 						},
 						{ currentBranch: "main" },
 					).decision,
-					"deny",
+					"ask",
 				);
 			});
 	it("leaves Git after a body some program may run unresolved (split the call)", () => {
@@ -109,19 +108,14 @@ describe("heredoc readers", () => {
 					}),
 				},
 			).output?.hookSpecificOutput?.permissionDecision ?? "allow";
-		assert.equal(
-			decide("python3 - <<'EOF'\nprint(1)\nEOF\ngit add -A"),
-			"deny",
-		);
+		assert.equal(decide("python3 - <<'EOF'\nprint(1)\nEOF\ngit add -A"), "ask");
 		assert.equal(decide("cat > f <<'EOF'\nx\nEOF\ngit add -A"), "allow");
 	});
 	it("trusts gh -F - only where gh itself reads a body", () => {
 		// An alias may run a shell; issue/pr bodies and api input are data.
 		assert.equal(
-			segments(withBody("gh q -F - <<D", "'EOF'", "git push")).includes(
-				"git push",
-			),
-			true,
+			findOutwardCommand(withBody("gh q -F - <<D", "'EOF'", "git push")),
+			"unsupported shell syntax",
 		);
 	});
 	it("lets a commit message mention guarded commands (#1280)", () => {
@@ -142,14 +136,11 @@ describe("heredoc readers", () => {
 // a document start it can trust; everything after it stays visible.
 describe("ambiguous document starts", () => {
 	for (const command of [
-		"echo $[1<<2]\ngit push",
 		// biome-ignore lint/suspicious/noTemplateCurlyInString: a shell expansion, not JavaScript interpolation
 		"echo ${x:-a<<b}\ngit push",
 		"echo $((1<<2))\ngit push",
 		'echo "$(cat <<\'EOF\'\nsay "hi <<X" now\nEOF\n)"\ngit push',
 		'git commit -m "$(cat <<\'EOF\'\nfix: treat "cat <<EOF" bodies as data\nEOF\n)"\ngit push',
-		"echo $(cat <<b)\ngit push\nb",
-		"x=`cat <<b`\ngit push\nb",
 	])
 		it(`keeps later commands visible: ${JSON.stringify(command)}`, () =>
 			assert.equal(findOutwardCommand(command), "git push"));

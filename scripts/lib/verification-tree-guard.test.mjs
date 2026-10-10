@@ -20,6 +20,21 @@ function payload({ toolName = "Bash", command }) {
 }
 
 describe("findVerificationSegments", () => {
+	it("does not treat standalone version or help as tree verification", () => {
+		for (const command of [
+			"make --version",
+			"make --help",
+			"pnpm --version",
+			"pnpm --help",
+			"npm --version",
+			"npm help install",
+		]) {
+			assert.deepEqual(findVerificationSegments(command), [], command);
+		}
+		assert.deepEqual(findVerificationSegments("pnpm run test --help"), [
+			"pnpm run test --help",
+		]);
+	});
 	it("finds a bare `make test`", () => {
 		assert.deepEqual(findVerificationSegments("make test"), ["make test"]);
 	});

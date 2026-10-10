@@ -20,6 +20,8 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
+      - run: node scripts/setup-shell-parser.mjs
+
       - run: make lint
 
       # .claude/skills/pfdsl is gitignored (#348) and absent on a fresh checkout, so link it to the tracked generated copy the way `make setup` does (#714) and checks that read the repo-local skill path resolve.

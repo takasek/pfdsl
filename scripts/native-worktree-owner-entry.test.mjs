@@ -47,6 +47,12 @@ describe("native ownership through the real hook entry", () => {
 			"test: fixture",
 		]);
 		target = join(fixture, "作業 tree");
+		git(repo, ["remote", "add", "origin", repo]);
+		git(repo, [
+			"symbolic-ref",
+			"refs/remotes/origin/HEAD",
+			"refs/remotes/origin/main",
+		]);
 		git(repo, ["worktree", "add", "-b", "topic", target]);
 		metadata = resolve(
 			target,

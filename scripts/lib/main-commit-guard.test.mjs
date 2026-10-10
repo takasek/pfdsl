@@ -7,6 +7,7 @@ import {
 	readFileSync,
 	realpathSync,
 	rmSync,
+	symlinkSync,
 	writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
@@ -31,6 +32,72 @@ function payload({ toolName = "Bash", command, cwd }) {
 	if (cwd !== undefined) value.cwd = cwd;
 	return value;
 }
+
+it("resolves attached literal -C targets without consuming other option values", () => {
+	for (const [command, cwd, decision] of [
+		["git -C/fixture/main commit -m x", "/fixture/topic", "deny"],
+		["git -C/fixture/topic commit -m x", "/fixture/main", "allow"],
+		["git -C '' commit -m x", "/fixture/topic", "allow"],
+		["git --namespace -C/fixture/topic commit -m x", "/fixture/main", "deny"],
+	]) {
+		const result = runMainCommitGuard(
+			JSON.stringify(payload({ command, cwd })),
+			{
+				supportsAsk: false,
+				resolveBranches: (_, target) => ({
+					currentBranch: target === "/fixture/main" ? "main" : "topic",
+					mainBranch: "main",
+					targetRelation: "own",
+				}),
+			},
+		);
+		assert.equal(
+			result.output?.hookSpecificOutput.permissionDecision ?? "allow",
+			decision,
+			command,
+		);
+	}
+});
+
+it("resolves symlink/.. targets in filesystem order for Git and env chdir", () => {
+	const root = realpathSync(mkdtempSync(join(tmpdir(), "pfdsl-git-path-")));
+	try {
+		const main = join(root, "main"),
+			own = join(root, "own");
+		mkdirSync(join(main, "dir"), { recursive: true });
+		mkdirSync(own);
+		symlinkSync(join(main, "dir"), join(own, "alias"));
+		const target = `${own}/alias/..`;
+		assert.equal(
+			execFileSync("pwd", ["-P"], { cwd: target, encoding: "utf8" }).trim(),
+			main,
+		);
+		for (const command of [
+			`git -C ${target} commit -m x`,
+			`git -C${target} commit -m x`,
+			`env -C ${target} git commit -m x`,
+		]) {
+			const result = runMainCommitGuard(
+				JSON.stringify(payload({ command, cwd: own })),
+				{
+					supportsAsk: false,
+					resolveBranches: (_, path) => ({
+						currentBranch: path === main ? "main" : "topic",
+						mainBranch: "main",
+						targetRelation: "own",
+					}),
+				},
+			);
+			assert.equal(
+				result.output?.hookSpecificOutput.permissionDecision,
+				"deny",
+				command,
+			);
+		}
+	} finally {
+		rmSync(root, { recursive: true, force: true });
+	}
+});
 
 describe("classifyGitCommand", () => {
 	it("denies subcommands that create new state on the branch", () => {
@@ -58,7 +125,13 @@ describe("classifyGitCommand", () => {
 		]) {
 			assert.deepEqual(
 				classifyGitCommand(`git ${sub} x`),
-				{ subcommand: sub, decision: "ask" },
+				{
+					subcommand: sub,
+					decision: "ask",
+					...(["checkout", "switch"].includes(sub)
+						? { effect: { kind: "enter-branch", ref: "x" } }
+						: {}),
+				},
 				sub,
 			);
 		}
@@ -115,15 +188,15 @@ describe("classifyGitCommand", () => {
 	it("classifies the targeted Codex routine wrapper as its Git mutation", () => {
 		for (const [command, subcommand] of [
 			[
-				"/Users/example/.codex/bin/codex-git-routine.mjs stage-all /repo/worktree topic",
+				"/opt/codex/bin/codex-git-routine.mjs stage-all /repo/worktree topic",
 				"add",
 			],
 			[
-				"/Users/example/.codex/bin/codex-git-routine.mjs commit /repo/worktree topic message",
+				"/opt/codex/bin/codex-git-routine.mjs commit /repo/worktree topic message",
 				"commit",
 			],
 			[
-				"/Users/example/.codex/bin/codex-git-routine.mjs branch-rename /repo/worktree old new",
+				"/opt/codex/bin/codex-git-routine.mjs branch-rename /repo/worktree old new",
 				"branch",
 			],
 		]) {
@@ -133,6 +206,55 @@ describe("classifyGitCommand", () => {
 				command,
 			);
 		}
+	});
+
+	it("classifies the node-launched Codex routine wrapper the same way", () => {
+		for (const [command, subcommand] of [
+			[
+				'node.exe "C:/Codex/bin/codex-git-routine.mjs" stage-all /repo/worktree topic',
+				"add",
+			],
+			[
+				'NODE.EXE "C:/Codex/bin/CODEX-GIT-ROUTINE.MJS" commit /repo/worktree topic message',
+				"commit",
+			],
+			[
+				"node /opt/codex/bin/codex-git-routine.mjs stage-all /repo/worktree topic",
+				"add",
+			],
+			[
+				"/usr/bin/node /opt/codex/bin/codex-git-routine.mjs commit /repo/worktree topic message",
+				"commit",
+			],
+			[
+				"node --no-warnings /opt/codex/bin/codex-git-routine.mjs stage-all /repo/worktree topic",
+				"add",
+			],
+			[
+				"node -- /opt/codex/bin/codex-git-routine.mjs commit /repo/worktree topic message",
+				"commit",
+			],
+			[
+				"node /opt/codex/bin/codex-git-routine.mjs branch-rename /repo/worktree old new",
+				"branch",
+			],
+		]) {
+			assert.deepEqual(
+				classifyGitCommand(command),
+				{ subcommand, decision: "deny" },
+				command,
+			);
+		}
+	});
+
+	it("leaves routine verbs and node scripts that are not Git mutations unclassified", () => {
+		for (const command of [
+			"/opt/codex/bin/codex-git-routine.mjs test /repo/worktree topic",
+			"node /opt/codex/bin/codex-git-routine.mjs node-test /repo/worktree topic a.test.mjs",
+			"node /opt/codex/bin/other-script.mjs commit /repo/worktree topic message",
+			"node scripts/check.mjs stage-all",
+		])
+			assert.equal(classifyGitCommand(command), null, command);
 	});
 
 	it("prefers the denied subcommand over an asked one in a compound", () => {
@@ -146,7 +268,11 @@ describe("classifyGitCommand", () => {
 		assert.equal(classifyGitCommand("git status --short"), null);
 		assert.equal(classifyGitCommand("git log --oneline -5"), null);
 		assert.equal(classifyGitCommand("git fetch origin"), null);
-		assert.equal(classifyGitCommand("git worktree add ../w -b topic"), null);
+		assert.deepEqual(classifyGitCommand("git worktree add ../w -b topic"), {
+			subcommand: "worktree",
+			decision: "ask",
+			effect: { kind: "shared" },
+		});
 	});
 
 	it("leaves the read-only stash forms alone, since they diagnose a loss", () => {
@@ -639,141 +765,44 @@ describe("git global-option bypass invariant (#1232)", () => {
 
 describe("resolveCommandCwd", () => {
 	const HOOK_CWD = "/repo";
-
-	it("keeps the hook's cwd for a plain commit", () => {
-		assert.equal(resolveCommandCwd("git commit -m 'x'", HOOK_CWD), HOOK_CWD);
+	it("resolves literal per-command targets without interpreting shell cwd", () => {
+		for (const [command, expected] of [
+			["git commit -m x", HOOK_CWD],
+			["git -C /elsewhere/w commit -m x", "/elsewhere/w"],
+			["git -C /worktrees/session -C ../sibling add -A", "/worktrees/sibling"],
+			["cd /a && git -C /b commit -m x", "/b"],
+			["echo 'cd /a' && git commit -m x", HOOK_CWD],
+			["cd /a && git add -A", null],
+			["cd '$SIBLING' && git commit -m x", null],
+			["cd $WORKTREE && git commit -m x", null],
+			["cd -- /a >/dev/null && git add -A", null],
+			["cd && git commit -m x", null],
+		])
+			assert.equal(resolveCommandCwd(command, HOOK_CWD), expected, command);
 	});
-
-	it("follows a leading cd into the tree the commit lands in (#751)", () => {
-		assert.equal(
-			resolveCommandCwd(
-				"cd .claude/worktrees/w && git commit -m 'x'",
-				HOOK_CWD,
-			),
-			"/repo/.claude/worktrees/w",
-		);
-	});
-
-	it("follows an absolute cd", () => {
-		assert.equal(
-			resolveCommandCwd("cd /elsewhere/w && git commit -m 'x'", HOOK_CWD),
-			"/elsewhere/w",
-		);
-	});
-
-	it("reads git -C, which used to bypass the guard entirely (#751)", () => {
-		assert.equal(
-			resolveCommandCwd("git -C /elsewhere/w commit -m 'x'", HOOK_CWD),
-			"/elsewhere/w",
-		);
-	});
-
-	it("reads the explicit target carried by the Codex routine wrapper", () => {
-		assert.equal(
-			resolveCommandCwd(
-				"/Users/example/.codex/bin/codex-git-routine.mjs stage-all /repo/sibling sibling",
-				HOOK_CWD,
-			),
-			"/repo/sibling",
-		);
-	});
-
-	it("applies repeated git -C options from left to right (#784)", () => {
-		assert.equal(
-			resolveCommandCwd(
-				"git -C /worktrees/session -C ../sibling add -A",
-				HOOK_CWD,
-			),
-			"/worktrees/sibling",
-		);
-	});
-
-	it("resolves the tree for guarded subcommands other than commit (#777)", () => {
-		assert.equal(resolveCommandCwd("cd /a && git add -A", HOOK_CWD), "/a");
-		assert.equal(resolveCommandCwd("git -C /b stash push", HOOK_CWD), "/b");
-	});
-
-	it("stops at the first guarded subcommand, not a later one", () => {
-		assert.equal(
-			resolveCommandCwd(
-				"cd /a && git add -A && cd /b && git commit -m 'x'",
-				HOOK_CWD,
-			),
-			"/a",
-		);
-	});
-
-	it("lets git -C win over an earlier cd, since git resolves last", () => {
-		assert.equal(
-			resolveCommandCwd("cd /a && git -C /b commit -m 'x'", HOOK_CWD),
-			"/b",
-		);
-	});
-
-	it("uses the cd in effect where the commit runs, not a later one", () => {
-		assert.equal(
-			resolveCommandCwd("cd /a && git commit -m 'x' && cd /b", HOOK_CWD),
-			"/a",
-		);
-	});
-
-	it("strips quotes around a cd path", () => {
-		assert.equal(
-			resolveCommandCwd("cd '/a b/w' && git commit -m 'x'", HOOK_CWD),
-			"/a b/w",
-		);
-	});
-
-	it("keeps shell syntax literal inside single-quoted cd paths", () => {
-		assert.equal(
-			resolveCommandCwd("cd '$SIBLING' && git commit -m 'x'", HOOK_CWD),
-			"/repo/$SIBLING",
-		);
-		assert.equal(
-			resolveCommandCwd("cd -- '/tmp/`literal`' && git add -A", HOOK_CWD),
-			"/tmp/`literal`",
-		);
-	});
-
-	it("leaves the cwd unresolved when the path is not statically known", () => {
-		assert.equal(
-			resolveCommandCwd("cd $WORKTREE && git commit -m 'x'", HOOK_CWD),
-			null,
-		);
-		assert.equal(
-			resolveCommandCwd("cd ~/works/x && git commit -m 'x'", HOOK_CWD),
-			null,
-		);
-		assert.equal(
-			resolveCommandCwd("cd \"$WORKTREE\" && git commit -m 'x'", HOOK_CWD),
-			null,
-		);
-	});
-
-	it("follows cd with an end-of-options marker or a redirection", () => {
-		assert.equal(
-			resolveCommandCwd("cd -- /elsewhere/w && git add -A", HOOK_CWD),
-			"/elsewhere/w",
-		);
-		assert.equal(
-			resolveCommandCwd("cd /elsewhere/w >/dev/null && git add -A", HOOK_CWD),
-			"/elsewhere/w",
-		);
-	});
-
-	it("leaves the cwd unresolved for a bare cd, which means the home directory", () => {
-		assert.equal(resolveCommandCwd("cd && git commit -m 'x'", HOOK_CWD), null);
-	});
-
-	it("ignores a cd inside a quoted string", () => {
-		assert.equal(
-			resolveCommandCwd("echo 'cd /a' && git commit -m 'x'", HOOK_CWD),
-			HOOK_CWD,
-		);
+	it("resolves the routine wrapper's explicit target behind supported launchers", () => {
+		for (const launcher of ["", "node ", "node --no-warnings ", "node -- "])
+			assert.equal(
+				resolveCommandCwd(
+					`${launcher}/opt/codex/bin/codex-git-routine.mjs stage-all /repo/sibling sibling`,
+					HOOK_CWD,
+				),
+				"/repo/sibling",
+				launcher,
+			);
 	});
 });
 
 describe("evaluateMainCommitGuard", () => {
+	it("recognizes Windows Git names for default branch protection", () => {
+		assert.equal(
+			evaluateMainCommitGuard(
+				payload({ command: '"C:/Program Files/Git/bin/GIT.EXE" add file' }),
+				{ currentBranch: "main" },
+			).decision,
+			"deny",
+		);
+	});
 	it("tells the session's own worktree, a sibling, an unrelated repository and an unresolved target apart (#1221)", () => {
 		const session = {
 			worktreeRoot: "/repo/.claude/worktrees/a",
@@ -932,6 +961,80 @@ describe("evaluateMainCommitGuard", () => {
 		assert.equal(result.decision, "deny");
 	});
 
+	it("treats a checkout sitting on MAIN as on the default branch (case-insensitive filesystems)", () => {
+		for (const currentBranch of ["MAIN", "Main"]) {
+			const result = evaluateMainCommitGuard(
+				payload({ command: "git commit -m 'x'" }),
+				{ currentBranch, mainBranch: "main" },
+			);
+			assert.equal(result.decision, "deny", currentBranch);
+		}
+	});
+
+	it("keeps the default-branch deny when a config override rides on the commit", () => {
+		for (const command of [
+			"git -c user.name=x commit -m 'x'",
+			"GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=a.b GIT_CONFIG_VALUE_0=c git commit -m 'x'",
+		]) {
+			const result = evaluateMainCommitGuard(payload({ command }), {
+				currentBranch: "main",
+			});
+			assert.equal(result.decision, "deny", command);
+			assert.match(result.reason, /Blocked 'git commit' on 'main'/, command);
+		}
+	});
+
+	it("asks for a config override on a feature branch, but not for a read or a foreign target", () => {
+		for (const command of [
+			"git -c user.name=x commit -m 'x'",
+			"git --config-env=a.b=ENV fetch origin",
+			"GIT_CONFIG_PARAMETERS=x git fetch origin",
+		]) {
+			const result = evaluateMainCommitGuard(payload({ command }), {
+				currentBranch: "topic",
+			});
+			assert.equal(result.decision, "ask", command);
+			assert.equal(
+				evaluateMainCommitGuard(payload({ command }), {
+					currentBranch: "topic",
+					targetRelation: "foreign",
+				}).decision,
+				"allow",
+				command,
+			);
+		}
+		assert.equal(
+			evaluateMainCommitGuard(payload({ command: "git -c k=v log -1" }), {
+				currentBranch: "topic",
+			}).decision,
+			"allow",
+		);
+	});
+
+	it("classifies visible config setters conservatively without unset recovery", () => {
+		for (const command of [
+			"export GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=a.b GIT_CONFIG_VALUE_0=c; git fetch origin",
+			"GIT_CONFIG_PARAMETERS=x; git fetch origin",
+		])
+			assert.equal(
+				evaluateMainCommitGuard(payload({ command }), {
+					currentBranch: "topic",
+				}).decision,
+				"ask",
+				command,
+			);
+		assert.equal(
+			evaluateMainCommitGuard(
+				payload({
+					command:
+						"export GIT_CONFIG_COUNT=1; unset GIT_CONFIG_COUNT; git fetch origin",
+				}),
+				{ currentBranch: "topic" },
+			).decision,
+			"ask",
+		);
+	});
+
 	it("allows when currentBranch is unknown (detached HEAD, detection failure)", () => {
 		const result = evaluateMainCommitGuard(
 			payload({ command: "git commit -m 'x'" }),
@@ -1022,6 +1125,52 @@ describe("evaluateMainCommitGuard bypass axis (#1232)", () => {
 		assert.equal(result.decision, "allow");
 	});
 
+	it("denies outside-target config writes independently of the setting name", () => {
+		for (const command of [
+			"git -C /tmp/sbx config --global include.path /tmp/settings.cfg",
+			"git -C /tmp/sbx config set --system user.name Example",
+			"git -C /tmp/sbx config --file /tmp/settings.cfg --add include.path /tmp/extra.cfg",
+			"git -C /tmp/sbx config -f/tmp/settings.cfg --unset user.name",
+			"git config user.name Local && git config --global include.path /tmp/settings.cfg",
+			"git -c core.hooksPath=/tmp/hooks config --global user.name Example",
+		]) {
+			const result = evaluateMainCommitGuard(payload({ command }), {
+				currentBranch: "feature/x",
+				targetRelation: "foreign",
+			});
+			assert.equal(result.decision, "deny", command);
+			assert.match(result.reason, /outside the target repo/);
+		}
+		const own = evaluateMainCommitGuard(
+			payload({ command: "git config --global user.name Example" }),
+			{ currentBranch: "feature/x" },
+		);
+		assert.equal(own.decision, "deny");
+		assert.doesNotMatch(own.reason, /drop the scope\/file flag/);
+		assert.match(own.reason, /own terminal/);
+	});
+
+	it("preserves outside-target config reads and foreign local writes", () => {
+		for (const command of [
+			"git config --global --get include.path",
+			"git config get --system user.name",
+			"git config --file /tmp/settings.cfg --list",
+			"git config --file /tmp/settings.cfg -lz",
+			"git config --local include.path /tmp/extra.cfg",
+			"git config set --worktree user.name Example",
+			"git config user.name --global",
+		]) {
+			assert.equal(
+				evaluateMainCommitGuard(payload({ command }), {
+					currentBranch: "main",
+					targetRelation: "foreign",
+				}).decision,
+				"allow",
+				command,
+			);
+		}
+	});
+
 	it("names the scope/file flag and suggests local config or a terminal for an outsideTarget deny against a foreign target (#1232)", () => {
 		const result = evaluateMainCommitGuard(
 			payload({ command: "git config --global core.hooksPath /x" }),
@@ -1063,6 +1212,84 @@ describe("evaluateMainCommitGuard bypass axis (#1232)", () => {
 });
 
 describe("runMainCommitGuard", () => {
+	it("denies dynamic rebase option positions while preserving explicit values", () => {
+		for (const [command, denied] of [
+			['flag=--update-refs; git rebase "$flag" upstream', true],
+			['git rebase "--$FLAG" upstream', true],
+			['git rebase "$BASE"', true],
+			['git rebase -- "$BASE"', false],
+			['git rebase --onto "$ONTO" upstream', false],
+			['git rebase --onto="$ONTO" upstream', false],
+			['git rebase --rebase-merges="$MODE" upstream', false],
+			['git rebase --exec "$COMMAND" upstream', false],
+			['git rebase -s "$STRATEGY" upstream', false],
+		]) {
+			const result = runMainCommitGuard(JSON.stringify(payload({ command })), {
+				resolveBranches: () => ({
+					currentBranch: "feature/x",
+					mainBranch: "main",
+					targetRelation: "own",
+				}),
+				supportsAsk: false,
+			});
+			assert.equal(
+				result.output?.hookSpecificOutput.permissionDecision,
+				denied ? "deny" : undefined,
+				command,
+			);
+		}
+	});
+
+	it("denies dynamic shared-ref destinations and worktree actions", () => {
+		for (const command of [
+			'spec="HEAD:refs/heads/victim"; git fetch . "$spec"',
+			'git pull origin "$SPEC"',
+			'git push . "$SPEC"',
+			'git push "$REPOSITORY" HEAD:refs/heads/victim',
+			'action=add; git worktree "$action" /tmp/new-checkout',
+			'git branch "$BRANCH" HEAD',
+			'git switch "$BRANCH"',
+		]) {
+			const result = runMainCommitGuard(JSON.stringify(payload({ command })), {
+				resolveBranches: () => ({
+					currentBranch: "feature/x",
+					mainBranch: "main",
+					targetRelation: "own",
+				}),
+				supportsAsk: false,
+			});
+			assert.equal(
+				result.output?.hookSpecificOutput.permissionDecision,
+				"deny",
+				command,
+			);
+		}
+	});
+
+	it("preserves ordinary dynamic values that do not select shared effects", () => {
+		for (const command of [
+			'git commit -m "$MESSAGE"',
+			'git log --format="$FORMAT"',
+			'git branch --list "$PATTERN"',
+			'git checkout -- "$FILE"',
+			'git fetch --depth "$DEPTH" origin main',
+			'git fetch origin --depth "$DEPTH" main',
+			'git fetch --depth 1 origin --negotiation-tip "$TIP" main',
+			'git pull origin --depth "$DEPTH" main',
+			"git worktree list --porcelain",
+		]) {
+			const result = runMainCommitGuard(JSON.stringify(payload({ command })), {
+				resolveBranches: () => ({
+					currentBranch: "feature/x",
+					mainBranch: "main",
+					targetRelation: "own",
+				}),
+				supportsAsk: false,
+			});
+			assert.equal(result.output, undefined, command);
+		}
+	});
+
 	const commit = JSON.stringify(payload({ command: "git commit -m 'x'" }));
 
 	it("denies a commit on the default branch", () => {
@@ -1089,7 +1316,7 @@ describe("runMainCommitGuard", () => {
 
 	it("evaluates every guarded segment in its own effective cwd (#784)", () => {
 		for (const command of [
-			"git add -A && cd /worktrees/sibling && git add -A",
+			"git -C /worktrees/session add -A && git -C /worktrees/sibling add -A",
 			"git add -A && git -C /worktrees/sibling add -A",
 		]) {
 			const visited = [];
@@ -1182,7 +1409,7 @@ describe("runMainCommitGuard", () => {
 		assert.equal(output.hookSpecificOutput.permissionDecision, "deny");
 	});
 
-	it("names the bypass flag too when the cwd is unresolved, so one retry fixes both (#1232)", () => {
+	it("rejects unquoted target expansion before any branch probe (#1232)", () => {
 		const input = JSON.stringify(
 			payload({ command: "git -C $W commit --no-verify -m x" }),
 		);
@@ -1193,9 +1420,8 @@ describe("runMainCommitGuard", () => {
 		});
 		assert.equal(shouldOutput, true);
 		const reason = output.hookSpecificOutput.permissionDecisionReason;
-		assert.match(reason, /cwd cannot be resolved/);
-		assert.match(reason, /--no-verify/);
-		assert.match(reason, /drop/i);
+		assert.match(reason, /may change command words/);
+		assert.match(reason, /quoted scalar/);
 	});
 });
 
@@ -1236,6 +1462,14 @@ describe("main-commit-guard wrapper", () => {
 		]);
 		git(repo, ["worktree", "add", "-b", "session", session]);
 		git(repo, ["worktree", "add", "-b", "sibling", sibling]);
+		mkdirSync(join(session, "sibling"));
+		writeFileSync(
+			resolve(
+				session,
+				git(session, ["rev-parse", "--git-path", "codex-thread.json"]).trim(),
+			),
+			JSON.stringify({ version: 1, ownerThreadId: "fixture-session" }),
+		);
 
 		// A throwaway sandbox of the shape distribution-review's probes create:
 		// its own .git, no remote, and the `main` that `git init` hands out
@@ -1251,16 +1485,31 @@ describe("main-commit-guard wrapper", () => {
 
 	function runWrapper(
 		command,
-		{ payloadCwd = session, claudeProjectDir = session, environment = {} } = {},
+		{
+			payloadCwd = session,
+			claudeProjectDir = session,
+			environment = {},
+			expectFailure = false,
+		} = {},
 	) {
 		const env = { ...process.env, ...environment };
 		if (claudeProjectDir === null) delete env.CLAUDE_PROJECT_DIR;
 		else env.CLAUDE_PROJECT_DIR = claudeProjectDir;
-		return execFileSync(process.execPath, [script], {
-			encoding: "utf8",
-			env,
-			input: JSON.stringify(payload({ command, cwd: payloadCwd })),
-		}).trim();
+		try {
+			return execFileSync(process.execPath, [script], {
+				encoding: "utf8",
+				env,
+				input: JSON.stringify({
+					...payload({ command, cwd: payloadCwd }),
+					session_id: "fixture-session",
+				}),
+			}).trim();
+		} catch (error) {
+			if (!expectFailure) throw error;
+			assert.equal(error.status, 2);
+			assert.match(error.stdout, /"permissionDecision":"deny"/);
+			return error.stdout.trim();
+		}
 	}
 
 	it("stays silent on an unrelated repository's main while still guarding a sibling (#1221)", () => {
@@ -1277,18 +1526,18 @@ describe("main-commit-guard wrapper", () => {
 		// the grounds that nothing distinguishes it.
 		const output = runWrapper(`git -C ${repo} add -A`, {
 			claudeProjectDir: join(root, "no-such-session-dir"),
+			expectFailure: true,
 		});
 		assert.match(output, /"permissionDecision":"deny"/);
 	});
 
-	it("stays silent when the target is not a git repository at all (#1221)", () => {
-		// The git-is-broken shape: no roots *and* no branch. The branch-name
-		// rule cannot fire without a branch, so this allows — which is what the
-		// guard did before #1221 too. Recorded so the prose describing
-		// `unknown` is not read as covering this case.
+	it("denies when a mutation target cannot establish a repository (#1404)", () => {
 		const notARepo = join(root, "not-a-repo");
 		mkdirSync(notARepo, { recursive: true });
-		assert.equal(runWrapper(`git -C ${notARepo} add -A`), "");
+		assert.match(
+			runWrapper(`git -C ${notARepo} add -A`, { expectFailure: true }),
+			/"permissionDecision":"deny"/,
+		);
 	});
 
 	it("uses the payload cwd as the session worktree in Codex (#784)", () => {
@@ -1303,23 +1552,25 @@ describe("main-commit-guard wrapper", () => {
 	});
 
 	it("guards the explicit wrapper target instead of invisible exec workdir", () => {
-		const routine = "/Users/example/.codex/bin/codex-git-routine.mjs";
-		for (const [target, branch, expected] of [
-			[sibling, "sibling", "deny"],
-			[repo, "main", "deny"],
-			[session, "session", null],
-		]) {
-			const output = runWrapper(`${routine} stage-all ${target} ${branch}`, {
-				claudeProjectDir: null,
-			});
-			if (expected === null) assert.equal(output, "");
-			else
-				assert.equal(
-					JSON.parse(output).hookSpecificOutput.permissionDecision,
-					expected,
-					target,
+		const routine = "/opt/codex/bin/codex-git-routine.mjs";
+		for (const launcher of ["", "node ", "node --no-warnings ", "node -- "])
+			for (const [target, branch, expected] of [
+				[sibling, "sibling", "deny"],
+				[repo, "main", "deny"],
+				[session, "session", null],
+			]) {
+				const output = runWrapper(
+					`${launcher}${routine} stage-all ${target} ${branch}`,
+					{ claudeProjectDir: null },
 				);
-		}
+				if (expected === null) assert.equal(output, "");
+				else
+					assert.equal(
+						JSON.parse(output).hookSpecificOutput.permissionDecision,
+						expected,
+						`${launcher}${target}`,
+					);
+			}
 	});
 
 	it("converts an unsupported Codex ask into a fail-closed deny", () => {
@@ -1381,7 +1632,7 @@ describe("main-commit-guard wrapper", () => {
 		assert.equal(claudeStillWins, "");
 	});
 
-	it("denies a guarded mutation when ambient Git target variables point at a sibling", () => {
+	it("asks about a guarded mutation when ambient Git target variables point at a sibling", () => {
 		const output = runWrapper("git add -A", {
 			environment: {
 				GIT_DIR: git(sibling, ["rev-parse", "--git-dir"]),
@@ -1391,7 +1642,7 @@ describe("main-commit-guard wrapper", () => {
 		assert.notEqual(output, "");
 		assert.equal(
 			JSON.parse(output).hookSpecificOutput.permissionDecision,
-			"deny",
+			"ask",
 		);
 
 		assert.equal(
@@ -1402,193 +1653,9 @@ describe("main-commit-guard wrapper", () => {
 		);
 	});
 
-	it("fails closed when CDPATH can redirect a relative cd", () => {
-		for (const command of [
-			`CDPATH=${root} cd sibling && git add -A`,
-			`export CDPATH=${root}; cd sibling && git add -A`,
-		]) {
-			const output = runWrapper(command);
-			assert.notEqual(output, "", command);
-			assert.equal(
-				JSON.parse(output).hookSpecificOutput.permissionDecision,
-				"deny",
-				command,
-			);
-		}
-
-		const ambient = runWrapper("cd sibling && git add -A", {
-			environment: { CDPATH: root },
-		});
-		assert.equal(
-			JSON.parse(ambient).hookSpecificOutput.permissionDecision,
-			"deny",
-		);
-
-		assert.equal(runWrapper(`CDPATH=${root} cd ${session} && git add -A`), "");
-		assert.equal(runWrapper("CDPATH= cd sibling && git add -A"), "");
-		assert.equal(
-			runWrapper("cd sibling && git status", { environment: { CDPATH: root } }),
-			"",
-		);
-	});
-
-	it("does not treat unset function options as clearing CDPATH", () => {
-		const blocked = runWrapper(
-			`CDPATH=${root}; unset -f CDPATH; cd sibling; git add -A`,
-		);
-		assert.notEqual(blocked, "");
-		assert.equal(
-			JSON.parse(blocked).hookSpecificOutput.permissionDecision,
-			"deny",
-		);
-
-		for (const command of [
-			`CDPATH=${root}; unset CDPATH; cd sibling; git add -A`,
-			`CDPATH=${root}; unset -v CDPATH; cd sibling; git add -A`,
-			`CDPATH=${root}; unset -- CDPATH; cd sibling; git add -A`,
-		]) {
-			assert.equal(runWrapper(command), "", command);
-		}
-	});
-
-	it("fails closed after cwd-changing control flow the parser cannot model", () => {
-		for (const command of [
-			`cd ${repo} || cd ${session}; git add -A`,
-			`cd ${repo}; cd ${session} | cat; git add -A`,
-			`cd ${repo}; (cd ${session}); git add -A`,
-			`cd ${repo}; cd ${session} & git add -A`,
-			`cd ${repo} && cd ${session}; git add -A`,
-		]) {
-			const output = runWrapper(command);
-			assert.notEqual(output, "", command);
-			assert.equal(
-				JSON.parse(output).hookSpecificOutput.permissionDecision,
-				"deny",
-				command,
-			);
-		}
-
-		assert.equal(runWrapper(`cd ${session} && git add -A`), "");
-		assert.equal(runWrapper(`cd ${repo} || cd ${session}; git status`), "");
-		assert.equal(runWrapper(`cd ${session} && git add -A; echo done`), "");
-		assert.equal(runWrapper("git add -A; false || echo later"), "");
-	});
-
-	it("decodes literal escapes and fails closed for dynamic protected setters", () => {
-		for (const command of [
-			`g\\it -C ${repo} add -A`,
-			`GIT\\_DIR=${join(repo, ".git")} g\\it add -A`,
-			'export "$d=/override"; git add -A',
-			'printf -v "$d" %s /override; git add -A',
-			'read "$n"; git add -A',
-		]) {
-			const output = runWrapper(command);
-			assert.notEqual(output, "", command);
-			assert.equal(
-				JSON.parse(output).hookSpecificOutput.permissionDecision,
-				"deny",
-				command,
-			);
-		}
-	});
-
-	it("parses read options before deciding which operands set state", () => {
-		assert.equal(runWrapper("read -p CDPATH REPLY; git add -A"), "");
-		for (const command of ["read -p; git add -A", 'read "$n"; git add -A']) {
-			const output = runWrapper(command);
-			assert.notEqual(output, "", command);
-			assert.equal(
-				JSON.parse(output).hookSpecificOutput.permissionDecision,
-				"deny",
-				command,
-			);
-		}
-	});
-
-	it("does not unexport ambient Git targets after export option termination", () => {
-		const output = runWrapper(
-			"export -- -n GIT_DIR GIT_WORK_TREE; git add -A",
-			{
-				environment: {
-					GIT_DIR: join(sibling, ".git"),
-					GIT_WORK_TREE: sibling,
-				},
-			},
-		);
-		assert.notEqual(output, "");
-		assert.equal(
-			JSON.parse(output).hookSpecificOutput.permissionDecision,
-			"deny",
-		);
-	});
-
-	it("treats read array output variables as protected setters", () => {
-		for (const command of [
-			"read -a CDPATH <<< x; cd sibling; git add -A",
-			"read -aCDPATH <<< x; cd sibling; git add -A",
-			'read -a"$name" <<< x; cd sibling; git add -A',
-		]) {
-			const output = runWrapper(command);
-			assert.notEqual(output, "", command);
-			assert.equal(
-				JSON.parse(output).hookSpecificOutput.permissionDecision,
-				"deny",
-				command,
-			);
-		}
-	});
-
-	it("does not clear protected state through conflicting unset or export options", () => {
-		for (const command of [
-			`CDPATH=${root}; unset -f -v CDPATH; cd sibling; git add -A`,
-			`export GIT_NAMESPACE; export -n -f GIT_NAMESPACE; printf -v GIT_NAMESPACE %s /override; git add -A`,
-		]) {
-			const output = runWrapper(command);
-			assert.notEqual(output, "", command);
-			assert.equal(
-				JSON.parse(output).hookSpecificOutput.permissionDecision,
-				"deny",
-				command,
-			);
-		}
-	});
-
-	it("fails closed after brace and reserved compounds", () => {
-		for (const command of [
-			`{ cd ${session}; }; git add -A`,
-			`if true; then cd ${session}; fi; git add -A`,
-		]) {
-			const output = runWrapper(command);
-			assert.notEqual(output, "", command);
-			assert.equal(
-				JSON.parse(output).hookSpecificOutput.permissionDecision,
-				"deny",
-				command,
-			);
-		}
-	});
-
 	it("only treats reserved words in command position as compounds", () => {
 		assert.equal(runWrapper("git commit -m if"), "");
 		assert.equal(runWrapper("echo if; git add -A"), "");
-	});
-
-	it("parses clustered read options before protected variable operands", () => {
-		for (const command of [
-			"read -rp CDPATH REPLY <<< x; cd .; git add -A",
-			"read -pCDPATH REPLY <<< x; cd .; git add -A",
-		]) {
-			assert.equal(runWrapper(command), "", command);
-		}
-	});
-
-	it("recognizes printf setters only in its option phase", () => {
-		for (const command of [
-			"export GIT_NAMESPACE; printf -- -v GIT_NAMESPACE; git add -A",
-			"export GIT_NAMESPACE; printf %s -v GIT_NAMESPACE; git add -A",
-		]) {
-			assert.equal(runWrapper(command), "", command);
-		}
 	});
 
 	it("removes unquoted backslash-newline continuations", () => {
@@ -1611,175 +1678,18 @@ describe("main-commit-guard wrapper", () => {
 		);
 	});
 
-	it("preserves Git export state across assignment-only segments", () => {
-		assert.equal(runWrapper("GIT_NAMESPACE=/override; git add -A"), "");
-		assert.equal(runWrapper("GIT_NAMESPACE= git add -A"), "");
-	});
-
 	it("does not taint control flow without target-affecting commands", () => {
 		for (const command of [
 			"printf x | cat; git add -A",
 			"test -f package.json && printf ok; git add -A",
-			`printf x | cat; cd ${session}; git add -A`,
+			`printf x | cat; git -C ${session} add -A`,
 		]) {
 			assert.equal(runWrapper(command), "", command);
 		}
 	});
-
-	it("fails closed when read makes CDPATH dynamically unknown", () => {
-		const output = runWrapper(
-			`read -r CDPATH <<< ${root}; cd sibling; git add -A`,
-		);
-		assert.notEqual(output, "");
-		assert.equal(
-			JSON.parse(output).hookSpecificOutput.permissionDecision,
-			"deny",
-		);
-
-		assert.equal(
-			runWrapper(`read -r CDPATH <<< ${root}; cd ${session}; git add -A`),
-			"",
-		);
-		assert.equal(
-			runWrapper(`read -r CDPATH <<< ${root}; cd sibling; git status`),
-			"",
-		);
-	});
-
-	it("fails closed when printf -v writes exported Git targets", () => {
-		const output = runWrapper(
-			`export GIT_DIR GIT_WORK_TREE; printf -v GIT_DIR %s ${join(sibling, ".git")}; printf -v GIT_WORK_TREE %s ${sibling}; git add -A`,
-		);
-		assert.notEqual(output, "");
-		assert.equal(
-			JSON.parse(output).hookSpecificOutput.permissionDecision,
-			"deny",
-		);
-
-		assert.equal(
-			runWrapper(
-				`export GIT_DIR GIT_WORK_TREE; printf -v GIT_DIR %s ${join(sibling, ".git")}; printf -v GIT_WORK_TREE %s ${sibling}; git status`,
-			),
-			"",
-		);
-	});
-
-	it("fails closed when dynamic builtins write protected state", () => {
-		for (const variable of [
-			"GIT_DIR",
-			"GIT_WORK_TREE",
-			"GIT_INDEX_FILE",
-			"GIT_COMMON_DIR",
-			"GIT_OBJECT_DIRECTORY",
-			"GIT_ALTERNATE_OBJECT_DIRECTORIES",
-			"GIT_NAMESPACE",
-		]) {
-			const output = runWrapper(
-				`export ${variable}; read -r ${variable} <<< /override; git add -A`,
-			);
-			assert.notEqual(output, "", variable);
-			assert.equal(
-				JSON.parse(output).hookSpecificOutput.permissionDecision,
-				"deny",
-				variable,
-			);
-		}
-
-		for (const command of [
-			"source guard-state.sh; git add -A",
-			". guard-state.sh; git add -A",
-			"eval guard_state; git add -A",
-		]) {
-			const output = runWrapper(command);
-			assert.notEqual(output, "", command);
-			assert.equal(
-				JSON.parse(output).hookSpecificOutput.permissionDecision,
-				"deny",
-				command,
-			);
-		}
-
-		assert.equal(runWrapper("source guard-state.sh; git status"), "");
-	});
-
-	it("recovers only after protected state is literally cleared", () => {
-		const targetVariables = [
-			"GIT_DIR",
-			"GIT_WORK_TREE",
-			"GIT_INDEX_FILE",
-			"GIT_COMMON_DIR",
-			"GIT_OBJECT_DIRECTORY",
-			"GIT_ALTERNATE_OBJECT_DIRECTORIES",
-			"GIT_NAMESPACE",
-		].join(" ");
-		assert.equal(
-			runWrapper(
-				`source guard-state.sh; unset CDPATH ${targetVariables}; cd .; git add -A`,
-			),
-			"",
-		);
-		const unsafeCdPath = runWrapper("cd sibling; git add -A", {
-			environment: { CDPATH: root },
-		});
-		assert.notEqual(unsafeCdPath, "");
-		assert.equal(
-			runWrapper("unset CDPATH; cd sibling; git add -A", {
-				environment: { CDPATH: root },
-			}),
-			"",
-		);
-		assert.equal(
-			runWrapper("CDPATH=; cd sibling; git add -A", {
-				environment: { CDPATH: root },
-			}),
-			"",
-		);
-	});
-
-	it("distinguishes Git export state from CDPATH shell state", () => {
-		assert.equal(runWrapper("export GIT_DIR; git add -A"), "");
-		assert.equal(
-			runWrapper(
-				`export -n GIT_DIR; printf -v GIT_DIR %s ${join(sibling, ".git")}; git add -A`,
-			),
-			"",
-		);
-		const output = runWrapper("export -n CDPATH; cd sibling; git add -A", {
-			environment: { CDPATH: root },
-		});
-		assert.notEqual(output, "");
-		assert.equal(
-			JSON.parse(output).hookSpecificOutput.permissionDecision,
-			"deny",
-		);
-	});
-
-	it("recovers each concrete ambient Git target independently", () => {
-		assert.equal(
-			runWrapper("unset GIT_NAMESPACE; git add -A", {
-				environment: { GIT_NAMESPACE: "/x" },
-			}),
-			"",
-		);
-		const blocked = runWrapper("unset GIT_NAMESPACE; git add -A", {
-			environment: { GIT_DIR: "/override", GIT_NAMESPACE: "/x" },
-		});
-		assert.notEqual(blocked, "");
-		assert.equal(
-			JSON.parse(blocked).hookSpecificOutput.permissionDecision,
-			"deny",
-		);
-		assert.equal(
-			runWrapper("git add -A", { environment: { GIT_NAMESPACE: "" } }),
-			"",
-		);
-	});
-
 	it("catches compound and repeated-C sibling mutations end to end (#784)", () => {
 		for (const command of [
-			`git add -A && cd ${sibling} && git add -A`,
-			`cd -- ${sibling} && git add -A`,
-			`cd ${sibling} >/dev/null && git add -A`,
+			`git -C ${session} add -A && git -C ${sibling} add -A`,
 			`git add -A && git -C ${sibling} add -A`,
 			`git -C ${session} -C ../sibling add -A`,
 		]) {
@@ -1793,9 +1703,9 @@ describe("main-commit-guard wrapper", () => {
 		}
 	});
 
-	it("fails closed when cd requires shell expansion", () => {
+	it("asks when cd requires shell expansion", () => {
 		for (const [command, decision] of [
-			[`SIBLING=${sibling}; cd "$SIBLING" && git add -A`, "deny"],
+			[`SIBLING=${sibling}; cd "$SIBLING" && git add -A`, "ask"],
 			[`SIBLING=${sibling}; cd "$SIBLING" && git restore tracked.txt`, "ask"],
 		]) {
 			const output = runWrapper(command);
@@ -1804,19 +1714,18 @@ describe("main-commit-guard wrapper", () => {
 			assert.equal(result.permissionDecision, decision, command);
 			assert.match(
 				result.permissionDecisionReason,
-				/literal path or harness workdir/,
+				/absolute literal path.*separate invocation with harness workdir/,
 				command,
 			);
 		}
 	});
 
-	it("fails closed for cwd-changing shell builtins the parser cannot model", () => {
+	it("asks for cwd-changing shell builtins the parser cannot model", () => {
 		for (const [command, decision] of [
-			[`builtin cd "${sibling}" && git add -A`, "deny"],
-			// `command cd` resolves to a literal target, so it lands on the
-			// cross-worktree ask rather than the unresolved-cwd deny (#1201).
+			[`builtin cd "${sibling}" && git add -A`, "ask"],
+			// Cwd-changing builtins require an explicit target regardless of wrapper.
 			[`command cd "${sibling}" && git add -A`, "ask"],
-			[`pushd "${sibling}" && git add -A`, "deny"],
+			[`pushd "${sibling}" && git add -A`, "ask"],
 			["popd && git restore tracked.txt", "ask"],
 		]) {
 			const output = runWrapper(command);
@@ -1829,12 +1738,12 @@ describe("main-commit-guard wrapper", () => {
 		}
 	});
 
-	it("tracks env chdir prefixes and fails closed for unresolved forms", () => {
+	it("tracks env chdir prefixes and asks on unsupported forms", () => {
 		for (const [command, decision] of [
 			[`env -C ${repo} git add -A`, "deny"],
 			[`env --chdir=${sibling} git add -A`, "ask"],
-			['WORKTREE=/somewhere; env -C "$WORKTREE" git add -A', "deny"],
-			["env --chdir= git add -A", "deny"],
+			['WORKTREE=/somewhere; env -C "$WORKTREE" git add -A', "ask"],
+			["env --chdir= git add -A", "ask"],
 		]) {
 			const output = runWrapper(command);
 			assert.notEqual(output, "", command);
@@ -1846,7 +1755,7 @@ describe("main-commit-guard wrapper", () => {
 		}
 	});
 
-	it("fails closed when Git environment variables override the target", () => {
+	it("asks when Git environment variables override the target", () => {
 		for (const variable of [
 			"GIT_DIR",
 			"GIT_WORK_TREE",
@@ -1864,14 +1773,14 @@ describe("main-commit-guard wrapper", () => {
 				assert.notEqual(output, "", command);
 				assert.equal(
 					JSON.parse(output).hookSpecificOutput.permissionDecision,
-					"deny",
+					"ask",
 					command,
 				);
 			}
 		}
 	});
 
-	it("fails closed after a shell builtin persists a Git target override", () => {
+	it("asks after a shell builtin persists a Git target override", () => {
 		for (const command of [
 			`export GIT_INDEX_FILE=${join(repo, ".git", "index")}; git add -A`,
 			`export GIT_DIR=${join(repo, ".git")} GIT_WORK_TREE=${repo}; git add -A`,
@@ -1883,7 +1792,7 @@ describe("main-commit-guard wrapper", () => {
 			assert.notEqual(output, "", command);
 			assert.equal(
 				JSON.parse(output).hookSpecificOutput.permissionDecision,
-				"deny",
+				"ask",
 				command,
 			);
 		}
@@ -1894,8 +1803,8 @@ describe("main-commit-guard wrapper", () => {
 
 	it("does not let Git repository-target flags or shell prefixes bypass sibling checks", () => {
 		for (const [command, decision] of [
-			[`git --git-dir=${join(repo, ".git")} add -A`, "deny"],
-			[`git --work-tree=${repo} add -A`, "deny"],
+			[`git --git-dir=${join(repo, ".git")} add -A`, "ask"],
+			[`git --work-tree=${repo} add -A`, "ask"],
 			[`command -- git -C ${sibling} add -A`, "ask"],
 			[`sudo -n git -C ${sibling} add -A`, "ask"],
 			[`>/dev/null git -C ${sibling} add -A`, "ask"],
@@ -1951,7 +1860,7 @@ describe("main-commit-guard wrapper", () => {
 		for (const [command, decision] of [
 			[`sudo -u root git -C ${sibling} add -A`, "ask"],
 			[`sudo --user=root git -C ${sibling} add -A`, "ask"],
-			["sudo -R /jail git add -A", "deny"],
+			["sudo -R /jail git add -A", "ask"],
 			[`time -o /tmp/time-output git -C ${sibling} add -A`, "ask"],
 		]) {
 			const output = runWrapper(command);
@@ -1964,7 +1873,7 @@ describe("main-commit-guard wrapper", () => {
 		}
 	});
 
-	it("fails closed when unknown shell-prefix options may hide guarded Git", () => {
+	it("asks when unknown shell-prefix options may hide guarded Git", () => {
 		for (const command of [
 			`sudo --unknown value git -C ${sibling} add -A`,
 			`time --unknown value git -C ${sibling} add -A`,
@@ -1973,7 +1882,7 @@ describe("main-commit-guard wrapper", () => {
 			assert.notEqual(output, "", command);
 			assert.equal(
 				JSON.parse(output).hookSpecificOutput.permissionDecision,
-				"deny",
+				"ask",
 				command,
 			);
 		}

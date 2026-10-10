@@ -1,7 +1,167 @@
 import assert from "node:assert/strict";
+import { execFileSync, spawnSync } from "node:child_process";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { describe, it } from "node:test";
-import { findOutwardCommand, splitCommandFlow } from "./delegation-guard.mjs";
+import {
+	evaluateDelegationGuard,
+	findOutwardCommand,
+	splitCommandFlow,
+} from "./delegation-guard.mjs";
 import { evaluateMainCommitGuard } from "./main-commit-guard.mjs";
+
+describe("opaque command selectors and executable prefixes", () => {
+	for (const command of [
+		'op=update-ref; git "$op" refs/heads/main HEAD',
+		'git -C /repo "$OP" refs/heads/main HEAD',
+		"git --$OPTION status",
+		'group=pr; verb=merge; gh "$group" "$verb" 123',
+		'gh -R "$REPO" pr "$VERB" 123',
+		'gh api "$ENDPOINT" -X PUT',
+		'gh api -X PUT "$ENDPOINT"',
+		'gh api graphql -f query="$QUERY"',
+		'/usr/bin/gh pr "$VERB" 123',
+		'EMPTY=""; gh -R"$EMPTY" owner/repo pr merge 123',
+		'EMPTY=""; env -u"$EMPTY" UNUSED git update-ref refs/heads/main HEAD',
+		'EMPTY=""; git -c"$EMPTY" x=y update-ref refs/heads/main HEAD',
+		'EMPTY=""; exec -a"$EMPTY" dummy gh pr merge 123',
+		'EMPTY=""; sudo -u"$EMPTY" user gh pr merge 123',
+		'EMPTY=""; time -f"$EMPTY" format gh pr merge 123',
+		'EMPTY=""; gh pr merge -b"$EMPTY" --help',
+		'gh -R"$REPO" pr view "$NUMBER"',
+		`args=(owner/repo pr merge 123); gh -R "\${args[@]}"`,
+		`args=(UNUSED git update-ref refs/heads/main HEAD); env -u "\${args[@]}"`,
+		`args=(x=y update-ref refs/heads/main HEAD); git -c "\${args[@]}"`,
+		'gh -R "$@"',
+		"env -u $OPTIONS",
+		"git -c $OPTIONS status",
+		"env -S 'git commit -m x'",
+		"env --split-string='gh pr merge 123'",
+		"env -Sgit update-ref refs/heads/main HEAD",
+		"env --ignore-signal=PIPE gh api -X PUT repos/O/R/pulls/123/merge",
+		"env --ignore-signal=PIPE git update-ref refs/heads/main HEAD",
+		'env "$OPTIONS" git commit -m x',
+		"gh land 123",
+		"gh land --help",
+		"gh co 123",
+		"gh help",
+		"gh help pr",
+		"gh -R owner/repo land 123",
+		"gh pr land 123",
+		"gh pr -R owner/repo land 123",
+		"gh repo autolink land 123",
+		"env GH_CONFIG_DIR=/tmp/other-gh gh pr land 123",
+		"gh alias set land 'pr merge'; gh land 123",
+	]) {
+		it(`asks on Claude and denies on Codex for unresolved invocation: ${command}`, () => {
+			const payload = { tool_name: "Bash", tool_input: { command } };
+			assert.equal(
+				evaluateDelegationGuard(payload, { supportsAsk: false }).decision,
+				"deny",
+			);
+			assert.equal(
+				evaluateDelegationGuard(
+					{ ...payload, agent_id: "child" },
+					{ supportsAsk: false },
+				).decision,
+				"deny",
+			);
+			assert.equal(
+				evaluateMainCommitGuard(payload, { currentBranch: "main" }).decision,
+				"ask",
+			);
+		});
+	}
+	it("recognizes nohup's option terminator and actual shell command positions", () => {
+		for (const command of [
+			"nohup -- git commit -m x",
+			"exec git commit -m x",
+			"if git commit -m x; then :; fi",
+		]) {
+			const payload = { tool_name: "Bash", tool_input: { command } };
+			assert.equal(
+				evaluateDelegationGuard(
+					{ ...payload, agent_id: "child" },
+					{ supportsAsk: false },
+				).decision,
+				"deny",
+				command,
+			);
+			assert.equal(
+				evaluateMainCommitGuard(payload, { currentBranch: "main" }).decision,
+				"deny",
+				command,
+			);
+		}
+	});
+	it("keeps ordinary dynamic option values and literal read commands usable", () => {
+		for (const command of [
+			'git log -1 --format="$FORMAT"',
+			'git --config-env=core.pager="$PAGER_ENV" log -1',
+			'git -c "user.name=$NAME" log -1',
+			'gh -R "$REPO" pr view "$NUMBER"',
+			'gh --repo="$REPO" pr view "$NUMBER"',
+			"env -i nohup -- git status",
+			"env -u UNUSED git status",
+			'gh pr create --title "$TITLE" --body "$BODY"',
+			"gh pr view 123 --repo owner/repo",
+			"gh pr ls --repo owner/repo",
+			"gh pr co 123",
+			"gh repo autolink list",
+			"gh repo autolink -R owner/repo list",
+			"gh cs ports forward 3000:3000",
+			"gh cs ports -c my-codespace",
+			"gh alias list",
+			"gh pr --help",
+			"gh --help",
+			"gh --version",
+		]) {
+			const payload = { tool_name: "Bash", tool_input: { command } };
+			assert.equal(evaluateDelegationGuard(payload).decision, "allow", command);
+		}
+	});
+});
+
+describe("GitHub CLI alias execution oracle", () => {
+	const ghAvailable = spawnSync("gh", ["--version"]).status === 0;
+	it("asks about root and nested aliases that the real CLI executes", {
+		skip: !ghAvailable && "gh is not installed",
+	}, () => {
+		const scratch = mkdtempSync(join(tmpdir(), "pfdsl-gh-alias-oracle-"));
+		try {
+			writeFileSync(
+				join(scratch, "config.yml"),
+				"aliases:\n  land: '!printf root-alias'\n  pr land: '!printf nested-alias'\n  repo autolink land: '!printf deep-alias'\n  help: '!printf help-alias'\n",
+			);
+			for (const [args, output] of [
+				[["land"], "root-alias"],
+				[["pr", "land"], "nested-alias"],
+				[["repo", "autolink", "land"], "deep-alias"],
+				[["help"], "help-alias"],
+			]) {
+				assert.equal(
+					execFileSync("gh", args, {
+						cwd: scratch,
+						env: { ...process.env, GH_CONFIG_DIR: scratch },
+						encoding: "utf8",
+						timeout: 5000,
+					}),
+					output,
+				);
+				assert.equal(
+					evaluateDelegationGuard({
+						tool_name: "Bash",
+						tool_input: { command: `gh ${args.join(" ")}` },
+					}).decision,
+					"ask",
+				);
+			}
+		} finally {
+			rmSync(scratch, { recursive: true, force: true });
+		}
+	});
+});
 
 describe("heredoc command boundaries", () => {
 	for (const delimiter of ["EOF", "'EOF'", '"EOF"', "E'O'F", "\\EOF"]) {
@@ -25,7 +185,10 @@ describe("heredoc command boundaries", () => {
 			),
 			null,
 		);
-		assert.equal(findOutwardCommand("cat <<'EOF'\ngit push"), null);
+		assert.equal(
+			findOutwardCommand("cat <<'EOF'\ngit push"),
+			"unsupported shell syntax",
+		);
 	});
 	it("still inspects real commands after and on the heredoc header", () => {
 		assert.equal(
@@ -52,20 +215,23 @@ describe("heredoc command boundaries", () => {
 		);
 	});
 	it("does not hide scripts passed to shell stdin", () => {
-		assert.equal(findOutwardCommand("bash <<'EOF'\ngit push\nEOF"), "git push");
+		assert.equal(
+			findOutwardCommand("bash <<'EOF'\ngit push\nEOF"),
+			"unsupported shell syntax",
+		);
 		assert.equal(
 			findOutwardCommand("sudo env sh <<'EOF'\ngit push\nEOF"),
-			"git push",
+			"unsupported shell syntax",
 		);
 		assert.equal(
 			findOutwardCommand("bash --rcfile -c <<'EOF'\ngit push\nEOF"),
-			"git push",
+			"unsupported shell syntax",
 		);
 	});
 	it("handles delimiter continuation, quoted backslashes and literal-dollar delimiters", () => {
 		assert.equal(
 			findOutwardCommand("cat <<EOF\ndata\nEO\\\nF\ngit push"),
-			"git push",
+			"unsupported shell syntax",
 		);
 		assert.equal(
 			findOutwardCommand('cat <<"\\EOF"\ndata\n\\EOF\ngit push'),
@@ -73,7 +239,7 @@ describe("heredoc command boundaries", () => {
 		);
 		assert.equal(
 			findOutwardCommand("cat <<$END\ndata\n$END\ngit push"),
-			"git push",
+			"unsupported shell syntax",
 		);
 	});
 	it("does not hide commands after ANSI-C quoted delimiters", () => {
@@ -83,11 +249,11 @@ describe("heredoc command boundaries", () => {
 		);
 		assert.equal(
 			findOutwardCommand("cat <<$'\\x45OF'\ndata\nEOF\ngit push"),
-			"git push",
+			"unsupported shell syntax",
 		);
 		assert.equal(
 			findOutwardCommand("cat <<$'\\400'\ndata\n\ngit push"),
-			"git push",
+			"unsupported shell syntax",
 		);
 		assert.equal(
 			findOutwardCommand("cat <<EO\\\nF\n$(git push)\nEOF"),
@@ -173,7 +339,7 @@ describe("gh invocation effects", () => {
 			assert.notEqual(findOutwardCommand(command), null));
 	for (const command of [
 		"gh workflow disable --help",
-		"gh help workflow",
+		"gh workflow --help",
 		"gh search issues foo",
 		"gh search code foo",
 		"gh run watch 123",
@@ -220,3 +386,20 @@ describe("gh invocation effects", () => {
 		);
 	});
 });
+
+for (const command of ["echo $[1<<2]\ngit push"]) {
+	it(`asks about unsupported document syntax: ${JSON.stringify(command)}`, () =>
+		assert.equal(
+			evaluateMainCommitGuard(
+				{ tool_name: "Bash", tool_input: { command } },
+				{ currentBranch: "main" },
+			).decision,
+			"ask",
+		));
+}
+
+it("does not turn literal text in a substitution heredoc into an executable command", () =>
+	assert.equal(findOutwardCommand("echo $(cat <<b)\ngit push\nb"), null));
+
+it("keeps literal text in a backtick heredoc as data", () =>
+	assert.equal(findOutwardCommand("x=`cat <<b`\ngit push\nb"), null));

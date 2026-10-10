@@ -24,10 +24,27 @@
 // delegation returns.
 
 import { basename } from "node:path";
-
-import { parseGhCommand } from "./gh-command.mjs";
+import {
+	findMergeCommand,
+	ghApiMethod,
+	githubToolEffect,
+	mergeDecision,
+} from "./external-operation-policy.mjs";
+import {
+	ghCommandSelectorTokens,
+	isBuiltinGhCommand,
+	parseGhCommand,
+} from "./gh-command.mjs";
 import { buildPermissionOutput, parseHookPayload } from "./hook-io.mjs";
-import { prepareHeredocs } from "./shell-heredoc.mjs";
+import {
+	classifyCodexGitRoutine,
+	isReadOnlyGitInvocation,
+} from "./shared-git-effects.mjs";
+import {
+	executableName,
+	readShellCommands,
+	shellParseDecision as syntaxDecision,
+} from "./shell-commands.mjs";
 
 /** Agents permitted to perform outward-facing actions. Publishing is their job. */
 export const DEFAULT_ALLOWED_AGENTS = ["issue-worker"];
@@ -66,6 +83,7 @@ const BUILTIN_GH_GROUPS = new Set([
 	"completion",
 ]);
 const GH_BOOLEAN_FLAGS = new Set([
+	"--comments",
 	"--draft",
 	"--fill",
 	"--fill-first",
@@ -253,7 +271,7 @@ const GH_COMMAND_HELP_FLAGS = {
 	},
 };
 
-function hasHelpOption(parsed) {
+export function hasHelpOption(parsed) {
 	if (!BUILTIN_GH_GROUPS.has(parsed.group)) return false;
 	// `extension exec` forwards the remaining argv to arbitrary extension code.
 	if (parsed.group === "extension" && parsed.verb === "exec") return false;
@@ -304,200 +322,92 @@ export const GIT_GLOBAL_FLAGS_WITH_VALUE = new Set([
 	"--attr-source",
 ]);
 
-const readsStdinFile = (tokens, flags) =>
-	tokens.some(
-		({ value }, i) =>
-			(flags.includes(value) && tokens[i + 1]?.value === "-") ||
-			flags.some((flag) => value === `${flag}=-`),
-	);
+// Compatibility helper for consumers that inspect a standalone word list.
+// Production guards consume the parser's structured commands directly.
+export function tokenize(source) {
+	return readShellCommands(source)[0]?.tokens ?? [];
+}
 
-/** Commands that read stdin only as data, never as a program. */
-const STDIN_DATA_READERS = {
-	cat: () => true,
-	tee: () => true,
-	git: (tokens) =>
-		["commit", "tag"].includes(gitSubcommand(tokens)) &&
-		readsStdinFile(tokens, ["-F", "--file"]),
-	// Only where gh itself reads the body: an alias may run a shell.
-	gh: (tokens) => {
-		const group = parseGhCommand(tokens)?.group;
-		return ["issue", "pr"].includes(group)
-			? readsStdinFile(tokens, ["--body-file", "-F"])
-			: group === "api" && readsStdinFile(tokens, ["--input"]);
-	},
-};
+export function splitCommandFlow(source) {
+	return readShellCommands(source);
+}
 
-/**
- * Whether every command that reads the heredocs opened on `header` is a known
- * data reader: the command carrying `<<` and the pipeline it feeds. Anything
- * else may run the body: a header that continues past the body, or one with a
- * process or command substitution, whose program can receive a reader's output.
- */
-function isDataReader(header) {
-	if (/(?:\|\|?|&&|\\)\s*$/.test(header)) return false;
-	let reading = false;
-	for (const { command: segment, separatorBefore } of splitCommandFlow(
-		header,
-	)) {
-		if (separatorBefore === "(") return false;
-		reading = segment.includes("<<") || (reading && separatorBefore === "|");
-		if (!reading) continue;
-		const raw = tokenize(segment);
-		const prefix = parseLeadingShellPrefix(raw);
-		const tokens = raw.slice(prefix.end);
-		const reader = STDIN_DATA_READERS[basename(tokens[0]?.value ?? "")];
-		if (prefix.unresolved || !reader?.(tokens)) return false;
+export function splitSegments(source) {
+	return readShellCommands(source).map(({ command }) => command);
+}
+
+/** Grammar and executable-prefix checks are shared by every Bash guard. */
+export function shellParseDecision(command, { supportsAsk = true } = {}) {
+	const failure = syntaxDecision(command, { supportsAsk });
+	if (failure) return failure;
+	const decision = supportsAsk ? "ask" : "deny";
+	const ambiguousWord = (token) =>
+		token.multipleWords || (token.dynamic && /^-[^-]/.test(token.value));
+	for (const { tokens } of readShellCommands(command)) {
+		const { end, unresolved } = parseLeadingShellPrefix(tokens);
+		if (unresolved || tokens.slice(0, end).some(ambiguousWord))
+			return {
+				decision,
+				matched: "shell prefix",
+				reason:
+					"Cannot inspect this executable prefix. Use supported literal options or run the command separately.",
+			};
+		const executable = tokens[end];
+		const builtinName =
+			executable?.value === "builtin"
+				? tokens[end + (tokens[end + 1]?.value === "--" ? 2 : 1)]
+				: null;
+		if (executable?.dynamic || builtinName?.dynamic)
+			return {
+				decision,
+				matched: "shell executable",
+				reason:
+					"Cannot inspect a dynamic executable. Rewrite it using a literal command name.",
+			};
+		const invocation = tokens.slice(end);
+		if (invocation.length)
+			invocation[0] = {
+				...invocation[0],
+				value: executableName(invocation[0].value),
+			};
+		if (
+			["git", "gh"].includes(invocation[0]?.value) &&
+			invocation.some(ambiguousWord)
+		)
+			return {
+				decision,
+				matched: "command words",
+				reason:
+					"Cannot inspect argument expansion that may change command words. Use separate options with quoted scalar values and literal command selectors.",
+			};
+		const selectors =
+			invocation[0]?.value === "git"
+				? [invocation[gitSubcommandIndex(invocation)]]
+				: (ghCommandSelectorTokens(invocation) ?? []);
+		// API endpoints, methods and GraphQL fields can all encode a merge.
+		if (
+			selectors.some((token) => token?.dynamic) ||
+			(selectors[0]?.value === "api" &&
+				invocation.some((token) => token.dynamic))
+		)
+			return {
+				decision,
+				matched: "command selector",
+				reason:
+					"Cannot inspect a dynamic Git or GitHub command selector or API request. Use literal subcommands and API arguments.",
+			};
+		if (invocation[0]?.value === "gh" && !isBuiltinGhCommand(invocation))
+			return {
+				decision,
+				matched: "GitHub command name",
+				reason:
+					"Cannot inspect a GitHub CLI alias, extension, or unsupported command name. Use an explicit supported built-in gh command.",
+			};
 	}
-	return true;
+	return null;
 }
 
-// Split on shell separators that start a new command, ignoring separators
-// inside quotes. Quote tracking is what keeps `echo "git push"` from being
-// read as a push.
-//
-// Exported so other command-inspecting guards (main-commit-guard.mjs) reuse
-// this parsing instead of re-implementing quote/segment handling.
-export function splitCommandFlow(command) {
-	command = prepareHeredocs(command, { isDataReader });
-	const segments = [];
-	let current = "";
-	let quote = null;
-	let separatorBefore = null;
-	const split = (separator) => {
-		segments.push({ command: current, separatorBefore });
-		current = "";
-		separatorBefore = separator;
-	};
-	for (let i = 0; i < command.length; i++) {
-		const ch = command[i];
-		if (quote) {
-			if (ch === "\\" && quote === '"') {
-				if (command[i + 1] === "\n") {
-					i++;
-					continue;
-				}
-				current += ch + (command[i + 1] ?? "");
-				i++;
-				continue;
-			}
-			if (ch === quote) quote = null;
-			current += ch;
-			continue;
-		}
-		if (ch === '"' || ch === "'") {
-			quote = ch;
-			current += ch;
-			continue;
-		}
-		if (ch === "\\") {
-			if (command[i + 1] === "\n") {
-				i++;
-				continue;
-			}
-			current += ch;
-			if (command[i + 1] !== undefined) current += command[++i];
-			continue;
-		}
-		const two = command.slice(i, i + 2);
-		if (two === "&&" || two === "||") {
-			split(two);
-			i++;
-			continue;
-		}
-		if (ch === "&" && (command[i - 1] === "<" || command[i - 1] === ">")) {
-			current += ch;
-			continue;
-		}
-		if (ch === ";" || ch === "|" || ch === "&" || ch === "\n") {
-			split(ch);
-			continue;
-		}
-		if (ch === "(" || ch === ")") {
-			split(ch);
-			continue;
-		}
-		current += ch;
-	}
-	segments.push({ command: current, separatorBefore });
-	return segments;
-}
-
-export function splitSegments(command) {
-	return splitCommandFlow(command).map(({ command: segment }) => segment);
-}
-
-// Tokens are only inspected when unquoted, so a quoted argument can never be
-// mistaken for a subcommand.
-export function tokenize(segment) {
-	const tokens = [];
-	let current = "";
-	let quote = null;
-	let quoted = false;
-	let tokenQuote;
-	let hasUnquotedText = false;
-	const flush = () => {
-		if (current !== "" || quoted) {
-			const token = { value: current, quoted };
-			if (tokenQuote !== undefined && !hasUnquotedText)
-				token.quote = tokenQuote;
-			tokens.push(token);
-		}
-		current = "";
-		quoted = false;
-		tokenQuote = undefined;
-		hasUnquotedText = false;
-	};
-	for (let i = 0; i < segment.length; i++) {
-		const ch = segment[i];
-		if (quote) {
-			if (ch === "\\" && quote === '"' && segment[i + 1] === "\n") {
-				i++;
-				continue;
-			}
-			if (ch === quote) {
-				quote = null;
-				continue;
-			}
-			current += ch;
-			continue;
-		}
-		if (ch === '"' || ch === "'") {
-			quote = ch;
-			quoted = true;
-			if (tokenQuote === undefined) tokenQuote = ch;
-			else if (tokenQuote !== ch) tokenQuote = null;
-			continue;
-		}
-		if (ch === "\\") {
-			if (segment[i + 1] === "\n") {
-				i++;
-				continue;
-			}
-			if (segment[i + 1] === undefined) current += ch;
-			else current += segment[++i];
-			hasUnquotedText = true;
-			continue;
-		}
-		if (/\s/.test(ch)) {
-			flush();
-			continue;
-		}
-		current += ch;
-		hasUnquotedText = true;
-	}
-	flush();
-	return tokens;
-}
-
-const ENV_FLAGS_WITH_VALUE = new Set([
-	"-u",
-	"--unset",
-	"-C",
-	"--chdir",
-	"-S",
-	"--split-string",
-	"-P",
-]);
+const ENV_FLAGS_WITH_VALUE = new Set(["-u", "--unset", "-C", "--chdir", "-P"]);
 
 const GIT_TARGET_VARIABLES = new Set([
 	"GIT_DIR",
@@ -508,18 +418,11 @@ const GIT_TARGET_VARIABLES = new Set([
 	"GIT_ALTERNATE_OBJECT_DIRECTORIES",
 	"GIT_NAMESPACE",
 ]);
-const STATEFUL_ASSIGNMENT_BUILTINS = new Set([
-	"export",
-	"readonly",
-	"typeset",
-	"declare",
-	"local",
-]);
 
 function protectedAssignment(value) {
 	const equals = value.indexOf("=");
 	if (equals === -1) return null;
-	const name = value.slice(0, equals);
+	const name = value.slice(0, equals).replace(/\+$/, "");
 	if (name === "CDPATH" || GIT_TARGET_VARIABLES.has(name))
 		return { name, value: value.slice(equals + 1) };
 	return null;
@@ -534,307 +437,34 @@ function isGitTargetAssignment(value) {
 	);
 }
 
-function isNonemptyCdPathAssignment(value) {
-	return value.startsWith("CDPATH=") && value.slice("CDPATH=".length) !== "";
-}
-
-function persistsShellAssignment(tokens, isAssignment) {
-	const prefix = parseLeadingShellPrefix(tokens);
-	const head = basename(tokens[prefix.end]?.value ?? "");
-	const assignment = tokens.some(({ value }) => isAssignment(value));
-	if (STATEFUL_ASSIGNMENT_BUILTINS.has(head)) return assignment;
-	return prefix.end === tokens.length && assignment;
-}
-
-/** Whether a segment changes a Git target variable for later shell commands. */
-export function persistsGitTargetOverride(tokens) {
-	return persistsShellAssignment(tokens, isGitTargetAssignment);
-}
-
-/** Whether a segment gives later relative `cd` calls a nonempty CDPATH. */
-export function persistsCdPathOverride(tokens) {
-	return persistsShellAssignment(tokens, isNonemptyCdPathAssignment);
-}
-
-/** State that matters to commands guarded for cross-worktree mutations. */
-export function createProtectedShellState({
-	ambientGitTargetOverride = false,
-	ambientGitTargetVariables,
-	ambientCdPath = false,
-} = {}) {
-	const ambientGitTargets =
-		ambientGitTargetVariables ??
-		(ambientGitTargetOverride
-			? [...GIT_TARGET_VARIABLES].filter(
-					(name) => process.env[name] !== undefined && process.env[name] !== "",
-				)
-			: []);
-	const fallbackGitTargets =
-		ambientGitTargetOverride && ambientGitTargets.length === 0
-			? GIT_TARGET_VARIABLES
-			: new Set(ambientGitTargets);
-	return {
-		cdPath: ambientCdPath ? "unknown" : "safe",
-		gitTargets: new Map(
-			[...GIT_TARGET_VARIABLES].map((name) => [
-				name,
-				{
-					exported: fallbackGitTargets.has(name),
-					value: fallbackGitTargets.has(name) ? "unknown" : "safe",
-				},
-			]),
-		),
-	};
-}
-
-export function hasProtectedGitTargetOverride(state) {
-	return [...state.gitTargets.values()].some(
-		({ exported, value }) => exported && value !== "safe",
-	);
-}
-
-export function hasProtectedCdPathOverride(state) {
-	return state.cdPath !== "safe";
-}
-
-function setProtectedValue(state, name, value, exported) {
-	if (name === "CDPATH") {
-		state.cdPath = value === "" ? "safe" : "unknown";
-		return;
-	}
-	const target = state.gitTargets.get(name);
-	if (!target) return;
-	target.value = value === "" ? "safe" : "unknown";
-	if (exported !== undefined) target.exported = exported;
-}
-
-function setProtectedUnknown(state, name) {
-	if (name === "CDPATH") {
-		state.cdPath = "unknown";
-		return;
-	}
-	const target = state.gitTargets.get(name);
-	if (target) target.value = "unknown";
-}
-
-function setAllProtectedUnknown(state) {
-	state.cdPath = "unknown";
-	for (const name of GIT_TARGET_VARIABLES)
-		setProtectedValue(state, name, "unknown", true);
-}
-
-function isDynamicSetterName(token) {
-	return (
-		(token.quote !== "'" && /[$`]/.test(token.value)) ||
-		/\[|\]/.test(token.value)
-	);
-}
-
-function unsetProtectedValue(state, name) {
-	if (name === "CDPATH") {
-		state.cdPath = "safe";
-		return;
-	}
-	const target = state.gitTargets.get(name);
-	if (!target) return;
-	target.value = "safe";
-	target.exported = false;
-}
-
-function protectedName(value) {
-	return value === "CDPATH" || GIT_TARGET_VARIABLES.has(value) ? value : null;
-}
-
-function applyAssignments(state, tokens, exported) {
-	let changed = false;
-	for (const token of tokens) {
-		const assignment = protectedAssignment(token.value);
-		if (assignment) {
-			setProtectedValue(state, assignment.name, assignment.value, exported);
-			changed = true;
-		}
-	}
-	return changed;
-}
-
-function applyExport(state, tokens) {
-	let unexport = false;
-	let functionMode = false;
-	let valid = true;
-	let options = true;
-	for (const token of tokens) {
-		const { value } = token;
-		if (options && value === "--") {
-			options = false;
-			continue;
-		}
-		if (options && value.startsWith("-")) {
-			for (const option of value.slice(1)) {
-				if (option === "n") unexport = true;
-				else if (option === "f") functionMode = true;
-				else valid = false;
-			}
-			continue;
-		}
-		if (isDynamicSetterName(token)) {
-			setAllProtectedUnknown(state);
-			return true;
-		}
-	}
-	if (!valid || functionMode) return false;
-	let changed = false;
-	options = true;
-	for (const { value } of tokens) {
-		if (options && value === "--") {
-			options = false;
-			continue;
-		}
-		if (options && value.startsWith("-")) continue;
-		const assignment = protectedAssignment(value);
-		if (assignment) {
-			setProtectedValue(state, assignment.name, assignment.value, !unexport);
-			changed = true;
-			continue;
-		}
-		const name = protectedName(value);
-		if (name && name !== "CDPATH") {
-			state.gitTargets.get(name).exported = !unexport;
-			changed = true;
-		}
-	}
-	return changed;
-}
-
-function applyUnset(state, tokens) {
-	let variables = true;
-	let options = true;
-	for (const { value } of tokens) {
-		if (options && value === "--") {
-			options = false;
-			continue;
-		}
-		if (options && value.startsWith("-")) {
-			variables &&= value === "-v";
-			continue;
-		}
-		if (!variables) continue;
-		const name = protectedName(value);
-		if (name) unsetProtectedValue(state, name);
-	}
-	return variables;
-}
-
-function readProtectedNames(tokens) {
-	const valueOptions = new Set(["a", "d", "i", "n", "N", "p", "t", "u"]);
-	const flagOptions = new Set(["e", "r", "s"]);
-	const names = [];
-	let options = true;
-	for (let i = 0; i < tokens.length; i++) {
-		const token = tokens[i];
-		if (options && token.value === "--") {
-			options = false;
-			continue;
-		}
-		if (options && token.value.startsWith("-") && token.value !== "-") {
-			const cluster = token.value.slice(1);
-			for (let index = 0; index < cluster.length; index++) {
-				const option = cluster[index];
-				if (flagOptions.has(option)) continue;
-				if (!valueOptions.has(option)) return { names, unknown: true };
-				const value =
-					index + 1 < cluster.length
-						? { ...token, value: cluster.slice(index + 1) }
-						: tokens[++i];
-				if (!value) return { names, unknown: true };
-				if (option === "a") {
-					if (isDynamicSetterName(value)) return { names, unknown: true };
-					const name = protectedName(value.value);
-					if (name) names.push(name);
-				}
-				break;
-			}
-			continue;
-		}
-		if (isDynamicSetterName(token)) return { names, unknown: true };
-		const name = protectedName(token.value);
-		if (name) names.push(name);
-	}
-	return { names, unknown: false };
-}
-
-function dynamicallyWrittenProtectedNames(head, tokens) {
-	if (head === "read") return readProtectedNames(tokens);
-	if (head !== "printf") return { names: [], unknown: false };
-	let options = true;
-	for (let i = 0; i < tokens.length; i++) {
-		const token = tokens[i];
-		if (options && token.value === "--") {
-			options = false;
-			continue;
-		}
-		if (!options || !token.value.startsWith("-") || token.value === "-")
-			return { names: [], unknown: false };
-		if (token.value === "-v") {
-			const name = tokens[i + 1];
-			if (!name || isDynamicSetterName(name))
-				return { names: [], unknown: true };
-			return {
-				names: [protectedName(name.value)].filter(Boolean),
-				unknown: false,
-			};
-		}
-		if (token.value.startsWith("-v"))
-			return {
-				names: [protectedName(token.value.slice(2))].filter(Boolean),
-				unknown: false,
-			};
-	}
-	return { names: [], unknown: false };
-}
-
-/** Update state after one shell command segment has run. */
-export function updateProtectedShellState(state, tokens) {
-	const prefix = parseLeadingShellPrefix(tokens);
-	const head = basename(tokens[prefix.end]?.value ?? "");
-	const arguments_ = tokens.slice(prefix.end + 1);
-	const assignments = tokens.slice(0, prefix.end);
-	if (prefix.end === tokens.length) return applyAssignments(state, assignments);
-	else if (STATEFUL_ASSIGNMENT_BUILTINS.has(head))
-		applyAssignments(state, assignments, true);
-
-	if (head === "source" || head === "." || head === "eval") {
-		setAllProtectedUnknown(state);
-		return true;
-	}
-	if (head === "unset") return applyUnset(state, arguments_);
-	if (head === "export") return applyExport(state, arguments_);
-	if (STATEFUL_ASSIGNMENT_BUILTINS.has(head)) {
-		return applyAssignments(state, arguments_, true);
-	}
-	const { names, unknown } = dynamicallyWrittenProtectedNames(head, arguments_);
-	if (unknown) {
-		setAllProtectedUnknown(state);
-		return true;
-	}
-	for (const name of names) setProtectedUnknown(state, name);
-	return names.length > 0;
+/** A visible `GIT_CONFIG_*` assignment: it injects settings into the Git call. */
+function isGitConfigAssignment(value) {
+	return /^GIT_CONFIG[A-Za-z0-9_]*\+?=/.test(value);
 }
 
 export function parseEnvPrefix(tokens, start = 0) {
-	if (basename(tokens[start]?.value ?? "") !== "env") return null;
+	if (executableName(tokens[start]?.value ?? "") !== "env") return null;
 	let i = start + 1;
 	let chdir;
 	let malformed = false;
 	let gitTargetOverride = false;
+	let gitConfigOverride = false;
 	while (i < tokens.length) {
 		const value = tokens[i].value;
-		if (/^[A-Za-z_][A-Za-z0-9_]*=/.test(value)) {
+		if (/^[A-Za-z_][A-Za-z0-9_]*\+?=/.test(value)) {
 			gitTargetOverride ||= isGitTargetAssignment(value);
+			gitConfigOverride ||= isGitConfigAssignment(value);
 			i++;
 			continue;
 		}
 		if (value === "--")
-			return { end: i + 1, chdir, malformed, gitTargetOverride };
+			return {
+				end: i + 1,
+				chdir,
+				malformed,
+				gitTargetOverride,
+				gitConfigOverride,
+			};
 		if (value === "-C" || value === "--chdir") {
 			if (!tokens[i + 1]) malformed = true;
 			else chdir = tokens[i + 1];
@@ -854,6 +484,7 @@ export function parseEnvPrefix(tokens, start = 0) {
 			continue;
 		}
 		if (ENV_FLAGS_WITH_VALUE.has(value)) {
+			if (!tokens[i + 1]) malformed = true;
 			i += 2;
 			continue;
 		}
@@ -864,15 +495,17 @@ export function parseEnvPrefix(tokens, start = 0) {
 			value === "--null" ||
 			value === "-v" ||
 			value === "--debug" ||
-			/^-(?:u|C|S|P).+/.test(value) ||
-			/^--(?:unset|chdir|split-string)=/.test(value)
+			/^-(?:u|C|P).+/.test(value) ||
+			/^--(?:unset|chdir)=/.test(value)
 		) {
 			i++;
 			continue;
 		}
+		// Split-string and unknown options can supply or hide executable words.
+		if (value.startsWith("-")) malformed = true;
 		break;
 	}
-	return { end: i, chdir, malformed, gitTargetOverride };
+	return { end: i, chdir, malformed, gitTargetOverride, gitConfigOverride };
 }
 
 const LEADING_REDIRECTION = /^(?:[0-9]*(?:<<<|<<|<>|<&|>&|>>?|<)|&>>?)/;
@@ -906,7 +539,7 @@ const SUDO_FLAGS_WITH_VALUE = new Set([
 const TIME_FLAGS_WITH_VALUE = new Set(["-o", "--output", "-f", "--format"]);
 
 function parseSudoPrefix(tokens, start) {
-	if (basename(tokens[start]?.value ?? "") !== "sudo") return null;
+	if (executableName(tokens[start]?.value ?? "") !== "sudo") return null;
 	let i = start + 1;
 	let unresolved = false;
 	while (i < tokens.length) {
@@ -958,7 +591,7 @@ function parseSudoPrefix(tokens, start) {
 }
 
 function parseTimePrefix(tokens, start) {
-	if (basename(tokens[start]?.value ?? "") !== "time") return null;
+	if (executableName(tokens[start]?.value ?? "") !== "time") return null;
 	let i = start + 1;
 	let unresolved = false;
 	while (i < tokens.length) {
@@ -1017,23 +650,50 @@ function parseCommandPrefix(tokens, start) {
 	return { end: i, query, unresolved };
 }
 
+function parseExecPrefix(tokens, start) {
+	if (tokens[start]?.value !== "exec") return null;
+	let i = start + 1;
+	let unresolved = false;
+	while (i < tokens.length) {
+		const value = tokens[i].value;
+		if (value === "--") return { end: i + 1, unresolved };
+		if (!value.startsWith("-") || value === "-") break;
+		for (let j = 1; j < value.length; j++) {
+			if (value[j] === "a") {
+				if (j === value.length - 1) {
+					if (!tokens[i + 1]) unresolved = true;
+					i++;
+				}
+				break;
+			}
+			if (!"cl".includes(value[j])) unresolved = true;
+		}
+		i++;
+	}
+	return { end: i, unresolved };
+}
+
 export function parseLeadingShellPrefix(tokens) {
 	let i = 0;
 	let unresolved = false;
 	let gitTargetOverride = false;
-	let cdPathOverride = false;
+	let gitConfigOverride = false;
 	const envs = [];
 	while (i < tokens.length) {
 		const value = tokens[i].value;
-		const executable = basename(value);
+		const executable = executableName(value);
+		if (["noglob", "nocorrect"].includes(value) && !tokens[i].quoted) {
+			i++;
+			continue;
+		}
 		const redirection = leadingRedirectionLength(tokens, i);
 		if (redirection > 0) {
 			i += redirection;
 			continue;
 		}
-		if (/^[A-Za-z_][A-Za-z0-9_]*=/.test(value)) {
+		if (/^[A-Za-z_][A-Za-z0-9_]*\+?=/.test(value)) {
 			gitTargetOverride ||= isGitTargetAssignment(value);
-			cdPathOverride ||= isNonemptyCdPathAssignment(value);
+			gitConfigOverride ||= isGitConfigAssignment(value);
 			i++;
 			continue;
 		}
@@ -1042,6 +702,7 @@ export function parseLeadingShellPrefix(tokens) {
 			envs.push(env);
 			unresolved ||= env.malformed;
 			gitTargetOverride ||= env.gitTargetOverride;
+			gitConfigOverride ||= env.gitConfigOverride;
 			i = env.end;
 			continue;
 		}
@@ -1054,7 +715,7 @@ export function parseLeadingShellPrefix(tokens) {
 					envs,
 					unresolved,
 					gitTargetOverride,
-					cdPathOverride,
+					gitConfigOverride,
 				};
 			i = command.end;
 			continue;
@@ -1065,6 +726,19 @@ export function parseLeadingShellPrefix(tokens) {
 			i = sudo.end;
 			continue;
 		}
+		if (value === "builtin") {
+			const next = i + (tokens[i + 1]?.value === "--" ? 2 : 1);
+			if (["builtin", "command", "exec"].includes(tokens[next]?.value)) {
+				i = next;
+				continue;
+			}
+		}
+		const exec = parseExecPrefix(tokens, i);
+		if (exec !== null) {
+			unresolved ||= exec.unresolved;
+			i = exec.end;
+			continue;
+		}
 		const time = parseTimePrefix(tokens, i);
 		if (time !== null) {
 			unresolved ||= time.unresolved;
@@ -1073,11 +747,19 @@ export function parseLeadingShellPrefix(tokens) {
 		}
 		if (executable === "nohup") {
 			i++;
+			if (tokens[i]?.value === "--") i++;
+			else if (tokens[i]?.value.startsWith("-")) unresolved = true;
 			continue;
 		}
 		break;
 	}
-	return { end: i, envs, unresolved, gitTargetOverride, cdPathOverride };
+	return {
+		end: i,
+		envs,
+		unresolved,
+		gitTargetOverride,
+		gitConfigOverride,
+	};
 }
 
 // `FOO=bar cmd` and executable command prefixes still run cmd.
@@ -1088,6 +770,18 @@ export function stripLeadingNoise(tokens) {
 export function gitSubcommandIndex(tokens) {
 	for (let i = 1; i < tokens.length; i++) {
 		const { value } = tokens[i];
+		if (
+			[...GIT_GLOBAL_FLAGS_WITH_VALUE].some(
+				(flag) =>
+					value.startsWith(`${flag}=`) ||
+					(!tokens[i].dynamic &&
+						["-C", "-c"].includes(flag) &&
+						value.startsWith(flag) &&
+						value.length > 2),
+			)
+		)
+			continue;
+		if (tokens[i].dynamic) return i;
 		if (GIT_GLOBAL_FLAGS_WITH_VALUE.has(value)) {
 			i++;
 			continue;
@@ -1103,30 +797,6 @@ export function gitSubcommand(tokens) {
 	return index === null ? null : tokens[index].value;
 }
 
-function ghApiMethod(args) {
-	let method = null;
-	let input = false;
-	for (let i = 0; i < args.length; i++) {
-		const arg = args[i];
-		if (arg === "--") break;
-		const flag = arg.split("=", 1)[0];
-		if (["-X", "--method"].includes(flag)) {
-			method = arg.includes("=") ? arg.slice(flag.length + 1) : args[++i];
-			if (method === undefined) return "UNKNOWN";
-			continue;
-		}
-		if (/^-X.+/.test(arg)) {
-			method = arg.slice(2);
-			continue;
-		}
-		input ||=
-			["-f", "-F", "--raw-field", "--field", "--input"].includes(flag) ||
-			/^-[fF].+/.test(arg);
-		if (GH_VALUE_FLAGS.has(arg)) i++;
-	}
-	return method ?? (input ? "POST" : "GET");
-}
-
 /**
  * Return a short label for the outward-facing command found in `command`, or
  * null when nothing in it publishes anything.
@@ -1135,12 +805,13 @@ function ghApiMethod(args) {
  */
 export function findOutwardCommand(command) {
 	if (typeof command !== "string" || command.trim() === "") return null;
+	if (shellParseDecision(command)) return "unsupported shell syntax";
 
-	for (const segment of splitSegments(command)) {
-		const tokens = stripLeadingNoise(tokenize(segment));
+	for (const { tokens: raw } of readShellCommands(command)) {
+		const tokens = stripLeadingNoise(raw);
 		if (tokens.length === 0) continue;
 		const head = tokens[0];
-		const executable = basename(head.value);
+		const executable = executableName(head.value);
 
 		if (executable === "git") {
 			const sub = gitSubcommand(tokens);
@@ -1165,7 +836,7 @@ export function findOutwardCommand(command) {
 				return "gh";
 			}
 			if (hasHelpOption(parsed) || parsed.group === "help") continue;
-			if (parsed.group === "browse") continue;
+			if (["browse", "version"].includes(parsed.group)) continue;
 			if (parsed.group === "api") {
 				const method = ghApiMethod(parsed.args);
 				if (method.toUpperCase() !== "GET")
@@ -1190,18 +861,80 @@ export function findOutwardCommand(command) {
  */
 export function evaluateDelegationGuard(
 	payload,
-	{ allowedAgents = DEFAULT_ALLOWED_AGENTS } = {},
+	{ allowedAgents = DEFAULT_ALLOWED_AGENTS, supportsAsk = true } = {},
 ) {
+	if (payload?.tool_name === "Bash") {
+		const failure = shellParseDecision(payload?.tool_input?.command, {
+			supportsAsk,
+		});
+		if (failure) return failure;
+	}
+	const effect = githubToolEffect(payload?.tool_name);
+	const merge =
+		effect === "merge"
+			? payload.tool_name
+			: payload?.tool_name === "Bash"
+				? findMergeCommand(payload?.tool_input?.command, {
+						executableName,
+						readShellCommands,
+						stripLeadingNoise,
+					})
+				: null;
+	if (merge) return mergeDecision(merge, supportsAsk);
+	if (effect && effect !== "read") {
+		if (
+			!supportsAsk ||
+			(payload?.agent_id && !allowedAgents.includes(payload.agent_type))
+		)
+			return {
+				decision: "deny",
+				matched: payload.tool_name,
+				reason:
+					"GitHub MCP writes require a verified parent identity. This hook cannot establish that identity on Codex. Have the parent use its reviewed command publication route; do not route around a delegated-write rejection.",
+			};
+	}
 	if (payload?.tool_name !== "Bash") return { decision: "allow" };
 
 	// No agent_id means the caller itself, which owns review and publishing.
 	// See the module header for why agent_id and not agent_type (#932).
 	if (!payload?.agent_id) return { decision: "allow" };
+	if (!supportsAsk) {
+		for (const { tokens: raw } of readShellCommands(
+			payload?.tool_input?.command,
+		)) {
+			const tokens = stripLeadingNoise(raw);
+			const routine = classifyCodexGitRoutine(
+				tokens.map((token) => token.value),
+			);
+			if (routine) {
+				if (routine.childAllowed) continue;
+				return {
+					decision: "deny",
+					matched: `codex-git-routine ${routine.verb ?? "unknown"}`,
+					reason:
+						"Codex Git metadata operations belong to the parent. Report the needed operation to the parent; continue with file edits and tests only.",
+				};
+			}
+			if (!tokens.length || executableName(tokens[0].value) !== "git") continue;
+			const sub = gitSubcommand(tokens);
+			const args = tokens
+				.slice(gitSubcommandIndex(tokens) + 1)
+				.map((token) => token.value);
+			if (!isReadOnlyGitInvocation(sub, args))
+				return {
+					decision: "deny",
+					matched: `git ${sub ?? "unknown"}`,
+					reason:
+						"Codex Git metadata operations belong to the parent. Report the needed operation to the parent; continue with file edits and tests only.",
+				};
+		}
+	}
 
 	// agent_type names which agent it is; the contract has it present whenever
 	// agent_id is, so it needs no absence handling here.
 	const agentType = payload?.agent_type;
-	if (allowedAgents.includes(agentType)) return { decision: "allow" };
+	if (supportsAsk && allowedAgents.includes(agentType))
+		return { decision: "allow" };
 
 	const matched = findOutwardCommand(payload?.tool_input?.command);
 	if (!matched) return { decision: "allow" };
@@ -1224,12 +957,12 @@ export function evaluateDelegationGuard(
  * @param {string} inputText - raw stdin payload
  * @returns {{shouldOutput: boolean, output?: object}}
  */
-export function runDelegationGuard(inputText) {
+export function runDelegationGuard(inputText, options = {}) {
 	const payload = parseHookPayload(inputText);
 	if (!payload) return { shouldOutput: false };
 
-	const result = evaluateDelegationGuard(payload);
-	if (result.decision === "deny") {
+	const result = evaluateDelegationGuard(payload, options);
+	if (result.decision !== "allow") {
 		return { shouldOutput: true, output: buildPermissionOutput(result) };
 	}
 	return { shouldOutput: false };

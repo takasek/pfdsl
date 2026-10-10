@@ -53,13 +53,13 @@ commit内でinstallerを呼ばず、配置はsetup・preflightが担当する。
 共有lockの待機は5秒で打ち切る。
 異常終了でlockが残った場合は、installerが実行中でないことを確認してから診断に表示されたlockだけを除去し、再実行する。
 default branchの判定はref名の比較であり、同じcommitを指すfeature branchと解決可能なdetached HEADは許可する。
-pre-commitを経由しないref操作の保護と、repo policyのロード失敗・timeoutは #1404 の別受入である。
+repo policyが直接argvで扱う共有ref操作の判定とロード失敗・timeoutは #1404 の受入である。pre-commitを通らない全ref操作の観測層はADR-0047の未採用候補とし、その導入を受入条件にしない。
 
 **worktree での git 操作**: `git commit` など git コマンドは worktree ディレクトリを指して実行する（理由は `.pfdsl/bindings/pfd-ops.md`「ワークサイクルの追加手順」の「手順 2 の追加で worktree 上の変更を検証する」が一次情報）。
 **worktree のパスはシェル変数に入れず literal で書く**。
-`scripts/main-commit-guard.mjs`（#777。deny / ask の割り当ては CLAUDE.md「コミット粒度」節が一次情報）の command target 解決は静的解析なので `git -C $W commit` の `$W` を解決できず、fail closed して deny する。
+`scripts/main-commit-guard.mjs`（#777。deny / ask の割り当ては CLAUDE.md「コミット粒度」節が一次情報）の command target 解決は静的解析なので `git -C $W commit` の `$W` を解決できず、Claudeでは命令全体をask、Codexではdenyにする。
 `git -C /workspace/.claude/worktrees/<name> commit` と literal で書けば target が解決される。session の root と一致するか、同一 repository の sibling で native 所有者を確認できれば own として判定する（ADR-0046）。native 所有証拠を確認できなければ Claude Code では ask、Codex では deny を維持する。cwd への移動だけで所有者と判断しない。main/default branch と検査回避は own でも保護する。
-なお deny は Bash 呼び出し全体を止めるため、`git -C $W add … && git -C $W commit …` が弾かれたときは add も実行されていない。
+なおaskの確認前やdeny時はBash呼び出し全体が未実行であり、`git -C $W add … && git -C $W commit …` のaddも実行されていない。
 
 ## develop のレビュー
 
@@ -372,6 +372,67 @@ worktree 作成から PR 作成までを一気通貫でやらせる場合のみ 
 `settings.json` の `permissions.deny` を使わないのは、プロジェクト全体に効いて呼び出し元と `issue-worker` まで巻き込むため。
 
 **3. 戻り時の検出。** 汎用手順のまま（`git log origin/<branch>..HEAD` と open PR 一覧の突合）。このリポ固有の追加値はない。
+
+## Codex の policy 境界と段階的な受入（#1404）
+
+最終方式の実装案・旧判断から変える範囲・対案・受入限界は [ADR-0047](../docs/adr/0047-codex-policy-boundaries.md) に記録する。
+#1404は最終file/MCP/policy設定の実入口受入、#1398は所有者判定の受入として、独立した完了条件を持つ。
+#1404は所有者に依存する経路について#1398の結論と証拠を参照し、同じ観測の再実行を要求しない。
+未採用候補はADR-0047と旧#1417〜#1423の履歴に保持し、issueの終了を受入完了や機構の採用へ読み替えない。
+追加の保護・試験・簡素化は、同 ADR の「簡素化を判断する基準と今後の候補」に従い、通常作業での発生可能性と保守負担で判断する。
+通常読取の別名・診断 help/version・REST merge 状態 GET・help 誤発火は PR #1413 で修復し、未判定入力の確認は代表例で検査する。
+親 gh 表、rebase、残る help 判定・重複試験の縮小や追加機構はADR-0047の未採用候補として保持し、今回の PR と両issueの受入へ追加しない。採否を今決める必要が生じた候補だけ、判断すべき問いと完了条件を定めてissue化する。
+現在のPR指摘の判断・修復はPR本文とレビューを正本にし、将来候補の採否と分ける。issueには必要な受入上の依存だけを記録し、恒久的な不具合受付窓口にはしない。
+汎用化と Jev 連携は今回の範囲に含めない。
+main-commit、delegation、verification-tree、closes-create、worktree-write、generated-root-instructions、roadmap-publish の既存入口を保持し、短い bootstrap から共通の `scripts/lib/policy-supervisor.mjs` を読み込む。
+同じ process 内の worker thread で policy/helper を動的 import し、監督の欠落・構文エラーは各入口で拒否する。
+stdin を含む内部 deadline は 5 秒、payload は 1 MiB、応答と診断は各 64 KiB とする。
+root・branch・owner 等の `createGuardProbe` 経由の Git probe は合計 3 秒・一回最大 500 ms とする。
+push の URL・repository 解決の読取 query は一回最大 1 秒で、3 秒の probe 予算の外だが policy 全体の 5 秒 deadline 内にある。
+ロード・同期/非同期例外、不正 payload/応答、期限超過は deny JSON・stderr・exit 2 とする。
+正常判定は exit 0 とし、Codex の ask は deny に変換する。
+worker thread は process.ppid を変えず、Claude の直接親照合条件を維持する。
+command-usage と PostToolUse の advisory はこの失敗拒否の対象ではない。
+bootstrap 自身の欠落・構文エラー、共通監督の初期化中の同期停止、host timeout、trust skip は内部監督が起動しないため保証範囲に含めない。
+
+共有 Git 効果、親の merge/auto-merge、GitHub MCP、子の Git metadata 変更、全 file target の物理パスをそれぞれ確認する。
+Codex の linked checkout は cwd と一致しても操作時の native owner 証拠を要求し、main/default・検査回避・共有作用先の拒否を免除しない。
+Edit/Write と apply_patch の追加・削除・移動元/先を全件調べ、primary・別 owner・解決不能 target・dangling symlink を保護する。
+Codex の matcher は `Edit|Write|apply_patch` とし、raw tool 名の配線と入口の拒否・通常通過を回帰検査する。
+GitHub MCP は既知の読取を許可し、Codex では親を含め変更系・未知の操作を拒否する。
+親の通常の Bash 公開経路は残す。
+roadmap の公開宣言は Claude ask を維持し、Codex は additionalContext による advisory とする。
+Codex の公開宣言を事前拒否したという保証を持たず、通常の公開承認と人間の PR レビューを維持する。
+
+pre-commit が走らない ref 操作を #1403 の commit 拒否で覆ったとは扱わない。
+verification-tree・closes-create は代替による事前保護の受入がないため残す。
+SessionStart は #1403・#1415 の setup・薄い共有 shim・preflight に接続したまま残す。
+共有 shim と checkout の判定の責務・旧版の保証外は本書「worktree でのサイクル実行」に従う。
+個人 wrapper・trusted roots を repo fixture の前提にしない。
+
+同梱 Codex CLI 0.160.0 の実入口で通常読取と merge の help を確認し、親の merge、default ref 更新、primary への no-op apply_patch は hook が下流実行前に拒否した。
+生入力で apply_patch の command 形式、親と子で共通の session_id、子の別 agent_id を観測した。
+子の add --dry-run は親担当の案内付きで下流実行前に拒否された。
+一時的な helper 欠落時は通常読取も拒否され、元の helper の復元後は同じ読取が exit 0 に回復した。
+hooks/list の sourcePath は primary の .codex/hooks.json で、新しい MCP matcher の実配線は未受入である。
+これは追加 matcher を最終設定から読み込んだ実入口で、読取の通過と変更の拒否を確認する項目である。
+明示した file matcher についても、正式な読込み後の raw apply_patch で primary・別 owner の拒否と通常書込みの通過を確認する。
+設定選択と Node 入口の回帰試験を、この live 受入へ格上げしない。
+Codex Desktop の親の実 add/commit は下記の native 所有者の記録で確認済みであり、未確認へ戻さない。
+Node 入口の再生・失敗注入、CLI の実操作、Desktop の実操作は別の根拠として扱う。
+
+## native 所有者の受入継続（#1398）
+
+PR #1410の限定実装とADR-0046は、2026-10-07のorigin/main `a4297156e724c9d0e0f22b61c043543aa7e98a0e` で確認済みである。
+今回のCodex Desktop親チャットからnative create_worktreeで作った2つのworktreeは、version 1のownerThreadIdがともに `01a11446-defe-7c20-9ae7-a81cf42b2efa` だった。
+一つ目の `codex/issue-1403-setup-safety` で実switch・stage・通常pre-commit付きcommit `108ca389` が成功し、commit直後のcleanを確認した。
+hookの生stdinは今回も保存していないため、事後のGit成功を所有者補正callbackの発火や、native隔離の一般保証とは扱わない。
+
+残る受入はClaude Desktopの実Git・親とsubagentの区別、別生存所有者、移動先に留まったcd後の操作、再開・fork・handoffの必要経路と適用範囲・fallbackである。
+native隔離へ保護を委ねる案は未採用であり、現方式の受入完了には要求しない。移管を選ぶ場合に限り、削除するrepo分岐が無い同じ陰性入力で代替を確認する。
+nodeによる最終entrypointの実行と合成metadataの回帰テストは、live harnessのhook受入と区別する。
+#1404 の Codex linked checkout・file・主体別 Git policy の拡張案は ADR-0047 に従う。
+Claude の直接親条件と上記未確認を完了へ読み替えない。
 
 ## hook の artifact 登録基準（#854）
 

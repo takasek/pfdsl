@@ -6,11 +6,6 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node scripts/delegation-guard.mjs",
-            "timeout": 10
-          },
-          {
-            "type": "command",
             "command": "node scripts/main-commit-guard.mjs",
             "timeout": 10
           },
@@ -32,7 +27,17 @@
         ]
       },
       {
-        "matcher": "Edit|Write",
+        "matcher": "Bash|mcp__.*github.*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node scripts/delegation-guard.mjs",
+            "timeout": 10
+          }
+        ]
+      },
+      {
+        "matcher": "Edit|Write|apply_patch",
         "hooks": [
           {
             "type": "command",

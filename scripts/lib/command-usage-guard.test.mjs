@@ -99,6 +99,12 @@ describe("usesPublishedCli", () => {
 });
 
 describe("usesBodyDroppingView", () => {
+	it("does not apply output guidance to help display", () => {
+		assert.equal(
+			usesBodyDroppingView("gh issue view 650 --comments --help"),
+			false,
+		);
+	});
 	it("flags gh issue view --comments, which prints no body", () => {
 		assert.equal(usesBodyDroppingView("gh issue view 650 --comments"), true);
 	});

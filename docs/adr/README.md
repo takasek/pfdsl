@@ -22,6 +22,7 @@
 - **ADR-0043** [採用先が移行を適用した版を `.pfdsl/config.json` に記録する](0043-applied-migration-state.md) — 採用先が移行を適用し終えた plugin の版（Claude Code では bundle の集約 hash も）をキー `appliedMigration` に置き、`check-install-sync.mjs` は読むだけで照合する。記録するのは検証後に明示実行する `--record-migration` だけで、記録より古い plugin からの `--deploy` と `--record-migration` は exit 3 で拒否する。「最後に見た版」・別ファイル・SessionStart hook・manifest からの推定・CLI での照合は見送った
 - **ADR-0044** [worktree 運用ガードの責務を、効果を観測できる層へ移す](0044-guard-responsibility-by-observable-layer.md)（変更系 Git の所有権判定と関連する削除方針は ADR-0046 が部分置換） — hook に実行後の cwd・branch・shell の状態を予測させない。main の直接 commit は pre-commit、検証ツリーは preflight が担い、PR の Closes は CI の検出に任せる（必須 check にするかは未決）。hook はコマンド文字列とファイルの物理パスで判定できるものに絞る。対象は検査回避、委譲先の外向き操作、payload.cwd を基準にした checkout の確認、作用先の分類、`gh pr merge` の確認である。#1208 の処遇表 B のうち2本の事前拒否を外す。Claude Code の sandbox は保護パスとの衝突のため保留する
 - **ADR-0046** [native 所有者の肯定証拠で sibling 誤判定を補正する](0046-native-worktree-ownership.md) — 変更系 Git の確定済み sibling だけを補正する。Claude の直接親 PID・UTC 開始時刻、Codex の native ownerThreadId と hook.session_id を使い、取得失敗や不一致では既存判断を維持する。ADR-0044 の関連条項だけを置換し、file policy と #1398 の未完了受入を保持する
+- **ADR-0047** [Codex の操作主体・作用先・policy 失敗を分けて保護する](0047-codex-policy-boundaries.md)（PR #1413 の実装案） — linked checkout の native 所有者、共有 Git 効果、file target、子の責務、MCP/merge、内部 deadline を分けて確認する。既存入口・SessionStart・事前検査を保持し、実配線と Desktop 等の未確認を記録する
 
 - **ADR-0001** [成果物の有形性](0001-tangible-outputs-intangible-inputs.md) — 出力は保管・検証可能なモノのみ、入力はフロー外リソースなら不定形を許可する非対称規則
 - **ADR-0002** [改版の表現](0002-revision-modeling.md) — 単一生成元制約下での改版・ループ・定常サイクルを3形態で使い分ける

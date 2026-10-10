@@ -19,12 +19,13 @@
 
 import { hasExemptionDeclaration } from "./closes-reference.mjs";
 import {
-	splitSegments,
+	hasHelpOption,
+	shellParseDecision,
 	stripLeadingNoise,
-	tokenize,
 } from "./delegation-guard.mjs";
 import { flagValues, parseGhCommand } from "./gh-command.mjs";
 import { buildPermissionOutput, parseHookPayload } from "./hook-io.mjs";
+import { readShellCommands } from "./shell-commands.mjs";
 
 /**
  * Closing-keyword token evidence: local/qualified issue numbers or issue URLs.
@@ -71,16 +72,21 @@ function resolveBodyText(args, readFile) {
  */
 export function evaluateClosesCreateGuard(
 	payload,
-	{ getDefaultBranch, readFile },
+	{ getDefaultBranch, readFile, supportsAsk = true },
 ) {
 	if (payload?.tool_name !== "Bash") return { decision: "allow" };
+	const failure = shellParseDecision(payload?.tool_input?.command, {
+		supportsAsk,
+	});
+	if (failure) return failure;
 	const command = payload?.tool_input?.command;
 	if (typeof command !== "string" || command.trim() === "")
 		return { decision: "allow" };
 
-	for (const segment of splitSegments(command)) {
-		const tokens = stripLeadingNoise(tokenize(segment));
+	for (const { tokens: raw } of readShellCommands(command)) {
+		const tokens = stripLeadingNoise(raw);
 		const parsed = parseGhCommand(tokens);
+		if (parsed && hasHelpOption(parsed)) continue;
 		if (!parsed || parsed.group !== "pr" || parsed.verb !== "create") continue;
 
 		const bodyText = resolveBodyText(parsed.args, readFile);
@@ -98,8 +104,11 @@ export function evaluateClosesCreateGuard(
 			reason:
 				`This 'gh pr create' targets ${defaultBranch} and its body has no closing keyword ` +
 				"(e.g. 'Closes #<n>') and no exemption declaration. If an issue exists, add 'Closes #<n>' to the " +
-				"body. If not, add a line-head 'no-issue: <reason>' declaration, or approve this once to proceed " +
-				"as-is. CI's check-closes-reference still runs after the PR is opened either way.",
+				"body. If not, add a line-head 'no-issue: <reason>' declaration." +
+				(supportsAsk
+					? " You may approve this once to proceed as-is."
+					: " Repair the body before retrying.") +
+				" CI's check-closes-reference still runs after the PR is opened either way.",
 		};
 	}
 

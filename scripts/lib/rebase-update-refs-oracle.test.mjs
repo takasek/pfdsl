@@ -1,0 +1,194 @@
+import assert from "node:assert/strict";
+import { spawnSync } from "node:child_process";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { test } from "node:test";
+import { parentDecision, quote } from "./guard-effect-oracle-harness.mjs";
+
+test("rebase option values cannot cancel observed updates to other refs", () => {
+	const scratch = mkdtempSync(join(tmpdir(), "pfdsl-rebase-values-"));
+	const repo = join(scratch, "repo");
+	const bin = join(scratch, "bin");
+	mkdirSync(bin);
+	writeFileSync(join(bin, "--no-update-refs"), "#!/bin/sh\nexit 0\n", {
+		mode: 0o700,
+	});
+	writeFileSync(join(bin, "--update-refs"), "#!/bin/sh\nexit 0\n", {
+		mode: 0o700,
+	});
+	const env = {
+		...Object.fromEntries(
+			Object.entries(process.env).filter(([name]) => !name.startsWith("GIT_")),
+		),
+		PATH: `${bin}:${process.env.PATH}`,
+		GIT_CONFIG_NOSYSTEM: "1",
+		GIT_CONFIG_GLOBAL: "/dev/null",
+		GIT_AUTHOR_NAME: "Fixture",
+		GIT_AUTHOR_EMAIL: "fixture@example.test",
+		GIT_COMMITTER_NAME: "Fixture",
+		GIT_COMMITTER_EMAIL: "fixture@example.test",
+		GIT_EDITOR: "true",
+	};
+	const git = (...args) => {
+		const result = spawnSync("git", args, {
+			cwd: repo,
+			env,
+			encoding: "utf8",
+			timeout: 10000,
+		});
+		assert.equal(result.status, 0, result.stderr);
+		return result.stdout.trim();
+	};
+	try {
+		mkdirSync(repo);
+		git("init", "-q", "-b", "main");
+		writeFileSync(join(repo, "base.txt"), "base\n");
+		git("add", ".");
+		git("commit", "-qm", "base");
+		git("switch", "-qc", "upstream");
+		writeFileSync(join(repo, "upstream.txt"), "upstream\n");
+		git("add", ".");
+		git("commit", "-qm", "upstream");
+		git("switch", "-qc", "topic", "main");
+		writeFileSync(join(repo, "topic.txt"), "topic\n");
+		git("add", ".");
+		git("commit", "-qm", "topic");
+		const original = git("rev-parse", "HEAD");
+		const cases = [
+			{
+				options: ["--update-refs"],
+				shellCommand: 'flag=--update-refs; git rebase "$flag" upstream',
+				shared: true,
+			},
+			{
+				options: ["--update-refs", "--exec", "--no-update-refs"],
+				shared: true,
+			},
+			{ options: ["--update-refs", "-x", "--no-update-refs"], shared: true },
+			{ options: ["--update-refs", "--ex", "--no-update-refs"], shared: true },
+			{ options: ["--update-r", "-qx", "--no-update-refs"], shared: true },
+			{ options: ["--update-refs", "--exec=--no-update-refs"], shared: true },
+			{ options: ["--update-refs", "-x--no-update-refs"], shared: true },
+			{ options: ["--update-refs", "--no-update-refs"], shared: false },
+			{
+				options: [
+					"--update-refs",
+					"--exec",
+					"--no-update-refs",
+					"--no-update-refs",
+				],
+				shared: false,
+			},
+			{
+				options: ["--no-update-refs", "--exec", "--update-refs"],
+				shared: false,
+			},
+			{ options: ["--no-update-refs", "--exec=--update-refs"], shared: false },
+			{
+				options: ["--exec", "--no-update-refs", "--update-refs"],
+				shared: true,
+			},
+			{ options: ["--no-update-refs", "--no-autostash"], shared: false },
+			{ options: ["--no-update-refs", "--ignore-date"], shared: false },
+			{ options: ["-k"], shared: false },
+			{ options: ["--no-update-refs", "-k"], shared: false },
+		];
+		const violations = [];
+		for (const { options, shared, shellCommand } of cases) {
+			git("reset", "--hard", original);
+			git("branch", "-f", "main", original);
+			git("branch", "-f", "other", original);
+			const args = ["rebase", ...options, "upstream"];
+			if (shellCommand) {
+				const result = spawnSync("/bin/sh", ["-c", shellCommand], {
+					cwd: repo,
+					env,
+					encoding: "utf8",
+					timeout: 10000,
+				});
+				assert.equal(result.status, 0, result.stderr);
+			} else git(...args);
+			const changed = ["main", "other"].filter(
+				(name) => git("rev-parse", name) !== original,
+			);
+			assert.notEqual(
+				git("rev-parse", "topic"),
+				original,
+				"rebase must actually run",
+			);
+			assert.equal(changed.length, shared ? 2 : 0, JSON.stringify(options));
+			const command = shellCommand ?? ["git", ...args].map(quote).join(" ");
+			const decision = parentDecision(command, repo);
+			if (decision !== (changed.length ? "ask" : "allow"))
+				violations.push({ command, changed, decision });
+		}
+		assert.deepEqual(violations, []);
+	} finally {
+		rmSync(scratch, { recursive: true, force: true });
+	}
+});
+
+test("autostash normally restores without shared stash changes, while quit stores it", () => {
+	const scratch = mkdtempSync(join(tmpdir(), "pfdsl-autostash-quit-"));
+	const env = {
+		...Object.fromEntries(
+			Object.entries(process.env).filter(([key]) => !key.startsWith("GIT_")),
+		),
+		GIT_CONFIG_NOSYSTEM: "1",
+		GIT_CONFIG_GLOBAL: "/dev/null",
+		GIT_AUTHOR_NAME: "Fixture",
+		GIT_AUTHOR_EMAIL: "fixture@example.test",
+		GIT_COMMITTER_NAME: "Fixture",
+		GIT_COMMITTER_EMAIL: "fixture@example.test",
+		GIT_EDITOR: "true",
+	};
+	try {
+		for (const conflict of [false, true]) {
+			const repo = join(scratch, conflict ? "conflict" : "normal");
+			mkdirSync(repo);
+			const run = (...args) =>
+				spawnSync("git", args, {
+					cwd: repo,
+					env,
+					encoding: "utf8",
+					timeout: 10000,
+				});
+			const git = (...args) => {
+				const result = run(...args);
+				assert.equal(result.status, 0, result.stderr);
+				return result.stdout.trim();
+			};
+			git("init", "-q", "-b", "main");
+			writeFileSync(join(repo, "file.txt"), "base\n");
+			writeFileSync(join(repo, "dirty.txt"), "base\n");
+			git("add", ".");
+			git("commit", "-qm", "base");
+			git("switch", "-qc", "upstream");
+			writeFileSync(join(repo, "file.txt"), "upstream\n");
+			git("commit", "-qam", "upstream");
+			git("switch", "-qc", "topic", "main");
+			writeFileSync(join(repo, conflict ? "file.txt" : "topic.txt"), "topic\n");
+			git("add", ".");
+			git("commit", "-qm", "topic");
+			writeFileSync(join(repo, "dirty.txt"), "uncommitted\n");
+			assert.equal(git("stash", "list"), "");
+			assert.equal(
+				parentDecision("git rebase --autostash upstream", repo),
+				"allow",
+			);
+			const rebase = run("rebase", "--autostash", "upstream");
+			assert.equal(rebase.status, conflict ? 1 : 0, rebase.stderr);
+			assert.equal(git("stash", "list"), "");
+			if (conflict) {
+				assert.equal(parentDecision("git rebase --quit", repo), "ask");
+				git("rebase", "--quit");
+				assert.match(git("stash", "list"), /autostash/);
+				assert.ok(git("rev-parse", "refs/stash"));
+				assert.match(git("reflog", "show", "refs/stash"), /autostash/);
+			}
+		}
+	} finally {
+		rmSync(scratch, { recursive: true, force: true });
+	}
+});

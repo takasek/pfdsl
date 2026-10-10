@@ -11,7 +11,9 @@
 import { runCommandUsageGuard } from "./lib/command-usage-guard.mjs";
 import { readStdinText } from "./lib/hook-io.mjs";
 
-const { shouldOutput, output } = runCommandUsageGuard(await readStdinText());
+const { shouldOutput, output } = runCommandUsageGuard(await readStdinText(), {
+	supportsAsk: Boolean(process.env.CLAUDE_PROJECT_DIR?.trim()),
+});
 if (shouldOutput) {
 	console.log(JSON.stringify(output));
 }

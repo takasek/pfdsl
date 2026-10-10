@@ -20,7 +20,8 @@ export async function readStdinText() {
 
 /**
  * Parse a hook payload, or null when it is not valid JSON — callers exit 0
- * quietly rather than crash on a malformed payload.
+ * quietly rather than crash on a malformed payload. Protected policy entries
+ * validate the payload in their supervisor before calling this legacy parser.
  * @param {string} text
  * @returns {object | null}
  */
@@ -50,7 +51,9 @@ export function parseHookPayload(text) {
  * transcript evidence live in that issue's comments, not here.
  *
  * So a PreToolUse rule that should not hard-block (command-usage-guard's npx
- * case, roadmap-publish-guard) routes through the permission prompt.
+ * case, Claude's roadmap-publish-guard) routes through the permission prompt.
+ * Codex's roadmap entry intentionally emits an advisory instead (ADR-0047);
+ * that path does not claim to establish this pre-write inference boundary.
  * @param {{decision: "deny" | "ask", reason: string}} result
  */
 export function buildPermissionOutput(result) {

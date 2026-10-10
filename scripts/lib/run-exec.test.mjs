@@ -1,7 +1,14 @@
 import assert from "node:assert/strict";
-import { existsSync, rmSync } from "node:fs";
+import {
+	existsSync,
+	mkdirSync,
+	mkdtempSync,
+	realpathSync,
+	rmSync,
+	symlinkSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
-import { dirname, resolve } from "node:path";
+import { dirname, join, resolve } from "node:path";
 import { describe, it } from "node:test";
 import { fileURLToPath } from "node:url";
 
@@ -19,6 +26,21 @@ import {
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 
 describe("run-exec", () => {
+	it("resolves a physical repository identity through a symlink cwd", () => {
+		const fixture = realpathSync(
+			mkdtempSync(join(tmpdir(), "pfdsl-root-alias-")),
+		);
+		try {
+			const repository = join(fixture, "repository");
+			git(["init", "-q", repository], { cwd: fixture, captureStderr: true });
+			mkdirSync(join(repository, "nested"));
+			const alias = join(fixture, "alias");
+			symlinkSync(join(repository, "nested"), alias);
+			assert.deepEqual(resolveGitRoots(alias), resolveGitRoots(repository));
+		} finally {
+			rmSync(fixture, { recursive: true, force: true });
+		}
+	});
 	it("bounds an optional probe without changing other runners", () => {
 		const result = tryRun(
 			process.execPath,
@@ -56,7 +78,7 @@ describe("run-exec", () => {
 				calls.push(opts);
 				return {
 					ok: true,
-					out: _args.includes("--show-toplevel") ? "/repo\n" : ".git\n",
+					out: _args.includes("--show-toplevel") ? "/repo\n" : "/repo/.git\n",
 				};
 			},
 		});
@@ -77,7 +99,7 @@ describe("run-exec", () => {
 				if (args.includes("--show-toplevel")) {
 					return { ok: true, out: "/repo/.claude/worktrees/topic\n" };
 				}
-				return { ok: true, out: "../../../.git\n" };
+				return { ok: true, out: "/repo/.git\n" };
 			},
 		});
 
@@ -90,8 +112,22 @@ describe("run-exec", () => {
 			calls.map(([args, opts]) => [args, opts.cwd]),
 			[
 				[["rev-parse", "--show-toplevel"], "/repo/.claude/worktrees/topic"],
-				[["rev-parse", "--git-common-dir"], "/repo/.claude/worktrees/topic"],
+				[
+					["rev-parse", "--path-format=absolute", "--git-common-dir"],
+					"/repo/.claude/worktrees/topic",
+				],
 			],
+		);
+	});
+	it("rejects a non-absolute common directory instead of guessing its identity", () => {
+		assert.equal(
+			resolveGitRoots("/repo", {
+				exec: (args) => ({
+					ok: true,
+					out: args.includes("--show-toplevel") ? "/repo\n" : "../.git\n",
+				}),
+			}),
+			null,
 		);
 	});
 

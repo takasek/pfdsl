@@ -21,6 +21,15 @@ const deps = {
 };
 
 describe("evaluateClosesCreateGuard", () => {
+	it("does not require issue linkage for help display", () => {
+		assert.equal(
+			evaluateClosesCreateGuard(
+				payload({ command: 'gh pr create --body "usage example" --help' }),
+				deps,
+			).decision,
+			"allow",
+		);
+	});
 	it("asks when a main-bound PR body has no Closes keyword and no exemption", () => {
 		const result = evaluateClosesCreateGuard(
 			payload({
