@@ -43,10 +43,10 @@
 | TSV 出力 (`pfdsl.export`) | #1261 | metadata exporter の値とタブ | 未移植 |
 | All 一括出力と部分失敗 | #1261 | 成功形式の保持、警告、失敗の内訳 | 未移植 |
 | 文書ごとの editor + preview tab | #1257 / #1258 | 実機の tab 往復、古い描画の隔離 | 基盤に接続。終了・復元契約は #1258 |
-| 新規・開く・保存・Save As・最近の文書 | #1258 | 任意文書、手動保存、Undo / Redo、close | フォルダ読取のみ。保存しないことを明示 |
-| 外部変更、dirty 衝突、保存 race の保護 | #1258 | 保存前後の独立 writer、dirty 内容保持 | 未実装。試作の保存 race を持ち込まない |
-| 検索・置換、基本 Undo / Redo、日本語 IME | #1257 / #1258 | Monaco 実操作と composition→commit | Monaco を利用、実機証拠は下記 |
-| Alt+F12 と既定 Peek Definition の衝突 | #1283 | 採用キーと VS Code 設定の実操作 | 未解決の既存 issue として維持 |
+| 新規・開く・保存・Save As・最近の文書 | #1258 | 任意文書、手動保存、Undo / Redo、close | #1431 に実装。現在版の Mac 受入は下記の残件 |
+| 外部変更、dirty 衝突、保存 race の保護 | #1258 | 保存前後の独立 writer、dirty 内容保持 | #1431 に実装。保存前検査の保証境界は「保存保証の簡素化と編集機能の集約」を参照 |
+| 検索・置換、基本 Undo / Redo、日本語 IME | #1257 / #1258 | Monaco 実操作と composition→commit | 本番タブの検索・置換を接続。自動検査と現在版の Mac 受入を分けて下記に記録 |
+| Alt+F12 と既定 Peek Definition の衝突 | #1283 | 採用キーと VS Code 設定の実操作 | 固定版 Linux VS Code の20条件成功。組込定義・Peek の対照は 2026-10-08 UTC の追補で確認。現在版への適用範囲は下記 |
 | 署名・公証 DMG、更新案内、対応 OS、利用者環境 | #1262 | 配布物と実機、Git 不在、追加開発環境不要 | 未実装。local `.app` は配布受入ではない |
 
 ## 追加 UI の受入範囲
@@ -502,3 +502,41 @@ Snapshot.binding は同梱 native が必ず返す契約に揃え、欠落時の�
 ボタン表示の検査は本番 main のクリック・タブ切替検査へ統合し、保存・終了・整形・座標境界の異なるシナリオは維持した。
 過去の固定版 native corpus・GUI 判定はこの版へ転写しない。
 実 native GUI、IME、Cmd-Q/menu/Dock Quit、Find/Replace、Undo/Redo、複雑な ACL/ownership の実機受入は残り、#1258/#1259 は未完了のままとする。
+
+## #1431 の完遂に向けた追加確認 — 2026-10-10
+
+#1258 は部分対応を最終方針にせず、この PR で文書ライフサイクルの完遂を目指す。
+現在の本番 document-tab に Monaco の find contribution を読み込み、Find と Replace を接続した。
+実 Monaco の回帰検査は、修正前に Find action 未登録で失敗し、修正後に日本語の検索結果選択・全置換・Undo/Redo・別タブの本文保持で成功した。
+独立した体験検査は3一致の順巡回・一周・逆巡回、単発置換と全置換の別々の Undo/Redo、既存コメント切替と別タブ隔離を確認し、そのシナリオを既存の本番 Monaco 検査へ統合した。
+この検査は DOM 計測を補った Node/JSDOM 上の本番 entry 操作であり、native GUI のキー・IME・保存受入を認定しない。
+追加修正後の全体テストは5,998件成功・1件 skip、全体型検査と debug `.app` の build は成功した。
+体験シナリオ統合後の本番 Monaco 検査も13件成功した。
+受入候補の executable SHA-256 は `d8531c59661606297c0a6097c10c7f495c0b315fea69c3a154d801ef12b98f40`、build 環境は Apple Silicon / macOS 27.0.1 (26A434)。
+この候補は引継ぎ HEAD `f304626f8e8b32daef3ddc36016a2178e96ba7b4` に今回の find contribution 接続を加えてビルドし、文書・テストの統合は同梱ソースを変更しない。
+
+### 現在版の Mac で確認する項目
+
+同じビルドのアプリで操作し、対象版・環境・入力・期待結果・実結果を残す。
+次の項目は未確認であり、結果を受領するまで #1258 の全条件達成とはしない。
+
+- ファイルとフォルダを開く、新規作成、Save/Save As、取消、最近の対象の再アクセス、同じ文書の再 Open。
+- 2つのタブを往復して本文・表示位置・図の隔離を確認し、構文エラーから復帰する。
+- 日本語 IME の変換確定、Find の次結果、単発置換・全置換、Undo/Redo、手動保存後のディスク本文を確認する。
+- 時間経過・タブ切替・フォーカス移動で未保存の本文がディスクへ書かれないことを確認する。
+- dirty タブの Save/Discard/Cancel、複数タブの途中取消、ウィンドウ close・Cmd-Q・メニュー Quit・Dock Quit を確認する。
+- clean 文書の外部変更を再読込し、dirty 文書ではローカル本文と外部版を比較・選択できることを確認する。
+- 外部削除・名前変更、Save As 先衝突、権限拒否等の保存失敗・再競合で、buffer と保存先を失わず回復できることを確認する。
+- 保存先の mode・owner/group・保護 flags・ACL を保持するか、保持できない場合は保存を拒否して buffer を残すことを確認する。
+
+セッション復元・未保存内容の退避・クラッシュ復旧は今回追加しない。
+保存最終検査後の race と旧 FD writer は、既に採用した保存前検査の保証範囲に従う。
+
+### #1283 の既存証拠と座標修正
+
+[累積受入表](evidence/2026-10-07-linux-appimage/remaining-checks/cumulative-matrix.csv)の #1283 / VS Code は全20条件成功である。
+対象は固定 source `8261f877d5cae8aa653a5310edfbd9e387acb116` の Linux VS Code であり、Mac のショートカットや standalone の巡回 UI の証拠ではない。
+定義・本文の全出現、途中からの巡回、quoted key・同名 field・alias・編集後増減、chord/context menu、直接定義移動、組込定義・Peek・multiCursorModifier の対照を含む。
+この固定版から引継ぎ HEAD `f304626f8e8b32daef3ddc36016a2178e96ba7b4` まで、VS Code の巡回 host、command/context menu/keybinding の契約は不変である。
+依存する analyzeSnapshot は本文 range を full-source UTF-16 座標へ正規化するよう変更され、現行 host の回帰検査は LF/CRLF・frontmatter 有無・先行する補助平面文字と完全な選択 token を確認する。
+旧版の実 UI 判定と現在版の共有計算・host 回帰検査を併用し、現在版の native UI で20条件を再実測したとは扱わない。

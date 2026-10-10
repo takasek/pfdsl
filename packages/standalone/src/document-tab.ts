@@ -12,6 +12,7 @@ import { mountPreview } from "@pfdsl/editor/preview";
 import * as monaco from "monaco-editor/editor/editor.api.js";
 import "monaco-editor/editor/contrib/comment/browser/comment.js";
 import "monaco-editor/editor/contrib/contextmenu/browser/contextmenu.js";
+import "monaco-editor/editor/contrib/find/browser/findController.js";
 import "monaco-editor/editor/standalone/browser/quickAccess/standaloneCommandsQuickAccess.js";
 import "./language.js";
 import { createNormalizedEdgesPanel } from "./normalized-edges.js";

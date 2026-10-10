@@ -155,6 +155,101 @@ test("the production document-tab entry loads real Monaco menu contributions", a
 				});
 			},
 		);
+		await t.test(
+			"independent Japanese workflow: cycle matches, replace one/all, undo/redo, comment, isolate tabs",
+			async () => {
+				const source =
+					"入力 >> 処理 -> 結果\n結果 >> 検査 -> 入力\n入力 >> 保存 -> 記録\n";
+				await withEditors(source, async (create, tabs) => {
+					const editor = create();
+					const other = create();
+					const tab = tabs[0];
+					await editor.getAction("actions.find").run();
+					const controller = editor.getContribution(
+						"editor.contrib.findController",
+					);
+					controller
+						.getState()
+						.change(
+							{ searchString: "入力", isRegex: false, matchCase: true },
+							true,
+						);
+					assert.equal(controller.getState().matchesCount, 3);
+					const positions = [];
+					for (let i = 0; i < 4; i++) {
+						await editor.getAction("editor.action.nextMatchFindAction").run();
+						const selection = editor.getSelection();
+						assert.equal(editor.getModel().getValueInRange(selection), "入力");
+						positions.push([selection.startLineNumber, selection.startColumn]);
+					}
+					assert.equal(
+						new Set(positions.slice(0, 3).map(JSON.stringify)).size,
+						3,
+					);
+					assert.deepEqual(
+						positions[3],
+						positions[0],
+						"next match wraps after all three occurrences",
+					);
+					await editor.getAction("editor.action.previousMatchFindAction").run();
+					assert.deepEqual(
+						[
+							editor.getSelection().startLineNumber,
+							editor.getSelection().startColumn,
+						],
+						positions[2],
+					);
+					await editor.getAction("editor.action.startFindReplaceAction").run();
+					controller
+						.getState()
+						.change({ searchString: "入力", replaceString: "受領" }, true);
+					const range = editor.getSelection();
+					const model = editor.getModel();
+					const start = model.getOffsetAt(range.getStartPosition());
+					const end = model.getOffsetAt(range.getEndPosition());
+					const single = `${source.slice(0, start)}受領${source.slice(end)}`;
+					controller.replace();
+					assert.equal(
+						tab.getSource(),
+						single,
+						"single replacement changes only selected occurrence",
+					);
+					assert.equal((editor.getValue().match(/入力/g) ?? []).length, 2);
+					assert.equal(other.getValue(), source);
+					await model.undo();
+					assert.equal(tab.getSource(), source);
+					await model.redo();
+					assert.equal(tab.getSource(), single);
+					controller
+						.getState()
+						.change({ searchString: "入力", replaceString: "受領" }, true);
+					controller.replaceAll();
+					const all = source.replaceAll("入力", "受領");
+					assert.equal(tab.getSource(), all);
+					assert.equal(other.getValue(), source);
+					await model.undo();
+					assert.equal(
+						tab.getSource(),
+						single,
+						"replace-all Undo preserves previous single replace",
+					);
+					await model.redo();
+					assert.equal(tab.getSource(), all);
+					controller.closeFindWidget();
+					editor.setSelection(new host.monaco.Selection(1, 1, 1, 16));
+					await editor.getAction("editor.action.commentLine").run();
+					assert.equal(tab.getSource(), `# ${all}`);
+					assert.equal(other.getValue(), source);
+					await model.undo();
+					assert.equal(tab.getSource(), all);
+					await model.redo();
+					assert.equal(tab.getSource(), `# ${all}`);
+					await editor.getAction("editor.action.commentLine").run();
+					assert.equal(tab.getSource(), all);
+					assert.equal(other.getValue(), source);
+				});
+			},
+		);
 		await t.test("document models use PFDSL square brackets", async () => {
 			await withEditors("[a, b] >> p", async (create) => {
 				const model = create().getModel();
