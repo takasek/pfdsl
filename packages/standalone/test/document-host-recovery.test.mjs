@@ -1,14 +1,10 @@
 import assert from "node:assert/strict";
 import { mkdtempSync, readFileSync, rmSync } from "node:fs";
-import { createRequire } from "node:module";
 import { join } from "node:path";
 import test from "node:test";
-import { fileURLToPath, pathToFileURL } from "node:url";
+import { pathToFileURL } from "node:url";
+import { bundleHost, JSDOM, root } from "./helpers/host-bundle.mjs";
 
-const root = fileURLToPath(new URL("../../../", import.meta.url));
-const require = createRequire(`${root}/packages/standalone/package.json`);
-const { build } = require("esbuild");
-const { JSDOM } = require("jsdom");
 test("Save As recovery retains target ownership and refuses intervening edits in the real host", async () => {
 	const temp = mkdtempSync(
 		join(root, "packages/standalone/node_modules/.host-recovery-"),
@@ -114,59 +110,7 @@ test("Save As recovery retains target ownership and refuses intervening edits in
 			if (command === "read_dependency") return "dependency";
 			throw new Error(`unexpected command ${command}`);
 		};
-		await build({
-			stdin: {
-				contents:
-					readFileSync(`${root}/packages/standalone/src/main.ts`, "utf8") +
-					"\nglobalThis.reviewEntries=opened;globalThis.reviewActive=()=>active;globalThis.reviewBusy=()=>busy;",
-				resolveDir: `${root}/packages/standalone/src`,
-				sourcefile: "main.ts",
-				loader: "ts",
-			},
-			outfile: output,
-			bundle: true,
-			platform: "node",
-			format: "esm",
-			plugins: [
-				{
-					name: "review-seams",
-					setup(b) {
-						b.onResolve(
-							{
-								filter:
-									/^(?:@tauri-apps\/api\/|@pfdsl\/editor$|monaco-editor\/|\.\/document-tab\.js$|\.\/acceptance\.js$|\.\/style\.css$)/,
-							},
-							(args) => ({ path: args.path, namespace: "review-seams" }),
-						);
-						b.onLoad({ filter: /.*/, namespace: "review-seams" }, (args) => ({
-							contents:
-								args.path === "@tauri-apps/api/core"
-									? "export const invoke=(...args)=>globalThis.nativeInvoke(...args);"
-									: args.path === "@tauri-apps/api/event"
-										? "export const listen=(...args)=>globalThis.nativeListen(...args);"
-										: args.path === "@tauri-apps/api/window"
-											? "export const getCurrentWindow=()=>({onCloseRequested(){},destroy(){}});"
-											: args.path === "@pfdsl/editor"
-												? 'export const previewStyles="";'
-												: args.path === "./acceptance.js"
-													? "export const verifyNativeCorpus=()=>globalThis.nativeAcceptance();"
-													: args.path === "./style.css"
-														? ""
-														: args.path === "./document-tab.js"
-															? `
-export function createDocumentTab(options){
- let source=options.source,revision=0;
- const container=document.createElement('div'),button=document.createElement('button');
- options.parent.append(container);button.textContent=options.name;
- return {container,button,location:options.path,activate(){},dispose(){container.remove();button.remove();},getSource:()=>source,getRevision:()=>revision,setSource(s){source=s;revision++;options.onChange?.();},setLocation(path,name,read){this.location=path;this.read=read;button.textContent=name;},markSaved(){},format(){}};
-}`
-															: "export default class Worker {}",
-							loader: "js",
-						}));
-					},
-				},
-			],
-		});
+		await bundleHost(output);
 		await import(pathToFileURL(output).href);
 		const flush = async () => {
 			for (let i = 0; i < 100; i++) await Promise.resolve();
