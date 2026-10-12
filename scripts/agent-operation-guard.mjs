@@ -68,6 +68,12 @@ if (isMainThread) {
 		const { evaluateAgentOperationPolicy } = await import(
 			"./lib/agent-operation-policy.mjs"
 		);
+		const { classifyAgentOperations } = await import(
+			"./lib/agent-operation-classifier.mjs"
+		);
+		const { recordUnresolvedDecision } = await import(
+			"./lib/agent-operation-unresolved.mjs"
+		);
 		const { collectAgentOperationEnvironment } = await import(
 			"./lib/agent-operation-environment.mjs"
 		);
@@ -93,6 +99,11 @@ if (isMainThread) {
 					hookRoot,
 				};
 		const decision = evaluateAgentOperationPolicy(payload, facts);
+		recordUnresolvedDecision(
+			classifyAgentOperations(payload, facts),
+			decision,
+			facts,
+		);
 		if (decision.decision !== "allow") {
 			if (shell?.error && decision.operationClass === "U")
 				decision.reason += ` ${shell.error}`;

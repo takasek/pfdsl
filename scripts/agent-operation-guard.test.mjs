@@ -5,6 +5,7 @@ import {
 	existsSync,
 	mkdirSync,
 	mkdtempSync,
+	readFileSync,
 	rmSync,
 	writeFileSync,
 } from "node:fs";
@@ -23,6 +24,7 @@ const helperFiles = [
 	"lib/agent-operation-classifier.mjs",
 	"lib/agent-operation-input-forms.mjs",
 	"lib/agent-operation-option-table.json",
+	"lib/agent-operation-unresolved.mjs",
 	"lib/agent-operation-table.mjs",
 	"lib/agent-operation-policy.mjs",
 	"lib/agent-operation-environment.mjs",
@@ -264,6 +266,35 @@ test("entry integration: stage-three ordinary verbs, literal targets and routine
 				"allow",
 			);
 		}
+	} finally {
+		f.cleanup();
+	}
+});
+
+test("entry integration: U recording is private and the aggregate CLI reads the common directory", () => {
+	const f = fixture();
+	try {
+		const log = join(f.primary, ".git/pfdsl/agent-operation-unresolved.jsonl");
+		assert.equal(f.invoke({ command: "git status" }).decision, "allow");
+		assert.equal(existsSync(log), false);
+		assert.equal(
+			f.invoke({
+				command: "gh api --not-declared=/fixture/private repos/o/r/issues",
+			}).decision,
+			"deny",
+		);
+		const text = readFileSync(log, "utf8");
+		assert.doesNotMatch(text, /fixture|private|"command"/);
+		assert.deepEqual(JSON.parse(text).unknownOptions, ["--not-declared"]);
+		const summary = JSON.parse(
+			run(
+				process.execPath,
+				[join(source, "scripts/agent-operation-unresolved-report.mjs")],
+				{ cwd: f.own },
+			),
+		);
+		assert.equal(summary.total, 1);
+		assert.deepEqual(summary.options, { "--not-declared": 1 });
 	} finally {
 		f.cleanup();
 	}
