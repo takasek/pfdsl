@@ -41,6 +41,66 @@ const ok = (snapshot) => ({ snapshot });
 const failed = (error = "unreadable") => ({ error: new Error(error) });
 const write = (result) => async () => result;
 
+for (const kind of ["save", "adopt", "close"])
+	for (const moved of [false, true])
+		test(`plan rebind | ${kind} | ${moved ? "moved path" : "new capability"}`, async () => {
+			const editor = view();
+			const original = snap("original");
+			const doc = new DocumentSession(editor, original);
+			editor.edit("local");
+			const plan = doc.plan(kind, kind === "close" ? null : original);
+			const rebound = {
+				...original,
+				id: moved ? 1 : 9,
+				path: moved ? "/moved/a.pfdsl" : original.path,
+			};
+			assert.equal(doc.rebindDisk(rebound), true);
+			const violations = [];
+			if (doc.holds(plan))
+				violations.push("V: old plan survived a target rebind");
+			if (doc.holds(plan, "editor"))
+				violations.push(
+					"V: editor-only close-save validation accepted a rebound plan",
+				);
+			if (kind === "save") {
+				await doc.save(plan, async () => {
+					violations.push("V: save executed the old capability after rebind");
+					return { outcome: "saved", current: original };
+				});
+			} else if (kind === "adopt" && doc.adopt(plan))
+				violations.push(
+					"V: adoption executed a plan with the old displayed path",
+				);
+			assert.deepEqual(violations, []);
+		});
+
+test("close plan editor scope permits an ordinary pre-save observation", () => {
+	const editor = view();
+	const original = snap("original");
+	const doc = new DocumentSession(editor, original);
+	editor.edit("local");
+	const plan = doc.plan("close", null);
+	const changed = snap("external", "r2");
+	doc.observe(changed, ok(changed));
+	assert.equal(doc.holds(plan), false);
+	assert.equal(doc.holds(plan, "editor"), true);
+});
+
+test("plan rebind | close editor scope rejects a capability rebound back to its original tuple", () => {
+	const editor = view();
+	const original = snap("original");
+	const doc = new DocumentSession(editor, original);
+	editor.edit("local");
+	const plan = doc.plan("close", null);
+	assert.equal(doc.rebindDisk({ ...original, id: 9 }), true);
+	assert.equal(doc.rebindDisk(original), true);
+	assert.equal(
+		doc.holds(plan, "editor"),
+		false,
+		"V: a rebind round trip resurrected the old close plan",
+	);
+});
+
 /** A session whose Save As to B failed with a conflict, leaving B as the recovery target. */
 async function recovering(disk = snap("original", "r1")) {
 	const editor = view();

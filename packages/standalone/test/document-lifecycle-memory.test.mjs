@@ -451,4 +451,156 @@ for (const external of [false, true])
 			}),
 	);
 
+for (const path of ["close-save", "quit-save"])
+	cell(`lifetime | pending-inspect | revert-to-acknowledged | ${path}`, () =>
+		judged(async (violate) => {
+			const native = new FakeNative();
+			const a = native.add(1, "a.pfdsl", TEXT.disk);
+			const gate = new InspectGate(native);
+			const host = await startHost(native, a, {
+				inspectGate: (id) => gate.hold(id),
+				confirm: async () => {
+					gate.arm(a.id);
+					return "save";
+				},
+			});
+			const tab = await host.open(a);
+			tab.type(TEXT.edited);
+			const trace = beginAction({ host, tab, owned: [a.id] });
+			if (path === "close-save") host.closeButton(tab).click();
+			else host.beginQuit(1);
+			await flush();
+			if (!gate.isHeld) violate("harness", "pre-save read was not pending");
+			tab.type(TEXT.disk);
+			gate.release();
+			await host.settle();
+			checkAction({ native, host, tab, trace, violate });
+			if (!host.isOpen(tab))
+				violate(
+					"C",
+					"an edit back to acknowledged text closed without a new decision",
+				);
+			if ((await host.finish()).length) violate("harness", "leaked IPC");
+		}),
+	);
+
+for (const missingPolls of [0, 1])
+	cell(
+		`rename recovery | same-content replacement observed before leaf rename | missing polls: ${missingPolls}`,
+		() =>
+			judged(async (violate) => {
+				const native = new FakeNative();
+				const a = native.add(1, "a.pfdsl", TEXT.disk);
+				const host = await startHost(native, a, {});
+				const tab = await host.open(a);
+				change(native, a, TEXT.disk);
+				await host.runPoll();
+				tab.type(TEXT.edited);
+				const c = native.link(a, 3, "c.pfdsl");
+				a.file = null;
+				for (let poll = 0; poll < missingPolls; poll++) await host.runPoll();
+				const trace = beginAction({ host, tab, owned: [a.id] });
+				const reopened = await host.open(c);
+				if (reopened !== tab || tab.location !== c.path)
+					violate(
+						"P",
+						"the observed inode did not recover the tab and dependency base at C",
+					);
+				await tab.read("base.pfdsl");
+				if (
+					host.log.findLast((item) => item.kind === "dependency")?.id !== c.id
+				)
+					violate(
+						"P",
+						"the renamed tab's dependency read still uses the old capability",
+					);
+				await host.click(tab.button);
+				await host.cmdS();
+				checkAction({ native, host, tab, trace, violate });
+				if (a.file !== null || c.file.source !== TEXT.edited)
+					violate(
+						"R",
+						"saving the recovered buffer did not target the renamed leaf",
+					);
+				if ((await host.finish()).length) violate("harness", "leaked IPC");
+			}),
+	);
+
+for (const relation of ["same-binding", "hard-link"])
+	cell(`recovery panel | ${relation} new capability after failed Save As`, () =>
+		judged(async (violate) => {
+			const native = new FakeNative();
+			const a = native.add(1, "a.pfdsl", TEXT.disk);
+			const b =
+				relation === "same-binding"
+					? native.reselect(a, 2)
+					: native.link(a, 2, "b.pfdsl");
+			const host = await startHost(native, a, {
+				choose: async () => native.snapshot(b),
+				beforeSave() {
+					b.file.source = "external\n";
+					b.file.mtime = ++native.clock;
+				},
+			});
+			const tab = await host.open(a);
+			tab.type(TEXT.edited);
+			await host.click(host.query("#save-as"));
+			await host.runPoll();
+			checkPanel({ host, native, violate, recoveryId: b.id, original: a });
+			if (relation === "hard-link" && !host.panel().originalAlsoChanged)
+				violate(
+					"P",
+					"distinct hard-link leaves lost their separate original notice",
+				);
+			if ((await host.finish()).length) violate("harness", "leaked IPC");
+		}),
+	);
+
+cell(
+	"oracle | dirty reselect does not acknowledge merely observed external text",
+	() =>
+		judged(async (violate) => {
+			const native = new FakeNative();
+			const a = native.add(1, "a.pfdsl", TEXT.disk);
+			const again = native.reselect(a, 9);
+			const host = await startHost(native, a, {});
+			const tab = await host.open(a);
+			tab.type(TEXT.edited);
+			change(native, a, "external not loaded\n");
+			await host.open(again);
+			if (
+				host.ledger.acks.some(
+					(ack) =>
+						ack.id === again.id && ack.content === "external not loaded\n",
+				)
+			)
+				violate(
+					"R",
+					"native selection alone acknowledged external text never loaded into the dirty editor",
+				);
+			if ((await host.finish()).length) violate("harness", "leaked IPC");
+		}),
+);
+
 guardKnownRed();
+
+cell(
+	"oracle | rejected missing selection does not acknowledge a new capability",
+	() =>
+		judged(async (violate) => {
+			const native = new FakeNative();
+			const a = native.add(1, "a.pfdsl", TEXT.disk);
+			const again = native.reselect(a, 9);
+			const host = await startHost(native, a, {});
+			const tab = await host.open(a);
+			tab.type(TEXT.edited);
+			a.file = null;
+			await host.open(again);
+			if (host.ledger.acks.some((ack) => ack.id === again.id))
+				violate(
+					"R",
+					"a rejected missing selection acquired an acknowledgement",
+				);
+			if ((await host.finish()).length) violate("harness", "leaked IPC");
+		}),
+);

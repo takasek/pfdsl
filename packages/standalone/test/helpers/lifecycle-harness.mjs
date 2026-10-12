@@ -241,15 +241,17 @@ export async function createHarness(label) {
 			acks: [],
 			received: [],
 			failures: [],
+			saves: [],
 			offered: [],
-			opened: new Set(),
 		};
 		let seq = 0;
 		const tick = () => ++seq;
 		let poll;
 		let quitListener;
 		let selected;
+		let selection;
 		let closeSaveOwner;
+		let closeStart = 0;
 		globalThis.document = dom.window.document;
 		globalThis.window = dom.window;
 		globalThis.self = dom.window;
@@ -268,13 +270,21 @@ export async function createHarness(label) {
 			);
 		const know = (id, state) =>
 			ledger.received.push({ seq: tick(), id, ...state });
-		const approve = (id, content, why) =>
-			ledger.acks.push({ seq: tick(), id, content, why });
+		const approve = (id, content, why, tab = closeSaveOwner ?? activeTab()) =>
+			ledger.acks.push({
+				seq: tick(),
+				id,
+				binding: native.docs.get(id)?.binding,
+				content,
+				why,
+				tab,
+			});
 		const learn = (snapshot) =>
 			know(snapshot.id, {
 				source: snapshot.source,
 				revision: snapshot.revision,
 				path: snapshot.path,
+				binding: snapshot.binding,
 			});
 		globalThis.reviewTabHook = (kind, tab, text) => {
 			if (kind === "dispose") log.push({ kind: "dispose", tab, seq: tick() });
@@ -282,16 +292,16 @@ export async function createHarness(label) {
 			if (kind === "setSource") {
 				const seen = ledger.received.findLast((item) => item.source === text);
 				log.push({ kind: "reload", tab, text, seq: tick(), id: seen?.id });
-				if (seen) approve(seen.id, text, "reload");
+				if (seen) approve(seen.id, tab.getSource(), "reload", tab);
 			}
 		};
 		dom.window.HTMLDialogElement.prototype.close = () => {};
 		dom.window.HTMLDialogElement.prototype.showModal = function () {
 			const fields = [...this.querySelectorAll("textarea")].map((f) => f.value);
 			const text = this.querySelector("p").textContent;
-			const target = [...native.docs.values()].find((doc) =>
-				[doc.path, ...doc.history].some((path) => text.includes(path)),
-			)?.id;
+			const target = [...ledger.received, ...ledger.offered]
+				.sort((first, second) => first.seq - second.seq)
+				.findLast((item) => item.path && text.includes(item.path))?.id;
 			const entry = {
 				kind: "dialog",
 				seq: tick(),
@@ -327,17 +337,23 @@ export async function createHarness(label) {
 			if (command === "remember_document" || command === "release_document")
 				return;
 			if (command === "exit_listener_ready") return;
+			if (command === "read_dependency") {
+				log.push({
+					kind: "dependency",
+					id: args.id,
+					path: args.path,
+					seq: tick(),
+				});
+				return "dependency text";
+			}
 			if (command === "finish_app_exit") {
 				log.push({ kind: "exit", approved: args.approved, seq: tick() });
 				return;
 			}
 			if (command === "select_document" || command === "open_document") {
 				const snapshot = native.snapshot(selected);
+				selection = snapshot;
 				learn(snapshot);
-				if (snapshot.source !== null && !ledger.opened.has(snapshot.id)) {
-					ledger.opened.add(snapshot.id);
-					approve(snapshot.id, snapshot.source, "open");
-				}
 				return snapshot;
 			}
 			if (command === "choose_save_target") {
@@ -350,6 +366,7 @@ export async function createHarness(label) {
 						source: chosen.source,
 						revision: chosen.revision,
 						path: chosen.path,
+						binding: chosen.binding,
 					});
 					// Choosing a file starts from no acknowledged content.
 					approve(chosen.id, undefined, "chosen");
@@ -361,6 +378,7 @@ export async function createHarness(label) {
 				const entry = {
 					kind: "inspect",
 					id: args.id,
+					binding: native.docs.get(args.id)?.binding,
 					seq: tick(),
 					doneSeq: undefined,
 					outcome: undefined,
@@ -399,8 +417,10 @@ export async function createHarness(label) {
 				const forced = handlers.saveReply?.(args);
 				const entry = {
 					kind: "save",
+					tab: closeSaveOwner ?? activeTab(),
 					seq: submittedSeq,
 					id: args.id,
+					binding: target.binding,
 					source: args.source,
 					expected: args.expected,
 					fs: fsOf(native, target),
@@ -408,6 +428,7 @@ export async function createHarness(label) {
 					wrote: false,
 				};
 				log.push(entry);
+				ledger.saves.push(entry);
 				if (forced) {
 					entry.outcome = forced.outcome;
 					if (forced.current) learn(forced.current);
@@ -435,10 +456,17 @@ export async function createHarness(label) {
 				const owner = tabs().find(
 					(tab) =>
 						tab.button.isConnected &&
-						tab.button.textContent.replace(/ •$/, "") === args.name,
+						tab.button.textContent.replace(/ •$/, "") === args.name &&
+						!log.some(
+							(item) =>
+								item.kind === "confirm" &&
+								item.tab === tab &&
+								item.seq > closeStart,
+						),
 				);
 				const entry = {
 					kind: "confirm",
+					tab: owner,
 					seq: tick(),
 					name: args.name,
 					textAtRequest: owner?.getSource(),
@@ -497,6 +525,7 @@ export async function createHarness(label) {
 			throw new Error("the host did not settle");
 		};
 		const click = async (element) => {
+			if (element.classList.contains("close-document")) closeStart = tick();
 			element.click();
 			await settle();
 		};
@@ -541,9 +570,25 @@ export async function createHarness(label) {
 				};
 			},
 			async open(target) {
+				const before = new Set(tabs());
 				selected = target;
+				selection = undefined;
 				await click(query("#open-file"));
-				return activeTab();
+				const tab = activeTab();
+				if (!before.has(tab)) approve(target.id, tab.getSource(), "open", tab);
+				else if (
+					selection?.source !== null &&
+					selection &&
+					tab.location === selection.path
+				) {
+					// A capability changes ownership, not which disk text the editor accepted.
+					const accepted = ledger.acks.findLast(
+						(ack) => ack.tab === tab && ack.content !== undefined,
+					);
+					if (accepted && accepted.id !== target.id)
+						approve(target.id, accepted.content, "rebind", tab);
+				}
+				return tab;
 			},
 			async newDocument() {
 				await click(query("#new"));
@@ -555,9 +600,11 @@ export async function createHarness(label) {
 			},
 			/** Starts a quit request without waiting for the host to go idle. */
 			beginQuit(payload) {
+				closeStart = tick();
 				quitListener({ payload: String(payload) });
 			},
 			async quit(payload) {
+				closeStart = tick();
 				quitListener({ payload: String(payload) });
 				await settle();
 			},

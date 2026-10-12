@@ -59,8 +59,13 @@ export function sameDiskContent(
  */
 type Observation =
 	| { state: "readable"; snapshot: DiskSnapshot }
-	| { state: "missing"; snapshot: DiskSnapshot }
-	| { state: "unreadable"; error: string | null; last: DiskSnapshot | null };
+	| { state: "missing"; snapshot: DiskSnapshot; identity: string | null }
+	| {
+			state: "unreadable";
+			error: string | null;
+			last: DiskSnapshot | null;
+			identity: string | null;
+	  };
 
 /** The result of reading one target. */
 type ReadResult = { snapshot: DiskSnapshot } | { error: unknown };
@@ -80,6 +85,8 @@ export interface OperationPlan {
 	editor: string;
 	epoch: number;
 	editorVersion: number | string;
+	/** The acknowledged binding context, replaced when a capability is rebound. */
+	acknowledged: object;
 }
 
 interface SaveOutcome {
@@ -116,10 +123,21 @@ interface Recovery {
 	receipt: SaveResult;
 }
 
-function classify(snapshot: DiskSnapshot): Observation {
+function classify(
+	snapshot: DiskSnapshot,
+	identity: string | null = null,
+): Observation {
 	return snapshot.source === null
-		? { state: "missing", snapshot }
+		? { state: "missing", snapshot, identity }
 		: { state: "readable", snapshot };
+}
+
+/** Last known inode evidence survives a missing leaf; it never establishes readability. */
+function identityOf(observation: Observation | undefined): string | null {
+	if (!observation) return null;
+	return observation.state === "readable"
+		? observation.snapshot.identity
+		: observation.identity;
 }
 
 function known(observation: Observation | undefined): DiskSnapshot | null {
@@ -176,8 +194,15 @@ export class DocumentSession {
 	get location(): DiskSnapshot | null {
 		const disk = this.acknowledged.disk;
 		if (!disk) return null;
-		const seen = known(this.observations.get(disk.id));
-		return seen ? { ...disk, path: seen.path } : disk;
+		const observation = this.observations.get(disk.id);
+		const seen = known(observation);
+		return seen
+			? {
+					...disk,
+					path: seen.path,
+					identity: identityOf(observation) ?? disk.identity,
+				}
+			: disk;
 	}
 	/** Whether the document holds this native capability: its own file or an unresolved save target. */
 	usesDocument(id: number) {
@@ -236,6 +261,7 @@ export class DocumentSession {
 			editor: this.view.getSource(),
 			epoch: this.epoch,
 			editorVersion: this.editorVersion(),
+			acknowledged: this.acknowledged,
 		};
 	}
 	/**
@@ -244,6 +270,7 @@ export class DocumentSession {
 	 * that read can itself advance the epoch and the review it triggers covers it.
 	 */
 	holds(plan: OperationPlan, scope: "all" | "editor" = "all") {
+		if (plan.acknowledged !== this.acknowledged) return false;
 		if (this.disposed || plan.editorVersion !== this.editorVersion())
 			return false;
 		return scope === "editor" || plan.epoch === this.epoch;
@@ -281,8 +308,9 @@ export class DocumentSession {
 						state: "unreadable",
 						error: String(result.error),
 						last: known(previous),
+						identity: identityOf(previous),
 					}
-				: classify(result.snapshot);
+				: classify(result.snapshot, identityOf(previous));
 		const moved = differs(previous, next);
 		this.observations.set(target.id, next);
 		if (moved) this.epoch++;
@@ -359,8 +387,16 @@ export class DocumentSession {
 		}
 		const unresolved = result.current ?? target;
 		const next: Observation = result.current
-			? classify(result.current)
-			: { state: "unreadable", error: null, last: null };
+			? classify(
+					result.current,
+					identityOf(this.observations.get(unresolved.id)) ?? target.identity,
+				)
+			: {
+					state: "unreadable",
+					error: null,
+					last: null,
+					identity: target.identity,
+				};
 		const kept = new Map<number, Observation>();
 		const original = this.activeObservation();
 		const disk = this.acknowledged.disk;
@@ -378,8 +414,18 @@ export class DocumentSession {
 	 */
 	rebindDisk(current: DiskSnapshot, previousMissing = false) {
 		const previous = this.acknowledged.disk;
-		if (!previous || !sameDocument(previous, current, previousMissing))
+		if (
+			!previous ||
+			!sameDocument(this.location ?? previous, current, previousMissing)
+		)
 			return false;
+		// Re-labelling observations must not erase a change to a plan's target or displayed path.
+		if (
+			previous.id !== current.id ||
+			previous.binding !== current.binding ||
+			this.location?.path !== current.path
+		)
+			this.epoch++;
 		const changed = !sameDiskContent(previous, current);
 		const owns = (snapshot: DiskSnapshot) =>
 			snapshot.binding === previous.binding;
@@ -458,7 +504,7 @@ export class DocumentSession {
 		} else message = changedMessage(seen);
 		const publication = recovery?.receipt.publication;
 		const original =
-			recovery && disk && recovery.target.id !== disk.id
+			recovery && disk && recovery.target.binding !== disk.binding
 				? this.observations.get(disk.id)
 				: undefined;
 		return {

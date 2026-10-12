@@ -50,6 +50,18 @@ function acknowledged(host, id, seq) {
 	return host.ledger.acks.findLast((ack) => ack.id === id && ack.seq < seq);
 }
 
+/** Unknown receipts do not erase a capability's recorded binding. */
+function targetBinding(host, id) {
+	return (
+		host.ledger.received.findLast(
+			(item) => item.id === id && item.binding !== undefined,
+		)?.binding ??
+		host.ledger.offered?.findLast(
+			(item) => item.id === id && item.binding !== undefined,
+		)?.binding
+	);
+}
+
 /** L, A, C, R, U, K and the disposal rule over everything since beginAction. */
 export function checkAction({ native, host, tab, trace, violate }) {
 	const log = host.log;
@@ -123,6 +135,7 @@ export function checkAction({ native, host, tab, trace, violate }) {
 	}
 	log.forEach((save, index) => {
 		if (save.kind !== "save") return;
+		if (save.tab && save.tab !== tab) return;
 		const earlier = log.slice(0, index);
 		const previousSave = earlier.findLastIndex(
 			(item) => item.kind === "save" && item.id === save.id,
@@ -187,7 +200,17 @@ export function checkAction({ native, host, tab, trace, violate }) {
 			);
 	});
 	// U: a failed read stays visible until the user resolves it or the content returns.
-	const unresolved = trace.owned.filter((id) => unresolvedFailure(host, id));
+	// A successful save or adoption moves this tab's ownership. Failures on its
+	// former targets stay in the ledger, but are no longer this tab's unresolved reads.
+	const settled = host.ledger.acks.findLast(
+		(ack) =>
+			ack.tab === tab &&
+			ack.seq > trace.seq0 &&
+			(ack.why === "save" || ack.why === "reload"),
+	);
+	const unresolved = (settled ? [settled.id] : trace.owned).filter((id) =>
+		unresolvedFailure(host, id),
+	);
 	if (alive && unresolved.length && !host.isDirty(tab))
 		violate("U", "an unreadable read left no sign on the tab");
 	// K
@@ -206,11 +229,16 @@ export function checkAction({ native, host, tab, trace, violate }) {
 function unresolvedFailure(host, id) {
 	const failure = host.ledger.failures.findLast((item) => item.id === id);
 	if (!failure) return false;
-	// Any approved write or load later resolves it: the document then lives elsewhere.
+	const binding = targetBinding(host, id);
+	// Only evidence for this target resolves its read failure.
 	const resolved = host.ledger.acks.some(
 		(ack) =>
+			(ack.id === id || (binding !== undefined && ack.binding === binding)) &&
 			ack.seq > failure.seq &&
-			(ack.why === "save" || ack.why === "approval" || ack.why === "open"),
+			(ack.why === "save" ||
+				ack.why === "approval" ||
+				ack.why === "open" ||
+				ack.why === "reload"),
 	);
 	const latest = host.ledger.received.findLast(
 		(item) => item.id === id && item.seq > failure.seq,
@@ -227,21 +255,33 @@ export function checkReads({ host, tab, trace, violate }) {
 		(item) => item.kind === "dispose" && item.tab === tab,
 	);
 	if (!dispose) return;
+	// The final decision belongs to the whole transaction, including other tabs
+	// and the review that may follow a Close Save decision.
 	const decisions = log.filter(
-		(item) => item.kind === "confirm" && item.name === trace.name,
+		(item) =>
+			(item.kind === "confirm" || item.kind === "dialog") &&
+			item.seq < dispose.seq,
 	);
 	const lastDecision = decisions.length
-		? Math.max(...decisions.map((item) => item.decidedSeq ?? 0))
+		? Math.max(
+				...decisions.map((item) => item.decidedSeq ?? item.clickSeq ?? 0),
+			)
 		: trace.seq0;
 	// A save that succeeded leaves its file as the only unresolved target.
 	const saved = log.findLast(
-		(item) => item.kind === "save" && item.outcome === "saved",
+		(item) =>
+			item.kind === "save" &&
+			item.tab === tab &&
+			item.outcome === "saved" &&
+			item.seq < dispose.seq,
 	);
 	for (const id of saved ? [saved.id] : trace.owned) {
+		const binding = targetBinding(host, id);
 		const read = log.some(
 			(item) =>
 				item.kind === "inspect" &&
-				item.id === id &&
+				(item.id === id ||
+					(binding !== undefined && item.binding === binding)) &&
 				item.seq > lastDecision &&
 				item.doneSeq !== undefined &&
 				item.doneSeq < dispose.seq,
@@ -260,7 +300,28 @@ export function checkReads({ host, tab, trace, violate }) {
  */
 export function checkPanel({ host, native, violate, recoveryId, original }) {
 	const panel = host.panel();
-	if (!panel.present) return;
+	if (!panel.present) {
+		const receipt = host.ledger?.saves?.findLast((item) =>
+			recoveryId === undefined
+				? item.tab === host.activeTab()
+				: item.id === recoveryId,
+		);
+		const lastSave =
+			receipt && host.ledger.saves.findLast((item) => item.tab === receipt.tab);
+		const adopted =
+			receipt &&
+			host.ledger.acks.some(
+				(ack) =>
+					ack.tab === receipt.tab &&
+					ack.seq > lastSave.seq &&
+					ack.why === "reload",
+			);
+		const unresolved = receipt
+			? host.isOpen(receipt.tab) && lastSave.outcome !== "saved" && !adopted
+			: recoveryId !== undefined;
+		if (unresolved) violate("P", "the unresolved recovery target has no panel");
+		return;
+	}
 	// The original is never "also changed" while it is itself the recovery target.
 	if (
 		original &&
@@ -340,7 +401,17 @@ export function checkObservation({
 				`the panel shows ${JSON.stringify(panel.preview)} but ${recovery.path} holds ${JSON.stringify(current.source)}`,
 			);
 	}
-	if (original && recovery && original.id !== recovery.id) {
+	if (
+		original &&
+		recovery &&
+		original.binding === recovery.binding &&
+		panel.originalAlsoChanged
+	)
+		violate(
+			"O",
+			"the original is itself the recovery target but the notice is shown",
+		);
+	if (original && recovery && original.binding !== recovery.binding) {
 		const current = fsOf(native, original);
 		const known = host.ledger.acks.findLast((ack) => ack.id === original.id);
 		if (!current.unreadable) {

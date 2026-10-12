@@ -180,7 +180,7 @@ async function openSnapshot(snapshot: DiskSnapshot) {
 		)
 	) {
 		for (const entry of opened) {
-			const previous = entry.session.disk;
+			const previous = entry.session.location;
 			if (!previous?.identity || previous.identity !== snapshot.identity)
 				continue;
 			// Equal inodes can be simultaneous hard links. Only a missing old leaf permits rename recovery.
@@ -320,6 +320,14 @@ async function saveEntry(
 ): Promise<boolean> {
 	if (!native) throw new Error("Use the desktop application to save files.");
 	const session = entry.session;
+	const checkConfirmation = () => {
+		if (confirmation && !session.holds(confirmation, "editor")) {
+			status.textContent =
+				"The document changed after the decision was asked. Editor content is retained; close it again.";
+			return false;
+		}
+		return true;
+	};
 	let target = observed ? (session.panel()?.observed ?? null) : session.disk;
 	// A target picked in the chooser has no acknowledged content to compare with.
 	const chosen = as || !target;
@@ -346,6 +354,8 @@ async function saveEntry(
 			status.textContent = `Could not read ${remembered.path}: ${String(error)}. The save was not attempted. Editor content is retained.`;
 			return false;
 		}
+		// Even a no-op or reload exit must still belong to the Close Save decision.
+		if (!checkConfirmation()) return false;
 		const clean = !session.isDirty();
 		const outcome = session.observe(remembered, { snapshot: fresh }, scope);
 		target = fresh;
@@ -376,11 +386,7 @@ async function saveEntry(
 	}
 	if (explainOpenTarget(entry, target!)) return false;
 	const selected = target!;
-	if (confirmation && !session.holds(confirmation, "editor")) {
-		status.textContent =
-			"The document changed after the decision was asked. Editor content is retained; close it again.";
-		return false;
-	}
+	if (!checkConfirmation()) return false;
 	// Identical text leaves nothing to overwrite, so there is nothing to review.
 	const review =
 		selected.source !== null &&
