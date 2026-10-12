@@ -201,6 +201,69 @@ test("entry integration: normal and safety representatives for Claude and Codex"
 	}
 });
 
+test("entry integration: stage-three ordinary verbs, literal targets and routine children", () => {
+	const f = fixture();
+	try {
+		for (const command of [
+			"git rev-list --count HEAD",
+			"git reflog",
+			"git reflog show",
+			"git for-each-ref",
+			"git ls-remote origin",
+			"git check-ignore a.txt",
+			"git diff-tree -r HEAD",
+			"git symbolic-ref --short HEAD",
+			"git shortlog -sn",
+			"git range-diff a...b",
+			"git patch-id",
+			"git count-objects -v",
+			"git tag -l",
+			"git sparse-checkout list",
+			"git format-patch -1",
+			"git hash-object a.txt",
+			"git commit-tree HEAD^{tree} -m x",
+			"git pull",
+			"git pull --rebase",
+			"git pull --ff-only",
+			"git pull origin main",
+			"git tag v1",
+			"git init /tmp/x",
+			"git clone https://example.invalid/r /tmp/b",
+			"git archive HEAD -o /tmp/x.tar",
+			"git bundle create /tmp/x.bundle HEAD",
+			"git worktree prune",
+			"git bisect start",
+			"git submodule update --init",
+		]) {
+			const result = f.invoke({ command });
+			assert.equal(result.status, 0, result.out);
+			assert.equal(result.decision, "allow", command);
+		}
+		for (const command of [
+			`pushd '${f.primary}' && git add -A`,
+			`export GIT_DIR='${f.primary}/.git' GIT_WORK_TREE='${f.primary}'; git add -A`,
+			`bash -c 'git -C ${f.primary} commit -m x'`,
+			`eval 'git -C ${f.primary} commit -m x'`,
+		])
+			assert.equal(f.invoke({ command }).decision, "deny", command);
+		for (const verb of ["stage-all", "commit", "branch-rename"]) {
+			const command = `/personal/codex-git-routine.mjs ${verb} ${f.own} feat/own x`;
+			const result = f.invoke(
+				{ command },
+				{ harness: "codex", agent_id: "child" },
+			);
+			assert.equal(result.decision, "deny", verb);
+			assert.match(result.reason, /Recovery: parent/);
+			assert.equal(
+				f.invoke({ command }, { harness: "codex" }).decision,
+				"allow",
+			);
+		}
+	} finally {
+		f.cleanup();
+	}
+});
+
 test("entry integration: parser missing -> exact bootstrap repair -> installed healthy -> normal allow", () => {
 	const f = fixture();
 	try {
