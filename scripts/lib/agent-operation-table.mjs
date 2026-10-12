@@ -161,6 +161,11 @@ export function decideOperation(input) {
 			"classes must be a nonempty array of finite operation classes.",
 		);
 	if (cell.health === "failed") {
+		if (cell.failure === "parser-timeout")
+			return stopped(
+				"Shell parsing was temporarily delayed. Retry the same command.",
+				"rewrite",
+			);
 		const repair = parserRecoveryCommand(cell.hookRoot);
 		if (cell.failure === "parser-missing" && repair && cell.command === repair)
 			return { decision: "allow" };

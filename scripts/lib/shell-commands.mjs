@@ -39,6 +39,7 @@ export function readShell(
 		expandLiteralScripts(result, parserPath);
 	} catch (error) {
 		const unavailable = error.code === "ENOENT";
+		const timedOut = error.code === "ETIMEDOUT";
 		const parserFailure =
 			Boolean(error.code) ||
 			error instanceof SyntaxError ||
@@ -52,14 +53,18 @@ export function readShell(
 			...(error.commands ? { commands: error.commands } : {}),
 			failure: unavailable
 				? "parser-missing"
-				: parserFailure
-					? "parser"
-					: "syntax",
+				: timedOut
+					? "parser-timeout"
+					: parserFailure
+						? "parser"
+						: "syntax",
 			error: unavailable
 				? "The pinned shell parser is missing. Run make setup in this checkout and retry."
-				: parserFailure
-					? `Cannot run the pinned shell parser: ${diagnostic}. Repair the parser before retrying.`
-					: `Cannot parse or inspect this shell command: ${diagnostic}. Rewrite it using ordinary simple commands, if/for/while, or explicit paths.`,
+				: timedOut
+					? "Shell parsing was temporarily delayed. Retry the same command."
+					: parserFailure
+						? `Cannot run the pinned shell parser: ${diagnostic}. Repair the parser before retrying.`
+						: `Cannot parse or inspect this shell command: ${diagnostic}. Rewrite it using ordinary simple commands, if/for/while, or explicit paths.`,
 		};
 	}
 	return result;
@@ -167,13 +172,16 @@ function expandLiteralScripts(result, parserPath) {
 }
 
 export function shellParseDecision(command, { parserPath } = {}) {
-	const { error, parserFailure } = readShell(command, { parserPath });
+	const { error, parserFailure, failure } = readShell(command, { parserPath });
 	return error
 		? {
 				decision: "deny",
 				matched: "shell syntax",
 				reason: error,
-				recovery: parserFailure ? "terminal" : "rewrite",
+				recovery:
+					parserFailure && failure !== "parser-timeout"
+						? "terminal"
+						: "rewrite",
 			}
 		: null;
 }

@@ -144,6 +144,8 @@ shfmt の1回の解析 timeout は3000ms、policy supervisor の内部 deadline 
 両 harness の PreToolUse hook timeout の10秒より短くする。
 複数命令や literal な内側の解析を含む処理全体は supervisor が止めるため、各解析の時間を合計して待ち続けない。
 高負荷時の成功を保証する値ではなく、通常の並列 session の遅延を許容しつつ同期停止を監督する上限である。
+parser の timeout は欠落やロード故障と区別し、一時的な遅延として同じ命令の再試行を案内する deny とする。
+回復先は同じ agent の書換え（再試行）であり、欠落時だけの root 固定 installer の allow 例外は変えない。
 
 判定表の合成入力、実 Git の代表例、live hook、設定の正式な読込みを別の証拠段階として記録する。
 合成入力と子プロセスの入口検査を live harness の成功へ格上げしない。
