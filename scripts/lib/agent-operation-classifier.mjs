@@ -45,6 +45,15 @@ const GIT_WRITE = new Set([
 	"rm",
 	"mv",
 ]);
+// Recognize the caller's personal routine by filename only; it is not imported
+// or executed here. Parent calls retain the routine's own policy boundary.
+const ROUTINE_CHECKS = new Set([
+	"build",
+	"test",
+	"typecheck",
+	"node-test",
+	"node-script",
+]);
 const VALUE_FLAGS = new Set([
 	"-m",
 	"--message",
@@ -762,6 +771,21 @@ export function classifyAgentOperations(payload, facts) {
 				const head = node.tokens[executableIndex];
 				if (head?.dynamic) return unresolved();
 				const name = basename(head?.value ?? "");
+				const args = node.tokens.slice(executableIndex + 1);
+				const routine =
+					name === "codex-git-routine.mjs"
+						? 0
+						: name === "node" &&
+								!args[0]?.dynamic &&
+								basename(args[0]?.value ?? "") === "codex-git-routine.mjs"
+							? 1
+							: null;
+				if (
+					routine !== null &&
+					subject === "codex-child" &&
+					!ROUTINE_CHECKS.has(args[routine]?.value)
+				)
+					return operation(["W"], "git", { target: "own" });
 				if (name === "git") return gitOperation(node, context, facts);
 				if (name === "gh")
 					return ghOperation(node.tokens.slice(executableIndex));

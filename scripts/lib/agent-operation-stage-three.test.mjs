@@ -126,3 +126,45 @@ test("hook-process Git target override keeps changing Git unresolved even with e
 	assert.equal(result.decision, "deny");
 	assert.equal(classified.operations[0].target, "unresolved");
 });
+
+test("property 6: child routines return nonverification verbs to the parent", async (t) => {
+	for (const prefix of [
+		"/personal/codex-git-routine.mjs",
+		"node /personal/codex-git-routine.mjs",
+	]) {
+		for (const verb of [
+			"stage-all",
+			"commit",
+			"branch-rename",
+			"fetch-origin",
+			"setup",
+		])
+			await t.test(`${prefix} ${verb}`, () => {
+				const command = `${prefix} ${verb} ${own} feat/own x`;
+				const child = inspect(command, {
+					facts: { harness: "codex" },
+					payload: { agent_id: "child" },
+				}).result;
+				assert.equal(child.decision, "deny");
+				assert.equal(child.recovery, "parent");
+				assert.equal(
+					inspect(command, { facts: { harness: "codex" } }).result.decision,
+					"allow",
+				);
+			});
+		for (const verb of [
+			"build",
+			"test",
+			"typecheck",
+			"node-test",
+			"node-script",
+		])
+			assert.equal(
+				inspect(`${prefix} ${verb} ${own} feat/own scripts/check.mjs`, {
+					facts: { harness: "codex" },
+					payload: { agent_id: "child" },
+				}).result.decision,
+				"allow",
+			);
+	}
+});
