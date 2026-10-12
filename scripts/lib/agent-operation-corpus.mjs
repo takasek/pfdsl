@@ -904,7 +904,29 @@ export const AGENT_OPERATION_CORPUS = [
 		`git -C ${primary} merge-tree --write-tree HEAD origin/main`,
 		"deny",
 	),
-	example("merge-tree-read", "git merge-tree HEAD origin/main", "allow", {
-		classes: ["R"],
-	}),
+	example(
+		"merge-tree-read",
+		"git merge-tree --trivial-merge HEAD HEAD origin/main",
+		"allow",
+		{
+			classes: ["R"],
+		},
+	),
+	example(
+		"merge-tree-default-own",
+		"git merge-tree HEAD origin/main",
+		"allow",
+		{ classes: ["W"] },
+	),
+	example(
+		"merge-tree-default-child",
+		`git -C ${own} merge-tree HEAD origin/main`,
+		"deny",
+		{ subject: "codex-child" },
+	),
+	example(
+		"merge-tree-default-primary",
+		`git -C ${primary} merge-tree HEAD origin/main`,
+		"deny",
+	),
 ];

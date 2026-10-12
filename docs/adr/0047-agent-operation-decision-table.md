@@ -92,6 +92,7 @@ agent が手動で追加した worktree は other-unowned であり、変更を�
 force 付きは own 以外で deny、other-live は force の有無を問わず deny とする。
 stash の push・pop・apply・drop は W、clear だけを S とする。
 試行用の merge-tree --write-tree は own から行う W とし、checkout と ref を変えずに object を書く。
+merge-tree の2引数の既定モードも W、明示した --trivial-merge の読取モードだけを R とする。
 Git metadata の書込みを子へ渡さず、Codex の子は親へ返す。
 検査回避の短い形 -n は commit・push・am、--config-env は core.hooksPath を指定する形を扱う。
 
