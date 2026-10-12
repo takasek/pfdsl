@@ -38,3 +38,17 @@ test("unknown options and missing required values are unresolved and never expos
 		/fixture|private/,
 	);
 });
+
+test("frequent run filters consume values and rebase merge mode does not", () => {
+	const run = parseInputForm(
+		tokens("--branch", "main", "--workflow", "ci"),
+		"gh run list",
+	);
+	assert.deepEqual(run.operands, []);
+	assert.equal(
+		run.values.find(({ flag }) => flag === "--branch").value,
+		"main",
+	);
+	const rebase = parseInputForm(tokens("-m"), "git rebase");
+	assert.deepEqual(rebase.issues, []);
+});

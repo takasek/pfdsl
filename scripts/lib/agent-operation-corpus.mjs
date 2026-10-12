@@ -116,6 +116,35 @@ function example(
 // Every row of the specification's acceptance pairs has a named normal case
 // and, where present, its independently specified safety case.
 export const AGENT_OPERATION_CORPUS = [
+	example("review-1437-root-gh-help", "gh --help", "allow"),
+	example("review-1437-root-gh-version", "gh --version", "allow"),
+	example("review-1437-rebase-merge-mode", "git rebase -m", "allow"),
+	example(
+		"review-1437-dynamic-setting",
+		'git -c "$setting" commit -m x',
+		"deny",
+	),
+	example(
+		"review-1437-dynamic-config-env",
+		'git --config-env "$setting" commit -m x',
+		"deny",
+	),
+	example(
+		"review-1437-opaque-commit-option",
+		'git commit "$flag" -m x',
+		"deny",
+	),
+	example("review-1437-opaque-api-field", 'gh api graphql -f "$field"', "deny"),
+	example(
+		"review-1437-busy-worktree-reset",
+		"git worktree add --force -B feat/busy /tmp/trial HEAD",
+		"deny",
+	),
+	example(
+		"review-1437-implicit-default-worktree",
+		"git worktree add --force /tmp/main",
+		"deny",
+	),
 	example("review-1437-01-update-stdin", "git update-ref --stdin", "deny"),
 	example(
 		"review-1437-02-nested-live",

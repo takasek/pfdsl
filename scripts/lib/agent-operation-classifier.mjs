@@ -249,6 +249,16 @@ function withInputIssues(
 
 function gitDecisionArguments(sub, parsed, classes) {
 	const { operands, values } = parsed;
+	const optionOperands = [
+		"commit",
+		"am",
+		"push",
+		"hash-object",
+		"tag",
+		"symbolic-ref",
+	].includes(sub)
+		? operands.filter((token) => token.dynamic && !token.positionalOnly)
+		: [];
 	const at = (...indices) => indices.map((index) => operands[index]);
 	const option = (...flags) =>
 		values.filter(({ flag }) => flags.includes(flag));
@@ -278,7 +288,8 @@ function gitDecisionArguments(sub, parsed, classes) {
 		return [
 			operands[["get", "set", "unset"].includes(operands[0]?.value) ? 1 : 0],
 		];
-	if (sub === "symbolic-ref") return classes.includes("R") ? [] : operands;
+	if (sub === "symbolic-ref")
+		return classes.includes("R") ? optionOperands : operands;
 	if (sub === "init") return at(0);
 	if (sub === "clone") return at(1);
 	if (["archive", "format-patch"].includes(sub)) return option("-o");
@@ -292,7 +303,7 @@ function gitDecisionArguments(sub, parsed, classes) {
 				? [...at(2), ...option("-b", "-B")]
 				: []),
 		];
-	return [];
+	return optionOperands;
 }
 
 function gitOperation(command, context, facts) {
@@ -353,9 +364,23 @@ function gitOperation(command, context, facts) {
 			value === "--config-env" ||
 			value.startsWith("--config-env=")
 		) {
-			const setting = value.startsWith("--config-env=")
-				? value.slice("--config-env=".length)
-				: tokens[++i]?.value;
+			const supplied = value.startsWith("--config-env=")
+				? { ...tokens[i], value: value.slice("--config-env=".length) }
+				: tokens[++i];
+			const setting = supplied?.value;
+			if (!supplied) globalIssues.push("missing-option-value");
+			else {
+				const key = setting.split("=")[0];
+				globalIssues.push(
+					...decisionArgumentIssues({ issues: [], flags: new Set() }, [
+						{
+							value: key,
+							dynamic:
+								supplied.dynamic && !/^[A-Za-z][A-Za-z0-9.-]*$/.test(key),
+						},
+					]),
+				);
+			}
 			bypass ||= setting?.split("=")[0].toLowerCase() === "core.hookspath";
 		} else if (
 			![
@@ -609,15 +634,28 @@ function gitOperation(command, context, facts) {
 			const created = parsed.values.find(({ flag }) =>
 				["-b", "-B"].includes(flag),
 			);
+			const selected =
+				created ??
+				operands[2] ??
+				(operands[1] && !operands[1].dynamic
+					? { value: basename(operands[1].value) }
+					: undefined);
 			classes = [
 				(created && defaultRef(created.value, facts)) ||
 				(!created &&
 					!flags.has("--detach") &&
-					defaultRef(operands[2]?.value, facts))
+					defaultRef(selected?.value, facts))
 					? "D"
 					: "B",
 			];
 			if (created?.dynamic) classes.push("U");
+			const busy =
+				!flags.has("--detach") && selected?.value
+					? facts.branches?.[selected.value.replace(/^refs\/heads\//, "")]
+							?.checkedOutAt
+					: null;
+			if (busy && busy !== location.tree?.root && !classes.includes("D"))
+				effective = pathFacts(busy, facts);
 			const target = destination(operands[1]);
 			const nested =
 				["other-live", "other-unowned"].includes(target.target) &&
@@ -743,6 +781,15 @@ function ghOperation(tokens) {
 	const initial = scan(args);
 	const initialGroup = initial.operands[0]?.value;
 	const initialVerb = initial.operands[1]?.value;
+	if (!initialGroup) {
+		const root = parseInputForm(args, "gh");
+		if (
+			!root.issues.length &&
+			["--help", "-h", "--version"].some((flag) => root.flags.has(flag))
+		)
+			return operation(["R"], "remote", { target: "own" });
+		return withInputIssues(unresolved("remote"), "gh", root);
+	}
 	const valueFlags = new Set(VALUE_FLAGS);
 	for (const flag of [
 		"--description",
@@ -802,6 +849,9 @@ function ghOperation(tokens) {
 		const sensitive = [
 			operands[1],
 			values.findLast(({ flag }) => ["-X", "--method"].includes(flag)),
+			...fields.filter(
+				(field) => !/^[A-Za-z_][A-Za-z0-9_]*=/.test(field.value),
+			),
 			...(queryToken
 				? [{ ...queryToken, value: queryToken.value.slice(6) }]
 				: []),

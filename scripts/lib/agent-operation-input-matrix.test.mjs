@@ -7,6 +7,39 @@ import { evaluateAgentOperationPolicy } from "./agent-operation-policy.mjs";
 // Each declared decision argument is crossed with every input source, without
 // generating Git syntax from help or interpreting external input contents.
 const roles = [
+	[
+		"Git setting key",
+		["git", "-c", "color.ui=never", "-C", "/fixture/own", "commit", "-m", "x"],
+		2,
+		"W",
+	],
+	[
+		"Git config-env key",
+		[
+			"git",
+			"--config-env",
+			"color.ui=COLOR",
+			"-C",
+			"/fixture/own",
+			"commit",
+			"-m",
+			"x",
+		],
+		2,
+		"W",
+	],
+	[
+		"API field key",
+		[
+			"gh",
+			"api",
+			"graphql",
+			"-f",
+			"query=mutation { updateIssue(input: {}) { clientMutationId } }",
+		],
+		4,
+		"O",
+	],
 	["Git execution path", ["git", "-C", "/fixture/own", "add", "a"], 2, "W"],
 	[
 		"update-ref",

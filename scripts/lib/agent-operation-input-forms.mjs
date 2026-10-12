@@ -20,7 +20,7 @@ export function parseInputForm(tokens, name) {
 			continue;
 		}
 		if (afterDash || !token.value.startsWith("-") || token.value === "-") {
-			operands.push(token);
+			operands.push({ ...token, positionalOnly: afterDash });
 			if (
 				name === "git config" &&
 				operands.length === 1 &&
@@ -71,10 +71,12 @@ export function decisionArgumentIssues(
 	indirectFlags = [],
 ) {
 	const issues = [...parsed.issues];
-	if (indirectFlags.some((flag) => parsed.flags.has(flag)))
-		issues.push(
-			indirectFlags.includes("--input") ? "indirect-file" : "indirect-stdin",
-		);
+	const sources = new Map([
+		["--input", "indirect-file"],
+		["--stdin", "indirect-stdin"],
+	]);
+	for (const selector of indirectFlags)
+		if (parsed.flags.has(selector)) issues.push(sources.get(selector));
 	for (const token of argumentsToInspect.filter(Boolean)) {
 		if (token.dynamic) issues.push("dynamic-argument");
 		else if (token.value === "-" || token.value === "@-")

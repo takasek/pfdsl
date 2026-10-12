@@ -1659,7 +1659,7 @@
 	},
 	"gh run list": {
 		"--branch": {
-			"arity": "none",
+			"arity": "required",
 			"count": 13
 		},
 		"--commit": {
@@ -3407,7 +3407,7 @@
 			"count": 0
 		},
 		"-m": {
-			"arity": "required",
+			"arity": "none",
 			"count": 0
 		}
 	},
