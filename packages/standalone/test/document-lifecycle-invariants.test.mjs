@@ -207,25 +207,162 @@ const flush = async () => {
 	for (let i = 0; i < 100; i++) await Promise.resolve();
 };
 
-async function runCell(tabState, event, timing, action) {
-	const violations = [];
-	const violate = (name, detail) => violations.push(`${name}: ${detail}`);
+const fsOf = (native, doc) => {
+	try {
+		return native.snapshot(doc);
+	} catch {
+		return { unreadable: true };
+	}
+};
+
+/**
+ * Runs the production main.ts over `native`. Every dialog is answered with the
+ * choice that confirms replacing or creating the target. `handlers` supplies
+ * confirm_close_document (confirm), choose_save_target (choose) and may lose a
+ * save reply (saveFault: "before" or "after" the write).
+ */
+async function startHost(native, watched, handlers = {}) {
 	const dom = new JSDOM(
 		readFileSync(`${root}/packages/standalone/index.html`, "utf8"),
 	);
 	const log = [];
-	const leaks = [];
 	let poll;
 	let quitListener;
+	let selected;
+	globalThis.document = dom.window.document;
+	globalThis.window = dom.window;
+	globalThis.self = dom.window;
+	dom.window.__TAURI_INTERNALS__ = {};
+	globalThis.setInterval = (fn) => {
+		poll = fn;
+		return 0;
+	};
+	dom.window.HTMLDialogElement.prototype.close = () => {};
+	dom.window.HTMLDialogElement.prototype.showModal = function () {
+		const fields = [...this.querySelectorAll("textarea")].map((f) => f.value);
+		log.push({
+			kind: "dialog",
+			title: this.querySelector("h2").textContent,
+			editor: fields[0],
+			disk: fields[1],
+			fs: fsOf(native, watched),
+			fsById: Object.fromEntries(
+				[...native.docs].map(([id, doc]) => [id, fsOf(native, doc)]),
+			),
+		});
+	};
+	globalThis.nativeAcceptance = () => new Promise(() => {});
+	globalThis.nativeListen = async (_, listener) => {
+		quitListener = listener;
+		return () => {};
+	};
+	globalThis.nativeInvoke = async (command, args) => {
+		if (command === "list_recent") return [];
+		if (command === "remember_document" || command === "release_document")
+			return;
+		if (command === "exit_listener_ready" || command === "finish_app_exit")
+			return;
+		if (command === "select_document" || command === "open_document")
+			return native.snapshot(selected);
+		if (command === "choose_save_target") return handlers.choose();
+		if (command === "inspect_document") {
+			log.push({ kind: "inspect", id: args.id });
+			return native.snapshot(native.docs.get(args.id));
+		}
+		if (command === "save_document") {
+			const target = native.docs.get(args.id);
+			const fault = handlers.saveFault?.(args);
+			log.push({
+				kind: "save",
+				id: args.id,
+				expected: args.expected,
+				fs: fsOf(native, target),
+			});
+			if (fault === "before") throw new Error("native reply lost");
+			const reply = native.save(target, args.source, args.expected);
+			if (fault === "after") throw new Error("native reply lost");
+			return reply;
+		}
+		if (command === "confirm_close_document")
+			return handlers.confirm(args.name);
+		throw new Error(`unexpected command ${command}`);
+	};
+	await import(`${pathToFileURL(output).href}?cell=${++cellSerial}`);
+	await flush();
+	const settle = async () => {
+		for (let i = 0; i < 60; i++) {
+			await flush();
+			const dialog = dom.window.document.querySelector("dialog");
+			if (dialog) {
+				const title = dialog.querySelector("h2").textContent;
+				const confirm =
+					title === "Review the target"
+						? "Replace Observed Version"
+						: title === "Recreate missing file"
+							? "Create File"
+							: "Keep Editing";
+				[...dialog.querySelectorAll("button")]
+					.find((b) => b.textContent === confirm)
+					.click();
+				continue;
+			}
+			if (!globalThis.reviewBusy()) return;
+		}
+		throw new Error("the host did not settle");
+	};
+	const click = async (element) => {
+		element.click();
+		await settle();
+	};
+	return {
+		dom,
+		log,
+		settle,
+		click,
+		query: (selector) => dom.window.document.querySelector(selector),
+		queryAll: (selector) => [...dom.window.document.querySelectorAll(selector)],
+		async open(target) {
+			selected = target;
+			await click(dom.window.document.querySelector("#open-file"));
+			return globalThis.reviewActive();
+		},
+		async runPoll() {
+			poll();
+			await flush();
+		},
+		async quit(payload) {
+			quitListener({ payload: String(payload) });
+			await settle();
+		},
+		async cmdS() {
+			dom.window.document.dispatchEvent(
+				new dom.window.KeyboardEvent("keydown", {
+					key: "s",
+					metaKey: true,
+					bubbles: true,
+				}),
+			);
+			await settle();
+		},
+		/** Returns the IPC commands that arrived after the host went idle. */
+		async finish() {
+			await settle();
+			const leaks = [];
+			globalThis.nativeInvoke = async (command) => {
+				leaks.push(command);
+			};
+			await flush();
+			dom.window.close();
+			return leaks;
+		},
+	};
+}
+
+async function runCell(tabState, event, timing, action) {
+	const violations = [];
+	const violate = (name, detail) => violations.push(`${name}: ${detail}`);
+	let host;
 	try {
-		globalThis.document = dom.window.document;
-		globalThis.window = dom.window;
-		globalThis.self = dom.window;
-		dom.window.__TAURI_INTERNALS__ = {};
-		globalThis.setInterval = (fn) => {
-			poll = fn;
-			return 0;
-		};
 		const native = new FakeNative();
 		const doc = native.add(1, "a.pfdsl", TEXT.disk);
 		const anchor = native.add(2, "anchor.pfdsl", "anchor disk\n");
@@ -238,152 +375,56 @@ async function runCell(tabState, event, timing, action) {
 			"anchor.pfdsl": "discard",
 		};
 		const asked = [];
-		const dialogs = [];
-		let selected = doc;
 		let eventApplied = false;
 		let lostReply = false;
 		let writesAtEvent = 0;
-		const runPoll = async () => {
-			poll();
-			await flush();
-		};
 		const applyEvent = async (pollNow) => {
 			eventApplied = true;
 			for (const step of EVENT_STEPS[event]) {
 				if (step === "poll") {
-					if (pollNow) await runPoll();
+					if (pollNow) await host.runPoll();
 				} else step(native, doc);
 			}
 			writesAtEvent = doc.writes;
 		};
-		dom.window.HTMLDialogElement.prototype.close = () => {};
-		dom.window.HTMLDialogElement.prototype.showModal = function () {
-			const fields = [...this.querySelectorAll("textarea")].map((f) => f.value);
-			let fs;
-			try {
-				fs = native.snapshot(doc);
-			} catch {
-				fs = { unreadable: true };
-			}
-			const entry = {
-				kind: "dialog",
-				title: this.querySelector("h2").textContent,
-				editor: fields[0],
-				disk: fields[1],
-				fs,
-			};
-			dialogs.push(entry);
-			log.push(entry);
-		};
-		globalThis.nativeAcceptance = () => new Promise(() => {});
-		globalThis.nativeListen = async (_, listener) => {
-			quitListener = listener;
-			return () => {};
-		};
-		globalThis.nativeInvoke = async (command, args) => {
-			if (command === "list_recent") return [];
-			if (command === "remember_document" || command === "release_document")
-				return;
-			if (command === "exit_listener_ready" || command === "finish_app_exit")
-				return;
-			if (command === "select_document" || command === "open_document")
-				return native.snapshot(selected);
-			if (command === "inspect_document") {
-				log.push({ kind: "inspect", id: args.id });
-				return native.snapshot(native.docs.get(args.id));
-			}
-			if (command === "save_document") {
-				const target = native.docs.get(args.id);
-				const lose = !lostReply && event.startsWith("reply-lost");
-				if (lose) lostReply = true;
-				log.push({
-					kind: "save",
-					id: args.id,
-					expected: args.expected,
-					fs: (() => {
-						try {
-							return native.snapshot(target);
-						} catch {
-							return { unreadable: true };
-						}
-					})(),
-				});
-				if (lose && event === "reply-lost-unpublished")
-					throw new Error("native reply lost");
-				const reply = native.save(target, args.source, args.expected);
-				if (lose) throw new Error("native reply lost");
-				return reply;
-			}
-			if (command === "confirm_close_document") {
-				asked.push(args.name);
+		host = await startHost(native, doc, {
+			saveFault(args) {
+				if (lostReply || !event.startsWith("reply-lost") || args.id !== doc.id)
+					return undefined;
+				lostReply = true;
+				return event === "reply-lost-published" ? "after" : "before";
+			},
+			async confirm(name) {
+				asked.push(name);
 				if (
-					args.name === "anchor.pfdsl" &&
+					name === "anchor.pfdsl" &&
 					timing === "during-confirm" &&
 					!eventApplied
 				)
 					await applyEvent(false);
-				return decisions[args.name];
-			}
-			throw new Error(`unexpected command ${command}`);
-		};
-		await import(`${pathToFileURL(output).href}?cell=${++cellSerial}`);
-		await flush();
-		const click = async (element) => {
-			element.click();
-			await settle();
-		};
-		const settle = async () => {
-			for (let i = 0; i < 60; i++) {
-				await flush();
-				const dialog = dom.window.document.querySelector("dialog");
-				if (dialog) {
-					const title = dialog.querySelector("h2").textContent;
-					const confirm =
-						title === "Review the target"
-							? "Replace Observed Version"
-							: title === "Recreate missing file"
-								? "Create File"
-								: "Keep Editing";
-					[...dialog.querySelectorAll("button")]
-						.find((b) => b.textContent === confirm)
-						.click();
-					continue;
-				}
-				if (!globalThis.reviewBusy()) return;
-			}
-			violate("harness", "the cell did not settle");
-		};
-		const open = async (target) => {
-			selected = target;
-			await click(dom.window.document.querySelector("#open-file"));
-			return globalThis.reviewActive();
-		};
-		const entry = await open(doc);
+				return decisions[name];
+			},
+		});
+		const { log, settle, click } = host;
+		const entry = await host.open(doc);
 		if (tabState === "dirty") entry.tab.type(TEXT.edited);
-		const guard = await open(anchor);
+		const guard = await host.open(anchor);
 		guard.tab.type("anchor edit\n");
 		entry.tab.button.click();
 		const alive = () => globalThis.reviewEntries.has(entry);
-		const fsNow = () => {
-			try {
-				return native.snapshot(doc);
-			} catch {
-				return { unreadable: true };
-			}
-		};
 
 		// Event and observation.
 		if (timing !== "during-confirm") await applyEvent(timing !== "unpolled");
-		if (timing === "polled" || timing === "drift") await runPoll();
+		if (timing === "polled" || timing === "drift") await host.runPoll();
 		const afterPoll = {
 			setSourceCalls: entry.tab.setSourceCalls,
 			conflict: entry.session.conflict,
 			dirty: entry.session.isDirty(),
 		};
 		const panelButton = () =>
-			[...dom.window.document.querySelectorAll("#conflicts button")].find(
-				(b) => b.textContent === "Review and Save Here…",
-			);
+			host
+				.queryAll("#conflicts button")
+				.find((b) => b.textContent === "Review and Save Here…");
 		if (panelExpected(tabState, event, timing)) {
 			if (!panelButton() || panelButton().disabled)
 				violate("panel", "no enabled 'Review and Save Here…' after the poll");
@@ -404,14 +445,7 @@ async function runCell(tabState, event, timing, action) {
 		if (action === "cmd-s") {
 			while (presses < 3) {
 				presses++;
-				dom.window.document.dispatchEvent(
-					new dom.window.KeyboardEvent("keydown", {
-						key: "s",
-						metaKey: true,
-						bubbles: true,
-					}),
-				);
-				await settle();
+				await host.cmdS();
 				if (!alive()) break;
 				if (!entry.session.isDirty() && !entry.session.saveFailure) break;
 			}
@@ -428,8 +462,7 @@ async function runCell(tabState, event, timing, action) {
 				if (action.startsWith("close"))
 					await click(entry.navigation.querySelector(".close-document"));
 				else {
-					quitListener({ payload: String(presses) });
-					await settle();
+					await host.quit(presses);
 				}
 			}
 		}
@@ -437,8 +470,8 @@ async function runCell(tabState, event, timing, action) {
 		await settle();
 
 		const text = entry.tab.getSource();
-		const fs = fsNow();
-		const status = dom.window.document.querySelector("#status").textContent;
+		const fs = fsOf(native, doc);
+		const status = host.query("#status").textContent;
 		const decision = decisions["a.pfdsl"];
 
 		// I1: a confirmed dialog is an exact description of what gets replaced.
@@ -530,16 +563,12 @@ async function runCell(tabState, event, timing, action) {
 		}
 
 		// A document the cell finished with must not keep native work running.
-		await settle();
-		globalThis.nativeInvoke = async (command) => {
-			leaks.push(command);
-		};
-		await flush();
+		const leaks = await host.finish();
 		if (leaks.length) violate("harness", `leaked IPC ${leaks.join(",")}`);
 	} catch (error) {
 		violate("harness", String(error?.stack ?? error));
 	} finally {
-		dom.window.close();
+		host?.dom.window.close();
 	}
 	return violations;
 }
