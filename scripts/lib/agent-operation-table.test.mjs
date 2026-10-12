@@ -220,6 +220,36 @@ test("declarative rows and class precedence implement the bounded contract", () 
 	);
 });
 
+test("Claude outward delegation returns to the parent except the publishing agent type", () => {
+	for (const target of axes.target) {
+		const cell = {
+			subject: "claude-subagent",
+			target,
+			operationClass: "O",
+			kind: "remote",
+		};
+		const blocked = decideOperation(cell);
+		assert.equal(blocked.decision, "deny");
+		assert.equal(blocked.recovery, "parent");
+		assert.equal(
+			decideOperation({ ...cell, agentType: "issue-worker" }).decision,
+			"allow",
+		);
+		assert.equal(
+			decideOperation({ ...cell, agentType: "reviewer" }).decision,
+			"deny",
+		);
+		assert.equal(
+			decideOperation({
+				...cell,
+				agentType: "issue-worker",
+				classes: ["O", "P"],
+			}).decision,
+			"deny",
+		);
+	}
+});
+
 test("owner decision: W B C O deny on other worktrees for every subject", () => {
 	for (const subject of axes.subject) {
 		for (const target of ["other-live", "other-unowned"]) {

@@ -68,6 +68,7 @@ function example(
 	expected = "allow",
 	{
 		subject = "claude-parent",
+		agentType,
 		cwd = own,
 		facts = {},
 		classes,
@@ -102,6 +103,7 @@ function example(
 			...(subject.endsWith("child") || subject.endsWith("subagent")
 				? { agent_id: "child" }
 				: {}),
+			...(agentType ? { agent_type: agentType } : {}),
 			tool_input: tool?.input ?? { command },
 		},
 		expected,
@@ -173,6 +175,39 @@ export const AGENT_OPERATION_CORPUS = [
 	example("pair-06-pr-merge", "gh pr merge 1413", "deny", {
 		classes: ["O", "P"],
 	}),
+	...["git push -u origin HEAD", "gh pr create"].map((command, i) =>
+		example(`claude-subagent-outward-${i}`, command, "deny", {
+			subject: "claude-subagent",
+			agentType: "reviewer",
+			classes: ["O"],
+		}),
+	),
+	example("claude-subagent-mcp-outward", null, "deny", {
+		subject: "claude-subagent",
+		agentType: "reviewer",
+		classes: ["O"],
+		tool: { name: "mcp__github__create_pull_request", input: {} },
+	}),
+	example("claude-issue-worker-outward", "gh pr create", "allow", {
+		subject: "claude-subagent",
+		agentType: "issue-worker",
+		classes: ["O"],
+	}),
+	example("claude-issue-worker-still-no-merge", "gh pr merge 1413", "deny", {
+		subject: "claude-subagent",
+		agentType: "issue-worker",
+		classes: ["O", "P"],
+	}),
+	example(
+		"codex-issue-worker-still-returns-to-parent",
+		"gh pr create",
+		"deny",
+		{
+			subject: "codex-child",
+			agentType: "issue-worker",
+			classes: ["O"],
+		},
+	),
 	example("pair-07-commit", "git commit -m x"),
 	example("pair-07-bypass", "git commit --no-verify -m x", "deny", {
 		classes: ["W", "X"],

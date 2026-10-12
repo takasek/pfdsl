@@ -42,9 +42,15 @@ export const AGENT_OPERATION_TABLE = Object.freeze(
 	),
 );
 
+export const DEFAULT_ALLOWED_AGENTS = Object.freeze(["issue-worker"]);
+
 const SUBJECTS = {
 	"claude-parent": { ask: "ask" },
-	"claude-subagent": { ask: "deny", recovery: "parent" },
+	"claude-subagent": {
+		ask: "deny",
+		recovery: "parent",
+		outwardAgents: DEFAULT_ALLOWED_AGENTS,
+	},
 	"codex-parent": { ask: "deny", recovery: "terminal" },
 	"codex-child": { ask: "deny", recovery: "parent", fileOnly: true },
 };
@@ -171,6 +177,16 @@ export function decideOperation(input) {
 		);
 	if (cell.kind === "remote") cell.target = "own";
 	const subject = SUBJECTS[cell.subject];
+	if (
+		cell.operationClass === "O" &&
+		subject.outwardAgents &&
+		!subject.outwardAgents.includes(cell.agentType)
+	)
+		return stopped(
+			"Return outward writes to the parent. Publishing is the caller's responsibility.",
+			"parent",
+			"O",
+		);
 	const exception = EXCEPTIONS.find(
 		({ match, targets }) =>
 			Object.entries(match).every(([key, value]) => cell[key] === value) &&

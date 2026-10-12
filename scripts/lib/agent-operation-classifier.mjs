@@ -531,6 +531,7 @@ export function classifyAgentOperations(payload, facts) {
 	const health = facts.health === "failed" || failure ? "failed" : "healthy";
 	const context = {
 		subject,
+		agentType: payload.agent_type,
 		health,
 		failure,
 		hookRoot: facts.hookRoot,
