@@ -11,6 +11,8 @@ function readMetadata(path) {
 	return readFileSync(path, "utf-8");
 }
 
+export { readMetadata as readNativeWorktreeMetadata };
+
 /**
  * Optional native evidence for an already resolved sibling, never a target
  * resolver or an execution permission. These private formats were observed
