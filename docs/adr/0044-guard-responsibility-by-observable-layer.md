@@ -1,6 +1,6 @@
 # ADR-0044: worktree 運用ガードの責務を、効果を観測できる層へ移す
 
-- Status: Superseded in part by ADR-0046（Bash 経由の変更系 Git の所有権判定と関連する削除方針。その他の Decision は保持し、その未実装部分は後続 PR で扱う）
+- Status: Superseded in part by ADR-0046（Bash 経由の変更系 Git の所有権判定と関連する削除方針。その他の Decision は保持し、その未実装部分は後続 PR で扱う）、Superseded in part by ADR-0047（変更系 Git の target・default branch・sibling 判定の削除方針と、検査回避・委譲先の外向き操作・作用先・merge の hook 責務）
 - Date: 2026-10-04
 
 ## Context
