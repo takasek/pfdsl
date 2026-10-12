@@ -878,4 +878,7 @@ export const AGENT_OPERATION_CORPUS = [
 		tool: { name: "mcp__github__merge_pull_request", input: {} },
 		classes: ["O", "P"],
 	}),
+	example("am-short-no-verify-own", "git am -n patch", "deny", {
+		classes: ["W", "X"],
+	}),
 ];

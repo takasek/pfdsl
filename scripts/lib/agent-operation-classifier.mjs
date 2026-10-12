@@ -437,7 +437,7 @@ function gitOperation(command, context, facts) {
 		if (
 			bypass ||
 			flags.has("--no-verify") ||
-			((sub.value === "commit" || sub.value === "push") && flags.has("-n"))
+			(["commit", "push", "am"].includes(sub.value) && flags.has("-n"))
 		)
 			classes.push("X");
 		if (
