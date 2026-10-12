@@ -90,6 +90,137 @@ for (const point of [
 				}),
 			);
 
+// A review's plan survives neither an edit nor an edit undone back to its text.
+for (const action of ["review", "recreate", "adopt"])
+	for (const edit of ["edit", "edit-undo"])
+		cell(`plan lifetime | ${action} | ${edit}`, () =>
+			judged(async (violate) => {
+				const native = new FakeNative();
+				const a = native.add(1, "a.pfdsl", TEXT.disk);
+				let tab;
+				const host = await startHost(native, a, {
+					confirm: async () => "cancel",
+					dialogChoice: (title) =>
+						title === "Discard editor changes" ? "Use Disk Version" : undefined,
+					onDialog() {
+						const before = tab.getSource();
+						tab.type("edited while the review was open\n");
+						if (edit === "edit-undo") tab.type(before);
+					},
+				});
+				tab = await host.open(a);
+				tab.type(TEXT.edited);
+				if (action === "recreate") a.file = null;
+				else change(native, a, "external version\n");
+				await host.runPoll();
+				const trace = beginAction({ host, tab, owned: [a.id] });
+				if (action === "adopt") await host.click(host.panel().use);
+				else await host.cmdS();
+				checkAction({ native, host, tab, trace, violate });
+				if ((await host.finish()).length) violate("harness", "leaked IPC");
+			}),
+		);
+
+cell("plan lifetime | adopt | disk changes during review", () =>
+	judged(async (violate) => {
+		const native = new FakeNative();
+		const a = native.add(1, "a.pfdsl", TEXT.disk);
+		const host = await startHost(native, a, {
+			confirm: async () => "cancel",
+			dialogChoice: (title) =>
+				title === "Discard editor changes" ? "Use Disk Version" : undefined,
+			onDialog() {
+				change(native, a, "changed after the adoption was shown\n");
+			},
+		});
+		const tab = await host.open(a);
+		tab.type(TEXT.edited);
+		change(native, a, "external version\n");
+		await host.runPoll();
+		const trace = beginAction({ host, tab, owned: [a.id] });
+		await host.click(host.panel().use);
+		checkAction({ native, host, tab, trace, violate });
+		if (host.log.some((item) => item.kind === "reload" && item.tab === tab))
+			violate(
+				"V",
+				"adopted a disk version different from the one shown in the review",
+			);
+		if ((await host.finish()).length) violate("harness", "leaked IPC");
+	}),
+);
+
+// Once the request has been sent, later edits stay unsaved rather than cancelling publication.
+for (const edit of ["edit", "edit-undo"])
+	cell(`plan lifetime | review | ${edit} during save I/O`, () =>
+		judged(async (violate) => {
+			const native = new FakeNative();
+			const a = native.add(1, "a.pfdsl", TEXT.disk);
+			let tab;
+			const host = await startHost(native, a, {
+				confirm: async () => "cancel",
+				beforeSave() {
+					const before = tab.getSource();
+					tab.type("edited after the save request was sent\n");
+					if (edit === "edit-undo") tab.type(before);
+				},
+			});
+			tab = await host.open(a);
+			tab.type(TEXT.edited);
+			change(native, a, "external version\n");
+			const trace = beginAction({ host, tab, owned: [a.id] });
+			await host.cmdS();
+			checkAction({ native, host, tab, trace, violate });
+			if (
+				!host.log.some(
+					(item) => item.kind === "save" && item.outcome === "saved",
+				)
+			)
+				violate("D", "a valid reviewed save did not succeed");
+			if ((await host.finish()).length) violate("harness", "leaked IPC");
+		}),
+	);
+
+// Quit can review a tab other than the active one; the approval belongs to that tab.
+for (const edited of ["reviewed", "other"])
+	cell(`plan lifetime | non-active quit review | edit ${edited} tab`, () =>
+		judged(async (violate) => {
+			const native = new FakeNative();
+			const a = native.add(1, "a.pfdsl", TEXT.disk);
+			const b = native.add(2, "b.pfdsl", TEXT.disk);
+			let tabA;
+			let tabB;
+			const host = await startHost(native, a, {
+				confirm: async (name) =>
+					name === "a.pfdsl" || name === "b.pfdsl" ? "save" : "discard",
+				onDialog(dialog) {
+					if (dialog.target === b.id)
+						(edited === "reviewed" ? tabB : tabA).type(
+							"typed during B's review\n",
+						);
+				},
+			});
+			tabA = await host.open(a);
+			tabA.type(TEXT.edited);
+			tabB = await host.open(b);
+			tabB.type(TEXT.edited);
+			change(native, b, "external B\n");
+			await host.click(tabA.button);
+			const traceA = beginAction({ host, tab: tabA, owned: [a.id] });
+			const traceB = beginAction({ host, tab: tabB, owned: [b.id] });
+			await host.quit(1);
+			checkAction({ native, host, tab: tabA, trace: traceA, violate });
+			checkAction({ native, host, tab: tabB, trace: traceB, violate });
+			if (!host.isOpen(tabA) || !host.isOpen(tabB))
+				violate("L", "quit discarded a tab edited during another tab's review");
+			if (
+				edited === "other" &&
+				!host.log.some((item) => item.kind === "save" && item.id === b.id)
+			)
+				violate("D", "an unchanged reviewed tab's save was refused");
+			if ((await host.finish()).length) violate("harness", "leaked IPC");
+		}),
+	);
+
 // F2 / T1: what a failed read means must not depend on which entry point saw it.
 for (const entry of ["poll", "cmd-s", "close-cancel", "use-disk"])
 	for (const tabState of ["clean", "dirty"])

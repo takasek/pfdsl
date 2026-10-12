@@ -25,6 +25,7 @@
 // P  Panel consistency: the panel names the recovery target by its current path
 //    and compares against what the application last learned about it.
 // O  Observation completeness: the panel reflects the files as they are.
+// V  An operation shown in a dialog is refused if its editor was edited before execution.
 import { fsOf } from "./lifecycle-harness.mjs";
 
 const REVIEW = "Review the target";
@@ -52,6 +53,34 @@ function acknowledged(host, id, seq) {
 /** L, A, C, R, U, K and the disposal rule over everything since beginAction. */
 export function checkAction({ native, host, tab, trace, violate }) {
 	const log = host.log;
+	// Use the recorded edits, including edit followed by Undo, rather than text equality.
+	const consumed = new Set();
+	for (const execution of log.filter(
+		(item) =>
+			item.kind === "save" || (item.kind === "reload" && item.tab === tab),
+	)) {
+		const dialog = log.findLast(
+			(item) =>
+				item.kind === "dialog" &&
+				item.tab === tab &&
+				!consumed.has(item) &&
+				(execution.kind !== "save" || item.target === execution.id) &&
+				item.seq < execution.seq &&
+				(CONFIRMING.has(item.choice) || item.choice === "Use Disk Version"),
+		);
+		if (dialog) consumed.add(dialog);
+		if (
+			dialog &&
+			log.some(
+				(item) =>
+					item.kind === "type" &&
+					item.tab === tab &&
+					item.seq > dialog.seq &&
+					item.seq < execution.seq,
+			)
+		)
+			violate("V", "executed a dialog's plan after its editor was edited");
+	}
 	const alive = host.isOpen(tab);
 	const text = tab.getSource();
 	const discarded = log.some(

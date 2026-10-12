@@ -249,6 +249,7 @@ export async function createHarness(label) {
 		let poll;
 		let quitListener;
 		let selected;
+		let closeSaveOwner;
 		globalThis.document = dom.window.document;
 		globalThis.window = dom.window;
 		globalThis.self = dom.window;
@@ -294,6 +295,7 @@ export async function createHarness(label) {
 			const entry = {
 				kind: "dialog",
 				seq: tick(),
+				tab: closeSaveOwner ?? activeTab(),
 				title: this.querySelector("h2").textContent,
 				text,
 				target,
@@ -389,13 +391,15 @@ export async function createHarness(label) {
 				return finish(snapshot);
 			}
 			if (command === "save_document") {
+				// Record submission before simulating work on the native side.
+				const submittedSeq = tick();
 				const target = native.docs.get(args.id);
 				const fault = handlers.saveFault?.(args);
 				handlers.beforeSave?.(args);
 				const forced = handlers.saveReply?.(args);
 				const entry = {
 					kind: "save",
-					seq: tick(),
+					seq: submittedSeq,
 					id: args.id,
 					source: args.source,
 					expected: args.expected,
@@ -446,6 +450,7 @@ export async function createHarness(label) {
 				};
 				log.push(entry);
 				entry.decision = await handlers.confirm(args.name);
+				closeSaveOwner = entry.decision === "save" ? owner : undefined;
 				entry.decidedSeq = tick();
 				return entry.decision;
 			}
@@ -484,7 +489,10 @@ export async function createHarness(label) {
 						.click();
 					continue;
 				}
-				if (!busy()) return;
+				if (!busy()) {
+					closeSaveOwner = undefined;
+					return;
+				}
 			}
 			throw new Error("the host did not settle");
 		};
