@@ -116,6 +116,28 @@ function example(
 // Every row of the specification's acceptance pairs has a named normal case
 // and, where present, its independently specified safety case.
 export const AGENT_OPERATION_CORPUS = [
+	example("review-1437-opaque-merge-option", 'git merge "$flag"', "deny"),
+	example("review-1437-opaque-rebase-option", 'git rebase "$flag"', "deny"),
+	...["claude-parent", "codex-parent"].flatMap((subject) =>
+		[primary, live].map((source) =>
+			example(
+				`review-1437-busy-composition-${subject}-${source === primary ? "primary" : "live"}`,
+				`git -C ${source} worktree add --force -B feat/own /tmp/trial HEAD`,
+				"deny",
+				{
+					subject,
+					facts: {
+						branches: {
+							...corpusFacts().branches,
+							"feat/own": { checkedOutAt: own },
+						},
+					},
+					target: source === primary ? "primary" : "other-live",
+					executionPath: source,
+				},
+			),
+		),
+	),
 	example("review-1437-root-gh-help", "gh --help", "allow"),
 	example("review-1437-root-gh-version", "gh --version", "allow"),
 	example("review-1437-rebase-merge-mode", "git rebase -m", "allow"),

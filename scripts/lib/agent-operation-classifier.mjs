@@ -249,14 +249,9 @@ function withInputIssues(
 
 function gitDecisionArguments(sub, parsed, classes) {
 	const { operands, values } = parsed;
-	const optionOperands = [
-		"commit",
-		"am",
-		"push",
-		"hash-object",
-		"tag",
-		"symbolic-ref",
-	].includes(sub)
+	const optionOperands = Object.values(
+		AGENT_OPERATION_INPUT_FORMS[`git ${sub}`] ?? {},
+	).some((option) => option.role === "decision")
 		? operands.filter((token) => token.dynamic && !token.positionalOnly)
 		: [];
 	const at = (...indices) => indices.map((index) => operands[index]);
@@ -417,6 +412,7 @@ function gitOperation(command, context, facts) {
 	let force;
 	let effective = location;
 	let creation;
+	let branchEffect;
 	const destination = (token) =>
 		pathFacts(
 			token && !token.dynamic && path
@@ -655,7 +651,7 @@ function gitOperation(command, context, facts) {
 							?.checkedOutAt
 					: null;
 			if (busy && busy !== location.tree?.root && !classes.includes("D"))
-				effective = pathFacts(busy, facts);
+				branchEffect = operation(["B"], "git", pathFacts(busy, facts));
 			const target = destination(operands[1]);
 			const nested =
 				["other-live", "other-unowned"].includes(target.target) &&
@@ -766,6 +762,7 @@ function gitOperation(command, context, facts) {
 	return creation
 		? [
 				result,
+				...(branchEffect ? [branchEffect] : []),
 				withInputIssues(
 					creation,
 					`git ${sub.value}`,

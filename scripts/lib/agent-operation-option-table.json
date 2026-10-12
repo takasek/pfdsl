@@ -1980,7 +1980,8 @@
 		},
 		"--no-verify": {
 			"arity": "none",
-			"count": 0
+			"count": 0,
+			"role": "decision"
 		},
 		"--version": {
 			"arity": "none",
@@ -1992,7 +1993,8 @@
 		},
 		"-n": {
 			"arity": "none",
-			"count": 0
+			"count": 0,
+			"role": "decision"
 		}
 	},
 	"git apply": {
@@ -2472,7 +2474,8 @@
 		},
 		"--no-verify": {
 			"arity": "none",
-			"count": 11
+			"count": 11,
+			"role": "decision"
 		},
 		"--quiet": {
 			"arity": "none",
@@ -2496,7 +2499,8 @@
 		},
 		"-n": {
 			"arity": "none",
-			"count": 0
+			"count": 0,
+			"role": "decision"
 		},
 		"-q": {
 			"arity": "none",
@@ -2882,7 +2886,8 @@
 		},
 		"-w": {
 			"arity": "none",
-			"count": 0
+			"count": 0,
+			"role": "decision"
 		}
 	},
 	"git help": {
@@ -3217,6 +3222,11 @@
 		"-q": {
 			"arity": "none",
 			"count": 3
+		},
+		"--no-verify": {
+			"arity": "none",
+			"count": 0,
+			"role": "decision"
 		}
 	},
 	"git merge-base": {
@@ -3344,7 +3354,8 @@
 		},
 		"--no-verify": {
 			"arity": "none",
-			"count": 0
+			"count": 0,
+			"role": "decision"
 		},
 		"--version": {
 			"arity": "none",
@@ -3409,6 +3420,11 @@
 		"-m": {
 			"arity": "none",
 			"count": 0
+		},
+		"--no-verify": {
+			"arity": "none",
+			"count": 0,
+			"role": "decision"
 		}
 	},
 	"git reflog": {
@@ -3850,7 +3866,8 @@
 	"git symbolic-ref": {
 		"--delete": {
 			"arity": "none",
-			"count": 0
+			"count": 0,
+			"role": "decision"
 		},
 		"--help": {
 			"arity": "none",
@@ -3866,7 +3883,8 @@
 		},
 		"-d": {
 			"arity": "none",
-			"count": 0
+			"count": 0,
+			"role": "decision"
 		},
 		"-h": {
 			"arity": "none",
@@ -3884,7 +3902,8 @@
 		},
 		"--list": {
 			"arity": "none",
-			"count": 0
+			"count": 0,
+			"role": "decision"
 		},
 		"--sort": {
 			"arity": "required",
@@ -3900,7 +3919,8 @@
 		},
 		"-l": {
 			"arity": "none",
-			"count": 7
+			"count": 7,
+			"role": "decision"
 		}
 	},
 	"git update-ref": {
