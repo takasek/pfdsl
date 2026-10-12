@@ -52,3 +52,19 @@ test("frequent run filters consume values and rebase merge mode does not", () =>
 	const rebase = parseInputForm(tokens("-m"), "git rebase");
 	assert.deepEqual(rebase.issues, []);
 });
+
+test("frequent exact option spellings use their declared value arity", () => {
+	for (const [name, flag, arity] of [
+		["git diff", "--find-copies-harder", "none"],
+		["git commit", "--allow-empty", "none"],
+		["git commit", "-qm", "required"],
+		["git commit", "-am", "required"],
+		["git commit", "-qam", "required"],
+		["git ls-files", "-i", "none"],
+		["git switch", "-qc", "required"],
+	]) {
+		const parsed = parseInputForm(tokens(flag, "data"), name);
+		assert.deepEqual(parsed.issues, [], `${name} ${flag}`);
+		assert.equal(parsed.values.length, arity === "required" ? 1 : 0);
+	}
+});

@@ -14,7 +14,7 @@
 		},
 		"--version": {
 			"arity": "none",
-			"count": 0
+			"count": 8
 		},
 		"-h": {
 			"arity": "none",
@@ -92,11 +92,11 @@
 		},
 		"-f": {
 			"arity": "required",
-			"count": 33
+			"count": 29
 		},
 		"-F": {
 			"arity": "required",
-			"count": 55
+			"count": 49
 		},
 		"-h": {
 			"arity": "none",
@@ -320,7 +320,7 @@
 		},
 		"--label": {
 			"arity": "required",
-			"count": 135
+			"count": 134
 		},
 		"--reason": {
 			"arity": "required",
@@ -456,7 +456,7 @@
 		},
 		"--search": {
 			"arity": "required",
-			"count": 44
+			"count": 43
 		},
 		"--state": {
 			"arity": "required",
@@ -1936,15 +1936,15 @@
 		},
 		"--version": {
 			"arity": "none",
-			"count": 0
+			"count": 8
 		},
 		"-c": {
 			"arity": "required",
-			"count": 0
+			"count": 27
 		},
 		"-C": {
 			"arity": "required",
-			"count": 0
+			"count": 2222
 		}
 	},
 	"git add": {
@@ -2274,7 +2274,7 @@
 		},
 		"--detach": {
 			"arity": "none",
-			"count": 5
+			"count": 11
 		},
 		"--force": {
 			"arity": "none",
@@ -2446,7 +2446,7 @@
 	"git commit": {
 		"--amend": {
 			"arity": "none",
-			"count": 20
+			"count": 41
 		},
 		"--author": {
 			"arity": "required",
@@ -2470,11 +2470,11 @@
 		},
 		"--no-edit": {
 			"arity": "none",
-			"count": 24
+			"count": 32
 		},
 		"--no-verify": {
 			"arity": "none",
-			"count": 11,
+			"count": 17,
 			"role": "decision"
 		},
 		"--quiet": {
@@ -2487,7 +2487,7 @@
 		},
 		"-F": {
 			"arity": "required",
-			"count": 119
+			"count": 280
 		},
 		"-h": {
 			"arity": "none",
@@ -2495,7 +2495,7 @@
 		},
 		"-m": {
 			"arity": "required",
-			"count": 227
+			"count": 349
 		},
 		"-n": {
 			"arity": "none",
@@ -2504,7 +2504,23 @@
 		},
 		"-q": {
 			"arity": "none",
-			"count": 426
+			"count": 403
+		},
+		"--allow-empty": {
+			"arity": "none",
+			"count": 9
+		},
+		"-qm": {
+			"arity": "required",
+			"count": 16
+		},
+		"-am": {
+			"arity": "required",
+			"count": 9
+		},
+		"-qam": {
+			"arity": "required",
+			"count": 7
 		}
 	},
 	"git commit-tree": {
@@ -2710,11 +2726,15 @@
 		},
 		"-U": {
 			"arity": "required",
-			"count": 0
+			"count": 15
 		},
 		"-U0": {
 			"arity": "none",
-			"count": 11
+			"count": 0
+		},
+		"--find-copies-harder": {
+			"arity": "none",
+			"count": 5
 		}
 	},
 	"git diff-tree": {
@@ -2836,7 +2856,7 @@
 		},
 		"-e": {
 			"arity": "required",
-			"count": 45
+			"count": 14
 		},
 		"-E": {
 			"arity": "none",
@@ -2848,7 +2868,7 @@
 		},
 		"-i": {
 			"arity": "none",
-			"count": 17
+			"count": 18
 		},
 		"-l": {
 			"arity": "none",
@@ -2947,7 +2967,7 @@
 		},
 		"-b": {
 			"arity": "required",
-			"count": 0
+			"count": 20
 		},
 		"-h": {
 			"arity": "none",
@@ -2959,7 +2979,7 @@
 		},
 		"-q": {
 			"arity": "none",
-			"count": 33
+			"count": 32
 		}
 	},
 	"git log": {
@@ -2989,7 +3009,7 @@
 		},
 		"--format": {
 			"arity": "required",
-			"count": 235
+			"count": 237
 		},
 		"--graph": {
 			"arity": "none",
@@ -3033,7 +3053,7 @@
 		},
 		"--since": {
 			"arity": "required",
-			"count": 5
+			"count": 6
 		},
 		"--skip": {
 			"arity": "required",
@@ -3113,7 +3133,7 @@
 		},
 		"-S": {
 			"arity": "required",
-			"count": 16
+			"count": 40
 		}
 	},
 	"git ls-files": {
@@ -3142,6 +3162,10 @@
 			"count": 0
 		},
 		"-o": {
+			"arity": "none",
+			"count": 3
+		},
+		"-i": {
 			"arity": "none",
 			"count": 3
 		}
@@ -3308,7 +3332,7 @@
 		},
 		"--ff-only": {
 			"arity": "none",
-			"count": 0
+			"count": 4
 		},
 		"--help": {
 			"arity": "none",
@@ -3375,7 +3399,7 @@
 		},
 		"-u": {
 			"arity": "none",
-			"count": 115
+			"count": 127
 		}
 	},
 	"git range-diff": {
@@ -3462,7 +3486,7 @@
 	"git reset": {
 		"--hard": {
 			"arity": "none",
-			"count": 6
+			"count": 17
 		},
 		"--help": {
 			"arity": "none",
@@ -3470,7 +3494,7 @@
 		},
 		"--soft": {
 			"arity": "none",
-			"count": 6
+			"count": 10
 		},
 		"--version": {
 			"arity": "none",
@@ -3742,7 +3766,7 @@
 		},
 		"-m": {
 			"arity": "required",
-			"count": 4
+			"count": 5
 		},
 		"-q": {
 			"arity": "none",
@@ -3816,7 +3840,7 @@
 		},
 		"--detach": {
 			"arity": "none",
-			"count": 0
+			"count": 7
 		},
 		"--force": {
 			"arity": "none",
@@ -3844,7 +3868,7 @@
 		},
 		"-c": {
 			"arity": "required",
-			"count": 59
+			"count": 67
 		},
 		"-C": {
 			"arity": "required",
@@ -3860,7 +3884,11 @@
 		},
 		"-q": {
 			"arity": "none",
-			"count": 38
+			"count": 32
+		},
+		"-qc": {
+			"arity": "required",
+			"count": 6
 		}
 	},
 	"git symbolic-ref": {
@@ -3978,7 +4006,7 @@
 	"git worktree": {
 		"--detach": {
 			"arity": "none",
-			"count": 44
+			"count": 49
 		},
 		"--expire": {
 			"arity": "required",
@@ -4006,7 +4034,7 @@
 		},
 		"-b": {
 			"arity": "required",
-			"count": 17
+			"count": 19
 		},
 		"-B": {
 			"arity": "required",
