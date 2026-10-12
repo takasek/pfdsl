@@ -448,7 +448,8 @@ export const AGENT_OPERATION_CORPUS = [
 	example("transcript-help-api", "gh help api"),
 	example("transcript-process-substitution", "diff <(git show HEAD:a) a"),
 	example("transcript-arithmetic", "echo $((1+2)); git commit -m x"),
-	example("transcript-pushd-popd", "pushd /tmp; ls; popd; git add a"),
+	// Stage-three owner rule: even balanced directory stacks are unresolved.
+	example("transcript-pushd-popd", "pushd /tmp; ls; popd; git add a", "deny"),
 	example(
 		"codex-stdin-commit-message",
 		`git -C ${own} commit -F - <<'EOF'\nmessage\nEOF`,

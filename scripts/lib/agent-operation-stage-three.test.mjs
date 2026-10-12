@@ -58,3 +58,71 @@ test("properties 2 and 7: ordinary Git destinations and ref roles preserve safet
 		"parent",
 	);
 });
+
+test("property 7: directory stack and literal environment writes leave mutation targets unresolved", async (t) => {
+	for (const command of [
+		`pushd ${primary} && git add -A`,
+		"pushd /tmp; ls; popd; git add a",
+		`export GIT_DIR=${primary}/.git GIT_WORK_TREE=${primary}; git add -A`,
+		"GIT_DIR=; git add a",
+		"readonly GIT_INDEX_FILE=/tmp/index; git add a",
+		`declare GIT_COMMON_DIR=${primary}/.git; git -C ${own} add a`,
+		"typeset CDPATH=/tmp; git add a",
+		"read -r GIT_OBJECT_DIRECTORY; git add a",
+		"printf -v GIT_NAMESPACE '%s' x; git add a",
+		"git add a; export GIT_ALTERNATE_OBJECT_DIRECTORIES=/tmp/objects",
+	])
+		await t.test(command, () => {
+			const { classified, result } = inspect(command);
+			assert.equal(result.decision, "deny");
+			assert.equal(
+				classified.operations.find(({ kind }) => kind === "git").target,
+				"unresolved",
+			);
+		});
+	assert.equal(inspect("echo GIT_DIR; git add a").result.decision, "allow");
+	assert.equal(
+		inspect("printf '%s' GIT_DIR; git add a").result.decision,
+		"allow",
+	);
+	assert.equal(
+		inspect("read -p GIT_DIR answer; git add a").result.decision,
+		"allow",
+	);
+	assert.equal(
+		inspect("git -c color.ui=never commit -m 'export GIT_DIR=x'").result
+			.decision,
+		"allow",
+	);
+	assert.equal(inspect("git commit -m 'GIT_DIR=x'").result.decision, "allow");
+	assert.equal(inspect("echo GIT_DIR=x; git add a").result.decision, "allow");
+	assert.equal(
+		inspect("export GIT_DIR=$target; git add a").result.decision,
+		"deny",
+	);
+});
+
+test("properties 1, 5 and 7: literal shell scripts use the same target rules and preserve deny", async (t) => {
+	for (const [command, decision] of [
+		[`bash -c 'git -C ${primary} commit -m x'`, "deny"],
+		[`eval 'git -C ${primary} commit -m x'`, "deny"],
+		[`sh -c 'git -C ${live} add a'`, "deny"],
+		[`zsh -c 'git -C ${own} add a'`, "allow"],
+		[`bash -c 'export GIT_DIR=x; git -C ${own} add a'`, "deny"],
+		["bash -c 'git commit --no-verify -m x'; eval '$cmd'", "deny"],
+		["bash -c 'git add a; ('", "deny"],
+		['bash -c "$script"', "deny"],
+		[`cd ${own} && bash -c 'git add a'`, "allow"],
+	])
+		await t.test(command, () =>
+			assert.equal(inspect(command).result.decision, decision, command),
+		);
+});
+
+test("hook-process Git target override keeps changing Git unresolved even with explicit C", () => {
+	const { result, classified } = inspect(`git -C ${own} add a`, {
+		facts: { gitTargetOverride: true },
+	});
+	assert.equal(result.decision, "deny");
+	assert.equal(classified.operations[0].target, "unresolved");
+});

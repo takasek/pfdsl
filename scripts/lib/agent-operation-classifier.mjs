@@ -209,7 +209,9 @@ function gitOperation(command, context, facts) {
 			]),
 	);
 	const targetOverride =
-		facts.gitTargetOverride || hasGitTargetEnvironment(assignments);
+		facts.gitTargetOverride ||
+		command.unresolvedGitTarget ||
+		hasGitTargetEnvironment(assignments);
 	const tokens = command.tokens.slice(command.executableIndex ?? 0);
 	let i = 1;
 	let path = command.unresolvedCwd || targetOverride ? null : context.cwd;
@@ -565,6 +567,7 @@ function gitOperation(command, context, facts) {
 			classes.push("U");
 		if (context.subject.startsWith("codex-") && !explicitAbsolute)
 			effective = pathFacts(null, facts);
+		if (targetOverride) effective = pathFacts(null, facts);
 	}
 	// U describes an operation whose ordinary class cannot be established at
 	// an execution target. Keep independently established prohibitions only.

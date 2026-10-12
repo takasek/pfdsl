@@ -3,6 +3,7 @@
 
 import { basename } from "node:path";
 import { fileURLToPath } from "node:url";
+import { GIT_TARGET_ENVIRONMENT_VARIABLES } from "./git-environment.mjs";
 import { run } from "./run-exec.mjs";
 import { shellParserPath } from "./shell-parser-tool.mjs";
 
@@ -34,6 +35,7 @@ export function readShell(
 		)
 			throw new SyntaxError("Invalid shell parser AST root");
 		result = adaptShell(ast, command);
+		expandLiteralScripts(result, parserPath);
 	} catch (error) {
 		const unavailable = error.code === "ENOENT";
 		const parserFailure =
@@ -60,6 +62,84 @@ export function readShell(
 		};
 	}
 	return result;
+}
+
+const TARGET_NAMES = new Set([...GIT_TARGET_ENVIRONMENT_VARIABLES, "CDPATH"]);
+const literalTargetName = (token) =>
+	token &&
+	(token.value.includes("=") || !token.dynamic) &&
+	TARGET_NAMES.has(token.value.split(/\+?=/, 1)[0]);
+function writesTargetName(node) {
+	const { tokens, executableIndex: index } = node;
+	const assignments = index < 0 ? tokens : tokens.slice(0, index);
+	if (
+		assignments.some(
+			(token) =>
+				/^[A-Za-z_][A-Za-z0-9_]*\+?=/.test(token.value) &&
+				TARGET_NAMES.has(token.value.split(/\+?=/, 1)[0]),
+		)
+	)
+		return true;
+	const name = executableName(tokens[index]?.value ?? "");
+	const args = tokens.slice(index + 1);
+	if (["pushd", "popd"].includes(name)) return true;
+	if (["export", "readonly", "declare", "typeset"].includes(name))
+		return args.some(literalTargetName);
+	if (name === "printf")
+		return args[0]?.value === "-v" && literalTargetName(args[1]);
+	if (name !== "read") return false;
+	for (let i = 0; i < args.length; i++) {
+		if (["-p", "-u", "-t", "-n", "-N", "-d", "-i"].includes(args[i].value)) {
+			i++;
+			continue;
+		}
+		if (literalTargetName(args[i])) return true;
+	}
+	return false;
+}
+
+function expandLiteralScripts(result, parserPath) {
+	const expanded = [];
+	for (const node of result.commands) {
+		expanded.push(node);
+		const tokens = node.tokens.slice(node.executableIndex);
+		const name = executableName(tokens[0]?.value ?? "");
+		const scriptIndex = ["bash", "sh", "zsh"].includes(name)
+			? tokens.findIndex(({ value }) => value === "-c") + 1
+			: name === "eval"
+				? 1
+				: 0;
+		if (!scriptIndex) continue;
+		const scriptTokens =
+			name === "eval"
+				? tokens.slice(1)
+				: tokens.slice(scriptIndex, scriptIndex + 1);
+		if (!scriptTokens.length || scriptTokens.some(({ dynamic }) => dynamic)) {
+			expanded.push({ ...node, unresolvedExecution: true });
+			continue;
+		}
+		const inner = readShell(scriptTokens.map(({ value }) => value).join(" "), {
+			parserPath,
+		});
+		for (const child of inner.commands ?? [])
+			expanded.push({
+				...child,
+				leadingCd: [...(node.leadingCd ?? []), ...(child.leadingCd ?? [])],
+				unresolvedCwd: node.unresolvedCwd || child.unresolvedCwd,
+			});
+		if (inner.error) {
+			result.error = inner.error;
+			result.failure = inner.failure;
+			expanded.push({ ...node, unresolvedExecution: true });
+		}
+	}
+	const ambiguous =
+		expanded.some(writesTargetName) ||
+		expanded.some((node) => node.unresolvedGitTarget);
+	result.commands = expanded.map((node) => ({
+		...node,
+		unresolvedGitTarget: ambiguous,
+	}));
 }
 
 export function shellParseDecision(command, { parserPath } = {}) {
