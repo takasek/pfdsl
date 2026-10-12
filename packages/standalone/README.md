@@ -203,6 +203,7 @@ The guard does not protect against Force Quit, crashes, or power loss.
 Owner-performed macOS Quit acceptance is recorded in [ACCEPTANCE.md](./ACCEPTANCE.md).
 A cancellation, failed save, unreadable disk state, changed tab membership, or edit during the close sequence preserves unconfirmed buffers; earlier successful saves remain on disk.
 Close finishes disk reads already in progress, starts fresh reads before decisions, and checks every target again after the last decision before disposing tabs.
+Every unresolved target is read, the document's own file and any failed Save As target alike (including for an Untitled document), and one target failing to read never skips another.
 An unreadable former disk version makes its surviving editor content require confirmation.
 A decision applies only to the editor and disk state the application observed when it requested confirmation; a changed observed version requires a new decision.
 Background disk polling pauses while confirmation is open, but the final checks reject the close if an observed version changed.
@@ -211,8 +212,11 @@ External changes after those final reads are not excluded atomically; Discard le
 Clean external changes reload automatically; dirty changes, deletion, and publication conflicts keep the editor content for review.
 A change that leaves the file's content identical (a touch, a permission change, or a replacement with the same bytes) is not treated as a disk change.
 The conflict panel identifies the recovery target and lets you compare its observed contents, choose another destination, or explicitly load the current disk version.
+The panel compares against the same snapshot its buttons act on.
 Every Save inspects its target first.
-A clean editor reloads a changed version instead of saving over it, a review compares the editor with that fresh inspection, and Replace uses the version the review showed.
+A clean editor reloads a changed version instead of saving over it, while a tab that shows unsaved state is never reloaded by Save.
+Replacing a disk version the document has not acknowledged, or a file picked in the chooser, always shows a review that compares the editor with that fresh inspection.
+Replace uses the version the review showed, and if the document changes while the review is open the save is not sent.
 Save As rejects a target already open by selected directory/leaf binding.
 Distinct hard-link names are separate tabs and save targets; saving atomically replaces only the selected name.
 External reloads acknowledge the text applied by Monaco, which normalizes mixed line endings to a single style; reloading or closing a clean tab does not rewrite the disk file, while a manual save writes the normalized editor text.
