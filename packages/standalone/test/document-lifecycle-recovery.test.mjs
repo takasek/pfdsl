@@ -3,13 +3,7 @@
 // disk file. Every cell checks the invariants documented in
 // helpers/lifecycle-invariants.mjs against README "Application behavior".
 import { cell, guardKnownRed } from "./helpers/known-red.mjs";
-import {
-	createHarness,
-	FakeNative,
-	fsOf,
-	InspectGate,
-	TEXT,
-} from "./helpers/lifecycle-harness.mjs";
+import { createHarness } from "./helpers/lifecycle-harness.mjs";
 import {
 	beginAction,
 	checkAction,
@@ -18,6 +12,7 @@ import {
 	checkPanel,
 	checkReads,
 } from "./helpers/lifecycle-invariants.mjs";
+import { apply, content, establish } from "./helpers/recovery-state.mjs";
 
 const { startHost } = await createHarness("lifecycle-recovery");
 
@@ -53,7 +48,11 @@ const B_EVENTS = [
 	"deleted",
 	"unreadable",
 	"recovered",
+	"moved",
+	"moved-changed",
 ];
+// Further user steps between the failure and the events.
+const HISTORIES = ["none", "cancel-again", "fail-again", "other-fails"];
 // in-flight: a poll started after the events is still reading when the action
 // opens its dialog and finishes while that dialog is open.
 const TIMINGS = ["polled", "unpolled", "during-confirm", "in-flight"];
@@ -69,27 +68,23 @@ const ACTIONS = [
 ];
 const SAVE_ACTIONS = new Set(["cmd-s", "review", "close-save"]);
 
-function apply(native, doc, event) {
-	if (event === "content-changed")
-		doc.file = {
-			source: `external ${doc.id}\n`,
-			ino: ++native.ino,
-			mtime: ++native.clock,
-		};
-	else if (event === "metadata-only")
-		doc.file = { ...doc.file, mtime: ++native.clock };
-	else if (event === "deleted") doc.file = null;
-	else if (event === "unreadable") doc.unreadable = true;
-	else if (event === "recovered") doc.unreadable = false;
-}
-
-/** What a user could see of a file: its text, "missing" or "unreadable". */
-const content = (native, doc) => {
-	const snapshot = fsOf(native, doc);
-	return snapshot.unreadable ? "unreadable" : (snapshot.source ?? "missing");
-};
-
-function applicable(failure, aEvent, bEvent, timing, action) {
+function applicable(failure, aEvent, bEvent, timing, action, history) {
+	if (history !== "none") {
+		if (!failure.hasB || failure.id.endsWith("b-unreadable")) return false;
+		if (history === "other-fails" && failure.start !== "file") return false;
+		// B already holds the editor text, so a second Save As has nothing to review.
+		if (history !== "other-fails" && failure.id.endsWith("lost-published"))
+			return false;
+		if (!["none", "content-changed"].includes(aEvent)) return false;
+		if (!["none", "content-changed", "deleted"].includes(bEvent)) return false;
+		if (!["polled", "unpolled"].includes(timing)) return false;
+		if (
+			!["poll", "cmd-s", "review", "close-save", "close-discard"].includes(
+				action,
+			)
+		)
+			return false;
+	}
 	if (failure.start === "untitled" && aEvent !== "none") return false;
 	if (!failure.hasB && bEvent !== "none") return false;
 	if (bEvent === "recovered" && !failure.id.endsWith("b-unreadable"))
@@ -104,108 +99,15 @@ function applicable(failure, aEvent, bEvent, timing, action) {
 	return true;
 }
 
-/** Brings the tab into the recovery state of `failure`. */
-async function establish(failure) {
-	const native = new FakeNative();
-	const a = native.add(1, "a.pfdsl", TEXT.disk);
-	const b = native.add(2, "b.pfdsl", "old B\n");
-	const ctx = {
-		native,
-		a,
-		b,
-		gate: new InspectGate(native),
-		tabName: undefined,
-		decision: "cancel",
-		onConfirm: undefined,
-		onLate: undefined,
-		useDisk: false,
-		faults: new Map(),
-		chooser: undefined,
-		beforeSave: undefined,
-	};
-	ctx.host = await startHost(native, a, {
-		choose: () => ctx.chooser(),
-		saveFault: (args) => ctx.faults.get(args.id)?.(),
-		beforeSave: (args) => ctx.beforeSave?.(args),
-		inspectGate: (id) => ctx.gate.hold(id),
-		dialogChoice: (title) =>
-			ctx.useDisk && title === "Discard editor changes"
-				? "Use Disk Version"
-				: undefined,
-		onDialog() {
-			if (ctx.gate.isHeld) {
-				ctx.onLate?.();
-				ctx.gate.release();
-			}
-		},
-		async confirm(name) {
-			if (name !== ctx.tabName) return "discard";
-			await ctx.onConfirm?.();
-			return ctx.decision;
-		},
-	});
-	const { host } = ctx;
-	if (failure.start === "file") ctx.tab = await host.open(a);
-	else ctx.tab = await host.newDocument();
-	ctx.tab.type(TEXT.edited);
-	const fault = (mode) => {
-		let used = false;
-		return () => {
-			if (used) return undefined;
-			used = true;
-			return mode;
-		};
-	};
-	const kind = failure.id.replace(/^(save-as|save|untitled)-/, "");
-	ctx.chooser = () => {
-		const chosen = native.snapshot(b);
-		if (kind === "conflict")
-			b.file = {
-				source: "external B\n",
-				ino: ++native.ino,
-				mtime: ++native.clock,
-			};
-		if (kind === "b-unreadable") b.unreadable = true;
-		return chosen;
-	};
-	if (kind === "lost-published")
-		ctx.faults.set(failure.hasB ? 2 : 1, fault("after"));
-	if (kind === "lost-unpublished")
-		ctx.faults.set(failure.hasB ? 2 : 1, fault("before"));
-	if (!failure.hasB && kind === "conflict") {
-		let used = false;
-		ctx.beforeSave = () => {
-			if (used) return;
-			used = true;
-			a.file = {
-				source: "external A\n",
-				ino: ++native.ino,
-				mtime: ++native.clock,
-			};
-		};
-	}
-	if (failure.via === "save-as") await host.click(host.query("#save-as"));
-	else await host.cmdS();
-	// Later choices see the target as it is.
-	ctx.chooser = () => native.snapshot(b);
-	return ctx;
-}
-
-async function runCell(failure, aEvent, bEvent, timing, action) {
+async function runCell(failure, aEvent, bEvent, timing, action, history) {
 	const violations = [];
 	const violate = (name, detail) => violations.push(`${name}: ${detail}`);
 	let ctx;
 	try {
-		ctx = await establish(failure);
+		ctx = await establish(startHost, failure, history);
 		const { native, a, b, host, tab } = ctx;
-		const recovery = failure.hasB ? b : a;
+		const { recovery, targets } = ctx;
 		const original = failure.start === "file" ? a : undefined;
-		const targets =
-			failure.start === "untitled"
-				? [b.id]
-				: failure.hasB
-					? [a.id, b.id]
-					: [a.id];
 		if (!host.panel().present)
 			violate("harness", "the recovery state was not established");
 		ctx.tabName = host.nameOf(tab);
@@ -334,13 +236,17 @@ async function runCell(failure, aEvent, bEvent, timing, action) {
 }
 
 for (const failure of FAILURES)
-	for (const aEvent of A_EVENTS)
-		for (const bEvent of B_EVENTS)
-			for (const timing of TIMINGS)
-				for (const action of ACTIONS) {
-					if (!applicable(failure, aEvent, bEvent, timing, action)) continue;
-					const label = `${failure.id} | A ${aEvent} | B ${bEvent} | ${timing} | ${action}`;
-					cell(label, () => runCell(failure, aEvent, bEvent, timing, action));
-				}
+	for (const history of HISTORIES)
+		for (const aEvent of A_EVENTS)
+			for (const bEvent of B_EVENTS)
+				for (const timing of TIMINGS)
+					for (const action of ACTIONS) {
+						if (!applicable(failure, aEvent, bEvent, timing, action, history))
+							continue;
+						const label = `${failure.id}${history === "none" ? "" : ` (${history})`} | A ${aEvent} | B ${bEvent} | ${timing} | ${action}`;
+						cell(label, () =>
+							runCell(failure, aEvent, bEvent, timing, action, history),
+						);
+					}
 
 guardKnownRed();

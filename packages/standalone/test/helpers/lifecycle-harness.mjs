@@ -20,9 +20,61 @@ export class FakeNative {
 			file: { source, ino: ++this.ino, mtime: ++this.clock },
 			unreadable: false,
 			writes: 0,
+			history: [],
 		};
 		this.docs.set(id, doc);
 		return doc;
+	}
+	/** The selected directory moved: the same file now has another path. */
+	move(doc, path) {
+		doc.history.push(doc.path);
+		doc.path = path;
+	}
+	/**
+	 * A second capability for the same leaf (the folder was selected again): same
+	 * binding and file, new id.
+	 */
+	reselect(doc, id) {
+		const alias = {
+			id,
+			path: doc.path,
+			binding: doc.binding,
+			history: [],
+			get file() {
+				return doc.file;
+			},
+			set file(value) {
+				doc.file = value;
+			},
+			get unreadable() {
+				return doc.unreadable;
+			},
+			set unreadable(value) {
+				doc.unreadable = value;
+			},
+			get writes() {
+				return doc.writes;
+			},
+			set writes(value) {
+				doc.writes = value;
+			},
+		};
+		this.docs.set(id, alias);
+		return alias;
+	}
+	/** Another leaf name for the same file (a hard link): same content and inode. */
+	link(doc, id, name) {
+		const alias = {
+			id,
+			path: `/A/${name}`,
+			binding: `dir:${name}`,
+			file: doc.file,
+			unreadable: false,
+			writes: 0,
+			history: [],
+		};
+		this.docs.set(id, alias);
+		return alias;
 	}
 	snapshot(doc) {
 		if (doc.unreadable) throw new Error("Permission denied (os error 13)");
@@ -183,7 +235,13 @@ export async function createHarness(label) {
 			readFileSync(`${root}/packages/standalone/index.html`, "utf8"),
 		);
 		const log = [];
-		const ledger = { acks: [], received: [], opened: new Set() };
+		const ledger = {
+			acks: [],
+			received: [],
+			failures: [],
+			offered: [],
+			opened: new Set(),
+		};
 		let seq = 0;
 		const tick = () => ++seq;
 		let poll;
@@ -217,6 +275,7 @@ export async function createHarness(label) {
 			});
 		globalThis.reviewTabHook = (kind, tab, text) => {
 			if (kind === "dispose") log.push({ kind: "dispose", tab, seq: tick() });
+			if (kind === "type") log.push({ kind: "type", tab, text, seq: tick() });
 			if (kind === "setSource") {
 				const seen = ledger.received.findLast((item) => item.source === text);
 				log.push({ kind: "reload", tab, text, seq: tick(), id: seen?.id });
@@ -228,7 +287,7 @@ export async function createHarness(label) {
 			const fields = [...this.querySelectorAll("textarea")].map((f) => f.value);
 			const text = this.querySelector("p").textContent;
 			const target = [...native.docs.values()].find((doc) =>
-				text.includes(doc.path),
+				[doc.path, ...doc.history].some((path) => text.includes(path)),
 			)?.id;
 			const entry = {
 				kind: "dialog",
@@ -239,7 +298,10 @@ export async function createHarness(label) {
 				editor: fields[0],
 				disk: fields[1],
 				shownEditor: fields[0] ?? activeTab()?.getSource(),
-				builtFrom: ledger.received.findLast((item) => item.id === target),
+				builtFrom: [...ledger.received, ...ledger.offered]
+					.filter((item) => item.id === target)
+					.sort((first, second) => first.seq - second.seq)
+					.at(-1),
 				fs: fsOf(native, watched),
 				fsById: Object.fromEntries(
 					[...native.docs].map(([id, doc]) => [id, fsOf(native, doc)]),
@@ -277,7 +339,14 @@ export async function createHarness(label) {
 			if (command === "choose_save_target") {
 				const chosen = await handlers.choose();
 				if (chosen) {
-					learn(chosen);
+					// A candidate target is shown to the user; it is not recorded as seen.
+					ledger.offered.push({
+						seq: tick(),
+						id: chosen.id,
+						source: chosen.source,
+						revision: chosen.revision,
+						path: chosen.path,
+					});
 					// Choosing a file starts from no acknowledged content.
 					approve(chosen.id, undefined, "chosen");
 				}
@@ -304,6 +373,7 @@ export async function createHarness(label) {
 				const fail = (error) => {
 					entry.doneSeq = tick();
 					entry.outcome = "error";
+					ledger.failures.push({ id: args.id, seq: entry.doneSeq });
 					throw error;
 				};
 				const held = handlers.inspectGate?.(args.id);
@@ -465,6 +535,10 @@ export async function createHarness(label) {
 			async runPoll() {
 				poll();
 				await flush();
+			},
+			/** Starts a quit request without waiting for the host to go idle. */
+			beginQuit(payload) {
+				quitListener({ payload: String(payload) });
 			},
 			async quit(payload) {
 				quitListener({ payload: String(payload) });

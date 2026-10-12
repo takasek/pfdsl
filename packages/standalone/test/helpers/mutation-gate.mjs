@@ -32,6 +32,7 @@ const SUITE = [
 	"close-guard.test.mjs",
 	"document-host-recovery.test.mjs",
 	"document-lifecycle-invariants.test.mjs",
+	"document-lifecycle-memory.test.mjs",
 	"document-lifecycle-recovery.test.mjs",
 	"document-lifecycle-scenarios.test.mjs",
 	"document-session.test.mjs",

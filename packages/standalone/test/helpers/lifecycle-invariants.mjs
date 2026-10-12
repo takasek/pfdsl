@@ -63,22 +63,24 @@ export function checkAction({ native, host, tab, trace, violate }) {
 	const usedDisk = log.some(
 		(item) => item.kind === "dialog" && item.choice === "Use Disk Version",
 	);
+	// Text the user typed during the action replaces what was there before.
+	const typed = log.findLast(
+		(item) => item.kind === "type" && item.tab === tab,
+	);
+	const unsaved = typed ? typed.text : trace.text0;
 	// Text this action already published is not unsaved any more.
 	const published = log.some(
-		(item) => item.kind === "save" && item.wrote && item.source === trace.text0,
+		(item) => item.kind === "save" && item.wrote && item.source === unsaved,
 	);
 	if (trace.dirty0 && !discarded && !usedDisk && !published) {
 		if (tab.setSourceCalls > trace.setSource0)
 			violate("L", "a tab that showed unsaved state was reloaded");
-		const keptInEditor = alive && text === trace.text0;
+		const keptInEditor = alive && text === unsaved;
 		const keptOnDisk = [...native.docs.values()].some(
-			(doc) => fsOf(native, doc).source === trace.text0,
+			(doc) => fsOf(native, doc).source === unsaved,
 		);
 		if (!keptInEditor && !keptOnDisk)
-			violate(
-				"L",
-				`unsaved text ${JSON.stringify(trace.text0)} exists nowhere`,
-			);
+			violate("L", `unsaved text ${JSON.stringify(unsaved)} exists nowhere`);
 	}
 	const disposed = log.some(
 		(item) => item.kind === "dispose" && item.tab === tab,
@@ -155,37 +157,38 @@ export function checkAction({ native, host, tab, trace, violate }) {
 				`replaced ${JSON.stringify(prior)} (acknowledged ${JSON.stringify(known?.content)}) without an approval that showed it`,
 			);
 	});
-	// U
-	const failed = log.findLast(
-		(item) =>
-			item.kind === "inspect" &&
-			item.outcome === "error" &&
-			trace.owned.includes(item.id),
-	);
-	if (failed && alive) {
-		const later = log.filter(
-			(item) =>
-				item.kind === "inspect" &&
-				item.id === failed.id &&
-				item.seq > failed.seq,
-		);
-		const recoveredSame = later.some(
-			(item) =>
-				item.outcome === "ok" &&
-				item.source === acknowledged(host, item.id, item.seq)?.content,
-		);
-		const resolved = host.ledger.acks.some(
-			(ack) => ack.id === failed.id && ack.seq > failed.doneSeq,
-		);
-		if (!host.isDirty(tab) && !recoveredSame && !resolved)
-			violate("U", "an unreadable read left no sign on the tab");
-	}
+	// U: a failed read stays visible until the user resolves it or the content returns.
+	const unresolved = trace.owned.filter((id) => unresolvedFailure(host, id));
+	if (alive && unresolved.length && !host.isDirty(tab))
+		violate("U", "an unreadable read left no sign on the tab");
 	// K
 	const asked = log.some(
 		(item) => item.kind === "confirm" && item.name === trace.name,
 	);
-	if (disposed && !asked && (trace.dirty0 || failed))
+	if (disposed && !asked && unresolved.length)
 		violate("K", "a tab that needed confirmation was closed without asking");
+}
+
+/**
+ * True while the last failed read of a file is neither resolved by an approved
+ * write, load or dialog nor undone by the file returning to what was
+ * acknowledged when the read failed.
+ */
+function unresolvedFailure(host, id) {
+	const failure = host.ledger.failures.findLast((item) => item.id === id);
+	if (!failure) return false;
+	// Any approved write or load later resolves it: the document then lives elsewhere.
+	const resolved = host.ledger.acks.some(
+		(ack) =>
+			ack.seq > failure.seq &&
+			(ack.why === "save" || ack.why === "approval" || ack.why === "open"),
+	);
+	const latest = host.ledger.received.findLast(
+		(item) => item.id === id && item.seq > failure.seq,
+	);
+	const recoveredSame =
+		latest && latest.source === acknowledged(host, id, failure.seq)?.content;
+	return !resolved && !recoveredSame;
 }
 
 /** T: every owned target was read after the last decision and before disposal. */
@@ -226,9 +229,19 @@ export function checkReads({ host, tab, trace, violate }) {
  * P: the panel names the recovery target by its current path, compares against
  * what the application last learned about it, and offers actions that fit.
  */
-export function checkPanel({ host, native, violate, recoveryId }) {
+export function checkPanel({ host, native, violate, recoveryId, original }) {
 	const panel = host.panel();
 	if (!panel.present) return;
+	// The original is never "also changed" while it is itself the recovery target.
+	if (
+		original &&
+		panel.recoveryPath === original.path &&
+		panel.originalAlsoChanged
+	)
+		violate(
+			"P",
+			"the panel says the original also changed but it is the recovery target",
+		);
 	const target =
 		recoveryId ??
 		[...native.docs.values()].find((doc) => doc.path === panel.recoveryPath)

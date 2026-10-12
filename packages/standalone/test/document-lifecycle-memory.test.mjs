@@ -1,0 +1,323 @@
+// What the lifecycle must remember across steps: a confirmation's lifetime, a
+// failed read, stale notices after a failed save, a target that moved, and
+// targets related by binding. Invariants are in helpers/lifecycle-invariants.mjs.
+import { cell, guardKnownRed } from "./helpers/known-red.mjs";
+import {
+	createHarness,
+	FakeNative,
+	flush,
+	InspectGate,
+	TEXT,
+} from "./helpers/lifecycle-harness.mjs";
+import {
+	beginAction,
+	checkAction,
+	checkPanel,
+	checkReads,
+} from "./helpers/lifecycle-invariants.mjs";
+import { apply, establish } from "./helpers/recovery-state.mjs";
+
+const { startHost } = await createHarness("lifecycle-memory");
+
+/** Runs `body` and gives it a violation sink; a throw counts as a violation. */
+async function judged(body) {
+	const violations = [];
+	const violate = (name, detail) => violations.push(`${name}: ${detail}`);
+	try {
+		await body(violate);
+	} catch (error) {
+		violate("harness", String(error?.stack ?? error));
+	}
+	return violations;
+}
+
+const change = (native, doc, source) => {
+	doc.file = { source, ino: ++native.ino, mtime: ++native.clock };
+};
+
+// F1: a Save decision covers the text shown when it was asked. Edits at the
+// points around it must never be saved or closed without a new decision.
+for (const point of [
+	"before-confirm",
+	"during-confirm",
+	"pending-inspect",
+	"during-save-io",
+])
+	for (const kind of ["edit", "edit-undo"])
+		for (const path of ["close-save", "quit-save"])
+			cell(`lifetime | ${point} | ${kind} | ${path}`, () =>
+				judged(async (violate) => {
+					const native = new FakeNative();
+					const a = native.add(1, "a.pfdsl", TEXT.disk);
+					const gate = new InspectGate(native);
+					let tab;
+					const edit = () => {
+						const base = tab.getSource();
+						tab.type("edited after the decision was asked\n");
+						if (kind === "edit-undo") tab.type(base);
+					};
+					const host = await startHost(native, a, {
+						inspectGate: (id) => gate.hold(id),
+						beforeSave: () => {
+							if (point === "during-save-io") edit();
+						},
+						async confirm() {
+							if (point === "during-confirm") edit();
+							if (point === "pending-inspect") gate.arm(a.id);
+							return "save";
+						},
+					});
+					tab = await host.open(a);
+					tab.type(TEXT.edited);
+					if (point === "before-confirm") edit();
+					const trace = beginAction({ host, tab, owned: [a.id] });
+					if (point === "pending-inspect") {
+						if (path === "close-save") host.closeButton(tab).click();
+						else host.beginQuit(1);
+						await flush();
+						if (!gate.isHeld)
+							violate("harness", "the pre-save inspection was not pending");
+						edit();
+						gate.release();
+						await host.settle();
+					} else if (path === "close-save")
+						await host.click(host.closeButton(tab));
+					else await host.quit(1);
+					checkAction({ native, host, tab, trace, violate });
+					checkReads({ host, tab, trace, violate });
+					checkPanel({ host, native, violate });
+					if ((await host.finish()).length) violate("harness", "leaked IPC");
+				}),
+			);
+
+// F2 / T1: what a failed read means must not depend on which entry point saw it.
+for (const entry of ["poll", "cmd-s", "close-cancel", "use-disk"])
+	for (const tabState of ["clean", "dirty"])
+		for (const recovery of ["same", "different"])
+			for (const next of ["poll", "cmd-s", "close-discard"]) {
+				if (entry === "use-disk" && tabState === "clean") continue;
+				cell(
+					`failure memory | ${tabState} | ${entry} | ${recovery} | ${next}`,
+					() =>
+						judged(async (violate) => {
+							const native = new FakeNative();
+							const a = native.add(1, "a.pfdsl", TEXT.disk);
+							const state = { decision: "cancel", useDisk: false, name: "" };
+							const host = await startHost(native, a, {
+								confirm: async (name) =>
+									name === state.name ? state.decision : "discard",
+								dialogChoice: (title) =>
+									state.useDisk && title === "Discard editor changes"
+										? "Use Disk Version"
+										: undefined,
+							});
+							const tab = await host.open(a);
+							state.name = host.nameOf(tab);
+							if (tabState === "dirty") tab.type(TEXT.edited);
+							if (entry === "use-disk") {
+								change(native, a, "disk v2 (external)\n");
+								await host.runPoll();
+							}
+							const before = a.file;
+							a.unreadable = true;
+							const first = beginAction({ host, tab, owned: [a.id] });
+							if (entry === "poll") await host.runPoll();
+							else if (entry === "cmd-s") await host.cmdS();
+							else if (entry === "close-cancel")
+								await host.click(host.closeButton(tab));
+							else {
+								state.useDisk = true;
+								await host.click(host.panel().use);
+								state.useDisk = false;
+							}
+							checkAction({ native, host, tab, trace: first, violate });
+							checkPanel({ host, native, violate });
+							a.unreadable = false;
+							if (recovery === "same") a.file = before;
+							else change(native, a, "disk v3 after recovery\n");
+							if (!host.isOpen(tab)) {
+								violate(
+									"K",
+									"the tab was closed although its disk could not be read",
+								);
+								return;
+							}
+							state.decision = "discard";
+							const second = beginAction({ host, tab, owned: [a.id] });
+							if (next === "poll") await host.runPoll();
+							else if (next === "cmd-s") {
+								for (let press = 0; press < 3 && host.isOpen(tab); press++) {
+									await host.cmdS();
+									if (!host.isDirty(tab) && !host.panel().present) break;
+								}
+							} else await host.click(host.closeButton(tab));
+							checkAction({ native, host, tab, trace: second, violate });
+							if (next === "close-discard")
+								checkReads({ host, tab, trace: second, violate });
+							checkPanel({ host, native, violate });
+							if ((await host.finish()).length)
+								violate("harness", "leaked IPC");
+						}),
+				);
+			}
+
+// F3: after the plain Save of the original failed, the original is the recovery
+// target and no notice may say that "the original also changed".
+cell("stale notice | the original returns to its first content", () =>
+	judged(async (violate) => {
+		const ctx = await establish(startHost, {
+			id: "save-as-conflict",
+			start: "file",
+			via: "save-as",
+			hasB: true,
+		});
+		const { native, a, host } = ctx;
+		change(native, a, "external A1\n");
+		await host.runPoll();
+		if (!host.panel().originalAlsoChanged)
+			violate("harness", "the notice was not shown for A1");
+		ctx.beforeSave = () => {
+			ctx.beforeSave = undefined;
+			change(native, a, "external A2\n");
+		};
+		await host.cmdS();
+		change(native, a, TEXT.disk);
+		await host.runPoll();
+		checkPanel({ host, native, violate, original: a });
+		if ((await host.finish()).length) violate("harness", "leaked IPC");
+	}),
+);
+
+// F4 / T4: a recovery target whose directory moved is named by its current path.
+for (const polls of [0, 1])
+	cell(`moved target | Use Current Disk Version before ${polls} poll(s)`, () =>
+		judged(async (violate) => {
+			const ctx = await establish(startHost, {
+				id: "save-as-conflict",
+				start: "file",
+				via: "save-as",
+				hasB: true,
+			});
+			const { native, b, host } = ctx;
+			apply(native, b, "moved-changed");
+			ctx.useDisk = true;
+			await host.click(host.panel().use);
+			for (let poll = 0; poll < polls; poll++) await host.runPoll();
+			checkPanel({ host, native, violate, recoveryId: b.id });
+			if ((await host.finish()).length) violate("harness", "leaked IPC");
+		}),
+	);
+
+// N2: the Save that follows a Close decision completes the close in one attempt.
+cell(
+	"close after an unreadable first save | the target recovers during the confirmation",
+	() =>
+		judged(async (violate) => {
+			const ctx = await establish(startHost, {
+				id: "untitled-b-unreadable",
+				start: "untitled",
+				via: "save",
+				hasB: true,
+			});
+			const { native, b, host, tab } = ctx;
+			ctx.tabName = host.nameOf(tab);
+			ctx.decision = "save";
+			ctx.onConfirm = () => apply(native, b, "recovered");
+			const trace = beginAction({ host, tab, owned: [b.id] });
+			await host.click(host.closeButton(tab));
+			checkAction({ native, host, tab, trace, violate });
+			if (host.isOpen(tab))
+				violate("N2", "the close did not complete after the Save succeeded");
+			if ((await host.finish()).length) violate("harness", "leaked IPC");
+		}),
+);
+
+// T3: the dialog is built from the inspection it received; a change after that
+// response is refused natively, never overwritten.
+for (const late of [false, true])
+	cell(
+		`dialog source | the file changes after the inspection answered: ${late}`,
+		() =>
+			judged(async (violate) => {
+				const native = new FakeNative();
+				const a = native.add(1, "a.pfdsl", TEXT.disk);
+				let armed = false;
+				const host = await startHost(native, a, {
+					afterInspect(id) {
+						if (late && armed && id === a.id) {
+							armed = false;
+							change(native, a, "disk v3 (after the answer)\n");
+						}
+					},
+				});
+				const tab = await host.open(a);
+				tab.type(TEXT.edited);
+				change(native, a, "disk v2 (external)\n");
+				armed = true;
+				const trace = beginAction({ host, tab, owned: [a.id] });
+				await host.cmdS();
+				checkAction({ native, host, tab, trace, violate });
+				if (late && a.file.source !== "disk v3 (after the answer)\n")
+					violate("R", "a change after the inspection was overwritten");
+				if ((await host.finish()).length) violate("harness", "leaked IPC");
+			}),
+	);
+
+// Relations: a hard link is another document; a reselected folder is the same one.
+cell(
+	"hard link | saving one leaf leaves the other leaf and its tab alone",
+	() =>
+		judged(async (violate) => {
+			const native = new FakeNative();
+			const a = native.add(1, "a.pfdsl", TEXT.disk);
+			const alias = native.link(a, 3, "alias.pfdsl");
+			const host = await startHost(native, a, {});
+			const first = await host.open(a);
+			first.type(TEXT.edited);
+			const second = await host.open(alias);
+			if (second === first)
+				violate("harness", "the hard link opened in the same tab");
+			first.button.click();
+			const trace = beginAction({ host, tab: first, owned: [a.id] });
+			await host.cmdS();
+			checkAction({ native, host, tab: first, trace, violate });
+			await host.runPoll();
+			if (alias.file.source !== TEXT.disk)
+				violate("R", "the other leaf was written");
+			if (host.isDirty(second) || second.getSource() !== TEXT.disk)
+				violate("L", "the other leaf's tab changed");
+			const saves = host.log.filter((item) => item.kind === "save");
+			if (saves.some((item) => item.id !== a.id))
+				violate("R", "the save targeted another leaf");
+			if ((await host.finish()).length) violate("harness", "leaked IPC");
+		}),
+);
+
+for (const external of [false, true])
+	cell(
+		`same binding, new id | reselecting the file, external change: ${external}`,
+		() =>
+			judged(async (violate) => {
+				const native = new FakeNative();
+				const a = native.add(1, "a.pfdsl", TEXT.disk);
+				const again = native.reselect(a, 9);
+				const host = await startHost(native, a, {});
+				const tab = await host.open(a);
+				tab.type(TEXT.edited);
+				if (external) change(native, a, "disk v2 (external)\n");
+				const tabs = host.tabs().filter((item) => host.isOpen(item)).length;
+				const trace = beginAction({ host, tab, owned: [a.id, again.id] });
+				const reopened = await host.open(again);
+				if (reopened !== tab)
+					violate("harness", "reselecting opened another tab");
+				if (host.tabs().filter((item) => host.isOpen(item)).length !== tabs)
+					violate("harness", "the number of tabs changed");
+				await host.cmdS();
+				checkAction({ native, host, tab, trace, violate });
+				if (a.file.source !== TEXT.edited)
+					violate("D", "the reselected document could not be saved");
+				if ((await host.finish()).length) violate("harness", "leaked IPC");
+			}),
+	);
+
+guardKnownRed();

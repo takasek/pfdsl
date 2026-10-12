@@ -17,7 +17,7 @@ export function createDocumentTab(options){
   activate(){},
   dispose(){container.remove();button.remove();hook('dispose',tab);},
   getSource:()=>source,getRevision:()=>revision,
-  type(s){source=s;revision++;options.onChange?.();},
+  type(s){source=s;revision++;hook('type',tab,s);options.onChange?.();},
   setSource(s){this.setSourceCalls++;source=s;revision++;hook('setSource',tab,s);options.onChange?.();},
   setLocation(path,name,read){this.location=path;this.read=read;button.textContent=name;},
   markSaved(){},format(){}};
