@@ -309,6 +309,9 @@ function copyTree() {
 		cpSync(join(standalone, name), join(target, name), { recursive: true });
 	symlinkSync(join(repo, "node_modules"), join(tree, "node_modules"));
 	symlinkSync(join(standalone, "node_modules"), join(target, "node_modules"));
+	// This helper imports the repository's shared CLI entrypoint check.
+	mkdirSync(join(tree, "scripts"));
+	symlinkSync(join(repo, "scripts/lib"), join(tree, "scripts/lib"));
 	return tree;
 }
 
