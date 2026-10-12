@@ -605,6 +605,69 @@ test("failed Save As keeps recovery target B when original A is polled", async (
 	assert.equal(doc.conflict.source, "external B");
 });
 
+for (const [name, touched] of [
+	["metadata-only change", (disk) => ({ ...disk, revision: "touched" })],
+	[
+		"replacement by a new inode",
+		(disk) => ({ ...disk, revision: "replaced", identity: "file:2" }),
+	],
+]) {
+	test(`a ${name} with identical content is adopted without a reload or conflict`, async () => {
+		for (const dirty of [false, true]) {
+			const sets = [];
+			const editor = view();
+			editor.setSource = (value) => sets.push(value);
+			const original = snap("original", "r1");
+			const doc = new DocumentSession(editor, original);
+			if (dirty) editor.edit("local");
+			const current = touched(original);
+			await doc.checkExternal(async () => current);
+			assert.deepEqual(sets, [], `dirty=${dirty}`);
+			assert.equal(doc.disk, current);
+			assert.equal(doc.observed, current);
+			assert.equal(doc.conflict, null);
+			assert.equal(doc.isDirty(), dirty);
+			assert.equal(doc.message, "");
+		}
+	});
+}
+
+test("identical content is compared as read from disk, not as normalized by the editor", async () => {
+	let text = "a\nb\n";
+	const sets = [];
+	const editor = {
+		getSource: () => text,
+		setSource: (value) => sets.push(value),
+	};
+	const original = snap("a\r\nb\n", "r1");
+	const doc = new DocumentSession(editor, original);
+	await doc.checkExternal(async () => ({ ...original, revision: "touched" }));
+	assert.deepEqual(sets, []);
+	assert.equal(doc.disk.revision, "touched");
+	text = "a\nb\nlocal\n";
+	await doc.checkExternal(async () => ({
+		...original,
+		source: "a\nb\n",
+		revision: "changed",
+	}));
+	assert.equal(doc.conflict.source, "a\nb\n");
+});
+
+test("a same-content observation clears an observation-only uncertainty", async () => {
+	const editor = view();
+	const original = snap("original", "r1");
+	const doc = new DocumentSession(editor, original);
+	await assert.rejects(
+		doc.checkExternal(async () => {
+			throw new Error("unreadable");
+		}),
+	);
+	assert.equal(doc.isDirty(), true);
+	await doc.checkExternal(async () => ({ ...original, revision: "touched" }));
+	assert.equal(doc.isDirty(), false);
+	assert.equal(doc.message, "");
+});
+
 test("a fresh inspection of the original keeps Save As recovery on B", async () => {
 	const editor = view();
 	const original = snap("original");

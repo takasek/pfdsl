@@ -242,7 +242,12 @@ export class DocumentSession {
 				}
 				return;
 			}
-			if (current.revision === this.disk.revision) {
+			// Metadata-only changes and same-content replacements are not document changes.
+			// The raw disk text is compared; savedSource is normalized by the editor.
+			if (
+				current.revision === this.disk.revision ||
+				(current.source !== null && current.source === this.disk.source)
+			) {
 				this.disk = current;
 				this.observed = current;
 				if (

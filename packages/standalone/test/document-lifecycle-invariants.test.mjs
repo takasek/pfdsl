@@ -40,61 +40,6 @@ const ACTIONS = [
 const SAVE_ACTIONS = new Set(["cmd-s", "review", "close-save", "quit-save"]);
 const TEXT = { disk: "disk v1\n", edited: "edited by the user\n" };
 
-/**
- * Cells whose invariants fail until their fix lands. A fix commit must delete
- * exactly the cells it repairs: a listed cell that passes fails the last test.
- */
-const KNOWN_RED = new Set([
-	"clean | metadata-only | polled | cmd-s",
-	"clean | metadata-only | polled | close-save",
-	"clean | metadata-only | polled | close-discard",
-	"clean | metadata-only | polled | close-cancel",
-	"clean | metadata-only | polled | quit-save",
-	"clean | metadata-only | polled | quit-discard",
-	"clean | metadata-only | polled | quit-cancel",
-	"clean | metadata-only | unpolled | close-save",
-	"clean | metadata-only | unpolled | close-discard",
-	"clean | metadata-only | unpolled | close-cancel",
-	"clean | metadata-only | unpolled | quit-save",
-	"clean | metadata-only | unpolled | quit-discard",
-	"clean | metadata-only | unpolled | quit-cancel",
-	"clean | metadata-only | during-confirm | quit-save",
-	"clean | metadata-only | during-confirm | quit-discard",
-	"clean | metadata-only | during-confirm | quit-cancel",
-	"clean | same-content-new-inode | polled | cmd-s",
-	"clean | same-content-new-inode | polled | close-save",
-	"clean | same-content-new-inode | polled | close-discard",
-	"clean | same-content-new-inode | polled | close-cancel",
-	"clean | same-content-new-inode | polled | quit-save",
-	"clean | same-content-new-inode | polled | quit-discard",
-	"clean | same-content-new-inode | polled | quit-cancel",
-	"clean | same-content-new-inode | unpolled | close-save",
-	"clean | same-content-new-inode | unpolled | close-discard",
-	"clean | same-content-new-inode | unpolled | close-cancel",
-	"clean | same-content-new-inode | unpolled | quit-save",
-	"clean | same-content-new-inode | unpolled | quit-discard",
-	"clean | same-content-new-inode | unpolled | quit-cancel",
-	"clean | same-content-new-inode | during-confirm | quit-save",
-	"clean | same-content-new-inode | during-confirm | quit-discard",
-	"clean | same-content-new-inode | during-confirm | quit-cancel",
-	"dirty | metadata-only | polled | cmd-s",
-	"dirty | metadata-only | polled | close-save",
-	"dirty | metadata-only | polled | close-discard",
-	"dirty | metadata-only | polled | close-cancel",
-	"dirty | metadata-only | polled | quit-save",
-	"dirty | metadata-only | polled | quit-discard",
-	"dirty | metadata-only | polled | quit-cancel",
-	"dirty | metadata-only | during-confirm | quit-save",
-	"dirty | same-content-new-inode | polled | cmd-s",
-	"dirty | same-content-new-inode | polled | close-save",
-	"dirty | same-content-new-inode | polled | close-discard",
-	"dirty | same-content-new-inode | polled | close-cancel",
-	"dirty | same-content-new-inode | polled | quit-save",
-	"dirty | same-content-new-inode | polled | quit-discard",
-	"dirty | same-content-new-inode | polled | quit-cancel",
-	"dirty | same-content-new-inode | during-confirm | quit-save",
-]);
-
 function applicable(tab, event, timing, action) {
 	if (event.startsWith("reply-lost"))
 		return (
@@ -228,7 +173,6 @@ const EVENT_STEPS = {
 	],
 };
 
-const results = new Map();
 const keys = [
 	"document",
 	"window",
@@ -263,7 +207,7 @@ const flush = async () => {
 	for (let i = 0; i < 100; i++) await Promise.resolve();
 };
 
-async function runCell(label, tabState, event, timing, action) {
+async function runCell(tabState, event, timing, action) {
 	const violations = [];
 	const violate = (name, detail) => violations.push(`${name}: ${detail}`);
 	const dom = new JSDOM(
@@ -597,7 +541,6 @@ async function runCell(label, tabState, event, timing, action) {
 	} finally {
 		dom.window.close();
 	}
-	results.set(label, violations);
 	return violations;
 }
 
@@ -607,19 +550,8 @@ for (const tab of TABS)
 			for (const action of ACTIONS) {
 				if (!applicable(tab, event, timing, action)) continue;
 				const label = `${tab} | ${event} | ${timing} | ${action}`;
-				test(
-					label,
-					KNOWN_RED.has(label) ? { todo: "known red" } : {},
-					async () => {
-						const violations = await runCell(label, tab, event, timing, action);
-						assert.deepEqual(violations, [], label);
-					},
-				);
+				test(label, async () => {
+					const violations = await runCell(tab, event, timing, action);
+					assert.deepEqual(violations, [], label);
+				});
 			}
-
-test("KNOWN_RED lists only cells that still fail", () => {
-	const stale = [...KNOWN_RED].filter(
-		(label) => !results.has(label) || results.get(label).length === 0,
-	);
-	assert.deepEqual(stale, [], "remove these cells from KNOWN_RED");
-});
