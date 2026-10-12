@@ -69,6 +69,7 @@ export function decisionArgumentIssues(
 	parsed,
 	argumentsToInspect,
 	indirectFlags = [],
+	classes = [],
 ) {
 	const issues = [...parsed.issues];
 	const sources = new Map([
@@ -77,7 +78,17 @@ export function decisionArgumentIssues(
 	]);
 	for (const selector of indirectFlags)
 		if (parsed.flags.has(selector)) issues.push(sources.get(selector));
-	for (const token of argumentsToInspect.filter(Boolean)) {
+	// Class selectors matter for every operation. Execution/write targets
+	// matter only when the proven class is not exclusively read-only.
+	for (const token of argumentsToInspect.filter(
+		(token) =>
+			token &&
+			!(
+				token.role === "target" &&
+				classes.length &&
+				classes.every((klass) => klass === "R")
+			),
+	)) {
 		if (token.dynamic) issues.push("dynamic-argument");
 		else if (token.value === "-" || token.value === "@-")
 			issues.push("indirect-stdin");

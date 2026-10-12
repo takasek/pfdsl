@@ -3,6 +3,7 @@ import { test } from "node:test";
 import { classifyAgentOperations } from "./agent-operation-classifier.mjs";
 import { corpusFacts } from "./agent-operation-corpus.mjs";
 import { evaluateAgentOperationPolicy } from "./agent-operation-policy.mjs";
+import { readShell } from "./shell-commands.mjs";
 
 // Each declared decision argument is crossed with every input source, without
 // generating Git syntax from help or interpreting external input contents.
@@ -139,6 +140,139 @@ const roles = [
 	],
 ];
 const sources = ["literal", "dynamic", "stdin", "file", "unknown-option"];
+test("read classes do not depend on execution targets or a proven GET endpoint", async (t) => {
+	for (const harness of ["claude", "codex"])
+		for (const source of sources)
+			for (const tail of [
+				["status"],
+				["log"],
+				["diff"],
+				["show"],
+				["fetch", "origin"],
+				["branch", "--list"],
+			])
+				await t.test(`${harness} R ${tail[0]}: ${source}`, () => {
+					const target =
+						source === "dynamic"
+							? { value: "$root", dynamic: true }
+							: {
+									value:
+										source === "stdin"
+											? "-"
+											: source === "file"
+												? "@fixture"
+												: "/fixture/own",
+								};
+					const tokens = [
+						{ value: "git" },
+						{ value: "-C" },
+						target,
+						...tail.map((value) => ({ value })),
+					];
+					if (source === "unknown-option")
+						tokens.push({ value: "--not-declared" });
+					const payload = {
+						tool_name: "Bash",
+						cwd: "/fixture/own",
+						tool_input: { command: "matrix" },
+					};
+					const facts = corpusFacts({
+						harness,
+						shell: { commands: [{ tokens }] },
+					});
+					const result = evaluateAgentOperationPolicy(payload, facts);
+					assert.equal(
+						result.operationClass,
+						source === "unknown-option" ? "U" : "R",
+					);
+					assert.equal(
+						result.decision,
+						source === "unknown-option" ? "deny" : "allow",
+					);
+				});
+	for (const method of [[], ["-X", "GET"], ["--method", "GET"]])
+		for (const source of sources)
+			await t.test(
+				`API GET ${method.join(" ") || "default"}: ${source}`,
+				() => {
+					const endpoint = {
+						value:
+							source === "dynamic"
+								? "repos/o/r/issues/comments/$id"
+								: source === "stdin"
+									? "-"
+									: source === "file"
+										? "@fixture"
+										: "repos/o/r/issues",
+						dynamic: source === "dynamic",
+					};
+					const tokens = [
+						{ value: "gh" },
+						{ value: "api" },
+						...method.map((value) => ({ value })),
+						endpoint,
+					];
+					if (source === "unknown-option")
+						tokens.push({ value: "--not-declared" });
+					const payload = {
+						tool_name: "Bash",
+						cwd: "/fixture/own",
+						tool_input: { command: "matrix" },
+					};
+					const facts = corpusFacts({ shell: { commands: [{ tokens }] } });
+					const result = evaluateAgentOperationPolicy(payload, facts);
+					assert.equal(
+						result.operationClass,
+						source === "unknown-option" ? "U" : "R",
+					);
+					assert.equal(
+						result.decision,
+						source === "unknown-option" ? "deny" : "allow",
+					);
+				},
+			);
+});
+
+test("directory hints apply to writes while reads remain R", () => {
+	for (const change of [false, true]) {
+		const command = `cd "$root" && git ${change ? "add a" : "status"}`;
+		const payload = {
+			tool_name: "Bash",
+			cwd: "/fixture/own",
+			tool_input: { command },
+		};
+		const facts = corpusFacts({ shell: readShell(command) });
+		assert.equal(
+			evaluateAgentOperationPolicy(payload, facts).decision,
+			change ? "deny" : "allow",
+		);
+	}
+});
+
+test("writes and unknown API methods still depend on their targets", () => {
+	for (const values of [
+		["git", "-C", "$root", "add", "a"],
+		["gh", "api", "-X", "PUT", "$endpoint"],
+		["gh", "api", "--method", "$method", "$endpoint"],
+		["gh", "api", "$endpoint", "-F", "body=@fixture"],
+	]) {
+		const tokens = values.map((value) => ({
+			value,
+			dynamic: value.startsWith("$"),
+		}));
+		const payload = {
+			tool_name: "Bash",
+			cwd: "/fixture/own",
+			tool_input: { command: "matrix" },
+		};
+		const facts = corpusFacts({ shell: { commands: [{ tokens }] } });
+		assert.equal(
+			evaluateAgentOperationPolicy(payload, facts).operationClass,
+			"U",
+		);
+		assert.equal(evaluateAgentOperationPolicy(payload, facts).decision, "deny");
+	}
+});
 test("global unknown options record only the literal name without an attached value", () => {
 	const tokens = ["git", "--not-declared=/fixture/private", "status"].map(
 		(value) => ({ value }),

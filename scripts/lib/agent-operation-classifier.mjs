@@ -227,7 +227,12 @@ function withInputIssues(
 	sensitive = [],
 	indirectFlags = [],
 ) {
-	const issues = decisionArgumentIssues(parsed, sensitive, indirectFlags);
+	const issues = decisionArgumentIssues(
+		parsed,
+		sensitive,
+		indirectFlags,
+		result.classes,
+	);
 	if (issues.length)
 		result.classes = [
 			...new Set([
@@ -333,17 +338,19 @@ function gitOperation(command, context, facts) {
 	let dynamicTarget = Boolean(targetOverride);
 	let bypass = false;
 	const globalIssues = [];
+	const targetArguments = [];
 	while (i < tokens.length && tokens[i].value.startsWith("-")) {
 		const value = tokens[i].value;
 		if (["--help", "--version"].includes(value))
 			return operation(["R"], "git", pathFacts(path, facts));
 		if (value === "-C") {
 			const target = tokens[++i];
-			globalIssues.push(
-				...decisionArgumentIssues({ issues: [], flags: new Set() }, [target]),
-			);
+			if (target) targetArguments.push({ ...target, role: "target" });
+			else globalIssues.push("missing-option-value");
 			dynamicTarget ||= !target || Boolean(target.dynamic);
-			dynamicTarget ||= globalIssues.length > 0;
+			dynamicTarget ||=
+				decisionArgumentIssues({ issues: [], flags: new Set() }, [target])
+					.length > 0;
 			explicitAbsolute = Boolean(
 				target && !target.dynamic && isAbsolute(target.value),
 			);
@@ -759,7 +766,7 @@ function gitOperation(command, context, facts) {
 		}),
 		`git ${sub.value}`,
 		parsed,
-		gitDecisionArguments(sub.value, parsed, classes),
+		[...gitDecisionArguments(sub.value, parsed, classes), ...targetArguments],
 		["fetch", "pull", "update-ref", "sparse-checkout"].includes(sub.value)
 			? ["--stdin"]
 			: [],
@@ -838,9 +845,10 @@ function ghOperation(tokens) {
 		return finish(operation(["O", "P"], "remote", { target: "own" }));
 	if (group === "api") {
 		const endpoint = operands[1]?.value;
-		const method = values.findLast(
+		const methodToken = values.findLast(
 			({ flag }) => flag === "-X" || flag === "--method",
-		)?.value;
+		);
+		const method = methodToken?.value;
 		const fields = values.filter(({ flag }) =>
 			["-f", "-F", "--field", "--raw-field", "--input"].includes(flag),
 		);
@@ -848,48 +856,56 @@ function ghOperation(tokens) {
 			.find(({ value }) => value.startsWith("query="))
 			?.value.slice(6);
 		const queryToken = fields.find(({ value }) => value.startsWith("query="));
+		const read = methodToken
+			? !methodToken.dynamic && ["GET", "HEAD"].includes(method.toUpperCase())
+			: !fields.length;
+		const targetRole = read ? "target" : "class";
 		const sensitive = [
-			operands[1],
-			values.findLast(({ flag }) => ["-X", "--method"].includes(flag)),
-			...fields.filter(
-				(field) => !/^[A-Za-z_][A-Za-z0-9_]*=/.test(field.value),
-			),
+			operands[1] && { ...operands[1], role: targetRole },
+			methodToken,
+			...fields
+				.filter((field) => !/^[A-Za-z_][A-Za-z0-9_]*=/.test(field.value))
+				.map((field) => ({ ...field, role: targetRole })),
 			...(queryToken
-				? [{ ...queryToken, value: queryToken.value.slice(6) }]
+				? [
+						{
+							...queryToken,
+							value: queryToken.value.slice(6),
+							role: targetRole,
+						},
+					]
 				: []),
 		];
-		const read = method
-			? ["GET", "HEAD"].includes(method.toUpperCase())
-			: !fields.length;
+		const indirectFlags = read ? [] : ["--input"];
 		const endpointPath = endpoint?.split("?")[0];
 		const merge =
-			(!read &&
-				/(?:^|\/)repos\/[^/]+\/[^/]+\/pulls\/[^/]+\/merge(?:-async)?\/?$/.test(
-					endpointPath ?? "",
-				)) ||
-			/\b(?:mergePullRequest|enqueuePullRequest|enablePullRequestAutoMerge)\s*\(/.test(
-				query ?? "",
-			);
+			!read &&
+			(/(?:^|\/)repos\/[^/]+\/[^/]+\/pulls\/[^/]+\/merge(?:-async)?\/?$/.test(
+				endpointPath ?? "",
+			) ||
+				/\b(?:mergePullRequest|enqueuePullRequest|enablePullRequestAutoMerge)\s*\(/.test(
+					query ?? "",
+				));
 		if (merge)
 			return finish(
 				operation(["O", "P"], "remote", { target: "own" }),
 				sensitive,
-				["--input"],
+				indirectFlags,
 			);
 		if (endpoint === "graphql")
 			return finish(
 				operation(
-					[query && /^\s*(?:query\b|\{)/.test(query) ? "R" : "O"],
+					[read || (query && /^\s*(?:query\b|\{)/.test(query)) ? "R" : "O"],
 					"remote",
 					{ target: "own" },
 				),
 				sensitive,
-				["--input"],
+				indirectFlags,
 			);
 		return finish(
 			operation([read ? "R" : "O"], "remote", { target: "own" }),
 			sensitive,
-			["--input"],
+			indirectFlags,
 		);
 	}
 	if (group === "run" && verb === "download")
@@ -1020,7 +1036,7 @@ export function classifyAgentOperations(payload, facts) {
 				if (name === "git") return gitOperation(node, context, facts);
 				if (name === "gh")
 					return ghOperation(node.tokens.slice(executableIndex));
-				if (name === "cd" && node.unresolvedCwd) return unresolved();
+				// cd is a directory hint; Git writes consume its unresolved target.
 				// Other programs' contents and side effects are outside this policy.
 				return null;
 			})

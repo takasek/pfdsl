@@ -61,6 +61,7 @@ worktree add の開始点 main は -b topic や --detach と併用できるが�
 
 実行先の解決: 命令の先頭から `&&` でつながる literal な `cd <path> &&`（絶対・相対）と、literal な `git -C` を解決する。
 subshell 内の `cd`、`;` や `||` の後の `cd`、条件分岐の中の `cd`、動的な値を含む `cd`・`-C` は、実行先を一意に決められないので unresolved とする。
+これは変更系操作の実行先の判定に使う。R は全対象で allow のため、読取の実行先を解決できなくても R のままとする。
 shell の状態機械は持たない。
 同じ命令文字列に pushd・popd、または Git の実行先を変える環境変数と CDPATH の literal な名前への代入・export・readonly・declare・typeset・read・printf -v があれば、変更系 Git の実行先を unresolved にする。
 対象の変数は GIT_DIR、GIT_WORK_TREE、GIT_INDEX_FILE、GIT_COMMON_DIR、GIT_OBJECT_DIRECTORY、GIT_ALTERNATE_OBJECT_DIRECTORIES、GIT_NAMESPACE とする。
@@ -161,6 +162,13 @@ shell の解析失敗による deny は1つの入口だけが出す。表の外�
 既知 option は値の有無とともに持ち、初期値は実 transcript で3回以上使われた option と、分類に必要な option とする。
 Git help から生成せず、コミットする観測値には option 名と件数だけを含める。
 未知の option、判定に使う引数が stdin・file・動的な値から来る形は U とする。
+判定に使う引数を、クラスを決める selector と、変更の実行先を決める target に分ける。
+selector はすべてのクラスで必要だが、target は R だけと確定した操作では必要ない。
+たとえば refspec・mode・設定 key・API method のように R か変更か、または P・X・D・S かを決める値は selector である。
+Git の `-C`・`cd` の実行先は target であり、R の読取では間接・動的な値でも未解決の理由にしない。
+API method が literal な GET と確定する場合（明示指定、または method・field・input の指定が無い既定形）は R とし、endpoint は判定に使わない。
+変更の method、field による既定 POST、または method を確定できない場合は endpoint を selector として判定する。
+GraphQL の query 内容からクラスを決める場合も selector の検査を要する。
 本文・title 等、判定に使わない値はこの規則の対象外とする。
 既に確定した P・X・D・S は U を付加しても弱めない。
 通常の形の追加は所有者が決め、宣言の外へ分類器が自動で広がらないようにする。
