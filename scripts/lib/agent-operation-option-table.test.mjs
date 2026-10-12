@@ -29,3 +29,19 @@ test("option representation retains every pre-compaction name, arity, count and 
 		snapshot.hash,
 	);
 });
+
+test("compact JSON keeps one complete subcommand per line", () => {
+	const text = readFileSync(
+		new URL("./agent-operation-option-table.json", import.meta.url),
+		"utf8",
+	);
+	const table = JSON.parse(text);
+	const names = Object.keys(table);
+	const lines = text.trimEnd().split("\n");
+	assert.equal(lines.length, names.length + 2);
+	for (const [index, line] of lines.slice(1, -1).entries()) {
+		const form = JSON.parse(`{${line.trim().replace(/,$/, "")}}`);
+		assert.deepEqual(Object.keys(form), [names[index]]);
+		assert.deepEqual(form[names[index]], table[names[index]]);
+	}
+});
