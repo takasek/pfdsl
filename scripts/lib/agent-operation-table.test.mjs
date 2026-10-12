@@ -220,6 +220,47 @@ test("declarative rows and class precedence implement the bounded contract", () 
 	);
 });
 
+test("owner decision: W B C O deny on other worktrees for every subject", () => {
+	for (const subject of axes.subject) {
+		for (const target of ["other-live", "other-unowned"]) {
+			for (const operationClass of ["W", "B", "C", "O"]) {
+				assert.equal(
+					decideOperation({
+						subject,
+						health: "healthy",
+						target,
+						operationClass,
+						kind: "git",
+						scope: "repository",
+					}).decision,
+					"deny",
+					`${subject}/${target}/${operationClass}`,
+				);
+			}
+		}
+	}
+});
+
+test("owner decision: Claude parent asks only for own repository configuration", () => {
+	for (const target of axes.target) {
+		for (const operationClass of axes.operationClass) {
+			const result = decideOperation({
+				subject: "claude-parent",
+				health: "healthy",
+				target,
+				operationClass,
+				kind: "git",
+				scope: "repository",
+			});
+			assert.equal(
+				result.decision === "ask",
+				target === "own" && operationClass === "C",
+				`${target}/${operationClass}`,
+			);
+		}
+	}
+});
+
 test("parser recovery is an exact fixed-root command and never bypasses policy failures", () => {
 	const hookRoot = "/fixture/own";
 	const command = parserRecoveryCommand(hookRoot);

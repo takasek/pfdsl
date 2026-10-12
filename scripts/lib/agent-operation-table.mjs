@@ -22,13 +22,13 @@ export const AGENT_OPERATION_TABLE = Object.freeze(
 	Object.fromEntries(
 		Object.entries({
 			R: ["A", "A", "A", "A", "A", "A", "A"],
-			W: ["A", "D", "Q", "Q", "A", "A", "U"],
-			B: ["A", "D", "Q", "Q", "A", "A", "U"],
+			W: ["A", "D", "D", "D", "A", "A", "U"],
+			B: ["A", "D", "D", "D", "A", "A", "U"],
 			D: ["D", "D", "D", "D", "A", "A", "U"],
 			S: ["D", "D", "D", "D", "A", "A", "U"],
-			C: ["Q", "D", "Q", "Q", "A", "A", "U"],
+			C: ["Q", "D", "D", "D", "A", "A", "U"],
 			X: ["D", "D", "D", "D", "A", "A", "D"],
-			O: ["A", "D", "Q", "Q", "A", "A", "U"],
+			O: ["A", "D", "D", "D", "A", "A", "U"],
 			P: ["D", "D", "D", "D", "D", "D", "D"],
 			U: ["U", "U", "U", "U", "U", "U", "U"],
 		}).map(([key, row]) => [

@@ -118,17 +118,26 @@ export const AGENT_OPERATION_CORPUS = [
 		"pair-01-own-add-commit-push",
 		"git add a && git commit -m x && git push -u origin HEAD",
 	),
-	...["claude-parent", "claude-subagent", "codex-parent", "codex-child"].map(
-		(subject) =>
-			example(
-				`pair-01-other-live-${subject}`,
-				`git -C ${live} add a`,
-				subject === "claude-parent" ? "ask" : "deny",
-				{ subject, target: "other-live", executionPath: live },
-			),
-	),
+	...[
+		"claude-parent",
+		"claude-subagent",
+		"codex-parent",
+		"codex-child",
+	].flatMap((subject) => [
+		example(`pair-01-other-live-${subject}`, `git -C ${live} add a`, "deny", {
+			subject,
+			target: "other-live",
+			executionPath: live,
+		}),
+		example(
+			`pair-01-other-unowned-${subject}`,
+			`git -C ${unowned} add a`,
+			"deny",
+			{ subject, target: "other-unowned", executionPath: unowned },
+		),
+	]),
 	example("pair-02-leading-own-cd", `cd ${own} && git commit -m x`),
-	example("pair-02-leading-live-cd", `cd ${live} && git commit -m x`, "ask", {
+	example("pair-02-leading-live-cd", `cd ${live} && git commit -m x`, "deny", {
 		target: "other-live",
 	}),
 	example("pair-03-codex-explicit-own", `git -C ${own} commit -m x`, "allow", {
@@ -235,7 +244,7 @@ export const AGENT_OPERATION_CORPUS = [
 			}),
 		],
 	},
-	example("pair-11-remove-live", `git worktree remove ${live}`, "ask", {
+	example("pair-11-remove-live", `git worktree remove ${live}`, "deny", {
 		target: "other-live",
 		executionPath: live,
 	}),
@@ -277,6 +286,9 @@ export const AGENT_OPERATION_CORPUS = [
 	example("pair-15-parser-repair", parserRecoveryCommand(own), "allow", {
 		facts: { health: "failed", failure: "parser-missing" },
 	}),
+	example("pair-15-parser-missing-make-setup", "make setup", "deny", {
+		facts: { health: "failed", failure: "parser-missing" },
+	}),
 	example("pair-15-parser-missing-commit", "git commit -m x", "deny", {
 		facts: { health: "failed", failure: "parser-missing" },
 	}),
@@ -310,7 +322,7 @@ export const AGENT_OPERATION_CORPUS = [
 		"allow",
 		{ cwd: live, executionPath: own, target: "own" },
 	),
-	example("resolution-session-own-cwd-live", "git add a", "ask", {
+	example("resolution-session-own-cwd-live", "git add a", "deny", {
 		cwd: live,
 		executionPath: live,
 		target: "other-live",
@@ -364,7 +376,7 @@ export const AGENT_OPERATION_CORPUS = [
 		target: "primary",
 		executionPath: `${primary}/a`,
 	}),
-	example("resolution-symlink-live-write", null, "ask", {
+	example("resolution-symlink-live-write", null, "deny", {
 		tool: {
 			name: "Write",
 			input: { file_path: `${own}/live-link/a`, content: "a" },
@@ -420,7 +432,7 @@ export const AGENT_OPERATION_CORPUS = [
 	example("own-free-switch", "git switch feat/merged", "allow", {
 		classes: ["B"],
 	}),
-	example("own-busy-branch-delete", "git branch -D feat/busy", "ask", {
+	example("own-busy-branch-delete", "git branch -D feat/busy", "deny", {
 		target: "other-live",
 	}),
 	example("own-default-commit", "git commit -m x", "deny", {
