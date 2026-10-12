@@ -145,11 +145,20 @@ function scan(tokens, valueFlags = VALUE_FLAGS) {
 		}
 		if (!afterDash && token.value.startsWith("-")) {
 			const equal = token.value.indexOf("=");
-			const flag = equal > 0 ? token.value.slice(0, equal) : token.value;
+			const attached =
+				!token.value.startsWith("--") &&
+				token.value.length > 2 &&
+				valueFlags.has(token.value.slice(0, 2));
+			const flag = attached
+				? token.value.slice(0, 2)
+				: equal > 0
+					? token.value.slice(0, equal)
+					: token.value;
 			flags.add(flag);
 			if (valueFlags.has(flag)) {
-				const value =
-					equal > 0
+				const value = attached
+					? { ...token, value: token.value.slice(2) }
+					: equal > 0
 						? { ...token, value: token.value.slice(equal + 1) }
 						: tokens[++i];
 				if (value) values.push({ flag, ...value });
@@ -475,7 +484,9 @@ function ghOperation(tokens) {
 				/(?:^|\/)repos\/[^/]+\/[^/]+\/pulls\/[^/]+\/merge(?:-async)?\/?$/.test(
 					endpointPath ?? "",
 				)) ||
-			/\b(?:mergePullRequest|enqueuePullRequest)\s*\(/.test(query ?? "");
+			/\b(?:mergePullRequest|enqueuePullRequest|enablePullRequestAutoMerge)\s*\(/.test(
+				query ?? "",
+			);
 		if (merge) return operation(["O", "P"], "remote", { target: "own" });
 		if (endpoint === "graphql")
 			return operation(

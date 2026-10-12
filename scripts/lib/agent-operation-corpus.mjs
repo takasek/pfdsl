@@ -644,6 +644,22 @@ export const AGENT_OPERATION_CORPUS = [
 		{ subject: "codex-parent" },
 	),
 	example("own-repository-config", "git config user.name x", "ask"),
+	example(
+		"foreign-attached-config-file-write",
+		`git -C ${foreign} config -f/tmp/config user.name x`,
+		"deny",
+		{
+			classes: ["C", "X"],
+		},
+	),
+	example(
+		"attached-API-merge-method",
+		"gh api -XPUT repos/o/r/pulls/1/merge",
+		"deny",
+		{
+			classes: ["O", "P"],
+		},
+	),
 	example("own-subagent-config", "git config user.name x", "deny", {
 		subject: "claude-subagent",
 	}),
@@ -770,7 +786,11 @@ export const AGENT_OPERATION_CORPUS = [
 			{ classes: ["O", "P"] },
 		),
 	),
-	...["mergePullRequest", "enqueuePullRequest"].map((mutation) =>
+	...[
+		"mergePullRequest",
+		"enqueuePullRequest",
+		"enablePullRequestAutoMerge",
+	].map((mutation) =>
 		example(
 			`gh-graphql-${mutation}`,
 			`gh api graphql -f query='mutation { ${mutation}(input: {pullRequestId: "id"}) { clientMutationId } }'`,
