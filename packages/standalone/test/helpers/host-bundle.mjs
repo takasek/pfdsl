@@ -10,9 +10,19 @@ export const { JSDOM } = require("jsdom");
 const tabStub = `
 export function createDocumentTab(options){
  let source=options.source,revision=0;
+ const hook=(...args)=>globalThis.reviewTabHook?.(...args);
  const container=document.createElement('div'),button=document.createElement('button');
  options.parent.append(container);button.textContent=options.name;
- return {container,button,location:options.path,setSourceCalls:0,activate(){},dispose(){container.remove();button.remove();},getSource:()=>source,getRevision:()=>revision,type(s){source=s;revision++;options.onChange?.();},setSource(s){this.setSourceCalls++;source=s;revision++;options.onChange?.();},setLocation(path,name,read){this.location=path;this.read=read;button.textContent=name;},markSaved(){},format(){}};
+ const tab={container,button,location:options.path,setSourceCalls:0,
+  activate(){},
+  dispose(){container.remove();button.remove();hook('dispose',tab);},
+  getSource:()=>source,getRevision:()=>revision,
+  type(s){source=s;revision++;options.onChange?.();},
+  setSource(s){this.setSourceCalls++;source=s;revision++;hook('setSource',tab,s);options.onChange?.();},
+  setLocation(path,name,read){this.location=path;this.read=read;button.textContent=name;},
+  markSaved(){},format(){}};
+ (globalThis.reviewTabs??=[]).push(tab);
+ return tab;
 }`;
 
 /**

@@ -84,6 +84,8 @@ const keys = [
 	"reviewEntries",
 	"reviewActive",
 	"reviewBusy",
+	"reviewTabs",
+	"reviewTabHook",
 ];
 
 export const flush = async () => {
@@ -97,6 +99,49 @@ export const fsOf = (native, doc) => {
 		return { unreadable: true };
 	}
 };
+
+/** Buttons whose click approves replacing, creating or adopting a disk version. */
+const APPROVALS = new Set([
+	"Replace Observed Version",
+	"Create File",
+	"Use Disk Version",
+]);
+
+/**
+ * Holds one inspection of an armed target until `release`, which answers with
+ * the file as it is at that moment, like a read that finishes late.
+ */
+export class InspectGate {
+	constructor(native) {
+		this.native = native;
+		this.ids = new Set();
+		this.held = null;
+	}
+	arm(...ids) {
+		this.ids = new Set(ids);
+	}
+	hold(id) {
+		if (!this.ids.has(id) || this.held) return undefined;
+		return new Promise((resolve, reject) => {
+			this.held = { id, resolve, reject };
+		});
+	}
+	get isHeld() {
+		return Boolean(this.held);
+	}
+	release() {
+		const held = this.held;
+		if (!held) return false;
+		this.held = null;
+		this.ids = new Set();
+		try {
+			held.resolve(this.native.snapshot(this.native.docs.get(held.id)));
+		} catch (error) {
+			held.reject(error);
+		}
+		return true;
+	}
+}
 
 /** Bundles the production host once; every started host re-evaluates it. */
 export async function createHarness(label) {
@@ -124,37 +169,77 @@ export async function createHarness(label) {
 	 * - lose a save reply (saveFault: "before" or "after" the write);
 	 * - change the disk just before a save reaches the native side (beforeSave);
 	 * - hold an inspection until the test releases it (inspectGate);
+	 * - change the disk after an inspection was answered (afterInspect);
 	 * - react when a dialog opens (onDialog) or pick another button (dialogChoice).
+	 *
+	 * The host records everything an invariant may need and nothing of the
+	 * application's own state: `log` (cleared by each action) holds dialogs with
+	 * their displayed texts and the button clicked, requests and their
+	 * resolution order, and tab events; `ledger` (never cleared) holds what the
+	 * application was told about each file and which versions the user approved.
 	 */
 	async function startHost(native, watched, handlers = {}) {
 		const dom = new JSDOM(
 			readFileSync(`${root}/packages/standalone/index.html`, "utf8"),
 		);
 		const log = [];
+		const ledger = { acks: [], received: [], opened: new Set() };
+		let seq = 0;
+		const tick = () => ++seq;
 		let poll;
 		let quitListener;
 		let selected;
 		globalThis.document = dom.window.document;
 		globalThis.window = dom.window;
 		globalThis.self = dom.window;
+		globalThis.reviewTabs = [];
 		dom.window.__TAURI_INTERNALS__ = {};
 		globalThis.setInterval = (fn) => {
 			poll = fn;
 			return 0;
 		};
+		const tabs = () => globalThis.reviewTabs;
+		const activeTab = () =>
+			tabs().find(
+				(tab) =>
+					tab.button.isConnected &&
+					tab.button.getAttribute("aria-selected") === "true",
+			);
+		const know = (id, state) =>
+			ledger.received.push({ seq: tick(), id, ...state });
+		const approve = (id, content, why) =>
+			ledger.acks.push({ seq: tick(), id, content, why });
+		const learn = (snapshot) =>
+			know(snapshot.id, {
+				source: snapshot.source,
+				revision: snapshot.revision,
+				path: snapshot.path,
+			});
+		globalThis.reviewTabHook = (kind, tab, text) => {
+			if (kind === "dispose") log.push({ kind: "dispose", tab, seq: tick() });
+			if (kind === "setSource") {
+				const seen = ledger.received.findLast((item) => item.source === text);
+				log.push({ kind: "reload", tab, text, seq: tick(), id: seen?.id });
+				if (seen) approve(seen.id, text, "reload");
+			}
+		};
 		dom.window.HTMLDialogElement.prototype.close = () => {};
 		dom.window.HTMLDialogElement.prototype.showModal = function () {
 			const fields = [...this.querySelectorAll("textarea")].map((f) => f.value);
 			const text = this.querySelector("p").textContent;
+			const target = [...native.docs.values()].find((doc) =>
+				text.includes(doc.path),
+			)?.id;
 			const entry = {
 				kind: "dialog",
+				seq: tick(),
 				title: this.querySelector("h2").textContent,
 				text,
-				target: [...native.docs.values()].find((doc) => text.includes(doc.path))
-					?.id,
+				target,
 				editor: fields[0],
 				disk: fields[1],
-				shownEditor: globalThis.reviewActive?.()?.tab.getSource(),
+				shownEditor: fields[0] ?? activeTab()?.getSource(),
+				builtFrom: ledger.received.findLast((item) => item.id === target),
 				fs: fsOf(native, watched),
 				fsById: Object.fromEntries(
 					[...native.docs].map(([id, doc]) => [id, fsOf(native, doc)]),
@@ -175,20 +260,61 @@ export async function createHarness(label) {
 			if (command === "list_recent") return [];
 			if (command === "remember_document" || command === "release_document")
 				return;
-			if (command === "exit_listener_ready" || command === "finish_app_exit")
+			if (command === "exit_listener_ready") return;
+			if (command === "finish_app_exit") {
+				log.push({ kind: "exit", approved: args.approved, seq: tick() });
 				return;
-			if (command === "select_document" || command === "open_document")
-				return native.snapshot(selected);
+			}
+			if (command === "select_document" || command === "open_document") {
+				const snapshot = native.snapshot(selected);
+				learn(snapshot);
+				if (snapshot.source !== null && !ledger.opened.has(snapshot.id)) {
+					ledger.opened.add(snapshot.id);
+					approve(snapshot.id, snapshot.source, "open");
+				}
+				return snapshot;
+			}
 			if (command === "choose_save_target") {
 				const chosen = await handlers.choose();
-				log.push({ kind: "choose", id: chosen?.id });
+				if (chosen) {
+					learn(chosen);
+					// Choosing a file starts from no acknowledged content.
+					approve(chosen.id, undefined, "chosen");
+				}
+				log.push({ kind: "choose", id: chosen?.id, seq: tick() });
 				return chosen;
 			}
 			if (command === "inspect_document") {
-				log.push({ kind: "inspect", id: args.id });
+				const entry = {
+					kind: "inspect",
+					id: args.id,
+					seq: tick(),
+					doneSeq: undefined,
+					outcome: undefined,
+				};
+				log.push(entry);
+				const finish = (snapshot) => {
+					entry.doneSeq = tick();
+					entry.outcome = "ok";
+					entry.source = snapshot.source;
+					learn(snapshot);
+					handlers.afterInspect?.(args.id, snapshot);
+					return snapshot;
+				};
+				const fail = (error) => {
+					entry.doneSeq = tick();
+					entry.outcome = "error";
+					throw error;
+				};
 				const held = handlers.inspectGate?.(args.id);
-				if (held) return held;
-				return native.snapshot(native.docs.get(args.id));
+				if (held) return held.then(finish, fail);
+				let snapshot;
+				try {
+					snapshot = native.snapshot(native.docs.get(args.id));
+				} catch (error) {
+					return fail(error);
+				}
+				return finish(snapshot);
 			}
 			if (command === "save_document") {
 				const target = native.docs.get(args.id);
@@ -196,6 +322,7 @@ export async function createHarness(label) {
 				handlers.beforeSave?.(args);
 				const entry = {
 					kind: "save",
+					seq: tick(),
 					id: args.id,
 					source: args.source,
 					expected: args.expected,
@@ -204,34 +331,55 @@ export async function createHarness(label) {
 					wrote: false,
 				};
 				log.push(entry);
-				if (fault === "before") throw new Error("native reply lost");
+				if (fault === "before") {
+					know(args.id, { unknown: true });
+					throw new Error("native reply lost");
+				}
 				const reply = native.save(target, args.source, args.expected);
-				if (fault === "after") throw new Error("native reply lost");
+				if (fault === "after") {
+					know(args.id, { unknown: true });
+					throw new Error("native reply lost");
+				}
 				entry.outcome = reply.outcome;
 				entry.wrote = reply.publication === "published";
+				if (reply.current) learn(reply.current);
+				else know(args.id, { unknown: true });
+				if (reply.outcome === "saved" && reply.current)
+					approve(args.id, reply.current.source, "save");
 				return reply;
 			}
 			if (command === "confirm_close_document") {
+				const owner = tabs().find(
+					(tab) =>
+						tab.button.isConnected &&
+						tab.button.textContent.replace(/ •$/, "") === args.name,
+				);
 				const entry = {
 					kind: "confirm",
+					seq: tick(),
 					name: args.name,
+					textAtRequest: owner?.getSource(),
 					decision: undefined,
+					decidedSeq: undefined,
 					fsById: Object.fromEntries(
 						[...native.docs].map(([id, doc]) => [id, fsOf(native, doc)]),
 					),
 				};
 				log.push(entry);
 				entry.decision = await handlers.confirm(args.name);
+				entry.decidedSeq = tick();
 				return entry.decision;
 			}
 			throw new Error(`unexpected command ${command}`);
 		};
 		await import(`${pathToFileURL(output).href}?cell=${++cellSerial}`);
 		await flush();
+		const query = (selector) => dom.window.document.querySelector(selector);
+		const busy = () => query("#save").disabled;
 		const settle = async () => {
 			for (let i = 0; i < 60; i++) {
 				await flush();
-				const dialog = dom.window.document.querySelector("dialog");
+				const dialog = query("dialog");
 				if (dialog) {
 					const title = dialog.querySelector("h2").textContent;
 					const confirm =
@@ -242,15 +390,22 @@ export async function createHarness(label) {
 								? "Create File"
 								: "Keep Editing");
 					dialog.entry.choice = confirm;
-					dialog.entry.editorAtClick = globalThis
-						.reviewActive?.()
-						?.tab.getSource();
+					dialog.entry.editorAtClick = activeTab()?.getSource();
+					dialog.entry.clickSeq = tick();
+					if (APPROVALS.has(confirm) && dialog.entry.target !== undefined)
+						approve(
+							dialog.entry.target,
+							dialog.entry.title === "Recreate missing file"
+								? null
+								: dialog.entry.disk,
+							"approval",
+						);
 					[...dialog.querySelectorAll("button")]
 						.find((b) => b.textContent === confirm)
 						.click();
 					continue;
 				}
-				if (!globalThis.reviewBusy()) return;
+				if (!busy()) return;
 			}
 			throw new Error("the host did not settle");
 		};
@@ -258,19 +413,54 @@ export async function createHarness(label) {
 			element.click();
 			await settle();
 		};
+		const all = (selector) => [
+			...dom.window.document.querySelectorAll(selector),
+		];
 		return {
 			dom,
 			log,
+			ledger,
 			settle,
 			click,
-			query: (selector) => dom.window.document.querySelector(selector),
-			queryAll: (selector) => [
-				...dom.window.document.querySelectorAll(selector),
-			],
+			query,
+			queryAll: all,
+			tick,
+			tabs,
+			activeTab,
+			isOpen: (tab) => tab.button.isConnected,
+			isDirty: (tab) => tab.button.textContent.endsWith(" •"),
+			nameOf: (tab) => tab.button.textContent.replace(/ •$/, ""),
+			closeButton: (tab) =>
+				tab.button.parentElement.querySelector(".close-document"),
+			/** What the conflict panel shows, read from the DOM. */
+			panel() {
+				const root = query("#conflicts");
+				const paragraphs = [...root.querySelectorAll("p")].map(
+					(item) => item.textContent,
+				);
+				const target = /Recovery target: (.*)\.$/.exec(paragraphs[0] ?? "");
+				const button = (text) =>
+					all("#conflicts button").find((item) => item.textContent === text);
+				return {
+					present: root.children.length > 0,
+					recoveryPath: target?.[1],
+					preview: root.querySelector("pre")?.textContent,
+					originalAlsoChanged: paragraphs.some((text) =>
+						/also changed/.test(text),
+					),
+					review: button("Review and Save Here…"),
+					use: button("Use Current Disk Version…"),
+					saveAs: button("Save As…"),
+				};
+			},
 			async open(target) {
 				selected = target;
-				await click(dom.window.document.querySelector("#open-file"));
-				return globalThis.reviewActive();
+				await click(query("#open-file"));
+				return activeTab();
+			},
+			async newDocument() {
+				await click(query("#new"));
+				return activeTab();
 			},
 			async runPoll() {
 				poll();

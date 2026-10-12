@@ -1,17 +1,30 @@
-// Invariants derived from README "Application behavior", stated over what the
-// user and the disk can observe rather than over the session's internal fields.
+// Invariants derived from README "Application behavior". They are stated over
+// what the host recorded (dialogs with their displayed text and the button
+// clicked, request and resolution order of every native call, the editor stub,
+// the DOM) and over the fake filesystem. No invariant reads the application's
+// session state, so a remodel of that state cannot blind them.
+//
+// "Acknowledged" content of a file is what the host saw the application load
+// into the editor (open, Use Current Disk Version, a clean reload), write
+// successfully, or what the user approved in a confirmed dialog. Content the
+// application merely observed is not acknowledged.
 //
 // L  No silent loss: unsaved text survives an action unless the user chose
 //    Discard or Use Current Disk Version, and a tab that showed unsaved state
-//    (isDirty) is never reloaded.
-// R  No unreviewed overwrite: a save that replaces disk content other than the
-//    content this tab last acknowledged is preceded, in the same action, by a
-//    confirmed dialog that showed that exact content and the exact text sent.
+//    (the bullet) is never reloaded.
+// R  No unreviewed overwrite: a write over content that is not acknowledged
+//    needs a confirmed dialog that showed that content.
 // A  Approval is execution: the text and revision sent equal what the confirmed
-//    dialog showed.
-// P  Panel consistency: the comparison text shown by the conflict panel is the
-//    snapshot its buttons act on.
-// O  Observation completeness: every unresolved target is inspected.
+//    dialog was built from and displayed.
+// C  Confirmation lifetime: a Save decision applies to the text shown when it was
+//    asked; other text needs its own approval.
+// U  An unreadable read leaves the tab marked until the user resolves it.
+// K  A tab that needed confirmation is not closed without being asked.
+// T  Close reads every unresolved target after the last decision and before the
+//    tab is disposed.
+// P  Panel consistency: the panel names the recovery target by its current path
+//    and compares against what the application last learned about it.
+// O  Observation completeness: the panel reflects the files as they are.
 import { fsOf } from "./lifecycle-harness.mjs";
 
 const REVIEW = "Review the target";
@@ -19,30 +32,28 @@ const RECREATE = "Recreate missing file";
 const CONFIRMING = new Set(["Replace Observed Version", "Create File"]);
 
 /** Captures what the action starts from and clears the host log. */
-export function beginAction({ host, entry }) {
-	const session = entry.session;
-	const acked = new Map();
-	for (const snapshot of [
-		session.observed,
-		session.pendingTarget,
-		session.disk,
-	])
-		if (snapshot) acked.set(snapshot.id, snapshot.source);
+export function beginAction({ host, tab, owned = [] }) {
 	host.log.length = 0;
 	return {
-		text0: entry.tab.getSource(),
-		dirty0: session.isDirty(),
-		name: entry.name,
-		acked,
-		setSource0: entry.tab.setSourceCalls,
+		seq0: host.tick(),
+		text0: tab.getSource(),
+		dirty0: host.isDirty(tab),
+		name: host.nameOf(tab),
+		setSource0: tab.setSourceCalls,
+		owned,
 	};
 }
 
-/** L, R and A over everything that happened since beginAction. */
-export function checkAction({ native, host, entry, trace, violate }) {
+/** The latest acknowledged content of a file before `seq`, if any. */
+function acknowledged(host, id, seq) {
+	return host.ledger.acks.findLast((ack) => ack.id === id && ack.seq < seq);
+}
+
+/** L, A, C, R, U, K and the disposal rule over everything since beginAction. */
+export function checkAction({ native, host, tab, trace, violate }) {
 	const log = host.log;
-	const alive = globalThis.reviewEntries.has(entry);
-	const text = entry.tab.getSource();
+	const alive = host.isOpen(tab);
+	const text = tab.getSource();
 	const discarded = log.some(
 		(item) =>
 			item.kind === "confirm" &&
@@ -57,8 +68,8 @@ export function checkAction({ native, host, entry, trace, violate }) {
 		(item) => item.kind === "save" && item.wrote && item.source === trace.text0,
 	);
 	if (trace.dirty0 && !discarded && !usedDisk && !published) {
-		if (entry.tab.setSourceCalls > trace.setSource0)
-			violate("L", "the editor of a tab with unsaved state was replaced");
+		if (tab.setSourceCalls > trace.setSource0)
+			violate("L", "a tab that showed unsaved state was reloaded");
 		const keptInEditor = alive && text === trace.text0;
 		const keptOnDisk = [...native.docs.values()].some(
 			(doc) => fsOf(native, doc).source === trace.text0,
@@ -68,6 +79,16 @@ export function checkAction({ native, host, entry, trace, violate }) {
 				"L",
 				`unsaved text ${JSON.stringify(trace.text0)} exists nowhere`,
 			);
+	}
+	const disposed = log.some(
+		(item) => item.kind === "dispose" && item.tab === tab,
+	);
+	if (disposed && !discarded) {
+		const onDisk = [...native.docs.values()].some(
+			(doc) => fsOf(native, doc).source === text,
+		);
+		if (!onDisk)
+			violate("L", `closed with ${JSON.stringify(text)} that no file holds`);
 	}
 	log.forEach((save, index) => {
 		if (save.kind !== "save") return;
@@ -90,90 +111,204 @@ export function checkAction({ native, host, entry, trace, violate }) {
 					"A",
 					`sent ${JSON.stringify(save.source)} but the dialog showed ${JSON.stringify(dialog.shownEditor)}`,
 				);
-			if ((save.expected ?? null) !== (dialog.fsById[save.id].revision ?? null))
-				violate(
-					"A",
-					`sent expected ${JSON.stringify(save.expected)} but the dialog showed ${JSON.stringify(dialog.fsById[save.id].revision)}`,
-				);
+			const built = dialog.builtFrom;
+			if (built && !built.unknown) {
+				if ((save.expected ?? null) !== (built.revision ?? null))
+					violate(
+						"A",
+						`sent expected ${JSON.stringify(save.expected)} but the dialog was built from ${JSON.stringify(built.revision)}`,
+					);
+				if (dialog.title === REVIEW && dialog.disk !== built.source)
+					violate(
+						"A",
+						`the dialog displayed ${JSON.stringify(dialog.disk)} but the inspection returned ${JSON.stringify(built.source)}`,
+					);
+			}
 		}
+		// C: a Save decision covers the text shown when it was asked.
+		const decision = earlier.findLast(
+			(item) =>
+				item.kind === "confirm" &&
+				item.name === trace.name &&
+				item.decision === "save",
+		);
+		if (decision && save.source !== decision.textAtRequest && !dialog)
+			violate(
+				"C",
+				`saved ${JSON.stringify(save.source)} although the Save decision was for ${JSON.stringify(decision.textAtRequest)}`,
+			);
 		if (!save.wrote) return;
+		// R
 		const prior = save.fs.unreadable ? undefined : (save.fs.source ?? null);
 		if (prior === undefined) {
 			violate("R", "published over an unreadable file");
 			return;
 		}
-		// A target picked in the chooser has no acknowledged content.
-		const chosen = earlier.some(
-			(item) => item.kind === "choose" && item.id === save.id,
-		);
-		const acked =
-			!chosen && trace.acked.has(save.id)
-				? trace.acked.get(save.id)
-				: undefined;
-		const needsReview =
-			prior === null ? typeof acked === "string" : prior !== acked;
-		if (!needsReview) return;
-		const showed =
-			dialog &&
-			(prior === null
-				? dialog.title === RECREATE
-				: dialog.title === REVIEW && dialog.disk === prior);
-		if (!showed || (dialog.fsById[save.id].source ?? null) !== prior)
+		const known = acknowledged(host, save.id, save.seq);
+		const allowed =
+			prior === null
+				? !known || known.content === undefined || known.content === null
+				: known?.content === prior;
+		if (!allowed)
 			violate(
 				"R",
-				`replaced ${JSON.stringify(prior)} (acknowledged ${JSON.stringify(acked)}) without a confirmed review that showed it`,
+				`replaced ${JSON.stringify(prior)} (acknowledged ${JSON.stringify(known?.content)}) without an approval that showed it`,
 			);
 	});
+	// U
+	const failed = log.findLast(
+		(item) =>
+			item.kind === "inspect" &&
+			item.outcome === "error" &&
+			trace.owned.includes(item.id),
+	);
+	if (failed && alive) {
+		const later = log.filter(
+			(item) =>
+				item.kind === "inspect" &&
+				item.id === failed.id &&
+				item.seq > failed.seq,
+		);
+		const recoveredSame = later.some(
+			(item) =>
+				item.outcome === "ok" &&
+				item.source === acknowledged(host, item.id, item.seq)?.content,
+		);
+		const resolved = host.ledger.acks.some(
+			(ack) => ack.id === failed.id && ack.seq > failed.doneSeq,
+		);
+		if (!host.isDirty(tab) && !recoveredSame && !resolved)
+			violate("U", "an unreadable read left no sign on the tab");
+	}
+	// K
+	const asked = log.some(
+		(item) => item.kind === "confirm" && item.name === trace.name,
+	);
+	if (disposed && !asked && (trace.dirty0 || failed))
+		violate("K", "a tab that needed confirmation was closed without asking");
 }
 
-/** P: the panel compares against the snapshot its buttons act on. */
-export function checkPanel({ host, entry, violate }) {
-	if (
-		!globalThis.reviewEntries.has(entry) ||
-		globalThis.reviewActive() !== entry
-	)
-		return;
-	const session = entry.session;
-	const panel = host.query("#conflicts");
-	const preview = panel.querySelector("pre");
-	if (preview) {
-		const observed = session.observed;
-		if (typeof observed?.source === "string") {
-			if (preview.textContent !== observed.source)
+/** T: every owned target was read after the last decision and before disposal. */
+export function checkReads({ host, tab, trace, violate }) {
+	const log = host.log;
+	const dispose = log.find(
+		(item) => item.kind === "dispose" && item.tab === tab,
+	);
+	if (!dispose) return;
+	const decisions = log.filter(
+		(item) => item.kind === "confirm" && item.name === trace.name,
+	);
+	const lastDecision = decisions.length
+		? Math.max(...decisions.map((item) => item.decidedSeq ?? 0))
+		: trace.seq0;
+	// A save that succeeded leaves its file as the only unresolved target.
+	const saved = log.findLast(
+		(item) => item.kind === "save" && item.outcome === "saved",
+	);
+	for (const id of saved ? [saved.id] : trace.owned) {
+		const read = log.some(
+			(item) =>
+				item.kind === "inspect" &&
+				item.id === id &&
+				item.seq > lastDecision &&
+				item.doneSeq !== undefined &&
+				item.doneSeq < dispose.seq,
+		);
+		if (!read)
+			violate(
+				"T",
+				`target ${id} was not read after the last decision and before the tab closed`,
+			);
+	}
+}
+
+/**
+ * P: the panel names the recovery target by its current path, compares against
+ * what the application last learned about it, and offers actions that fit.
+ */
+export function checkPanel({ host, native, violate, recoveryId }) {
+	const panel = host.panel();
+	if (!panel.present) return;
+	const target =
+		recoveryId ??
+		[...native.docs.values()].find((doc) => doc.path === panel.recoveryPath)
+			?.id;
+	if (target === undefined) return;
+	const receipts = host.ledger.received.filter((item) => item.id === target);
+	const latest = receipts.at(-1);
+	if (!latest) return;
+	const knownPath = receipts.findLast((item) => item.path)?.path;
+	if (recoveryId !== undefined && knownPath && panel.recoveryPath !== knownPath)
+		violate(
+			"P",
+			`the panel names ${panel.recoveryPath} but the target is at ${knownPath}`,
+		);
+	if (panel.preview !== undefined) {
+		if (typeof latest.source === "string") {
+			if (panel.preview !== latest.source)
 				violate(
 					"P",
-					`the panel shows ${JSON.stringify(preview.textContent)} but its buttons act on ${JSON.stringify(observed.source)}`,
+					`the panel shows ${JSON.stringify(panel.preview)} but the application last learned ${JSON.stringify(latest.source)}`,
 				);
 		} else {
-			const stale = [session.conflict, session.disk, session.pendingTarget]
-				.map((snapshot) => snapshot?.source)
+			const stale = receipts
+				.map((item) => item.source)
 				.filter((source) => typeof source === "string");
-			if (stale.includes(preview.textContent))
+			if (stale.includes(panel.preview))
 				violate(
 					"P",
-					`the panel shows ${JSON.stringify(preview.textContent)} while its buttons act on ${observed ? "a missing file" : "no snapshot"}`,
+					`the panel still shows ${JSON.stringify(panel.preview)} after the target became ${latest.unknown ? "unknown" : "missing"}`,
 				);
 		}
-		const buttons = new Map(
-			host
-				.queryAll("#conflicts button")
-				.map((button) => [button.textContent, button]),
-		);
-		const review = buttons.get("Review and Save Here…");
-		const use = buttons.get("Use Current Disk Version…");
-		if (review && review.disabled !== !session.observed)
-			violate(
-				"P",
-				"Review and Save Here… does not follow the observed snapshot",
-			);
+	}
+	const unknown = Boolean(latest.unknown);
+	if (panel.review && panel.review.disabled !== unknown)
+		violate("P", "Review and Save Here… does not follow what is known");
+	if (panel.use && panel.use.disabled !== (unknown || latest.source === null))
+		violate("P", "Use Current Disk Version… does not follow what is known");
+}
+
+/**
+ * O: after an observation the panel reflects the files as they are. The
+ * original is reported as also changed only while it differs from the content
+ * acknowledged for it.
+ */
+export function checkObservation({
+	host,
+	native,
+	original,
+	recovery,
+	violate,
+}) {
+	const panel = host.panel();
+	if (!panel.present) {
+		violate("O", "no conflict panel in a recovery state");
+		return;
+	}
+	if (recovery) {
+		const current = fsOf(native, recovery);
 		if (
-			use &&
-			use.disabled !== (!session.observed || session.observed.source === null)
+			!current.unreadable &&
+			typeof current.source === "string" &&
+			panel.preview !== current.source &&
+			panel.recoveryPath === recovery.path
 		)
 			violate(
-				"P",
-				"Use Current Disk Version… does not follow the observed snapshot",
+				"O",
+				`the panel shows ${JSON.stringify(panel.preview)} but ${recovery.path} holds ${JSON.stringify(current.source)}`,
 			);
+	}
+	if (original && recovery && original.id !== recovery.id) {
+		const current = fsOf(native, original);
+		const known = host.ledger.acks.findLast((ack) => ack.id === original.id);
+		if (!current.unreadable) {
+			const changed = (current.source ?? null) !== (known?.content ?? null);
+			if (changed !== panel.originalAlsoChanged)
+				violate(
+					"O",
+					`the original holds ${JSON.stringify(current.source)} (acknowledged ${JSON.stringify(known?.content)}) but the notice is ${panel.originalAlsoChanged ? "shown" : "absent"}`,
+				);
+		}
 	}
 }
 

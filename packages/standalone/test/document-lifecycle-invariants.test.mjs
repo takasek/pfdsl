@@ -10,12 +10,14 @@ import {
 	createHarness,
 	FakeNative,
 	fsOf,
+	InspectGate,
 	TEXT,
 } from "./helpers/lifecycle-harness.mjs";
 import {
 	beginAction,
 	checkAction,
 	checkPanel,
+	checkReads,
 } from "./helpers/lifecycle-invariants.mjs";
 
 const { startHost } = await createHarness("lifecycle-invariants");
@@ -35,10 +37,13 @@ const EVENTS = [
 ];
 // polled: the event is seen by the 1 s poll. unpolled: no poll runs before the
 // action. drift: polled, then the file changes again unseen. during-confirm:
-// the event happens while another tab's close confirmation is open.
-const TIMINGS = ["polled", "unpolled", "drift", "during-confirm"];
+// the event happens while another tab's close confirmation is open. in-flight:
+// a poll started after the event is still reading when the action opens its
+// dialog, and finishes while that dialog is open (the file changed again).
+const TIMINGS = ["polled", "unpolled", "drift", "during-confirm", "in-flight"];
 const ACTIONS = [
 	"cmd-s",
+	"save-as",
 	"review",
 	"close-save",
 	"close-discard",
@@ -56,13 +61,20 @@ function applicable(tab, event, timing, action) {
 			timing === "polled" &&
 			["cmd-s", "close-save", "quit-save"].includes(action)
 		);
-	if (timing === "during-confirm" && !action.startsWith("quit")) return false;
+	if (timing === "during-confirm") return action.startsWith("quit");
+	// A poll still reading would block the close sequence, which finishes it first.
+	if (timing === "in-flight") return action === "cmd-s" || action === "save-as";
 	if (action === "review") return panelExpected(tab, event, timing);
 	return true;
 }
 /** The conflict panel README promises after the event was polled. */
 function panelExpected(tab, event, timing) {
-	if (timing === "unpolled" || timing === "during-confirm") return false;
+	if (
+		timing === "unpolled" ||
+		timing === "during-confirm" ||
+		timing === "in-flight"
+	)
+		return false;
 	if (event === "deleted") return true;
 	return tab === "dirty" && event === "content-changed";
 }
@@ -121,6 +133,8 @@ async function runCell(tabState, event, timing, action) {
 		const native = new FakeNative();
 		const doc = native.add(1, "a.pfdsl", TEXT.disk);
 		const anchor = native.add(2, "anchor.pfdsl", "anchor disk\n");
+		const target = native.add(3, "target.pfdsl", "old target\n");
+		const gate = new InspectGate(native);
 		const decisions = {
 			"a.pfdsl": action.endsWith("save")
 				? "save"
@@ -143,6 +157,19 @@ async function runCell(tabState, event, timing, action) {
 			writesAtEvent = doc.writes;
 		};
 		host = await startHost(native, doc, {
+			choose: () => native.snapshot(target),
+			inspectGate: (id) => gate.hold(id),
+			onDialog() {
+				// The read that was in flight finishes while the dialog is open.
+				if (!gate.isHeld) return;
+				doc.unreadable = false;
+				doc.file = {
+					source: "disk v3 (late)\n",
+					ino: ++native.ino,
+					mtime: ++native.clock,
+				};
+				gate.release();
+			},
 			saveFault(args) {
 				if (lostReply || !event.startsWith("reply-lost") || args.id !== doc.id)
 					return undefined;
@@ -161,29 +188,29 @@ async function runCell(tabState, event, timing, action) {
 			},
 		});
 		const { log, settle, click } = host;
-		const entry = await host.open(doc);
-		if (tabState === "dirty") entry.tab.type(TEXT.edited);
+		const tab = await host.open(doc);
+		if (tabState === "dirty") tab.type(TEXT.edited);
 		const guard = await host.open(anchor);
-		guard.tab.type("anchor edit\n");
-		entry.tab.button.click();
-		const alive = () => globalThis.reviewEntries.has(entry);
+		guard.type("anchor edit\n");
+		tab.button.click();
+		const alive = () => host.isOpen(tab);
 
 		// Event and observation.
-		if (timing !== "during-confirm") await applyEvent(timing !== "unpolled");
+		if (timing !== "during-confirm")
+			await applyEvent(timing !== "unpolled" && timing !== "in-flight");
 		if (timing === "polled" || timing === "drift") await host.runPoll();
-		const panelButton = () =>
-			host
-				.queryAll("#conflicts button")
-				.find((b) => b.textContent === "Review and Save Here…");
+		if (timing === "in-flight") {
+			gate.arm(doc.id);
+			await host.runPoll();
+		}
 		const afterPoll = {
-			setSourceCalls: entry.tab.setSourceCalls,
-			conflict: entry.session.conflict,
-			dirty: entry.session.isDirty(),
-			message: entry.session.message,
-			panel: host.query("#conflicts").children.length > 0,
+			setSourceCalls: tab.setSourceCalls,
+			dirty: host.isDirty(tab),
+			panel: host.panel().present,
 		};
 		if (panelExpected(tabState, event, timing)) {
-			if (!panelButton() || panelButton().disabled)
+			const review = host.panel().review;
+			if (!review || review.disabled)
 				violate("panel", "no enabled 'Review and Save Here…' after the poll");
 		}
 		if (timing === "drift") {
@@ -195,8 +222,8 @@ async function runCell(tabState, event, timing, action) {
 			};
 		}
 		const writesBefore = doc.writes;
-		checkPanel({ host, entry, violate });
-		const trace = beginAction({ host, entry });
+		checkPanel({ host, native, violate });
+		const trace = beginAction({ host, tab, owned: [doc.id] });
 
 		// Action.
 		let presses = 0;
@@ -205,10 +232,12 @@ async function runCell(tabState, event, timing, action) {
 				presses++;
 				await host.cmdS();
 				if (!alive()) break;
-				if (!entry.session.isDirty() && !entry.session.saveFailure) break;
+				if (!host.isDirty(tab) && !host.panel().present) break;
 			}
+		} else if (action === "save-as") {
+			await click(host.query("#save-as"));
 		} else if (action === "review") {
-			const button = panelButton();
+			const button = host.panel().review;
 			if (!button || button.disabled)
 				violate("harness", "Review and Save Here… is not available");
 			else await click(button);
@@ -217,51 +246,22 @@ async function runCell(tabState, event, timing, action) {
 			const attempts = action.endsWith("save") ? 3 : 1;
 			while (presses < attempts && (presses === 0 || alive())) {
 				presses++;
-				if (action.startsWith("close"))
-					await click(entry.navigation.querySelector(".close-document"));
-				else {
-					await host.quit(presses);
-				}
+				if (action.startsWith("close")) await click(host.closeButton(tab));
+				else await host.quit(presses);
 			}
 		}
 		if (timing === "during-confirm" && !eventApplied) await applyEvent(false);
+		if (gate.release()) await settle();
 		await settle();
 
-		checkAction({ native, host, entry, trace, violate });
-		checkPanel({ host, entry, violate });
-		const text = entry.tab.getSource();
+		checkAction({ native, host, tab, trace, violate });
+		if (action.startsWith("close") || action.startsWith("quit"))
+			checkReads({ host, tab, trace, violate });
+		checkPanel({ host, native, violate });
+		const text = tab.getSource();
 		const fs = fsOf(native, doc);
 		const status = host.query("#status").textContent;
 		const decision = decisions["a.pfdsl"];
-
-		// I1: a confirmed dialog is an exact description of what gets replaced.
-		log.forEach((item, index) => {
-			if (item.kind !== "dialog") return;
-			if (
-				item.title !== "Review the target" &&
-				item.title !== "Recreate missing file"
-			)
-				return;
-			if (item.fs.unreadable) {
-				violate("I1", `${item.title} was shown for an unreadable file`);
-				return;
-			}
-			const expectedDisk = item.fs.source ?? "File is missing";
-			if (item.title === "Review the target" && item.disk !== expectedDisk)
-				violate(
-					"I1",
-					`dialog showed ${JSON.stringify(item.disk)} but the file held ${JSON.stringify(expectedDisk)}`,
-				);
-			if (item.title === "Recreate missing file" && item.fs.source !== null)
-				violate("I1", "Recreate was offered but the file exists");
-			const next = log.slice(index + 1).find((entry) => entry.kind === "save");
-			if (!next) violate("I1", "a confirmed dialog was not followed by a save");
-			else if ((next.expected ?? null) !== (item.fs.revision ?? null))
-				violate(
-					"I1",
-					`save expected ${JSON.stringify(next.expected)} but the file was at ${JSON.stringify(item.fs.revision)} when the dialog was shown`,
-				);
-		});
 
 		// I2: confirming never ends in a dead end; unreadable files are never written blind.
 		if (SAVE_ACTIONS.has(action)) {
@@ -269,17 +269,16 @@ async function runCell(tabState, event, timing, action) {
 				if (doc.writes !== writesAtEvent)
 					violate("I2", "a blind write reached an unreadable file");
 				if (!alive()) violate("I2", "the buffer was dropped");
-				if (!status && !entry.session.message)
-					violate("I2", "no message explains the refused save");
+				if (!status) violate("I2", "no message explains the refused save");
 			} else {
 				const done =
 					action === "cmd-s" || action === "review"
-						? alive() && !entry.session.isDirty()
+						? alive() && !host.isDirty(tab)
 						: !alive();
 				if (!done)
 					violate(
 						"I2",
-						`the save did not complete (alive=${alive()} dirty=${entry.session.isDirty()} presses=${presses} status=${JSON.stringify(status)})`,
+						`the save did not complete (alive=${alive()} dirty=${host.isDirty(tab)} presses=${presses} status=${JSON.stringify(status)})`,
 					);
 				else if (fs.source !== text)
 					violate(
@@ -287,7 +286,7 @@ async function runCell(tabState, event, timing, action) {
 						`the file holds ${JSON.stringify(fs.source)} but the editor held ${JSON.stringify(text)}`,
 					);
 			}
-		} else if (doc.writes !== writesBefore)
+		} else if (action !== "save-as" && doc.writes !== writesBefore)
 			violate("I2", "an action without Save wrote to disk");
 
 		// I3: a tab disappears only by Discard or when the disk holds its text.
@@ -307,18 +306,23 @@ async function runCell(tabState, event, timing, action) {
 			if (timing === "polled" || timing === "during-confirm") {
 				if (afterPoll.setSourceCalls !== 0)
 					violate("I4", "the poll replaced the editor text");
-				if (afterPoll.conflict) violate("I4", "the poll raised a conflict");
+				if (afterPoll.panel) violate("I4", "the poll raised a conflict");
 				if (tabState === "clean" && afterPoll.dirty)
 					violate("I4", "the poll made a clean tab dirty");
 			}
-			if (timing !== "drift" && entry.tab.setSourceCalls !== 0)
+			if (
+				timing !== "drift" &&
+				timing !== "in-flight" &&
+				tab.setSourceCalls !== 0
+			)
 				violate("I4", "the editor text was replaced");
 		}
 
 		// I2': Save and Close never see a same-content change, whenever it happens.
 		if (
 			(event === "metadata-only" || event === "same-content-new-inode") &&
-			timing !== "drift"
+			timing !== "drift" &&
+			timing !== "in-flight"
 		) {
 			if (tabState === "dirty" && SAVE_ACTIONS.has(action)) {
 				if (log.some((item) => item.kind === "dialog"))
@@ -335,7 +339,12 @@ async function runCell(tabState, event, timing, action) {
 		}
 
 		// I6: a clean editor follows an external content change instead of saving over it.
-		if (tabState === "clean" && event === "content-changed") {
+		if (
+			tabState === "clean" &&
+			event === "content-changed" &&
+			timing !== "in-flight" &&
+			action !== "save-as"
+		) {
 			if (SAVE_ACTIONS.has(action)) {
 				if (log.some((item) => item.kind === "dialog"))
 					violate("I6", "a review dialog was shown");
@@ -357,9 +366,7 @@ async function runCell(tabState, event, timing, action) {
 
 		// I5: a file that returns to its observed state leaves no trace behind.
 		if (event === "deleted-restored" && timing === "polled") {
-			if (afterPoll.conflict) violate("I5", "the poll kept a conflict");
 			if (afterPoll.panel) violate("I5", "the conflict panel is still shown");
-			if (afterPoll.message) violate("I5", "a stale message remains");
 			if (
 				SAVE_ACTIONS.has(action) &&
 				log.some((item) => item.kind === "dialog")
@@ -405,18 +412,16 @@ async function failSaveAs() {
 		},
 		confirm: async () => "cancel",
 	});
-	const entry = await host.open(a);
-	entry.tab.type(TEXT.edited);
+	const tab = await host.open(a);
+	tab.type(TEXT.edited);
 	await host.click(host.query("#save-as"));
-	assert.equal(entry.session.disk.id, 1);
-	assert.equal(entry.session.pendingTarget.id, 2);
-	assert.equal(entry.session.observed.id, 2);
+	assert.equal(host.panel().recoveryPath, b.path);
 	host.log.length = 0;
-	return { native, a, b, host, entry };
+	return { native, a, b, host, tab };
 }
 
 test("Save after a failed Save As still reviews and replaces the original document", async () => {
-	const { native, a, host, entry } = await failSaveAs();
+	const { native, a, host, tab } = await failSaveAs();
 	try {
 		a.file = {
 			source: "external A\n",
@@ -430,34 +435,31 @@ test("Save after a failed Save As still reviews and replaces the original docume
 		const saves = host.log.filter((item) => item.kind === "save");
 		assert.deepEqual(
 			saves.map((item) => [item.id, item.expected]),
-			[[1, dialog.fsById[1].revision]],
+			[[1, dialog.builtFrom.revision]],
 		);
 		assert.equal(a.file.source, TEXT.edited);
-		assert.equal(entry.session.disk.id, 1);
-		assert.equal(entry.session.isDirty(), false);
+		assert.equal(host.isDirty(tab), false);
+		assert.equal(host.nameOf(tab), "a.pfdsl");
 	} finally {
 		assert.deepEqual(await host.finish(), []);
 	}
 });
 
 test("Review and Save Here inspects the recovery target again", async () => {
-	const { native, b, host, entry } = await failSaveAs();
+	const { native, b, host, tab } = await failSaveAs();
 	try {
 		b.file = { source: "later B\n", ino: ++native.ino, mtime: ++native.clock };
-		const button = host
-			.queryAll("#conflicts button")
-			.find((item) => item.textContent === "Review and Save Here…");
-		await host.click(button);
+		await host.click(host.panel().review);
 		const dialog = host.log.find((item) => item.kind === "dialog");
 		assert.equal(dialog.title, "Review the target");
 		assert.equal(dialog.disk, "later B\n");
 		const saves = host.log.filter((item) => item.kind === "save");
 		assert.deepEqual(
 			saves.map((item) => [item.id, item.expected]),
-			[[2, dialog.fsById[2].revision]],
+			[[2, dialog.builtFrom.revision]],
 		);
 		assert.equal(b.file.source, TEXT.edited);
-		assert.equal(entry.session.disk.id, 2);
+		assert.equal(host.nameOf(tab), "b.pfdsl");
 	} finally {
 		assert.deepEqual(await host.finish(), []);
 	}

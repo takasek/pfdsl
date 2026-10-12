@@ -7,13 +7,16 @@ import {
 	createHarness,
 	FakeNative,
 	fsOf,
+	InspectGate,
 	TEXT,
 } from "./helpers/lifecycle-harness.mjs";
 import {
 	beginAction,
 	checkAction,
 	checkInspected,
+	checkObservation,
 	checkPanel,
+	checkReads,
 } from "./helpers/lifecycle-invariants.mjs";
 
 const { startHost } = await createHarness("lifecycle-recovery");
@@ -51,11 +54,14 @@ const B_EVENTS = [
 	"unreadable",
 	"recovered",
 ];
-const TIMINGS = ["polled", "unpolled", "during-confirm"];
+// in-flight: a poll started after the events is still reading when the action
+// opens its dialog and finishes while that dialog is open.
+const TIMINGS = ["polled", "unpolled", "during-confirm", "in-flight"];
 const ACTIONS = [
 	"poll",
 	"cmd-s",
 	"review",
+	"use",
 	"close-save",
 	"close-discard",
 	"close-cancel",
@@ -92,6 +98,8 @@ function applicable(failure, aEvent, bEvent, timing, action) {
 		return false;
 	if (timing === "during-confirm")
 		return ["close-save", "close-discard", "quit-discard"].includes(action);
+	// A poll still reading would block the close sequence, which finishes it first.
+	if (timing === "in-flight") return action === "cmd-s" || action === "review";
 	if (action === "poll") return timing === "unpolled";
 	return true;
 }
@@ -105,9 +113,12 @@ async function establish(failure) {
 		native,
 		a,
 		b,
+		gate: new InspectGate(native),
 		tabName: undefined,
 		decision: "cancel",
 		onConfirm: undefined,
+		onLate: undefined,
+		useDisk: false,
 		faults: new Map(),
 		chooser: undefined,
 		beforeSave: undefined,
@@ -116,6 +127,17 @@ async function establish(failure) {
 		choose: () => ctx.chooser(),
 		saveFault: (args) => ctx.faults.get(args.id)?.(),
 		beforeSave: (args) => ctx.beforeSave?.(args),
+		inspectGate: (id) => ctx.gate.hold(id),
+		dialogChoice: (title) =>
+			ctx.useDisk && title === "Discard editor changes"
+				? "Use Disk Version"
+				: undefined,
+		onDialog() {
+			if (ctx.gate.isHeld) {
+				ctx.onLate?.();
+				ctx.gate.release();
+			}
+		},
 		async confirm(name) {
 			if (name !== ctx.tabName) return "discard";
 			await ctx.onConfirm?.();
@@ -123,12 +145,9 @@ async function establish(failure) {
 		},
 	});
 	const { host } = ctx;
-	if (failure.start === "file") ctx.entry = await host.open(a);
-	else {
-		await host.click(host.query("#new"));
-		ctx.entry = globalThis.reviewActive();
-	}
-	ctx.entry.tab.type(TEXT.edited);
+	if (failure.start === "file") ctx.tab = await host.open(a);
+	else ctx.tab = await host.newDocument();
+	ctx.tab.type(TEXT.edited);
 	const fault = (mode) => {
 		let used = false;
 		return () => {
@@ -178,14 +197,18 @@ async function runCell(failure, aEvent, bEvent, timing, action) {
 	let ctx;
 	try {
 		ctx = await establish(failure);
-		const { native, a, b, host, entry } = ctx;
-		const session = entry.session;
-		if (!session.pendingTarget)
+		const { native, a, b, host, tab } = ctx;
+		const recovery = failure.hasB ? b : a;
+		const original = failure.start === "file" ? a : undefined;
+		const targets =
+			failure.start === "untitled"
+				? [b.id]
+				: failure.hasB
+					? [a.id, b.id]
+					: [a.id];
+		if (!host.panel().present)
 			violate("harness", "the recovery state was not established");
-		ctx.tabName = entry.name;
-		const targets = [session.disk?.id, session.pendingTarget?.id].filter(
-			(id, index, all) => id !== undefined && all.indexOf(id) === index,
-		);
+		ctx.tabName = host.nameOf(tab);
 		const docOf = (id) => native.docs.get(id);
 		const events = () => {
 			if (failure.start === "file") apply(native, a, aEvent);
@@ -196,6 +219,16 @@ async function runCell(failure, aEvent, bEvent, timing, action) {
 			: action.endsWith("discard")
 				? "discard"
 				: "cancel";
+		ctx.useDisk = action === "use";
+		const gated = failure.start === "untitled" ? b : a;
+		ctx.onLate = () => {
+			gated.unreadable = false;
+			gated.file = {
+				source: "late change\n",
+				ino: ++native.ino,
+				mtime: ++native.clock,
+			};
+		};
 		let changedInConfirm = false;
 		if (timing === "during-confirm") {
 			let done = false;
@@ -213,67 +246,75 @@ async function runCell(failure, aEvent, bEvent, timing, action) {
 			host.log.length = 0;
 			await host.runPoll();
 			checkInspected({ host, ids: targets, violate, when: "by the poll" });
-			observed({ native, ctx, targets, violate });
-			checkPanel({ host, entry, violate });
+			checkObservation({ host, native, original, recovery, violate });
+			checkPanel({ host, native, violate, recoveryId: recovery.id });
+			const panel = host.panel();
+			const readable = content(native, recovery) !== "unreadable";
+			if (readable && panel.review?.disabled && panel.use?.disabled !== false)
+				violate(
+					"D",
+					"no Review or Use action is reachable for a readable target",
+				);
 		}
-		const trace = beginAction({ host, entry });
-		const reviewId = session.observed?.id;
-		const alive = () => globalThis.reviewEntries.has(entry);
+		if (timing === "in-flight") {
+			ctx.gate.arm(gated.id);
+			await host.runPoll();
+		}
+		const trace = beginAction({ host, tab, owned: targets });
+		const alive = () => host.isOpen(tab);
 		let attempts = 0;
 		if (action === "poll") {
 			await host.runPoll();
 			checkInspected({ host, ids: targets, violate, when: "by the poll" });
-			observed({ native, ctx, targets, violate });
+			checkObservation({ host, native, original, recovery, violate });
 		} else if (action === "cmd-s") {
 			while (attempts < 3) {
 				attempts++;
 				await host.cmdS();
-				if (!alive() || (!session.isDirty() && !session.saveFailure)) break;
+				if (!alive() || (!host.isDirty(tab) && !host.panel().present)) break;
 			}
-		} else if (action === "review") {
-			const button = () =>
-				host
-					.queryAll("#conflicts button")
-					.find((item) => item.textContent === "Review and Save Here…");
-			while (attempts < 3 && alive() && button() && !button().disabled) {
+		} else if (action === "review" || action === "use") {
+			const pick = () => {
+				const panel = host.panel();
+				return action === "review" ? panel.review : panel.use;
+			};
+			while (attempts < 3 && alive() && pick() && !pick().disabled) {
 				attempts++;
-				await host.click(button());
-				if (!session.pendingTarget && !session.saveFailure) break;
+				const mark = host.log.length;
+				await host.click(pick());
+				const first = host.log
+					.slice(mark)
+					.find((item) => item.kind === "inspect" || item.kind === "save");
+				if (first && first.id !== recovery.id)
+					violate(
+						"P",
+						`${action} acted on target ${first.id}, not the recovery target ${recovery.id}`,
+					);
+				if (action === "use" || !host.panel().present) break;
 			}
 		} else {
 			const attemptsAllowed = action === "close-save" ? 3 : 1;
 			while (attempts < attemptsAllowed && (attempts === 0 || alive())) {
 				attempts++;
-				if (action.startsWith("close"))
-					await host.click(entry.navigation.querySelector(".close-document"));
+				if (action.startsWith("close")) await host.click(host.closeButton(tab));
 				else await host.quit(attempts);
 			}
-			const passes = action.endsWith("discard") && !alive() ? 2 : 1;
-			checkInspected({
-				host,
-				ids: targets,
-				times: passes,
-				violate,
-				when: `by ${action}`,
-			});
 			if (changedInConfirm && !alive() && action.endsWith("discard"))
 				violate(
 					"V",
 					"a decision was applied although a target changed meanwhile",
 				);
 		}
-		checkAction({ native, host, entry, trace, violate });
-		checkPanel({ host, entry, violate });
+		if (ctx.gate.release()) await host.settle();
+		checkAction({ native, host, tab, trace, violate });
+		if (action.startsWith("close") || action.startsWith("quit"))
+			checkReads({ host, tab, trace, violate });
+		checkPanel({ host, native, violate, recoveryId: recovery.id });
 
 		// D: no dead end while the target stays readable.
-		if (SAVE_ACTIONS.has(action) && attempts > 0) {
-			const wanted = docOf(
-				action === "review"
-					? reviewId
-					: failure.start === "untitled"
-						? b.id
-						: a.id,
-			);
+		if (SAVE_ACTIONS.has(action) && attempts > 0 && timing !== "in-flight") {
+			const wanted =
+				action === "review" ? recovery : failure.start === "untitled" ? b : a;
 			if (content(native, wanted) !== "unreadable") {
 				if (content(native, wanted) !== trace.text0)
 					violate(
@@ -290,35 +331,6 @@ async function runCell(failure, aEvent, bEvent, timing, action) {
 		ctx?.host.dom.window.close();
 	}
 	return violations;
-}
-
-/** O: after an observation the session knows what is on disk for each target. */
-function observed({ native, ctx, targets, violate }) {
-	const session = ctx.entry.session;
-	if (!globalThis.reviewEntries.has(ctx.entry)) return;
-	const elsewhere =
-		session.pendingTarget && session.pendingTarget.id !== session.disk?.id;
-	for (const id of targets) {
-		const current = fsOf(native, native.docs.get(id));
-		if (current.unreadable) continue;
-		const text = current.source ?? null;
-		if (id === session.disk?.id && elsewhere) {
-			// The original is reported as a source conflict only when it changed.
-			const changed = text !== session.disk.source;
-			if (changed !== Boolean(session.sourceConflict))
-				violate(
-					"O",
-					`the original holds ${JSON.stringify(text)} (changed=${changed}) but sourceConflict=${JSON.stringify(session.sourceConflict?.source)}`,
-				);
-		} else if (
-			session.observed?.id !== id ||
-			(session.observed.source ?? null) !== text
-		)
-			violate(
-				"O",
-				`target ${id} holds ${JSON.stringify(text)} but the session observed ${JSON.stringify(session.observed?.source)} of ${session.observed?.id}`,
-			);
-	}
 }
 
 for (const failure of FAILURES)

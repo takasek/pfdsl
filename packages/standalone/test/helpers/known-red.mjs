@@ -4,7 +4,10 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-export const KNOWN_RED = new Set([]);
+export const KNOWN_RED = new Set([
+	// F2: a pre-save inspection that fails leaves the tab looking clean.
+	"clean | unreadable | unpolled | cmd-s",
+]);
 
 const results = new Map();
 

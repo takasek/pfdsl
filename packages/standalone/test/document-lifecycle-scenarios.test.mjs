@@ -6,6 +6,7 @@ import { cell, guardKnownRed } from "./helpers/known-red.mjs";
 import {
 	createHarness,
 	FakeNative,
+	InspectGate,
 	TEXT,
 } from "./helpers/lifecycle-harness.mjs";
 import {
@@ -32,16 +33,15 @@ function judge() {
 for (const [name, setup] of [
 	[
 		"Save As onto an existing file",
-		async ({ native, host, ctx }) => {
-			ctx.chooser = () => native.snapshot(ctx.b);
+		async ({ host, ctx }) => {
+			ctx.chooser = () => ctx.native.snapshot(ctx.b);
 			await host.click(host.query("#save-as"));
 		},
 	],
 	[
 		"Save with the file deleted",
-		async ({ native, host, ctx }) => {
+		async ({ host, ctx }) => {
 			ctx.a.file = null;
-			void native;
 			await host.cmdS();
 		},
 	],
@@ -52,33 +52,27 @@ for (const [name, setup] of [
 			const native = new FakeNative();
 			const a = native.add(1, "a.pfdsl", TEXT.disk);
 			const b = native.add(2, "b.pfdsl", "old B\n");
-			const ctx = { a, b, hold: false, release: undefined, chooser: undefined };
+			const gate = new InspectGate(native);
+			const ctx = { native, a, b, chooser: undefined };
 			const host = await startHost(native, a, {
 				choose: () => ctx.chooser(),
 				confirm: async () => "cancel",
-				inspectGate: (id) =>
-					ctx.hold && id === 1
-						? new Promise((resolve) => {
-								ctx.hold = false;
-								ctx.release = resolve;
-							})
-						: undefined,
+				inspectGate: (id) => gate.hold(id),
 				onDialog() {
 					// The poll's read finishes while the dialog is open.
-					if (!ctx.release) return;
+					if (!gate.isHeld) return;
 					external(native, a, "changed while the dialog is open\n");
-					ctx.release(native.snapshot(a));
-					ctx.release = undefined;
+					gate.release();
 				},
 			});
 			const { violate, violations } = judge();
-			const entry = await host.open(a);
-			ctx.hold = true;
+			const tab = await host.open(a);
+			gate.arm(a.id);
 			await host.runPoll();
-			const trace = beginAction({ host, entry });
-			await setup({ native, host, ctx });
-			checkAction({ native, host, entry, trace, violate });
-			checkPanel({ host, entry, violate });
+			const trace = beginAction({ host, tab, owned: [a.id] });
+			await setup({ host, ctx });
+			checkAction({ native, host, tab, trace, violate });
+			checkPanel({ host, native, violate });
 			assert.deepEqual(await host.finish(), []);
 			return violations;
 		},
@@ -99,15 +93,15 @@ for (const confirm of [true, false]) {
 						: undefined,
 			});
 			const { violate, violations } = judge();
-			const entry = await host.open(a);
-			entry.tab.type(TEXT.edited);
+			const tab = await host.open(a);
+			tab.type(TEXT.edited);
 			external(native, a, "disk v2 (external)\n");
 			await host.runPoll();
-			entry.tab.type(TEXT.disk);
-			const trace = beginAction({ host, entry });
+			tab.type(TEXT.disk);
+			const trace = beginAction({ host, tab, owned: [a.id] });
 			await host.cmdS();
-			checkAction({ native, host, entry, trace, violate });
-			checkPanel({ host, entry, violate });
+			checkAction({ native, host, tab, trace, violate });
+			checkPanel({ host, native, violate });
 			if (!confirm) assert.equal(a.file.source, "disk v2 (external)\n");
 			assert.deepEqual(await host.finish(), []);
 			return violations;
@@ -128,13 +122,12 @@ for (const target of ["existing", "new"]) {
 					confirm: async () => "cancel",
 				});
 				const { violate, violations } = judge();
-				await host.click(host.query("#new"));
-				const entry = globalThis.reviewActive();
-				entry.tab.type(TEXT.edited);
-				const trace = beginAction({ host, entry });
+				const tab = await host.newDocument();
+				tab.type(TEXT.edited);
+				const trace = beginAction({ host, tab, owned: [c.id] });
 				if (via === "cmd-s") await host.cmdS();
 				else await host.click(host.query("#save-as"));
-				checkAction({ native, host, entry, trace, violate });
+				checkAction({ native, host, tab, trace, violate });
 				assert.equal(c.file?.source, TEXT.edited);
 				const review = host.log.find(
 					(item) =>
@@ -158,8 +151,8 @@ cell(
 			choose: () => native.snapshot(b),
 			confirm: async () => "cancel",
 		});
-		const entry = await host.open(a);
-		entry.tab.type(TEXT.edited);
+		const tab = await host.open(a);
+		tab.type(TEXT.edited);
 		await host.click(host.query("#save-as"));
 		const review = host.log.find((item) => item.title === "Review the target");
 		assert.match(review.text, /disk version .* differs from the editor/);
@@ -182,15 +175,12 @@ cell(
 					a.file = { ...a.file, mtime: ++native.clock };
 			},
 		});
-		const entry = await host.open(a);
-		entry.tab.type(TEXT.edited);
+		const tab = await host.open(a);
+		tab.type(TEXT.edited);
 		external(native, a, "disk v2 (external)\n");
 		await host.runPoll();
-		const use = host
-			.queryAll("#conflicts button")
-			.find((item) => item.textContent === "Use Current Disk Version…");
-		await host.click(use);
-		assert.equal(entry.tab.getSource(), "disk v2 (external)\n");
+		await host.click(host.panel().use);
+		assert.equal(tab.getSource(), "disk v2 (external)\n");
 		assert.doesNotMatch(host.query("#status").textContent, /changed again/);
 		assert.deepEqual(await host.finish(), []);
 	},
@@ -216,20 +206,18 @@ cell(
 					? "Keep Editing"
 					: undefined,
 		});
-		const entry = await host.open(a);
-		entry.tab.type(TEXT.edited);
+		const tab = await host.open(a);
+		tab.type(TEXT.edited);
 		await host.click(host.query("#save-as"));
 		// A poll learns what B holds, which enables Review and Save Here.
 		await host.runPoll();
-		const message = entry.session.message;
+		const says = () => host.query("#conflicts p").textContent;
+		const message = says();
 		assert.match(message, /could not be confirmed/);
-		assert.ok(entry.session.observed);
+		assert.equal(host.panel().review.disabled, false);
 		ctx.cancel = true;
-		const review = host
-			.queryAll("#conflicts button")
-			.find((item) => item.textContent === "Review and Save Here…");
-		await host.click(review);
-		assert.equal(entry.session.message, message);
+		await host.click(host.panel().review);
+		assert.equal(says(), message);
 		assert.deepEqual(await host.finish(), []);
 	},
 );
