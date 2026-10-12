@@ -114,6 +114,28 @@ test("property 4: every denied cell has a reason and a finite recovery destinati
 	}
 });
 
+test("forced remove denial explains nonforce cleanup without promising it for live owners", () => {
+	const input = {
+		subject: "claude-parent",
+		health: "healthy",
+		target: "other-unowned",
+		operationClass: "W",
+		kind: "git",
+		scope: "repository",
+		action: "worktree-remove",
+		force: true,
+	};
+	const result = decideOperation(input);
+	assert.equal(result.decision, "deny");
+	assert.match(result.reason, /without --force/);
+	assert.match(result.reason, /other-unowned/);
+	assert.equal(decideOperation({ ...input, force: false }).decision, "allow");
+	assert.equal(
+		decideOperation({ ...input, target: "other-live", force: false }).decision,
+		"deny",
+	);
+});
+
 test("property 5: adding another operation or U never weakens a denied cell", () => {
 	for (const cell of cells) {
 		const denied = decideOperation(cell);

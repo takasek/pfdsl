@@ -95,6 +95,8 @@ const EXCEPTIONS = [
 			"unresolved",
 		],
 		value: "D",
+		reason:
+			"Do not force removal outside your assigned worktree. Retry without --force to clean up an other-unowned trial; Git will refuse remaining changes. A live owner's worktree still requires its owner or a human terminal.",
 	},
 	{
 		match: {
@@ -208,7 +210,11 @@ export function decideOperation(input) {
 		);
 	const outcomes = {
 		A: { decision: "allow", operationClass: cell.operationClass },
-		D: stopped(REASONS[cell.operationClass], "terminal", cell.operationClass),
+		D: stopped(
+			exception?.reason ?? REASONS[cell.operationClass],
+			"terminal",
+			cell.operationClass,
+		),
 		U: stopped(REASONS.U, "rewrite", cell.operationClass),
 		Q: stopped(
 			REASONS[cell.operationClass],
