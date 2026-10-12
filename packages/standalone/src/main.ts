@@ -514,17 +514,13 @@ async function useDiskVersion(entry: Entry) {
 		throw error;
 	}
 	session.observe(observed, { snapshot: current }, scope);
-	if (!session.holds(plan, "editor")) {
-		status.textContent =
-			"The editor changed during the read. Your new edits are retained; review again.";
-		return;
-	}
-	if (!session.holds(plan)) {
-		status.textContent = "The disk changed again. Review the new version.";
-		return;
-	}
 	if (explainOpenTarget(entry, current)) return;
-	if (!session.adopt(plan)) return;
+	if (!session.adopt(plan)) {
+		status.textContent = session.holds(plan, "editor")
+			? "The disk changed again. Review the new version."
+			: "The editor changed during the read. Your new edits are retained; review again.";
+		return;
+	}
 	syncLocation(entry);
 	await remember(current.path).catch(report);
 	label(entry);

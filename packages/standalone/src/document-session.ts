@@ -53,20 +53,20 @@ export function sameDiskContent(
 
 /**
  * What the session last learned about one tracked target. An unreadable target
- * keeps the last snapshot it was known by, only so that a panel can still name
- * and show it; `error` is null when the unreadable state comes from a save
+ * keeps the last snapshot for target identification and panel display, never
+ * as evidence of a readable current version; `error` is null when it comes from a save
  * receipt instead of a read.
  */
-export type Observation =
+type Observation =
 	| { state: "readable"; snapshot: DiskSnapshot }
 	| { state: "missing"; snapshot: DiskSnapshot }
 	| { state: "unreadable"; error: string | null; last: DiskSnapshot | null };
 
 /** The result of reading one target. */
-export type ReadResult = { snapshot: DiskSnapshot } | { error: unknown };
+type ReadResult = { snapshot: DiskSnapshot } | { error: unknown };
 
 /** "stale" means the result belongs to a state the session has left. */
-export type ObserveOutcome = "reloaded" | "changed" | "unchanged" | "stale";
+type ObserveOutcome = "reloaded" | "changed" | "unchanged" | "stale";
 
 /** One confirmed or immediate operation on a target, as the user was shown it. */
 export interface OperationPlan {
@@ -82,7 +82,7 @@ export interface OperationPlan {
 	editorVersion: number | string;
 }
 
-export interface SaveOutcome {
+interface SaveOutcome {
 	saved: boolean;
 	/** The plan no longer described the document, so nothing was sent. */
 	stale: boolean;
@@ -90,7 +90,7 @@ export interface SaveOutcome {
 }
 
 /** What the conflict panel shows, derived from the session's state. */
-export interface ConflictPanel {
+interface ConflictPanel {
 	state: string;
 	message: string;
 	targetPath: string;
@@ -101,7 +101,7 @@ export interface ConflictPanel {
 }
 
 /** The editor and session state a read started from. */
-export interface ReadScope {
+interface ReadScope {
 	acknowledged: object;
 	recovery: object | null;
 	editorVersion: number | string;
@@ -343,6 +343,13 @@ export class DocumentSession {
 		}
 		const message = result.message ?? "";
 		if (result.outcome === "saved" && result.current) {
+			if (
+				differs(
+					this.observations.get(result.current.id),
+					classify(result.current),
+				)
+			)
+				this.epoch++;
 			this.acknowledged = { source: plan.editor, disk: result.current };
 			this.recovery = null;
 			this.observations = new Map([
@@ -553,6 +560,7 @@ export async function closeDocuments<T extends Closable>(
 			)
 				return false;
 		}
+		// A successful Save resolves this decision; compare the final read to its result.
 		versions.set(document, {
 			version: document.closeVersion?.(),
 			dirty: document.isDirty(),

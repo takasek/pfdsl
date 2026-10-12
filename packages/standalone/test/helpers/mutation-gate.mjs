@@ -6,8 +6,9 @@
 // tree (src, test, index.html, package.json; node_modules is linked), the
 // standalone suite runs there, and the worktree itself is never modified. A
 // mutation is caught when at least one failing cell reports an invariant tag
-// (L, R, A, C, U, K, T, P, O, V, D, I1..I6) rather than only a status text.
+// (L, R, A, C, U, K, T, P, O, V, D, N2, I1..I6) rather than only a status text.
 // Mutation texts match the current sources; update them with the sources.
+// Each mutation names the guarantee it removes and where that guarantee lives.
 import { spawn } from "node:child_process";
 import {
 	cpSync,
@@ -25,6 +26,27 @@ import { fileURLToPath } from "node:url";
 
 const repo = fileURLToPath(new URL("../../../../", import.meta.url));
 const standalone = join(repo, "packages/standalone");
+const INVARIANT_TAGS = new Set([
+	"L",
+	"R",
+	"A",
+	"C",
+	"U",
+	"K",
+	"T",
+	"P",
+	"O",
+	"V",
+	"D",
+	"N2",
+	"I1",
+	"I2",
+	"I2'",
+	"I3",
+	"I4",
+	"I5",
+	"I6",
+]);
 
 // The suites that exercise the document lifecycle. The editor tests need
 // packages outside the copied tree and say nothing about these mutations.
@@ -34,99 +56,134 @@ const SUITE = [
 	"document-lifecycle-invariants.test.mjs",
 	"document-lifecycle-memory.test.mjs",
 	"document-lifecycle-recovery.test.mjs",
+	"document-lifecycle-relations.test.mjs",
 	"document-lifecycle-scenarios.test.mjs",
 	"document-session.test.mjs",
 ];
 
-/** [description, file, search text, replacement] steps per mutation. */
+/**
+ * [file, search text, replacement] steps per mutation. `guarantee` is what the
+ * mutation removes and `where` is where that guarantee lives in the sources.
+ * M1-M10 are the semantic mutations of the pre-ADR-0047 session, restated for
+ * the observation/plan model; M11-M13 remove the guarantees behind the cells
+ * that were known to fail before it (F1, F2, N2).
+ */
 const MUTATIONS = {
 	M1: {
-		what: "review condition without observed/conflict",
+		what: "review no longer required for a version the document has not acknowledged",
+		guarantee:
+			"Replacing a disk version the document has not acknowledged shows a review",
+		where: "main.ts saveEntry: the review condition",
 		steps: [
 			[
 				"src/main.ts",
-				"(chosen || observed || changed || entry.session.conflict)",
-				"(chosen || changed)",
+				"(chosen || observed || !session.acknowledges(selected))",
+				"(chosen || observed)",
 			],
 		],
 	},
 	M2: {
-		what: "followDiskIfClean back to text === savedSource",
+		what: "a clean editor is decided by the text alone, not by unsaved state",
+		guarantee:
+			"A tab that shows unsaved state (failed read, deletion, recovery) is never reloaded",
+		where: "document-session.ts observe: the clean test",
 		steps: [
 			[
 				"src/document-session.ts",
-				"if (this.isDirty() || this.saveFailure || this.pendingTarget) return null;",
-				"if (this.view.getSource() !== this.savedSource || this.saveFailure || this.pendingTarget) return null;",
+				"const clean = !this.isDirty();",
+				"const clean = this.view.getSource() === this.acknowledged.source;",
 			],
 		],
 	},
 	M3: {
-		what: "recordTarget recovery branch returns false",
+		what: "the original counts as acknowledged while a Save As recovery is pending",
+		guarantee:
+			"Saving the original after a failed Save As still reviews a changed original",
+		where: "document-session.ts acknowledges",
 		steps: [
 			[
 				"src/document-session.ts",
-				"this.sourceConflict = changed ? fresh : null;\n\t\t\t\treturn changed;",
-				"this.sourceConflict = changed ? fresh : null;\n\t\t\t\treturn false;",
+				"disk && disk.id === snapshot.id && sameDiskContent(disk, snapshot),",
+				"disk && disk.id === snapshot.id && (this.recovery !== null || sameDiskContent(disk, snapshot)),",
 			],
 		],
 	},
 	M4: {
-		what: "remove changedDuringReview()",
+		what: "operation plans are not checked when executed",
+		guarantee:
+			"An approval applies only to the state it was given for; Use Disk refuses a changed editor or disk",
+		where: "document-session.ts save and adopt: holds(plan)",
 		steps: [
 			[
-				"src/main.ts",
-				'if (decision !== "replace" || changedDuringReview()) return false;',
-				'if (decision !== "replace") return false;',
+				"src/document-session.ts",
+				'if (!this.holds(plan)) return { saved: false, stale: true, message: "" };',
+				"",
 			],
 			[
-				"src/main.ts",
-				'if (decision !== "create" || changedDuringReview()) return false;',
-				'if (decision !== "create") return false;',
+				"src/document-session.ts",
+				"if (!plan.target || !this.holds(plan)) return false;",
+				"if (!plan.target) return false;",
 			],
 		],
 	},
 	M5: {
-		what: "read the recovery target only after the original succeeds",
+		what: "the recovery target is read only after the original succeeds",
+		guarantee:
+			"Every unresolved target is read, and one failing read never skips another",
+		where: "document-session.ts readTargets",
 		steps: [
 			[
 				"src/document-session.ts",
-				"const [original, target] = await Promise.allSettled([\n\t\t\tbaseline ? read(baseline.id) : Promise.resolve(null),\n\t\t\tread(recovery.id),\n\t\t]);",
-				"const [original] = await Promise.allSettled([baseline ? read(baseline.id) : Promise.resolve(null)]);\n\t\tconst [target] = original.status === 'fulfilled' ? await Promise.allSettled([read(recovery.id)]) : [original];",
+				"const results = await Promise.allSettled(\n\t\t\ttargets.map((target) => read(target.id)),\n\t\t);",
+				"const first = (await Promise.allSettled([read(targets[0].id)]))[0];\n\t\tconst results = [first];\n\t\tif (targets.length > 1) results.push(first.status === 'fulfilled' ? (await Promise.allSettled([read(targets[1].id)]))[0] : first);",
 			],
 		],
 	},
 	M6: {
-		what: "panel preview from conflict instead of observed",
+		what: "the panel preview shows the acknowledged baseline, not the observation",
+		guarantee:
+			"The panel compares against the same snapshot its buttons act on",
+		where: "main.ts renderConflict: the preview text",
 		steps: [
 			[
 				"src/main.ts",
 				'text.textContent = observed\n\t\t\t? (observed.source ?? "File is missing")\n\t\t\t: "The current disk content could not be confirmed.";',
-				'text.textContent = entry.session.conflict?.source ?? "The current disk content could not be confirmed.";',
+				'text.textContent = entry.session.disk?.source ?? "The current disk content could not be confirmed.";',
 			],
 		],
 	},
 	M7: {
-		what: "unreadable tracking as a single flag",
+		what: "a second unreadable target is not a new state",
+		guarantee:
+			"Another target becoming unreadable invalidates a decision taken before",
+		where:
+			"document-session.ts observe: epoch advance on a changed classification",
 		steps: [
 			[
 				"src/document-session.ts",
-				"if (this.unreadable.has(id)) return;\n\t\tthis.unreadable.add(id);\n\t\tthis.observationVersion++;",
-				"const first = this.unreadable.size === 0;\n\t\tthis.unreadable.add(id);\n\t\tif (first) this.observationVersion++;",
+				"const moved = differs(previous, next);",
+				'const moved = differs(previous, next) && !(next.state === "unreadable" && [...this.observations.values()].some((item) => item.state === "unreadable"));',
 			],
 		],
 	},
 	M8: {
-		what: "drop readable/unreadable tracking of the recovery observation",
+		what: "the unresolved save target's observation is not recorded",
+		guarantee:
+			"The recovery target is observed like the document's own file, whatever read started it",
+		where: "document-session.ts observe: storing the observation",
 		steps: [
 			[
 				"src/document-session.ts",
-				'\t\tif (baseline)\n\t\t\tif (original.status === "fulfilled") this.markReadable(baseline.id);\n\t\t\telse this.markUnreadable(baseline.id);\n\t\tif (target.status === "fulfilled") this.markReadable(recovery.id);\n\t\telse this.markUnreadable(recovery.id);\n',
-				"",
+				"this.observations.set(target.id, next);",
+				"if (target.id === this.acknowledged.disk?.id) this.observations.set(target.id, next);",
 			],
 		],
 	},
 	M9: {
 		what: "closeDocuments final re-read removed",
+		guarantee:
+			"Close checks every target again after the last decision, before disposing tabs",
+		where: "document-session.ts closeDocuments",
 		steps: [
 			[
 				"src/document-session.ts",
@@ -137,11 +194,54 @@ const MUTATIONS = {
 	},
 	M10: {
 		what: "closeEntries prepareClose re-read removed",
+		guarantee: "Close starts a fresh read of every target before the decision",
+		where: "main.ts closeEntries: prepareClose",
 		steps: [
 			[
 				"src/main.ts",
 				'\t\t\t\t\tawait entry.session\n\t\t\t\t\t\t.checkExternal((id) =>\n\t\t\t\t\t\t\tinvoke<DiskSnapshot>("inspect_document", { id }),\n\t\t\t\t\t\t)\n\t\t\t\t\t\t.catch(report);\n',
 				"",
+			],
+		],
+	},
+	M11: {
+		what: "a close Save is not checked against the decision it follows",
+		guarantee:
+			"A Save decision applies to the text shown when it was asked (F1)",
+		where: "main.ts saveEntry: the confirmation plan check",
+		steps: [
+			[
+				"src/main.ts",
+				'if (confirmation && !session.holds(confirmation, "editor")) {',
+				"if (false) {",
+			],
+		],
+	},
+	M12: {
+		what: "a failed pre-save read is not remembered",
+		guarantee:
+			"A failed read protects the tab whichever entry point saw it (F2)",
+		where: "main.ts saveEntry: the pre-save inspection failure",
+		steps: [
+			["src/main.ts", "session.observe(remembered, { error }, scope);", ""],
+		],
+	},
+	M13: {
+		what: "close keeps the version from before its successful Save",
+		guarantee:
+			"A save that succeeds during a close confirmation leaves the close one attempt (N2)",
+		where:
+			"document-session.ts closeDocuments: capturing the post-decision version",
+		steps: [
+			[
+				"src/document-session.ts",
+				"await document.prepareClose?.();\n\t\tif (document.isDirty()) {",
+				"await document.prepareClose?.();\n\t\tconst versionBeforeDecision = document.closeVersion?.();\n\t\tif (document.isDirty()) {",
+			],
+			[
+				"src/document-session.ts",
+				"version: document.closeVersion?.(),",
+				"version: versionBeforeDecision,",
 			],
 		],
 	},
@@ -175,7 +275,7 @@ function apply(tree, mutation) {
 }
 
 function runSuite(tree) {
-	return new Promise((resolve) => {
+	return new Promise((resolve, reject) => {
 		const child = spawn(
 			process.execPath,
 			["--test", ...SUITE.map((file) => `packages/standalone/test/${file}`)],
@@ -188,7 +288,8 @@ function runSuite(tree) {
 		child.stderr.on("data", (chunk) => {
 			output += chunk;
 		});
-		child.on("close", () => resolve(output));
+		child.on("error", reject);
+		child.on("close", (code) => resolve({ output, code }));
 	});
 }
 
@@ -206,7 +307,7 @@ function failures(output) {
 						(match) => match[1],
 					),
 				),
-			];
+			].filter((tag) => INVARIANT_TAGS.has(tag));
 			return label ? { label, tags } : undefined;
 		})
 		.filter(Boolean);
@@ -214,33 +315,56 @@ function failures(output) {
 
 const wanted = process.argv.slice(2);
 const names = wanted.length ? wanted : ["baseline", ...Object.keys(MUTATIONS)];
-const results = await Promise.all(
-	names.map(async (name) => {
-		const tree = copyTree();
-		try {
-			if (name !== "baseline") apply(tree, MUTATIONS[name]);
-			const output = await runSuite(tree);
-			const total = Number(/^ℹ tests (\d+)/m.exec(output)?.[1] ?? 0);
-			const failed = Number(/^ℹ fail (\d+)/m.exec(output)?.[1] ?? 0);
-			const cells = failures(output);
-			const tagged = cells.filter((cell) => cell.tags.length > 0);
-			return { name, total, failed, tagged, cells };
-		} finally {
-			rmSync(tree, { recursive: true, force: true });
-		}
-	}),
-);
+for (const name of names)
+	if (name !== "baseline" && !Object.hasOwn(MUTATIONS, name))
+		throw new Error(`Unknown mutation: ${name}`);
+async function runMutation(name) {
+	const tree = copyTree();
+	try {
+		if (name !== "baseline") apply(tree, MUTATIONS[name]);
+		const { output, code } = await runSuite(tree);
+		const total = Number(/^ℹ tests (\d+)/m.exec(output)?.[1] ?? 0);
+		const failed = Number(/^ℹ fail (\d+)/m.exec(output)?.[1] ?? 0);
+		const cells = failures(output);
+		const tagged = cells.filter((cell) => cell.tags.length > 0);
+		console.log(
+			`completed ${name}: ${failed}/${total} failing, ${tagged.length} invariant-labelled`,
+		);
+		return { name, total, failed, tagged, cells, code };
+	} finally {
+		rmSync(tree, { recursive: true, force: true });
+	}
+}
+
+// Each suite already runs test files concurrently; bound the number of copied suites.
+const results = [];
+for (let offset = 0; offset < names.length; offset += 2)
+	results.push(
+		...(await Promise.all(names.slice(offset, offset + 2).map(runMutation))),
+	);
+const baseline = results.find((result) => result.name === "baseline");
 
 let missed = false;
-for (const { name, total, failed, tagged, cells } of results) {
+for (const { name, total, failed, tagged, cells, code } of results) {
 	const what = name === "baseline" ? "unmodified suite" : MUTATIONS[name].what;
 	const tags = [...new Set(tagged.flatMap((cell) => cell.tags))].join(",");
 	console.log(
 		`${name.padEnd(8)} ${what}\n         failing ${failed}/${total}, invariant-labelled ${tagged.length} [${tags}]`,
 	);
+	if (name !== "baseline")
+		console.log(
+			`         removes: ${MUTATIONS[name].guarantee} (${MUTATIONS[name].where})`,
+		);
 	for (const cell of tagged.slice(0, 3))
 		console.log(`         e.g. ${cell.label} :: ${cell.tags.join(",")}`);
-	if (name === "baseline" ? failed !== 0 : tagged.length === 0) missed = true;
+	if (
+		total === 0 ||
+		(baseline && total !== baseline.total) ||
+		(name === "baseline"
+			? failed !== 0 || code !== 0
+			: tagged.length === 0 || failed === 0 || code !== 1)
+	)
+		missed = true;
 	if (name !== "baseline" && tagged.length === 0 && cells.length > 0)
 		console.log(
 			`         only untagged: ${cells
