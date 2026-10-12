@@ -119,8 +119,11 @@ export async function createHarness(label) {
 	/**
 	 * Runs the production main.ts over `native`. Every dialog is answered with the
 	 * choice that confirms replacing or creating the target. `handlers` supplies
-	 * confirm_close_document (confirm), choose_save_target (choose) and may lose a
-	 * save reply (saveFault: "before" or "after" the write).
+	 * confirm_close_document (confirm), choose_save_target (choose) and may
+	 * - lose a save reply (saveFault: "before" or "after" the write);
+	 * - change the disk just before a save reaches the native side (beforeSave);
+	 * - hold an inspection until the test releases it (inspectGate);
+	 * - react when a dialog opens (onDialog) or pick another button (dialogChoice).
 	 */
 	async function startHost(native, watched, handlers = {}) {
 		const dom = new JSDOM(
@@ -141,16 +144,26 @@ export async function createHarness(label) {
 		dom.window.HTMLDialogElement.prototype.close = () => {};
 		dom.window.HTMLDialogElement.prototype.showModal = function () {
 			const fields = [...this.querySelectorAll("textarea")].map((f) => f.value);
-			log.push({
+			const text = this.querySelector("p").textContent;
+			const entry = {
 				kind: "dialog",
 				title: this.querySelector("h2").textContent,
+				text,
+				target: [...native.docs.values()].find((doc) => text.includes(doc.path))
+					?.id,
 				editor: fields[0],
 				disk: fields[1],
+				shownEditor: globalThis.reviewActive?.()?.tab.getSource(),
 				fs: fsOf(native, watched),
 				fsById: Object.fromEntries(
 					[...native.docs].map(([id, doc]) => [id, fsOf(native, doc)]),
 				),
-			});
+				choice: undefined,
+				editorAtClick: undefined,
+			};
+			this.entry = entry;
+			log.push(entry);
+			handlers.onDialog?.(entry);
 		};
 		globalThis.nativeAcceptance = () => new Promise(() => {});
 		globalThis.nativeListen = async (_, listener) => {
@@ -165,30 +178,51 @@ export async function createHarness(label) {
 				return;
 			if (command === "select_document" || command === "open_document")
 				return native.snapshot(selected);
-			if (command === "choose_save_target") return handlers.choose();
+			if (command === "choose_save_target") {
+				const chosen = await handlers.choose();
+				log.push({ kind: "choose", id: chosen?.id });
+				return chosen;
+			}
 			if (command === "inspect_document") {
 				log.push({ kind: "inspect", id: args.id });
+				const held = handlers.inspectGate?.(args.id);
+				if (held) return held;
 				return native.snapshot(native.docs.get(args.id));
 			}
 			if (command === "save_document") {
 				const target = native.docs.get(args.id);
 				const fault = handlers.saveFault?.(args);
+				handlers.beforeSave?.(args);
 				const entry = {
 					kind: "save",
 					id: args.id,
+					source: args.source,
 					expected: args.expected,
 					fs: fsOf(native, target),
 					outcome: "lost",
+					wrote: false,
 				};
 				log.push(entry);
 				if (fault === "before") throw new Error("native reply lost");
 				const reply = native.save(target, args.source, args.expected);
 				if (fault === "after") throw new Error("native reply lost");
 				entry.outcome = reply.outcome;
+				entry.wrote = reply.publication === "published";
 				return reply;
 			}
-			if (command === "confirm_close_document")
-				return handlers.confirm(args.name);
+			if (command === "confirm_close_document") {
+				const entry = {
+					kind: "confirm",
+					name: args.name,
+					decision: undefined,
+					fsById: Object.fromEntries(
+						[...native.docs].map(([id, doc]) => [id, fsOf(native, doc)]),
+					),
+				};
+				log.push(entry);
+				entry.decision = await handlers.confirm(args.name);
+				return entry.decision;
+			}
 			throw new Error(`unexpected command ${command}`);
 		};
 		await import(`${pathToFileURL(output).href}?cell=${++cellSerial}`);
@@ -200,11 +234,16 @@ export async function createHarness(label) {
 				if (dialog) {
 					const title = dialog.querySelector("h2").textContent;
 					const confirm =
-						title === "Review the target"
+						handlers.dialogChoice?.(title, dialog.entry) ??
+						(title === "Review the target"
 							? "Replace Observed Version"
 							: title === "Recreate missing file"
 								? "Create File"
-								: "Keep Editing";
+								: "Keep Editing");
+					dialog.entry.choice = confirm;
+					dialog.entry.editorAtClick = globalThis
+						.reviewActive?.()
+						?.tab.getSource();
 					[...dialog.querySelectorAll("button")]
 						.find((b) => b.textContent === confirm)
 						.click();

@@ -5,12 +5,18 @@
 // target with expected=null is created exclusively).
 import assert from "node:assert/strict";
 import test from "node:test";
+import { cell, guardKnownRed } from "./helpers/known-red.mjs";
 import {
 	createHarness,
 	FakeNative,
 	fsOf,
 	TEXT,
 } from "./helpers/lifecycle-harness.mjs";
+import {
+	beginAction,
+	checkAction,
+	checkPanel,
+} from "./helpers/lifecycle-invariants.mjs";
 
 const { startHost } = await createHarness("lifecycle-invariants");
 
@@ -189,7 +195,8 @@ async function runCell(tabState, event, timing, action) {
 			};
 		}
 		const writesBefore = doc.writes;
-		log.length = 0;
+		checkPanel({ host, entry, violate });
+		const trace = beginAction({ host, entry });
 
 		// Action.
 		let presses = 0;
@@ -220,6 +227,8 @@ async function runCell(tabState, event, timing, action) {
 		if (timing === "during-confirm" && !eventApplied) await applyEvent(false);
 		await settle();
 
+		checkAction({ native, host, entry, trace, violate });
+		checkPanel({ host, entry, violate });
 		const text = entry.tab.getSource();
 		const fs = fsOf(native, doc);
 		const status = host.query("#status").textContent;
@@ -375,10 +384,7 @@ for (const tab of TABS)
 			for (const action of ACTIONS) {
 				if (!applicable(tab, event, timing, action)) continue;
 				const label = `${tab} | ${event} | ${timing} | ${action}`;
-				test(label, async () => {
-					const violations = await runCell(tab, event, timing, action);
-					assert.deepEqual(violations, [], label);
-				});
+				cell(label, () => runCell(tab, event, timing, action));
 			}
 
 /** Fails Save As to B with a conflict, leaving A open with B as the recovery target. */
@@ -456,3 +462,5 @@ test("Review and Save Here inspects the recovery target again", async () => {
 		assert.deepEqual(await host.finish(), []);
 	}
 });
+
+guardKnownRed();
