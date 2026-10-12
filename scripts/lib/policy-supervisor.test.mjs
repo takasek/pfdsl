@@ -12,7 +12,12 @@ const payload = JSON.stringify({
 });
 function supervised(
 	body,
-	{ input = payload, claude = false, deadlineMs = 1000 } = {},
+	{
+		input = payload,
+		claude = false,
+		deadlineMs = 1000,
+		useDefaultDeadline = false,
+	} = {},
 ) {
 	const root = mkdtempSync(
 		fileURLToPath(
@@ -23,14 +28,14 @@ function supervised(
 		const entry = join(root, "entry.mjs");
 		writeFileSync(
 			entry,
-			`import { isMainThread } from "node:worker_threads";\nif (isMainThread) { const {supervisePolicy} = await import(${JSON.stringify(helper)}); await supervisePolicy(new URL(import.meta.url), { deadlineMs: ${deadlineMs} }); } else { for await (const _chunk of process.stdin) {} ${body} }\n`,
+			`import { isMainThread } from "node:worker_threads";\nif (isMainThread) { const {supervisePolicy} = await import(${JSON.stringify(helper)}); await supervisePolicy(new URL(import.meta.url), { ${useDefaultDeadline ? "" : `deadlineMs: ${deadlineMs}`} }); } else { for await (const _chunk of process.stdin) {} ${body} }\n`,
 		);
 		return tryRun(process.execPath, [entry], {
 			cwd: root,
 			input,
 			env: { ...process.env, CLAUDE_PROJECT_DIR: claude ? root : "" },
 			captureStderr: true,
-			timeout: 2500,
+			timeout: useDefaultDeadline ? 10000 : 2500,
 		});
 	} finally {
 		rmSync(root, { recursive: true, force: true });
@@ -38,6 +43,15 @@ function supervised(
 }
 const output = (decision) =>
 	`console.log(JSON.stringify({hookSpecificOutput: {hookEventName: "PreToolUse", permissionDecision: ${JSON.stringify(decision)}, permissionDecisionReason: "fixture reason"}}));`;
+
+test("default supervisor deadline accommodates a policy beyond the former five-second limit", () => {
+	const result = supervised(
+		"await new Promise(resolve => setTimeout(resolve, 5200));",
+		{ useDefaultDeadline: true },
+	);
+	assert.equal(result.status, 0, result.out);
+	assert.equal(result.out, "");
+});
 
 test("supervisor preserves normal silent allow, deny and Claude ask without a second conversion", () => {
 	assert.equal(supervised("").status, 0);

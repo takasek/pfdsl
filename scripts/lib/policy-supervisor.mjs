@@ -1,10 +1,11 @@
 import { Worker } from "node:worker_threads";
+import { POLICY_DEADLINE_MS } from "./agent-operation-timeouts.mjs";
 
 // Transplanted from dbcff6be. Threads retain the hook's process.ppid for
 // native ownership while a stopped policy cannot stop this deadline.
 export async function supervisePolicy(
 	entryUrl,
-	{ inputText, deadlineMs = 5000 } = {},
+	{ inputText, deadlineMs = POLICY_DEADLINE_MS } = {},
 ) {
 	let finished = false;
 	let worker;

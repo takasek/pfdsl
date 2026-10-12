@@ -31,6 +31,7 @@ const helperFiles = [
 	"lib/physical-path.mjs",
 	"lib/guard-probe.mjs",
 	"lib/policy-supervisor.mjs",
+	"lib/agent-operation-timeouts.mjs",
 	"lib/hook-io.mjs",
 	"lib/cli-entrypoint.mjs",
 ];

@@ -140,6 +140,11 @@ shell の解析失敗による deny は1つの入口だけが出す。表の外�
 
 各項目は、検証した harness の版と起動方式とともに記録する。
 
+shfmt の1回の解析 timeout は3000ms、policy supervisor の内部 deadline は8000msとし、scripts/lib/agent-operation-timeouts.mjs にまとめる。
+両 harness の PreToolUse hook timeout の10秒より短くする。
+複数命令や literal な内側の解析を含む処理全体は supervisor が止めるため、各解析の時間を合計して待ち続けない。
+高負荷時の成功を保証する値ではなく、通常の並列 session の遅延を許容しつつ同期停止を監督する上限である。
+
 判定表の合成入力、実 Git の代表例、live hook、設定の正式な読込みを別の証拠段階として記録する。
 合成入力と子プロセスの入口検査を live harness の成功へ格上げしない。
 Codex version 1 の他者 ownerThreadId だけでは生存を証明しない。

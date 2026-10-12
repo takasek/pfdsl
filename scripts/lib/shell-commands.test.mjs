@@ -1,6 +1,59 @@
 import assert from "node:assert/strict";
+import {
+	chmodSync,
+	mkdtempSync,
+	readFileSync,
+	rmSync,
+	writeFileSync,
+} from "node:fs";
+import { join } from "node:path";
 import { test } from "node:test";
+import { fileURLToPath } from "node:url";
+import {
+	POLICY_DEADLINE_MS,
+	SHELL_PARSER_TIMEOUT_MS,
+} from "./agent-operation-timeouts.mjs";
 import { readShell, shellParseDecision } from "./shell-commands.mjs";
+
+test("internal parser and policy deadlines fit both configured hook timeouts", () => {
+	assert.equal(SHELL_PARSER_TIMEOUT_MS, 3000);
+	assert.equal(POLICY_DEADLINE_MS, 8000);
+	assert.ok(SHELL_PARSER_TIMEOUT_MS < POLICY_DEADLINE_MS);
+	for (const path of [".claude/settings.json", ".codex/hooks.json"]) {
+		const config = JSON.parse(
+			readFileSync(new URL(`../../${path}`, import.meta.url), "utf8"),
+		);
+		const entries = config.hooks.PreToolUse.flatMap(
+			({ hooks }) => hooks,
+		).filter(({ command }) => command.includes("agent-operation-guard.mjs"));
+		assert.ok(entries.length > 0);
+		for (const { timeout } of entries) {
+			assert.equal(timeout, 10);
+			assert.ok(POLICY_DEADLINE_MS < timeout * 1000);
+		}
+	}
+});
+
+test("parser permits a transient delay beyond the former one-second limit", () => {
+	const root = mkdtempSync(
+		fileURLToPath(
+			new URL("../../node_modules/pfdsl-slow-parser-", import.meta.url),
+		),
+	);
+	try {
+		const parserPath = join(root, "parser");
+		writeFileSync(
+			parserPath,
+			`#!${process.execPath}\nsetTimeout(() => console.log(JSON.stringify({ Type: 'File' })), 1200);\n`,
+		);
+		chmodSync(parserPath, 0o755);
+		const parsed = readShell("git status", { parserPath });
+		assert.equal(parsed.error, undefined);
+		assert.deepEqual(parsed.commands, []);
+	} finally {
+		rmSync(root, { recursive: true, force: true });
+	}
+});
 
 test("shfmt reads ordinary transcript shapes without executing them", () => {
 	for (const source of [

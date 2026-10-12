@@ -3,6 +3,7 @@
 
 import { basename } from "node:path";
 import { fileURLToPath } from "node:url";
+import { SHELL_PARSER_TIMEOUT_MS } from "./agent-operation-timeouts.mjs";
 import { GIT_TARGET_ENVIRONMENT_VARIABLES } from "./git-environment.mjs";
 import { run } from "./run-exec.mjs";
 import { shellParserPath } from "./shell-parser-tool.mjs";
@@ -26,7 +27,7 @@ export function readShell(
 			run(parserPath, ["--to-json", "--language-dialect=zsh"], {
 				input: command,
 				captureStderr: true,
-				timeout: 1000,
+				timeout: SHELL_PARSER_TIMEOUT_MS,
 			}),
 		);
 		if (
