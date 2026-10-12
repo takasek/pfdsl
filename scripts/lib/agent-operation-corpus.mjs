@@ -533,6 +533,33 @@ export const AGENT_OPERATION_CORPUS = [
 		target: "own",
 	}),
 	...[
+		`*** Begin Patch\n*** Delete File: ${own}/file-link\n*** End Patch`,
+		`*** Begin Patch\n*** Update File: ${own}/file-link\n*** Move to: ${own}/moved\n@@\n-a\n+b\n*** End Patch`,
+	].map((command, i) =>
+		example(`resolution-patch-unlinks-own-symlink-${i}`, null, "allow", {
+			subject: "codex-child",
+			facts: {
+				physicalPaths: { [`${own}/file-link`]: `${primary}/a` },
+				physicalEntryPaths: { [`${own}/file-link`]: `${own}/file-link` },
+			},
+			tool: { name: "apply_patch", input: { command } },
+			target: "own",
+		}),
+	),
+	example("resolution-patch-updates-symlink-content", null, "deny", {
+		facts: {
+			physicalPaths: { [`${own}/file-link`]: `${primary}/a` },
+			physicalEntryPaths: { [`${own}/file-link`]: `${own}/file-link` },
+		},
+		tool: {
+			name: "apply_patch",
+			input: {
+				command: `*** Begin Patch\n*** Update File: ${own}/file-link\n@@\n-a\n+b\n*** End Patch`,
+			},
+		},
+		target: "primary",
+	}),
+	...[
 		"cd - && git add a",
 		"cd /fixture/own && git status & git add a",
 		"! cd /fixture/own && git add a",

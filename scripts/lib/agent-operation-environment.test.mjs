@@ -1,5 +1,11 @@
 import assert from "node:assert/strict";
-import { mkdirSync, mkdtempSync, rmSync, symlinkSync } from "node:fs";
+import {
+	mkdirSync,
+	mkdtempSync,
+	rmSync,
+	symlinkSync,
+	writeFileSync,
+} from "node:fs";
 import { join } from "node:path";
 import { test } from "node:test";
 import { fileURLToPath } from "node:url";
@@ -19,7 +25,9 @@ function fixture({ nativeLock = true } = {}) {
 	);
 	for (const path of Object.values(roots)) mkdirSync(path);
 	mkdirSync(join(roots.primary, "sub"));
+	writeFileSync(join(roots.primary, "a"), "a");
 	symlinkSync(join(roots.primary, "sub"), join(roots.own, "link"));
+	symlinkSync(join(roots.primary, "a"), join(roots.own, "file-link"));
 	const commonDir = join(roots.primary, ".git");
 	const start = "Mon Oct 12 00:00:00 2026";
 	const listing = Object.entries(roots)
@@ -183,4 +191,34 @@ test("GitHub capabilities have no checkout and unknown capabilities remain unres
 		).operations[0].classes,
 		["U"],
 	);
+});
+
+test("patch deletion observes its own directory entry rather than the symlink's foreign contents", () => {
+	const f = fixture();
+	try {
+		const path = join(f.roots.own, "file-link");
+		const payload = {
+			tool_name: "apply_patch",
+			cwd: f.roots.own,
+			session_id: "session",
+			agent_id: "child",
+			tool_input: {
+				command: `*** Begin Patch\n*** Delete File: ${path}\n*** End Patch`,
+			},
+		};
+		const facts = collectAgentOperationEnvironment(payload, {
+			hookRoot: f.root,
+			environment: {},
+			probeGit: f.probeGit,
+			probeProcess: f.probeProcess,
+			readMetadata: f.readMetadata,
+		});
+		const operation = classifyAgentOperations(payload, facts).operations[0];
+		assert.equal(operation.target, "own");
+		assert.equal(operation.executionPath, path);
+		assert.equal(facts.physicalEntryPaths[path], path);
+		assert.equal(facts.physicalPaths[path], undefined);
+	} finally {
+		f.cleanup();
+	}
 });

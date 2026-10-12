@@ -130,6 +130,7 @@ export function collectAgentOperationEnvironment(
 		worktrees: [],
 		branches: {},
 		physicalPaths: {},
+		physicalEntryPaths: {},
 		gitMetadataPaths: [],
 		gitTargetOverride: hasGitTargetEnvironment(environment),
 		shell,
@@ -146,10 +147,13 @@ export function collectAgentOperationEnvironment(
 				: MCP_WRITE.has(tool)
 					? "O"
 					: "U";
-	const paths = new Set(
+	const paths = new Map(
 		classifyAgentOperations(payload, facts)
-			.operations.map(({ executionInput }) => executionInput)
-			.filter(Boolean),
+			.operations.filter(({ executionInput }) => executionInput)
+			.map(({ executionInput: path, followFinalSymlink = true }) => [
+				`${followFinalSymlink ? "follow" : "entry"}:${path}`,
+				{ path, followFinalSymlink },
+			]),
 	);
 	if (!paths.size) return facts;
 	if (!sessionRoot)
@@ -249,9 +253,13 @@ export function collectAgentOperationEnvironment(
 		facts.worktrees.push(tree);
 		if (branch) facts.branches[branch] = { checkedOutAt: root };
 	}
-	for (const path of paths) {
-		const physical = resolvePhysicalPath(path, payload.cwd);
-		facts.physicalPaths[path] = physical;
+	for (const { path, followFinalSymlink } of paths.values()) {
+		const physical = resolvePhysicalPath(path, payload.cwd, {
+			followFinalSymlink,
+		});
+		(followFinalSymlink ? facts.physicalPaths : facts.physicalEntryPaths)[
+			path
+		] = physical;
 		const target = resolveGitRoots(existingDirectory(physical), {
 			exec: probeGit,
 			environment: env,

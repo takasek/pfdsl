@@ -88,18 +88,22 @@ const GH_WRITE = {
 const under = (path, root) =>
 	path === root || path.startsWith(`${root.replace(/\/$/, "")}/`);
 
-function physicalPath(path, facts) {
-	const entries = Object.entries(facts.physicalPaths ?? {})
+function physicalPath(path, facts, followFinalSymlink = true) {
+	const entries = Object.entries(
+		(followFinalSymlink ? facts.physicalPaths : facts.physicalEntryPaths) ??
+			facts.physicalPaths ??
+			{},
+	)
 		.filter(([from]) => under(path, from))
 		.sort((a, b) => b[0].length - a[0].length);
 	const mapped = entries[0];
 	return mapped ? `${mapped[1]}${path.slice(mapped[0].length)}` : path;
 }
 
-function pathFacts(path, facts) {
+function pathFacts(path, facts, followFinalSymlink = true) {
 	if (!path || !isAbsolute(path))
 		return { target: "unresolved", executionPath: null };
-	const executionPath = resolve(physicalPath(path, facts));
+	const executionPath = resolve(physicalPath(path, facts, followFinalSymlink));
 	const tree = (facts.worktrees ?? [])
 		.filter(({ root }) => under(executionPath, root))
 		.sort((a, b) => b.root.length - a.root.length)[0];
@@ -503,11 +507,21 @@ function fileOperations(payload, context, facts) {
 						...patch.matchAll(
 							/^\*\*\* (?:Add File|Update File|Delete File|Move to): (.+)$/gm,
 						),
-					].map((match) => match[1])
+					].map((match) => ({
+						path: match[1],
+						followFinalSymlink:
+							!match[0].startsWith("*** Delete File:") &&
+							!(
+								match[0].startsWith("*** Update File:") &&
+								patch
+									.slice(match.index + match[0].length)
+									.startsWith("\n*** Move to:")
+							),
+					}))
 				: []
-			: [input?.file_path ?? input?.path];
+			: [{ path: input?.file_path ?? input?.path, followFinalSymlink: true }];
 	if (!paths.length) return [unresolved("file")];
-	return paths.map((path) => {
+	return paths.map(({ path, followFinalSymlink }) => {
 		const missingAbsolute =
 			tool === "apply_patch" &&
 			context.subject.startsWith("codex-") &&
@@ -521,6 +535,7 @@ function fileOperations(payload, context, facts) {
 						: null
 				: null,
 			facts,
+			followFinalSymlink,
 		);
 		const gitMetadata = Boolean(
 			location.executionPath?.split("/").includes(".git") ||
@@ -532,7 +547,7 @@ function fileOperations(payload, context, facts) {
 			[read ? "R" : location.target === "unresolved" ? "U" : "W"],
 			"file",
 			location,
-			{ gitMetadata },
+			{ gitMetadata, followFinalSymlink },
 		);
 	});
 }
