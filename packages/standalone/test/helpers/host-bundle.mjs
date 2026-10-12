@@ -12,7 +12,7 @@ export function createDocumentTab(options){
  let source=options.source,revision=0;
  const container=document.createElement('div'),button=document.createElement('button');
  options.parent.append(container);button.textContent=options.name;
- return {container,button,location:options.path,activate(){},dispose(){container.remove();button.remove();},getSource:()=>source,getRevision:()=>revision,setSource(s){source=s;revision++;options.onChange?.();},setLocation(path,name,read){this.location=path;this.read=read;button.textContent=name;},markSaved(){},format(){}};
+ return {container,button,location:options.path,setSourceCalls:0,activate(){},dispose(){container.remove();button.remove();},getSource:()=>source,getRevision:()=>revision,type(s){source=s;revision++;options.onChange?.();},setSource(s){this.setSourceCalls++;source=s;revision++;options.onChange?.();},setLocation(path,name,read){this.location=path;this.read=read;button.textContent=name;},markSaved(){},format(){}};
 }`;
 
 /**
