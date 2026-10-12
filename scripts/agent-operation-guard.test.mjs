@@ -12,6 +12,7 @@ import { dirname, join } from "node:path";
 import { test } from "node:test";
 import { fileURLToPath } from "node:url";
 import { parserRecoveryCommand } from "./lib/agent-operation-table.mjs";
+import { POLICY_DEADLINE_MS } from "./lib/agent-operation-timeouts.mjs";
 import { run, tryRun, withoutGitTargetEnvironment } from "./lib/run-exec.mjs";
 import { shellParserPath } from "./lib/shell-parser-tool.mjs";
 
@@ -99,7 +100,8 @@ function fixture() {
 				},
 				input: JSON.stringify(payload),
 				captureStderr: true,
-				timeout: 8000,
+				// The entry must report its own deadline before this harness gives up.
+				timeout: POLICY_DEADLINE_MS + 5000,
 			},
 		);
 		const output = result.out.trim()
