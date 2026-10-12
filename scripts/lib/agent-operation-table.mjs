@@ -124,12 +124,34 @@ export function combineDecisions(decisions) {
 
 /** Pure evaluation of the finite axes and the specification's overrides. */
 export function decideOperation(input) {
+	if (!input || typeof input !== "object" || Array.isArray(input))
+		throw new TypeError(
+			"An operation must be an object with finite table inputs.",
+		);
 	const cell = {
 		health: "healthy",
 		kind: "git",
 		scope: "repository",
 		...input,
 	};
+	const hasClasses = cell.classes !== undefined;
+	for (const [key, values] of Object.entries(AGENT_OPERATION_AXES)) {
+		if (key === "operationClass" && hasClasses && cell[key] === undefined)
+			continue;
+		if (!values.includes(cell[key]))
+			throw new TypeError(`Invalid finite table input: ${key}.`);
+	}
+	if (
+		hasClasses &&
+		(!Array.isArray(cell.classes) ||
+			cell.classes.length === 0 ||
+			!cell.classes.every((value) =>
+				AGENT_OPERATION_AXES.operationClass.includes(value),
+			))
+	)
+		throw new TypeError(
+			"classes must be a nonempty array of finite operation classes.",
+		);
 	if (cell.health === "failed") {
 		const repair = parserRecoveryCommand(cell.hookRoot);
 		if (cell.failure === "parser-missing" && repair && cell.command === repair)
@@ -141,20 +163,11 @@ export function decideOperation(input) {
 			cell.failure === "parser-missing" && repair ? "rewrite" : "terminal",
 		);
 	}
-	if (cell.classes)
+	if (hasClasses)
 		return combineDecisions(
 			cell.classes.map((operationClass) =>
 				decideOperation({ ...cell, classes: undefined, operationClass }),
 			),
-		);
-	if (
-		!Object.entries(AGENT_OPERATION_AXES).every(([key, values]) =>
-			values.includes(cell[key]),
-		)
-	)
-		return stopped(
-			"Input is outside the finite table. Rewrite using the documented inputs.",
-			"rewrite",
 		);
 	if (cell.kind === "remote") cell.target = "own";
 	const subject = SUBJECTS[cell.subject];

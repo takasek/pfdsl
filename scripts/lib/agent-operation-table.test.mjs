@@ -35,6 +35,35 @@ test("the specified input axes have 3360 cells", () => {
 	assert.equal(cells.length, 3360);
 });
 
+test("values outside the finite axes throw, including empty or malformed class collections", () => {
+	const base = {
+		subject: "codex-parent",
+		health: "healthy",
+		target: "own",
+		kind: "git",
+		scope: "repository",
+		operationClass: "X",
+	};
+	for (const classes of [[], null, "R", {}, ["unknown"], ["R", null]]) {
+		assert.throws(() => decideOperation({ ...base, classes }), TypeError);
+	}
+	for (const key of Object.keys(axes)) {
+		assert.throws(
+			() => decideOperation({ ...base, [key]: "unknown" }),
+			TypeError,
+		);
+		assert.throws(
+			() => decideOperation({ ...base, [key]: "unknown", classes: ["R"] }),
+			TypeError,
+		);
+	}
+	assert.throws(
+		() => decideOperation({ ...base, health: "failed", classes: [] }),
+		TypeError,
+	);
+	assert.throws(() => decideOperation(null), TypeError);
+});
+
 test("property 3: Codex never returns ask in any cell", () => {
 	for (const cell of cells) {
 		const result = decideOperation(cell);
