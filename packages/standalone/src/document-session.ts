@@ -94,23 +94,41 @@ export class DocumentSession {
 			state(this.sourceConflict),
 		]);
 	}
-	/** Record a fresh inspection of a Save target so the panel and the review agree. */
-	recordTarget(fresh: DiskSnapshot) {
+	/**
+	 * Adopts a fresh inspection of a Save target and returns whether its content
+	 * differs from the version this session last acknowledged or observed there.
+	 * The document's own file is judged against its acknowledged disk version.
+	 * While a Save As recovery targets another file, the original only reports a
+	 * change as a source conflict and the recovery target keeps the panel.
+	 */
+	recordTarget(fresh: DiskSnapshot): boolean {
 		const owner = this.disk;
 		const recovery = this.pendingTarget;
-		const ownsFresh = owner?.id === fresh.id;
-		if (owner && ownsFresh && recovery && recovery.id !== owner.id) {
-			// A failed Save As keeps B as the recovery target; A only reports its own change.
-			this.sourceConflict = sameDiskContent(owner, fresh) ? null : fresh;
-			return;
-		}
-		if (owner && ownsFresh && sameDiskContent(owner, fresh))
-			this.adoptUnchanged(fresh);
-		else {
+		let changed: boolean;
+		if (owner && owner.id === fresh.id) {
+			changed = !sameDiskContent(owner, fresh);
+			if (recovery && recovery.id !== owner.id) {
+				this.sourceConflict = changed ? fresh : null;
+				return changed;
+			}
+			if (changed) {
+				this.observed = fresh;
+				this.flagExternalChange(fresh);
+			} else this.adoptUnchanged(fresh);
+		} else {
+			const known =
+				this.observed?.id === fresh.id
+					? this.observed
+					: recovery?.id === fresh.id
+						? recovery
+						: null;
+			changed = !known || !sameDiskContent(known, fresh);
 			this.observed = fresh;
-			this.flagExternalChange(fresh);
+			// An unchanged target keeps the failure that explains the panel.
+			if (changed) this.flagExternalChange(fresh);
 		}
 		if (recovery?.id === fresh.id) this.pendingTarget = fresh;
+		return changed;
 	}
 	/**
 	 * A clean editor has nothing to save: it follows the disk instead of replacing it.

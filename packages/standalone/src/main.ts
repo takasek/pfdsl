@@ -324,7 +324,10 @@ async function saveEntry(
 ): Promise<boolean> {
 	if (!native) throw new Error("Use the desktop application to save files.");
 	let target = observed ? entry.session.observed : entry.session.disk;
+	// A target picked in the chooser has no acknowledged content to compare with.
+	const chosen = as || !target;
 	let inspected = false;
+	let changed = false;
 	if (as || !target) {
 		target = await invoke<DiskSnapshot | null>("choose_save_target", {
 			name: entry.name.endsWith(".pfdsl") ? entry.name : `${entry.name}.pfdsl`,
@@ -353,14 +356,19 @@ async function saveEntry(
 			renderConflict();
 			return true;
 		}
-		entry.session.recordTarget(target);
+		changed = entry.session.recordTarget(target);
 		inspected = true;
 	}
 	if (explainOpenTarget(entry, target)) return false;
-	if (target.source !== null && (as || observed || entry.session.conflict)) {
+	// Identical text leaves nothing to overwrite, so there is nothing to review.
+	const review =
+		target.source !== null &&
+		target.source !== entry.tab.getSource() &&
+		(chosen || observed || changed || entry.session.conflict);
+	if (review) {
 		const decision = await choose(
 			"Review the target",
-			`Replace the observed version of ${target.path}? A detected external change before saving will stop the save.`,
+			`Replace the disk version of ${target.path} with the editor content? The disk version shown below differs from the editor, and a further change before saving stops the save.`,
 			[
 				["cancel", "Keep Editing"],
 				["another", "Choose Another File"],

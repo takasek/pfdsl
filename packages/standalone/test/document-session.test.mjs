@@ -814,6 +814,33 @@ test("a save is still needed unless the editor is clean and the disk readable", 
 	assert.equal(eol.followDiskIfClean(snap("a\r\nb\n", "r2")), null);
 });
 
+test("a fresh inspection reports whether the target differs from what was acknowledged", async () => {
+	const original = snap("original", "r1");
+	const own = new DocumentSession(view(), original);
+	assert.equal(own.recordTarget({ ...original, revision: "touched" }), false);
+	assert.equal(own.recordTarget(snap("external", "r2")), true);
+	// While a Save As recovery owns the panel, a changed original is only reported.
+	const target = { ...snap("old B", "b0", "/B/b.pfdsl"), id: 2 };
+	const recovering = new DocumentSession(view(), original);
+	recovering.view.edit("local");
+	await recovering.save(
+		async () => ({ outcome: "published-but-unconfirmed" }),
+		target,
+	);
+	const message = recovering.message;
+	assert.equal(recovering.recordTarget(snap("external", "r2")), true);
+	assert.equal(recovering.recordTarget(original), false);
+	// An unchanged recovery target keeps the failure that explains the panel.
+	assert.equal(
+		recovering.recordTarget({ ...target, revision: "touched" }),
+		false,
+	);
+	assert.equal(recovering.message, message);
+	assert.equal(recovering.observed.revision, "touched");
+	assert.equal(recovering.recordTarget({ ...target, source: "later B" }), true);
+	assert.match(recovering.message, /The disk changed/);
+});
+
 test("a fresh inspection of the original keeps Save As recovery on B", async () => {
 	const editor = view();
 	const original = snap("original");
