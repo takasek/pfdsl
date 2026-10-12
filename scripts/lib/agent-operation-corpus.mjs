@@ -116,6 +116,22 @@ function example(
 // Every row of the specification's acceptance pairs has a named normal case
 // and, where present, its independently specified safety case.
 export const AGENT_OPERATION_CORPUS = [
+	...[
+		"--set-upstream-to=origin/main",
+		"--set-upstream-to origin/main",
+		"-u origin/main",
+		"--unset-upstream",
+		"--edit-description",
+	].flatMap((options, i) =>
+		["codex-parent", "codex-child"].map((subject) =>
+			example(
+				`branch-metadata-${i}-${subject}`,
+				`git -C ${own} branch ${options}`,
+				subject === "codex-child" ? "deny" : "allow",
+				{ subject, classes: ["B"], target: "own" },
+			),
+		),
+	),
 	example("relative-cd-with-CDPATH", "cd sibling && git add a", "deny", {
 		facts: { cdPathOverride: true },
 		target: "unresolved",

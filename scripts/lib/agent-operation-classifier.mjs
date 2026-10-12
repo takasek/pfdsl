@@ -454,6 +454,10 @@ function gitOperation(command, context, facts) {
 				"--delete",
 				"-f",
 				"--force",
+				"--set-upstream-to",
+				"-u",
+				"--unset-upstream",
+				"--edit-description",
 			].includes(flag),
 		);
 		classes = [
