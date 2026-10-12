@@ -304,6 +304,15 @@ mod tests {
         fs::write(&path, "original").unwrap();
         (root, Document::selected(&path).unwrap())
     }
+    /// Re-runs one test in a fresh process. A child that ran no test must not pass.
+    fn run_in_child(name: &str, variable: &str) {
+        let child = std::process::Command::new(std::env::current_exe().unwrap())
+            .args(["--exact", &format!("documents::tests::{name}"), "--nocapture"])
+            .env(variable, "1").output().unwrap();
+        let stdout = String::from_utf8_lossy(&child.stdout);
+        assert!(child.status.success() && stdout.contains("test result: ok. 1 passed; 0 failed"),
+            "child status {:?}: {} {}", child.status, stdout, String::from_utf8_lossy(&child.stderr));
+    }
     fn attribute(path: &Path, name: &str, value: Option<&[u8]>) -> Vec<u8> {
         use std::os::unix::ffi::OsStrExt;
         let path = std::ffi::CString::new(path.as_os_str().as_bytes()).unwrap();
@@ -551,10 +560,7 @@ mod tests {
     }
     #[test] fn partial_staging_write_never_changes_the_target() {
         if std::env::var_os("PFDSL_PARTIAL_WRITE_CHILD").is_none() {
-            let child = std::process::Command::new(std::env::current_exe().unwrap())
-                .args(["--exact", "documents::tests::partial_staging_write_never_changes_the_target", "--nocapture"])
-                .env("PFDSL_PARTIAL_WRITE_CHILD", "1").output().unwrap();
-            assert!(child.status.success(), "child status {:?}: {} {}", child.status, String::from_utf8_lossy(&child.stdout), String::from_utf8_lossy(&child.stderr)); return;
+            run_in_child("partial_staging_write_never_changes_the_target", "PFDSL_PARTIAL_WRITE_CHILD"); return;
         }
         // A child-only write limit produces a partial write without changing global test limits.
         // This is not an ENOSPC / full-volume test.
@@ -640,10 +646,7 @@ mod tests {
         use std::os::unix::fs::PermissionsExt;
         if std::env::var_os("PFDSL_UMASK_CHILD").is_none() {
             // umask is process-wide, so the parallel test process must never change it.
-            let child = std::process::Command::new(std::env::current_exe().unwrap())
-                .args(["--exact", "documents::tests::new_files_follow_the_process_umask_and_existing_files_keep_their_mode", "--nocapture"])
-                .env("PFDSL_UMASK_CHILD", "1").output().unwrap();
-            assert!(child.status.success(), "child status {:?}: {} {}", child.status, String::from_utf8_lossy(&child.stdout), String::from_utf8_lossy(&child.stderr)); return;
+            run_in_child("new_files_follow_the_process_umask_and_existing_files_keep_their_mode", "PFDSL_UMASK_CHILD"); return;
         }
         for mask in [0o022u32, 0o077] {
             unsafe { libc::umask(mask as libc::mode_t); }
@@ -700,7 +703,7 @@ mod tests {
             Race::ReplaceParent => { expect(moved.join("a.pfdsl"), "original")?; expect(leaf, "foreign") }
         }
     }
-    #[test] fn external_changes_never_turn_into_a_saved_result_or_lose_data() {
+    #[test] fn external_changes_are_refused_before_publication_and_reported_after_it() {
         let mut failures = Vec::new();
         for point in POINTS { for race in RACES {
             let cell = format!("{point:?} x {race:?}");
