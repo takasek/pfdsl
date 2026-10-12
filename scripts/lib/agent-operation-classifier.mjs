@@ -266,6 +266,7 @@ function gitDecisionArguments(sub, parsed, classes) {
 						"-b",
 						"-B",
 						"-c",
+						"-qc",
 						"-C",
 						"--create",
 						"--force-create",
@@ -597,7 +598,9 @@ function gitOperation(command, context, facts) {
 				changedRefs = operands.slice(-1);
 		} else if (["switch", "checkout"].includes(sub.value)) {
 			const created = parsed.values.find(({ flag }) =>
-				["-c", "-C", "--create", "--force-create", "-b", "-B"].includes(flag),
+				["-c", "-qc", "-C", "--create", "--force-create", "-b", "-B"].includes(
+					flag,
+				),
 			);
 			if (created) changedRefs = [created];
 		}
