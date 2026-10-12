@@ -1,5 +1,11 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import {
+	copyFileSync,
+	mkdirSync,
+	mkdtempSync,
+	rmSync,
+	writeFileSync,
+} from "node:fs";
 import { join } from "node:path";
 import { test } from "node:test";
 import { fileURLToPath } from "node:url";
@@ -14,9 +20,9 @@ import {
 	decideOperation,
 	parserRecoveryCommand,
 } from "./agent-operation-table.mjs";
+import { run } from "./run-exec.mjs";
 import { readShell } from "./shell-commands.mjs";
 import {
-	installShellParser,
 	isShellParserInstalled,
 	shellParserPath,
 } from "./shell-parser-tool.mjs";
@@ -241,39 +247,56 @@ test("parser recovery is an exact fixed-root command and never bypasses policy f
 
 test("property 8: missing parser -> allowed repair -> healthy recheck -> normal operations allowed", async () => {
 	const root = fileURLToPath(new URL("../../", import.meta.url));
-	const facts = corpusFacts({ hookRoot: root });
+	const repairRoot = mkdtempSync(join(root, "node_modules/pfdsl-recovery-"));
+	const facts = corpusFacts({ hookRoot: repairRoot });
 	const payload = {
 		tool_name: "Bash",
 		cwd: facts.sessionRoot,
 		tool_input: { command: "git status" },
 	};
-	const missing = readShell(payload.tool_input.command, {
-		parserPath: join(root, "node_modules/.pfdsl-tools/missing-parser"),
-	});
-	assert.equal(missing.failure, "parser-missing");
-	assert.equal(
-		evaluate(classifyAgentOperations(payload, { ...facts, shell: missing }))
-			.decision,
-		"deny",
-	);
-	const repair = {
-		...payload,
-		tool_input: { command: parserRecoveryCommand(root) },
-	};
-	assert.equal(
-		evaluate(classifyAgentOperations(repair, { ...facts, shell: missing }))
-			.decision,
-		"allow",
-	);
-	// Exercise verified installation into a missing location using the actual pinned bytes.
-	const { mkdtempSync, rmSync } = await import("node:fs");
-	const repairRoot = mkdtempSync(join(root, "node_modules/pfdsl-recovery-"));
 	try {
-		assert.equal(isShellParserInstalled(repairRoot), false);
-		const bytes = readFileSync(shellParserPath(root));
-		await installShellParser(repairRoot, {
-			fetchAsset: async () => ({ ok: true, arrayBuffer: async () => bytes }),
+		const missing = readShell(payload.tool_input.command, {
+			parserPath: shellParserPath(repairRoot),
 		});
+		assert.equal(missing.failure, "parser-missing");
+		assert.equal(
+			evaluate(classifyAgentOperations(payload, { ...facts, shell: missing }))
+				.decision,
+			"deny",
+		);
+		const repair = {
+			...payload,
+			tool_input: { command: parserRecoveryCommand(repairRoot) },
+		};
+		assert.equal(
+			evaluate(classifyAgentOperations(repair, { ...facts, shell: missing }))
+				.decision,
+			"allow",
+		);
+		assert.equal(isShellParserInstalled(repairRoot), false);
+		mkdirSync(join(repairRoot, "scripts/lib"), { recursive: true });
+		for (const file of [
+			"scripts/setup-shell-parser.mjs",
+			"scripts/lib/shell-parser-tool.mjs",
+			"scripts/lib/cli-entrypoint.mjs",
+		])
+			copyFileSync(join(root, file), join(repairRoot, file));
+		// Execute the selected installer from another cwd. Only its download is
+		// injected, using the actual pinned asset and the production checksum.
+		const download = join(repairRoot, "download-fixture.mjs");
+		writeFileSync(
+			download,
+			`import { readFileSync } from "node:fs";\nglobalThis.fetch = async () => ({ ok: true, arrayBuffer: async () => readFileSync(${JSON.stringify(shellParserPath(root))}) });\n`,
+		);
+		run(
+			process.execPath,
+			[
+				"--import",
+				download,
+				join(repairRoot, "scripts/setup-shell-parser.mjs"),
+			],
+			{ cwd: join(root, "scripts"), timeout: 5000 },
+		);
 		assert.equal(isShellParserInstalled(repairRoot), true);
 		for (const example of AGENT_OPERATION_CORPUS.filter(
 			({ expected, health }) => expected === "allow" && health === "healthy",
