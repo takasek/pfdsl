@@ -201,7 +201,12 @@ impl Document {
         let mut options = OpenOptions::new();
         options.read(true).write(true).create_new(true);
         #[cfg(unix)]
-        { use cap_std::fs::OpenOptionsExt; options.custom_flags(libc::O_NOFOLLOW).mode(0o600); }
+        {
+            use cap_std::fs::OpenOptionsExt;
+            // An existing file's mode is copied onto the stage; a new file follows the process umask.
+            let mode = if original.is_some() { 0o600 } else { 0o666 };
+            options.custom_flags(libc::O_NOFOLLOW).mode(mode);
+        }
         let mut file = match self.parent.open_with(&stage, &options) {
             Ok(file) => file,
             Err(error) => return result("failed-before-publication", Some(current), error.to_string()),
@@ -631,4 +636,28 @@ mod tests {
     }
 
 
+    #[test] fn new_files_follow_the_process_umask_and_existing_files_keep_their_mode() {
+        use std::os::unix::fs::PermissionsExt;
+        if std::env::var_os("PFDSL_UMASK_CHILD").is_none() {
+            // umask is process-wide, so the parallel test process must never change it.
+            let child = std::process::Command::new(std::env::current_exe().unwrap())
+                .args(["--exact", "documents::tests::new_files_follow_the_process_umask_and_existing_files_keep_their_mode", "--nocapture"])
+                .env("PFDSL_UMASK_CHILD", "1").output().unwrap();
+            assert!(child.status.success(), "child status {:?}: {} {}", child.status, String::from_utf8_lossy(&child.stdout), String::from_utf8_lossy(&child.stderr)); return;
+        }
+        for mask in [0o022u32, 0o077] {
+            unsafe { libc::umask(mask as libc::mode_t); }
+            let (root, mut doc) = fixture("umask");
+            let created = root.join("new.pfdsl");
+            let mut fresh = Document::selected(&created).unwrap();
+            assert_eq!(fresh.save(0, "new", None).outcome, "saved");
+            assert_eq!(fs::metadata(&created).unwrap().permissions().mode() & 0o7777, 0o666 & !mask, "umask {mask:o}");
+            let existing = root.join("a.pfdsl");
+            fs::set_permissions(&existing, fs::Permissions::from_mode(0o640)).unwrap();
+            let before = doc.inspect(0).unwrap();
+            assert_eq!(doc.save(0, "changed", before.revision.as_deref()).outcome, "saved");
+            assert_eq!(fs::metadata(&existing).unwrap().permissions().mode() & 0o7777, 0o640, "umask {mask:o}");
+            fs::remove_dir_all(root).unwrap();
+        }
+    }
 }

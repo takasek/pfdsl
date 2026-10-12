@@ -224,6 +224,7 @@ On macOS, a save checks the selected directory and disk revision, stages and syn
 A detected external change stops the save and preserves editor content for review.
 Saving identical content after the initial checks does not replace the file or create a temporary file.
 Successful saves do not retain previous disk objects; unpublished temporary files are removed on failure, with a status message if cleanup fails.
+A new file follows the process umask, while an existing file keeps its mode, owner, and protection.
 Publication can succeed before a later conflict or read error is reported; inspect the current target before retrying.
 The guarantee ends at the final pre-save check: an external write after that check can be overwritten, and later writes through an old file descriptor are not recovered.
 Deliberate manipulation of the application's exclusive temporary names is outside this guarantee.
