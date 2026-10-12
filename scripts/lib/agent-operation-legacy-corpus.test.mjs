@@ -5,7 +5,7 @@ import { evaluateAgentOperationPolicy } from "./agent-operation-policy.mjs";
 import { readShell } from "./shell-commands.mjs";
 
 test("entry replay corpus retains every adopted legacy safety case with independent deny expectations", async (t) => {
-	assert.equal(AGENT_OPERATION_LEGACY_CORPUS.length, 315);
+	assert.equal(AGENT_OPERATION_LEGACY_CORPUS.length, 543);
 	for (const example of AGENT_OPERATION_LEGACY_CORPUS)
 		await t.test(example.id, () => {
 			assert.equal(example.expected, "deny");

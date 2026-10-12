@@ -75,6 +75,7 @@ function fixture() {
 			cwd = own,
 			agent_id,
 			agent_type,
+			environment = {},
 		} = {},
 	) => {
 		const payload = {
@@ -90,7 +91,11 @@ function fixture() {
 			[join(own, "scripts/agent-operation-guard.mjs")],
 			{
 				cwd: other,
-				env: { ...env, CLAUDE_PROJECT_DIR: harness === "claude" ? own : "" },
+				env: {
+					...env,
+					CLAUDE_PROJECT_DIR: harness === "claude" ? own : "",
+					...environment,
+				},
 				input: JSON.stringify(payload),
 				captureStderr: true,
 				timeout: 8000,
@@ -235,6 +240,83 @@ test("entry integration: parser missing -> exact bootstrap repair -> installed h
 				.decision,
 			"allow",
 		);
+	} finally {
+		f.cleanup();
+	}
+});
+
+test("entry integration: native identity allows its owner and preserves stale, malformed and bypass denials", () => {
+	const f = fixture();
+	try {
+		const metadata = f.git(f.other, [
+			"rev-parse",
+			"--git-path",
+			"codex-thread.json",
+		]);
+		const command = `git -C '${f.other}' add a`;
+		writeFileSync(
+			metadata,
+			JSON.stringify({ version: 1, ownerThreadId: "fixture-session" }),
+		);
+		assert.equal(f.invoke({ command }, { harness: "codex" }).decision, "allow");
+		assert.equal(
+			f.invoke(
+				{ command: `git -C '${f.other}' commit --no-verify -m x` },
+				{ harness: "codex" },
+			).decision,
+			"deny",
+		);
+		for (const text of [
+			JSON.stringify({ version: 1, ownerThreadId: "other" }),
+			"{broken",
+		]) {
+			writeFileSync(metadata, text);
+			assert.equal(
+				f.invoke(
+					{ command },
+					{ harness: "codex", environment: { CODEX_THREAD_ID: "other" } },
+				).decision,
+				"deny",
+			);
+		}
+		rmSync(metadata);
+		assert.equal(f.invoke({ command }, { harness: "codex" }).decision, "deny");
+		writeFileSync(
+			metadata,
+			JSON.stringify({ version: 1, ownerThreadId: "fixture-session" }),
+		);
+		assert.equal(
+			f.invoke(
+				{ command },
+				{
+					harness: "codex",
+					environment: {
+						GIT_DIR: f.git(f.other, ["rev-parse", "--absolute-git-dir"]),
+					},
+				},
+			).decision,
+			"deny",
+		);
+		const start = run("ps", ["-o", "lstart=", "-p", String(process.pid)], {
+			env: { ...process.env, LC_ALL: "C", TZ: "UTC" },
+		}).trim();
+		f.git(f.primary, [
+			"worktree",
+			"lock",
+			"--reason",
+			`claude session other (pid ${process.pid} start ${start})`,
+			f.other,
+		]);
+		assert.equal(f.invoke({ command }).decision, "allow");
+		f.git(f.primary, ["worktree", "unlock", f.other]);
+		f.git(f.primary, [
+			"worktree",
+			"lock",
+			"--reason",
+			`claude session other (pid ${process.pid} start Tue Oct 6 00:00:00 2026)`,
+			f.other,
+		]);
+		assert.equal(f.invoke({ command }).decision, "deny");
 	} finally {
 		f.cleanup();
 	}
