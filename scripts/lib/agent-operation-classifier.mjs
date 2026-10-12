@@ -19,6 +19,16 @@ const GIT_READ = new Set([
 	"grep",
 	"help",
 	"version",
+	"rev-list",
+	"for-each-ref",
+	"ls-remote",
+	"check-ignore",
+	"check-attr",
+	"diff-tree",
+	"shortlog",
+	"range-diff",
+	"patch-id",
+	"count-objects",
 ]);
 const GIT_WRITE = new Set([
 	"add",
@@ -266,6 +276,21 @@ function gitOperation(command, context, facts) {
 			flagsWithValues.add(flag);
 	if (sub.value === "worktree")
 		for (const flag of ["-b", "-B"]) flagsWithValues.add(flag);
+	if (["archive", "format-patch"].includes(sub.value))
+		for (const flag of ["-o", "--output", "--output-directory"])
+			flagsWithValues.add(flag);
+	if (["init", "clone"].includes(sub.value))
+		for (const flag of [
+			"--template",
+			"--initial-branch",
+			"-b",
+			"--branch",
+			"--depth",
+			"--reference",
+			"--origin",
+			"-o",
+		])
+			flagsWithValues.add(flag);
 	const parsed = scan(args, flagsWithValues, sub.value === "config");
 	const { operands, flags } = parsed;
 	const location = pathFacts(path, facts);
@@ -276,7 +301,93 @@ function gitOperation(command, context, facts) {
 	let action;
 	let force;
 	let effective = location;
-	if (sub.value === "merge-tree")
+	const destination = (token) =>
+		pathFacts(
+			token && !token.dynamic && path
+				? isAbsolute(token.value)
+					? token.value
+					: `${path}/${token.value}`
+				: null,
+			facts,
+		);
+	if (
+		["init", "clone", "archive", "bundle", "format-patch"].includes(sub.value)
+	) {
+		classes = ["W"];
+		if (sub.value === "init")
+			effective = operands.length ? destination(operands[0]) : location;
+		else if (sub.value === "clone") effective = destination(operands[1]);
+		else if (sub.value === "archive") {
+			const output = parsed.values.find(({ flag }) =>
+				["-o", "--output"].includes(flag),
+			);
+			if (output) effective = destination(output);
+			else classes = ["R"];
+		} else if (sub.value === "bundle") {
+			if (operands[0]?.value === "create") effective = destination(operands[1]);
+			else
+				classes = [
+					["list-heads", "verify"].includes(operands[0]?.value) ? "R" : "U",
+				];
+		} else {
+			const output = parsed.values.find(({ flag }) =>
+				["-o", "--output-directory"].includes(flag),
+			);
+			if (flags.has("--stdout")) classes = ["R"];
+			else if (output) effective = destination(output);
+		}
+	} else if (sub.value === "reflog")
+		classes = [
+			!operands.length ||
+			["show", "list", "exists"].includes(operands[0]?.value)
+				? "R"
+				: "U",
+		];
+	else if (sub.value === "symbolic-ref") {
+		const writing =
+			operands.length > 1 || flags.has("--delete") || flags.has("-d");
+		classes = [
+			!writing
+				? "R"
+				: operands.some(({ value }) => defaultRef(value, facts))
+					? "D"
+					: "U",
+		];
+	} else if (sub.value === "tag")
+		classes = [
+			flags.has("-l") || flags.has("--list") || !operands.length ? "R" : "B",
+		];
+	else if (sub.value === "hash-object") classes = [flags.has("-w") ? "W" : "R"];
+	else if (sub.value === "commit-tree" || sub.value === "bisect")
+		classes = ["W"];
+	else if (sub.value === "sparse-checkout")
+		classes = [
+			operands[0]?.value === "list"
+				? "R"
+				: ["set", "add", "reapply", "disable", "init"].includes(
+							operands[0]?.value,
+						)
+					? "W"
+					: "U",
+		];
+	else if (sub.value === "submodule")
+		classes = [
+			!operands.length || ["status", "summary"].includes(operands[0]?.value)
+				? "R"
+				: operands[0]?.value === "update"
+					? "W"
+					: "U",
+		];
+	else if (sub.value === "pull") {
+		const refs = operands.slice(1);
+		classes = [
+			location.tree?.branch === facts.defaultBranch ||
+			refs.some(({ value }) => defaultRef(value.split(":")[1], facts))
+				? "D"
+				: "W",
+		];
+		if (refs.some(({ dynamic }) => dynamic)) classes.push("U");
+	} else if (sub.value === "merge-tree")
 		// The approved trial writes objects without changing a checkout or ref.
 		// Keep that metadata write in W so Codex children return it to a parent.
 		classes = [
@@ -403,7 +514,7 @@ function gitOperation(command, context, facts) {
 					: null,
 				facts,
 			);
-		} else classes = [verb === "list" ? "R" : "U"];
+		} else classes = [verb === "list" ? "R" : verb === "prune" ? "W" : "U"];
 	} else if (sub.value === "config") {
 		scope =
 			flags.has("--global") ||

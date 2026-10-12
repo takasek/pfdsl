@@ -1,0 +1,48 @@
+git ls-tree HEAD
+git ls-remote origin
+git check-ignore a.txt
+git init /tmp/x
+git archive HEAD -o /tmp/x.tar
+git cat-file -p HEAD
+git merge-tree --write-tree HEAD origin/main
+git apply x.patch
+git apply --check x.patch
+git tag v1
+git tag -l
+git clone https://github.com/a/b /tmp/b
+git hash-object a.txt
+git clean -fd
+git reflog
+git reflog show
+git pull
+git update-ref refs/heads/feature/q HEAD
+git diff-tree -r HEAD
+git show-ref
+git patch-id
+git help commit
+git for-each-ref
+git sparse-checkout list
+git bundle create /tmp/x.bundle HEAD
+git commit-tree HEAD^{tree} -m x
+git symbolic-ref --short HEAD
+git rev-list --count HEAD
+git worktree list
+git worktree prune
+git remote -v
+git remote get-url origin
+git config --get user.name
+git config user.email
+git config --list
+git stash list
+git branch --show-current
+git branch -vv
+git merge-base HEAD origin/main
+git grep foo
+git ls-files
+git rebase origin/main
+git revert HEAD
+git cherry-pick HEAD
+git restore a.txt
+git rm a.txt
+git mv a.txt b.txt
+git blame a.txt
