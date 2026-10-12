@@ -442,10 +442,16 @@ function ghOperation(tokens) {
 		const query = fields
 			.find(({ value }) => value.startsWith("query="))
 			?.value.slice(6);
+		const read = method
+			? ["GET", "HEAD"].includes(method.toUpperCase())
+			: !fields.length;
+		const endpointPath = endpoint?.split("?")[0];
 		const merge =
-			/(?:^|\/)repos\/[^/]+\/[^/]+\/pulls\/[^/]+\/merge(?:-async)?\/?$/.test(
-				endpoint ?? "",
-			) || /\b(?:mergePullRequest|enqueuePullRequest)\s*\(/.test(query ?? "");
+			(!read &&
+				/(?:^|\/)repos\/[^/]+\/[^/]+\/pulls\/[^/]+\/merge(?:-async)?\/?$/.test(
+					endpointPath ?? "",
+				)) ||
+			/\b(?:mergePullRequest|enqueuePullRequest)\s*\(/.test(query ?? "");
 		if (merge) return operation(["O", "P"], "remote", { target: "own" });
 		if (endpoint === "graphql")
 			return operation(
@@ -453,19 +459,7 @@ function ghOperation(tokens) {
 				"remote",
 				{ target: "own" },
 			);
-		return operation(
-			[
-				method
-					? ["GET", "HEAD"].includes(method.toUpperCase())
-						? "R"
-						: "O"
-					: fields.length
-						? "O"
-						: "R",
-			],
-			"remote",
-			{ target: "own" },
-		);
+		return operation([read ? "R" : "O"], "remote", { target: "own" });
 	}
 	if (GH_READ[group]?.includes(verb))
 		return operation(["R"], "remote", { target: "own" });

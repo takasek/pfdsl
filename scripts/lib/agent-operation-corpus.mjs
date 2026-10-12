@@ -570,6 +570,23 @@ export const AGENT_OPERATION_CORPUS = [
 		"allow",
 		{ classes: ["O"] },
 	),
+	...[
+		"gh api repos/o/r/pulls/1/merge",
+		"gh api repos/o/r/pulls/1/merge --method GET",
+		"gh api repos/o/r/pulls/1/merge --method GET -f foo=bar",
+	].map((command, i) =>
+		example(`gh-api-merge-status-read-${i}`, command, "allow", {
+			classes: ["R"],
+		}),
+	),
+	...[
+		"gh api -X PUT 'repos/o/r/pulls/1/merge?foo=bar'",
+		"gh api 'repos/o/r/pulls/1/merge?foo=bar' -f sha=x",
+	].map((command, i) =>
+		example(`gh-api-merge-query-write-${i}`, command, "deny", {
+			classes: ["O", "P"],
+		}),
+	),
 	...["merge", "merge-async"].map((endpoint) =>
 		example(
 			`gh-api-${endpoint}`,
