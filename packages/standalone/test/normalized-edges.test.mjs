@@ -34,7 +34,7 @@ test("normalized output uses current unsaved source and clears immediately on ed
 			"x >> build\ny >> build\nbuild -> result\n",
 		);
 		assert.equal(editor.getValue(), "[y, x] >> build -> result\n");
-		assert.equal(tab.isDirty(), true);
+		assert.equal(tab.hasUnsavedText(), true);
 		editor.model.source = "fresh >> step -> next\n";
 		editor.callbacks.onDidChangeModelContent();
 		assert.equal(panel.hidden, true);
@@ -114,7 +114,7 @@ test("normalized text is inert and keyboard closure returns to the invoking cont
 		assert.equal(panel.hidden, true);
 		assert.equal(document.activeElement, trigger);
 		assert.equal(editor.getValue(), source);
-		assert.equal(tab.isDirty(), false);
+		assert.equal(tab.hasUnsavedText(), false);
 	});
 });
 

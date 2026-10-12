@@ -21,7 +21,7 @@ test("flat formatting uses the current unsaved source and one bracketed editor e
 		assert.equal(editor.edits.length, 1);
 		assert.equal(editor.undoStops, 2);
 		assert.equal(editor.edits[0].origin, "pfdsl.format");
-		assert.equal(tab.isDirty(), true);
+		assert.equal(tab.hasUnsavedText(), true);
 		tab.format("flat");
 		assert.equal(editor.edits.length, 1);
 		assert.equal(editor.undoStops, 2);

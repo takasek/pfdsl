@@ -259,7 +259,7 @@ export function createDocumentTab({
 			source = value;
 			button.textContent = `${name}${editor.getValue() === source ? "" : " •"}`;
 		},
-		isDirty: () => editor.getValue() !== source,
+		hasUnsavedText: () => editor.getValue() !== source,
 		normalize() {
 			if (disposed) return;
 			const output = computeNormalizedEdgesOutput(
