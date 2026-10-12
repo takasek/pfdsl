@@ -7,8 +7,8 @@ import {
 	closeDocuments,
 	type DiskSnapshot,
 	DocumentSession,
+	type OperationPlan,
 	type SaveResult,
-	sameDiskContent,
 	sameDocument,
 } from "./document-session.js";
 import { createDocumentTab, type DocumentTab } from "./document-tab.js";
@@ -38,13 +38,7 @@ const documentHandles = new Set<number>();
 async function releaseUnusedDocuments() {
 	for (const id of documentHandles) {
 		// An acceptance document can arrive while an earlier release is pending.
-		if (
-			[...opened].some(
-				({ session }) =>
-					session.disk?.id === id || session.pendingTarget?.id === id,
-			)
-		)
-			continue;
+		if ([...opened].some(({ session }) => session.usesDocument(id))) continue;
 		await invoke("release_document", { id });
 		documentHandles.delete(id);
 	}
@@ -74,7 +68,7 @@ function label(entry: Entry) {
 	entry.tab.button.textContent = `${entry.name}${entry.session.isDirty() ? " •" : ""}`;
 }
 function syncLocation(entry: Entry) {
-	const disk = entry.session.disk;
+	const disk = entry.session.location;
 	if (!disk) return;
 	const name = basename(disk.path);
 	if (
@@ -322,14 +316,15 @@ async function saveEntry(
 	entry: Entry,
 	as = false,
 	observed = false,
+	_confirmation?: OperationPlan,
 ): Promise<boolean> {
 	if (!native) throw new Error("Use the desktop application to save files.");
-	let target = observed ? entry.session.observed : entry.session.disk;
+	const session = entry.session;
+	let target = observed ? (session.panel()?.observed ?? null) : session.disk;
 	// A target picked in the chooser has no acknowledged content to compare with.
 	const chosen = as || !target;
 	let inspected = false;
-	let changed = false;
-	if (as || !target) {
+	if (chosen) {
 		target = await invoke<DiskSnapshot | null>("choose_save_target", {
 			name: entry.name.endsWith(".pfdsl") ? entry.name : `${entry.name}.pfdsl`,
 		});
@@ -337,128 +332,131 @@ async function saveEntry(
 		documentHandles.add(target.id);
 	} else {
 		// The remembered snapshot may predate an external change; review what is on disk now.
-		const remembered = target;
+		const remembered = target!;
+		const scope = session.begin();
+		let fresh: DiskSnapshot;
 		try {
-			target = await invoke<DiskSnapshot>("inspect_document", {
+			fresh = await invoke<DiskSnapshot>("inspect_document", {
 				id: remembered.id,
 			});
 		} catch (error) {
+			session.observe(remembered, { error }, scope);
+			label(entry);
+			renderConflict();
 			status.textContent = `Could not read ${remembered.path}: ${String(error)}. The save was not attempted. Editor content is retained.`;
 			return false;
 		}
-		const followed = observed ? null : entry.session.followDiskIfClean(target);
-		if (followed) {
+		const clean = !session.isDirty();
+		const outcome = session.observe(remembered, { snapshot: fresh }, scope);
+		target = fresh;
+		// A clean editor has nothing to save: it follows the disk instead of replacing it.
+		if (!observed && outcome === "reloaded") {
 			syncLocation(entry);
 			status.textContent =
-				followed === "reloaded"
-					? "Reloaded the current disk version; there was nothing to save."
-					: "Already saved.";
+				"Reloaded the current disk version; there was nothing to save.";
 			label(entry);
 			renderConflict();
 			return true;
 		}
-		changed = entry.session.recordTarget(target);
+		// Normalized line endings still make a manual save write the editor text.
+		if (
+			!observed &&
+			clean &&
+			fresh.source !== null &&
+			session.acknowledges(fresh) &&
+			fresh.source === entry.tab.getSource()
+		) {
+			syncLocation(entry);
+			status.textContent = "Already saved.";
+			label(entry);
+			renderConflict();
+			return true;
+		}
 		inspected = true;
 	}
-	if (explainOpenTarget(entry, target)) return false;
+	if (explainOpenTarget(entry, target!)) return false;
+	const selected = target!;
 	// Identical text leaves nothing to overwrite, so there is nothing to review.
 	const review =
-		target.source !== null &&
-		target.source !== entry.tab.getSource() &&
-		(chosen || observed || changed || entry.session.conflict);
-	// An approval applies only to the state it was given for.
-	const reviewed = entry.session.closeVersion();
-	const changedDuringReview = () => {
-		if (entry.session.closeVersion() === reviewed) return false;
-		status.textContent =
-			"The document changed while the review was open. Editor content is retained; review it again.";
-		return true;
-	};
+		selected.source !== null &&
+		selected.source !== entry.tab.getSource() &&
+		(chosen || observed || !session.acknowledges(selected));
+	const recreate = !review && inspected && selected.source === null;
+	const plan = session.plan(recreate ? "recreate" : "save", selected);
 	if (review) {
 		const decision = await choose(
 			"Review the target",
-			`Replace the disk version of ${target.path} with the editor content? The disk version shown below differs from the editor, and a further change before saving stops the save.`,
+			`Replace the disk version of ${selected.path} with the editor content? The disk version shown below differs from the editor, and a further change before saving stops the save.`,
 			[
 				["cancel", "Keep Editing"],
 				["another", "Choose Another File"],
 				["replace", "Replace Observed Version"],
 			],
-			{ local: entry.tab.getSource(), disk: target.source },
+			{ local: plan.editor, disk: plan.disk },
 		);
 		if (decision === "another") return saveEntry(entry, true);
-		if (decision !== "replace" || changedDuringReview()) return false;
-	} else if (inspected && target.source === null) {
+		if (decision !== "replace") return false;
+	} else if (recreate) {
 		const decision = await choose(
 			"Recreate missing file",
-			`Create ${target.path} again? A file created by another writer will not be overwritten.`,
+			`Create ${selected.path} again? A file created by another writer will not be overwritten.`,
 			[
 				["cancel", "Keep Editing"],
 				["create", "Create File"],
 			],
 		);
-		if (decision !== "create" || changedDuringReview()) return false;
+		if (decision !== "create") return false;
 	}
-	const selected = target;
-	const saved = await entry.session.save(async (source) => {
-		const result = await invoke<SaveResult>("save_document", {
-			id: selected.id,
-			source,
-			expected: selected.revision,
-		});
-		return result;
-	}, selected);
-	if (saved && entry.session.disk) {
-		const disk = entry.session.disk;
+	const outcome = await session.save(plan, (request) =>
+		invoke<SaveResult>("save_document", {
+			id: request.target!.id,
+			source: request.editor,
+			expected: request.revision,
+		}),
+	);
+	if (outcome.stale) {
+		status.textContent =
+			"The document changed while the review was open. Editor content is retained; review it again.";
+		label(entry);
+		renderConflict();
+		return false;
+	}
+	if (outcome.saved && session.disk) {
 		syncLocation(entry);
-		await remember(disk.path).catch((error) =>
+		await remember(session.disk.path).catch((error) =>
 			report(`Saved; recent targets could not be updated: ${String(error)}`),
 		);
 	}
 	status.textContent =
-		entry.session.message ||
-		(saved
+		outcome.message ||
+		(outcome.saved
 			? "Saved."
 			: "The save was not accepted. Editor content is retained.");
 	label(entry);
 	renderConflict();
-	return saved;
+	return outcome.saved;
 }
 let renderedEntry: Entry | undefined;
 let renderedState = "";
 function renderConflict() {
-	const state = active
-		? JSON.stringify([
-				active.session.message,
-				active.session.conflict,
-				active.session.observed,
-				active.session.sourceConflict,
-				active.session.saveFailure,
-				active.session.pendingTarget,
-			])
-		: "";
+	const panel = active?.session.panel() ?? null;
+	const state = active ? JSON.stringify(panel) : "";
 	if (active === renderedEntry && state === renderedState) return;
 	renderedEntry = active;
 	renderedState = state;
 	conflicts.replaceChildren();
 	if (!active) return;
 	const entry = active;
-	if (entry.session.conflict || entry.session.saveFailure) {
+	if (panel) {
 		const message = document.createElement("p");
-		const publication = entry.session.saveFailure?.publication;
-		const state =
-			publication === "published"
-				? "Content was published, but the save was not accepted."
-				: publication === "unknown"
-					? "Whether content was published could not be confirmed."
-					: "";
-		message.textContent = `${state} ${entry.session.message} Recovery target: ${entry.session.pendingTarget?.path ?? entry.session.observed?.path ?? "unknown"}.`;
+		message.textContent = `${panel.state} ${panel.message} Recovery target: ${panel.targetPath}.`;
 		conflicts.append(message);
 		const preview = document.createElement("details");
 		const summary = document.createElement("summary");
 		summary.textContent = "Observed external version";
 		const text = document.createElement("pre");
 		// Compare against the snapshot the buttons below act on.
-		const observed = entry.session.observed;
+		const observed = panel.observed;
 		text.textContent = observed
 			? (observed.source ?? "File is missing")
 			: "The current disk content could not be confirmed.";
@@ -466,58 +464,65 @@ function renderConflict() {
 		conflicts.append(preview);
 		const replace = document.createElement("button");
 		replace.textContent = "Review and Save Here…";
-		replace.disabled = !entry.session.observed;
+		replace.disabled = !observed;
 		replace.onclick = () => run(() => saveEntry(entry, false, true));
 		const another = document.createElement("button");
 		another.textContent = "Save As…";
 		another.onclick = () => run(() => saveEntry(entry, true));
 		const use = document.createElement("button");
 		use.textContent = "Use Current Disk Version…";
-		use.disabled =
-			!entry.session.observed || entry.session.observed.source === null;
-		use.onclick = () =>
-			run(async () => {
-				const observed = entry.session.observed;
-				if (!observed || explainOpenTarget(entry, observed)) return;
-				const confirmedVersion = entry.session.closeVersion();
-				const choice = await choose(
-					"Discard editor changes",
-					`Replace the editor content with the observed current disk version of ${observed.path}?`,
-					[
-						["cancel", "Keep Editing"],
-						["disk", "Use Disk Version"],
-					],
-					{ local: entry.tab.getSource(), disk: observed.source },
-				);
-				if (choice !== "disk") return;
-				const current = await invoke<DiskSnapshot>("inspect_document", {
-					id: observed.id,
-				});
-				if (!sameDiskContent(observed, current)) {
-					entry.session.conflict = current;
-					entry.session.observed = current;
-					status.textContent =
-						"The disk changed again. Review the new version.";
-					return;
-				}
-				if (explainOpenTarget(entry, current)) return;
-				if (!entry.session.useDiskIfUnchanged(current, confirmedVersion)) {
-					status.textContent =
-						"The editor changed during the read. Your new edits are retained; review again.";
-					return;
-				}
-				syncLocation(entry);
-				await remember(current.path).catch(report);
-				label(entry);
-				status.textContent = "Reloaded the current disk version.";
-			});
+		use.disabled = !observed || observed.source === null;
+		use.onclick = () => run(() => useDiskVersion(entry));
 		conflicts.append(replace, another, use);
+		if (panel.originalChanged) {
+			const notice = document.createElement("p");
+			notice.textContent = `The original document ${panel.originalChanged} also changed. Its disk version is preserved. Resolve the Save As target above, or save the editor elsewhere.`;
+			conflicts.append(notice);
+		}
 	}
-	if (entry.session.sourceConflict) {
-		const notice = document.createElement("p");
-		notice.textContent = `The original document ${entry.session.sourceConflict.path} also changed. Its disk version is preserved. Resolve the Save As target above, or save the editor elsewhere.`;
-		conflicts.append(notice);
+}
+/** Replaces the editor with the version the panel shows, after a fresh read confirms it. */
+async function useDiskVersion(entry: Entry) {
+	const session = entry.session;
+	const observed = session.panel()?.observed;
+	if (!observed || explainOpenTarget(entry, observed)) return;
+	const plan = session.plan("adopt", observed);
+	const choice = await choose(
+		"Discard editor changes",
+		`Replace the editor content with the observed current disk version of ${observed.path}?`,
+		[
+			["cancel", "Keep Editing"],
+			["disk", "Use Disk Version"],
+		],
+		{ local: plan.editor, disk: plan.disk },
+	);
+	if (choice !== "disk") return;
+	const scope = session.begin();
+	let current: DiskSnapshot;
+	try {
+		current = await invoke<DiskSnapshot>("inspect_document", {
+			id: observed.id,
+		});
+	} catch (error) {
+		session.observe(observed, { error }, scope);
+		throw error;
 	}
+	session.observe(observed, { snapshot: current }, scope);
+	if (!session.holds(plan, "editor")) {
+		status.textContent =
+			"The editor changed during the read. Your new edits are retained; review again.";
+		return;
+	}
+	if (!session.holds(plan)) {
+		status.textContent = "The disk changed again. Review the new version.";
+		return;
+	}
+	if (explainOpenTarget(entry, current)) return;
+	if (!session.adopt(plan)) return;
+	syncLocation(entry);
+	await remember(current.path).catch(report);
+	label(entry);
+	status.textContent = "Reloaded the current disk version.";
 }
 function dispose(entry: Entry) {
 	opened.delete(entry);
@@ -547,13 +552,14 @@ async function closeEntries(entries: Entry[]) {
 						.catch(report);
 				},
 				closeVersion: () => entry.session.closeVersion(),
+				closePlan: () => entry.session.plan("close", null),
 			}),
 		),
 		async (entry) =>
 			invoke<"save" | "discard" | "cancel">("confirm_close_document", {
 				name: entry.name,
 			}),
-		saveEntry,
+		(entry, plan) => saveEntry(entry, false, false, plan),
 		dispose,
 		() =>
 			opened.size === membership.length &&
@@ -671,23 +677,19 @@ if (native) {
 		if (busy) return;
 		for (const entry of opened) {
 			if (busy) break;
-			if (entry.session.disk || entry.session.pendingTarget) {
-				try {
-					await entry.session.checkExternal((id) =>
-						invoke<DiskSnapshot>("inspect_document", {
-							id,
-						}),
-					);
-					if (opened.has(entry)) {
-						syncLocation(entry);
-						label(entry);
-					}
-				} catch (error) {
-					if (opened.has(entry)) label(entry);
-					report(
-						`Could not check ${entry.name}: ${String(error)}. Editor content is retained.`,
-					);
+			try {
+				await entry.session.checkExternal((id) =>
+					invoke<DiskSnapshot>("inspect_document", { id }),
+				);
+				if (opened.has(entry)) {
+					syncLocation(entry);
+					label(entry);
 				}
+			} catch (error) {
+				if (opened.has(entry)) label(entry);
+				report(
+					`Could not check ${entry.name}: ${String(error)}. Editor content is retained.`,
+				);
 			}
 		}
 		renderConflict();

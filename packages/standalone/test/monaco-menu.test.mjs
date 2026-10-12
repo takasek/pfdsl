@@ -161,10 +161,13 @@ test("the production document-tab entry loads real Monaco menu contributions", a
 							await editor.getModel().redo();
 							assert.equal(tab.getSource(), source);
 							assert.equal(session.isDirty(), false);
-							await session.save(async (text) => {
-								assert.equal(text, source);
-								return { outcome: "saved", current: replacement };
-							});
+							await session.save(
+								session.plan("save", replacement),
+								async (plan) => {
+									assert.equal(plan.editor, source);
+									return { outcome: "saved", current: replacement };
+								},
+							);
 						},
 					);
 				},

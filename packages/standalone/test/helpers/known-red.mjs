@@ -8,27 +8,6 @@ export const KNOWN_RED = new Set([
 	// F1: an edit after the Save decision was asked but before the pre-save inspection answered is saved without a new decision.
 	"lifetime | pending-inspect | edit | close-save",
 	"lifetime | pending-inspect | edit | quit-save",
-	// F2: a failed pre-save inspection leaves the tab looking clean.
-	"clean | unreadable | unpolled | cmd-s",
-	"failure memory | clean | cmd-s | same | poll",
-	"failure memory | clean | cmd-s | same | cmd-s",
-	"failure memory | clean | cmd-s | same | close-discard",
-	"failure memory | clean | cmd-s | different | poll",
-	"failure memory | clean | cmd-s | different | cmd-s",
-	"failure memory | clean | cmd-s | different | close-discard",
-	// F3: the notice that the original also changed outlives the failed Save of the original.
-	"stale notice | the original returns to its first content",
-	// F4: the panel names the moved recovery target by its old path.
-	"moved target | Use Current Disk Version before 0 poll(s)",
-	"moved target | Use Current Disk Version before 1 poll(s)",
-	"save-as-conflict | A none | B moved-changed | unpolled | use",
-	"save-as-conflict | A content-changed | B moved-changed | unpolled | use",
-	"save-as-conflict | A metadata-only | B moved-changed | unpolled | use",
-	"save-as-conflict | A deleted | B moved-changed | unpolled | use",
-	"save-as-conflict | A unreadable | B moved-changed | unpolled | use",
-	"untitled-conflict | A none | B moved-changed | unpolled | use",
-	// N2: the close needs a second attempt after a Save that succeeded during the confirmation.
-	"close after an unreadable first save | the target recovers during the confirmation",
 ]);
 
 const results = new Map();

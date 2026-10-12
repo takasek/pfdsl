@@ -192,19 +192,22 @@ test("Save As recovery retains target ownership and refuses intervening edits in
 		entry.tab.setSource("local");
 		await click("#save-as");
 		await dialogClick("Replace Observed Version");
+		// The panel names the target its buttons act on.
+		const recoveryPath = () =>
+			/Recovery target: (.*)\.$/.exec(
+				document.querySelector("#conflicts p")?.textContent ?? "",
+			)?.[1];
 		const results = {
 			beforePoll: {
 				disk: entry.session.disk.path,
-				observed: entry.session.observed.path,
-				conflict: entry.session.conflict.path,
+				recovery: recoveryPath(),
 			},
 		};
 		poll();
 		await flush();
 		results.afterPoll = {
 			disk: entry.session.disk.path,
-			observed: entry.session.observed.path,
-			conflict: entry.session.conflict.path,
+			recovery: recoveryPath(),
 		};
 		// Exercise the real host recovery DOM for a reply lost after a clean Save As.
 		selectedDocument = {
@@ -228,8 +231,7 @@ test("Save As recovery retains target ownership and refuses intervening edits in
 		await dialogClick("Replace Observed Version");
 		assert.equal(uncertain.session.isDirty(), true);
 		assert.equal(uncertain.session.disk.path, selectedDocument.path);
-		assert.equal(uncertain.session.observed, null);
-		assert.equal(uncertain.session.pendingTarget.path, saveTarget.path);
+
 		assert.equal(uncertain.tab.getSource(), A.source);
 		assert.match(
 			document.querySelector("#conflicts").textContent,
@@ -273,14 +275,18 @@ test("Save As recovery retains target ownership and refuses intervening edits in
 			nativeFailure.tab.setSource(packet.buffer);
 			await click("#save-as");
 			await dialogClick("Replace Observed Version");
-			assert.equal(nativeFailure.session.saveFailure.publication, "published");
-			assert.equal(nativeFailure.session.saveFailure.targetState, "unreadable");
-			assert.equal(nativeFailure.session.observed, null);
+			assert.match(
+				document.querySelector("#conflicts").textContent,
+				/Content was published/,
+			);
 			assert.equal(
 				nativeFailure.session.disk.revision,
 				packet.baseline.revision,
 			);
-			assert.equal(nativeFailure.session.pendingTarget.id, packet.baseline.id);
+			assert.equal(
+				nativeFailure.session.usesDocument(packet.baseline.id),
+				true,
+			);
 			assert.equal(nativeFailure.tab.getSource(), packet.buffer);
 			assert.equal(nativeFailure.session.isDirty(), true);
 
@@ -354,8 +360,9 @@ test("Save As recovery retains target ownership and refuses intervening edits in
 			await entry.tab.read("/B/preset.yaml");
 			results.dependencyCall = calls.at(-1);
 		}
-		assert.equal(results.afterPoll.observed, B.path);
-		assert.equal(results.afterPoll.conflict, B.path);
+		assert.equal(results.beforePoll.disk, A.path);
+		assert.equal(results.beforePoll.recovery, B.path);
+		assert.equal(results.afterPoll.recovery, B.path);
 		assert.ok(
 			!calls.some(
 				(call) => call.command === "release_document" && call.args.id === B.id,
