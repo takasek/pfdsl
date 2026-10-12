@@ -23,20 +23,26 @@ PR #1431 のレビューでは、外部レビュー bot が約10周にわたり1
 
 1. **承認済みの基準**（acknowledged）：editor に承認済みとして入っている本文と、それに対応する生のディスク snapshot。open・保存成功・明示的な採用（Use Current Disk Version）・clean な editor の自動再読込でだけ更新する。
 2. **対象別の観測**（observations）：追跡する対象ごとに `readable(snapshot)`・`missing(snapshot)`・`unreadable(error)` のいずれか。追跡する対象は、active 文書の native binding と、未解決の回復先だけである。表示パスは観測した snapshot から取る。
+`unreadable` は、対象の識別とパネルでの名前・直前の本文の表示のために、直前に観測した snapshot を保持する。
+これは読める現行版の証拠としては使わず、保存・採用の前に対象を再検査する。
+保存の応答から作る `unreadable` は snapshot を持たず、パネルのボタンも無効のままにする。
 3. **未解決の保存**（recovery）：失敗または未確認の保存の対象と receipt（publication の既知/未知を含む）。成功するか、明示的に解決されるまで保持する。
-4. **世代**（epoch）：観測の分類（readable・missing・unreadable）か内容（同一内容判定で比較）が変わるたびに1つ進む。
+4. **世代**（epoch）：観測の分類（readable・missing・unreadable）・内容（同一内容判定で比較）・表示パスが変わるか、対象を初めて観測するたびに1つ進む。
 
 衝突の有無、dirty 表示、パネルの表示内容と対象名、元文書の変更通知、終了判断の照合値は保持せず、上の4つから導く。
+再オープンで native capability を更新する場合は、承認済み本文を変えずに基準と観測の対象 ID・binding・パスを付け替える。
 内容の比較は、生のディスク本文の一致か revision の一致で行う（`sameDiskContent`）。
 UI の判断は内容の同値性で行い、native の保存は承認した厳密な revision と保護メタデータで検査する。
 
 ### 観測の単一入口
 
-poll、Save 前の読取、close/quit の再検査、Use Current Disk Version の再検査、再オープンは、すべて同じ `observe(target, result)` を通す。
+poll、Save 前の読取、close/quit の再検査、Use Current Disk Version の再検査、再オープン時の capability 更新後の観測適用は、すべて同じ `observe(target, result)` を通す。
+再オープンの移動回復判定で行う旧 leaf の検査は、失敗すれば capability 更新を許可せず、セッションへの観測適用は行わない。
 同じ観測結果は、入口にかかわらず同じ保護状態を作る。
 各対象は独立に読み、ある対象の失敗で他の対象の読取を省かない。
 clean な editor（本文が承認済み基準と一致し、未解決の保存がなく、active 対象の直前の観測が基準と同内容）が読める別内容を観測した場合に限り、自動再読込して基準を更新する。
-保存成功は、その対象の観測を世代を進めずに `readable(result.current)` に置き換える。
+保存成功は、その対象の観測を `readable(result.current)` に置き換え、観測が変われば同じ判定で世代を進める。
+終了処理は Save 成功後の照合値を記録して最後の再検査と比較するため、成功した保存だけを理由に終了の2回目の試行を要求しない。
 
 ### 操作計画
 
@@ -64,7 +70,7 @@ close/quit の Save は終了確認の計画を保存処理まで渡し、Save �
 不変条件は、harness が自分で記録した観測（表示したダイアログとその本文、送った要求、fake native のファイル内容、editor 本文、パネルの DOM、タブの存否、要求と応答と判断と破棄の順序）だけで定義し、セッションの内部状態を読まない。
 状態 × ディスク側の変化 × タイミング × 操作の直積と、多段の失敗履歴・対象関係の変化を含む回復状態の直積に当てる。
 検査は `packages/standalone/test/document-lifecycle-*.test.mjs` と `test/helpers/lifecycle-invariants.mjs` にある。
-src を壊す変異 M1〜M10 のそれぞれを不変条件に紐づくセルが検出することを、`test/helpers/mutation-gate.mjs` で確認する（`make test` には含めない）。
+src を壊す変異 M1〜M13 のそれぞれを不変条件に紐づくセルが検出することを、`test/helpers/mutation-gate.mjs` で確認する（`make test` には含めない）。
 改修前の head で見つかっていた欠陥（独立レビューの F1〜F4、観点1・2の N2）は、改修前は既知の失敗として記録し、改修で解消する。
 native 側の保存契約、新規ファイルの mode、native の競合直積は変更しない。
 
