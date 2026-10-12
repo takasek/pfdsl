@@ -139,6 +139,8 @@ shell の解析失敗による deny は1つの入口だけが出す。表の外�
 | ask | 使える（人間への割込み） | 使えない（deny になる） |
 
 各項目は、検証した harness の版と起動方式とともに記録する。
+所有の比較では起点を含む worktree の root を使い、subdirectory での起動も同じ linked worktree の割当とする。
+primary と other-live の判定を先に適用し、各操作の実行先は明示した対象から決める。
 
 shfmt の1回の解析 timeout は3000ms、policy supervisor の内部 deadline は8000msとし、scripts/lib/agent-operation-timeouts.mjs にまとめる。
 両 harness の PreToolUse hook timeout の10秒より短くする。

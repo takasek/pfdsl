@@ -127,6 +127,14 @@ function pathFacts(path, facts, followFinalSymlink = true) {
 		.filter(({ root }) => under(executionPath, root))
 		.sort((a, b) => b.root.length - a.root.length)[0];
 	if (!tree) return { target: "scratch", executionPath, executionInput: path };
+	const origin = facts.sessionRoot
+		? resolve(physicalPath(facts.sessionRoot, facts))
+		: null;
+	const sessionTree = origin
+		? (facts.worktrees ?? [])
+				.filter(({ root }) => under(origin, root))
+				.sort((a, b) => b.root.length - a.root.length)[0]
+		: null;
 	const checks = [
 		[tree.commonDir !== facts.commonDir, "foreign"],
 		[tree.primary, "primary"],
@@ -135,7 +143,7 @@ function pathFacts(path, facts, followFinalSymlink = true) {
 			"other-live",
 		],
 		[
-			tree.root === facts.sessionRoot ||
+			tree.root === sessionTree?.root ||
 				(typeof facts.sessionId === "string" &&
 					facts.sessionId.length > 0 &&
 					tree.ownership?.ownerId === facts.sessionId),

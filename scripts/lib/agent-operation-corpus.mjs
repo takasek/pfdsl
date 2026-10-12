@@ -117,6 +117,35 @@ function example(
 // and, where present, its independently specified safety case.
 export const AGENT_OPERATION_CORPUS = [
 	...[
+		["own", own, own, "allow"],
+		["explicit-primary", own, primary, "deny"],
+		["explicit-unowned", own, unowned, "deny"],
+		["origin-primary", primary, primary, "deny"],
+		["origin-live", live, live, "deny"],
+		["prefix-is-not-ownership", `${own}-else`, own, "deny"],
+	].map(([id, origin, destination, expected]) =>
+		example(
+			`session-subdirectory-${id}`,
+			`git -C ${destination} add a.txt`,
+			expected,
+			{
+				subject: "codex-parent",
+				cwd: `${origin}/packages/app`,
+				facts: { sessionRoot: `${origin}/packages/app` },
+				classes: ["W"],
+				target:
+					id === "own"
+						? "own"
+						: destination === primary
+							? "primary"
+							: destination === live
+								? "other-live"
+								: "other-unowned",
+				executionPath: destination,
+			},
+		),
+	),
+	...[
 		"--list",
 		"-l",
 		"-a",

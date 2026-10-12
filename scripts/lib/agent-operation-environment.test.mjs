@@ -154,6 +154,46 @@ function fixture({ nativeLock = true } = {}) {
 	};
 }
 
+test("a subdirectory origin observes its containing worktree root without changing explicit targets", () => {
+	const f = fixture({ nativeLock: false });
+	try {
+		for (const [origin, destination, expected] of [
+			[f.roots.own, f.roots.own, "allow"],
+			[f.roots.own, f.roots.primary, "deny"],
+			[f.roots.primary, f.roots.primary, "deny"],
+			[f.roots.live, f.roots.live, "deny"],
+		]) {
+			const cwd = join(origin, "packages/app");
+			mkdirSync(cwd, { recursive: true });
+			const payload = {
+				tool_name: "exec_command",
+				cwd,
+				session_id: "session",
+				tool_input: { cmd: `git -C ${destination} add a.txt` },
+			};
+			const facts = collectAgentOperationEnvironment(payload, {
+				hookRoot: f.root,
+				environment: {},
+				shell: readShell(payload.tool_input.cmd),
+				probeGit: f.probeGit,
+				probeProcess: f.probeProcess,
+				readMetadata: f.readMetadata,
+			});
+			assert.equal(facts.sessionRoot, origin);
+			assert.equal(
+				evaluateAgentOperationPolicy(payload, facts).decision,
+				expected,
+			);
+			assert.equal(
+				classifyAgentOperations(payload, facts).operations[0].executionPath,
+				destination,
+			);
+		}
+	} finally {
+		f.cleanup();
+	}
+});
+
 test("environment observations preserve session origin, physical targets, branch occupancy and live native evidence", () => {
 	const f = fixture();
 	try {

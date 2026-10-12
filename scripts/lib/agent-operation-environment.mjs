@@ -178,6 +178,7 @@ export function collectAgentOperationEnvironment(
 		environment: env,
 	});
 	if (!roots) throw new Error("Cannot establish the session Git roots");
+	facts.sessionRoot = resolvePhysicalPath(roots.worktreeRoot, null);
 	facts.commonDir = roots.commonDir;
 	facts.gitMetadataPaths.push(roots.commonDir);
 	const head = probeGit(

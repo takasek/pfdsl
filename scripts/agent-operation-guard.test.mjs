@@ -265,6 +265,27 @@ test("entry integration: stage-three ordinary verbs, literal targets and routine
 	}
 });
 
+test("entry integration: Codex subdirectory origins keep ownership and explicit destinations separate", () => {
+	const f = fixture();
+	try {
+		const cwd = join(f.own, "packages/app");
+		mkdirSync(cwd, { recursive: true });
+		for (const [destination, expected] of [
+			[f.own, "allow"],
+			[f.primary, "deny"],
+			[f.other, "deny"],
+		]) {
+			const result = f.invoke(
+				{ cmd: `git -C ${destination} add a.txt` },
+				{ harness: "codex", tool_name: "exec_command", cwd },
+			);
+			assert.equal(result.decision, expected);
+		}
+	} finally {
+		f.cleanup();
+	}
+});
+
 test("entry integration: parser missing -> exact bootstrap repair -> installed healthy -> normal allow", () => {
 	const f = fixture();
 	try {
