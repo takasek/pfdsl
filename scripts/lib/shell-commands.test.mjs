@@ -32,6 +32,13 @@ test("only a leading literal cd AND chain supplies an execution prefix", () => {
 		"(cd /fixture/own && git add a)",
 		"if true; then cd /fixture/own && git add a; fi",
 		'cd "$target" && git add a',
+		"X=1 cd /fixture/own && git add a",
+		"X=1 cd /fixture/own; git add a",
+		"command cd /fixture/own && git add a",
+		"command -p cd /fixture/own; git add a",
+		"builtin cd /fixture/own && git add a",
+		"noglob cd /fixture/own; git add a",
+		"nocorrect cd /fixture/own; git add a",
 	]) {
 		const parsed = readShell(source);
 		assert.equal(parsed.error, undefined, source);

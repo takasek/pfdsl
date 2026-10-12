@@ -99,6 +99,7 @@ export function adaptShell(ast, source) {
 			stmt?.Negated ||
 			stmt?.Background ||
 			stmt?.Redirs?.length ||
+			stmt?.Cmd?.Assigns?.length ||
 			args?.length !== 2 ||
 			args[0]?.value !== "cd" ||
 			args.some(({ dynamic }) => dynamic)
@@ -218,14 +219,23 @@ export function adaptShell(ast, source) {
 	}
 
 	function leaf(node, tokens) {
-		const prefix = tokens.findIndex(
+		let prefix = tokens.findIndex(
 			(token) =>
 				!["noglob", "nocorrect"].includes(token.value) &&
 				!/^[A-Za-z_][A-Za-z0-9_]*\+?=/.test(token.value),
 		);
+		while (["command", "builtin"].includes(tokens[prefix]?.value)) {
+			prefix++;
+			if (["-p", "--"].includes(tokens[prefix]?.value)) prefix++;
+		}
 		if (["repeat", "always", "coproc", "-"].includes(tokens[prefix]?.value))
 			fail(tokens[prefix].value);
-		const command = { tokens, command: text(node), offset: node.Pos.Offset };
+		const command = {
+			tokens,
+			executableIndex: prefix,
+			command: text(node),
+			offset: node.Pos.Offset,
+		};
 		commands.push(command);
 	}
 
@@ -342,8 +352,8 @@ export function adaptShell(ast, source) {
 
 	(ast.Stmts ?? []).forEach(statement);
 	const unresolvedCwd = commands.some(
-		({ tokens, offset }) =>
-			tokens[0]?.value === "cd" && !prefixNodes.has(offset),
+		({ tokens, executableIndex, offset }) =>
+			tokens[executableIndex]?.value === "cd" && !prefixNodes.has(offset),
 	);
 	for (const command of commands) {
 		command.isLeadingCd = prefixNodes.has(command.offset);
