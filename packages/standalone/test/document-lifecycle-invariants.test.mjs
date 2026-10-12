@@ -40,6 +40,33 @@ const ACTIONS = [
 const SAVE_ACTIONS = new Set(["cmd-s", "review", "close-save", "quit-save"]);
 const TEXT = { disk: "disk v1\n", edited: "edited by the user\n" };
 
+/**
+ * Cells whose invariants fail until their fix lands. A fix commit must delete
+ * exactly the cells it repairs: a listed cell that passes fails the last test.
+ */
+const KNOWN_RED = new Set([
+	"clean | metadata-only | unpolled | cmd-s",
+	"clean | metadata-only | during-confirm | quit-save",
+	"clean | metadata-only | during-confirm | quit-discard",
+	"clean | same-content-new-inode | unpolled | cmd-s",
+	"clean | same-content-new-inode | during-confirm | quit-save",
+	"clean | same-content-new-inode | during-confirm | quit-discard",
+	"dirty | metadata-only | unpolled | cmd-s",
+	"dirty | metadata-only | during-confirm | quit-save",
+	"dirty | metadata-only | during-confirm | quit-discard",
+	"dirty | same-content-new-inode | unpolled | cmd-s",
+	"dirty | same-content-new-inode | during-confirm | quit-save",
+	"dirty | same-content-new-inode | during-confirm | quit-discard",
+	"dirty | deleted-restored | polled | cmd-s",
+	"dirty | deleted-restored | polled | close-save",
+	"dirty | deleted-restored | polled | close-discard",
+	"dirty | deleted-restored | polled | close-cancel",
+	"dirty | deleted-restored | polled | quit-save",
+	"dirty | deleted-restored | polled | quit-discard",
+	"dirty | deleted-restored | polled | quit-cancel",
+]);
+const results = new Map();
+
 function applicable(tab, event, timing, action) {
 	if (event.startsWith("reply-lost"))
 		return (
@@ -55,10 +82,7 @@ function applicable(tab, event, timing, action) {
 function panelExpected(tab, event, timing) {
 	if (timing === "unpolled" || timing === "during-confirm") return false;
 	if (event === "deleted") return true;
-	return (
-		tab === "dirty" &&
-		(event === "content-changed" || event === "deleted-restored")
-	);
+	return tab === "dirty" && event === "content-changed";
 }
 
 class FakeNative {
@@ -272,15 +296,18 @@ async function startHost(native, watched, handlers = {}) {
 		if (command === "save_document") {
 			const target = native.docs.get(args.id);
 			const fault = handlers.saveFault?.(args);
-			log.push({
+			const entry = {
 				kind: "save",
 				id: args.id,
 				expected: args.expected,
 				fs: fsOf(native, target),
-			});
+				outcome: "lost",
+			};
+			log.push(entry);
 			if (fault === "before") throw new Error("native reply lost");
 			const reply = native.save(target, args.source, args.expected);
 			if (fault === "after") throw new Error("native reply lost");
+			entry.outcome = reply.outcome;
 			return reply;
 		}
 		if (command === "confirm_close_document")
@@ -416,15 +443,17 @@ async function runCell(tabState, event, timing, action) {
 		// Event and observation.
 		if (timing !== "during-confirm") await applyEvent(timing !== "unpolled");
 		if (timing === "polled" || timing === "drift") await host.runPoll();
-		const afterPoll = {
-			setSourceCalls: entry.tab.setSourceCalls,
-			conflict: entry.session.conflict,
-			dirty: entry.session.isDirty(),
-		};
 		const panelButton = () =>
 			host
 				.queryAll("#conflicts button")
 				.find((b) => b.textContent === "Review and Save Here…");
+		const afterPoll = {
+			setSourceCalls: entry.tab.setSourceCalls,
+			conflict: entry.session.conflict,
+			dirty: entry.session.isDirty(),
+			message: entry.session.message,
+			panel: host.query("#conflicts").children.length > 0,
+		};
 		if (panelExpected(tabState, event, timing)) {
 			if (!panelButton() || panelButton().disabled)
 				violate("panel", "no enabled 'Review and Save Here…' after the poll");
@@ -553,13 +582,37 @@ async function runCell(tabState, event, timing, action) {
 			}
 			if (timing !== "drift" && entry.tab.setSourceCalls !== 0)
 				violate("I4", "the editor text was replaced");
+		}
+
+		// I2': Save and Close never see a same-content change, whenever it happens.
+		if (
+			(event === "metadata-only" || event === "same-content-new-inode") &&
+			timing !== "drift"
+		) {
+			if (tabState === "dirty" && SAVE_ACTIONS.has(action)) {
+				if (log.some((item) => item.kind === "dialog"))
+					violate("I2'", "a review dialog was shown");
+				if (log.some((item) => item.outcome === "conflict"))
+					violate("I2'", "the native save reported a conflict");
+			}
+			if (SAVE_ACTIONS.has(action) || action.endsWith("discard"))
+				if (presses !== 1 || (action !== "cmd-s" && alive()))
+					violate(
+						"I2'",
+						`the first attempt did not finish (attempts=${presses}, alive=${alive()})`,
+					);
+		}
+
+		// I5: a file that returns to its observed state leaves no trace behind.
+		if (event === "deleted-restored" && timing === "polled") {
+			if (afterPoll.conflict) violate("I5", "the poll kept a conflict");
+			if (afterPoll.panel) violate("I5", "the conflict panel is still shown");
+			if (afterPoll.message) violate("I5", "a stale message remains");
 			if (
-				timing === "polled" &&
-				tabState === "dirty" &&
 				SAVE_ACTIONS.has(action) &&
 				log.some((item) => item.kind === "dialog")
 			)
-				violate("I4", "a dirty tab needed a review dialog to save");
+				violate("I5", "Save asked for a review");
 		}
 
 		// A document the cell finished with must not keep native work running.
@@ -579,10 +632,15 @@ for (const tab of TABS)
 			for (const action of ACTIONS) {
 				if (!applicable(tab, event, timing, action)) continue;
 				const label = `${tab} | ${event} | ${timing} | ${action}`;
-				test(label, async () => {
-					const violations = await runCell(tab, event, timing, action);
-					assert.deepEqual(violations, [], label);
-				});
+				test(
+					label,
+					KNOWN_RED.has(label) ? { todo: "known red" } : {},
+					async () => {
+						const violations = await runCell(tab, event, timing, action);
+						results.set(label, violations);
+						assert.deepEqual(violations, [], label);
+					},
+				);
 			}
 
 /** Fails Save As to B with a conflict, leaving A open with B as the recovery target. */
@@ -659,4 +717,11 @@ test("Review and Save Here inspects the recovery target again", async () => {
 	} finally {
 		assert.deepEqual(await host.finish(), []);
 	}
+});
+
+test("KNOWN_RED lists only cells that still fail", () => {
+	const stale = [...KNOWN_RED].filter(
+		(label) => !results.has(label) || results.get(label).length === 0,
+	);
+	assert.deepEqual(stale, [], "remove these cells from KNOWN_RED");
 });
