@@ -12,6 +12,7 @@ setup-unlocked:
 setup-deps:
 	rm -f node_modules/.pfdsl-setup-complete
 	pnpm install
+	node scripts/setup-shell-parser.mjs
 
 setup-artifacts:
 	node scripts/shared-hooks.mjs install

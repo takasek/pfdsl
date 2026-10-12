@@ -17,15 +17,16 @@ import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { afterEach, describe, it } from "node:test";
 import { fileURLToPath } from "node:url";
-
 import {
 	acquireSetupLock,
+	areDependenciesCurrent,
 	isSetupCurrent,
 	setupFingerprint,
 	setupInputs,
 	setupLockPath,
 	writeSetupMarker,
 } from "../setup-completion.mjs";
+import { shellParserPath } from "./shell-parser-tool.mjs";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 const makefile = join(root, "Makefile");
@@ -33,6 +34,16 @@ const sentinel = "node_modules/.pfdsl-setup-complete";
 const cp = "/bin/cp";
 const chmod = "/bin/chmod";
 const fixtures = [];
+
+it("missing installer cannot make a missing parser appear current", () => {
+	const { cwd } = fixture();
+	writeSetupMarker(cwd);
+	assert.equal(areDependenciesCurrent(cwd), true);
+	rmSync(shellParserPath(cwd));
+	assert.equal(areDependenciesCurrent(cwd), false);
+	rmSync(join(cwd, "scripts/setup-shell-parser.mjs"));
+	assert.equal(areDependenciesCurrent(cwd), false);
+});
 
 function sessionStartCommand(path) {
 	const settings = JSON.parse(readFileSync(join(root, path), "utf8"));
@@ -64,6 +75,7 @@ function fixture() {
 		"scripts/shared-hooks.mjs",
 		"scripts/link-repo-skill.mjs",
 		"scripts/lib/repo-skill-link.mjs",
+		"scripts/setup-shell-parser.mjs",
 	])
 		writeFileSync(join(cwd, path), readFileSync(join(root, path)));
 	installSkill(cwd);
@@ -75,6 +87,13 @@ function fixture() {
 		join(cwd, "scripts/lib/cli-entrypoint.mjs"),
 		readFileSync(join(root, "scripts/lib/cli-entrypoint.mjs")),
 	);
+	writeFileSync(
+		join(cwd, "scripts/lib/shell-parser-tool.mjs"),
+		readFileSync(join(root, "scripts/lib/shell-parser-tool.mjs")),
+	);
+	const parser = shellParserPath(cwd);
+	mkdirSync(dirname(parser), { recursive: true });
+	writeFileSync(parser, readFileSync(shellParserPath(root)), { mode: 0o755 });
 	writeFileSync(join(cwd, "package.json"), "{}\n");
 	writeFileSync(join(cwd, "pnpm-lock.yaml"), "lockfileVersion: '9.0'\n");
 	writeFileSync(join(cwd, "pnpm-workspace.yaml"), "packages: []\n");
@@ -327,6 +346,8 @@ describe("setup completion sentinel", () => {
 			"scripts/lib/repo-skill-link.mjs",
 			"scripts/link-repo-skill.mjs",
 			"scripts/setup-completion.mjs",
+			"scripts/setup-shell-parser.mjs",
+			"scripts/lib/shell-parser-tool.mjs",
 			"packages/zeta/package.json",
 			"packages/alpha/package.json",
 		]) {
@@ -355,6 +376,9 @@ describe("setup completion sentinel", () => {
 			writeFileSync(join(cwd, entry), "#!/bin/sh\nexit 0\n", { mode: 0o755 });
 		}
 		installSkill(cwd);
+		const parser = shellParserPath(cwd);
+		mkdirSync(dirname(parser), { recursive: true });
+		writeFileSync(parser, readFileSync(shellParserPath(root)), { mode: 0o755 });
 
 		const inputs = setupInputs(cwd);
 		assert.deepEqual(
@@ -567,7 +591,7 @@ describe("setup completion sentinel", () => {
 				SETUP_LINK_PATH: join(context.cwd, "node_modules/fixture-dependency"),
 			}),
 		);
-		assert.equal(readFileSync(context.log, "utf8"), "pnpm\nnode\nnode\n");
+		assert.equal(readFileSync(context.log, "utf8"), "pnpm\nnode\nnode\nnode\n");
 		assert.equal(isSetupCurrent(context.cwd), true);
 	});
 
@@ -665,7 +689,7 @@ describe("setup completion sentinel", () => {
 		]);
 		assertSucceeded(firstResult);
 		assertSucceeded(secondResult);
-		assert.equal(readFileSync(context.log, "utf8"), "pnpm\nnode\nnode\n");
+		assert.equal(readFileSync(context.log, "utf8"), "pnpm\nnode\nnode\nnode\n");
 		assert.equal(isSetupCurrent(context.cwd), true);
 	});
 
@@ -762,7 +786,7 @@ describe("setup completion sentinel", () => {
 				`${path} should run setup without a marker`,
 			);
 			const log = readFileSync(context.log, "utf8");
-			assert.equal(log, "pnpm\nnode\nnode\n");
+			assert.equal(log, "pnpm\nnode\nnode\nnode\n");
 			assertSucceeded(runSessionStart(context, sessionStartCommand(path)));
 			assert.equal(
 				readFileSync(context.log, "utf8"),
