@@ -412,7 +412,6 @@ export const KNOWN_RED = new Set([
 	"untitled-b-unreadable | A none | B recovered | unpolled | quit-discard",
 	"untitled-b-unreadable | A none | B recovered | during-confirm | close-discard",
 	"untitled-b-unreadable | A none | B recovered | during-confirm | quit-discard",
-	"an inspection in flight cannot change the text a review is about to use (Save As onto an existing file)",
 	"Use Current Disk Version ignores a touch that happens while its dialog is open",
 ]);
 

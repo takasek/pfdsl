@@ -365,6 +365,14 @@ async function saveEntry(
 		target.source !== null &&
 		target.source !== entry.tab.getSource() &&
 		(chosen || observed || changed || entry.session.conflict);
+	// An approval applies only to the state it was given for.
+	const reviewed = entry.session.closeVersion();
+	const changedDuringReview = () => {
+		if (entry.session.closeVersion() === reviewed) return false;
+		status.textContent =
+			"The document changed while the review was open. Editor content is retained; review it again.";
+		return true;
+	};
 	if (review) {
 		const decision = await choose(
 			"Review the target",
@@ -377,7 +385,7 @@ async function saveEntry(
 			{ local: entry.tab.getSource(), disk: target.source },
 		);
 		if (decision === "another") return saveEntry(entry, true);
-		if (decision !== "replace") return false;
+		if (decision !== "replace" || changedDuringReview()) return false;
 	} else if ((observed || inspected) && target.source === null) {
 		const decision = await choose(
 			"Recreate missing file",
@@ -387,7 +395,7 @@ async function saveEntry(
 				["create", "Create File"],
 			],
 		);
-		if (decision !== "create") return false;
+		if (decision !== "create" || changedDuringReview()) return false;
 	}
 	const selected = target;
 	const saved = await entry.session.save(async (source) => {
