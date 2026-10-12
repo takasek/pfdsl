@@ -116,6 +116,76 @@ function example(
 // Every row of the specification's acceptance pairs has a named normal case
 // and, where present, its independently specified safety case.
 export const AGENT_OPERATION_CORPUS = [
+	example("review-1437-01-update-stdin", "git update-ref --stdin", "deny"),
+	example(
+		"review-1437-02-nested-live",
+		`git worktree add ${live}/nested feat/new`,
+		"deny",
+	),
+	example(
+		"review-1437-02-primary-creation",
+		`git worktree add ${primary}/.claude/worktrees/trial feat/new`,
+		"allow",
+	),
+	example(
+		"review-1437-03-default-checkout",
+		"git worktree add --force /tmp/main-copy main",
+		"deny",
+	),
+	example(
+		"review-1437-03-default-startpoint",
+		"git worktree add -b topic /tmp/topic main",
+		"allow",
+	),
+	example(
+		"review-1437-03-default-detached",
+		"git worktree add --detach /tmp/topic main",
+		"allow",
+	),
+	example(
+		"review-1437-04-api-input",
+		"gh api graphql --input merge.json",
+		"deny",
+	),
+	example(
+		"review-1437-04-query-file",
+		"gh api graphql -F query=@merge.graphql",
+		"deny",
+	),
+	example("review-1437-05-push-dry-run", "git push -n origin HEAD", "allow"),
+	example("review-1437-06-fetch-stdin", "git fetch --stdin origin", "deny"),
+	example(
+		"review-1437-07-download",
+		`gh run download 123 -D ${live}`,
+		"allow",
+		{ classes: ["W"] },
+	),
+	example(
+		"review-1437-08-dynamic-endpoint",
+		'gh api -X PUT "$endpoint"',
+		"deny",
+	),
+	example(
+		"review-1437-09-busy-ref",
+		"git update-ref refs/heads/feat/busy HEAD",
+		"deny",
+	),
+	example(
+		"review-1437-10-unlisted-output",
+		`git diff --output=${live}/victim HEAD~1 HEAD`,
+		"deny",
+	),
+	example(
+		"review-1437-11-separate-directory-value",
+		`git init --separate-git-dir ${live}/metadata /tmp/new`,
+		"allow",
+		{ target: "scratch", executionPath: "/tmp/new" },
+	),
+	example(
+		"review-1437-12-api-jq-value",
+		"gh api --jq . -X PUT repos/o/r/pulls/123/merge",
+		"deny",
+	),
 	...[
 		["own", own, own, "allow"],
 		["explicit-primary", own, primary, "deny"],

@@ -33,7 +33,9 @@ test("properties 2 and 7: ordinary Git destinations and ref roles preserve safet
 			"deny",
 			["W"],
 		],
-		[`git archive HEAD --output=${primary}/x.tar`, "primary", "deny", ["W"]],
+		// Stage five limits destination protection to the owner's listed -o form.
+		[`git archive HEAD -o ${primary}/x.tar`, "primary", "deny", ["W"]],
+		[`git archive HEAD --output=${primary}/x.tar`, "own", "deny", ["U"]],
 		[`git bundle create ${live}/x.bundle HEAD`, "other-live", "deny", ["W"]],
 		["git pull origin main", "own", "allow", ["W"]],
 		["git pull origin main:main", "own", "deny", ["D"]],

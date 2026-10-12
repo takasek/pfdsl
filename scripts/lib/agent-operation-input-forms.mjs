@@ -21,6 +21,12 @@ export function parseInputForm(tokens, name) {
 		}
 		if (afterDash || !token.value.startsWith("-") || token.value === "-") {
 			operands.push(token);
+			if (
+				name === "git config" &&
+				operands.length === 1 &&
+				token.value.includes(".")
+			)
+				afterDash = true;
 			continue;
 		}
 		const equal = token.value.indexOf("=");
@@ -57,4 +63,23 @@ export function parseInputForm(tokens, name) {
 		issues: [...new Set(issues)],
 		unknownOptions: [...new Set(unknownOptions)],
 	};
+}
+
+export function decisionArgumentIssues(
+	parsed,
+	argumentsToInspect,
+	indirectFlags = [],
+) {
+	const issues = [...parsed.issues];
+	if (indirectFlags.some((flag) => parsed.flags.has(flag)))
+		issues.push(
+			indirectFlags.includes("--input") ? "indirect-file" : "indirect-stdin",
+		);
+	for (const token of argumentsToInspect.filter(Boolean)) {
+		if (token.dynamic) issues.push("dynamic-argument");
+		else if (token.value === "-" || token.value === "@-")
+			issues.push("indirect-stdin");
+		else if (token.value.startsWith("@")) issues.push("indirect-file");
+	}
+	return [...new Set(issues)];
 }

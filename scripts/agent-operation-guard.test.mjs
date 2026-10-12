@@ -21,6 +21,8 @@ const helperFiles = [
 	"agent-operation-guard.mjs",
 	"setup-shell-parser.mjs",
 	"lib/agent-operation-classifier.mjs",
+	"lib/agent-operation-input-forms.mjs",
+	"lib/agent-operation-option-table.json",
 	"lib/agent-operation-table.mjs",
 	"lib/agent-operation-policy.mjs",
 	"lib/agent-operation-environment.mjs",

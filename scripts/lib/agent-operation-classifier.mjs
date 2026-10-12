@@ -1,6 +1,11 @@
 // Pure operation adapter: callers parse shell and observe Git/fs outside here.
 // Injected ownership records must already be validated native evidence.
 import { basename, isAbsolute, resolve } from "node:path";
+import {
+	AGENT_OPERATION_INPUT_FORMS,
+	decisionArgumentIssues,
+	parseInputForm,
+} from "./agent-operation-input-forms.mjs";
 import { hasGitTargetEnvironment } from "./git-environment.mjs";
 
 const GIT_READ = new Set([
@@ -93,7 +98,7 @@ const CONFIG_READ = new Set([
 const GH_READ = {
 	pr: ["view", "list", "status", "checks", "diff"],
 	issue: ["view", "list", "status"],
-	run: ["view", "list", "watch", "download"],
+	run: ["view", "list", "watch"],
 	repo: ["view", "list"],
 	auth: ["status"],
 	search: ["code", "commits", "issues", "prs", "repos"],
@@ -215,6 +220,81 @@ const defaultRef = (value, facts) =>
 	value === facts.defaultBranch ||
 	value === `refs/heads/${facts.defaultBranch}`;
 
+function withInputIssues(
+	result,
+	subcommand,
+	parsed,
+	sensitive = [],
+	indirectFlags = [],
+) {
+	const issues = decisionArgumentIssues(parsed, sensitive, indirectFlags);
+	if (issues.length)
+		result.classes = [
+			...new Set([
+				...result.classes.filter((klass) =>
+					["P", "X", "D", "S"].includes(klass),
+				),
+				"U",
+			]),
+		];
+	if (result.classes.includes("U")) {
+		result.subcommand = subcommand;
+		result.unresolvedReasons = issues.length
+			? issues
+			: ["unresolved-target-or-command"];
+		result.unknownOptions = parsed.unknownOptions;
+	}
+	return result;
+}
+
+function gitDecisionArguments(sub, parsed, classes) {
+	const { operands, values } = parsed;
+	const at = (...indices) => indices.map((index) => operands[index]);
+	const option = (...flags) =>
+		values.filter(({ flag }) => flags.includes(flag));
+	if (["branch", "switch", "checkout"].includes(sub))
+		return classes.includes("R") || classes.includes("W")
+			? []
+			: [
+					...operands,
+					...option(
+						"-b",
+						"-B",
+						"-c",
+						"-C",
+						"--create",
+						"--force-create",
+						"--set-upstream-to",
+						"-u",
+					),
+				];
+	if (["fetch", "pull"].includes(sub)) return operands.slice(1);
+	if (sub === "update-ref") return at(0);
+	if (
+		["remote", "stash", "sparse-checkout", "submodule", "bisect"].includes(sub)
+	)
+		return at(0);
+	if (sub === "config")
+		return [
+			operands[["get", "set", "unset"].includes(operands[0]?.value) ? 1 : 0],
+		];
+	if (sub === "symbolic-ref") return classes.includes("R") ? [] : operands;
+	if (sub === "init") return at(0);
+	if (sub === "clone") return at(1);
+	if (["archive", "format-patch"].includes(sub)) return option("-o");
+	if (sub === "bundle")
+		return operands[0]?.value === "create" ? at(0, 1) : at(0);
+	if (sub === "worktree")
+		return [
+			...at(0),
+			...(["add", "remove"].includes(operands[0]?.value) ? at(1) : []),
+			...(operands[0]?.value === "add"
+				? [...at(2), ...option("-b", "-B")]
+				: []),
+		];
+	return [];
+}
+
 function gitOperation(command, context, facts) {
 	const assignments = Object.fromEntries(
 		command.tokens
@@ -245,13 +325,18 @@ function gitOperation(command, context, facts) {
 	let explicitAbsolute = false;
 	let dynamicTarget = Boolean(targetOverride);
 	let bypass = false;
+	const globalIssues = [];
 	while (i < tokens.length && tokens[i].value.startsWith("-")) {
 		const value = tokens[i].value;
 		if (["--help", "--version"].includes(value))
 			return operation(["R"], "git", pathFacts(path, facts));
 		if (value === "-C") {
 			const target = tokens[++i];
+			globalIssues.push(
+				...decisionArgumentIssues({ issues: [], flags: new Set() }, [target]),
+			);
 			dynamicTarget ||= !target || Boolean(target.dynamic);
+			dynamicTarget ||= globalIssues.length > 0;
 			explicitAbsolute = Boolean(
 				target && !target.dynamic && isAbsolute(target.value),
 			);
@@ -280,46 +365,33 @@ function gitOperation(command, context, facts) {
 				"--no-optional-locks",
 			].includes(value)
 		)
-			return unresolved("git");
+			return operation(bypass ? ["X", "U"] : ["U"], "git", null, {
+				subcommand: "git",
+				unresolvedReasons: ["unknown-option"],
+				unknownOptions: /^--?[A-Za-z0-9][A-Za-z0-9-]*$/.test(value)
+					? [value]
+					: [],
+			});
 		i++;
 	}
 	const sub = tokens[i];
 	if (!sub || sub.dynamic) return unresolved("git");
 	const args = tokens.slice(i + 1);
-	// -f is force for branches/worktrees, but a value flag for config and gh.
-	const flagsWithValues = new Set(VALUE_FLAGS);
-	if (sub.value !== "config") flagsWithValues.delete("-f");
-	if (sub.value === "branch") flagsWithValues.delete("-m");
-	if (["switch", "checkout"].includes(sub.value))
-		for (const flag of ["-c", "-C", "--create", "--force-create", "-b", "-B"])
-			flagsWithValues.add(flag);
-	if (sub.value === "worktree")
-		for (const flag of ["-b", "-B"]) flagsWithValues.add(flag);
-	if (["archive", "format-patch"].includes(sub.value))
-		for (const flag of ["-o", "--output", "--output-directory"])
-			flagsWithValues.add(flag);
-	if (["init", "clone"].includes(sub.value))
-		for (const flag of [
-			"--template",
-			"--initial-branch",
-			"-b",
-			"--branch",
-			"--depth",
-			"--reference",
-			"--origin",
-			"-o",
-		])
-			flagsWithValues.add(flag);
-	const parsed = scan(args, flagsWithValues, sub.value === "config");
+	const parsed = parseInputForm(args, `git ${sub.value}`);
+	parsed.issues.push(...globalIssues);
 	const { operands, flags } = parsed;
 	const location = pathFacts(path, facts);
-	if (flags.has("--help") || flags.has("--version") || flags.has("-h"))
+	if (
+		!parsed.issues.length &&
+		(flags.has("--help") || flags.has("--version") || flags.has("-h"))
+	)
 		return operation(["R"], "git", location);
 	let classes;
 	let scope = "repository";
 	let action;
 	let force;
 	let effective = location;
+	let creation;
 	const destination = (token) =>
 		pathFacts(
 			token && !token.dynamic && path
@@ -524,7 +596,10 @@ function gitOperation(command, context, facts) {
 			classes = ["D"];
 		if (changedRefs.some(({ dynamic }) => dynamic)) classes.push("U");
 		const busy = changedRefs
-			.map(({ value }) => facts.branches?.[value]?.checkedOutAt)
+			.map(
+				({ value }) =>
+					facts.branches?.[value.replace(/^refs\/heads\//, "")]?.checkedOutAt,
+			)
 			.find((root) => root && root !== location.tree?.root);
 		if (busy && !classes.includes("R") && !classes.includes("D"))
 			effective = pathFacts(busy, facts);
@@ -534,8 +609,38 @@ function gitOperation(command, context, facts) {
 			const created = parsed.values.find(({ flag }) =>
 				["-b", "-B"].includes(flag),
 			);
-			classes = [created && defaultRef(created.value, facts) ? "D" : "B"];
+			classes = [
+				(created && defaultRef(created.value, facts)) ||
+				(!created &&
+					!flags.has("--detach") &&
+					defaultRef(operands[2]?.value, facts))
+					? "D"
+					: "B",
+			];
 			if (created?.dynamic) classes.push("U");
+			const target = destination(operands[1]);
+			const nested =
+				["other-live", "other-unowned"].includes(target.target) &&
+				target.executionPath !== target.tree?.root;
+			creation = operation(
+				[
+					nested
+						? "W"
+						: target.target === "unresolved"
+							? "U"
+							: classes.includes("D")
+								? "D"
+								: "B",
+				],
+				"git",
+				{
+					...target,
+					target:
+						nested || target.target === "unresolved"
+							? target.target
+							: "scratch",
+				},
+			);
 		} else if (verb === "remove") {
 			classes = ["W"];
 			action = "worktree-remove";
@@ -589,7 +694,7 @@ function gitOperation(command, context, facts) {
 		if (
 			bypass ||
 			flags.has("--no-verify") ||
-			(["commit", "push", "am"].includes(sub.value) && flags.has("-n"))
+			(["commit", "am"].includes(sub.value) && flags.has("-n"))
 		)
 			classes.push("X");
 		if (
@@ -608,10 +713,29 @@ function gitOperation(command, context, facts) {
 		classes = classes.filter((klass) =>
 			["U", "P", "X", "D", "S"].includes(klass),
 		);
-	return operation(classes, "git", effective, {
-		scope,
-		...(action ? { action, force } : {}),
-	});
+	const result = withInputIssues(
+		operation(classes, "git", effective, {
+			scope,
+			...(action ? { action, force } : {}),
+		}),
+		`git ${sub.value}`,
+		parsed,
+		gitDecisionArguments(sub.value, parsed, classes),
+		["fetch", "pull", "update-ref", "sparse-checkout"].includes(sub.value)
+			? ["--stdin"]
+			: [],
+	);
+	return creation
+		? [
+				result,
+				withInputIssues(
+					creation,
+					`git ${sub.value}`,
+					parsed,
+					gitDecisionArguments(sub.value, parsed, classes),
+				),
+			]
+		: result;
 }
 
 function ghOperation(tokens) {
@@ -643,19 +767,26 @@ function ghOperation(tokens) {
 		(initialGroup === "auth" && initialVerb === "logout")
 	)
 		valueFlags.add("-h");
-	const parsed = scan(args, valueFlags);
+	const name =
+		initialGroup === "api" ? "gh api" : `gh ${initialGroup} ${initialVerb}`;
+	const parsed = parseInputForm(args, name);
 	const { operands, flags, values } = parsed;
 	const group = operands[0]?.value;
 	const verb = operands[1]?.value;
+	if (!AGENT_OPERATION_INPUT_FORMS[name] && group !== "help")
+		return unresolved("remote");
+	const finish = (result, sensitive = [], indirectFlags = []) =>
+		withInputIssues(result, name, parsed, sensitive, indirectFlags);
 	if (
 		group === "help" ||
-		flags.has("--help") ||
-		flags.has("--version") ||
-		(flags.has("-h") && !valueFlags.has("-h"))
+		(!parsed.issues.length &&
+			(flags.has("--help") ||
+				flags.has("--version") ||
+				(flags.has("-h") && !valueFlags.has("-h"))))
 	)
 		return operation(["R"], "remote", { target: "own" });
 	if (group === "pr" && verb === "merge")
-		return operation(["O", "P"], "remote", { target: "own" });
+		return finish(operation(["O", "P"], "remote", { target: "own" }));
 	if (group === "api") {
 		const endpoint = operands[1]?.value;
 		const method = values.findLast(
@@ -667,6 +798,14 @@ function ghOperation(tokens) {
 		const query = fields
 			.find(({ value }) => value.startsWith("query="))
 			?.value.slice(6);
+		const queryToken = fields.find(({ value }) => value.startsWith("query="));
+		const sensitive = [
+			operands[1],
+			values.findLast(({ flag }) => ["-X", "--method"].includes(flag)),
+			...(queryToken
+				? [{ ...queryToken, value: queryToken.value.slice(6) }]
+				: []),
+		];
 		const read = method
 			? ["GET", "HEAD"].includes(method.toUpperCase())
 			: !fields.length;
@@ -679,19 +818,34 @@ function ghOperation(tokens) {
 			/\b(?:mergePullRequest|enqueuePullRequest|enablePullRequestAutoMerge)\s*\(/.test(
 				query ?? "",
 			);
-		if (merge) return operation(["O", "P"], "remote", { target: "own" });
-		if (endpoint === "graphql")
-			return operation(
-				[query && /^\s*(?:query\b|\{)/.test(query) ? "R" : "O"],
-				"remote",
-				{ target: "own" },
+		if (merge)
+			return finish(
+				operation(["O", "P"], "remote", { target: "own" }),
+				sensitive,
+				["--input"],
 			);
-		return operation([read ? "R" : "O"], "remote", { target: "own" });
+		if (endpoint === "graphql")
+			return finish(
+				operation(
+					[query && /^\s*(?:query\b|\{)/.test(query) ? "R" : "O"],
+					"remote",
+					{ target: "own" },
+				),
+				sensitive,
+				["--input"],
+			);
+		return finish(
+			operation([read ? "R" : "O"], "remote", { target: "own" }),
+			sensitive,
+			["--input"],
+		);
 	}
+	if (group === "run" && verb === "download")
+		return finish(operation(["W"], "remote", { target: "own" }));
 	if (GH_READ[group]?.includes(verb))
-		return operation(["R"], "remote", { target: "own" });
+		return finish(operation(["R"], "remote", { target: "own" }));
 	if (GH_WRITE[group]?.includes(verb))
-		return operation(["O"], "remote", { target: "own" });
+		return finish(operation(["O"], "remote", { target: "own" }));
 	return unresolved("remote");
 }
 
@@ -789,7 +943,7 @@ export function classifyAgentOperations(payload, facts) {
 	} else if (["Bash", "exec_command"].includes(payload.tool_name)) {
 		operations = (facts.shell?.commands ?? [])
 			.filter((node) => !node.isLeadingCd)
-			.map((node) => {
+			.flatMap((node) => {
 				if (node.unresolvedExecution) return unresolved();
 				const executableIndex = node.executableIndex ?? 0;
 				const head = node.tokens[executableIndex];

@@ -1324,6 +1324,14 @@
 			"arity": "none",
 			"count": 0
 		},
+		"--notes": {
+			"arity": "required",
+			"count": 0
+		},
+		"--notes-file": {
+			"arity": "required",
+			"count": 0
+		},
 		"--repo": {
 			"arity": "required",
 			"count": 0
@@ -1346,6 +1354,14 @@
 			"arity": "none",
 			"count": 0
 		},
+		"--notes": {
+			"arity": "required",
+			"count": 0
+		},
+		"--notes-file": {
+			"arity": "required",
+			"count": 0
+		},
 		"--repo": {
 			"arity": "required",
 			"count": 0
@@ -1366,6 +1382,14 @@
 	"gh release edit": {
 		"--help": {
 			"arity": "none",
+			"count": 0
+		},
+		"--notes": {
+			"arity": "required",
+			"count": 0
+		},
+		"--notes-file": {
+			"arity": "required",
 			"count": 0
 		},
 		"--repo": {
@@ -1394,6 +1418,10 @@
 			"arity": "none",
 			"count": 0
 		},
+		"--name": {
+			"arity": "required",
+			"count": 0
+		},
 		"--private": {
 			"arity": "none",
 			"count": 3
@@ -1406,8 +1434,16 @@
 			"arity": "none",
 			"count": 0
 		},
+		"-d": {
+			"arity": "required",
+			"count": 0
+		},
 		"-h": {
-			"arity": "none",
+			"arity": "required",
+			"count": 0
+		},
+		"-n": {
+			"arity": "required",
 			"count": 0
 		},
 		"-R": {
@@ -1416,8 +1452,16 @@
 		}
 	},
 	"gh repo delete": {
+		"--description": {
+			"arity": "required",
+			"count": 0
+		},
 		"--help": {
 			"arity": "none",
+			"count": 0
+		},
+		"--name": {
+			"arity": "required",
 			"count": 0
 		},
 		"--repo": {
@@ -1428,8 +1472,16 @@
 			"arity": "none",
 			"count": 0
 		},
+		"-d": {
+			"arity": "required",
+			"count": 0
+		},
 		"-h": {
-			"arity": "none",
+			"arity": "required",
+			"count": 0
+		},
+		"-n": {
+			"arity": "required",
 			"count": 0
 		},
 		"-R": {
@@ -1438,8 +1490,16 @@
 		}
 	},
 	"gh repo edit": {
+		"--description": {
+			"arity": "required",
+			"count": 0
+		},
 		"--help": {
 			"arity": "none",
+			"count": 0
+		},
+		"--name": {
+			"arity": "required",
 			"count": 0
 		},
 		"--repo": {
@@ -1450,8 +1510,16 @@
 			"arity": "none",
 			"count": 0
 		},
+		"-d": {
+			"arity": "required",
+			"count": 0
+		},
 		"-h": {
-			"arity": "none",
+			"arity": "required",
+			"count": 0
+		},
+		"-n": {
+			"arity": "required",
 			"count": 0
 		},
 		"-R": {
@@ -1460,8 +1528,16 @@
 		}
 	},
 	"gh repo list": {
+		"--description": {
+			"arity": "required",
+			"count": 0
+		},
 		"--help": {
 			"arity": "none",
+			"count": 0
+		},
+		"--name": {
+			"arity": "required",
 			"count": 0
 		},
 		"--repo": {
@@ -1472,8 +1548,16 @@
 			"arity": "none",
 			"count": 0
 		},
+		"-d": {
+			"arity": "required",
+			"count": 0
+		},
 		"-h": {
-			"arity": "none",
+			"arity": "required",
+			"count": 0
+		},
+		"-n": {
+			"arity": "required",
 			"count": 0
 		},
 		"-R": {
@@ -1482,6 +1566,10 @@
 		}
 	},
 	"gh repo view": {
+		"--description": {
+			"arity": "required",
+			"count": 0
+		},
 		"--help": {
 			"arity": "none",
 			"count": 0
@@ -1494,6 +1582,10 @@
 			"arity": "required",
 			"count": 6
 		},
+		"--name": {
+			"arity": "required",
+			"count": 0
+		},
 		"--repo": {
 			"arity": "required",
 			"count": 0
@@ -1502,8 +1594,16 @@
 			"arity": "none",
 			"count": 0
 		},
+		"-d": {
+			"arity": "required",
+			"count": 0
+		},
 		"-h": {
-			"arity": "none",
+			"arity": "required",
+			"count": 0
+		},
+		"-n": {
+			"arity": "required",
 			"count": 0
 		},
 		"-R": {
@@ -1896,6 +1996,10 @@
 		}
 	},
 	"git apply": {
+		"--check": {
+			"arity": "none",
+			"count": 0
+		},
 		"--help": {
 			"arity": "none",
 			"count": 0
@@ -2082,6 +2186,10 @@
 		},
 		"-u": {
 			"arity": "required",
+			"count": 0
+		},
+		"-vv": {
+			"arity": "none",
 			"count": 0
 		}
 	},
