@@ -584,3 +584,79 @@ for (const tab of TABS)
 					assert.deepEqual(violations, [], label);
 				});
 			}
+
+/** Fails Save As to B with a conflict, leaving A open with B as the recovery target. */
+async function failSaveAs() {
+	const native = new FakeNative();
+	const a = native.add(1, "a.pfdsl", TEXT.disk);
+	const b = native.add(2, "b.pfdsl", "old B\n");
+	const host = await startHost(native, a, {
+		choose() {
+			// B changes right after it was inspected, so the Save As is refused.
+			const chosen = native.snapshot(b);
+			b.file = {
+				source: "external B\n",
+				ino: ++native.ino,
+				mtime: ++native.clock,
+			};
+			return chosen;
+		},
+		confirm: async () => "cancel",
+	});
+	const entry = await host.open(a);
+	entry.tab.type(TEXT.edited);
+	await host.click(host.query("#save-as"));
+	assert.equal(entry.session.disk.id, 1);
+	assert.equal(entry.session.pendingTarget.id, 2);
+	assert.equal(entry.session.observed.id, 2);
+	host.log.length = 0;
+	return { native, a, b, host, entry };
+}
+
+test("Save after a failed Save As still reviews and replaces the original document", async () => {
+	const { native, a, host, entry } = await failSaveAs();
+	try {
+		a.file = {
+			source: "external A\n",
+			ino: ++native.ino,
+			mtime: ++native.clock,
+		};
+		await host.cmdS();
+		const dialog = host.log.find((item) => item.kind === "dialog");
+		assert.equal(dialog.title, "Review the target");
+		assert.equal(dialog.disk, "external A\n");
+		const saves = host.log.filter((item) => item.kind === "save");
+		assert.deepEqual(
+			saves.map((item) => [item.id, item.expected]),
+			[[1, dialog.fsById[1].revision]],
+		);
+		assert.equal(a.file.source, TEXT.edited);
+		assert.equal(entry.session.disk.id, 1);
+		assert.equal(entry.session.isDirty(), false);
+	} finally {
+		assert.deepEqual(await host.finish(), []);
+	}
+});
+
+test("Review and Save Here inspects the recovery target again", async () => {
+	const { native, b, host, entry } = await failSaveAs();
+	try {
+		b.file = { source: "later B\n", ino: ++native.ino, mtime: ++native.clock };
+		const button = host
+			.queryAll("#conflicts button")
+			.find((item) => item.textContent === "Review and Save Here…");
+		await host.click(button);
+		const dialog = host.log.find((item) => item.kind === "dialog");
+		assert.equal(dialog.title, "Review the target");
+		assert.equal(dialog.disk, "later B\n");
+		const saves = host.log.filter((item) => item.kind === "save");
+		assert.deepEqual(
+			saves.map((item) => [item.id, item.expected]),
+			[[2, dialog.fsById[2].revision]],
+		);
+		assert.equal(b.file.source, TEXT.edited);
+		assert.equal(entry.session.disk.id, 2);
+	} finally {
+		assert.deepEqual(await host.finish(), []);
+	}
+});
