@@ -98,7 +98,7 @@ function physicalPath(path, facts) {
 function pathFacts(path, facts) {
 	if (!path || !isAbsolute(path))
 		return { target: "unresolved", executionPath: null };
-	const executionPath = physicalPath(resolve(path), facts);
+	const executionPath = resolve(physicalPath(path, facts));
 	const tree = (facts.worktrees ?? [])
 		.filter(({ root }) => under(executionPath, root))
 		.sort((a, b) => b.root.length - a.root.length)[0];
@@ -173,7 +173,7 @@ function gitOperation(command, context, facts) {
 	let i = 1;
 	let path = command.unresolvedCwd ? null : context.cwd;
 	for (const cd of command.leadingCd ?? [])
-		path = path ? resolve(path, cd) : null;
+		path = path ? (isAbsolute(cd) ? cd : `${path}/${cd}`) : null;
 	let explicitAbsolute = false;
 	let dynamicTarget = false;
 	let bypass = false;
@@ -190,9 +190,9 @@ function gitOperation(command, context, facts) {
 			path =
 				!dynamicTarget && target
 					? isAbsolute(target.value)
-						? resolve(target.value)
+						? target.value
 						: path
-							? resolve(path, target.value)
+							? `${path}/${target.value}`
 							: null
 					: null;
 		} else if (
@@ -351,7 +351,11 @@ function gitOperation(command, context, facts) {
 			force = ["--force", "-f", "-ff"].some((flag) => flags.has(flag));
 			const target = operands[1];
 			effective = pathFacts(
-				target && !target.dynamic && path ? resolve(path, target.value) : null,
+				target && !target.dynamic && path
+					? isAbsolute(target.value)
+						? target.value
+						: `${path}/${target.value}`
+					: null,
 				facts,
 			);
 		} else classes = [verb === "list" ? "R" : "U"];
@@ -495,9 +499,9 @@ function fileOperations(payload, context, facts) {
 		const location = pathFacts(
 			typeof path === "string" && !missingAbsolute
 				? isAbsolute(path)
-					? resolve(path)
+					? path
 					: context.cwd
-						? resolve(context.cwd, path)
+						? `${context.cwd}/${path}`
 						: null
 				: null,
 			facts,

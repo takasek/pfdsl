@@ -518,6 +518,25 @@ export const AGENT_OPERATION_CORPUS = [
 		},
 		target: "other-live",
 	}),
+	example("resolution-physical-parent-after-symlink", null, "deny", {
+		facts: { physicalPaths: { [`${own}/link/../a`]: `${primary}/a` } },
+		tool: {
+			name: "Write",
+			input: { file_path: `${own}/link/../a`, content: "x" },
+		},
+		target: "primary",
+		executionPath: `${primary}/a`,
+	}),
+	example(
+		"resolution-Git-physical-parent-after-symlink",
+		`git -C ${own}/link/.. add a`,
+		"deny",
+		{
+			facts: { physicalPaths: { [`${own}/link/..`]: primary } },
+			target: "primary",
+			executionPath: primary,
+		},
+	),
 	example("resolution-move-patch", null, "deny", {
 		tool: {
 			name: "apply_patch",
