@@ -73,13 +73,19 @@ t-wadaのTDDで。適切な粒度でコミットすること。
 
 ただし事後的な分割（先に一括で変更してから複数コミットへ割り直す）が中間ファイル再構成等でトークン効率を著しく損なう場合は、論理単位の純度より作業順=コミット順を優先してよい。
 
-変更束はブランチで作業し PR で main に統合する（main 直コミットしない。生態系図の develop→PR→merge_pr が正規経路）。`scripts/main-commit-guard.mjs`（PreToolUse(Bash) hook）は、mainまたはsibling worktreeを対象にする変更系Gitを保護する。ツールに渡すパスと実行worktreeを一致させる。
-main上では新しい状態を作る操作をdenyとし、破壊・復元操作はClaude Codeでask、askを表現できないCodexでfail-closed denyとする。
-sessionのrootと異なる同一repositoryのworktreeは、native所有証拠を確認できる場合だけownへ補正する。照合条件と対象範囲は [ADR-0046](docs/adr/0046-native-worktree-ownership.md) を一次情報とする。確認できなければClaude Codeでask、Codexでfail-closed denyとする。cwdへの移動だけでは所有者の根拠にならない。この補正はmain/default branchや検査回避の保護を免除しない。
-保護の範囲はこのリポジトリのcheckoutに限る。targetのgit common dirがsessionのものと異なれば、ブランチ名が `main` でも素通しする（使い捨てsandboxの既定ブランチが `main` になるため）。
-変更系Gitの実効targetをshell構文から確定できない場合はfail closedとする。
-検査を飛ばすコマンド（`--no-verify`/`-n`、`-c`・`--config-env`・`git config` 経由の `core.hooksPath` 上書き）はforeign target以外、branch・worktreeを問わずdenyとし、`git config` の `--global`/`--system`/`--file`・`-f`（`--file`・`-f` は指す先を問わず対象）はforeign targetでもdenyとする（#1232）。
-sessionまたはtargetのgit rootsを解決できない場合は管轄外と区別し、ブランチ名規則を適用したままにする（targetのブランチ名が読めなければそもそもブランチ名規則が発火しないため、これが保護として効くのはsession側だけが解決できない場合である）。分類と構文対応の一次情報は `scripts/lib/main-commit-guard.mjs` とする。
+変更束はブランチで作業し PR で main に統合する（main 直コミットしない）。
+`scripts/agent-operation-guard.mjs` は Bash・GitHub MCP・Edit・Write・apply_patch の操作先と責務を、ADR-0047 の有限の判定表で判定する。
+primary・default branch・検査回避・PR 統合・別 worktree の変更を保護し、own での通常作業を許可する。
+session の起点と native 所有証拠は所有判定に使い、実行先は literal な先頭 cd の AND-list、git -C、削除対象、書込み先の物理パスから決める。
+other-live・other-unowned の変更は全主体 deny とし、own の repository 設定だけ Claude 親 ask とする。
+Claude subagent の外向き書込みは親へ返し、agent_type の許可表にある issue-worker だけを例外とする。
+Codex の子は読取と own の通常ファイルの書込みだけを担当する。
+ロード故障・同期停止・未解決入力は回復先を示して deny し、parser 欠落時は案内にある hook root 固定の回復コマンドだけを許可する。
+保証外の shell・Git 構文を増やさず、未決点は所有者へ記録する。
+{{#codex}}
+変更系 Git は `git -C <絶対パス>`、apply_patch の対象も絶対パスを既定の書き方にする。
+exec_command.workdir は hook に届かないため、実行先の証拠にしない。
+{{/codex}}
 
 コミットメッセージは**英語**。
 

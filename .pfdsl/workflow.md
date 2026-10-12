@@ -57,8 +57,10 @@ pre-commitを経由しないref操作の保護と、repo policyのロード失�
 
 **worktree での git 操作**: `git commit` など git コマンドは worktree ディレクトリを指して実行する（理由は `.pfdsl/bindings/pfd-ops.md`「ワークサイクルの追加手順」の「手順 2 の追加で worktree 上の変更を検証する」が一次情報）。
 **worktree のパスはシェル変数に入れず literal で書く**。
-`scripts/main-commit-guard.mjs`（#777。deny / ask の割り当ては CLAUDE.md「コミット粒度」節が一次情報）の command target 解決は静的解析なので `git -C $W commit` の `$W` を解決できず、fail closed して deny する。
-`git -C /workspace/.claude/worktrees/<name> commit` と literal で書けば target が解決される。session の root と一致するか、同一 repository の sibling で native 所有者を確認できれば own として判定する（ADR-0046）。native 所有証拠を確認できなければ Claude Code では ask、Codex では deny を維持する。cwd への移動だけで所有者と判断しない。main/default branch と検査回避は own でも保護する。
+`scripts/agent-operation-guard.mjs` の実行先解決は ADR-0047 に従い、先頭の literal cd の AND-list と literal git -C に限定する。
+Codex の変更系 Git は `git -C <絶対パス>`、apply_patch は絶対パスを既定とする。
+所有は session の起点と ADR-0046 の native 所有証拠で判定し、other-live・other-unowned の変更は全主体 deny とする。
+main/default branch と検査回避は own でも保護する。
 なお deny は Bash 呼び出し全体を止めるため、`git -C $W add … && git -C $W commit …` が弾かれたときは add も実行されていない。
 
 ## develop のレビュー
@@ -368,7 +370,7 @@ repo scope の agent（`ci-triage` 等、このリポの開発都合の道具）
 worktree 作成から PR 作成までを一気通貫でやらせる場合のみ `issue-worker` を使う。
 `pfd-implementer.md` は `gen_plugin` が plugin へミラーする配布物でもあるため、リポ固有の agent 名・スクリプトパスを本文に書かない。
 
-**2. PreToolUse hook。** 実装は `scripts/delegation-guard.mjs`、allowlist は `scripts/lib/delegation-guard.mjs` の `DEFAULT_ALLOWED_AGENTS`。
+**2. PreToolUse hook。** 実装は `scripts/agent-operation-guard.mjs`、allowlist は `scripts/lib/agent-operation-table.mjs` の `DEFAULT_ALLOWED_AGENTS`。
 `settings.json` の `permissions.deny` を使わないのは、プロジェクト全体に効いて呼び出し元と `issue-worker` まで巻き込むため。
 
 **3. 戻り時の検出。** 汎用手順のまま（`git log origin/<branch>..HEAD` と open PR 一覧の突合）。このリポ固有の追加値はない。
@@ -377,7 +379,8 @@ worktree 作成から PR 作成までを一気通貫でやらせる場合のみ 
 
 一般形は上の「workflow.pfdsl に登録する agent の範囲」と同じく、pfd-ops の `references/work-cycle.md`「成果物の門番」が一次情報。
 このリポでの適用対象は `.claude/settings.json` に配線された hook 全般（PreToolUse ガードと PostToolUse advisory の双方）で、登録先は対象 artifact の分類と producer 関係を記録する `workflow.pfdsl`。
-登録しない側に当たるのは `command-usage-guard` / `closes-create-guard` / `roadmap-publish-guard` / `verification-tree-guard` / `worktree-write-guard` 等で、いずれも個別事故への対処であって図のプロセスの出力ではない。
+登録しない側に当たるのは `command-usage-guard` / `closes-create-guard` / `roadmap-publish-guard` / `verification-tree-guard` 等で、いずれも個別事故への対処であって図のプロセスの出力ではない。
+`agent-operation-guard` は既存の委譲と作業先の保護責務を統合し、図に登録した2つの責務の実装先を共有する。
 
 artifact 登録済みの一覧とそれぞれの要求元は `workflow.pfdsl` の artifact 定義と各 artifact の producer 関係が一次情報。`node packages/cli/dist/cli.js graph neighbors .pfdsl/workflow.pfdsl <hook artifact ID>` で対象 hook artifact の producer を引き、artifact 定義を参照する。
 PostToolUse advisory であっても、要求元の手順を名指しできれば登録側になる。advisory か guard かは判定軸ではなく、要求元の手順を名指しできるかどうかで判定する。
