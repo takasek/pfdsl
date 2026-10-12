@@ -117,6 +117,34 @@ function example(
 // and, where present, its independently specified safety case.
 export const AGENT_OPERATION_CORPUS = [
 	...[
+		"--list",
+		"-l",
+		"-a",
+		"-r",
+		"--merged",
+		"--no-merged",
+		"--contains",
+		"--no-contains",
+		"--points-at",
+	].flatMap((option, i) =>
+		["claude-parent", "codex-child"].map((subject) =>
+			example(
+				`branch-list-filter-${i}-${subject}`,
+				`git -C ${own} branch ${option} main`,
+				"allow",
+				{ subject, classes: ["R"], target: "own" },
+			),
+		),
+	),
+	...["-f", "-D"].map((option, i) =>
+		example(
+			`branch-default-mutation-${i}`,
+			`git -C ${own} branch ${option} main`,
+			"deny",
+			{ classes: ["D"], target: "own" },
+		),
+	),
+	...[
 		"--set-upstream-to=origin/main",
 		"--set-upstream-to origin/main",
 		"-u origin/main",

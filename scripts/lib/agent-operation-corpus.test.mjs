@@ -29,8 +29,13 @@ for (const property of [1, 2]) {
 			await t.test(example.id, () => {
 				for (const step of example.steps ?? [example]) {
 					const classified = classify(step);
+					const diagnostic = `${step.id} [${classified.failure ?? "healthy"}]`;
 					assert.equal(classified.subject, step.subject);
-					assert.equal(evaluate(classified).decision, step.expected, step.id);
+					assert.equal(
+						evaluate(classified).decision,
+						step.expected,
+						diagnostic,
+					);
 					if (step.classes)
 						assert.deepEqual(
 							[
@@ -39,7 +44,7 @@ for (const property of [1, 2]) {
 								),
 							].sort(),
 							[...step.classes].sort(),
-							step.id,
+							diagnostic,
 						);
 				}
 			});
@@ -53,14 +58,15 @@ test("property 7: execution uses explicit Git, remove and physical file targets 
 	assert.ok(cases.length >= 15);
 	for (const example of cases) {
 		const classified = classify(example);
+		const diagnostic = `${example.id} [${classified.failure ?? "healthy"}]`;
 		const operation = classified.operations.find(({ kind }) =>
 			["git", "file"].includes(kind),
 		);
-		assert.ok(operation, example.id);
+		assert.ok(operation, diagnostic);
 		if (example.target)
-			assert.equal(operation.target, example.target, example.id);
+			assert.equal(operation.target, example.target, diagnostic);
 		if (example.executionPath)
-			assert.equal(operation.executionPath, example.executionPath, example.id);
+			assert.equal(operation.executionPath, example.executionPath, diagnostic);
 	}
 });
 

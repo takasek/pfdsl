@@ -463,8 +463,17 @@ function gitOperation(command, context, facts) {
 		classes = [
 			sub.value === "branch" &&
 			((!operands.length && !branchMutation) ||
-				flags.has("--list") ||
-				flags.has("-l"))
+				[
+					"--list",
+					"-l",
+					"-a",
+					"-r",
+					"--merged",
+					"--no-merged",
+					"--contains",
+					"--no-contains",
+					"--points-at",
+				].some((flag) => flags.has(flag)))
 				? "R"
 				: "B",
 		];
