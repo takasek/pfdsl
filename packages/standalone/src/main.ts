@@ -456,9 +456,11 @@ function renderConflict() {
 		const summary = document.createElement("summary");
 		summary.textContent = "Observed external version";
 		const text = document.createElement("pre");
-		text.textContent =
-			entry.session.conflict?.source ??
-			"The current disk content could not be confirmed.";
+		// Compare against the snapshot the buttons below act on.
+		const observed = entry.session.observed;
+		text.textContent = observed
+			? (observed.source ?? "File is missing")
+			: "The current disk content could not be confirmed.";
 		preview.append(summary, text);
 		conflicts.append(preview);
 		const replace = document.createElement("button");
