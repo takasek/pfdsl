@@ -335,10 +335,11 @@ release runner の `migration-guide` ゲートが CLI/plugin の公開で確か�
 
 **vscode-extension を変更した場合**: `pnpm --filter @pfdsl/vscode-extension typecheck` を実行してエラーがないことを確認してからコミットする。`noUncheckedIndexedAccess` / `exactOptionalPropertyTypes` の strict 設定により、他パッケージの型変更が vscode-extension 側でエラーを起こす場合がある。vscode-extension の挙動変更全体を実動作確認の対象とする。クリック・ホバー等の UI 挙動変更（DocumentLinkProvider・HoverProvider 等）や preview/export の描画内容変更（statusStyles・tag・group 解決ロジック等）はその例である。挙動変更を含む場合は `/vscode-ext-debug` スキルで PR 作成前にビルド後の実動作を確認し、ユーザーの確認結果を受け取るまで完了とみなさない。
 
-## subagent へ worktree 作成を委譲する場合の安全確認
+## subagent の worktree 隔離の安全確認
 
 一般形は `.pfdsl/bindings/pfd-ops.md`「ワークサイクルの追加手順」の「適用点 3 と 3 層制御で実装を委譲し外向き操作を制御する」にある「委譲先の外向き操作の制御」の 1（agent の選択）が一次情報。
-このリポで再利用判定を持つ手順は `superpowers:using-git-worktrees` skill の Step 0（既存 isolation 検出時は再利用）で、バイパスを明記する先は `.claude/agents/` の agent 定義（例: `.claude/agents/issue-worker.md`）。
+このリポの `issue-worker` は呼び出し元が native の worktree 隔離で起動し、割り当てた root と所有証拠を確認する。
+手順の正本は `.claude/agents/issue-worker.md` であり、agent 自身が手動で作成した worktree を所有扱いに変えない。
 乗っ取りが実際に起きたのは issue #439 の issue-worker 試走で、呼び出し元ブランチは無傷で復旧できたが、一歩間違えば作業中のコミット履歴を破壊しかねなかった。
 
 ## workflow.pfdsl に登録する agent の範囲
@@ -368,7 +369,7 @@ repo scope の agent（`ci-triage` 等、このリポの開発都合の道具）
 
 **1. agent の選択。** 実装だけを委譲するなら `pfd-implementer`（`tools:` に `mcp__github__*` を含まない）。
 `general-purpose` は `tools: *` で GitHub MCP を丸ごと持つので、実装委譲には使わない。
-worktree 作成から PR 作成までを一気通貫でやらせる場合のみ `issue-worker` を使う。
+呼び出し元が native の worktree 隔離で起動し、PR 作成までを一気通貫でやらせる場合のみ `issue-worker` を使う。
 `pfd-implementer.md` は `gen_plugin` が plugin へミラーする配布物でもあるため、リポ固有の agent 名・スクリプトパスを本文に書かない。
 
 **2. PreToolUse hook。** 実装は `scripts/agent-operation-guard.mjs`、allowlist は `scripts/lib/agent-operation-table.mjs` の `DEFAULT_ALLOWED_AGENTS`。
