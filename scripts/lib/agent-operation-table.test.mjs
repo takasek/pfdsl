@@ -1,11 +1,33 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { test } from "node:test";
+import { fileURLToPath } from "node:url";
+import { classifyAgentOperations } from "./agent-operation-classifier.mjs";
+import {
+	AGENT_OPERATION_CORPUS,
+	corpusFacts,
+} from "./agent-operation-corpus.mjs";
 import {
 	AGENT_OPERATION_AXES,
 	combineDecisions,
 	decideOperation,
 	parserRecoveryCommand,
 } from "./agent-operation-table.mjs";
+import { readShell } from "./shell-commands.mjs";
+import {
+	installShellParser,
+	isShellParserInstalled,
+	shellParserPath,
+} from "./shell-parser-tool.mjs";
+
+function evaluate(classified) {
+	return combineDecisions(
+		classified.operations.map((operation) =>
+			decideOperation({ ...classified, ...operation }),
+		),
+	);
+}
 
 // The specification's axes are independent of the production table's rows.
 const axes = {
@@ -214,5 +236,63 @@ test("parser recovery is an exact fixed-root command and never bypasses policy f
 		{ hookRoot: "/fixture/other" },
 	]) {
 		assert.equal(decideOperation({ ...base, ...change }).decision, "deny");
+	}
+});
+
+test("property 8: missing parser -> allowed repair -> healthy recheck -> normal operations allowed", async () => {
+	const root = fileURLToPath(new URL("../../", import.meta.url));
+	const facts = corpusFacts({ hookRoot: root });
+	const payload = {
+		tool_name: "Bash",
+		cwd: facts.sessionRoot,
+		tool_input: { command: "git status" },
+	};
+	const missing = readShell(payload.tool_input.command, {
+		parserPath: join(root, "node_modules/.pfdsl-tools/missing-parser"),
+	});
+	assert.equal(missing.failure, "parser-missing");
+	assert.equal(
+		evaluate(classifyAgentOperations(payload, { ...facts, shell: missing }))
+			.decision,
+		"deny",
+	);
+	const repair = {
+		...payload,
+		tool_input: { command: parserRecoveryCommand(root) },
+	};
+	assert.equal(
+		evaluate(classifyAgentOperations(repair, { ...facts, shell: missing }))
+			.decision,
+		"allow",
+	);
+	// Exercise verified installation into a missing location using the actual pinned bytes.
+	const { mkdtempSync, rmSync } = await import("node:fs");
+	const repairRoot = mkdtempSync(join(root, "node_modules/pfdsl-recovery-"));
+	try {
+		assert.equal(isShellParserInstalled(repairRoot), false);
+		const bytes = readFileSync(shellParserPath(root));
+		await installShellParser(repairRoot, {
+			fetchAsset: async () => ({ ok: true, arrayBuffer: async () => bytes }),
+		});
+		assert.equal(isShellParserInstalled(repairRoot), true);
+		for (const example of AGENT_OPERATION_CORPUS.filter(
+			({ expected, health }) => expected === "allow" && health === "healthy",
+		)) {
+			for (const step of example.steps ?? [example]) {
+				const command =
+					step.payload.tool_input.command ?? step.payload.tool_input.cmd;
+				const shell = command
+					? readShell(command, { parserPath: shellParserPath(repairRoot) })
+					: undefined;
+				const classified = classifyAgentOperations(step.payload, {
+					...step.facts,
+					shell,
+				});
+				assert.equal(classified.health, "healthy", step.id);
+				assert.equal(evaluate(classified).decision, "allow", step.id);
+			}
+		}
+	} finally {
+		rmSync(repairRoot, { recursive: true, force: true });
 	}
 });
