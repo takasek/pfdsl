@@ -106,13 +106,19 @@ function expandLiteralScripts(result, parserPath) {
 		const name = executableName(tokens[0]?.value ?? "");
 		let scriptIndex = name === "eval" ? (tokens[1]?.value === "--" ? 2 : 1) : 0;
 		if (["bash", "sh", "zsh"].includes(name)) {
+			let commandStringMode = false;
 			for (let i = 1; i < tokens.length; i++) {
 				const flag = tokens[i];
-				if (flag.dynamic || flag.value === "--" || !/^[+-]/.test(flag.value))
+				if (flag.value === "--") {
+					if (commandStringMode) scriptIndex = i + 1;
 					break;
+				}
+				if (flag.dynamic || !/^[+-]/.test(flag.value)) {
+					if (commandStringMode) scriptIndex = i;
+					break;
+				}
 				if (/^-[A-Za-z]*c[A-Za-z]*$/.test(flag.value)) {
-					scriptIndex = i + 1;
-					break;
+					commandStringMode = true;
 				}
 				if (
 					["-o", "+o", "-O", "+O", "--rcfile", "--init-file"].includes(
@@ -120,6 +126,10 @@ function expandLiteralScripts(result, parserPath) {
 					)
 				)
 					i++;
+			}
+			if (commandStringMode && !scriptIndex) {
+				expanded.push({ ...node, unresolvedExecution: true });
+				continue;
 			}
 		}
 		if (!scriptIndex) continue;

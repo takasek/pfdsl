@@ -347,15 +347,17 @@ function gitOperation(command, context, facts) {
 			if (flags.has("--stdout")) classes = ["R"];
 			else if (output) effective = destination(output);
 		}
-	} else if (sub.value === "reflog")
+	} else if (sub.value === "reflog") {
+		// Other literal operands are refs in Git's default show mode. Keep the
+		// modifying modes unresolved; do not interpret any of their effects.
+		const first = operands[0];
 		classes = [
-			!operands.length ||
-			["show", "list", "exists"].includes(operands[0]?.value) ||
-			/^HEAD(?:$|[~^@])|^refs\//.test(operands[0]?.value ?? "")
-				? "R"
-				: "U",
+			first?.dynamic ||
+			["expire", "delete", "drop", "write"].includes(first?.value)
+				? "U"
+				: "R",
 		];
-	else if (sub.value === "symbolic-ref") {
+	} else if (sub.value === "symbolic-ref") {
 		const writing =
 			operands.length > 1 || flags.has("--delete") || flags.has("-d");
 		classes = [
