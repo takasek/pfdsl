@@ -23,6 +23,7 @@ import {
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { isCliEntrypoint } from "../../../../scripts/lib/cli-entrypoint.mjs";
 
 const repo = fileURLToPath(new URL("../../../../", import.meta.url));
 const standalone = join(repo, "packages/standalone");
@@ -55,10 +56,12 @@ const SUITE = [
 	"document-host-recovery.test.mjs",
 	"document-lifecycle-invariants.test.mjs",
 	"document-lifecycle-memory.test.mjs",
+	"document-lifecycle-oracle.test.mjs",
 	"document-lifecycle-recovery.test.mjs",
 	"document-lifecycle-relations.test.mjs",
 	"document-lifecycle-scenarios.test.mjs",
 	"document-session.test.mjs",
+	"mutation-gate.test.mjs",
 ];
 
 /**
@@ -68,7 +71,7 @@ const SUITE = [
  * the observation/plan model; M11-M13 remove the guarantees behind the cells
  * that were known to fail before it (F1, F2, N2).
  */
-const MUTATIONS = {
+export const MUTATIONS = {
 	M1: {
 		what: "review no longer required for a version the document has not acknowledged",
 		guarantee:
@@ -245,6 +248,57 @@ const MUTATIONS = {
 			],
 		],
 	},
+	M14: {
+		what: "a Close Save no-op bypasses its editor-version check",
+		guarantee:
+			"An edit back to acknowledged text during the pre-save read requires a new close decision",
+		where: "main.ts saveEntry: confirmation check before no-op exits",
+		steps: [["src/main.ts", "\t\tif (!checkConfirmation()) return false;", ""]],
+	},
+	M15: {
+		what: "rename recovery uses the acknowledged inode instead of the observed inode",
+		guarantee:
+			"A same-content replacement can be recovered at its renamed leaf after the old leaf is inspected missing",
+		where: "document-session.ts location: target observation identity",
+		steps: [
+			[
+				"src/document-session.ts",
+				"identity: identityOf(observation) ?? disk.identity",
+				"identity: disk.identity",
+			],
+		],
+	},
+	M16: {
+		what: "the panel treats two capabilities for one binding as distinct targets",
+		guarantee:
+			"The original is not also changed when it is the recovery target; hard-link leaves remain separate",
+		where: "document-session.ts panel: original target relation",
+		steps: [
+			[
+				"src/document-session.ts",
+				"recovery.target.binding !== disk.binding",
+				"recovery.target.id !== disk.id",
+			],
+		],
+	},
+	M17: {
+		what: "rebind relabels a plan's target without advancing its epoch",
+		guarantee:
+			"A plan cannot execute after its capability or displayed path changes",
+		where: "document-session.ts rebindDisk: epoch advance",
+		steps: [
+			[
+				"src/document-session.ts",
+				"\t\tif (plan.acknowledged !== this.acknowledged) return false;",
+				"",
+			],
+			[
+				"src/document-session.ts",
+				"\t\tif (\n\t\t\tprevious.id !== current.id ||\n\t\t\tprevious.binding !== current.binding ||\n\t\t\tthis.location?.path !== current.path\n\t\t)\n\t\t\tthis.epoch++;",
+				"",
+			],
+		],
+	},
 };
 
 function copyTree() {
@@ -313,11 +367,22 @@ function failures(output) {
 		.filter(Boolean);
 }
 
-const wanted = process.argv.slice(2);
-const names = wanted.length ? wanted : ["baseline", ...Object.keys(MUTATIONS)];
-for (const name of names)
-	if (name !== "baseline" && !Object.hasOwn(MUTATIONS, name))
-		throw new Error(`Unknown mutation: ${name}`);
+export function selectNames(wanted, available = Object.keys(MUTATIONS)) {
+	return [
+		"baseline",
+		...new Set(
+			(wanted.length ? wanted : available).filter(
+				(name) => name !== "baseline",
+			),
+		),
+	];
+}
+export function newlyTagged(cells, baselineCells) {
+	const existing = new Set(baselineCells.map((cell) => cell.label));
+	return cells.filter(
+		(cell) => cell.tags.length > 0 && !existing.has(cell.label),
+	);
+}
 async function runMutation(name) {
 	const tree = copyTree();
 	try {
@@ -336,43 +401,56 @@ async function runMutation(name) {
 	}
 }
 
-// Each suite already runs test files concurrently; bound the number of copied suites.
-const results = [];
-for (let offset = 0; offset < names.length; offset += 2)
-	results.push(
-		...(await Promise.all(names.slice(offset, offset + 2).map(runMutation))),
-	);
-const baseline = results.find((result) => result.name === "baseline");
+async function main() {
+	const names = selectNames(process.argv.slice(2));
+	for (const name of names)
+		if (name !== "baseline" && !Object.hasOwn(MUTATIONS, name))
+			throw new Error(`Unknown mutation: ${name}`);
+	// Each suite already runs test files concurrently; bound the number of copied suites.
+	const baseline = await runMutation("baseline");
+	const results = [baseline];
+	for (let offset = 1; offset < names.length; offset += 2)
+		results.push(
+			...(await Promise.all(names.slice(offset, offset + 2).map(runMutation))),
+		);
 
-let missed = false;
-for (const { name, total, failed, tagged, cells, code } of results) {
-	const what = name === "baseline" ? "unmodified suite" : MUTATIONS[name].what;
-	const tags = [...new Set(tagged.flatMap((cell) => cell.tags))].join(",");
-	console.log(
-		`${name.padEnd(8)} ${what}\n         failing ${failed}/${total}, invariant-labelled ${tagged.length} [${tags}]`,
-	);
-	if (name !== "baseline")
+	let missed = false;
+	for (const { name, total, failed, cells, code } of results) {
+		const tagged =
+			name === "baseline"
+				? cells.filter((cell) => cell.tags.length > 0)
+				: newlyTagged(cells, baseline.cells);
+		const what =
+			name === "baseline" ? "unmodified suite" : MUTATIONS[name].what;
+		const tags = [...new Set(tagged.flatMap((cell) => cell.tags))].join(",");
 		console.log(
-			`         removes: ${MUTATIONS[name].guarantee} (${MUTATIONS[name].where})`,
+			`${name.padEnd(8)} ${what}\n         failing ${failed}/${total}, invariant-labelled ${tagged.length} [${tags}]`,
 		);
-	for (const cell of tagged.slice(0, 3))
-		console.log(`         e.g. ${cell.label} :: ${cell.tags.join(",")}`);
-	if (
-		total === 0 ||
-		(baseline && total !== baseline.total) ||
-		(name === "baseline"
-			? failed !== 0 || code !== 0
-			: tagged.length === 0 || failed === 0 || code !== 1)
-	)
-		missed = true;
-	if (name !== "baseline" && tagged.length === 0 && cells.length > 0)
-		console.log(
-			`         only untagged: ${cells
-				.slice(0, 2)
-				.map((cell) => cell.label)
-				.join("; ")}`,
-		);
+		if (name !== "baseline")
+			console.log(
+				`         removes: ${MUTATIONS[name].guarantee} (${MUTATIONS[name].where})`,
+			);
+		for (const cell of tagged.slice(0, 3))
+			console.log(`         e.g. ${cell.label} :: ${cell.tags.join(",")}`);
+		if (
+			total === 0 ||
+			(baseline && total !== baseline.total) ||
+			(name === "baseline"
+				? failed !== 0 || code !== 0
+				: tagged.length === 0 || failed === 0 || code !== 1)
+		)
+			missed = true;
+		if (name !== "baseline" && tagged.length === 0 && cells.length > 0)
+			console.log(
+				`         only untagged: ${cells
+					.slice(0, 2)
+					.map((cell) => cell.label)
+					.join("; ")}`,
+			);
+	}
+	if (!existsSync(standalone)) process.exit(2);
+	console.log(missed ? "GATE FAILED" : "gate passed");
+	process.exit(missed ? 1 : 0);
 }
-if (!existsSync(standalone)) process.exit(2);
-console.log(missed ? "GATE FAILED" : "gate passed");
-process.exit(missed ? 1 : 0);
+
+if (isCliEntrypoint(import.meta.url, process.argv[1])) await main();
