@@ -65,11 +65,8 @@ if (isMainThread) {
 		const { readStdinText, buildPermissionOutput } = await import(
 			"./lib/hook-io.mjs"
 		);
-		const { classifyAgentOperations } = await import(
-			"./lib/agent-operation-classifier.mjs"
-		);
-		const { combineDecisions, decideOperation } = await import(
-			"./lib/agent-operation-table.mjs"
+		const { evaluateAgentOperationPolicy } = await import(
+			"./lib/agent-operation-policy.mjs"
 		);
 		const { collectAgentOperationEnvironment } = await import(
 			"./lib/agent-operation-environment.mjs"
@@ -95,12 +92,7 @@ if (isMainThread) {
 						: "parser-missing",
 					hookRoot,
 				};
-		const classified = classifyAgentOperations(payload, facts);
-		const decision = combineDecisions(
-			classified.operations.map((operation) =>
-				decideOperation({ ...classified, ...operation }),
-			),
-		);
+		const decision = evaluateAgentOperationPolicy(payload, facts);
 		if (decision.decision !== "allow") {
 			if (shell?.error && decision.operationClass === "U")
 				decision.reason += ` ${shell.error}`;

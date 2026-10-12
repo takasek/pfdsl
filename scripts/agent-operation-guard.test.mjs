@@ -21,6 +21,7 @@ const helperFiles = [
 	"setup-shell-parser.mjs",
 	"lib/agent-operation-classifier.mjs",
 	"lib/agent-operation-table.mjs",
+	"lib/agent-operation-policy.mjs",
 	"lib/agent-operation-environment.mjs",
 	"lib/shell-commands.mjs",
 	"lib/shell-parser-tool.mjs",
