@@ -133,6 +133,8 @@ export function collectAgentOperationEnvironment(
 		physicalEntryPaths: {},
 		gitMetadataPaths: [],
 		gitTargetOverride: hasGitTargetEnvironment(environment),
+		cdPathOverride:
+			typeof environment.CDPATH === "string" && environment.CDPATH !== "",
 		shell,
 		mcpTools: {},
 	};

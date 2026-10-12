@@ -204,7 +204,15 @@ function gitOperation(command, context, facts) {
 	let i = 1;
 	let path = command.unresolvedCwd || targetOverride ? null : context.cwd;
 	for (const cd of command.leadingCd ?? [])
-		path = path ? (isAbsolute(cd) ? cd : `${path}/${cd}`) : null;
+		path = path
+			? facts.cdPathOverride &&
+				!isAbsolute(cd) &&
+				!/^(?:\.\.?)(?:\/|$)/.test(cd)
+				? null
+				: isAbsolute(cd)
+					? cd
+					: `${path}/${cd}`
+			: null;
 	let explicitAbsolute = false;
 	let dynamicTarget = Boolean(targetOverride);
 	let bypass = false;
@@ -455,7 +463,34 @@ function gitOperation(command, context, facts) {
 
 function ghOperation(tokens) {
 	const args = tokens.slice(1);
-	const parsed = scan(args);
+	const initial = scan(args);
+	const initialGroup = initial.operands[0]?.value;
+	const initialVerb = initial.operands[1]?.value;
+	const valueFlags = new Set(VALUE_FLAGS);
+	for (const flag of [
+		"--description",
+		"--color",
+		"--name",
+		"--notes",
+		"--notes-file",
+		"--add-label",
+		"--reason",
+		"--add-reviewer",
+	])
+		valueFlags.add(flag);
+	if (initialGroup !== "api") valueFlags.delete("-f");
+	if (["pr", "issue"].includes(initialGroup)) valueFlags.add("-b");
+	if (initialGroup === "pr" && initialVerb === "merge") valueFlags.delete("-m");
+	if (["repo", "label"].includes(initialGroup)) {
+		valueFlags.add("-d");
+		valueFlags.add("-n");
+	}
+	if (
+		initialGroup === "repo" ||
+		(initialGroup === "auth" && initialVerb === "logout")
+	)
+		valueFlags.add("-h");
+	const parsed = scan(args, valueFlags);
 	const { operands, flags, values } = parsed;
 	const group = operands[0]?.value;
 	const verb = operands[1]?.value;
@@ -463,7 +498,7 @@ function ghOperation(tokens) {
 		group === "help" ||
 		flags.has("--help") ||
 		flags.has("--version") ||
-		flags.has("-h")
+		(flags.has("-h") && !valueFlags.has("-h"))
 	)
 		return operation(["R"], "remote", { target: "own" });
 	if (group === "pr" && verb === "merge")

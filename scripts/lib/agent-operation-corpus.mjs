@@ -116,6 +116,29 @@ function example(
 // Every row of the specification's acceptance pairs has a named normal case
 // and, where present, its independently specified safety case.
 export const AGENT_OPERATION_CORPUS = [
+	example("relative-cd-with-CDPATH", "cd sibling && git add a", "deny", {
+		facts: { cdPathOverride: true },
+		target: "unresolved",
+	}),
+	example("dot-relative-cd-with-CDPATH", "cd ../own && git add a", "allow", {
+		facts: { cdPathOverride: true },
+	}),
+	...[
+		"gh label create x --description --help",
+		"gh issue edit 1 --add-label --help",
+		"gh pr edit 1 --add-reviewer --help",
+		"gh release create v1 --notes --help",
+		"gh repo create x -h --help",
+		"gh repo create foo -h https://example.com --private",
+		"gh auth logout -h github.com",
+	].map((command, i) =>
+		example(`outward-help-looking-value-${i}`, command, "deny", {
+			subject: "claude-subagent",
+		}),
+	),
+	example("merge-mode-with-standalone-help", "gh pr merge -m --help", "allow", {
+		classes: ["R"],
+	}),
 	example("ordinary-env-own-Git", "env -i git commit -m x", "allow"),
 	example("ordinary-env-primary-Git", "env -i git add a", "deny", {
 		cwd: primary,
