@@ -55,7 +55,8 @@ export class FakeNative {
 		} catch (error) {
 			return result("failed-before-publication", null, String(error));
 		}
-		if (current.revision !== expected)
+		// expected null means "create": it succeeds only while the target is still absent.
+		if (current.revision !== (expected ?? null))
 			return result(
 				"conflict",
 				current,

@@ -234,4 +234,23 @@ cell(
 	},
 );
 
+cell(
+	"the fake native creates exclusively and replaces only the expected revision",
+	() => {
+		const native = new FakeNative();
+		const doc = native.add(1, "a.pfdsl", "existing\n");
+		const violations = [];
+		const create = native.save(doc, "new\n", null);
+		if (create.outcome !== "conflict" || doc.file.source !== "existing\n")
+			violations.push("an existing file was created over");
+		const replace = native.save(doc, "new\n", native.snapshot(doc).revision);
+		if (replace.outcome !== "saved" || doc.file.source !== "new\n")
+			violations.push("the expected revision was refused");
+		doc.file = null;
+		if (native.save(doc, "again\n", null).outcome !== "saved")
+			violations.push("a missing target was not created");
+		return violations;
+	},
+);
+
 guardKnownRed();
