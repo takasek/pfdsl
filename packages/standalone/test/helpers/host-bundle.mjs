@@ -9,7 +9,9 @@ export const { JSDOM } = require("jsdom");
 
 const tabStub = `
 export function createDocumentTab(options){
- let source=options.source,revision=0;
+ // reviewNormalize stands in for Monaco's line-ending normalization when a test sets it.
+ const normalize=(text)=>globalThis.reviewNormalize?globalThis.reviewNormalize(text):text;
+ let source=normalize(options.source),revision=0;
  const hook=(...args)=>globalThis.reviewTabHook?.(...args);
  const container=document.createElement('div'),button=document.createElement('button');
  options.parent.append(container);button.textContent=options.name;
@@ -18,7 +20,7 @@ export function createDocumentTab(options){
   dispose(){container.remove();button.remove();hook('dispose',tab);},
   getSource:()=>source,getRevision:()=>revision,
   type(s){source=s;revision++;hook('type',tab,s);options.onChange?.();},
-  setSource(s){this.setSourceCalls++;source=s;revision++;hook('setSource',tab,s);options.onChange?.();},
+  setSource(s){this.setSourceCalls++;source=normalize(s);revision++;hook('setSource',tab,s);options.onChange?.();},
   setLocation(path,name,read){this.location=path;this.read=read;button.textContent=name;},
   markSaved(){},format(){}};
  (globalThis.reviewTabs??=[]).push(tab);

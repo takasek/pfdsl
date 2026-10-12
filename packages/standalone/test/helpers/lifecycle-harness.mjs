@@ -138,6 +138,7 @@ const keys = [
 	"reviewBusy",
 	"reviewTabs",
 	"reviewTabHook",
+	"reviewNormalize",
 ];
 
 export const flush = async () => {
@@ -219,6 +220,7 @@ export async function createHarness(label) {
 	 * choice that confirms replacing or creating the target. `handlers` supplies
 	 * confirm_close_document (confirm), choose_save_target (choose) and may
 	 * - lose a save reply (saveFault: "before" or "after" the write);
+	 * - answer a save with a reply of its own, without touching the file (saveReply);
 	 * - change the disk just before a save reaches the native side (beforeSave);
 	 * - hold an inspection until the test releases it (inspectGate);
 	 * - change the disk after an inspection was answered (afterInspect);
@@ -390,6 +392,7 @@ export async function createHarness(label) {
 				const target = native.docs.get(args.id);
 				const fault = handlers.saveFault?.(args);
 				handlers.beforeSave?.(args);
+				const forced = handlers.saveReply?.(args);
 				const entry = {
 					kind: "save",
 					seq: tick(),
@@ -401,6 +404,12 @@ export async function createHarness(label) {
 					wrote: false,
 				};
 				log.push(entry);
+				if (forced) {
+					entry.outcome = forced.outcome;
+					if (forced.current) learn(forced.current);
+					else know(args.id, { unknown: true });
+					return forced;
+				}
 				if (fault === "before") {
 					know(args.id, { unknown: true });
 					throw new Error("native reply lost");
