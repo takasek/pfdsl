@@ -132,7 +132,7 @@ function pathFacts(path, facts, followFinalSymlink = true) {
 	};
 }
 
-function scan(tokens, valueFlags = VALUE_FLAGS) {
+function scan(tokens, valueFlags = VALUE_FLAGS, legacyConfig = false) {
 	const operands = [];
 	const flags = new Set();
 	const values = [];
@@ -163,7 +163,11 @@ function scan(tokens, valueFlags = VALUE_FLAGS) {
 						: tokens[++i];
 				if (value) values.push({ flag, ...value });
 			}
-		} else operands.push(token);
+		} else {
+			if (legacyConfig && operands.length === 0 && token.value.includes("."))
+				afterDash = true;
+			operands.push(token);
+		}
 	}
 	return { operands, flags, values };
 }
@@ -254,7 +258,7 @@ function gitOperation(command, context, facts) {
 			flagsWithValues.add(flag);
 	if (sub.value === "worktree")
 		for (const flag of ["-b", "-B"]) flagsWithValues.add(flag);
-	const parsed = scan(args, flagsWithValues);
+	const parsed = scan(args, flagsWithValues, sub.value === "config");
 	const { operands, flags } = parsed;
 	const location = pathFacts(path, facts);
 	if (flags.has("--help") || flags.has("--version") || flags.has("-h"))
@@ -598,6 +602,7 @@ export function classifyAgentOperations(payload, facts) {
 		operations = (facts.shell?.commands ?? [])
 			.filter((node) => !node.isLeadingCd)
 			.map((node) => {
+				if (node.unresolvedExecution) return unresolved();
 				const executableIndex = node.executableIndex ?? 0;
 				const head = node.tokens[executableIndex];
 				if (head?.dynamic) return unresolved();

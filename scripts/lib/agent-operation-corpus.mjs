@@ -116,6 +116,45 @@ function example(
 // Every row of the specification's acceptance pairs has a named normal case
 // and, where present, its independently specified safety case.
 export const AGENT_OPERATION_CORPUS = [
+	example("ordinary-env-own-Git", "env -i git commit -m x", "allow"),
+	example("ordinary-env-primary-Git", "env -i git add a", "deny", {
+		cwd: primary,
+	}),
+	example("ordinary-env-subagent-push", "env FOO=bar git push", "deny", {
+		subject: "claude-subagent",
+	}),
+	example(
+		"ordinary-sudo-other-Git",
+		`sudo -u root git -C ${unowned} add a`,
+		"deny",
+	),
+	example(
+		"ordinary-time-other-Git",
+		`time -o /tmp/time-output git -C ${unowned} add a`,
+		"deny",
+	),
+	example(
+		"unknown-wrapper-option",
+		`sudo --unknown value git -C ${unowned} add a`,
+		"deny",
+	),
+	example(
+		"wrapper-string-remains-data",
+		"sudo echo 'git commit --no-verify'",
+		"allow",
+	),
+	example(
+		"legacy-config-value-is-help-looking-data",
+		"git config core.hooksPath --help",
+		"deny",
+		{ classes: ["C", "X"] },
+	),
+	example(
+		"legacy-config-value-is-option-looking-data",
+		"git config core.hooksPath --show-origin",
+		"deny",
+		{ classes: ["C", "X"] },
+	),
 	example(
 		"pair-01-own-add-commit-push",
 		"git add a && git commit -m x && git push -u origin HEAD",

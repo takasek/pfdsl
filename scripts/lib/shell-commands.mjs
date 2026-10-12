@@ -239,11 +239,65 @@ export function adaptShell(ast, source) {
 			prefix++;
 			if (["-p", "--"].includes(tokens[prefix]?.value)) prefix++;
 		}
+		let unresolvedExecution = false;
+		let prefixCwd = false;
+		// Ordinary executable prefixes only; no shell state, clusters or argv
+		// oracle. Unknown prefix options are unresolved, not guessed programs.
+		while (
+			["env", "sudo", "time", "nohup"].includes(
+				executableName(tokens[prefix]?.value ?? ""),
+			)
+		) {
+			const wrapper = executableName(tokens[prefix++].value);
+			const values =
+				wrapper === "env"
+					? ["-C", "--chdir", "-u", "--unset", "-P"]
+					: wrapper === "sudo"
+						? ["-u", "--user", "-g", "--group", "-p", "--prompt"]
+						: wrapper === "time"
+							? ["-o", "--output", "-f", "--format"]
+							: [];
+			const booleans =
+				wrapper === "env"
+					? ["-i", "--ignore-environment", "-0", "--null", "-v", "--debug"]
+					: wrapper === "sudo"
+						? ["-n", "--non-interactive", "-E", "--preserve-env"]
+						: wrapper === "time"
+							? ["-a", "--append", "-p", "--portability"]
+							: [];
+			while (prefix < tokens.length) {
+				const value = tokens[prefix].value;
+				if (wrapper === "env" && /^[A-Za-z_][A-Za-z0-9_]*=/.test(value)) {
+					prefix++;
+					continue;
+				}
+				if (value === "--") {
+					prefix++;
+					break;
+				}
+				const flag = value.split("=", 1)[0];
+				if (values.includes(flag)) {
+					prefixCwd ||= wrapper === "env" && ["-C", "--chdir"].includes(flag);
+					prefix += value.includes("=") ? 1 : 2;
+					if (prefix > tokens.length) unresolvedExecution = true;
+					continue;
+				}
+				if (booleans.includes(value)) {
+					prefix++;
+					continue;
+				}
+				if (value.startsWith("-")) unresolvedExecution = true;
+				break;
+			}
+			if (unresolvedExecution) break;
+		}
 		if (["repeat", "always", "coproc", "-"].includes(tokens[prefix]?.value))
 			fail(tokens[prefix].value);
 		const command = {
 			tokens,
 			executableIndex: prefix,
+			unresolvedExecution,
+			unresolvedCwd: prefixCwd,
 			command: text(node),
 			offset: node.Pos.Offset,
 		};
@@ -380,7 +434,7 @@ export function adaptShell(ast, source) {
 			command.offset >= ast.Stmts[0].Pos.Offset &&
 			command.offset < ast.Stmts[0].End.Offset;
 		command.leadingCd = withinPrefixChain ? [...leadingCd] : [];
-		command.unresolvedCwd =
+		command.unresolvedCwd ||=
 			unresolvedCwd || (leadingCd.length > 0 && !withinPrefixChain);
 	}
 	return { commands };
