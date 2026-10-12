@@ -316,7 +316,7 @@ async function saveEntry(
 	entry: Entry,
 	as = false,
 	observed = false,
-	_confirmation?: OperationPlan,
+	confirmation?: OperationPlan,
 ): Promise<boolean> {
 	if (!native) throw new Error("Use the desktop application to save files.");
 	const session = entry.session;
@@ -376,6 +376,11 @@ async function saveEntry(
 	}
 	if (explainOpenTarget(entry, target!)) return false;
 	const selected = target!;
+	if (confirmation && !session.holds(confirmation, "editor")) {
+		status.textContent =
+			"The document changed after the decision was asked. Editor content is retained; close it again.";
+		return false;
+	}
 	// Identical text leaves nothing to overwrite, so there is nothing to review.
 	const review =
 		selected.source !== null &&
@@ -394,7 +399,8 @@ async function saveEntry(
 			],
 			{ local: plan.editor, disk: plan.disk },
 		);
-		if (decision === "another") return saveEntry(entry, true);
+		if (decision === "another")
+			return saveEntry(entry, true, false, confirmation);
 		if (decision !== "replace") return false;
 	} else if (recreate) {
 		const decision = await choose(

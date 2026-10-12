@@ -4,11 +4,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-export const KNOWN_RED = new Set([
-	// F1: an edit after the Save decision was asked but before the pre-save inspection answered is saved without a new decision.
-	"lifetime | pending-inspect | edit | close-save",
-	"lifetime | pending-inspect | edit | quit-save",
-]);
+export const KNOWN_RED = new Set([]);
 
 const results = new Map();
 
