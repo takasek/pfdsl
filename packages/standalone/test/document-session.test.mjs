@@ -841,6 +841,69 @@ test("a fresh inspection reports whether the target differs from what was acknow
 	assert.match(recovering.message, /The disk changed/);
 });
 
+const failedAs = async (disk) => {
+	const editor = view();
+	const target = { ...snap("old B", "b0", "/B/b.pfdsl"), id: 2 };
+	const current = { ...target, source: "external B", revision: "b1" };
+	const doc = new DocumentSession(editor, disk);
+	editor.edit("local");
+	await doc.save(async () => ({ outcome: "conflict", current }), target);
+	return { doc, current, target };
+};
+
+test("an untitled document with a failed first save still observes its recovery target", async () => {
+	const { doc, current } = await failedAs(null);
+	const reads = [];
+	const later = { ...current, source: "later B", revision: "b2" };
+	await doc.checkExternal(async (id) => {
+		reads.push(id);
+		return later;
+	});
+	assert.deepEqual(reads, [2]);
+	assert.equal(doc.observed, later);
+	assert.equal(doc.pendingTarget, later);
+	assert.equal(doc.conflict, later);
+});
+
+test("an untouched recovery target is not replaced by a touch", async () => {
+	const { doc, current } = await failedAs(snap("original", "r1"));
+	const touched = { ...current, revision: "b1-touched" };
+	await doc.checkExternal(async (id) =>
+		id === 2 ? touched : snap("original", "r1"),
+	);
+	assert.equal(doc.conflict, current);
+	assert.equal(doc.observed, touched);
+});
+
+test("an unreadable original does not stop the recovery target from being read", async () => {
+	const { doc, current } = await failedAs(snap("original", "r1"));
+	const later = { ...current, source: "later B", revision: "b2" };
+	const before = doc.closeVersion();
+	await assert.rejects(
+		doc.checkExternal(async (id) => {
+			if (id === 1) throw new Error("original unreadable");
+			return later;
+		}),
+	);
+	assert.equal(doc.observed, later);
+	assert.equal(doc.conflict, later);
+	assert.notEqual(doc.closeVersion(), before);
+});
+
+test("a second target becoming unreadable is a new state for a close decision", async () => {
+	const { doc, current } = await failedAs(snap("original", "r1"));
+	const read = (failing) => async (id) => {
+		if (failing.has(id)) throw new Error(`${id} unreadable`);
+		return id === 2 ? current : snap("original", "r1");
+	};
+	await assert.rejects(doc.checkExternal(read(new Set([2]))));
+	const first = doc.closeVersion();
+	await assert.rejects(doc.checkExternal(read(new Set([2]))));
+	assert.equal(doc.closeVersion(), first);
+	await assert.rejects(doc.checkExternal(read(new Set([1, 2]))));
+	assert.notEqual(doc.closeVersion(), first);
+});
+
 test("a fresh inspection of the original keeps Save As recovery on B", async () => {
 	const editor = view();
 	const original = snap("original");

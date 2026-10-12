@@ -670,7 +670,7 @@ if (native) {
 		if (busy) return;
 		for (const entry of opened) {
 			if (busy) break;
-			if (entry.session.disk) {
+			if (entry.session.disk || entry.session.pendingTarget) {
 				try {
 					await entry.session.checkExternal((id) =>
 						invoke<DiskSnapshot>("inspect_document", {

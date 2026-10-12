@@ -65,7 +65,9 @@ export class DocumentSession {
 	private uncertain = false;
 	private checkPromise: Promise<void> | null = null;
 	private observationVersion = 0;
-	private inspectionFailed = false;
+	// A repeated unreadable observation of one target is the state the user confirmed;
+	// another target becoming unreadable, or any target recovering, is not.
+	private unreadable = new Set<number>();
 	private disposed = false;
 	constructor(view: DocumentView, disk: DiskSnapshot | null) {
 		this.view = view;
@@ -250,27 +252,84 @@ export class DocumentSession {
 	}
 	checkExternal(read: (id: number) => Promise<DiskSnapshot>): Promise<void> {
 		if (this.checkPromise) return this.checkPromise;
-		if (!this.disk || this.disposed) return Promise.resolve();
-		this.checkPromise = this.observeExternal(read)
-			.then(() => {
-				if (this.inspectionFailed) {
-					this.inspectionFailed = false;
-					this.observationVersion++;
-				}
-			})
-			.finally(() => {
-				this.checkPromise = null;
-			});
+		if ((!this.disk && !this.pendingTarget) || this.disposed)
+			return Promise.resolve();
+		this.checkPromise = this.observeExternal(read).finally(() => {
+			this.checkPromise = null;
+		});
 		return this.checkPromise;
+	}
+	private markReadable(id: number) {
+		if (this.unreadable.delete(id)) this.observationVersion++;
+	}
+	private markUnreadable(id: number) {
+		if (this.unreadable.has(id)) return;
+		this.unreadable.add(id);
+		this.observationVersion++;
 	}
 	async prepareClose() {
 		// A started observation can make this buffer the last surviving readable copy.
 		await this.checkPromise?.catch(() => {});
 	}
+	/**
+	 * A failed Save As does not transfer the document's ownership. Both the original
+	 * (when it exists) and the recovery target are read, each independent of the
+	 * other's failure, because the final close check needs every unresolved target.
+	 */
+	private async observeRecovery(
+		read: (id: number) => Promise<DiskSnapshot>,
+		baseline: DiskSnapshot | null,
+		recovery: DiskSnapshot,
+	) {
+		const [original, target] = await Promise.allSettled([
+			baseline ? read(baseline.id) : Promise.resolve(null),
+			read(recovery.id),
+		]);
+		if (
+			this.disposed ||
+			this.disk !== baseline ||
+			this.pendingTarget !== recovery
+		)
+			return;
+		if (baseline)
+			if (original.status === "fulfilled") this.markReadable(baseline.id);
+			else this.markUnreadable(baseline.id);
+		if (target.status === "fulfilled") this.markReadable(recovery.id);
+		else this.markUnreadable(recovery.id);
+		if (original.status === "fulfilled" && baseline && original.value)
+			this.sourceConflict = sameDiskContent(baseline, original.value)
+				? null
+				: original.value;
+		if (target.status === "fulfilled") {
+			const seen = target.value;
+			const known = this.observed?.id === seen.id ? this.observed : recovery;
+			const changed = !sameDiskContent(known, seen) || known.path !== seen.path;
+			if (
+				this.observed?.id !== seen.id ||
+				changed ||
+				known.revision !== seen.revision
+			) {
+				this.observed = seen;
+				this.pendingTarget = seen;
+			}
+			if (changed) this.conflict = seen;
+		}
+		const failure = [original, target].find(
+			(result) => result.status === "rejected",
+		);
+		if (failure?.status === "rejected") {
+			this.uncertain = true;
+			this.message = `The disk version could not be read. Your editor content is retained. ${String(failure.reason)}`;
+			throw failure.reason;
+		}
+	}
 	private async observeExternal(read: (id: number) => Promise<DiskSnapshot>) {
-		if (!this.disk || this.disposed) return;
-		const baseline = this.disk;
+		if (this.disposed) return;
 		const recovery = this.pendingTarget;
+		if (recovery && recovery.id !== this.disk?.id)
+			return this.observeRecovery(read, this.disk, recovery);
+		if (!this.disk) return;
+		const baseline = this.disk;
 		const viewRevision = this.editorVersion();
 		const dirty = this.isDirty();
 		try {
@@ -281,29 +340,7 @@ export class DocumentSession {
 				this.pendingTarget !== recovery
 			)
 				return;
-			if (recovery && recovery.id !== baseline.id) {
-				// A failed Save As does not transfer the active document's ownership.
-				// Poll A separately while every recovery action continues to target B.
-				this.sourceConflict = sameDiskContent(baseline, current)
-					? null
-					: current;
-				const target = await read(recovery.id);
-				if (
-					this.disposed ||
-					this.disk !== baseline ||
-					this.pendingTarget !== recovery
-				)
-					return;
-				if (
-					target.revision !== this.observed?.revision ||
-					target.path !== this.observed.path
-				) {
-					this.observed = target;
-					this.pendingTarget = target;
-					this.conflict = target;
-				}
-				return;
-			}
+			this.markReadable(baseline.id);
 			if (sameDiskContent(this.disk, current)) {
 				this.adoptUnchanged(current);
 				return;
@@ -331,9 +368,7 @@ export class DocumentSession {
 				this.pendingTarget === recovery
 			) {
 				this.uncertain = true;
-				// A repeated unreadable observation is the same state the user confirmed.
-				if (!this.inspectionFailed) this.observationVersion++;
-				this.inspectionFailed = true;
+				this.markUnreadable(baseline.id);
 				this.message = `The disk version could not be read. Your editor content is retained. ${String(error)}`;
 			}
 			throw error;
