@@ -42,6 +42,23 @@ PR #1413 の旧 ADR-0047 が採った「Git が起こす共有作用の全防止
 所有・割当の判定には session の起点と native の所有証拠を使い、実行先は起点で代用せず各操作の明示的な対象から決める。
 通常の Git 操作は `-C` または harness の作業ディレクトリ、`git worktree remove` は削除対象、file 書込みは書込み先の物理パスを実行先とする。
 
+性質7の「書込み先」は、次の有限の実行先表に列挙した形だけを指す。
+
+| 入力 | 実行先 |
+| --- | --- |
+| literal な git -C | 指定した path |
+| 先頭の literal な cd の AND-list、harness の cwd | 解決した作業ディレクトリ |
+| worktree remove | 削除対象 |
+| Edit・Write・apply_patch | 書込み先の物理パス |
+| init・clone | 作成先の位置引数 |
+| archive・format-patch の -o | 出力先 |
+| bundle create | file の位置引数 |
+| worktree add | 作成先。作成元の B・D と合成し、own 以外の既存 linked worktree の内部への入れ子だけを拒否する。primary 配下の .claude/worktrees と scratch への作成を許可する |
+
+この表にない option の出力先、shell のリダイレクト、Git 以外のプログラムの書込み先は保証外とする。
+列挙を追加するかは所有者が決める。
+worktree add の開始点 main は -b topic や --detach と併用できるが、既存の default branch を checkout する形は D とする。
+
 実行先の解決: 命令の先頭から `&&` でつながる literal な `cd <path> &&`（絶対・相対）と、literal な `git -C` を解決する。
 subshell 内の `cd`、`;` や `||` の後の `cd`、条件分岐の中の `cd`、動的な値を含む `cd`・`-C` は、実行先を一意に決められないので unresolved とする。
 shell の状態機械は持たない。
@@ -101,9 +118,9 @@ stash の push・pop・apply・drop は W、clear だけを S とする。
 試行用の merge-tree --write-tree は own から行う W とし、checkout と ref を変えずに object を書く。
 merge-tree の2引数の既定モードも W、明示した --trivial-merge の読取モードだけを R とする。
 Git metadata の書込みを子へ渡さず、Codex の子は親へ返す。
-検査回避の短い形 -n は commit・push・am、--config-env は core.hooksPath を指定する形を扱う。
+検査回避の短い形 -n は commit・am だけとし、push の -n は dry-run とする。--config-env は core.hooksPath を指定する形を扱う。
 純粋な読取は R、pull は W とし、default branch へ書く refspec や default 上での変更は D とする。
-tag の作成は B、list は R。init・clone・archive・bundle create の書込み先 path を実行先にする。
+tag の作成は B、list は R。init・clone・archive・format-patch・bundle create の実行先は、上の有限の実行先表に従う。
 worktree prune・bisect・submodule update は W。reflog は verb 無し・show・list・exists を R、それ以外を U とする。
 symbolic-ref は読取を R、default branch を指す書込みを D、それ以外の書込みを U とする。
 R だけの命令の判定では、Git roots・worktree 一覧・branch・所有証拠の観測を省く。混在した命令の変更側の観測と、policy・parser の健全性による上書きは維持する。
@@ -122,7 +139,7 @@ shell の解析失敗による deny は1つの入口だけが出す。表の外�
 4. すべての deny に回復先がある。回復先は、同じ agent の書換え、親への返却、人間の terminal のいずれか。
 5. 判定は単調である。未解決や別の命令を付け足しても、確定した deny は deny のまま弱まらない。
 6. 所有者の一致で、子を親の権限へ昇格させない。codex-child の判定は、同じ対象・クラスの codex-parent より緩くならない。
-7. 所有・割当の判定には session の起点と所有証拠を使うが、実行先は起点で代用しない。実行先は各操作の明示的な対象（`-C`、削除対象、書込み先）から決める。
+7. 所有・割当の判定には session の起点と所有証拠を使うが、実行先は起点で代用しない。実行先は上の有限の実行先表に列挙した対象から決め、「書込み先」もその列挙を指す。
 8. 回復の遷移が成立する。parser の欠落について「failed → 回復コマンドが allow → 再検査で healthy → 正常コーパスが allow」を検査する。回復コマンドが allow になるだけでは成功としない。
 
 受入例と実 transcript の入力は scripts/lib/agent-operation-corpus.mjs、旧保護の採用ケースは scripts/lib/agent-operation-legacy-corpus.mjs に置く。
@@ -139,6 +156,18 @@ shell の解析失敗による deny は1つの入口だけが出す。表の外�
 | ask | 使える（人間への割込み） | 使えない（deny になる） |
 
 各項目は、検証した harness の版と起動方式とともに記録する。
+
+分類器が対応する入力の形は scripts/lib/agent-operation-option-table.json に subcommand ごとに宣言する。
+既知 option は値の有無とともに持ち、初期値は実 transcript で3回以上使われた option と、分類に必要な option とする。
+Git help から生成せず、コミットする観測値には option 名と件数だけを含める。
+未知の option、判定に使う引数が stdin・file・動的な値から来る形は U とする。
+本文・title 等、判定に使わない値はこの規則の対象外とする。
+既に確定した P・X・D・S は U を付加しても弱めない。
+通常の形の追加は所有者が決め、宣言の外へ分類器が自動で広がらないようにする。
+
+U による deny は Git common directory の pfdsl/agent-operation-unresolved.jsonl に、時刻・主体・subcommand・理由の分類・未知 option 名だけを追記する。
+命令全文や path は含めず、記録の書込みに失敗しても判定を変えない。
+scripts/agent-operation-unresolved-report.mjs は理由と option の件数を集計する。
 所有の比較では起点を含む worktree の root を使い、subdirectory での起動も同じ linked worktree の割当とする。
 primary と other-live の判定を先に適用し、各操作の実行先は明示した対象から決める。
 
