@@ -46,17 +46,9 @@ const TEXT = { disk: "disk v1\n", edited: "edited by the user\n" };
  */
 const KNOWN_RED = new Set([
 	"clean | metadata-only | unpolled | cmd-s",
-	"clean | metadata-only | during-confirm | quit-save",
-	"clean | metadata-only | during-confirm | quit-discard",
 	"clean | same-content-new-inode | unpolled | cmd-s",
-	"clean | same-content-new-inode | during-confirm | quit-save",
-	"clean | same-content-new-inode | during-confirm | quit-discard",
 	"dirty | metadata-only | unpolled | cmd-s",
-	"dirty | metadata-only | during-confirm | quit-save",
-	"dirty | metadata-only | during-confirm | quit-discard",
 	"dirty | same-content-new-inode | unpolled | cmd-s",
-	"dirty | same-content-new-inode | during-confirm | quit-save",
-	"dirty | same-content-new-inode | during-confirm | quit-discard",
 	"dirty | deleted-restored | polled | cmd-s",
 	"dirty | deleted-restored | polled | close-save",
 	"dirty | deleted-restored | polled | close-discard",

@@ -495,7 +495,7 @@ for (const change of ["source", "state epoch", "edit then undo"]) {
 				revision++;
 			}
 			if (change === "state epoch")
-				await doc.checkExternal(async () => snap("original", "disk:2"));
+				await doc.checkExternal(async () => snap("changed on disk", "disk:2"));
 			if (change === "edit then undo") {
 				editor.edit("source B");
 				revision++;
@@ -666,6 +666,64 @@ test("a same-content observation clears an observation-only uncertainty", async 
 	await doc.checkExternal(async () => ({ ...original, revision: "touched" }));
 	assert.equal(doc.isDirty(), false);
 	assert.equal(doc.message, "");
+});
+
+const touchedOriginal = () => {
+	const original = snap("original", "r1");
+	return { original, touched: { ...original, revision: "touched" } };
+};
+
+test("a same-content fresh inspection is adopted instead of flagged", () => {
+	const { original, touched } = touchedOriginal();
+	const doc = new DocumentSession(view(), original);
+	doc.view.edit("local");
+	doc.recordTarget(touched);
+	assert.equal(doc.disk, touched);
+	assert.equal(doc.observed, touched);
+	assert.equal(doc.conflict, null);
+	assert.equal(doc.sourceConflict, null);
+});
+
+test("reopening a binding with only a touch is neither a conflict nor a reload", () => {
+	const { original, touched } = touchedOriginal();
+	for (const dirty of [false, true]) {
+		const sets = [];
+		const editor = view();
+		editor.setSource = (value) => sets.push(value);
+		const doc = new DocumentSession(editor, original);
+		if (dirty) editor.edit("local");
+		assert.equal(doc.rebindDisk({ ...touched, id: 9 }), true);
+		assert.deepEqual(sets, [], `dirty=${dirty}`);
+		assert.equal(doc.conflict, null);
+		assert.equal(doc.disk.revision, "touched");
+		assert.equal(doc.isDirty(), dirty);
+	}
+});
+
+test("a touched original is not a source conflict during Save As recovery", async () => {
+	const { original, touched } = touchedOriginal();
+	const target = { ...snap("old B", "b0", "/B/b.pfdsl"), id: 2 };
+	const current = { ...target, source: "external B", revision: "b1" };
+	const doc = new DocumentSession(view(), original);
+	doc.view.edit("local");
+	await doc.save(async () => ({ outcome: "conflict", current }), target);
+	doc.recordTarget(touched);
+	assert.equal(doc.sourceConflict, null);
+	await doc.checkExternal(async (id) => (id === 2 ? current : touched));
+	assert.equal(doc.sourceConflict, null);
+	await doc.checkExternal(async (id) =>
+		id === 2 ? current : snap("external A"),
+	);
+	assert.equal(doc.sourceConflict.source, "external A");
+});
+
+test("a touch does not invalidate a close decision", async () => {
+	const { original, touched } = touchedOriginal();
+	const doc = new DocumentSession(view(), original);
+	doc.view.edit("local");
+	const version = doc.closeVersion();
+	await doc.checkExternal(async () => touched);
+	assert.equal(doc.closeVersion(), version);
 });
 
 test("a fresh inspection of the original keeps Save As recovery on B", async () => {

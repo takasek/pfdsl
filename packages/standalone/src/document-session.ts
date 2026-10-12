@@ -37,6 +37,20 @@ export function sameDocument(
 	);
 }
 
+/**
+ * Metadata-only changes and same-content replacements are not document changes.
+ * The raw disk text is compared; savedSource is normalized by the editor.
+ */
+export function sameDiskContent(
+	previous: DiskSnapshot,
+	current: DiskSnapshot,
+): boolean {
+	return (
+		previous.revision === current.revision ||
+		(current.source !== null && current.source === previous.source)
+	);
+}
+
 /** Keeps disk acknowledgment separate from the editor's current content. */
 export class DocumentSession {
 	view: DocumentView;
@@ -67,7 +81,7 @@ export class DocumentSession {
 	}
 	closeVersion() {
 		const state = (snapshot: DiskSnapshot | null) =>
-			snapshot && [snapshot.id, snapshot.path, snapshot.revision];
+			snapshot && [snapshot.id, snapshot.path, snapshot.source];
 		// Disk-only state changes can make a clean buffer the last surviving copy.
 		return JSON.stringify([
 			this.editorVersion(),
@@ -91,13 +105,30 @@ export class DocumentSession {
 		const ownsFresh = owner?.id === fresh.id;
 		if (owner && ownsFresh && recovery && recovery.id !== owner.id) {
 			// A failed Save As keeps B as the recovery target; A only reports its own change.
-			this.sourceConflict = fresh.revision === owner.revision ? null : fresh;
+			this.sourceConflict = sameDiskContent(owner, fresh) ? null : fresh;
 			return;
 		}
-		this.observed = fresh;
+		if (owner && ownsFresh && sameDiskContent(owner, fresh))
+			this.adoptUnchanged(fresh);
+		else {
+			this.observed = fresh;
+			this.flagExternalChange(fresh);
+		}
 		if (recovery?.id === fresh.id) this.pendingTarget = fresh;
-		if (owner && ownsFresh && fresh.revision === owner.revision) return;
-		this.flagExternalChange(fresh);
+	}
+	private adoptUnchanged(current: DiskSnapshot) {
+		this.disk = current;
+		this.observed = current;
+		if (
+			this.view.getSource() === this.savedSource &&
+			!this.saveFailure &&
+			!this.pendingTarget
+		) {
+			this.uncertain = false;
+			this.conflict = null;
+			this.sourceConflict = null;
+			this.message = "";
+		}
 	}
 	private flagExternalChange(current: DiskSnapshot) {
 		this.conflict = current;
@@ -111,7 +142,7 @@ export class DocumentSession {
 		const previous = this.disk;
 		if (!previous || !sameDocument(previous, current, previousMissing))
 			return false;
-		const changed = previous.revision !== current.revision;
+		const changed = !sameDiskContent(previous, current);
 		const dirty = this.isDirty();
 		// Adopt the selected native capability without acknowledging unsaved text.
 		this.disk = {
@@ -120,6 +151,7 @@ export class DocumentSession {
 			path: current.path,
 			binding: current.binding,
 			identity: current.identity,
+			...(changed ? {} : { revision: current.revision }),
 		};
 		const oldPending = this.pendingTarget;
 		const ownsSource = (snapshot: DiskSnapshot) =>
@@ -223,8 +255,9 @@ export class DocumentSession {
 			if (recovery && recovery.id !== baseline.id) {
 				// A failed Save As does not transfer the active document's ownership.
 				// Poll A separately while every recovery action continues to target B.
-				this.sourceConflict =
-					current.revision === baseline.revision ? null : current;
+				this.sourceConflict = sameDiskContent(baseline, current)
+					? null
+					: current;
 				const target = await read(recovery.id);
 				if (
 					this.disposed ||
@@ -242,24 +275,8 @@ export class DocumentSession {
 				}
 				return;
 			}
-			// Metadata-only changes and same-content replacements are not document changes.
-			// The raw disk text is compared; savedSource is normalized by the editor.
-			if (
-				current.revision === this.disk.revision ||
-				(current.source !== null && current.source === this.disk.source)
-			) {
-				this.disk = current;
-				this.observed = current;
-				if (
-					this.view.getSource() === this.savedSource &&
-					!this.saveFailure &&
-					!this.pendingTarget
-				) {
-					this.uncertain = false;
-					this.conflict = null;
-					this.sourceConflict = null;
-					this.message = "";
-				}
+			if (sameDiskContent(this.disk, current)) {
+				this.adoptUnchanged(current);
 				return;
 			}
 			if (
