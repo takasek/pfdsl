@@ -45,10 +45,6 @@ const TEXT = { disk: "disk v1\n", edited: "edited by the user\n" };
  * exactly the cells it repairs: a listed cell that passes fails the last test.
  */
 const KNOWN_RED = new Set([
-	"clean | metadata-only | unpolled | cmd-s",
-	"clean | same-content-new-inode | unpolled | cmd-s",
-	"dirty | metadata-only | unpolled | cmd-s",
-	"dirty | same-content-new-inode | unpolled | cmd-s",
 	"dirty | deleted-restored | polled | cmd-s",
 	"dirty | deleted-restored | polled | close-save",
 	"dirty | deleted-restored | polled | close-discard",

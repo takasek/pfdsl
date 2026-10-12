@@ -94,10 +94,6 @@ export class DocumentSession {
 			state(this.sourceConflict),
 		]);
 	}
-	/** A Save has to look at its target again before it asks for a decision. */
-	needsReview() {
-		return Boolean(this.conflict || this.saveFailure || this.uncertain);
-	}
 	/** Record a fresh inspection of a Save target so the panel and the review agree. */
 	recordTarget(fresh: DiskSnapshot) {
 		const owner = this.disk;

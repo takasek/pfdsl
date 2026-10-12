@@ -580,8 +580,9 @@ test("Save As recovery retains target ownership and refuses intervening edits in
 			outcome: "saved",
 			current: { ...A, source: "edit original leaf", revision: "a1" },
 		};
-		inspectSnapshots.set(A.id, saveReply.current);
+		// Save inspects the target first, so the disk keeps its old state until the save runs.
 		await click("#save");
+		inspectSnapshots.set(A.id, saveReply.current);
 		assert.equal(
 			calls.filter((c) => c.command === "save_document").at(-1).args.id,
 			A.id,

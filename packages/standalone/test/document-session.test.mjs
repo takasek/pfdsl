@@ -764,15 +764,12 @@ test("a fresh inspection of the document flags a change but not a match", () => 
 	const original = snap("original");
 	const doc = new DocumentSession(editor, original);
 	editor.edit("local");
-	assert.equal(doc.needsReview(), false);
 	doc.recordTarget({ ...original });
 	assert.equal(doc.conflict, null);
-	assert.equal(doc.needsReview(), false);
 	const missing = { ...original, source: null, revision: null, identity: null };
 	doc.recordTarget(missing);
 	assert.equal(doc.observed, missing);
 	assert.equal(doc.conflict, missing);
-	assert.equal(doc.needsReview(), true);
 	assert.match(doc.message, /deleted or moved/);
 	const changed = snap("external", "r2");
 	doc.recordTarget(changed);

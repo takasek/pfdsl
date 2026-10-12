@@ -331,7 +331,7 @@ async function saveEntry(
 		});
 		if (!target) return false;
 		documentHandles.add(target.id);
-	} else if (observed || entry.session.needsReview()) {
+	} else {
 		// The remembered snapshot may predate an external change; review what is on disk now.
 		const remembered = target;
 		try {
