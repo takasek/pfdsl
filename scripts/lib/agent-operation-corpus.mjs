@@ -621,6 +621,22 @@ export const AGENT_OPERATION_CORPUS = [
 			classes: ["O", "P"],
 		}),
 	),
+	example(
+		"gh-api-last-method-write",
+		"gh api --method GET -X PUT repos/o/r/pulls/1/merge",
+		"deny",
+		{
+			classes: ["O", "P"],
+		},
+	),
+	example(
+		"gh-api-last-method-read",
+		"gh api --method PUT -X GET repos/o/r/pulls/1/merge",
+		"allow",
+		{
+			classes: ["R"],
+		},
+	),
 	...["merge", "merge-async"].map((endpoint) =>
 		example(
 			`gh-api-${endpoint}`,

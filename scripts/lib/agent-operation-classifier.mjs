@@ -435,7 +435,7 @@ function ghOperation(tokens) {
 		return operation(["O", "P"], "remote", { target: "own" });
 	if (group === "api") {
 		const endpoint = operands[1]?.value;
-		const method = values.find(
+		const method = values.findLast(
 			({ flag }) => flag === "-X" || flag === "--method",
 		)?.value;
 		const fields = values.filter(({ flag }) =>
