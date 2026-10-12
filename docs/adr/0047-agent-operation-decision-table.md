@@ -91,6 +91,8 @@ agent が手動で追加した worktree は other-unowned であり、変更を�
 試行用 worktree の片付けを止めず、未 commit の変更の拒否は Git 自身に任せる。
 force 付きは own 以外で deny、other-live は force の有無を問わず deny とする。
 stash の push・pop・apply・drop は W、clear だけを S とする。
+試行用の merge-tree --write-tree は own から行う W とし、checkout と ref を変えずに object を書く。
+Git metadata の書込みを子へ渡さず、Codex の子は親へ返す。
 検査回避の短い形 -n は commit・push・am、--config-env は core.hooksPath を指定する形を扱う。
 
 次の guard は、操作先と責務ではなく内容を検査するもので、この表の外に置く: closes-create（PR 本文のクローズ参照）、roadmap-publish、generated-root-instructions（生成物の正本案内）、command-usage（advisory）、verification-tree（検証を走らせる tree）。

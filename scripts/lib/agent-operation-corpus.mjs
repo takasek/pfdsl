@@ -881,4 +881,30 @@ export const AGENT_OPERATION_CORPUS = [
 	example("am-short-no-verify-own", "git am -n patch", "deny", {
 		classes: ["W", "X"],
 	}),
+	example(
+		"merge-tree-trial-claude",
+		"git merge-tree --write-tree HEAD origin/main",
+		"allow",
+		{ classes: ["W"] },
+	),
+	example(
+		"merge-tree-trial-codex",
+		`git -C ${own} merge-tree --write-tree HEAD origin/main`,
+		"allow",
+		{ subject: "codex-parent", classes: ["W"] },
+	),
+	example(
+		"merge-tree-trial-child",
+		`git -C ${own} merge-tree --write-tree HEAD origin/main`,
+		"deny",
+		{ subject: "codex-child" },
+	),
+	example(
+		"merge-tree-trial-primary",
+		`git -C ${primary} merge-tree --write-tree HEAD origin/main`,
+		"deny",
+	),
+	example("merge-tree-read", "git merge-tree HEAD origin/main", "allow", {
+		classes: ["R"],
+	}),
 ];

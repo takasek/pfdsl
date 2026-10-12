@@ -276,7 +276,11 @@ function gitOperation(command, context, facts) {
 	let action;
 	let force;
 	let effective = location;
-	if (GIT_READ.has(sub.value)) classes = ["R"];
+	if (sub.value === "merge-tree")
+		// The approved trial writes objects without changing a checkout or ref.
+		// Keep that metadata write in W so Codex children return it to a parent.
+		classes = [flags.has("--write-tree") ? "W" : "R"];
+	else if (GIT_READ.has(sub.value)) classes = ["R"];
 	else if (GIT_WRITE.has(sub.value)) {
 		classes = ["W"];
 		if (

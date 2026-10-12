@@ -56,7 +56,7 @@ const SUBJECTS = {
 };
 const REASONS = {
 	R: "Read operation.",
-	W: "Write only in your assigned linked worktree. Use native worktree creation for work; use git merge-tree --write-tree for a merge trial.",
+	W: "Write only in your assigned linked worktree. Use native worktree creation for work; run git merge-tree --write-tree from your assigned worktree for a merge trial.",
 	B: "Operate on free feature branches from your assigned linked worktree.",
 	D: "The local default branch is protected. Use a feature branch or ask a human to run this in a terminal.",
 	S: "Clearing the shared stash is reserved for a human terminal.",
