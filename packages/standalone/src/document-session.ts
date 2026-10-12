@@ -80,6 +80,33 @@ export class DocumentSession {
 			state(this.sourceConflict),
 		]);
 	}
+	/** A Save has to look at its target again before it asks for a decision. */
+	needsReview() {
+		return Boolean(this.conflict || this.saveFailure || this.uncertain);
+	}
+	/** Record a fresh inspection of a Save target so the panel and the review agree. */
+	recordTarget(fresh: DiskSnapshot) {
+		const owner = this.disk;
+		const recovery = this.pendingTarget;
+		const ownsFresh = owner?.id === fresh.id;
+		if (owner && ownsFresh && recovery && recovery.id !== owner.id) {
+			// A failed Save As keeps B as the recovery target; A only reports its own change.
+			this.sourceConflict = fresh.revision === owner.revision ? null : fresh;
+			return;
+		}
+		this.observed = fresh;
+		if (recovery?.id === fresh.id) this.pendingTarget = fresh;
+		if (owner && ownsFresh && fresh.revision === owner.revision) return;
+		this.flagExternalChange(fresh);
+	}
+	private flagExternalChange(current: DiskSnapshot) {
+		this.conflict = current;
+		this.uncertain = true;
+		this.message =
+			current.source === null
+				? "The file was deleted or moved. Your editor content is retained."
+				: "The disk changed. Your editor content is retained.";
+	}
 	rebindDisk(current: DiskSnapshot, previousMissing = false) {
 		const previous = this.disk;
 		if (!previous || !sameDocument(previous, current, previousMissing))
@@ -244,12 +271,7 @@ export class DocumentSession {
 			) {
 				this.useDisk(current);
 			} else {
-				this.conflict = current;
-				this.uncertain = true;
-				this.message =
-					current.source === null
-						? "The file was deleted or moved. Your editor content is retained."
-						: "The disk changed. Your editor content is retained.";
+				this.flagExternalChange(current);
 			}
 		} catch (error) {
 			if (

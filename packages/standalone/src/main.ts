@@ -324,12 +324,26 @@ async function saveEntry(
 ): Promise<boolean> {
 	if (!native) throw new Error("Use the desktop application to save files.");
 	let target = observed ? entry.session.observed : entry.session.disk;
+	let inspected = false;
 	if (as || !target) {
 		target = await invoke<DiskSnapshot | null>("choose_save_target", {
 			name: entry.name.endsWith(".pfdsl") ? entry.name : `${entry.name}.pfdsl`,
 		});
 		if (!target) return false;
 		documentHandles.add(target.id);
+	} else if (observed || entry.session.needsReview()) {
+		// The remembered snapshot may predate an external change; review what is on disk now.
+		const remembered = target;
+		try {
+			target = await invoke<DiskSnapshot>("inspect_document", {
+				id: remembered.id,
+			});
+		} catch (error) {
+			status.textContent = `Could not read ${remembered.path}: ${String(error)}. The save was not attempted. Editor content is retained.`;
+			return false;
+		}
+		entry.session.recordTarget(target);
+		inspected = true;
 	}
 	if (explainOpenTarget(entry, target)) return false;
 	if (target.source !== null && (as || observed || entry.session.conflict)) {
@@ -345,7 +359,7 @@ async function saveEntry(
 		);
 		if (decision === "another") return saveEntry(entry, true);
 		if (decision !== "replace") return false;
-	} else if (observed && target.source === null) {
+	} else if ((observed || inspected) && target.source === null) {
 		const decision = await choose(
 			"Recreate missing file",
 			`Create ${target.path} again? A file created by another writer will not be overwritten.`,

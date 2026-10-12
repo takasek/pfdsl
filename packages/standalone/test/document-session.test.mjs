@@ -605,6 +605,60 @@ test("failed Save As keeps recovery target B when original A is polled", async (
 	assert.equal(doc.conflict.source, "external B");
 });
 
+test("a fresh inspection of the original keeps Save As recovery on B", async () => {
+	const editor = view();
+	const original = snap("original");
+	const target = { ...snap("old B", "b0", "/B/b.pfdsl"), id: 2 };
+	const current = { ...target, source: "external B", revision: "b1" };
+	const doc = new DocumentSession(editor, original);
+	editor.edit("local");
+	await doc.save(async () => ({ outcome: "conflict", current }), target);
+	const changedA = snap("external A");
+	doc.recordTarget(changedA);
+	assert.equal(doc.sourceConflict.source, "external A");
+	assert.equal(doc.observed.id, 2);
+	assert.equal(doc.pendingTarget.id, 2);
+	assert.equal(doc.conflict.id, 2);
+	doc.recordTarget(original);
+	assert.equal(doc.sourceConflict, null);
+});
+
+test("a fresh inspection of the recovery target replaces its observed snapshot", async () => {
+	const editor = view();
+	const target = { ...snap("old B", "b0", "/B/b.pfdsl"), id: 2 };
+	const current = { ...target, source: "external B", revision: "b1" };
+	const doc = new DocumentSession(editor, snap("original"));
+	editor.edit("local");
+	await doc.save(async () => ({ outcome: "conflict", current }), target);
+	const later = { ...target, source: "later B", revision: "b2" };
+	doc.recordTarget(later);
+	assert.equal(doc.observed, later);
+	assert.equal(doc.pendingTarget, later);
+	assert.equal(doc.conflict, later);
+	assert.equal(doc.disk.id, 1);
+});
+
+test("a fresh inspection of the document flags a change but not a match", () => {
+	const editor = view();
+	const original = snap("original");
+	const doc = new DocumentSession(editor, original);
+	editor.edit("local");
+	assert.equal(doc.needsReview(), false);
+	doc.recordTarget({ ...original });
+	assert.equal(doc.conflict, null);
+	assert.equal(doc.needsReview(), false);
+	const missing = { ...original, source: null, revision: null, identity: null };
+	doc.recordTarget(missing);
+	assert.equal(doc.observed, missing);
+	assert.equal(doc.conflict, missing);
+	assert.equal(doc.needsReview(), true);
+	assert.match(doc.message, /deleted or moved/);
+	const changed = snap("external", "r2");
+	doc.recordTarget(changed);
+	assert.equal(doc.conflict, changed);
+	assert.match(doc.message, /The disk changed/);
+});
+
 test("unconfirmed Save As without a readable result still belongs to the chosen target", async () => {
 	const editor = view();
 	const doc = new DocumentSession(editor, snap("original"));
