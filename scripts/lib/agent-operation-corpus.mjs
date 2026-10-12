@@ -352,6 +352,24 @@ export const AGENT_OPERATION_CORPUS = [
 	example("transcript-process-substitution", "diff <(git show HEAD:a) a"),
 	example("transcript-arithmetic", "echo $((1+2)); git commit -m x"),
 	example("transcript-pushd-popd", "pushd /tmp; ls; popd; git add a"),
+	example(
+		"codex-stdin-commit-message",
+		`git -C ${own} commit -F - <<'EOF'\nmessage\nEOF`,
+		"allow",
+		{
+			subject: "codex-parent",
+			classes: ["W"],
+		},
+	),
+	example(
+		"codex-stdin-message-literal-example",
+		`git -C ${own} -c color.ui=never commit -F - <<'EOF'\ngit commit --no-verify -m example\nEOF`,
+		"allow",
+		{
+			subject: "codex-parent",
+			classes: ["W"],
+		},
+	),
 
 	example(
 		"resolution-session-live-explicit-own",

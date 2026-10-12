@@ -260,6 +260,13 @@ export function adaptShell(ast, source) {
 			// A shell can execute a heredoc as a program. Its body belongs to another
 			// language invocation, so require an explicit script rather than guess.
 			const args = (cmd.Args ?? []).map(word).map(({ value }) => value);
+			let gitSubcommand = 1;
+			if (head === "git")
+				while (args[gitSubcommand]?.startsWith("-")) {
+					if (["-C", "-c", "--config-env"].includes(args[gitSubcommand]))
+						gitSubcommand++;
+					gitSubcommand++;
+				}
 			const stdinValue = (flags) =>
 				args.some(
 					(arg, i) =>
@@ -269,7 +276,7 @@ export function adaptShell(ast, source) {
 			const reader =
 				["cat", "tee"].includes(head) ||
 				(head === "git" &&
-					["commit", "tag"].includes(args[1]) &&
+					["commit", "tag"].includes(args[gitSubcommand]) &&
 					stdinValue(["-F", "--file"])) ||
 				(head === "gh" &&
 					["pr", "issue", "api"].includes(args[1]) &&

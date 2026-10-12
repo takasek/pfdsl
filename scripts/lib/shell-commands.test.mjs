@@ -62,6 +62,17 @@ test("a dynamic executable is retained so it cannot hide an earlier denial", () 
 	assert.equal(parsed.commands[1].tokens[0].dynamic, true);
 });
 
+test("data heredocs accept ordinary Git global options before the subcommand", () => {
+	for (const source of [
+		"git -C /fixture/own commit -F - <<'EOF'\nmessage\nEOF",
+		"git -C /fixture/own -c color.ui=never commit -F - <<'EOF'\ngit commit --no-verify -m example\nEOF",
+	]) {
+		const parsed = readShell(source);
+		assert.equal(parsed.error, undefined, source);
+		assert.equal(parsed.commands.length, 1, source);
+	}
+});
+
 test("missing parser and syntax errors have distinct recovery facts", () => {
 	const missing = readShell("git status", {
 		parserPath: "/nonexistent/pfdsl-shfmt",
