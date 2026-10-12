@@ -29,13 +29,9 @@
 // nothing else — and unlike C there is no case where dropping the body silently
 // is what was wanted.
 
-import {
-	splitSegments,
-	stripLeadingNoise,
-	tokenize,
-} from "./delegation-guard.mjs";
 import { parseGhCommand } from "./gh-command.mjs";
 import { buildPermissionOutput, parseHookPayload } from "./hook-io.mjs";
+import { readShell } from "./shell-commands.mjs";
 
 /** `@pfdsl/cli`, optionally with a version spec. */
 const PUBLISHED_CLI_SPEC = /^@pfdsl\/cli(@.+)?$/;
@@ -52,9 +48,9 @@ const VIEW_GROUPS = new Set(["issue", "pr"]);
  * @returns {Array<Array<{value: string, quoted: boolean}>>}
  */
 function commandSegments(command) {
-	return splitSegments(command).map((segment) =>
-		stripLeadingNoise(tokenize(segment)),
-	);
+	const shell = readShell(command);
+	if (shell.error) return [];
+	return shell.commands.map((node) => node.tokens.slice(node.executableIndex));
 }
 
 /**
