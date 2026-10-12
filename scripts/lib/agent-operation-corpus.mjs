@@ -488,6 +488,50 @@ export const AGENT_OPERATION_CORPUS = [
 	example("resolution-codex-relative-C", "git -C ../own add a", "deny", {
 		subject: "codex-parent",
 	}),
+	example(
+		"resolution-inherited-Git-target",
+		`git -C ${own} commit -m x`,
+		"deny",
+		{
+			facts: { gitTargetOverride: true },
+			classes: ["U"],
+			target: "unresolved",
+		},
+	),
+	example("resolution-inherited-Git-read", "git status", "allow", {
+		facts: { gitTargetOverride: true },
+		classes: ["R"],
+		target: "unresolved",
+	}),
+	example(
+		"resolution-inline-Git-target",
+		`GIT_DIR=/fixture/repo/.git git -C ${own} commit -m x`,
+		"deny",
+		{
+			classes: ["U"],
+			target: "unresolved",
+		},
+	),
+	example(
+		"resolution-unrelated-assignment",
+		"FOO=bar git commit -m x",
+		"allow",
+		{
+			classes: ["W"],
+			target: "own",
+		},
+	),
+	example("resolution-native-patch-command", null, "allow", {
+		subject: "codex-child",
+		tool: {
+			name: "apply_patch",
+			input: {
+				command: `*** Begin Patch\n*** Add File: ${own}/a\n+a\n*** End Patch`,
+			},
+		},
+		classes: ["W"],
+		target: "own",
+	}),
 	...[
 		"cd - && git add a",
 		"cd /fixture/own && git status & git add a",

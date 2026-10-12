@@ -1,6 +1,7 @@
 // Pure stage-one adapter: callers parse shell and observe Git/fs outside here.
 // Injected ownership records must already be validated native evidence.
 import { basename, isAbsolute, resolve } from "node:path";
+import { hasGitTargetEnvironment } from "./git-environment.mjs";
 
 const GIT_READ = new Set([
 	"status",
@@ -102,7 +103,7 @@ function pathFacts(path, facts) {
 	const tree = (facts.worktrees ?? [])
 		.filter(({ root }) => under(executionPath, root))
 		.sort((a, b) => b.root.length - a.root.length)[0];
-	if (!tree) return { target: "scratch", executionPath };
+	if (!tree) return { target: "scratch", executionPath, executionInput: path };
 	const checks = [
 		[tree.commonDir !== facts.commonDir, "foreign"],
 		[tree.primary, "primary"],
@@ -122,6 +123,7 @@ function pathFacts(path, facts) {
 	return {
 		target: checks.find(([matches]) => matches)[1],
 		executionPath,
+		executionInput: path,
 		tree,
 	};
 }
@@ -159,6 +161,7 @@ function operation(classes, kind, location, extra = {}) {
 		kind,
 		scope: "repository",
 		executionPath: location?.executionPath ?? null,
+		executionInput: location?.executionInput ?? null,
 		target: location?.target ?? "unresolved",
 		...extra,
 	};
@@ -169,13 +172,24 @@ const defaultRef = (value, facts) =>
 	value === `refs/heads/${facts.defaultBranch}`;
 
 function gitOperation(command, context, facts) {
+	const assignments = Object.fromEntries(
+		command.tokens
+			.slice(0, command.executableIndex ?? 0)
+			.filter(({ value }) => /^[A-Za-z_][A-Za-z0-9_]*=/.test(value))
+			.map(({ value }) => [
+				value.slice(0, value.indexOf("=")),
+				value.slice(value.indexOf("=") + 1),
+			]),
+	);
+	const targetOverride =
+		facts.gitTargetOverride || hasGitTargetEnvironment(assignments);
 	const tokens = command.tokens.slice(command.executableIndex ?? 0);
 	let i = 1;
-	let path = command.unresolvedCwd ? null : context.cwd;
+	let path = command.unresolvedCwd || targetOverride ? null : context.cwd;
 	for (const cd of command.leadingCd ?? [])
 		path = path ? (isAbsolute(cd) ? cd : `${path}/${cd}`) : null;
 	let explicitAbsolute = false;
-	let dynamicTarget = false;
+	let dynamicTarget = Boolean(targetOverride);
 	let bypass = false;
 	while (i < tokens.length && tokens[i].value.startsWith("-")) {
 		const value = tokens[i].value;
@@ -479,7 +493,9 @@ function fileOperations(payload, context, facts) {
 	const tool = payload.tool_name;
 	const read = tool === "Read";
 	const patch =
-		typeof input === "string" ? input : (input?.patch ?? input?.input);
+		typeof input === "string"
+			? input
+			: (input?.patch ?? input?.input ?? input?.command);
 	const paths =
 		tool === "apply_patch"
 			? typeof patch === "string"
