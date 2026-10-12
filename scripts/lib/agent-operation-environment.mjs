@@ -113,10 +113,8 @@ export function collectAgentOperationEnvironment(
 	const harness = environment.CLAUDE_PROJECT_DIR?.trim() ? "claude" : "codex";
 	const origin =
 		harness === "claude" ? environment.CLAUDE_PROJECT_DIR : payload.cwd;
-	const sessionRoot =
-		typeof origin === "string" && isAbsolute(origin)
-			? resolvePhysicalPath(origin, null)
-			: null;
+	let sessionRoot =
+		typeof origin === "string" && isAbsolute(origin) ? origin : null;
 	const sessionId =
 		payload.session_id || (harness === "claude" ? `claude:${parentPid}` : null);
 	const facts = {
@@ -149,15 +147,29 @@ export function collectAgentOperationEnvironment(
 				: MCP_WRITE.has(tool)
 					? "O"
 					: "U";
+	const preliminary = classifyAgentOperations(payload, facts);
+	// Every target column permits healthy R. Its decision needs neither branch
+	// occupancy nor ownership; mixed calls still observe their mutations.
+	if (
+		preliminary.operations.every(({ classes }) =>
+			classes.every((klass) => klass === "R"),
+		)
+	)
+		return facts;
 	const paths = new Map(
-		classifyAgentOperations(payload, facts)
-			.operations.filter(({ executionInput }) => executionInput)
+		preliminary.operations
+			.filter(
+				({ executionInput, classes }) =>
+					executionInput && !classes.every((klass) => klass === "R"),
+			)
 			.map(({ executionInput: path, followFinalSymlink = true }) => [
 				`${followFinalSymlink ? "follow" : "entry"}:${path}`,
 				{ path, followFinalSymlink },
 			]),
 	);
 	if (!paths.size) return facts;
+	sessionRoot = sessionRoot ? resolvePhysicalPath(sessionRoot, null) : null;
+	facts.sessionRoot = sessionRoot;
 	if (!sessionRoot)
 		throw new Error("Cannot establish the observed session origin");
 	const env = withoutGitTargetEnvironment(environment);

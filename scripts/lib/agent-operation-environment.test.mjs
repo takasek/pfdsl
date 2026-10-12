@@ -11,7 +11,78 @@ import { test } from "node:test";
 import { fileURLToPath } from "node:url";
 import { classifyAgentOperations } from "./agent-operation-classifier.mjs";
 import { collectAgentOperationEnvironment } from "./agent-operation-environment.mjs";
+import { evaluateAgentOperationPolicy } from "./agent-operation-policy.mjs";
+import { GIT_TARGET_ENVIRONMENT_VARIABLES } from "./git-environment.mjs";
 import { readShell } from "./shell-commands.mjs";
+
+test("read-only calls do not observe repository roots, worktrees or native ownership", () => {
+	const noObservation = () => {
+		throw new Error("read-only observation must be skipped");
+	};
+	for (const command of [
+		"git status",
+		"git reflog show",
+		"git tag -l",
+		"bash -c 'git rev-list --count HEAD'",
+		"git diff; git log -1",
+	]) {
+		const payload = {
+			tool_name: "Bash",
+			cwd: "/fixture/own",
+			tool_input: { command },
+		};
+		const facts = collectAgentOperationEnvironment(payload, {
+			hookRoot: "/fixture/own",
+			environment: {},
+			shell: readShell(command),
+			probeGit: noObservation,
+			probeProcess: noObservation,
+			readMetadata: noObservation,
+		});
+		assert.deepEqual(facts.worktrees, []);
+		assert.equal(
+			evaluateAgentOperationPolicy(payload, facts).decision,
+			"allow",
+			command,
+		);
+	}
+});
+
+test("each inherited Git target variable makes mutations unresolved without weakening bypass denial", () => {
+	for (const variable of GIT_TARGET_ENVIRONMENT_VARIABLES) {
+		const payload = {
+			tool_name: "Bash",
+			cwd: "/fixture/own",
+			tool_input: { command: "git -C /fixture/own add a" },
+		};
+		const facts = collectAgentOperationEnvironment(payload, {
+			hookRoot: "/fixture/own",
+			environment: { [variable]: "/fixture/primary" },
+			shell: readShell(payload.tool_input.command),
+		});
+		const result = evaluateAgentOperationPolicy(payload, facts);
+		assert.equal(facts.gitTargetOverride, true, variable);
+		assert.equal(
+			classifyAgentOperations(payload, facts).operations[0].target,
+			"unresolved",
+			variable,
+		);
+		assert.equal(result.decision, "deny", variable);
+		assert.equal(result.recovery, "rewrite", variable);
+		const bypass = {
+			...payload,
+			tool_input: { command: "git -C /fixture/own commit --no-verify -m x" },
+		};
+		assert.equal(
+			evaluateAgentOperationPolicy(bypass, {
+				...facts,
+				shell: readShell(bypass.tool_input.command),
+			}).operationClass,
+			"X",
+			variable,
+		);
+	}
+});
 
 function fixture({ nativeLock = true } = {}) {
 	const root = mkdtempSync(
