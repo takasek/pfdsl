@@ -77,6 +77,8 @@ t-wadaのTDDで。適切な粒度でコミットすること。
 `scripts/agent-operation-guard.mjs` は Bash・GitHub MCP・Edit・Write・apply_patch の操作先と責務を、ADR-0047 の有限の判定表で判定する。
 primary・default branch・検査回避・PR 統合・別 worktree の変更を保護し、own での通常作業を許可する。
 session の起点と native 所有証拠は所有判定に使い、実行先は literal な先頭 cd の AND-list、git -C、削除対象、書込み先の物理パスから決める。
+同じ命令文字列の pushd・popd、Git target 環境変数・CDPATH の literal な名前への書込みは、変更系 Git を unresolved にする。値や実行順序は追跡しない。
+literal な shell -c・eval の内側も同じ規則で分類し、source・dot が読む file の中身は保証外とする。
 other-live・other-unowned の変更は全主体 deny とし、own の repository 設定だけ Claude 親 ask とする。
 Claude subagent の外向き書込みは親へ返し、agent_type の許可表にある issue-worker だけを例外とする。
 Codex の子は読取と own の通常ファイルの書込みだけを担当する。

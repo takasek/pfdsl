@@ -45,6 +45,11 @@ PR #1413 の旧 ADR-0047 が採った「Git が起こす共有作用の全防止
 実行先の解決: 命令の先頭から `&&` でつながる literal な `cd <path> &&`（絶対・相対）と、literal な `git -C` を解決する。
 subshell 内の `cd`、`;` や `||` の後の `cd`、条件分岐の中の `cd`、動的な値を含む `cd`・`-C` は、実行先を一意に決められないので unresolved とする。
 shell の状態機械は持たない。
+同じ命令文字列に pushd・popd、または Git の実行先を変える環境変数と CDPATH の literal な名前への代入・export・readonly・declare・typeset・read・printf -v があれば、変更系 Git の実行先を unresolved にする。
+対象の変数は GIT_DIR、GIT_WORK_TREE、GIT_INDEX_FILE、GIT_COMMON_DIR、GIT_OBJECT_DIRECTORY、GIT_ALTERNATE_OBJECT_DIRECTORIES、GIT_NAMESPACE とする。
+値や前後関係を解釈せず、hook process の環境にある Git target の上書きも unresolved とする。
+bash・sh・zsh の -c と eval の literal な文字列は、内側を同じ規則で分類し、解析できなければ unresolved にする。
+source・dot の file の中身は保証外のままとする。
 
 agent が手動で追加した worktree は other-unowned であり、変更を伴う作業には native の worktree 作成を使う。
 軸の外の入力や空のクラス集合は例外とし、表を拡張して受け入れない。
@@ -75,6 +80,7 @@ agent が手動で追加した worktree は other-unowned であり、変更を�
 主体による上書き:
 
 - codex-child は R と、own への file 書込み（Edit・Write・絶対パスの apply_patch。`.git` 管理ファイルを除く）だけを allow とする。Git と gh・MCP の W・B・O は「親へ返す」案内付き deny。
+- codex-child の個人の codex-git-routine.mjs の呼出しは、検証 verb（build・test・typecheck・node-test・node-script）以外を W と同じく親へ返す。routine をリポの依存にせず、親の呼出しはこの表で判定しない。
 - claude-subagent は親と同じ表に従う。ただし ask のセルは「親へ返す」案内付き deny とする。background の subagent は ask に人間が応答するまで停止するためである。
 - claude-subagent の O（外向き書込み）は「親へ返す」案内付き deny とする。レビューと公開は呼び出し元が持つという既存の責務境界（#932、main の agent-operation-guard）を維持する。例外は、PR 作成までを役割に持つ agent 種別（現行は `issue-worker`）だけで、`agent_type` の許可表で判定する。
 - Codex は ask を表現できないので、ask のセルは「人間の terminal で実行する」案内付き deny になる。
@@ -90,11 +96,17 @@ agent が手動で追加した worktree は other-unowned であり、変更を�
 例外として、force 無しの worktree remove は other-unowned でも allow とする。
 試行用 worktree の片付けを止めず、未 commit の変更の拒否は Git 自身に任せる。
 force 付きは own 以外で deny、other-live は force の有無を問わず deny とする。
+force を止める案内は、other-unowned の試行なら force 無しで片付けられることを示す。
 stash の push・pop・apply・drop は W、clear だけを S とする。
 試行用の merge-tree --write-tree は own から行う W とし、checkout と ref を変えずに object を書く。
 merge-tree の2引数の既定モードも W、明示した --trivial-merge の読取モードだけを R とする。
 Git metadata の書込みを子へ渡さず、Codex の子は親へ返す。
 検査回避の短い形 -n は commit・push・am、--config-env は core.hooksPath を指定する形を扱う。
+純粋な読取は R、pull は W とし、default branch へ書く refspec や default 上での変更は D とする。
+tag の作成は B、list は R。init・clone・archive・bundle create の書込み先 path を実行先にする。
+worktree prune・bisect・submodule update は W。reflog は verb 無し・show・list・exists を R、それ以外を U とする。
+symbolic-ref は読取を R、default branch を指す書込みを D、それ以外の書込みを U とする。
+R だけの命令の判定では、Git roots・worktree 一覧・branch・所有証拠の観測を省く。混在した命令の変更側の観測と、policy・parser の健全性による上書きは維持する。
 
 次の guard は、操作先と責務ではなく内容を検査するもので、この表の外に置く: closes-create（PR 本文のクローズ参照）、roadmap-publish、generated-root-instructions（生成物の正本案内）、command-usage（advisory）、verification-tree（検証を走らせる tree）。
 shell の解析失敗による deny は1つの入口だけが出す。表の外の guard は、解析失敗では止めず、自分の検査対象が解析できた場合だけ判定する。
@@ -135,7 +147,7 @@ Codex version 1 の他者 ownerThreadId だけでは生存を証明しない。
 
 ## 保証外と回復先
 
-- `bash -c`・`eval`・script file・Git alias の内部。
+- source・dot で読む script file、その他の script file・Git alias の内部。literal な -c・eval の文字列は上の分類の対象とする。
 - 保存済みの remote 設定（mirror、特殊な refspec、include）が引き起こす作用。
 - 同じディレクトリで2つの session を同時に起動した場合（同居）。own の判定は排他的な所有を証明しない。同居の検出は harness のネイティブな隔離（Claude の lock、Codex の managed worktree）に委ねる。
 - primary で実行する Git 以外の命令の副作用（例: `make build` による生成物や共有 shim の配置）。

@@ -58,6 +58,7 @@ pre-commitを経由しないref操作の保護と、repo policyのロード失�
 **worktree での git 操作**: `git commit` など git コマンドは worktree ディレクトリを指して実行する（理由は `.pfdsl/bindings/pfd-ops.md`「ワークサイクルの追加手順」の「手順 2 の追加で worktree 上の変更を検証する」が一次情報）。
 **worktree のパスはシェル変数に入れず literal で書く**。
 `scripts/agent-operation-guard.mjs` の実行先解決は ADR-0047 に従い、先頭の literal cd の AND-list と literal git -C に限定する。
+pushd・popd と Git target 環境変数・CDPATH の名前への書込みが同じ命令文字列にあれば、変更系 Git は unresolved とする。literal な shell -c・eval の文字列も同じ規則で分類し、shell の状態を追跡しない。
 Codex の変更系 Git は `git -C <絶対パス>`、apply_patch は絶対パスを既定とする。
 所有は session の起点と ADR-0046 の native 所有証拠で判定し、other-live・other-unowned の変更は全主体 deny とする。
 main/default branch と検査回避は own でも保護する。
