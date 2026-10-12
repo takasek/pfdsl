@@ -342,6 +342,17 @@ async function saveEntry(
 			status.textContent = `Could not read ${remembered.path}: ${String(error)}. The save was not attempted. Editor content is retained.`;
 			return false;
 		}
+		const followed = observed ? null : entry.session.followDiskIfClean(target);
+		if (followed) {
+			syncLocation(entry);
+			status.textContent =
+				followed === "reloaded"
+					? "Reloaded the current disk version; there was nothing to save."
+					: "Already saved.";
+			label(entry);
+			renderConflict();
+			return true;
+		}
 		entry.session.recordTarget(target);
 		inspected = true;
 	}

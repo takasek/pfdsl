@@ -112,6 +112,28 @@ export class DocumentSession {
 		}
 		if (recovery?.id === fresh.id) this.pendingTarget = fresh;
 	}
+	/**
+	 * A clean editor has nothing to save: it follows the disk instead of replacing it.
+	 * Returns null when a save is still needed.
+	 */
+	followDiskIfClean(fresh: DiskSnapshot): "reloaded" | "unchanged" | null {
+		const owner = this.disk;
+		if (!owner || fresh.id !== owner.id || fresh.source === null) return null;
+		if (
+			this.view.getSource() !== this.savedSource ||
+			this.saveFailure ||
+			this.pendingTarget
+		)
+			return null;
+		if (!sameDiskContent(owner, fresh)) {
+			this.useDisk(fresh);
+			return "reloaded";
+		}
+		// Normalized line endings still make a manual save write the editor text.
+		if (fresh.source !== this.view.getSource()) return null;
+		this.adoptUnchanged(fresh);
+		return "unchanged";
+	}
 	private adoptUnchanged(current: DiskSnapshot) {
 		this.disk = current;
 		this.observed = current;

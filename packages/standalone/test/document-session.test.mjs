@@ -746,6 +746,52 @@ test("a dirty document drops an observation-only conflict when the disk returns 
 	}
 });
 
+test("a clean editor follows the disk instead of saving", async () => {
+	const original = snap("original", "r1");
+	const sets = [];
+	const editor = view();
+	const apply = editor.setSource;
+	editor.setSource = (value) => {
+		sets.push(value);
+		apply(value);
+	};
+	const doc = new DocumentSession(editor, original);
+	const changed = snap("external", "r2");
+	assert.equal(doc.followDiskIfClean(changed), "reloaded");
+	assert.deepEqual(sets, ["external"]);
+	assert.equal(doc.disk, changed);
+	assert.equal(doc.isDirty(), false);
+	const touched = { ...changed, revision: "r3" };
+	assert.equal(doc.followDiskIfClean(touched), "unchanged");
+	assert.equal(doc.disk, touched);
+	assert.deepEqual(sets, ["external"]);
+});
+
+test("a save is still needed unless the editor is clean and the disk readable", async () => {
+	const original = snap("original", "r1");
+	const changed = snap("external", "r2");
+	const dirty = new DocumentSession(view(), original);
+	dirty.view.edit("local");
+	assert.equal(dirty.followDiskIfClean(changed), null);
+	assert.equal(dirty.disk, original);
+	const missing = new DocumentSession(view(), original);
+	const gone = { ...original, source: null, revision: null, identity: null };
+	assert.equal(missing.followDiskIfClean(gone), null);
+	const other = new DocumentSession(view(), original);
+	assert.equal(other.followDiskIfClean({ ...changed, id: 2 }), null);
+	const failed = new DocumentSession(view(), original);
+	failed.view.edit("local");
+	await failed.save(async () => ({ outcome: "conflict", current: changed }));
+	failed.view.edit("original");
+	assert.equal(failed.followDiskIfClean(snap("later", "r3")), null);
+	// Normalized line endings: the editor text differs from the raw disk text.
+	const eol = new DocumentSession(
+		{ getSource: () => "a\nb\n", setSource() {} },
+		snap("a\r\nb\n", "r1"),
+	);
+	assert.equal(eol.followDiskIfClean(snap("a\r\nb\n", "r2")), null);
+});
+
 test("a fresh inspection of the original keeps Save As recovery on B", async () => {
 	const editor = view();
 	const original = snap("original");

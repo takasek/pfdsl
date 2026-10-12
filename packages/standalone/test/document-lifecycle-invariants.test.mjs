@@ -576,6 +576,27 @@ async function runCell(tabState, event, timing, action) {
 					);
 		}
 
+		// I6: a clean editor follows an external content change instead of saving over it.
+		if (tabState === "clean" && event === "content-changed") {
+			if (SAVE_ACTIONS.has(action)) {
+				if (log.some((item) => item.kind === "dialog"))
+					violate("I6", "a review dialog was shown");
+				if (log.some((item) => item.kind === "save"))
+					violate("I6", "a clean editor wrote to the disk");
+			}
+			if (alive() && text !== fs.source)
+				violate("I6", "the editor does not hold the disk content");
+			if (
+				timing === "unpolled" &&
+				action === "cmd-s" &&
+				!/nothing to save/.test(status)
+			)
+				violate(
+					"I6",
+					`the reload was not reported (${JSON.stringify(status)})`,
+				);
+		}
+
 		// I5: a file that returns to its observed state leaves no trace behind.
 		if (event === "deleted-restored" && timing === "polled") {
 			if (afterPoll.conflict) violate("I5", "the poll kept a conflict");

@@ -211,7 +211,8 @@ External changes after those final reads are not excluded atomically; Discard le
 Clean external changes reload automatically; dirty changes, deletion, and publication conflicts keep the editor content for review.
 A change that leaves the file's content identical (a touch, a permission change, or a replacement with the same bytes) is not treated as a disk change.
 The conflict panel identifies the recovery target and lets you compare its observed contents, choose another destination, or explicitly load the current disk version.
-Every Save inspects its target first, a review compares the editor with that fresh inspection, and Replace uses the version the review showed.
+Every Save inspects its target first.
+A clean editor reloads a changed version instead of saving over it, a review compares the editor with that fresh inspection, and Replace uses the version the review showed.
 Save As rejects a target already open by selected directory/leaf binding.
 Distinct hard-link names are separate tabs and save targets; saving atomically replaces only the selected name.
 External reloads acknowledge the text applied by Monaco, which normalizes mixed line endings to a single style; reloading or closing a clean tab does not rewrite the disk file, while a manual save writes the normalized editor text.
