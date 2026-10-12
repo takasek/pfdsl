@@ -87,7 +87,10 @@ export function adaptShell(ast, source) {
 	const leadingCd = [];
 	const prefixNodes = new Set();
 	const flattenAnd = (stmt) =>
-		stmt?.Cmd?.Type === "BinaryCmd" && stmt.Cmd.Op === "&&"
+		!stmt?.Negated &&
+		!stmt?.Background &&
+		stmt?.Cmd?.Type === "BinaryCmd" &&
+		stmt.Cmd.Op === "&&"
 			? [...flattenAnd(stmt.Cmd.X), ...flattenAnd(stmt.Cmd.Y)]
 			: [stmt];
 	const initial = flattenAnd(ast.Stmts?.[0]);
@@ -101,6 +104,7 @@ export function adaptShell(ast, source) {
 			stmt?.Cmd?.Assigns?.length ||
 			args?.length !== 2 ||
 			args[0]?.value !== "cd" ||
+			args[1]?.value.startsWith("-") ||
 			args.some(({ dynamic }) => dynamic)
 		)
 			break;
@@ -364,8 +368,13 @@ export function adaptShell(ast, source) {
 	);
 	for (const command of commands) {
 		command.isLeadingCd = prefixNodes.has(command.offset);
-		command.leadingCd = [...leadingCd];
-		command.unresolvedCwd = unresolvedCwd;
+		const withinPrefixChain =
+			ast.Stmts?.[0] &&
+			command.offset >= ast.Stmts[0].Pos.Offset &&
+			command.offset < ast.Stmts[0].End.Offset;
+		command.leadingCd = withinPrefixChain ? [...leadingCd] : [];
+		command.unresolvedCwd =
+			unresolvedCwd || (leadingCd.length > 0 && !withinPrefixChain);
 	}
 	return { commands };
 }

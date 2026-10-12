@@ -39,11 +39,18 @@ test("only a leading literal cd AND chain supplies an execution prefix", () => {
 		"builtin cd /fixture/own && git add a",
 		"noglob cd /fixture/own; git add a",
 		"nocorrect cd /fixture/own; git add a",
+		"cd - && git add a",
+		"cd /fixture/own && git status & git add a",
+		"! cd /fixture/own && git add a",
+		"cd /fixture/own && true; git add a",
 	]) {
 		const parsed = readShell(source);
 		assert.equal(parsed.error, undefined, source);
 		assert.ok(
-			parsed.commands.some(({ unresolvedCwd }) => unresolvedCwd),
+			parsed.commands.some(
+				({ tokens, unresolvedCwd }) =>
+					tokens.some(({ value }) => value === "git") && unresolvedCwd,
+			),
 			source,
 		);
 	}

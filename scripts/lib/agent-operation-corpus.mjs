@@ -401,6 +401,17 @@ export const AGENT_OPERATION_CORPUS = [
 	example("resolution-codex-relative-C", "git -C ../own add a", "deny", {
 		subject: "codex-parent",
 	}),
+	...[
+		"cd - && git add a",
+		"cd /fixture/own && git status & git add a",
+		"! cd /fixture/own && git add a",
+		"cd /fixture/own && true; git add a",
+	].map((command, i) =>
+		example(`resolution-nonprefix-cd-${i}`, command, "deny", {
+			cwd: live,
+			target: "unresolved",
+		}),
+	),
 	example("resolution-codex-workdir-is-not-evidence", "git add a", "deny", {
 		subject: "codex-parent",
 		tool: { name: "exec_command", input: { cmd: "git add a", workdir: own } },
