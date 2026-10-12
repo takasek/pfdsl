@@ -726,6 +726,26 @@ test("a touch does not invalidate a close decision", async () => {
 	assert.equal(doc.closeVersion(), version);
 });
 
+test("a dirty document drops an observation-only conflict when the disk returns to its baseline", async () => {
+	const editor = view();
+	const original = snap("original", "r1");
+	const doc = new DocumentSession(editor, original);
+	editor.edit("local");
+	for (const away of [
+		snap("external", "r2"),
+		{ ...original, source: null, revision: null, identity: null },
+	]) {
+		await doc.checkExternal(async () => away);
+		assert.equal(doc.conflict, away);
+		await doc.checkExternal(async () => ({ ...original }));
+		assert.equal(doc.conflict, null);
+		assert.equal(doc.sourceConflict, null);
+		assert.equal(doc.message, "");
+		assert.equal(doc.isDirty(), true);
+		assert.equal(editor.getSource(), "local");
+	}
+});
+
 test("a fresh inspection of the original keeps Save As recovery on B", async () => {
 	const editor = view();
 	const original = snap("original");

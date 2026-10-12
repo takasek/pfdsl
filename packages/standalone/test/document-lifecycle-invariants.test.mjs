@@ -40,21 +40,6 @@ const ACTIONS = [
 const SAVE_ACTIONS = new Set(["cmd-s", "review", "close-save", "quit-save"]);
 const TEXT = { disk: "disk v1\n", edited: "edited by the user\n" };
 
-/**
- * Cells whose invariants fail until their fix lands. A fix commit must delete
- * exactly the cells it repairs: a listed cell that passes fails the last test.
- */
-const KNOWN_RED = new Set([
-	"dirty | deleted-restored | polled | cmd-s",
-	"dirty | deleted-restored | polled | close-save",
-	"dirty | deleted-restored | polled | close-discard",
-	"dirty | deleted-restored | polled | close-cancel",
-	"dirty | deleted-restored | polled | quit-save",
-	"dirty | deleted-restored | polled | quit-discard",
-	"dirty | deleted-restored | polled | quit-cancel",
-]);
-const results = new Map();
-
 function applicable(tab, event, timing, action) {
 	if (event.startsWith("reply-lost"))
 		return (
@@ -620,15 +605,10 @@ for (const tab of TABS)
 			for (const action of ACTIONS) {
 				if (!applicable(tab, event, timing, action)) continue;
 				const label = `${tab} | ${event} | ${timing} | ${action}`;
-				test(
-					label,
-					KNOWN_RED.has(label) ? { todo: "known red" } : {},
-					async () => {
-						const violations = await runCell(tab, event, timing, action);
-						results.set(label, violations);
-						assert.deepEqual(violations, [], label);
-					},
-				);
+				test(label, async () => {
+					const violations = await runCell(tab, event, timing, action);
+					assert.deepEqual(violations, [], label);
+				});
 			}
 
 /** Fails Save As to B with a conflict, leaving A open with B as the recovery target. */
@@ -705,11 +685,4 @@ test("Review and Save Here inspects the recovery target again", async () => {
 	} finally {
 		assert.deepEqual(await host.finish(), []);
 	}
-});
-
-test("KNOWN_RED lists only cells that still fail", () => {
-	const stale = [...KNOWN_RED].filter(
-		(label) => !results.has(label) || results.get(label).length === 0,
-	);
-	assert.deepEqual(stale, [], "remove these cells from KNOWN_RED");
 });

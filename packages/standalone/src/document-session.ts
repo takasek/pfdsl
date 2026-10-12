@@ -115,11 +115,8 @@ export class DocumentSession {
 	private adoptUnchanged(current: DiskSnapshot) {
 		this.disk = current;
 		this.observed = current;
-		if (
-			this.view.getSource() === this.savedSource &&
-			!this.saveFailure &&
-			!this.pendingTarget
-		) {
+		// isDirty() still reports unsaved text through the content comparison.
+		if (!this.saveFailure && !this.pendingTarget) {
 			this.uncertain = false;
 			this.conflict = null;
 			this.sourceConflict = null;
