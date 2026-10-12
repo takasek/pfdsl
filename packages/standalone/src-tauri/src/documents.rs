@@ -660,4 +660,79 @@ mod tests {
             fs::remove_dir_all(root).unwrap();
         }
     }
+    #[derive(Clone, Copy, Debug, PartialEq)]
+    enum Point { Stale, BeforePublish, AfterPublish }
+    #[derive(Clone, Copy, Debug, PartialEq)]
+    enum Race { InPlace, ReplaceDifferent, ReplaceIdentical, Delete, Symlink, Directory, Chmod, MoveParent, ReplaceParent }
+    const POINTS: [Point; 3] = [Point::Stale, Point::BeforePublish, Point::AfterPublish];
+    const RACES: [Race; 9] = [Race::InPlace, Race::ReplaceDifferent, Race::ReplaceIdentical, Race::Delete, Race::Symlink, Race::Directory, Race::Chmod, Race::MoveParent, Race::ReplaceParent];
+    fn inject(race: Race, root: &Path, moved: &Path) {
+        use std::os::unix::fs::PermissionsExt;
+        let leaf = root.join("a.pfdsl");
+        match race {
+            Race::InPlace => fs::write(&leaf, "external").unwrap(),
+            Race::ReplaceDifferent => { fs::write(root.join("x.tmp"), "external").unwrap(); fs::rename(root.join("x.tmp"), &leaf).unwrap(); }
+            Race::ReplaceIdentical => { fs::write(root.join("x.tmp"), "original").unwrap(); fs::rename(root.join("x.tmp"), &leaf).unwrap(); }
+            Race::Delete => fs::remove_file(&leaf).unwrap(),
+            Race::Symlink => { fs::write(root.join("foreign.txt"), "foreign").unwrap(); fs::remove_file(&leaf).unwrap(); std::os::unix::fs::symlink("foreign.txt", &leaf).unwrap(); }
+            Race::Directory => { fs::remove_file(&leaf).unwrap(); fs::create_dir(&leaf).unwrap(); fs::write(leaf.join("external.txt"), "external data").unwrap(); }
+            Race::Chmod => fs::set_permissions(&leaf, fs::Permissions::from_mode(0o600)).unwrap(),
+            Race::MoveParent => fs::rename(root, moved).unwrap(),
+            Race::ReplaceParent => { fs::rename(root, moved).unwrap(); fs::create_dir(root).unwrap(); fs::write(root.join("a.pfdsl"), "foreign").unwrap(); }
+        }
+    }
+    /// What the external actor left behind must still be there, byte for byte.
+    fn intact(race: Race, root: &Path, moved: &Path) -> Result<(), String> {
+        use std::os::unix::fs::PermissionsExt;
+        let leaf = root.join("a.pfdsl");
+        let expect = |path: PathBuf, bytes: &str| match fs::read_to_string(&path) {
+            Ok(actual) if actual == bytes => Ok(()),
+            other => Err(format!("{} holds {other:?}, expected {bytes:?}", path.display())),
+        };
+        match race {
+            Race::InPlace | Race::ReplaceDifferent => expect(leaf, "external"),
+            Race::ReplaceIdentical => expect(leaf, "original"),
+            Race::Delete => if fs::symlink_metadata(&leaf).is_err() { Ok(()) } else { Err("the deleted leaf was recreated".into()) },
+            Race::Symlink => if fs::read_link(&leaf).is_ok() { expect(root.join("foreign.txt"), "foreign") } else { Err("the symlink was replaced".into()) },
+            Race::Directory => expect(leaf.join("external.txt"), "external data"),
+            Race::Chmod => { expect(leaf.clone(), "original")?; let mode = fs::metadata(&leaf).unwrap().permissions().mode() & 0o7777; if mode == 0o600 { Ok(()) } else { Err(format!("mode became {mode:o}")) } }
+            Race::MoveParent => { expect(moved.join("a.pfdsl"), "original")?; if root.exists() { Err("the moved directory path was recreated".into()) } else { Ok(()) } }
+            Race::ReplaceParent => { expect(moved.join("a.pfdsl"), "original")?; expect(leaf, "foreign") }
+        }
+    }
+    #[test] fn external_changes_never_turn_into_a_saved_result_or_lose_data() {
+        let mut failures = Vec::new();
+        for point in POINTS { for race in RACES {
+            let cell = format!("{point:?} x {race:?}");
+            let (root, mut doc) = fixture("race-matrix");
+            let moved = root.with_extension("moved");
+            let before = doc.inspect(0).unwrap();
+            let expected = before.revision.as_deref();
+            let result = match point {
+                Point::Stale => { inject(race, &root, &moved); doc.save(0, "local", expected) }
+                Point::BeforePublish => doc.save_with(0, "local", expected, || inject(race, &root, &moved)),
+                Point::AfterPublish => doc.save_with_hooks(0, "local", expected, || {}, || inject(race, &root, &moved)),
+            };
+            let dir = if matches!(race, Race::MoveParent | Race::ReplaceParent) { &moved } else { &root };
+            let mut fail = |rule: &str, detail: String| failures.push(format!("{cell}: {rule}: {detail} (outcome {}, publication {}, message {:?})", result.outcome, result.publication, result.message));
+            if result.outcome == "saved" {
+                let leaf = dir.join("a.pfdsl");
+                let regular = fs::symlink_metadata(&leaf).map(|m| m.is_file()).unwrap_or(false);
+                if !regular || fs::read_to_string(&leaf).ok().as_deref() != Some("local") { fail("R1", format!("saved, but {} is not a regular file holding the buffer", leaf.display())); }
+            } else {
+                let left = [&root, &moved].iter().filter_map(|d| fs::read_dir(d).ok()).flatten().filter_map(|e| e.ok())
+                    .filter(|e| e.file_name().to_string_lossy().starts_with(".pfdsl-save-")).count();
+                if left > 0 && !result.message.contains("Could not remove temporary file") { fail("R3", format!("{left} temporary file(s) remain without a cleanup report")); }
+            }
+            if point == Point::AfterPublish {
+                if result.publication != "published" { fail("R4", "the change came after publication but publication is not reported".into()); }
+            } else {
+                if result.outcome == "saved" { fail("R2", "a change before the final check was reported as saved".into()); }
+                if result.publication != "not-published" { fail("R2", "content was published despite the earlier change".into()); }
+                if let Err(detail) = intact(race, &root, &moved) { fail("R2", detail); }
+            }
+            let _ = fs::remove_dir_all(&root); let _ = fs::remove_dir_all(&moved);
+        } }
+        assert!(failures.is_empty(), "{} failing cell(s):\n{}", failures.len(), failures.join("\n"));
+    }
 }
