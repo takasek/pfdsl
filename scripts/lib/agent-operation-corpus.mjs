@@ -432,6 +432,45 @@ export const AGENT_OPERATION_CORPUS = [
 	example("own-free-switch", "git switch feat/merged", "allow", {
 		classes: ["B"],
 	}),
+	example("branch-rename-own", `git -C ${own} branch -m feat/new`, "allow", {
+		classes: ["B"],
+	}),
+	example("branch-rename-child", `git -C ${own} branch -m feat/new`, "deny", {
+		subject: "codex-child",
+		classes: ["B"],
+	}),
+	example("branch-rename-default", "git branch -m main feat/new", "deny", {
+		classes: ["D"],
+	}),
+	example("branch-rename-current-default", "git branch -m feat/new", "deny", {
+		facts: {
+			worktrees: corpusFacts().worktrees.map((tree) =>
+				tree.root === own ? { ...tree, branch: "main" } : tree,
+			),
+		},
+		classes: ["D"],
+	}),
+	...[
+		"git branch feat/new main",
+		"git branch -f feat/new main",
+		"git switch -c feat/new main",
+		"git switch -C feat/new main",
+		"git checkout -b feat/new main",
+		"git update-ref refs/heads/feat/new main",
+	].map((command, i) =>
+		example(`branch-default-is-startpoint-${i}`, command, "allow", {
+			classes: ["B"],
+		}),
+	),
+	...[
+		"git checkout -- main",
+		"git checkout --detach main",
+		"git switch --detach main",
+	].map((command, i) =>
+		example(`branch-default-is-read-source-${i}`, command, "allow", {
+			classes: ["W"],
+		}),
+	),
 	example("own-busy-branch-delete", "git branch -D feat/busy", "deny", {
 		target: "other-live",
 	}),

@@ -219,6 +219,10 @@ function gitOperation(command, context, facts) {
 	// -f is force for branches/worktrees, but a value flag for config and gh.
 	const flagsWithValues = new Set(VALUE_FLAGS);
 	if (sub.value !== "config") flagsWithValues.delete("-f");
+	if (sub.value === "branch") flagsWithValues.delete("-m");
+	if (["switch", "checkout"].includes(sub.value))
+		for (const flag of ["-c", "-C", "--create", "--force-create", "-b", "-B"])
+			flagsWithValues.add(flag);
 	const parsed = scan(args, flagsWithValues);
 	const { operands, flags } = parsed;
 	const location = pathFacts(path, facts);
@@ -263,26 +267,68 @@ function gitOperation(command, context, facts) {
 	} else if (
 		["branch", "switch", "checkout", "update-ref"].includes(sub.value)
 	) {
+		const branchMutation = [...flags].some((flag) =>
+			[
+				"-m",
+				"-M",
+				"--move",
+				"-c",
+				"-C",
+				"--copy",
+				"-d",
+				"-D",
+				"--delete",
+				"-f",
+				"--force",
+			].includes(flag),
+		);
 		classes = [
 			sub.value === "branch" &&
-			(!operands.length || flags.has("--list") || flags.has("-l"))
+			((!operands.length && !branchMutation) ||
+				flags.has("--list") ||
+				flags.has("-l"))
 				? "R"
 				: "B",
 		];
+		// Ref destinations differ from readable startpoints and pathspecs.
+		// These are the ordinary branch forms in the finite acceptance corpus.
+		let changedRefs = operands.slice(0, 1);
+		if (sub.value === "branch") {
+			if (["-m", "-M", "--move"].some((flag) => flags.has(flag)))
+				changedRefs = [
+					...(operands.length < 2 && location.tree?.branch
+						? [{ value: location.tree.branch }]
+						: []),
+					...operands,
+				];
+			else if (["-d", "-D", "--delete"].some((flag) => flags.has(flag)))
+				changedRefs = operands;
+			else if (["-c", "-C", "--copy"].some((flag) => flags.has(flag)))
+				changedRefs = operands.slice(-1);
+		} else if (["switch", "checkout"].includes(sub.value)) {
+			const created = parsed.values.find(({ flag }) =>
+				["-c", "-C", "--create", "--force-create", "-b", "-B"].includes(flag),
+			);
+			if (created) changedRefs = [created];
+		}
 		if (
 			(sub.value === "switch" || sub.value === "checkout") &&
 			flags.has("--detach")
-		)
+		) {
 			classes = ["W"];
-		if (sub.value === "checkout" && args.some(({ value }) => value === "--"))
+			changedRefs = [];
+		}
+		if (sub.value === "checkout" && args.some(({ value }) => value === "--")) {
 			classes = ["W"];
+			changedRefs = [];
+		}
 		if (
-			operands.some(({ value }) => defaultRef(value, facts)) &&
+			changedRefs.some(({ value }) => defaultRef(value, facts)) &&
 			!classes.includes("R")
 		)
 			classes = ["D"];
-		if (operands.some(({ dynamic }) => dynamic)) classes.push("U");
-		const busy = operands
+		if (changedRefs.some(({ dynamic }) => dynamic)) classes.push("U");
+		const busy = changedRefs
 			.map(({ value }) => facts.branches?.[value]?.checkedOutAt)
 			.find((root) => root && root !== location.tree?.root);
 		if (busy && !classes.includes("R") && !classes.includes("D"))
