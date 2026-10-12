@@ -767,6 +767,28 @@ test("a clean editor follows the disk instead of saving", async () => {
 	assert.deepEqual(sets, ["external"]);
 });
 
+test("a tab that shows unsaved state is never reloaded by a save", async () => {
+	const original = snap("original", "r1");
+	// An unreadable observation leaves the text clean but requires confirmation.
+	const unreadable = new DocumentSession(view(), original);
+	await assert.rejects(
+		unreadable.checkExternal(async () => {
+			throw new Error("unreadable");
+		}),
+	);
+	assert.equal(unreadable.isDirty(), true);
+	assert.equal(unreadable.followDiskIfClean(snap("external", "r2")), null);
+	assert.equal(unreadable.disk, original);
+	// A conflict undone back to the saved text is still unsaved state.
+	const editor = view();
+	const undone = new DocumentSession(editor, original);
+	editor.edit("local");
+	await undone.checkExternal(async () => snap("external", "r2"));
+	editor.edit("original");
+	assert.equal(undone.isDirty(), true);
+	assert.equal(undone.followDiskIfClean(snap("external", "r2")), null);
+});
+
 test("a save is still needed unless the editor is clean and the disk readable", async () => {
 	const original = snap("original", "r1");
 	const changed = snap("external", "r2");

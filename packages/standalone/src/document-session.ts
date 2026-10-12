@@ -119,12 +119,8 @@ export class DocumentSession {
 	followDiskIfClean(fresh: DiskSnapshot): "reloaded" | "unchanged" | null {
 		const owner = this.disk;
 		if (!owner || fresh.id !== owner.id || fresh.source === null) return null;
-		if (
-			this.view.getSource() !== this.savedSource ||
-			this.saveFailure ||
-			this.pendingTarget
-		)
-			return null;
+		// The poll reloads only an editor that shows no unsaved state; so does Save.
+		if (this.isDirty() || this.saveFailure || this.pendingTarget) return null;
 		if (!sameDiskContent(owner, fresh)) {
 			this.useDisk(fresh);
 			return "reloaded";

@@ -5,12 +5,6 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 export const KNOWN_RED = new Set([
-	"clean | deleted | drift | cmd-s",
-	"clean | deleted | drift | close-save",
-	"clean | deleted | drift | quit-save",
-	"clean | unreadable | drift | cmd-s",
-	"clean | unreadable | drift | close-save",
-	"clean | unreadable | drift | quit-save",
 	"save-as-conflict | A unreadable | B none | polled | cmd-s",
 	"save-as-conflict | A unreadable | B none | polled | review",
 	"save-as-conflict | A unreadable | B none | polled | close-save",
@@ -462,8 +456,6 @@ export const KNOWN_RED = new Set([
 	"untitled-b-unreadable | A none | B recovered | during-confirm | close-discard",
 	"untitled-b-unreadable | A none | B recovered | during-confirm | quit-discard",
 	"an inspection in flight cannot change the text a review is about to use (Save As onto an existing file)",
-	"undoing back to the saved text keeps the unsaved state (Replace)",
-	"undoing back to the saved text keeps the unsaved state (Keep Editing)",
 	"Untitled cmd-s onto a existing file goes through the same review",
 	"a review says that the disk version differs and that a further change stops the save",
 	"Use Current Disk Version ignores a touch that happens while its dialog is open",
