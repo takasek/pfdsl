@@ -159,7 +159,8 @@ shell の解析失敗による deny は1つの入口だけが出す。表の外�
 各項目は、検証した harness の版と起動方式とともに記録する。
 
 分類器が対応する入力の形は scripts/lib/agent-operation-option-table.json に subcommand ごとに宣言する。
-既知 option は値の有無とともに持ち、初期値は実 transcript で3回以上使われた option と、分類に必要な option とする。
+既知 option は値の有無とともに持ち、初期値は実 transcript で1回以上使われた option と、分類に必要な option とする。
+観測された綴りを正常形として登録し、短縮 cluster の一般的な展開は行わない。
 Git help から生成せず、コミットする観測値には option 名と件数だけを含める。
 未知の option、判定に使う引数が stdin・file・動的な値から来る形は U とする。
 判定に使う引数を、クラスを決める selector と、変更の実行先を決める target に分ける。

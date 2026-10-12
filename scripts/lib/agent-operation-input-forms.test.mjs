@@ -68,3 +68,24 @@ test("frequent exact option spellings use their declared value arity", () => {
 		assert.equal(parsed.values.length, arity === "required" ? 1 : 0);
 	}
 });
+
+test("observed once options preserve value bindings without changing operands", () => {
+	for (const [name, values, operands] of [
+		["git log", ["--find-object", "object", "HEAD"], ["HEAD"]],
+		["git init", ["-qb", "topic", "/fixture/new"], ["/fixture/new"]],
+		[
+			"gh search prs",
+			["--limit", "10", "--json", "number", "--jq", ".[0]"],
+			[],
+		],
+		["git status", ["--untracked-files=all"], []],
+	]) {
+		const parsed = parseInputForm(tokens(...values), name);
+		assert.deepEqual(parsed.issues, [], name);
+		assert.deepEqual(
+			parsed.operands.map(({ value }) => value),
+			operands,
+			name,
+		);
+	}
+});

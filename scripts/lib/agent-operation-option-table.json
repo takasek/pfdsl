@@ -104,7 +104,7 @@
 		},
 		"-H": {
 			"arity": "required",
-			"count": 0
+			"count": 1
 		},
 		"-i": {
 			"arity": "none",
@@ -208,7 +208,7 @@
 		},
 		"-R": {
 			"arity": "required",
-			"count": 0
+			"count": 1
 		},
 		"-t": {
 			"arity": "required",
@@ -278,11 +278,15 @@
 		},
 		"-R": {
 			"arity": "required",
-			"count": 0
+			"count": 2
 		},
 		"-t": {
 			"arity": "required",
 			"count": 0
+		},
+		"--edit-last": {
+			"arity": "none",
+			"count": 2
 		}
 	},
 	"gh issue create": {
@@ -340,7 +344,7 @@
 		},
 		"-b": {
 			"arity": "required",
-			"count": 0
+			"count": 2
 		},
 		"-F": {
 			"arity": "required",
@@ -356,7 +360,15 @@
 		},
 		"-t": {
 			"arity": "required",
-			"count": 0
+			"count": 2
+		},
+		"-l": {
+			"arity": "required",
+			"count": 2
+		},
+		"--dry-run": {
+			"arity": "none",
+			"count": 1
 		}
 	},
 	"gh issue edit": {
@@ -402,7 +414,7 @@
 		},
 		"--title": {
 			"arity": "required",
-			"count": 0
+			"count": 2
 		},
 		"--version": {
 			"arity": "none",
@@ -476,7 +488,11 @@
 		},
 		"-R": {
 			"arity": "required",
-			"count": 0
+			"count": 1
+		},
+		"--author": {
+			"arity": "required",
+			"count": 1
 		}
 	},
 	"gh issue reopen": {
@@ -687,6 +703,10 @@
 		"-R": {
 			"arity": "required",
 			"count": 0
+		},
+		"--watch": {
+			"arity": "none",
+			"count": 1
 		}
 	},
 	"gh pr close": {
@@ -728,7 +748,7 @@
 		},
 		"--repo": {
 			"arity": "required",
-			"count": 0
+			"count": 1
 		},
 		"--title": {
 			"arity": "required",
@@ -892,7 +912,7 @@
 		},
 		"-R": {
 			"arity": "required",
-			"count": 0
+			"count": 2
 		},
 		"-t": {
 			"arity": "required",
@@ -923,6 +943,10 @@
 		"-R": {
 			"arity": "required",
 			"count": 3
+		},
+		"--patch": {
+			"arity": "none",
+			"count": 1
 		}
 	},
 	"gh pr edit": {
@@ -940,7 +964,7 @@
 		},
 		"--body": {
 			"arity": "required",
-			"count": 0
+			"count": 1
 		},
 		"--body-file": {
 			"arity": "required",
@@ -988,7 +1012,7 @@
 		},
 		"-R": {
 			"arity": "required",
-			"count": 0
+			"count": 2
 		},
 		"-t": {
 			"arity": "required",
@@ -1068,7 +1092,7 @@
 		},
 		"--help": {
 			"arity": "none",
-			"count": 0
+			"count": 2
 		},
 		"--match-head-commit": {
 			"arity": "required",
@@ -1084,7 +1108,7 @@
 		},
 		"--repo": {
 			"arity": "required",
-			"count": 0
+			"count": 1
 		},
 		"--squash": {
 			"arity": "none",
@@ -1317,6 +1341,10 @@
 		"-R": {
 			"arity": "required",
 			"count": 8
+		},
+		"--comments": {
+			"arity": "none",
+			"count": 1
 		}
 	},
 	"gh release create": {
@@ -1416,7 +1444,7 @@
 		},
 		"--help": {
 			"arity": "none",
-			"count": 0
+			"count": 2
 		},
 		"--name": {
 			"arity": "required",
@@ -1449,6 +1477,10 @@
 		"-R": {
 			"arity": "required",
 			"count": 0
+		},
+		"--add-readme": {
+			"arity": "none",
+			"count": 1
 		}
 	},
 	"gh repo delete": {
@@ -1496,7 +1528,7 @@
 		},
 		"--help": {
 			"arity": "none",
-			"count": 0
+			"count": 2
 		},
 		"--name": {
 			"arity": "required",
@@ -1609,6 +1641,10 @@
 		"-R": {
 			"arity": "required",
 			"count": 0
+		},
+		"-q": {
+			"arity": "required",
+			"count": 1
 		}
 	},
 	"gh run download": {
@@ -1709,6 +1745,10 @@
 		"-R": {
 			"arity": "required",
 			"count": 4
+		},
+		"--status": {
+			"arity": "required",
+			"count": 2
 		}
 	},
 	"gh run view": {
@@ -1850,7 +1890,7 @@
 		},
 		"--repo": {
 			"arity": "required",
-			"count": 0
+			"count": 1
 		},
 		"--version": {
 			"arity": "none",
@@ -1884,7 +1924,19 @@
 		},
 		"-R": {
 			"arity": "required",
-			"count": 0
+			"count": 1
+		},
+		"--limit": {
+			"arity": "required",
+			"count": 1
+		},
+		"--json": {
+			"arity": "required",
+			"count": 1
+		},
+		"--jq": {
+			"arity": "required",
+			"count": 1
 		}
 	},
 	"gh search repos": {
@@ -1928,7 +1980,7 @@
 		},
 		"--no-pager": {
 			"arity": "none",
-			"count": 0
+			"count": 2
 		},
 		"--paginate": {
 			"arity": "none",
@@ -1971,6 +2023,18 @@
 		"-u": {
 			"arity": "none",
 			"count": 3
+		},
+		"-N": {
+			"arity": "none",
+			"count": 2
+		},
+		"-f": {
+			"arity": "none",
+			"count": 1
+		},
+		"--dry-run": {
+			"arity": "none",
+			"count": 2
 		}
 	},
 	"git am": {
@@ -2017,6 +2081,10 @@
 		"-R": {
 			"arity": "none",
 			"count": 10
+		},
+		"--unidiff-zero": {
+			"arity": "none",
+			"count": 2
 		}
 	},
 	"git archive": {
@@ -2071,6 +2139,10 @@
 		"-h": {
 			"arity": "none",
 			"count": 0
+		},
+		"-L": {
+			"arity": "required",
+			"count": 2
 		}
 	},
 	"git branch": {
@@ -2192,7 +2264,15 @@
 		},
 		"-vv": {
 			"arity": "none",
-			"count": 0
+			"count": 2
+		},
+		"--git-completion-helper": {
+			"arity": "none",
+			"count": 2
+		},
+		"--sort": {
+			"arity": "required",
+			"count": 1
 		}
 	},
 	"git bundle": {
@@ -2229,6 +2309,10 @@
 		"-t": {
 			"arity": "none",
 			"count": 3
+		},
+		"-e": {
+			"arity": "none",
+			"count": 1
 		}
 	},
 	"git check-attr": {
@@ -2265,6 +2349,14 @@
 		"-v": {
 			"arity": "none",
 			"count": 20
+		},
+		"--stdin": {
+			"arity": "none",
+			"count": 2
+		},
+		"--no-index": {
+			"arity": "none",
+			"count": 2
 		}
 	},
 	"git checkout": {
@@ -2298,7 +2390,7 @@
 		},
 		"-b": {
 			"arity": "required",
-			"count": 0
+			"count": 1
 		},
 		"-B": {
 			"arity": "required",
@@ -2323,6 +2415,18 @@
 		"-q": {
 			"arity": "none",
 			"count": 25
+		},
+		"--git-completion-helper": {
+			"arity": "none",
+			"count": 2
+		},
+		"--git-completion-helper-all": {
+			"arity": "none",
+			"count": 2
+		},
+		"--ours": {
+			"arity": "none",
+			"count": 2
 		}
 	},
 	"git cherry-pick": {
@@ -2353,6 +2457,10 @@
 		"-m": {
 			"arity": "required",
 			"count": 0
+		},
+		"--no-commit": {
+			"arity": "none",
+			"count": 1
 		}
 	},
 	"git clean": {
@@ -2392,11 +2500,11 @@
 		},
 		"--branch": {
 			"arity": "required",
-			"count": 0
+			"count": 1
 		},
 		"--depth": {
 			"arity": "required",
-			"count": 0
+			"count": 1
 		},
 		"--help": {
 			"arity": "none",
@@ -2441,6 +2549,14 @@
 		"-q": {
 			"arity": "none",
 			"count": 8
+		},
+		"--shared": {
+			"arity": "none",
+			"count": 2
+		},
+		"--no-checkout": {
+			"arity": "none",
+			"count": 2
 		}
 	},
 	"git commit": {
@@ -2454,7 +2570,7 @@
 		},
 		"--date": {
 			"arity": "required",
-			"count": 0
+			"count": 1
 		},
 		"--file": {
 			"arity": "required",
@@ -2521,6 +2637,18 @@
 		"-qam": {
 			"arity": "required",
 			"count": 7
+		},
+		"-a": {
+			"arity": "none",
+			"count": 1
+		},
+		"--dry-run": {
+			"arity": "none",
+			"count": 1
+		},
+		"--reset-author": {
+			"arity": "none",
+			"count": 1
 		}
 	},
 	"git commit-tree": {
@@ -2564,7 +2692,7 @@
 		},
 		"--get-all": {
 			"arity": "none",
-			"count": 0
+			"count": 1
 		},
 		"--get-regexp": {
 			"arity": "none",
@@ -2674,11 +2802,11 @@
 		},
 		"--exit-code": {
 			"arity": "none",
-			"count": 0
+			"count": 1
 		},
 		"--help": {
 			"arity": "none",
-			"count": 0
+			"count": 1
 		},
 		"--name-only": {
 			"arity": "none",
@@ -2735,6 +2863,26 @@
 		"--find-copies-harder": {
 			"arity": "none",
 			"count": 5
+		},
+		"-M": {
+			"arity": "optional",
+			"count": 2
+		},
+		"-z": {
+			"arity": "none",
+			"count": 1
+		},
+		"--raw": {
+			"arity": "none",
+			"count": 1
+		},
+		"--no-index": {
+			"arity": "none",
+			"count": 1
+		},
+		"--shortstat": {
+			"arity": "none",
+			"count": 2
 		}
 	},
 	"git diff-tree": {
@@ -2766,7 +2914,7 @@
 		},
 		"--force": {
 			"arity": "none",
-			"count": 0
+			"count": 2
 		},
 		"--help": {
 			"arity": "none",
@@ -2786,7 +2934,7 @@
 		},
 		"--tags": {
 			"arity": "none",
-			"count": 0
+			"count": 1
 		},
 		"--version": {
 			"arity": "none",
@@ -2794,11 +2942,19 @@
 		},
 		"-h": {
 			"arity": "none",
-			"count": 0
+			"count": 2
 		},
 		"-q": {
 			"arity": "none",
 			"count": 102
+		},
+		"--git-completion-helper": {
+			"arity": "none",
+			"count": 2
+		},
+		"-f": {
+			"arity": "none",
+			"count": 1
 		}
 	},
 	"git for-each-ref": {
@@ -2813,6 +2969,10 @@
 		"-h": {
 			"arity": "none",
 			"count": 0
+		},
+		"--format": {
+			"arity": "required",
+			"count": 1
 		}
 	},
 	"git format-patch": {
@@ -2889,6 +3049,54 @@
 		"-nE": {
 			"arity": "none",
 			"count": 17
+		},
+		"-nwiE": {
+			"arity": "none",
+			"count": 2
+		},
+		"-nwi": {
+			"arity": "none",
+			"count": 1
+		},
+		"-nlE": {
+			"arity": "none",
+			"count": 1
+		},
+		"-A2": {
+			"arity": "none",
+			"count": 1
+		},
+		"-B1": {
+			"arity": "none",
+			"count": 1
+		},
+		"-A3": {
+			"arity": "none",
+			"count": 1
+		},
+		"-iE": {
+			"arity": "none",
+			"count": 2
+		},
+		"-lI": {
+			"arity": "none",
+			"count": 1
+		},
+		"-ohI": {
+			"arity": "none",
+			"count": 1
+		},
+		"-B2": {
+			"arity": "none",
+			"count": 1
+		},
+		"-A6": {
+			"arity": "none",
+			"count": 1
+		},
+		"-o": {
+			"arity": "none",
+			"count": 1
 		}
 	},
 	"git hash-object": {
@@ -2980,6 +3188,10 @@
 		"-q": {
 			"arity": "none",
 			"count": 32
+		},
+		"-qb": {
+			"arity": "required",
+			"count": 1
 		}
 	},
 	"git log": {
@@ -3061,11 +3273,11 @@
 		},
 		"--stat": {
 			"arity": "none",
-			"count": 0
+			"count": 1
 		},
 		"--until": {
 			"arity": "required",
-			"count": 0
+			"count": 1
 		},
 		"--version": {
 			"arity": "none",
@@ -3125,7 +3337,7 @@
 		},
 		"-n": {
 			"arity": "required",
-			"count": 0
+			"count": 2
 		},
 		"-p": {
 			"arity": "none",
@@ -3134,6 +3346,66 @@
 		"-S": {
 			"arity": "required",
 			"count": 40
+		},
+		"-G": {
+			"arity": "required",
+			"count": 1
+		},
+		"-12": {
+			"arity": "none",
+			"count": 1
+		},
+		"-20": {
+			"arity": "none",
+			"count": 1
+		},
+		"-200": {
+			"arity": "none",
+			"count": 1
+		},
+		"--cherry-pick": {
+			"arity": "none",
+			"count": 2
+		},
+		"--right-only": {
+			"arity": "none",
+			"count": 1
+		},
+		"--left-only": {
+			"arity": "none",
+			"count": 1
+		},
+		"--merges": {
+			"arity": "none",
+			"count": 2
+		},
+		"--ancestry-path": {
+			"arity": "none",
+			"count": 2
+		},
+		"--follow": {
+			"arity": "none",
+			"count": 2
+		},
+		"--source": {
+			"arity": "none",
+			"count": 1
+		},
+		"-50": {
+			"arity": "none",
+			"count": 1
+		},
+		"-30": {
+			"arity": "none",
+			"count": 1
+		},
+		"-m": {
+			"arity": "none",
+			"count": 2
+		},
+		"--find-object": {
+			"arity": "required",
+			"count": 2
 		}
 	},
 	"git ls-files": {
@@ -3168,6 +3440,22 @@
 		"-i": {
 			"arity": "none",
 			"count": 3
+		},
+		"--ignored": {
+			"arity": "none",
+			"count": 2
+		},
+		"--directory": {
+			"arity": "none",
+			"count": 1
+		},
+		"-z": {
+			"arity": "none",
+			"count": 1
+		},
+		"-s": {
+			"arity": "none",
+			"count": 2
 		}
 	},
 	"git ls-remote": {
@@ -3251,6 +3539,18 @@
 			"arity": "none",
 			"count": 0,
 			"role": "decision"
+		},
+		"--no-commit": {
+			"arity": "none",
+			"count": 2
+		},
+		"--no-ff": {
+			"arity": "none",
+			"count": 2
+		},
+		"--ff-only": {
+			"arity": "none",
+			"count": 2
 		}
 	},
 	"git merge-base": {
@@ -3295,6 +3595,10 @@
 		"-h": {
 			"arity": "none",
 			"count": 0
+		},
+		"--no-messages": {
+			"arity": "none",
+			"count": 1
 		}
 	},
 	"git mv": {
@@ -3419,7 +3723,7 @@
 	"git rebase": {
 		"--abort": {
 			"arity": "none",
-			"count": 0
+			"count": 1
 		},
 		"--continue": {
 			"arity": "none",
@@ -3449,6 +3753,14 @@
 			"arity": "none",
 			"count": 0,
 			"role": "decision"
+		},
+		"--exec": {
+			"arity": "required",
+			"count": 1
+		},
+		"--skip": {
+			"arity": "none",
+			"count": 1
 		}
 	},
 	"git reflog": {
@@ -3463,6 +3775,18 @@
 		"-h": {
 			"arity": "none",
 			"count": 0
+		},
+		"-5": {
+			"arity": "none",
+			"count": 1
+		},
+		"-20": {
+			"arity": "none",
+			"count": 1
+		},
+		"-n": {
+			"arity": "required",
+			"count": 2
 		}
 	},
 	"git remote": {
@@ -3525,6 +3849,14 @@
 		"-h": {
 			"arity": "none",
 			"count": 0
+		},
+		"--worktree": {
+			"arity": "none",
+			"count": 1
+		},
+		"--source": {
+			"arity": "required",
+			"count": 1
 		}
 	},
 	"git rev-list": {
@@ -3555,6 +3887,14 @@
 		"-h": {
 			"arity": "none",
 			"count": 0
+		},
+		"--merges": {
+			"arity": "none",
+			"count": 2
+		},
+		"--no-merges": {
+			"arity": "none",
+			"count": 2
 		}
 	},
 	"git rev-parse": {
@@ -3588,11 +3928,11 @@
 		},
 		"--show-toplevel": {
 			"arity": "none",
-			"count": 0
+			"count": 1
 		},
 		"--verify": {
 			"arity": "none",
-			"count": 0
+			"count": 1
 		},
 		"--version": {
 			"arity": "none",
@@ -3601,6 +3941,22 @@
 		"-h": {
 			"arity": "none",
 			"count": 0
+		},
+		"--is-inside-work-tree": {
+			"arity": "none",
+			"count": 1
+		},
+		"--is-shallow-repository": {
+			"arity": "none",
+			"count": 1
+		},
+		"--symbolic-full-name": {
+			"arity": "none",
+			"count": 2
+		},
+		"--absolute-git-dir": {
+			"arity": "none",
+			"count": 1
 		}
 	},
 	"git revert": {
@@ -3610,7 +3966,7 @@
 		},
 		"--continue": {
 			"arity": "none",
-			"count": 0
+			"count": 1
 		},
 		"--help": {
 			"arity": "none",
@@ -3618,7 +3974,7 @@
 		},
 		"--no-edit": {
 			"arity": "none",
-			"count": 0
+			"count": 1
 		},
 		"--version": {
 			"arity": "none",
@@ -3631,6 +3987,10 @@
 		"-m": {
 			"arity": "required",
 			"count": 0
+		},
+		"--no-commit": {
+			"arity": "none",
+			"count": 1
 		}
 	},
 	"git rm": {
@@ -3649,6 +4009,10 @@
 		"-q": {
 			"arity": "none",
 			"count": 11
+		},
+		"--cached": {
+			"arity": "none",
+			"count": 2
 		}
 	},
 	"git shortlog": {
@@ -3709,6 +4073,14 @@
 		"-s": {
 			"arity": "none",
 			"count": 10
+		},
+		"--numstat": {
+			"arity": "none",
+			"count": 1
+		},
+		"--date": {
+			"arity": "required",
+			"count": 2
 		}
 	},
 	"git show-ref": {
@@ -3771,6 +4143,14 @@
 		"-q": {
 			"arity": "none",
 			"count": 3
+		},
+		"-u": {
+			"arity": "none",
+			"count": 1
+		},
+		"-p": {
+			"arity": "none",
+			"count": 1
 		}
 	},
 	"git status": {
@@ -3813,6 +4193,14 @@
 		"-sb": {
 			"arity": "none",
 			"count": 11
+		},
+		"--untracked-files": {
+			"arity": "optional",
+			"count": 2
+		},
+		"--cached": {
+			"arity": "none",
+			"count": 1
 		}
 	},
 	"git submodule": {
@@ -3872,7 +4260,7 @@
 		},
 		"-C": {
 			"arity": "required",
-			"count": 0
+			"count": 1
 		},
 		"-f": {
 			"arity": "none",
@@ -3889,6 +4277,14 @@
 		"-qc": {
 			"arity": "required",
 			"count": 6
+		},
+		"--git-completion-helper": {
+			"arity": "none",
+			"count": 2
+		},
+		"--track": {
+			"arity": "optional",
+			"count": 1
 		}
 	},
 	"git symbolic-ref": {
@@ -3917,6 +4313,10 @@
 		"-h": {
 			"arity": "none",
 			"count": 0
+		},
+		"-q": {
+			"arity": "none",
+			"count": 1
 		}
 	},
 	"git tag": {
@@ -3930,7 +4330,7 @@
 		},
 		"--list": {
 			"arity": "none",
-			"count": 0,
+			"count": 1,
 			"role": "decision"
 		},
 		"--sort": {
@@ -4058,7 +4458,7 @@
 		},
 		"-z": {
 			"arity": "none",
-			"count": 0
+			"count": 1
 		}
 	}
 }
