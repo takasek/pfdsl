@@ -8,6 +8,7 @@ import {
 	type DiskSnapshot,
 	DocumentSession,
 	type SaveResult,
+	sameDiskContent,
 	sameDocument,
 } from "./document-session.js";
 import { createDocumentTab, type DocumentTab } from "./document-tab.js";
@@ -386,7 +387,7 @@ async function saveEntry(
 		);
 		if (decision === "another") return saveEntry(entry, true);
 		if (decision !== "replace" || changedDuringReview()) return false;
-	} else if ((observed || inspected) && target.source === null) {
+	} else if (inspected && target.source === null) {
 		const decision = await choose(
 			"Recreate missing file",
 			`Create ${target.path} again? A file created by another writer will not be overwritten.`,
@@ -492,7 +493,7 @@ function renderConflict() {
 				const current = await invoke<DiskSnapshot>("inspect_document", {
 					id: observed.id,
 				});
-				if (current.revision !== observed.revision) {
+				if (!sameDiskContent(observed, current)) {
 					entry.session.conflict = current;
 					entry.session.observed = current;
 					status.textContent =

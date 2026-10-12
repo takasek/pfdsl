@@ -161,13 +161,14 @@ export class DocumentSession {
 			this.message = "";
 		}
 	}
-	private flagExternalChange(current: DiskSnapshot) {
+	private flagExternalChange(current: DiskSnapshot, message?: string) {
 		this.conflict = current;
 		this.uncertain = true;
 		this.message =
-			current.source === null
+			message ??
+			(current.source === null
 				? "The file was deleted or moved. Your editor content is retained."
-				: "The disk changed. Your editor content is retained.";
+				: "The disk changed. Your editor content is retained.");
 	}
 	rebindDisk(current: DiskSnapshot, previousMissing = false) {
 		const previous = this.disk;
@@ -203,12 +204,11 @@ export class DocumentSession {
 		}
 		this.observed = current;
 		if (changed && !dirty && current.source !== null) this.useDisk(current);
-		else if (changed) {
-			this.conflict = current;
-			this.uncertain = true;
-			this.message =
-				"The selected location contains a changed disk version. Your editor content is retained.";
-		}
+		else if (changed)
+			this.flagExternalChange(
+				current,
+				"The selected location contains a changed disk version. Your editor content is retained.",
+			);
 		return true;
 	}
 	async save(

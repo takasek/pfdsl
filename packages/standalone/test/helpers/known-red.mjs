@@ -4,9 +4,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-export const KNOWN_RED = new Set([
-	"Use Current Disk Version ignores a touch that happens while its dialog is open",
-]);
+export const KNOWN_RED = new Set([]);
 
 const results = new Map();
 
