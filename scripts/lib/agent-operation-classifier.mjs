@@ -223,6 +223,8 @@ function gitOperation(command, context, facts) {
 	if (["switch", "checkout"].includes(sub.value))
 		for (const flag of ["-c", "-C", "--create", "--force-create", "-b", "-B"])
 			flagsWithValues.add(flag);
+	if (sub.value === "worktree")
+		for (const flag of ["-b", "-B"]) flagsWithValues.add(flag);
 	const parsed = scan(args, flagsWithValues);
 	const { operands, flags } = parsed;
 	const location = pathFacts(path, facts);
@@ -335,11 +337,16 @@ function gitOperation(command, context, facts) {
 			effective = pathFacts(busy, facts);
 	} else if (sub.value === "worktree") {
 		const verb = operands[0]?.value;
-		if (verb === "add") classes = ["B"];
-		else if (verb === "remove") {
+		if (verb === "add") {
+			const created = parsed.values.find(({ flag }) =>
+				["-b", "-B"].includes(flag),
+			);
+			classes = [created && defaultRef(created.value, facts) ? "D" : "B"];
+			if (created?.dynamic) classes.push("U");
+		} else if (verb === "remove") {
 			classes = ["W"];
 			action = "worktree-remove";
-			force = flags.has("--force") || flags.has("-f");
+			force = ["--force", "-f", "-ff"].some((flag) => flags.has(flag));
 			const target = operands[1];
 			effective = pathFacts(
 				target && !target.dynamic && path ? resolve(path, target.value) : null,

@@ -308,6 +308,43 @@ export const AGENT_OPERATION_CORPUS = [
 		executionPath: "/tmp/x",
 	}),
 	example(
+		"worktree-add-force-feature",
+		"git worktree add -B feat/new /tmp/new HEAD",
+		"allow",
+		{
+			classes: ["B"],
+		},
+	),
+	...["-b", "-B"].map((flag) =>
+		example(
+			`worktree-add-default-${flag}`,
+			`git worktree add ${flag} main /tmp/new HEAD`,
+			"deny",
+			{
+				facts: { branches: {} },
+				classes: ["D"],
+			},
+		),
+	),
+	example(
+		"worktree-remove-double-force-own",
+		`git -C ${own} worktree remove -ff ${own}`,
+		"allow",
+		{
+			classes: ["W"],
+			target: "own",
+		},
+	),
+	example(
+		"worktree-remove-double-force-unowned",
+		`git -C ${own} worktree remove -ff ${unowned}`,
+		"deny",
+		{
+			classes: ["W"],
+			target: "other-unowned",
+		},
+	),
+	example(
 		"transcript-while-add",
 		'while read -r f; do git add "$f"; done < list',
 	),
