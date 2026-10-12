@@ -1,4 +1,4 @@
-// Pure stage-one adapter: callers parse shell and observe Git/fs outside here.
+// Pure operation adapter: callers parse shell and observe Git/fs outside here.
 // Injected ownership records must already be validated native evidence.
 import { basename, isAbsolute, resolve } from "node:path";
 import { hasGitTargetEnvironment } from "./git-environment.mjs";

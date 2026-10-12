@@ -45,8 +45,6 @@ const SKILL_MIRROR_ROOTS = [
 	"scripts/harness-template/skills",
 ];
 const FOREIGN_ARGV_GUARDS = new Set([
-	"scripts/lib/delegation-guard.mjs",
-	"scripts/lib/main-commit-guard.mjs",
 	"scripts/lib/agent-operation-classifier.mjs",
 ]);
 

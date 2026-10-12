@@ -1,11 +1,12 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { tokenize } from "./delegation-guard.mjs";
 import { flagValues, parseGhCommand } from "./gh-command.mjs";
+import { readShell } from "./shell-commands.mjs";
 
 /** @param {string} segment */
 function parse(segment) {
-	return parseGhCommand(tokenize(segment));
+	const command = readShell(segment).commands?.[0];
+	return parseGhCommand(command?.tokens.slice(command.executableIndex) ?? []);
 }
 
 describe("parseGhCommand", () => {

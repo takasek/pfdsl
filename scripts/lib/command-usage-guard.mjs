@@ -137,7 +137,7 @@ export function evaluateCommandUsageGuard(payload) {
 
 /**
  * Orchestrates the hook's stdin payload into a print-or-not decision, the way
- * runDelegationGuard does (#645): the wrapper script is not unit-testable, so
+ * the other content guards do: the wrapper script is not unit-testable, so
  * nothing that can be decided belongs there. Malformed JSON produces no output
  * — a crash in this guard must not wedge every Bash call.
  * @param {string} inputText raw stdin payload

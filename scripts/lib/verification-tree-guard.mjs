@@ -12,7 +12,7 @@
 // fixed list of verification verbs" but "does this command's target tree
 // depend on cwd" — a command that names its tree explicitly (`-C <path>`, an
 // absolute script path) is unaffected by drift and is excluded regardless of
-// what the command does. worktree-write-guard.mjs closes the equivalent gap
+// what the command does. agent-operation-guard.mjs closes the equivalent gap
 // for Edit/Write; this closes it for commands whose tree is cwd-implicit.
 //
 // Claude Code asks rather than denies: a deliberate check of the main checkout

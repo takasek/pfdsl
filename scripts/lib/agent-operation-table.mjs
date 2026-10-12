@@ -1,4 +1,4 @@
-// Stage-one policy data. No hook imports this table yet.
+// Finite policy data shared by the hook entry and acceptance tests.
 export const AGENT_OPERATION_AXES = Object.freeze({
 	subject: ["claude-parent", "claude-subagent", "codex-parent", "codex-child"],
 	health: ["healthy", "failed"],
