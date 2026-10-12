@@ -399,6 +399,40 @@ export const AGENT_OPERATION_CORPUS = [
 		{ subject: "codex-child", target: "own" },
 	),
 	example(
+		"resolution-missing-session-id-unowned",
+		`git -C ${unowned} add a`,
+		"deny",
+		{
+			facts: { sessionId: undefined },
+			target: "other-unowned",
+		},
+	),
+	example(
+		"resolution-empty-session-id-unowned",
+		`git -C ${unowned} add a`,
+		"deny",
+		{
+			facts: {
+				sessionId: "",
+				worktrees: corpusFacts().worktrees.map((tree) =>
+					tree.root === unowned
+						? { ...tree, ownership: { ownerId: "", live: false } }
+						: tree,
+				),
+			},
+			target: "other-unowned",
+		},
+	),
+	example(
+		"resolution-startup-own-without-session-id",
+		`git -C ${own} add a`,
+		"allow",
+		{
+			facts: { sessionId: undefined },
+			target: "own",
+		},
+	),
+	example(
 		"resolution-leading-relative-cd",
 		"cd ../own && git commit -m x",
 		"allow",

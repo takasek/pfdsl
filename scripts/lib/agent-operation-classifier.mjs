@@ -112,7 +112,9 @@ function pathFacts(path, facts) {
 		],
 		[
 			tree.root === facts.sessionRoot ||
-				tree.ownership?.ownerId === facts.sessionId,
+				(typeof facts.sessionId === "string" &&
+					facts.sessionId.length > 0 &&
+					tree.ownership?.ownerId === facts.sessionId),
 			"own",
 		],
 		[true, "other-unowned"],
