@@ -139,6 +139,20 @@ const roles = [
 	],
 ];
 const sources = ["literal", "dynamic", "stdin", "file", "unknown-option"];
+test("global unknown options record only the literal name without an attached value", () => {
+	const tokens = ["git", "--not-declared=/fixture/private", "status"].map(
+		(value) => ({ value }),
+	);
+	const result = classifyAgentOperations(
+		{
+			tool_name: "Bash",
+			cwd: "/fixture/own",
+			tool_input: { command: "matrix" },
+		},
+		corpusFacts({ shell: { commands: [{ tokens }] } }),
+	);
+	assert.deepEqual(result.operations[0].unknownOptions, ["--not-declared"]);
+});
 test("decision arguments cross literal, dynamic, stdin, file and unknown-option sources", async (t) => {
 	for (const [role, values, index, klass] of roles)
 		for (const source of sources)

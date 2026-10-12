@@ -388,8 +388,10 @@ function gitOperation(command, context, facts) {
 			return operation(bypass ? ["X", "U"] : ["U"], "git", null, {
 				subcommand: "git",
 				unresolvedReasons: ["unknown-option"],
-				unknownOptions: /^--?[A-Za-z0-9][A-Za-z0-9-]*$/.test(value)
-					? [value]
+				unknownOptions: /^--?[A-Za-z0-9][A-Za-z0-9-]*$/.test(
+					value.split("=")[0],
+				)
+					? [value.split("=")[0]]
 					: [],
 			});
 		i++;
