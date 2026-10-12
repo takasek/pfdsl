@@ -12,9 +12,8 @@
  * some other way of writing the same code.
  *
  *   - flag lookup: a `"--name"` literal handed to indexOf/includes/startsWith.
- *     Not "is this array process.argv" — that needs dataflow. One file in the
- *     repo legitimately matches (it parses other commands' arguments) and is
- *     exempted by name below.
+ *     Not "is this array process.argv" — that needs dataflow. Foreign-argv
+ *     parsers legitimately match and are exempted by name below.
  *   - entrypoint: `import.meta.url` compared against something holding
  *     `process.argv[1]` with no realpath in sight. The correct forms are a
  *     call (isCliEntrypoint) or a comparison that names realpath, so neither
@@ -48,6 +47,7 @@ const SKILL_MIRROR_ROOTS = [
 const FOREIGN_ARGV_GUARDS = new Set([
 	"scripts/lib/delegation-guard.mjs",
 	"scripts/lib/main-commit-guard.mjs",
+	"scripts/lib/agent-operation-classifier.mjs",
 ]);
 
 // Its one flag-name lookup is the --force deprecation hint that #631 put

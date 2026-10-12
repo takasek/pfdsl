@@ -148,6 +148,7 @@ describe("per-rule exemptions", () => {
 	const FOREIGN_ARGV_GUARDS = [
 		"scripts/lib/delegation-guard.mjs",
 		"scripts/lib/main-commit-guard.mjs",
+		"scripts/lib/agent-operation-classifier.mjs",
 	];
 
 	// Its lookup decides what the error says, not what the script does: the
