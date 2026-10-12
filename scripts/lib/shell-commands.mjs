@@ -46,6 +46,7 @@ export function readShell(
 			.slice(0, 300);
 		result = {
 			parserFailure,
+			...(error.commands ? { commands: error.commands } : {}),
 			failure: unavailable
 				? "parser-missing"
 				: parserFailure
@@ -61,16 +62,14 @@ export function readShell(
 	return result;
 }
 
-export function shellParseDecision(
-	command,
-	{ supportsAsk = true, parserPath } = {},
-) {
+export function shellParseDecision(command, { parserPath } = {}) {
 	const { error, parserFailure } = readShell(command, { parserPath });
 	return error
 		? {
-				decision: supportsAsk && !parserFailure ? "ask" : "deny",
+				decision: "deny",
 				matched: "shell syntax",
 				reason: error,
+				recovery: parserFailure ? "terminal" : "rewrite",
 			}
 		: null;
 }
@@ -109,7 +108,15 @@ export function adaptShell(ast, source) {
 		prefixNodes.add(stmt.Cmd.Pos.Offset);
 	}
 	const fail = (type) => {
-		throw new Error(`Unsupported shell construct ${type}.`);
+		const error = new Error(`Unsupported shell construct ${type}.`);
+		// Keep observed commands for composition, but never claim a cwd after
+		// an incomplete traversal. The syntax decision remains deny.
+		error.commands = commands.map((command) => ({
+			...command,
+			leadingCd: [],
+			unresolvedCwd: true,
+		}));
+		throw error;
 	};
 
 	function word(node) {

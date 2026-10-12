@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { readShell } from "./shell-commands.mjs";
+import { readShell, shellParseDecision } from "./shell-commands.mjs";
 
 test("shfmt reads ordinary transcript shapes without executing them", () => {
 	for (const source of [
@@ -62,4 +62,23 @@ test("missing parser and syntax errors have distinct recovery facts", () => {
 	assert.equal(missing.failure, "parser-missing");
 	assert.equal(missing.commands, undefined);
 	assert.equal(readShell("if then").failure, "syntax");
+});
+
+test("property 5: unsupported syntax cannot weaken an earlier prohibition into ask", () => {
+	for (const source of [
+		"git commit --no-verify -m x; repeat 2 echo x",
+		"git commit --no-verify -m x; python <<'EOF'\nprint('x')\nEOF",
+		"git commit --no-verify -m x; if then",
+	]) {
+		const decision = shellParseDecision(source, { supportsAsk: true });
+		assert.equal(decision.decision, "deny", source);
+		assert.equal(decision.recovery, "rewrite", source);
+	}
+	const parsed = readShell("git commit --no-verify -m x; repeat 2 echo x");
+	assert.equal(parsed.failure, "syntax");
+	assert.ok(
+		parsed.commands?.some(({ tokens }) =>
+			tokens.some(({ value }) => value === "--no-verify"),
+		),
+	);
 });
