@@ -104,15 +104,28 @@ function expandLiteralScripts(result, parserPath) {
 		expanded.push(node);
 		const tokens = node.tokens.slice(node.executableIndex);
 		const name = executableName(tokens[0]?.value ?? "");
-		const scriptIndex = ["bash", "sh", "zsh"].includes(name)
-			? tokens.findIndex(({ value }) => value === "-c") + 1
-			: name === "eval"
-				? 1
-				: 0;
+		let scriptIndex = name === "eval" ? (tokens[1]?.value === "--" ? 2 : 1) : 0;
+		if (["bash", "sh", "zsh"].includes(name)) {
+			for (let i = 1; i < tokens.length; i++) {
+				const flag = tokens[i];
+				if (flag.dynamic || flag.value === "--" || !/^[+-]/.test(flag.value))
+					break;
+				if (/^-[A-Za-z]*c[A-Za-z]*$/.test(flag.value)) {
+					scriptIndex = i + 1;
+					break;
+				}
+				if (
+					["-o", "+o", "-O", "+O", "--rcfile", "--init-file"].includes(
+						flag.value,
+					)
+				)
+					i++;
+			}
+		}
 		if (!scriptIndex) continue;
 		const scriptTokens =
 			name === "eval"
-				? tokens.slice(1)
+				? tokens.slice(scriptIndex)
 				: tokens.slice(scriptIndex, scriptIndex + 1);
 		if (!scriptTokens.length || scriptTokens.some(({ dynamic }) => dynamic)) {
 			expanded.push({ ...node, unresolvedExecution: true });

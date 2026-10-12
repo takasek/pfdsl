@@ -350,7 +350,8 @@ function gitOperation(command, context, facts) {
 	} else if (sub.value === "reflog")
 		classes = [
 			!operands.length ||
-			["show", "list", "exists"].includes(operands[0]?.value)
+			["show", "list", "exists"].includes(operands[0]?.value) ||
+			/^HEAD(?:$|[~^@])|^refs\//.test(operands[0]?.value ?? "")
 				? "R"
 				: "U",
 		];
@@ -772,13 +773,14 @@ export function classifyAgentOperations(payload, facts) {
 				if (head?.dynamic) return unresolved();
 				const name = basename(head?.value ?? "");
 				const args = node.tokens.slice(executableIndex + 1);
+				const script = name === "node" && args[0]?.value === "--" ? 1 : 0;
 				const routine =
 					name === "codex-git-routine.mjs"
 						? 0
 						: name === "node" &&
-								!args[0]?.dynamic &&
-								basename(args[0]?.value ?? "") === "codex-git-routine.mjs"
-							? 1
+								!args[script]?.dynamic &&
+								basename(args[script]?.value ?? "") === "codex-git-routine.mjs"
+							? script + 1
 							: null;
 				if (
 					routine !== null &&

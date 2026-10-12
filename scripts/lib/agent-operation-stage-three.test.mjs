@@ -41,6 +41,8 @@ test("properties 2 and 7: ordinary Git destinations and ref roles preserve safet
 		["git symbolic-ref HEAD refs/heads/main", "own", "deny", ["D"]],
 		["git symbolic-ref HEAD refs/heads/feature", "own", "deny", ["U"]],
 		["git reflog delete HEAD", "own", "deny", ["U"]],
+		["git reflog HEAD", "own", "allow", ["R"]],
+		["git reflog refs/heads/feature", "own", "allow", ["R"]],
 		["git tag v1", "own", "allow", ["B"]],
 		["git hash-object -w a.txt", "own", "allow", ["W"]],
 	])
@@ -113,6 +115,11 @@ test("properties 1, 5 and 7: literal shell scripts use the same target rules and
 		["bash -c 'git add a; ('", "deny"],
 		['bash -c "$script"', "deny"],
 		[`cd ${own} && bash -c 'git add a'`, "allow"],
+		[`bash -lc 'git -C ${primary} add a'`, "deny"],
+		[`bash -ec 'git -C ${primary} add a'`, "deny"],
+		[`eval -- 'git -C ${primary} add a'`, "deny"],
+		[`eval -- 'git -C ${own} add a'`, "allow"],
+		[`bash -lc 'git -C ${own} add a'`, "allow"],
 	])
 		await t.test(command, () =>
 			assert.equal(inspect(command).result.decision, decision, command),
@@ -129,6 +136,7 @@ test("hook-process Git target override keeps changing Git unresolved even with e
 
 test("property 6: child routines return nonverification verbs to the parent", async (t) => {
 	for (const prefix of [
+		"node -- /personal/codex-git-routine.mjs",
 		"/personal/codex-git-routine.mjs",
 		"node /personal/codex-git-routine.mjs",
 	]) {
@@ -167,4 +175,11 @@ test("property 6: child routines return nonverification verbs to the parent", as
 				"allow",
 			);
 	}
+});
+
+test("unresolved target recovery explains why an existing absolute C is insufficient", () => {
+	const { result } = inspect(`pushd /tmp; popd; git -C ${own} add a`);
+	assert.equal(result.decision, "deny");
+	assert.match(result.reason, /directory-stack/);
+	assert.match(result.reason, /Git-target/);
 });

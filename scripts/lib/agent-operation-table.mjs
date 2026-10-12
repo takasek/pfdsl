@@ -64,7 +64,7 @@ const REASONS = {
 	X: "Verification bypass and external configuration writes require a human terminal.",
 	O: "Return outward writes to the responsible parent in its assigned worktree.",
 	P: "PR integration is reserved for a human terminal.",
-	U: "Rewrite with a literal executable and an explicit absolute target; Codex Git writes require git -C <absolute-path>.",
+	U: "Rewrite with a literal executable and an explicit absolute target; Codex Git writes require git -C <absolute-path>. Remove directory-stack commands and Git-target/CDPATH writes from this call; an absolute -C does not resolve those effects. If the hook inherits Git target overrides, repair its environment in a human terminal.",
 };
 const CLASS_PRIORITY = {
 	P: 100,
