@@ -170,6 +170,9 @@ Git の `-C`・`cd` の実行先は target であり、R の読取では間接�
 API method が literal な GET と確定する場合（明示指定、または method・field・input の指定が無い既定形）は R とし、endpoint は判定に使わない。
 変更の method、field による既定 POST、または method を確定できない場合は endpoint を selector として判定する。
 GraphQL の query 内容からクラスを決める場合も selector の検査を要する。
+REST の endpoint と method からクラスを決める場合、`--input`・field の file／stdin／動的な値は送信データであり selector ではない。
+REST の merge endpoint は送信データの形を問わず P を維持する。
+GraphQL の query や body からクラスを決める場合だけ、間接・動的な内容を U とする。method・endpoint 自体の間接・動的な値の検査は維持する。
 本文・title 等、判定に使わない値はこの規則の対象外とする。
 既に確定した P・X・D・S は U を付加しても弱めない。
 通常の形の追加は所有者が決め、宣言の外へ分類器が自動で広がらないようにする。

@@ -233,6 +233,83 @@ test("read classes do not depend on execution targets or a proven GET endpoint",
 			);
 });
 
+test("API body sources matter only when GraphQL content selects the class", async (t) => {
+	for (const endpoint of [
+		"repos/o/r/issues",
+		"repos/o/r/pulls/1/merge",
+		"graphql",
+	])
+		for (const method of [[], ["-X", "POST"], ["--method", "GET"]])
+			for (const flag of ["--input", "-F"])
+				for (const source of ["literal", "dynamic", "stdin", "file"])
+					await t.test(
+						`${endpoint} ${method.join(" ") || "default"} ${flag}: ${source}`,
+						() => {
+							const content =
+								source === "dynamic"
+									? "$data"
+									: source === "stdin"
+										? "@-"
+										: source === "file"
+											? "@fixture"
+											: "query { viewer { login } }";
+							const tokens = ["gh", "api", endpoint, ...method, flag].map(
+								(value) => ({ value }),
+							);
+							tokens.push({
+								value: flag === "-F" ? `query=${content}` : content,
+								dynamic: source === "dynamic",
+							});
+							const payload = {
+								tool_name: "Bash",
+								cwd: "/fixture/own",
+								tool_input: { command: "matrix" },
+							};
+							const facts = corpusFacts({ shell: { commands: [{ tokens }] } });
+							const klass = method.includes("GET")
+								? "R"
+								: endpoint === "graphql"
+									? flag === "--input" || source !== "literal"
+										? "U"
+										: "R"
+									: endpoint.endsWith("/merge")
+										? "P"
+										: "O";
+							const result = evaluateAgentOperationPolicy(payload, facts);
+							assert.equal(result.operationClass, klass);
+							assert.equal(
+								result.decision,
+								["P", "U"].includes(klass) ? "deny" : "allow",
+							);
+						},
+					);
+});
+
+test("REST data cannot select GraphQL merge or conceal a literal merge endpoint", () => {
+	for (const [endpoint, expected] of [
+		["repos/o/r/issues", "O"],
+		["repos/o/r/pulls/1/merge", "P"],
+	]) {
+		const tokens = [
+			"gh",
+			"api",
+			endpoint,
+			"-F",
+			"query=mutation { mergePullRequest(input: {}) { clientMutationId } }",
+		].map((value) => ({ value }));
+		const payload = {
+			tool_name: "Bash",
+			cwd: "/fixture/own",
+			tool_input: { command: "matrix" },
+		};
+		const facts = corpusFacts({ shell: { commands: [{ tokens }] } });
+		assert.equal(
+			evaluateAgentOperationPolicy(payload, facts).operationClass,
+			expected,
+		);
+	}
+});
+
 test("directory hints apply to writes while reads remain R", () => {
 	for (const change of [false, true]) {
 		const command = `cd "$root" && git ${change ? "add a" : "status"}`;

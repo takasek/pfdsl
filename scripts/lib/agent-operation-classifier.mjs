@@ -849,13 +849,16 @@ function ghOperation(tokens) {
 			({ flag }) => flag === "-X" || flag === "--method",
 		);
 		const method = methodToken?.value;
+		const graphql = endpoint === "graphql";
 		const fields = values.filter(({ flag }) =>
 			["-f", "-F", "--field", "--raw-field", "--input"].includes(flag),
 		);
-		const query = fields
+		const query = (graphql ? fields : [])
 			.find(({ value }) => value.startsWith("query="))
 			?.value.slice(6);
-		const queryToken = fields.find(({ value }) => value.startsWith("query="));
+		const queryToken = graphql
+			? fields.find(({ value }) => value.startsWith("query="))
+			: undefined;
 		const read = methodToken
 			? !methodToken.dynamic && ["GET", "HEAD"].includes(method.toUpperCase())
 			: !fields.length;
@@ -863,7 +866,7 @@ function ghOperation(tokens) {
 		const sensitive = [
 			operands[1] && { ...operands[1], role: targetRole },
 			methodToken,
-			...fields
+			...(graphql ? fields : [])
 				.filter((field) => !/^[A-Za-z_][A-Za-z0-9_]*=/.test(field.value))
 				.map((field) => ({ ...field, role: targetRole })),
 			...(queryToken
@@ -876,7 +879,7 @@ function ghOperation(tokens) {
 					]
 				: []),
 		];
-		const indirectFlags = read ? [] : ["--input"];
+		const indirectFlags = graphql && !read ? ["--input"] : [];
 		const endpointPath = endpoint?.split("?")[0];
 		const merge =
 			!read &&
@@ -892,7 +895,7 @@ function ghOperation(tokens) {
 				sensitive,
 				indirectFlags,
 			);
-		if (endpoint === "graphql")
+		if (graphql)
 			return finish(
 				operation(
 					[read || (query && /^\s*(?:query\b|\{)/.test(query)) ? "R" : "O"],
