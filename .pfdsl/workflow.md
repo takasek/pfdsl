@@ -94,7 +94,8 @@ main/default branch と検査回避は own でも保護する。
 レビューは、実装時の会話・推論を引き継がない別 agent に依頼する。要件・最終差分・必要な一次資料を渡し、実装側の結論や採用理由を先に与えない。
 レビュー担当は一次資料から目的と scope を確かめ、指定一覧を探索範囲の上限にしない。差分と関係する消費者を読み、正常・失敗・非該当の入力で主張の反証を試みる。測った版と条件が最終成果へ適用できるかも確認する。自己レビューは準備として行い、別文脈のレビューの代替にしない。
 観点1・2は最終差分の別 agent 1本で覆ってよい。観点3が発火する場合は、結論を知らない別 agent に解答を含まないツリーを渡して独立に設計させ、その後に最終差分の reviewer が採用理由と実装を確認する。観点4が発火する場合は変更意図を知らない別 agent にシナリオを渡す。観点を agent 数へ機械的に一対一対応させず、各観点の独立性を保つ。
-指摘は根拠となる箇所と failure scenario を添えて返し、実装側が一次資料で確認して対応する。リテラルや特殊ケースの分類を既存の宣言・データから導く指摘を採用する前には、「分類の循環を確認する」へ戻る。各観点の状態、確認範囲・根拠・未確認、未解決の指摘を PR 本文に記録する。
+指摘は根拠となる箇所と failure scenario を添えて返し、実装側が一次資料で確認して対応する。リテラルや特殊ケースの分類を既存の宣言・データから導く指摘を採用する前には、「分類の循環を確認する」へ戻る。
+hook・guard の判定への指摘は、修正の前に ADR-0047 の採否基準で仕分ける。対応する入力の literal な誤読は直し、対応範囲を増やす提案は所有者が決め、保証外と検出回避の敵対的な入力は理由を返信して閉じる。作用の網羅を契約にして指摘を順に直した PR #1413 は、91 commits まで広がって収束しなかった。各観点の状態、確認範囲・根拠・未確認、未解決の指摘を PR 本文に記録する。
 
 使える手段を観点とブリーフ要件に合わせて選ぶ。`/simplify` は固定4角度で品質を探すが、correctness を明示的に探さないため観点2を兼ねない。`/code-review` は観点2の要件を実際に満たせる範囲で使い、不足する反証・消費者探索は別のレビューで補う。観点4には成果物とシナリオだけを渡した agent、または領域に対応する専用 skill を使う。
 `code-reviewer` agent を Agent tool で起動するには `pr-review-toolkit` / `feature-dev` plugin のいずれかが必要である。起動可否は harness と plugin の版に依存するため、過去の記録でなくその回の実体を確認する。`/code-review` の `disable-model-invocation` は2026-07-28時点で `false` だった。
@@ -374,6 +375,9 @@ repo scope の agent（`ci-triage` 等、このリポの開発都合の道具）
 
 **2. PreToolUse hook。** 実装は `scripts/agent-operation-guard.mjs`、allowlist は `scripts/lib/agent-operation-table.mjs` の `DEFAULT_ALLOWED_AGENTS`。
 `settings.json` の `permissions.deny` を使わないのは、プロジェクト全体に効いて呼び出し元と `issue-worker` まで巻き込むため。
+表に無い入力の形は U（書換え案内付き deny）となり、Git common dir の `pfdsl/agent-operation-unresolved.jsonl` に記録される。
+U が通常作業を止めた回と、#1404 の受入を進める回は、`node scripts/agent-operation-unresolved-report.mjs` で理由と option の件数を集計し、頻出する形を option 表へ加えるかを所有者に諮る。
+レビュー指摘から自動で表を広げない（ADR-0047「保証外と回復先」の採否基準）。
 
 **3. 戻り時の検出。** 汎用手順のまま（`git log origin/<branch>..HEAD` と open PR 一覧の突合）。このリポ固有の追加値はない。
 
