@@ -1,6 +1,6 @@
-# Review records
+# レビュー記録
 
-This directory stores dated evaluation records for maintainers.
-They describe the evaluated revision and do not establish acceptance of later revisions.
+このディレクトリには、メンテナ向けの評価記録を日付ごとに保存します。
+各資料は評価対象の版について記述したもので、後の版の受入結果を示すものではありません。
 
-- [Standalone design review by Astra 6 and Sol 6.1, 2026-10-13](standalone/2026-10-13/README.md)
+- [Astra 6とSol 6.1によるStandaloneデザインレビュー（2026-10-13）](standalone/2026-10-13/README.md)

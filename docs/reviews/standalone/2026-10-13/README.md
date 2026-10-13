@@ -1,70 +1,75 @@
-# Standalone design review: Astra 6 and Sol 6.1
+# Standaloneデザインレビュー：Astra 6とSol 6.1
 
-These are archival copies of two independent evaluations and the parent chat's comparison, prepared for maintainers on 2026-10-13 (Japan time).
-The reports distinguish native observations, measurements in the shared web frontend, source inspection, shitae models, and unimplemented proposals.
-No product code was changed by this archive operation.
+2026年10月13日（日本時間）に行った二つの独立評価と、親チャットによる比較を、メンテナ向けに保存した資料です。
+各レポートでは、macOSアプリでの観察、共有フロントエンドのブラウザ測定、コードの確認、shitaeモデルでの検証、未実装の提案を区別しています。
+今回の保存作業では製品コードを変更していません。
 
-## Evaluated revisions
+## 評価対象の版
 
-| Repository | Final evaluated revision |
+| リポジトリ | 最終評価対象commit |
 | --- | --- |
 | PFDSL | [83701fb03e7846fe9582a3ae3b685d624f681902](https://github.com/takasek/pfdsl/tree/83701fb03e7846fe9582a3ae3b685d624f681902) |
 | shitae | [a3ebaedbd5d452c99093a949bbaf94508da43ab4](https://github.com/takasek/shitae/tree/a3ebaedbd5d452c99093a949bbaf94508da43ab4) |
 
-The archive branch was created from PFDSL's fetched `origin/main`, which pointed to the final evaluated PFDSL revision at creation.
-The commit containing these documents is an archive revision, not another evaluated product revision.
-The reports also mention the earlier PFDSL revision `266cbb3196de6d274353b9d6ce91befb424e45f2`; observations were rechecked against the final target as described in each report.
+保存用ブランチは、fetchで更新したPFDSLの`origin/main`から作成しました。
+作成時点の`origin/main`は、上記の最終評価対象commitを指していました。
+この文書を含むcommitは資料の保存版であり、新たに評価した製品の版ではありません。
+各レポートには旧PFDSL版`266cbb3196de6d274353b9d6ce91befb424e45f2`への言及もあります。
+旧版の所見を最終対象へ再照合した範囲は、各レポートに記載しています。
 
-## Reports and their relationship
+## レポートの役割と関係
 
-| Record | Author | Role |
+| 資料 | 作成者 | 役割 |
 | --- | --- | --- |
-| [Design analysis](astra/review.html) | Astra 6 | Primary analysis, with its own priorities, native operations, measurements, and limits |
-| [Design analysis](sol/review.md) | Sol 6.1 | Primary analysis, with its own priorities and acceptance conditions |
-| [Validation record](sol/validation.md) | Sol 6.1 | Evaluation environment, performed checks, observations, and remaining acceptance work |
-| [Comparison](comparison.html) | Parent chat | Compares the two reports; preserves differences in coverage and priority |
-| [Source provenance](provenance.json) | Archive preparation | Original source hashes and final evaluated revisions |
+| [デザイン分析](astra/review.html) | Astra 6 | 独自の優先順位、実機操作、測定、確認範囲を持つ一次分析 |
+| [デザイン分析](sol/review.md) | Sol 6.1 | 独自の優先順位と受入条件を持つ一次分析 |
+| [検証記録](sol/validation.md) | Sol 6.1 | 評価環境、実施した検査、観察、残る受入作業 |
+| [比較](comparison.html) | 親チャット | 両レポートを比較し、確認範囲と優先順位の違いを保持した資料 |
+| [出典記録](provenance.json) | 保存担当 | 元資料のハッシュと最終評価対象commit |
 
-The HTML reports are static documents with no scripts.
-View their source on GitHub or open the files in a browser from a checkout.
-The comparison is not an independent third product evaluation or a general ranking of the models.
-Each model was run once; native debug/release builds, browser sizes, operations, and modeling choices differed.
+HTMLレポートはスクリプトを含まない静的文書です。
+GitHubではソースを閲覧でき、checkoutしたファイルをブラウザで開くと表示できます。
+比較資料は、独立した第三の製品評価や、モデル一般の順位付けではありません。
+各モデルを一回ずつ実行した結果であり、実機のdebug／releaseビルド、ブラウザの寸法、操作範囲、モデル化の選択は異なります。
 
-## Evidence included here
+## 収録した検証根拠
 
-| Evidence | What it supports | Limits |
+| 根拠 | 確認できること | 限界 |
 | --- | --- | --- |
-| [Astra environment manifest](astra/evidence/manifest.json) | Evaluated revisions, OS, build configuration, original native debug executable hash | The executable itself and private checkout paths are omitted |
-| [Astra full File menu](astra/evidence/23-native-file-menu-full.txt) | Observed native File menu contents | Text capture, not complete keyboard or menu acceptance |
-| [Astra initial File menu capture](astra/evidence/02-native-file-menu.txt), [View menu capture](astra/evidence/03-native-view-menu.txt) | Notices that the accessibility tree did not change | These captures do not contain menu contents |
-| [Astra status after tab switch](astra/evidence/07-native-status-other-tab.txt) | Saved message remaining with a different edited document | Does not establish user confusion or data loss |
-| [Astra missing-file state](astra/evidence/06-native-missing.txt) | Preserved buffer and unresolved external-change state in one observed path | Does not accept all conflict recovery paths |
-| [Astra producer options](astra/evidence/09-native-producer-options.txt) | Disabled candidate with an existing producer | Does not establish complete native save safety |
-| [Astra layout](astra/evidence/13-browser-measurement.json), [Sol layout](sol/evidence/web-1280-layout.json) | Shared web frontend geometry | CSS pixels; not native point sizes or native narrow-window acceptance |
-| [Sol large-graph AX capture](sol/evidence/native-large-graph.ax.txt) | Capture did not contain document body | No large-graph native acceptance or established performance defect |
+| [Astraの環境記録](astra/evidence/manifest.json) | 評価対象commit、OS、ビルド設定、元の実機debug実行ファイルのハッシュ | 実行ファイル自体と私的なcheckoutパスは未収録 |
+| [AstraのFileメニュー全文](astra/evidence/23-native-file-menu-full.txt) | 実機で観察したFileメニューの内容 | テキスト取得記録であり、キーボードやメニュー操作全体の受入完了ではない |
+| [Astraの初回Fileメニュー取得](astra/evidence/02-native-file-menu.txt)、[Viewメニュー取得](astra/evidence/03-native-view-menu.txt) | アクセシビリティツリーに変化がなかったという通知 | これらの記録にはメニュー内容が含まれていない |
+| [Astraのタブ切替後の状態](astra/evidence/07-native-status-other-tab.txt) | 別の文書を編集しても保存済みメッセージが残る状態 | 利用者の誤読やデータ損失を実証したものではない |
+| [Astraのファイル不在時の状態](astra/evidence/06-native-missing.txt) | 一つの観察経路で、バッファと未解決の外部変更状態が保持されたこと | 競合復旧の全経路を受入済みとはしない |
+| [Astraの生成元候補](astra/evidence/09-native-producer-options.txt) | 既存の生成元がある接続候補の無効化 | 実機の保存処理全体の安全性を証明しない |
+| [Astraの領域測定](astra/evidence/13-browser-measurement.json)、[Solの領域測定](sol/evidence/web-1280-layout.json) | 共有フロントエンドをブラウザで表示したときの領域寸法 | CSS pxであり、実機のptや狭幅ウィンドウの受入結果ではない |
+| [Solの大規模図のAX取得記録](sol/evidence/native-large-graph.ax.txt) | 取得結果に文書本文が含まれていなかったこと | 大規模図の実機受入や、性能不具合の確定には至っていない |
 
-## Public-copy transformations
+## 公開保存版の加工
 
-The original local artifacts remain unchanged.
-The reports here retain their narrative conclusions and priorities but are explicitly marked as public archive copies.
-Private absolute paths were removed from reports and text evidence.
-Screenshots, binary pipe captures, executables, build logs, temporary scripts, the supplied reference-image pack, and complete HIG/DocC text copies are not included.
-Apple HIG references in Astra's report and Sol's analysis remain official links rather than copied source text.
-Image placeholders do not provide public pixel evidence for the original visual judgments.
+元のローカル成果物は変更せず残しています。
+この保存版は元レポートの結論と優先順位を保持し、公開保存用に加工した版であることを明記しています。
+レポートとテキスト根拠から私的な絶対パスを取り除きました。
+スクリーンショット、pipe出力のバイナリ、実行ファイル、ビルドログ、一時スクリプト、提供された参考画像パック、HIG／DocC本文の完全な複製は収録していません。
+AstraのレポートとSolの分析にあるApple HIGの参照は、本文を複製せず公式URLを残しています。
+画像の省略表示だけでは、元の視覚的判断を公開された画像から検証することはできません。
 
-Links to omitted local material are replaced with explicit omission notes.
-The `originalSourceFile` filenames and SHA256 values in `provenance.json` identify the inputs before sanitization; they are not hashes of the sanitized copies.
-The `source` field names each corresponding public archive file.
-The Astra manifest retains the original executable hash but omits local root fields and shitae-specific model hashes.
-Sol's validation record retains historical shitae check results to explain evaluation preparation; the underlying models and shitae-specific evidence are not archived in this repository.
-The parent comparison still discusses shitae's contribution and candidate improvements as historical review content, not implementation decisions or issue state.
-The separate shitae project chat owns its report archive, model evidence, and issue filing.
+未収録のローカル資料へのリンクは、省略を明示する注記へ置き換えました。
+`provenance.json`の`originalSourceFile`とSHA256は、加工前の元ファイルを識別する情報です。
+加工後の保存ファイルのハッシュではありません。
+`source`は、対応する公開保存ファイルのパスを示します。
+Astraの環境記録には元の実行ファイルのハッシュを残し、ローカルrootのフィールドとshitae固有のモデルハッシュを省略しました。
+Solの検証記録には評価準備を説明する当時のshitae検査結果を残していますが、モデルとshitae固有の根拠はこのリポジトリに保存していません。
+親の比較資料にあるshitaeの効果と改善候補は、当時のレビュー内容であり、実装の採用決定やissueの状態を示すものではありません。
+shitae側のレポート保存、モデルの検証根拠、起票は、shitaeプロジェクトの専用チャットが担当します。
 
-## What remains unverified
+## 残る未検証範囲
 
-Neither review accepts VoiceOver, IME composition, measured contrast, dark appearance, large native documents, long-duration performance, or other operating systems.
-Native file operations were covered differently: Astra observed editing, saving, tab switching, Undo, and selected conflict behavior but did not complete an Open roundtrip; Sol observed short input, diagnostic recovery, and an unsaved-close sheet, but did not accept actual saving or conflict recovery.
-Web observations do not verify native dialogs or file I/O.
-shitae simulations do not verify disk revision handling, data preservation, actual focus movement, editor Undo retention, or visual readability.
-The original reviews did not run the full product test suite or CI.
-This archive's document checks and independent review do not extend those product acceptance boundaries.
+両レビューとも、VoiceOver、IMEの入力組成（変換中の入力）、コントラストの実測、ダーク外観、大規模文書の実機操作、長時間性能、他OSの受入は完了していません。
+実機のファイル操作は確認範囲が異なります。
+Astraは編集、保存、タブ切替、Undo、一部の競合時の挙動を観察しましたが、Openから再度開く一連の操作は完了していません。
+Solは短い入力、診断からの復帰、未保存のまま閉じる際の確認を観察しましたが、実際の保存と競合復旧の受入は完了していません。
+ブラウザでの観察は、実機のダイアログやファイルI/Oを検証するものではありません。
+shitaeのシミュレーションは、ディスクのrevision照合、データ保全、実際のフォーカス移動、エディタのUndo保持、視覚的な読みやすさを検証しません。
+元のレビューでは、製品の全件テストやCIを実行していません。
+この保存作業で行う文書検査と独立レビューによって、製品の受入済み範囲が広がることはありません。
