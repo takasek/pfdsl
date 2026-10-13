@@ -19,7 +19,8 @@ pnpm --filter @pfdsl/standalone tauri build --bundles app
 
 Rust/Cargo, Xcode command-line tools, and the repository's Node/pnpm prerequisites are developer build requirements.
 They are separate from the eventual installation requirements for distributed users.
-The macOS CI job compiles an Apple Silicon app and runs native unit tests; it does not certify GUI or IME behavior.
+The macOS CI job compiles an Apple Silicon app, runs native unit tests, and briefly starts the bundled executable to check native startup and exit-guard installation.
+The startup smoke does not certify GUI, IME, or Quit interaction.
 
 ## Linux verification
 
@@ -236,7 +237,16 @@ Publication can succeed before a later conflict or read error is reported; inspe
 The guarantee ends at the final pre-save check: an external write after that check can be overwritten, and later writes through an old file descriptor are not recovered.
 Deliberate manipulation of the application's exclusive temporary names is outside this guarantee.
 This is not an atomic compare-and-swap, backup history, crash-recovery, or power-loss durability guarantee.
-Save publication on other operating systems is currently refused; it never falls back to unconditional overwrite.
+On other operating systems, Save and Save As are disabled before opening a save dialog, with a persistent explanation.
+Saving remains disabled while native support is being checked or if that check fails; shortcuts and recovery actions follow the same rule.
+Native save requests and save-target selection are also refused before creating or writing a temporary file.
+Dirty close offers Keep Editing, Discard and Cancel when saving is unavailable.
+Keep Editing is the first button, and Cancel remains the dismissal action; only an explicit Discard discards editor content.
+In browser-only mode, saving is also disabled with an explanation to use the desktop application.
+The native document I/O boundary selects the macOS backend or an explicit read-only backend at compile time.
+The read-only backend verifies the originally selected directory path and refuses inspection if that path is moved or replaced; it does not follow directory moves.
+Its opaque revision token includes file identity, modification time and content hash, with an explicit unsupported protection marker; it does not detect protection-metadata changes.
+Linux saving remains a separate product decision; Windows is outside the supported build targets.
 
 The #1258 document-editing candidate remains under validation.
 Existing-file saving keeps the FD obtained by exclusive stage creation and copies metadata with the operating system's `fcopyfile` facility.

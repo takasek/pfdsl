@@ -1,0 +1,123 @@
+PFDSL PR #1440: Linux GUI Acceptance
+実測日: 2026-10-13 UTC / 実測環境: dot cloud Linux desktop
+
+結果概要
+L1、L3、L4は実測PASS。L2はtab-closeとnative window-closeの全指定保持条件、明示Discardによる閉鎖、2文書のDiscard→CancelがPASS。
+別のapplication Quit入口は未確認。Linux画面に独立したQuitメニューはなく、Ctrl-Qにも観測可能な応答はなかったため、Alt-F4によるnative window-closeと同一視しない。
+macOS固有のQuit、IME、保存成功、corpus acceptanceはこの検証の対象外・未実行。CI成功のみをGUI成功として扱っていない。
+
+1. 対象の同定と実行条件
+Repository: takasek/pfdsl
+PR: https://github.com/takasek/pfdsl/pull/1440
+Run: https://github.com/takasek/pfdsl/actions/runs/38362253568
+Source commit: 3e6240ee7f776f55be69aaf379de41aedd35da1f
+Artifact: pfdsl-linux-appimage-x64-3e6240ee7f776f55be69aaf379de41aedd35da1f-attempt-1
+Artifact ID: 11795497292
+Artifact ZIP bytes: 120069358
+Run attempt: 1
+linux-native job 115178965137: completed / success
+linux-appimage-runtime job 115180561609: completed / success
+
+Artifact ZIP SHA-256（GitHub artifact digestと一致）:
+ce0b5f364b8e25f78e232b9dff1c42cc9326080e1ef2858123fe0a61b38c4ced
+PFDSL.AppImage SHA-256（実行前後同一）:
+7cb57ef7004af60bd52d4edbf66e877da77c732e606fa8f331ae0f256f5d83f5
+Inner usr/bin/pfdsl-desktop SHA-256（実行前後同一）:
+9d3b607871c1fb7a728c73e5584a550e49aa7e4b9c4f1a48ace5537628c71a3f
+
+Runtime OS: Debian GNU/Linux 13 (trixie), DEBIAN_VERSION_FULL=13.6
+Runtime CPU: x86_64
+Kernel: Linux 6.18.44 #1 SMP Sat Sep 26 20:02:31 UTC 2026
+GUI session: DISPLAY=:0（cloud desktop Terminalの既存環境から通常起動）
+Runtime GTK/WebKitのhost package version: 未確認。dpkg-queryがno packages foundを返したため、CIのversionをhost観測値として扱わない。
+参考CI build-environment: Debian 13.7 x86_64、Node v24.21.0、pnpm 10.33.2、rustc/cargo 1.99.0、GTK 3.24.49、WebKitGTK 2.54.0。これらはartifact付属のbuild時記録。
+
+2. Integrity / Runtime preflight: PASS
+exact commitのpackages/standalone/README.mdの「Use the verification AppImage when WebKitGTK runtime is unavailable」を読んで実施。
+新規作成ディレクトリにartifact ZIPとtar.gzを展開。SOURCE_COMMITは上記の修正HEADと完全一致。
+SHA256SUMS: 14 / 14 OK。AppImageを--appimage-extractし、APPDIR_SHA256SUMS: 304 / 304 OK。
+AppRunとinner executableの実行可能属性、bundled libGLESv2.so.2 / libGLdispatch.so.0の存在を確認。
+README指定LD_LIBRARY_PATHでinner executableとlibGLESv2.so.2のlddを実施。not found / version errorなし。
+その後cloud desktop Terminalでextracted directoryから./AppRunを通常起動。inner executableの直接起動は行っていない。
+アプリウィンドウとeditor/previewを確認。追加OS package、sandbox変更、起動フラグ変更、product source変更、CI runner変更、PRへの投稿はなし。
+
+3. L1: Save / Save As制限 — PASS
+初期表示: Save / Save Asがdisabled。説明「Safe document saving is currently supported on macOS only.」が常時表示。
+一時a.pfdslを通常Open file pickerで開き、editor末尾に「# local_a_unsaved」を入力。
+Ctrl-S: chooserなし。編集本文とdirty表示を保持。ファイルhash不変。
+Ctrl-Shift-S: chooserなし。編集本文とdirty表示を保持。ファイルhash不変。
+Evidence: 01-startup-0.jpg, 02-l1-ctrl-s.jpg, 03-l1-ctrl-shift-s.jpg
+
+4. L2: dirty close — 条件別実測
+A. tab-close
+Keep Editing / Discard / Cancelの3ボタン。Keep Editingが左端の最初のボタン。
+初期Return: dialogを閉じて編集本文を保持。PASS（04,05）
+Escape: 本文を保持。PASS（06）
+dialog X: 本文を保持。PASS（07）
+Keep Editing click: 本文を保持。PASS（08）
+Cancel click: 本文を保持。PASS（09）
+Discard click: a.pfdsl tabだけを閉鎖。disk a.pfdslは変更なし。PASS（10）
+
+B. native window-close（Alt-F4）
+2文書a.pfdsl / b.pfdslにそれぞれ「# local_a_two_docs」「# local_b_two_docs」を入力。
+最初のa.pfdsl確認でDiscard、その次のb.pfdsl確認でCancelを選択。
+windowは閉じず、両tabと両方の編集本文が保持された。disk hash不変。PASS（11–15）
+その後L4のmove.pfdslもdirty状態のまま、native window-closeを反復:
+初期Return: window・dirty tabs・編集中本文を保持。PASS（30,31）
+Escape: 同上。PASS（32）
+dialog X: 同上。PASS（33,34）
+Keep Editing click: 同上。PASS（35,36）
+Cancel click: 同上。PASS（37,38）
+a.pfdsl / b.pfdslを再選択し、それぞれの独自編集markerが残ることも確認。PASS（39,40）
+最後にwindow-closeでa、b、moveの各確認に明示Discard。全確認後に通常終了。exit status 0。PASS（41,42,44,46）
+43と45は描画遷移中の補助capture。最終判断は44/46、終了status、空のPFDSL window inventoryに基づく。
+
+C. distinct application Quit
+Ctrl-Qは実行したが、dialogも終了も観測されなかった（29）。独立Quitメニューは画面に露出していない。
+別Quit入口の受入れは未確認。native window-closeの結果を別QuitのPASSとしない。
+
+5. L3: dirty external change — PASS
+external.pfdslのeditorへ「# local_external_unsaved」を入力。
+外部操作としてdiskタイトルを「External disk version」へ変更し、「# DELIBERATE_EXTERNAL_V2」を追記。
+アプリは「The disk changed. Your editor content is retained.」と正しいrecovery targetを表示。
+local editorは元タイトルとlocal markerを保持。Observed external versionは外部タイトルと外部markerを表示。
+Review and Save Here… / Save As…はdisabled、macOS-only理由付き。
+Use Current Disk Version…で比較dialogを開き、Editor contentとObserved disk contentの両markerを確認。
+Keep Editingで一度キャンセルし、local本文とdisk hash保持を確認。
+再度開いてUse Disk Versionを明示選択すると、外部タイトルとmarkerがeditorへ入りdirty表示が消え、「Reloaded the current disk version.」を表示。
+macOS-only saving説明とSave / Save As disabledは引き続き表示。adoptionによるdisk書込みなし。
+Evidence: 16–24
+
+6. L4: parent directory moved — PASS
+parent/move.pfdslを開き「# local_move_unsaved」を入力。
+外部操作としてparent directoryをparent-movedへrename。old path不存在、moved file存在・hash同一を確認。
+アプリは「Could not check move.pfdsl: No such file or directory (os error 2). Editor content is retained.」を表示。
+元本文とlocal markerを保持。old pathで読取成功したという表示はなかった。
+dirty tab-closeでもread errorを表示し、Cancelで本文を保持。最後のwindow-closeでは明示Discardまで保持。
+Evidence: 25–28, 44
+
+7. ディスクhashの検証
+全て新規一時文書。通常の保存・保存取消・close取消・Discard・disk adoptionから生じたファイル内容変更は検出なし。
+以下のhashを基準に、各checkpointのfiles-after-*.txtおよびfiles-final.txtを照合した。
+基準:
+a.pfdsl: b600d838a5bfdab93190b46b64d70e308bcfdc20000f510cc8b239a238be2093
+b.pfdsl: 692e6e91581c868d6359aa6296be2fdc6036b2fd7431838ed857e57495d5d129
+external.pfdsl: f1854888508c98a50df6c3ced981146e34ec5e84381b842b6a6abcb52e8ad00f
+parent/move.pfdsl: 576d03913fd482b3886512f3688ac2301ae15b61626dcdf0193d670787cf2527
+意図的外部操作だけを分離:
+- 07:39:47 UTC external.pfdslを意図的変更。
+  変更後SHA-256: 1447553983de9795806e041cad00fea5bdbd09130b924ab8e88bae4fe0b6ddc6
+- 07:42:51 UTC parent→parent-movedへ意図的rename。move.pfdslのbytes/hashは不変。
+Return/Escapeと一部window cancel系列は連続操作後のcheckpointでhashを採取。各UI保持は個別captureで記録。
+
+8. 最終確認と証拠
+normal AppRun exit status: 0
+startup.log: stdout+stderr合流で0 bytes（起動から通常終了までエラー出力なし）
+PFDSL open-window inventory: empty after explicit final Discard
+payload再検証: SHA256SUMS 14 / 14、APPDIR_SHA256SUMS 304 / 304、outer/inner hashes実行前後一致。
+証拠ZIPには46 desktop captures、capture-index（採取時刻とhash）、exact-HEAD README、CI/artifact metadata、各hash/ldd/runtime/exitログ、意図的変更記録を収録。実行binaryはZIPに再同梱していない。
+
+補足
+最初のGUI Terminal操作では/tmpの共有を仮定したwrapper pathが見つからなかった。AppRun未実行の段階であり、共有ディレクトリを確認して正しいshared pathから1回だけ通常起動した。
+最初の一時fixtureを.pfd拡張子で選んだところUIが「Choose a .pfdsl document」と案内したため、受入れ開始前に.pfdslへ修正。以降は通常pickerで正常にopenした。
+これらをアプリ起動失敗や受入れPASSの根拠に含めていない。

@@ -81,6 +81,8 @@ test("Save As recovery retains target ownership and refuses intervening edits in
 		globalThis.calls = [];
 		globalThis.nativeInvoke = async (command, args) => {
 			calls.push({ command, args });
+			if (command === "document_capabilities")
+				return { save: true, reason: null };
 			if (command === "list_recent") return [];
 			if (command === "remember_document" || command === "release_document")
 				return;

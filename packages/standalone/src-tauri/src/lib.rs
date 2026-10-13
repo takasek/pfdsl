@@ -1,5 +1,6 @@
 mod workspace;
 mod documents;
+mod native_directory;
 mod exit;
 mod exit_gate;
 
@@ -13,6 +14,9 @@ struct Folders {
     acceptance: Option<PathBuf>,
     documents: Mutex<documents::Registry>,
 }
+
+#[tauri::command]
+fn document_capabilities() -> native_directory::Capabilities { native_directory::capabilities() }
 
 #[tauri::command]
 async fn select_folder(
@@ -79,6 +83,7 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             exit::finish_app_exit,
             exit::exit_listener_ready,
+            document_capabilities,
             select_folder,
             list_documents,
             read_document,
@@ -102,6 +107,10 @@ pub fn run() {
         .build(tauri::generate_context!())
         .expect("Could not start PFDSL")
         .run(|app, event| {
+            if matches!(event, tauri::RunEvent::Ready) && std::env::var("PFDSL_STARTUP_SMOKE").as_deref() == Ok("1") {
+                // Setup has already installed the native exit guard; this is not frontend or GUI acceptance.
+                println!("PFDSL_NATIVE_STARTUP_READY");
+            }
             if let tauri::RunEvent::ExitRequested { api, .. } = event {
                 if !app.state::<exit_gate::ExitGate>().take_approval() {
                     api.prevent_exit();
@@ -180,6 +189,7 @@ fn save_document(id: usize, source: String, expected: Option<String>, folders: S
 }
 #[tauri::command]
 async fn choose_save_target(name: String, app: tauri::AppHandle, folders: State<'_, Folders>) -> Result<Option<documents::Snapshot>, String> {
+    native_directory::require_save()?;
     let Some(file) = app.dialog().file().add_filter("PFDSL", &["pfdsl"]).set_file_name(name).blocking_save_file() else { return Ok(None); };
     let path = file.into_path().map_err(|e| e.to_string())?;
     Ok(Some(add_document(documents::Document::selected(&path)?, &folders)?))
@@ -196,19 +206,35 @@ fn release_document(id: usize, folders: State<'_, Folders>) -> Result<(), String
 }
 
 #[tauri::command]
-async fn confirm_close_document(name: String, window: tauri::Window) -> Result<String, String> {
-    let decision = window.dialog().message(format!("Save changes to {name}?"))
+async fn confirm_close_document(name: String, allow_save: bool, window: tauri::Window) -> Result<String, String> {
+    let capability = native_directory::capabilities();
+    let (message, buttons) = close_prompt(&name, capability, allow_save);
+    let decision = window.dialog().message(message)
         .title("PFDSL").parent(&window)
-        .buttons(MessageDialogButtons::YesNoCancelCustom("Save".into(), "Discard".into(), "Cancel".into()))
+        .buttons(buttons)
         .blocking_show_with_result();
-    Ok(match decision {
-        MessageDialogResult::Yes => "save",
-        MessageDialogResult::No => "discard",
-        MessageDialogResult::Custom(ref choice) if choice == "Save" => "save",
+    Ok(close_decision(decision, capability.save && allow_save).into())
+}
+
+fn close_decision(decision: MessageDialogResult, can_save: bool) -> &'static str {
+    match decision {
+        MessageDialogResult::Yes if can_save => "save",
+        MessageDialogResult::No if can_save => "discard",
+        MessageDialogResult::Custom(ref choice) if choice == "Save" && can_save => "save",
         MessageDialogResult::Custom(ref choice) if choice == "Discard" => "discard",
         _ => "cancel",
-    }.into())
+    }
 }
+
+fn close_prompt(name: &str, capability: native_directory::Capabilities, allow_save: bool) -> (String, MessageDialogButtons) {
+    let (message, buttons) = if capability.save && allow_save {
+        (format!("Save changes to {name}?"), MessageDialogButtons::YesNoCancelCustom("Save".into(), "Discard".into(), "Cancel".into()))
+    } else {
+        (format!("{} Discard changes to {name}? Choose Keep Editing or Cancel to retain the editor content.", capability.reason.unwrap_or("Document saving support could not be confirmed.")), MessageDialogButtons::YesNoCancelCustom("Keep Editing".into(), "Discard".into(), "Cancel".into()))
+    };
+    (message, buttons)
+}
+
 fn recent_path(app: &tauri::AppHandle) -> Result<PathBuf, String> {
     let directory = std::env::var_os("PFDSL_DOCUMENTS_STATE_DIR").map(PathBuf::from)
         .map(Ok).unwrap_or_else(|| app.path().app_local_data_dir().map_err(|e| e.to_string()))?;
@@ -260,4 +286,35 @@ fn open_recent_folder(path: String, app: tauri::AppHandle, folders: State<'_, Fo
 fn open_recent(path: String, app: tauri::AppHandle, folders: State<'_, Folders>) -> Result<documents::Snapshot, String> {
     if !read_recent(&app)?.iter().any(|p| p.kind == "file" && p.path == path) { return Err("Unknown recent target".into()); }
     add_document(documents::Document::selected(&PathBuf::from(path))?, &folders)
+}
+
+#[cfg(test)]
+mod document_capability_tests {
+ use super::*;
+ #[test] fn close_never_offers_save_without_both_native_and_frontend_support() {
+  for native_save in [false, true] { for frontend_save in [false, true] {
+   let capability = native_directory::Capabilities { save: native_save, reason: if native_save { None } else { Some("Unsupported saving") }, directory_tracking: "selected-path", protection_metadata: false };
+   let (message, buttons) = close_prompt("dirty.pfdsl", capability, frontend_save);
+   if native_save && frontend_save {
+    assert!(matches!(buttons, MessageDialogButtons::YesNoCancelCustom(_, _, _)));
+    assert!(message.contains("Save changes"));
+   } else {
+    match buttons { MessageDialogButtons::YesNoCancelCustom(keep, discard, cancel) => { assert_eq!(keep, "Keep Editing", "Return must retain unsaved content"); assert_eq!(discard, "Discard"); assert_eq!(cancel, "Cancel", "dismissal must retain unsaved content"); }, _ => panic!("Save must not be offered") }
+    assert!(message.contains("Discard changes"));
+    assert!(message.contains(if native_save { "could not be confirmed" } else { "Unsupported saving" }));
+   }
+  } }
+ }
+ #[test] fn unavailable_save_requires_explicit_discard() {
+  for result in [MessageDialogResult::Ok, MessageDialogResult::Cancel, MessageDialogResult::Yes, MessageDialogResult::No, MessageDialogResult::Custom("Cancel".into()), MessageDialogResult::Custom("Keep Editing".into()), MessageDialogResult::Custom("Save".into())] {
+   assert_eq!(close_decision(result, false), "cancel", "default and dismissed results must retain the editor");
+  }
+  assert_eq!(close_decision(MessageDialogResult::Custom("Discard".into()), false), "discard");
+ }
+ #[test] fn supported_close_decisions_keep_their_existing_meaning() {
+  for result in [MessageDialogResult::Yes, MessageDialogResult::Custom("Save".into())] { assert_eq!(close_decision(result, true), "save"); }
+  for result in [MessageDialogResult::No, MessageDialogResult::Custom("Discard".into())] { assert_eq!(close_decision(result, true), "discard"); }
+  for result in [MessageDialogResult::Cancel, MessageDialogResult::Ok, MessageDialogResult::Custom("Cancel".into())] { assert_eq!(close_decision(result, true), "cancel"); }
+ }
+
 }

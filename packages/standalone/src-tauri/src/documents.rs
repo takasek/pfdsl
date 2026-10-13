@@ -1,13 +1,11 @@
-use cap_std::fs::{Dir, MetadataExt, OpenOptions};
+use cap_std::fs::{Dir, MetadataExt};
+use crate::native_directory::{self, directory_path, publish};
 use serde::Serialize;
 use sha2::{Digest, Sha256};
 use std::io::{Read, Write};
 use std::path::{Component, Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
 
-#[cfg(target_os = "macos")]
-#[path = "save_metadata.rs"]
-mod save_metadata;
 
 static NEXT_STAGE: AtomicU64 = AtomicU64::new(1);
 
@@ -105,7 +103,7 @@ impl Document {
         let parent = self.parent.dir_metadata().map_err(|e| e.to_string())?;
         let binding = format!("{}:{}:{}", parent.dev(), parent.ino(), leaf);
         let absent = Snapshot { id, path: path.clone(), source: None, revision: None, identity: None, binding: binding.clone() };
-        let metadata = match self.parent.symlink_metadata(leaf) {
+        let metadata = match native_directory::leaf_metadata(&self.parent, leaf) {
             Ok(value) => value,
             Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(absent),
             Err(error) => return Err(error.to_string()),
@@ -113,20 +111,17 @@ impl Document {
         if !metadata.is_file() || metadata.file_type().is_symlink() {
             return Err("The document target is not a regular file; it was not discarded".into());
         }
-        let mut file = self.parent.open(leaf).map_err(|e| e.to_string())?;
+        let mut file = native_directory::open(&self.parent, leaf).map_err(|e| e.to_string())?;
         let before = file.metadata().map_err(|e| e.to_string())?;
-        #[cfg(target_os = "macos")]
-        let metadata_before = save_metadata::capture(&file)?;
+        let metadata_before = native_directory::capture(&file)?;
         let mut source = String::new();
         file.read_to_string(&mut source).map_err(|e| e.to_string())?;
         after_read();
         let after = file.metadata().map_err(|e| e.to_string())?;
-        #[cfg(target_os = "macos")]
-        let metadata_after = save_metadata::capture(&file)?;
-        #[cfg(target_os = "macos")]
+        let metadata_after = native_directory::capture(&file)?;
         if metadata_before != metadata_after { return Err("Metadata changed while reading; editor content is retained.".into()); }
         // The descriptor can outlive atomic replacement or deletion of the selected name.
-        let named_after = self.parent.symlink_metadata(leaf)
+        let named_after = native_directory::leaf_metadata(&self.parent, leaf)
             .map_err(|_| "The selected file changed while reading. Try again; editor content is retained.".to_string())?;
         if !named_after.is_file() || named_after.file_type().is_symlink()
             || named_after.dev() != after.dev() || named_after.ino() != after.ino()
@@ -140,19 +135,12 @@ impl Document {
             return Err("The disk changed while reading. Try again; editor content is retained.".into());
         }
         let revision = format!("{}:{:?}:{:x}", identity, after.modified().ok(), Sha256::digest(source.as_bytes()));
-        #[cfg(target_os = "macos")]
-        let revision = format!("{revision}:{:x}", Sha256::digest(format!("{metadata_after:?}").as_bytes()));
+        let revision = format!("{revision}:{}", native_directory::protection_revision(&metadata_after));
         Ok(Snapshot { id, path, source: Some(source), revision: Some(revision), identity: Some(identity), binding })
     }
     fn validate_binding(&self) -> Result<(), String> {
         for (directory, path) in [(&self.source_root, self.source_root_path.as_path()), (&self.parent, self.path.parent().unwrap())] {
-            let actual = directory_path(directory, path)?;
-            let named = std::fs::symlink_metadata(path).map_err(|e| e.to_string())?;
-            let retained = directory.dir_metadata().map_err(|e| e.to_string())?;
-            use std::os::unix::fs::MetadataExt as _;
-            if actual != path || !named.is_dir() || named.file_type().is_symlink() || named.dev() != retained.dev() || named.ino() != retained.ino() {
-                return Err("The selected directory was moved, deleted, or replaced. Select its current location explicitly; no content was published.".into());
-            }
+            native_directory::validate_binding(directory, path)?;
         }
         Ok(())
     }
@@ -170,6 +158,7 @@ impl Document {
             let target_state = match &current { Some(s) if s.source.is_some() => "readable", Some(_) => "missing", None => "unreadable" };
             SaveResult { outcome: outcome.into(), current, message, publication: "not-published".into(), target_state: target_state.into() }
         };
+        if let Err(error) = native_directory::require_save() { return result("failed-before-publication", None, error); }
         if let Err(error) = self.validate_binding() { return result("conflict", self.inspect(id).ok(), error); }
         let current = match self.inspect(id) {
             Ok(value) => value,
@@ -184,37 +173,25 @@ impl Document {
         }
         let original = if current.source.is_some() {
             // Directory write permission must not bypass the file's write protection.
-            let mut options = OpenOptions::new();
-            options.read(true).write(true);
-            match self.parent.open_with(&self.leaf, &options) {
+            match native_directory::open_writable(&self.parent, &self.leaf) {
                 Ok(file) if file.metadata().is_ok_and(|m| current.identity.as_deref() == Some(&format!("{}:{}", m.dev(), m.ino()))) => Some(file),
                 Ok(_) => return result("conflict", self.inspect(id).ok(), "The target changed before saving. Editor content is retained.".into()),
                 Err(error) => return result("failed-before-publication", Some(current), format!("The document cannot be opened for writing. Editor content is retained. {error}")),
             }
         } else { None };
-        #[cfg(target_os = "macos")]
-        let protection = match original.as_ref().map(save_metadata::capture).transpose() {
-            Ok(stamp) => stamp,
+        let protection = match original.as_ref().map(native_directory::capture).transpose() {
+            Ok(stamp) => stamp.flatten(),
             Err(error) => return result("failed-before-publication", Some(current), error),
         };
         let stage = format!(".pfdsl-save-{}-{}-{}", std::process::id(), std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_nanos(), NEXT_STAGE.fetch_add(1, Ordering::Relaxed));
-        let mut options = OpenOptions::new();
-        options.read(true).write(true).create_new(true);
-        #[cfg(unix)]
-        {
-            use cap_std::fs::OpenOptionsExt;
-            // An existing file's mode is copied onto the stage; a new file follows the process umask.
-            let mode = if original.is_some() { 0o600 } else { 0o666 };
-            options.custom_flags(libc::O_NOFOLLOW).mode(mode);
-        }
-        let mut file = match self.parent.open_with(&stage, &options) {
+        let mut file = match native_directory::create_stage(&self.parent, &stage, original.is_some()) {
             Ok(file) => file,
             Err(error) => return result("failed-before-publication", Some(current), error.to_string()),
         };
         // The app owns this exclusive temporary name. Deliberate manipulation of
         // app-private temporary names is outside the document-conflict guarantee.
         let cleanup = |mut receipt: SaveResult| {
-            if let Err(error) = self.parent.remove_file(&stage) {
+            if let Err(error) = native_directory::remove_stage(&self.parent, &stage) {
                 if error.kind() != std::io::ErrorKind::NotFound {
                     receipt.message.push_str(&format!(" Could not remove temporary file '{stage}': {error}"));
                 }
@@ -222,19 +199,16 @@ impl Document {
             receipt
         };
         let prepared = (|| -> Result<(), String> {
-            #[cfg(target_os = "macos")]
             if let (Some(required), Some(original)) = (&protection, &original) {
                 required.copy_to(original, &file)?;
             }
             metadata_copied(&file);
-            #[cfg(target_os = "macos")]
             if let Some(required) = &protection {
-                if save_metadata::capture(&file)? != *required { return Err("The temporary file did not preserve document protection; no content was written.".into()); }
+                if native_directory::capture(&file)?.as_ref() != Some(required) { return Err("The temporary file did not preserve document protection; no content was written.".into()); }
             }
             file.write_all(source.as_bytes()).map_err(|e| e.to_string())?;
-            #[cfg(target_os = "macos")]
             if let Some(required) = &protection {
-                if save_metadata::capture(&file)? != *required { return Err("Document protection changed while preparing the save; no content was published.".into()); }
+                if native_directory::capture(&file)?.as_ref() != Some(required) { return Err("Document protection changed while preparing the save; no content was published.".into()); }
             }
             file.sync_all().map_err(|e| e.to_string())
         })();
@@ -263,33 +237,6 @@ impl Document {
         receipt
     }
 
-}
-
-#[cfg(target_os = "macos")]
-fn directory_path(directory: &Dir, _: &Path) -> Result<PathBuf, String> {
-    use std::os::fd::AsRawFd;
-    let mut buffer = [0u8; libc::PATH_MAX as usize];
-    if unsafe { libc::fcntl(directory.as_raw_fd(), libc::F_GETPATH, buffer.as_mut_ptr()) } == -1 {
-        return Err(format!("Could not identify the selected directory: {}", std::io::Error::last_os_error()));
-    }
-    let path = std::ffi::CStr::from_bytes_until_nul(&buffer).map_err(|e| e.to_string())?.to_str().map_err(|e| e.to_string())?;
-    Ok(PathBuf::from(path))
-}
-#[cfg(not(target_os = "macos"))]
-fn directory_path(_: &Dir, fallback: &Path) -> Result<PathBuf, String> { Ok(fallback.to_path_buf()) }
-
-#[cfg(target_os = "macos")]
-fn publish(parent: &Dir, stage: &str, target: &str, replace: bool) -> Result<(), String> {
-    use std::os::fd::AsRawFd;
-    let stage = std::ffi::CString::new(stage).map_err(|e| e.to_string())?;
-    let target = std::ffi::CString::new(target).map_err(|e| e.to_string())?;
-    // Both arguments are single leaves in the same capability-bound directory.
-    let result = unsafe { libc::renameatx_np(parent.as_raw_fd(), stage.as_ptr(), parent.as_raw_fd(), target.as_ptr(), if replace { 0 } else { libc::RENAME_EXCL }) };
-    if result == 0 { Ok(()) } else { Err(format!("Safe publication failed: {}. Choose another file or filesystem.", std::io::Error::last_os_error())) }
-}
-#[cfg(not(target_os = "macos"))]
-fn publish(_: &Dir, _: &str, _: &str, _: bool) -> Result<(), String> {
-    Err("Safe document publication is currently supported on macOS only.".into())
 }
 
 #[cfg(all(test, target_os = "macos"))]
@@ -738,4 +685,32 @@ mod tests {
         } }
         assert!(failures.is_empty(), "{} failing cell(s):\n{}", failures.len(), failures.join("\n"));
     }
+}
+
+#[cfg(all(test, not(target_os = "macos")))]
+mod unsupported_tests {
+ use super::*;
+ #[test] fn unsupported_save_never_stages_writes_or_acknowledges_a_no_op() {
+  let root = std::env::temp_dir().join(format!("pfdsl-unsupported-document-{}", std::process::id()));
+  std::fs::create_dir(&root).unwrap();
+  let path = root.join("a.pfdsl");
+  std::fs::write(&path, "original").unwrap();
+  let metadata = std::fs::metadata(&path).unwrap();
+  let mut doc = Document::selected(&path).unwrap();
+  let before = doc.inspect(0).unwrap();
+  assert!(before.revision.as_ref().unwrap().ends_with(":unsupported"));
+  for source in ["original", "changed"] {
+   let receipt = doc.save(0, source, before.revision.as_deref());
+   assert_eq!(receipt.outcome, "failed-before-publication");
+   assert_eq!(receipt.publication, "not-published");
+   assert!(receipt.message.contains("macOS only"));
+  }
+  let mut missing = Document::selected(&root.join("new.pfdsl")).unwrap();
+  assert_eq!(missing.save(1, "new", None).outcome, "failed-before-publication");
+  assert_eq!(std::fs::read_dir(&root).unwrap().count(), 1);
+  assert_eq!(std::fs::read_to_string(&path).unwrap(), "original");
+  assert_eq!(std::fs::metadata(&path).unwrap().modified().unwrap(), metadata.modified().unwrap());
+  assert_eq!(std::fs::metadata(&path).unwrap().permissions(), metadata.permissions());
+  std::fs::remove_dir_all(root).unwrap();
+ }
 }

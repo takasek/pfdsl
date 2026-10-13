@@ -739,6 +739,79 @@ source `cd3b078107cf023a61ad14732dec842c83cf4439` の公式 Tauri debug build（
 読取失敗と復旧の時機・確認中の編集・同 binding の別 capability・rebind 後の計画は自動検査の証拠であり、この実機受入で網羅的に操作したものではない。
 容量不足（ENOSPC）・異なる owner・複雑な ACL・最低 macOS は引き続き未実測である。
 
+### OS 境界の保存能力と安全な終了 — #1438 / #1440、2026-10-13
+
+受入対象の製品ソースは `3e6240ee7f776f55be69aaf379de41aedd35da1f`。
+所有者が指定の Mac app で M1〜M8 をすべて通過したと報告し、Linux 担当から L1〜L4 の画面・ログ付き報告を受領した。
+以下はこの版の保存能力・終了・読取専用 backend の受入であり、以前の GUI / IME / native corpus の未実測範囲を完了へ変更しない。
+公開記録には [受入レポートと整合性記録](evidence/2026-10-13-native-os-boundary/PFDSL-1440-Linux-GUI-Acceptance.txt) を保存した。
+46枚の JPEG 画面原本は、所有者が提供した証拠 ZIP と受領側のローカル展開に保持する。
+公開前ガードは JPEG を検査対象として扱わないため、原本の画像 bytes は Git に含めず、capture index の採取時刻・ファイル名・hash と元 ZIP の hash を残す。
+この公開用コピーは添付 ZIP 全体の再配布ではない。
+capture index の `file` は元 ZIP 内の相対パスであり、公開コピー内の画像ファイルへのリンクではない。
+添付文書・ログ・画面は観測資料として扱い、収録されていた起動スクリプトは実行・同梱していない。
+
+#### Mac の所有者受入
+
+準備記録は macOS `27.0.1` / arm64。
+最終 bundled app のコピーにローカル ad-hoc 署名を付け、署名検証と startup smoke 成功後の app を所有者へ渡した。
+正式な署名・公証済み配布版ではない。
+準備時の [startup ログ](evidence/2026-10-13-native-os-boundary/mac-preparation-startup.log) を保存した。
+受領後も同じ executable hash のコピーに `codesign --verify --deep --strict` を行い、[署名再検証](evidence/2026-10-13-native-os-boundary/mac-receipt-codesign.log) は exit 0 だった。
+署名前 executable SHA-256 は `1e0e9ba2861ec5dca4bd8ab6b9ed39ee44027f692d9a7e5428916a140b2b755b`、受入コピーは `9e86d544f2c90fd9d8195d10534e523c7045e9d0d4d8d275922f05e2915c1146`。
+[準備 manifest](evidence/2026-10-13-native-os-boundary/mac-preparation-manifest.json) と所有者の「MacのM1〜M8は全部通過した」という報告を根拠に、指定した各条件を PASS と記録する。
+Codex が GUI を操作した結果や、Linux と同等の個別画面・ファイル hash の独立採取とは扱わない。
+
+| 項目 | 指定した条件と通過報告 |
+| --- | --- |
+| M1 | 既存文書を編集して Cmd-S。保存後に dirty が消え、再読込で本文が残る |
+| M2 | New の Save As で新規文書を保存。次の Save As の取消で本文と保存先を保持 |
+| M3 | Save As の既存文書への上書き比較で取消は両ファイルを保持し、明示 Replace は選択先だけを更新 |
+| M4 | dirty 文書の外部変更後に Cmd-S。外部版との比較、Keep Editing で保持、明示 Replace で editor 本文を保存 |
+| M5 | dirty タブの Cancel は本文保持。明示 Discard は閉鎖し、ディスク本文を変更しない |
+| M6 | dirty ウィンドウの Save は保存して終了し、再起動で保存本文を確認 |
+| M7 | dirty 状態の Cmd-Q・メニュー Quit・Dock Quit それぞれで Cancel は本文保持 |
+| M8 | 2文書の Quit で Discard→Cancel は両本文保持。再試行で両方 Save は保存して終了し、再読込後の clean Quit は確認なし |
+
+#### Linux の画面・ログ付き受入
+
+実測環境は dot cloud desktop の Debian `13.6` / x86_64、DISPLAY `:0`。
+[desktop run 38362253568](https://github.com/takasek/pfdsl/actions/runs/38362253568) attempt 1 の artifact `11795497292` を展開し、extracted `AppRun` を通常起動したという報告である。
+添付には実行 binary は含まれず、受領側では GUI の再実行や binary の再採取はしていない。
+artifact の head・run・ZIP digest は GitHub API と照合した。
+host GTK / WebKit package version は未確認であり、CI の Debian `13.7` / GTK `3.24.49` / WebKitGTK `2.54.0` を実測 host の値として扱わない。
+
+| 対象 | SHA-256 |
+| --- | --- |
+| 配布 artifact ZIP | `ce0b5f364b8e25f78e232b9dff1c42cc9326080e1ef2858123fe0a61b38c4ced` |
+| 実測 AppImage（前後同一との報告） | `7cb57ef7004af60bd52d4edbf66e877da77c732e606fa8f331ae0f256f5d83f5` |
+| 内側 executable（前後同一との報告） | `9d3b607871c1fb7a728c73e5584a550e49aa7e4b9c4f1a48ace5537628c71a3f` |
+| 添付証拠 ZIP | `e5c9d2ea52972c1cf2eb16425c1ad16bf4aa9bcd1c1bc0c35b11fdcab56b8da9` |
+| 添付レポート | `8eed3a5deb7b89fdca6251800446402aa06da945762874fbcd94760f2ceb0476` |
+
+| 項目 | 確認した範囲 | 結果 |
+| --- | --- | --- |
+| L1 | Save / Save As 無効と macOS 限定説明。Ctrl-S / Ctrl-Shift-S は chooser・書込みなし、編集保持 | PASS |
+| L2 | タブ閉鎖・native window-close の初期 Return、Escape、ダイアログ×、Keep Editing、Cancel は保持。明示 Discard だけ閉鎖。2文書の Discard→Cancel は両本文保持 | PASS |
+| L3 | 外部変更の比較、採用取消による保持、明示 Use Disk Version による採用。保存系回復操作は無効、説明は継続、採用で書込みなし | PASS |
+| L4 | 親フォルダ移動は旧パスの読取エラーとして表示。編集本文を保持し、Cancel でも保持 | PASS |
+
+L2 の独立した application Quit 入口は未確認。
+画面に Quit メニューが露出せず、Ctrl-Q には観測可能な応答がなかったため、Alt-F4 の window-close を独立 Quit の PASS として数えない。
+Linux の保存成功・macOS 固有の Quit・IME・native corpus もこの Linux 受入の対象外である。
+
+46枚の画面すべてについて [capture index](evidence/2026-10-13-native-os-boundary/capture-index.json) の SHA-256 とファイルの一致を確認した。
+添付レポートは ZIP 内のレポートと byte 単位で同一だった。
+各 document hash checkpoint は、意図的な `external.pfdsl` の変更と `parent` → `parent-moved` の移動だけに対応し、その他の変更は記録されていない。
+Return / Escape と一部 window 取消系列の hash は連続操作後の採取であり、個別キー直後の採取とは扱わない。
+起動前後の checksum ログは外側14 / 14・内側304 / 304がすべて OK、正常終了は exit 0、合流した stdout / stderr は0 bytes。
+最終 window inventory は空と報告されている。
+43・45番は描画遷移中の補助画面であり、通常終了の判断は44・46番と exit status・inventory の記録に基づく。
+
+#1438 の OS 境界・保存能力・安全な取消と、macOS の保存・Quit および Linux の露出した閉鎖経路について、指定の実機受入を完了とする。
+Linux の独立 Quit は上記の未確認として残し、Linux 保存実装と Windows 対応は元の範囲外を維持する。
+実機対象後の追加変更はこの受入記録と証拠のみで、製品ソースは変更しない。
+
 ## 2026-10-13 — output 接続の単一 producer 制約（#1432）
 
 #483 の既存接続 UI の受入とは分け、共有 editor の実装 `7a939f06` に追加した拒否動作を確認した。
