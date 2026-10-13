@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Astra 6 と Sol 6.1 — standaloneレビューの比較</title>
+<style>
+:root{color-scheme:light dark;--bg:#fafaf8;--panel:#fff;--ink:#202524;--muted:#59615e;--line:#d6dcd8;--accent:#235b49;--soft:#edf3ef}
+@media(prefers-color-scheme:dark){:root{--bg:#171c19;--panel:#202722;--ink:#e9eee9;--muted:#b1beb4;--line:#46534a;--accent:#9bd4b9;--soft:#29382f}}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.75 system-ui,-apple-system,'Hiragino Sans',sans-serif}main{max-width:1120px;margin:auto;padding:38px 26px 64px}h1{font-size:30px;line-height:1.35;max-width:28em}h2{font-size:23px;margin-top:40px}h3{font-size:18px}p{max-width:88ch}a{color:var(--accent);text-underline-offset:3px}nav{display:flex;gap:8px 24px;flex-wrap:wrap}small,.meta{color:var(--muted);font-size:13px}.lead{font-size:19px}.callout{background:var(--soft);border-left:4px solid var(--accent);padding:12px 20px}.table-wrap{overflow-x:auto}table{border-collapse:collapse;width:100%;font-size:15px;line-height:1.7}th,td{border-bottom:1px solid var(--line);padding:13px 14px;text-align:left;vertical-align:top}th{background:var(--soft)}td:first-child{min-width:140px}ul,ol{padding-left:24px}li{margin:10px 0}code{font-size:.88em;overflow-wrap:anywhere}details{border:1px solid var(--line);border-radius:8px;margin:18px 0;padding:12px 18px;background:var(--panel)}summary{font-weight:600;cursor:pointer}figure{margin:20px 0}img{max-width:100%;height:auto;border:1px solid var(--line)}figcaption{font-size:13px;color:var(--muted);margin-top:8px}.shots{display:grid;grid-template-columns:1fr 1fr;gap:22px}.sources{display:flex;flex-wrap:wrap;gap:8px 22px}@media(max-width:720px){main{padding:24px 16px 48px}h1{font-size:25px}.shots{grid-template-columns:1fr}table{min-width:760px}}
+</style>
+</head>
+<body><main><p class="meta">公開保存用加工版。本文の評価は2026-10-13の指定commitを対象とする当時の記録です。画像・shitaeモデル・私的パスを省略し、リンクを収録済み根拠へ整理しました。加工方針と収録範囲は <a href="README.md">索引</a>を参照してください。</p>
+<p class="meta">2026年10月13日 · 親チャットによる成果物の比較 · 実装変更は未実施</p>
+<h1>Astra 6 と Sol 6.1のレビューは、何を共通して見つけ、どこで違ったか</h1>
+<p class="lead">両方を動かした価値はありました。作業領域とmacOSメニューという共通の問題を確かめながら、保存表示の帰属、空の状態、shitaeの表示・参照解決について異なる具体例を得られています。</p>
+<nav aria-label="資料の入口"><a href="#comparison">デザインの比較</a><a href="#dogfood">shitaeの効果</a><a href="#features">shitae改善候補</a><a href="#next">改善着手への推奨</a><a href="#evidence">確認範囲</a></nav>
+<p class="sources"><a href="astra/review.html">Astraの原報告</a><a href="sol/review.md">Solの原報告</a><span>共通リファレンス [参照資料はこの保存版に未収録]</span></p>
+<div class="callout"><p><strong>比較条件：</strong>初期依頼と資料は共通で、各チャットは相手の成果物を参照せず評価しました。途中にユーザーが両チャットへPR #1441後の更新を指示し、最終的には両方が同じpfdsl <code>83701fb03e7846fe9582a3ae3b685d624f681902</code>、shitae <code>a3ebaedbd5d452c99093a949bbaf94508da43ab4</code>を使用しています。</p><p>各モデルを1回ずつ動かした結果です。Astraのnativeはdebug、Solはreleaseで、ブラウザの高さ・狭幅の条件、操作範囲、モデル化の選択も異なります。条件を完全に統一した比較実験ではなく、今回の違いをモデル固有の得意分野と断定しません。指摘の採否は一致数より根拠で判断します。</p></div>
+
+<h2 id="comparison">デザインの比較</h2>
+<div class="table-wrap"><table><thead><tr><th scope="col">論点</th><th scope="col">Astra 6</th><th scope="col">Sol 6.1</th><th scope="col">比較から言えること</th></tr></thead><tbody>
+<tr><td>作業領域</td><td>最優先。可動の分割線、サイドバー開閉、Source / Split / Diagramを提案。</td><td>最優先。幅指定の競合を先に直し、表示切替と調整を提案。</td><td>共通。1280 CSS px幅でソース350.89px、図702.11pxを別々に測定。50%指定と共有previewの100%指定が競合する同じコードも示しています。</td></tr>
+<tr><td>保存表示の帰属</td><td>優先2。Aの保存後にBへ移って編集しても「Saved.」が残ることをnativeで観察。</td><td>優先5の補助表示・状態の論点。共通statusが別タブで誤読される可能性をcodeから指摘。</td><td>同じ懸念を持つ一方、Astraは実操作と2文書モデルまで掘り下げました。データ損失の実証ではありません。</td></tr>
+<tr><td>macOSメニュー</td><td>優先3。File / Edit / Viewから既存操作を発見できる入口を提案。</td><td>優先2。File / View、ショートカット、New後のフォーカスをまとめて提案。</td><td>共通。FileがClose Window / Close Allだけであることを両方がnativeで観察。既存のCmd/Ctrl+SとSave Asを「ない機能」と誤認していません。</td></tr>
+<tr><td>空の状態・文書識別</td><td>優先5。初期サンプルの扱い、長い名前・同名文書、文字階層を改善候補に。</td><td>優先3。最後の文書を閉じてもSave・整形が有効に見えることをwebで操作確認。New後のフォーカス、同名文書の識別も指摘。</td><td>Solが空状態の具体的な失敗条件を追加しています。Astraの保存表示と合わせると「どの文書に、何ができるか」という一続きの問題として扱えます。</td></tr>
+<tr><td>診断・補助表示</td><td>優先4。行・列、Go to error、操作の役割分け、ノード操作の意味を提案。</td><td>優先5。正規化カードとミニマップの重なり、復旧比較の情報階層を掘り下げる。</td><td>方向は共通。全情報を右インスペクタへ集める案はSolが慎重に扱います。両方とも既存のEscape・フォーカス復帰・不正接続の説明を維持する考えです。</td></tr>
+<tr><td>アクセシビリティ・仕上げ</td><td>文字拡大、VoiceOver、フォーカス、コントラストを未検証として明示。</td><td>優先4として受入検証と必要な修正を必須に位置付け、視覚スタイルは優先6。</td><td>対立は主に着手順と必須扱いの強さです。どちらも実操作で合格を確認していません。CSS pxとHIGのptを数値だけで比較していない点は妥当です。</td></tr>
+</tbody></table></div>
+<p>大きく両立しない設計方向は、今回の報告には見当たりません。保存表示や初期状態の重要度には差がありますが、片方だけが扱った論点と、互いに反対した論点は区別する必要があります。</p>
+<details><summary>保存済みの実画面から確認できる例</summary><div class="shots"><p class="meta">[公開保存版では画面画像を省略。元のローカル成果物に保持。]</p><p class="meta">[公開保存版では画面画像を省略。元のローカル成果物に保持。]</p></div></details>
+
+<h2 id="dogfood">shitaeを使って何がよくなったか</h2>
+<p>両方とも、文字・余白・寸法の診断には実画面とCSSが必要だったと報告しています。shitaeで得られた具体的な効果は、表示の所属、寿命、操作後の戻り先を検討・再実行できるようになったことです。</p>
+<div class="table-wrap"><table><thead><tr><th scope="col">検討</th><th scope="col">実際に得られた効果</th><th scope="col">根拠と限界</th></tr></thead><tbody>
+<tr><td>Astra：保存表示</td><td>「A編集→保存→Bへ切替→B編集」の同じ操作列で、共通通知と文書固有状態の差を比較。</td><td>コードと実機で見つけた懸念を、読者が歩ける例にした効果。shitaeによる新規発見とは数えていません。</td></tr>
+<tr><td>Astra・Sol：表示モード</td><td>図だけを表示した後のソース移動には、ソースの再表示が必要だと提案を具体化。</td><td>モデルの戻り先は確認。MonacoのUndo、カーソル、図の視点や実フォーカス保持は製品での検証が必要です。</td></tr>
+<tr><td>Sol：復旧通知</td><td>提案モデルでは比較中も通知とReview入口が残ったため、hideを加え、取消時に通知を戻すよう修正。</td><td>今回作った提案自身の問題の発見。PFDSL現行アプリに同じ不具合があるという主張ではありません。</td></tr>
+<tr><td>Sol：文書なし</td><td>現状と提案で、NoDocument時に見える部品集合と保存操作の違いを確認。</td><td>現行問題の根拠はwebとcode。モデルは改善案の関係を検討する道具です。</td></tr>
+</tbody></table></div>
+<p><strong>負担も共通していました。</strong>両者とも、包含部品に書いた裸のgoto(##variant)が字句上の部品ではなくアクティブ画面を変える点を誤解し、修正しています。仕様どおりの意味であり、この作者の誤り自体を言語の不具合とは扱いません。静的検査の通過だけでは意図どおりのモデルとは言えない、という実例です。</p>
+<p>Astraは2文書を有限例として扱い、Solは代表文書・表示モード・復旧を別モデルに分けました。Solは空の末端部品にW103が30・31・9件残ることを明示し、Astraの3モデルはcheck診断0件でした。モデルの大きさと記述方法が異なるため、警告件数だけで品質を順位付けしません。</p>
+<p>shitaeなしの対照群や、時間・利用者成績の比較はありません。確認できたのは設計の具体化と提案モデルの修正であり、設計時間の短縮率や製品品質の向上率ではありません。</p>
+<p class="sources"><span>Astraの効果レポート・モデル [参照資料はこの保存版に未収録]</span><span>Solの効果レポート [参照資料はこの保存版に未収録]</span><span>Solのモデル一覧 [参照資料はこの保存版に未収録]</span></p>
+
+<h2 id="features">shitae改善候補の統合</h2>
+<div class="table-wrap"><table><thead><tr><th scope="col">候補</th><th scope="col">発見・確認</th><th scope="col">親の推奨</th></tr></thead><tbody>
+<tr><td>CLIの出力完全性</td><td>共通。pipe捕捉ではexit 0のまま65,536 bytesでHTMLが切断。通常ファイルへの出力は完全。CLIはstdout.write直後にprocess.exit(0)。</td><td>最初に修正を検討。切断は再現記録あり。非同期出力完了前の終了という原因候補は、修正前後のテストで確定させる必要があります。</td></tr>
+<tr><td>inline部品の子要素の表示</td><td>Astra固有。inlineでは名称だけ、名前付きcomponentでは子が表示される最小再現。extractがinline内容を保持せずref:nullへ変換するコードも確認。</td><td>既に書ける表現の可視化を修復する候補。レイアウト記法や禁止されたinline入れ子の追加は不要です。</td></tr>
+<tr><td>aliasを使うmember gateの解決</td><td>Sol固有。同じbodyのdiagram: DiagramViewに対するdiagram.graph?が未解決になり、gateが常時有効になる記録。SPECのalias優先解決と、extract・判定処理を親も照合。</td><td>既存の参照解決の修正候補として先に扱う。ラフな未定義参照のalways-onを一律に禁止する提案には広げません。</td></tr>
+<tr><td>シナリオの保存・再生</td><td>共通。ログ・巻戻し・ghost・simconfigは既存。操作列、条件選択、モデル版をまとめて引き継ぐ手段が不足。</td><td>新機能の有力候補。既存ログを利用し、モデルhashと選択した分岐を保存する小さな補助機能から検討。</td></tr>
+<tr><td>参照先と現在状態の説明</td><td>Astraは操作前のreceiver表示、Solは包含階層の解決済み部品・variant表示を提案。</td><td>両案を組み合わせる余地があります。任意の詳細表示で、どこを変え、今どうなっているかを読めるようにする案。</td></tr>
+<tr><td>AIガイド・警告の扱い</td><td>Sol固有。AI_GUIDEのsingleton / setへの入口不足、意図した空の葉のW103が多い負担。</td><td>ガイド補完を先に検討。警告の一律非表示や新しいleaf型は、必要性を追加の実例で見極める。</td></tr>
+</tbody></table></div>
+<p>AstraのMermaid補助ビュー案は低優先の選択肢として残せます。現在の遷移図がsetによる状態変更を描かないことと、遷移マップ自体が存在しないことは異なります。</p>
+<p>今回の実使用からは、まず生成・表示・参照解決の信頼性を整える方が有効そうです。寸法・色・CSS・実ファイルI/OをDSLへ追加する根拠は得られていません。修正・issue作成はこの比較では行っていません。</p>
+<p class="sources"><span>Astraの改善メモ [参照資料はこの保存版に未収録]</span><span>Solの改善メモ [参照資料はこの保存版に未収録]</span></p>
+
+<h2 id="next">改善着手への推奨</h2>
+<p>私の推奨は、次の順で改善案を具体的な画面へ落とすことです。必須範囲の違いは原報告に残し、ここでは両者の根拠を使った着手案として整理します。</p>
+<ol><li><strong>作業領域を取り戻す。</strong>幅指定の競合を直すことを入口に、調整できる分割と表示切替を具体化する。ソースと図の往復、編集履歴、図の視点を保つ。</li><li><strong>文書の識別と状態を一貫させる。</strong>保存結果の対象、現在の未保存状態、同名文書の区別、文書なしの操作条件を一緒に扱う。AstraとSolの固有の観察を統合する部分。</li><li><strong>macOSの操作入口を接続する。</strong>メニュー、ショートカット、ボタン、フォーカスを既存の文書サービスへそろえる。</li><li><strong>視覚上の階層を具体的な画面案で比較する。</strong>文書情報、頻用操作、表示操作、診断・補助表示のまとまりを設計し、広い画面と狭い画面で検討する。文字・余白・整列はこの段階で実画面の見え方を確かめる。</li></ol>
+<p>文字拡大、キーボード、VoiceOver、IME、コントラストの未確認は、改善後に品質を判定する際の残件として引き継ぎます。shitaeの操作モデルと実画面の評価を併用します。</p>
+<div class="callout"><p><strong>レビューの成果と残る距離：</strong>今回の報告は、主作業を妨げる問題の根拠と改善方向を用意できています。一方、比較できる完成画面案や、改善後の可読性・初見利用者の評価はまだありません。この二つのレビューだけで「良い完成デザインができた」とは判断しません。</p></div>
+
+<h2 id="evidence">親が確認したこと・まだ確認していないこと</h2>
+<p>両チャットの完了、両worktreeの同一HEADと未変更状態、原報告、モデル検査記録、生成完全性とpipe切断の記録を読み取りました。pfdslの幅指定・previewへのクラス追加・タブ切替と保存status、shitaeのCLI終了・inline抽出・alias gateの抽出と判定、対応するSPECを一次コードで照合しました。</p>
+<p>また、保存表示のnative画像・操作記録、空状態のweb画像、Fileメニューの記録、1280px幅の測定値を確認しました。親自身は今回アプリを再操作したり、CLIの再現を再実行したりしていません。子の保存記録と一次コードの照合であり、追加のnative受入や修正後の因果検証ではありません。</p>
+<p>Astraはnativeで編集・保存・タブ切替などを観察していますがOpenの再操作は未完了です。Solは短い文書のnative入力・診断復帰・未保存確認を観察し、保存・外部変更などは未受入です。両方とも大規模文書、VoiceOver、IMEなどの受入が残っています。</p>
+<p class="sources"><a href="astra/evidence/manifest.json">Astraの版・検証範囲</a><span>Astraのモデル検査 [参照資料はこの保存版に未収録]</span><a href="sol/validation.md">Solの検証記録</a></p>
+<p class="meta">モデルの一般比較・ランキングではありません。今回は同じ依頼から得られた具体的な成果物を比較しました。原報告と子チャットの成果物は変更していません。</p>
+<p class="meta">会話履歴を引き継がない別agentが原報告・保存証拠・一次コードを照合し、修正が必要な不整合は見つかりませんでした。実アプリの再操作や因果検証ではありません。<span>独立監査の記録 [参照資料はこの保存版に未収録]</span>。</p>
+<p class="meta">この比較資料は本文・ローカルリンクの検査を実施しました。file: URLのブラウザプレビューはセキュリティポリシーで拒否され、レンダリング結果は未確認です。</p>
+</main></body></html>
