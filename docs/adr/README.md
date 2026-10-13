@@ -12,6 +12,8 @@
 
 ## 一覧
 
+- **ADR-0047** [agent 操作を有限の判定表で決める](0047-agent-operation-decision-table.md) — 操作先と責務の取り違えを防ぎ、通常動線を維持する。ADR-0044・ADR-0046 の関連 hook 条項を部分置換し、判定表と性質1〜8を契約とする。
+
 - **ADR-0045** [依存閉包を共有し、編集の拒否を影響する関係に絞る](0045-dependency-closure-and-scoped-edit-gates.md) — check は全依存を検査し、rename/delete は具体的に壊れうる group 継承・変更後 boundary だけを依存側の拒否対象にする。
 
 - **ADR-0038** [retro-patterns を事例記録へ移す](0038-retro-case-migration.md) — 対策の抽出・自動選別を終了し、再発防止を既存の操作手順・入力・道具・テストが所有する。検索できる証拠と毎サイクルの retro、独立レビューを維持する。

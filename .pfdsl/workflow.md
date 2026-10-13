@@ -57,8 +57,11 @@ pre-commitを経由しないref操作の保護と、repo policyのロード失�
 
 **worktree での git 操作**: `git commit` など git コマンドは worktree ディレクトリを指して実行する（理由は `.pfdsl/bindings/pfd-ops.md`「ワークサイクルの追加手順」の「手順 2 の追加で worktree 上の変更を検証する」が一次情報）。
 **worktree のパスはシェル変数に入れず literal で書く**。
-`scripts/main-commit-guard.mjs`（#777。deny / ask の割り当ては CLAUDE.md「コミット粒度」節が一次情報）の command target 解決は静的解析なので `git -C $W commit` の `$W` を解決できず、fail closed して deny する。
-`git -C /workspace/.claude/worktrees/<name> commit` と literal で書けば target が解決される。session の root と一致するか、同一 repository の sibling で native 所有者を確認できれば own として判定する（ADR-0046）。native 所有証拠を確認できなければ Claude Code では ask、Codex では deny を維持する。cwd への移動だけで所有者と判断しない。main/default branch と検査回避は own でも保護する。
+`scripts/agent-operation-guard.mjs` の実行先解決は ADR-0047 に従い、先頭の literal cd の AND-list と literal git -C に限定する。
+pushd・popd と Git target 環境変数・CDPATH の名前への書込みが同じ命令文字列にあれば、変更系 Git は unresolved とする。literal な shell -c・eval の文字列も同じ規則で分類し、shell の状態を追跡しない。
+Codex の変更系 Git は `git -C <絶対パス>`、apply_patch は絶対パスを既定とする。
+所有は session の起点と ADR-0046 の native 所有証拠で判定し、other-live・other-unowned の変更は全主体 deny とする。
+main/default branch と検査回避は own でも保護する。
 なお deny は Bash 呼び出し全体を止めるため、`git -C $W add … && git -C $W commit …` が弾かれたときは add も実行されていない。
 
 ## develop のレビュー
@@ -91,7 +94,8 @@ pre-commitを経由しないref操作の保護と、repo policyのロード失�
 レビューは、実装時の会話・推論を引き継がない別 agent に依頼する。要件・最終差分・必要な一次資料を渡し、実装側の結論や採用理由を先に与えない。
 レビュー担当は一次資料から目的と scope を確かめ、指定一覧を探索範囲の上限にしない。差分と関係する消費者を読み、正常・失敗・非該当の入力で主張の反証を試みる。測った版と条件が最終成果へ適用できるかも確認する。自己レビューは準備として行い、別文脈のレビューの代替にしない。
 観点1・2は最終差分の別 agent 1本で覆ってよい。観点3が発火する場合は、結論を知らない別 agent に解答を含まないツリーを渡して独立に設計させ、その後に最終差分の reviewer が採用理由と実装を確認する。観点4が発火する場合は変更意図を知らない別 agent にシナリオを渡す。観点を agent 数へ機械的に一対一対応させず、各観点の独立性を保つ。
-指摘は根拠となる箇所と failure scenario を添えて返し、実装側が一次資料で確認して対応する。リテラルや特殊ケースの分類を既存の宣言・データから導く指摘を採用する前には、「分類の循環を確認する」へ戻る。各観点の状態、確認範囲・根拠・未確認、未解決の指摘を PR 本文に記録する。
+指摘は根拠となる箇所と failure scenario を添えて返し、実装側が一次資料で確認して対応する。リテラルや特殊ケースの分類を既存の宣言・データから導く指摘を採用する前には、「分類の循環を確認する」へ戻る。
+hook・guard の判定への指摘は、修正の前に ADR-0047 の採否基準で仕分ける。対応する入力の literal な誤読は直し、対応範囲を増やす提案は所有者が決め、保証外と検出回避の敵対的な入力は理由を返信して閉じる。作用の網羅を契約にして指摘を順に直した PR #1413 は、91 commits まで広がって収束しなかった。各観点の状態、確認範囲・根拠・未確認、未解決の指摘を PR 本文に記録する。
 
 使える手段を観点とブリーフ要件に合わせて選ぶ。`/simplify` は固定4角度で品質を探すが、correctness を明示的に探さないため観点2を兼ねない。`/code-review` は観点2の要件を実際に満たせる範囲で使い、不足する反証・消費者探索は別のレビューで補う。観点4には成果物とシナリオだけを渡した agent、または領域に対応する専用 skill を使う。
 `code-reviewer` agent を Agent tool で起動するには `pr-review-toolkit` / `feature-dev` plugin のいずれかが必要である。起動可否は harness と plugin の版に依存するため、過去の記録でなくその回の実体を確認する。`/code-review` の `disable-model-invocation` は2026-07-28時点で `false` だった。
@@ -332,10 +336,11 @@ release runner の `migration-guide` ゲートが CLI/plugin の公開で確か�
 
 **vscode-extension を変更した場合**: `pnpm --filter @pfdsl/vscode-extension typecheck` を実行してエラーがないことを確認してからコミットする。`noUncheckedIndexedAccess` / `exactOptionalPropertyTypes` の strict 設定により、他パッケージの型変更が vscode-extension 側でエラーを起こす場合がある。vscode-extension の挙動変更全体を実動作確認の対象とする。クリック・ホバー等の UI 挙動変更（DocumentLinkProvider・HoverProvider 等）や preview/export の描画内容変更（statusStyles・tag・group 解決ロジック等）はその例である。挙動変更を含む場合は `/vscode-ext-debug` スキルで PR 作成前にビルド後の実動作を確認し、ユーザーの確認結果を受け取るまで完了とみなさない。
 
-## subagent へ worktree 作成を委譲する場合の安全確認
+## subagent の worktree 隔離の安全確認
 
 一般形は `.pfdsl/bindings/pfd-ops.md`「ワークサイクルの追加手順」の「適用点 3 と 3 層制御で実装を委譲し外向き操作を制御する」にある「委譲先の外向き操作の制御」の 1（agent の選択）が一次情報。
-このリポで再利用判定を持つ手順は `superpowers:using-git-worktrees` skill の Step 0（既存 isolation 検出時は再利用）で、バイパスを明記する先は `.claude/agents/` の agent 定義（例: `.claude/agents/issue-worker.md`）。
+このリポの `issue-worker` は呼び出し元が native の worktree 隔離で起動し、割り当てた root と所有証拠を確認する。
+手順の正本は `.claude/agents/issue-worker.md` であり、agent 自身が手動で作成した worktree を所有扱いに変えない。
 乗っ取りが実際に起きたのは issue #439 の issue-worker 試走で、呼び出し元ブランチは無傷で復旧できたが、一歩間違えば作業中のコミット履歴を破壊しかねなかった。
 
 ## workflow.pfdsl に登録する agent の範囲
@@ -365,11 +370,14 @@ repo scope の agent（`ci-triage` 等、このリポの開発都合の道具）
 
 **1. agent の選択。** 実装だけを委譲するなら `pfd-implementer`（`tools:` に `mcp__github__*` を含まない）。
 `general-purpose` は `tools: *` で GitHub MCP を丸ごと持つので、実装委譲には使わない。
-worktree 作成から PR 作成までを一気通貫でやらせる場合のみ `issue-worker` を使う。
+呼び出し元が native の worktree 隔離で起動し、PR 作成までを一気通貫でやらせる場合のみ `issue-worker` を使う。
 `pfd-implementer.md` は `gen_plugin` が plugin へミラーする配布物でもあるため、リポ固有の agent 名・スクリプトパスを本文に書かない。
 
-**2. PreToolUse hook。** 実装は `scripts/delegation-guard.mjs`、allowlist は `scripts/lib/delegation-guard.mjs` の `DEFAULT_ALLOWED_AGENTS`。
+**2. PreToolUse hook。** 実装は `scripts/agent-operation-guard.mjs`、allowlist は `scripts/lib/agent-operation-table.mjs` の `DEFAULT_ALLOWED_AGENTS`。
 `settings.json` の `permissions.deny` を使わないのは、プロジェクト全体に効いて呼び出し元と `issue-worker` まで巻き込むため。
+表に無い入力の形は U（書換え案内付き deny）となり、Git common dir の `pfdsl/agent-operation-unresolved.jsonl` に記録される。
+U が通常作業を止めた回と、#1404 の受入を進める回は、`node scripts/agent-operation-unresolved-report.mjs` で理由と option の件数を集計し、頻出する形を option 表へ加えるかを所有者に諮る。
+レビュー指摘から自動で表を広げない（ADR-0047「保証外と回復先」の採否基準）。
 
 **3. 戻り時の検出。** 汎用手順のまま（`git log origin/<branch>..HEAD` と open PR 一覧の突合）。このリポ固有の追加値はない。
 
@@ -377,7 +385,8 @@ worktree 作成から PR 作成までを一気通貫でやらせる場合のみ 
 
 一般形は上の「workflow.pfdsl に登録する agent の範囲」と同じく、pfd-ops の `references/work-cycle.md`「成果物の門番」が一次情報。
 このリポでの適用対象は `.claude/settings.json` に配線された hook 全般（PreToolUse ガードと PostToolUse advisory の双方）で、登録先は対象 artifact の分類と producer 関係を記録する `workflow.pfdsl`。
-登録しない側に当たるのは `command-usage-guard` / `closes-create-guard` / `roadmap-publish-guard` / `verification-tree-guard` / `worktree-write-guard` 等で、いずれも個別事故への対処であって図のプロセスの出力ではない。
+登録しない側に当たるのは `command-usage-guard` / `closes-create-guard` / `roadmap-publish-guard` / `verification-tree-guard` 等で、いずれも個別事故への対処であって図のプロセスの出力ではない。
+`agent-operation-guard` は既存の委譲と作業先の保護責務を統合し、図に登録した2つの責務の実装先を共有する。
 
 artifact 登録済みの一覧とそれぞれの要求元は `workflow.pfdsl` の artifact 定義と各 artifact の producer 関係が一次情報。`node packages/cli/dist/cli.js graph neighbors .pfdsl/workflow.pfdsl <hook artifact ID>` で対象 hook artifact の producer を引き、artifact 定義を参照する。
 PostToolUse advisory であっても、要求元の手順を名指しできれば登録側になる。advisory か guard かは判定軸ではなく、要求元の手順を名指しできるかどうかで判定する。

@@ -10,7 +10,7 @@ import {
 	writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { afterEach, describe, it } from "node:test";
 import { fileURLToPath } from "node:url";
 import {
@@ -18,6 +18,7 @@ import {
 	isSetupCurrent,
 	writeSetupMarker,
 } from "../setup-completion.mjs";
+import { shellParserPath } from "./shell-parser-tool.mjs";
 
 const fixtures = [];
 const shim = readFileSync(new URL("../hooks/pre-commit-shim", import.meta.url));
@@ -63,6 +64,26 @@ function fixture() {
 	symlinkSync(
 		"../../generated/skills/pfdsl",
 		join(root, ".claude/skills/pfdsl"),
+	);
+	for (const file of [
+		"scripts/setup-shell-parser.mjs",
+		"scripts/lib/shell-parser-tool.mjs",
+		"scripts/lib/cli-entrypoint.mjs",
+	]) {
+		mkdirSync(dirname(join(root, file)), { recursive: true });
+		writeFileSync(
+			join(root, file),
+			readFileSync(new URL(`../../${file}`, import.meta.url)),
+		);
+	}
+	const parser = shellParserPath(root);
+	mkdirSync(dirname(parser), { recursive: true });
+	writeFileSync(
+		parser,
+		readFileSync(
+			shellParserPath(fileURLToPath(new URL("../../", import.meta.url))),
+		),
+		{ mode: 0o755 },
 	);
 	writeSetupMarker(root);
 	return { root, env, git };

@@ -24,7 +24,7 @@ function wiringByCommand() {
 		for (const group of groups) {
 			for (const hook of group.hooks ?? []) {
 				const events = wiring.get(hook.command) ?? [];
-				events.push(`${event}[${group.matcher ?? "*"}]`);
+				if (!events.includes(event)) events.push(event);
 				wiring.set(hook.command, events);
 			}
 		}
@@ -33,6 +33,35 @@ function wiringByCommand() {
 }
 
 describe(".claude/settings.json hook wiring", () => {
+	it("wires the operation entry exactly once for Bash, files and GitHub MCP in both harnesses", () => {
+		for (const file of [".claude/settings.json", ".codex/hooks.json"]) {
+			const settings = JSON.parse(readFileSync(resolve(root, file), "utf8"));
+			for (const tool of [
+				"Bash",
+				"Edit",
+				"Write",
+				"apply_patch",
+				"mcp__github__merge_pull_request",
+				"mcp__plugin_github_github__create_issue",
+				"mcp__codex_apps__github_create_issue",
+			]) {
+				const matching = settings.hooks.PreToolUse.filter((group) =>
+					new RegExp(`^(?:${group.matcher})$`).test(tool),
+				).flatMap((group) => group.hooks);
+				assert.equal(
+					matching.filter(
+						(hook) => hook.command === "node scripts/agent-operation-guard.mjs",
+					).length,
+					1,
+					`${file}: ${tool}`,
+				);
+			}
+			assert.equal(
+				JSON.stringify(settings.hooks).includes("main-commit-guard"),
+				false,
+			);
+		}
+	});
 	it("ships the managed issue reminder without inferring commits from commands", () => {
 		const hooks = JSON.parse(
 			readFileSync(resolve(root, "hooks/hooks.json"), "utf8"),

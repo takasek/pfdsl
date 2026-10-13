@@ -29,13 +29,9 @@
 // nothing else — and unlike C there is no case where dropping the body silently
 // is what was wanted.
 
-import {
-	splitSegments,
-	stripLeadingNoise,
-	tokenize,
-} from "./delegation-guard.mjs";
 import { parseGhCommand } from "./gh-command.mjs";
 import { buildPermissionOutput, parseHookPayload } from "./hook-io.mjs";
+import { readShell } from "./shell-commands.mjs";
 
 /** `@pfdsl/cli`, optionally with a version spec. */
 const PUBLISHED_CLI_SPEC = /^@pfdsl\/cli(@.+)?$/;
@@ -52,9 +48,9 @@ const VIEW_GROUPS = new Set(["issue", "pr"]);
  * @returns {Array<Array<{value: string, quoted: boolean}>>}
  */
 function commandSegments(command) {
-	return splitSegments(command).map((segment) =>
-		stripLeadingNoise(tokenize(segment)),
-	);
+	const shell = readShell(command);
+	if (shell.error) return [];
+	return shell.commands.map((node) => node.tokens.slice(node.executableIndex));
 }
 
 /**
@@ -141,7 +137,7 @@ export function evaluateCommandUsageGuard(payload) {
 
 /**
  * Orchestrates the hook's stdin payload into a print-or-not decision, the way
- * runDelegationGuard does (#645): the wrapper script is not unit-testable, so
+ * the other content guards do: the wrapper script is not unit-testable, so
  * nothing that can be decided belongs there. Malformed JSON produces no output
  * — a crash in this guard must not wedge every Bash call.
  * @param {string} inputText raw stdin payload

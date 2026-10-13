@@ -12,7 +12,7 @@
 // fixed list of verification verbs" but "does this command's target tree
 // depend on cwd" — a command that names its tree explicitly (`-C <path>`, an
 // absolute script path) is unaffected by drift and is excluded regardless of
-// what the command does. worktree-write-guard.mjs closes the equivalent gap
+// what the command does. agent-operation-guard.mjs closes the equivalent gap
 // for Edit/Write; this closes it for commands whose tree is cwd-implicit.
 //
 // Claude Code asks rather than denies: a deliberate check of the main checkout
@@ -37,12 +37,8 @@
 // that registration. Explicit syntax avoids cwd drift in this guard only;
 // it does not override ownership, main-checkout, or trusted-root checks.
 
-import {
-	splitSegments,
-	stripLeadingNoise,
-	tokenize,
-} from "./delegation-guard.mjs";
 import { buildPermissionOutput, parseHookPayload } from "./hook-io.mjs";
+import { readShell } from "./shell-commands.mjs";
 
 /** `-C`/`--directory` forms that make `make`'s cwd explicit, so drift cannot
  * affect it. */
@@ -155,8 +151,8 @@ function isVerificationNode(rest) {
 }
 
 /** Whether one already-split segment is a verification command. */
-function isVerificationSegment(segment) {
-	const tokens = stripLeadingNoise(tokenize(segment));
+function isVerificationSegment(node) {
+	const tokens = node.tokens.slice(node.executableIndex);
 	if (tokens.length === 0) return false;
 	const head = tokens[0];
 	if (head.quoted) return false;
@@ -185,9 +181,11 @@ function isVerificationSegment(segment) {
  */
 export function findVerificationSegments(command) {
 	if (typeof command !== "string" || command.trim() === "") return [];
-	return splitSegments(command)
-		.filter((segment) => isVerificationSegment(segment))
-		.map((segment) => segment.trim());
+	const shell = readShell(command);
+	if (shell.error) return [];
+	return shell.commands
+		.filter(isVerificationSegment)
+		.map((node) => node.command.trim());
 }
 
 function verificationRiskReason(mainRoot) {

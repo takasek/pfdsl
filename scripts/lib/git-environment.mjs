@@ -9,7 +9,7 @@
  * stay clear of the generic `run(file, args)` (scripts/lib/check-script-imports.mjs).
  */
 
-const GIT_TARGET_ENVIRONMENT_VARIABLES = [
+export const GIT_TARGET_ENVIRONMENT_VARIABLES = Object.freeze([
 	"GIT_DIR",
 	"GIT_WORK_TREE",
 	"GIT_INDEX_FILE",
@@ -17,7 +17,7 @@ const GIT_TARGET_ENVIRONMENT_VARIABLES = [
 	"GIT_OBJECT_DIRECTORY",
 	"GIT_ALTERNATE_OBJECT_DIRECTORIES",
 	"GIT_NAMESPACE",
-];
+]);
 
 /** Copy an environment without variables that redirect Git's repository state. */
 export function withoutGitTargetEnvironment(environment = process.env) {

@@ -18,13 +18,9 @@
 // human should make in the moment, not a hard stop with no path through.
 
 import { hasExemptionDeclaration } from "./closes-reference.mjs";
-import {
-	splitSegments,
-	stripLeadingNoise,
-	tokenize,
-} from "./delegation-guard.mjs";
 import { flagValues, parseGhCommand } from "./gh-command.mjs";
 import { buildPermissionOutput, parseHookPayload } from "./hook-io.mjs";
+import { readShell } from "./shell-commands.mjs";
 
 /**
  * Closing-keyword token evidence: local/qualified issue numbers or issue URLs.
@@ -78,8 +74,10 @@ export function evaluateClosesCreateGuard(
 	if (typeof command !== "string" || command.trim() === "")
 		return { decision: "allow" };
 
-	for (const segment of splitSegments(command)) {
-		const tokens = stripLeadingNoise(tokenize(segment));
+	const shell = readShell(command);
+	if (shell.error) return { decision: "allow" };
+	for (const node of shell.commands) {
+		const tokens = node.tokens.slice(node.executableIndex);
 		const parsed = parseGhCommand(tokens);
 		if (!parsed || parsed.group !== "pr" || parsed.verb !== "create") continue;
 

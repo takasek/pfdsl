@@ -27,12 +27,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node scripts/delegation-guard.mjs",
-            "timeout": 10
-          },
-          {
-            "type": "command",
-            "command": "node scripts/main-commit-guard.mjs",
+            "command": "node scripts/agent-operation-guard.mjs",
             "timeout": 10
           },
           {
@@ -53,11 +48,11 @@
         ]
       },
       {
-        "matcher": "Edit|Write",
+        "matcher": "Edit|Write|apply_patch",
         "hooks": [
           {
             "type": "command",
-            "command": "node scripts/worktree-write-guard.mjs",
+            "command": "node scripts/agent-operation-guard.mjs",
             "timeout": 10
           },
           {
@@ -68,6 +63,16 @@
           {
             "type": "command",
             "command": "node scripts/generated-root-instructions-guard.mjs",
+            "timeout": 10
+          }
+        ]
+      },
+      {
+        "matcher": "mcp__.*github.*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node scripts/agent-operation-guard.mjs",
             "timeout": 10
           }
         ]
