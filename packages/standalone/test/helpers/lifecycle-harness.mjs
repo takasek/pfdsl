@@ -333,6 +333,10 @@ export async function createHarness(label) {
 			return () => {};
 		};
 		globalThis.nativeInvoke = async (command, args) => {
+			if (command === "document_capabilities")
+				return handlers.capabilities
+					? handlers.capabilities()
+					: { save: true, reason: null };
 			if (command === "list_recent") return [];
 			if (command === "remember_document" || command === "release_document")
 				return;
@@ -469,6 +473,7 @@ export async function createHarness(label) {
 					tab: owner,
 					seq: tick(),
 					name: args.name,
+					allowSave: args.allowSave,
 					textAtRequest: owner?.getSource(),
 					decision: undefined,
 					decidedSeq: undefined,
@@ -487,7 +492,7 @@ export async function createHarness(label) {
 		await import(`${pathToFileURL(output).href}?cell=${++cellSerial}`);
 		await flush();
 		const query = (selector) => dom.window.document.querySelector(selector);
-		const busy = () => query("#save").disabled;
+		const busy = () => globalThis.reviewBusy();
 		const settle = async () => {
 			for (let i = 0; i < 60; i++) {
 				await flush();

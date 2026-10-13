@@ -25,6 +25,51 @@ const tabs = document.querySelector<HTMLElement>("#tabs")!;
 const documents = document.querySelector<HTMLElement>("#documents")!;
 const conflicts = document.querySelector<HTMLElement>("#conflicts")!;
 const native = "__TAURI_INTERNALS__" in window;
+let saveCapability = {
+	save: false,
+	reason: native
+		? "Checking document saving support…"
+		: "Use the desktop application to save files.",
+};
+const saveSupport = document.querySelector<HTMLElement>("#save-support")!;
+function updateSaveControls() {
+	for (const selector of ["#save", "#save-as"]) {
+		const button = document.querySelector<HTMLButtonElement>(selector)!;
+		button.disabled = busy || !saveCapability.save;
+		button.title = saveCapability.reason;
+	}
+	saveSupport.textContent = saveCapability.reason;
+}
+async function loadSaveCapability() {
+	const previousReason = saveCapability.reason;
+	try {
+		const capability = await invoke<{ save: boolean; reason: string | null }>(
+			"document_capabilities",
+		);
+		if (
+			typeof capability?.save !== "boolean" ||
+			(!capability.save &&
+				(typeof capability.reason !== "string" || !capability.reason.trim()))
+		) {
+			throw new Error("Invalid document saving capability");
+		}
+		saveCapability = {
+			save: capability.save,
+			reason: capability.save ? "" : capability.reason!,
+		};
+	} catch (error) {
+		saveCapability = {
+			save: false,
+			reason: `Could not determine document saving support: ${String(error)}. Saving is disabled.`,
+		};
+	}
+	if (status.textContent === previousReason)
+		status.textContent = saveCapability.save
+			? "Document saving is available."
+			: saveCapability.reason;
+	updateSaveControls();
+	renderConflict();
+}
 interface Entry {
 	tab: DocumentTab;
 	session: DocumentSession;
@@ -111,6 +156,7 @@ function run(action: () => Promise<unknown>) {
 				"header button, #files button, #recent button, .close-document",
 			))
 				button.disabled = false;
+			updateSaveControls();
 			if (active) label(active);
 			renderConflict();
 		});
@@ -318,7 +364,10 @@ async function saveEntry(
 	observed = false,
 	confirmation?: OperationPlan,
 ): Promise<boolean> {
-	if (!native) throw new Error("Use the desktop application to save files.");
+	if (!saveCapability.save) {
+		status.textContent = saveCapability.reason;
+		return false;
+	}
 	const session = entry.session;
 	const checkConfirmation = () => {
 		if (confirmation && !session.holds(confirmation, "editor")) {
@@ -452,7 +501,7 @@ let renderedEntry: Entry | undefined;
 let renderedState = "";
 function renderConflict() {
 	const panel = active?.session.panel() ?? null;
-	const state = active ? JSON.stringify(panel) : "";
+	const state = active ? JSON.stringify([panel, saveCapability.save]) : "";
 	if (active === renderedEntry && state === renderedState) return;
 	renderedEntry = active;
 	renderedState = state;
@@ -476,10 +525,13 @@ function renderConflict() {
 		conflicts.append(preview);
 		const replace = document.createElement("button");
 		replace.textContent = "Review and Save Here…";
-		replace.disabled = !observed;
+		replace.disabled = !observed || !saveCapability.save;
+		replace.title = saveCapability.reason;
 		replace.onclick = () => run(() => saveEntry(entry, false, true));
 		const another = document.createElement("button");
 		another.textContent = "Save As…";
+		another.disabled = !saveCapability.save;
+		another.title = saveCapability.reason;
 		another.onclick = () => run(() => saveEntry(entry, true));
 		const use = document.createElement("button");
 		use.textContent = "Use Current Disk Version…";
@@ -566,6 +618,7 @@ async function closeEntries(entries: Entry[]) {
 		async (entry) =>
 			invoke<"save" | "discard" | "cancel">("confirm_close_document", {
 				name: entry.name,
+				allowSave: saveCapability.save,
 			}),
 		(entry, plan) => saveEntry(entry, false, false, plan),
 		dispose,
@@ -626,7 +679,9 @@ openDocument(
 	"---\ntitle: 日本語のフロー\nartifact:\n  input:\n    label: 入力\n  output:\n    label: 成果物\nprocess:\n  build:\n    label: 作成する\n---\ninput >> build -> output\n",
 	null,
 );
+updateSaveControls();
 if (native) {
+	void loadSaveCapability();
 	void refreshRecent().catch(report);
 	void verifyNativeCorpus()
 		.then(async (entry) => {

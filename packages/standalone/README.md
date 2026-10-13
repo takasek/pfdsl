@@ -236,7 +236,14 @@ Publication can succeed before a later conflict or read error is reported; inspe
 The guarantee ends at the final pre-save check: an external write after that check can be overwritten, and later writes through an old file descriptor are not recovered.
 Deliberate manipulation of the application's exclusive temporary names is outside this guarantee.
 This is not an atomic compare-and-swap, backup history, crash-recovery, or power-loss durability guarantee.
-Save publication on other operating systems is currently refused; it never falls back to unconditional overwrite.
+On other operating systems, Save and Save As are disabled before opening a save dialog, with a persistent explanation.
+Saving remains disabled while native support is being checked or if that check fails; shortcuts and recovery actions follow the same rule.
+Native save requests and save-target selection are also refused before creating or writing a temporary file.
+Dirty close offers Discard and Cancel when saving is unavailable; Cancel retains the editor content.
+The native document I/O boundary selects the macOS backend or an explicit read-only backend at compile time.
+The read-only backend verifies the originally selected directory path and refuses inspection if that path is moved or replaced; it does not follow directory moves.
+Its opaque revision token includes file identity, modification time and content hash, with an explicit unsupported protection marker; it does not detect protection-metadata changes.
+Linux saving remains a separate product decision; Windows is outside the supported build targets.
 
 The #1258 document-editing candidate remains under validation.
 Existing-file saving keeps the FD obtained by exclusive stage creation and copies metadata with the operating system's `fcopyfile` facility.

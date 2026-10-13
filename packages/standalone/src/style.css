@@ -172,3 +172,11 @@ dialog textarea {
 	justify-content: flex-end;
 	gap: 8px;
 }
+
+#save-support {
+	margin: 0;
+	padding: 0.4rem 0.75rem;
+}
+#save-support:empty {
+	display: none;
+}
