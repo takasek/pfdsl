@@ -1,0 +1,13 @@
+{
+	"final_files": {
+		"a.pfdsl": "b600d838a5bfdab93190b46b64d70e308bcfdc20000f510cc8b239a238be2093",
+		"external.pfdsl": "1447553983de9795806e041cad00fea5bdbd09130b924ab8e88bae4fe0b6ddc6",
+		"b.pfdsl": "692e6e91581c868d6359aa6296be2fdc6036b2fd7431838ed857e57495d5d129",
+		"parent-moved/move.pfdsl": "576d03913fd482b3886512f3688ac2301ae15b61626dcdf0193d670787cf2527"
+	},
+	"normal_exit": 0,
+	"stdout_stderr_bytes": 0,
+	"outer_checks_before_after": 14,
+	"inner_checks_before_after": 304,
+	"pfdsldesktop_window_inventory_after_exit": []
+}
