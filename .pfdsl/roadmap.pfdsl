@@ -155,11 +155,6 @@ artifact:
     status: wip
     criteria: "エディタでのノード選択とホバー内の周辺グラフでのノードクリックのどちらでも、移動先のノードだけが短時間強調される。連続選択で古い強調が残らず、再描画だけでは点滅せず、動きを減らす設定を尊重する"
     location: ../packages/
-  standalone_foundation:
-    label: 両ホストで利用するアプリ共通基盤
-    status: done
-    criteria: VS Code と製品用 Tauri アプリが共通処理で同じサンプルを解析・描画し、Mac の起動・日本語入力・再描画を確認済み。全機能の受入対応表に後続工程と検証方法が割り当てられている
-    location: ../packages/standalone/
   standalone_documents:
     label: 安全に編集・保存できる文書アプリ
     status: done
@@ -213,9 +208,6 @@ process:
   i1432_prevent_multiple_producer_connection:
     label: 別 producer を増やす output 接続を防止する
     location: https://github.com/takasek/pfdsl/issues/1432
-  i1258_build_standalone_documents:
-    label: 文書の安全な編集・保存を完成させる
-    location: https://github.com/takasek/pfdsl/issues/1258
   i1259_build_standalone_pfd_features:
     label: PFD 編集・閲覧機能を両版で揃える
     location: https://github.com/takasek/pfdsl/issues/1259
@@ -260,8 +252,6 @@ group_node_clash_diagnostic >> publish_cli_group_node_clash -> cli_release_group
 [def_insertion, editor_connector, toolchain] >> i1352_i1282_i1283_i1284_i483_improve_preview -> [hover_local_graph, node_definition_creation, node_location_cycle, preview_connector, preview_editing_usability, preview_focus_cue]
 
 preview_connector >> i1432_prevent_multiple_producer_connection -> connector_single_producer_guard
-
-standalone_foundation >> i1258_build_standalone_documents -> standalone_documents
 
 standalone_documents >> i1259_build_standalone_pfd_features -> standalone_pfd_features
 
