@@ -4,7 +4,7 @@ import { readFileSync } from "node:fs";
 import { test } from "node:test";
 import { AGENT_OPERATION_INPUT_FORMS } from "./agent-operation-input-forms.mjs";
 
-test("option representation retains every pre-compaction name, arity, count and role", () => {
+test("option representation retains the authorized name, arity, count and role snapshot", () => {
 	const snapshot = JSON.parse(
 		readFileSync(
 			new URL(

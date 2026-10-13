@@ -610,6 +610,13 @@ function gitOperation(command, context, facts) {
 				),
 			);
 			if (created) changedRefs = [created];
+			else if (["--track", "-t"].some((flag) => flags.has(flag)))
+				changedRefs = changedRefs.map((ref) => ({
+					...ref,
+					value: ref.value
+						.replace(/^refs\/remotes\//, "")
+						.replace(/^[^/]+\//, ""),
+				}));
 		}
 		if (
 			(sub.value === "switch" || sub.value === "checkout") &&

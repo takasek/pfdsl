@@ -116,6 +116,51 @@ function example(
 // Every row of the specification's acceptance pairs has a named normal case
 // and, where present, its independently specified safety case.
 export const AGENT_OPERATION_CORPUS = [
+	...["switch", "checkout"].map((verb) =>
+		example(
+			`review-1437-C-full-remote-${verb}`,
+			`git -C ${own} ${verb} --track refs/remotes/origin/main`,
+			"deny",
+			{ classes: ["D"] },
+		),
+	),
+	...["claude-parent", "codex-parent"].flatMap((subject) =>
+		["switch", "checkout"].flatMap((verb) =>
+			["--track", "-t"].flatMap((track) =>
+				[
+					["implicit-main", "origin/main", [], "deny", "D"],
+					["implicit-feature", "origin/topic", [], "allow", "B"],
+					[
+						"explicit-topic",
+						"origin/main",
+						[verb === "switch" ? "-c" : "-b", "topic"],
+						"allow",
+						"B",
+					],
+					[
+						"explicit-main",
+						"origin/topic",
+						[verb === "switch" ? "-c" : "-b", "main"],
+						"deny",
+						"D",
+					],
+				].map(([name, branch, create, expected, klass]) =>
+					example(
+						`review-1437-C-${subject}-${verb}-${track === "-t" ? "short" : "long"}-${name}`,
+						`git -C ${own} ${verb} ${track} ${create.join(" ")} ${branch}`,
+						expected,
+						{ subject, classes: [klass] },
+					),
+				),
+			),
+		),
+	),
+	example(
+		"review-1437-C-nested-local-name",
+		`git -C ${own} switch --track origin/feat/busy`,
+		"deny",
+		{ target: "other-live", classes: ["B"] },
+	),
 	...["claude-parent", "codex-parent"].flatMap((subject) =>
 		[
 			["claude-native", `${primary}/.claude/worktrees/trial`, "allow"],
