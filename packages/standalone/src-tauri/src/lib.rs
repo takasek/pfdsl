@@ -107,6 +107,10 @@ pub fn run() {
         .build(tauri::generate_context!())
         .expect("Could not start PFDSL")
         .run(|app, event| {
+            if matches!(event, tauri::RunEvent::Ready) && std::env::var("PFDSL_STARTUP_SMOKE").as_deref() == Ok("1") {
+                // Setup has already installed the native exit guard; this is not frontend or GUI acceptance.
+                println!("PFDSL_NATIVE_STARTUP_READY");
+            }
             if let tauri::RunEvent::ExitRequested { api, .. } = event {
                 if !app.state::<exit_gate::ExitGate>().take_approval() {
                     api.prevent_exit();

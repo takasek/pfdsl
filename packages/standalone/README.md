@@ -19,7 +19,8 @@ pnpm --filter @pfdsl/standalone tauri build --bundles app
 
 Rust/Cargo, Xcode command-line tools, and the repository's Node/pnpm prerequisites are developer build requirements.
 They are separate from the eventual installation requirements for distributed users.
-The macOS CI job compiles an Apple Silicon app and runs native unit tests; it does not certify GUI or IME behavior.
+The macOS CI job compiles an Apple Silicon app, runs native unit tests, and briefly starts the bundled executable to check native startup and exit-guard installation.
+The startup smoke does not certify GUI, IME, or Quit interaction.
 
 ## Linux verification
 

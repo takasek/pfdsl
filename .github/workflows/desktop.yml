@@ -202,3 +202,7 @@ jobs:
       # Native unit tests run on the runner architecture; this compiles the Apple Silicon app.
       # Neither check substitutes for the GUI/IME acceptance on a real Apple Silicon Mac.
       - run: pnpm --filter @pfdsl/standalone tauri build --target aarch64-apple-darwin --bundles app
+      - name: Smoke bundled native startup and exit guard
+        run: >-
+          node scripts/standalone-startup-smoke.mjs
+          packages/standalone/src-tauri/target/aarch64-apple-darwin/release/bundle/macos/PFDSL.app/Contents/MacOS/pfdsl-desktop
