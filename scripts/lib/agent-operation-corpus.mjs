@@ -116,6 +116,54 @@ function example(
 // Every row of the specification's acceptance pairs has a named normal case
 // and, where present, its independently specified safety case.
 export const AGENT_OPERATION_CORPUS = [
+	...["claude-parent", "codex-parent"].flatMap((subject) =>
+		[
+			["claude-native", `${primary}/.claude/worktrees/trial`, "allow"],
+			["dot-native", `${primary}/.worktrees/trial`, "allow"],
+			["ordinary-primary", `${primary}/packages/trial`, "deny"],
+			["primary-root", primary, "deny"],
+			["claude-prefix", `${primary}/.claude/worktrees-extra/trial`, "deny"],
+			["dot-prefix", `${primary}/.worktrees-extra/trial`, "deny"],
+			["native-container", `${primary}/.worktrees`, "deny"],
+		].map(([name, path, expected]) =>
+			example(
+				`review-1437-A-${subject}-${name}`,
+				`git -C ${own} worktree add ${path} feat/new`,
+				expected,
+				{ subject },
+			),
+		),
+	),
+	example(
+		"review-1437-A-native-nested-linked",
+		`git -C ${own} worktree add ${primary}/.worktrees/existing/nested feat/new`,
+		"deny",
+		{
+			facts: {
+				worktrees: [
+					...corpusFacts().worktrees,
+					{
+						root: `${primary}/.worktrees/existing`,
+						commonDir,
+						branch: "feat/other",
+						ownership: { ownerId: "other", live: true },
+					},
+				],
+			},
+		},
+	),
+	example(
+		"review-1437-A-native-symlink-outside",
+		`git -C ${own} worktree add ${primary}/.worktrees/link/trial feat/new`,
+		"deny",
+		{
+			facts: {
+				physicalPaths: {
+					[`${primary}/.worktrees/link`]: `${primary}/packages`,
+				},
+			},
+		},
+	),
 	example(
 		"frequent-switch-qc-default",
 		`git -C ${own} switch -qc main`,

@@ -668,6 +668,17 @@ function gitOperation(command, context, facts) {
 			const nested =
 				["other-live", "other-unowned"].includes(target.target) &&
 				target.executionPath !== target.tree?.root;
+			const nativePrimaryDestination =
+				target.target === "primary" &&
+				[".claude/worktrees", ".worktrees"].some((directory) => {
+					const container = resolve(target.tree.root, directory);
+					return (
+						target.executionPath !== container &&
+						under(target.executionPath, container)
+					);
+				});
+			const protectedPrimary =
+				target.target === "primary" && !nativePrimaryDestination;
 			creation = operation(
 				[
 					nested
@@ -682,7 +693,7 @@ function gitOperation(command, context, facts) {
 				{
 					...target,
 					target:
-						nested || target.target === "unresolved"
+						nested || protectedPrimary || target.target === "unresolved"
 							? target.target
 							: "scratch",
 				},
