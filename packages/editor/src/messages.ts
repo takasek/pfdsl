@@ -31,7 +31,13 @@ export type MessageToWebview =
 	| { type: "focus"; nodeId: string }
 	| { type: "clearFocus" }
 	| { type: "diff"; report: DiffReport }
-	| { type: "clearDiff" };
+	| { type: "clearDiff" }
+	| {
+			type: "editResult";
+			request: PreviewEditRequest;
+			ok: boolean;
+			message?: string;
+	  };
 
 export type MessageFromWebview =
 	| PreviewEditRequest

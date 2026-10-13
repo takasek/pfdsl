@@ -1,0 +1,84 @@
+Window: "PFDSL Design Review 01a1339d", App: PFDSL Design Review 01a1339d.
+0 standard window PFDSL Design Review 01a1339d, Secondary Actions: Raise
+	1 container
+		2 scroll area
+			3 HTML content Description: PFDSL, URL: tauri://localhost
+				4 container
+					5 text PFDSL
+					6 button New
+					7 button Open file…
+					8 button Open folder…
+					9 button Save
+					10 button Save As…
+					11 button Format flows
+					12 button Format flat
+					13 button Normalized edges
+					14 text Saved.
+				15 container
+					16 heading Recent, Value: 2
+						17 text Recent
+					18 container Recent targets
+						19 button [local artifact: native-a.pfdsl], Help: [local artifact: [local] artifact: native-a.pfdsl]
+					20 heading Folder files, Value: 2
+						21 text Folder files
+					22 container PFD files
+					23 container Documents
+						24 tab (selected) Welcome •
+						25 button Close Welcome
+					26 editor (settable) Editor content, Value: [editor: Editor content]
+						27 text (settable) ---
+title: Review fixture
+---
+idea >> design -> plan
+plan >> publish -> release
+
+					28 container Diagram view
+						29 button Zoom out
+						30 container Zoom level
+							31 text 100%
+						32 button Zoom in
+						33 button Fit
+						34 button 100%
+						35 button (expanded) Node actions, Secondary Actions: Collapse
+						36 button (collapsed) Help, Secondary Actions: Expand
+					37 container
+						38 text Review fixture
+						39 button Node design. Enter for Node actions.
+						40 button Node plan. Enter for Node actions.
+						41 button Node idea. Enter for Node actions.
+						42 button Node publish. Enter for Node actions.
+						43 button Node release. Enter for Node actions.
+					44 container
+						45 text Review fixture design plan idea publish release
+					46 container Node actions
+						47 text process: design
+						48 button Close
+						49 button Create definition
+						50 container
+							51 text Connection (arrow direction)
+							52 pop up button (collapsed) Connection (arrow direction), Value: design -> …, Secondary Actions: Expand
+								53 menu Secondary Actions: Cancel
+							54 text Existing node
+							55 pop up button (expanded) Existing node, Value: New node ID…, Secondary Actions: Collapse
+								56 menu Secondary Actions: Cancel
+							57 text release is already produced by publish. Adding design would create multiple producers (V001). Target node ID
+							58 text field (settable) Target node ID
+							59 button Add connection
+		60 menu Secondary Actions: Cancel
+			61 (selected) New node ID…
+			62 idea
+			63 plan
+			64 (disabled) release — release is already produced by publish. Adding design would create multiple producers (V001).
+	65 close button
+	66 full screen button Help: this button also has an action to zoom the window, Secondary Actions: zoom the window
+	67 minimize button
+	68 text PFDSL Design Review 01a1339d
+69 menu bar
+	70 PFDSL Design Review 01a1339d
+	71 File
+	72 Edit
+	73 View
+	74 Window
+	75 Help
+
+The focused UI element is 55 pop up button (expanded) Existing node, Value: New node ID…, Secondary Actions: Collapse
