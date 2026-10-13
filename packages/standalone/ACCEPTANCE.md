@@ -738,3 +738,33 @@ source `cd3b078107cf023a61ad14732dec842c83cf4439` の公式 Tauri debug build（
 項目6は手順書の `stat -f '%Lp'` が所有者のシェルの GNU stat ではファイルシステム情報の表示になったため、所有者が作成した `newfile.pfdsl` と Save As で作成した `g2.pfdsl` を `/usr/bin/stat -f '%Lp'` で確認し、ともに `644`（所有者のシェルの umask は `022`）だった。
 読取失敗と復旧の時機・確認中の編集・同 binding の別 capability・rebind 後の計画は自動検査の証拠であり、この実機受入で網羅的に操作したものではない。
 容量不足（ENOSPC）・異なる owner・複雑な ACL・最低 macOS は引き続き未実測である。
+
+## 2026-10-13 — output 接続の単一 producer 制約（#1432）
+
+#483 の既存接続 UI の受入とは分け、共有 editor の実装 `7a939f06` に追加した拒否動作を確認した。
+候補表示と適用直前は authored source の正規化 output edge を使い、別 process の producer を増やす場合だけ拒否する。
+input / feedback、既存 V001 と無関係な接続、本文の自由編集はこの制約では拒否しない。
+同じ edge の重複は別判定であり、Node actions は従来どおり拒否する。
+
+所有者には両ホストの `connections.pfdsl` で、output 候補の理由付き選択不可、ID 入力の拒否後の入力・本文保持、有効な `fresh` 接続と単一 Undo/Redo の3点を提示し、「全部いけた」と回答を受けた。
+VS Code の追加確認では最初に `other >> compile` が追加されており、これは許可対象の input だった。
+所有者が Connection の `compile -> …` 表示を確認して再操作し、「あー、成功した」と回答した。
+同時点の実 UI でも `other` の入力保持、`review` を既存 producer とする V001 拒否理由、`compile -> other` が本文に追加されていないことを確認した。
+
+独立した native の体験レビューでは、キーボードからの Node actions、process 側の output 拒否、artifact 側から新規 process を追加する拒否、input / feedback / 有効 output の単一 Undo/Redo と再描画、定義作成から label 編集への移動を確認した。
+この native 観測後に変更したのは、error 再描画が先行した場合のフォーム・拒否応答の保持経路であり、観測した通常操作の結果は再利用した。
+最終 source `7a939f06` の公式 Tauri debug app build は成功したが、この記録は署名・公証済み配布版、Linux の実機、全エラー輸送順序の native 受入を示さない。
+
+全体 `make test` は成功し、独立レビュー修正後の editor 全295件と、standalone の拒否・文書寿命・両ホスト表示一致の6件も成功した。
+editor / standalone / VS Code の型検査と変更ファイルの Biome 検査は成功した。
+両端・新規 process・引用 ID・本文のみの ID・第三 producer・種別切替・stale source を回帰検査し、拒否時の本文・dirty・Undo 境界・入力を確認した。
+非同期 source 確認中に error 再描画が先行すると入力を失う P2 を独立レビューで再現し、専用テストの Red、修正後の Green、独立再レビューで解消を確認した。
+この応答順序は共有 DOM の自動検査と独立再現で確認した。
+実ホスト輸送での順序は未確認である。
+
+旧 VS Code コマンドは同じ producer 判定を使い、候補の description と ID 入力にも理由を示す。
+QuickPick の候補は Node actions の disabled option と異なり、拒否理由を示して候補選択へ戻る。
+既存の同一 edge に対する Add anyway 契約は保持する。
+旧コマンドの候補・直接入力・stale source の自動検査5件は成功した。
+実 UI の旧コマンド操作は CUA のキー操作が反映されず、座標操作も `noWindowsAvailable` で停止した。
+所有者が本文の compile を対象に旧コマンドの output と other を選び、「理由が出て拒否、本文は変わらない」と回答したため、この実 UI 受入は所有者の結果を根拠にする。
