@@ -229,7 +229,7 @@ describe("check-commit-subjects workflow", () => {
 						},
 					},
 					{
-						uses: "actions/setup-node@820762786026740c76f36085b0efc47a31fe5020",
+						uses: "actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1",
 						with: { "node-version": 24 },
 					},
 					{
@@ -327,7 +327,7 @@ describe("check-commit-subjects workflow", () => {
 		assert.equal(lint.run.trim().replace(/\\\n/g, " ").split("\n").length, 1);
 		assert.deepEqual(steps.map((s) => s.uses).filter(Boolean), [
 			"actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
-			"actions/setup-node@820762786026740c76f36085b0efc47a31fe5020",
+			"actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1",
 		]);
 		assert.ok(
 			["ubuntu-latest", "ubuntu-24.04", "ubuntu-22.04"].includes(
