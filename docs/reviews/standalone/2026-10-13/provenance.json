@@ -1,0 +1,82 @@
+{
+  "evaluationDate": "2026-10-13",
+  "pfdslEvaluatedCommit": "83701fb03e7846fe9582a3ae3b685d624f681902",
+  "shitaeEvaluatedCommit": "a3ebaedbd5d452c99093a949bbaf94508da43ab4",
+  "sources": [
+    {
+      "source": "astra/evidence/02-native-file-menu.txt",
+      "originalSourceFile": "02-native-file-menu.txt",
+      "originalSha256": "7c3a98ab2a5095038a79db340b57f93660d8e9bbfc4d1c4ff23c82a31d03853d"
+    },
+    {
+      "source": "astra/evidence/03-native-view-menu.txt",
+      "originalSourceFile": "03-native-view-menu.txt",
+      "originalSha256": "7c3a98ab2a5095038a79db340b57f93660d8e9bbfc4d1c4ff23c82a31d03853d"
+    },
+    {
+      "source": "astra/evidence/06-native-missing.txt",
+      "originalSourceFile": "06-native-missing.txt",
+      "originalSha256": "af1a5715feab86a19bdc0385091df29452e33ce5217191100b3d1524e0c22d24"
+    },
+    {
+      "source": "astra/evidence/07-native-status-other-tab.txt",
+      "originalSourceFile": "07-native-status-other-tab.txt",
+      "originalSha256": "969beb3a560da108e30f66c7ef43638684ff65f65b67467015ca331dd9e08498"
+    },
+    {
+      "source": "astra/evidence/09-native-producer-options.txt",
+      "originalSourceFile": "09-native-producer-options.txt",
+      "originalSha256": "411e0dc887a7d8b45a3ac982d95e2eb8d0d684c8c90038a978b17af595ac8611"
+    },
+    {
+      "source": "astra/evidence/13-browser-measurement.json",
+      "originalSourceFile": "13-browser-measurement.json",
+      "originalSha256": "18e20fd3ee08172586a2e4bad95c1b7ed2f8bc58eb8bfd1942542633462eaf91"
+    },
+    {
+      "source": "astra/evidence/23-native-file-menu-full.txt",
+      "originalSourceFile": "23-native-file-menu-full.txt",
+      "originalSha256": "1b3b8d94185e585ae052ab5ed84a9052e6137428d1a4c5845e315d43833c3d47"
+    },
+    {
+      "source": "sol/evidence/web-1280-layout.json",
+      "originalSourceFile": "web-1280-layout.json",
+      "originalSha256": "8fc8baee9faa0f80a72e292b646dfd47618ad31059ecb28d6323cef5c7c719a9"
+    },
+    {
+      "source": "sol/evidence/native-large-graph.ax.txt",
+      "originalSourceFile": "native-large-graph.ax.txt",
+      "originalSha256": "14c3390497bd1ef48fd1f379a41b493a7f8e099a0eab1eca083658ba82ac4b66"
+    },
+    {
+      "source": "astra/evidence/manifest.json",
+      "originalSourceFile": "manifest.json",
+      "originalSha256": "ade0d00adbf1ab0190404da1567ebdbb99158c7f90521c167ff53ba5a70fae18"
+    },
+    {
+      "source": "astra/review.html",
+      "originalSourceFile": "index.html",
+      "originalSha256": "f9484e703be1c5ba7d11ef04eeb26eaa7776637d40004de902d5e3a8c59b9a74"
+    },
+    {
+      "source": "astra/report.css",
+      "originalSourceFile": "report.css",
+      "originalSha256": "79d138f79d00d73df3f2f21bbfd5c1f54725436cd77db2bcccb60d729b397078"
+    },
+    {
+      "source": "sol/review.md",
+      "originalSourceFile": "review.md",
+      "originalSha256": "75e671405c3146ea1af885f784a2bd418ab425da4c518fa7899a7f1656c81a01"
+    },
+    {
+      "source": "sol/validation.md",
+      "originalSourceFile": "validation.md",
+      "originalSha256": "3de0be8264913b9e18b960849889c4eeaf6650df0023f3cba3c926d4393b7011"
+    },
+    {
+      "source": "comparison.html",
+      "originalSourceFile": "standalone-review-comparison.html",
+      "originalSha256": "5e859e7e1f3479cf1b77d1141c440c88916e1046d611c28a1d8cb1f70e5bbc75"
+    }
+  ]
+}

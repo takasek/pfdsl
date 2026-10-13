@@ -1,0 +1,31 @@
+{
+  "date": "2026-10-13",
+  "pfdslCommit": "83701fb03e7846fe9582a3ae3b685d624f681902",
+  "shitaeCommit": "a3ebaedbd5d452c99093a949bbaf94508da43ab4",
+  "os": "ProductName:\t\tmacOS\nProductVersion:\t\t27.0.1\nBuildVersion:\t\t26A434\n",
+  "pfdslStatusPorcelain": "",
+  "shitaeStatusPorcelain": "",
+  "buildConfig": {
+    "productName": "PFDSL Design Review 01a1339d",
+    "identifier": "dev.pfdsl.designreview01a1339d",
+    "app": {
+      "windows": [
+        {
+          "label": "main",
+          "title": "PFDSL Design Review 01a1339d",
+          "width": 1280,
+          "height": 800
+        }
+      ]
+    }
+  },
+  "verificationLimits": [
+    "No full test suite or CI run",
+    "Native file open roundtrip incomplete",
+    "No VoiceOver IME contrast dark-mode large-corpus or other-OS acceptance",
+    "Narrow viewport measured in browser frontend only"
+  ],
+  "sha256": {
+    "nativeDebugExecutable": "5bbf32324a2bf288dbf7544ce7da7490b9a4b1da7be6e14ed36e6c47d3f15d5e"
+  }
+}
