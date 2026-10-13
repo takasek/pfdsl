@@ -5,7 +5,10 @@
 Status: Accepted（実装契約。live の受入は未完了）。
 
 通常の agent（Claude の親・subagent、Codex の親・子）が、操作先と責務を取り違えることを防ぐ。
-敵対者、shell と Git の全構文の網羅、script・alias・eval の内部は対象外とする。
+敵対者、shell と Git の全構文の網羅、script file・alias の内部は対象外とする。
+通常の agent が書かない、検出を避けるための変形は敵対的な入力として対象外とする。
+GraphQL へのコメント挿入や、GIT_CONFIG_* 環境変数による hook の無効化がこれに当たる。
+検査回避は --no-verify・-c core.hooksPath 等の通常の表記で判定する。
 通常の作業動線を止めないことを、保護と同じ重さで守る。
 
 単一入口は scripts/agent-operation-guard.mjs とし、Bash、GitHub MCP、Edit・Write・apply_patch を受ける。
@@ -53,11 +56,13 @@ PR #1413 の旧 ADR-0047 が採った「Git が起こす共有作用の全防止
 | init・clone | 作成先の位置引数 |
 | archive・format-patch の -o | 出力先 |
 | bundle create | file の位置引数 |
-| worktree add | 作成先。作成元の B・D と合成し、own 以外の既存 linked worktree の内部への入れ子だけを拒否する。primary 配下の .claude/worktrees と scratch への作成を許可する |
+| worktree add | 作成先。作成元の B・D と合成する。primary 内部は .claude/worktrees・.worktrees の内部だけを許可し、それ以外は primary として拒否する。own 以外の既存 linked worktree の内部への入れ子は拒否し、scratch への作成を許可する |
 
 この表にない option の出力先、shell のリダイレクト、Git 以外のプログラムの書込み先は保証外とする。
 列挙を追加するかは所有者が決める。
 worktree add の開始点 main は -b topic や --detach と併用できるが、既存の default branch を checkout する形は D とする。
+switch・checkout の --track・-t で作成名を明示しない場合は、remote/name から暗黙に作る local name を branch の対象とし、default branch なら D とする。
+作成名を -c・-b 等で明示した場合はその名前を対象とし、default 以外は B の判定を維持する。
 
 実行先の解決: 命令の先頭から `&&` でつながる literal な `cd <path> &&`（絶対・相対）と、literal な `git -C` を解決する。
 subshell 内の `cd`、`;` や `||` の後の `cd`、条件分岐の中の `cd`、動的な値を含む `cd`・`-C` は、実行先を一意に決められないので unresolved とする。
@@ -197,6 +202,8 @@ Codex version 1 の他者 ownerThreadId だけでは生存を証明しない。
 
 ## 保証外と回復先
 
+- 検出回避を目的とした敵対的な変形。GraphQL のコメント挿入や GIT_CONFIG_* による hook 無効化のために、対応する入力形を増やさない。
+- main を checkout した linked worktree での update-ref HEAD。通常の agent がこの前提を作る switch main は D として拒否するため、この状態での入力は保証外とする。
 - source・dot で読む script file、その他の script file・Git alias の内部。literal な -c・eval の文字列は上の分類の対象とする。
 - 保存済みの remote 設定（mirror、特殊な refspec、include）が引き起こす作用。
 - 同じディレクトリで2つの session を同時に起動した場合（同居）。own の判定は排他的な所有を証明しない。同居の検出は harness のネイティブな隔離（Claude の lock、Codex の managed worktree）に委ねる。
@@ -208,6 +215,9 @@ Git long option の一意接頭辞、短縮 cluster の網羅、Git help から�
 文をまたぐ shell 状態や pushd・popd の cwd 状態機械は持たない。
 checkout されていない他 session の未 push branch の -D による削除と、stash pop が他 session の退避を取り出す残余は受け入れる。
 表に無い入力はセルやクラスを足さず、未決点へ記録し、所有者が採否を決める。
+採否の基準は、対応する通常形の literal な判定引数の誤読か、対応範囲を増やす提案かを分けることである。
+通常の agent の操作先・責務の取り違えへの反例は修正し、検出回避のための敵対的な入力は保証外として扱う。
+新しい形の追加や保証外の変更は、個別の指摘から自動で広げず所有者が決める。
 回復先は同じ agent の書換え、親への返却、人間の terminal の3つとする。
 parser の欠落だけは hook root 固定の完全一致コマンドで回復でき、make setup は例外にしない。
 bootstrap 自体や公式 parser release の取得が故障した場合は、人間の terminal へ返す。
