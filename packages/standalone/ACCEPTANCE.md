@@ -711,3 +711,30 @@ mutation gate は変異ごとに独立したコピーで4,265件を実行し、b
 独立した最終差分レビューとシナリオ検査を実施した。
 `make typecheck` と `make test` は共有 Git hook lock の作成が EPERM で停止した（各 exit 2）。
 この差分の Mac GUI 受入は未実施であり、以前の実機証拠を転写しない。
+
+### 再構成後の全体検査と所有者 Mac 実機受入 — 2026-10-13
+
+上記で Codex の sandbox が停止した全体検査は、呼出し側の通常環境で実行した。
+`4c301d92` で `make typecheck` と `make lint` が成功し、`make test` は14,523件中14,522件成功・1件 skip・失敗0だった。
+後続の `cd3b0781` は変異ゲート helper が共有 CLI 判定を変異コピー内で解決できるようにした変更だけで、その専用テストを個別に再実行して成功し、同 head の mutation gate は baseline の失敗0と全17変異の検出で `gate passed`（exit 0）だった。
+
+source `cd3b078107cf023a61ad14732dec842c83cf4439` の公式 Tauri debug build（arm64）にローカル ad-hoc 署名を付け、`codesign --verify --deep --strict` 成功後の executable SHA-256 は `1bf60f2d278ad10799e8733b038b9f7fdcc5ef621ba8b1a8f615d5cebef05e17` だった。
+正式な署名・公証済み配布版ではない。
+所有者がこの app で次の10項目を操作し、全項目を期待どおりと報告した。
+
+| # | 条件 | 期待 |
+| --- | --- | --- |
+| 1 | 編集中に外部変更、Cmd-S | 読み直した外部版を比較する確認が出て、Replace で editor 本文を保存する |
+| 2 | 編集中に外部削除、タブを閉じて Save | 再作成の確認を経てファイルを作り直し、タブを閉じる |
+| 3 | 未編集で外部変更、すぐ Cmd-S | 確認なしで外部版を再読込し、書き込まない |
+| 4 | touch・chmod の後に編集して Cmd-S | 衝突や確認なしに保存し、変更後の mode を保つ |
+| 5 | Untitled の Cmd-S で既存ファイルを選ぶ | 既存本文を比較する確認を経て保存する |
+| 6 | Save As で新規ファイルを作る | umask 022 で mode 644 |
+| 7 | 未編集タブが読取不能になり、別内容で復旧した後に閉じる | 確認なしで閉じず、Cancel でタブと本文が残る |
+| 8 | 書込み不可フォルダへの Save As 失敗後に元ファイルが外部変更、Cmd-S | 元ファイルを対象に外部版を比較する確認を出し、確認なしに上書きしない |
+| 9 | Save As の後、未保存なしで Cmd-Q | 確認なしで終了する |
+| 10 | 編集中に Cmd-Q して Cancel | 終了せず、タブと本文が残る |
+
+項目6は手順書の `stat -f '%Lp'` が所有者のシェルの GNU stat ではファイルシステム情報の表示になったため、所有者が作成した `newfile.pfdsl` と Save As で作成した `g2.pfdsl` を `/usr/bin/stat -f '%Lp'` で確認し、ともに `644`（所有者のシェルの umask は `022`）だった。
+読取失敗と復旧の時機・確認中の編集・同 binding の別 capability・rebind 後の計画は自動検査の証拠であり、この実機受入で網羅的に操作したものではない。
+容量不足（ENOSPC）・異なる owner・複雑な ACL・最低 macOS は引き続き未実測である。
