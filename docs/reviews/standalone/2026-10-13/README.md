@@ -39,7 +39,7 @@ GitHubではソースを閲覧でき、checkoutしたファイルをブラウザ
 | [Astraの環境記録](astra/evidence/manifest.json) | 評価対象commit、OS、ビルド設定、元の実機debug実行ファイルのハッシュ | 実行ファイル自体と私的なcheckoutパスは未収録 |
 | [AstraのFileメニュー全文](astra/evidence/23-native-file-menu-full.txt) | 実機で観察したFileメニューの内容 | テキスト取得記録であり、キーボードやメニュー操作全体の受入完了ではない |
 | [Astraの初回Fileメニュー取得](astra/evidence/02-native-file-menu.txt)、[Viewメニュー取得](astra/evidence/03-native-view-menu.txt) | アクセシビリティツリーに変化がなかったという通知 | これらの記録にはメニュー内容が含まれていない |
-| [Astraのタブ切替後の状態](astra/evidence/07-native-status-other-tab.txt) | 別の文書を編集しても保存済みメッセージが残る状態 | 利用者の誤読やデータ損失を実証したものではない |
+| [Astraのタブ切替後の状態](astra/evidence/07-native-status-other-tab.txt) | Welcomeを選択した状態で「Saved.」が残ること | Welcomeには未保存ドットがなく、ドットがあるのは非選択の文書。切替先を編集した状態や、利用者の誤読・データ損失を実証したものではない |
 | [Astraのファイル不在時の状態](astra/evidence/06-native-missing.txt) | 一つの観察経路で、バッファと未解決の外部変更状態が保持されたこと | 競合復旧の全経路を受入済みとはしない |
 | [Astraの生成元候補](astra/evidence/09-native-producer-options.txt) | 既存の生成元がある接続候補の無効化 | 実機の保存処理全体の安全性を証明しない |
 | [Astraの領域測定](astra/evidence/13-browser-measurement.json)、[Solの領域測定](sol/evidence/web-1280-layout.json) | 共有フロントエンドをブラウザで表示したときの領域寸法 | CSS pxであり、実機のptや狭幅ウィンドウの受入結果ではない |
@@ -53,6 +53,8 @@ GitHubではソースを閲覧でき、checkoutしたファイルをブラウザ
 スクリーンショット、pipe出力のバイナリ、実行ファイル、ビルドログ、一時スクリプト、提供された参考画像パック、HIG／DocC本文の完全な複製は収録していません。
 AstraのレポートとSolの分析にあるApple HIGの参照は、本文を複製せず公式URLを残しています。
 画像の省略表示だけでは、元の視覚的判断を公開された画像から検証することはできません。
+保存表示について、収録したAX記録はタブ切替後、未収録の元画像`08-native-error.png`はWelcome編集後の状態を示します。
+編集後の記述は元画像に基づくものであり、収録したAX記録だけをその根拠として扱いません。
 
 未収録のローカル資料へのリンクは、省略を明示する注記へ置き換えました。
 `provenance.json`の`originalSourceFile`とSHA256は、加工前の元ファイルを識別する情報です。

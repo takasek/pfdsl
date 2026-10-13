@@ -13,6 +13,7 @@
 <p><a href="https://developer.apple.com/design/human-interface-guidelines/split-views">Apple HIG: Split views</a>のmacOS向けの幅調整・ペイン表示制御と、<a href="https://developer.apple.com/design/human-interface-guidelines/designing-for-macos">Designing for macOS</a>の長時間の作業・調整可能な作業領域を根拠にしています。参考S01 OmniGraffleからは「中央の内容に周辺の操作を従わせる役割分担」、S04 VS Codeからは「並列領域を独立に扱う構造」を学びます。色や固定比率を移植する提案ではありません。</p>
 <h3>2. 「Saved.」の対象と鮮度を明らかにする</h3>
 <p><span class="tag">観測</span>ある文書を保存後、別のWelcomeタブへ移って編集しても、ヘッダーには「Saved.」が残りました。タブの未保存ドットと並ぶため、今の文書が保存済みだと誤読する余地があります。データ消失を確認した指摘ではありません。<a href="evidence/07-native-status-other-tab.txt">別タブへの切替記録</a>、<span>未保存ドットとSaved.の同居 [参照資料はこの保存版に未収録]</span>。</p>
+<p class="meta">根拠の区別：収録したAX記録ではWelcomeが選択され、未保存ドットは非選択の文書にあります。AX記録が示すのはタブ切替後にも「Saved.」が残ることです。上記のWelcome編集後の記述は、元資料の画像<code>08-native-error.png</code>に基づきます。この画像には選択中のWelcomeの未保存ドットと「Saved.」が同居していますが、公開保存版には画像を収録していません。</p>
 <p><span class="tag">実装</span>保存結果は単一のstatusへ書かれます（<a href="https://github.com/takasek/pfdsl/blob/83701fb03e7846fe9582a3ae3b685d624f681902/packages/standalone/src/main.ts#L442">packages/standalone/src/main.ts:442</a>）。タブ切替は表示と競合欄を更新しますがstatusを更新せず（同ファイル89行）、編集時もタブ名の更新です（143行）。</p>
 <p><span class="tag">提案</span>現在の文書名に添えて「Edited」「Saved」「Changed on disk」を表示し、過去の操作結果は「Saved A.pfdsl」の一時通知として区別します。保存処理中に別文書へ移る場合も、結果を元の文書へ帰属させます。エラーや外部変更の操作は対象パスを示し、取消後も編集内容と未解決状態を保持します。</p>
 <p>受入例は「A編集→A保存→Bへ切替→B編集」「同じAを保存後さらに編集」「保存中に切替」「外部変更の確認を取消」です。前2例の帰属の違いは<span>現状モデル [参照資料はこの保存版に未収録]</span>と<span>提案モデル [参照資料はこの保存版に未収録]</span>で比較できます。条件を手動選択する模型であり、実ディスク処理の保証ではありません。</p>
