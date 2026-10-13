@@ -41,7 +41,8 @@ export const previewMarkup = `
   <button id="create-definition" type="button">Create definition</button>
   <form id="connector-form">
     <label>Connection (arrow direction)<select id="connector-kind"></select></label>
-    <label>Existing node<select id="connector-existing"><option value="">New node ID…</option></select></label>
+    <label>Existing node<select id="connector-existing" aria-describedby="connector-unavailable"><option value="">New node ID…</option></select></label>
+    <p id="connector-unavailable" aria-live="polite"></p>
     <label>Target node ID<input id="connector-target" required autocomplete="off"></label>
     <button type="submit">Add connection</button>
   </form>

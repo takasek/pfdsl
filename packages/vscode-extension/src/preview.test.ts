@@ -375,6 +375,31 @@ it("applies source-bound node creation as one WorkspaceEdit and rejects a stale 
 	expect(host.api.workspace.applyEdit).toHaveBeenCalledTimes(1);
 });
 
+it("returns producer refusals and stale refusals to the requesting form without an editor edit", async () => {
+	const { open } = setup();
+	const source = "a >> p -> b\nc >> q -> d\n";
+	const doc = document("producer-refusal", source);
+	const panel = await open(doc);
+	for (const candidateSource of [source, "older"]) {
+		const request = {
+			type: "addConnector" as const,
+			nodeId: "q",
+			source: candidateSource,
+			connector: "->" as const,
+			otherId: "b",
+		};
+		await panel.receive(request);
+		expect(panel.messages.at(-1)).toEqual({
+			type: "editResult",
+			request,
+			ok: false,
+			message: expect.any(String),
+		});
+		expect(doc.getText()).toBe(source);
+		expect(host.api.workspace.applyEdit).not.toHaveBeenCalled();
+	}
+});
+
 it("reveals a local preview connection while preserving preview focus and source selection", async () => {
 	const { open } = setup();
 	let source = "first >> task -> old\na >> p -> b\nlast >> finish -> end\n";
@@ -450,7 +475,9 @@ it("refreshes a preview edit from the replacement document after the source is c
 		otherId: "after_close",
 	});
 	expect(preview.getActivePreviewDoc()).toBe(reopened);
-	expect(panel.messages.at(-1)).toMatchObject({
+	expect(
+		panel.messages.filter((m) => m.type === "render").at(-1),
+	).toMatchObject({
 		type: "render",
 		editing: { source: reopened.getText() },
 	});
@@ -484,7 +511,9 @@ it.each([
 		original.uri,
 	);
 	expect(preview.getActivePreviewDoc()).toBe(current);
-	expect(panel.messages.at(-1)).toMatchObject({
+	expect(
+		panel.messages.filter((m) => m.type === "render").at(-1),
+	).toMatchObject({
 		type: "render",
 		editing: { source: diskSource },
 	});
@@ -525,7 +554,7 @@ it.each([
 	});
 	expect(host.api.workspace.applyEdit).not.toHaveBeenCalled();
 	expect(host.window.showTextDocument).not.toHaveBeenCalled();
-	expect(panel.messages).toHaveLength(1);
+	expect(panel.messages.filter((m) => m.type !== "editResult")).toHaveLength(1);
 	if (state !== "disposed")
 		expect(host.window.showInformationMessage).toHaveBeenCalledWith(
 			"The source document could not be reopened.",

@@ -157,6 +157,37 @@ export function edgeAlreadyExists(
 	);
 }
 
+/** Refuse only a new output edge that would add a different producer. */
+export function outputProducerConflict(
+	edges: readonly NormalizedEdge[],
+	nodeId: string,
+	nodeRole: ConnectorRole,
+	connector: ConnectorKind,
+	otherId: string,
+): string | undefined {
+	if (
+		connector !== "->" ||
+		edgeAlreadyExists(edges, nodeId, nodeRole, connector, otherId)
+	)
+		return undefined;
+	const process = nodeRole === "process" ? nodeId : otherId;
+	const artifact = nodeRole === "artifact" ? nodeId : otherId;
+	const producers = [
+		...new Set(
+			edges
+				.filter(
+					(e) =>
+						e.kind === "output" &&
+						e.artifact === artifact &&
+						e.process !== process,
+				)
+				.map((e) => e.process),
+		),
+	];
+	if (!producers.length) return undefined;
+	return `${formatId(artifact)} is already produced by ${producers.map(formatId).join(", ")}. Adding ${formatId(process)} would create multiple producers (V001).`;
+}
+
 /** The kind an "other node" must have to be a valid endpoint for a given connector choice. */
 export function compatibleOtherKind(nodeRole: ConnectorRole): NodeKind {
 	return nodeRole === "artifact" ? "process" : "artifact";

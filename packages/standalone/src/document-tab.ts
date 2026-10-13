@@ -92,6 +92,12 @@ export function createDocumentTab({
 				const result = applyPreviewEdit(editor.getValue(), message);
 				if (!result.ok) {
 					reportStatus(result.message);
+					void preview.receive({
+						type: "editResult",
+						request: message,
+						ok: false,
+						message: result.message,
+					});
 					return;
 				}
 				const selections = result.selection
@@ -119,6 +125,11 @@ export function createDocumentTab({
 					message.type === "createDefinition" ? selections : undefined,
 				);
 				editor.pushUndoStop();
+				void preview.receive({
+					type: "editResult",
+					request: message,
+					ok: true,
+				});
 				if (result.selection) {
 					editor.revealRangeInCenter(selections![0]!);
 					if (message.type === "createDefinition") editor.focus();

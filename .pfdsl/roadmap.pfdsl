@@ -82,7 +82,7 @@ artifact:
   connector_single_producer_guard:
     label: 別の生成元を増やす接続の事前防止
     description: "既存接続 UI の完了とは分け、output 追加による V001 を理由付きで防止する共有編集制約。要件は issue #1432"
-    status: todo
+    status: wip
     criteria: "両ホストで候補と適用時の判定が一致し、別 producer を増やす output を拒否する。本文・dirty・Undo・入力を保持し、有効な接続と既存不正図の無関係な編集を妨げないことを回帰検査と実 UI で確認する"
     location: https://github.com/takasek/pfdsl/issues/1432
   def_insertion:

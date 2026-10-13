@@ -1,12 +1,14 @@
-import type { DiffReport } from "@pfdsl/core";
+import { analyzeSource, type DiffReport } from "@pfdsl/core";
 import { renderDotToSvg } from "@pfdsl/preview-engine/renderer";
 import {
 	type ConnectorKind,
 	compatibleOtherKind,
 	connectorChoiceLabel,
+	outputProducerConflict,
 } from "./connector-logic.js";
 import { buildDiffPanelHtml } from "./diff-panel.js";
 import type { MessageFromWebview, MessageToWebview } from "./messages.js";
+import { applyPreviewEdit, type PreviewEditRequest } from "./preview-edit.js";
 import { neighborhoodDot, type PreviewGraph } from "./preview-graph.js";
 import { FOCUS_CUE_DURATION_MS, previewMarkup } from "./preview-shell.js";
 import { unwrapAnchors } from "./svg-anchors.js";
@@ -127,10 +129,54 @@ export function mountPreview(container: HTMLElement, host: PreviewHost) {
 		container.querySelector<HTMLInputElement>("#connector-target")!;
 	let actionTarget: string | undefined;
 	let actionSource: string | undefined;
+	let pendingConnector:
+		| Extract<PreviewEditRequest, { type: "addConnector" }>
+		| undefined;
+	const addConnection = container.querySelector<HTMLButtonElement>(
+		'#connector-form button[type="submit"]',
+	)!;
+	const actionError = container.querySelector<HTMLElement>(
+		"#node-actions-error",
+	)!;
+	function updateConnectorCandidates() {
+		if (!actionTarget || actionSource === undefined || !editingData) return;
+		const model = analyzeSource(actionSource);
+		const kind = model.nodeKinds.get(actionTarget);
+		if (kind !== "artifact" && kind !== "process") return;
+		const previous = connectorExisting.value;
+		connectorExisting.replaceChildren();
+		const newOption = document.createElement("option");
+		newOption.value = "";
+		newOption.textContent = "New node ID…";
+		connectorExisting.append(newOption);
+		const reasons: string[] = [];
+		for (const other of editingData.nodes.filter(
+			(n) => n.id !== actionTarget && n.kind === compatibleOtherKind(kind),
+		)) {
+			const reason = outputProducerConflict(
+				model.edges,
+				actionTarget,
+				kind,
+				connectorKind.value as ConnectorKind,
+				other.id,
+			);
+			const option = document.createElement("option");
+			option.value = other.id;
+			option.textContent = reason ? `${other.id} — ${reason}` : other.id;
+			option.disabled = !!reason;
+			if (reason) reasons.push(reason);
+			connectorExisting.append(option);
+		}
+		connectorExisting.value = previous;
+		container.querySelector("#connector-unavailable")!.textContent =
+			reasons.join(" ");
+	}
 	function closeActions() {
 		actions.hidden = true;
 		actionsToggle.setAttribute("aria-expanded", "false");
 		actionTarget = actionSource = undefined;
+		pendingConnector = undefined;
+		addConnection.disabled = false;
 	}
 	function openActions(id: string) {
 		if (graphRevision !== revision) return;
@@ -149,19 +195,10 @@ export function mountPreview(container: HTMLElement, host: PreviewHost) {
 			option.textContent = connectorChoiceLabel(id, node.kind, connector);
 			connectorKind.append(option);
 		}
-		connectorExisting.replaceChildren();
-		const newOption = document.createElement("option");
-		newOption.value = "";
-		newOption.textContent = "New node ID…";
-		connectorExisting.append(newOption);
-		for (const other of editingData.nodes.filter(
-			(n) => n.id !== id && n.kind === compatibleOtherKind(node.kind),
-		)) {
-			const option = document.createElement("option");
-			option.value = other.id;
-			option.textContent = other.id;
-			connectorExisting.append(option);
-		}
+		pendingConnector = undefined;
+		addConnection.disabled = false;
+		connectorExisting.value = "";
+		updateConnectorCandidates();
 		connectorTarget.value = "";
 		actions.hidden = false;
 		actionsToggle.setAttribute("aria-expanded", "true");
@@ -187,18 +224,38 @@ export function mountPreview(container: HTMLElement, host: PreviewHost) {
 	on(connectorExisting, "change", () => {
 		connectorTarget.value = connectorExisting.value;
 	});
+	on(connectorKind, "change", () => {
+		updateConnectorCandidates();
+		actionError.textContent = "";
+	});
 	on(container.querySelector("#connector-form")!, "submit", (e) => {
 		e.preventDefault();
-		if (!actionTarget || actionSource === undefined) return;
-		const message: MessageFromWebview = {
+		if (!actionTarget || actionSource === undefined || pendingConnector) return;
+		if (!editingData) {
+			actionError.textContent =
+				"The preview is unavailable. Fix its diagnostics and reopen Node actions.";
+			connectorTarget.focus();
+			return;
+		}
+		const message: Extract<PreviewEditRequest, { type: "addConnector" }> = {
 			type: "addConnector",
 			nodeId: actionTarget,
 			source: actionSource,
 			connector: connectorKind.value as ConnectorKind,
 			otherId: connectorTarget.value,
 		};
-		closeActions();
-		actionsToggle.focus({ preventScroll: true });
+		const result = applyPreviewEdit(
+			editingData?.source ?? actionSource,
+			message,
+		);
+		if (!result.ok) {
+			actionError.textContent = result.message;
+			connectorTarget.focus();
+			return;
+		}
+		actionError.textContent = "";
+		pendingConnector = message;
+		addConnection.disabled = true;
 		host.postMessage(message);
 	});
 	on(root, "contextmenu", (e) => {
@@ -761,7 +818,10 @@ export function mountPreview(container: HTMLElement, host: PreviewHost) {
 		selectedNodeId = pendingFocusNodeId = undefined;
 		lastFocusedNodeId = undefined;
 		hideHover();
-		closeActions();
+		if (actions.hidden) closeActions();
+		else
+			actionError.textContent =
+				"The preview is unavailable. Fix its diagnostics and reopen Node actions.";
 		clearCue();
 		editingData = undefined;
 		graphData = undefined;
@@ -778,6 +838,29 @@ export function mountPreview(container: HTMLElement, host: PreviewHost) {
 
 	async function receive(msg: MessageToWebview) {
 		if (disposed) return;
+		if (msg.type === "editResult") {
+			const request = msg.request;
+			if (
+				!pendingConnector ||
+				request.type !== "addConnector" ||
+				request.nodeId !== pendingConnector.nodeId ||
+				request.source !== pendingConnector.source ||
+				request.connector !== pendingConnector.connector ||
+				request.otherId !== pendingConnector.otherId
+			)
+				return;
+			pendingConnector = undefined;
+			addConnection.disabled = false;
+			if (msg.ok) {
+				closeActions();
+				actionsToggle.focus({ preventScroll: true });
+			} else {
+				actionError.textContent =
+					msg.message ?? "The connection could not be applied.";
+				connectorTarget.focus();
+			}
+			return;
+		}
 		const currentRevision =
 			msg.type === "render" || msg.type === "error" ? ++revision : revision;
 		if (msg.type === "error") {
@@ -807,7 +890,9 @@ export function mountPreview(container: HTMLElement, host: PreviewHost) {
 		if (msg.type !== "render") return;
 		hoverSvgs.clear();
 		hideHover();
-		closeActions();
+		if (!actions.hidden && msg.editing?.source !== actionSource)
+			actionError.textContent =
+				"The document changed. Reopen Node actions and try again.";
 		clearCue();
 		// The cursor hint supplied while opening must not displace the initial Fit.
 		if (hasPositioned && msg.focusNodeId !== undefined) {
