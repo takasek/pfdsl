@@ -3,7 +3,7 @@ use std::path::{Path, PathBuf};
 
 pub struct Folder {
     pub path: PathBuf,
-    directory: Dir,
+    pub(crate) directory: Dir,
 }
 
 impl Folder {

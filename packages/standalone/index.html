@@ -2,8 +2,8 @@
 <html lang="en">
 <head><meta charset="UTF-8" /><meta name="viewport" content="width=device-width, initial-scale=1.0" /><title>PFDSL</title></head>
 <body>
-<header><strong>PFDSL</strong><button type="button" id="open">Open folder…</button><button type="button" id="format">Format</button><span id="status" role="status">Changes stay in this window.</span></header>
-<main><aside><nav id="files" aria-label="PFD files"></nav></aside><section id="workspace"><nav id="tabs" aria-label="Documents"></nav><div id="documents"></div></section></main>
+<header><strong>PFDSL</strong><button type="button" id="new">New</button><button type="button" id="open-file">Open file…</button><button type="button" id="open">Open folder…</button><button type="button" id="save">Save</button><button type="button" id="save-as">Save As…</button><button type="button" id="format">Format flows</button><button type="button" id="format-flat">Format flat</button><button type="button" id="normalize">Normalized edges</button><span id="status" role="status">Save documents explicitly.</span></header>
+<main><aside><h2>Recent</h2><nav id="recent" aria-label="Recent targets"></nav><h2>Folder files</h2><nav id="files" aria-label="PFD files"></nav></aside><section id="workspace"><nav id="tabs" aria-label="Documents"></nav><div id="documents"></div><section id="conflicts" aria-label="Disk versions"></section></section></main>
 <script type="module" src="/src/main.ts"></script>
 </body>
 </html>
