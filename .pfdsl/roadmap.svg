@@ -64,13 +64,13 @@
 <g id="node5" class="node">
 <title>connector_single_producer_guard</title>
 <g id="a_node5"><a xlink:href="https://github.com/takasek/pfdsl/issues/1432" xlink:title="別の生成元を増やす接続の事前防止&#10;&#10;既存接続 UI の完了とは分け、output 追加による V001 を理由付きで防止する共有編集制約。要件は issue #1432&#10;criteria: 両ホストで候補と適用時の判定が一致し、別 producer を増やす output を拒否する。本文・dirty・Undo・入力を保持し、有効な接続と既存不正図の無関係な編集を妨げないことを回帰検査と実 UI で確認する&#10;location: https://github.com/takasek/pfdsl/issues/1432">
-<polygon fill="#f8f9fa" stroke="black" stroke-width="2" points="2282.22,-604.2 2037.42,-604.2 2037.42,-545.8 2282.22,-545.8 2282.22,-604.2"/>
+<polygon fill="#d4edda" stroke="black" stroke-width="2" points="2282.22,-604.2 2037.42,-604.2 2037.42,-545.8 2282.22,-545.8 2282.22,-604.2"/>
 <text xml:space="preserve" text-anchor="middle" x="2159.82" y="-587.6" font-family="Times,serif" font-size="14.00">connector_single_producer_guard</text>
 <text xml:space="preserve" text-anchor="middle" x="2159.82" y="-570.8" font-family="Times,serif" font-size="14.00">別の生成元を増やす</text>
 <text xml:space="preserve" text-anchor="middle" x="2159.82" y="-554" font-family="Times,serif" font-size="14.00">接続の事前防止</text>
 </a>
 </g>
-<text xml:space="preserve" text-anchor="middle" x="2024.98" y="-533.2" font-family="Times,serif" font-size="14.00">todo</text>
+<text xml:space="preserve" text-anchor="middle" x="2023.82" y="-533.2" font-family="Times,serif" font-size="14.00">done</text>
 </g>
 <!-- def_insertion -->
 <g id="node6" class="node">
