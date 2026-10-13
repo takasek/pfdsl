@@ -220,7 +220,6 @@ fn close_decision(decision: MessageDialogResult, can_save: bool) -> &'static str
     match decision {
         MessageDialogResult::Yes if can_save => "save",
         MessageDialogResult::No if can_save => "discard",
-        MessageDialogResult::Ok if !(can_save) => "discard",
         MessageDialogResult::Custom(ref choice) if choice == "Save" && can_save => "save",
         MessageDialogResult::Custom(ref choice) if choice == "Discard" => "discard",
         _ => "cancel",
@@ -231,7 +230,7 @@ fn close_prompt(name: &str, capability: native_directory::Capabilities, allow_sa
     let (message, buttons) = if capability.save && allow_save {
         (format!("Save changes to {name}?"), MessageDialogButtons::YesNoCancelCustom("Save".into(), "Discard".into(), "Cancel".into()))
     } else {
-        (format!("{} Discard changes to {name}? Choose Cancel to keep editing.", capability.reason.unwrap_or("Document saving support could not be confirmed.")), MessageDialogButtons::OkCancelCustom("Discard".into(), "Cancel".into()))
+        (format!("{} Discard changes to {name}? Choose Keep Editing or Cancel to retain the editor content.", capability.reason.unwrap_or("Document saving support could not be confirmed.")), MessageDialogButtons::YesNoCancelCustom("Keep Editing".into(), "Discard".into(), "Cancel".into()))
     };
     (message, buttons)
 }
@@ -300,10 +299,22 @@ mod document_capability_tests {
     assert!(matches!(buttons, MessageDialogButtons::YesNoCancelCustom(_, _, _)));
     assert!(message.contains("Save changes"));
    } else {
-    match buttons { MessageDialogButtons::OkCancelCustom(discard, cancel) => { assert_eq!(discard, "Discard"); assert_eq!(cancel, "Cancel"); }, _ => panic!("Save must not be offered") }
+    match buttons { MessageDialogButtons::YesNoCancelCustom(keep, discard, cancel) => { assert_eq!(keep, "Keep Editing", "Return must retain unsaved content"); assert_eq!(discard, "Discard"); assert_eq!(cancel, "Cancel", "dismissal must retain unsaved content"); }, _ => panic!("Save must not be offered") }
     assert!(message.contains("Discard changes"));
     assert!(message.contains(if native_save { "could not be confirmed" } else { "Unsupported saving" }));
    }
   } }
  }
+ #[test] fn unavailable_save_requires_explicit_discard() {
+  for result in [MessageDialogResult::Ok, MessageDialogResult::Cancel, MessageDialogResult::Yes, MessageDialogResult::No, MessageDialogResult::Custom("Cancel".into()), MessageDialogResult::Custom("Keep Editing".into()), MessageDialogResult::Custom("Save".into())] {
+   assert_eq!(close_decision(result, false), "cancel", "default and dismissed results must retain the editor");
+  }
+  assert_eq!(close_decision(MessageDialogResult::Custom("Discard".into()), false), "discard");
+ }
+ #[test] fn supported_close_decisions_keep_their_existing_meaning() {
+  for result in [MessageDialogResult::Yes, MessageDialogResult::Custom("Save".into())] { assert_eq!(close_decision(result, true), "save"); }
+  for result in [MessageDialogResult::No, MessageDialogResult::Custom("Discard".into())] { assert_eq!(close_decision(result, true), "discard"); }
+  for result in [MessageDialogResult::Cancel, MessageDialogResult::Ok, MessageDialogResult::Custom("Cancel".into())] { assert_eq!(close_decision(result, true), "cancel"); }
+ }
+
 }

@@ -240,7 +240,9 @@ This is not an atomic compare-and-swap, backup history, crash-recovery, or power
 On other operating systems, Save and Save As are disabled before opening a save dialog, with a persistent explanation.
 Saving remains disabled while native support is being checked or if that check fails; shortcuts and recovery actions follow the same rule.
 Native save requests and save-target selection are also refused before creating or writing a temporary file.
-Dirty close offers Discard and Cancel when saving is unavailable; Cancel retains the editor content.
+Dirty close offers Keep Editing, Discard and Cancel when saving is unavailable.
+Keep Editing is the first button, and Cancel remains the dismissal action; only an explicit Discard discards editor content.
+In browser-only mode, saving is also disabled with an explanation to use the desktop application.
 The native document I/O boundary selects the macOS backend or an explicit read-only backend at compile time.
 The read-only backend verifies the originally selected directory path and refuses inspection if that path is moved or replaced; it does not follow directory moves.
 Its opaque revision token includes file identity, modification time and content hash, with an explicit unsupported protection marker; it does not detect protection-metadata changes.

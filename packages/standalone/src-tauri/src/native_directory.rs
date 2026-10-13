@@ -52,6 +52,8 @@ pub(crate) fn open_writable(parent: &Dir, leaf: &str) -> Result<File, std::io::E
 pub(crate) fn remove_stage(parent: &Dir, stage: &str) -> Result<(), std::io::Error> {
     parent.remove_file(stage)
 }
+// This boundary shares Unix device/inode identity between the supported macOS and Linux targets.
+// Windows identity and build support are intentionally not implemented.
 fn validate_named_directory(directory: &Dir, path: &Path) -> Result<(), String> {
     let named = std::fs::symlink_metadata(path).map_err(|e| e.to_string())?;
     let retained = directory.dir_metadata().map_err(|e| e.to_string())?;
