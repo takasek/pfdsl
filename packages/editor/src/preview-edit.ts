@@ -10,6 +10,7 @@ import {
 	compatibleOtherKind,
 	edgeAlreadyExists,
 	insertConnectorEdge,
+	outputProducerConflict,
 	validateNewNodeId,
 } from "./connector-logic.js";
 import {
@@ -126,6 +127,14 @@ export function applyPreviewEdit(
 		)
 	)
 		return fail("This connection already exists.");
+	const conflict = outputProducerConflict(
+		model.edges,
+		request.nodeId,
+		kind,
+		request.connector,
+		request.otherId,
+	);
+	if (conflict) return fail(conflict);
 	const edge = buildConnectorEdgeLine(
 		request.nodeId,
 		kind,

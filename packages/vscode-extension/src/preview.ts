@@ -103,14 +103,33 @@ async function editFromPreview(
 	state: PreviewState,
 	request: PreviewEditRequest,
 ) {
+	const reply = (ok: boolean, message?: string) => {
+		if (!state.disposed && request.type === "addConnector")
+			void state.panel.webview.postMessage({
+				type: "editResult",
+				request,
+				ok,
+				...(message === undefined ? {} : { message }),
+			});
+	};
 	const snapshot = await prepareEditSource(state);
-	if (!snapshot?.isCurrent()) return;
+	if (!snapshot?.isCurrent()) {
+		reply(
+			false,
+			"The source could not be checked. Reopen Node actions and try again.",
+		);
+		return;
+	}
 	const result = applyPreviewEdit(snapshot.source, request);
 	if (!result.ok) {
 		vscode.window.showInformationMessage(result.message);
+		reply(false, result.message);
 		return;
 	}
-	if (!snapshot.isCurrent()) return;
+	if (!snapshot.isCurrent()) {
+		reply(false, "The document changed. Reopen Node actions and try again.");
+		return;
+	}
 	const edit = new vscode.WorkspaceEdit();
 	edit.replace(
 		state.doc.uri,
@@ -124,9 +143,14 @@ async function editFromPreview(
 		vscode.window.showInformationMessage(
 			"The preview edit could not be applied.",
 		);
+		reply(false, "The preview edit could not be applied.");
 		return;
 	}
-	if (state.disposed || state.doc.getText() !== result.source) return;
+	if (state.disposed || state.doc.getText() !== result.source) {
+		reply(false, "The document changed while applying the preview edit.");
+		return;
+	}
+	reply(true);
 	if (result.selection) {
 		const { start, end } = result.selection;
 		const range = new vscode.Range(

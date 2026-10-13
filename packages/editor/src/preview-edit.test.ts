@@ -2,6 +2,69 @@ import { expect, it } from "vitest";
 import { analyzeSnapshot } from "./document.js";
 import { applyPreviewEdit } from "./preview-edit.js";
 
+it.each([
+	["q", "b", "a >> p -> b\nc >> q -> d\n"],
+	["b", "q", "a >> p -> b\nc >> q -> d\n"],
+	["b", "new_process", "a >> p -> b\n"],
+	["r", "b", "a >> p -> b\na >> q -> b\na >> r -> d\n"],
+	[
+		"my process",
+		"my result",
+		'a >> p -> "my result"\nc >> "my process" -> d\n',
+	],
+])("refuses another producer from %s to %s without returning an edit", (nodeId, otherId, source) => {
+	const result = applyPreviewEdit(source, {
+		type: "addConnector",
+		nodeId,
+		otherId,
+		source,
+		connector: "->",
+	});
+	expect(result).toEqual({
+		ok: false,
+		message: expect.stringContaining("already produced by"),
+	});
+});
+
+it.each([
+	">>",
+	">>?",
+	"->",
+] as const)("allows unrelated %s edits despite an existing V001", (connector) => {
+	const source = "a >> p -> b\na >> q -> b\na >> r -> d\n";
+	const result = applyPreviewEdit(source, {
+		type: "addConnector",
+		nodeId: "r",
+		otherId: "new_artifact",
+		source,
+		connector,
+	});
+	expect(result.ok).toBe(true);
+});
+
+it("checks the current authored source even when a newly produced artifact was previously free", () => {
+	const old = "a >> p\nc >> q\nb\n";
+	const current = `${old}p -> b\n`;
+	expect(
+		applyPreviewEdit(current, {
+			type: "addConnector",
+			nodeId: "q",
+			otherId: "b",
+			source: old,
+			connector: "->",
+		}).ok,
+	).toBe(false);
+	expect(
+		applyPreviewEdit(current, {
+			type: "addConnector",
+			nodeId: "q",
+			otherId: "b",
+			source: current,
+			connector: "->",
+		}),
+	).toEqual({ ok: false, message: expect.stringContaining("p") });
+});
+
 it("creates a definition through the CST, retaining authored body and selecting its label", () => {
 	const source = "---\r\ntitle: 'Keep' # comment\r\n---\r\na >> p -> b\r\n";
 	const result = applyPreviewEdit(source, {

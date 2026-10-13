@@ -7,6 +7,7 @@ import {
 	edgeAlreadyExists,
 	insertConnectorEdge,
 	nodeIdAtSourcePosition,
+	outputProducerConflict,
 	validateNewNodeId,
 } from "@pfdsl/editor";
 import * as vscode from "vscode";
@@ -85,6 +86,12 @@ export function registerConnectorEditing(
 				return;
 			}
 			const { nodeId, line: cursorLine } = cursor;
+			const candidateSource = editor.document.getText();
+			const candidateVersion = editor.document.version;
+			const isCurrent = () =>
+				!editor.document.isClosed &&
+				editor.document.version === candidateVersion &&
+				editor.document.getText() === candidateSource;
 
 			const { nodeKinds, edges } = analyzeDocument(editor.document);
 			const nodeKind = nodeKinds.get(nodeId);
@@ -127,29 +134,85 @@ export function registerConnectorEditing(
 				.filter(([id, kind]) => id !== nodeId && kind === wantedKind)
 				.map(([id]) => id)
 				.sort();
-			const idPick = await vscode.window.showQuickPick(
-				[
-					{ label: newIdItem, alwaysShow: true },
-					...existingIds.map((id) => ({ label: id, alwaysShow: false })),
-				],
-				{ placeHolder: `Select the ${wantedKind} to connect` },
-			);
+			const items = [
+				{ label: newIdItem, alwaysShow: true },
+				...existingIds.map((id) => ({
+					label: id,
+					alwaysShow: false,
+					description:
+						outputProducerConflict(edges, nodeId, nodeRole, connector, id) ??
+						"",
+				})),
+			];
+			let idPick: (typeof items)[number] | undefined;
+			while (true) {
+				idPick = await vscode.window.showQuickPick(items, {
+					placeHolder: `Select the ${wantedKind} to connect`,
+				});
+				if (!idPick) return;
+				if (!isCurrent()) {
+					vscode.window.showInformationMessage(
+						"The document changed. Run Add Connector again.",
+					);
+					return;
+				}
+				const conflict = outputProducerConflict(
+					edges,
+					nodeId,
+					nodeRole,
+					connector,
+					idPick.label,
+				);
+				if (idPick.label === newIdItem || !conflict) break;
+				vscode.window.showInformationMessage(conflict);
+			}
 			if (!idPick) return;
 
 			let otherId = idPick.label;
 			if (idPick.label === newIdItem) {
 				const input = await vscode.window.showInputBox({
 					prompt: `New ${wantedKind} ID`,
-					validateInput: (value) =>
-						validateNewNodeId({
-							value,
-							currentNodeId: nodeId,
-							wantedKind,
-							kindOfExisting: (id) => nodeKinds.get(id),
-						}),
+					validateInput: (value) => {
+						if (!isCurrent())
+							return "The document changed. Run Add Connector again.";
+						return (
+							validateNewNodeId({
+								value,
+								currentNodeId: nodeId,
+								wantedKind,
+								kindOfExisting: (id) => nodeKinds.get(id),
+							}) ??
+							outputProducerConflict(edges, nodeId, nodeRole, connector, value)
+						);
+					},
 				});
 				if (!input) return;
 				otherId = input;
+			}
+			if (!isCurrent()) {
+				vscode.window.showInformationMessage(
+					"The document changed. Run Add Connector again.",
+				);
+				return;
+			}
+			const current = analyzeDocument(editor.document);
+			const invalid =
+				validateNewNodeId({
+					value: otherId,
+					currentNodeId: nodeId,
+					wantedKind,
+					kindOfExisting: (id) => current.nodeKinds.get(id),
+				}) ??
+				outputProducerConflict(
+					current.edges,
+					nodeId,
+					nodeRole,
+					connector,
+					otherId,
+				);
+			if (invalid) {
+				vscode.window.showInformationMessage(invalid);
+				return;
 			}
 
 			if (edgeAlreadyExists(edges, nodeId, nodeRole, connector, otherId)) {
@@ -159,6 +222,12 @@ export function registerConnectorEditing(
 					"Add anyway",
 				);
 				if (choice !== "Add anyway") return;
+			}
+			if (!isCurrent()) {
+				vscode.window.showInformationMessage(
+					"The document changed. Run Add Connector again.",
+				);
+				return;
 			}
 
 			const edgeLine = buildConnectorEdgeLine(

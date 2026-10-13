@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, expect, it, vi } from "vitest";
-import { analyzeSnapshot } from "./document.js";
+import { analyzeSnapshot, prepareDocument } from "./document.js";
 import { mountPreview } from "./preview.js";
 import { buildPreviewGraph } from "./preview-graph.js";
 import { FOCUS_CUE_DURATION_MS, previewStyles } from "./preview-shell.js";
@@ -13,6 +13,124 @@ afterEach(() => {
 });
 const svg =
 	'<svg width="200" height="100"><g class="node"><title>a</title><polygon points="0,0 40,0 40,30"/><text>A</text></g><g class="node"><title>p</title><text>P</text></g></svg>';
+
+it("explains unavailable output candidates to keyboard users, updates on kind changes, and retains rejected input", async () => {
+	const s = setup();
+	const source = "a >> p -> b\nc >> q -> d\n";
+	const prepared = prepareDocument(analyzeSnapshot(source), null, () => null);
+	await s.preview.receive(prepared.message);
+	s.node("p").dispatchEvent(
+		new KeyboardEvent("keydown", { key: "Enter", bubbles: true }),
+	);
+	const kind = s.container.querySelector<HTMLSelectElement>("#connector-kind")!;
+	const existing = s.container.querySelector<HTMLSelectElement>(
+		"#connector-existing",
+	)!;
+	const input =
+		s.container.querySelector<HTMLInputElement>("#connector-target")!;
+	kind.value = "->";
+	kind.dispatchEvent(new Event("change"));
+	const unavailable = [...existing.options].find((o) => o.value === "d")!;
+	expect(unavailable.disabled).toBe(true);
+	expect(unavailable.textContent).toContain("q");
+	const help = s.container.querySelector("#connector-unavailable")!;
+	expect(help.textContent).toContain("d");
+	expect(help.textContent).toContain("q");
+	expect(existing.getAttribute("aria-describedby")).toBe(help.id);
+	input.value = "d";
+	s.postMessage.mockClear();
+	s.container
+		.querySelector("#connector-form")!
+		.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
+	expect(s.postMessage).not.toHaveBeenCalled();
+	expect(input.value).toBe("d");
+	expect(s.container.querySelector<HTMLElement>("#node-actions")!.hidden).toBe(
+		false,
+	);
+	expect(
+		s.container.querySelector("#node-actions-error")!.textContent,
+	).toContain("q");
+	kind.value = ">>?";
+	kind.dispatchEvent(new Event("change"));
+	expect([...existing.options].find((o) => o.value === "d")!.disabled).toBe(
+		false,
+	);
+});
+
+it("keeps a submitted connector editable after host refusal and ignores unrelated responses", async () => {
+	const s = setup();
+	await s.preview.receive(s.message);
+	s.node("p").dispatchEvent(
+		new KeyboardEvent("keydown", { key: "Enter", bubbles: true }),
+	);
+	const input =
+		s.container.querySelector<HTMLInputElement>("#connector-target")!;
+	input.value = "free";
+	const form = s.container.querySelector("#connector-form")!;
+	form.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
+	const request = s.postMessage.mock.calls.at(-1)![0];
+	await s.preview.receive({
+		type: "editResult",
+		request: { ...request, nodeId: "other" },
+		ok: true,
+	});
+	expect(s.container.querySelector<HTMLElement>("#node-actions")!.hidden).toBe(
+		false,
+	);
+	await s.preview.receive({
+		type: "editResult",
+		request,
+		ok: false,
+		message: "The document changed.",
+	});
+	expect(input.value).toBe("free");
+	expect(document.activeElement).toBe(input);
+	expect(
+		s.container.querySelector<HTMLButtonElement>(
+			'#connector-form button[type="submit"]',
+		)!.disabled,
+	).toBe(false);
+	input.value = "corrected";
+	form.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
+	expect(s.postMessage).toHaveBeenLastCalledWith({
+		...request,
+		otherId: "corrected",
+	});
+});
+
+it("retains a pending connector and its refusal across an error redraw and recovery", async () => {
+	const s = setup();
+	await s.preview.receive(s.message);
+	s.node("p").dispatchEvent(
+		new KeyboardEvent("keydown", { key: "Enter", bubbles: true }),
+	);
+	const input =
+		s.container.querySelector<HTMLInputElement>("#connector-target")!;
+	input.value = "free";
+	s.container
+		.querySelector("#connector-form")!
+		.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
+	const request = s.postMessage.mock.calls.at(-1)![0];
+	await s.preview.receive({ type: "error", message: "V001" });
+	await s.preview.receive({
+		type: "editResult",
+		request,
+		ok: false,
+		message: "The document changed.",
+	});
+	expect(s.container.querySelector<HTMLElement>("#node-actions")!.hidden).toBe(
+		false,
+	);
+	expect(input.value).toBe("free");
+	expect(
+		s.container.querySelector("#node-actions-error")!.textContent,
+	).toContain("document changed");
+	await s.preview.receive(s.message);
+	expect(input.value).toBe("free");
+	expect(s.container.querySelector<HTMLElement>("#node-actions")!.hidden).toBe(
+		false,
+	);
+});
 
 it("keeps the cue animation and removal deadline at 1500ms", async () => {
 	vi.useFakeTimers();
@@ -349,7 +467,11 @@ it("opens the shared node panel from context/keyboard and emits source-bound cre
 		...s.message,
 		editing: { ...s.message.editing, source: "changed" },
 	});
-	expect(panel.hidden).toBe(true);
+	expect(panel.hidden).toBe(false);
+	expect(input.value).toBe("new_result");
+	expect(
+		s.container.querySelector("#node-actions-error")!.textContent,
+	).toContain("document changed");
 });
 
 it("does not accept stale local graph completion after an error", async () => {
@@ -527,6 +649,11 @@ it("returns connection submission to the preview toolbar across redraw", async (
 	s.container
 		.querySelector<HTMLButtonElement>("#connector-form button[type=submit]")!
 		.click();
+	const request = s.postMessage.mock.calls.at(-1)![0];
+	expect(s.container.querySelector<HTMLElement>("#node-actions")!.hidden).toBe(
+		false,
+	);
+	await s.preview.receive({ type: "editResult", request, ok: true });
 	await s.preview.receive(s.message);
 	expect(document.activeElement).toBe(
 		s.container.querySelector("#node-actions-toggle"),

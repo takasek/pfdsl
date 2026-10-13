@@ -81,7 +81,7 @@ function prepare(source: string) {
 	registerConnectorEditing({
 		subscriptions: [],
 	} as unknown as vscode.ExtensionContext);
-	return { edit };
+	return { edit, doc };
 }
 
 it("resolves a quoted process and offers correctly quoted connection choices", async () => {
@@ -106,5 +106,57 @@ it("reports a duplicate quoted edge without surrounding its syntax with another 
 	await host.commands.get("pfdsl.addConnector")!();
 	expect(host.window.showWarningMessage.mock.calls[0]?.[0]).toBe(
 		'Connection a >> "my process" already exists.',
+	);
+});
+
+it("refuses an output to another process's artifact and describes the producer in its picker", async () => {
+	const s = prepare('a >> "my process" -> out\nb >> q -> taken\n');
+	host.window.showQuickPick
+		.mockResolvedValueOnce({ connector: "->" })
+		.mockResolvedValueOnce({ label: "taken" });
+	await host.commands.get("pfdsl.addConnector")!();
+	expect(s.edit).not.toHaveBeenCalled();
+	expect(host.window.showInformationMessage).toHaveBeenCalledWith(
+		expect.stringContaining("q"),
+	);
+	expect(host.window.showQuickPick.mock.calls[1]![0]).toContainEqual(
+		expect.objectContaining({
+			label: "taken",
+			description: expect.stringContaining("q"),
+		}),
+	);
+});
+
+it("does not insert from a picker whose authored source changed", async () => {
+	const s = prepare('a >> "my process" -> out\nb >> q -> taken\n');
+	host.window.showQuickPick
+		.mockResolvedValueOnce({ connector: "->" })
+		.mockImplementationOnce(async () => {
+			s.doc.getText = () =>
+				'a >> "my process" -> out\nb >> q -> taken\nq -> free\n';
+			s.doc.version++;
+			return { label: "free" };
+		});
+	await host.commands.get("pfdsl.addConnector")!();
+	expect(s.edit).not.toHaveBeenCalled();
+	expect(host.window.showInformationMessage).toHaveBeenCalledWith(
+		expect.stringContaining("document changed"),
+	);
+});
+
+it("validates a typed output and refuses a submitted conflicting ID even if input validation is bypassed", async () => {
+	const s = prepare('a >> "my process" -> out\nb >> q -> taken\n');
+	host.window.showQuickPick
+		.mockResolvedValueOnce({ connector: "->" })
+		.mockImplementationOnce(async (items) => items[0]);
+	host.window.showInputBox.mockImplementationOnce(async (options) => {
+		expect(options.validateInput("taken")).toContain("q");
+		expect(options.validateInput("fresh")).toBeUndefined();
+		return "taken";
+	});
+	await host.commands.get("pfdsl.addConnector")!();
+	expect(s.edit).not.toHaveBeenCalled();
+	expect(host.window.showInformationMessage).toHaveBeenCalledWith(
+		expect.stringContaining("already produced by q"),
 	);
 });
