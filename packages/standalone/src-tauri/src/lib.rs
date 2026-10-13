@@ -213,15 +213,20 @@ async fn confirm_close_document(name: String, allow_save: bool, window: tauri::W
         .title("PFDSL").parent(&window)
         .buttons(buttons)
         .blocking_show_with_result();
-    Ok(match decision {
-        MessageDialogResult::Yes if capability.save && allow_save => "save",
-        MessageDialogResult::No if capability.save && allow_save => "discard",
-        MessageDialogResult::Ok if !(capability.save && allow_save) => "discard",
-        MessageDialogResult::Custom(ref choice) if choice == "Save" && capability.save && allow_save => "save",
+    Ok(close_decision(decision, capability.save && allow_save).into())
+}
+
+fn close_decision(decision: MessageDialogResult, can_save: bool) -> &'static str {
+    match decision {
+        MessageDialogResult::Yes if can_save => "save",
+        MessageDialogResult::No if can_save => "discard",
+        MessageDialogResult::Ok if !(can_save) => "discard",
+        MessageDialogResult::Custom(ref choice) if choice == "Save" && can_save => "save",
         MessageDialogResult::Custom(ref choice) if choice == "Discard" => "discard",
         _ => "cancel",
-    }.into())
+    }
 }
+
 fn close_prompt(name: &str, capability: native_directory::Capabilities, allow_save: bool) -> (String, MessageDialogButtons) {
     let (message, buttons) = if capability.save && allow_save {
         (format!("Save changes to {name}?"), MessageDialogButtons::YesNoCancelCustom("Save".into(), "Discard".into(), "Cancel".into()))
