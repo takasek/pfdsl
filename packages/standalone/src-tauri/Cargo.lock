@@ -2298,6 +2298,9 @@ name = "pfdsl-desktop"
 version = "0.1.0"
 dependencies = [
  "cap-std",
+ "libc",
+ "serde",
+ "serde_json",
  "sha2",
  "tauri",
  "tauri-build",

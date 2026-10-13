@@ -1,5 +1,5 @@
-import { analyzeSource } from "@pfdsl/core";
 import { describe, expect, it } from "vitest";
+import { analyzeSnapshot as analyzeSource } from "./document.js";
 import {
 	findFrontmatterDefinitionInText,
 	findNodeOccurrenceRanges,

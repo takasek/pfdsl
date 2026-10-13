@@ -37,14 +37,17 @@ export function computeRangeFormatOutput(
 /**
  * Clamps a 0-based [startLine, endLine] selection so it never starts inside
  * the frontmatter block. Returns null when the selection is entirely within
- * the frontmatter (nothing to format).
+ * the frontmatter, or when its closing delimiter is missing (nothing to format).
  */
 export function clampSelectionToBody(
 	source: string,
 	startLine: number,
 	endLine: number,
 ): { startLine: number; endLine: number } | null {
-	const frontmatterLineCount = loadFrontmatter(source).bodyStartLine - 1;
+	const frontmatter = loadFrontmatter(source);
+	if (frontmatter.diagnostics.some((diagnostic) => diagnostic.code === "FM001"))
+		return null;
+	const frontmatterLineCount = frontmatter.bodyStartLine - 1;
 	if (endLine < frontmatterLineCount) return null;
 	return { startLine: Math.max(startLine, frontmatterLineCount), endLine };
 }
