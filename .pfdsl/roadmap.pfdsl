@@ -248,7 +248,7 @@ group_node_clash_diagnostic >> publish_cli_group_node_clash -> cli_release_group
 
 standalone_documents >> i1259_i1260_i1261_build_standalone_features -> standalone_pfd_features
 
-standalone_pfd_features >> i1262_i1445_accept_mac_candidate -> gui_mac_acceptance
+[preview_editing_usability, standalone_pfd_features] >> i1262_i1445_accept_mac_candidate -> gui_mac_acceptance
 
 [editor_connector, preview_editing_usability, toolchain] >> i1445_prepare_gui_vscode_candidate -> gui_vscode_candidate
 
