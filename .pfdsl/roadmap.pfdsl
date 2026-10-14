@@ -137,47 +137,19 @@ artifact:
     status: done
     criteria: "定義キーから本文中の同一 ID の全出現箇所を文書順に巡回して定義へ戻れ、途中からも次へ進める。キー操作と右クリックから利用でき、VS Code の既存操作とのショートカット衝突が解消済み"
     location: ../packages/
-  hover_local_graph:
-    label: Connections 近隣移動の実装
-    description: "Connections の直接近隣確認・移動の実装。履歴 ID を保持し、仕様・担当境界は location の Issue 本文を正本とする"
-    status: wip
-    criteria: "location の Issue 本文が定める近隣確認・移動の実装・必要な自動検証・独立レビューと、版に対応する実行可能な受入計画の登録が完了している。実機合格と旧方式の実装履歴は別に扱う"
-    location: https://github.com/takasek/pfdsl/issues/1284
-  preview_focus_cue:
-    label: 移動先の一時強調の実装
-    description: "移動先の一時強調の実装。対象経路・維持条件・担当は location の Issue 本文を正本とする"
-    status: wip
-    criteria: "location の Issue 本文が定める一時強調の実装・必要な自動検証・独立レビューと、版に対応する実行可能な受入計画の登録が完了している。実機未実施を許容し、この done は実機合格を表さない"
-    location: https://github.com/takasek/pfdsl/issues/1284
   standalone_documents:
     label: 安全に編集・保存できる文書アプリ
     status: done
     criteria: 任意 PFD の新規・開く・手動保存・別名保存とエディタ＋プレビューの組のタブ操作が実機で動き、未保存終了・外部再変更・削除・保存失敗の試験で内容を黙って失わずに解決できる
   standalone_pfd_features:
-    label: PFD 編集・閲覧機能の実装済みアプリ
-    description: "PFD 編集・閲覧機能の実装成果物。要求の内訳と担当は location の Issue 本文から辿り、実機結果は共通受入 Issue で扱う"
+    label: 公開前 GUI 機能の実装済みアプリ
+    description: "公開前の GUI 機能を集約した実装成果物。要求・担当・内部の着手順と進捗は location の Issue 本文から辿り、実機結果は共通受入 Issue で扱う"
     status: wip
     criteria: "location の Issue 本文が定める機能範囲の実装・必要な自動検証・独立レビューと、版に対応する実行可能な受入計画の登録が完了している。実機未実施を許容し、この done は実機合格を意味しない"
     location: https://github.com/takasek/pfdsl/issues/1259
-  standalone_integrations:
-    label: 関連参照・構造差分・外部実行の実装済みアプリ
-    status: todo
-    criteria: "location の Issue 本文が定める外部連携範囲の実装・必要な自動検証・独立レビューと、版に対応する実行可能な受入計画の登録が完了している。実到達の実機結果は共通受入 Issue に残す"
-    location: https://github.com/takasek/pfdsl/issues/1260
-  standalone_exports:
-    label: 全形式の書出しを実装済みのアプリ
-    status: todo
-    criteria: "location の Issue 本文が定める書出し範囲の実装・必要な自動検証・独立レビューと、版に対応する実行可能な受入計画の登録が完了している。実ファイルと外部 viewer による実機合格は共通受入 Issue で扱う"
-    location: https://github.com/takasek/pfdsl/issues/1261
-  standalone_mac_candidate:
-    label: 署名・公証済み macOS 候補配布物
-    description: "公開前の署名・公証済み macOS 候補配布物。対象版・対応 OS・配布条件は location の Issue 本文を正本とする"
-    status: todo
-    criteria: "location の Issue 本文が定める候補配布物と識別情報・配布手順を準備し、その版の公開前受入を実行できる。実機合格・実公開は未了でよい"
-    location: https://github.com/takasek/pfdsl/issues/1262
   gui_mac_acceptance:
-    label: Mac 公開範囲の実機合格記録
-    description: "共通受入 Issue が管理する Mac 公開範囲の実機合格記録。部分試験と公開用の全結果を区別する"
+    label: 実機受入済みの macOS 候補配布物
+    description: "署名・公証済み候補配布物と、その版・公開範囲に対応する実機合格記録。候補準備中の進捗は Issue で管理する"
     status: todo
     criteria: "location の共通受入 Issue が定める Mac 公開範囲に必要な公開前試験が候補配布物で合格し、不合格への修正・再試験、対象版・環境・証拠と適用範囲を記録済み。他ホストの未確認を追加ゲートにしない"
     location: https://github.com/takasek/pfdsl/issues/1445
@@ -221,20 +193,12 @@ process:
     label: プレビューを改善する
     description: "表示・編集・移動を改善する既存工程。現在の仕様・担当・残件は location の Issue とその参照先を正本とし、関連 Issue の全番号を同期しない"
     location: https://github.com/takasek/pfdsl/issues/1352
-  i1259_build_standalone_pfd_features:
-    label: PFD 編集・閲覧機能を両版で揃える
+  i1259_i1260_i1261_build_standalone_features:
+    label: 公開前の GUI 機能を実装する
     location: https://github.com/takasek/pfdsl/issues/1259
-  i1260_build_standalone_integrations:
-    label: 関連参照・差分・外部実行を接続する
-    location: https://github.com/takasek/pfdsl/issues/1260
-  i1261_build_standalone_exports:
-    label: 全形式の書き出しを完成させる
-    location: https://github.com/takasek/pfdsl/issues/1261
-  i1262_prepare_standalone_candidate:
-    label: macOS 候補配布物を準備する
-    location: https://github.com/takasek/pfdsl/issues/1262
-  i1445_accept_gui_mac:
-    label: Mac 候補の公開範囲を実機受入する
+  i1262_i1445_accept_mac_candidate:
+    label: Mac の受入済み候補を作る
+    description: "候補準備と実機受入を同じ工程内で順に行い、配布物とその合格証拠を揃える。準備に合格を要求せず、内部の進捗・担当は Issue で管理する"
     location: https://github.com/takasek/pfdsl/issues/1445
   i1445_accept_gui_vscode:
     label: VS Code 統合版の公開範囲を実機受入する
@@ -271,18 +235,12 @@ group_delete_cli >> publish_cli_group_delete -> cli_release_group_delete
 meta_set_extension_fields >> publish_cli_meta_set_extension -> cli_release_meta_set_extension
 
 group_node_clash_diagnostic >> publish_cli_group_node_clash -> cli_release_group_node_clash
-[def_insertion, editor_connector, toolchain] >> i1352_i1282_i1283_i1284_i483_improve_preview -> [hover_local_graph, node_definition_creation, node_location_cycle, preview_connector, preview_editing_usability, preview_focus_cue]
+[def_insertion, editor_connector, toolchain] >> i1352_i1282_i1283_i1284_i483_improve_preview -> [node_definition_creation, node_location_cycle, preview_connector, preview_editing_usability]
 
-standalone_documents >> i1259_build_standalone_pfd_features -> standalone_pfd_features
+standalone_documents >> i1259_i1260_i1261_build_standalone_features -> standalone_pfd_features
 
-standalone_pfd_features >> i1260_build_standalone_integrations -> standalone_integrations
-
-standalone_pfd_features >> i1261_build_standalone_exports -> standalone_exports
-
-[standalone_exports, standalone_integrations] >> i1262_prepare_standalone_candidate -> standalone_mac_candidate
-
-standalone_mac_candidate >> i1445_accept_gui_mac -> gui_mac_acceptance
+standalone_pfd_features >> i1262_i1445_accept_mac_candidate -> gui_mac_acceptance
 
 toolchain >> i1445_accept_gui_vscode -> gui_vscode_acceptance
 
-[gui_mac_acceptance, standalone_mac_candidate] >> i1262_publish_standalone -> standalone_release
+gui_mac_acceptance >> i1262_publish_standalone -> standalone_release
