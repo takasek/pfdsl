@@ -27,19 +27,53 @@ GitHub Issues。規約と採用手順は `scripts/harness-template/skills/pfd-op
 ## プレビュー改善の管理単位
 
 プレビューの表示・編集・移動は `i1352_i1282_i1283_i1284_i483_improve_preview` の一工程として扱う。
-関連 issue と各出力 artifact は課題・実装・確認の内訳であり、別々の作業サイクルを要求しない。
+関連 issue と各出力 artifact は課題・実装の内訳であり、別々の作業サイクルを要求しない。
 当初の要望や criteria は見直しの対象とし、利用時の観察に合わせて改善範囲・完了条件・次に扱う課題を更新する。
-現在の範囲と完了条件は [PR #1394](https://github.com/takasek/pfdsl/pull/1394)、対象版と確認結果は [受入記録](../packages/standalone/ACCEPTANCE.md)を参照する。
-未確認を確認済みに読み替えず、今回扱うか次へ回すかをその記録で区別する。
+現在の UI 構成・操作方式は [#1444](https://github.com/takasek/pfdsl/issues/1444) と所有者の採否記録、担当固有の要求は #1284・#1352・#1259 等を参照する。
+PR #1394 の旧 hover 方式は当時の実装履歴であり、現在の仕様は text hover と下部 Connections へ置き換える。
+手順は [受入計画](../packages/standalone/ACCEPTANCE-PLAN.md)、元条件の移管先は [対応表](../packages/standalone/ACCEPTANCE-MAPPING.md)、版別の実結果は [受入記録](../packages/standalone/ACCEPTANCE.md)を参照する。
+未確認を合格・対象外へ読み替えず、既知の不合格も未実施へ戻さない。
 
 入力は既存の依存を保持したため、`editor_connector` が wip の間は束全体の ready 判定もその前提待ちになる。
 今回の先行着手は所有者が関連課題を今回の範囲に含めた指示に基づき、完了状態や依存を変更したことにはしない。
-各出力の受入が揃えば個別に done とし、束全体やほかの issue の未完了から個別出力の受入未達を推定しない。
+未完了の改善出力は実装・必要な自動検証・独立レビュー・受入計画登録で個別に done と判断でき、実機合格は別成果物で管理する。
+束全体やほかの issue の未完了から個別出力の未達を推定しない。
 `node_location_cycle`・`node_definition_creation`・`preview_connector` は個別の受入に基づいて done とした。
 `editor_connector` の wip と既存入力 edge を保持するため、束の保守的な依存に対する W003 が出るが、束全体を完了とする根拠には使わない。
-接続操作による V001 の事前防止は、既存の接続 UI の完了条件と分けて [#1432](https://github.com/takasek/pfdsl/issues/1432) で扱う。
-`preview_connector` から後続の `connector_single_producer_guard` を作る工程として登録し、未着手の todo を保持する。
-ゲートは `preview_editing_usability` を入口にできるが、それだけで各出力の確認済みや完了を認定せず、受入記録の内訳も確認する。
+接続操作による V001 の事前防止は [#1432](https://github.com/takasek/pfdsl/issues/1432) / PR #1441 で完了済みの共有編集判定を利用する。
+保存能力は #1438 / PR #1440、文書ライフサイクルは #1258 / PR #1431 の統合済み基盤として扱い、今回再実装・再開しない。
+ゲートは `preview_editing_usability` を入口にできるが、実装の done から新方式の実機合格を推定せず、#1445 のホスト別結果を確認する。
+
+## GUI領域の実装・実機受入・公開
+
+対象は #1444・#1284・#1352・#1259・#1260・#1261・#1262 と、移管先 [#1445](https://github.com/takasek/pfdsl/issues/1445) に限る。
+実装時は必要な自動検証・独立レビューと受入テスト計画の追加／更新まで行う。
+実機確認は後工程の受入 Issue でまとめて行い、未実施だけを理由に実装 PR・次工程を止めない。
+実装完了・実機合格・公開完了は別々に判断し、PR の最終レビューとマージは人間に残す。
+この限定領域では、binding・workflow の従来の実機確認待ちより本節を優先する。
+通常の自動 test・既存 CI は維持する。
+
+- `standalone_pfd_features` は #1259 の実装・自動検証・レビュー・計画登録を表す。
+  done なら実機未実施でも #1260／#1261 は独立して ready となり、互いの完了を待たない。
+- `standalone_integrations` と `standalone_exports` も実装成果物である。
+  #1262 の候補準備はこれらを入力に取り、受入成功を準備条件にしない。
+- `standalone_mac_candidate` は署名・公証済みの候補 DMG と識別・対応 OS・配布手順を表す。
+  #1445 がそれを検査して `gui_mac_acceptance` を作り、候補と Mac 合格記録から #1262 の公開へ進む。
+  公開後の GUI-42 の取得物・結果の読み戻しは `standalone_release` の criteria に残す。
+- `gui_vscode_acceptance` は現行 `toolchain` の特定 build を検査した V 結果である。
+  既存の `publish_ext_editing` へだけ入力し、Mac の候補や受入を待たない。
+  Mac 公開も V や限定 Linux の未確認を待たない。
+- 受入 Issue は今回の移管範囲の必要な試験と不合格への対応が揃うまで完了にせず、将来すべての GUI 改修の窓口にはしない。
+  部分試験は既存 app／拡張で先行でき、roadmap の受入成果物は対象公開範囲の必要な全結果を表す。
+- #1444 の `flow:exempt` を維持し、全体完了を他の機能開発の開始条件にしない。
+  領域配分・文書状態・menu の先行は推奨着手順であり、実機受入待ちのハード依存ではない。
+
+今回の管理文書変更では既存 status を進めず、`editor_connector` の wip と束の保守的入力、完了済み基盤の受入を保持する。
+`hover_local_graph` は履歴 ID を残して Connections 近隣移動の実装へ、`preview_focus_cue` は editor／Connections の両経路へ意味を変更する。
+新しい Mac 候補・M/V 受入は todo とし、実装の done を実機合格として読めない名称・criteria にする。
+旧条件と新しい担当工程の対応は受入対応表に残す。
+GitHub Issue 本文は更新時点で反映され、計画・roadmap の main 反映はこの文書 PR の統合時となる。
+未マージ中の Issue は公開済み作業ブランチ／commit／PR から文書へ案内する。
 
 ## プリフライト・ゲート集約スクリプト（#354）
 

@@ -1,5 +1,15 @@
 # 共通基盤の受入対応表
 
+## 現行計画と結果の入口
+
+現在の実機手順は [ACCEPTANCE-PLAN.md](ACCEPTANCE-PLAN.md)、元の要求・担当・移管先は [ACCEPTANCE-MAPPING.md](ACCEPTANCE-MAPPING.md)、未実施・不合格の管理は [GUI統合版の実機受入 #1445](https://github.com/takasek/pfdsl/issues/1445)を参照する。
+2026-10-14の管理整理で実装完了と実機合格を分離した。
+新仕様の試験は未実施であり、この登録で製品実装・実機合格・公開や既存 status を進めない。
+以下の表と日付付き節は各版の実装状態・実行履歴であり、旧 hover 局所グラフ方式や古い未移植・実機待ちの記述を現行の要求・進行条件として読まない。
+過去の不合格・未確認・合格と完了済み基盤の証拠を保持し、旧証拠の再利用は版差分と適用可能範囲を記録する。
+
+## 基盤段階の機能対応と版別履歴
+
 参照する現行拡張: `459dfa74cd80c390017e4983834751721e4a4480`。
 機能一覧は、その版の `packages/vscode-extension/package.json`、`src/extension.ts` と各登録 provider・内部 command を照合した。
 専用 configuration の宣言はない。
