@@ -88,7 +88,7 @@ artifact:
     label: "extension 編集支援リリース"
     description: "#482 コネクタ編集 / #483 Preview UI / #484 定義挿入を含む次期 Marketplace リリース"
     status: todo
-    criteria: "npx @vscode/vsce show takasek.pfdsl --json の versions に packages/vscode-extension/package.json の version が含まれ、その版でコネクタ編集・Preview 生成 UI・定義挿入が動作する。公開範囲に対応する gui_vscode_acceptance の対象版・差分適用範囲と公開版が一致し、Mac や限定 Linux の未確認をこの公開の追加ゲートにしない"
+    criteria: "npx @vscode/vsce show takasek.pfdsl --json の versions に packages/vscode-extension/package.json の version が含まれ、その版でコネクタ編集・Preview 生成 UI・定義挿入が動作する。共通受入 Issue で定める VS Code 公開範囲の合格記録と公開版が対応し、他ホストの未確認を追加ゲートにしない"
   group_delete_cli:
     label: "group を削除できる delete (#1278)"
     description: "delete が group id を受け付け、宣言を削除する。所属ノードと子 group は残し、group: と parent: を削除されずに残る最も近い祖先へ付け替える。祖先がなければ参照を外す"
@@ -121,9 +121,9 @@ artifact:
     criteria: "npm view @pfdsl/cli versions に group 削除を含む版が含まれ、その版を固定して取得した CLI で pfdsl delete <file> <group-id> が group を削除する。同じ release tag の plugin 配布について .pfdsl/workflow.md の「release milestone artifact の作成規約」と .pfdsl/pipeline.md の公開・pin・取得確認を満たす"
   preview_editing_usability:
     label: 表示・編集・移動の改善実装
-    description: "プレビューの表示・編集・移動の改善全体。関連 issue は課題の参照とし、現在の改善範囲と完了条件は roadmap.md の「プレビュー改善の管理単位」から辿る"
+    description: "プレビューの表示・編集・移動の改善実装。要求と担当の内訳は生成工程の location が指す Issue から辿る"
     status: wip
-    criteria: "#1352 の Fit・100%・倍率・操作案内、診断と minimap の回復、定義作成後の編集案内、clone からの起動手順と既存機能との非競合を実装し、必要な自動検証・独立レビューが完了している。#1444 の配置と整合し ACCEPTANCE-PLAN.md に実機項目を登録済み。実機未実施は #1445 に残し、この done は実機合格を意味しない"
+    criteria: "生成工程の Issue 本文が定める改善範囲の実装・必要な自動検証・独立レビューと、版に対応する実行可能な受入計画の登録が完了している。実機未実施は共通受入 Issue に残し、この done は実機合格を意味しない"
     location: ../packages/
   node_definition_creation:
     label: プレビューと CLI から作れるノード定義
@@ -139,15 +139,15 @@ artifact:
     location: ../packages/
   hover_local_graph:
     label: Connections 近隣移動の実装
-    description: "履歴 ID を保持し、旧 hover 内グラフ方式を #1444 の text hover と下部 Connections へ置き換える。直接前後の確認・移動は #1284、画面構成と編集入口は #1444 が担当する"
+    description: "Connections の直接近隣確認・移動の実装。履歴 ID を保持し、仕様・担当境界は location の Issue 本文を正本とする"
     status: wip
-    criteria: "未定義・孤立を含む中心と直接前後を Connections に表示し、feedback の方向を保ち、チップから全体図を維持して移動・中心更新できる実装が自動検証と独立レビューを通過し、GUI-09〜11・16・20・22 を ACCEPTANCE-PLAN.md に登録済み。実機未実施は #1445 に残し、旧 hover 方式の完成を前提にしない"
+    criteria: "location の Issue 本文が定める近隣確認・移動の実装・必要な自動検証・独立レビューと、版に対応する実行可能な受入計画の登録が完了している。実機合格と旧方式の実装履歴は別に扱う"
     location: https://github.com/takasek/pfdsl/issues/1284
   preview_focus_cue:
     label: 移動先の一時強調の実装
-    description: "editor 選択と Connections のチップ移動に同じ短時間の合図を使う。要件は #1284（旧 #1285 から移管）、実機受入は #1445"
+    description: "移動先の一時強調の実装。対象経路・維持条件・担当は location の Issue 本文を正本とする"
     status: wip
-    criteria: "editor と Connections の両経路で対象だけを短時間強調し、連続移動の古い合図を消し、再描画だけでは再強調せず、zoom・pan・fill・status と reduced-motion を保つ実装が自動検証・独立レビューを通過し GUI-11・16 を登録済み。実機未実施を許容し done は実機合格を表さない"
+    criteria: "location の Issue 本文が定める一時強調の実装・必要な自動検証・独立レビューと、版に対応する実行可能な受入計画の登録が完了している。実機未実施を許容し、この done は実機合格を表さない"
     location: https://github.com/takasek/pfdsl/issues/1284
   standalone_documents:
     label: 安全に編集・保存できる文書アプリ
@@ -155,42 +155,42 @@ artifact:
     criteria: 任意 PFD の新規・開く・手動保存・別名保存とエディタ＋プレビューの組のタブ操作が実機で動き、未保存終了・外部再変更・削除・保存失敗の試験で内容を黙って失わずに解決できる
   standalone_pfd_features:
     label: PFD 編集・閲覧機能の実装済みアプリ
-    description: "#1259 の言語支援・構造編集・preview 同等性。実機結果は #1445 に分離し、実装完了から #1260・#1261 へ独立して進める。#1444 全体を新しい開始条件にしない"
+    description: "PFD 編集・閲覧機能の実装成果物。要求の内訳と担当は location の Issue 本文から辿り、実機結果は共通受入 Issue で扱う"
     status: wip
-    criteria: "#1259 の全機能対応表の言語支援・構造編集・preview・相互移動・extends の実装が必要な両 host の自動検証と独立レビューを通過し、ACCEPTANCE-PLAN.md の対応試験を登録・具体化済み。実機未実施を #1445 に残し done は実機合格を意味しない"
+    criteria: "location の Issue 本文が定める機能範囲の実装・必要な自動検証・独立レビューと、版に対応する実行可能な受入計画の登録が完了している。実機未実施を許容し、この done は実機合格を意味しない"
     location: https://github.com/takasek/pfdsl/issues/1259
   standalone_integrations:
     label: 関連参照・構造差分・外部実行の実装済みアプリ
     status: todo
-    criteria: "#1260 の参照解決・開き先・未保存内容の Git／別ファイル構造差分と解除、Terminal.app／Ghostty の明示実行、Git 不在・path・環境・失敗系の実装が必要な自動検証と独立レビューを通過し GUI-30〜33 を具体化済み。実到達の実機結果は #1445 に残し、#1261 や前工程の実機合格は待たない"
+    criteria: "location の Issue 本文が定める外部連携範囲の実装・必要な自動検証・独立レビューと、版に対応する実行可能な受入計画の登録が完了している。実到達の実機結果は共通受入 Issue に残す"
     location: https://github.com/takasek/pfdsl/issues/1260
   standalone_exports:
     label: 全形式の書出しを実装済みのアプリ
     status: todo
-    criteria: "#1261 の DOT・SVG・PDF・PNG・TSV・All の実出力、追加 runtime 不要、未保存対象・失敗・部分成功の実装が自動 file 検証と独立レビューを通過し GUI-34〜36 の寸法・許容差・再現条件を具体化済み。menu 項目だけで完了にせず、実 file／外部 viewer の実機受入は #1445 に残す。#1260 の完了は待たない"
+    criteria: "location の Issue 本文が定める書出し範囲の実装・必要な自動検証・独立レビューと、版に対応する実行可能な受入計画の登録が完了している。実ファイルと外部 viewer による実機合格は共通受入 Issue で扱う"
     location: https://github.com/takasek/pfdsl/issues/1261
   standalone_mac_candidate:
     label: 署名・公証済み macOS 候補配布物
-    description: "#1262 が公開前に準備する Apple Silicon DMG と対応 OS・版・source commit・識別情報。受入する app の実体であり、受入成功を生成条件にしない"
+    description: "公開前の署名・公証済み macOS 候補配布物。対象版・対応 OS・配布条件は location の Issue 本文を正本とする"
     status: todo
-    criteria: "統合済み実装を含む候補 DMG、署名・公証、最低 OS 宣言の候補、関連付け・手動更新案内と配布手順・CI・notes・license を準備し、GUI-39〜43 の公開前に実施できる条件を具体化済み。実機合格・実公開は未了でよい"
+    criteria: "location の Issue 本文が定める候補配布物と識別情報・配布手順を準備し、その版の公開前受入を実行できる。実機合格・実公開は未了でよい"
     location: https://github.com/takasek/pfdsl/issues/1262
   gui_mac_acceptance:
     label: Mac 公開範囲の実機合格記録
-    description: "#1445 が候補配布物の M 試験を管理する。部分試験は既存 app で先行でき、この成果物は公開範囲に必要な全結果を表す"
+    description: "共通受入 Issue が管理する Mac 公開範囲の実機合格記録。部分試験と公開用の全結果を区別する"
     status: todo
-    criteria: "#1445 で固定した Mac 公開範囲に必要な ACCEPTANCE-PLAN.md の M 試験（公開後の GUI-42 を除く）が候補配布物で合格し、不合格の修正・再試験と版・環境・証拠・旧証拠の適用範囲を記録済み。V・限定 Linux の未確認をゲートにしない"
+    criteria: "location の共通受入 Issue が定める Mac 公開範囲に必要な公開前試験が候補配布物で合格し、不合格への修正・再試験、対象版・環境・証拠と適用範囲を記録済み。他ホストの未確認を追加ゲートにしない"
     location: https://github.com/takasek/pfdsl/issues/1445
   gui_vscode_acceptance:
     label: VS Code 公開範囲の実機合格記録
-    description: "#1445 の V 結果。現行 toolchain の特定 build を実行対象として選び、Mac の候補準備や受入を待たず利用可能な試験から進める"
+    description: "共通受入 Issue が管理する VS Code 公開範囲の実機合格記録。実行対象の build を Issue で特定する"
     status: todo
-    criteria: "#1445 で固定した VS Code 公開範囲に必要な ACCEPTANCE-PLAN.md の V 試験が実 Extension Development Host で合格し、不合格への修正・再試験、対象 commit／package・環境・証拠と公開版への差分適用範囲を記録済み。Mac・限定 Linux の未確認をゲートにしない"
+    criteria: "location の共通受入 Issue が定める VS Code 公開範囲に必要な試験が実 Extension Development Host で合格し、不合格への修正・再試験、対象版・環境・証拠と公開版への適用範囲を記録済み。他ホストの未確認を追加ゲートにしない"
     location: https://github.com/takasek/pfdsl/issues/1445
   standalone_release:
     label: 公開済み macOS スタンドアロンアプリ
     status: todo
-    criteria: "gui_mac_acceptance と同じ候補を承認後に GitHub Releases へ公開し、固定 URL・版・source commit・DMG 識別情報・最低 macOS・受入証拠を記録済み。GUI-42 で実取得経路の配布物を読み戻し、候補との一致・導入・全機能の適用範囲・更新案内・後からの取得可能性を確認済み。開発版の合格や未公開候補だけでは完了としない"
+    criteria: "生成工程の公開 Issue 本文が定める公開・取得確認が完了し、Mac 合格記録と公開配布物の対象版・適用範囲が一致する。公開結果と取得物を読み戻した証拠を記録済み。開発版の合格や未公開候補だけでは完了としない"
     location: https://github.com/takasek/pfdsl/releases
     externalStakeholders: [ macOS 利用者 ]
 process:
@@ -219,7 +219,7 @@ process:
     label: CLI 同名診断公開
   i1352_i1282_i1283_i1284_i483_improve_preview:
     label: プレビューを改善する
-    description: "表示・編集・移動の既存束を維持する。#1352・#1284 の残実装は #1444 の UI 仕様に合わせ、実機条件は #1445 へ移す。#1282・#1283・#483 の done と editor_connector の wip・入力は保持する"
+    description: "表示・編集・移動を改善する既存工程。現在の仕様・担当・残件は location の Issue とその参照先を正本とし、関連 Issue の全番号を同期しない"
     location: https://github.com/takasek/pfdsl/issues/1352
   i1259_build_standalone_pfd_features:
     label: PFD 編集・閲覧機能を両版で揃える

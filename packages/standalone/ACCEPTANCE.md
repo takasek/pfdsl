@@ -2,7 +2,7 @@
 
 ## 現行計画と結果の入口
 
-現在の実機手順は [ACCEPTANCE-PLAN.md](ACCEPTANCE-PLAN.md)、元の要求・担当・移管先は [ACCEPTANCE-MAPPING.md](ACCEPTANCE-MAPPING.md)、未実施・不合格の管理は [GUI統合版の実機受入 #1445](https://github.com/takasek/pfdsl/issues/1445)を参照する。
+版に対応する実機手順は [ACCEPTANCE-PLAN.md](ACCEPTANCE-PLAN.md)、2026-10-14の移管時の照合履歴は [ACCEPTANCE-MAPPING.md](ACCEPTANCE-MAPPING.md)、現在の対象Issue・担当・公開範囲・進捗・残件は [GUI統合版の実機受入 #1445](https://github.com/takasek/pfdsl/issues/1445)を参照する。
 2026-10-14の管理整理で実装完了と実機合格を分離した。
 新仕様の試験は未実施であり、この登録で製品実装・実機合格・公開や既存 status を進めない。
 以下の表と日付付き節は各版の実装状態・実行履歴であり、旧 hover 局所グラフ方式や古い未移植・実機待ちの記述を現行の要求・進行条件として読まない。

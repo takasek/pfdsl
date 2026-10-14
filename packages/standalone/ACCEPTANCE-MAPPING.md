@@ -1,13 +1,16 @@
-# GUI要求・担当・試験の対応
+# GUI要求・担当・試験の移管記録（2026-10-14）
 
 2026-10-14、main `6d04e85534207f653005955d6c099b7a9a9aecc7`、各Issue本文・全コメント、#1444の[画面案](https://github.com/takasek/pfdsl/issues/1444#issuecomment-6143768523)と[全採否](https://github.com/takasek/pfdsl/issues/1444#issuecomment-6145651652)を基準に整理した。
-要求はIssue、操作は[計画](ACCEPTANCE-PLAN.md)、版別結果は[受入記録](ACCEPTANCE.md)、未実施・不合格の管理は[#1445](https://github.com/takasek/pfdsl/issues/1445)が正本である。
+本書はこの移管時点の照合記録であり、以下の担当・実装状態・移管先はその時点を表す。
+現在の対象Issue・担当・要求と試験IDの対応・公開範囲・進捗・残件は[#1445](https://github.com/takasek/pfdsl/issues/1445)とそこから参照する要求Issueが正本である。
+以後のIssueの追加・分割・統合・担当変更はIssue本文に記録し、本書を現在の管理台帳として更新しない。
+版に結び付く操作は[計画](ACCEPTANCE-PLAN.md)、実結果は[版別受入記録](ACCEPTANCE.md)に置く。
 下表の旧条件番号は取得時の各受入チェックリストを上から数えた識別子で、製品仕様の新しい採番機構ではない。
 自動欄の「実装」は実装・必要なunit/DOM/host検証・独立レビュー・計画登録を担当Issueの完了条件に残すことを表す。
 実機の合格を表す印ではない。
 テストIDはすべて計画の見出しで解決し、各ホストの状態は未実施から個別に記録する。
 
-## 担当と共有APIの境界
+## 移管時の担当と共有APIの境界
 
 | Issue | 担当 | 別担当・維持条件 |
 | --- | --- | --- |
@@ -131,7 +134,7 @@ edge削除とinput/feedback切替の共有要求も現行message契約にない�
 各Issueの共通採用条件（手動保存、OS範囲、WebKit、文書形式、terminal/外部app、非同梱Git、追加runtime不要、署名DMGと手動更新、未決の退避/復元/クラッシュ復旧）は元の担当に保持しGUI-08/30〜36/39〜42へ対応する。
 初版にMarkdown viewer・内部terminal・Mac App Storeを追加しない。
 
-## 統合済み基盤と現在の残実装
+## 移管時の統合済み基盤と残実装
 
 | 根拠 | 現在の扱い |
 | --- | --- |
