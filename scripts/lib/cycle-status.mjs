@@ -31,24 +31,36 @@ function extractProcessSection(pfdslText) {
 }
 
 /**
- * issue 番号から、それを iN_ prefix または `location:` に持つ process の processId を返す。
+ * issue 番号を iN_ prefix または `location:` に持つ全 process の ID を返す。
  * @param {string} pfdslText - .pfdsl/roadmap.pfdsl の全文
  * @param {number} issueNumber
- * @returns {string | null}
+ * @returns {string[]}
  */
-export function findProcessIdForIssueNumber(pfdslText, issueNumber) {
+export function findProcessIdsForIssueNumber(pfdslText, issueNumber) {
 	// 番兵行を足し、最後のエントリも他のエントリと同じ境界規則
 	// (`^  \S` か `^\S` の手前まで) で終端できるようにする。
 	const scanText = `${extractProcessSection(pfdslText)}\n\x00`;
 	const entryPattern = /^ {2}(\S+):\n([\s\S]*?)(?=^ {2}\S|^\S)/gm;
+	const matches = new Set();
 	for (const [, processId, block] of scanText.matchAll(entryPattern)) {
 		if (issueNumbersOfProcessId(processId).includes(issueNumber)) {
-			return processId;
+			matches.add(processId);
 		}
 		const match = block.match(/location:\s*\S*\/issues\/(\d+)/);
-		if (match && Number(match[1]) === issueNumber) return processId;
+		if (match && Number(match[1]) === issueNumber) matches.add(processId);
 	}
-	return null;
+	return [...matches];
+}
+
+/** Return a unique match, rejecting ambiguous issue ownership. */
+export function findProcessIdForIssueNumber(pfdslText, issueNumber) {
+	const matches = findProcessIdsForIssueNumber(pfdslText, issueNumber);
+	if (matches.length > 1) {
+		throw new Error(
+			`Issue ${issueNumber} matches multiple processes: ${matches.join(", ")}`,
+		);
+	}
+	return matches[0] ?? null;
 }
 
 /**

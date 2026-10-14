@@ -153,9 +153,15 @@ artifact:
     status: todo
     criteria: "location の共通受入 Issue が定める Mac 公開範囲に必要な公開前試験が候補配布物で合格し、不合格への修正・再試験、対象版・環境・証拠と適用範囲を記録済み。他ホストの未確認を追加ゲートにしない"
     location: https://github.com/takasek/pfdsl/issues/1445
+  gui_vscode_candidate:
+    label: VS Code 公開範囲の版固定候補
+    description: "必要な V 実装を含む commit・拡張 package・対応する計画版を特定した受入対象。Mac 専用機能や DMG は準備条件にしない"
+    status: todo
+    criteria: "location の共通受入 Issue が定める V 対象要求の実装・自動検証・独立レビューを確認し、その実装を含む commit から build した拡張 package と識別情報・計画版を登録済み。実機合格は未了でよい"
+    location: https://github.com/takasek/pfdsl/issues/1445
   gui_vscode_acceptance:
     label: VS Code 公開範囲の実機合格記録
-    description: "共通受入 Issue が管理する VS Code 公開範囲の実機合格記録。実行対象の build を Issue で特定する"
+    description: "共通受入 Issue が管理する VS Code 公開範囲の実機合格記録。版固定候補を検査し、候補準備と部分試験の進捗は Issue で管理する"
     status: todo
     criteria: "location の共通受入 Issue が定める VS Code 公開範囲に必要な試験が実 Extension Development Host で合格し、不合格への修正・再試験、対象版・環境・証拠と公開版への適用範囲を記録済み。他ホストの未確認を追加ゲートにしない"
     location: https://github.com/takasek/pfdsl/issues/1445
@@ -200,6 +206,9 @@ process:
     label: Mac の受入済み候補を作る
     description: "候補準備と実機受入を同じ工程内で順に行い、配布物とその合格証拠を揃える。準備に合格を要求せず、内部の進捗・担当は Issue で管理する"
     location: https://github.com/takasek/pfdsl/issues/1445
+  i1445_prepare_gui_vscode_candidate:
+    label: VS Code の版固定候補を準備する
+    location: https://github.com/takasek/pfdsl/issues/1445
   i1445_accept_gui_vscode:
     label: VS Code 統合版の公開範囲を実機受入する
     location: https://github.com/takasek/pfdsl/issues/1445
@@ -241,6 +250,8 @@ standalone_documents >> i1259_i1260_i1261_build_standalone_features -> standalon
 
 standalone_pfd_features >> i1262_i1445_accept_mac_candidate -> gui_mac_acceptance
 
-toolchain >> i1445_accept_gui_vscode -> gui_vscode_acceptance
+[editor_connector, preview_editing_usability, toolchain] >> i1445_prepare_gui_vscode_candidate -> gui_vscode_candidate
+
+gui_vscode_candidate >> i1445_accept_gui_vscode -> gui_vscode_acceptance
 
 gui_mac_acceptance >> i1262_publish_standalone -> standalone_release

@@ -70,7 +70,11 @@ GitHubのIssue更新とGit文書のmain反映は別の時点であり、未マ�
   - 公開 pending を `releasePending`（`{needsAction, report}`）で出力する（#814）。`scripts/release-status.mjs` をそのまま走らせた結果で、`needsAction` はその終了コード、`report` は印字された行。判定でなく報告材料で、pending は公開直後を除いて常に nonzero になる。`needsAction` が何を畳み込むか、なぜそこで止まるかは `scripts/lib/release-status-check.mjs` の `needsAction` の JSDoc が一次情報 — ここには複製しない（#880）。運用上知っておく必要があるのは、false が「公開までにやるべきことが残っていない」であって「`make release` が成功する」ではないこと、true の理由は `report` の行にしか出ないので読むのは行のほうになること、の2点。台帳へ書き写す運用を置かないのは、値の一次情報が npm レジストリ・Marketplace・git であり、書き写した側は無視されたうえに古くなるため
   - このサイクルが着手する issue のうち、`flow:managed` なのに roadmap に process を持たないものを `unregisteredManagedIssues`、roadmap に process がなく `flow:managed` と `flow:exempt` のどちらも持たないものを `untriagedTargetIssues` で出力する（#963、#983）。`audit-issues-flow.mjs` は同じ欠落を全 open issue について報告するが advisory 止まりで、監査を落とさない — roadmap 登録は実装ブランチに乗るため、そのブランチが main へマージされるまで他セッションからは欠落して見え、未分類 issue は GitHub 上で分類されるまで一時的に全セッションから未分類に見える。あるサイクルの差分が消せるのは自分が着手する issue の欠落だけで、他の issue の分は消せない。行動できるのがその1件だけなので、ここが唯一の検査点になる。どちらかが非空で返ってきたら、着手前に roadmap へ依存チェーンを1本足して `flow:managed` を付けるか、`flow:exempt` へ分類するかのどちらかを済ませる — どちらでもないまま進めた回は、その issue の登録または分類が誰の担当でもないまま残る
 
-  - 明示した issue の対応 process を解決し、`graph neighbors --json` の primary successor から出力 artifact キーを引き、実行すべき `gate-check.mjs --artifact <key>` の完成形コマンド行を `gateCheckCommand` で出力する（転記ミス・フォールバック判定への意図しない低下を防ぐ。対応 process の識別は既存の location 解決を使い、出力は CLI の graph 結果を正とする）
+  - 明示したIssueの対応processを全件解決し、`graph neighbors --json` の全primary出力から対象artifactを選ぶ。
+    候補が一つなら自動選択し、複数なら `--artifact <key>` を付けて再実行する。
+    指定artifactが対象の各登録済みIssueに対応するprocessの出力であることを確認し、`gateCheckCommand` と `wipUpdateCommand` を生成する。
+    曖昧な候補・無関係な指定・graph取得失敗では両コマンドを生成せず、理由と候補を報告する。
+    対象未選択は判断待ちとして終了コードだけで選択済みとは読まず、`--no-artifact` へ自動転換しない。
 - **終端ゲートの実行（pfd-ops 手順3）**: `workflow.md`「終端ゲートの根拠」に従う。対象 issue を含むコマンド構築規則も同節に置く。
 - `cycle-status.mjs` と `gate-check.mjs` は `packages/cli/dist/cli.js` の存在を前提にする箇所がある（ビルドの前提は `workflow.md`「worktree でのサイクル実行」の「worktree 前提」）。`gate-check.mjs` はビルド未完了でも最後まで走り、項目名・SKIP 条件・正本への固定案内は印字される（CLI に依存する `pfdsl check` と gen-plugin identity の2項目だけが FAIL。実測 #560）
 
