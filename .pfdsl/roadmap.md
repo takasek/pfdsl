@@ -26,20 +26,39 @@ GitHub Issues。規約と採用手順は `scripts/harness-template/skills/pfd-op
 
 ## プレビュー改善の管理単位
 
-プレビューの表示・編集・移動は `i1352_i1282_i1283_i1284_i483_improve_preview` の一工程として扱う。
-関連 issue と各出力 artifact は課題・実装・確認の内訳であり、別々の作業サイクルを要求しない。
-当初の要望や criteria は見直しの対象とし、利用時の観察に合わせて改善範囲・完了条件・次に扱う課題を更新する。
-現在の範囲と完了条件は [PR #1394](https://github.com/takasek/pfdsl/pull/1394)、対象版と確認結果は [受入記録](../packages/standalone/ACCEPTANCE.md)を参照する。
-未確認を確認済みに読み替えず、今回扱うか次へ回すかをその記録で区別する。
+プレビューの表示・編集・移動は既存の改善工程として扱う。
+関連Issueの分割・統合は作業の内訳であり、それだけで別の作業サイクルやroadmap工程を要求しない。
+現在の仕様・担当・改善範囲・残件は工程の `location` が指すIssue本文と、その管理先から参照する要求Issue・所有者の採否記録を読む。
+個別成果物の完了はその実装と検証で判断し、束全体や他Issueの未完了から推定しない。
+既存の依存入力と完了済み基盤の証拠を保持し、実装完了から実機合格を推定しない。
 
-入力は既存の依存を保持したため、`editor_connector` が wip の間は束全体の ready 判定もその前提待ちになる。
-今回の先行着手は所有者が関連課題を今回の範囲に含めた指示に基づき、完了状態や依存を変更したことにはしない。
-各出力の受入が揃えば個別に done とし、束全体やほかの issue の未完了から個別出力の受入未達を推定しない。
-`node_location_cycle`・`node_definition_creation`・`preview_connector` は個別の受入に基づいて done とした。
-`editor_connector` の wip と既存入力 edge を保持するため、束の保守的な依存に対する W003 が出るが、束全体を完了とする根拠には使わない。
-接続操作による V001 の事前防止は、既存の接続 UI の完了条件と分けて [#1432](https://github.com/takasek/pfdsl/issues/1432) で扱う。
-`preview_connector` から後続の `connector_single_producer_guard` を作る工程として登録し、未着手の todo を保持する。
-ゲートは `preview_editing_usability` を入口にできるが、それだけで各出力の確認済みや完了を認定せず、受入記録の内訳も確認する。
+## GUI領域の実装・実機受入・公開
+
+実装時は必要な自動検証・独立レビューと実行可能な受入テスト計画の追加／更新まで行う。
+実機確認は後工程の受入Issueでまとめて行い、未実施だけを理由に実装PR・次工程を止めない。
+実装完了・実機合格・公開完了は別々に判断し、PRの最終レビューとマージは人間に残す。
+この運用の適用範囲は受入工程の `location` が指す共通受入Issueで管理し、その範囲ではbinding・workflowの従来の実機確認待ちより本節を優先する。
+通常の自動test・既存CIは維持する。
+
+対象Issueの一覧・担当・要求と試験IDの対応・対象版・ホスト別の公開範囲・進捗・残件はIssue本文を正本とし、roadmapへ写さない。
+共通受入Issueを一つの入口とし、機能別・ホスト別に確認項目の正本を増やさない。
+実装・公開の詳細要求はそれぞれの担当Issue、版に結び付く操作と期待結果は[受入計画](../packages/standalone/ACCEPTANCE-PLAN.md)、実結果は[版別受入記録](../packages/standalone/ACCEPTANCE.md)とevidenceに置く。
+[移管時の対応記録](../packages/standalone/ACCEPTANCE-MAPPING.md)は当時の照合履歴とし、現在の対象一覧・担当の台帳として更新しない。
+Issueの追加・分割・統合・担当変更は共通受入Issueの管理表へ反映し、既存の試験IDを再利用できる限り計画やroadmapの改修を要求しない。
+操作や期待結果が変わる場合は実装版に対応する計画を更新し、成果物・工程間の依存・完了の意味が変わる場合はroadmapを更新する。
+このGUI領域ではバックエンドのIssue単位のラベル判定へのローカルな補足として、既存工程・成果物の内訳に当たる詳細Issueは、実装・仕様追加を含んでも `flow:exempt` として工程のIssueから参照する。
+工程を管理するIssueは `flow:managed` とし、詳細Issueの要求と完了証拠を集約して成果物の完了を判断する。
+既存成果物で表せない製品能力や新しい工程間依存を追加する作業は、既存バックエンド規約に従い `flow:managed` として登録する。
+この補足は共通受入Issueが管理するGUI領域だけに適用し、配布バックエンド・監査・他領域の分類は変更しない。
+既存processのID・`location` は登録済み工程の参照であり、関連する詳細Issueの全番号を同期する一覧にはしない。
+
+公開するホストに必要な受入結果を要求し、他ホストの未確認を追加ゲートにしない。
+候補配布物の準備はその実機合格より先に進め、受入対象の生成と受入成功の循環を作らない。
+共通受入Issueの中で対象版・ホスト・結果を区別し、必要な試験の未実施や既知の不合格を合格・対象外へ読み替えない。
+受入processは公開に必要な成果物と実行依存を表し、共通Issueとは別の試験一覧を持たない。
+同じ入力・同じ後続を持ち、間に重要な引き渡しがない内訳は一工程・一成果物にまとめ、個別の進捗はIssueで管理する。
+着手条件や公開条件を左右する実際の依存が異なる場合だけ工程・成果物を分ける。
+GitHubのIssue更新とGit文書のmain反映は別の時点であり、未マージ文書は実在するPR・公開済みcommitから参照する。
 
 ## プリフライト・ゲート集約スクリプト（#354）
 
@@ -51,7 +70,11 @@ GitHub Issues。規約と採用手順は `scripts/harness-template/skills/pfd-op
   - 公開 pending を `releasePending`（`{needsAction, report}`）で出力する（#814）。`scripts/release-status.mjs` をそのまま走らせた結果で、`needsAction` はその終了コード、`report` は印字された行。判定でなく報告材料で、pending は公開直後を除いて常に nonzero になる。`needsAction` が何を畳み込むか、なぜそこで止まるかは `scripts/lib/release-status-check.mjs` の `needsAction` の JSDoc が一次情報 — ここには複製しない（#880）。運用上知っておく必要があるのは、false が「公開までにやるべきことが残っていない」であって「`make release` が成功する」ではないこと、true の理由は `report` の行にしか出ないので読むのは行のほうになること、の2点。台帳へ書き写す運用を置かないのは、値の一次情報が npm レジストリ・Marketplace・git であり、書き写した側は無視されたうえに古くなるため
   - このサイクルが着手する issue のうち、`flow:managed` なのに roadmap に process を持たないものを `unregisteredManagedIssues`、roadmap に process がなく `flow:managed` と `flow:exempt` のどちらも持たないものを `untriagedTargetIssues` で出力する（#963、#983）。`audit-issues-flow.mjs` は同じ欠落を全 open issue について報告するが advisory 止まりで、監査を落とさない — roadmap 登録は実装ブランチに乗るため、そのブランチが main へマージされるまで他セッションからは欠落して見え、未分類 issue は GitHub 上で分類されるまで一時的に全セッションから未分類に見える。あるサイクルの差分が消せるのは自分が着手する issue の欠落だけで、他の issue の分は消せない。行動できるのがその1件だけなので、ここが唯一の検査点になる。どちらかが非空で返ってきたら、着手前に roadmap へ依存チェーンを1本足して `flow:managed` を付けるか、`flow:exempt` へ分類するかのどちらかを済ませる — どちらでもないまま進めた回は、その issue の登録または分類が誰の担当でもないまま残る
 
-  - 明示した issue の対応 process を解決し、`graph neighbors --json` の primary successor から出力 artifact キーを引き、実行すべき `gate-check.mjs --artifact <key>` の完成形コマンド行を `gateCheckCommand` で出力する（転記ミス・フォールバック判定への意図しない低下を防ぐ。対応 process の識別は既存の location 解決を使い、出力は CLI の graph 結果を正とする）
+  - 明示したIssueの対応processを全件解決し、`graph neighbors --json` の全primary出力から対象artifactを選ぶ。
+    候補が一つなら自動選択し、複数なら `--artifact <key>` を付けて再実行する。
+    指定artifactが対象の各登録済みIssueに対応するprocessの出力であることを確認し、`gateCheckCommand` と `wipUpdateCommand` を生成する。
+    曖昧な候補・無関係な指定・graph取得失敗では両コマンドを生成せず、理由と候補を報告する。
+    対象未選択は判断待ちとして終了コードだけで選択済みとは読まず、`--no-artifact` へ自動転換しない。
 - **終端ゲートの実行（pfd-ops 手順3）**: `workflow.md`「終端ゲートの根拠」に従う。対象 issue を含むコマンド構築規則も同節に置く。
 - `cycle-status.mjs` と `gate-check.mjs` は `packages/cli/dist/cli.js` の存在を前提にする箇所がある（ビルドの前提は `workflow.md`「worktree でのサイクル実行」の「worktree 前提」）。`gate-check.mjs` はビルド未完了でも最後まで走り、項目名・SKIP 条件・正本への固定案内は印字される（CLI に依存する `pfdsl check` と gen-plugin identity の2項目だけが FAIL。実測 #560）
 

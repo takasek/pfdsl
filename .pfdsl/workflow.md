@@ -334,6 +334,10 @@ release runner の `migration-guide` ゲートが CLI/plugin の公開で確か�
 
 ## VS Code 拡張の UI 動作確認
 
+GUI領域の受入時機は roadmap.md「GUI領域の実装・実機受入・公開」の運用原則を参照し、対象Issue・担当・公開範囲・進捗・残件は同節が案内する共通受入Issueで一元管理する。
+共通受入Issueの適用範囲では、以下の実機確認待ちより同節の手順を優先する。
+通常の型検査・自動test・CIは維持する。
+
 **vscode-extension を変更した場合**: `pnpm --filter @pfdsl/vscode-extension typecheck` を実行してエラーがないことを確認してからコミットする。`noUncheckedIndexedAccess` / `exactOptionalPropertyTypes` の strict 設定により、他パッケージの型変更が vscode-extension 側でエラーを起こす場合がある。vscode-extension の挙動変更全体を実動作確認の対象とする。クリック・ホバー等の UI 挙動変更（DocumentLinkProvider・HoverProvider 等）や preview/export の描画内容変更（statusStyles・tag・group 解決ロジック等）はその例である。挙動変更を含む場合は `/vscode-ext-debug` スキルで PR 作成前にビルド後の実動作を確認し、ユーザーの確認結果を受け取るまで完了とみなさない。
 
 ## subagent の worktree 隔離の安全確認

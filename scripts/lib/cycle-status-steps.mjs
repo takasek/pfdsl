@@ -17,7 +17,7 @@ import { resolve } from "node:path";
 import {
 	buildGateCheckCommand,
 	countBehind,
-	findProcessIdForIssueNumber,
+	findProcessIdsForIssueNumber,
 	isUnregisteredManagedIssue,
 	parsePorcelainPaths,
 	parseReadyOutput,
@@ -43,6 +43,7 @@ export function cycleStatusExitCode(result) {
  *   root: string,
  *   base: string,
  *   issueNumbers?: number[],
+ *   artifact?: string,
  * }} deps
  */
 export async function runCycleStatus({
@@ -54,6 +55,7 @@ export async function runCycleStatus({
 	root,
 	base,
 	issueNumbers = [],
+	artifact: requestedArtifact,
 }) {
 	let fetched = true;
 	try {
@@ -234,10 +236,10 @@ export async function runCycleStatus({
 
 	// The artifact comes from the process each explicit issue maps to in
 	// roadmap.pfdsl. Exempt issues may have no corresponding process.
-	// No resolvable process, or issues split across different processes, falls
-	// back to null rather than guessing; buildGateCheckCommand turns that into
-	// the --no-artifact equivalent.
+	// Multiple processes or outputs require explicit artifact selection. Only
+	// confirmed exempt targets without a process may use --no-artifact.
 	let artifactKey = null;
+	const artifactCandidates = new Map();
 	let gateCheckCommandError = null;
 	/** @type {number[]} target issues labelled flow:managed with no process yet */
 	const unregisteredManagedIssues = [];
@@ -254,10 +256,10 @@ export async function runCycleStatus({
 			gateCheckCommandError = `failed to read .pfdsl/roadmap.pfdsl: ${e.message}`;
 		}
 		if (roadmapText !== null) {
-			const processIdByIssue = new Map(
+			const processIdsByIssue = new Map(
 				targetIssues.map((issue) => [
 					issue,
-					findProcessIdForIssueNumber(roadmapText, issue),
+					findProcessIdsForIssueNumber(roadmapText, issue),
 				]),
 			);
 			// The one moment the missing roadmap entry is actionable (#963): this
@@ -267,7 +269,8 @@ export async function runCycleStatus({
 			// Only issues whose labels were actually fetched are judged as managed.
 			// When both the process and labels are unknown, however, the command must
 			// fail closed: `--no-artifact` is valid only for a confirmed exempt issue.
-			for (const [issue, processId] of processIdByIssue) {
+			for (const [issue, processIds] of processIdsByIssue) {
+				const processId = processIds[0] ?? null; // Existence check only.
 				const labels = labelsByIssue.get(issue);
 				if (labels === undefined) {
 					if (processId === null) {
@@ -288,44 +291,86 @@ export async function runCycleStatus({
 				}
 			}
 			const resolvedProcessIds = new Set(
-				[...processIdByIssue.values()].filter((id) => id !== null),
+				[...processIdsByIssue.values()].flat(),
 			);
 			if (
 				!gateCheckCommandError &&
-				resolvedProcessIds.size === 1 &&
+				resolvedProcessIds.size > 0 &&
 				!existsSync(cliPath)
 			) {
 				const [processId] = resolvedProcessIds;
 				gateCheckCommandError = `failed to resolve the output artifact for process '${processId}': packages/cli/dist/cli.js not built; run 'pnpm -r build' first`;
-			} else if (!gateCheckCommandError && resolvedProcessIds.size === 1) {
-				const [processId] = resolvedProcessIds;
-				try {
-					const neighborsJson = JSON.parse(
-						sh(process.execPath, [
-							cliPath,
-							"graph",
-							"neighbors",
-							".pfdsl/roadmap.pfdsl",
-							processId,
-							"--json",
-						]),
-					);
-					// `neighbors` tags each element since #828, and the artifact
-					// under gate is the process's output, so name the kind rather
-					// than taking [0]. It selects rather than rejects: feedback
-					// edges only run artifact -> process (computeNeighbors in
-					// packages/core/src/graph-analysis.ts, and N001/N002 keep an id
-					// from being both), so a process has no feedback successor to
-					// drop.
-					artifactKey =
-						neighborsJson?.successors?.find((n) => n?.kind === "primary")?.id ??
-						null;
-					if (!artifactKey) {
-						gateCheckCommandError = `failed to resolve the output artifact for process '${processId}': graph neighbors returned no primary successor`;
+			} else if (!gateCheckCommandError) {
+				for (const processId of resolvedProcessIds) {
+					try {
+						const neighborsJson = JSON.parse(
+							sh(process.execPath, [
+								cliPath,
+								"graph",
+								"neighbors",
+								".pfdsl/roadmap.pfdsl",
+								processId,
+								"--json",
+							]),
+						);
+						// `neighbors` tags each element since #828, and the artifact
+						// under gate is the process's output, so name the kind rather
+						// than taking [0]. It selects rather than rejects: feedback
+						// edges only run artifact -> process (computeNeighbors in
+						// packages/core/src/graph-analysis.ts, and N001/N002 keep an id
+						// from being both), so a process has no feedback successor to
+						// drop.
+						if (
+							neighborsJson?.ok !== true ||
+							!Array.isArray(neighborsJson.successors)
+						) {
+							throw new Error("graph neighbors returned an invalid response");
+						}
+						const outputs = neighborsJson.successors.filter(
+							(n) => n?.kind === "primary",
+						);
+						if (
+							!outputs?.length ||
+							outputs.some((n) => typeof n.id !== "string" || !n.id)
+						) {
+							throw new Error("graph neighbors returned no primary successor");
+						}
+						for (const { id } of outputs) {
+							const producers = artifactCandidates.get(id) ?? new Set();
+							producers.add(processId);
+							artifactCandidates.set(id, producers);
+						}
+					} catch (e) {
+						gateCheckCommandError = `failed to resolve the output artifact for process '${processId}': ${e.message}`;
+						break;
 					}
-				} catch (e) {
-					artifactKey = null;
-					gateCheckCommandError = `failed to resolve the output artifact for process '${processId}': ${e.message}`;
+				}
+				if (!gateCheckCommandError) {
+					const candidates = [...artifactCandidates.keys()].sort();
+					const selected =
+						requestedArtifact ??
+						(candidates.length === 1 ? candidates[0] : undefined);
+					if (
+						requestedArtifact !== undefined &&
+						!artifactCandidates.has(requestedArtifact)
+					) {
+						gateCheckCommandError = `Artifact '${requestedArtifact}' is not a primary output of the target issues; candidates: ${candidates.join(", ") || "none"}`;
+					} else if (candidates.length > 1 && selected === undefined) {
+						gateCheckCommandError = `Multiple output artifacts match the target issues; rerun with --artifact <id>: ${candidates.join(", ")}`;
+					} else if (selected !== undefined) {
+						const producers = artifactCandidates.get(selected);
+						const unrelated = [...processIdsByIssue]
+							.filter(
+								([, ids]) =>
+									ids.length > 0 && !ids.some((id) => producers.has(id)),
+							)
+							.map(([issue]) => issue);
+						if (unrelated.length > 0) {
+							gateCheckCommandError = `Artifact '${selected}' does not belong to the mapped processes for issues: ${unrelated.join(", ")}`;
+						} else {
+							artifactKey = selected;
+						}
+					}
 				}
 			}
 		}
@@ -336,9 +381,10 @@ export async function runCycleStatus({
 	const gateCheckCommand = gateCheckCommandError
 		? null
 		: buildGateCheckCommand(artifactKey, base, targetIssues);
-	const wipUpdateCommand = artifactKey
-		? `node packages/cli/dist/cli.js meta set .pfdsl/roadmap.pfdsl ${quoteShellArgument(artifactKey)} status wip`
-		: undefined;
+	const wipUpdateCommand =
+		!gateCheckCommandError && artifactKey
+			? `node packages/cli/dist/cli.js meta set .pfdsl/roadmap.pfdsl ${quoteShellArgument(artifactKey)} status wip`
+			: undefined;
 
 	const result = {
 		fetched,
@@ -358,6 +404,7 @@ export async function runCycleStatus({
 		issueLookupFailures,
 		blocking: issueLookupFailures.length > 0,
 		wipUpdateCommand,
+		artifactCandidates: [...artifactCandidates.keys()].sort(),
 		gateCheckCommand,
 		unregisteredManagedIssues,
 		untriagedTargetIssues,

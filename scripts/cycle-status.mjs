@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // Cycle preflight: bundles step-1 mechanical operations (fetch, rebase-behind
 // check, open PR listing, ready listing) into one compact JSON payload.
-// Usage: node scripts/cycle-status.mjs [--base main] [--issue <n> ...]
+// Usage: node scripts/cycle-status.mjs [--base main] [--issue <n> ...] [--artifact <id>]
 
 import { existsSync, readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
@@ -28,6 +28,7 @@ try {
 		options: {
 			base: { type: "string" },
 			issue: { type: "string", multiple: true },
+			artifact: { type: "string" },
 		},
 		strict: true,
 		allowPositionals: false,
@@ -64,6 +65,7 @@ const result = await runCycleStatus({
 	root,
 	base,
 	issueNumbers,
+	artifact: values.artifact,
 });
 
 console.log(JSON.stringify(result, null, 2));

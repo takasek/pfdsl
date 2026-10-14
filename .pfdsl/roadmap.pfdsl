@@ -88,7 +88,7 @@ artifact:
     label: "extension 編集支援リリース"
     description: "#482 コネクタ編集 / #483 Preview UI / #484 定義挿入を含む次期 Marketplace リリース"
     status: todo
-    criteria: "npx @vscode/vsce show takasek.pfdsl --json の versions に packages/vscode-extension/package.json の version が含まれ、その版でコネクタ編集・Preview 生成 UI・定義挿入が動作する"
+    criteria: "npx @vscode/vsce show takasek.pfdsl --json の versions に packages/vscode-extension/package.json の version が含まれ、その版でコネクタ編集・Preview 生成 UI・定義挿入が動作する。共通受入 Issue で定める VS Code 公開範囲の合格記録と公開版が対応し、他ホストの未確認を追加ゲートにしない"
   group_delete_cli:
     label: "group を削除できる delete (#1278)"
     description: "delete が group id を受け付け、宣言を削除する。所属ノードと子 group は残し、group: と parent: を削除されずに残る最も近い祖先へ付け替える。祖先がなければ参照を外す"
@@ -120,10 +120,10 @@ artifact:
     status: todo
     criteria: "npm view @pfdsl/cli versions に group 削除を含む版が含まれ、その版を固定して取得した CLI で pfdsl delete <file> <group-id> が group を削除する。同じ release tag の plugin 配布について .pfdsl/workflow.md の「release milestone artifact の作成規約」と .pfdsl/pipeline.md の公開・pin・取得確認を満たす"
   preview_editing_usability:
-    label: 図全体と編集・移動を見失わないプレビュー
-    description: "プレビューの表示・編集・移動の改善全体。関連 issue は課題の参照とし、現在の改善範囲と完了条件は roadmap.md の「プレビュー改善の管理単位」から辿る"
+    label: 表示・編集・移動の改善実装
+    description: "プレビューの表示・編集・移動の改善実装。要求と担当の内訳は生成工程の location が指す Issue から辿る"
     status: wip
-    criteria: "現在選んだ改善範囲の実装が完了条件を満たし、受入記録で対象版と実操作結果を確認できる。未確認範囲と次に扱う課題が区別して記録されている"
+    criteria: "生成工程の Issue 本文が定める改善範囲の実装・必要な自動検証・独立レビューと、版に対応する実行可能な受入計画の登録が完了している。実機未実施は共通受入 Issue に残し、この done は実機合格を意味しない"
     location: ../packages/
   node_definition_creation:
     label: プレビューと CLI から作れるノード定義
@@ -137,38 +137,38 @@ artifact:
     status: done
     criteria: "定義キーから本文中の同一 ID の全出現箇所を文書順に巡回して定義へ戻れ、途中からも次へ進める。キー操作と右クリックから利用でき、VS Code の既存操作とのショートカット衝突が解消済み"
     location: ../packages/
-  hover_local_graph:
-    label: ホバー内の周辺グラフとノード移動
-    description: "注目ノードと直接の前後ノード・エッジからなる小さな図をホバー表示内に描き、図内のノードを選んでメインのプレビューへ移動する機能。要件は issue #1284"
-    status: wip
-    criteria: "メタデータの有無にかかわらずホバー内に中心と直接の前後ノード・エッジだけの小さな図を表示し、feedback edge を含む接続方向を保つ。図内のノードをクリックしてメインの図でそのノードへ移動できる"
-    location: ../packages/
-  preview_focus_cue:
-    label: フォーカス先ノードの一時的な強調
-    description: "エディタでの選択とホバー内の周辺グラフでのクリックによってメインの図が移動した先を、短時間示す視覚的な合図。要件は issue #1284（#1285 から移管）"
-    status: wip
-    criteria: "エディタでのノード選択とホバー内の周辺グラフでのノードクリックのどちらでも、移動先のノードだけが短時間強調される。連続選択で古い強調が残らず、再描画だけでは点滅せず、動きを減らす設定を尊重する"
-    location: ../packages/
   standalone_documents:
     label: 安全に編集・保存できる文書アプリ
     status: done
     criteria: 任意 PFD の新規・開く・手動保存・別名保存とエディタ＋プレビューの組のタブ操作が実機で動き、未保存終了・外部再変更・削除・保存失敗の試験で内容を黙って失わずに解決できる
   standalone_pfd_features:
-    label: PFD 編集・閲覧機能が揃ったアプリ
+    label: 公開前 GUI 機能の実装済みアプリ
+    description: "公開前の GUI 機能を集約した実装成果物。要求・担当・内部の着手順と進捗は location の Issue 本文から辿り、実機結果は共通受入 Issue で扱う"
     status: wip
-    criteria: 受入対応表の言語支援・構造編集・プレビュー操作・相互移動・extends が両ホストで検証され、日本語・大きい図・不完全な文書・タブ切替の実機確認と証拠が揃っている
-  standalone_integrations:
-    label: 関連参照・差分・外部実行を備えたアプリ
+    criteria: "location の Issue 本文が定める機能範囲の実装・必要な自動検証・独立レビューと、版に対応する実行可能な受入計画の登録が完了している。実機未実施を許容し、この done は実機合格を意味しない"
+    location: https://github.com/takasek/pfdsl/issues/1259
+  gui_mac_acceptance:
+    label: 実機受入済みの macOS 候補配布物
+    description: "署名・公証済み候補配布物と、その版・公開範囲に対応する実機合格記録。候補準備中の進捗は Issue で管理する"
     status: todo
-    criteria: 関連 PFD・外部ファイル・URL・ディレクトリ候補、未保存内容を含む別ファイル／Git 差分、Terminal.app／Ghostty 実行を Mac 実機で確認し、Git 不在・起動失敗・権限拒否を扱える
-  standalone_exports:
-    label: 全形式を書き出せるアプリ
+    criteria: "location の共通受入 Issue が定める Mac 公開範囲に必要な公開前試験が候補配布物で合格し、不合格への修正・再試験、対象版・環境・証拠と適用範囲を記録済み。他ホストの未確認を追加ゲートにしない"
+    location: https://github.com/takasek/pfdsl/issues/1445
+  gui_vscode_candidate:
+    label: VS Code 公開範囲の版固定候補
+    description: "必要な V 実装を含む commit・拡張 package・対応する計画版を特定した受入対象。Mac 専用機能や DMG は準備条件にしない"
     status: todo
-    criteria: 開発環境を別途導入しない Mac で DOT・SVG・PDF・PNG・TSV と一括出力を利用でき、日本語・フォント・大きい図・寸法・部分成功を実ファイルと両ホストの受入証拠で確認できる
+    criteria: "location の共通受入 Issue が定める V 対象要求の実装・自動検証・独立レビューを確認し、その実装を含む commit から build した拡張 package と識別情報・計画版を登録済み。実機合格は未了でよい"
+    location: https://github.com/takasek/pfdsl/issues/1445
+  gui_vscode_acceptance:
+    label: VS Code 公開範囲の実機合格記録
+    description: "共通受入 Issue が管理する VS Code 公開範囲の実機合格記録。版固定候補を検査し、候補準備と部分試験の進捗は Issue で管理する"
+    status: todo
+    criteria: "location の共通受入 Issue が定める VS Code 公開範囲に必要な試験が実 Extension Development Host で合格し、不合格への修正・再試験、対象版・環境・証拠と公開版への適用範囲を記録済み。他ホストの未確認を追加ゲートにしない"
+    location: https://github.com/takasek/pfdsl/issues/1445
   standalone_release:
     label: 公開済み macOS スタンドアロンアプリ
     status: todo
-    criteria: GitHub Releases の固定した公開版から署名・公証済み Apple Silicon DMG を取得でき、版・ソースコミット・DMG 識別情報・対応 macOS 下限を記録済み。配布物で全機能・関連付け・更新案内・導入入替・長時間利用の受入証拠が揃っている
+    criteria: "生成工程の公開 Issue 本文が定める公開・取得確認が完了し、Mac 合格記録と公開配布物の対象版・適用範囲が一致する。公開結果と取得物を読み戻した証拠を記録済み。開発版の合格や未公開候補だけでは完了としない"
     location: https://github.com/takasek/pfdsl/releases
     externalStakeholders: [ macOS 利用者 ]
 process:
@@ -197,17 +197,21 @@ process:
     label: CLI 同名診断公開
   i1352_i1282_i1283_i1284_i483_improve_preview:
     label: プレビューを改善する
-    description: "表示・編集・移動を一つの改善工程として扱う。関連課題は #1352、#1282、#1283、#1284、#483。範囲と完了条件は利用時の観察に合わせて見直し、各出力は実装と確認の内訳として残す"
+    description: "表示・編集・移動を改善する既存工程。現在の仕様・担当・残件は location の Issue とその参照先を正本とし、関連 Issue の全番号を同期しない"
     location: https://github.com/takasek/pfdsl/issues/1352
-  i1259_build_standalone_pfd_features:
-    label: PFD 編集・閲覧機能を両版で揃える
+  i1259_i1260_i1261_build_standalone_features:
+    label: 公開前の GUI 機能を実装する
     location: https://github.com/takasek/pfdsl/issues/1259
-  i1260_build_standalone_integrations:
-    label: 関連参照・差分・外部実行を接続する
-    location: https://github.com/takasek/pfdsl/issues/1260
-  i1261_build_standalone_exports:
-    label: 全形式の書き出しを完成させる
-    location: https://github.com/takasek/pfdsl/issues/1261
+  i1262_i1445_accept_mac_candidate:
+    label: Mac の受入済み候補を作る
+    description: "候補準備と実機受入を同じ工程内で順に行い、配布物とその合格証拠を揃える。準備に合格を要求せず、内部の進捗・担当は Issue で管理する"
+    location: https://github.com/takasek/pfdsl/issues/1445
+  i1445_prepare_gui_vscode_candidate:
+    label: VS Code の版固定候補を準備する
+    location: https://github.com/takasek/pfdsl/issues/1445
+  i1445_accept_gui_vscode:
+    label: VS Code 統合版の公開範囲を実機受入する
+    location: https://github.com/takasek/pfdsl/issues/1445
   i1262_publish_standalone:
     label: 配布物の全体受入を完了して公開する
     location: https://github.com/takasek/pfdsl/issues/1262
@@ -233,19 +237,21 @@ ready_counts_cli >> publish_cli_ready_counts -> cli_release_ready_counts
 
 ext_v0015 >> i482_implement_editor_connector -> editor_connector
 
-[def_insertion, editor_connector, preview_connector] >> publish_ext_editing -> ext_editing_release
+[def_insertion, editor_connector, gui_vscode_acceptance, preview_connector] >> publish_ext_editing -> ext_editing_release
 
 group_delete_cli >> publish_cli_group_delete -> cli_release_group_delete
 
 meta_set_extension_fields >> publish_cli_meta_set_extension -> cli_release_meta_set_extension
 
 group_node_clash_diagnostic >> publish_cli_group_node_clash -> cli_release_group_node_clash
-[def_insertion, editor_connector, toolchain] >> i1352_i1282_i1283_i1284_i483_improve_preview -> [hover_local_graph, node_definition_creation, node_location_cycle, preview_connector, preview_editing_usability, preview_focus_cue]
+[def_insertion, editor_connector, toolchain] >> i1352_i1282_i1283_i1284_i483_improve_preview -> [node_definition_creation, node_location_cycle, preview_connector, preview_editing_usability]
 
-standalone_documents >> i1259_build_standalone_pfd_features -> standalone_pfd_features
+standalone_documents >> i1259_i1260_i1261_build_standalone_features -> standalone_pfd_features
 
-standalone_pfd_features >> i1260_build_standalone_integrations -> standalone_integrations
+[preview_editing_usability, standalone_pfd_features] >> i1262_i1445_accept_mac_candidate -> gui_mac_acceptance
 
-standalone_pfd_features >> i1261_build_standalone_exports -> standalone_exports
+[editor_connector, preview_editing_usability, toolchain] >> i1445_prepare_gui_vscode_candidate -> gui_vscode_candidate
 
-[standalone_exports, standalone_integrations] >> i1262_publish_standalone -> standalone_release
+gui_vscode_candidate >> i1445_accept_gui_vscode -> gui_vscode_acceptance
+
+gui_mac_acceptance >> i1262_publish_standalone -> standalone_release

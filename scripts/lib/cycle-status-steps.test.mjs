@@ -750,13 +750,15 @@ describe("runCycleStatus", () => {
 		);
 	});
 
-	it("falls back to --no-artifact when --issue numbers resolve to different processes", async () => {
+	it("requires artifact selection when target issues resolve to different processes", async () => {
 		const result = await runCycleStatus(
 			baseDeps({
 				issueNumbers: [667, 668],
 				sh: (_file, args) => {
 					if (args.includes("neighbors"))
-						return neighborsJsonOk(["should_not_be_used"]);
+						return neighborsJsonOk([
+							args.includes("proc_a") ? "out_a" : "out_b",
+						]);
 					return "";
 				},
 				readFileSync: () =>
@@ -770,10 +772,9 @@ describe("runCycleStatus", () => {
 				},
 			}),
 		);
-		assert.equal(
-			result.gateCheckCommand,
-			"node scripts/gate-check.mjs --base main --no-artifact --issue 667 --issue 668",
-		);
+		assert.equal(result.gateCheckCommand, null);
+		assert.equal(result.wipUpdateCommand, undefined);
+		assert.match(result.gateCheckCommandError, /--artifact/);
 	});
 
 	it("returns a null gate-check command until a target is selected", async () => {
