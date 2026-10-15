@@ -19,6 +19,7 @@ export const editor = {
 			model,
 			callbacks,
 			renders: 0,
+			focus() {},
 			getValue: () => model.source,
 			getModel: () => model,
 			render() {

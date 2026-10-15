@@ -215,7 +215,7 @@ async function failedSaveAs(options = {}) {
 	});
 	const tab = await host.open(a);
 	tab.type(TEXT.edited);
-	await host.click(host.query("#save-as"));
+	await host.command("save-as");
 	return {
 		native,
 		a,
@@ -264,7 +264,7 @@ test("a hard-link Save As target keeps its own leaf when the original is renamed
 	});
 	const tab = await host.open(a);
 	tab.type(TEXT.edited);
-	await host.click(host.query("#save-as"));
+	await host.command("save-as");
 	try {
 		assert.equal(host.panel().recoveryPath, link.path);
 		const renamed = rename(native, a, 9, "renamed.pfdsl");
@@ -295,7 +295,7 @@ test("a Save As target that reselects the original follows the original's rename
 	});
 	const tab = await host.open(a);
 	tab.type(TEXT.edited);
-	await host.click(host.query("#save-as"));
+	await host.command("save-as");
 	try {
 		assert.equal(host.panel().present, true);
 		const renamed = rename(native, a, 9, "renamed.pfdsl");
@@ -568,7 +568,7 @@ test("a clean tab keeps the unsaved mark after its Save As lost the reply", asyn
 		confirm: async () => "cancel",
 	});
 	const tab = await host.open(a);
-	await host.click(host.query("#save-as"));
+	await host.command("save-as");
 	try {
 		assert.equal(tab.getSource(), TEXT.disk);
 		assert.equal(host.isDirty(tab), true);
@@ -608,7 +608,7 @@ test("a published but unconfirmed save keeps its receipt, the buffer and the rec
 	});
 	const tab = await host.open(a);
 	tab.type(TEXT.edited);
-	await host.click(host.query("#save-as"));
+	await host.command("save-as");
 	try {
 		const text = () => host.query("#conflicts p").textContent;
 		assert.match(
@@ -656,7 +656,7 @@ test("Save As onto a file that another tab has open is refused with both buffers
 	second.type("unsaved B\n");
 	first.button.click();
 	host.log.length = 0;
-	await host.click(host.query("#save-as"));
+	await host.command("save-as");
 	try {
 		assert.match(status(host), /already open as b\.pfdsl/);
 		assert.equal(host.log.filter((item) => item.kind === "save").length, 0);
@@ -685,7 +685,7 @@ test("Use Current Disk Version refuses a recovery target that another tab has op
 	});
 	const first = await host.open(a);
 	first.type(TEXT.edited);
-	await host.click(host.query("#save-as"));
+	await host.command("save-as");
 	assert.equal(host.panel().recoveryPath, b.path);
 	const second = await host.open(b);
 	second.type("unsaved B\n");

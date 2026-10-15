@@ -7,6 +7,17 @@ const require = createRequire(`${root}/packages/standalone/package.json`);
 export const { build } = require("esbuild");
 export const { JSDOM } = require("jsdom");
 
+export const menuStub = `
+class Item {
+ static async new(options){return new Item(options)}
+ constructor(options){Object.assign(this,options);this.children=options.items??[];delete this.items;(globalThis.reviewMenuItems??=[]).push(this)}
+ async setEnabled(v){this.enabled=v} async setChecked(v){this.checked=v} async setText(v){this.text=v}
+ async setAsAppMenu(){this.appMenu=true} async setAsWindowsMenuForNSApp(){} async setAsHelpMenuForNSApp(){}
+ async items(){return this.children} async append(i){this.children.push(i)} async remove(i){this.children=this.children.filter(x=>x!==i)} async close(){this.closed=true}
+}
+export const Menu=Item,MenuItem=Item,CheckMenuItem=Item,Submenu=Item,PredefinedMenuItem=Item;
+`;
+
 const tabStub = `
 export function createDocumentTab(options){
  // reviewNormalize stands in for Monaco's line-ending normalization when a test sets it.
@@ -16,7 +27,7 @@ export function createDocumentTab(options){
  const container=document.createElement('div'),button=document.createElement('button');
  options.parent.append(container);button.textContent=options.name;
  const tab={container,button,location:options.path,read:options.read,setSourceCalls:0,
-  activate(){},focus(){},command(){},canDiagram(){return true;},
+  activate(){},focus(){},command(){},canDiagram(){return true;},canCreateDefinition(){return false;},
   dispose(){container.remove();button.remove();hook('dispose',tab);},
   getSource:()=>source,getRevision:()=>revision,
   type(s){source=s;revision++;hook('type',tab,s);options.onChange?.();},
@@ -57,7 +68,7 @@ export async function bundleHost(outfile) {
 					b.onResolve(
 						{
 							filter:
-								/^(?:@tauri-apps\/api\/|@pfdsl\/editor$|monaco-editor\/|\.\/document-tab\.js$|\.\/text-comparison\.js$|\.\/native-menu\.js$|\.\/acceptance\.js$|\.\/style\.css$)/,
+								/^(?:@tauri-apps\/api\/|@pfdsl\/editor$|monaco-editor\/|\.\/document-tab\.js$|\.\/text-comparison\.js$|\.\/acceptance\.js$|\.\/style\.css$)/,
 						},
 						(args) => ({ path: args.path, namespace: "review-seams" }),
 					);
@@ -65,8 +76,8 @@ export async function bundleHost(outfile) {
 						contents:
 							args.path === "./text-comparison.js"
 								? comparisonStub
-								: args.path === "./native-menu.js"
-									? "export const installNativeMenu=async()=>({update(){},recent(){}});"
+								: args.path === "@tauri-apps/api/menu"
+									? menuStub
 									: args.path === "@tauri-apps/api/core"
 										? "export const invoke=(...args)=>globalThis.nativeInvoke(...args);"
 										: args.path === "@tauri-apps/api/event"

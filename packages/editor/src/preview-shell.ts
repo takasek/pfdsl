@@ -5,16 +5,10 @@ const graphStyles =
 const previewControlsStyles = `
 #tooltip { pointer-events: auto; max-width: min(360px, calc(100vw - 16px)); max-height: calc(100vh - 16px); overflow: auto; word-break: normal; overflow-wrap: anywhere; }
 #tooltip .tt-val[data-field="status"] { white-space: nowrap; }
-.tt-graph { max-width: 340px; max-height: 230px; overflow: auto; margin-top: 6px; }
-.tt-graph svg { display: block; }
-.tt-graph g.node { cursor: pointer; }
 .pfdsl-focus-ring { position: absolute; pointer-events: none; outline: 2px solid var(--pfdsl-focusBorder, #007fd4); animation: pfdsl-cue ${FOCUS_CUE_DURATION_MS}ms ease-out; }
 @keyframes pfdsl-cue { from { opacity: 1; } to { opacity: 0.35; } }
 @media (prefers-reduced-motion: reduce) { .pfdsl-focus-ring { animation: none; } }
-#node-actions { flex-shrink: 0; padding: 8px; max-height: 40%; overflow: auto; font: 12px var(--pfdsl-editor-font-family, sans-serif); border-top: 1px solid var(--pfdsl-panel-border, #555); }
-#node-actions button, #node-actions input, #node-actions select { color: inherit; background: var(--pfdsl-editor-background, #fff); font: inherit; margin: 4px; }
-#node-actions label { display: block; }
-#inner g.node:focus-visible, .tt-graph g.node:focus-visible { outline: 2px solid var(--pfdsl-focusBorder, #007fd4); }
+#inner g.node:focus-visible { outline: 2px solid var(--pfdsl-focusBorder, #007fd4); }
 #preview-toolbar { flex-shrink: 0; display: flex; align-items: center; gap: 4px; flex-wrap: wrap; padding: 4px 8px; border-bottom: 1px solid var(--pfdsl-panel-border, #555); font: 12px var(--pfdsl-editor-font-family, sans-serif); }
 #preview-toolbar button { color: inherit; background: transparent; border: 1px solid var(--pfdsl-panel-border, #555); border-radius: 3px; padding: 2px 6px; cursor: pointer; }
 #preview-toolbar button:disabled { opacity: 0.5; cursor: default; }
@@ -45,7 +39,7 @@ export const previewMarkup = `
 <div id="diff-panel"></div>`;
 
 const connectionsStyles = `
-#node-actions { overflow: visible; display: flex; flex-direction: column; min-height: 0; max-height: 42%; position: relative; }
+#node-actions { flex-shrink: 0; padding: 8px; border-top: 1px solid var(--pfdsl-panel-border, #555); font: 12px var(--pfdsl-editor-font-family, sans-serif); overflow: visible; display: flex; flex-direction: column; min-height: 0; max-height: 42%; position: relative; }
 #node-actions[hidden] { display: none; }
 .connections-heading { display: flex; gap: 6px; align-items: center; }
 .connections-heading strong { flex: 1; min-width: 0; overflow-wrap: anywhere; }
@@ -56,7 +50,7 @@ const connectionsStyles = `
 [data-side="right"] .connection-row, [data-side="right"] .connections-input { grid-template-columns: 32px minmax(0, 1fr); }
 .connections-input { overflow-y: auto; scrollbar-gutter: stable; flex-shrink: 0; }
 .connections-center { align-self: center; text-align: center; overflow-wrap: anywhere; padding: 4px; }
-#node-actions button, #node-actions input { min-width: 0; box-sizing: border-box; overflow-wrap: anywhere; }
+#node-actions button, #node-actions input { color: inherit; background: var(--pfdsl-editor-background, #fff); font: inherit; margin: 4px; min-width: 0; box-sizing: border-box; overflow-wrap: anywhere; }
 #node-actions input { width: calc(100% - 8px); padding: 4px; }
 #node-actions [data-edge], #node-actions [data-create] { padding: 2px; min-height: 24px; border: 1px solid var(--pfdsl-panel-border, #777); }
 .connection-candidates { position: absolute; bottom: 100%; left: 0; right: 0; max-height: min(220px, 35vh); overflow: auto; background: var(--pfdsl-editor-background, #fff); border: 1px solid var(--pfdsl-panel-border, #777); z-index: 110; box-shadow: 0 2px 8px #0003; }

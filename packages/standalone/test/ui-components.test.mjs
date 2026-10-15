@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
 import { pathToFileURL } from "node:url";
-import { build, JSDOM, root } from "./helpers/host-bundle.mjs";
+import { build, JSDOM, menuStub, root } from "./helpers/host-bundle.mjs";
 
 async function bundle(name, source, stub, run) {
 	const temporary = mkdtempSync(join(tmpdir(), `pfdsl-1444-${name}-`));
@@ -37,18 +37,8 @@ async function bundle(name, source, stub, run) {
 	}
 }
 
-const menuStub = `
-class Item {
- static async new(options){return new Item(options)}
- constructor(options){Object.assign(this,options);this.children=options.items??[];delete this.items;(globalThis.menuItems??=[]).push(this)}
- async setEnabled(v){this.enabled=v} async setChecked(v){this.checked=v} async setText(v){this.text=v}
- async setAsAppMenu(){this.appMenu=true} async setAsWindowsMenuForNSApp(){} async setAsHelpMenuForNSApp(){}
- async items(){return this.children} async append(i){this.children.push(i)} async remove(i){this.children=this.children.filter(x=>x!==i)} async close(){this.closed=true}
-}
-export const Menu=Item,MenuItem=Item,CheckMenuItem=Item,Submenu=Item,PredefinedMenuItem=Item;
-`;
 test("native menu registers stable commands, applies document/busy/capability state and replaces recent items", async () => {
-	globalThis.menuItems = [];
+	globalThis.reviewMenuItems = [];
 	try {
 		await bundle(
 			"native-menu",
@@ -62,7 +52,8 @@ test("native menu registers stable commands, applies document/busy/capability st
 					(target) => actions.push(target.path),
 					(error) => errors.push(error),
 				);
-				const item = (id) => globalThis.menuItems.find((x) => x.id === id);
+				const item = (id) =>
+					globalThis.reviewMenuItems.find((x) => x.id === id);
 				const flush = async () => {
 					for (let i = 0; i < 500; i++) await Promise.resolve();
 				};
@@ -81,6 +72,9 @@ test("native menu registers stable commands, applies document/busy/capability st
 				assert.equal(item("format").enabled, false);
 				assert.equal(item("sidebar").enabled, false);
 				assert.equal(item("save").accelerator, "CmdOrCtrl+S");
+				assert.equal(item("format").text, "Format flows");
+				assert.equal(item("format-flat").text, "Format flat");
+				assert.equal(item("normalize").text, "Normalized edges");
 				assert.equal(item("close-tab").accelerator, "CmdOrCtrl+W");
 				menu.update({
 					busy: false,
@@ -138,7 +132,7 @@ test("native menu registers stable commands, applies document/busy/capability st
 			},
 		);
 	} finally {
-		delete globalThis.menuItems;
+		delete globalThis.reviewMenuItems;
 	}
 });
 

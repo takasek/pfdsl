@@ -39,15 +39,7 @@ let saveCapability = {
 };
 const saveSupport = document.querySelector<HTMLElement>("#save-support")!;
 function updateSaveControls() {
-	for (const selector of ["#save", "#save-as"]) {
-		const button = document.querySelector<HTMLButtonElement>(selector)!;
-		button.disabled = busy || !active || !saveCapability.save;
-		button.title = saveCapability.reason;
-	}
 	saveSupport.textContent = saveCapability.reason;
-	for (const id of ["format", "format-flat", "normalize"])
-		document.querySelector<HTMLButtonElement>(`#${id}`)!.disabled =
-			busy || !active;
 	updateMenu();
 }
 async function loadSaveCapability() {
@@ -120,14 +112,16 @@ function basename(path: string) {
 	return path.split("/").pop()!;
 }
 function updateMenu() {
+	document.querySelector<HTMLButtonElement>("#sidebar")!.disabled =
+		busy || !folderRoot;
 	nativeMenu?.update({
 		busy,
 		document: !!active,
 		save: saveCapability.save,
 		folder: !!folderRoot,
 		sidebar: !document.querySelector<HTMLElement>("#folder-sidebar")!.hidden,
-		diagram: active?.tab.canDiagram?.() ?? !!active,
-		definition: active?.tab.canCreateDefinition?.() ?? false,
+		diagram: active?.tab.canDiagram() ?? false,
+		definition: active?.tab.canCreateDefinition() ?? false,
 	});
 }
 function renderWorkspace() {
@@ -163,9 +157,6 @@ function renderWorkspace() {
 		file.setAttribute("aria-current", String(file.title === active?.path));
 	updateSaveControls();
 }
-function label(_entry: Entry) {
-	renderWorkspace();
-}
 function syncLocation(entry: Entry) {
 	const disk = entry.session.location;
 	if (!disk) return;
@@ -200,7 +191,7 @@ function run(action: () => Promise<unknown>) {
 	busy = true;
 	updateMenu();
 	for (const button of document.querySelectorAll<HTMLButtonElement>(
-		"[data-command], #files button, #recent button, .close-document, [data-start], #try-sample",
+		"#sidebar, #files button, .close-document, [data-start], #try-sample",
 	))
 		button.disabled = true;
 	void action()
@@ -209,11 +200,11 @@ function run(action: () => Promise<unknown>) {
 			await releaseUnusedDocuments().catch(report);
 			busy = false;
 			for (const button of document.querySelectorAll<HTMLButtonElement>(
-				"[data-command], #files button, #recent button, .close-document, [data-start], #try-sample",
+				"#files button, .close-document, [data-start], #try-sample",
 			))
 				button.disabled = false;
 			updateSaveControls();
-			if (active) label(active);
+			renderWorkspace();
 			renderConflict();
 		});
 }
@@ -227,7 +218,7 @@ function openDocument(name: string, source: string, disk: DiskSnapshot | null) {
 	if (existing) {
 		if (existing.session.rebindDisk(disk)) {
 			syncLocation(existing);
-			label(existing);
+			renderWorkspace();
 			void remember(disk.path).catch(report);
 		}
 		activate(existing);
@@ -244,7 +235,7 @@ function openDocument(name: string, source: string, disk: DiskSnapshot | null) {
 		reportStatus: (message) =>
 			report(entry ? `${entry.name}: ${message}` : message),
 		onChange: () => {
-			if (entry) label(entry);
+			if (entry) renderWorkspace();
 		},
 	});
 	const navigation = document.createElement("span");
@@ -295,7 +286,7 @@ async function openSnapshot(snapshot: DiskSnapshot) {
 				entry.session.rebindDisk(snapshot, true)
 			) {
 				syncLocation(entry);
-				label(entry);
+				renderWorkspace();
 				break;
 			}
 		}
@@ -314,25 +305,6 @@ async function refreshRecent() {
 		);
 	recentTargets = recent;
 	nativeMenu?.recent(recentTargets);
-	const container = document.querySelector<HTMLElement>("#recent")!;
-	container.replaceChildren();
-	for (const target of recent) {
-		const button = document.createElement("button");
-		button.textContent = `${target.kind === "folder" ? "Folder: " : ""}${basename(target.path)}`;
-		button.title = target.path;
-		button.onclick = () =>
-			run(async () => {
-				if (target.kind === "folder")
-					await showFolder(
-						await invoke<string>("open_recent_folder", { path: target.path }),
-					);
-				else
-					await openSnapshot(
-						await invoke<DiskSnapshot>("open_recent", { path: target.path }),
-					);
-			});
-		container.append(button);
-	}
 }
 async function showFolder(root: string) {
 	folderRoot = root;
@@ -464,7 +436,7 @@ async function saveEntry(
 			});
 		} catch (error) {
 			session.observe(remembered, { error }, scope);
-			label(entry);
+			renderWorkspace();
 			renderConflict();
 			status.textContent = `Could not read ${remembered.path}: ${String(error)}. The save was not attempted. Editor content is retained.`;
 			return false;
@@ -479,7 +451,7 @@ async function saveEntry(
 			syncLocation(entry);
 			status.textContent =
 				"Reloaded the current disk version; there was nothing to save.";
-			label(entry);
+			renderWorkspace();
 			renderConflict();
 			return true;
 		}
@@ -493,7 +465,7 @@ async function saveEntry(
 		) {
 			syncLocation(entry);
 			status.textContent = "Already saved.";
-			label(entry);
+			renderWorkspace();
 			renderConflict();
 			return true;
 		}
@@ -544,7 +516,7 @@ async function saveEntry(
 	if (outcome.stale) {
 		status.textContent =
 			"The document changed while the review was open. Editor content is retained; review it again.";
-		label(entry);
+		renderWorkspace();
 		renderConflict();
 		return false;
 	}
@@ -555,7 +527,7 @@ async function saveEntry(
 		);
 	}
 	status.textContent = `${entry.name}: ${outcome.message || (outcome.saved ? "Saved." : "The save was not accepted. Editor content is retained.")}`;
-	label(entry);
+	renderWorkspace();
 	renderConflict();
 	return outcome.saved;
 }
@@ -643,7 +615,7 @@ async function useDiskVersion(entry: Entry) {
 	}
 	syncLocation(entry);
 	await remember(current.path).catch(report);
-	label(entry);
+	renderWorkspace();
 	status.textContent = "Reloaded the current disk version.";
 }
 function dispose(entry: Entry) {
@@ -690,69 +662,61 @@ async function closeEntries(entries: Entry[]) {
 			membership.every((entry) => opened.has(entry)),
 	);
 }
-document.querySelector<HTMLButtonElement>("#new")!.onclick = () => {
-	if (!busy) {
+const commands: Record<string, () => void> = {
+	new() {
 		openDocument(`Untitled ${serial + 1}`, "", null);
-		active?.tab.focus?.();
-	}
+		active?.tab.focus();
+	},
+	format: () => active?.tab.format(),
+	"format-flat": () => active?.tab.format("flat"),
+	normalize: () => active?.tab.normalize(),
+	save: () =>
+		run(async () => {
+			if (active) await saveEntry(active);
+		}),
+	"save-as": () =>
+		run(async () => {
+			if (active) await saveEntry(active, true);
+		}),
+	"open-file": () =>
+		run(async () => {
+			if (!native)
+				throw new Error("Use the desktop application to choose a file.");
+			const snapshot = await invoke<DiskSnapshot | null>("select_document");
+			if (snapshot) await openSnapshot(snapshot);
+		}),
+	open: () =>
+		run(async () => {
+			if (!native)
+				throw new Error("Use the desktop application to choose a folder.");
+			const root = await invoke<string | null>("select_folder");
+			if (root) await showFolder(root);
+		}),
+	sidebar() {
+		if (!folderRoot) return;
+		const sidebar = document.querySelector<HTMLElement>("#folder-sidebar")!;
+		sidebar.hidden = !sidebar.hidden;
+		document
+			.querySelector("#sidebar")!
+			.setAttribute("aria-expanded", String(!sidebar.hidden));
+		updateMenu();
+		active?.tab.activate();
+	},
 };
-document.querySelector<HTMLButtonElement>("#format")!.onclick = () => {
-	if (!busy) active?.tab.format();
-};
-document.querySelector<HTMLButtonElement>("#format-flat")!.onclick = () => {
-	if (!busy) active?.tab.format("flat");
-};
-document.querySelector<HTMLButtonElement>("#normalize")!.onclick = () => {
-	if (!busy) active?.tab.normalize();
-};
-document.querySelector<HTMLButtonElement>("#save")!.onclick = () =>
-	run(async () => {
-		if (active) await saveEntry(active);
-	});
-document.querySelector<HTMLButtonElement>("#save-as")!.onclick = () =>
-	run(async () => {
-		if (active) await saveEntry(active, true);
-	});
-document.querySelector<HTMLButtonElement>("#open-file")!.onclick = () =>
-	run(async () => {
-		if (!native)
-			throw new Error("Use the desktop application to choose a file.");
-		const snapshot = await invoke<DiskSnapshot | null>("select_document");
-		if (snapshot) await openSnapshot(snapshot);
-	});
-document.querySelector<HTMLButtonElement>("#open")!.onclick = () =>
-	run(async () => {
-		if (!native)
-			throw new Error("Use the desktop application to choose a folder.");
-		const root = await invoke<string | null>("select_folder");
-		if (root) await showFolder(root);
-	});
 document.addEventListener("keydown", (event) => {
 	if (event.isComposing || (nativeMenu && event.isTrusted)) return;
 	if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "s") {
 		event.preventDefault();
-		run(async () => {
-			if (active) await saveEntry(active, event.shiftKey);
-		});
+		performCommand(event.shiftKey ? "save-as" : "save");
 	}
 });
 document.querySelector<HTMLButtonElement>("#sidebar")!.onclick = () => {
-	if (!folderRoot || busy) return;
-	const sidebar = document.querySelector<HTMLElement>("#folder-sidebar")!;
-	sidebar.hidden = !sidebar.hidden;
-	document
-		.querySelector("#sidebar")!
-		.setAttribute("aria-expanded", String(!sidebar.hidden));
-	updateMenu();
-	active?.tab.activate();
+	performCommand("sidebar");
 };
 for (const button of document.querySelectorAll<HTMLButtonElement>(
 	"[data-start]",
 ))
-	button.onclick = () =>
-		document
-			.querySelector<HTMLButtonElement>(`#${button.dataset.start}`)!
-			.click();
+	button.onclick = () => performCommand(button.dataset.start!);
 document.querySelector<HTMLButtonElement>("#try-sample")!.onclick = () => {
 	if (busy) return;
 	openDocument(
@@ -764,11 +728,9 @@ document.querySelector<HTMLButtonElement>("#try-sample")!.onclick = () => {
 };
 function performCommand(id: string) {
 	if (busy || document.querySelector("dialog[open]")) return;
-	const button = document.querySelector<HTMLButtonElement>(
-		`#menu-commands > #${id}, header > #${id}`,
-	);
-	if (button) {
-		button.click();
+	const command = commands[id];
+	if (command) {
+		command();
 		return;
 	}
 	if (id === "close-window") {
@@ -894,10 +856,10 @@ if (native) {
 				);
 				if (opened.has(entry)) {
 					syncLocation(entry);
-					label(entry);
+					renderWorkspace();
 				}
 			} catch (error) {
-				if (opened.has(entry)) label(entry);
+				if (opened.has(entry)) renderWorkspace();
 				report(
 					`Could not check ${entry.name}: ${String(error)}. Editor content is retained.`,
 				);

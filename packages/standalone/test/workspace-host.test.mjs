@@ -4,6 +4,23 @@ import { createHarness, FakeNative } from "./helpers/lifecycle-harness.mjs";
 
 const { startHost } = await createHarness("workspace-ui");
 
+test("native commands act on the workspace without hidden DOM command mirrors", async () => {
+	const native = new FakeNative();
+	const doc = native.add(1, "unused.pfdsl", "unused");
+	const host = await startHost(native, doc);
+	try {
+		assert.equal(host.query("#menu-commands"), null);
+		assert.equal(host.query("#recent"), null);
+		await host.command("new");
+		assert.equal(host.tabs().length, 1);
+		assert.equal(host.activeTab().getSource(), "");
+		await host.command("close-tab");
+		assert.equal(host.query("#start-screen").hidden, false);
+	} finally {
+		await host.finish();
+	}
+});
+
 test("Try a sample opens a multiline sample only on request", async () => {
 	const native = new FakeNative();
 	const doc = native.add(1, "unused.pfdsl", "unused");
@@ -28,8 +45,8 @@ test("starts empty, creates only on request, and returns to the start screen aft
 	try {
 		assert.equal(host.tabs().length, 0);
 		assert.equal(host.query("#start-screen").hidden, false);
-		assert.equal(host.query("#save").disabled, true);
-		assert.equal(host.query("#format").disabled, true);
+		assert.equal(!host.menuItem("save").enabled, true);
+		assert.equal(!host.menuItem("format").enabled, true);
 		const tab = await host.newDocument();
 		assert.equal(host.query("#start-screen").hidden, true);
 		assert.match(host.query("#document-state").textContent, /Not saved/);

@@ -38,7 +38,18 @@ export async function withFormatHost(
 				configurable: true,
 			});
 		await build({
-			entryPoints: [join(packageRoot, `src/${entry}.ts`)],
+			...(entry === "main"
+				? {
+						stdin: {
+							contents:
+								readFileSync(join(packageRoot, "src/main.ts"), "utf8") +
+								"\nexport { performCommand };",
+							resolveDir: join(packageRoot, "src"),
+							sourcefile: "main.ts",
+							loader: "ts",
+						},
+					}
+				: { entryPoints: [join(packageRoot, `src/${entry}.ts`)] }),
 			outfile: output,
 			bundle: true,
 			platform: "node",
@@ -67,8 +78,8 @@ export async function withFormatHost(
 		const module = await import(pathToFileURL(output).href);
 		// Formatting uses two explicitly created documents as its fixture.
 		if (entry === "main") {
-			dom.window.document.querySelector("#new").click();
-			dom.window.document.querySelector("#new").click();
+			module.performCommand("new");
+			module.performCommand("new");
 		}
 		const create = (source, options = {}) => {
 			const statuses = [];
@@ -86,6 +97,7 @@ export async function withFormatHost(
 			return { tab, editor: instances.at(-1), statuses };
 		};
 		await run({
+			command: module.performCommand,
 			create,
 			document: dom.window.document,
 			window: dom.window,

@@ -1,3 +1,4 @@
+import assert from "node:assert/strict";
 import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { after } from "node:test";
@@ -136,6 +137,7 @@ const keys = [
 	"reviewEntries",
 	"reviewActive",
 	"reviewBusy",
+	"reviewMenuItems",
 	"reviewTabs",
 	"reviewTabHook",
 	"reviewNormalize",
@@ -233,6 +235,7 @@ export async function createHarness(label) {
 	 * application was told about each file and which versions the user approved.
 	 */
 	async function startHost(native, watched, handlers = {}) {
+		globalThis.reviewMenuItems = [];
 		const dom = new JSDOM(
 			readFileSync(`${root}/packages/standalone/index.html`, "utf8"),
 		);
@@ -534,6 +537,15 @@ export async function createHarness(label) {
 			element.click();
 			await settle();
 		};
+		const menuItem = (id) =>
+			globalThis.reviewMenuItems.find((item) => item.id === id);
+		const command = async (id) => {
+			await flush();
+			const item = menuItem(id);
+			assert.ok(item, `Missing menu command ${id}`);
+			if (item.enabled) item.action();
+			await settle();
+		};
 		const all = (selector) => [
 			...dom.window.document.querySelectorAll(selector),
 		];
@@ -543,6 +555,8 @@ export async function createHarness(label) {
 			ledger,
 			settle,
 			click,
+			command,
+			menuItem,
 			query,
 			queryAll: all,
 			tick,
@@ -578,7 +592,7 @@ export async function createHarness(label) {
 				const before = new Set(tabs());
 				selected = target;
 				selection = undefined;
-				await click(query("#open-file"));
+				await command("open-file");
 				const tab = activeTab();
 				if (!before.has(tab)) approve(target.id, tab.getSource(), "open", tab);
 				else if (
@@ -596,7 +610,7 @@ export async function createHarness(label) {
 				return tab;
 			},
 			async newDocument() {
-				await click(query("#new"));
+				await command("new");
 				return activeTab();
 			},
 			async runPoll() {
