@@ -72,8 +72,8 @@ export function buildHoverLines(
 	const lines: string[] = [`${icon} **${id}**`, "---"];
 	const rows: string[] = [];
 
-	if (kind === "artifact") {
-		const meta = frontmatter?.artifact?.[id];
+	if (kind !== "group") {
+		const meta = frontmatter?.[kind]?.[id];
 		if (meta) {
 			if (meta.label) lines.push(`**${meta.label}**`);
 			if (meta.description) lines.push(...descLines(meta.description));
@@ -87,6 +87,12 @@ export function buildHoverLines(
 						meta.externalStakeholders.join(", "),
 					),
 				);
+		}
+	}
+
+	if (kind === "artifact") {
+		const meta = frontmatter?.artifact?.[id];
+		if (meta) {
 			if (meta.status) rows.push(tableRow("status", meta.status));
 			if (meta.tags?.length) rows.push(tableRow("tags", meta.tags.join(", ")));
 			if (meta.parts?.length)
@@ -102,18 +108,6 @@ export function buildHoverLines(
 	} else if (kind === "process") {
 		const meta = frontmatter?.process?.[id];
 		if (meta) {
-			if (meta.label) lines.push(`**${meta.label}**`);
-			if (meta.description) lines.push(...descLines(meta.description));
-			if (meta.index !== undefined)
-				rows.push(tableRow("index", String(meta.index)));
-			if (meta.owner) rows.push(tableRow("owner", meta.owner));
-			if (meta.externalStakeholders?.length)
-				rows.push(
-					tableRow(
-						"externalStakeholders",
-						meta.externalStakeholders.join(", "),
-					),
-				);
 			if (meta.group)
 				rows.push(
 					tableRow("group", groupDisplay(meta.group, frontmatter, links)),
