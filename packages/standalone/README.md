@@ -31,8 +31,26 @@ Right-click in the editor or press F1 to find **Go to PFDSL definition**, **Next
 Sort metadata accepts multiple keys in priority order; Cancel or Escape returns to the editor without changing the source.
 Definition insertion selects the new label and retains the reminder to complete criteria for a produced artifact.
 Each successful source edit is undoable.
-The **Command** inlay hint shows the declared process command; displaying or hovering it does not execute it.
+The **Run in Terminal.app** inlay hint shows the declared process command; displaying or hovering it does not execute it.
 Native GUI, keyboard, and Japanese IME acceptance for these features is tracked separately in the [acceptance plan](ACCEPTANCE-PLAN.md).
+
+## References, comparison and process commands
+
+Command-click `location` or `subflow` values, use their source hover links, or Command-click preview nodes to follow references.
+PFDSL files open in application tabs, other files in their default application, and HTTP/HTTPS URLs in the default browser.
+Directories offer a file chooser when several candidates exist; Cancel or Escape leaves the source unchanged.
+Relative locations and process working directories use the document directory plus a relative `basePath`; absolute `basePath` is ignored, matching VS Code.
+Subflows always resolve relative to the document directory.
+Save an untitled document before opening relative references or running a command.
+
+Use F1 or the editor context menu to **Compare structure with file…**, **Compare structure with Git ref…**, or **Clear structural comparison**.
+The baseline label and direction appear beside the preview; comparison includes metadata and follows the current unsaved source without changing its Undo history.
+Git comparison uses the saved document's repository and Git on the application's PATH; a missing Git installation does not disable file comparison or editing.
+
+Place the cursor on a process and choose **Run process command in Terminal.app** or **Run process command in Ghostty**, or activate the inlay hint for Terminal.app.
+Commands run only after this explicit action, in a new terminal using `/bin/zsh -l -c` and the terminal's normal login environment.
+The application does not forward its environment or secrets, monitor completion, or update progress from exit codes.
+macOS may request Automation permission for the selected terminal; denial or a missing terminal is reported without changing the document.
 
 ## Linux verification
 
@@ -273,7 +291,8 @@ Native document capabilities are released when tabs close, selections are supers
 The exact bundle and nontrivial ACL/ownership and inherited ACL behavior still require acceptance; this is not proof of all-attribute preservation.
 Its current native GUI, Japanese IME, Find/Replace, Undo/Redo, and manual-save interactions still require acceptance on the exact bundle; see the appended [validation record](ACCEPTANCE.md).
 The language features above have automated Monaco checks and still require native acceptance in the [acceptance plan](ACCEPTANCE-PLAN.md).
-External navigation, export, and distribution remain later implementation work tracked in the [acceptance matrix](ACCEPTANCE.md).
+External navigation and process commands have automated checks and still require native acceptance in the [acceptance plan](ACCEPTANCE-PLAN.md).
+Export and distribution remain later implementation work tracked in the [acceptance matrix](ACCEPTANCE.md).
 Local `.app` builds are not signed/notarized release DMGs.
 
 ## Verification

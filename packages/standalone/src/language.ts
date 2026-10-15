@@ -5,6 +5,7 @@ import "monaco-editor/editor/contrib/codeAction/browser/codeActionContributions.
 import "monaco-editor/editor/contrib/gotoSymbol/browser/goToCommands.js";
 import "monaco-editor/editor/contrib/gotoSymbol/browser/peek/referencesController.js";
 import "monaco-editor/editor/contrib/inlayHints/browser/inlayHintsContribution.js";
+import "monaco-editor/editor/contrib/links/browser/links.js";
 import { language as yaml } from "monaco-editor/languages/definitions/yaml/yaml.js";
 import configuration from "../../vscode-extension/language-configuration.json";
 

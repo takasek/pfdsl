@@ -13,6 +13,9 @@ function offset(model, line, column) {
 
 export { Range };
 export const editor = {
+	registerLinkOpener() {
+		return { dispose() {} };
+	},
 	createModel(source) {
 		return {
 			source,

@@ -96,11 +96,13 @@ test("the production document-tab entry loads real Monaco menu contributions", a
 				import { errorHandler } from "monaco-editor/base/common/errors.js";
 				import { IBulkEditService } from "monaco-editor/editor/browser/services/bulkEditService.js";
 				import { ICommandService } from "monaco-editor/platform/commands/common/commands.js";
+				import { IOpenerService } from "monaco-editor/platform/opener/common/opener.js";
 				errorHandler.unexpectedErrorHandler = error => { throw error; };
 				const languageFeatures = StandaloneServices.get(ILanguageFeaturesService);
 				const applyEdit = edit => StandaloneServices.get(IBulkEditService).apply(edit);
 				const execute = (id, ...args) => StandaloneServices.get(ICommandService).executeCommand(id, ...args);
-				export { createDocumentTab, monaco, EditorExtensionsRegistry, MenuId, languageFeatures, applyEdit, execute };
+				const openLink = url => StandaloneServices.get(IOpenerService).open(url);
+				export { createDocumentTab, monaco, EditorExtensionsRegistry, MenuId, languageFeatures, applyEdit, execute, openLink };
 			`,
 				resolveDir: packageRoot,
 			},
@@ -116,7 +118,7 @@ test("the production document-tab entry loads real Monaco menu contributions", a
 
 		async function withEditors(source, check) {
 			const tabs = [];
-			const create = () => {
+			const create = (options = {}) => {
 				const tab = host.createDocumentTab({
 					parent: document.querySelector("main"),
 					key: `language-${tabs.length}`,
@@ -125,6 +127,7 @@ test("the production document-tab entry loads real Monaco menu contributions", a
 					path: null,
 					read: async () => null,
 					reportStatus() {},
+					...options,
 				});
 				tabs.push(tab);
 				return host.monaco.editor.getEditors().at(-1);
@@ -355,6 +358,135 @@ test("the production document-tab entry loads real Monaco menu contributions", a
 					);
 					await editor.getModel().undo();
 					assert.equal(editor.getValue(), source);
+				});
+			},
+		);
+		await t.test(
+			"authored hover Markdown cannot acquire executable command trust",
+			async () => {
+				const source =
+					'---\nartifact: {a: {label: "[Open documentation](command:fake-run)", description: "[More](command:fake-run)", location: "<command:autolink-run>"}}\nprocess: {p: {command: "printf marker"}}\n---\na >> p -> b\n';
+				await withEditors(source, async (create) => {
+					const editor = create({ referenceServices: {} });
+					const model = editor.getModel();
+					const hovers = await Promise.all(
+						host.languageFeatures.hoverProvider
+							.ordered(model)
+							.map((p) =>
+								p.provideHover(
+									model,
+									{ lineNumber: 5, column: 1 },
+									{ isCancellationRequested: false },
+								),
+							),
+					);
+					const contents = hovers.filter(Boolean).flatMap((h) => h.contents);
+					assert.ok(
+						contents.some((c) => c.value.includes("Open documentation")),
+					);
+					for (const content of contents.filter((c) => c.isTrusted)) {
+						assert.ok(!content.value.includes("<command:"));
+						assert.match(content.value, /\[Open location\]/);
+					}
+					for (const content of contents.filter((c) =>
+						c.value.includes("fake-run"),
+					))
+						assert.equal(
+							content.isTrusted,
+							false,
+							"document-authored Markdown is separate from trusted generated actions",
+						);
+				});
+			},
+		);
+		await t.test(
+			"reference links, explicit process commands and metadata comparison reach their owning services",
+			async () => {
+				const source =
+					'---\nbasePath: ../assets\nartifact: {a: {label: After, location: "read me.txt"}}\nprocess: {p: {command: "printf 日本語\\nprintf done", subflow: "child.pfdsl"}}\n---\na >> p -> b\n';
+				const opened = [],
+					runs = [],
+					statuses = [];
+				const services = {
+					context: async () => "/work/docs/a.pfdsl",
+					inspect: async () => "file",
+					list: async () => [],
+					open: async (target) => opened.push(target),
+					run: async (...args) => runs.push(args),
+					compareFile: async () => ({
+						label: "comparison.pfdsl",
+						source: source.replace("After", "Before"),
+					}),
+					compareGit: async (ref) => ({
+						label: `Git ${ref}`,
+						source: source.replace("After", "Before"),
+					}),
+				};
+				await withEditors(source, async (create, tabs) => {
+					const editor = create({
+						referenceServices: services,
+						reportStatus: (value) => statuses.push(value),
+					});
+					const other = create();
+					assert.equal(opened.length + runs.length, 0);
+					const model = editor.getModel(),
+						token = {
+							isCancellationRequested: false,
+							onCancellationRequested() {
+								return { dispose() {} };
+							},
+						};
+					const results = await Promise.all(
+						host.languageFeatures.linkProvider
+							.ordered(model)
+							.map((p) => p.provideLinks(model, token)),
+					);
+					const links = results
+						.filter(Boolean)
+						.flatMap((result) => result.links);
+					assert.equal(links.length, 2);
+					await host.openLink(links[0].url);
+					assert.deepEqual(opened.at(-1), {
+						kind: "path",
+						value: "/work/assets/read me.txt",
+					});
+					await host.openLink(links[1].url);
+					assert.deepEqual(opened.at(-1), {
+						kind: "path",
+						value: "/work/docs/child.pfdsl",
+					});
+					editor.setPosition({ lineNumber: 4, column: 11 });
+					await editor.getAction("pfdsl.runGhostty").run();
+					assert.deepEqual(runs.at(-1), [
+						"printf 日本語\nprintf done",
+						"/work/assets",
+						"ghostty",
+					]);
+					await editor.getAction("pfdsl.compareFile").run();
+					assert.match(
+						tabs[0].container.querySelector(".reference-comparison")
+							.textContent,
+						/comparison.pfdsl.*including metadata/,
+					);
+					assert.match(
+						tabs[0].container.querySelector("#diff-panel").textContent,
+						/~ node.*a/,
+					);
+					assert.equal(editor.getValue(), source);
+					assert.equal(other.getValue(), source);
+					await editor.getAction("pfdsl.clearDiff").run();
+					assert.equal(
+						tabs[0].container.querySelector(".reference-comparison").hidden,
+						true,
+					);
+					editor.setValue(`${source}b >> q -> c\n`);
+					const count = opened.length;
+					await host.openLink(links[0].url);
+					assert.equal(
+						opened.length,
+						count,
+						"old links cannot open after editing",
+					);
 				});
 			},
 		);

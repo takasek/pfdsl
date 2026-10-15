@@ -4,6 +4,9 @@ export const language = {};
 export const Uri = { parse: (value) => value };
 export const MarkerSeverity = { Error: 8, Warning: 4, Info: 2 };
 export const editor = {
+	registerLinkOpener() {
+		return { dispose() {} };
+	},
 	createModel(source) {
 		const range = { fullDocument: true };
 		return {

@@ -333,7 +333,10 @@ lenient表示と一度読んだ同じ依存snapshotを使い、別tabへ古い�
 ### GUI-30：参照の実到達先
 
 対応：#1260。対象・入力：M、location/subflow/相対・絶対basePath、PFD/外部file/URL/複数候補directory、空白・引用・日本語path。Vは既存内部open回帰。
-操作：各参照の起動先と実fileを照合し、候補選択／取消／不在／権限拒否を試す。
+操作：sourceのCommand-click、node hoverのlocation/subflow link、previewのCommand-clickで起動先と実fileを照合する。
+directory直下にfileがある場合と、直下にfileがなく子directoryを再帰する場合で候補選択／Escape／取消を試し、symlink directory、不在／権限拒否も確認する。
+相対locationはdocument directory＋相対basePath、絶対basePathは無視、subflowはdocument directory基準を照合し、Untitledの相対参照はSave案内になることを確認する。
+候補読取中の編集／tab切替／closeと、preview更新前の参照操作では古い結果を開かないことを確認する。
 期待：MのPFDは内部tab、他fileは既定app、URLは既定browserへ届く。
 VをMの規則へ一律変更せず、取消・失敗で本文/dirtyを保ち理由を示す。
 表示リンクやmock成功だけで完了にしない。
@@ -342,8 +345,9 @@ VをMの規則へ一律変更せず、取消・失敗で本文/dirtyを保ち理
 ### GUI-31：Git／別file構造差分
 
 対応：#1260。対象・入力：M/V、repo/ref・別file・未保存A、node/edge差分・metadataだけの差分。
-操作：各比較→解除、読取中編集／tab切替、取消、不正ref／失敗を試す。
-期待：現在側は未保存内容で正しい対象を比較し、metadata非比較の現仕様を明示する。
+操作：F1またはeditor context menuの`Compare structure with file…`／`Compare structure with Git ref…`で比較し、baseline表示とbaseline→currentの方向を読む。
+label/statusだけの変更とnode/edge変更を分けて確認し、比較後の編集反映、`Clear structural comparison`またはbannerの解除、読取中編集／tab切替／close、取消、不正ref／失敗を試す。
+期待：現在側は未保存内容で正しい対象を比較し、承認済みの現行VS Codeと同じmetadata比較を含める。
 source/dirty/Undoを表示だけで変えず、古い結果を新対象へ適用しない。
 GUI-07の保存競合text比較を前提にしない。
 状態：M/V各未実施。記録：未記入。
@@ -351,15 +355,22 @@ GUI-07の保存競合text比較を前提にしない。
 ### GUI-32：Git不在と単独file
 
 対応：#1260。対象・入力：M、Gitあり／なしの試験環境、repo外単独file。
-操作：Git比較の理由／導入案内を読み、通常編集・保存・別file比較・全形式出力を続ける。
+操作：通常起動と、検証用processだけのPATHからGitを除いた起動を分け、Git比較の理由／導入案内を読む。
+例えば候補appのexecutableを絶対path指定し、その子processだけ`PATH=/nonexistent`で起動する。
+system設定は変更せず、通常編集・保存・別file比較・全形式出力を続ける。
+repo外単独fileではrepo判定失敗と別file比較の継続を確認する。
 期待：定義したGit検出／repo判定に合い、Git非同梱で通常機能を阻害しない。
 状態：M未実施。記録：未記入。不在を再現できなければ未実施。
 
 ### GUI-33：Terminal.app／Ghostty
 
 対応：#1260。対象・入力：M、両terminal、空白・引用・日本語path/引数、複数行command、相対／絶対basePath、非秘密の環境値。
-操作：明示操作前は非実行を確認し、各terminalへ渡してcwd/引数/envを照合する。不在・起動失敗・権限拒否も試す。
-期待：標準Terminal.app／選択Ghosttyの実到達先と内容が合い、失敗理由と本文を保つ。
+操作：commandを持つprocessへcursorを置き、F1/context menuの`Run process command in Terminal.app`／`Run process command in Ghostty`、Terminal.app用inlay hintの3導線で明示操作前の非実行と操作後の実到達先を確認する。
+無害なprintfで引用符・日本語・複数行引数、pwdでcwdを照合し、`/bin/zsh -l -c`の通常login環境の非秘密値を確認する。
+相対basePathのcwdと絶対basePath無視を確認し、cwd不在ならcommandが実行されず理由を示すことを確認する。
+OSのAutomation許可／拒否、Ghostty不在・起動失敗、実行完了後に結果を読めることも試す。
+期待：標準Terminal.app／選択Ghosttyの新しいterminalへ内容が届き、失敗理由と本文を保つ。
+GUI processの環境や秘密値は転送せず、許可ダイアログの操作結果は自動検査の結果から推定しない。
 内部terminalや終了codeによる自動進捗更新を追加せず、秘密値を記録しない。
 状態：M未実施。記録：未記入。
 

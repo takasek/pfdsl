@@ -3,6 +3,8 @@ import {
 	analyzeSnapshot,
 	applyPreviewEdit,
 	buildHoverLines,
+	type DocumentReference,
+	documentReferences,
 	findDefinitionEditTarget,
 	findFrontmatterDefinitionRange,
 	findNodeOccurrenceRanges,
@@ -27,6 +29,14 @@ function range(value: SourceRange) {
 export function registerLanguageFeatures(
 	editor: monaco.editor.IStandaloneCodeEditor,
 	reportStatus: (message: string) => void,
+	navigation?:
+		| {
+				open(
+					reference: Pick<DocumentReference, "field" | "value">,
+				): Promise<void>;
+				run(command: string): Promise<void>;
+		  }
+		| undefined,
 ) {
 	let disposed = false;
 	let cached: ReturnType<typeof analyzeSnapshot> | undefined;
@@ -179,7 +189,52 @@ export function registerLanguageFeatures(
 	const gotoId = `${editor.getId()}:pfdsl.hoverDefinition`;
 	const findId = `${editor.getId()}:pfdsl.hoverFindAll`;
 	const finishId = `${editor.getId()}:pfdsl.finishDefinition`;
+	const openId = `${editor.getId()}:pfdsl.openReference`;
+	const runId = `${editor.getId()}:pfdsl.runCommand`;
 	registrations.push(
+		editor.addAction({
+			id: "pfdsl.openReference",
+			label: "Open hovered reference",
+			async run(
+				_editor,
+				version: number,
+				field: "location" | "subflow",
+				value: string,
+			) {
+				if (
+					disposed ||
+					model.getVersionId() !== version ||
+					!documentReferences(snapshot()).some(
+						(ref) => ref.field === field && ref.value === value,
+					)
+				)
+					return;
+				try {
+					await navigation?.open({ field, value });
+				} catch (error) {
+					reportStatus(String(error));
+				}
+			},
+		}),
+		editor.addAction({
+			id: "pfdsl.runCommand",
+			label: "Run declared process command",
+			async run(_editor, version: number, command: string) {
+				if (
+					disposed ||
+					model.getVersionId() !== version ||
+					!Object.values(snapshot().frontmatter?.process ?? {}).some(
+						(meta) => meta?.command === command,
+					)
+				)
+					return;
+				try {
+					await navigation?.run(command);
+				} catch (error) {
+					reportStatus(String(error));
+				}
+			},
+		}),
 		editor.addAction({
 			id: "pfdsl.hoverDefinition",
 			label: "Go to hovered definition",
@@ -215,19 +270,42 @@ export function registerLanguageFeatures(
 				const args = encodeURIComponent(
 					JSON.stringify([model.getVersionId(), item.nodeId]),
 				);
+				const link = (label: string, command: string, args: unknown[]) =>
+					`[${label.replace(/[\\[\]]/g, "\\$&")}](command:${command}?${encodeURIComponent(JSON.stringify([model.getVersionId(), ...args]))})`;
 				const lines = buildHoverLines(item.nodeId, kind, current.frontmatter);
-				lines.splice(
-					2,
-					0,
+				// Authored Markdown never shares trust with generated executable actions.
+				const actions = [
 					`[Go to definition](command:${gotoId}?${args})  [Find all](command:${findId}?${args})`,
-				);
+				];
+				if (navigation) {
+					const declaration = current.sourceMap.declarations.find(
+						(d) => d.section === kind && d.id === item.nodeId,
+					);
+					for (const ref of documentReferences(current).filter((ref) =>
+						declaration?.fields
+							.get(ref.field)
+							?.values.some(
+								(value) => value.range.start.offset === ref.range.start.offset,
+							),
+					))
+						actions.push(
+							link(`Open ${ref.field}`, openId, [ref.field, ref.value]),
+						);
+					const command = current.frontmatter?.process?.[item.nodeId]?.command;
+					if (kind === "process" && command)
+						actions.push(link("▶ Run in Terminal.app", runId, [command]));
+				}
 				return {
 					range: range(item.range),
 					contents: [
 						{
 							value: lines.join("  \n"),
 							supportHtml: true,
-							isTrusted: { enabledCommands: [gotoId, findId] },
+							isTrusted: false,
+						},
+						{
+							value: actions.join("  \n"),
+							isTrusted: { enabledCommands: [gotoId, findId, openId, runId] },
 						},
 					],
 				};
@@ -267,7 +345,18 @@ export function registerLanguageFeatures(
 						)
 						.map((hint) => ({
 							position: { lineNumber: hint.line + 1, column: hint.column + 1 },
-							label: "Command",
+							label: navigation
+								? [
+										{
+											label: "▶ Run in Terminal.app",
+											command: {
+												id: runId,
+												title: "Run declared process command",
+												arguments: [model.getVersionId(), hint.command],
+											},
+										},
+									]
+								: "Command",
 							tooltip: { value: `\`\`\`shell\n${hint.command}\n\`\`\`` },
 							paddingLeft: true,
 						})),

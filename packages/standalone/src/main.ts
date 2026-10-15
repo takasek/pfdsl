@@ -12,6 +12,7 @@ import {
 	sameDocument,
 } from "./document-session.js";
 import { createDocumentTab, type DocumentTab } from "./document-tab.js";
+import { createNativeReferenceServices } from "./reference-services.js";
 import "./style.css";
 
 (self as unknown as { MonacoEnvironment: unknown }).MonacoEnvironment = {
@@ -134,6 +135,7 @@ function syncLocation(entry: Entry) {
 function activate(entry: Entry) {
 	active = entry;
 	for (const other of opened) {
+		if (other !== entry) other.tab.deactivate?.();
 		other.tab.container.style.display = other === entry ? "flex" : "none";
 		other.tab.button.setAttribute("aria-selected", String(other === entry));
 	}
@@ -185,6 +187,19 @@ function openDocument(name: string, source: string, disk: DiskSnapshot | null) {
 		source,
 		path: disk?.path ?? null,
 		read: readFor(disk?.id),
+		referenceServices: native
+			? createNativeReferenceServices(
+					() => entry?.session.location?.id,
+					() => !!entry && !busy && opened.has(entry) && active === entry,
+					async (snapshot) => {
+						try {
+							await openSnapshot(snapshot);
+						} finally {
+							await releaseUnusedDocuments();
+						}
+					},
+				)
+			: undefined,
 		reportStatus: report,
 		onChange: () => {
 			if (entry) label(entry);
