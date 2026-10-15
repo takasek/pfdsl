@@ -16,6 +16,12 @@ export function createsPrimaryCycle(
 	from: string,
 	to: string,
 ): boolean {
+	const outgoing = new Map<string, string[]>();
+	for (const { from, to } of edges) {
+		const targets = outgoing.get(from);
+		if (targets) targets.push(to);
+		else outgoing.set(from, [to]);
+	}
 	const pending = [to];
 	const seen = new Set<string>();
 	while (pending.length) {
@@ -23,9 +29,7 @@ export function createsPrimaryCycle(
 		if (node === from) return true;
 		if (seen.has(node)) continue;
 		seen.add(node);
-		pending.push(
-			...edges.filter((edge) => edge.from === node).map((edge) => edge.to),
-		);
+		pending.push(...(outgoing.get(node) ?? []));
 	}
 	return false;
 }
