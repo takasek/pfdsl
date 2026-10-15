@@ -10,8 +10,8 @@ export const { JSDOM } = require("jsdom");
 export const menuStub = `
 class Item {
  static async new(options){return new Item(options)}
- constructor(options){Object.assign(this,options);this.children=options.items??[];delete this.items;(globalThis.reviewMenuItems??=[]).push(this)}
- async setEnabled(v){this.enabled=v} async setChecked(v){this.checked=v} async setText(v){this.text=v}
+ constructor(options){Object.assign(this,options);this.children=options.items??[];this.writes=[];delete this.items;(globalThis.reviewMenuItems??=[]).push(this)}
+ async setEnabled(v){this.writes.push(['enabled',v]);this.enabled=v} async setChecked(v){this.writes.push(['checked',v]);this.checked=v} async setText(v){this.writes.push(['text',v]);this.text=v}
  async setAsAppMenu(){this.appMenu=true} async setAsWindowsMenuForNSApp(){} async setAsHelpMenuForNSApp(){}
  async items(){return this.children} async append(i){this.children.push(i)} async remove(i){this.children=this.children.filter(x=>x!==i)} async close(){this.closed=true}
 }

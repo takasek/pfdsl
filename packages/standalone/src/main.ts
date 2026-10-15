@@ -112,14 +112,18 @@ function basename(path: string) {
 	return path.split("/").pop()!;
 }
 function updateMenu() {
-	document.querySelector<HTMLButtonElement>("#sidebar")!.disabled =
-		busy || !folderRoot;
+	const sidebar =
+		!document.querySelector<HTMLElement>("#folder-sidebar")!.hidden;
+	const toggle = document.querySelector<HTMLButtonElement>("#sidebar")!;
+	toggle.disabled = busy || !folderRoot;
+	toggle.setAttribute("aria-expanded", String(sidebar));
+	toggle.setAttribute("aria-label", sidebar ? "Hide sidebar" : "Show sidebar");
 	nativeMenu?.update({
 		busy,
 		document: !!active,
 		save: saveCapability.save,
 		folder: !!folderRoot,
-		sidebar: !document.querySelector<HTMLElement>("#folder-sidebar")!.hidden,
+		sidebar,
 		diagram: active?.tab.canDiagram() ?? false,
 		definition: active?.tab.canCreateDefinition() ?? false,
 	});
@@ -307,6 +311,7 @@ async function refreshRecent() {
 	nativeMenu?.recent(recentTargets);
 }
 async function showFolder(root: string) {
+	const paths = await invoke<string[]>("list_documents");
 	folderRoot = root;
 	document.querySelector<HTMLElement>("#folder-sidebar")!.hidden = false;
 	document.querySelector<HTMLElement>("#folder-title")!.textContent =
@@ -314,9 +319,7 @@ async function showFolder(root: string) {
 	const toggle = document.querySelector<HTMLButtonElement>("#sidebar")!;
 	toggle.disabled = false;
 	toggle.title = root;
-	toggle.setAttribute("aria-expanded", "true");
 	updateMenu();
-	const paths = await invoke<string[]>("list_documents");
 	const files = document.querySelector<HTMLElement>("#files")!;
 	files.replaceChildren();
 	for (const path of paths) {
@@ -696,9 +699,6 @@ const commands: Record<string, () => void> = {
 		if (!folderRoot) return;
 		const sidebar = document.querySelector<HTMLElement>("#folder-sidebar")!;
 		sidebar.hidden = !sidebar.hidden;
-		document
-			.querySelector("#sidebar")!
-			.setAttribute("aria-expanded", String(!sidebar.hidden));
 		updateMenu();
 		active?.tab.activate();
 	},

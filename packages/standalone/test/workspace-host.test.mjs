@@ -1,8 +1,63 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { createHarness, FakeNative } from "./helpers/lifecycle-harness.mjs";
+import {
+	createHarness,
+	FakeNative,
+	flush,
+} from "./helpers/lifecycle-harness.mjs";
 
 const { startHost } = await createHarness("workspace-ui");
+
+test("retains the previous folder until the replacement listing succeeds", async () => {
+	const native = new FakeNative();
+	const doc = native.add(1, "a.pfdsl", "a >> p -> b\n");
+	let root = "/A";
+	let listing = async () => ["/A/a.pfdsl"];
+	const host = await startHost(native, doc, {
+		selectFolder: () => root,
+		listDocuments: () => listing(),
+	});
+	try {
+		await host.command("open");
+		assert.equal(host.query("#folder-title").textContent, "A");
+		assert.equal(
+			host.query("#sidebar").getAttribute("aria-label"),
+			"Hide sidebar",
+		);
+		await host.command("sidebar");
+		assert.equal(
+			host.query("#sidebar").getAttribute("aria-label"),
+			"Show sidebar",
+		);
+		await host.command("sidebar");
+		assert.equal(
+			host.query("#sidebar").getAttribute("aria-label"),
+			"Hide sidebar",
+		);
+		let reject;
+		root = "/B";
+		listing = () =>
+			new Promise((_, no) => {
+				reject = no;
+			});
+		host.menuItem("open").action();
+		await flush();
+		const titleWhilePending = host.query("#folder-title").textContent;
+		reject(new Error("Cannot read B"));
+		await host.settle();
+		assert.equal(titleWhilePending, "A");
+		assert.equal(host.query("#folder-title").textContent, "A");
+		assert.equal(host.query("#files button").title, "/A/a.pfdsl");
+		assert.match(host.query("#status").textContent, /Cannot read B/);
+		root = "/C";
+		listing = async () => ["/C/c.pfdsl"];
+		await host.command("open");
+		assert.equal(host.query("#folder-title").textContent, "C");
+		assert.equal(host.query("#files button").title, "/C/c.pfdsl");
+	} finally {
+		await host.finish();
+	}
+});
 
 test("native commands act on the workspace without hidden DOM command mirrors", async () => {
 	const native = new FakeNative();

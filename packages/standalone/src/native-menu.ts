@@ -166,16 +166,45 @@ export async function installNativeMenu(
 	const enqueue = (work: () => Promise<void>) => {
 		queue = queue.then(work).catch(report);
 	};
+	let pendingState: MenuState | undefined;
+	let appliedState: MenuState | undefined;
+	let updating = false;
+	function updatePendingState() {
+		if (updating) return;
+		updating = true;
+		enqueue(async () => {
+			try {
+				while (pendingState) {
+					const state = pendingState;
+					pendingState = undefined;
+					const previous = appliedState;
+					// A failed partial update must not leave a trusted property cache.
+					appliedState = undefined;
+					for (const [id, item] of items) {
+						const enabled = commandEnabled(id, state);
+						if (!previous || commandEnabled(id, previous) !== enabled)
+							await item.setEnabled(enabled);
+					}
+					if (!previous || previous.busy !== state.busy)
+						await recent.setEnabled(!state.busy);
+					if (!previous || previous.sidebar !== state.sidebar) {
+						await sidebar.setChecked(state.sidebar);
+						await sidebar.setText(
+							state.sidebar ? "Hide Sidebar" : "Show Sidebar",
+						);
+					}
+					appliedState = state;
+				}
+			} finally {
+				updating = false;
+				if (pendingState) updatePendingState();
+			}
+		});
+	}
 	return {
 		update(state: MenuState) {
-			enqueue(async () => {
-				for (const [id, item] of items) {
-					await item.setEnabled(commandEnabled(id, state));
-				}
-				await recent.setEnabled(!state.busy);
-				await sidebar.setChecked(state.sidebar);
-				await sidebar.setText(state.sidebar ? "Hide Sidebar" : "Show Sidebar");
-			});
+			pendingState = { ...state };
+			updatePendingState();
 		},
 		recent(targets: RecentTarget[]) {
 			enqueue(async () => {

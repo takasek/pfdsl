@@ -336,6 +336,9 @@ export async function createHarness(label) {
 			return () => {};
 		};
 		globalThis.nativeInvoke = async (command, args) => {
+			if (command === "select_folder") return handlers.selectFolder?.() ?? null;
+			if (command === "list_documents") return handlers.listDocuments?.() ?? [];
+			if (command === "remember_folder") return;
 			if (command === "document_capabilities")
 				return handlers.capabilities
 					? handlers.capabilities()

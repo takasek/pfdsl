@@ -137,6 +137,100 @@ test("native menu registers stable commands, applies document/busy/capability st
 });
 
 const comparisonStub = `export const editor={createModel(value){const model={value,dispose(){this.disposed=true}};(globalThis.comparisonModels??=[]).push(model);return model},createDiffEditor(element,options){globalThis.diffEditor={element,options,setModel(models){this.models=models},dispose(){this.disposed=true}};return globalThis.diffEditor}};`;
+test("native menu skips unchanged properties and coalesces states arriving during an update", async () => {
+	globalThis.reviewMenuItems = [];
+	try {
+		await bundle(
+			"native-menu",
+			/^@tauri-apps\/api\/menu$/,
+			menuStub,
+			async ({ installNativeMenu }) => {
+				const errors = [];
+				const menu = await installNativeMenu(
+					() => {},
+					() => {},
+					(error) => errors.push(error),
+				);
+				const flush = async () => {
+					for (let i = 0; i < 5000; i++) await Promise.resolve();
+				};
+				const state = {
+					busy: false,
+					document: true,
+					save: true,
+					folder: false,
+					sidebar: false,
+					diagram: true,
+					definition: false,
+				};
+				const writes = () =>
+					globalThis.reviewMenuItems.reduce(
+						(sum, item) => sum + item.writes.length,
+						0,
+					);
+				menu.update(state);
+				await flush();
+				const before = writes();
+				for (let i = 0; i < 20; i++) menu.update({ ...state });
+				await flush();
+				assert.equal(writes(), before);
+				const first = globalThis.reviewMenuItems.find(
+					(item) => item.id === "new",
+				);
+				const original = first.setEnabled.bind(first);
+				let release,
+					calls = 0;
+				const held = new Promise((resolve) => {
+					release = resolve;
+				});
+				first.setEnabled = async (value) => {
+					calls++;
+					if (!value) await held;
+					await original(value);
+				};
+				menu.update({ ...state, busy: true });
+				await Promise.resolve();
+				for (let i = 0; i < 20; i++)
+					menu.update({ ...state, document: i % 2 === 0 });
+				menu.update({ ...state });
+				release();
+				await flush();
+				assert.equal(calls, 2);
+				assert.equal(
+					globalThis.reviewMenuItems.find((item) => item.id === "save").enabled,
+					true,
+				);
+				assert.deepEqual(errors, []);
+				let releaseFailure;
+				const failure = new Promise((resolve) => {
+					releaseFailure = resolve;
+				});
+				first.setEnabled = async (value) => {
+					if (!value) {
+						await failure;
+						throw new Error("native update failed");
+					}
+					await original(value);
+				};
+				menu.update({ ...state, busy: true });
+				await Promise.resolve();
+				menu.update({ ...state });
+				releaseFailure();
+				await flush();
+				assert.equal(errors.length, 1);
+				assert.match(String(errors[0]), /native update failed/);
+				assert.equal(first.enabled, true);
+				assert.equal(
+					globalThis.reviewMenuItems.find((item) => item.id === "save").enabled,
+					true,
+				);
+			},
+		);
+	} finally {
+		delete globalThis.reviewMenuItems;
+	}
+});
+
 test("text comparison is read only, aligned, names both revisions and disposes every editor/model", async () => {
 	const previous = Object.getOwnPropertyDescriptor(globalThis, "document");
 	const dom = new JSDOM("<main></main>");
