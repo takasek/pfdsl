@@ -679,7 +679,6 @@ export function mountPreview(container: HTMLElement, host: PreviewHost) {
 		connections.update(undefined);
 		clearCue();
 		editingData = undefined;
-		host.onStateChange?.();
 		actionsToggle.disabled = true;
 		error.textContent = message;
 		error.hidden = false;
@@ -689,6 +688,7 @@ export function mountPreview(container: HTMLElement, host: PreviewHost) {
 		tooltip.style.display = "none";
 		releaseDrag();
 		updateControls();
+		host.onStateChange?.();
 	}
 
 	async function receive(msg: MessageToWebview) {

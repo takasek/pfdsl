@@ -8,7 +8,7 @@ afterEach(() => {
 	vi.restoreAllMocks();
 });
 
-function setup(width = 1600, height = 800) {
+function setup(width = 1600, height = 800, onStateChange?: () => void) {
 	const frames: FrameRequestCallback[] = [];
 	vi.spyOn(window, "requestAnimationFrame").mockImplementation((callback) => {
 		frames.push(callback);
@@ -19,6 +19,7 @@ function setup(width = 1600, height = 800) {
 	let visible = true;
 	const preview = mountPreview(container, {
 		postMessage() {},
+		onStateChange,
 		renderDot: async (dot) => {
 			if (dot === "reject") throw new Error("Graphviz <failure>\n".repeat(30));
 			return `<svg width="${width}" height="${height}"><g class="node"><title>${dot}</title></g></svg>`;
@@ -150,6 +151,41 @@ it("does not retain a prior minimap when a new graph commits in a hidden tab", a
 			.querySelector("#minimap-svg [data-node-id]")
 			?.getAttribute("data-node-id"),
 	).toBe("new");
+});
+
+it.each([
+	"parse",
+	"renderer",
+])("publishes disabled diagram capability on %s failure and restores it on recovery", async (kind) => {
+	const observed: boolean[] = [];
+	const s = setup(1600, 800, () =>
+		observed.push(
+			!s.container.querySelector<HTMLButtonElement>("#node-actions-toggle")!
+				.disabled,
+		),
+	);
+	const valid = {
+		type: "render" as const,
+		dot: "a",
+		editing: {
+			source: "a >> p\n",
+			nodes: [
+				{ id: "a", kind: "artifact" as const, defined: false },
+				{ id: "p", kind: "process" as const, defined: false },
+			],
+		},
+	};
+	await s.preview.receive(valid);
+	expect(observed.at(-1)).toBe(true);
+	observed.length = 0;
+	await s.preview.receive(
+		kind === "parse"
+			? { type: "error", message: "P007: Invalid source" }
+			: { ...valid, dot: "reject" },
+	);
+	expect(observed).toEqual([false]);
+	await s.preview.receive(valid);
+	expect(observed.at(-1)).toBe(true);
 });
 
 it.each([
