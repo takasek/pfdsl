@@ -76,12 +76,13 @@ impl ExportSession {
         Ok(Self { dir, path, targets })
     }
     fn write(&mut self, format: &str, bytes: &[u8]) -> Result<String, String> {
-        self.write_with_hooks(format, bytes, || {}, || {})
+        self.write_with_hooks(format, bytes, |_| {}, || {}, || {})
     }
     fn write_with_hooks(
         &mut self,
         format: &str,
         bytes: &[u8],
+        metadata_copied: impl FnOnce(&cap_std::fs::File),
         before_publish: impl FnOnce(),
         after_publish: impl FnOnce(),
     ) -> Result<String, String> {
@@ -125,7 +126,18 @@ impl ExportSession {
             if let (Some(stamp), Some(original)) = (&protection, &original) {
                 stamp.copy_to(original, &file)?;
             }
+            metadata_copied(&file);
+            if let Some(required) = &protection {
+                if crate::native_directory::capture(&file)?.as_ref() != Some(required) {
+                    return Err("The temporary file did not preserve export protection; no content was written.".into());
+                }
+            }
             file.write_all(bytes).map_err(|e| e.to_string())?;
+            if let Some(required) = &protection {
+                if crate::native_directory::capture(&file)?.as_ref() != Some(required) {
+                    return Err("Export protection changed while preparing the file; no content was published.".into());
+                }
+            }
             file.sync_all().map_err(|e| e.to_string())?;
             crate::native_directory::validate_binding(&self.dir, &self.path)?;
             if revision(&self.dir, &target.leaf)? != target.observed {
@@ -341,6 +353,71 @@ mod tests {
     }
     #[cfg(target_os = "macos")]
     #[test]
+    fn incomplete_protection_is_refused_before_export_bytes_are_written() {
+        use std::io::{Read, Seek, SeekFrom};
+        use std::os::{fd::AsRawFd, unix::fs::PermissionsExt};
+        let root =
+            std::env::temp_dir().join(format!("pfdsl-export-protection-{}", std::process::id()));
+        std::fs::create_dir(&root).unwrap();
+        let path = root.join("private.svg");
+        std::fs::write(&path, "old").unwrap();
+        std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o600)).unwrap();
+        let mut session = ExportSession::new(&root, "private", &["svg".into()]).unwrap();
+        let mut retained_stage = None;
+        let result = session.write_with_hooks(
+            "svg",
+            b"private export",
+            |stage| {
+                assert_eq!(unsafe { libc::fchmod(stage.as_raw_fd(), 0o644) }, 0);
+                retained_stage = Some(stage.try_clone().unwrap());
+            },
+            || {},
+            || {},
+        );
+        let mut stage = retained_stage.unwrap();
+        stage.seek(SeekFrom::Start(0)).unwrap();
+        let mut bytes = Vec::new();
+        stage.read_to_end(&mut bytes).unwrap();
+        assert!(
+            bytes.is_empty(),
+            "Export bytes were written before protection was established"
+        );
+        assert!(result.is_err());
+        assert_eq!(std::fs::read(&path).unwrap(), b"old");
+        assert_eq!(std::fs::read_dir(&root).unwrap().count(), 1);
+        std::fs::remove_dir_all(root).unwrap();
+    }
+    #[cfg(target_os = "macos")]
+    #[test]
+    fn special_modes_are_preserved_or_the_export_is_refused() {
+        use std::os::unix::fs::PermissionsExt;
+        let root =
+            std::env::temp_dir().join(format!("pfdsl-export-special-mode-{}", std::process::id()));
+        std::fs::create_dir(&root).unwrap();
+        let path = root.join("private.svg");
+        for mode in [0o4750, 0o6750] {
+            std::fs::write(&path, "old").unwrap();
+            std::fs::set_permissions(&path, std::fs::Permissions::from_mode(mode)).unwrap();
+            let mut session = ExportSession::new(&root, "private", &["svg".into()]).unwrap();
+            let result = session.write("svg", b"replacement");
+            assert_eq!(
+                std::fs::metadata(&path).unwrap().permissions().mode() & 0o7777,
+                mode
+            );
+            assert_eq!(
+                std::fs::read(&path).unwrap(),
+                if result.is_ok() {
+                    b"replacement".as_slice()
+                } else {
+                    b"old".as_slice()
+                }
+            );
+        }
+        assert_eq!(std::fs::read_dir(&root).unwrap().count(), 1);
+        std::fs::remove_dir_all(root).unwrap();
+    }
+    #[cfg(target_os = "macos")]
+    #[test]
     fn a_move_during_publication_never_reports_a_stale_success_path() {
         let root =
             std::env::temp_dir().join(format!("pfdsl-export-publish-{}", std::process::id()));
@@ -353,6 +430,7 @@ mod tests {
             .write_with_hooks(
                 "dot",
                 b"digraph {}",
+                |_| {},
                 || std::fs::rename(&selected, &moved).unwrap(),
                 || {},
             )
