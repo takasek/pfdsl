@@ -1,15 +1,8 @@
-import { analyzeSource, type DiffReport } from "@pfdsl/core";
+import type { DiffReport } from "@pfdsl/core";
 import { renderDotToSvg } from "@pfdsl/preview-engine/renderer";
-import {
-	type ConnectorKind,
-	compatibleOtherKind,
-	connectorChoiceLabel,
-	outputProducerConflict,
-} from "./connector-logic.js";
+import { mountConnections } from "./connections-panel.js";
 import { buildDiffPanelHtml } from "./diff-panel.js";
 import type { MessageFromWebview, MessageToWebview } from "./messages.js";
-import { applyPreviewEdit, type PreviewEditRequest } from "./preview-edit.js";
-import { neighborhoodDot, type PreviewGraph } from "./preview-graph.js";
 import { FOCUS_CUE_DURATION_MS, previewMarkup } from "./preview-shell.js";
 import { unwrapAnchors } from "./svg-anchors.js";
 import {
@@ -27,6 +20,7 @@ import {
 
 export interface PreviewHost {
 	postMessage(message: MessageFromWebview): void;
+	onStateChange?: () => void;
 	/** Hosts without related-file navigation omit its gestures and help. */
 	canOpenRelatedFiles?: boolean;
 	renderDot?: (dot: string) => Promise<string>;
@@ -103,13 +97,10 @@ export function mountPreview(container: HTMLElement, host: PreviewHost) {
 	let subflows: Record<string, string> = {};
 	let pendingFocusNodeId: string | undefined;
 	let pendingFocusCue = false;
-	let graphData: PreviewGraph | undefined;
 	let editingData: Extract<MessageToWebview, { type: "render" }>["editing"];
 	let selectedNodeId: string | undefined;
 	let lastFocusedNodeId: string | undefined;
 	let hoverId: string | undefined;
-	let hoverToken = 0;
-	const hoverSvgs = new Map<string, Promise<string>>();
 	let hideTimer: number | undefined;
 	let cueTimer: number | undefined;
 	let cuedNode: Element | undefined;
@@ -118,145 +109,36 @@ export function mountPreview(container: HTMLElement, host: PreviewHost) {
 	const actionsToggle = container.querySelector<HTMLButtonElement>(
 		"#node-actions-toggle",
 	)!;
-	const createDefinition =
-		container.querySelector<HTMLButtonElement>("#create-definition")!;
-	const connectorKind =
-		container.querySelector<HTMLSelectElement>("#connector-kind")!;
-	const connectorExisting = container.querySelector<HTMLSelectElement>(
-		"#connector-existing",
-	)!;
-	const connectorTarget =
-		container.querySelector<HTMLInputElement>("#connector-target")!;
-	let actionTarget: string | undefined;
-	let actionSource: string | undefined;
-	let pendingConnector:
-		| Extract<PreviewEditRequest, { type: "addConnector" }>
-		| undefined;
-	const addConnection = container.querySelector<HTMLButtonElement>(
-		'#connector-form button[type="submit"]',
-	)!;
-	const actionError = container.querySelector<HTMLElement>(
-		"#node-actions-error",
-	)!;
-	function updateConnectorCandidates() {
-		if (!actionTarget || actionSource === undefined || !editingData) return;
-		const model = analyzeSource(actionSource);
-		const kind = model.nodeKinds.get(actionTarget);
-		if (kind !== "artifact" && kind !== "process") return;
-		const previous = connectorExisting.value;
-		connectorExisting.replaceChildren();
-		const newOption = document.createElement("option");
-		newOption.value = "";
-		newOption.textContent = "New node ID…";
-		connectorExisting.append(newOption);
-		const reasons: string[] = [];
-		for (const other of editingData.nodes.filter(
-			(n) => n.id !== actionTarget && n.kind === compatibleOtherKind(kind),
-		)) {
-			const reason = outputProducerConflict(
-				model.edges,
-				actionTarget,
-				kind,
-				connectorKind.value as ConnectorKind,
-				other.id,
-			);
-			const option = document.createElement("option");
-			option.value = other.id;
-			option.textContent = reason ? `${other.id} — ${reason}` : other.id;
-			option.disabled = !!reason;
-			if (reason) reasons.push(reason);
-			connectorExisting.append(option);
-		}
-		connectorExisting.value = previous;
-		container.querySelector("#connector-unavailable")!.textContent =
-			reasons.join(" ");
-	}
+	const connections = mountConnections(container, {
+		postMessage: host.postMessage,
+		navigate(id) {
+			selectedNodeId = pendingFocusNodeId = id;
+			pendingFocusCue = true;
+			positionGraph();
+		},
+		close() {
+			closeActions();
+			actionsToggle.focus();
+		},
+	});
 	function closeActions() {
-		actions.hidden = true;
+		connections.close();
 		actionsToggle.setAttribute("aria-expanded", "false");
-		actionTarget = actionSource = undefined;
-		pendingConnector = undefined;
-		addConnection.disabled = false;
 	}
 	function openActions(id: string) {
 		if (graphRevision !== revision) return;
-		const node = editingData?.nodes.find((n) => n.id === id);
-		if (!node || !editingData) return;
-		selectedNodeId = actionTarget = id;
-		actionSource = editingData.source;
-		container.querySelector("#node-actions-title")!.textContent =
-			`${node.kind}: ${id}`;
-		container.querySelector("#node-actions-error")!.textContent = "";
-		createDefinition.hidden = node.defined;
-		connectorKind.replaceChildren();
-		for (const connector of [">>", ">>?", "->"] as const) {
-			const option = document.createElement("option");
-			option.value = connector;
-			option.textContent = connectorChoiceLabel(id, node.kind, connector);
-			connectorKind.append(option);
-		}
-		pendingConnector = undefined;
-		addConnection.disabled = false;
-		connectorExisting.value = "";
-		updateConnectorCandidates();
-		connectorTarget.value = "";
-		actions.hidden = false;
-		actionsToggle.setAttribute("aria-expanded", "true");
-		(createDefinition.hidden ? connectorKind : createDefinition).focus();
+		selectedNodeId = id;
+		connections.open(id);
+		actionsToggle.setAttribute("aria-expanded", String(!actions.hidden));
+		host.onStateChange?.();
 	}
 	on(actionsToggle, "click", () => {
+		if (!actions.hidden) {
+			closeActions();
+			return;
+		}
 		const id = selectedNodeId ?? editingData?.nodes[0]?.id;
 		if (id) openActions(id);
-	});
-	on(container.querySelector("#node-actions-close")!, "click", () => {
-		closeActions();
-		actionsToggle.focus();
-	});
-	on(createDefinition, "click", () => {
-		if (!actionTarget || actionSource === undefined) return;
-		host.postMessage({
-			type: "createDefinition",
-			nodeId: actionTarget,
-			source: actionSource,
-		});
-		closeActions();
-	});
-	on(connectorExisting, "change", () => {
-		connectorTarget.value = connectorExisting.value;
-	});
-	on(connectorKind, "change", () => {
-		updateConnectorCandidates();
-		actionError.textContent = "";
-	});
-	on(container.querySelector("#connector-form")!, "submit", (e) => {
-		e.preventDefault();
-		if (!actionTarget || actionSource === undefined || pendingConnector) return;
-		if (!editingData) {
-			actionError.textContent =
-				"The preview is unavailable. Fix its diagnostics and reopen Node actions.";
-			connectorTarget.focus();
-			return;
-		}
-		const message: Extract<PreviewEditRequest, { type: "addConnector" }> = {
-			type: "addConnector",
-			nodeId: actionTarget,
-			source: actionSource,
-			connector: connectorKind.value as ConnectorKind,
-			otherId: connectorTarget.value,
-		};
-		const result = applyPreviewEdit(
-			editingData?.source ?? actionSource,
-			message,
-		);
-		if (!result.ok) {
-			actionError.textContent = result.message;
-			connectorTarget.focus();
-			return;
-		}
-		actionError.textContent = "";
-		pendingConnector = message;
-		addConnection.disabled = true;
-		host.postMessage(message);
 	});
 	on(root, "contextmenu", (e) => {
 		const id = (e.target as Element).closest<HTMLElement>("g.node")?.dataset
@@ -324,7 +206,6 @@ export function mountPreview(container: HTMLElement, host: PreviewHost) {
 	function hideHover() {
 		cancelHide();
 		hoverId = undefined;
-		hoverToken++;
 		tooltip.replaceChildren();
 		tooltip.style.display = "none";
 	}
@@ -337,25 +218,6 @@ export function mountPreview(container: HTMLElement, host: PreviewHost) {
 	on(tooltip, "focusin", cancelHide);
 	on(tooltip, "focusout", (e) => {
 		if (!tooltip.contains(e.relatedTarget as Node | null)) scheduleHide();
-	});
-	function navigateLocal(target: EventTarget | null) {
-		const id = (target as Element).closest<HTMLElement>("g.node")?.dataset
-			.nodeId;
-		if (!id) return;
-		selectedNodeId = pendingFocusNodeId = id;
-		pendingFocusCue = true;
-		positionGraph();
-		hideHover();
-		[...inner.querySelectorAll<HTMLElement>("g.node")]
-			.find((n) => n.dataset.nodeId === id)
-			?.focus({ preventScroll: true });
-	}
-	on(tooltip, "click", (e) => navigateLocal(e.target));
-	on(tooltip, "keydown", (e) => {
-		if (["Enter", " "].includes(e.key)) {
-			e.preventDefault();
-			navigateLocal(e.target);
-		}
 	});
 	function clampTooltip(x: number, y: number) {
 		const rect = tooltip.getBoundingClientRect();
@@ -383,21 +245,24 @@ export function mountPreview(container: HTMLElement, host: PreviewHost) {
 		if (graphRevision !== revision) return;
 		cancelHide();
 		const nodeId = (node as HTMLElement).dataset.nodeId;
-		if (!nodeId || hoverId === nodeId) return;
-		hoverId = nodeId;
-		const token = ++hoverToken;
-		const hoverRevision = revision;
-		let localSvg = hoverSvgs.get(nodeId);
-		if (!localSvg && graphData) {
-			const dot = neighborhoodDot(graphData, nodeId);
-			if (dot) {
-				localSvg = Promise.resolve().then(() => renderDot(dot));
-				hoverSvgs.set(nodeId, localSvg);
-			}
+		if (!nodeId) return;
+		if (hoverId === nodeId) {
+			clampTooltip(x + 14, y + 14);
+			return;
 		}
-		const desc = Object.hasOwn(descriptions, nodeId)
+		hoverId = nodeId;
+		const desc: Array<[string, string]> | undefined = Object.hasOwn(
+			descriptions,
+			nodeId,
+		)
 			? descriptions[nodeId]
-			: undefined;
+			: [
+					["**", nodeId],
+					[
+						"kind",
+						editingData?.nodes.find((n) => n.id === nodeId)?.kind ?? "node",
+					],
+				];
 		const nodeLocs = Object.hasOwn(locations, nodeId) ? locations[nodeId]! : [];
 		const subflow = (node as HTMLElement).dataset.subflow;
 		const hint =
@@ -412,7 +277,7 @@ export function mountPreview(container: HTMLElement, host: PreviewHost) {
 								? `${modKey}+Click to open URL`
 								: `${modKey}+Click to open file`
 							: null;
-		if (!desc && !hint && !localSvg) {
+		if (!desc && !hint) {
 			hideHover();
 			return;
 		}
@@ -449,33 +314,6 @@ export function mountPreview(container: HTMLElement, host: PreviewHost) {
 		tooltip.innerHTML = parts.join("");
 		tooltip.style.display = "block";
 		clampTooltip(x + 14, y + 14);
-		if (!localSvg) return;
-		try {
-			const svg = await localSvg;
-			if (
-				disposed ||
-				hoverRevision !== revision ||
-				token !== hoverToken ||
-				hoverId !== nodeId
-			)
-				return;
-			const local = document.createElement("div");
-			local.className = "tt-graph";
-			local.innerHTML = svg;
-			unwrapAnchors(local);
-			for (const node of local.querySelectorAll<HTMLElement>("g.node")) {
-				prepareGraphNode(node, (id) => `Focus ${id}`);
-			}
-			tooltip.append(local);
-			clampTooltip(x + 14, y + 14);
-		} catch {
-			if (hoverSvgs.get(nodeId) === localSvg) hoverSvgs.delete(nodeId);
-			if (disposed || token !== hoverToken || hoverRevision !== revision)
-				return;
-			const message = document.createElement("p");
-			message.textContent = "Neighborhood preview could not be rendered.";
-			tooltip.append(message);
-		}
 	}
 	on(root, "mousemove", (e) => {
 		if (dragging || minimapDragging) return;
@@ -494,6 +332,7 @@ export function mountPreview(container: HTMLElement, host: PreviewHost) {
 		if (selectedNodeId && selectedNodeId !== lastFocusedNodeId)
 			focusNode(selectedNodeId, true);
 		lastFocusedNodeId = selectedNodeId;
+		host.onStateChange?.();
 		const rect = node.getBoundingClientRect();
 		void showHover(node, rect.right, rect.bottom);
 	});
@@ -672,16 +511,23 @@ export function mountPreview(container: HTMLElement, host: PreviewHost) {
 			focusNode(pendingFocusNodeId, pendingFocusCue);
 			pendingFocusNodeId = undefined;
 			pendingFocusCue = false;
+			host.onStateChange?.();
 		}
 		if (minimapSvg.firstElementChild) updateMinimapVp();
 		else refreshMinimap();
 	}
 	const resizeObserver =
 		typeof window.ResizeObserver === "function"
-			? new window.ResizeObserver(positionGraph)
+			? new window.ResizeObserver(() => {
+					connections.resize();
+					positionGraph();
+				})
 			: undefined;
 	resizeObserver?.observe(root);
-	on(window, "resize", positionGraph);
+	on(window, "resize", () => {
+		connections.resize();
+		positionGraph();
+	});
 	on(fitButton, "click", () => {
 		pendingFocusNodeId = undefined;
 		fitCurrentGraph();
@@ -814,17 +660,14 @@ export function mountPreview(container: HTMLElement, host: PreviewHost) {
 	}
 
 	function showError(message: string) {
-		hoverSvgs.clear();
 		selectedNodeId = pendingFocusNodeId = undefined;
 		lastFocusedNodeId = undefined;
 		hideHover();
-		if (actions.hidden) closeActions();
-		else
-			actionError.textContent =
-				"The preview is unavailable. Fix its diagnostics and reopen Node actions.";
+		closeActions();
+		connections.update(undefined);
 		clearCue();
 		editingData = undefined;
-		graphData = undefined;
+		host.onStateChange?.();
 		actionsToggle.disabled = true;
 		error.textContent = message;
 		error.hidden = false;
@@ -839,26 +682,7 @@ export function mountPreview(container: HTMLElement, host: PreviewHost) {
 	async function receive(msg: MessageToWebview) {
 		if (disposed) return;
 		if (msg.type === "editResult") {
-			const request = msg.request;
-			if (
-				!pendingConnector ||
-				request.type !== "addConnector" ||
-				request.nodeId !== pendingConnector.nodeId ||
-				request.source !== pendingConnector.source ||
-				request.connector !== pendingConnector.connector ||
-				request.otherId !== pendingConnector.otherId
-			)
-				return;
-			pendingConnector = undefined;
-			addConnection.disabled = false;
-			if (msg.ok) {
-				closeActions();
-				actionsToggle.focus({ preventScroll: true });
-			} else {
-				actionError.textContent =
-					msg.message ?? "The connection could not be applied.";
-				connectorTarget.focus();
-			}
+			connections.result(msg);
 			return;
 		}
 		const currentRevision =
@@ -876,6 +700,8 @@ export function mountPreview(container: HTMLElement, host: PreviewHost) {
 		if (msg.type === "clearFocus") {
 			pendingFocusNodeId = undefined;
 			pendingFocusCue = false;
+			selectedNodeId = undefined;
+			host.onStateChange?.();
 			return;
 		}
 		if (msg.type === "diff") {
@@ -888,11 +714,8 @@ export function mountPreview(container: HTMLElement, host: PreviewHost) {
 			return;
 		}
 		if (msg.type !== "render") return;
-		hoverSvgs.clear();
 		hideHover();
-		if (!actions.hidden && msg.editing?.source !== actionSource)
-			actionError.textContent =
-				"The document changed. Reopen Node actions and try again.";
+		connections.update(msg.editing);
 		clearCue();
 		// The cursor hint supplied while opening must not displace the initial Fit.
 		if (hasPositioned && msg.focusNodeId !== undefined) {
@@ -905,7 +728,6 @@ export function mountPreview(container: HTMLElement, host: PreviewHost) {
 			descriptions = msg.descriptions ?? {};
 			locations = msg.locations ?? {};
 			subflows = msg.subflows ?? {};
-			graphData = msg.graph;
 			editingData = msg.editing;
 			if (!editingData?.nodes.some((n) => n.id === selectedNodeId))
 				selectedNodeId = undefined;
@@ -917,11 +739,12 @@ export function mountPreview(container: HTMLElement, host: PreviewHost) {
 			error.textContent = "";
 			root.hidden = false;
 			graphRevision = currentRevision;
+			host.onStateChange?.();
 			updateControls();
 			for (const node of inner.querySelectorAll<HTMLElement>("g.node")) {
 				const id = prepareGraphNode(
 					node,
-					(id) => `Node ${id}. Enter for Node actions.`,
+					(id) => `Node ${id}. Enter for Connections.`,
 				);
 				if (id) {
 					const sf = Object.hasOwn(subflows, id) ? subflows[id] : undefined;
@@ -953,8 +776,23 @@ export function mountPreview(container: HTMLElement, host: PreviewHost) {
 	host.postMessage({ type: "ready" });
 	return {
 		receive,
+		canCreateDefinition() {
+			return (
+				!disposed &&
+				graphRevision === revision &&
+				editingData?.nodes.find((n) => n.id === selectedNodeId)?.defined ===
+					false
+			);
+		},
+		createDefinition() {
+			if (this.canCreateDefinition() && selectedNodeId && editingData)
+				host.postMessage({
+					type: "createDefinition",
+					nodeId: selectedNodeId,
+					source: editingData.source,
+				});
+		},
 		dispose() {
-			hoverSvgs.clear();
 			hideHover();
 			closeActions();
 			clearCue();

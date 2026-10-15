@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, expect, it, vi } from "vitest";
-import { analyzeSnapshot, prepareDocument } from "./document.js";
+import { analyzeSnapshot } from "./document.js";
 import { mountPreview } from "./preview.js";
 import { buildPreviewGraph } from "./preview-graph.js";
 import { FOCUS_CUE_DURATION_MS, previewStyles } from "./preview-shell.js";
@@ -13,124 +13,6 @@ afterEach(() => {
 });
 const svg =
 	'<svg width="200" height="100"><g class="node"><title>a</title><polygon points="0,0 40,0 40,30"/><text>A</text></g><g class="node"><title>p</title><text>P</text></g></svg>';
-
-it("explains unavailable output candidates to keyboard users, updates on kind changes, and retains rejected input", async () => {
-	const s = setup();
-	const source = "a >> p -> b\nc >> q -> d\n";
-	const prepared = prepareDocument(analyzeSnapshot(source), null, () => null);
-	await s.preview.receive(prepared.message);
-	s.node("p").dispatchEvent(
-		new KeyboardEvent("keydown", { key: "Enter", bubbles: true }),
-	);
-	const kind = s.container.querySelector<HTMLSelectElement>("#connector-kind")!;
-	const existing = s.container.querySelector<HTMLSelectElement>(
-		"#connector-existing",
-	)!;
-	const input =
-		s.container.querySelector<HTMLInputElement>("#connector-target")!;
-	kind.value = "->";
-	kind.dispatchEvent(new Event("change"));
-	const unavailable = [...existing.options].find((o) => o.value === "d")!;
-	expect(unavailable.disabled).toBe(true);
-	expect(unavailable.textContent).toContain("q");
-	const help = s.container.querySelector("#connector-unavailable")!;
-	expect(help.textContent).toContain("d");
-	expect(help.textContent).toContain("q");
-	expect(existing.getAttribute("aria-describedby")).toBe(help.id);
-	input.value = "d";
-	s.postMessage.mockClear();
-	s.container
-		.querySelector("#connector-form")!
-		.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
-	expect(s.postMessage).not.toHaveBeenCalled();
-	expect(input.value).toBe("d");
-	expect(s.container.querySelector<HTMLElement>("#node-actions")!.hidden).toBe(
-		false,
-	);
-	expect(
-		s.container.querySelector("#node-actions-error")!.textContent,
-	).toContain("q");
-	kind.value = ">>?";
-	kind.dispatchEvent(new Event("change"));
-	expect([...existing.options].find((o) => o.value === "d")!.disabled).toBe(
-		false,
-	);
-});
-
-it("keeps a submitted connector editable after host refusal and ignores unrelated responses", async () => {
-	const s = setup();
-	await s.preview.receive(s.message);
-	s.node("p").dispatchEvent(
-		new KeyboardEvent("keydown", { key: "Enter", bubbles: true }),
-	);
-	const input =
-		s.container.querySelector<HTMLInputElement>("#connector-target")!;
-	input.value = "free";
-	const form = s.container.querySelector("#connector-form")!;
-	form.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
-	const request = s.postMessage.mock.calls.at(-1)![0];
-	await s.preview.receive({
-		type: "editResult",
-		request: { ...request, nodeId: "other" },
-		ok: true,
-	});
-	expect(s.container.querySelector<HTMLElement>("#node-actions")!.hidden).toBe(
-		false,
-	);
-	await s.preview.receive({
-		type: "editResult",
-		request,
-		ok: false,
-		message: "The document changed.",
-	});
-	expect(input.value).toBe("free");
-	expect(document.activeElement).toBe(input);
-	expect(
-		s.container.querySelector<HTMLButtonElement>(
-			'#connector-form button[type="submit"]',
-		)!.disabled,
-	).toBe(false);
-	input.value = "corrected";
-	form.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
-	expect(s.postMessage).toHaveBeenLastCalledWith({
-		...request,
-		otherId: "corrected",
-	});
-});
-
-it("retains a pending connector and its refusal across an error redraw and recovery", async () => {
-	const s = setup();
-	await s.preview.receive(s.message);
-	s.node("p").dispatchEvent(
-		new KeyboardEvent("keydown", { key: "Enter", bubbles: true }),
-	);
-	const input =
-		s.container.querySelector<HTMLInputElement>("#connector-target")!;
-	input.value = "free";
-	s.container
-		.querySelector("#connector-form")!
-		.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
-	const request = s.postMessage.mock.calls.at(-1)![0];
-	await s.preview.receive({ type: "error", message: "V001" });
-	await s.preview.receive({
-		type: "editResult",
-		request,
-		ok: false,
-		message: "The document changed.",
-	});
-	expect(s.container.querySelector<HTMLElement>("#node-actions")!.hidden).toBe(
-		false,
-	);
-	expect(input.value).toBe("free");
-	expect(
-		s.container.querySelector("#node-actions-error")!.textContent,
-	).toContain("document changed");
-	await s.preview.receive(s.message);
-	expect(input.value).toBe("free");
-	expect(s.container.querySelector<HTMLElement>("#node-actions")!.hidden).toBe(
-		false,
-	);
-});
 
 it("keeps the cue animation and removal deadline at 1500ms", async () => {
 	vi.useFakeTimers();
@@ -207,33 +89,6 @@ function setup(
 	};
 }
 
-it("shows a real local graph for undefined nodes and keeps it clickable across the hover gap", async () => {
-	vi.useFakeTimers();
-	const s = setup();
-	await s.preview.receive(s.message);
-	s.node("a").dispatchEvent(
-		new MouseEvent("mousemove", { bubbles: true, clientX: 100, clientY: 80 }),
-	);
-	await vi.advanceTimersByTimeAsync(1);
-	const tooltip = s.container.querySelector<HTMLElement>("#tooltip")!;
-	expect(tooltip.querySelector("svg g.node")).not.toBeNull();
-	s.root.dispatchEvent(new MouseEvent("mouseleave"));
-	tooltip.dispatchEvent(new MouseEvent("mouseenter"));
-	await vi.advanceTimersByTimeAsync(250);
-	expect(tooltip.style.display).toBe("block");
-	tooltip
-		.querySelector<HTMLElement>('g[data-node-id="p"]')!
-		.dispatchEvent(new MouseEvent("click", { bubbles: true }));
-	expect(s.node("p").classList.contains("pfdsl-focus-cue")).toBe(true);
-	expect(
-		s.container.querySelector("#inner > .pfdsl-focus-ring"),
-	).not.toBeNull();
-	expect(s.postMessage).not.toHaveBeenCalledWith({
-		type: "nodeClick",
-		nodeId: "p",
-	});
-});
-
 it.each([
 	"constructor",
 	"toString",
@@ -260,8 +115,8 @@ it.each([
 		}),
 	);
 	await vi.advanceTimersByTimeAsync(1);
-	expect(renderDot).toHaveBeenCalledTimes(2);
-	expect(s.container.querySelector("#tooltip svg g.node")).not.toBeNull();
+	expect(renderDot).toHaveBeenCalledTimes(1);
+	expect(s.container.querySelector("#tooltip svg g.node")).toBeNull();
 	expect(s.node(id).dataset.subflow).toBeUndefined();
 	expect(s.container.querySelector("#tooltip .tt-hint")).toBeNull();
 	s.postMessage.mockClear();
@@ -429,154 +284,6 @@ it("replaces the cue and clears its timer; a redraw never starts another cue", a
 	expect(s.container.querySelector(".pfdsl-focus-ring")).toBeNull();
 });
 
-it("opens the shared node panel from context/keyboard and emits source-bound creation/connection requests", async () => {
-	const s = setup();
-	await s.preview.receive(s.message);
-	s.node("a").dispatchEvent(
-		new MouseEvent("contextmenu", { bubbles: true, cancelable: true }),
-	);
-	const panel = s.container.querySelector<HTMLElement>("#node-actions")!;
-	expect(panel.hidden).toBe(false);
-	s.container.querySelector<HTMLButtonElement>("#create-definition")!.click();
-	expect(s.postMessage).toHaveBeenCalledWith({
-		type: "createDefinition",
-		nodeId: "a",
-		source: s.message.editing.source,
-	});
-	s.node("p").dispatchEvent(
-		new KeyboardEvent("keydown", { key: "Enter", bubbles: true }),
-	);
-	expect(
-		s.container.querySelector<HTMLButtonElement>("#create-definition")!.hidden,
-	).toBe(true);
-	const input =
-		s.container.querySelector<HTMLInputElement>("#connector-target")!;
-	input.value = "new_result";
-	s.container.querySelector<HTMLSelectElement>("#connector-kind")!.value = "->";
-	s.container
-		.querySelector<HTMLFormElement>("#connector-form")!
-		.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
-	expect(s.postMessage).toHaveBeenCalledWith({
-		type: "addConnector",
-		nodeId: "p",
-		source: s.message.editing.source,
-		connector: "->",
-		otherId: "new_result",
-	});
-	await s.preview.receive({
-		...s.message,
-		editing: { ...s.message.editing, source: "changed" },
-	});
-	expect(panel.hidden).toBe(false);
-	expect(input.value).toBe("new_result");
-	expect(
-		s.container.querySelector("#node-actions-error")!.textContent,
-	).toContain("document changed");
-});
-
-it("does not accept stale local graph completion after an error", async () => {
-	let resolve!: (value: string) => void;
-	const renderer = vi.fn((dot: string) =>
-		dot === "main"
-			? Promise.resolve(svg)
-			: new Promise<string>((r) => {
-					resolve = r;
-				}),
-	);
-	const s = setup(renderer);
-	await s.preview.receive(s.message);
-	s.node("a").dispatchEvent(new MouseEvent("mousemove", { bubbles: true }));
-	await s.preview.receive({ type: "error", message: "Broken" });
-	resolve(svg);
-	await Promise.resolve();
-	await Promise.resolve();
-	expect(
-		s.container.querySelector<HTMLElement>("#tooltip")!.style.display,
-	).toBe("none");
-	expect(s.container.querySelector("#tooltip svg")).toBeNull();
-});
-
-it("keeps the current hover when the previous neighborhood completes last", async () => {
-	vi.useFakeTimers();
-	const completions: Array<(value: string) => void> = [];
-	const s = setup(
-		vi.fn((dot: string) =>
-			dot === "main"
-				? Promise.resolve(svg)
-				: new Promise<string>((resolve) => completions.push(resolve)),
-		),
-	);
-	await s.preview.receive(s.message);
-	s.node("a").dispatchEvent(new MouseEvent("mousemove", { bubbles: true }));
-	await Promise.resolve();
-	s.node("p").dispatchEvent(new MouseEvent("mousemove", { bubbles: true }));
-	await Promise.resolve();
-	expect(completions).toHaveLength(2);
-	completions[1]!(svg.replace("<svg ", '<svg data-render="current" '));
-	await vi.advanceTimersByTimeAsync(0);
-	const tooltip = s.container.querySelector<HTMLElement>("#tooltip")!;
-	expect(tooltip.querySelector("svg")?.getAttribute("data-render")).toBe(
-		"current",
-	);
-	completions[0]!(svg.replace("<svg ", '<svg data-render="stale" '));
-	await vi.advanceTimersByTimeAsync(0);
-	expect(tooltip.querySelectorAll("svg")).toHaveLength(1);
-	expect(tooltip.querySelector("svg")?.getAttribute("data-render")).toBe(
-		"current",
-	);
-});
-
-it("isolates pending hover and cue timers when a disposed container is remounted", async () => {
-	vi.useFakeTimers();
-	let completeHover!: (value: string) => void;
-	const s = setup(
-		vi.fn((dot: string) =>
-			dot === "main"
-				? Promise.resolve(svg)
-				: new Promise<string>((resolve) => {
-						completeHover = resolve;
-					}),
-		),
-	);
-	await s.preview.receive(s.message);
-	await s.preview.receive({ type: "focus", nodeId: "a" });
-	s.node("p").dispatchEvent(new MouseEvent("mousemove", { bubbles: true }));
-	await Promise.resolve();
-	const oldTooltip = s.container.querySelector<HTMLElement>("#tooltip")!;
-	const oldNode = s.node("a");
-	await vi.advanceTimersByTimeAsync(500);
-	s.preview.dispose();
-	expect(oldNode.classList.contains("pfdsl-focus-cue")).toBe(false);
-	const next = mountPreview(s.container, {
-		postMessage: vi.fn(),
-		renderDot: async () => svg.replace("<svg ", '<svg data-render="next" '),
-	});
-	cleanups.push(() => next.dispose());
-	Object.defineProperties(s.container.querySelector("#root")!, {
-		clientWidth: { value: 400 },
-		clientHeight: { value: 300 },
-	});
-	Object.defineProperties(s.container.querySelector("#inner")!, {
-		offsetWidth: { value: 200 },
-		offsetHeight: { value: 100 },
-	});
-	await next.receive(s.message);
-	await next.receive({ type: "focus", nodeId: "p" });
-	completeHover(svg.replace("<svg ", '<svg data-render="disposed" '));
-	await Promise.resolve();
-	await Promise.resolve();
-	expect(oldTooltip.style.display).toBe("none");
-	expect(oldTooltip.querySelector("svg")).toBeNull();
-	expect(s.container.querySelector("#tooltip svg")).toBeNull();
-	expect(
-		s.container.querySelector("#inner svg")?.getAttribute("data-render"),
-	).toBe("next");
-	await vi.advanceTimersByTimeAsync(1000);
-	expect(s.node("p").classList.contains("pfdsl-focus-cue")).toBe(true);
-	await vi.advanceTimersByTimeAsync(500);
-	expect(s.container.querySelector(".pfdsl-focus-cue")).toBeNull();
-});
-
 it("keeps a right-clicked node stationary until its context menu opens", async () => {
 	const s = setup();
 	await s.preview.receive(s.message);
@@ -597,7 +304,7 @@ it("keeps a right-clicked node stationary until its context menu opens", async (
 		false,
 	);
 	expect(s.container.querySelector("#node-actions-title")!.textContent).toBe(
-		"artifact: a",
+		"Connections — a",
 	);
 });
 
@@ -638,28 +345,6 @@ it("keeps manual pan when the same node regains focus, but reveals a different f
 	expect(inner.style.transform).not.toBe(panned);
 });
 
-it("returns connection submission to the preview toolbar across redraw", async () => {
-	const s = setup();
-	await s.preview.receive(s.message);
-	s.node("p").dispatchEvent(
-		new KeyboardEvent("keydown", { key: "Enter", bubbles: true }),
-	);
-	s.container.querySelector<HTMLInputElement>("#connector-target")!.value =
-		"extra";
-	s.container
-		.querySelector<HTMLButtonElement>("#connector-form button[type=submit]")!
-		.click();
-	const request = s.postMessage.mock.calls.at(-1)![0];
-	expect(s.container.querySelector<HTMLElement>("#node-actions")!.hidden).toBe(
-		false,
-	);
-	await s.preview.receive({ type: "editResult", request, ok: true });
-	await s.preview.receive(s.message);
-	expect(document.activeElement).toBe(
-		s.container.querySelector("#node-actions-toggle"),
-	);
-});
-
 it.each([
 	false,
 	true,
@@ -679,21 +364,8 @@ it.each([
 		false,
 	);
 	expect(s.container.querySelector("#node-actions-title")!.textContent).toBe(
-		"artifact: a",
+		"Connections — a",
 	);
-});
-
-it("uses an unquoted placeholder in connection choices", async () => {
-	const s = setup();
-	await s.preview.receive(s.message);
-	s.node("p").dispatchEvent(
-		new KeyboardEvent("keydown", { key: "Enter", bubbles: true }),
-	);
-	expect(
-		[...s.container.querySelectorAll("#connector-kind option")].map(
-			(o) => o.textContent,
-		),
-	).toEqual(["… >> p", "… >>? p", "p -> …"]);
 });
 
 it("retains the minimap SVG on focus and resize, but replaces it after rendering", async () => {
@@ -705,60 +377,4 @@ it("retains the minimap SVG on focus and resize, but replaces it after rendering
 	expect(s.container.querySelector("#minimap-svg svg")).toBe(clone);
 	await s.preview.receive(s.message);
 	expect(s.container.querySelector("#minimap-svg svg")).not.toBe(clone);
-});
-
-it("reuses neighborhood rendering within a revision and invalidates it on redraw", async () => {
-	vi.useFakeTimers();
-	const s = setup();
-	await s.preview.receive(s.message);
-	for (const id of ["a", "p", "a"]) {
-		s.node(id).dispatchEvent(new MouseEvent("mousemove", { bubbles: true }));
-		await vi.advanceTimersByTimeAsync(1);
-	}
-	expect(s.renderDot).toHaveBeenCalledTimes(3);
-	await s.preview.receive(s.message);
-	s.node("a").dispatchEvent(new MouseEvent("mousemove", { bubbles: true }));
-	await vi.advanceTimersByTimeAsync(1);
-	expect(s.renderDot).toHaveBeenCalledTimes(5);
-});
-
-it("shares in-flight neighborhood renders and ignores completion after redraw", async () => {
-	vi.useFakeTimers();
-	const resolveLocals: Array<(value: string) => void> = [];
-	const renderDot = vi.fn(async (dot: string) =>
-		dot === "main"
-			? svg
-			: new Promise<string>((resolve) => {
-					resolveLocals.push(resolve);
-				}),
-	);
-	const s = setup(renderDot);
-	await s.preview.receive(s.message);
-	for (const id of ["a", "p", "a"]) {
-		s.node(id).dispatchEvent(new MouseEvent("mousemove", { bubbles: true }));
-		await vi.advanceTimersByTimeAsync(1);
-	}
-	expect(renderDot).toHaveBeenCalledTimes(3);
-	await s.preview.receive(s.message);
-	for (const resolve of resolveLocals) resolve(svg);
-	await vi.advanceTimersByTimeAsync(1);
-	expect(
-		s.container.querySelector("#tooltip")!.getAttribute("style"),
-	).toContain("display: none");
-});
-
-it("retries a failed neighborhood render instead of caching the rejection", async () => {
-	vi.useFakeTimers();
-	const renderDot = vi
-		.fn(async (_dot: string) => svg)
-		.mockImplementationOnce(async () => svg)
-		.mockRejectedValueOnce(new Error("layout failed"));
-	const s = setup(renderDot);
-	await s.preview.receive(s.message);
-	for (const id of ["a", "p", "a"]) {
-		s.node(id).dispatchEvent(new MouseEvent("mousemove", { bubbles: true }));
-		await vi.advanceTimersByTimeAsync(1);
-	}
-	expect(renderDot).toHaveBeenCalledTimes(4);
-	expect(s.container.querySelector("#tooltip svg")).not.toBeNull();
 });

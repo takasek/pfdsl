@@ -161,6 +161,7 @@ test("production main routes Normalize to the active tab and preserves Format", 
 		seam,
 		instances,
 		async ({ document, editors }) => {
+			editors[1].model.source = "input >> build -> output\n";
 			const docs = [...document.querySelectorAll(".document")];
 			const button = document.querySelector("#normalize");
 			assert.equal(button.textContent, "Normalized edges");

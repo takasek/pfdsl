@@ -49,6 +49,50 @@ aside {
 	padding: 8px;
 	border-right: 1px solid #ddd;
 }
+body [hidden] {
+	display: none;
+}
+header {
+	gap: 8px;
+	padding: 6px 10px;
+}
+#document-name {
+	overflow-wrap: anywhere;
+	min-width: 0;
+}
+#document-state {
+	color: #555;
+}
+#document-location {
+	overflow-wrap: anywhere;
+}
+#location-details {
+	margin-left: auto;
+	max-width: 70%;
+}
+#start-screen {
+	margin: auto;
+	padding: 24px;
+	text-align: center;
+}
+footer {
+	flex-shrink: 0;
+	padding: 4px 10px;
+	border-top: 1px solid #ddd;
+}
+button:focus-visible,
+summary:focus-visible {
+	outline: 2px solid #3369a0;
+	outline-offset: 2px;
+}
+button:disabled {
+	cursor: default;
+	color: #666;
+}
+#files [aria-current="true"] {
+	background: #e6f0ff;
+	border-color: #3369a0;
+}
 .normalized-edges {
 	position: absolute;
 	right: 0;
@@ -107,6 +151,24 @@ aside {
 	min-width: 0;
 	height: 100%;
 }
+.editor {
+	width: calc((100% - 6px) * var(--source-ratio, 0.5));
+	flex-shrink: 0;
+}
+.preview {
+	flex: 1;
+}
+.workspace-divider {
+	width: 6px;
+	flex-shrink: 0;
+	cursor: col-resize;
+	background: #e5e5e5;
+	touch-action: none;
+}
+.workspace-divider:focus-visible {
+	outline: 2px solid #3369a0;
+	outline-offset: -2px;
+}
 .preview {
 	border-left: 1px solid #ddd;
 	box-sizing: border-box;
@@ -147,11 +209,23 @@ aside h2 {
 	white-space: pre-wrap;
 }
 dialog {
-	width: min(800px, 85vw);
+	width: min(1100px, 90vw);
 	max-height: 80vh;
 	overflow: auto;
 	border: 1px solid #aaa;
 	border-radius: 8px;
+}
+.comparison-labels {
+	display: grid;
+	grid-template-columns: 1fr 1fr;
+	gap: 12px;
+	overflow-wrap: anywhere;
+}
+.text-comparison {
+	height: min(400px, 45vh);
+	min-height: 180px;
+	width: 100%;
+	border: 1px solid #bbb;
 }
 dialog::backdrop {
 	background: #0006;

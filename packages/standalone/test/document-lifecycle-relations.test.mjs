@@ -29,12 +29,8 @@ const rename = (native, doc, id, name) => {
 };
 const inspected = (host) =>
 	host.log.filter((item) => item.kind === "inspect").map((item) => item.id);
-// The host opens two sample tabs before any file.
-const openTabs = (host) =>
-	host
-		.tabs()
-		.slice(2)
-		.filter((tab) => host.isOpen(tab));
+// Startup is empty; count the documents explicitly opened by each scenario.
+const openTabs = (host) => host.tabs().filter((tab) => host.isOpen(tab));
 const status = (host) => host.query("#status").textContent;
 
 for (const external of [false, true]) {

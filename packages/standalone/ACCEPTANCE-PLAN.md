@@ -67,6 +67,7 @@ a >> r -> d
 
 対応：#1444。対象・入力：M、編集済みA/B、大きい図、カーソル・選択・Undo・zoom/pan。
 操作：起動時の左右実幅を測り、分割線をドラッグ／キーで調整し、リサイズとA→B→Aを行う。
+入口：`Source and diagram widths`分割線。左右キーは5ポイント、Shift併用は1ポイント、Home/Endは10/90%。6pxの分割線を除いた両paneを初期50:50にし、同じeditor/preview instanceの幅だけを変える。
 期待：左editor／右図、初期50:50と可変幅が成立し、本文・dirty・Undo・カーソル・選択・図の視点を保つ。
 毎回Fitへ戻らず、片側表示モードを追加しない。
 状態：M未実施。記録：未記入。
@@ -109,6 +110,7 @@ Tauri採用だけで合格にせず、独自キー設定画面を追加しない
 ### GUI-06：保存中切替と状態・通知
 
 対応：#1444。対象・入力：M、A/B、ディスク独立読取。保存中と分かる再現方法は実装PRで確定する。
+時機：大きいAでSaveを開始し、native保存応答前にBのtabを選ぶ。保存応答前であることを観測できない場合は、この変種を未実施のまま残す。既存の`document-host-recovery.test.mjs`／`document-lifecycle-*.test.mjs`による応答保留と`workspace-host.test.mjs`の表示検査は自動検証の別証拠であり、nativeの遅延注入スイッチは追加しない。
 操作：A編集→保存→B編集、A再編集、A保存処理中にB切替、A外部変更確認の取消、の4変種で本文・disk・dirty・Undo・表示を記録する。
 期待：保存結果はAに帰属し、Bの本文・dirty・Undoを変えない。
 BにAのSavedを現在状態として残さず、A再編集で表示を更新する。
@@ -123,6 +125,7 @@ BにAのSavedを現在状態として残さず、A再編集で表示を更新す
 read-only表示と色以外の差分区別を保ち、取消は内容と未解決状態を保持する。
 再競合は再確認し、file不在ではUse diskを無効にする。
 自動競合解決・確認削減を追加しない。
+入口：既存の`Review and Save Here…`／`Use Current Disk Version…`と保存前比較。比較はMonacoのread-onlyな左右diff editorを使い、変更gutter・行対応・overviewと独立した長行scrollを確認する。`Editor content`と`Observed disk content`は既存のOperationPlanに束縛された版で、表示部品自身は文書やdiskを書き換えない。
 状態：M未実施。記録：未記入。#1260の構造差分とは別。
 
 ### GUI-08：実ファイルの保存・終了回帰
@@ -179,11 +182,13 @@ Enter確定だけで新規作成しない。
 期待：＋が逆種別の新nodeをID＝初期labelで作り接続を一操作・一Undoで適用する。
 失敗で未接続新node、dirty/Undoの部分変更を残さず、既存コメント／metadataと後の編集導線を保つ。
 状態：M/V各未実施。記録：未記入。現APIとの差分は#1444。
+API差分：`addConnector`に`create: true`を追加し、共有`applyPreviewEdit`が既存IDを拒否して`insertDefinition`とedge挿入を単一のsource/editへ合成する。候補選択は`create: false`、常設＋だけが`true`を送る。両hostが既存のsource/revision/dispose検査と単一editor edit／WorkspaceEditで適用する。
 
 ### GUI-14：拒否と古い対象への非適用
 
 対応：#1444、統合済み#1432。対象・入力：M/V、空／既存／不正ID、重複edge、種別違い、別producer、無関係な既存V001、一時的入出力不足。
 操作：不正候補／＋、候補中source・種別・中心・tab変更／閉鎖後の旧要求確定を試す。非同期結果の再現は実装PRで具体化する。
+自動再現：`connections-panel.test.ts`で旧候補を保持してsource更新後に確定し、共有のsource一致検査で拒否する。ホスト拒否・無関係な応答・閉鎖後の遅着応答も同じテストで操作する。`connector-producer.test.mjs`は描画を更新しないままMonacoの現在sourceを変更してから＋を確定し、host側で再拒否する。実hostの非同期時機を観測できなければ、その実機変種は未実施とする。
 期待：理由付き拒否でsource・dirty・Undo・入力を保ち、単一producerは共通判定を使う。
 無関係な既存エラーや一時的不足を一括遮断せず、stale要求・描画・dispose後の結果を別文書／次対象へ適用しない。
 状態：M/V各未実施。記録：未記入。
@@ -196,6 +201,7 @@ Enter確定だけで新規作成しない。
 成果物→工程の向きを保持しoutputの切替は理由付き無効、方向反転を起こさない。
 左右列だけで判断せず共有適用条件で検証する。
 状態：M/V各未実施。記録：未記入。現APIにない編集要求は#1444。
+API差分：`deleteConnector`／`toggleFeedback`は`nodeId/source/artifact/process/kind`を渡す。共有計算がsemantic edgeの全authored occurrenceを対象に、該当する集合／chain文だけを再構成し、文外・内部コメントと端点のkindを保つ。最後のedgeを消してkindが失われる端点はCST経由の最小定義を保持する。切替先重複、outputのfeedback化、新しいprimary cycleを拒否し、無関係な既存V001/V010は一括拒否しない。
 
 ### GUI-16：同期・Undo・表示寿命
 
@@ -443,3 +449,10 @@ GUI-06/14/31の時機再現、GUI-13/15の共有編集API差分、GUI-34/35の�
 試験対象と期待結果は上記を維持し、未確定の実行手段を合格とは扱わない。
 通常の自動test・CIと、共通受入Issueから辿る担当Issueの実装契約を維持する。
 新しい試験管理システム、状態機械、網羅性判定器や証跡基盤は導入しない。
+
+#1444の変更束ではGUI-01〜07/09〜16の入口と共有APIを上記へ具体化した。
+2026-10-15の開発browserで、新規入力、分割線50→60、Connectionsの中心移動、新規作成＋接続と1回のUndo/Redo、図からsourceへの移動、Fit/100%/zoomを別agentが盲検操作した。
+実行時はこの変更束の未commit作業版であり、native menu・実ファイルI/O・VoiceOver/IME・VのExtension Development Host・公開済みbundleは未実施である。
+ブラウザでは文書作成後のnative New入口がないため、2文書操作はこの観測の範囲外であり、自動hostテストのtab切替検査とも区別する。
+試験中の開発サーバーreloadによる試験文書の消失は、再作成後に再試験し、製品の保存／復旧欠陥とは数えない。
+GUIの状態欄と#1445の未実施は、このbrowser観測と自動検証だけでは合格へ変更しない。

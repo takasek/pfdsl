@@ -24,6 +24,10 @@ export const editor = {
 			getModel: () => model,
 			render() {},
 			layout() {},
+			focus() {},
+			trigger(_origin, id) {
+				this.lastCommand = id;
+			},
 			addAction() {
 				return { dispose() {} };
 			},

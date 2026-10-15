@@ -16,7 +16,7 @@ export function createDocumentTab(options){
  const container=document.createElement('div'),button=document.createElement('button');
  options.parent.append(container);button.textContent=options.name;
  const tab={container,button,location:options.path,read:options.read,setSourceCalls:0,
-  activate(){},
+  activate(){},focus(){},command(){},canDiagram(){return true;},
   dispose(){container.remove();button.remove();hook('dispose',tab);},
   getSource:()=>source,getRevision:()=>revision,
   type(s){source=s;revision++;hook('type',tab,s);options.onChange?.();},
@@ -25,6 +25,10 @@ export function createDocumentTab(options){
   markSaved(){},format(){}};
  (globalThis.reviewTabs??=[]).push(tab);
  return tab;
+}`;
+const comparisonStub = `export function createTextComparison(parent, local, disk) {
+ const fields=[local,disk??'File is missing'].map(value=>{const field=document.createElement('textarea');field.readOnly=true;field.value=value;parent.append(field);return field;});
+ return {dispose(){for(const field of fields)field.remove();}};
 }`;
 
 /**
@@ -53,27 +57,31 @@ export async function bundleHost(outfile) {
 					b.onResolve(
 						{
 							filter:
-								/^(?:@tauri-apps\/api\/|@pfdsl\/editor$|monaco-editor\/|\.\/document-tab\.js$|\.\/acceptance\.js$|\.\/style\.css$)/,
+								/^(?:@tauri-apps\/api\/|@pfdsl\/editor$|monaco-editor\/|\.\/document-tab\.js$|\.\/text-comparison\.js$|\.\/native-menu\.js$|\.\/acceptance\.js$|\.\/style\.css$)/,
 						},
 						(args) => ({ path: args.path, namespace: "review-seams" }),
 					);
 					b.onLoad({ filter: /.*/, namespace: "review-seams" }, (args) => ({
 						contents:
-							args.path === "@tauri-apps/api/core"
-								? "export const invoke=(...args)=>globalThis.nativeInvoke(...args);"
-								: args.path === "@tauri-apps/api/event"
-									? "export const listen=(...args)=>globalThis.nativeListen(...args);"
-									: args.path === "@tauri-apps/api/window"
-										? "export const getCurrentWindow=()=>({onCloseRequested(){},destroy(){}});"
-										: args.path === "@pfdsl/editor"
-											? 'export const previewStyles="";'
-											: args.path === "./acceptance.js"
-												? "export const verifyNativeCorpus=()=>globalThis.nativeAcceptance();"
-												: args.path === "./style.css"
-													? ""
-													: args.path === "./document-tab.js"
-														? tabStub
-														: "export default class Worker {}",
+							args.path === "./text-comparison.js"
+								? comparisonStub
+								: args.path === "./native-menu.js"
+									? "export const installNativeMenu=async()=>({update(){},recent(){}});"
+									: args.path === "@tauri-apps/api/core"
+										? "export const invoke=(...args)=>globalThis.nativeInvoke(...args);"
+										: args.path === "@tauri-apps/api/event"
+											? "export const listen=(...args)=>globalThis.nativeListen(...args);"
+											: args.path === "@tauri-apps/api/window"
+												? "export const getCurrentWindow=()=>({onCloseRequested(){},destroy(){}});"
+												: args.path === "@pfdsl/editor"
+													? 'export const previewStyles="";'
+													: args.path === "./acceptance.js"
+														? "export const verifyNativeCorpus=()=>globalThis.nativeAcceptance();"
+														: args.path === "./style.css"
+															? ""
+															: args.path === "./document-tab.js"
+																? tabStub
+																: "export default class Worker {}",
 						loader: "js",
 					}));
 				},

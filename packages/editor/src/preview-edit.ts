@@ -4,10 +4,12 @@ import {
 	loadFrontmatter,
 	type Range,
 } from "@pfdsl/core";
+import { type ConnectionEdit, editConnection } from "./connection-edit.js";
 import {
 	buildConnectorEdgeLine,
 	type ConnectorKind,
 	compatibleOtherKind,
+	createsPrimaryCycle,
 	edgeAlreadyExists,
 	insertConnectorEdge,
 	outputProducerConflict,
@@ -19,6 +21,7 @@ import {
 } from "./def-insertion-logic.js";
 
 export type PreviewEditRequest =
+	| ConnectionEdit
 	| { type: "createDefinition"; nodeId: string; source: string }
 	| {
 			type: "addConnector";
@@ -26,6 +29,7 @@ export type PreviewEditRequest =
 			source: string;
 			connector: ConnectorKind;
 			otherId: string;
+			create?: boolean;
 	  };
 
 export type PreviewEditResult =
@@ -86,6 +90,16 @@ export function applyPreviewEdit(
 	const kind = model.nodeKinds.get(request.nodeId);
 	if (kind !== "artifact" && kind !== "process")
 		return fail("The target node no longer exists.");
+	if (request.type === "deleteConnector" || request.type === "toggleFeedback") {
+		const result = editConnection(source, request);
+		return "message" in result
+			? fail(result.message)
+			: {
+					ok: true,
+					source: result.source,
+					edit: sourceEdit(source, result.source),
+				};
+	}
 	if (request.type === "createDefinition") {
 		if (
 			!findUndefinedNodeKind(model.nodeKinds, model.frontmatter, request.nodeId)
@@ -117,6 +131,8 @@ export function applyPreviewEdit(
 		kindOfExisting: (id) => model.nodeKinds.get(id),
 	});
 	if (invalid) return fail(invalid);
+	if (request.create && model.nodeKinds.has(request.otherId))
+		return fail("This ID already exists. Choose it from the candidates.");
 	if (
 		edgeAlreadyExists(
 			model.edges,
@@ -135,6 +151,17 @@ export function applyPreviewEdit(
 		request.otherId,
 	);
 	if (conflict) return fail(conflict);
+	const artifact = kind === "artifact" ? request.nodeId : request.otherId;
+	const process = kind === "process" ? request.nodeId : request.otherId;
+	if (
+		request.connector !== ">>?" &&
+		createsPrimaryCycle(
+			model.graph.primaryEdges,
+			request.connector === "->" ? process : artifact,
+			request.connector === "->" ? artifact : process,
+		)
+	)
+		return fail("This connection would create a cycle (V010).");
 	const edge = buildConnectorEdgeLine(
 		request.nodeId,
 		kind,
@@ -142,6 +169,17 @@ export function applyPreviewEdit(
 		request.otherId,
 	);
 	const inserted = insertConnectorEdge(source, edge, request.nodeId);
+	if (request.create) {
+		const definition = insertDefinition(
+			inserted.text,
+			compatibleOtherKind(kind) as "artifact" | "process",
+			request.otherId,
+		);
+		if (!definition.inserted)
+			return fail("The new node definition could not be inserted safely.");
+		const output = definition.output + loadFrontmatter(inserted.text).body;
+		return { ok: true, source: output, edit: sourceEdit(source, output) };
+	}
 	const offset =
 		inserted.text.split("\n").slice(0, inserted.insertedLine).join("\n")
 			.length +

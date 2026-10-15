@@ -65,6 +65,11 @@ export async function withFormatHost(
 			],
 		});
 		const module = await import(pathToFileURL(output).href);
+		// Formatting uses two explicitly created documents as its fixture.
+		if (entry === "main") {
+			dom.window.document.querySelector("#new").click();
+			dom.window.document.querySelector("#new").click();
+		}
 		const create = (source, options = {}) => {
 			const statuses = [];
 			const tab = module.createDocumentTab({

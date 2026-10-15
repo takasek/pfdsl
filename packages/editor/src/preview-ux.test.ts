@@ -253,8 +253,9 @@ it("offers related-file gestures only for a host that can open them", async () =
 	const node = container.querySelector("#inner g.node")!;
 	node.dispatchEvent(new MouseEvent("mousemove", { bubbles: true }));
 	expect(container.querySelector<HTMLElement>("#tooltip")!.style.display).toBe(
-		"none",
+		"block",
 	);
+	expect(container.querySelector("#tooltip .tt-hint")).toBeNull();
 	node.dispatchEvent(new MouseEvent("click", { bubbles: true, ctrlKey: true }));
 	expect(postMessage.mock.calls).toEqual([[{ type: "ready" }]]);
 });

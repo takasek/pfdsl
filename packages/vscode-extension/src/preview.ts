@@ -104,7 +104,7 @@ async function editFromPreview(
 	request: PreviewEditRequest,
 ) {
 	const reply = (ok: boolean, message?: string) => {
-		if (!state.disposed && request.type === "addConnector")
+		if (!state.disposed)
 			void state.panel.webview.postMessage({
 				type: "editResult",
 				request,
@@ -167,7 +167,7 @@ async function editFromPreview(
 					? vscode.ViewColumn.Beside
 					: sourceColumn,
 			...(request.type === "createDefinition" ? { selection: range } : {}),
-			preserveFocus: request.type === "addConnector",
+			preserveFocus: request.type !== "createDefinition",
 		});
 		if (state.disposed || state.doc.getText() !== result.source) return;
 		if (request.type === "createDefinition")
@@ -454,7 +454,9 @@ export function registerPreview(context: vscode.ExtensionContext): {
 				state.controller.markReady();
 			} else if (
 				msg.type === "createDefinition" ||
-				msg.type === "addConnector"
+				msg.type === "addConnector" ||
+				msg.type === "deleteConnector" ||
+				msg.type === "toggleFeedback"
 			) {
 				await editFromPreview(state, msg);
 			} else if (msg.type === "nodeClick") {

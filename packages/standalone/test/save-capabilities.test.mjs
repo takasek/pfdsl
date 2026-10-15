@@ -77,10 +77,11 @@ test("supported saving preserves normal Save and Save As availability", async ()
 	const doc = native.add(3, "supported.pfdsl", "original");
 	const host = await startHost(native, doc);
 	try {
+		assert.equal(host.query("#save").disabled, true);
+		const tab = await host.open(doc);
 		assert.equal(host.query("#save").disabled, false);
 		assert.equal(host.query("#save-as").disabled, false);
 		assert.equal(host.query("#save-support").textContent, "");
-		const tab = await host.open(doc);
 		tab.type("local");
 		await host.cmdS();
 		assert.equal(doc.file.source, "local");
