@@ -1,4 +1,18 @@
-pub fn envelope(svg: &str, width: f64, height: f64) -> Result<String, String> {
+pub struct PreparedPdf {
+    pub html: String,
+    pub width: f64,
+    pub height: f64,
+}
+
+pub fn prepare(svg: &str, width: f64, height: f64) -> Result<PreparedPdf, String> {
+    Ok(PreparedPdf {
+        html: envelope(svg, width, height)?,
+        width: (width * 0.75).ceil(),
+        height: (height * 0.75).ceil(),
+    })
+}
+
+fn envelope(svg: &str, width: f64, height: f64) -> Result<String, String> {
     if ![width, height]
         .into_iter()
         .all(|value| value.is_finite() && value > 0.0 && value <= 32768.0)
@@ -136,7 +150,9 @@ mod tests {
 
     #[test]
     fn wraps_graphviz_svg_with_full_dimensions_and_cjk() {
-        let html = envelope(SVG, 640.0, 480.0).unwrap();
+        let prepared = prepare(SVG, 640.0, 480.0).unwrap();
+        assert_eq!((prepared.width, prepared.height), (480.0, 360.0));
+        let html = prepared.html;
         assert!(html.contains("width:480px;height:360px"));
         assert!(html.contains("日本語の成果物"));
         assert!(html.contains("default-src 'none'"));
@@ -146,8 +162,8 @@ mod tests {
     #[test]
     fn rejects_invalid_dimensions_and_non_svg_documents() {
         for size in [0.0, -1.0, f64::NAN, f64::INFINITY, 32769.0] {
-            assert!(envelope(SVG, size, 100.0).is_err());
-            assert!(envelope(SVG, 100.0, size).is_err());
+            assert!(prepare(SVG, size, 100.0).is_err());
+            assert!(prepare(SVG, 100.0, size).is_err());
         }
         assert!(envelope("<html>wrong</html>", 100.0, 100.0).is_err());
         assert!(envelope("<svg>", 100.0, 100.0).is_err());

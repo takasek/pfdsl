@@ -15,14 +15,12 @@ import "monaco-editor/editor/contrib/contextmenu/browser/contextmenu.js";
 import "monaco-editor/editor/contrib/find/browser/findController.js";
 import "monaco-editor/editor/standalone/browser/quickAccess/standaloneCommandsQuickAccess.js";
 import "./language.js";
-import {
-	type ExportServices,
-	registerExportFeatures,
-} from "./export-features.js";
+import { registerExportFeatures } from "./export-features.js";
 import {
 	createExportResults,
 	type ExportResultPresenter,
 } from "./export-results.js";
+import type { ExportServices } from "./export-services.js";
 import { registerLanguageFeatures } from "./language-features.js";
 import { createNormalizedEdgesPanel } from "./normalized-edges.js";
 import { formatSnapshot, processSnapshot } from "./processing.js";

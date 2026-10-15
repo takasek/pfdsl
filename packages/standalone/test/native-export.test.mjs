@@ -7,7 +7,7 @@ import {
 	rmSync,
 	writeFileSync,
 } from "node:fs";
-import { tmpdir } from "node:os";
+import { homedir, tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
@@ -23,14 +23,55 @@ test("product WebKit PDF and browser canvas preserve dimensions and Japanese tex
 	const root = fileURLToPath(new URL("../", import.meta.url));
 	const temporary = mkdtempSync(join(tmpdir(), "pfdsl-product-export-"));
 	try {
+		const cargo = process.env.CARGO ?? join(homedir(), ".cargo/bin/cargo");
+		const manifest = join(root, "src-tauri/Cargo.toml");
+		const metadata = spawnSync(
+			cargo,
+			[
+				"+stable",
+				"metadata",
+				"--manifest-path",
+				manifest,
+				"--no-deps",
+				"--format-version",
+				"1",
+			],
+			{ encoding: "utf8" },
+		);
+		assert.equal(metadata.status, 0, metadata.stderr);
+		const compiled = spawnSync(
+			cargo,
+			[
+				"+stable",
+				"build",
+				"--manifest-path",
+				manifest,
+				"--locked",
+				"--example",
+				"pdf-envelope",
+			],
+			{ encoding: "utf8", timeout: 120000 },
+		);
+		assert.equal(compiled.status, 0, compiled.stderr);
+		const envelope = join(
+			JSON.parse(metadata.stdout).target_directory,
+			"debug/examples/pdf-envelope",
+		);
+		function preparePdf(svg, width, height) {
+			writeFileSync(join(temporary, "input.svg"), svg);
+			const prepared = spawnSync(
+				envelope,
+				[join(temporary, "input.svg"), String(width), String(height)],
+				{ encoding: "utf8" },
+			);
+			assert.equal(prepared.status, 0, prepared.stderr);
+			const input = JSON.parse(prepared.stdout);
+			writeFileSync(join(temporary, "input.html"), input.html);
+			return input;
+		}
 		const svg =
 			'<svg xmlns="http://www.w3.org/2000/svg" width="640pt" height="480pt" viewBox="0 0 640.2 480.4"><text x="20" y="45" font-size="24" font-family="sans-serif">日本語の成果物 Export</text><rect x="10" y="60" width="600" height="400" fill="none" stroke="black"/></svg>';
-		writeFileSync(join(temporary, "input.svg"), svg);
-		// Same envelope geometry/CSP as pdf.rs; its parser and 72/96 conversion are covered by native unit tests.
-		writeFileSync(
-			join(temporary, "input.html"),
-			`<!doctype html><html><head><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; base-uri 'none'"><style>html,body{margin:0;padding:0;width:480.15px;height:360.3px;background:white;overflow:hidden}svg{display:block;width:480.15px;height:360.3px}</style></head><body>${svg}</body></html>`,
-		);
+		const initial = preparePdf(svg, 640.2, 480.4);
 		await build({
 			entryPoints: [join(root, "src/export-image.ts")],
 			bundle: true,
@@ -66,8 +107,8 @@ test("product WebKit PDF and browser canvas preserve dimensions and Japanese tex
 				join(temporary, "input.svg"),
 				join(temporary, "input.html"),
 				join(temporary, "png.js"),
-				"481",
-				"361",
+				String(initial.width),
+				String(initial.height),
 				pdf,
 				png,
 			],
@@ -145,19 +186,15 @@ test("product WebKit PDF and browser canvas preserve dimensions and Japanese tex
 					readFileSync(join(temporary, "corpus.tsv"), "utf8"),
 					/^kind\tid\tlabel/,
 				);
-				writeFileSync(join(temporary, "input.svg"), graphSvg);
-				writeFileSync(
-					join(temporary, "input.html"),
-					`<!doctype html><html><head><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; base-uri 'none'"><style>html,body{margin:0;padding:0;width:${width * 0.75}px;height:${height * 0.75}px;background:white;overflow:hidden}svg{display:block;width:${width * 0.75}px;height:${height * 0.75}px}</style></head><body>${graphSvg.replace(/^[\s\S]*?(?=<svg\b)/, "")}</body></html>`,
-				);
+				const input = preparePdf(graphSvg, width, height);
 				const output = spawnSync(
 					executable,
 					[
 						join(temporary, "input.svg"),
 						join(temporary, "input.html"),
 						join(temporary, "png.js"),
-						String(Math.ceil(width * 0.75)),
-						String(Math.ceil(height * 0.75)),
+						String(input.width),
+						String(input.height),
 						pdf,
 						png,
 					],

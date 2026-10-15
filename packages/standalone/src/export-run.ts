@@ -10,7 +10,6 @@ export interface ExportSources {
 }
 export interface ExportSelection {
 	id: number;
-	paths?: Partial<Record<ExportFormat, string>>;
 }
 export function createExportRun(host: {
 	snapshot(): Promise<ExportSources>;

@@ -177,7 +177,6 @@ pub(crate) struct Exports {
 #[derive(Serialize)]
 pub(crate) struct Selection {
     id: u64,
-    paths: HashMap<String, String>,
 }
 
 #[tauri::command]
@@ -243,23 +242,13 @@ pub(crate) async fn choose_export(
             }
         }
     }
-    let paths = session
-        .targets
-        .iter()
-        .map(|(format, t)| {
-            (
-                format.clone(),
-                session.path.join(&t.leaf).to_string_lossy().into_owned(),
-            )
-        })
-        .collect();
     let id = exports.next.fetch_add(1, Ordering::Relaxed);
     exports
         .sessions
         .lock()
         .map_err(|e| e.to_string())?
         .insert(id, session);
-    Ok(Some(Selection { id, paths }))
+    Ok(Some(Selection { id }))
 }
 
 #[tauri::command]
@@ -289,8 +278,8 @@ pub(crate) fn release_export(exports: State<'_, Exports>, id: u64) -> Result<(),
 
 #[tauri::command]
 pub(crate) async fn export_pdf(svg: String, width: f64, height: f64) -> Result<Vec<u8>, String> {
-    let html = crate::pdf::envelope(&svg, width, height)?;
-    crate::pdf::render(html, (width * 0.75).ceil(), (height * 0.75).ceil()).await
+    let prepared = crate::pdf::prepare(&svg, width, height)?;
+    crate::pdf::render(prepared.html, prepared.width, prepared.height).await
 }
 
 #[cfg(test)]

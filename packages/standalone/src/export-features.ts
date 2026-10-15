@@ -1,6 +1,5 @@
 import {
 	computeExportSources,
-	type ExportFormat,
 	type ExportResult,
 	exportFormats,
 } from "@pfdsl/editor";
@@ -8,18 +7,10 @@ import { renderDotToSvg } from "@pfdsl/preview-engine";
 import type * as monaco from "monaco-editor/editor/editor.api.js";
 import { svgSize, svgToPng } from "./export-image.js";
 import type { ExportResultPresenter } from "./export-results.js";
-import { createExportRun, type ExportSelection } from "./export-run.js";
+import { createExportRun } from "./export-run.js";
+import type { ExportServices } from "./export-services.js";
 import { processSnapshot } from "./processing.js";
 
-export interface ExportServices {
-	choose(
-		name: string,
-		formats: readonly ExportFormat[],
-	): Promise<ExportSelection | null>;
-	write(id: number, format: ExportFormat, bytes: Uint8Array): Promise<string>;
-	release(id: number): Promise<void>;
-	pdf(svg: string, width: number, height: number): Promise<Uint8Array>;
-}
 export function registerExportFeatures(
 	editor: monaco.editor.IStandaloneCodeEditor,
 	context: () => {
