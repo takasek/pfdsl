@@ -55,6 +55,7 @@ const connectionsStyles = `
 #node-actions [data-edge], #node-actions [data-create] { padding: 2px; min-height: 24px; border: 1px solid var(--pfdsl-panel-border, #777); }
 .connection-candidates { position: absolute; bottom: 100%; left: 0; right: 0; max-height: min(220px, 35vh); overflow: auto; background: var(--pfdsl-editor-background, #fff); border: 1px solid var(--pfdsl-panel-border, #777); z-index: 110; box-shadow: 0 2px 8px #0003; }
 #node-actions .connection-candidates button { display: block; text-align: left; width: calc(100% - 8px); }
+#node-actions .connection-candidates [aria-selected="true"] { outline: 2px solid var(--pfdsl-focusBorder, #007fd4); outline-offset: -2px; }
 .connection-reason { font-size: 0.9em; overflow-wrap: anywhere; max-height: 3em; overflow: auto; }
 .connection-menu { padding: 4px; border: 1px solid var(--pfdsl-panel-border, #777); }
 #node-actions button:focus-visible, #node-actions input:focus-visible { outline: 2px solid var(--pfdsl-focusBorder, #007fd4); outline-offset: 1px; }

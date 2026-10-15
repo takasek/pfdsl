@@ -1,5 +1,5 @@
 import { analyzeSource, type NormalizedEdge } from "@pfdsl/core";
-import type { MessageToWebview } from "./messages.js";
+import type { MessageToWebview, PreviewEditMessage } from "./messages.js";
 import {
 	applyPreviewEdit,
 	connectorError,
@@ -17,14 +17,18 @@ interface Side {
 	candidates: HTMLDivElement;
 	reason: HTMLSpanElement;
 }
+type Popup =
+	| { type: "candidates"; side: Side; active?: HTMLButtonElement }
+	| { type: "edge"; trigger: HTMLButtonElement; edge: NormalizedEdge };
 let serial = 0;
 
 export function mountConnections(
 	container: HTMLElement,
 	host: {
-		postMessage(request: PreviewEditRequest): void;
+		postMessage(request: PreviewEditMessage): void;
 		navigate(id: string): void;
 		close(): void;
+		onOpenChange(open: boolean): void;
 	},
 ) {
 	const document = container.ownerDocument;
@@ -38,10 +42,17 @@ export function mountConnections(
 	let editing: Editing;
 	let model: ReturnType<typeof analyzeSource> | undefined;
 	let center: string | undefined;
+	let popup: Popup | undefined;
+	let applyingFocus = false;
 	let pending:
-		| { request: PreviewEditRequest; side?: Side; value?: string }
+		| {
+				request: PreviewEditMessage & { requestId: string };
+				side?: Side;
+				value?: string;
+		  }
 		| undefined;
 	const token = ++serial;
+	let requestSerial = 0;
 	function button(text: string, label: string, action: () => void) {
 		const element = document.createElement("button");
 		element.type = "button";
@@ -50,11 +61,39 @@ export function mountConnections(
 		element.onclick = action;
 		return element;
 	}
-	function hideCandidates() {
-		for (const side of sides) {
-			side.candidates.hidden = true;
-			side.input.setAttribute("aria-expanded", "false");
+	function moveFocus(target: HTMLElement) {
+		// Restoring a control must not reopen its candidate popup.
+		applyingFocus = true;
+		try {
+			target.focus();
+		} finally {
+			applyingFocus = false;
 		}
+	}
+	function setPopup(next: Popup | undefined, target?: HTMLElement) {
+		if (popup?.type === "candidates")
+			popup.active?.setAttribute("aria-selected", "false");
+		popup = next;
+		for (const side of sides) {
+			const open = next?.type === "candidates" && next.side === side;
+			side.candidates.hidden = !open;
+			side.input.setAttribute("aria-expanded", String(open));
+			side.input.removeAttribute("aria-activedescendant");
+		}
+		if (next?.type === "candidates" && next.active) {
+			next.active.setAttribute("aria-selected", "true");
+			next.side.input.setAttribute("aria-activedescendant", next.active.id);
+		}
+		menu.hidden = next?.type !== "edge";
+		if (target) moveFocus(target);
+	}
+	function dismissPopup() {
+		const previous = popup;
+		const target =
+			previous?.type === "edge" && menu.contains(document.activeElement)
+				? previous.trigger
+				: undefined;
+		setPopup(undefined, target);
 	}
 	function connector(left: boolean) {
 		const kind = editing?.nodes.find((n) => n.id === center)?.kind;
@@ -81,13 +120,17 @@ export function mountConnections(
 			error.textContent = result.message;
 			return;
 		}
-		pending = { request, ...(side ? { side, value: side.input.value } : {}) };
+		const message = { ...request, requestId: `${token}:${++requestSerial}` };
+		pending = {
+			request: message,
+			...(side ? { side, value: side.input.value } : {}),
+		};
 		error.textContent = "";
-		if (menu.contains(document.activeElement)) sides[0]!.input.focus();
-		hideCandidates();
-		menu.hidden = true;
+		const target =
+			side?.input ?? (popup?.type === "edge" ? sides[0]!.input : undefined);
+		setPopup(undefined, target);
 		refreshInputs();
-		host.postMessage(request);
+		host.postMessage(message);
 	}
 	function caption(id: string) {
 		if (!editing) return id;
@@ -98,7 +141,7 @@ export function mountConnections(
 				: undefined;
 		return typeof label === "string" && label !== id ? `${id} — ${label}` : id;
 	}
-	function populate(side: Side, show = false) {
+	function populate(side: Side) {
 		side.candidates.replaceChildren();
 		if (!editing || !center || !model) return;
 		const kind = editing.nodes.find((n) => n.id === center)?.kind;
@@ -125,7 +168,11 @@ export function mountConnections(
 				() => submit(request, side),
 			);
 			candidate.dataset.candidate = node.id;
+			candidate.id = `${side.candidates.id}-option-${side.candidates.childElementCount}`;
+			candidate.tabIndex = -1;
 			candidate.setAttribute("role", "option");
+			candidate.setAttribute("aria-selected", "false");
+			candidate.onpointerdown = (event) => event.preventDefault();
 			candidate.disabled = !!pending || !!reason;
 			if (reason) {
 				candidate.title = reason;
@@ -133,11 +180,10 @@ export function mountConnections(
 			}
 			side.candidates.append(candidate);
 		}
-		if (show) {
-			hideCandidates();
-			side.candidates.hidden = false;
-			side.input.setAttribute("aria-expanded", "true");
-		}
+	}
+	function showCandidates(side: Side) {
+		populate(side);
+		setPopup({ type: "candidates", side });
 	}
 	function refreshInputs() {
 		for (const side of sides) {
@@ -209,49 +255,53 @@ export function mountConnections(
 		input.oninput = () => {
 			error.textContent = "";
 			refreshInputs();
-			populate(side, true);
+			showCandidates(side);
 		};
-		input.onfocus = () => populate(side, true);
+		input.onfocus = () => {
+			if (!applyingFocus) showCandidates(side);
+		};
 		input.onkeydown = (event) => {
 			if (event.isComposing) return;
-			if (event.key === "Escape") {
-				event.stopPropagation();
-				hideCandidates();
-			}
-			if (event.key === "ArrowDown") {
-				event.preventDefault();
-				populate(side, true);
-				candidates
-					.querySelector<HTMLButtonElement>("button:not(:disabled)")
-					?.focus();
-			}
-			if (event.key === "Enter") event.preventDefault();
-		};
-		candidates.onkeydown = (event) => {
-			const options = [
-				...candidates.querySelectorAll<HTMLButtonElement>(
-					"button:not(:disabled)",
-				),
-			];
-			const index = options.indexOf(
-				document.activeElement as HTMLButtonElement,
-			);
-			if (event.key === "Escape") {
-				event.stopPropagation();
-				hideCandidates();
-				input.focus();
-				hideCandidates();
-			}
 			if (event.key === "ArrowDown" || event.key === "ArrowUp") {
 				event.preventDefault();
-				options[
-					(index + (event.key === "ArrowDown" ? 1 : options.length - 1)) %
-						options.length
-				]?.focus();
+				if (popup?.type !== "candidates" || popup.side !== side)
+					showCandidates(side);
+				const options = [
+					...candidates.querySelectorAll<HTMLButtonElement>(
+						"button:not(:disabled)",
+					),
+				];
+				const active = popup?.type === "candidates" ? popup.active : undefined;
+				const index = active ? options.indexOf(active) : -1;
+				const next =
+					options[
+						index < 0
+							? event.key === "ArrowDown"
+								? 0
+								: options.length - 1
+							: (index + (event.key === "ArrowDown" ? 1 : options.length - 1)) %
+								options.length
+					];
+				setPopup({
+					type: "candidates",
+					side,
+					...(next ? { active: next } : {}),
+				});
+				next?.scrollIntoView?.({ block: "nearest" });
+			}
+			if (event.key === "Enter") {
+				event.preventDefault();
+				if (popup?.type === "candidates" && popup.side === side)
+					popup.active?.click();
 			}
 		};
 		section.addEventListener("focusout", (event) => {
-			if (!section.contains(event.relatedTarget as Node)) hideCandidates();
+			if (
+				popup?.type === "candidates" &&
+				popup.side === side &&
+				!section.contains(event.relatedTarget as Node)
+			)
+				setPopup(undefined);
 		});
 		controls.append(...(left ? [input, create] : [create, input]));
 		section.append(list, controls, candidates, reason);
@@ -261,9 +311,20 @@ export function mountConnections(
 	const centerLabel = document.createElement("strong");
 	centerLabel.className = "connections-center";
 	layout.append(sides[0]!.section, centerLabel, sides[1]!.section);
+	panel.onkeydown = (event) => {
+		if (event.isComposing || event.key !== "Escape") return;
+		event.preventDefault();
+		event.stopPropagation();
+		if (popup) dismissPopup();
+		else host.close();
+	};
 	function showEdge(edge: NormalizedEdge, trigger: HTMLButtonElement) {
+		setPopup(undefined);
+		const remove = populateEdge(edge);
+		setPopup({ type: "edge", trigger, edge }, remove);
+	}
+	function populateEdge(edge: NormalizedEdge) {
 		menu.replaceChildren();
-		hideCandidates();
 		const request = (
 			type: "deleteConnector" | "toggleFeedback",
 		): PreviewEditRequest => ({
@@ -288,19 +349,17 @@ export function mountConnections(
 		const reason = document.createElement("span");
 		reason.textContent = result.ok ? "" : result.message;
 		menu.append(remove, toggle, reason);
-		menu.hidden = false;
 		remove.disabled = !!pending;
-		remove.focus();
-		menu.onkeydown = (event) => {
-			if (event.key === "Escape") {
-				event.stopPropagation();
-				menu.hidden = true;
-				trigger.focus();
-			}
-		};
+		return remove;
 	}
-	function render() {
+	function render(focused: Element | null = null) {
 		if (!center || !editing || !model) return;
+		const replacedFocus =
+			menu.contains(focused) ||
+			sides.some(
+				(side) =>
+					side.list.contains(focused) || side.candidates.contains(focused),
+			);
 		title.textContent = `Connections — ${caption(center)}`;
 		centerLabel.textContent = caption(center);
 		definition.hidden =
@@ -317,7 +376,6 @@ export function mountConnections(
 				const neighbor = button(caption(id), `Go to ${caption(id)}`, () => {
 					host.navigate(id);
 					open(id);
-					focus();
 				});
 				neighbor.dataset.neighbor = id;
 				const line = button(
@@ -335,25 +393,25 @@ export function mountConnections(
 			}
 		}
 		refreshInputs();
+		if (replacedFocus || (focused === definition && definition.hidden))
+			moveFocus(sides[0]!.input);
 	}
 	function open(id: string) {
 		if (!editing?.nodes.some((n) => n.id === id)) return;
 		if (center !== id) {
 			for (const side of sides) side.input.value = "";
 			pending = undefined;
-			menu.hidden = true;
-			hideCandidates();
+			setPopup(undefined);
 			error.textContent = "";
 		}
 		center = id;
 		panel.hidden = false;
+		host.onOpenChange(true);
 		render();
-	}
-	function focus() {
-		(definition.hidden || definition.disabled
-			? sides[0]!.input
-			: definition
-		).focus();
+		if (definition.hidden || definition.disabled) {
+			showCandidates(sides[0]!);
+			moveFocus(sides[0]!.input);
+		} else setPopup(undefined, definition);
 	}
 	definition.onclick = () => {
 		if (editing && center)
@@ -367,35 +425,32 @@ export function mountConnections(
 		host.close();
 	return {
 		open,
-		focus,
+		isOpen: () => center !== undefined,
 		close() {
 			center = undefined;
 			pending = undefined;
-			menu.hidden = true;
-			hideCandidates();
+			setPopup(undefined);
 			panel.hidden = true;
+			host.onOpenChange(false);
 		},
 		resize() {
-			hideCandidates();
-			menu.hidden = true;
+			dismissPopup();
 		},
 		update(data: Editing) {
+			const focused = document.activeElement;
 			if (data?.source !== editing?.source)
 				model = data ? analyzeSource(data.source) : undefined;
 			editing = data;
-			hideCandidates();
-			menu.hidden = true;
+			setPopup(undefined);
 			if (!data?.nodes.some((n) => n.id === center)) {
 				this.close();
 				return;
 			}
-			render();
+			render(focused);
 		},
 		result(message: Extract<MessageToWebview, { type: "editResult" }>) {
-			if (
-				!pending ||
-				JSON.stringify(message.request) !== JSON.stringify(pending.request)
-			)
+			// A reply updates data; the user may already be working elsewhere.
+			if (!pending || message.request.requestId !== pending.request.requestId)
 				return;
 			const { side, value } = pending;
 			pending = undefined;
@@ -405,8 +460,8 @@ export function mountConnections(
 			} else
 				error.textContent = message.message ?? "The edit could not be applied.";
 			refreshInputs();
-			side?.input.focus();
-			hideCandidates();
+			if (popup?.type === "candidates") showCandidates(popup.side);
+			else if (popup?.type === "edge") populateEdge(popup.edge);
 		},
 	};
 }

@@ -7,7 +7,7 @@ import {
 	findFrontmatterDefinitionRange,
 	findNodeOccurrenceRanges,
 	nodeIdAtSourcePosition,
-	type PreviewEditRequest,
+	type PreviewEditMessage,
 	positionOfNodeId,
 } from "@pfdsl/editor";
 import * as vscode from "vscode";
@@ -101,7 +101,7 @@ async function prepareEditSource(state: PreviewState) {
 
 async function editFromPreview(
 	state: PreviewState,
-	request: PreviewEditRequest,
+	request: PreviewEditMessage,
 ) {
 	const reply = (ok: boolean, message?: string) => {
 		if (!state.disposed)

@@ -116,25 +116,23 @@ export function mountPreview(container: HTMLElement, host: PreviewHost) {
 			pendingFocusCue = true;
 			positionGraph();
 		},
-		close() {
-			closeActions();
-			actionsToggle.focus();
+		close: closeActions,
+		onOpenChange(open) {
+			actionsToggle.setAttribute("aria-expanded", String(open));
 		},
 	});
 	function closeActions() {
 		connections.close();
-		actionsToggle.setAttribute("aria-expanded", "false");
+		actionsToggle.focus();
 	}
 	function openActions(id: string) {
 		if (graphRevision !== revision) return;
 		selectedNodeId = id;
 		connections.open(id);
-		actionsToggle.setAttribute("aria-expanded", String(!actions.hidden));
-		connections.focus();
 		host.onStateChange?.();
 	}
 	on(actionsToggle, "click", () => {
-		if (!actions.hidden) {
+		if (connections.isOpen()) {
 			closeActions();
 			return;
 		}
@@ -160,10 +158,9 @@ export function mountPreview(container: HTMLElement, host: PreviewHost) {
 		}
 	});
 	on(container, "keydown", (e) => {
-		if (e.key === "Escape") {
+		if (e.key === "Escape" && !e.isComposing) {
 			hideHover();
 			closeActions();
-			actionsToggle.focus();
 		}
 	});
 	function clearCue() {
@@ -672,10 +669,12 @@ export function mountPreview(container: HTMLElement, host: PreviewHost) {
 	}
 
 	function showError(message: string) {
+		const previewFocused =
+			actions.contains(document.activeElement) ||
+			root.contains(document.activeElement);
 		selectedNodeId = pendingFocusNodeId = undefined;
 		lastFocusedNodeId = undefined;
 		hideHover();
-		closeActions();
 		connections.update(undefined);
 		clearCue();
 		editingData = undefined;
@@ -688,6 +687,7 @@ export function mountPreview(container: HTMLElement, host: PreviewHost) {
 		tooltip.style.display = "none";
 		releaseDrag();
 		updateControls();
+		if (previewFocused) error.focus();
 		host.onStateChange?.();
 	}
 
@@ -727,7 +727,9 @@ export function mountPreview(container: HTMLElement, host: PreviewHost) {
 		}
 		if (msg.type !== "render") return;
 		hideHover();
+		const panelFocused = actions.contains(document.activeElement);
 		connections.update(msg.editing);
+		if (panelFocused && !connections.isOpen()) helpToggle.focus();
 		clearCue();
 		// The cursor hint supplied while opening must not displace the initial Fit.
 		if (hasPositioned && msg.focusNodeId !== undefined) {
@@ -806,7 +808,7 @@ export function mountPreview(container: HTMLElement, host: PreviewHost) {
 		},
 		dispose() {
 			hideHover();
-			closeActions();
+			connections.close();
 			clearCue();
 			disposed = true;
 			revision++;

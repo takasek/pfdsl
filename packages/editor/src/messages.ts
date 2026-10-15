@@ -2,6 +2,9 @@ import type { DiffReport } from "@pfdsl/core";
 import type { PreviewEditRequest } from "./preview-edit.js";
 import type { PreviewGraph } from "./preview-graph.js";
 
+/** Transport identity is separate from the source edit calculation. */
+export type PreviewEditMessage = PreviewEditRequest & { requestId?: string };
+
 /**
  * Shared postMessage protocol between preview.ts (extension host) and
  * webview.ts (webview script). Previously hand-rolled separately in both
@@ -34,13 +37,13 @@ export type MessageToWebview =
 	| { type: "clearDiff" }
 	| {
 			type: "editResult";
-			request: PreviewEditRequest;
+			request: PreviewEditMessage;
 			ok: boolean;
 			message?: string;
 	  };
 
 export type MessageFromWebview =
-	| PreviewEditRequest
+	| PreviewEditMessage
 	| { type: "ready" }
 	| { type: "nodeClick"; nodeId: string }
 	| { type: "openUrl"; url: string }
