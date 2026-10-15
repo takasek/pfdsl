@@ -27,7 +27,13 @@ test("native reference facade binds current document IDs and releases results af
 		const service = createNativeReferenceServices(
 			() => id,
 			() => available,
-			async (snapshot) => opened.push(snapshot),
+			async (snapshot, isCurrent) => {
+				if (isCurrent()) opened.push(snapshot);
+				else
+					await window.__TAURI_INTERNALS__.invoke("release_document", {
+						id: snapshot.id,
+					});
+			},
 		);
 		await service.context();
 		assert.equal(calls.at(-1).args.id, 1);

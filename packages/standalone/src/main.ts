@@ -164,7 +164,6 @@ function run(action: () => Promise<unknown>) {
 		});
 }
 function openDocument(name: string, source: string, disk: DiskSnapshot | null) {
-	if (disk) documentHandles.add(disk.id);
 	const existing =
 		disk &&
 		[...opened].find(
@@ -191,9 +190,9 @@ function openDocument(name: string, source: string, disk: DiskSnapshot | null) {
 			? createNativeReferenceServices(
 					() => entry?.session.location?.id,
 					() => !!entry && !busy && opened.has(entry) && active === entry,
-					async (snapshot) => {
+					async (snapshot, isCurrent) => {
 						try {
-							await openSnapshot(snapshot);
+							await openSnapshot(snapshot, isCurrent);
 						} finally {
 							await releaseUnusedDocuments();
 						}
@@ -228,37 +227,52 @@ function openDocument(name: string, source: string, disk: DiskSnapshot | null) {
 	activate(current);
 	if (disk) void remember(disk.path).catch(report);
 }
-async function openSnapshot(snapshot: DiskSnapshot) {
-	documentHandles.add(snapshot.id);
-	if (snapshot.source === null)
-		throw new Error(
-			"This file is missing. Choose its new location or save the retained editor content elsewhere.",
-		);
-	if (
-		![...opened].some(
-			(entry) =>
-				entry.session.disk && sameDocument(entry.session.disk, snapshot),
-		)
-	) {
-		for (const entry of opened) {
-			const previous = entry.session.location;
-			if (!previous?.identity || previous.identity !== snapshot.identity)
-				continue;
-			// Equal inodes can be simultaneous hard links. Only a missing old leaf permits rename recovery.
-			const current = await invoke<DiskSnapshot>("inspect_document", {
-				id: previous.id,
-			}).catch(() => null);
-			if (
-				current?.source === null &&
-				entry.session.rebindDisk(snapshot, true)
-			) {
-				syncLocation(entry);
-				label(entry);
-				break;
+async function openSnapshot(snapshot: DiskSnapshot, isCurrent = () => true) {
+	try {
+		if (!isCurrent()) return;
+		if (snapshot.source === null)
+			throw new Error(
+				"This file is missing. Choose its new location or save the retained editor content elsewhere.",
+			);
+		if (
+			![...opened].some(
+				(entry) =>
+					entry.session.disk && sameDocument(entry.session.disk, snapshot),
+			)
+		) {
+			for (const entry of opened) {
+				const previous = entry.session.location;
+				if (!previous?.identity || previous.identity !== snapshot.identity)
+					continue;
+				// Equal inodes can be simultaneous hard links. Only a missing old leaf permits rename recovery.
+				const current = await invoke<DiskSnapshot>("inspect_document", {
+					id: previous.id,
+				}).catch(() => null);
+				if (!isCurrent()) return;
+				if (!opened.has(entry) || entry.session.location?.id !== previous.id)
+					continue;
+				if (
+					current?.source === null &&
+					entry.session.rebindDisk(snapshot, true)
+				) {
+					syncLocation(entry);
+					label(entry);
+					// Rebinding/activation may invalidate this operation's own origin.
+					openDocument(basename(snapshot.path), snapshot.source, snapshot);
+					return;
+				}
 			}
 		}
+		if (!isCurrent()) return;
+		openDocument(basename(snapshot.path), snapshot.source, snapshot);
+	} finally {
+		// Before adoption this function is the sole owner; the normal sweep cannot release it.
+		if ([...opened].some(({ session }) => session.usesDocument(snapshot.id))) {
+			documentHandles.add(snapshot.id);
+		} else {
+			await invoke("release_document", { id: snapshot.id });
+		}
 	}
-	openDocument(basename(snapshot.path), snapshot.source, snapshot);
 }
 async function remember(path: string) {
 	await invoke("remember_document", { path });

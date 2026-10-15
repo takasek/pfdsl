@@ -6,6 +6,53 @@ const svg = (id: string) =>
 	`<svg width="100" height="100" viewBox="0 0 100 100"><g class="node"><title>${id}</title><text>${id}</text></g></svg>`;
 
 describe("portable preview lifecycle", () => {
+	it("rejects references from the previous graph while a new render is pending", async () => {
+		const container = document.createElement("div");
+		document.body.append(container);
+		let finish!: (svg: string) => void;
+		const postMessage = vi.fn();
+		const preview = mountPreview(container, {
+			postMessage,
+			renderDot: (dot) =>
+				dot === "old"
+					? Promise.resolve(svg("a"))
+					: new Promise((resolve) => {
+							finish = resolve;
+						}),
+		});
+		try {
+			await preview.receive({
+				type: "render",
+				dot: "old",
+				subflows: { a: "old.pfdsl" },
+			});
+			const node = container.querySelector("g.node")!;
+			const pending = preview.receive({
+				type: "render",
+				dot: "new",
+				subflows: { a: "new.pfdsl" },
+			});
+			postMessage.mockClear();
+			node.dispatchEvent(
+				new MouseEvent("click", { bubbles: true, metaKey: true }),
+			);
+			expect(postMessage).not.toHaveBeenCalled();
+			finish(svg("a"));
+			await pending;
+			container
+				.querySelector("g.node")!
+				.dispatchEvent(
+					new MouseEvent("click", { bubbles: true, metaKey: true }),
+				);
+			expect(postMessage).toHaveBeenCalledWith({
+				type: "openFile",
+				path: "new.pfdsl",
+			});
+		} finally {
+			preview.dispose();
+			container.remove();
+		}
+	});
 	it("keeps graph dragging from starting native SVG text selection", async () => {
 		const container = document.createElement("div");
 		document.body.append(container);

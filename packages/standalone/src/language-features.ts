@@ -264,15 +264,13 @@ export function registerLanguageFeatures(
 				const current = snapshot();
 				const kind = current.nodeKinds.get(item.nodeId);
 				if (!kind) return null;
-				const args = encodeURIComponent(
-					JSON.stringify([model.getVersionId(), item.nodeId]),
-				);
 				const link = (label: string, command: string, args: unknown[]) =>
-					`[${label.replace(/[\\[\]]/g, "\\$&")}](command:${command}?${encodeURIComponent(JSON.stringify([model.getVersionId(), ...args]))})`;
+					`[${label.replace(/[\\[\]]/g, "\\$&")}](command:${command}?${encodeURIComponent(JSON.stringify([model.getVersionId(), ...args])).replace(/[()]/g, (c) => `%${c.charCodeAt(0).toString(16)}`)})`;
 				const lines = buildHoverLines(item.nodeId, kind, current.frontmatter);
 				// Authored Markdown never shares trust with generated executable actions.
 				const actions = [
-					`[Go to definition](command:${gotoId}?${args})  [Find all](command:${findId}?${args})`,
+					link("Go to definition", gotoId, [item.nodeId]),
+					link("Find all", findId, [item.nodeId]),
 				];
 				if (navigation) {
 					const declaration = current.sourceMap.declarations.find(
