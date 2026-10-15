@@ -144,7 +144,7 @@ artifact:
   standalone_pfd_features:
     label: 公開前 GUI 機能の実装済みアプリ
     description: "公開前の GUI 機能を集約した実装成果物。要求・担当・内部の着手順と進捗は location の Issue 本文から辿り、実機結果は共通受入 Issue で扱う"
-    status: wip
+    status: done
     criteria: "location の Issue 本文が定める機能範囲の実装・必要な自動検証・独立レビューと、版に対応する実行可能な受入計画の登録が完了している。実機未実施を許容し、この done は実機合格を意味しない"
     location: https://github.com/takasek/pfdsl/issues/1259
   gui_mac_acceptance:

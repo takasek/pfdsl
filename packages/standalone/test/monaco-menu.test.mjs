@@ -136,9 +136,61 @@ test("the production document-tab entry loads real Monaco menu contributions", a
 				await check(create, tabs);
 			} finally {
 				for (const tab of tabs) tab.dispose();
+				for (const panel of document.querySelectorAll(".export-results"))
+					panel.remove();
 				await new Promise((resolve) => setImmediate(resolve));
 			}
 		}
+		await t.test(
+			"structural comparison and whole-graph export coexist in the same tab",
+			async () => {
+				const source =
+					'---\nartifact: {a: {label: Before, location: "child.pfdsl"}}\n---\na >> p -> b\n';
+				await withEditors(source, async (create, tabs) => {
+					const saved = [];
+					const editor = create({
+						referenceServices: {
+							context: async () => "/work/a.pfdsl",
+							inspect: async () => "file",
+							list: async () => [],
+							open: async () => {},
+							run: async () => {},
+							compareFile: async () => ({ source, label: "Baseline" }),
+							compareGit: async () => ({ source, label: "HEAD" }),
+						},
+						exportServices: {
+							choose: async () => ({ id: 9 }),
+							write: async (_id, format, bytes) => {
+								saved.push(new TextDecoder().decode(bytes));
+								return `/chosen/a.${format}`;
+							},
+							release: async () => {},
+							pdf: async () => new Uint8Array(),
+						},
+					});
+					tabs[0].setSource(source.replace("Before", "After"));
+					await editor.getAction("pfdsl.compareFile").run();
+					const panel = tabs[0].container.querySelector("#diff-panel");
+					assert.match(panel.textContent, /~ node.*a/);
+					const diff = panel.textContent,
+						revision = editor.getModel().getVersionId();
+					await editor.getAction("pfdsl.export.dot").run();
+					assert.equal(panel.textContent, diff);
+					assert.equal(editor.getModel().getVersionId(), revision);
+					assert.match(saved[0], /After/);
+					assert.ok(!saved[0].includes("diff-added"));
+					await editor.getAction("pfdsl.clearDiff").run();
+					await editor.getAction("pfdsl.export.dot").run();
+					assert.equal(saved.length, 2);
+					assert.equal(
+						tabs[0].container.querySelector(".reference-comparison").hidden,
+						true,
+					);
+					editor.trigger("coexist-test", "undo", null);
+					assert.equal(editor.getValue(), source);
+				});
+			},
+		);
 		await t.test(
 			"export actions capture the unsaved document and show actual partial outcomes without changing Undo",
 			async () => {
