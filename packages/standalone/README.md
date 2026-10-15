@@ -22,6 +22,18 @@ They are separate from the eventual installation requirements for distributed us
 The macOS CI job compiles an Apple Silicon app, runs native unit tests, and briefly starts the bundled executable to check native startup and exit-guard installation.
 The startup smoke does not certify GUI, IME, or Quit interaction.
 
+## Editing PFDSL
+
+The source editor highlights YAML frontmatter and PFDSL flows.
+Hover a node ID for its metadata, **Go to definition**, and **Find all**.
+Find all opens a literal text search; PFDSL occurrence navigation visits the definition key and semantic node references.
+Right-click in the editor or press F1 to find **Go to PFDSL definition**, **Next PFDSL node occurrence**, **Previous PFDSL node occurrence**, **Insert PFDSL definition**, and **Sort metadata…**.
+Sort metadata accepts multiple keys in priority order; Cancel or Escape returns to the editor without changing the source.
+Definition insertion selects the new label and retains the reminder to complete criteria for a produced artifact.
+Each successful source edit is undoable.
+The **Command** inlay hint shows the declared process command; displaying or hovering it does not execute it.
+Native GUI, keyboard, and Japanese IME acceptance for these features is tracked separately in the [acceptance plan](ACCEPTANCE-PLAN.md).
+
 ## Linux verification
 
 Linux is a development verification environment; the distribution target remains Apple Silicon macOS.
@@ -186,7 +198,7 @@ Native selection mapping, keyboard focus, and Undo/Redo remain to be checked in 
 
 PFDSL editors support square-bracket and double-quote pairing and surrounding selected text.
 Use **Toggle Line Comment** from the editor Command Palette (F1), or Command-/ on macOS, to add or remove `#` on selected lines.
-Syntax highlighting and string-aware quote suppression remain unimplemented; quote pairing cannot distinguish existing strings yet.
+Syntax highlighting now distinguishes YAML frontmatter and PFDSL flows; string-aware quote suppression remains unimplemented, so quote pairing cannot distinguish existing strings yet.
 Word lookup uses the extension's shared Unicode pattern: letters, numbers, underscores and hyphens form a word, including Japanese and supplementary-plane letters.
 The pattern also permits a standalone hyphen; it is not a PFDSL tokenizer.
 Automated checks cover real Monaco word ranges and the shared regex; native selection gestures and VS Code UI behavior remain unverified.
@@ -260,7 +272,8 @@ A publication followed by an error retains a failure receipt and dirty buffer; a
 Native document capabilities are released when tabs close, selections are superseded, or Save As targets are canceled or rejected; unresolved Save As targets remain available until resolved or closed.
 The exact bundle and nontrivial ACL/ownership and inherited ACL behavior still require acceptance; this is not proof of all-attribute preservation.
 Its current native GUI, Japanese IME, Find/Replace, Undo/Redo, and manual-save interactions still require acceptance on the exact bundle; see the appended [validation record](ACCEPTANCE.md).
-Syntax highlighting and the remaining PFD-specific language commands, external navigation, export, and distribution remain in the [acceptance matrix](ACCEPTANCE.md).
+The language features above have automated Monaco checks and still require native acceptance in the [acceptance plan](ACCEPTANCE-PLAN.md).
+External navigation, export, and distribution remain later implementation work tracked in the [acceptance matrix](ACCEPTANCE.md).
 Local `.app` builds are not signed/notarized release DMGs.
 
 ## Verification

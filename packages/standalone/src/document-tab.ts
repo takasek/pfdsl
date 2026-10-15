@@ -15,6 +15,7 @@ import "monaco-editor/editor/contrib/contextmenu/browser/contextmenu.js";
 import "monaco-editor/editor/contrib/find/browser/findController.js";
 import "monaco-editor/editor/standalone/browser/quickAccess/standaloneCommandsQuickAccess.js";
 import "./language.js";
+import { registerLanguageFeatures } from "./language-features.js";
 import { createNormalizedEdgesPanel } from "./normalized-edges.js";
 import { formatSnapshot, processSnapshot } from "./processing.js";
 import { registerSelectionFormatting } from "./selection-format.js";
@@ -66,6 +67,7 @@ export function createDocumentTab({
 		renderWhitespace: "selection",
 	});
 	const selectionFormatting = registerSelectionFormatting(editor);
+	const languageFeatures = registerLanguageFeatures(editor, reportStatus);
 	let editorRenderQueued = false;
 	function requestEditorRender() {
 		if (disposed || editorRenderQueued) return;
@@ -226,6 +228,7 @@ export function createDocumentTab({
 			disposed = true;
 			revision++;
 			selectionFormatting.dispose();
+			languageFeatures.dispose();
 			preview.dispose();
 			editor.dispose();
 			model.dispose();

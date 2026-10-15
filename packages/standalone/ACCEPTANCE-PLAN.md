@@ -285,6 +285,8 @@ Escapeと取消後は起点／編集継続位置へ戻り、常設入力を保�
 
 対応：#1259。対象・入力：M/V、同じ日本語・未完成YAML/body・quoted key・括弧／コメント、host設定。
 操作：入力・comment toggle・語選択・括弧補完・強調を基準拡張と照合し、エラーから戻す。
+Mの言語支援接続版では文書先頭の`---`だけがYAML強調を開始し、終了フェンス後の`>>`／`>>?`／`->`、角括弧、quoted ID、Unicode ID、コメントを区別する。
+先頭空行の後のフェンス、未閉鎖quoted ID、未閉鎖YAML、flow map・block scalarも入力し、修復後の強調と語選択を再確認する。
 期待：言語仕様に合い入力を失わず回復する。
 専用configurationなしでも言語設定・文法・キー・host設定を棚卸しから落とさない。
 状態：M/V各未実施。記録：未記入。
@@ -293,6 +295,12 @@ Escapeと取消後は起点／編集継続位置へ戻り、常設入力を保�
 
 対応：#1259。対象・入力：M/V、未定義・全metadata・quoted/flow key・同名field・反復ID・command。
 操作：ソースhoverの情報／前後関係→定義移動→Find all→hint/inlayを読む。
+MではソースのノードIDをhoverし、`Go to definition`／`Find all`を選ぶ。
+右クリックまたはF1から`Go to PFDSL definition`、`Next PFDSL node occurrence`、`Previous PFDSL node occurrence`、`Find all text matching this node`を実行する。
+quoted/flow keyのID上と同じ行の`label`／`owner`等のfield上を区別し、定義＋body内の同一IDの巡回・折返し、定義なしの案内を確認する。
+Find allは現行拡張と同じliteral文字列検索であり、metadata fieldを除くsemantic参照・巡回とは区別する。
+processのcommand行末の`Command` hintをhoverして複数行の内容を読み、表示だけで実行されないことを確認する。
+hoverを残したまま編集・文書切替・閉鎖し、旧版のリンクが新しい文書や版へ作用しないことを確認する。
 期待：semantic nodeとfield、定義range、全出現が正しく、図hover廃止と混同しない。
 表示hintと外部実行GUI-33を区別する。
 状態：M/V各未実施。記録：未記入。
@@ -301,6 +309,13 @@ Escapeと取消後は起点／編集継続位置へ戻り、常設入力を保�
 
 対応：#1259。対象・入力：M/V、未定義・quoted/flow/alias/同名field、値・コメント・CRLF・補助平面文字。
 操作：Quick Fix、直接移動、各選択方式のsort、拒否、Undo/Redo、保存後他hostでOpenを行う。
+Mは未定義ID上のQuick Fixまたは右クリック／F1の`Insert PFDSL definition`を使い、新しいlabel値の選択と、produced artifactでcriteria案内が残ることを確認する。
+`Sort metadata…`でPrimary keyとThenを順に選び、topological／group／index／idの単独と`group → id`を実行する。
+重複キー・キーなしは編集せず理由を示し、Cancel／Escapeは本文・dirty・Undoを保ってeditorへfocusを戻す。
+開いた整列フォームはその文書に所属し、他tabに切り替えても他文書を編集しない。
+各成功後に1回のUndoで操作前の本文へ戻り、Redoで同じ結果へ戻ることを確認する。
+Quick Fix候補の表示中に同じ文書を編集してから適用する時機を観測できた場合は、古い版の候補の拒否も記録する。
+自動検査の版変更注入だけではこの実機変種を合格にせず、観測できなければ未実施として残す。
 期待：token/rangeが正しく値・コメント・改行を保つ。
 失敗は無変更、成功はUndo可能で、保存文書の意味が両hostで一致する。
 状態：M/V各未実施。記録：未記入。

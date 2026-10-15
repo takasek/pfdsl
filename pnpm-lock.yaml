@@ -176,6 +176,9 @@ importers:
 
   packages/standalone:
     dependencies:
+      '@pfdsl/core':
+        specifier: workspace:*
+        version: link:../core
       '@pfdsl/editor':
         specifier: workspace:*
         version: link:../editor

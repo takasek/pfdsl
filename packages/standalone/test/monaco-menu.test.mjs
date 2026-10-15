@@ -26,6 +26,7 @@ test("the production document-tab entry loads real Monaco menu contributions", a
 		"Element",
 		"Node",
 		"MouseEvent",
+		"UIEvent",
 		"KeyboardEvent",
 		"CSS",
 		"HTMLElement",
@@ -90,11 +91,20 @@ test("the production document-tab entry loads real Monaco menu contributions", a
 				import * as monaco from "monaco-editor/editor/editor.api.js";
 				import { EditorExtensionsRegistry } from "monaco-editor/editor/browser/editorExtensions.js";
 				import { MenuId } from "monaco-editor/platform/actions/common/actions.js";
-				export { createDocumentTab, monaco, EditorExtensionsRegistry, MenuId };
+				import { StandaloneServices } from "monaco-editor/editor/standalone/browser/standaloneServices.js";
+				import { ILanguageFeaturesService } from "monaco-editor/editor/common/services/languageFeatures.js";
+				import { errorHandler } from "monaco-editor/base/common/errors.js";
+				import { IBulkEditService } from "monaco-editor/editor/browser/services/bulkEditService.js";
+				import { ICommandService } from "monaco-editor/platform/commands/common/commands.js";
+				errorHandler.unexpectedErrorHandler = error => { throw error; };
+				const languageFeatures = StandaloneServices.get(ILanguageFeaturesService);
+				const applyEdit = edit => StandaloneServices.get(IBulkEditService).apply(edit);
+				const execute = (id, ...args) => StandaloneServices.get(ICommandService).executeCommand(id, ...args);
+				export { createDocumentTab, monaco, EditorExtensionsRegistry, MenuId, languageFeatures, applyEdit, execute };
 			`,
 				resolveDir: packageRoot,
 			},
-			external: ["@pfdsl/editor", "@pfdsl/editor/*"],
+			external: ["@pfdsl/core", "@pfdsl/editor", "@pfdsl/editor/*"],
 			outfile: output,
 			bundle: true,
 			platform: "node",
@@ -126,6 +136,228 @@ test("the production document-tab entry loads real Monaco menu contributions", a
 				await new Promise((resolve) => setImmediate(resolve));
 			}
 		}
+		await t.test(
+			"PFDSL syntax distinguishes frontmatter, body arrows, Unicode IDs and comments",
+			async () => {
+				const lines = host.monaco.editor.tokenize(
+					'---\nartifact:\n  "入力": {label: "Input"}\n---\n[入力, b] >>? 処理 -> c # note',
+					"pfdsl",
+				);
+				assert.ok(lines[1].some((token) => /type/.test(token.type)));
+				assert.ok(lines[4].some((token) => /keyword/.test(token.type)));
+				assert.ok(lines[4].some((token) => /comment/.test(token.type)));
+				assert.ok(lines[4].some((token) => /variable/.test(token.type)));
+			},
+		);
+		await t.test(
+			"language providers use semantic quoted keys, show metadata, and isolate tabs",
+			async () => {
+				const source =
+					'---\nartifact:\n  "入力": {label: Input, owner: Team}\nprocess:\n  p: {command: "echo hello"}\n---\n入力 >> p -> 出力\n入力 >> p\n';
+				await withEditors(source, async (create, tabs) => {
+					const editor = create();
+					const other = create();
+					const model = editor.getModel();
+					const position = { lineNumber: 7, column: 1 };
+					const token = {
+						isCancellationRequested: false,
+						onCancellationRequested() {
+							return { dispose() {} };
+						},
+					};
+					const providers = (kind) =>
+						host.languageFeatures[kind].ordered(model);
+					assert.ok(editor.getContribution("editor.contrib.contentHover"));
+					assert.ok(
+						editor.getContribution("editor.contrib.codeActionController"),
+						JSON.stringify(
+							host.EditorExtensionsRegistry.getEditorContributions().map(
+								(entry) => entry.id,
+							),
+						),
+					);
+					assert.ok(editor.getContribution("editor.contrib.InlayHints"));
+					const hover = (
+						await Promise.all(
+							providers("hoverProvider").map((p) =>
+								p.provideHover(model, position, token),
+							),
+						)
+					).find(Boolean);
+					assert.match(
+						hover.contents.map((c) => c.value).join("\n"),
+						/Input[\s\S]*owner[\s\S]*Team/,
+					);
+					const definition = (
+						await Promise.all(
+							providers("definitionProvider").map((p) =>
+								p.provideDefinition(model, position, token),
+							),
+						)
+					)
+						.flat()
+						.filter(Boolean);
+					assert.equal(definition[0].range.startLineNumber, 3);
+					const fields = { lineNumber: 3, column: 16 };
+					assert.ok(
+						(
+							await Promise.all(
+								providers("hoverProvider").map((p) =>
+									p.provideHover(model, fields, token),
+								),
+							)
+						).every((h) => !h),
+					);
+					const hints = (
+						await Promise.all(
+							providers("inlayHintsProvider").map((p) =>
+								p.provideInlayHints(model, model.getFullModelRange(), token),
+							),
+						)
+					).filter(Boolean);
+					assert.equal(hints.flatMap((h) => h.hints).length, 1);
+					editor.setPosition(position);
+					await editor.getAction("pfdsl.jumpToDefinition").run();
+					assert.equal(editor.getSelection().startLineNumber, 3);
+					await editor.getAction("pfdsl.nextNodeOccurrence").run();
+					assert.equal(editor.getSelection().startLineNumber, 7);
+					await editor.getAction("pfdsl.previousNodeOccurrence").run();
+					assert.equal(editor.getSelection().startLineNumber, 3);
+					await editor.getAction("pfdsl.findAll").run();
+					assert.equal(
+						editor.getContribution("editor.contrib.findController").getState()
+							.searchString,
+						"入力",
+					);
+					assert.equal(other.getValue(), source);
+					tabs[0].dispose();
+					assert.equal(
+						host.languageFeatures.hoverProvider.ordered(other.getModel())
+							.length > 0,
+						true,
+					);
+				});
+			},
+		);
+		await t.test(
+			"Quick Fix and sort act on real Monaco models with Undo and unchanged failure",
+			async () => {
+				await withEditors("a >> p -> b\n", async (create) => {
+					const editor = create();
+					const other = create();
+					const model = editor.getModel();
+					editor.setPosition({ lineNumber: 1, column: 1 });
+					await editor.getAction("pfdsl.insertDefinition").run();
+					assert.match(editor.getValue(), /artifact:[\s\S]*a:[\s\S]*label:/);
+					assert.equal(model.getValueInRange(editor.getSelection()), "a");
+					await model.undo();
+					assert.equal(editor.getValue(), "a >> p -> b\n");
+					await model.redo();
+					assert.equal(other.getValue(), "a >> p -> b\n");
+					editor.setValue(
+						"---\nartifact:\n  b: {label: B} # keep\n  a: {label: A}\n---\na >> p -> b\n",
+					);
+					const unsorted = editor.getValue();
+					await editor.getAction("pfdsl.sort.id").run();
+					assert.ok(
+						editor.getValue().indexOf("a:") < editor.getValue().indexOf("b:"),
+					);
+					assert.match(editor.getValue(), /# keep/);
+					await model.undo();
+					assert.equal(editor.getValue(), unsorted);
+					editor.setValue("---\nartifact: [\n---\na >> p");
+					const invalid = editor.getValue();
+					await editor.getAction("pfdsl.sort.id").run();
+					assert.equal(editor.getValue(), invalid);
+				});
+			},
+		);
+		await t.test(
+			"code actions reject a stale model version and apply one undoable edit with label focus",
+			async () => {
+				await withEditors("a >> p -> b\r\n", async (create) => {
+					const editor = create();
+					const other = create();
+					const model = editor.getModel();
+					const token = {
+						isCancellationRequested: false,
+						onCancellationRequested() {
+							return { dispose() {} };
+						},
+					};
+					const actions = async () =>
+						(
+							await Promise.all(
+								host.languageFeatures.codeActionProvider
+									.ordered(model)
+									.map((provider) =>
+										provider.provideCodeActions(
+											model,
+											new host.monaco.Range(1, 11, 1, 12),
+											{ trigger: 1 },
+											token,
+										),
+									),
+							)
+						)
+							.filter(Boolean)
+							.flatMap((result) => result.actions);
+					const stale = (await actions())[0];
+					assert.ok(stale.edit);
+					editor.executeEdits("typing", [
+						{ range: new host.monaco.Range(1, 1, 1, 1), text: "new >> p\r\n" },
+					]);
+					const typed = editor.getValue();
+					await assert.rejects(host.applyEdit(stale.edit), /changed|version/i);
+					assert.equal(editor.getValue(), typed);
+					editor.setValue("a >> p -> b\r\n");
+					const fresh = (await actions())[0];
+					await host.applyEdit(fresh.edit);
+					await host.execute(fresh.command.id, ...fresh.command.arguments);
+					assert.equal(model.getValueInRange(editor.getSelection()), "b");
+					assert.match(editor.getValue(), /a >> p -> b\r\n$/);
+					assert.equal(other.getValue(), "a >> p -> b\r\n");
+					await model.undo();
+					assert.equal(editor.getValue(), "a >> p -> b\r\n");
+					await model.redo();
+					assert.match(editor.getValue(), /artifact:/);
+				});
+			},
+		);
+		await t.test(
+			"metadata sort accepts ordered keys and cancellation keeps editor state",
+			async () => {
+				const source =
+					"---\nartifact:\n  z: {label: Z, group: g}\n  b: {label: B, group: g}\n  a: {label: A, group: h}\ngroup:\n  g: {label: G}\n  h: {label: H}\n---\n[a, b] >> p -> z\n";
+				await withEditors(source, async (create) => {
+					const editor = create();
+					await editor.getAction("pfdsl.sortMeta").run();
+					let panel = editor
+						.getContainerDomNode()
+						.parentElement.querySelector(".metadata-sort");
+					assert.ok(panel);
+					panel.querySelector('[type="button"]').click();
+					assert.equal(editor.getValue(), source);
+					await editor.getAction("pfdsl.sortMeta").run();
+					panel = editor
+						.getContainerDomNode()
+						.parentElement.querySelector(".metadata-sort");
+					panel.querySelectorAll("select")[0].value = "group";
+					panel.querySelectorAll("select")[1].value = "id";
+					panel.dispatchEvent(
+						new dom.window.Event("submit", { bubbles: true, cancelable: true }),
+					);
+					assert.ok(
+						editor.getValue().indexOf("b:") < editor.getValue().indexOf("z:"),
+					);
+					assert.ok(
+						editor.getValue().indexOf("z:") < editor.getValue().indexOf("a:"),
+					);
+					await editor.getModel().undo();
+					assert.equal(editor.getValue(), source);
+				});
+			},
+		);
 		for (const [before, after] of [
 			["\r\n", "\n"],
 			["\n", "\r\n"],

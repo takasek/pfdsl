@@ -180,3 +180,18 @@ dialog textarea {
 #save-support:empty {
 	display: none;
 }
+.metadata-sort {
+	position: absolute;
+	z-index: 20;
+	top: 3rem;
+	left: 1rem;
+	display: flex;
+	flex-direction: column;
+	gap: 0.75rem;
+	padding: 1rem;
+	max-width: calc(100% - 4rem);
+	background: #fff;
+	color: #222;
+	border: 1px solid #888;
+	box-shadow: 0 4px 16px #0003;
+}

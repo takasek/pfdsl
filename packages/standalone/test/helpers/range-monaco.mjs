@@ -1,6 +1,7 @@
 import { Range } from "monaco-editor/editor/common/core/range.js";
 // Controlled Monaco selection/edit boundary; formatter and host stay production code.
 export const instances = [];
+export const language = {};
 export const Uri = { parse: (value) => value };
 export const MarkerSeverity = { Error: 8, Warning: 4, Info: 2 };
 function offset(model, line, column) {
@@ -42,6 +43,7 @@ export const editor = {
 	create(_element, { model }) {
 		const callbacks = {};
 		const instance = {
+			getId: () => `range-${instances.indexOf(instance)}`,
 			model,
 			callbacks,
 			actions: [],
@@ -97,4 +99,15 @@ export const editor = {
 };
 
 // Language registration is outside this controlled editor seam.
-export const languages = { register() {}, setLanguageConfiguration() {} };
+export const languages = new Proxy(
+	{
+		register() {},
+		setLanguageConfiguration() {},
+		setMonarchTokensProvider() {},
+	},
+	{
+		get(target, key) {
+			return target[key] ?? (() => ({ dispose() {} }));
+		},
+	},
+);
