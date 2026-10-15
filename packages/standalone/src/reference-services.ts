@@ -20,7 +20,10 @@ export interface ReferenceServices {
 export function createNativeReferenceServices(
 	documentId: () => number | undefined,
 	available: () => boolean,
-	openSnapshot: (snapshot: DiskSnapshot) => Promise<void>,
+	openSnapshot: (
+		snapshot: DiskSnapshot,
+		isCurrent: () => boolean,
+	) => Promise<void>,
 ): ReferenceServices {
 	function check() {
 		if (!available())
@@ -40,16 +43,8 @@ export function createNativeReferenceServices(
 				target,
 			);
 			if (!snapshot) return;
-			if (!available() || !isCurrent()) {
-				await invoke("release_document", { id: snapshot.id });
-				return;
-			}
-			try {
-				await openSnapshot(snapshot);
-			} catch (error) {
-				await invoke("release_document", { id: snapshot.id });
-				throw error;
-			}
+			// The adoption boundary owns the snapshot across all of its awaits.
+			await openSnapshot(snapshot, () => available() && isCurrent());
 		},
 		compareFile: () => {
 			check();

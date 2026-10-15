@@ -97,12 +97,13 @@ test("the production document-tab entry loads real Monaco menu contributions", a
 				import { IBulkEditService } from "monaco-editor/editor/browser/services/bulkEditService.js";
 				import { ICommandService } from "monaco-editor/platform/commands/common/commands.js";
 				import { IOpenerService } from "monaco-editor/platform/opener/common/opener.js";
+				import { renderMarkdown } from "monaco-editor/base/browser/markdownRenderer.js";
 				errorHandler.unexpectedErrorHandler = error => { throw error; };
 				const languageFeatures = StandaloneServices.get(ILanguageFeaturesService);
 				const applyEdit = edit => StandaloneServices.get(IBulkEditService).apply(edit);
 				const execute = (id, ...args) => StandaloneServices.get(ICommandService).executeCommand(id, ...args);
 				const openLink = url => StandaloneServices.get(IOpenerService).open(url);
-				export { createDocumentTab, monaco, EditorExtensionsRegistry, MenuId, languageFeatures, applyEdit, execute, openLink };
+				export { createDocumentTab, monaco, EditorExtensionsRegistry, MenuId, languageFeatures, applyEdit, execute, openLink, renderMarkdown };
 			`,
 				resolveDir: packageRoot,
 			},
@@ -526,6 +527,59 @@ test("the production document-tab entry loads real Monaco menu contributions", a
 							false,
 							"document-authored Markdown is separate from trusted generated actions",
 						);
+				});
+			},
+		);
+		await t.test(
+			"rendered hover links retain parentheses in paths and commands",
+			async () => {
+				const source = `---\nartifact: {a: {location: "draft).md"}}\nprocess: {p: {command: 'printf ")"'}}\n---\na >> p -> b\n`;
+				await withEditors(source, async (create) => {
+					const editor = create({ referenceServices: {} });
+					for (const [column, expected] of [
+						[1, ["location", "draft).md"]],
+						[6, ['printf ")"']],
+					]) {
+						const hovers = await Promise.all(
+							host.languageFeatures.hoverProvider
+								.ordered(editor.getModel())
+								.map((p) =>
+									p.provideHover(
+										editor.getModel(),
+										{ lineNumber: 5, column },
+										{ isCancellationRequested: false },
+									),
+								),
+						);
+						const trusted = hovers
+							.filter(Boolean)
+							.flatMap((h) => h.contents)
+							.filter((c) => c.isTrusted);
+						const rendered = trusted.map((content) =>
+							host.renderMarkdown(content),
+						);
+						try {
+							const links = rendered.flatMap((item) => [
+								...item.element.querySelectorAll("a"),
+							]);
+							const link = links.find((link) =>
+								link.textContent.includes(
+									column === 1 ? "Open location" : "Run in Terminal",
+								),
+							);
+							assert.ok(link);
+							const href =
+								link.getAttribute("data-href") ?? link.getAttribute("href");
+							assert.deepEqual(
+								JSON.parse(
+									decodeURIComponent(href.slice(href.indexOf("?") + 1)),
+								).slice(1),
+								expected,
+							);
+						} finally {
+							for (const item of rendered) item.dispose();
+						}
+					}
 				});
 			},
 		);
