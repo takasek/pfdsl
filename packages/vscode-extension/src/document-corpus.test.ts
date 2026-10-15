@@ -1,7 +1,7 @@
-import { analyze } from "@pfdsl/core";
+import { analyze, analyzeSource } from "@pfdsl/core";
 import { findFrontmatterDefinitionInText } from "@pfdsl/editor";
 import { describe, expect, it } from "vitest";
-import { declaredCommands, runHintAnchors } from "./codelens-logic.js";
+import { runHintsFromAnalysis } from "./codelens-logic.js";
 import { extractDocumentLinks } from "./document-link-logic.js";
 
 const corpus = [
@@ -35,14 +35,9 @@ process: {p: {command: make}}
 ---
 a >> p -> b
 `;
-	const result = analyze(source);
 	expect(extractDocumentLinks(source, "/repo/main.pfdsl")).toEqual([]);
 	expect(
-		runHintAnchors(
-			source.split("\n"),
-			result.bodyStartLine,
-			declaredCommands(result.frontmatter?.process),
-		),
+		runHintsFromAnalysis(analyzeSource(source), source.split("\n")),
 	).toEqual([
 		{ line: 2, column: source.split("\n")[2]!.length, command: "make" },
 	]);
@@ -72,11 +67,9 @@ describe.each(corpus)("shared authored document corpus", (source) => {
 	});
 
 	it("runs the semantic command, including flow and folded scalars", () => {
-		const result = analyze(source);
-		const hints = runHintAnchors(
+		const hints = runHintsFromAnalysis(
+			analyzeSource(source),
 			source.split("\n"),
-			result.bodyStartLine,
-			declaredCommands(result.frontmatter?.process),
 		);
 		expect(hints).toHaveLength(1);
 		expect(hints[0]?.command).toBe("make build");

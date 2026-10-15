@@ -113,10 +113,13 @@ export function nextNodeOccurrenceRange(
 	model: SourceModel,
 	source: string,
 	position: CursorPosition,
+	direction: 1 | -1 = 1,
 ): Range | undefined {
 	const nodeId = nodeIdAtSourcePosition(model, source, position);
 	if (nodeId === undefined) return undefined;
 	const ranges = findNodeOccurrenceRanges(model, source, nodeId);
 	const index = ranges.findIndex((range) => containsPosition(range, position));
-	return index < 0 ? undefined : ranges[(index + 1) % ranges.length];
+	return index < 0
+		? undefined
+		: ranges[(index + direction + ranges.length) % ranges.length];
 }

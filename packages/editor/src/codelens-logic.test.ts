@@ -1,105 +1,53 @@
+import { analyzeSource } from "@pfdsl/core";
 import { describe, expect, it } from "vitest";
-import { declaredCommands, runHintAnchors } from "./codelens-logic.js";
+import { runHintsFromAnalysis } from "./codelens-logic.js";
 
-describe("declaredCommands", () => {
-	it("collects the command of every process that has one", () => {
-		expect(
-			declaredCommands({
-				build: { command: "make build" },
-				test: { command: "make test" },
-			}),
-		).toEqual(new Set(["make build", "make test"]));
-	});
+function hints(lines: readonly string[]) {
+	return runHintsFromAnalysis(analyzeSource(lines.join("\n")), lines);
+}
 
-	it("skips processes without a command", () => {
-		expect(declaredCommands({ build: {}, test: { command: "x" } })).toEqual(
-			new Set(["x"]),
-		);
-	});
-
-	it("collapses the same command declared twice", () => {
-		expect(
-			declaredCommands({ a: { command: "make" }, b: { command: "make" } }).size,
-		).toBe(1);
-	});
-
-	it("is empty when there is no process section at all", () => {
-		expect(declaredCommands(undefined)).toEqual(new Set());
-	});
-});
-
-describe("runHintAnchors", () => {
-	const lines = [
-		"---",
-		"process:",
-		"  build:",
-		"    command: make build",
-		"---",
-		"spec >> build -> out",
-	];
-	const bodyStartLine = 6; // 1-based line the body starts on
-
-	it("anchors at the end of the command line", () => {
-		expect(
-			runHintAnchors(lines, bodyStartLine, new Set(["make build"])),
-		).toEqual([
-			{
-				line: 3,
-				column: "    command: make build".length,
-				command: "make build",
-			},
-		]);
-	});
-
-	it("returns nothing when no process declares a command", () => {
-		expect(runHintAnchors(lines, bodyStartLine, new Set())).toEqual([]);
-	});
-
-	it("skips a command: line whose value no process declares", () => {
-		expect(
-			runHintAnchors(lines, bodyStartLine, new Set(["make test"])),
-		).toEqual([]);
-	});
-
-	it("ignores a body line that looks like a command declaration", () => {
-		const withBodyLookalike = [...lines, "    command: make build"];
-		expect(
-			runHintAnchors(withBodyLookalike, bodyStartLine, new Set(["make build"])),
-		).toHaveLength(1);
-	});
-
-	it("unquotes a quoted value, since that is how it reaches the runner", () => {
-		const quoted = [
+describe("runHintsFromAnalysis", () => {
+	it("anchors each semantic command at the end of its authored line", () => {
+		const lines = [
 			"---",
 			"process:",
 			"  build:",
 			'    command: "make build"',
+			"  test: {command: make test}",
 			"---",
-		];
-		expect(runHintAnchors(quoted, 6, new Set(["make build"]))[0]?.command).toBe(
-			"make build",
-		);
-	});
-
-	it("requires the indent that puts command: inside a node, not at the root", () => {
-		const rootLevel = ["---", "command: make build", "---"];
-		expect(runHintAnchors(rootLevel, 4, new Set(["make build"]))).toEqual([]);
-	});
-
-	it("anchors every declaring line when several processes have commands", () => {
-		const two = [
-			"---",
-			"process:",
-			"  build:",
+			"spec >> build -> out",
 			"    command: make build",
-			"  test:",
-			"    command: make test",
-			"---",
 		];
+		expect(hints(lines)).toEqual([
+			{ line: 3, column: lines[3]!.length, command: "make build" },
+			{ line: 4, column: lines[4]!.length, command: "make test" },
+		]);
+	});
+	it("ignores missing, empty and unrelated commands", () => {
+		for (const lines of [["a >> p -> b"], ["---", "command: make", "---"]]) {
+			expect(hints(lines)).toEqual([]);
+		}
 		expect(
-			runHintAnchors(two, 8, new Set(["make build", "make test"])).map(
-				(a) => a.line,
-			),
-		).toEqual([3, 5]);
+			hints([
+				"---",
+				"process: {a: {}, b: {command: ''}, c: {command: make}}",
+				"---",
+			]),
+		).toEqual([
+			{
+				line: 1,
+				column: "process: {a: {}, b: {command: ''}, c: {command: make}}".length,
+				command: "make",
+			},
+		]);
+	});
+	it("retains separate anchors for the same command declared twice", () => {
+		expect(
+			hints([
+				"---",
+				"process: {a: {command: make}, b: {command: make}}",
+				"---",
+			]),
+		).toHaveLength(2);
 	});
 });

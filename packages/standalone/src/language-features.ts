@@ -7,6 +7,7 @@ import {
 	findFrontmatterDefinitionRange,
 	findNodeOccurrenceRanges,
 	findUndefinedNodeKind,
+	nextNodeOccurrenceRange,
 	nodeOccurrenceAtSourcePosition,
 	runHintsFromAnalysis,
 } from "@pfdsl/editor";
@@ -62,21 +63,17 @@ export function registerLanguageFeatures(
 		if (value) select(value);
 		else reportStatus(`No frontmatter definition found for "${id}"`);
 	}
-	function cycle(direction: number) {
+	function cycle(direction: 1 | -1) {
 		const position = editor.getPosition();
 		if (!position) return;
-		const current = occurrence(position);
-		if (!current) return;
-		const ranges = findNodeOccurrenceRanges(
-			snapshot(),
-			model.getValue(),
-			current.nodeId,
+		select(
+			nextNodeOccurrenceRange(
+				snapshot(),
+				model.getValue(),
+				{ line: position.lineNumber - 1, character: position.column - 1 },
+				direction,
+			),
 		);
-		const index = ranges.findIndex(
-			(r) => r.start.offset === current.range.start.offset,
-		);
-		if (index >= 0)
-			select(ranges[(index + direction + ranges.length) % ranges.length]);
 	}
 	function findAll(id = nodeAtCursor()) {
 		if (id === undefined || disposed) return;
