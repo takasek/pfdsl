@@ -96,7 +96,7 @@ export function nodeIdAtSourcePosition(
 	return nodeOccurrenceAtSourcePosition(model, source, position)?.nodeId;
 }
 
-/** The full authored token used by editor commands and hover ranges. */
+/** The full authored token; group declarations opt in for hover, while node navigation keeps its default scope. */
 export function nodeOccurrenceAtSourcePosition(
 	model: SourceModel,
 	source: string,

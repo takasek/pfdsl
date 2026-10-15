@@ -293,7 +293,8 @@ Mの言語支援接続版では文書先頭の`---`だけがYAML強調を開始�
 
 ### GUI-27：editor hover・Find all・hint
 
-対応：#1259。対象・入力：M/V、未定義・全metadata・quoted/flow key・同名field・反復ID・command。
+対応：#1259。対象・入力：M/V、未定義・schema定義済みの全metadata・quoted/flow key・同名field・反復ID・command。
+schema外の拡張キーを含む文書も入力するが、任意の拡張キーのhover表示をこの受入条件には含めない。
 操作：ソースhoverの情報／前後関係→定義移動→Find all→hint/inlayを読む。
 MではソースのノードIDをhoverし、`Go to definition`／`Find all`を選ぶ。
 artifact/processの`index`、processの複数`location`と`boundary`、groupの`color`／`parent`を含む文書で、それぞれの値がhoverへ表示されることを確認する。
