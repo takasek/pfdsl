@@ -20,6 +20,7 @@ test("the production document-tab entry loads real Monaco menu contributions", a
 	const globals = [
 		"window",
 		"document",
+		"DOMParser",
 		"navigator",
 		"self",
 		"customElements",
@@ -225,7 +226,10 @@ test("the production document-tab entry loads real Monaco menu contributions", a
 					assert.ok(saved.every(([, value]) => value.includes("After")));
 					const panel = document.querySelector(".export-results");
 					assert.match(panel.textContent, /DOT: Saved \/chosen\/日本語.dot/);
-					assert.match(panel.textContent, /PDF: conversion-failed/);
+					assert.match(
+						panel.textContent,
+						/PDF: conversion-failed:.*PDF unavailable/,
+					);
 					assert.deepEqual(released, [7]);
 					cancel = true;
 					await editor.getAction("pfdsl.export.dot").run();
