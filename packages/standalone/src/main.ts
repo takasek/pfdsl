@@ -16,6 +16,9 @@ import { createExportResults } from "./export-results.js";
 import { nativeExportServices } from "./export-services.js";
 import { createNativeReferenceServices } from "./reference-services.js";
 import "./style.css";
+import { getCurrentWindow } from "@tauri-apps/api/window";
+import { installNativeMenu, type RecentTarget } from "./native-menu.js";
+import { createTextComparison } from "./text-comparison.js";
 
 (self as unknown as { MonacoEnvironment: unknown }).MonacoEnvironment = {
 	getWorker: () => new EditorWorker(),
@@ -29,6 +32,9 @@ const tabs = document.querySelector<HTMLElement>("#tabs")!;
 const documents = document.querySelector<HTMLElement>("#documents")!;
 const conflicts = document.querySelector<HTMLElement>("#conflicts")!;
 const native = "__TAURI_INTERNALS__" in window;
+let nativeMenu: Awaited<ReturnType<typeof installNativeMenu>> | undefined;
+let folderRoot: string | undefined;
+let recentTargets: RecentTarget[] = [];
 let saveCapability = {
 	save: false,
 	reason: native
@@ -37,12 +43,8 @@ let saveCapability = {
 };
 const saveSupport = document.querySelector<HTMLElement>("#save-support")!;
 function updateSaveControls() {
-	for (const selector of ["#save", "#save-as"]) {
-		const button = document.querySelector<HTMLButtonElement>(selector)!;
-		button.disabled = busy || !saveCapability.save;
-		button.title = saveCapability.reason;
-	}
 	saveSupport.textContent = saveCapability.reason;
+	updateMenu();
 }
 async function loadSaveCapability() {
 	const previousReason = saveCapability.reason;
@@ -113,8 +115,55 @@ function report(error: unknown) {
 function basename(path: string) {
 	return path.split("/").pop()!;
 }
-function label(entry: Entry) {
-	entry.tab.button.textContent = `${entry.name}${entry.session.isDirty() ? " •" : ""}`;
+function updateMenu() {
+	const sidebar =
+		!document.querySelector<HTMLElement>("#folder-sidebar")!.hidden;
+	const toggle = document.querySelector<HTMLButtonElement>("#sidebar")!;
+	toggle.disabled = busy || !folderRoot;
+	toggle.setAttribute("aria-expanded", String(sidebar));
+	toggle.setAttribute("aria-label", sidebar ? "Hide sidebar" : "Show sidebar");
+	nativeMenu?.update({
+		busy,
+		document: !!active,
+		save: saveCapability.save,
+		folder: !!folderRoot,
+		sidebar,
+		diagram: active?.tab.canDiagram() ?? false,
+		definition: active?.tab.canCreateDefinition() ?? false,
+	});
+}
+function renderWorkspace() {
+	for (const entry of opened) {
+		const sameName = [...opened].filter((other) => other.name === entry.name);
+		const visibleName =
+			sameName.length > 1 && entry.path
+				? `${entry.name} — ${entry.path.slice(0, entry.path.lastIndexOf("/"))}`
+				: entry.name;
+		entry.tab.button.textContent = `${visibleName}${entry.session.isDirty() ? " •" : ""}`;
+		entry.tab.button.title = entry.path ?? `${entry.name} — Not saved`;
+	}
+	document.querySelector<HTMLElement>("#start-screen")!.hidden = !!active;
+	document.querySelector<HTMLElement>("#documents")!.hidden = !active;
+	document.querySelector<HTMLElement>("#document-name")!.textContent =
+		active?.name ?? "PFDSL";
+	document.querySelector<HTMLElement>("#document-state")!.textContent = !active
+		? ""
+		: active.session.panel()
+			? "External change — review required"
+			: !active.path
+				? "Not saved"
+				: active.session.isDirty()
+					? "Modified"
+					: "Saved";
+	document.querySelector<HTMLElement>("#document-location")!.textContent =
+		active?.path ?? (active ? "Not saved to a file" : "No document");
+	document.querySelector<HTMLElement>("#location-details")!.hidden = !active;
+	document.title = active ? `${active.name} — PFDSL` : "PFDSL";
+	for (const file of document.querySelectorAll<HTMLButtonElement>(
+		"#files button",
+	))
+		file.setAttribute("aria-current", String(file.title === active?.path));
+	updateSaveControls();
 }
 function syncLocation(entry: Entry) {
 	const disk = entry.session.location;
@@ -143,13 +192,15 @@ function activate(entry: Entry) {
 		other.tab.button.setAttribute("aria-selected", String(other === entry));
 	}
 	entry.tab.activate();
+	renderWorkspace();
 	renderConflict();
 }
 function run(action: () => Promise<unknown>) {
 	if (busy) return;
 	busy = true;
+	updateMenu();
 	for (const button of document.querySelectorAll<HTMLButtonElement>(
-		"header button, #files button, #recent button, .close-document",
+		"#sidebar, #files button, .close-document, [data-start], #try-sample",
 	))
 		button.disabled = true;
 	void action()
@@ -158,11 +209,11 @@ function run(action: () => Promise<unknown>) {
 			await releaseUnusedDocuments().catch(report);
 			busy = false;
 			for (const button of document.querySelectorAll<HTMLButtonElement>(
-				"header button, #files button, #recent button, .close-document",
+				"#files button, .close-document, [data-start], #try-sample",
 			))
 				button.disabled = false;
 			updateSaveControls();
-			if (active) label(active);
+			renderWorkspace();
 			renderConflict();
 		});
 }
@@ -175,7 +226,7 @@ function openDocument(name: string, source: string, disk: DiskSnapshot | null) {
 	if (existing) {
 		if (existing.session.rebindDisk(disk)) {
 			syncLocation(existing);
-			label(existing);
+			renderWorkspace();
 			void remember(disk.path).catch(report);
 		}
 		activate(existing);
@@ -204,9 +255,10 @@ function openDocument(name: string, source: string, disk: DiskSnapshot | null) {
 			: undefined,
 		exportServices: native ? nativeExportServices : undefined,
 		showExportResults,
-		reportStatus: report,
+		reportStatus: (message) =>
+			report(entry ? `${entry.name}: ${message}` : message),
 		onChange: () => {
-			if (entry) label(entry);
+			if (entry) renderWorkspace();
 		},
 	});
 	const navigation = document.createElement("span");
@@ -261,7 +313,7 @@ async function openSnapshot(snapshot: DiskSnapshot, isCurrent = () => true) {
 					entry.session.rebindDisk(snapshot, true)
 				) {
 					syncLocation(entry);
-					label(entry);
+					renderWorkspace();
 					// Rebinding/activation may invalidate this operation's own origin.
 					openDocument(basename(snapshot.path), snapshot.source, snapshot);
 					return;
@@ -289,28 +341,19 @@ async function refreshRecent() {
 		await invoke<Array<{ kind: "file" | "folder"; path: string }>>(
 			"list_recent",
 		);
-	const container = document.querySelector<HTMLElement>("#recent")!;
-	container.replaceChildren();
-	for (const target of recent) {
-		const button = document.createElement("button");
-		button.textContent = `${target.kind === "folder" ? "Folder: " : ""}${basename(target.path)}`;
-		button.title = target.path;
-		button.onclick = () =>
-			run(async () => {
-				if (target.kind === "folder")
-					await showFolder(
-						await invoke<string>("open_recent_folder", { path: target.path }),
-					);
-				else
-					await openSnapshot(
-						await invoke<DiskSnapshot>("open_recent", { path: target.path }),
-					);
-			});
-		container.append(button);
-	}
+	recentTargets = recent;
+	nativeMenu?.recent(recentTargets);
 }
 async function showFolder(root: string) {
 	const paths = await invoke<string[]>("list_documents");
+	folderRoot = root;
+	document.querySelector<HTMLElement>("#folder-sidebar")!.hidden = false;
+	document.querySelector<HTMLElement>("#folder-title")!.textContent =
+		basename(root);
+	const toggle = document.querySelector<HTMLButtonElement>("#sidebar")!;
+	toggle.disabled = false;
+	toggle.title = root;
+	updateMenu();
 	const files = document.querySelector<HTMLElement>("#files")!;
 	files.replaceChildren();
 	for (const path of paths) {
@@ -334,24 +377,13 @@ function choose(
 	comparison?: { local: string; disk: string | null },
 ): Promise<string> {
 	const dialog = document.createElement("dialog");
+	const origin = document.activeElement as HTMLElement | null;
 	const heading = document.createElement("h2");
 	heading.textContent = title;
 	const text = document.createElement("p");
 	text.textContent = message;
 	dialog.append(heading, text);
-	if (comparison)
-		for (const [label, value] of [
-			["Editor content", comparison.local],
-			["Observed disk content", comparison.disk ?? "File is missing"],
-		] as const) {
-			const caption = document.createElement("label");
-			caption.textContent = label;
-			const field = document.createElement("textarea");
-			field.readOnly = true;
-			field.value = value;
-			caption.append(field);
-			dialog.append(caption);
-		}
+	let comparisonView: ReturnType<typeof createTextComparison> | undefined;
 	const buttons = document.createElement("div");
 	buttons.className = "dialog-actions";
 	dialog.append(buttons);
@@ -361,8 +393,11 @@ function choose(
 		const finish = (choice: string) => {
 			if (settled) return;
 			settled = true;
+			comparisonView?.dispose();
 			dialog.close();
 			dialog.remove();
+			if (origin?.isConnected) origin.focus();
+			else active?.tab.focus?.();
 			resolve(choice);
 		};
 		for (const [value, name] of choices) {
@@ -375,6 +410,12 @@ function choose(
 			event.preventDefault();
 			finish("cancel");
 		};
+		if (comparison)
+			comparisonView = createTextComparison(
+				dialog,
+				comparison.local,
+				comparison.disk,
+			);
 		dialog.showModal();
 	});
 }
@@ -432,7 +473,7 @@ async function saveEntry(
 			});
 		} catch (error) {
 			session.observe(remembered, { error }, scope);
-			label(entry);
+			renderWorkspace();
 			renderConflict();
 			status.textContent = `Could not read ${remembered.path}: ${String(error)}. The save was not attempted. Editor content is retained.`;
 			return false;
@@ -447,7 +488,7 @@ async function saveEntry(
 			syncLocation(entry);
 			status.textContent =
 				"Reloaded the current disk version; there was nothing to save.";
-			label(entry);
+			renderWorkspace();
 			renderConflict();
 			return true;
 		}
@@ -461,7 +502,7 @@ async function saveEntry(
 		) {
 			syncLocation(entry);
 			status.textContent = "Already saved.";
-			label(entry);
+			renderWorkspace();
 			renderConflict();
 			return true;
 		}
@@ -480,7 +521,7 @@ async function saveEntry(
 	if (review) {
 		const decision = await choose(
 			"Review the target",
-			`Replace the disk version of ${selected.path} with the editor content? The disk version shown below differs from the editor, and a further change before saving stops the save.`,
+			`Replace the disk version of ${selected.path} with the editor content? The disk version shown below differs from the editor, and a further change before saving stops the save. Replace Observed Version writes the editor content to this file and resolves this target only after the revision is confirmed. Keep Editing closes this comparison without writing; editor content and unresolved changes remain. Choose Another File opens Save As; cancelling retains the current content and unresolved state. A further disk or editor change stops the save.`,
 			[
 				["cancel", "Keep Editing"],
 				["another", "Choose Another File"],
@@ -512,7 +553,7 @@ async function saveEntry(
 	if (outcome.stale) {
 		status.textContent =
 			"The document changed while the review was open. Editor content is retained; review it again.";
-		label(entry);
+		renderWorkspace();
 		renderConflict();
 		return false;
 	}
@@ -522,12 +563,8 @@ async function saveEntry(
 			report(`Saved; recent targets could not be updated: ${String(error)}`),
 		);
 	}
-	status.textContent =
-		outcome.message ||
-		(outcome.saved
-			? "Saved."
-			: "The save was not accepted. Editor content is retained.");
-	label(entry);
+	status.textContent = `${entry.name}: ${outcome.message || (outcome.saved ? "Saved." : "The save was not accepted. Editor content is retained.")}`;
+	renderWorkspace();
 	renderConflict();
 	return outcome.saved;
 }
@@ -587,7 +624,7 @@ async function useDiskVersion(entry: Entry) {
 	const plan = session.plan("adopt", observed);
 	const choice = await choose(
 		"Discard editor changes",
-		`Replace the editor content with the observed current disk version of ${observed.path}?`,
+		`Replace the editor content with the observed current disk version of ${observed.path}? Use Disk Version retains that disk version without writing and replaces the editor content after a fresh revision check. This resolves the matching external change; any separate unresolved target remains. Keep Editing closes this comparison without writing or replacing the editor; unresolved changes remain.`,
 		[
 			["cancel", "Keep Editing"],
 			["disk", "Use Disk Version"],
@@ -615,7 +652,7 @@ async function useDiskVersion(entry: Entry) {
 	}
 	syncLocation(entry);
 	await remember(current.path).catch(report);
-	label(entry);
+	renderWorkspace();
 	status.textContent = "Reloaded the current disk version.";
 }
 function dispose(entry: Entry) {
@@ -629,6 +666,7 @@ function dispose(entry: Entry) {
 		if (next) activate(next);
 	}
 	renderConflict();
+	renderWorkspace();
 }
 async function closeEntries(entries: Entry[]) {
 	const membership = [...opened];
@@ -661,58 +699,130 @@ async function closeEntries(entries: Entry[]) {
 			membership.every((entry) => opened.has(entry)),
 	);
 }
-document.querySelector<HTMLButtonElement>("#new")!.onclick = () => {
-	if (!busy) openDocument(`Untitled ${serial + 1}`, "", null);
+const commands: Record<string, () => void> = {
+	new() {
+		openDocument(`Untitled ${serial + 1}`, "", null);
+		active?.tab.focus();
+	},
+	format: () => active?.tab.format(),
+	"format-flat": () => active?.tab.format("flat"),
+	normalize: () => active?.tab.normalize(),
+	save: () =>
+		run(async () => {
+			if (active) await saveEntry(active);
+		}),
+	"save-as": () =>
+		run(async () => {
+			if (active) await saveEntry(active, true);
+		}),
+	"open-file": () =>
+		run(async () => {
+			if (!native)
+				throw new Error("Use the desktop application to choose a file.");
+			const snapshot = await invoke<DiskSnapshot | null>("select_document");
+			if (snapshot) await openSnapshot(snapshot);
+		}),
+	open: () =>
+		run(async () => {
+			if (!native)
+				throw new Error("Use the desktop application to choose a folder.");
+			const root = await invoke<string | null>("select_folder");
+			if (root) await showFolder(root);
+		}),
+	sidebar() {
+		if (!folderRoot) return;
+		const sidebar = document.querySelector<HTMLElement>("#folder-sidebar")!;
+		sidebar.hidden = !sidebar.hidden;
+		updateMenu();
+		active?.tab.activate();
+	},
 };
-document.querySelector<HTMLButtonElement>("#format")!.onclick = () => {
-	if (!busy) active?.tab.format();
-};
-document.querySelector<HTMLButtonElement>("#format-flat")!.onclick = () => {
-	if (!busy) active?.tab.format("flat");
-};
-document.querySelector<HTMLButtonElement>("#normalize")!.onclick = () => {
-	if (!busy) active?.tab.normalize();
-};
-document.querySelector<HTMLButtonElement>("#save")!.onclick = () =>
-	run(async () => {
-		if (active) await saveEntry(active);
-	});
-document.querySelector<HTMLButtonElement>("#save-as")!.onclick = () =>
-	run(async () => {
-		if (active) await saveEntry(active, true);
-	});
-document.querySelector<HTMLButtonElement>("#open-file")!.onclick = () =>
-	run(async () => {
-		if (!native)
-			throw new Error("Use the desktop application to choose a file.");
-		const snapshot = await invoke<DiskSnapshot | null>("select_document");
-		if (snapshot) await openSnapshot(snapshot);
-	});
-document.querySelector<HTMLButtonElement>("#open")!.onclick = () =>
-	run(async () => {
-		if (!native)
-			throw new Error("Use the desktop application to choose a folder.");
-		const root = await invoke<string | null>("select_folder");
-		if (root) await showFolder(root);
-	});
 document.addEventListener("keydown", (event) => {
+	if (event.isComposing || (nativeMenu && event.isTrusted)) return;
 	if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "s") {
 		event.preventDefault();
-		run(async () => {
-			if (active) await saveEntry(active, event.shiftKey);
-		});
+		performCommand(event.shiftKey ? "save-as" : "save");
 	}
 });
-openDocument(
-	"Welcome",
-	"---\ntitle: Welcome to PFDSL\n---\nidea >> design -> plan\n",
-	null,
-);
-openDocument(
-	"日本語",
-	"---\ntitle: 日本語のフロー\nartifact:\n  input:\n    label: 入力\n  output:\n    label: 成果物\nprocess:\n  build:\n    label: 作成する\n---\ninput >> build -> output\n",
-	null,
-);
+document.querySelector<HTMLButtonElement>("#sidebar")!.onclick = () => {
+	performCommand("sidebar");
+};
+for (const button of document.querySelectorAll<HTMLButtonElement>(
+	"[data-start]",
+))
+	button.onclick = () => performCommand(button.dataset.start!);
+document.querySelector<HTMLButtonElement>("#try-sample")!.onclick = () => {
+	if (busy) return;
+	openDocument(
+		"Sample (not saved)",
+		"---\ntitle: Sample flow\n---\nidea >> design -> plan\n",
+		null,
+	);
+	active?.tab.focus?.();
+};
+function performCommand(id: string) {
+	if (busy || document.querySelector("dialog[open]")) return;
+	const command = commands[id];
+	if (command) {
+		command();
+		return;
+	}
+	if (id === "close-window") {
+		void getCurrentWindow().close().catch(report);
+		return;
+	}
+	if (!active) return;
+	if (id === "close-tab") {
+		const entry = active;
+		run(async () => {
+			await closeEntries([entry]);
+			active?.tab.focus?.();
+		});
+		return;
+	}
+	if (id === "next-tab" || id === "previous-tab") {
+		const entries = [...opened];
+		const index = entries.indexOf(active);
+		activate(
+			entries[
+				(index + (id === "next-tab" ? 1 : entries.length - 1)) % entries.length
+			]!,
+		);
+		active?.tab.focus?.();
+		return;
+	}
+	const target = document.activeElement as HTMLElement | null;
+	if (
+		["undo", "redo", "delete"].includes(id) &&
+		target?.matches("input,textarea") &&
+		!target.closest(".monaco-editor")
+	) {
+		document.execCommand(id);
+		return;
+	}
+	active.tab.command(id === "find" ? "actions.find" : id);
+}
+function openRecentTarget(target: RecentTarget) {
+	run(async () => {
+		if (target.kind === "folder")
+			await showFolder(
+				await invoke<string>("open_recent_folder", { path: target.path }),
+			);
+		else
+			await openSnapshot(
+				await invoke<DiskSnapshot>("open_recent", { path: target.path }),
+			);
+	});
+}
+renderWorkspace();
+if (native)
+	void installNativeMenu(performCommand, openRecentTarget, report)
+		.then((menu) => {
+			nativeMenu = menu;
+			menu.recent(recentTargets);
+			updateMenu();
+		})
+		.catch(report);
 updateSaveControls();
 if (native) {
 	void loadSaveCapability();
@@ -780,10 +890,10 @@ if (native) {
 				);
 				if (opened.has(entry)) {
 					syncLocation(entry);
-					label(entry);
+					renderWorkspace();
 				}
 			} catch (error) {
-				if (opened.has(entry)) label(entry);
+				if (opened.has(entry)) renderWorkspace();
 				report(
 					`Could not check ${entry.name}: ${String(error)}. Editor content is retained.`,
 				);

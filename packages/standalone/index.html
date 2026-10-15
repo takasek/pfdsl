@@ -2,9 +2,9 @@
 <html lang="en">
 <head><meta charset="UTF-8" /><meta name="viewport" content="width=device-width, initial-scale=1.0" /><title>PFDSL</title></head>
 <body>
-<header><strong>PFDSL</strong><button type="button" id="new">New</button><button type="button" id="open-file">Open file…</button><button type="button" id="open">Open folder…</button><button type="button" id="save" disabled>Save</button><button type="button" id="save-as" disabled>Save As…</button><button type="button" id="format">Format flows</button><button type="button" id="format-flat">Format flat</button><button type="button" id="normalize">Normalized edges</button><span id="status" role="status">Open a document or start a new one.</span></header>
-<p id="save-support" role="status" aria-live="polite"></p>
-<main><aside><h2>Recent</h2><nav id="recent" aria-label="Recent targets"></nav><h2>Folder files</h2><nav id="files" aria-label="PFD files"></nav></aside><section id="workspace"><nav id="tabs" aria-label="Documents"></nav><div id="documents"></div><section id="conflicts" aria-label="Disk versions"></section></section></main>
+<header><button type="button" id="sidebar" aria-label="Show sidebar" aria-controls="folder-sidebar" aria-expanded="false" disabled title="Open a folder to use the sidebar">☷</button><strong id="document-name">PFDSL</strong><span id="document-state" role="status"></span><details id="location-details"><summary>Document location</summary><span id="document-location"></span></details></header>
+<main><aside id="folder-sidebar" hidden><h2 id="folder-title">Folder files</h2><nav id="files" aria-label="PFD files"></nav></aside><section id="workspace"><nav id="tabs" role="tablist" aria-label="Documents"></nav><section id="start-screen" aria-label="Start"><h1>PFDSL</h1><p>Write a process. See the flow.</p><button type="button" data-start="new">New</button><button type="button" data-start="open-file">Open…</button><button type="button" id="try-sample">Try a sample</button></section><div id="documents"></div><section id="conflicts" aria-label="Disk versions"></section></section></main>
+<footer><span id="status" role="status">Open a document or start a new one.</span><p id="save-support" role="status" aria-live="polite"></p></footer>
 <script type="module" src="/src/main.ts"></script>
 </body>
 </html>

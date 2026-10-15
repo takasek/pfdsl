@@ -112,7 +112,7 @@ export async function establish(startHost, failure, history = "none") {
 			change(a, "external A\n");
 		};
 	}
-	if (failure.via === "save-as") await host.click(host.query("#save-as"));
+	if (failure.via === "save-as") await host.command("save-as");
 	else await host.cmdS();
 	ctx.recovery = failure.hasB ? b : a;
 	ctx.targets =
@@ -126,7 +126,7 @@ export async function establish(startHost, failure, history = "none") {
 		ctx.chooser = () => native.snapshot(b);
 		ctx.dialogOverride = (title) =>
 			title === "Review the target" ? "Keep Editing" : undefined;
-		await host.click(host.query("#save-as"));
+		await host.command("save-as");
 		ctx.dialogOverride = undefined;
 	} else if (history === "fail-again") {
 		ctx.chooser = () => {
@@ -134,7 +134,7 @@ export async function establish(startHost, failure, history = "none") {
 			change(b, "external B again\n");
 			return chosen;
 		};
-		await host.click(host.query("#save-as"));
+		await host.command("save-as");
 	} else if (history === "other-fails") {
 		let used = false;
 		ctx.beforeSave = () => {

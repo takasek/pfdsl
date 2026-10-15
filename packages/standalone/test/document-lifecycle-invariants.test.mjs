@@ -235,7 +235,7 @@ async function runCell(tabState, event, timing, action) {
 				if (!host.isDirty(tab) && !host.panel().present) break;
 			}
 		} else if (action === "save-as") {
-			await click(host.query("#save-as"));
+			await host.command("save-as");
 		} else if (action === "review") {
 			const button = host.panel().review;
 			if (!button || button.disabled)
@@ -414,7 +414,7 @@ async function failSaveAs() {
 	});
 	const tab = await host.open(a);
 	tab.type(TEXT.edited);
-	await host.click(host.query("#save-as"));
+	await host.command("save-as");
 	assert.equal(host.panel().recoveryPath, b.path);
 	host.log.length = 0;
 	return { native, a, b, host, tab };

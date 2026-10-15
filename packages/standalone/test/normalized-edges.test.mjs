@@ -160,12 +160,12 @@ test("production main routes Normalize to the active tab and preserves Format", 
 		"main",
 		seam,
 		instances,
-		async ({ document, editors }) => {
+		async ({ document, editors, command }) => {
+			editors[1].model.source = "input >> build -> output\n";
 			const docs = [...document.querySelectorAll(".document")];
-			const button = document.querySelector("#normalize");
-			assert.equal(button.textContent, "Normalized edges");
+			const button = document.querySelector("#tabs button");
 			button.focus();
-			button.click();
+			command("normalize");
 			assert.equal(docs[0].querySelector(".normalized-edges").hidden, true);
 			assert.equal(docs[1].querySelector(".normalized-edges").hidden, false);
 			assert.equal(
@@ -176,7 +176,7 @@ test("production main routes Normalize to the active tab and preserves Format", 
 			first.model.source = "fresh >> step -> next\n";
 			document.querySelector("#tabs button").click();
 			button.focus();
-			button.click();
+			command("normalize");
 			assert.equal(
 				docs[0].querySelector("pre").textContent,
 				"fresh >> step\nstep -> next\n",
@@ -195,7 +195,7 @@ test("production main routes Normalize to the active tab and preserves Format", 
 				first.callbacks.onDidChangeModelContent();
 			};
 			first.model.source = "a>>p->b";
-			document.querySelector("#format").click();
+			command("format");
 			assert.equal(edits, 1);
 			assert.match(first.getValue(), /a >> p/);
 			assert.equal(docs[0].querySelector(".normalized-edges").hidden, true);

@@ -40,16 +40,20 @@ For an undefined node, **Insert artifact/process definition** in Quick Fix inser
 A produced artifact should also declare meaningful completion `criteria` (W002 warns when absent; strict validation treats it as an error).
 The Quick Fix keeps that diagnostic until you supply a criterion, and the insertion can be undone in one step.
 
-Right-click a preview node, or focus it with Tab and press Enter, to open **Node actions**.
-The toolbar button opens actions for the focused node and shows its ID.
+Right-click a preview node, or focus it with Tab and press Enter, to open **Connections**.
+The bottom panel shows direct incoming neighbors on the left, the current node in the center, and outgoing neighbors on the right.
+Each neighbor list scrolls independently; the center and connection inputs remain visible.
 For an undefined node, **Create definition** inserts its frontmatter entry and selects the label in the editor.
-Choose an input, feedback, or output connection, then select an existing compatible node or enter a new ID.
+Focus either **Connect a node…** input to filter compatible existing nodes by ID or label, then select a candidate to connect it on that side.
+Use the adjacent **+** to explicitly create and connect a new node with the entered ID as its initial label; pressing Enter in the input does not create a node.
+Right-click a connection line to delete just that edge or switch an artifact-to-process input between normal and feedback.
+Output connections cannot become feedback; duplicate connections, new cycles and additional producers are refused with a reason.
 Each edit is one Undo step; a menu from an older document revision refuses to apply.
 
-Hover over a node to see its direct neighbors as a small graph, including feedback edges.
-Move into the hover and click a node to center it in the main preview.
+Hover over a node to read its text information; long information can be scrolled or focused with the keyboard.
+Click a neighbor in **Connections** to center it in the main preview and update the panel without filtering the full diagram.
 This navigation and editor selections briefly outline the destination; redraws preserve position without repeating the cue.
-Press Escape to close the hover or Node actions.
+Press Escape to close the hover or Connections; Escape in a candidate list closes only the candidates and retains the input.
 
 ```pfdsl
 [requirement, constraint] >> design -> spec

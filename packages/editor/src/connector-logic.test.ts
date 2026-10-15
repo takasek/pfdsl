@@ -2,10 +2,34 @@ import { analyzeSource, type NormalizedEdge } from "@pfdsl/core";
 import { describe, expect, it } from "vitest";
 import {
 	buildConnectorEdgeLine,
+	createsPrimaryCycle,
 	edgeAlreadyExists,
 	insertConnectorEdge,
 	validateNewNodeId,
 } from "./connector-logic.js";
+
+it("checks a long path without rescanning every edge for each visited node", () => {
+	let reads = 0;
+	const edges = Array.from({ length: 200 }, (_, i) => ({
+		get from() {
+			reads++;
+			return `n${i}`;
+		},
+		to: `n${i + 1}`,
+	}));
+	expect(createsPrimaryCycle(edges, "n200", "n0")).toBe(true);
+	expect(reads).toBeLessThanOrEqual(edges.length);
+	expect(
+		createsPrimaryCycle(
+			[
+				{ from: "a", to: "b" },
+				{ from: "b", to: "a" },
+			],
+			"x",
+			"a",
+		),
+	).toBe(false);
+});
 
 describe("buildConnectorEdgeLine", () => {
 	it.each([

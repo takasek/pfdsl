@@ -7,7 +7,7 @@ import {
 	findFrontmatterDefinitionRange,
 	findNodeOccurrenceRanges,
 	nodeIdAtSourcePosition,
-	type PreviewEditRequest,
+	type PreviewEditMessage,
 	positionOfNodeId,
 } from "@pfdsl/editor";
 import * as vscode from "vscode";
@@ -101,10 +101,10 @@ async function prepareEditSource(state: PreviewState) {
 
 async function editFromPreview(
 	state: PreviewState,
-	request: PreviewEditRequest,
+	request: PreviewEditMessage,
 ) {
 	const reply = (ok: boolean, message?: string) => {
-		if (!state.disposed && request.type === "addConnector")
+		if (!state.disposed)
 			void state.panel.webview.postMessage({
 				type: "editResult",
 				request,
@@ -116,7 +116,7 @@ async function editFromPreview(
 	if (!snapshot?.isCurrent()) {
 		reply(
 			false,
-			"The source could not be checked. Reopen Node actions and try again.",
+			"The source could not be checked. Reopen Connections and try again.",
 		);
 		return;
 	}
@@ -127,7 +127,7 @@ async function editFromPreview(
 		return;
 	}
 	if (!snapshot.isCurrent()) {
-		reply(false, "The document changed. Reopen Node actions and try again.");
+		reply(false, "The document changed. Reopen Connections and try again.");
 		return;
 	}
 	const edit = new vscode.WorkspaceEdit();
@@ -167,7 +167,7 @@ async function editFromPreview(
 					? vscode.ViewColumn.Beside
 					: sourceColumn,
 			...(request.type === "createDefinition" ? { selection: range } : {}),
-			preserveFocus: request.type === "addConnector",
+			preserveFocus: request.type !== "createDefinition",
 		});
 		if (state.disposed || state.doc.getText() !== result.source) return;
 		if (request.type === "createDefinition")
@@ -454,7 +454,9 @@ export function registerPreview(context: vscode.ExtensionContext): {
 				state.controller.markReady();
 			} else if (
 				msg.type === "createDefinition" ||
-				msg.type === "addConnector"
+				msg.type === "addConnector" ||
+				msg.type === "deleteConnector" ||
+				msg.type === "toggleFeedback"
 			) {
 				await editFromPreview(state, msg);
 			} else if (msg.type === "nodeClick") {

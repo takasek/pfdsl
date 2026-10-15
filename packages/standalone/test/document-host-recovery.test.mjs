@@ -22,12 +22,14 @@ test("Save As recovery retains target ownership and refuses intervening edits in
 		"reviewEntries",
 		"reviewActive",
 		"reviewBusy",
+		"reviewMenuItems",
 	];
 	const old = new Map(
 		keys.map((key) => [key, Object.getOwnPropertyDescriptor(globalThis, key)]),
 	);
 	let dom;
 	try {
+		globalThis.reviewMenuItems = [];
 		dom = new JSDOM(
 			readFileSync(`${root}/packages/standalone/index.html`, "utf8"),
 		);
@@ -121,6 +123,13 @@ test("Save As recovery retains target ownership and refuses intervening edits in
 			document.querySelector(selector).click();
 			await flush();
 		};
+		const command = async (id) => {
+			await flush();
+			const item = globalThis.reviewMenuItems.find((item) => item.id === id);
+			assert.ok(item, `Missing menu command ${id}`);
+			if (item.enabled) item.action();
+			await flush();
+		};
 		const dialogClick = async (text) => {
 			[...document.querySelectorAll("dialog button")]
 				.find((b) => b.textContent === text)
@@ -131,7 +140,7 @@ test("Save As recovery retains target ownership and refuses intervening edits in
 		const baselineSelection = selectedDocument;
 		const baselineTabCount = reviewEntries.size;
 		selectedDocument = { ...A, id: 100, binding: "old-parent:a.pfdsl" };
-		await click("#open-file");
+		await command("open-file");
 		const oldBinding = reviewActive();
 		oldBinding.tab.setSource("keep old edits");
 		selectedDocument = {
@@ -141,14 +150,14 @@ test("Save As recovery retains target ownership and refuses intervening edits in
 			identity: "new-inode",
 			source: "new folder content",
 		};
-		await click("#open-file");
+		await command("open-file");
 		const newBinding = reviewActive();
 		assert.notEqual(newBinding, oldBinding);
 		assert.equal(newBinding.tab.getSource(), "new folder content");
 		assert.equal(oldBinding.tab.getSource(), "keep old edits");
 		for (let id = 102; id < 112; id++) {
 			selectedDocument = { ...selectedDocument, id };
-			await click("#open-file");
+			await command("open-file");
 			assert.equal(reviewActive(), newBinding);
 			assert.equal(reviewEntries.size, baselineTabCount + 2);
 			assert.ok(
@@ -160,7 +169,7 @@ test("Save As recovery retains target ownership and refuses intervening edits in
 		}
 		// A canceled Save As releases the newly selected target immediately.
 		saveTarget = { ...B, id: 112, source: "existing target" };
-		await click("#save-as");
+		await command("save-as");
 		await dialogClick("Keep Editing");
 		assert.ok(
 			calls.some(
@@ -169,7 +178,7 @@ test("Save As recovery retains target ownership and refuses intervening edits in
 		);
 		// A target already open in another tab is also released after rejection.
 		saveTarget = { ...A, id: 113, binding: "old-parent:a.pfdsl" };
-		await click("#save-as");
+		await command("save-as");
 		assert.ok(
 			calls.some(
 				(call) => call.command === "release_document" && call.args.id === 113,
@@ -189,10 +198,10 @@ test("Save As recovery retains target ownership and refuses intervening edits in
 		assert.equal(reviewEntries.size, baselineTabCount);
 		selectedDocument = baselineSelection;
 		saveTarget = B;
-		await click("#open-file");
+		await command("open-file");
 		const entry = reviewActive();
 		entry.tab.setSource("local");
-		await click("#save-as");
+		await command("save-as");
 		await dialogClick("Replace Observed Version");
 		// The panel names the target its buttons act on.
 		const recoveryPath = () =>
@@ -227,9 +236,9 @@ test("Save As recovery retains target ownership and refuses intervening edits in
 			binding: "uncertain:b.pfdsl",
 		};
 		saveReply = new Error("native reply lost");
-		await click("#open-file");
+		await command("open-file");
 		const uncertain = reviewActive();
-		await click("#save-as");
+		await command("save-as");
 		await dialogClick("Replace Observed Version");
 		assert.equal(uncertain.session.isDirty(), true);
 		assert.equal(uncertain.session.disk.path, selectedDocument.path);
@@ -272,10 +281,10 @@ test("Save As recovery retains target ownership and refuses intervening edits in
 			selectedDocument = packet.baseline;
 			saveTarget = packet.baseline;
 			saveReply = packet.result;
-			await click("#open-file");
+			await command("open-file");
 			const nativeFailure = reviewActive();
 			nativeFailure.tab.setSource(packet.buffer);
-			await click("#save-as");
+			await command("save-as");
 			await dialogClick("Replace Observed Version");
 			assert.match(
 				document.querySelector("#conflicts").textContent,
@@ -312,7 +321,7 @@ test("Save As recovery retains target ownership and refuses intervening edits in
 
 		// Open B independently while A still owns a failed Save As recovery.
 		selectedDocument = published;
-		await click("#open-file");
+		await command("open-file");
 		const other = reviewActive();
 		assert.notEqual(other, entry);
 		other.tab.setSource("unsaved B buffer");
@@ -332,7 +341,7 @@ test("Save As recovery retains target ownership and refuses intervening edits in
 		await flush();
 		entry.tab.button.click();
 		// Recreate B's pending recovery; choose its disk version before an A poll.
-		await click("#save-as");
+		await command("save-as");
 		await dialogClick("Replace Observed Version");
 		let release;
 		pendingInspect = new Promise((resolve) => (release = resolve));
@@ -393,7 +402,7 @@ test("Save As recovery retains target ownership and refuses intervening edits in
 			revision: null,
 			identity: null,
 		});
-		await click("#open-file");
+		await command("open-file");
 		pendingInspect = null;
 		assert.equal(reviewActive(), entry);
 		assert.equal(reviewEntries.size, beforeRenameCount);
@@ -417,7 +426,7 @@ test("Save As recovery retains target ownership and refuses intervening edits in
 			"function",
 			"normal native Quit must enter the document transaction",
 		);
-		await click("#new");
+		await command("new");
 		const unsaved = reviewActive();
 		unsaved.tab.setSource("unique untitled buffer");
 		const all = [...reviewEntries];
@@ -462,7 +471,7 @@ test("Save As recovery retains target ownership and refuses intervening edits in
 			identity: "inodeC",
 			binding: "separate:target.pfdsl",
 		};
-		await click("#save-as");
+		await command("save-as");
 		assert.equal(reviewBusy(), true);
 		let releaseExitAck;
 		pendingExitAck = new Promise((resolve) => {
@@ -568,7 +577,7 @@ test("Save As recovery retains target ownership and refuses intervening edits in
 		// Two live hard-link names must keep separate tabs and normal-save targets.
 		selectedDocument = A;
 		inspectSnapshots.set(A.id, A);
-		await click("#open-file");
+		await command("open-file");
 		const originalLink = reviewActive();
 		originalLink.tab.setSource("edit original leaf");
 		const alias = {
@@ -579,7 +588,7 @@ test("Save As recovery retains target ownership and refuses intervening edits in
 		};
 		inspectSnapshots.set(alias.id, alias);
 		selectedDocument = alias;
-		await click("#open-file");
+		await command("open-file");
 		assert.equal(reviewEntries.size, 2);
 		assert.notEqual(reviewActive(), originalLink);
 		assert.equal(originalLink.session.disk.id, A.id);
@@ -590,7 +599,7 @@ test("Save As recovery retains target ownership and refuses intervening edits in
 			current: { ...A, source: "edit original leaf", revision: "a1" },
 		};
 		// Save inspects the target first, so the disk keeps its old state until the save runs.
-		await click("#save");
+		await command("save");
 		inspectSnapshots.set(A.id, saveReply.current);
 		assert.equal(
 			calls.filter((c) => c.command === "save_document").at(-1).args.id,
@@ -605,7 +614,7 @@ test("Save As recovery retains target ownership and refuses intervening edits in
 		// Closing must observe changes made after the last poll, even while busy.
 		for (const scenario of ["deleted tab", "moved quit", "unreadable tab"]) {
 			selectedDocument = { ...A, id: 20, identity: `inode:${scenario}` };
-			await click("#open-file");
+			await command("open-file");
 			const clean = reviewActive();
 			assert.equal(clean.session.isDirty(), false);
 			const start = calls.length;
@@ -644,7 +653,7 @@ test("Save As recovery retains target ownership and refuses intervening edits in
 			assert.equal(reviewEntries.size, 0);
 		}
 		selectedDocument = { ...A, id: 21, identity: "inode:delayed close" };
-		await click("#open-file");
+		await command("open-file");
 		const delayed = reviewActive();
 		let releasePoll;
 		pendingInspect = new Promise((resolve) => {
@@ -694,11 +703,11 @@ test("Save As recovery retains target ownership and refuses intervening edits in
 		// A changes while B's confirmation is pending: the entire native quit is refused.
 		selectedDocument = A;
 		inspectSnapshots.set(A.id, A);
-		await click("#open-file");
+		await command("open-file");
 		const early = reviewActive();
 		selectedDocument = B;
 		inspectSnapshots.set(B.id, B);
-		await click("#open-file");
+		await command("open-file");
 		const later = reviewActive();
 		later.tab.setSource("dirty B during quit");
 		let releaseLater;

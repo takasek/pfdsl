@@ -27,6 +27,7 @@ import { formatSnapshot, processSnapshot } from "./processing.js";
 import { registerReferenceFeatures } from "./reference-features.js";
 import type { ReferenceServices } from "./reference-services.js";
 import { registerSelectionFormatting } from "./selection-format.js";
+import { createWorkspaceSplit } from "./workspace-split.js";
 
 interface DocumentTabOptions {
 	parent: HTMLElement;
@@ -116,11 +117,14 @@ export function createDocumentTab({
 	button.setAttribute("role", "tab");
 	const preview = mountPreview(previewElement, {
 		canOpenRelatedFiles: !!referenceServices,
+		onStateChange: () => onChange?.(),
 		postMessage(message) {
 			if (disposed) return;
 			if (
 				message.type === "createDefinition" ||
-				message.type === "addConnector"
+				message.type === "addConnector" ||
+				message.type === "deleteConnector" ||
+				message.type === "toggleFeedback"
 			) {
 				const result = applyPreviewEdit(editor.getValue(), message);
 				if (!result.ok) {
@@ -215,6 +219,8 @@ export function createDocumentTab({
 				reportStatus("Related-file navigation is not available in this build.");
 		},
 	});
+	const split = createWorkspaceSplit(container, () => editor.layout());
+	editorElement.after(split.divider);
 	references = registerReferenceFeatures(
 		editor,
 		container,
@@ -253,6 +259,7 @@ export function createDocumentTab({
 		editor.render();
 		await preview.receive(result.message);
 		if (!disposed && currentRevision === revision) references.refresh();
+		onChange?.();
 	}
 
 	function requestRefresh() {
@@ -283,6 +290,7 @@ export function createDocumentTab({
 			disposed = true;
 			revision++;
 			selectionFormatting.dispose();
+			split.dispose();
 			languageFeatures.dispose();
 			references.dispose();
 			exports.dispose();
@@ -295,6 +303,45 @@ export function createDocumentTab({
 		activate() {
 			editor.layout();
 			requestRefresh();
+		},
+		focus() {
+			editor.focus();
+		},
+		canDiagram() {
+			return !previewElement.querySelector<HTMLButtonElement>(
+				"#node-actions-toggle",
+			)!.disabled;
+		},
+		canCreateDefinition: () => preview.canCreateDefinition(),
+		command(id: string) {
+			if (id === "create-definition") {
+				preview.createDefinition();
+				return;
+			}
+			const diagram = [
+				"fit-graph",
+				"actual-size",
+				"zoom-in",
+				"zoom-out",
+				"node-actions-toggle",
+				"preview-help-toggle",
+			];
+			if (diagram.includes(id)) {
+				previewElement.querySelector<HTMLButtonElement>(`#${id}`)?.click();
+				return;
+			}
+			if (id === "font-increase" || id === "font-decrease") {
+				const size = editor.getOption(monaco.editor.EditorOption.fontSize);
+				editor.updateOptions({
+					fontSize: Math.max(
+						8,
+						Math.min(48, size + (id === "font-increase" ? 1 : -1)),
+					),
+				});
+				return;
+			}
+			editor.focus();
+			editor.trigger("pfdsl.menu", id === "delete" ? "deleteRight" : id, null);
 		},
 		deactivate() {
 			references.cancelPending();

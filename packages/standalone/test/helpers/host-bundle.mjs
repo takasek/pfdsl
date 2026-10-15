@@ -7,6 +7,17 @@ const require = createRequire(`${root}/packages/standalone/package.json`);
 export const { build } = require("esbuild");
 export const { JSDOM } = require("jsdom");
 
+export const menuStub = `
+class Item {
+ static async new(options){return new Item(options)}
+ constructor(options){Object.assign(this,options);this.children=options.items??[];this.writes=[];delete this.items;(globalThis.reviewMenuItems??=[]).push(this)}
+ async setEnabled(v){this.writes.push(['enabled',v]);this.enabled=v} async setChecked(v){this.writes.push(['checked',v]);this.checked=v} async setText(v){this.writes.push(['text',v]);this.text=v}
+ async setAsAppMenu(){this.appMenu=true} async setAsWindowsMenuForNSApp(){} async setAsHelpMenuForNSApp(){}
+ async items(){return this.children} async append(i){this.children.push(i)} async remove(i){this.children=this.children.filter(x=>x!==i)} async close(){this.closed=true}
+}
+export const Menu=Item,MenuItem=Item,CheckMenuItem=Item,Submenu=Item,PredefinedMenuItem=Item;
+`;
+
 const tabStub = `
 export function createDocumentTab(options){
  // reviewNormalize stands in for Monaco's line-ending normalization when a test sets it.
@@ -16,7 +27,7 @@ export function createDocumentTab(options){
  const container=document.createElement('div'),button=document.createElement('button');
  options.parent.append(container);button.textContent=options.name;
  const tab={container,button,location:options.path,read:options.read,references:options.referenceServices,setSourceCalls:0,
-  activate(){},
+  activate(){},focus(){},command(){},canDiagram(){return true;},canCreateDefinition(){return false;},
   dispose(){container.remove();button.remove();hook('dispose',tab);},
   getSource:()=>source,getRevision:()=>revision,
   type(s){source=s;revision++;hook('type',tab,s);options.onChange?.();},
@@ -25,6 +36,10 @@ export function createDocumentTab(options){
   markSaved(){},format(){}};
  (globalThis.reviewTabs??=[]).push(tab);
  return tab;
+}`;
+const comparisonStub = `export function createTextComparison(parent, local, disk) {
+ const fields=[local,disk??'File is missing'].map(value=>{const field=document.createElement('textarea');field.readOnly=true;field.value=value;parent.append(field);return field;});
+ return {dispose(){for(const field of fields)field.remove();}};
 }`;
 
 /**
@@ -53,27 +68,31 @@ export async function bundleHost(outfile) {
 					b.onResolve(
 						{
 							filter:
-								/^(?:@tauri-apps\/api\/|@pfdsl\/editor$|monaco-editor\/|\.\/document-tab\.js$|\.\/acceptance\.js$|\.\/style\.css$)/,
+								/^(?:@tauri-apps\/api\/|@pfdsl\/editor$|monaco-editor\/|\.\/document-tab\.js$|\.\/text-comparison\.js$|\.\/acceptance\.js$|\.\/style\.css$)/,
 						},
 						(args) => ({ path: args.path, namespace: "review-seams" }),
 					);
 					b.onLoad({ filter: /.*/, namespace: "review-seams" }, (args) => ({
 						contents:
-							args.path === "@tauri-apps/api/core"
-								? "export const invoke=(...args)=>globalThis.nativeInvoke(...args);"
-								: args.path === "@tauri-apps/api/event"
-									? "export const listen=(...args)=>globalThis.nativeListen(...args);"
-									: args.path === "@tauri-apps/api/window"
-										? "export const getCurrentWindow=()=>({onCloseRequested(){},destroy(){}});"
-										: args.path === "@pfdsl/editor"
-											? 'export const previewStyles="";'
-											: args.path === "./acceptance.js"
-												? "export const verifyNativeCorpus=()=>globalThis.nativeAcceptance();"
-												: args.path === "./style.css"
-													? ""
-													: args.path === "./document-tab.js"
-														? tabStub
-														: "export default class Worker {}",
+							args.path === "./text-comparison.js"
+								? comparisonStub
+								: args.path === "@tauri-apps/api/menu"
+									? menuStub
+									: args.path === "@tauri-apps/api/core"
+										? "export const invoke=(...args)=>globalThis.nativeInvoke(...args);"
+										: args.path === "@tauri-apps/api/event"
+											? "export const listen=(...args)=>globalThis.nativeListen(...args);"
+											: args.path === "@tauri-apps/api/window"
+												? "export const getCurrentWindow=()=>({onCloseRequested(){},destroy(){}});"
+												: args.path === "@pfdsl/editor"
+													? 'export const previewStyles="";'
+													: args.path === "./acceptance.js"
+														? "export const verifyNativeCorpus=()=>globalThis.nativeAcceptance();"
+														: args.path === "./style.css"
+															? ""
+															: args.path === "./document-tab.js"
+																? tabStub
+																: "export default class Worker {}",
 						loader: "js",
 					}));
 				},

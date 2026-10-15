@@ -56,22 +56,18 @@ test("default flows and explicit flows retain grouping and error/no-op behavior"
 		assert.equal(editor.undoStops, 4);
 	});
 });
-test("production toolbar formats only the switched active document in the chosen style", async () => {
-	await withHost("main", async ({ document, editors }) => {
-		const flat = document.querySelector("#format-flat");
-		assert.equal(document.querySelector("#format").textContent, "Format flows");
-		assert.ok(flat, "Missing Flat format choice");
-		assert.equal(flat.textContent, "Format flat");
+test("production commands format only the switched active document in the chosen style", async () => {
+	await withHost("main", async ({ document, editors, command }) => {
 		editors[1].model.source = "fresh>>step->next";
-		flat.click();
+		command("format-flat");
 		assert.equal(editors[1].getValue(), "fresh >> step\nstep -> next\n");
 		assert.equal(editors[0].edits.length, 0);
 		document.querySelector("#tabs button").click();
 		editors[0].model.source = "a>>p->b";
-		flat.click();
+		command("format-flat");
 		assert.equal(editors[0].getValue(), "a >> p\np -> b\n");
 		assert.equal(editors[1].edits.length, 1);
-		document.querySelector("#format").click();
+		command("format");
 		assert.equal(editors[0].getValue(), "a >> p -> b\n");
 		assert.equal(editors[0].edits.length, 2);
 		assert.equal(editors[0].undoStops, 4);

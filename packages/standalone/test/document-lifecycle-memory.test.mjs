@@ -544,7 +544,7 @@ for (const relation of ["same-binding", "hard-link"])
 			});
 			const tab = await host.open(a);
 			tab.type(TEXT.edited);
-			await host.click(host.query("#save-as"));
+			await host.command("save-as");
 			await host.runPoll();
 			checkPanel({ host, native, violate, recoveryId: b.id, original: a });
 			if (relation === "hard-link" && !host.panel().originalAlsoChanged)

@@ -11,6 +11,29 @@ import { idsOfStatement } from "./preview-logic.js";
 export type ConnectorRole = "artifact" | "process";
 export type ConnectorKind = ">>" | ">>?" | "->";
 
+export function createsPrimaryCycle(
+	edges: ReadonlyArray<{ from: string; to: string }>,
+	from: string,
+	to: string,
+): boolean {
+	const outgoing = new Map<string, string[]>();
+	for (const { from, to } of edges) {
+		const targets = outgoing.get(from);
+		if (targets) targets.push(to);
+		else outgoing.set(from, [to]);
+	}
+	const pending = [to];
+	const seen = new Set<string>();
+	while (pending.length) {
+		const node = pending.pop()!;
+		if (node === from) return true;
+		if (seen.has(node)) continue;
+		seen.add(node);
+		pending.push(...(outgoing.get(node) ?? []));
+	}
+	return false;
+}
+
 /**
  * Builds the edge line text. `>>`/`>>?` always read artifact-then-process
  * left-to-right; `->` always reads process-then-artifact. nodeRole says

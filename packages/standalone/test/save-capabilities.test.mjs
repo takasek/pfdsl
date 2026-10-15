@@ -12,8 +12,8 @@ test("unsupported saving is explained before any chooser, confirmation or write"
 		capabilities: () => ({ save: false, reason }),
 	});
 	try {
-		assert.equal(host.query("#save").disabled, true);
-		assert.equal(host.query("#save-as").disabled, true);
+		assert.equal(!host.menuItem("save").enabled, true);
+		assert.equal(!host.menuItem("save-as").enabled, true);
 		assert.equal(host.query("#save-support").textContent, reason);
 		const tab = await host.open(doc);
 		tab.type("local");
@@ -51,14 +51,14 @@ test("saving stays disabled while capability lookup is pending and after failure
 			}),
 	});
 	try {
-		assert.equal(host.query("#save").disabled, true);
+		assert.equal(!host.menuItem("save").enabled, true);
 		const tab = await host.open(doc);
 		tab.type("local");
 		await host.cmdS();
 		assert.equal(doc.writes, 0);
 		reject(new Error("IPC unavailable"));
 		await host.settle();
-		assert.equal(host.query("#save-as").disabled, true);
+		assert.equal(!host.menuItem("save-as").enabled, true);
 		assert.match(
 			host.query("#save-support").textContent,
 			/Could not determine.*IPC unavailable/,
@@ -77,10 +77,11 @@ test("supported saving preserves normal Save and Save As availability", async ()
 	const doc = native.add(3, "supported.pfdsl", "original");
 	const host = await startHost(native, doc);
 	try {
-		assert.equal(host.query("#save").disabled, false);
-		assert.equal(host.query("#save-as").disabled, false);
-		assert.equal(host.query("#save-support").textContent, "");
+		assert.equal(!host.menuItem("save").enabled, true);
 		const tab = await host.open(doc);
+		assert.equal(!host.menuItem("save").enabled, false);
+		assert.equal(!host.menuItem("save-as").enabled, false);
+		assert.equal(host.query("#save-support").textContent, "");
 		tab.type("local");
 		await host.cmdS();
 		assert.equal(doc.file.source, "local");
@@ -98,7 +99,7 @@ for (const capability of [undefined, { save: false }, { save: "yes" }]) {
 			capabilities: () => capability,
 		});
 		try {
-			assert.equal(host.query("#save").disabled, true);
+			assert.equal(!host.menuItem("save").enabled, true);
 			assert.match(
 				host.query("#save-support").textContent,
 				/Invalid document saving capability/,
@@ -148,14 +149,14 @@ test("capability completion re-enables saving after a pending lookup", async () 
 			}),
 	});
 	try {
-		assert.equal(host.query("#save").disabled, true);
+		assert.equal(!host.menuItem("save").enabled, true);
 		const tab = await host.open(doc);
 		tab.type("local");
 		await host.cmdS();
 		assert.match(host.query("#status").textContent, /Checking document/);
 		resolve({ save: true, reason: null });
 		await host.settle();
-		assert.equal(host.query("#save").disabled, false);
+		assert.equal(!host.menuItem("save").enabled, false);
 		assert.equal(host.query("#save-support").textContent, "");
 		assert.doesNotMatch(host.query("#status").textContent, /Checking document/);
 	} finally {

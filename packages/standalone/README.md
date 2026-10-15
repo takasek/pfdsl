@@ -215,14 +215,19 @@ An AppImage dependency check does not certify folder dialogs, GUI interaction, o
 ## Application behavior
 
 Each tab pairs its editor and preview.
-Choose **Open folder…** to list PFDs in that folder and open them as additional tabs.
+The source is on the left and the diagram on the right, initially sharing the available width equally.
+Drag the divider, or focus it and use Left/Right (Shift for smaller steps), Home or End, to adjust the widths without recreating either pane.
+When no document is open, choose **New**, **Open…**, or **Try a sample**; the sample is opened only on request and is not saved to a file.
+Use the native **File**, **Edit**, **View** and **Window** menus for document commands, formatting, diagram controls and tab navigation.
+Choose **File > Open Folder…** to show the optional folder sidebar and open files as additional tabs.
+The sidebar button and **View > Show/Hide Sidebar** toggle that folder view; recent files and folders are under **File > Recent**.
 Format is an Undoable editor operation, and editor/node navigation uses the shared source positions.
-Choose **Normalized edges** to inspect the active tab’s current text without editing it.
+Choose **View > Normalized edges** to inspect the active tab’s current text without editing it.
 The read-only result uses the same edge sorting and serialization as the VS Code command; errors block the output, while warnings do not.
 Result messages belong to their tab: an empty edge set shows `No normalized edges.`, and blocked output shows `Fix errors before normalizing.`.
 Editing clears the previous result; run the action again to refresh it.
 Each tab retains its own result, and **Close** or Escape within the panel dismisses it.
-Choose **Format flows** for per-process grouped flows or **Format flat** for one edge per line.
+Choose **Edit > Format > Format flows** for per-process grouped flows or **Format flat** for one edge per line.
 The shared formatter preserves chains containing internal comments as written, including in Flat mode.
 Each action formats the active tab's current text as a whole document; selecting text does not limit the operation to that selection.
 The action leaves text that produces formatting errors or text already in the chosen canonical format unchanged.
@@ -231,7 +236,7 @@ With multiple selections, these actions format only the primary selection, match
 Selection formatting expands to complete body lines and includes the selection's ending line, even when its end is at column one.
 A selection confined to frontmatter or an unclosed frontmatter block is left unchanged.
 The existing shared range formatter skips full-graph validation, preserves internally commented chains, and leaves selected text unchanged on formatting errors or canonical no-ops.
-These actions leave the toolbar's whole-document Format behavior unchanged.
+These actions leave the menu's whole-document Format behavior unchanged.
 Native selection mapping, keyboard focus, and Undo/Redo remain to be checked in the current application.
 
 PFDSL editors support square-bracket and double-quote pairing and surrounding selected text.
@@ -245,7 +250,9 @@ These language-support changes have automated editor checks; native keyboard and
 The native host holds a directory capability for each folder explicitly selected for that session.
 Reads stay bound to that directory when its pathname is replaced; relative traversal and symlink escape are rejected.
 
-Choose **New**, **Open file…**, or a recent file/folder to work with documents.
+Choose **File > New**, **File > Open…**, or **File > Recent** to work with documents.
+The document header shows its current state; expand **Document location** to inspect the full path.
+Same-name tabs include their parent folders, and completed save messages name the document they belong to.
 **Save** (Command-S) and **Save As…** (Command-Shift-S) are manual operations; there is no autosave or session restoration.
 The recent list stores targets only, never editor content.
 Closing a dirty tab or window, or using macOS Command-Q, the application Quit menu, or Dock Quit, enters the same Save, Discard, and Cancel transaction.

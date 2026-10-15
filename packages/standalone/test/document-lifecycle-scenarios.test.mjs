@@ -35,7 +35,7 @@ for (const [name, setup] of [
 		"Save As onto an existing file",
 		async ({ host, ctx }) => {
 			ctx.chooser = () => ctx.native.snapshot(ctx.b);
-			await host.click(host.query("#save-as"));
+			await host.command("save-as");
 		},
 	],
 	[
@@ -126,7 +126,7 @@ for (const target of ["existing", "new"]) {
 				tab.type(TEXT.edited);
 				const trace = beginAction({ host, tab, owned: [c.id] });
 				if (via === "cmd-s") await host.cmdS();
-				else await host.click(host.query("#save-as"));
+				else await host.command("save-as");
 				checkAction({ native, host, tab, trace, violate });
 				assert.equal(c.file?.source, TEXT.edited);
 				const review = host.log.find(
@@ -153,7 +153,7 @@ cell(
 		});
 		const tab = await host.open(a);
 		tab.type(TEXT.edited);
-		await host.click(host.query("#save-as"));
+		await host.command("save-as");
 		const review = host.log.find((item) => item.title === "Review the target");
 		assert.match(review.text, /disk version .* differs from the editor/);
 		assert.match(review.text, /further change before saving stops the save/);
@@ -208,7 +208,7 @@ cell(
 		});
 		const tab = await host.open(a);
 		tab.type(TEXT.edited);
-		await host.click(host.query("#save-as"));
+		await host.command("save-as");
 		// A poll learns what B holds, which enables Review and Save Here.
 		await host.runPoll();
 		const says = () => host.query("#conflicts p").textContent;

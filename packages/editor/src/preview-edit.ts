@@ -4,10 +4,12 @@ import {
 	loadFrontmatter,
 	type Range,
 } from "@pfdsl/core";
+import { type ConnectionEdit, editConnection } from "./connection-edit.js";
 import {
 	buildConnectorEdgeLine,
 	type ConnectorKind,
 	compatibleOtherKind,
+	createsPrimaryCycle,
 	edgeAlreadyExists,
 	insertConnectorEdge,
 	outputProducerConflict,
@@ -19,6 +21,7 @@ import {
 } from "./def-insertion-logic.js";
 
 export type PreviewEditRequest =
+	| ConnectionEdit
 	| { type: "createDefinition"; nodeId: string; source: string }
 	| {
 			type: "addConnector";
@@ -26,6 +29,7 @@ export type PreviewEditRequest =
 			source: string;
 			connector: ConnectorKind;
 			otherId: string;
+			create?: boolean;
 	  };
 
 export type PreviewEditResult =
@@ -66,6 +70,74 @@ function sourceEdit(before: string, after: string) {
 	return { startOffset, endOffset, text: after.slice(startOffset, afterEnd) };
 }
 
+/** Syntax errors and missing endpoints prevent all preview edits. */
+function editableNodeError(
+	model: ReturnType<typeof analyzeSource>,
+	nodeId: string,
+) {
+	if (
+		model.diagnostics.some(
+			(d) => d.severity === "error" && /^(FM|L|P|N)\d+$/.test(d.code),
+		)
+	)
+		return "The document cannot be parsed safely. Fix its diagnostics first.";
+	const kind = model.nodeKinds.get(nodeId);
+	if (kind !== "artifact" && kind !== "process")
+		return "The target node no longer exists.";
+	return undefined;
+}
+
+/** Candidate validation reuses the analyzed snapshot without constructing an edit. */
+export function connectorError(
+	model: ReturnType<typeof analyzeSource>,
+	request: Extract<PreviewEditRequest, { type: "addConnector" }>,
+) {
+	const invalidSource = editableNodeError(model, request.nodeId);
+	if (invalidSource) return invalidSource;
+	const kind = model.nodeKinds.get(request.nodeId) as "artifact" | "process";
+	if (![">>", ">>?", "->"].includes(request.connector))
+		return "Unknown connector.";
+	const invalid = validateNewNodeId({
+		value: request.otherId,
+		currentNodeId: request.nodeId,
+		wantedKind: compatibleOtherKind(kind),
+		kindOfExisting: (id) => model.nodeKinds.get(id),
+	});
+	if (invalid) return invalid;
+	if (request.create && model.nodeKinds.has(request.otherId))
+		return "This ID already exists. Choose it from the candidates.";
+	if (
+		edgeAlreadyExists(
+			model.edges,
+			request.nodeId,
+			kind,
+			request.connector,
+			request.otherId,
+		)
+	)
+		return "This connection already exists.";
+	const conflict = outputProducerConflict(
+		model.edges,
+		request.nodeId,
+		kind,
+		request.connector,
+		request.otherId,
+	);
+	if (conflict) return conflict;
+	const artifact = kind === "artifact" ? request.nodeId : request.otherId;
+	const process = kind === "process" ? request.nodeId : request.otherId;
+	if (
+		request.connector !== ">>?" &&
+		createsPrimaryCycle(
+			model.graph.primaryEdges,
+			request.connector === "->" ? process : artifact,
+			request.connector === "->" ? artifact : process,
+		)
+	)
+		return "This connection would create a cycle (V010).";
+	return undefined;
+}
+
 /** A menu belongs to the exact authored source from which its candidates were calculated. */
 export function applyPreviewEdit(
 	source: string,
@@ -73,19 +145,24 @@ export function applyPreviewEdit(
 ): PreviewEditResult {
 	const fail = (message: string): PreviewEditResult => ({ ok: false, message });
 	if (request.source !== source)
-		return fail("The document changed. Reopen Node actions and try again.");
-	const model = { ...analyzeSource(source), source };
-	if (
-		model.diagnostics.some(
-			(d) => d.severity === "error" && /^(FM|L|P|N)\d+$/.test(d.code),
-		)
-	)
-		return fail(
-			"The document cannot be parsed safely. Fix its diagnostics first.",
-		);
-	const kind = model.nodeKinds.get(request.nodeId);
-	if (kind !== "artifact" && kind !== "process")
-		return fail("The target node no longer exists.");
+		return fail("The document changed. Reopen Connections and try again.");
+	const model = analyzeSource(source);
+	const invalid =
+		request.type === "addConnector"
+			? connectorError(model, request)
+			: editableNodeError(model, request.nodeId);
+	if (invalid) return fail(invalid);
+	const kind = model.nodeKinds.get(request.nodeId) as "artifact" | "process";
+	if (request.type === "deleteConnector" || request.type === "toggleFeedback") {
+		const result = editConnection(source, request);
+		return "message" in result
+			? fail(result.message)
+			: {
+					ok: true,
+					source: result.source,
+					edit: sourceEdit(source, result.source),
+				};
+	}
 	if (request.type === "createDefinition") {
 		if (
 			!findUndefinedNodeKind(model.nodeKinds, model.frontmatter, request.nodeId)
@@ -108,33 +185,6 @@ export function applyPreviewEdit(
 			needsCriteria: target?.needsCriteria,
 		};
 	}
-	if (![">>", ">>?", "->"].includes(request.connector))
-		return fail("Unknown connector.");
-	const invalid = validateNewNodeId({
-		value: request.otherId,
-		currentNodeId: request.nodeId,
-		wantedKind: compatibleOtherKind(kind),
-		kindOfExisting: (id) => model.nodeKinds.get(id),
-	});
-	if (invalid) return fail(invalid);
-	if (
-		edgeAlreadyExists(
-			model.edges,
-			request.nodeId,
-			kind,
-			request.connector,
-			request.otherId,
-		)
-	)
-		return fail("This connection already exists.");
-	const conflict = outputProducerConflict(
-		model.edges,
-		request.nodeId,
-		kind,
-		request.connector,
-		request.otherId,
-	);
-	if (conflict) return fail(conflict);
 	const edge = buildConnectorEdgeLine(
 		request.nodeId,
 		kind,
@@ -142,6 +192,27 @@ export function applyPreviewEdit(
 		request.otherId,
 	);
 	const inserted = insertConnectorEdge(source, edge, request.nodeId);
+	if (request.create) {
+		const definition = insertDefinition(
+			inserted.text,
+			compatibleOtherKind(kind) as "artifact" | "process",
+			request.otherId,
+		);
+		if (!definition.inserted)
+			return fail("The new node definition could not be inserted safely.");
+		const output = definition.output + loadFrontmatter(inserted.text).body;
+		const target = findDefinitionEditTarget(
+			analyzeSource(output),
+			compatibleOtherKind(kind) as "artifact" | "process",
+			request.otherId,
+		);
+		return {
+			ok: true,
+			source: output,
+			edit: sourceEdit(source, output),
+			selection: target?.labelRange,
+		};
+	}
 	const offset =
 		inserted.text.split("\n").slice(0, inserted.insertedLine).join("\n")
 			.length +

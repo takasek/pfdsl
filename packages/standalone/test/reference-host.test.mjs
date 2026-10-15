@@ -18,6 +18,7 @@ test("reference adoption retains pending handles and rejects invalidation during
 		"reviewActive",
 		"reviewBusy",
 		"reviewTabs",
+		"reviewMenuItems",
 	];
 	const old = new Map(
 		keys.map((key) => [key, Object.getOwnPropertyDescriptor(globalThis, key)]),
@@ -40,6 +41,7 @@ test("reference adoption retains pending handles and rejects invalidation during
 				dom.window.__TAURI_INTERNALS__ = {};
 				globalThis.nativeAcceptance = () => new Promise(() => {});
 				globalThis.nativeListen = async () => () => {};
+				globalThis.reviewMenuItems = [];
 				const calls = [];
 				let finish;
 				const original = {
@@ -84,7 +86,13 @@ test("reference adoption retains pending handles and rejects invalidation during
 				};
 				try {
 					await import(`${pathToFileURL(output).href}?${invalidation}`);
-					document.querySelector("#open-file").click();
+					document.querySelector('[data-start="new"]').click();
+					await flush();
+					const openFile = reviewMenuItems.find(
+						(item) => item.id === "open-file",
+					);
+					assert.equal(openFile.enabled, true);
+					openFile.action();
 					await flush();
 					const origin = reviewActive();
 					let current = true;
