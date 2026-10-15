@@ -30,10 +30,16 @@ export function findFrontmatterDefinitionInText(
 // Body navigation consumes an analyzeSnapshot model, not raw core body coordinates.
 type SourceModel = DocumentModel;
 
-function authoredNodeDeclarations(model: SourceModel, source: string) {
+function authoredNodeDeclarations(
+	model: SourceModel,
+	source: string,
+	includeGroups = false,
+) {
 	const declarations = model.sourceMap.declarations.filter(
 		({ section, range }) =>
-			(section === "artifact" || section === "process") &&
+			(section === "artifact" ||
+				section === "process" ||
+				(includeGroups && section === "group")) &&
 			!source
 				.slice(range.start.offset, range.end.offset)
 				.trim()
@@ -90,15 +96,18 @@ export function nodeIdAtSourcePosition(
 	return nodeOccurrenceAtSourcePosition(model, source, position)?.nodeId;
 }
 
-/** The full authored token used by editor commands and hover ranges. */
+/** The full authored token; group declarations opt in for hover, while node navigation keeps its default scope. */
 export function nodeOccurrenceAtSourcePosition(
 	model: SourceModel,
 	source: string,
 	position: CursorPosition,
+	options: { includeGroups?: boolean } = {},
 ): { nodeId: string; range: Range } | undefined {
-	const definition = authoredNodeDeclarations(model, source).find(({ range }) =>
-		containsPosition(range, position),
-	);
+	const definition = authoredNodeDeclarations(
+		model,
+		source,
+		options.includeGroups,
+	).find(({ range }) => containsPosition(range, position));
 	if (definition) return { nodeId: definition.id, range: definition.range };
 	const token = model.document.statements
 		.flatMap(idsOfStatement)
@@ -113,10 +122,13 @@ export function nextNodeOccurrenceRange(
 	model: SourceModel,
 	source: string,
 	position: CursorPosition,
+	direction: 1 | -1 = 1,
 ): Range | undefined {
 	const nodeId = nodeIdAtSourcePosition(model, source, position);
 	if (nodeId === undefined) return undefined;
 	const ranges = findNodeOccurrenceRanges(model, source, nodeId);
 	const index = ranges.findIndex((range) => containsPosition(range, position));
-	return index < 0 ? undefined : ranges[(index + 1) % ranges.length];
+	return index < 0
+		? undefined
+		: ranges[(index + direction + ranges.length) % ranges.length];
 }

@@ -393,14 +393,14 @@
 <g id="node43" class="node">
 <title>standalone_pfd_features</title>
 <g id="a_node43"><a xlink:href="https://github.com/takasek/pfdsl/issues/1259" xlink:title="公開前 GUI 機能の実装済みアプリ&#10;&#10;公開前の GUI 機能を集約した実装成果物。要求・担当・内部の着手順と進捗は location の Issue 本文から辿り、実機結果は共通受入 Issue で扱う&#10;criteria: location の Issue 本文が定める機能範囲の実装・必要な自動検証・独立レビューと、版に対応する実行可能な受入計画の登録が完了している。実機未実施を許容し、この done は実機合格を意味しない&#10;location: https://github.com/takasek/pfdsl/issues/1259">
-<polygon fill="#fff3cd" stroke="black" points="1543.02,-457.6 1355.82,-457.6 1355.82,-382.4 1543.02,-382.4 1543.02,-457.6"/>
+<polygon fill="#d4edda" stroke="black" points="1543.02,-457.6 1355.82,-457.6 1355.82,-382.4 1543.02,-382.4 1543.02,-457.6"/>
 <text xml:space="preserve" text-anchor="middle" x="1449.42" y="-441" font-family="Times,serif" font-size="14.00">standalone_pfd_features</text>
 <text xml:space="preserve" text-anchor="middle" x="1449.42" y="-424.2" font-family="Times,serif" font-size="14.00">公開前 GUI</text>
 <text xml:space="preserve" text-anchor="middle" x="1449.42" y="-407.4" font-family="Times,serif" font-size="14.00">機能の実装済みアプ</text>
 <text xml:space="preserve" text-anchor="middle" x="1449.42" y="-390.6" font-family="Times,serif" font-size="14.00">リ</text>
 </a>
 </g>
-<text xml:space="preserve" text-anchor="middle" x="1345.32" y="-369.8" font-family="Times,serif" font-size="14.00">wip</text>
+<text xml:space="preserve" text-anchor="middle" x="1342.21" y="-369.8" font-family="Times,serif" font-size="14.00">done</text>
 </g>
 <!-- i1259_i1260_i1261_build_standalone_features&#45;&gt;standalone_pfd_features -->
 <g id="edge34" class="edge">

@@ -1,7 +1,11 @@
+export * from "./codelens-logic.js";
 export * from "./connector-logic.js";
 export * from "./def-insertion-logic.js";
 export * from "./document.js";
+export * from "./expand-directory.js";
+export * from "./export.js";
 export * from "./format-logic.js";
+export * from "./hover-logic.js";
 export * from "./jump-logic.js";
 export * from "./location-utils.js";
 export * from "./messages.js";
@@ -10,3 +14,4 @@ export * from "./preview-edit.js";
 export * from "./preview-graph.js";
 export * from "./preview-logic.js";
 export { previewMarkup, previewStyles } from "./preview-shell.js";
+export * from "./references.js";

@@ -1,5 +1,6 @@
 import { pathToFileURL } from "node:url";
 import { analyzeSource, isUrlLike, resolveLocationFsPath } from "@pfdsl/core";
+import { documentReferences } from "@pfdsl/editor";
 
 export interface LinkRange {
 	line: number;
@@ -17,34 +18,25 @@ export function extractDocumentLinks(
 	const model = typeof source === "string" ? analyzeSource(source) : source;
 	const links: LinkRange[] = [];
 	if (!model.frontmatter) return links;
-	for (const declaration of model.sourceMap.declarations) {
-		if (declaration.section !== "artifact" && declaration.section !== "process")
-			continue;
-		for (const key of ["location", "subflow"]) {
-			if (key === "subflow" && declaration.section !== "process") continue;
-			for (const { value, range } of declaration.fields.get(key)?.values ??
-				[]) {
-				if (!value) continue;
-				const target = isUrlLike(value)
-					? value
-					: pathToFileURL(
-							resolveLocationFsPath(
-								docFsPath,
-								value,
-								key === "location" ? model.frontmatter.basePath : undefined,
-							),
-						).href;
-				links.push({
-					line: range.start.line - 1,
-					startChar: range.start.column - 1,
-					endChar: range.end.column - 1,
-					...(range.end.line !== range.start.line
-						? { endLine: range.end.line - 1 }
-						: {}),
-					target,
-				});
-			}
-		}
+	for (const { field: key, value, range } of documentReferences(model)) {
+		const target = isUrlLike(value)
+			? value
+			: pathToFileURL(
+					resolveLocationFsPath(
+						docFsPath,
+						value,
+						key === "location" ? model.frontmatter.basePath : undefined,
+					),
+				).href;
+		links.push({
+			line: range.start.line - 1,
+			startChar: range.start.column - 1,
+			endChar: range.end.column - 1,
+			...(range.end.line !== range.start.line
+				? { endLine: range.end.line - 1 }
+				: {}),
+			target,
+		});
 	}
 	return links;
 }

@@ -759,7 +759,7 @@
 <!-- export_metadata -->
 <g id="node74" class="node">
 <title>export_metadata</title>
-<g id="a_node74"><a xlink:title="メタデータ抽出&#10;&#10;正準化グラフとfrontmatterからノードメタデータを抽出しTSV化する。CLIサブコマンドはなくVSCode拡張のエクスポート機能のみが呼ぶ&#10;location: packages/metadata&#45;exporter/src/index.ts">
+<g id="a_node74"><a xlink:title="メタデータ抽出&#10;&#10;正準化グラフとfrontmatterからノードメタデータを抽出しTSV化する。CLIサブコマンドはなく、共有editor計算を両GUIのexport機能が呼ぶ&#10;location: packages/metadata&#45;exporter/src/index.ts, packages/editor/src/export.ts">
 <ellipse fill="none" stroke="#27ae60" cx="1410.64" cy="-2316.1" rx="77.28" ry="29.42"/>
 <text xml:space="preserve" text-anchor="middle" x="1410.64" y="-2320.3" font-family="Times,serif" font-size="14.00">export_metadata</text>
 <text xml:space="preserve" text-anchor="middle" x="1410.64" y="-2303.5" font-family="Times,serif" font-size="14.00">メタデータ抽出</text>
@@ -776,7 +776,7 @@
 <!-- render_graph -->
 <g id="node95" class="node">
 <title>render_graph</title>
-<g id="a_node95"><a xlink:title="DOT変換&#10;&#10;正準化グラフとfrontmatter（スタイル・タイトル）からGraphviz DOTを構築する&#10;command: node packages/cli/dist/cli.js render&#10;location: packages/graphviz&#45;exporter/src/index.ts">
+<g id="a_node95"><a xlink:title="DOT変換&#10;&#10;正準化グラフとfrontmatter（スタイル・タイトル）からGraphviz DOTを構築する&#10;command: node packages/cli/dist/cli.js render&#10;location: packages/graphviz&#45;exporter/src/dot.ts, packages/editor/src/export.ts">
 <ellipse fill="none" stroke="#27ae60" cx="1410.64" cy="-2393.1" rx="64.08" ry="29.42"/>
 <text xml:space="preserve" text-anchor="middle" x="1410.64" y="-2397.3" font-family="Times,serif" font-size="14.00">render_graph</text>
 <text xml:space="preserve" text-anchor="middle" x="1410.64" y="-2380.5" font-family="Times,serif" font-size="14.00">DOT変換</text>
@@ -1301,7 +1301,7 @@
 <!-- dot_graph -->
 <g id="node51" class="node">
 <title>dot_graph</title>
-<g id="a_node51"><a xlink:title="DOTグラフ&#10;&#10;Graphviz DOT形式テキスト（renderコマンドのデフォルト出力）&#10;criteria: node packages/cli/dist/cli.js render が実装され動作確認済み&#10;externalStakeholders: CLIユーザー">
+<g id="a_node51"><a xlink:title="DOTグラフ&#10;&#10;Graphviz DOT形式テキスト。CLI renderの既定出力と両GUIの全図書出しの共通入力&#10;criteria: CLI renderとpackages/editor/src/export.test.tsでDOT計算を検証し、両GUIのexport接続検査を通過する&#10;externalStakeholders: CLIユーザー, VSCode拡張ユーザー, standaloneアプリユーザー">
 <polygon fill="none" stroke="black" points="1710.33,-2185.9 1623.93,-2185.9 1623.93,-2144.3 1710.33,-2144.3 1710.33,-2185.9"/>
 <text xml:space="preserve" text-anchor="middle" x="1667.13" y="-2169.3" font-family="Times,serif" font-size="14.00">dot_graph</text>
 <text xml:space="preserve" text-anchor="middle" x="1667.13" y="-2152.5" font-family="Times,serif" font-size="14.00">DOTグラフ</text>
@@ -1311,7 +1311,7 @@
 <!-- export_image -->
 <g id="node73" class="node">
 <title>export_image</title>
-<g id="a_node73"><a xlink:title="画像化&#10;&#10;DOTをSVG（wasm、外部依存なし）またはPDF/PNG（puppeteer必須）へ変換する&#10;command: node packages/cli/dist/cli.js render &#45;&#45;format svg&#10;location: packages/preview&#45;engine/src/index.ts">
+<g id="a_node73"><a xlink:title="画像化&#10;&#10;DOTをWASMでSVGへ変換し、CLI/VSCodeは既存Node/Puppeteer API、standaloneは追加runtime不要のWKWebView/canvasでPDF/PNGへ変換する。previewのviewportや比較装飾は出力へ持ち込まない&#10;command: node packages/cli/dist/cli.js render &#45;&#45;format svg&#10;location: packages/preview&#45;engine/src/renderer.ts, packages/graphviz&#45;exporter/src/index.ts, packages/standalone/src/export&#45;features.ts, packages/standalone/src/export&#45;image.ts, packages/standalone/src&#45;tauri/src/pdf.rs, packages/standalone/src&#45;tauri/native/pdf.m">
 <ellipse fill="none" stroke="#27ae60" cx="1905.46" cy="-2316.1" rx="65.74" ry="29.42"/>
 <text xml:space="preserve" text-anchor="middle" x="1905.46" y="-2320.3" font-family="Times,serif" font-size="14.00">export_image</text>
 <text xml:space="preserve" text-anchor="middle" x="1905.46" y="-2303.5" font-family="Times,serif" font-size="14.00">画像化</text>
@@ -1374,7 +1374,7 @@
 <!-- metadata_tsv -->
 <g id="node56" class="node">
 <title>metadata_tsv</title>
-<g id="a_node56"><a xlink:title="メタデータTSV&#10;&#10;ノードのkind/label/description/status/tags/ownerを抽出したタブ区切りテキスト&#10;criteria: packages/metadata&#45;exporter/src/index.test.ts でメタデータ抽出・TSV 化が検証されており、VSCode 拡張の export コマンド（packages/vscode&#45;extension/src/export.ts）で TSV 形式を選択すると .tsv ファイルが出力される&#10;externalStakeholders: VSCode拡張ユーザー">
+<g id="a_node56"><a xlink:title="メタデータTSV&#10;&#10;ノードのkind/label/description/status/tags/ownerを抽出したタブ区切りテキスト&#10;criteria: packages/metadata&#45;exporter/src/index.test.tsとpackages/editor/src/export.test.tsで抽出・TSV化を検証し、両GUIのexport接続検査で保存結果を確認する&#10;externalStakeholders: VSCode拡張ユーザー, standaloneアプリユーザー">
 <polygon fill="none" stroke="black" stroke-width="2" points="1724.73,-2125.9 1609.53,-2125.9 1609.53,-2084.3 1724.73,-2084.3 1724.73,-2125.9"/>
 <text xml:space="preserve" text-anchor="middle" x="1667.13" y="-2109.3" font-family="Times,serif" font-size="14.00">metadata_tsv</text>
 <text xml:space="preserve" text-anchor="middle" x="1667.13" y="-2092.5" font-family="Times,serif" font-size="14.00">メタデータTSV</text>
@@ -1394,7 +1394,7 @@
 <!-- rendered_image -->
 <g id="node58" class="node">
 <title>rendered_image</title>
-<g id="a_node58"><a xlink:title="レンダリング画像&#10;&#10;DOTから変換したSVG（wasm）またはPDF/PNG（puppeteer経由）&#10;criteria: node packages/cli/dist/cli.js render &#45;&#45;format svg/pdf/png が実装され動作確認済み&#10;externalStakeholders: CLIユーザー, VSCode拡張ユーザー">
+<g id="a_node58"><a xlink:title="レンダリング画像&#10;&#10;DOTからWASMで生成した全図SVGとそのPDF/PNG。CLI/VSCodeは既存Puppeteer、standaloneは専用WKWebView/canvasで変換する&#10;criteria: CLI/共有変換検査とpackages/standalone/test/native&#45;export.test.mjsで全sampleの実file・寸法・PDF文字保持を検証する。製品GUIと候補配布物の実機受入は#1445に残す&#10;externalStakeholders: CLIユーザー, VSCode拡張ユーザー, standaloneアプリユーザー">
 <polygon fill="none" stroke="black" stroke-width="2" points="2179.79,-2185.9 2042.99,-2185.9 2042.99,-2144.3 2179.79,-2144.3 2179.79,-2185.9"/>
 <text xml:space="preserve" text-anchor="middle" x="2111.39" y="-2169.3" font-family="Times,serif" font-size="14.00">rendered_image</text>
 <text xml:space="preserve" text-anchor="middle" x="2111.39" y="-2152.5" font-family="Times,serif" font-size="14.00">レンダリング画像</text>

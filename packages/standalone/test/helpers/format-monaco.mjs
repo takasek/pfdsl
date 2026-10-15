@@ -1,8 +1,12 @@
 // Controlled Monaco boundary; document-tab and formatting stay production code.
 export const instances = [];
+export const language = {};
 export const Uri = { parse: (value) => value };
 export const MarkerSeverity = { Error: 8, Warning: 4, Info: 2 };
 export const editor = {
+	registerLinkOpener() {
+		return { dispose() {} };
+	},
 	createModel(source) {
 		const range = { fullDocument: true };
 		return {
@@ -16,6 +20,7 @@ export const editor = {
 	create(_element, { model }) {
 		const callbacks = {};
 		const instance = {
+			getId: () => `format-${instances.indexOf(instance)}`,
 			model,
 			callbacks,
 			edits: [],
@@ -65,4 +70,15 @@ function assertFullDocument(edits, model) {
 }
 
 // Language registration is outside this controlled editor seam.
-export const languages = { register() {}, setLanguageConfiguration() {} };
+export const languages = new Proxy(
+	{
+		register() {},
+		setLanguageConfiguration() {},
+		setMonarchTokensProvider() {},
+	},
+	{
+		get(target, key) {
+			return target[key] ?? (() => ({ dispose() {} }));
+		},
+	},
+);

@@ -616,6 +616,7 @@ export function mountPreview(container: HTMLElement, host: PreviewHost) {
 	on(window, "mouseup", releaseDrag);
 
 	on(root, "click", (e) => {
+		if (graphRevision !== revision) return;
 		if (host.canOpenRelatedFiles === false) return;
 		const node = (e.target as Element).closest("g.node");
 		if (!node) return;

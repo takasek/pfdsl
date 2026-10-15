@@ -26,7 +26,7 @@ export function createDocumentTab(options){
  const hook=(...args)=>globalThis.reviewTabHook?.(...args);
  const container=document.createElement('div'),button=document.createElement('button');
  options.parent.append(container);button.textContent=options.name;
- const tab={container,button,location:options.path,read:options.read,setSourceCalls:0,
+ const tab={container,button,location:options.path,read:options.read,references:options.referenceServices,setSourceCalls:0,
   activate(){},focus(){},command(){},canDiagram(){return true;},canCreateDefinition(){return false;},
   dispose(){container.remove();button.remove();hook('dispose',tab);},
   getSource:()=>source,getRevision:()=>revision,
