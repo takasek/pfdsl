@@ -22,8 +22,8 @@ export default mergeConfig(
 				// ready・差分保留・配送・破棄の状態管理は
 				// preview-controller.ts、ディレクトリ展開は expand-directory.ts、
 				// connector の入力検証は @pfdsl/editor、codelens の行判定は
-				// codelens-logic.ts、export の命名と部分失敗の集約は
-				// export-logic.ts にあり、いずれもこのリストの外でテストされている
+				// codelens-logic.ts、export の命名は export-logic.ts、形式別の
+				// 部分失敗は @pfdsl/editor にあり、このリストの外でテストされている
 				// （#611, #634）。
 				// preview.ts の controller 接続は src/preview.test.ts が小さな
 				// fake host で検査する。実 webview の輸送・DOM 描画の証明ではない。

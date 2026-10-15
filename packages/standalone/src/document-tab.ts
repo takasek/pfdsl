@@ -15,8 +15,17 @@ import "monaco-editor/editor/contrib/contextmenu/browser/contextmenu.js";
 import "monaco-editor/editor/contrib/find/browser/findController.js";
 import "monaco-editor/editor/standalone/browser/quickAccess/standaloneCommandsQuickAccess.js";
 import "./language.js";
+import { registerExportFeatures } from "./export-features.js";
+import {
+	createExportResults,
+	type ExportResultPresenter,
+} from "./export-results.js";
+import type { ExportServices } from "./export-services.js";
+import { registerLanguageFeatures } from "./language-features.js";
 import { createNormalizedEdgesPanel } from "./normalized-edges.js";
 import { formatSnapshot, processSnapshot } from "./processing.js";
+import { registerReferenceFeatures } from "./reference-features.js";
+import type { ReferenceServices } from "./reference-services.js";
 import { registerSelectionFormatting } from "./selection-format.js";
 
 interface DocumentTabOptions {
@@ -28,6 +37,9 @@ interface DocumentTabOptions {
 	read: (path: string) => Promise<string | null>;
 	reportStatus: (message: string) => void;
 	onChange?: () => void;
+	referenceServices?: ReferenceServices | undefined;
+	exportServices?: ExportServices | undefined;
+	showExportResults?: ExportResultPresenter | undefined;
 }
 
 /** One Monaco editor and preview pair, with private snapshot and refresh state. */
@@ -40,6 +52,9 @@ export function createDocumentTab({
 	read,
 	reportStatus,
 	onChange,
+	referenceServices,
+	exportServices,
+	showExportResults,
 }: DocumentTabOptions) {
 	let snapshot: DocumentModel | undefined;
 	let revision = 0;
@@ -66,6 +81,24 @@ export function createDocumentTab({
 		renderWhitespace: "selection",
 	});
 	const selectionFormatting = registerSelectionFormatting(editor);
+	let references: ReturnType<typeof registerReferenceFeatures>;
+	const languageFeatures = registerLanguageFeatures(
+		editor,
+		reportStatus,
+		referenceServices
+			? {
+					open: (reference) => references.open(reference),
+					run: (command) => references.run(command),
+				}
+			: undefined,
+	);
+	const exports = registerExportFeatures(
+		editor,
+		() => ({ name, path, read }),
+		exportServices,
+		reportStatus,
+		showExportResults ?? createExportResults(parent, reportStatus),
+	);
 	let editorRenderQueued = false;
 	function requestEditorRender() {
 		if (disposed || editorRenderQueued) return;
@@ -82,7 +115,7 @@ export function createDocumentTab({
 	button.textContent = name;
 	button.setAttribute("role", "tab");
 	const preview = mountPreview(previewElement, {
-		canOpenRelatedFiles: false,
+		canOpenRelatedFiles: !!referenceServices,
 		postMessage(message) {
 			if (disposed) return;
 			if (
@@ -164,10 +197,33 @@ export function createDocumentTab({
 					editor.revealPositionInCenter(editorPosition);
 					editor.focus();
 				}
+			} else if (
+				message.type === "openFile" ||
+				message.type === "openLocation" ||
+				message.type === "openUrl"
+			) {
+				if (!snapshot || snapshot.source !== editor.getValue()) {
+					reportStatus(
+						"The document changed. Wait for the preview to refresh before opening its reference.",
+					);
+					return;
+				}
+				void references
+					.handleMessage(message)
+					.catch((error) => reportStatus(String(error)));
 			} else if (message.type !== "ready")
 				reportStatus("Related-file navigation is not available in this build.");
 		},
 	});
+	references = registerReferenceFeatures(
+		editor,
+		container,
+		referenceServices,
+		(message) => {
+			void preview.receive(message);
+		},
+		reportStatus,
+	);
 
 	async function refresh() {
 		if (disposed) return;
@@ -196,6 +252,7 @@ export function createDocumentTab({
 		// Publish the editor's visible lines before replacing the matching graph.
 		editor.render();
 		await preview.receive(result.message);
+		if (!disposed && currentRevision === revision) references.refresh();
 	}
 
 	function requestRefresh() {
@@ -226,6 +283,9 @@ export function createDocumentTab({
 			disposed = true;
 			revision++;
 			selectionFormatting.dispose();
+			languageFeatures.dispose();
+			references.dispose();
+			exports.dispose();
 			preview.dispose();
 			editor.dispose();
 			model.dispose();
@@ -235,6 +295,10 @@ export function createDocumentTab({
 		activate() {
 			editor.layout();
 			requestRefresh();
+		},
+		deactivate() {
+			references.cancelPending();
+			exports.cancelPending();
 		},
 		getSource: () => editor.getValue(),
 		getRevision: () => model.getVersionId(),
@@ -260,6 +324,7 @@ export function createDocumentTab({
 			nextName: string,
 			readSource?: (path: string) => Promise<string | null>,
 		) {
+			references.locationChanged();
 			path = nextPath;
 			name = nextName;
 			if (readSource) read = readSource;

@@ -180,3 +180,78 @@ dialog textarea {
 #save-support:empty {
 	display: none;
 }
+.metadata-sort {
+	position: absolute;
+	z-index: 20;
+	top: 3rem;
+	left: 1rem;
+	display: flex;
+	flex-direction: column;
+	gap: 0.75rem;
+	padding: 1rem;
+	max-width: calc(100% - 4rem);
+	background: #fff;
+	color: #222;
+	border: 1px solid #888;
+	box-shadow: 0 4px 16px #0003;
+}
+.reference-dialog {
+	position: absolute;
+	z-index: 21;
+	top: 4rem;
+	left: 1rem;
+	display: flex;
+	flex-direction: column;
+	gap: 0.75rem;
+	max-width: calc(100% - 4rem);
+	padding: 1rem;
+	background: #fff;
+	color: #222;
+	border: 1px solid #888;
+	box-shadow: 0 4px 16px #0003;
+}
+.reference-dialog label,
+.reference-dialog input,
+.reference-dialog select {
+	display: block;
+	max-width: 100%;
+}
+.reference-comparison {
+	position: absolute;
+	z-index: 5;
+	bottom: 0;
+	right: 0;
+	max-width: 50%;
+	padding: 0.5rem;
+	background: #fff;
+	color: #222;
+	border: 1px solid #888;
+}
+.reference-comparison[hidden] {
+	display: none;
+}
+.export-results {
+	position: absolute;
+	z-index: 20;
+	bottom: 1rem;
+	right: 1rem;
+	max-width: min(44rem, 90%);
+	max-height: 50%;
+	overflow: auto;
+	padding: 1rem;
+	background: Canvas;
+	color: CanvasText;
+	border: 1px solid GrayText;
+	box-shadow: 0 2px 12px #0003;
+	user-select: text;
+}
+.export-results[hidden] {
+	display: none;
+}
+.export-results h2 {
+	font-size: 1rem;
+	margin: 0 0 0.5rem;
+}
+.export-results li {
+	overflow-wrap: anywhere;
+}

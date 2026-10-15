@@ -119,21 +119,21 @@ artifact:
     group: run_outputs
   dot_graph:
     label: DOTグラフ
-    description: Graphviz DOT形式テキスト（renderコマンドのデフォルト出力）
-    criteria: node packages/cli/dist/cli.js render が実装され動作確認済み
-    externalStakeholders: [ CLIユーザー ]
+    description: Graphviz DOT形式テキスト。CLI renderの既定出力と両GUIの全図書出しの共通入力
+    criteria: CLI renderとpackages/editor/src/export.test.tsでDOT計算を検証し、両GUIのexport接続検査を通過する
+    externalStakeholders: [ CLIユーザー, VSCode拡張ユーザー, standaloneアプリユーザー ]
     group: run_outputs
   rendered_image:
     label: レンダリング画像
-    description: DOTから変換したSVG（wasm）またはPDF/PNG（puppeteer経由）
-    criteria: node packages/cli/dist/cli.js render --format svg/pdf/png が実装され動作確認済み
-    externalStakeholders: [ CLIユーザー, VSCode拡張ユーザー ]
+    description: DOTからWASMで生成した全図SVGとそのPDF/PNG。CLI/VSCodeは既存Puppeteer、standaloneは専用WKWebView/canvasで変換する
+    criteria: CLI/共有変換検査とpackages/standalone/test/native-export.test.mjsで全sampleの実file・寸法・PDF文字保持を検証する。製品GUIと候補配布物の実機受入は#1445に残す
+    externalStakeholders: [ CLIユーザー, VSCode拡張ユーザー, standaloneアプリユーザー ]
     group: run_outputs
   metadata_tsv:
     label: メタデータTSV
     description: ノードのkind/label/description/status/tags/ownerを抽出したタブ区切りテキスト
-    criteria: packages/metadata-exporter/src/index.test.ts でメタデータ抽出・TSV 化が検証されており、VSCode 拡張の export コマンド（packages/vscode-extension/src/export.ts）で TSV 形式を選択すると .tsv ファイルが出力される
-    externalStakeholders: [ VSCode拡張ユーザー ]
+    criteria: packages/metadata-exporter/src/index.test.tsとpackages/editor/src/export.test.tsで抽出・TSV化を検証し、両GUIのexport接続検査で保存結果を確認する
+    externalStakeholders: [ VSCode拡張ユーザー, standaloneアプリユーザー ]
     group: run_outputs
   diff_report:
     label: 差分レポート
@@ -489,18 +489,18 @@ process:
     label: DOT変換
     description: 正準化グラフとfrontmatter（スタイル・タイトル）からGraphviz DOTを構築する
     command: node packages/cli/dist/cli.js render
-    location: "packages/graphviz-exporter/src/index.ts"
+    location: [ "packages/graphviz-exporter/src/dot.ts", "packages/editor/src/export.ts" ]
     tags: [ b ]
   export_image:
     label: 画像化
-    description: DOTをSVG（wasm、外部依存なし）またはPDF/PNG（puppeteer必須）へ変換する
+    description: DOTをWASMでSVGへ変換し、CLI/VSCodeは既存Node/Puppeteer API、standaloneは追加runtime不要のWKWebView/canvasでPDF/PNGへ変換する。previewのviewportや比較装飾は出力へ持ち込まない
     command: node packages/cli/dist/cli.js render --format svg
-    location: "packages/preview-engine/src/index.ts"
+    location: [ "packages/preview-engine/src/renderer.ts", "packages/graphviz-exporter/src/index.ts", "packages/standalone/src/export-features.ts", "packages/standalone/src/export-image.ts", "packages/standalone/src-tauri/src/pdf.rs", "packages/standalone/src-tauri/native/pdf.m" ]
     tags: [ b ]
   export_metadata:
     label: メタデータ抽出
-    description: "正準化グラフとfrontmatterからノードメタデータを抽出しTSV化する。CLIサブコマンドはなくVSCode拡張のエクスポート機能のみが呼ぶ"
-    location: "packages/metadata-exporter/src/index.ts"
+    description: "正準化グラフとfrontmatterからノードメタデータを抽出しTSV化する。CLIサブコマンドはなく、共有editor計算を両GUIのexport機能が呼ぶ"
+    location: [ "packages/metadata-exporter/src/index.ts", "packages/editor/src/export.ts" ]
     tags: [ b ]
   diff_graphs:
     label: 差分算出

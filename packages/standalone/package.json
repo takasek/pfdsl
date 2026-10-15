@@ -11,6 +11,7 @@
 		"tauri": "tauri"
 	},
 	"dependencies": {
+		"@pfdsl/core": "workspace:*",
 		"@pfdsl/editor": "workspace:*",
 		"@pfdsl/preview-engine": "workspace:*",
 		"@tauri-apps/api": "2.11.1",

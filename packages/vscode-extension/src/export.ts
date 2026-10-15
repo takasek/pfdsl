@@ -1,17 +1,17 @@
-import { computeNormalizedEdgesOutput } from "@pfdsl/editor";
-import { exportDot, svgToBinary } from "@pfdsl/graphviz-exporter";
-import { extractMetadata, toTsv } from "@pfdsl/metadata-exporter";
+import {
+	computeExportSources,
+	computeNormalizedEdgesOutput,
+	exportFormats,
+	runExports,
+} from "@pfdsl/editor";
+import { svgToBinary } from "@pfdsl/graphviz-exporter";
 import { renderDotToSvg } from "@pfdsl/preview-engine";
 import * as vscode from "vscode";
 import {
 	analyzeDocument,
 	resolveEffectiveFrontmatterForUri,
 } from "./analyze.js";
-import {
-	exportAllOutcome,
-	exportStem,
-	skippedBinaryFormats,
-} from "./export-logic.js";
+import { exportStem } from "./export-logic.js";
 import { requireActivePfdslEditor } from "./utils.js";
 
 const outputChannel = vscode.window.createOutputChannel("PFDSL");
@@ -53,8 +53,10 @@ export function registerExport(
 				doc.uri,
 				frontmatter,
 			);
-			const dot = exportDot(graph, effectiveFrontmatter);
-			const tsvContent = toTsv(extractMetadata(graph, effectiveFrontmatter));
+			const { dot, tsv: tsvContent } = computeExportSources(
+				graph,
+				effectiveFrontmatter,
+			);
 			const base = doc.uri.path.replace(/\.pfdsl$/, "");
 
 			async function writeFile(
@@ -76,37 +78,35 @@ export function registerExport(
 				if (!dirUri) return;
 				const stem = exportStem(dirUri.fsPath);
 
-				const svg = await renderDotToSvg(dot);
-				const coreWrites = [
-					writeFile(`${stem}.dot`, dot),
-					writeFile(`${stem}.svg`, svg),
-					writeFile(`${stem}.tsv`, tsvContent),
-				];
-
-				const [pdfResult, pngResult] = await Promise.allSettled([
-					svgToBinary(svg, "pdf"),
-					svgToBinary(svg, "png"),
-				]);
-
-				const binaryWrites: Promise<void>[] = [];
-				if (pdfResult.status === "fulfilled") {
-					binaryWrites.push(writeFile(`${stem}.pdf`, pdfResult.value));
-				}
-				if (pngResult.status === "fulfilled") {
-					binaryWrites.push(writeFile(`${stem}.png`, pngResult.value));
-				}
-
-				await Promise.all([...coreWrites, ...binaryWrites]);
-
-				const outcome = exportAllOutcome(
-					stem,
-					skippedBinaryFormats(pdfResult, pngResult),
+				let svg: Promise<string> | undefined;
+				const results = await runExports(
+					exportFormats,
+					async (format) => {
+						if (format === "dot") return Buffer.from(dot, "utf8");
+						if (format === "tsv") return Buffer.from(tsvContent, "utf8");
+						svg ??= renderDotToSvg(dot);
+						const content = await svg;
+						return format === "svg"
+							? Buffer.from(content, "utf8")
+							: svgToBinary(content, format);
+					},
+					async (format, bytes) => {
+						const path = `${stem}.${format}`;
+						await writeFile(path, bytes);
+						return path;
+					},
 				);
-				if (outcome.kind === "warning") {
-					vscode.window.showWarningMessage(outcome.message);
-				} else {
-					vscode.window.showInformationMessage(outcome.message);
-				}
+				const message = results
+					.map(
+						(result) =>
+							`${result.format.toUpperCase()}: ${result.status === "saved" ? result.savedPath : `${result.status}: ${result.error}`}`,
+					)
+					.join("\n");
+				outputChannel.appendLine(message);
+				if (results.some((result) => result.status !== "saved")) {
+					outputChannel.show(true);
+					vscode.window.showWarningMessage(message);
+				} else vscode.window.showInformationMessage(message);
 				return;
 			}
 

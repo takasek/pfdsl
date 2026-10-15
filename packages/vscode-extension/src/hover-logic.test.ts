@@ -404,3 +404,27 @@ describe("buildHoverLines (group kind)", () => {
 		expect(lines).toHaveLength(2);
 	});
 });
+it("shows filesystem locations as text in unsaved and virtual documents while retaining URL links", () => {
+	for (const kind of ["artifact", "process"] as const) {
+		for (const uri of [
+			"untitled:Untitled-1",
+			"vscode-remote://ssh-remote+server/work/a.pfdsl",
+		]) {
+			const lines = buildHoverLines(
+				"p",
+				kind,
+				{
+					[kind]: {
+						p: { location: ["process.md", "https://example.org/process"] },
+					},
+				},
+				uri,
+			).join("\n");
+			expect(lines).toContain("process.md");
+			expect(lines).toContain(
+				"[https://example.org/process](https://example.org/process)",
+			);
+			expect(lines).not.toContain("file:");
+		}
+	}
+});

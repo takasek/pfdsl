@@ -285,14 +285,26 @@ Escapeと取消後は起点／編集継続位置へ戻り、常設入力を保�
 
 対応：#1259。対象・入力：M/V、同じ日本語・未完成YAML/body・quoted key・括弧／コメント、host設定。
 操作：入力・comment toggle・語選択・括弧補完・強調を基準拡張と照合し、エラーから戻す。
+Mの言語支援接続版では文書先頭の`---`だけがYAML強調を開始し、終了フェンス後の`>>`／`>>?`／`->`、角括弧、quoted ID、Unicode ID、コメントを区別する。
+先頭空行の後のフェンス、未閉鎖quoted ID、未閉鎖YAML、flow map・block scalarも入力し、修復後の強調と語選択を再確認する。
 期待：言語仕様に合い入力を失わず回復する。
 専用configurationなしでも言語設定・文法・キー・host設定を棚卸しから落とさない。
 状態：M/V各未実施。記録：未記入。
 
 ### GUI-27：editor hover・Find all・hint
 
-対応：#1259。対象・入力：M/V、未定義・全metadata・quoted/flow key・同名field・反復ID・command。
+対応：#1259。対象・入力：M/V、未定義・schema定義済みの全metadata・quoted/flow key・同名field・反復ID・command。
+schema外の拡張キーを含む文書も入力するが、任意の拡張キーのhover表示をこの受入条件には含めない。
 操作：ソースhoverの情報／前後関係→定義移動→Find all→hint/inlayを読む。
+MではソースのノードIDをhoverし、`Go to definition`／`Find all`を選ぶ。
+artifact/processの`index`、processの複数`location`と`boundary`、groupの`color`／`parent`を含む文書で、それぞれの値がhoverへ表示されることを確認する。
+block／flow mapのquoted group keyをhoverし、label・color・parent・artifact/processのmemberを読み、同じ行のmetadata field上には宣言hoverが出ないことを確認する。
+group hoverの`Find all`と、artifact/processを対象とする定義移動・semantic巡回を区別し、既存の巡回・Undo・文書隔離を再確認する。
+右クリックまたはF1から`Go to PFDSL definition`、`Next PFDSL node occurrence`、`Previous PFDSL node occurrence`、`Find all text matching this node`を実行する。
+quoted/flow keyのID上と同じ行の`label`／`owner`等のfield上を区別し、定義＋body内の同一IDの巡回・折返し、定義なしの案内を確認する。
+Find allは現行拡張と同じliteral文字列検索であり、metadata fieldを除くsemantic参照・巡回とは区別する。
+processのcommand行末の`Command` hintをhoverして複数行の内容を読み、表示だけで実行されないことを確認する。
+hoverを残したまま編集・文書切替・閉鎖し、旧版のリンクが新しい文書や版へ作用しないことを確認する。
 期待：semantic nodeとfield、定義range、全出現が正しく、図hover廃止と混同しない。
 表示hintと外部実行GUI-33を区別する。
 状態：M/V各未実施。記録：未記入。
@@ -301,6 +313,13 @@ Escapeと取消後は起点／編集継続位置へ戻り、常設入力を保�
 
 対応：#1259。対象・入力：M/V、未定義・quoted/flow/alias/同名field、値・コメント・CRLF・補助平面文字。
 操作：Quick Fix、直接移動、各選択方式のsort、拒否、Undo/Redo、保存後他hostでOpenを行う。
+Mは未定義ID上のQuick Fixまたは右クリック／F1の`Insert PFDSL definition`を使い、新しいlabel値の選択と、produced artifactでcriteria案内が残ることを確認する。
+`Sort metadata…`でPrimary keyとThenを順に選び、topological／group／index／idの単独と`group → id`を実行する。
+重複キー・キーなしは編集せず理由を示し、Cancel／Escapeは本文・dirty・Undoを保ってeditorへfocusを戻す。
+開いた整列フォームはその文書に所属し、他tabに切り替えても他文書を編集しない。
+各成功後に1回のUndoで操作前の本文へ戻り、Redoで同じ結果へ戻ることを確認する。
+Quick Fix候補の表示中に同じ文書を編集してから適用する時機を観測できた場合は、古い版の候補の拒否も記録する。
+自動検査の版変更注入だけではこの実機変種を合格にせず、観測できなければ未実施として残す。
 期待：token/rangeが正しく値・コメント・改行を保つ。
 失敗は無変更、成功はUndo可能で、保存文書の意味が両hostで一致する。
 状態：M/V各未実施。記録：未記入。
@@ -318,7 +337,12 @@ lenient表示と一度読んだ同じ依存snapshotを使い、別tabへ古い�
 ### GUI-30：参照の実到達先
 
 対応：#1260。対象・入力：M、location/subflow/相対・絶対basePath、PFD/外部file/URL/複数候補directory、空白・引用・日本語path。Vは既存内部open回帰。
-操作：各参照の起動先と実fileを照合し、候補選択／取消／不在／権限拒否を試す。
+操作：sourceのCommand-click、node hoverのlocation/subflow link、previewのCommand-clickで起動先と実fileを照合する。
+directory直下にfileがある場合と、直下にfileがなく子directoryを再帰する場合で候補選択／Escape／取消を試し、symlink directory、不在／権限拒否も確認する。
+読める子directoryと権限拒否の子directoryを並べ、読める側の候補を選択・取消できることを確認する。
+全候補が読めない場合は権限エラー、読めるが空の場合は`No files found`となり、本文・dirtyを変えないことを確認する。
+相対locationはdocument directory＋相対basePath、絶対basePathは無視、subflowはdocument directory基準を照合し、Untitledの相対参照はSave案内になることを確認する。
+候補読取中の編集／tab切替／closeと、preview更新前の参照操作では古い結果を開かないことを確認する。
 期待：MのPFDは内部tab、他fileは既定app、URLは既定browserへ届く。
 VをMの規則へ一律変更せず、取消・失敗で本文/dirtyを保ち理由を示す。
 表示リンクやmock成功だけで完了にしない。
@@ -327,8 +351,9 @@ VをMの規則へ一律変更せず、取消・失敗で本文/dirtyを保ち理
 ### GUI-31：Git／別file構造差分
 
 対応：#1260。対象・入力：M/V、repo/ref・別file・未保存A、node/edge差分・metadataだけの差分。
-操作：各比較→解除、読取中編集／tab切替、取消、不正ref／失敗を試す。
-期待：現在側は未保存内容で正しい対象を比較し、metadata非比較の現仕様を明示する。
+操作：F1またはeditor context menuの`Compare structure with file…`／`Compare structure with Git ref…`で比較し、baseline表示とbaseline→currentの方向を読む。
+label/statusだけの変更とnode/edge変更を分けて確認し、比較後の編集反映、`Clear structural comparison`またはbannerの解除、読取中編集／tab切替／close、取消、不正ref／失敗を試す。
+期待：現在側は未保存内容で正しい対象を比較し、承認済みの現行VS Codeと同じmetadata比較を含める。
 source/dirty/Undoを表示だけで変えず、古い結果を新対象へ適用しない。
 GUI-07の保存競合text比較を前提にしない。
 状態：M/V各未実施。記録：未記入。
@@ -336,15 +361,22 @@ GUI-07の保存競合text比較を前提にしない。
 ### GUI-32：Git不在と単独file
 
 対応：#1260。対象・入力：M、Gitあり／なしの試験環境、repo外単独file。
-操作：Git比較の理由／導入案内を読み、通常編集・保存・別file比較・全形式出力を続ける。
+操作：通常起動と、検証用processだけのPATHからGitを除いた起動を分け、Git比較の理由／導入案内を読む。
+例えば候補appのexecutableを絶対path指定し、その子processだけ`PATH=/nonexistent`で起動する。
+system設定は変更せず、通常編集・保存・別file比較・全形式出力を続ける。
+repo外単独fileではrepo判定失敗と別file比較の継続を確認する。
 期待：定義したGit検出／repo判定に合い、Git非同梱で通常機能を阻害しない。
 状態：M未実施。記録：未記入。不在を再現できなければ未実施。
 
 ### GUI-33：Terminal.app／Ghostty
 
 対応：#1260。対象・入力：M、両terminal、空白・引用・日本語path/引数、複数行command、相対／絶対basePath、非秘密の環境値。
-操作：明示操作前は非実行を確認し、各terminalへ渡してcwd/引数/envを照合する。不在・起動失敗・権限拒否も試す。
-期待：標準Terminal.app／選択Ghosttyの実到達先と内容が合い、失敗理由と本文を保つ。
+操作：commandを持つprocessへcursorを置き、F1/context menuの`Run process command in Terminal.app`／`Run process command in Ghostty`、Terminal.app用inlay hintの3導線で明示操作前の非実行と操作後の実到達先を確認する。
+無害なprintfで引用符・日本語・複数行引数、pwdでcwdを照合し、`/bin/zsh -l -c`の通常login環境の非秘密値を確認する。
+相対basePathのcwdと絶対basePath無視を確認し、cwd不在ならcommandが実行されず理由を示すことを確認する。
+OSのAutomation許可／拒否、Ghostty不在・起動失敗、実行完了後に結果を読めることも試す。
+期待：標準Terminal.app／選択Ghosttyの新しいterminalへ内容が届き、失敗理由と本文を保つ。
+GUI processの環境や秘密値は転送せず、許可ダイアログの操作結果は自動検査の結果から推定しない。
 内部terminalや終了codeによる自動進捗更新を追加せず、秘密値を記録しない。
 状態：M未実施。記録：未記入。
 
@@ -353,23 +385,40 @@ GUI-07の保存競合text比較を前提にしない。
 ### GUI-34：全形式の実出力
 
 対応：#1261。対象・入力：M/V、全sample、日本語/font/style/status/preset/大きい図、未保存A。
-操作：単体DOT/SVG/PDF/PNG/TSVとAllを実UIで生成し、DOT構造/encoding、SVG全図/node/edgeと外部view、PDFページ/縮尺/日本語/文字抽出、PNG pixel寸法、TSV値/tabを検査する。
+操作：MはeditorのF1/context menuから`Export as DOT…`／`Export as SVG…`／`Export as PDF…`／`Export as PNG…`／`Export as TSV…`／`Export All (DOT, SVG, PDF, PNG, TSV)…`を実行し、basenameと保存先を選ぶ。
+未保存編集後、previewのzoom/pan/focus/構造比較の各状態で全図を生成し、DOT構造/UTF-8、SVG全図/node/edgeと外部view、TSVの7列と値/tabを照合する。
+MのSVG viewBoxを`x y W H`として、PNGのIHDR幅高は`ceil(W) × ceil(H)`pixel、DPR非依存・白背景を期待する。
+MのPDFは1unitを72/96pointへ描画し、MediaBoxは`ceil(0.75W) × ceil(0.75H)`point、測定差は各軸0.1point以内、1page・全図・日本語の表示と文字抽出を期待する。
+Vは既存Node/Puppeteerの寸法規約を維持し、PNGは各軸ceil pixel、PDFは`0.75W × 0.75H`pointを基準に各軸1point以内の印刷丸め差で照合する。
+日本語はPDFKit/Preview等の外部viewerでも読み、SVGとPDF/PNGの全node・edge・長label・四隅を比較し、文字抽出だけで描画合格としない。
+SVG/PDF/PNGのfont準備とpreset/style/statusを確認し、preset警告は結果へ残す。
 期待：利用可能な実fileができ切れ・欠落がなく未保存対象が合う。
-実装PRで寸法・許容差を確定し、両hostの意味／見た目／利用可能性で判定する。
+寸法規約は上記に固定し、両hostの意味／見た目／利用可能性で判定する。
+Vの既存Node/Puppeteer公開APIとMのnative/browser経路を区別して記録する。
 menu項目やbyte一致だけで完成にしない。
 状態：M/V各未実施。記録：未記入。
 
 ### GUI-35：出力失敗と部分成功
 
-対応：#1261。対象・入力：M/V、既存出力、新規／書込不能先、一部形式失敗（再現方法は実装PRで確定）。
-操作：chooser／上書き取消、明示上書き、権限／変換失敗、All部分失敗を行い保存fileを独立に読む。
+対応：#1261。対象・入力：M/V、既存出力、新規／書込不能先、一部形式失敗、同名・日本語basename。
+操作：Mのchooser／上書き確認の取消は全形式無書込と照合し、明示上書きは選んだ固定拡張子だけを置換する。
+Allで既存の`<basename>.png`だけを読取専用にして選び、上書き確認後のPNG write-failedと他形式の成功・保存pathを独立に読む。
+テスト後は使い捨てfileの権限を戻す。
+Mは既存0600 fileの権限保持、symlink/非regular target拒否、選択後の外部更新、directory移動、stage失敗を試す。
+Mの変換失敗は32768unit超の図によるPDF/PNG拒否を使い、DOT/SVG/TSV成功と区別する。
+PNGの64megapixel超も黙って縮小しないことを確認する。
+MのAllの保存開始後にtab切替／closeを行い、結果一覧へ元文書名・版・各形式の実保存pathまたは失敗理由が残り、明示Dismissまで読めることを確認する。
+Mで保存先移動がpublication後に検出された場合は、書込み済みだがpath未確認の説明と実diskを照合し、成功pathとして扱わない。
+Vは既存export chooserの取消、Puppeteer不在によるbinary変換失敗、読取専用PNGによる書込失敗を試し、Output channelと通知の形式別結果・実保存pathを実diskと照合する。
+M専用のnative保存境界や結果panelをVへ要求しない。
 期待：成功／警告／失敗と保存fileが一致し、部分成功fileを捨てず、source/dirty/Undoを変えない。
 状態：M/V各未実施。記録：未記入。不在の故障APIを前提にしない。
 
 ### GUI-36：追加runtimeなしのMac出力
 
 対応：#1261/#1262。対象・入力：M、Node/Graphviz/Puppeteer/独立browser/開発tool/Gitを追加導入しない検証Macと候補app。
-操作：GUI-34全形式を生成し、既定外部viewerで開きbundle/依存/font/WebKit/PDF APIを記録する。
+操作：GUI-34の単体とAllを生成し、既定外部viewerで開きbundle/依存/font/WebKit/PDF APIを記録する。
+PDFの専用WKWebViewとPNGのcanvasが使われ、Node sidecar/Puppeteer/Chromiumの実行・同梱がないことをbundleとprocessで確認する。
 期待：app導入だけで利用でき独立Chromiumを同梱しない。
 日本語・寸法が合い、最低OS制約をGUI-39へ渡す。
 試作のPDF一例を全形式合格にしない。

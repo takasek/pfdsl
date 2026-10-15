@@ -22,6 +22,56 @@ They are separate from the eventual installation requirements for distributed us
 The macOS CI job compiles an Apple Silicon app, runs native unit tests, and briefly starts the bundled executable to check native startup and exit-guard installation.
 The startup smoke does not certify GUI, IME, or Quit interaction.
 
+## Editing PFDSL
+
+The source editor highlights YAML frontmatter and PFDSL flows.
+Hover a node ID for its metadata, **Go to definition**, and **Find all**.
+Find all opens a literal text search; PFDSL occurrence navigation visits the definition key and semantic node references.
+Right-click in the editor or press F1 to find **Go to PFDSL definition**, **Next PFDSL node occurrence**, **Previous PFDSL node occurrence**, **Insert PFDSL definition**, and **Sort metadata…**.
+Sort metadata accepts multiple keys in priority order; Cancel or Escape returns to the editor without changing the source.
+Definition insertion selects the new label and retains the reminder to complete criteria for a produced artifact.
+Each successful source edit is undoable.
+The **Run in Terminal.app** inlay hint shows the declared process command; displaying or hovering it does not execute it.
+Native GUI, keyboard, and Japanese IME acceptance for these features is tracked separately in the [acceptance plan](ACCEPTANCE-PLAN.md).
+
+## References, comparison and process commands
+
+Command-click `location` or `subflow` values, use their source hover links, or Command-click preview nodes to follow references.
+PFDSL files open in application tabs, other files in their default application, and HTTP/HTTPS URLs in the default browser.
+Directories offer a file chooser when several candidates exist; Cancel or Escape leaves the source unchanged.
+Relative locations and process working directories use the document directory plus a relative `basePath`; absolute `basePath` is ignored, matching VS Code.
+Subflows always resolve relative to the document directory.
+Save an untitled document before opening relative references or running a command.
+
+Use F1 or the editor context menu to **Compare structure with file…**, **Compare structure with Git ref…**, or **Clear structural comparison**.
+The baseline label and direction appear beside the preview; comparison includes metadata and follows the current unsaved source without changing its Undo history.
+Git comparison uses the saved document's repository and Git on the application's PATH; a missing Git installation does not disable file comparison or editing.
+
+Place the cursor on a process and choose **Run process command in Terminal.app** or **Run process command in Ghostty**, or activate the inlay hint for Terminal.app.
+Commands run only after this explicit action, in a new terminal using `/bin/zsh -l -c` and the terminal's normal login environment.
+The application does not forward its environment or secrets, monitor completion, or update progress from exit codes.
+macOS may request Automation permission for the selected terminal; denial or a missing terminal is reported without changing the document.
+
+## Exporting
+
+Press F1 or open the editor context menu to **Export as DOT…**, **SVG…**, **PDF…**, **PNG…**, **TSV…**, or **Export All (DOT, SVG, PDF, PNG, TSV)…**.
+Choose a base file name and destination, then confirm replacement of existing outputs before any file is written.
+Each export captures the current unsaved source and saved preset dependencies once, and produces the whole graph regardless of preview zoom, pan, focus, or structural comparison.
+Export does not change the source, dirty state, or Undo history.
+
+Results list each format's saved path, warning, conversion failure, or write failure.
+Successful files remain when another format fails.
+Results remain available after switching or closing the originating tab until dismissed.
+Canceling a pending chooser writes nothing; after writing starts, the captured export finishes independently of tab selection.
+If a destination changes during publication, the result explains that publication happened but its saved path or content could not be confirmed.
+
+SVG comes from the bundled Graphviz WASM renderer, PNG from canvas, and PDF from a separate native WebKit view.
+No Node.js, Graphviz, Puppeteer, or separate browser installation is required by the desktop application.
+SVG viewBox units are treated as CSS pixels; PNG uses their ceiling in pixels with an opaque white background, independently of display density.
+PDF scales each unit to 72/96 points and rounds each page dimension upward to whole points, preserving the full diagram on one page and retaining text.
+Dimensions over 32768 units are rejected for PDF/PNG, and PNG also rejects canvases over 64 megapixels rather than silently shrinking or clipping.
+Exact application, external viewer, font fallback, minimum OS, and All-format acceptance remain tracked in [GUI-34–36](ACCEPTANCE-PLAN.md).
+
 ## Linux verification
 
 Linux is a development verification environment; the distribution target remains Apple Silicon macOS.
@@ -186,7 +236,7 @@ Native selection mapping, keyboard focus, and Undo/Redo remain to be checked in 
 
 PFDSL editors support square-bracket and double-quote pairing and surrounding selected text.
 Use **Toggle Line Comment** from the editor Command Palette (F1), or Command-/ on macOS, to add or remove `#` on selected lines.
-Syntax highlighting and string-aware quote suppression remain unimplemented; quote pairing cannot distinguish existing strings yet.
+Syntax highlighting now distinguishes YAML frontmatter and PFDSL flows; string-aware quote suppression remains unimplemented, so quote pairing cannot distinguish existing strings yet.
 Word lookup uses the extension's shared Unicode pattern: letters, numbers, underscores and hyphens form a word, including Japanese and supplementary-plane letters.
 The pattern also permits a standalone hyphen; it is not a PFDSL tokenizer.
 Automated checks cover real Monaco word ranges and the shared regex; native selection gestures and VS Code UI behavior remain unverified.
@@ -260,7 +310,10 @@ A publication followed by an error retains a failure receipt and dirty buffer; a
 Native document capabilities are released when tabs close, selections are superseded, or Save As targets are canceled or rejected; unresolved Save As targets remain available until resolved or closed.
 The exact bundle and nontrivial ACL/ownership and inherited ACL behavior still require acceptance; this is not proof of all-attribute preservation.
 Its current native GUI, Japanese IME, Find/Replace, Undo/Redo, and manual-save interactions still require acceptance on the exact bundle; see the appended [validation record](ACCEPTANCE.md).
-Syntax highlighting and the remaining PFD-specific language commands, external navigation, export, and distribution remain in the [acceptance matrix](ACCEPTANCE.md).
+The language features above have automated Monaco checks and still require native acceptance in the [acceptance plan](ACCEPTANCE-PLAN.md).
+External navigation and process commands have automated checks and still require native acceptance in the [acceptance plan](ACCEPTANCE-PLAN.md).
+Export has automated checks and still requires native application acceptance in the [acceptance plan](ACCEPTANCE-PLAN.md).
+Distribution remains tracked separately in the [acceptance matrix](ACCEPTANCE.md).
 Local `.app` builds are not signed/notarized release DMGs.
 
 ## Verification

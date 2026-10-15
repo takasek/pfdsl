@@ -27,6 +27,10 @@
 	"bundle": {
 		"active": true,
 		"targets": ["app"],
-		"macOS": { "minimumSystemVersion": "11.0" }
+		"macOS": {
+			"minimumSystemVersion": "11.0",
+			"infoPlist": "Info.plist",
+			"entitlements": "Entitlements.plist"
+		}
 	}
 }
