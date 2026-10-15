@@ -11,6 +11,7 @@ import {
 import { createServer } from "node:net";
 import { basename, dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { analyzeSource, loadFrontmatter } from "@pfdsl/core";
 import { downloadAndUnzipVSCode } from "@vscode/test-electron";
 import { chromium } from "playwright-core";
 import { isCliEntrypoint } from "../../../scripts/lib/cli-entrypoint.mjs";
@@ -1127,6 +1128,11 @@ async function assertPreviewUsability(session) {
 	const view = await readTransform(frame);
 	await editFixture(session, "requirements >> design ->");
 	await waitForColdRender(frame.locator("#preview-error"), 1, "syntax error");
+	await expectEventually(
+		"the final authored syntax error is rendered",
+		() => frame.locator("#preview-error").textContent(),
+		(text) => text.includes("P007: Expected artifact expression after ->"),
+	);
 	const errorGeometry = await frame
 		.locator("#preview-error")
 		.evaluate((error) => ({
@@ -1254,6 +1260,11 @@ async function assertDefinitionQuickFix(session) {
 	);
 }
 
+async function createConnection(frame, target) {
+	await frame.locator('[data-side="right"] input').fill(target);
+	await frame.locator('[data-side="right"] [data-create]').click();
+}
+
 async function assertPreviewEditingFocus(session) {
 	const { frame, page } = session;
 	const sourceTab = page.getByRole("tab", {
@@ -1271,11 +1282,7 @@ async function assertPreviewEditingFocus(session) {
 		.locator('#inner g.node[data-node-id="p"]')
 		.click({ button: "right" });
 	for (const target of ["first_result", "second_result"]) {
-		await frame.locator("#connector-kind").selectOption("->");
-		await frame.locator("#connector-target").fill(target);
-		await frame
-			.getByRole("button", { name: "Add connection", exact: true })
-			.click();
+		await createConnection(frame, target);
 		await waitForColdRender(
 			frame.locator(`#inner g.node[data-node-id="${target}"]`),
 			1,
@@ -1288,7 +1295,7 @@ async function assertPreviewEditingFocus(session) {
 		);
 		assert.equal(
 			await frame
-				.locator("#node-actions-toggle")
+				.locator('[data-side="right"] input')
 				.evaluate(
 					(button) => document.activeElement === button && document.hasFocus(),
 				),
@@ -1300,7 +1307,6 @@ async function assertPreviewEditingFocus(session) {
 			"true",
 			"source remains simultaneously visible in its own group",
 		);
-		await frame.locator("#node-actions-toggle").click();
 	}
 	await frame.locator("#node-actions-close").click();
 	await frame
@@ -1332,11 +1338,7 @@ async function assertPreviewEditingFocus(session) {
 	await waitForSourceCloseReady(sourceTab, { timeoutMs: coldRenderTimeoutMs });
 	await closeSourceTab(page, sourceTab);
 	await frame.locator('#inner g.node[data-node-id="p"]').press("Enter");
-	await frame.locator("#connector-kind").selectOption("->");
-	await frame.locator("#connector-target").fill("reopened_result");
-	await frame
-		.getByRole("button", { name: "Add connection", exact: true })
-		.click();
+	await createConnection(frame, "reopened_result");
 	await waitForColdRender(
 		frame.locator('#inner g.node[data-node-id="reopened_result"]'),
 		1,
@@ -1349,7 +1351,7 @@ async function assertPreviewEditingFocus(session) {
 			sourceSelected: await sourceTab.getAttribute("aria-selected"),
 			previewSelected: await previewTab.getAttribute("aria-selected"),
 			previewFocused: await frame
-				.locator("#node-actions-toggle")
+				.locator('[data-side="right"] input')
 				.evaluate(
 					(button) => document.activeElement === button && document.hasFocus(),
 				),
@@ -1394,15 +1396,11 @@ async function assertHiddenSourceExternalChange(session) {
 		.press("Enter");
 	const diskSource = `external >> rebuild -> result\n${source}`;
 	await writeFile(session.fixturePath, diskSource, "utf8");
-	await frame.locator("#connector-kind").selectOption("->");
-	await frame.locator("#connector-target").fill("stale_result");
-	await frame
-		.getByRole("button", { name: "Add connection", exact: true })
-		.click();
+	await createConnection(frame, "stale_result");
 	await page
 		.getByLabel(/, source: PFDSL, notification,/)
 		.getByText(
-			/^The (?:document changed\. Reopen Node actions and try again\.|file changed outside VS Code\. Reload the source file before editing from the preview\.)$/,
+			/^The (?:document changed\. Reopen Connections and try again\.|file changed outside VS Code\. Reload the source file before editing from the preview\.)$/,
 			{ exact: true },
 		)
 		.waitFor({ state: "visible" });
@@ -1436,11 +1434,7 @@ async function assertHiddenSourceExternalChange(session) {
 	await frame
 		.locator('#inner g.node[data-node-id="hidden_source_process"]')
 		.press("Enter");
-	await frame.locator("#connector-kind").selectOption("->");
-	await frame.locator("#connector-target").fill("fresh_result");
-	await frame
-		.getByRole("button", { name: "Add connection", exact: true })
-		.click();
+	await createConnection(frame, "fresh_result");
 	await waitForColdRender(
 		frame.locator('#inner g.node[data-node-id="fresh_result"]'),
 		1,
@@ -1451,7 +1445,11 @@ async function assertHiddenSourceExternalChange(session) {
 	await waitForInteraction(
 		"fresh retry saved without losing external changes",
 		() => readFile(session.fixturePath, "utf8"),
-		(text) => text === `${diskSource}hidden_source_process -> fresh_result\n`,
+		(text) =>
+			loadFrontmatter(text).body ===
+				`${diskSource}hidden_source_process -> fresh_result\n` &&
+			analyzeSource(text).frontmatter?.artifact?.fresh_result?.label ===
+				"fresh_result",
 		{ timeoutMs: coldRenderTimeoutMs },
 	);
 	console.log(
