@@ -130,6 +130,7 @@ export function mountPreview(container: HTMLElement, host: PreviewHost) {
 		selectedNodeId = id;
 		connections.open(id);
 		actionsToggle.setAttribute("aria-expanded", String(!actions.hidden));
+		connections.focus();
 		host.onStateChange?.();
 	}
 	on(actionsToggle, "click", () => {
@@ -516,14 +517,25 @@ export function mountPreview(container: HTMLElement, host: PreviewHost) {
 		if (minimapSvg.firstElementChild) updateMinimapVp();
 		else refreshMinimap();
 	}
+	let containerWidth = container.clientWidth;
+	let containerHeight = container.clientHeight;
 	const resizeObserver =
 		typeof window.ResizeObserver === "function"
 			? new window.ResizeObserver(() => {
-					connections.resize();
+					// Panel content also resizes the graph; only a host resize dismisses menus.
+					if (
+						container.clientWidth !== containerWidth ||
+						container.clientHeight !== containerHeight
+					) {
+						containerWidth = container.clientWidth;
+						containerHeight = container.clientHeight;
+						connections.resize();
+					}
 					positionGraph();
 				})
 			: undefined;
 	resizeObserver?.observe(root);
+	resizeObserver?.observe(container);
 	on(window, "resize", () => {
 		connections.resize();
 		positionGraph();

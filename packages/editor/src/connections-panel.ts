@@ -108,11 +108,19 @@ export function mountConnections(
 				!caption(node.id).toLocaleLowerCase().includes(query)
 			)
 				continue;
-			const request = requestFor(side, node.id, false);
-			const reason = connectorError(model, request);
+			let request = requestFor(side, node.id, false);
+			let reason = connectorError(model, request);
+			if (reason && request.connector === ">>") {
+				const feedback = { ...request, connector: ">>?" as const };
+				if (!connectorError(model, feedback)) {
+					request = feedback;
+					reason = undefined;
+				}
+			}
+			const feedback = request.connector === ">>?";
 			const candidate = button(
-				caption(node.id),
-				`Connect ${caption(node.id)}`,
+				`${caption(node.id)}${feedback ? " — feedback" : ""}`,
+				`Connect ${caption(node.id)}${feedback ? " as feedback" : ""}`,
 				() => submit(request, side),
 			);
 			candidate.dataset.candidate = node.id;
@@ -351,6 +359,12 @@ export function mountConnections(
 		host.close();
 	return {
 		open,
+		focus() {
+			(definition.hidden || definition.disabled
+				? sides[0]!.input
+				: definition
+			).focus();
+		},
 		close() {
 			center = undefined;
 			pending = undefined;

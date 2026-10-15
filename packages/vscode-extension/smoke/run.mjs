@@ -1309,6 +1309,31 @@ async function assertPreviewEditingFocus(session) {
 		);
 	}
 	await frame.locator("#node-actions-close").click();
+	await frame.locator('#inner g.node[data-node-id="p"]').press("Enter");
+	await waitForInteraction(
+		"keyboard opening focuses a Connections control",
+		() =>
+			frame
+				.locator("#node-actions")
+				.evaluate(
+					(panel) =>
+						panel.contains(document.activeElement) && document.hasFocus(),
+				),
+		(focused) => focused,
+	);
+	await frame.locator('[data-side="left"] input').fill("b");
+	const feedback = frame.locator('[data-side="left"] [data-candidate="b"]');
+	assert.match(await feedback.textContent(), /feedback/);
+	await feedback.click();
+	await waitForColdRender(
+		frame.getByRole("button", {
+			name: "feedback connection from b to p",
+			exact: true,
+		}),
+		1,
+		"feedback connection from the candidate list",
+	);
+	await frame.locator("#node-actions-close").click();
 	await frame
 		.locator('#inner g.node[data-node-id="b"]')
 		.click({ button: "right" });

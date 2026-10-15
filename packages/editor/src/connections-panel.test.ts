@@ -36,6 +36,57 @@ async function setup(
 	return { container, postMessage, preview, source };
 }
 
+it.each([
+	{ center: "p", side: "left", other: "b" },
+	{ center: "b", side: "right", other: "p" },
+])("offers explicit feedback for a backward loop from $center", async ({
+	center,
+	side,
+	other,
+}) => {
+	const s = await setup();
+	if (center !== "p")
+		s.container
+			.querySelector<HTMLButtonElement>(`[data-neighbor="${center}"]`)!
+			.click();
+	const input = s.container.querySelector<HTMLInputElement>(
+		`[data-side="${side}"] input`,
+	)!;
+	input.focus();
+	const candidate = s.container.querySelector<HTMLButtonElement>(
+		`[data-side="${side}"] [data-candidate="${other}"]`,
+	)!;
+	expect(candidate.disabled).toBe(false);
+	expect(candidate.textContent).toContain("feedback");
+	candidate.click();
+	const request = s.postMessage.mock.calls.at(-1)![0];
+	expect(request).toMatchObject({
+		type: "addConnector",
+		nodeId: center,
+		otherId: other,
+		connector: ">>?",
+		create: false,
+	});
+	const result = previewEdits.applyPreviewEdit(s.source, request);
+	expect(result.ok).toBe(true);
+	if (result.ok) expect(result.source).toContain("b >>? p");
+});
+
+it.each([
+	"Enter",
+	" ",
+	"ContextMenu",
+])("focuses a panel control after opening Connections with %s", async (key) => {
+	const s = await setup();
+	s.container.querySelector<HTMLButtonElement>("#node-actions-close")!.click();
+	const node = s.container.querySelector<SVGGElement>('[data-node-id="p"]')!;
+	node.focus();
+	node.dispatchEvent(new KeyboardEvent("keydown", { key, bubbles: true }));
+	const panel = s.container.querySelector<HTMLElement>("#node-actions")!;
+	expect(panel.hidden).toBe(false);
+	expect(panel.contains(document.activeElement)).toBe(true);
+});
+
 it("disables creation when a parsed metadata alias cannot retain the new definition", async () => {
 	const s = await setup(
 		"---\nshared: &empty {}\nartifact: *empty\n---\na >> p -> b\n",
@@ -137,6 +188,36 @@ it("supports candidate keyboard navigation, Escape, IME input, resize and focus 
 	expect(
 		s.postMessage.mock.calls.filter(([m]) => m.type === "addConnector"),
 	).toHaveLength(0);
+});
+
+it("keeps candidates through internal layout changes and closes them when the preview is resized", async () => {
+	let resized!: ResizeObserverCallback;
+	vi.stubGlobal(
+		"ResizeObserver",
+		class {
+			constructor(callback: ResizeObserverCallback) {
+				resized = callback;
+			}
+			observe() {}
+			disconnect() {}
+		},
+	);
+	try {
+		const s = await setup();
+		const input = s.container.querySelector<HTMLInputElement>(
+			'[data-side="left"] input',
+		)!;
+		input.value = "b";
+		input.dispatchEvent(new Event("input"));
+		resized([], {} as ResizeObserver);
+		expect(input.getAttribute("aria-expanded")).toBe("true");
+		Object.defineProperty(s.container, "clientWidth", { value: 600 });
+		resized([], {} as ResizeObserver);
+		expect(input.getAttribute("aria-expanded")).toBe("false");
+		expect(input.value).toBe("b");
+	} finally {
+		vi.unstubAllGlobals();
+	}
 });
 
 it("keeps rejected text and displays host refusals, and drops a late result after the center closes", async () => {
