@@ -146,9 +146,10 @@ export function registerReferenceFeatures(
 				target.value,
 			);
 			if (!valid(request, version)) return;
-			if (failure) throw failure;
-			if (!candidates.length)
+			if (!candidates.length) {
+				if (failure) throw failure;
 				throw new Error(`No files found in ${target.value}`);
+			}
 			const selected =
 				candidates.length === 1
 					? candidates[0]!

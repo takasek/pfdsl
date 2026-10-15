@@ -604,6 +604,70 @@ test("the production document-tab entry loads real Monaco menu contributions", a
 			},
 		);
 		await t.test(
+			"directory references retain readable siblings and report failures only without candidates",
+			async () => {
+				const source =
+					"---\nartifact: {a: {location: docs}}\n---\na >> p -> b\n";
+				for (const mode of [
+					"partial",
+					"all-unreadable",
+					"root-unreadable",
+					"empty",
+				]) {
+					const opened = [],
+						statuses = [];
+					await withEditors(source, async (create) => {
+						const editor = create({
+							reportStatus: (value) => statuses.push(value),
+							referenceServices: {
+								context: async () => "/work/a.pfdsl",
+								inspect: async () => "directory",
+								list: async (path) => {
+									if (mode === "empty") return [];
+									if (mode === "root-unreadable" || path.endsWith("locked"))
+										throw new Error("Permission denied: locked");
+									if (path === "/work/docs")
+										return [
+											{ name: "readable", isDirectory: true },
+											{ name: "locked", isDirectory: true },
+										];
+									return mode === "partial"
+										? [{ name: "good.md", isDirectory: false }]
+										: [];
+								},
+								open: async (target) => opened.push(target),
+								run: async () => {},
+							},
+						});
+						const token = { isCancellationRequested: false };
+						const links = (
+							await Promise.all(
+								host.languageFeatures.linkProvider
+									.ordered(editor.getModel())
+									.map((p) => p.provideLinks(editor.getModel(), token)),
+							)
+						)
+							.filter(Boolean)
+							.flatMap((r) => r.links);
+						assert.equal(links.length, 1);
+						await host.openLink(links[0].url);
+						if (mode === "partial") {
+							assert.deepEqual(opened, [
+								{ kind: "path", value: "/work/docs/readable/good.md" },
+							]);
+							assert.deepEqual(statuses, []);
+						} else {
+							assert.deepEqual(opened, []);
+							assert.match(
+								statuses.at(-1),
+								mode === "empty" ? /No files found/ : /Permission denied/,
+							);
+						}
+					});
+				}
+			},
+		);
+		await t.test(
 			"rendered hover links retain parentheses in paths and commands",
 			async () => {
 				const source = `---\nartifact: {a: {location: "draft).md"}}\nprocess: {p: {command: 'printf ")"'}}\n---\na >> p -> b\n`;

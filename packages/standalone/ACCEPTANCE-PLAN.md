@@ -296,6 +296,9 @@ Mの言語支援接続版では文書先頭の`---`だけがYAML強調を開始�
 対応：#1259。対象・入力：M/V、未定義・全metadata・quoted/flow key・同名field・反復ID・command。
 操作：ソースhoverの情報／前後関係→定義移動→Find all→hint/inlayを読む。
 MではソースのノードIDをhoverし、`Go to definition`／`Find all`を選ぶ。
+artifact/processの`index`、processの複数`location`と`boundary`、groupの`color`／`parent`を含む文書で、それぞれの値がhoverへ表示されることを確認する。
+block／flow mapのquoted group keyをhoverし、label・color・parent・artifact/processのmemberを読み、同じ行のmetadata field上には宣言hoverが出ないことを確認する。
+group hoverの`Find all`と、artifact/processを対象とする定義移動・semantic巡回を区別し、既存の巡回・Undo・文書隔離を再確認する。
 右クリックまたはF1から`Go to PFDSL definition`、`Next PFDSL node occurrence`、`Previous PFDSL node occurrence`、`Find all text matching this node`を実行する。
 quoted/flow keyのID上と同じ行の`label`／`owner`等のfield上を区別し、定義＋body内の同一IDの巡回・折返し、定義なしの案内を確認する。
 Find allは現行拡張と同じliteral文字列検索であり、metadata fieldを除くsemantic参照・巡回とは区別する。
@@ -335,6 +338,8 @@ lenient表示と一度読んだ同じ依存snapshotを使い、別tabへ古い�
 対応：#1260。対象・入力：M、location/subflow/相対・絶対basePath、PFD/外部file/URL/複数候補directory、空白・引用・日本語path。Vは既存内部open回帰。
 操作：sourceのCommand-click、node hoverのlocation/subflow link、previewのCommand-clickで起動先と実fileを照合する。
 directory直下にfileがある場合と、直下にfileがなく子directoryを再帰する場合で候補選択／Escape／取消を試し、symlink directory、不在／権限拒否も確認する。
+読める子directoryと権限拒否の子directoryを並べ、読める側の候補を選択・取消できることを確認する。
+全候補が読めない場合は権限エラー、読めるが空の場合は`No files found`となり、本文・dirtyを変えないことを確認する。
 相対locationはdocument directory＋相対basePath、絶対basePathは無視、subflowはdocument directory基準を照合し、Untitledの相対参照はSave案内になることを確認する。
 候補読取中の編集／tab切替／closeと、preview更新前の参照操作では古い結果を開かないことを確認する。
 期待：MのPFDは内部tab、他fileは既定app、URLは既定browserへ届く。
