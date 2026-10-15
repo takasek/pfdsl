@@ -103,6 +103,99 @@ it("disables creation when a parsed metadata alias cannot retain the new definit
 	expect(create.title).toContain("definition could not be inserted safely");
 });
 
+function expectPanelFocus(container: HTMLElement) {
+	const focused = document.activeElement!;
+	expect(container.querySelector("#node-actions")!.contains(focused)).toBe(
+		true,
+	);
+	expect(focused.isConnected).toBe(true);
+	expect(focused.closest("[hidden]")).toBeNull();
+}
+
+it("keeps keyboard focus in Connections through consecutive neighbor moves", async () => {
+	const s = await setup("x >> r -> a >> p -> b\n");
+	for (const id of ["a", "r", "a", "p"]) {
+		const neighbor = s.container.querySelector<HTMLButtonElement>(
+			`[data-neighbor="${id}"]`,
+		)!;
+		neighbor.focus();
+		neighbor.click();
+		expect(s.container.querySelector("#node-actions-title")!.textContent).toBe(
+			`Connections — ${id}`,
+		);
+		expectPanelFocus(s.container);
+	}
+});
+
+it.each(
+	[
+		{ source: "a >> p -> b\n", action: "delete-edge" },
+		{ source: "a >> p -> b\n", action: "toggle-feedback" },
+		{ source: "a >>? p -> b\n", action: "toggle-feedback" },
+	].flatMap((operation) =>
+		[true, false].flatMap((ok) =>
+			[true, false].map((renderFirst) => ({ ...operation, ok, renderFirst })),
+		),
+	),
+)("restores visible focus for $action (ok=$ok, renderFirst=$renderFirst, source=$source)", async ({
+	source,
+	action,
+	ok,
+	renderFirst,
+}) => {
+	const s = await setup(source);
+	s.container
+		.querySelector<HTMLButtonElement>('[data-side="left"] [data-edge]')!
+		.click();
+	const control = s.container.querySelector<HTMLButtonElement>(
+		`[data-${action}]`,
+	)!;
+	control.focus();
+	control.click();
+	expectPanelFocus(s.container);
+	const request = s.postMessage.mock.calls.at(-1)![0];
+	const edit = previewEdits.applyPreviewEdit(source, request);
+	expect(edit.ok).toBe(true);
+	const updated = ok && edit.ok ? edit.source : source;
+	const redraw = () =>
+		s.preview.receive(
+			prepareDocument(analyzeSnapshot(updated), null, () => null).message,
+		);
+	if (renderFirst) await redraw();
+	await s.preview.receive({
+		type: "editResult",
+		request,
+		ok,
+		...(ok ? {} : { message: "The revision changed" }),
+	});
+	if (!renderFirst) await redraw();
+	expectPanelFocus(s.container);
+	expect(
+		s.container.querySelector<HTMLElement>(".connection-menu")!.hidden,
+	).toBe(true);
+});
+
+it("keeps visible panel focus after deleting the last connection", async () => {
+	const s = await setup("a >> p\n");
+	s.container
+		.querySelector<HTMLButtonElement>('[data-side="left"] [data-edge]')!
+		.click();
+	s.container.querySelector<HTMLButtonElement>("[data-delete-edge]")!.click();
+	const request = s.postMessage.mock.calls.at(-1)![0];
+	const result = previewEdits.applyPreviewEdit(s.source, request);
+	expect(result.ok).toBe(true);
+	if (!result.ok) return;
+	await s.preview.receive(
+		prepareDocument(analyzeSnapshot(result.source), null, () => null).message,
+	);
+	await s.preview.receive({ type: "editResult", request, ok: true });
+	expect(s.container.querySelector<HTMLElement>("#node-actions")!.hidden).toBe(
+		false,
+	);
+	expect(s.container.querySelectorAll("[data-edge]")).toHaveLength(0);
+	expectPanelFocus(s.container);
+});
+
 it("preserves text typed after sending a connection while its reply is pending", async () => {
 	const s = await setup();
 	const input = s.container.querySelector<HTMLInputElement>(

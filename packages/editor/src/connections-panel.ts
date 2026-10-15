@@ -83,6 +83,7 @@ export function mountConnections(
 		}
 		pending = { request, ...(side ? { side, value: side.input.value } : {}) };
 		error.textContent = "";
+		if (menu.contains(document.activeElement)) sides[0]!.input.focus();
 		hideCandidates();
 		menu.hidden = true;
 		refreshInputs();
@@ -316,6 +317,7 @@ export function mountConnections(
 				const neighbor = button(caption(id), `Go to ${caption(id)}`, () => {
 					host.navigate(id);
 					open(id);
+					focus();
 				});
 				neighbor.dataset.neighbor = id;
 				const line = button(
@@ -347,6 +349,12 @@ export function mountConnections(
 		panel.hidden = false;
 		render();
 	}
+	function focus() {
+		(definition.hidden || definition.disabled
+			? sides[0]!.input
+			: definition
+		).focus();
+	}
 	definition.onclick = () => {
 		if (editing && center)
 			submit({
@@ -359,12 +367,7 @@ export function mountConnections(
 		host.close();
 	return {
 		open,
-		focus() {
-			(definition.hidden || definition.disabled
-				? sides[0]!.input
-				: definition
-			).focus();
-		},
+		focus,
 		close() {
 			center = undefined;
 			pending = undefined;

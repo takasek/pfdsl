@@ -1333,6 +1333,61 @@ async function assertPreviewEditingFocus(session) {
 		1,
 		"feedback connection from the candidate list",
 	);
+	for (const id of ["a", "p"]) {
+		await frame.locator(`[data-neighbor="${id}"]`).press("Enter");
+		await waitForInteraction(
+			`neighbor ${id} keeps visible Connections focus`,
+			() =>
+				frame
+					.locator("#node-actions")
+					.evaluate(
+						(panel) =>
+							panel.contains(document.activeElement) &&
+							!document.activeElement.closest("[hidden]") &&
+							document.hasFocus(),
+					),
+			(focused) => focused,
+		);
+	}
+	for (const action of ["Make feedback", "Remove feedback", "Delete"]) {
+		const kind = action === "Remove feedback" ? "feedback" : "input";
+		await frame
+			.getByRole("button", {
+				name: `${kind} connection from a to p`,
+				exact: true,
+			})
+			.press("Enter");
+		const control = frame.getByRole("button", {
+			name: action === "Delete" ? "Delete this connection" : "Toggle feedback",
+			exact: true,
+		});
+		assert.equal(await control.textContent(), action);
+		await control.press("Enter");
+		await waitForInteraction(
+			`${action} keeps visible Connections focus`,
+			() =>
+				frame
+					.locator("#node-actions")
+					.evaluate(
+						(panel) =>
+							panel.contains(document.activeElement) &&
+							!document.activeElement.closest("[hidden]") &&
+							document.hasFocus(),
+					),
+			(focused) => focused,
+		);
+		await waitForColdRender(
+			frame.getByRole("button", {
+				name: `${action === "Make feedback" ? "feedback" : "input"} connection from a to p`,
+				exact: true,
+			}),
+			action === "Delete" ? 0 : 1,
+			`${action} applied`,
+		);
+	}
+	console.log(
+		"Connections keyboard actions: neighbor navigation, Make/Remove feedback and Delete retain visible panel focus",
+	);
 	await frame.locator("#node-actions-close").click();
 	await frame
 		.locator('#inner g.node[data-node-id="b"]')
