@@ -14,6 +14,7 @@ monaco.languages.register({ id: "yaml" });
 monaco.languages.setMonarchTokensProvider("yaml", yaml);
 monaco.languages.setMonarchTokensProvider("pfdsl", {
 	unicode: true,
+	includeLF: true,
 	defaultToken: "",
 	tokenizer: {
 		root: [
@@ -28,17 +29,19 @@ monaco.languages.setMonarchTokensProvider("pfdsl", {
 			[/^---\s*$/, { token: "metatag", next: "@body", nextEmbedded: "@pop" }],
 		],
 		body: [
-			[/#.*$/, "comment"],
+			[/#[^\n]*/, "comment"],
 			[/>>\?|>>|->/, "keyword.operator"],
 			[/[[\]]/, "delimiter.bracket"],
 			[/[,;]/, "delimiter"],
 			[/"/, "string", "@quoted"],
-			[/[\p{L}\p{N}_][\p{L}\p{N}_-]*/u, "variable"],
+			[/[\p{L}\p{N}_](?:[\p{L}\p{N}_]|-(?!>))*/u, "variable"],
 		],
 		quoted: [
+			[/\n/, "", "@pop"],
 			[/\\./, "string.escape"],
 			[/"/, "string", "@pop"],
-			[/[^"\\]+/, "string"],
+			[/[^"\\\n]+/, "string"],
+			[/\\/, "string.escape"],
 		],
 	},
 });

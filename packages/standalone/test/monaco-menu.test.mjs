@@ -137,6 +137,41 @@ test("the production document-tab entry loads real Monaco menu contributions", a
 			}
 		}
 		await t.test(
+			"compact arrows and an unfinished quoted ID recover according to the lexer",
+			async () => {
+				for (const source of ["a>>p->b", "a-b>>p-q->b-c"]) {
+					const tokens = host.monaco.editor.tokenize(source, "pfdsl")[0];
+					for (const arrow of [">>", "->"]) {
+						const offset = source.indexOf(arrow);
+						assert.ok(
+							tokens.some(
+								(token) =>
+									token.offset === offset &&
+									token.type.includes("keyword.operator"),
+							),
+							`${source}: ${arrow} must retain its own operator token`,
+						);
+					}
+				}
+			},
+		);
+		await t.test("unfinished quoted IDs stop at their line boundary", () => {
+			for (const quoted of ['"', '"oops', '"oops\\', '"oops\\x']) {
+				for (const gap of ["\n", "\n\n"]) {
+					const lines = host.monaco.editor.tokenize(
+						`${quoted}${gap}a >> p -> "b" # note`,
+						"pfdsl",
+					);
+					const following = lines.at(-1);
+					assert.ok(
+						following.some((token) => token.type.includes("keyword.operator")),
+						"an unterminated ID cannot turn the following flow line into a string",
+					);
+					assert.ok(following.some((token) => token.type.includes("comment")));
+				}
+			}
+		});
+		await t.test(
 			"PFDSL syntax distinguishes frontmatter, body arrows, Unicode IDs and comments",
 			async () => {
 				const lines = host.monaco.editor.tokenize(
