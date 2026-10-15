@@ -259,9 +259,17 @@ export function registerLanguageFeatures(
 		monaco.languages.registerHoverProvider("pfdsl", {
 			provideHover(target, position) {
 				if (!owned(target)) return null;
-				const item = occurrence(position);
-				if (!item) return null;
 				const current = snapshot();
+				const item = nodeOccurrenceAtSourcePosition(
+					current,
+					current.source,
+					{
+						line: position.lineNumber - 1,
+						character: position.column - 1,
+					},
+					{ includeGroups: true },
+				);
+				if (!item) return null;
 				const kind = current.nodeKinds.get(item.nodeId);
 				if (!kind) return null;
 				const link = (label: string, command: string, args: unknown[]) =>
@@ -269,7 +277,9 @@ export function registerLanguageFeatures(
 				const lines = buildHoverLines(item.nodeId, kind, current.frontmatter);
 				// Authored Markdown never shares trust with generated executable actions.
 				const actions = [
-					link("Go to definition", gotoId, [item.nodeId]),
+					...(kind === "group"
+						? []
+						: [link("Go to definition", gotoId, [item.nodeId])]),
 					link("Find all", findId, [item.nodeId]),
 				];
 				if (navigation) {

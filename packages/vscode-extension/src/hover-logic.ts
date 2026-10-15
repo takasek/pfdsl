@@ -15,6 +15,8 @@ function locationLink(docUri: string, loc: string, basePath?: string): string {
 	const label = loc.replace(/[\\[\]]/g, "\\$&");
 	const link = (uri: string) => `[${label}](${uri.replace(/[\\()]/g, "\\$&")})`;
 	if (isUrlLike(loc)) return link(loc);
+	// Unsaved and virtual documents have no filesystem base for these links.
+	if (!docUri.startsWith("file:")) return label;
 	const isDir = loc.endsWith("/");
 	const absPath = resolveLocationFsPath(
 		fileURLToPath(docUri),

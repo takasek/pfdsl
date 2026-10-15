@@ -45,6 +45,23 @@ function groupDisplay(
 	return label ? `${groupId} (${label})` : groupId;
 }
 
+function locationRow(
+	location: string | string[] | undefined,
+	links?: HoverLinks,
+): string[] {
+	const locations = normalizeLocation(location);
+	return locations.length
+		? [
+				tableRow(
+					"location",
+					locations
+						.map((value) => (links ? links.location(value) : value))
+						.join(", "),
+				),
+			]
+		: [];
+}
+
 export function buildHoverLines(
 	id: string,
 	kind: NodeKind,
@@ -60,6 +77,8 @@ export function buildHoverLines(
 		if (meta) {
 			if (meta.label) lines.push(`**${meta.label}**`);
 			if (meta.description) lines.push(...descLines(meta.description));
+			if (meta.index !== undefined)
+				rows.push(tableRow("index", String(meta.index)));
 			if (meta.owner) rows.push(tableRow("owner", meta.owner));
 			if (meta.externalStakeholders?.length)
 				rows.push(
@@ -77,13 +96,7 @@ export function buildHoverLines(
 					tableRow("group", groupDisplay(meta.group, frontmatter, links)),
 				);
 			if (meta.criteria) rows.push(tableRow("criteria", meta.criteria));
-			const locs = normalizeLocation(meta.location);
-			if (locs.length) {
-				const locDisplay = links
-					? locs.map((l) => links.location(l)).join(", ")
-					: locs.join(", ");
-				rows.push(tableRow("location", locDisplay));
-			}
+			rows.push(...locationRow(meta.location, links));
 			if (meta.revises) rows.push(tableRow("revises", meta.revises));
 		}
 	} else if (kind === "process") {
@@ -91,6 +104,8 @@ export function buildHoverLines(
 		if (meta) {
 			if (meta.label) lines.push(`**${meta.label}**`);
 			if (meta.description) lines.push(...descLines(meta.description));
+			if (meta.index !== undefined)
+				rows.push(tableRow("index", String(meta.index)));
 			if (meta.owner) rows.push(tableRow("owner", meta.owner));
 			if (meta.externalStakeholders?.length)
 				rows.push(
@@ -111,12 +126,25 @@ export function buildHoverLines(
 				rows.push(tableRow("command", commandDisplay));
 			}
 			if (meta.subflow) rows.push(tableRow("subflow", meta.subflow));
+			rows.push(...locationRow(meta.location, links));
+			if (meta.boundary && Object.keys(meta.boundary).length) {
+				rows.push(
+					tableRow(
+						"boundary",
+						Object.entries(meta.boundary)
+							.map(([parent, child]) => `${parent} → ${child}`)
+							.join("\n"),
+					),
+				);
+			}
 		}
 	} else {
 		// kind === "group"
 		const meta = frontmatter?.group?.[id];
 		if (meta) {
 			if (meta.label) lines.push(`**${meta.label}**`);
+			if (meta.color) rows.push(tableRow("color", meta.color));
+			if (meta.parent) rows.push(tableRow("parent", meta.parent));
 			for (const [mapKey, icon] of [
 				["artifact", KIND_ICON.artifact],
 				["process", KIND_ICON.process],

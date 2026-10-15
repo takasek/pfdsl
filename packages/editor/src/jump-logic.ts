@@ -30,10 +30,16 @@ export function findFrontmatterDefinitionInText(
 // Body navigation consumes an analyzeSnapshot model, not raw core body coordinates.
 type SourceModel = DocumentModel;
 
-function authoredNodeDeclarations(model: SourceModel, source: string) {
+function authoredNodeDeclarations(
+	model: SourceModel,
+	source: string,
+	includeGroups = false,
+) {
 	const declarations = model.sourceMap.declarations.filter(
 		({ section, range }) =>
-			(section === "artifact" || section === "process") &&
+			(section === "artifact" ||
+				section === "process" ||
+				(includeGroups && section === "group")) &&
 			!source
 				.slice(range.start.offset, range.end.offset)
 				.trim()
@@ -95,10 +101,13 @@ export function nodeOccurrenceAtSourcePosition(
 	model: SourceModel,
 	source: string,
 	position: CursorPosition,
+	options: { includeGroups?: boolean } = {},
 ): { nodeId: string; range: Range } | undefined {
-	const definition = authoredNodeDeclarations(model, source).find(({ range }) =>
-		containsPosition(range, position),
-	);
+	const definition = authoredNodeDeclarations(
+		model,
+		source,
+		options.includeGroups,
+	).find(({ range }) => containsPosition(range, position));
 	if (definition) return { nodeId: definition.id, range: definition.range };
 	const token = model.document.statements
 		.flatMap(idsOfStatement)

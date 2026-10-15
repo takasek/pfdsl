@@ -535,6 +535,75 @@ test("the production document-tab entry loads real Monaco menu contributions", a
 			},
 		);
 		await t.test(
+			"group declaration hover shows metadata and members without widening node navigation",
+			async () => {
+				for (const source of [
+					'---\nartifact: {a: {group: g}}\nprocess: {p: {group: g}}\ngroup:\n  "g": {label: Group, color: "#c0ffee", parent: outer}\n  outer: {label: Outer}\n---\na >> p -> b\n',
+					"---\nartifact: {a: {group: g}}\nprocess: {p: {group: g}}\ngroup: {'g': {label: Group, color: '#c0ffee', parent: outer}, outer: {label: Outer}}\n---\na >> p -> b\n",
+				])
+					await withEditors(source, async (create) => {
+						const editor = create();
+						const model = editor.getModel();
+						const line =
+							source
+								.split("\n")
+								.findIndex((line) => line.includes("label: Group")) + 1;
+						const column =
+							model
+								.getLineContent(line)
+								.indexOf(source.includes('"g"') ? '"g"' : "'g'") + 2;
+						const hovers = await Promise.all(
+							host.languageFeatures.hoverProvider
+								.ordered(model)
+								.map((p) =>
+									p.provideHover(
+										model,
+										{ lineNumber: line, column },
+										{ isCancellationRequested: false },
+									),
+								),
+						);
+						const contents = hovers.filter(Boolean).flatMap((h) => h.contents);
+						const text = contents.map((c) => c.value).join("\n");
+						for (const expected of ["Group", "#c0ffee", "outer", "📄 a", "▶️ p"])
+							assert.ok(
+								text.includes(expected),
+								`missing group hover metadata: ${expected}`,
+							);
+						assert.ok(
+							!text.includes("Go to definition"),
+							"group hover must not advertise artifact/process-only navigation",
+						);
+						for (const content of contents.filter((c) =>
+							c.value.includes("#c0ffee"),
+						))
+							assert.equal(content.isTrusted, false);
+						const field = model.getLineContent(line).indexOf("color") + 2;
+						const fieldHovers = await Promise.all(
+							host.languageFeatures.hoverProvider
+								.ordered(model)
+								.map((p) =>
+									p.provideHover(
+										model,
+										{ lineNumber: line, column: field },
+										{ isCancellationRequested: false },
+									),
+								),
+						);
+						assert.ok(
+							fieldHovers.every((h) => !h),
+							"metadata field names do not become group declarations",
+						);
+						editor.setPosition({ lineNumber: line, column });
+						await editor.getAction("pfdsl.nextNodeOccurrence").run();
+						assert.deepEqual(
+							{ ...editor.getPosition() },
+							{ lineNumber: line, column },
+						);
+					});
+			},
+		);
+		await t.test(
 			"rendered hover links retain parentheses in paths and commands",
 			async () => {
 				const source = `---\nartifact: {a: {location: "draft).md"}}\nprocess: {p: {command: 'printf ")"'}}\n---\na >> p -> b\n`;

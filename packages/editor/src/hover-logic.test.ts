@@ -2,6 +2,38 @@ import { describe, expect, it } from "vitest";
 import { buildHoverLines } from "./hover-logic.js";
 
 describe("host-neutral hover metadata", () => {
+	it("renders index, process locations/boundary and group color/parent", () => {
+		const fm = {
+			artifact: { a: { index: 0 } },
+			process: {
+				p: {
+					index: 7,
+					location: ["process.md", "notes.md"],
+					boundary: { "parent|input": "child<input", output: "child-out" },
+				},
+			},
+			group: { g: { color: "#c0ffee", parent: "outer" } },
+		};
+		expect(buildHoverLines("a", "artifact", fm).join("\n")).toContain(
+			"| _index_ | 0 |",
+		);
+		const process = buildHoverLines("p", "process", fm).join("\n");
+		for (const expected of [
+			"| _index_ | 7 |",
+			"process.md, notes.md",
+			"parent\\|input → child&lt;input<br>output → child-out",
+		])
+			expect(process).toContain(expected);
+		const group = buildHoverLines("g", "group", fm).join("\n");
+		expect(group).toContain("| _color_ | #c0ffee |");
+		expect(group).toContain("| _parent_ | outer |");
+		const linked = buildHoverLines("p", "process", fm, {
+			node: (id) => id,
+			location: (path) => `file:${path}`,
+			command: (command) => command,
+		}).join("\n");
+		expect(linked).toContain("file:process.md, file:notes.md");
+	});
 	it("renders artifact fields without filesystem or command links", () => {
 		const text = buildHoverLines("a", "artifact", {
 			artifact: {
