@@ -2,13 +2,16 @@
 import { afterEach, expect, it, vi } from "vitest";
 import { analyzeSnapshot, prepareDocument } from "./document.js";
 import { mountPreview } from "./preview.js";
+import * as previewEdits from "./preview-edit.js";
 
 const dispose: Array<() => void> = [];
 afterEach(() => {
 	for (const cleanup of dispose.splice(0)) cleanup();
 	vi.restoreAllMocks();
 });
-async function setup() {
+async function setup(
+	source = "---\nartifact:\n  free: {label: Searchable result}\n---\na >> p -> b\n",
+) {
 	vi.spyOn(window, "requestAnimationFrame").mockImplementation(() => 0);
 	const container = document.createElement("div");
 	document.body.append(container);
@@ -22,8 +25,6 @@ async function setup() {
 		preview.dispose();
 		container.remove();
 	});
-	const source =
-		"---\nartifact:\n  free: {label: Searchable result}\n---\na >> p -> b\n";
 	await preview.receive(
 		prepareDocument(analyzeSnapshot(source), null, () => null).message,
 	);
@@ -34,6 +35,60 @@ async function setup() {
 		);
 	return { container, postMessage, preview, source };
 }
+
+it("disables creation when a parsed metadata alias cannot retain the new definition", async () => {
+	const s = await setup(
+		"---\nshared: &empty {}\nartifact: *empty\n---\na >> p -> b\n",
+	);
+	const input = s.container.querySelector<HTMLInputElement>(
+		'[data-side="right"] input',
+	)!;
+	input.value = "fresh";
+	input.dispatchEvent(new Event("input"));
+	const create = s.container.querySelector<HTMLButtonElement>(
+		'[data-side="right"] [data-create]',
+	)!;
+	expect(create.disabled).toBe(true);
+	expect(create.title).toContain("definition could not be inserted safely");
+});
+
+it("preserves text typed after sending a connection while its reply is pending", async () => {
+	const s = await setup();
+	const input = s.container.querySelector<HTMLInputElement>(
+		'[data-side="right"] input',
+	)!;
+	input.value = "new_result";
+	input.dispatchEvent(new Event("input"));
+	s.container
+		.querySelector<HTMLButtonElement>('[data-side="right"] [data-create]')!
+		.click();
+	const request = s.postMessage.mock.calls.at(-1)![0];
+	input.value = "next_result";
+	input.dispatchEvent(new Event("input"));
+	await s.preview.receive({ type: "editResult", request, ok: true });
+	expect(input.value).toBe("next_result");
+});
+
+it("validates existing candidates without generating edited documents for each candidate", async () => {
+	const s = await setup();
+	const compute = vi.spyOn(previewEdits, "applyPreviewEdit");
+	const input = s.container.querySelector<HTMLInputElement>(
+		'[data-side="left"] input',
+	)!;
+	input.focus();
+	input.value = "free";
+	input.dispatchEvent(new Event("input"));
+	expect(
+		s.container.querySelector<HTMLButtonElement>('[data-candidate="free"]')!
+			.disabled,
+	).toBe(false);
+	expect(
+		compute.mock.calls.every(
+			([, request]) => request.type === "addConnector" && request.create,
+		),
+	).toBe(true);
+	expect(compute.mock.calls.length).toBeLessThanOrEqual(4);
+});
 
 it("supports candidate keyboard navigation, Escape, IME input, resize and focus departure without creating a node", async () => {
 	const s = await setup();

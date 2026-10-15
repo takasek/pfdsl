@@ -1,6 +1,10 @@
 import { analyzeSource, type NormalizedEdge } from "@pfdsl/core";
 import type { MessageToWebview } from "./messages.js";
-import { applyPreviewEdit, type PreviewEditRequest } from "./preview-edit.js";
+import {
+	applyPreviewEdit,
+	connectorError,
+	type PreviewEditRequest,
+} from "./preview-edit.js";
 
 type Editing = Extract<MessageToWebview, { type: "render" }>["editing"];
 interface Side {
@@ -34,7 +38,9 @@ export function mountConnections(
 	let editing: Editing;
 	let model: ReturnType<typeof analyzeSource> | undefined;
 	let center: string | undefined;
-	let pending: { request: PreviewEditRequest; side?: Side } | undefined;
+	let pending:
+		| { request: PreviewEditRequest; side?: Side; value?: string }
+		| undefined;
 	const token = ++serial;
 	function button(text: string, label: string, action: () => void) {
 		const element = document.createElement("button");
@@ -58,7 +64,7 @@ export function mountConnections(
 		side: Side,
 		otherId: string,
 		create: boolean,
-	): PreviewEditRequest {
+	): Extract<PreviewEditRequest, { type: "addConnector" }> {
 		return {
 			type: "addConnector",
 			nodeId: center!,
@@ -75,7 +81,7 @@ export function mountConnections(
 			error.textContent = result.message;
 			return;
 		}
-		pending = { request, ...(side ? { side } : {}) };
+		pending = { request, ...(side ? { side, value: side.input.value } : {}) };
 		error.textContent = "";
 		hideCandidates();
 		menu.hidden = true;
@@ -93,7 +99,7 @@ export function mountConnections(
 	}
 	function populate(side: Side, show = false) {
 		side.candidates.replaceChildren();
-		if (!editing || !center) return;
+		if (!editing || !center || !model) return;
 		const kind = editing.nodes.find((n) => n.id === center)?.kind;
 		const query = side.input.value.toLocaleLowerCase();
 		for (const node of editing.nodes) {
@@ -103,7 +109,7 @@ export function mountConnections(
 			)
 				continue;
 			const request = requestFor(side, node.id, false);
-			const result = applyPreviewEdit(editing.source, request);
+			const reason = connectorError(model, request);
 			const candidate = button(
 				caption(node.id),
 				`Connect ${caption(node.id)}`,
@@ -111,10 +117,10 @@ export function mountConnections(
 			);
 			candidate.dataset.candidate = node.id;
 			candidate.setAttribute("role", "option");
-			candidate.disabled = !!pending || !result.ok;
-			if (!result.ok) {
-				candidate.title = result.message;
-				candidate.textContent += ` — ${result.message}`;
+			candidate.disabled = !!pending || !!reason;
+			if (reason) {
+				candidate.title = reason;
+				candidate.textContent += ` — ${reason}`;
 			}
 			side.candidates.append(candidate);
 		}
@@ -133,11 +139,10 @@ export function mountConnections(
 							requestFor(side, side.input.value, true),
 						)
 					: undefined;
+			const reason = result && !result.ok ? result.message : undefined;
 			side.create.disabled = !!pending || !result?.ok;
-			side.create.title =
-				result && !result.ok ? result.message : "Create and connect a new node";
-			side.reason.textContent =
-				side.input.value && result && !result.ok ? result.message : "";
+			side.create.title = reason ?? "Create and connect a new node";
+			side.reason.textContent = side.input.value ? (reason ?? "") : "";
 		}
 	}
 	function createSide(left: boolean): Side {
@@ -375,10 +380,10 @@ export function mountConnections(
 				JSON.stringify(message.request) !== JSON.stringify(pending.request)
 			)
 				return;
-			const side = pending.side;
+			const { side, value } = pending;
 			pending = undefined;
 			if (message.ok) {
-				if (side) side.input.value = "";
+				if (side && side.input.value === value) side.input.value = "";
 				error.textContent = "";
 			} else
 				error.textContent = message.message ?? "The edit could not be applied.";

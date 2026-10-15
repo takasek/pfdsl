@@ -400,7 +400,10 @@ it("returns producer refusals and stale refusals to the requesting form without 
 	}
 });
 
-it("reveals a local preview connection while preserving preview focus and source selection", async () => {
+it.each([
+	false,
+	true,
+])("reveals a local preview connection (create=%s) while preserving preview focus and source selection", async (create) => {
 	const { open } = setup();
 	let source = "first >> task -> old\na >> p -> b\nlast >> finish -> end\n";
 	const original = source;
@@ -426,27 +429,40 @@ it("reveals a local preview connection while preserving preview focus and source
 		source,
 		connector: "->",
 		otherId: "new_result",
+		create,
 	});
 	const replacement =
 		host.api.workspace.applyEdit.mock.calls[0]![0].replacements[0]!;
-	expect(replacement.range.start.line).toBe(2);
-	expect(replacement.range.end.line).toBe(2);
-	expect(replacement.text).toBe("p -> new_result\n");
-	expect(source).toBe(
-		"first >> task -> old\na >> p -> b\np -> new_result\nlast >> finish -> end\n",
-	);
+	if (create) {
+		expect(analyze(source).frontmatter?.artifact?.new_result?.label).toBe(
+			"new_result",
+		);
+		expect(source).toContain(
+			"first >> task -> old\na >> p -> b\np -> new_result\nlast >> finish -> end\n",
+		);
+	} else {
+		expect(replacement.range.start.line).toBe(2);
+		expect(replacement.range.end.line).toBe(2);
+		expect(replacement.text).toBe("p -> new_result\n");
+		expect(source).toBe(
+			"first >> task -> old\na >> p -> b\np -> new_result\nlast >> finish -> end\n",
+		);
+	}
 	const editor = await host.window.showTextDocument.mock.results.at(-1)!.value;
 	expect(host.window.showTextDocument).toHaveBeenCalledWith(doc, {
 		viewColumn: 1,
 		preserveFocus: true,
 	});
 	expect(editor.selection).toBeUndefined();
-	expect(editor.revealRange).toHaveBeenCalledWith(
-		new host.api.Range(
-			new host.api.Position(2, "p -> new_result".length),
-			new host.api.Position(2, "p -> new_result".length),
-		),
-	);
+	if (create)
+		expect(editor.revealRange).toHaveBeenCalledWith(expect.any(host.api.Range));
+	else
+		expect(editor.revealRange).toHaveBeenCalledWith(
+			new host.api.Range(
+				new host.api.Position(2, "p -> new_result".length),
+				new host.api.Position(2, "p -> new_result".length),
+			),
+		);
 	expect(host.window.showInformationMessage).not.toHaveBeenCalled();
 });
 
@@ -518,7 +534,7 @@ it.each([
 		editing: { source: diskSource },
 	});
 	expect(host.window.showInformationMessage).toHaveBeenCalledWith(
-		"The document changed. Reopen Node actions and try again.",
+		"The document changed. Reopen Connections and try again.",
 	);
 	expect(host.window.showTextDocument).not.toHaveBeenCalled();
 	expect(current.getText()).toBe(diskSource);

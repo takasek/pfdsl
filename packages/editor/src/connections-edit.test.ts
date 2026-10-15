@@ -2,6 +2,28 @@ import { analyzeSource } from "@pfdsl/core";
 import { expect, it } from "vitest";
 import { applyPreviewEdit } from "./preview-edit.js";
 
+it.each([
+	"[a # internal\n] >> p",
+	"[a, # internal\n a] >> p",
+])("preserves a following statement when deleting commented input %s", (statement) => {
+	const source = `${statement}; c >> q -> d\n`;
+	const result = applyPreviewEdit(source, {
+		type: "deleteConnector",
+		nodeId: "p",
+		source,
+		artifact: "a",
+		process: "p",
+		kind: "input",
+	});
+	expect(result.ok).toBe(true);
+	if (!result.ok) return;
+	expect(analyzeSource(result.source).edges).toEqual(
+		analyzeSource("c >> q -> d\n").edges,
+	);
+	expect(result.source).toContain("# internal\n");
+	expect(result.source).toContain("; c >> q -> d\n");
+});
+
 it("creates metadata and a connection atomically, rejecting an existing ID", () => {
 	const source = "a >> p -> b\n";
 	const request = {
@@ -15,6 +37,7 @@ it("creates metadata and a connection atomically, rejecting an existing ID", () 
 	const result = applyPreviewEdit(source, request);
 	expect(result.ok).toBe(true);
 	if (!result.ok) return;
+	expect(result.selection).toBeDefined();
 	expect(
 		analyzeSource(result.source).frontmatter?.artifact?.new_result?.label,
 	).toBe("new_result");

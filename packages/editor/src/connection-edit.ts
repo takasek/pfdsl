@@ -88,10 +88,11 @@ export function editConnection(
 		const comments = [...masked.join("").matchAll(/#[^\r\n]*/g)].map((match) =>
 			original.slice(match.index, match.index + match[0].length),
 		);
-		const replacement = [...comments, formatEdges(remaining).trimEnd()]
-			.filter(Boolean)
-			.join("\n")
-			.replace(/\n/g, newline);
+		const replacement =
+			`${comments.map((comment) => `${comment}\n`).join("")}${formatEdges(remaining).trimEnd()}`.replace(
+				/\n/g,
+				newline,
+			);
 		output =
 			output.slice(0, offset + statement.start.offset) +
 			replacement +

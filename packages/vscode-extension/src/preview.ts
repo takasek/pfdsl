@@ -116,7 +116,7 @@ async function editFromPreview(
 	if (!snapshot?.isCurrent()) {
 		reply(
 			false,
-			"The source could not be checked. Reopen Node actions and try again.",
+			"The source could not be checked. Reopen Connections and try again.",
 		);
 		return;
 	}
@@ -127,7 +127,7 @@ async function editFromPreview(
 		return;
 	}
 	if (!snapshot.isCurrent()) {
-		reply(false, "The document changed. Reopen Node actions and try again.");
+		reply(false, "The document changed. Reopen Connections and try again.");
 		return;
 	}
 	const edit = new vscode.WorkspaceEdit();
