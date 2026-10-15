@@ -1324,7 +1324,18 @@ async function assertPreviewEditingFocus(session) {
 	await frame.locator('[data-side="left"] input').fill("b");
 	const feedback = frame.locator('[data-side="left"] [data-candidate="b"]');
 	assert.match(await feedback.textContent(), /feedback/);
-	await feedback.click();
+	const leftInput = frame.locator('[data-side="left"] input');
+	await leftInput.press("ArrowDown");
+	assert.equal(
+		await leftInput.evaluate(
+			(input) =>
+				document.activeElement === input &&
+				input.getAttribute("aria-activedescendant") ===
+					document.querySelector('[data-side="left"] [data-candidate="b"]').id,
+		),
+		true,
+	);
+	await leftInput.press("Enter");
 	await waitForColdRender(
 		frame.getByRole("button", {
 			name: "feedback connection from b to p",
@@ -1332,6 +1343,18 @@ async function assertPreviewEditingFocus(session) {
 		}),
 		1,
 		"feedback connection from the candidate list",
+	);
+	await leftInput.fill("second_result");
+	await frame
+		.locator('[data-side="left"] [data-candidate="second_result"]')
+		.click();
+	await waitForColdRender(
+		frame.getByRole("button", {
+			name: "feedback connection from second_result to p",
+			exact: true,
+		}),
+		1,
+		"pointer candidate connection",
 	);
 	for (const id of ["a", "p"]) {
 		await frame.locator(`[data-neighbor="${id}"]`).press("Enter");
@@ -1349,6 +1372,49 @@ async function assertPreviewEditingFocus(session) {
 			(focused) => focused,
 		);
 	}
+	const viewport = await page.evaluate(() => ({
+		width: innerWidth,
+		height: innerHeight,
+	}));
+	const previewWidth = await frame.evaluate(() => innerWidth);
+	async function restoreViewport() {
+		await page.setViewportSize(viewport);
+		await waitForInteraction(
+			"preview receives the restored viewport",
+			() => frame.evaluate(() => innerWidth),
+			(width) => width === previewWidth,
+		);
+		// Allow layout and ResizeObserver delivery after the viewport is restored.
+		await frame.evaluate(
+			() =>
+				new Promise((resolve) =>
+					requestAnimationFrame(() => requestAnimationFrame(resolve)),
+				),
+		);
+	}
+	const inputEdge = frame.getByRole("button", {
+		name: "input connection from a to p",
+		exact: true,
+	});
+	await inputEdge.press("Enter");
+	await page.setViewportSize({
+		width: viewport.width - 64,
+		height: viewport.height,
+	});
+	await waitForInteraction(
+		"resizing closes edge actions and returns focus to the edge",
+		() =>
+			inputEdge.evaluate(
+				(edge) =>
+					document.activeElement === edge &&
+					document.querySelector(".connection-menu").hidden &&
+					document.hasFocus(),
+			),
+		(ready) => ready,
+	);
+	await restoreViewport();
+	await inputEdge.press("Escape");
+	await frame.locator('#inner g.node[data-node-id="p"]').press("Enter");
 	for (const action of ["Make feedback", "Remove feedback", "Delete"]) {
 		const kind = action === "Remove feedback" ? "feedback" : "input";
 		await frame
@@ -1362,6 +1428,7 @@ async function assertPreviewEditingFocus(session) {
 			exact: true,
 		});
 		assert.equal(await control.textContent(), action);
+		assert.equal(await control.isEnabled(), true, `${action} is enabled`);
 		await control.press("Enter");
 		await waitForInteraction(
 			`${action} keeps visible Connections focus`,
@@ -1388,7 +1455,50 @@ async function assertPreviewEditingFocus(session) {
 	console.log(
 		"Connections keyboard actions: neighbor navigation, Make/Remove feedback and Delete retain visible panel focus",
 	);
-	await frame.locator("#node-actions-close").click();
+	for (const side of ["left", "right"]) {
+		if (side === "right")
+			await frame.locator('#inner g.node[data-node-id="p"]').press("Enter");
+		const input = frame.locator(`[data-side="${side}"] input`);
+		const value = side === "left" ? "first_result" : "a";
+		await input.fill(value);
+		await input.press("ArrowDown");
+		if (side === "right")
+			await page.setViewportSize({
+				width: viewport.width - 64,
+				height: viewport.height,
+			});
+		else await page.keyboard.press("Escape");
+		await waitForInteraction(
+			`${side} Escape dismisses only candidates`,
+			() =>
+				input.evaluate(
+					(input) =>
+						document.activeElement === input &&
+						input.getAttribute("aria-expanded") === "false" &&
+						!input.closest("[hidden]"),
+				),
+			(closed) => closed,
+		);
+		if (side === "right") await restoreViewport();
+		await input.press("Escape");
+		await waitForInteraction(
+			`${side} second Escape closes Connections and returns focus`,
+			() =>
+				frame
+					.locator("#node-actions-toggle")
+					.evaluate(
+						(toggle) =>
+							document.activeElement === toggle &&
+							toggle.getAttribute("aria-expanded") === "false" &&
+							document.hasFocus(),
+					),
+			(closed) => closed,
+		);
+		assert.equal(await input.inputValue(), value);
+	}
+	console.log(
+		"Connections Escape: candidate then panel close preserves both input values and returns focus",
+	);
 	await frame
 		.locator('#inner g.node[data-node-id="b"]')
 		.click({ button: "right" });

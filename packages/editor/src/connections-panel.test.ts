@@ -112,6 +112,224 @@ function expectPanelFocus(container: HTMLElement) {
 	expect(focused.closest("[hidden]")).toBeNull();
 }
 
+it("selects existing candidates with Arrow and Enter while keeping real focus in the input", async () => {
+	const s = await setup();
+	const input = s.container.querySelector<HTMLInputElement>(
+		'[data-side="left"] input',
+	)!;
+	input.focus();
+	input.value = "free";
+	input.dispatchEvent(new Event("input"));
+	input.dispatchEvent(
+		new KeyboardEvent("keydown", { key: "Enter", bubbles: true }),
+	);
+	expect(
+		s.postMessage.mock.calls.filter(
+			([message]) => message.type === "addConnector",
+		),
+	).toHaveLength(0);
+	input.dispatchEvent(
+		new KeyboardEvent("keydown", { key: "ArrowDown", bubbles: true }),
+	);
+	const candidate = s.container.querySelector<HTMLButtonElement>(
+		'[data-candidate="free"]',
+	)!;
+	expect(document.activeElement).toBe(input);
+	expect(input.getAttribute("aria-activedescendant")).toBe(candidate.id);
+	expect(candidate.getAttribute("aria-selected")).toBe("true");
+	expect(candidate.tabIndex).toBe(-1);
+	input.dispatchEvent(
+		new KeyboardEvent("keydown", { key: "Enter", bubbles: true }),
+	);
+	expect(s.postMessage).toHaveBeenLastCalledWith(
+		expect.objectContaining({
+			type: "addConnector",
+			otherId: "free",
+			create: false,
+		}),
+	);
+	expect(document.activeElement).toBe(input);
+	expect(input.hasAttribute("aria-activedescendant")).toBe(false);
+	expect(input.getAttribute("aria-expanded")).toBe("false");
+});
+
+it("dismisses the edge menu before resize and keeps a visible return target", async () => {
+	const s = await setup();
+	const edge = s.container.querySelector<HTMLButtonElement>(
+		'[data-side="left"] [data-edge]',
+	)!;
+	edge.click();
+	window.dispatchEvent(new Event("resize"));
+	expect(
+		s.container.querySelector<HTMLElement>(".connection-menu")!.hidden,
+	).toBe(true);
+	expect(document.activeElement).toBe(edge);
+	expectPanelFocus(s.container);
+	edge.dispatchEvent(
+		new KeyboardEvent("keydown", { key: "Escape", bubbles: true }),
+	);
+	expect(s.container.querySelector<HTMLElement>("#node-actions")!.hidden).toBe(
+		true,
+	);
+});
+
+it("moves focus to a stable control only when redraw removes the current control", async () => {
+	const s = await setup();
+	s.container
+		.querySelector<HTMLButtonElement>('[data-side="left"] [data-edge]')!
+		.click();
+	await s.preview.receive(
+		prepareDocument(analyzeSnapshot(`${s.source}# changed\n`), null, () => null)
+			.message,
+	);
+	expectPanelFocus(s.container);
+	expect(
+		s.container.querySelector<HTMLElement>(".connection-menu")!.hidden,
+	).toBe(true);
+	expect(
+		(document.activeElement as HTMLInputElement).getAttribute("role"),
+	).toBe("combobox");
+	expect(document.activeElement!.getAttribute("aria-expanded")).toBe("false");
+});
+
+it("closes the panel and returns to a visible preview control when the center disappears", async () => {
+	const s = await setup();
+	await s.preview.receive(
+		prepareDocument(analyzeSnapshot("x >> q\n"), null, () => null).message,
+	);
+	expect(s.container.querySelector<HTMLElement>("#node-actions")!.hidden).toBe(
+		true,
+	);
+	expect(
+		s.container
+			.querySelector("#node-actions-toggle")!
+			.getAttribute("aria-expanded"),
+	).toBe("false");
+	expect(document.activeElement).toBe(
+		s.container.querySelector("#preview-help-toggle"),
+	);
+});
+
+it.each([
+	true,
+	false,
+])("only returns preview focus on error if it owned focus (inside=%s)", async (inside) => {
+	const s = await setup();
+	const elsewhere = document.createElement("button");
+	s.container.after(elsewhere);
+	try {
+		if (!inside) elsewhere.focus();
+		await s.preview.receive({ type: "error", message: "Invalid source" });
+		expect(document.activeElement).toBe(
+			inside ? s.container.querySelector("#preview-error") : elsewhere,
+		);
+		expect(document.activeElement!.closest("[hidden]")).toBeNull();
+	} finally {
+		elsewhere.remove();
+	}
+});
+
+it.each([
+	true,
+	false,
+])("does not move focus on a late edit response (ok=%s)", async (ok) => {
+	const s = await setup();
+	const input = s.container.querySelector<HTMLInputElement>(
+		'[data-side="right"] input',
+	)!;
+	input.focus();
+	input.value = "fresh";
+	input.dispatchEvent(new Event("input"));
+	s.container
+		.querySelector<HTMLButtonElement>('[data-side="right"] [data-create]')!
+		.click();
+	const request = s.postMessage.mock.calls.at(-1)![0];
+	const elsewhere = document.createElement("button");
+	s.container.after(elsewhere);
+	try {
+		elsewhere.focus();
+		await s.preview.receive({ type: "editResult", request, ok });
+		expect(document.activeElement).toBe(elsewhere);
+	} finally {
+		elsewhere.remove();
+	}
+});
+
+it.each([
+	"candidates",
+	"edge",
+])("refreshes the %s opened while a request is pending without moving focus", async (kind) => {
+	const s = await setup();
+	const input = s.container.querySelector<HTMLInputElement>(
+		'[data-side="right"] input',
+	)!;
+	input.focus();
+	input.value = "fresh";
+	input.dispatchEvent(new Event("input"));
+	s.container
+		.querySelector<HTMLButtonElement>('[data-side="right"] [data-create]')!
+		.click();
+	const request = s.postMessage.mock.calls.at(-1)![0];
+	if (kind === "candidates") {
+		input.value = "free";
+		input.dispatchEvent(new Event("input"));
+	} else
+		s.container
+			.querySelector<HTMLButtonElement>('[data-side="left"] [data-edge]')!
+			.click();
+	const selector =
+		kind === "candidates"
+			? '[data-side="right"] [data-candidate="free"]'
+			: "[data-delete-edge]";
+	expect(s.container.querySelector<HTMLButtonElement>(selector)!.disabled).toBe(
+		true,
+	);
+	const focused = document.activeElement;
+	await s.preview.receive({
+		type: "editResult",
+		request,
+		ok: false,
+		message: "Rejected",
+	});
+	expect(s.container.querySelector<HTMLButtonElement>(selector)!.disabled).toBe(
+		false,
+	);
+	expect(document.activeElement).toBe(focused);
+	expect(input.value).toBe(kind === "candidates" ? "free" : "fresh");
+});
+
+it("keeps two identical requests distinct after closing and reopening the panel", async () => {
+	const s = await setup();
+	const input = s.container.querySelector<HTMLInputElement>(
+		'[data-side="right"] input',
+	)!;
+	const send = () => {
+		input.focus();
+		input.value = "fresh";
+		input.dispatchEvent(new Event("input"));
+		s.container
+			.querySelector<HTMLButtonElement>('[data-side="right"] [data-create]')!
+			.click();
+		return s.postMessage.mock.calls.at(-1)![0];
+	};
+	const first = send();
+	s.container.querySelector<HTMLButtonElement>("#node-actions-close")!.click();
+	s.container.querySelector<HTMLButtonElement>("#node-actions-toggle")!.click();
+	const second = send();
+	await s.preview.receive({
+		type: "editResult",
+		request: first,
+		ok: false,
+		message: "Old request refused",
+	});
+	expect(s.container.querySelector("#node-actions-error")!.textContent).toBe(
+		"",
+	);
+	expect(input.value).toBe("fresh");
+	await s.preview.receive({ type: "editResult", request: second, ok: true });
+	expect(input.value).toBe("");
+});
+
 it("keeps keyboard focus in Connections through consecutive neighbor moves", async () => {
 	const s = await setup("x >> r -> a >> p -> b\n");
 	for (const id of ["a", "r", "a", "p"]) {
@@ -256,14 +474,15 @@ it("supports candidate keyboard navigation, Escape, IME input, resize and focus 
 	const candidate = s.container.querySelector<HTMLButtonElement>(
 		'[data-side="left"] [data-candidate="free"]',
 	)!;
-	expect(document.activeElement).toBe(candidate);
-	candidate.dispatchEvent(
+	expect(document.activeElement).toBe(input);
+	expect(input.getAttribute("aria-activedescendant")).toBe(candidate.id);
+	input.dispatchEvent(
 		new KeyboardEvent("keydown", { key: "ArrowDown", bubbles: true }),
 	);
-	candidate.dispatchEvent(
+	input.dispatchEvent(
 		new KeyboardEvent("keydown", { key: "ArrowUp", bubbles: true }),
 	);
-	candidate.dispatchEvent(
+	input.dispatchEvent(
 		new KeyboardEvent("keydown", { key: "Escape", bubbles: true }),
 	);
 	expect(document.activeElement).toBe(input);
@@ -271,6 +490,13 @@ it("supports candidate keyboard navigation, Escape, IME input, resize and focus 
 	input.dispatchEvent(
 		new KeyboardEvent("keydown", { key: "Escape", bubbles: true }),
 	);
+	expect(s.container.querySelector<HTMLElement>("#node-actions")!.hidden).toBe(
+		true,
+	);
+	expect(input.value).toBe("free");
+	s.container.querySelector<HTMLButtonElement>("#node-actions-toggle")!.click();
+	input.value = "free";
+	input.dispatchEvent(new Event("input"));
 	input.focus();
 	window.dispatchEvent(new Event("resize"));
 	expect(input.value).toBe("free");
@@ -281,6 +507,71 @@ it("supports candidate keyboard navigation, Escape, IME input, resize and focus 
 	expect(
 		s.postMessage.mock.calls.filter(([m]) => m.type === "addConnector"),
 	).toHaveLength(0);
+});
+
+it.each(
+	["left", "right"].flatMap((side) =>
+		["input", "candidate", "resize"].map((origin) => ({ side, origin })),
+	),
+)("closes candidates before Connections from $side after $origin", async ({
+	side,
+	origin,
+}) => {
+	const s = await setup();
+	const input = s.container.querySelector<HTMLInputElement>(
+		`[data-side="${side}"] input`,
+	)!;
+	const panel = s.container.querySelector<HTMLElement>("#node-actions")!;
+	input.focus();
+	input.value = "free";
+	input.dispatchEvent(new Event("input"));
+	if (origin === "candidate")
+		input.dispatchEvent(
+			new KeyboardEvent("keydown", { key: "ArrowDown", bubbles: true }),
+		);
+	if (origin === "resize") window.dispatchEvent(new Event("resize"));
+	else {
+		document.activeElement!.dispatchEvent(
+			new KeyboardEvent("keydown", { key: "Escape", bubbles: true }),
+		);
+		expect(panel.hidden).toBe(false);
+		expect(document.activeElement).toBe(input);
+	}
+	expect(input.getAttribute("aria-expanded")).toBe("false");
+	input.dispatchEvent(
+		new KeyboardEvent("keydown", { key: "Escape", bubbles: true }),
+	);
+	expect(panel.hidden).toBe(true);
+	expect(document.activeElement).toBe(
+		s.container.querySelector("#node-actions-toggle"),
+	);
+	expect(input.value).toBe("free");
+	expect(
+		s.postMessage.mock.calls.filter(([message]) => message.type !== "ready"),
+	).toHaveLength(0);
+});
+
+it.each([
+	"left",
+	"right",
+])("leaves composing Escape in the %s input to the IME", async (side) => {
+	const s = await setup();
+	const input = s.container.querySelector<HTMLInputElement>(
+		`[data-side="${side}"] input`,
+	)!;
+	input.focus();
+	input.dispatchEvent(
+		new KeyboardEvent("keydown", {
+			key: "Escape",
+			bubbles: true,
+			isComposing: true,
+		}),
+	);
+	expect(s.container.querySelector<HTMLElement>("#node-actions")!.hidden).toBe(
+		false,
+	);
+	expect(input.getAttribute("aria-expanded")).toBe("true");
+	expect(document.activeElement).toBe(input);
 });
 
 it("keeps candidates through internal layout changes and closes them when the preview is resized", async () => {
@@ -533,7 +824,13 @@ it("clears only the accepted side, ignores unrelated replies, and clears candida
 	const request = s.postMessage.mock.calls.at(-1)![0];
 	await s.preview.receive({
 		type: "editResult",
-		request: { ...request, otherId: "unrelated" },
+		request: { ...request, requestId: undefined },
+		ok: true,
+	});
+	expect(right.value).toBe("right_new");
+	await s.preview.receive({
+		type: "editResult",
+		request: { ...request, requestId: "unrelated" },
 		ok: true,
 	});
 	expect(right.value).toBe("right_new");

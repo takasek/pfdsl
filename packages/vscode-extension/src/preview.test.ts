@@ -383,6 +383,7 @@ it("returns producer refusals and stale refusals to the requesting form without 
 	for (const candidateSource of [source, "older"]) {
 		const request = {
 			type: "addConnector" as const,
+			requestId: `refusal:${candidateSource}`,
 			nodeId: "q",
 			source: candidateSource,
 			connector: "->" as const,
@@ -423,13 +424,20 @@ it.each([
 		return true;
 	});
 	const panel = await open(doc);
-	await panel.receive({
-		type: "addConnector",
+	const request = {
+		type: "addConnector" as const,
+		requestId: `connection:${create}`,
 		nodeId: "p",
 		source,
-		connector: "->",
+		connector: "->" as const,
 		otherId: "new_result",
 		create,
+	};
+	await panel.receive(request);
+	expect(panel.messages).toContainEqual({
+		type: "editResult",
+		request,
+		ok: true,
 	});
 	const replacement =
 		host.api.workspace.applyEdit.mock.calls[0]![0].replacements[0]!;
