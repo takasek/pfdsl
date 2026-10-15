@@ -8,7 +8,7 @@ afterEach(() => {
 	vi.restoreAllMocks();
 });
 
-function setup(width = 1600, height = 800, onStateChange?: () => void) {
+function setup(width = 1600, height = 800, onStateChange = () => {}) {
 	const frames: FrameRequestCallback[] = [];
 	vi.spyOn(window, "requestAnimationFrame").mockImplementation((callback) => {
 		frames.push(callback);
