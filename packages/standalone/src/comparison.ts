@@ -45,9 +45,10 @@ export function createComparison(
 				)
 					return;
 				// Validate before replacing a usable comparison.
-				compareDocumentSources(result.source, getSource());
+				const report = compareDocumentSources(result.source, getSource());
 				baseline = result;
-				refresh();
+				send({ type: "diff", report });
+				showLabel(result.label);
 			} catch (error) {
 				if (!disposed && request === generation) report(String(error));
 			}
