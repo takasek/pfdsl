@@ -15,6 +15,14 @@ import "monaco-editor/editor/contrib/contextmenu/browser/contextmenu.js";
 import "monaco-editor/editor/contrib/find/browser/findController.js";
 import "monaco-editor/editor/standalone/browser/quickAccess/standaloneCommandsQuickAccess.js";
 import "./language.js";
+import {
+	type ExportServices,
+	registerExportFeatures,
+} from "./export-features.js";
+import {
+	createExportResults,
+	type ExportResultPresenter,
+} from "./export-results.js";
 import { registerLanguageFeatures } from "./language-features.js";
 import { createNormalizedEdgesPanel } from "./normalized-edges.js";
 import { formatSnapshot, processSnapshot } from "./processing.js";
@@ -32,6 +40,8 @@ interface DocumentTabOptions {
 	reportStatus: (message: string) => void;
 	onChange?: () => void;
 	referenceServices?: ReferenceServices | undefined;
+	exportServices?: ExportServices | undefined;
+	showExportResults?: ExportResultPresenter | undefined;
 }
 
 /** One Monaco editor and preview pair, with private snapshot and refresh state. */
@@ -45,6 +55,8 @@ export function createDocumentTab({
 	reportStatus,
 	onChange,
 	referenceServices,
+	exportServices,
+	showExportResults,
 }: DocumentTabOptions) {
 	let snapshot: DocumentModel | undefined;
 	let revision = 0;
@@ -81,6 +93,13 @@ export function createDocumentTab({
 					run: (command) => references.run(command),
 				}
 			: undefined,
+	);
+	const exports = registerExportFeatures(
+		editor,
+		() => ({ name, path, read }),
+		exportServices,
+		reportStatus,
+		showExportResults ?? createExportResults(parent, reportStatus),
 	);
 	let editorRenderQueued = false;
 	function requestEditorRender() {
@@ -268,6 +287,7 @@ export function createDocumentTab({
 			selectionFormatting.dispose();
 			languageFeatures.dispose();
 			references.dispose();
+			exports.dispose();
 			preview.dispose();
 			editor.dispose();
 			model.dispose();
@@ -280,6 +300,7 @@ export function createDocumentTab({
 		},
 		deactivate() {
 			references.cancelPending();
+			exports.cancelPending();
 		},
 		getSource: () => editor.getValue(),
 		getRevision: () => model.getVersionId(),

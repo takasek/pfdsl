@@ -4,6 +4,8 @@ mod native_directory;
 mod exit;
 mod exit_gate;
 mod references;
+mod exports;
+mod pdf;
 
 use std::path::PathBuf;
 use std::sync::Mutex;
@@ -60,6 +62,7 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
         .manage(exit_gate::ExitGate::default())
+        .manage(exports::Exports::default())
         .on_window_event(|window, event| {
             if let tauri::WindowEvent::CloseRequested { api, .. } = event {
                 api.prevent_close();
@@ -89,6 +92,10 @@ pub fn run() {
             references::choose_comparison,
             references::compare_git,
             references::run_process,
+            exports::choose_export,
+            exports::write_export,
+            exports::release_export,
+            exports::export_pdf,
             exit::finish_app_exit,
             exit::exit_listener_ready,
             document_capabilities,

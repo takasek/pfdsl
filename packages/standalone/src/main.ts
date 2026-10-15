@@ -12,6 +12,8 @@ import {
 	sameDocument,
 } from "./document-session.js";
 import { createDocumentTab, type DocumentTab } from "./document-tab.js";
+import { createExportResults } from "./export-results.js";
+import { nativeExportServices } from "./export-services.js";
 import { createNativeReferenceServices } from "./reference-services.js";
 import "./style.css";
 
@@ -22,6 +24,7 @@ const style = document.createElement("style");
 style.textContent = previewStyles;
 document.head.append(style);
 const status = document.querySelector<HTMLElement>("#status")!;
+const showExportResults = createExportResults(document.body, report);
 const tabs = document.querySelector<HTMLElement>("#tabs")!;
 const documents = document.querySelector<HTMLElement>("#documents")!;
 const conflicts = document.querySelector<HTMLElement>("#conflicts")!;
@@ -200,6 +203,8 @@ function openDocument(name: string, source: string, disk: DiskSnapshot | null) {
 					},
 				)
 			: undefined,
+		exportServices: native ? nativeExportServices : undefined,
+		showExportResults,
 		reportStatus: report,
 		onChange: () => {
 			if (entry) label(entry);

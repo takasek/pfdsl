@@ -379,23 +379,40 @@ GUI processの環境や秘密値は転送せず、許可ダイアログの操作
 ### GUI-34：全形式の実出力
 
 対応：#1261。対象・入力：M/V、全sample、日本語/font/style/status/preset/大きい図、未保存A。
-操作：単体DOT/SVG/PDF/PNG/TSVとAllを実UIで生成し、DOT構造/encoding、SVG全図/node/edgeと外部view、PDFページ/縮尺/日本語/文字抽出、PNG pixel寸法、TSV値/tabを検査する。
+操作：MはeditorのF1/context menuから`Export as DOT…`／`Export as SVG…`／`Export as PDF…`／`Export as PNG…`／`Export as TSV…`／`Export All (DOT, SVG, PDF, PNG, TSV)…`を実行し、basenameと保存先を選ぶ。
+未保存編集後、previewのzoom/pan/focus/構造比較の各状態で全図を生成し、DOT構造/UTF-8、SVG全図/node/edgeと外部view、TSVの7列と値/tabを照合する。
+MのSVG viewBoxを`x y W H`として、PNGのIHDR幅高は`ceil(W) × ceil(H)`pixel、DPR非依存・白背景を期待する。
+MのPDFは1unitを72/96pointへ描画し、MediaBoxは`ceil(0.75W) × ceil(0.75H)`point、測定差は各軸0.1point以内、1page・全図・日本語の表示と文字抽出を期待する。
+Vは既存Node/Puppeteerの寸法規約を維持し、PNGは各軸ceil pixel、PDFは`0.75W × 0.75H`pointを基準に各軸1point以内の印刷丸め差で照合する。
+日本語はPDFKit/Preview等の外部viewerでも読み、SVGとPDF/PNGの全node・edge・長label・四隅を比較し、文字抽出だけで描画合格としない。
+SVG/PDF/PNGのfont準備とpreset/style/statusを確認し、preset警告は結果へ残す。
 期待：利用可能な実fileができ切れ・欠落がなく未保存対象が合う。
-実装PRで寸法・許容差を確定し、両hostの意味／見た目／利用可能性で判定する。
+寸法規約は上記に固定し、両hostの意味／見た目／利用可能性で判定する。
+Vの既存Node/Puppeteer公開APIとMのnative/browser経路を区別して記録する。
 menu項目やbyte一致だけで完成にしない。
 状態：M/V各未実施。記録：未記入。
 
 ### GUI-35：出力失敗と部分成功
 
-対応：#1261。対象・入力：M/V、既存出力、新規／書込不能先、一部形式失敗（再現方法は実装PRで確定）。
-操作：chooser／上書き取消、明示上書き、権限／変換失敗、All部分失敗を行い保存fileを独立に読む。
+対応：#1261。対象・入力：M/V、既存出力、新規／書込不能先、一部形式失敗、同名・日本語basename。
+操作：Mのchooser／上書き確認の取消は全形式無書込と照合し、明示上書きは選んだ固定拡張子だけを置換する。
+Allで既存の`<basename>.png`だけを読取専用にして選び、上書き確認後のPNG write-failedと他形式の成功・保存pathを独立に読む。
+テスト後は使い捨てfileの権限を戻す。
+Mは既存0600 fileの権限保持、symlink/非regular target拒否、選択後の外部更新、directory移動、stage失敗を試す。
+Mの変換失敗は32768unit超の図によるPDF/PNG拒否を使い、DOT/SVG/TSV成功と区別する。
+PNGの64megapixel超も黙って縮小しないことを確認する。
+MのAllの保存開始後にtab切替／closeを行い、結果一覧へ元文書名・版・各形式の実保存pathまたは失敗理由が残り、明示Dismissまで読めることを確認する。
+Mで保存先移動がpublication後に検出された場合は、書込み済みだがpath未確認の説明と実diskを照合し、成功pathとして扱わない。
+Vは既存export chooserの取消、Puppeteer不在によるbinary変換失敗、読取専用PNGによる書込失敗を試し、Output channelと通知の形式別結果・実保存pathを実diskと照合する。
+M専用のnative保存境界や結果panelをVへ要求しない。
 期待：成功／警告／失敗と保存fileが一致し、部分成功fileを捨てず、source/dirty/Undoを変えない。
 状態：M/V各未実施。記録：未記入。不在の故障APIを前提にしない。
 
 ### GUI-36：追加runtimeなしのMac出力
 
 対応：#1261/#1262。対象・入力：M、Node/Graphviz/Puppeteer/独立browser/開発tool/Gitを追加導入しない検証Macと候補app。
-操作：GUI-34全形式を生成し、既定外部viewerで開きbundle/依存/font/WebKit/PDF APIを記録する。
+操作：GUI-34の単体とAllを生成し、既定外部viewerで開きbundle/依存/font/WebKit/PDF APIを記録する。
+PDFの専用WKWebViewとPNGのcanvasが使われ、Node sidecar/Puppeteer/Chromiumの実行・同梱がないことをbundleとprocessで確認する。
 期待：app導入だけで利用でき独立Chromiumを同梱しない。
 日本語・寸法が合い、最低OS制約をGUI-39へ渡す。
 試作のPDF一例を全形式合格にしない。

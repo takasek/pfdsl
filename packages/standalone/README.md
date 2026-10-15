@@ -52,6 +52,26 @@ Commands run only after this explicit action, in a new terminal using `/bin/zsh 
 The application does not forward its environment or secrets, monitor completion, or update progress from exit codes.
 macOS may request Automation permission for the selected terminal; denial or a missing terminal is reported without changing the document.
 
+## Exporting
+
+Press F1 or open the editor context menu to **Export as DOT…**, **SVG…**, **PDF…**, **PNG…**, **TSV…**, or **Export All (DOT, SVG, PDF, PNG, TSV)…**.
+Choose a base file name and destination, then confirm replacement of existing outputs before any file is written.
+Each export captures the current unsaved source and saved preset dependencies once, and produces the whole graph regardless of preview zoom, pan, focus, or structural comparison.
+Export does not change the source, dirty state, or Undo history.
+
+Results list each format's saved path, warning, conversion failure, or write failure.
+Successful files remain when another format fails.
+Results remain available after switching or closing the originating tab until dismissed.
+Canceling a pending chooser writes nothing; after writing starts, the captured export finishes independently of tab selection.
+If a destination changes during publication, the result explains that publication happened but its saved path or content could not be confirmed.
+
+SVG comes from the bundled Graphviz WASM renderer, PNG from canvas, and PDF from a separate native WebKit view.
+No Node.js, Graphviz, Puppeteer, or separate browser installation is required by the desktop application.
+SVG viewBox units are treated as CSS pixels; PNG uses their ceiling in pixels with an opaque white background, independently of display density.
+PDF scales each unit to 72/96 points and rounds each page dimension upward to whole points, preserving the full diagram on one page and retaining text.
+Dimensions over 32768 units are rejected for PDF/PNG, and PNG also rejects canvases over 64 megapixels rather than silently shrinking or clipping.
+Exact application, external viewer, font fallback, minimum OS, and All-format acceptance remain tracked in [GUI-34–36](ACCEPTANCE-PLAN.md).
+
 ## Linux verification
 
 Linux is a development verification environment; the distribution target remains Apple Silicon macOS.
@@ -292,7 +312,8 @@ The exact bundle and nontrivial ACL/ownership and inherited ACL behavior still r
 Its current native GUI, Japanese IME, Find/Replace, Undo/Redo, and manual-save interactions still require acceptance on the exact bundle; see the appended [validation record](ACCEPTANCE.md).
 The language features above have automated Monaco checks and still require native acceptance in the [acceptance plan](ACCEPTANCE-PLAN.md).
 External navigation and process commands have automated checks and still require native acceptance in the [acceptance plan](ACCEPTANCE-PLAN.md).
-Export and distribution remain later implementation work tracked in the [acceptance matrix](ACCEPTANCE.md).
+Export has automated checks and still requires native application acceptance in the [acceptance plan](ACCEPTANCE-PLAN.md).
+Distribution remains tracked separately in the [acceptance matrix](ACCEPTANCE.md).
 Local `.app` builds are not signed/notarized release DMGs.
 
 ## Verification

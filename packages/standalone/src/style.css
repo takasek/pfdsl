@@ -230,3 +230,28 @@ dialog textarea {
 .reference-comparison[hidden] {
 	display: none;
 }
+.export-results {
+	position: absolute;
+	z-index: 20;
+	bottom: 1rem;
+	right: 1rem;
+	max-width: min(44rem, 90%);
+	max-height: 50%;
+	overflow: auto;
+	padding: 1rem;
+	background: Canvas;
+	color: CanvasText;
+	border: 1px solid GrayText;
+	box-shadow: 0 2px 12px #0003;
+	user-select: text;
+}
+.export-results[hidden] {
+	display: none;
+}
+.export-results h2 {
+	font-size: 1rem;
+	margin: 0 0 0.5rem;
+}
+.export-results li {
+	overflow-wrap: anywhere;
+}

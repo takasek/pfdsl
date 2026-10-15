@@ -140,6 +140,49 @@ test("the production document-tab entry loads real Monaco menu contributions", a
 			}
 		}
 		await t.test(
+			"export actions capture the unsaved document and show actual partial outcomes without changing Undo",
+			async () => {
+				const source =
+					"---\nartifact: {a: {label: Before}}\n---\na >> p -> b\n";
+				await withEditors(source, async (create, tabs) => {
+					const saved = [],
+						released = [];
+					let cancel = false;
+					const editor = create({
+						exportServices: {
+							choose: async () => (cancel ? null : { id: 7 }),
+							write: async (_id, format, bytes) => {
+								saved.push([format, new TextDecoder().decode(bytes)]);
+								return `/chosen/日本語.${format}`;
+							},
+							release: async (id) => released.push(id),
+							pdf: async () => {
+								throw new Error("PDF unavailable");
+							},
+						},
+					});
+					tabs[0].setSource(source.replace("Before", "After"));
+					const revision = editor.getModel().getVersionId();
+					await editor.getAction("pfdsl.export.all").run();
+					assert.equal(editor.getModel().getVersionId(), revision);
+					assert.deepEqual(
+						saved.map(([format]) => format),
+						["dot", "svg", "tsv"],
+					);
+					assert.ok(saved.every(([, value]) => value.includes("After")));
+					const panel = document.querySelector(".export-results");
+					assert.match(panel.textContent, /DOT: Saved \/chosen\/日本語.dot/);
+					assert.match(panel.textContent, /PDF: conversion-failed/);
+					assert.deepEqual(released, [7]);
+					cancel = true;
+					await editor.getAction("pfdsl.export.dot").run();
+					assert.equal(saved.length, 3);
+					await editor.trigger("export-test", "undo", null);
+					assert.equal(editor.getValue(), source);
+				});
+			},
+		);
+		await t.test(
 			"PFDSL syntax distinguishes frontmatter, body arrows, Unicode IDs and comments",
 			async () => {
 				const lines = host.monaco.editor.tokenize(

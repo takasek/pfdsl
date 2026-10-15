@@ -22,6 +22,7 @@
 	"dependencies": {
 		"@pfdsl/core": "workspace:*",
 		"@pfdsl/graphviz-exporter": "workspace:*",
+		"@pfdsl/metadata-exporter": "workspace:*",
 		"@pfdsl/preview-engine": "workspace:*"
 	},
 	"devDependencies": {
