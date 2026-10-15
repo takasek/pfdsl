@@ -400,7 +400,8 @@ export function mountConnections(
 		if (!editing?.nodes.some((n) => n.id === id)) return;
 		if (center !== id) {
 			for (const side of sides) side.input.value = "";
-			pending = undefined;
+			// Navigation abandons input feedback, not the edit already sent to the host.
+			if (pending) delete pending.side;
 			setPopup(undefined);
 			error.textContent = "";
 		}
@@ -428,7 +429,7 @@ export function mountConnections(
 		isOpen: () => center !== undefined,
 		close() {
 			center = undefined;
-			pending = undefined;
+			if (pending) delete pending.side;
 			setPopup(undefined);
 			panel.hidden = true;
 			host.onOpenChange(false);

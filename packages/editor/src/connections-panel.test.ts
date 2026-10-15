@@ -315,7 +315,15 @@ it("keeps two identical requests distinct after closing and reopening the panel"
 	const first = send();
 	s.container.querySelector<HTMLButtonElement>("#node-actions-close")!.click();
 	s.container.querySelector<HTMLButtonElement>("#node-actions-toggle")!.click();
+	send();
+	expect(
+		s.postMessage.mock.calls.filter(
+			([message]) => message.type === "addConnector",
+		),
+	).toHaveLength(1);
+	await s.preview.receive({ type: "editResult", request: first, ok: false });
 	const second = send();
+	expect(second.requestId).not.toBe(first.requestId);
 	await s.preview.receive({
 		type: "editResult",
 		request: first,
@@ -328,6 +336,49 @@ it("keeps two identical requests distinct after closing and reopening the panel"
 	expect(input.value).toBe("fresh");
 	await s.preview.receive({ type: "editResult", request: second, ok: true });
 	expect(input.value).toBe("");
+});
+
+it.each([
+	true,
+	false,
+])("keeps a pending edit locked across neighbor navigation (ok=%s)", async (ok) => {
+	const s = await setup();
+	const input = s.container.querySelector<HTMLInputElement>(
+		'[data-side="right"] input',
+	)!;
+	const create = s.container.querySelector<HTMLButtonElement>(
+		'[data-side="right"] [data-create]',
+	)!;
+	const send = () => {
+		input.value = "fresh";
+		input.dispatchEvent(new Event("input"));
+		create.click();
+	};
+	send();
+	const request = s.postMessage.mock.calls.at(-1)![0];
+	s.container.querySelector<HTMLButtonElement>('[data-neighbor="b"]')!.click();
+	send();
+	expect(create.disabled).toBe(true);
+	expect(
+		s.postMessage.mock.calls.filter(
+			([message]) => message.type === "addConnector",
+		),
+	).toHaveLength(1);
+	await s.preview.receive({ type: "editResult", request, ok });
+	expect(input.value).toBe("fresh");
+	expect(create.disabled).toBe(false);
+	expectPanelFocus(s.container);
+	create.click();
+	expect(s.postMessage.mock.calls.at(-1)![0]).toMatchObject({
+		type: "addConnector",
+		nodeId: "b",
+		otherId: "fresh",
+	});
+	expect(
+		s.postMessage.mock.calls.filter(
+			([message]) => message.type === "addConnector",
+		),
+	).toHaveLength(2);
 });
 
 it("keeps keyboard focus in Connections through consecutive neighbor moves", async () => {

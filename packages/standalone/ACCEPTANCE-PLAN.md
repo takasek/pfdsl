@@ -192,6 +192,8 @@ API差分：`addConnector`に`create: true`を追加し、共有`applyPreviewEdi
 自動再現：`connections-panel.test.ts`で旧候補を保持してsource更新後に確定し、共有のsource一致検査で拒否する。ホスト拒否・無関係な応答・閉鎖後の遅着応答も同じテストで操作する。`connector-producer.test.mjs`は描画を更新しないままMonacoの現在sourceを変更してから＋を確定し、host側で再拒否する。実hostの非同期時機を観測できなければ、その実機変種は未実施とする。
 期待：理由付き拒否でsource・dirty・Undo・入力を保ち、単一producerは共通判定を使う。
 無関係な既存エラーや一時的不足を一括遮断せず、stale要求・描画・dispose後の結果を別文書／次対象へ適用しない。
+開始した編集の応答を保留したまま中心を移動、またはパネルを閉じて再開しても、応答までConnectionsから次の編集を送信しない。
+成功／拒否の応答後は再操作でき、移動先で入力した値と現在のフォーカスを保つ。
 状態：M/V各未実施。記録：未記入。
 
 ### GUI-15：edge削除とfeedback切替
