@@ -197,6 +197,22 @@ describe("semantic node occurrences", () => {
 });
 
 describe("nextNodeOccurrenceRange", () => {
+	it("cycles backwards through every occurrence and wraps to the last", () => {
+		const model = analyzeSource(CYCLE_SOURCE);
+		let position = { line: 2, character: 5 };
+		const visited = [];
+		for (let i = 0; i < 4; i++) {
+			const range = nextNodeOccurrenceRange(model, CYCLE_SOURCE, position, -1)!;
+			visited.push([range.start.line, range.start.column]);
+			position = { line: range.end.line - 1, character: range.end.column - 1 };
+		}
+		expect(visited).toEqual([
+			[10, 1],
+			[9, 16],
+			[9, 1],
+			[3, 3],
+		]);
+	});
 	it("cycles definition, each body occurrence, and back to the definition", () => {
 		const model = analyzeSource(CYCLE_SOURCE);
 		let position = { line: 2, character: 5 };

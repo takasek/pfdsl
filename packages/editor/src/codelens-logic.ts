@@ -1,19 +1,9 @@
-import { analyzeSource } from "@pfdsl/core";
+import type { analyzeSource } from "@pfdsl/core";
 
 export interface RunHintAnchor {
 	line: number;
 	column: number;
 	command: string;
-}
-
-export function declaredCommands(
-	process: Record<string, { command?: string } | undefined> | undefined,
-): Set<string> {
-	return new Set(
-		Object.values(process ?? {}).flatMap((meta) =>
-			meta?.command ? [meta.command] : [],
-		),
-	);
 }
 
 export function runHintsFromAnalysis(
@@ -31,17 +21,4 @@ export function runHintsFromAnalysis(
 			{ line, column: (lines[line] ?? "").replace(/\r$/, "").length, command },
 		];
 	});
-}
-
-/** Compatibility adapter for callers with document lines. */
-export function runHintAnchors(
-	lines: readonly string[],
-	bodyStartLine: number,
-	commands: ReadonlySet<string>,
-): RunHintAnchor[] {
-	if (commands.size === 0) return [];
-	return runHintsFromAnalysis(
-		analyzeSource(lines.slice(0, bodyStartLine - 1).join("\n")),
-		lines,
-	).filter((hint) => commands.has(hint.command));
 }
