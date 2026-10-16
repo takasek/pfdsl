@@ -1,26 +1,36 @@
 # PFDSL desktop application
 
 The product source lives here, separate from the feasibility experiment in `experiments/standalone`.
-This is the shared-foundation stage of the Tauri application for Apple Silicon Macs.
+This Tauri application targets distribution on Apple Silicon Macs; Linux is also supported as a development verification environment.
 It uses the same document services and preview DOM as the VS Code extension.
 It does not run a Node sidecar or parse PFDSL in Rust.
 
-## Building and development (macOS)
+## Building and development
 
-Install the repository's Node.js/pnpm prerequisites, stable Rust via [rustup](https://v2.tauri.app/start/prerequisites/#rust), and [macOS development tools](https://v2.tauri.app/start/prerequisites/#macos).
-For desktop builds, Xcode Command Line Tools are sufficient (`xcode-select --install`); a full Xcode installation also works.
-`make setup` prepares JavaScript dependencies and repository hooks; it does not install Rust or Xcode.
+Install Node.js 24, pnpm (the version pinned in the root `package.json`), stable Rust via [rustup](https://v2.tauri.app/start/prerequisites/#rust), and make.
+On macOS, install [Xcode Command Line Tools](https://v2.tauri.app/start/prerequisites/#macos) (`xcode-select --install`); a full Xcode installation also works.
+On Linux, install [Tauri's system dependencies](https://v2.tauri.app/start/prerequisites/#linux), including a C/C++ compiler, pkg-config, GTK 3, WebKitGTK 4.1, and OpenSSL development libraries.
+`make setup` prepares JavaScript dependencies and repository hooks; it does not install Rust or OS development libraries.
 
-Run from the clone or worktree root to build and open a local release application:
+Run from the clone or worktree root to build for the current host:
 
 ```sh
 make setup
 make standalone
-open "$PWD/packages/standalone/src-tauri/target/release/bundle/macos/PFDSL.app"
 ```
 
-`make standalone` builds shared packages, then Tauri builds the frontend and bundles the app for the current Mac.
-The app stays in the build directory until you open or copy it.
+`make standalone` builds shared packages, then Tauri builds the frontend and native release application.
+On macOS it creates an `.app`; on Linux it creates the executable without packaging, following the existing Linux CI build.
+This builds for the current host, not a different OS; Windows and other hosts are not supported by this application yet.
+
+| Host | Output | Launch from the repository root |
+| --- | --- | --- |
+| macOS | `packages/standalone/src-tauri/target/release/bundle/macos/PFDSL.app` | `open packages/standalone/src-tauri/target/release/bundle/macos/PFDSL.app` |
+| Linux | `packages/standalone/src-tauri/target/release/pfdsl-desktop` | `./packages/standalone/src-tauri/target/release/pfdsl-desktop` |
+
+Linux needs a graphical desktop session to launch the application.
+Save and Save As remain disabled on Linux; the shared build entry does not add platform features.
+See [Linux verification](#linux-verification) and [application behavior](#application-behavior) for the feature and packaging limits.
 The target preserves your PATH and appends `${CARGO_HOME:-$HOME/.cargo}/bin`, so an existing rustup installation is found even when your shell has not loaded Cargo's environment.
 If `cargo metadata` reports `No such file or directory`, check `cargo --version` and `rustc --version` after running `. "$HOME/.cargo/env"` (or your custom Rust environment setup).
 Missing or unusable Rust stops the target with a prerequisite link before compiling packages.
@@ -33,9 +43,10 @@ make standalone MODE=dev
 
 This builds shared packages once, starts the frontend server, and opens the development app.
 Stop it with `Ctrl+C`; after changing shared packages, restart this command to rebuild them.
-These Makefile commands target macOS; Linux build and packaging commands are maintained in [desktop CI](../../.github/workflows/desktop.yml).
+The same command works on macOS and Linux; Xcode is checked only on macOS.
+Linux AppImage packaging remains a separate verification step in [desktop CI](../../.github/workflows/desktop.yml), not part of this target.
 
-Rust/Cargo, Xcode command-line tools, and Node/pnpm are developer build requirements.
+Rust/Cargo, the OS development libraries, and Node/pnpm are developer build requirements.
 They are separate from the eventual installation requirements for distributed users.
 The macOS CI job compiles an Apple Silicon app, runs native unit tests, and briefly starts the bundled executable to check native startup and exit-guard installation.
 The startup smoke does not certify GUI, IME, or Quit interaction.
@@ -119,7 +130,7 @@ pkg-config --modversion gtk+-3.0 webkit2gtk-4.1
 make setup
 make build
 cargo test --manifest-path packages/standalone/src-tauri/Cargo.toml --locked --lib
-pnpm --filter @pfdsl/standalone tauri build --no-bundle -- --locked
+make standalone
 ```
 
 The [no-bundle option](https://v2.tauri.app/reference/cli/#build) skips packaging while building the frontend and native executable.
@@ -130,7 +141,7 @@ With the default Cargo target directory and no explicit `--target`, launch the r
 packages/standalone/src-tauri/target/release/pfdsl-desktop
 ```
 
-For iterative work in the graphical session, use `pnpm --filter @pfdsl/standalone tauri dev` instead.
+For iterative work in the graphical session, use `make standalone MODE=dev` instead.
 A missing display, a build failure, or an unavailable dialog is a failed or blocked step; retain the error before changing the environment.
 
 For the native corpus comparison, pass the Linux executable to the existing preparation tool and use a new absolute corpus directory:
