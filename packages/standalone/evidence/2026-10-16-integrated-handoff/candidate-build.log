@@ -11,39 +11,39 @@ packages/core build: CLI Using tsconfig: tsconfig.json
 packages/core build: CLI tsup v8.5.1
 packages/core build: CLI Target: es2022
 packages/core build: ESM Build start
+packages/core build: ESM dist/index.js          134.92 KB
 packages/core build: ESM dist/json-schema.js    1.08 KB
 packages/core build: ESM dist/chunk-ZQTMCSOS.js 2.98 KB
-packages/core build: ESM dist/index.js          134.92 KB
-packages/core build: ESM ⚡️ Build success in 35ms
+packages/core build: ESM ⚡️ Build success in 47ms
 packages/core build: DTS Build start
-packages/core build: DTS ⚡️ Build success in 841ms
+packages/core build: DTS ⚡️ Build success in 1287ms
 packages/core build: DTS dist/index.d.ts       50.41 KB
 packages/core build: DTS dist/json-schema.d.ts 7.39 KB
 packages/core build: Done
 packages/graphviz-exporter build$ tsup src/index.ts src/dot.ts --format esm --dts
 packages/metadata-exporter build$ tsup src/index.ts --format esm --dts
-packages/graphviz-exporter build: CLI Building entry: src/dot.ts, src/index.ts
-packages/graphviz-exporter build: CLI Using tsconfig: tsconfig.json
-packages/graphviz-exporter build: CLI tsup v8.5.1
 packages/metadata-exporter build: CLI Building entry: src/index.ts
 packages/metadata-exporter build: CLI Using tsconfig: tsconfig.json
 packages/metadata-exporter build: CLI tsup v8.5.1
-packages/graphviz-exporter build: CLI Target: es2022
-packages/graphviz-exporter build: ESM Build start
+packages/graphviz-exporter build: CLI Building entry: src/dot.ts, src/index.ts
+packages/graphviz-exporter build: CLI Using tsconfig: tsconfig.json
+packages/graphviz-exporter build: CLI tsup v8.5.1
 packages/metadata-exporter build: CLI Target: es2022
 packages/metadata-exporter build: ESM Build start
+packages/graphviz-exporter build: CLI Target: es2022
+packages/graphviz-exporter build: ESM Build start
 packages/metadata-exporter build: ESM dist/index.js 1.59 KB
-packages/metadata-exporter build: ESM ⚡️ Build success in 9ms
-packages/graphviz-exporter build: ESM dist/index.js          1.86 KB
-packages/graphviz-exporter build: ESM dist/dot.js            109.00 B
+packages/metadata-exporter build: ESM ⚡️ Build success in 15ms
 packages/graphviz-exporter build: ESM dist/chunk-JTJZKHRV.js 17.76 KB
-packages/graphviz-exporter build: ESM ⚡️ Build success in 11ms
-packages/graphviz-exporter build: DTS Build start
+packages/graphviz-exporter build: ESM dist/dot.js            109.00 B
+packages/graphviz-exporter build: ESM dist/index.js          1.86 KB
+packages/graphviz-exporter build: ESM ⚡️ Build success in 15ms
 packages/metadata-exporter build: DTS Build start
-packages/metadata-exporter build: DTS ⚡️ Build success in 363ms
+packages/graphviz-exporter build: DTS Build start
+packages/metadata-exporter build: DTS ⚡️ Build success in 390ms
 packages/metadata-exporter build: DTS dist/index.d.ts 512.00 B
 packages/metadata-exporter build: Done
-packages/graphviz-exporter build: DTS ⚡️ Build success in 697ms
+packages/graphviz-exporter build: DTS ⚡️ Build success in 713ms
 packages/graphviz-exporter build: DTS dist/index.d.ts 252.00 B
 packages/graphviz-exporter build: DTS dist/dot.d.ts   673.00 B
 packages/graphviz-exporter build: Done
@@ -53,12 +53,12 @@ packages/preview-engine build: CLI Using tsconfig: tsconfig.json
 packages/preview-engine build: CLI tsup v8.5.1
 packages/preview-engine build: CLI Target: es2022
 packages/preview-engine build: ESM Build start
-packages/preview-engine build: ESM dist/index.js          711.00 B
-packages/preview-engine build: ESM dist/chunk-O573FP6M.js 347.00 B
 packages/preview-engine build: ESM dist/renderer.js       85.00 B
+packages/preview-engine build: ESM dist/chunk-O573FP6M.js 347.00 B
+packages/preview-engine build: ESM dist/index.js          711.00 B
 packages/preview-engine build: ESM ⚡️ Build success in 9ms
 packages/preview-engine build: DTS Build start
-packages/preview-engine build: DTS ⚡️ Build success in 437ms
+packages/preview-engine build: DTS ⚡️ Build success in 462ms
 packages/preview-engine build: DTS dist/index.d.ts    688.00 B
 packages/preview-engine build: DTS dist/renderer.d.ts 91.00 B
 packages/preview-engine build: Done
@@ -79,37 +79,37 @@ packages/cli build: ESM Build start
 packages/editor build: ESM dist/index.js          23.78 KB
 packages/editor build: ESM dist/preview.js        38.99 KB
 packages/editor build: ESM dist/chunk-3XCFPYZX.js 24.09 KB
-packages/editor build: ESM ⚡️ Build success in 15ms
+packages/editor build: ESM ⚡️ Build success in 17ms
 packages/cli build: ESM dist/index.js          1.26 KB
 packages/cli build: ESM dist/cli.js            484.00 B
 packages/cli build: ESM dist/chunk-7TZQZBZG.js 609.19 KB
-packages/cli build: ESM ⚡️ Build success in 40ms
+packages/cli build: ESM ⚡️ Build success in 46ms
 packages/editor build: DTS Build start
 packages/cli build: DTS Build start
-packages/cli build: DTS ⚡️ Build success in 529ms
+packages/cli build: DTS ⚡️ Build success in 547ms
 packages/cli build: DTS dist/index.d.ts 13.59 KB
 packages/cli build: Done
-packages/editor build: DTS ⚡️ Build success in 933ms
+packages/editor build: DTS ⚡️ Build success in 876ms
 packages/editor build: DTS dist/index.d.ts             11.24 KB
 packages/editor build: DTS dist/preview.d.ts           730.00 B
 packages/editor build: DTS dist/messages-BVL0PLZA.d.ts 12.71 KB
 packages/editor build: Done
 packages/standalone build$ vite build && esbuild src/processing.ts --bundle --platform=node --format=esm --packages=external --outfile=dist/processing.js
 packages/vscode-extension build$ node esbuild.config.mjs
-packages/standalone build: vite v8.3.1 building client environment for production...
-packages/standalone build: transforming...
 packages/vscode-extension build:   dist/analysis-host.cjs      420.8kb
 packages/vscode-extension build:   dist/analysis-host.cjs.map    1.0mb
-packages/vscode-extension build: ⚡ Done in 111ms
+packages/vscode-extension build: ⚡ Done in 74ms
+packages/standalone build: vite v8.3.1 building client environment for production...
+packages/standalone build: transforming...
 packages/standalone build: ✓ 1054 modules transformed.
-packages/vscode-extension build:   dist/extension.cjs      11.1mb ⚠️
-packages/vscode-extension build:   dist/extension.cjs.map  13.2mb
-packages/vscode-extension build: ⚡ Done in 353ms
 packages/vscode-extension build:   dist/webview.js       8.9mb ⚠️
 packages/vscode-extension build:   dist/webview.js.map  10.2mb
-packages/vscode-extension build: ⚡ Done in 385ms
-packages/standalone build: rendering chunks...
+packages/vscode-extension build: ⚡ Done in 349ms
+packages/vscode-extension build:   dist/extension.cjs      11.1mb ⚠️
+packages/vscode-extension build:   dist/extension.cjs.map  13.2mb
+packages/vscode-extension build: ⚡ Done in 361ms
 packages/vscode-extension build: Done
+packages/standalone build: rendering chunks...
 packages/standalone build: computing gzip size...
 packages/standalone build: dist/index.html                            1.48 kB │ gzip:     0.71 kB
 packages/standalone build: dist/assets/codicon-DF1abBS2.ttf         153.22 kB
@@ -121,7 +121,7 @@ packages/standalone build: dist/assets/zstd-Dx_4Lof7.js             240.41 kB �
 packages/standalone build: dist/assets/graphviz-BKX3zE1B.js         798.55 kB │ gzip:   624.77 kB
 packages/standalone build: dist/assets/index-sd9efuED.js          3,457.95 kB │ gzip:   901.54 kB
 packages/standalone build: dist/assets/duckdb-BzlFElZV.js         7,567.95 kB │ gzip: 6,207.11 kB
-packages/standalone build: ✓ built in 574ms
+packages/standalone build: ✓ built in 560ms
 packages/standalone build: [plugin builtin:vite-reporter] 
 packages/standalone build: (!) Some chunks are larger than 1000 kB after minification. Consider:
 packages/standalone build: - Using dynamic import() to code-split the application

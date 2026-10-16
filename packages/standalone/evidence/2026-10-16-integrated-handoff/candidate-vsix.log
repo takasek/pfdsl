@@ -1,6 +1,6 @@
 # Public copy: checkout paths made relative; original local log retained.
  INFO  Files included in the VSIX:
-pfdsl-0.0.18-ff1fd549.vsix
+pfdsl-0.0.18-3c1ceed3.vsix
 ├─ [Content_Types].xml 
 ├─ extension.vsixmanifest 
 └─ extension/
@@ -22,4 +22,4 @@ pfdsl-0.0.18-ff1fd549.vsix
    └─ syntaxes/
       └─ pfdsl.tmLanguage.json [1.53 KB]
 
- DONE  Packaged: packages/standalone/src-tauri/target/acceptance-1445/pfdsl-0.0.18-ff1fd549.vsix (16 files, 14.39 MB)
+ DONE  Packaged: packages/standalone/src-tauri/target/acceptance-1445/pfdsl-0.0.18-3c1ceed3.vsix (16 files, 14.39 MB)

@@ -1,7 +1,7 @@
 {
-	"sourceCommit": "ff1fd5492e9997dfb1025f60ed5177e3060972fe",
+	"sourceCommit": "3c1ceed33e4d0f118e1939e66aa6877a5ab97d57",
 	"uncommittedDiff": false,
-	"planCommit": "ff1fd5492e9997dfb1025f60ed5177e3060972fe",
+	"planCommit": "3c1ceed33e4d0f118e1939e66aa6877a5ab97d57",
 	"planSha256": "1ad9722c94a0dcc8cd35ebad8666233cf7e07eecf43217b4af486747f2592f5f",
 	"platform": "darwin-arm64",
 	"macSigning": "adhoc linker-signed executable; no sealed resources, no team, no notarization",
@@ -12,14 +12,14 @@
 	],
 	"files": [
 		{
-			"name": "pfdsl-0.0.18-ff1fd549.vsix",
-			"path": "packages/standalone/src-tauri/target/acceptance-1445/pfdsl-0.0.18-ff1fd549.vsix",
-			"sha256": "3e0e3562b379611d6633e19fca77320349e97110930ee63d7ba3e7edbc719780"
+			"name": "pfdsl-0.0.18-3c1ceed3.vsix",
+			"path": "packages/standalone/src-tauri/target/acceptance-1445/pfdsl-0.0.18-3c1ceed3.vsix",
+			"sha256": "f9208119b96f0464f6072680b3f002a787d3bc3093fbd78355a7bdee254ca5f6"
 		},
 		{
-			"name": "PFDSL-0.1.0-ff1fd549-adhoc.app.zip",
-			"path": "packages/standalone/src-tauri/target/acceptance-1445/PFDSL-0.1.0-ff1fd549-adhoc.app.zip",
-			"sha256": "3c1f5093fa5f223275fab6e079f0b20bf5ef6b5219fa17eb698cd30307686555"
+			"name": "PFDSL-0.1.0-3c1ceed3-adhoc.app.zip",
+			"path": "packages/standalone/src-tauri/target/acceptance-1445/PFDSL-0.1.0-3c1ceed3-adhoc.app.zip",
+			"sha256": "f446664dc8453f81dd4eabb974a534251c263133f0730725e91bfc75d8eb0dc2"
 		}
 	],
 	"macExecutable": {
