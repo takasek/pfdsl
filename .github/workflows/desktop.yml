@@ -43,7 +43,11 @@ jobs:
           curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs -o "$RUNNER_TEMP/rustup-init.sh"
           sh "$RUNNER_TEMP/rustup-init.sh" -y --profile minimal --default-toolchain stable
           echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
-      - run: make setup
+      - name: Prepare the container checkout and repository dependencies
+        run: |
+          # checkout's safe.directory lives in a temporary HOME, not this shell's.
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          make setup
       - run: pnpm -r build
       - name: Test the Linux native library
         run: cargo +stable test --manifest-path packages/standalone/src-tauri/Cargo.toml --locked --lib
