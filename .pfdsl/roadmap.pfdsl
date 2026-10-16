@@ -30,11 +30,6 @@ artifact:
     status: done
     criteria: "docs/spec/spec.md に waiting/suspended status 分割・type フィールド・W002 source artifact 免除の定義節が存在する"
     location: ../docs/spec/spec.md
-  ext_v0015:
-    label: "extension v0.0.15（次期）"
-    status: done
-    criteria: npx @vscode/vsce show takasek.pfdsl --json の versions に 0.0.15 が含まれる
-    location: https://marketplace.visualstudio.com/items?itemName=takasek.pfdsl
   published_extension:
     label: "Marketplace 公開済み extension (#119)"
     description: "VS Marketplace は OIDC/Trusted Publishing 非対応のため PAT が必要。VSCE_PAT 環境変数を設定して `make release-extension` でローカル実行する"
@@ -125,22 +120,6 @@ artifact:
     status: done
     criteria: "生成工程の Issue 本文が定める改善範囲の実装・必要な自動検証・独立レビューと、版に対応する実行可能な受入計画の登録が完了している。実機未実施は共通受入 Issue に残し、この done は実機合格を意味しない"
     location: ../packages/
-  node_definition_creation:
-    label: プレビューと CLI から作れるノード定義
-    description: "未定義ノードから共通 core 処理を使って frontmatter 定義を挿入する機能。要件は issue #1282"
-    status: done
-    criteria: "Preview のノードから定義作成でき、CLI でも同じファイルに同じ定義を作れる。既存定義・不正な入力では重複や部分書込みが起きず、拡張では Undo できる"
-    location: ../packages/
-  node_location_cycle:
-    label: 定義と本文中の同一ノード位置を巡回する操作
-    description: "エディタ内で frontmatter 定義キーとグラフ本文に現れる同一ノード ID の各位置を順に巡回する機能。右クリックとショートカットから使い、Cmd+クリックの適否は既存操作との整合で判断する。要件は issue #1283"
-    status: done
-    criteria: "定義キーから本文中の同一 ID の全出現箇所を文書順に巡回して定義へ戻れ、途中からも次へ進める。キー操作と右クリックから利用でき、VS Code の既存操作とのショートカット衝突が解消済み"
-    location: ../packages/
-  standalone_documents:
-    label: 安全に編集・保存できる文書アプリ
-    status: done
-    criteria: 任意 PFD の新規・開く・手動保存・別名保存とエディタ＋プレビューの組のタブ操作が実機で動き、未保存終了・外部再変更・削除・保存失敗の試験で内容を黙って失わずに解決できる
   standalone_pfd_features:
     label: 公開前 GUI 機能の実装済みアプリ
     description: "公開前の GUI 機能を集約した実装成果物。要求・担当・内部の着手順と進捗は location の Issue 本文から辿り、実機結果は共通受入 Issue で扱う"
@@ -184,9 +163,6 @@ process:
   introduce_tombstones:
     label: tombstone 機構導入
     description: "初の ID 削除が発生した時点で起票・着手する。tombstone リスト実体・再定義禁止 lint・mint-check への tombstone 次元追加を含む"
-  i482_implement_editor_connector:
-    label: エディタ コネクタ編集実装
-    location: https://github.com/takasek/pfdsl/issues/482
   publish_ext_editing:
     label: extension 編集支援リリース
   publish_cli_group_delete:
@@ -195,19 +171,9 @@ process:
     label: CLI 拡張フィールド更新公開
   publish_cli_group_node_clash:
     label: CLI 同名診断公開
-  i1352_i1282_i1283_i1284_i483_improve_preview:
-    label: プレビューを改善する
-    description: "表示・編集・移動を改善する既存工程。現在の仕様・担当・残件は location の Issue とその参照先を正本とし、関連 Issue の全番号を同期しない"
-    location: https://github.com/takasek/pfdsl/issues/1352
-  i1259_i1260_i1261_build_standalone_features:
-    label: 公開前の GUI 機能を実装する
-    location: https://github.com/takasek/pfdsl/issues/1259
   i1262_i1445_accept_mac_candidate:
     label: Mac の受入済み候補を作る
     description: "候補準備と実機受入を同じ工程内で順に行い、配布物とその合格証拠を揃える。準備に合格を要求せず、内部の進捗・担当は Issue で管理する"
-    location: https://github.com/takasek/pfdsl/issues/1445
-  i1445_prepare_gui_vscode_candidate:
-    label: VS Code の版固定候補を準備する
     location: https://github.com/takasek/pfdsl/issues/1445
   i1445_accept_gui_vscode:
     label: VS Code 統合版の公開範囲を実機受入する
@@ -235,8 +201,6 @@ ready_counts_cli >> publish_cli_ready_counts -> cli_release_ready_counts
 
 [mint_check_tool, spec_id_syntax] >> introduce_tombstones -> spec_id_tombstones
 
-ext_v0015 >> i482_implement_editor_connector -> editor_connector
-
 [def_insertion, editor_connector, gui_vscode_acceptance, preview_connector] >> publish_ext_editing -> ext_editing_release
 
 group_delete_cli >> publish_cli_group_delete -> cli_release_group_delete
@@ -244,13 +208,7 @@ group_delete_cli >> publish_cli_group_delete -> cli_release_group_delete
 meta_set_extension_fields >> publish_cli_meta_set_extension -> cli_release_meta_set_extension
 
 group_node_clash_diagnostic >> publish_cli_group_node_clash -> cli_release_group_node_clash
-[def_insertion, editor_connector, toolchain] >> i1352_i1282_i1283_i1284_i483_improve_preview -> [node_definition_creation, node_location_cycle, preview_connector, preview_editing_usability]
-
-standalone_documents >> i1259_i1260_i1261_build_standalone_features -> standalone_pfd_features
-
 [preview_editing_usability, standalone_pfd_features] >> i1262_i1445_accept_mac_candidate -> gui_mac_acceptance
-
-[editor_connector, preview_editing_usability, toolchain] >> i1445_prepare_gui_vscode_candidate -> gui_vscode_candidate
 
 gui_vscode_candidate >> i1445_accept_gui_vscode -> gui_vscode_acceptance
 
