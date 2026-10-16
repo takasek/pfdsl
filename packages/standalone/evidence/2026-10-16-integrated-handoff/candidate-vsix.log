@@ -1,0 +1,25 @@
+# Public copy: checkout paths made relative; original local log retained.
+ INFO  Files included in the VSIX:
+pfdsl-0.0.18-ff1fd549.vsix
+├─ [Content_Types].xml 
+├─ extension.vsixmanifest 
+└─ extension/
+   ├─ LICENSE.txt [1.04 KB]
+   ├─ language-configuration.json [0.3 KB]
+   ├─ package.json [3.53 KB]
+   ├─ readme.md [7.28 KB]
+   ├─ dist/
+   │  ├─ analysis-host.cjs [420.82 KB]
+   │  ├─ extension.cjs [11.13 MB]
+   │  └─ webview.js [8.88 MB]
+   ├─ smoke/
+   │  ├─ README.md [3 KB]
+   │  ├─ harness.mjs [5.67 KB]
+   │  ├─ harness.test.mjs [30.33 KB]
+   │  ├─ run.mjs [53.25 KB]
+   │  ├─ save-readiness.mjs [0.52 KB]
+   │  └─ save-readiness.test.mjs [0.88 KB]
+   └─ syntaxes/
+      └─ pfdsl.tmLanguage.json [1.53 KB]
+
+ DONE  Packaged: packages/standalone/src-tauri/target/acceptance-1445/pfdsl-0.0.18-ff1fd549.vsix (16 files, 14.39 MB)

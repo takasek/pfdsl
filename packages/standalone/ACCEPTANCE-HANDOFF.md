@@ -59,8 +59,50 @@ OS全体や個人設定は変更していない。
 
 ## 候補登録
 
-候補のsource commit・計画版・hash・取得場所は本節に固定して登録する。
-最終候補build／package後に識別情報を追記する。
+source commitと計画版はともに`ff1fd5492e9997dfb1025f60ed5177e3060972fe`。
+このcommitの未コミット差分なしを確認してworkspace build、Tauri app build、既存`vsce package --no-dependencies`を実行した。
+生成後の変更は候補登録・証拠・roadmapのみで、製品sourceと計画は同commitのまま固定する。
+計画SHA-256は`1ad9722c94a0dcc8cd35ebad8666233cf7e07eecf43217b4af486747f2592f5f`。
+取得場所はこの作業checkoutを起点とする`packages/standalone/src-tauri/target/acceptance-1445/`であり、外部公開URLではない。
+公開用ログとmanifestのpathも同じcheckout相対表記とし、機械の私的rootを含む原ログはローカルに保持する。
+別の担当Macへの転送・公開は本作業では行っていない。
+
+| 候補file | SHA-256 |
+| --- | --- |
+| `pfdsl-0.0.18-ff1fd549.vsix` | `3e0e3562b379611d6633e19fca77320349e97110930ee63d7ba3e7edbc719780` |
+| `PFDSL-0.1.0-ff1fd549-adhoc.app.zip` | `3c1f5093fa5f223275fab6e079f0b20bf5ef6b5219fa17eb698cd30307686555` |
+
+実行file・frontend全assets・拡張3bundleのhashは[evidenceのcandidate.json](evidence/2026-10-16-integrated-handoff/candidate.json)、build/packageログとcodesign読戻しも同directoryにある。
+Mac実行fileのSHA-256は`157cc5a2086b8067334d6f741840edb62e3a61bdaf2fb343709a27a1b09c9307`。
+build環境はmacOS 27.0.1（26A434）／arm64、現在のVS Code CLIは1.138.0で、再利用した実V smokeの1.132.1とは異なる。
+受入記録には実行するhost版を別途記入する。
+
+このMacでの先行起動は、候補zipのSHA-256を表と照合してから、新規runへ展開したappの通常LaunchServices経路を使う。
+build出力の可変pathを受入対象にせず、展開後の実行fileも上記SHA-256と一致することを確認する。
+以下はkitを新規runへ生成した後の例で、`mac-candidate`が既存なら別runを使う。
+本作業では手動起動・実機受入はしていない。
+
+```sh
+shasum -a 256 packages/standalone/src-tauri/target/acceptance-1445/PFDSL-0.1.0-ff1fd549-adhoc.app.zip
+mkdir /tmp/pfdsl-gui-1445-my-run/mac-candidate
+ditto -x -k packages/standalone/src-tauri/target/acceptance-1445/PFDSL-0.1.0-ff1fd549-adhoc.app.zip /tmp/pfdsl-gui-1445-my-run/mac-candidate
+shasum -a 256 /tmp/pfdsl-gui-1445-my-run/mac-candidate/PFDSL.app/Contents/MacOS/pfdsl-desktop
+open /tmp/pfdsl-gui-1445-my-run/mac-candidate/PFDSL.app
+```
+
+Vは個人環境へ上書きせず、新規run内のuser-data／extensions directoryへ候補を入れる。
+以下はkitを`/tmp/pfdsl-gui-1445-my-run`へ生成した後の実行例であり、今回installはしていない。
+
+```sh
+code --user-data-dir /tmp/pfdsl-gui-1445-my-run/vscode-user --extensions-dir /tmp/pfdsl-gui-1445-my-run/vscode-extensions --install-extension packages/standalone/src-tauri/target/acceptance-1445/pfdsl-0.0.18-ff1fd549.vsix
+code --new-window --user-data-dir /tmp/pfdsl-gui-1445-my-run/vscode-user --extensions-dir /tmp/pfdsl-gui-1445-my-run/vscode-extensions /tmp/pfdsl-gui-1445-my-run
+```
+
+そのwindowでPFDを開き、`PFDSL: Open Preview to the Side`を実行する。
+GUI-37はpackage起動とは別にroot／拡張READMEのclone→build→F5経路を検査する。
+候補VSIXのzip内3bundleをbuild済みdistとhash照合し、すべて一致した。
+VのGUI-26〜29は既存language configuration／grammar／hover／jump／definition／normalize／sort、GUI-30/31はdocument-link／diff、GUI-34/35はexportの実装と検査を確認した。
+これらは#1448統合全体検査と#1450の追加adapter検査・レビューの対象であり、今回Vの製品sourceは変更していない。
 VSIXのpackage versionは既存`0.0.18`を維持し、同番号のMarketplace公開物とhashで区別する。
 Macアプリのversionは既存`0.1.0`で、開発／ad-hoc署名の先行確認用。
 正式署名・公証DMG、gui_mac_acceptanceの完成、公開完了を意味しない。

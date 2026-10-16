@@ -1,0 +1,24 @@
+# Public copy: checkout paths made relative; original local log retained.
+Executable=packages/standalone/src-tauri/target/release/bundle/macos/PFDSL.app/Contents/MacOS/pfdsl-desktop
+Identifier=pfdsl_desktop-fe96f43d857c3241
+Format=app bundle with Mach-O thin (arm64)
+CodeDirectory v=20400 size=149848 flags=0x20002(adhoc,linker-signed) hashes=4679+0 location=embedded
+VersionPlatform=1
+VersionMin=720896
+VersionSDK=1769472
+Hash type=sha256 size=32
+CandidateCDHash sha256=d887278a3b041b09833a3921be85d4379759959a
+CandidateCDHashFull sha256=d887278a3b041b09833a3921be85d4379759959a00bf26a8d86a184cf73bd874
+Hash choices=sha256
+CMSDigest=d887278a3b041b09833a3921be85d4379759959a00bf26a8d86a184cf73bd874
+CMSDigestType=2
+Executable Segment base=0
+Executable Segment limit=15089664
+Executable Segment flags=0x1
+Page size=4096
+CDHash=d887278a3b041b09833a3921be85d4379759959a
+Signature=adhoc
+Info.plist=not bound
+TeamIdentifier=not set
+Sealed Resources=none
+Internal requirements=none
