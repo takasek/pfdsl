@@ -2,7 +2,7 @@
 
 This is a disposable input kit and blank result sheet for [the acceptance plan](../ACCEPTANCE-PLAN.md), not another procedure specification.
 Current candidate identities and implementation evidence are in [the handoff](../ACCEPTANCE-HANDOFF.md); current assignments and blockers belong to [#1445](https://github.com/takasek/pfdsl/issues/1445).
-After copying this index into a run directory, follow those links in the source checkout at the candidate's plan commit.
+Preparation rewrites those two links to file URLs in the source checkout; keep that checkout available and verify its plan version against the candidate registration.
 
 Create a NEW directory, then open its copies only:
 

@@ -112,8 +112,14 @@ await writeFile(
 		"W".repeat(15000) +
 		'" }\n---\na >> p -> b\n',
 );
-for (const name of ["RECORDS.csv", "README.md"])
-	await cp(new URL(name, import.meta.url), join(target, name));
+await cp(new URL("RECORDS.csv", import.meta.url), join(target, "RECORDS.csv"));
+let index = await readFile(new URL("README.md", import.meta.url), "utf8");
+for (const name of ["ACCEPTANCE-PLAN.md", "ACCEPTANCE-HANDOFF.md"])
+	index = index.replaceAll(
+		`](../${name})`,
+		`](${new URL(`../${name}`, import.meta.url).href})`,
+	);
+await writeFile(join(target, "README.md"), index);
 const large = await readFile(
 	join(target, "samples/pfdsl_implementation_flow.pfdsl"),
 	"utf8",
