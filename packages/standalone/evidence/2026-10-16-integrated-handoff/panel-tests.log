@@ -1,0 +1,14 @@
+✔ normalized output uses current unsaved source and clears immediately on edit (79.759459ms)
+✔ normalized output is private to its tab, clears invalid output, and distinguishes empty edges (45.787042ms)
+✔ normalized text is inert and keyboard closure returns to the invoking control (10.681166ms)
+✔ normalization stays independent of pending preset reads and disposed completions (12.889625ms)
+✔ production main routes Normalize to the active tab and preserves Format (31.01775ms)
+✔ resizes the linked panes by keyboard without recreating the document, and releases listeners on dispose (71.16725ms)
+ℹ tests 6
+ℹ suites 0
+ℹ pass 6
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 327.790792

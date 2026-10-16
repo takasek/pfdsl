@@ -1,0 +1,49 @@
+# Public copy: checkout paths made relative; original local log retained.
+
+> @pfdsl/standalone@0.0.0 tauri packages/standalone
+> tauri build --bundles app
+
+        Info Looking up installed tauri packages to check mismatched versions...
+     Running beforeBuildCommand `pnpm build`
+
+> @pfdsl/standalone@0.0.0 build packages/standalone
+> vite build && esbuild src/processing.ts --bundle --platform=node --format=esm --packages=external --outfile=dist/processing.js
+
+vite v8.3.1 building client environment for production...
+transforming...
+✓ 1054 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/index.html                            1.48 kB │ gzip:     0.71 kB
+dist/assets/codicon-DF1abBS2.ttf         153.22 kB
+dist/assets/editor.worker-DWPaKKV_.js    303.93 kB
+dist/assets/index-BbNpBGfx.css           148.21 kB │ gzip:    22.21 kB
+dist/assets/base91-DOY1bT5-.js            73.26 kB │ gzip:    47.73 kB
+dist/assets/expat-CX7Bg68x.js            128.48 kB │ gzip:    93.68 kB
+dist/assets/zstd-Dx_4Lof7.js             240.41 kB │ gzip:   184.48 kB
+dist/assets/graphviz-BKX3zE1B.js         798.55 kB │ gzip:   624.77 kB
+dist/assets/index-sd9efuED.js          3,457.95 kB │ gzip:   901.54 kB
+dist/assets/duckdb-BzlFElZV.js         7,567.95 kB │ gzip: 6,207.11 kB
+
+✓ built in 541ms
+[plugin builtin:vite-reporter] 
+(!) Some chunks are larger than 1000 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rolldownOptions.output.codeSplitting to improve chunking: https://rolldown.rs/reference/OutputOptions.codeSplitting
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+
+  dist/processing.js  528b 
+
+⚡ Done in 5ms
+   Compiling pfdsl-desktop v0.1.0 (packages/standalone/src-tauri)
+warning: pfdsl-desktop@0.1.0: native/pdf.m:29:167: warning: unused parameter 'value' [-Wunused-parameter]
+warning: pfdsl-desktop@0.1.0:    29 |     [webView callAsyncJavaScript:@"await document.fonts.ready; return true;" arguments:@{} inFrame:nil inContentWorld:WKContentWorld.pageWorld completionHandler:^(id value, NSError *fontError) {
+warning: pfdsl-desktop@0.1.0:       |                                                                                                                                                                       ^
+warning: pfdsl-desktop@0.1.0: 1 warning generated.
+warning: pfdsl-desktop@0.1.0: STATIC_VCRUNTIME is deprecated; use build.windows.staticVCRuntime in tauri.conf.json or tauri_build::WindowsAttributes::static_vc_runtime instead.
+    Finished `release` profile [optimized] target(s) in 14.05s
+       Built application at: packages/standalone/src-tauri/target/release/pfdsl-desktop
+    Bundling PFDSL.app (packages/standalone/src-tauri/target/release/bundle/macos/PFDSL.app)
+    Finished 1 bundle at:
+        packages/standalone/src-tauri/target/release/bundle/macos/PFDSL.app
+
