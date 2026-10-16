@@ -72,8 +72,8 @@ artifact:
   editor_connector:
     label: "エディタ コネクタ編集支援 (#482)"
     description: "ノード前後への新規追加・既存接続の code action/コマンド。edge 挿入ロジックはロジック層に分離し Preview UI (#483) と共用"
-    status: wip
-    criteria: "カーソル下ノードへの前後追加・接続がコネクタ種選択付きの code action から実行でき、選択結果が .pfdsl テキストへ挿入されることが実 extension host で確認され、共有編集計算の回帰テストが成功している"
+    status: done
+    criteria: "カーソル下ノードへの前後追加・接続がコネクタ種選択付きの code action/コマンドから .pfdsl テキストへ挿入され、共有編集計算と host の必要な自動検証・独立レビューが完了し、実 extension host の QuickPick 確認を共通受入 Issue の GUI-20 へ登録している。実機未実施は実装完了を妨げず、この done は実機合格を意味しない"
   preview_connector:
     label: "Preview コネクタ生成 UI (#483)"
     description: "webview の nodeClick 基盤を拡張し、ノードクリックから前後追加・接続をテキストへ反映する。#482 の編集機構を共用"
@@ -122,7 +122,7 @@ artifact:
   preview_editing_usability:
     label: 表示・編集・移動の改善実装
     description: "プレビューの表示・編集・移動の改善実装。要求と担当の内訳は生成工程の location が指す Issue から辿る"
-    status: wip
+    status: done
     criteria: "生成工程の Issue 本文が定める改善範囲の実装・必要な自動検証・独立レビューと、版に対応する実行可能な受入計画の登録が完了している。実機未実施は共通受入 Issue に残し、この done は実機合格を意味しない"
     location: ../packages/
   node_definition_creation:
@@ -156,7 +156,7 @@ artifact:
   gui_vscode_candidate:
     label: VS Code 公開範囲の版固定候補
     description: "必要な V 実装を含む commit・拡張 package・対応する計画版を特定した受入対象。Mac 専用機能や DMG は準備条件にしない"
-    status: todo
+    status: wip
     criteria: "location の共通受入 Issue が定める V 対象要求の実装・自動検証・独立レビューを確認し、その実装を含む commit から build した拡張 package と識別情報・計画版を登録済み。実機合格は未了でよい"
     location: https://github.com/takasek/pfdsl/issues/1445
   gui_vscode_acceptance:

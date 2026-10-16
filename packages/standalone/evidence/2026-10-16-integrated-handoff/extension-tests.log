@@ -1,0 +1,14 @@
+# ANSI terminal styling removed; result text unchanged; original retained locally.
+# Public copy: checkout paths made relative; original local log retained.
+The CJS build of Vite's Node API is deprecated. See https://vite.dev/guide/troubleshooting.html#vite-cjs-node-api-deprecated for more details.
+
+ RUN  v1.6.1 packages/vscode-extension
+
+ ✓ src/preview-controller.test.ts  (8 tests) 2ms
+ ✓ src/connector.test.ts  (5 tests) 5ms
+
+ Test Files  2 passed (2)
+      Tests  13 passed (13)
+   Start at  09:11:42
+   Duration  177ms (transform 70ms, setup 0ms, collect 163ms, tests 7ms, environment 0ms, prepare 46ms)
+

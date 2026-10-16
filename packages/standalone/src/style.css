@@ -109,6 +109,8 @@ button:disabled {
 .normalized-edges > button {
 	float: right;
 	max-width: 100%;
+	padding-inline: 2px;
+	overflow-wrap: anywhere;
 }
 .normalized-edges > pre {
 	clear: both;

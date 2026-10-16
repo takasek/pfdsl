@@ -34,7 +34,7 @@ Linux正式対応・Linux保存・Windows・新しいテーマ対応は追加し
    ブラウザ試作・モデル・共有計算・CI・startup smokeの成功と区別する。
 2. 使い捨てフォルダに、異なる本文の`one/same.pfdsl`（A）と`two/same.pfdsl`（B）、長い日本語名、空白・引用符・日本語path、保存不能先、外部変更／削除／rename用コピーを用意する。
    操作前後のディスク本文を独立して読む。
-3. 全`docs/samples/`と、大きい図`docs/pfdsl_implementation_flow.pfdsl`（原レビューでは313行）をコピーし、実行版の行数を記録する。
+3. 全`docs/samples/`と、大きい図`docs/samples/pfdsl_implementation_flow.pfdsl`（原レビューでは313行）をコピーし、実行版の行数を記録する。
    長い行・離れた挿入／削除／変更のある比較文書、横長図、多数の接続、quoted／flow YAML key、同名field、反復ID、alias、LF／CRLF・補助平面文字を含む文書を用意する。
 4. 周辺試験の本文は下の例とする。
    a〜dと孤立loneのartifact定義、p〜rのprocess定義と長いlabelを付け、別コピーではaの定義とlocationを外す。
@@ -71,6 +71,9 @@ a >> r -> d
 入口：`Source and diagram widths`分割線。左右キーは5ポイント、Shift併用は1ポイント、Home/Endは10/90%。6pxの分割線を除いた両paneを初期50:50にし、同じeditor/preview instanceの幅だけを変える。
 期待：左editor／右図、初期50:50と可変幅が成立し、本文・dirty・Undo・カーソル・選択・図の視点を保つ。
 毎回Fitへ戻らず、片側表示モードを追加しない。
+代表幅800/900/1280pxではsidebarの有無と本文100/200%を区別し、source90%でもCloseの全文字が折返して読め、クリック／Escapeと起点へのfocus復帰が可能なことを確認する。
+PR #1448の320px・source90%での文字欠け、sidebar併用時の最小26px幅による重なりは既知の不合格履歴として保持する。
+この極小幅の過去結果を未実施へ戻さず、代表幅の修正やChrome probeの成功をnativeの合格へ転写しない。
 状態：M未実施。記録：未記入。
 
 ### GUI-02：Recentとフォルダサイドバー
@@ -248,6 +251,8 @@ UI最小labelとCLI完成sourceの契約を区別し、正しい文書で一Undo
 期待：既存動線が競合せず、巡回は定義→全本文出現→定義、途中・編集後増減も正しい。
 field/alias use siteを誤巡回しない。
 standaloneへ#1283専用巡回UIを追加要求しない。
+Vのeditor上ではノードIDにカーソルを置き、context menuまたはcommand paletteの`PFDSL: Add Connector…`から`>>`／`>>?`／`->`と既存／新規IDを選び、本文への挿入・再描画・Undo／Redo・取消で無変更を確認する。
+これは#482／PR #488で保留されたeditor QuickPickの実Host条件であり、Connections側の成功で代用しない。
 状態：M/V各未実施。記録：未記入。
 
 ### GUI-21：Normalized edges

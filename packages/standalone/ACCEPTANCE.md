@@ -851,3 +851,16 @@ QuickPick の候補は Node actions の disabled option と異なり、拒否理
 旧コマンドの候補・直接入力・stale source の自動検査5件は成功した。
 実 UI の旧コマンド操作は CUA のキー操作が反映されず、座標操作も `noWindowsAvailable` で停止した。
 所有者が本文の compile を対象に旧コマンドの output と other を選び、「理由が出て拒否、本文は変わらない」と回答したため、この実 UI 受入は所有者の結果を根拠にする。
+
+## 統合候補への引継ぎ — 2026-10-16
+
+[引継ぎ記録](ACCEPTANCE-HANDOFF.md)はmain `48ae121c`の#1448/#1450統合を照合し、実装証拠・候補・試験素材を登録する。
+今回、手動実機受入は実施していない。
+過去の上記結果を新しい統合UIの合格へ更新していない。
+
+代表幅のNormalized edgesのClose文字欠けを本番CSS／部品のChrome probeで再現し、最小CSS修正後に同じ48ケースを再測定した。
+800/900/1280pxの36ケースでは修正前6失敗、修正後0失敗で、Close／Escapeとfocus復帰も成功した。
+この観測は制御browser部品の自動検査であり、Tauriアプリ実機・200%のOS設定・読上げの成功を意味しない。
+320pxの既知の文字欠け／重なりは#1448当時の不合格履歴として保持し、GUI-01/21/25の残件として#1445へ渡す。
+共有135件・拡張13件・既存分割／正規化6件も成功した。
+証拠は[evidence/2026-10-16-integrated-handoff](evidence/2026-10-16-integrated-handoff)、対応する操作は現行計画、未実施の変種別記録欄は[kit](acceptance-kit/RECORDS.csv)を参照する。
