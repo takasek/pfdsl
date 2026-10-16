@@ -43,12 +43,12 @@ jobs:
           curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs -o "$RUNNER_TEMP/rustup-init.sh"
           sh "$RUNNER_TEMP/rustup-init.sh" -y --profile minimal --default-toolchain stable
           echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
-      - run: pnpm install --frozen-lockfile
+      - run: make setup
       - run: pnpm -r build
       - name: Test the Linux native library
         run: cargo +stable test --manifest-path packages/standalone/src-tauri/Cargo.toml --locked --lib
-      - name: Build the Linux native executable without packaging
-        run: pnpm --filter @pfdsl/standalone tauri build --no-bundle -- --locked
+      - name: Build the Linux native executable through the shared Makefile entry
+        run: make standalone
       - name: Prepare verification files
         run: |
           git -C "$GITHUB_WORKSPACE" -c safe.directory="$GITHUB_WORKSPACE" diff --exit-code HEAD

@@ -154,11 +154,12 @@ Press `F5` in that window to launch an Extension Development Host with PFDSL loa
 - `Format Document` / `pfdsl.format`
 - `PFDSL: Open Preview to the Side` (`pfdsl.preview`) — live SVG, refreshes on edit
 
-## Standalone desktop app (macOS)
+## Standalone desktop app
 
-Build the local macOS application with `make setup` followed by `make standalone`.
-Use `make standalone MODE=dev` to run the development app with hot reload.
-See [desktop build prerequisites and commands](packages/standalone/README.md#building-and-development-macos) for Rust/Xcode setup, the app location, and troubleshooting.
+Build for the current host with `make setup` followed by `make standalone`: a macOS `.app` or a Linux native executable.
+Use `make standalone MODE=dev` on either OS to run the development app with hot reload.
+See [desktop build prerequisites and commands](packages/standalone/README.md#building-and-development) for OS dependencies, output locations, Linux feature limits, and troubleshooting.
+Windows builds are not supported by this application yet.
 
 ## Claude Code skill
 
