@@ -154,6 +154,12 @@ Press `F5` in that window to launch an Extension Development Host with PFDSL loa
 - `Format Document` / `pfdsl.format`
 - `PFDSL: Open Preview to the Side` (`pfdsl.preview`) — live SVG, refreshes on edit
 
+## Standalone desktop app (macOS)
+
+Build the local macOS application with `make setup` followed by `make standalone`.
+Use `make standalone MODE=dev` to run the development app with hot reload.
+See [desktop build prerequisites and commands](packages/standalone/README.md#building-and-development-macos) for Rust/Xcode setup, the app location, and troubleshooting.
+
 ## Claude Code skill
 
 A skill for Claude Code is bundled at `.claude/skills/pfdsl/`. It provides PFDSL syntax reference, CLI command guidance, and workflow steps for editing `.pfdsl` files. Claude Code picks it up automatically when working in this repo.
