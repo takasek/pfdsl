@@ -109,15 +109,15 @@
 <!-- editor_connector -->
 <g id="node6" class="node">
 <title>editor_connector</title>
-<g id="a_node6"><a xlink:title="エディタ コネクタ編集支援 (#482)&#10;&#10;ノード前後への新規追加・既存接続の code action/コマンド。edge 挿入ロジックはロジック層に分離し Preview UI (#483) と共用&#10;criteria: カーソル下ノードへの前後追加・接続がコネクタ種選択付きの code action から実行でき、選択結果が .pfdsl テキストへ挿入されることが実 extension host で確認され、共有編集計算の回帰テストが成功している">
-<polygon fill="#fff3cd" stroke="black" points="806.05,-949.6 654.85,-949.6 654.85,-874.4 806.05,-874.4 806.05,-949.6"/>
+<g id="a_node6"><a xlink:title="エディタ コネクタ編集支援 (#482)&#10;&#10;ノード前後への新規追加・既存接続の code action/コマンド。edge 挿入ロジックはロジック層に分離し Preview UI (#483) と共用&#10;criteria: カーソル下ノードへの前後追加・接続がコネクタ種選択付きの code action/コマンドから .pfdsl テキストへ挿入され、共有編集計算と host の必要な自動検証・独立レビューが完了し、実 extension host の QuickPick 確認を共通受入 Issue の GUI&#45;20 へ登録している。実機未実施は実装完了を妨げず、この done は実機合格を意味しない">
+<polygon fill="#d4edda" stroke="black" points="806.05,-949.6 654.85,-949.6 654.85,-874.4 806.05,-874.4 806.05,-949.6"/>
 <text xml:space="preserve" text-anchor="middle" x="730.45" y="-933" font-family="Times,serif" font-size="14.00">editor_connector</text>
 <text xml:space="preserve" text-anchor="middle" x="730.45" y="-916.2" font-family="Times,serif" font-size="14.00">エディタ</text>
 <text xml:space="preserve" text-anchor="middle" x="730.45" y="-899.4" font-family="Times,serif" font-size="14.00">コネクタ編集支援 (</text>
 <text xml:space="preserve" text-anchor="middle" x="730.45" y="-882.6" font-family="Times,serif" font-size="14.00">#482)</text>
 </a>
 </g>
-<text xml:space="preserve" text-anchor="middle" x="644.35" y="-861.8" font-family="Times,serif" font-size="14.00">wip</text>
+<text xml:space="preserve" text-anchor="middle" x="641.25" y="-861.8" font-family="Times,serif" font-size="14.00">done</text>
 </g>
 <!-- editor_connector&#45;&gt;i1352_i1282_i1283_i1284_i483_improve_preview -->
 <g id="edge27" class="edge">
@@ -322,14 +322,14 @@
 <g id="node14" class="node">
 <title>gui_vscode_candidate</title>
 <g id="a_node14"><a xlink:href="https://github.com/takasek/pfdsl/issues/1445" xlink:title="VS Code 公開範囲の版固定候補&#10;&#10;必要な V 実装を含む commit・拡張 package・対応する計画版を特定した受入対象。Mac 専用機能や DMG は準備条件にしない&#10;criteria: location の共通受入 Issue が定める V 対象要求の実装・自動検証・独立レビューを確認し、その実装を含む commit から build した拡張 package と識別情報・計画版を登録済み。実機合格は未了でよい&#10;location: https://github.com/takasek/pfdsl/issues/1445">
-<polygon fill="#f8f9fa" stroke="black" points="2110.62,-819.6 1945.02,-819.6 1945.02,-744.4 2110.62,-744.4 2110.62,-819.6"/>
+<polygon fill="#d4edda" stroke="black" points="2110.62,-819.6 1945.02,-819.6 1945.02,-744.4 2110.62,-744.4 2110.62,-819.6"/>
 <text xml:space="preserve" text-anchor="middle" x="2027.82" y="-803" font-family="Times,serif" font-size="14.00">gui_vscode_candidate</text>
 <text xml:space="preserve" text-anchor="middle" x="2027.82" y="-786.2" font-family="Times,serif" font-size="14.00">VS Code</text>
 <text xml:space="preserve" text-anchor="middle" x="2027.82" y="-769.4" font-family="Times,serif" font-size="14.00">公開範囲の版固定候</text>
 <text xml:space="preserve" text-anchor="middle" x="2027.82" y="-752.6" font-family="Times,serif" font-size="14.00">補</text>
 </a>
 </g>
-<text xml:space="preserve" text-anchor="middle" x="1932.58" y="-731.8" font-family="Times,serif" font-size="14.00">todo</text>
+<text xml:space="preserve" text-anchor="middle" x="1931.41" y="-731.8" font-family="Times,serif" font-size="14.00">done</text>
 </g>
 <!-- i1445_accept_gui_vscode -->
 <g id="node20" class="node">
@@ -505,13 +505,13 @@
 <g id="node30" class="node">
 <title>preview_editing_usability</title>
 <g id="a_node30"><a xlink:title="表示・編集・移動の改善実装&#10;&#10;プレビューの表示・編集・移動の改善実装。要求と担当の内訳は生成工程の location が指す Issue から辿る&#10;criteria: 生成工程の Issue 本文が定める改善範囲の実装・必要な自動検証・独立レビューと、版に対応する実行可能な受入計画の登録が完了している。実機未実施は共通受入 Issue に残し、この done は実機合格を意味しない&#10;location: ../packages/">
-<polygon fill="#fff3cd" stroke="black" points="1550.22,-668.2 1348.62,-668.2 1348.62,-609.8 1550.22,-609.8 1550.22,-668.2"/>
+<polygon fill="#d4edda" stroke="black" points="1550.22,-668.2 1348.62,-668.2 1348.62,-609.8 1550.22,-609.8 1550.22,-668.2"/>
 <text xml:space="preserve" text-anchor="middle" x="1449.42" y="-651.6" font-family="Times,serif" font-size="14.00">preview_editing_usability</text>
 <text xml:space="preserve" text-anchor="middle" x="1449.42" y="-634.8" font-family="Times,serif" font-size="14.00">表示・編集・移動の</text>
 <text xml:space="preserve" text-anchor="middle" x="1449.42" y="-618" font-family="Times,serif" font-size="14.00">改善実装</text>
 </a>
 </g>
-<text xml:space="preserve" text-anchor="middle" x="1338.12" y="-597.2" font-family="Times,serif" font-size="14.00">wip</text>
+<text xml:space="preserve" text-anchor="middle" x="1335.01" y="-597.2" font-family="Times,serif" font-size="14.00">done</text>
 </g>
 <!-- i1352_i1282_i1283_i1284_i483_improve_preview&#45;&gt;preview_editing_usability -->
 <g id="edge32" class="edge">
