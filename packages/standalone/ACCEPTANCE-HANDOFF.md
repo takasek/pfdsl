@@ -59,7 +59,7 @@ OS全体や個人設定は変更していない。
 
 ## 候補登録
 
-source commitと計画版はともに`3c1ceed33e4d0f118e1939e66aa6877a5ab97d57`。
+source commitと計画版はともに`ebca71b5c1b89acb86e184002a17694f03e4b310`。
 このcommitの未コミット差分なしを確認してworkspace build、Tauri app build、既存`vsce package --no-dependencies`を実行した。
 生成後の変更は候補登録・証拠・roadmapのみで、製品sourceと計画は同commitのまま固定する。
 計画SHA-256は`1ad9722c94a0dcc8cd35ebad8666233cf7e07eecf43217b4af486747f2592f5f`。
@@ -69,8 +69,8 @@ source commitと計画版はともに`3c1ceed33e4d0f118e1939e66aa6877a5ab97d57`�
 
 | 候補file | SHA-256 |
 | --- | --- |
-| `pfdsl-0.0.18-3c1ceed3.vsix` | `f9208119b96f0464f6072680b3f002a787d3bc3093fbd78355a7bdee254ca5f6` |
-| `PFDSL-0.1.0-3c1ceed3-adhoc.app.zip` | `f446664dc8453f81dd4eabb974a534251c263133f0730725e91bfc75d8eb0dc2` |
+| `pfdsl-0.0.18-ebca71b5.vsix` | `ab8a1904b2040a01f27db3a3b0811c7c0f9cfae709f87e1ac4e814d79e7df29c` |
+| `PFDSL-0.1.0-ebca71b5-adhoc.app.zip` | `2b47adaab1522b040e56a0b9caa2e64d01d194d08f2299cc7637f4ba6563187a` |
 
 実行file・frontend全assets・拡張3bundleのhashは[evidenceのcandidate.json](evidence/2026-10-16-integrated-handoff/candidate.json)、build/packageログとcodesign読戻しも同directoryにある。
 Mac実行fileのSHA-256は`157cc5a2086b8067334d6f741840edb62e3a61bdaf2fb343709a27a1b09c9307`。
@@ -83,9 +83,9 @@ build出力の可変pathを受入対象にせず、展開後の実行fileも上�
 本作業では手動起動・実機受入はしていない。
 
 ```sh
-shasum -a 256 packages/standalone/src-tauri/target/acceptance-1445/PFDSL-0.1.0-3c1ceed3-adhoc.app.zip
+shasum -a 256 packages/standalone/src-tauri/target/acceptance-1445/PFDSL-0.1.0-ebca71b5-adhoc.app.zip
 mkdir /tmp/pfdsl-gui-1445-my-run/mac-candidate
-ditto -x -k packages/standalone/src-tauri/target/acceptance-1445/PFDSL-0.1.0-3c1ceed3-adhoc.app.zip /tmp/pfdsl-gui-1445-my-run/mac-candidate
+ditto -x -k packages/standalone/src-tauri/target/acceptance-1445/PFDSL-0.1.0-ebca71b5-adhoc.app.zip /tmp/pfdsl-gui-1445-my-run/mac-candidate
 shasum -a 256 /tmp/pfdsl-gui-1445-my-run/mac-candidate/PFDSL.app/Contents/MacOS/pfdsl-desktop
 open /tmp/pfdsl-gui-1445-my-run/mac-candidate/PFDSL.app
 ```
@@ -94,7 +94,7 @@ Vは個人環境へ上書きせず、新規run内のuser-data／extensions direc
 以下はkitを`/tmp/pfdsl-gui-1445-my-run`へ生成した後の実行例であり、今回installはしていない。
 
 ```sh
-code --user-data-dir /tmp/pfdsl-gui-1445-my-run/vscode-user --extensions-dir /tmp/pfdsl-gui-1445-my-run/vscode-extensions --install-extension packages/standalone/src-tauri/target/acceptance-1445/pfdsl-0.0.18-3c1ceed3.vsix
+code --user-data-dir /tmp/pfdsl-gui-1445-my-run/vscode-user --extensions-dir /tmp/pfdsl-gui-1445-my-run/vscode-extensions --install-extension packages/standalone/src-tauri/target/acceptance-1445/pfdsl-0.0.18-ebca71b5.vsix
 code --new-window --user-data-dir /tmp/pfdsl-gui-1445-my-run/vscode-user --extensions-dir /tmp/pfdsl-gui-1445-my-run/vscode-extensions /tmp/pfdsl-gui-1445-my-run
 ```
 

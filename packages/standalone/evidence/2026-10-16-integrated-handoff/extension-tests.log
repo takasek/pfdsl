@@ -1,3 +1,4 @@
+# Public copy: checkout paths made relative; original local log retained.
 # ANSI terminal styling removed; result text unchanged; original retained locally.
 # Public copy: checkout paths made relative; original local log retained.
 The CJS build of Vite's Node API is deprecated. See https://vite.dev/guide/troubleshooting.html#vite-cjs-node-api-deprecated for more details.

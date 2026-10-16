@@ -25,7 +25,7 @@ dist/assets/graphviz-BKX3zE1B.js         798.55 kB │ gzip:   624.77 kB
 dist/assets/index-sd9efuED.js          3,457.95 kB │ gzip:   901.54 kB
 dist/assets/duckdb-BzlFElZV.js         7,567.95 kB │ gzip: 6,207.11 kB
 
-✓ built in 725ms
+✓ built in 541ms
 [plugin builtin:vite-reporter] 
 (!) Some chunks are larger than 1000 kB after minification. Consider:
 - Using dynamic import() to code-split the application
@@ -34,14 +34,14 @@ dist/assets/duckdb-BzlFElZV.js         7,567.95 kB │ gzip: 6,207.11 kB
 
   dist/processing.js  528b 
 
-⚡ Done in 6ms
+⚡ Done in 5ms
    Compiling pfdsl-desktop v0.1.0 (packages/standalone/src-tauri)
 warning: pfdsl-desktop@0.1.0: native/pdf.m:29:167: warning: unused parameter 'value' [-Wunused-parameter]
 warning: pfdsl-desktop@0.1.0:    29 |     [webView callAsyncJavaScript:@"await document.fonts.ready; return true;" arguments:@{} inFrame:nil inContentWorld:WKContentWorld.pageWorld completionHandler:^(id value, NSError *fontError) {
 warning: pfdsl-desktop@0.1.0:       |                                                                                                                                                                       ^
 warning: pfdsl-desktop@0.1.0: 1 warning generated.
 warning: pfdsl-desktop@0.1.0: STATIC_VCRUNTIME is deprecated; use build.windows.staticVCRuntime in tauri.conf.json or tauri_build::WindowsAttributes::static_vc_runtime instead.
-    Finished `release` profile [optimized] target(s) in 15.47s
+    Finished `release` profile [optimized] target(s) in 14.05s
        Built application at: packages/standalone/src-tauri/target/release/pfdsl-desktop
     Bundling PFDSL.app (packages/standalone/src-tauri/target/release/bundle/macos/PFDSL.app)
     Finished 1 bundle at:
