@@ -62,6 +62,23 @@ build-deps:
 vscode-build: build-deps
 	pnpm --filter ./packages/vscode-extension build
 
+# macOS desktop app. MODE=dev starts Tauri with Vite instead of bundling.
+# Keep the caller's toolchain first; rustup's default location is a fallback.
+MODE ?= build
+.PHONY: standalone
+standalone: export PATH := $(PATH):$(if $(CARGO_HOME),$(CARGO_HOME),$(HOME)/.cargo)/bin
+standalone: preflight
+	@case "$(MODE)" in build|dev) ;; *) echo "Use make standalone MODE=build or MODE=dev." >&2; exit 1 ;; esac
+	@test "$$(uname -s)" = Darwin || { echo "make standalone requires macOS. See https://v2.tauri.app/start/prerequisites/ for other platforms." >&2; exit 1; }
+	@cargo --version && rustc --version || { echo "Install stable Rust with rustup: https://v2.tauri.app/start/prerequisites/#rust" >&2; exit 1; }
+	@xcode-select -p >/dev/null || { echo "Install Xcode Command Line Tools: xcode-select --install" >&2; exit 1; }
+	$(MAKE) build-deps
+	@if [ "$(MODE)" = dev ]; then \
+		pnpm --filter @pfdsl/standalone tauri dev; \
+	else \
+		pnpm --filter @pfdsl/standalone tauri build --bundles app -- --locked; \
+	fi
+
 .PHONY: test-vscode-smoke
 test-vscode-smoke: vscode-build
 	pnpm --filter ./packages/vscode-extension test:smoke

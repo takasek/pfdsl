@@ -5,19 +5,37 @@ This is the shared-foundation stage of the Tauri application for Apple Silicon M
 It uses the same document services and preview DOM as the VS Code extension.
 It does not run a Node sidecar or parse PFDSL in Rust.
 
-After the repository's normal setup and build, start the native development application:
+## Building and development (macOS)
+
+Install the repository's Node.js/pnpm prerequisites, stable Rust via [rustup](https://v2.tauri.app/start/prerequisites/#rust), and [macOS development tools](https://v2.tauri.app/start/prerequisites/#macos).
+For desktop builds, Xcode Command Line Tools are sufficient (`xcode-select --install`); a full Xcode installation also works.
+`make setup` prepares JavaScript dependencies and repository hooks; it does not install Rust or Xcode.
+
+Run from the clone or worktree root to build and open a local release application:
 
 ```sh
-pnpm --filter @pfdsl/standalone tauri dev
+make setup
+make standalone
+open "$PWD/packages/standalone/src-tauri/target/release/bundle/macos/PFDSL.app"
 ```
 
-Build a local application bundle:
+`make standalone` builds shared packages, then Tauri builds the frontend and bundles the app for the current Mac.
+The app stays in the build directory until you open or copy it.
+The target preserves your PATH and appends `${CARGO_HOME:-$HOME/.cargo}/bin`, so an existing rustup installation is found even when your shell has not loaded Cargo's environment.
+If `cargo metadata` reports `No such file or directory`, check `cargo --version` and `rustc --version` after running `. "$HOME/.cargo/env"` (or your custom Rust environment setup).
+Missing or unusable Rust stops the target with a prerequisite link before compiling packages.
+
+Start the native development application with Vite hot reload and Tauri's Rust rebuilds:
 
 ```sh
-pnpm --filter @pfdsl/standalone tauri build --bundles app
+make standalone MODE=dev
 ```
 
-Rust/Cargo, Xcode command-line tools, and the repository's Node/pnpm prerequisites are developer build requirements.
+This builds shared packages once, starts the frontend server, and opens the development app.
+Stop it with `Ctrl+C`; after changing shared packages, restart this command to rebuild them.
+These Makefile commands target macOS; Linux build and packaging commands are maintained in [desktop CI](../../.github/workflows/desktop.yml).
+
+Rust/Cargo, Xcode command-line tools, and Node/pnpm are developer build requirements.
 They are separate from the eventual installation requirements for distributed users.
 The macOS CI job compiles an Apple Silicon app, runs native unit tests, and briefly starts the bundled executable to check native startup and exit-guard installation.
 The startup smoke does not certify GUI, IME, or Quit interaction.
