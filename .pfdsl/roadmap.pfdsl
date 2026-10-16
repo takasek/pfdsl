@@ -156,8 +156,8 @@ artifact:
   gui_vscode_candidate:
     label: VS Code 公開範囲の版固定候補
     description: "必要な V 実装を含む commit・拡張 package・対応する計画版を特定した受入対象。Mac 専用機能や DMG は準備条件にしない"
-    status: done
-    criteria: "location の共通受入 Issue が定める V 対象要求の実装・自動検証・独立レビューを確認し、その実装を含む commit から build した拡張 package と識別情報・計画版を登録済み。実機合格は未了でよい"
+    status: wip
+    criteria: "location の共通受入 Issue が定める V 対象要求の実装・自動検証・独立レビューを確認し、その実装を含む commit から build した拡張 package と識別情報・計画版を登録済み。受入担当が固定 package を取得できる保管先・取得方法・保持条件を登録し、取得物の hash を照合済み。実機合格は未了でよい"
     location: https://github.com/takasek/pfdsl/issues/1445
   gui_vscode_acceptance:
     label: VS Code 公開範囲の実機合格記録

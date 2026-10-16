@@ -66,6 +66,11 @@ source commitと計画版はともに`ebca71b5c1b89acb86e184002a17694f03e4b310`�
 取得場所はこの作業checkoutを起点とする`packages/standalone/src-tauri/target/acceptance-1445/`であり、外部公開URLではない。
 公開用ログとmanifestのpathも同じcheckout相対表記とし、機械の私的rootを含む原ログはローカルに保持する。
 別の担当Macへの転送・公開は本作業では行っていない。
+このdirectoryとVSIXはgitignore対象であり、fresh checkoutから候補の登録hashに一致するbytesを取得できない。
+以下はローカルの生成・識別記録で、別の受入担当へ引き渡せる候補の完成記録ではない。
+レビュー指摘に従い、gui_vscode_candidateはwipへ訂正する。
+担当が取得できる保管先・取得方法・保持条件と、取得物のhash読戻しを#1445へ登録するまでdoneにしない。
+既存CIにはこの固定VSIXの保存経路がなく、新規アップロード先やMarketplace／Releases公開は今回追加していない。
 
 | 候補file | SHA-256 |
 | --- | --- |
@@ -109,7 +114,9 @@ Macアプリのversionは既存`0.1.0`で、開発／ad-hoc署名の先行確認
 
 ## 残件と今すぐできる範囲
 
-1. #1445担当（受入実施者はIssue未割当）：版固定VSIXのV対象GUI-09〜31/34/35/37/38と、開発用Macアプリの機能部分を実行できる。
+1. #1445担当（受入実施者はIssue未割当）：生成元のこのMacでは、ローカルVSIXのV対象GUI-09〜31/34/35/37/38と開発用Macアプリの機能部分を部分確認できる。
+   別の担当はこの候補bytesを取得できないため、gui_vscode_candidate完成を前提にしたV最終受入へはまだ渡していない。
+   sourceからの再buildは異なる候補であり、登録済みhashの取得に代えない。
    最初に候補hashを照合し、[kit](acceptance-kit/README.md)を新規ディレクトリへ生成して`one/same.pfdsl`を開き、GUI-10/11のp→a→rとGUI-17のFit／100%から始める。
 2. #1262担当（配布準備者はIssue未割当）：正式署名・公証、DMG、最低OSの決定と実測、関連付け、手動更新案内、GUI-39〜41の導入環境が残る。
    現設定`minimumSystemVersion: 11.0`は対応実測の証拠ではない。
@@ -125,4 +132,5 @@ Macアプリのversionは既存`0.1.0`で、開発／ad-hoc署名の先行確認
    後続の同期修正の自動証拠は再利用できるが、新しい統合UIのM/V実機合格へ転写しない（GUI-11/17/18/38）。
 
 V候補準備はMac署名や受入を待たない。
+V候補の残件は、受入担当が取得できる保管先への引渡しであり、実装不足や実機合格待ちではない。
 Mac／Vの実機合格artifactと公開artifactは未完了のままとする。
