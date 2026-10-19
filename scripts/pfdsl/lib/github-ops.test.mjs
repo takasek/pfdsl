@@ -11,6 +11,69 @@ import {
 	isGitHubUnavailableError,
 } from "./github-ops.mjs";
 
+describe("HTTP repository routing", () => {
+	for (const [remote, supported] of [
+		["https://github.com/acme/app.git", true],
+		["git@github.com:acme/app.git", true],
+		["http://local_proxy@127.0.0.1:41729/git/acme/app", true],
+		["http://local_proxy@localhost/git/acme/app", true],
+		["https://enterprise.example/acme/app.git", false],
+		["https://enterprise.example:8443/acme/app.git", false],
+		["https://github.com:8443/acme/app.git", false],
+		["http://127.0.0.1:41729/acme/app", false],
+		["http://proxy.example/git/acme/app", false],
+	]) {
+		it(`routes or rejects ${remote} before sending a token`, async () => {
+			const cwd = mkdtempSync(join(tmpdir(), "github-identity-"));
+			const saved = process.env.GH_TOKEN;
+			process.env.GH_TOKEN = "fixture-token";
+			try {
+				execFileSync("git", ["init", "-q", cwd]);
+				execFileSync("git", ["-C", cwd, "remote", "add", "origin", remote]);
+				const fetchImpl = stubFetch({ number: 7 });
+				const ops = createGitHubOps({
+					cwd,
+					execGhImpl: stubExecGh({
+						"issue view": new Error("ENOENT"),
+						"issue edit": new Error("ENOENT"),
+					}),
+					fetchImpl,
+				});
+				if (supported) {
+					assert.deepEqual(
+						await ops.viewIssue({ number: 7, fields: ["number"] }),
+						{ number: 7 },
+					);
+					await ops.addIssueLabel({ number: 7, label: "fixture" });
+					assert.equal(fetchImpl.calls.length, 2);
+					assert.equal(
+						fetchImpl.calls[0].url,
+						"https://api.github.com/repos/acme/app/issues/7",
+					);
+					assert.equal(
+						fetchImpl.calls[1].url,
+						"https://api.github.com/repos/acme/app/issues/7/labels",
+					);
+				} else {
+					await assert.rejects(
+						ops.viewIssue({ number: 7, fields: ["number"] }),
+						/unsupported.*host/i,
+					);
+					await assert.rejects(
+						ops.addIssueLabel({ number: 7, label: "fixture" }),
+						/unsupported.*host/i,
+					);
+					assert.deepEqual(fetchImpl.calls, []);
+				}
+			} finally {
+				rmSync(cwd, { recursive: true, force: true });
+				if (saved === undefined) delete process.env.GH_TOKEN;
+				else process.env.GH_TOKEN = saved;
+			}
+		});
+	}
+});
+
 for (const value of [
 	{},
 	[],
