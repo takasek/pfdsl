@@ -356,7 +356,14 @@ const PR_VIEW_FIELDS = {
 	body: (pr) => (pr.body === null ? "" : pr.body),
 	headRefName: (pr) => pr.head?.ref,
 	number: (pr) => pr.number,
-	state: (pr) => pr.state,
+	state: (pr) => {
+		if (
+			!["open", "closed"].includes(pr.state) ||
+			typeof pr.merged !== "boolean"
+		)
+			throw new Error("github-rest: malformed pr view state/merged response");
+		return pr.merged ? "MERGED" : pr.state.toUpperCase();
+	},
 	title: (pr) => pr.title,
 	url: (pr) => pr.html_url,
 };
@@ -370,8 +377,7 @@ const CLOSING_ISSUES_FIELD = "closingIssuesReferences";
 
 /**
  * Assemble a `pr view --json` object from the two sources its fields come
- * from, so both PR selectors (by number, and by the current branch) merge them
- * the same way.
+ * from: the REST payload and GraphQL closing references.
  * @param {string[]} fields gh's --json field names
  * @param {Record<string, unknown> | null} pr the REST pull-request payload
  * @param {{number: number}[] | null} closing
