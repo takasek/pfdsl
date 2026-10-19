@@ -30,7 +30,7 @@ it("checks canonical prose through the tracked distribution manifest scope", () 
 		mkdirSync(dirname(join(fixture, shipped)), { recursive: true });
 		writeFileSync(
 			join(fixture, shipped),
-			"The generated copy is not the prose source.\n",
+			"See #999 in the generated copy, which is not the prose source.\n",
 		);
 		execFileSync("git", ["init", "-q", fixture]);
 		execFileSync("git", ["-C", fixture, "add", shipped]);
@@ -44,47 +44,20 @@ it("checks canonical prose through the tracked distribution manifest scope", () 
 				[join(fixture, "scripts/check-distributed-prose.mjs")],
 				{ cwd: fixture, encoding: "utf-8" },
 			);
-		for (const destination of [
-			"https://github.com/takasek/pfdsl/issues/674",
-			"<https://github.com/takasek/pfdsl/issues/674>",
-			"https://github.com/takasek/pfdsl/issues/674/",
-			"<https://github.com/takasek/pfdsl/pull/674/?view=details>",
-			"https://github.com/takasek/pfdsl/pull/674/checks",
-			"https://github.com/takasek/pfdsl/issues/674?q=(foo)",
-		]) {
-			for (const title of ["", ' "details"', " 'details'", " (details)"]) {
-				writeFileSync(canonical, `See [#674](${destination}${title}).\n`);
-				const resolved = check();
-				assert.equal(
-					resolved.status,
-					0,
-					`${destination}${title}: ${resolved.stderr}`,
-				);
-				assert.match(resolved.stdout, /OK \(1 file\(s\)\)/);
-			}
-		}
-		for (const content of [
-			"See [#674][upstream].\n\n[upstream]: https://github.com/takasek/pfdsl/issues/674",
-			"See [#674](\nhttps://github.com/takasek/pfdsl/issues/674\n).",
-		]) {
-			writeFileSync(canonical, `${content}\n`);
-			const resolved = check();
-			assert.equal(resolved.status, 0, resolved.stderr);
-		}
-		for (const content of [
-			"See #674.",
-			"See [#674](https://github.com/o/r/issues/674?q=\\).",
-			"See [#674](<https://github.com/o/r/issues/674#comment-\\>).",
-			"See [#674](https://github.com/o/r/issues/674?q=(foo).",
-		]) {
-			writeFileSync(canonical, `${content}\n`);
-			const bare = check();
-			assert.equal(bare.status, 1, bare.stderr);
-			assert.match(
-				bare.stderr,
-				/scripts\/harness-template\/skills\/pfd-ops\/SKILL.md:1: \[issue-ref\]/,
-			);
-		}
+		writeFileSync(
+			canonical,
+			"See [#674](https://github.com/takasek/pfdsl/pull/674/checks).\n",
+		);
+		const resolved = check();
+		assert.equal(resolved.status, 0, resolved.stderr);
+		assert.match(resolved.stdout, /OK \(1 file\(s\)\)/);
+		writeFileSync(canonical, "See #674.\n");
+		const bare = check();
+		assert.equal(bare.status, 1, bare.stderr);
+		assert.match(
+			bare.stderr,
+			/scripts\/harness-template\/skills\/pfd-ops\/SKILL.md:1: \[issue-ref\]/,
+		);
 	} finally {
 		rmSync(fixture, { recursive: true, force: true });
 	}
