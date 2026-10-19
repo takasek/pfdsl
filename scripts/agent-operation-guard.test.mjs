@@ -82,9 +82,11 @@ function fixture() {
 			agent_id,
 			agent_type,
 			environment = {},
+			payload: observedPayload,
+			processCwd = other,
 		} = {},
 	) => {
-		const payload = {
+		const payload = observedPayload ?? {
 			tool_name,
 			cwd,
 			session_id: "fixture-session",
@@ -96,7 +98,7 @@ function fixture() {
 			process.execPath,
 			[join(own, "scripts/agent-operation-guard.mjs")],
 			{
-				cwd: other,
+				cwd: processCwd,
 				env: {
 					...env,
 					CLAUDE_PROJECT_DIR: harness === "claude" ? own : "",
@@ -127,6 +129,293 @@ function fixture() {
 		cleanup: () => rmSync(root, { recursive: true, force: true }),
 	};
 }
+
+test("entry integration: replay observed Codex managed-outside hook inputs", () => {
+	const observed = JSON.parse(
+		readFileSync(
+			new URL(
+				"./lib/__fixtures__/codex-managed-outside-hook-inputs-2026-10-15.json",
+				import.meta.url,
+			),
+			"utf8",
+		),
+	);
+	assert.deepEqual(
+		observed.cases.map(({ name }) => name),
+		["read", "create", "remove", "negative"],
+	);
+	const f = fixture();
+	try {
+		const environment = Object.fromEntries(
+			[
+				"CODEX_THREAD_ID",
+				"CODEX_SESSION_ID",
+				"CODEX_AGENT_ID",
+				"CODEX_PARENT_THREAD_ID",
+				"CLAUDE_PROJECT_DIR",
+			].map((name) => [name, undefined]),
+		);
+		const invoke = (payload) =>
+			f.invoke(undefined, {
+				harness: "codex",
+				payload,
+				environment,
+				processCwd: f.own,
+			});
+		for (const {
+			name,
+			input,
+			environment: capturedEnvironment,
+		} of observed.cases) {
+			assert.deepEqual(capturedEnvironment, {}, name);
+			assert.equal(Object.hasOwn(input, "agent_id"), false, name);
+			assert.equal(Object.hasOwn(input, "agent_type"), false, name);
+			// Rebind physical roots, preserving the observed schema and relative paths.
+			const payload = JSON.parse(
+				JSON.stringify(input)
+					.replaceAll("/fixture/pfdsl/.worktrees/acceptance", f.own)
+					.replaceAll("/fixture/pfdsl", f.primary),
+			);
+			const result = invoke(payload);
+			assert.equal(result.status, 0, `${name}: ${result.out}`);
+			assert.equal(
+				result.decision,
+				name === "negative" ? "deny" : "allow",
+				name,
+			);
+			if (name === "negative") {
+				assert.match(
+					result.reason,
+					/Write only in your assigned linked worktree/,
+				);
+			}
+			if (name === "create" || name === "remove") {
+				// Synthetic contrasts: an ignored command or Delete header must not
+				// turn an otherwise identical primary-target patch into a read/allow.
+				const primaryTarget = {
+					...payload,
+					tool_input: {
+						command: payload.tool_input.command.replaceAll(f.own, f.primary),
+					},
+				};
+				const denied = invoke(primaryTarget);
+				assert.equal(denied.status, 0, denied.out);
+				assert.equal(denied.decision, "deny", `${name}: primary target`);
+				assert.match(
+					denied.reason,
+					/Write only in your assigned linked worktree/,
+				);
+			}
+		}
+	} finally {
+		f.cleanup();
+	}
+});
+
+test("entry integration: replay observed resumed Codex child hook inputs", () => {
+	const observed = JSON.parse(
+		readFileSync(
+			new URL(
+				"./lib/__fixtures__/codex-resumed-child-hook-inputs-2026-10-15.json",
+				import.meta.url,
+			),
+			"utf8",
+		),
+	);
+	assert.deepEqual(
+		observed.cases.map(({ name }) => name),
+		["create", "read", "update", "remove", "negative"],
+	);
+	const f = fixture();
+	try {
+		const environment = Object.fromEntries(
+			[
+				"CODEX_THREAD_ID",
+				"CODEX_SESSION_ID",
+				"CODEX_AGENT_ID",
+				"CODEX_PARENT_THREAD_ID",
+				"CLAUDE_PROJECT_DIR",
+			].map((name) => [name, undefined]),
+		);
+		const inputs = observed.cases.map(
+			({ input, environment: capturedEnvironment }) => {
+				assert.deepEqual(capturedEnvironment, {});
+				assert.notEqual(input.session_id, input.agent_id);
+				assert.equal(input.agent_type, "default");
+				return JSON.parse(
+					JSON.stringify(input)
+						.replaceAll("/fixture/codex/worktrees/acceptance/pfdsl", f.own)
+						.replaceAll("/fixture/pfdsl", f.primary),
+				);
+			},
+		);
+		const invoke = (payload) =>
+			f.invoke(undefined, {
+				harness: "codex",
+				payload,
+				environment,
+				processCwd: f.primary,
+			});
+		const missingOwner = invoke(inputs[0]);
+		assert.equal(missingOwner.status, 0, missingOwner.out);
+		assert.equal(missingOwner.decision, "deny");
+		assert.match(missingOwner.reason, /Recovery: parent/);
+		const metadata = f.git(f.own, [
+			"rev-parse",
+			"--git-path",
+			"codex-thread.json",
+		]);
+		writeFileSync(
+			metadata,
+			JSON.stringify({ version: 1, ownerThreadId: inputs[0].session_id }),
+		);
+		for (const [index, { name }] of observed.cases.entries()) {
+			const result = invoke(inputs[index]);
+			assert.equal(result.status, 0, `${name}: ${result.out}`);
+			assert.equal(
+				result.decision,
+				name === "negative" ? "deny" : "allow",
+				name,
+			);
+			if (name === "negative") {
+				assert.match(result.reason, /Return this operation to the parent/);
+				assert.match(result.reason, /A Codex child/);
+			}
+		}
+		// Synthetic contrasts distinguish child responsibility from target ownership.
+		const parentInput = { ...inputs.at(-1) };
+		delete parentInput.agent_id;
+		delete parentInput.agent_type;
+		assert.equal(invoke(parentInput).decision, "allow");
+		writeFileSync(
+			metadata,
+			JSON.stringify({ version: 1, ownerThreadId: inputs[0].agent_id }),
+		);
+		const childIdIsNotOwner = invoke(inputs[0]);
+		assert.equal(childIdIsNotOwner.status, 0, childIdIsNotOwner.out);
+		assert.equal(childIdIsNotOwner.decision, "deny");
+		assert.match(childIdIsNotOwner.reason, /Recovery: parent/);
+	} finally {
+		f.cleanup();
+	}
+});
+
+test("entry integration: replay observed Claude parent, child and live-peer Git inputs", () => {
+	const observed = JSON.parse(
+		readFileSync(
+			new URL(
+				"./lib/__fixtures__/claude-native-git-hook-inputs-2026-10-19.json",
+				import.meta.url,
+			),
+			"utf8",
+		),
+	);
+	assert.deepEqual(
+		observed.cases.map(({ name }) => name),
+		["parent-own-add", "child-own-add", "parent-peer-cd-add"],
+	);
+	assert.equal(observed.provenance.claudeCodeVersion, "2.1.299");
+	assert.deepEqual(
+		observed.cases.map(({ nativeResult }) => nativeResult.isError),
+		[false, false, true],
+	);
+	const f = fixture();
+	try {
+		const inputs = observed.cases.map(
+			({ input, environment, process: capturedProcess }) => {
+				assert.equal(input.cwd, observed.nativeEvidence.own.root);
+				assert.equal(capturedProcess.cwd, input.cwd);
+				assert.equal(
+					capturedProcess.parentPid,
+					observed.nativeEvidence.own.pid,
+				);
+				assert.equal(environment.CLAUDE_PROJECT_DIR, "/fixture/pfdsl");
+				return JSON.parse(
+					JSON.stringify(input)
+						.replaceAll(observed.nativeEvidence.own.root, f.own)
+						.replaceAll(observed.nativeEvidence.peer.root, f.other)
+						.replaceAll("/fixture/pfdsl", f.primary),
+				);
+			},
+		);
+		const parentKeys = [
+			"cwd",
+			"hook_event_name",
+			"permission_mode",
+			"session_id",
+			"tool_input",
+			"tool_name",
+			"tool_use_id",
+			"transcript_path",
+		].sort();
+		for (const index of [0, 2])
+			assert.deepEqual(Object.keys(inputs[index]).sort(), parentKeys);
+		assert.deepEqual(
+			Object.keys(inputs[1]).sort(),
+			[...parentKeys, "agent_id", "agent_type"].sort(),
+		);
+		assert.equal(typeof inputs[1].agent_id, "string");
+		assert.notEqual(inputs[1].agent_id.trim(), "");
+		assert.equal(inputs[1].agent_type, "general-purpose");
+		assert.notEqual(inputs[1].agent_id, inputs[1].session_id);
+		assert.equal(new Set(inputs.map(({ session_id }) => session_id)).size, 1);
+		const invoke = (payload) =>
+			f.invoke(undefined, {
+				payload,
+				processCwd: f.own,
+				environment: { CLAUDE_PROJECT_DIR: f.primary },
+			});
+		// Disposable replay: current test processes replace the captured native
+		// PID/start. These locks are not additional Desktop acceptance evidence.
+		const missingLock = invoke(inputs[0]);
+		assert.equal(missingLock.decision, "deny");
+		const start = (pid) =>
+			run("ps", ["-o", "lstart=", "-p", String(pid)], {
+				env: {
+					...withoutGitTargetEnvironment(process.env),
+					LC_ALL: "C",
+					TZ: "UTC",
+				},
+			}).trim();
+		for (const [target, pid, native] of [
+			[f.own, process.pid, observed.nativeEvidence.own],
+			[f.other, process.ppid, observed.nativeEvidence.peer],
+		]) {
+			const capturedReason = native.worktreeBlock
+				.split("\n")
+				.find((line) => line.startsWith("locked "))
+				.slice("locked ".length);
+			assert.ok(
+				capturedReason.includes(`pid ${native.pid} start ${native.start}`),
+			);
+			f.git(f.own, [
+				"worktree",
+				"lock",
+				"--reason",
+				capturedReason.replace(
+					`pid ${native.pid} start ${native.start}`,
+					`pid ${pid} start ${start(pid)}`,
+				),
+				target,
+			]);
+		}
+		for (const [index, { name }] of observed.cases.entries()) {
+			const result = invoke(inputs[index]);
+			assert.equal(result.status, 0, `${name}: ${result.out}`);
+			assert.equal(result.decision, index === 2 ? "deny" : "allow", name);
+			if (index === 2)
+				assert.match(
+					result.reason,
+					/Write only in your assigned linked worktree/,
+				);
+		}
+		// Removing the qualifying native evidence must revoke the positive replay.
+		f.git(f.own, ["worktree", "unlock", f.own]);
+		assert.equal(invoke(inputs[1]).decision, "deny");
+	} finally {
+		f.cleanup();
+	}
+});
 
 test("entry integration: normal and safety representatives for Claude and Codex", () => {
 	const f = fixture();

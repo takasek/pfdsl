@@ -1,0 +1,143 @@
+{
+	"schemaVersion": 1,
+	"provenance": {
+		"capturedDateUTC": "2026-10-19",
+		"client": "Claude Desktop",
+		"claudeCodeVersion": "2.1.299",
+		"testedHead": "b8302af901c696f01b55e640b0510142ac282989",
+		"evidenceSha256": "795251a1f56b6ed6ac6a4c05addc22b92e5510b1b391610275864be14499d007",
+		"scenario": "Fresh native owner and live peer; parent own add, foreground general-purpose child own add, parent literal cd plus absolute-C peer add.",
+		"capture": "Permission-neutral observer; selected native payload fields plus tool_input, CLAUDE_PROJECT_DIR and observer process fields.",
+		"acceptanceRecord": "docs/agent-operation-acceptance-2026-10-13.md",
+		"normalization": [
+			"Physical roots, session/agent/tool identities, lock names and process IDs replaced with fixture values; relationships and field presence preserved.",
+			"Captured tool_input recombined with the selected payload fields; literal shell structure retained.",
+			"Native UTC start strings and metadata record structure retained."
+		],
+		"limits": [
+			"Selected fields are not complete hook stdin or individual guard output.",
+			"Parent reads were batched in assistant messages; strict sequential dispatch was not achieved.",
+			"The final parent worktree-list command added a grep pipe.",
+			"The parent post-PPID read was denied by the native auto mode classifier; coordinator poststate is separate evidence.",
+			"Success results have is_error=false but no captured numeric exit code.",
+			"The peer command was denied before execution; this does not establish a changed or persistent shell cwd.",
+			"Disposable replay rebinds physical roots and current test PID/start; it is not another live Desktop trial."
+		]
+	},
+	"nativeEvidence": {
+		"own": {
+			"root": "/fixture/pfdsl/.claude/worktrees/owner",
+			"head": "b8302af901c696f01b55e640b0510142ac282989",
+			"branch": "worktree-fixture-owner",
+			"status": "",
+			"index": "",
+			"pid": 41001,
+			"start": "Mon Oct 19 04:09:10 2026",
+			"worktreeBlock": "worktree /fixture/pfdsl/.claude/worktrees/owner\nHEAD b8302af901c696f01b55e640b0510142ac282989\nbranch refs/heads/worktree-fixture-owner\nlocked claude session fixture-own (pid 41001 start Mon Oct 19 04:09:10 2026)"
+		},
+		"peer": {
+			"root": "/fixture/pfdsl/.claude/worktrees/peer",
+			"head": "b8302af901c696f01b55e640b0510142ac282989",
+			"branch": "worktree-fixture-peer",
+			"status": "",
+			"index": "",
+			"pid": 41002,
+			"start": "Mon Oct 19 04:09:21 2026",
+			"worktreeBlock": "worktree /fixture/pfdsl/.claude/worktrees/peer\nHEAD b8302af901c696f01b55e640b0510142ac282989\nbranch refs/heads/worktree-fixture-peer\nlocked claude session fixture-peer (pid 41002 start Mon Oct 19 04:09:21 2026)"
+		}
+	},
+	"cases": [
+		{
+			"name": "parent-own-add",
+			"sourceCaptureSha256": "65f1bfd98c66109c18ad4c8270ff355a5889bfc040edb866150acfaa00c0e3c1",
+			"toolIdCorrelation": "native-parent-or-child-transcript",
+			"input": {
+				"session_id": "fixture-claude-session",
+				"transcript_path": "/fixture/claude/projects/owner/fixture-claude-session.jsonl",
+				"cwd": "/fixture/pfdsl/.claude/worktrees/owner",
+				"hook_event_name": "PreToolUse",
+				"tool_name": "Bash",
+				"tool_use_id": "fixture-parent-own-add",
+				"permission_mode": "auto",
+				"tool_input": {
+					"command": "git -C /fixture/pfdsl/.claude/worktrees/owner add -- README.md"
+				}
+			},
+			"environment": {
+				"CLAUDE_PROJECT_DIR": "/fixture/pfdsl"
+			},
+			"process": {
+				"pid": 51001,
+				"parentPid": 41001,
+				"cwd": "/fixture/pfdsl/.claude/worktrees/owner"
+			},
+			"nativeResult": {
+				"isError": false,
+				"content": "(Bash completed with no output)",
+				"numericExitCode": null
+			}
+		},
+		{
+			"name": "child-own-add",
+			"sourceCaptureSha256": "e8bab7052b148d5bc9cd5064e44c76e29cd450be9d7afd49ac8aa841043c81c3",
+			"toolIdCorrelation": "native-parent-or-child-transcript",
+			"input": {
+				"session_id": "fixture-claude-session",
+				"transcript_path": "/fixture/claude/projects/owner/fixture-claude-session.jsonl",
+				"cwd": "/fixture/pfdsl/.claude/worktrees/owner",
+				"hook_event_name": "PreToolUse",
+				"tool_name": "Bash",
+				"tool_use_id": "fixture-child-own-add",
+				"agent_id": "fixture-claude-child",
+				"agent_type": "general-purpose",
+				"permission_mode": "auto",
+				"tool_input": {
+					"command": "git -C /fixture/pfdsl/.claude/worktrees/owner add -- README.md"
+				}
+			},
+			"environment": {
+				"CLAUDE_PROJECT_DIR": "/fixture/pfdsl"
+			},
+			"process": {
+				"pid": 51002,
+				"parentPid": 41001,
+				"cwd": "/fixture/pfdsl/.claude/worktrees/owner"
+			},
+			"nativeResult": {
+				"isError": false,
+				"content": "(Bash completed with no output)",
+				"numericExitCode": null
+			}
+		},
+		{
+			"name": "parent-peer-cd-add",
+			"sourceCaptureSha256": "5de674a6bcf18fbe73c9c5c6a8bbaf79fec34e52e02e5a0c074abb806779b881",
+			"toolIdCorrelation": "native-parent-or-child-transcript",
+			"input": {
+				"session_id": "fixture-claude-session",
+				"transcript_path": "/fixture/claude/projects/owner/fixture-claude-session.jsonl",
+				"cwd": "/fixture/pfdsl/.claude/worktrees/owner",
+				"hook_event_name": "PreToolUse",
+				"tool_name": "Bash",
+				"tool_use_id": "fixture-parent-peer-cd-add",
+				"permission_mode": "auto",
+				"tool_input": {
+					"command": "cd /fixture/pfdsl/.claude/worktrees/peer && git -C /fixture/pfdsl/.claude/worktrees/peer add -- .acceptance-missing"
+				}
+			},
+			"environment": {
+				"CLAUDE_PROJECT_DIR": "/fixture/pfdsl"
+			},
+			"process": {
+				"pid": 51003,
+				"parentPid": 41001,
+				"cwd": "/fixture/pfdsl/.claude/worktrees/owner"
+			},
+			"nativeResult": {
+				"isError": true,
+				"content": "PreToolUse:Bash hook error: Write only in your assigned linked worktree. Use native worktree creation for work; run git merge-tree --write-tree from your assigned worktree for a merge trial. Recovery: human terminal.",
+				"numericExitCode": null
+			}
+		}
+	]
+}

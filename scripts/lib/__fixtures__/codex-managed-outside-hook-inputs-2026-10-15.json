@@ -1,0 +1,150 @@
+{
+	"schemaVersion": 1,
+	"provenance": {
+		"capturedDateUTC": "2026-10-15",
+		"client": "Codex Desktop",
+		"appVersion": "26.1007.71326",
+		"scenario": "Resumed local parent turn in a linked worktree outside the Codex managed directory.",
+		"capture": "Passive diagnostic observer; selected input fields, original key names, and selected environment only.",
+		"evidenceSha256": "f37e9265db57f6bd10103430aa4370f8d00338406eb9cf9f0d435a3be75b50b3",
+		"acceptanceRecord": "docs/agent-operation-acceptance-2026-10-13.md",
+		"normalization": [
+			"Physical roots and probe basenames replaced with fixture paths.",
+			"Session, turn, and tool-use IDs replaced with fixture identities.",
+			"Input field presence, tool names, command structure, permission mode, and captured environment preserved."
+		],
+		"limits": [
+			"Selected input is not the complete raw stdin: model and transcript_path values were not captured.",
+			"Empty environment means only the observer allowlist was absent; not the entire process environment.",
+			"No agent-related input keys were present; session_id alone does not identify a parent.",
+			"The negative tool_use_id was not independently matched in native/raw records.",
+			"Replay in a disposable Git environment does not rerun native lifecycle or final-settings-only acceptance."
+		]
+	},
+	"cases": [
+		{
+			"name": "read",
+			"sourceCaptureSha256": "9e64d91a55906c1002f712bdefc04486b6ec4e7a15cd3593a3063d98019f963e",
+			"toolIdCorrelation": "native-and-raw-event",
+			"input": {
+				"hook_event_name": "PreToolUse",
+				"session_id": "fixture-codex-session",
+				"turn_id": "fixture-codex-turn",
+				"cwd": "/fixture/pfdsl/.worktrees/acceptance",
+				"tool_name": "Bash",
+				"tool_use_id": "fixture-read-call",
+				"permission_mode": "default",
+				"tool_input": {
+					"command": "git -C /fixture/pfdsl/.worktrees/acceptance status --short"
+				}
+			},
+			"payloadKeys": [
+				"cwd",
+				"hook_event_name",
+				"model",
+				"permission_mode",
+				"session_id",
+				"tool_input",
+				"tool_name",
+				"tool_use_id",
+				"transcript_path",
+				"turn_id"
+			],
+			"toolInputKeys": ["command"],
+			"environment": {}
+		},
+		{
+			"name": "create",
+			"sourceCaptureSha256": "d38bc6c712f8338cafba4362fe6fd45d5216e308a7a4b19bd166c20d285802d3",
+			"toolIdCorrelation": "native-and-raw-event",
+			"input": {
+				"hook_event_name": "PreToolUse",
+				"session_id": "fixture-codex-session",
+				"turn_id": "fixture-codex-turn",
+				"cwd": "/fixture/pfdsl/.worktrees/acceptance",
+				"tool_name": "apply_patch",
+				"tool_use_id": "fixture-create-call",
+				"permission_mode": "default",
+				"tool_input": {
+					"command": "*** Begin Patch\n*** Add File: /fixture/pfdsl/.worktrees/acceptance/.acceptance-hook-input.txt\n+acceptance probe: codex hook input\n*** End Patch"
+				}
+			},
+			"payloadKeys": [
+				"cwd",
+				"hook_event_name",
+				"model",
+				"permission_mode",
+				"session_id",
+				"tool_input",
+				"tool_name",
+				"tool_use_id",
+				"transcript_path",
+				"turn_id"
+			],
+			"toolInputKeys": ["command"],
+			"environment": {}
+		},
+		{
+			"name": "remove",
+			"sourceCaptureSha256": "65420f5eac96abff6cadba93927ec8c2a543c6b7580407905828f447808f85be",
+			"toolIdCorrelation": "native-and-raw-event",
+			"input": {
+				"hook_event_name": "PreToolUse",
+				"session_id": "fixture-codex-session",
+				"turn_id": "fixture-codex-turn",
+				"cwd": "/fixture/pfdsl/.worktrees/acceptance",
+				"tool_name": "apply_patch",
+				"tool_use_id": "fixture-remove-call",
+				"permission_mode": "default",
+				"tool_input": {
+					"command": "*** Begin Patch\n*** Delete File: /fixture/pfdsl/.worktrees/acceptance/.acceptance-hook-input.txt\n*** End Patch"
+				}
+			},
+			"payloadKeys": [
+				"cwd",
+				"hook_event_name",
+				"model",
+				"permission_mode",
+				"session_id",
+				"tool_input",
+				"tool_name",
+				"tool_use_id",
+				"transcript_path",
+				"turn_id"
+			],
+			"toolInputKeys": ["command"],
+			"environment": {}
+		},
+		{
+			"name": "negative",
+			"sourceCaptureSha256": "3fc9d6ddc1af7b2b3684cbf539c9a36eabe7031c15ad8768b3001a7259b567e6",
+			"toolIdCorrelation": "command-turn-time-only",
+			"input": {
+				"hook_event_name": "PreToolUse",
+				"session_id": "fixture-codex-session",
+				"turn_id": "fixture-codex-turn",
+				"cwd": "/fixture/pfdsl/.worktrees/acceptance",
+				"tool_name": "Bash",
+				"tool_use_id": "fixture-negative-call",
+				"permission_mode": "default",
+				"tool_input": {
+					"command": "git -C /fixture/pfdsl add -- .acceptance-primary-missing"
+				}
+			},
+			"payloadKeys": [
+				"cwd",
+				"hook_event_name",
+				"model",
+				"permission_mode",
+				"session_id",
+				"tool_input",
+				"tool_name",
+				"tool_use_id",
+				"transcript_path",
+				"turn_id"
+			],
+			"toolInputKeys": ["command"],
+			"environment": {}
+		}
+	]
+}

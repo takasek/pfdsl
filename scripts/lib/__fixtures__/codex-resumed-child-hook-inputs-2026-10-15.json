@@ -1,0 +1,202 @@
+{
+	"schemaVersion": 1,
+	"provenance": {
+		"capturedDateUTC": "2026-10-15",
+		"client": "Codex Desktop",
+		"appVersion": "26.1007.71326",
+		"scenario": "Later turns of the same existing child after its parent Desktop session had resumed; no newly spawned replacement child.",
+		"capture": "Passive diagnostic observer; selected input fields, original key names, and selected environment only.",
+		"evidenceSha256": "d630f87a73bf40f9d9617a4f23608db5cab87761301f2f84bb5026ff21af2c46",
+		"acceptanceRecord": "docs/agent-operation-acceptance-2026-10-13.md",
+		"normalization": [
+			"Physical roots and probe basenames replaced with fixture paths.",
+			"Parent, child, turn and tool-use identities replaced separately, preserving their relationships.",
+			"Field presence, tool names, literal command structure, permission mode and selected environment preserved."
+		],
+		"limits": [
+			"Selected input is not complete raw stdin; model and transcript_path values were not captured.",
+			"Empty environment means only the observer allowlist was absent, not the whole environment.",
+			"Hook cwd and hook-process cwd were the primary checkout, while actual child shell workdir was own.",
+			"The negative tool_use_id was not independently matched in native/raw records.",
+			"Retained child identity and later-turn execution do not prove every child process restart or native lifecycle.",
+			"Replay in disposable Git worktrees does not repeat Desktop lifecycle or final-settings-only acceptance."
+		]
+	},
+	"cases": [
+		{
+			"name": "create",
+			"sourceCaptureSha256": "c6d53a3390640ca6906fe0f10fc48e34622a5599db8eb7b2d4cde99b6581c7a7",
+			"toolIdCorrelation": "native-and-raw-event",
+			"input": {
+				"hook_event_name": "PreToolUse",
+				"session_id": "fixture-codex-parent",
+				"turn_id": "fixture-child-turn",
+				"cwd": "/fixture/pfdsl",
+				"tool_name": "apply_patch",
+				"tool_use_id": "fixture-child-create-call",
+				"agent_id": "fixture-codex-child",
+				"agent_type": "default",
+				"permission_mode": "default",
+				"tool_input": {
+					"command": "*** Begin Patch\n*** Add File: /fixture/codex/worktrees/acceptance/pfdsl/.acceptance-child-hook-input.txt\n+acceptance probe: codex child resume before\n*** End Patch"
+				}
+			},
+			"payloadKeys": [
+				"agent_id",
+				"agent_type",
+				"cwd",
+				"hook_event_name",
+				"model",
+				"permission_mode",
+				"session_id",
+				"tool_input",
+				"tool_name",
+				"tool_use_id",
+				"transcript_path",
+				"turn_id"
+			],
+			"toolInputKeys": ["command"],
+			"environment": {}
+		},
+		{
+			"name": "read",
+			"sourceCaptureSha256": "3a0aae586dc2693e98238c163e2668f8194a79bc22064a0f683a5449235273a5",
+			"toolIdCorrelation": "native-and-raw-event",
+			"input": {
+				"hook_event_name": "PreToolUse",
+				"session_id": "fixture-codex-parent",
+				"turn_id": "fixture-child-turn",
+				"cwd": "/fixture/pfdsl",
+				"tool_name": "Bash",
+				"tool_use_id": "fixture-child-read-call",
+				"agent_id": "fixture-codex-child",
+				"agent_type": "default",
+				"permission_mode": "default",
+				"tool_input": {
+					"command": "cat /fixture/codex/worktrees/acceptance/pfdsl/.acceptance-child-hook-input.txt"
+				}
+			},
+			"payloadKeys": [
+				"agent_id",
+				"agent_type",
+				"cwd",
+				"hook_event_name",
+				"model",
+				"permission_mode",
+				"session_id",
+				"tool_input",
+				"tool_name",
+				"tool_use_id",
+				"transcript_path",
+				"turn_id"
+			],
+			"toolInputKeys": ["command"],
+			"environment": {}
+		},
+		{
+			"name": "update",
+			"sourceCaptureSha256": "bd5c36a188460d4a078ed796fd8fff885ed03d6700808baeaf0a9108eea8537e",
+			"toolIdCorrelation": "native-and-raw-event",
+			"input": {
+				"hook_event_name": "PreToolUse",
+				"session_id": "fixture-codex-parent",
+				"turn_id": "fixture-child-turn",
+				"cwd": "/fixture/pfdsl",
+				"tool_name": "apply_patch",
+				"tool_use_id": "fixture-child-update-call",
+				"agent_id": "fixture-codex-child",
+				"agent_type": "default",
+				"permission_mode": "default",
+				"tool_input": {
+					"command": "*** Begin Patch\n*** Update File: /fixture/codex/worktrees/acceptance/pfdsl/.acceptance-child-hook-input.txt\n@@\n-acceptance probe: codex child resume before\n+acceptance probe: codex child resume after\n*** End Patch"
+				}
+			},
+			"payloadKeys": [
+				"agent_id",
+				"agent_type",
+				"cwd",
+				"hook_event_name",
+				"model",
+				"permission_mode",
+				"session_id",
+				"tool_input",
+				"tool_name",
+				"tool_use_id",
+				"transcript_path",
+				"turn_id"
+			],
+			"toolInputKeys": ["command"],
+			"environment": {}
+		},
+		{
+			"name": "remove",
+			"sourceCaptureSha256": "3fbe6d1ee26c9984685e4067adc6c5c34f1c51ba02f30de548a58bf4a52a64b4",
+			"toolIdCorrelation": "native-and-raw-event",
+			"input": {
+				"hook_event_name": "PreToolUse",
+				"session_id": "fixture-codex-parent",
+				"turn_id": "fixture-child-turn",
+				"cwd": "/fixture/pfdsl",
+				"tool_name": "apply_patch",
+				"tool_use_id": "fixture-child-remove-call",
+				"agent_id": "fixture-codex-child",
+				"agent_type": "default",
+				"permission_mode": "default",
+				"tool_input": {
+					"command": "*** Begin Patch\n*** Delete File: /fixture/codex/worktrees/acceptance/pfdsl/.acceptance-child-hook-input.txt\n*** End Patch"
+				}
+			},
+			"payloadKeys": [
+				"agent_id",
+				"agent_type",
+				"cwd",
+				"hook_event_name",
+				"model",
+				"permission_mode",
+				"session_id",
+				"tool_input",
+				"tool_name",
+				"tool_use_id",
+				"transcript_path",
+				"turn_id"
+			],
+			"toolInputKeys": ["command"],
+			"environment": {}
+		},
+		{
+			"name": "negative",
+			"sourceCaptureSha256": "1be2a299091f18a97162afa4544063bae42ec63e3defb20b1dd31900564205c8",
+			"toolIdCorrelation": "command-turn-time-only",
+			"input": {
+				"hook_event_name": "PreToolUse",
+				"session_id": "fixture-codex-parent",
+				"turn_id": "fixture-child-turn",
+				"cwd": "/fixture/pfdsl",
+				"tool_name": "Bash",
+				"tool_use_id": "fixture-child-negative-call",
+				"agent_id": "fixture-codex-child",
+				"agent_type": "default",
+				"permission_mode": "default",
+				"tool_input": {
+					"command": "git -C /fixture/codex/worktrees/acceptance/pfdsl add -- .acceptance-child-missing"
+				}
+			},
+			"payloadKeys": [
+				"agent_id",
+				"agent_type",
+				"cwd",
+				"hook_event_name",
+				"model",
+				"permission_mode",
+				"session_id",
+				"tool_input",
+				"tool_name",
+				"tool_use_id",
+				"transcript_path",
+				"turn_id"
+			],
+			"toolInputKeys": ["command"],
+			"environment": {}
+		}
+	]
+}
