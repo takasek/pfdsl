@@ -46,6 +46,31 @@ describe("bundle-path rule", () => {
 });
 
 describe("issue-ref rule", () => {
+	for (const kind of ["issues", "pull"]) {
+		for (const suffix of ["/", "/?view=details", "/#issuecomment-123"]) {
+			for (const angle of [false, true]) {
+				const url = `https://github.com/takasek/pfdsl/${kind}/674${suffix}`;
+				const destination = angle ? `<${url}>` : url;
+				it(`allows a resolved URL with a trailing slash: ${destination}`, () => {
+					assert.deepEqual(rules(`See [#674](${destination}).`), []);
+					const found = findRepoSpecificProse(
+						at(`See [#674](${destination}) and #675.`),
+					);
+					assert.equal(found.length, 1);
+					assert.match(found[0].reason, /#675/);
+				});
+			}
+		}
+	}
+	for (const suffix of ["?q=\\", "#comment-\\", "?q=\\x", "#comment-\\x"]) {
+		for (const angle of [false, true]) {
+			const url = `https://github.com/o/r/issues/674${suffix}`;
+			const destination = angle ? `<${url}>` : url;
+			it(`retains the warning for escaped URL syntax: ${destination}`, () => {
+				assert.deepEqual(rules(`See [#674](${destination}).`), ["issue-ref"]);
+			});
+		}
+	}
 	for (const destination of [
 		"https://github.com/takasek/pfdsl/issues/674",
 		"<https://github.com/takasek/pfdsl/issues/674>",

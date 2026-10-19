@@ -47,6 +47,8 @@ it("checks canonical prose through the tracked distribution manifest scope", () 
 		for (const destination of [
 			"https://github.com/takasek/pfdsl/issues/674",
 			"<https://github.com/takasek/pfdsl/issues/674>",
+			"https://github.com/takasek/pfdsl/issues/674/",
+			"<https://github.com/takasek/pfdsl/pull/674/?view=details>",
 		]) {
 			for (const title of ["", ' "details"', " 'details'", " (details)"]) {
 				writeFileSync(canonical, `See [#674](${destination}${title}).\n`);
@@ -59,13 +61,19 @@ it("checks canonical prose through the tracked distribution manifest scope", () 
 				assert.match(resolved.stdout, /OK \(1 file\(s\)\)/);
 			}
 		}
-		writeFileSync(canonical, "See #674.\n");
-		const bare = check();
-		assert.equal(bare.status, 1, bare.stderr);
-		assert.match(
-			bare.stderr,
-			/scripts\/harness-template\/skills\/pfd-ops\/SKILL.md:1: \[issue-ref\]/,
-		);
+		for (const content of [
+			"See #674.",
+			"See [#674](https://github.com/o/r/issues/674?q=\\).",
+			"See [#674](<https://github.com/o/r/issues/674#comment-\\>).",
+		]) {
+			writeFileSync(canonical, `${content}\n`);
+			const bare = check();
+			assert.equal(bare.status, 1, bare.stderr);
+			assert.match(
+				bare.stderr,
+				/scripts\/harness-template\/skills\/pfd-ops\/SKILL.md:1: \[issue-ref\]/,
+			);
+		}
 	} finally {
 		rmSync(fixture, { recursive: true, force: true });
 	}

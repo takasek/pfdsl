@@ -19,7 +19,7 @@ function stripCode(line) {
 	return line.replace(/`[^`]*`/g, "\0");
 }
 
-const ISSUE_URL = String.raw`https:\/\/github\.com\/[\w.-]+\/[\w.-]+\/(?:issues|pull)\/\d+(?:[?#][^\s)<>]*)?`;
+const ISSUE_URL = String.raw`https:\/\/github\.com\/[\w.-]+\/[\w.-]+\/(?:issues|pull)\/\d+\/?(?:[?#][^\s)<>\\]*)?`;
 const LINK_DESTINATION = `(?:${ISSUE_URL}|<${ISSUE_URL}>)`;
 const LINK_TITLE = String.raw`(?:"[^"\n]*"|'[^'\n]*'|\([^()\n]*\))`;
 const RESOLVED_ISSUE_LINK = new RegExp(
@@ -35,6 +35,7 @@ const RESOLVED_ISSUE_LINK = new RegExp(
  * navigable links and do not exempt their alt text. URL/label semantic
  * agreement remains human review's responsibility.
  * Destinations may use angle brackets; titles may use quotes or parentheses.
+ * A trailing URL slash is allowed; backslashes in URL suffixes are not.
  */
 function stripResolvedIssueLinks(line) {
 	return line.replace(RESOLVED_ISSUE_LINK, "");
