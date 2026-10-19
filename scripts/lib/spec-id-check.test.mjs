@@ -8,6 +8,31 @@ import {
 	formatSpecIdViolations,
 } from "./spec-id-check.mjs";
 
+describe("parsed code exclusion", () => {
+	it("keeps SPEC markers in separate table cells outside code spans", () => {
+		const text =
+			"| a | b |\n| --- | --- |\n| ` | (SPEC_real) [[SPEC_real]] |\n| ` | text |";
+		assert.deepEqual(findSpecIdDefinitions(text), [
+			{ line: 3, id: "SPEC_real" },
+		]);
+		assert.deepEqual(findStrictRefs(text), [{ line: 3, id: "SPEC_real" }]);
+	});
+	it("ignores multiline code examples while preserving real marker line numbers", () => {
+		const text =
+			"😀 `example\r\n(SPEC_quoted) [[SPEC_quoted]]\r\n` (SPEC_real) [[SPEC_real]]\r\n";
+		assert.deepEqual(findSpecIdDefinitions(text), [
+			{ line: 3, id: "SPEC_real" },
+		]);
+		assert.deepEqual(findStrictRefs(text), [{ line: 3, id: "SPEC_real" }]);
+	});
+
+	it("does not create markers by joining prose across code spans", () => {
+		const text = "(SPEC_`example`fake) [[SPEC_`example`fake]]";
+		assert.deepEqual(findSpecIdDefinitions(text), []);
+		assert.deepEqual(findStrictRefs(text), []);
+	});
+});
+
 describe("findSpecIdDefinitions", () => {
 	it("finds a single marker on a heading line", () => {
 		const text =

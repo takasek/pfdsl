@@ -1,7 +1,7 @@
 /**
  * Pure functions for the SPEC_<id> strict-reference lint (#328): matches
- * `(SPEC_<id>)` id definitions (any non-fenced, non-inline-code line — heading,
- * list item, table row, or bare paragraph) against `[[SPEC_<id>]]` strict
+ * `(SPEC_<id>)` id definitions outside parsed code blocks and code spans
+ * (heading, list item, table row, or bare paragraph) against `[[SPEC_<id>]]` strict
  * references, so callers can flag (a) an id defined more than once and (b) a
  * strict reference with no matching definition anywhere in the corpus.
  *
@@ -11,25 +11,39 @@
  * the id character class.
  */
 
-import { forEachNonFencedLine } from "./forward-ref-marker-check.mjs";
+import { fromMarkdown } from "mdast-util-from-markdown";
+import { gfmTableFromMarkdown } from "mdast-util-gfm-table";
+import { gfmTable } from "micromark-extension-gfm-table";
 
 const DEFINITION_RE = /\(SPEC_([A-Za-z0-9_]+)\)/g;
 const STRICT_REF_RE = /\[\[SPEC_([A-Za-z0-9_]+)\]\]/g;
-const INLINE_CODE_RE = /(`+)[\s\S]*?\1(?!`)/g;
 
 /**
- * Blanks out inline code spans on a line so markers quoted inside them
- * aren't matched. Follows the CommonMark code span rule: a span opens with
- * a run of one or more backticks and closes at the next run of exactly the
- * same length (the trailing `(?!`)` rejects a shorter run that's actually
- * a prefix of a longer one, e.g. `` ` `` closing a `` `` `` open), so
- * multi-backtick fences (`` `` ``) are handled the same as single pairs
- * (#328, #398).
- * @param {string} line
- * @returns {string}
+ * Masks parsed code blocks and code spans without joining surrounding prose
+ * or changing line numbers. SPEC syntax remains matched against source text.
  */
-function stripInlineCode(line) {
-	return line.replace(INLINE_CODE_RE, "");
+function nonCodeLines(text) {
+	const chars = text.split("");
+	function visit(node) {
+		if (node.type === "code" || node.type === "inlineCode") {
+			for (
+				let i = node.position.start.offset;
+				i < node.position.end.offset;
+				i++
+			) {
+				if (chars[i] !== "\n" && chars[i] !== "\r") chars[i] = " ";
+			}
+			return;
+		}
+		for (const child of node.children ?? []) visit(child);
+	}
+	visit(
+		fromMarkdown(text, {
+			extensions: [gfmTable()],
+			mdastExtensions: [gfmTableFromMarkdown()],
+		}),
+	);
+	return chars.join("").split("\n");
 }
 
 /**
@@ -38,10 +52,9 @@ function stripInlineCode(line) {
  */
 export function findSpecIdDefinitions(text) {
 	const hits = [];
-	forEachNonFencedLine(text, (line, lineNumber) => {
-		const stripped = stripInlineCode(line);
-		for (const match of stripped.matchAll(DEFINITION_RE)) {
-			hits.push({ line: lineNumber, id: `SPEC_${match[1]}` });
+	nonCodeLines(text).forEach((line, index) => {
+		for (const match of line.matchAll(DEFINITION_RE)) {
+			hits.push({ line: index + 1, id: `SPEC_${match[1]}` });
 		}
 	});
 	return hits;
@@ -53,10 +66,9 @@ export function findSpecIdDefinitions(text) {
  */
 export function findStrictRefs(text) {
 	const hits = [];
-	forEachNonFencedLine(text, (line, lineNumber) => {
-		const stripped = stripInlineCode(line);
-		for (const match of stripped.matchAll(STRICT_REF_RE)) {
-			hits.push({ line: lineNumber, id: `SPEC_${match[1]}` });
+	nonCodeLines(text).forEach((line, index) => {
+		for (const match of line.matchAll(STRICT_REF_RE)) {
+			hits.push({ line: index + 1, id: `SPEC_${match[1]}` });
 		}
 	});
 	return hits;
