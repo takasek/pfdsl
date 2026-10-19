@@ -96,7 +96,7 @@ function normalizeIssueViewComments(issue) {
 
 /**
  * @param {string} cwd
- * @returns {{host: string, owner: string, repo: string}}
+ * @returns {{identity: {host: string, owner: string, repo: string}, httpSupported: boolean}}
  */
 function repositoryFromGitRemote(cwd) {
 	let remoteUrl;
@@ -119,7 +119,16 @@ function repositoryFromGitRemote(cwd) {
 		throw new Error(
 			`could not determine host/owner/repo from git remote: ${remoteUrl}`,
 		);
-	return { host, ...ownerRepo };
+	// Only the documented loopback /git/owner/repo transport stands for
+	// public GitHub. A different proxy's upstream cannot be inferred.
+	const localProxy =
+		/^http:\/\/(?:[^/@]+@)?(?:127\.0\.0\.1|localhost)(?::\d+)?\/git\/[^/]+\/[^/]+\/?$/.test(
+			remoteUrl,
+		);
+	return {
+		identity: { host, ...ownerRepo },
+		httpSupported: host.toLowerCase() === "github.com" || localProxy,
+	};
 }
 
 /**
@@ -139,17 +148,23 @@ export function createGitHubOps({
 	// `cwd` is fixed for this instance, so the repo it names is too. Resolving
 	// it once keeps a gate-check run that walks several issues from spawning
 	// `git remote get-url origin` per operation.
-	/** @type {{host: string, owner: string, repo: string} | undefined} */
+	/** @type {ReturnType<typeof repositoryFromGitRemote> | undefined} */
 	let repositoryCache;
-	const repository = () => (repositoryCache ??= repositoryFromGitRemote(cwd));
+	const resolvedRepository = () =>
+		(repositoryCache ??= repositoryFromGitRemote(cwd));
+	const repository = () => resolvedRepository().identity;
 	const ownerRepo = () => {
+		if (!resolvedRepository().httpSupported)
+			throw new Error(
+				`github-ops: unsupported HTTP fallback host: ${repository().host}; use the gh CLI for this repository`,
+			);
 		const { owner, repo } = repository();
 		return { owner, repo };
 	};
 
 	/**
 	 * Runs `ghCall`, and on a genuine gh-unavailable ENOENT with a token
-	 * present, resolves this repo's owner/repo and runs `httpCall` with it.
+	 * present, checks HTTP host support, then runs `httpCall` for this repo.
 	 * A missing gh with no token becomes GitHubUnavailableError. Other gh
 	 * errors remain unchanged. `httpCall` undefined means this operation has no HTTP
 	 * implementation: once gh is confirmed unavailable and a token is
