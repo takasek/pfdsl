@@ -44,13 +44,21 @@ it("checks canonical prose through the tracked distribution manifest scope", () 
 				[join(fixture, "scripts/check-distributed-prose.mjs")],
 				{ cwd: fixture, encoding: "utf-8" },
 			);
-		writeFileSync(
-			canonical,
-			"See [#674](https://github.com/takasek/pfdsl/issues/674).\n",
-		);
-		const resolved = check();
-		assert.equal(resolved.status, 0, resolved.stderr);
-		assert.match(resolved.stdout, /OK \(1 file\(s\)\)/);
+		for (const destination of [
+			"https://github.com/takasek/pfdsl/issues/674",
+			"<https://github.com/takasek/pfdsl/issues/674>",
+		]) {
+			for (const title of ["", ' "details"', " 'details'", " (details)"]) {
+				writeFileSync(canonical, `See [#674](${destination}${title}).\n`);
+				const resolved = check();
+				assert.equal(
+					resolved.status,
+					0,
+					`${destination}${title}: ${resolved.stderr}`,
+				);
+				assert.match(resolved.stdout, /OK \(1 file\(s\)\)/);
+			}
+		}
 		writeFileSync(canonical, "See #674.\n");
 		const bare = check();
 		assert.equal(bare.status, 1, bare.stderr);

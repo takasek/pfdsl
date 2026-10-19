@@ -15,9 +15,17 @@
 
 /** Inline code is quoted material — an example, not a claim about this repo. */
 function stripCode(line) {
-	// Keep a boundary so removing code cannot join prose into a new link.
-	return line.replace(/`[^`]*`/g, " ");
+	// Keep a non-whitespace boundary: code must not supply link syntax or spacing.
+	return line.replace(/`[^`]*`/g, "\0");
 }
+
+const ISSUE_URL = String.raw`https:\/\/github\.com\/[\w.-]+\/[\w.-]+\/(?:issues|pull)\/\d+(?:[?#][^\s)<>]*)?`;
+const LINK_DESTINATION = `(?:${ISSUE_URL}|<${ISSUE_URL}>)`;
+const LINK_TITLE = String.raw`(?:"[^"\n]*"|'[^'\n]*'|\([^()\n]*\))`;
+const RESOLVED_ISSUE_LINK = new RegExp(
+	String.raw`(?<![!\\])\[[^[\]\\\n]*\]\([ \t]*${LINK_DESTINATION}(?:[ \t]+${LINK_TITLE})?[ \t]*\)`,
+	"g",
+);
 
 /**
  * Exclude single-line inline links to explicit GitHub issue/PR URLs from the
@@ -26,12 +34,10 @@ function stripCode(line) {
  * those still need an explicit inline link or human review. Images are not
  * navigable links and do not exempt their alt text. URL/label semantic
  * agreement remains human review's responsibility.
+ * Destinations may use angle brackets; titles may use quotes or parentheses.
  */
 function stripResolvedIssueLinks(line) {
-	return line.replace(
-		/(?<![!\\])\[[^[\]\\\n]*\]\(https:\/\/github\.com\/[\w.-]+\/[\w.-]+\/(?:issues|pull)\/\d+(?:[?#][^\s)]*)?(?:\s+"[^"\n]*")?\)/g,
-		"",
-	);
+	return line.replace(RESOLVED_ISSUE_LINK, "");
 }
 
 const RULES = [

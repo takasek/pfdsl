@@ -46,9 +46,35 @@ describe("bundle-path rule", () => {
 });
 
 describe("issue-ref rule", () => {
+	for (const destination of [
+		"https://github.com/takasek/pfdsl/issues/674",
+		"<https://github.com/takasek/pfdsl/issues/674>",
+	]) {
+		for (const title of ["", ' "details"', " 'details'", " (details)"]) {
+			it(`allows standard inline delimiters: ${destination}${title}`, () => {
+				const link = `[#674](${destination}${title})`;
+				assert.deepEqual(rules(`See ${link}.`), []);
+				assert.deepEqual(rules(`See [#674]( ${destination}${title} ).`), []);
+				const found = findRepoSpecificProse(at(`ok\nSee ${link} and #603.`));
+				assert.equal(found.length, 1);
+				assert.equal(found[0].line, 2);
+				assert.match(found[0].reason, /#603/);
+			});
+		}
+	}
+	for (const destination of [
+		"<https://github.com/takasek/pfdsl/issues/674",
+		"https://github.com/takasek/pfdsl/issues/674>",
+	]) {
+		it(`rejects unmatched destination delimiters: ${destination}`, () => {
+			assert.deepEqual(rules(`See [#674](${destination}).`), ["issue-ref"]);
+		});
+	}
 	for (const content of [
 		"See [#674]`example`(https://github.com/takasek/pfdsl/issues/674).",
 		"See [#674](https://github.com/`example`takasek/pfdsl/issues/674).",
+		"See [#674](`example`https://github.com/takasek/pfdsl/issues/674).",
+		'See [#674](https://github.com/takasek/pfdsl/issues/674`example` "details").',
 	]) {
 		it(`does not join code-separated text into a resolved link: ${content}`, () => {
 			assert.deepEqual(rules(content), ["issue-ref"]);
