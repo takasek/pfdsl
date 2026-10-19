@@ -7,6 +7,45 @@ import {
 	resolveCheckTarget,
 } from "./companion-binding-check.mjs";
 
+describe("parsed companion references", () => {
+	it("checks used reference destinations but not unused definitions or code examples", () => {
+		const text =
+			"[guide][ref] ![image](docs/image.png 'preview') ` [example](docs/fake.md) `\n\n[ref]: docs/guide.md\n[unused]: docs/unused.md";
+		assert.deepEqual(extractPathReferences(text), [
+			"docs/guide.md",
+			"docs/image.png",
+		]);
+	});
+
+	it("resolves relative references and titled links for the relative-path checker", () => {
+		const text =
+			"[guide][ref] [other](./other.md 'details')\n\n[ref]: ../guide.md#intro";
+		assert.deepEqual(extractRelativeMarkdownLinks(text), [
+			"../guide.md",
+			"./other.md",
+		]);
+	});
+
+	it("ignores paths and apparent headings throughout a code block", () => {
+		const text =
+			"````md\n```\n# Required\n`docs/fake.md` [fake](./fake.md)\n````\n";
+		assert.deepEqual(extractPathReferences(text), []);
+		assert.deepEqual(extractRelativeMarkdownLinks(text), []);
+		assert.deepEqual(findMissingHeadings(text, ["Required"]), ["Required"]);
+	});
+
+	it("retains the raw ATX heading policy", () => {
+		assert.deepEqual(
+			findMissingHeadings("Setext\n===\n\n  # Indented\n\n# Raw\n", [
+				"Setext",
+				"Indented",
+				"Raw",
+			]),
+			["Setext", "Indented"],
+		);
+	});
+});
+
 describe("extractPathReferences", () => {
 	it("extracts inline-code paths starting with docs/, .claude/, scripts/, packages/", () => {
 		const text =

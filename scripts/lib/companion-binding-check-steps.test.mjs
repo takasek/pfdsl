@@ -16,6 +16,37 @@ function baseDeps(overrides = {}) {
 }
 
 describe("runCompanionBindingsCheck", () => {
+	it("keeps a spaced repo destination in the repo-root path check", () => {
+		const result = runCompanionBindingsCheck(
+			baseDeps({
+				listFiles: () => [".pfdsl/workflow.md"],
+				readFile: () => "[guide](<docs/a b.md>)",
+				exists: (path) => path === "docs/a b.md",
+			}),
+		);
+		assert.equal(result.exitCode, 0, result.stderrLines.join("\n"));
+	});
+	it("reports resolved reference targets through both path checks", () => {
+		const result = runCompanionBindingsCheck(
+			baseDeps({
+				listFiles: () => [".pfdsl/workflow.md"],
+				readFile: () =>
+					"[root][r] [local][l]\n\n[r]: docs/gone.md\n[l]: ./gone.md",
+			}),
+		);
+		assert.equal(result.exitCode, 1);
+		assert.ok(
+			result.stderrLines.some((line) =>
+				line.includes("dead path reference `docs/gone.md`"),
+			),
+		);
+		assert.ok(
+			result.stderrLines.some((line) =>
+				line.includes("resolved: .pfdsl/gone.md"),
+			),
+		);
+		assert.match(result.stderrLines.at(-1), /2 error\(s\)/);
+	});
 	it("keeps historical references without exempting current bindings or lookalike paths", () => {
 		for (const [file, expected] of [
 			[".pfdsl/bindings/pfd-retro-patterns/case.md", 0],
