@@ -15,7 +15,23 @@
 
 /** Inline code is quoted material — an example, not a claim about this repo. */
 function stripCode(line) {
-	return line.replace(/`[^`]*`/g, "");
+	// Keep a boundary so removing code cannot join prose into a new link.
+	return line.replace(/`[^`]*`/g, " ");
+}
+
+/**
+ * Exclude single-line inline links to explicit GitHub issue/PR URLs from the
+ * issue-reference rule. This lightweight scanner does not resolve reference-
+ * style links, multiline links, nested labels, or escaped Markdown syntax;
+ * those still need an explicit inline link or human review. Images are not
+ * navigable links and do not exempt their alt text. URL/label semantic
+ * agreement remains human review's responsibility.
+ */
+function stripResolvedIssueLinks(line) {
+	return line.replace(
+		/(?<![!\\])\[[^[\]\\\n]*\]\(https:\/\/github\.com\/[\w.-]+\/[\w.-]+\/(?:issues|pull)\/\d+(?:[?#][^\s)]*)?(?:\s+"[^"\n]*")?\)/g,
+		"",
+	);
 }
 
 const RULES = [
@@ -39,7 +55,7 @@ const RULES = [
 		// resolves to the upstream repo for the reader, a bare issue number
 		// resolves to whatever the reader's own tracker holds under that number.
 		test(line) {
-			const m = /#\d{2,}/.exec(stripCode(line));
+			const m = /#\d{2,}/.exec(stripResolvedIssueLinks(stripCode(line)));
 			return m
 				? `bare issue reference ${m[0]} — adopters cannot resolve it`
 				: undefined;

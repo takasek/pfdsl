@@ -46,6 +46,61 @@ describe("bundle-path rule", () => {
 });
 
 describe("issue-ref rule", () => {
+	for (const content of [
+		"See [#674]`example`(https://github.com/takasek/pfdsl/issues/674).",
+		"See [#674](https://github.com/`example`takasek/pfdsl/issues/674).",
+	]) {
+		it(`does not join code-separated text into a resolved link: ${content}`, () => {
+			assert.deepEqual(rules(content), ["issue-ref"]);
+		});
+	}
+	for (const label of ["#674", "takasek/pfdsl#674"]) {
+		it(`allows a resolved upstream inline label: ${label}`, () => {
+			assert.deepEqual(
+				rules(`See [${label}](https://github.com/takasek/pfdsl/issues/674).`),
+				[],
+			);
+		});
+	}
+	it("allows a pull request URL with a fragment and link title", () => {
+		assert.deepEqual(
+			rules(
+				'See [#674](https://github.com/takasek/pfdsl/pull/674#issuecomment-123 "details").',
+			),
+			[],
+		);
+	});
+	it("still reports bare references alongside resolved links with the source line", () => {
+		const found = findRepoSpecificProse(
+			at(
+				"ok\nSee [#674](https://github.com/takasek/pfdsl/issues/674) and #603.",
+			),
+		);
+		assert.equal(found.length, 1);
+		assert.equal(found[0].line, 2);
+		assert.match(found[0].reason, /#603/);
+	});
+	for (const content of [
+		"See [#674](issues/674).",
+		"See [#674](https://example.com/issues/674).",
+		"See [#674](https://github.com/takasek/pfdsl).",
+		"See [#674][upstream].\n[upstream]: https://github.com/takasek/pfdsl/issues/674",
+		"![#674](https://github.com/takasek/pfdsl/issues/674)",
+		"See [#674\\](https://github.com/takasek/pfdsl/issues/674).",
+		"See \\[#674](https://github.com/takasek/pfdsl/issues/674).",
+	]) {
+		it(`retains the warning for unsupported link syntax or destination: ${content}`, () => {
+			assert.deepEqual(rules(content), ["issue-ref"]);
+		});
+	}
+	it("keeps the bundle path rule active inside a resolved link label", () => {
+		assert.deepEqual(
+			rules(
+				"[.claude/skills/pfd-ops/#674](https://github.com/takasek/pfdsl/issues/674)",
+			),
+			["bundle-path"],
+		);
+	});
 	it("flags a bare issue citation", () => {
 		const found = findRepoSpecificProse(
 			at("素の `--deploy` を先に実行する（#603）。\n"),
