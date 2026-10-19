@@ -46,6 +46,64 @@ describe("bundle-path rule", () => {
 });
 
 describe("issue-ref rule", () => {
+	for (const content of [
+		"See [#674](https://github.com/o/r/issues/674?q=(foo)).",
+		"See [#674](https://github.com/o/r/pull/674/checks).",
+		"See [#674](https://github.com/o/r/pull/674/files).",
+		"See [#674](https://github.com/o/r/pull/674/commits).",
+		"See [#674][upstream].\n\n[upstream]: https://github.com/o/r/issues/674",
+		"See [#674][].\n\n[#674]: https://github.com/o/r/issues/674",
+		"See [#674](\nhttps://github.com/o/r/issues/674\n).",
+		"See [label \\] #674](https://github.com/o/r/issues/674).",
+		"See [**#674**](https://github.com/o/r/issues/674).",
+		"``example `#674` text``",
+	]) {
+		it(`uses Markdown link and code structure: ${content}`, () => {
+			assert.deepEqual(rules(content), []);
+		});
+	}
+	it("retains a reference in a malformed unbalanced link", () => {
+		assert.deepEqual(
+			rules("See [#674](https://github.com/o/r/issues/674?q=(foo)."),
+			["issue-ref"],
+		);
+	});
+	for (const destination of [
+		"https://github.com.example/o/r/issues/674",
+		"https://user@github.com/o/r/issues/674",
+		"https://github.com:8443/o/r/issues/674",
+		"http://github.com/o/r/issues/674",
+		"https://github.com/o/r/issues/0",
+	]) {
+		it(`does not exempt a different identity: ${destination}`, () => {
+			assert.deepEqual(rules(`See [#674](${destination}).`), ["issue-ref"]);
+		});
+	}
+	it("uses the first definition when reference identifiers collide", () => {
+		assert.deepEqual(
+			rules(
+				"See [#674][upstream].\n\n[upstream]: https://example.com\n[upstream]: https://github.com/o/r/issues/674",
+			),
+			["issue-ref"],
+		);
+	});
+	it("keeps prose after a code fence containing shorter fences", () => {
+		const found = findRepoSpecificProse(
+			at("````md\n```\n#674\n````\nSee #675."),
+		);
+		assert.equal(found.length, 1);
+		assert.equal(found[0].line, 5);
+		assert.match(found[0].reason, /#675/);
+	});
+	it("retains original CRLF lines and text after masking multiline links", () => {
+		const content =
+			"😀\r\nSee [#674](\r\nhttps://github.com/o/r/issues/674\r\n) and #675.\r\n";
+		const found = findRepoSpecificProse(at(content));
+		assert.equal(found.length, 1);
+		assert.equal(found[0].line, 4);
+		assert.match(found[0].reason, /#675/);
+		assert.equal(found[0].text, ") and #675.");
+	});
 	for (const kind of ["issues", "pull"]) {
 		for (const suffix of ["/", "/?view=details", "/#issuecomment-123"]) {
 			for (const angle of [false, true]) {
@@ -62,12 +120,17 @@ describe("issue-ref rule", () => {
 			}
 		}
 	}
-	for (const suffix of ["?q=\\", "#comment-\\", "?q=\\x", "#comment-\\x"]) {
+	for (const [suffix, expected] of [
+		["?q=\\", ["issue-ref"]],
+		["#comment-\\", ["issue-ref"]],
+		["?q=\\x", []],
+		["#comment-\\x", []],
+	]) {
 		for (const angle of [false, true]) {
 			const url = `https://github.com/o/r/issues/674${suffix}`;
 			const destination = angle ? `<${url}>` : url;
-			it(`retains the warning for escaped URL syntax: ${destination}`, () => {
-				assert.deepEqual(rules(`See [#674](${destination}).`), ["issue-ref"]);
+			it(`follows parsed link structure for backslashes: ${destination}`, () => {
+				assert.deepEqual(rules(`See [#674](${destination}).`), expected);
 			});
 		}
 	}

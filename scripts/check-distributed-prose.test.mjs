@@ -49,6 +49,8 @@ it("checks canonical prose through the tracked distribution manifest scope", () 
 			"<https://github.com/takasek/pfdsl/issues/674>",
 			"https://github.com/takasek/pfdsl/issues/674/",
 			"<https://github.com/takasek/pfdsl/pull/674/?view=details>",
+			"https://github.com/takasek/pfdsl/pull/674/checks",
+			"https://github.com/takasek/pfdsl/issues/674?q=(foo)",
 		]) {
 			for (const title of ["", ' "details"', " 'details'", " (details)"]) {
 				writeFileSync(canonical, `See [#674](${destination}${title}).\n`);
@@ -62,9 +64,18 @@ it("checks canonical prose through the tracked distribution manifest scope", () 
 			}
 		}
 		for (const content of [
+			"See [#674][upstream].\n\n[upstream]: https://github.com/takasek/pfdsl/issues/674",
+			"See [#674](\nhttps://github.com/takasek/pfdsl/issues/674\n).",
+		]) {
+			writeFileSync(canonical, `${content}\n`);
+			const resolved = check();
+			assert.equal(resolved.status, 0, resolved.stderr);
+		}
+		for (const content of [
 			"See #674.",
 			"See [#674](https://github.com/o/r/issues/674?q=\\).",
 			"See [#674](<https://github.com/o/r/issues/674#comment-\\>).",
+			"See [#674](https://github.com/o/r/issues/674?q=(foo).",
 		]) {
 			writeFileSync(canonical, `${content}\n`);
 			const bare = check();

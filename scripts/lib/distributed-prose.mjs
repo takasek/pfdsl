@@ -13,32 +13,73 @@
 // Adding a rule: append to RULES. Each returns a reason for an offending line,
 // or undefined.
 
-/** Inline code is quoted material — an example, not a claim about this repo. */
-function stripCode(line) {
-	// Keep a non-whitespace boundary: code must not supply link syntax or spacing.
-	return line.replace(/`[^`]*`/g, "\0");
-}
-
-const ISSUE_URL = String.raw`https:\/\/github\.com\/[\w.-]+\/[\w.-]+\/(?:issues|pull)\/\d+\/?(?:[?#][^\s)<>\\]*)?`;
-const LINK_DESTINATION = `(?:${ISSUE_URL}|<${ISSUE_URL}>)`;
-const LINK_TITLE = String.raw`(?:"[^"\n]*"|'[^'\n]*'|\([^()\n]*\))`;
-const RESOLVED_ISSUE_LINK = new RegExp(
-	String.raw`(?<![!\\])\[[^[\]\\\n]*\]\([ \t]*${LINK_DESTINATION}(?:[ \t]+${LINK_TITLE})?[ \t]*\)`,
-	"g",
-);
+import { fromMarkdown } from "mdast-util-from-markdown";
 
 /**
- * Exclude single-line inline links to explicit GitHub issue/PR URLs from the
- * issue-reference rule. This lightweight scanner does not resolve reference-
- * style links, multiline links, nested labels, or escaped Markdown syntax;
- * those still need an explicit inline link or human review. Images are not
- * navigable links and do not exempt their alt text. URL/label semantic
- * agreement remains human review's responsibility.
- * Destinations may use angle brackets; titles may use quotes or parentheses.
- * A trailing URL slash is allowed; backslashes in URL suffixes are not.
+ * Markdown syntax belongs to the parser. This predicate only identifies the
+ * GitHub issue/PR named by a parsed destination, including its subpages.
+ * Existence, access permissions and URL/label agreement remain human review.
  */
-function stripResolvedIssueLinks(line) {
-	return line.replace(RESOLVED_ISSUE_LINK, "");
+function isGitHubIssueUrl(destination) {
+	let url;
+	try {
+		url = new URL(destination);
+	} catch {
+		return false;
+	}
+	const [, owner, repo, kind, number] = url.pathname.split("/");
+	return (
+		url.origin === "https://github.com" &&
+		!url.username &&
+		!url.password &&
+		/^[\w.-]+$/.test(owner ?? "") &&
+		/^[\w.-]+$/.test(repo ?? "") &&
+		["issues", "pull"].includes(kind) &&
+		/^[1-9]\d*$/.test(number)
+	);
+}
+
+function walk(node, visit) {
+	visit(node);
+	for (const child of node.children ?? []) walk(child, visit);
+}
+
+/** Mask parsed ranges without changing UTF-16 offsets, newlines or diagnostics. */
+function proseForRules(content) {
+	const tree = fromMarkdown(content);
+	const definitions = new Map();
+	walk(tree, (node) => {
+		if (node.type === "definition" && !definitions.has(node.identifier))
+			definitions.set(node.identifier, node.url);
+	});
+	const issue = content.split("");
+	const bundle = content.split("");
+	const mask = (text, node) => {
+		for (
+			let i = node.position.start.offset;
+			i < node.position.end.offset;
+			i++
+		) {
+			if (text[i] !== "\n" && text[i] !== "\r") text[i] = " ";
+		}
+	};
+	walk(tree, (node) => {
+		if (node.type === "code") {
+			mask(issue, node);
+			mask(bundle, node);
+		} else if (
+			node.type === "inlineCode" ||
+			(["link", "definition"].includes(node.type) &&
+				isGitHubIssueUrl(node.url)) ||
+			(node.type === "linkReference" &&
+				isGitHubIssueUrl(definitions.get(node.identifier)))
+		)
+			mask(issue, node);
+	});
+	return {
+		issue: issue.join("").split("\n"),
+		bundle: bundle.join("").split("\n"),
+	};
 }
 
 const RULES = [
@@ -62,7 +103,7 @@ const RULES = [
 		// resolves to the upstream repo for the reader, a bare issue number
 		// resolves to whatever the reader's own tracker holds under that number.
 		test(line) {
-			const m = /#\d{2,}/.exec(stripResolvedIssueLinks(stripCode(line)));
+			const m = /#\d{2,}/.exec(line);
 			return m
 				? `bare issue reference ${m[0]} — adopters cannot resolve it`
 				: undefined;
@@ -77,18 +118,12 @@ const RULES = [
 export function findRepoSpecificProse(files) {
 	const found = [];
 	for (const { path, content } of files) {
-		let inFence = false;
+		const prose = proseForRules(content);
 		content.split("\n").forEach((text, i) => {
-			// Tilde fences count too — the repo's four other markdown scanners
-			// all recognize both, and a rule that fires inside a ~~~ block
-			// would flag quoted material as prose.
-			if (/^\s*(```|~~~)/.test(text)) {
-				inFence = !inFence;
-				return;
-			}
-			if (inFence) return;
 			for (const rule of RULES) {
-				const reason = rule.test(text);
+				const reason = rule.test(
+					rule.name === "issue-ref" ? prose.issue[i] : prose.bundle[i],
+				);
 				if (reason)
 					found.push({
 						path,
