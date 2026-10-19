@@ -5,43 +5,42 @@
  * lives in the main script; this module stays testable.
  */
 
+import { fromMarkdown } from "mdast-util-from-markdown";
 import { headingText, isHeading } from "./markdown-heading.mjs";
 
 const PATH_PREFIXES = ["docs", "\\.claude", "scripts", "packages"];
 const PREFIX_ALT = PATH_PREFIXES.join("|");
-const PATH_TOKEN_RE = new RegExp(`^(?:${PREFIX_ALT})/\\S*$`);
-const FENCE_RE = /^(```|~~~)/;
-
-const INLINE_CODE_RE = /`([^`]*)`/g;
-const MD_LINK_RE = new RegExp(`\\]\\(((?:${PREFIX_ALT})/[^)\\s]*)\\)`, "g");
-// A link target resolved against the linking file's own directory: no scheme
-// (`https:`, `mailto:`), no leading `/`, not an in-page `#anchor`, not one of
-// the repo-relative prefixes MD_LINK_RE already owns, and ending in `.md`
-// before any anchor or title attribute. Carrying the prefix set in a negative
-// lookahead keeps the two extractors from both claiming a target; targets that
-// are neither (an image, a `.json`) belong to neither by design.
-const RELATIVE_MD_LINK_RE = new RegExp(
-	`\\]\\((?!(?:${PREFIX_ALT})/)(?![a-zA-Z][a-zA-Z0-9+.-]*:)(?![/#])([^)\\s]*\\.md(?:#[^)\\s]*)?)(?:\\s+"[^"]*")?\\)`,
-	"g",
-);
+const REPO_PATH_RE = new RegExp(`^(?:${PREFIX_ALT})/`);
+const SCHEME_RE = /^[a-zA-Z][a-zA-Z0-9+.-]*:/;
 
 /**
- * @param {string} text
- * @returns {string} text with fenced code blocks (```...``` or ~~~...~~~) removed
+ * @param {import('mdast').Nodes} node
+ * @param {(node: import('mdast').Nodes) => void} visit
  */
-function stripFencedBlocks(text) {
-	const lines = text.split("\n");
-	const out = [];
-	let inFence = false;
-	for (const line of lines) {
-		if (FENCE_RE.test(line)) {
-			inFence = !inFence;
-			continue;
-		}
-		if (inFence) continue;
-		out.push(line);
+function walk(node, visit) {
+	visit(node);
+	if ("children" in node) {
+		for (const child of node.children) walk(child, visit);
 	}
-	return out.join("\n");
+}
+
+/** Collect used link/image destinations; unused definitions are not references. */
+function linkTargets(tree) {
+	const definitions = new Map();
+	walk(tree, (node) => {
+		if (node.type === "definition" && !definitions.has(node.identifier)) {
+			definitions.set(node.identifier, node.url);
+		}
+	});
+	const targets = [];
+	walk(tree, (node) => {
+		if (node.type === "link" || node.type === "image") targets.push(node.url);
+		if (node.type === "linkReference" || node.type === "imageReference") {
+			const target = definitions.get(node.identifier);
+			if (target !== undefined) targets.push(target);
+		}
+	});
+	return targets;
 }
 
 /**
@@ -61,7 +60,7 @@ function normalizeRef(ref) {
 /**
  * Extracts repo-relative path references (inline code + markdown link
  * targets) starting with docs/, .claude/, scripts/, or packages/, in
- * source order with duplicates removed. Inline code content is split on
+ * inline-code order followed by link order, with duplicates removed. Inline code content is split on
  * whitespace first, so a path embedded in a shell command (e.g. `` `node
  * scripts/foo.mjs --fix` ``) is still found, not just a bare path in its
  * own inline-code span.
@@ -69,17 +68,16 @@ function normalizeRef(ref) {
  * @returns {string[]}
  */
 export function extractPathReferences(text) {
-	const unfenced = stripFencedBlocks(text);
+	const tree = fromMarkdown(text);
 	const refs = [];
-
-	for (const inlineMatch of unfenced.matchAll(INLINE_CODE_RE)) {
-		for (const token of inlineMatch[1].split(/\s+/)) {
-			if (PATH_TOKEN_RE.test(token)) refs.push(normalizeRef(token));
+	walk(tree, (node) => {
+		if (node.type !== "inlineCode") return;
+		for (const token of node.value.split(/\s+/)) {
+			if (REPO_PATH_RE.test(token)) refs.push(normalizeRef(token));
 		}
-	}
-
-	for (const linkMatch of unfenced.matchAll(MD_LINK_RE)) {
-		refs.push(normalizeRef(linkMatch[1]));
+	});
+	for (const target of linkTargets(tree)) {
+		if (REPO_PATH_RE.test(target)) refs.push(normalizeRef(target));
 	}
 
 	return [...new Set(refs)];
@@ -105,10 +103,16 @@ export function extractPathReferences(text) {
 export function extractRelativeMarkdownLinks(text) {
 	const refs = [];
 
-	for (const linkMatch of stripFencedBlocks(text).matchAll(
-		RELATIVE_MD_LINK_RE,
-	)) {
-		refs.push(normalizeRef(linkMatch[1]));
+	for (const target of linkTargets(fromMarkdown(text))) {
+		const ref = normalizeRef(target);
+		if (
+			!REPO_PATH_RE.test(target) &&
+			!SCHEME_RE.test(target) &&
+			!target.startsWith("/") &&
+			!target.startsWith("#") &&
+			ref.endsWith(".md")
+		)
+			refs.push(ref);
 	}
 
 	return [...new Set(refs)];
@@ -142,8 +146,20 @@ export function resolveCheckTarget(ref) {
  * @returns {string[]} the subset of requiredHeadings not found as a heading line
  */
 export function findMissingHeadings(text, requiredHeadings) {
-	const headingLines = stripFencedBlocks(text)
+	const codeLines = new Set();
+	walk(fromMarkdown(text), (node) => {
+		if (node.type !== "code") return;
+		for (
+			let line = node.position.start.line;
+			line <= node.position.end.line;
+			line++
+		) {
+			codeLines.add(line);
+		}
+	});
+	const headingLines = text
 		.split("\n")
+		.filter((_, index) => !codeLines.has(index + 1))
 		.filter(isHeading)
 		.map(headingText);
 	return requiredHeadings.filter((h) => !headingLines.includes(h));

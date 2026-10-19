@@ -38,9 +38,9 @@ c3f2fa839ba9590b4c6ebc97746546e5b626a09435d64d012c85a65622d9c1e5  skills/pfd-ops
 
 ac6f9e9959367f8d63561cef333cb4bf42ae18d8cbf1a8879651e95ea71bfd84  skills/pfd-ops/install/scripts/pfdsl/lib/gh-exec.mjs
 
-80b32af418f80cae1627decbd32dc9a3c7f6b8d82b5f22632b310fcc9d5a7d52  skills/pfd-ops/install/scripts/pfdsl/lib/github-ops.mjs
+f3fdafd6610276237be6ee2ce53a68fefcd458c35a85f8cae9b3498ad86b0f23  skills/pfd-ops/install/scripts/pfdsl/lib/github-ops.mjs
 
-50e114f0721dee90dc29d87a421e27cd5547dd7f50f0bf0478859c09a3c216b9  skills/pfd-ops/install/scripts/pfdsl/lib/github-rest.mjs
+ffa9ca19362e85a2ee3286c4e1c54b7503cc7a445ff728fec54a4fd0771463ab  skills/pfd-ops/install/scripts/pfdsl/lib/github-rest.mjs
 
 4c805c89a3888800aa458b6edd322f1bbcc2446aa49bb1035395be3571e95c65  skills/pfd-ops/install/scripts/pfdsl/lib/issues-flow-audit.mjs
 

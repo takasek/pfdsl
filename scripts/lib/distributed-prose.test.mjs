@@ -7,93 +7,127 @@ const at = (content, path = "skills/pfd-retro/SKILL.md") => [{ path, content }];
 const rules = (content) =>
 	findRepoSpecificProse(at(content)).map((f) => f.rule);
 
-describe("bundle-path rule", () => {
-	it("flags a bundle path written only in its repo-local form", () => {
-		// An adopting repo loads the bundle from the plugin cache, so `.claude/`
-		// never resolves there and the reader is sent to a file that cannot exist.
-		const found = findRepoSpecificProse(
-			at("pfd-lens agent（`.claude/agents/pfd-lens.md`）へ委譲する。\n"),
-		);
-		assert.equal(found.length, 1);
-		assert.equal(found[0].rule, "bundle-path");
-		assert.equal(found[0].line, 1);
+describe("bundle-path policy", () => {
+	it("flags an unqualified bundle path even inside inline code", () => {
+		assert.deepEqual(rules("Read `.claude/skills/pfd-ops/SKILL.md`."), [
+			"bundle-path",
+		]);
 	});
+	it("allows the plugin-root and repo-local qualifications", () => {
+		assert.deepEqual(
+			rules("repo-local: `.claude/skills/pfd-ops/SKILL.md`."),
+			[],
+		);
+		assert.deepEqual(
+			rules("CLAUDE_PLUGIN_ROOT: `.claude/skills/pfd-ops/SKILL.md`."),
+			[],
+		);
+	});
+	it("leaves adopting-repository paths outside the bundle policy", () => {
+		assert.deepEqual(
+			rules("Read `.pfdsl/bindings/pfd-ops.md` and `.claude/settings.json`."),
+			[],
+		);
+	});
+});
 
-	it("accepts a path qualified with the plugin root on the same line", () => {
+describe("issue-reference policy", () => {
+	it("exempts parsed GitHub issue/PR identities and their subpages", () => {
+		for (const content of [
+			"See [#674](https://github.com/o/r/issues/674).",
+			"See [o/r#674](https://github.com/o/r/pull/674/checks).",
+		])
+			assert.deepEqual(rules(content), []);
+	});
+	it("resolves reference definitions and exempts their syntax", () => {
+		assert.deepEqual(
+			rules("See [#674][].\n\n[#674]: https://github.com/o/r/issues/674"),
+			[],
+		);
+	});
+	it("uses the first definition when identifiers collide", () => {
 		assert.deepEqual(
 			rules(
-				// biome-ignore lint/suspicious/noTemplateCurlyInString: documents the literal ${CLAUDE_PLUGIN_ROOT} placeholder
-				"plugin なら `${CLAUDE_PLUGIN_ROOT}/skills/pfdsl/`、repo-local なら `.claude/skills/pfdsl/`。\n",
+				"See [#674][upstream].\n\n[upstream]: https://example.com\n[upstream]: https://github.com/o/r/issues/674",
 			),
-			[],
+			["issue-ref"],
 		);
 	});
-
-	it("accepts a repo-local path that names the load mode it belongs to", () => {
+	it("keeps unresolved references and image alt text in scope", () => {
+		assert.deepEqual(rules("See [#674][missing]."), ["issue-ref"]);
+		assert.deepEqual(rules("![#674](https://github.com/o/r/issues/674)"), [
+			"issue-ref",
+		]);
+	});
+	it("does not exempt another host, identity, protocol or non-issue page", () => {
+		for (const destination of [
+			"issues/674",
+			"https://github.com.example/o/r/issues/674",
+			"https://user@github.com/o/r/issues/674",
+			"https://github.com:8443/o/r/issues/674",
+			"http://github.com/o/r/issues/674",
+			"https://github.com/o/r",
+			"https://github.com/o/r/issues/0",
+		])
+			assert.deepEqual(rules(`See [#674](${destination}).`), ["issue-ref"]);
+	});
+	it("requires an actual parsed link before exempting a URL", () => {
 		assert.deepEqual(
-			rules("- repo-local: `.claude/skills/pfd-ops/references/scaffold/`\n"),
-			[],
+			rules("See [#674](https://github.com/o/r/issues/674?q=(foo)."),
+			["issue-ref"],
 		);
 	});
-
-	it("ignores .pfdsl paths, which live in the adopting repo and resolve there", () => {
-		assert.deepEqual(rules("`.pfdsl/bindings/pfd-retro.md` に従う\n"), []);
+	it("retains bare references and original CRLF diagnostics beside a multiline link", () => {
+		const content =
+			"😀\r\nSee [#674](\r\nhttps://github.com/o/r/issues/674\r\n) and #675.\r\n";
+		assert.deepEqual(findRepoSpecificProse(at(content)), [
+			{
+				path: "skills/pfd-retro/SKILL.md",
+				line: 4,
+				rule: "issue-ref",
+				reason: "bare issue reference #675 — adopters cannot resolve it",
+				text: ") and #675.",
+			},
+		]);
 	});
-
-	it("ignores .claude paths outside the bundle's own trees", () => {
-		assert.deepEqual(rules("`.claude/settings.json` で配線する\n"), []);
+	it("keeps the issue-token threshold without treating ADRs as issues", () => {
+		assert.deepEqual(rules("Step #1 follows ADR-0028."), []);
+		assert.deepEqual(rules("See #674."), ["issue-ref"]);
 	});
 });
 
-describe("issue-ref rule", () => {
-	it("flags a bare issue citation", () => {
-		const found = findRepoSpecificProse(
-			at("素の `--deploy` を先に実行する（#603）。\n"),
-		);
-		assert.equal(found.length, 1);
-		assert.equal(found[0].rule, "issue-ref");
-		assert.match(found[0].reason, /#603/);
-	});
-
-	it("allows a number inside inline code, which reads as an example", () => {
-		// `- [ ] #123` shows the reader a task-list syntax, it does not cite an issue.
+describe("parser and diagnostic integration", () => {
+	it("ignores block code for both rules but inline code only for issue references", () => {
+		const content =
+			"Read `#674 .claude/skills/pfd-ops/SKILL.md`.\n\n```md\n#674 .claude/skills/pfd-ops/SKILL.md\n```\nSee #675.";
 		assert.deepEqual(
-			rules("本文中の手書き `- [ ] #123` 形式は自動チェックされない\n"),
-			[],
-		);
-	});
-
-	it("allows ADR references, which the bundle resolves for the reader", () => {
-		assert.deepEqual(rules("配置手順は ADR-0028 に従う\n"), []);
-	});
-
-	it("ignores a single digit, which is not an issue citation shape", () => {
-		assert.deepEqual(rules("手順 #1 から始める\n"), []);
-	});
-});
-
-describe("scanning", () => {
-	it("skips fenced blocks, which are quoted commands rather than prose", () => {
-		assert.deepEqual(
-			rules("```sh\nnode .claude/skills/pfd-ops/x.mjs # see #603\n```\n"),
-			[],
-		);
-	});
-
-	it("reports every offending line with its 1-based number", () => {
-		const found = findRepoSpecificProse(
-			at("ok\n`.claude/skills/pfd-ops/` を読む\nok\n（#480）\n"),
-		);
-		assert.deepEqual(
-			found.map((f) => [f.line, f.rule]),
+			findRepoSpecificProse(at(content)).map(({ line, rule }) => [line, rule]),
 			[
-				[2, "bundle-path"],
-				[4, "issue-ref"],
+				[1, "bundle-path"],
+				[6, "issue-ref"],
 			],
 		);
 	});
-
-	it("returns nothing for an empty file set", () => {
+	it("keeps bundle-path checks active inside resolved link labels", () => {
+		assert.deepEqual(
+			rules("[.claude/skills/pfd-ops/#674](https://github.com/o/r/issues/674)"),
+			["bundle-path"],
+		);
+	});
+	it("preserves each input file path in findings", () => {
+		const found = findRepoSpecificProse([
+			...at("See #674.", "skills/a.md"),
+			...at("ok\nSee #675.", "skills/b.md"),
+		]);
+		assert.deepEqual(
+			found.map(({ path, line }) => [path, line]),
+			[
+				["skills/a.md", 1],
+				["skills/b.md", 2],
+			],
+		);
+	});
+	it("accepts an empty file set", () => {
 		assert.deepEqual(findRepoSpecificProse([]), []);
 	});
 });
