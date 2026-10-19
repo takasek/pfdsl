@@ -14,6 +14,29 @@ import {
 	parseOwnerRepo,
 } from "./github-rest.mjs";
 
+for (const [value, expected] of [
+	[{ state: "open", merged: false }, "OPEN"],
+	[{ state: "closed", merged: false }, "CLOSED"],
+	[{ state: "closed", merged: true }, "MERGED"],
+	[{ merged: true }, undefined],
+	[{ state: "unknown", merged: true }, undefined],
+	[{ state: "closed" }, undefined],
+	[{ state: "closed", merged: "true" }, undefined],
+]) {
+	it(`normalizes or rejects PR state: ${JSON.stringify(value)}`, async () => {
+		const result = fetchPullRequestView(
+			"acme",
+			"app",
+			"fixture",
+			8,
+			["state"],
+			async () => jsonResponse(value),
+		);
+		if (expected) assert.deepEqual(await result, { state: expected });
+		else await assert.rejects(result, /malformed/i);
+	});
+}
+
 it("rejects missing issue fields requested by the design gate", async () => {
 	await assert.rejects(
 		fetchIssueView(
