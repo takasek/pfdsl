@@ -22,7 +22,7 @@ function failed(detail, phase) {
 			"Hook input could not be read or validated. Inspect the caller's payload and input delivery, then correct the identified input problem.";
 	else if (phase === "policy-load")
 		guidance =
-			"Policy components could not be loaded. Inspect the reported module or dependency using read-only diagnostics, then correct the identified loading problem.";
+			"Policy components could not be loaded. Ask a human to inspect the reported module or dependency using read-only diagnostics and correct the identified loading problem in a human terminal; the guarded tools cannot repair it.";
 	else if (detail === "Git policy probe budget exhausted")
 		guidance =
 			"Git safety checks did not finish within their time budget. Investigate the cause using read-only diagnostics before choosing a recovery.";
