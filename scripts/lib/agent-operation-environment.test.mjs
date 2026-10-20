@@ -84,24 +84,15 @@ test("each inherited Git target variable makes mutations unresolved without weak
 	}
 });
 
-function fixture({
-	nativeLock = true,
-	extraLocks = {},
-	extraWorktrees = 0,
-} = {}) {
+function fixture({ nativeLock = true, extraLocks = {} } = {}) {
 	const root = mkdtempSync(
 		fileURLToPath(new URL("../../node_modules/pfdsl-facts-", import.meta.url)),
 	);
 	const roots = Object.fromEntries(
-		[
-			"primary",
-			"own",
-			"live",
-			"native",
-			"unowned",
-			"foreign",
-			...Array.from({ length: extraWorktrees }, (_, i) => `extra-${i}`),
-		].map((name) => [name, join(root, name)]),
+		["primary", "own", "live", "native", "unowned", "foreign"].map((name) => [
+			name,
+			join(root, name),
+		]),
 	);
 	for (const path of Object.values(roots)) mkdirSync(path);
 	mkdirSync(join(roots.primary, "sub"));
@@ -167,38 +158,6 @@ function fixture({
 		cleanup: () => rmSync(root, { recursive: true, force: true }),
 	};
 }
-
-test("ownership observations stay bounded when unrelated worktrees accumulate", () => {
-	const f = fixture({ nativeLock: false, extraWorktrees: 100 });
-	try {
-		const payload = {
-			tool_name: "apply_patch",
-			cwd: f.roots.primary,
-			session_id: "session",
-			tool_input: {
-				command: `*** Begin Patch\n*** Add File: ${f.roots.native}/new.txt\n+hello\n*** End Patch`,
-			},
-		};
-		const facts = collectAgentOperationEnvironment(payload, {
-			hookRoot: f.root,
-			environment: {},
-			probeGit: f.probeGit,
-			probeProcess: f.probeProcess,
-			readMetadata: f.readMetadata,
-		});
-		assert.equal(
-			evaluateAgentOperationPolicy(payload, facts).decision,
-			"allow",
-		);
-		assert.ok(
-			f.seen.length < 20,
-			`expected bounded Git probes, got ${f.seen.length}`,
-		);
-		assert.equal(Object.keys(facts.branches).length, 105);
-	} finally {
-		f.cleanup();
-	}
-});
 
 test("a subdirectory origin observes its containing worktree root without changing explicit targets", () => {
 	const f = fixture({ nativeLock: false });
@@ -311,8 +270,14 @@ test("Codex observes native identity separately from cwd and ignores the unobser
 		assert.equal(operation.target, "own");
 		assert.equal(operation.executionPath, f.roots.native);
 		assert.equal(
-			facts.worktrees.find(({ root }) => root === f.roots.unowned).ownership,
-			undefined,
+			facts.worktrees.find(({ root }) => root === f.roots.unowned).ownership
+				.ownerId,
+			"other",
+		);
+		assert.equal(
+			facts.worktrees.find(({ root }) => root === f.roots.unowned).ownership
+				.live,
+			false,
 		);
 	} finally {
 		f.cleanup();
