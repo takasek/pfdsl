@@ -8,7 +8,7 @@ interface ArtifactProcessPair {
 }
 
 function pairKey(artifact: string, process: string): string {
-	return `${artifact}\0${process}`;
+	return JSON.stringify([artifact, process]);
 }
 
 /** Pairs represented as both a normal input and feedback edge. */

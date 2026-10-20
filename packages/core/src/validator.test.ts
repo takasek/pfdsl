@@ -357,6 +357,12 @@ a >> design -> b
 	});
 
 	describe("V036: input and feedback for the same artifact-process pair", () => {
+		it("does not report V036 for distinct pairs containing quoted NUL IDs", () => {
+			const src =
+				'"a\0b" >> "c" -> out\n"a" >>? "b\0c"\nseed >> "b\0c" -> result';
+			expect(diagnose(src).filter((d) => d.code === "V036")).toEqual([]);
+		});
+
 		it("reports one error in both modes and does not also report V011", () => {
 			const src = "a >> p -> b\na >>? p";
 			for (const options of [undefined, { strict: true }]) {
