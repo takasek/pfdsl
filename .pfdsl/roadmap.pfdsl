@@ -182,10 +182,6 @@ process:
     label: CLI 拡張フィールド更新公開
   publish_cli_group_node_clash:
     label: CLI 同名診断公開
-  i1467_input_feedback_conflict:
-    label: "input と feedback の併記を V036 として報告する (#1467)"
-    description: "同じ artifact・process の組への通常入力と feedback の併記を error にし、V011 の重複を抑止する"
-    location: https://github.com/takasek/pfdsl/issues/1467
   publish_cli_edge_kind_conflict:
     label: CLI input / feedback 併記診断公開
   i1262_i1445_accept_mac_candidate:
@@ -225,8 +221,6 @@ group_delete_cli >> publish_cli_group_delete -> cli_release_group_delete
 meta_set_extension_fields >> publish_cli_meta_set_extension -> cli_release_meta_set_extension
 
 group_node_clash_diagnostic >> publish_cli_group_node_clash -> cli_release_group_node_clash
-
-toolchain >> i1467_input_feedback_conflict -> edge_kind_conflict_diagnostic
 
 edge_kind_conflict_diagnostic >> publish_cli_edge_kind_conflict -> cli_release_edge_kind_conflict
 [preview_editing_usability, standalone_pfd_features] >> i1262_i1445_accept_mac_candidate -> gui_mac_acceptance
