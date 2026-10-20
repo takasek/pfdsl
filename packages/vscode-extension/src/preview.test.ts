@@ -14,6 +14,7 @@ const host = vi.hoisted(() => {
 	});
 	const commands = new Map<string, () => unknown>();
 	const panels: ReturnType<typeof createPanel>[] = [];
+	const tabGroups: vscode.TabGroup[] = [];
 	class Position {
 		constructor(
 			public line: number,
@@ -44,8 +45,10 @@ const host = vi.hoisted(() => {
 	const window = {
 		activeTextEditor: undefined as vscode.TextEditor | undefined,
 		visibleTextEditors: [] as vscode.TextEditor[],
-		createWebviewPanel: () => {
-			const panel = createPanel();
+		tabGroups: { all: tabGroups },
+		createWebviewPanel: (viewType: string) => {
+			const panel = createPanel(viewType);
+			panel.viewColumn = (window.activeTextEditor?.viewColumn ?? 1) + 1;
 			panels.push(panel);
 			return panel;
 		},
@@ -67,13 +70,15 @@ const host = vi.hoisted(() => {
 	const openTextDocument = vi.fn(async (value: ReturnType<typeof uri>) => ({
 		uri: value,
 	}));
-	function createPanel() {
+	function createPanel(viewType: string) {
 		let receive = (_message: MessageFromWebview) => {};
 		let disposed = () => {};
 		let viewChanged = (_event: { webviewPanel: { active: boolean } }) => {};
 		const messages: MessageToWebview[] = [];
 		const panel = {
-			title: "",
+			title: "PFDSL Preview",
+			viewType,
+			viewColumn: 2,
 			active: true,
 			messages,
 			webview: {
@@ -109,6 +114,36 @@ const host = vi.hoisted(() => {
 		commands,
 		panels,
 		window,
+		setTabGroups: (groups: vscode.TabGroup[]) => {
+			tabGroups.splice(0, tabGroups.length, ...groups);
+		},
+		createTabGroup: (
+			viewColumn: vscode.ViewColumn,
+			panel?: ReturnType<typeof createPanel>,
+		) => {
+			const group: vscode.TabGroup = {
+				isActive: false,
+				viewColumn,
+				activeTab: undefined,
+				tabs: [],
+			};
+			if (panel) {
+				const tab = {
+					get label() {
+						return panel.title;
+					},
+					group,
+					input: new host.api.TabInputWebview(panel.viewType),
+					isActive: true,
+					isDirty: false,
+					isPinned: true,
+					isPreview: false,
+				} as vscode.Tab;
+				(group.tabs as vscode.Tab[]).push(tab);
+				Object.assign(group, { activeTab: tab });
+			}
+			return group;
+		},
 		api: {
 			Position,
 			Range,
@@ -142,6 +177,9 @@ const host = vi.hoisted(() => {
 					uri([base.path, ...parts].join("/")),
 			},
 			ViewColumn: { One: 1, Beside: 2 },
+			TabInputWebview: class {
+				constructor(public viewType: string) {}
+			},
 			env: { openExternal: vi.fn(async () => true) },
 			FileType: { File: 1, Directory: 2 },
 			ExtensionMode: { Development: 2 },
@@ -219,7 +257,12 @@ function setup() {
 			selection: { active: { line: 0, character: 0 } },
 		} as vscode.TextEditor;
 		await host.commands.get("pfdsl.preview")!();
-		return host.panels[host.panels.length - 1]!;
+		const panel = host.panels[host.panels.length - 1]!;
+		host.setTabGroups([
+			host.createTabGroup(viewColumn),
+			host.createTabGroup(panel.viewColumn, panel),
+		]);
+		return panel;
 	}
 	return { preview, open };
 }
@@ -309,6 +352,7 @@ beforeEach(() => {
 	vi.clearAllMocks();
 	clearAnalyzeCache();
 	host.panels.length = 0;
+	host.setTabGroups([]);
 	host.commands.clear();
 	host.window.activeTextEditor = undefined;
 	host.api.workspace.applyEdit.mockClear();
@@ -377,6 +421,7 @@ it.each([
 	expect(host.window.showTextDocument).toHaveBeenLastCalledWith(doc, {
 		viewColumn: 1,
 		preserveFocus: preserveFocus ?? false,
+		preview: false,
 	});
 });
 
@@ -434,22 +479,64 @@ it("opens a hidden source when nodeClick does not preserve focus", async () => {
 	);
 });
 
-it.each([
-	false,
-	true,
-])("opens a hidden source outside the preview column (same column: %s)", async (sameColumn) => {
+it("opens a hidden source beside the actual preview group when its remembered column now points there", async () => {
 	const { open } = setup();
 	const doc = document(
 		"hidden-source-column",
 		"---\nartifact:\n  a: {label: A}\n---\na >> p\n",
 	);
 	const panel = await open(doc, 3);
-	if (sameColumn) Object.assign(panel, { viewColumn: 3 });
+	Object.assign(panel, { viewColumn: 4 });
+	host.setTabGroups([host.createTabGroup(3, panel)]);
 	await panel.receive({ type: "nodeClick", nodeId: "a", preserveFocus: false });
 	expect(host.window.showTextDocument).toHaveBeenCalledWith(doc, {
-		viewColumn: sameColumn ? host.api.ViewColumn.Beside : 3,
+		viewColumn: host.api.ViewColumn.Beside,
 		selection: expect.any(host.api.Range),
 		preserveFocus: false,
+		preview: false,
+	});
+});
+
+it("uses the remembered column when its editor group still exists outside the preview", async () => {
+	const { open } = setup();
+	const doc = document(
+		"remembered-source-column",
+		"---\nartifact:\n  a: {label: A}\n---\na >> p\n",
+	);
+	const panel = await open(doc, 3);
+	Object.assign(panel, { viewColumn: 3 });
+	await panel.receive({ type: "nodeClick", nodeId: "a", preserveFocus: false });
+	expect(host.window.showTextDocument).toHaveBeenCalledWith(doc, {
+		viewColumn: 3,
+		selection: expect.any(host.api.Range),
+		preserveFocus: false,
+		preview: false,
+	});
+});
+
+it("finds the right preview group when separate documents share a tab label", async () => {
+	const { open } = setup();
+	const first = await open(document("folder-a/flow"), 1);
+	const targetDoc = document("folder-b/flow");
+	const target = await open(targetDoc, 3);
+	first.receive({ type: "ready" });
+	target.receive({ type: "ready" });
+	host.setTabGroups([
+		host.createTabGroup(2, first),
+		host.createTabGroup(3, target),
+	]);
+
+	await target.receive({
+		type: "nodeClick",
+		nodeId: "a",
+		preserveFocus: false,
+	});
+
+	expect(host.window.showTextDocument).toHaveBeenCalledWith(targetDoc, {
+		viewColumn: host.api.ViewColumn.Beside,
+		selection: expect.any(host.api.Range),
+		preserveFocus: false,
+		preview: false,
 	});
 });
 
@@ -604,7 +691,8 @@ it("refreshes a preview edit from the replacement document after the source is c
 	const source = "a >> p -> b\n";
 	const original = document("reopened-source", source);
 	const panel = await open(original, 1);
-	Object.assign(panel, { viewColumn: 1 });
+	Object.assign(panel, { viewColumn: 2 });
+	host.setTabGroups([host.createTabGroup(1, panel)]);
 	panel.receive({ type: "ready" });
 	Object.assign(original, { isClosed: true });
 	host.api.workspace.openTextDocument.mockResolvedValueOnce(
@@ -819,9 +907,14 @@ it.each([
 	const panel = await open(doc, 3);
 	if (state === "moved")
 		host.window.visibleTextEditors = [
-			{ document: doc, viewColumn: 4 },
+			{ document: doc, viewColumn: 5 },
 		] as vscode.TextEditor[];
-	if (state === "group removed") Object.assign(panel, { viewColumn: 3 });
+	if (state === "moved")
+		host.setTabGroups([...host.window.tabGroups.all, host.createTabGroup(5)]);
+	if (state === "group removed") {
+		Object.assign(panel, { viewColumn: 4 });
+		host.setTabGroups([host.createTabGroup(3, panel)]);
+	}
 	host.api.workspace.applyEdit.mockImplementationOnce(async (edit) => {
 		vi.spyOn(doc, "getText").mockReturnValue(
 			edit.replacements[0]!.text + source,
@@ -834,7 +927,7 @@ it.each([
 		expect.objectContaining({
 			viewColumn:
 				state === "moved"
-					? 4
+					? 5
 					: state === "group removed"
 						? host.api.ViewColumn.Beside
 						: 3,
