@@ -336,17 +336,18 @@ function jumpToNode(
 			targetEnd ?? targetPos.translate(0, nodeId.length),
 		);
 		existingEditor.revealRange(range);
+		if (preserveFocus) return;
 		const vc = existingEditor.viewColumn;
 		if (vc !== undefined) {
 			vscode.window.showTextDocument(doc, {
 				viewColumn: vc,
-				preserveFocus,
+				preserveFocus: false,
 			});
 		}
-	} else {
+	} else if (!preserveFocus) {
 		vscode.window.showTextDocument(doc, {
 			selection: range,
-			preserveFocus,
+			preserveFocus: false,
 		});
 	}
 }
