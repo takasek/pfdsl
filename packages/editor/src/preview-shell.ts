@@ -9,6 +9,7 @@ const previewControlsStyles = `
 @keyframes pfdsl-cue { from { opacity: 1; } to { opacity: 0.35; } }
 @media (prefers-reduced-motion: reduce) { .pfdsl-focus-ring { animation: none; } }
 #inner g.node:focus-visible { outline: 2px solid var(--pfdsl-focusBorder, #007fd4); }
+#inner g.node polygon, #inner g.node ellipse, #inner g.node path, #inner g.node rect, #inner g.node circle, #inner g.node polyline { pointer-events: all; }
 #preview-toolbar { flex-shrink: 0; display: flex; align-items: center; gap: 4px; flex-wrap: wrap; padding: 4px 8px; border-bottom: 1px solid var(--pfdsl-panel-border, #555); font: 12px var(--pfdsl-editor-font-family, sans-serif); }
 #preview-toolbar button { color: inherit; background: transparent; border: 1px solid var(--pfdsl-panel-border, #555); border-radius: 3px; padding: 2px 6px; cursor: pointer; }
 #preview-toolbar button:disabled { opacity: 0.5; cursor: default; }
@@ -23,11 +24,11 @@ export const previewMarkup = `
   <output id="zoom-level" aria-label="Zoom level">100%</output>
   <button id="zoom-in" type="button" aria-label="Zoom in" disabled>+</button>
   <button id="fit-graph" type="button" disabled>Fit</button>
-  <button id="actual-size" type="button" disabled>100%</button>
+  <button id="actual-size" type="button" disabled>Actual size</button>
   <button id="node-actions-toggle" type="button" disabled aria-controls="node-actions" aria-expanded="false">Connections</button>
   <button id="preview-help-toggle" type="button" aria-expanded="false" aria-controls="preview-help">Help</button>
 </div>
-<div id="preview-help" hidden>Wheel: zoom at the pointer. Drag: pan. Minimap: click or drag to move. Double-click a node: go to source. Double-click the background: 100%. Right-click a node or focus it and press Enter: Connections. Hover a node: read its information. Escape: close. <span data-related-files-help>Ctrl/⌘+Click: open a node's location or subflow.</span></div>
+<div id="preview-help" hidden>Wheel: zoom at the pointer. Drag: pan. Minimap: click or drag to move. Click a node or focus it and press Enter: Connections. Right-click also opens Connections. Double-click a node or choose Go to definition in Connections: go to source. Double-click the background: actual size. Hover a node: read its information. Escape: close. <span data-related-files-help>Ctrl/⌘+Click: open a node's location or subflow.</span></div>
 <div id="root-wrap"><div id="root"><div id="inner"></div></div><div id="preview-error" class="err" role="alert" tabindex="0" hidden></div><div id="minimap"><div id="minimap-svg"></div><div id="minimap-vp"></div></div></div>
 <div id="tooltip" role="region" tabindex="0" aria-label="Node information"></div>
 <section id="node-actions" aria-label="Connections" hidden>

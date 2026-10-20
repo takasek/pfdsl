@@ -1,5 +1,9 @@
 import { analyzeSource, type NormalizedEdge } from "@pfdsl/core";
-import type { MessageToWebview, PreviewEditMessage } from "./messages.js";
+import type {
+	MessageFromWebview,
+	MessageToWebview,
+	PreviewEditMessage,
+} from "./messages.js";
 import {
 	applyPreviewEdit,
 	connectorError,
@@ -25,7 +29,7 @@ let serial = 0;
 export function mountConnections(
 	container: HTMLElement,
 	host: {
-		postMessage(request: PreviewEditMessage): void;
+		postMessage(request: MessageFromWebview): void;
 		navigate(id: string): void;
 		close(): void;
 		onOpenChange(open: boolean): void;
@@ -362,8 +366,9 @@ export function mountConnections(
 			);
 		title.textContent = `Connections — ${caption(center)}`;
 		centerLabel.textContent = caption(center);
-		definition.hidden =
-			editing.nodes.find((n) => n.id === center)?.defined ?? true;
+		definition.textContent = editing.nodes.find((n) => n.id === center)?.defined
+			? "Go to definition"
+			: "Create definition";
 		for (const side of sides) {
 			side.list.replaceChildren();
 			for (const edge of model.edges) {
@@ -396,7 +401,7 @@ export function mountConnections(
 		if (replacedFocus || (focused === definition && definition.hidden))
 			moveFocus(sides[0]!.input);
 	}
-	function open(id: string) {
+	function open(id: string, preserveFocus = false) {
 		if (!editing?.nodes.some((n) => n.id === id)) return;
 		if (center !== id) {
 			for (const side of sides) side.input.value = "";
@@ -409,18 +414,27 @@ export function mountConnections(
 		panel.hidden = false;
 		host.onOpenChange(true);
 		render();
-		if (definition.hidden || definition.disabled) {
+		if (preserveFocus) return;
+		if (
+			editing.nodes.find((n) => n.id === id)?.defined ||
+			definition.disabled
+		) {
 			showCandidates(sides[0]!);
 			moveFocus(sides[0]!.input);
 		} else setPopup(undefined, definition);
 	}
 	definition.onclick = () => {
-		if (editing && center)
+		if (editing && center) {
+			if (editing.nodes.find((n) => n.id === center)?.defined) {
+				host.postMessage({ type: "nodeClick", nodeId: center });
+				return;
+			}
 			submit({
 				type: "createDefinition",
 				nodeId: center,
 				source: editing.source,
 			});
+		}
 	};
 	panel.querySelector<HTMLButtonElement>("#node-actions-close")!.onclick = () =>
 		host.close();

@@ -297,25 +297,23 @@ async function openFileActivatingExisting(
 function jumpToNode(
 	doc: vscode.TextDocument,
 	nodeId: string,
-	preferDefinition = false,
+	preserveFocus = false,
 ): void {
 	let targetPos: vscode.Position | undefined;
 	let targetEnd: vscode.Position | undefined;
-	if (preferDefinition) {
-		const definition = findFrontmatterDefinitionRange(
-			analyzeDocument(doc),
-			nodeId,
+	const definition = findFrontmatterDefinitionRange(
+		analyzeDocument(doc),
+		nodeId,
+	);
+	if (definition) {
+		targetPos = new vscode.Position(
+			definition.start.line - 1,
+			definition.start.column - 1,
 		);
-		if (definition) {
-			targetPos = new vscode.Position(
-				definition.start.line - 1,
-				definition.start.column - 1,
-			);
-			targetEnd = new vscode.Position(
-				definition.end.line - 1,
-				definition.end.column - 1,
-			);
-		}
+		targetEnd = new vscode.Position(
+			definition.end.line - 1,
+			definition.end.column - 1,
+		);
 	}
 	if (!targetPos) {
 		const found = positionOfNodeId(
@@ -342,13 +340,13 @@ function jumpToNode(
 		if (vc !== undefined) {
 			vscode.window.showTextDocument(doc, {
 				viewColumn: vc,
-				preserveFocus: false,
+				preserveFocus,
 			});
 		}
 	} else {
 		vscode.window.showTextDocument(doc, {
 			selection: range,
-			preserveFocus: false,
+			preserveFocus,
 		});
 	}
 }
@@ -429,17 +427,7 @@ export function registerPreview(context: vscode.ExtensionContext): {
 			) {
 				await editFromPreview(state, msg);
 			} else if (msg.type === "nodeClick") {
-				const editor = vscode.window.visibleTextEditors.find(
-					(e) => e.document === state.doc,
-				);
-				const cursorId = editor
-					? nodeIdAtSourcePosition(
-							analyzeDocument(state.doc),
-							state.doc.getText(),
-							editor.selection.active,
-						)
-					: undefined;
-				jumpToNode(state.doc, msg.nodeId, cursorId === msg.nodeId);
+				jumpToNode(state.doc, msg.nodeId, msg.preserveFocus);
 			} else if (msg.type === "openUrl") {
 				vscode.env.openExternal(vscode.Uri.parse(msg.url));
 			} else if (msg.type === "openFile") {
@@ -526,6 +514,11 @@ export function registerPreview(context: vscode.ExtensionContext): {
 		}),
 
 		vscode.window.onDidChangeTextEditorSelection((e) => {
+			if (
+				e.kind !== vscode.TextEditorSelectionChangeKind.Keyboard &&
+				e.kind !== vscode.TextEditorSelectionChangeKind.Mouse
+			)
+				return;
 			const state = panels.get(e.textEditor.document.uri.toString());
 			if (!state) return;
 			const sel = e.selections[0];

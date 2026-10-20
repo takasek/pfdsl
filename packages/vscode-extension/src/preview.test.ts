@@ -19,6 +19,9 @@ const host = vi.hoisted(() => {
 			public line: number,
 			public character: number,
 		) {}
+		translate(line: number, character: number) {
+			return new Position(this.line + line, this.character + character);
+		}
 	}
 	class Range {
 		constructor(
@@ -36,6 +39,7 @@ const host = vi.hoisted(() => {
 	let selectionChanged = (_event: {
 		textEditor: vscode.TextEditor;
 		selections: readonly vscode.Selection[];
+		kind?: vscode.TextEditorSelectionChangeKind;
 	}) => {};
 	const window = {
 		activeTextEditor: undefined as vscode.TextEditor | undefined,
@@ -109,6 +113,7 @@ const host = vi.hoisted(() => {
 			Position,
 			Range,
 			Selection: Range,
+			TextEditorSelectionChangeKind: { Keyboard: 1, Mouse: 2, Command: 3 },
 			WorkspaceEdit,
 			window,
 			commands: {
@@ -148,15 +153,17 @@ const host = vi.hoisted(() => {
 			line: number,
 			character: number,
 			startCharacter = character - 1,
+			kind: vscode.TextEditorSelectionChangeKind | null = 1,
 		) =>
 			selectionChanged({
+				...(kind === null ? {} : { kind }),
 				textEditor: { document } as vscode.TextEditor,
 				selections: [
 					{
 						active: { line, character },
 						start: { line, character: startCharacter },
 						end: { line, character },
-						isEmpty: false,
+						isEmpty: startCharacter === character,
 					},
 				] as vscode.Selection[],
 			}),
@@ -326,6 +333,54 @@ it("focuses a selected semantic definition key and ignores an identically named 
 	expect(panel.messages.at(-1)).toEqual({ type: "clearFocus" });
 	host.changeSelection(doc, 5, 16, 0);
 	expect(panel.messages.at(-1)).toEqual({ type: "clearFocus" });
+});
+
+it("synchronizes user node selections and ignores command and edit selection events", async () => {
+	const { open } = setup();
+	const doc = document("cursor-focus");
+	const panel = await open(doc);
+	panel.receive({ type: "ready" });
+	for (const kind of [1, 2]) {
+		host.changeSelection(doc, 0, 6, 5, kind);
+		expect(panel.messages.at(-1)).toEqual({ type: "focus", nodeId: "p" });
+	}
+	// A plain caret move keeps the existing VS Code behavior: it clears the focus.
+	host.changeSelection(doc, 0, 5, 5, 2);
+	expect(panel.messages.at(-1)).toEqual({ type: "clearFocus" });
+	const count = panel.messages.length;
+	host.changeSelection(doc, 0, 6, 5, 3);
+	host.changeSelection(doc, 0, 6, 5, null);
+	expect(panel.messages).toHaveLength(count);
+});
+
+it.each([
+	undefined,
+	false,
+	true,
+])("handles nodeClick preserveFocus=%s at the definition", async (preserveFocus) => {
+	const { open } = setup();
+	const doc = document(
+		"node-jump",
+		"---\nartifact:\n  a: {label: A}\n---\na >> p -> b\n",
+	);
+	const panel = await open(doc);
+	const editor = {
+		document: doc,
+		viewColumn: 1,
+		selection: { active: { line: 4, character: 5 } },
+		revealRange: vi.fn(),
+	};
+	host.window.visibleTextEditors = [editor as unknown as vscode.TextEditor];
+	await panel.receive({
+		type: "nodeClick",
+		nodeId: "a",
+		...(preserveFocus === undefined ? {} : { preserveFocus }),
+	});
+	expect(editor.selection).toMatchObject({ start: { line: 2, character: 2 } });
+	expect(host.window.showTextDocument).toHaveBeenLastCalledWith(doc, {
+		viewColumn: 1,
+		preserveFocus: preserveFocus ?? false,
+	});
 });
 
 it("focuses a quoted authored definition key selected with its quotes", async () => {

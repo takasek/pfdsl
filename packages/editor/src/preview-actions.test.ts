@@ -14,6 +14,171 @@ afterEach(() => {
 const svg =
 	'<svg width="200" height="100"><g class="node"><title>a</title><polygon points="0,0 40,0 40,30"/><text>A</text></g><g class="node"><title>p</title><text>P</text></g></svg>';
 
+it("makes unpainted node shapes hit targets only in the main graph", async () => {
+	const shapes =
+		'<polygon fill="none"/><ellipse fill="none"/><path fill="none"/><rect fill="none"/><circle fill="none"/><polyline fill="none"/>';
+	const s = setup(
+		vi.fn(async (_dot: string) =>
+			svg.replace('<polygon points="0,0 40,0 40,30"/>', shapes),
+		),
+	);
+	await s.preview.receive(s.message);
+	for (const shape of s.node("a").querySelectorAll("[fill]")) {
+		expect(window.getComputedStyle(shape).pointerEvents).toBe("all");
+		expect(shape.getAttribute("fill")).toBe("none");
+	}
+	expect(
+		window.getComputedStyle(s.container.querySelector("#minimap-svg")!)
+			.pointerEvents,
+	).toBe("none");
+	expect(
+		window.getComputedStyle(s.container.querySelector("#minimap-svg polygon")!)
+			.pointerEvents,
+	).not.toBe("all");
+});
+
+it.each([
+	"click",
+	"drag",
+	"returning drag",
+	"other node",
+	"outside",
+	"ctrlKey",
+	"metaKey",
+])("distinguishes a node %s from a Connections click", async (gesture) => {
+	const s = setup();
+	await s.preview.receive(s.message);
+	const modifiers = {
+		ctrlKey: gesture === "ctrlKey",
+		metaKey: gesture === "metaKey",
+	};
+	s.node("a")
+		.querySelector("polygon")!
+		.dispatchEvent(
+			new MouseEvent("mousedown", {
+				bubbles: true,
+				clientX: 20,
+				clientY: 20,
+				...modifiers,
+			}),
+		);
+	if (gesture.includes("drag"))
+		window.dispatchEvent(
+			new MouseEvent("mousemove", { buttons: 1, clientX: 60, clientY: 20 }),
+		);
+	const target =
+		gesture === "outside"
+			? s.root
+			: s.node(gesture === "other node" ? "p" : "a");
+	target.dispatchEvent(
+		new MouseEvent("mouseup", {
+			bubbles: true,
+			clientX: gesture === "drag" ? 60 : 22,
+			clientY: 21,
+			...modifiers,
+		}),
+	);
+	expect(s.container.querySelector<HTMLElement>("#node-actions")!.hidden).toBe(
+		gesture !== "click",
+	);
+	if (gesture === "click") {
+		expect(s.postMessage).toHaveBeenCalledWith({
+			type: "nodeClick",
+			nodeId: "a",
+			preserveFocus: true,
+		});
+		expect(
+			s.container.querySelector("#node-actions-title")!.textContent,
+		).toContain("a");
+	}
+});
+
+it("replaces the previous selection cue on a click without moving the graph", async () => {
+	const s = setup();
+	await s.preview.receive(s.message);
+	await s.preview.receive({ type: "focus", nodeId: "a" });
+	const transform =
+		s.container.querySelector<HTMLElement>("#inner")!.style.transform;
+	s.node("p").dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
+	s.node("p").dispatchEvent(new MouseEvent("mouseup", { bubbles: true }));
+	expect(s.node("p").classList.contains("pfdsl-focus-cue")).toBe(true);
+	expect(s.node("a").classList.contains("pfdsl-focus-cue")).toBe(false);
+	expect(
+		s.container.querySelector<HTMLElement>("#inner")!.style.transform,
+	).toBe(transform);
+});
+
+it("synchronizes editor, graph and Connections without taking editor focus", async () => {
+	const s = setup();
+	await s.preview.receive(s.message);
+	const editor = document.createElement("textarea");
+	s.container.append(editor);
+	editor.focus();
+	await s.preview.receive({ type: "focus", nodeId: "a" });
+	expect(s.container.querySelector<HTMLElement>("#node-actions")!.hidden).toBe(
+		true,
+	);
+	s.node("a").dispatchEvent(
+		new KeyboardEvent("keydown", { key: "Enter", bubbles: true }),
+	);
+	editor.focus();
+	await s.preview.receive({ type: "focus", nodeId: "p" });
+	expect(
+		s.container.querySelector("#node-actions-title")!.textContent,
+	).toContain("p");
+	expect(s.node("p").classList.contains("pfdsl-focus-cue")).toBe(true);
+	expect(document.activeElement).toBe(editor);
+	s.container.querySelector<HTMLButtonElement>('[data-neighbor="a"]')!.click();
+	expect(s.postMessage).toHaveBeenLastCalledWith({
+		type: "nodeClick",
+		nodeId: "a",
+		preserveFocus: true,
+	});
+	expect(s.node("a").classList.contains("pfdsl-focus-cue")).toBe(true);
+	expect(
+		s.container
+			.querySelector("#node-actions")!
+			.contains(document.activeElement),
+	).toBe(true);
+	s.node("p").dispatchEvent(new MouseEvent("dblclick", { bubbles: true }));
+	expect(
+		s.container.querySelector("#node-actions-title")!.textContent,
+	).toContain("p");
+	expect(s.postMessage).toHaveBeenLastCalledWith({
+		type: "nodeClick",
+		nodeId: "p",
+	});
+});
+
+it("offers Go to definition for a defined center and keeps Create definition for an undefined center", async () => {
+	const s = setup();
+	await s.preview.receive(s.message);
+	s.node("p").dispatchEvent(
+		new KeyboardEvent("keydown", { key: "Enter", bubbles: true }),
+	);
+	const definition =
+		s.container.querySelector<HTMLButtonElement>("#create-definition")!;
+	expect(definition.hidden).toBe(false);
+	expect(definition.textContent).toBe("Go to definition");
+	definition.click();
+	expect(s.postMessage).toHaveBeenLastCalledWith({
+		type: "nodeClick",
+		nodeId: "p",
+	});
+	s.container.querySelector<HTMLButtonElement>('[data-neighbor="a"]')!.click();
+	expect(definition.textContent).toBe("Create definition");
+	definition.click();
+	expect(s.postMessage).toHaveBeenLastCalledWith(
+		expect.objectContaining({ type: "createDefinition", nodeId: "a" }),
+	);
+	expect(s.container.querySelector("#actual-size")!.textContent).toBe(
+		"Actual size",
+	);
+	expect(s.node("a").getAttribute("aria-label")).toContain(
+		"Click or press Enter",
+	);
+});
+
 it("keeps the cue animation and removal deadline at 1500ms", async () => {
 	vi.useFakeTimers();
 	const s = setup();

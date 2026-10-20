@@ -1,4 +1,6 @@
 import { Range } from "monaco-editor/editor/common/core/range.js";
+
+export { Selection } from "monaco-editor/editor/common/core/selection.js";
 // Controlled Monaco selection/edit boundary; formatter and host stay production code.
 export const instances = [];
 export const language = {};
@@ -13,6 +15,7 @@ function offset(model, line, column) {
 
 export { Range };
 export const editor = {
+	CursorChangeReason: { Explicit: 3 },
 	registerLinkOpener() {
 		return { dispose() {} };
 	},
@@ -21,6 +24,10 @@ export const editor = {
 			source,
 			getValue() {
 				return this.source;
+			},
+			getPositionAt(index) {
+				const lines = this.source.slice(0, index).split("\n");
+				return { lineNumber: lines.length, column: lines.at(-1).length + 1 };
 			},
 			getLineCount() {
 				return this.source.split("\n").length;
@@ -52,6 +59,24 @@ export const editor = {
 			actions: [],
 			edits: [],
 			undoStops: 0,
+			focusCalls: 0,
+			focus() {
+				this.focusCalls++;
+			},
+			setPosition(position) {
+				this.position = position;
+				callbacks.onDidChangeCursorPosition?.({
+					position,
+					source: "api",
+					reason: 3,
+				});
+			},
+			revealPositionInCenter(position) {
+				this.revealed = position;
+			},
+			revealRangeInCenter(range) {
+				this.revealed = range;
+			},
 			selection: null,
 			getSelection() {
 				return this.selection;
