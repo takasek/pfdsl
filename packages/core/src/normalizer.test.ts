@@ -274,10 +274,11 @@ describe("edgeOccurrences", () => {
 		"node",
 		"x >> q -> a >>? p -> [b, c] >> r",
 		"[a, b] >>? p -> c >> q",
-		"a >> p >>? q -> b",
+		"a >> p -> b >>? q",
 	])("yields the edges normalize derives from %j, in order", (src) => {
 		const { tokens } = lex(src);
-		const { document } = parseTokens(tokens);
+		const { document, diagnostics } = parseTokens(tokens);
+		expect(diagnostics).toEqual([]);
 		const occurrences = document.statements
 			.flatMap(edgeOccurrences)
 			.map(({ kind, artifact, process }) =>
