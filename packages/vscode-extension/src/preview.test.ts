@@ -354,7 +354,6 @@ it("synchronizes node selections regardless of kind and clears focus for an empt
 it.each([
 	undefined,
 	false,
-	true,
 ])("handles nodeClick preserveFocus=%s at the definition", async (preserveFocus) => {
 	const { open } = setup();
 	const doc = document(
@@ -379,6 +378,60 @@ it.each([
 		viewColumn: 1,
 		preserveFocus: preserveFocus ?? false,
 	});
+});
+
+it("does not open a hidden source for a preserveFocus nodeClick", async () => {
+	const { open } = setup();
+	const doc = document(
+		"hidden-node-jump",
+		"---\nartifact:\n  a: {label: A}\n---\na >> p -> b\n",
+	);
+	const panel = await open(doc);
+
+	await panel.receive({ type: "nodeClick", nodeId: "a", preserveFocus: true });
+
+	expect(host.window.showTextDocument).not.toHaveBeenCalled();
+});
+
+it("updates a visible source selection without reopening or activating it", async () => {
+	const { open } = setup();
+	const doc = document(
+		"visible-node-jump",
+		"---\nartifact:\n  a: {label: A}\n---\na >> p -> b\n",
+	);
+	const panel = await open(doc);
+	const editor = {
+		document: doc,
+		viewColumn: 1,
+		selection: { active: { line: 4, character: 5 } },
+		revealRange: vi.fn(),
+	};
+	host.window.visibleTextEditors = [editor as unknown as vscode.TextEditor];
+
+	await panel.receive({ type: "nodeClick", nodeId: "a", preserveFocus: true });
+
+	expect(editor.selection).toMatchObject({ start: { line: 2, character: 2 } });
+	expect(editor.revealRange).toHaveBeenCalledWith(expect.any(host.api.Range));
+	expect(host.window.showTextDocument).not.toHaveBeenCalled();
+});
+
+it("opens a hidden source when nodeClick does not preserve focus", async () => {
+	const { open } = setup();
+	const doc = document(
+		"focused-node-jump",
+		"---\nartifact:\n  a: {label: A}\n---\na >> p -> b\n",
+	);
+	const panel = await open(doc);
+
+	await panel.receive({ type: "nodeClick", nodeId: "a" });
+
+	expect(host.window.showTextDocument).toHaveBeenCalledWith(
+		doc,
+		expect.objectContaining({
+			selection: expect.any(host.api.Range),
+			preserveFocus: false,
+		}),
+	);
 });
 
 it("focuses a quoted authored definition key selected with its quotes", async () => {
