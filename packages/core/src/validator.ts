@@ -14,6 +14,7 @@ import {
 	primaryGraphCycle,
 	strictFeedback,
 } from "./rules/cycles.js";
+import { inputFeedbackConflict } from "./rules/edge-kinds.js";
 import {
 	artifactOnlyFields,
 	boundaryWithoutSubflow,
@@ -53,6 +54,7 @@ export const RULES: readonly Rule[] = [
 	styleShape, // V008, V009
 	partsCycle, // V006
 	primaryGraphCycle, // V010
+	inputFeedbackConflict, // V036
 	strictFeedback, // V011
 	processOnlyFields, // V012, V015
 	artifactOnlyFields, // V014, W002

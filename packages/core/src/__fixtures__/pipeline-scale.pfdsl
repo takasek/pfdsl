@@ -158,4 +158,4 @@ impl_core >> build_plugin_a -> impl_plugin_a
 
 adr_set >> write_article -> article
 
-spec_alpha >>? implement_core
+feature_x >>? implement_core

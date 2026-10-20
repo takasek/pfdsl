@@ -283,6 +283,12 @@ export const DIAGNOSTIC_REGISTRY: Readonly<
 		summary:
 			"a roadmap file has an edge artifact with no frontmatter declaration (ghost node), or a declaration with no `status:`",
 	},
+	V036: {
+		severities: ["error"],
+		section: "15.4",
+		summary:
+			"an artifact-process pair is connected as both a normal input (`>>`) and feedback (`>>?`)",
+	},
 
 	W001: {
 		severities: ["warning"],
