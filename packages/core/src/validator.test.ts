@@ -456,6 +456,41 @@ a >> design -> b
 					end: { line: 1, column: 1, offset: 0 },
 				});
 			});
+
+			it("reads the document's statements once however many pairs conflict", () => {
+				const ids = Array.from({ length: 50 }, (_, i) => `a${i}`).join(", ");
+				const src = `[${ids}] >> p -> b\n[${ids}] >>? p`;
+				const { tokens } = lex(src);
+				const { document } = parseTokens(tokens);
+				const { edges, nodeKinds } = normalize(document, null);
+				let reads = 0;
+				const counted = {
+					type: document.type,
+					get statements() {
+						reads++;
+						return document.statements;
+					},
+				};
+				const diags = validate(edges, nodeKinds, null, { document: counted });
+				expect(diags.filter((d) => d.code === "V036")).toHaveLength(50);
+				expect(reads).toBe(1);
+			});
+
+			it("reads no statements when nothing conflicts", () => {
+				const { tokens } = lex("a >> p -> b");
+				const { document } = parseTokens(tokens);
+				const { edges, nodeKinds } = normalize(document, null);
+				let reads = 0;
+				const counted = {
+					type: document.type,
+					get statements() {
+						reads++;
+						return document.statements;
+					},
+				};
+				validate(edges, nodeKinds, null, { document: counted });
+				expect(reads).toBe(0);
+			});
 		});
 
 		it("keeps an identical repeated input as an N003 warning only", () => {

@@ -72,20 +72,30 @@ function withoutNulls<T>(entries: Record<string, T | null> | undefined) {
 }
 
 /** The first statement writing `edge`, spanning its two endpoint IDs in source order. */
-function edgeRangeOf(edge: NormalizedEdge, document?: Document): Range {
-	for (const stmt of document?.statements ?? []) {
-		const hit = edgeOccurrences(stmt).find(
-			(occurrence) =>
-				occurrence.kind === edge.kind &&
-				occurrence.artifact.value === edge.artifact &&
-				occurrence.process.value === edge.process,
-		);
-		if (!hit) continue;
-		return edge.kind === "output"
-			? { start: hit.process.start, end: hit.artifact.end }
-			: { start: hit.artifact.start, end: hit.process.end };
+function edgeRangeKey(edge: NormalizedEdge): string {
+	return JSON.stringify([edge.kind, edge.artifact, edge.process]);
+}
+
+/** Each edge's first authored occurrence, from one pass over the document. */
+function edgeRangeIndex(document: Document): Map<string, Range> {
+	const index = new Map<string, Range>();
+	for (const stmt of document.statements) {
+		for (const { kind, artifact, process } of edgeOccurrences(stmt)) {
+			const key = edgeRangeKey({
+				kind,
+				artifact: artifact.value,
+				process: process.value,
+			});
+			if (index.has(key)) continue;
+			index.set(
+				key,
+				kind === "output"
+					? { start: process.start, end: artifact.end }
+					: { start: artifact.start, end: process.end },
+			);
+		}
 	}
-	return zeroRange();
+	return index;
 }
 
 export function buildRuleContext(
@@ -99,6 +109,7 @@ export function buildRuleContext(
 		: options.source
 			? findFrontmatterNodeRanges(options.source)
 			: new Map<string, Range>();
+	let edgeRanges: Map<string, Range> | undefined;
 
 	const edgeGroups = groupEdges(edges);
 	const edgeProcesses = new Set<string>([
@@ -137,7 +148,12 @@ export function buildRuleContext(
 		nodesWithEdges,
 		primaryAdj,
 		rangeOf: (id) => nodeRanges.get(id) ?? zeroRange(),
-		edgeRange: (edge) => edgeRangeOf(edge, options.document),
+		edgeRange(edge) {
+			if (!options.document) return zeroRange();
+			// Built on first use, so documents with no located diagnostic skip it.
+			edgeRanges ??= edgeRangeIndex(options.document);
+			return edgeRanges.get(edgeRangeKey(edge)) ?? zeroRange();
+		},
 		strictly: (severity) => (options.strict ? "error" : severity),
 	};
 }
