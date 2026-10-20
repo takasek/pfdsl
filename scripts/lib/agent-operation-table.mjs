@@ -80,9 +80,17 @@ const CLASS_PRIORITY = {
 };
 const SEVERITY = { allow: 0, ask: 1, deny: 2 };
 
-// These are operation details of the two explicitly decided remove exceptions,
+// These are operation details of explicitly decided preparation/remove exceptions,
 // not additional subjects, targets or operation classes.
 const EXCEPTIONS = [
+	{
+		match: {
+			operationClass: "W",
+			action: "primary-ff-pull",
+			target: "primary",
+		},
+		value: "A",
+	},
 	{ match: { operationClass: "X", scope: "external" }, value: "D" },
 	{
 		match: { operationClass: "W", action: "worktree-remove", force: true },

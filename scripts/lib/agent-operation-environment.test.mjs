@@ -15,6 +15,68 @@ import { evaluateAgentOperationPolicy } from "./agent-operation-policy.mjs";
 import { GIT_TARGET_ENVIRONMENT_VARIABLES } from "./git-environment.mjs";
 import { readShell } from "./shell-commands.mjs";
 
+test("primary pull requires clean status, matching upstream and no local-only commit", () => {
+	const f = fixture({ nativeLock: false });
+	try {
+		for (const failure of [
+			null,
+			"dirty",
+			"upstream",
+			"ahead",
+			"status-error",
+			"upstream-error",
+		]) {
+			const command = `git -C ${f.roots.primary} pull --ff-only --no-autostash origin main`;
+			const payload = {
+				tool_name: "exec_command",
+				cwd: f.roots.own,
+				session_id: "session",
+				tool_input: { cmd: command },
+			};
+			const observed = [];
+			const facts = collectAgentOperationEnvironment(payload, {
+				hookRoot: f.root,
+				environment: {},
+				shell: readShell(command),
+				probeProcess: f.probeProcess,
+				readMetadata: f.readMetadata,
+				probeGit(args, options) {
+					const result = (ok, out) => ({ ok, status: ok ? 0 : 1, out });
+					if (
+						["status", "merge-base"].includes(args[0]) ||
+						args.includes("@{upstream}")
+					) {
+						assert.equal(options.cwd, f.roots.primary);
+						observed.push(args[0]);
+						if (args[0] === "status")
+							return result(
+								failure !== "status-error",
+								failure === "dirty" ? " M a\n" : "",
+							);
+						if (args[0] === "merge-base")
+							return result(failure !== "ahead", "");
+						return result(
+							failure !== "upstream-error",
+							failure === "upstream"
+								? "refs/remotes/other/main\n"
+								: "refs/remotes/origin/main\n",
+						);
+					}
+					return f.probeGit(args, options);
+				},
+			});
+			assert.equal(observed.length, 3);
+			assert.equal(
+				evaluateAgentOperationPolicy(payload, facts).decision,
+				failure ? "deny" : "allow",
+				String(failure),
+			);
+		}
+	} finally {
+		f.cleanup();
+	}
+});
+
 test("read-only calls do not observe repository roots, worktrees or native ownership", () => {
 	const noObservation = () => {
 		throw new Error("read-only observation must be skipped");
@@ -84,15 +146,24 @@ test("each inherited Git target variable makes mutations unresolved without weak
 	}
 });
 
-function fixture({ nativeLock = true, extraLocks = {} } = {}) {
+function fixture({
+	nativeLock = true,
+	extraLocks = {},
+	extraWorktrees = 0,
+} = {}) {
 	const root = mkdtempSync(
 		fileURLToPath(new URL("../../node_modules/pfdsl-facts-", import.meta.url)),
 	);
 	const roots = Object.fromEntries(
-		["primary", "own", "live", "native", "unowned", "foreign"].map((name) => [
-			name,
-			join(root, name),
-		]),
+		[
+			"primary",
+			"own",
+			"live",
+			"native",
+			"unowned",
+			"foreign",
+			...Array.from({ length: extraWorktrees }, (_, i) => `extra-${i}`),
+		].map((name) => [name, join(root, name)]),
 	);
 	for (const path of Object.values(roots)) mkdirSync(path);
 	mkdirSync(join(roots.primary, "sub"));
@@ -158,6 +229,38 @@ function fixture({ nativeLock = true, extraLocks = {} } = {}) {
 		cleanup: () => rmSync(root, { recursive: true, force: true }),
 	};
 }
+
+test("ownership observations stay bounded when unrelated worktrees accumulate", () => {
+	const f = fixture({ nativeLock: false, extraWorktrees: 100 });
+	try {
+		const payload = {
+			tool_name: "apply_patch",
+			cwd: f.roots.primary,
+			session_id: "session",
+			tool_input: {
+				command: `*** Begin Patch\n*** Add File: ${f.roots.native}/new.txt\n+hello\n*** End Patch`,
+			},
+		};
+		const facts = collectAgentOperationEnvironment(payload, {
+			hookRoot: f.root,
+			environment: {},
+			probeGit: f.probeGit,
+			probeProcess: f.probeProcess,
+			readMetadata: f.readMetadata,
+		});
+		assert.equal(
+			evaluateAgentOperationPolicy(payload, facts).decision,
+			"allow",
+		);
+		assert.ok(
+			f.seen.length < 20,
+			`expected bounded Git probes, got ${f.seen.length}`,
+		);
+		assert.equal(Object.keys(facts.branches).length, 105);
+	} finally {
+		f.cleanup();
+	}
+});
 
 test("a subdirectory origin observes its containing worktree root without changing explicit targets", () => {
 	const f = fixture({ nativeLock: false });
@@ -270,14 +373,8 @@ test("Codex observes native identity separately from cwd and ignores the unobser
 		assert.equal(operation.target, "own");
 		assert.equal(operation.executionPath, f.roots.native);
 		assert.equal(
-			facts.worktrees.find(({ root }) => root === f.roots.unowned).ownership
-				.ownerId,
-			"other",
-		);
-		assert.equal(
-			facts.worktrees.find(({ root }) => root === f.roots.unowned).ownership
-				.live,
-			false,
+			facts.worktrees.find(({ root }) => root === f.roots.unowned).ownership,
+			undefined,
 		);
 	} finally {
 		f.cleanup();
