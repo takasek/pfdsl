@@ -16,6 +16,10 @@ const previewControlsStyles = `
 #zoom-level { min-width: 4em; text-align: center; }
 #preview-help { padding: 6px 12px; flex-shrink: 0; max-height: 25%; overflow: auto; font: 12px var(--pfdsl-editor-font-family, sans-serif); }
 #preview-error { position: absolute; inset: 0; margin: 0; overflow: auto; overflow-wrap: anywhere; font-size: 13px; cursor: text; }
+#preview-error .error-repair { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 12px; white-space: normal; }
+#preview-error .error-repair button { color: var(--pfdsl-editor-foreground, #222); background: transparent; border: 1px solid var(--pfdsl-panel-border, #555); border-radius: 3px; padding: 2px 6px; cursor: pointer; font: inherit; }
+#preview-error .error-repair button:disabled { opacity: 0.5; cursor: default; }
+#preview-error .error-repair button:focus-visible { outline: 2px solid var(--pfdsl-focusBorder, #007fd4); }
 `;
 export const previewMarkup = `
 <div id="preview-toolbar" role="group" aria-label="Diagram view">
