@@ -1,5 +1,4 @@
-import { zeroRange } from "../position.js";
-import type { Diagnostic } from "../types/index.js";
+import type { Diagnostic, NormalizedEdge } from "../types/index.js";
 import type { RuleContext } from "./context.js";
 
 interface ArtifactProcessPair {
@@ -13,11 +12,11 @@ function pairKey(artifact: string, process: string): string {
 
 /** Pairs represented as both a normal input and feedback edge. */
 export function inputFeedbackConflictPairs(
-	ctx: RuleContext,
+	edges: readonly NormalizedEdge[],
 ): ArtifactProcessPair[] {
 	const inputs = new Set<string>();
 	const feedback = new Map<string, ArtifactProcessPair>();
-	for (const edge of ctx.edges) {
+	for (const edge of edges) {
 		if (edge.kind === "input") {
 			inputs.add(pairKey(edge.artifact, edge.process));
 		} else if (edge.kind === "feedback") {
@@ -39,10 +38,10 @@ export function inputFeedbackConflictPairs(
 
 /** V036: one artifact-process pair cannot be both a normal input and feedback. */
 export function inputFeedbackConflict(ctx: RuleContext): Diagnostic[] {
-	return inputFeedbackConflictPairs(ctx).map(({ artifact, process }) => ({
+	return inputFeedbackConflictPairs(ctx.edges).map(({ artifact, process }) => ({
 		severity: "error",
 		code: "V036",
 		message: `Artifact '${artifact}' is connected to process '${process}' both as an input (>>) and as feedback (>>?); keep only one connection`,
-		range: zeroRange(),
+		range: ctx.edgeRange({ kind: "feedback", artifact, process }),
 	}));
 }

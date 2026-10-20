@@ -3,7 +3,10 @@ import type { PreviewEditRequest } from "./preview-edit.js";
 import type { PreviewGraph } from "./preview-graph.js";
 
 /** Transport identity is separate from the source edit calculation. */
-export type PreviewEditMessage = PreviewEditRequest & { requestId?: string };
+export type PreviewEditMessage = PreviewEditRequest & {
+	requestId?: string;
+	repair?: true;
+};
 
 /**
  * Shared postMessage protocol between preview.ts (extension host) and
@@ -30,7 +33,11 @@ export type MessageToWebview =
 				}>;
 			};
 	  }
-	| { type: "error"; message: string }
+	| {
+			type: "error";
+			message: string;
+			repair?: { source: string; artifact: string; process: string };
+	  }
 	| { type: "focus"; nodeId: string }
 	| { type: "clearFocus" }
 	| { type: "diff"; report: DiffReport }

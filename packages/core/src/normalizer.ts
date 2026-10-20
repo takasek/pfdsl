@@ -4,6 +4,7 @@ import type {
 	Diagnostic,
 	Document,
 	Frontmatter,
+	IdNode,
 	NormalizedEdge,
 	Statement,
 } from "./types/index.js";
@@ -13,6 +14,50 @@ export interface NormalizeResult {
 	nodeKinds: Map<string, "artifact" | "process" | "group">;
 	isolatedNodes: Set<string>;
 	diagnostics: Diagnostic[];
+}
+
+/** One authored edge, with the ID nodes it was written with. */
+export interface EdgeOccurrence {
+	kind: NormalizedEdge["kind"];
+	artifact: IdNode;
+	process: IdNode;
+}
+
+/** The edges one statement writes, in source order, as `normalize` derives them. */
+export function edgeOccurrences(stmt: Statement): EdgeOccurrence[] {
+	const between = (
+		kind: NormalizedEdge["kind"],
+		expr: ArtifactExpr,
+		process: IdNode,
+	) => expr.ids.map((artifact) => ({ kind, artifact, process }));
+	switch (stmt.type) {
+		case "chain": {
+			const out: EdgeOccurrence[] = [];
+			let current = stmt.head;
+			for (const seg of stmt.segments) {
+				out.push(
+					...between(
+						seg.op === ">>" ? "input" : "feedback",
+						current,
+						seg.process,
+					),
+				);
+				if (seg.output !== null) {
+					out.push(...between("output", seg.output, seg.process));
+					current = seg.output;
+				}
+			}
+			return out;
+		}
+		case "input-edge":
+			return between("input", stmt.artifact, stmt.process);
+		case "feedback-edge":
+			return between("feedback", stmt.artifact, stmt.process);
+		case "output-edge":
+			return between("output", stmt.artifact, stmt.process);
+		case "node-decl":
+			return [];
+	}
 }
 
 function edgeKey(edge: NormalizedEdge): string {

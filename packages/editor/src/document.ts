@@ -1,6 +1,7 @@
 import {
 	analyzeSource,
 	type Diagnostic,
+	inputFeedbackConflictPairs,
 	loadDependencyClosure,
 	loadDependencyClosureAsync,
 	resolveEffectiveFrontmatter,
@@ -93,8 +94,17 @@ export function prepareDocument(
 	}
 	let message: MessageToWebview;
 	const error = blockingDiagnosticMessage(model.diagnostics);
-	if (error) message = { type: "error", message: error };
-	else {
+	if (error) {
+		const pair =
+			model.diagnostics.find((d) => d.severity === "error")?.code === "V036"
+				? inputFeedbackConflictPairs(model.edges)[0]
+				: undefined;
+		message = {
+			type: "error",
+			message: error,
+			...(pair ? { repair: { source: model.source, ...pair } } : {}),
+		};
+	} else {
 		try {
 			message = {
 				type: "render",

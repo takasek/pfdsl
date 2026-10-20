@@ -286,7 +286,10 @@ export function analyzeSource(
 		isolatedNodes,
 		diagnostics: normDiags,
 	} = normalize(document, frontmatter);
-	const valOpts: import("./validator.js").ValidateOptions = { sourceMap };
+	const valOpts: import("./validator.js").ValidateOptions = {
+		sourceMap,
+		document,
+	};
 	if (opts.strict) valOpts.strict = true;
 	if (opts.readyGate) valOpts.readyGate = true;
 	const valDiags = validate(edges, nodeKinds, frontmatter, valOpts);
@@ -365,7 +368,7 @@ export function format(source: string, opts: FormatOptions = {}): FormatResult {
 	} = normalize(document, frontmatter);
 	const valDiags = opts.skipValidation
 		? []
-		: validate(edges, nodeKinds, frontmatter, { source });
+		: validate(edges, nodeKinds, frontmatter, { source, document });
 
 	// Frontmatter is canonicalized through the yaml CST (ADR-0034) rather than
 	// passed through verbatim. Left untouched when absent, when the fence is
@@ -483,3 +486,4 @@ export function format(source: string, opts: FormatOptions = {}): FormatResult {
 		diagnostics: [...parseDiags, ...normDiags, ...valDiags],
 	};
 }
+export { inputFeedbackConflictPairs } from "./rules/edge-kinds.js";

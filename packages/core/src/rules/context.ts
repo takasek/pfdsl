@@ -5,11 +5,13 @@ import {
 	frontmatterNodeRanges,
 } from "../frontmatter.js";
 import type { FrontmatterSource } from "../frontmatter-source.js";
+import { edgeOccurrences } from "../normalizer.js";
 import { zeroRange } from "../position.js";
 import type {
 	ArtifactMeta,
 	Diagnostic,
 	DiagnosticSeverity,
+	Document,
 	Frontmatter,
 	NodeKind,
 	NormalizedEdge,
@@ -21,6 +23,8 @@ export interface ValidateOptions {
 	strict?: boolean;
 	source?: string;
 	sourceMap?: FrontmatterSource;
+	/** Parsed body, which locates diagnostics about authored edges. */
+	document?: Document;
 	readyGate?: boolean;
 }
 
@@ -50,6 +54,8 @@ export interface RuleContext {
 
 	/** Range of a node's front-matter declaration, when the source was supplied. */
 	rangeOf(id: string): Range;
+	/** Range of an edge's first authored occurrence, when the document was supplied. */
+	edgeRange(edge: NormalizedEdge): Range;
 	/** `error` under --strict, the given severity otherwise. */
 	strictly(severity: DiagnosticSeverity): DiagnosticSeverity;
 }
@@ -65,6 +71,33 @@ function withoutNulls<T>(entries: Record<string, T | null> | undefined) {
 	return out;
 }
 
+/** The first statement writing `edge`, spanning its two endpoint IDs in source order. */
+function edgeRangeKey(edge: NormalizedEdge): string {
+	return JSON.stringify([edge.kind, edge.artifact, edge.process]);
+}
+
+/** Each edge's first authored occurrence, from one pass over the document. */
+function edgeRangeIndex(document: Document): Map<string, Range> {
+	const index = new Map<string, Range>();
+	for (const stmt of document.statements) {
+		for (const { kind, artifact, process } of edgeOccurrences(stmt)) {
+			const key = edgeRangeKey({
+				kind,
+				artifact: artifact.value,
+				process: process.value,
+			});
+			if (index.has(key)) continue;
+			index.set(
+				key,
+				kind === "output"
+					? { start: process.start, end: artifact.end }
+					: { start: artifact.start, end: process.end },
+			);
+		}
+	}
+	return index;
+}
+
 export function buildRuleContext(
 	edges: NormalizedEdge[],
 	nodeKinds: Map<string, NodeKind>,
@@ -76,6 +109,7 @@ export function buildRuleContext(
 		: options.source
 			? findFrontmatterNodeRanges(options.source)
 			: new Map<string, Range>();
+	let edgeRanges: Map<string, Range> | undefined;
 
 	const edgeGroups = groupEdges(edges);
 	const edgeProcesses = new Set<string>([
@@ -114,6 +148,12 @@ export function buildRuleContext(
 		nodesWithEdges,
 		primaryAdj,
 		rangeOf: (id) => nodeRanges.get(id) ?? zeroRange(),
+		edgeRange(edge) {
+			if (!options.document) return zeroRange();
+			// Built on first use, so documents with no located diagnostic skip it.
+			edgeRanges ??= edgeRangeIndex(options.document);
+			return edgeRanges.get(edgeRangeKey(edge)) ?? zeroRange();
+		},
 		strictly: (severity) => (options.strict ? "error" : severity),
 	};
 }
