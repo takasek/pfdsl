@@ -41,6 +41,9 @@ A produced artifact should also declare meaningful completion `criteria` (W002 w
 The Quick Fix keeps that diagnostic until you supply a criterion, and the insertion can be undone in one step.
 
 Click anywhere inside a preview node, or focus it with Tab and press Enter, to open **Connections**.
+A single click waits briefly for a possible double-click and preserves the diagram's pan; Enter and right-click open Connections immediately.
+Double-click a node to open Connections for that node and focus its source location.
+Explicit source navigation reopens a closed source beside the preview; synchronization alone keeps a closed source closed.
 Right-click remains available; dragging pans without opening the panel, and Cmd/Ctrl+click opens a location or subflow without opening Connections.
 The bottom panel shows direct incoming neighbors on the left, the current node in the center, and outgoing neighbors on the right.
 Each neighbor list scrolls independently; the center and connection inputs remain visible.
