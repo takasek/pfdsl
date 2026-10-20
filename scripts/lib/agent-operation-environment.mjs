@@ -41,6 +41,7 @@ const MCP_READ = new Set([
 	"get_repo",
 	"fetch",
 	"fetch_issue",
+	"fetch_issue_comments",
 	"fetch_pr",
 	"fetch_file",
 ]);

@@ -6,6 +6,7 @@ import { parseFrontmatterCst } from "./frontmatter-cst.js";
 import {
 	analyze,
 	format,
+	inputFeedbackConflictPairs,
 	isUnreadableError,
 	normalizeDocument,
 	parse,
@@ -19,6 +20,17 @@ import { zeroRange } from "./position.js";
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const samplePath = resolve(__dirname, "__fixtures__/pipeline-scale.pfdsl");
 const sampleSource = readFileSync(samplePath, "utf-8");
+
+it("finds sorted unique conflicts from edges alone", () => {
+	const { edges } = analyze(
+		"z >> q -> out\na >> p -> b\nz >>? q\na >>? p\na >>? p\n",
+	);
+	expect(inputFeedbackConflictPairs(edges)).toEqual([
+		{ artifact: "a", process: "p" },
+		{ artifact: "z", process: "q" },
+	]);
+	expect(inputFeedbackConflictPairs([])).toEqual([]);
+});
 
 function semanticSnapshot(source: string) {
 	const result = analyze(source);
@@ -52,6 +64,27 @@ function assertFormatPreservesSemantics(
 }
 
 describe("public API", () => {
+	it.each([
+		"\n",
+		"\r\n",
+	])("locates V036 at the feedback edge after frontmatter with %j newlines", (newline) => {
+		const source = [
+			"---",
+			"type: workflow",
+			"---",
+			"a >> p -> b",
+			"a >>? p",
+			"",
+		].join(newline);
+		for (const result of [analyze(source), format(source)]) {
+			const diagnostic = result.diagnostics.find(
+				(item) => item.code === "V036",
+			);
+			expect(diagnostic?.range.start).toMatchObject({ line: 5, column: 1 });
+			expect(diagnostic?.range.end).toMatchObject({ line: 5, column: 8 });
+		}
+	});
+
 	it.each([
 		"\n",
 		"\r\n",

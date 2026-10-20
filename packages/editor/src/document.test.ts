@@ -1,6 +1,37 @@
 import { describe, expect, it } from "vitest";
 import { analyzeSnapshot, preloadPresets, prepareDocument } from "./index.js";
 
+describe("V036 error repair", () => {
+	it.each([
+		"a >> p -> b\na >>? p\n",
+		"z >> q -> out\na >> p -> b\nz >>? q\na >>? p\n",
+	])("offers the first sorted pair matching the displayed diagnostic", (source) => {
+		const model = analyzeSnapshot(source);
+		const first = model.diagnostics.find((d) => d.severity === "error")!;
+		expect(first.code).toBe("V036");
+		expect(first.message).toBe(
+			"Artifact 'a' is connected to process 'p' both as an input (>>) and as feedback (>>?); keep only one connection",
+		);
+		expect(prepareDocument(model, null, () => null).message).toEqual({
+			type: "error",
+			message: `${first.code}: ${first.message}`,
+			repair: { source, artifact: "a", process: "p" },
+		});
+	});
+	it.each([
+		"a >>",
+		"a >> p -> a\na >>? p\n",
+	])("does not offer repair for an earlier error", (source) => {
+		const model = analyzeSnapshot(source);
+		expect(
+			model.diagnostics.find((d) => d.severity === "error")?.code,
+		).not.toBe("V036");
+		expect(prepareDocument(model, null, () => null).message).not.toHaveProperty(
+			"repair",
+		);
+	});
+});
+
 describe("shared document pipeline", () => {
 	it("reports raw YAML dependency positions in the original file", async () => {
 		const source = "group:\n  g: {parent: 2}\n";

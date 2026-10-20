@@ -25,8 +25,8 @@ export const editor = {
 			getValue() {
 				return this.source;
 			},
-			getPositionAt(index) {
-				const lines = this.source.slice(0, index).split("\n");
+			getPositionAt(value) {
+				const lines = this.source.slice(0, value).split("\n");
 				return { lineNumber: lines.length, column: lines.at(-1).length + 1 };
 			},
 			getLineCount() {
