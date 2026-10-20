@@ -56,6 +56,7 @@ const warningOnly =
 	"---\nartifact:\n  bundle:\n    parts: [orphan]\n---\nreq >> design -> bundle\n"; // W001: orphan has no edges
 // V002 (process with no inputs): a warning by default, an error under --strict.
 const incomplete = "P -> B\n";
+const mixedInputFeedback = "a >> p -> b\na >>? p\n";
 const inlineComment =
 	"---\nartifact:\n  spec:\n    criteria: Details are in issue #123\n---\nspec >> P -> output\n";
 
@@ -67,6 +68,7 @@ beforeAll(() => {
 	writeFileSync(join(dir, "invalid-declared.pfdsl"), invalidDeclared);
 	writeFileSync(join(dir, "warning-only.pfdsl"), warningOnly);
 	writeFileSync(join(dir, "incomplete.pfdsl"), incomplete);
+	writeFileSync(join(dir, "mixed-input-feedback.pfdsl"), mixedInputFeedback);
 	writeFileSync(join(dir, "inline-comment.pfdsl"), inlineComment);
 });
 
@@ -2684,6 +2686,12 @@ describe("shouldColorize (#435)", () => {
 });
 
 describe("--json output (#181)", () => {
+	it("check reports a mixed input and feedback pair as V036", async () => {
+		const r = await run(["check", join(dir, "mixed-input-feedback.pfdsl")]);
+		expect(r.exitCode).toBe(1);
+		expect(r.stderr).toContain("V036");
+	});
+
 	it("check --json includes the FM003 warning", async () => {
 		const r = await run(["check", join(dir, "inline-comment.pfdsl"), "--json"]);
 		expect(r.exitCode).toBe(0);

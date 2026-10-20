@@ -200,6 +200,11 @@ For PR-based work, a completed artifact's `done` update belongs in the completio
 Review stale `wip` values against completion evidence before changing them.
 If local instructions still defer `done` updates until after merging, update those instructions to include the status change in the completion PR.
 
+### Mixed normal and feedback edges (V036)
+
+When the same artifact is connected to the same process through both `>>` and `>>?`, `check` reports an error in both normal and strict modes.
+Keep the edge kind that matches the dependency and remove the other connection.
+
 ### IDs beginning with a hyphen (L002)
 
 A body ID beginning with `-` must use quoted-ID syntax.

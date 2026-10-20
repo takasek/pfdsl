@@ -1,6 +1,6 @@
 <!-- DO NOT EDIT — snapshot distributed with pfdsl skill. Authoritative source: https://github.com/takasek/pfdsl/blob/main/docs/spec/spec.md -->
 
-# PFDSL仕様書 v0.0.27
+# PFDSL仕様書 v0.0.28
 
 ## 1. 目的
 
@@ -1065,6 +1065,9 @@ strict mode では、フィードバック元 A が Primary Graph 上ですで�
 ### 15.4 重複 edge
 
 同一 edge の重複記述は冗長であり、2回目以降は無視してよい。処理系は warning (N003) を報告してよい。
+同じ artifact・process の組に通常入力（`>>`）と feedback（`>>?`）の両方がある場合は、通常・strict の両 mode で組ごとに1件の error (V036) を報告する。
+N003 が無視可能な同一 edge の冗長を示すのに対し、V036 は異なる2本の edge が正規形に残る無視できない矛盾を示す。
+この組には V011 を重ねて報告しない。V011 は通常入力の直接接続がなく、feedback 元 artifact が primary graph 上の別経路で process に到達するときの検査として残す。
 
 ### 15.5 parts 制約
 
@@ -1251,6 +1254,7 @@ Artifact / Process 同士の矛盾は引き続き N001 / N002 が扱う。
 | V033 | error | §15.11 | `boundary:` マップの side 越境（入力↔出力） |
 | V034 | error | §15.11 | 境界集合の不一致（親 I/O と子 open input / terminal の全単射違反） |
 | V035 | error | §15.16 | roadmap ファイルの edge 上の artifact が front matter に宣言を持たない（幽霊ノード）、または宣言はあるが `status:` が未設定 |
+| V036 | error | §15.4 | 同じ artifact / process の組が通常入力 (`>>`) と feedback (`>>?`) の両方で接続されている |
 | W001 | warning | §15.5 | parts メンバーが edge に参加していない |
 | W002 | warning (--strict: error) | §15.7 | produced Artifact に `criteria:` が未設定 |
 | W003 | warning | §15.6 | status 非単調（出力 Artifact が `done` なのに、明示 status を持つ入力 Artifact が `done` 未満） |

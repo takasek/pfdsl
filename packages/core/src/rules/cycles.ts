@@ -1,6 +1,7 @@
 import { zeroRange } from "../position.js";
 import type { Diagnostic } from "../types/index.js";
 import type { RuleContext } from "./context.js";
+import { inputFeedbackConflictPairs } from "./edge-kinds.js";
 
 /**
  * V010: the primary graph must be acyclic (§16). Feedback edges are exempt —
@@ -54,6 +55,12 @@ export function primaryGraphCycle(ctx: RuleContext): Diagnostic[] {
 export function strictFeedback(ctx: RuleContext): Diagnostic[] {
 	if (!ctx.options.strict) return [];
 	const diagnostics: Diagnostic[] = [];
+	const conflictingInputsByProcess = new Map<string, Set<string>>();
+	for (const { artifact, process } of inputFeedbackConflictPairs(ctx)) {
+		const artifacts = conflictingInputsByProcess.get(process) ?? new Set();
+		artifacts.add(artifact);
+		conflictingInputsByProcess.set(process, artifacts);
+	}
 
 	const reachableFrom = (start: string): Set<string> => {
 		const reachable = new Set<string>();
@@ -72,6 +79,7 @@ export function strictFeedback(ctx: RuleContext): Diagnostic[] {
 
 	for (const e of ctx.edges) {
 		if (e.kind !== "feedback") continue;
+		if (conflictingInputsByProcess.get(e.process)?.has(e.artifact)) continue;
 		if (reachableFrom(e.artifact).has(e.process)) {
 			diagnostics.push({
 				severity: "error",
