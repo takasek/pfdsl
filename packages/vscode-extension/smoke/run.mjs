@@ -1043,7 +1043,9 @@ async function assertDefinitionQuickFix(session) {
 			sourceLines: await quickFixSource.locator(".view-line").allTextContents(),
 		}),
 		({ status, sourceLines }) => {
-			if (status.includes("selected")) return false;
+			// The status bar text also carries its CSS, so read the selection
+			// count from the cursor indicator alone.
+			if (/Ln \d+, Col \d+ \(\d+ selected\)/.test(status)) return false;
 			const cursor = parseStatusCursorPosition(status);
 			if (cursor === null) return false;
 			const labelLineIndex = sourceLines.findIndex((line) =>
