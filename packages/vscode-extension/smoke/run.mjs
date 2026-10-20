@@ -872,6 +872,11 @@ async function assertPreviewInteractions(session) {
 	);
 	await frame.locator('#inner g.node[data-node-id="design"]').dblclick();
 	await waitForInteraction(
+		"double-click opens Connections for the navigation target",
+		() => frame.locator("#node-actions-title").textContent(),
+		(title) => title.includes("design"),
+	);
+	await waitForInteraction(
 		"node double-click moves the source cursor to design",
 		() => readStatusCursorPosition(page),
 		(cursorAfterNavigation) =>
@@ -1334,6 +1339,32 @@ async function assertPreviewEditingFocus(session) {
 		{ timeoutMs: coldRenderTimeoutMs },
 	);
 	await waitForSourceCloseReady(sourceTab, { timeoutMs: coldRenderTimeoutMs });
+	for (const gesture of ["double-click", "Go to definition"]) {
+		await closeSourceTab(page, sourceTab);
+		if (gesture === "double-click")
+			await frame.locator('#inner g.node[data-node-id="b"]').dblclick();
+		else
+			await frame
+				.getByRole("button", { name: "Go to definition", exact: true })
+				.click();
+		await waitForInteraction(
+			`${gesture} reopens and focuses the source without covering the preview`,
+			async () => ({
+				groups: await page.locator(".editor-group-container").count(),
+				sourceSelected: await sourceTab.getAttribute("aria-selected"),
+				previewSelected: await previewTab.getAttribute("aria-selected"),
+				sourceFocused: await page.locator(".monaco-editor.focused").count(),
+			}),
+			(state) =>
+				state.groups === 2 &&
+				state.sourceSelected === "true" &&
+				state.previewSelected === "true" &&
+				state.sourceFocused > 0,
+		);
+		await waitForSourceCloseReady(sourceTab, {
+			timeoutMs: coldRenderTimeoutMs,
+		});
+	}
 	await closeSourceTab(page, sourceTab);
 	await frame.locator('#inner g.node[data-node-id="p"]').press("Enter");
 	await createConnection(frame, "reopened_result");

@@ -295,10 +295,11 @@ async function openFileActivatingExisting(
 }
 
 function jumpToNode(
-	doc: vscode.TextDocument,
+	state: PreviewState,
 	nodeId: string,
 	preserveFocus = false,
 ): void {
+	const { doc } = state;
 	let targetPos: vscode.Position | undefined;
 	let targetEnd: vscode.Position | undefined;
 	const definition = findFrontmatterDefinitionRange(
@@ -346,6 +347,10 @@ function jumpToNode(
 		}
 	} else if (!preserveFocus) {
 		vscode.window.showTextDocument(doc, {
+			viewColumn:
+				state.sourceViewColumn === state.panel.viewColumn
+					? vscode.ViewColumn.Beside
+					: state.sourceViewColumn,
 			selection: range,
 			preserveFocus: false,
 		});
@@ -428,7 +433,7 @@ export function registerPreview(context: vscode.ExtensionContext): {
 			) {
 				await editFromPreview(state, msg);
 			} else if (msg.type === "nodeClick") {
-				jumpToNode(state.doc, msg.nodeId, msg.preserveFocus);
+				jumpToNode(state, msg.nodeId, msg.preserveFocus);
 			} else if (msg.type === "openUrl") {
 				vscode.env.openExternal(vscode.Uri.parse(msg.url));
 			} else if (msg.type === "openFile") {
