@@ -486,3 +486,4 @@ export function format(source: string, opts: FormatOptions = {}): FormatResult {
 		diagnostics: [...parseDiags, ...normDiags, ...valDiags],
 	};
 }
+export { inputFeedbackConflictPairs } from "./rules/edge-kinds.js";

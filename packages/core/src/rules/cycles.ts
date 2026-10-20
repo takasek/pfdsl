@@ -56,7 +56,7 @@ export function strictFeedback(ctx: RuleContext): Diagnostic[] {
 	if (!ctx.options.strict) return [];
 	const diagnostics: Diagnostic[] = [];
 	const conflictingInputsByProcess = new Map<string, Set<string>>();
-	for (const { artifact, process } of inputFeedbackConflictPairs(ctx)) {
+	for (const { artifact, process } of inputFeedbackConflictPairs(ctx.edges)) {
 		const artifacts = conflictingInputsByProcess.get(process) ?? new Set();
 		artifacts.add(artifact);
 		conflictingInputsByProcess.set(process, artifacts);
