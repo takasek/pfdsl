@@ -171,7 +171,10 @@ Connectionsから追加・削除・feedback切替・定義作成を適用し、e
 editor操作はeditorのfocusを保ち、閉じたConnectionsを開かず、開いていれば中心を追従する。
 Connectionsの近隣移動はeditorのcursorも移し、focusはConnectionsに残す。
 図のdouble clickは途中のclickでConnectionsが開き、sourceへ移動してeditorにfocusする。
-Go to definitionは中心nodeの定義位置へ移動してeditorにfocusし、Create definitionは従来の定義作成を行う。
+Go to definitionは中心nodeの定義位置へ移動してeditorにfocusする。
+Create definitionは`label: ""`を持つ定義を作り、editorへfocusして空の引用符の内側にcursorを置く。
+そこからlabelを入力でき、既存の案内と、出力成果物に必要なcriteriaのW002案内を保つ。
+labelがIDと同じ既存nodeは、`layout.maxWidth`の有無によらず図にIDを1回だけ表示する。
 対象だけ短時間示し古い強調を残さず、再描画の再センタリングだけで再強調しない。
 fill/status・zoom/panを保ち、reduced-motionではanimationを抑えた静的合図を使う。
 状態：M/V各未実施。記録：未記入。
@@ -195,14 +198,15 @@ Escape後も入力を残し、同対象の幅変更で値を保つ。
 Enter確定だけで新規作成しない。
 状態：M/V各未実施。記録：未記入。
 
-### GUI-13：新規作成＋接続の一括適用
+### GUI-13：新規IDへの接続追加
 
-対応：#1444。対象・入力：M/V、両種別中心の左右、有効新ID、コメント／metadata、接続拒否となる新producer。
+対応：#1444/#1466。対象・入力：M/V、両種別中心の左右、有効新ID、コメント／metadata、接続拒否となる新producer。
 操作：＋で作成・接続しsource/図/一覧を照合しUndo/Redoする。拒否変種も行う。
-期待：＋が逆種別の新nodeをID＝初期labelで作り接続を一操作・一Undoで適用する。
+期待：＋が逆種別の新IDへの接続だけを一操作・一Undoで追加し、front matterの定義やlabelを書かない。
+editorの選択位置は候補選択による追加と同じく追加した接続位置とし、定義が必要なら新nodeのCreate definitionを使う。
 失敗で未接続新node、dirty/Undoの部分変更を残さず、既存コメント／metadataと後の編集導線を保つ。
 状態：M/V各未実施。記録：未記入。現APIとの差分は#1444。
-API差分：`addConnector`に`create: true`を追加し、共有`applyPreviewEdit`が既存IDを拒否して`insertDefinition`とedge挿入を単一のsource/editへ合成する。候補選択は`create: false`、常設＋だけが`true`を送る。両hostが既存のsource/revision/dispose検査と単一editor edit／WorkspaceEditで適用する。
+API差分：`addConnector`の`create: true`は新IDの検査に使い、共有`applyPreviewEdit`は既存IDを拒否してedgeだけを挿入する。候補選択は`create: false`、常設＋だけが`true`を送る。両hostが既存のsource/revision/dispose検査と単一editor edit／WorkspaceEditで適用する。
 
 ### GUI-14：拒否と古い対象への非適用
 
@@ -221,6 +225,7 @@ API差分：`addConnector`に`create: true`を追加し、共有`applyPreviewEdi
 操作：lineのclick／右clickでその位置のmenuを開き、Delete、input↔feedback、outputの項目、通常inputへ戻せない条件を試す。
 画面端でmenuがはみ出さず、Arrow／Home／EndとEnter／Spaceで選択でき、Escapeで起点lineへ戻り、menu外clickで閉じることを確認する。
 期待：選んだedgeだけ削除しnodeを消さない。
+最後の接続が無くなる未定義nodeは、labelの無い空のmapping定義で種別を保持する。
 成果物→工程の向きを保持し、outputのmenuはDeleteだけで、方向反転を起こさない。
 切替後は同じ接続のbutton、削除後は同じ側の次の行（末尾なら前の行、行が無ければ同じ側の入力欄）へ戻し、候補は開かない。
 左右列だけで判断せず共有適用条件で検証する。

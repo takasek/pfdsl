@@ -75,11 +75,13 @@ Its ID argument is the semantic name without DSL quotation marks; shell-quote a 
 Literal quotes and commas inside the name remain part of the ID; unlike `meta set`, this argument is not a DSL-quoted ID list.
 It previews the complete result by default; add `--write` to update the file.
 Supply initial scalar fields as `field=value`, using the same field rules as `meta set`.
+No label is added unless `label=value` is supplied; without fields, the definition is an empty mapping.
 For a roadmap artifact, supply a valid status explicitly; for a produced artifact, supply completion criteria.
 
 ```sh
 pfdsl meta create plan.pfdsl result status=todo 'criteria=The report is reviewed'
 pfdsl meta create plan.pfdsl result status=todo 'criteria=The report is reviewed' --write
+pfdsl meta create plan.pfdsl result 'label=Release report' status=todo 'criteria=The report is reviewed' --write
 ```
 
 The command preserves the graph body and existing YAML comments and quoting.

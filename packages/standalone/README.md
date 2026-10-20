@@ -63,10 +63,12 @@ Opening Connections with the pointer preserves focus; opening from a node with E
 Focus or click a **Connect a node…** input to browse available candidates by ID or label, then use the arrow keys and Enter to connect one.
 Unavailable and already connected candidates are hidden; a feedback candidate appears when a normal input would create a cycle.
 After connecting a candidate, focus stays in the input and the refreshed candidates remain open.
+Use the adjacent **+** to connect a new ID without adding a frontmatter definition or label; pressing Enter does not create a node.
 Click or right-click a connection line to open its menu beside the line; use arrow keys to choose an action and Escape to return to the line.
 Output connections offer **Delete** only; input connections also offer **Make feedback** or **Remove feedback**.
 After deleting or switching a connection, focus stays near that connection on the same side and candidates stay closed.
 Double-click a node or use **Go to definition** in Connections to move to its definition and focus the editor; undefined nodes offer **Create definition** instead.
+**Create definition** adds an empty label and focuses the editor with the cursor inside its quotation marks, ready to type.
 Use **Fit** to see the whole diagram or **Actual size** to restore 100%; the zoom display shows the current scale.
 
 The source editor highlights YAML frontmatter and PFDSL flows.
