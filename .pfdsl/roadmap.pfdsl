@@ -97,7 +97,7 @@ artifact:
   edge_kind_conflict_diagnostic:
     label: "input と feedback の併記診断 V036 (#1467)"
     description: "同じ artifact・process の組を通常入力と feedback の両方で接続する矛盾を通常・strict の両 mode で報告し、V011 の重複を抑止する"
-    status: wip
+    status: done
     location: ../packages/core/src/rules/edge-kinds.ts
     criteria: "同じ artifact・process の組に `>>` と `>>?` があると組ごとに1件の V036 error が報告され、strict でも V011 を重ねず、間接到達の V011・同種重複の N003・別 process の非該当を保持する。CLI check と preview edit を含む tests と spec / diagnostics registry が一致する"
   cli_release_group_node_clash:
