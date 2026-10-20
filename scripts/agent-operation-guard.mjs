@@ -8,8 +8,28 @@ import { isMainThread } from "node:worker_threads";
 const hookRoot = fileURLToPath(new URL("../", import.meta.url));
 const delegatedCodex =
 	!process.env.CLAUDE_PROJECT_DIR?.trim() && process.env.CLAUDECODE === "1";
-function failed(detail) {
-	const reason = `Cannot execute the agent operation policy: ${String(detail).slice(0, 400)}. Repair the hook in a human terminal before retrying.`;
+function failed(detail, phase) {
+	const diagnostic = String(detail).slice(0, 400);
+	let guidance;
+	if (detail === "bootstrap input deadline exceeded")
+		guidance =
+			"Hook input was not received within the time limit. Inspect the caller's input delivery using read-only diagnostics before choosing a recovery.";
+	else if (detail === "bootstrap policy loading deadline exceeded")
+		guidance =
+			"Policy components did not finish loading within the time limit. Investigate module loading using read-only diagnostics before choosing a recovery.";
+	else if (phase === "input")
+		guidance =
+			"Hook input could not be read or validated. Inspect the caller's payload and input delivery, then correct the identified input problem.";
+	else if (phase === "policy-load")
+		guidance =
+			"Policy components could not be loaded. Inspect the reported module or dependency using read-only diagnostics, then correct the identified loading problem.";
+	else if (detail === "Git policy probe budget exhausted")
+		guidance =
+			"Git safety checks did not finish within their time budget. Investigate the cause using read-only diagnostics before choosing a recovery.";
+	else
+		guidance =
+			"The underlying cause is not established. Investigate the reported failure using read-only diagnostics before choosing a recovery.";
+	const reason = `Cannot execute the agent operation policy: ${diagnostic}. The operation was denied because safety verification is incomplete. ${guidance}`;
 	console.error(reason);
 	console.log(
 		JSON.stringify({
@@ -24,8 +44,15 @@ function failed(detail) {
 }
 
 if (isMainThread) {
+	let phase = "input";
 	const timer = setTimeout(
-		() => failed("bootstrap input deadline exceeded"),
+		() =>
+			failed(
+				phase === "input"
+					? "bootstrap input deadline exceeded"
+					: "bootstrap policy loading deadline exceeded",
+				phase,
+			),
 		5000,
 	);
 	try {
@@ -57,13 +84,16 @@ if (isMainThread) {
 			clearTimeout(timer);
 			process.exit(0);
 		}
+		phase = "policy-load";
 		const { supervisePolicy } = await import("./lib/policy-supervisor.mjs");
 		clearTimeout(timer);
+		phase = "policy-execution";
 		await supervisePolicy(new URL(import.meta.url), { inputText: input });
 	} catch (error) {
-		failed(error instanceof Error ? error.message : error);
+		failed(error instanceof Error ? error.message : error, phase);
 	}
 } else {
+	let phase = "policy-load";
 	try {
 		const { readStdinText, buildPermissionOutput } = await import(
 			"./lib/hook-io.mjs"
@@ -84,7 +114,9 @@ if (isMainThread) {
 		const { isShellParserInstalled, shellParserPath } = await import(
 			"./lib/shell-parser-tool.mjs"
 		);
+		phase = "input";
 		const payload = JSON.parse(await readStdinText());
+		phase = "policy-execution";
 		const healthy = isShellParserInstalled(hookRoot);
 		const command = payload.tool_input?.command ?? payload.tool_input?.cmd;
 		const shell =
@@ -121,6 +153,6 @@ if (isMainThread) {
 		}
 		process.exit(0);
 	} catch (error) {
-		failed(error instanceof Error ? error.message : error);
+		failed(error instanceof Error ? error.message : error, phase);
 	}
 }
