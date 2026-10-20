@@ -109,7 +109,8 @@ function sourceColumnOutsidePreview(
 		group.tabs.some(
 			(tab) =>
 				tab.input instanceof vscode.TabInputWebview &&
-				tab.input.viewType === state.previewViewType &&
+				// VS Code prefixes a webview tab's type with "mainThreadWebview-".
+				tab.input.viewType.endsWith(state.previewViewType) &&
 				tab.label === state.panel.title,
 		),
 	);

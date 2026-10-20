@@ -133,7 +133,10 @@ const host = vi.hoisted(() => {
 						return panel.title;
 					},
 					group,
-					input: new host.api.TabInputWebview(panel.viewType),
+					// VS Code reports a webview tab's type with this internal prefix.
+					input: new host.api.TabInputWebview(
+						`mainThreadWebview-${panel.viewType}`,
+					),
 					isActive: true,
 					isDirty: false,
 					isPinned: true,
