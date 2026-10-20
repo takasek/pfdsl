@@ -6,7 +6,7 @@ import type {
 	ProcessMeta,
 } from "@pfdsl/core";
 import { resolveMeta, STYLE_ATTRS } from "@pfdsl/core";
-import { wrapLabel } from "./label.js";
+import { isDisplayableLabel, wrapLabel } from "./label.js";
 
 export const DEFAULT_FEEDBACK_COLOR = "#888888";
 
@@ -129,7 +129,8 @@ export function nodeAttrs(
 ): string {
 	const shape = kind === "process" ? "ellipse" : "box";
 	const meta = resolveMeta(fm, kind, id);
-	const nodeLabel = meta?.label;
+	const rawNodeLabel = meta?.label;
+	const nodeLabel = isDisplayableLabel(rawNodeLabel) ? rawNodeLabel : undefined;
 	const description = meta?.description;
 	const ameta =
 		kind === "artifact" ? (meta as ArtifactMeta | undefined) : undefined;

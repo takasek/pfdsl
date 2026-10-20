@@ -3308,6 +3308,25 @@ describe("status ready", () => {
 		expect(r.stdout).not.toContain("impl");
 	});
 
+	it("uses the process ID in text output when its label is blank", async () => {
+		const f = withStatus(
+			'---\nartifact:\n  req: {status: done}\nprocess:\n  design: {label: "   "}\n---\nreq >> design -> spec\n',
+		);
+		const r = await run(["status", "ready", f]);
+		expect(r.stdout).toMatch(/^ {4}design\s+"design"\s+inputs:/m);
+	});
+
+	it("uses the process ID for a blank label in JSON display values", async () => {
+		const f = withStatus(
+			'---\nartifact:\n  req: {status: done}\nprocess:\n  design: {label: ""}\n---\nreq >> design -> spec\n',
+		);
+		const r = await run(["status", "ready", f, "--json"]);
+		expect(JSON.parse(r.stdout).ready[0]).toMatchObject({
+			id: "design",
+			label: "design",
+		});
+	});
+
 	it("excludes process whose input is not done", async () => {
 		const f = withStatus(
 			"---\nartifact:\n  req:\n    status: todo\n---\nreq >> design -> spec\n",
@@ -4430,6 +4449,27 @@ describe("status gaps", () => {
 		expect(r.stdout).toContain("Missing");
 	});
 
+	it("uses the artifact ID in text output when a gap label is blank", async () => {
+		const rm = roadmapWith("  other:\n    status: done\n");
+		const fl = flowWith(`  missing_artifact:\n${TRACKED}    label: "  "\n`);
+		const r = await run(["status", "gaps", rm, fl]);
+		expect(r.stdout).toMatch(
+			/^ {2}missing_artifact\s+"missing_artifact"\s+in:/m,
+		);
+	});
+
+	it("uses the artifact ID for a blank gap label in JSON display values", async () => {
+		const rm = roadmapWith("  other:\n    status: done\n");
+		const fl = flowWith(`  missing_artifact:\n${TRACKED}    label: ""\n`);
+		const r = await run(["status", "gaps", rm, fl, "--json"]);
+		expect(JSON.parse(r.stdout).gaps).toEqual([
+			expect.objectContaining({
+				artifactId: "missing_artifact",
+				label: "missing_artifact",
+			}),
+		]);
+	});
+
 	it("ignores untagged artifacts in flow files", async () => {
 		const rm = roadmapWith("  other:\n    status: done\n");
 		const fl = flowWith("  plain_art:\n    label: Plain\n");
@@ -4685,6 +4725,24 @@ describe("status list", () => {
 		expect(r.stdout).not.toMatch(/^ {2}b\s/m);
 	});
 
+	it("uses the artifact ID in text output when its label is empty", async () => {
+		const f = withStatus(
+			'---\nartifact:\n  a: {label: "", status: todo}\n---\nx >> p -> a\n',
+		);
+		const r = await run(["status", "list", f, "--status", "todo"]);
+		expect(r.stdout).toMatch(/^ {2}a\s+"a"\s+status: todo$/m);
+	});
+
+	it("uses the artifact ID for a blank label in JSON display values", async () => {
+		const f = withStatus(
+			'---\nartifact:\n  a: {label: " ", status: todo}\n---\nx >> p -> a\n',
+		);
+		const r = await run(["status", "list", f, "--status", "todo", "--json"]);
+		expect(JSON.parse(r.stdout).items).toEqual([
+			{ id: "a", label: "a", status: "todo" },
+		]);
+	});
+
 	it("lists artifacts matching multiple comma-separated statuses", async () => {
 		const f = withStatus(
 			"---\nartifact:\n  a:\n    status: todo\n  b:\n    status: wip\n  c:\n    status: done\n---\nx >> p1 -> a\na >> p2 -> b\nb >> p3 -> c\n",
@@ -4749,6 +4807,25 @@ describe("status blocked", () => {
 		expect(r.exitCode).toBe(0);
 		expect(r.stdout).toContain("design");
 		expect(r.stdout).toContain("req");
+	});
+
+	it("uses the process ID in text output when its label is blank", async () => {
+		const f = withStatus(
+			'---\nartifact:\n  req: {status: todo}\nprocess:\n  design: {label: "  "}\n---\nreq >> design -> spec\n',
+		);
+		const r = await run(["status", "blocked", f]);
+		expect(r.stdout).toMatch(/^ {2}design\s+"design"\s+blocked by:/m);
+	});
+
+	it("uses the process ID for a blank label in JSON display values", async () => {
+		const f = withStatus(
+			'---\nartifact:\n  req: {status: todo}\nprocess:\n  design: {label: ""}\n---\nreq >> design -> spec\n',
+		);
+		const r = await run(["status", "blocked", f, "--json"]);
+		expect(JSON.parse(r.stdout).blocked[0]).toMatchObject({
+			id: "design",
+			label: "design",
+		});
 	});
 
 	it("excludes processes whose inputs are all done", async () => {

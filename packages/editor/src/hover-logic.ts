@@ -1,5 +1,5 @@
 import type { Frontmatter, NodeKind } from "@pfdsl/core";
-import { normalizeLocation } from "./location-utils.js";
+import { isDisplayableLabel, normalizeLocation } from "./location-utils.js";
 
 export interface HoverLinks {
 	node: (id: string, icon: string) => string;
@@ -40,9 +40,9 @@ function groupDisplay(
 	const label = frontmatter?.group?.[groupId]?.label;
 	if (links) {
 		const link = links.node(groupId, KIND_ICON.group);
-		return label ? `${link} (${label})` : link;
+		return isDisplayableLabel(label) ? `${link} (${label})` : link;
 	}
-	return label ? `${groupId} (${label})` : groupId;
+	return isDisplayableLabel(label) ? `${groupId} (${label})` : groupId;
 }
 
 function locationRow(
@@ -75,7 +75,7 @@ export function buildHoverLines(
 	if (kind !== "group") {
 		const meta = frontmatter?.[kind]?.[id];
 		if (meta) {
-			if (meta.label) lines.push(`**${meta.label}**`);
+			if (isDisplayableLabel(meta.label)) lines.push(`**${meta.label}**`);
 			if (meta.description) lines.push(...descLines(meta.description));
 			if (meta.index !== undefined)
 				rows.push(tableRow("index", String(meta.index)));
@@ -136,7 +136,7 @@ export function buildHoverLines(
 		// kind === "group"
 		const meta = frontmatter?.group?.[id];
 		if (meta) {
-			if (meta.label) lines.push(`**${meta.label}**`);
+			if (isDisplayableLabel(meta.label)) lines.push(`**${meta.label}**`);
 			if (meta.color) rows.push(tableRow("color", meta.color));
 			if (meta.parent) rows.push(tableRow("parent", meta.parent));
 			for (const [mapKey, icon] of [

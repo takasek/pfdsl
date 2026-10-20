@@ -135,4 +135,21 @@ describe("host-neutral hover metadata", () => {
 			buildHoverLines("p", "process", { process: { p: {} } }),
 		).toHaveLength(2);
 	});
+	it.each([
+		"",
+		" \t ",
+	])("treats blank labels as absent in hover for %j", (label) => {
+		expect(
+			buildHoverLines("a", "artifact", { artifact: { a: { label } } }),
+		).toHaveLength(2);
+		expect(
+			buildHoverLines("g", "group", { group: { g: { label } } }),
+		).toHaveLength(2);
+		const groupRef = buildHoverLines("a", "artifact", {
+			artifact: { a: { group: "g" } },
+			group: { g: { label } },
+		}).join("\n");
+		expect(groupRef).toContain("| _group_ | g |");
+		expect(groupRef).not.toContain("g ()");
+	});
 });

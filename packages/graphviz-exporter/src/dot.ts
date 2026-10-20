@@ -1,6 +1,6 @@
 import type { Frontmatter, Graph, NodeKind } from "@pfdsl/core";
 import { compareIds, diffGraphsDetailed, resolveMeta } from "@pfdsl/core";
-import { wrapLabel } from "./label.js";
+import { isDisplayableLabel, wrapLabel } from "./label.js";
 import {
 	calcMinWidth,
 	DEFAULT_FEEDBACK_COLOR,
@@ -89,14 +89,15 @@ export function exportDot(
 
 	function emitGroupBlock(gid: string, indent: string): void {
 		const gm = groupDefs[gid]!;
+		const groupLabel = gm.label;
 		const inner = `${indent}  `;
 		const clusterId = `cluster_${gid}`;
 		const dotId = /^[A-Za-z_][A-Za-z0-9_]*$/.test(clusterId)
 			? clusterId
 			: quote(clusterId);
 		lines.push(`${indent}subgraph ${dotId} {`);
-		if (gm.label !== undefined)
-			lines.push(`${inner}label=${quote(String(gm.label))};`);
+		if (isDisplayableLabel(groupLabel))
+			lines.push(`${inner}label=${quote(groupLabel)};`);
 		if (gm.color !== undefined) {
 			const fillColor = String(gm.color);
 			const strokeColor = darkenHex(fillColor) ?? fillColor;
@@ -243,7 +244,10 @@ export function exportDiffDot(
 
 		const fm = removed.has(id) ? fmA : fmB;
 		const meta = resolveMeta(fm, kind, id);
-		const nodeLabel = meta?.label;
+		const rawNodeLabel = meta?.label;
+		const nodeLabel = isDisplayableLabel(rawNodeLabel)
+			? rawNodeLabel
+			: undefined;
 		const wrappedLabel =
 			nodeLabel !== undefined && maxWidth !== undefined
 				? wrapLabel(nodeLabel, maxWidth)

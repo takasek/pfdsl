@@ -5,6 +5,11 @@ const BREAK_CHARS = /[、。，．,.\s()（）「」『』【】[\]=]/;
 
 // Times New Roman em widths (per 1000 units), font size = 14pt
 const FONT_SIZE = 14;
+
+export function isDisplayableLabel(value: unknown): value is string {
+	return typeof value === "string" && value.trim().length > 0;
+}
+
 const CHAR_EM: Record<string, number> = {
 	" ": 250,
 	"!": 333,

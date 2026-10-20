@@ -1078,6 +1078,10 @@ export interface ReadyOptions {
 	color?: boolean;
 }
 
+function labelForDisplay(label: string | undefined, id: string): string {
+	return label?.trim() ? label : id;
+}
+
 export interface StatusReadyItem {
 	id: string;
 	label: string;
@@ -1291,7 +1295,7 @@ export function runReady(file: string, opts: ReadyOptions = {}): CommandResult {
 
 	const toItem = (pid: string): StatusReadyItem => ({
 		id: pid,
-		label: frontmatter?.process?.[pid]?.label ?? pid,
+		label: labelForDisplay(frontmatter?.process?.[pid]?.label, pid),
 		inputs: processInputs.get(pid) ?? [],
 		outputs: processOutputs.get(pid) ?? [],
 		newlyReadyCount: countNewlyReady(pid),
@@ -1379,7 +1383,7 @@ export function runStatusList(
 		)
 		.map(([id, meta]) => ({
 			id,
-			label: meta.label ?? id,
+			label: labelForDisplay(meta.label, id),
 			status: meta.status as string,
 		}))
 		.sort((a, b) => compareIds(a.id, b.id));
@@ -1441,7 +1445,7 @@ export function runStatusBlocked(
 		if (blockedBy.length === 0) continue;
 		blockedItems.push({
 			id: pid,
-			label: frontmatter?.process?.[pid]?.label ?? pid,
+			label: labelForDisplay(frontmatter?.process?.[pid]?.label, pid),
 			blockedBy,
 		});
 	}
@@ -3196,7 +3200,7 @@ export function runStatusGaps(
 				gaps.push({
 					file: flowFile,
 					artifactId: aid,
-					label: meta.label ?? aid,
+					label: labelForDisplay(meta.label, aid),
 				});
 			}
 		}

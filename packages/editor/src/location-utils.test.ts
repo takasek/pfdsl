@@ -122,6 +122,18 @@ describe("buildDescriptions", () => {
 		});
 	});
 
+	it.each([
+		"",
+		" \t ",
+	])("omits blank artifact and process labels from tooltip rows for %j", (label) => {
+		expect(
+			buildDescriptions({
+				artifact: { a: { label } },
+				process: { p: { label } },
+			}),
+		).toEqual({});
+	});
+
 	it("appends comma-joined locations for array location", () => {
 		const fm = {
 			artifact: { a: { location: ["x.ts", "y.ts"] } },

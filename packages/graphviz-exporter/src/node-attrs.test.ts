@@ -32,6 +32,20 @@ describe("matching node labels", () => {
 			expect(nodeAttrs(id, kind, fm)).toContain(`tooltip="${id}\\n\\nDetails"`);
 		}
 	});
+
+	it.each([
+		"",
+		" \t ",
+	])("matches absent labels in DOT attributes (%j)", (label) => {
+		const attrs = nodeAttrs("a", "artifact", {
+			artifact: { a: { label, description: "Details" } },
+		});
+		expect(attrs).toBe(
+			nodeAttrs("a", "artifact", {
+				artifact: { a: { description: "Details" } },
+			}),
+		);
+	});
 });
 
 describe("quote", () => {

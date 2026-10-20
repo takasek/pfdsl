@@ -1,5 +1,6 @@
 import { analyzeSource, type NormalizedEdge } from "@pfdsl/core";
 import { edgeAlreadyExists } from "./connector-logic.js";
+import { isDisplayableLabel } from "./location-utils.js";
 import type {
 	MessageFromWebview,
 	MessageToWebview,
@@ -160,7 +161,7 @@ export function mountConnections(
 			kind === "artifact" || kind === "process"
 				? model?.frontmatter?.[kind]?.[id]?.label
 				: undefined;
-		return typeof label === "string" && label !== id ? `${id} (${label})` : id;
+		return isDisplayableLabel(label) && label !== id ? `${id} (${label})` : id;
 	}
 	function nodeName(id: string) {
 		return `${caption(id)}, ${model?.nodeKinds.get(id)}`;
