@@ -30,7 +30,7 @@ The extension no longer assigns Alt+F12, which is VS Code's [default Peek Defini
 Cmd/Ctrl+Click keeps VS Code's existing [definition and multiple-cursor behavior](https://code.visualstudio.com/docs/editing/codebasics#_multicursor-modifier), controlled by `editor.multiCursorModifier`.
 
 The first visible preview fits the complete diagram, without enlarging a small diagram.
-Use **Fit** to see the whole diagram again, **100%** for its original size, or **− / +** to zoom around the viewport center.
+Use **Fit** to see the whole diagram again, **Actual size** for its original size, or **− / +** to zoom around the viewport center.
 The toolbar shows the current zoom level; **Help** lists the gestures.
 Wheel to zoom at the pointer, drag the diagram to pan, and click or drag the minimap to move.
 Double-click a node to go to its source; double-click the background to return to 100%.
@@ -40,10 +40,12 @@ For an undefined node, **Insert artifact/process definition** in Quick Fix inser
 A produced artifact should also declare meaningful completion `criteria` (W002 warns when absent; strict validation treats it as an error).
 The Quick Fix keeps that diagnostic until you supply a criterion, and the insertion can be undone in one step.
 
-Right-click a preview node, or focus it with Tab and press Enter, to open **Connections**.
+Click anywhere inside a preview node, or focus it with Tab and press Enter, to open **Connections**.
+Right-click remains available; dragging pans without opening the panel, and Cmd/Ctrl+click opens a location or subflow without opening Connections.
 The bottom panel shows direct incoming neighbors on the left, the current node in the center, and outgoing neighbors on the right.
 Each neighbor list scrolls independently; the center and connection inputs remain visible.
 For an undefined node, **Create definition** inserts its frontmatter entry and selects the label in the editor.
+For a defined node, **Go to definition** moves to its definition and focuses the editor.
 Focus either **Connect a node…** input to filter compatible existing nodes by ID or label, then select a candidate to connect it on that side.
 Use the adjacent **+** to explicitly create and connect a new node with the entered ID as its initial label; pressing Enter in the input does not create a node.
 Right-click a connection line to delete just that edge or switch an artifact-to-process input between normal and feedback.
@@ -51,7 +53,9 @@ Output connections cannot become feedback; duplicate connections, new cycles and
 Each edit is one Undo step; a menu from an older document revision refuses to apply.
 
 Hover over a node to read its text information; long information can be scrolled or focused with the keyboard.
-Click a neighbor in **Connections** to center it in the main preview and update the panel without filtering the full diagram.
+Click a neighbor in **Connections** to center it in the main preview, update the panel and move the editor cursor while keeping focus in Connections.
+Selecting a node ID in the editor, for example by double-clicking it, updates the diagram and any open Connections panel without leaving the editor; it does not open a closed panel.
+Preview edits preserve the panel's current node even when applying an edit moves the editor cursor.
 This navigation and editor selections briefly outline the destination; redraws preserve position without repeating the cue.
 Press Escape to close the hover or Connections; Escape in a candidate list closes only the candidates and retains the input.
 

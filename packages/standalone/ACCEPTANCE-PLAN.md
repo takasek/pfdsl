@@ -154,7 +154,8 @@ read-only表示と色以外の差分区別を保ち、取消は内容と未解�
 ### GUI-10：Connectionsの方向と独立scroll
 
 対応：#1444/#1284。対象・入力：M/V、p/b/lone、定義なしa、多数接続、長label、狭幅・幅を取るscrollbar。
-操作：各nodeを右clickして開き、左右内容をsourceと照合し、片側scroll、片側ゼロ・孤立も試す。
+操作：fillなし／status色付きの各nodeの図形内側をclickして開き、左右内容をsourceと照合し、片側scroll、片側ゼロ・孤立も試す。
+Tab→Enterと右clickでも開き、node上からのpan、移動後に起点へ戻るdrag、Cmd/Ctrl+click、minimap操作では閉じたConnectionsが開かないことを確認する。
 期待：直接前後だけを左入力／中心／右出力へ示し、pへq/cを混ぜずfeedback方向を保つ。
 未定義・孤立でも中心を扱い、scrollは左右独立、中心と下部入力を固定する。
 常設1行text＋／＋textと各＋のライン下の整列、読上げ方向を保ち可視Incoming/Outgoingを復活させない。
@@ -163,8 +164,14 @@ read-only表示と色以外の差分区別を保ち、取消は内容と未解�
 ### GUI-11：近隣移動と一時強調
 
 対応：#1284/旧#1285/#1444。対象・入力：M/V、大きい図、p/a/r、reduced-motion通常／有効。
-操作：Connectionsでp→a→rと連続移動し、editor→図も使う。本文編集の再描画、pan/zoom、tab切替とpanel再開を行う。
-期待：全体図を保って対象へ移動し中心を更新する。
+操作：Connectionsでp→a→rと連続移動し、editorのkeyboard／mouseによる操作（Mはcursor移動、VはnodeのIDの選択）、図のclick／double clickも使う。
+定義ありのGo to definitionと定義なしのCreate definitionを使い、本文編集の再描画、pan/zoom、tab切替とpanel再開を行う。
+Connectionsから追加・削除・feedback切替・定義作成を適用し、editorのcursorが動いても中心が変わらないことを確認する。
+期待：全体図を保って対象へ移動し、editor・図・Connectionsが同じnodeを指す。
+editor操作はeditorのfocusを保ち、閉じたConnectionsを開かず、開いていれば中心を追従する。
+Connectionsの近隣移動はeditorのcursorも移し、focusはConnectionsに残す。
+図のdouble clickは途中のclickでConnectionsが開き、sourceへ移動してeditorにfocusする。
+Go to definitionは中心nodeの定義位置へ移動してeditorにfocusし、Create definitionは従来の定義作成を行う。
 対象だけ短時間示し古い強調を残さず、再描画の再センタリングだけで再強調しない。
 fill/status・zoom/panを保ち、reduced-motionではanimationを抑えた静的合図を使う。
 状態：M/V各未実施。記録：未記入。
@@ -218,11 +225,11 @@ API差分：`deleteConnector`／`toggleFeedback`は`nodeId/source/artifact/proce
 古いmenu/cue/候補/timerを残さずmount/revision/dispose境界を維持する。
 状態：M/V各未実施。記録：未記入。
 
-### GUI-17：Fit・100%・倍率・案内
+### GUI-17：Fit・Actual size・倍率・案内
 
 対応：#1352/#1259/#1444。対象・入力：M/V、大きい図、小さいsubflow、横長図、side-by-side狭幅。
-操作：初回、Fit/100%/Zoom、wheel/drag/minimap/double click、pan後編集、resize→Fit、HelpとREADME照合を行う。
-期待：初回全体を把握しFitと100%を区別して戻れる。
+操作：初回、Fit/Actual size/Zoom、wheel/drag/minimap/double click、pan後編集、resize→Fit、HelpとREADME照合を行う。
+期待：初回全体を把握しFitとActual sizeを区別して戻れ、倍率表示は従来どおり100%等を示す。
 通常再描画は視点を不必要に戻さず、倍率・基本操作と説明が一致する。
 minimap位置対応を保ち、resizeで図が切れるだけでは不合格にしない。
 状態：M/V各未実施。記録：未記入。配置正本は#1444。
