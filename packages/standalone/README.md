@@ -56,7 +56,7 @@ The startup smoke does not certify GUI, IME, or Quit interaction.
 Click anywhere inside a diagram node, or focus it with Tab and press Enter, to open **Connections**; right-click also works.
 Dragging pans without opening Connections, and Cmd/Ctrl+click retains location and subflow navigation.
 Selecting a neighbor updates the diagram, Connections and editor cursor while keeping focus in Connections.
-Moving the editor cursor updates the diagram and an open Connections panel without taking editor focus or opening a closed panel.
+Any editor cursor change, including keyboard, mouse, Go to definition and search navigation, updates the diagram and an open Connections panel without taking editor focus or opening a closed panel.
 Applying a preview edit keeps the panel on its current node.
 Artifacts have square outlines and processes have rounded outlines; feedback connections use dashed gray lines.
 Opening Connections with the pointer preserves focus; opening from a node with Enter focuses the first heading action without showing candidates.

@@ -514,11 +514,6 @@ export function registerPreview(context: vscode.ExtensionContext): {
 		}),
 
 		vscode.window.onDidChangeTextEditorSelection((e) => {
-			if (
-				e.kind !== vscode.TextEditorSelectionChangeKind.Keyboard &&
-				e.kind !== vscode.TextEditorSelectionChangeKind.Mouse
-			)
-				return;
 			const state = panels.get(e.textEditor.document.uri.toString());
 			if (!state) return;
 			const sel = e.selections[0];

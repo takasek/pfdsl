@@ -164,7 +164,7 @@ Tab→Enterと右clickでも開き、node上からのpan、移動後に起点へ
 ### GUI-11：近隣移動と一時強調
 
 対応：#1284/旧#1285/#1444。対象・入力：M/V、大きい図、p/a/r、reduced-motion通常／有効。
-操作：Connectionsでp→a→rと連続移動し、editorのkeyboard／mouseによる操作（Mはcursor移動、VはnodeのIDの選択）、図のclick／double clickも使う。
+操作：Connectionsでp→a→rと連続移動し、editor操作（Mはkeyboard／mouseとGo to definition・検索結果などのAPI移動、Vはnode IDの選択）、図のclick／double clickも使う。
 定義ありのGo to definitionと定義なしのCreate definitionを使い、本文編集の再描画、pan/zoom、tab切替とpanel再開を行う。
 Connectionsから追加・削除・feedback切替・定義作成を適用し、editorのcursorが動いても中心が変わらないことを確認する。
 期待：全体図を保って対象へ移動し、editor・図・Connectionsが同じnodeを指す。
