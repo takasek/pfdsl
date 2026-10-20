@@ -19,6 +19,11 @@ import {
 	readTransform,
 	removeRunDirectory,
 } from "./harness.mjs";
+import {
+	installEdgeResizeDiagnostics,
+	readEdgeResizeDiagnostics,
+	removeEdgeResizeDiagnostics,
+} from "./resize-diagnostics.mjs";
 import { waitForSourceCloseReady } from "./save-readiness.mjs";
 
 const vscodeVersion = "1.132.1";
@@ -1254,22 +1259,28 @@ async function assertPreviewEditingFocus(session) {
 		name: "input connection from a, artifact to p, process. Connection actions",
 		exact: true,
 	});
-	await inputEdge.press("Enter");
-	await page.setViewportSize({
-		width: viewport.width - 64,
-		height: viewport.height,
-	});
-	await waitForInteraction(
-		"resizing closes edge actions and returns focus to the edge",
-		() =>
-			inputEdge.evaluate(
-				(edge) =>
-					document.activeElement === edge &&
-					document.querySelector(".connection-menu").hidden &&
-					document.hasFocus(),
-			),
-		(ready) => ready,
-	);
+	await inputEdge.evaluate(installEdgeResizeDiagnostics);
+	try {
+		await inputEdge.press("Enter");
+		console.log(
+			"Edge resize before viewport change:",
+			JSON.stringify(await inputEdge.evaluate(readEdgeResizeDiagnostics)),
+		);
+		await page.setViewportSize({
+			width: viewport.width - 64,
+			height: viewport.height,
+		});
+		const state = await waitForInteraction(
+			"resizing closes edge actions and returns focus to the edge",
+			() => inputEdge.evaluate(readEdgeResizeDiagnostics),
+			(state) => state.ready,
+		);
+		console.log("Edge resize completed:", JSON.stringify(state));
+	} finally {
+		await inputEdge.evaluate(removeEdgeResizeDiagnostics).catch((error) => {
+			console.error("Edge resize diagnostics cleanup failed:", error.message);
+		});
+	}
 	await restoreViewport();
 	await inputEdge.press("Escape");
 	await frame.locator('#inner g.node[data-node-id="p"]').press("Enter");
