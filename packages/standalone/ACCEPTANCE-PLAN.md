@@ -79,18 +79,19 @@ PR #1448の320px・source90%での文字欠け、sidebar併用時の最小26px�
 ### GUI-02：Recentとフォルダサイドバー
 
 対応：#1444。対象・入力：M、フォルダ未選択、one/two、A/B。
-操作：未選択時の無効理由を読む。Open Folder→ファイル選択→アイコン／menuでsidebar閉鎖・再開→File > Recentで文書／フォルダへ再アクセスする。
-期待：フォルダ名・階層・選択が対応し、閉鎖で作業幅が戻る。
+操作：開始時にサイドバー切替ボタンが非表示でView > Show Sidebarが無効なことを確認する。Open Folder→ファイル選択→Filesボタン／menuでsidebar閉鎖・再開→File > Recentで文書／フォルダへ再アクセスする。
+期待：フォルダ名・階層・選択が対応し、表示中はFilesボタンが現れ、閉鎖で作業幅が戻る。
 Recentを左側や開始画面へ常設せず、本文とdirtyを保つ。
 状態：M未実施。記録：未記入。
 
 ### GUI-03：開始画面と文書識別
 
 対応：#1444。対象・入力：M、文書ゼロ、A/B、長い名前、既存起動ファイル経路。
-操作：起動→キーでNew/Open→Try a sample→最後のtab閉鎖を行う。実ファイル起動と同名文書の保存・閉鎖対象、完全な場所も確認する。
-期待：自動Welcome＋sampleの2文書を開かず、文書ゼロだけ開始画面を示す。
-実文書を優先しNew後editorへfocusする。
-sample、同名文書、長い名前・場所をtooltipだけに頼らず識別し、セッション復元を追加しない。
+操作：起動→キーでNew/Open→Try a sample→最後のtab閉鎖を行う。Newを複数回行って途中のtabを閉じ、最小空き番号の再利用とSampleのSave As既定名を確認する。実ファイル起動と同名文書の保存・閉鎖対象、完全な場所も確認する。
+期待：自動Welcome＋sampleの2文書を開かず、文書ゼロだけ開始画面を示す。実文書を優先しNew後editorへfocusする。
+文書名はtabとwindow titleに表示し、headerは短い状態とlocationを示す。locationは1行で省略表示し、titleから完全pathを確認できる。
+sampleはSampleと表示しSave As既定名をSample.pfdslにする。Untitledは現在開く文書名の最小空き番号を使う。
+同名文書を区別し、長い名前・場所をtooltipだけに頼らず識別して、セッション復元を追加しない。
 状態：M未実施。記録：未記入。
 
 ### GUI-04：メニュー・標準キー・単一実行
