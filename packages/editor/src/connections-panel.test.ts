@@ -3,8 +3,476 @@ import { afterEach, expect, it, vi } from "vitest";
 import { analyzeSnapshot, prepareDocument } from "./document.js";
 import { mountPreview } from "./preview.js";
 import * as previewEdits from "./preview-edit.js";
+import { previewStyles } from "./preview-shell.js";
 
 const dispose: Array<() => void> = [];
+
+it.each([
+	true,
+	false,
+])("does not reopen dismissed candidates on late success (renderFirst=%s)", async (renderFirst) => {
+	const s = await setup();
+	const input = s.container.querySelector<HTMLInputElement>(
+		'[data-side="right"] input',
+	)!;
+	input.focus();
+	s.container
+		.querySelector<HTMLButtonElement>(
+			'[data-side="right"] [data-candidate="free"]',
+		)!
+		.click();
+	const request = s.postMessage.mock.calls.at(-1)![0];
+	const result = previewEdits.applyPreviewEdit(s.source, request);
+	if (!result.ok) throw new Error(result.message);
+	input.dispatchEvent(
+		new KeyboardEvent("keydown", { key: "ArrowDown", bubbles: true }),
+	);
+	input.dispatchEvent(
+		new KeyboardEvent("keydown", { key: "Escape", bubbles: true }),
+	);
+	expect(input.getAttribute("aria-expanded")).toBe("false");
+	const redraw = () =>
+		s.preview.receive(
+			prepareDocument(analyzeSnapshot(result.source), null, () => null).message,
+		);
+	if (renderFirst) await redraw();
+	await s.preview.receive({ type: "editResult", request, ok: true });
+	if (!renderFirst) await redraw();
+	expect(input.getAttribute("aria-expanded")).toBe("false");
+	expect(document.activeElement).toBe(input);
+});
+
+it.each([
+	"center",
+	"input",
+	"document",
+])("does not reopen old candidates after changing $0 while an addition is pending", async (change) => {
+	const s = await setup();
+	const right = s.container.querySelector<HTMLInputElement>(
+		'[data-side="right"] input',
+	)!;
+	right.focus();
+	s.container
+		.querySelector<HTMLButtonElement>(
+			'[data-side="right"] [data-candidate="free"]',
+		)!
+		.click();
+	const request = s.postMessage.mock.calls.at(-1)![0];
+	if (change === "center")
+		await s.preview.receive({ type: "focus", nodeId: "a" });
+	if (change === "document")
+		await s.preview.receive(
+			prepareDocument(analyzeSnapshot("x >> p -> y\n"), null, () => null)
+				.message,
+		);
+	const current = s.container.querySelector<HTMLInputElement>(
+		`[data-side="${change === "input" ? "left" : "right"}"] input`,
+	)!;
+	current.focus();
+	current.value = "next";
+	current.dispatchEvent(new Event("input"));
+	current.dispatchEvent(
+		new KeyboardEvent("keydown", { key: "Escape", bubbles: true }),
+	);
+	await s.preview.receive({ type: "editResult", request, ok: true });
+	expect(current.value).toBe("next");
+	expect(document.activeElement).toBe(current);
+	expect(
+		s.container.querySelector('[role="combobox"][aria-expanded="true"]'),
+	).toBeNull();
+});
+
+it.each([
+	"neighbor",
+	"edge",
+])("preserves %s focus when reopening the same center with the pointer", async (control) => {
+	const s = await setup();
+	const selector =
+		control === "neighbor"
+			? '[data-side="right"] [data-neighbor="b"]'
+			: '[data-side="right"] [data-edge]';
+	s.container.querySelector<HTMLButtonElement>(selector)!.focus();
+	s.container
+		.querySelector('[data-node-id="p"]')!
+		.dispatchEvent(
+			new MouseEvent("contextmenu", { bubbles: true, cancelable: true }),
+		);
+	expect(document.activeElement).toBe(s.container.querySelector(selector));
+	expect(
+		s.container.querySelector('[role="combobox"][aria-expanded="true"]'),
+	).toBeNull();
+});
+
+it.each([
+	true,
+	false,
+])("distinguishes parallel input and feedback rows after deletion (renderFirst=%s)", async (renderFirst) => {
+	const s = await setup("a >> p\na >>? p\nc >> p\n");
+	s.container
+		.querySelector<HTMLButtonElement>(
+			'[data-side="left"] [data-edge][data-kind="feedback"]',
+		)!
+		.click();
+	s.container.querySelector<HTMLButtonElement>("[data-delete-edge]")!.click();
+	const request = s.postMessage.mock.calls.at(-1)![0];
+	const result = previewEdits.applyPreviewEdit(s.source, request);
+	if (!result.ok) throw new Error(result.message);
+	const redraw = () =>
+		s.preview.receive(
+			prepareDocument(analyzeSnapshot(result.source), null, () => null).message,
+		);
+	if (renderFirst) await redraw();
+	await s.preview.receive({ type: "editResult", request, ok: true });
+	if (!renderFirst) await redraw();
+	expect(document.activeElement).toBe(
+		s.container
+			.querySelector('[data-neighbor="c"]')!
+			.closest(".connection-row")!
+			.querySelector("[data-edge]"),
+	);
+});
+
+it("distinguishes an unchanged feedback row from an input row on redraw", async () => {
+	const s = await setup("a >> p\na >>? p\nc >> p\n");
+	s.container
+		.querySelector<HTMLButtonElement>('[data-edge][data-kind="feedback"]')!
+		.focus();
+	await s.preview.receive(
+		prepareDocument(analyzeSnapshot(`${s.source}# redraw\n`), null, () => null)
+			.message,
+	);
+	expect(document.activeElement).toBe(
+		s.container.querySelector('[data-edge][data-kind="feedback"]'),
+	);
+});
+
+it.each([
+	true,
+	false,
+])("restores the switched semantic connection among repeated endpoints (renderFirst=%s)", async (renderFirst) => {
+	const s = await setup("a >> p\na >>? p\nc >> p\n");
+	// Removing one kind makes the remaining kind switchable without changing edit rules.
+	s.container
+		.querySelector<HTMLButtonElement>('[data-edge][data-kind="input"]')!
+		.click();
+	s.container.querySelector<HTMLButtonElement>("[data-delete-edge]")!.click();
+	let request = s.postMessage.mock.calls.at(-1)![0];
+	let result = previewEdits.applyPreviewEdit(s.source, request);
+	if (!result.ok) throw new Error(result.message);
+	const remaining = result.source;
+	await s.preview.receive(
+		prepareDocument(analyzeSnapshot(remaining), null, () => null).message,
+	);
+	await s.preview.receive({ type: "editResult", request, ok: true });
+	s.container
+		.querySelector<HTMLButtonElement>('[data-edge][data-kind="feedback"]')!
+		.click();
+	s.container
+		.querySelector<HTMLButtonElement>("[data-toggle-feedback]")!
+		.click();
+	request = s.postMessage.mock.calls.at(-1)![0];
+	result = previewEdits.applyPreviewEdit(remaining, request);
+	if (!result.ok) throw new Error(result.message);
+	const changed = result.source;
+	const redraw = () =>
+		s.preview.receive(
+			prepareDocument(analyzeSnapshot(changed), null, () => null).message,
+		);
+	if (renderFirst) await redraw();
+	await s.preview.receive({ type: "editResult", request, ok: true });
+	if (!renderFirst) await redraw();
+	const row = s.container
+		.querySelector('[data-neighbor="a"]')!
+		.closest(".connection-row")!;
+	expect(document.activeElement).toBe(
+		row.querySelector('[data-edge][data-kind="input"]'),
+	);
+	expect(
+		s.container.querySelector('[role="combobox"][aria-expanded="true"]'),
+	).toBeNull();
+});
+
+it.each([
+	false,
+	true,
+])("opens without candidates, with heading focus only for keyboard (defined=%s)", async (defined) => {
+	const s = await setup(
+		defined
+			? "---\nprocess:\n  p: {label: Work}\n---\na >> p -> b\n"
+			: undefined,
+	);
+	s.container.querySelector<HTMLButtonElement>("#node-actions-close")!.click();
+	const node = s.container.querySelector<SVGGElement>('[data-node-id="p"]')!;
+	node.focus();
+	node.dispatchEvent(
+		new MouseEvent("contextmenu", { bubbles: true, cancelable: true }),
+	);
+	expect(document.activeElement).toBe(node);
+	expect(
+		s.container.querySelector('[role="combobox"][aria-expanded="true"]'),
+	).toBeNull();
+	node.dispatchEvent(
+		new KeyboardEvent("keydown", { key: "Enter", bubbles: true }),
+	);
+	expect(document.activeElement).toBe(
+		s.container.querySelector("#create-definition"),
+	);
+	expect(
+		s.container.querySelector('[role="combobox"][aria-expanded="true"]'),
+	).toBeNull();
+});
+
+it.each([
+	{
+		source: "a >> p -> b\n",
+		side: "left",
+		absent: "a",
+		present: "b",
+		feedback: true,
+	},
+	{
+		source: "a >>? p -> b\n",
+		side: "left",
+		absent: "a",
+		present: "b",
+		feedback: true,
+	},
+	{
+		source: "a >> p -> b\nc >> q -> d\n",
+		side: "right",
+		absent: "d",
+		present: "c",
+		feedback: false,
+	},
+	{
+		source: "---\nartifact:\n  free: {}\n---\na >> p -> b\n",
+		side: "right",
+		absent: "b",
+		present: "free",
+		feedback: false,
+	},
+])("filters candidates by semantic connection and edit validity ($source, $side)", async ({
+	source,
+	side,
+	absent,
+	present,
+	feedback,
+}) => {
+	const s = await setup(source);
+	s.container
+		.querySelector<HTMLInputElement>(`[data-side="${side}"] input`)!
+		.focus();
+	const list = s.container.querySelector(
+		`[data-side="${side}"] .connection-candidates`,
+	)!;
+	expect(list.querySelector(`[data-candidate="${absent}"]`)).toBeNull();
+	const option = list.querySelector<HTMLElement>(
+		`[data-candidate="${present}"]`,
+	)!;
+	expect(option).not.toBeNull();
+	expect(option.getAttribute("aria-label")).toContain("artifact");
+	expect(option.querySelector('[data-kind="artifact"]')).not.toBeNull();
+	expect(option.dataset.feedback === "true").toBe(feedback);
+	expect(option.textContent).not.toContain(" — ");
+});
+
+it("shows draft -> doc as a feedback candidate into draft", async () => {
+	const s = await setup("draft -> doc\na >> p\n");
+	await s.preview.receive({ type: "focus", nodeId: "draft" });
+	s.container
+		.querySelector<HTMLInputElement>('[data-side="left"] input')!
+		.focus();
+	s.container
+		.querySelector<HTMLButtonElement>('[data-candidate="doc"]')!
+		.click();
+	expect(s.postMessage).toHaveBeenLastCalledWith(
+		expect.objectContaining({
+			nodeId: "draft",
+			otherId: "doc",
+			connector: ">>?",
+		}),
+	);
+});
+
+it("gives center and neighbors kind shapes and accessible names", async () => {
+	const s = await setup();
+	const center = s.container.querySelector<HTMLElement>(".connections-center")!;
+	expect(center.dataset.kind).toBe("process");
+	expect(center.getAttribute("role")).toBe("img");
+	expect(center.getAttribute("aria-label")).toContain("process");
+	const neighbor = s.container.querySelector('[data-neighbor="a"]')!;
+	expect(neighbor.querySelector('[data-kind="artifact"]')).not.toBeNull();
+	expect(neighbor.getAttribute("aria-label")).toContain("artifact");
+});
+
+it("uses kind outlines, distinct connection strokes, shared borders and scroll padding", async () => {
+	const s = await setup("a >> p\nb >>? p\n");
+	const style = document.createElement("style");
+	// JSDOM cannot resolve CSS variables; use the stylesheet's theme fallbacks.
+	style.textContent = previewStyles.replace(
+		/var\(--[^,)]+,\s*([^)]+)\)/g,
+		"$1",
+	);
+	s.container.append(style);
+	const css = (selector: string) =>
+		window.getComputedStyle(s.container.querySelector(selector)!);
+	expect(css(".connections-center").borderRadius).toBe("999px");
+	expect(css('[data-neighbor="a"] .connection-node').borderRadius).toBe("0");
+	expect(css(".connection-row").borderTopWidth).toBe("1px");
+	expect(css(".connections-input").borderTopWidth).toBe("1px");
+	expect(css("[data-edge]").borderTopWidth).toBe("0px");
+	for (const selector of [
+		".connections-list",
+		".connection-candidates",
+		".connection-reason",
+		".connection-menu",
+	]) {
+		const computed = css(selector);
+		expect(
+			parseFloat(computed.paddingInline || computed.paddingLeft),
+		).toBeGreaterThanOrEqual(14);
+		expect(
+			parseFloat(computed.paddingInline || computed.paddingRight),
+		).toBeGreaterThanOrEqual(14);
+	}
+	expect(css(".connection-menu").position).toBe("fixed");
+	// JSDOM does not paint pseudo-elements; assert the authored stroke rules too.
+	expect(previewStyles).toContain("border-top: 2px solid currentColor");
+	expect(previewStyles).toContain(
+		'[data-kind="feedback"]::before { border-top-style: dashed; }',
+	);
+	expect(css('[data-edge][data-kind="feedback"]').color).toBe(
+		"rgb(136, 136, 136)",
+	);
+});
+
+it("anchors and clamps the context menu, navigates by keyboard, and returns on Escape", async () => {
+	const s = await setup();
+	const edge = s.container.querySelector<HTMLButtonElement>(
+		'[data-side="left"] [data-edge]',
+	)!;
+	vi.spyOn(edge, "getBoundingClientRect").mockReturnValue(
+		new DOMRect(1000, 750, 30, 24),
+	);
+	const menu = s.container.querySelector<HTMLElement>(".connection-menu")!;
+	vi.spyOn(menu, "getBoundingClientRect").mockReturnValue(
+		new DOMRect(0, 0, 180, 80),
+	);
+	edge.dispatchEvent(
+		new MouseEvent("contextmenu", { bubbles: true, cancelable: true }),
+	);
+	expect(menu.getAttribute("role")).toBe("menu");
+	expect(parseFloat(menu.style.left) + 180).toBeLessThanOrEqual(
+		window.innerWidth,
+	);
+	expect(parseFloat(menu.style.top) + 80).toBeLessThanOrEqual(
+		window.innerHeight,
+	);
+	expect(parseFloat(menu.style.left)).toBeGreaterThan(0);
+	menu.dispatchEvent(
+		new KeyboardEvent("keydown", { key: "ArrowDown", bubbles: true }),
+	);
+	expect(document.activeElement).toBe(
+		menu.querySelector("[data-toggle-feedback]"),
+	);
+	menu.dispatchEvent(
+		new KeyboardEvent("keydown", { key: "Home", bubbles: true }),
+	);
+	expect(document.activeElement).toBe(menu.querySelector("[data-delete-edge]"));
+	menu.dispatchEvent(
+		new KeyboardEvent("keydown", { key: "Escape", bubbles: true }),
+	);
+	expect(menu.hidden).toBe(true);
+	expect(document.activeElement).toBe(edge);
+	edge.click();
+	document.body.dispatchEvent(new MouseEvent("pointerdown", { bubbles: true }));
+	expect(menu.hidden).toBe(true);
+});
+
+it.each([
+	true,
+	false,
+])("reopens current candidates after adding in either reply order (renderFirst=%s)", async (renderFirst) => {
+	const s = await setup();
+	const input = s.container.querySelector<HTMLInputElement>(
+		'[data-side="right"] input',
+	)!;
+	input.focus();
+	s.container
+		.querySelector<HTMLButtonElement>(
+			'[data-side="right"] [data-candidate="free"]',
+		)!
+		.click();
+	const request = s.postMessage.mock.calls.at(-1)![0];
+	const result = previewEdits.applyPreviewEdit(s.source, request);
+	if (!result.ok) throw new Error(result.message);
+	const redraw = () =>
+		s.preview.receive(
+			prepareDocument(analyzeSnapshot(result.source), null, () => null).message,
+		);
+	if (renderFirst) await redraw();
+	await s.preview.receive({ type: "editResult", request, ok: true });
+	if (!renderFirst) {
+		// A success acknowledgement must not enable candidates from the old source.
+		expect(
+			s.container.querySelector(
+				'[data-side="right"] .connection-candidates:not([hidden]) [data-candidate="free"]:not(:disabled)',
+			),
+		).toBeNull();
+		input.dispatchEvent(
+			new KeyboardEvent("keydown", { key: "Escape", bubbles: true }),
+		);
+		input.dispatchEvent(
+			new KeyboardEvent("keydown", { key: "ArrowDown", bubbles: true }),
+		);
+		expect(
+			s.container.querySelector(
+				'[data-side="right"] .connection-candidates:not([hidden]) [data-candidate="free"]:not(:disabled)',
+			),
+		).toBeNull();
+		await redraw();
+	}
+	expect(document.activeElement).toBe(input);
+	expect(input.getAttribute("aria-expanded")).toBe("true");
+	expect(
+		s.container.querySelector('[data-side="right"] [data-candidate="free"]'),
+	).toBeNull();
+});
+
+it.each([
+	"deleteConnector",
+	"toggleFeedback",
+] as const)("restores the operated side after %s", async (action) => {
+	const s = await setup("a >> p -> b\nc >> p\n");
+	s.container
+		.querySelector<HTMLButtonElement>('[data-side="left"] [data-edge]')!
+		.click();
+	s.container
+		.querySelector<HTMLButtonElement>(
+			action === "deleteConnector"
+				? "[data-delete-edge]"
+				: "[data-toggle-feedback]",
+		)!
+		.click();
+	const request = s.postMessage.mock.calls.at(-1)![0];
+	const result = previewEdits.applyPreviewEdit(s.source, request);
+	if (!result.ok) throw new Error(result.message);
+	await s.preview.receive(
+		prepareDocument(analyzeSnapshot(result.source), null, () => null).message,
+	);
+	expect(document.activeElement).toBe(
+		s.container.querySelector('[data-side="left"] [data-edge]'),
+	);
+	expect(
+		document
+			.activeElement!.closest(".connection-row")!
+			.querySelector("[data-neighbor]")!
+			.getAttribute("data-neighbor"),
+	).toBe(action === "deleteConnector" ? "c" : "a");
+	expect(
+		s.container.querySelector('[role="combobox"][aria-expanded="true"]'),
+	).toBeNull();
+});
 afterEach(() => {
 	for (const cleanup of dispose.splice(0)) cleanup();
 	vi.restoreAllMocks();
@@ -187,14 +655,17 @@ it("moves focus to a stable control only when redraw removes the current control
 	expect(
 		s.container.querySelector<HTMLElement>(".connection-menu")!.hidden,
 	).toBe(true);
+	expect(document.activeElement).toBe(
+		s.container.querySelector('[data-side="left"] [data-edge]'),
+	);
 	expect(
-		(document.activeElement as HTMLInputElement).getAttribute("role"),
-	).toBe("combobox");
-	expect(document.activeElement!.getAttribute("aria-expanded")).toBe("false");
+		s.container.querySelector('[aria-expanded="true"][role="combobox"]'),
+	).toBeNull();
 });
 
 it("closes the panel and returns to a visible preview control when the center disappears", async () => {
 	const s = await setup();
+	s.container.querySelector<HTMLButtonElement>("#create-definition")!.focus();
 	await s.preview.receive(
 		prepareDocument(analyzeSnapshot("x >> q\n"), null, () => null).message,
 	);
@@ -219,7 +690,11 @@ it.each([
 	const elsewhere = document.createElement("button");
 	s.container.after(elsewhere);
 	try {
-		if (!inside) elsewhere.focus();
+		if (inside)
+			s.container
+				.querySelector<HTMLButtonElement>("#create-definition")!
+				.focus();
+		else elsewhere.focus();
 		await s.preview.receive({ type: "error", message: "Invalid source" });
 		expect(document.activeElement).toBe(
 			inside ? s.container.querySelector("#preview-error") : elsewhere,
@@ -773,7 +1248,7 @@ it("toggles semantic input from either endpoint, retains center through redraw a
 	s.container.querySelector<HTMLButtonElement>('[data-neighbor="p"]')!.click();
 	s.container
 		.querySelector<HTMLButtonElement>(
-			'[aria-label="feedback connection from b to p"]',
+			'[aria-label="feedback connection from b, artifact to p, process. Connection actions"]',
 		)!
 		.click();
 	expect(s.container.querySelector("[data-toggle-feedback]")!.textContent).toBe(
@@ -906,10 +1381,7 @@ it("offers delete and input feedback only, and keeps text hover free of an inter
 		'[data-side="right"] [data-edge]',
 	)!;
 	output.click();
-	expect(
-		s.container.querySelector<HTMLButtonElement>("[data-toggle-feedback]")!
-			.disabled,
-	).toBe(true);
+	expect(s.container.querySelector("[data-toggle-feedback]")).toBeNull();
 	s.container.querySelector<HTMLButtonElement>("[data-delete-edge]")!.click();
 	expect(s.postMessage).toHaveBeenLastCalledWith(
 		expect.objectContaining({

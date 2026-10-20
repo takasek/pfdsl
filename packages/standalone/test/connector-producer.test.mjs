@@ -29,8 +29,7 @@ test("production standalone refusal retains text, clean state, input and undo bo
 			input.value = "b";
 			input.dispatchEvent(new window.Event("input"));
 			const candidate = tab.container.querySelector('[data-candidate="b"]');
-			assert.equal(candidate.disabled, true);
-			assert.match(candidate.title, /already produced by p/);
+			assert.equal(candidate, null);
 			assert.equal(tab.getSource(), source);
 			assert.equal(tab.hasUnsavedText(), false);
 			assert.equal(editor.edits.length, 0);
