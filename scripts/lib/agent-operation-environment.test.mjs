@@ -496,7 +496,7 @@ test("missing chain, wrong owner, PID reuse and missing lock deny file writes wi
 
 test("a live owner lock is not enough: the chain's Claude start and the session worktree must match", () => {
 	for (const [fixtureOptions, options, expected] of [
-		// The lock PID was reused between the lock and chain observations.
+		// The chain's Claude and the lock's ps disagree on the start of the same PID.
 		[{}, { ownerStart: "Mon Oct 12 01:00:00 2026" }, { native: "deny" }],
 		// The delegating Claude also owns a worktree outside this session.
 		[{ extraLocks: { own: 123 } }, {}, { native: "allow", own: "deny" }],
