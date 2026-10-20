@@ -2,6 +2,27 @@ import { analyzeSource } from "@pfdsl/core";
 import { expect, it } from "vitest";
 import { applyPreviewEdit } from "./preview-edit.js";
 
+it("allows deleting one edge kind from a V036 input-feedback conflict", () => {
+	const source = "a >> p -> b\na >>? p\n";
+	expect(
+		analyzeSource(source).diagnostics.filter((d) => d.code === "V036"),
+	).toHaveLength(1);
+	const result = applyPreviewEdit(source, {
+		type: "deleteConnector",
+		nodeId: "p",
+		source,
+		artifact: "a",
+		process: "p",
+		kind: "feedback",
+	});
+	expect(result.ok).toBe(true);
+	if (!result.ok) return;
+	expect(result.source).toContain("a >> p -> b");
+	expect(analyzeSource(result.source).diagnostics).not.toContainEqual(
+		expect.objectContaining({ code: "V036" }),
+	);
+});
+
 it.each([
 	"[a # internal\n] >> p",
 	"[a, # internal\n a] >> p",

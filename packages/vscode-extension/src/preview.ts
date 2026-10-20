@@ -22,6 +22,7 @@ import { requireActivePfdslEditor } from "./utils.js";
 
 interface PreviewState {
 	panel: vscode.WebviewPanel;
+	previewViewType: string;
 	doc: vscode.TextDocument;
 	sourceViewColumn: vscode.ViewColumn;
 	controller: PreviewController;
@@ -98,6 +99,27 @@ async function prepareEditSource(state: PreviewState) {
 	return { source, isCurrent };
 }
 
+function sourceColumnOutsidePreview(
+	state: PreviewState,
+	preferredColumn: vscode.ViewColumn,
+): vscode.ViewColumn {
+	const groups = vscode.window.tabGroups.all;
+	const previewGroup = groups.find((group) =>
+		group.tabs.some(
+			(tab) =>
+				tab.input instanceof vscode.TabInputWebview &&
+				tab.input.viewType === state.previewViewType &&
+				tab.label === state.panel.title,
+		),
+	);
+	const preferredGroup = groups.find(
+		(group) => group.viewColumn === preferredColumn,
+	);
+	return preferredGroup && preferredGroup !== previewGroup
+		? preferredColumn
+		: vscode.ViewColumn.Beside;
+}
+
 async function editFromPreview(
 	state: PreviewState,
 	request: PreviewEditMessage,
@@ -161,10 +183,7 @@ async function editFromPreview(
 				(editor) => editor.document === state.doc,
 			)?.viewColumn ?? state.sourceViewColumn;
 		const editor = await vscode.window.showTextDocument(state.doc, {
-			viewColumn:
-				sourceColumn === state.panel.viewColumn
-					? vscode.ViewColumn.Beside
-					: sourceColumn,
+			viewColumn: sourceColumnOutsidePreview(state, sourceColumn),
 			...(request.type === "createDefinition" ? { selection: range } : {}),
 			preserveFocus: request.type !== "createDefinition",
 		});
@@ -343,16 +362,15 @@ function jumpToNode(
 			vscode.window.showTextDocument(doc, {
 				viewColumn: vc,
 				preserveFocus: false,
+				preview: false,
 			});
 		}
 	} else if (!preserveFocus) {
 		vscode.window.showTextDocument(doc, {
-			viewColumn:
-				state.sourceViewColumn === state.panel.viewColumn
-					? vscode.ViewColumn.Beside
-					: state.sourceViewColumn,
+			viewColumn: sourceColumnOutsidePreview(state, state.sourceViewColumn),
 			selection: range,
 			preserveFocus: false,
+			preview: false,
 		});
 	}
 }
@@ -382,6 +400,7 @@ export function registerPreview(context: vscode.ExtensionContext): {
 		focusNodeId?: string,
 	): PreviewState {
 		const docUri = doc.uri.toString();
+		const previewViewType = `pfdslPreview-${encodeURIComponent(docUri)}`;
 		const sourceViewColumn =
 			vscode.window.visibleTextEditors.find((editor) => editor.document === doc)
 				?.viewColumn ??
@@ -393,7 +412,7 @@ export function registerPreview(context: vscode.ExtensionContext): {
 			"webview.js",
 		);
 		const panel = vscode.window.createWebviewPanel(
-			"pfdslPreview",
+			previewViewType,
 			"PFDSL Preview",
 			{ viewColumn: vscode.ViewColumn.Beside, preserveFocus: true },
 			{
@@ -410,6 +429,7 @@ export function registerPreview(context: vscode.ExtensionContext): {
 
 		const state: PreviewState = {
 			panel,
+			previewViewType,
 			doc,
 			sourceViewColumn,
 			disposed: false,
