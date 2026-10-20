@@ -274,11 +274,7 @@ export function createDocumentTab({
 		onChange?.();
 	});
 	editor.onDidChangeCursorPosition((event) => {
-		if (
-			event.reason !== monaco.editor.CursorChangeReason.Explicit ||
-			(event.source !== "keyboard" && event.source !== "mouse")
-		)
-			return;
+		if (event.source === "pfdsl.preview") return;
 		if (!snapshot || snapshot.source !== editor.getValue() || disposed) return;
 		const nodeId = nodeIdAtSourcePosition(snapshot, snapshot.source, {
 			line: event.position.lineNumber - 1,
