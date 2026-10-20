@@ -133,6 +133,33 @@ function fixture() {
 	};
 }
 
+test("Codex tag lookup passes the hook entry without permitting tag pushes or custom upload programs", () => {
+	const f = fixture();
+	try {
+		const options = { harness: "codex", tool_name: "exec_command" };
+		const command = `git -C ${f.other} ls-remote --tags origin refs/tags/v0.2.0`;
+		assert.equal(
+			f.invoke({ cmd: command, workdir: f.other }, options).decision,
+			"allow",
+		);
+		// Execute against the local fixture remote, with no network or ref writes.
+		assert.equal(
+			f.git(f.other, ["ls-remote", "--tags", "origin", "refs/tags/v0.2.0"]),
+			"",
+		);
+		for (const cmd of [
+			`git -C ${f.own} push --tags origin`,
+			`git -C ${f.other} ls-remote --tags --upload-pack=/tmp/program origin`,
+		])
+			assert.equal(
+				f.invoke({ cmd, workdir: f.other }, options).decision,
+				"deny",
+			);
+	} finally {
+		f.cleanup();
+	}
+});
+
 test("primary fast-forward preparation passes the hook entry while unsafe variants remain denied", () => {
 	const f = fixture();
 	try {
