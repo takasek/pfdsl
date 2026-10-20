@@ -674,21 +674,31 @@ export function mountPreview(container: HTMLElement, host: PreviewHost) {
 
 	const repairToken = ++repairSerial;
 	let repairRequestSerial = 0;
+	type Repair = Extract<MessageToWebview, { type: "error" }>["repair"];
 	let pendingRepair: string | undefined;
+	let shownRepair: Repair;
 	let repairButtons: HTMLButtonElement[] = [];
 	let repairNotice: HTMLElement | undefined;
 	function clearRepair() {
 		pendingRepair = undefined;
+		shownRepair = undefined;
 		repairButtons = [];
 		repairNotice = undefined;
 	}
-	function showError(
-		message: string,
-		repair?: Extract<MessageToWebview, { type: "error" }>["repair"],
-	) {
+	function showError(message: string, repair?: Repair) {
 		const previewFocused =
 			actions.contains(document.activeElement) ||
-			root.contains(document.activeElement);
+			root.contains(document.activeElement) ||
+			error.contains(document.activeElement);
+		// A host may resend the unchanged error while a repair is applied; only a
+		// different source or pair makes the pending request obsolete.
+		const pending =
+			repair &&
+			shownRepair?.source === repair.source &&
+			shownRepair.artifact === repair.artifact &&
+			shownRepair.process === repair.process
+				? pendingRepair
+				: undefined;
 		selectedNodeId = pendingFocusNodeId = undefined;
 		lastFocusedNodeId = undefined;
 		hideHover();
@@ -699,6 +709,8 @@ export function mountPreview(container: HTMLElement, host: PreviewHost) {
 		error.textContent = message;
 		clearRepair();
 		if (repair) {
+			shownRepair = repair;
+			pendingRepair = pending;
 			const controls = document.createElement("div");
 			controls.className = "error-repair";
 			repairNotice = document.createElement("span");
@@ -709,6 +721,7 @@ export function mountPreview(container: HTMLElement, host: PreviewHost) {
 				const button = document.createElement("button");
 				button.type = "button";
 				button.textContent = label;
+				button.disabled = pending !== undefined;
 				button.onclick = () => {
 					pendingRepair = `repair:${repairToken}:${++repairRequestSerial}`;
 					for (const control of repairButtons) control.disabled = true;

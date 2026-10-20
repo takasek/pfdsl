@@ -104,4 +104,67 @@ describe("preview error repair", () => {
 			container.remove();
 		}
 	});
+
+	it("keeps a pending repair and focus across a refresh of the same error", async () => {
+		const container = document.createElement("div");
+		document.body.append(container);
+		const postMessage = vi.fn();
+		const preview = mountPreview(container, {
+			postMessage,
+			renderDot: async () => "<svg/>",
+		});
+		const repair = {
+			source: "a >> p -> b\na >>? p\n",
+			artifact: "a",
+			process: "p",
+		};
+		const buttons = () => [
+			...container.querySelectorAll<HTMLButtonElement>("#preview-error button"),
+		];
+		try {
+			await preview.receive({ type: "error", message: "Conflict", repair });
+			buttons()[0]!.focus();
+			buttons()[0]!.click();
+			const request = postMessage.mock.calls.at(-1)![0];
+			// A host may resend the unchanged error before the edit settles.
+			await preview.receive({ type: "error", message: "Conflict", repair });
+			expect(buttons().every((b) => b.disabled)).toBe(true);
+			expect(
+				container
+					.querySelector("#preview-error")!
+					.contains(document.activeElement),
+			).toBe(true);
+			await preview.receive({
+				type: "editResult",
+				request,
+				ok: false,
+				message: "Could not apply",
+			});
+			expect(container.querySelector("#preview-error")!.textContent).toContain(
+				"Could not apply",
+			);
+			expect(buttons().every((b) => !b.disabled)).toBe(true);
+			// A different source makes the pending request obsolete.
+			buttons()[1]!.click();
+			const obsolete = postMessage.mock.calls.at(-1)![0];
+			await preview.receive({
+				type: "error",
+				message: "Conflict",
+				repair: { ...repair, source: `${repair.source}\n` },
+			});
+			expect(buttons().every((b) => !b.disabled)).toBe(true);
+			await preview.receive({
+				type: "editResult",
+				request: obsolete,
+				ok: false,
+				message: "Stale",
+			});
+			expect(
+				container.querySelector("#preview-error")!.textContent,
+			).not.toContain("Stale");
+		} finally {
+			preview.dispose();
+			container.remove();
+		}
+	});
 });
