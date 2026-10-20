@@ -1032,10 +1032,32 @@ async function assertDefinitionQuickFix(session) {
 		.getByText('Insert artifact definition for "smoke_output"', { exact: true })
 		.waitFor({ state: "visible" });
 	await session.page.keyboard.press("Enter");
+	const quickFixSource = session.page
+		.locator(".monaco-editor .view-lines")
+		.first();
+	const labelPrefix = 'label: "';
 	await waitForInteraction(
-		"Quick Fix moved to the new label selection",
-		() => readStatusText(session.page),
-		(text) => /Ln 4, Col 24 \(12 selected\)/.test(text),
+		"Quick Fix placed the cursor in the empty label",
+		async () => ({
+			status: await readStatusText(session.page),
+			sourceLines: await quickFixSource.locator(".view-line").allTextContents(),
+		}),
+		({ status, sourceLines }) => {
+			if (status.includes("selected")) return false;
+			const cursor = parseStatusCursorPosition(status);
+			if (cursor === null) return false;
+			const labelLineIndex = sourceLines.findIndex((line) =>
+				line.includes('label: ""'),
+			);
+			if (labelLineIndex === -1 || cursor.line !== labelLineIndex + 1)
+				return false;
+			const definitionLine = sourceLines[labelLineIndex] ?? "";
+			const labelPrefixIndex = definitionLine.indexOf(labelPrefix);
+			return (
+				labelPrefixIndex !== -1 &&
+				cursor.column - 1 === labelPrefixIndex + labelPrefix.length
+			);
+		},
 	);
 	await session.page.keyboard.insertText("FriendlyResult");
 	await expectEventually(
@@ -1048,7 +1070,13 @@ async function assertDefinitionQuickFix(session) {
 	);
 	await session.page.keyboard.press(`${modifier}+z`);
 	await expectEventually(
-		"Undo restores the selected label",
+		"Undo restores the empty label",
+		() => quickFixSource.textContent(),
+		(text) =>
+			text?.includes('label: ""') === true && !text.includes("FriendlyResult"),
+	);
+	await expectEventually(
+		"Undo removes the label from the rendered node",
 		() =>
 			session.frame
 				.locator('#inner g.node[data-node-id="smoke_output"]')
@@ -1060,7 +1088,11 @@ async function assertDefinitionQuickFix(session) {
 	await expectEventually(
 		"one Undo removes the definition insertion",
 		() => source.textContent(),
-		(text) => text && !text.includes("artifact:") && !text.includes("label:"),
+		(text) =>
+			text &&
+			!text.includes("artifact:") &&
+			!text.includes("label:") &&
+			text.includes("requirements >> design -> smoke_output"),
 	);
 	await editFixture(session, await readFile(session.fixturePath, "utf8"));
 	await waitForColdRender(
@@ -1069,7 +1101,7 @@ async function assertDefinitionQuickFix(session) {
 		"fixture after Quick Fix Undo",
 	);
 	console.log(
-		"definition Quick Fix: label selection and single-edit Undo passed",
+		"definition Quick Fix: empty label editing and single-edit Undo passed",
 	);
 }
 
@@ -1477,8 +1509,10 @@ async function assertHiddenSourceExternalChange(session) {
 		(text) =>
 			loadFrontmatter(text).body ===
 				`${diskSource}hidden_source_process -> fresh_result\n` &&
-			analyzeSource(text).frontmatter?.artifact?.fresh_result?.label ===
+			!Object.hasOwn(
+				analyzeSource(text).frontmatter?.artifact ?? {},
 				"fresh_result",
+			),
 		{ timeoutMs: coldRenderTimeoutMs },
 	);
 	console.log(
