@@ -434,6 +434,25 @@ it("opens a hidden source when nodeClick does not preserve focus", async () => {
 	);
 });
 
+it.each([
+	false,
+	true,
+])("opens a hidden source outside the preview column (same column: %s)", async (sameColumn) => {
+	const { open } = setup();
+	const doc = document(
+		"hidden-source-column",
+		"---\nartifact:\n  a: {label: A}\n---\na >> p\n",
+	);
+	const panel = await open(doc, 3);
+	if (sameColumn) Object.assign(panel, { viewColumn: 3 });
+	await panel.receive({ type: "nodeClick", nodeId: "a", preserveFocus: false });
+	expect(host.window.showTextDocument).toHaveBeenCalledWith(doc, {
+		viewColumn: sameColumn ? host.api.ViewColumn.Beside : 3,
+		selection: expect.any(host.api.Range),
+		preserveFocus: false,
+	});
+});
+
 it("focuses a quoted authored definition key selected with its quotes", async () => {
 	const { open } = setup();
 	const doc = document(

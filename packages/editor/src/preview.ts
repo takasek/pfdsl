@@ -26,6 +26,9 @@ export interface PreviewHost {
 	renderDot?: (dot: string) => Promise<string>;
 }
 
+const SYNC_ECHO_TIMEOUT_MS = 1000;
+export const NODE_CLICK_DELAY_MS = 500;
+
 function prepareGraphNode(
 	node: HTMLElement,
 	label: (id: string) => string,
@@ -105,6 +108,26 @@ export function mountPreview(container: HTMLElement, host: PreviewHost) {
 	let cueTimer: number | undefined;
 	let cuedNode: Element | undefined;
 	let cueRing: HTMLDivElement | undefined;
+	let syncEchoNodeId: string | undefined;
+	let syncEchoTimer: number | undefined;
+	let clickTimer: number | undefined;
+	function cancelNodeClick() {
+		if (clickTimer !== undefined) window.clearTimeout(clickTimer);
+		clickTimer = undefined;
+	}
+	function clearSyncEcho() {
+		if (syncEchoTimer !== undefined) window.clearTimeout(syncEchoTimer);
+		syncEchoTimer = undefined;
+		syncEchoNodeId = undefined;
+	}
+	function synchronizeNode(id: string) {
+		clearSyncEcho();
+		syncEchoNodeId = id;
+		// Both hosts can report the selection made by this message. A missing
+		// report must not suppress a later editor navigation indefinitely.
+		syncEchoTimer = window.setTimeout(clearSyncEcho, SYNC_ECHO_TIMEOUT_MS);
+		host.postMessage({ type: "nodeClick", nodeId: id, preserveFocus: true });
+	}
 	const actions = container.querySelector<HTMLElement>("#node-actions")!;
 	const actionsToggle = container.querySelector<HTMLButtonElement>(
 		"#node-actions-toggle",
@@ -115,7 +138,7 @@ export function mountPreview(container: HTMLElement, host: PreviewHost) {
 			selectedNodeId = pendingFocusNodeId = id;
 			pendingFocusCue = true;
 			positionGraph();
-			host.postMessage({ type: "nodeClick", nodeId: id, preserveFocus: true });
+			synchronizeNode(id);
 		},
 		close: closeActions,
 		onOpenChange(open) {
@@ -123,6 +146,7 @@ export function mountPreview(container: HTMLElement, host: PreviewHost) {
 		},
 	});
 	function closeActions() {
+		cancelNodeClick();
 		connections.close();
 		actionsToggle.focus();
 	}
@@ -131,6 +155,7 @@ export function mountPreview(container: HTMLElement, host: PreviewHost) {
 		preserveFocus = false,
 		focusHeading = false,
 	) {
+		cancelNodeClick();
 		if (graphRevision !== revision) return;
 		selectedNodeId = id;
 		const node = [...inner.querySelectorAll<HTMLElement>("g.node")].find(
@@ -139,8 +164,7 @@ export function mountPreview(container: HTMLElement, host: PreviewHost) {
 		if (node) showCue(node);
 		else clearCue();
 		connections.open(id, focusHeading);
-		if (!preserveFocus)
-			host.postMessage({ type: "nodeClick", nodeId: id, preserveFocus: true });
+		if (!preserveFocus) synchronizeNode(id);
 		host.onStateChange?.();
 	}
 	on(actionsToggle, "click", (event) => {
@@ -588,6 +612,7 @@ export function mountPreview(container: HTMLElement, host: PreviewHost) {
 
 	let nodePress: { id: string; x: number; y: number } | undefined;
 	on(root, "mousedown", (e) => {
+		cancelNodeClick();
 		if (e.button === 2 && (e.target as Element).closest?.("g.node")) {
 			e.preventDefault();
 			return;
@@ -658,7 +683,9 @@ export function mountPreview(container: HTMLElement, host: PreviewHost) {
 		)
 			return;
 		hideHover();
-		openActions(id);
+		cancelNodeClick();
+		// Keep the node under the second click until dblclick can be dispatched.
+		clickTimer = window.setTimeout(() => openActions(id), NODE_CLICK_DELAY_MS);
 	});
 
 	on(root, "click", (e) => {
@@ -683,6 +710,7 @@ export function mountPreview(container: HTMLElement, host: PreviewHost) {
 	});
 
 	on(root, "dblclick", (e) => {
+		cancelNodeClick();
 		const node = (e.target as Element).closest("g.node");
 		if (node) {
 			const nodeId = (node as HTMLElement).dataset.nodeId;
@@ -748,10 +776,16 @@ export function mountPreview(container: HTMLElement, host: PreviewHost) {
 		const currentRevision =
 			msg.type === "render" || msg.type === "error" ? ++revision : revision;
 		if (msg.type === "error") {
+			cancelNodeClick();
+			clearSyncEcho();
 			showError(msg.message);
 			return;
 		}
 		if (msg.type === "focus") {
+			const echo = syncEchoNodeId === msg.nodeId;
+			clearSyncEcho();
+			if (echo) return;
+			cancelNodeClick();
 			pendingFocusNodeId = msg.nodeId;
 			pendingFocusCue = true;
 			positionGraph();
@@ -759,6 +793,8 @@ export function mountPreview(container: HTMLElement, host: PreviewHost) {
 			return;
 		}
 		if (msg.type === "clearFocus") {
+			cancelNodeClick();
+			clearSyncEcho();
 			pendingFocusNodeId = undefined;
 			pendingFocusCue = false;
 			selectedNodeId = undefined;
@@ -775,6 +811,8 @@ export function mountPreview(container: HTMLElement, host: PreviewHost) {
 			return;
 		}
 		if (msg.type !== "render") return;
+		cancelNodeClick();
+		clearSyncEcho();
 		hideHover();
 		const panelFocused = actions.contains(document.activeElement);
 		connections.update(msg.editing);
@@ -856,6 +894,8 @@ export function mountPreview(container: HTMLElement, host: PreviewHost) {
 				});
 		},
 		dispose() {
+			cancelNodeClick();
+			clearSyncEcho();
 			hideHover();
 			connections.close();
 			connections.dispose();

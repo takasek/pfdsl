@@ -156,6 +156,7 @@ read-only表示と色以外の差分区別を保ち、取消は内容と未解�
 対応：#1444/#1284。対象・入力：M/V、p/b/lone、定義なしa、多数接続、長label、狭幅・幅を取るscrollbar。
 操作：fillなし／status色付きの各nodeの図形内側をclickして開き、左右内容をsourceと照合し、片側scroll、片側ゼロ・孤立も試す。
 Tab→Enterと右clickでも開き、node上からのpan、移動後に起点へ戻るdrag、Cmd/Ctrl+click、minimap操作では閉じたConnectionsが開かないことを確認する。
+閉じたConnectionsで図の下端付近のnodeをdouble clickし、2回目のclickまでpanelが開いて図の領域を縮めないこと、Enterと右clickには待ち時間がないことを確認する。
 期待：直接前後だけを左入力／中心／右出力へ示し、pへq/cを混ぜずfeedback方向を保つ。
 未定義・孤立でも中心を扱い、scrollは左右独立、中心と下部入力を固定する。
 常設1行text＋／＋textと各＋のライン下の整列、読上げ方向を保ち可視Incoming/Outgoingを復活させない。
@@ -170,7 +171,9 @@ Connectionsから追加・削除・feedback切替・定義作成を適用し、e
 期待：全体図を保って対象へ移動し、editor・図・Connectionsが同じnodeを指す。
 editor操作はeditorのfocusを保ち、閉じたConnectionsを開かず、開いていれば中心を追従する。
 Connectionsの近隣移動はeditorのcursorも移し、focusはConnectionsに残す。
-図のdouble clickは途中のclickでConnectionsが開き、sourceへ移動してeditorにfocusする。
+図の単clickはdouble click判定の待ち時間後にConnectionsを開き、同期のechoではpanを変えず合図を繰り返さない。
+図のdouble clickは単click処理を取り消し、Connectionsを同じnodeで開いてsourceへ移動しeditorにfocusする。
+Vではsourceを閉じてからdouble clickとGo to definitionを各々試し、previewを覆わない別groupへsourceが開いてfocusすること、単click同期だけではsourceを開かないことを確認する。
 Go to definitionは中心nodeの定義位置へ移動してeditorにfocusする。
 Create definitionは`label: ""`を持つ定義を作り、editorへfocusして空の引用符の内側にcursorを置く。
 そこからlabelを入力でき、既存の案内と、出力成果物に必要なcriteriaのW002案内を保つ。

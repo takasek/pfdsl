@@ -54,6 +54,7 @@ The startup smoke does not certify GUI, IME, or Quit interaction.
 ## Editing PFDSL
 
 Click anywhere inside a diagram node, or focus it with Tab and press Enter, to open **Connections**; right-click also works.
+A single click waits briefly for a possible double-click and preserves the diagram's pan; Enter and right-click open Connections immediately.
 Dragging pans without opening Connections, and Cmd/Ctrl+click retains location and subflow navigation.
 Selecting a neighbor updates the diagram, Connections and editor cursor while keeping focus in Connections.
 Any editor cursor change, including keyboard, mouse, Go to definition and search navigation, updates the diagram and an open Connections panel without taking editor focus or opening a closed panel.
