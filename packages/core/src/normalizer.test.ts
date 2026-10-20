@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { lex } from "./lexer.js";
-import { normalize } from "./normalizer.js";
+import { edgeOccurrences, normalize } from "./normalizer.js";
 import { parseTokens } from "./parser.js";
 import type { Frontmatter, NormalizedEdge } from "./types/index.js";
 
@@ -260,5 +260,32 @@ describe("isolated nodes", () => {
 	it("does not collect a node that an edge already mentions", () => {
 		const fm = { artifact: { A: { label: "A" } } } as unknown as Frontmatter;
 		expect(isolated("A >> P -> B", fm)).toEqual([]);
+	});
+});
+
+describe("edgeOccurrences", () => {
+	// Every statement form, chains whose segments mix >> and >>?, bare and
+	// bracketed artifact lists, and a chain ending without an output.
+	it.each([
+		"a >> p -> b",
+		"[a, b] >>? p",
+		"p -> [x, y]",
+		"[a, b] >> p",
+		"node",
+		"x >> q -> a >>? p -> [b, c] >> r",
+		"[a, b] >>? p -> c >> q",
+		"a >> p -> b >>? q",
+	])("yields the edges normalize derives from %j, in order", (src) => {
+		const { tokens } = lex(src);
+		const { document, diagnostics } = parseTokens(tokens);
+		expect(diagnostics).toEqual([]);
+		const occurrences = document.statements
+			.flatMap(edgeOccurrences)
+			.map(({ kind, artifact, process }) =>
+				kind === "output"
+					? { kind, process: process.value, artifact: artifact.value }
+					: { kind, artifact: artifact.value, process: process.value },
+			);
+		expect(occurrences).toEqual(normalize(document, null).edges);
 	});
 });

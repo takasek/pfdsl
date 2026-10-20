@@ -356,6 +356,152 @@ a >> design -> b
 		});
 	});
 
+	describe("V036: input and feedback for the same artifact-process pair", () => {
+		it("does not report V036 for distinct pairs containing quoted NUL IDs", () => {
+			const src =
+				'"a\0b" >> "c" -> out\n"a" >>? "b\0c"\nseed >> "b\0c" -> result';
+			expect(diagnose(src).filter((d) => d.code === "V036")).toEqual([]);
+		});
+
+		it("reports one error in both modes and does not also report V011", () => {
+			const src = "a >> p -> b\na >>? p";
+			for (const options of [undefined, { strict: true }]) {
+				const diags = diagnose(src, null, options);
+				expect(diags.map((d) => d.code)).toEqual(["V036"]);
+				expect(diags[0]?.severity).toBe("error");
+				expect(diags[0]?.message).toContain(
+					"both as an input (>>) and as feedback (>>?)",
+				);
+			}
+		});
+
+		it("reports the same conflict when feedback is written first", () => {
+			const diags = diagnose("a >>? p\na >> p -> b");
+			expect(diags.map((d) => d.code)).toEqual(["V036"]);
+		});
+
+		it("does not report a conflict when the two edge kinds target different processes", () => {
+			expect(codes("a >> p -> b\na >>? q")).not.toContain("V036");
+		});
+
+		it("reports one V036 per conflicting pair", () => {
+			const diags = diagnose("b >> q -> c\na >> p -> d\nb >>? q\na >>? p");
+			expect(diags.filter((d) => d.code === "V036")).toHaveLength(2);
+		});
+
+		describe("range", () => {
+			/** Line/column span of each V036, analyzed with the parsed document available. */
+			function v036Spans(src: string) {
+				const { tokens } = lex(src);
+				const { document } = parseTokens(tokens);
+				return diagnose(src, null, { document })
+					.filter((d) => d.code === "V036")
+					.map(({ range: { start, end } }) => [
+						[start.line, start.column],
+						[end.line, end.column],
+					]);
+			}
+
+			it("spans the feedback edge from its artifact to its process", () => {
+				expect(v036Spans("a >> p -> b\na >>? p")).toEqual([
+					[
+						[2, 1],
+						[2, 8],
+					],
+				]);
+			});
+
+			it("points at the feedback edge when it is written before the input", () => {
+				expect(v036Spans("a >>? p\na >> p -> b")).toEqual([
+					[
+						[1, 1],
+						[1, 8],
+					],
+				]);
+			});
+
+			it("points at a feedback segment inside a chain", () => {
+				expect(v036Spans("x >> q -> a >>? p\na >> p -> b")).toEqual([
+					[
+						[1, 11],
+						[1, 18],
+					],
+				]);
+			});
+
+			it("starts at the conflicting ID of a multi-artifact expression", () => {
+				expect(v036Spans("[c, a] >>? p\na >> p -> b\nc >> s -> d")).toEqual([
+					[
+						[1, 5],
+						[1, 13],
+					],
+				]);
+			});
+
+			it("uses the first feedback occurrence of a repeated edge", () => {
+				expect(v036Spans("a >> p -> b\na >>? p\na >>? p")).toEqual([
+					[
+						[2, 1],
+						[2, 8],
+					],
+				]);
+			});
+
+			it("falls back to the document start without a parsed document", () => {
+				const [diag] = diagnose("a >> p -> b\na >>? p").filter(
+					(d) => d.code === "V036",
+				);
+				expect(diag?.range).toEqual({
+					start: { line: 1, column: 1, offset: 0 },
+					end: { line: 1, column: 1, offset: 0 },
+				});
+			});
+
+			it("reads the document's statements once however many pairs conflict", () => {
+				const ids = Array.from({ length: 50 }, (_, i) => `a${i}`).join(", ");
+				const src = `[${ids}] >> p -> b\n[${ids}] >>? p`;
+				const { tokens } = lex(src);
+				const { document } = parseTokens(tokens);
+				const { edges, nodeKinds } = normalize(document, null);
+				let reads = 0;
+				const counted = {
+					type: document.type,
+					get statements() {
+						reads++;
+						return document.statements;
+					},
+				};
+				const diags = validate(edges, nodeKinds, null, { document: counted });
+				expect(diags.filter((d) => d.code === "V036")).toHaveLength(50);
+				expect(reads).toBe(1);
+			});
+
+			it("reads no statements when nothing conflicts", () => {
+				const { tokens } = lex("a >> p -> b");
+				const { document } = parseTokens(tokens);
+				const { edges, nodeKinds } = normalize(document, null);
+				let reads = 0;
+				const counted = {
+					type: document.type,
+					get statements() {
+						reads++;
+						return document.statements;
+					},
+				};
+				validate(edges, nodeKinds, null, { document: counted });
+				expect(reads).toBe(0);
+			});
+		});
+
+		it("keeps an identical repeated input as an N003 warning only", () => {
+			const { tokens } = lex("a >> p -> b\na >> p");
+			const { document } = parseTokens(tokens);
+			const diags = normalize(document, null).diagnostics;
+			expect(diags.map((d) => d.code)).toEqual(["N003"]);
+			expect(diags[0]?.severity).toBe("warning");
+		});
+	});
+
 	describe("V010: primary-graph cycle detection", () => {
 		it("detects a direct cycle between two processes", () => {
 			// a >> p -> b  +  b >> q -> a  forms a cycle in the primary graph

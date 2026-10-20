@@ -230,10 +230,15 @@ minimap位置対応を保ち、resizeで図が切れるだけでは不合格に�
 
 ### GUI-18：診断とminimap回復
 
-対応：#1352/#1444/#1259。対象・入力：M/V、zoom/pan後に末尾IDを除くsimple-chain、FM/lexer/parserエラー、通常打鍵・IME。
+対応：#1352/#1444/#1259/#1475。対象・入力：M/V、zoom/pan後に末尾IDを除くsimple-chain、FM/lexer/parserエラー、`a >> p -> b`と`a >>? p`の併記（V036）、通常打鍵・IME。
 操作：正常→エラー→正常、全文読取、Go to error、IME組成と復帰を行う。
+V036では、エディタの波線が`a >>? p`の`a`から`p`までに出ることを確認する。
+図が止まったerror表示の「Keep normal input」と「Keep feedback」をそれぞれ別の試行でkeyboardとpointerから選び、各1回のUndoで併記へ戻ることを確認する。
 期待：診断はzoom/pan外の通常サイズで読め、古い図/minimapを現行として残さない。
 文書別件数と行列から正しい位置へ戻り、修正後現在図と操作が回復する。
+「Keep normal input」はfeedbackだけを、「Keep feedback」は通常入力だけを消し、どちらも既定として選ばれていない。
+修復後、Mはステータス表示、Vは情報メッセージで、消した接続と新しく出た診断（通常入力を消した場合のW008）を示し、図が再描画される。
+V036以外のerrorが先に表示されている場合は修復の操作を出さない。
 毎打鍵modalで編集を遮らず、待機時間や診断抑制を本整理で決めない。
 状態：M/V各未実施。記録：未記入。
 

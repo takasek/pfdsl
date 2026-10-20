@@ -7,6 +7,7 @@ import {
 	findFrontmatterDefinitionRange,
 	nodeIdAtSourcePosition,
 	positionOfNodeId,
+	repairResultMessage,
 } from "@pfdsl/editor";
 import { mountPreview } from "@pfdsl/editor/preview";
 import * as monaco from "monaco-editor/editor/editor.api.js";
@@ -127,7 +128,8 @@ export function createDocumentTab({
 				message.type === "deleteConnector" ||
 				message.type === "toggleFeedback"
 			) {
-				const result = applyPreviewEdit(editor.getValue(), message);
+				const beforeSource = editor.getValue();
+				const result = applyPreviewEdit(beforeSource, message);
 				if (!result.ok) {
 					reportStatus(result.message);
 					void preview.receive({
@@ -173,9 +175,11 @@ export function createDocumentTab({
 					if (message.type === "createDefinition") editor.focus();
 				}
 				reportStatus(
-					result.needsCriteria
-						? "Edit the new label. Add criteria describing how this produced artifact is judged complete (W002)."
-						: "Preview edit applied. Complete any required metadata.",
+					message.repair && message.type === "deleteConnector"
+						? repairResultMessage(message, beforeSource, result.source)
+						: result.needsCriteria
+							? "Edit the new label. Add criteria describing how this produced artifact is judged complete (W002)."
+							: "Preview edit applied. Complete any required metadata.",
 				);
 			} else if (
 				message.type === "nodeClick" &&

@@ -185,6 +185,6 @@ do_release_v2 -> release_v2
 adr_set >> write_article
 write_article -> article
 
-spec_alpha >>? implement_core
+feature_x >>? implement_core
 "
 `;
