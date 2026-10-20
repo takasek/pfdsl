@@ -1018,6 +1018,17 @@ async function assertPreviewUsability(session) {
 	);
 }
 
+export function isDefinitionInsertionUndone(text) {
+	// Monaco view lines can contain non-breaking spaces instead of source spaces.
+	const source = text?.replace(/\u00a0/g, " ");
+	return Boolean(
+		source &&
+			!source.includes("artifact:") &&
+			!source.includes("label:") &&
+			source.includes("requirements >> design -> smoke_output"),
+	);
+}
+
 async function assertDefinitionQuickFix(session) {
 	const modifier = process.platform === "darwin" ? "Meta" : "Control";
 	await editFixture(session, "requirements >> design -> smoke_output");
@@ -1094,11 +1105,7 @@ async function assertDefinitionQuickFix(session) {
 	await expectEventually(
 		"one Undo removes the definition insertion",
 		() => source.textContent(),
-		(text) =>
-			text &&
-			!text.includes("artifact:") &&
-			!text.includes("label:") &&
-			text.includes("requirements >> design -> smoke_output"),
+		isDefinitionInsertionUndone,
 	);
 	await editFixture(session, await readFile(session.fixturePath, "utf8"));
 	await waitForColdRender(
