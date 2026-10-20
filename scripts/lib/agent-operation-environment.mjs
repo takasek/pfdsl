@@ -204,6 +204,7 @@ export function collectAgentOperationEnvironment(
 	if (!listed.ok) throw new Error("Cannot observe the repository worktrees");
 	const records = worktreeRecords(listed.out);
 	if (!records.length) throw new Error("Empty Git worktree response");
+	const nativeObservations = [];
 	for (const [index, record] of records.entries()) {
 		const root = resolvePhysicalPath(record.worktree, null);
 		const branch =
@@ -216,6 +217,36 @@ export function collectAgentOperationEnvironment(
 			primary: index === 0,
 			branch,
 		};
+		if (
+			tree.primary &&
+			branch === facts.defaultBranch &&
+			preliminary.operations.some(({ action }) => action === "primary-ff-pull")
+		) {
+			const options = { cwd: root, env };
+			const status = probeGit(
+				["status", "--porcelain=v1", "--untracked-files=normal"],
+				options,
+			);
+			const upstream = probeGit(
+				["rev-parse", "--symbolic-full-name", "@{upstream}"],
+				options,
+			);
+			const ancestor = probeGit(
+				[
+					"merge-base",
+					"--is-ancestor",
+					"HEAD",
+					`refs/remotes/origin/${facts.defaultBranch}`,
+				],
+				options,
+			);
+			tree.primaryPullReady =
+				status.ok &&
+				status.out === "" &&
+				upstream.ok &&
+				upstream.out.trim() === `refs/remotes/origin/${facts.defaultBranch}` &&
+				ancestor.ok;
+		}
 		const lock =
 			typeof record.locked === "string"
 				? record.locked.match(
@@ -251,7 +282,46 @@ export function collectAgentOperationEnvironment(
 				tree.ownership = { ownerId: sessionId, live: true };
 			}
 		}
-		if (!tree.primary && !tree.ownership?.live && !facts.codexDelegation) {
+		if (!tree.primary && !tree.ownership?.live && !facts.codexDelegation)
+			nativeObservations.push(tree);
+		facts.worktrees.push(tree);
+		if (branch) facts.branches[branch] = { checkedOutAt: root };
+	}
+	for (const { path, followFinalSymlink } of paths.values()) {
+		const physical = resolvePhysicalPath(path, payload.cwd, {
+			followFinalSymlink,
+		});
+		(followFinalSymlink ? facts.physicalPaths : facts.physicalEntryPaths)[
+			path
+		] = physical;
+		const target = resolveGitRoots(existingDirectory(physical), {
+			exec: probeGit,
+			environment: env,
+		});
+		if (
+			target &&
+			!facts.worktrees.some(({ root }) => root === target.worktreeRoot)
+		)
+			facts.worktrees.push({
+				root: target.worktreeRoot,
+				commonDir: target.commonDir,
+				primary: target.worktreeRoot === target.mainRoot,
+				branch: null,
+			});
+	}
+	// Keep the complete branch occupancy map, then resolve optional ownership
+	// only where this call acts (including a busy branch's checkout). Unrelated
+	// worktrees must not consume the per-call Git probe budget.
+	const executionPaths = classifyAgentOperations(payload, facts)
+		.operations.map(({ executionPath }) => executionPath)
+		.filter(Boolean);
+	for (const tree of nativeObservations) {
+		const { root } = tree;
+		if (
+			executionPaths.some(
+				(path) => path === root || path.startsWith(`${root}/`),
+			)
+		) {
 			const relation = refineNativeWorktreeRelation("sibling", {
 				targetRoot: root,
 				payload,
@@ -285,30 +355,6 @@ export function collectAgentOperationEnvironment(
 				}
 			}
 		}
-		facts.worktrees.push(tree);
-		if (branch) facts.branches[branch] = { checkedOutAt: root };
-	}
-	for (const { path, followFinalSymlink } of paths.values()) {
-		const physical = resolvePhysicalPath(path, payload.cwd, {
-			followFinalSymlink,
-		});
-		(followFinalSymlink ? facts.physicalPaths : facts.physicalEntryPaths)[
-			path
-		] = physical;
-		const target = resolveGitRoots(existingDirectory(physical), {
-			exec: probeGit,
-			environment: env,
-		});
-		if (
-			target &&
-			!facts.worktrees.some(({ root }) => root === target.worktreeRoot)
-		)
-			facts.worktrees.push({
-				root: target.worktreeRoot,
-				commonDir: target.commonDir,
-				primary: target.worktreeRoot === target.mainRoot,
-				branch: null,
-			});
 	}
 	return facts;
 }
