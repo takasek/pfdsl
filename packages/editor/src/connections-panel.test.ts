@@ -410,6 +410,30 @@ it("anchors and clamps the context menu, navigates by keyboard, and returns on E
 	expect(menu.hidden).toBe(true);
 });
 
+it("closes the context menu when its fixed anchor moves", async () => {
+	const s = await setup();
+	const edge = s.container.querySelector<HTMLButtonElement>(
+		'[data-side="left"] [data-edge]',
+	)!;
+	const list = edge.closest<HTMLElement>(".connections-list")!;
+	const menu = s.container.querySelector<HTMLElement>(".connection-menu")!;
+	const open = () =>
+		edge.dispatchEvent(
+			new MouseEvent("contextmenu", { bubbles: true, cancelable: true }),
+		);
+	open();
+	menu.dispatchEvent(new Event("scroll"));
+	expect(menu.hidden).toBe(false);
+	const focus = vi.spyOn(edge, "focus");
+	list.dispatchEvent(new Event("scroll"));
+	expect(menu.hidden).toBe(true);
+	expect(document.activeElement).toBe(edge);
+	expect(focus).toHaveBeenCalledWith({ preventScroll: true });
+	open();
+	window.dispatchEvent(new Event("resize"));
+	expect(menu.hidden).toBe(true);
+});
+
 it("keeps one-item edge menus keyboard navigable and returns focus on Escape", async () => {
 	const s = await setup("a >> p -> b\nb >>? p\n");
 	const edge = s.container.querySelector<HTMLButtonElement>(
