@@ -48,6 +48,9 @@ function fixture() {
 		other = join(root, "other");
 	const env = withoutGitTargetEnvironment(process.env);
 	delete env.CLAUDE_PROJECT_DIR;
+	// A Claude Bash exports CLAUDECODE; inherited, every Codex case would be a
+	// delegated child. Delegation cases set it explicitly.
+	delete env.CLAUDECODE;
 	const git = (cwd, args) =>
 		run("git", args, { cwd, env, captureStderr: true }).trim();
 	mkdirSync(primary);
