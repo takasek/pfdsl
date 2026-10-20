@@ -5,11 +5,13 @@ import {
 	frontmatterNodeRanges,
 } from "../frontmatter.js";
 import type { FrontmatterSource } from "../frontmatter-source.js";
+import { edgeOccurrences } from "../normalizer.js";
 import { zeroRange } from "../position.js";
 import type {
 	ArtifactMeta,
 	Diagnostic,
 	DiagnosticSeverity,
+	Document,
 	Frontmatter,
 	NodeKind,
 	NormalizedEdge,
@@ -21,6 +23,8 @@ export interface ValidateOptions {
 	strict?: boolean;
 	source?: string;
 	sourceMap?: FrontmatterSource;
+	/** Parsed body, which locates diagnostics about authored edges. */
+	document?: Document;
 	readyGate?: boolean;
 }
 
@@ -50,6 +54,8 @@ export interface RuleContext {
 
 	/** Range of a node's front-matter declaration, when the source was supplied. */
 	rangeOf(id: string): Range;
+	/** Range of an edge's first authored occurrence, when the document was supplied. */
+	edgeRange(edge: NormalizedEdge): Range;
 	/** `error` under --strict, the given severity otherwise. */
 	strictly(severity: DiagnosticSeverity): DiagnosticSeverity;
 }
@@ -63,6 +69,23 @@ function withoutNulls<T>(entries: Record<string, T | null> | undefined) {
 		out[id] = meta ?? ({} as T);
 	}
 	return out;
+}
+
+/** The first statement writing `edge`, spanning its two endpoint IDs in source order. */
+function edgeRangeOf(edge: NormalizedEdge, document?: Document): Range {
+	for (const stmt of document?.statements ?? []) {
+		const hit = edgeOccurrences(stmt).find(
+			(occurrence) =>
+				occurrence.kind === edge.kind &&
+				occurrence.artifact.value === edge.artifact &&
+				occurrence.process.value === edge.process,
+		);
+		if (!hit) continue;
+		return edge.kind === "output"
+			? { start: hit.process.start, end: hit.artifact.end }
+			: { start: hit.artifact.start, end: hit.process.end };
+	}
+	return zeroRange();
 }
 
 export function buildRuleContext(
@@ -114,6 +137,7 @@ export function buildRuleContext(
 		nodesWithEdges,
 		primaryAdj,
 		rangeOf: (id) => nodeRanges.get(id) ?? zeroRange(),
+		edgeRange: (edge) => edgeRangeOf(edge, options.document),
 		strictly: (severity) => (options.strict ? "error" : severity),
 	};
 }

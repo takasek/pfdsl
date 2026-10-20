@@ -1,4 +1,3 @@
-import { zeroRange } from "../position.js";
 import type { Diagnostic } from "../types/index.js";
 import type { RuleContext } from "./context.js";
 
@@ -43,6 +42,6 @@ export function inputFeedbackConflict(ctx: RuleContext): Diagnostic[] {
 		severity: "error",
 		code: "V036",
 		message: `Artifact '${artifact}' is connected to process '${process}' both as an input (>>) and as feedback (>>?); keep only one connection`,
-		range: zeroRange(),
+		range: ctx.edgeRange({ kind: "feedback", artifact, process }),
 	}));
 }

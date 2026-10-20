@@ -389,6 +389,75 @@ a >> design -> b
 			expect(diags.filter((d) => d.code === "V036")).toHaveLength(2);
 		});
 
+		describe("range", () => {
+			/** Line/column span of each V036, analyzed with the parsed document available. */
+			function v036Spans(src: string) {
+				const { tokens } = lex(src);
+				const { document } = parseTokens(tokens);
+				return diagnose(src, null, { document })
+					.filter((d) => d.code === "V036")
+					.map(({ range: { start, end } }) => [
+						[start.line, start.column],
+						[end.line, end.column],
+					]);
+			}
+
+			it("spans the feedback edge from its artifact to its process", () => {
+				expect(v036Spans("a >> p -> b\na >>? p")).toEqual([
+					[
+						[2, 1],
+						[2, 8],
+					],
+				]);
+			});
+
+			it("points at the feedback edge when it is written before the input", () => {
+				expect(v036Spans("a >>? p\na >> p -> b")).toEqual([
+					[
+						[1, 1],
+						[1, 8],
+					],
+				]);
+			});
+
+			it("points at a feedback segment inside a chain", () => {
+				expect(v036Spans("x >> q -> a >>? p\na >> p -> b")).toEqual([
+					[
+						[1, 11],
+						[1, 18],
+					],
+				]);
+			});
+
+			it("starts at the conflicting ID of a multi-artifact expression", () => {
+				expect(v036Spans("[c, a] >>? p\na >> p -> b\nc >> s -> d")).toEqual([
+					[
+						[1, 5],
+						[1, 13],
+					],
+				]);
+			});
+
+			it("uses the first feedback occurrence of a repeated edge", () => {
+				expect(v036Spans("a >> p -> b\na >>? p\na >>? p")).toEqual([
+					[
+						[2, 1],
+						[2, 8],
+					],
+				]);
+			});
+
+			it("falls back to the document start without a parsed document", () => {
+				const [diag] = diagnose("a >> p -> b\na >>? p").filter(
+					(d) => d.code === "V036",
+				);
+				expect(diag?.range).toEqual({
+					start: { line: 1, column: 1, offset: 0 },
+					end: { line: 1, column: 1, offset: 0 },
+				});
+			});
+		});
+
 		it("keeps an identical repeated input as an N003 warning only", () => {
 			const { tokens } = lex("a >> p -> b\na >> p");
 			const { document } = parseTokens(tokens);

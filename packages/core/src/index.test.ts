@@ -55,6 +55,27 @@ describe("public API", () => {
 	it.each([
 		"\n",
 		"\r\n",
+	])("locates V036 at the feedback edge after frontmatter with %j newlines", (newline) => {
+		const source = [
+			"---",
+			"type: workflow",
+			"---",
+			"a >> p -> b",
+			"a >>? p",
+			"",
+		].join(newline);
+		for (const result of [analyze(source), format(source)]) {
+			const diagnostic = result.diagnostics.find(
+				(item) => item.code === "V036",
+			);
+			expect(diagnostic?.range.start).toMatchObject({ line: 5, column: 1 });
+			expect(diagnostic?.range.end).toMatchObject({ line: 5, column: 8 });
+		}
+	});
+
+	it.each([
+		"\n",
+		"\r\n",
 	])("locates lexer diagnostics after long frontmatter with %j newlines", (newline) => {
 		const frontmatter = [
 			"---",
