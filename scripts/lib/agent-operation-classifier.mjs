@@ -148,10 +148,11 @@ function pathFacts(path, facts, followFinalSymlink = true) {
 			"other-live",
 		],
 		[
-			tree.root === sessionTree?.root ||
-				(typeof facts.sessionId === "string" &&
-					facts.sessionId.length > 0 &&
-					tree.ownership?.ownerId === facts.sessionId),
+			(!facts.codexDelegation || tree.delegationVerified) &&
+				(tree.root === sessionTree?.root ||
+					(typeof facts.sessionId === "string" &&
+						facts.sessionId.length > 0 &&
+						tree.ownership?.ownerId === facts.sessionId)),
 			"own",
 		],
 		[true, "other-unowned"],
@@ -1004,7 +1005,9 @@ function fileOperations(payload, context, facts) {
  * Codex's tool_input.workdir is deliberately not an observed execution target.
  */
 export function classifyAgentOperations(payload, facts) {
-	const subject = `${facts.harness === "codex" ? "codex" : "claude"}-${payload.agent_id ? (facts.harness === "codex" ? "child" : "subagent") : "parent"}`;
+	const subject = facts.codexDelegation
+		? "codex-child"
+		: `${facts.harness === "codex" ? "codex" : "claude"}-${payload.agent_id ? (facts.harness === "codex" ? "child" : "subagent") : "parent"}`;
 	const command = payload.tool_input?.command ?? payload.tool_input?.cmd;
 	const failure =
 		facts.failure ??
@@ -1012,6 +1015,7 @@ export function classifyAgentOperations(payload, facts) {
 	const health = facts.health === "failed" || failure ? "failed" : "healthy";
 	const context = {
 		subject,
+		delegated: Boolean(facts.codexDelegation),
 		agentType: payload.agent_type,
 		health,
 		failure,

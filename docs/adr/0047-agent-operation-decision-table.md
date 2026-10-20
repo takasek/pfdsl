@@ -108,6 +108,27 @@ agent が手動で追加した worktree は other-unowned であり、変更を�
 - claude-subagent の O（外向き書込み）は「親へ返す」案内付き deny とする。レビューと公開は呼び出し元が持つという既存の責務境界（#932、main の agent-operation-guard）を維持する。例外は、PR 作成までを役割に持つ agent 種別（現行は `issue-worker`）だけで、`agent_type` の許可表で判定する。
 - Codex は ask を表現できないので、ask のセルは「人間の terminal で実行する」案内付き deny になる。
 
+### Claude から codex exec への委譲
+
+Claude の Bash から起動した Codex CLI は native の `agent_id` を持たないが、責務は codex-child とする。
+観測した Claude 2.1.299 / Codex 0.163.0-alpha.10.2 の起動形である `hook → codex → shell → claude` の固定接続だけを扱う。
+shell は zsh・bash・sh、各 CLI の実行ファイル名は codex・claude とする。
+hook 環境の `CLAUDECODE=1` と空の `CLAUDE_PROJECT_DIR` は権限を子へ制限する兆候であり、所有証拠ではない。
+各操作で3つの process の PID・PPID・開始時刻・実行ファイルを読み、接続が不一致・欠落でも子の制限を維持する。
+任意祖先探索、検出を避けるための環境消去、別の wrapper・daemon・plugin 起動形の対応追加は行わない。
+`CODEX_THREAD_ID` は外側の session から継承されうるため、所有者の同一性には使わない。
+
+固定接続の Claude の PID・開始時刻と、session の起動 root に対応する linked worktree の生存 native lock が一致した場合だけ、その子にとって当該 worktree を own と分類する。
+primary・別の worktree・native lock 欠落・PID 再利用・親終了はこの認定を受けない。
+Claude の実際の所有記録は変更せず、分類器へ渡す操作単位の事実だけを補正する。
+所有の成功判定をキャッシュせず、失敗時に codex-parent や起動 root だけの own 判定へ戻さない。
+所有者の一致で子を親の権限へ昇格させない性質を維持し、Git metadata・変更系 Git・外向き書込みは親へ返す。
+主体の制限は操作先の収集より前に行い、checkout を持たない gh・MCP にも適用する。
+hook の故障時にも親の権限へ戻さず、parser 欠落時の固定回復コマンドは委譲元へ返す。
+
+正常終了と SIGTERM では子の残存を観測しなかったが、子の終了保証は権限判定の前提にしない。
+別の起動形・SIGKILL・任意 script の副作用や未登録 MCP の網羅保証はこの決定へ追加しない。
+
 健全性による上書き:
 
 - failed のとき、R を含む全クラスを修復案内付き deny とする。

@@ -6,6 +6,8 @@ import { fileURLToPath } from "node:url";
 import { isMainThread } from "node:worker_threads";
 
 const hookRoot = fileURLToPath(new URL("../", import.meta.url));
+const delegatedCodex =
+	!process.env.CLAUDE_PROJECT_DIR?.trim() && process.env.CLAUDECODE === "1";
 function failed(detail) {
 	const reason = `Cannot execute the agent operation policy: ${String(detail).slice(0, 400)}. Repair the hook in a human terminal before retrying.`;
 	console.error(reason);
@@ -47,6 +49,7 @@ if (isMainThread) {
 			import.meta.url,
 		);
 		if (
+			!delegatedCodex &&
 			["Bash", "exec_command"].includes(payload?.tool_name) &&
 			command === repair &&
 			!existsSync(parser)
@@ -92,6 +95,7 @@ if (isMainThread) {
 			? collectAgentOperationEnvironment(payload, { hookRoot, shell })
 			: {
 					harness: process.env.CLAUDE_PROJECT_DIR?.trim() ? "claude" : "codex",
+					codexDelegation: delegatedCodex ? { owner: null } : null,
 					health: "failed",
 					failure: existsSync(shellParserPath(hookRoot))
 						? "parser"
