@@ -360,7 +360,7 @@ hoverを残したまま編集・文書切替・閉鎖し、旧版のリンクが
 
 対応：#1259。対象・入力：M/V、未定義・quoted/flow/alias/同名field、値・コメント・CRLF・補助平面文字。
 操作：Quick Fix、直接移動、各選択方式のsort、拒否、Undo/Redo、保存後他hostでOpenを行う。
-Mは未定義ID上のQuick Fixまたは右クリック／F1の`Insert PFDSL definition`を使い、新しいlabel値の選択と、produced artifactでcriteria案内が残ることを確認する。
+Mは未定義ID上のQuick Fixまたは右クリック／F1の`Insert PFDSL definition`を使い、挿入した`label: ""`の空の引用符の内側にcursorが置かれることと、produced artifactでcriteria案内が残ることを確認する。
 `Sort metadata…`でPrimary keyとThenを順に選び、topological／group／index／idの単独と`group → id`を実行する。
 重複キー・キーなしは編集せず理由を示し、Cancel／Escapeは本文・dirty・Undoを保ってeditorへfocusを戻す。
 開いた整列フォームはその文書に所属し、他tabに切り替えても他文書を編集しない。
