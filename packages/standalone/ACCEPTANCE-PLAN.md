@@ -180,8 +180,16 @@ fill/status・zoom/panを保ち、reduced-motionではanimationを抑えた静�
 
 対応：#1444。対象・入力：M/V、工程／成果物中心、ID≠label、左右別入力。
 操作：focus→ID/label絞り込み→キー／pointer選択、Escape、候補中幅変更、中心／文書変更を行う。
+パネルをpointerで開いたときはfocusを移さず、node上のEnterでは見出しの最初の操作へ移し、どちらも候補を開かないことを確認する。
+一覧・中心・候補の成果物は四角枠、工程は完全に丸い枠で示し、VoiceOverでID・label・種別・接続方向・操作名が伝わることを確認する。
+通常接続は実線、feedbackは図と同じ灰色の破線で示し、候補のfeedback印をem dash連結で表示しないことを確認する。
+macOSのオーバーレイscrollbarを表示し、一覧・候補・理由・menuの左右余白が内容との重なりを防ぎ、各行と入力＋が一つの外枠にまとまることを確認する。
 `a >> p -> b`のp左側からb、b右側からpを選ぶときは、feedbackと明示された候補を選び、`b >>? p`を作成できることを確認する。
 期待：逆種別だけを指定側へ接続し、成功側だけ空にする。
+選択成功後は入力focusを保ち、更新後の候補一覧を再表示する。
+同じ側で接続済みの候補はinput／feedbackとも非表示とし、反対向きのoutputは除外判定に含めない。
+通常接続が可能なら通常候補、V010で通常接続が不可能でfeedbackが可能な場合だけfeedback候補を表示し、V001等の不可能な候補は表示しない。
+`draft -> doc`だけがあるとき、draftに入る側のdocをfeedback候補として選べることを確認する。
 Escape後も入力を残し、同対象の幅変更で値を保つ。
 中心／文書変更は両値・古い候補をclearし、候補は入力／＋を覆わない。
 Enter確定だけで新規作成しない。
@@ -199,7 +207,7 @@ API差分：`addConnector`に`create: true`を追加し、共有`applyPreviewEdi
 ### GUI-14：拒否と古い対象への非適用
 
 対応：#1444、統合済み#1432。対象・入力：M/V、空／既存／不正ID、重複edge、種別違い、別producer、無関係な既存V001、一時的入出力不足。
-操作：不正候補／＋、候補中source・種別・中心・tab変更／閉鎖後の旧要求確定を試す。非同期結果の再現は実装PRで具体化する。
+操作：不正候補の非表示と＋の拒否理由、候補中source・種別・中心・tab変更／閉鎖後の旧要求確定を試す。非同期結果の再現は実装PRで具体化する。
 自動再現：`connections-panel.test.ts`で旧候補を保持してsource更新後に確定し、共有のsource一致検査で拒否する。ホスト拒否・無関係な応答・閉鎖後の遅着応答も同じテストで操作する。`connector-producer.test.mjs`は描画を更新しないままMonacoの現在sourceを変更してから＋を確定し、host側で再拒否する。実hostの非同期時機を観測できなければ、その実機変種は未実施とする。
 期待：理由付き拒否でsource・dirty・Undo・入力を保ち、単一producerは共通判定を使う。
 無関係な既存エラーや一時的不足を一括遮断せず、stale要求・描画・dispose後の結果を別文書／次対象へ適用しない。
@@ -210,9 +218,11 @@ API差分：`addConnector`に`create: true`を追加し、共有`applyPreviewEdi
 ### GUI-15：edge削除とfeedback切替
 
 対応：#1444。対象・入力：M/V、p中心の左input/右output、b中心の左output/右input、同endpointのprimary/feedback。
-操作：line右clickでDelete、input↔feedback、outputの切替、通常inputへ戻せない条件を試す。
+操作：lineのclick／右clickでその位置のmenuを開き、Delete、input↔feedback、outputの項目、通常inputへ戻せない条件を試す。
+画面端でmenuがはみ出さず、Arrow／Home／EndとEnter／Spaceで選択でき、Escapeで起点lineへ戻り、menu外clickで閉じることを確認する。
 期待：選んだedgeだけ削除しnodeを消さない。
-成果物→工程の向きを保持しoutputの切替は理由付き無効、方向反転を起こさない。
+成果物→工程の向きを保持し、outputのmenuはDeleteだけで、方向反転を起こさない。
+切替後は同じ接続のbutton、削除後は同じ側の次の行（末尾なら前の行、行が無ければ同じ側の入力欄）へ戻し、候補は開かない。
 左右列だけで判断せず共有適用条件で検証する。
 状態：M/V各未実施。記録：未記入。現APIにない編集要求は#1444。
 API差分：`deleteConnector`／`toggleFeedback`は`nodeId/source/artifact/process/kind`を渡す。共有計算がsemantic edgeの全authored occurrenceを対象に、該当する集合／chain文だけを再構成し、文外・内部コメントと端点のkindを保つ。最後のedgeを消してkindが失われる端点はCST経由の最小定義を保持する。切替先重複、outputのfeedback化、新しいprimary cycleを拒否し、無関係な既存V001/V010は一括拒否しない。
@@ -223,6 +233,7 @@ API差分：`deleteConnector`／`toggleFeedback`は`nodeId/source/artifact/proce
 操作：各編集のUndo/Redo、panel開閉、連続移動、候補中resize、tab切替／閉鎖を交互に行う。
 期待：source/図/左右一覧が同期し、Aの結果をBの本文・dirty・Undo・選択へ漏らさない。
 古いmenu/cue/候補/timerを残さずmount/revision/dispose境界を維持する。
+中心・文書切替と幅変更ではmenuを閉じ、再描画で操作要素が置換された場合も同じ側の近くにfocusを戻す。
 状態：M/V各未実施。記録：未記入。
 
 ### GUI-17：Fit・Actual size・倍率・案内

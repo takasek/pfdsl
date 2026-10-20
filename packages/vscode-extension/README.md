@@ -42,6 +42,14 @@ The Quick Fix keeps that diagnostic until you supply a criterion, and the insert
 
 Click anywhere inside a preview node, or focus it with Tab and press Enter, to open **Connections**.
 Right-click remains available; dragging pans without opening the panel, and Cmd/Ctrl+click opens a location or subflow without opening Connections.
+Artifacts have square outlines and processes have rounded outlines; feedback connections use dashed gray lines.
+Opening Connections with the pointer preserves focus; Enter on a node focuses the first heading action without opening candidates.
+Focus or click **Connect a node…** to browse available candidates; use arrow keys and Enter to select one.
+Unavailable and already connected candidates are hidden; feedback candidates appear when a normal input would create a cycle.
+Adding a candidate keeps input focus and reopens the refreshed list.
+Click or right-click a connection line for a menu beside it; use arrow keys to choose an action and Escape to return to the line.
+Output connections offer **Delete** only; input connections also offer **Make feedback** or **Remove feedback**.
+Deleting or switching a connection returns focus nearby on the same side without opening candidates.
 The bottom panel shows direct incoming neighbors on the left, the current node in the center, and outgoing neighbors on the right.
 Each neighbor list scrolls independently; the center and connection inputs remain visible.
 For an undefined node, **Create definition** inserts its frontmatter entry and selects the label in the editor.
