@@ -22,10 +22,39 @@ If the previous identity or completion is unknown, keep it unknown: inspect the 
 Do not infer a previous release or record the target merely to silence a notice.
 Record the target only after all potentially applicable steps have been resolved and their checks pass; report unresolved decisions until then.
 
-## Unreleased — after CLI/plugin v0.1.0
+## CLI/plugin v0.2.0 — after CLI/plugin v0.1.0
 
 This section covers the changes after CLI/plugin v0.1.0 that need action in an adopting repository.
-The destination release is assigned during release preparation; do not infer it.
+CLI/plugin v0.2.0 is the release target; use its published tag and package once available, rather than upstream main or a preparation branch.
+This interval includes specification versions v0.0.27 and v0.0.28; specification and package versions are separate.
+
+A dependency range such as `^0.1.0` does not admit v0.2.0.
+If the repository declares `@pfdsl/cli` in `package.json`, update its declared range and lockfile through the repository's package manager, then verify the resolved CLI reports `0.2.0` before running the migration checks.
+
+### Ready counts replace recommendations
+
+`status ready --best` and the `best` JSON field have been removed.
+Replace executable calls and active instructions with `pfdsl status ready <roadmap.pfdsl> --json` and choose from the returned `ready` items using the project's goals, deadlines and effort.
+Each item now includes `newlyReadyCount`: the additional processes that would become ready if all of that process's outputs became done, excluding currently ready processes.
+Counts are not priorities, and zero does not mean a process is unnecessary.
+Text output includes counts by default; `--no-counts` hides them in text but JSON still includes them.
+Update consumers that require the former recommendation field or parse the text layout, then exercise them with the target CLI; retain historical commands in dated records.
+Source: commit `e71e70f3`.
+
+### Conflicting normal and feedback inputs
+
+Specification v0.0.28 rejects a normal input (`a >> p`) and a feedback input (`a >>? p`) for the same artifact/process pair with V036, including in ordinary `check` mode.
+For each reported pair, choose the intended relationship and remove the other edge, preserving unrelated connections.
+Run `pfdsl check <file>` and the repository's strict checks afterwards; do not suppress the error or replace every feedback edge globally.
+Source: [Issue #1467](https://github.com/takasek/pfdsl/issues/1467).
+
+### Explicit labels when creating definitions
+
+`meta create` no longer adds an ID-derived `label`; an empty or whitespace-only label is displayed as no explicit label.
+Existing explicit labels are retained.
+If a caller depends on a newly created definition containing a label, pass `label=...` explicitly and check the saved definition and rendered result.
+Otherwise no label migration is needed.
+Source: commits `cd73be2b` and `9558ee56`.
 
 ### GitHub operation availability
 
@@ -37,6 +66,25 @@ The operation API now throws `GitHubUnavailableError` when gh is absent and neit
 An available token still enables the HTTP fallback, and an operation with no HTTP implementation remains an error.
 Refresh deployed audit/helper files together through the normal bundle update path, preserving local edits.
 The upstream repository's check inventory and terminal report revision changes do not add a new adopter CI requirement.
+
+### Sweep workflow authentication
+
+For adopters of the GitHub Issues backend, refresh the deployed workflow and helper files together, preserving local modifications and the existing `sweepCompletedChains.enabled` choice.
+The workflow can now open its PR with a GitHub App installation token.
+If choosing that path, configure the repository variable `REPO_AUTOMATION_APP_CLIENT_ID` and matching secret `REPO_AUTOMATION_APP_PRIVATE_KEY` for an App installed on the repository with Contents and Pull requests write permissions.
+The legacy `PFDSL_SWEEP_APP_CLIENT_ID` / `PFDSL_SWEEP_APP_PRIVATE_KEY` pair remains supported; the shared Client ID takes precedence and must have its own matching key.
+A Client ID without a usable matching key fails rather than silently selecting the other credentials.
+Without either Client ID, the workflow keeps using `GITHUB_TOKEN`; check the PR's actual workflow runs and any approval or repository-permission requirements before treating CI as passed.
+After the next enabled sweep, check its job result, proposed PR and CI results; no deployed file or successful local check proves that the App installation or hosted workflow ran successfully.
+No App configuration is required when the backend is not adopted or the sweep remains disabled.
+Source: commits `ca0e3e9b`, `52dd9ef3`, and `29436a03`.
+
+### Structural diff consumers
+
+`diff` now reports added and removed frontmatter metadata for surviving nodes and quotes edge endpoint IDs using DSL spelling where needed.
+If automation parses edge display strings or relies on a node with newly added metadata being unchanged, update it to the target output and test IDs containing spaces, quotes or arrows.
+Do not use a split on ` -> ` to identify edge endpoints.
+Source: commits `3d123476` and `9685e2b2`.
 
 ### Group and node IDs
 
@@ -112,7 +160,7 @@ The command writes the running plugin's version, and its bundle hash where the p
 Commit that change together with the migration it records.
 It cannot be combined with `--deploy`, `--overwrite-local-edits` or `--delete-edited-orphans` (exit 2), and it writes nothing, exiting with 3 after saying why, when the running plugin's version is unknown (a repo-local copy), when the plugin is older than the recorded state, or when `.pfdsl/config.json` is not valid JSON or does not contain a JSON object.
 A malformed `appliedMigration` does not stop it: the command overwrites that key, and a plain run or `--deploy` keeps failing on such a record until you do.
-You may write the key by hand, in the form `{"appliedMigration": {"pluginVersion": "0.1.0", "bundleHash": "<64 hex digits>"}}`, but the command computes the hash for you.
+You may write the key by hand, in the form `{"appliedMigration": {"pluginVersion": "0.2.0", "bundleHash": "<64 hex digits>"}}` when migrating to v0.2.0, but the command computes the identity of the actual running plugin for you.
 A Codex plugin has no bundle manifest, so its record has no `bundleHash`.
 
 Once recorded, later runs say nothing while the plugin matches the record.

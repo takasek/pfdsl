@@ -82,8 +82,23 @@ test("supervisor denies load failures, synchronous stalls and unsupported respon
 		assert.equal(result.status, 2, body);
 		const response = JSON.parse(result.out).hookSpecificOutput;
 		assert.equal(response.permissionDecision, "deny");
-		assert.match(response.permissionDecisionReason, /human terminal/);
+		assert.match(response.permissionDecisionReason, /read-only/);
+		assert.doesNotMatch(response.permissionDecisionReason, /Repair the hook/);
 		assert.match(response.permissionDecisionReason, reason);
+		if (body === "for (;;) {}") {
+			assert.match(response.permissionDecisionReason, /human terminal/);
+			assert.match(
+				response.permissionDecisionReason,
+				/cause is not established/,
+			);
+		} else
+			assert.doesNotMatch(response.permissionDecisionReason, /human terminal/);
+		assert.match(
+			response.permissionDecisionReason,
+			body === "for (;;) {}"
+				? /time limit/
+				: /cause is not established|policy response/,
+		);
 	}
 });
 
@@ -91,8 +106,15 @@ test("supervisor validates hook payloads while accepting the native apply_patch 
 	for (const input of [
 		"{bad",
 		JSON.stringify({ tool_name: "Bash", tool_input: {} }),
-	])
-		assert.equal(supervised("", { input }).status, 2);
+	]) {
+		const result = supervised("", { input });
+		assert.equal(result.status, 2);
+		const response = JSON.parse(result.out).hookSpecificOutput;
+		assert.equal(response.permissionDecision, "deny");
+		assert.match(response.permissionDecisionReason, /Hook input|hook input/);
+		assert.match(response.permissionDecisionReason, /caller|payload/);
+		assert.doesNotMatch(response.permissionDecisionReason, /human terminal/);
+	}
 	for (const tool_input of [
 		"*** Begin Patch\n*** End Patch",
 		{ command: "*** Begin Patch\n*** End Patch" },

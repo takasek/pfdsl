@@ -94,6 +94,14 @@ agent が手動で追加した worktree は other-unowned であり、変更を�
 
 対象の列は checkout を実行先に持つ操作（Git、file）に適用する。`gh` と MCP の操作は checkout を持たないので、own の列で判定する。
 
+primary の準備更新だけは W の例外として親 agent に許可する。
+入口は `git -C <absolute-primary> pull --ff-only --no-autostash origin <default>` に限定し、追加の option・global config・refspec は受け付けない。
+hook が primary の default branch、`origin/<default>` の upstream、未コミット変更なし、HEAD が `origin/<default>` の祖先であることを観測できた場合だけ許可する。
+観測失敗・detached HEAD・別 branch・ローカル固有 commit・別 upstream は許可しない。
+Git 自身も `--ff-only` で非 fast-forward を拒否し、`--no-autostash` で手元の変更の自動退避を禁止する。
+事前観測と実行の間の状態変更を排他する機構ではない。
+通常の primary 書込み・commit・他 worktree の変更・子 agent の Git 書込みの保護は維持する。
+
 クラスの決め方と合成:
 
 - 実行されない形（`--help`、`--version`、`gh help`）は、実行される操作より先に R と判定する。
