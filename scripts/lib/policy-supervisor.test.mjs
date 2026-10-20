@@ -83,11 +83,16 @@ test("supervisor denies load failures, synchronous stalls and unsupported respon
 		const response = JSON.parse(result.out).hookSpecificOutput;
 		assert.equal(response.permissionDecision, "deny");
 		assert.match(response.permissionDecisionReason, /read-only/);
-		assert.doesNotMatch(
-			response.permissionDecisionReason,
-			/human terminal|Repair the hook/,
-		);
+		assert.doesNotMatch(response.permissionDecisionReason, /Repair the hook/);
 		assert.match(response.permissionDecisionReason, reason);
+		if (body === "for (;;) {}") {
+			assert.match(response.permissionDecisionReason, /human terminal/);
+			assert.match(
+				response.permissionDecisionReason,
+				/cause is not established/,
+			);
+		} else
+			assert.doesNotMatch(response.permissionDecisionReason, /human terminal/);
 		assert.match(
 			response.permissionDecisionReason,
 			body === "for (;;) {}"

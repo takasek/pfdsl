@@ -11,19 +11,18 @@ const delegatedCodex =
 function failed(detail, phase) {
 	const diagnostic = String(detail).slice(0, 400);
 	let guidance;
-	if (detail === "bootstrap input deadline exceeded")
+	if (phase === "input")
 		guidance =
-			"Hook input was not received within the time limit. Inspect the caller's input delivery using read-only diagnostics before choosing a recovery.";
-	else if (detail === "bootstrap policy loading deadline exceeded")
-		guidance =
-			"Policy components did not finish loading within the time limit. Investigate module loading using read-only diagnostics before choosing a recovery.";
-	else if (phase === "input")
-		guidance =
-			"Hook input could not be read or validated. Inspect the caller's payload and input delivery, then correct the identified input problem.";
-	else if (phase === "policy-load")
-		guidance =
-			"Policy components could not be loaded. Ask a human to inspect the reported module or dependency using read-only diagnostics and correct the identified loading problem in a human terminal; the guarded tools cannot repair it.";
-	else if (detail === "Git policy probe budget exhausted")
+			detail === "bootstrap input deadline exceeded"
+				? "Hook input was not received within the time limit. Inspect the caller's input delivery using read-only diagnostics before choosing a recovery."
+				: "Hook input could not be read or validated. Inspect the caller's payload and input delivery, then correct the identified input problem.";
+	else if (phase === "policy-load") {
+		const cause =
+			detail === "bootstrap policy loading deadline exceeded"
+				? "Policy components did not finish loading within the time limit."
+				: "Policy components could not be loaded.";
+		guidance = `${cause} Ask a human to investigate the reported module or dependency using read-only diagnostics in a human terminal and decide how to recover; the guarded tools cannot repair it.`;
+	} else if (detail === "Git policy probe budget exhausted")
 		guidance =
 			"Git safety checks did not finish within their time budget. Investigate the cause using read-only diagnostics before choosing a recovery.";
 	else

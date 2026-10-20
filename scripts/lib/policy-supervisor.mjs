@@ -17,7 +17,7 @@ export async function supervisePolicy(
 			category === "input"
 				? "Hook input could not be read or validated. Inspect the caller's payload and input delivery, then correct the identified input problem."
 				: category === "deadline"
-					? "Safety verification did not finish within the time limit. Investigate the cause using read-only diagnostics before choosing a recovery."
+					? "Safety verification did not finish within the time limit; the underlying cause is not established. Ask a human to investigate the timeout using read-only diagnostics in a human terminal before choosing a recovery."
 					: category === "response"
 						? "Inspect the policy response and the reported failure using read-only diagnostics before choosing a recovery."
 						: "The underlying cause is not established. Investigate the reported failure using read-only diagnostics before choosing a recovery.";

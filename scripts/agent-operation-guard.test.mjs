@@ -513,7 +513,7 @@ test("entry integration: probe failures deny with bounded evidence and read-only
 	}
 });
 
-test("entry integration: a policy-load deadline does not blame already received input", () => {
+test("entry integration: a policy-load deadline returns recovery to a human without blaming received input", () => {
 	const f = fixture();
 	try {
 		writeFileSync(
@@ -528,9 +528,34 @@ test("entry integration: a policy-load deadline does not blame already received 
 			/Policy components did not finish loading within the time limit/,
 		);
 		assert.match(result.reason, /read-only/);
+		assert.match(result.reason, /human terminal/);
+		assert.match(result.reason, /guarded tools cannot repair/);
 		assert.doesNotMatch(
 			result.reason,
-			/input was not received|caller|human terminal/,
+			/input was not received|caller|could not be loaded/,
+		);
+	} finally {
+		f.cleanup();
+	}
+});
+
+test("entry integration: a stalled worker helper returns unknown deadline recovery to a human", () => {
+	const f = fixture();
+	try {
+		writeFileSync(
+			join(f.own, "scripts/lib/hook-io.mjs"),
+			"await new Promise(() => {});\n",
+		);
+		const result = f.invoke({ command: "git status" });
+		assert.equal(result.status, 2);
+		assert.equal(result.decision, "deny");
+		assert.match(result.reason, /time limit/);
+		assert.match(result.reason, /cause is not established/);
+		assert.match(result.reason, /human terminal/);
+		assert.match(result.reason, /read-only/);
+		assert.doesNotMatch(
+			result.reason,
+			/Policy components could not be loaded|input was not received|Repair the hook/,
 		);
 	} finally {
 		f.cleanup();
