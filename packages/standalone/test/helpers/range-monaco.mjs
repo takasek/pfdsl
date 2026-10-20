@@ -58,17 +58,30 @@ export const editor = {
 			callbacks,
 			actions: [],
 			edits: [],
+			cursorEvents: [],
 			undoStops: 0,
 			focusCalls: 0,
+			emitCursorChange(source, position = this.position, reason = 3) {
+				const event = {
+					position: position ?? { lineNumber: 1, column: 1 },
+					source,
+					reason,
+				};
+				this.cursorEvents.push(event);
+				callbacks.onDidChangeCursorPosition?.(event);
+			},
 			focus() {
 				this.focusCalls++;
 			},
 			setPosition(position) {
 				this.position = position;
-				callbacks.onDidChangeCursorPosition?.({
-					position,
-					source: "api",
-					reason: 3,
+				this.emitCursorChange("api", position);
+			},
+			setSelection(selection) {
+				this.selection = selection;
+				this.setPosition({
+					lineNumber: selection.positionLineNumber,
+					column: selection.positionColumn,
 				});
 			},
 			revealPositionInCenter(position) {
@@ -109,6 +122,7 @@ export const editor = {
 					model.source.slice(0, start) + text + model.source.slice(end);
 				if (selections) this.selection = selections[0];
 				callbacks.onDidChangeModelContent?.();
+				this.emitCursorChange(origin);
 			},
 		};
 		for (const event of [

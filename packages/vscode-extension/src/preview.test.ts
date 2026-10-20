@@ -335,22 +335,20 @@ it("focuses a selected semantic definition key and ignores an identically named 
 	expect(panel.messages.at(-1)).toEqual({ type: "clearFocus" });
 });
 
-it("synchronizes user node selections and ignores command and edit selection events", async () => {
+it("synchronizes node selections regardless of kind and clears focus for an empty selection", async () => {
 	const { open } = setup();
 	const doc = document("cursor-focus");
 	const panel = await open(doc);
 	panel.receive({ type: "ready" });
-	for (const kind of [1, 2]) {
+	for (const kind of [1, 2, 3, null]) {
+		const count = panel.messages.length;
 		host.changeSelection(doc, 0, 6, 5, kind);
+		expect(panel.messages).toHaveLength(count + 1);
 		expect(panel.messages.at(-1)).toEqual({ type: "focus", nodeId: "p" });
 	}
 	// A plain caret move keeps the existing VS Code behavior: it clears the focus.
-	host.changeSelection(doc, 0, 5, 5, 2);
+	host.changeSelection(doc, 0, 5, 5, 3);
 	expect(panel.messages.at(-1)).toEqual({ type: "clearFocus" });
-	const count = panel.messages.length;
-	host.changeSelection(doc, 0, 6, 5, 3);
-	host.changeSelection(doc, 0, 6, 5, null);
-	expect(panel.messages).toHaveLength(count);
 });
 
 it.each([

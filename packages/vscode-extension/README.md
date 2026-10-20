@@ -48,7 +48,7 @@ Focus or click **Connect a node…** to browse available candidates; use arrow k
 Unavailable and already connected candidates are hidden; feedback candidates appear when a normal input would create a cycle.
 Adding a candidate keeps input focus and reopens the refreshed list.
 Click or right-click a connection line for a menu beside it; use arrow keys to choose an action and Escape to return to the line.
-Output connections offer **Delete** only; input connections also offer **Make feedback** or **Remove feedback**.
+Output connections offer **Delete** only; input connections offer **Make feedback** or **Remove feedback** when the switch is valid.
 Deleting or switching a connection returns focus nearby on the same side without opening candidates.
 The bottom panel shows direct incoming neighbors on the left, the current node in the center, and outgoing neighbors on the right.
 Each neighbor list scrolls independently; the center and connection inputs remain visible.
@@ -62,7 +62,7 @@ Each edit is one Undo step; a menu from an older document revision refuses to ap
 
 Hover over a node to read its text information; long information can be scrolled or focused with the keyboard.
 Click a neighbor in **Connections** to center it in the main preview, update the panel and move the editor cursor while keeping focus in Connections.
-Selecting a node ID in the editor, for example by double-clicking it, updates the diagram and any open Connections panel without leaving the editor; it does not open a closed panel.
+Selecting a node ID in the editor, by double-clicking it or through a command such as Go to definition, updates the diagram and any open Connections panel without leaving the editor; it does not open a closed panel.
 Preview edits preserve the panel's current node even when applying an edit moves the editor cursor.
 This navigation and editor selections briefly outline the destination; redraws preserve position without repeating the cue.
 Press Escape to close the hover or Connections; Escape in a candidate list closes only the candidates and retains the input.

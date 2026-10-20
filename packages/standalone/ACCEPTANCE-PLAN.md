@@ -164,7 +164,7 @@ Tab→Enterと右clickでも開き、node上からのpan、移動後に起点へ
 ### GUI-11：近隣移動と一時強調
 
 対応：#1284/旧#1285/#1444。対象・入力：M/V、大きい図、p/a/r、reduced-motion通常／有効。
-操作：Connectionsでp→a→rと連続移動し、editorのkeyboard／mouseによる操作（Mはcursor移動、VはnodeのIDの選択）、図のclick／double clickも使う。
+操作：Connectionsでp→a→rと連続移動し、editor操作（Mはkeyboard／mouseとGo to definition・検索結果などのAPI移動、Vはnode IDの選択）、図のclick／double clickも使う。
 定義ありのGo to definitionと定義なしのCreate definitionを使い、本文編集の再描画、pan/zoom、tab切替とpanel再開を行う。
 Connectionsから追加・削除・feedback切替・定義作成を適用し、editorのcursorが動いても中心が変わらないことを確認する。
 期待：全体図を保って対象へ移動し、editor・図・Connectionsが同じnodeを指す。
@@ -222,8 +222,8 @@ API差分：`addConnector`の`create: true`は新IDの検査に使い、共有`a
 ### GUI-15：edge削除とfeedback切替
 
 対応：#1444。対象・入力：M/V、p中心の左input/右output、b中心の左output/右input、同endpointのprimary/feedback。
-操作：lineのclick／右clickでその位置のmenuを開き、Delete、input↔feedback、outputの項目、通常inputへ戻せない条件を試す。
-画面端でmenuがはみ出さず、Arrow／Home／EndとEnter／Spaceで選択でき、Escapeで起点lineへ戻り、menu外clickで閉じることを確認する。
+操作：lineのclick／右clickでその位置のmenuを開き、Delete、切替可能なinput↔feedback、outputの項目を試す。共有計算が切替を拒否する条件（通常inputへ戻すとV010になる、または切替先が既にある）では、切替項目と理由を表示せずDeleteだけが残ることを確認する。
+画面端でmenuがはみ出さず、項目が1つだけの場合もArrow／Home／Endでその項目へfocusでき、Enter／Spaceで選択できることを確認する。Escapeで起点lineへ戻り、menu外clickで閉じることを確認する。
 期待：選んだedgeだけ削除しnodeを消さない。
 最後の接続が無くなる未定義nodeは、labelの無い空のmapping定義で種別を保持する。
 成果物→工程の向きを保持し、outputのmenuはDeleteだけで、方向反転を起こさない。
