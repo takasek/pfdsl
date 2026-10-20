@@ -1,6 +1,6 @@
 import type { Frontmatter, Graph, NodeKind } from "@pfdsl/core";
 import { compareIds, diffGraphsDetailed, resolveMeta } from "@pfdsl/core";
-import { isDisplayableLabel, wrapLabel } from "./label.js";
+import { displayNodeLabel, isDisplayableLabel, wrapLabel } from "./label.js";
 import {
 	calcMinWidth,
 	DEFAULT_FEEDBACK_COLOR,
@@ -244,10 +244,7 @@ export function exportDiffDot(
 
 		const fm = removed.has(id) ? fmA : fmB;
 		const meta = resolveMeta(fm, kind, id);
-		const rawNodeLabel = meta?.label;
-		const nodeLabel = isDisplayableLabel(rawNodeLabel)
-			? rawNodeLabel
-			: undefined;
+		const nodeLabel = displayNodeLabel(id, meta?.label);
 		const wrappedLabel =
 			nodeLabel !== undefined && maxWidth !== undefined
 				? wrapLabel(nodeLabel, maxWidth)
