@@ -33,8 +33,37 @@ test("standalone syncs non-preview cursor changes and ignores preview-edit recen
 			const node = (id) =>
 				tab.container.querySelector(`#inner [data-node-id="${id}"]`);
 			assert.ok(node("p"));
+			root.dispatchEvent(
+				new window.MouseEvent("mousedown", {
+					bubbles: true,
+					clientX: 10,
+					clientY: 10,
+				}),
+			);
+			window.dispatchEvent(
+				new window.MouseEvent("mousemove", {
+					buttons: 1,
+					clientX: 90,
+					clientY: 60,
+				}),
+			);
+			window.dispatchEvent(new window.MouseEvent("mouseup"));
+			const panned = inner.style.transform;
 			node("p").dispatchEvent(
 				new window.MouseEvent("contextmenu", { bubbles: true }),
+			);
+			assert.equal(editor.cursorEvents.at(-1).source, "api");
+			assert.equal(
+				inner.style.transform,
+				panned,
+				"the synchronous Monaco selection echo preserves pan",
+			);
+			const ring = inner.querySelector(".pfdsl-focus-ring");
+			editor.emitCursorChange("api");
+			assert.notEqual(
+				inner.querySelector(".pfdsl-focus-ring"),
+				ring,
+				"a subsequent real API navigation still cues the node",
 			);
 			const title = () =>
 				tab.container.querySelector("#node-actions-title").textContent;
