@@ -54,7 +54,7 @@ Each edit is one Undo step; a menu from an older document revision refuses to ap
 
 Hover over a node to read its text information; long information can be scrolled or focused with the keyboard.
 Click a neighbor in **Connections** to center it in the main preview, update the panel and move the editor cursor while keeping focus in Connections.
-Selecting a node ID in the editor, for example by double-clicking it, updates the diagram and any open Connections panel without leaving the editor; it does not open a closed panel.
+Selecting a node ID in the editor, by double-clicking it or through a command such as Go to definition, updates the diagram and any open Connections panel without leaving the editor; it does not open a closed panel.
 Preview edits preserve the panel's current node even when applying an edit moves the editor cursor.
 This navigation and editor selections briefly outline the destination; redraws preserve position without repeating the cue.
 Press Escape to close the hover or Connections; Escape in a candidate list closes only the candidates and retains the input.

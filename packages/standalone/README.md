@@ -56,7 +56,7 @@ The startup smoke does not certify GUI, IME, or Quit interaction.
 Click anywhere inside a diagram node, or focus it with Tab and press Enter, to open **Connections**; right-click also works.
 Dragging pans without opening Connections, and Cmd/Ctrl+click retains location and subflow navigation.
 Selecting a neighbor updates the diagram, Connections and editor cursor while keeping focus in Connections.
-Moving the editor cursor updates the diagram and an open Connections panel without taking editor focus or opening a closed panel.
+Any editor cursor change, including keyboard, mouse, Go to definition and search navigation, updates the diagram and an open Connections panel without taking editor focus or opening a closed panel.
 Applying a preview edit keeps the panel on its current node.
 Double-click a node or use **Go to definition** in Connections to move to its definition and focus the editor; undefined nodes offer **Create definition** instead.
 Use **Fit** to see the whole diagram or **Actual size** to restore 100%; the zoom display shows the current scale.
