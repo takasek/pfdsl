@@ -168,7 +168,9 @@ export function applyPreviewEdit(
 			!findUndefinedNodeKind(model.nodeKinds, model.frontmatter, request.nodeId)
 		)
 			return fail("This node already has a definition.");
-		const inserted = insertDefinition(source, kind, request.nodeId);
+		const inserted = insertDefinition(source, kind, request.nodeId, {
+			label: "",
+		});
 		if (!inserted.inserted)
 			return fail("The definition could not be inserted safely.");
 		const output = inserted.output + loadFrontmatter(source).body;
@@ -192,27 +194,6 @@ export function applyPreviewEdit(
 		request.otherId,
 	);
 	const inserted = insertConnectorEdge(source, edge, request.nodeId);
-	if (request.create) {
-		const definition = insertDefinition(
-			inserted.text,
-			compatibleOtherKind(kind) as "artifact" | "process",
-			request.otherId,
-		);
-		if (!definition.inserted)
-			return fail("The new node definition could not be inserted safely.");
-		const output = definition.output + loadFrontmatter(inserted.text).body;
-		const target = findDefinitionEditTarget(
-			analyzeSource(output),
-			compatibleOtherKind(kind) as "artifact" | "process",
-			request.otherId,
-		);
-		return {
-			ok: true,
-			source: output,
-			edit: sourceEdit(source, output),
-			selection: target?.labelRange,
-		};
-	}
 	const offset =
 		inserted.text.split("\n").slice(0, inserted.insertedLine).join("\n")
 			.length +

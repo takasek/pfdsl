@@ -3680,7 +3680,8 @@ const HELP_META_CREATE = `${helpUsage("meta create", "<file> <id> [field=value .
 Create a frontmatter definition for one node already present in the body.
 The artifact or process kind is inferred from the authored graph. Existing
 definitions, absent ids, ambiguous kinds and unreadable frontmatter are
-refused. The default label is the id; label=value replaces that initial label.
+refused. No label is added unless label=value is supplied.
+Without initial fields, the definition is an empty mapping.
 The id argument is one semantic ID, not a DSL-quoted ID list. Use shell
 quoting to pass spaces as one argument, for example 'my process'. Do not
 include the DSL's surrounding double quotes. Literal quotes and commas

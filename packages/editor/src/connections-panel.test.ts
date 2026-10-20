@@ -556,7 +556,7 @@ it.each([
 	expect(panel.contains(document.activeElement)).toBe(true);
 });
 
-it("disables creation when a parsed metadata alias cannot retain the new definition", async () => {
+it("allows a new connection without extending an aliased metadata section", async () => {
 	const s = await setup(
 		"---\nshared: &empty {}\nartifact: *empty\n---\na >> p -> b\n",
 	);
@@ -568,8 +568,15 @@ it("disables creation when a parsed metadata alias cannot retain the new definit
 	const create = s.container.querySelector<HTMLButtonElement>(
 		'[data-side="right"] [data-create]',
 	)!;
-	expect(create.disabled).toBe(true);
-	expect(create.title).toContain("definition could not be inserted safely");
+	expect(create.disabled).toBe(false);
+	create.click();
+	expect(s.postMessage).toHaveBeenLastCalledWith(
+		expect.objectContaining({
+			type: "addConnector",
+			otherId: "fresh",
+			create: true,
+		}),
+	);
 });
 
 function expectPanelFocus(container: HTMLElement) {

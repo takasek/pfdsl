@@ -229,7 +229,7 @@ describe("definition Quick Fix", () => {
 		expect(replacement.range.start).toEqual(new host.api.Position(0, 0));
 		expect(replacement.range.end).toEqual(new host.api.Position(4, 0));
 		expect(replacement.text).toBe(
-			insertDefinition(source, "artifact", "out").output,
+			insertDefinition(source, "artifact", "out", { label: "" }).output,
 		);
 		expect(replacement.text).toContain("# retained");
 		expect(replacement.text).not.toContain("criteria:");
@@ -239,7 +239,7 @@ describe("definition Quick Fix", () => {
 		expect(
 			document.getText().endsWith("input >> build -> out # body remains\n"),
 		).toBe(true);
-		expect(selectedText(host.visibleTextEditors[0]!)).toBe("out");
+		expect(selectedText(host.visibleTextEditors[0]!)).toBe("");
 		expect(action.edit!.replacements).toHaveLength(1);
 	});
 
@@ -252,7 +252,18 @@ describe("definition Quick Fix", () => {
 		document.apply(action.edit!);
 		await followUp(action);
 		const target = host.visibleTextEditors[0]!;
-		expect(selectedText(target)).toBe(id);
+		expect(selectedText(target)).toBe("");
+		const caret = target.selection!.start;
+		expect(
+			document
+				.getText()
+				.split("\n")
+				[caret.line]!.slice(caret.character - 1, caret.character + 1),
+		).toBe('""');
+		expect(host.api.window.showTextDocument).toHaveBeenCalledWith(
+			document,
+			expect.objectContaining({ preserveFocus: false }),
+		);
 		expect(target.revealRange).toHaveBeenCalledWith(target.selection);
 		const hint = host.api.window.showInformationMessage.mock.calls[0]![0];
 		expect(hint).toContain(`Edit the label for ${kind} "${id}"`);

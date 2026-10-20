@@ -43,9 +43,10 @@ it.each([
 	expect(result.needsCriteria).toBe(true);
 	expect(result.selection).toBeDefined();
 	const selection = result.selection!;
-	expect(edited.slice(selection.start.offset, selection.end.offset)).toContain(
-		id,
-	);
+	expect(selection.start).toEqual(selection.end);
+	expect(
+		edited.slice(selection.start.offset - 1, selection.end.offset + 1),
+	).toBe('""');
 	const ranges = findNodeOccurrenceRanges(model, edited, id);
 	expect(ranges).toHaveLength(3);
 	expect(ranges[0]).toEqual(findFrontmatterDefinitionRange(model, id));

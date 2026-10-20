@@ -143,8 +143,11 @@ export function nodeAttrs(
 	const maxWidth =
 		typeof fm?.layout?.maxWidth === "number" ? fm.layout.maxWidth : undefined;
 	const wrappedNodeLabel =
-		nodeLabel && maxWidth ? wrapLabel(nodeLabel, maxWidth) : nodeLabel;
-	const label = wrappedNodeLabel ? `${id}\n${wrappedNodeLabel}` : id;
+		nodeLabel && nodeLabel !== id && maxWidth
+			? wrapLabel(nodeLabel, maxWidth)
+			: nodeLabel;
+	const label =
+		wrappedNodeLabel && nodeLabel !== id ? `${id}\n${wrappedNodeLabel}` : id;
 
 	const wrappingOccurred = wrappedNodeLabel !== nodeLabel;
 	const originalLabel = nodeLabel ?? id;

@@ -83,6 +83,23 @@ test("standalone synchronizes user selection and preview navigation without edit
 			assert.equal(editor.focusCalls, focusCalls + 1);
 			assert.deepEqual(editor.position, { lineNumber: 3, column: 3 });
 			assert.match(title(), /A/);
+			node("p").dispatchEvent(
+				new window.MouseEvent("contextmenu", { bubbles: true }),
+			);
+			tab.container.querySelector("#create-definition").click();
+			assert.match(editor.getValue(), /label: ""/);
+			assert.equal(editor.focusCalls, focusCalls + 2);
+			assert.equal(editor.model.getValueInRange(editor.selection), "");
+			const line = editor.getValue().split("\n")[
+				editor.selection.startLineNumber - 1
+			];
+			assert.equal(
+				line.slice(
+					editor.selection.startColumn - 2,
+					editor.selection.startColumn,
+				),
+				'""',
+			);
 		},
 	);
 });

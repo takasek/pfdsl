@@ -76,7 +76,9 @@ export function registerDefInsertion(context: vscode.ExtensionContext): void {
 			const kind = findUndefinedNodeKind(nodeKinds, frontmatter, id);
 			if (!kind) return;
 
-			const { inserted, output } = insertDefinition(source, kind, id);
+			const { inserted, output } = insertDefinition(source, kind, id, {
+				label: "",
+			});
 			if (!inserted) return;
 
 			const action = new vscode.CodeAction(
