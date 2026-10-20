@@ -84,7 +84,7 @@ test("each inherited Git target variable makes mutations unresolved without weak
 	}
 });
 
-function fixture({ nativeLock = true } = {}) {
+function fixture({ nativeLock = true, extraLocks = {} } = {}) {
 	const root = mkdtempSync(
 		fileURLToPath(new URL("../../node_modules/pfdsl-facts-", import.meta.url)),
 	);
@@ -101,11 +101,16 @@ function fixture({ nativeLock = true } = {}) {
 	symlinkSync(join(roots.primary, "a"), join(roots.own, "file-link"));
 	const commonDir = join(roots.primary, ".git");
 	const start = "Mon Oct 12 00:00:00 2026";
+	const locks = {
+		live: 456,
+		...(nativeLock ? { native: 123 } : {}),
+		...extraLocks,
+	};
 	const listing = Object.entries(roots)
 		.filter(([name]) => name !== "foreign")
 		.map(
 			([name, path]) =>
-				`worktree ${path}\0branch refs/heads/${name === "primary" ? "main" : `feat/${name}`}\0${name === "live" || (name === "native" && nativeLock) ? `locked claude session ${name} (pid ${name === "live" ? 456 : 123} start ${start})\0` : ""}\0`,
+				`worktree ${path}\0branch refs/heads/${name === "primary" ? "main" : `feat/${name}`}\0${locks[name] ? `locked claude session ${name} (pid ${locks[name]} start ${start})\0` : ""}\0`,
 		)
 		.join("");
 	const seen = [];
@@ -337,7 +342,12 @@ test("patch deletion observes its own directory entry rather than the symlink's 
 function delegatedFacts(
 	f,
 	payload,
-	{ connected = true, ownerPid = 123, start = "Mon Oct 12 00:00:00 2026" } = {},
+	{
+		connected = true,
+		ownerPid = 123,
+		start = "Mon Oct 12 00:00:00 2026",
+		ownerStart = start,
+	} = {},
 ) {
 	return collectAgentOperationEnvironment(payload, {
 		hookRoot: f.root,
@@ -352,7 +362,7 @@ function delegatedFacts(
 			const rows = {
 				10: "10 20 Mon Oct 12 00:00:01 2026 /Applications/codex",
 				20: `20 ${ownerPid} Mon Oct 12 00:00:01 2026 /bin/zsh`,
-				[ownerPid]: `${ownerPid} 1 ${start} /Applications/Claude Code/claude`,
+				[ownerPid]: `${ownerPid} 1 ${ownerStart} /Applications/Claude Code/claude`,
 			};
 			return { ok: connected, out: rows[args.at(-1)] ?? "" };
 		},
@@ -478,6 +488,37 @@ test("missing chain, wrong owner, PID reuse and missing lock deny file writes wi
 				evaluateAgentOperationPolicy(payload, facts).decision,
 				"deny",
 			);
+		} finally {
+			f.cleanup();
+		}
+	}
+});
+
+test("a live owner lock is not enough: the chain's Claude start and the session worktree must match", () => {
+	for (const [fixtureOptions, options, expected] of [
+		// The lock PID was reused between the lock and chain observations.
+		[{}, { ownerStart: "Mon Oct 12 01:00:00 2026" }, { native: "deny" }],
+		// The delegating Claude also owns a worktree outside this session.
+		[{ extraLocks: { own: 123 } }, {}, { native: "allow", own: "deny" }],
+	]) {
+		const f = fixture(fixtureOptions);
+		try {
+			for (const [target, decision] of Object.entries(expected)) {
+				const payload = {
+					tool_name: "Write",
+					cwd: f.roots.native,
+					session_id: "session",
+					tool_input: { file_path: `${f.roots[target]}/a`, content: "x" },
+				};
+				assert.equal(
+					evaluateAgentOperationPolicy(
+						payload,
+						delegatedFacts(f, payload, options),
+					).decision,
+					decision,
+					target,
+				);
+			}
 		} finally {
 			f.cleanup();
 		}
