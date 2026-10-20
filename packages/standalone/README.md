@@ -289,7 +289,8 @@ The native host holds a directory capability for each folder explicitly selected
 Reads stay bound to that directory when its pathname is replaced; relative traversal and symlink escape are rejected.
 
 Choose **File > New**, **File > Open…**, or **File > Recent** to work with documents.
-The document header shows its current state; expand **Document location** to inspect the full path.
+Document names appear in tabs and the window title, while the header shows the current state and location.
+The location stays on one line and truncates long paths with an ellipsis; its title contains the full path, and the text remains selectable and copyable.
 Same-name tabs include their parent folders, and completed save messages name the document they belong to.
 **Save** (Command-S) and **Save As…** (Command-Shift-S) are manual operations; there is no autosave or session restoration.
 The recent list stores targets only, never editor content.

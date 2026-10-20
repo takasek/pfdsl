@@ -8,6 +8,7 @@ import {
 	nodeIdAtSourcePosition,
 	type PreviewEditMessage,
 	positionOfNodeId,
+	repairResultMessage,
 } from "@pfdsl/editor";
 import * as vscode from "vscode";
 import {
@@ -172,6 +173,10 @@ async function editFromPreview(
 		return;
 	}
 	reply(true);
+	if (request.repair && request.type === "deleteConnector")
+		vscode.window.showInformationMessage(
+			repairResultMessage(request, snapshot.source, result.source),
+		);
 	if (result.selection) {
 		const { start, end } = result.selection;
 		const range = new vscode.Range(

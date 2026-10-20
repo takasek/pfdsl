@@ -24,9 +24,9 @@ export function createDocumentTab(options){
  const normalize=(text)=>globalThis.reviewNormalize?globalThis.reviewNormalize(text):text;
  let source=normalize(options.source),revision=0;
  const hook=(...args)=>globalThis.reviewTabHook?.(...args);
- const container=document.createElement('div'),button=document.createElement('button');
+ const container=document.createElement('div'),button=document.createElement('button');button.setAttribute('role','tab');button.setAttribute('aria-selected','false');
  options.parent.append(container);button.textContent=options.name;
- const tab={container,button,location:options.path,read:options.read,references:options.referenceServices,setSourceCalls:0,
+ const tab={key:options.key,container,button,location:options.path,read:options.read,references:options.referenceServices,setSourceCalls:0,
   activate(){},focus(){},command(){},canDiagram(){return true;},canCreateDefinition(){return false;},
   dispose(){container.remove();button.remove();hook('dispose',tab);},
   getSource:()=>source,getRevision:()=>revision,
