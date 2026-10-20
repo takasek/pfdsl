@@ -381,7 +381,12 @@ export async function createHarness(label) {
 					// Choosing a file starts from no acknowledged content.
 					approve(chosen.id, undefined, "chosen");
 				}
-				log.push({ kind: "choose", id: chosen?.id, seq: tick() });
+				log.push({
+					kind: "choose",
+					id: chosen?.id,
+					name: args.name,
+					seq: tick(),
+				});
 				return chosen;
 			}
 			if (command === "inspect_document") {

@@ -115,6 +115,7 @@ export function createDocumentTab({
 	const button = document.createElement("button");
 	button.textContent = name;
 	button.setAttribute("role", "tab");
+	button.setAttribute("aria-selected", "false");
 	const preview = mountPreview(previewElement, {
 		canOpenRelatedFiles: !!referenceServices,
 		onStateChange: () => onChange?.(),

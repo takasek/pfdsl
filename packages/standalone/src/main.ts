@@ -119,6 +119,7 @@ function updateMenu() {
 	const sidebar =
 		!document.querySelector<HTMLElement>("#folder-sidebar")!.hidden;
 	const toggle = document.querySelector<HTMLButtonElement>("#sidebar")!;
+	toggle.hidden = !folderRoot;
 	toggle.disabled = busy || !folderRoot;
 	toggle.setAttribute("aria-expanded", String(sidebar));
 	toggle.setAttribute("aria-label", sidebar ? "Hide sidebar" : "Show sidebar");
@@ -134,6 +135,7 @@ function updateMenu() {
 }
 function renderWorkspace() {
 	for (const entry of opened) {
+		entry.navigation.classList.toggle("selected", entry === active);
 		const sameName = [...opened].filter((other) => other.name === entry.name);
 		const visibleName =
 			sameName.length > 1 && entry.path
@@ -144,8 +146,6 @@ function renderWorkspace() {
 	}
 	document.querySelector<HTMLElement>("#start-screen")!.hidden = !!active;
 	document.querySelector<HTMLElement>("#documents")!.hidden = !active;
-	document.querySelector<HTMLElement>("#document-name")!.textContent =
-		active?.name ?? "PFDSL";
 	document.querySelector<HTMLElement>("#document-state")!.textContent = !active
 		? ""
 		: active.session.panel()
@@ -155,9 +155,10 @@ function renderWorkspace() {
 				: active.session.isDirty()
 					? "Modified"
 					: "Saved";
-	document.querySelector<HTMLElement>("#document-location")!.textContent =
-		active?.path ?? (active ? "Not saved to a file" : "No document");
-	document.querySelector<HTMLElement>("#location-details")!.hidden = !active;
+	const location = document.querySelector<HTMLElement>("#document-location")!;
+	location.textContent = active?.path ?? (active ? "Not saved to a file" : "");
+	location.title = active?.path ?? (active ? "Not saved to a file" : "");
+	location.hidden = !active;
 	document.title = active ? `${active.name} — PFDSL` : "PFDSL";
 	for (const file of document.querySelectorAll<HTMLButtonElement>(
 		"#files button",
@@ -263,10 +264,12 @@ function openDocument(name: string, source: string, disk: DiskSnapshot | null) {
 	});
 	const navigation = document.createElement("span");
 	navigation.className = "document-tab";
+	navigation.setAttribute("role", "none");
 	const close = document.createElement("button");
 	close.className = "close-document";
 	close.textContent = "×";
 	close.setAttribute("aria-label", `Close ${name}`);
+	close.setAttribute("tabindex", "-1");
 	navigation.append(tab.button, close);
 	tabs.append(navigation);
 	entry = {
@@ -701,7 +704,10 @@ async function closeEntries(entries: Entry[]) {
 }
 const commands: Record<string, () => void> = {
 	new() {
-		openDocument(`Untitled ${serial + 1}`, "", null);
+		const openNames = new Set([...opened].map((entry) => entry.name));
+		let number = 1;
+		while (openNames.has(`Untitled ${number}`)) number++;
+		openDocument(`Untitled ${number}`, "", null);
 		active?.tab.focus();
 	},
 	format: () => active?.tab.format(),
@@ -754,7 +760,7 @@ for (const button of document.querySelectorAll<HTMLButtonElement>(
 document.querySelector<HTMLButtonElement>("#try-sample")!.onclick = () => {
 	if (busy) return;
 	openDocument(
-		"Sample (not saved)",
+		"Sample",
 		"---\ntitle: Sample flow\n---\nidea >> design -> plan\n",
 		null,
 	);

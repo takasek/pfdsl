@@ -100,6 +100,8 @@ export async function processSnapshot(...args) {
 			source: "a >> p -> b\n",
 		});
 		tabs.push(first);
+		assert.equal(first.button.getAttribute("role"), "tab");
+		assert.equal(first.button.getAttribute("aria-selected"), "false");
 		first.activate();
 		await waitFor(() => first.container.querySelector("#inner svg"));
 		const oldEditor = instances.at(-1);
