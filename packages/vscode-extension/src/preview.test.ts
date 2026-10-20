@@ -312,6 +312,43 @@ beforeEach(() => {
 	host.window.visibleTextEditors = [];
 });
 
+it.each([
+	true,
+	false,
+])("reports a successful repair only when flagged (%s)", async (repair) => {
+	const { open } = setup();
+	const before = "a >> p -> b\na >>? p\n";
+	let source = before;
+	const doc = document("repair", source);
+	vi.spyOn(doc, "getText").mockImplementation(() => source);
+	host.api.workspace.applyEdit.mockImplementationOnce(async (edit) => {
+		expect(edit.replacements).toHaveLength(1);
+		source = "p -> b\na >>? p\n";
+		return true;
+	});
+	const panel = await open(doc);
+	const request = {
+		type: "deleteConnector" as const,
+		nodeId: "a",
+		source,
+		artifact: "a",
+		process: "p",
+		kind: "input" as const,
+		...(repair ? { repair: true as const } : {}),
+	};
+	await panel.receive(request);
+	expect(panel.messages).toContainEqual({
+		type: "editResult",
+		request,
+		ok: true,
+	});
+	if (repair)
+		expect(host.window.showInformationMessage).toHaveBeenCalledWith(
+			expect.stringMatching(/^Removed the normal input 'a' >> 'p'\. W008: /),
+		);
+	else expect(host.window.showInformationMessage).not.toHaveBeenCalled();
+});
+
 it("focuses a selected semantic definition key and ignores an identically named field", async () => {
 	const { open } = setup();
 	const doc = document(
