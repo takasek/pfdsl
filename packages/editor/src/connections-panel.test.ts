@@ -389,6 +389,36 @@ it("anchors and clamps the context menu, navigates by keyboard, and returns on E
 	expect(menu.hidden).toBe(true);
 });
 
+it("keeps one-item edge menus keyboard navigable and returns focus on Escape", async () => {
+	const s = await setup("a >> p -> b\nb >>? p\n");
+	const edge = s.container.querySelector<HTMLButtonElement>(
+		'[data-side="left"] [data-edge][data-kind="feedback"]',
+	)!;
+	const menu = s.container.querySelector<HTMLElement>(".connection-menu")!;
+	edge.dispatchEvent(
+		new MouseEvent("contextmenu", { bubbles: true, cancelable: true }),
+	);
+	const remove = menu.querySelector<HTMLButtonElement>("[data-delete-edge]")!;
+	expect(menu.hidden).toBe(false);
+	expect(menu.querySelectorAll("[role=menuitem]")).toHaveLength(1);
+	expect(document.activeElement).toBe(remove);
+	for (const key of ["ArrowDown", "ArrowUp", "Home", "End"]) {
+		const event = new KeyboardEvent("keydown", {
+			key,
+			bubbles: true,
+			cancelable: true,
+		});
+		menu.dispatchEvent(event);
+		expect(event.defaultPrevented).toBe(true);
+		expect(document.activeElement).toBe(remove);
+	}
+	menu.dispatchEvent(
+		new KeyboardEvent("keydown", { key: "Escape", bubbles: true }),
+	);
+	expect(menu.hidden).toBe(true);
+	expect(document.activeElement).toBe(edge);
+});
+
 it.each([
 	true,
 	false,
@@ -1251,9 +1281,10 @@ it("toggles semantic input from either endpoint, retains center through redraw a
 			'[aria-label="feedback connection from b, artifact to p, process. Connection actions"]',
 		)!
 		.click();
-	expect(s.container.querySelector("[data-toggle-feedback]")!.textContent).toBe(
-		"Remove feedback",
-	);
+	const menu = s.container.querySelector<HTMLElement>(".connection-menu")!;
+	expect(menu.querySelector("[data-toggle-feedback]")).toBeNull();
+	expect(menu.querySelectorAll("[role=menuitem]")).toHaveLength(1);
+	expect(menu.textContent).toBe("Delete");
 });
 
 it("shows both connection sides and navigates while retaining the full graph", async () => {

@@ -64,7 +64,7 @@ Focus or click a **Connect a node…** input to browse available candidates by I
 Unavailable and already connected candidates are hidden; a feedback candidate appears when a normal input would create a cycle.
 After connecting a candidate, focus stays in the input and the refreshed candidates remain open.
 Click or right-click a connection line to open its menu beside the line; use arrow keys to choose an action and Escape to return to the line.
-Output connections offer **Delete** only; input connections also offer **Make feedback** or **Remove feedback**.
+Output connections offer **Delete** only; input connections offer **Make feedback** or **Remove feedback** when the switch is valid.
 After deleting or switching a connection, focus stays near that connection on the same side and candidates stay closed.
 Double-click a node or use **Go to definition** in Connections to move to its definition and focus the editor; undefined nodes offer **Create definition** instead.
 Use **Fit** to see the whole diagram or **Actual size** to restore 100%; the zoom display shows the current scale.

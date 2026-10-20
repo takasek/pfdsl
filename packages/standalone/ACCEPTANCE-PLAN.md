@@ -218,8 +218,8 @@ API差分：`addConnector`に`create: true`を追加し、共有`applyPreviewEdi
 ### GUI-15：edge削除とfeedback切替
 
 対応：#1444。対象・入力：M/V、p中心の左input/右output、b中心の左output/右input、同endpointのprimary/feedback。
-操作：lineのclick／右clickでその位置のmenuを開き、Delete、input↔feedback、outputの項目、通常inputへ戻せない条件を試す。
-画面端でmenuがはみ出さず、Arrow／Home／EndとEnter／Spaceで選択でき、Escapeで起点lineへ戻り、menu外clickで閉じることを確認する。
+操作：lineのclick／右clickでその位置のmenuを開き、Delete、切替可能なinput↔feedback、outputの項目を試す。共有計算が切替を拒否する条件（通常inputへ戻すとV010になる、または切替先が既にある）では、切替項目と理由を表示せずDeleteだけが残ることを確認する。
+画面端でmenuがはみ出さず、項目が1つだけの場合もArrow／Home／Endでその項目へfocusでき、Enter／Spaceで選択できることを確認する。Escapeで起点lineへ戻り、menu外clickで閉じることを確認する。
 期待：選んだedgeだけ削除しnodeを消さない。
 成果物→工程の向きを保持し、outputのmenuはDeleteだけで、方向反転を起こさない。
 切替後は同じ接続のbutton、削除後は同じ側の次の行（末尾なら前の行、行が無ければ同じ側の入力欄）へ戻し、候補は開かない。

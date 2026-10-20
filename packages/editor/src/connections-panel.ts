@@ -437,6 +437,8 @@ export function mountConnections(
 		menu.append(remove);
 		remove.disabled = !!pending;
 		if (edge.kind === "output") return remove;
+		const result = applyPreviewEdit(editing!.source, request("toggleFeedback"));
+		if (!result.ok) return remove;
 		const toggle = button(
 			edge.kind === "feedback" ? "Remove feedback" : "Make feedback",
 			edge.kind === "feedback" ? "Remove feedback" : "Make feedback",
@@ -444,12 +446,8 @@ export function mountConnections(
 		);
 		toggle.dataset.toggleFeedback = "";
 		toggle.setAttribute("role", "menuitem");
-		const result = applyPreviewEdit(editing!.source, request("toggleFeedback"));
-		toggle.disabled = !!pending || !result.ok;
-		if (!result.ok) toggle.title = result.message;
-		const reason = document.createElement("span");
-		reason.textContent = result.ok ? "" : result.message;
-		menu.append(toggle, reason);
+		toggle.disabled = !!pending;
+		menu.append(toggle);
 		return remove;
 	}
 	function render(focused: Element | null = null) {

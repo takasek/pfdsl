@@ -48,7 +48,7 @@ Focus or click **Connect a node…** to browse available candidates; use arrow k
 Unavailable and already connected candidates are hidden; feedback candidates appear when a normal input would create a cycle.
 Adding a candidate keeps input focus and reopens the refreshed list.
 Click or right-click a connection line for a menu beside it; use arrow keys to choose an action and Escape to return to the line.
-Output connections offer **Delete** only; input connections also offer **Make feedback** or **Remove feedback**.
+Output connections offer **Delete** only; input connections offer **Make feedback** or **Remove feedback** when the switch is valid.
 Deleting or switching a connection returns focus nearby on the same side without opening candidates.
 The bottom panel shows direct incoming neighbors on the left, the current node in the center, and outgoing neighbors on the right.
 Each neighbor list scrolls independently; the center and connection inputs remain visible.
