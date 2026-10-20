@@ -175,3 +175,21 @@ it.each([
 	expect(raw.document).toEqual(before);
 	expect(raw.document.statements[0]!.start.offset).toBe(0);
 });
+
+it.each([
+	"\n",
+	"\r\n",
+])("adapts the V036 edge range to full-source UTF-16 coordinates (%j)", (eol) => {
+	const prefix = ["---", "title: Keep", "---", ""].join(eol);
+	const body = ['"成果😀" >> p -> b', '"成果😀" >>? p', ""].join(eol);
+	const source = prefix + body;
+	const diagnostic = analyzeSnapshot(source).diagnostics.find(
+		(d) => d.code === "V036",
+	)!;
+	const start = source.indexOf('"成果😀" >>? p');
+	const end = start + '"成果😀" >>? p'.length;
+	expect(diagnostic.range).toEqual({
+		start: { line: 5, column: 1, offset: start },
+		end: { line: 5, column: '"成果😀" >>? p'.length + 1, offset: end },
+	});
+});

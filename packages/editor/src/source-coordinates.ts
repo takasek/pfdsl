@@ -63,10 +63,11 @@ export function snapshotCoordinates(
 			...model.document,
 			statements: model.document.statements.map(statement),
 		},
-		// Lexer/parser ranges share body offsets. Metadata and document-wide
-		// diagnostics already have their own full-source or zero-range contract.
+		// Lexer/parser ranges and V036's edge range share body offsets. Metadata
+		// and document-wide diagnostics already have their own full-source or
+		// zero-range contract.
 		diagnostics: model.diagnostics.map((diagnostic) =>
-			/^[LP]\d+$/.test(diagnostic.code)
+			/^([LP]\d+|V036)$/.test(diagnostic.code)
 				? { ...diagnostic, range: endpoints(diagnostic.range) }
 				: diagnostic,
 		),
