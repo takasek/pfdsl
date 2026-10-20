@@ -79,7 +79,7 @@ PR #1448の320px・source90%での文字欠け、sidebar併用時の最小26px�
 ### GUI-02：Recentとフォルダサイドバー
 
 対応：#1444。対象・入力：M、フォルダ未選択、one/two、A/B。
-操作：開始時にサイドバー切替ボタンが非表示でWindow > Show Sidebarが無効なことを確認する。Open Folder→ファイル選択→Filesボタン／menuでsidebar閉鎖・再開→File > Recentで文書／フォルダへ再アクセスする。
+操作：開始時にサイドバー切替ボタンが非表示でView > Show Sidebarが無効なことを確認する。Open Folder→ファイル選択→Filesボタン／menuでsidebar閉鎖・再開→File > Recentで文書／フォルダへ再アクセスする。
 期待：フォルダ名・階層・選択が対応し、表示中はFilesボタンが現れ、閉鎖で作業幅が戻る。
 Recentを左側や開始画面へ常設せず、本文とdirtyを保つ。
 状態：M未実施。記録：未記入。
