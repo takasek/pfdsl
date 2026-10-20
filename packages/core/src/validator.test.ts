@@ -356,6 +356,42 @@ a >> design -> b
 		});
 	});
 
+	describe("V036: input and feedback for the same artifact-process pair", () => {
+		it("reports one error in both modes and does not also report V011", () => {
+			const src = "a >> p -> b\na >>? p";
+			for (const options of [undefined, { strict: true }]) {
+				const diags = diagnose(src, null, options);
+				expect(diags.map((d) => d.code)).toEqual(["V036"]);
+				expect(diags[0]?.severity).toBe("error");
+				expect(diags[0]?.message).toContain(
+					"both as an input (>>) and as feedback (>>?)",
+				);
+			}
+		});
+
+		it("reports the same conflict when feedback is written first", () => {
+			const diags = diagnose("a >>? p\na >> p -> b");
+			expect(diags.map((d) => d.code)).toEqual(["V036"]);
+		});
+
+		it("does not report a conflict when the two edge kinds target different processes", () => {
+			expect(codes("a >> p -> b\na >>? q")).not.toContain("V036");
+		});
+
+		it("reports one V036 per conflicting pair", () => {
+			const diags = diagnose("b >> q -> c\na >> p -> d\nb >>? q\na >>? p");
+			expect(diags.filter((d) => d.code === "V036")).toHaveLength(2);
+		});
+
+		it("keeps an identical repeated input as an N003 warning only", () => {
+			const { tokens } = lex("a >> p -> b\na >> p");
+			const { document } = parseTokens(tokens);
+			const diags = normalize(document, null).diagnostics;
+			expect(diags.map((d) => d.code)).toEqual(["N003"]);
+			expect(diags[0]?.severity).toBe("warning");
+		});
+	});
+
 	describe("V010: primary-graph cycle detection", () => {
 		it("detects a direct cycle between two processes", () => {
 			// a >> p -> b  +  b >> q -> a  forms a cycle in the primary graph
