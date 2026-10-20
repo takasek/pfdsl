@@ -204,7 +204,7 @@ export function createDocumentTab({
 					};
 					editor.setPosition(editorPosition);
 					editor.revealPositionInCenter(editorPosition);
-					editor.focus();
+					if (!message.preserveFocus) editor.focus();
 				}
 			} else if (
 				message.type === "openFile" ||
@@ -279,6 +279,7 @@ export function createDocumentTab({
 		onChange?.();
 	});
 	editor.onDidChangeCursorPosition((event) => {
+		if (event.source === "pfdsl.preview") return;
 		if (!snapshot || snapshot.source !== editor.getValue() || disposed) return;
 		const nodeId = nodeIdAtSourcePosition(snapshot, snapshot.source, {
 			line: event.position.lineNumber - 1,

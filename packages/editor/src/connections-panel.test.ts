@@ -33,6 +33,7 @@ async function setup(
 		.dispatchEvent(
 			new MouseEvent("contextmenu", { bubbles: true, cancelable: true }),
 		);
+	postMessage.mockClear();
 	return { container, postMessage, preview, source };
 }
 
@@ -743,6 +744,12 @@ it("toggles semantic input from either endpoint, retains center through redraw a
 		s.container.querySelector("#node-actions-error")!.textContent,
 	).toContain("document changed");
 	s.container.querySelector<HTMLButtonElement>('[data-neighbor="a"]')!.click();
+	expect(s.postMessage).toHaveBeenLastCalledWith({
+		type: "nodeClick",
+		nodeId: "a",
+		preserveFocus: true,
+	});
+	s.postMessage.mockClear();
 	s.container.querySelector<HTMLButtonElement>("#create-definition")!.click();
 	expect(s.postMessage).toHaveBeenLastCalledWith(
 		expect.objectContaining({

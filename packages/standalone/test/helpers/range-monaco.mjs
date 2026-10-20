@@ -1,4 +1,6 @@
 import { Range } from "monaco-editor/editor/common/core/range.js";
+
+export { Selection } from "monaco-editor/editor/common/core/selection.js";
 // Controlled Monaco selection/edit boundary; formatter and host stay production code.
 export const instances = [];
 export const language = {};
@@ -13,6 +15,7 @@ function offset(model, line, column) {
 
 export { Range };
 export const editor = {
+	CursorChangeReason: { Explicit: 3 },
 	registerLinkOpener() {
 		return { dispose() {} };
 	},
@@ -55,7 +58,38 @@ export const editor = {
 			callbacks,
 			actions: [],
 			edits: [],
+			cursorEvents: [],
 			undoStops: 0,
+			focusCalls: 0,
+			emitCursorChange(source, position = this.position, reason = 3) {
+				const event = {
+					position: position ?? { lineNumber: 1, column: 1 },
+					source,
+					reason,
+				};
+				this.cursorEvents.push(event);
+				callbacks.onDidChangeCursorPosition?.(event);
+			},
+			focus() {
+				this.focusCalls++;
+			},
+			setPosition(position) {
+				this.position = position;
+				this.emitCursorChange("api", position);
+			},
+			setSelection(selection) {
+				this.selection = selection;
+				this.setPosition({
+					lineNumber: selection.positionLineNumber,
+					column: selection.positionColumn,
+				});
+			},
+			revealPositionInCenter(position) {
+				this.revealed = position;
+			},
+			revealRangeInCenter(range) {
+				this.revealed = range;
+			},
 			selection: null,
 			getSelection() {
 				return this.selection;
@@ -87,6 +121,7 @@ export const editor = {
 				model.source =
 					model.source.slice(0, start) + text + model.source.slice(end);
 				callbacks.onDidChangeModelContent?.();
+				this.emitCursorChange(origin);
 			},
 		};
 		for (const event of [

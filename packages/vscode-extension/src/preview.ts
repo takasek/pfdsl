@@ -23,6 +23,7 @@ import { requireActivePfdslEditor } from "./utils.js";
 
 interface PreviewState {
 	panel: vscode.WebviewPanel;
+	previewViewType: string;
 	doc: vscode.TextDocument;
 	sourceViewColumn: vscode.ViewColumn;
 	controller: PreviewController;
@@ -99,6 +100,28 @@ async function prepareEditSource(state: PreviewState) {
 	return { source, isCurrent };
 }
 
+function sourceColumnOutsidePreview(
+	state: PreviewState,
+	preferredColumn: vscode.ViewColumn,
+): vscode.ViewColumn {
+	const groups = vscode.window.tabGroups.all;
+	const previewGroup = groups.find((group) =>
+		group.tabs.some(
+			(tab) =>
+				tab.input instanceof vscode.TabInputWebview &&
+				// VS Code prefixes a webview tab's type with "mainThreadWebview-".
+				tab.input.viewType.endsWith(state.previewViewType) &&
+				tab.label === state.panel.title,
+		),
+	);
+	const preferredGroup = groups.find(
+		(group) => group.viewColumn === preferredColumn,
+	);
+	return preferredGroup && preferredGroup !== previewGroup
+		? preferredColumn
+		: vscode.ViewColumn.Beside;
+}
+
 async function editFromPreview(
 	state: PreviewState,
 	request: PreviewEditMessage,
@@ -166,10 +189,7 @@ async function editFromPreview(
 				(editor) => editor.document === state.doc,
 			)?.viewColumn ?? state.sourceViewColumn;
 		const editor = await vscode.window.showTextDocument(state.doc, {
-			viewColumn:
-				sourceColumn === state.panel.viewColumn
-					? vscode.ViewColumn.Beside
-					: sourceColumn,
+			viewColumn: sourceColumnOutsidePreview(state, sourceColumn),
 			...(request.type === "createDefinition" ? { selection: range } : {}),
 			preserveFocus: request.type !== "createDefinition",
 		});
@@ -300,27 +320,26 @@ async function openFileActivatingExisting(
 }
 
 function jumpToNode(
-	doc: vscode.TextDocument,
+	state: PreviewState,
 	nodeId: string,
-	preferDefinition = false,
+	preserveFocus = false,
 ): void {
+	const { doc } = state;
 	let targetPos: vscode.Position | undefined;
 	let targetEnd: vscode.Position | undefined;
-	if (preferDefinition) {
-		const definition = findFrontmatterDefinitionRange(
-			analyzeDocument(doc),
-			nodeId,
+	const definition = findFrontmatterDefinitionRange(
+		analyzeDocument(doc),
+		nodeId,
+	);
+	if (definition) {
+		targetPos = new vscode.Position(
+			definition.start.line - 1,
+			definition.start.column - 1,
 		);
-		if (definition) {
-			targetPos = new vscode.Position(
-				definition.start.line - 1,
-				definition.start.column - 1,
-			);
-			targetEnd = new vscode.Position(
-				definition.end.line - 1,
-				definition.end.column - 1,
-			);
-		}
+		targetEnd = new vscode.Position(
+			definition.end.line - 1,
+			definition.end.column - 1,
+		);
 	}
 	if (!targetPos) {
 		const found = positionOfNodeId(
@@ -343,17 +362,21 @@ function jumpToNode(
 			targetEnd ?? targetPos.translate(0, nodeId.length),
 		);
 		existingEditor.revealRange(range);
+		if (preserveFocus) return;
 		const vc = existingEditor.viewColumn;
 		if (vc !== undefined) {
 			vscode.window.showTextDocument(doc, {
 				viewColumn: vc,
 				preserveFocus: false,
+				preview: false,
 			});
 		}
-	} else {
+	} else if (!preserveFocus) {
 		vscode.window.showTextDocument(doc, {
+			viewColumn: sourceColumnOutsidePreview(state, state.sourceViewColumn),
 			selection: range,
 			preserveFocus: false,
+			preview: false,
 		});
 	}
 }
@@ -383,6 +406,7 @@ export function registerPreview(context: vscode.ExtensionContext): {
 		focusNodeId?: string,
 	): PreviewState {
 		const docUri = doc.uri.toString();
+		const previewViewType = `pfdslPreview-${encodeURIComponent(docUri)}`;
 		const sourceViewColumn =
 			vscode.window.visibleTextEditors.find((editor) => editor.document === doc)
 				?.viewColumn ??
@@ -394,7 +418,7 @@ export function registerPreview(context: vscode.ExtensionContext): {
 			"webview.js",
 		);
 		const panel = vscode.window.createWebviewPanel(
-			"pfdslPreview",
+			previewViewType,
 			"PFDSL Preview",
 			{ viewColumn: vscode.ViewColumn.Beside, preserveFocus: true },
 			{
@@ -411,6 +435,7 @@ export function registerPreview(context: vscode.ExtensionContext): {
 
 		const state: PreviewState = {
 			panel,
+			previewViewType,
 			doc,
 			sourceViewColumn,
 			disposed: false,
@@ -434,17 +459,7 @@ export function registerPreview(context: vscode.ExtensionContext): {
 			) {
 				await editFromPreview(state, msg);
 			} else if (msg.type === "nodeClick") {
-				const editor = vscode.window.visibleTextEditors.find(
-					(e) => e.document === state.doc,
-				);
-				const cursorId = editor
-					? nodeIdAtSourcePosition(
-							analyzeDocument(state.doc),
-							state.doc.getText(),
-							editor.selection.active,
-						)
-					: undefined;
-				jumpToNode(state.doc, msg.nodeId, cursorId === msg.nodeId);
+				jumpToNode(state, msg.nodeId, msg.preserveFocus);
 			} else if (msg.type === "openUrl") {
 				vscode.env.openExternal(vscode.Uri.parse(msg.url));
 			} else if (msg.type === "openFile") {

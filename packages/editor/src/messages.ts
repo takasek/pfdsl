@@ -52,7 +52,7 @@ export type MessageToWebview =
 export type MessageFromWebview =
 	| PreviewEditMessage
 	| { type: "ready" }
-	| { type: "nodeClick"; nodeId: string }
+	| { type: "nodeClick"; nodeId: string; preserveFocus?: boolean }
 	| { type: "openUrl"; url: string }
 	| { type: "openFile"; path: string }
 	| { type: "openLocation"; nodeId: string };

@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { afterEach, expect, it, vi } from "vitest";
 import { analyzeSnapshot } from "./document.js";
-import { mountPreview } from "./preview.js";
+import { mountPreview, NODE_CLICK_DELAY_MS } from "./preview.js";
 import { buildPreviewGraph } from "./preview-graph.js";
 import { FOCUS_CUE_DURATION_MS, previewStyles } from "./preview-shell.js";
 
@@ -13,6 +13,336 @@ afterEach(() => {
 });
 const svg =
 	'<svg width="200" height="100"><g class="node"><title>a</title><polygon points="0,0 40,0 40,30"/><text>A</text></g><g class="node"><title>p</title><text>P</text></g></svg>';
+
+it("makes unpainted node shapes hit targets only in the main graph", async () => {
+	const shapes =
+		'<polygon fill="none"/><ellipse fill="none"/><path fill="none"/><rect fill="none"/><circle fill="none"/><polyline fill="none"/>';
+	const s = setup(
+		vi.fn(async (_dot: string) =>
+			svg.replace('<polygon points="0,0 40,0 40,30"/>', shapes),
+		),
+	);
+	await s.preview.receive(s.message);
+	for (const shape of s.node("a").querySelectorAll("[fill]")) {
+		expect(window.getComputedStyle(shape).pointerEvents).toBe("all");
+		expect(shape.getAttribute("fill")).toBe("none");
+	}
+	expect(
+		window.getComputedStyle(s.container.querySelector("#minimap-svg")!)
+			.pointerEvents,
+	).toBe("none");
+	expect(
+		window.getComputedStyle(s.container.querySelector("#minimap-svg polygon")!)
+			.pointerEvents,
+	).not.toBe("all");
+});
+
+it.each([
+	"click",
+	"drag",
+	"returning drag",
+	"other node",
+	"outside",
+	"ctrlKey",
+	"metaKey",
+])("distinguishes a node %s from a Connections click", async (gesture) => {
+	vi.useFakeTimers();
+	const s = setup();
+	await s.preview.receive(s.message);
+	const modifiers = {
+		ctrlKey: gesture === "ctrlKey",
+		metaKey: gesture === "metaKey",
+	};
+	s.node("a")
+		.querySelector("polygon")!
+		.dispatchEvent(
+			new MouseEvent("mousedown", {
+				bubbles: true,
+				clientX: 20,
+				clientY: 20,
+				...modifiers,
+			}),
+		);
+	if (gesture.includes("drag"))
+		window.dispatchEvent(
+			new MouseEvent("mousemove", { buttons: 1, clientX: 60, clientY: 20 }),
+		);
+	const target =
+		gesture === "outside"
+			? s.root
+			: s.node(gesture === "other node" ? "p" : "a");
+	target.dispatchEvent(
+		new MouseEvent("mouseup", {
+			bubbles: true,
+			clientX: gesture === "drag" ? 60 : 22,
+			clientY: 21,
+			...modifiers,
+		}),
+	);
+	await vi.advanceTimersByTimeAsync(NODE_CLICK_DELAY_MS);
+	expect(s.container.querySelector<HTMLElement>("#node-actions")!.hidden).toBe(
+		gesture !== "click",
+	);
+	if (gesture === "click") {
+		expect(s.postMessage).toHaveBeenCalledWith({
+			type: "nodeClick",
+			nodeId: "a",
+			preserveFocus: true,
+		});
+		expect(
+			s.container.querySelector("#node-actions-title")!.textContent,
+		).toContain("a");
+	}
+});
+
+it("replaces the previous selection cue on a click without moving the graph", async () => {
+	vi.useFakeTimers();
+	const s = setup();
+	await s.preview.receive(s.message);
+	await s.preview.receive({ type: "focus", nodeId: "a" });
+	const transform =
+		s.container.querySelector<HTMLElement>("#inner")!.style.transform;
+	s.node("p").dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
+	s.node("p").dispatchEvent(new MouseEvent("mouseup", { bubbles: true }));
+	await vi.advanceTimersByTimeAsync(NODE_CLICK_DELAY_MS);
+	expect(s.node("p").classList.contains("pfdsl-focus-cue")).toBe(true);
+	expect(s.node("a").classList.contains("pfdsl-focus-cue")).toBe(false);
+	expect(
+		s.container.querySelector<HTMLElement>("#inner")!.style.transform,
+	).toBe(transform);
+});
+
+it.each([
+	false,
+	true,
+])("waits for double-click before changing layout (double-click: %s)", async (doubleClick) => {
+	vi.useFakeTimers();
+	const s = setup();
+	await s.preview.receive(s.message);
+	s.postMessage.mockClear();
+	const panel = s.container.querySelector<HTMLElement>("#node-actions")!;
+	const inner = s.container.querySelector<HTMLElement>("#inner")!;
+	const transform = inner.style.transform;
+	const click = () => {
+		s.node("p").dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
+		s.node("p").dispatchEvent(new MouseEvent("mouseup", { bubbles: true }));
+	};
+	click();
+	expect(NODE_CLICK_DELAY_MS).toBe(500);
+	await vi.advanceTimersByTimeAsync(NODE_CLICK_DELAY_MS - 1);
+	expect(panel.hidden).toBe(true);
+	expect(s.postMessage).not.toHaveBeenCalled();
+	expect(inner.style.transform).toBe(transform);
+	if (doubleClick) {
+		click();
+		s.node("p").dispatchEvent(new MouseEvent("dblclick", { bubbles: true }));
+		expect(panel.hidden).toBe(false);
+		expect(
+			s.container.querySelector("#node-actions-title")!.textContent,
+		).toContain("p");
+		await vi.advanceTimersByTimeAsync(501);
+		expect(s.postMessage.mock.calls).toEqual([
+			[{ type: "nodeClick", nodeId: "p" }],
+		]);
+	} else {
+		await vi.advanceTimersByTimeAsync(1);
+		expect(panel.hidden).toBe(false);
+		expect(s.postMessage).toHaveBeenCalledWith({
+			type: "nodeClick",
+			nodeId: "p",
+			preserveFocus: true,
+		});
+	}
+});
+
+it.each([
+	"redraw",
+	"error",
+	"dispose",
+	"clearFocus",
+])("cancels a pending click on %s", async (change) => {
+	vi.useFakeTimers();
+	const s = setup();
+	await s.preview.receive(s.message);
+	s.postMessage.mockClear();
+	s.node("p").dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
+	s.node("p").dispatchEvent(new MouseEvent("mouseup", { bubbles: true }));
+	if (change === "redraw") await s.preview.receive(s.message);
+	if (change === "error")
+		await s.preview.receive({ type: "error", message: "Broken" });
+	if (change === "dispose") s.preview.dispose();
+	if (change === "clearFocus") await s.preview.receive({ type: "clearFocus" });
+	await vi.advanceTimersByTimeAsync(500);
+	expect(s.postMessage).not.toHaveBeenCalled();
+});
+
+it("keeps the layout stable while the second press crosses the click deadline", async () => {
+	vi.useFakeTimers();
+	const s = setup();
+	await s.preview.receive(s.message);
+	s.postMessage.mockClear();
+	s.node("p").dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
+	s.node("p").dispatchEvent(new MouseEvent("mouseup", { bubbles: true }));
+	await vi.advanceTimersByTimeAsync(NODE_CLICK_DELAY_MS - 1);
+	s.node("p").dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
+	await vi.advanceTimersByTimeAsync(2);
+	expect(s.container.querySelector<HTMLElement>("#node-actions")!.hidden).toBe(
+		true,
+	);
+	expect(s.postMessage).not.toHaveBeenCalled();
+	s.node("p").dispatchEvent(new MouseEvent("mouseup", { bubbles: true }));
+	s.node("p").dispatchEvent(new MouseEvent("dblclick", { bubbles: true }));
+	await vi.advanceTimersByTimeAsync(NODE_CLICK_DELAY_MS);
+	expect(s.postMessage.mock.calls).toEqual([
+		[{ type: "nodeClick", nodeId: "p" }],
+	]);
+});
+
+it("consumes a synchronization echo once without moving or repeating the cue", async () => {
+	vi.useFakeTimers();
+	const s = setup();
+	await s.preview.receive(s.message);
+	s.node("p").dispatchEvent(
+		new KeyboardEvent("keydown", { key: "Enter", bubbles: true }),
+	);
+	const inner = s.container.querySelector<HTMLElement>("#inner")!;
+	const transform = inner.style.transform;
+	const ring = inner.querySelector(".pfdsl-focus-ring");
+	await vi.advanceTimersByTimeAsync(100);
+	await s.preview.receive({ type: "focus", nodeId: "p" });
+	expect(inner.style.transform).toBe(transform);
+	expect(inner.querySelector(".pfdsl-focus-ring")).toBe(ring);
+	await vi.advanceTimersByTimeAsync(1400);
+	expect(inner.querySelector(".pfdsl-focus-ring")).toBeNull();
+	await s.preview.receive({ type: "focus", nodeId: "p" });
+	expect(inner.querySelector(".pfdsl-focus-ring")).not.toBeNull();
+	s.node("p").dispatchEvent(
+		new KeyboardEvent("keydown", { key: "Enter", bubbles: true }),
+	);
+	await s.preview.receive({ type: "focus", nodeId: "p" });
+	const consumedRing = inner.querySelector(".pfdsl-focus-ring");
+	await s.preview.receive({ type: "focus", nodeId: "p" });
+	expect(inner.querySelector(".pfdsl-focus-ring")).not.toBe(consumedRing);
+});
+
+it.each([
+	"Enter",
+	"contextmenu",
+])("opens immediately with %s and cancels a waiting click", async (gesture) => {
+	vi.useFakeTimers();
+	const s = setup();
+	await s.preview.receive(s.message);
+	s.postMessage.mockClear();
+	s.node("p").dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
+	s.node("p").dispatchEvent(new MouseEvent("mouseup", { bubbles: true }));
+	s.node("a").dispatchEvent(
+		gesture === "Enter"
+			? new KeyboardEvent("keydown", { key: "Enter", bubbles: true })
+			: new MouseEvent("contextmenu", { bubbles: true }),
+	);
+	expect(s.container.querySelector<HTMLElement>("#node-actions")!.hidden).toBe(
+		false,
+	);
+	const ring = s.container.querySelector(".pfdsl-focus-ring");
+	await vi.advanceTimersByTimeAsync(NODE_CLICK_DELAY_MS);
+	expect(s.container.querySelector(".pfdsl-focus-ring")).toBe(ring);
+	expect(s.postMessage.mock.calls).toEqual([
+		[{ type: "nodeClick", nodeId: "a", preserveFocus: true }],
+	]);
+});
+
+it.each([
+	"different focus",
+	"clear focus",
+	"timeout",
+])("does not retain a missing echo after %s", async (interruption) => {
+	vi.useFakeTimers();
+	const s = setup();
+	await s.preview.receive(s.message);
+	s.node("p").dispatchEvent(
+		new KeyboardEvent("keydown", { key: "Enter", bubbles: true }),
+	);
+	if (interruption === "different focus")
+		await s.preview.receive({ type: "focus", nodeId: "a" });
+	if (interruption === "clear focus")
+		await s.preview.receive({ type: "clearFocus" });
+	if (interruption === "timeout") await vi.advanceTimersByTimeAsync(2000);
+	const ring = s.container.querySelector(".pfdsl-focus-ring");
+	await s.preview.receive({ type: "focus", nodeId: "p" });
+	expect(s.node("p").classList.contains("pfdsl-focus-cue")).toBe(true);
+	expect(s.container.querySelector(".pfdsl-focus-ring")).not.toBe(ring);
+});
+
+it("synchronizes editor, graph and Connections without taking editor focus", async () => {
+	const s = setup();
+	await s.preview.receive(s.message);
+	const editor = document.createElement("textarea");
+	s.container.append(editor);
+	editor.focus();
+	await s.preview.receive({ type: "focus", nodeId: "a" });
+	expect(s.container.querySelector<HTMLElement>("#node-actions")!.hidden).toBe(
+		true,
+	);
+	s.node("a").dispatchEvent(
+		new KeyboardEvent("keydown", { key: "Enter", bubbles: true }),
+	);
+	editor.focus();
+	await s.preview.receive({ type: "focus", nodeId: "p" });
+	expect(
+		s.container.querySelector("#node-actions-title")!.textContent,
+	).toContain("p");
+	expect(s.node("p").classList.contains("pfdsl-focus-cue")).toBe(true);
+	expect(document.activeElement).toBe(editor);
+	s.container.querySelector<HTMLButtonElement>('[data-neighbor="a"]')!.click();
+	expect(s.postMessage).toHaveBeenLastCalledWith({
+		type: "nodeClick",
+		nodeId: "a",
+		preserveFocus: true,
+	});
+	expect(s.node("a").classList.contains("pfdsl-focus-cue")).toBe(true);
+	expect(
+		s.container
+			.querySelector("#node-actions")!
+			.contains(document.activeElement),
+	).toBe(true);
+	s.node("p").dispatchEvent(new MouseEvent("dblclick", { bubbles: true }));
+	expect(
+		s.container.querySelector("#node-actions-title")!.textContent,
+	).toContain("p");
+	expect(s.postMessage).toHaveBeenLastCalledWith({
+		type: "nodeClick",
+		nodeId: "p",
+	});
+});
+
+it("offers Go to definition for a defined center and keeps Create definition for an undefined center", async () => {
+	const s = setup();
+	await s.preview.receive(s.message);
+	s.node("p").dispatchEvent(
+		new KeyboardEvent("keydown", { key: "Enter", bubbles: true }),
+	);
+	const definition =
+		s.container.querySelector<HTMLButtonElement>("#create-definition")!;
+	expect(definition.hidden).toBe(false);
+	expect(definition.textContent).toBe("Go to definition");
+	definition.click();
+	expect(s.postMessage).toHaveBeenLastCalledWith({
+		type: "nodeClick",
+		nodeId: "p",
+	});
+	s.container.querySelector<HTMLButtonElement>('[data-neighbor="a"]')!.click();
+	expect(definition.textContent).toBe("Create definition");
+	definition.click();
+	expect(s.postMessage).toHaveBeenLastCalledWith(
+		expect.objectContaining({ type: "createDefinition", nodeId: "a" }),
+	);
+	expect(s.container.querySelector("#actual-size")!.textContent).toBe(
+		"Actual size",
+	);
+	expect(s.node("a").getAttribute("aria-label")).toContain(
+		"Click or press Enter",
+	);
+});
 
 it("keeps the cue animation and removal deadline at 1500ms", async () => {
 	vi.useFakeTimers();

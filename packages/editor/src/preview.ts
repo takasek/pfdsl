@@ -26,6 +26,9 @@ export interface PreviewHost {
 	renderDot?: (dot: string) => Promise<string>;
 }
 
+const SYNC_ECHO_TIMEOUT_MS = 1000;
+export const NODE_CLICK_DELAY_MS = 500;
+
 function prepareGraphNode(
 	node: HTMLElement,
 	label: (id: string) => string,
@@ -108,6 +111,26 @@ export function mountPreview(container: HTMLElement, host: PreviewHost) {
 	let cueTimer: number | undefined;
 	let cuedNode: Element | undefined;
 	let cueRing: HTMLDivElement | undefined;
+	let syncEchoNodeId: string | undefined;
+	let syncEchoTimer: number | undefined;
+	let clickTimer: number | undefined;
+	function cancelNodeClick() {
+		if (clickTimer !== undefined) window.clearTimeout(clickTimer);
+		clickTimer = undefined;
+	}
+	function clearSyncEcho() {
+		if (syncEchoTimer !== undefined) window.clearTimeout(syncEchoTimer);
+		syncEchoTimer = undefined;
+		syncEchoNodeId = undefined;
+	}
+	function synchronizeNode(id: string) {
+		clearSyncEcho();
+		syncEchoNodeId = id;
+		// Both hosts can report the selection made by this message. A missing
+		// report must not suppress a later editor navigation indefinitely.
+		syncEchoTimer = window.setTimeout(clearSyncEcho, SYNC_ECHO_TIMEOUT_MS);
+		host.postMessage({ type: "nodeClick", nodeId: id, preserveFocus: true });
+	}
 	const actions = container.querySelector<HTMLElement>("#node-actions")!;
 	const actionsToggle = container.querySelector<HTMLButtonElement>(
 		"#node-actions-toggle",
@@ -118,6 +141,7 @@ export function mountPreview(container: HTMLElement, host: PreviewHost) {
 			selectedNodeId = pendingFocusNodeId = id;
 			pendingFocusCue = true;
 			positionGraph();
+			synchronizeNode(id);
 		},
 		close: closeActions,
 		onOpenChange(open) {
@@ -125,13 +149,21 @@ export function mountPreview(container: HTMLElement, host: PreviewHost) {
 		},
 	});
 	function closeActions() {
+		cancelNodeClick();
 		connections.close();
 		actionsToggle.focus();
 	}
-	function openActions(id: string) {
+	function openActions(id: string, preserveFocus = false) {
+		cancelNodeClick();
 		if (graphRevision !== revision) return;
 		selectedNodeId = id;
-		connections.open(id);
+		const node = [...inner.querySelectorAll<HTMLElement>("g.node")].find(
+			(node) => node.dataset.nodeId === id,
+		);
+		if (node) showCue(node);
+		else clearCue();
+		connections.open(id, preserveFocus);
+		if (!preserveFocus) synchronizeNode(id);
 		host.onStateChange?.();
 	}
 	on(actionsToggle, "click", () => {
@@ -577,12 +609,20 @@ export function mountPreview(container: HTMLElement, host: PreviewHost) {
 		{ passive: false },
 	);
 
+	let nodePress: { id: string; x: number; y: number } | undefined;
 	on(root, "mousedown", (e) => {
+		cancelNodeClick();
 		if (e.button === 2 && (e.target as Element).closest?.("g.node")) {
 			e.preventDefault();
 			return;
 		}
 		if (e.button !== 0) return;
+		const id = (e.target as Element).closest<HTMLElement>("g.node")?.dataset
+			.nodeId;
+		nodePress =
+			id && !e.metaKey && !e.ctrlKey
+				? { id, x: e.clientX, y: e.clientY }
+				: undefined;
 		e.preventDefault();
 		dragging = true;
 		startX = e.clientX - panX;
@@ -591,6 +631,11 @@ export function mountPreview(container: HTMLElement, host: PreviewHost) {
 	});
 
 	on(window, "mousemove", (e) => {
+		if (
+			nodePress &&
+			Math.hypot(e.clientX - nodePress.x, e.clientY - nodePress.y) > 4
+		)
+			nodePress = undefined;
 		if (
 			shouldReleaseDrag(e.buttons, {
 				graph: dragging,
@@ -611,12 +656,36 @@ export function mountPreview(container: HTMLElement, host: PreviewHost) {
 	});
 
 	function releaseDrag() {
+		nodePress = undefined;
 		dragging = false;
 		minimapDragging = false;
 		minimapDragRect = null;
 		root.style.cursor = "grab";
 	}
-	on(window, "mouseup", releaseDrag);
+	on(window, "mouseup", (e) => {
+		const press = nodePress;
+		releaseDrag();
+		if (
+			!press ||
+			e.button !== 0 ||
+			e.metaKey ||
+			e.ctrlKey ||
+			Math.hypot(e.clientX - press.x, e.clientY - press.y) > 4
+		)
+			return;
+		const id = (e.target as Element).closest?.<HTMLElement>("#inner g.node")
+			?.dataset.nodeId;
+		if (
+			id !== press.id ||
+			!inner.contains(e.target as Node) ||
+			graphRevision !== revision
+		)
+			return;
+		hideHover();
+		cancelNodeClick();
+		// Keep the node under the second click until dblclick can be dispatched.
+		clickTimer = window.setTimeout(() => openActions(id), NODE_CLICK_DELAY_MS);
+	});
 
 	on(root, "click", (e) => {
 		if (graphRevision !== revision) return;
@@ -640,10 +709,12 @@ export function mountPreview(container: HTMLElement, host: PreviewHost) {
 	});
 
 	on(root, "dblclick", (e) => {
+		cancelNodeClick();
 		const node = (e.target as Element).closest("g.node");
 		if (node) {
 			const nodeId = (node as HTMLElement).dataset.nodeId;
 			if (nodeId) {
+				openActions(nodeId, true);
 				host.postMessage({ type: "nodeClick", nodeId });
 				return;
 			}
@@ -767,16 +838,25 @@ export function mountPreview(container: HTMLElement, host: PreviewHost) {
 		const currentRevision =
 			msg.type === "render" || msg.type === "error" ? ++revision : revision;
 		if (msg.type === "error") {
+			cancelNodeClick();
+			clearSyncEcho();
 			showError(msg.message, msg.repair);
 			return;
 		}
 		if (msg.type === "focus") {
+			const echo = syncEchoNodeId === msg.nodeId;
+			clearSyncEcho();
+			if (echo) return;
+			cancelNodeClick();
 			pendingFocusNodeId = msg.nodeId;
 			pendingFocusCue = true;
 			positionGraph();
+			if (connections.isOpen()) connections.open(msg.nodeId, true);
 			return;
 		}
 		if (msg.type === "clearFocus") {
+			cancelNodeClick();
+			clearSyncEcho();
 			pendingFocusNodeId = undefined;
 			pendingFocusCue = false;
 			selectedNodeId = undefined;
@@ -793,6 +873,8 @@ export function mountPreview(container: HTMLElement, host: PreviewHost) {
 			return;
 		}
 		if (msg.type !== "render") return;
+		cancelNodeClick();
+		clearSyncEcho();
 		clearRepair();
 		error.replaceChildren();
 		hideHover();
@@ -827,7 +909,7 @@ export function mountPreview(container: HTMLElement, host: PreviewHost) {
 			for (const node of inner.querySelectorAll<HTMLElement>("g.node")) {
 				const id = prepareGraphNode(
 					node,
-					(id) => `Node ${id}. Enter for Connections.`,
+					(id) => `Node ${id}. Click or press Enter for Connections.`,
 				);
 				if (id) {
 					const sf = Object.hasOwn(subflows, id) ? subflows[id] : undefined;
@@ -876,6 +958,8 @@ export function mountPreview(container: HTMLElement, host: PreviewHost) {
 				});
 		},
 		dispose() {
+			cancelNodeClick();
+			clearSyncEcho();
 			hideHover();
 			connections.close();
 			clearCue();
