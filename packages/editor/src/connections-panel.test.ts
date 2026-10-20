@@ -106,8 +106,14 @@ it.each([
 it.each([
 	true,
 	false,
-])("distinguishes parallel input and feedback rows after deletion (renderFirst=%s)", async (renderFirst) => {
-	const s = await setup("a >> p\na >>? p\nc >> p\n");
+])("returns focus near the deleted feedback row between input rows (renderFirst=%s)", async (renderFirst) => {
+	const source = "a >> p\nb >>? p\nc >> p\n";
+	expect(
+		analyzeSnapshot(source).diagnostics.filter(
+			(diagnostic) => diagnostic.severity === "error",
+		),
+	).toEqual([]);
+	const s = await setup(source);
 	s.container
 		.querySelector<HTMLButtonElement>(
 			'[data-side="left"] [data-edge][data-kind="feedback"]',
@@ -117,10 +123,12 @@ it.each([
 	const request = s.postMessage.mock.calls.at(-1)![0];
 	const result = previewEdits.applyPreviewEdit(s.source, request);
 	if (!result.ok) throw new Error(result.message);
+	const model = analyzeSnapshot(result.source);
+	expect(
+		model.diagnostics.filter((diagnostic) => diagnostic.severity === "error"),
+	).toEqual([]);
 	const redraw = () =>
-		s.preview.receive(
-			prepareDocument(analyzeSnapshot(result.source), null, () => null).message,
-		);
+		s.preview.receive(prepareDocument(model, null, () => null).message);
 	if (renderFirst) await redraw();
 	await s.preview.receive({ type: "editResult", request, ok: true });
 	if (!renderFirst) await redraw();
@@ -132,57 +140,70 @@ it.each([
 	);
 });
 
-it("distinguishes an unchanged feedback row from an input row on redraw", async () => {
-	const s = await setup("a >> p\na >>? p\nc >> p\n");
+it("preserves feedback row focus when input rows reorder", async () => {
+	const source = "a >>? p\nb >> p\nc >> p\n";
+	expect(
+		analyzeSnapshot(source).diagnostics.filter(
+			(diagnostic) => diagnostic.severity === "error",
+		),
+	).toEqual([]);
+	const s = await setup(source);
 	s.container
-		.querySelector<HTMLButtonElement>('[data-edge][data-kind="feedback"]')!
+		.querySelector<HTMLButtonElement>(
+			'[data-side="left"] [data-edge][data-kind="feedback"]',
+		)!
 		.focus();
-	await s.preview.receive(
-		prepareDocument(analyzeSnapshot(`${s.source}# redraw\n`), null, () => null)
-			.message,
-	);
-	expect(document.activeElement).toBe(
-		s.container.querySelector('[data-edge][data-kind="feedback"]'),
-	);
+	const redrawn = analyzeSnapshot("c >> p\na >>? p\nb >> p\n# redraw\n");
+	expect(
+		redrawn.diagnostics.filter((diagnostic) => diagnostic.severity === "error"),
+	).toEqual([]);
+	await s.preview.receive(prepareDocument(redrawn, null, () => null).message);
+	const focused = document.activeElement as HTMLButtonElement;
+	expect(focused.dataset.kind).toBe("feedback");
+	expect(
+		focused
+			.closest(".connection-row")
+			?.querySelector("[data-neighbor]")
+			?.getAttribute("data-neighbor"),
+	).toBe("a");
 });
 
 it.each([
 	true,
 	false,
-])("restores the switched semantic connection among repeated endpoints (renderFirst=%s)", async (renderFirst) => {
-	const s = await setup("a >> p\na >>? p\nc >> p\n");
-	// Removing one kind makes the remaining kind switchable without changing edit rules.
+])("restores the switched connection by row identity after reorder (renderFirst=%s)", async (renderFirst) => {
+	const source = "a >> p\nb >>? p\nc >> p\n";
+	expect(
+		analyzeSnapshot(source).diagnostics.filter(
+			(diagnostic) => diagnostic.severity === "error",
+		),
+	).toEqual([]);
+	const s = await setup(source);
 	s.container
-		.querySelector<HTMLButtonElement>('[data-edge][data-kind="input"]')!
-		.click();
-	s.container.querySelector<HTMLButtonElement>("[data-delete-edge]")!.click();
-	let request = s.postMessage.mock.calls.at(-1)![0];
-	let result = previewEdits.applyPreviewEdit(s.source, request);
-	if (!result.ok) throw new Error(result.message);
-	const remaining = result.source;
-	await s.preview.receive(
-		prepareDocument(analyzeSnapshot(remaining), null, () => null).message,
-	);
-	await s.preview.receive({ type: "editResult", request, ok: true });
-	s.container
-		.querySelector<HTMLButtonElement>('[data-edge][data-kind="feedback"]')!
+		.querySelector<HTMLButtonElement>(
+			'[data-side="left"] [data-edge][data-kind="feedback"]',
+		)!
 		.click();
 	s.container
 		.querySelector<HTMLButtonElement>("[data-toggle-feedback]")!
 		.click();
-	request = s.postMessage.mock.calls.at(-1)![0];
-	result = previewEdits.applyPreviewEdit(remaining, request);
+	const request = s.postMessage.mock.calls.at(-1)![0];
+	const result = previewEdits.applyPreviewEdit(s.source, request);
 	if (!result.ok) throw new Error(result.message);
-	const changed = result.source;
+	// The host may redraw after another source edit reorders rows while the toggle is pending.
+	const changed = result.source.replace("a >> p\nb >> p\n", "b >> p\na >> p\n");
+	expect(changed).not.toBe(result.source);
+	const model = analyzeSnapshot(changed);
+	expect(
+		model.diagnostics.filter((diagnostic) => diagnostic.severity === "error"),
+	).toEqual([]);
 	const redraw = () =>
-		s.preview.receive(
-			prepareDocument(analyzeSnapshot(changed), null, () => null).message,
-		);
+		s.preview.receive(prepareDocument(model, null, () => null).message);
 	if (renderFirst) await redraw();
 	await s.preview.receive({ type: "editResult", request, ok: true });
 	if (!renderFirst) await redraw();
 	const row = s.container
-		.querySelector('[data-neighbor="a"]')!
+		.querySelector('[data-neighbor="b"]')!
 		.closest(".connection-row")!;
 	expect(document.activeElement).toBe(
 		row.querySelector('[data-edge][data-kind="input"]'),

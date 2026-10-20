@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 import { describe, expect, it, vi } from "vitest";
+import { analyzeSnapshot, prepareDocument } from "./document.js";
 import { mountPreview } from "./preview.js";
 
 const svg = (id: string) =>
@@ -215,6 +216,32 @@ describe("portable preview lifecycle", () => {
 		await disposed;
 		expect(a.querySelector("svg")).toBeNull();
 		second.dispose();
+	});
+	it("shows V036 instead of rendering a graph with conflicting input and feedback", async () => {
+		const container = document.createElement("div");
+		document.body.append(container);
+		const renderDot = vi.fn(async () => svg("a"));
+		const preview = mountPreview(container, {
+			postMessage() {},
+			renderDot,
+		});
+		try {
+			const model = analyzeSnapshot("a >> p -> b\na >>? p\n");
+			expect(model.diagnostics.map((diagnostic) => diagnostic.code)).toContain(
+				"V036",
+			);
+			const message = prepareDocument(model, null, () => null).message;
+			expect(message.type).toBe("error");
+			await preview.receive(message);
+			expect(renderDot).not.toHaveBeenCalled();
+			expect(container.querySelector("#preview-error")?.textContent).toContain(
+				"V036",
+			);
+			expect(container.querySelector("#inner svg")).toBeNull();
+		} finally {
+			preview.dispose();
+			container.remove();
+		}
 	});
 	it("routes node gestures through the supplied host and removes listeners on disposal", async () => {
 		const root = document.createElement("div");
