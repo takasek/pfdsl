@@ -1,6 +1,6 @@
 # ADR-0040: 監査の対象についての契約と、1回の監査の実行管理を別の区分に置く
 
-- Status: Accepted
+- Status: Accepted、Superseded in part by ADR-0048（知識成果物のライフサイクル監査の項目を区分 ii とした記述。監査の対象と実行管理の区別は維持）
 - Date: 2026-09-26
 
 ## Context

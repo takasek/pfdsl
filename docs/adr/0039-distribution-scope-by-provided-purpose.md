@@ -1,6 +1,6 @@
 # ADR-0039: 配布層の所有範囲を提供すると決めた用途で定め、汎用性では定めない
 
-- Status: Accepted（区分の境界を ADR-0040 で明確化。D 層の採用宣言の記法は ADR-0041 で変更）
+- Status: Accepted（区分の境界を ADR-0040 で明確化。D 層の採用宣言の記法は ADR-0041 で変更）、Superseded in part by ADR-0048（区分 ii の要件、D 層の区分、設計記録の配置の区分、複数行本文の readback の置き場所、`takasek/common` を移設先とした記述）
 - Date: 2026-09-19
 
 ## Context
