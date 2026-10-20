@@ -38,7 +38,7 @@ export const previewMarkup = `
 <section id="node-actions" aria-label="Connections" hidden>
   <div class="connections-heading"><strong id="node-actions-title"></strong><button id="create-definition" type="button">Create definition</button><button id="node-actions-close" type="button">Close</button></div>
   <div class="connections-grid"></div>
-  <div class="connection-menu" role="group" aria-label="Connection actions" hidden></div>
+  <div class="connection-menu" role="menu" aria-label="Connection actions" hidden></div>
   <p id="node-actions-error" role="alert"></p>
 </section>
 <div id="diff-panel"></div>`;
@@ -50,19 +50,28 @@ const connectionsStyles = `
 .connections-heading strong { flex: 1; min-width: 0; overflow-wrap: anywhere; }
 .connections-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(48px, 20%) minmax(0, 1fr); min-height: 0; }
 .connections-side { display: flex; flex-direction: column; min-width: 0; min-height: 0; position: relative; }
-.connections-list { overflow-y: auto; scrollbar-gutter: stable; min-height: 30px; max-height: 180px; flex: 1; }
-.connection-row, .connections-input { display: grid; grid-template-columns: minmax(0, 1fr) 32px; gap: 0; align-items: center; }
+.connections-list { overflow-y: auto; scrollbar-gutter: stable; padding-inline: 14px; min-height: 30px; max-height: 180px; flex: 1; }
+.connection-row, .connections-input { display: grid; grid-template-columns: minmax(0, 1fr) 32px; gap: 0; align-items: center; border: 1px solid var(--pfdsl-panel-border, #777); margin: 4px 0; }
 [data-side="right"] .connection-row, [data-side="right"] .connections-input { grid-template-columns: 32px minmax(0, 1fr); }
-.connections-input { overflow-y: auto; scrollbar-gutter: stable; flex-shrink: 0; }
+.connections-input { flex-shrink: 0; margin-inline: 14px; }
 .connections-center { align-self: center; text-align: center; overflow-wrap: anywhere; padding: 4px; }
 #node-actions button, #node-actions input { color: inherit; background: var(--pfdsl-editor-background, #fff); font: inherit; margin: 4px; min-width: 0; box-sizing: border-box; overflow-wrap: anywhere; }
-#node-actions input { width: calc(100% - 8px); padding: 4px; }
-#node-actions [data-edge], #node-actions [data-create] { padding: 2px; min-height: 24px; border: 1px solid var(--pfdsl-panel-border, #777); }
-.connection-candidates { position: absolute; bottom: 100%; left: 0; right: 0; max-height: min(220px, 35vh); overflow: auto; background: var(--pfdsl-editor-background, #fff); border: 1px solid var(--pfdsl-panel-border, #777); z-index: 110; box-shadow: 0 2px 8px #0003; }
+#node-actions input { width: 100%; padding: 4px; }
+#node-actions .connection-row button, #node-actions .connections-input > * { border: 0; margin: 0; background: transparent; padding: 4px; }
+#node-actions [data-edge], #node-actions [data-create] { padding: 6px; min-height: 28px; }
+.connection-node { display: inline-block; border: 1px solid currentColor; border-radius: 0; padding: 3px 6px; overflow-wrap: anywhere; max-width: 100%; box-sizing: border-box; }
+.connection-node[data-kind="process"] { border-radius: 999px; }
+#node-actions [data-edge]::before { content: ''; display: block; border-top: 2px solid currentColor; width: 100%; }
+#node-actions [data-edge]::after { content: ''; display: block; width: 5px; height: 5px; border-top: 2px solid currentColor; border-right: 2px solid currentColor; transform: rotate(45deg); margin-left: auto; margin-top: -4px; }
+#node-actions [data-edge][data-kind="feedback"] { color: #888888; }
+#node-actions [data-edge][data-kind="feedback"]::before { border-top-style: dashed; }
+.connection-feedback-mark { display: inline-block; color: #888888; border-bottom: 2px dashed currentColor; margin-left: 6px; font-size: 0.9em; }
+.connection-candidates { position: absolute; bottom: 100%; left: 0; right: 0; max-height: min(220px, 35vh); overflow: auto; padding-inline: 14px; box-sizing: border-box; background: var(--pfdsl-editor-background, #fff); border: 1px solid var(--pfdsl-panel-border, #777); z-index: 110; box-shadow: 0 2px 8px #0003; }
 #node-actions .connection-candidates button { display: block; text-align: left; width: calc(100% - 8px); }
 #node-actions .connection-candidates [aria-selected="true"] { outline: 2px solid var(--pfdsl-focusBorder, #007fd4); outline-offset: -2px; }
-.connection-reason { font-size: 0.9em; overflow-wrap: anywhere; max-height: 3em; overflow: auto; }
-.connection-menu { padding: 4px; border: 1px solid var(--pfdsl-panel-border, #777); }
+.connection-reason { font-size: 0.9em; overflow-wrap: anywhere; max-height: 3em; overflow: auto; padding-inline: 14px; }
+.connection-menu { position: fixed; z-index: 120; padding: 4px 14px; box-sizing: border-box; max-width: calc(100vw - 8px); max-height: calc(100vh - 8px); overflow: auto; background: var(--pfdsl-editor-background, #fff); border: 1px solid var(--pfdsl-panel-border, #777); box-shadow: 0 2px 8px #0003; }
+#node-actions .connection-menu button { display: block; text-align: left; }
 #node-actions button:focus-visible, #node-actions input:focus-visible { outline: 2px solid var(--pfdsl-focusBorder, #007fd4); outline-offset: 1px; }
 `;
 export const previewStyles =

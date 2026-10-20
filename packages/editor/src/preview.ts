@@ -153,7 +153,11 @@ export function mountPreview(container: HTMLElement, host: PreviewHost) {
 		connections.close();
 		actionsToggle.focus();
 	}
-	function openActions(id: string, preserveFocus = false) {
+	function openActions(
+		id: string,
+		preserveFocus = false,
+		focusHeading = false,
+	) {
 		cancelNodeClick();
 		if (graphRevision !== revision) return;
 		selectedNodeId = id;
@@ -162,17 +166,17 @@ export function mountPreview(container: HTMLElement, host: PreviewHost) {
 		);
 		if (node) showCue(node);
 		else clearCue();
-		connections.open(id, preserveFocus);
+		connections.open(id, focusHeading);
 		if (!preserveFocus) synchronizeNode(id);
 		host.onStateChange?.();
 	}
-	on(actionsToggle, "click", () => {
+	on(actionsToggle, "click", (event) => {
 		if (connections.isOpen()) {
 			closeActions();
 			return;
 		}
 		const id = selectedNodeId ?? editingData?.nodes[0]?.id;
-		if (id) openActions(id);
+		if (id) openActions(id, false, event.detail === 0);
 	});
 	on(root, "contextmenu", (e) => {
 		const id = (e.target as Element).closest<HTMLElement>("g.node")?.dataset
@@ -189,7 +193,7 @@ export function mountPreview(container: HTMLElement, host: PreviewHost) {
 		if (id && ["Enter", " ", "ContextMenu"].includes(e.key)) {
 			e.preventDefault();
 			hideHover();
-			openActions(id);
+			openActions(id, false, true);
 		}
 	});
 	on(container, "keydown", (e) => {
@@ -851,7 +855,7 @@ export function mountPreview(container: HTMLElement, host: PreviewHost) {
 			pendingFocusNodeId = msg.nodeId;
 			pendingFocusCue = true;
 			positionGraph();
-			if (connections.isOpen()) connections.open(msg.nodeId, true);
+			if (connections.isOpen()) connections.open(msg.nodeId);
 			return;
 		}
 		if (msg.type === "clearFocus") {
@@ -962,6 +966,7 @@ export function mountPreview(container: HTMLElement, host: PreviewHost) {
 			clearSyncEcho();
 			hideHover();
 			connections.close();
+			connections.dispose();
 			clearCue();
 			disposed = true;
 			revision++;

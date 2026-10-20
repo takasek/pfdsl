@@ -59,6 +59,14 @@ Dragging pans without opening Connections, and Cmd/Ctrl+click retains location a
 Selecting a neighbor updates the diagram, Connections and editor cursor while keeping focus in Connections.
 Any editor cursor change, including keyboard, mouse, Go to definition and search navigation, updates the diagram and an open Connections panel without taking editor focus or opening a closed panel.
 Applying a preview edit keeps the panel on its current node.
+Artifacts have square outlines and processes have rounded outlines; feedback connections use dashed gray lines.
+Opening Connections with the pointer preserves focus; opening from a node with Enter focuses the first heading action without showing candidates.
+Focus or click a **Connect a node…** input to browse available candidates by ID or label, then use the arrow keys and Enter to connect one.
+Unavailable and already connected candidates are hidden; a feedback candidate appears when a normal input would create a cycle.
+After connecting a candidate, focus stays in the input and the refreshed candidates remain open.
+Click or right-click a connection line to open its menu beside the line; use arrow keys to choose an action and Escape to return to the line.
+Output connections offer **Delete** only; input connections offer **Make feedback** or **Remove feedback** when the switch is valid.
+After deleting or switching a connection, focus stays near that connection on the same side and candidates stay closed.
 Double-click a node or use **Go to definition** in Connections to move to its definition and focus the editor; undefined nodes offer **Create definition** instead.
 Use **Fit** to see the whole diagram or **Actual size** to restore 100%; the zoom display shows the current scale.
 

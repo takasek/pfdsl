@@ -1,4 +1,5 @@
 import { analyzeSource, type NormalizedEdge } from "@pfdsl/core";
+import { edgeAlreadyExists } from "./connector-logic.js";
 import type {
 	MessageFromWebview,
 	MessageToWebview,
@@ -48,11 +49,16 @@ export function mountConnections(
 	let center: string | undefined;
 	let popup: Popup | undefined;
 	let applyingFocus = false;
+	const rowEdges = new WeakMap<Element, NormalizedEdge>();
+	let acceptedSource: string | undefined;
+	let acceptedAddition: { side: Side; source: string } | undefined;
 	let pending:
 		| {
 				request: PreviewEditMessage & { requestId: string };
 				side?: Side;
 				value?: string;
+				source: string;
+				reopen: boolean;
 		  }
 		| undefined;
 	const token = ++serial;
@@ -65,16 +71,20 @@ export function mountConnections(
 		element.onclick = action;
 		return element;
 	}
-	function moveFocus(target: HTMLElement) {
+	function moveFocus(target: HTMLElement, options?: FocusOptions) {
 		// Restoring a control must not reopen its candidate popup.
 		applyingFocus = true;
 		try {
-			target.focus();
+			target.focus(options);
 		} finally {
 			applyingFocus = false;
 		}
 	}
-	function setPopup(next: Popup | undefined, target?: HTMLElement) {
+	function setPopup(
+		next: Popup | undefined,
+		target?: HTMLElement,
+		focus?: FocusOptions,
+	) {
 		if (popup?.type === "candidates")
 			popup.active?.setAttribute("aria-selected", "false");
 		popup = next;
@@ -89,15 +99,17 @@ export function mountConnections(
 			next.side.input.setAttribute("aria-activedescendant", next.active.id);
 		}
 		menu.hidden = next?.type !== "edge";
-		if (target) moveFocus(target);
+		if (target) moveFocus(target, focus);
 	}
-	function dismissPopup() {
+	function dismissPopup(focus?: FocusOptions) {
 		const previous = popup;
+		if (pending) pending.reopen = false;
+		acceptedAddition = undefined;
 		const target =
 			previous?.type === "edge" && menu.contains(document.activeElement)
 				? previous.trigger
 				: undefined;
-		setPopup(undefined, target);
+		setPopup(undefined, target, focus);
 	}
 	function connector(left: boolean) {
 		const kind = editing?.nodes.find((n) => n.id === center)?.kind;
@@ -127,11 +139,20 @@ export function mountConnections(
 		const message = { ...request, requestId: `${token}:${++requestSerial}` };
 		pending = {
 			request: message,
+			source: result.source,
+			reopen: !!side,
 			...(side ? { side, value: side.input.value } : {}),
 		};
 		error.textContent = "";
+		if (request.type === "toggleFeedback" && popup?.type === "edge") {
+			const row = popup.trigger.closest(".connection-row")!;
+			rowEdges.set(row, {
+				...popup.edge,
+				kind: request.kind === "feedback" ? "input" : "feedback",
+			});
+		}
 		const target =
-			side?.input ?? (popup?.type === "edge" ? sides[0]!.input : undefined);
+			side?.input ?? (popup?.type === "edge" ? popup.trigger : undefined);
 		setPopup(undefined, target);
 		refreshInputs();
 		host.postMessage(message);
@@ -143,7 +164,17 @@ export function mountConnections(
 			kind === "artifact" || kind === "process"
 				? model?.frontmatter?.[kind]?.[id]?.label
 				: undefined;
-		return typeof label === "string" && label !== id ? `${id} — ${label}` : id;
+		return typeof label === "string" && label !== id ? `${id} (${label})` : id;
+	}
+	function nodeName(id: string) {
+		return `${caption(id)}, ${model?.nodeKinds.get(id)}`;
+	}
+	function shape(element: HTMLElement, id: string) {
+		element.classList.add("connection-node");
+		element.setAttribute("role", "img");
+		element.dataset.kind = model?.nodeKinds.get(id);
+		element.textContent = caption(id);
+		element.setAttribute("aria-label", nodeName(id));
 	}
 	function populate(side: Side) {
 		side.candidates.replaceChildren();
@@ -157,6 +188,19 @@ export function mountConnections(
 			)
 				continue;
 			let request = requestFor(side, node.id, false);
+			// Input and feedback occupy the same side; the opposite output is independent.
+			if (
+				edgeAlreadyExists(
+					model.edges,
+					center,
+					kind!,
+					request.connector,
+					node.id,
+				) ||
+				(request.connector === ">>" &&
+					edgeAlreadyExists(model.edges, center, kind!, ">>?", node.id))
+			)
+				continue;
 			let reason = connectorError(model, request);
 			if (reason && request.connector === ">>") {
 				const feedback = { ...request, connector: ">>?" as const };
@@ -165,28 +209,43 @@ export function mountConnections(
 					reason = undefined;
 				}
 			}
+			if (reason) continue;
+			// With both input kinds' duplicates excluded, a valid feedback and an
+			// invalid input differ only in the shared validator's cycle check.
 			const feedback = request.connector === ">>?";
 			const candidate = button(
-				`${caption(node.id)}${feedback ? " — feedback" : ""}`,
-				`Connect ${caption(node.id)}${feedback ? " as feedback" : ""}`,
+				"",
+				`Connect ${nodeName(node.id)} ${side.left ? "into" : "from"} ${nodeName(center)}${feedback ? " as feedback" : ""}`,
 				() => submit(request, side),
 			);
+			const badge = document.createElement("span");
+			shape(badge, node.id);
+			candidate.append(badge);
+			if (feedback) {
+				const mark = document.createElement("span");
+				mark.className = "connection-feedback-mark";
+				mark.textContent = "feedback";
+				mark.setAttribute("aria-hidden", "true");
+				candidate.append(mark);
+				candidate.dataset.feedback = "true";
+			}
 			candidate.dataset.candidate = node.id;
 			candidate.id = `${side.candidates.id}-option-${side.candidates.childElementCount}`;
 			candidate.tabIndex = -1;
 			candidate.setAttribute("role", "option");
 			candidate.setAttribute("aria-selected", "false");
 			candidate.onpointerdown = (event) => event.preventDefault();
-			candidate.disabled = !!pending || !!reason;
-			if (reason) {
-				candidate.title = reason;
-				candidate.textContent += ` — ${reason}`;
-			}
+			candidate.disabled = !!pending;
 			side.candidates.append(candidate);
 		}
 	}
 	function showCandidates(side: Side) {
-		populate(side);
+		if (pending?.side === side) pending.reopen = true;
+		if (acceptedSource && editing?.source !== acceptedSource) {
+			// Keep the user's popup intent, but never offer an acknowledged old edge again.
+			side.candidates.replaceChildren();
+			acceptedAddition = { side, source: acceptedSource };
+		} else populate(side);
 		setPopup({ type: "candidates", side });
 	}
 	function refreshInputs() {
@@ -264,6 +323,7 @@ export function mountConnections(
 		input.onfocus = () => {
 			if (!applyingFocus) showCandidates(side);
 		};
+		input.onclick = () => showCandidates(side);
 		input.onkeydown = (event) => {
 			if (event.isComposing) return;
 			if (event.key === "ArrowDown" || event.key === "ArrowUp") {
@@ -326,7 +386,53 @@ export function mountConnections(
 		setPopup(undefined);
 		const remove = populateEdge(edge);
 		setPopup({ type: "edge", trigger, edge }, remove);
+		menu.style.left = "0px";
+		menu.style.top = "0px";
+		const anchor = trigger.getBoundingClientRect();
+		const bounds = menu.getBoundingClientRect();
+		const view = document.defaultView!;
+		menu.style.left = `${Math.max(4, Math.min(anchor.left, view.innerWidth - bounds.width - 4))}px`;
+		menu.style.top = `${Math.max(4, Math.min(anchor.bottom, view.innerHeight - bounds.height - 4))}px`;
 	}
+	menu.onkeydown = (event) => {
+		if (event.isComposing) return;
+		const items = [
+			...menu.querySelectorAll<HTMLButtonElement>("button:not(:disabled)"),
+		];
+		const index = items.indexOf(document.activeElement as HTMLButtonElement);
+		let next: HTMLButtonElement | undefined;
+		if (event.key === "ArrowDown") next = items[(index + 1) % items.length];
+		else if (event.key === "ArrowUp")
+			next = items[(index + items.length - 1) % items.length];
+		else if (event.key === "Home") next = items[0];
+		else if (event.key === "End") next = items.at(-1);
+		else return;
+		event.preventDefault();
+		next?.focus();
+	};
+	menu.addEventListener("focusout", (event: FocusEvent) => {
+		if (popup?.type === "edge" && !menu.contains(event.relatedTarget as Node))
+			setPopup(undefined);
+	});
+	function outsidePointer(event: Event) {
+		if (
+			popup?.type === "edge" &&
+			!menu.contains(event.target as Node) &&
+			!popup.trigger.contains(event.target as Node)
+		)
+			dismissPopup();
+	}
+	document.addEventListener("pointerdown", outsidePointer);
+	// The fixed menu keeps its opening coordinates, so it closes once its row can move.
+	function anchorMoved(event: Event) {
+		if (
+			popup?.type === "edge" &&
+			(event.type === "resize" || !menu.contains(event.target as Node))
+		)
+			dismissPopup({ preventScroll: true });
+	}
+	document.addEventListener("scroll", anchorMoved, true);
+	document.defaultView!.addEventListener("resize", anchorMoved);
 	function populateEdge(edge: NormalizedEdge) {
 		menu.replaceChildren();
 		const request = (
@@ -341,31 +447,36 @@ export function mountConnections(
 			submit(request("deleteConnector")),
 		);
 		remove.dataset.deleteEdge = "";
+		remove.setAttribute("role", "menuitem");
+		menu.append(remove);
+		remove.disabled = !!pending;
+		if (edge.kind === "output") return remove;
+		const result = applyPreviewEdit(editing!.source, request("toggleFeedback"));
+		if (!result.ok) return remove;
 		const toggle = button(
 			edge.kind === "feedback" ? "Remove feedback" : "Make feedback",
-			"Toggle feedback",
+			edge.kind === "feedback" ? "Remove feedback" : "Make feedback",
 			() => submit(request("toggleFeedback")),
 		);
 		toggle.dataset.toggleFeedback = "";
-		const result = applyPreviewEdit(editing!.source, request("toggleFeedback"));
-		toggle.disabled = !!pending || !result.ok;
-		if (!result.ok) toggle.title = result.message;
-		const reason = document.createElement("span");
-		reason.textContent = result.ok ? "" : result.message;
-		menu.append(remove, toggle, reason);
-		remove.disabled = !!pending;
+		toggle.setAttribute("role", "menuitem");
+		toggle.disabled = !!pending;
+		menu.append(toggle);
 		return remove;
 	}
 	function render(focused: Element | null = null) {
 		if (!center || !editing || !model) return;
-		const replacedFocus =
-			menu.contains(focused) ||
-			sides.some(
-				(side) =>
-					side.list.contains(focused) || side.candidates.contains(focused),
-			);
+		const focusSide = sides.find(
+			(side) =>
+				side.list.contains(focused) || side.candidates.contains(focused),
+		);
+		const oldRow = focused?.closest<HTMLElement>(".connection-row");
+		const oldIndex =
+			focusSide && oldRow ? [...focusSide.list.children].indexOf(oldRow) : 0;
+		const oldEdge = oldRow ? rowEdges.get(oldRow) : undefined;
+		const wasEdge = focused?.hasAttribute("data-edge");
 		title.textContent = `Connections — ${caption(center)}`;
-		centerLabel.textContent = caption(center);
+		shape(centerLabel, center);
 		definition.textContent = editing.nodes.find((n) => n.id === center)?.defined
 			? "Go to definition"
 			: "Create definition";
@@ -378,17 +489,23 @@ export function mountConnections(
 				const id = side.left ? from : to;
 				const row = document.createElement("div");
 				row.className = "connection-row";
-				const neighbor = button(caption(id), `Go to ${caption(id)}`, () => {
+				rowEdges.set(row, edge);
+				const neighbor = button("", `Go to ${nodeName(id)}`, () => {
 					host.navigate(id);
-					open(id);
+					open(id, true);
 				});
+				const badge = document.createElement("span");
+				shape(badge, id);
+				neighbor.append(badge);
 				neighbor.dataset.neighbor = id;
 				const line = button(
-					edge.kind === "feedback" ? "⇢" : "→",
-					`${edge.kind} connection from ${from} to ${to}`,
+					"",
+					`${edge.kind} connection from ${nodeName(from)} to ${nodeName(to)}. Connection actions`,
 					() => showEdge(edge, line),
 				);
 				line.dataset.edge = "";
+				line.dataset.kind = edge.kind;
+				line.setAttribute("aria-haspopup", "menu");
 				line.oncontextmenu = (event) => {
 					event.preventDefault();
 					showEdge(edge, line);
@@ -398,30 +515,44 @@ export function mountConnections(
 			}
 		}
 		refreshInputs();
-		if (replacedFocus || (focused === definition && definition.hidden))
-			moveFocus(sides[0]!.input);
+		if (focusSide) {
+			const rows = [...focusSide.list.children];
+			const same = rows.find((row) => {
+				const edge = rowEdges.get(row);
+				return (
+					oldEdge &&
+					edge?.artifact === oldEdge.artifact &&
+					edge.process === oldEdge.process &&
+					edge.kind === oldEdge.kind
+				);
+			});
+			const row = same ?? rows[Math.min(oldIndex, rows.length - 1)];
+			moveFocus(
+				row?.querySelector<HTMLButtonElement>(
+					wasEdge ? "[data-edge]" : "[data-neighbor]",
+				) ?? focusSide.input,
+			);
+		}
 	}
-	function open(id: string, preserveFocus = false) {
+	function open(id: string, focusHeading = false) {
 		if (!editing?.nodes.some((n) => n.id === id)) return;
+		const focused =
+			popup?.type === "edge" && menu.contains(document.activeElement)
+				? popup.trigger
+				: document.activeElement;
 		if (center !== id) {
 			for (const side of sides) side.input.value = "";
 			// Navigation abandons input feedback, not the edit already sent to the host.
 			if (pending) delete pending.side;
+			acceptedAddition = undefined;
 			setPopup(undefined);
 			error.textContent = "";
 		}
 		center = id;
 		panel.hidden = false;
 		host.onOpenChange(true);
-		render();
-		if (preserveFocus) return;
-		if (
-			editing.nodes.find((n) => n.id === id)?.defined ||
-			definition.disabled
-		) {
-			showCandidates(sides[0]!);
-			moveFocus(sides[0]!.input);
-		} else setPopup(undefined, definition);
+		render(focused);
+		setPopup(undefined, focusHeading ? definition : undefined);
 	}
 	definition.onclick = () => {
 		if (editing && center) {
@@ -440,10 +571,16 @@ export function mountConnections(
 		host.close();
 	return {
 		open,
+		dispose() {
+			document.removeEventListener("pointerdown", outsidePointer);
+			document.removeEventListener("scroll", anchorMoved, true);
+			document.defaultView!.removeEventListener("resize", anchorMoved);
+		},
 		isOpen: () => center !== undefined,
 		close() {
 			center = undefined;
 			if (pending) delete pending.side;
+			acceptedAddition = undefined;
 			setPopup(undefined);
 			panel.hidden = true;
 			host.onOpenChange(false);
@@ -452,9 +589,31 @@ export function mountConnections(
 			dismissPopup();
 		},
 		update(data: Editing) {
-			const focused = document.activeElement;
-			if (data?.source !== editing?.source)
+			const focused =
+				popup?.type === "edge" && menu.contains(document.activeElement)
+					? popup.trigger
+					: document.activeElement;
+			if (
+				pending &&
+				data?.source !== pending.request.source &&
+				data?.source !== pending.source
+			)
+				delete pending.side;
+			const addition = pending?.side
+				? { side: pending.side, source: pending.source }
+				: acceptedAddition;
+			const reopen =
+				popup?.type === "candidates" &&
+				popup.side === addition?.side &&
+				addition.source === data?.source &&
+				document.activeElement === addition.side.input
+					? addition.side
+					: undefined;
+			acceptedAddition = undefined;
+			if (data?.source !== editing?.source) {
+				acceptedSource = undefined;
 				model = data ? analyzeSource(data.source) : undefined;
+			}
 			editing = data;
 			setPopup(undefined);
 			if (!data?.nodes.some((n) => n.id === center)) {
@@ -462,16 +621,26 @@ export function mountConnections(
 				return;
 			}
 			render(focused);
+			if (reopen) showCandidates(reopen);
 		},
 		result(message: Extract<MessageToWebview, { type: "editResult" }>) {
 			// A reply updates data; the user may already be working elsewhere.
 			if (!pending || message.request.requestId !== pending.request.requestId)
 				return;
-			const { side, value } = pending;
+			const { request, side, value, source, reopen } = pending;
 			pending = undefined;
 			if (message.ok) {
+				if (
+					request.type === "addConnector" &&
+					editing?.source === request.source
+				)
+					acceptedSource = source;
 				if (side && side.input.value === value) side.input.value = "";
 				error.textContent = "";
+				if (side && reopen && document.activeElement === side.input) {
+					if (editing?.source !== source) acceptedAddition = { side, source };
+					showCandidates(side);
+				}
 			} else
 				error.textContent = message.message ?? "The edit could not be applied.";
 			refreshInputs();

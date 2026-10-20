@@ -1151,7 +1151,7 @@ async function assertPreviewEditingFocus(session) {
 	await leftInput.press("Enter");
 	await waitForColdRender(
 		frame.getByRole("button", {
-			name: "feedback connection from b to p",
+			name: "feedback connection from b, artifact to p, process. Connection actions",
 			exact: true,
 		}),
 		1,
@@ -1163,7 +1163,7 @@ async function assertPreviewEditingFocus(session) {
 		.click();
 	await waitForColdRender(
 		frame.getByRole("button", {
-			name: "feedback connection from second_result to p",
+			name: "feedback connection from second_result, artifact to p, process. Connection actions",
 			exact: true,
 		}),
 		1,
@@ -1206,7 +1206,7 @@ async function assertPreviewEditingFocus(session) {
 		);
 	}
 	const inputEdge = frame.getByRole("button", {
-		name: "input connection from a to p",
+		name: "input connection from a, artifact to p, process. Connection actions",
 		exact: true,
 	});
 	await inputEdge.press("Enter");
@@ -1232,12 +1232,12 @@ async function assertPreviewEditingFocus(session) {
 		const kind = action === "Remove feedback" ? "feedback" : "input";
 		await frame
 			.getByRole("button", {
-				name: `${kind} connection from a to p`,
+				name: `${kind} connection from a, artifact to p, process. Connection actions`,
 				exact: true,
 			})
 			.press("Enter");
-		const control = frame.getByRole("button", {
-			name: action === "Delete" ? "Delete this connection" : "Toggle feedback",
+		const control = frame.getByRole("menuitem", {
+			name: action === "Delete" ? "Delete this connection" : action,
 			exact: true,
 		});
 		assert.equal(await control.textContent(), action);
@@ -1258,7 +1258,7 @@ async function assertPreviewEditingFocus(session) {
 		);
 		await waitForColdRender(
 			frame.getByRole("button", {
-				name: `${action === "Make feedback" ? "feedback" : "input"} connection from a to p`,
+				name: `${action === "Make feedback" ? "feedback" : "input"} connection from a, artifact to p, process. Connection actions`,
 				exact: true,
 			}),
 			action === "Delete" ? 0 : 1,
