@@ -19,8 +19,8 @@ export interface InsertDefinitionResult {
 }
 
 /**
- * Insert a `label: <id>` definition block, optionally with initial scalar
- * fields (including an explicit label), for a node that appears only in
+ * Insert a definition containing only the supplied initial scalar fields
+ * (an empty mapping when none are supplied), for a node that appears only in
  * edges. Applied through the frontmatter yaml CST (ADR-0034), so unrelated
  * comments, quote style, and flow-vs-block choice survive untouched; a
  * no-op (and idempotent) when `id` is already defined under `kind`.
@@ -56,7 +56,7 @@ export function insertDefinition(
 	}
 
 	try {
-		doc.setIn([kind, id, "label"], id);
+		doc.setIn([kind, id], doc.createNode({}));
 		for (const [field, value] of Object.entries(fields)) {
 			doc.setIn([kind, id, field], value);
 		}

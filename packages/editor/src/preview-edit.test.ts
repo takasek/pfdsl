@@ -77,6 +77,10 @@ it("creates a definition through the CST, retaining authored body and selecting 
 	expect(result.source).toContain("title: 'Keep' # comment\r\n");
 	expect(result.source.endsWith("a >> p -> b\r\n")).toBe(true);
 	expect(result.selection).toBeDefined();
+	expect(result.source).toContain('label: ""');
+	const caret = result.selection!.start;
+	expect(result.selection!.end).toEqual(caret);
+	expect(result.source.slice(caret.offset - 1, caret.offset + 1)).toBe('""');
 	expect(result.needsCriteria).toBe(true);
 });
 

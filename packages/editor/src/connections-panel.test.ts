@@ -326,6 +326,30 @@ it("gives center and neighbors kind shapes and accessible names", async () => {
 	expect(neighbor.getAttribute("aria-label")).toContain("artifact");
 });
 
+it("treats blank labels as absent in center, neighbor and candidate names", async () => {
+	const s = await setup(
+		'---\nartifact:\n  a: {label: ""}\n  free: {label: "   "}\nprocess:\n  p: {label: "  "}\n---\na >> p -> b\n',
+	);
+	const center = s.container.querySelector<HTMLElement>(".connections-center")!;
+	expect(center.textContent).toBe("p");
+	expect(center.getAttribute("aria-label")).toBe("p, process");
+	const neighbor = s.container.querySelector<HTMLButtonElement>(
+		'[data-neighbor="a"]',
+	)!;
+	expect(neighbor.querySelector(".connection-node")?.textContent).toBe("a");
+	expect(neighbor.getAttribute("aria-label")).toBe("Go to a, artifact");
+	s.container
+		.querySelector<HTMLInputElement>('[data-side="right"] input')!
+		.focus();
+	const candidate = s.container.querySelector<HTMLButtonElement>(
+		'[data-candidate="free"]',
+	)!;
+	expect(candidate.querySelector(".connection-node")?.textContent).toBe("free");
+	expect(candidate.getAttribute("aria-label")).toBe(
+		"Connect free, artifact from p, process",
+	);
+});
+
 it("uses kind outlines, distinct connection strokes, shared borders and scroll padding", async () => {
 	const s = await setup("a >> p\nb >>? p\n");
 	const style = document.createElement("style");
@@ -631,7 +655,7 @@ it.each([
 	expect(panel.contains(document.activeElement)).toBe(true);
 });
 
-it("disables creation when a parsed metadata alias cannot retain the new definition", async () => {
+it("allows a new connection without extending an aliased metadata section", async () => {
 	const s = await setup(
 		"---\nshared: &empty {}\nartifact: *empty\n---\na >> p -> b\n",
 	);
@@ -643,8 +667,15 @@ it("disables creation when a parsed metadata alias cannot retain the new definit
 	const create = s.container.querySelector<HTMLButtonElement>(
 		'[data-side="right"] [data-create]',
 	)!;
-	expect(create.disabled).toBe(true);
-	expect(create.title).toContain("definition could not be inserted safely");
+	expect(create.disabled).toBe(false);
+	create.click();
+	expect(s.postMessage).toHaveBeenLastCalledWith(
+		expect.objectContaining({
+			type: "addConnector",
+			otherId: "fresh",
+			create: true,
+		}),
+	);
 });
 
 function expectPanelFocus(container: HTMLElement) {

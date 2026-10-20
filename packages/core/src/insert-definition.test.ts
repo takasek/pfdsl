@@ -3,6 +3,17 @@ import { analyze } from "./index.js";
 import { insertDefinition } from "./insert-definition.js";
 
 describe("insertDefinition", () => {
+	it.each([
+		{},
+		{ label: "" },
+		{ location: "build.ts" },
+	])("writes only supplied fields %j without introducing diagnostics", (fields) => {
+		const result = insertDefinition("a >> p -> b\n", "process", "p", fields);
+		expect(result.inserted).toBe(true);
+		const model = analyze(`${result.output}a >> p -> b\n`);
+		expect(model.frontmatter?.process?.p).toEqual(fields);
+		expect(model.diagnostics).toEqual(analyze("a >> p -> b\n").diagnostics);
+	});
 	it("inserts initial scalar fields with an explicit label and numeric index", () => {
 		const result = insertDefinition("a >> p -> b\n", "process", "p", {
 			label: "Build: release",
@@ -50,12 +61,13 @@ describe("insertDefinition", () => {
 		"template: &section {}\nprocess: *section",
 	])("safely refuses an unsupported section: %s", (yaml) => {
 		const src = `---\n${yaml}\n---\na >> p -> b\n`;
-		expect(() =>
-			insertDefinition(src, "process", "p", { location: "build.ts" }),
-		).not.toThrow();
-		expect(
-			insertDefinition(src, "process", "p", { location: "build.ts" }),
-		).toEqual({ output: "", inserted: false });
+		for (const fields of [{}, { location: "build.ts" }]) {
+			expect(() => insertDefinition(src, "process", "p", fields)).not.toThrow();
+			expect(insertDefinition(src, "process", "p", fields)).toEqual({
+				output: "",
+				inserted: false,
+			});
+		}
 	});
 
 	it("inserts a new block into an existing section", () => {
@@ -71,7 +83,7 @@ a >> p -> b
 `;
 		const { output, inserted } = insertDefinition(src, "artifact", "b");
 		expect(inserted).toBe(true);
-		expect(output).toContain("b:\n    label: b");
+		expect(output).toContain("b: {}");
 		// existing definitions are untouched
 		expect(output).toContain("a:\n    label: A");
 	});
@@ -86,14 +98,14 @@ a >> p -> b
 `;
 		const { output, inserted } = insertDefinition(src, "process", "p");
 		expect(inserted).toBe(true);
-		expect(output).toContain("process:\n  p:\n    label: p");
+		expect(output).toContain("process:\n  p: {}");
 	});
 
 	it("synthesizes front matter when the document has none", () => {
 		const src = "a >> p -> b\n";
 		const { output, inserted } = insertDefinition(src, "process", "p");
 		expect(inserted).toBe(true);
-		expect(output).toBe("---\nprocess:\n  p:\n    label: p\n---\n");
+		expect(output).toBe("---\nprocess:\n  p: {}\n---\n");
 	});
 
 	it("is a no-op when the node is already defined", () => {
@@ -148,7 +160,7 @@ a >> p -> b
 		expect(output).toContain("artifact:\n  # user artifacts\n");
 		const { diagnostics } = analyze(`${output}a >> p -> b\n`);
 		expect(diagnostics.filter((d) => d.severity === "error")).toEqual([]);
-		expect(output).toContain("b:\n    label: b");
+		expect(output).toContain("b: {}");
 		expect(output).toContain("a:\n    label: A");
 	});
 
@@ -166,9 +178,7 @@ a >> p -> b
 `;
 		const { output, inserted } = insertDefinition(src, "artifact", "b");
 		expect(inserted).toBe(true);
-		expect(output).toBe(
-			"---\nartifact: { a: { label: A }, b: { label: b } }\n---\n",
-		);
+		expect(output).toBe("---\nartifact: { a: { label: A }, b: {} }\n---\n");
 	});
 
 	it("normalizes an unusual indent width to the canonical 2-space step", () => {
@@ -182,7 +192,7 @@ artifact:
 a >> p -> b
 `;
 		const { output } = insertDefinition(src, "artifact", "b");
-		expect(output).toContain("  b:\n    label: b");
+		expect(output).toContain("  b: {}");
 	});
 
 	it("does not throw when the fences are well-formed but the YAML content is invalid (FM002)", () => {
@@ -231,8 +241,7 @@ artifact:
       Hello
       world.
     label: A
-  b:
-    label: b
+  b: {}
 ---
 `);
 	});
@@ -262,8 +271,7 @@ artifact:
     description: >
       Hello
       world.
-  b:
-    label: b
+  b: {}
 ---
 `);
 	});

@@ -1,5 +1,9 @@
 import type { Frontmatter } from "@pfdsl/core";
 
+export function isDisplayableLabel(value: unknown): value is string {
+	return typeof value === "string" && value.trim().length > 0;
+}
+
 export function normalizeLocation(loc: unknown): string[] {
 	if (typeof loc === "string" && loc) return [loc];
 	if (Array.isArray(loc))
@@ -18,7 +22,7 @@ export function buildDescriptions(
 		const meta = fm.artifact?.[id];
 		if (!meta) continue;
 		const rows: Array<[string, string]> = [];
-		if (meta.label) rows.push(["**", meta.label]);
+		if (isDisplayableLabel(meta.label)) rows.push(["**", meta.label]);
 		if (meta.description) rows.push(["", meta.description.trimEnd()]);
 		if (meta.owner) rows.push(["owner", meta.owner]);
 		if (meta.externalStakeholders?.length)
@@ -37,7 +41,7 @@ export function buildDescriptions(
 		const meta = fm.process?.[id];
 		if (!meta) continue;
 		const rows: Array<[string, string]> = [];
-		if (meta.label) rows.push(["**", meta.label]);
+		if (isDisplayableLabel(meta.label)) rows.push(["**", meta.label]);
 		if (meta.description) rows.push(["", meta.description.trimEnd()]);
 		if (meta.owner) rows.push(["owner", meta.owner]);
 		if (meta.externalStakeholders?.length)

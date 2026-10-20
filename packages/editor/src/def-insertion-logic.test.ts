@@ -73,6 +73,24 @@ a >> p -> b
 
 describe("findDefinitionEditTarget", () => {
 	it.each([
+		'""',
+		"''",
+	])("places the caret inside empty quoted label %s", (label) => {
+		const source = `---\nprocess: {p: {label: ${label}}}\n---\na >> p -> b\n`;
+		const target = findDefinitionEditTarget(
+			analyzeSource(source),
+			"process",
+			"p",
+		)!;
+		expect(target.labelRange.start).toEqual(target.labelRange.end);
+		expect(
+			source.slice(
+				target.labelRange.start.offset - 1,
+				target.labelRange.end.offset + 1,
+			),
+		).toBe(label);
+	});
+	it.each([
 		"\n",
 		"\r\n",
 	])("selects only the authored label value in quoted flow YAML with %j newlines", (newline) => {

@@ -55,10 +55,10 @@ Output connections offer **Delete** only; input connections offer **Make feedbac
 Deleting or switching a connection returns focus nearby on the same side without opening candidates.
 The bottom panel shows direct incoming neighbors on the left, the current node in the center, and outgoing neighbors on the right.
 Each neighbor list scrolls independently; the center and connection inputs remain visible.
-For an undefined node, **Create definition** inserts its frontmatter entry and selects the label in the editor.
+For an undefined node, **Create definition** inserts its frontmatter entry with an empty label and focuses the editor with the cursor inside its quotation marks, ready to type.
 For a defined node, **Go to definition** moves to its definition and focuses the editor.
 Focus either **Connect a node…** input to filter compatible existing nodes by ID or label, then select a candidate to connect it on that side.
-Use the adjacent **+** to explicitly create and connect a new node with the entered ID as its initial label; pressing Enter in the input does not create a node.
+Use the adjacent **+** to connect a new ID without adding a frontmatter definition or label; pressing Enter in the input does not create a node.
 Right-click a connection line to delete just that edge or switch an artifact-to-process input between normal and feedback.
 Output connections cannot become feedback; duplicate connections, new cycles and additional producers are refused with a reason.
 Each edit is one Undo step; a menu from an older document revision refuses to apply.

@@ -45,7 +45,7 @@ it.each([
 	expect(result.source).toContain("; c >> q -> d\n");
 });
 
-it("creates metadata and a connection atomically, rejecting an existing ID", () => {
+it("creates only a connection to a new ID, rejecting an existing ID", () => {
 	const source = "a >> p -> b\n";
 	const request = {
 		type: "addConnector",
@@ -59,9 +59,11 @@ it("creates metadata and a connection atomically, rejecting an existing ID", () 
 	expect(result.ok).toBe(true);
 	if (!result.ok) return;
 	expect(result.selection).toBeDefined();
-	expect(
-		analyzeSource(result.source).frontmatter?.artifact?.new_result?.label,
-	).toBe("new_result");
+	expect(analyzeSource(result.source).frontmatter).toBeNull();
+	expect(result.selection!.start).toEqual(result.selection!.end);
+	expect(result.source.slice(0, result.selection!.start.offset)).toMatch(
+		/p -> new_result$/,
+	);
 	expect(analyzeSource(result.source).edges).toContainEqual({
 		kind: "output",
 		process: "p",
@@ -119,6 +121,9 @@ it("keeps undefined endpoints when their last edge is removed", () => {
 			]),
 		);
 		expect(model.edges).toEqual([]);
+		expect(model.frontmatter?.artifact?.a).toEqual({});
+		expect(model.frontmatter?.process?.p).toEqual({});
+		expect(result.source).not.toContain("label:");
 	}
 });
 

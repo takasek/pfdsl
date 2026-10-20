@@ -6,7 +6,7 @@ import type {
 	ProcessMeta,
 } from "@pfdsl/core";
 import { resolveMeta, STYLE_ATTRS } from "@pfdsl/core";
-import { wrapLabel } from "./label.js";
+import { displayNodeLabel, wrapLabel } from "./label.js";
 
 export const DEFAULT_FEEDBACK_COLOR = "#888888";
 
@@ -129,7 +129,7 @@ export function nodeAttrs(
 ): string {
 	const shape = kind === "process" ? "ellipse" : "box";
 	const meta = resolveMeta(fm, kind, id);
-	const nodeLabel = meta?.label;
+	const nodeLabel = displayNodeLabel(id, meta?.label);
 	const description = meta?.description;
 	const ameta =
 		kind === "artifact" ? (meta as ArtifactMeta | undefined) : undefined;
@@ -144,7 +144,8 @@ export function nodeAttrs(
 		typeof fm?.layout?.maxWidth === "number" ? fm.layout.maxWidth : undefined;
 	const wrappedNodeLabel =
 		nodeLabel && maxWidth ? wrapLabel(nodeLabel, maxWidth) : nodeLabel;
-	const label = wrappedNodeLabel ? `${id}\n${wrappedNodeLabel}` : id;
+	const label =
+		wrappedNodeLabel && nodeLabel !== id ? `${id}\n${wrappedNodeLabel}` : id;
 
 	const wrappingOccurred = wrappedNodeLabel !== nodeLabel;
 	const originalLabel = nodeLabel ?? id;

@@ -112,7 +112,7 @@ export const editor = {
 			pushUndoStop() {
 				this.undoStops++;
 			},
-			executeEdits(origin, edits) {
+			executeEdits(origin, edits, selections) {
 				this.edits.push({ origin, edits });
 				if (edits.length !== 1) throw Error("Expected one edit");
 				const { range, text } = edits[0];
@@ -120,6 +120,7 @@ export const editor = {
 				const end = offset(model, range.endLineNumber, range.endColumn);
 				model.source =
 					model.source.slice(0, start) + text + model.source.slice(end);
+				if (selections) this.selection = selections[0];
 				callbacks.onDidChangeModelContent?.();
 				this.emitCursorChange(origin);
 			},

@@ -602,7 +602,7 @@ it("applies source-bound node creation as one WorkspaceEdit and rejects a stale 
 	expect(host.api.workspace.applyEdit).toHaveBeenCalledTimes(1);
 	const edit = host.api.workspace.applyEdit.mock.calls[0]![0];
 	expect(edit.replacements).toHaveLength(1);
-	expect(edit.replacements[0]!.text).toContain("label: b");
+	expect(edit.replacements[0]!.text).toContain('label: ""');
 	expect(edit.replacements[0]!.range.start).toEqual(
 		new host.api.Position(0, 0),
 	);
@@ -693,36 +693,25 @@ it.each([
 	});
 	const replacement =
 		host.api.workspace.applyEdit.mock.calls[0]![0].replacements[0]!;
-	if (create) {
-		expect(analyze(source).frontmatter?.artifact?.new_result?.label).toBe(
-			"new_result",
-		);
-		expect(source).toContain(
-			"first >> task -> old\na >> p -> b\np -> new_result\nlast >> finish -> end\n",
-		);
-	} else {
-		expect(replacement.range.start.line).toBe(2);
-		expect(replacement.range.end.line).toBe(2);
-		expect(replacement.text).toBe("p -> new_result\n");
-		expect(source).toBe(
-			"first >> task -> old\na >> p -> b\np -> new_result\nlast >> finish -> end\n",
-		);
-	}
+	expect(analyze(source).frontmatter).toBeNull();
+	expect(replacement.range.start.line).toBe(2);
+	expect(replacement.range.end.line).toBe(2);
+	expect(replacement.text).toBe("p -> new_result\n");
+	expect(source).toBe(
+		"first >> task -> old\na >> p -> b\np -> new_result\nlast >> finish -> end\n",
+	);
 	const editor = await host.window.showTextDocument.mock.results.at(-1)!.value;
 	expect(host.window.showTextDocument).toHaveBeenCalledWith(doc, {
 		viewColumn: 1,
 		preserveFocus: true,
 	});
 	expect(editor.selection).toBeUndefined();
-	if (create)
-		expect(editor.revealRange).toHaveBeenCalledWith(expect.any(host.api.Range));
-	else
-		expect(editor.revealRange).toHaveBeenCalledWith(
-			new host.api.Range(
-				new host.api.Position(2, "p -> new_result".length),
-				new host.api.Position(2, "p -> new_result".length),
-			),
-		);
+	expect(editor.revealRange).toHaveBeenCalledWith(
+		new host.api.Range(
+			new host.api.Position(2, "p -> new_result".length),
+			new host.api.Position(2, "p -> new_result".length),
+		),
+	);
 	expect(host.window.showInformationMessage).not.toHaveBeenCalled();
 });
 

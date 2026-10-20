@@ -36,6 +36,26 @@ input-data >> do-work -> output-data
 		expect(dot).toContain('"do-work" -> "output-data";');
 	});
 
+	it.each([
+		"",
+		"   ",
+	])("omits blank group labels from graph clusters (%j)", (label) => {
+		const source = [
+			"---",
+			"group:",
+			`  g: { label: ${JSON.stringify(label)} }`,
+			"artifact:",
+			"  a: { group: g }",
+			"---",
+			"a >> p -> out",
+			"",
+		].join("\n");
+		const { graph, frontmatter } = buildFromSource(source);
+		const dot = exportDot(graph, frontmatter);
+		expect(dot).not.toContain('label=""');
+		expect(dot).not.toContain('label="   "');
+	});
+
 	it("emits a digraph with default rankdir LR", () => {
 		const { graph, frontmatter } = buildFromSource("req >> design -> spec\n");
 		const dot = exportDot(graph, frontmatter);
@@ -1087,6 +1107,31 @@ v2 >> P -> X
 describe("exportDiffDot", () => {
 	const collisionBase =
 		'["a -> b", a] >> hub -> seed\nseed >> c -> out1\nseed >> "b -> c" -> out2\n';
+	it.each([
+		undefined,
+		2,
+	])("renders a label matching its node ID once in the diff graph (maxWidth=%s)", (maxWidth) => {
+		const layout =
+			maxWidth === undefined ? "" : `layout: { maxWidth: ${maxWidth} }\n`;
+		const a = analyze(
+			"---\nartifact:\n  spec: { status: todo }\n---\nspec >> P -> X\n",
+		);
+		const b = analyze(
+			`---\n${layout}artifact:\n  spec: { status: done, label: spec }\n---\nspec >> P -> X\n`,
+		);
+		const dot = exportDiffDot(a.graph, a.frontmatter, b.graph, b.frontmatter);
+		expect(dot).toContain('"spec" [shape=box, label="spec", style="filled"');
+		expect(dot).not.toContain('label="spec\\n');
+	});
+	it("renders whitespace-only node labels as the ID in the diff graph", () => {
+		const a = analyze("spec >> P -> out\n");
+		const b = analyze(
+			'---\nartifact:\n  spec: { label: "   " }\n---\nspec >> P -> out\n',
+		);
+		const dot = exportDiffDot(a.graph, a.frontmatter, b.graph, b.frontmatter);
+		expect(dot).toContain('"spec" [shape=box, label="spec"');
+		expect(dot).not.toContain('label="spec\\n');
+	});
 	it.each([
 		">>",
 		">>?",

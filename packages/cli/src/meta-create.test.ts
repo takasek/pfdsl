@@ -59,9 +59,7 @@ describe("meta create", () => {
 		writeFileSync(file, source);
 		const result = await run(["meta", "create", file, "p"]);
 		expect(result.exitCode).toBe(0);
-		expect(result.stdout).toBe(
-			"---\nprocess:\n  p:\n    label: p\n---\na >> p -> b\n",
-		);
+		expect(result.stdout).toBe("---\nprocess:\n  p: {}\n---\na >> p -> b\n");
 		expect(readFileSync(file, "utf8")).toBe(source);
 	});
 
@@ -91,7 +89,7 @@ describe("meta create", () => {
 		});
 		expect(
 			analyze(readFileSync(file, "utf8")).frontmatter?.artifact?.b,
-		).toMatchObject({ label: "b", status: "todo", index: 4 });
+		).toEqual({ status: "todo", index: 4 });
 	});
 
 	it("retains commas and equals in positional field values and requires explicit unknown-field permission", async () => {
@@ -133,7 +131,8 @@ describe("meta create", () => {
 			written: false,
 			line: 3,
 		});
-		expect(payload.output).toContain("label: p");
+		expect(payload.output).toContain("p: {}");
+		expect(payload.output).not.toContain("label:");
 		expect(readFileSync(file, "utf8")).toBe(source);
 	});
 
@@ -175,7 +174,7 @@ describe("meta create", () => {
 		]);
 		expect(result.exitCode).toBe(0);
 		expect(readFileSync(file, "utf8")).toContain(
-			"process: { q: { label: 'Keep' }, p: { label: p, location: src/a.ts } }",
+			"process: { q: { label: 'Keep' }, p: { location: src/a.ts } }",
 		);
 	});
 
@@ -469,9 +468,7 @@ describe("meta create", () => {
 		expect(created.exitCode, created.stderr).toBe(0);
 		expect(
 			analyze(readFileSync(file, "utf8")).frontmatter?.[kind]?.[id],
-		).toEqual(
-			kind === "artifact" ? { label: id, status: "todo" } : { label: id },
-		);
+		).toEqual(kind === "artifact" ? { status: "todo" } : {});
 	});
 
 	it("documents creation, positional fields, previews and definition position", async () => {
@@ -482,6 +479,24 @@ describe("meta create", () => {
 		expect(result.stdout).toContain("--allow-unknown");
 		expect(result.stdout).toContain("location=src/build.ts");
 		expect(result.stdout).toContain("status=todo");
+		expect(result.stdout).toContain(
+			"No label is added unless label=value is supplied.",
+		);
+	});
+	it("writes an explicitly empty label", async () => {
+		writeFileSync(file, "a >> p -> b\n");
+		const result = await run([
+			"meta",
+			"create",
+			file,
+			"p",
+			"label=",
+			"--write",
+		]);
+		expect(result.exitCode).toBe(0);
+		expect(analyze(readFileSync(file, "utf8")).frontmatter?.process?.p).toEqual(
+			{ label: "" },
+		);
 	});
 
 	it("rejects stdin and missing arguments", async () => {

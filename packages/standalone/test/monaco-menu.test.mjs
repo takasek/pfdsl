@@ -387,7 +387,7 @@ test("the production document-tab entry loads real Monaco menu contributions", a
 					editor.setPosition({ lineNumber: 1, column: 1 });
 					await editor.getAction("pfdsl.insertDefinition").run();
 					assert.match(editor.getValue(), /artifact:[\s\S]*a:[\s\S]*label:/);
-					assert.equal(model.getValueInRange(editor.getSelection()), "a");
+					assert.equal(model.getValueInRange(editor.getSelection()), "");
 					await model.undo();
 					assert.equal(editor.getValue(), "a >> p -> b\n");
 					await model.redo();
@@ -452,7 +452,11 @@ test("the production document-tab entry loads real Monaco menu contributions", a
 					const fresh = (await actions())[0];
 					await host.applyEdit(fresh.edit);
 					await host.execute(fresh.command.id, ...fresh.command.arguments);
-					assert.equal(model.getValueInRange(editor.getSelection()), "b");
+					assert.equal(model.getValueInRange(editor.getSelection()), "");
+					const caret = model.getOffsetAt(
+						editor.getSelection().getStartPosition(),
+					);
+					assert.equal(editor.getValue().slice(caret - 1, caret + 1), '""');
 					assert.match(editor.getValue(), /a >> p -> b\r\n$/);
 					assert.equal(other.getValue(), "a >> p -> b\r\n");
 					await model.undo();

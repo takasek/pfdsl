@@ -14,6 +14,40 @@ import {
 // reaches the branches a whole-graph assertion cannot single out — the 3-digit
 // hex form, the non-colour input, the minimum-width floor.
 
+describe("matching node labels", () => {
+	it.each([
+		"artifact",
+		"process",
+	] as const)("renders a matching %s label once even with wrapping", (kind) => {
+		for (const maxWidth of [undefined, 3]) {
+			const id = "long_identifier";
+			const fm: Frontmatter = {
+				[kind]: { [id]: { label: id } },
+				layout: maxWidth === undefined ? {} : { maxWidth },
+			};
+			expect(nodeAttrs(id, kind, fm)).toBe(
+				`[shape=${kind === "process" ? "ellipse" : "box"}, label="${id}"]`,
+			);
+			fm[kind]![id]!.description = "Details";
+			expect(nodeAttrs(id, kind, fm)).toContain(`tooltip="${id}\\n\\nDetails"`);
+		}
+	});
+
+	it.each([
+		"",
+		" \t ",
+	])("matches absent labels in DOT attributes (%j)", (label) => {
+		const attrs = nodeAttrs("a", "artifact", {
+			artifact: { a: { label, description: "Details" } },
+		});
+		expect(attrs).toBe(
+			nodeAttrs("a", "artifact", {
+				artifact: { a: { description: "Details" } },
+			}),
+		);
+	});
+});
+
 describe("quote", () => {
 	it("wraps a plain string in double quotes", () => {
 		expect(quote("plain")).toBe('"plain"');

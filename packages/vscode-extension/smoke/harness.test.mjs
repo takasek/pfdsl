@@ -37,6 +37,7 @@ import {
 	collectWebviewFailureSnapshot,
 	findTextEndPosition,
 	isCursorNavigationTransition,
+	isDefinitionInsertionUndone,
 	isWithinScaleTolerance,
 	minimapClickChangesPan,
 	minimapDragChangesPan,
@@ -49,6 +50,24 @@ import {
 	waitForWorkbenchPage,
 	withWorkbenchOperation,
 } from "./run.mjs";
+
+test("definition Undo accepts Monaco spaces and rejects remaining metadata", () => {
+	const body = "requirements >> design -> smoke_output";
+	assert.equal(
+		isDefinitionInsertionUndone(body.replaceAll(" ", "\u00a0")),
+		true,
+	);
+	assert.equal(
+		isDefinitionInsertionUndone(`artifact:smoke_output:{}${body}`),
+		false,
+	);
+	assert.equal(isDefinitionInsertionUndone(`label: ""${body}`), false);
+	assert.equal(isDefinitionInsertionUndone(""), false);
+	assert.equal(
+		isDefinitionInsertionUndone("requirements >> design -> other"),
+		false,
+	);
+});
 
 test("command palette replacement keeps the command provider prefix", () => {
 	assert.equal(
