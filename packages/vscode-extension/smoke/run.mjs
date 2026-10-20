@@ -1036,11 +1036,15 @@ async function assertDefinitionQuickFix(session) {
 		.locator(".monaco-editor .view-lines")
 		.first();
 	const labelPrefix = 'label: "';
+	// Monaco renders some spaces in view lines as U+00A0.
+	const plainSpaces = (text) => text.replace(/ /g, " ");
 	await waitForInteraction(
 		"Quick Fix placed the cursor in the empty label",
 		async () => ({
 			status: await readStatusText(session.page),
-			sourceLines: await quickFixSource.locator(".view-line").allTextContents(),
+			sourceLines: (
+				await quickFixSource.locator(".view-line").allTextContents()
+			).map(plainSpaces),
 		}),
 		({ status, sourceLines }) => {
 			// The status bar text also carries its CSS, so read the selection
@@ -1073,7 +1077,7 @@ async function assertDefinitionQuickFix(session) {
 	await session.page.keyboard.press(`${modifier}+z`);
 	await expectEventually(
 		"Undo restores the empty label",
-		() => quickFixSource.textContent(),
+		async () => plainSpaces((await quickFixSource.textContent()) ?? ""),
 		(text) =>
 			text?.includes('label: ""') === true && !text.includes("FriendlyResult"),
 	);
