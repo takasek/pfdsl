@@ -161,6 +161,11 @@ export function decideOperation(input) {
 			"classes must be a nonempty array of finite operation classes.",
 		);
 	if (cell.health === "failed") {
+		if (cell.delegated)
+			return stopped(
+				"Return policy or parser repair to the parent. Delegated Codex authority cannot be established while the hook is unhealthy.",
+				"parent",
+			);
 		if (cell.failure === "parser-timeout")
 			return stopped(
 				"Shell parsing was temporarily delayed. Retry the same command.",

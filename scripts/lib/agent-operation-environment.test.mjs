@@ -84,7 +84,7 @@ test("each inherited Git target variable makes mutations unresolved without weak
 	}
 });
 
-function fixture({ nativeLock = true } = {}) {
+function fixture({ nativeLock = true, extraLocks = {} } = {}) {
 	const root = mkdtempSync(
 		fileURLToPath(new URL("../../node_modules/pfdsl-facts-", import.meta.url)),
 	);
@@ -101,11 +101,16 @@ function fixture({ nativeLock = true } = {}) {
 	symlinkSync(join(roots.primary, "a"), join(roots.own, "file-link"));
 	const commonDir = join(roots.primary, ".git");
 	const start = "Mon Oct 12 00:00:00 2026";
+	const locks = {
+		live: 456,
+		...(nativeLock ? { native: 123 } : {}),
+		...extraLocks,
+	};
 	const listing = Object.entries(roots)
 		.filter(([name]) => name !== "foreign")
 		.map(
 			([name, path]) =>
-				`worktree ${path}\0branch refs/heads/${name === "primary" ? "main" : `feat/${name}`}\0${name === "live" || (name === "native" && nativeLock) ? `locked claude session ${name} (pid ${name === "live" ? 456 : 123} start ${start})\0` : ""}\0`,
+				`worktree ${path}\0branch refs/heads/${name === "primary" ? "main" : `feat/${name}`}\0${locks[name] ? `locked claude session ${name} (pid ${locks[name]} start ${start})\0` : ""}\0`,
 		)
 		.join("");
 	const seen = [];
@@ -332,4 +337,209 @@ test("patch deletion observes its own directory entry rather than the symlink's 
 	} finally {
 		f.cleanup();
 	}
+});
+
+function delegatedFacts(
+	f,
+	payload,
+	{
+		connected = true,
+		ownerPid = 123,
+		start = "Mon Oct 12 00:00:00 2026",
+		ownerStart = start,
+	} = {},
+) {
+	return collectAgentOperationEnvironment(payload, {
+		hookRoot: f.root,
+		environment: { CLAUDECODE: "1" },
+		parentPid: 10,
+		shell: payload.tool_input?.command
+			? readShell(payload.tool_input.command)
+			: undefined,
+		probeGit: f.probeGit,
+		probeProcess: (_command, args) => {
+			if (args[1] === "lstart=") return { ok: connected, out: start };
+			const rows = {
+				10: "10 20 Mon Oct 12 00:00:01 2026 /Applications/codex",
+				20: `20 ${ownerPid} Mon Oct 12 00:00:01 2026 /bin/zsh`,
+				[ownerPid]: `${ownerPid} 1 ${ownerStart} /Applications/Claude Code/claude`,
+			};
+			return { ok: connected, out: rows[args.at(-1)] ?? "" };
+		},
+		readMetadata: f.readMetadata,
+	});
+}
+
+test("Claude-delegated Codex is a child without agent_id and may patch only its live owner's tree", () => {
+	const f = fixture();
+	try {
+		for (const [target, expected] of [
+			["native", "allow"],
+			["live", "deny"],
+			["unowned", "deny"],
+			["primary", "deny"],
+			["foreign", "deny"],
+		]) {
+			const payload = {
+				tool_name: "apply_patch",
+				cwd: f.roots.native,
+				session_id: "session",
+				tool_input: {
+					command: `*** Begin Patch\n*** Add File: ${f.roots[target]}/new.txt\n+hello\n*** End Patch`,
+				},
+			};
+			const facts = delegatedFacts(f, payload);
+			assert.equal(
+				classifyAgentOperations(payload, facts).subject,
+				"codex-child",
+			);
+			assert.equal(
+				evaluateAgentOperationPolicy(payload, facts).decision,
+				expected,
+				target,
+			);
+		}
+	} finally {
+		f.cleanup();
+	}
+});
+
+test("delegation never authorizes Git metadata, Git mutation, remote writes, wrappers or mixed calls", () => {
+	const f = fixture();
+	try {
+		for (const command of [
+			`git -C ${f.roots.native} add a`,
+			`git -C ${f.roots.native} commit -m x`,
+			`git -C ${f.roots.native} push origin HEAD`,
+			`git -C ${f.roots.native} config user.name x`,
+			`git -C ${f.roots.native} branch topic`,
+			`git -C ${f.roots.native} status && gh issue comment 1 --body x`,
+			"gh pr create --title x --body x",
+			`node /fixture/.codex/bin/codex-git-routine.mjs commit ${f.roots.native} topic x`,
+		]) {
+			const payload = {
+				tool_name: "Bash",
+				cwd: f.roots.native,
+				session_id: "session",
+				tool_input: { command },
+			};
+			const facts = delegatedFacts(f, payload);
+			assert.equal(
+				classifyAgentOperations(payload, facts).subject,
+				"codex-child",
+			);
+			assert.equal(
+				evaluateAgentOperationPolicy(payload, facts).decision,
+				"deny",
+				command,
+			);
+		}
+		for (const payload of [
+			{ tool_name: "mcp__github__create_issue", tool_input: {} },
+			{
+				tool_name: "apply_patch",
+				cwd: f.roots.native,
+				tool_input: {
+					command: `*** Begin Patch\n*** Add File: ${f.commonDir}/new-metadata\n+x\n*** End Patch`,
+				},
+			},
+			{
+				tool_name: "Write",
+				cwd: f.roots.native,
+				tool_input: { file_path: `${f.commonDir}/config`, content: "x" },
+			},
+		]) {
+			const facts = delegatedFacts(f, payload);
+			assert.equal(
+				classifyAgentOperations(payload, facts).subject,
+				"codex-child",
+			);
+			assert.equal(
+				evaluateAgentOperationPolicy(payload, facts).decision,
+				"deny",
+			);
+		}
+	} finally {
+		f.cleanup();
+	}
+});
+
+test("missing chain, wrong owner, PID reuse and missing lock deny file writes without parent fallback", () => {
+	for (const [fixtureOptions, options] of [
+		[{}, { connected: false }],
+		[{}, { ownerPid: 999 }],
+		[{}, { start: "Mon Oct 12 01:00:00 2026" }],
+		[{ nativeLock: false }, {}],
+	]) {
+		const f = fixture(fixtureOptions);
+		try {
+			const payload = {
+				tool_name: "Write",
+				cwd: f.roots.native,
+				session_id: "session",
+				tool_input: { file_path: `${f.roots.native}/a`, content: "x" },
+			};
+			const facts = delegatedFacts(f, payload, options);
+			assert.equal(
+				classifyAgentOperations(payload, facts).subject,
+				"codex-child",
+			);
+			assert.equal(
+				evaluateAgentOperationPolicy(payload, facts).decision,
+				"deny",
+			);
+		} finally {
+			f.cleanup();
+		}
+	}
+});
+
+test("a live owner lock is not enough: the chain's Claude start and the session worktree must match", () => {
+	for (const [fixtureOptions, options, expected] of [
+		// The chain's Claude and the lock's ps disagree on the start of the same PID.
+		[{}, { ownerStart: "Mon Oct 12 01:00:00 2026" }, { native: "deny" }],
+		// The delegating Claude also owns a worktree outside this session.
+		[{ extraLocks: { own: 123 } }, {}, { native: "allow", own: "deny" }],
+	]) {
+		const f = fixture(fixtureOptions);
+		try {
+			for (const [target, decision] of Object.entries(expected)) {
+				const payload = {
+					tool_name: "Write",
+					cwd: f.roots.native,
+					session_id: "session",
+					tool_input: { file_path: `${f.roots[target]}/a`, content: "x" },
+				};
+				assert.equal(
+					evaluateAgentOperationPolicy(
+						payload,
+						delegatedFacts(f, payload, options),
+					).decision,
+					decision,
+					target,
+				);
+			}
+		} finally {
+			f.cleanup();
+		}
+	}
+});
+
+test("a lost delegation still permits reads without inspecting native ownership", () => {
+	const payload = {
+		tool_name: "Bash",
+		cwd: "/no/repo",
+		tool_input: { command: "git status" },
+	};
+	const facts = collectAgentOperationEnvironment(payload, {
+		environment: { CLAUDECODE: "1" },
+		parentPid: 10,
+		shell: readShell("git status"),
+		probeProcess: () => ({ ok: false, out: "" }),
+		probeGit: () => {
+			throw new Error("read must not probe Git");
+		},
+	});
+	assert.equal(classifyAgentOperations(payload, facts).subject, "codex-child");
+	assert.equal(evaluateAgentOperationPolicy(payload, facts).decision, "allow");
 });

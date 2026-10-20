@@ -3,6 +3,7 @@
 import { lstatSync } from "node:fs";
 import { dirname, isAbsolute, resolve } from "node:path";
 import { classifyAgentOperations } from "./agent-operation-classifier.mjs";
+import { observeCodexClaudeDelegation } from "./codex-claude-delegation.mjs";
 import { createGuardProbe } from "./guard-probe.mjs";
 import {
 	readNativeWorktreeMetadata,
@@ -119,6 +120,11 @@ export function collectAgentOperationEnvironment(
 		payload.session_id || (harness === "claude" ? `claude:${parentPid}` : null);
 	const facts = {
 		harness,
+		codexDelegation: observeCodexClaudeDelegation({
+			environment,
+			parentPid,
+			probeProcess,
+		}),
 		health: "healthy",
 		hookRoot,
 		sessionRoot,
@@ -230,8 +236,21 @@ export function collectAgentOperationEnvironment(
 							: `claude:${lock[1]}:${normalizeStart(lock[2])}`,
 					live: true,
 				};
+			const owner = facts.codexDelegation?.owner;
+			if (
+				!tree.primary &&
+				root === facts.sessionRoot &&
+				tree.ownership?.live &&
+				owner?.pid === Number(lock[1]) &&
+				owner.start === normalizeStart(lock[2])
+			) {
+				// The delegating Claude keeps ownership; only this child's ordinary
+				// file scope is mapped to own. Subject authority stays codex-child.
+				tree.delegationVerified = true;
+				tree.ownership = { ownerId: sessionId, live: true };
+			}
 		}
-		if (!tree.primary && !tree.ownership?.live) {
+		if (!tree.primary && !tree.ownership?.live && !facts.codexDelegation) {
 			const relation = refineNativeWorktreeRelation("sibling", {
 				targetRoot: root,
 				payload,

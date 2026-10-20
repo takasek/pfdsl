@@ -28,6 +28,7 @@ const helperFiles = [
 	"lib/agent-operation-table.mjs",
 	"lib/agent-operation-policy.mjs",
 	"lib/agent-operation-environment.mjs",
+	"lib/codex-claude-delegation.mjs",
 	"lib/shell-commands.mjs",
 	"lib/shell-parser-tool.mjs",
 	"lib/run-exec.mjs",
@@ -47,6 +48,9 @@ function fixture() {
 		other = join(root, "other");
 	const env = withoutGitTargetEnvironment(process.env);
 	delete env.CLAUDE_PROJECT_DIR;
+	// A Claude Bash exports CLAUDECODE, which would make every Codex case a delegated child.
+	// Delegation cases set it explicitly.
+	delete env.CLAUDECODE;
 	const git = (cwd, args) =>
 		run("git", args, { cwd, env, captureStderr: true }).trim();
 	mkdirSync(primary);
@@ -127,6 +131,34 @@ function fixture() {
 		cleanup: () => rmSync(root, { recursive: true, force: true }),
 	};
 }
+
+test("delegated Codex entry keeps child restrictions when the fixed chain is missing", () => {
+	const f = fixture();
+	try {
+		const options = { harness: "codex", environment: { CLAUDECODE: "1" } };
+		for (const command of [
+			`git -C ${f.own} add a`,
+			"gh issue comment 1 --body x",
+		])
+			assert.equal(f.invoke({ command }, options).decision, "deny");
+		assert.equal(
+			f.invoke({ command: "git status" }, options).decision,
+			"allow",
+		);
+		assert.equal(
+			f.invoke(
+				{ file_path: join(f.own, "a"), content: "x" },
+				{ ...options, tool_name: "Write" },
+			).decision,
+			"deny",
+		);
+		rmSync(shellParserPath(f.own));
+		const repair = parserRecoveryCommand(f.own);
+		assert.equal(f.invoke({ command: repair }, options).decision, "deny");
+	} finally {
+		f.cleanup();
+	}
+});
 
 test("entry integration: normal and safety representatives for Claude and Codex", () => {
 	const f = fixture();
