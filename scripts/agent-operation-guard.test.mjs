@@ -133,6 +133,29 @@ function fixture() {
 	};
 }
 
+test("primary fast-forward preparation passes the hook entry while unsafe variants remain denied", () => {
+	const f = fixture();
+	try {
+		f.git(f.primary, ["fetch", "origin", "main:refs/remotes/origin/main"]);
+		f.git(f.primary, ["branch", "--set-upstream-to=origin/main", "main"]);
+		const command = `git -C ${f.primary} pull --ff-only --no-autostash origin main`;
+		const options = { harness: "codex", cwd: f.primary };
+		assert.equal(f.invoke({ command }, options).decision, "allow");
+		assert.equal(
+			f.invoke({ command }, { ...options, agent_id: "child" }).decision,
+			"deny",
+		);
+		assert.equal(
+			f.invoke({ command: `git -C ${f.primary} add a` }, options).decision,
+			"deny",
+		);
+		writeFileSync(join(f.primary, "untracked"), "keep");
+		assert.equal(f.invoke({ command }, options).decision, "deny");
+	} finally {
+		f.cleanup();
+	}
+});
+
 test("delegated Codex entry keeps child restrictions when the fixed chain is missing", () => {
 	const f = fixture();
 	try {
