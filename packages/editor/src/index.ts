@@ -15,3 +15,4 @@ export * from "./preview-graph.js";
 export * from "./preview-logic.js";
 export { previewMarkup, previewStyles } from "./preview-shell.js";
 export * from "./references.js";
+export * from "./repair-result.js";

@@ -72,16 +72,20 @@ export function mountConnections(
 		element.onclick = action;
 		return element;
 	}
-	function moveFocus(target: HTMLElement) {
+	function moveFocus(target: HTMLElement, options?: FocusOptions) {
 		// Restoring a control must not reopen its candidate popup.
 		applyingFocus = true;
 		try {
-			target.focus();
+			target.focus(options);
 		} finally {
 			applyingFocus = false;
 		}
 	}
-	function setPopup(next: Popup | undefined, target?: HTMLElement) {
+	function setPopup(
+		next: Popup | undefined,
+		target?: HTMLElement,
+		focus?: FocusOptions,
+	) {
 		if (popup?.type === "candidates")
 			popup.active?.setAttribute("aria-selected", "false");
 		popup = next;
@@ -96,9 +100,9 @@ export function mountConnections(
 			next.side.input.setAttribute("aria-activedescendant", next.active.id);
 		}
 		menu.hidden = next?.type !== "edge";
-		if (target) moveFocus(target);
+		if (target) moveFocus(target, focus);
 	}
-	function dismissPopup() {
+	function dismissPopup(focus?: FocusOptions) {
 		const previous = popup;
 		if (pending) pending.reopen = false;
 		acceptedAddition = undefined;
@@ -106,7 +110,7 @@ export function mountConnections(
 			previous?.type === "edge" && menu.contains(document.activeElement)
 				? previous.trigger
 				: undefined;
-		setPopup(undefined, target);
+		setPopup(undefined, target, focus);
 	}
 	function connector(left: boolean) {
 		const kind = editing?.nodes.find((n) => n.id === center)?.kind;
@@ -420,6 +424,16 @@ export function mountConnections(
 			dismissPopup();
 	}
 	document.addEventListener("pointerdown", outsidePointer);
+	// The fixed menu keeps its opening coordinates, so it closes once its row can move.
+	function anchorMoved(event: Event) {
+		if (
+			popup?.type === "edge" &&
+			(event.type === "resize" || !menu.contains(event.target as Node))
+		)
+			dismissPopup({ preventScroll: true });
+	}
+	document.addEventListener("scroll", anchorMoved, true);
+	document.defaultView!.addEventListener("resize", anchorMoved);
 	function populateEdge(edge: NormalizedEdge) {
 		menu.replaceChildren();
 		const request = (
@@ -560,6 +574,8 @@ export function mountConnections(
 		open,
 		dispose() {
 			document.removeEventListener("pointerdown", outsidePointer);
+			document.removeEventListener("scroll", anchorMoved, true);
+			document.defaultView!.removeEventListener("resize", anchorMoved);
 		},
 		isOpen: () => center !== undefined,
 		close() {

@@ -44,6 +44,9 @@ function prepareGraphNode(
 	return id;
 }
 
+/** Distinguishes repair requests of previews mounted in the same document. */
+let repairSerial = 0;
+
 /** Mount one independent preview. Transport and lifetime belong to its host. */
 export function mountPreview(container: HTMLElement, host: PreviewHost) {
 	const document = container.ownerDocument;
@@ -744,10 +747,33 @@ export function mountPreview(container: HTMLElement, host: PreviewHost) {
 		return s.replace(/[&<>"']/g, (c) => HTML_ESCAPES[c]!);
 	}
 
-	function showError(message: string) {
+	const repairToken = ++repairSerial;
+	let repairRequestSerial = 0;
+	type Repair = Extract<MessageToWebview, { type: "error" }>["repair"];
+	let pendingRepair: string | undefined;
+	let shownRepair: Repair;
+	let repairButtons: HTMLButtonElement[] = [];
+	let repairNotice: HTMLElement | undefined;
+	function clearRepair() {
+		pendingRepair = undefined;
+		shownRepair = undefined;
+		repairButtons = [];
+		repairNotice = undefined;
+	}
+	function showError(message: string, repair?: Repair) {
 		const previewFocused =
 			actions.contains(document.activeElement) ||
-			root.contains(document.activeElement);
+			root.contains(document.activeElement) ||
+			error.contains(document.activeElement);
+		// A host may resend the unchanged error while a repair is applied; only a
+		// different source or pair makes the pending request obsolete.
+		const pending =
+			repair &&
+			shownRepair?.source === repair.source &&
+			shownRepair.artifact === repair.artifact &&
+			shownRepair.process === repair.process
+				? pendingRepair
+				: undefined;
 		selectedNodeId = pendingFocusNodeId = undefined;
 		lastFocusedNodeId = undefined;
 		hideHover();
@@ -756,6 +782,40 @@ export function mountPreview(container: HTMLElement, host: PreviewHost) {
 		editingData = undefined;
 		actionsToggle.disabled = true;
 		error.textContent = message;
+		clearRepair();
+		if (repair) {
+			shownRepair = repair;
+			pendingRepair = pending;
+			const controls = document.createElement("div");
+			controls.className = "error-repair";
+			repairNotice = document.createElement("span");
+			for (const [label, kind] of [
+				["Keep normal input", "feedback"],
+				["Keep feedback", "input"],
+			] as const) {
+				const button = document.createElement("button");
+				button.type = "button";
+				button.textContent = label;
+				button.disabled = pending !== undefined;
+				button.onclick = () => {
+					pendingRepair = `repair:${repairToken}:${++repairRequestSerial}`;
+					for (const control of repairButtons) control.disabled = true;
+					repairNotice!.textContent = "";
+					host.postMessage({
+						type: "deleteConnector",
+						nodeId: repair.artifact,
+						...repair,
+						kind,
+						repair: true,
+						requestId: pendingRepair,
+					});
+				};
+				repairButtons.push(button);
+				controls.append(button);
+			}
+			controls.append(repairNotice);
+			error.append(controls);
+		}
 		error.hidden = false;
 		root.hidden = true;
 		inner.replaceChildren();
@@ -771,6 +831,12 @@ export function mountPreview(container: HTMLElement, host: PreviewHost) {
 		if (disposed) return;
 		if (msg.type === "editResult") {
 			connections.result(msg);
+			if (pendingRepair && msg.request.requestId === pendingRepair && !msg.ok) {
+				pendingRepair = undefined;
+				repairNotice!.textContent =
+					msg.message ?? "The edit could not be applied.";
+				for (const button of repairButtons) button.disabled = false;
+			}
 			return;
 		}
 		const currentRevision =
@@ -778,7 +844,7 @@ export function mountPreview(container: HTMLElement, host: PreviewHost) {
 		if (msg.type === "error") {
 			cancelNodeClick();
 			clearSyncEcho();
-			showError(msg.message);
+			showError(msg.message, msg.repair);
 			return;
 		}
 		if (msg.type === "focus") {
@@ -813,6 +879,8 @@ export function mountPreview(container: HTMLElement, host: PreviewHost) {
 		if (msg.type !== "render") return;
 		cancelNodeClick();
 		clearSyncEcho();
+		clearRepair();
+		error.replaceChildren();
 		hideHover();
 		const panelFocused = actions.contains(document.activeElement);
 		connections.update(msg.editing);

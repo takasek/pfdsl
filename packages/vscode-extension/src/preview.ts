@@ -8,6 +8,7 @@ import {
 	nodeIdAtSourcePosition,
 	type PreviewEditMessage,
 	positionOfNodeId,
+	repairResultMessage,
 } from "@pfdsl/editor";
 import * as vscode from "vscode";
 import {
@@ -108,7 +109,8 @@ function sourceColumnOutsidePreview(
 		group.tabs.some(
 			(tab) =>
 				tab.input instanceof vscode.TabInputWebview &&
-				tab.input.viewType === state.previewViewType &&
+				// VS Code prefixes a webview tab's type with "mainThreadWebview-".
+				tab.input.viewType.endsWith(state.previewViewType) &&
 				tab.label === state.panel.title,
 		),
 	);
@@ -172,6 +174,10 @@ async function editFromPreview(
 		return;
 	}
 	reply(true);
+	if (request.repair && request.type === "deleteConnector")
+		vscode.window.showInformationMessage(
+			repairResultMessage(request, snapshot.source, result.source),
+		);
 	if (result.selection) {
 		const { start, end } = result.selection;
 		const range = new vscode.Range(

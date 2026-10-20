@@ -28,10 +28,6 @@ button {
 	border: 1px solid #ccc;
 	border-radius: 4px;
 }
-button[aria-selected="true"] {
-	background: #e6f0ff;
-	border-color: #3369a0;
-}
 #status {
 	flex-basis: 100%;
 	overflow-wrap: anywhere;
@@ -56,19 +52,17 @@ header {
 	gap: 8px;
 	padding: 6px 10px;
 }
-#document-name {
-	overflow-wrap: anywhere;
-	min-width: 0;
-}
 #document-state {
+	white-space: nowrap;
 	color: #555;
 }
 #document-location {
-	overflow-wrap: anywhere;
-}
-#location-details {
-	margin-left: auto;
+	min-width: 0;
 	max-width: 70%;
+	margin-left: auto;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
 }
 #start-screen {
 	margin: auto;
@@ -179,6 +173,17 @@ button:disabled {
 .document-tab {
 	display: flex;
 	flex-shrink: 0;
+	border: 1px solid #ccc;
+	border-radius: 4px;
+	background: #fff;
+}
+.document-tab.selected {
+	border-color: #3369a0;
+	background: #e6f0ff;
+}
+.document-tab > button {
+	border: none;
+	background: transparent;
 }
 .close-document {
 	margin-left: 2px;

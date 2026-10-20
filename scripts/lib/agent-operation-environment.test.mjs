@@ -284,6 +284,38 @@ test("Codex observes native identity separately from cwd and ignores the unobser
 	}
 });
 
+test("GitHub issue comment reads are allowed without observing a checkout", () => {
+	for (const tool_name of [
+		"mcp__codex_apps__github__fetch_issue_comments",
+		"mcp__codex_apps__github_fetch_issue_comments",
+	]) {
+		const payload = {
+			tool_name,
+			tool_input: { repo_full_name: "takasek/pfdsl", issue_number: 1319 },
+		};
+		const noObservation = () => {
+			throw new Error("comment reads must not observe a checkout");
+		};
+		const facts = collectAgentOperationEnvironment(payload, {
+			hookRoot: "/fixture/hook",
+			environment: {},
+			probeGit: noObservation,
+			probeProcess: noObservation,
+			readMetadata: noObservation,
+		});
+		assert.deepEqual(
+			classifyAgentOperations(payload, facts).operations[0].classes,
+			["R"],
+			tool_name,
+		);
+		assert.equal(
+			evaluateAgentOperationPolicy(payload, facts).decision,
+			"allow",
+			tool_name,
+		);
+	}
+});
+
 test("GitHub capabilities have no checkout and unknown capabilities remain unresolved", () => {
 	const payload = {
 		tool_name: "mcp__plugin_github_github__merge_pull_request",

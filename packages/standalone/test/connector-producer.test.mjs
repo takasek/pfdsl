@@ -4,6 +4,67 @@ import { fileURLToPath } from "node:url";
 import { withFormatHost } from "./helpers/format-host.mjs";
 import { instances } from "./helpers/range-monaco.mjs";
 
+test("standalone repair reports new warnings through the existing single edit path", async () => {
+	await withFormatHost(
+		"document-tab",
+		fileURLToPath(new URL("./helpers/range-monaco.mjs", import.meta.url)),
+		instances,
+		async ({ create }) => {
+			const { tab, editor, statuses } = create("a >> p -> b\na >>? p\n");
+			tab.activate();
+			for (
+				let attempt = 0;
+				attempt < 1000 && !tab.container.querySelector("#preview-error button");
+				attempt++
+			)
+				await new Promise((resolve) => setTimeout(resolve, 5));
+			const button = tab.container.querySelectorAll("#preview-error button")[1];
+			assert.ok(button);
+			button.click();
+			assert.equal(tab.getSource(), "p -> b\na >>? p\n");
+			assert.equal(editor.edits.length, 1);
+			assert.equal(editor.undoStops, 2);
+			assert.match(
+				statuses.at(-1),
+				/^Removed the normal input 'a' >> 'p'\. W008: /,
+			);
+		},
+	);
+});
+
+test("standalone ordinary delete retains its existing status", async () => {
+	await withFormatHost(
+		"document-tab",
+		fileURLToPath(new URL("./helpers/range-monaco.mjs", import.meta.url)),
+		instances,
+		async ({ create, window }) => {
+			const { tab, editor, statuses } = create("a >> p -> b\n");
+			tab.activate();
+			for (
+				let attempt = 0;
+				attempt < 1000 &&
+				!tab.container.querySelector('#inner g[data-node-id="p"]');
+				attempt++
+			)
+				await new Promise((resolve) => setTimeout(resolve, 5));
+			const node = tab.container.querySelector('#inner g[data-node-id="p"]');
+			assert.ok(node);
+			node.dispatchEvent(
+				new window.KeyboardEvent("keydown", { key: "Enter", bubbles: true }),
+			);
+			tab.container.querySelector('[data-side="left"] [data-edge]').click();
+			tab.container.querySelector("[data-delete-edge]").click();
+			assert.ok(tab.getSource().endsWith("\np -> b\n"));
+			assert.equal(editor.edits.length, 1);
+			assert.equal(editor.undoStops, 2);
+			assert.equal(
+				statuses.at(-1),
+				"Preview edit applied. Complete any required metadata.",
+			);
+		},
+	);
+});
+
 test("production standalone refusal retains text, clean state, input and undo boundaries", async () => {
 	await withFormatHost(
 		"document-tab",
