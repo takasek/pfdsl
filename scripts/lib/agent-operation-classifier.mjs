@@ -506,11 +506,32 @@ function gitOperation(command, context, facts) {
 		];
 	else if (sub.value === "pull") {
 		const refs = operands.slice(1);
+		// A deliberately finite preparation command, separate from ordinary W.
+		const primaryPullForm =
+			i === 3 &&
+			tokens[1]?.value === "-C" &&
+			explicitAbsolute &&
+			args.length === 4 &&
+			args.every(({ dynamic }) => !dynamic) &&
+			flags.size === 2 &&
+			flags.has("--ff-only") &&
+			flags.has("--no-autostash") &&
+			operands.length === 2 &&
+			operands[0].value === "origin";
+		if (primaryPullForm) action = "primary-ff-pull";
 		classes = [
-			location.tree?.branch === facts.defaultBranch ||
-			refs.some(({ value }) => defaultRef(value.split(":")[1], facts))
-				? "D"
-				: "W",
+			primaryPullForm &&
+			context.subject.endsWith("-parent") &&
+			location.target === "primary" &&
+			location.tree?.primaryPullReady === true &&
+			location.tree.branch === facts.defaultBranch &&
+			operands[1].value === facts.defaultBranch
+				? "W"
+				: location.target === "primary" ||
+						location.tree?.branch === facts.defaultBranch ||
+						refs.some(({ value }) => defaultRef(value.split(":")[1], facts))
+					? "D"
+					: "W",
 		];
 		if (refs.some(({ dynamic }) => dynamic)) classes.push("U");
 	} else if (sub.value === "merge-tree")

@@ -216,6 +216,36 @@ export function collectAgentOperationEnvironment(
 			primary: index === 0,
 			branch,
 		};
+		if (
+			tree.primary &&
+			branch === facts.defaultBranch &&
+			preliminary.operations.some(({ action }) => action === "primary-ff-pull")
+		) {
+			const options = { cwd: root, env };
+			const status = probeGit(
+				["status", "--porcelain=v1", "--untracked-files=normal"],
+				options,
+			);
+			const upstream = probeGit(
+				["rev-parse", "--symbolic-full-name", "@{upstream}"],
+				options,
+			);
+			const ancestor = probeGit(
+				[
+					"merge-base",
+					"--is-ancestor",
+					"HEAD",
+					`refs/remotes/origin/${facts.defaultBranch}`,
+				],
+				options,
+			);
+			tree.primaryPullReady =
+				status.ok &&
+				status.out === "" &&
+				upstream.ok &&
+				upstream.out.trim() === `refs/remotes/origin/${facts.defaultBranch}` &&
+				ancestor.ok;
+		}
 		const lock =
 			typeof record.locked === "string"
 				? record.locked.match(

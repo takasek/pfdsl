@@ -15,6 +15,68 @@ import { evaluateAgentOperationPolicy } from "./agent-operation-policy.mjs";
 import { GIT_TARGET_ENVIRONMENT_VARIABLES } from "./git-environment.mjs";
 import { readShell } from "./shell-commands.mjs";
 
+test("primary pull requires clean status, matching upstream and no local-only commit", () => {
+	const f = fixture({ nativeLock: false });
+	try {
+		for (const failure of [
+			null,
+			"dirty",
+			"upstream",
+			"ahead",
+			"status-error",
+			"upstream-error",
+		]) {
+			const command = `git -C ${f.roots.primary} pull --ff-only --no-autostash origin main`;
+			const payload = {
+				tool_name: "exec_command",
+				cwd: f.roots.own,
+				session_id: "session",
+				tool_input: { cmd: command },
+			};
+			const observed = [];
+			const facts = collectAgentOperationEnvironment(payload, {
+				hookRoot: f.root,
+				environment: {},
+				shell: readShell(command),
+				probeProcess: f.probeProcess,
+				readMetadata: f.readMetadata,
+				probeGit(args, options) {
+					const result = (ok, out) => ({ ok, status: ok ? 0 : 1, out });
+					if (
+						["status", "merge-base"].includes(args[0]) ||
+						args.includes("@{upstream}")
+					) {
+						assert.equal(options.cwd, f.roots.primary);
+						observed.push(args[0]);
+						if (args[0] === "status")
+							return result(
+								failure !== "status-error",
+								failure === "dirty" ? " M a\n" : "",
+							);
+						if (args[0] === "merge-base")
+							return result(failure !== "ahead", "");
+						return result(
+							failure !== "upstream-error",
+							failure === "upstream"
+								? "refs/remotes/other/main\n"
+								: "refs/remotes/origin/main\n",
+						);
+					}
+					return f.probeGit(args, options);
+				},
+			});
+			assert.equal(observed.length, 3);
+			assert.equal(
+				evaluateAgentOperationPolicy(payload, facts).decision,
+				failure ? "deny" : "allow",
+				String(failure),
+			);
+		}
+	} finally {
+		f.cleanup();
+	}
+});
+
 test("read-only calls do not observe repository roots, worktrees or native ownership", () => {
 	const noObservation = () => {
 		throw new Error("read-only observation must be skipped");
