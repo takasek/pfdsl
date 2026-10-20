@@ -86,6 +86,7 @@ function fixture() {
 			agent_id,
 			agent_type,
 			environment = {},
+			rawInput,
 		} = {},
 	) => {
 		const payload = {
@@ -106,7 +107,7 @@ function fixture() {
 					CLAUDE_PROJECT_DIR: harness === "claude" ? own : "",
 					...environment,
 				},
-				input: JSON.stringify(payload),
+				input: rawInput ?? JSON.stringify(payload),
 				captureStderr: true,
 				// The entry must report its own deadline before this harness gives up.
 				timeout: POLICY_DEADLINE_MS + 5000,
@@ -497,13 +498,121 @@ test("entry integration: native identity allows its owner and preserves stale, m
 	}
 });
 
-test("entry integration: missing policy and supervisor produce a human-terminal deny", () => {
+test("entry integration: probe failures deny with bounded evidence and read-only investigation guidance", () => {
+	for (const [detail, expected] of [
+		[
+			"Git policy probe budget exhausted",
+			/Git safety checks did not finish within their time budget/,
+		],
+		[
+			"Git policy probe could not execute within its budget",
+			/cause is not established/,
+		],
+		["fixture unknown observation failure", /cause is not established/],
+	]) {
+		const f = fixture();
+		try {
+			writeFileSync(
+				join(f.own, "scripts/lib/guard-probe.mjs"),
+				`export function createGuardProbe() { return () => { throw new Error(${JSON.stringify(detail)}); }; }\n`,
+			);
+			const result = f.invoke(
+				{ command: `git -C ${f.own} add a` },
+				{ harness: "codex" },
+			);
+			assert.equal(result.status, 2);
+			assert.equal(result.decision, "deny");
+			assert.ok(result.reason.includes(detail));
+			assert.match(result.reason, expected);
+			assert.match(
+				result.reason,
+				/operation was denied because safety verification is incomplete/,
+			);
+			assert.match(result.reason, /read-only/);
+			assert.doesNotMatch(result.reason, /human terminal|Repair the hook/);
+		} finally {
+			f.cleanup();
+		}
+	}
+});
+
+test("entry integration: a policy-load deadline returns recovery to a human without blaming received input", () => {
+	const f = fixture();
+	try {
+		writeFileSync(
+			join(f.own, "scripts/lib/policy-supervisor.mjs"),
+			"await new Promise(() => {});\nexport async function supervisePolicy() {}\n",
+		);
+		const result = f.invoke({ command: "git status" });
+		assert.equal(result.status, 2);
+		assert.equal(result.decision, "deny");
+		assert.match(
+			result.reason,
+			/Policy components did not finish loading within the time limit/,
+		);
+		assert.match(result.reason, /read-only/);
+		assert.match(result.reason, /human terminal/);
+		assert.match(result.reason, /guarded tools cannot repair/);
+		assert.doesNotMatch(
+			result.reason,
+			/input was not received|caller|could not be loaded/,
+		);
+	} finally {
+		f.cleanup();
+	}
+});
+
+test("entry integration: a stalled worker helper returns unknown deadline recovery to a human", () => {
+	const f = fixture();
+	try {
+		writeFileSync(
+			join(f.own, "scripts/lib/hook-io.mjs"),
+			"await new Promise(() => {});\n",
+		);
+		const result = f.invoke({ command: "git status" });
+		assert.equal(result.status, 2);
+		assert.equal(result.decision, "deny");
+		assert.match(result.reason, /time limit/);
+		assert.match(result.reason, /cause is not established/);
+		assert.match(result.reason, /human terminal/);
+		assert.match(result.reason, /read-only/);
+		assert.doesNotMatch(
+			result.reason,
+			/Policy components could not be loaded|input was not received|Repair the hook/,
+		);
+	} finally {
+		f.cleanup();
+	}
+});
+
+test("entry integration: invalid input points to caller payload inspection", () => {
+	const f = fixture();
+	try {
+		for (const rawInput of [
+			"{bad",
+			JSON.stringify({ tool_name: "Bash", tool_input: {} }),
+		]) {
+			const result = f.invoke({}, { rawInput });
+			assert.equal(result.status, 2);
+			assert.equal(result.decision, "deny");
+			assert.match(result.reason, /[Hh]ook input/);
+			assert.match(result.reason, /caller|payload/);
+			assert.doesNotMatch(result.reason, /human terminal|Repair the hook/);
+		}
+	} finally {
+		f.cleanup();
+	}
+});
+
+test("entry integration: missing policy and supervisor return loading failures to a human", () => {
 	const f = fixture();
 	try {
 		rmSync(join(f.own, "scripts/lib/agent-operation-table.mjs"));
 		const failed = f.invoke({ command: "git status" });
 		assert.equal(failed.status, 2);
 		assert.equal(failed.decision, "deny");
+		assert.match(failed.reason, /Policy components could not be loaded/);
+		assert.match(failed.reason, /read-only/);
 		assert.match(failed.reason, /human terminal/);
 		assert.equal(
 			f.invoke({ command: parserRecoveryCommand(f.own) }).decision,
@@ -514,7 +623,28 @@ test("entry integration: missing policy and supervisor produce a human-terminal 
 		const bootstrap = f.invoke({ command: "git status" });
 		assert.equal(bootstrap.status, 2);
 		assert.equal(bootstrap.decision, "deny");
+		assert.match(bootstrap.reason, /Policy components could not be loaded/);
 		assert.match(bootstrap.reason, /human terminal/);
+	} finally {
+		f.cleanup();
+	}
+});
+
+test("entry integration: corrupt policy and supervisor return loading failures to a human", () => {
+	const f = fixture();
+	try {
+		for (const relative of [
+			"agent-operation-table.mjs",
+			"policy-supervisor.mjs",
+		]) {
+			writeFileSync(join(f.own, "scripts/lib", relative), "export const = ;\n");
+			const result = f.invoke({ command: "git status" });
+			assert.equal(result.status, 2);
+			assert.equal(result.decision, "deny");
+			assert.match(result.reason, /Policy components could not be loaded/);
+			assert.match(result.reason, /read-only/);
+			assert.match(result.reason, /human terminal/);
+		}
 	} finally {
 		f.cleanup();
 	}

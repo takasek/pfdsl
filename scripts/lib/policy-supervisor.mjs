@@ -9,10 +9,19 @@ export async function supervisePolicy(
 ) {
 	let finished = false;
 	let worker;
-	const fail = (detail) => {
+	let phase = "input";
+	const fail = (detail, category = phase) => {
 		if (finished) return;
 		finished = true;
-		const reason = `Cannot execute the policy safely: ${String(detail).slice(0, 400)}. Repair the hook in a human terminal before retrying.`;
+		const guidance =
+			category === "input"
+				? "Hook input could not be read or validated. Inspect the caller's payload and input delivery, then correct the identified input problem."
+				: category === "deadline"
+					? "Safety verification did not finish within the time limit; the underlying cause is not established. Ask a human to investigate the timeout using read-only diagnostics in a human terminal before choosing a recovery."
+					: category === "response"
+						? "Inspect the policy response and the reported failure using read-only diagnostics before choosing a recovery."
+						: "The underlying cause is not established. Investigate the reported failure using read-only diagnostics before choosing a recovery.";
+		const reason = `Cannot execute the policy safely: ${String(detail).slice(0, 400)}. The operation was denied because safety verification is incomplete. ${guidance}`;
 		console.error(reason);
 		console.log(
 			JSON.stringify({
@@ -26,7 +35,7 @@ export async function supervisePolicy(
 		process.exit(2);
 	};
 	const timer = setTimeout(
-		() => fail("internal deadline exceeded"),
+		() => fail("internal deadline exceeded", "deadline"),
 		deadlineMs,
 	);
 	try {
@@ -59,6 +68,7 @@ export async function supervisePolicy(
 				typeof (toolInput.command ?? toolInput.cmd) !== "string")
 		)
 			throw new Error("invalid hook payload");
+		phase = "policy-execution";
 		worker = new Worker(entryUrl, { stdin: true, stdout: true, stderr: true });
 		let out = "",
 			diagnostic = "";
@@ -102,7 +112,7 @@ export async function supervisePolicy(
 				process.stdout.write(out);
 				process.exit(code);
 			} catch (error) {
-				fail(error.message);
+				fail(error.message, "response");
 			}
 		});
 		worker.stdin.on("error", (error) => fail(error.message));
