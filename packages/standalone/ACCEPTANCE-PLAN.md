@@ -271,7 +271,7 @@ V036以外のerrorが先に表示されている場合は修復の操作を出�
 ### GUI-19：作成後の定義編集案内
 
 対応：#1352、統合済み#1282、#1259。対象・入力：M/V、bodyのみnode、quoted key、produced artifact、コメント。
-操作：Quick Fixとpreviewから定義を作り、位置・label選択・次項目を確認しUndo/Redoする。
+操作：Quick Fixとpreviewから定義を作り、位置・空の`label: ""`の引用符内のcursor・次項目を確認しUndo/Redoする。
 期待：新labelと必要metadataを見つけ、空criteriaでW002だけを消さない。
 UI最小labelとCLI完成sourceの契約を区別し、正しい文書で一Undo、重複なし。
 状態：M/V各未実施。記録：未記入。
