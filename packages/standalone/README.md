@@ -77,7 +77,7 @@ Hover a node ID for its metadata, **Go to definition**, and **Find all**.
 Find all opens a literal text search; PFDSL occurrence navigation visits the definition key and semantic node references.
 Right-click in the editor or press F1 to find **Go to PFDSL definition**, **Next PFDSL node occurrence**, **Previous PFDSL node occurrence**, **Insert PFDSL definition**, and **Sort metadata…**.
 Sort metadata accepts multiple keys in priority order; Cancel or Escape returns to the editor without changing the source.
-Definition insertion selects the new label and retains the reminder to complete criteria for a produced artifact.
+Definition insertion writes `label: ""`, places the cursor inside the empty quotes, and retains the reminder to complete criteria for a produced artifact.
 Each successful source edit is undoable.
 The **Run in Terminal.app** inlay hint shows the declared process command; displaying or hovering it does not execute it.
 Native GUI, keyboard, and Japanese IME acceptance for these features is tracked separately in the [acceptance plan](ACCEPTANCE-PLAN.md).
