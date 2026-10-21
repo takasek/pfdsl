@@ -180,7 +180,7 @@ artifact:
     description: 計画上の後続で未起票。このリポの開発規律を、binding の「ワークサイクルの追加手順」スロット経由ではなく root の指示から読ませる。配布物の整理より先に統合し、移行の途中でこのリポのセッションが規律を読まなくなる状態を作らない
     status: todo
     criteria: >
-      生成した CLAUDE.md と AGENTS.md が、このリポの作業規律を置いた binding の節を作業の開始時に読むよう指示し、companion-binding-check がその節の見出しを必須にしている。
+      生成した CLAUDE.md と AGENTS.md が、このリポの作業規律を置いた binding の節を作業の開始時に読むよう指示し、scripts/check-companion-bindings.mjs がその節の見出しを必須にしている。
       このリポで新しく開いたセッションが、着手時にその節を読むことを1回確かめた
   executor_neutral_work_cycle:
     label: 実行主体に依存しない work-cycle
@@ -199,7 +199,7 @@ artifact:
     criteria: github-issues-backend.md が実行主体の外部書込みの手順と PR 本文規約を持たず、アダプタ自身の書込みを読み戻す原則を持つ。このリポの PR 作成手順（クローズ参照の扱い等）が binding だけで完結する
   backend_neutral_work_item_contract:
     label: バックエンドに依存しない作業項目の対応契約
-    description: 計画上の後続で未起票。作業項目 id と process id の対応、managed / exempt の判定基準、作業項目の close が status を動かさないこと、process と run の対応を、両バックエンドに重複させず protocol に1つだけ置く（ADR-0048 契約6）
+    description: 計画上の後続で未起票。両バックエンドの reference に重複している作業項目と process の対応の規則を、protocol に1つだけ置く（対象の規則は ADR-0048 契約6）
     status: todo
     criteria: 両バックエンドの reference に同じ規則の本文が残らず、どちらも protocol に置いた1つの契約を参照する
   prune_cli:
@@ -216,7 +216,7 @@ artifact:
     label: 採用したリポでだけ働く GitHub アダプタ
     description: 計画上の後続で未起票。設計仕様の結論に従い、GitHub Issues バックエンドの reference・hook・CI 設定を、採用を宣言したリポでだけ働かせる
     status: todo
-    criteria: GitHub Issues バックエンドを採用しないリポでは GitHub アダプタの hook が通知せず、その reference と CI 設定が配置されない。採用したリポでは移行案内に従った後に現行と同じ手順・hook・CI 設定が働く
+    criteria: 設計仕様の結論のとおりに配布され、GitHub Issues バックエンドを採用しないリポでは GitHub アダプタの hook が通知を出さない。採用したリポでは、移行案内に従った後も現行と同じ手順・hook・CI 設定が働く
 process:
   publish_cli_ready_counts:
     label: 新規 ready 数を示す CLI と plugin を公開する
