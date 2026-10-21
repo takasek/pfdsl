@@ -17,6 +17,9 @@ const unsafe = [
 	"node --test example.test.mjs; git push",
 	"pnpm --filter core test; git push",
 	"pnpm -r run test; git push",
+	"pnpm typecheck; git push",
+	"pnpm --filter core typecheck; git push",
+	"pnpm -r run typecheck; git push",
 	"CHECK=1 make test; command git push",
 	"make test | tail -1 && git push",
 	"! make test && git push",
@@ -35,6 +38,8 @@ for (const command of unsafe) {
 
 for (const command of [
 	"make test && make typecheck && git push",
+	"pnpm typecheck && git push",
+	"pnpm --filter core run typecheck && git push",
 	"make test &&\n git push",
 	"make test && echo 'literal ; | ||' && git push",
 	"make test > /tmp/test.log 2>&1 && git push",

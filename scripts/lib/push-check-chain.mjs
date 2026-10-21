@@ -1,4 +1,5 @@
 import { fileURLToPath } from "node:url";
+import { parserRecoveryCommand } from "./agent-operation-table.mjs";
 import { SHELL_PARSER_TIMEOUT_MS } from "./agent-operation-timeouts.mjs";
 import { run } from "./run-exec.mjs";
 import { adaptShell, executableName } from "./shell-commands.mjs";
@@ -46,7 +47,9 @@ function kind(node) {
 			: null;
 	if (name === "pnpm") {
 		const words = operands(args, ["-C", "--dir", "--filter", "-F"]);
-		return (words[0] === "run" ? words[1] : words[0]) === "test"
+		return ["test", "typecheck"].includes(
+			words[0] === "run" ? words[1] : words[0],
+		)
 			? "check"
 			: null;
 	}
@@ -61,6 +64,9 @@ function kind(node) {
  */
 export function checkPushChain(command) {
 	if (typeof command !== "string" || !command.trim()) return null;
+	// Keep the operation guard's exact fixed-root repair usable without the
+	// parser. Other hooks still decide its ownership and policy permissions.
+	if (command === parserRecoveryCommand(root)) return null;
 	let commands;
 	const statements = new Map();
 	try {
@@ -82,11 +88,13 @@ export function checkPushChain(command) {
 		}
 		visit(ast);
 		commands = adaptShell(ast, command).commands;
-	} catch {
+	} catch (error) {
 		return {
 			decision: "deny",
 			reason:
-				"Cannot inspect the push/check chain. Repair the pinned shell parser with make setup or rewrite unsupported shell syntax, then retry.",
+				error.code === "ENOENT"
+					? `Cannot inspect the push/check chain because the pinned shell parser is missing. Run exactly: ${parserRecoveryCommand(root)}. Then retry.`
+					: "Cannot inspect the push/check chain. Investigate the parser failure or unsupported shell syntax, then retry.",
 		};
 	}
 	const bytes = Buffer.from(command);

@@ -8,7 +8,9 @@ import {
 import { checkPushChain } from "./lib/push-check-chain.mjs";
 
 const payload = parseHookPayload(await readStdinText());
-if (payload?.tool_name === "Bash") {
-	const result = checkPushChain(payload.tool_input?.command);
+if (["Bash", "exec_command"].includes(payload?.tool_name)) {
+	const result = checkPushChain(
+		payload.tool_input?.command ?? payload.tool_input?.cmd,
+	);
 	if (result) console.log(JSON.stringify(buildPermissionOutput(result)));
 }
