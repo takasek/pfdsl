@@ -169,7 +169,7 @@ artifact:
   responsibility_boundary_adr:
     label: 責務境界の ADR と0段目 (#1490)
     description: PFDSL の責務を PFD の意味論なしには成立しない判断に限る ADR-0048 と、それに合わせて書き換えた配布層の昇格先の判定ルールの0段目。後続の再編の仕様になる
-    status: wip
+    status: done
     criteria: >
       docs/adr/0048 が Accepted で存在し、ADR-0039 と ADR-0040 の Status に部分上書きが注記されている。
       architecture.md の0段目だけを渡した読み手が再編の各項目の置き場を再現でき、その結果が PR 本文に記録されている。
