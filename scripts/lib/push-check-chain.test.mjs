@@ -13,6 +13,8 @@ const unsafe = [
 	'make build x; make test x; echo "test=$?"; make typecheck; git push',
 	"make -C /tmp/repo test; git -C /tmp/repo push origin HEAD",
 	"make lint; git push",
+	"make coverage; git push",
+	"make test; git --namespace foo push",
 	"make check-docs; git push",
 	"node --test example.test.mjs; git push",
 	"pnpm --filter core test; git push",
@@ -38,6 +40,9 @@ for (const command of unsafe) {
 
 for (const command of [
 	"make test && make typecheck && git push",
+	"make coverage && git push",
+	"make test && git --namespace foo push",
+	"make test && git --namespace=foo push",
 	"pnpm typecheck && git push",
 	"pnpm --filter core run typecheck && git push",
 	"make test &&\n git push",

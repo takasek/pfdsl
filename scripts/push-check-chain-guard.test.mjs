@@ -52,7 +52,7 @@ test("Codex exec_command denies ungated push and allows the corrected chain", ()
 	assert.equal(invoke("git push", "exec_command"), "");
 });
 
-test("with no parser the actual hook permits only its exact fixed-root repair", () => {
+test("parser failures leave denial and fixed-root recovery to the operation guard", () => {
 	const fixture = realpathSync(
 		mkdtempSync(join(tmpdir(), "pfdsl-1493-hook-recovery-")),
 	);
@@ -77,19 +77,15 @@ test("with no parser the actual hook permits only its exact fixed-root repair", 
 						}),
 					},
 				);
-			assert.equal(probe(repair), "");
 			for (const command of [
+				repair,
 				"make setup",
 				"git push",
+				"make test; git push",
 				`${repair}; git push`,
 				parserRecoveryCommand(`${fixture}/other`),
 			]) {
-				const output = JSON.parse(probe(command)).hookSpecificOutput;
-				assert.equal(output.permissionDecision, "deny", command);
-				assert.ok(
-					output.permissionDecisionReason.includes(repair),
-					output.permissionDecisionReason,
-				);
+				assert.equal(probe(command), "", command);
 			}
 		}
 		const parser = shellParserPath(fixture);
@@ -103,7 +99,7 @@ test("with no parser the actual hook permits only its exact fixed-root repair", 
 					cwd: fixture,
 					input: JSON.stringify({
 						tool_name: "Bash",
-						tool_input: { command: repair },
+						tool_input: { command: "make test; git push" },
 					}),
 				},
 			),

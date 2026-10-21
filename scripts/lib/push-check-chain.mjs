@@ -1,5 +1,4 @@
 import { fileURLToPath } from "node:url";
-import { parserRecoveryCommand } from "./agent-operation-table.mjs";
 import { SHELL_PARSER_TIMEOUT_MS } from "./agent-operation-timeouts.mjs";
 import { run } from "./run-exec.mjs";
 import { adaptShell, executableName } from "./shell-commands.mjs";
@@ -35,13 +34,14 @@ function kind(node) {
 			"--git-dir",
 			"--work-tree",
 			"--config-env",
+			"--namespace",
 		])[0] === "push"
 			? "push"
 			: null;
 	if (name === "node") return args.includes("--test") ? "check" : null;
 	if (name === "make")
 		return operands(args, ["-C", "--directory", "-f", "--file"]).some((arg) =>
-			/^(?:test|typecheck|lint|check.*)$/.test(arg),
+			/^(?:test|typecheck|lint|coverage|check.*)$/.test(arg),
 		)
 			? "check"
 			: null;
@@ -64,9 +64,6 @@ function kind(node) {
  */
 export function checkPushChain(command) {
 	if (typeof command !== "string" || !command.trim()) return null;
-	// Keep the operation guard's exact fixed-root repair usable without the
-	// parser. Other hooks still decide its ownership and policy permissions.
-	if (command === parserRecoveryCommand(root)) return null;
 	let commands;
 	const statements = new Map();
 	try {
@@ -88,14 +85,10 @@ export function checkPushChain(command) {
 		}
 		visit(ast);
 		commands = adaptShell(ast, command).commands;
-	} catch (error) {
-		return {
-			decision: "deny",
-			reason:
-				error.code === "ENOENT"
-					? `Cannot inspect the push/check chain because the pinned shell parser is missing. Run exactly: ${parserRecoveryCommand(root)}. Then retry.`
-					: "Cannot inspect the push/check chain. Investigate the parser failure or unsupported shell syntax, then retry.",
-		};
+	} catch {
+		// ADR-0047: the operation guard alone denies parser failures and owns
+		// fixed-root recovery. This content guard judges only parsed commands.
+		return null;
 	}
 	const bytes = Buffer.from(command);
 	let sawCheck = false;
