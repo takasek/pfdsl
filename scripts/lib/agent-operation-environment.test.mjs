@@ -413,6 +413,44 @@ test("GitHub issue comment reads are allowed without observing a checkout", () =
 	}
 });
 
+for (const capability of [
+	"fetch_pr_comments",
+	"list_pull_request_reviews",
+	"list_pull_request_review_threads",
+	"reply_to_review_comment",
+]) {
+	for (const separator of ["_", "__"]) {
+		test(`GitHub review capability ${separator}${capability} preserves read and outward-write policy`, () => {
+			const write = capability === "reply_to_review_comment";
+			for (const child of [false, true]) {
+				const payload = {
+					tool_name: `mcp__codex_apps__github${separator}${capability}`,
+					tool_input: { repo_full_name: "takasek/pfdsl", pr_number: 1485 },
+					...(child ? { agent_id: "review-child" } : {}),
+				};
+				const noObservation = () => {
+					throw new Error("remote capabilities must not observe a checkout");
+				};
+				const facts = collectAgentOperationEnvironment(payload, {
+					hookRoot: "/fixture/hook",
+					environment: { CODEX_THREAD_ID: "review-parent" },
+					probeGit: noObservation,
+					probeProcess: noObservation,
+					readMetadata: noObservation,
+				});
+				assert.deepEqual(
+					classifyAgentOperations(payload, facts).operations[0].classes,
+					[write ? "O" : "R"],
+				);
+				assert.equal(
+					evaluateAgentOperationPolicy(payload, facts).decision,
+					write && child ? "deny" : "allow",
+				);
+			}
+		});
+	}
+}
+
 test("GitHub capabilities have no checkout and unknown capabilities remain unresolved", () => {
 	const payload = {
 		tool_name: "mcp__plugin_github_github__merge_pull_request",

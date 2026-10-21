@@ -43,6 +43,9 @@ const MCP_READ = new Set([
 	"fetch_issue",
 	"fetch_issue_comments",
 	"fetch_pr",
+	"fetch_pr_comments",
+	"list_pull_request_reviews",
+	"list_pull_request_review_threads",
 	"fetch_file",
 ]);
 const MCP_WRITE = new Set([
@@ -57,6 +60,7 @@ const MCP_WRITE = new Set([
 	"create_branch",
 	"create_pull_request_review",
 	"add_pull_request_review_comment",
+	"reply_to_review_comment",
 	"submit_pull_request_review",
 ]);
 const MCP_MERGE = new Set([
