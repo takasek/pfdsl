@@ -17,7 +17,7 @@ pfd-retro の D 層（知識成果物のライフサイクル監査）の採用�
 似た事例が必要なとき、現象・パス・エラー等の具体語で検索し、本文と根拠を読む。件数の閾値や専用検索器、タグ・phase、全読や読了証跡は必要ない。
 
 ```bash
-rg -n --glob '*.md' '具体的な現象やエラー' .pfdsl/bindings/pfd-retro-patterns/
+grep -rnE --include='*.md' '具体的な現象やエラー' .pfdsl/bindings/pfd-retro-patterns/
 ```
 
 検索の0件を失敗の不在、ヒットを今回の適用とみなさない。
