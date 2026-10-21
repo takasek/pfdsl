@@ -19,7 +19,7 @@ PFD 採用状況: roadmap（`.pfdsl/roadmap.pfdsl`）・workflow（`.pfdsl/workf
 
 ```bash
 grep -rnE --include='*.md' 'ENOENT|baseline|委譲' .pfdsl/bindings/pfd-retro-patterns/
-ls .pfdsl/bindings/pfd-retro-patterns/
+find .pfdsl/bindings/pfd-retro-patterns -name '*.md'
 ```
 
 新しい観察は既存の関連事例へ追記でき、独立した事例なら同じ置き場へ保存する。観測した入力・結果、当時の版や条件、証拠、原因の仮説、未解決事項を区別して書く。コミットされなかった失敗は Git 履歴から復元できないため、その場の実物や安全に共有できる抜粋を残す。private な証拠の公開には別途承認が必要である。
