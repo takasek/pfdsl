@@ -27,17 +27,9 @@ GitHub Issues。規約と採用手順は `scripts/harness-template/skills/pfd-op
 ## 起票前のプレースホルダ
 
 L3 reference の id 規約では、まだ issue が無いプロセスを plain の id で置き、起票時に `iN_` を付けてリネームする。
-この状態は `check` を通ってしまうので、該当するプロセスをここに書き残す。
-起票して `iN_` を付けたら、この一覧から外す。
-
-- `load_work_rules_from_root`
-- `reduce_work_cycle_protocol`
-- `narrow_retro_to_model`
-- `move_writer_rules_out_of_github_preset`
-- `unify_work_item_contract`
-- `add_prune_cli`
-- `design_adapter_plugin_split`
-- `separate_github_adapter`
+この状態は `check` を通ってしまうので、id 規約からの逸脱としてここに記録する。
+該当するプロセスは description を「未起票のプレースホルダ。」で始めて示し、`grep -n '未起票のプレースホルダ' .pfdsl/roadmap.pfdsl` で列挙する。
+起票して `iN_` を付けるときに、description のこの文言も外す。
 
 ## プレビュー改善の管理単位
 
