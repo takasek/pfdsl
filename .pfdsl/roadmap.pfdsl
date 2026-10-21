@@ -161,6 +161,35 @@ artifact:
     criteria: "生成工程の公開 Issue 本文が定める公開・取得確認が完了し、Mac 合格記録と公開配布物の対象版・適用範囲が一致する。公開結果と取得物を読み戻した証拠を記録済み。開発版の合格や未公開候補だけでは完了としない"
     location: https://github.com/takasek/pfdsl/releases
     externalStakeholders: [ macOS 利用者 ]
+  boundary_decisions:
+    label: 責務境界の所有者決定（D1〜D6）
+    description: 外部のセカンドオピニオン（2026-10-17）と再編計画を受けて、所有者が 2026-10-21 に決めた判断点。内容と根拠は ADR-0048 の判断点の節に記録する
+    status: done
+    criteria: 判断点 D1〜D6 のそれぞれに所有者の決定がある
+  responsibility_boundary_adr:
+    label: 責務境界の ADR と0段目 (#1490)
+    description: PFDSL の責務を PFD の意味論なしには成立しない判断に限る ADR-0048 と、それに合わせて書き換えた配布層の昇格先の判定ルールの0段目。後続の再編の仕様になる
+    status: wip
+    criteria: >
+      docs/adr/0048 が Accepted で存在し、ADR-0039 と ADR-0040 の Status に部分上書きが注記されている。
+      architecture.md の0段目だけを渡した読み手が再編の各項目の置き場を再現でき、その結果が PR 本文に記録されている。
+      make test・make typecheck・make lint が通り、make gen-plugin の後に差分が出ない
+    location: ../docs/adr/0048-responsibility-boundary-by-pfd-semantics.md
+  executor_neutral_work_cycle:
+    label: 実行主体に依存しない work-cycle
+    description: 計画上の後続で未起票。このリポの作業規律を root の指示から読ませる変更（flow:exempt）の統合後に着手する
+    status: todo
+    criteria: work-cycle.md が実行主体を主語にする規則を持たず、1サイクル1プロセスを既定のプリセットとして示し、run の成功と受入の区別と制御主体の単一性を定める。採用側プローブで、外部の実行主体の完了から done を付けずに受入の確認へ進むことを確かめた
+  three_valued_model_retro:
+    label: 3値の model retro と証拠の契約
+    description: 計画上の後続で未起票。このリポの作業規律を root の指示から読ませる変更（flow:exempt）の統合後に着手する
+    status: todo
+    criteria: pfd-retro の結論が実行側の失敗・モデルの改訂候補・変更不要の3値で、変更不要は照合したモデル要素と証拠を名指す。証拠の契約が版との対応を定め、C 層の汎用項目が配布物から外れている
+  prune_cli:
+    label: 完了チェーン回収の CLI 動詞
+    description: 計画上の後続で未起票。完了チェーン回収の保持規則と検証を CLI のトップレベル動詞にし、配置スクリプトは CLI を呼ぶだけにする
+    status: todo
+    criteria: 保持規則と検証が CLI のトップレベル動詞 prune にあり、ADR-0022 の出力モデルに従う。このリポの roadmap に対して旧スクリプトと削除対象が一致する
 process:
   publish_cli_ready_counts:
     label: 新規 ready 数を示す CLI と plugin を公開する
@@ -194,6 +223,18 @@ process:
   i1262_publish_standalone:
     label: 配布物の全体受入を完了して公開する
     location: https://github.com/takasek/pfdsl/issues/1262
+  i1490_define_responsibility_boundary:
+    label: 責務境界の ADR と0段目を確定する
+    location: https://github.com/takasek/pfdsl/issues/1490
+  reduce_work_cycle_protocol:
+    label: work-cycle を protocol に絞る
+    description: 未起票のプレースホルダ。起票時に process id へ iN_ を付ける
+  narrow_retro_to_model:
+    label: pfd-retro を model retro に絞る
+    description: 未起票のプレースホルダ。起票時に process id へ iN_ を付ける
+  add_prune_cli:
+    label: 完了チェーン回収を CLI 動詞にする
+    description: 未起票のプレースホルダ。起票時に process id へ iN_ を付ける
 
 tag:
   "priority:high": { style: { color: "#b60205", penwidth: "2" } }
@@ -228,3 +269,11 @@ edge_kind_conflict_diagnostic >> publish_cli_edge_kind_conflict -> cli_release_e
 gui_vscode_candidate >> i1445_accept_gui_vscode -> gui_vscode_acceptance
 
 gui_mac_acceptance >> i1262_publish_standalone -> standalone_release
+
+boundary_decisions >> i1490_define_responsibility_boundary -> responsibility_boundary_adr
+
+responsibility_boundary_adr >> reduce_work_cycle_protocol -> executor_neutral_work_cycle
+
+responsibility_boundary_adr >> narrow_retro_to_model -> three_valued_model_retro
+
+responsibility_boundary_adr >> add_prune_cli -> prune_cli
