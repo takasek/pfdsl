@@ -24,6 +24,21 @@ GitHub Issues。規約と採用手順は `scripts/harness-template/skills/pfd-op
 **保持範囲**: 規則は L3 reference「完了チェーン回収」が一次情報。
 このリポで完了履歴を持つ一次情報は closed issue・git 履歴・`docs/adr/`・`docs/spec/spec-history.md`・npm レジストリ・VS Code Marketplace で、#1052 の一括回収でこれらへの写しを roadmap から落とした。
 
+## 起票前のプレースホルダ
+
+L3 reference の id 規約では、まだ issue が無いプロセスを plain の id で置き、起票時に `iN_` を付けてリネームする。
+この状態は `check` を通ってしまうので、該当するプロセスをここに書き残す。
+起票して `iN_` を付けたら、この一覧から外す。
+
+- `load_work_rules_from_root`
+- `reduce_work_cycle_protocol`
+- `narrow_retro_to_model`
+- `move_writer_rules_out_of_github_preset`
+- `unify_work_item_contract`
+- `add_prune_cli`
+- `design_adapter_plugin_split`
+- `separate_github_adapter`
+
 ## プレビュー改善の管理単位
 
 プレビューの表示・編集・移動は既存の改善工程として扱う。
