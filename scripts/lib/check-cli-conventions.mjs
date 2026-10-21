@@ -46,6 +46,7 @@ const SKILL_MIRROR_ROOTS = [
 ];
 const FOREIGN_ARGV_GUARDS = new Set([
 	"scripts/lib/agent-operation-classifier.mjs",
+	"scripts/lib/push-check-chain.mjs",
 ]);
 
 // Its one flag-name lookup is the --force deprecation hint that #631 put

@@ -145,7 +145,10 @@ describe("per-rule exemptions", () => {
 		".agents/skills/pfd-ops/scripts/check-install-sync.mjs",
 		"scripts/harness-template/skills/pfd-ops/scripts/check-install-sync.mjs",
 	];
-	const FOREIGN_ARGV_GUARDS = ["scripts/lib/agent-operation-classifier.mjs"];
+	const FOREIGN_ARGV_GUARDS = [
+		"scripts/lib/agent-operation-classifier.mjs",
+		"scripts/lib/push-check-chain.mjs",
+	];
 
 	// Its lookup decides what the error says, not what the script does: the
 	// hint has to run ahead of the strict parse or --force reads as a plain
