@@ -6,7 +6,68 @@ import { shellParserPath } from "./shell-parser-tool.mjs";
 
 const root = fileURLToPath(new URL("../../", import.meta.url));
 const reason =
-	"Push is not gated by every preceding check's success. Rewrite the command so checks and push are connected by && and a failed check prevents push, then retry.";
+	"This command can run git push without every preceding check succeeding. Checks must gate push through an && chain.";
+
+const GIT_VALUE_OPTIONS = [
+	"-C",
+	"-c",
+	"--git-dir",
+	"--work-tree",
+	"--config-env",
+	"--namespace",
+];
+const GIT_INFORMATION_OPTIONS = new Set([
+	"--exec-path",
+	"--html-path",
+	"--man-path",
+	"--info-path",
+	"--version",
+	"-v",
+	"--help",
+	"-h",
+]);
+const NODE_VALUE_OPTIONS = new Set([
+	"-r",
+	"--require",
+	"--import",
+	"--loader",
+	"--experimental-loader",
+	"-e",
+	"--eval",
+	"-p",
+	"--print",
+	"-C",
+	"--conditions",
+	"--test-name-pattern",
+	"--test-skip-pattern",
+	"--test-reporter",
+	"--test-reporter-destination",
+	"--test-concurrency",
+	"--test-timeout",
+]);
+
+function gitSubcommand(args) {
+	for (let i = 0; i < args.length; i++) {
+		const arg = args[i];
+		if (GIT_INFORMATION_OPTIONS.has(arg)) return null;
+		if (GIT_VALUE_OPTIONS.includes(arg)) i++;
+		else if (!arg.startsWith("-")) return arg;
+	}
+	return null;
+}
+
+function nodeTestMode(args) {
+	let testMode = false;
+	for (let i = 0; i < args.length; i++) {
+		const arg = args[i];
+		// Node options end at --, stdin, or the script entrypoint. Later argv
+		// belongs to that script, not the Node test runner.
+		if (arg === "--" || arg === "-" || !arg.startsWith("-")) break;
+		if (arg === "--test") testMode = true;
+		if (NODE_VALUE_OPTIONS.has(arg)) i++;
+	}
+	return testMode;
+}
 
 // Skip value-taking global options rather than mistaking their values for
 // targets or subcommands. No aliases, dynamic argv or script files are expanded.
@@ -27,22 +88,25 @@ function kind(node) {
 	const tokens = node.tokens.slice(node.executableIndex);
 	const name = executableName(tokens[0]?.value ?? "");
 	const args = tokens.slice(1).map(({ value }) => value);
-	if (name === "git")
+	if (name === "git") return gitSubcommand(args) === "push" ? "push" : null;
+	if (name === "node") return nodeTestMode(args) ? "check" : null;
+	if (name === "make")
 		return operands(args, [
 			"-C",
-			"-c",
-			"--git-dir",
-			"--work-tree",
-			"--config-env",
-			"--namespace",
-		])[0] === "push"
-			? "push"
-			: null;
-	if (name === "node") return args.includes("--test") ? "check" : null;
-	if (name === "make")
-		return operands(args, ["-C", "--directory", "-f", "--file"]).some((arg) =>
-			/^(?:test|typecheck|lint|coverage|check.*)$/.test(arg),
-		)
+			"--directory",
+			"-f",
+			"--file",
+			"--makefile",
+			"-I",
+			"--include-dir",
+			"-o",
+			"--old-file",
+			"--assume-old",
+			"-W",
+			"--what-if",
+			"--new-file",
+			"--assume-new",
+		]).some((arg) => /^(?:test|typecheck|lint|coverage|check.*)$/.test(arg))
 			? "check"
 			: null;
 	if (name === "pnpm") {
@@ -66,6 +130,7 @@ export function checkPushChain(command) {
 	if (typeof command !== "string" || !command.trim()) return null;
 	let commands;
 	const statements = new Map();
+	const declarations = [];
 	try {
 		const ast = JSON.parse(
 			run(shellParserPath(root), ["--to-json", "--language-dialect=zsh"], {
@@ -76,6 +141,10 @@ export function checkPushChain(command) {
 		);
 		function visit(node) {
 			if (!node || typeof node !== "object") return;
+			if (node.Type === "FuncDecl") {
+				declarations.push([node.Pos.Offset, node.End.Offset]);
+				return;
+			}
 			if (node.Cmd?.Type === "CallExpr")
 				statements.set(node.Cmd.Pos.Offset, node);
 			for (const value of Object.values(node)) {
@@ -84,7 +153,14 @@ export function checkPushChain(command) {
 			}
 		}
 		visit(ast);
-		commands = adaptShell(ast, command).commands;
+		// The shared operation adapter also lists function bodies for safety
+		// classification. Declaring a function does not execute those calls.
+		commands = adaptShell(ast, command).commands.filter(
+			(node) =>
+				!declarations.some(
+					([start, end]) => node.offset >= start && node.offset < end,
+				),
+		);
 	} catch {
 		// ADR-0047: the operation guard alone denies parser failures and owns
 		// fixed-root recovery. This content guard judges only parsed commands.
@@ -97,7 +173,10 @@ export function checkPushChain(command) {
 	for (const node of commands) {
 		const stmt = statements.get(node.offset);
 		if (sawCheck && previous) {
-			const gap = bytes.subarray(previous.end, node.offset).toString();
+			// A statement can start with a redirection before its executable.
+			const gap = bytes
+				.subarray(previous.end, stmt?.Pos.Offset ?? node.offset)
+				.toString();
 			const whitespace = String.raw`(?:\s|\\\n|#[^\n]*(?:\n|$))*`;
 			broken ||= !new RegExp(`^${whitespace}&&${whitespace}$`).test(gap);
 		}
