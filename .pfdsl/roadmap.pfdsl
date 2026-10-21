@@ -177,44 +177,49 @@ artifact:
     location: ../docs/adr/0048-responsibility-boundary-by-pfd-semantics.md
   root_loaded_work_rules:
     label: root の指示から読むこのリポの作業規律
-    description: 計画上の後続で未起票。このリポの開発規律を、binding の「ワークサイクルの追加手順」スロット経由ではなく root の指示から読ませる。配布物の整理より先に統合し、移行の途中でこのリポのセッションが規律を読まなくなる状態を作らない
+    description: ADR-0048 の後続で未起票。このリポの開発規律を、binding の「ワークサイクルの追加手順」スロット経由ではなく root の指示から読ませる。配布物の整理より先に統合し、移行の途中でこのリポのセッションが規律を読まなくなる状態を作らない
     status: todo
     criteria: >
-      生成した CLAUDE.md と AGENTS.md が、このリポの作業規律を置いた binding の節を作業の開始時に読むよう指示し、scripts/check-companion-bindings.mjs がその節の見出しを必須にしている。
+      生成した CLAUDE.md と AGENTS.md が、このリポの作業規律を置いた binding の節を作業の開始時に読むよう指示し、scripts/check-companion-bindings.mjs が新しい見出しを必須にし、旧見出しの「ワークサイクルの追加手順」だけの binding を失敗させる。
       このリポで新しく開いたセッションが、着手時にその節を読むことを1回確かめた
   executor_neutral_work_cycle:
     label: 実行主体に依存しない work-cycle
-    description: 計画上の後続で未起票。work-cycle.md から実行主体を主語にする規則を外し、PFD 側の protocol だけを残す
+    description: ADR-0048 の後続で未起票。work-cycle.md から実行主体を主語にする規則を外し、PFD 側の protocol だけを残す
     status: todo
-    criteria: work-cycle.md が実行主体を主語にする規則を持たず、1サイクル1プロセスを既定のプリセットとして示し、run の成功と受入の区別と制御主体の単一性を定める。採用側プローブで、外部の実行主体の完了から done を付けずに受入の確認へ進むことを確かめた
+    criteria: >
+      work-cycle.md が実行主体を主語にする規則を持たず、1サイクル1プロセスを既定のプリセットとして示し、run の成功と受入の区別と制御主体の単一性を定め、binding の「ワークサイクルの追加手順」スロットを PFD 固有の追加ゲート項目に縮小している。
+      採用側プローブで、外部の実行主体の完了から done を付けずに受入の確認へ進むことを確かめた
   three_valued_model_retro:
     label: 3値の model retro と証拠の契約
-    description: 計画上の後続で未起票。pfd-retro を3値の model retro と証拠の契約に絞り、D 層を同じ plugin 内の独立した skill と図の監査レンズへ分ける（ADR-0048 D1）
+    description: ADR-0048 の後続で未起票。pfd-retro を3値の model retro と証拠の契約に絞り、D 層を同じ plugin 内の独立した skill と図の監査レンズへ分ける（ADR-0048 D1）
     status: todo
-    criteria: pfd-retro の結論が実行側の失敗・モデルの改訂候補・変更不要の3値で、変更不要は照合したモデル要素と証拠を名指す。証拠の契約が版との対応を定め、C 層の汎用項目が配布物から外れている
+    criteria: >
+      pfd-retro の結論が実行側の失敗・モデルの改訂候補・変更不要の3値で、変更不要は照合したモデル要素と証拠を名指す。
+      証拠の契約が版との対応を定め、C 層の汎用項目が配布物から外れている。
+      D 層は同じ plugin 内の独立した skill と図の監査レンズへ分かれ、L4 滞留監査は配布層への還流として別の節にある
   writer_free_github_preset:
     label: 実行主体の書込み規律を外した GitHub Issues プリセット
-    description: 計画上の後続で未起票。実行主体が行う外部書込みの手順と PR 運用をこのリポの binding へ移し、プリセットにはアダプタ自身が外部へ書く場合の読み戻しの原則だけを残す（ADR-0048 D2）
+    description: ADR-0048 の後続で未起票。実行主体が行う外部書込みの手順と PR 運用をこのリポの binding へ移し、プリセットにはアダプタ自身が外部へ書く場合の読み戻しの原則だけを残す（ADR-0048 D2）
     status: todo
     criteria: github-issues-backend.md が実行主体の外部書込みの手順と PR 本文規約を持たず、アダプタ自身の書込みを読み戻す原則を持つ。このリポの PR 作成手順（クローズ参照の扱い等）が binding だけで完結する
   backend_neutral_work_item_contract:
     label: バックエンドに依存しない作業項目の対応契約
-    description: 計画上の後続で未起票。両バックエンドの reference に重複している作業項目と process の対応の規則を、protocol に1つだけ置く（対象の規則は ADR-0048 契約6）
+    description: ADR-0048 の後続で未起票。両バックエンドの reference に重複している作業項目と process の対応の規則を、protocol に1つだけ置く（対象の規則は ADR-0048 契約6）
     status: todo
     criteria: 両バックエンドの reference に同じ規則の本文が残らず、どちらも protocol に置いた1つの契約を参照する
   prune_cli:
     label: 完了チェーン回収の CLI 動詞
-    description: 計画上の後続で未起票。完了チェーン回収の保持規則と検証を CLI のトップレベル動詞にし、配置スクリプトは CLI を呼ぶだけにする
+    description: ADR-0048 の後続で未起票。完了チェーン回収の保持規則と検証を CLI のトップレベル動詞にし、配置スクリプトは CLI を呼ぶだけにする
     status: todo
     criteria: 保持規則と検証が CLI のトップレベル動詞 prune にあり、ADR-0022 の出力モデルに従う。このリポの roadmap に対して旧スクリプトと削除対象が一致する
   adapter_plugin_split_design:
     label: core と GitHub アダプタの plugin 分割の設計仕様
-    description: 計画上の後続で未起票。分割の費用が過大と分かった場合は、1つの plugin のまま .pfdsl/config.json の宣言で絞る案へ切り替える（ADR-0048 D5）
+    description: ADR-0048 の後続で未起票。分割の費用が過大と分かった場合は、1つの plugin のまま .pfdsl/config.json の宣言で絞る案へ切り替える（ADR-0048 D5）
     status: todo
     criteria: plugin 間で依存を宣言できるかの確認結果と、分割するか1つの plugin のまま宣言で絞るかの決定、その理由、採用先の移行手順が設計仕様に記録され、所有者が承認している
   optional_github_adapter:
     label: 採用したリポでだけ働く GitHub アダプタ
-    description: 計画上の後続で未起票。設計仕様の結論に従い、GitHub Issues バックエンドの reference・hook・CI 設定を、採用を宣言したリポでだけ働かせる
+    description: ADR-0048 の後続で未起票。設計仕様の結論に従い、GitHub Issues バックエンドの reference・hook・CI 設定を、採用を宣言したリポでだけ働かせる
     status: todo
     criteria: 設計仕様の結論のとおりに配布され、GitHub Issues バックエンドを採用しないリポでは GitHub アダプタの hook が通知を出さない。採用したリポでは、移行案内に従った後も現行と同じ手順・hook・CI 設定が働く
 process:
@@ -274,8 +279,8 @@ process:
   design_adapter_plugin_split:
     label: core と GitHub アダプタの plugin 分割を設計する
     description: 未起票のプレースホルダ。起票時に process id へ iN_ を付ける
-  separate_github_adapter:
-    label: 設計に従って GitHub アダプタを core から分ける
+  apply_github_adapter_design:
+    label: 設計に従って GitHub アダプタを採用したリポでだけ働かせる
     description: 未起票のプレースホルダ。起票時に process id へ iN_ を付ける。分割するか宣言で絞るかは入力の設計仕様に従う
 
 tag:
@@ -328,4 +333,4 @@ responsibility_boundary_adr >> add_prune_cli -> prune_cli
 
 [backend_neutral_work_item_contract, prune_cli, writer_free_github_preset] >> design_adapter_plugin_split -> adapter_plugin_split_design
 
-adapter_plugin_split_design >> separate_github_adapter -> optional_github_adapter
+adapter_plugin_split_design >> apply_github_adapter_design -> optional_github_adapter
