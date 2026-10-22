@@ -181,7 +181,24 @@ describe("runCompanionBindingsCheck", () => {
 		assert.equal(result.exitCode, 1);
 		assert.match(
 			result.stderrLines[0],
-			/missing required heading "ワークサイクルの追加手順"/,
+			/missing required heading "このリポの作業規律"/,
+		);
+	});
+
+	it("flags a pfd-ops.md that keeps only the former work-cycle slot heading", () => {
+		const result = runCompanionBindingsCheck(
+			baseDeps({
+				exists: (path) => path === PFD_OPS_PATH,
+				readFile: (file) =>
+					file === PFD_OPS_PATH
+						? "# pfd-ops バインディング\n\n## ワークサイクルの追加手順\n"
+						: "",
+			}),
+		);
+		assert.equal(result.exitCode, 1);
+		assert.match(
+			result.stderrLines[0],
+			/missing required heading "このリポの作業規律"/,
 		);
 	});
 
@@ -191,7 +208,7 @@ describe("runCompanionBindingsCheck", () => {
 				exists: (path) => path === PFD_OPS_PATH,
 				readFile: (file) =>
 					file === PFD_OPS_PATH
-						? "# pfd-ops バインディング\n\n## ワークサイクルの追加手順\n"
+						? "# pfd-ops バインディング\n\n## このリポの作業規律\n"
 						: "",
 			}),
 		);

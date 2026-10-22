@@ -17,7 +17,7 @@
 
 このリポが pfdsl スキルの上流であるため経路1（品質ガイド改訂）が成立する。配布先リポでは経路1は存在しない場合がある。
 
-散文として書く前の機械化の検討と、hook で機械化する場合に decision を選ぶ軸（防ぎたい害が実行そのものか、結果の読み違いか）は、`.pfdsl/bindings/pfd-ops.md`「ワークサイクルの追加手順」の「再発防止を手順へ反映し機械化を判断する」が一次情報（ADR-0039 で配布層から移設）。
+散文として書く前の機械化の検討と、hook で機械化する場合に decision を選ぶ軸（防ぎたい害が実行そのものか、結果の読み違いか）は、`.pfdsl/bindings/pfd-ops.md`「このリポの作業規律」の「再発防止を手順へ反映し機械化を判断する」が一次情報（ADR-0039 で配布層から移設）。
 このリポの既存機構は pre-commit・`gate-check.mjs`・CI であり、追加する検査の対象と重複をここに照合する。過去事例の記録は現行規約と分け、運用責任の終了は `.pfdsl/bindings/pfd-retro.md` に従う。
 
 ## 学習ループ
@@ -35,7 +35,7 @@ waxa CLI（blank-slate, ツール呼び出し不可）では retrieval 有無を
 ## worktree でのサイクル実行
 
 **サイクルは worktree で回す**: 対象リポジトリの専用 worktree を使い、作成場所と作成手順は利用中のハーネスまたはマシン側の設定に従う。
-worktree を既定とする理由は `.pfdsl/bindings/pfd-ops.md`「ワークサイクルの追加手順」の「手順 1 の追加で worktree と upstream を確認する」が一次情報。
+worktree を既定とする理由は `.pfdsl/bindings/pfd-ops.md`「このリポの作業規律」の「手順 1 の追加で worktree と upstream を確認する」が一次情報。
 消えた編集を探すとき `git stash list` を先に見ることも配布層の同じ手順が持つ。
 過去の干渉の症状と当時の対応記録は `.pfdsl/bindings/pfd-retro-patterns/shared-worktree-interference.md`。現行の復旧は上記の binding「手順 1 の追加で worktree と upstream を確認する」と、この checkout の指示に従う。
 
@@ -55,7 +55,7 @@ commit内でinstallerを呼ばず、配置はsetup・preflightが担当する。
 default branchの判定はref名の比較であり、同じcommitを指すfeature branchと解決可能なdetached HEADは許可する。
 pre-commitを経由しないref操作の保護と、repo policyのロード失敗・timeoutは #1404 の別受入である。
 
-**worktree での git 操作**: `git commit` など git コマンドは worktree ディレクトリを指して実行する（理由は `.pfdsl/bindings/pfd-ops.md`「ワークサイクルの追加手順」の「手順 2 の追加で worktree 上の変更を検証する」が一次情報）。
+**worktree での git 操作**: `git commit` など git コマンドは worktree ディレクトリを指して実行する（理由は `.pfdsl/bindings/pfd-ops.md`「このリポの作業規律」の「手順 2 の追加で worktree 上の変更を検証する」が一次情報）。
 **worktree のパスはシェル変数に入れず literal で書く**。
 `scripts/agent-operation-guard.mjs` の実行先解決は ADR-0047 に従い、先頭の literal cd の AND-list と literal git -C に限定する。
 pushd・popd と Git target 環境変数・CDPATH の名前への書込みが同じ命令文字列にあれば、変更系 Git は unresolved とする。literal な shell -c・eval の文字列も同じ規則で分類し、shell の状態を追跡しない。
@@ -130,7 +130,7 @@ develop 完了時点（PR 作成前、マージを待たない）で:
 
 ## レビューの実施粒度
 
-原則（diff の規模に review の重さを合わせる）は `.pfdsl/bindings/pfd-ops.md`「ワークサイクルの追加手順」の「終端ゲートの追加項目を検査して完了を確認する」が一次情報。
+原則（diff の規模に review の重さを合わせる）は `.pfdsl/bindings/pfd-ops.md`「このリポの作業規律」の「終端ゲートの追加項目を検査して完了を確認する」が一次情報。
 手段の起動数は、発火した観点と必要な独立性を満たしたうえで差分の規模に合わせる。
 
 - 軽い側: 数十行・1〜2ファイル中心。観点1・2を別 agent 1本で覆える場合はまとめ、追加の角度や agent を増やさない
@@ -186,7 +186,7 @@ spec 統合時の Opus 外部レビューで繰り返し指摘された項目:
 
 ### 委譲時の入力（構造捏造の予防）
 
-一般形（生成物が適合すべき既存構造は実物から読んで委譲入力に明示する）は `.pfdsl/bindings/pfd-ops.md`「ワークサイクルの追加手順」の「適用点 3 と 3 層制御で実装を委譲し外向き操作を制御する」が一次情報。
+一般形（生成物が適合すべき既存構造は実物から読んで委譲入力に明示する）は `.pfdsl/bindings/pfd-ops.md`「このリポの作業規律」の「適用点 3 と 3 層制御で実装を委譲し外向き操作を制御する」が一次情報。
 proposal 起草での「既存構造」は対象 spec の現行 frontmatter キー構造・制約節番号であり、`spec.md` の該当節を読ませる/grep させることで渡す。
 渡さなかった実例が 2026-06-20 の捏造（spec に無い `presentation` ブロック — review-perspectives A「入力充足」の委譲版）で、戻り後レビューで検出した。
 
@@ -236,7 +236,7 @@ push・release は生成出力のstage済み未commit差分も拒否し、stage�
 自動stage・自動コミットは行わない。
 配布する install payload は `scripts/lib/install-templates.mjs` の許可一覧から skill の `installFiles` 宣言を導出し、開発用ファイルを列挙し直さない。
 
-**生成物 drift 検査はコミット分割を制約する**: 規則は `.pfdsl/bindings/pfd-ops.md`「ワークサイクルの追加手順」の「終端ゲートの追加項目を検査して完了を確認する」にあるコミット粒度ゲートが一次情報。このリポで該当する検査は`gen-plugin`（inventoryが選ぶ手書き入力と`CLAUDE.md`・settings・hooksからClaude root、Codex root、repository Codex assetsを同時に導出する結合gate）と`gen-install`。
+**生成物 drift 検査はコミット分割を制約する**: 規則は `.pfdsl/bindings/pfd-ops.md`「このリポの作業規律」の「終端ゲートの追加項目を検査して完了を確認する」にあるコミット粒度ゲートが一次情報。このリポで該当する検査は`gen-plugin`（inventoryが選ぶ手書き入力と`CLAUDE.md`・settings・hooksからClaude root、Codex root、repository Codex assetsを同時に導出する結合gate）と`gen-install`。
 
 **出力抑制**: `make gen-samples` / `make gen-skill` はpnpm全パッケージbuild + 全サンプルcheckのwarningを毎回出力するため数百行に及ぶ。実行後は`git status --short docs/samples/ plugin/pfdsl/ plugin/pfdsl-codex/ AGENTS.md .agents/ .codex/`で変更ファイルのみ確認すれば足りる（ビルド自体の成否は非ゼロ終了コードで分かる）。
 
@@ -342,7 +342,7 @@ GUI領域の受入時機は roadmap.md「GUI領域の実装・実機受入・公
 
 ## subagent の worktree 隔離の安全確認
 
-一般形は `.pfdsl/bindings/pfd-ops.md`「ワークサイクルの追加手順」の「適用点 3 と 3 層制御で実装を委譲し外向き操作を制御する」にある「委譲先の外向き操作の制御」の 1（agent の選択）が一次情報。
+一般形は `.pfdsl/bindings/pfd-ops.md`「このリポの作業規律」の「適用点 3 と 3 層制御で実装を委譲し外向き操作を制御する」にある「委譲先の外向き操作の制御」の 1（agent の選択）が一次情報。
 このリポの `issue-worker` は呼び出し元が native の worktree 隔離で起動し、割り当てた root と所有証拠を確認する。
 手順の正本は `.claude/agents/issue-worker.md` であり、agent 自身が手動で作成した worktree を所有扱いに変えない。
 乗っ取りが実際に起きたのは issue #439 の issue-worker 試走で、呼び出し元ブランチは無傷で復旧できたが、一歩間違えば作業中のコミット履歴を破壊しかねなかった。
@@ -362,14 +362,14 @@ repo scope の agent（`ci-triage` 等、このリポの開発都合の道具）
 
 ## agent を追加するサイクルの動作確認
 
-原則（起動できるかは確かめるまで分からないので送る前に1回呼ぶ・引き渡す検証手順は壊れたことの確認を含む）は `.pfdsl/bindings/pfd-ops.md`「ワークサイクルの追加手順」の「手順 2 の追加で worktree 上の変更を検証する」が一次情報。
+原則（起動できるかは確かめるまで分からないので送る前に1回呼ぶ・引き渡す検証手順は壊れたことの確認を含む）は `.pfdsl/bindings/pfd-ops.md`「このリポの作業規律」の「手順 2 の追加で worktree 上の変更を検証する」が一次情報。
 このリポでの実測は #754 — `Agent` tool が `Agent type 'local-check-triage' not found` を返し、引き渡した `git stash push -- <file>` は当該変更のコミット後に空振りして検査が緑を返した。
 前者は「同一セッションからは起動できない」の実例として記録されていたが、harness のドキュメントは定義の追加を検出して再起動なしに使えると述べており、再起動が要るのはディレクトリごと新設した場合等に限られる。
 #754 が当たったのはその例外側だったとみられる — 1事例から一般則を立てた形なので、同種の記録は「この回はこうだった」までに留める。
 
 ## 委譲先の外向き操作の制御（3層）
 
-3層の**原則**は `.pfdsl/bindings/pfd-ops.md`「ワークサイクルの追加手順」の「適用点 3 と 3 層制御で実装を委譲し外向き操作を制御する」が一次情報（#558 で配布層へ昇格し、ADR-0039 で binding へ移設）。
+3層の**原則**は `.pfdsl/bindings/pfd-ops.md`「このリポの作業規律」の「適用点 3 と 3 層制御で実装を委譲し外向き操作を制御する」が一次情報（#558 で配布層へ昇格し、ADR-0039 で binding へ移設）。
 ここにはこのリポの実装値のみを書く。
 
 **1. agent の選択。** 実装だけを委譲するなら `pfd-implementer`（`tools:` に `mcp__github__*` を含まない）。

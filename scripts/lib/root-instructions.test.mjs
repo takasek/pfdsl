@@ -2,6 +2,8 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { describe, it } from "node:test";
 
+import { findMissingHeadings } from "./companion-binding-check.mjs";
+import { REQUIRED_BINDING_HEADINGS } from "./companion-binding-check-steps.mjs";
 import {
 	ROOT_INSTRUCTIONS_TEMPLATE_PATH,
 	renderRootInstructions,
@@ -172,5 +174,41 @@ describe("renderRootInstructions", () => {
 		// mustache section it is declared in, never a heading-level scan.
 		assert.doesNotMatch(claudeOutput, /\{\{[^{}]*\}\}/);
 		assert.doesNotMatch(codexOutput, /\{\{[^{}]*\}\}/);
+	});
+
+	// The repo work rules are reached through the root instructions, not the
+	// distributed work-cycle slot (ADR-0048), so both targets must name the
+	// binding section. The name they quote is read from the output and must be
+	// a heading the companion check requires of that binding and that the
+	// binding has, so a rename cannot pass by updating only some of the three.
+	it("points both targets at the repo work rules section of the pfd-ops binding", () => {
+		const template = readFileSync(ROOT_INSTRUCTIONS_TEMPLATE_PATH, "utf-8");
+		const bindingPath = ".pfdsl/bindings/pfd-ops.md";
+		const binding = readFileSync(
+			new URL(`../../${bindingPath}`, import.meta.url),
+			"utf-8",
+		);
+		const required = REQUIRED_BINDING_HEADINGS.find(
+			(entry) => entry.path === bindingPath,
+		);
+		assert.ok(required, `${bindingPath} must have required headings`);
+		for (const target of ["claude", "codex"]) {
+			const output = renderRootInstructions({
+				template,
+				target,
+				authoritativeSource:
+					"scripts/root-instructions-template/INSTRUCTIONS.md",
+			});
+			const pointer = output.match(
+				/作業の開始時に `\.pfdsl\/bindings\/pfd-ops\.md`「([^」]+)」を読み/,
+			);
+			assert.ok(pointer, `${target} output must point at the binding`);
+			const heading = pointer[1];
+			assert.ok(
+				required.headings.includes(heading),
+				`${target} points at "${heading}", which the companion check does not require`,
+			);
+			assert.deepEqual(findMissingHeadings(binding, [heading]), []);
+		}
 	});
 });
