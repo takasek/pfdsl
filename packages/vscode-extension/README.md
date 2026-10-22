@@ -36,7 +36,7 @@ Wheel to zoom at the pointer, drag the diagram to pan, and click or drag the min
 Double-click a node to go to its source; double-click the background to return to 100%.
 Editing and error recovery preserve your zoom and pan; syntax and rendering errors appear separately at normal text size with the minimap hidden.
 
-For an undefined node, **Insert artifact/process definition** in Quick Fix inserts its frontmatter definition and selects the new label for editing.
+For an undefined node, **Insert artifact/process definition** in Quick Fix inserts its frontmatter definition with `label: ""` and places the cursor inside the empty quotes so you can type the label.
 A produced artifact should also declare meaningful completion `criteria` (W002 warns when absent; strict validation treats it as an error).
 The Quick Fix keeps that diagnostic until you supply a criterion, and the insertion can be undone in one step.
 

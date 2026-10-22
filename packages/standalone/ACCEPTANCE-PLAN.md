@@ -271,7 +271,7 @@ V036以外のerrorが先に表示されている場合は修復の操作を出�
 ### GUI-19：作成後の定義編集案内
 
 対応：#1352、統合済み#1282、#1259。対象・入力：M/V、bodyのみnode、quoted key、produced artifact、コメント。
-操作：Quick Fixとpreviewから定義を作り、位置・label選択・次項目を確認しUndo/Redoする。
+操作：Quick Fixとpreviewから定義を作り、位置・空の`label: ""`の引用符内のcursor・次項目を確認しUndo/Redoする。
 期待：新labelと必要metadataを見つけ、空criteriaでW002だけを消さない。
 UI最小labelとCLI完成sourceの契約を区別し、正しい文書で一Undo、重複なし。
 状態：M/V各未実施。記録：未記入。
@@ -360,7 +360,7 @@ hoverを残したまま編集・文書切替・閉鎖し、旧版のリンクが
 
 対応：#1259。対象・入力：M/V、未定義・quoted/flow/alias/同名field、値・コメント・CRLF・補助平面文字。
 操作：Quick Fix、直接移動、各選択方式のsort、拒否、Undo/Redo、保存後他hostでOpenを行う。
-Mは未定義ID上のQuick Fixまたは右クリック／F1の`Insert PFDSL definition`を使い、新しいlabel値の選択と、produced artifactでcriteria案内が残ることを確認する。
+Mは未定義ID上のQuick Fixまたは右クリック／F1の`Insert PFDSL definition`を使い、挿入した`label: ""`の空の引用符の内側にcursorが置かれることと、produced artifactでcriteria案内が残ることを確認する。
 `Sort metadata…`でPrimary keyとThenを順に選び、topological／group／index／idの単独と`group → id`を実行する。
 重複キー・キーなしは編集せず理由を示し、Cancel／Escapeは本文・dirty・Undoを保ってeditorへfocusを戻す。
 開いた整列フォームはその文書に所属し、他tabに切り替えても他文書を編集しない。
