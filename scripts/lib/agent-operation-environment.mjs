@@ -18,6 +18,8 @@ import {
 } from "./run-exec.mjs";
 
 const MCP_READ = new Set([
+	"get_commit",
+	"get_label",
 	"get_issue",
 	"get_pull_request",
 	"get_pull_request_files",

@@ -54,6 +54,8 @@ export function corpusFacts(overrides = {}) {
 			[`${own}/live-link/a`]: `${live}/a`,
 		},
 		mcpTools: {
+			mcp__github__get_commit: "R",
+			mcp__github__get_label: "R",
 			mcp__github__get_pull_request: "R",
 			mcp__github__create_pull_request: "O",
 			mcp__github__issue_write: "O",
@@ -1170,6 +1172,16 @@ export const AGENT_OPERATION_CORPUS = [
 		"gh api graphql -f query='query { viewer { login } }'",
 		"allow",
 		{ classes: ["R"] },
+	),
+	...["get_commit", "get_label"].flatMap((name) =>
+		["claude-parent", "claude-subagent", "codex-parent", "codex-child"].map(
+			(subject) =>
+				example(`mcp-${name}-${subject}`, null, "allow", {
+					subject,
+					tool: { name: `mcp__github__${name}`, input: {} },
+					classes: ["R"],
+				}),
+		),
 	),
 	example("mcp-write", null, "allow", {
 		tool: { name: "mcp__github__create_pull_request", input: {} },

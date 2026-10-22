@@ -181,6 +181,36 @@ test("missing origin/HEAD points to setup and leaves setup recovery available", 
 	}
 });
 
+test("GitHub commit and label reads pass the entry for parents and children", () => {
+	const f = fixture();
+	try {
+		for (const harness of ["claude", "codex"])
+			for (const agent_id of [undefined, "child"])
+				for (const [name, input] of [
+					["get_commit", { sha: "HEAD" }],
+					["get_commit", { sha: "HEAD", include_diff: true }],
+					["get_label", { name: "bug" }],
+				]) {
+					const result = f.invoke(
+						{ owner: "fixture", repo: "repo", ...input },
+						{
+							harness,
+							agent_id,
+							tool_name: `mcp__github__${name}`,
+							cwd: f.primary,
+						},
+					);
+					assert.equal(
+						result.decision,
+						"allow",
+						`${harness} ${name}: ${result.reason}`,
+					);
+				}
+	} finally {
+		f.cleanup();
+	}
+});
+
 test("current GitHub issue_write capability keeps parent and child outward-write boundaries", () => {
 	const f = fixture();
 	try {
