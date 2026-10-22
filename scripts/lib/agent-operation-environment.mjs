@@ -199,7 +199,7 @@ export function collectAgentOperationEnvironment(
 	);
 	if (!head.ok || !/^origin\/.+/.test(head.out.trim()))
 		throw new Error(
-			"Cannot establish the default branch; restore origin/HEAD in a human terminal",
+			"Cannot establish the default branch; run make setup in the session repository to restore origin/HEAD, then retry. If setup fails, check its origin connectivity and fetch diagnostics",
 		);
 	facts.defaultBranch = head.out.trim().slice("origin/".length);
 	const listed = probeGit(["worktree", "list", "--porcelain", "-z"], {

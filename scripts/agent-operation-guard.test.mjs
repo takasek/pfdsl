@@ -133,6 +133,36 @@ function fixture() {
 	};
 }
 
+test("missing origin/HEAD points to setup and leaves setup recovery available", () => {
+	const f = fixture();
+	try {
+		f.git(f.primary, ["symbolic-ref", "--delete", "refs/remotes/origin/HEAD"]);
+		const denied = f.invoke(
+			{ file_path: join(f.root, "scratch.md"), content: "scratch" },
+			{ tool_name: "Write" },
+		);
+		assert.equal(denied.decision, "deny");
+		assert.match(denied.reason, /make setup/);
+		assert.doesNotMatch(denied.reason, /human terminal/);
+		assert.equal(f.invoke({ command: "make setup" }).decision, "allow");
+		f.git(f.primary, ["update-ref", "refs/remotes/origin/main", "HEAD"]);
+		f.git(f.primary, ["remote", "set-head", "origin", "-a"]);
+		assert.equal(
+			f.invoke(
+				{ file_path: join(f.root, "scratch.md"), content: "scratch" },
+				{ tool_name: "Write" },
+			).decision,
+			"allow",
+		);
+		assert.equal(
+			f.invoke({ command: `git -C ${f.own} commit -m fixture` }).decision,
+			"allow",
+		);
+	} finally {
+		f.cleanup();
+	}
+});
+
 test("Codex tag lookup passes the hook entry without permitting tag pushes or custom upload programs", () => {
 	const f = fixture();
 	try {

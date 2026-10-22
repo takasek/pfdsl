@@ -158,8 +158,54 @@ export function isSetupCurrent(root = process.cwd(), options = {}) {
 	return (
 		areDependenciesCurrent(root) &&
 		inspectSkillLink(root).reason === null &&
-		inspectHooksPath(root, options).reason === null
+		inspectHooksPath(root, options).reason === null &&
+		inspectDefaultBranch(root, options).reason === null
 	);
+}
+
+function inspectDefaultBranch(root, { env = process.env } = {}) {
+	const git = (args) =>
+		spawnSync("git", args, { cwd: root, env, encoding: "utf8" });
+	const head = git(["symbolic-ref", "--quiet", "refs/remotes/origin/HEAD"]);
+	const ref = head.stdout?.trim();
+	if (
+		head.status === 0 &&
+		/^refs\/remotes\/origin\/.+/.test(ref) &&
+		git(["rev-parse", "--verify", `${ref}^{commit}`]).status === 0
+	)
+		return { reason: null, missing: false };
+	const missing =
+		head.status === 1 &&
+		git(["show-ref", "--verify", "--quiet", "refs/remotes/origin/HEAD"])
+			.status === 1;
+	return {
+		missing,
+		reason: missing
+			? "Cannot resolve origin/HEAD. Run make setup to restore it from origin's default branch."
+			: "Invalid origin/HEAD: expected an origin symbolic ref resolving to a commit. Inspect origin/HEAD and fetch the advertised default branch from origin if needed, then run git remote set-head origin -a and make setup.",
+	};
+}
+
+function ensureDefaultBranch(root) {
+	const state = inspectDefaultBranch(root);
+	if (state.reason === null) return;
+	if (!state.missing) throw new Error(state.reason);
+	const restored = spawnSync("git", ["remote", "set-head", "origin", "-a"], {
+		cwd: root,
+		env: { ...process.env, GIT_TERMINAL_PROMPT: "0" },
+		encoding: "utf8",
+		timeout: 30_000,
+	});
+	if (restored.status !== 0 || inspectDefaultBranch(root).reason !== null) {
+		const detail =
+			restored.error?.message ||
+			restored.stderr?.trim() ||
+			restored.stdout?.trim() ||
+			"origin/HEAD still does not resolve to a commit";
+		throw new Error(
+			`Cannot restore origin/HEAD: ${detail.slice(0, 1000)}. Check origin connectivity and authentication; fetch origin's advertised default branch if it is missing locally, then rerun make setup.`,
+		);
+	}
 }
 
 function inspectSkillLink(root) {
@@ -457,6 +503,7 @@ async function runSetup(root = process.cwd()) {
 	try {
 		const skill = inspectSkillLink(root);
 		if (skill.reason !== null && !skill.managed) throw new Error(skill.reason);
+		ensureDefaultBranch(root);
 		if (isSetupCurrent(root)) return 0;
 		const dependenciesCurrent = areDependenciesCurrent(root);
 		const status = await runSetupUnlocked(
@@ -483,6 +530,12 @@ async function main(args) {
 		throw new Error("usage: setup-completion.mjs <check|run|write>");
 	}
 	if (args[0] === "check") {
+		const defaultBranch = inspectDefaultBranch(process.cwd());
+		if (defaultBranch.reason !== null) {
+			console.error(defaultBranch.reason);
+			process.exitCode = 1;
+			return;
+		}
 		const hooks = inspectHooksPath();
 		if (hooks.reason !== null) {
 			console.error(hooks.reason);
