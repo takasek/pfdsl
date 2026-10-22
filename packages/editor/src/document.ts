@@ -1,6 +1,6 @@
 import {
 	analyzeSource,
-	type Diagnostic,
+	type DependencyDiagnostic,
 	inputFeedbackConflictPairs,
 	loadDependencyClosure,
 	loadDependencyClosureAsync,
@@ -76,7 +76,7 @@ export function prepareDocument(
 	load: PresetLoader,
 ) {
 	let frontmatter = model.frontmatter;
-	let presetDiagnostics: Diagnostic[] = [];
+	let presetDiagnostics: DependencyDiagnostic[] = [];
 	if (path !== null) {
 		const dependencies = loadDependencyClosure(path, (file) =>
 			file === path ? model : load(file),
