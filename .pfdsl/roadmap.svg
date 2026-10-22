@@ -321,9 +321,9 @@
 <text xml:space="preserve" text-anchor="middle" x="53.21" y="-1400.5" font-family="Times,serif" font-size="14.00">done</text>
 </g>
 <!-- i542_migrate_spec_id_refs -->
-<g id="node27" class="node">
+<g id="node28" class="node">
 <title>i542_migrate_spec_id_refs</title>
-<g id="a_node27"><a xlink:href="https://github.com/takasek/pfdsl/issues/542" xlink:title="spec.md 仕様ID参照移行&#10;&#10;spec.md の節番号相互参照を仕様ID参照へ段階移行する。クラスタ単位の段階計画（§15 制約 → §2.x 意味論 → 残り）は #542 が一次情報&#10;location: https://github.com/takasek/pfdsl/issues/542">
+<g id="a_node28"><a xlink:href="https://github.com/takasek/pfdsl/issues/542" xlink:title="spec.md 仕様ID参照移行&#10;&#10;spec.md の節番号相互参照を仕様ID参照へ段階移行する。クラスタ単位の段階計画（§15 制約 → §2.x 意味論 → 残り）は #542 が一次情報&#10;location: https://github.com/takasek/pfdsl/issues/542">
 <ellipse fill="none" stroke="black" cx="449.51" cy="-1339.3" rx="119.08" ry="41.3"/>
 <text xml:space="preserve" text-anchor="middle" x="449.51" y="-1351.9" font-family="Times,serif" font-size="14.00">i542_migrate_spec_id_refs</text>
 <text xml:space="preserve" text-anchor="middle" x="449.51" y="-1335.1" font-family="Times,serif" font-size="14.00">spec.md</text>
@@ -544,6 +544,36 @@
 <path fill="none" stroke="black" d="M1843.31,-267.37C1851.34,-267.32 1859.42,-267.27 1867.45,-267.22"/>
 <polygon fill="black" stroke="black" points="1867.28,-270.72 1877.26,-267.16 1867.24,-263.72 1867.28,-270.72"/>
 </g>
+<!-- i1506_load_work_rules_from_root -->
+<g id="node27" class="node">
+<title>i1506_load_work_rules_from_root</title>
+<g id="a_node27"><a xlink:href="https://github.com/takasek/pfdsl/issues/1506" xlink:title="このリポの作業規律を root の指示から読ませる&#10;location: https://github.com/takasek/pfdsl/issues/1506">
+<ellipse fill="none" stroke="black" cx="449.51" cy="-191.3" rx="150.43" ry="53.17"/>
+<text xml:space="preserve" text-anchor="middle" x="449.51" y="-212.3" font-family="Times,serif" font-size="14.00">i1506_load_work_rules_from_root</text>
+<text xml:space="preserve" text-anchor="middle" x="449.51" y="-195.5" font-family="Times,serif" font-size="14.00">このリポの作業規律</text>
+<text xml:space="preserve" text-anchor="middle" x="449.51" y="-178.7" font-family="Times,serif" font-size="14.00">を root</text>
+<text xml:space="preserve" text-anchor="middle" x="449.51" y="-161.9" font-family="Times,serif" font-size="14.00">の指示から読ませる</text>
+</a>
+</g>
+</g>
+<!-- root_loaded_work_rules -->
+<g id="node48" class="node">
+<title>root_loaded_work_rules</title>
+<g id="a_node48"><a xlink:title="root の指示から読むこのリポの作業規律&#10;&#10;このリポの開発規律を、binding の「ワークサイクルの追加手順」スロット経由ではなく root の指示から読ませる。配布物の整理より先に統合し、移行の途中でこのリポのセッションが規律を読まなくなる状態を作らない&#10;criteria:&#10; &#160;生成した CLAUDE.md と AGENTS.md が、このリポの作業規律を置いた binding の節を作業の開始時に読むよう指示し、scripts/check&#45;companion&#45;bindings.mjs が新しい見出しを必須にし、旧見出しの「ワークサイクルの追加手順」だけの binding を失敗させる。 このリポで新しく開いたセッションが、着手時にその節を読むことを1回確かめた&#10; &#160;">
+<polygon fill="#d4edda" stroke="black" points="850.21,-232.5 670.21,-232.5 670.21,-174.1 850.21,-174.1 850.21,-232.5"/>
+<text xml:space="preserve" text-anchor="middle" x="760.21" y="-215.9" font-family="Times,serif" font-size="14.00">root_loaded_work_rules</text>
+<text xml:space="preserve" text-anchor="middle" x="760.21" y="-199.1" font-family="Times,serif" font-size="14.00">root の指示から読む</text>
+<text xml:space="preserve" text-anchor="middle" x="760.21" y="-182.3" font-family="Times,serif" font-size="14.00">このリポの作業規律</text>
+</a>
+</g>
+<text xml:space="preserve" text-anchor="middle" x="656.61" y="-161.5" font-family="Times,serif" font-size="14.00">done</text>
+</g>
+<!-- i1506_load_work_rules_from_root&#45;&gt;root_loaded_work_rules -->
+<g id="edge34" class="edge">
+<title>i1506_load_work_rules_from_root&#45;&gt;root_loaded_work_rules</title>
+<path fill="none" stroke="black" d="M599.44,-197.08C619.45,-197.86 639.59,-198.64 658.49,-199.38"/>
+<polygon fill="black" stroke="black" points="658.14,-202.87 668.27,-199.76 658.41,-195.87 658.14,-202.87"/>
+</g>
 <!-- spec_id_refs -->
 <g id="node49" class="node">
 <title>spec_id_refs</title>
@@ -563,9 +593,9 @@
 <polygon fill="black" stroke="black" points="672.37,-1342.8 682.37,-1339.3 672.37,-1335.8 672.37,-1342.8"/>
 </g>
 <!-- introduce_tombstones -->
-<g id="node28" class="node">
+<g id="node29" class="node">
 <title>introduce_tombstones</title>
-<g id="a_node28"><a xlink:title="tombstone 機構導入&#10;&#10;初の ID 削除が発生した時点で起票・着手する。tombstone リスト実体・再定義禁止 lint・mint&#45;check への tombstone 次元追加を含む">
+<g id="a_node29"><a xlink:title="tombstone 機構導入&#10;&#10;初の ID 削除が発生した時点で起票・着手する。tombstone リスト実体・再定義禁止 lint・mint&#45;check への tombstone 次元追加を含む">
 <ellipse fill="none" stroke="black" cx="449.51" cy="-1214.3" rx="98.75" ry="29.42"/>
 <text xml:space="preserve" text-anchor="middle" x="449.51" y="-1218.5" font-family="Times,serif" font-size="14.00">introduce_tombstones</text>
 <text xml:space="preserve" text-anchor="middle" x="449.51" y="-1201.7" font-family="Times,serif" font-size="14.00">tombstone 機構導入</text>
@@ -589,36 +619,6 @@
 <title>introduce_tombstones&#45;&gt;spec_id_tombstones</title>
 <path fill="none" stroke="black" d="M548.61,-1214.3C588.46,-1214.3 634.11,-1214.3 672.69,-1214.3"/>
 <polygon fill="black" stroke="black" points="672.39,-1217.8 682.39,-1214.3 672.39,-1210.8 672.39,-1217.8"/>
-</g>
-<!-- load_work_rules_from_root -->
-<g id="node29" class="node">
-<title>load_work_rules_from_root</title>
-<g id="a_node29"><a xlink:title="このリポの作業規律を root の指示から読ませる&#10;&#10;未起票のプレースホルダ。起票時に process id へ iN_ を付ける">
-<ellipse fill="none" stroke="black" cx="449.51" cy="-191.3" rx="122.93" ry="53.17"/>
-<text xml:space="preserve" text-anchor="middle" x="449.51" y="-212.3" font-family="Times,serif" font-size="14.00">load_work_rules_from_root</text>
-<text xml:space="preserve" text-anchor="middle" x="449.51" y="-195.5" font-family="Times,serif" font-size="14.00">このリポの作業規律</text>
-<text xml:space="preserve" text-anchor="middle" x="449.51" y="-178.7" font-family="Times,serif" font-size="14.00">を root</text>
-<text xml:space="preserve" text-anchor="middle" x="449.51" y="-161.9" font-family="Times,serif" font-size="14.00">の指示から読ませる</text>
-</a>
-</g>
-</g>
-<!-- root_loaded_work_rules -->
-<g id="node48" class="node">
-<title>root_loaded_work_rules</title>
-<g id="a_node48"><a xlink:title="root の指示から読むこのリポの作業規律&#10;&#10;ADR&#45;0048 の後続で未起票。このリポの開発規律を、binding の「ワークサイクルの追加手順」スロット経由ではなく root の指示から読ませる。配布物の整理より先に統合し、移行の途中でこのリポのセッションが規律を読まなくなる状態を作らない&#10;criteria:&#10; &#160;生成した CLAUDE.md と AGENTS.md が、このリポの作業規律を置いた binding の節を作業の開始時に読むよう指示し、scripts/check&#45;companion&#45;bindings.mjs が新しい見出しを必須にし、旧見出しの「ワークサイクルの追加手順」だけの binding を失敗させる。 このリポで新しく開いたセッションが、着手時にその節を読むことを1回確かめた&#10; &#160;">
-<polygon fill="#f8f9fa" stroke="black" points="850.21,-232.5 670.21,-232.5 670.21,-174.1 850.21,-174.1 850.21,-232.5"/>
-<text xml:space="preserve" text-anchor="middle" x="760.21" y="-215.9" font-family="Times,serif" font-size="14.00">root_loaded_work_rules</text>
-<text xml:space="preserve" text-anchor="middle" x="760.21" y="-199.1" font-family="Times,serif" font-size="14.00">root の指示から読む</text>
-<text xml:space="preserve" text-anchor="middle" x="760.21" y="-182.3" font-family="Times,serif" font-size="14.00">このリポの作業規律</text>
-</a>
-</g>
-<text xml:space="preserve" text-anchor="middle" x="657.77" y="-161.5" font-family="Times,serif" font-size="14.00">todo</text>
-</g>
-<!-- load_work_rules_from_root&#45;&gt;root_loaded_work_rules -->
-<g id="edge34" class="edge">
-<title>load_work_rules_from_root&#45;&gt;root_loaded_work_rules</title>
-<path fill="none" stroke="black" d="M572.08,-196.02C600.7,-197.13 630.9,-198.31 658.48,-199.38"/>
-<polygon fill="black" stroke="black" points="658.09,-202.87 668.21,-199.76 658.36,-195.87 658.09,-202.87"/>
 </g>
 <!-- meta_set_extension_fields -->
 <g id="node30" class="node">
@@ -879,11 +879,11 @@
 <path fill="none" stroke="black" d="M185.32,-161.22C214.67,-141.07 255.32,-114.91 293.61,-96.3 317.98,-84.45 345.58,-73.82 370.66,-65.14"/>
 <polygon fill="black" stroke="black" points="371.46,-68.57 379.8,-62.03 369.21,-61.94 371.46,-68.57"/>
 </g>
-<!-- responsibility_boundary_adr&#45;&gt;load_work_rules_from_root -->
+<!-- responsibility_boundary_adr&#45;&gt;i1506_load_work_rules_from_root -->
 <g id="edge33" class="edge">
-<title>responsibility_boundary_adr&#45;&gt;load_work_rules_from_root</title>
-<path fill="none" stroke="black" d="M251.41,-191.3C271.9,-191.3 293.56,-191.3 314.74,-191.3"/>
-<polygon fill="black" stroke="black" points="314.58,-194.8 324.58,-191.3 314.58,-187.8 314.58,-194.8"/>
+<title>responsibility_boundary_adr&#45;&gt;i1506_load_work_rules_from_root</title>
+<path fill="none" stroke="black" d="M251.41,-191.3C263.16,-191.3 275.29,-191.3 287.49,-191.3"/>
+<polygon fill="black" stroke="black" points="287.2,-194.8 297.2,-191.3 287.2,-187.8 287.2,-194.8"/>
 </g>
 <!-- responsibility_boundary_adr&#45;&gt;move_writer_rules_out_of_github_preset -->
 <g id="edge41" class="edge">
