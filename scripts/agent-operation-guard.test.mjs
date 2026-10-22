@@ -550,6 +550,49 @@ test("entry integration: parser missing -> exact bootstrap repair -> installed h
 	}
 });
 
+test("Linux proc tick ownership passes the real hook entry", {
+	skip: process.platform !== "linux",
+}, () => {
+	const f = fixture();
+	try {
+		const stat = readFileSync(`/proc/${process.pid}/stat`, "utf8");
+		const ticks = stat
+			.slice(stat.lastIndexOf(")") + 2)
+			.trim()
+			.split(/\s+/)[19];
+		assert.match(ticks, /^\d+$/);
+		f.git(f.primary, [
+			"worktree",
+			"lock",
+			"--reason",
+			`claude session own (pid ${process.pid} start ${ticks})`,
+			f.own,
+		]);
+		const options = { environment: { CLAUDE_PROJECT_DIR: f.primary } };
+		const command = `git -C ${f.own} commit --allow-empty -m probe`;
+		assert.equal(f.invoke({ command }, options).decision, "allow");
+		f.git(f.own, ["commit", "--allow-empty", "-m", "probe"]);
+		assert.equal(
+			f.invoke({ command: `git -C ${f.primary} commit -m probe` }, options)
+				.decision,
+			"deny",
+		);
+		f.git(f.primary, ["worktree", "unlock", f.own]);
+		f.git(f.primary, [
+			"worktree",
+			"lock",
+			"--reason",
+			`claude session own (pid ${process.pid} start ${BigInt(ticks) + 1n})`,
+			f.own,
+		]);
+		const denied = f.invoke({ command }, options);
+		assert.equal(denied.decision, "deny");
+		assert.match(denied.reason, /"startMatched":false/);
+	} finally {
+		f.cleanup();
+	}
+});
+
 test("Claude native owner can fast-forward a feature worktree while a primary startup stays protected", () => {
 	const f = fixture();
 	try {
@@ -581,6 +624,14 @@ test("Claude native owner can fast-forward a feature worktree while a primary st
 			options,
 		);
 		assert.equal(primary.decision, "deny");
+		assert.match(primary.reason, /Ownership diagnostics:/);
+		assert.match(primary.reason, new RegExp(`"ppid":${process.pid}`));
+		assert.ok(
+			primary.reason.includes(
+				`"entry":"${f.own}/scripts/agent-operation-guard.mjs"`,
+			),
+		);
+		assert.ok(primary.reason.includes(`"claudeProjectDir":"${f.primary}"`));
 		assert.match(primary.reason, /Recovery: same agent rewrite/);
 		assert.match(primary.reason, /fresh session/);
 		writeFileSync(join(f.own, "topic"), "topic\n");

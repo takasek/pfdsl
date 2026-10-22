@@ -6,6 +6,7 @@ import { classifyAgentOperations } from "./agent-operation-classifier.mjs";
 import { observeCodexClaudeDelegation } from "./codex-claude-delegation.mjs";
 import { createGuardProbe } from "./guard-probe.mjs";
 import {
+	matchesClaudeProcessStart,
 	readNativeWorktreeMetadata,
 	refineNativeWorktreeRelation,
 } from "./native-worktree-owner.mjs";
@@ -119,6 +120,8 @@ export function collectAgentOperationEnvironment(
 		shell,
 		environment = process.env,
 		parentPid = process.ppid,
+		platform = process.platform,
+		readProcessStat = readNativeWorktreeMetadata,
 		probeGit = createGuardProbe(),
 		probeProcess = tryRun,
 		readMetadata = readNativeWorktreeMetadata,
@@ -259,6 +262,7 @@ export function collectAgentOperationEnvironment(
 				upstream.out.trim() === `refs/remotes/origin/${facts.defaultBranch}` &&
 				ancestor.ok;
 		}
+		tree.nativeLock = typeof record.locked === "string" ? record.locked : null;
 		const lock =
 			typeof record.locked === "string"
 				? record.locked.match(
@@ -266,13 +270,18 @@ export function collectAgentOperationEnvironment(
 					)
 				: null;
 		if (lock) {
-			const started = probeProcess("ps", ["-o", "lstart=", "-p", lock[1]], {
-				cwd: root,
-				env: { ...env, LC_ALL: "C", TZ: "UTC" },
-				captureStderr: true,
-				timeout: 500,
-			});
-			if (started.ok && normalizeStart(started.out) === normalizeStart(lock[2]))
+			const processOptions = {
+				platform,
+				readProcessStat,
+				execProcess: probeProcess,
+				options: { cwd: root, env, captureStderr: true, timeout: 500 },
+			};
+			tree.nativeStartMatched = matchesClaudeProcessStart(
+				Number(lock[1]),
+				lock[2],
+				processOptions,
+			);
+			if (tree.nativeStartMatched)
 				tree.ownership = {
 					ownerId:
 						harness === "claude" && Number(lock[1]) === parentPid
@@ -286,7 +295,9 @@ export function collectAgentOperationEnvironment(
 				root === facts.sessionRoot &&
 				tree.ownership?.live &&
 				owner?.pid === Number(lock[1]) &&
-				owner.start === normalizeStart(lock[2])
+				(owner.start === normalizeStart(lock[2]) ||
+					(/^\d+$/.test(lock[2]) &&
+						matchesClaudeProcessStart(owner.pid, owner.start, processOptions)))
 			) {
 				// The delegating Claude keeps ownership; only this child's ordinary
 				// file scope is mapped to own. Subject authority stays codex-child.
@@ -339,6 +350,8 @@ export function collectAgentOperationEnvironment(
 				payload,
 				environment,
 				parentPid,
+				platform,
+				readProcessStat,
 				execGit: probeGit,
 				execProcess: probeProcess,
 				readMetadata,

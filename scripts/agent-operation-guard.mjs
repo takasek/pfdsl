@@ -8,6 +8,43 @@ import { isMainThread } from "node:worker_threads";
 const hookRoot = fileURLToPath(new URL("../", import.meta.url));
 const delegatedCodex =
 	!process.env.CLAUDE_PROJECT_DIR?.trim() && process.env.CLAUDECODE === "1";
+
+// Only failed scope decisions expose this bounded allowlist. Never dump argv or the environment.
+function ownershipDiagnostics(payload, facts, classified) {
+	const bounded = (value) =>
+		typeof value === "string" ? value.slice(0, 512) : null;
+	const paths = classified.operations
+		.map(({ executionPath }) => executionPath)
+		.filter(Boolean);
+	return JSON.stringify({
+		entry: fileURLToPath(import.meta.url),
+		hookRoot,
+		pid: process.pid,
+		ppid: process.ppid,
+		processCwd: bounded(process.cwd()),
+		payloadCwd: bounded(payload.cwd),
+		tool: bounded(payload.tool_name),
+		sessionId: bounded(payload.session_id),
+		agentId: bounded(payload.agent_id),
+		agentType: bounded(payload.agent_type),
+		claudeProjectDir: bounded(process.env.CLAUDE_PROJECT_DIR),
+		claudeCode: process.env.CLAUDECODE === "1",
+		harness: facts.harness,
+		gitTargetOverride: facts.gitTargetOverride,
+		targets: (facts.worktrees ?? [])
+			.filter(({ root }) =>
+				paths.some((path) => path === root || path.startsWith(`${root}/`)),
+			)
+			.slice(0, 4)
+			.map((tree) => ({
+				root: bounded(tree.root),
+				primary: tree.primary === true,
+				lock: bounded(tree.nativeLock),
+				startMatched: tree.nativeStartMatched ?? null,
+				owner: bounded(tree.ownership?.ownerId),
+			})),
+	});
+}
 function failed(detail, phase) {
 	const diagnostic = String(detail).slice(0, 400);
 	let guidance;
@@ -134,12 +171,17 @@ if (isMainThread) {
 					hookRoot,
 				};
 		const decision = evaluateAgentOperationPolicy(payload, facts);
-		recordUnresolvedDecision(
-			classifyAgentOperations(payload, facts),
-			decision,
-			facts,
-		);
+		const classified = classifyAgentOperations(payload, facts);
+		recordUnresolvedDecision(classified, decision, facts);
 		if (decision.decision !== "allow") {
+			if (
+				decision.decision === "deny" &&
+				["W", "B", "D"].includes(decision.operationClass) &&
+				classified.operations.some(({ target }) =>
+					["primary", "other-live", "other-unowned"].includes(target),
+				)
+			)
+				decision.reason += ` Ownership diagnostics: ${ownershipDiagnostics(payload, facts, classified)}.`;
 			if (shell?.error && decision.operationClass === "U")
 				decision.reason += ` ${shell.error}`;
 			const recovery = {

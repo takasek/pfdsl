@@ -51,6 +51,11 @@ main/default branch、検査回避、作用先の既存判定は維持する。
 ### Claude の対応条件
 
 初版は、`claude session <name> (pid P start S)` 形式の native lock に記録された PID と UTC 起動時刻が hook プロセスの直接の親に一致する場合だけ補正する。
+#1511 の Linux cloud 観測では、lock の `start 359` と生存中の `/proc/105/stat` のフィールド22が一致した。
+この数値形式は Linux の `/proc/<pid>/stat` の PID・生存状態・開始値を操作ごとに照合し、開始値を Number や日時へ変換せず文字列で比較する（フィールド定義は [proc_pid_stat(5)](https://man7.org/linux/man-pages/man5/proc_pid_stat.5.html)）。
+日時形式は従来の UTC `ps lstart` 照合を維持し、Linux 以外で数値形式を肯定証拠にしない。
+同じ照合を別所有者の生存確認にも使い、委譲時は固定接続から取得した Claude の日時形式の開始値も生存プロセスと照合する。
+実 hook の環境・直接親は cloud で未取得のため、Bash の環境変数から harness を推測する fallback や祖先探索は追加しない。
 `claude agent <name> (pid P start S)` の agent 種別は意図して除外し、PID と起動時刻が一致しても確定済み sibling を補正しない。
 親セッションと subagent の隔離 worktree が同じ PID を記録する場合でも、親からその隔離 worktree を own と扱う根拠にはしない。
 任意の祖先まで一致を探索しない。
@@ -60,6 +65,8 @@ Claude A が別セッション B を子プロセスとして起動した構成�
 subagent が親セッションの session 種別 worktree を対象にする場合と、自分の agent 種別隔離 worktree を対象にする場合を区別し、後者の sibling 補正は行わない。
 追加の shell・wrapper・未知の中継プロセスが入る構成は、初版では補正しない。
 lock の欠落・読取不能・形式不明、開始時刻不一致、ps 取得失敗、再開後の stale lock は従来の sibling 判断へ戻す。
+所有範囲による変更操作の拒否には、実 hook の entry・PID/PPID・cwd・payload の識別情報、許可リストに限定した環境値、対象 lock と照合結果を診断として添える。
+診断は判定を変更せず、命令全文・全環境・プロセス引数を出力しない。
 native 観測で条件を絞った結果であり、全 Claude 起動方式への互換性は主張しない。
 native lock が当該プロセスのセッション系列を表すという観測に依存する。
 同一プロセス内の独立セッション多重化・所有権移管、時刻の同じ秒内の PID 再利用、読取り後の所有状態変更は未検証である。
