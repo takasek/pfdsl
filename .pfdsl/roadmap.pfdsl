@@ -178,7 +178,7 @@ artifact:
   root_loaded_work_rules:
     label: root の指示から読むこのリポの作業規律
     description: このリポの開発規律を、binding の「ワークサイクルの追加手順」スロット経由ではなく root の指示から読ませる。配布物の整理より先に統合し、移行の途中でこのリポのセッションが規律を読まなくなる状態を作らない
-    status: wip
+    status: done
     criteria: >
       生成した CLAUDE.md と AGENTS.md が、このリポの作業規律を置いた binding の節を作業の開始時に読むよう指示し、scripts/check-companion-bindings.mjs が新しい見出しを必須にし、旧見出しの「ワークサイクルの追加手順」だけの binding を失敗させる。
       このリポで新しく開いたセッションが、着手時にその節を読むことを1回確かめた
