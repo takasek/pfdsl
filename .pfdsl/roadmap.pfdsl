@@ -220,6 +220,14 @@ artifact:
     description: ADR-0048 の後続で未起票。設計仕様の結論に従い、GitHub Issues バックエンドの reference・hook・CI 設定を、採用を宣言したリポでだけ働かせる
     status: todo
     criteria: 設計仕様の結論のとおりに配布され、GitHub Issues バックエンドを採用しないリポでは GitHub アダプタの hook が通知を出さない。採用したリポでは、移行案内に従った後も現行と同じ手順・hook・CI 設定が働く
+  wiki_roadmap_integration:
+    label: Wiki を正本にする roadmap 連携 (#1519)
+    description: 実装リポの PR に依存せず roadmap を編集できる採用側連携。詳細は対応 Issue を一次情報とする
+    status: todo
+    criteria: >
+      採用リポで Wiki 更新から SVG を更新でき、ready・validate・render が同じ正本を読む。
+      同時更新・失敗時の扱い、共有 done の確定条件、移行と復帰の手順が検証されている
+    externalStakeholders: [ PFD採用リポの運用者 ]
 process:
   publish_cli_ready_counts:
     label: 新規 ready 数を示す CLI と plugin を公開する
@@ -274,6 +282,9 @@ process:
   apply_github_adapter_design:
     label: 設計に従って GitHub アダプタを採用したリポでだけ働かせる
     description: 未起票のプレースホルダ。起票時に process id へ iN_ を付ける。分割するか宣言で絞るかは入力の設計仕様に従う
+  i1519_add_wiki_roadmap_integration:
+    label: roadmap の保存先を分離して Wiki 連携を追加する
+    location: https://github.com/takasek/pfdsl/issues/1519
 
 tag:
   "priority:high": { style: { color: "#b60205", penwidth: "2" } }
@@ -322,3 +333,5 @@ responsibility_boundary_adr >> add_prune_cli -> prune_cli
 [backend_neutral_work_item_contract, prune_cli, writer_free_github_preset] >> design_adapter_plugin_split -> adapter_plugin_split_design
 
 adapter_plugin_split_design >> apply_github_adapter_design -> optional_github_adapter
+
+[responsibility_boundary_adr, toolchain] >> i1519_add_wiki_roadmap_integration -> wiki_roadmap_integration
