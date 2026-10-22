@@ -161,6 +161,70 @@ artifact:
     criteria: "生成工程の公開 Issue 本文が定める公開・取得確認が完了し、Mac 合格記録と公開配布物の対象版・適用範囲が一致する。公開結果と取得物を読み戻した証拠を記録済み。開発版の合格や未公開候補だけでは完了としない"
     location: https://github.com/takasek/pfdsl/releases
     externalStakeholders: [ macOS 利用者 ]
+  boundary_decisions:
+    label: 責務境界の所有者決定（D1〜D6）
+    description: 外部のセカンドオピニオン（2026-10-17）と再編計画を受けて、所有者が 2026-10-21 に決めた判断点。内容と根拠は ADR-0048 の判断点の節に記録する
+    status: done
+    criteria: 判断点 D1〜D6 のそれぞれに所有者の決定がある
+  responsibility_boundary_adr:
+    label: 責務境界の ADR と0段目 (#1490)
+    description: PFDSL の責務を PFD の意味論なしには成立しない判断に限る ADR-0048 と、それに合わせて書き換えた配布層の昇格先の判定ルールの0段目。後続の再編の仕様になる
+    status: done
+    criteria: >
+      docs/adr/0048 が Accepted で存在し、ADR-0039 と ADR-0040 の Status に部分上書きが注記されている。
+      architecture.md の0段目だけを渡した読み手が再編の各項目の置き場を再現でき、その結果が PR 本文に記録されている。
+      make test・make typecheck・make lint が通り、make gen-plugin の後に差分が出ない
+    location: ../docs/adr/0048-responsibility-boundary-by-pfd-semantics.md
+  root_loaded_work_rules:
+    label: root の指示から読むこのリポの作業規律
+    description: ADR-0048 の後続で未起票。このリポの開発規律を、binding の「ワークサイクルの追加手順」スロット経由ではなく root の指示から読ませる。配布物の整理より先に統合し、移行の途中でこのリポのセッションが規律を読まなくなる状態を作らない
+    status: todo
+    criteria: >
+      生成した CLAUDE.md と AGENTS.md が、このリポの作業規律を置いた binding の節を作業の開始時に読むよう指示し、scripts/check-companion-bindings.mjs が新しい見出しを必須にし、旧見出しの「ワークサイクルの追加手順」だけの binding を失敗させる。
+      このリポで新しく開いたセッションが、着手時にその節を読むことを1回確かめた
+  executor_neutral_work_cycle:
+    label: 実行主体に依存しない work-cycle
+    description: ADR-0048 の後続で未起票。work-cycle.md から実行主体を主語にする規則を外し、PFD 側の protocol だけを残す
+    status: todo
+    criteria: >
+      work-cycle.md が実行主体を主語にする規則を持たず、1サイクル1プロセスを既定のプリセットとして示し、run の成功と受入の区別と制御主体の単一性を定め、binding の「ワークサイクルの追加手順」スロットを PFD 固有の追加ゲート項目に縮小している。
+      採用側プローブで、外部の実行主体の完了から done を付けずに受入の確認へ進むことを確かめた
+  three_valued_model_retro:
+    label: 3値の model retro と証拠の契約
+    description: ADR-0048 の後続で未起票。pfd-retro を3値の model retro と証拠の契約に絞り、D 層を同じ plugin 内の独立した skill と図の監査レンズへ分ける（ADR-0048 D1）
+    status: todo
+    criteria: >
+      pfd-retro の結論が実行側の失敗・モデルの改訂候補・変更不要の3値で、変更不要は照合したモデル要素と証拠を名指す。
+      証拠の契約が版との対応を定め、C 層の汎用項目が配布物から外れている。
+      D 層は同じ plugin 内の独立した skill と図の監査レンズへ分かれ、L4 滞留監査は配布層への還流として別の節にある
+  writer_free_github_preset:
+    label: 実行主体の書込み規律を外した GitHub Issues プリセット
+    description: ADR-0048 の後続で未起票。実行主体が行う外部書込みの手順と PR 運用をこのリポの binding へ移し、プリセットにはアダプタ自身が外部へ書く場合の読み戻しの原則だけを残す（ADR-0048 D2）
+    status: todo
+    criteria: github-issues-backend.md が実行主体の外部書込みの手順と PR 本文規約を持たず、アダプタ自身の書込みを読み戻す原則を持つ。このリポの PR 作成手順（クローズ参照の扱い等）が binding だけで完結する
+  backend_neutral_work_item_contract:
+    label: バックエンドに依存しない作業項目の対応契約
+    description: 両バックエンドの reference に重複している作業項目と process の対応の規則を、protocol に1つだけ置く（対象の規則は ADR-0048 契約6）
+    status: todo
+    criteria: >
+      両バックエンドの reference に同じ規則の本文が残らず、どちらも protocol に置いた1つの契約を参照する。
+      その契約は作業項目と process を location: で対応付け、1つの作業項目に複数の process を対応させてよく、process id の接頭辞で作業項目を表す規約を持たない。
+      移行の前に、接頭辞と location: から導かれる作業項目と process の対応をすべて列挙し、移行の後も読取側のスクリプトが同じ対応を導けるか、外した対応ごとに理由が記録されている
+  prune_cli:
+    label: 完了チェーン回収の CLI 動詞
+    description: ADR-0048 の後続で未起票。完了チェーン回収の保持規則と検証を CLI のトップレベル動詞にし、配置スクリプトは CLI を呼ぶだけにする
+    status: todo
+    criteria: 保持規則と検証が CLI のトップレベル動詞 prune にあり、ADR-0022 の出力モデルに従う。このリポの roadmap に対して旧スクリプトと削除対象が一致する
+  adapter_plugin_split_design:
+    label: core と GitHub アダプタの plugin 分割の設計仕様
+    description: ADR-0048 の後続で未起票。分割の費用が過大と分かった場合は、1つの plugin のまま .pfdsl/config.json の宣言で絞る案へ切り替える（ADR-0048 D5）
+    status: todo
+    criteria: plugin 間で依存を宣言できるかの確認結果と、分割するか1つの plugin のまま宣言で絞るかの決定、その理由、採用先の移行手順が設計仕様に記録され、所有者が承認している
+  optional_github_adapter:
+    label: 採用したリポでだけ働く GitHub アダプタ
+    description: ADR-0048 の後続で未起票。設計仕様の結論に従い、GitHub Issues バックエンドの reference・hook・CI 設定を、採用を宣言したリポでだけ働かせる
+    status: todo
+    criteria: 設計仕様の結論のとおりに配布され、GitHub Issues バックエンドを採用しないリポでは GitHub アダプタの hook が通知を出さない。採用したリポでは、移行案内に従った後も現行と同じ手順・hook・CI 設定が働く
 process:
   publish_cli_ready_counts:
     label: 新規 ready 数を示す CLI と plugin を公開する
@@ -194,6 +258,33 @@ process:
   i1262_publish_standalone:
     label: 配布物の全体受入を完了して公開する
     location: https://github.com/takasek/pfdsl/issues/1262
+  i1490_define_responsibility_boundary:
+    label: 責務境界の ADR と0段目を確定する
+    location: https://github.com/takasek/pfdsl/issues/1490
+  reduce_work_cycle_protocol:
+    label: work-cycle を protocol に絞る
+    description: 未起票のプレースホルダ。起票時に process id へ iN_ を付ける
+  narrow_retro_to_model:
+    label: pfd-retro を model retro に絞る
+    description: 未起票のプレースホルダ。起票時に process id へ iN_ を付ける
+  add_prune_cli:
+    label: 完了チェーン回収を CLI 動詞にする
+    description: 未起票のプレースホルダ。起票時に process id へ iN_ を付ける
+  load_work_rules_from_root:
+    label: このリポの作業規律を root の指示から読ませる
+    description: 未起票のプレースホルダ。起票時に process id へ iN_ を付ける
+  move_writer_rules_out_of_github_preset:
+    label: GitHub Issues プリセットから書込み規律と PR 運用を外す
+    description: 未起票のプレースホルダ。起票時に process id へ iN_ を付ける
+  i1497_unify_work_item_contract:
+    label: 作業項目の対応契約を1つにする
+    location: https://github.com/takasek/pfdsl/issues/1497
+  design_adapter_plugin_split:
+    label: core と GitHub アダプタの plugin 分割を設計する
+    description: 未起票のプレースホルダ。起票時に process id へ iN_ を付ける
+  apply_github_adapter_design:
+    label: 設計に従って GitHub アダプタを採用したリポでだけ働かせる
+    description: 未起票のプレースホルダ。起票時に process id へ iN_ を付ける。分割するか宣言で絞るかは入力の設計仕様に従う
 
 tag:
   "priority:high": { style: { color: "#b60205", penwidth: "2" } }
@@ -228,3 +319,21 @@ edge_kind_conflict_diagnostic >> publish_cli_edge_kind_conflict -> cli_release_e
 gui_vscode_candidate >> i1445_accept_gui_vscode -> gui_vscode_acceptance
 
 gui_mac_acceptance >> i1262_publish_standalone -> standalone_release
+
+boundary_decisions >> i1490_define_responsibility_boundary -> responsibility_boundary_adr
+
+responsibility_boundary_adr >> load_work_rules_from_root -> root_loaded_work_rules
+
+[responsibility_boundary_adr, root_loaded_work_rules] >> reduce_work_cycle_protocol -> executor_neutral_work_cycle
+
+[responsibility_boundary_adr, root_loaded_work_rules] >> narrow_retro_to_model -> three_valued_model_retro
+
+[responsibility_boundary_adr, root_loaded_work_rules] >> move_writer_rules_out_of_github_preset -> writer_free_github_preset
+
+[executor_neutral_work_cycle, writer_free_github_preset] >> i1497_unify_work_item_contract -> backend_neutral_work_item_contract
+
+responsibility_boundary_adr >> add_prune_cli -> prune_cli
+
+[backend_neutral_work_item_contract, prune_cli, writer_free_github_preset] >> design_adapter_plugin_split -> adapter_plugin_split_design
+
+adapter_plugin_split_design >> apply_github_adapter_design -> optional_github_adapter

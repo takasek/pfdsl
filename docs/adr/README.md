@@ -12,13 +12,15 @@
 
 ## 一覧
 
+- **ADR-0048** [PFDSL の責務を、PFD の意味論なしには成立しない判断に限る](0048-responsibility-boundary-by-pfd-semantics.md) — ADR-0039 の「提供すると決めた用途」は動機による判定で、どの規律にも付けられた。PFD の意味論を除いても成り立つ規則を中核から外し、書き換え先を PFD の要素・companion の構造的事実・`.pfdsl/config.json`・CLI が導出できる状態に限る。区分 ii に「判定の論理が PFD の語彙で書ける」を加え、D 層は所有者の決定による付属機能、配布機構は区分の外の別枠とする。retro の3値の結論、版と対応した証拠、run の成功と受入の区別、制御主体の単一性、意味論を定義しないアダプタを契約とし、判断点 D1〜D6 を記録する。ADR-0039 の区分 ii と `takasek/common` を移設先とした記述、ADR-0040 の D 層の区分を部分置換する。
+
 - **ADR-0047** [agent 操作を有限の判定表で決める](0047-agent-operation-decision-table.md) — 操作先と責務の取り違えを防ぎ、通常動線を維持する。ADR-0044・ADR-0046 の関連 hook 条項を部分置換し、判定表と性質1〜8を契約とする。
 
 - **ADR-0045** [依存閉包を共有し、編集の拒否を影響する関係に絞る](0045-dependency-closure-and-scoped-edit-gates.md) — check は全依存を検査し、rename/delete は具体的に壊れうる group 継承・変更後 boundary だけを依存側の拒否対象にする。
 
 - **ADR-0038** [retro-patterns を事例記録へ移す](0038-retro-case-migration.md) — 対策の抽出・自動選別を終了し、再発防止を既存の操作手順・入力・道具・テストが所有する。検索できる証拠と毎サイクルの retro、独立レビューを維持する。
-- **ADR-0039** [配布層の所有範囲を提供すると決めた用途で定める](0039-distribution-scope-by-provided-purpose.md) — ADR-0023 の昇格基準は「固有名詞を含まず全利用者に効く」だけを条件としたため、PFD 運用に固有の用途を持たない規律（git 衛生・委譲・設計記録の書式）が配布層を占めた。3区分を定め、昇格の0段目に「提供すると決めた用途に入るか」を置き、区分 iii を採用リポの binding へ移す。知識成果物ライフサイクル監査は binding の採用宣言で有効化する選択項目にする
-- **ADR-0040** [監査の対象についての契約と、1回の監査の実行管理を別の区分に置く](0040-audit-target-versus-run-management.md) — ADR-0039 の0段目は「終端監査の契約」を区分 i に挙げたが、実行 ID・cutoff・checkpoint 等で1回の監査を凍結する規律はどの区分の文言にも当たらなかった。監査に関わる区分 i・ii の項目は監査の対象について何を判定するか、その実行管理は区分 iii とし、自リポ binding の昇格指示も0段目に揃える
+- **ADR-0039** [配布層の所有範囲を提供すると決めた用途で定める](0039-distribution-scope-by-provided-purpose.md)（区分 ii の要件、D 層・設計記録の配置・再承認参照の区分、readback の置き場所、`takasek/common` を移設先とした記述は ADR-0048 が部分置換） — ADR-0023 の昇格基準は「固有名詞を含まず全利用者に効く」だけを条件としたため、PFD 運用に固有の用途を持たない規律（git 衛生・委譲・設計記録の書式）が配布層を占めた。3区分を定め、昇格の0段目に「提供すると決めた用途に入るか」を置き、区分 iii を採用リポの binding へ移す。知識成果物ライフサイクル監査は binding の採用宣言で有効化する選択項目にする
+- **ADR-0040** [監査の対象についての契約と、1回の監査の実行管理を別の区分に置く](0040-audit-target-versus-run-management.md)（知識成果物のライフサイクル監査の項目を区分 ii とした記述は ADR-0048 が部分置換） — ADR-0039 の0段目は「終端監査の契約」を区分 i に挙げたが、実行 ID・cutoff・checkpoint 等で1回の監査を凍結する規律はどの区分の文言にも当たらなかった。監査に関わる区分 i・ii の項目は監査の対象について何を判定するか、その実行管理は区分 iii とし、自リポ binding の昇格指示も0段目に揃える
 - **ADR-0041** [pfd-retro D 層の採用宣言を3値の構造化宣言にする](0041-retro-d-layer-declaration-token.md) — ADR-0039 の決定は変えず、宣言を `.pfdsl/config.json` の `knowledgeLifecycleAudit`（`mode` と `targets`）にする。宣言が無い・不正な状態は監査せず所有者へ毎回報告し、宣言を知らない旧版の採用先と選んだ採用先を区別する
 - **ADR-0042** [採用先の宣言の値を `.pfdsl/config.json` に置く](0042-adopter-config-file.md) — 切り替えや列挙のような宣言の値は採用先が git 管理する `.pfdsl/config.json` に置き、散文の binding はそのキーを指す。completed-chain sweep は同ファイルで有効にしない限り動かさない。移行状態の置き場所もここに予約する
 - **ADR-0043** [採用先が移行を適用した版を `.pfdsl/config.json` に記録する](0043-applied-migration-state.md) — 採用先が移行を適用し終えた plugin の版（Claude Code では bundle の集約 hash も）をキー `appliedMigration` に置き、`check-install-sync.mjs` は読むだけで照合する。記録するのは検証後に明示実行する `--record-migration` だけで、記録より古い plugin からの `--deploy` と `--record-migration` は exit 3 で拒否する。「最後に見た版」・別ファイル・SessionStart hook・manifest からの推定・CLI での照合は見送った
