@@ -44,6 +44,7 @@ import {
 	parseStatusCursorPosition,
 	quickInputValue,
 	resolveVSCodeExecutablePath,
+	submitQuickInput,
 	waitForColdRender,
 	waitForStatusCursorPosition,
 	waitForVisibleCount,
@@ -78,6 +79,72 @@ test("command palette replacement keeps the command provider prefix", () => {
 		quickInputValue("file", "/tmp/fixture.pfdsl"),
 		"/tmp/fixture.pfdsl",
 	);
+});
+
+test("file picker waits for the selected fixture result before accepting", async () => {
+	const events = [];
+	const fixturePath = "/tmp/smoke/01-simple-chain.pfdsl";
+	let releaseResult;
+	const resultReady = new Promise((resolve) => {
+		releaseResult = resolve;
+	});
+	const input = {
+		count: async () => 1,
+		evaluate: async () => true,
+		fill: async (value) => events.push(["fill", value]),
+		inputValue: async () => fixturePath,
+		press: async (key) => events.push(["accept", key]),
+	};
+	const page = {
+		evaluate: async () => ({}),
+		locator: (selector) => {
+			if (selector === ".quick-input-widget:not([inert]) input:visible")
+				return input;
+			if (selector === ".quick-input-widget")
+				return { waitFor: async () => events.push(["hidden"]) };
+			assert.equal(
+				selector,
+				".quick-input-widget:not([inert]) .monaco-list-row.focused .label-name",
+			);
+			return {
+				getByText: (name, options) => {
+					assert.equal(name, "01-simple-chain.pfdsl");
+					assert.deepEqual(options, { exact: true });
+					return {
+						waitFor: async (state) => {
+							assert.deepEqual(state, { state: "visible" });
+							events.push(["waiting for selected fixture"]);
+							await resultReady;
+							events.push(["selected fixture visible"]);
+						},
+					};
+				},
+			};
+		},
+	};
+	const focusTarget = { focus: async () => {}, press: async () => {} };
+	const pending = submitQuickInput(
+		page,
+		focusTarget,
+		"Control+p",
+		"file",
+		fixturePath,
+	);
+	await new Promise((resolve) => setImmediate(resolve));
+	try {
+		assert.deepEqual(events, [
+			["fill", fixturePath],
+			["waiting for selected fixture"],
+		]);
+	} finally {
+		releaseResult();
+		await pending;
+	}
+	assert.deepEqual(events.slice(-3), [
+		["selected fixture visible"],
+		["accept", "Enter"],
+		["hidden"],
+	]);
 });
 
 test("source close targets its own close button and checks tab and preview survival", async () => {
