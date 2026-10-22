@@ -34,6 +34,69 @@ function codex(overrides = {}) {
 }
 
 describe("native worktree owner", () => {
+	it("matches Linux clock ticks without rounding and rechecks process identity", () => {
+		let ticks = "18446744073709551614";
+		const options = claude({
+			platform: "linux",
+			execGit: () => ({ ok: true, out: listing.replace(start, ticks) }),
+			readProcessStat: (path) => {
+				assert.equal(path, "/proc/123/stat");
+				return `123 (claude ) with spaces) S ${Array(18).fill("0").join(" ")} ${ticks} 0\n`;
+			},
+		});
+		assert.equal(refineNativeWorktreeRelation("sibling", options), "own");
+		const captured = options.execGit();
+		options.execGit = () => captured;
+		ticks = "18446744073709551615";
+		assert.equal(refineNativeWorktreeRelation("sibling", options), "sibling");
+	});
+	it("rejects missing, malformed, dead and non-Linux tick evidence", () => {
+		const options = claude({
+			platform: "linux",
+			execGit: () => ({ ok: true, out: listing.replace(start, "359") }),
+		});
+		for (const stat of [
+			"",
+			"123 (claude) S 0",
+			`124 (claude) S ${Array(18).fill("0").join(" ")} 359`,
+			`123 (claude) Z ${Array(18).fill("0").join(" ")} 359`,
+			`123 (claude) S ${Array(18).fill("0").join(" ")} invalid`,
+		])
+			assert.equal(
+				refineNativeWorktreeRelation("sibling", {
+					...options,
+					readProcessStat: () => stat,
+				}),
+				"sibling",
+			);
+		assert.equal(
+			refineNativeWorktreeRelation("sibling", {
+				...options,
+				readProcessStat: () => {
+					throw new Error("gone");
+				},
+			}),
+			"sibling",
+		);
+		assert.equal(
+			refineNativeWorktreeRelation("sibling", {
+				...options,
+				platform: "darwin",
+				execProcess: () => ({ ok: true, out: "359" }),
+			}),
+			"sibling",
+		);
+		assert.equal(
+			refineNativeWorktreeRelation("sibling", {
+				...options,
+				parentPid: 456,
+				readProcessStat: () => {
+					throw new Error("must not read another parent's stat");
+				},
+			}),
+			"sibling",
+		);
+	});
 	it("refines a Claude sibling using its direct parent and UTC start, preserving NUL paths", () => {
 		assert.equal(refineNativeWorktreeRelation("sibling", claude()), "own");
 	});

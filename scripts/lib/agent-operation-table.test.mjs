@@ -114,6 +114,22 @@ test("property 4: every denied cell has a reason and a finite recovery destinati
 	}
 });
 
+test("ordinary protected Git writes give a cloud recovery without requiring a human terminal", () => {
+	for (const operationClass of ["W", "B", "D"]) {
+		const result = decideOperation({
+			subject: "claude-parent",
+			health: "healthy",
+			target: "primary",
+			operationClass,
+			kind: "git",
+		});
+		assert.equal(result.decision, "deny");
+		assert.equal(result.recovery, "rewrite");
+		assert.match(result.reason, /cloud.*fresh session/i);
+		assert.match(result.reason, /make setup/);
+	}
+});
+
 test("forced remove denial explains nonforce cleanup without promising it for live owners", () => {
 	const input = {
 		subject: "claude-parent",

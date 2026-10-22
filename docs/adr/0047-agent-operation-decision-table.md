@@ -60,6 +60,10 @@ PR #1413 の旧 ADR-0047 が採った「Git が起こす共有作用の全防止
 
 この表にない option の出力先、shell のリダイレクト、Git 以外のプログラムの書込み先は保証外とする。
 列挙を追加するかは所有者が決める。
+#1510 の再現では、`origin/HEAD` がない同じ session で、同じ scratchpad への Write は環境観測中に deny、Bash の `cat > /tmp/...` は allow になった。
+Write は書込み先を持つ W として観測される一方、`cat` とそのリダイレクトはこの表の操作として収集されないためであり、Bash の書込み先の安全性を検証した結果ではない。
+この入口差は `scripts/agent-operation-guard.test.mjs` で再現し、セットアップによる参照修復後に両方が allow になることも確認する。
+リダイレクトを操作として収集する一般化は、この修正では追加しない。
 worktree add の開始点 main は -b topic や --detach と併用できるが、既存の default branch を checkout する形は D とする。
 switch・checkout の --track・-t で作成名を明示しない場合は、remote/name から暗黙に作る local name を branch の対象とし、default branch なら D とする。
 作成名を -c・-b 等で明示した場合はその名前を対象とし、default 以外は B の判定を維持する。
@@ -93,6 +97,9 @@ agent が手動で追加した worktree は other-unowned であり、変更を�
 | U 未解決 | 動的な実行名、動的な `cd`・`-C`、Codex の `-C` 無し変更系 Git | 書換え案内付き deny | 同左 | 同左 | 同左 |
 
 対象の列は checkout を実行先に持つ操作（Git、file）に適用する。`gh` と MCP の操作は checkout を持たないので、own の列で判定する。
+通常の Git の W・B・D が対象の列によって拒否された場合、deny は維持し、回復先は同じ agent の書換えとする。
+cloud では native worktree の parser 導入・setup 後に絶対パスを指定して操作し、所有確認ができない場合や primary の更新が必要な場合は、意図した remote ref を指定した新しい session で再開する。
+この案内は primary の通常変更や所有未確認 worktree を許可せず、子の親返却、検査回避・PR 統合・強制削除等の既存の停止先も変更しない。
 
 primary の準備更新だけは W の例外として親 agent に許可する。
 入口は `git -C <absolute-primary> pull --ff-only --no-autostash origin <default>` に限定し、追加の option・global config・refspec は受け付けない。

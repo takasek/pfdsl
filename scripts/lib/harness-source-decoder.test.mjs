@@ -616,6 +616,49 @@ describe("harness source decoder", () => {
 		);
 	});
 
+	it("preserves supported Claude worktree bases as repository-only settings", () => {
+		for (const baseRef of ["head", "fresh"]) {
+			const subject = fixture();
+			subject.addFile(
+				".claude/settings.json",
+				JSON.stringify({
+					permissions: { allow: [] },
+					hooks: {},
+					worktree: { baseRef },
+				}),
+			);
+			const records = decodeFixture({
+				root: ROOT,
+				contract: CONTRACT,
+				fs: subject.fs,
+			});
+			assert.deepEqual(
+				recordFor(records, "repository-hooks").semantic.worktree,
+				{ baseRef },
+			);
+		}
+	});
+	it("rejects unsupported worktree base values and unknown worktree keys", () => {
+		for (const worktree of [
+			null,
+			"head",
+			{},
+			{ baseRef: "main" },
+			{ baseRef: 1 },
+			{ baseRef: "head", unknown: true },
+		]) {
+			const subject = fixture();
+			subject.addFile(
+				".claude/settings.json",
+				JSON.stringify({ permissions: { allow: [] }, hooks: {}, worktree }),
+			);
+			assert.throws(
+				() => decodeFixture({ root: ROOT, contract: CONTRACT, fs: subject.fs }),
+				/source-schema: claude-settings:/,
+			);
+		}
+	});
+
 	it("keeps enabledPlugins as a Claude-only settings field instead of rejecting it", () => {
 		const subject = fixture();
 		subject.addFile(

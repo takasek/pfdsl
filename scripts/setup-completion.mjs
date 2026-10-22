@@ -158,8 +158,97 @@ export function isSetupCurrent(root = process.cwd(), options = {}) {
 	return (
 		areDependenciesCurrent(root) &&
 		inspectSkillLink(root).reason === null &&
-		inspectHooksPath(root, options).reason === null
+		inspectHooksPath(root, options).reason === null &&
+		inspectDefaultBranch(root, options).reason === null
 	);
+}
+
+function inspectDefaultBranch(root, { env = process.env } = {}) {
+	const git = (args) =>
+		spawnSync("git", args, { cwd: root, env, encoding: "utf8" });
+	const head = git(["symbolic-ref", "--quiet", "refs/remotes/origin/HEAD"]);
+	const ref = head.stdout?.trim();
+	if (
+		head.status === 0 &&
+		/^refs\/remotes\/origin\/.+/.test(ref) &&
+		git(["rev-parse", "--verify", `${ref}^{commit}`]).status === 0
+	)
+		return { reason: null, missing: false };
+	const missing =
+		head.status === 1 &&
+		git(["show-ref", "--verify", "--quiet", "refs/remotes/origin/HEAD"])
+			.status === 1;
+	return {
+		missing,
+		reason: missing
+			? "Cannot resolve origin/HEAD. Run make setup to restore it from origin's default branch."
+			: "Invalid origin/HEAD: expected an origin symbolic ref resolving to a commit. Inspect origin/HEAD and fetch the advertised default branch from origin if needed, then run git remote set-head origin -a and make setup.",
+	};
+}
+
+function ensureDefaultBranch(root) {
+	const state = inspectDefaultBranch(root);
+	if (state.reason === null) return;
+	if (!state.missing) throw new Error(state.reason);
+	const git = (args) =>
+		spawnSync("git", args, {
+			cwd: root,
+			env: { ...process.env, GIT_TERMINAL_PROMPT: "0" },
+			encoding: "utf8",
+			timeout: 30_000,
+		});
+	const checked = (args) => {
+		const result = git(args);
+		if (result.status !== 0)
+			throw new Error(
+				result.error?.message ||
+					result.stderr?.trim() ||
+					`git ${args[0]} failed`,
+			);
+		return result.stdout;
+	};
+	try {
+		const advertised = checked(["ls-remote", "--symref", "origin", "HEAD"]);
+		const heads = advertised.split(/\r?\n/).flatMap((line) => {
+			const match = /^ref: (refs\/heads\/(.+))\tHEAD$/.exec(line);
+			return match ? [{ ref: match[1], branch: match[2] }] : [];
+		});
+		if (heads.length !== 1)
+			throw new Error(
+				"origin did not advertise one symbolic default branch; configure the default branch on origin before retrying",
+			);
+		const { ref, branch } = heads[0];
+		checked(["check-ref-format", ref]);
+		checked(["check-ref-format", "--branch", branch]);
+		const tracking = `refs/remotes/origin/${branch}`;
+		if (tracking === "refs/remotes/origin/HEAD")
+			throw new Error("origin advertised the reserved HEAD branch name");
+		if (git(["symbolic-ref", "--quiet", tracking]).status !== 1)
+			throw new Error(
+				`${tracking} is symbolic or cannot be inspected; restore a direct remote-tracking ref before retrying`,
+			);
+		if (git(["rev-parse", "--verify", `${tracking}^{commit}`]).status !== 0) {
+			if (git(["show-ref", "--verify", "--quiet", tracking]).status !== 1)
+				throw new Error(
+					`${tracking} exists but does not resolve to a commit; inspect it before retrying`,
+				);
+			checked([
+				"fetch",
+				"--no-tags",
+				"--refmap=",
+				"origin",
+				`${ref}:${tracking}`,
+			]);
+		}
+		checked(["remote", "set-head", "origin", branch]);
+		const ready = inspectDefaultBranch(root);
+		if (ready.reason !== null) throw new Error(ready.reason);
+	} catch (error) {
+		const detail = error instanceof Error ? error.message : String(error);
+		throw new Error(
+			`Cannot restore origin/HEAD: ${detail.slice(0, 1000)}. Check origin connectivity and authentication, then rerun make setup.`,
+		);
+	}
 }
 
 function inspectSkillLink(root) {
@@ -457,6 +546,7 @@ async function runSetup(root = process.cwd()) {
 	try {
 		const skill = inspectSkillLink(root);
 		if (skill.reason !== null && !skill.managed) throw new Error(skill.reason);
+		ensureDefaultBranch(root);
 		if (isSetupCurrent(root)) return 0;
 		const dependenciesCurrent = areDependenciesCurrent(root);
 		const status = await runSetupUnlocked(
@@ -483,6 +573,12 @@ async function main(args) {
 		throw new Error("usage: setup-completion.mjs <check|run|write>");
 	}
 	if (args[0] === "check") {
+		const defaultBranch = inspectDefaultBranch(process.cwd());
+		if (defaultBranch.reason !== null) {
+			console.error(defaultBranch.reason);
+			process.exitCode = 1;
+			return;
+		}
 		const hooks = inspectHooksPath();
 		if (hooks.reason !== null) {
 			console.error(hooks.reason);
@@ -499,6 +595,8 @@ async function main(args) {
 		return;
 	}
 	if (args[0] === "write") {
+		const defaultBranch = inspectDefaultBranch(process.cwd());
+		if (defaultBranch.reason !== null) throw new Error(defaultBranch.reason);
 		writeSetupMarker();
 		return;
 	}

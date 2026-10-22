@@ -47,6 +47,18 @@ function fixture() {
 		return r.stdout.trim();
 	};
 	git("init", "-q");
+	git(
+		"-c",
+		"user.name=Setup Fixture",
+		"-c",
+		"user.email=setup@example.invalid",
+		"commit",
+		"--allow-empty",
+		"-qm",
+		"fixture",
+	);
+	git("update-ref", "refs/remotes/origin/main", "HEAD");
+	git("symbolic-ref", "refs/remotes/origin/HEAD", "refs/remotes/origin/main");
 	mkdirSync(join(root, "scripts/hooks"), { recursive: true });
 	writeFileSync(join(root, "scripts/hooks/pre-commit-shim"), shim);
 	writeFileSync(join(root, "scripts/pre-commit"), "#!/bin/sh\nexit 0\n", {
