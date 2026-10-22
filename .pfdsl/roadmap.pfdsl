@@ -208,7 +208,8 @@ artifact:
     status: todo
     criteria: >
       両バックエンドの reference に同じ規則の本文が残らず、どちらも protocol に置いた1つの契約を参照する。
-      その契約は作業項目と process を location: で対応付け、1つの作業項目に複数の process を対応させてよく、process id の接頭辞で作業項目を表す規約を持たない
+      その契約は作業項目と process を location: で対応付け、1つの作業項目に複数の process を対応させてよく、process id の接頭辞で作業項目を表す規約を持たない。
+      移行の前に、接頭辞と location: から導かれる作業項目と process の対応をすべて列挙し、移行の後も読取側のスクリプトが同じ対応を導けるか、外した対応ごとに理由が記録されている
   prune_cli:
     label: 完了チェーン回収の CLI 動詞
     description: ADR-0048 の後続で未起票。完了チェーン回収の保持規則と検証を CLI のトップレベル動詞にし、配置スクリプトは CLI を呼ぶだけにする
