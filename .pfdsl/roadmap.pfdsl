@@ -204,9 +204,11 @@ artifact:
     criteria: github-issues-backend.md が実行主体の外部書込みの手順と PR 本文規約を持たず、アダプタ自身の書込みを読み戻す原則を持つ。このリポの PR 作成手順（クローズ参照の扱い等）が binding だけで完結する
   backend_neutral_work_item_contract:
     label: バックエンドに依存しない作業項目の対応契約
-    description: ADR-0048 の後続で未起票。両バックエンドの reference に重複している作業項目と process の対応の規則を、protocol に1つだけ置く（対象の規則は ADR-0048 契約6）
+    description: 両バックエンドの reference に重複している作業項目と process の対応の規則を、protocol に1つだけ置く（対象の規則は ADR-0048 契約6）
     status: todo
-    criteria: 両バックエンドの reference に同じ規則の本文が残らず、どちらも protocol に置いた1つの契約を参照する
+    criteria: >
+      両バックエンドの reference に同じ規則の本文が残らず、どちらも protocol に置いた1つの契約を参照する。
+      その契約は作業項目と process を location: で対応付け、1つの作業項目に複数の process を対応させてよく、process id の接頭辞で作業項目を表す規約を持たない
   prune_cli:
     label: 完了チェーン回収の CLI 動詞
     description: ADR-0048 の後続で未起票。完了チェーン回収の保持規則と検証を CLI のトップレベル動詞にし、配置スクリプトは CLI を呼ぶだけにする
@@ -273,9 +275,9 @@ process:
   move_writer_rules_out_of_github_preset:
     label: GitHub Issues プリセットから書込み規律と PR 運用を外す
     description: 未起票のプレースホルダ。起票時に process id へ iN_ を付ける
-  unify_work_item_contract:
+  i1497_unify_work_item_contract:
     label: 作業項目の対応契約を1つにする
-    description: 未起票のプレースホルダ。起票時に process id へ iN_ を付ける
+    location: https://github.com/takasek/pfdsl/issues/1497
   design_adapter_plugin_split:
     label: core と GitHub アダプタの plugin 分割を設計する
     description: 未起票のプレースホルダ。起票時に process id へ iN_ を付ける
@@ -327,7 +329,7 @@ responsibility_boundary_adr >> load_work_rules_from_root -> root_loaded_work_rul
 
 [responsibility_boundary_adr, root_loaded_work_rules] >> move_writer_rules_out_of_github_preset -> writer_free_github_preset
 
-[executor_neutral_work_cycle, writer_free_github_preset] >> unify_work_item_contract -> backend_neutral_work_item_contract
+[executor_neutral_work_cycle, writer_free_github_preset] >> i1497_unify_work_item_contract -> backend_neutral_work_item_contract
 
 responsibility_boundary_adr >> add_prune_cli -> prune_cli
 
