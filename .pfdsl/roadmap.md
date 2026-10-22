@@ -95,7 +95,9 @@ roadmap差分の有無によらず PR には `check-roadmap-registration.yml` �
 `edited` を trigger に含めるのは `check-closes-reference.yml` と同じ理由で、PR 本文の編集が対象集合を変えるからである。
 
 **`gh` CLI が使えない環境（Claude Code Remote 等）での代替**: `cycle-status.mjs` / `gate-check.mjs`（内部の `audit-issues-flow.mjs`）は `gh` を呼ぶが、`github-ops.mjs` が `GH_TOKEN` / `GITHUB_TOKEN` のある環境では HTTP backend へ落ちる（#489・#1044）。token も無い場合は GitHub MCP server のツール（`list_pull_requests` / `issue_read` / `pull_request_read` 等）で個別に代替する: PR一覧は `list_pull_requests`、設計の確認は `issue_read` で本文とコメントを取得して読む、`audit-issues-flow` 相当は対象 issue の分類と `iN_` process・入出力依存を roadmap.pfdsl の記載と手動突合する。
-cloud session で指定 branch が clone 済みの場合、fetch 後はその branch 上で `git merge --ff-only origin/<base>` により基点を更新してからプリフライトを実行する。履歴が分岐して fast-forward できない場合は状態を保持して報告し、`git reset --hard` に切り替えない。
+cloud session の開始 checkout が primary の場合、その場所での merge・reset・checkout による更新は案内しない。新しい版を検証する場合は、意図した remote branch の最新 ref を指定した新しい session を開始する。
+native worktree の作成では SessionStart が再実行されると仮定しない。最初に parser 欠落で止まったら、deny の `Run exactly:` に出る、その worktree の絶対パスを持つ parser 導入コマンドだけを単独で実行する。導入後に同じ worktree で `make setup`、続いて `node scripts/setup-completion.mjs check` を実行する。parser がない間は、導入コマンドと setup を `&&` 等で連結しない。
+取得済み ref へ更新する場合は、所有が確認できた native worktree の feature branch 上で `git -C <worktreeの絶対パス> merge --ff-only <取得済みref>` を使う。作業の基点更新なら `origin/<base>`、PR の新版検証ならその PR branch の取得済み ref を指定する。所有拒否が続く場合は実行先・拒否文・所有証拠を報告し、必要な版を指定した新しい cloud session へ移る。履歴が分岐して fast-forward できない場合は状態を保持して報告し、`git reset --hard`・detached checkout・scratch clone・pull を回避策として試さない。
 `origin/HEAD` 修復の受入対象は、修正版の setup と hook を含む新しい clone とする。既存 cloud session が旧 hook により回復不能になっている場合は、修正版を含む新しい clone で session を再起動する。旧 checkout のまま再起動しても hook の内容は更新されない。
 `github-ops.mjs` の HTTP backend は上のリポ内スクリプトが必要とする operation の互換層であり、issue コメントや PR 本文の作成・編集を代行する汎用 GitHub write adapter ではない。
 fallback の transport は REST だけではない — `closingIssuesReferences` は REST の pull request payload に存在せず、GraphQL へ直接問い合わせる（#1043）。

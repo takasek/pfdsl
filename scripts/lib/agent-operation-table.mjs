@@ -58,7 +58,7 @@ const REASONS = {
 	R: "Read operation.",
 	W: "Write only in your assigned linked worktree. Use native worktree creation for work; run git merge-tree --write-tree from your assigned worktree for a merge trial.",
 	B: "Operate on free feature branches from your assigned linked worktree.",
-	D: "The local default branch is protected. Use a feature branch or ask a human to run this in a terminal.",
+	D: "The local default branch is protected. Use a feature branch in your assigned linked worktree.",
 	S: "Clearing the shared stash is reserved for a human terminal.",
 	C: "Repository configuration changes require the parent or a human terminal.",
 	X: "Verification bypass and external configuration writes require a human terminal.",
@@ -184,7 +184,7 @@ export function decideOperation(input) {
 			return { decision: "allow" };
 		return stopped(
 			cell.failure === "parser-missing"
-				? `The pinned parser is missing. Run exactly: ${repair ?? "the fixed-root parser installer in a human terminal"}. Retry after the parser health check succeeds.`
+				? `The pinned parser is missing. Run exactly: ${repair ?? "the fixed-root parser installer in a human terminal"}. After the parser health check succeeds, run make setup from this same worktree, then retry your original command. Run the repair command alone.`
 				: "Policy or parser loading failed. Repair the installed helpers in a human terminal and retry.",
 			cell.failure === "parser-missing" && repair ? "rewrite" : "terminal",
 		);
@@ -226,11 +226,18 @@ export function decideOperation(input) {
 			"parent",
 			cell.operationClass,
 		);
+	const ordinaryGitRecovery =
+		!exception &&
+		cell.kind === "git" &&
+		["W", "B", "D"].includes(cell.operationClass);
+	const cloudRecovery =
+		" For cloud sessions, prepare your native worktree using the exact parser repair and make setup, then use git -C <absolute-worktree-path> for the update. If ownership is still denied or the startup checkout is primary, start a fresh session at the intended remote ref; do not use reset, checkout, clone or pull as a bypass.";
 	const outcomes = {
 		A: { decision: "allow", operationClass: cell.operationClass },
 		D: stopped(
-			exception?.reason ?? REASONS[cell.operationClass],
-			"terminal",
+			(exception?.reason ?? REASONS[cell.operationClass]) +
+				(ordinaryGitRecovery ? cloudRecovery : ""),
+			ordinaryGitRecovery ? "rewrite" : "terminal",
 			cell.operationClass,
 		),
 		U: stopped(REASONS.U, "rewrite", cell.operationClass),

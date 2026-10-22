@@ -97,6 +97,9 @@ agent が手動で追加した worktree は other-unowned であり、変更を�
 | U 未解決 | 動的な実行名、動的な `cd`・`-C`、Codex の `-C` 無し変更系 Git | 書換え案内付き deny | 同左 | 同左 | 同左 |
 
 対象の列は checkout を実行先に持つ操作（Git、file）に適用する。`gh` と MCP の操作は checkout を持たないので、own の列で判定する。
+通常の Git の W・B・D が対象の列によって拒否された場合、deny は維持し、回復先は同じ agent の書換えとする。
+cloud では native worktree の parser 導入・setup 後に絶対パスを指定して操作し、所有確認ができない場合や primary の更新が必要な場合は、意図した remote ref を指定した新しい session で再開する。
+この案内は primary の通常変更や所有未確認 worktree を許可せず、子の親返却、検査回避・PR 統合・強制削除等の既存の停止先も変更しない。
 
 primary の準備更新だけは W の例外として親 agent に許可する。
 入口は `git -C <absolute-primary> pull --ff-only --no-autostash origin <default>` に限定し、追加の option・global config・refspec は受け付けない。

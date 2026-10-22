@@ -482,6 +482,7 @@ test("entry integration: parser missing -> exact bootstrap repair -> installed h
 		assert.equal(denied.decision, "deny");
 		const repair = parserRecoveryCommand(f.own);
 		assert.ok(denied.reason.includes(repair));
+		assert.match(denied.reason, /After.*make setup/);
 		assert.equal(
 			f.invoke({ command: repair }, { harness: "codex" }).decision,
 			"allow",
@@ -506,10 +507,68 @@ test("entry integration: parser missing -> exact bootstrap repair -> installed h
 			{ cwd: f.other, captureStderr: true },
 		);
 		assert.equal(
+			f.invoke({ command: "make setup" }, { harness: "codex" }).decision,
+			"allow",
+		);
+		assert.equal(
 			f.invoke({ command: `git -C ${f.own} commit -m x` }, { harness: "codex" })
 				.decision,
 			"allow",
 		);
+	} finally {
+		f.cleanup();
+	}
+});
+
+test("Claude native owner can fast-forward a feature worktree while a primary startup stays protected", () => {
+	const f = fixture();
+	try {
+		const start = run("ps", ["-o", "lstart=", "-p", String(process.pid)], {
+			env: { ...process.env, LC_ALL: "C", TZ: "UTC" },
+		}).trim();
+		f.git(f.primary, [
+			"worktree",
+			"lock",
+			"--reason",
+			`claude session own (pid ${process.pid} start ${start})`,
+			f.own,
+		]);
+		writeFileSync(join(f.primary, "a"), "fetched update\n");
+		f.git(f.primary, ["add", "a"]);
+		f.git(f.primary, ["commit", "-m", "upstream"]);
+		f.git(f.own, ["fetch", "origin", "main"]);
+		const options = { environment: { CLAUDE_PROJECT_DIR: f.primary } };
+		const command = `git -C ${f.own} merge --ff-only origin/main`;
+		assert.equal(f.invoke({ command }, options).decision, "allow");
+		f.git(f.own, ["merge", "--ff-only", "origin/main"]);
+		assert.equal(
+			f.git(f.own, ["rev-parse", "HEAD"]),
+			f.git(f.primary, ["rev-parse", "HEAD"]),
+		);
+		assert.equal(f.git(f.own, ["branch", "--show-current"]), "feat/own");
+		const primary = f.invoke(
+			{ command: `git -C ${f.primary} merge --ff-only origin/main` },
+			options,
+		);
+		assert.equal(primary.decision, "deny");
+		assert.match(primary.reason, /Recovery: same agent rewrite/);
+		assert.match(primary.reason, /fresh session/);
+		writeFileSync(join(f.own, "topic"), "topic\n");
+		f.git(f.own, ["add", "topic"]);
+		f.git(f.own, ["commit", "-m", "topic"]);
+		writeFileSync(join(f.primary, "a"), "divergent update\n");
+		f.git(f.primary, ["add", "a"]);
+		f.git(f.primary, ["commit", "-m", "later upstream"]);
+		f.git(f.own, ["fetch", "origin", "main"]);
+		const before = f.git(f.own, ["rev-parse", "HEAD"]);
+		assert.equal(f.invoke({ command }, options).decision, "allow");
+		const refused = tryRun("git", ["merge", "--ff-only", "origin/main"], {
+			cwd: f.own,
+			env: withoutGitTargetEnvironment(process.env),
+			captureStderr: true,
+		});
+		assert.equal(refused.ok, false);
+		assert.equal(f.git(f.own, ["rev-parse", "HEAD"]), before);
 	} finally {
 		f.cleanup();
 	}
