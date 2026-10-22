@@ -262,9 +262,6 @@ process:
   add_prune_cli:
     label: 完了チェーン回収を CLI 動詞にする
     description: 未起票のプレースホルダ。起票時に process id へ iN_ を付ける
-  i1506_load_work_rules_from_root:
-    label: このリポの作業規律を root の指示から読ませる
-    location: https://github.com/takasek/pfdsl/issues/1506
   move_writer_rules_out_of_github_preset:
     label: GitHub Issues プリセットから書込み規律と PR 運用を外す
     description: 未起票のプレースホルダ。起票時に process id へ iN_ を付ける
@@ -311,8 +308,6 @@ edge_kind_conflict_diagnostic >> publish_cli_edge_kind_conflict -> cli_release_e
 gui_vscode_candidate >> i1445_accept_gui_vscode -> gui_vscode_acceptance
 
 gui_mac_acceptance >> i1262_publish_standalone -> standalone_release
-
-responsibility_boundary_adr >> i1506_load_work_rules_from_root -> root_loaded_work_rules
 
 [responsibility_boundary_adr, root_loaded_work_rules] >> reduce_work_cycle_protocol -> executor_neutral_work_cycle
 
