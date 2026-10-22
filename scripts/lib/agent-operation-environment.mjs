@@ -47,6 +47,7 @@ const MCP_READ = new Set([
 	"list_pull_request_reviews",
 	"list_pull_request_review_threads",
 	"fetch_file",
+	"fetch_workflow_job_logs",
 ]);
 const MCP_WRITE = new Set([
 	"create_pull_request",
