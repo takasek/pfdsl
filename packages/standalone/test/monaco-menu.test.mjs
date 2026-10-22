@@ -144,6 +144,55 @@ test("the production document-tab entry loads real Monaco menu contributions", a
 			}
 		}
 		await t.test(
+			"dependency problems reach Monaco and a separate panel while the graph stays usable",
+			async () => {
+				const source = "---\nextends: parent.yaml\n---\na >> p -> b\n";
+				await withEditors(source, async (create, tabs) => {
+					let parent = null;
+					const editor = create({
+						path: "/work/entry.pfdsl",
+						read: async () => parent,
+					});
+					const tab = tabs[0];
+					const waitFor = async (predicate) => {
+						for (let i = 0; i < 200; i++) {
+							if (predicate()) return;
+							await new Promise((resolve) => setTimeout(resolve, 5));
+						}
+						assert.fail("Dependency presentation did not settle");
+					};
+					const markers = () =>
+						host.monaco.editor.getModelMarkers({
+							resource: editor.getModel().uri,
+						});
+					tab.activate();
+					await waitFor(() => tab.container.querySelector("#inner svg"));
+					assert.ok(
+						markers().some(
+							(m) =>
+								m.code === "V026" && /Dependency.*parent.yaml/.test(m.message),
+						),
+					);
+					const panel = tab.container.querySelector(".dependency-problems");
+					assert.equal(panel.hidden, false);
+					assert.match(panel.textContent, /V026.*parent.yaml/);
+					parent = "extends: parent.yaml\n";
+					tab.activate();
+					await waitFor(() => markers().some((m) => m.code === "V027"));
+					const cycle = markers().find((m) => m.code === "V027");
+					assert.match(cycle.message, /parent.yaml/);
+					assert.equal(cycle.startLineNumber, 1);
+					assert.equal(tab.canDiagram(), true);
+					parent = "statusStyles: {done: {fillcolor: magenta}}\n";
+					tab.activate();
+					await waitFor(() => !markers().some((m) => m.code === "V027"));
+					assert.equal(panel.hidden, true);
+					assert.equal(panel.textContent, "");
+					assert.equal(editor.getValue(), source);
+				});
+			},
+		);
+		await t.test(
 			"structural comparison and whole-graph export coexist in the same tab",
 			async () => {
 				const source =
@@ -174,6 +223,17 @@ test("the production document-tab entry loads real Monaco menu contributions", a
 					await editor.getAction("pfdsl.compareFile").run();
 					const panel = tabs[0].container.querySelector("#diff-panel");
 					assert.match(panel.textContent, /~ node.*a/);
+					const column = tabs[0].container.querySelector(".preview-column");
+					assert.ok(column, "inspection surfaces need a shared layout column");
+					assert.equal(
+						column.querySelector(".reference-comparison").parentElement,
+						column,
+					);
+					tabs[0].normalize();
+					assert.equal(
+						column.querySelector(".normalized-edges").parentElement,
+						column,
+					);
 					const diff = panel.textContent,
 						revision = editor.getModel().getVersionId();
 					await editor.getAction("pfdsl.export.dot").run();

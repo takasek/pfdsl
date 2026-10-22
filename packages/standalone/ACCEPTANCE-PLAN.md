@@ -68,6 +68,7 @@ a >> r -> d
 対応：#1444。対象・入力：M、編集済みA/B、大きい図、カーソル・選択・Undo・zoom/pan。
 操作：起動時の左右実幅を測り、分割線をドラッグ／キーで調整し、リサイズとA→B→Aを行う。
 分割比10%・50%・90%でNormalized edgesを開閉し、開いたまま分割と画面幅を変えて、パネルが右図の幅に追従し左editorを覆わず、Close／Escapeで閉じられることも確認する。
+1180×812と898×812、source50%・70%でも長いIDの12入力・12出力を末尾までスクロールし、minimapと一覧の領域が重ならず最終行まで読めることを確認する。
 入口：`Source and diagram widths`分割線。左右キーは5ポイント、Shift併用は1ポイント、Home/Endは10/90%。6pxの分割線を除いた両paneを初期50:50にし、同じeditor/preview instanceの幅だけを変える。
 期待：左editor／右図、初期50:50と可変幅が成立し、本文・dirty・Undo・カーソル・選択・図の視点を保つ。
 毎回Fitへ戻らず、片側表示モードを追加しない。
@@ -92,12 +93,16 @@ Recentを左側や開始画面へ常設せず、本文とdirtyを保つ。
 文書名はtabとwindow titleに表示し、headerは短い状態とlocationを示す。locationは1行で省略表示し、titleから完全pathを確認できる。
 sampleはSampleと表示しSave As既定名をSample.pfdslにする。Untitledは現在開く文書名の最小空き番号を使う。
 同名文書を区別し、長い名前・場所をtooltipだけに頼らず識別して、セッション復元を追加しない。
+同名タブの補足は一意になる最短の親path末尾を使い、tooltipには完全pathを残す。同じ末尾folder名、root直下、片方の親pathが他方の末尾になる組合せ、Save Asと閉鎖後の再計算も確認する。
+タブバーが横にあふれるまで開き、New／Open／既存文書の再選択／Previous・Next／閉鎖後の選択で、選択タブが自動的に見える位置へ移ることを確認する。
 状態：M未実施。記録：未記入。
 
 ### GUI-04：メニュー・標準キー・単一実行
 
 対応：#1444。対象・入力：M、文書なし／busy／対象nodeなし、A/B、editor・検索・候補。
 操作：New/Open/Save/Save As/Find/Undo/Redo/Clipboard、Close Tab/Window、Format flows/flat、Normalized edges、sidebar、図操作、Previous/Next Tabをmenuと標準キー、残るbutton／右clickで実行する。
+Ctrl+Tab／Ctrl+Shift+TabはWebView側が処理し、native menuの同名項目はキー表示のみとする。
+2タブと3タブでeditorとFitから一回ずつ切り替え、二重実行がなく、IME変換中・dialog表示中・busy時は切り替わらないことを確認する。
 期待：Fileは文書管理、Editは変更、Viewは表示、Windowはtab/windowを扱い、PFDSL/Helpの既存役割と英語名称を保つ。
 同じ有効条件で正しい対象へ一度だけ働き、項目を残して無効理由を伝える。
 標準キーを転用せずIME・入力欄・OS操作を奪わない。
@@ -352,6 +357,9 @@ quoted/flow keyのID上と同じ行の`label`／`owner`等のfield上を区別�
 Find allは現行拡張と同じliteral文字列検索であり、metadata fieldを除くsemantic参照・巡回とは区別する。
 processのcommand行末の`Command` hintをhoverして複数行の内容を読み、表示だけで実行されないことを確認する。
 hoverを残したまま編集・文書切替・閉鎖し、旧版のリンクが新しい文書や版へ作用しないことを確認する。
+2026-10-21の使用感レポートの15行fixtureでも、14行目のpackage_manifestでShow Hover→撮影→Escape→本文編集を行う。
+labelのみ、criteriaのみ、groupとcriteria、descriptionを含む場合を分け、Linux nativeではWebKitWebProcessの存否・終了時刻・stderr・利用可能な終了理由を記録する。
+Linuxで報告された3回の表示プロセス消失は原因未確定であり、Chromiumでの成功をWebKitGTKやMac nativeの合格へ転写しない。
 期待：semantic nodeとfield、定義range、全出現が正しく、図hover廃止と混同しない。
 表示hintと外部実行GUI-33を区別する。
 状態：M/V各未実施。記録：未記入。
@@ -375,6 +383,8 @@ Quick Fix候補の表示中に同じ文書を編集してから適用する時�
 
 対応：#1259。対象・入力：M/V、LF/CRLF、FM跨ぎ選択、不完全入力、未保存entry、missing/cyclic/更新preset。
 操作：全体／範囲をflow/flatで整形・Undo/Redoし診断code/severity/message/rangeを照合する。preset変更・欠落・循環と高速編集／tab切替を行う。
+保存パスのあるentryで不存在の親、entry→親1→親2→親1の循環、不正な親YAMLを開き、Dependency problemsとGo to Next Problemでcode・対象file・理由を読む。
+依存先の座標をentry本文の位置と誤認させず、正常なstatusStyles継承への修正後は依存表示が消えることを確認する。
 期待：形式と選択境界が合い、authored未保存source/診断と依存診断を分離する。
 lenient表示と一度読んだ同じ依存snapshotを使い、別tabへ古い結果を漏らさない。
 状態：M/V各未実施。記録：未記入。
@@ -400,6 +410,8 @@ VをMの規則へ一律変更せず、取消・失敗で本文/dirtyを保ち理
 対応：#1260。対象・入力：M/V、repo/ref・別file・未保存A、node/edge差分・metadataだけの差分。
 操作：F1またはeditor context menuの`Compare structure with file…`／`Compare structure with Git ref…`で比較し、baseline表示とbaseline→currentの方向を読む。
 label/statusだけの変更とnode/edge変更を分けて確認し、比較後の編集反映、`Clear structural comparison`またはbannerの解除、読取中編集／tab切替／close、取消、不正ref／失敗を試す。
+1180×812、sidebarなし、source50%でcriteriaだけ異なる1行の差分と複数行の差分を読む。
+短いパスと長いパス、source70%・90%、898px幅でも、比較案内と差分一覧が別領域にあり、全行とClear comparisonへ到達できることを確認する。
 期待：現在側は未保存内容で正しい対象を比較し、承認済みの現行VS Codeと同じmetadata比較を含める。
 source/dirty/Undoを表示だけで変えず、古い結果を新対象へ適用しない。
 GUI-07の保存競合text比較を前提にしない。

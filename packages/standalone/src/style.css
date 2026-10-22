@@ -88,17 +88,15 @@ button:disabled {
 	border-color: #3369a0;
 }
 .normalized-edges {
-	position: absolute;
-	right: 0;
-	bottom: 0;
-	width: calc((100% - 6px) * (1 - var(--source-ratio, 0.5)));
+	flex-shrink: 1;
+	min-height: 0;
+	width: 100%;
 	max-height: 45%;
 	box-sizing: border-box;
 	overflow: auto;
 	padding: 12px;
 	background: #fff;
 	border: 1px solid #3369a0;
-	z-index: 2;
 }
 .normalized-edges > button {
 	float: right;
@@ -143,7 +141,7 @@ button:disabled {
 	display: flex;
 }
 .editor,
-.preview {
+.preview-column {
 	width: 50%;
 	min-width: 0;
 	height: 100%;
@@ -152,8 +150,33 @@ button:disabled {
 	width: calc((100% - 6px) * var(--source-ratio, 0.5));
 	flex-shrink: 0;
 }
-.preview {
+.preview-column {
 	flex: 1;
+	display: flex;
+	flex-direction: column;
+}
+.preview {
+	flex: 1 0 50%;
+	min-height: 0;
+	min-width: 0;
+}
+.preview #diff-panel {
+	box-sizing: border-box;
+	max-height: min(200px, 40%);
+}
+.preview.pfdsl-preview {
+	overflow-y: auto;
+}
+.dependency-problems {
+	flex-shrink: 1;
+	min-height: 0;
+	box-sizing: border-box;
+	max-height: 20%;
+	overflow: auto;
+	overflow-wrap: anywhere;
+	padding: 6px 12px;
+	border-top: 1px solid #bbb;
+	background: #fff5e6;
 }
 .workspace-divider {
 	width: 6px;
@@ -299,11 +322,12 @@ dialog textarea {
 	max-width: 100%;
 }
 .reference-comparison {
-	position: absolute;
-	z-index: 5;
-	bottom: 0;
-	right: 0;
-	max-width: 50%;
+	flex-shrink: 1;
+	min-height: 0;
+	box-sizing: border-box;
+	max-height: 20%;
+	overflow: auto;
+	overflow-wrap: anywhere;
 	padding: 0.5rem;
 	background: #fff;
 	color: #222;

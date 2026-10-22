@@ -19,6 +19,135 @@ function applyProductionStyles(host) {
 	host.dom.window.document.head.append(style);
 }
 
+test("duplicate basenames use the shortest unique parent suffix and retain full-path tooltips", async () => {
+	const native = new FakeNative();
+	const docs = [
+		"/work/red/shared/flow.pfdsl",
+		"/work/blue/shared/flow.pfdsl",
+		"/archive/flow.pfdsl",
+	].map((path, i) => {
+		const doc = native.add(i + 1, `file${i}.pfdsl`, "a >> p -> b\n");
+		doc.path = path;
+		return doc;
+	});
+	const host = await startHost(native, docs[0]);
+	try {
+		for (const doc of docs) await host.open(doc);
+		assert.deepEqual(
+			host.tabs().map((tab) => tab.button.textContent),
+			[
+				"flow.pfdsl — red/shared",
+				"flow.pfdsl — blue/shared",
+				"flow.pfdsl — archive",
+			],
+		);
+		assert.deepEqual(
+			host.tabs().map((tab) => tab.button.title),
+			docs.map((doc) => doc.path),
+		);
+		await host.command("close-tab");
+		await host.command("close-tab");
+		assert.equal(host.activeTab().button.textContent, "flow.pfdsl");
+	} finally {
+		await host.finish();
+	}
+});
+
+test("parent suffixes distinguish root and ancestor paths without losing dirty state", async () => {
+	const native = new FakeNative();
+	const docs = [
+		"/flow.pfdsl",
+		"/shared/flow.pfdsl",
+		"/nested/shared/flow.pfdsl",
+	].map((path, i) => {
+		const doc = native.add(i + 1, `file${i}.pfdsl`, "a >> p -> b\n");
+		doc.path = path;
+		return doc;
+	});
+	const host = await startHost(native, docs[0]);
+	try {
+		for (const doc of docs) await host.open(doc);
+		host.activeTab().type("edited");
+		assert.deepEqual(
+			host.tabs().map((tab) => tab.button.textContent),
+			[
+				"flow.pfdsl — /",
+				"flow.pfdsl — /shared",
+				"flow.pfdsl — nested/shared •",
+			],
+		);
+		assert.equal(host.activeTab().button.title, "/nested/shared/flow.pfdsl");
+	} finally {
+		await host.finish();
+	}
+});
+
+test("tab activation reveals the selected tab horizontally without moving the document", async () => {
+	const native = new FakeNative();
+	const host = await startHost(native, native.add(1, "unused.pfdsl", "unused"));
+	try {
+		const first = await host.newDocument();
+		const second = await host.newDocument();
+		const bar = host.query("#tabs");
+		bar.getBoundingClientRect = () => ({ left: 10, right: 310 });
+		first.button.parentElement.getBoundingClientRect = () => ({
+			left: -90,
+			right: 10,
+		});
+		second.button.parentElement.getBoundingClientRect = () => ({
+			left: 310,
+			right: 410,
+		});
+		bar.scrollLeft = 200;
+		await host.command("previous-tab");
+		assert.equal(bar.scrollLeft, 100);
+		await host.command("next-tab");
+		assert.equal(bar.scrollLeft, 200);
+	} finally {
+		await host.finish();
+	}
+});
+
+test("Ctrl+Tab uses one host command from editor and toolbar, with three tabs", async () => {
+	const native = new FakeNative();
+	const host = await startHost(native, native.add(1, "unused.pfdsl", "unused"));
+	try {
+		const first = await host.newDocument();
+		const second = await host.newDocument();
+		const third = await host.newDocument();
+		const key = (target, options = {}) =>
+			target.dispatchEvent(
+				new host.dom.window.KeyboardEvent("keydown", {
+					key: "Tab",
+					ctrlKey: true,
+					bubbles: true,
+					cancelable: true,
+					...options,
+				}),
+			);
+		assert.equal(key(third.button), false);
+		assert.equal(host.activeTab(), first);
+		assert.equal(key(host.query("#sidebar")), false);
+		assert.equal(host.activeTab(), second);
+		key(second.button, { shiftKey: true });
+		assert.equal(host.activeTab(), first);
+		key(first.button, { isComposing: true });
+		assert.equal(host.activeTab(), first);
+		key(first.button, { altKey: true });
+		assert.equal(host.activeTab(), first);
+		const dialog = host.dom.window.document.createElement("dialog");
+		dialog.setAttribute("open", "");
+		host.dom.window.document.body.append(dialog);
+		key(dialog);
+		assert.equal(host.activeTab(), first);
+		dialog.remove();
+		assert.equal(host.menuItem("next-tab").accelerator, undefined);
+		assert.equal(host.menuItem("previous-tab").accelerator, undefined);
+	} finally {
+		await host.finish();
+	}
+});
+
 test("retains the previous folder until the replacement listing succeeds", async () => {
 	const native = new FakeNative();
 	const doc = native.add(1, "a.pfdsl", "a >> p -> b\n");

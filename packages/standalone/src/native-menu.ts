@@ -74,8 +74,8 @@ export async function installNativeMenu(
 			await PredefinedMenuItem.new({ item: "Minimize" }),
 			await PredefinedMenuItem.new({ item: "Maximize" }),
 			await separator(),
-			await create("previous-tab", "Show Previous Tab", "Ctrl+Shift+Tab"),
-			await create("next-tab", "Show Next Tab", "Ctrl+Tab"),
+			await create("previous-tab", "Show Previous Tab (Ctrl+Shift+Tab)"),
+			await create("next-tab", "Show Next Tab (Ctrl+Tab)"),
 			await PredefinedMenuItem.new({ item: "BringAllToFront" }),
 		],
 	});

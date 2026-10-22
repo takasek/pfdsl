@@ -21,6 +21,7 @@ export function registerReferenceFeatures(
 	services: ReferenceServices | undefined,
 	send: (message: MessageToWebview) => void,
 	report: (message: string) => void,
+	comparisonParent: HTMLElement = container,
 ) {
 	const model = editor.getModel()!;
 	let disposed = false,
@@ -29,7 +30,7 @@ export function registerReferenceFeatures(
 	const banner = document.createElement("div");
 	banner.className = "reference-comparison";
 	banner.hidden = true;
-	container.append(banner);
+	comparisonParent.append(banner);
 	const comparison = createComparison(
 		() => model.getValue(),
 		() => model.getVersionId(),

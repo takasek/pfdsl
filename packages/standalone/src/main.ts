@@ -137,10 +137,23 @@ function renderWorkspace() {
 	for (const entry of opened) {
 		entry.navigation.classList.toggle("selected", entry === active);
 		const sameName = [...opened].filter((other) => other.name === entry.name);
-		const visibleName =
-			sameName.length > 1 && entry.path
-				? `${entry.name} — ${entry.path.slice(0, entry.path.lastIndexOf("/"))}`
-				: entry.name;
+		let visibleName = entry.name;
+		if (sameName.length > 1 && entry.path) {
+			const parents = sameName
+				.filter((other) => other.path)
+				.map((other) => other.path!.split("/").slice(0, -1));
+			const parent = entry.path.split("/").slice(0, -1);
+			let depth = 1;
+			while (
+				depth < parent.length &&
+				parents.filter(
+					(parts) =>
+						parts.slice(-depth).join("/") === parent.slice(-depth).join("/"),
+				).length > 1
+			)
+				depth++;
+			visibleName += ` — ${parent.slice(-depth).join("/") || "/"}`;
+		}
 		entry.tab.button.textContent = `${visibleName}${entry.session.isDirty() ? " •" : ""}`;
 		entry.tab.button.title = entry.path ?? `${entry.name} — Not saved`;
 	}
@@ -195,6 +208,15 @@ function activate(entry: Entry) {
 	entry.tab.activate();
 	renderWorkspace();
 	renderConflict();
+	const bar = document.querySelector<HTMLElement>("#tabs")!;
+	const viewport = bar.getBoundingClientRect();
+	const tab = entry.navigation.getBoundingClientRect();
+	if (tab.left < viewport.left) bar.scrollLeft += tab.left - viewport.left;
+	else if (tab.right > viewport.right)
+		bar.scrollLeft += Math.min(
+			tab.right - viewport.right,
+			tab.left - viewport.left,
+		);
 }
 function run(action: () => Promise<unknown>) {
 	if (busy) return;
@@ -743,6 +765,27 @@ const commands: Record<string, () => void> = {
 		active?.tab.activate();
 	},
 };
+// WebView owns this shortcut: a native accelerator as well could switch twice.
+document.addEventListener(
+	"keydown",
+	(event) => {
+		if (
+			event.isComposing ||
+			busy ||
+			document.querySelector("dialog[open], .reference-dialog") ||
+			!event.ctrlKey ||
+			event.metaKey ||
+			event.altKey ||
+			event.key !== "Tab" ||
+			!active
+		)
+			return;
+		event.preventDefault();
+		event.stopPropagation();
+		performCommand(event.shiftKey ? "previous-tab" : "next-tab");
+	},
+	true,
+);
 document.addEventListener("keydown", (event) => {
 	if (event.isComposing || (nativeMenu && event.isTrusted)) return;
 	if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "s") {
