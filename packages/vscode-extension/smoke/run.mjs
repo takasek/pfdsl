@@ -147,7 +147,13 @@ export async function closeSourceTab(
 	);
 }
 
-async function submitQuickInput(page, focusTarget, shortcut, mode, text) {
+export async function submitQuickInput(
+	page,
+	focusTarget,
+	shortcut,
+	mode,
+	text,
+) {
 	return withWorkbenchOperation(
 		page,
 		`${mode} picker: ${mode === "command" ? text : "open fixture"}`,
@@ -184,6 +190,13 @@ async function submitQuickInput(page, focusTarget, shortcut, mode, text) {
 				await page
 					.locator(".quick-input-widget .label-name")
 					.getByText(text, { exact: true })
+					.waitFor({ state: "visible" });
+			} else {
+				await page
+					.locator(
+						".quick-input-widget:not([inert]) .monaco-list-row.focused .label-name",
+					)
+					.getByText(basename(text), { exact: true })
 					.waitFor({ state: "visible" });
 			}
 			await input.press("Enter");
