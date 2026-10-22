@@ -33,6 +33,16 @@ function wiringByCommand() {
 }
 
 describe(".claude/settings.json hook wiring", () => {
+	it("starts native worktrees at the selected session HEAD", () => {
+		const settings = JSON.parse(
+			readFileSync(resolve(root, ".claude/settings.json"), "utf8"),
+		);
+		assert.equal(settings.worktree?.baseRef, "head");
+		const codex = JSON.parse(
+			readFileSync(resolve(root, ".codex/hooks.json"), "utf8"),
+		);
+		assert.equal(Object.hasOwn(codex, "worktree"), false);
+	});
 	it("allows bounded cloud setup and read-only GitHub tools without wildcard writes", () => {
 		const settings = JSON.parse(
 			readFileSync(resolve(root, ".claude/settings.json"), "utf8"),
@@ -78,7 +88,8 @@ describe(".claude/settings.json hook wiring", () => {
 				).flatMap((group) => group.hooks);
 				assert.equal(
 					matching.filter(
-						(hook) => hook.command === "node scripts/agent-operation-guard.mjs",
+						(hook) =>
+							hook.command === "exec node scripts/agent-operation-guard.mjs",
 					).length,
 					1,
 					`${file}: ${tool}`,

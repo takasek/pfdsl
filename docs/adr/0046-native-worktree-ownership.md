@@ -65,6 +65,9 @@ Claude A が別セッション B を子プロセスとして起動した構成�
 直接親の照合は保存した CLI・Desktop の親と subagent の hook 観測に一致するが、session 種別の lock への限定を含めて適用する。
 subagent が親セッションの session 種別 worktree を対象にする場合と、自分の agent 種別隔離 worktree を対象にする場合を区別し、後者の sibling 補正は行わない。
 追加の shell・wrapper・未知の中継プロセスが入る構成は、初版では補正しない。
+#1511 の cloud primary では `node hook → sh → claude` が実測され、hook の直接親と native lock の PID が異なることを確認した。
+共有設定の guard 起動を `exec node scripts/agent-operation-guard.mjs` として起動 shell を置換し、直接親の照合条件を維持する。
+実 shell を使う fixture は旧起動の拒否と exec 起動の許可、primary の拒否を検証するが、最終設定の cloud native での実測は別途必要である。
 lock の欠落・読取不能・形式不明、開始時刻不一致、ps 取得失敗、再開後の stale lock は従来の sibling 判断へ戻す。
 所有範囲による変更操作の拒否には、実 hook の entry・PID/PPID・cwd・payload の識別情報、許可リストに限定した環境値、対象 lock と照合結果を診断として添える。
 診断は判定を変更せず、命令全文・全環境・プロセス引数を出力しない。

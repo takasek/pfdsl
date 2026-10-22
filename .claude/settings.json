@@ -33,6 +33,9 @@
       "Bash(gh pr create *)"
     ]
   },
+  "worktree": {
+    "baseRef": "head"
+  },
   "hooks": {
     "PreToolUse": [
       {
@@ -40,7 +43,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node scripts/agent-operation-guard.mjs",
+            "command": "exec node scripts/agent-operation-guard.mjs",
             "timeout": 10
           },
           {
@@ -65,7 +68,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node scripts/agent-operation-guard.mjs",
+            "command": "exec node scripts/agent-operation-guard.mjs",
             "timeout": 10
           },
           {
@@ -85,7 +88,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node scripts/agent-operation-guard.mjs",
+            "command": "exec node scripts/agent-operation-guard.mjs",
             "timeout": 10
           }
         ]

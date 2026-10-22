@@ -88,6 +88,7 @@ function fixture() {
 			agent_type,
 			environment = {},
 			rawInput,
+			hookCommand,
 		} = {},
 	) => {
 		const payload = {
@@ -99,10 +100,12 @@ function fixture() {
 			tool_input,
 		};
 		const result = tryRun(
-			process.execPath,
-			[join(own, "scripts/agent-operation-guard.mjs")],
+			hookCommand ? "sh" : process.execPath,
+			hookCommand
+				? ["-c", `trap : EXIT; ${hookCommand}`]
+				: [join(own, "scripts/agent-operation-guard.mjs")],
 			{
-				cwd: other,
+				cwd: hookCommand ? own : other,
 				env: {
 					...env,
 					CLAUDE_PROJECT_DIR: harness === "claude" ? own : "",
@@ -564,6 +567,56 @@ test("entry integration: parser missing -> exact bootstrap repair -> installed h
 			f.invoke({ command: `git -C ${f.own} commit -m x` }, { harness: "codex" })
 				.decision,
 			"allow",
+		);
+	} finally {
+		f.cleanup();
+	}
+});
+
+test("configured hook replaces its launch shell and preserves direct-parent ownership", () => {
+	const f = fixture();
+	try {
+		const start =
+			process.platform === "linux"
+				? readFileSync(`/proc/${process.pid}/stat`, "utf8")
+						.split(") ")
+						.at(-1)
+						.trim()
+						.split(/\s+/)[19]
+				: run("ps", ["-o", "lstart=", "-p", String(process.pid)], {
+						env: { ...process.env, LC_ALL: "C", TZ: "UTC" },
+					}).trim();
+		f.git(f.primary, [
+			"worktree",
+			"lock",
+			"--reason",
+			`claude session own (pid ${process.pid} start ${start})`,
+			f.own,
+		]);
+		const settings = JSON.parse(
+			readFileSync(join(source, ".claude/settings.json"), "utf8"),
+		);
+		const hookCommand = settings.hooks.PreToolUse.find(
+			({ matcher }) => matcher === "Bash",
+		).hooks.find(({ command }) =>
+			command.includes("scripts/agent-operation-guard.mjs"),
+		).command;
+		const input = { command: `git -C ${f.own} commit --allow-empty -m probe` };
+		const options = {
+			environment: { CLAUDE_PROJECT_DIR: f.primary },
+			hookCommand,
+		};
+		assert.equal(f.invoke(input, options).decision, "allow");
+		const old = f.invoke(input, {
+			...options,
+			hookCommand: "node scripts/agent-operation-guard.mjs",
+		});
+		assert.equal(old.decision, "deny");
+		assert.match(old.reason, /Ownership diagnostics:/);
+		assert.equal(
+			f.invoke({ command: `git -C ${f.primary} merge --ff-only HEAD` }, options)
+				.decision,
+			"deny",
 		);
 	} finally {
 		f.cleanup();
