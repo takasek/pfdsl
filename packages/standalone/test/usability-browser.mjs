@@ -14,6 +14,15 @@ const require = createRequire(
 const { chromium } = require("playwright-core");
 const server = await createServer({
 	root,
+	plugins: [
+		{
+			name: "usability-workspace-fixtures",
+			transform(code, id) {
+				if (id === join(root, "src/main.ts"))
+					return `${code}\nwindow.usabilityWorkspace = { open: openDocument, active: () => active?.tab, tabs: () => [...opened].map(entry => entry.tab) };`;
+			},
+		},
+	],
 	server: { port: 0, strictPort: false, host: "127.0.0.1" },
 });
 let browser;
@@ -53,6 +62,59 @@ try {
 			await page.getByRole("button", { name: "Fit", exact: true }).click();
 	}
 	console.log("PASS overflowing tabs and trusted Ctrl+Tab events");
+	await page.goto(server.resolvedUrls.local[0]);
+	// Inject file receipts at the host boundary; keep the real workspace and Monaco.
+	// This does not exercise the native file chooser or filesystem.
+	await page.evaluate(() => {
+		for (const [index, folder] of ["red", "blue"].entries()) {
+			const source = `# ${folder}\n# navigation\na >> p -> b\n`;
+			window.usabilityWorkspace.open("flow.pfdsl", source, {
+				id: index + 1,
+				path: `/work/${folder}/shared/flow.pfdsl`,
+				source,
+				revision: folder,
+				identity: folder,
+				binding: folder,
+			});
+		}
+	});
+	assert.deepEqual(await page.getByRole("tab").allTextContents(), [
+		"flow.pfdsl — red/shared",
+		"flow.pfdsl — blue/shared",
+	]);
+	assert.deepEqual(
+		await page
+			.getByRole("tab")
+			.evaluateAll((tabs) => tabs.map((tab) => tab.title)),
+		["/work/red/shared/flow.pfdsl", "/work/blue/shared/flow.pfdsl"],
+	);
+	const tabSources = await page.evaluate(() =>
+		window.usabilityWorkspace.tabs().map((tab) => tab.getSource()),
+	);
+	await page.evaluate(() => {
+		window.usabilityWorkspace.active().command("cursorTop");
+		window.usabilityWorkspace.active().command("cursorRight");
+	});
+	await page.keyboard.type("x");
+	assert.deepEqual(
+		await page.evaluate(() =>
+			window.usabilityWorkspace.tabs().map((tab) => tab.getSource()),
+		),
+		[tabSources[0], tabSources[1].replace("#", "#x")],
+	);
+	await page.evaluate(() => window.usabilityWorkspace.active().command("undo"));
+	await page
+		.getByRole("tab", { name: "flow.pfdsl — red/shared", exact: true })
+		.click();
+	assert.deepEqual(
+		await page.evaluate(() =>
+			window.usabilityWorkspace.tabs().map((tab) => tab.getSource()),
+		),
+		tabSources,
+	);
+	console.log(
+		"PASS same-name labels/tooltips, editing Undo and cross-tab source isolation",
+	);
 	await page.goto(server.resolvedUrls.local[0]);
 	await page.evaluate(async () => {
 		const { createDocumentTab } = await import("/src/document-tab.ts");

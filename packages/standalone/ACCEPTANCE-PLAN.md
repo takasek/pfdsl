@@ -93,6 +93,7 @@ Recentを左側や開始画面へ常設せず、本文とdirtyを保つ。
 文書名はtabとwindow titleに表示し、headerは短い状態とlocationを示す。locationは1行で省略表示し、titleから完全pathを確認できる。
 sampleはSampleと表示しSave As既定名をSample.pfdslにする。Untitledは現在開く文書名の最小空き番号を使う。
 同名文書を区別し、長い名前・場所をtooltipだけに頼らず識別して、セッション復元を追加しない。
+同名タブの補足は一意になる最短の親path末尾を使い、tooltipには完全pathを残す。同じ末尾folder名、root直下、片方の親pathが他方の末尾になる組合せ、Save Asと閉鎖後の再計算も確認する。
 タブバーが横にあふれるまで開き、New／Open／既存文書の再選択／Previous・Next／閉鎖後の選択で、選択タブが自動的に見える位置へ移ることを確認する。
 状態：M未実施。記録：未記入。
 

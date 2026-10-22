@@ -19,6 +19,69 @@ function applyProductionStyles(host) {
 	host.dom.window.document.head.append(style);
 }
 
+test("duplicate basenames use the shortest unique parent suffix and retain full-path tooltips", async () => {
+	const native = new FakeNative();
+	const docs = [
+		"/work/red/shared/flow.pfdsl",
+		"/work/blue/shared/flow.pfdsl",
+		"/archive/flow.pfdsl",
+	].map((path, i) => {
+		const doc = native.add(i + 1, `file${i}.pfdsl`, "a >> p -> b\n");
+		doc.path = path;
+		return doc;
+	});
+	const host = await startHost(native, docs[0]);
+	try {
+		for (const doc of docs) await host.open(doc);
+		assert.deepEqual(
+			host.tabs().map((tab) => tab.button.textContent),
+			[
+				"flow.pfdsl — red/shared",
+				"flow.pfdsl — blue/shared",
+				"flow.pfdsl — archive",
+			],
+		);
+		assert.deepEqual(
+			host.tabs().map((tab) => tab.button.title),
+			docs.map((doc) => doc.path),
+		);
+		await host.command("close-tab");
+		await host.command("close-tab");
+		assert.equal(host.activeTab().button.textContent, "flow.pfdsl");
+	} finally {
+		await host.finish();
+	}
+});
+
+test("parent suffixes distinguish root and ancestor paths without losing dirty state", async () => {
+	const native = new FakeNative();
+	const docs = [
+		"/flow.pfdsl",
+		"/shared/flow.pfdsl",
+		"/nested/shared/flow.pfdsl",
+	].map((path, i) => {
+		const doc = native.add(i + 1, `file${i}.pfdsl`, "a >> p -> b\n");
+		doc.path = path;
+		return doc;
+	});
+	const host = await startHost(native, docs[0]);
+	try {
+		for (const doc of docs) await host.open(doc);
+		host.activeTab().type("edited");
+		assert.deepEqual(
+			host.tabs().map((tab) => tab.button.textContent),
+			[
+				"flow.pfdsl — /",
+				"flow.pfdsl — /shared",
+				"flow.pfdsl — nested/shared •",
+			],
+		);
+		assert.equal(host.activeTab().button.title, "/nested/shared/flow.pfdsl");
+	} finally {
+		await host.finish();
+	}
+});
+
 test("tab activation reveals the selected tab horizontally without moving the document", async () => {
 	const native = new FakeNative();
 	const host = await startHost(native, native.add(1, "unused.pfdsl", "unused"));
