@@ -30,7 +30,7 @@ import {
 const COMPANION_ROOT = ".pfdsl";
 const CASE_STORE = ".pfdsl/bindings/pfd-retro-patterns";
 
-const REQUIRED_BINDING_HEADINGS = [
+export const REQUIRED_BINDING_HEADINGS = [
 	{
 		path: ".pfdsl/bindings/pfd-retro.md",
 		headings: ["pfd-retro バインディング"],
@@ -38,8 +38,8 @@ const REQUIRED_BINDING_HEADINGS = [
 	},
 	{
 		path: ".pfdsl/bindings/pfd-ops.md",
-		headings: ["ワークサイクルの追加手順"],
-		reason: "pfd-ops' work cycle reads its repo-level steps from it",
+		headings: ["このリポの作業規律"],
+		reason: "the root instructions point sessions at it",
 	},
 ];
 

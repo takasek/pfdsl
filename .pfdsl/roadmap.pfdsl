@@ -172,8 +172,8 @@ artifact:
     location: ../docs/adr/0048-responsibility-boundary-by-pfd-semantics.md
   root_loaded_work_rules:
     label: root の指示から読むこのリポの作業規律
-    description: ADR-0048 の後続で未起票。このリポの開発規律を、binding の「ワークサイクルの追加手順」スロット経由ではなく root の指示から読ませる。配布物の整理より先に統合し、移行の途中でこのリポのセッションが規律を読まなくなる状態を作らない
-    status: todo
+    description: このリポの開発規律を、binding の「ワークサイクルの追加手順」スロット経由ではなく root の指示から読ませる。配布物の整理より先に統合し、移行の途中でこのリポのセッションが規律を読まなくなる状態を作らない
+    status: done
     criteria: >
       生成した CLAUDE.md と AGENTS.md が、このリポの作業規律を置いた binding の節を作業の開始時に読むよう指示し、scripts/check-companion-bindings.mjs が新しい見出しを必須にし、旧見出しの「ワークサイクルの追加手順」だけの binding を失敗させる。
       このリポで新しく開いたセッションが、着手時にその節を読むことを1回確かめた
@@ -262,9 +262,9 @@ process:
   add_prune_cli:
     label: 完了チェーン回収を CLI 動詞にする
     description: 未起票のプレースホルダ。起票時に process id へ iN_ を付ける
-  load_work_rules_from_root:
+  i1506_load_work_rules_from_root:
     label: このリポの作業規律を root の指示から読ませる
-    description: 未起票のプレースホルダ。起票時に process id へ iN_ を付ける
+    location: https://github.com/takasek/pfdsl/issues/1506
   move_writer_rules_out_of_github_preset:
     label: GitHub Issues プリセットから書込み規律と PR 運用を外す
     description: 未起票のプレースホルダ。起票時に process id へ iN_ を付ける
@@ -312,7 +312,7 @@ gui_vscode_candidate >> i1445_accept_gui_vscode -> gui_vscode_acceptance
 
 gui_mac_acceptance >> i1262_publish_standalone -> standalone_release
 
-responsibility_boundary_adr >> load_work_rules_from_root -> root_loaded_work_rules
+responsibility_boundary_adr >> i1506_load_work_rules_from_root -> root_loaded_work_rules
 
 [responsibility_boundary_adr, root_loaded_work_rules] >> reduce_work_cycle_protocol -> executor_neutral_work_cycle
 
