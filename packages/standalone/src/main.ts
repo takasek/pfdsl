@@ -195,6 +195,15 @@ function activate(entry: Entry) {
 	entry.tab.activate();
 	renderWorkspace();
 	renderConflict();
+	const bar = document.querySelector<HTMLElement>("#tabs")!;
+	const viewport = bar.getBoundingClientRect();
+	const tab = entry.navigation.getBoundingClientRect();
+	if (tab.left < viewport.left) bar.scrollLeft += tab.left - viewport.left;
+	else if (tab.right > viewport.right)
+		bar.scrollLeft += Math.min(
+			tab.right - viewport.right,
+			tab.left - viewport.left,
+		);
 }
 function run(action: () => Promise<unknown>) {
 	if (busy) return;
@@ -743,6 +752,27 @@ const commands: Record<string, () => void> = {
 		active?.tab.activate();
 	},
 };
+// WebView owns this shortcut: a native accelerator as well could switch twice.
+document.addEventListener(
+	"keydown",
+	(event) => {
+		if (
+			event.isComposing ||
+			busy ||
+			document.querySelector("dialog[open], .reference-dialog") ||
+			!event.ctrlKey ||
+			event.metaKey ||
+			event.altKey ||
+			event.key !== "Tab" ||
+			!active
+		)
+			return;
+		event.preventDefault();
+		event.stopPropagation();
+		performCommand(event.shiftKey ? "previous-tab" : "next-tab");
+	},
+	true,
+);
 document.addEventListener("keydown", (event) => {
 	if (event.isComposing || (nativeMenu && event.isTrusted)) return;
 	if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "s") {

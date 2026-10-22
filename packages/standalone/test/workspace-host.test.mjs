@@ -19,6 +19,72 @@ function applyProductionStyles(host) {
 	host.dom.window.document.head.append(style);
 }
 
+test("tab activation reveals the selected tab horizontally without moving the document", async () => {
+	const native = new FakeNative();
+	const host = await startHost(native, native.add(1, "unused.pfdsl", "unused"));
+	try {
+		const first = await host.newDocument();
+		const second = await host.newDocument();
+		const bar = host.query("#tabs");
+		bar.getBoundingClientRect = () => ({ left: 10, right: 310 });
+		first.button.parentElement.getBoundingClientRect = () => ({
+			left: -90,
+			right: 10,
+		});
+		second.button.parentElement.getBoundingClientRect = () => ({
+			left: 310,
+			right: 410,
+		});
+		bar.scrollLeft = 200;
+		await host.command("previous-tab");
+		assert.equal(bar.scrollLeft, 100);
+		await host.command("next-tab");
+		assert.equal(bar.scrollLeft, 200);
+	} finally {
+		await host.finish();
+	}
+});
+
+test("Ctrl+Tab uses one host command from editor and toolbar, with three tabs", async () => {
+	const native = new FakeNative();
+	const host = await startHost(native, native.add(1, "unused.pfdsl", "unused"));
+	try {
+		const first = await host.newDocument();
+		const second = await host.newDocument();
+		const third = await host.newDocument();
+		const key = (target, options = {}) =>
+			target.dispatchEvent(
+				new host.dom.window.KeyboardEvent("keydown", {
+					key: "Tab",
+					ctrlKey: true,
+					bubbles: true,
+					cancelable: true,
+					...options,
+				}),
+			);
+		assert.equal(key(third.button), false);
+		assert.equal(host.activeTab(), first);
+		assert.equal(key(host.query("#sidebar")), false);
+		assert.equal(host.activeTab(), second);
+		key(second.button, { shiftKey: true });
+		assert.equal(host.activeTab(), first);
+		key(first.button, { isComposing: true });
+		assert.equal(host.activeTab(), first);
+		key(first.button, { altKey: true });
+		assert.equal(host.activeTab(), first);
+		const dialog = host.dom.window.document.createElement("dialog");
+		dialog.setAttribute("open", "");
+		host.dom.window.document.body.append(dialog);
+		key(dialog);
+		assert.equal(host.activeTab(), first);
+		dialog.remove();
+		assert.equal(host.menuItem("next-tab").accelerator, undefined);
+		assert.equal(host.menuItem("previous-tab").accelerator, undefined);
+	} finally {
+		await host.finish();
+	}
+});
+
 test("retains the previous folder until the replacement listing succeeds", async () => {
 	const native = new FakeNative();
 	const doc = native.add(1, "a.pfdsl", "a >> p -> b\n");

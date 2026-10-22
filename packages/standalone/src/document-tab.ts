@@ -67,9 +67,17 @@ export function createDocumentTab({
 	editorElement.className = "editor";
 	const previewElement = document.createElement("div");
 	previewElement.className = "preview";
-	container.append(editorElement, previewElement);
+	const previewColumn = document.createElement("div");
+	previewColumn.className = "preview-column";
+	previewColumn.append(previewElement);
+	container.append(editorElement, previewColumn);
 	parent.append(container);
-	const normalizedEdges = createNormalizedEdgesPanel(container);
+	const normalizedEdges = createNormalizedEdgesPanel(previewColumn);
+	const dependencyProblems = document.createElement("section");
+	dependencyProblems.className = "dependency-problems";
+	dependencyProblems.setAttribute("aria-label", "Dependency problems");
+	dependencyProblems.hidden = true;
+	previewColumn.append(dependencyProblems);
 	const model = monaco.editor.createModel(
 		source,
 		"pfdsl",
@@ -234,6 +242,7 @@ export function createDocumentTab({
 			void preview.receive(message);
 		},
 		reportStatus,
+		previewColumn,
 	);
 
 	async function refresh() {
@@ -242,10 +251,25 @@ export function createDocumentTab({
 		const result = await processSnapshot(editor.getValue(), path, read);
 		if (disposed || currentRevision !== revision) return;
 		snapshot = result.model;
+		const dependencyDiagnostics = result.presetDiagnostics.map((d) => ({
+			...d,
+			message: `Dependency ${d.file ?? path}: ${d.message}${d.file ? ` (${d.range.start.line}:${d.range.start.column})` : ""}`,
+			// Foreign coordinates belong to the dependency, not this editor model.
+			range: d.file
+				? { start: { line: 1, column: 1 }, end: { line: 1, column: 1 } }
+				: d.range,
+		}));
+		dependencyProblems.replaceChildren();
+		dependencyProblems.hidden = dependencyDiagnostics.length === 0;
+		for (const d of dependencyDiagnostics) {
+			const item = document.createElement("div");
+			item.textContent = `${d.code}: ${d.message}`;
+			dependencyProblems.append(item);
+		}
 		monaco.editor.setModelMarkers(
 			editor.getModel()!,
 			"pfdsl",
-			result.model.diagnostics.map((d) => ({
+			[...result.model.diagnostics, ...dependencyDiagnostics].map((d) => ({
 				severity:
 					d.severity === "error"
 						? monaco.MarkerSeverity.Error
