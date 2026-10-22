@@ -414,18 +414,24 @@ test("GitHub issue comment reads are allowed without observing a checkout", () =
 });
 
 for (const capability of [
+	"fetch_workflow_job_logs",
 	"fetch_pr_comments",
 	"list_pull_request_reviews",
 	"list_pull_request_review_threads",
 	"reply_to_review_comment",
 ]) {
 	for (const separator of ["_", "__"]) {
-		test(`GitHub review capability ${separator}${capability} preserves read and outward-write policy`, () => {
+		test(`GitHub capability ${separator}${capability} preserves read and outward-write policy`, () => {
 			const write = capability === "reply_to_review_comment";
 			for (const child of [false, true]) {
 				const payload = {
 					tool_name: `mcp__codex_apps__github${separator}${capability}`,
-					tool_input: { repo_full_name: "takasek/pfdsl", pr_number: 1485 },
+					tool_input: {
+						repo_full_name: "takasek/pfdsl",
+						...(capability === "fetch_workflow_job_logs"
+							? { job_id: 119106443463 }
+							: { pr_number: 1485 }),
+					},
 					...(child ? { agent_id: "review-child" } : {}),
 				};
 				const noObservation = () => {
