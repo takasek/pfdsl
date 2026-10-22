@@ -10,7 +10,7 @@ const delegatedCodex =
 	!process.env.CLAUDE_PROJECT_DIR?.trim() && process.env.CLAUDECODE === "1";
 
 // Only failed scope decisions expose this bounded allowlist. Never dump argv or the environment.
-function ownershipDiagnostics(payload, facts, classified) {
+function ownershipDiagnostics(payload, facts, classified, processChain) {
 	const bounded = (value) =>
 		typeof value === "string" ? value.slice(0, 512) : null;
 	const paths = classified.operations
@@ -21,6 +21,7 @@ function ownershipDiagnostics(payload, facts, classified) {
 		hookRoot,
 		pid: process.pid,
 		ppid: process.ppid,
+		processChain,
 		processCwd: bounded(process.cwd()),
 		payloadCwd: bounded(payload.cwd),
 		tool: bounded(payload.tool_name),
@@ -146,6 +147,9 @@ if (isMainThread) {
 		const { collectAgentOperationEnvironment } = await import(
 			"./lib/agent-operation-environment.mjs"
 		);
+		const { observeHookProcessChain } = await import(
+			"./lib/hook-process-diagnostics.mjs"
+		);
 		const { readShell } = await import("./lib/shell-commands.mjs");
 		const { isShellParserInstalled, shellParserPath } = await import(
 			"./lib/shell-parser-tool.mjs"
@@ -181,7 +185,7 @@ if (isMainThread) {
 					["primary", "other-live", "other-unowned"].includes(target),
 				)
 			)
-				decision.reason += ` Ownership diagnostics: ${ownershipDiagnostics(payload, facts, classified)}.`;
+				decision.reason += ` Ownership diagnostics: ${ownershipDiagnostics(payload, facts, classified, observeHookProcessChain())}.`;
 			if (shell?.error && decision.operationClass === "U")
 				decision.reason += ` ${shell.error}`;
 			const recovery = {

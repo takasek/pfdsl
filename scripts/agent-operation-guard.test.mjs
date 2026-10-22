@@ -28,6 +28,7 @@ const helperFiles = [
 	"lib/agent-operation-table.mjs",
 	"lib/agent-operation-policy.mjs",
 	"lib/agent-operation-environment.mjs",
+	"lib/hook-process-diagnostics.mjs",
 	"lib/codex-claude-delegation.mjs",
 	"lib/shell-commands.mjs",
 	"lib/shell-parser-tool.mjs",
@@ -175,6 +176,25 @@ test("missing origin/HEAD points to setup and leaves setup recovery available", 
 		assert.equal(
 			f.invoke({ command: `git -C ${f.own} commit -m fixture` }).decision,
 			"allow",
+		);
+	} finally {
+		f.cleanup();
+	}
+});
+
+test("unknown MCP tools explain the capability-table gap instead of Git argv recovery", () => {
+	const f = fixture();
+	try {
+		const result = f.invoke(
+			{ owner: "fixture", repo: "repo" },
+			{ tool_name: "mcp__github__get_unknown_capability" },
+		);
+		assert.equal(result.decision, "deny");
+		assert.match(result.reason, /get_unknown_capability/);
+		assert.match(result.reason, /capability table/);
+		assert.doesNotMatch(
+			result.reason,
+			/literally in argv|directory-stack|Git-target/,
 		);
 	} finally {
 		f.cleanup();
@@ -632,6 +652,10 @@ test("Claude native owner can fast-forward a feature worktree while a primary st
 			),
 		);
 		assert.ok(primary.reason.includes(`"claudeProjectDir":"${f.primary}"`));
+		assert.match(
+			primary.reason,
+			new RegExp(`"processChain":\\[\\{"pid":${process.pid},`),
+		);
 		assert.match(primary.reason, /Recovery: same agent rewrite/);
 		assert.match(primary.reason, /fresh session/);
 		writeFileSync(join(f.own, "topic"), "topic\n");

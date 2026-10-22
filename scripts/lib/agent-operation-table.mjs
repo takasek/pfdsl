@@ -230,6 +230,12 @@ export function decideOperation(input) {
 		!exception &&
 		cell.kind === "git" &&
 		["W", "B", "D"].includes(cell.operationClass);
+	const unknownMcpReason =
+		cell.operationClass === "U" &&
+		cell.kind === "remote" &&
+		typeof cell.mcpTool === "string"
+			? `MCP tool ${JSON.stringify(cell.mcpTool.slice(0, 200))} is not classified by this hook's finite capability table. Changing its arguments cannot resolve this. Use a declared tool, or start a session in a checkout containing an updated capability table. Record the hook checkout revision and tool name for the maintainer.`
+			: null;
 	const cloudRecovery =
 		" For cloud sessions, prepare your native worktree using the exact parser repair and make setup, then use git -C <absolute-worktree-path> for the update. If ownership is still denied or the startup checkout is primary, start a fresh session at the intended remote ref; do not use reset, checkout, clone or pull as a bypass.";
 	const outcomes = {
@@ -240,7 +246,7 @@ export function decideOperation(input) {
 			ordinaryGitRecovery ? "rewrite" : "terminal",
 			cell.operationClass,
 		),
-		U: stopped(REASONS.U, "rewrite", cell.operationClass),
+		U: stopped(unknownMcpReason ?? REASONS.U, "rewrite", cell.operationClass),
 		Q: stopped(
 			REASONS[cell.operationClass],
 			subject.recovery ?? "terminal",
