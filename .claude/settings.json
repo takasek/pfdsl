@@ -7,6 +7,8 @@
       "Bash(make typecheck)",
       "Bash(git fetch origin *)",
       "Bash(git merge --ff-only origin/*)",
+      "Bash(git -C * fetch origin *)",
+      "Bash(git -C * merge --ff-only origin/*)",
       "mcp__github__pull_request_read",
       "mcp__github__issue_read",
       "mcp__github__list_*",

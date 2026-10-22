@@ -45,6 +45,8 @@ describe(".claude/settings.json hook wiring", () => {
 			"make typecheck",
 			"git fetch origin *",
 			"git merge --ff-only origin/*",
+			"git -C * fetch origin *",
+			"git -C * merge --ff-only origin/*",
 		])
 			assert.ok(allow.includes(`Bash(${command})`), command);
 		assert.equal(allow.includes("Bash(make *)"), false);
