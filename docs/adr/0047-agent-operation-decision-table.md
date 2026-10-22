@@ -60,6 +60,10 @@ PR #1413 の旧 ADR-0047 が採った「Git が起こす共有作用の全防止
 
 この表にない option の出力先、shell のリダイレクト、Git 以外のプログラムの書込み先は保証外とする。
 列挙を追加するかは所有者が決める。
+#1510 の再現では、`origin/HEAD` がない同じ session で、同じ scratchpad への Write は環境観測中に deny、Bash の `cat > /tmp/...` は allow になった。
+Write は書込み先を持つ W として観測される一方、`cat` とそのリダイレクトはこの表の操作として収集されないためであり、Bash の書込み先の安全性を検証した結果ではない。
+この入口差は `scripts/agent-operation-guard.test.mjs` で再現し、セットアップによる参照修復後に両方が allow になることも確認する。
+リダイレクトを操作として収集する一般化は、この修正では追加しない。
 worktree add の開始点 main は -b topic や --detach と併用できるが、既存の default branch を checkout する形は D とする。
 switch・checkout の --track・-t で作成名を明示しない場合は、remote/name から暗黙に作る local name を branch の対象とし、default branch なら D とする。
 作成名を -c・-b 等で明示した場合はその名前を対象とし、default 以外は B の判定を維持する。

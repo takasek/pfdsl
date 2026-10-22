@@ -54,6 +54,11 @@ const MCP_WRITE = new Set([
 	"update_pull_request",
 	"create_issue",
 	"update_issue",
+	"issue_write",
+	"pull_request_review_write",
+	"sub_issue_write",
+	"update_pull_request_branch",
+	"resolve_review_thread",
 	"add_issue_comment",
 	"push_files",
 	"create_or_update_file",
@@ -199,7 +204,7 @@ export function collectAgentOperationEnvironment(
 	);
 	if (!head.ok || !/^origin\/.+/.test(head.out.trim()))
 		throw new Error(
-			"Cannot establish the default branch; run make setup in the session repository to restore origin/HEAD, then retry. If setup fails, check its origin connectivity and fetch diagnostics",
+			"Cannot establish the default branch; run make setup in the session repository to restore origin/HEAD, then retry. In an existing cloud session using older hook files, restart with a fresh clone containing this fix; restarting an old checkout does not update its hooks",
 		);
 	facts.defaultBranch = head.out.trim().slice("origin/".length);
 	const listed = probeGit(["worktree", "list", "--porcelain", "-z"], {

@@ -56,6 +56,11 @@ export function corpusFacts(overrides = {}) {
 		mcpTools: {
 			mcp__github__get_pull_request: "R",
 			mcp__github__create_pull_request: "O",
+			mcp__github__issue_write: "O",
+			mcp__github__pull_request_review_write: "O",
+			mcp__github__sub_issue_write: "O",
+			mcp__github__update_pull_request_branch: "O",
+			mcp__github__resolve_review_thread: "O",
 			mcp__github__merge_pull_request: "P",
 		},
 		...overrides,
@@ -1174,6 +1179,23 @@ export const AGENT_OPERATION_CORPUS = [
 		subject: "codex-child",
 		tool: { name: "mcp__github__create_pull_request", input: {} },
 	}),
+	...[
+		"issue_write",
+		"pull_request_review_write",
+		"sub_issue_write",
+		"update_pull_request_branch",
+		"resolve_review_thread",
+	].flatMap((name) => [
+		example(`mcp-${name}`, null, "allow", {
+			tool: { name: `mcp__github__${name}`, input: {} },
+			classes: ["O"],
+		}),
+		example(`mcp-child-${name}`, null, "deny", {
+			subject: "codex-child",
+			tool: { name: `mcp__github__${name}`, input: {} },
+			classes: ["O"],
+		}),
+	]),
 	example("mcp-merge", null, "deny", {
 		tool: { name: "mcp__github__merge_pull_request", input: {} },
 		classes: ["O", "P"],

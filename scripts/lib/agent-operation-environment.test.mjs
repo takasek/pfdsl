@@ -419,10 +419,22 @@ for (const capability of [
 	"list_pull_request_reviews",
 	"list_pull_request_review_threads",
 	"reply_to_review_comment",
+	"issue_write",
+	"pull_request_review_write",
+	"sub_issue_write",
+	"update_pull_request_branch",
+	"resolve_review_thread",
 ]) {
 	for (const separator of ["_", "__"]) {
 		test(`GitHub capability ${separator}${capability} preserves read and outward-write policy`, () => {
-			const write = capability === "reply_to_review_comment";
+			const write = [
+				"reply_to_review_comment",
+				"issue_write",
+				"pull_request_review_write",
+				"sub_issue_write",
+				"update_pull_request_branch",
+				"resolve_review_thread",
+			].includes(capability);
 			for (const child of [false, true]) {
 				const payload = {
 					tool_name: `mcp__codex_apps__github${separator}${capability}`,

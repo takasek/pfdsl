@@ -552,6 +552,8 @@ async function main(args) {
 		return;
 	}
 	if (args[0] === "write") {
+		const defaultBranch = inspectDefaultBranch(process.cwd());
+		if (defaultBranch.reason !== null) throw new Error(defaultBranch.reason);
 		writeSetupMarker();
 		return;
 	}

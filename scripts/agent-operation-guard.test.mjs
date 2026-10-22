@@ -143,7 +143,21 @@ test("missing origin/HEAD points to setup and leaves setup recovery available", 
 		);
 		assert.equal(denied.decision, "deny");
 		assert.match(denied.reason, /make setup/);
+		assert.match(
+			denied.reason,
+			/existing cloud session.*restart.*fresh clone/i,
+		);
+		assert.match(
+			denied.reason,
+			/restarting an old checkout does not update its hooks/i,
+		);
 		assert.doesNotMatch(denied.reason, /human terminal/);
+		// ADR-0047 excludes shell redirects from file-target classification.
+		// This difference is observed behavior, not a protected-write guarantee.
+		assert.equal(
+			f.invoke({ command: `cat > ${join(f.root, "scratch.md")}` }).decision,
+			"allow",
+		);
 		assert.equal(f.invoke({ command: "make setup" }).decision, "allow");
 		f.git(f.primary, ["update-ref", "refs/remotes/origin/main", "HEAD"]);
 		f.git(f.primary, ["remote", "set-head", "origin", "-a"]);
@@ -155,9 +169,32 @@ test("missing origin/HEAD points to setup and leaves setup recovery available", 
 			"allow",
 		);
 		assert.equal(
+			f.invoke({ command: `cat > ${join(f.root, "scratch.md")}` }).decision,
+			"allow",
+		);
+		assert.equal(
 			f.invoke({ command: `git -C ${f.own} commit -m fixture` }).decision,
 			"allow",
 		);
+	} finally {
+		f.cleanup();
+	}
+});
+
+test("current GitHub issue_write capability keeps parent and child outward-write boundaries", () => {
+	const f = fixture();
+	try {
+		const input = {
+			method: "create",
+			owner: "fixture",
+			repo: "repo",
+			title: "Fixture",
+		};
+		const options = { tool_name: "mcp__github__issue_write", harness: "codex" };
+		assert.equal(f.invoke(input, options).decision, "allow");
+		const child = f.invoke(input, { ...options, agent_id: "child" });
+		assert.equal(child.decision, "deny");
+		assert.match(child.reason, /parent/i);
 	} finally {
 		f.cleanup();
 	}

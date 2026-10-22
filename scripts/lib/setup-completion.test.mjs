@@ -295,6 +295,10 @@ describe("setup completion sentinel", () => {
 	it("reports recovery when origin/HEAD cannot be restored and retries successfully", () => {
 		const context = fixture();
 		writeSetupMarker(context.cwd);
+		const markerBeforeFailure = readFileSync(context.marker, "utf8");
+		const logBeforeFailure = existsSync(context.log)
+			? readFileSync(context.log, "utf8")
+			: "";
 		git(context.cwd, "symbolic-ref", "--delete", "refs/remotes/origin/HEAD");
 		git(
 			context.cwd,
@@ -307,10 +311,55 @@ describe("setup completion sentinel", () => {
 		assert.notEqual(failed.status, 0);
 		assert.match(failed.stderr, /origin\/HEAD/);
 		assert.match(failed.stderr, /make setup/);
+		assert.equal(readFileSync(context.marker, "utf8"), markerBeforeFailure);
+		assert.equal(
+			existsSync(context.log) ? readFileSync(context.log, "utf8") : "",
+			logBeforeFailure,
+		);
 		assert.notEqual(runCheck(context).status, 0);
+		for (const path of [".claude/settings.json", ".codex/hooks.json"]) {
+			const retried = runSessionStart(context, sessionStartCommand(path));
+			assert.notEqual(retried.status, 0);
+			assert.match(retried.stderr, /Cannot restore origin\/HEAD/);
+			assert.notEqual(runCheck(context).status, 0);
+		}
 		git(context.cwd, "remote", "set-url", "origin", context.cwd);
 		assertSucceeded(runSetup(context));
 		assertSucceeded(runCheck(context));
+	});
+
+	it("never writes a new dependency marker when origin/HEAD restoration fails", () => {
+		const context = fixture();
+		git(context.cwd, "symbolic-ref", "--delete", "refs/remotes/origin/HEAD");
+		git(
+			context.cwd,
+			"remote",
+			"set-url",
+			"origin",
+			join(context.cwd, "absent-remote"),
+		);
+		assert.equal(existsSync(context.marker), false);
+		assert.notEqual(runSetup(context).status, 0);
+		assert.equal(existsSync(context.marker), false);
+		assert.notEqual(runCheck(context).status, 0);
+		assert.equal(existsSync(context.log), false);
+	});
+
+	it("rejects the marker write command while origin/HEAD is unresolved", () => {
+		const context = fixture();
+		git(context.cwd, "symbolic-ref", "--delete", "refs/remotes/origin/HEAD");
+		const result = spawnSync(
+			process.execPath,
+			["scripts/setup-completion.mjs", "write"],
+			{
+				cwd: context.cwd,
+				encoding: "utf8",
+				env: environment(context),
+			},
+		);
+		assert.notEqual(result.status, 0);
+		assert.match(result.stderr, /origin\/HEAD.*make setup/);
+		assert.equal(existsSync(context.marker), false);
 	});
 
 	it("keeps a valid origin/HEAD usable without contacting origin", () => {

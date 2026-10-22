@@ -95,6 +95,8 @@ roadmap差分の有無によらず PR には `check-roadmap-registration.yml` �
 `edited` を trigger に含めるのは `check-closes-reference.yml` と同じ理由で、PR 本文の編集が対象集合を変えるからである。
 
 **`gh` CLI が使えない環境（Claude Code Remote 等）での代替**: `cycle-status.mjs` / `gate-check.mjs`（内部の `audit-issues-flow.mjs`）は `gh` を呼ぶが、`github-ops.mjs` が `GH_TOKEN` / `GITHUB_TOKEN` のある環境では HTTP backend へ落ちる（#489・#1044）。token も無い場合は GitHub MCP server のツール（`list_pull_requests` / `issue_read` / `pull_request_read` 等）で個別に代替する: PR一覧は `list_pull_requests`、設計の確認は `issue_read` で本文とコメントを取得して読む、`audit-issues-flow` 相当は対象 issue の分類と `iN_` process・入出力依存を roadmap.pfdsl の記載と手動突合する。
+cloud session で指定 branch が clone 済みの場合、fetch 後はその branch 上で `git merge --ff-only origin/<base>` により基点を更新してからプリフライトを実行する。履歴が分岐して fast-forward できない場合は状態を保持して報告し、`git reset --hard` に切り替えない。
+`origin/HEAD` 修復の受入対象は、修正版の setup と hook を含む新しい clone とする。既存 cloud session が旧 hook により回復不能になっている場合は、修正版を含む新しい clone で session を再起動する。旧 checkout のまま再起動しても hook の内容は更新されない。
 `github-ops.mjs` の HTTP backend は上のリポ内スクリプトが必要とする operation の互換層であり、issue コメントや PR 本文の作成・編集を代行する汎用 GitHub write adapter ではない。
 fallback の transport は REST だけではない — `closingIssuesReferences` は REST の pull request payload に存在せず、GraphQL へ直接問い合わせる（#1043）。
 GitHub 側にしか無い読みを本文の正規表現で再構成すると、Development sidebar で手動リンクされた PR が「closing issue 0件」に見える。
