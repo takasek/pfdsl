@@ -399,70 +399,132 @@ test("setup and readiness reject a different shim even when its version comment 
 	assert.equal(readFileSync(hook, "utf8"), changed);
 });
 
-test("SessionStart restores a clone's missing origin/HEAD before a linked worktree commit", () => {
-	const { root, env, git, commit } = fixture();
-	assert.equal(
-		git(
-			"add",
-			"scripts",
-			"Makefile",
-			"package.json",
-			"pnpm-workspace.yaml",
-			"pnpm-lock.yaml",
-			"generated",
-		).status,
-		0,
-	);
-	assert.equal(commit().status, 0);
-	const clone = join(root, "clone");
-	const cloned = git("clone", "--no-local", root, clone);
-	assert.equal(cloned.status, 0, cloned.stderr);
-	const own = join(root, "own");
-	assert.equal(
-		git("-C", clone, "worktree", "add", "-b", "topic", own).status,
-		0,
-	);
-	checkout(own);
-	writeSetupMarker(own);
-	assert.equal(
-		git("-C", clone, "symbolic-ref", "--delete", "refs/remotes/origin/HEAD")
-			.status,
-		0,
-	);
-	copyFileSync(
-		join(own, "scripts/hooks/pre-commit-shim"),
-		join(clone, ".git/hooks/pre-commit"),
-	);
-	chmodSync(join(clone, ".git/hooks/pre-commit"), 0o755);
-	const missing = commit(own);
-	assert.notEqual(missing.status, 0);
-	assert.match(missing.stderr, /cannot resolve origin\/HEAD/);
-	const settings = JSON.parse(
-		readFileSync(new URL(".claude/settings.json", source), "utf8"),
-	);
-	const started = spawnSync(
-		"/bin/sh",
-		["-c", settings.hooks.SessionStart[0].hooks[0].command],
-		{ cwd: own, env, encoding: "utf8" },
-	);
-	assert.equal(started.status, 0, started.stdout + started.stderr);
-	assert.equal(
-		git("-C", clone, "symbolic-ref", "refs/remotes/origin/HEAD").stdout.trim(),
-		"refs/remotes/origin/feature",
-	);
-	const ready = spawnSync(
-		process.execPath,
-		["scripts/setup-completion.mjs", "check"],
-		{ cwd: own, env, encoding: "utf8" },
-	);
-	assert.equal(ready.status, 0, ready.stderr);
-	const committed = commit(own);
-	assert.equal(committed.status, 0, committed.stderr);
-	assert.match(committed.stdout + committed.stderr, /gate-new/);
-	const refused = commit(clone);
-	assert.notEqual(refused.status, 0);
-	assert.match(refused.stderr, /commits on the default branch/);
-});
+for (const narrow of [false, true]) {
+	test(`SessionStart restores a ${narrow ? "single-branch" : "full"} clone's missing origin/HEAD before a linked worktree commit`, () => {
+		const { root, env, git, commit } = fixture();
+		assert.equal(
+			git(
+				"add",
+				"scripts",
+				"Makefile",
+				"package.json",
+				"pnpm-workspace.yaml",
+				"pnpm-lock.yaml",
+				"generated",
+			).status,
+			0,
+		);
+		assert.equal(commit().status, 0);
+		if (narrow) {
+			assert.equal(git("branch", "cloud-task").status, 0);
+			assert.equal(git("branch", "unrelated").status, 0);
+			assert.equal(git("tag", "must-not-fetch-tag").status, 0);
+		}
+		const clone = join(root, "clone");
+		const cloned = git(
+			"clone",
+			"--no-local",
+			...(narrow
+				? ["--single-branch", "--branch", "cloud-task", "--no-tags"]
+				: []),
+			root,
+			clone,
+		);
+		assert.equal(cloned.status, 0, cloned.stderr);
+		const own = join(root, "own");
+		if (narrow) {
+			assert.equal(
+				git("-C", clone, "symbolic-ref", "--quiet", "refs/remotes/origin/HEAD")
+					.status,
+				1,
+			);
+			assert.equal(
+				git("-C", clone, "rev-parse", "--verify", "refs/remotes/origin/feature")
+					.status,
+				128,
+			);
+		}
+		assert.equal(
+			git("-C", clone, "worktree", "add", "-b", "topic", own).status,
+			0,
+		);
+		checkout(own);
+		writeSetupMarker(own);
+		if (!narrow)
+			assert.equal(
+				git("-C", clone, "symbolic-ref", "--delete", "refs/remotes/origin/HEAD")
+					.status,
+				0,
+			);
+		copyFileSync(
+			join(own, "scripts/hooks/pre-commit-shim"),
+			join(clone, ".git/hooks/pre-commit"),
+		);
+		chmodSync(join(clone, ".git/hooks/pre-commit"), 0o755);
+		const missing = commit(own);
+		assert.notEqual(missing.status, 0);
+		assert.match(missing.stderr, /cannot resolve origin\/HEAD/);
+		const settings = JSON.parse(
+			readFileSync(new URL(".claude/settings.json", source), "utf8"),
+		);
+		const started = spawnSync(
+			"/bin/sh",
+			["-c", settings.hooks.SessionStart[0].hooks[0].command],
+			{ cwd: own, env, encoding: "utf8" },
+		);
+		assert.equal(started.status, 0, started.stdout + started.stderr);
+		if (narrow) {
+			assert.equal(
+				git("-C", clone, "branch", "--show-current").stdout.trim(),
+				"cloud-task",
+			);
+			assert.equal(
+				git(
+					"-C",
+					clone,
+					"for-each-ref",
+					"--format=%(refname)",
+					"refs/remotes/origin/unrelated",
+					"refs/tags/must-not-fetch-tag",
+				).stdout.trim(),
+				"",
+			);
+		}
+		assert.equal(
+			git(
+				"-C",
+				clone,
+				"symbolic-ref",
+				"refs/remotes/origin/HEAD",
+			).stdout.trim(),
+			"refs/remotes/origin/feature",
+		);
+		const ready = spawnSync(
+			process.execPath,
+			["scripts/setup-completion.mjs", "check"],
+			{ cwd: own, env, encoding: "utf8" },
+		);
+		assert.equal(ready.status, 0, ready.stderr);
+		const committed = commit(own);
+		assert.equal(committed.status, 0, committed.stderr);
+		assert.match(committed.stdout + committed.stderr, /gate-new/);
+		if (narrow)
+			assert.equal(
+				git(
+					"-C",
+					clone,
+					"switch",
+					"-c",
+					"feature",
+					"refs/remotes/origin/feature",
+				).status,
+				0,
+			);
+		const refused = commit(clone);
+		assert.notEqual(refused.status, 0);
+		assert.match(refused.stderr, /commits on the default branch/);
+	});
+}
 
 test("alternating and parallel setup keeps the same bootstrap and different checkout-specific gates", async () => {
 	const { root, env, git, hook, commit } = fixture();

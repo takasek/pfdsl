@@ -33,6 +33,32 @@ function wiringByCommand() {
 }
 
 describe(".claude/settings.json hook wiring", () => {
+	it("allows bounded cloud setup and read-only GitHub tools without wildcard writes", () => {
+		const settings = JSON.parse(
+			readFileSync(resolve(root, ".claude/settings.json"), "utf8"),
+		);
+		const allow = settings.permissions.allow;
+		for (const command of [
+			"make setup",
+			"make test",
+			"make lint",
+			"make typecheck",
+			"git fetch origin *",
+			"git merge --ff-only origin/*",
+		])
+			assert.ok(allow.includes(`Bash(${command})`), command);
+		assert.equal(allow.includes("Bash(make *)"), false);
+		assert.deepEqual(
+			allow.filter((rule) => rule.startsWith("mcp__github__")).sort(),
+			[
+				"mcp__github__get_*",
+				"mcp__github__issue_read",
+				"mcp__github__list_*",
+				"mcp__github__pull_request_read",
+				"mcp__github__search_*",
+			],
+		);
+	});
 	it("wires the operation entry exactly once for Bash, files and GitHub MCP in both harnesses", () => {
 		for (const file of [".claude/settings.json", ".codex/hooks.json"]) {
 			const settings = JSON.parse(readFileSync(resolve(root, file), "utf8"));

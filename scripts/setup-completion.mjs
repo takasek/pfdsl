@@ -190,20 +190,63 @@ function ensureDefaultBranch(root) {
 	const state = inspectDefaultBranch(root);
 	if (state.reason === null) return;
 	if (!state.missing) throw new Error(state.reason);
-	const restored = spawnSync("git", ["remote", "set-head", "origin", "-a"], {
-		cwd: root,
-		env: { ...process.env, GIT_TERMINAL_PROMPT: "0" },
-		encoding: "utf8",
-		timeout: 30_000,
-	});
-	if (restored.status !== 0 || inspectDefaultBranch(root).reason !== null) {
-		const detail =
-			restored.error?.message ||
-			restored.stderr?.trim() ||
-			restored.stdout?.trim() ||
-			"origin/HEAD still does not resolve to a commit";
+	const git = (args) =>
+		spawnSync("git", args, {
+			cwd: root,
+			env: { ...process.env, GIT_TERMINAL_PROMPT: "0" },
+			encoding: "utf8",
+			timeout: 30_000,
+		});
+	const checked = (args) => {
+		const result = git(args);
+		if (result.status !== 0)
+			throw new Error(
+				result.error?.message ||
+					result.stderr?.trim() ||
+					`git ${args[0]} failed`,
+			);
+		return result.stdout;
+	};
+	try {
+		const advertised = checked(["ls-remote", "--symref", "origin", "HEAD"]);
+		const heads = advertised.split(/\r?\n/).flatMap((line) => {
+			const match = /^ref: (refs\/heads\/(.+))\tHEAD$/.exec(line);
+			return match ? [{ ref: match[1], branch: match[2] }] : [];
+		});
+		if (heads.length !== 1)
+			throw new Error(
+				"origin did not advertise one symbolic default branch; configure the default branch on origin before retrying",
+			);
+		const { ref, branch } = heads[0];
+		checked(["check-ref-format", ref]);
+		checked(["check-ref-format", "--branch", branch]);
+		const tracking = `refs/remotes/origin/${branch}`;
+		if (tracking === "refs/remotes/origin/HEAD")
+			throw new Error("origin advertised the reserved HEAD branch name");
+		if (git(["symbolic-ref", "--quiet", tracking]).status !== 1)
+			throw new Error(
+				`${tracking} is symbolic or cannot be inspected; restore a direct remote-tracking ref before retrying`,
+			);
+		if (git(["rev-parse", "--verify", `${tracking}^{commit}`]).status !== 0) {
+			if (git(["show-ref", "--verify", "--quiet", tracking]).status !== 1)
+				throw new Error(
+					`${tracking} exists but does not resolve to a commit; inspect it before retrying`,
+				);
+			checked([
+				"fetch",
+				"--no-tags",
+				"--refmap=",
+				"origin",
+				`${ref}:${tracking}`,
+			]);
+		}
+		checked(["remote", "set-head", "origin", branch]);
+		const ready = inspectDefaultBranch(root);
+		if (ready.reason !== null) throw new Error(ready.reason);
+	} catch (error) {
+		const detail = error instanceof Error ? error.message : String(error);
 		throw new Error(
-			`Cannot restore origin/HEAD: ${detail.slice(0, 1000)}. Check origin connectivity and authentication; fetch origin's advertised default branch if it is missing locally, then rerun make setup.`,
+			`Cannot restore origin/HEAD: ${detail.slice(0, 1000)}. Check origin connectivity and authentication, then rerun make setup.`,
 		);
 	}
 }

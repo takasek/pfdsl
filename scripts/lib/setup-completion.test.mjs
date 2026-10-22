@@ -134,7 +134,7 @@ function fixture() {
 		pnpm: '#!/bin/sh\nprintf \'pnpm\\n\' >> "$SETUP_LOG"\n[ -d "$SETUP_EXPECT_LOCK" ] || exit 97\n[ -n "$SETUP_READY_FILE" ] && : > "$SETUP_READY_FILE"\nif [ -n "$SETUP_RELEASE_FILE" ]; then while [ ! -f "$SETUP_RELEASE_FILE" ]; do /bin/sleep 0.02; done; fi\n[ "$SETUP_FAIL_STAGE" = pnpm ] && exit 1\nmkdir -p node_modules\nif [ -n "$SETUP_LINK_PATH" ]; then mkdir -p "$SETUP_LINK_PATH"; printf "%s\\n" "{\\"bin\\":{\\"fixture-command\\":\\"cli.js\\"}}" > "$SETUP_LINK_PATH/package.json"; mkdir -p "$(dirname "$SETUP_LINK_PATH")/.bin"; : > "$(dirname "$SETUP_LINK_PATH")/.bin/fixture-command"; "$REAL_CHMOD" 755 "$(dirname "$SETUP_LINK_PATH")/.bin/fixture-command"; fi\n[ -d "$SETUP_EXPECT_LOCK" ] || exit 98\n',
 		// setup-completion.mjs reads Git state through the real git; only the
 		// Makefile's own common-dir lookup is logged and can be failed.
-		git: '#!/bin/sh\ncase "$1 $2" in "config "*|"symbolic-ref "*|"show-ref "*|"remote "*|"rev-parse "*) exec /usr/bin/git "$@";; esac\nprintf \'git\\n\' >> "$SETUP_LOG"\n[ "$SETUP_FAIL_STAGE" = git ] && exit 1\nprintf \'.git\\n\'\n',
+		git: '#!/bin/sh\nif [ "$1" = fetch ]; then printf \'fetch\\n\' >> "$SETUP_LOG"; [ "$SETUP_FAIL_STAGE" = fetch ] && exit 1; fi\ncase "$1 $2" in "config "*|"symbolic-ref "*|"show-ref "*|"remote "*|"rev-parse "*|"ls-remote "*|"check-ref-format "*|"fetch "*) exec /usr/bin/git "$@";; esac\nprintf \'git\\n\' >> "$SETUP_LOG"\n[ "$SETUP_FAIL_STAGE" = git ] && exit 1\nprintf \'.git\\n\'\n',
 		cp: '#!/bin/sh\nprintf \'cp\\n\' >> "$SETUP_LOG"\n[ "$SETUP_FAIL_STAGE" = cp ] && exit 1\nexec "$REAL_CP" "$@"\n',
 		chmod:
 			'#!/bin/sh\nprintf \'chmod\\n\' >> "$SETUP_LOG"\n[ "$SETUP_FAIL_STAGE" = chmod ] && exit 1\nexec "$REAL_CHMOD" "$@"\n',
@@ -394,27 +394,106 @@ describe("setup completion sentinel", () => {
 		});
 	}
 
-	it("reports the missing advertised branch in a narrow clone without guessing", () => {
+	it("fetches only a missing remote-advertised default branch without changing local branches", () => {
 		const context = fixture();
 		writeSetupMarker(context.cwd);
 		git(context.cwd, "branch", "-m", "trunk");
+		git(context.cwd, "branch", "unrelated");
+		const head = git(context.cwd, "rev-parse", "HEAD");
 		git(context.cwd, "symbolic-ref", "--delete", "refs/remotes/origin/HEAD");
-		const failed = runSetup(context);
-		assert.notEqual(failed.status, 0);
-		assert.match(failed.stderr, /trunk/);
-		assert.match(failed.stderr, /fetch.*make setup/);
-		git(
-			context.cwd,
-			"fetch",
-			"origin",
-			"refs/heads/trunk:refs/remotes/origin/trunk",
-		);
 		assertSucceeded(runSetup(context));
+		assert.equal(git(context.cwd, "rev-parse", "HEAD"), head);
+		assert.equal(git(context.cwd, "branch", "--show-current"), "trunk");
+		assert.equal(
+			git(
+				context.cwd,
+				"for-each-ref",
+				"--format=%(refname)",
+				"refs/remotes/origin/unrelated",
+			),
+			"",
+		);
 		assert.equal(
 			git(context.cwd, "symbolic-ref", "refs/remotes/origin/HEAD"),
 			"refs/remotes/origin/trunk",
 		);
 		assertSucceeded(runCheck(context));
+		assert.equal(readFileSync(context.log, "utf8"), "fetch\n");
+	});
+
+	it("does not create a marker when fetching the advertised branch fails", () => {
+		const context = fixture();
+		git(context.cwd, "symbolic-ref", "--delete", "refs/remotes/origin/HEAD");
+		git(context.cwd, "update-ref", "-d", "refs/remotes/origin/main");
+		const failed = runSetup(context, "fetch");
+		assert.notEqual(failed.status, 0);
+		assert.match(failed.stderr, /git fetch failed.*make setup/);
+		assert.equal(existsSync(context.marker), false);
+		assert.equal(readFileSync(context.log, "utf8"), "fetch\n");
+		assertSucceeded(runSetup(context));
+		assertSucceeded(runCheck(context));
+	});
+
+	it("refuses a dangling symbolic tracking ref without creating its local branch target", () => {
+		const context = fixture();
+		git(context.cwd, "symbolic-ref", "--delete", "refs/remotes/origin/HEAD");
+		git(context.cwd, "update-ref", "-d", "refs/remotes/origin/main");
+		git(
+			context.cwd,
+			"symbolic-ref",
+			"refs/remotes/origin/main",
+			"refs/heads/sentinel",
+		);
+		const failed = runSetup(context);
+		assert.notEqual(failed.status, 0);
+		assert.equal(
+			git(
+				context.cwd,
+				"for-each-ref",
+				"--format=%(refname)",
+				"refs/heads/sentinel",
+			),
+			"",
+		);
+		assert.equal(existsSync(context.marker), false);
+		assert.equal(existsSync(context.log), false);
+	});
+
+	it("ignores configured fetch mappings that would create a local branch", () => {
+		const context = fixture();
+		git(context.cwd, "symbolic-ref", "--delete", "refs/remotes/origin/HEAD");
+		git(context.cwd, "update-ref", "-d", "refs/remotes/origin/main");
+		git(
+			context.cwd,
+			"config",
+			"remote.origin.fetch",
+			"refs/heads/main:refs/heads/sentinel",
+		);
+		assertSucceeded(runSetup(context));
+		assert.equal(
+			git(
+				context.cwd,
+				"for-each-ref",
+				"--format=%(refname)",
+				"refs/heads/sentinel",
+			),
+			"",
+		);
+		assertSucceeded(runCheck(context));
+	});
+
+	it("does not guess a default branch when origin advertises a detached HEAD", () => {
+		const context = fixture();
+		git(context.cwd, "checkout", "--detach");
+		git(context.cwd, "symbolic-ref", "--delete", "refs/remotes/origin/HEAD");
+		const failed = runSetup(context);
+		assert.notEqual(failed.status, 0);
+		assert.match(
+			failed.stderr,
+			/did not advertise one symbolic default branch/,
+		);
+		assert.equal(existsSync(context.marker), false);
+		assert.equal(existsSync(context.log), false);
 	});
 	for (const state of ["missing", "wrong", "legacy directory"])
 		it(`rejects and repairs a ${state} owned skill link with a current marker`, () => {

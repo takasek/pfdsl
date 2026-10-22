@@ -1,6 +1,17 @@
 {
   "permissions": {
     "allow": [
+      "Bash(make setup)",
+      "Bash(make test)",
+      "Bash(make lint)",
+      "Bash(make typecheck)",
+      "Bash(git fetch origin *)",
+      "Bash(git merge --ff-only origin/*)",
+      "mcp__github__pull_request_read",
+      "mcp__github__issue_read",
+      "mcp__github__list_*",
+      "mcp__github__get_*",
+      "mcp__github__search_*",
       "Bash(pnpm test *)",
       "Bash(pnpm typecheck *)",
       "Bash(pnpm build *)",
