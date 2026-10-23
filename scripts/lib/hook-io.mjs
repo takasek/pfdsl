@@ -49,8 +49,8 @@ export function parseHookPayload(text) {
  * rather than the contents (#929). It was measured in #974 — the runs and the
  * transcript evidence live in that issue's comments, not here.
  *
- * So a PreToolUse rule that should not hard-block (command-usage-guard's npx
- * case, roadmap-publish-guard) routes through the permission prompt.
+ * So a PreToolUse rule that should not hard-block (roadmap-publish-guard)
+ * routes through the permission prompt.
  * @param {{decision: "deny" | "ask", reason: string}} result
  */
 export function buildPermissionOutput(result) {

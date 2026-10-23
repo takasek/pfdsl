@@ -10,7 +10,7 @@
 2. **設計決定** — ADR 起草（`docs/adr/`）。ADR 化した判断は適用ルールのガイド蒸留要否も判定する
 3. **作業項目** — issue 起票 + 依存グラフ更新（`roadmap.pfdsl`。手段は roadmap.md 参照）
 
-`maintain_repo_bindings` は binding・guard・companionに加えて、現行の `adopter_config` も改版基準として読む。
+`maintain_repo_bindings` は binding・companionに加えて、現行の `adopter_config` も改版基準として読む。
 `.pfdsl/config.json` の一方の宣言値を変更するときも、もう一方を含む既存値を保持して差分改訂する。
 
 今回の監査で得た所見を起票する前に、共通の方針判断・調査・修正を一度に進める利点が大きいものは、一つの作業項目にまとめる。まとめた場合も、各所見の受入条件は残す。この整理のために、過去の類似 issue を追加で探索する必要はない。
@@ -53,16 +53,12 @@ commit内でinstallerを呼ばず、配置はsetup・preflightが担当する。
 共有lockの待機は5秒で打ち切る。
 異常終了でlockが残った場合は、installerが実行中でないことを確認してから診断に表示されたlockだけを除去し、再実行する。
 default branchの判定はref名の比較であり、同じcommitを指すfeature branchと解決可能なdetached HEADは許可する。
-pre-commitを経由しないref操作の保護と、repo policyのロード失敗・timeoutは #1404 の別受入である。
+pre-commitを経由しないref操作やローカルの誤編集を網羅的に防ぐことは保証しない（ADR-0050）。
 
 **worktree での git 操作**: `git commit` など git コマンドは worktree ディレクトリを指して実行する（理由は `.pfdsl/bindings/pfd-ops.md`「このリポの作業規律」の「手順 2 の追加で worktree 上の変更を検証する」が一次情報）。
-**worktree のパスはシェル変数に入れず literal で書く**。
-`scripts/agent-operation-guard.mjs` の実行先解決は ADR-0047 に従い、先頭の literal cd の AND-list と literal git -C に限定する。
-pushd・popd と Git target 環境変数・CDPATH の名前への書込みが同じ命令文字列にあれば、変更系 Git は unresolved とする。literal な shell -c・eval の文字列も同じ規則で分類し、shell の状態を追跡しない。
 Codex の変更系 Git は `git -C <絶対パス>`、apply_patch は絶対パスを既定とする。
-所有は session の起点と ADR-0046 の native 所有証拠で判定し、other-live・other-unowned の変更は全主体 deny とする。
-main/default branch と検査回避は own でも保護する。
-なお deny は Bash 呼び出し全体を止めるため、`git -C $W add … && git -C $W commit …` が弾かれたときは add も実行されていない。
+作業先は harness の割当と実際の checkout で確認し、repo hook でコマンド文字列やプロセスから所有者・作用先を推定しない。
+Git hook と remote の必須 check は、それぞれ commit 時の検査と main の統合条件を担う。
 
 ## develop のレビュー
 
@@ -95,7 +91,9 @@ main/default branch と検査回避は own でも保護する。
 レビュー担当は一次資料から目的と scope を確かめ、指定一覧を探索範囲の上限にしない。差分と関係する消費者を読み、正常・失敗・非該当の入力で主張の反証を試みる。測った版と条件が最終成果へ適用できるかも確認する。自己レビューは準備として行い、別文脈のレビューの代替にしない。
 観点1・2は最終差分の別 agent 1本で覆ってよい。観点3が発火する場合は、結論を知らない別 agent に解答を含まないツリーを渡して独立に設計させ、その後に最終差分の reviewer が採用理由と実装を確認する。観点4が発火する場合は変更意図を知らない別 agent にシナリオを渡す。観点を agent 数へ機械的に一対一対応させず、各観点の独立性を保つ。
 指摘は根拠となる箇所と failure scenario を添えて返し、実装側が一次資料で確認して対応する。リテラルや特殊ケースの分類を既存の宣言・データから導く指摘を採用する前には、「分類の循環を確認する」へ戻る。
-hook・guard の判定への指摘は、修正の前に ADR-0047 の採否基準で仕分ける。対応する入力の literal な誤読は直し、対応範囲を増やす提案は所有者が決め、保証外と検出回避の敵対的な入力は理由を返信して閉じる。作用の網羅を契約にして指摘を順に直した PR #1413 は、91 commits まで広がって収束しなかった。各観点の状態、確認範囲・根拠・未確認、未解決の指摘を PR 本文に記録する。
+保護の追加を求める指摘は、ADR-0050 の責務と受け入れた残余に照らして扱う。
+網羅性を高めるために新しい分類器・判定表・deny パターンを足さない。
+各観点の状態、確認範囲・根拠・未確認、未解決の指摘を PR 本文に記録する。
 
 使える手段を観点とブリーフ要件に合わせて選ぶ。`/simplify` は固定4角度で品質を探すが、correctness を明示的に探さないため観点2を兼ねない。`/code-review` は観点2の要件を実際に満たせる範囲で使い、不足する反証・消費者探索は別のレビューで補う。観点4には成果物とシナリオだけを渡した agent、または領域に対応する専用 skill を使う。
 `code-reviewer` agent を Agent tool で起動するには `pr-review-toolkit` / `feature-dev` plugin のいずれかが必要である。起動可否は harness と plugin の版に依存するため、過去の記録でなくその回の実体を確認する。`/code-review` の `disable-model-invocation` は2026-07-28時点で `false` だった。
@@ -186,7 +184,7 @@ spec 統合時の Opus 外部レビューで繰り返し指摘された項目:
 
 ### 委譲時の入力（構造捏造の予防）
 
-一般形（生成物が適合すべき既存構造は実物から読んで委譲入力に明示する）は `.pfdsl/bindings/pfd-ops.md`「このリポの作業規律」の「適用点 3 と 3 層制御で実装を委譲し外向き操作を制御する」が一次情報。
+一般形（生成物が適合すべき既存構造は実物から読んで委譲入力に明示する）は `.pfdsl/bindings/pfd-ops.md`「このリポの作業規律」の「適用点 3 で実装を委譲し外向き操作の担当を定める」が一次情報。
 proposal 起草での「既存構造」は対象 spec の現行 frontmatter キー構造・制約節番号であり、`spec.md` の該当節を読ませる/grep させることで渡す。
 渡さなかった実例が 2026-06-20 の捏造（spec に無い `presentation` ブロック — review-perspectives A「入力充足」の委譲版）で、戻り後レビューで検出した。
 
@@ -342,8 +340,8 @@ GUI領域の受入時機は roadmap.md「GUI領域の実装・実機受入・公
 
 ## subagent の worktree 隔離の安全確認
 
-一般形は `.pfdsl/bindings/pfd-ops.md`「このリポの作業規律」の「適用点 3 と 3 層制御で実装を委譲し外向き操作を制御する」にある「委譲先の外向き操作の制御」の 1（agent の選択）が一次情報。
-このリポの `issue-worker` は呼び出し元が native の worktree 隔離で起動し、割り当てた root と所有証拠を確認する。
+一般形は `.pfdsl/bindings/pfd-ops.md`「このリポの作業規律」の「適用点 3 で実装を委譲し外向き操作の担当を定める」が一次情報。
+このリポの `issue-worker` は呼び出し元が割り当てた worktree で起動し、起動先の root・branch と割当を確認する。
 手順の正本は `.claude/agents/issue-worker.md` であり、agent 自身が手動で作成した worktree を所有扱いに変えない。
 乗っ取りが実際に起きたのは issue #439 の issue-worker 試走で、呼び出し元ブランチは無傷で復旧できたが、一歩間違えば作業中のコミット履歴を破壊しかねなかった。
 
@@ -367,9 +365,9 @@ repo scope の agent（`ci-triage` 等、このリポの開発都合の道具）
 前者は「同一セッションからは起動できない」の実例として記録されていたが、harness のドキュメントは定義の追加を検出して再起動なしに使えると述べており、再起動が要るのはディレクトリごと新設した場合等に限られる。
 #754 が当たったのはその例外側だったとみられる — 1事例から一般則を立てた形なので、同種の記録は「この回はこうだった」までに留める。
 
-## 委譲先の外向き操作の制御（3層）
+## 委譲先の外向き操作の担当
 
-3層の**原則**は `.pfdsl/bindings/pfd-ops.md`「このリポの作業規律」の「適用点 3 と 3 層制御で実装を委譲し外向き操作を制御する」が一次情報（#558 で配布層へ昇格し、ADR-0039 で binding へ移設）。
+担当範囲と戻り時の確認は `.pfdsl/bindings/pfd-ops.md`「このリポの作業規律」の「適用点 3 で実装を委譲し外向き操作の担当を定める」が一次情報。
 ここにはこのリポの実装値のみを書く。
 
 **1. agent の選択。** 実装だけを委譲するなら `pfd-implementer`（`tools:` に `mcp__github__*` を含まない）。
@@ -377,20 +375,15 @@ repo scope の agent（`ci-triage` 等、このリポの開発都合の道具）
 呼び出し元が native の worktree 隔離で起動し、PR 作成までを一気通貫でやらせる場合のみ `issue-worker` を使う。
 `pfd-implementer.md` は `gen_plugin` が plugin へミラーする配布物でもあるため、リポ固有の agent 名・スクリプトパスを本文に書かない。
 
-**2. PreToolUse hook。** 実装は `scripts/agent-operation-guard.mjs`、allowlist は `scripts/lib/agent-operation-table.mjs` の `DEFAULT_ALLOWED_AGENTS`。
-`settings.json` の `permissions.deny` を使わないのは、プロジェクト全体に効いて呼び出し元と `issue-worker` まで巻き込むため。
-表に無い入力の形は U（書換え案内付き deny）となり、Git common dir の `pfdsl/agent-operation-unresolved.jsonl` に記録される。
-U が通常作業を止めた回と、#1404 の受入を進める回は、`node scripts/agent-operation-unresolved-report.mjs` で理由と option の件数を集計し、頻出する形を option 表へ加えるかを所有者に諮る。
-レビュー指摘から自動で表を広げない（ADR-0047「保証外と回復先」の採否基準）。
-
-**3. 戻り時の検出。** 汎用手順のまま（`git log origin/<branch>..HEAD` と open PR 一覧の突合）。このリポ固有の追加値はない。
+**2. 戻り時の確認。** `git log origin/<branch>..HEAD` と open PR 一覧を突合する。
+subagent の push を拒否する repo hook や permission deny は置かない。
+ツール制限を経由しない Bash 等の書込みまで防ぐとは説明しない（ADR-0050）。
 
 ## hook の artifact 登録基準（#854）
 
 一般形は上の「workflow.pfdsl に登録する agent の範囲」と同じく、pfd-ops の `references/work-cycle.md`「成果物の門番」が一次情報。
 このリポでの適用対象は `.claude/settings.json` に配線された hook 全般（PreToolUse ガードと PostToolUse advisory の双方）で、登録先は対象 artifact の分類と producer 関係を記録する `workflow.pfdsl`。
-登録しない側に当たるのは `command-usage-guard` / `closes-create-guard` / `roadmap-publish-guard` / `verification-tree-guard` 等で、いずれも個別事故への対処であって図のプロセスの出力ではない。
-`agent-operation-guard` は既存の委譲と作業先の保護責務を統合し、図に登録した2つの責務の実装先を共有する。
+登録しない側に当たるのは `closes-create-guard` / `roadmap-publish-guard` 等で、いずれも個別事故への対処であって図のプロセスの出力ではない。
 
 artifact 登録済みの一覧とそれぞれの要求元は `workflow.pfdsl` の artifact 定義と各 artifact の producer 関係が一次情報。`node packages/cli/dist/cli.js graph neighbors .pfdsl/workflow.pfdsl <hook artifact ID>` で対象 hook artifact の producer を引き、artifact 定義を参照する。
 PostToolUse advisory であっても、要求元の手順を名指しできれば登録側になる。advisory か guard かは判定軸ではなく、要求元の手順を名指しできるかどうかで判定する。

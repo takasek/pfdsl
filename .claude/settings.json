@@ -43,21 +43,6 @@
         "hooks": [
           {
             "type": "command",
-            "command": "exec node scripts/agent-operation-guard.mjs",
-            "timeout": 10
-          },
-          {
-            "type": "command",
-            "command": "node scripts/command-usage-guard.mjs",
-            "timeout": 10
-          },
-          {
-            "type": "command",
-            "command": "node scripts/verification-tree-guard.mjs",
-            "timeout": 10
-          },
-          {
-            "type": "command",
             "command": "node scripts/closes-create-guard.mjs",
             "timeout": 10
           }
@@ -68,27 +53,12 @@
         "hooks": [
           {
             "type": "command",
-            "command": "exec node scripts/agent-operation-guard.mjs",
-            "timeout": 10
-          },
-          {
-            "type": "command",
             "command": "node scripts/roadmap-publish-guard.mjs",
             "timeout": 10
           },
           {
             "type": "command",
             "command": "node scripts/generated-root-instructions-guard.mjs",
-            "timeout": 10
-          }
-        ]
-      },
-      {
-        "matcher": "mcp__.*github.*",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "exec node scripts/agent-operation-guard.mjs",
             "timeout": 10
           }
         ]

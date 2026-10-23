@@ -39,15 +39,6 @@
 			"quoteStyle": "double"
 		}
 	},
-	"overrides": [
-		{
-			"includes": ["scripts/lib/agent-operation-option-table.json"],
-			"json": {
-				"formatter": { "enabled": false },
-				"linter": { "enabled": true }
-			}
-		}
-	],
 	"assist": {
 		"enabled": true,
 		"actions": {

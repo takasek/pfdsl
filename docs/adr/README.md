@@ -12,9 +12,11 @@
 
 ## 一覧
 
+- **ADR-0050** [agent 操作の保護を減らし、検査と統合の層へ分担する](0050-simplify-agent-operation-protection.md) — ローカルの誤編集・stage の残余を受け入れ、操作・所有判定 guard と専用依存を撤去する。Git hook、内容検査、生成器、CI の残る消費者を維持し、個人 wrapper を repo の前提にしない。ADR-0046・0047 を置換し、ADR-0044 を部分置換する。
+
 - **ADR-0048** [PFDSL の責務を、PFD の意味論なしには成立しない判断に限る](0048-responsibility-boundary-by-pfd-semantics.md) — ADR-0039 の「提供すると決めた用途」は動機による判定で、どの規律にも付けられた。PFD の意味論を除いても成り立つ規則を中核から外し、書き換え先を PFD の要素・companion の構造的事実・`.pfdsl/config.json`・CLI が導出できる状態に限る。区分 ii に「判定の論理が PFD の語彙で書ける」を加え、D 層は所有者の決定による付属機能、配布機構は区分の外の別枠とする。retro の3値の結論、版と対応した証拠、run の成功と受入の区別、制御主体の単一性、意味論を定義しないアダプタを契約とし、判断点 D1〜D6 を記録する。ADR-0039 の区分 ii と `takasek/common` を移設先とした記述、ADR-0040 の D 層の区分を部分置換する。
 
-- **ADR-0047** [agent 操作を有限の判定表で決める](0047-agent-operation-decision-table.md) — 操作先と責務の取り違えを防ぎ、通常動線を維持する。ADR-0044・ADR-0046 の関連 hook 条項を部分置換し、判定表と性質1〜8を契約とする。
+- **ADR-0047** [agent 操作を有限の判定表で決める](0047-agent-operation-decision-table.md)（ADR-0050 が置換） — 操作先と責務の取り違えを防ぎ、通常動線を維持する。ADR-0044・ADR-0046 の関連 hook 条項を部分置換し、判定表と性質1〜8を契約とした。
 
 - **ADR-0045** [依存閉包を共有し、編集の拒否を影響する関係に絞る](0045-dependency-closure-and-scoped-edit-gates.md) — check は全依存を検査し、rename/delete は具体的に壊れうる group 継承・変更後 boundary だけを依存側の拒否対象にする。
 
@@ -24,8 +26,8 @@
 - **ADR-0041** [pfd-retro D 層の採用宣言を3値の構造化宣言にする](0041-retro-d-layer-declaration-token.md) — ADR-0039 の決定は変えず、宣言を `.pfdsl/config.json` の `knowledgeLifecycleAudit`（`mode` と `targets`）にする。宣言が無い・不正な状態は監査せず所有者へ毎回報告し、宣言を知らない旧版の採用先と選んだ採用先を区別する
 - **ADR-0042** [採用先の宣言の値を `.pfdsl/config.json` に置く](0042-adopter-config-file.md) — 切り替えや列挙のような宣言の値は採用先が git 管理する `.pfdsl/config.json` に置き、散文の binding はそのキーを指す。completed-chain sweep は同ファイルで有効にしない限り動かさない。移行状態の置き場所もここに予約する
 - **ADR-0043** [採用先が移行を適用した版を `.pfdsl/config.json` に記録する](0043-applied-migration-state.md) — 採用先が移行を適用し終えた plugin の版（Claude Code では bundle の集約 hash も）をキー `appliedMigration` に置き、`check-install-sync.mjs` は読むだけで照合する。記録するのは検証後に明示実行する `--record-migration` だけで、記録より古い plugin からの `--deploy` と `--record-migration` は exit 3 で拒否する。「最後に見た版」・別ファイル・SessionStart hook・manifest からの推定・CLI での照合は見送った
-- **ADR-0044** [worktree 運用ガードの責務を、効果を観測できる層へ移す](0044-guard-responsibility-by-observable-layer.md)（変更系 Git の所有権判定と関連する削除方針は ADR-0046 が部分置換） — hook に実行後の cwd・branch・shell の状態を予測させない。main の直接 commit は pre-commit、検証ツリーは preflight が担い、PR の Closes は CI の検出に任せる（必須 check にするかは未決）。hook はコマンド文字列とファイルの物理パスで判定できるものに絞る。対象は検査回避、委譲先の外向き操作、payload.cwd を基準にした checkout の確認、作用先の分類、`gh pr merge` の確認である。#1208 の処遇表 B のうち2本の事前拒否を外す。Claude Code の sandbox は保護パスとの衝突のため保留する
-- **ADR-0046** [native 所有者の肯定証拠で sibling 誤判定を補正する](0046-native-worktree-ownership.md) — 変更系 Git の確定済み sibling だけを補正する。Claude の直接親 PID・UTC 開始時刻、Codex の native ownerThreadId と hook.session_id を使い、取得失敗や不一致では既存判断を維持する。ADR-0044 の関連条項だけを置換し、file policy と #1398 の未完了受入を保持する
+- **ADR-0044** [worktree 運用ガードの責務を、効果を観測できる層へ移す](0044-guard-responsibility-by-observable-layer.md)（ADR-0050 が部分置換） — Git pre-commit・共有 shim・setup は維持する。repo policy・隔離前提・委譲先拒否・移行方針・GitHub の責務は ADR-0050 に従う。
+- **ADR-0046** [native 所有者の肯定証拠で sibling 誤判定を補正する](0046-native-worktree-ownership.md)（ADR-0050 が置換） — 変更系 Git の確定済み sibling に native 所有証拠を用いて補正する契約と、当時の受入証拠を記録する。
 - **ADR-0049** [standalone の文書セッションを対象別観測と操作計画で表す](0049-standalone-document-session-model.md) — 重なり合う可変フィールドを、承認済みの基準・対象別の観測・未解決の保存・世代の4つに限り、衝突・dirty・パネル表示・終了判断を導出する。観測は単一の入口を通し、確認と実行を操作計画で結ぶ。入口ごとの個別修正は却下した
 
 - **ADR-0001** [成果物の有形性](0001-tangible-outputs-intangible-inputs.md) — 出力は保管・検証可能なモノのみ、入力はフロー外リソースなら不定形を許可する非対称規則
