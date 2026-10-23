@@ -17,7 +17,7 @@ export function snapshot(modelSource, ready, artifacts) {
 
 export function checkEvidence(evidence, context) {
  if (!evidence || evidence.schemaVersion !== 0 || !text(evidence.runId) || !text(evidence.processId) ||
-  !strings(evidence.workItemIds) || !strings(evidence.changedPaths) || !strings(evidence.acceptanceEvidence) ||
+  !strings(evidence.workItemIds) || evidence.workItemIds.length === 0 || !strings(evidence.changedPaths) || !strings(evidence.acceptanceEvidence) ||
   !Array.isArray(evidence.transitions) || !Array.isArray(evidence.deviations) ||
   !evidence.versions || !['model','artifacts','criteria'].every(key => text(evidence.versions[key])) ||
   !evidence.transitions.every(t => t && text(t.artifactId) && text(t.from) && text(t.to)) ||
@@ -28,6 +28,9 @@ export function checkEvidence(evidence, context) {
  const model = analyze(context.modelSource);
  if (model.diagnostics.some(d => d.severity === 'error')) errors.push('MODEL_INVALID');
  if (model.nodeKinds.get(evidence.processId) !== 'process') return [...errors, 'PROCESS_MISSING'];
+ const location = model.frontmatter?.process?.[evidence.processId]?.location;
+ const issue = typeof location === 'string' ? /^https:\/\/github\.com\/takasek\/pfdsl\/issues\/([1-9][0-9]*)$/.exec(location)?.[1] : undefined;
+ if (issue && !evidence.workItemIds.includes(issue)) errors.push('WORK_ITEM_MISMATCH');
  const selected = context.ready.find(item => item.id === evidence.processId);
  if (!selected) errors.push('NOT_READY');
  const outputs = model.edges.filter(edge => edge.process === evidence.processId && edge.kind === 'output').map(edge => edge.artifact);

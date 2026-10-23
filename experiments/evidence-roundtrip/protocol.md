@@ -28,6 +28,9 @@ driverが書くJSONのv0形は次のとおり。
 ```
 
 版はSHA-256で固定する。
+このv0はGitHub Issuesを採用した本リポ限定で、workItemIdsに少なくとも1件を要求する。
+processのlocationが本リポのissue URLなら、その番号が含まれることも照合する。
+backend非採用や別backend向けの一般化は未実施である。
 modelはモデル原文のJSON表現、artifactsはパスから内容ダイジェストへの対応表、criteriaはartifact IDからcriteriaまたはnullへの対応表のJSON表現をハッシュする。
 キー順も含む同一バイト表現の照合であり、意味的同値を判定しない。
 変更されたパスは準備側の成果物版に存在する必要がある。

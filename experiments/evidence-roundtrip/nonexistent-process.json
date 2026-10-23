@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 0,
+  "runId": "883eb6d0-63eb-48aa-8a3b-05f403fe3de8-nonexistent-process",
+  "processId": "e0_process_does_not_exist",
+  "workItemIds": [
+    "1525"
+  ],
+  "versions": {
+    "model": "23f2df271635d00d6fa85d15795973d28462f07d77944f2f20a4d8b0c227a48c",
+    "artifacts": "e53cd60cf1f4b4a09c3c79df66a8cde2296137ee1bfb5259bee2ee7e441d5497",
+    "criteria": "f6db580e5dd837a3054353c199797cdc5b9930c73fa61a1e4128b909ca2914b1"
+  },
+  "changedPaths": [],
+  "transitions": [],
+  "deviations": [
+    {
+      "type": "execution-failure",
+      "reason": "i1525_revise_boundary_test is absent from the CLI ready list; execution stopped."
+    }
+  ],
+  "acceptanceEvidence": []
+}
