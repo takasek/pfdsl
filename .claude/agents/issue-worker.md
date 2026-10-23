@@ -1,7 +1,7 @@
 ---
 name: issue-worker
 description: >
-  呼び出し元が native の worktree 隔離で起動し、issue 番号を渡すと、fetch から意味あるブランチ名への
+  呼び出し元が割り当てた worktree で起動し、issue 番号を渡すと、fetch から意味あるブランチ名への
   リネーム・t-wada 流 TDD 実装・PR 作成までを一気通貫で行う。「#288」
   「fix #400 worktreeで」のように issue 番号起点で実装フローを頼まれたら使う。
   main への直接 push、issue スコープ外の変更はしない。

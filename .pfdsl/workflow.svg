@@ -219,11 +219,11 @@
 <!-- maintain_repo_bindings -->
 <g id="node34" class="node">
 <title>maintain_repo_bindings</title>
-<g id="a_node34"><a xlink:title="repo binding・guard・companion整備&#10;&#10;decisions が指名した repo&#45;local な binding・guard・companion の正本を改訂する。 prose_mechanization_sweep_record の散文・機構矛盾、retro_findings の運用実態との不一致を binding 文言・guard 規則・説明へ反映する。 workflow_md の改訂では workflow_pfdsl を突合相手として読み、図の改訂で名指しが食い違った箇所を追随させる。 bindings_pfd_ops の改訂では ops_skill_general の現行 SKILL.md・work&#45;cycle.md を突合相手として読み、配布層とリポ固有手順の契約を揃える。 検証コマンドは正本ごとに異なり、各出力 artifact の criteria が一次情報である。&#10;">
+<g id="a_node34"><a xlink:title="repo binding・companion整備&#10;&#10;decisions が指名した repo&#45;local な binding・companion の正本を改訂する。 prose_mechanization_sweep_record の散文・機構矛盾、retro_findings の運用実態との不一致を binding 文言・説明へ反映する。 workflow_md の改訂では workflow_pfdsl を突合相手として読み、図の改訂で名指しが食い違った箇所を追随させる。 bindings_pfd_ops の改訂では ops_skill_general の現行 SKILL.md・work&#45;cycle.md を突合相手として読み、配布層とリポ固有手順の契約を揃える。 検証コマンドは正本ごとに異なり、各出力 artifact の criteria が一次情報である。&#10;">
 <ellipse fill="none" stroke="black" cx="2709.63" cy="-1701.14" rx="107.54" ry="41.3"/>
 <text xml:space="preserve" text-anchor="middle" x="2709.63" y="-1713.74" font-family="Times,serif" font-size="14.00">maintain_repo_bindings</text>
-<text xml:space="preserve" text-anchor="middle" x="2709.63" y="-1696.94" font-family="Times,serif" font-size="14.00">repo binding・guard</text>
-<text xml:space="preserve" text-anchor="middle" x="2709.63" y="-1680.14" font-family="Times,serif" font-size="14.00">・companion整備</text>
+<text xml:space="preserve" text-anchor="middle" x="2709.63" y="-1696.94" font-family="Times,serif" font-size="14.00">repo binding・compan</text>
+<text xml:space="preserve" text-anchor="middle" x="2709.63" y="-1680.14" font-family="Times,serif" font-size="14.00">ion整備</text>
 </a>
 </g>
 <text xml:space="preserve" text-anchor="middle" x="2532.5" y="-1647.24" font-family="Times,serif" font-size="14.00">knowledge_maintenance</text>

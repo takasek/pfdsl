@@ -372,7 +372,7 @@ repo scope の agent（`ci-triage` 等、このリポの開発都合の道具）
 
 **1. agent の選択。** 実装だけを委譲するなら `pfd-implementer`（`tools:` に `mcp__github__*` を含まない）。
 `general-purpose` は `tools: *` で GitHub MCP を丸ごと持つので、実装委譲には使わない。
-呼び出し元が native の worktree 隔離で起動し、PR 作成までを一気通貫でやらせる場合のみ `issue-worker` を使う。
+呼び出し元が割り当てた worktree で起動し、PR 作成までを一気通貫でやらせる場合のみ `issue-worker` を使う。
 `pfd-implementer.md` は `gen_plugin` が plugin へミラーする配布物でもあるため、リポ固有の agent 名・スクリプトパスを本文に書かない。
 
 **2. 戻り時の確認。** `git log origin/<branch>..HEAD` と open PR 一覧を突合する。

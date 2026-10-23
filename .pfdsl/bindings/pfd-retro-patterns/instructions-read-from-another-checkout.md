@@ -2,6 +2,8 @@
 tags: [target:worktree, context:parallel-work, phase: pre-artifact]
 ---
 
+> 過去事例（2026-09-18）。本文の対策・判断は当時の記録であり、現行の指示ではない。現行手順は [pfd-retro binding](../pfd-retro.md) を参照。verification-tree-guard は [ADR-0050](../../../docs/adr/0050-simplify-agent-operation-protection.md) で撤去する。端末固有の絶対パスは `<primary-checkout>` に置換してある。
+
 - **サイクルの指示文書を、サイクルのツリーとは別の checkout から読む trap**: worktree でサイクルを回す運用では、実行も書き込みも worktree 側で行う。
   しかしセッション冒頭に読む指示文書（skill 本文・reference・companion）は、ツールへ渡すパス次第で main checkout 側の実体になる。
   main checkout は誰も rebase していない限り `origin/main` より遅れるので、そこから読んだ規約は**撤去済みの節を含んだまま**実行主体の前提になる。
@@ -10,12 +12,12 @@ tags: [target:worktree, context:parallel-work, phase: pre-artifact]
   どちらも緑のまま進む。
   問いの形: 「いま従っている規約は、どのツリーのファイルから読んだか。そのツリーは `origin/<base>` に対して遅れていないか」。
 
-  観測（2026-09-18、issue #1160 のサイクル）: セッション冒頭に読んだ `work-cycle.md` と `roadmap.md` は main checkout（`/Users/m5/works/pfdsl`）の実体だった。
+  観測（2026-09-18、issue #1160 のサイクル）: セッション冒頭に読んだ `work-cycle.md` と `roadmap.md` は main checkout（`<primary-checkout>`）の実体だった。
   サイクルは `.claude/worktrees/root-instructions-template`（`origin/main` 起点）で回していた。
   読んだ版は `Review:` trailer をゲート条件として要求し、`phase: pre-artifact` のパターンを成果物を書く前に読み直すことを3つの参照点で求めていた。
   現行版はどちらも持たない — trailer はゲート条件から外れ（記録先は PR 本文）、pre-artifact 節自体が撤去されている。
 
-  証拠: `rg -c 'pre-artifact' /Users/m5/works/pfdsl/.claude/skills/pfd-ops/references/work-cycle.md` が `1`、同じ相対パスを worktree 側で引くと `0`。
+  証拠: `rg -c 'pre-artifact' <primary-checkout>/.claude/skills/pfd-ops/references/work-cycle.md` が `1`、同じ相対パスを worktree 側で引くと `0`。
   companion も同様で、開発手順は `89cc2e1e docs(workflow): move development procedures out of roadmap` で `roadmap.md` から `workflow.md` へ移っていた。
 
   この回の帰結: コミット直前に現行 `workflow.md` を読み直したため、外へ出た成果物（PR 本文・設計記録・委譲ブリーフ）はいずれも現行規約に一致した。
