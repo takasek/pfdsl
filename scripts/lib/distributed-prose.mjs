@@ -143,6 +143,46 @@ export function findRepoSpecificProse(files) {
 const EXECUTOR_VOCABULARY =
 	/\b(?:commits?|PRs?|pull\s+requests?|branches|branch|worktrees?|sub-?agents?|TDD|sessions?|turns?)\b|コミット|プルリクエスト|ブランチ|ワークツリー|サブエージェント|セッション|ターン/gi;
 
+/** Observe decoded text without replacing the Markdown parser's handlers. */
+function textWithSourceRanges(content) {
+	const ranges = new WeakMap();
+	const textTokens = new Set([
+		"data",
+		"characterReference",
+		"characterEscapeValue",
+		"characterEscape",
+		"lineEnding",
+		"autolinkProtocol",
+		"autolinkEmail",
+	]);
+	const tree = fromMarkdown(content, {
+		mdastExtensions: [
+			{
+				afterExit(token) {
+					if (!textTokens.has(token.type)) return;
+					const node = this.stack.at(-1)?.children?.at(-1);
+					if (node?.type !== "text") return;
+					const positions = ranges.get(node) ?? [];
+					if (token.type === "characterEscape") {
+						positions.at(-1).start = token.start.offset;
+						return;
+					}
+					const added = node.value.length - positions.length;
+					const literal = token.end.offset - token.start.offset === added;
+					for (let i = 0; i < added; i++) {
+						positions.push({
+							start: token.start.offset + (literal ? i : 0),
+							end: literal ? token.start.offset + i + 1 : token.end.offset,
+						});
+					}
+					ranges.set(node, positions);
+				},
+			},
+		],
+	});
+	return { tree, ranges };
+}
+
 /**
  * Report sentence-sized candidates separately from the failing distribution rules.
  * Coordinates are one-based UTF-16 columns in the original source, at the first
@@ -151,22 +191,32 @@ const EXECUTOR_VOCABULARY =
 export function findExecutorVocabulary(files) {
 	const found = [];
 	for (const { path, content } of files) {
-		const tree = fromMarkdown(content);
+		const { tree, ranges } = textWithSourceRanges(content);
 		walk(tree, (block) => {
 			if (!["paragraph", "heading"].includes(block.type)) return;
 			const start = block.position.start.offset;
 			const end = block.position.end.offset;
-			const prose = Array.from({ length: end - start }, () => " ");
+			const prose = [];
+			const positions = [];
+			let cursor = start;
+			const maskUntil = (offset) => {
+				while (cursor < offset) {
+					prose.push(" ");
+					positions.push({ start: cursor, end: cursor + 1 });
+					cursor++;
+				}
+			};
 			walk(block, (node) => {
 				if (node.type !== "text") return;
-				for (
-					let i = node.position.start.offset;
-					i < node.position.end.offset;
-					i++
-				) {
-					prose[i - start] = content[i];
+				maskUntil(node.position.start.offset);
+				const sourceRanges = ranges.get(node);
+				for (let i = 0; i < node.value.length; i++) {
+					prose.push(node.value[i]);
+					positions.push(sourceRanges[i]);
 				}
+				cursor = node.position.end.offset;
 			});
+			maskUntil(end);
 			// Split visible prose only: punctuation in code and link destinations
 			// cannot terminate a sentence. Blank block boundaries are handled by AST.
 			const visible = prose.join("");
@@ -175,7 +225,7 @@ export function findExecutorVocabulary(files) {
 			)) {
 				const matches = [...sentence[0].matchAll(EXECUTOR_VOCABULARY)];
 				if (!matches.length) continue;
-				const offset = start + sentence.index + matches[0].index;
+				const offset = positions[sentence.index + matches[0].index].start;
 				const prefix = content.slice(0, offset);
 				const line = prefix.split("\n").length;
 				const column = offset - prefix.lastIndexOf("\n");
@@ -186,8 +236,8 @@ export function findExecutorVocabulary(files) {
 					terms: [...new Set(matches.map((match) => match[0]))],
 					text: content
 						.slice(
-							start + sentence.index,
-							start + sentence.index + sentence[0].length,
+							positions[sentence.index].start,
+							positions[sentence.index + sentence[0].length - 1].end,
 						)
 						.trim(),
 				});

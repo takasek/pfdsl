@@ -10,6 +10,42 @@ const report = (content) =>
 	findExecutorVocabulary([{ path: "protocol.md", content }]);
 
 describe("executor vocabulary report", () => {
+	it("scans decoded references while preserving source coordinates and sentence text", () => {
+		const source =
+			"# &#80;R checks\r\n\r\n😀 &amp; done&period; Review **P&#82;** and [comm&#x69;t](https://example.com/branch)&period;\r\nNext &#x30BF;&#x30FC;&#x30F3;。";
+		const found = report(source);
+		assert.equal(found.length, 3);
+		assert.deepEqual(
+			found.map((f) => f.terms),
+			[["PR"], ["PR", "commit"], ["ターン"]],
+		);
+		assert.deepEqual(
+			found.map((f) => [f.line, f.column]),
+			[
+				[1, 3],
+				[3, source.split("\r\n")[2].indexOf("P&#82;") + 1],
+				[4, 6],
+			],
+		);
+		assert.equal(
+			found[1].text,
+			"Review **P&#82;** and [comm&#x69;t](https://example.com/branch)&period;",
+		);
+		assert.equal(found[2].text, "Next &#x30BF;&#x30FC;&#x30F3;。");
+	});
+	it("keeps escaped references literal and excludes encoded vocabulary in code and destinations", () => {
+		assert.deepEqual(
+			report(
+				"\\&commat; P\\&#82; `&#80;R` [safe](https://example.com/&#80;R).\n\n```md\ncomm&#105;t\n```",
+			),
+			[],
+		);
+		const found = report("&NotEqualTilde; &#x1F600; \\* P&#82;.");
+		assert.deepEqual(found[0].terms, ["PR"]);
+		assert.equal(found[0].column, "&NotEqualTilde; &#x1F600; \\* ".length + 1);
+		assert.equal(found[0].text, "&NotEqualTilde; &#x1F600; \\* P&#82;.");
+		assert.equal(report("\\* P&#82;.")[0].text, "\\* P&#82;.");
+	});
 	it("recognizes a pull request across Markdown soft wrapping", () => {
 		const found = report("Intro. Open a pull\nrequest after review.");
 		assert.equal(found.length, 1);
