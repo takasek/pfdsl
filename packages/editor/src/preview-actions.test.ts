@@ -708,3 +708,128 @@ it("retains the minimap SVG on focus and resize, but replaces it after rendering
 	await s.preview.receive(s.message);
 	expect(s.container.querySelector("#minimap-svg svg")).not.toBe(clone);
 });
+
+it("recovers the Connections center after repeated errors without restoring selection, input or focus", async () => {
+	const s = setup();
+	await s.preview.receive(s.message);
+	s.node("p").dispatchEvent(new MouseEvent("contextmenu", { bubbles: true }));
+	const input =
+		s.container.querySelector<HTMLInputElement>(".connection-input") ??
+		s.container.querySelector<HTMLInputElement>("#node-actions input")!;
+	input.value = "unfinished";
+	await s.preview.receive({ type: "clearFocus" });
+	const editor = document.createElement("textarea");
+	s.container.append(editor);
+	editor.focus();
+	s.postMessage.mockClear();
+	await s.preview.receive({ type: "error", message: "Invalid YAML" });
+	await s.preview.receive({ type: "clearFocus" });
+	await s.preview.receive({ type: "error", message: "Still invalid" });
+	expect(s.container.querySelector<HTMLElement>("#node-actions")!.hidden).toBe(
+		true,
+	);
+	await s.preview.receive(s.message);
+	expect(s.container.querySelector<HTMLElement>("#node-actions")!.hidden).toBe(
+		false,
+	);
+	expect(s.container.querySelector("#node-actions-title")!.textContent).toBe(
+		"Connections — p",
+	);
+	expect(input.value).toBe("");
+	expect(document.activeElement).toBe(editor);
+	expect(s.preview.canCreateDefinition()).toBe(false);
+	expect(s.postMessage).not.toHaveBeenCalled();
+});
+
+it.each([
+	"close before",
+	"escape during",
+	"other node",
+	"render hint",
+	"removed",
+])("does not recover an abandoned Connections center: %s", async (reason) => {
+	const s = setup();
+	await s.preview.receive(s.message);
+	s.node("p").dispatchEvent(new MouseEvent("contextmenu", { bubbles: true }));
+	if (reason === "close before")
+		s.container
+			.querySelector<HTMLButtonElement>("#node-actions-close")!
+			.click();
+	await s.preview.receive({ type: "error", message: "Invalid YAML" });
+	if (reason === "escape during")
+		s.container.dispatchEvent(
+			new KeyboardEvent("keydown", { key: "Escape", bubbles: true }),
+		);
+	if (reason === "other node")
+		await s.preview.receive({ type: "focus", nodeId: "a" });
+	if (reason === "render hint")
+		await s.preview.receive({ ...s.message, focusNodeId: "a" });
+	if (reason === "removed")
+		await s.preview.receive({
+			...s.message,
+			editing: { source: "a\n", nodes: [s.message.editing.nodes[0]!] },
+		});
+	await s.preview.receive(s.message);
+	expect(s.container.querySelector<HTMLElement>("#node-actions")!.hidden).toBe(
+		true,
+	);
+});
+
+it("only consumes recovery after the newest render succeeds, including hidden previews", async () => {
+	let finish!: (value: string) => void;
+	const s = setup(
+		vi.fn((dot: string) =>
+			dot === "pending"
+				? new Promise<string>((resolve) => {
+						finish = resolve;
+					})
+				: Promise.resolve(svg),
+		),
+	);
+	await s.preview.receive(s.message);
+	s.node("p").dispatchEvent(new MouseEvent("contextmenu", { bubbles: true }));
+	await s.preview.receive({ type: "error", message: "Invalid YAML" });
+	const old = s.preview.receive({
+		...s.message,
+		dot: "pending",
+		editing: { source: "a\n", nodes: [s.message.editing.nodes[0]!] },
+	});
+	s.container.hidden = true;
+	await s.preview.receive({ type: "error", message: "Invalid again" });
+	finish(svg);
+	await old;
+	expect(s.container.querySelector<HTMLElement>("#node-actions")!.hidden).toBe(
+		true,
+	);
+	await s.preview.receive(s.message);
+	expect(s.container.querySelector<HTMLElement>("#node-actions")!.hidden).toBe(
+		false,
+	);
+	expect(s.container.querySelector("#node-actions-title")!.textContent).toBe(
+		"Connections — p",
+	);
+});
+
+it("forgets pending Connections edits on error so late replies cannot lock or repopulate recovery", async () => {
+	const s = setup();
+	await s.preview.receive(s.message);
+	s.node("a").dispatchEvent(new MouseEvent("contextmenu", { bubbles: true }));
+	s.container.querySelector<HTMLButtonElement>("#create-definition")!.click();
+	const request = s.postMessage.mock.calls.at(-1)![0];
+	expect(request.type).toBe("createDefinition");
+	await s.preview.receive({ type: "error", message: "Invalid YAML" });
+	await s.preview.receive(s.message);
+	expect(
+		s.container.querySelector<HTMLButtonElement>("#create-definition")!
+			.disabled,
+	).toBe(false);
+	await s.preview.receive({
+		type: "editResult",
+		request: request as never,
+		ok: false,
+		message: "Old failure",
+	});
+	expect(s.container.querySelector("#node-actions-error")!.textContent).toBe(
+		"",
+	);
+});

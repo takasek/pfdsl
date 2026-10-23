@@ -254,6 +254,9 @@ API差分：`deleteConnector`／`toggleFeedback`は`nodeId/source/artifact/proce
 期待：source/図/左右一覧が同期し、Aの結果をBの本文・dirty・Undo・選択へ漏らさない。
 古いmenu/cue/候補/timerを残さずmount/revision/dispose境界を維持する。
 中心・文書切替と幅変更ではmenuを閉じ、再描画で操作要素が置換された場合も同じ側の近くにfocusを戻す。
+#1515変種：AでConnectionsを開き、sourceのcriteriaを不完全なYAMLにしてpanelが閉じた後、Bへ切り替えて編集し、Aへ戻って修復する。
+期待：Aの最新の正常図に同じIDがある場合だけConnectionsの中心を再表示し、Bの本文・Undo・選択・focusは変わらない。
+候補入力と保留していた編集のUI状態は復元せず、遅れた応答も新しいpanelへ表示しない。
 状態：M/V各未実施。記録：未記入。
 
 ### GUI-17：Fit・Actual size・倍率・案内
@@ -269,6 +272,11 @@ minimap位置対応を保ち、resizeで図が切れるだけでは不合格に�
 
 対応：#1352/#1444/#1259/#1475。対象・入力：M/V、zoom/pan後に末尾IDを除くsimple-chain、FM/lexer/parserエラー、`a >> p -> b`と`a >>? p`の併記（V036）、通常打鍵・IME。
 操作：正常→エラー→正常、全文読取、Go to error、IME組成と復帰を行う。
+#1515変種（GUI-11の近隣移動後にも実施）：Connectionsでpを開き、sourceのcriteriaへ閉じていない引用符を入力し、連続して不完全YAMLを編集してから修復する。
+期待：エラー中はConnectionsから編集できず、修復後にpが存在すればConnectionsだけが戻る。
+sourceへの入力focus、本文・Undo、pan/zoomを復帰処理が変更せず、選択解除だけでは復帰候補を失わない。
+修復前にプレビューのエラー表示へfocusを移してEscape、エラー前の明示Close、別nodeへの明示選択、正常化時のpの削除／改名を別々に試し、この場合は旧pへ戻らないことを確認する。
+削除／改名後にUndoで同IDを戻しても、自動復帰しないことを確認する。
 V036では、エディタの波線が`a >>? p`の`a`から`p`までに出ることを確認する。
 図が止まったerror表示の「Keep normal input」と「Keep feedback」をそれぞれ別の試行でkeyboardとpointerから選び、各1回のUndoで併記へ戻ることを確認する。
 期待：診断はzoom/pan外の通常サイズで読め、古い図/minimapを現行として残さない。

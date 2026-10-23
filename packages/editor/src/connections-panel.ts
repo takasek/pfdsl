@@ -578,6 +578,7 @@ export function mountConnections(
 			document.defaultView!.removeEventListener("resize", anchorMoved);
 		},
 		isOpen: () => center !== undefined,
+		centerId: () => center,
 		close() {
 			center = undefined;
 			if (pending) delete pending.side;
@@ -590,6 +591,8 @@ export function mountConnections(
 			dismissPopup();
 		},
 		update(data: Editing) {
+			// Invalid source ends the old editing session, including late replies.
+			if (!data) pending = undefined;
 			const focused =
 				popup?.type === "edge" && menu.contains(document.activeElement)
 					? popup.trigger

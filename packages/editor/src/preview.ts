@@ -105,6 +105,7 @@ export function mountPreview(container: HTMLElement, host: PreviewHost) {
 	let pendingFocusCue = false;
 	let editingData: Extract<MessageToWebview, { type: "render" }>["editing"];
 	let selectedNodeId: string | undefined;
+	let recoverConnectionsId: string | undefined;
 	let lastFocusedNodeId: string | undefined;
 	let hoverId: string | undefined;
 	let hideTimer: number | undefined;
@@ -150,6 +151,7 @@ export function mountPreview(container: HTMLElement, host: PreviewHost) {
 	});
 	function closeActions() {
 		cancelNodeClick();
+		recoverConnectionsId = undefined;
 		connections.close();
 		actionsToggle.focus();
 	}
@@ -160,6 +162,7 @@ export function mountPreview(container: HTMLElement, host: PreviewHost) {
 	) {
 		cancelNodeClick();
 		if (graphRevision !== revision) return;
+		recoverConnectionsId = undefined;
 		selectedNodeId = id;
 		const node = [...inner.querySelectorAll<HTMLElement>("g.node")].find(
 			(node) => node.dataset.nodeId === id,
@@ -761,6 +764,9 @@ export function mountPreview(container: HTMLElement, host: PreviewHost) {
 		repairNotice = undefined;
 	}
 	function showError(message: string, repair?: Repair) {
+		// Selection may already have cleared while typing. Only remember the
+		// open panel's center, never its input, source selection or DOM focus.
+		recoverConnectionsId = connections.centerId() ?? recoverConnectionsId;
 		const previewFocused =
 			actions.contains(document.activeElement) ||
 			root.contains(document.activeElement) ||
@@ -851,6 +857,7 @@ export function mountPreview(container: HTMLElement, host: PreviewHost) {
 			const echo = syncEchoNodeId === msg.nodeId;
 			clearSyncEcho();
 			if (echo) return;
+			if (msg.nodeId !== recoverConnectionsId) recoverConnectionsId = undefined;
 			cancelNodeClick();
 			pendingFocusNodeId = msg.nodeId;
 			pendingFocusCue = true;
@@ -888,6 +895,8 @@ export function mountPreview(container: HTMLElement, host: PreviewHost) {
 		clearCue();
 		// The cursor hint supplied while opening must not displace the initial Fit.
 		if (hasPositioned && msg.focusNodeId !== undefined) {
+			if (msg.focusNodeId !== recoverConnectionsId)
+				recoverConnectionsId = undefined;
 			pendingFocusNodeId = msg.focusNodeId;
 			pendingFocusCue = false;
 		}
@@ -908,6 +917,10 @@ export function mountPreview(container: HTMLElement, host: PreviewHost) {
 			error.textContent = "";
 			root.hidden = false;
 			graphRevision = currentRevision;
+			if (recoverConnectionsId !== undefined) {
+				connections.open(recoverConnectionsId);
+				recoverConnectionsId = undefined;
+			}
 			host.onStateChange?.();
 			updateControls();
 			for (const node of inner.querySelectorAll<HTMLElement>("g.node")) {
@@ -962,6 +975,7 @@ export function mountPreview(container: HTMLElement, host: PreviewHost) {
 				});
 		},
 		dispose() {
+			recoverConnectionsId = undefined;
 			cancelNodeClick();
 			clearSyncEcho();
 			hideHover();
