@@ -67,7 +67,7 @@ const SUITE = [
 /**
  * [file, search text, replacement] steps per mutation. `guarantee` is what the
  * mutation removes and `where` is where that guarantee lives in the sources.
- * M1-M10 are the semantic mutations of the pre-ADR-0047 session, restated for
+ * M1-M10 are the semantic mutations of the pre-ADR-0049 session, restated for
  * the observation/plan model; M11-M13 remove the guarantees behind the cells
  * that were known to fail before it (F1, F2, N2).
  */
