@@ -28,6 +28,7 @@ const helperFiles = [
 	"lib/agent-operation-table.mjs",
 	"lib/agent-operation-policy.mjs",
 	"lib/agent-operation-environment.mjs",
+	"lib/hook-process-diagnostics.mjs",
 	"lib/codex-claude-delegation.mjs",
 	"lib/shell-commands.mjs",
 	"lib/shell-parser-tool.mjs",
@@ -87,6 +88,7 @@ function fixture() {
 			agent_type,
 			environment = {},
 			rawInput,
+			hookCommand,
 		} = {},
 	) => {
 		const payload = {
@@ -98,10 +100,12 @@ function fixture() {
 			tool_input,
 		};
 		const result = tryRun(
-			process.execPath,
-			[join(own, "scripts/agent-operation-guard.mjs")],
+			hookCommand ? "sh" : process.execPath,
+			hookCommand
+				? ["-c", `trap : EXIT; ${hookCommand}`]
+				: [join(own, "scripts/agent-operation-guard.mjs")],
 			{
-				cwd: other,
+				cwd: hookCommand ? own : other,
 				env: {
 					...env,
 					CLAUDE_PROJECT_DIR: harness === "claude" ? own : "",
@@ -132,6 +136,122 @@ function fixture() {
 		cleanup: () => rmSync(root, { recursive: true, force: true }),
 	};
 }
+
+test("missing origin/HEAD points to setup and leaves setup recovery available", () => {
+	const f = fixture();
+	try {
+		f.git(f.primary, ["symbolic-ref", "--delete", "refs/remotes/origin/HEAD"]);
+		const denied = f.invoke(
+			{ file_path: join(f.root, "scratch.md"), content: "scratch" },
+			{ tool_name: "Write" },
+		);
+		assert.equal(denied.decision, "deny");
+		assert.match(denied.reason, /make setup/);
+		assert.match(
+			denied.reason,
+			/existing cloud session.*restart.*fresh clone/i,
+		);
+		assert.match(
+			denied.reason,
+			/restarting an old checkout does not update its hooks/i,
+		);
+		assert.doesNotMatch(denied.reason, /human terminal/);
+		// ADR-0047 excludes shell redirects from file-target classification.
+		// This difference is observed behavior, not a protected-write guarantee.
+		assert.equal(
+			f.invoke({ command: `cat > ${join(f.root, "scratch.md")}` }).decision,
+			"allow",
+		);
+		assert.equal(f.invoke({ command: "make setup" }).decision, "allow");
+		f.git(f.primary, ["update-ref", "refs/remotes/origin/main", "HEAD"]);
+		f.git(f.primary, ["remote", "set-head", "origin", "-a"]);
+		assert.equal(
+			f.invoke(
+				{ file_path: join(f.root, "scratch.md"), content: "scratch" },
+				{ tool_name: "Write" },
+			).decision,
+			"allow",
+		);
+		assert.equal(
+			f.invoke({ command: `cat > ${join(f.root, "scratch.md")}` }).decision,
+			"allow",
+		);
+		assert.equal(
+			f.invoke({ command: `git -C ${f.own} commit -m fixture` }).decision,
+			"allow",
+		);
+	} finally {
+		f.cleanup();
+	}
+});
+
+test("unknown MCP tools explain the capability-table gap instead of Git argv recovery", () => {
+	const f = fixture();
+	try {
+		const result = f.invoke(
+			{ owner: "fixture", repo: "repo" },
+			{ tool_name: "mcp__github__get_unknown_capability" },
+		);
+		assert.equal(result.decision, "deny");
+		assert.match(result.reason, /get_unknown_capability/);
+		assert.match(result.reason, /capability table/);
+		assert.doesNotMatch(
+			result.reason,
+			/literally in argv|directory-stack|Git-target/,
+		);
+	} finally {
+		f.cleanup();
+	}
+});
+
+test("GitHub commit and label reads pass the entry for parents and children", () => {
+	const f = fixture();
+	try {
+		for (const harness of ["claude", "codex"])
+			for (const agent_id of [undefined, "child"])
+				for (const [name, input] of [
+					["get_commit", { sha: "HEAD" }],
+					["get_commit", { sha: "HEAD", include_diff: true }],
+					["get_label", { name: "bug" }],
+				]) {
+					const result = f.invoke(
+						{ owner: "fixture", repo: "repo", ...input },
+						{
+							harness,
+							agent_id,
+							tool_name: `mcp__github__${name}`,
+							cwd: f.primary,
+						},
+					);
+					assert.equal(
+						result.decision,
+						"allow",
+						`${harness} ${name}: ${result.reason}`,
+					);
+				}
+	} finally {
+		f.cleanup();
+	}
+});
+
+test("current GitHub issue_write capability keeps parent and child outward-write boundaries", () => {
+	const f = fixture();
+	try {
+		const input = {
+			method: "create",
+			owner: "fixture",
+			repo: "repo",
+			title: "Fixture",
+		};
+		const options = { tool_name: "mcp__github__issue_write", harness: "codex" };
+		assert.equal(f.invoke(input, options).decision, "allow");
+		const child = f.invoke(input, { ...options, agent_id: "child" });
+		assert.equal(child.decision, "deny");
+		assert.match(child.reason, /parent/i);
+	} finally {
+		f.cleanup();
+	}
+});
 
 test("Codex tag lookup passes the hook entry without permitting tag pushes or custom upload programs", () => {
 	const f = fixture();
@@ -415,6 +535,7 @@ test("entry integration: parser missing -> exact bootstrap repair -> installed h
 		assert.equal(denied.decision, "deny");
 		const repair = parserRecoveryCommand(f.own);
 		assert.ok(denied.reason.includes(repair));
+		assert.match(denied.reason, /After.*make setup/);
 		assert.equal(
 			f.invoke({ command: repair }, { harness: "codex" }).decision,
 			"allow",
@@ -439,10 +560,173 @@ test("entry integration: parser missing -> exact bootstrap repair -> installed h
 			{ cwd: f.other, captureStderr: true },
 		);
 		assert.equal(
+			f.invoke({ command: "make setup" }, { harness: "codex" }).decision,
+			"allow",
+		);
+		assert.equal(
 			f.invoke({ command: `git -C ${f.own} commit -m x` }, { harness: "codex" })
 				.decision,
 			"allow",
 		);
+	} finally {
+		f.cleanup();
+	}
+});
+
+test("configured hook replaces its launch shell and preserves direct-parent ownership", () => {
+	const f = fixture();
+	try {
+		const start =
+			process.platform === "linux"
+				? readFileSync(`/proc/${process.pid}/stat`, "utf8")
+						.split(") ")
+						.at(-1)
+						.trim()
+						.split(/\s+/)[19]
+				: run("ps", ["-o", "lstart=", "-p", String(process.pid)], {
+						env: { ...process.env, LC_ALL: "C", TZ: "UTC" },
+					}).trim();
+		f.git(f.primary, [
+			"worktree",
+			"lock",
+			"--reason",
+			`claude session own (pid ${process.pid} start ${start})`,
+			f.own,
+		]);
+		const settings = JSON.parse(
+			readFileSync(join(source, ".claude/settings.json"), "utf8"),
+		);
+		const hookCommand = settings.hooks.PreToolUse.find(
+			({ matcher }) => matcher === "Bash",
+		).hooks.find(({ command }) =>
+			command.includes("scripts/agent-operation-guard.mjs"),
+		).command;
+		const input = { command: `git -C ${f.own} commit --allow-empty -m probe` };
+		const options = {
+			environment: { CLAUDE_PROJECT_DIR: f.primary },
+			hookCommand,
+		};
+		assert.equal(f.invoke(input, options).decision, "allow");
+		const old = f.invoke(input, {
+			...options,
+			hookCommand: "node scripts/agent-operation-guard.mjs",
+		});
+		assert.equal(old.decision, "deny");
+		assert.match(old.reason, /Ownership diagnostics:/);
+		assert.equal(
+			f.invoke({ command: `git -C ${f.primary} merge --ff-only HEAD` }, options)
+				.decision,
+			"deny",
+		);
+	} finally {
+		f.cleanup();
+	}
+});
+
+test("Linux proc tick ownership passes the real hook entry", {
+	skip: process.platform !== "linux",
+}, () => {
+	const f = fixture();
+	try {
+		const stat = readFileSync(`/proc/${process.pid}/stat`, "utf8");
+		const ticks = stat
+			.slice(stat.lastIndexOf(")") + 2)
+			.trim()
+			.split(/\s+/)[19];
+		assert.match(ticks, /^\d+$/);
+		f.git(f.primary, [
+			"worktree",
+			"lock",
+			"--reason",
+			`claude session own (pid ${process.pid} start ${ticks})`,
+			f.own,
+		]);
+		const options = { environment: { CLAUDE_PROJECT_DIR: f.primary } };
+		const command = `git -C ${f.own} commit --allow-empty -m probe`;
+		assert.equal(f.invoke({ command }, options).decision, "allow");
+		f.git(f.own, ["commit", "--allow-empty", "-m", "probe"]);
+		assert.equal(
+			f.invoke({ command: `git -C ${f.primary} commit -m probe` }, options)
+				.decision,
+			"deny",
+		);
+		f.git(f.primary, ["worktree", "unlock", f.own]);
+		f.git(f.primary, [
+			"worktree",
+			"lock",
+			"--reason",
+			`claude session own (pid ${process.pid} start ${BigInt(ticks) + 1n})`,
+			f.own,
+		]);
+		const denied = f.invoke({ command }, options);
+		assert.equal(denied.decision, "deny");
+		assert.match(denied.reason, /"startMatched":false/);
+	} finally {
+		f.cleanup();
+	}
+});
+
+test("Claude native owner can fast-forward a feature worktree while a primary startup stays protected", () => {
+	const f = fixture();
+	try {
+		const start = run("ps", ["-o", "lstart=", "-p", String(process.pid)], {
+			env: { ...process.env, LC_ALL: "C", TZ: "UTC" },
+		}).trim();
+		f.git(f.primary, [
+			"worktree",
+			"lock",
+			"--reason",
+			`claude session own (pid ${process.pid} start ${start})`,
+			f.own,
+		]);
+		writeFileSync(join(f.primary, "a"), "fetched update\n");
+		f.git(f.primary, ["add", "a"]);
+		f.git(f.primary, ["commit", "-m", "upstream"]);
+		f.git(f.own, ["fetch", "origin", "main"]);
+		const options = { environment: { CLAUDE_PROJECT_DIR: f.primary } };
+		const command = `git -C ${f.own} merge --ff-only origin/main`;
+		assert.equal(f.invoke({ command }, options).decision, "allow");
+		f.git(f.own, ["merge", "--ff-only", "origin/main"]);
+		assert.equal(
+			f.git(f.own, ["rev-parse", "HEAD"]),
+			f.git(f.primary, ["rev-parse", "HEAD"]),
+		);
+		assert.equal(f.git(f.own, ["branch", "--show-current"]), "feat/own");
+		const primary = f.invoke(
+			{ command: `git -C ${f.primary} merge --ff-only origin/main` },
+			options,
+		);
+		assert.equal(primary.decision, "deny");
+		assert.match(primary.reason, /Ownership diagnostics:/);
+		assert.match(primary.reason, new RegExp(`"ppid":${process.pid}`));
+		assert.ok(
+			primary.reason.includes(
+				`"entry":"${f.own}/scripts/agent-operation-guard.mjs"`,
+			),
+		);
+		assert.ok(primary.reason.includes(`"claudeProjectDir":"${f.primary}"`));
+		assert.match(
+			primary.reason,
+			new RegExp(`"processChain":\\[\\{"pid":${process.pid},`),
+		);
+		assert.match(primary.reason, /Recovery: same agent rewrite/);
+		assert.match(primary.reason, /fresh session/);
+		writeFileSync(join(f.own, "topic"), "topic\n");
+		f.git(f.own, ["add", "topic"]);
+		f.git(f.own, ["commit", "-m", "topic"]);
+		writeFileSync(join(f.primary, "a"), "divergent update\n");
+		f.git(f.primary, ["add", "a"]);
+		f.git(f.primary, ["commit", "-m", "later upstream"]);
+		f.git(f.own, ["fetch", "origin", "main"]);
+		const before = f.git(f.own, ["rev-parse", "HEAD"]);
+		assert.equal(f.invoke({ command }, options).decision, "allow");
+		const refused = tryRun("git", ["merge", "--ff-only", "origin/main"], {
+			cwd: f.own,
+			env: withoutGitTargetEnvironment(process.env),
+			captureStderr: true,
+		});
+		assert.equal(refused.ok, false);
+		assert.equal(f.git(f.own, ["rev-parse", "HEAD"]), before);
 	} finally {
 		f.cleanup();
 	}

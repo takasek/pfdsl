@@ -6,6 +6,7 @@ import { classifyAgentOperations } from "./agent-operation-classifier.mjs";
 import { observeCodexClaudeDelegation } from "./codex-claude-delegation.mjs";
 import { createGuardProbe } from "./guard-probe.mjs";
 import {
+	matchesClaudeProcessStart,
 	readNativeWorktreeMetadata,
 	refineNativeWorktreeRelation,
 } from "./native-worktree-owner.mjs";
@@ -18,6 +19,8 @@ import {
 } from "./run-exec.mjs";
 
 const MCP_READ = new Set([
+	"get_commit",
+	"get_label",
 	"get_issue",
 	"get_pull_request",
 	"get_pull_request_files",
@@ -54,6 +57,11 @@ const MCP_WRITE = new Set([
 	"update_pull_request",
 	"create_issue",
 	"update_issue",
+	"issue_write",
+	"pull_request_review_write",
+	"sub_issue_write",
+	"update_pull_request_branch",
+	"resolve_review_thread",
 	"add_issue_comment",
 	"push_files",
 	"create_or_update_file",
@@ -112,6 +120,8 @@ export function collectAgentOperationEnvironment(
 		shell,
 		environment = process.env,
 		parentPid = process.ppid,
+		platform = process.platform,
+		readProcessStat = readNativeWorktreeMetadata,
 		probeGit = createGuardProbe(),
 		probeProcess = tryRun,
 		readMetadata = readNativeWorktreeMetadata,
@@ -199,7 +209,7 @@ export function collectAgentOperationEnvironment(
 	);
 	if (!head.ok || !/^origin\/.+/.test(head.out.trim()))
 		throw new Error(
-			"Cannot establish the default branch; restore origin/HEAD in a human terminal",
+			"Cannot establish the default branch; run make setup in the session repository to restore origin/HEAD, then retry. In an existing cloud session using older hook files, restart with a fresh clone containing this fix; restarting an old checkout does not update its hooks",
 		);
 	facts.defaultBranch = head.out.trim().slice("origin/".length);
 	const listed = probeGit(["worktree", "list", "--porcelain", "-z"], {
@@ -252,6 +262,7 @@ export function collectAgentOperationEnvironment(
 				upstream.out.trim() === `refs/remotes/origin/${facts.defaultBranch}` &&
 				ancestor.ok;
 		}
+		tree.nativeLock = typeof record.locked === "string" ? record.locked : null;
 		const lock =
 			typeof record.locked === "string"
 				? record.locked.match(
@@ -259,13 +270,18 @@ export function collectAgentOperationEnvironment(
 					)
 				: null;
 		if (lock) {
-			const started = probeProcess("ps", ["-o", "lstart=", "-p", lock[1]], {
-				cwd: root,
-				env: { ...env, LC_ALL: "C", TZ: "UTC" },
-				captureStderr: true,
-				timeout: 500,
-			});
-			if (started.ok && normalizeStart(started.out) === normalizeStart(lock[2]))
+			const processOptions = {
+				platform,
+				readProcessStat,
+				execProcess: probeProcess,
+				options: { cwd: root, env, captureStderr: true, timeout: 500 },
+			};
+			tree.nativeStartMatched = matchesClaudeProcessStart(
+				Number(lock[1]),
+				lock[2],
+				processOptions,
+			);
+			if (tree.nativeStartMatched)
 				tree.ownership = {
 					ownerId:
 						harness === "claude" && Number(lock[1]) === parentPid
@@ -279,7 +295,9 @@ export function collectAgentOperationEnvironment(
 				root === facts.sessionRoot &&
 				tree.ownership?.live &&
 				owner?.pid === Number(lock[1]) &&
-				owner.start === normalizeStart(lock[2])
+				(owner.start === normalizeStart(lock[2]) ||
+					(/^\d+$/.test(lock[2]) &&
+						matchesClaudeProcessStart(owner.pid, owner.start, processOptions)))
 			) {
 				// The delegating Claude keeps ownership; only this child's ordinary
 				// file scope is mapped to own. Subject authority stays codex-child.
@@ -332,6 +350,8 @@ export function collectAgentOperationEnvironment(
 				payload,
 				environment,
 				parentPid,
+				platform,
+				readProcessStat,
 				execGit: probeGit,
 				execProcess: probeProcess,
 				readMetadata,

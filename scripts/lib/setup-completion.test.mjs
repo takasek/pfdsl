@@ -35,6 +35,34 @@ const cp = "/bin/cp";
 const chmod = "/bin/chmod";
 const fixtures = [];
 
+function git(cwd, ...args) {
+	const result = spawnSync("/usr/bin/git", args, { cwd, encoding: "utf8" });
+	assert.equal(result.status, 0, result.stderr);
+	return result.stdout.trim();
+}
+
+function seedDefaultBranch(cwd) {
+	git(
+		cwd,
+		"-c",
+		"user.name=Setup Fixture",
+		"-c",
+		"user.email=setup@example.invalid",
+		"commit",
+		"--allow-empty",
+		"-qm",
+		"fixture",
+	);
+	git(cwd, "remote", "add", "origin", cwd);
+	git(cwd, "update-ref", "refs/remotes/origin/main", "HEAD");
+	git(
+		cwd,
+		"symbolic-ref",
+		"refs/remotes/origin/HEAD",
+		"refs/remotes/origin/main",
+	);
+}
+
 it("missing installer cannot make a missing parser appear current", () => {
 	const { cwd } = fixture();
 	writeSetupMarker(cwd);
@@ -53,7 +81,11 @@ function sessionStartCommand(path) {
 function fixture() {
 	const cwd = mkdtempSync(join(tmpdir(), "setup-completion-"));
 	fixtures.push(cwd);
-	assert.equal(spawnSync("/usr/bin/git", ["init", "-q", cwd]).status, 0);
+	assert.equal(
+		spawnSync("/usr/bin/git", ["init", "-q", "-b", "main", cwd]).status,
+		0,
+	);
+	seedDefaultBranch(cwd);
 	const bin = join(cwd, "bin");
 	const log = join(cwd, "setup.log");
 	mkdirSync(join(cwd, "scripts/hooks"), { recursive: true });
@@ -102,7 +134,7 @@ function fixture() {
 		pnpm: '#!/bin/sh\nprintf \'pnpm\\n\' >> "$SETUP_LOG"\n[ -d "$SETUP_EXPECT_LOCK" ] || exit 97\n[ -n "$SETUP_READY_FILE" ] && : > "$SETUP_READY_FILE"\nif [ -n "$SETUP_RELEASE_FILE" ]; then while [ ! -f "$SETUP_RELEASE_FILE" ]; do /bin/sleep 0.02; done; fi\n[ "$SETUP_FAIL_STAGE" = pnpm ] && exit 1\nmkdir -p node_modules\nif [ -n "$SETUP_LINK_PATH" ]; then mkdir -p "$SETUP_LINK_PATH"; printf "%s\\n" "{\\"bin\\":{\\"fixture-command\\":\\"cli.js\\"}}" > "$SETUP_LINK_PATH/package.json"; mkdir -p "$(dirname "$SETUP_LINK_PATH")/.bin"; : > "$(dirname "$SETUP_LINK_PATH")/.bin/fixture-command"; "$REAL_CHMOD" 755 "$(dirname "$SETUP_LINK_PATH")/.bin/fixture-command"; fi\n[ -d "$SETUP_EXPECT_LOCK" ] || exit 98\n',
 		// setup-completion.mjs reads Git state through the real git; only the
 		// Makefile's own common-dir lookup is logged and can be failed.
-		git: '#!/bin/sh\ncase "$1 $2" in "config "*|"rev-parse --path-format=absolute") exec /usr/bin/git "$@";; esac\nprintf \'git\\n\' >> "$SETUP_LOG"\n[ "$SETUP_FAIL_STAGE" = git ] && exit 1\nprintf \'.git\\n\'\n',
+		git: '#!/bin/sh\nif [ "$1" = fetch ]; then printf \'fetch\\n\' >> "$SETUP_LOG"; [ "$SETUP_FAIL_STAGE" = fetch ] && exit 1; fi\ncase "$1 $2" in "config "*|"symbolic-ref "*|"show-ref "*|"remote "*|"rev-parse "*|"ls-remote "*|"check-ref-format "*|"fetch "*) exec /usr/bin/git "$@";; esac\nprintf \'git\\n\' >> "$SETUP_LOG"\n[ "$SETUP_FAIL_STAGE" = git ] && exit 1\nprintf \'.git\\n\'\n',
 		cp: '#!/bin/sh\nprintf \'cp\\n\' >> "$SETUP_LOG"\n[ "$SETUP_FAIL_STAGE" = cp ] && exit 1\nexec "$REAL_CP" "$@"\n',
 		chmod:
 			'#!/bin/sh\nprintf \'chmod\\n\' >> "$SETUP_LOG"\n[ "$SETUP_FAIL_STAGE" = chmod ] && exit 1\nexec "$REAL_CHMOD" "$@"\n',
@@ -231,6 +263,238 @@ afterEach(() => {
 });
 
 describe("setup completion sentinel", () => {
+	it("detects and repairs a missing origin/HEAD without reinstalling dependencies", () => {
+		const context = fixture();
+		writeSetupMarker(context.cwd);
+		git(context.cwd, "symbolic-ref", "--delete", "refs/remotes/origin/HEAD");
+		assert.equal(areDependenciesCurrent(context.cwd), true);
+		assert.equal(isSetupCurrent(context.cwd), false);
+		const check = runCheck(context);
+		assert.notEqual(check.status, 0);
+		assert.match(check.stderr, /origin\/HEAD.*make setup/);
+		assertSucceeded(runSetup(context));
+		assert.equal(
+			git(context.cwd, "symbolic-ref", "refs/remotes/origin/HEAD"),
+			`refs/remotes/origin/${git(context.cwd, "branch", "--show-current")}`,
+		);
+		assertSucceeded(runCheck(context));
+		assert.equal(existsSync(context.log), false);
+	});
+
+	it("repairs missing origin/HEAD through each SessionStart hook", () => {
+		for (const path of [".claude/settings.json", ".codex/hooks.json"]) {
+			const context = fixture();
+			writeSetupMarker(context.cwd);
+			git(context.cwd, "symbolic-ref", "--delete", "refs/remotes/origin/HEAD");
+			assertSucceeded(runSessionStart(context, sessionStartCommand(path)));
+			assertSucceeded(runCheck(context));
+			assert.equal(existsSync(context.log), false);
+		}
+	});
+
+	it("reports recovery when origin/HEAD cannot be restored and retries successfully", () => {
+		const context = fixture();
+		writeSetupMarker(context.cwd);
+		const markerBeforeFailure = readFileSync(context.marker, "utf8");
+		const logBeforeFailure = existsSync(context.log)
+			? readFileSync(context.log, "utf8")
+			: "";
+		git(context.cwd, "symbolic-ref", "--delete", "refs/remotes/origin/HEAD");
+		git(
+			context.cwd,
+			"remote",
+			"set-url",
+			"origin",
+			join(context.cwd, "absent-remote"),
+		);
+		const failed = runSetup(context);
+		assert.notEqual(failed.status, 0);
+		assert.match(failed.stderr, /origin\/HEAD/);
+		assert.match(failed.stderr, /make setup/);
+		assert.equal(readFileSync(context.marker, "utf8"), markerBeforeFailure);
+		assert.equal(
+			existsSync(context.log) ? readFileSync(context.log, "utf8") : "",
+			logBeforeFailure,
+		);
+		assert.notEqual(runCheck(context).status, 0);
+		for (const path of [".claude/settings.json", ".codex/hooks.json"]) {
+			const retried = runSessionStart(context, sessionStartCommand(path));
+			assert.notEqual(retried.status, 0);
+			assert.match(retried.stderr, /Cannot restore origin\/HEAD/);
+			assert.notEqual(runCheck(context).status, 0);
+		}
+		git(context.cwd, "remote", "set-url", "origin", context.cwd);
+		assertSucceeded(runSetup(context));
+		assertSucceeded(runCheck(context));
+	});
+
+	it("never writes a new dependency marker when origin/HEAD restoration fails", () => {
+		const context = fixture();
+		git(context.cwd, "symbolic-ref", "--delete", "refs/remotes/origin/HEAD");
+		git(
+			context.cwd,
+			"remote",
+			"set-url",
+			"origin",
+			join(context.cwd, "absent-remote"),
+		);
+		assert.equal(existsSync(context.marker), false);
+		assert.notEqual(runSetup(context).status, 0);
+		assert.equal(existsSync(context.marker), false);
+		assert.notEqual(runCheck(context).status, 0);
+		assert.equal(existsSync(context.log), false);
+	});
+
+	it("rejects the marker write command while origin/HEAD is unresolved", () => {
+		const context = fixture();
+		git(context.cwd, "symbolic-ref", "--delete", "refs/remotes/origin/HEAD");
+		const result = spawnSync(
+			process.execPath,
+			["scripts/setup-completion.mjs", "write"],
+			{
+				cwd: context.cwd,
+				encoding: "utf8",
+				env: environment(context),
+			},
+		);
+		assert.notEqual(result.status, 0);
+		assert.match(result.stderr, /origin\/HEAD.*make setup/);
+		assert.equal(existsSync(context.marker), false);
+	});
+
+	it("keeps a valid origin/HEAD usable without contacting origin", () => {
+		const context = fixture();
+		writeSetupMarker(context.cwd);
+		git(
+			context.cwd,
+			"remote",
+			"set-url",
+			"origin",
+			join(context.cwd, "absent-remote"),
+		);
+		assertSucceeded(runSetup(context));
+		assertSucceeded(runCheck(context));
+		assert.equal(existsSync(context.log), false);
+	});
+
+	for (const target of ["refs/heads/main", "refs/remotes/origin/missing"]) {
+		it(`refuses to overwrite an invalid origin/HEAD pointing to ${target}`, () => {
+			const context = fixture();
+			writeSetupMarker(context.cwd);
+			git(context.cwd, "symbolic-ref", "refs/remotes/origin/HEAD", target);
+			assert.equal(isSetupCurrent(context.cwd), false);
+			const result = runSetup(context);
+			assert.notEqual(result.status, 0);
+			assert.match(result.stderr, /Invalid origin\/HEAD/);
+			assert.match(result.stderr, /make setup/);
+			assert.equal(
+				git(context.cwd, "symbolic-ref", "refs/remotes/origin/HEAD"),
+				target,
+			);
+		});
+	}
+
+	it("fetches only a missing remote-advertised default branch without changing local branches", () => {
+		const context = fixture();
+		writeSetupMarker(context.cwd);
+		git(context.cwd, "branch", "-m", "trunk");
+		git(context.cwd, "branch", "unrelated");
+		const head = git(context.cwd, "rev-parse", "HEAD");
+		git(context.cwd, "symbolic-ref", "--delete", "refs/remotes/origin/HEAD");
+		assertSucceeded(runSetup(context));
+		assert.equal(git(context.cwd, "rev-parse", "HEAD"), head);
+		assert.equal(git(context.cwd, "branch", "--show-current"), "trunk");
+		assert.equal(
+			git(
+				context.cwd,
+				"for-each-ref",
+				"--format=%(refname)",
+				"refs/remotes/origin/unrelated",
+			),
+			"",
+		);
+		assert.equal(
+			git(context.cwd, "symbolic-ref", "refs/remotes/origin/HEAD"),
+			"refs/remotes/origin/trunk",
+		);
+		assertSucceeded(runCheck(context));
+		assert.equal(readFileSync(context.log, "utf8"), "fetch\n");
+	});
+
+	it("does not create a marker when fetching the advertised branch fails", () => {
+		const context = fixture();
+		git(context.cwd, "symbolic-ref", "--delete", "refs/remotes/origin/HEAD");
+		git(context.cwd, "update-ref", "-d", "refs/remotes/origin/main");
+		const failed = runSetup(context, "fetch");
+		assert.notEqual(failed.status, 0);
+		assert.match(failed.stderr, /git fetch failed.*make setup/);
+		assert.equal(existsSync(context.marker), false);
+		assert.equal(readFileSync(context.log, "utf8"), "fetch\n");
+		assertSucceeded(runSetup(context));
+		assertSucceeded(runCheck(context));
+	});
+
+	it("refuses a dangling symbolic tracking ref without creating its local branch target", () => {
+		const context = fixture();
+		git(context.cwd, "symbolic-ref", "--delete", "refs/remotes/origin/HEAD");
+		git(context.cwd, "update-ref", "-d", "refs/remotes/origin/main");
+		git(
+			context.cwd,
+			"symbolic-ref",
+			"refs/remotes/origin/main",
+			"refs/heads/sentinel",
+		);
+		const failed = runSetup(context);
+		assert.notEqual(failed.status, 0);
+		assert.equal(
+			git(
+				context.cwd,
+				"for-each-ref",
+				"--format=%(refname)",
+				"refs/heads/sentinel",
+			),
+			"",
+		);
+		assert.equal(existsSync(context.marker), false);
+		assert.equal(existsSync(context.log), false);
+	});
+
+	it("ignores configured fetch mappings that would create a local branch", () => {
+		const context = fixture();
+		git(context.cwd, "symbolic-ref", "--delete", "refs/remotes/origin/HEAD");
+		git(context.cwd, "update-ref", "-d", "refs/remotes/origin/main");
+		git(
+			context.cwd,
+			"config",
+			"remote.origin.fetch",
+			"refs/heads/main:refs/heads/sentinel",
+		);
+		assertSucceeded(runSetup(context));
+		assert.equal(
+			git(
+				context.cwd,
+				"for-each-ref",
+				"--format=%(refname)",
+				"refs/heads/sentinel",
+			),
+			"",
+		);
+		assertSucceeded(runCheck(context));
+	});
+
+	it("does not guess a default branch when origin advertises a detached HEAD", () => {
+		const context = fixture();
+		git(context.cwd, "checkout", "--detach");
+		git(context.cwd, "symbolic-ref", "--delete", "refs/remotes/origin/HEAD");
+		const failed = runSetup(context);
+		assert.notEqual(failed.status, 0);
+		assert.match(
+			failed.stderr,
+			/did not advertise one symbolic default branch/,
+		);
+		assert.equal(existsSync(context.marker), false);
+		assert.equal(existsSync(context.log), false);
+	});
 	for (const state of ["missing", "wrong", "legacy directory"])
 		it(`rejects and repairs a ${state} owned skill link with a current marker`, () => {
 			const context = fixture();
@@ -363,7 +627,11 @@ describe("setup completion sentinel", () => {
 			join(cwd, "scripts/hooks/pre-commit-shim"),
 			readFileSync(join(root, "scripts/hooks/pre-commit-shim")),
 		);
-		assert.equal(spawnSync("/usr/bin/git", ["init", "-q", cwd]).status, 0);
+		assert.equal(
+			spawnSync("/usr/bin/git", ["init", "-q", "-b", "main", cwd]).status,
+			0,
+		);
+		seedDefaultBranch(cwd);
 		writeFileSync(
 			join(cwd, ".git/hooks/pre-commit"),
 			readFileSync(join(cwd, "scripts/hooks/pre-commit-shim")),

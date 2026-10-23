@@ -1050,9 +1050,12 @@ export function classifyAgentOperations(payload, facts) {
 	else if (payload.tool_name?.startsWith("mcp__")) {
 		const klass = facts.mcpTools?.[payload.tool_name] ?? "U";
 		operations = [
-			operation(klass === "P" ? ["O", "P"] : [klass], "remote", {
-				target: "own",
-			}),
+			operation(
+				klass === "P" ? ["O", "P"] : [klass],
+				"remote",
+				{ target: "own" },
+				{ mcpTool: payload.tool_name },
+			),
 		];
 	} else if (["Bash", "exec_command"].includes(payload.tool_name)) {
 		operations = (facts.shell?.commands ?? [])

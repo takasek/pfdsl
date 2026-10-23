@@ -148,6 +148,7 @@ test("each inherited Git target variable makes mutations unresolved without weak
 
 function fixture({
 	nativeLock = true,
+	lockStart = "Mon Oct 12 00:00:00 2026",
 	extraLocks = {},
 	extraWorktrees = 0,
 } = {}) {
@@ -171,7 +172,7 @@ function fixture({
 	symlinkSync(join(roots.primary, "sub"), join(roots.own, "link"));
 	symlinkSync(join(roots.primary, "a"), join(roots.own, "file-link"));
 	const commonDir = join(roots.primary, ".git");
-	const start = "Mon Oct 12 00:00:00 2026";
+	const start = lockStart;
 	const locks = {
 		live: 456,
 		...(nativeLock ? { native: 123 } : {}),
@@ -346,6 +347,50 @@ test("environment observations preserve session origin, physical targets, branch
 	}
 });
 
+test("Linux tick locks preserve own, other-live and PID-reuse boundaries", () => {
+	const f = fixture({ lockStart: "359" });
+	try {
+		for (const ticks of ["359", "360"])
+			for (const target of ["native", "live", "primary"]) {
+				const command = `git -C ${f.roots[target]} commit -m probe`;
+				const payload = {
+					tool_name: "Bash",
+					cwd: f.roots.primary,
+					session_id: "session",
+					tool_input: { command },
+				};
+				const facts = collectAgentOperationEnvironment(payload, {
+					hookRoot: f.root,
+					environment: { CLAUDE_PROJECT_DIR: f.roots.primary },
+					parentPid: 123,
+					platform: "linux",
+					shell: readShell(command),
+					probeGit: f.probeGit,
+					probeProcess: f.probeProcess,
+					readProcessStat: (path) =>
+						`${path.split("/")[2]} (claude) S ${Array(18).fill("0").join(" ")} ${ticks}`,
+				});
+				const operation = classifyAgentOperations(payload, facts).operations[0];
+				assert.equal(
+					operation.target,
+					target === "primary"
+						? "primary"
+						: ticks !== "359"
+							? "other-unowned"
+							: target === "native"
+								? "own"
+								: "other-live",
+				);
+				assert.equal(
+					evaluateAgentOperationPolicy(payload, facts).decision,
+					target === "native" && ticks === "359" ? "allow" : "deny",
+				);
+			}
+	} finally {
+		f.cleanup();
+	}
+});
+
 test("Codex observes native identity separately from cwd and ignores the unobserved workdir", () => {
 	const f = fixture({ nativeLock: false });
 	try {
@@ -419,10 +464,22 @@ for (const capability of [
 	"list_pull_request_reviews",
 	"list_pull_request_review_threads",
 	"reply_to_review_comment",
+	"issue_write",
+	"pull_request_review_write",
+	"sub_issue_write",
+	"update_pull_request_branch",
+	"resolve_review_thread",
 ]) {
 	for (const separator of ["_", "__"]) {
 		test(`GitHub capability ${separator}${capability} preserves read and outward-write policy`, () => {
-			const write = capability === "reply_to_review_comment";
+			const write = [
+				"reply_to_review_comment",
+				"issue_write",
+				"pull_request_review_write",
+				"sub_issue_write",
+				"update_pull_request_branch",
+				"resolve_review_thread",
+			].includes(capability);
 			for (const child of [false, true]) {
 				const payload = {
 					tool_name: `mcp__codex_apps__github${separator}${capability}`,
@@ -520,12 +577,16 @@ function delegatedFacts(
 		ownerPid = 123,
 		start = "Mon Oct 12 00:00:00 2026",
 		ownerStart = start,
+		platform = process.platform,
+		readProcessStat,
 	} = {},
 ) {
 	return collectAgentOperationEnvironment(payload, {
 		hookRoot: f.root,
 		environment: { CLAUDECODE: "1" },
 		parentPid: 10,
+		platform,
+		...(readProcessStat ? { readProcessStat } : {}),
 		shell: payload.tool_input?.command
 			? readShell(payload.tool_input.command)
 			: undefined,
@@ -695,6 +756,45 @@ test("a live owner lock is not enough: the chain's Claude start and the session 
 		} finally {
 			f.cleanup();
 		}
+	}
+});
+
+test("Linux tick locks require the delegated owner's UTC identity as well as live ticks", () => {
+	const f = fixture({ lockStart: "359" });
+	try {
+		const payload = {
+			tool_name: "Write",
+			cwd: f.roots.native,
+			session_id: "session",
+			tool_input: { file_path: `${f.roots.native}/a`, content: "x" },
+		};
+		for (const ownerStart of [
+			"Mon Oct 12 00:00:00 2026",
+			"Mon Oct 12 01:00:00 2026",
+		])
+			for (const ticks of ["359", "360"]) {
+				const facts = delegatedFacts(f, payload, {
+					platform: "linux",
+					ownerStart,
+					readProcessStat: (path) =>
+						`${path.split("/")[2]} (claude) S ${Array(18).fill("0").join(" ")} ${ticks}`,
+				});
+				assert.equal(
+					evaluateAgentOperationPolicy(payload, facts).decision,
+					ticks === "359" && ownerStart.includes("00:00:00") ? "allow" : "deny",
+				);
+				const command = `git -C ${f.roots.native} commit -m x`;
+				const git = { ...payload, tool_name: "Bash", tool_input: { command } };
+				assert.equal(
+					evaluateAgentOperationPolicy(git, {
+						...facts,
+						shell: readShell(command),
+					}).decision,
+					"deny",
+				);
+			}
+	} finally {
+		f.cleanup();
 	}
 });
 

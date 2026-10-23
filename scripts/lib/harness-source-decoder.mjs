@@ -19,7 +19,12 @@ const AGENT_FRONTMATTER_KEYS = new Set([
 	"tools",
 	"model",
 ]);
-const SETTINGS_KEYS = new Set(["permissions", "hooks", "enabledPlugins"]);
+const SETTINGS_KEYS = new Set([
+	"permissions",
+	"hooks",
+	"enabledPlugins",
+	"worktree",
+]);
 const PERMISSIONS_KEYS = new Set(["allow"]);
 const HOOK_ENTRY_KEYS = new Set(["matcher", "hooks"]);
 const HOOK_COMMAND_KEYS = new Set([
@@ -435,6 +440,21 @@ function validateSettings(path, settings) {
 	);
 	validateHooks(path, "claude-settings", settings.hooks, SETTINGS_HOOK_EVENTS);
 	validateEnabledPlugins(path, settings.enabledPlugins);
+	if (settings.worktree !== undefined) {
+		assertKnownKeys(
+			settings.worktree,
+			new Set(["baseRef"]),
+			path,
+			"claude-settings",
+		);
+		if (!["head", "fresh"].includes(settings.worktree.baseRef))
+			sourceSchemaError(
+				path,
+				"claude-settings",
+				"worktree.baseRef",
+				"expected head or fresh for",
+			);
+	}
 }
 
 // `enabledPlugins` is Claude-only: it is kept on the semantic record so the
@@ -613,6 +633,9 @@ function decodeSemanticRecord(capability, source) {
 				...(source.enabledPlugins === undefined
 					? {}
 					: { enabledPlugins: clone(source.enabledPlugins) }),
+				...(source.worktree === undefined
+					? {}
+					: { worktree: clone(source.worktree) }),
 			};
 		case "plugin-hooks":
 			return { hooks: clone(source.hooks) };
