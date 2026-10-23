@@ -367,7 +367,7 @@ Mの言語支援接続版では文書先頭の`---`だけがYAML強調を開始�
 
 ### GUI-27：editor hover・Find all・hint
 
-対応：#1259。対象・入力：M/V、未定義・schema定義済みの全metadata・quoted/flow key・同名field・反復ID・command。
+対応：#1259、#1518。対象・入力：M/V、未定義・schema定義済みの全metadata・quoted/flow key・同名field・反復ID・command。
 schema外の拡張キーを含む文書も入力するが、任意の拡張キーのhover表示をこの受入条件には含めない。
 操作：ソースhoverの情報／前後関係→定義移動→Find all→hint/inlayを読む。
 MではソースのノードIDをhoverし、`Go to definition`／`Find all`を選ぶ。
@@ -384,6 +384,12 @@ labelのみ、criteriaのみ、groupとcriteria、descriptionを含む場合を�
 Linuxで報告された3回の表示プロセス消失は原因未確定であり、Chromiumでの成功をWebKitGTKやMac nativeの合格へ転写しない。
 期待：semantic nodeとfield、定義range、全出現が正しく、図hover廃止と混同しない。
 表示hintと外部実行GUI-33を区別する。
+Go to LineはCtrl+GとF1の`Go to Line/Column...`から開き、行と列を指定して移動する。
+無効値は移動せず、範囲外の行・列はMonaco標準の有効範囲へ補正されることを確認する。
+同名のred/blue文書を別フォルダから開き、blueでF1→Go to Line→`:3:1`→Enter→`changed_`入力→Undo、redへ切替→Ctrl+G→`:2:1`→Escapeを行う。
+タブ往復を繰り返し、Escapeで入力欄が閉じ、開始位置と選択へ戻り、本文・Undo履歴・別文書の位置と選択が保たれることを確認する。
+入力中のタブ切替・閉鎖、F1の`>`とGo to Lineの`:`の切替、候補の上下移動、既存FindのEscapeも確認する。
+Chromiumでの自動検証はnativeの合格にせず、#1445の版・ホスト別受入結果へ記録する。
 状態：M/V各未実施。記録：未記入。
 
 ### GUI-28：Quick Fix・定義移動・sort

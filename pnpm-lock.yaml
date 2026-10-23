@@ -4,6 +4,11 @@ settings:
   autoInstallPeers: true
   excludeLinksFromLockfile: false
 
+patchedDependencies:
+  monaco-editor@0.57.0:
+    hash: f0593a21d3c2932f2b9aa392514c9210c054c6165e387bc51b2f0f32bf9e2596
+    path: patches/monaco-editor@0.57.0.patch
+
 importers:
 
   .:
@@ -202,7 +207,7 @@ importers:
         version: 2.11.1
       monaco-editor:
         specifier: 0.57.0
-        version: 0.57.0
+        version: 0.57.0(patch_hash=f0593a21d3c2932f2b9aa392514c9210c054c6165e387bc51b2f0f32bf9e2596)
       path-browserify:
         specifier: 1.0.1
         version: 1.0.1
@@ -3733,7 +3738,7 @@ snapshots:
 
   modern-tar@0.7.6: {}
 
-  monaco-editor@0.57.0:
+  monaco-editor@0.57.0(patch_hash=f0593a21d3c2932f2b9aa392514c9210c054c6165e387bc51b2f0f32bf9e2596):
     dependencies:
       dompurify: 3.4.15
       marked: 14.0.0

@@ -46,6 +46,11 @@ Stop it with `Ctrl+C`; after changing shared packages, restart this command to r
 The same command works on macOS and Linux; Xcode is checked only on macOS.
 Linux AppImage packaging remains a separate verification step in [desktop CI](../../.github/workflows/desktop.yml), not part of this target.
 
+The workspace pins a [Monaco 0.57.0 patch](../../patches/monaco-editor@0.57.0.patch) that prefers actual DOM focus when choosing the active editor.
+This prevents delayed blur notifications from sending Quick Input commands to another tab.
+When updating Monaco, recheck the patch and run the unit tests plus `node packages/standalone/test/goto-line-browser.mjs` after building shared packages.
+The browser check requires an installed Chrome and checks Chromium only; native acceptance remains separate.
+
 Rust/Cargo, the OS development libraries, and Node/pnpm are developer build requirements.
 They are separate from the eventual installation requirements for distributed users.
 The macOS CI job compiles an Apple Silicon app, runs native unit tests, and briefly starts the bundled executable to check native startup and exit-guard installation.
@@ -78,6 +83,9 @@ Hover a node ID for its metadata, **Go to definition**, and **Find all**.
 Find all opens a literal text search; PFDSL occurrence navigation visits the definition key and semantic node references.
 Right-click in the editor or press F1 to find **Go to PFDSL definition**, **Next PFDSL node occurrence**, **Previous PFDSL node occurrence**, **Insert PFDSL definition**, and **Sort metadata…**.
 Sort metadata accepts multiple keys in priority order; Cancel or Escape returns to the editor without changing the source.
+Press Ctrl+G, or choose **Go to Line/Column...** from F1, to enter a line and optional column (for example, `:3:2`).
+Enter confirms the position; Escape restores the starting position without editing the document.
+Line and column values outside the document are clamped using Monaco's standard navigation rules.
 Definition insertion writes `label: ""`, places the cursor inside the empty quotes, and retains the reminder to complete criteria for a produced artifact.
 Each successful source edit is undoable.
 The **Run in Terminal.app** inlay hint shows the declared process command; displaying or hovering it does not execute it.

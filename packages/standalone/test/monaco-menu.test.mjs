@@ -98,13 +98,15 @@ test("the production document-tab entry loads real Monaco menu contributions", a
 				import { IBulkEditService } from "monaco-editor/editor/browser/services/bulkEditService.js";
 				import { ICommandService } from "monaco-editor/platform/commands/common/commands.js";
 				import { IOpenerService } from "monaco-editor/platform/opener/common/opener.js";
+				import { ICodeEditorService } from "monaco-editor/editor/browser/services/codeEditorService.js";
 				import { renderMarkdown } from "monaco-editor/base/browser/markdownRenderer.js";
 				errorHandler.unexpectedErrorHandler = error => { throw error; };
 				const languageFeatures = StandaloneServices.get(ILanguageFeaturesService);
 				const applyEdit = edit => StandaloneServices.get(IBulkEditService).apply(edit);
 				const execute = (id, ...args) => StandaloneServices.get(ICommandService).executeCommand(id, ...args);
 				const openLink = url => StandaloneServices.get(IOpenerService).open(url);
-				export { createDocumentTab, monaco, EditorExtensionsRegistry, MenuId, languageFeatures, applyEdit, execute, openLink, renderMarkdown };
+				const focusedEditor = () => StandaloneServices.get(ICodeEditorService).getFocusedCodeEditor();
+				export { createDocumentTab, monaco, EditorExtensionsRegistry, MenuId, languageFeatures, applyEdit, execute, openLink, renderMarkdown, focusedEditor };
 			`,
 				resolveDir: packageRoot,
 			},
@@ -143,6 +145,52 @@ test("the production document-tab entry loads real Monaco menu contributions", a
 				await new Promise((resolve) => setImmediate(resolve));
 			}
 		}
+		await t.test(
+			"Go to Line is available through the production entry",
+			async () => {
+				await withEditors("# navigation\na >> p -> b\n", async (create) => {
+					assert.ok(create().getAction("editor.action.gotoLine"));
+				});
+			},
+		);
+		await t.test(
+			"actual input focus wins over another editor's delayed blur",
+			async () => {
+				await withEditors("# navigation\na >> p -> b\n", async (create) => {
+					const red = create();
+					const blue = create();
+					// Freeze the cached flags at the state observed before the old blur timer fires.
+					for (const editor of [red, blue]) {
+						editor.hasTextFocus = () => false;
+						editor.hasWidgetFocus = () => true;
+					}
+					const input = document.createElement("input");
+					red.getDomNode().append(input);
+					input.focus();
+					assert.equal(document.activeElement, input);
+					assert.equal(host.focusedEditor()?.getId(), red.getId());
+					blue.getDomNode().append(input);
+					input.focus();
+					assert.equal(host.focusedEditor()?.getId(), blue.getId());
+					// A Peek-style embedded editor must win over the containing editor,
+					// including when the child happens to be registered first.
+					const redParent = red.getDomNode().parentElement;
+					const blueParent = blue.getDomNode().parentElement;
+					red.getDomNode().append(blue.getDomNode());
+					input.focus();
+					assert.equal(host.focusedEditor()?.getId(), blue.getId());
+					blueParent.append(blue.getDomNode());
+					blue.getDomNode().append(red.getDomNode());
+					red.getDomNode().append(input);
+					input.focus();
+					assert.equal(host.focusedEditor()?.getId(), red.getId());
+					redParent.append(red.getDomNode());
+					// With focus outside any editor, retain Monaco's existing fallback.
+					input.remove();
+					assert.equal(host.focusedEditor()?.getId(), blue.getId());
+				});
+			},
+		);
 		await t.test(
 			"dependency problems reach Monaco and a separate panel while the graph stays usable",
 			async () => {
