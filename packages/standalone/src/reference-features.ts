@@ -20,7 +20,7 @@ export function registerReferenceFeatures(
 	container: HTMLElement,
 	services: ReferenceServices | undefined,
 	send: (message: MessageToWebview) => void,
-	report: (message: string) => void,
+	report: (message: string, channel?: string) => void,
 	comparisonParent: HTMLElement = container,
 ) {
 	const model = editor.getModel()!;
@@ -35,7 +35,7 @@ export function registerReferenceFeatures(
 		() => model.getValue(),
 		() => model.getVersionId(),
 		send,
-		report,
+		(message) => report(message, "comparison"),
 		(label) => {
 			banner.replaceChildren();
 			banner.hidden = label === null;

@@ -37,7 +37,7 @@ interface DocumentTabOptions {
 	source: string;
 	path: string | null;
 	read: (path: string) => Promise<string | null>;
-	reportStatus: (message: string) => void;
+	reportStatus: (message: string, channel?: string) => void;
 	onChange?: () => void;
 	referenceServices?: ReferenceServices | undefined;
 	exportServices?: ExportServices | undefined;
@@ -61,6 +61,7 @@ export function createDocumentTab({
 	let snapshot: DocumentModel | undefined;
 	let revision = 0;
 	let disposed = false;
+	let diagnosticsSummary = "Checking…";
 	const container = document.createElement("div");
 	container.className = "document";
 	const editorElement = document.createElement("div");
@@ -248,7 +249,18 @@ export function createDocumentTab({
 	async function refresh() {
 		if (disposed) return;
 		const currentRevision = ++revision;
-		const result = await processSnapshot(editor.getValue(), path, read);
+		diagnosticsSummary = "Checking…";
+		onChange?.();
+		let result: Awaited<ReturnType<typeof processSnapshot>>;
+		try {
+			result = await processSnapshot(editor.getValue(), path, read);
+		} catch (error) {
+			if (!disposed && currentRevision === revision) {
+				diagnosticsSummary = `Analysis failed: ${String(error)}`;
+				onChange?.();
+			}
+			return;
+		}
 		if (disposed || currentRevision !== revision) return;
 		snapshot = result.model;
 		const dependencyDiagnostics = result.presetDiagnostics.map((d) => ({
@@ -259,6 +271,13 @@ export function createDocumentTab({
 				? { start: { line: 1, column: 1 }, end: { line: 1, column: 1 } }
 				: d.range,
 		}));
+		const allDiagnostics = [
+			...result.model.diagnostics,
+			...dependencyDiagnostics,
+		];
+		diagnosticsSummary = allDiagnostics.length
+			? `${allDiagnostics.filter((d) => d.severity === "error").length} errors, ${allDiagnostics.filter((d) => d.severity === "warning").length} warnings, ${allDiagnostics.filter((d) => d.severity !== "error" && d.severity !== "warning").length} hints`
+			: "No problems";
 		dependencyProblems.replaceChildren();
 		dependencyProblems.hidden = dependencyDiagnostics.length === 0;
 		for (const d of dependencyDiagnostics) {
@@ -286,13 +305,25 @@ export function createDocumentTab({
 		);
 		// Publish the editor's visible lines before replacing the matching graph.
 		editor.render();
-		await preview.receive(result.message);
+		try {
+			await preview.receive(result.message);
+		} catch (error) {
+			if (!disposed && currentRevision === revision)
+				reportStatus(`Preview failed: ${String(error)}`);
+		}
 		if (!disposed && currentRevision === revision) references.refresh();
 		onChange?.();
 	}
 
 	function requestRefresh() {
-		void refresh().catch((error) => reportStatus(String(error)));
+		const pending = refresh();
+		const requested = revision;
+		void pending.catch((error) => {
+			if (!disposed && requested === revision) {
+				diagnosticsSummary = `Analysis failed: ${String(error)}`;
+				onChange?.();
+			}
+		});
 	}
 	editor.onDidChangeModelContent(() => {
 		if (disposed) return;
@@ -379,6 +410,7 @@ export function createDocumentTab({
 		},
 		getSource: () => editor.getValue(),
 		getRevision: () => model.getVersionId(),
+		getDiagnosticsSummary: () => diagnosticsSummary,
 		setSource(value: string) {
 			editor.pushUndoStop();
 			const eol = value.includes("\r\n") ? "\r\n" : "\n";

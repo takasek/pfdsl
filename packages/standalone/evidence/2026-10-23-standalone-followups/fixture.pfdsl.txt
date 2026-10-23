@@ -1,0 +1,15 @@
+---
+group:
+  delivery: { label: Delivery }
+artifact:
+  package_manifest:
+    label: "package manifest"
+    criteria: "Checksums match the packaged files"
+    group: delivery
+process:
+  package_release: { label: Package release }
+  publish_release: { label: Publish release }
+---
+source >> package_release -> package_manifest
+package_manifest >> publish_release -> announcement
+

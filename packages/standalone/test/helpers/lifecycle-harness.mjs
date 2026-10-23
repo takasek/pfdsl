@@ -141,6 +141,7 @@ const keys = [
 	"reviewTabs",
 	"reviewTabHook",
 	"reviewNormalize",
+	"reviewSetTitle",
 ];
 
 export const flush = async () => {
@@ -344,8 +345,8 @@ export async function createHarness(label) {
 					? handlers.capabilities()
 					: { save: true, reason: null };
 			if (command === "list_recent") return [];
-			if (command === "remember_document" || command === "release_document")
-				return;
+			if (command === "remember_document") return handlers.remember?.();
+			if (command === "release_document") return;
 			if (command === "exit_listener_ready") return;
 			if (command === "read_dependency") {
 				log.push({

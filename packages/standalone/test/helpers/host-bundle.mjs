@@ -28,6 +28,7 @@ export function createDocumentTab(options){
  options.parent.append(container);button.textContent=options.name;
  const tab={key:options.key,container,button,location:options.path,read:options.read,references:options.referenceServices,setSourceCalls:0,
   activate(){},focus(){},command(){},canDiagram(){return true;},canCreateDefinition(){return false;},
+  report:options.reportStatus, getDiagnosticsSummary:()=>"No problems",
   dispose(){container.remove();button.remove();hook('dispose',tab);},
   getSource:()=>source,getRevision:()=>revision,
   type(s){source=s;revision++;hook('type',tab,s);options.onChange?.();},
@@ -83,7 +84,7 @@ export async function bundleHost(outfile) {
 										: args.path === "@tauri-apps/api/event"
 											? "export const listen=(...args)=>globalThis.nativeListen(...args);"
 											: args.path === "@tauri-apps/api/window"
-												? "export const getCurrentWindow=()=>({onCloseRequested(){},destroy(){}});"
+												? "export const getCurrentWindow=()=>({onCloseRequested(){},destroy(){},async setTitle(title){return globalThis.reviewSetTitle?.(title)}});"
 												: args.path === "@pfdsl/editor"
 													? 'export const previewStyles="";'
 													: args.path === "./acceptance.js"

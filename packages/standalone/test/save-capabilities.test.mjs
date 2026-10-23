@@ -65,7 +65,7 @@ test("saving stays disabled while capability lookup is pending and after failure
 		);
 		assert.equal(
 			host.query("#status").textContent,
-			host.query("#save-support").textContent,
+			`Save needs attention — ${doc.path}: ${host.query("#save-support").textContent}`,
 		);
 	} finally {
 		await host.finish();

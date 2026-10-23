@@ -24,6 +24,7 @@ export function createComparison(
 				report: compareDocumentSources(baseline.source, getSource()),
 			});
 			showLabel(baseline.label);
+			report("");
 		} catch (error) {
 			send({ type: "clearDiff" });
 			showLabel(baseline.label);
@@ -45,12 +46,14 @@ export function createComparison(
 				)
 					return;
 				// Validate before replacing a usable comparison.
-				const report = compareDocumentSources(result.source, getSource());
+				const diff = compareDocumentSources(result.source, getSource());
 				baseline = result;
-				send({ type: "diff", report });
+				send({ type: "diff", report: diff });
 				showLabel(result.label);
+				report("");
 			} catch (error) {
-				if (!disposed && request === generation) report(String(error));
+				if (!disposed && request === generation && revision === getRevision())
+					report(String(error));
 			}
 		},
 		refresh,
@@ -63,6 +66,7 @@ export function createComparison(
 			if (!disposed) {
 				send({ type: "clearDiff" });
 				showLabel(null);
+				report("");
 			}
 		},
 		dispose() {

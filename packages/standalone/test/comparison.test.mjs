@@ -2,6 +2,52 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { createComparison } from "../src/comparison.ts";
 
+test("a comparison read rejected after an edit cannot publish a stale error", async () => {
+	let revision = 1,
+		reject;
+	const statuses = [];
+	const controller = createComparison(
+		() => "a >> p -> b",
+		() => revision,
+		() => {},
+		(message) => statuses.push(message),
+	);
+	const pending = controller.compare(
+		() =>
+			new Promise((_, fail) => {
+				reject = fail;
+			}),
+	);
+	revision++;
+	reject(new Error("old read failed"));
+	await pending;
+	assert.deepEqual(statuses, []);
+});
+
+test("successful comparison and clear resolve the comparison notification", async () => {
+	const statuses = [];
+	const controller = createComparison(
+		() => "a >> p -> b",
+		() => 1,
+		() => {},
+		(message) => statuses.push(message),
+	);
+	await controller.compare(async () => {
+		throw new Error("read failed");
+	});
+	assert.match(statuses.at(-1), /read failed/);
+	await controller.compare(async () => ({
+		source: "a >> p -> b",
+		label: "HEAD",
+	}));
+	assert.equal(statuses.at(-1), "");
+	await controller.compare(async () => {
+		throw new Error("read failed again");
+	});
+	controller.clear();
+	assert.equal(statuses.at(-1), "");
+});
+
 test("comparison uses unsaved metadata, preserves baseline across edits and rejects late reads", async () => {
 	let source = "---\nartifact: {a: {label: After}}\n---\na >> p -> b\n";
 	let revision = 1;
