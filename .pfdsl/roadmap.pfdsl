@@ -177,6 +177,22 @@ artifact:
     criteria: >
       生成した CLAUDE.md と AGENTS.md が、このリポの作業規律を置いた binding の節を作業の開始時に読むよう指示し、scripts/check-companion-bindings.mjs が新しい見出しを必須にし、旧見出しの「ワークサイクルの追加手順」だけの binding を失敗させる。
       このリポで新しく開いたセッションが、着手時にその節を読むことを1回確かめた
+  boundary_test_revision_adr:
+    label: 契約1を3条件の AND に改める ADR (#1525)
+    description: ADR-0048 の契約1を書込み先・業種中立・名指しの AND に改め、0段目の第3基準を統合し、companion の構造的事実・D3 の運び手・D1 の条件化・D5 の既定を決める ADR。後続の work-cycle・pfd-retro・plugin 分割の設計の前提になる
+    status: todo
+    criteria: >
+      新しい ADR が Accepted で存在し、ADR-0048 の Status に部分上書きが注記されている。
+      architecture.md の0段目だけを渡した読み手が work-cycle.md の判定の食い違う6規則の置き場を再現でき、0段目に契約1と別系統の基準が残っていない
+    location: https://github.com/takasek/pfdsl/issues/1525
+  evidence_roundtrip_record:
+    label: E0 の往復記録と証拠スキーマ v0 (#1526)
+    description: 数十行の driver で status ready から実行・証拠 JSON・読取専用の検査までを1回通した記録。契約3の保存方式と検査動詞の設計の入力になる
+    status: todo
+    criteria: >
+      このリポの roadmap に対して driver が ready を読み1 process 分の証拠 JSON を出し検査器が合否判定するまでを1回通し、スキーマ v0・検査項目・検査できなかった項目と理由・動詞候補名が experiments/ に記録されている。
+      status を書き換える動詞は作っていない
+    location: https://github.com/takasek/pfdsl/issues/1526
   executor_neutral_work_cycle:
     label: 実行主体に依存しない work-cycle
     description: ADR-0048 の後続で未起票。work-cycle.md から実行主体を主語にする規則を外し、PFD 側の protocol だけを残す
@@ -253,6 +269,12 @@ process:
   i1262_publish_standalone:
     label: 配布物の全体受入を完了して公開する
     location: https://github.com/takasek/pfdsl/issues/1262
+  i1525_revise_boundary_test:
+    label: 契約1を3条件の AND に改める
+    location: https://github.com/takasek/pfdsl/issues/1525
+  i1526_run_evidence_roundtrip:
+    label: E0 で証拠の往復を1回回す
+    location: https://github.com/takasek/pfdsl/issues/1526
   reduce_work_cycle_protocol:
     label: work-cycle を protocol に絞る
     description: 未起票のプレースホルダ。起票時に process id へ iN_ を付ける
@@ -309,9 +331,13 @@ gui_vscode_candidate >> i1445_accept_gui_vscode -> gui_vscode_acceptance
 
 gui_mac_acceptance >> i1262_publish_standalone -> standalone_release
 
-[responsibility_boundary_adr, root_loaded_work_rules] >> reduce_work_cycle_protocol -> executor_neutral_work_cycle
+responsibility_boundary_adr >> i1525_revise_boundary_test -> boundary_test_revision_adr
 
-[responsibility_boundary_adr, root_loaded_work_rules] >> narrow_retro_to_model -> three_valued_model_retro
+responsibility_boundary_adr >> i1526_run_evidence_roundtrip -> evidence_roundtrip_record
+
+[boundary_test_revision_adr, evidence_roundtrip_record, responsibility_boundary_adr, root_loaded_work_rules] >> reduce_work_cycle_protocol -> executor_neutral_work_cycle
+
+[boundary_test_revision_adr, responsibility_boundary_adr, root_loaded_work_rules] >> narrow_retro_to_model -> three_valued_model_retro
 
 [responsibility_boundary_adr, root_loaded_work_rules] >> move_writer_rules_out_of_github_preset -> writer_free_github_preset
 
@@ -319,6 +345,6 @@ gui_mac_acceptance >> i1262_publish_standalone -> standalone_release
 
 responsibility_boundary_adr >> add_prune_cli -> prune_cli
 
-[backend_neutral_work_item_contract, prune_cli, writer_free_github_preset] >> design_adapter_plugin_split -> adapter_plugin_split_design
+[backend_neutral_work_item_contract, boundary_test_revision_adr, prune_cli, writer_free_github_preset] >> design_adapter_plugin_split -> adapter_plugin_split_design
 
 adapter_plugin_split_design >> apply_github_adapter_design -> optional_github_adapter
