@@ -31,6 +31,7 @@ Cmd/Ctrl+Click keeps VS Code's existing [definition and multiple-cursor behavior
 
 The first visible preview fits the complete diagram, without enlarging a small diagram.
 Use **Fit** to see the whole diagram again, **Actual size** for its original size, or **− / +** to zoom around the viewport center.
+Select a node ID in the source or a node in the preview, then use **Focus selected node** to center it at 100%, or smaller when needed to fit the diagram viewport. Groups are not supported by this action.
 The toolbar shows the current zoom level; **Help** lists the gestures.
 Wheel to zoom at the pointer, drag the diagram to pan, and click or drag the minimap to move.
 Double-click a node to go to its source; double-click the background to return to 100%.

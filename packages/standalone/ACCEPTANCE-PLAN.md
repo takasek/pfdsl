@@ -263,6 +263,11 @@ API差分：`deleteConnector`／`toggleFeedback`は`nodeId/source/artifact/proce
 
 対応：#1352/#1259/#1444。対象・入力：M/V、大きい図、小さいsubflow、横長図、side-by-side狭幅。
 操作：初回、Fit/Actual size/Zoom、wheel/drag/minimap/double click、pan後編集、resize→Fit、HelpとREADME照合を行う。
+#1517変種：source検索でnodeを選び（Vはnode IDを選択）、Focus selected nodeを押す。
+通常nodeは100%で中央へ、表示領域より大きいnodeは100%を上限として全体が収まる倍率で中央へ移ることを確認する。
+Connectionsの表示中も残った図の領域で中央化し、panel・本文・Undoを変更しない。
+未選択、groupだけの選択、エラー中、描画中は操作を無効とし、正常化だけでは古い選択を復元しない。
+通常のsource選択は倍率を保ち、明示操作後の再描画だけで再ズームせず、FitとActual sizeは従来の意味を維持する。
 期待：初回全体を把握しFitとActual sizeを区別して戻れ、倍率表示は従来どおり100%等を示す。
 通常再描画は視点を不必要に戻さず、倍率・基本操作と説明が一致する。
 minimap位置対応を保ち、resizeで図が切れるだけでは不合格にしない。
@@ -299,6 +304,7 @@ UI最小labelとCLI完成sourceの契約を区別し、正しい文書で一Undo
 
 対応：#1352/#1444、完了済み#1283/#483/#1282。対象・入力：M/V、quoted/同名field/反復/alias、VのmultiCursorModifier両設定。
 操作：double click移動、pan/zoom、subflow、作成／接続、live/Problems/Undo/SVGを使う。VのN/D chord/context menuと組込定義／Alt+F12 Peek／Cmd/Ctrl+clickを対照する。
+#1517変種：GUI-17の検索→選択→Focus selected nodeの後に、接続編集→Undo、Fit、Actual size、pan/zoomを順に行い、選択対象・本文・履歴と既存操作を保つことを確認する。
 期待：既存動線が競合せず、巡回は定義→全本文出現→定義、途中・編集後増減も正しい。
 field/alias use siteを誤巡回しない。
 standaloneへ#1283専用巡回UIを追加要求しない。
@@ -343,6 +349,8 @@ Escapeと取消後は起点／編集継続位置へ戻り、常設入力を保�
 
 対応：#1444。対象・入力：M/V、長い日本語名/label/行、代表寸法、通常／本文200%、現対応テーマ。
 操作：拡大と各幅で保存／戻る／Close、候補・診断・比較を読み、文字と重要境界のcontrastを実測する。
+#1517変種：Connectionsを開いた狭い図領域と長いlabelの巨大nodeでFocus selected nodeを使い、toolbarが折り返しても操作へ到達できること、倍率は100%以下で対象全体が収まることを確認する。
+非表示tabで古い移動を予約せず、表示へ戻しただけでは勝手に再ズームしないことも確認する。
 期待：主操作と重要名称／状態へ到達し、図zoomと文字拡大、選択とfocus、status色と操作色を区別する。
 色以外の手掛かり、system font・余白・整列・意味色を揃え、px/pt数値だけや固定色からdark対応を推定しない。
 状態：M/V各未実施。記録：未記入。対応外テーマを追加しない。
