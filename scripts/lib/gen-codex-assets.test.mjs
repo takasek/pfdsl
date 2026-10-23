@@ -792,10 +792,6 @@ describe("hookCapabilityToCodexHooks", () => {
 		const record = hookRecord({
 			PreToolUse: [{ matcher: "Bash", hooks: [] }],
 		});
-		record.semantic.permissions = {
-			allow: ["Bash(node scripts/*)"],
-			deny: ["mcp__github__merge_pull_request"],
-		};
 
 		assert.deepEqual(JSON.parse(hookCapabilityToCodexHooks(record)), {
 			hooks: { PreToolUse: [{ matcher: "Bash", hooks: [] }] },

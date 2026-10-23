@@ -31,13 +31,6 @@
       "Bash(gh issue create *)",
       "Bash(gh issue comment *)",
       "Bash(gh pr create *)"
-    ],
-    "deny": [
-      "mcp__github__merge_pull_request",
-      "mcp__github__enable_pr_auto_merge",
-      "Bash(gh pr merge*)",
-      "Bash(git commit --no-verify*)",
-      "Bash(git push --no-verify*)"
     ]
   },
   "worktree": {

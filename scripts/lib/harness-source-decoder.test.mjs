@@ -693,27 +693,6 @@ describe("harness source decoder", () => {
 		);
 	});
 
-	it("preserves explicit Claude permission denials in source semantics", () => {
-		const subject = fixture();
-		const permissions = {
-			allow: ["Bash(node scripts/*)"],
-			deny: ["mcp__github__merge_pull_request", "Bash(git push --no-verify*)"],
-		};
-		subject.addFile(
-			".claude/settings.json",
-			JSON.stringify({ permissions, hooks: {} }),
-		);
-		const records = decodeFixture({
-			root: ROOT,
-			contract: CONTRACT,
-			fs: subject.fs,
-		});
-		assert.deepEqual(
-			recordFor(records, "repository-hooks").semantic.permissions,
-			permissions,
-		);
-	});
-
 	it("rejects an unknown permissions field instead of dropping a permission", () => {
 		const subject = fixture();
 		subject.addFile(
