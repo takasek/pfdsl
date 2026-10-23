@@ -207,7 +207,7 @@ gen-plugin: check-docs
 	node scripts/gen-plugin.mjs
 
 .PHONY: push
-push: check-docs
+push: test typecheck lint check-docs
 	node scripts/check-generation.mjs --gen-plugin push --samples
 	git push
 
