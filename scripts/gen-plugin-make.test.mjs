@@ -20,6 +20,19 @@ function dryRun(target) {
 
 const runs = (script) => (line) => line.startsWith(`node scripts/${script}`);
 
+it("make push runs all checks before generation and shares one build", () => {
+	const recipe = dryRun("push");
+	const generate = recipe.findIndex(runs("check-generation.mjs"));
+	for (const target of ["test", "typecheck", "lint", "check-docs"]) {
+		for (const line of dryRun(target)) {
+			const at = recipe.indexOf(line);
+			assert.ok(at >= 0 && at < generate, `${line} runs before generation`);
+		}
+	}
+	assert.equal(recipe.filter((line) => line === "pnpm -r build").length, 1);
+	assert.ok(generate < recipe.indexOf("git push"));
+});
+
 it("make push checks all generated surfaces and never stages or commits edits", () => {
 	const recipe = dryRun("push");
 	assert.ok(
