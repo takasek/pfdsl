@@ -61,11 +61,16 @@ const host = vi.hoisted(() => {
 		showInformationMessage: vi.fn(),
 		showWarningMessage: vi.fn(),
 		showQuickPick: vi.fn(async (items: unknown[]) => items[0]),
-		showTextDocument: vi.fn(async (document: vscode.TextDocument) => ({
-			document,
-			selection: undefined,
-			revealRange: vi.fn(),
-		})),
+		showTextDocument: vi.fn(
+			async (
+				document: vscode.TextDocument,
+				_options?: vscode.TextDocumentShowOptions,
+			) => ({
+				document,
+				selection: undefined,
+				revealRange: vi.fn(),
+			}),
+		),
 	};
 	const openTextDocument = vi.fn(async (value: ReturnType<typeof uri>) => ({
 		uri: value,
@@ -704,6 +709,7 @@ it.each([
 	expect(host.window.showTextDocument).toHaveBeenCalledWith(doc, {
 		viewColumn: 1,
 		preserveFocus: true,
+		preview: false,
 	});
 	expect(editor.selection).toBeUndefined();
 	expect(editor.revealRange).toHaveBeenCalledWith(
@@ -713,6 +719,127 @@ it.each([
 		),
 	);
 	expect(host.window.showInformationMessage).not.toHaveBeenCalled();
+});
+
+it.each([
+	"addConnector",
+	"createDefinition",
+	"deleteConnector",
+	"toggleFeedback",
+] as const)("keeps one source tab when the dirty-file tracker runs during %s", async (type) => {
+	const { open } = setup();
+	const source = "a >> p -> b\n";
+	const doc = document(`dirty-tracker-${type}`, source);
+	const panel = await open(doc);
+	host.setTabGroups([host.createTabGroup(1, panel)]);
+	const sourceColumns = new Set<number>();
+	const previewColumns = new Set<number>();
+	let dirty = false;
+	host.window.showTextDocument.mockImplementation(async (document, options) => {
+		const column = options?.viewColumn ?? 1;
+		await Promise.resolve();
+		sourceColumns.add(column);
+		if (options?.preview ?? !dirty) previewColumns.add(column);
+		else previewColumns.delete(column);
+		return {
+			document,
+			viewColumn: column,
+			selection: undefined,
+			revealRange: vi.fn(),
+		};
+	});
+	host.api.workspace.applyEdit.mockImplementationOnce(async (edit) => {
+		dirty = true;
+		const replacement = edit.replacements[0]!;
+		const offset = (position: { line: number; character: number }) =>
+			source
+				.split("\n")
+				.slice(0, position.line)
+				.reduce((sum, line) => sum + line.length + 1, 0) + position.character;
+		vi.spyOn(doc, "getText").mockReturnValue(
+			source.slice(0, offset(replacement.range.start)) +
+				replacement.text +
+				source.slice(offset(replacement.range.end)),
+		);
+		// VS Code's dirty-file tracker opens an unrepresented dirty model inactive in the active group.
+		if (sourceColumns.size === 0) sourceColumns.add(1);
+		return true;
+	});
+	await panel.receive(
+		type === "deleteConnector" || type === "toggleFeedback"
+			? {
+					type,
+					nodeId: "p",
+					source,
+					artifact: "a",
+					process: "p",
+					kind: "input",
+				}
+			: { type, nodeId: "p", source, connector: "->", otherId: "new_result" },
+	);
+	expect(sourceColumns).toEqual(new Set([host.api.ViewColumn.Beside]));
+	expect(previewColumns.size).toBe(0);
+	expect(panel.messages).toContainEqual(
+		expect.objectContaining({ type: "editResult", ok: true }),
+	);
+});
+
+it.each([
+	"changed",
+	"closed",
+	"disposed",
+])("does not edit when the source becomes %s while its editor opens", async (state) => {
+	const { open } = setup();
+	const source = "a >> p -> b\n";
+	const doc = document(`opening-${state}`, source);
+	const panel = await open(doc);
+	host.window.showTextDocument.mockImplementationOnce(async (document) => {
+		if (state === "changed") Object.assign(doc, { version: 2 });
+		else if (state === "closed") Object.assign(doc, { isClosed: true });
+		else panel.dispose();
+		return { document, selection: undefined, revealRange: vi.fn() };
+	});
+	await panel.receive({
+		type: "addConnector",
+		nodeId: "p",
+		source,
+		connector: "->",
+		otherId: "new_result",
+	});
+	expect(host.api.workspace.applyEdit).not.toHaveBeenCalled();
+	expect(doc.getText()).toBe(source);
+	const replies = panel.messages.filter(
+		(message) => message.type === "editResult",
+	);
+	expect(replies).toEqual(
+		state === "disposed" ? [] : [expect.objectContaining({ ok: false })],
+	);
+});
+
+it("replies with a failure when the source editor cannot be opened", async () => {
+	const { open } = setup();
+	const source = "a >> p -> b\n";
+	const doc = document("opening-failed", source);
+	const panel = await open(doc);
+	host.window.showTextDocument.mockRejectedValueOnce(
+		new Error("another editor opened in the meantime"),
+	);
+	const request = {
+		type: "addConnector" as const,
+		nodeId: "p",
+		source,
+		connector: "->" as const,
+		otherId: "new_result",
+	};
+	await expect(panel.receive(request)).resolves.toBeUndefined();
+	expect(host.api.workspace.applyEdit).not.toHaveBeenCalled();
+	expect(doc.getText()).toBe(source);
+	expect(panel.messages).toContainEqual({
+		type: "editResult",
+		request,
+		ok: false,
+		message: expect.any(String),
+	});
 });
 
 it("refreshes a preview edit from the replacement document after the source is closed", async () => {
@@ -897,6 +1024,7 @@ it.each([
 	expect(host.window.showTextDocument).toHaveBeenCalledWith(doc, {
 		viewColumn: 1,
 		preserveFocus: true,
+		preview: false,
 	});
 	if (state === "dirty" || state === "unknown-encoding")
 		expect(host.api.workspace.fs.readFile).not.toHaveBeenCalled();
