@@ -276,7 +276,16 @@ export function createDocumentTab({
 			...dependencyDiagnostics,
 		];
 		diagnosticsSummary = allDiagnostics.length
-			? `${allDiagnostics.filter((d) => d.severity === "error").length} errors, ${allDiagnostics.filter((d) => d.severity === "warning").length} warnings, ${allDiagnostics.filter((d) => d.severity !== "error" && d.severity !== "warning").length} hints`
+			? (["error", "warning", "info", "hint"] as const)
+					.map((severity) => {
+						const count = allDiagnostics.filter(
+							(d) => d.severity === severity,
+						).length;
+						const label =
+							severity === "info" ? "informational message" : severity;
+						return `${count} ${label}${count === 1 ? "" : "s"}`;
+					})
+					.join(", ")
 			: "No problems";
 		dependencyProblems.replaceChildren();
 		dependencyProblems.hidden = dependencyDiagnostics.length === 0;

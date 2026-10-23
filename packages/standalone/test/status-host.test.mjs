@@ -8,6 +8,34 @@ import {
 
 const { startHost } = await createHarness("status-ui");
 
+test("failed native titles do not retry unchanged titles or restore dismissed notices on typing", async () => {
+	const writes = [];
+	globalThis.reviewSetTitle = async (title) => {
+		writes.push(title);
+		throw new Error("Denied");
+	};
+	const native = new FakeNative();
+	const doc = native.add(1, "a.pfdsl", "original");
+	const host = await startHost(native, doc);
+	try {
+		const a = await host.open(doc);
+		a.type("first edit");
+		await host.settle();
+		host.query("#dismiss-status").click();
+		const count = writes.length;
+		a.type("another edit");
+		await host.settle();
+		assert.equal(writes.length, count);
+		assert.doesNotMatch(
+			host.query("#status").textContent,
+			/Could not update the window title/,
+		);
+	} finally {
+		await host.finish();
+		delete globalThis.reviewSetTitle;
+	}
+});
+
 test("save completion for an earlier revision does not announce the newer edits as saved", async () => {
 	const native = new FakeNative();
 	const doc = native.add(1, "a.pfdsl", "original");
@@ -114,7 +142,7 @@ test("save failures survive edits, background completion and unrelated notices u
 	}
 });
 
-test("action notices belong to a document revision and are separate from current diagnostics", async () => {
+test("action notices are hidden on other tabs, retained on return, and expire on editing", async () => {
 	const native = new FakeNative();
 	const doc = native.add(1, "a.pfdsl", "a >> p -> b");
 	const host = await startHost(native, doc);
@@ -125,16 +153,13 @@ test("action notices belong to a document revision and are separate from current
 			host.query("#status").textContent,
 			/Last action.*a.pfdsl.*W002/,
 		);
-		assert.match(
-			host.query("#diagnostics").textContent,
-			/Current diagnostics.*No problems/,
-		);
 		const b = await host.newDocument();
 		assert.doesNotMatch(host.query("#status").textContent, /W002/);
 		a.report("Late result from A");
 		assert.doesNotMatch(host.query("#status").textContent, /Late result/);
 		a.button.click();
 		await flush();
+		assert.match(host.query("#status").textContent, /Late result from A/);
 		a.type("new revision");
 		assert.doesNotMatch(host.query("#status").textContent, /Late result/);
 		a.report("Done");

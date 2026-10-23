@@ -87,10 +87,10 @@ async function loadSaveCapability() {
 		};
 	}
 	for (const entry of opened) {
-		if (entry.saveNotice?.kind === "capability")
-			entry.saveNotice = saveCapability.save
+		if (entry.notice?.channel === "capability")
+			entry.notice = saveCapability.save
 				? undefined
-				: { message: saveCapability.reason, kind: "capability" };
+				: { ...entry.notice, message: saveCapability.reason };
 	}
 	renderStatus();
 	updateSaveControls();
@@ -106,7 +106,7 @@ interface Entry {
 	notice?:
 		| { message: string; revision: number | string; channel: string }
 		| undefined;
-	saveNotice?: { message: string; kind: "save" | "capability" } | undefined;
+	saveNotice?: { message: string } | undefined;
 }
 const opened = new Set<Entry>();
 const documentHandles = new Set<number>();
@@ -143,7 +143,7 @@ function renderStatus() {
 	if (status.textContent !== text) status.textContent = text;
 	dismissStatus.hidden = !active?.notice && !appNotice;
 	const summary = active
-		? `Current diagnostics — ${active.name}: ${active.tab.getDiagnosticsSummary?.() ?? "Checking…"}`
+		? `Current diagnostics — ${active.path ?? active.name}: ${active.tab.getDiagnosticsSummary?.() ?? "Checking…"}`
 		: "";
 	if (diagnostics.textContent !== summary) diagnostics.textContent = summary;
 }
@@ -166,11 +166,10 @@ function saveNotice(
 	entry: Entry,
 	message: string,
 	resolved = false,
-	kind: "save" | "capability" = "save",
 	revision: number | string = entry.tab.getRevision(),
 ) {
 	if (!opened.has(entry)) return;
-	entry.saveNotice = resolved ? undefined : { message, kind };
+	entry.saveNotice = resolved ? undefined : { message };
 	if (resolved) notify(message, entry, "action", revision);
 	else {
 		entry.notice = undefined;
@@ -558,7 +557,7 @@ async function saveEntry(
 	confirmation?: OperationPlan,
 ): Promise<boolean> {
 	if (!saveCapability.save) {
-		saveNotice(entry, saveCapability.reason, false, "capability");
+		notify(saveCapability.reason, entry, "capability");
 		return false;
 	}
 	const session = entry.session;
@@ -708,7 +707,6 @@ async function saveEntry(
 				? "Saved."
 				: "The save was not accepted. Editor content is retained."),
 		outcome.saved,
-		"save",
 		plan.editorVersion,
 	);
 	renderWorkspace();
@@ -812,7 +810,6 @@ async function useDiskVersion(entry: Entry) {
 		entry,
 		"Reloaded the current disk version.",
 		!session.panel(),
-		"save",
 		adoptedRevision,
 	);
 }

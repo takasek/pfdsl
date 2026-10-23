@@ -41,11 +41,18 @@ test("native title writes serialize and converge after delayed and rejected upda
 		await new Promise(setImmediate);
 		assert.deepEqual(failures, ["denied"]);
 		update("PFDSL");
+		assert.deepEqual(writes, ["A", "PFDSL"]);
+		update("A");
+		update("PFDSL");
 		assert.deepEqual(writes, ["A", "PFDSL", "PFDSL"]);
+		finish.reject("still denied");
+		await new Promise(setImmediate);
+		update("C");
+		assert.deepEqual(writes, ["A", "PFDSL", "PFDSL", "C"]);
 		finish.resolve();
 		await new Promise(setImmediate);
-		update("PFDSL");
-		assert.equal(writes.length, 3);
+		update("C");
+		assert.equal(writes.length, 4);
 	} finally {
 		rmSync(dir, { recursive: true, force: true });
 	}

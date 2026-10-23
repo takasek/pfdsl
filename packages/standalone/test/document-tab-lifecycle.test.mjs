@@ -110,7 +110,8 @@ export async function processSnapshot(...args) {
 		oldEditor.model.source =
 			"---\nartifact:\n  b: {label: B}\n---\na >> p -> b\n";
 		oldEditor.callbacks.onDidChangeModelContent();
-		await waitFor(() => first.getDiagnosticsSummary().includes("1 warnings"));
+		await waitFor(() => first.getDiagnosticsSummary().includes("1 warning"));
+		assert.doesNotMatch(first.getDiagnosticsSummary(), /1 warnings|1 errors/);
 		oldEditor.model.source =
 			"---\nartifact:\n  b: {label: B, criteria: Ready}\n---\na >> p -> b\n";
 		oldEditor.callbacks.onDidChangeModelContent();

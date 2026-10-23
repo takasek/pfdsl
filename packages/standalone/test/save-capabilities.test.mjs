@@ -29,6 +29,9 @@ test("unsupported saving is explained before any chooser, confirmation or write"
 			false,
 		);
 		assert.equal(host.isDirty(tab), true);
+		host.query("#dismiss-status").click();
+		assert.equal(host.query("#status").textContent, "");
+		assert.equal(host.query("#save-support").textContent, reason);
 		native.save(doc, "external", native.snapshot(doc).revision);
 		await host.runPoll();
 		assert.equal(host.panel().review.disabled, true);
@@ -65,7 +68,7 @@ test("saving stays disabled while capability lookup is pending and after failure
 		);
 		assert.equal(
 			host.query("#status").textContent,
-			`Save needs attention — ${doc.path}: ${host.query("#save-support").textContent}`,
+			`Last action — ${doc.path}: ${host.query("#save-support").textContent}`,
 		);
 	} finally {
 		await host.finish();

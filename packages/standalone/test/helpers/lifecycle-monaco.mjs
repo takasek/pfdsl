@@ -12,6 +12,10 @@ export const editor = {
 	createModel(source) {
 		return {
 			source,
+			version: 1,
+			getVersionId() {
+				return this.version;
+			},
 			dispose() {
 				this.disposed = true;
 			},

@@ -3,13 +3,13 @@ export function createWindowTitle(
 	write: (title: string) => Promise<void>,
 	report: (error: unknown) => void,
 ) {
-	let desired = "";
+	let desired: string | undefined;
 	let applied: string | undefined;
 	let running = false;
 	async function drain() {
 		running = true;
 		try {
-			while (desired !== applied) {
+			while (desired !== undefined && desired !== applied) {
 				const title = desired;
 				try {
 					await write(title);
@@ -24,6 +24,8 @@ export function createWindowTitle(
 		}
 	}
 	return (title: string) => {
+		// Retry a failed write only when the requested title changes.
+		if (title === desired) return;
 		desired = title;
 		if (!running && desired !== applied) void drain();
 	};
