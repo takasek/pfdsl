@@ -1,0 +1,155 @@
+{
+  "ok": true,
+  "ready": [
+    {
+      "id": "publish_cli_ready_counts",
+      "label": "新規 ready 数を示す CLI と plugin を公開する",
+      "inputs": [
+        "ready_counts_cli"
+      ],
+      "outputs": [
+        "cli_release_ready_counts"
+      ],
+      "newlyReadyCount": 0
+    },
+    {
+      "id": "i542_migrate_spec_id_refs",
+      "label": "spec.md 仕様ID参照移行",
+      "inputs": [
+        "get_by_id_tool",
+        "mint_check_tool",
+        "spec_id_syntax",
+        "spec_v0011"
+      ],
+      "outputs": [
+        "spec_id_refs"
+      ],
+      "newlyReadyCount": 0
+    },
+    {
+      "id": "publish_cli_group_delete",
+      "label": "CLI group 削除公開",
+      "inputs": [
+        "group_delete_cli"
+      ],
+      "outputs": [
+        "cli_release_group_delete"
+      ],
+      "newlyReadyCount": 0
+    },
+    {
+      "id": "publish_cli_meta_set_extension",
+      "label": "CLI 拡張フィールド更新公開",
+      "inputs": [
+        "meta_set_extension_fields"
+      ],
+      "outputs": [
+        "cli_release_meta_set_extension"
+      ],
+      "newlyReadyCount": 0
+    },
+    {
+      "id": "publish_cli_group_node_clash",
+      "label": "CLI 同名診断公開",
+      "inputs": [
+        "group_node_clash_diagnostic"
+      ],
+      "outputs": [
+        "cli_release_group_node_clash"
+      ],
+      "newlyReadyCount": 0
+    },
+    {
+      "id": "publish_cli_edge_kind_conflict",
+      "label": "CLI input / feedback 併記診断公開",
+      "inputs": [
+        "edge_kind_conflict_diagnostic"
+      ],
+      "outputs": [
+        "cli_release_edge_kind_conflict"
+      ],
+      "newlyReadyCount": 0
+    },
+    {
+      "id": "i1262_i1445_accept_mac_candidate",
+      "label": "Mac の受入済み候補を作る",
+      "inputs": [
+        "preview_editing_usability",
+        "standalone_pfd_features"
+      ],
+      "outputs": [
+        "gui_mac_acceptance"
+      ],
+      "newlyReadyCount": 1
+    },
+    {
+      "id": "i1445_accept_gui_vscode",
+      "label": "VS Code 統合版の公開範囲を実機受入する",
+      "inputs": [
+        "gui_vscode_candidate"
+      ],
+      "outputs": [
+        "gui_vscode_acceptance"
+      ],
+      "newlyReadyCount": 1
+    },
+    {
+      "id": "i1526_run_evidence_roundtrip",
+      "label": "E0 で証拠の往復を1回回す",
+      "inputs": [
+        "responsibility_boundary_adr"
+      ],
+      "outputs": [
+        "evidence_roundtrip_record"
+      ],
+      "newlyReadyCount": 0
+    },
+    {
+      "id": "narrow_retro_to_model",
+      "label": "pfd-retro を model retro に絞る",
+      "inputs": [
+        "responsibility_boundary_adr",
+        "root_loaded_work_rules"
+      ],
+      "outputs": [
+        "three_valued_model_retro"
+      ],
+      "newlyReadyCount": 0
+    },
+    {
+      "id": "move_writer_rules_out_of_github_preset",
+      "label": "GitHub Issues プリセットから書込み規律と PR 運用を外す",
+      "inputs": [
+        "responsibility_boundary_adr",
+        "root_loaded_work_rules"
+      ],
+      "outputs": [
+        "writer_free_github_preset"
+      ],
+      "newlyReadyCount": 0
+    },
+    {
+      "id": "add_prune_cli",
+      "label": "完了チェーン回収を CLI 動詞にする",
+      "inputs": [
+        "responsibility_boundary_adr"
+      ],
+      "outputs": [
+        "prune_cli"
+      ],
+      "newlyReadyCount": 0
+    },
+    {
+      "id": "i1519_add_wiki_roadmap_integration",
+      "label": "roadmap の保存先を分離して Wiki 連携を追加する",
+      "inputs": [
+        "responsibility_boundary_adr",
+        "toolchain"
+      ],
+      "outputs": [
+        "wiki_roadmap_integration"
+      ],
+      "newlyReadyCount": 0
+    }
+  ]
+}

@@ -1,0 +1,20 @@
+import { execFileSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
+import { readFileSync, writeFileSync } from 'node:fs';
+import { resolve } from 'node:path';
+import { snapshot } from './check.mjs';
+
+const [target] = process.argv.slice(2);
+if (!target || process.argv.length !== 3) throw new Error('Usage: prepare.mjs <target-checkout>');
+const modelPath = resolve(target,'.pfdsl/roadmap.pfdsl');
+const modelSource = readFileSync(modelPath,'utf8');
+const ready = JSON.parse(execFileSync(process.execPath,[resolve(target,'packages/cli/dist/cli.js'),'status','ready',modelPath,'--json'],{encoding:'utf8'}));
+if (!ready.ok || !Array.isArray(ready.ready)) throw new Error('CLI ready query failed');
+const artifacts = Object.fromEntries(['docs/adr/0051-conjunctive-boundary-test.md','scripts/harness-template/skills/pfd-ops/references/architecture.md'].map(path => [path,createHash('sha256').update(readFileSync(resolve(target,path))).digest('hex')]));
+const context = snapshot(modelSource,ready.ready,artifacts);
+context.sourceCommit = execFileSync('git',['-C',target,'rev-parse','HEAD'],{encoding:'utf8'}).trim();
+context.modelPath = '.pfdsl/roadmap.pfdsl';
+context.modelBlob = execFileSync('git',['-C',target,'hash-object',modelPath],{encoding:'utf8'}).trim();
+context.note = 'Working files captured before driver generation; content digests identify uncommitted artifact versions.';
+writeFileSync(new URL('./snapshot.json',import.meta.url),`${JSON.stringify(context,null,2)}\n`);
+writeFileSync(new URL('./ready.json',import.meta.url),`${JSON.stringify(ready,null,2)}\n`);
