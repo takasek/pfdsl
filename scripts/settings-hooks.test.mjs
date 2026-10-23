@@ -71,7 +71,7 @@ describe(".claude/settings.json hook wiring", () => {
 			],
 		);
 	});
-	it("wires the operation entry exactly once for Bash, files and GitHub MCP in both harnesses", () => {
+	it("keeps content guards without operation policies in either harness", () => {
 		for (const file of [".claude/settings.json", ".codex/hooks.json"]) {
 			const settings = JSON.parse(readFileSync(resolve(root, file), "utf8"));
 			for (const tool of [
@@ -86,12 +86,18 @@ describe(".claude/settings.json hook wiring", () => {
 				const matching = settings.hooks.PreToolUse.filter((group) =>
 					new RegExp(`^(?:${group.matcher})$`).test(tool),
 				).flatMap((group) => group.hooks);
-				assert.equal(
-					matching.filter(
-						(hook) =>
-							hook.command === "exec node scripts/agent-operation-guard.mjs",
-					).length,
-					1,
+				const expected =
+					tool === "Bash"
+						? ["node scripts/closes-create-guard.mjs"]
+						: ["Edit", "Write", "apply_patch"].includes(tool)
+							? [
+									"node scripts/roadmap-publish-guard.mjs",
+									"node scripts/generated-root-instructions-guard.mjs",
+								]
+							: [];
+				assert.deepEqual(
+					matching.map((hook) => hook.command),
+					expected,
 					`${file}: ${tool}`,
 				);
 			}

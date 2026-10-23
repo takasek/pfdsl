@@ -3,10 +3,10 @@
 
 import { basename } from "node:path";
 import { fileURLToPath } from "node:url";
-import { SHELL_PARSER_TIMEOUT_MS } from "./agent-operation-timeouts.mjs";
-import { GIT_TARGET_ENVIRONMENT_VARIABLES } from "./git-environment.mjs";
 import { run } from "./run-exec.mjs";
 import { shellParserPath } from "./shell-parser-tool.mjs";
+
+const SHELL_PARSER_TIMEOUT_MS = 3000;
 
 const root = fileURLToPath(new URL("../../", import.meta.url));
 
@@ -70,40 +70,6 @@ export function readShell(
 	return result;
 }
 
-const TARGET_NAMES = new Set([...GIT_TARGET_ENVIRONMENT_VARIABLES, "CDPATH"]);
-const literalTargetName = (token) =>
-	token &&
-	(token.value.includes("=") || !token.dynamic) &&
-	TARGET_NAMES.has(token.value.split(/\+?=/, 1)[0]);
-function writesTargetName(node) {
-	const { tokens, executableIndex: index } = node;
-	const assignments = index < 0 ? tokens : tokens.slice(0, index);
-	if (
-		assignments.some(
-			(token) =>
-				/^[A-Za-z_][A-Za-z0-9_]*\+?=/.test(token.value) &&
-				TARGET_NAMES.has(token.value.split(/\+?=/, 1)[0]),
-		)
-	)
-		return true;
-	const name = executableName(tokens[index]?.value ?? "");
-	const args = tokens.slice(index + 1);
-	if (["pushd", "popd"].includes(name)) return true;
-	if (["export", "readonly", "declare", "typeset"].includes(name))
-		return args.some(literalTargetName);
-	if (name === "printf")
-		return args[0]?.value === "-v" && literalTargetName(args[1]);
-	if (name !== "read") return false;
-	for (let i = 0; i < args.length; i++) {
-		if (["-p", "-u", "-t", "-n", "-N", "-d", "-i"].includes(args[i].value)) {
-			i++;
-			continue;
-		}
-		if (literalTargetName(args[i])) return true;
-	}
-	return false;
-}
-
 function expandLiteralScripts(result, parserPath) {
 	const expanded = [];
 	for (const node of result.commands) {
@@ -150,45 +116,14 @@ function expandLiteralScripts(result, parserPath) {
 		const inner = readShell(scriptTokens.map(({ value }) => value).join(" "), {
 			parserPath,
 		});
-		for (const child of inner.commands ?? [])
-			expanded.push({
-				...child,
-				leadingCd: [...(node.leadingCd ?? []), ...(child.leadingCd ?? [])],
-				unresolvedCwd: node.unresolvedCwd || child.unresolvedCwd,
-			});
+		expanded.push(...(inner.commands ?? []));
 		if (inner.error) {
 			result.error = inner.error;
 			result.failure = inner.failure;
 			expanded.push({ ...node, unresolvedExecution: true });
 		}
 	}
-	const ambiguous =
-		expanded.some(writesTargetName) ||
-		expanded.some((node) => node.unresolvedGitTarget);
-	result.commands = expanded.map((node) => ({
-		...node,
-		unresolvedGitTarget: ambiguous,
-	}));
-}
-
-export function shellParseDecision(command, { parserPath } = {}) {
-	const { error, parserFailure, failure } = readShell(command, { parserPath });
-	return error
-		? {
-				decision: "deny",
-				matched: "shell syntax",
-				reason: error,
-				recovery:
-					parserFailure && failure !== "parser-timeout"
-						? "terminal"
-						: "rewrite",
-			}
-		: null;
-}
-
-export function readShellCommands(command) {
-	const result = readShell(command);
-	return result.commands ?? [];
+	result.commands = expanded;
 }
 
 export function adaptShell(ast, source) {
@@ -196,42 +131,9 @@ export function adaptShell(ast, source) {
 	const text = (node) =>
 		bytes.subarray(node.Pos.Offset, node.End.Offset).toString();
 	const commands = [];
-	const leadingCd = [];
-	const prefixNodes = new Set();
-	const flattenAnd = (stmt) =>
-		!stmt?.Negated &&
-		!stmt?.Background &&
-		stmt?.Cmd?.Type === "BinaryCmd" &&
-		stmt.Cmd.Op === "&&"
-			? [...flattenAnd(stmt.Cmd.X), ...flattenAnd(stmt.Cmd.Y)]
-			: [stmt];
-	const initial = flattenAnd(ast.Stmts?.[0]);
-	for (let i = 0; i < initial.length - 1; i++) {
-		const stmt = initial[i];
-		const args = stmt?.Cmd?.Type === "CallExpr" ? stmt.Cmd.Args?.map(word) : [];
-		if (
-			stmt?.Negated ||
-			stmt?.Background ||
-			stmt?.Redirs?.length ||
-			stmt?.Cmd?.Assigns?.length ||
-			args?.length !== 2 ||
-			args[0]?.value !== "cd" ||
-			args[1]?.value.startsWith("-") ||
-			args.some(({ dynamic }) => dynamic)
-		)
-			break;
-		leadingCd.push(args[1].value);
-		prefixNodes.add(stmt.Cmd.Pos.Offset);
-	}
 	const fail = (type) => {
 		const error = new Error(`Unsupported shell construct ${type}.`);
-		// Keep observed commands for composition, but never claim a cwd after
-		// an incomplete traversal. The syntax decision remains deny.
-		error.commands = commands.map((command) => ({
-			...command,
-			leadingCd: [],
-			unresolvedCwd: true,
-		}));
+		error.commands = commands;
 		throw error;
 	};
 
@@ -352,7 +254,6 @@ export function adaptShell(ast, source) {
 			if (["-p", "--"].includes(tokens[prefix]?.value)) prefix++;
 		}
 		let unresolvedExecution = false;
-		let prefixCwd = false;
 		// Ordinary executable prefixes only; no shell state, clusters or argv
 		// oracle. Unknown prefix options are unresolved, not guessed programs.
 		while (
@@ -389,7 +290,6 @@ export function adaptShell(ast, source) {
 				}
 				const flag = value.split("=", 1)[0];
 				if (values.includes(flag)) {
-					prefixCwd ||= wrapper === "env" && ["-C", "--chdir"].includes(flag);
 					prefix += value.includes("=") ? 1 : 2;
 					if (prefix > tokens.length) unresolvedExecution = true;
 					continue;
@@ -409,7 +309,6 @@ export function adaptShell(ast, source) {
 			tokens,
 			executableIndex: prefix,
 			unresolvedExecution,
-			unresolvedCwd: prefixCwd,
 			command: text(node),
 			offset: node.Pos.Offset,
 		};
@@ -535,19 +434,5 @@ export function adaptShell(ast, source) {
 	}
 
 	(ast.Stmts ?? []).forEach(statement);
-	const unresolvedCwd = commands.some(
-		({ tokens, executableIndex, offset }) =>
-			tokens[executableIndex]?.value === "cd" && !prefixNodes.has(offset),
-	);
-	for (const command of commands) {
-		command.isLeadingCd = prefixNodes.has(command.offset);
-		const withinPrefixChain =
-			ast.Stmts?.[0] &&
-			command.offset >= ast.Stmts[0].Pos.Offset &&
-			command.offset < ast.Stmts[0].End.Offset;
-		command.leadingCd = withinPrefixChain ? [...leadingCd] : [];
-		command.unresolvedCwd ||=
-			unresolvedCwd || (leadingCd.length > 0 && !withinPrefixChain);
-	}
 	return { commands };
 }

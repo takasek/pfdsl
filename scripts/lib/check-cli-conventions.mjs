@@ -44,9 +44,6 @@ const SKILL_MIRROR_ROOTS = [
 	".agents/skills",
 	"scripts/harness-template/skills",
 ];
-const FOREIGN_ARGV_GUARDS = new Set([
-	"scripts/lib/agent-operation-classifier.mjs",
-]);
 
 // Its one flag-name lookup is the --force deprecation hint that #631 put
 // deliberately *ahead* of its strict parse, so the message survives instead
@@ -58,13 +55,6 @@ function isCheckInstallSyncMirror(file) {
 	);
 }
 
-// These guards parse the argv of other commands, rather than their own. As
-// command-usage-guard.mjs already documents, determining whose argv an array
-// holds needs dataflow, so retain an explicit flag-lookup-only exception.
-function isFlagLookupExempt(file) {
-	return isCheckInstallSyncMirror(file) || FOREIGN_ARGV_GUARDS.has(file);
-}
-
 /**
  * @param {string} source
  * @param {string} [file] - repo-relative path, for the per-rule exemptions
@@ -72,7 +62,7 @@ function isFlagLookupExempt(file) {
  */
 export function findCliConventionViolations(source, file = "") {
 	const findings = [];
-	const flagLookupApplies = !isFlagLookupExempt(file);
+	const flagLookupApplies = !isCheckInstallSyncMirror(file);
 	source.split("\n").forEach((text, i) => {
 		if (COMMENT_LINE.test(text.trim())) return;
 		if (flagLookupApplies && FLAG_LOOKUP.test(text)) {
@@ -97,11 +87,6 @@ function isExcluded(file) {
 	// The detector and its tests hold the retired patterns as data.
 	if (file.endsWith(".test.mjs")) return true;
 	if (file === "scripts/lib/check-cli-conventions.mjs") return true;
-	// Parses *other* commands' arguments, so the flag-name literals are its
-	// subject rather than its own argv. Excluded by name instead of by deciding
-	// whose argv an array holds — the analysis check-no-shell-strings.mjs
-	// records as having failed for it.
-	if (file === "scripts/lib/command-usage-guard.mjs") return true;
 	// Generated mirror of hooks/ and .claude/skills/ — the sources are scanned,
 	// and scripts/gen-plugin.mjs' identity gate keeps the copy equal to them.
 	return file.startsWith("plugin/");

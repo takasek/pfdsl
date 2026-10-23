@@ -75,16 +75,6 @@ t-wadaのTDDで。適切な粒度でコミットすること。
 ただし事後的な分割（先に一括で変更してから複数コミットへ割り直す）が中間ファイル再構成等でトークン効率を著しく損なう場合は、論理単位の純度より作業順=コミット順を優先してよい。
 
 変更束はブランチで作業し PR で main に統合する（main 直コミットしない）。
-`scripts/agent-operation-guard.mjs` は Bash・GitHub MCP・Edit・Write・apply_patch の操作先と責務を、ADR-0047 の有限の判定表で判定する。
-primary・default branch・検査回避・PR 統合・別 worktree の変更を保護し、own での通常作業を許可する。
-session の起点と native 所有証拠は所有判定に使い、実行先は literal な先頭 cd の AND-list、git -C、削除対象、書込み先の物理パスから決める。
-同じ命令文字列の pushd・popd、Git target 環境変数・CDPATH の literal な名前への書込みは、変更系 Git を unresolved にする。値や実行順序は追跡しない。
-literal な shell -c・eval の内側も同じ規則で分類し、source・dot が読む file の中身は保証外とする。
-other-live・other-unowned の変更は全主体 deny とし、own の repository 設定だけ Claude 親 ask とする。
-Claude subagent の外向き書込みは親へ返し、agent_type の許可表にある issue-worker だけを例外とする。
-Codex の子は読取と own の通常ファイルの書込みだけを担当する。
-ロード故障・同期停止・未解決入力は回復先を示して deny し、parser 欠落時は案内にある hook root 固定の回復コマンドだけを許可する。
-保証外の shell・Git 構文を増やさず、未決点は所有者へ記録する。
 
 コミットメッセージは**英語**。
 

@@ -287,7 +287,7 @@ artifact:
     group: generation
   implementer_agent:
     label: 実装委譲agent
-    description: "pfd-implementer agent。実装のみを委譲し、push・PR 作成・issue 操作は呼び出し元に残す。手書きだが gen_plugin が plugin へミラーする（#558）。留保指定を機構で担保するのは delegation_guard で、そちらは配布しない"
+    description: "pfd-implementer agent。実装のみを委譲し、push・PR 作成・issue 操作は呼び出し元に残す。手書きだが gen_plugin が plugin へミラーする（#558）。harness が対応する tools 制限と戻り時の照合を使い、全経路の外向き操作の拒否は保証しない"
     criteria: make gen-plugin が差分なしで完了して plugin/pfdsl/agents/pfd-implementer.md が実在し、採用リポで plugin を入れただけで pfd-implementer が起動でき、その tools 列に外向きツール面（GitHub MCP）が無い
     location: "scripts/harness-template/agents/pfd-implementer.md"
     group: generation
@@ -296,18 +296,6 @@ artifact:
     description: "pfd-ops 運用が要求する非ブロッキングな PostToolUse(Bash) advisory 群。hooks/ は成功した flow:managed issue-create の roadmap reminder を含み、gen_plugin がディレクトリ全体をミラーして Claude Code と Codex の plugin host へ配布する"
     criteria: "正本の hooks/hooks.json が各 PostToolUse(Bash) advisory を配線し、make gen-plugin が Claude Code plugin root と Codex plugin root の hooks/ へ取り込み、scripts/lib/gen-plugin.test.mjs が生成済み両 consumer を採用リポに追加インストールなしで実行して flow:managed issue-create の reminder の command 解決、PostToolUse 出力、非ブロッキング（exit 0）を検証する"
     location: "hooks/"
-    group: generation
-  delegation_guard:
-    label: 外向き操作ガード
-    description: "委譲先 subagent の push・PR 作成・issue 操作を拒否する PreToolUse(Bash) フック（#554）。implementer_agent のブリーフが書く留保指定を、指示でなく権限として強制する。.claude/settings.json の配線を伴うリポ固有の機構であり、implementer_agent と違って配布対象外"
-    criteria: Claude subagent の外向き書込みは親へ返す deny とし、issue-worker のみを例外とする。Codex の子は外向き書込みを担当しない。scripts/lib/agent-operation-corpus.test.mjs と scripts/agent-operation-guard.test.mjs が検査する
-    location: "scripts/agent-operation-guard.mjs"
-    group: generation
-  main_branch_guard:
-    label: mainブランチ操作ガード
-    description: "Bash・GitHub MCP・Edit・Write・apply_patch の操作先と責務を ADR-0047 の有限表で判定するリポ固有の入口。Git・fs・native 所有証拠の観測を入口側で行い、分類器と判定表は純関数のままにする。通常動線と安全ケースを同じ重さで扱い、shell・Git の全構文は保証しない"
-    criteria: "性質1〜8を表とコーパスで検査し、Claude・Codex の入口、native 所有証拠、parser の欠落から回復、policy ロード故障を scripts/agent-operation-guard.test.mjs で検査する。live hook と正式な設定読込みの未完了受入は #1404・#1398 に残す"
-    location: "scripts/agent-operation-guard.mjs"
     group: generation
   ecosystem_skill:
     label: PFDセット構築スキル
@@ -436,10 +424,10 @@ process:
     group: generation
     tags: [ knowledge_maintenance ]
   maintain_repo_bindings:
-    label: repo binding・guard・companion整備
+    label: repo binding・companion整備
     description: >
-      decisions が指名した repo-local な binding・guard・companion の正本を改訂する。
-      prose_mechanization_sweep_record の散文・機構矛盾、retro_findings の運用実態との不一致を binding 文言・guard 規則・説明へ反映する。
+      decisions が指名した repo-local な binding・companion の正本を改訂する。
+      prose_mechanization_sweep_record の散文・機構矛盾、retro_findings の運用実態との不一致を binding 文言・説明へ反映する。
       workflow_md の改訂では workflow_pfdsl を突合相手として読み、図の改訂で名指しが食い違った箇所を追随させる。
       bindings_pfd_ops の改訂では ops_skill_general の現行 SKILL.md・work-cycle.md を突合相手として読み、配布層とリポ固有手順の契約を揃える。
       検証コマンドは正本ごとに異なり、各出力 artifact の criteria が一次情報である。
@@ -638,7 +626,7 @@ retro_skill >>? review_examples
 toolchain >>? review_examples
 
 decisions >> maintain_distributed_prompt_assets -> [distributed_advisory_hooks, ecosystem_skill, grill_skill, implementer_agent, ops_skill_general, ops_skill_l3, pfd_lens_agent, retro_skill, review_perspectives]
-decisions >> maintain_repo_bindings -> [adopter_config, bindings_pfd_ops, bindings_pfd_retro, delegation_guard, main_branch_guard, workflow_md]
+decisions >> maintain_repo_bindings -> [adopter_config, bindings_pfd_ops, bindings_pfd_retro, workflow_md]
 decisions >> maintain_repo_local_capabilities -> [distribution_review_perspectives, distribution_review_skill, prose_mechanization_audit_skill, spec_stress_skill, vscode_ext_debug_skill]
 
 distributed_advisory_hooks >>? maintain_distributed_prompt_assets
@@ -654,8 +642,6 @@ review_perspectives >>? maintain_distributed_prompt_assets
 adopter_config >>? maintain_repo_bindings
 bindings_pfd_ops >>? maintain_repo_bindings
 bindings_pfd_retro >>? maintain_repo_bindings
-delegation_guard >>? maintain_repo_bindings
-main_branch_guard >>? maintain_repo_bindings
 workflow_md >>? maintain_repo_bindings
 
 distribution_review_perspectives >>? maintain_repo_local_capabilities
@@ -728,10 +714,8 @@ integrated_repository >>? develop
 vscode_ext_debug_skill >>? develop
 workflow_pfdsl >>? develop
 
-delegation_guard >>? develop
 distribution_review_perspectives >>? develop
 implementer_agent >>? develop
-main_branch_guard >>? develop
 workflow_md >>? develop
 
 issue_updates >>? file_issues
@@ -748,7 +732,7 @@ readme >>? update_readme
 distribution_review_skill >>? review_distribution
 
 
-[bindings_pfd_ops, bindings_pfd_retro, decisions, delegation_guard, main_branch_guard, ops_skill_general, ops_skill_l3, pipeline_md, roadmap_md, workflow_md] >> sweep_prose_mechanization -> prose_mechanization_sweep_record
+[bindings_pfd_ops, bindings_pfd_retro, decisions, ops_skill_general, ops_skill_l3, pipeline_md, roadmap_md, workflow_md] >> sweep_prose_mechanization -> prose_mechanization_sweep_record
 
 prose_mechanization_audit_skill >>? sweep_prose_mechanization
 

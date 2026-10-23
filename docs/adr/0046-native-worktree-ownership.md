@@ -1,6 +1,6 @@
 # ADR-0046: native 所有者の肯定証拠で sibling 誤判定を補正する
 
-- Status: Accepted（変更系 Git の限定補正。#1398 全体の受入は未了）、Superseded in part by ADR-0047（補正を Git だけに限定する条項、所有未確認時の Claude ask、復旧系 ask、file policy を別責務とする条項。native 所有証拠の照合条件は維持）
+- Status: Superseded by [ADR-0050](0050-simplify-agent-operation-protection.md)。native 所有証拠の照合を含む repo の所有判定を撤去する。以下は当時の判断・観測記録として保持する。
 - Date: 2026-10-07
 - 対象: #1398。判断記録: https://github.com/takasek/pfdsl/issues/1398#issuecomment-6022222988
 

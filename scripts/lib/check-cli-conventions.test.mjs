@@ -126,17 +126,6 @@ describe("selectScannedFiles", () => {
 	it("skips the generated plugin mirror", () => {
 		assert.deepEqual(selectScannedFiles(["plugin/pfdsl/hooks/h.mjs"]), []);
 	});
-
-	// This one parses *other* commands' argv, not its own — the shape is the
-	// point of the file. Excluded by name rather than by trying to tell whose
-	// argv an array holds, which is the analysis check-no-shell-strings.mjs
-	// records as having failed for it.
-	it("skips the guard that inspects other commands' arguments", () => {
-		assert.deepEqual(
-			selectScannedFiles(["scripts/lib/command-usage-guard.mjs"]),
-			[],
-		);
-	});
 });
 
 describe("per-rule exemptions", () => {
@@ -145,7 +134,6 @@ describe("per-rule exemptions", () => {
 		".agents/skills/pfd-ops/scripts/check-install-sync.mjs",
 		"scripts/harness-template/skills/pfd-ops/scripts/check-install-sync.mjs",
 	];
-	const FOREIGN_ARGV_GUARDS = ["scripts/lib/agent-operation-classifier.mjs"];
 
 	// Its lookup decides what the error says, not what the script does: the
 	// hint has to run ahead of the strict parse or --force reads as a plain
@@ -169,17 +157,6 @@ describe("per-rule exemptions", () => {
 			"if (import.meta.url === `file://${process.argv[1]}`) main();";
 		for (const file of CHECK_INSTALL_SYNC_MIRRORS) {
 			assert.equal(findCliConventionViolations(source, file).length, 1);
-		}
-	});
-
-	it("exempts foreign-argv guard flag lookups without exempting entrypoints", () => {
-		const flagLookup = `if (token.startsWith("--work-tree=")) {}`;
-		const entrypoint =
-			// biome-ignore lint/suspicious/noTemplateCurlyInString: fixture source under test, not an interpolation
-			"if (import.meta.url === `file://${process.argv[1]}`) main();";
-		for (const file of FOREIGN_ARGV_GUARDS) {
-			assert.deepEqual(findCliConventionViolations(flagLookup, file), []);
-			assert.equal(findCliConventionViolations(entrypoint, file).length, 1);
 		}
 	});
 });

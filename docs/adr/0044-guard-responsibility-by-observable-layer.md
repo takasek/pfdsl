@@ -1,6 +1,6 @@
 # ADR-0044: worktree 運用ガードの責務を、効果を観測できる層へ移す
 
-- Status: Superseded in part by ADR-0046（Bash 経由の変更系 Git の所有権判定と関連する削除方針。その他の Decision は保持し、その未実装部分は後続 PR で扱う）、Superseded in part by ADR-0047（変更系 Git の target・default branch・sibling 判定の削除方針と、検査回避・委譲先の外向き操作・作用先・merge の hook 責務）
+- Status: Superseded in part by [ADR-0050](0050-simplify-agent-operation-protection.md)（repo policy・harness の隔離前提・委譲先拒否・関連する移行方針と GitHub の責務）。Git 層の pre-commit・共有 shim・setup は維持する。ADR-0046・0047 による過去の置換も ADR-0050 に統合した。
 - Date: 2026-10-04
 
 ## Context
@@ -45,6 +45,9 @@ PR の触ったテストは全て通っていた。
 所有者は 2026-10-04 にこの方針を承認した。
 
 ## Decision
+
+Git 層以外の上記対象は ADR-0050 に置き換えられた。
+以下の旧記述は当時の判断として保持し、現行の repo guard や native 隔離の保証として扱わない。
 
 ### 脅威モデル
 

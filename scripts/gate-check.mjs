@@ -263,18 +263,13 @@ const sizeReport = collectSizeDeltas({
 });
 
 // `root` here is this script's own location (resolved from import.meta.url
-// above), not the shell's cwd. gate-check's PreToolUse guard
-// (verification-tree-guard.mjs) already stops most cwd-drifted runs before
-// they start, but a run that slips past it (e.g. inside a subagent) still
-// needs to be checkable after the fact — and it is only checkable if the
-// tree named here is the one gate-check actually inspected, not wherever the
-// invoking shell happened to be sitting (#840).
+// above), not the shell's cwd. Report the tree gate-check actually inspected
+// so the result can be matched to the intended checkout after the run (#840).
 const mainRootLookup = exec("git", ["rev-parse", "--git-common-dir"]);
 const branchLookup = rawExec("git", ["rev-parse", "--abbrev-ref", "HEAD"]);
 // Either lookup failing (e.g. no git on PATH) must not stop the gate itself
 // — only this report line degrades, to a null-branch/root-as-mainRoot line
-// via formatRunTreeLine, same as verification-tree-guard.mjs's own read of a
-// failed git call as "cannot tell".
+// via formatRunTreeLine.
 const mainRoot = mainRootLookup.ok
 	? dirname(resolve(root, mainRootLookup.out.trim()))
 	: root;

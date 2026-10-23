@@ -145,10 +145,8 @@ export function formatGateTable(results) {
  * A worktree session's shell cwd can drift back to the main checkout between
  * commands; a gate run there is silently checking a tree without the
  * branch's changes, and a PASS from it reads exactly like a PASS from the
- * worktree. This does not stop that run (verification-tree-guard.mjs's
- * PreToolUse hook does, for the paths it can see) — it prints where the run
- * happened, so a run that slipped past that guard (e.g. inside a subagent) is
- * still checkable after the fact.
+ * worktree. Reporting the inspected tree makes that distinction checkable
+ * after the run; it does not prevent a run in the wrong checkout.
  * @param {{root: string, mainRoot: string, branch: string | null}} params
  *   - root: the tree gate-check actually inspected (its own script location,
  *     not cwd — see the call site for why those can differ).
