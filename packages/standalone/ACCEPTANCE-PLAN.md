@@ -91,6 +91,7 @@ Recentを左側や開始画面へ常設せず、本文とdirtyを保つ。
 操作：起動→キーでNew/Open→Try a sample→最後のtab閉鎖を行う。Newを複数回行って途中のtabを閉じ、最小空き番号の再利用とSampleのSave As既定名を確認する。実ファイル起動と同名文書の保存・閉鎖対象、完全な場所も確認する。
 期待：自動Welcome＋sampleの2文書を開かず、文書ゼロだけ開始画面を示す。実文書を優先しNew後editorへfocusする。
 文書名はtabとwindow titleに表示し、headerは短い状態とlocationを示す。locationは1行で省略表示し、titleから完全pathを確認できる。
+native titleはDOM titleとは別にウィンドウ管理側で確認する（#1514）。文書ゼロのPFDSL、新規名、Open、Save As後の名前、dirtyの` •`、同名時の親path補足、片方を閉じた後の補足解除を確認する。連続切替後も最後の文書へ収束し、IPC失敗時は案内が出て編集を続けられることを確認する。
 sampleはSampleと表示しSave As既定名をSample.pfdslにする。Untitledは現在開く文書名の最小空き番号を使う。
 同名文書を区別し、長い名前・場所をtooltipだけに頼らず識別して、セッション復元を追加しない。
 同名タブの補足は一意になる最短の親path末尾を使い、tooltipには完全pathを残す。同じ末尾folder名、root直下、片方の親pathが他方の末尾になる組合せ、Save Asと閉鎖後の再計算も確認する。
@@ -103,6 +104,7 @@ sampleはSampleと表示しSave As既定名をSample.pfdslにする。Untitled�
 操作：New/Open/Save/Save As/Find/Undo/Redo/Clipboard、Close Tab/Window、Format flows/flat、Normalized edges、sidebar、図操作、Previous/Next Tabをmenuと標準キー、残るbutton／右clickで実行する。
 Ctrl+Tab／Ctrl+Shift+TabはWebView側が処理し、native menuの同名項目はキー表示のみとする。
 2タブと3タブでeditorとFitから一回ずつ切り替え、二重実行がなく、IME変換中・dialog表示中・busy時は切り替わらないことを確認する。
+切替直後と処理完了後のnative titleを記録し、古い文書名が後着しないことを確認する（#1514）。
 期待：Fileは文書管理、Editは変更、Viewは表示、Windowはtab/windowを扱い、PFDSL/Helpの既存役割と英語名称を保つ。
 同じ有効条件で正しい対象へ一度だけ働き、項目を残して無効理由を伝える。
 標準キーを転用せずIME・入力欄・OS操作を奪わない。
@@ -125,7 +127,10 @@ Tauri採用だけで合格にせず、独自キー設定画面を追加しない
 期待：保存結果はAに帰属し、Bの本文・dirty・Undoを変えない。
 BにAのSavedを現在状態として残さず、A再編集で表示を更新する。
 通知消失で未保存／外部変更状態を消さず、取消でbufferと未解決状態を保つ。
+`Current diagnostics`と`Last action`を区別し、後者の発生文書を確認する（#1516）。Aの一時通知はBに表示せず、A編集後は消える。`Dismiss action notice`で一時通知を閉じ、診断と本文は保持される。Aの保存失敗はBへ切替後もAのpath付き`Save needs attention`として残り、Aを編集しても消えず、保存・回復成功で解消する。時間経過や一時通知のdismissで保存失敗を消さない。politeな読み上げで同じ通知を描画ごとに繰り返さないことも確認する。
 状態：M未実施。記録：未記入。時機未観測の変種は未実施。
+読み上げの残件（#1516）：連続入力で `Checking…` と診断件数の変化が過剰に読まれないか、複数文書の保存失敗がある状態で新規通知を出すと既存の全行が再読されないかを VoiceOver 等で確認する。
+DOM の aria-live 属性検査や診断統合テストだけでは、この確認を完了したと扱わない。
 
 ### GUI-07：外部変更の説明とテキスト比較
 
@@ -135,6 +140,7 @@ BにAのSavedを現在状態として残さず、A再編集で表示を更新す
 read-only表示と色以外の差分区別を保ち、取消は内容と未解決状態を保持する。
 再競合は再確認し、file不在ではUse diskを無効にする。
 自動競合解決・確認削減を追加しない。
+回復案内が必要な間は操作通知のdismissや現在診断の更新で失われず、回復後は解消済みの保存失敗が残らないことを確認する（#1516）。
 入口：既存の`Review and Save Here…`／`Use Current Disk Version…`と保存前比較。比較はMonacoのread-onlyな左右diff editorを使い、変更gutter・行対応・overviewと独立した長行scrollを確認する。`Editor content`と`Observed disk content`は既存のOperationPlanに束縛された版で、表示部品自身は文書やdiskを書き換えない。
 状態：M未実施。記録：未記入。#1260の構造差分とは別。
 
@@ -387,6 +393,7 @@ Quick Fix候補の表示中に同じ文書を編集してから適用する時�
 依存先の座標をentry本文の位置と誤認させず、正常なstatusStyles継承への修正後は依存表示が消えることを確認する。
 期待：形式と選択境界が合い、authored未保存source/診断と依存診断を分離する。
 lenient表示と一度読んだ同じ依存snapshotを使い、別tabへ古い結果を漏らさない。
+Mでは`Current diagnostics`が最新snapshotの件数を示し、解析待ちは`Checking…`へ切り替わることを確認する（#1516）。定義追加後のW002入力案内が`Last action`に表示された後、criteriaを入力し、古い案内が消えて最新warning数が減ることを確認する。遅延した旧版の解析失敗と閉鎖済み文書の結果は現在診断へ表示しない。
 状態：M/V各未実施。記録：未記入。
 
 ## 外部参照・構造差分・command
@@ -415,6 +422,7 @@ label/statusだけの変更とnode/edge変更を分けて確認し、比較後�
 期待：現在側は未保存内容で正しい対象を比較し、承認済みの現行VS Codeと同じmetadata比較を含める。
 source/dirty/Undoを表示だけで変えず、古い結果を新対象へ適用しない。
 GUI-07の保存競合text比較を前提にしない。
+Mでは比較読取失敗を現在診断と混同せず`Last action`として読み、再比較成功またはClearでその通知が消えることを確認する（#1516）。比較読取中の本文編集・別tab切替・閉鎖後に旧処理が失敗しても、新しい文書や版へエラーを表示しない。
 状態：M/V各未実施。記録：未記入。
 
 ### GUI-32：Git不在と単独file
@@ -543,6 +551,7 @@ debug/ad-hoc署名appの成功を正式配布物へ転写しない。
 操作：Save/Save As無効理由とキー非書込み、closeの保持既定／明示Discard、外部変更の採用取消を確認する。
 期待：UI/nativeで保存不可を守り取消で本文を保つ。
 露出しない独立Quit入口は未実施と分け、Mac保存／Quitを転写しない。
+GUI-27のhover再試験も同じ対象版で行う（#1513）。配布物のSHA-256、OS・WebKitGTK版、CPU実行方式、X11/Wayland・描画環境、fixtureのSHA-256、操作時刻を固定する。撮影なし／撮影あり／自動キー操作を区別し、labelのみ・criteriaのみ・group＋criteria・descriptionありを比較する。アプリ・network・WebKitWebProcessのPIDと終了時刻、stderr、利用できるexit status・signal・crash/core・OOM情報を保存する。元ホスト、別Linux、Macの結果は別行に残す。プロセス存否だけで原因を断定せず、非再現だけで解消扱いにしない。
 状態：L未実施。記録：未記入。Mac/V公開ゲート外で正式Linux対応に広げない。
 
 ## 実装時の具体化

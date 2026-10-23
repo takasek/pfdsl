@@ -28,6 +28,7 @@ export function createDocumentTab(options){
  options.parent.append(container);button.textContent=options.name;
  const tab={key:options.key,container,button,location:options.path,read:options.read,references:options.referenceServices,setSourceCalls:0,
   activate(){},focus(){},command(){},canDiagram(){return true;},canCreateDefinition(){return false;},
+  report:options.reportStatus, getDiagnosticsSummary:()=>"No problems",
   dispose(){container.remove();button.remove();hook('dispose',tab);},
   getSource:()=>source,getRevision:()=>revision,
   type(s){source=s;revision++;hook('type',tab,s);options.onChange?.();},
@@ -47,7 +48,7 @@ const comparisonStub = `export function createTextComparison(parent, local, disk
  * The bundle also publishes `opened`, `active` and `busy` through
  * globalThis.reviewEntries / reviewActive / reviewBusy.
  */
-export async function bundleHost(outfile) {
+export async function bundleHost(outfile, { realDocumentTabs = false } = {}) {
 	await build({
 		stdin: {
 			contents:
@@ -61,7 +62,47 @@ export async function bundleHost(outfile) {
 		bundle: true,
 		platform: "node",
 		format: "esm",
+		...(realDocumentTabs ? { packages: "external" } : {}),
 		plugins: [
+			...(realDocumentTabs
+				? [
+						{
+							name: "production-document-tabs",
+							setup(b) {
+								const seam = `${root}/packages/standalone/test/helpers/lifecycle-monaco.mjs`;
+								b.onResolve({ filter: /^monaco-editor\// }, (args) =>
+									args.path.includes("worker")
+										? undefined
+										: { path: seam, external: true },
+								);
+								b.onResolve({ filter: /^@pfdsl\/editor$/ }, (args) => ({
+									path: args.path,
+									external: true,
+								}));
+								b.onResolve({ filter: /^\.\/document-tab\.js$/ }, () => ({
+									path: "real-tab",
+									namespace: "real-tab",
+								}));
+								b.onLoad({ filter: /.*/, namespace: "real-tab" }, () => ({
+									contents: `
+import {createDocumentTab as create} from ${JSON.stringify(`${root}/packages/standalone/src/document-tab.ts`)};
+import {instances} from ${JSON.stringify(seam)};
+export function createDocumentTab(options) {
+ const tab = create(options), editor = instances.at(-1);
+ tab.type = source => { editor.model.source = source; editor.model.version++; editor.callbacks.onDidChangeModelContent(); };
+ (globalThis.reviewTabs ??= []).push(tab);
+ return tab;
+}`,
+									resolveDir: `${root}/packages/standalone/src`,
+								}));
+								b.onResolve({ filter: /lifecycle-monaco\.mjs$/ }, () => ({
+									path: seam,
+									external: true,
+								}));
+							},
+						},
+					]
+				: []),
 			{
 				name: "review-seams",
 				setup(b) {
@@ -83,7 +124,7 @@ export async function bundleHost(outfile) {
 										: args.path === "@tauri-apps/api/event"
 											? "export const listen=(...args)=>globalThis.nativeListen(...args);"
 											: args.path === "@tauri-apps/api/window"
-												? "export const getCurrentWindow=()=>({onCloseRequested(){},destroy(){}});"
+												? "export const getCurrentWindow=()=>({onCloseRequested(){},destroy(){},async setTitle(title){return globalThis.reviewSetTitle?.(title)}});"
 												: args.path === "@pfdsl/editor"
 													? 'export const previewStyles="";'
 													: args.path === "./acceptance.js"

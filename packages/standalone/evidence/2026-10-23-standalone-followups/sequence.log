@@ -1,0 +1,15 @@
+2026-10-23T14:11:36,898301085+00:00
+9289 /run/rosetta/rosetta ././/lib/x86_64-linux-gnu/webkit2gtk-4.1/WebKitWebProcess 4 35
+2026-10-23T14:11:38,711008044+00:00
+9289 /run/rosetta/rosetta ././/lib/x86_64-linux-gnu/webkit2gtk-4.1/WebKitWebProcess 4 35
+2026-10-23T14:11:41,168081254+00:00
+
+(pfdsl-desktop:9195): Gtk-CRITICAL **: 14:09:33.738: gtk_tree_model_get_iter_first: assertion 'GTK_IS_TREE_MODEL (tree_model)' failed
+
+(pfdsl-desktop:9195): Gtk-CRITICAL **: 14:09:33.747: gtk_tree_model_get_iter_first: assertion 'GTK_IS_TREE_MODEL (tree_model)' failed
+
+(pfdsl-desktop:9195): Gtk-CRITICAL **: 14:09:33.755: gtk_tree_model_get_iter_first: assertion 'GTK_IS_TREE_MODEL (tree_model)' failed
+
+(pfdsl-desktop:9195): Gtk-CRITICAL **: 14:09:33.763: gtk_tree_model_get_iter_first: assertion 'GTK_IS_TREE_MODEL (tree_model)' failed
+
+(pfdsl-desktop:9195): Gtk-CRITICAL **: 14:09:33.771: gtk_tree_model_get_iter_first: assertion 'GTK_IS_TREE_MODEL (tree_model)' failed

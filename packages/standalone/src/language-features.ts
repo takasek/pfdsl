@@ -209,7 +209,8 @@ export function registerLanguageFeatures(
 				try {
 					await navigation?.open({ field, value });
 				} catch (error) {
-					reportStatus(String(error));
+					if (!disposed && model.getVersionId() === version)
+						reportStatus(String(error));
 				}
 			},
 		}),
@@ -228,7 +229,8 @@ export function registerLanguageFeatures(
 				try {
 					await navigation?.run(command);
 				} catch (error) {
-					reportStatus(String(error));
+					if (!disposed && model.getVersionId() === version)
+						reportStatus(String(error));
 				}
 			},
 		}),

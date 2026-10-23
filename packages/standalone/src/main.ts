@@ -19,6 +19,7 @@ import "./style.css";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { installNativeMenu, type RecentTarget } from "./native-menu.js";
 import { createTextComparison } from "./text-comparison.js";
+import { createWindowTitle } from "./window-title.js";
 
 (self as unknown as { MonacoEnvironment: unknown }).MonacoEnvironment = {
 	getWorker: () => new EditorWorker(),
@@ -27,11 +28,28 @@ const style = document.createElement("style");
 style.textContent = previewStyles;
 document.head.append(style);
 const status = document.querySelector<HTMLElement>("#status")!;
+status.setAttribute("aria-live", "polite");
+status.setAttribute("aria-atomic", "true");
+const diagnostics = document.createElement("div");
+diagnostics.id = "diagnostics";
+diagnostics.setAttribute("role", "status");
+diagnostics.setAttribute("aria-live", "polite");
+diagnostics.setAttribute("aria-atomic", "true");
+status.before(diagnostics);
+const dismissStatus = document.createElement("button");
+dismissStatus.id = "dismiss-status";
+dismissStatus.textContent = "Dismiss action notice";
+dismissStatus.hidden = true;
+status.after(dismissStatus);
 const showExportResults = createExportResults(document.body, report);
 const tabs = document.querySelector<HTMLElement>("#tabs")!;
 const documents = document.querySelector<HTMLElement>("#documents")!;
 const conflicts = document.querySelector<HTMLElement>("#conflicts")!;
 const native = "__TAURI_INTERNALS__" in window;
+const updateNativeTitle = createWindowTitle(
+	(title) => getCurrentWindow().setTitle(title),
+	(error) => report(`Could not update the window title: ${String(error)}`),
+);
 let nativeMenu: Awaited<ReturnType<typeof installNativeMenu>> | undefined;
 let folderRoot: string | undefined;
 let recentTargets: RecentTarget[] = [];
@@ -47,7 +65,6 @@ function updateSaveControls() {
 	updateMenu();
 }
 async function loadSaveCapability() {
-	const previousReason = saveCapability.reason;
 	try {
 		const capability = await invoke<{ save: boolean; reason: string | null }>(
 			"document_capabilities",
@@ -69,10 +86,13 @@ async function loadSaveCapability() {
 			reason: `Could not determine document saving support: ${String(error)}. Saving is disabled.`,
 		};
 	}
-	if (status.textContent === previousReason)
-		status.textContent = saveCapability.save
-			? "Document saving is available."
-			: saveCapability.reason;
+	for (const entry of opened) {
+		if (entry.notice?.channel === "capability")
+			entry.notice = saveCapability.save
+				? undefined
+				: { ...entry.notice, message: saveCapability.reason };
+	}
+	renderStatus();
 	updateSaveControls();
 	renderConflict();
 }
@@ -83,6 +103,10 @@ interface Entry {
 	navigation: HTMLElement;
 	path: string | null;
 	documentID: number | undefined;
+	notice?:
+		| { message: string; revision: number | string; channel: string }
+		| undefined;
+	saveNotice?: { message: string } | undefined;
 }
 const opened = new Set<Entry>();
 const documentHandles = new Set<number>();
@@ -97,6 +121,66 @@ async function releaseUnusedDocuments() {
 let active: Entry | undefined;
 let serial = 0;
 let busy = false;
+let appNotice = "";
+function renderStatus() {
+	for (const entry of opened) {
+		if (entry.notice && entry.notice.revision !== entry.tab.getRevision())
+			entry.notice = undefined;
+	}
+	const lines = [...opened].flatMap((entry) =>
+		entry.saveNotice
+			? [
+					`Save needs attention — ${entry.path ?? entry.name}: ${entry.saveNotice.message}`,
+				]
+			: [],
+	);
+	if (active?.notice)
+		lines.push(
+			`Last action — ${active.path ?? active.name}: ${active.notice.message}`,
+		);
+	if (appNotice) lines.push(`Application notice: ${appNotice}`);
+	const text = lines.join("\n");
+	if (status.textContent !== text) status.textContent = text;
+	dismissStatus.hidden = !active?.notice && !appNotice;
+	const summary = active
+		? `Current diagnostics — ${active.path ?? active.name}: ${active.tab.getDiagnosticsSummary?.() ?? "Checking…"}`
+		: "";
+	if (diagnostics.textContent !== summary) diagnostics.textContent = summary;
+}
+function notify(
+	message: string,
+	entry: Entry | undefined,
+	channel = "action",
+	revision: number | string | undefined = entry?.tab.getRevision(),
+) {
+	if (entry) {
+		if (!opened.has(entry)) return;
+		if (!message && entry.notice?.channel !== channel) return;
+		entry.notice = message
+			? { message, revision: revision!, channel }
+			: undefined;
+	} else appNotice = message;
+	renderStatus();
+}
+function saveNotice(
+	entry: Entry,
+	message: string,
+	resolved = false,
+	revision: number | string = entry.tab.getRevision(),
+) {
+	if (!opened.has(entry)) return;
+	entry.saveNotice = resolved ? undefined : { message };
+	if (resolved) notify(message, entry, "action", revision);
+	else {
+		entry.notice = undefined;
+		renderStatus();
+	}
+}
+dismissStatus.onclick = () => {
+	if (active) active.notice = undefined;
+	appNotice = "";
+	renderStatus();
+};
 const readFor =
 	(id: number | undefined) =>
 	async (path: string): Promise<string | null> => {
@@ -110,7 +194,7 @@ const readFor =
 		}
 	};
 function report(error: unknown) {
-	status.textContent = String(error);
+	notify(String(error), undefined);
 }
 function basename(path: string) {
 	return path.split("/").pop()!;
@@ -172,7 +256,11 @@ function renderWorkspace() {
 	location.textContent = active?.path ?? (active ? "Not saved to a file" : "");
 	location.title = active?.path ?? (active ? "Not saved to a file" : "");
 	location.hidden = !active;
-	document.title = active ? `${active.name} — PFDSL` : "PFDSL";
+	document.title = active
+		? `${active.tab.button.textContent} — PFDSL`
+		: "PFDSL";
+	if (native) updateNativeTitle(document.title);
+	renderStatus();
 	for (const file of document.querySelectorAll<HTMLButtonElement>(
 		"#files button",
 	))
@@ -278,8 +366,9 @@ function openDocument(name: string, source: string, disk: DiskSnapshot | null) {
 			: undefined,
 		exportServices: native ? nativeExportServices : undefined,
 		showExportResults,
-		reportStatus: (message) =>
-			report(entry ? `${entry.name}: ${message}` : message),
+		reportStatus: (message, channel) => {
+			if (entry) notify(message, entry, channel);
+		},
 		onChange: () => {
 			if (entry) renderWorkspace();
 		},
@@ -393,7 +482,7 @@ async function showFolder(root: string) {
 	}
 	await invoke("remember_folder", { path: root });
 	await refreshRecent();
-	status.textContent = `Opened ${root}. Save documents explicitly.`;
+	notify(`Opened ${root}. Save documents explicitly.`, undefined);
 }
 function choose(
 	title: string,
@@ -455,7 +544,10 @@ function otherOpenTarget(entry: Entry, target: DiskSnapshot) {
 function explainOpenTarget(entry: Entry, target: DiskSnapshot) {
 	const other = otherOpenTarget(entry, target);
 	if (!other) return false;
-	status.textContent = `The target is already open as ${other.name}. Both editor buffers are retained. Choose another file or close that tab explicitly.`;
+	saveNotice(
+		entry,
+		`The target is already open as ${other.name}. Both editor buffers are retained. Choose another file or close that tab explicitly.`,
+	);
 	return true;
 }
 async function saveEntry(
@@ -465,14 +557,16 @@ async function saveEntry(
 	confirmation?: OperationPlan,
 ): Promise<boolean> {
 	if (!saveCapability.save) {
-		status.textContent = saveCapability.reason;
+		notify(saveCapability.reason, entry, "capability");
 		return false;
 	}
 	const session = entry.session;
 	const checkConfirmation = () => {
 		if (confirmation && !session.holds(confirmation, "editor")) {
-			status.textContent =
-				"The document changed after the decision was asked. Editor content is retained; close it again.";
+			saveNotice(
+				entry,
+				"The document changed after the decision was asked. Editor content is retained; close it again.",
+			);
 			return false;
 		}
 		return true;
@@ -482,9 +576,19 @@ async function saveEntry(
 	const chosen = as || !target;
 	let inspected = false;
 	if (chosen) {
-		target = await invoke<DiskSnapshot | null>("choose_save_target", {
-			name: entry.name.endsWith(".pfdsl") ? entry.name : `${entry.name}.pfdsl`,
-		});
+		try {
+			target = await invoke<DiskSnapshot | null>("choose_save_target", {
+				name: entry.name.endsWith(".pfdsl")
+					? entry.name
+					: `${entry.name}.pfdsl`,
+			});
+		} catch (error) {
+			saveNotice(
+				entry,
+				`Could not select the save target: ${String(error)}. The save was not attempted. Editor content is retained; try Save As again.`,
+			);
+			return false;
+		}
 		if (!target) return false;
 		documentHandles.add(target.id);
 	} else {
@@ -500,7 +604,10 @@ async function saveEntry(
 			session.observe(remembered, { error }, scope);
 			renderWorkspace();
 			renderConflict();
-			status.textContent = `Could not read ${remembered.path}: ${String(error)}. The save was not attempted. Editor content is retained.`;
+			saveNotice(
+				entry,
+				`Could not read ${remembered.path}: ${String(error)}. The save was not attempted. Editor content is retained.`,
+			);
 			return false;
 		}
 		// Even a no-op or reload exit must still belong to the Close Save decision.
@@ -511,8 +618,11 @@ async function saveEntry(
 		// A clean editor has nothing to save: it follows the disk instead of replacing it.
 		if (!observed && outcome === "reloaded") {
 			syncLocation(entry);
-			status.textContent =
-				"Reloaded the current disk version; there was nothing to save.";
+			saveNotice(
+				entry,
+				"Reloaded the current disk version; there was nothing to save.",
+				true,
+			);
 			renderWorkspace();
 			renderConflict();
 			return true;
@@ -526,7 +636,7 @@ async function saveEntry(
 			fresh.source === entry.tab.getSource()
 		) {
 			syncLocation(entry);
-			status.textContent = "Already saved.";
+			saveNotice(entry, "Already saved.", true);
 			renderWorkspace();
 			renderConflict();
 			return true;
@@ -576,8 +686,10 @@ async function saveEntry(
 		}),
 	);
 	if (outcome.stale) {
-		status.textContent =
-			"The document changed while the review was open. Editor content is retained; review it again.";
+		saveNotice(
+			entry,
+			"The document changed while the review was open. Editor content is retained; review it again.",
+		);
 		renderWorkspace();
 		renderConflict();
 		return false;
@@ -588,7 +700,15 @@ async function saveEntry(
 			report(`Saved; recent targets could not be updated: ${String(error)}`),
 		);
 	}
-	status.textContent = `${entry.name}: ${outcome.message || (outcome.saved ? "Saved." : "The save was not accepted. Editor content is retained.")}`;
+	saveNotice(
+		entry,
+		outcome.message ||
+			(outcome.saved
+				? "Saved."
+				: "The save was not accepted. Editor content is retained."),
+		outcome.saved,
+		plan.editorVersion,
+	);
 	renderWorkspace();
 	renderConflict();
 	return outcome.saved;
@@ -665,20 +785,33 @@ async function useDiskVersion(entry: Entry) {
 		});
 	} catch (error) {
 		session.observe(observed, { error }, scope);
-		throw error;
+		saveNotice(
+			entry,
+			`Could not read the recovery target: ${String(error)}. Editor content is retained; review it again.`,
+		);
+		return;
 	}
 	session.observe(observed, { snapshot: current }, scope);
 	if (explainOpenTarget(entry, current)) return;
 	if (!session.adopt(plan)) {
-		status.textContent = session.holds(plan, "editor")
-			? "The disk changed again. Review the new version."
-			: "The editor changed during the read. Your new edits are retained; review again.";
+		saveNotice(
+			entry,
+			session.holds(plan, "editor")
+				? "The disk changed again. Review the new version."
+				: "The editor changed during the read. Your new edits are retained; review again.",
+		);
 		return;
 	}
 	syncLocation(entry);
+	const adoptedRevision = entry.tab.getRevision();
 	await remember(current.path).catch(report);
 	renderWorkspace();
-	status.textContent = "Reloaded the current disk version.";
+	saveNotice(
+		entry,
+		"Reloaded the current disk version.",
+		!session.panel(),
+		adoptedRevision,
+	);
 }
 function dispose(entry: Entry) {
 	opened.delete(entry);

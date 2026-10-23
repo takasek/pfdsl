@@ -3,15 +3,24 @@ export const instances = [];
 export const language = {};
 export const markerCalls = [];
 export const snapshotCalls = [];
+export const linkOpeners = [];
 export const Uri = { parse: (value) => value };
 export const MarkerSeverity = { Error: 8, Warning: 4, Info: 2 };
 export const editor = {
-	registerLinkOpener() {
+	registerLinkOpener(opener) {
+		linkOpeners.push(opener);
 		return { dispose() {} };
 	},
 	createModel(source) {
 		return {
 			source,
+			version: 1,
+			getVersionId() {
+				return this.version;
+			},
+			getValue() {
+				return this.source;
+			},
 			dispose() {
 				this.disposed = true;
 			},
@@ -20,6 +29,7 @@ export const editor = {
 	create(_element, { model }) {
 		const callbacks = {};
 		const instance = {
+			actions: new Map(),
 			getId: () => `lifecycle-${instances.indexOf(instance)}`,
 			model,
 			callbacks,
@@ -31,7 +41,8 @@ export const editor = {
 				this.renders++;
 			},
 			layout() {},
-			addAction() {
+			addAction(action) {
+				this.actions.set(action.id, action);
 				return { dispose() {} };
 			},
 			dispose() {

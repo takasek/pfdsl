@@ -141,6 +141,7 @@ const keys = [
 	"reviewTabs",
 	"reviewTabHook",
 	"reviewNormalize",
+	"reviewSetTitle",
 ];
 
 export const flush = async () => {
@@ -199,7 +200,7 @@ export class InspectGate {
 }
 
 /** Bundles the production host once; every started host re-evaluates it. */
-export async function createHarness(label) {
+export async function createHarness(label, options) {
 	const old = new Map(
 		keys.map((key) => [key, Object.getOwnPropertyDescriptor(globalThis, key)]),
 	);
@@ -207,7 +208,7 @@ export async function createHarness(label) {
 		join(root, `packages/standalone/node_modules/.${label}-`),
 	);
 	const output = join(temp, "main.mjs");
-	await bundleHost(output);
+	await bundleHost(output, options);
 	let cellSerial = 0;
 	after(() => {
 		for (const key of keys) {
@@ -344,8 +345,8 @@ export async function createHarness(label) {
 					? handlers.capabilities()
 					: { save: true, reason: null };
 			if (command === "list_recent") return [];
-			if (command === "remember_document" || command === "release_document")
-				return;
+			if (command === "remember_document") return handlers.remember?.();
+			if (command === "release_document") return;
 			if (command === "exit_listener_ready") return;
 			if (command === "read_dependency") {
 				log.push({

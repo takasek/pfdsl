@@ -10,6 +10,10 @@
 
 ## 基盤段階の機能対応と版別履歴
 
+2026-10-23 の #1513・#1514・#1516 の追加調査と macOS 中間版の部分確認は [検証記録](evidence/2026-10-23-standalone-followups/README.md) を参照する。
+Linux hover の終了は2試行で再現せず、#1513 は未解決。
+macOS のタイトル・診断表示は独立した実操作で部分確認したが、保存後のタイトルや最終追加修正の実機確認は未完了であり、#1445 の全受入合格には更新しない。
+
 参照する現行拡張: `459dfa74cd80c390017e4983834751721e4a4480`。
 機能一覧は、その版の `packages/vscode-extension/package.json`、`src/extension.ts` と各登録 provider・内部 command を照合した。
 専用 configuration の宣言はない。

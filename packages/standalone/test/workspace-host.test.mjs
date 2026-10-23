@@ -8,6 +8,38 @@ import {
 } from "./helpers/lifecycle-harness.mjs";
 
 const { startHost } = await createHarness("workspace-ui");
+
+test("native titles follow new, open, edits, Save As, tab switches and final close", async () => {
+	const writes = [];
+	const native = new FakeNative();
+	const doc = native.add(1, "flow.pfdsl", "a >> p -> b");
+	const target = native.add(2, "renamed.pfdsl", null);
+	const host = await startHost(native, doc, {
+		choose: async () => native.snapshot(target),
+		confirm: async () => "discard",
+	});
+	globalThis.reviewSetTitle = async (title) => {
+		writes.push(title);
+	};
+	try {
+		await host.newDocument();
+		assert.equal(writes.at(-1), "Untitled 1 — PFDSL");
+		await host.open(doc);
+		assert.equal(writes.at(-1), "flow.pfdsl — PFDSL");
+		host.activeTab().type("a >> q -> b");
+		await flush();
+		assert.equal(writes.at(-1), "flow.pfdsl • — PFDSL");
+		await host.command("save-as");
+		assert.equal(writes.at(-1), "renamed.pfdsl — PFDSL");
+		await host.command("next-tab");
+		assert.equal(writes.at(-1), "Untitled 1 — PFDSL");
+		await host.command("close-tab");
+		await host.command("close-tab");
+		assert.equal(writes.at(-1), "PFDSL");
+	} finally {
+		await host.finish();
+	}
+});
 const productionStyles = readFileSync(
 	new URL("../src/style.css", import.meta.url),
 	"utf8",
@@ -361,7 +393,7 @@ test("keeps document state current through edits and tab switches, disambiguatin
 		assert.match(host.activeTab().button.textContent, /B/);
 		assert.match(host.query("#document-location").textContent, /B\/same.pfdsl/);
 		assert.equal(host.query("#document-location").title, "/B/same.pfdsl");
-		assert.equal(host.dom.window.document.title, "same.pfdsl — PFDSL");
+		assert.equal(host.dom.window.document.title, "same.pfdsl — B — PFDSL");
 		a.button.click();
 		assert.match(host.query("#document-state").textContent, /Modified/);
 		assert.equal(host.query("#document-location").title, "/A/same.pfdsl");

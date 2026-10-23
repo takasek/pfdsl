@@ -71,10 +71,15 @@ export function registerExportFeatures(
 					: `Export as ${format.toUpperCase()}…`,
 			contextMenuGroupId: "pfdsl-export",
 			async run() {
+				const requestedVersion = editor.getModel()!.getVersionId();
 				try {
 					await run.run(format === "all" ? exportFormats : [format]);
 				} catch (error) {
-					if (!disposed) report(String(error));
+					if (
+						!disposed &&
+						editor.getModel()!.getVersionId() === requestedVersion
+					)
+						report(String(error));
 				}
 			},
 		}),

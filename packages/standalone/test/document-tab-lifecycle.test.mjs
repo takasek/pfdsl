@@ -103,10 +103,27 @@ export async function processSnapshot(...args) {
 		assert.equal(first.button.getAttribute("role"), "tab");
 		assert.equal(first.button.getAttribute("aria-selected"), "false");
 		first.activate();
+		assert.equal(first.getDiagnosticsSummary(), "Checking…");
 		await waitFor(() => first.container.querySelector("#inner svg"));
+		assert.notEqual(first.getDiagnosticsSummary(), "Checking…");
 		const oldEditor = instances.at(-1);
+		oldEditor.model.source =
+			"---\nartifact:\n  b: {label: B}\n---\na >> p -> b\n";
+		oldEditor.callbacks.onDidChangeModelContent();
+		await waitFor(() => first.getDiagnosticsSummary().includes("1 warning"));
+		assert.doesNotMatch(first.getDiagnosticsSummary(), /1 warnings|1 errors/);
+		oldEditor.model.source =
+			"---\nartifact:\n  b: {label: B, criteria: Ready}\n---\na >> p -> b\n";
+		oldEditor.callbacks.onDidChangeModelContent();
+		assert.equal(first.getDiagnosticsSummary(), "Checking…");
+		await waitFor(
+			() =>
+				first.getDiagnosticsSummary().includes("0 warnings") ||
+				first.getDiagnosticsSummary() === "No problems",
+		);
 		oldEditor.model.source = "---\nextends: delayed.yaml\n---\na >> p -> b\n";
 		oldEditor.callbacks.onDidChangeModelContent();
+		assert.equal(first.getDiagnosticsSummary(), "Checking…");
 		await waitFor(() => finishRead);
 		const pendingSnapshot = snapshotCalls.at(-1);
 		assert.equal(pendingSnapshot.finished, false);

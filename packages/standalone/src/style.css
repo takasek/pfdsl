@@ -29,10 +29,14 @@ button {
 	border-radius: 4px;
 }
 #status {
+	white-space: pre-line;
 	flex-basis: 100%;
 	overflow-wrap: anywhere;
 	margin-left: auto;
 	color: #555;
+}
+#diagnostics {
+	font-weight: 500;
 }
 main {
 	display: flex;
