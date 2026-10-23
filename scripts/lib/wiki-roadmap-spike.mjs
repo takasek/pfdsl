@@ -154,11 +154,16 @@ export function evaluate(snapshot, cli) {
 		blocked,
 		svg,
 		sourceHash: snapshot.sourceHash,
+		repoRevision: snapshot.repoRevision,
 	};
 }
 
 export function publish(snapshot, result) {
-	if (result.status !== "rendered" || result.sourceHash !== snapshot.sourceHash)
+	if (
+		result.status !== "rendered" ||
+		result.sourceHash !== snapshot.sourceHash ||
+		result.repoRevision !== snapshot.repoRevision
+	)
 		throw new Error("No matching rendered result");
 	git(snapshot.wiki, "fetch", "origin");
 	if (

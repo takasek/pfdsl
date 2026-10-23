@@ -44,6 +44,7 @@ node --test scripts/lib/wiki-roadmap-spike.test.mjs
 検証とready/blockedの取得はその場合も行う。
 
 `publish` は生成SVGとmanifestだけを通常commit/pushする。
+公開前に描画結果の本文hashと本体repoのcommitを取得snapshotと照合し、本文が同じでも参照版が異なる結果は拒否する。
 人間の `Roadmap.md` は書き戻さない。
 取得したWiki commitからremoteが進んでいれば競合として止まり、fetchとpushの間の競合も通常pushの非fast-forward拒否へ委ねる。
 無関係なページ更新でも公開時は一旦止め、再取得後に同じ入力なら描画を省く設計である。
@@ -68,6 +69,7 @@ force-pushや自動rebaseは使わない。
 | 実roadmap | 現行HEADのroadmapをWikiページに埋めて抽出し、内容一致とCLI出力を確認 |
 | 往復 | fixtureのready/blockedと内容がWiki移行・復元を通じて一致 |
 | 空白付き原稿 | ページ先頭・末尾の空白を含め、公開後の読戻しで原稿をそのまま比較 |
+| 参照版の取り違え | 本文不変でもpreset変更でSVGが変わる2版を用意し、古い結果の公開をWikiへの変更前に拒否。新しい版の再描画は公開できる |
 
 ローカル試験はGitHubの認証、gollum発火、Web編集の競合UI、Wiki上のSVG表示を証明しない。
 試作の操作経路はテストから呼ぶ関数であり、登録・構造変更・wip/done更新を行う運用コマンドはまだない。

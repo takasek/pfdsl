@@ -251,3 +251,42 @@ test("publishing preserves leading and trailing whitespace in the Wiki page", ()
 	git(f.editor, "pull", "--ff-only");
 	assert.equal(readFileSync(join(f.editor, "Roadmap.md"), "utf8"), original);
 });
+
+test("rejects a render for a different repository revision before changing the Wiki", () => {
+	const f = fixture();
+	const firstRevision = commit(
+		f.repo,
+		".pfdsl/preset.yaml",
+		'statusStyles:\n  done: { fillcolor: "#123456", style: filled }\n',
+	);
+	commit(
+		f.editor,
+		"Roadmap.md",
+		page(source.replace("basePath: ..", "basePath: ..\nextends: preset.yaml")),
+	);
+	git(f.editor, "push", "origin", "HEAD:main");
+	const first = acquire({ ...f, repoRevision: firstRevision });
+	const oldResult = evaluate(first, cli);
+	assert.match(oldResult.svg, /#123456/i);
+	const secondRevision = commit(
+		f.repo,
+		".pfdsl/preset.yaml",
+		'statusStyles:\n  done: { fillcolor: "#abcdef", style: filled }\n',
+	);
+	const second = acquire({ ...f, repoRevision: secondRevision });
+	assert.equal(first.sourceHash, second.sourceHash);
+	assert.notEqual(first.repoRevision, second.repoRevision);
+	const before = git(f.wiki, "rev-parse", "main");
+	assert.throws(
+		() => publish(second, oldResult),
+		/No matching rendered result/,
+	);
+	assert.equal(git(f.wiki, "rev-parse", "main"), before);
+	assert.equal(git(second.wiki, "status", "--porcelain"), "");
+	const currentResult = evaluate(second, cli);
+	assert.match(currentResult.svg, /#abcdef/i);
+	assert.equal(publish(second, currentResult).status, "published");
+	const manifest = JSON.parse(git(f.wiki, "show", "main:Roadmap.render.json"));
+	assert.equal(manifest.repoRevision, secondRevision);
+	assert.equal(manifest.key, currentResult.key);
+});
