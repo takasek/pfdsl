@@ -10,6 +10,44 @@ const report = (content) =>
 	findExecutorVocabulary([{ path: "protocol.md", content }]);
 
 describe("executor vocabulary report", () => {
+	it("preserves visible adjacency through emphasis and link markup", () => {
+		for (const [source, term] of [
+			["com**mit**.", "commit"],
+			["P**R**.", "PR"],
+			["**P**R.", "PR"],
+			["co*mm*it.", "commit"],
+			["com[mit](https://example.com/branch).", "commit"],
+			["P[**&#82;**][ref].\n\n[ref]: https://example.com/commit", "PR"],
+			["ター**ン**。", "ターン"],
+		]) {
+			const found = report(source);
+			assert.equal(found.length, 1, source);
+			assert.deepEqual(found[0].terms, [term], source);
+			assert.equal(found[0].column, source.indexOf("**") === 0 ? 3 : 1);
+			assert.equal(found[0].text, source.split("\n\n")[0]);
+		}
+	});
+	it("does not join text across excluded inline content", () => {
+		for (const source of [
+			"com`x`mit.",
+			"P![image](x)R.",
+			"com<!-- hidden -->mit.",
+		]) {
+			assert.deepEqual(report(source), [], source);
+		}
+	});
+	it("keeps closing inline syntax with the sentence it belongs to", () => {
+		const source = "[PR.](https://example.com) Next commit.";
+		assert.deepEqual(
+			report(source).map((f) => f.text),
+			["[PR.](https://example.com)", "Next commit."],
+		);
+		assert.equal(report("**Ready.** Next commit.")[0].text, "Next commit.");
+		assert.deepEqual(
+			report("**PR. Next commit.**").map((f) => f.text),
+			["**PR.", "Next commit.**"],
+		);
+	});
 	it("scans decoded references while preserving source coordinates and sentence text", () => {
 		const source =
 			"# &#80;R checks\r\n\r\n😀 &amp; done&period; Review **P&#82;** and [comm&#x69;t](https://example.com/branch)&period;\r\nNext &#x30BF;&#x30FC;&#x30F3;。";

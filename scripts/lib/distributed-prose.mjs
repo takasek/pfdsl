@@ -194,29 +194,48 @@ export function findExecutorVocabulary(files) {
 		const { tree, ranges } = textWithSourceRanges(content);
 		walk(tree, (block) => {
 			if (!["paragraph", "heading"].includes(block.type)) return;
-			const start = block.position.start.offset;
 			const end = block.position.end.offset;
 			const prose = [];
 			const positions = [];
-			let cursor = start;
-			const maskUntil = (offset) => {
-				while (cursor < offset) {
-					prose.push(" ");
-					positions.push({ start: cursor, end: cursor + 1 });
-					cursor++;
+			const append = (node) => {
+				if (node.type === "text") {
+					const sourceRanges = ranges.get(node);
+					for (let i = 0; i < node.value.length; i++) {
+						prose.push(node.value[i]);
+						positions.push(sourceRanges[i]);
+					}
+				} else if (
+					[
+						"paragraph",
+						"heading",
+						"emphasis",
+						"strong",
+						"link",
+						"linkReference",
+					].includes(node.type)
+				) {
+					const first = positions.length;
+					for (const child of node.children) append(child);
+					if (positions.length > first) {
+						positions[first] = {
+							...positions[first],
+							textStart: node.position.start.offset,
+						};
+						positions[positions.length - 1] = {
+							...positions.at(-1),
+							textEnd: node.position.end.offset,
+						};
+					}
+				} else {
+					// Ignored content must not synthesize a word across its boundary.
+					prose.push(node.type === "break" ? "\n" : " ");
+					positions.push({
+						start: node.position.start.offset,
+						end: node.position.end.offset,
+					});
 				}
 			};
-			walk(block, (node) => {
-				if (node.type !== "text") return;
-				maskUntil(node.position.start.offset);
-				const sourceRanges = ranges.get(node);
-				for (let i = 0; i < node.value.length; i++) {
-					prose.push(node.value[i]);
-					positions.push(sourceRanges[i]);
-				}
-				cursor = node.position.end.offset;
-			});
-			maskUntil(end);
+			append(block);
 			// Split visible prose only: punctuation in code and link destinations
 			// cannot terminate a sentence. Blank block boundaries are handled by AST.
 			const visible = prose.join("");
@@ -236,8 +255,12 @@ export function findExecutorVocabulary(files) {
 					terms: [...new Set(matches.map((match) => match[0]))],
 					text: content
 						.slice(
-							positions[sentence.index].start,
-							positions[sentence.index + sentence[0].length - 1].end,
+							positions[sentence.index].textStart ??
+								positions[sentence.index].start,
+							sentence.index + sentence[0].length === visible.length
+								? end
+								: (positions[sentence.index + sentence[0].length - 1].textEnd ??
+										positions[sentence.index + sentence[0].length - 1].end),
 						)
 						.trim(),
 				});
