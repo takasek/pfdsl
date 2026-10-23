@@ -153,6 +153,31 @@ async function editFromPreview(
 		reply(false, "The document changed. Reopen Connections and try again.");
 		return;
 	}
+	let openedSource: vscode.TextEditor | undefined;
+	if (
+		!vscode.window.visibleTextEditors.some(
+			(editor) => editor.document === state.doc,
+		)
+	) {
+		// Open the source outside the preview before making it dirty.
+		try {
+			openedSource = await vscode.window.showTextDocument(state.doc, {
+				viewColumn: sourceColumnOutsidePreview(state, state.sourceViewColumn),
+				preserveFocus: true,
+				preview: false,
+			});
+		} catch {
+			reply(
+				false,
+				"The source could not be opened. Reopen Connections and try again.",
+			);
+			return;
+		}
+		if (!snapshot.isCurrent()) {
+			reply(false, "The document changed. Reopen Connections and try again.");
+			return;
+		}
+	}
 	const edit = new vscode.WorkspaceEdit();
 	edit.replace(
 		state.doc.uri,
@@ -188,11 +213,17 @@ async function editFromPreview(
 			vscode.window.visibleTextEditors.find(
 				(editor) => editor.document === state.doc,
 			)?.viewColumn ?? state.sourceViewColumn;
-		const editor = await vscode.window.showTextDocument(state.doc, {
-			viewColumn: sourceColumnOutsidePreview(state, sourceColumn),
-			...(request.type === "createDefinition" ? { selection: range } : {}),
-			preserveFocus: request.type !== "createDefinition",
-		});
+		const editor =
+			request.type !== "createDefinition" &&
+			openedSource?.document === state.doc
+				? openedSource
+				: await vscode.window.showTextDocument(state.doc, {
+						viewColumn: sourceColumnOutsidePreview(state, sourceColumn),
+						...(request.type === "createDefinition"
+							? { selection: range }
+							: {}),
+						preserveFocus: request.type !== "createDefinition",
+					});
 		if (state.disposed || state.doc.getText() !== result.source) return;
 		if (request.type === "createDefinition")
 			editor.selection = new vscode.Selection(range.start, range.end);
