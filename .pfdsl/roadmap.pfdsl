@@ -343,7 +343,7 @@ statusStyles:
 
 toolchain >> i119_publish_extension -> published_extension
 
-[ready_counts_cli, boundary_transition_release_policy] >> publish_cli_ready_counts -> cli_release_ready_counts
+[boundary_transition_release_policy, ready_counts_cli] >> publish_cli_ready_counts -> cli_release_ready_counts
 
 [get_by_id_tool, mint_check_tool, spec_id_syntax, spec_v0011] >> i542_migrate_spec_id_refs -> spec_id_refs
 
@@ -351,13 +351,13 @@ toolchain >> i119_publish_extension -> published_extension
 
 [def_insertion, editor_connector, gui_vscode_acceptance, preview_connector] >> publish_ext_editing -> ext_editing_release
 
-[group_delete_cli, boundary_transition_release_policy] >> publish_cli_group_delete -> cli_release_group_delete
+[boundary_transition_release_policy, group_delete_cli] >> publish_cli_group_delete -> cli_release_group_delete
 
-[meta_set_extension_fields, boundary_transition_release_policy] >> publish_cli_meta_set_extension -> cli_release_meta_set_extension
+[boundary_transition_release_policy, meta_set_extension_fields] >> publish_cli_meta_set_extension -> cli_release_meta_set_extension
 
-[group_node_clash_diagnostic, boundary_transition_release_policy] >> publish_cli_group_node_clash -> cli_release_group_node_clash
+[boundary_transition_release_policy, group_node_clash_diagnostic] >> publish_cli_group_node_clash -> cli_release_group_node_clash
 
-[edge_kind_conflict_diagnostic, boundary_transition_release_policy] >> publish_cli_edge_kind_conflict -> cli_release_edge_kind_conflict
+[boundary_transition_release_policy, edge_kind_conflict_diagnostic] >> publish_cli_edge_kind_conflict -> cli_release_edge_kind_conflict
 [preview_editing_usability, standalone_pfd_features] >> i1262_i1445_accept_mac_candidate -> gui_mac_acceptance
 
 gui_vscode_candidate >> i1445_accept_gui_vscode -> gui_vscode_acceptance
@@ -372,7 +372,7 @@ responsibility_boundary_adr >> i1525_revise_boundary_test -> boundary_test_revis
 
 responsibility_boundary_adr >> i1526_run_evidence_roundtrip -> evidence_roundtrip_record
 
-[boundary_test_revision_adr, evidence_roundtrip_record, responsibility_boundary_adr, root_loaded_work_rules, local_pr_status_timing] >> reduce_work_cycle_protocol -> executor_neutral_work_cycle
+[boundary_test_revision_adr, evidence_roundtrip_record, local_pr_status_timing, responsibility_boundary_adr, root_loaded_work_rules] >> reduce_work_cycle_protocol -> executor_neutral_work_cycle
 
 [responsibility_boundary_adr, root_loaded_work_rules] >> narrow_retro_to_model -> three_valued_model_retro
 
