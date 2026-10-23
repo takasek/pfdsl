@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
-import { pathToFileURL } from 'node:url';
 import { analyze } from '../../packages/core/dist/index.js';
+import { isCliEntrypoint } from '../../scripts/lib/cli-entrypoint.mjs';
 
 const digest = (value) => createHash('sha256').update(JSON.stringify(value)).digest('hex');
 const types = new Set(['additional-input', 'process-granularity', 'feedback', 'artifact-definition', 'criteria-observability', 'decision-boundary', 'execution-failure', 'unchanged']);
@@ -46,7 +46,7 @@ export function checkEvidence(evidence, context) {
  return [...new Set(errors)];
 }
 
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+if (isCliEntrypoint(import.meta.url, process.argv[1])) {
  try {
   const [evidencePath, contextPath, ...extra] = process.argv.slice(2);
   if (!evidencePath || !contextPath || extra.length) throw new Error('Usage: check.mjs <evidence.json> <snapshot.json>');
