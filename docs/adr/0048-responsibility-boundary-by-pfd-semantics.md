@@ -1,6 +1,6 @@
 # ADR-0048: PFDSL の責務を、PFD の意味論なしには成立しない判断に限る
 
-- Status: Accepted
+- Status: Accepted; 契約1、D3 の対応記録の運び手、companion の構造的事実の定義は [ADR-0051](0051-conjunctive-boundary-test.md)で部分上書き
 - Date: 2026-10-21
 
 ## Context
@@ -198,10 +198,11 @@ GitHub アダプタは、CLI の版・生成器・テスト・distribution-revie
 - protocol に指定したファイルの実行主体の語彙を、報告から始めて検査にする。
 - 実行主体との往復の実験（D6）。
 
-本 ADR の作成時に見つかった次の未決事項は、括弧内の後続の変更で決める。
+本 ADR の作成時に見つかった未決事項を以下に残す。
+D3 の運び手と companion の構造的事実は ADR-0051 で解決し、それ以外は括弧内の後続の変更で決める。
 
-- D3 は対応の記録を「process の `location:` と PR 本文で足り」るとするが、契約1は作業記録の書式を中核の書き換え先から外している。中核が要求できるのは `location:` 側だけで、PR 本文は実行主体の側の実践とする読みが整合する。どちらとするかを決める（`work-cycle.md` を protocol に絞る変更）。
-- 契約1の書き換え先にある「companion の構造的事実」は定義が無い。配布中の `work-cycle.md` は構造的事実を companion でなく PFD に置くとしているので、食い違って読める。意味を決める（同上）。
+- D3 は当初「process の `location:` と PR 本文で足り」るとした。ADR-0051 は証拠の process ID で実行との対応を運び、PR 本文の形式は採用先に委ねる。`location:` の既存仕様全体は狭めない。
+- 「companion の構造的事実」は当初未定義だった。ADR-0051 でモデル要素・境界・宣言に対応する構造上の関係として定義し、一般的な実行手順と区別した。
 - `work-cycle.md` を protocol に絞る変更と pfd-retro を絞る変更は、受け入れに実行主体の語彙を報告する検査を使う見込みだが、その検査を前提にしていない。使うかを決め、使うなら報告する検査の作成を前提に加える（それぞれの起票時）。
 - `docs/distribution-review.md` の backend 比較表に、「設計記録はいつ必要で、どこに置くか」の行が残る。設計記録の配置は区分 iii になったので、この行を見直す（GitHub Issues プリセットの変更）。
 - pfd-retro の L4 滞留監査は、移設先を「利用者環境（global 設定・共通リポ）」と案内する。採用先一般には正しいが、このリポの規律は private な共通リポに置かないので、このリポでは `.pfdsl/bindings/pfd-ops.md` の冒頭の指示（宛先は binding）が優先する。この案内を見直す（pfd-retro を絞る変更）。

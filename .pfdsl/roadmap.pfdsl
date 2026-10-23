@@ -180,7 +180,7 @@ artifact:
   boundary_test_revision_adr:
     label: 契約1を4条件の AND に改める ADR (#1525)
     description: ADR-0048 の契約1を意味論・書込み先・業種中立・名指しの AND に改め、0段目の第3基準を統合し、companion の構造的事実と D3 の運び手を決める ADR。後続の work-cycle と plugin 分割の設計の前提になる
-    status: wip
+    status: done
     criteria: >
       新しい ADR が Accepted で存在し、ADR-0048 の Status に部分上書きが注記されている。
       architecture.md の0段目と評価入力だけを渡した読み手が、所有者承認済みの独立参照集合11件の置き場・分割・保持条件・情報不足を再現でき、0段目に契約1と別系統の基準が残っていない
