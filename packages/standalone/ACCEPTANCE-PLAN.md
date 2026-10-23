@@ -254,12 +254,20 @@ API差分：`deleteConnector`／`toggleFeedback`は`nodeId/source/artifact/proce
 期待：source/図/左右一覧が同期し、Aの結果をBの本文・dirty・Undo・選択へ漏らさない。
 古いmenu/cue/候補/timerを残さずmount/revision/dispose境界を維持する。
 中心・文書切替と幅変更ではmenuを閉じ、再描画で操作要素が置換された場合も同じ側の近くにfocusを戻す。
+#1515変種：AでConnectionsを開き、sourceのcriteriaを不完全なYAMLにしてpanelが閉じた後、Bへ切り替えて編集し、Aへ戻って修復する。
+期待：Aの最新の正常図に同じIDがある場合だけConnectionsの中心を再表示し、Bの本文・Undo・選択・focusは変わらない。
+候補入力と保留していた編集のUI状態は復元せず、遅れた応答も新しいpanelへ表示しない。
 状態：M/V各未実施。記録：未記入。
 
 ### GUI-17：Fit・Actual size・倍率・案内
 
 対応：#1352/#1259/#1444。対象・入力：M/V、大きい図、小さいsubflow、横長図、side-by-side狭幅。
 操作：初回、Fit/Actual size/Zoom、wheel/drag/minimap/double click、pan後編集、resize→Fit、HelpとREADME照合を行う。
+#1517変種：source検索でnodeを選び（Vはnode IDを選択）、Focus selected nodeを押す。
+通常nodeは100%で中央へ、表示領域より大きいnodeは100%を上限として全体が収まる倍率で中央へ移ることを確認する。
+Connectionsの表示中も残った図の領域で中央化し、panel・本文・Undoを変更しない。
+未選択、groupだけの選択、エラー中、描画中は操作を無効とし、正常化だけでは古い選択を復元しない。
+通常のsource選択は倍率を保ち、明示操作後の再描画だけで再ズームせず、FitとActual sizeは従来の意味を維持する。
 期待：初回全体を把握しFitとActual sizeを区別して戻れ、倍率表示は従来どおり100%等を示す。
 通常再描画は視点を不必要に戻さず、倍率・基本操作と説明が一致する。
 minimap位置対応を保ち、resizeで図が切れるだけでは不合格にしない。
@@ -269,6 +277,11 @@ minimap位置対応を保ち、resizeで図が切れるだけでは不合格に�
 
 対応：#1352/#1444/#1259/#1475。対象・入力：M/V、zoom/pan後に末尾IDを除くsimple-chain、FM/lexer/parserエラー、`a >> p -> b`と`a >>? p`の併記（V036）、通常打鍵・IME。
 操作：正常→エラー→正常、全文読取、Go to error、IME組成と復帰を行う。
+#1515変種（GUI-11の近隣移動後にも実施）：Connectionsでpを開き、sourceのcriteriaへ閉じていない引用符を入力し、連続して不完全YAMLを編集してから修復する。
+期待：エラー中はConnectionsから編集できず、修復後にpが存在すればConnectionsだけが戻る。
+sourceへの入力focus、本文・Undo、pan/zoomを復帰処理が変更せず、選択解除だけでは復帰候補を失わない。
+修復前にプレビューのエラー表示へfocusを移してEscape、エラー前の明示Close、別nodeへの明示選択、正常化時のpの削除／改名を別々に試し、この場合は旧pへ戻らないことを確認する。
+削除／改名後にUndoで同IDを戻しても、自動復帰しないことを確認する。
 V036では、エディタの波線が`a >>? p`の`a`から`p`までに出ることを確認する。
 図が止まったerror表示の「Keep normal input」と「Keep feedback」をそれぞれ別の試行でkeyboardとpointerから選び、各1回のUndoで併記へ戻ることを確認する。
 期待：診断はzoom/pan外の通常サイズで読め、古い図/minimapを現行として残さない。
@@ -291,6 +304,7 @@ UI最小labelとCLI完成sourceの契約を区別し、正しい文書で一Undo
 
 対応：#1352/#1444、完了済み#1283/#483/#1282。対象・入力：M/V、quoted/同名field/反復/alias、VのmultiCursorModifier両設定。
 操作：double click移動、pan/zoom、subflow、作成／接続、live/Problems/Undo/SVGを使う。VのN/D chord/context menuと組込定義／Alt+F12 Peek／Cmd/Ctrl+clickを対照する。
+#1517変種：GUI-17の検索→選択→Focus selected nodeの後に、接続編集→Undo、Fit、Actual size、pan/zoomを順に行い、選択対象・本文・履歴と既存操作を保つことを確認する。
 期待：既存動線が競合せず、巡回は定義→全本文出現→定義、途中・編集後増減も正しい。
 field/alias use siteを誤巡回しない。
 standaloneへ#1283専用巡回UIを追加要求しない。
@@ -335,6 +349,8 @@ Escapeと取消後は起点／編集継続位置へ戻り、常設入力を保�
 
 対応：#1444。対象・入力：M/V、長い日本語名/label/行、代表寸法、通常／本文200%、現対応テーマ。
 操作：拡大と各幅で保存／戻る／Close、候補・診断・比較を読み、文字と重要境界のcontrastを実測する。
+#1517変種：Connectionsを開いた狭い図領域と長いlabelの巨大nodeでFocus selected nodeを使い、toolbarが折り返しても操作へ到達できること、倍率は100%以下で対象全体が収まることを確認する。
+非表示tabで古い移動を予約せず、表示へ戻しただけでは勝手に再ズームしないことも確認する。
 期待：主操作と重要名称／状態へ到達し、図zoomと文字拡大、選択とfocus、status色と操作色を区別する。
 色以外の手掛かり、system font・余白・整列・意味色を揃え、px/pt数値だけや固定色からdark対応を推定しない。
 状態：M/V各未実施。記録：未記入。対応外テーマを追加しない。

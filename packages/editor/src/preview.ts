@@ -8,6 +8,7 @@ import { unwrapAnchors } from "./svg-anchors.js";
 import {
 	centerPan,
 	fitGraph,
+	focusNodeView,
 	MAX_SCALE,
 	MIN_SCALE,
 	minimapScale,
@@ -78,6 +79,9 @@ export function mountPreview(container: HTMLElement, host: PreviewHost) {
 	const tooltip = container.querySelector("#tooltip") as HTMLDivElement;
 	const error = container.querySelector("#preview-error") as HTMLDivElement;
 	const zoomLevel = container.querySelector("#zoom-level") as HTMLOutputElement;
+	const focusSelected = container.querySelector<HTMLButtonElement>(
+		"#focus-selected-node",
+	)!;
 	const viewButtons = ["zoom-out", "zoom-in", "fit-graph", "actual-size"].map(
 		(id) => container.querySelector(`#${id}`) as HTMLButtonElement,
 	);
@@ -105,6 +109,7 @@ export function mountPreview(container: HTMLElement, host: PreviewHost) {
 	let pendingFocusCue = false;
 	let editingData: Extract<MessageToWebview, { type: "render" }>["editing"];
 	let selectedNodeId: string | undefined;
+	let recoverConnectionsId: string | undefined;
 	let lastFocusedNodeId: string | undefined;
 	let hoverId: string | undefined;
 	let hideTimer: number | undefined;
@@ -150,6 +155,7 @@ export function mountPreview(container: HTMLElement, host: PreviewHost) {
 	});
 	function closeActions() {
 		cancelNodeClick();
+		recoverConnectionsId = undefined;
 		connections.close();
 		actionsToggle.focus();
 	}
@@ -160,6 +166,7 @@ export function mountPreview(container: HTMLElement, host: PreviewHost) {
 	) {
 		cancelNodeClick();
 		if (graphRevision !== revision) return;
+		recoverConnectionsId = undefined;
 		selectedNodeId = id;
 		const node = [...inner.querySelectorAll<HTMLElement>("g.node")].find(
 			(node) => node.dataset.nodeId === id,
@@ -167,6 +174,7 @@ export function mountPreview(container: HTMLElement, host: PreviewHost) {
 		if (node) showCue(node);
 		else clearCue();
 		connections.open(id, focusHeading);
+		updateControls();
 		if (!preserveFocus) synchronizeNode(id);
 		host.onStateChange?.();
 	}
@@ -369,6 +377,7 @@ export function mountPreview(container: HTMLElement, host: PreviewHost) {
 		if (selectedNodeId && selectedNodeId !== lastFocusedNodeId)
 			focusNode(selectedNodeId, true);
 		lastFocusedNodeId = selectedNodeId;
+		updateControls();
 		host.onStateChange?.();
 		const rect = node.getBoundingClientRect();
 		void showHover(node, rect.right, rect.bottom);
@@ -481,6 +490,15 @@ export function mountPreview(container: HTMLElement, host: PreviewHost) {
 		zoomOut.disabled ||= scale <= minimumScale;
 		zoomIn.disabled ||= scale >= MAX_SCALE;
 		zoomLevel.textContent = `${Number((scale * 100).toFixed(1))}%`;
+		focusSelected.disabled =
+			!hasGraph || graphRevision !== revision || !selectedGraphNode();
+	}
+
+	function selectedGraphNode() {
+		if (!editingData?.nodes.some((node) => node.id === selectedNodeId)) return;
+		return [...inner.querySelectorAll<HTMLElement>("g.node")].find(
+			(node) => node.dataset.nodeId === selectedNodeId,
+		);
 	}
 
 	function applyTransform() {
@@ -552,6 +570,7 @@ export function mountPreview(container: HTMLElement, host: PreviewHost) {
 		}
 		if (minimapSvg.firstElementChild) updateMinimapVp();
 		else refreshMinimap();
+		updateControls();
 	}
 	let containerWidth = container.clientWidth;
 	let containerHeight = container.clientHeight;
@@ -584,6 +603,23 @@ export function mountPreview(container: HTMLElement, host: PreviewHost) {
 		pendingFocusNodeId = undefined;
 		scale = 1;
 		centerGraph();
+	});
+	on(focusSelected, "click", () => {
+		if (graphRevision !== revision || !error.hidden) return;
+		const node = selectedGraphNode();
+		if (!node) return;
+		const view = focusNodeView(
+			{ scale, panX, panY },
+			node.getBoundingClientRect(),
+			root.getBoundingClientRect(),
+			{ width: root.clientWidth, height: root.clientHeight },
+		);
+		if (!view) return;
+		pendingFocusNodeId = undefined;
+		({ scale, panX, panY } = view);
+		minimumScale = Math.min(minimumScale, scale);
+		applyTransform();
+		showCue(node);
 	});
 	function zoom(deltaY: number, x: number, y: number) {
 		({ scale, panX, panY } = zoomAt(
@@ -761,6 +797,9 @@ export function mountPreview(container: HTMLElement, host: PreviewHost) {
 		repairNotice = undefined;
 	}
 	function showError(message: string, repair?: Repair) {
+		// Selection may already have cleared while typing. Only remember the
+		// open panel's center, never its input, source selection or DOM focus.
+		recoverConnectionsId = connections.centerId() ?? recoverConnectionsId;
 		const previewFocused =
 			actions.contains(document.activeElement) ||
 			root.contains(document.activeElement) ||
@@ -851,6 +890,7 @@ export function mountPreview(container: HTMLElement, host: PreviewHost) {
 			const echo = syncEchoNodeId === msg.nodeId;
 			clearSyncEcho();
 			if (echo) return;
+			if (msg.nodeId !== recoverConnectionsId) recoverConnectionsId = undefined;
 			cancelNodeClick();
 			pendingFocusNodeId = msg.nodeId;
 			pendingFocusCue = true;
@@ -864,6 +904,7 @@ export function mountPreview(container: HTMLElement, host: PreviewHost) {
 			pendingFocusNodeId = undefined;
 			pendingFocusCue = false;
 			selectedNodeId = undefined;
+			updateControls();
 			host.onStateChange?.();
 			return;
 		}
@@ -877,6 +918,7 @@ export function mountPreview(container: HTMLElement, host: PreviewHost) {
 			return;
 		}
 		if (msg.type !== "render") return;
+		updateControls();
 		cancelNodeClick();
 		clearSyncEcho();
 		clearRepair();
@@ -888,6 +930,8 @@ export function mountPreview(container: HTMLElement, host: PreviewHost) {
 		clearCue();
 		// The cursor hint supplied while opening must not displace the initial Fit.
 		if (hasPositioned && msg.focusNodeId !== undefined) {
+			if (msg.focusNodeId !== recoverConnectionsId)
+				recoverConnectionsId = undefined;
 			pendingFocusNodeId = msg.focusNodeId;
 			pendingFocusCue = false;
 		}
@@ -908,6 +952,10 @@ export function mountPreview(container: HTMLElement, host: PreviewHost) {
 			error.textContent = "";
 			root.hidden = false;
 			graphRevision = currentRevision;
+			if (recoverConnectionsId !== undefined) {
+				connections.open(recoverConnectionsId);
+				recoverConnectionsId = undefined;
+			}
 			host.onStateChange?.();
 			updateControls();
 			for (const node of inner.querySelectorAll<HTMLElement>("g.node")) {
@@ -962,6 +1010,7 @@ export function mountPreview(container: HTMLElement, host: PreviewHost) {
 				});
 		},
 		dispose() {
+			recoverConnectionsId = undefined;
 			cancelNodeClick();
 			clearSyncEcho();
 			hideHover();

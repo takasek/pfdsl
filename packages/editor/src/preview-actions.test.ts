@@ -382,8 +382,8 @@ function setup(
 	container.append(style);
 	const root = container.querySelector<HTMLElement>("#root")!;
 	Object.defineProperties(root, {
-		clientWidth: { value: 400 },
-		clientHeight: { value: 300 },
+		clientWidth: { value: 400, configurable: true },
+		clientHeight: { value: 300, configurable: true },
 	});
 	Object.defineProperties(container.querySelector("#inner")!, {
 		offsetWidth: { value: graphSize.width },
@@ -707,4 +707,250 @@ it("retains the minimap SVG on focus and resize, but replaces it after rendering
 	expect(s.container.querySelector("#minimap-svg svg")).toBe(clone);
 	await s.preview.receive(s.message);
 	expect(s.container.querySelector("#minimap-svg svg")).not.toBe(clone);
+});
+
+it("recovers the Connections center after repeated errors without restoring selection, input or focus", async () => {
+	const s = setup();
+	await s.preview.receive(s.message);
+	s.node("p").dispatchEvent(new MouseEvent("contextmenu", { bubbles: true }));
+	const input =
+		s.container.querySelector<HTMLInputElement>(".connection-input") ??
+		s.container.querySelector<HTMLInputElement>("#node-actions input")!;
+	input.value = "unfinished";
+	await s.preview.receive({ type: "clearFocus" });
+	const editor = document.createElement("textarea");
+	s.container.append(editor);
+	editor.focus();
+	s.postMessage.mockClear();
+	await s.preview.receive({ type: "error", message: "Invalid YAML" });
+	await s.preview.receive({ type: "clearFocus" });
+	await s.preview.receive({ type: "error", message: "Still invalid" });
+	expect(s.container.querySelector<HTMLElement>("#node-actions")!.hidden).toBe(
+		true,
+	);
+	await s.preview.receive(s.message);
+	expect(s.container.querySelector<HTMLElement>("#node-actions")!.hidden).toBe(
+		false,
+	);
+	expect(s.container.querySelector("#node-actions-title")!.textContent).toBe(
+		"Connections — p",
+	);
+	expect(input.value).toBe("");
+	expect(document.activeElement).toBe(editor);
+	expect(s.preview.canCreateDefinition()).toBe(false);
+	expect(s.postMessage).not.toHaveBeenCalled();
+});
+
+it.each([
+	"close before",
+	"escape during",
+	"other node",
+	"render hint",
+	"removed",
+])("does not recover an abandoned Connections center: %s", async (reason) => {
+	const s = setup();
+	await s.preview.receive(s.message);
+	s.node("p").dispatchEvent(new MouseEvent("contextmenu", { bubbles: true }));
+	if (reason === "close before")
+		s.container
+			.querySelector<HTMLButtonElement>("#node-actions-close")!
+			.click();
+	await s.preview.receive({ type: "error", message: "Invalid YAML" });
+	if (reason === "escape during")
+		s.container.dispatchEvent(
+			new KeyboardEvent("keydown", { key: "Escape", bubbles: true }),
+		);
+	if (reason === "other node")
+		await s.preview.receive({ type: "focus", nodeId: "a" });
+	if (reason === "render hint")
+		await s.preview.receive({ ...s.message, focusNodeId: "a" });
+	if (reason === "removed")
+		await s.preview.receive({
+			...s.message,
+			editing: { source: "a\n", nodes: [s.message.editing.nodes[0]!] },
+		});
+	await s.preview.receive(s.message);
+	expect(s.container.querySelector<HTMLElement>("#node-actions")!.hidden).toBe(
+		true,
+	);
+});
+
+it("only consumes recovery after the newest render succeeds, including hidden previews", async () => {
+	let finish!: (value: string) => void;
+	const s = setup(
+		vi.fn((dot: string) =>
+			dot === "pending"
+				? new Promise<string>((resolve) => {
+						finish = resolve;
+					})
+				: Promise.resolve(svg),
+		),
+	);
+	await s.preview.receive(s.message);
+	s.node("p").dispatchEvent(new MouseEvent("contextmenu", { bubbles: true }));
+	await s.preview.receive({ type: "error", message: "Invalid YAML" });
+	const old = s.preview.receive({
+		...s.message,
+		dot: "pending",
+		editing: { source: "a\n", nodes: [s.message.editing.nodes[0]!] },
+	});
+	s.container.hidden = true;
+	await s.preview.receive({ type: "error", message: "Invalid again" });
+	finish(svg);
+	await old;
+	expect(s.container.querySelector<HTMLElement>("#node-actions")!.hidden).toBe(
+		true,
+	);
+	await s.preview.receive(s.message);
+	expect(s.container.querySelector<HTMLElement>("#node-actions")!.hidden).toBe(
+		false,
+	);
+	expect(s.container.querySelector("#node-actions-title")!.textContent).toBe(
+		"Connections — p",
+	);
+});
+
+it("forgets pending Connections edits on error so late replies cannot lock or repopulate recovery", async () => {
+	const s = setup();
+	await s.preview.receive(s.message);
+	s.node("a").dispatchEvent(new MouseEvent("contextmenu", { bubbles: true }));
+	s.container.querySelector<HTMLButtonElement>("#create-definition")!.click();
+	const request = s.postMessage.mock.calls.at(-1)![0];
+	expect(request.type).toBe("createDefinition");
+	await s.preview.receive({ type: "error", message: "Invalid YAML" });
+	await s.preview.receive(s.message);
+	expect(
+		s.container.querySelector<HTMLButtonElement>("#create-definition")!
+			.disabled,
+	).toBe(false);
+	await s.preview.receive({
+		type: "editResult",
+		request: request as never,
+		ok: false,
+		message: "Old failure",
+	});
+	expect(s.container.querySelector("#node-actions-error")!.textContent).toBe(
+		"",
+	);
+});
+
+it("focuses the selected node at 100% without changing Connections, source or keyboard focus", async () => {
+	const s = setup(undefined, { width: 1600, height: 800 });
+	await s.preview.receive(s.message);
+	const button = s.container.querySelector<HTMLButtonElement>(
+		"#focus-selected-node",
+	)!;
+	expect(button).not.toBeNull();
+	expect(button.disabled).toBe(true);
+	s.node("a").dispatchEvent(new MouseEvent("contextmenu", { bubbles: true }));
+	// Fit is 0.23, pan=(16,58): natural node bounds are (100,200,100,50).
+	vi.spyOn(s.node("a"), "getBoundingClientRect").mockReturnValue({
+		left: 39,
+		top: 104,
+		width: 23,
+		height: 11.5,
+	} as DOMRect);
+	s.postMessage.mockClear();
+	button.focus();
+	button.click();
+	expect(
+		s.container.querySelector<HTMLElement>("#inner")!.style.transform,
+	).toBe("translate(50px, -75px) scale(1)");
+	expect(s.container.querySelector<HTMLElement>("#node-actions")!.hidden).toBe(
+		false,
+	);
+	expect(s.container.querySelector("#node-actions-title")!.textContent).toBe(
+		"Connections — a",
+	);
+	expect(document.activeElement).toBe(button);
+	expect(s.postMessage).not.toHaveBeenCalled();
+	await s.preview.receive(s.message);
+	expect(
+		s.container.querySelector<HTMLElement>("#inner")!.style.transform,
+	).toBe("translate(50px, -75px) scale(1)");
+	await s.preview.receive({ type: "clearFocus" });
+	expect(button.disabled).toBe(true);
+	await s.preview.receive({ type: "focus", nodeId: "group" });
+	expect(button.disabled).toBe(true);
+});
+
+it("disables explicit node focus during pending renders and errors, and restores it only for a live selection", async () => {
+	let finish!: (value: string) => void;
+	const s = setup(
+		vi.fn((dot: string) =>
+			dot === "pending"
+				? new Promise<string>((resolve) => {
+						finish = resolve;
+					})
+				: Promise.resolve(svg),
+		),
+	);
+	await s.preview.receive(s.message);
+	const button = s.container.querySelector<HTMLButtonElement>(
+		"#focus-selected-node",
+	)!;
+	expect(button).not.toBeNull();
+	await s.preview.receive({ type: "focus", nodeId: "a" });
+	expect(button.disabled).toBe(false);
+	const pending = s.preview.receive({ ...s.message, dot: "pending" });
+	expect(button.disabled).toBe(true);
+	finish(svg);
+	await pending;
+	expect(button.disabled).toBe(false);
+	await s.preview.receive({ type: "error", message: "Invalid YAML" });
+	expect(button.disabled).toBe(true);
+	await s.preview.receive(s.message);
+	expect(button.disabled).toBe(true);
+	s.node("a").focus();
+	expect(button.disabled).toBe(false);
+});
+
+it("fits a giant selected node to the remaining viewport and keeps zoom continuous below 5%", async () => {
+	const s = setup();
+	await s.preview.receive(s.message);
+	s.node("a").dispatchEvent(new MouseEvent("contextmenu", { bubbles: true }));
+	Object.defineProperties(s.root, {
+		clientWidth: { value: 200 },
+		clientHeight: { value: 100 },
+	});
+	vi.spyOn(s.node("a"), "getBoundingClientRect").mockReturnValue({
+		left: 100,
+		top: 100,
+		width: 10000,
+		height: 1000,
+	} as DOMRect);
+	s.container.querySelector<HTMLButtonElement>("#focus-selected-node")!.click();
+	expect(
+		s.container.querySelector<HTMLElement>("#inner")!.style.transform,
+	).toBe("translate(16px, 41.6px) scale(0.0168)");
+	expect(
+		s.container.querySelector<HTMLButtonElement>("#zoom-out")!.disabled,
+	).toBe(true);
+	s.container.querySelector<HTMLButtonElement>("#zoom-in")!.click();
+	expect(s.container.querySelector("#zoom-level")!.textContent).toBe("1.8%");
+});
+
+it("does not queue explicit focusing in a hidden tab", async () => {
+	const s = setup();
+	await s.preview.receive(s.message);
+	s.node("a").dispatchEvent(new MouseEvent("contextmenu", { bubbles: true }));
+	const inner = s.container.querySelector<HTMLElement>("#inner")!;
+	const before = inner.style.transform;
+	vi.spyOn(s.node("a"), "getBoundingClientRect").mockReturnValue({
+		left: 150,
+		top: 150,
+		width: 100,
+		height: 50,
+	} as DOMRect);
+	Object.defineProperties(s.root, {
+		clientWidth: { value: 0 },
+		clientHeight: { value: 0 },
+	});
+	s.container.querySelector<HTMLButtonElement>("#focus-selected-node")!.click();
+	Object.defineProperties(s.root, {
+		clientWidth: { value: 400 },
+		clientHeight: { value: 300 },
+	});
+	window.dispatchEvent(new Event("resize"));
+	expect(inner.style.transform).toBe(before);
 });

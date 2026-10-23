@@ -113,6 +113,31 @@ export function panToCenterNode(
 	};
 }
 
+/** Fit one node at up to natural size, using bounds measured at the old transform. */
+export function focusNodeView(
+	view: ViewTransform,
+	nodeRect: RectLike,
+	viewportRect: RectLike,
+	viewport: { width: number; height: number },
+): ViewTransform | undefined {
+	const fitted = fitGraph(viewport, {
+		width: nodeRect.width / view.scale,
+		height: nodeRect.height / view.scale,
+	});
+	if (!fitted) return undefined;
+	const centerX =
+		(nodeRect.left + nodeRect.width / 2 - viewportRect.left - view.panX) /
+		view.scale;
+	const centerY =
+		(nodeRect.top + nodeRect.height / 2 - viewportRect.top - view.panY) /
+		view.scale;
+	return {
+		scale: fitted.scale,
+		panX: viewport.width / 2 - centerX * fitted.scale,
+		panY: viewport.height / 2 - centerY * fitted.scale,
+	};
+}
+
 /** The scale that fits a graph inside the minimap box without distorting it. */
 export function minimapScale(
 	graph: { width: number; height: number },
