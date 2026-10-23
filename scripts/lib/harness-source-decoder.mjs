@@ -25,7 +25,7 @@ const SETTINGS_KEYS = new Set([
 	"enabledPlugins",
 	"worktree",
 ]);
-const PERMISSIONS_KEYS = new Set(["allow"]);
+const PERMISSIONS_KEYS = new Set(["allow", "deny"]);
 const HOOK_ENTRY_KEYS = new Set(["matcher", "hooks"]);
 const HOOK_COMMAND_KEYS = new Set([
 	"type",
