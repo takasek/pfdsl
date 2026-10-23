@@ -226,9 +226,11 @@ export function createDocumentTab({
 					);
 					return;
 				}
-				void references
-					.handleMessage(message)
-					.catch((error) => reportStatus(String(error)));
+				const requestedVersion = model.getVersionId();
+				void references.handleMessage(message).catch((error) => {
+					if (!disposed && model.getVersionId() === requestedVersion)
+						reportStatus(String(error));
+				});
 			} else if (message.type !== "ready")
 				reportStatus("Related-file navigation is not available in this build.");
 		},
@@ -276,7 +278,7 @@ export function createDocumentTab({
 			...dependencyDiagnostics,
 		];
 		diagnosticsSummary = allDiagnostics.length
-			? (["error", "warning", "info", "hint"] as const)
+			? (["error", "warning", "info"] as const)
 					.map((severity) => {
 						const count = allDiagnostics.filter(
 							(d) => d.severity === severity,

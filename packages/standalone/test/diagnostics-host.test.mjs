@@ -25,6 +25,7 @@ test("real analysis summaries reach the active host and distinguish same-name do
 		const first = await host.open(a);
 		const text = () => host.query("#diagnostics").textContent;
 		await until(() => text().includes("1 warning"));
+		assert.doesNotMatch(text(), /hints/);
 		assert.match(text(), /Current diagnostics — \/A\/same.pfdsl:/);
 		first.type(
 			"---\nartifact:\n  b: {label: B, criteria: Ready}\n---\na >> p -> b\n",

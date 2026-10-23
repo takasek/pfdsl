@@ -178,9 +178,10 @@ export function registerReferenceFeatures(
 			resolveLocationFsPath(path, ".", current.frontmatter?.basePath),
 			terminal,
 		);
-		report(
-			`Command sent to ${terminal === "terminal" ? "Terminal.app" : "Ghostty"}. Process completion is not monitored.`,
-		);
+		if (valid(request, version))
+			report(
+				`Command sent to ${terminal === "terminal" ? "Terminal.app" : "Ghostty"}. Process completion is not monitored.`,
+			);
 	}
 	function runAtCursor(terminal: "terminal" | "ghostty") {
 		const current = analyzeSnapshot(model.getValue()),
@@ -201,10 +202,12 @@ export function registerReferenceFeatures(
 		return run(command, terminal);
 	}
 	const safely = (work: () => unknown | Promise<unknown>) => async () => {
+		const requestedVersion = model.getVersionId();
 		try {
 			if (!disposed) await work();
 		} catch (error) {
-			if (!disposed) report(String(error));
+			if (!disposed && model.getVersionId() === requestedVersion)
+				report(String(error));
 		}
 	};
 	const actions = [
@@ -277,6 +280,7 @@ export function registerReferenceFeatures(
 				)
 					return false;
 				if (disposed) return true;
+				const requestedVersion = model.getVersionId();
 				try {
 					const { version, index } = JSON.parse(resource.query);
 					if (version !== model.getVersionId()) return true;
@@ -285,7 +289,8 @@ export function registerReferenceFeatures(
 					];
 					if (ref) await open(ref);
 				} catch (error) {
-					report(String(error));
+					if (!disposed && model.getVersionId() === requestedVersion)
+						report(String(error));
 				}
 				return true;
 			},
