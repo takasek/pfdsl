@@ -137,3 +137,62 @@ export function findRepoSpecificProse(files) {
 	}
 	return found;
 }
+
+// Advisory candidates only. Vocabulary cannot establish the grammatical subject,
+// normative force, or responsibility boundary of a sentence.
+const EXECUTOR_VOCABULARY =
+	/\b(?:commits?|PRs?|pull\s+requests?|branches|branch|worktrees?|sub-?agents?|TDD|sessions?|turns?)\b|コミット|プルリクエスト|ブランチ|ワークツリー|サブエージェント|セッション|ターン/gi;
+
+/**
+ * Report sentence-sized candidates separately from the failing distribution rules.
+ * Coordinates are one-based UTF-16 columns in the original source, at the first
+ * matched term. Only parsed Markdown text participates, not code or destinations.
+ */
+export function findExecutorVocabulary(files) {
+	const found = [];
+	for (const { path, content } of files) {
+		const tree = fromMarkdown(content);
+		walk(tree, (block) => {
+			if (!["paragraph", "heading"].includes(block.type)) return;
+			const start = block.position.start.offset;
+			const end = block.position.end.offset;
+			const prose = Array.from({ length: end - start }, () => " ");
+			walk(block, (node) => {
+				if (node.type !== "text") return;
+				for (
+					let i = node.position.start.offset;
+					i < node.position.end.offset;
+					i++
+				) {
+					prose[i - start] = content[i];
+				}
+			});
+			// Split visible prose only: punctuation in code and link destinations
+			// cannot terminate a sentence. Blank block boundaries are handled by AST.
+			const visible = prose.join("");
+			for (const sentence of visible.matchAll(
+				/[^。！？.!?]+[。！？.!?]*|[。！？.!?]+/g,
+			)) {
+				const matches = [...sentence[0].matchAll(EXECUTOR_VOCABULARY)];
+				if (!matches.length) continue;
+				const offset = start + sentence.index + matches[0].index;
+				const prefix = content.slice(0, offset);
+				const line = prefix.split("\n").length;
+				const column = offset - prefix.lastIndexOf("\n");
+				found.push({
+					path,
+					line,
+					column,
+					terms: [...new Set(matches.map((match) => match[0]))],
+					text: content
+						.slice(
+							start + sentence.index,
+							start + sentence.index + sentence[0].length,
+						)
+						.trim(),
+				});
+			}
+		});
+	}
+	return found;
+}
