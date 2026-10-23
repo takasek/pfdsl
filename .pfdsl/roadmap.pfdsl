@@ -179,7 +179,7 @@ artifact:
       このリポで新しく開いたセッションが、着手時にその節を読むことを1回確かめた
   boundary_test_revision_adr:
     label: 契約1を3条件の AND に改める ADR (#1525)
-    description: ADR-0048 の契約1を書込み先・業種中立・名指しの AND に改め、0段目の第3基準を統合し、companion の構造的事実・D3 の運び手・D1 の条件化・D5 の既定を決める ADR。後続の work-cycle・pfd-retro・plugin 分割の設計の前提になる
+    description: ADR-0048 の契約1を意味論・書込み先・業種中立・名指しの AND に改め、0段目の第3基準を統合し、companion の構造的事実と D3 の運び手を決める ADR。後続の work-cycle と plugin 分割の設計の前提になる
     status: todo
     criteria: >
       新しい ADR が Accepted で存在し、ADR-0048 の Status に部分上書きが注記されている。
@@ -337,7 +337,7 @@ responsibility_boundary_adr >> i1526_run_evidence_roundtrip -> evidence_roundtri
 
 [boundary_test_revision_adr, evidence_roundtrip_record, responsibility_boundary_adr, root_loaded_work_rules] >> reduce_work_cycle_protocol -> executor_neutral_work_cycle
 
-[boundary_test_revision_adr, responsibility_boundary_adr, root_loaded_work_rules] >> narrow_retro_to_model -> three_valued_model_retro
+[responsibility_boundary_adr, root_loaded_work_rules] >> narrow_retro_to_model -> three_valued_model_retro
 
 [responsibility_boundary_adr, root_loaded_work_rules] >> move_writer_rules_out_of_github_preset -> writer_free_github_preset
 
