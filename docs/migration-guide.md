@@ -22,6 +22,31 @@ If the previous identity or completion is unknown, keep it unknown: inspect the 
 Do not infer a previous release or record the target merely to silence a notice.
 Record the target only after all potentially applicable steps have been resolved and their checks pass; report unresolved decisions until then.
 
+## Unreleased CLI/plugin — after CLI/plugin v0.2.0
+
+These changes are not yet assigned to a published CLI/plugin release.
+Apply them only when the target release includes the referenced changes; specification v0.0.29 is not a CLI/plugin version.
+
+### PR timing becomes an adopting repository's rule
+
+Specification v0.0.29 and the distributed work-cycle no longer require updating an artifact to `done` in its completion commit or PR, or prescribe when to integrate that update for an artifact stored in another repository.
+The file-based tracker preset also stops requiring the work item's completed status and the artifact's `done` status in the same commit. It still requires both states in the version assessed as complete and retains the graph until that check is finished; commit and PR grouping belong to the adopting repository.
+The meaning of `status` is unchanged: it describes the tree containing the file, and the integration target's value is authoritative when multiple trees exist.
+Status values and diagnostics are unchanged.
+This removes a distributed operational requirement; it does not provide equivalent protection through a new audit.
+Closing an issue does not update artifact status, and no close-reason monitor is introduced.
+
+If your repository relies on the former timing rule, preserve it as your own rule before upgrading:
+
+1. Read the installed bundle's `pfd-ops/references/work-cycle.md`, section `進捗と完了根拠`, or retain that file from the installed release tag or bundle archive.
+2. Copy the relevant timing into `.pfdsl/bindings/pfd-ops.md` or your execution environment's instructions, preserving local differences. For example, require a `done` update to accompany the completion change when both can be integrated in one PR, and explicitly assign the later update when the completed artifact is stored elsewhere.
+3. Ensure your root instructions or execution environment load that local rule. Do not assume that a future distributed work-cycle will continue loading a general workflow extension slot.
+4. Exercise your normal completion path and confirm that the status update reaches the intended integration tree. Include the separate-repository case if your project uses it. An unchanged `pfdsl check` result does not verify this timing.
+
+Keeping this rule is an adopting repository's choice, not a new mandatory migration check for projects that do not use it.
+The upstream repository retains its own timing in [its binding](https://github.com/takasek/pfdsl/blob/main/.pfdsl/bindings/pfd-ops.md).
+Source: [Issue #1523 and the owner's decision](https://github.com/takasek/pfdsl/issues/1523#issuecomment-6369838044).
+
 ## CLI/plugin v0.2.0 — after CLI/plugin v0.1.0
 
 This section covers the changes after CLI/plugin v0.1.0 that need action in an adopting repository.

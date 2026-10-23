@@ -414,6 +414,7 @@ binding・companion・guard の分類に当たることは根拠にならない 
 ## develop 着手時の artifact status 更新
 
 着手時の todo→wip と、完了根拠に基づく done 更新は pfd-ops の `references/work-cycle.md`「進捗と完了根拠」に従う。
+commit・PR と結び付けた更新時点は binding「PR で統合する成果物の status 更新」に従う。
 
 ## workflow.pfdsl に status を書かない
 

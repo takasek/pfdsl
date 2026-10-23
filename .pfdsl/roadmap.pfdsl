@@ -185,6 +185,14 @@ artifact:
       architecture.md に移行中の適用関係が配布され、workflow.md に後続の段階公開と採用先の手順保持を含む移行案内の作成手順がある。
       公開版ごとの配布レビューを維持し、該当する公開工程から本方針を参照できる
     location: ../.pfdsl/workflow.md
+  local_pr_status_timing:
+    label: 採用先へ移した PR 時点の status 更新手順 (#1523)
+    description: PR と commit に結び付けた done 更新の義務を spec と配布手順から外し、このリポの binding に残す。採用先へ手順保持の方法と配布側の保証の縮小を案内する
+    status: done
+    criteria: >
+      spec のツリーに関する意味論を維持したまま PR 時点の手順が区分 iii へ移り、spec-history と移行案内に変更範囲が記録されている。
+      root の指示から読む binding にこのリポの手順があり、close に基づく代替監査を追加していない
+    location: https://github.com/takasek/pfdsl/issues/1523
   boundary_test_revision_adr:
     label: 契約1を3条件の AND に改める ADR (#1525)
     description: ADR-0048 の契約1を意味論・書込み先・業種中立・名指しの AND に改め、0段目の第3基準を統合し、companion の構造的事実と D3 の運び手を決める ADR。後続の work-cycle と plugin 分割の設計の前提になる
@@ -288,6 +296,9 @@ process:
   i1522_define_transition_release_policy:
     label: 責務境界の段階公開方針と移行注記を整える
     location: https://github.com/takasek/pfdsl/issues/1522
+  i1523_move_pr_status_timing:
+    label: PR 時点の status 更新手順を採用先の規律へ移す
+    location: https://github.com/takasek/pfdsl/issues/1523
   i1525_revise_boundary_test:
     label: 契約1を3条件の AND に改める
     location: https://github.com/takasek/pfdsl/issues/1525
@@ -355,11 +366,13 @@ gui_mac_acceptance >> i1262_publish_standalone -> standalone_release
 
 responsibility_boundary_adr >> i1522_define_transition_release_policy -> boundary_transition_release_policy
 
+[responsibility_boundary_adr, root_loaded_work_rules] >> i1523_move_pr_status_timing -> local_pr_status_timing
+
 responsibility_boundary_adr >> i1525_revise_boundary_test -> boundary_test_revision_adr
 
 responsibility_boundary_adr >> i1526_run_evidence_roundtrip -> evidence_roundtrip_record
 
-[boundary_test_revision_adr, evidence_roundtrip_record, responsibility_boundary_adr, root_loaded_work_rules] >> reduce_work_cycle_protocol -> executor_neutral_work_cycle
+[boundary_test_revision_adr, evidence_roundtrip_record, responsibility_boundary_adr, root_loaded_work_rules, local_pr_status_timing] >> reduce_work_cycle_protocol -> executor_neutral_work_cycle
 
 [responsibility_boundary_adr, root_loaded_work_rules] >> narrow_retro_to_model -> three_valued_model_retro
 
