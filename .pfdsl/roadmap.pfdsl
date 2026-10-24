@@ -239,7 +239,7 @@ artifact:
   wiki_roadmap_integration:
     label: Wiki を正本にする roadmap 連携 (#1519)
     description: 実装リポの PR に依存せず roadmap を編集できる採用側連携。詳細は対応 Issue を一次情報とする
-    status: todo
+    status: wip
     criteria: >
       採用リポで Wiki 更新から SVG を更新でき、ready・validate・render が同じ正本を読む。
       同時更新・失敗時の扱い、共有 done の確定条件、移行と復帰の手順が検証されている
