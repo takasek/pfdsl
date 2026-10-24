@@ -147,16 +147,17 @@ describe("executor vocabulary report", () => {
 			[],
 		);
 	});
-	it("reads the canonical work-cycle and reports its known completion timing sentence", () => {
+	it("reports the fixed completion timing fixture", () => {
 		const content = readFileSync(
 			new URL(
-				"../harness-template/skills/pfd-ops/references/work-cycle.md",
+				"../__fixtures__/executor-vocabulary/completion-timing.md",
 				import.meta.url,
 			),
 			"utf8",
 		);
-		assert.ok(
-			report(content).some((f) => f.text.includes("完了コミットと同時に")),
-		);
+		const found = report(content);
+		assert.equal(found.length, 1);
+		assert.equal(found[0].text, content.trim());
+		assert.deepEqual(found[0].terms, ["コミット"]);
 	});
 });
