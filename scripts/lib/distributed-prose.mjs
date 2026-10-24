@@ -137,3 +137,135 @@ export function findRepoSpecificProse(files) {
 	}
 	return found;
 }
+
+// Advisory candidates only. Vocabulary cannot establish the grammatical subject,
+// normative force, or responsibility boundary of a sentence.
+const EXECUTOR_VOCABULARY =
+	/\b(?:commits?|PRs?|pull\s+requests?|branches|branch|worktrees?|sub-?agents?|TDD|sessions?|turns?)\b|コミット|プルリクエスト|ブランチ|ワークツリー|サブエージェント|セッション|ターン/gi;
+
+/** Observe decoded text without replacing the Markdown parser's handlers. */
+function textWithSourceRanges(content) {
+	const ranges = new WeakMap();
+	const textTokens = new Set([
+		"data",
+		"characterReference",
+		"characterEscapeValue",
+		"characterEscape",
+		"lineEnding",
+		"autolinkProtocol",
+		"autolinkEmail",
+	]);
+	const tree = fromMarkdown(content, {
+		mdastExtensions: [
+			{
+				afterExit(token) {
+					if (!textTokens.has(token.type)) return;
+					const node = this.stack.at(-1)?.children?.at(-1);
+					if (node?.type !== "text") return;
+					const positions = ranges.get(node) ?? [];
+					if (token.type === "characterEscape") {
+						positions.at(-1).start = token.start.offset;
+						return;
+					}
+					const added = node.value.length - positions.length;
+					const literal = token.end.offset - token.start.offset === added;
+					for (let i = 0; i < added; i++) {
+						positions.push({
+							start: token.start.offset + (literal ? i : 0),
+							end: literal ? token.start.offset + i + 1 : token.end.offset,
+						});
+					}
+					ranges.set(node, positions);
+				},
+			},
+		],
+	});
+	return { tree, ranges };
+}
+
+/**
+ * Report sentence-sized candidates separately from the failing distribution rules.
+ * Coordinates are one-based UTF-16 columns in the original source, at the first
+ * matched term. Only parsed Markdown text participates, not code or destinations.
+ */
+export function findExecutorVocabulary(files) {
+	const found = [];
+	for (const { path, content } of files) {
+		const { tree, ranges } = textWithSourceRanges(content);
+		walk(tree, (block) => {
+			if (!["paragraph", "heading"].includes(block.type)) return;
+			const end = block.position.end.offset;
+			const prose = [];
+			const positions = [];
+			const append = (node) => {
+				if (node.type === "text") {
+					const sourceRanges = ranges.get(node);
+					for (let i = 0; i < node.value.length; i++) {
+						prose.push(node.value[i]);
+						positions.push(sourceRanges[i]);
+					}
+				} else if (
+					[
+						"paragraph",
+						"heading",
+						"emphasis",
+						"strong",
+						"link",
+						"linkReference",
+					].includes(node.type)
+				) {
+					const first = positions.length;
+					for (const child of node.children) append(child);
+					if (positions.length > first) {
+						positions[first] = {
+							...positions[first],
+							textStart: node.position.start.offset,
+						};
+						positions[positions.length - 1] = {
+							...positions.at(-1),
+							textEnd: node.position.end.offset,
+						};
+					}
+				} else {
+					// Ignored content must not synthesize a word across its boundary.
+					prose.push(node.type === "break" ? "\n" : " ");
+					positions.push({
+						start: node.position.start.offset,
+						end: node.position.end.offset,
+					});
+				}
+			};
+			append(block);
+			// Split visible prose only: punctuation in code and link destinations
+			// cannot terminate a sentence. Blank block boundaries are handled by AST.
+			const visible = prose.join("");
+			for (const sentence of visible.matchAll(
+				/[^。！？.!?]+[。！？.!?]*|[。！？.!?]+/g,
+			)) {
+				const matches = [...sentence[0].matchAll(EXECUTOR_VOCABULARY)];
+				if (!matches.length) continue;
+				const offset = positions[sentence.index + matches[0].index].start;
+				const prefix = content.slice(0, offset);
+				const line = prefix.split("\n").length;
+				const column = offset - prefix.lastIndexOf("\n");
+				found.push({
+					path,
+					line,
+					column,
+					terms: [...new Set(matches.map((match) => match[0]))],
+					text: content
+						.slice(
+							positions[sentence.index].textStart ??
+								positions[sentence.index].start,
+							sentence.index + sentence[0].length === visible.length
+								? end
+								: (positions[sentence.index + sentence[0].length - 1].textEnd ??
+										positions[sentence.index + sentence[0].length - 1].end),
+						)
+						.trim(),
+				});
+			}
+		});
+	}
+	return found;
+}
