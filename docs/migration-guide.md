@@ -22,6 +22,21 @@ If the previous identity or completion is unknown, keep it unknown: inspect the 
 Do not infer a previous release or record the target merely to silence a notice.
 Record the target only after all potentially applicable steps have been resolved and their checks pass; report unresolved decisions until then.
 
+## Unreleased CLI/plugin — after CLI/plugin v0.2.0
+
+Apply the following change only when your target release includes it.
+
+### Include final deliverables in roadmap scope
+
+The distributed work-cycle now includes work that creates a new product capability as a final deliverable, even when it does not gate another roadmap task.
+This repairs a missing condition in the shared work-cycle and aligns it with the existing classification test in both work-item backends and the rule that permits genuine final deliverables as graph terminals.
+Review work previously excluded solely because no later task depended on it; add qualifying work with its input artifacts, process, output artifacts and dependencies to the roadmap PFD.
+Work that neither gates another roadmap task nor creates a new product capability remains outside the roadmap.
+
+Removing lists of task types and specifying that the dependency graph means the roadmap PFD are clarifications, not additional scope changes.
+Classify by the two conditions above rather than by names such as bug fix or tooling.
+For GitHub Issues, use `flow:managed` when either condition holds and `flow:exempt` otherwise; apply the equivalent fields with the file-based tracker.
+
 ## CLI/plugin v0.2.0 — after CLI/plugin v0.1.0
 
 This section covers the changes after CLI/plugin v0.1.0 that need action in an adopting repository.

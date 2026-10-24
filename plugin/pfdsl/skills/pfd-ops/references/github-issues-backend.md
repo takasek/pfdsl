@@ -18,7 +18,7 @@ PFD の作業項目を GitHub Issues で管理する流儀。pfdsl 固有では�
 
 ## ラベル判定基準
 
-roadmap は「製品の成果物を生み、他作業の着手をゲートする作業」を管理する。**新機能・spec 追加・リリース・他 issue の前提になる作業**は `flow:managed`。**他作業をゲートしない保守作業** — バグ修正/hotfix・CI/ビルド/git hook/ツーリング・PFD や doc の bookkeeping（図への登録漏れ補完等）— は `flow:exempt` とし roadmap に載せない。判定テスト: 「この issue の完了が別の roadmap 作業の前提になるか、新しい製品能力を生むか」。No（保守・基盤・修正のみ）なら exempt。
+roadmap の PFD は、他の roadmap 作業の着手をゲートする成果物、または新しい製品能力を生む最終納品物を作る作業を管理する。判定テスト: 「この issue の完了が別の roadmap 作業の前提になるか、新しい製品能力を生むか」。どちらかに当たれば `flow:managed` とし、入力 artifact・process・出力 artifact とその依存関係を roadmap の PFD に追加する。どちらにも当たらなければ `flow:exempt` とし、roadmap に載せない。作業の種別名だけでは分類しない。
 
 **判定タイミング**: 起票時に `flow:managed` / `flow:exempt` を判定してから roadmap 追加要否を決める。`flow:managed` の起票と roadmap 追加は同時に行う（後回しにすると依存グラフが stale になり気付き依存に戻る）。
 
