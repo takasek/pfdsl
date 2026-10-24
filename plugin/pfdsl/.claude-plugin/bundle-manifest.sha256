@@ -18,7 +18,7 @@ a3f96e180a957152509a1d019b2b4247fb74c3f0ce6c7b25cd79355d9a3e75bb  hooks/lib/mana
 
 ae6f8cfe03b3df98c89a4b46eb176609cbf2a7c311f0d36f42817eab337ffcf2  hooks/managed-issue-reminder-post-tool-use.mjs
 
-1b02be475f9b74243c0ac31aea25b3472717dda8224906da9c5bf9223af8903c  skills/pfd-ecosystem/SKILL.md
+654d10996a5254b34c243e01f347e1cba062a21d4d513596d05fe140a2939823  skills/pfd-ecosystem/SKILL.md
 
 e895452e8fcbca4176557065ee9667702054e60d90d40cd7325bc065e0657292  skills/pfd-ecosystem/references/kind-taxonomy.md
 
@@ -60,7 +60,7 @@ d6636ad19abcd0019d685f0cbc26db35fb779ea1afa9568d070fb94bb68eb7f2  skills/pfd-ops
 
 202138d33823bf267e906da5befcd23670a0896130fdc05dfab20e99a0041ad6  skills/pfd-ops/references/file-based-tracker-backend.md
 
-ea8b15c0dbd2fef4e09ec27b094c6a424930bdd5e7f5bf65902dc5776cd8f4ab  skills/pfd-ops/references/github-issues-backend.md
+ac0581ec7d87ab9a98f1d082170dc74accdcbd5bdffa10bd90adb41f2eace0f6  skills/pfd-ops/references/github-issues-backend.md
 
 4da6e061033c43a67bd71d55bd816fc3c57ef32f52d0dea19070bcc7c2b79582  skills/pfd-ops/references/scaffold/bindings/pfd-ops.md
 
@@ -84,7 +84,7 @@ deb6cb7549f74139a1414360474a8ec15e67e3298e27f597addf7546978df708  skills/pfd-ops
 
 c1328f9dcb946c35f7bba42306324d82929f7031fb52d459c3b2ee12fd904686  skills/pfd-ops/references/scaffold/workflow.pfdsl
 
-35a4cdd9f2b4da6d93217a4142bbf934067053f6ccc9b5820b6ec867fc7f6333  skills/pfd-ops/references/work-cycle.md
+62979b791dcf6e6f82e88c25f4de31e7879a0c7e3d111abc9f9aa2f69a630d78  skills/pfd-ops/references/work-cycle.md
 
 be85d8e1614e9bf8e6ca3f89f2f591dbfd9deebd5c0e8131ba3309b3fd6537a2  skills/pfd-ops/scripts/check-install-sync.mjs
 
@@ -92,7 +92,7 @@ be85d8e1614e9bf8e6ca3f89f2f591dbfd9deebd5c0e8131ba3309b3fd6537a2  skills/pfd-ops
 
 c8a84302faab507a4fadfee9ae2d06c4ac89dc64e29dcd7025a65ceebe98162b  skills/pfd-ops/scripts/plugin-version-check.mjs
 
-7fbb4821acd71d84c98a089ed6216ff63af58f8d4a019b9e8c1094d15eaf2e0e  skills/pfd-retro/SKILL.md
+30d590dd79a9521df7e1967d9afee266fee4a1331aa81c717bbda37cc2dce222  skills/pfd-retro/SKILL.md
 
 e2c21005c67147e1f6e73edd0930a650dce2261a71e53753cedd562aad935444  skills/pfd-retro/references/knowledge-lifecycle.md
 
