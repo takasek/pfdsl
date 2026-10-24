@@ -117,6 +117,19 @@ function sourceColumnOutsidePreview(
 	const preferredGroup = groups.find(
 		(group) => group.viewColumn === preferredColumn,
 	);
+	const sourceGroups = groups.filter(
+		(group) =>
+			group !== previewGroup &&
+			group.tabs.some(
+				(tab) =>
+					tab.input instanceof vscode.TabInputText &&
+					tab.input.uri.toString() === state.doc.uri.toString(),
+			),
+	);
+	const sourceGroup =
+		sourceGroups.find((group) => group.viewColumn === preferredColumn) ??
+		sourceGroups[0];
+	if (sourceGroup) return sourceGroup.viewColumn;
 	return preferredGroup && preferredGroup !== previewGroup
 		? preferredColumn
 		: vscode.ViewColumn.Beside;
