@@ -188,7 +188,7 @@ artifact:
   evidence_roundtrip_record:
     label: E0 の往復記録と証拠スキーマ v0 (#1526)
     description: 数十行の driver で status ready から実行・証拠 JSON・読取専用の検査までを1回通した記録。契約3の保存方式と検査動詞の設計の入力になる
-    status: todo
+    status: wip
     criteria: >
       このリポの roadmap に対して driver が ready を読み1 process 分の証拠 JSON を出し検査器が合否判定するまでを1回通し、スキーマ v0・検査項目・検査できなかった項目と理由・動詞候補名が experiments/ に記録されている。
       status を書き換える動詞は作っていない

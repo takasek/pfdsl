@@ -1,0 +1,168 @@
+{
+  "modelSource": "---\ntype: roadmap\ntitle: Issue 依存フロー（2026-06）\ndescription: オープン issue の依存関係と着手可能順序。issue 本体が一次情報、本ファイルは依存構造のみ管理。issue 管理規約・同期手段は sibling roadmap.md と pfd-ops スキルの references/github-issues-backend.md 参照\nlayout:\n  direction: LR\n  maxWidth: 130\n\nartifact:\n  ready_counts_cli:\n    label: 各工程の新規 ready 数を示す CLI (#1345)\n    description: 全出力完了前後の ready 集合差を各工程に表示する。単一 best 推薦を廃止し、件数の解釈と着手対象の選択を利用者へ委ねる\n    status: done\n    location: ../packages/cli/src/index.ts\n    criteria: 新規 ready 数が実際の状態更新前後の集合差と一致し、標準テキスト表示、--no-counts、JSON 常時件数、best 廃止と運用 consumer の移行がテストで検証されている\n  cli_release_ready_counts:\n    label: CLIリリース：各工程の新規 ready 数\n    description: 各工程の新規 ready 数と単一 best 推薦廃止を含む npm CLI と、同じ release tag から配布する plugin 資産\n    status: todo\n    criteria: 公開された固定 npm 版の status ready が各工程の件数を返し、同じ release tag の plugin が件数と利用者の対象選択を使う手順を配布している\n    externalStakeholders: [ CLI利用者 ]\n  toolchain:\n    label: ツールチェーン実装（現行）\n    description: packages/（core / cli / graphviz-exporter / preview-engine / vscode-extension）全体。後続プロセスが前提にするのは「実装が存在すること」であって特定の版ではない。現行版は cli_release_* チェーンを経て進み続けており、公開版の一次情報は npm レジストリ（ここに版数を書かない — ドリフトするため）。名前と粒度は workflow.pfdsl の toolchain に揃えてある（#783）\n    status: done\n    criteria: check/fmt/graph が全サンプルに対してエラーなし、npm view @pfdsl/cli versions で公開済みバージョンが1件以上確認できる\n    location: ../packages/\n  spec_v0011:\n    label: 仕様書 v0.0.11（waiting/suspended/type統合）\n    status: done\n    criteria: \"docs/spec/spec.md に waiting/suspended status 分割・type フィールド・W002 source artifact 免除の定義節が存在する\"\n    location: ../docs/spec/spec.md\n  published_extension:\n    label: \"Marketplace 公開済み extension (#119)\"\n    description: \"VS Marketplace は OIDC/Trusted Publishing 非対応のため PAT が必要。VSCE_PAT 環境変数を設定して `make release-extension` でローカル実行する\"\n    status: suspended\n    criteria: \"`VSCE_PAT` を設定した `make release-extension` で VS Code Marketplace への publish が動作確認済み\"\n  spec_id_syntax:\n    label: \"仕様ID構文 ADR + 最小lint (#328)\"\n    description: \"spec.md 相互参照の仕様ID方式。構文・レンジ規則の詳細と移行方針は issue #328 が一次情報。汎用ツール化の検討記録は issue コメント参照\"\n    status: done\n    location: ../docs/adr/0027-spec-id-cross-references.md\n    criteria: \"docs/adr/0027-spec-id-cross-references.md に構文・レンジ規則が定義され、node scripts/check-spec-ids.mjs（make check-docs 経由で CI 実行）が ID 一意性チェックと dangling 参照チェックを行う\"\n  get_by_id_tool:\n    label: \"get-by-ID ツール (#402)\"\n    description: \"仕様IDのレンジ規則（ADR-0027）に従い該当ブロックを取得する scripts ツール。LLM の spec 参照 token 削減と、移行作業での範囲機械確認が用途\"\n    status: done\n    location: ../scripts/get-spec-id.mjs\n    criteria: \"見出し・list item・table 行・paragraph の4種別の範囲取得が scripts/lib/spec-id-range.test.mjs で検証され、node scripts/get-spec-id.mjs SPEC_id_syntax docs/adr/0027-spec-id-cross-references.md が実データからブロック全体を返すことで動作確認できる\"\n  mint_check_tool:\n    label: \"mint-check ツール (#405)\"\n    description: \"採番前に slug の既出（定義・strict 参照・forward-ref）を列挙する scripts ツール。既存 forward-ref の slug を別概念で採番する silent 衝突の防止が主目的。tombstone 次元は初 ID 削除まで据え置き（spec_id_tombstones へ）\"\n    status: done\n    criteria: 定義・strict 参照・forward-ref の全出現種別が file:line で列挙され、既出ゼロ/ありで exit code が分かれることが scripts/lib/mint-check.test.mjs・scripts/lib/mint-check-steps.test.mjs のテストで検証されている\n    location: ../scripts/mint-check.mjs\n  spec_id_refs:\n    label: 仕様ID相互参照化済み spec.md\n    description: \"節番号直書きの相互参照を仕様ID参照へ段階移行した spec.md。ADR 確定後に別 issue として起票する（#328 移行方針）。後続門番のプレースホルダ（ADR-0018）\"\n    status: todo\n    criteria: docs/spec/spec.md の節番号相互参照が仕様ID参照に置換され、node scripts/check-spec-ids.mjs が dangling 参照なしで通過する\n    location: ../docs/spec/spec.md\n  spec_id_tombstones:\n    label: 仕様ID tombstone 機構\n    description: \"廃止済み仕様IDの tombstone リスト実体・再定義禁止 lint・mint-check への tombstone 次元追加。初の ID 削除が発生した時点で駆動（ADR-0027 §ID性質、#405 で据え置き）。後続門番のプレースホルダ（ADR-0018）\"\n    status: suspended\n    criteria: tombstone リストが記録形式付きで導入され、tombstone 済み ID の再定義が make check-docs 経由のチェックでエラーになり、scripts/mint-check.mjs が tombstone を第4の出現種別として列挙する\n  editor_connector:\n    label: \"エディタ コネクタ編集支援 (#482)\"\n    description: \"ノード前後への新規追加・既存接続の code action/コマンド。edge 挿入ロジックはロジック層に分離し Preview UI (#483) と共用\"\n    status: done\n    criteria: \"カーソル下ノードへの前後追加・接続がコネクタ種選択付きの code action/コマンドから .pfdsl テキストへ挿入され、共有編集計算と host の必要な自動検証・独立レビューが完了し、実 extension host の QuickPick 確認を共通受入 Issue の GUI-20 へ登録している。実機未実施は実装完了を妨げず、この done は実機合格を意味しない\"\n  preview_connector:\n    label: \"Preview コネクタ生成 UI (#483)\"\n    description: \"webview の nodeClick 基盤を拡張し、ノードクリックから前後追加・接続をテキストへ反映する。#482 の編集機構を共用\"\n    status: done\n    criteria: \"Preview のノードクリックからコネクタ選択・生成でテキストへ反映され再描画されることが動作確認済み\"\n  def_insertion:\n    label: \"frontmatter 定義挿入 code action (#484)\"\n    description: \"edge にのみ現れる未定義ノードへ artifact/process 定義スケルトンを挿入する\"\n    status: done\n    criteria: \"edge にのみ現れる未定義ノード上で Quick Fix『Insert {kind} definition』を実行すると frontmatter に artifact/process 定義が挿入されることが実 extension host で確認され、種別判定と定義挿入の回帰テストが成功している\"\n  ext_editing_release:\n    label: \"extension 編集支援リリース\"\n    description: \"#482 コネクタ編集 / #483 Preview UI / #484 定義挿入を含む次期 Marketplace リリース\"\n    status: todo\n    criteria: \"npx @vscode/vsce show takasek.pfdsl --json の versions に packages/vscode-extension/package.json の version が含まれ、その版でコネクタ編集・Preview 生成 UI・定義挿入が動作する。共通受入 Issue で定める VS Code 公開範囲の合格記録と公開版が対応し、他ホストの未確認を追加ゲートにしない\"\n  group_delete_cli:\n    label: \"group を削除できる delete (#1278)\"\n    description: \"delete が group id を受け付け、宣言を削除する。所属ノードと子 group は残し、group: と parent: を削除されずに残る最も近い祖先へ付け替える。祖先がなければ参照を外す\"\n    status: done\n    criteria: \"pfdsl delete <file> <group-id> --write が group の宣言を削除し、所属ノードと子 group を残して group: と parent: を削除されずに残る最も近い祖先へ付け替える。祖先がない場合の参照解除と、親子 group の一括削除を含め、packages/core と packages/cli/src/index.test.ts のテストで検証されている\"\n  group_node_clash_diagnostic:\n    label: \"group と node の同名を報告する診断 (#1291)\"\n    description: \"1ファイル内で group と artifact / process が同じ id を持つことを invalid として、種別を正しく名指して報告する診断。spec §2.8.1 と §15 への規定を含む\"\n    status: done\n    criteria: \"group と artifact / process が同じ id を持つファイルに対し、check が種別を名指すエラーを報告し、docs/spec/spec.md に規定があり、packages/core のテストで検証されている\"\n  edge_kind_conflict_diagnostic:\n    label: \"input と feedback の併記診断 V036 (#1467)\"\n    description: \"同じ artifact・process の組を通常入力と feedback の両方で接続する矛盾を通常・strict の両 mode で報告し、V011 の重複を抑止する\"\n    status: done\n    location: ../packages/core/src/rules/edge-kinds.ts\n    criteria: \"同じ artifact・process の組に `>>` と `>>?` があると組ごとに1件の V036 error が報告され、strict でも V011 を重ねず、間接到達の V011・同種重複の N003・別 process の非該当を保持する。CLI check と preview edit を含む tests と spec / diagnostics registry が一致する\"\n  cli_release_group_node_clash:\n    label: \"CLIリリース: group と node の同名の診断\"\n    description: \"#1291 の診断を含む npm CLI と、同じ release tag から配布する plugin 資産\"\n    status: todo\n    criteria: \"npm view @pfdsl/cli versions に同名の診断を含む版が含まれ、その版を固定して取得した CLI の check が group と node の同名をエラーとして報告する。同じ release tag の plugin 配布について .pfdsl/workflow.md の「release milestone artifact の作成規約」と .pfdsl/pipeline.md の公開・pin・取得確認を満たす\"\n  cli_release_edge_kind_conflict:\n    label: \"CLIリリース: input と feedback の併記診断\"\n    description: \"#1467 の V036 を含む npm CLI と、同じ release tag から配布する plugin 資産\"\n    status: todo\n    criteria: \"npm view @pfdsl/cli versions に V036 を含む版が含まれ、その版を固定して取得した CLI の check が通常・strict の両 mode で併記を V036 として報告する。同じ release tag の plugin 配布について .pfdsl/workflow.md の「release milestone artifact の作成規約」と .pfdsl/pipeline.md の公開・pin・取得確認を満たす\"\n  meta_set_extension_fields:\n    label: \"対象判定と拡張フィールド更新を整えた meta set (#1305)\"\n    description: \"既存の未知スカラーフィールドの更新を許し、新しい未知フィールドの追加は明示的なフラグで許す meta set。本文だけのノードと不在 ID を区別し、frontmatter 定義の追加を案内する。通常出力と JSON の扱いを揃える。要件は統合後の issue #1305\"\n    status: done\n    criteria: \"pfdsl meta set が既存の updated_at を更新でき、フラグなしの新しい未知フィールドは拒否し、フラグ付きなら追加する。本文だけのノードには frontmatter 定義の追加を案内し、不在 ID と通常出力・JSON の両方で区別する。結果に error がある場合は書き込まない。これらが packages/cli/src/index.test.ts のテストで検証され、rename --help が拡張フィールドの値を改名しないことを説明する\"\n  cli_release_meta_set_extension:\n    label: \"CLIリリース: 拡張フィールドの meta set\"\n    description: \"統合後の #1305 の対象判定・診断と拡張フィールド更新を含む npm CLI と、同じ release tag から配布する plugin 資産\"\n    status: todo\n    criteria: \"npm view @pfdsl/cli versions に統合後の #1305 を含む版が含まれ、その版を固定して取得した CLI の meta set が既存の updated_at を更新でき、フラグなしの新しい未知フィールドを拒否し、フラグ付きなら追加する。本文だけのノードには定義追加を案内し、不在 ID との診断区別を通常出力と JSON の両方で確認できる。同じ release tag の plugin 配布について .pfdsl/workflow.md の「release milestone artifact の作成規約」と .pfdsl/pipeline.md の公開・pin・取得確認を満たす\"\n  cli_release_group_delete:\n    label: \"CLIリリース: group 削除\"\n    description: \"#1278 の group 削除を含む npm CLI と、同じ release tag から配布する plugin 資産\"\n    status: todo\n    criteria: \"npm view @pfdsl/cli versions に group 削除を含む版が含まれ、その版を固定して取得した CLI で pfdsl delete <file> <group-id> が group を削除する。同じ release tag の plugin 配布について .pfdsl/workflow.md の「release milestone artifact の作成規約」と .pfdsl/pipeline.md の公開・pin・取得確認を満たす\"\n  preview_editing_usability:\n    label: 表示・編集・移動の改善実装\n    description: \"プレビューの表示・編集・移動の改善実装。要求と担当の内訳は生成工程の location が指す Issue から辿る\"\n    status: done\n    criteria: \"生成工程の Issue 本文が定める改善範囲の実装・必要な自動検証・独立レビューと、版に対応する実行可能な受入計画の登録が完了している。実機未実施は共通受入 Issue に残し、この done は実機合格を意味しない\"\n    location: ../packages/\n  standalone_pfd_features:\n    label: 公開前 GUI 機能の実装済みアプリ\n    description: \"公開前の GUI 機能を集約した実装成果物。要求・担当・内部の着手順と進捗は location の Issue 本文から辿り、実機結果は共通受入 Issue で扱う\"\n    status: done\n    criteria: \"location の Issue 本文が定める機能範囲の実装・必要な自動検証・独立レビューと、版に対応する実行可能な受入計画の登録が完了している。実機未実施を許容し、この done は実機合格を意味しない\"\n    location: https://github.com/takasek/pfdsl/issues/1259\n  gui_mac_acceptance:\n    label: 実機受入済みの macOS 候補配布物\n    description: \"署名・公証済み候補配布物と、その版・公開範囲に対応する実機合格記録。候補準備中の進捗は Issue で管理する\"\n    status: todo\n    criteria: \"location の共通受入 Issue が定める Mac 公開範囲に必要な公開前試験が候補配布物で合格し、不合格への修正・再試験、対象版・環境・証拠と適用範囲を記録済み。他ホストの未確認を追加ゲートにしない\"\n    location: https://github.com/takasek/pfdsl/issues/1445\n  gui_vscode_candidate:\n    label: VS Code 公開範囲の版固定候補\n    description: \"必要な V 実装を含む commit・拡張 package・対応する計画版を特定した受入対象。Mac 専用機能や DMG は準備条件にしない\"\n    status: done\n    criteria: \"location の共通受入 Issue が定める V 対象要求の実装・自動検証・独立レビューを確認し、その実装を含む commit から build した拡張 package と識別情報・計画版を登録済み。実機合格は未了でよい\"\n    location: https://github.com/takasek/pfdsl/issues/1445\n  gui_vscode_acceptance:\n    label: VS Code 公開範囲の実機合格記録\n    description: \"共通受入 Issue が管理する VS Code 公開範囲の実機合格記録。版固定候補を検査し、候補準備と部分試験の進捗は Issue で管理する\"\n    status: todo\n    criteria: \"location の共通受入 Issue が定める VS Code 公開範囲に必要な試験が実 Extension Development Host で合格し、不合格への修正・再試験、対象版・環境・証拠と公開版への適用範囲を記録済み。他ホストの未確認を追加ゲートにしない\"\n    location: https://github.com/takasek/pfdsl/issues/1445\n  standalone_release:\n    label: 公開済み macOS スタンドアロンアプリ\n    status: todo\n    criteria: \"生成工程の公開 Issue 本文が定める公開・取得確認が完了し、Mac 合格記録と公開配布物の対象版・適用範囲が一致する。公開結果と取得物を読み戻した証拠を記録済み。開発版の合格や未公開候補だけでは完了としない\"\n    location: https://github.com/takasek/pfdsl/releases\n    externalStakeholders: [ macOS 利用者 ]\n  responsibility_boundary_adr:\n    label: 責務境界の ADR と0段目 (#1490)\n    description: PFDSL の責務を PFD の意味論なしには成立しない判断に限る ADR-0048 と、それに合わせて書き換えた配布層の昇格先の判定ルールの0段目。後続の再編の仕様になる\n    status: done\n    criteria: >\n      docs/adr/0048 が Accepted で存在し、ADR-0039 と ADR-0040 の Status に部分上書きが注記されている。\n      architecture.md の0段目だけを渡した読み手が再編の各項目の置き場を再現でき、その結果が PR 本文に記録されている。\n      make test・make typecheck・make lint が通り、make gen-plugin の後に差分が出ない\n    location: ../docs/adr/0048-responsibility-boundary-by-pfd-semantics.md\n  root_loaded_work_rules:\n    label: root の指示から読むこのリポの作業規律\n    description: このリポの開発規律を、binding の「ワークサイクルの追加手順」スロット経由ではなく root の指示から読ませる。配布物の整理より先に統合し、移行の途中でこのリポのセッションが規律を読まなくなる状態を作らない\n    status: done\n    criteria: >\n      生成した CLAUDE.md と AGENTS.md が、このリポの作業規律を置いた binding の節を作業の開始時に読むよう指示し、scripts/check-companion-bindings.mjs が新しい見出しを必須にし、旧見出しの「ワークサイクルの追加手順」だけの binding を失敗させる。\n      このリポで新しく開いたセッションが、着手時にその節を読むことを1回確かめた\n  boundary_test_revision_adr:\n    label: 契約1を4条件の AND に改める ADR (#1525)\n    description: ADR-0048 の契約1を意味論・書込み先・業種中立・名指しの AND に改め、0段目の第3基準を統合し、companion の構造的事実と D3 の運び手を決める ADR。後続の work-cycle と plugin 分割の設計の前提になる\n    status: wip\n    criteria: >\n      新しい ADR が Accepted で存在し、ADR-0048 の Status に部分上書きが注記されている。\n      architecture.md の0段目と評価入力だけを渡した読み手が、所有者承認済みの独立参照集合11件の置き場・分割・保持条件・情報不足を再現でき、0段目に契約1と別系統の基準が残っていない\n    location: https://github.com/takasek/pfdsl/issues/1525\n  evidence_roundtrip_record:\n    label: E0 の往復記録と証拠スキーマ v0 (#1526)\n    description: 数十行の driver で status ready から実行・証拠 JSON・読取専用の検査までを1回通した記録。契約3の保存方式と検査動詞の設計の入力になる\n    status: todo\n    criteria: >\n      このリポの roadmap に対して driver が ready を読み1 process 分の証拠 JSON を出し検査器が合否判定するまでを1回通し、スキーマ v0・検査項目・検査できなかった項目と理由・動詞候補名が experiments/ に記録されている。\n      status を書き換える動詞は作っていない\n    location: https://github.com/takasek/pfdsl/issues/1526\n  executor_neutral_work_cycle:\n    label: 実行主体に依存しない work-cycle\n    description: ADR-0048 の後続で未起票。work-cycle.md から実行主体を主語にする規則を外し、PFD 側の protocol だけを残す\n    status: todo\n    criteria: >\n      work-cycle.md が実行主体を主語にする規則を持たず、1サイクル1プロセスを既定のプリセットとして示し、run の成功と受入の区別と制御主体の単一性を定め、binding の「ワークサイクルの追加手順」スロットを PFD 固有の追加ゲート項目に縮小している。\n      採用側プローブで、外部の実行主体の完了から done を付けずに受入の確認へ進むことを確かめた\n  three_valued_model_retro:\n    label: 3値の model retro と証拠の契約\n    description: ADR-0048 の後続で未起票。pfd-retro を3値の model retro と証拠の契約に絞り、D 層を同じ plugin 内の独立した skill と図の監査レンズへ分ける（ADR-0048 D1）\n    status: todo\n    criteria: >\n      pfd-retro の結論が実行側の失敗・モデルの改訂候補・変更不要の3値で、変更不要は照合したモデル要素と証拠を名指す。\n      証拠の契約が版との対応を定め、C 層の汎用項目が配布物から外れている。\n      D 層は同じ plugin 内の独立した skill と図の監査レンズへ分かれ、L4 滞留監査は配布層への還流として別の節にある\n  writer_free_github_preset:\n    label: 実行主体の書込み規律を外した GitHub Issues プリセット\n    description: ADR-0048 の後続で未起票。実行主体が行う外部書込みの手順と PR 運用をこのリポの binding へ移し、プリセットにはアダプタ自身が外部へ書く場合の読み戻しの原則だけを残す（ADR-0048 D2）\n    status: todo\n    criteria: github-issues-backend.md が実行主体の外部書込みの手順と PR 本文規約を持たず、アダプタ自身の書込みを読み戻す原則を持つ。このリポの PR 作成手順（クローズ参照の扱い等）が binding だけで完結する\n  backend_neutral_work_item_contract:\n    label: バックエンドに依存しない作業項目の対応契約\n    description: 両バックエンドの reference に重複している作業項目と process の対応の規則を、protocol に1つだけ置く（対象の規則は ADR-0048 契約6）\n    status: todo\n    criteria: >\n      両バックエンドの reference に同じ規則の本文が残らず、どちらも protocol に置いた1つの契約を参照する。\n      その契約は作業項目と process を location: で対応付け、1つの作業項目に複数の process を対応させてよく、process id の接頭辞で作業項目を表す規約を持たない。\n      移行の前に、接頭辞と location: から導かれる作業項目と process の対応をすべて列挙し、移行の後も読取側のスクリプトが同じ対応を導けるか、外した対応ごとに理由が記録されている\n  prune_cli:\n    label: 完了チェーン回収の CLI 動詞\n    description: ADR-0048 の後続で未起票。完了チェーン回収の保持規則と検証を CLI のトップレベル動詞にし、配置スクリプトは CLI を呼ぶだけにする\n    status: todo\n    criteria: 保持規則と検証が CLI のトップレベル動詞 prune にあり、ADR-0022 の出力モデルに従う。このリポの roadmap に対して旧スクリプトと削除対象が一致する\n  adapter_plugin_split_design:\n    label: core と GitHub アダプタの plugin 分割の設計仕様\n    description: ADR-0048 の後続で未起票。分割の費用が過大と分かった場合は、1つの plugin のまま .pfdsl/config.json の宣言で絞る案へ切り替える（ADR-0048 D5）\n    status: todo\n    criteria: plugin 間で依存を宣言できるかの確認結果と、分割するか1つの plugin のまま宣言で絞るかの決定、その理由、採用先の移行手順が設計仕様に記録され、所有者が承認している\n  optional_github_adapter:\n    label: 採用したリポでだけ働く GitHub アダプタ\n    description: ADR-0048 の後続で未起票。設計仕様の結論に従い、GitHub Issues バックエンドの reference・hook・CI 設定を、採用を宣言したリポでだけ働かせる\n    status: todo\n    criteria: 設計仕様の結論のとおりに配布され、GitHub Issues バックエンドを採用しないリポでは GitHub アダプタの hook が通知を出さない。採用したリポでは、移行案内に従った後も現行と同じ手順・hook・CI 設定が働く\n  wiki_roadmap_integration:\n    label: Wiki を正本にする roadmap 連携 (#1519)\n    description: 実装リポの PR に依存せず roadmap を編集できる採用側連携。詳細は対応 Issue を一次情報とする\n    status: todo\n    criteria: >\n      採用リポで Wiki 更新から SVG を更新でき、ready・validate・render が同じ正本を読む。\n      同時更新・失敗時の扱い、共有 done の確定条件、移行と復帰の手順が検証されている\n    externalStakeholders: [ PFD採用リポの運用者 ]\nprocess:\n  publish_cli_ready_counts:\n    label: 新規 ready 数を示す CLI と plugin を公開する\n  i119_publish_extension:\n    label: extension自動公開実装\n    location: https://github.com/takasek/pfdsl/issues/119\n  i542_migrate_spec_id_refs:\n    label: spec.md 仕様ID参照移行\n    description: \"spec.md の節番号相互参照を仕様ID参照へ段階移行する。クラスタ単位の段階計画（§15 制約 → §2.x 意味論 → 残り）は #542 が一次情報\"\n    location: https://github.com/takasek/pfdsl/issues/542\n  introduce_tombstones:\n    label: tombstone 機構導入\n    description: \"初の ID 削除が発生した時点で起票・着手する。tombstone リスト実体・再定義禁止 lint・mint-check への tombstone 次元追加を含む\"\n  publish_ext_editing:\n    label: extension 編集支援リリース\n  publish_cli_group_delete:\n    label: CLI group 削除公開\n  publish_cli_meta_set_extension:\n    label: CLI 拡張フィールド更新公開\n  publish_cli_group_node_clash:\n    label: CLI 同名診断公開\n  publish_cli_edge_kind_conflict:\n    label: CLI input / feedback 併記診断公開\n  i1262_i1445_accept_mac_candidate:\n    label: Mac の受入済み候補を作る\n    description: \"候補準備と実機受入を同じ工程内で順に行い、配布物とその合格証拠を揃える。準備に合格を要求せず、内部の進捗・担当は Issue で管理する\"\n    location: https://github.com/takasek/pfdsl/issues/1445\n  i1445_accept_gui_vscode:\n    label: VS Code 統合版の公開範囲を実機受入する\n    location: https://github.com/takasek/pfdsl/issues/1445\n  i1262_publish_standalone:\n    label: 配布物の全体受入を完了して公開する\n    location: https://github.com/takasek/pfdsl/issues/1262\n  i1525_revise_boundary_test:\n    label: 契約1を3条件の AND に改める\n    location: https://github.com/takasek/pfdsl/issues/1525\n  i1526_run_evidence_roundtrip:\n    label: E0 で証拠の往復を1回回す\n    location: https://github.com/takasek/pfdsl/issues/1526\n  reduce_work_cycle_protocol:\n    label: work-cycle を protocol に絞る\n    description: 未起票のプレースホルダ。起票時に process id へ iN_ を付ける\n  narrow_retro_to_model:\n    label: pfd-retro を model retro に絞る\n    description: 未起票のプレースホルダ。起票時に process id へ iN_ を付ける\n  add_prune_cli:\n    label: 完了チェーン回収を CLI 動詞にする\n    description: 未起票のプレースホルダ。起票時に process id へ iN_ を付ける\n  move_writer_rules_out_of_github_preset:\n    label: GitHub Issues プリセットから書込み規律と PR 運用を外す\n    description: 未起票のプレースホルダ。起票時に process id へ iN_ を付ける\n  i1497_unify_work_item_contract:\n    label: 作業項目の対応契約を1つにする\n    location: https://github.com/takasek/pfdsl/issues/1497\n  design_adapter_plugin_split:\n    label: core と GitHub アダプタの plugin 分割を設計する\n    description: 未起票のプレースホルダ。起票時に process id へ iN_ を付ける\n  apply_github_adapter_design:\n    label: 設計に従って GitHub アダプタを採用したリポでだけ働かせる\n    description: 未起票のプレースホルダ。起票時に process id へ iN_ を付ける。分割するか宣言で絞るかは入力の設計仕様に従う\n  i1519_add_wiki_roadmap_integration:\n    label: roadmap の保存先を分離して Wiki 連携を追加する\n    location: https://github.com/takasek/pfdsl/issues/1519\n\ntag:\n  \"priority:high\": { style: { color: \"#b60205\", penwidth: \"2\" } }\n\nstatusStyles:\n  done: { fillcolor: \"#d4edda\", style: filled }\n  wip: { fillcolor: \"#fff3cd\", style: filled }\n  todo: { fillcolor: \"#f8f9fa\", style: filled }\n  waiting: { fillcolor: \"#f8d7da\", style: filled }\n  suspended: { fillcolor: \"#e2e3e5\", style: filled }\n---\n\ntoolchain >> i119_publish_extension -> published_extension\n\nready_counts_cli >> publish_cli_ready_counts -> cli_release_ready_counts\n\n[get_by_id_tool, mint_check_tool, spec_id_syntax, spec_v0011] >> i542_migrate_spec_id_refs -> spec_id_refs\n\n[mint_check_tool, spec_id_syntax] >> introduce_tombstones -> spec_id_tombstones\n\n[def_insertion, editor_connector, gui_vscode_acceptance, preview_connector] >> publish_ext_editing -> ext_editing_release\n\ngroup_delete_cli >> publish_cli_group_delete -> cli_release_group_delete\n\nmeta_set_extension_fields >> publish_cli_meta_set_extension -> cli_release_meta_set_extension\n\ngroup_node_clash_diagnostic >> publish_cli_group_node_clash -> cli_release_group_node_clash\n\nedge_kind_conflict_diagnostic >> publish_cli_edge_kind_conflict -> cli_release_edge_kind_conflict\n[preview_editing_usability, standalone_pfd_features] >> i1262_i1445_accept_mac_candidate -> gui_mac_acceptance\n\ngui_vscode_candidate >> i1445_accept_gui_vscode -> gui_vscode_acceptance\n\ngui_mac_acceptance >> i1262_publish_standalone -> standalone_release\n\nresponsibility_boundary_adr >> i1525_revise_boundary_test -> boundary_test_revision_adr\n\nresponsibility_boundary_adr >> i1526_run_evidence_roundtrip -> evidence_roundtrip_record\n\n[boundary_test_revision_adr, evidence_roundtrip_record, responsibility_boundary_adr, root_loaded_work_rules] >> reduce_work_cycle_protocol -> executor_neutral_work_cycle\n\n[responsibility_boundary_adr, root_loaded_work_rules] >> narrow_retro_to_model -> three_valued_model_retro\n\n[responsibility_boundary_adr, root_loaded_work_rules] >> move_writer_rules_out_of_github_preset -> writer_free_github_preset\n\n[executor_neutral_work_cycle, writer_free_github_preset] >> i1497_unify_work_item_contract -> backend_neutral_work_item_contract\n\nresponsibility_boundary_adr >> add_prune_cli -> prune_cli\n\n[backend_neutral_work_item_contract, boundary_test_revision_adr, prune_cli, writer_free_github_preset] >> design_adapter_plugin_split -> adapter_plugin_split_design\n\nadapter_plugin_split_design >> apply_github_adapter_design -> optional_github_adapter\n\n[responsibility_boundary_adr, toolchain] >> i1519_add_wiki_roadmap_integration -> wiki_roadmap_integration\n",
+  "ready": [
+    {
+      "id": "publish_cli_ready_counts",
+      "label": "新規 ready 数を示す CLI と plugin を公開する",
+      "inputs": [
+        "ready_counts_cli"
+      ],
+      "outputs": [
+        "cli_release_ready_counts"
+      ],
+      "newlyReadyCount": 0
+    },
+    {
+      "id": "i542_migrate_spec_id_refs",
+      "label": "spec.md 仕様ID参照移行",
+      "inputs": [
+        "get_by_id_tool",
+        "mint_check_tool",
+        "spec_id_syntax",
+        "spec_v0011"
+      ],
+      "outputs": [
+        "spec_id_refs"
+      ],
+      "newlyReadyCount": 0
+    },
+    {
+      "id": "publish_cli_group_delete",
+      "label": "CLI group 削除公開",
+      "inputs": [
+        "group_delete_cli"
+      ],
+      "outputs": [
+        "cli_release_group_delete"
+      ],
+      "newlyReadyCount": 0
+    },
+    {
+      "id": "publish_cli_meta_set_extension",
+      "label": "CLI 拡張フィールド更新公開",
+      "inputs": [
+        "meta_set_extension_fields"
+      ],
+      "outputs": [
+        "cli_release_meta_set_extension"
+      ],
+      "newlyReadyCount": 0
+    },
+    {
+      "id": "publish_cli_group_node_clash",
+      "label": "CLI 同名診断公開",
+      "inputs": [
+        "group_node_clash_diagnostic"
+      ],
+      "outputs": [
+        "cli_release_group_node_clash"
+      ],
+      "newlyReadyCount": 0
+    },
+    {
+      "id": "publish_cli_edge_kind_conflict",
+      "label": "CLI input / feedback 併記診断公開",
+      "inputs": [
+        "edge_kind_conflict_diagnostic"
+      ],
+      "outputs": [
+        "cli_release_edge_kind_conflict"
+      ],
+      "newlyReadyCount": 0
+    },
+    {
+      "id": "i1262_i1445_accept_mac_candidate",
+      "label": "Mac の受入済み候補を作る",
+      "inputs": [
+        "preview_editing_usability",
+        "standalone_pfd_features"
+      ],
+      "outputs": [
+        "gui_mac_acceptance"
+      ],
+      "newlyReadyCount": 1
+    },
+    {
+      "id": "i1445_accept_gui_vscode",
+      "label": "VS Code 統合版の公開範囲を実機受入する",
+      "inputs": [
+        "gui_vscode_candidate"
+      ],
+      "outputs": [
+        "gui_vscode_acceptance"
+      ],
+      "newlyReadyCount": 1
+    },
+    {
+      "id": "i1526_run_evidence_roundtrip",
+      "label": "E0 で証拠の往復を1回回す",
+      "inputs": [
+        "responsibility_boundary_adr"
+      ],
+      "outputs": [
+        "evidence_roundtrip_record"
+      ],
+      "newlyReadyCount": 0
+    },
+    {
+      "id": "narrow_retro_to_model",
+      "label": "pfd-retro を model retro に絞る",
+      "inputs": [
+        "responsibility_boundary_adr",
+        "root_loaded_work_rules"
+      ],
+      "outputs": [
+        "three_valued_model_retro"
+      ],
+      "newlyReadyCount": 0
+    },
+    {
+      "id": "move_writer_rules_out_of_github_preset",
+      "label": "GitHub Issues プリセットから書込み規律と PR 運用を外す",
+      "inputs": [
+        "responsibility_boundary_adr",
+        "root_loaded_work_rules"
+      ],
+      "outputs": [
+        "writer_free_github_preset"
+      ],
+      "newlyReadyCount": 0
+    },
+    {
+      "id": "add_prune_cli",
+      "label": "完了チェーン回収を CLI 動詞にする",
+      "inputs": [
+        "responsibility_boundary_adr"
+      ],
+      "outputs": [
+        "prune_cli"
+      ],
+      "newlyReadyCount": 0
+    },
+    {
+      "id": "i1519_add_wiki_roadmap_integration",
+      "label": "roadmap の保存先を分離して Wiki 連携を追加する",
+      "inputs": [
+        "responsibility_boundary_adr",
+        "toolchain"
+      ],
+      "outputs": [
+        "wiki_roadmap_integration"
+      ],
+      "newlyReadyCount": 0
+    }
+  ],
+  "artifacts": {
+    "docs/adr/0051-conjunctive-boundary-test.md": "c9b31057cd9e0f7e24b587c2daea19716d5f7f355fe4849f0dcfa34697e82b27",
+    "scripts/harness-template/skills/pfd-ops/references/architecture.md": "ad0fe7535512ac853555f646208037163f0d7ac84f8875d00862b704d0def108"
+  },
+  "versions": {
+    "model": "23f2df271635d00d6fa85d15795973d28462f07d77944f2f20a4d8b0c227a48c",
+    "artifacts": "e53cd60cf1f4b4a09c3c79df66a8cde2296137ee1bfb5259bee2ee7e441d5497",
+    "criteria": "f6db580e5dd837a3054353c199797cdc5b9930c73fa61a1e4128b909ca2914b1"
+  },
+  "sourceCommit": "fa50ee2dccee99c1be6a94b0f0ed7f08c8f2c4ec",
+  "modelPath": ".pfdsl/roadmap.pfdsl",
+  "modelBlob": "796d2ab6783040d7f5cd1d212f3b5ec10f8991df",
+  "note": "Working files captured before driver generation; content digests identify uncommitted artifact versions."
+}
