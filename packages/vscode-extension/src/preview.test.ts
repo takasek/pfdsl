@@ -185,6 +185,9 @@ const host = vi.hoisted(() => {
 					uri([base.path, ...parts].join("/")),
 			},
 			ViewColumn: { One: 1, Beside: 2 },
+			TabInputText: class {
+				constructor(public uri: vscode.Uri) {}
+			},
 			TabInputWebview: class {
 				constructor(public viewType: string) {}
 			},
@@ -719,6 +722,100 @@ it.each([
 		),
 	);
 	expect(host.window.showInformationMessage).not.toHaveBeenCalled();
+});
+
+it.each([
+	"addConnector",
+	"createDefinition",
+	"deleteConnector",
+	"toggleFeedback",
+	"nodeClick",
+] as const)("reuses a moved inactive source tab for %s", async (type) => {
+	const { open } = setup();
+	const source = "a >> p -> b\n";
+	const doc = document(`inactive-tab-${type}`, source);
+	const panel = await open(doc);
+	const movedGroup = host.createTabGroup(4);
+	(movedGroup.tabs as vscode.Tab[]).push({
+		input: new host.api.TabInputText(host.uri(doc.uri.path) as vscode.Uri),
+		group: movedGroup,
+		isActive: false,
+	} as vscode.Tab);
+	host.setTabGroups([...host.window.tabGroups.all, movedGroup]);
+	host.window.visibleTextEditors = [];
+	if (type !== "nodeClick")
+		host.api.workspace.applyEdit.mockImplementationOnce(async (edit) => {
+			const replacement = edit.replacements[0]!;
+			const offset = (position: { line: number; character: number }) =>
+				source
+					.split("\n")
+					.slice(0, position.line)
+					.reduce((sum, line) => sum + line.length + 1, 0) + position.character;
+			vi.spyOn(doc, "getText").mockReturnValue(
+				source.slice(0, offset(replacement.range.start)) +
+					replacement.text +
+					source.slice(offset(replacement.range.end)),
+			);
+			return true;
+		});
+	await panel.receive(
+		type === "nodeClick"
+			? { type, nodeId: "p" }
+			: type === "deleteConnector" || type === "toggleFeedback"
+				? {
+						type,
+						nodeId: "p",
+						source,
+						artifact: "a",
+						process: "p",
+						kind: "input",
+					}
+				: { type, nodeId: "p", source, connector: "->", otherId: "new_result" },
+	);
+	expect(host.window.showTextDocument).toHaveBeenCalled();
+	for (const [openedDoc, options] of host.window.showTextDocument.mock.calls) {
+		expect(openedDoc).toBe(doc);
+		expect(options?.viewColumn).toBe(4);
+	}
+	expect(
+		host.window.showTextDocument.mock.calls.at(-1)?.[1]?.preserveFocus,
+	).toBe(type !== "createDefinition" && type !== "nodeClick");
+	if (type !== "nodeClick")
+		expect(panel.messages).toContainEqual(
+			expect.objectContaining({ type: "editResult", ok: true }),
+		);
+});
+
+it("keeps definition creation in the visible split source group", async () => {
+	const { open } = setup();
+	const source = "a >> p -> b\n";
+	const doc = document("visible-split", source);
+	const panel = await open(doc);
+	for (const column of [1, 4]) {
+		const group =
+			column === 1
+				? host.window.tabGroups.all[0]!
+				: host.createTabGroup(column);
+		(group.tabs as vscode.Tab[]).push({
+			input: new host.api.TabInputText(doc.uri),
+			group,
+		} as vscode.Tab);
+		if (column === 4) host.setTabGroups([...host.window.tabGroups.all, group]);
+	}
+	host.window.visibleTextEditors = [
+		{ document: doc, viewColumn: 4 } as vscode.TextEditor,
+	];
+	host.api.workspace.applyEdit.mockImplementationOnce(async (edit) => {
+		vi.spyOn(doc, "getText").mockReturnValue(
+			edit.replacements[0]!.text + source,
+		);
+		return true;
+	});
+	await panel.receive({ type: "createDefinition", nodeId: "b", source });
+	expect(host.window.showTextDocument).toHaveBeenCalledWith(
+		doc,
+		expect.objectContaining({ viewColumn: 4, preserveFocus: false }),
+	);
 });
 
 it.each([
