@@ -3,6 +3,7 @@
 この記録は採用判断のための内部資料であり、運用の切替宣言ではない。
 第2段階の担当者が実験を再実行し、実環境の未確認点を埋めてから保存先とconsumerの契約を確定するために使う。
 調査基準は `8b16e2a3f4620bde95cb8e1045806cc0f130214c`、GitHub状態の確認日は2026-10-24（JST）。
+第2段階の参照先とstatusの説明は、2026-10-25の #1519・#1542 の決定とroadmap計画に合わせて更新した。試作の観測結果は当時のものとして保持する。
 対象は [#1519](https://github.com/takasek/pfdsl/issues/1519)、接続先の契約は [#1497](https://github.com/takasek/pfdsl/issues/1497) と [ADR-0048](adr/0048-responsibility-boundary-by-pfd-semantics.md)。
 
 ## 今回の判断と方式比較
@@ -81,7 +82,7 @@ force-pushや自動rebaseは使わない。
 本体repoのcommitと論理パス `.pfdsl/roadmap.pfdsl` を固定する。
 `location`/`command.cwd` は文書位置と `basePath` を使い、extends/subflowは文書位置を使う。
 元の配置を再現することで、抽出先の一時ディレクトリ名に意味を依存させない。
-参照先が本体の古い版にあるか新しい版にあるかを曖昧にしないため、運用版では参照commitの取得方針を採用設定に明記する必要がある。
+この試作は全体で1つの参照commitを固定する。運用版のモデル既定とartifactごとの参照先上書きは #1542 のフィールドで解決し、Wiki専用の解決機構を追加しない。取得方針と、参照先がprocessのlocationやcommand.cwdにも及ぶかは #1542 の設計で確定する。
 標準入力は一部のmulti-file検証を省くため、この経路には使わない。
 
 `meta check-links` はURLやglobを検査しない。
@@ -168,6 +169,6 @@ rollbackでは更新を停止し、最終Wiki版を取得・検証して本体�
 
 `done` はcriteriaと、後続が必要とする場所・版で利用できる根拠に結び付ける。
 main実装が必要な成果物はmerge後、公開物が必要なら公開後、検収が必要なら検収記録後に更新する。
-Issue closeをdoneへ自動変換しない。
+Issue closeはdoneの根拠にも契機にもしない。
 merge済み実装とWiki上のwipの差を検出する監査は、第2段階の受入条件として残す。
-#1519全体の受入条件は未達であり、roadmapのstatusはwipのままとする。
+#1519全体の受入条件は未達であり、roadmapでは準備成果物 `wiki_roadmap_ready_for_cutover` をwip、切替出力 `wiki_roadmap_integration` をtodoとする。切替は準備の完了と、#1542の参照先解決実装がWiki運用の採用版に含まれることを待つ。
