@@ -36,6 +36,37 @@ describe("executor vocabulary report", () => {
 			assert.deepEqual(report(source), [], source);
 		}
 	});
+	it("does not synthesize phrases across excluded inline content", () => {
+		for (const excluded of ["`unrelated`", "![image](x)", "<!-- hidden -->"]) {
+			for (const gap of ["", " ", "\n"]) {
+				const source = `pull${gap}${excluded}${gap}request. Next PR.`;
+				const found = report(source);
+				assert.equal(found.length, 1, source);
+				assert.deepEqual(found[0].terms, ["PR"], source);
+				assert.equal(found[0].text, "Next PR.", source);
+				const prefix = source.slice(0, source.indexOf("PR"));
+				assert.equal(found[0].line, prefix.split("\n").length, source);
+				assert.equal(
+					found[0].column,
+					prefix.length - prefix.lastIndexOf("\n"),
+					source,
+				);
+			}
+		}
+	});
+	it("keeps genuine whitespace and formatting within phrases searchable", () => {
+		for (const source of [
+			"pull request.",
+			"pull\nrequest.",
+			"pull  \nrequest.",
+			"pull **request**.",
+		]) {
+			const found = report(source);
+			assert.equal(found.length, 1, source);
+			assert.match(found[0].terms[0], /^pull\s+request$/, source);
+			assert.equal(found[0].text, source);
+		}
+	});
 	it("keeps closing inline syntax with the sentence it belongs to", () => {
 		const source = "[PR.](https://example.com) Next commit.";
 		assert.deepEqual(

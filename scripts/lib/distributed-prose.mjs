@@ -227,8 +227,8 @@ export function findExecutorVocabulary(files) {
 						};
 					}
 				} else {
-					// Ignored content must not synthesize a word across its boundary.
-					prose.push(node.type === "break" ? "\n" : " ");
+					// Excluded content separates words and whitespace-matched phrases.
+					prose.push(node.type === "break" ? "\n" : "\0");
 					positions.push({
 						start: node.position.start.offset,
 						end: node.position.end.offset,

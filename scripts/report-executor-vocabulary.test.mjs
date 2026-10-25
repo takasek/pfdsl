@@ -15,7 +15,7 @@ it("reports only selected files, stays successful on findings, and rejects missi
 		const target = join(directory, "selected.md");
 		writeFileSync(
 			target,
-			"Commit in this PR.\n\n&#80;R uses pull&Tab;request.\n",
+			"Commit in this PR.\n\n&#80;R uses pull&Tab;request.\n\npull`unrelated`request.\n",
 		);
 		writeFileSync(join(directory, "not-selected.md"), "Use TDD.\n");
 		const result = run(["--json", target]);
