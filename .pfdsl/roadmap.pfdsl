@@ -252,13 +252,38 @@ artifact:
     description: ADR-0048 の後続で未起票。設計仕様の結論に従い、GitHub Issues バックエンドの reference・hook・CI 設定を、採用を宣言したリポでだけ働かせる
     status: todo
     criteria: 設計仕様の結論のとおりに配布され、GitHub Issues バックエンドを採用しないリポでは GitHub アダプタの hook が通知を出さない。採用したリポでは、移行案内に従った後も現行と同じ手順・hook・CI 設定が働く
+  artifact_reference_spec:
+    label: モデルと artifact の参照先の仕様 (#1542)
+    description: 参照先のモデル既定と artifact ごとの上書きを業種中立に定義する。詳細と未決の設計論点は対応 Issue を一次情報とする
+    status: todo
+    location: https://github.com/takasek/pfdsl/issues/1542
+    criteria: >
+      モデル既定・artifact 上書き・省略・異常・ツリーとの優先順位と固定版の証拠の契約が、
+      proposal のレビューを経て spec と履歴へ統合され、実装と採用版への後続が登録されている。
+      実装・公開の完了はこの成果物の受入に含めない
+  artifact_reference_implementation:
+    label: 参照先を解決できる実装
+    description: 確定した参照先仕様を消費し、CLI と利用側で解決できる実装を作る。後続 Issue は未起票
+    status: todo
+    criteria: 確定仕様の既定・上書き・正常・異常・互換性の契約が実装され、対応する検査が通っている
+  artifact_reference_adoption_version:
+    label: Wiki 運用で参照先を解決できる採用版
+    description: 実装を含む採用版と配布形態を固定する。公開が必要なら既存の公開工程へ接続し、公開の承認を別途得る
+    status: todo
+    criteria: Wiki 運用で使う版と配布形態が特定され、その版に参照先解決の実装が含まれ、モデル既定と artifact 上書きの解決をその版で検証した証拠がある
+  wiki_roadmap_ready_for_cutover:
+    label: 正本切替の準備が整った Wiki 連携 (#1519)
+    description: 試作と切替前の連携準備。参照先の採用版を待たずに進め、正本はリポ内に維持する
+    status: wip
+    criteria: 連携の実装と検証、consumer の向け先、移行・復帰と binding 変更の準備がレビュー可能で、正本はまだリポ内にある
   wiki_roadmap_integration:
     label: Wiki を正本にする roadmap 連携 (#1519)
     description: 実装リポの PR に依存せず roadmap を編集できる採用側連携。詳細は対応 Issue を一次情報とする
     status: todo
     criteria: >
       採用リポで Wiki 更新から SVG を更新でき、ready・validate・render が同じ正本を読む。
-      同時更新・失敗時の扱い、共有 done の確定条件、移行と復帰の手順が検証されている
+      同時更新・失敗時の扱い、共有 done の確定条件、移行と復帰の手順が検証されている。
+      採用版での参照先解決を確認して正本を Wiki へ切り替え、リポ内成果物も merge 後に done へ更新する規則を binding へ反映している
     externalStakeholders: [ PFD採用リポの運用者 ]
 process:
   publish_cli_ready_counts:
@@ -326,9 +351,21 @@ process:
   apply_github_adapter_design:
     label: 設計に従って GitHub アダプタを採用したリポでだけ働かせる
     description: 未起票のプレースホルダ。起票時に process id へ iN_ を付ける。分割するか宣言で絞るかは入力の設計仕様に従う
-  i1519_add_wiki_roadmap_integration:
-    label: roadmap の保存先を分離して Wiki 連携を追加する
+  i1519_prepare_wiki_roadmap_integration:
+    label: Wiki 連携と正本切替の準備を整える
     location: https://github.com/takasek/pfdsl/issues/1519
+  i1519_switch_wiki_roadmap_source:
+    label: 検証済みの採用版で正本を Wiki へ切り替える
+    location: https://github.com/takasek/pfdsl/issues/1519
+  i1542_define_artifact_reference:
+    label: モデルと artifact の参照先の仕様を定める
+    location: https://github.com/takasek/pfdsl/issues/1542
+  implement_artifact_reference:
+    label: 確定仕様に従って参照先解決を実装する
+    description: 未起票のプレースホルダ。起票時に process id へ iN_ を付ける
+  prepare_artifact_reference_adoption_version:
+    label: 参照先解決を含む Wiki 採用版を準備して検証する
+    description: 未起票のプレースホルダ。起票時に process id へ iN_ を付ける。配布形態の確定時に必要な既存公開工程へ接続する
 
 tag:
   "priority:high": { style: { color: "#b60205", penwidth: "2" } }
@@ -386,4 +423,12 @@ responsibility_boundary_adr >> add_prune_cli -> prune_cli
 
 adapter_plugin_split_design >> apply_github_adapter_design -> optional_github_adapter
 
-[responsibility_boundary_adr, toolchain] >> i1519_add_wiki_roadmap_integration -> wiki_roadmap_integration
+[responsibility_boundary_adr, toolchain] >> i1542_define_artifact_reference -> artifact_reference_spec
+
+[artifact_reference_spec, toolchain] >> implement_artifact_reference -> artifact_reference_implementation
+
+artifact_reference_implementation >> prepare_artifact_reference_adoption_version -> artifact_reference_adoption_version
+
+[responsibility_boundary_adr, toolchain] >> i1519_prepare_wiki_roadmap_integration -> wiki_roadmap_ready_for_cutover
+
+[artifact_reference_adoption_version, wiki_roadmap_ready_for_cutover] >> i1519_switch_wiki_roadmap_source -> wiki_roadmap_integration
