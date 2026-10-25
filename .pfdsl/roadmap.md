@@ -135,7 +135,7 @@ issue/PR view の要求フィールド欠落、closing issue の識別情報不�
 **hotfix PR の明示**: 緊急修正（バグ修正、誤り修正）を PR にのせる場合は description 冒頭に `hotfix:` を明記する。レビュー優先度・マージ判断の依拠になる。
 `check-closes-reference.yml` は行頭の `hotfix:`、または理由付きの `no-issue: <理由>` を、デフォルトブランチ向けで閉じる issue が無い PR の明示宣言として認める。hotfix 宣言ではコロンまで含めて一致させる（L3 reference は「"hotfix" と明記」とだけ書くが、機械が読むのはこちらの厳しい形）。
 
-- [ ] このサイクルで起票した issue を `flow:managed` / `flow:exempt` に分類した（判定は L3 reference の「ラベル判定基準」。保守・基盤・修正は exempt）
+- [ ] このサイクルで起票した issue を `flow:managed` / `flow:exempt` に分類した（判定は L3 reference の「ラベル判定基準」に従う）
 - [ ] `flow:managed` の issue がすべて roadmap.pfdsl の artifact として登録済みか確認した（exempt は登録しない）
 - [ ] `node scripts/pfdsl/audit-issues-flow.mjs` の分類・登録検査が通過した（更新日時・priority完全一致は要求しない。`gate-check.mjs` 実行時はその一部として自動実行される）
 

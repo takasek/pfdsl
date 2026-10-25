@@ -422,7 +422,7 @@ commit・PR と結び付けた更新時点は binding「PR で統合する成果
 
 ## release milestone artifact の作成規約
 
-roadmap の CLI release milestone（`cli_release_<slug>` 等）はバージョン番号の事前予約ではない。**下流作業がそれを入力として要求する時点**でのみ作成する（pfd-ops の `references/work-cycle.md`「着手可能性と受け入れ」と「成果物の門番」を適用）。バージョン番号は roadmap 本体に書かず、done 後の label/criteria に事実として付記するのみ — 番号を先に書いて後から実態と合わせる運用（#278 導入前の運用）は廃止した。
+roadmap の CLI release milestone（`cli_release_<slug>` 等）はバージョン番号の事前予約ではない。掲載要否は pfd-ops の `references/work-cycle.md`「着手可能性と受け入れ」の基準に従い、成果物の終端性は同「成果物の門番」で確認する。バージョン番号は roadmap 本体に書かず、done 後の label/criteria に事実として付記するのみ — 番号を先に書いて後から実態と合わせる運用（#278 導入前の運用）は廃止した。
 
 複数の実装 issue を1つの PR/リリースに束ねる場合も、milestone ノードは束ねた内容を表す1つの slug で作成すればよい。「中間バージョンをスキップ/統合するか」という判断自体が発生しない — バージョン番号を roadmap に書かないため、スキップ対象になるバージョン番号付きノードが最初から存在しない。
 
