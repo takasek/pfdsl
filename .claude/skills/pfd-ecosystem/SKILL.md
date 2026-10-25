@@ -113,4 +113,4 @@ roadmap の雛形は出力 artifact を `suspended` にして着手候補から�
 ## ステップ 5: 検証とゲート
 
 - 各 `.pfdsl` ファイルに対して `pfdsl check <file> --strict` が通ること
-- **roadmap.pfdsl を採用している場合のみ**: 作成した `.pfdsl` のうち、他作業の着手をゲートする成果物を生むものだけ登録する（判定基準は pfd-ops の `references/work-cycle.md`「着手可能性と受け入れ」が一次情報 — ここには複製しない）。登録対象は `roadmap.pfdsl` に artifact として登録されているか確認し、未登録なら同 reference の「成果物の門番」に従って登録する。roadmap 未採用のリポではこの項目は N/A
+- **roadmap.pfdsl を採用している場合のみ**: 作成した `.pfdsl` の登録要否は、pfd-ops の `references/work-cycle.md`「着手可能性と受け入れ」の判定基準に従う。登録対象は `roadmap.pfdsl` に artifact として登録されているか確認し、未登録なら同 reference の「成果物の門番」に従って登録する。roadmap 未採用のリポではこの項目は N/A

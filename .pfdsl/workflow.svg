@@ -515,7 +515,7 @@
 <!-- file_issues -->
 <g id="node54" class="node">
 <title>file_issues</title>
-<g id="a_node54"><a xlink:title="issue 管理&#10;&#10;起票・更新・クローズ。対話から生まれた新規提案を起票し、既存 issue の実装方針・scope 改訂は develop の着手前に gh_issues へ反映する。レビュー知見と develop の完了報告を還流として反映し、roadmap_pfdsl と同期する。`flow:managed` の issue は起票と同時に roadmap_pfdsl への artifact/process/edge 追加を行う（後回し禁止 — 依存グラフが stale になり気付き依存に戻る）。`flow:exempt`（保守・基盤・修正）は roadmap に載せない — カテゴリ列挙と判定基準は references/github&#45;issues&#45;backend.md が一次情報">
+<g id="a_node54"><a xlink:title="issue 管理&#10;&#10;起票・更新・クローズ。対話から生まれた新規提案を起票し、既存 issue の実装方針・scope 改訂は develop の着手前に gh_issues へ反映する。レビュー知見と develop の完了報告を還流として反映し、roadmap_pfdsl と同期する。未解決の依存がある（前提が未完了、または他の作業が待っている）作業を flow:managed とし、起票と同時に roadmap_pfdsl への artifact/process/edge 追加を行う。どちらにも当たらない作業は flow:exempt として roadmap に載せない。判定基準の一次情報は references/github&#45;issues&#45;backend.md">
 <ellipse fill="none" stroke="black" cx="611.21" cy="-1432.14" rx="53.11" ry="29.42"/>
 <text xml:space="preserve" text-anchor="middle" x="611.21" y="-1436.34" font-family="Times,serif" font-size="14.00">file_issues</text>
 <text xml:space="preserve" text-anchor="middle" x="611.21" y="-1419.54" font-family="Times,serif" font-size="14.00">issue 管理</text>
