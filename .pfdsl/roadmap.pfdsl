@@ -318,15 +318,6 @@ process:
   i1262_publish_standalone:
     label: 配布物の全体受入を完了して公開する
     location: https://github.com/takasek/pfdsl/issues/1262
-  i1522_define_transition_release_policy:
-    label: 責務境界の段階公開方針と移行注記を整える
-    location: https://github.com/takasek/pfdsl/issues/1522
-  i1523_move_pr_status_timing:
-    label: PR 時点の status 更新手順を採用先の規律へ移す
-    location: https://github.com/takasek/pfdsl/issues/1523
-  i1525_revise_boundary_test:
-    label: 契約1を3条件の AND に改める
-    location: https://github.com/takasek/pfdsl/issues/1525
   i1526_run_evidence_roundtrip:
     label: E0 で証拠の往復を1回回す
     location: https://github.com/takasek/pfdsl/issues/1526
@@ -400,12 +391,6 @@ toolchain >> i119_publish_extension -> published_extension
 gui_vscode_candidate >> i1445_accept_gui_vscode -> gui_vscode_acceptance
 
 gui_mac_acceptance >> i1262_publish_standalone -> standalone_release
-
-responsibility_boundary_adr >> i1522_define_transition_release_policy -> boundary_transition_release_policy
-
-[responsibility_boundary_adr, root_loaded_work_rules] >> i1523_move_pr_status_timing -> local_pr_status_timing
-
-responsibility_boundary_adr >> i1525_revise_boundary_test -> boundary_test_revision_adr
 
 responsibility_boundary_adr >> i1526_run_evidence_roundtrip -> evidence_roundtrip_record
 
