@@ -190,11 +190,11 @@ export function genPluginIdentityStep({ node, triggerPaths }) {
 }
 
 /**
- * Output artifact status update: is the artifact done, or explicitly left wip?
+ * Output artifact status update: is the artifact done, or explicitly left wip/waiting?
  * Three ways in, and which one applies is the point of the step: a declared
  * --no-artifact cycle skips, a completed cycle requires the named artifact to
  * be done at HEAD with a status change from base, and --in-progress requires
- * it to be wip at HEAD regardless of its base status. Without a key, a cycle
+ * it to be wip or waiting at HEAD regardless of its base status. Without a key, a cycle
  * that left roadmap.pfdsl untouched skips, and one that changed it falls back
  * to "some status: line moved", which is all the diff can honestly say.
  */

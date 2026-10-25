@@ -230,12 +230,12 @@ export function classifyOutputArtifactStatus({
 	}
 	if (artifactKey) {
 		if (inProgress) {
+			const intentionallyIncomplete = status === "wip" || status === "waiting";
 			return {
-				status: status === "wip" ? "PASS" : "FAIL",
-				detail:
-					status === "wip"
-						? undefined
-						: `--in-progress declared for artifact '${artifactKey}', but HEAD status is '${status ?? "unset"}'; expected wip`,
+				status: intentionallyIncomplete ? "PASS" : "FAIL",
+				detail: intentionallyIncomplete
+					? undefined
+					: `--in-progress declared for artifact '${artifactKey}', but HEAD status is '${status ?? "unset"}'; expected wip or waiting`,
 			};
 		}
 		if (status !== "done") {
@@ -243,7 +243,7 @@ export function classifyOutputArtifactStatus({
 				status: "FAIL",
 				detail:
 					`artifact '${artifactKey}' has status '${status ?? "unset"}' at HEAD; ` +
-					"completed cycles must set it to done in this PR per spec §2.7.1, " +
+					"completed cycles must set it to done in this PR per this repository's PR status timing binding (.pfdsl/bindings/pfd-ops.md), " +
 					"or pass --in-progress for an intentionally incomplete cycle",
 			};
 		}
