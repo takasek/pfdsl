@@ -280,7 +280,10 @@ describe("outputArtifactStatusStep", () => {
 			changedFiles: [ROADMAP],
 		});
 		assert.equal(result.status, "FAIL");
-		assert.match(result.detail, /done in this PR.*--in-progress/);
+		assert.match(
+			result.detail,
+			/done in this PR.*\.pfdsl\/bindings\/pfd-ops\.md.*--in-progress/,
+		);
 	});
 
 	it("fails when a named artifact stays todo at HEAD", () => {
@@ -296,7 +299,10 @@ describe("outputArtifactStatusStep", () => {
 			changedFiles: [ROADMAP],
 		});
 		assert.equal(result.status, "FAIL");
-		assert.match(result.detail, /done in this PR.*--in-progress/);
+		assert.match(
+			result.detail,
+			/done in this PR.*\.pfdsl\/bindings\/pfd-ops\.md.*--in-progress/,
+		);
 	});
 
 	it("fails when done was already present at the base and did not change", () => {
@@ -421,6 +427,56 @@ describe("outputArtifactStatusStep", () => {
 			changedFiles: [ROADMAP],
 		});
 		assert.equal(result.status, "PASS");
+	});
+
+	for (const baseStatus of ["wip", "waiting"]) {
+		it(`passes an in-progress declaration when HEAD is waiting (base ${baseStatus})`, () => {
+			const { before, after } = snapshots(baseStatus, "waiting");
+			const { exec } = fakeExec({
+				"git show origin/main:": { out: before },
+				"git show HEAD:": { out: after },
+			});
+			const result = outputArtifactStatusStep({
+				exec,
+				base: "main",
+				artifactKey: "spec_v1",
+				inProgress: true,
+				changedFiles: [ROADMAP],
+			});
+			assert.equal(result.status, "PASS");
+		});
+	}
+
+	it("does not treat waiting as a completed cycle without an in-progress declaration", () => {
+		const { before, after } = snapshots("wip", "waiting");
+		const { exec } = fakeExec({
+			"git show origin/main:": { out: before },
+			"git show HEAD:": { out: after },
+		});
+		const result = outputArtifactStatusStep({
+			exec,
+			base: "main",
+			artifactKey: "spec_v1",
+			changedFiles: [ROADMAP],
+		});
+		assert.equal(result.status, "FAIL");
+		assert.match(result.detail, /waiting.*--in-progress/);
+	});
+
+	it("rejects suspended as an in-progress declaration", () => {
+		const { before, after } = snapshots("wip", "suspended");
+		const { exec } = fakeExec({
+			"git show origin/main:": { out: before },
+			"git show HEAD:": { out: after },
+		});
+		const result = outputArtifactStatusStep({
+			exec,
+			base: "main",
+			artifactKey: "spec_v1",
+			inProgress: true,
+			changedFiles: [ROADMAP],
+		});
+		assert.equal(result.status, "FAIL");
 	});
 
 	it("fails an in-progress declaration when HEAD is todo", () => {
