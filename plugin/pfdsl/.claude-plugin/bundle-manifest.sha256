@@ -18,7 +18,7 @@ a3f96e180a957152509a1d019b2b4247fb74c3f0ce6c7b25cd79355d9a3e75bb  hooks/lib/mana
 
 ae6f8cfe03b3df98c89a4b46eb176609cbf2a7c311f0d36f42817eab337ffcf2  hooks/managed-issue-reminder-post-tool-use.mjs
 
-1b02be475f9b74243c0ac31aea25b3472717dda8224906da9c5bf9223af8903c  skills/pfd-ecosystem/SKILL.md
+654d10996a5254b34c243e01f347e1cba062a21d4d513596d05fe140a2939823  skills/pfd-ecosystem/SKILL.md
 
 e895452e8fcbca4176557065ee9667702054e60d90d40cd7325bc065e0657292  skills/pfd-ecosystem/references/kind-taxonomy.md
 
@@ -56,11 +56,11 @@ a8e4d35e456f05babab77d002a20f7230b7942aaf7bb82138bf2007b5926c4f7  skills/pfd-ops
 
 d6636ad19abcd0019d685f0cbc26db35fb779ea1afa9568d070fb94bb68eb7f2  skills/pfd-ops/install/scripts/pfdsl/sweep-completed-chains.mjs
 
-9ec5af823cdda139f53aa9824e2c2c2a4d89ef8b82c6646875164ec11deb3267  skills/pfd-ops/references/architecture.md
+4e3a453a58e34eb48ec74b6841c36375faba9b1ce421edfccb3ffe03426d3fd2  skills/pfd-ops/references/architecture.md
 
-202138d33823bf267e906da5befcd23670a0896130fdc05dfab20e99a0041ad6  skills/pfd-ops/references/file-based-tracker-backend.md
+8b1fae0de7d1f6a94048708d0ccff753fb576b4a316201b338c84834b1c2abff  skills/pfd-ops/references/file-based-tracker-backend.md
 
-ea8b15c0dbd2fef4e09ec27b094c6a424930bdd5e7f5bf65902dc5776cd8f4ab  skills/pfd-ops/references/github-issues-backend.md
+689d24acaab69a59dd9b73b33efab6f753ce8dfe36179aaaea62ac13a73f8caf  skills/pfd-ops/references/github-issues-backend.md
 
 4da6e061033c43a67bd71d55bd816fc3c57ef32f52d0dea19070bcc7c2b79582  skills/pfd-ops/references/scaffold/bindings/pfd-ops.md
 
@@ -84,7 +84,7 @@ deb6cb7549f74139a1414360474a8ec15e67e3298e27f597addf7546978df708  skills/pfd-ops
 
 c1328f9dcb946c35f7bba42306324d82929f7031fb52d459c3b2ee12fd904686  skills/pfd-ops/references/scaffold/workflow.pfdsl
 
-35a4cdd9f2b4da6d93217a4142bbf934067053f6ccc9b5820b6ec867fc7f6333  skills/pfd-ops/references/work-cycle.md
+7732eb7ef65cc8d92f75677c1625fe158fe971ea8bee579d6d8cbfbf4c371238  skills/pfd-ops/references/work-cycle.md
 
 be85d8e1614e9bf8e6ca3f89f2f591dbfd9deebd5c0e8131ba3309b3fd6537a2  skills/pfd-ops/scripts/check-install-sync.mjs
 
@@ -92,7 +92,7 @@ be85d8e1614e9bf8e6ca3f89f2f591dbfd9deebd5c0e8131ba3309b3fd6537a2  skills/pfd-ops
 
 c8a84302faab507a4fadfee9ae2d06c4ac89dc64e29dcd7025a65ceebe98162b  skills/pfd-ops/scripts/plugin-version-check.mjs
 
-7fbb4821acd71d84c98a089ed6216ff63af58f8d4a019b9e8c1094d15eaf2e0e  skills/pfd-retro/SKILL.md
+30d590dd79a9521df7e1967d9afee266fee4a1331aa81c717bbda37cc2dce222  skills/pfd-retro/SKILL.md
 
 e2c21005c67147e1f6e73edd0930a650dce2261a71e53753cedd562aad935444  skills/pfd-retro/references/knowledge-lifecycle.md
 
@@ -100,7 +100,7 @@ e2c21005c67147e1f6e73edd0930a650dce2261a71e53753cedd562aad935444  skills/pfd-ret
 
 5d946e545b1dd9f84f3f74953c2d3ccfc55cd7c169d3b5ae4040dff1b4e62a26  skills/pfd-upstream-report/SKILL.md
 
-6186a0bef4234bde722ca3dc053f676697285aa6d2a66a117ed8c79d0c2b65a7  skills/pfdsl/SKILL.md
+96f94d14a458cd1faba50e71207cd69069c846704eb06e7f9855df254580022e  skills/pfdsl/SKILL.md
 
 cd3b49619550799898858fe1fec583816c00a335f3e70fa20fdfa8e1a2dc1a8d  skills/pfdsl/references/examples.md
 
@@ -110,4 +110,4 @@ b657698a8a10210e10ee40130a292007ca55a02e8f46e77181d4777b769a86bb  skills/pfdsl/r
 
 3168c3cba3190fc247daca502d24467f484a3774b432ded5744a5f47cb9f800f  skills/pfdsl/references/samples.md
 
-57d10ab77255fb4acf321855775724dc7ee78e6d5291a07a8a8cb9f97978b263  skills/pfdsl/references/spec.md
+57e849bd2f1368d06687e8ca7055d7c8a6052f74f9a9cb21b4cceaccf2d16233  skills/pfdsl/references/spec.md

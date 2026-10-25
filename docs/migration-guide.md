@@ -22,6 +22,72 @@ If the previous identity or completion is unknown, keep it unknown: inspect the 
 Do not infer a previous release or record the target merely to silence a notice.
 Record the target only after all potentially applicable steps have been resolved and their checks pass; report unresolved decisions until then.
 
+## Unreleased CLI/plugin — after CLI/plugin v0.2.0
+
+These changes are not yet assigned to a published CLI/plugin release.
+Apply them only when the target release includes the referenced changes; specification v0.0.29 is not a CLI/plugin version.
+
+### PR timing becomes an adopting repository's rule
+
+Specification v0.0.29 and the distributed work-cycle no longer require updating an artifact to `done` in its completion commit or PR, or prescribe when to integrate that update for an artifact stored in another repository.
+The file-based tracker preset also stops requiring the work item's completed status and the artifact's `done` status in the same commit. It still requires both states in the version assessed as complete and retains the graph until that check is finished; commit and PR grouping belong to the adopting repository.
+The meaning of `status` is unchanged: it describes the tree containing the file, and the integration target's value is authoritative when multiple trees exist.
+The shared work-cycle requires updating output artifacts to `done` once criteria are supported by evidence.
+It now adds availability at the location and version needed by downstream work as a condition.
+Specify that location and version in criteria; the new default is availability in the integration target when neither is specified.
+The update may be included in the same integration that makes the artifact available; the integration target becomes `done` through that integration.
+The adopting repository decides which change unit carries the update; the update itself remains required.
+Status values and diagnostics are unchanged.
+This removes a distributed operational requirement; it does not provide equivalent protection through a new audit.
+Closing an issue does not update artifact status, and no close-reason monitor is introduced.
+
+If your repository relies on the former timing rule, preserve it as your own rule before upgrading:
+
+1. Read the installed bundle's `pfd-ops/references/work-cycle.md`, section `進捗と完了根拠`, or retain that file from the installed release tag or bundle archive.
+2. Copy the relevant timing into `.pfdsl/bindings/pfd-ops.md` or your execution environment's instructions, preserving local differences. For example, require a `done` update to accompany the completion change when both can be integrated in one PR, and explicitly assign the later update when the completed artifact is stored elsewhere.
+3. Ensure your root instructions or execution environment load that local rule. Do not assume that a future distributed work-cycle will continue loading a general workflow extension slot.
+4. Exercise your normal completion path and confirm that the status update reaches the intended integration tree. Include the separate-repository case if your project uses it. An unchanged `pfdsl check` result does not verify this timing.
+
+Keeping this rule is an adopting repository's choice, not a new mandatory migration check for projects that do not use it.
+This entry supersedes the v0.1.0 entry's instruction under [Roadmap declarations and status (V035)](#roadmap-declarations-and-status-v035) to change local instructions so that `done` must accompany the completion PR.
+When upgrading across that older interval to a release containing this change, do not introduce that obligation unless your repository chooses to retain it.
+While its roadmap remains in the repository, the upstream repository requires `done` in the completion PR when the merge alone satisfies criteria.
+If external approval or other unfinished work remains, even without further code changes, it integrates the artifact as `wip` (`waiting` for an external dependency), registers the remainder as follow-up work, and updates to `done` there when the evidence and required availability are established.
+See [its binding](https://github.com/takasek/pfdsl/blob/main/.pfdsl/bindings/pfd-ops.md).
+Source: [Issue #1523 and the owner's decision](https://github.com/takasek/pfdsl/issues/1523#issuecomment-6369838044).
+
+### Track unresolved dependencies in the roadmap
+
+**Behavior change:** The roadmap PFD now includes work with an unresolved dependency: a prerequisite is unfinished, or another task is waiting for its output.
+The former shared rule only checked whether the work gated another task; it did not include work solely because its own prerequisite was unfinished.
+The GitHub preset also listed task types, including releases, as managed examples. A release awaiting unfinished implementation remains included under the new criterion.
+A new feature whose prerequisites are all complete and whose output nobody is waiting for is not included solely because it creates a product capability or a final deliverable.
+The separate rule about which artifacts may be graph terminals is unchanged.
+
+**Clarifications:** Task-type lists are removed, “dependency graph” means the roadmap PFD, and “add a chain” is replaced by adding input artifacts, a process, output artifacts and their dependencies.
+The file-based preset's terminal deletion unit is different: the terminal artifact, its sole producer and related edges; it excludes input artifacts. The preset names this deletion unit explicitly rather than calling both units a chain.
+
+**Affected installations:** Repositories using the distributed work-cycle or either the GitHub Issues or file-based work-item preset, when the target bundle includes this change.
+
+**Action:** Review all open work items, including both managed and exempt items, against the new criterion and adjust their labels or equivalent fields and roadmap representation.
+Do not reopen or relabel closed historical items as part of this migration.
+For work that qualifies, register the relevant input artifacts, process, output artifacts and dependencies in the roadmap PFD.
+Before removing an entry that no longer qualifies, inspect its consumers and preserve inputs still needed by other work.
+
+**Verification:** Apply the criterion to the following cases with each backend you use, then inspect the resulting graph with `pfdsl check`, `graph orphans`, `status ready` and `status blocked`.
+Confirm that the retained dependencies and readiness results match the actual prerequisites; syntax checks alone do not validate classification.
+
+| Work at the time of classification | Include in roadmap? | Reason |
+| --- | --- | --- |
+| An artifact that another task is waiting for | Yes | Another task depends on the unfinished output |
+| A release awaiting unfinished implementation | Yes | Its prerequisite is unfinished |
+| A new feature with all prerequisites complete and no waiting consumer | No | Neither condition applies |
+| A spelling correction with all prerequisites complete and no waiting consumer | No | Neither condition applies |
+| Research whose result another task is waiting for | Yes | Another task depends on the result |
+
+For GitHub Issues, use `flow:managed` for included work and `flow:exempt` otherwise; use the equivalent fields in the file-based tracker.
+Source: [PR #1541](https://github.com/takasek/pfdsl/pull/1541), including the owner's revised dependency-only criterion of 2026-10-25.
+
 ## CLI/plugin v0.2.0 — after CLI/plugin v0.1.0
 
 This section covers the changes after CLI/plugin v0.1.0 that need action in an adopting repository.

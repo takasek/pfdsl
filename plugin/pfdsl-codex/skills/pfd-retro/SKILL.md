@@ -71,7 +71,7 @@ node <skill-directory>/scripts/classify-knowledge-lifecycle.mjs <repository-root
 |---|---|
 | ツール・チェッカー品質ルール | 上流ツールスキルの品質ガイド（companion で宛先を指定） |
 | 設計判断の記録 | 設計決定記録（ADR 等。companion で所在を指定。運用しないリポでは新設を提案する） |
-| 未着手作業の発見 | 採用済みの作業項目バックエンドへ記録する。作業項目バックエンドが存在しない場合はユーザーへの報告に留め、新しいバックエンドを導入しない。`.pfdsl/roadmap.pfdsl` を採用している場合に限り、他作業の着手をゲートするものは依存チェーンにも追加する（pfd-ops の `references/work-cycle.md`「着手可能性と受け入れ」）。ゲートしないもの（バグ修正・tooling・図や doc の bookkeeping 等）は作業項目バックエンドへの記録だけで止め、roadmap には登録しない |
+| 未着手作業の発見 | 採用済みの作業項目バックエンドへ記録する。作業項目バックエンドが存在しない場合はユーザーへの報告に留め、新しいバックエンドを導入しない。`.pfdsl/roadmap.pfdsl` を採用している場合に限り、pfd-ops の `references/work-cycle.md`「着手可能性と受け入れ」の判定基準に従って roadmap へ登録する。対象外なら作業項目バックエンドへの記録だけで止める |
 | ゲート項目の追加・修正 | 該当する PFD の criteria または sibling companion の終端ゲート（**ルール文のみ。発見括弧禁止**）。どの companion に書くかは `pfd-ops/references/architecture.md` の「companion への書き分けルール」表に従う |
 | 能力成果物の起動条件漏れ | 当該スキル自身の description に追記する。そのスキルが workflow.pfdsl にノードとして登録されている場合は、そのノードの description にも追記する（片方だけ直すと図と実体が食い違う）。当該スキルが配布 bundle 同梱のもの（pfd-* スキル）の場合は、スキル本文でなく `.pfdsl/bindings/<当該スキル名>.md` に書く |
 | 体感した効果 | 効果ログ（companion で宛先を指定。未定義の場合は記録しない） |
