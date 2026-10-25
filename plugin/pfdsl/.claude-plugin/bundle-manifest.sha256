@@ -58,9 +58,9 @@ d6636ad19abcd0019d685f0cbc26db35fb779ea1afa9568d070fb94bb68eb7f2  skills/pfd-ops
 
 9ec5af823cdda139f53aa9824e2c2c2a4d89ef8b82c6646875164ec11deb3267  skills/pfd-ops/references/architecture.md
 
-202138d33823bf267e906da5befcd23670a0896130fdc05dfab20e99a0041ad6  skills/pfd-ops/references/file-based-tracker-backend.md
+66f7886582b23dbcd02d9e307cb80fccb63f7f1e847dd152565b07fef74433d5  skills/pfd-ops/references/file-based-tracker-backend.md
 
-ac0581ec7d87ab9a98f1d082170dc74accdcbd5bdffa10bd90adb41f2eace0f6  skills/pfd-ops/references/github-issues-backend.md
+689d24acaab69a59dd9b73b33efab6f753ce8dfe36179aaaea62ac13a73f8caf  skills/pfd-ops/references/github-issues-backend.md
 
 4da6e061033c43a67bd71d55bd816fc3c57ef32f52d0dea19070bcc7c2b79582  skills/pfd-ops/references/scaffold/bindings/pfd-ops.md
 
@@ -84,7 +84,7 @@ deb6cb7549f74139a1414360474a8ec15e67e3298e27f597addf7546978df708  skills/pfd-ops
 
 c1328f9dcb946c35f7bba42306324d82929f7031fb52d459c3b2ee12fd904686  skills/pfd-ops/references/scaffold/workflow.pfdsl
 
-62979b791dcf6e6f82e88c25f4de31e7879a0c7e3d111abc9f9aa2f69a630d78  skills/pfd-ops/references/work-cycle.md
+f2f43f1ca11452e842c33ff382ed3561b9a768a9d2cdd2cc49fd22e9f327abc4  skills/pfd-ops/references/work-cycle.md
 
 be85d8e1614e9bf8e6ca3f89f2f591dbfd9deebd5c0e8131ba3309b3fd6537a2  skills/pfd-ops/scripts/check-install-sync.mjs
 
