@@ -22,6 +22,42 @@ If the previous identity or completion is unknown, keep it unknown: inspect the 
 Do not infer a previous release or record the target merely to silence a notice.
 Record the target only after all potentially applicable steps have been resolved and their checks pass; report unresolved decisions until then.
 
+## Unreleased CLI/plugin — after CLI/plugin v0.2.0
+
+Apply the following change only when your target release includes it.
+
+### Track unresolved dependencies in the roadmap
+
+**Behavior change:** The roadmap PFD now includes work with an unresolved dependency: a prerequisite is unfinished, or another task is waiting for its output.
+The former shared rule only checked whether the work gated another task; it did not include work solely because its own prerequisite was unfinished.
+The GitHub preset also listed task types, including releases, as managed examples. A release awaiting unfinished implementation remains included under the new criterion.
+A new feature whose prerequisites are all complete and whose output nobody is waiting for is not included solely because it creates a product capability or a final deliverable.
+The separate rule about which artifacts may be graph terminals is unchanged.
+
+**Clarifications:** Task-type lists are removed, “dependency graph” means the roadmap PFD, and “add a chain” is replaced by adding input artifacts, a process, output artifacts and their dependencies.
+The file-based preset's terminal deletion unit is different: the terminal artifact, its sole producer and related edges; it excludes input artifacts. The preset names this deletion unit explicitly rather than calling both units a chain.
+
+**Affected installations:** Repositories using the distributed work-cycle or either the GitHub Issues or file-based work-item preset, when the target bundle includes this change.
+
+**Action:** Review all open work items, including both managed and exempt items, against the new criterion and adjust their labels or equivalent fields and roadmap representation.
+Do not reopen or relabel closed historical items as part of this migration.
+For work that qualifies, register the relevant input artifacts, process, output artifacts and dependencies in the roadmap PFD.
+Before removing an entry that no longer qualifies, inspect its consumers and preserve inputs still needed by other work.
+
+**Verification:** Apply the criterion to the following cases with each backend you use, then inspect the resulting graph with `pfdsl check`, `graph orphans`, `status ready` and `status blocked`.
+Confirm that the retained dependencies and readiness results match the actual prerequisites; syntax checks alone do not validate classification.
+
+| Work at the time of classification | Include in roadmap? | Reason |
+| --- | --- | --- |
+| An artifact that another task is waiting for | Yes | Another task depends on the unfinished output |
+| A release awaiting unfinished implementation | Yes | Its prerequisite is unfinished |
+| A new feature with all prerequisites complete and no waiting consumer | No | Neither condition applies |
+| A spelling correction with all prerequisites complete and no waiting consumer | No | Neither condition applies |
+| Research whose result another task is waiting for | Yes | Another task depends on the result |
+
+For GitHub Issues, use `flow:managed` for included work and `flow:exempt` otherwise; use the equivalent fields in the file-based tracker.
+Source: [PR #1541](https://github.com/takasek/pfdsl/pull/1541), including the owner's revised dependency-only criterion of 2026-10-25.
+
 ## CLI/plugin v0.2.0 — after CLI/plugin v0.1.0
 
 This section covers the changes after CLI/plugin v0.1.0 that need action in an adopting repository.
