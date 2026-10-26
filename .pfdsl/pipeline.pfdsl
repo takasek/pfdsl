@@ -63,6 +63,12 @@ artifact:
   definition_creation_request:
     label: 定義を作る対象と初期フィールド
     description: CLIの引数またはpreviewの利用者操作で指定する対象IDと初期scalarフィールド。previewでは候補を得たsource snapshotも要求へ添え、ホストが現在文書との一致を検証する
+  metadata_sort_request:
+    label: ノード定義のソートキー列
+    description: 呼び出し元が指定する優先順付きのソートキー列。sort(source, opts) の opts.by に渡す
+  metadata_update_request:
+    label: フィールド更新の対象と値
+    description: 呼び出し元が指定するノード種別・ID・フィールド名と文字列または数値の更新値。setFrontmatterField の kind・id・field・value に渡す
   comparison_source:
     label: 比較対象の.pfdslソース
     description: diff の第2引数で指定する、比較対象文書のfrontmatter+bodyのテキスト
@@ -657,9 +663,9 @@ parsed_doc >> normalize -> [normalize_diagnostics, normalized_graph]
 
 pfdsl_source >> format -> [format_diagnostics, formatted_source]
 
-pfdsl_source >> sort_meta -> sorted_source
+[metadata_sort_request, pfdsl_source] >> sort_meta -> sorted_source
 
-pfdsl_source >> set_meta -> updated_source
+[metadata_update_request, pfdsl_source] >> set_meta -> updated_source
 
 [definition_creation_request, pfdsl_source] >> create_node_definition -> definition_created_source
 

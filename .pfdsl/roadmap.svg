@@ -1041,7 +1041,7 @@
 <!-- preview_editing_usability -->
 <g id="node48" class="node">
 <title>preview_editing_usability</title>
-<g id="a_node48"><a xlink:title="表示・編集・移動の改善実装&#10;&#10;プレビューの表示・編集・移動の改善実装。要求と担当の内訳は生成工程の location が指す Issue から辿る&#10;criteria: 生成工程の Issue 本文が定める改善範囲の実装・必要な自動検証・独立レビューと、版に対応する実行可能な受入計画の登録が完了している。実機未実施は共通受入 Issue に残し、この done は実機合格を意味しない&#10;location: ../packages/">
+<g id="a_node48"><a xlink:title="表示・編集・移動の改善実装&#10;&#10;プレビューの表示・編集・移動の改善実装。要求は location の #1352 と #1284、対象版・担当・実機の残件は #1445 の管理表、確認手順はそこから参照する版固定の受入計画を正本とする&#10;criteria: #1352 と #1284 の Issue 本文が定める改善範囲の実装・必要な自動検証・独立レビューと、版に対応する実行可能な受入計画の登録が完了している。実機未実施は #1445 に残し、この done は実機合格を意味しない&#10;location: ../packages/, https://github.com/takasek/pfdsl/issues/1352, https://github.com/takasek/pfdsl/issues/1284, https://github.com/takasek/pfdsl/issues/1445">
 <polygon fill="#d4edda" stroke="black" stroke-width="2" points="261.21,-2197.93 59.61,-2197.93 59.61,-2139.53 261.21,-2139.53 261.21,-2197.93"/>
 <text xml:space="preserve" text-anchor="middle" x="160.41" y="-2181.33" font-family="Times,serif" font-size="14.00">preview_editing_usability</text>
 <text xml:space="preserve" text-anchor="middle" x="160.41" y="-2164.53" font-family="Times,serif" font-size="14.00">表示・編集・移動の</text>
