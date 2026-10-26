@@ -8,6 +8,147 @@ import { previewStyles } from "./preview-shell.js";
 const dispose: Array<() => void> = [];
 
 it.each([
+	"stay",
+	"reopen",
+	"edit",
+])("does not follow an unrelated node after an undone rename (%s)", async (action) => {
+	const s = await setup();
+	const trigger = s.container.querySelector<HTMLButtonElement>(
+		".connections-identity > button",
+	)!;
+	trigger.click();
+	s.container.querySelector<HTMLInputElement>('[aria-label="Node ID"]')!.value =
+		"build";
+	s.container.querySelector<HTMLButtonElement>("[data-save-node]")!.click();
+	const request = s.postMessage.mock.calls.at(-1)![0];
+	await s.preview.receive({ type: "editResult", request, ok: true });
+	await s.preview.receive(
+		prepareDocument(analyzeSnapshot(s.source), null, () => null).message,
+	);
+	if (action === "reopen") {
+		s.container
+			.querySelector<HTMLButtonElement>("#node-actions-close")!
+			.click();
+		s.container
+			.querySelector('[data-node-id="p"]')!
+			.dispatchEvent(new MouseEvent("contextmenu", { bubbles: true }));
+	}
+	if (action !== "stay") {
+		trigger.click();
+		s.container.querySelector<HTMLTextAreaElement>(
+			'[aria-label="Node label"]',
+		)!.value = "Draft";
+	}
+	await s.preview.receive(
+		prepareDocument(
+			analyzeSnapshot(`${s.source}x >> build -> y\n`),
+			null,
+			() => null,
+		).message,
+	);
+	expect(s.container.querySelector(".connections-center")!.textContent).toBe(
+		"p",
+	);
+	if (action !== "stay") {
+		expect(
+			s.container.querySelector<HTMLElement>(".node-rename-form")!.hidden,
+		).toBe(false);
+		expect(
+			s.container.querySelector<HTMLTextAreaElement>(
+				'[aria-label="Node label"]',
+			)!.value,
+		).toBe("Draft");
+	}
+});
+
+it("follows a saved rename after a pre-save render and success reply", async () => {
+	const s = await setup();
+	s.container
+		.querySelector<HTMLButtonElement>(".connections-identity > button")!
+		.click();
+	s.container.querySelector<HTMLInputElement>('[aria-label="Node ID"]')!.value =
+		"build";
+	s.container.querySelector<HTMLButtonElement>("[data-save-node]")!.click();
+	const request = s.postMessage.mock.calls.at(-1)![0];
+	const result = previewEdits.applyPreviewEdit(s.source, request);
+	if (!result.ok) throw new Error(result.message);
+	await s.preview.receive(
+		prepareDocument(analyzeSnapshot(s.source), null, () => null).message,
+	);
+	await s.preview.receive({ type: "editResult", request, ok: true });
+	await s.preview.receive(
+		prepareDocument(analyzeSnapshot(result.source), null, () => null).message,
+	);
+	expect(s.container.querySelector<HTMLElement>("#node-actions")!.hidden).toBe(
+		false,
+	);
+	expect(s.container.querySelector(".connections-center")!.textContent).toBe(
+		"build",
+	);
+});
+
+it.each([
+	{ renderFirst: true, newId: "p" },
+	{ renderFirst: false, newId: "p" },
+	{ renderFirst: true, newId: "build" },
+	{ renderFirst: false, newId: "build" },
+])("unlocks an undone save when its render is coalesced ($newId, renderFirst=$renderFirst)", async ({
+	renderFirst,
+	newId,
+}) => {
+	const s = await setup();
+	const trigger = s.container.querySelector<HTMLButtonElement>(
+		".connections-identity > button",
+	)!;
+	trigger.click();
+	const id = s.container.querySelector<HTMLInputElement>(
+		'[aria-label="Node ID"]',
+	)!;
+	const label = s.container.querySelector<HTMLTextAreaElement>(
+		'[aria-label="Node label"]',
+	)!;
+	id.value = newId;
+	label.value = "Build";
+	s.container.querySelector<HTMLButtonElement>("[data-save-node]")!.click();
+	const request = s.postMessage.mock.calls.at(-1)![0];
+	// The save's render is superseded: only Undo's original source arrives.
+	const redraw = () =>
+		s.preview.receive(
+			prepareDocument(analyzeSnapshot(s.source), null, () => null).message,
+		);
+	if (renderFirst) await redraw();
+	await s.preview.receive({ type: "editResult", request, ok: true });
+	if (!renderFirst) await redraw();
+	expect(id.readOnly).toBe(false);
+	expect(label.readOnly).toBe(false);
+	expect(s.container.querySelector(".connections-center")!.textContent).toBe(
+		"p",
+	);
+	expect(
+		s.container.querySelector<HTMLElement>(".node-rename-form")!.hidden,
+	).toBe(true);
+	s.container.querySelector<HTMLButtonElement>("#node-actions-close")!.click();
+	s.container
+		.querySelector('[data-node-id="p"]')!
+		.dispatchEvent(new MouseEvent("contextmenu", { bubbles: true }));
+	trigger.click();
+	expect(id.value).toBe("p");
+	expect(label.value).toBe("");
+	label.value = "Retry";
+	s.container.querySelector<HTMLButtonElement>("[data-save-node]")!.click();
+	expect(s.postMessage.mock.calls.at(-1)![0]).toMatchObject({
+		type: "renameNode",
+		nodeId: "p",
+		newId: "p",
+		label: "Retry",
+		source: s.source,
+	});
+	expect(s.postMessage.mock.calls.at(-1)![0].requestId).not.toBe(
+		request.requestId,
+	);
+});
+
+it.each([
 	true,
 	false,
 ])("finishes a label-only save with a coalesced render (renderFirst=%s)", async (renderFirst) => {
