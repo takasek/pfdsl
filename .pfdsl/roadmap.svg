@@ -153,14 +153,14 @@
 <g id="node6" class="node">
 <title>artifact_reference_spec</title>
 <g id="a_node6"><a xlink:href="https://github.com/takasek/pfdsl/issues/1542" xlink:title="モデルと artifact の参照先の仕様 (#1542)&#10;&#10;参照先のモデル既定と artifact ごとの上書きを業種中立に定義する。詳細と未決の設計論点は対応 Issue を一次情報とする&#10;criteria:&#10; &#160;モデル既定・artifact 上書き・省略・異常・ツリーとの優先順位と固定版の証拠の契約が、 proposal のレビューを経て spec と履歴へ統合され、実装と採用版への後続が登録されている。 実装・公開の完了はこの成果物の受入に含めない&#10; &#160;&#10;location: https://github.com/takasek/pfdsl/issues/1542">
-<polygon fill="#d4edda" stroke="black" points="934.92,-305.33 747.72,-305.33 747.72,-230.13 934.92,-230.13 934.92,-305.33"/>
+<polygon fill="#fff3cd" stroke="black" points="934.92,-305.33 747.72,-305.33 747.72,-230.13 934.92,-230.13 934.92,-305.33"/>
 <text xml:space="preserve" text-anchor="middle" x="841.32" y="-288.73" font-family="Times,serif" font-size="14.00">artifact_reference_spec</text>
 <text xml:space="preserve" text-anchor="middle" x="841.32" y="-271.93" font-family="Times,serif" font-size="14.00">モデルと artifact</text>
 <text xml:space="preserve" text-anchor="middle" x="841.32" y="-255.13" font-family="Times,serif" font-size="14.00">の参照先の仕様 (</text>
 <text xml:space="preserve" text-anchor="middle" x="841.32" y="-238.33" font-family="Times,serif" font-size="14.00">#1542)</text>
 </a>
 </g>
-<text xml:space="preserve" text-anchor="middle" x="734.12" y="-217.53" font-family="Times,serif" font-size="14.00">done</text>
+<text xml:space="preserve" text-anchor="middle" x="737.22" y="-217.53" font-family="Times,serif" font-size="14.00">wip</text>
 </g>
 <!-- implement_artifact_reference -->
 <g id="node38" class="node">

@@ -379,7 +379,7 @@ Specification example: `baseRef: { source, revision }` sets the artifact default
 ```pfdsl
 ---
 title: Artifact reference targets
-description: Specification example. Reference resolution requires a supporting implementation and an acquisition context; a successful check in an older CLI does not verify these references.
+description: Specification example with logical model path .pfdsl/roadmap.pfdsl in each selected source. The acquisition context must supply that path; this sample's physical docs/samples path is not its logical path. Reference resolution requires a supporting implementation; older CLI checks do not verify it.
 basePath: ..
 baseRef: { source: https://example.com/project.git, revision: main }
 artifact:
