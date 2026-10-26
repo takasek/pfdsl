@@ -3,6 +3,7 @@ title: Pipeline Scale Test Fixture
 description: Fixed fixture for snapshot testing pipeline throughput. Represents structural patterns of a real roadmap without coupling to production planning data.
 type: roadmap
 basePath: ./
+baseRef: { source: https://example.com/project.git, revision: main }
 layout:
   direction: LR
   maxWidth: 130
@@ -18,6 +19,7 @@ artifact:
     status: done
     criteria: drafted and reviewed
     location: docs/spec/beta.md
+    ref: { source: https://example.com/project.git, revision: develop }
   policy_doc:
     label: Policy Document
     description: Design decisions for the multi-module architecture.

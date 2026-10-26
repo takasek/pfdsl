@@ -836,6 +836,58 @@ digraph PFDSL {
 
 ---
 
+## 18-reference-targets — Artifact reference targets
+
+Specification example: `baseRef: { source, revision }` sets the artifact default; an artifact's `ref` replaces it. Reference resolution requires a supporting implementation and acquisition context; older CLI checks do not verify it.
+
+```pfdsl
+---
+title: Artifact reference targets
+description: Specification example with logical model path .pfdsl/roadmap.pfdsl in each selected source. The acquisition context must supply that path; this sample's physical docs/samples path is not its logical path. Reference resolution requires a supporting implementation; older CLI checks do not verify it.
+basePath: ..
+baseRef: { source: https://example.com/project.git, revision: main }
+artifact:
+  accepted_plan:
+    label: Accepted plan
+    location: docs/plan.md
+    criteria: The plan has been accepted at its effective reference target.
+  working_plan:
+    label: Working plan
+    location: docs/plan.md
+    ref: { source: https://example.com/project.git, revision: develop }
+    criteria: The revised plan is available at its effective reference target.
+process:
+  revise:
+    label: Revise plan
+---
+accepted_plan >> revise -> working_plan
+```
+
+<img src="18-reference-targets.svg">
+
+<details>
+<summary>DOT</summary>
+
+```dot
+digraph PFDSL {
+  rankdir=LR;
+  newrank=true;
+  label="Artifact reference targets";
+  labelloc="t";
+
+  "accepted_plan" [shape=box, label="accepted_plan\nAccepted plan", tooltip="Accepted plan\ncriteria: The plan has been accepted at its effective reference target.\nlocation: docs/plan.md", penwidth="2"];
+  "revise" [shape=ellipse, label="revise\nRevise plan"];
+  "working_plan" [shape=box, label="working_plan\nWorking plan", tooltip="Working plan\ncriteria: The revised plan is available at its effective reference target.\nlocation: docs/plan.md", penwidth="2"];
+
+  "accepted_plan" -> "revise";
+  "revise" -> "working_plan";
+}
+```
+
+</details>
+
+---
+
 ## pfdsl_implementation_flow — PFDSL toolchain roadmap
 
 How PFDSL itself was built — a snapshot of the toolchain implementation flow, written in PFDSL (dogfooding).
