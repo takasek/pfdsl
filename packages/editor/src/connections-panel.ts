@@ -5,6 +5,7 @@ import type {
 	MessageFromWebview,
 	MessageToWebview,
 	PreviewEditMessage,
+	SourceRevision,
 } from "./messages.js";
 import {
 	applyPreviewEdit,
@@ -35,6 +36,7 @@ export function mountConnections(
 		navigate(id: string): void;
 		close(): void;
 		onOpenChange(open: boolean): void;
+		onRename?(oldId: string, newId: string): void;
 	},
 ) {
 	const document = container.ownerDocument;
@@ -60,6 +62,8 @@ export function mountConnections(
 				value?: string;
 				source: string;
 				reopen: boolean;
+				appliedRevision?: SourceRevision;
+				followRename?: boolean;
 		  }
 		| undefined;
 	const token = ++serial;
@@ -137,11 +141,17 @@ export function mountConnections(
 			error.textContent = result.message;
 			return;
 		}
+		if (request.type === "renameNode" && result.source === editing.source) {
+			error.textContent = "";
+			endRename(true);
+			return;
+		}
 		const message = { ...request, requestId: `${token}:${++requestSerial}` };
 		pending = {
 			request: message,
 			source: result.source,
 			reopen: !!side,
+			followRename: request.type === "renameNode",
 			...(side ? { side, value: side.input.value } : {}),
 		};
 		error.textContent = "";
@@ -250,6 +260,9 @@ export function mountConnections(
 		setPopup({ type: "candidates", side });
 	}
 	function refreshInputs() {
+		centerButton.setAttribute("aria-disabled", String(!!pending));
+		idInput.readOnly = labelInput.readOnly = !!pending;
+		saveNode.disabled = cancelNode.disabled = !!pending;
 		for (const side of sides) {
 			const result =
 				editing && center
@@ -373,14 +386,99 @@ export function mountConnections(
 		return side;
 	}
 	const sides = [createSide(true), createSide(false)];
-	const centerLabel = document.createElement("strong");
+	const centerSection = document.createElement("div");
+	centerSection.className = "connections-identity";
+	const centerLabel = document.createElement("span");
 	centerLabel.className = "connections-center";
-	layout.append(sides[0]!.section, centerLabel, sides[1]!.section);
+	const centerButton = button("", "Edit node ID and label", () => {
+		if (!editing || !center || pending) return;
+		setPopup(undefined);
+		renameSource = editing.source;
+		idInput.value = center;
+		const kind = model?.nodeKinds.get(center);
+		const label =
+			kind === "artifact" || kind === "process"
+				? model?.frontmatter?.[kind]?.[center]?.label
+				: undefined;
+		labelInput.value = typeof label === "string" ? label : "";
+		renameForm.hidden = false;
+		centerButton.hidden = true;
+		error.textContent = "";
+		moveFocus(idInput);
+		idInput.select();
+	});
+	centerButton.append(centerLabel);
+	const renameForm = document.createElement("form");
+	renameForm.className = "node-rename-form";
+	renameForm.hidden = true;
+	let renameSource = "";
+	function field(text: string, accessibleName: string, multiline = false) {
+		const label = document.createElement("label");
+		label.textContent = text;
+		const input = document.createElement(multiline ? "textarea" : "input");
+		input.setAttribute("aria-label", accessibleName);
+		input.setAttribute("aria-describedby", error.id);
+		input.autocomplete = "off";
+		label.append(input);
+		renameForm.append(label);
+		return input;
+	}
+	const idInput = field("ID", "Node ID");
+	const labelInput = field("Label", "Node label", true);
+	function endRename(focus = false) {
+		renameForm.hidden = true;
+		centerButton.hidden = false;
+		if (focus) moveFocus(centerButton);
+	}
+	function followRename(
+		request: Extract<PreviewEditRequest, { type: "renameNode" }>,
+	) {
+		if (center !== request.nodeId) return;
+		center = request.newId;
+		host.onRename?.(request.nodeId, request.newId);
+		endRename(renameForm.contains(document.activeElement));
+	}
+	function saveRename() {
+		if (!center || pending) return;
+		submit({
+			type: "renameNode",
+			source: renameSource,
+			nodeId: center,
+			newId: idInput.value,
+			label: labelInput.value,
+		});
+	}
+	const saveNode = button("Save", "Save node ID and label", saveRename);
+	saveNode.dataset.saveNode = "";
+	const cancelNode = button("Cancel", "Cancel node editing", () => {
+		endRename(true);
+		error.textContent = "";
+	});
+	renameForm.append(saveNode, cancelNode);
+	renameForm.onsubmit = (event) => {
+		event.preventDefault();
+		saveRename();
+	};
+	renameForm.onkeydown = (event) => {
+		if (
+			event.key === "Enter" &&
+			(event.target === idInput ||
+				(event.target === labelInput && (event.ctrlKey || event.metaKey)))
+		) {
+			event.preventDefault();
+			if (!event.isComposing) saveRename();
+		}
+	};
+	centerSection.append(centerButton, renameForm);
+	layout.append(sides[0]!.section, centerSection, sides[1]!.section);
 	panel.onkeydown = (event) => {
 		if (event.isComposing || event.key !== "Escape") return;
 		event.preventDefault();
 		event.stopPropagation();
-		if (popup) dismissPopup();
+		if (!renameForm.hidden) {
+			endRename(true);
+			error.textContent = "";
+		} else if (popup) dismissPopup();
 		else host.close();
 	};
 	function showEdge(edge: NormalizedEdge, trigger: HTMLButtonElement) {
@@ -478,6 +576,10 @@ export function mountConnections(
 		const wasEdge = focused?.hasAttribute("data-edge");
 		title.textContent = `Connections — ${caption(center)}`;
 		shape(centerLabel, center);
+		centerButton.setAttribute(
+			"aria-label",
+			`Edit ${caption(center)} ID and label`,
+		);
 		definition.textContent = editing.nodes.find((n) => n.id === center)?.defined
 			? "Go to definition"
 			: "Create definition";
@@ -542,6 +644,8 @@ export function mountConnections(
 				? popup.trigger
 				: document.activeElement;
 		if (center !== id) {
+			if (pending) pending.followRename = false;
+			endRename();
 			for (const side of sides) side.input.value = "";
 			// Navigation abandons input feedback, not the edit already sent to the host.
 			if (pending) delete pending.side;
@@ -580,6 +684,8 @@ export function mountConnections(
 		isOpen: () => center !== undefined,
 		centerId: () => center,
 		close() {
+			if (pending) pending.followRename = false;
+			endRename();
 			center = undefined;
 			if (pending) delete pending.side;
 			acceptedAddition = undefined;
@@ -590,9 +696,39 @@ export function mountConnections(
 		resize() {
 			dismissPopup();
 		},
-		update(data: Editing) {
+		update(data: Editing, revision?: SourceRevision): boolean {
 			// Invalid source ends the old editing session, including late replies.
 			if (!data) pending = undefined;
+			if (pending?.request.type === "renameNode" && data) {
+				const applied = pending.appliedRevision;
+				// Wait for success and a snapshot at or after that edit. A pre-save
+				// refresh and Undo may have identical source but different versions.
+				if (
+					!applied ||
+					!revision ||
+					revision.epoch < applied.epoch ||
+					(revision.epoch === applied.epoch &&
+						revision.version < applied.version)
+				)
+					return false;
+				const { request, source, followRename: follow } = pending;
+				if (follow && center === request.nodeId) {
+					if (
+						revision.epoch === applied.epoch &&
+						revision.invalidatedRenameRequestId !== request.requestId &&
+						applied.invalidatedRenameRequestId !== request.requestId &&
+						(data.source === source ||
+							(data.source !== request.source &&
+								data.nodes.some((n) => n.id === request.newId) &&
+								(request.newId === request.nodeId ||
+									!data.nodes.some((n) => n.id === request.nodeId))))
+					)
+						followRename(request);
+					else endRename(renameForm.contains(document.activeElement));
+				}
+				// The first post-save snapshot consumes the intent, including Undo.
+				pending = undefined;
+			}
 			const focused =
 				popup?.type === "edge" && menu.contains(document.activeElement)
 					? popup.trigger
@@ -622,15 +758,27 @@ export function mountConnections(
 			setPopup(undefined);
 			if (!data?.nodes.some((n) => n.id === center)) {
 				this.close();
-				return;
+				return true;
 			}
 			render(focused);
 			if (reopen) showCandidates(reopen);
+			return true;
 		},
 		result(message: Extract<MessageToWebview, { type: "editResult" }>) {
 			// A reply updates data; the user may already be working elsewhere.
 			if (!pending || message.request.requestId !== pending.request.requestId)
 				return;
+			if (message.ok && pending.request.type === "renameNode") {
+				if (message.sourceRevision) {
+					pending.appliedRevision = message.sourceRevision;
+					return;
+				}
+				pending = undefined;
+				error.textContent =
+					"The saved document could not be synchronized. Reopen Connections and try again.";
+				refreshInputs();
+				return;
+			}
 			const { request, side, value, source, reopen } = pending;
 			pending = undefined;
 			if (message.ok) {
