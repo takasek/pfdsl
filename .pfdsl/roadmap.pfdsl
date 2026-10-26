@@ -322,9 +322,6 @@ process:
   i1262_publish_standalone:
     label: 配布物の全体受入を完了して公開する
     location: https://github.com/takasek/pfdsl/issues/1262
-  i1526_run_evidence_roundtrip:
-    label: E0 で証拠の往復を1回回す
-    location: https://github.com/takasek/pfdsl/issues/1526
   reduce_work_cycle_protocol:
     label: work-cycle を protocol に絞る
     description: 未起票のプレースホルダ。起票時に process id へ iN_ を付ける
@@ -352,9 +349,6 @@ process:
   i1519_switch_wiki_roadmap_source:
     label: 検証済みの採用版で正本を Wiki へ切り替える
     location: https://github.com/takasek/pfdsl/issues/1519
-  i1542_define_artifact_reference:
-    label: モデルと artifact の参照先の仕様を定める
-    location: https://github.com/takasek/pfdsl/issues/1542
   implement_artifact_reference:
     label: 確定仕様に従って参照先解決を実装する
     description: 未起票のプレースホルダ。起票時に process id へ iN_ を付ける
@@ -396,8 +390,6 @@ gui_vscode_candidate >> i1445_accept_gui_vscode -> gui_vscode_acceptance
 
 gui_mac_acceptance >> i1262_publish_standalone -> standalone_release
 
-responsibility_boundary_adr >> i1526_run_evidence_roundtrip -> evidence_roundtrip_record
-
 [boundary_test_revision_adr, evidence_roundtrip_record, local_pr_status_timing, responsibility_boundary_adr, root_loaded_work_rules] >> reduce_work_cycle_protocol -> executor_neutral_work_cycle
 
 [responsibility_boundary_adr, root_loaded_work_rules] >> narrow_retro_to_model -> three_valued_model_retro
@@ -411,8 +403,6 @@ responsibility_boundary_adr >> add_prune_cli -> prune_cli
 [backend_neutral_work_item_contract, boundary_test_revision_adr, prune_cli, writer_free_github_preset] >> design_adapter_plugin_split -> adapter_plugin_split_design
 
 adapter_plugin_split_design >> apply_github_adapter_design -> optional_github_adapter
-
-[responsibility_boundary_adr, toolchain] >> i1542_define_artifact_reference -> artifact_reference_spec
 
 [artifact_reference_spec, toolchain] >> implement_artifact_reference -> artifact_reference_implementation
 
