@@ -73,9 +73,62 @@ force-pushや自動rebaseは使わない。
 | 参照版の取り違え | 本文不変でもpreset変更でSVGが変わる2版を用意し、古い結果の公開をWikiへの変更前に拒否。新しい版の再描画は公開できる |
 
 ローカル試験はGitHubの認証、gollum発火、Web編集の競合UI、Wiki上のSVG表示を証明しない。
-試作の操作経路はテストから呼ぶ関数であり、登録・構造変更・wip/done更新を行う運用コマンドはまだない。
-また、CRLFは抽出時にLFへ正規化される。
+最初の試作の操作経路はテストから呼ぶ関数であった。
+下記の更新候補コマンドを追加したが、実Wikiへの原稿更新を行う運用アダプタはまだない。
+更新候補コマンドは検証用のPFDをLFへ正規化し、Wikiページのフェンス外本文と元の改行を保つ。
 運用の切替は意味の同値性も照合し、任意のMarkdownをバイト同一で往復できるという契約にはしない。
+
+## 原稿の更新候補を作る切替前準備
+
+2026-10-26の所有者指示「#1542の仕様を確定してPRにまとめたら、#1519の切替前準備も続けよう」に基づく。
+今回は、既取得のローカルWikiコピーと本体repoの固定版から、公開しない更新候補を作る経路を追加した。
+Wikiを有効化していない状態でも、登録・構造変更・status変更の原稿往復を検証できるため、この経路を先行する。
+別クラスの案は実環境用の取得runnerとgollum workflowを先に用意することだが、起草時にはWikiが無効で受入不能であり、日常の原稿更新経路も残っていた。
+所有者による有効化後も試験ページ公開とGit取得の受入は未完了であり、原稿更新経路を先行する判断を維持する。
+こちらは試験公開の承認と、編集経路の受入条件がそろった段階で続ける。
+既存試作のローカル制限を外して運用アダプタと呼ぶ案は採らない。
+「公開まで一体化する」という前提を外し、取得・候補生成・検証・公開を分ける。
+
+`scripts/wiki-roadmap-edit.mjs` はローカルのrepoとWikiを使う。
+`scripts/lib/wiki-roadmap-spike.mjs` の取得・単一フェンス抽出を再利用し、取得時のWiki版とページ全体hashを期待値として照合する。
+フェンス外の説明・画像参照を保ち、必要ならフェンスを長くして候補本文の終端記号との衝突を避ける。
+差替え後に再抽出して、LF正規化した候補モデルと一致することを確かめる。
+変更後のPFDは既存CLIで作るため、Wiki専用の登録・status・done判定の規則は追加しない。
+
+次はローカルで取得済みのWikiコピー `../pfdsl.wiki` と、編集した候補 `next-roadmap.pfdsl` を使う例である。
+本体の文脈はコミットで固定され、未コミット変更は含めない。
+出力先は存在しないディレクトリを指定する。
+
+```bash
+code_revision=$(git rev-parse HEAD)
+wiki_revision=$(git -C ../pfdsl.wiki rev-parse HEAD)
+page_hash=$(git -C ../pfdsl.wiki show "$wiki_revision:Roadmap.md" | shasum -a 256 | cut -d ' ' -f 1)
+node scripts/wiki-roadmap-edit.mjs \
+  --repo . --wiki ../pfdsl.wiki --repo-revision "$code_revision" \
+  --expected-wiki-revision "$wiki_revision" --expected-page-hash "$page_hash" \
+  --replacement next-roadmap.pfdsl --output ../wiki-edit-candidate
+```
+
+検証用コピーの論理配置 `.pfdsl/roadmap.pfdsl` を保ったまま、固定したCLIでstrict check・ready・blocked・静的SVGを得る。
+元のモデルが不正でも候補の修正は可能で、元の検査失敗はmanifestのbaselineに失敗として残す。
+候補が不正なら成功出力を作らず、検証に使ったコピーの原稿も復元する。
+PFDのcommandは実行しない。
+元Wikiのページ・Git履歴を更新せず、ネットワーク取得・commit・pushを行わない。
+
+出力は `Roadmap.before.md`、候補 `Roadmap.md`、`roadmap.pfdsl`、`Roadmap.diff`、`Roadmap.svg`、最後に書く完了記録 `manifest.json` である。
+manifestは元Wiki版、元ページとPFDのhash、候補hash、本体の文脈版、実際のCLI等のdigest、変更前後のグラフ検査結果を区別する。
+`referenceResolution: not-verified` と `operationalReady: false` を常に記録する。
+strict checkの成功や候補のready一覧を、#1542の参照先解決・実運用の着手許可・共有doneの証拠としては扱わない。
+この入口はリンク検査を参照解決の代理として実行しない。
+
+候補作成後にWikiが進む可能性は残る。
+将来の公開操作では、manifestの元Wiki版とページhashを実際の送信先で再照合し、不一致なら再取得と再編集を要求する。
+今回の候補生成は、その送信直前の競合検査や実Wiki書込みの代替ではない。
+companionと採用設定はまだ本体repoに残し、cycle-status・監査・ゲート・release-runner・完了チェーン回収のconsumerは切り替えない。
+本体PRの未マージ状態とWiki版の差を扱う既存手順も、この準備段階では維持する。
+
+ローカル検証はページ本文保存、期待版・ページhashの不一致、フェンス欠落・複数・引用内・未閉鎖、CRLF、終端記号との衝突、CLI検証失敗、既存出力の保護、実CLIを使うコマンド入口を対象とする。
+認証・gollum・Web編集・実Wiki上のSVG表示は未実施であり、#1519はwipを維持する。
 
 ### パスの契約
 
@@ -100,11 +153,13 @@ manifestだけでは閲覧者に鮮度が伝わらないため、運用前に「
 
 ## GitHub実環境の確認手順（未実施）
 
-GitHub APIで `has_wiki: false` を確認した。
+試作時はGitHub APIで `has_wiki: false` を確認した。
+2026-10-26に所有者が設定で有効化し、APIで `has_wiki: true` を再確認した。
+同時点の `.wiki.git` へのHEAD照会は `Repository not found` であり、初期ページ作成後のGit取得はまだ確認できていない。
 公式文書は初期ページをGitHub上で作ってから `.wiki.git` をcloneする手順を示す。
 WebとGitの両方を検証対象にするが、両方を正式対応するとまだ宣言しない。
 
-承認対象の具体案は、`takasek/pfdsl` のWikiを有効化し、編集をcollaborator限定に保ち、次の試験用ページを初期ページとして公開することである。
+次の承認対象の具体案は、有効化済みの `takasek/pfdsl` のWikiで編集をcollaborator限定に保ち、次の試験用ページを初期ページとして公開することである。
 本体repoの正本や利用者の作業選択は変更しない。
 
 ```markdown

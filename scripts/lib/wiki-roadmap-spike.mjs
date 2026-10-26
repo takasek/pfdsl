@@ -14,7 +14,7 @@ import { dirname, join, resolve } from "node:path";
 import { fromMarkdown } from "mdast-util-from-markdown";
 
 const hash = (value) => createHash("sha256").update(value).digest("hex");
-function toolIdentity(cli) {
+export function toolIdentity(cli) {
 	const root = resolve(dirname(cli), "../../..");
 	const digest = createHash("sha256")
 		.update(process.version)
