@@ -223,3 +223,28 @@ coreの依存closureを使い、entry・extends・subflowの実際の読み込�
 依存文書がWiki snapshotの外へ出る場合も生成を拒否する。
 この制限を外し、本体repoのartifact参照を同一の採用実装で解決・検証することが切替前の残件である。
 既存consumerとpipelineの正本入力は変更せず、準備はwip、切替はtodoを維持する。
+
+## マージ後の実環境受入（2026-10-26）
+
+上記の認証・イベント未確認という記述はPR #1547時点の境界であり、以下はmerge後の固定版で追加した実測である。
+実行した本体版は `254ff066f36c9fe4ecd89c3017c10a602cfc909c`、試験対象は既存のWiki trialだけである。
+正本・consumer・編集権限・認証方式は切り替えていない。
+
+| 試験 | 実測 |
+| --- | --- |
+| [手動実行](https://github.com/takasek/pfdsl/actions/runs/40276950372) | 成功。既定のGITHUB_TOKENとcontents: writeでclone・検証・通常pushできた。Wiki出力版は `52599f40936f51fb67ceee86bf77e4d9fc05900a` |
+| [Web編集からの自動起動](https://github.com/takasek/pfdsl/actions/runs/40277183097) | companionをGitHubの編集画面で保存するとgollumで起動し、indexを更新した。入力版は `d94df97c2b4b620a9c21535a536c3c5c84fac583`、出力版は `21524a68eee7031877925a784c2b70b2b05186e4` |
+| [不正入力の拒否](https://github.com/takasek/pfdsl/actions/runs/40277406411) | 試験PFDを一時的に循環グラフにし、手動実行がV010・V035で期待どおり失敗した。indexとSVGは前回成功時のbytesを保持した |
+| [元のモデルへの復旧](https://github.com/takasek/pfdsl/actions/runs/40277520734) | 原文を元のbytesに戻して通常pushした。手動実行はunchangedで成功し、既存の成功receiptと図を再利用した。新たな公開commitは作っていない |
+| 実remoteの競合 | Wiki版 `84a3a790bc860b35bbf1b8941f3d32bf240abefb` からローカル公開候補を準備後、別のWeb編集を保存した。候補のpublishはfetch後に `Wiki remote conflict` で拒否され、local HEADは動かず、先行編集を上書きしなかった |
+| [先行Web編集の自動生成](https://github.com/takasek/pfdsl/actions/runs/40277642304) | gollumからの生成が成功。最終Wiki出力版は `d6bf5adc681e9eaac96ac8a49bcae13969ca838f`、入力版は `f4465e08c885a3a63780320c3d3e16c8b00e0abd` |
+
+最終出力を再取得し、indexのreceiptが持つsourceHash・companionHash・svgHashを実ファイルのSHA256と照合した。
+PFDは試験前の原文とbyte一致し、SVG hashは `0be2e2b20152e65bb679cabca99461ba48073e41669bf0c810c8494ac89ea80d` だった。
+ブラウザでindexの図の読込完了と自然寸法381×81、原文・companion preview/sourceへのリンク、入力版・最終成功の表示を確認した。
+companionに残っていた「自動更新しない」という旧説明は、Web編集試験で現行workflowの説明へ更新し、Actionsへの証拠リンクも残した。
+
+GitでpushしたPFD変更では、この試験中のrun一覧にgollum起動を観測せず、明示的な手動実行で不正入力と復旧を確認した。
+Webでのcompanion編集による自動起動と、GitからのPFD更新の自動配送を同じ受入にしない。
+PFDを日常編集する正式な経路と、その更新を自動生成へ接続する方式は未受入であり、試験中のGit更新には手動実行を併用する。
+fetch後からpush直前の狭い競合窓、共有done、本体repoの参照解決、consumer移行、正本切替も今回の実測範囲には含めない。
