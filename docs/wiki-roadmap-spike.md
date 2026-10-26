@@ -303,3 +303,15 @@ Webでのcompanion編集による自動起動と、GitからのPFD更新の自�
 この実測時点ではPFDの日常編集経路と自動生成への接続は未受入であり、試験中のGit更新には手動実行を併用した。
 後続の公開コマンドは上節のとおりGit更新イベントに依存せず、編集から検証・図生成・公開までを一つの操作にする。
 fetch後からpush直前の狭い競合窓、共有done、本体repoの参照解決、consumer移行、正本切替も今回の実測範囲には含めない。
+
+### 公開コマンドの実Wiki試験（2026-10-26）
+
+既存の試験PFDのtitleとresultのlabelだけを変更し、公開コマンドを1回実行した。
+statusとグラフ構造、companion、本体repoの正本は変更していない。
+実行結果はpublished・localUpdated=trueであり、原稿版 `ca500917e272011f9249e992e9876effe141c043` と生成物版 `dfccf24ff8877841c992587bd96086dd86c9d640` が、編集前の版 `d6bf5adc681e9eaac96ac8a49bcae13969ca838f` に続く2つのcommitとして公開された。
+公開コマンドはActions起動や手動の生成コマンドを併用せず、手元のcloneもcleanに同期した。
+
+別のcloneで再取得し、receiptのsourceHash・companionHash・svgHashが各ファイルのSHA256と一致することと、receiptが指す原稿版が公開履歴の直前の祖先であることを確認した。
+SVG hashは `b19d84acb11be4da9862f36d12de9e4bf241ae7182952ea63b974611bc58ef9d` で、事前にsource・metadata・描画を確認したSVGとbyte一致した。
+ブラウザでもRoadmap publishing trialの見出し、Trial resultの図、原稿版の表示、画像の読込完了と自然寸法413×121を確認した。
+これはこの版の公開コマンドを使う経路の受入であり、任意のGit pushの自動配送や、本体repoの成果物の参照解決・正本切替の受入ではない。
