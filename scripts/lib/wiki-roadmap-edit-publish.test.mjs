@@ -13,6 +13,7 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { test } from "node:test";
 import { publishEdit } from "./wiki-roadmap-edit-publish.mjs";
+import { generate } from "./wiki-roadmap-generate.mjs";
 
 const git = (cwd, ...args) =>
 	execFileSync("git", ["-C", cwd, ...args], {
@@ -116,6 +117,51 @@ test("invalid edits preserve the editor's bytes and leave all public files and l
 	assert.equal(read(f.wiki, "roadmap.pfdsl"), invalid);
 	assert.equal(remoteBytes(f, "roadmap.pfdsl"), source);
 	assert.equal(existsSync(join(f.wiki, "roadmap.svg")), false);
+});
+
+test("receipts describe committed inputs when Git normalizes editor line endings", (t) => {
+	for (const eol of ["lf", "crlf"]) {
+		const f = fixture(t);
+		writeFileSync(
+			join(f.wiki, ".gitattributes"),
+			`*.pfdsl text eol=${eol}\n*.md text eol=${eol}\n`,
+		);
+		git(f.wiki, "add", ".gitattributes");
+		git(f.wiki, "commit", "-m", "Set text line endings");
+		git(f.wiki, "push");
+		const companion = "# Companion\n\nUpdated prose.\n";
+		writeFileSync(
+			join(f.wiki, "roadmap.pfdsl"),
+			edited.replaceAll("\n", "\r\n"),
+		);
+		writeFileSync(
+			join(f.wiki, "roadmap.md"),
+			companion.replaceAll("\n", "\r\n"),
+		);
+		const result = publishEdit(options(f));
+		assert.equal(result.status, "published");
+		assert.equal(result.localUpdated, true);
+		const receipt = JSON.parse(
+			remoteBytes(f, "roadmap.index.md")
+				.split("<!-- pfdsl-wiki-preview: ")[1]
+				.split(" -->")[0],
+		);
+		for (const [file, contents, field] of [
+			["roadmap.pfdsl", edited, "sourceHash"],
+			["roadmap.md", companion, "companionHash"],
+		]) {
+			assert.equal(remoteBytes(f, file), contents);
+			assert.equal(
+				receipt[field],
+				createHash("sha256").update(contents).digest("hex"),
+			);
+		}
+		assert.equal(receipt.wikiRevision, result.sourceRevision);
+		assert.match(remoteBytes(f, "roadmap.index.md"), /# After/);
+		assert.equal(git(f.wiki, "status", "--porcelain"), "");
+		assert.equal(generate(options(f)).status, "unchanged");
+		assert.equal(publishEdit(options(f)).status, "unchanged");
+	}
 });
 
 test("restoring cached valid content publishes the source commit without regenerating or staging leftover edits", (t) => {

@@ -200,6 +200,7 @@ node scripts/wiki-roadmap-publish.mjs --wiki /path/to/wiki --repository takasek/
 取得済みのWiki版を基に、編集した原文を作業用cloneへコピーし、未公開の原稿commitを作る。
 既存generateで検証・描画して生成物commitを作り、両commitを1回の通常pushで公開する。
 receiptの入力版は、その公開履歴に残る原稿commitを指す。
+Gitの改行正規化がある場合も、検証・描画・receiptの入力hashは公開する原稿commitの内容を使い、編集中の変更検出には手元の元bytesを使う。
 過去の検証済み内容へ戻して既存のindex・SVGを再利用できる場合は、原稿commitだけを公開し、receiptには再利用した生成物の入力版を保持する。
 gollum配送やActionsの追加起動に依存せず、原稿だけが公開される中間状態を作らない。
 remoteへの通信は元のcloneから行い、そのcloneだけに設定したGit認証・通信設定を再利用する。

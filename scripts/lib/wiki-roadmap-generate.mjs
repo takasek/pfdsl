@@ -46,11 +46,12 @@ function toolIdentity(cli) {
 	}
 	return digest.digest("hex");
 }
-const git = (cwd, ...args) =>
+const gitOutput = (cwd, ...args) =>
 	runGit(["-C", cwd, ...args], {
 		env: withoutGitTargetEnvironment(process.env),
 		captureStderr: true,
-	}).trim();
+	});
+const git = (cwd, ...args) => gitOutput(cwd, ...args).trim();
 const read = (wiki, name) => readFileSync(join(wiki, name), "utf8");
 function regular(wiki, name, required = true) {
 	const path = join(wiki, name);
@@ -147,22 +148,29 @@ export function generate({ wiki, repository, cli, expectedRevision }) {
 			readFileSync(new URL("./run-exec.mjs", import.meta.url)),
 	);
 	const key = snapshotKey(wiki, wikiRevision, repository, toolchain);
-	const sourceHash = hash(read(wiki, inputs[0])),
-		companionHash = hash(read(wiki, inputs[1]));
-	const metadata = parse(read(wiki, inputs[0])).frontmatter ?? {};
+	// Git may normalize editor bytes on commit or change line endings on checkout.
+	// Validate and describe the published blobs; retain raw hashes for race detection.
+	const committedInputs = inputs.map((name) =>
+		gitOutput(wiki, "show", `${wikiRevision}:${name}`),
+	);
+	const worktreeInputHashes = inputs.map((name) => hash(read(wiki, name)));
+	const sourceHash = hash(committedInputs[0]),
+		companionHash = hash(committedInputs[1]);
+	const metadata = parse(committedInputs[0]).frontmatter ?? {};
 	if (
 		existsSync(join(wiki, outputs[0])) &&
 		existsSync(join(wiki, outputs[1]))
 	) {
 		try {
-			const page = read(wiki, outputs[0]);
+			const page = gitOutput(wiki, "show", `${wikiRevision}:${outputs[0]}`);
 			const start = page.lastIndexOf(marker);
 			const receipt = JSON.parse(
 				page.slice(start + marker.length).split(" -->")[0],
 			);
 			if (
 				receipt.key === key &&
-				receipt.svgHash === hash(read(wiki, outputs[1])) &&
+				receipt.svgHash ===
+					hash(gitOutput(wiki, "show", `${wikiRevision}:${outputs[1]}`)) &&
 				page === indexPage(metadata, receipt)
 			)
 				return {
@@ -171,6 +179,8 @@ export function generate({ wiki, repository, cli, expectedRevision }) {
 					key,
 					sourceHash,
 					companionHash,
+					worktreeInputHashes,
+					worktreeOutputHashes: outputs.map((name) => hash(read(wiki, name))),
 					indexHash: hash(page),
 					svgHash: receipt.svgHash,
 					inputWikiRevision: receipt.wikiRevision,
@@ -184,6 +194,9 @@ export function generate({ wiki, repository, cli, expectedRevision }) {
 		const snapshot = join(scratch, "wiki");
 		git(scratch, "clone", "--no-local", "--no-checkout", wiki, snapshot);
 		git(snapshot, "checkout", "--detach", wikiRevision);
+		inputs.forEach((name, index) => {
+			writeFileSync(join(snapshot, name), committedInputs[index]);
+		});
 		rejectUnsupportedReferences(snapshot);
 		const file = join(snapshot, inputs[0]);
 		const invoke = (...args) =>
@@ -219,6 +232,8 @@ export function generate({ wiki, repository, cli, expectedRevision }) {
 			key,
 			sourceHash,
 			companionHash,
+			worktreeInputHashes,
+			worktreeOutputHashes: [hash(index), hash(svg)],
 			indexHash: hash(index),
 			svgHash: hash(svg),
 		};
@@ -257,10 +272,14 @@ export function publish({
 		throw new Error("Wiki index must be clean");
 	for (const name of [...inputs, ...outputs]) regular(wiki, name);
 	if (
-		hash(read(wiki, inputs[0])) !== result.sourceHash ||
-		hash(read(wiki, inputs[1])) !== result.companionHash ||
-		hash(read(wiki, outputs[0])) !== result.indexHash ||
-		hash(read(wiki, outputs[1])) !== result.svgHash
+		inputs.some(
+			(name, index) =>
+				hash(read(wiki, name)) !== result.worktreeInputHashes[index],
+		) ||
+		outputs.some(
+			(name, index) =>
+				hash(read(wiki, name)) !== result.worktreeOutputHashes[index],
+		)
 	)
 		throw new Error("Generated snapshot changed");
 	git(transportWiki, "fetch", "origin", branch);
