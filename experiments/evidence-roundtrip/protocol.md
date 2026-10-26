@@ -1,6 +1,8 @@
 # E0 限定試験 protocol v0
 
 これはADR-0048契約3の試験用の運び手であり、PFDSL仕様や新しいCLI動詞ではない。
+冒頭の対象指定と停止条件は保存済み初回試行の契約であり、変更しない。
+成功したsafe-mode試行の対象・実行入口・具体的なデータ型は [個別protocol](safe-mode-20261026/protocol.md) に生成前に固定し、実行後照合には本書後半の追加契約を適用した。
 モデルの選択は既存CLIの `status ready <roadmap> --json` に従い、入力statusを独自にdoneだけへ制限しない。
 readyが返すのは `id`、`label`、`inputs`、`outputs`、`newlyReadyCount` であり、criteriaは返さない。
 

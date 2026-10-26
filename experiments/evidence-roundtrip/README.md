@@ -1,11 +1,48 @@
-# E0 証拠の往復：未完了の限定試験
+# E0 証拠の往復：初回停止とsafe-mode成功記録
 
 ## 結果と受入状態
 
-#1526 の成功した1 processの往復は未達である。
-このPRはschema v0・読取専用検査器と、実在するroadmapに対する停止・否定試験の記録を残す。
-`evidence_roundtrip_record` はwipを維持する。
+#1526の実作業の往復を、2026-10-26にsafe-modeで実行した。
+[新試行の記録](safe-mode-20261026/README.md)に、固定入力・未編集driver・実入力監査・実作業・3版の証拠・checkerのPASSを保存した。
+実際にreadyだった#542の§15.1クラスタを進め、見出しへ安定IDを付け、その2参照を置換した。
+#542の全体criteriaは未達なので `spec_id_refs` はwipを維持し、E0の往復記録だけを受入済みとして `evidence_roundtrip_record` をdoneにする。
 statusを書き換える新しい動詞は作っていない。
+
+safe-modeでは共通指示・skill・過去会話・メモリが要求へ入っていないことを実API requestの復元とdigest照合で確認し、独立reviewerも同じ結果を確認した。
+標準harnessと環境・アカウント識別metadataは残るため、metadata-zeroやサーバー内部の未記録加工までの証明は主張しない。
+driverのassertion一覧保存にはprotocol逸脱があり、生成ソースを編集せず、親の実行ログ・実差分検証で補完した事実も新試行の記録に明示した。
+run成功と全成果物のcriteria受入、検査器の保証と親側の検証を区別する。
+
+公開用のパス除去と実行原本の違いは [公開用表現の説明](safe-mode-20261026/README.md#公開用表現と実行原本) を参照する。
+
+## 成功試行の固定版と再検査
+
+実行直後と同じ対象版と証拠の公開用表現はcommit `3ac0190a589bdc8b02ac4de57a0da0cd6bd353a8` に固定した。
+後続のE0 done更新をdriverの成果に数えず、その更新後のモデルを実行時の版として渡さない。
+リポジトリルートで次を実行すると、driverを再実行せず実行時の対象2pathだけを一時ディレクトリへ復元して実checkerで検査できる。
+この復元先はGit worktreeではなく、版照合用のファイル集合である。
+
+```sh
+e0_replay_dir=$(mktemp -d)
+mkdir -p "$e0_replay_dir/.pfdsl" "$e0_replay_dir/docs/spec"
+git show 3ac0190a589bdc8b02ac4de57a0da0cd6bd353a8:.pfdsl/roadmap.pfdsl > "$e0_replay_dir/.pfdsl/roadmap.pfdsl"
+git show 3ac0190a589bdc8b02ac4de57a0da0cd6bd353a8:docs/spec/spec.md > "$e0_replay_dir/docs/spec/spec.md"
+node experiments/evidence-roundtrip/check.mjs \
+  experiments/evidence-roundtrip/safe-mode-20261026/evidence.json \
+  experiments/evidence-roundtrip/safe-mode-20261026/snapshot.json \
+  "$e0_replay_dir"
+```
+
+期待結果は `PASS`、終了コード0である。
+実行時の非公開原本の準備commitは `b521a4ce`、公開用対応commitは `a26efb9f78b4c794aeac3f0fdcc7bada0062bbf9` である。
+公開用の新試行ディレクトリと `pins.json`、`input-audit.json` / `execution.json` / `parent-verification.json` を参照する。
+CLI候補名は `evidence check` / `evidence inspect` のままで、製品動詞や恒久スキーマを採用していない。
+readyにcriteriaが無い点は新試行でも既存の `meta get` 出力を組み合わせて扱い、readyの拡張はこの実験で追加していない。
+
+## 初回停止試行（履歴）
+
+以下は成功試行とは別に保存した初回の限定試験である。
+この時点では成功往復が未達で、`evidence_roundtrip_record` はwipだった。
 
 対象 `i1525_revise_boundary_test` はsnapshot取得時点で出力がwipであり、現行CLIのready集合に無かった。
 先行した調査・文案作成をdriverの実行と数えず、過去のtodoへ戻さなかった。
@@ -25,7 +62,7 @@ statusを書き換える新しい動詞は作っていない。
 否定例の内容と結果は `nonexistent-process.json`、`unfinished-input.json`、`negative-results.json` に保存した。
 主試行は `evidence.json` と `result.json` に保存した。
 
-## 版と生成手順
+## 初回停止試行の版と生成手順
 
 既存契約は base `52cacebbe8da6781722ae62fc827bf3bb53f3053` のADR-0048契約3を使用した。
 #1525の新しい4条件を実行契約へ追加していない。
@@ -82,7 +119,9 @@ CLI動詞候補は `evidence check` と `evidence inspect` だが、公開動詞
 readyの出力にcriteriaが無いため準備側がモデルを別途読んだ。
 criteriaを取得する別の問い合わせとの組合せかreadyの拡張かは、成功した往復で必要量を測ってから比較する。
 
-## 残る試験
+## 初回停止試行の時点で残っていた試験
+
+以下は当時の残件であり、現在の到達点は冒頭と新試行の記録を参照する。
 
 未着手でスコープ内の実processを選び、作業を開始する前にsnapshot・入力・実行入口を揃える必要がある。
 その後、driverが実作業を進めた差分と受入証拠を取得し、実行後の成果物版を含む検査を通す。
@@ -101,11 +140,11 @@ Codexの非実行入力表示と実際の読取専用起動を照合したが、
 この版のbareは通常のOAuth/keychainログインを使わず、APIキーまたは明示したapiKeyHelper等を必要とする。
 環境にAPIキーは無く、認証の取得・移設や新しい費用設定はしていない。
 この失敗をdriverの生成・実行や隔離達成に数えない。
-bareで使える認証を準備するか、既定の隔離条件を満たす別の実行環境を用意してから再開する必要がある。
+当時はここで停止したが、その後safe-modeで通常のログインを使えることを確認し、新試行へ進めた。
 
 実行後照合の不足は独立設計レビューでも確認し、[protocolの追加契約](protocol.md#実行後照合付きの再試行)に従う検査を追加した。
 checkerが実行後の実ファイルを読み、申告された出力版、scope内の変更path集合、最終statusと遷移、出力に対応する受入参照を照合する。
 prepareはcapture planと新規記録先を明示させ、対象がreadyでない場合と既存記録の上書きを拒否する。
 scope内の虚偽申告・申告漏れ、証拠生成後の内容改変、出力以外のstatus変更等を回帰fixtureで検証した。
 これは実験器具の改善であり、実在roadmapの1 processを進めた成功往復ではない。
-過去のsnapshot・driver・停止証拠・2否定例を保持し、`evidence_roundtrip_record` はwipのままである。
+この時点では過去のsnapshot・driver・停止証拠・2否定例を保持し、`evidence_roundtrip_record` はwipのままだった。
