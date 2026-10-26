@@ -87,6 +87,10 @@ statusStyles:
 
 その他のトップレベルフィールド（`version` / `dslVersion` 等）と各フィールドの正確な仕様は `references/spec.md` §2、機能別の最小例は `references/samples.md` を参照。
 
+Specification v0.0.30 defines artifact reference targets: document-level `baseRef: { source, revision }` and artifact-level `ref` replacing that whole mapping.
+They select the artifact's reference target; they do not change process locations or command working directories.
+Reference resolution is a separate implementation milestone: do not interpret an older CLI accepting these unknown fields as support, or switch an external roadmap to authoritative use before verifying the chosen implementation version.
+
 ## CLI
 
 **Preflight — check the CLI before running any command below.** This skill invokes the CLI as `pfdsl` and targets **`@pfdsl/cli` >= {{cliVersion}}**. Older releases may reject newer commands or diagram types, or return less information for a supported command. Run `pfdsl --version` once at the start of the session.

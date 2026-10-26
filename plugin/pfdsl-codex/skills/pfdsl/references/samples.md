@@ -374,6 +374,35 @@ requirements >> build -> implementation
 
 ---
 
+## 18-reference-targets — Artifact reference targets
+
+Specification example: `baseRef: { source, revision }` sets the artifact default; an artifact's `ref` replaces it. Reference resolution requires a supporting implementation and acquisition context; older CLI checks do not verify it.
+
+```pfdsl
+---
+title: Artifact reference targets
+description: Specification example. Reference resolution requires a supporting implementation and an acquisition context; a successful check in an older CLI does not verify these references.
+basePath: ..
+baseRef: { source: https://example.com/project.git, revision: main }
+artifact:
+  accepted_plan:
+    label: Accepted plan
+    location: docs/plan.md
+    criteria: The plan has been accepted at its effective reference target.
+  working_plan:
+    label: Working plan
+    location: docs/plan.md
+    ref: { source: https://example.com/project.git, revision: develop }
+    criteria: The revised plan is available at its effective reference target.
+process:
+  revise:
+    label: Revise plan
+---
+accepted_plan >> revise -> working_plan
+```
+
+---
+
 ## pfdsl_implementation_flow — PFDSL toolchain roadmap
 
 How PFDSL itself was built — a snapshot of the toolchain implementation flow, written in PFDSL (dogfooding).

@@ -259,7 +259,7 @@ artifact:
   artifact_reference_spec:
     label: モデルと artifact の参照先の仕様 (#1542)
     description: 参照先のモデル既定と artifact ごとの上書きを業種中立に定義する。詳細と未決の設計論点は対応 Issue を一次情報とする
-    status: todo
+    status: done
     location: https://github.com/takasek/pfdsl/issues/1542
     criteria: >
       モデル既定・artifact 上書き・省略・異常・ツリーとの優先順位と固定版の証拠の契約が、

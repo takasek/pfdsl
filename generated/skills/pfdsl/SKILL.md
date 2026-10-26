@@ -88,6 +88,10 @@ statusStyles:
 
 その他のトップレベルフィールド（`version` / `dslVersion` 等）と各フィールドの正確な仕様は `references/spec.md` §2、機能別の最小例は `references/samples.md` を参照。
 
+Specification v0.0.30 defines artifact reference targets: document-level `baseRef: { source, revision }` and artifact-level `ref` replacing that whole mapping.
+They select the artifact's reference target; they do not change process locations or command working directories.
+Reference resolution is a separate implementation milestone: do not interpret an older CLI accepting these unknown fields as support, or switch an external roadmap to authoritative use before verifying the chosen implementation version.
+
 ## CLI
 
 **Preflight — check the CLI before running any command below.** This skill invokes the CLI as `pfdsl` and targets **`@pfdsl/cli` >= 0.2.0**. Older releases may reject newer commands or diagram types, or return less information for a supported command. Run `pfdsl --version` once at the start of the session.
@@ -180,4 +184,4 @@ Declare a new group under `group:` before moving nodes into it: a `group:` value
 | フィールドの正確な仕様 | `references/spec.md` §3–5（モデル・識別子・型推論）・§14（正準順序） |
 | PFD のレビュー・監査 | `references/review-perspectives.md`（A/B/C カタログ。A/B は図、C は normative 仕様文書（自リポ保守の仕様がある場合）の監査。書くルールは `references/quality-guide.md`、問い詰めはこちら） |
 
-`references/spec.md` は full spec v0.0.29（20節・大型）— 全読せず、節見出し（`## N.`）とエラーコードで該当箇所だけ読む。
+`references/spec.md` は full spec v0.0.30（20節・大型）— 全読せず、節見出し（`## N.`）とエラーコードで該当箇所だけ読む。
