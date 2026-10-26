@@ -8,6 +8,7 @@ import {
 	nodeIdAtSourcePosition,
 	type PreviewEditMessage,
 	positionOfNodeId,
+	RenameTracking,
 	repairResultMessage,
 } from "@pfdsl/editor";
 import * as vscode from "vscode";
@@ -25,9 +26,19 @@ interface PreviewState {
 	panel: vscode.WebviewPanel;
 	previewViewType: string;
 	doc: vscode.TextDocument;
+	documentEpoch: number;
+	renameTracking: RenameTracking;
 	sourceViewColumn: vscode.ViewColumn;
 	controller: PreviewController;
 	disposed: boolean;
+}
+
+function setSourceDocument(state: PreviewState, doc: vscode.TextDocument) {
+	if (state.doc !== doc) {
+		state.documentEpoch++;
+		state.renameTracking = new RenameTracking();
+	}
+	state.doc = doc;
 }
 
 async function prepareEditSource(state: PreviewState) {
@@ -49,7 +60,7 @@ async function prepareEditSource(state: PreviewState) {
 			);
 			return;
 		}
-		state.doc = current;
+		setSourceDocument(state, current);
 		dropAnalyzeCache(current.uri);
 		state.controller.update();
 	}
@@ -139,12 +150,23 @@ async function editFromPreview(
 	state: PreviewState,
 	request: PreviewEditMessage,
 ) {
+	let appliedEpoch = state.documentEpoch;
 	const reply = (ok: boolean, message?: string) => {
 		if (!state.disposed)
 			void state.panel.webview.postMessage({
 				type: "editResult",
 				request,
 				ok,
+				...(ok && request.type === "renameNode"
+					? {
+							sourceRevision: {
+								epoch: appliedEpoch,
+								version: state.doc.version,
+								invalidatedRenameRequestId:
+									state.renameTracking.invalidatedRequestId,
+							},
+						}
+					: {}),
 				...(message === undefined ? {} : { message }),
 			});
 	};
@@ -200,6 +222,8 @@ async function editFromPreview(
 		),
 		result.edit.text,
 	);
+	appliedEpoch = state.documentEpoch;
+	state.renameTracking.begin(request, result.source);
 	if (!(await vscode.workspace.applyEdit(edit))) {
 		vscode.window.showInformationMessage(
 			"The preview edit could not be applied.",
@@ -211,6 +235,7 @@ async function editFromPreview(
 		reply(false, "The document changed while applying the preview edit.");
 		return;
 	}
+	state.renameTracking.observe(result.source);
 	reply(true);
 	if (request.repair && request.type === "deleteConnector")
 		vscode.window.showInformationMessage(
@@ -439,8 +464,17 @@ export function registerPreview(context: vscode.ExtensionContext): {
 		const { message } = preparePreviewForDocument(state.doc);
 		state.panel.title = `PFDSL Preview — ${state.doc.uri.path.split("/").pop() ?? ""}`;
 		state.panel.webview.postMessage(
-			message.type === "render" && focusNodeId !== undefined
-				? { ...message, focusNodeId }
+			message.type === "render"
+				? {
+						...message,
+						...(focusNodeId !== undefined ? { focusNodeId } : {}),
+						sourceRevision: {
+							epoch: state.documentEpoch,
+							version: state.doc.version,
+							invalidatedRenameRequestId:
+								state.renameTracking.invalidatedRequestId,
+						},
+					}
 				: message,
 		);
 	}
@@ -481,6 +515,8 @@ export function registerPreview(context: vscode.ExtensionContext): {
 			panel,
 			previewViewType,
 			doc,
+			documentEpoch: 0,
+			renameTracking: new RenameTracking(),
 			sourceViewColumn,
 			disposed: false,
 			controller: new PreviewController(
@@ -499,7 +535,8 @@ export function registerPreview(context: vscode.ExtensionContext): {
 				msg.type === "createDefinition" ||
 				msg.type === "addConnector" ||
 				msg.type === "deleteConnector" ||
-				msg.type === "toggleFeedback"
+				msg.type === "toggleFeedback" ||
+				msg.type === "renameNode"
 			) {
 				await editFromPreview(state, msg);
 			} else if (msg.type === "nodeClick") {
@@ -584,7 +621,11 @@ export function registerPreview(context: vscode.ExtensionContext): {
 		vscode.workspace.onDidChangeTextDocument((e) => {
 			const state = panels.get(e.document.uri.toString());
 			if (state) {
-				state.doc = e.document;
+				setSourceDocument(state, e.document);
+				state.renameTracking.observe(
+					e.document.getText(),
+					e.reason === vscode.TextDocumentChangeReason.Undo,
+				);
 				state.controller.update();
 			}
 		}),

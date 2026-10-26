@@ -92,14 +92,18 @@ describe("harness distribution inventory", () => {
 				"transform",
 			]);
 		}
-		for (const id of ["agent:pfd-lens", "agent:pfd-implementer"]) {
-			assert.deepEqual(dispositionsFor(id), [
-				"transform",
-				"transform",
-				"transform",
-				"intentional-exclusion",
-			]);
-		}
+		assert.deepEqual(dispositionsFor("agent:pfd-lens"), [
+			"transform",
+			"transform",
+			"transform",
+			"intentional-exclusion",
+		]);
+		assert.deepEqual(dispositionsFor("agent:pfd-implementer"), [
+			"transform",
+			"intentional-exclusion",
+			"transform",
+			"intentional-exclusion",
+		]);
 	});
 
 	it("keeps declared source paths and target output surfaces unique", () => {
@@ -158,7 +162,17 @@ describe("harness distribution inventory", () => {
 	});
 
 	it("lists the maintained agents exactly", () => {
-		assert.deepEqual(DISTRIBUTED_AGENTS, ["pfd-lens.md", "pfd-implementer.md"]);
+		assert.deepEqual(DISTRIBUTED_AGENTS, ["pfd-lens.md"]);
+	});
+
+	it("keeps the implementer source outside distributed templates", () => {
+		const implementer = HARNESS_CAPABILITY_CONTRACT.find(
+			({ id }) => id === "agent:pfd-implementer",
+		);
+		assert.equal(
+			implementer.source.path,
+			"scripts/repo-agent-template/pfd-implementer.md",
+		);
 	});
 
 	it("accounts for every skill, command, and agent source entry", () => {

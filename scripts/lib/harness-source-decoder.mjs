@@ -213,8 +213,27 @@ function generatedClaudeEntries(contract, kind) {
 }
 
 function assertHarnessTemplateTopology(root, contract, fs, isUnmaintained) {
-	const templates = contract.filter((entry) =>
-		entry.source.encoding.startsWith("harness-"),
+	const repositoryAgents = sourceEntries(
+		contract.filter((entry) =>
+			entry.source.path.startsWith("scripts/repo-agent-template/"),
+		),
+		"harness-agent-template",
+		"scripts/repo-agent-template/",
+	);
+	if (repositoryAgents.size) {
+		assertEntryClosure(
+			fs,
+			pathFor(root, "scripts/repo-agent-template"),
+			repositoryAgents,
+			{},
+			"file",
+			isUnmaintained,
+		);
+	}
+	const templates = contract.filter(
+		(entry) =>
+			entry.source.encoding.startsWith("harness-") &&
+			entry.source.path.startsWith("scripts/harness-template/"),
 	);
 	if (!templates.length) return;
 	const base = pathFor(root, "scripts/harness-template");

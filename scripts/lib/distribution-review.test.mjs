@@ -214,6 +214,23 @@ describe("diffBase", () => {
 });
 
 describe("formatGateFailure", () => {
+	it("reports a removed implementer bundle entry using its relocated source", () => {
+		const file = "plugin/pfdsl/agents/pfd-implementer.md";
+		const result = runDistributionReviewCheck({
+			readRecord: () => ({ commit: "a".repeat(40) }),
+			commitExists: () => true,
+			changedSince: () => [file],
+		});
+		assert.equal(result.ok, false);
+		assert.deepEqual(result.files, [file]);
+		const message = formatGateFailure(result);
+		assert.ok(message.includes(file));
+		assert.match(
+			message,
+			/fix in: scripts\/repo-agent-template\/pfd-implementer\.md/,
+		);
+	});
+
 	it("points at the canonical source of every unreviewed file", () => {
 		const message = formatGateFailure({
 			base: "abc1234",

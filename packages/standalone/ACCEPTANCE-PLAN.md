@@ -172,6 +172,16 @@ Tab→Enterと右clickでも開き、node上からのpan、移動後に起点へ
 期待：直接前後だけを左入力／中心／右出力へ示し、pへq/cを混ぜずfeedback方向を保つ。
 未定義・孤立でも中心を扱い、scrollは左右独立、中心と下部入力を固定する。
 常設1行text＋／＋textと各＋のライン下の整列、読上げ方向を保ち可視Incoming/Outgoingを復活させない。
+中央nodeをclickまたはTab→Enter／Spaceで編集し、IDとLabelを変更してSaveする。
+artifact／process、定義なし、Labelのみ変更、空／複数行のLabel、空白を含むID、重複ID、コメント・CRLFを試す。
+期待：ID変更は同一file内の接続・parts・revises・boundary参照を保ち、Labelと一回のUndoで戻せる。
+変更後も中心と選択を新IDへ引き継ぎ、sourceへfocusを移さない。
+Cancel／Escapeは未保存入力を捨てて中心へfocusを戻し、IME確定Enterは保存しない。
+Label内のEnterは改行、ID内のEnterまたはLabel内のCmd/Ctrl+Enterは保存として動作する。
+保存失敗・source競合では入力と理由を保持する。
+保存中の近隣移動・closeを遅延応答が覆さず、応答と再描画の順序が逆でも中心を保持する。
+extendsを持つfileのID変更は理由を示して拒否し、Labelのみの変更は許可する。
+他fileからの参照の一括変更は対象外であり、YAML anchor／alias／mergeを持つfileは安全に編集できない旨を示す。
 状態：M/V各未実施。記録：未記入。
 
 ### GUI-11：近隣移動と一時強調

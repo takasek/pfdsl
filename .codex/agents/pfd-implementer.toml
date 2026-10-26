@@ -1,4 +1,4 @@
-# DO NOT EDIT. Authoritative source: scripts/harness-template/agents/pfd-implementer.md.
+# DO NOT EDIT. Authoritative source: scripts/repo-agent-template/pfd-implementer.md.
 name = "pfd-implementer"
 description = "設計が確定済みの実装を委譲する。指定された worktree 内で t-wada 流 TDD によりファイルを編集し、検査する。git metadata 操作は親 agent が担当する。"
 sandbox_mode = "workspace-write"

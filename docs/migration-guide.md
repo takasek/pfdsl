@@ -27,6 +27,23 @@ Record the target only after all potentially applicable steps have been resolved
 These changes are not yet assigned to a published CLI/plugin release.
 Apply them only when the target release includes the referenced changes; specification v0.0.29 is not a CLI/plugin version.
 
+### Keep a local implementation agent if you need one
+
+The Claude Code plugin no longer bundles `pfd-implementer`; its only bundled agent is `pfd-lens`.
+The upstream repository continues generating its own Claude Code and Codex implementation agents from a repository-only template.
+The Codex native plugin continues to contain no agents.
+Source: [Issue #1503](https://github.com/takasek/pfdsl/issues/1503).
+
+If your repository uses the bundled `pfd-implementer` and wants to keep it, migrate before replacing the installed bundle:
+
+1. Retain `agents/pfd-implementer.md` from the installed Claude plugin, or recover that rendered file from the previous release's retained bundle.
+2. Copy it into your repository as `.claude/agents/pfd-implementer.md`. If that file already exists, compare and merge the definitions while preserving local changes.
+3. Remove the copied generated-file notice and adapt the instructions, tools and delegation references to your repository. The local copy is now your responsibility and will no longer receive plugin updates. Do not copy the upstream Mustache template as a ready-to-run agent.
+4. Start a new Claude Code session after upgrading, confirm the repository-local agent is available, and run a small delegated task using your normal workflow. Update any plugin-qualified invocation to select the local agent.
+
+Repositories that do not use this agent need no replacement.
+Existing repository-local agents are not deleted by this distribution change.
+
 ### PR timing becomes an adopting repository's rule
 
 The status explanation below describes specification v0.0.29 for models without explicit reference targets.

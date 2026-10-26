@@ -182,6 +182,18 @@ it("rebuilds missing Claude outputs from canonical templates and stays byte-stab
 			"utf8",
 		);
 		assert.match(implementer, /親 agent が `git fetch`、stage、commit/);
+		assert.match(
+			implementer,
+			/Authoritative source: scripts\/repo-agent-template\/pfd-implementer\.md/,
+		);
+		assert.match(
+			readFileSync(join(root, ".claude/agents/pfd-implementer.md"), "utf8"),
+			/Authoritative source: scripts\/repo-agent-template\/pfd-implementer\.md/,
+		);
+		assert.deepEqual(readdirSync(join(root, "plugin/pfdsl/agents")), [
+			"pfd-lens.md",
+		]);
+		assert.equal(existsSync(join(root, "plugin/pfdsl-codex/agents")), false);
 		assert.doesNotMatch(
 			implementer,
 			/論理単位でコミットする|コミットとして仕上げる/,
@@ -200,6 +212,13 @@ it("rebuilds missing Claude outputs from canonical templates and stays byte-stab
 it("rejects canonical closure and omitted-branch tag errors, while leaving literal payload examples intact", () => {
 	const root = fixture();
 	try {
+		const extraAgent = join(root, "scripts/repo-agent-template/undeclared.md");
+		writeFileSync(extraAgent, "extra\n");
+		assert.throws(
+			() => decodeHarnessSources({ root }),
+			/source-topology:.*undeclared/,
+		);
+		rmSync(extraAgent);
 		const source = join(
 			root,
 			"scripts/harness-template/skills/pfd-grill/SKILL.md",

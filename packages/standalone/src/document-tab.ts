@@ -7,6 +7,7 @@ import {
 	findFrontmatterDefinitionRange,
 	nodeIdAtSourcePosition,
 	positionOfNodeId,
+	RenameTracking,
 	repairResultMessage,
 } from "@pfdsl/editor";
 import { mountPreview } from "@pfdsl/editor/preview";
@@ -61,6 +62,8 @@ export function createDocumentTab({
 }: DocumentTabOptions) {
 	let snapshot: DocumentModel | undefined;
 	let revision = 0;
+	let sourceVersion = 0;
+	const renameTracking = new RenameTracking();
 	let disposed = false;
 	let diagnosticsSummary = "Checking…";
 	const container = document.createElement("div");
@@ -136,7 +139,8 @@ export function createDocumentTab({
 				message.type === "createDefinition" ||
 				message.type === "addConnector" ||
 				message.type === "deleteConnector" ||
-				message.type === "toggleFeedback"
+				message.type === "toggleFeedback" ||
+				message.type === "renameNode"
 			) {
 				const beforeSource = editor.getValue();
 				const result = applyPreviewEdit(beforeSource, message);
@@ -160,6 +164,7 @@ export function createDocumentTab({
 							),
 						]
 					: undefined;
+				renameTracking.begin(message, result.source);
 				editor.pushUndoStop();
 				editor.executeEdits(
 					"pfdsl.preview",
@@ -179,6 +184,11 @@ export function createDocumentTab({
 					type: "editResult",
 					request: message,
 					ok: true,
+					sourceRevision: {
+						epoch: 0,
+						version: sourceVersion,
+						invalidatedRenameRequestId: renameTracking.invalidatedRequestId,
+					},
 				});
 				if (result.selection) {
 					editor.revealRangeInCenter(selections![0]!);
@@ -252,6 +262,8 @@ export function createDocumentTab({
 	async function refresh() {
 		if (disposed) return;
 		const currentRevision = ++revision;
+		const snapshotVersion = sourceVersion;
+		const invalidatedRenameRequestId = renameTracking.invalidatedRequestId;
 		diagnosticsSummary = "Checking…";
 		onChange?.();
 		let result: Awaited<ReturnType<typeof processSnapshot>>;
@@ -318,7 +330,18 @@ export function createDocumentTab({
 		// Publish the editor's visible lines before replacing the matching graph.
 		editor.render();
 		try {
-			await preview.receive(result.message);
+			await preview.receive(
+				result.message.type === "render"
+					? {
+							...result.message,
+							sourceRevision: {
+								epoch: 0,
+								version: snapshotVersion,
+								invalidatedRenameRequestId,
+							},
+						}
+					: result.message,
+			);
 		} catch (error) {
 			if (!disposed && currentRevision === revision)
 				reportStatus(`Preview failed: ${String(error)}`);
@@ -337,8 +360,10 @@ export function createDocumentTab({
 			}
 		});
 	}
-	editor.onDidChangeModelContent(() => {
+	editor.onDidChangeModelContent((event) => {
 		if (disposed) return;
+		sourceVersion++;
+		renameTracking.observe(editor.getValue(), event?.isUndoing);
 		normalizedEdges.clear();
 		button.textContent = `${name}${editor.getValue() === source ? "" : " •"}`;
 		requestEditorRender();

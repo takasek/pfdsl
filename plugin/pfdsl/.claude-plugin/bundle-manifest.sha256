@@ -1,7 +1,5 @@
 80add03e7a00967396cd1e0d76e5fde49b59c3eb7d152e75ff3da9d550032c63  .claude-plugin/plugin.json
 
-9778bbb74ce2b98d3746e16f8d7eaae6075b2992f4a5c96a3fbe703082af547f  agents/pfd-implementer.md
-
 7002bb642290e9e9c1a2bde23a05fa101bedc94f75ea028054455f3955322ec2  agents/pfd-lens.md
 
 ee876b228cb467d56cb08e73049b4ad107dbd8215e95de331f552fb39c3221c4  commands/pfd-cycle.md
@@ -56,7 +54,7 @@ a8e4d35e456f05babab77d002a20f7230b7942aaf7bb82138bf2007b5926c4f7  skills/pfd-ops
 
 d6636ad19abcd0019d685f0cbc26db35fb779ea1afa9568d070fb94bb68eb7f2  skills/pfd-ops/install/scripts/pfdsl/sweep-completed-chains.mjs
 
-4e3a453a58e34eb48ec74b6841c36375faba9b1ce421edfccb3ffe03426d3fd2  skills/pfd-ops/references/architecture.md
+dfe6c7de546e3ab77ec9c7dc2a64492b69f753a20ff802a80b00d3011bcfc7e5  skills/pfd-ops/references/architecture.md
 
 8b1fae0de7d1f6a94048708d0ccff753fb576b4a316201b338c84834b1c2abff  skills/pfd-ops/references/file-based-tracker-backend.md
 

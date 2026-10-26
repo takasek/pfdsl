@@ -38,6 +38,8 @@ describe("GEN_PLUGIN_TRIGGER", () => {
 			"scripts/gen-codex-assets.mjs",
 			"scripts/lib/root-instructions.mjs",
 			"scripts/root-instructions-template/INSTRUCTIONS.md",
+			"scripts/repo-agent-template/pfd-implementer.md",
+			".claude/agents/pfd-implementer.md",
 			"AGENTS.md",
 			".agents/skills/pfd-ops/SKILL.md",
 			".codex/agents/pfd-implementer.toml",
