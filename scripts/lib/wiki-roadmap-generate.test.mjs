@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
+import { createHash } from "node:crypto";
 import {
 	existsSync,
 	mkdtempSync,
@@ -39,6 +40,18 @@ function commit(wiki) {
 }
 const options = (wiki) => ({ wiki, repository: "takasek/pfdsl", cli });
 const read = (wiki, name) => readFileSync(join(wiki, name), "utf8");
+const hash = (value) => createHash("sha256").update(value).digest("hex");
+function assertReceiptMatchesFiles(wiki) {
+	const page = read(wiki, "roadmap.index.md");
+	const receipt = JSON.parse(
+		page.split("<!-- pfdsl-wiki-preview: ")[1].split(" -->")[0],
+	);
+	assert.equal(receipt.sourceHash, hash(read(wiki, "roadmap.pfdsl")));
+	assert.equal(receipt.companionHash, hash(read(wiki, "roadmap.md")));
+	assert.equal(receipt.svgHash, hash(read(wiki, "roadmap.svg")));
+	assert.match(page, /# Trial roadmap\n/);
+	assert.doesNotMatch(page, /Corrupt/);
+}
 
 test("generates the pair with real CLI validation, separate links and immutable inputs", (t) => {
 	const wiki = fixture(t);
@@ -71,18 +84,23 @@ test("generates the pair with real CLI validation, separate links and immutable 
 test("regenerates edited inputs and repairs a corrupted index or SVG", (t) => {
 	const wiki = fixture(t);
 	generate(options(wiki));
+	const expectedSvg = read(wiki, "roadmap.svg");
 	commit(wiki);
 	writeFileSync(join(wiki, "roadmap.md"), "New companion\n");
 	commit(wiki);
 	assert.equal(generate(options(wiki)).status, "generated");
+	assertReceiptMatchesFiles(wiki);
 	commit(wiki);
 	writeFileSync(join(wiki, "roadmap.index.md"), "Corrupt\n");
 	commit(wiki);
 	assert.equal(generate(options(wiki)).status, "generated");
+	assertReceiptMatchesFiles(wiki);
 	commit(wiki);
 	writeFileSync(join(wiki, "roadmap.svg"), "Corrupt\n");
 	commit(wiki);
 	assert.equal(generate(options(wiki)).status, "generated");
+	assert.equal(read(wiki, "roadmap.svg"), expectedSvg);
+	assertReceiptMatchesFiles(wiki);
 });
 
 test("the CLI accepts the four-file layout and rejects unknown flags without running model commands", (t) => {
@@ -221,6 +239,23 @@ test("publishes only the generated pair and refuses competing remote commits", (
 		publish({ wiki, result, expectedRemote: remote }).status,
 		"published",
 	);
+	assert.equal(
+		git(remote, "rev-parse", "refs/heads/master"),
+		git(wiki, "rev-parse", "HEAD"),
+	);
+	for (const name of [
+		"roadmap.index.md",
+		"roadmap.svg",
+		"roadmap.md",
+		"roadmap.pfdsl",
+	]) {
+		const published = execFileSync(
+			"git",
+			["-C", remote, "show", `master:${name}`],
+			{ encoding: "utf8" },
+		);
+		assert.equal(published, read(wiki, name));
+	}
 	assert.deepEqual(
 		git(wiki, "diff-tree", "--no-commit-id", "--name-only", "-r", "HEAD")
 			.split("\n")
@@ -231,7 +266,6 @@ test("publishes only the generated pair and refuses competing remote commits", (
 	commit(wiki);
 	git(wiki, "push");
 	const next = generate(options(wiki));
-	git(wiki, "push", "origin", `${next.wikiRevision}:refs/heads/competing`);
 	// Advance the remote master without changing this checkout.
 	const other = mkdtempSync(join(tmpdir(), "wiki-editor-"));
 	t.after(() => rmSync(other, { recursive: true, force: true }));
@@ -241,9 +275,11 @@ test("publishes only the generated pair and refuses competing remote commits", (
 	writeFileSync(join(other, "Other.md"), "Concurrent\n");
 	commit(other);
 	git(other, "push");
+	const editorRevision = git(remote, "rev-parse", "refs/heads/master");
 	assert.throws(
 		() => publish({ wiki, result: next, expectedRemote: remote }),
 		/conflict/i,
 	);
 	assert.equal(git(wiki, "rev-parse", "HEAD"), next.wikiRevision);
+	assert.equal(git(remote, "rev-parse", "refs/heads/master"), editorRevision);
 });
