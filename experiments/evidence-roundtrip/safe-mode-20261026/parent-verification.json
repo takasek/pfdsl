@@ -1,0 +1,26 @@
+{
+  "allPassed": true,
+  "preSpecMatchesFrozenDigest": true,
+  "headingDefinitionsAdded": 1,
+  "sectionReferencesReplaced": 2,
+  "normativeTextAndEveryOtherBytePreserved": true,
+  "trackedWorktreeDiffExactlyCaptureScope": true,
+  "frozenProtocolCliCheckerAndOtherInputsUnchanged": true,
+  "generatedDriverUnmodified": true,
+  "checkerResult": {
+    "status": "PASS",
+    "errors": []
+  },
+  "outputStatus": "wip",
+  "fullArtifactCriteriaMet": false,
+  "remainingWork": "The rest of Stage 1, Stage 2 and Stage 3 of issue 542 remain; no full migration or artifact acceptance is claimed.",
+  "driverProtocolDeviation": {
+    "requirement": "Save command arguments, statuses, stdout/stderr and these assertions in checks.json.",
+    "observed": "checks.json records external commands but not an assertion list.",
+    "mitigation": "The parent preserves the complete execution exit/stdout/stderr and independently verifies the exact expected target diff here. The generated source is not edited; this omission remains explicitly recorded."
+  },
+  "postArtifacts": {
+    "docs/spec/spec.md": "cacdfae1e38b4395d214155edcedfb12c9dee69c73abe4b9a05d58bf1579e47b",
+    ".pfdsl/roadmap.pfdsl": "e3c247c31b4ef3e337ba42a0fba16b3a55b4e76f6b8ee8608bf2ed3bef81ae73"
+  }
+}
