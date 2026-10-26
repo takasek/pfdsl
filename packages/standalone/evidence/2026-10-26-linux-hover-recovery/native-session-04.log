@@ -1,0 +1,10 @@
+
+(pfdsl-desktop:2216): Gdk-CRITICAL **: 06:01:23.117: gdk_window_get_window_type: assertion 'GDK_IS_WINDOW (window)' failed
+
+(pfdsl-desktop:2216): Gtk-CRITICAL **: 06:01:23.118: gtk_accessible_get_widget: assertion 'GTK_IS_ACCESSIBLE (accessible)' failed
+
+(pfdsl-desktop:2216): Gdk-CRITICAL **: 06:03:31.469: gdk_window_get_window_type: assertion 'GDK_IS_WINDOW (window)' failed
+
+(pfdsl-desktop:2216): Gtk-CRITICAL **: 06:03:31.473: gtk_accessible_get_widget: assertion 'GTK_IS_ACCESSIBLE (accessible)' failed
+
+(pfdsl-desktop:2216): Gdk-CRITICAL **: 06:05:43.060: gdk_window_get_window_type: assertion 'GDK_IS_WINDOW (window)' failed

@@ -1,0 +1,5 @@
+{"pfdsl_observer":"connected","pid":3534,"view":"0x555556be1510","epochSeconds":1793001955.009208052,"monotonic":1194.636235506,"reason":-1,"reasonName":"unknown"}
+{"utc": "2026-10-26T08:06:00", "monotonic": 1199.877465175, "kind": "ready", "processes": [{"pid": 3534, "comm": "pfdsl-desktop", "ppid": 3531, "state": "S", "startTicks": 119351}, {"pid": 3594, "comm": "WebKitNetworkPr", "ppid": 3534, "state": "S", "startTicks": 119442}, {"pid": 3624, "comm": "WebKitWebProces", "ppid": 3534, "state": "S", "startTicks": 119465}]}
+{"utc": "2026-10-26T08:06:06", "monotonic": 1205.69387476, "kind": "intentional-signal", "pid": 3624, "signal": "SIGTERM"}
+{"pfdsl_observer":"web-process-terminated","pid":3534,"view":"0x555556be1510","epochSeconds":1793001966.092006917,"monotonic":1205.712736719,"reason":0,"reasonName":"crashed"}
+{"utc": "2026-10-26T08:06:07", "monotonic": 1206.715490303, "kind": "control-end", "processes": [{"pid": 3534, "comm": "pfdsl-desktop", "ppid": 3531, "state": "S", "startTicks": 119351}, {"pid": 3594, "comm": "WebKitNetworkPr", "ppid": 3534, "state": "S", "startTicks": 119442}]}

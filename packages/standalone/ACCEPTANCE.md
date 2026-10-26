@@ -14,6 +14,10 @@
 Linux hover の終了は2試行で再現せず、#1513 は未解決。
 macOS のタイトル・診断表示は独立した実操作で部分確認したが、保存後のタイトルや最終追加修正の実機確認は未完了であり、#1445 の全受入合格には更新しない。
 
+2026-10-26 の [原記録回収](evidence/2026-10-26-linux-hover-recovery/README.md) と [調査要約・全量取得先](evidence/2026-10-26-linux-hover-summary/README.md) を参照する。
+元障害の原因は未特定で、#1513は未解決、GUI-27／GUI-44の受入状態も進めない。
+新しいRosetta/Linux環境の20回はEscape後約2.5〜4秒の非再現に限られ、遅延発症を検証していない。
+
 参照する現行拡張: `459dfa74cd80c390017e4983834751721e4a4480`。
 機能一覧は、その版の `packages/vscode-extension/package.json`、`src/extension.ts` と各登録 provider・内部 command を照合した。
 専用 configuration の宣言はない。
