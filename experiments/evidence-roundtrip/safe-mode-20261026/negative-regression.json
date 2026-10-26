@@ -1,0 +1,35 @@
+[
+  {
+    "file": "../evidence.json",
+    "evidenceSha256": "4a709ddf9473887b851e827d35117c3ba5ffd68d3437103793a997648b37bd0c",
+    "exitCode": 1,
+    "result": {
+      "status": "FAIL",
+      "errors": [
+        "NOT_READY"
+      ]
+    }
+  },
+  {
+    "file": "../nonexistent-process.json",
+    "evidenceSha256": "98ea7d228c766a01a9ca3659816662ea570c2482b092d6b873610ab18ea8d9e3",
+    "exitCode": 1,
+    "result": {
+      "status": "FAIL",
+      "errors": [
+        "PROCESS_MISSING"
+      ]
+    }
+  },
+  {
+    "file": "../unfinished-input.json",
+    "evidenceSha256": "e9aff6f919b2c8cf386ff300727e2e8de6ddef5f1e059bf74620e08c2d290d9b",
+    "exitCode": 1,
+    "result": {
+      "status": "FAIL",
+      "errors": [
+        "NOT_READY"
+      ]
+    }
+  }
+]

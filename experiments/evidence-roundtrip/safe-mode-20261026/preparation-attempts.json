@@ -1,0 +1,40 @@
+{
+  "attempt1": {
+    "classification": "preparation-invalid",
+    "reason": "The preparation commit failed Markdown line-break checks; generation was started before the failure was read. The generated driver is not executed or counted. The original uncommitted prompt and pins are preserved with the attempt1 prefix.",
+    "targetFilesChanged": false,
+    "sessionId": "06f66364-a6fd-4c80-a365-398cdf38d850",
+    "advisorUsed": true
+  },
+  "attempt2": {
+    "classification": "driver-contract-failure-before-execution",
+    "sessionId": "c861eb1e-a647-4b36-9554-ac43d8401f0a",
+    "advisorUsed": false,
+    "targetFilesChanged": false,
+    "findings": [
+      {
+        "cause": "The protocol named a manifest without specifying the concrete artifacts field.",
+        "observed": "The driver invented preSnapshot.manifest and post.manifest, producing no changed paths."
+      },
+      {
+        "cause": "The protocol required <trial-snapshot.json> as the checker input, but did not repeat that this means the original frozen snapshot in the final invocation.",
+        "observed": "The driver created trial-snapshot.json containing the post state, outside the allowed writes, and passed it instead of the frozen pre snapshot."
+      }
+    ],
+    "action": "Preserved the generated source; did not execute it. Clarified data types and the original-pre argument; regenerate from a fresh session.",
+    "privateOriginalPreparationCommit": "870903b8",
+    "publishedPreparationCommit": "fbf1d3170ab7301d48c82933c152f2335e8dfbfc"
+  },
+  "attempt3": {
+    "classification": "successful-roundtrip-with-recorded-logging-deviation",
+    "sessionId": "dd57f8b8-5399-48bd-be3d-62e68a929084",
+    "advisorExposed": false,
+    "toolCalls": 0,
+    "targetFilesChanged": true,
+    "checkerStatus": "PASS",
+    "driverUnmodified": true,
+    "deviation": "Assertion list omitted from checks.json; execution.json and parent-verification.json preserve parent-side verification.",
+    "privateOriginalPreparationCommit": "b521a4ceb4330306db39b42c39ee988a895478d6",
+    "publishedPreparationCommit": "a26efb9f78b4c794aeac3f0fdcc7bada0062bbf9"
+  }
+}

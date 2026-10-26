@@ -1,0 +1,13 @@
+{
+  "exitCode": 0,
+  "stdout": "PASS runId=5aa6d436-8c45-41ce-871f-d39d6caf6293 changed=docs/spec/spec.md,.pfdsl/roadmap.pfdsl\n",
+  "stderr": "",
+  "driverSha256": "c08471075bd913413151f927c13548406a5cb2c8de1e66fd722c74e562539ffc",
+  "generatedSourceUnmodified": true,
+  "nodeEntrypoint": "experiments/evidence-roundtrip/safe-mode-20261026/driver.mjs",
+  "sessionId": "dd57f8b8-5399-48bd-be3d-62e68a929084",
+  "publicationNote": "This is a public rendering. Original hashes and exact-match audits refer to private originals; see publication-redactions.json.",
+  "privateOriginalPreparationCommit": "b521a4ceb4330306db39b42c39ee988a895478d6",
+  "publishedPreparationCommit": "a26efb9f78b4c794aeac3f0fdcc7bada0062bbf9",
+  "publicDriverTargetAdaptedAfterExecution": true
+}

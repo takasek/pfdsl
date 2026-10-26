@@ -1,0 +1,129 @@
+{
+  "basePublishedCommit": "abd1a5ca2dc4428890d426856cbebed071d01223",
+  "originalLocalHead": "653c7ac1e0dcfad66bba2265a31e8154eb7bd4c1",
+  "privateHistoryRetained": true,
+  "publicPrivateCommitMap": [
+    {
+      "privateOriginal": "870903b8b90aced9db1fcc18e9a3135601945dfa",
+      "publicRendering": "fbf1d3170ab7301d48c82933c152f2335e8dfbfc"
+    },
+    {
+      "privateOriginal": "b521a4ceb4330306db39b42c39ee988a895478d6",
+      "publicRendering": "a26efb9f78b4c794aeac3f0fdcc7bada0062bbf9"
+    },
+    {
+      "privateOriginal": "e530706e3865c3eae9c7bb12f84453dd8ccda778",
+      "publicRendering": "3ac0190a589bdc8b02ac4de57a0da0cd6bd353a8"
+    }
+  ],
+  "publishedFinalRevision": "The PR head containing this file; not embedded to avoid a self-referential commit hash.",
+  "treatment": "Local checkout roots are replaced by CHECKOUT_ROOT. The public driver target is derived relative to its location. Original executed source and request bodies remain private and unchanged.",
+  "claimBoundary": "Original hash values and exact-match audit statements refer to private execution originals. Public renderings are not byte-identical raw inputs or executed source. Target model/spec and evidence versions/results are unchanged.",
+  "files": [
+    {
+      "path": "experiments/evidence-roundtrip/README.md",
+      "privateOriginalSha256": "284b6e7cb268fad350a0affb500851d702e2ec624663ef2fe8bb7696bf4f0165",
+      "publicRenderingSha256": "bd35c57939ed207ec9b4ce697734d2e351fe5dd3e75b0ffcfc8977be81d74c09"
+    },
+    {
+      "path": "experiments/evidence-roundtrip/safe-mode-20261026/README.md",
+      "privateOriginalSha256": "4ea697d20e41ec46b74b44474c58a44df009a8d3178d2783ac506611f7a2be76",
+      "publicRenderingSha256": "1e7672a910051bc9e231a7a14ecd31fd25840456da78499c533331a7c4199787"
+    },
+    {
+      "path": "experiments/evidence-roundtrip/safe-mode-20261026/attempt1-pins.json",
+      "privateOriginalSha256": "e34e0f6c95671384b48dea67b86de6148a5fceacd62c5c510c931f85db8e22d1",
+      "publicRenderingSha256": "97c8249d019550f94198088b3cf66327001fce2f43a6ed4c769978e2a3b21f12"
+    },
+    {
+      "path": "experiments/evidence-roundtrip/safe-mode-20261026/attempt1-prompt.txt",
+      "privateOriginalSha256": "5d7803f12c965bfcb4fd8ba654cd2a5cee3f3c01227fca1938750e44fd2ef714",
+      "publicRenderingSha256": "2ca834e63dd4af52503c233203189ded2e8bb793aabfa20a3393a07492936cf4"
+    },
+    {
+      "path": "experiments/evidence-roundtrip/safe-mode-20261026/attempt1-protocol.txt",
+      "privateOriginalSha256": "3bf3c850b5dd69d9e4ecbcfc4d501b82797f7d23c69d6421b336e2dbadd39dbc",
+      "publicRenderingSha256": "90fd94ae6b1e8b17db6decb5888a7d7c37e2c92c975f2d3cdbcae363d0642858"
+    },
+    {
+      "path": "experiments/evidence-roundtrip/safe-mode-20261026/attempt1-response.json",
+      "privateOriginalSha256": "e1dd65422fd197bdb8a8ebde9631dc7560362a4659e489a0ac02fc0aae3758b1",
+      "publicRenderingSha256": "57d7f3998f84f71864caec609df05fcb024ac02f9faca4274d1b0744c1358489"
+    },
+    {
+      "path": "experiments/evidence-roundtrip/safe-mode-20261026/attempt2-driver.txt",
+      "privateOriginalSha256": "64fcc7deeab89079c3e91946997067ba08972ef7caa7cec4680d8b1944d9a1ad",
+      "publicRenderingSha256": "a35a3254e5235a8c54458afaee244e00cbe921a83b1a79573762a6eaab005e64"
+    },
+    {
+      "path": "experiments/evidence-roundtrip/safe-mode-20261026/attempt2-input-audit.json",
+      "privateOriginalSha256": "a8c4060824aeea3117479c9f7f07bba89de555f6221f9ef463b2883d2824d4d5",
+      "publicRenderingSha256": "32914ef243ff8efcb91348ef366106ee8f108ede94b1034054f369a313330be1"
+    },
+    {
+      "path": "experiments/evidence-roundtrip/safe-mode-20261026/attempt2-prompt.txt",
+      "privateOriginalSha256": "a5e10b830135cd2b71eccd0851f31f2d11e6194995282de56366700cca4fb2e3",
+      "publicRenderingSha256": "d536906d4aa7e2a2787bea6557c42c1b332a558ac8b9124be6ba5c386e5bba2b"
+    },
+    {
+      "path": "experiments/evidence-roundtrip/safe-mode-20261026/attempt2-protocol.txt",
+      "privateOriginalSha256": "d43aa7b57bbc9acb5191be28a00c298cd01f7e61e38c6c7998b9ee514c715a6e",
+      "publicRenderingSha256": "9cd7cec425030448fdff2985834ce3dab818861af1b6b68ebbb017959f6507b6"
+    },
+    {
+      "path": "experiments/evidence-roundtrip/safe-mode-20261026/attempt2-response.json",
+      "privateOriginalSha256": "db2f827011b2f9c3a5148806e6660c4220193c4ce66fb4efc1b950e978167611",
+      "publicRenderingSha256": "6721bf92b80a436303d0bf541a75e0dcd870fb2c6bcaec25f409b2eece9db36f"
+    },
+    {
+      "path": "experiments/evidence-roundtrip/safe-mode-20261026/attempt3-response.json",
+      "privateOriginalSha256": "bab7a8f31805adf5a2df73fe35e983c39278bce96bbb8f8b58ba6045f86f46b6",
+      "publicRenderingSha256": "476bb018bb61c829b6210ab2e34d0288aefaa229a9eebf71793835e416ade693"
+    },
+    {
+      "path": "experiments/evidence-roundtrip/safe-mode-20261026/cli-metadata.txt",
+      "privateOriginalSha256": "71a1027b432364f94262c39b4ad987371f96cdc7a3bf556351298cf797e8b999",
+      "publicRenderingSha256": "e56bcbe43fd66fd16e21d76f2597225b5fe2ea1e48e0d4a5e993508b50d54b8f"
+    },
+    {
+      "path": "experiments/evidence-roundtrip/safe-mode-20261026/driver.mjs",
+      "privateOriginalSha256": "c08471075bd913413151f927c13548406a5cb2c8de1e66fd722c74e562539ffc",
+      "publicRenderingSha256": "0a20b42e5c705bd1ba62580c5fd44b016a3d60e39a95d92f795b7c16560d9711"
+    },
+    {
+      "path": "experiments/evidence-roundtrip/safe-mode-20261026/execution.json",
+      "privateOriginalSha256": "b74b7d73ff5d29966b5f6aecb901170682bfc034cd82815de1fbf3884542992e",
+      "publicRenderingSha256": "c497323e8d7e00813b41999b105bbddec1f15f081f372f23ba6a6d81d8e6d7b7"
+    },
+    {
+      "path": "experiments/evidence-roundtrip/safe-mode-20261026/input-audit.json",
+      "privateOriginalSha256": "15fe8e5882a045a023193a2a7c752aaa1a8b9573a21af8d616d3d7473e0471e0",
+      "publicRenderingSha256": "b3039a168830224cab232342e03d0d625329660101d5ce0e481305d8ef7f9628"
+    },
+    {
+      "path": "experiments/evidence-roundtrip/safe-mode-20261026/pins.json",
+      "privateOriginalSha256": "00585f85b0ac2e7a7933b6c672e7135ac07f6d87a2a44aa85449f3a4940aaa2d",
+      "publicRenderingSha256": "be504ba7fc1014c0c67dc2b5abdc51aec9caa015d8529113c0276c3f50974b07"
+    },
+    {
+      "path": "experiments/evidence-roundtrip/safe-mode-20261026/preparation-attempts.json",
+      "privateOriginalSha256": "e2db4151e7b88785bfcded536668708cce2fad2704ed63fafa5cd13c6be2e44d",
+      "publicRenderingSha256": "705b904476d715cab82c100a2e613e6acbac28dc3a2cd4d07c6c6942ac1103da"
+    },
+    {
+      "path": "experiments/evidence-roundtrip/safe-mode-20261026/prompt.md",
+      "privateOriginalSha256": "0f7951aff75a395759cf1ff1dc31b3ad99f8e37428907f875ed60bdb99b6935d",
+      "publicRenderingSha256": "1a3766096ae14ada011db496bb7e8d21770e893503efa3e7c953f9deb1904813"
+    },
+    {
+      "path": "experiments/evidence-roundtrip/safe-mode-20261026/protocol.md",
+      "privateOriginalSha256": "1db06eade965e535f1ddd7e23a9cbd4261733af74ece441e274ce6b4a7b46a60",
+      "publicRenderingSha256": "9a2473dec1f7d93519259634d05953ba51471849c9ba21bf44fc636b385a049a"
+    },
+    {
+      "path": "experiments/evidence-roundtrip/safe-mode-20261026/replay-result.json",
+      "privateOriginalSha256": "7e814982da244f9e13d11087aae3b611ffe55bbf99235900e24b71c45df019f2",
+      "publicRenderingSha256": "fdf31a390acb6beb460f49d69f4fc564e78025b16904212e40f51b9594a8c788"
+    }
+  ]
+}

@@ -477,14 +477,14 @@
 <g id="node19" class="node">
 <title>evidence_roundtrip_record</title>
 <g id="a_node19"><a xlink:href="https://github.com/takasek/pfdsl/issues/1526" xlink:title="E0 の往復記録と証拠スキーマ v0 (#1526)&#10;&#10;数十行の driver で status ready から実行・証拠 JSON・読取専用の検査までを1回通した記録。契約3の保存方式と検査動詞の設計の入力になる&#10;criteria:&#10; &#160;このリポの roadmap に対して driver が ready を読み1 process 分の証拠 JSON を出し検査器が合否判定するまでを1回通し、スキーマ v0・検査項目・検査できなかった項目と理由・動詞候補名が experiments/ に記録されている。 status を書き換える動詞は作っていない&#10; &#160;&#10;location: https://github.com/takasek/pfdsl/issues/1526">
-<polygon fill="#f8f9fa" stroke="black" points="942.12,-676.33 740.52,-676.33 740.52,-601.13 942.12,-601.13 942.12,-676.33"/>
+<polygon fill="#d4edda" stroke="black" points="942.12,-676.33 740.52,-676.33 740.52,-601.13 942.12,-601.13 942.12,-676.33"/>
 <text xml:space="preserve" text-anchor="middle" x="841.32" y="-659.73" font-family="Times,serif" font-size="14.00">evidence_roundtrip_record</text>
 <text xml:space="preserve" text-anchor="middle" x="841.32" y="-642.93" font-family="Times,serif" font-size="14.00">E0 の往復記録と証</text>
 <text xml:space="preserve" text-anchor="middle" x="841.32" y="-626.13" font-family="Times,serif" font-size="14.00">拠スキーマ v0 (</text>
 <text xml:space="preserve" text-anchor="middle" x="841.32" y="-609.33" font-family="Times,serif" font-size="14.00">#1526)</text>
 </a>
 </g>
-<text xml:space="preserve" text-anchor="middle" x="728.08" y="-588.53" font-family="Times,serif" font-size="14.00">todo</text>
+<text xml:space="preserve" text-anchor="middle" x="726.92" y="-588.53" font-family="Times,serif" font-size="14.00">done</text>
 </g>
 <!-- evidence_roundtrip_record&#45;&gt;reduce_work_cycle_protocol -->
 <g id="edge41" class="edge">
@@ -842,13 +842,13 @@
 <g id="node61" class="node">
 <title>spec_id_refs</title>
 <g id="a_node61"><a xlink:title="仕様ID相互参照化済み spec.md&#10;&#10;節番号直書きの相互参照を仕様ID参照へ段階移行した spec.md。ADR 確定後に別 issue として起票する（#328 移行方針）。後続門番のプレースホルダ（ADR&#45;0018）&#10;criteria: docs/spec/spec.md の節番号相互参照が仕様ID参照に置換され、node scripts/check&#45;spec&#45;ids.mjs が dangling 参照なしで通過する&#10;location: ../docs/spec/spec.md">
-<polygon fill="#f8f9fa" stroke="black" stroke-width="2" points="916.92,-1924.93 765.72,-1924.93 765.72,-1866.53 916.92,-1866.53 916.92,-1924.93"/>
+<polygon fill="#fff3cd" stroke="black" stroke-width="2" points="916.92,-1924.93 765.72,-1924.93 765.72,-1866.53 916.92,-1866.53 916.92,-1924.93"/>
 <text xml:space="preserve" text-anchor="middle" x="841.32" y="-1908.33" font-family="Times,serif" font-size="14.00">spec_id_refs</text>
 <text xml:space="preserve" text-anchor="middle" x="841.32" y="-1891.53" font-family="Times,serif" font-size="14.00">仕様ID相互参照化済</text>
 <text xml:space="preserve" text-anchor="middle" x="841.32" y="-1874.73" font-family="Times,serif" font-size="14.00">み spec.md</text>
 </a>
 </g>
-<text xml:space="preserve" text-anchor="middle" x="753.28" y="-1853.93" font-family="Times,serif" font-size="14.00">todo</text>
+<text xml:space="preserve" text-anchor="middle" x="755.22" y="-1853.93" font-family="Times,serif" font-size="14.00">wip</text>
 </g>
 <!-- i542_migrate_spec_id_refs&#45;&gt;spec_id_refs -->
 <g id="edge10" class="edge">

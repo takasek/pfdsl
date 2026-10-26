@@ -1,0 +1,31 @@
+{
+  "sourceCommit": "abd1a5ca2dc4428890d426856cbebed071d01223",
+  "contract": "ADR-0048 contract 3 and protocol.md experimental v0 including the post-run check; no retroactive changes to the saved stopped trial",
+  "scope": "Only section 15.1 in issue 542; the full artifact remains wip",
+  "hashes": {
+    ".pfdsl/roadmap.pfdsl": "27903d80efcb1db9db3335d42749716e36abb4d9bef070ac3a1b1f6847094ba8",
+    "docs/spec/spec.md": "e2983664848a88c3b8d44f7b9ab24716ce01738e0249704515cb1e8086d89cad",
+    "experiments/evidence-roundtrip/check.mjs": "83edca0948fe3682a1f45ad8282a20d663a813d59258af22e54b2b774cfe53b0",
+    "experiments/evidence-roundtrip/prepare.mjs": "b1f7e3057158d65fffafb5f7a46d5253732bb8e840d9525cc9247c9802b8a0d7",
+    "experiments/evidence-roundtrip/safe-mode-20261026/capture-plan.json": "cad539a3803ba2fb62b1e1188e61758647c75a5e45a2dde2dcad4dc526ff21b5",
+    "experiments/evidence-roundtrip/safe-mode-20261026/cli-metadata.txt": "71a1027b432364f94262c39b4ad987371f96cdc7a3bf556351298cf797e8b999",
+    "experiments/evidence-roundtrip/safe-mode-20261026/cli-version.txt": "1f930dd1f133c1f97a94fe3acb8db34372cf4c01ffdb2b3ff4ca72f9494121e9",
+    "experiments/evidence-roundtrip/safe-mode-20261026/prompt.md": "0f7951aff75a395759cf1ff1dc31b3ad99f8e37428907f875ed60bdb99b6935d",
+    "experiments/evidence-roundtrip/safe-mode-20261026/protocol.md": "1db06eade965e535f1ddd7e23a9cbd4261733af74ece441e274ce6b4a7b46a60",
+    "experiments/evidence-roundtrip/safe-mode-20261026/ready.json": "ed02918575ac5366bd832be63b5fd7a58e147682a10405ff543adcd6ea4e48e8",
+    "experiments/evidence-roundtrip/safe-mode-20261026/snapshot.json": "7c476318e5bdbd17455d9404a6b575280e68452b3a5ec0d2192900e6b13f5296",
+    "packages/cli/dist/cli.js": "a73140996e851a9a23444f2dad9ab9b21df9f5de384cda12e0754908c4deba8b",
+    "packages/core/dist/chunk-ZQTMCSOS.js": "7455259a8b07bb9b663fa460812cc07530e76e01d808a4a94cb13518023c9bde",
+    "packages/core/dist/index.js": "aee41fecf38fdece2e797c45048632235d1e9aecd1323df5e4aa2b4f2a10783b"
+  },
+  "generationCwd": "/private/tmp",
+  "generationMode": "fresh Claude safe-mode session, normal subscription authentication, no supplied prior conversation or skills; inspect actual request after generation",
+  "limitations": [
+    "Base harness and intrinsic account/environment metadata remain; no project/user instructions, skills, memory or previous conversation are allowed.",
+    "API request body reconstruction is checked against the recorded requestDigest; transport and server-side additions are outside the available evidence."
+  ],
+  "generationEnvironment": {
+    "CLAUDE_CODE_DISABLE_ADVISOR_TOOL": "1"
+  },
+  "publicationNote": "This is a public rendering. Original hashes and exact-match audits refer to private originals; see publication-redactions.json."
+}
