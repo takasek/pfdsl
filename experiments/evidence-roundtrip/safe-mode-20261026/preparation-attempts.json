@@ -26,7 +26,15 @@
     "publishedPreparationCommit": "fbf1d3170ab7301d48c82933c152f2335e8dfbfc"
   },
   "attempt3": {
-    "classification": "pending",
-    "reason": "Fresh generation from a revised, committed protocol, with the documented advisor-disable environment variable. No previous responses supplied."
+    "classification": "successful-roundtrip-with-recorded-logging-deviation",
+    "sessionId": "dd57f8b8-5399-48bd-be3d-62e68a929084",
+    "advisorExposed": false,
+    "toolCalls": 0,
+    "targetFilesChanged": true,
+    "checkerStatus": "PASS",
+    "driverUnmodified": true,
+    "deviation": "Assertion list omitted from checks.json; execution.json and parent-verification.json preserve parent-side verification.",
+    "privateOriginalPreparationCommit": "b521a4ceb4330306db39b42c39ee988a895478d6",
+    "publishedPreparationCommit": "a26efb9f78b4c794aeac3f0fdcc7bada0062bbf9"
   }
 }

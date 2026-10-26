@@ -56,7 +56,7 @@ artifact:
   spec_id_refs:
     label: 仕様ID相互参照化済み spec.md
     description: "節番号直書きの相互参照を仕様ID参照へ段階移行した spec.md。ADR 確定後に別 issue として起票する（#328 移行方針）。後続門番のプレースホルダ（ADR-0018）"
-    status: todo
+    status: wip
     criteria: docs/spec/spec.md の節番号相互参照が仕様ID参照に置換され、node scripts/check-spec-ids.mjs が dangling 参照なしで通過する
     location: ../docs/spec/spec.md
   spec_id_tombstones:
