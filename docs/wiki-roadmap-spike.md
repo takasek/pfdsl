@@ -95,19 +95,31 @@ Wikiを有効化していない状態でも、登録・構造変更・status変�
 差替え後に再抽出して、LF正規化した候補モデルと一致することを確かめる。
 変更後のPFDは既存CLIで作るため、Wiki専用の登録・status・done判定の規則は追加しない。
 
-次はローカルで取得済みのWikiコピー `../pfdsl.wiki` と、編集した候補 `next-roadmap.pfdsl` を使う例である。
-本体の文脈はコミットで固定され、未コミット変更は含めない。
-出力先は存在しないディレクトリを指定する。
+次はローカルで取得済みのWikiコピー `../pfdsl.wiki` を使う例である。
+本体の文脈とWiki原稿の両方をコミットで固定し、どちらの未コミット変更も入力に含めない。
+候補の編集を始める前に期待版・ページhash・元ページを保存する。
 
 ```bash
 code_revision=$(git rev-parse HEAD)
 wiki_revision=$(git -C ../pfdsl.wiki rev-parse HEAD)
 page_hash=$(git -C ../pfdsl.wiki show "$wiki_revision:Roadmap.md" | shasum -a 256 | cut -d ' ' -f 1)
+git -C ../pfdsl.wiki show "$wiki_revision:Roadmap.md" > ../Roadmap.edit-base.md
+```
+
+保存した `../Roadmap.edit-base.md` のPFDブロックを `next-roadmap.pfdsl` へコピーし、既存CLI等で登録・構造・statusの変更を編集する。
+編集後も上で保存した期待版とhashを使い、現在のHEADから取り直して古い候補と組み合わせない。
+同じシェルで、存在しない出力先を指定して候補を生成する。
+
+```bash
 node scripts/wiki-roadmap-edit.mjs \
   --repo . --wiki ../pfdsl.wiki --repo-revision "$code_revision" \
   --expected-wiki-revision "$wiki_revision" --expected-page-hash "$page_hash" \
   --replacement next-roadmap.pfdsl --output ../wiki-edit-candidate
 ```
+
+競合時は期待値だけを更新せず、新しい版の原稿を保存し直し、その原稿へ変更を適用し直す。
+構文・グラフ検査の失敗時は候補PFDを修正して再実行する。
+出力先が既存なら、元の出力を保持して新しい出力先を選ぶ。
 
 検証用コピーの論理配置 `.pfdsl/roadmap.pfdsl` を保ったまま、固定したCLIでstrict check・ready・blocked・静的SVGを得る。
 元のモデルが不正でも候補の修正は可能で、元の検査失敗はmanifestのbaselineに失敗として残す。
