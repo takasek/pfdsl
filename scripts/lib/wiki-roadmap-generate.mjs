@@ -219,15 +219,23 @@ export function generate({ wiki, repository, cli, expectedRevision }) {
 }
 
 /** Commit the generated pair, then use an ordinary non-force push. */
-export function publish({ wiki, result, expectedRemote }) {
+export function publish({
+	wiki,
+	result,
+	expectedRemote,
+	expectedRemoteRevision = result.wikiRevision,
+	transportWiki = wiki,
+}) {
 	wiki = checkout(wiki);
 	if (result.status === "unchanged") return result;
 	if (result.status !== "generated")
 		throw new Error("No generated pair to publish");
+	transportWiki = checkout(transportWiki);
 	if (
 		!expectedRemote ||
-		git(wiki, "remote", "get-url", "origin") !== expectedRemote ||
-		git(wiki, "remote", "get-url", "--push", "origin") !== expectedRemote
+		git(transportWiki, "remote", "get-url", "origin") !== expectedRemote ||
+		git(transportWiki, "remote", "get-url", "--push", "origin") !==
+			expectedRemote
 	)
 		throw new Error("Unexpected Wiki remote");
 	const branch = git(wiki, "symbolic-ref", "--short", "HEAD");
@@ -243,8 +251,8 @@ export function publish({ wiki, result, expectedRemote }) {
 		hash(read(wiki, outputs[1])) !== result.svgHash
 	)
 		throw new Error("Generated snapshot changed");
-	git(wiki, "fetch", "origin", branch);
-	if (git(wiki, "rev-parse", "FETCH_HEAD") !== result.wikiRevision)
+	git(transportWiki, "fetch", "origin", branch);
+	if (git(transportWiki, "rev-parse", "FETCH_HEAD") !== expectedRemoteRevision)
 		throw new Error("Wiki remote conflict: generate from the new revision");
 	git(wiki, "add", "--", ...outputs);
 	git(
@@ -257,10 +265,14 @@ export function publish({ wiki, result, expectedRemote }) {
 		"-m",
 		"docs(wiki): generate roadmap index and SVG",
 	);
-	git(wiki, "push", "origin", `HEAD:refs/heads/${branch}`);
+	const revision = git(wiki, "rev-parse", "HEAD");
+	// Network operations use the editor checkout's own Git authentication settings.
+	if (transportWiki !== wiki)
+		git(transportWiki, "fetch", "--no-tags", wiki, branch);
+	git(transportWiki, "push", "origin", `${revision}:refs/heads/${branch}`);
 	return {
 		status: "published",
-		revision: git(wiki, "rev-parse", "HEAD"),
+		revision,
 		inputWikiRevision: result.wikiRevision,
 	};
 }
