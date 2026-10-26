@@ -74,8 +74,8 @@ VSCode の URI・version 単位の解析 cache はこの snapshot を jump・lin
 無効な YAML・型不正の metadata を描画・操作の消費者へ渡さない契約と、renderer の寛容な解決・strict check の診断は維持する。
 - **generate_frontmatter_schema**: Zod の型・値制約から外部検証用 JSON Schema を生成する。空宣言を許可する文書形状を公開し、後続の意味検証へ委譲するために緩めた読込み用スキーマは公開しない。変換コードはビルド時だけ使い、core の通常入口へ含めない。
 - **format（`formatter.ts`）**: ソーステキストから独立に再 lex/parse し整形済みテキストを生成する。check の parse 結果を再利用しない別経路。frontmatter は yaml CST（`frontmatter-cst.ts`）経由で正準化する（ADR-0034）
-- **sort_meta（`sort.ts` の `sort(source, opts)`）**: 入力はソーステキスト（format と同じく独立再 parse）。構文木を受け取る経路ではない。frontmatter の並べ替えは yaml CST（`frontmatter-cst.ts`）経由（ADR-0034）
-- **set_meta（`frontmatter-cst.ts` の `setFrontmatterField(source, kind, id, field, value)`）**: sort_meta と同じくソーステキストを入力に取り、指定ノードの指定フィールドだけを yaml CST 上で書き換える。対象ノードの定義が無い場合の新規挿入は `insert-definition.ts` が担う
+- **sort_meta（`sort.ts` の `sort(source, opts)`）**: 入力はソーステキストと、`metadata_sort_request` が表す優先順付きのソートキー列（`opts.by`）。format と同じく独立再 parse し、構文木を受け取る経路ではない。frontmatter の並べ替えは yaml CST（`frontmatter-cst.ts`）経由（ADR-0034）
+- **set_meta（`frontmatter-cst.ts` の `setFrontmatterField(source, kind, id, field, value)`）**: 入力はソーステキストと、`metadata_update_request` が表すノード種別・ID・フィールド名・更新値。指定ノードの指定フィールドだけを yaml CST 上で書き換える。対象ノードの定義が無い場合の新規挿入は `insert-definition.ts` が担う
 - **reindex_meta（`reindex.ts` の `reindex(source, opts)`）**: ソーステキストを入力に取り、`computeTopoOrder` の順序に沿って `index` フィールドを採番し直す。位相順を要するため内部で `analyze()` を通す点が sort_meta / set_meta と異なる
 - **render_graph（`graphviz-exporter` の `exportDot(graph, frontmatter)`）**: 正準化グラフと frontmatter（layout / title / statusStyles）から DOT 文字列を組む
 - **export_image**: DOT→SVG は `@hpcc-js/wasm`（`preview-engine` の `renderDotToSvg`）で外部依存なし。PDF/PNG は `svgToBinary` が `puppeteer` を動的 import し、未インストール時は明示エラーで失敗する（フォールバックしない）
