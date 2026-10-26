@@ -1,0 +1,11 @@
+{
+  "attempt1": {
+    "classification": "preparation-invalid",
+    "reason": "The preparation commit failed Markdown line-break checks; generation was started before the failure was read. The generated driver is not executed or counted. The original uncommitted prompt and pins are preserved with the attempt1 prefix.",
+    "targetFilesChanged": false
+  },
+  "attempt2": {
+    "classification": "pending",
+    "reason": "Fresh generation after the corrected preparation commit; no prior response will be supplied."
+  }
+}
