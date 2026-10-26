@@ -1,0 +1,26 @@
+
+(pfdsl-desktop:1749): Gtk-WARNING **: 05:31:52.412: no trigger event for menu popup
+
+(pfdsl-desktop:1749): Gtk-WARNING **: 05:31:52.418: no trigger event for menu popup
+
+(pfdsl-desktop:1749): Gdk-CRITICAL **: 05:36:16.474: gdk_window_get_window_type: assertion 'GDK_IS_WINDOW (window)' failed
+
+(pfdsl-desktop:1749): Gtk-CRITICAL **: 05:36:16.480: gtk_accessible_get_widget: assertion 'GTK_IS_ACCESSIBLE (accessible)' failed
+
+(pfdsl-desktop:1749): Gdk-CRITICAL **: 05:45:05.111: gdk_window_get_window_type: assertion 'GDK_IS_WINDOW (window)' failed
+
+(pfdsl-desktop:1749): Gtk-CRITICAL **: 05:45:05.115: gtk_accessible_get_widget: assertion 'GTK_IS_ACCESSIBLE (accessible)' failed
+
+(pfdsl-desktop:1749): Gdk-CRITICAL **: 05:45:14.791: gdk_window_get_window_type: assertion 'GDK_IS_WINDOW (window)' failed
+
+(pfdsl-desktop:1749): Gtk-CRITICAL **: 05:45:14.793: gtk_accessible_get_widget: assertion 'GTK_IS_ACCESSIBLE (accessible)' failed
+
+(pfdsl-desktop:1749): Gdk-CRITICAL **: 05:55:25.188: gdk_window_get_window_type: assertion 'GDK_IS_WINDOW (window)' failed
+
+(pfdsl-desktop:1749): Gtk-CRITICAL **: 05:55:25.191: gtk_accessible_get_widget: assertion 'GTK_IS_ACCESSIBLE (accessible)' failed
+
+(pfdsl-desktop:1749): Gdk-CRITICAL **: 05:55:58.259: gdk_window_get_window_type: assertion 'GDK_IS_WINDOW (window)' failed
+
+(pfdsl-desktop:1749): Gtk-CRITICAL **: 05:56:17.552: gtk_accessible_get_widget: assertion 'GTK_IS_ACCESSIBLE (accessible)' failed
+
+(pfdsl-desktop:1749): Gtk-CRITICAL **: 05:59:29.321: gtk_accessible_get_widget: assertion 'GTK_IS_ACCESSIBLE (accessible)' failed

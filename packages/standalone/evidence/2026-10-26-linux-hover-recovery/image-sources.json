@@ -1,0 +1,29 @@
+[
+	{
+		"path": "s03_webkit_memory_check.png",
+		"archivePath": "evidence/s03_webkit_memory_check.jpg",
+		"sourceSHA256": "e74f49f16e581fe4e3c4f69ee7914a676fe0f35d780e202e174e02b61d4af632",
+		"pngSHA256": "b1690537fd304286cd634dc38bdf4d0d157177dedd5b46ee849da7101d8f7d15",
+		"width": 1177,
+		"height": 849,
+		"conversion": "JPEG decoded RGB pixels preserved exactly in metadata-free PNG; no crop, resize or redaction"
+	},
+	{
+		"path": "s05_ps.png",
+		"archivePath": "evidence/s05_ps.jpg",
+		"sourceSHA256": "f3a91040972f2b4ae88e5220db4a01b13c1beb87df87e1eb76ef1eca984827f2",
+		"pngSHA256": "ba84eb7ae07f1782207ffce81ae82988de77fbf93c7b3bf9e8c723a83523a2cb",
+		"width": 1177,
+		"height": 849,
+		"conversion": "JPEG decoded RGB pixels preserved exactly in metadata-free PNG; no crop, resize or redaction"
+	},
+	{
+		"path": "s05_hover_escape_1.png",
+		"archivePath": "evidence/s05_hover_escape_1.jpg",
+		"sourceSHA256": "7cecb93ba173549a71796d7d460dff7b608cf4dccd0a0af1549e18651e189322",
+		"pngSHA256": "a9c4186cf1ee8c68d747ee7ddf745407d7335e4135c7f136fb7fb297025a66ec",
+		"width": 1180,
+		"height": 812,
+		"conversion": "JPEG decoded RGB pixels preserved exactly in metadata-free PNG; no crop, resize or redaction"
+	}
+]

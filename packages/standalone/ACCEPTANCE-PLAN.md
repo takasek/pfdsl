@@ -587,6 +587,13 @@ debug/ad-hoc署名appの成功を正式配布物へ転写しない。
 期待：UI/nativeで保存不可を守り取消で本文を保つ。
 露出しない独立Quit入口は未実施と分け、Mac保存／Quitを転写しない。
 GUI-27のhover再試験も同じ対象版で行う（#1513）。配布物のSHA-256、OS・WebKitGTK版、CPU実行方式、X11/Wayland・描画環境、fixtureのSHA-256、操作時刻を固定する。撮影なし／撮影あり／自動キー操作を区別し、labelのみ・criteriaのみ・group＋criteria・descriptionありを比較する。アプリ・network・WebKitWebProcessのPIDと終了時刻、stderr、利用できるexit status・signal・crash/core・OOM情報を保存する。元ホスト、別Linux、Macの結果は別行に残す。プロセス存否だけで原因を断定せず、非再現だけで解消扱いにしない。
+原記録の回収で得た377バイトのfixtureは [hover-rich.pfdsl.txt](evidence/2026-10-26-linux-hover-recovery/hover-rich.pfdsl.txt) をバイト列のまま `.pfdsl` へコピーして開く（SHA-256 `1a3457175367b886fff0de6d304f490be891d7dfe43f15c7df726ab3184e5933`）。
+10月23日の378バイト版とは末尾の改行が1個異なるため、両方を試す場合は別の入力条件として記録する。
+操作前にWebKitWebProcessのPIDと実ロードされたライブラリのパス・ハッシュ・版の根拠を保存し、可能な終了通知・stderr・core／OOM情報の採取を開始してから操作する。
+撮影とキー入力に加え、アクセシビリティ取得の有無と実行時点も記録し、採取手段による条件差を分ける。
+元環境はリセット済みなので、新規Linux環境を元ホストと同条件とは呼ばない。
+終了理由を採取できなければその制限を残し、試験終了のためのCtrl+C等を障害原因のsignalと混同しない。
+観測窓と異常時の状態保全は [次の採取手順](evidence/2026-10-26-linux-hover-summary/NEXT-LINUX-RUN.md) を参照し、短い非再現と遅延発症の未検証を区別する。
 状態：L未実施。記録：未記入。Mac/V公開ゲート外で正式Linux対応に広げない。
 
 ## 実装時の具体化

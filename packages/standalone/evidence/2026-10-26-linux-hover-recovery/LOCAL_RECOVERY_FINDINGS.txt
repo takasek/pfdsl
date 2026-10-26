@@ -1,0 +1,84 @@
+PFDSL #1513：既存ローカル記録の回収結果
+回収日：2026-10-26。新規のアプリ起動・再試験・設定変更は行っていません。
+
+1. 対象配布物と残存
+source b008ba8b43e5dc35f0c5d2b9d41f8ade2187a3c4、Actions run 39477198995 attempt 1。
+原保存場所：/workspace/shared/pfdsl-evaluation/artifact
+PFDSL.AppImage は現在も存在（113,039,864 bytes）。SHA-256:
+ce92083a00e8a494976205c35d0b23647de8064cb7b3582e9d76c4033309d268
+展開済み usr/bin/pfdsl-desktop SHA-256:
+9fa189996971ffc34b21edd62c4d3944268ebea5b96387c390745179dae52e7b
+展開済み AppDir の元 APPDIR_SHA256SUMS 全304件を今回再照合し、不一致0件。
+元 tar.gz（120,480,801 bytes）と appimage.zip（120,513,713 bytes）も残存。
+この回収セットには大きな配布物本体を重複収録せず、識別情報・チェックサム・起動スクリプトを収録。
+
+2. 元環境の確認範囲
+当時の記録では dot クラウド上 Debian 13 x86_64 のネイティブ Tauri/WebKitGTK ウィンドウ。ブラウザーによる代用ではない。
+実機/VM/コンテナの基盤種別、ホストCPU、エミュレーションの有無：不明。
+ただし s03_webkit_memory_check.jpg と s05_ps.jpg の当時の ps 画面には、PID1 の bubblewrap が --unshare-user / --unshare-pid / --unshare-ipc / --unshare-uts 等を使用し、X11ソケット /tmp/.X11-unix/X0 を bind した native-session が写っている。アプリを隔離した名前空間の証拠であり、基盤ホストの種別を確定するものではない。
+表示バックエンド：保存済み AppRun は GTK hook を source し、その hook は GDK_BACKEND=x11 を明示。上記X0ソケットとも整合する。Xvfbか実Xサーバーか、背後のWaylandの有無：不明。
+GPU機種、ハードウェア/ソフトウェア描画、GL renderer：不明。保存された実行時GPU調査は見つからない。
+WebKitGTK実ロード版・絶対パス：不明。実行プロセスの /proc/PID/maps や loader trace は未回収。
+build-environment.txt は配布物のビルド環境。Debian13.7、WebKitGTK2.54.0、libwebkit2gtk-4.1-0 2.54.0-1~deb13u2 とあるが、これを元GUI実行環境の実測値としない。
+preflight-ldd.txt では /workspace/shared/pfdsl-evaluation/artifact/squashfs-root/usr/lib/libwebkit2gtk-4.1.so.0 に解決する。これは事前依存関係解決であり、問題発生プロセスの実ロード確認ではない。
+当時の通常起動は展開済み squashfs-root で ./AppRun 2>&1 | tee ../../evidence/<log名>。AppImageをFUSE mountして起動した試験とは区別する。
+
+3. 3セッションの観測
+以下の操作時刻は当時作成された実施記録から再構成。全操作の機械可読イベントログはない。date -u が写るプロセス画像の時刻は一次証拠。レポート日付10月21日とは異なり、問題を観測したのは10月20日UTC（10月21日JST）。
+
+Session03 / 初回
+20:28 UTC開始。最初のPID1567を調整のため終了し、別の通常起動でPID1749となった。実際の障害対象ログは native-session-02b.log。native-session-03.log は先行PID1567のものなので取り違えない。
+20:33以降、release/approval関連ファイルの新しい成果物・定義・接続、検索、タブ遷移、整形、比較、幅変更、使い捨てファイル親ディレクトリの一時改名などを操作。
+20:53–20:54 package_manifestでF1 references検索後、Ctrl+K→Ctrl+I。ラベル・group・criteriaとGo to definition / Find allを含むrich hover。
+実施記録は成功hoverを20:54:16、Find allクリックとwebview AX消失を20:54:27付近とする。クリック単独が原因とは確定できない。
+以後Escape/F12/native WindowNextで復旧せず。ネイティブAboutは開き、その再描画でweb内容が白紙になった（画像あり）。
+20:57:00 UTCの s03_native_processes.jpg は date -u とps結果。app1749が存在し、WebKitWebProcessは表示されない。ただしこの最初のgrepは pfdsl|WebKitWebProcess のみで、networkを選択しない。
+続く s03_webkit_memory_check.jpg には広いgrep（1749|WebKit|bwrap）を実行した結果があり、app1749、network1774（親1749）、WebKitWebProcessなし。app RSS171296KB / network70128KB。
+/proc/1749/task/1749/children と /sys/fs/cgroup/memory.events/current/max は No such file or directory。OOMを否定できない。
+記録上、20:59–21:00:50に通常のwindow closeが効かず、該当AppRunのlaunch TerminalでCtrl+Cし終了。これは障害原因signalではなく事後の手動終了。終了コード・実際の受信signalは保存なし。
+未保存の使い捨て3バッファがアクセス不能になり、新規起動では戻らなかった。保存済み実文書の破損証拠ではない。
+
+Session04 / 新規起動
+21:01 UTC頃、PID2216、ログ native-session-04.log。
+最小label-only hover-find-all.pfdslではFind allが2回成功。Ctrl+F/Escape、F1 references/Escapeを挟んだ試行も成功。
+21:04–21:06に reconstructed-release.pfdslを2つ目のタブで開き、dirty comment、Ctrl+F package_manifest/Escape、F1 references/Escape、Ctrl+K→Ctrl+I。rich hover後のFind all操作付近でnative-only AX/凍結。Aboutで白紙（画像）。
+21:06頃のプロセス観測は実施記録由来。s04-native-processes.txt と画像にはapp2216とnetwork2241（親2216）、WebKitWebProcessなし。生テキスト内にdate行はない。
+rich hover表示の時点でAX link nodeが欠けていたという記録があり、Find allを原因と断定できない。
+21:07頃、該当AppRunのみ停止しsession05へ。終了コード・原因signalは不明。
+reconstructed-releaseは当時のscaffoldと編集記録からの再構成品で、消失したdirty bufferの厳密なexportではない。
+
+Session05 / 小さいfixtureによる切り分け
+21:07以降の新規起動、PID2469、ログ native-session-05.log。
+377 bytesの hover-rich.pfdsl をファイルとして単独タブに開いたと記録される。末尾空行を含む15 editor lines。
+21:10:20頃、source line14 package_manifestをクリック→Ctrl+K→Ctrl+I→スクリーンショット→Escape→その後にAX取得。Find allクリックなし、hoverを開いている間のAX取得なし。
+Escape後もhoverが凍結したまま（s05_hover_escape_1/2.jpg）。
+21:11:06 UTC（date -uが画像・テキスト双方に存在）、app2469とnetwork2494（親2469）のみ。WebKitWebProcessなし。app RSS171372KB / network69928KB。
+21:11:20頃に該当AppRunを停止と記録。終了コード・原因signalは不明。
+スクリーンショットと自動キー操作を含む試行であり、撮影なし・人間の手操作だけの対照ではない。
+
+4. stderr / signal / core / OOMの限界
+保存launchログはstdout/stderrを2>&1で合流しteeしたもので、stderr専用分離ファイルではない。
+PID1749: Gtk menu warning、Gdk gdk_window_get_window_type assertion、Gtk gtk_accessible_get_widget assertion。最後の記録は05:59:29.321（ログ表示時計）。
+PID2216: Gdk/GTK assertion at06:01:23、06:03:31、Gdk assertion at06:05:43。
+PID2469: Gdk/GTK assertion at06:08:07.236。
+これらのログ行には日付・timezoneがなく、05:xx/06:xxをUTCと扱わない。後日の同評価環境画像ではdate -uと通常clockに9時間差があるが、障害ログ自体のtimezoneを直接採取した証拠ではない。故障原因を示すbacktraceでもない。WebKitWebProcess自身の終了行・exit status・signalはない。
+3件とも障害前WebKitWebProcessのPIDは、この回収範囲では不明。障害後のpsで名前がないこと、UI凍結/白紙、native menu生存が主な根拠。特定child PIDの終了をwaitpidで捕捉した記録ではない。
+core dump / crash report / kernel OOM記録 / coredumpctl / dmesgの保存証拠は、この評価ディレクトリでは見つからない。『OOMやクラッシュがなかった』ではなく未確認。
+したがって最も堅い結論は『rich hover周辺の自動操作・撮影を含む3セッションで、内容UIが応答しなくなり、ネイティブpsでは本体/networkが残る一方WebKitWebProcessが見えなかった』。Find all原因、metadata table原因、特定signal、OOM、GPU、WebKitの特定版欠陥は未確定。
+
+5. 元環境と再試験
+配布物、展開AppDir、fixture、ログ、画像、最終PDF/DOCXは現在も残る。
+元の稼働中デスクトップ環境は既に10月21日最終作業前にリセットされた記録があり、s08_environment.jpgに04:27:04 UTCのdate、uptime約1h10、古いPFDSL/Terminalが存在しない状態が残る。現在の環境をそのまま元環境と呼べない。
+同一配布物・同一fixtureで新しい条件の試験を組むことは可能な候補だが、CPU/GPU/基盤/Xサーバー/実ロード版が未確認なので『完全に同じ条件』であることは保証できない。今回の回収では再試験を行っていない。
+
+6. 報告来歴・担当・原PDF
+実操作はdotのクラウド側の主操作担当によるSession03/04/05。3人の独立した担当者による再現ではない。独立した第2パスはそれより前のSession02であり、3件のhover観測とは別。担当の厳密な実行agent IDはこのローカルファイルだけでは確認できない。
+全3件でdotのcomputer-useによるキー・クリック自動操作と画面撮影を使用。当時記録にはSky key chords、desktop/bound click、AX state取得がある。人間の手操作だけの試験ではない。Session05ではスクリーンショット後にEscape、次いでAX取得という順序が記録されている。
+最小fixtureの実ロード確認：s05_hover_escape_1.jpg/2.jpgは上部にフルパス.../repro/hover/hover-rich.pfdsl、単独ファイルタブ、Saved状態を示す。可視範囲にはgroup delivery、Deliveryラベル、line14のpackage_manifest >> publish_release -> announcement、hoverにpackage manifest/criteria、対応する5ノード図が写る。従って単に文書へ文字列を貼った試験ではなく、ファイルを開き、そのモデルを表示した記録である。ただしhoverで隠れるソース行もあり、当時のエディタ全バイトをexportしてディスクと完全一致確認した証拠はない。
+正式納品は2026-10-21 04:40:11.249087 UTC（13:40:11 JST）。納品PDFをreport/PFDSL_usability_report_ja_DELIVERED.pdfとして同梱。元Library ID libfile_84b45c008b048191af5d204c6810f8ec、version0、1,875,100 bytes、SHA-256 57e276457b9b79eedf09de41445a765af55cc51afff92312ac7db5ddb458f132。
+ローカル原稿PDF（1,849,974 bytes、SHA-256 b1dc6e9cf7d7bae2e3b1430e32184ec327e712f2128820f195577b7b8977b695）とはPDFバイト列が異なる。回収担当の照合では13ページのpdftotext -layout出力および12埋込画像が一致。バイト差の原因は不明であり同一ファイルとは表現しない。
+PDF6ページの図6はs05_hover_escape_1.jpgのcrop[0,54,1180,490]に対応。13ページは再現手順と限界。評価全体はUTC10月20日19:17〜10月21日04:34の約9時間17分経過、連続稼働試験ではない。
+
+7. 収録と照合
+recovered-files.json に元パス、bytes、SHA-256を記録。スクリーンショットは試験用モデルと診断Terminalの当時画像で、編集・加工していない。
+ネイティブプロセスのprimary ps textと、そのコマンド・表示時計を含む画像を併せて読むこと。時系列は当時の実施記録から再構成し、raw ps・画像による証拠と区別した。
