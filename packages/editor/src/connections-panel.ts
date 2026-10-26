@@ -35,6 +35,7 @@ export function mountConnections(
 		navigate(id: string): void;
 		close(): void;
 		onOpenChange(open: boolean): void;
+		onRename?(oldId: string, newId: string): void;
 	},
 ) {
 	const document = container.ownerDocument;
@@ -60,6 +61,7 @@ export function mountConnections(
 				value?: string;
 				source: string;
 				reopen: boolean;
+				acknowledged?: boolean;
 		  }
 		| undefined;
 	const token = ++serial;
@@ -135,6 +137,10 @@ export function mountConnections(
 		const result = applyPreviewEdit(editing.source, request);
 		if (!result.ok) {
 			error.textContent = result.message;
+			return;
+		}
+		if (request.type === "renameNode" && result.source === editing.source) {
+			endRename(true);
 			return;
 		}
 		const message = { ...request, requestId: `${token}:${++requestSerial}` };
@@ -250,6 +256,9 @@ export function mountConnections(
 		setPopup({ type: "candidates", side });
 	}
 	function refreshInputs() {
+		centerButton.setAttribute("aria-disabled", String(!!pending));
+		idInput.readOnly = labelInput.readOnly = !!pending;
+		saveNode.disabled = cancelNode.disabled = !!pending;
 		for (const side of sides) {
 			const result =
 				editing && center
@@ -373,14 +382,99 @@ export function mountConnections(
 		return side;
 	}
 	const sides = [createSide(true), createSide(false)];
-	const centerLabel = document.createElement("strong");
+	const centerSection = document.createElement("div");
+	centerSection.className = "connections-identity";
+	const centerLabel = document.createElement("span");
 	centerLabel.className = "connections-center";
-	layout.append(sides[0]!.section, centerLabel, sides[1]!.section);
+	const centerButton = button("", "Edit node ID and label", () => {
+		if (!editing || !center || pending) return;
+		setPopup(undefined);
+		renameSource = editing.source;
+		idInput.value = center;
+		const kind = model?.nodeKinds.get(center);
+		const label =
+			kind === "artifact" || kind === "process"
+				? model?.frontmatter?.[kind]?.[center]?.label
+				: undefined;
+		labelInput.value = typeof label === "string" ? label : "";
+		renameForm.hidden = false;
+		centerButton.hidden = true;
+		error.textContent = "";
+		moveFocus(idInput);
+		idInput.select();
+	});
+	centerButton.append(centerLabel);
+	const renameForm = document.createElement("form");
+	renameForm.className = "node-rename-form";
+	renameForm.hidden = true;
+	let renameSource = "";
+	function field(text: string, accessibleName: string, multiline = false) {
+		const label = document.createElement("label");
+		label.textContent = text;
+		const input = document.createElement(multiline ? "textarea" : "input");
+		input.setAttribute("aria-label", accessibleName);
+		input.setAttribute("aria-describedby", error.id);
+		input.autocomplete = "off";
+		label.append(input);
+		renameForm.append(label);
+		return input;
+	}
+	const idInput = field("ID", "Node ID");
+	const labelInput = field("Label", "Node label", true);
+	function endRename(focus = false) {
+		renameForm.hidden = true;
+		centerButton.hidden = false;
+		if (focus) moveFocus(centerButton);
+	}
+	function followRename(
+		request: Extract<PreviewEditRequest, { type: "renameNode" }>,
+	) {
+		if (center !== request.nodeId) return;
+		center = request.newId;
+		host.onRename?.(request.nodeId, request.newId);
+		endRename(renameForm.contains(document.activeElement));
+	}
+	function saveRename() {
+		if (!center || pending) return;
+		submit({
+			type: "renameNode",
+			source: renameSource,
+			nodeId: center,
+			newId: idInput.value,
+			label: labelInput.value,
+		});
+	}
+	const saveNode = button("Save", "Save node ID and label", saveRename);
+	saveNode.dataset.saveNode = "";
+	const cancelNode = button("Cancel", "Cancel node editing", () => {
+		endRename(true);
+		error.textContent = "";
+	});
+	renameForm.append(saveNode, cancelNode);
+	renameForm.onsubmit = (event) => {
+		event.preventDefault();
+		saveRename();
+	};
+	renameForm.onkeydown = (event) => {
+		if (
+			event.key === "Enter" &&
+			(event.target === idInput ||
+				(event.target === labelInput && (event.ctrlKey || event.metaKey)))
+		) {
+			event.preventDefault();
+			if (!event.isComposing) saveRename();
+		}
+	};
+	centerSection.append(centerButton, renameForm);
+	layout.append(sides[0]!.section, centerSection, sides[1]!.section);
 	panel.onkeydown = (event) => {
 		if (event.isComposing || event.key !== "Escape") return;
 		event.preventDefault();
 		event.stopPropagation();
-		if (popup) dismissPopup();
+		if (!renameForm.hidden) {
+			endRename(true);
+			error.textContent = "";
+		} else if (popup) dismissPopup();
 		else host.close();
 	};
 	function showEdge(edge: NormalizedEdge, trigger: HTMLButtonElement) {
@@ -478,6 +572,10 @@ export function mountConnections(
 		const wasEdge = focused?.hasAttribute("data-edge");
 		title.textContent = `Connections — ${caption(center)}`;
 		shape(centerLabel, center);
+		centerButton.setAttribute(
+			"aria-label",
+			`Edit ${caption(center)} ID and label`,
+		);
 		definition.textContent = editing.nodes.find((n) => n.id === center)?.defined
 			? "Go to definition"
 			: "Create definition";
@@ -542,6 +640,7 @@ export function mountConnections(
 				? popup.trigger
 				: document.activeElement;
 		if (center !== id) {
+			endRename();
 			for (const side of sides) side.input.value = "";
 			// Navigation abandons input feedback, not the edit already sent to the host.
 			if (pending) delete pending.side;
@@ -580,6 +679,7 @@ export function mountConnections(
 		isOpen: () => center !== undefined,
 		centerId: () => center,
 		close() {
+			endRename();
 			center = undefined;
 			if (pending) delete pending.side;
 			acceptedAddition = undefined;
@@ -597,6 +697,23 @@ export function mountConnections(
 				popup?.type === "edge" && menu.contains(document.activeElement)
 					? popup.trigger
 					: document.activeElement;
+			const renameRequest =
+				pending?.request.type === "renameNode" ? pending.request : undefined;
+			if (
+				pending &&
+				renameRequest &&
+				data &&
+				(data.source === pending.source ||
+					(data.source !== renameRequest.source &&
+						data.nodes.some((n) => n.id === renameRequest.newId) &&
+						(pending.acknowledged ||
+							!data.nodes.some((n) => n.id === renameRequest.nodeId))))
+			) {
+				followRename(renameRequest);
+				if (pending.acknowledged) pending = undefined;
+			}
+			if (pending?.acknowledged && data?.source !== pending.request.source)
+				pending = undefined;
 			if (
 				pending &&
 				data?.source !== pending.request.source &&
@@ -631,9 +748,23 @@ export function mountConnections(
 			// A reply updates data; the user may already be working elsewhere.
 			if (!pending || message.request.requestId !== pending.request.requestId)
 				return;
+			if (
+				message.ok &&
+				pending.request.type === "renameNode" &&
+				editing?.source === pending.request.source &&
+				editing.source !== pending.source
+			) {
+				pending.acknowledged = true;
+				return;
+			}
 			const { request, side, value, source, reopen } = pending;
 			pending = undefined;
 			if (message.ok) {
+				if (
+					request.type === "renameNode" &&
+					editing?.nodes.some((n) => n.id === request.newId)
+				)
+					followRename(request);
 				if (
 					request.type === "addConnector" &&
 					editing?.source === request.source

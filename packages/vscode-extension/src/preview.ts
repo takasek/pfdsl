@@ -499,7 +499,8 @@ export function registerPreview(context: vscode.ExtensionContext): {
 				msg.type === "createDefinition" ||
 				msg.type === "addConnector" ||
 				msg.type === "deleteConnector" ||
-				msg.type === "toggleFeedback"
+				msg.type === "toggleFeedback" ||
+				msg.type === "renameNode"
 			) {
 				await editFromPreview(state, msg);
 			} else if (msg.type === "nodeClick") {

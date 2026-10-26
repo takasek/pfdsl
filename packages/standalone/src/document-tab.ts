@@ -136,7 +136,8 @@ export function createDocumentTab({
 				message.type === "createDefinition" ||
 				message.type === "addConnector" ||
 				message.type === "deleteConnector" ||
-				message.type === "toggleFeedback"
+				message.type === "toggleFeedback" ||
+				message.type === "renameNode"
 			) {
 				const beforeSource = editor.getValue();
 				const result = applyPreviewEdit(beforeSource, message);

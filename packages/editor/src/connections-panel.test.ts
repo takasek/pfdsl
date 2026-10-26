@@ -10,6 +10,273 @@ const dispose: Array<() => void> = [];
 it.each([
 	true,
 	false,
+])("finishes a label-only save with a coalesced render (renderFirst=%s)", async (renderFirst) => {
+	const s = await setup();
+	s.container
+		.querySelector<HTMLButtonElement>(".connections-identity > button")!
+		.click();
+	s.container.querySelector<HTMLTextAreaElement>(
+		'[aria-label="Node label"]',
+	)!.value = "Build";
+	s.container.querySelector<HTMLButtonElement>("[data-save-node]")!.click();
+	const request = s.postMessage.mock.calls.at(-1)![0];
+	const result = previewEdits.applyPreviewEdit(s.source, request);
+	if (!result.ok) throw new Error(result.message);
+	const redraw = () =>
+		s.preview.receive(
+			prepareDocument(
+				analyzeSnapshot(`${result.source}# later edit\n`),
+				null,
+				() => null,
+			).message,
+		);
+	if (renderFirst) await redraw();
+	await s.preview.receive({ type: "editResult", request, ok: true });
+	if (!renderFirst) await redraw();
+	expect(
+		s.container.querySelector<HTMLElement>(".node-rename-form")!.hidden,
+	).toBe(true);
+	expect(s.container.querySelector(".connections-center")!.textContent).toBe(
+		"p (Build)",
+	);
+});
+
+it.each([
+	true,
+	false,
+])("follows rename when its render includes another source change (renderFirst=%s)", async (renderFirst) => {
+	const s = await setup();
+	s.container
+		.querySelector<HTMLButtonElement>(".connections-identity > button")!
+		.click();
+	s.container.querySelector<HTMLInputElement>('[aria-label="Node ID"]')!.value =
+		"build";
+	s.container.querySelector<HTMLButtonElement>("[data-save-node]")!.click();
+	const request = s.postMessage.mock.calls.at(-1)![0];
+	const result = previewEdits.applyPreviewEdit(s.source, request);
+	if (!result.ok) throw new Error(result.message);
+	const redraw = () =>
+		s.preview.receive(
+			prepareDocument(
+				analyzeSnapshot(`${result.source}# later edit\n`),
+				null,
+				() => null,
+			).message,
+		);
+	if (renderFirst) await redraw();
+	await s.preview.receive({ type: "editResult", request, ok: true });
+	if (!renderFirst) await redraw();
+	expect(s.container.querySelector<HTMLElement>("#node-actions")!.hidden).toBe(
+		false,
+	);
+	expect(s.container.querySelector(".connections-center")!.textContent).toBe(
+		"build",
+	);
+	expect(
+		s.container.querySelector<HTMLButtonElement>("[data-save-node]")!.disabled,
+	).toBe(false);
+});
+
+it("preserves multiline labels when changing only the ID", async () => {
+	const s = await setup(
+		'---\nprocess:\n  p:\n    label: "Build\\nresult"\n---\na >> p -> b\n',
+	);
+	s.container
+		.querySelector<HTMLButtonElement>(".connections-identity > button")!
+		.click();
+	const name = s.container.querySelector<HTMLTextAreaElement>(
+		'[aria-label="Node label"]',
+	)!;
+	expect(name.value).toBe("Build\nresult");
+	name.dispatchEvent(
+		new KeyboardEvent("keydown", { key: "Enter", bubbles: true }),
+	);
+	expect(s.postMessage).not.toHaveBeenCalled();
+	s.container.querySelector<HTMLInputElement>('[aria-label="Node ID"]')!.value =
+		"build";
+	s.container.querySelector<HTMLButtonElement>("[data-save-node]")!.click();
+	expect(s.postMessage.mock.calls.at(-1)![0]).toMatchObject({
+		label: "Build\nresult",
+	});
+});
+
+it.each([
+	"navigate",
+	"close",
+])("does not return to the renamed node after %s while saving", async (action) => {
+	const s = await setup();
+	s.container
+		.querySelector<HTMLButtonElement>(".connections-identity > button")!
+		.click();
+	s.container.querySelector<HTMLInputElement>('[aria-label="Node ID"]')!.value =
+		"build";
+	s.container.querySelector<HTMLButtonElement>("[data-save-node]")!.click();
+	const request = s.postMessage.mock.calls.at(-1)![0];
+	if (action === "navigate")
+		s.container
+			.querySelector<HTMLButtonElement>('[data-neighbor="b"]')!
+			.click();
+	else
+		s.container
+			.querySelector<HTMLButtonElement>("#node-actions-close")!
+			.click();
+	const result = previewEdits.applyPreviewEdit(s.source, request);
+	if (!result.ok) throw new Error(result.message);
+	await s.preview.receive({ type: "editResult", request, ok: true });
+	await s.preview.receive(
+		prepareDocument(analyzeSnapshot(result.source), null, () => null).message,
+	);
+	expect(s.container.querySelector<HTMLElement>("#node-actions")!.hidden).toBe(
+		action === "close",
+	);
+	if (action === "navigate")
+		expect(s.container.querySelector(".connections-center")!.textContent).toBe(
+			"b",
+		);
+});
+
+it("keeps an unchanged save local and ignores IME confirmation", async () => {
+	const s = await setup();
+	const trigger = s.container.querySelector<HTMLButtonElement>(
+		".connections-identity > button",
+	)!;
+	trigger.click();
+	const id = s.container.querySelector<HTMLInputElement>(
+		'[aria-label="Node ID"]',
+	)!;
+	id.dispatchEvent(
+		new KeyboardEvent("keydown", {
+			key: "Enter",
+			isComposing: true,
+			bubbles: true,
+		}),
+	);
+	expect(s.postMessage).not.toHaveBeenCalled();
+	expect(
+		s.container.querySelector<HTMLElement>(".node-rename-form")!.hidden,
+	).toBe(false);
+	s.container.querySelector<HTMLButtonElement>("[data-save-node]")!.click();
+	expect(s.postMessage).not.toHaveBeenCalled();
+	expect(
+		s.container.querySelector<HTMLElement>(".node-rename-form")!.hidden,
+	).toBe(true);
+	expect(document.activeElement).toBe(trigger);
+});
+
+it("does not overwrite newer source with an open rename draft", async () => {
+	const s = await setup();
+	s.container
+		.querySelector<HTMLButtonElement>(".connections-identity > button")!
+		.click();
+	const id = s.container.querySelector<HTMLInputElement>(
+		'[aria-label="Node ID"]',
+	)!;
+	id.value = "build";
+	await s.preview.receive(
+		prepareDocument(analyzeSnapshot(`${s.source}extra\n`), null, () => null)
+			.message,
+	);
+	s.container.querySelector<HTMLButtonElement>("[data-save-node]")!.click();
+	expect(s.postMessage).not.toHaveBeenCalled();
+	expect(
+		s.container.querySelector("#node-actions-error")!.textContent,
+	).toContain("document changed");
+	expect(id.value).toBe("build");
+});
+
+it.each([
+	true,
+	false,
+])("edits the center ID and label without closing Connections (renderFirst=%s)", async (renderFirst) => {
+	const s = await setup();
+	s.container
+		.querySelector<HTMLButtonElement>(".connections-identity > button")!
+		.click();
+	const id = s.container.querySelector<HTMLInputElement>(
+		'[aria-label="Node ID"]',
+	)!;
+	const name = s.container.querySelector<HTMLInputElement>(
+		'[aria-label="Node label"]',
+	)!;
+	expect(document.activeElement).toBe(id);
+	id.value = "build";
+	name.value = "Build result";
+	s.container.querySelector<HTMLButtonElement>("[data-save-node]")!.click();
+	const request = s.postMessage.mock.calls.at(-1)![0];
+	expect(request).toMatchObject({
+		type: "renameNode",
+		nodeId: "p",
+		newId: "build",
+		label: "Build result",
+	});
+	const result = previewEdits.applyPreviewEdit(s.source, request);
+	if (!result.ok) throw new Error(result.message);
+	const redraw = () =>
+		s.preview.receive(
+			prepareDocument(analyzeSnapshot(result.source), null, () => null).message,
+		);
+	if (renderFirst) await redraw();
+	await s.preview.receive({ type: "editResult", request, ok: true });
+	if (!renderFirst) {
+		expect(
+			s.container.querySelector<HTMLButtonElement>("[data-save-node]")!
+				.disabled,
+		).toBe(true);
+		await redraw();
+	}
+	expect(s.container.querySelector<HTMLElement>("#node-actions")!.hidden).toBe(
+		false,
+	);
+	expect(
+		s.container.querySelector(".connections-center")!.textContent,
+	).toContain("build (Build result)");
+	expect(s.container.querySelector('[data-neighbor="a"]')).not.toBeNull();
+	expect(s.container.querySelector('[data-neighbor="b"]')).not.toBeNull();
+});
+
+it("cancels center editing with Escape and keeps the panel open", async () => {
+	const s = await setup();
+	const trigger = s.container.querySelector<HTMLButtonElement>(
+		".connections-identity > button",
+	)!;
+	trigger.click();
+	const id = s.container.querySelector<HTMLInputElement>(
+		'[aria-label="Node ID"]',
+	)!;
+	id.value = "unsaved";
+	id.dispatchEvent(
+		new KeyboardEvent("keydown", { key: "Escape", bubbles: true }),
+	);
+	expect(
+		s.container.querySelector<HTMLElement>(".node-rename-form")!.hidden,
+	).toBe(true);
+	expect(s.container.querySelector<HTMLElement>("#node-actions")!.hidden).toBe(
+		false,
+	);
+	expect(document.activeElement).toBe(trigger);
+	expect(s.postMessage).not.toHaveBeenCalled();
+});
+
+it("keeps rejected rename input available for correction", async () => {
+	const s = await setup();
+	s.container
+		.querySelector<HTMLButtonElement>(".connections-identity > button")!
+		.click();
+	const id = s.container.querySelector<HTMLInputElement>(
+		'[aria-label="Node ID"]',
+	)!;
+	id.value = "a";
+	s.container.querySelector<HTMLButtonElement>("[data-save-node]")!.click();
+	expect(s.postMessage).not.toHaveBeenCalled();
+	expect(
+		s.container.querySelector("#node-actions-error")!.textContent,
+	).toContain("already exists");
+	expect(id.value).toBe("a");
+});
+
+it.each([
+	true,
+	false,
 ])("does not reopen dismissed candidates on late success (renderFirst=%s)", async (renderFirst) => {
 	const s = await setup();
 	const input = s.container.querySelector<HTMLInputElement>(

@@ -142,6 +142,12 @@ export function mountPreview(container: HTMLElement, host: PreviewHost) {
 	)!;
 	const connections = mountConnections(container, {
 		postMessage: host.postMessage,
+		onRename(oldId, newId) {
+			if (selectedNodeId === oldId) selectedNodeId = newId;
+			if (lastFocusedNodeId === oldId) lastFocusedNodeId = newId;
+			if (pendingFocusNodeId === oldId) pendingFocusNodeId = newId;
+			if (recoverConnectionsId === oldId) recoverConnectionsId = newId;
+		},
 		navigate(id) {
 			selectedNodeId = pendingFocusNodeId = id;
 			pendingFocusCue = true;

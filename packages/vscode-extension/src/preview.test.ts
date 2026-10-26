@@ -729,6 +729,7 @@ it.each([
 	"createDefinition",
 	"deleteConnector",
 	"toggleFeedback",
+	"renameNode",
 	"nodeClick",
 ] as const)("reuses a moved inactive source tab for %s", async (type) => {
 	const { open } = setup();
@@ -761,16 +762,24 @@ it.each([
 	await panel.receive(
 		type === "nodeClick"
 			? { type, nodeId: "p" }
-			: type === "deleteConnector" || type === "toggleFeedback"
-				? {
-						type,
-						nodeId: "p",
-						source,
-						artifact: "a",
-						process: "p",
-						kind: "input",
-					}
-				: { type, nodeId: "p", source, connector: "->", otherId: "new_result" },
+			: type === "renameNode"
+				? { type, nodeId: "p", newId: "build", label: "Build", source }
+				: type === "deleteConnector" || type === "toggleFeedback"
+					? {
+							type,
+							nodeId: "p",
+							source,
+							artifact: "a",
+							process: "p",
+							kind: "input",
+						}
+					: {
+							type,
+							nodeId: "p",
+							source,
+							connector: "->",
+							otherId: "new_result",
+						},
 	);
 	expect(host.window.showTextDocument).toHaveBeenCalled();
 	for (const [openedDoc, options] of host.window.showTextDocument.mock.calls) {
