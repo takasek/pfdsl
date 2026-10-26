@@ -10,27 +10,35 @@
 ## 採用するファイル構成の変更（2026-10-26）
 
 所有者の「companionもWiki本文で記述したい。ただしファイルは分かれていたほうがよい」という指示に基づき、companionはWiki本文、PFD正本は別ファイルとする。
-以下は役割を示す配置例であり、実運用への切替や既存試験ページの変更を実施した宣言ではない。
+所有者の追加指示「companionとpfdslは同名です。まとめページのほうに区別をつけたい。roadmap.index.mdとか？」に基づき、まとめページを `roadmap.index.md` に分ける。
+以下は採用構成であり、小さな試験PFDでの表示確認と実運用への切替を区別する。
 
 | Wiki内のファイル | 役割 | 更新する主体 |
 | --- | --- | --- |
-| `roadmap.md` | companionの正本。既存companionの内容を本文に置き、SVGを埋め込み、PFD正本へリンクする | 人間・承認された編集経路 |
+| `roadmap.index.md` | まとめページ。SVGを埋め込み、companionのWikiプレビューと原文、PFD原文、SVGへリンクする | 人間・承認された編集経路 |
+| `roadmap.md` | companionの正本。既存companionの内容をWiki本文として記述する | 人間・承認された編集経路 |
 | `roadmap.pfdsl` | 依存関係・進捗を持つPFDの正本 | PFDの編集経路 |
 | `roadmap.svg` | PFDから生成する表示用の図 | 描画処理 |
 
-閲覧上はWikiページにcompanion本文と図がまとまり、保存上はMarkdown・PFD・SVGの3ファイルに分かれる。
+companionとPFDは同じbasenameの `roadmap.md` / `roadmap.pfdsl` とし、まとめページだけ `.index.md` で区別する。
+図とリンクはまとめページで閲覧し、companionのプレビューは独立したWikiページで開く。保存上はMarkdown2ファイル・PFD・SVGの4ファイルに分かれる。
 所有者判断により、この分離構成のファイル名は小文字の `roadmap` に揃える。
 Wiki本文のコードブロックをPFDの第二正本として維持しない。
 companionも本体repoから移す方向とし、切替時に本体側の編集可能な第二正本を残さない。
 採用設定・取得処理・workflow等、本体repoに属する実装と設定までWikiへ移すことは要求しない。
 
 この判断は、当初の「Wiki本文の単一PFDフェンスを正本にする」「companionは本体repoに残す」という案を置換する。
+companion本文に図とプレビューの自己リンクを置いた途中案も置換する。
 下に残す単一フェンス抽出・更新候補コマンドと `Roadmap-Trial.md` の公開結果は、旧候補の試作証拠である。
 分離ファイル方式の取得・更新・表示まで受入済みとは扱わず、次の準備実装は独立したPFDファイルを扱う形に変える。
 companionはWiki本文として編集できるが、独立PFDファイルのWeb編集可否はまだ確認していない。
 正式に対応する編集経路は、その確認とGit編集の受入に基づいて決める。
 取得側は同じWiki固定版からcompanionとPFDを取り、SVGはそのPFDと参照先の固定版に対応付ける。
 同時更新の検査は、PFDとcompanionの変更を同じcommitへ一律に束ねるためでなく、各編集が基にしたファイルを別の内容へ上書きしないために行う。
+
+試験用のまとめページは [roadmap.index](https://github.com/takasek/pfdsl/wiki/roadmap.index)、companionプレビューは [roadmap](https://github.com/takasek/pfdsl/wiki/roadmap) で公開した。
+Wiki版 `584c688185fe965debdb1e769c47f32b075a6dfe` で、まとめページからcompanionへの遷移と図の表示を確認した。
+このcompanionは試験用の説明であり、本体repoにある運用companionの移行完了を表さない。
 
 ## 今回の判断と方式比較
 
