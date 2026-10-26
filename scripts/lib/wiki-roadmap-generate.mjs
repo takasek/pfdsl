@@ -10,18 +10,19 @@ import {
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { isAbsolute, join, relative } from "node:path";
-import {
-	analyze,
-	loadDependencyClosure,
-	parse,
-	wrapPresetSource,
-} from "../../packages/core/dist/index.js";
+import { fileURLToPath } from "node:url";
 import {
 	run,
 	git as runGit,
 	withoutGitTargetEnvironment,
 } from "./run-exec.mjs";
 import { toolIdentity } from "./wiki-roadmap-spike.mjs";
+
+// Like gen-samples, load the build output at runtime; it is absent in unbuilt clones.
+const { analyze, loadDependencyClosure, parse, wrapPresetSource } =
+	await import(
+		fileURLToPath(new URL("../../packages/core/dist/index.js", import.meta.url))
+	);
 
 const outputs = ["roadmap.index.md", "roadmap.svg"];
 const inputs = ["roadmap.pfdsl", "roadmap.md"];
