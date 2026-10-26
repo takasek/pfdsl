@@ -14,11 +14,12 @@
 
 | Wiki内のファイル | 役割 | 更新する主体 |
 | --- | --- | --- |
-| `Roadmap.md` | companionの正本。既存companionの内容を本文に置き、SVGを埋め込み、PFD正本へリンクする | 人間・承認された編集経路 |
-| `Roadmap.pfdsl` | 依存関係・進捗を持つPFDの正本 | PFDの編集経路 |
-| `Roadmap.svg` | PFDから生成する表示用の図 | 描画処理 |
+| `roadmap.md` | companionの正本。既存companionの内容を本文に置き、SVGを埋め込み、PFD正本へリンクする | 人間・承認された編集経路 |
+| `roadmap.pfdsl` | 依存関係・進捗を持つPFDの正本 | PFDの編集経路 |
+| `roadmap.svg` | PFDから生成する表示用の図 | 描画処理 |
 
 閲覧上はWikiページにcompanion本文と図がまとまり、保存上はMarkdown・PFD・SVGの3ファイルに分かれる。
+所有者判断により、この分離構成のファイル名は小文字の `roadmap` に揃える。
 Wiki本文のコードブロックをPFDの第二正本として維持しない。
 companionも本体repoから移す方向とし、切替時に本体側の編集可能な第二正本を残さない。
 採用設定・取得処理・workflow等、本体repoに属する実装と設定までWikiへ移すことは要求しない。
