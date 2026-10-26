@@ -2,6 +2,14 @@ import type { DiffReport } from "@pfdsl/core";
 import type { PreviewEditRequest } from "./preview-edit.js";
 import type { PreviewGraph } from "./preview-graph.js";
 
+/** Host document lifetime and content version; Undo advances the version too. */
+export interface SourceRevision {
+	epoch: number;
+	version: number;
+	/** Rename whose node disappeared during Undo, including discarded snapshots. */
+	invalidatedRenameRequestId?: string | undefined;
+}
+
 /** Transport identity is separate from the source edit calculation. */
 export type PreviewEditMessage = PreviewEditRequest & {
 	requestId?: string;
@@ -19,6 +27,7 @@ export type MessageToWebview =
 	| {
 			type: "render";
 			dot: string;
+			sourceRevision?: SourceRevision;
 			focusNodeId?: string;
 			descriptions?: Record<string, Array<[string, string]>>;
 			locations?: Record<string, string[]>;
@@ -47,6 +56,8 @@ export type MessageToWebview =
 			request: PreviewEditMessage;
 			ok: boolean;
 			message?: string;
+			/** Successful rename: host version and any observed invalidation. */
+			sourceRevision?: SourceRevision;
 	  };
 
 export type MessageFromWebview =

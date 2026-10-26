@@ -3,6 +3,8 @@ import {
 	insertDefinition,
 	loadFrontmatter,
 	type Range,
+	rename,
+	setFrontmatterField,
 } from "@pfdsl/core";
 import { type ConnectionEdit, editConnection } from "./connection-edit.js";
 import {
@@ -22,6 +24,13 @@ import {
 
 export type PreviewEditRequest =
 	| ConnectionEdit
+	| {
+			type: "renameNode";
+			nodeId: string;
+			source: string;
+			newId: string;
+			label: string;
+	  }
 	| { type: "createDefinition"; nodeId: string; source: string }
 	| {
 			type: "addConnector";
@@ -153,6 +162,63 @@ export function applyPreviewEdit(
 			: editableNodeError(model, request.nodeId);
 	if (invalid) return fail(invalid);
 	const kind = model.nodeKinds.get(request.nodeId) as "artifact" | "process";
+	if (request.type === "renameNode") {
+		if (
+			!request.newId.trim() ||
+			/[\r\n]/.test(request.newId) ||
+			request.newId.includes("\0")
+		)
+			return fail("Enter a non-empty, single-line ID.");
+		if (request.newId !== request.nodeId && model.frontmatter?.extends)
+			return fail(
+				"ID changes in documents using extends require the CLI rename command. Label changes are available here.",
+			);
+		const renamed = rename(source, request.nodeId, request.newId, {
+			analysis: model,
+		});
+		// An unchanged ID still checks the rename safety rules (including shared YAML).
+		if (
+			!renamed.ok &&
+			!(request.newId === request.nodeId && renamed.reason === "newExists")
+		)
+			return fail(
+				renamed.reason === "newExists"
+					? "This ID already exists."
+					: `The node cannot be renamed safely (${renamed.reason}).`,
+			);
+		let output = renamed.ok ? renamed.output : source;
+		if (
+			request.label !==
+			(model.frontmatter?.[kind]?.[request.nodeId]?.label ?? "")
+		) {
+			if (
+				findUndefinedNodeKind(
+					model.nodeKinds,
+					model.frontmatter,
+					request.nodeId,
+				)
+			) {
+				const inserted = insertDefinition(output, kind, request.newId, {
+					label: request.label,
+				});
+				if (!inserted.inserted)
+					return fail("The label definition could not be inserted safely.");
+				output = inserted.output + loadFrontmatter(output).body;
+			} else {
+				const updated = setFrontmatterField(
+					output,
+					kind,
+					request.newId,
+					"label",
+					request.label,
+				);
+				if (updated === null)
+					return fail("The label could not be changed safely.");
+				output = updated;
+			}
+		}
+		return { ok: true, source: output, edit: sourceEdit(source, output) };
+	}
 	if (request.type === "deleteConnector" || request.type === "toggleFeedback") {
 		const result = editConnection(source, request);
 		return "message" in result

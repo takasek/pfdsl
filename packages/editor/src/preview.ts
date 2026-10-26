@@ -142,6 +142,12 @@ export function mountPreview(container: HTMLElement, host: PreviewHost) {
 	)!;
 	const connections = mountConnections(container, {
 		postMessage: host.postMessage,
+		onRename(oldId, newId) {
+			if (selectedNodeId === oldId) selectedNodeId = newId;
+			if (lastFocusedNodeId === oldId) lastFocusedNodeId = newId;
+			if (pendingFocusNodeId === oldId) pendingFocusNodeId = newId;
+			if (recoverConnectionsId === oldId) recoverConnectionsId = newId;
+		},
 		navigate(id) {
 			selectedNodeId = pendingFocusNodeId = id;
 			pendingFocusCue = true;
@@ -866,10 +872,12 @@ export function mountPreview(container: HTMLElement, host: PreviewHost) {
 		host.onStateChange?.();
 	}
 
+	let deferredRender: Extract<MessageToWebview, { type: "render" }> | undefined;
 	async function receive(msg: MessageToWebview) {
 		if (disposed) return;
 		if (msg.type === "editResult") {
 			connections.result(msg);
+			if (deferredRender) await receive(deferredRender);
 			if (pendingRepair && msg.request.requestId === pendingRepair && !msg.ok) {
 				pendingRepair = undefined;
 				repairNotice!.textContent =
@@ -878,9 +886,18 @@ export function mountPreview(container: HTMLElement, host: PreviewHost) {
 			}
 			return;
 		}
+		const panelFocused = actions.contains(document.activeElement);
+		if (msg.type === "render") {
+			if (!connections.update(msg.editing, msg.sourceRevision)) {
+				deferredRender = msg;
+				return;
+			}
+			deferredRender = undefined;
+		}
 		const currentRevision =
 			msg.type === "render" || msg.type === "error" ? ++revision : revision;
 		if (msg.type === "error") {
+			deferredRender = undefined;
 			cancelNodeClick();
 			clearSyncEcho();
 			showError(msg.message, msg.repair);
@@ -924,8 +941,6 @@ export function mountPreview(container: HTMLElement, host: PreviewHost) {
 		clearRepair();
 		error.replaceChildren();
 		hideHover();
-		const panelFocused = actions.contains(document.activeElement);
-		connections.update(msg.editing);
 		if (panelFocused && !connections.isOpen()) helpToggle.focus();
 		clearCue();
 		// The cursor hint supplied while opening must not displace the initial Fit.
