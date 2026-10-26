@@ -472,7 +472,7 @@ subgraph cluster_g1 {
 
 各 `.pfdsl` ファイルは独立した ID 名前空間を持つ。artifact ID および process ID はファイル内でのみ一意であればよい。グローバルレジストリは持たない。
 
-異なるファイルが同名 ID を持っていても衝突しない。制約 V001（§15.1 単一生成元制約）/ V002・V003（§15.2 プロセス完全性制約）はファイル単位で成立すれば十分とする。
+異なるファイルが同名 ID を持っていても衝突しない。制約 V001（[[SPEC_single_producer_constraint]] 単一生成元制約）/ V002・V003（§15.2 プロセス完全性制約）はファイル単位で成立すれば十分とする。
 
 W003（status 非単調, §15.6）を含む status 系検査も同様にファイル単位で閉じる。各ファイルの status 宣言のみを見て評価し、複数ファイルを跨いだ平坦化ビューを構成しない。境界 artifact のメタデータ権威（親優先, §2.9.3）と組み合わせた場合も、検査はファイル単位で行うため、平坦化ビューでのみ現れる非単調は警告対象としない。
 
@@ -1012,7 +1012,7 @@ edge は接続 node の rank に基づき昇順に整列する。
 
 ## 15. 制約
 
-### 15.1 単一生成元制約
+### 15.1 単一生成元制約 (SPEC_single_producer_constraint)
 
 Primary Graph において、同一 Artifact を複数 Process が生成してはならない。
 
@@ -1218,7 +1218,7 @@ Artifact / Process 同士の矛盾は引き続き N001 / N002 が扱う。
 | P008 | error | §10 | チェーン継続でプロセス識別子が無い |
 | P010 | error | §10 | チェーン継続で artifact 式が無い |
 | P011 | error | §11 | artifact 集合を閉じる `]` が無い |
-| V001 | error | §15.1 | 同一 Artifact を複数 Process が生成 |
+| V001 | error | [[SPEC_single_producer_constraint]] | 同一 Artifact を複数 Process が生成 |
 | V002 | warning (--strict: error) | §15.2 | Process に入力が無い |
 | V003 | warning (--strict: error) | §15.2 | Process に出力が無い |
 | V004 | error | §15.5 | parts のメンバーが Process |
