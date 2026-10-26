@@ -920,7 +920,8 @@ const DEFAULT_CODEX_ASSEMBLY_DEPS = {
 
 /**
  * Generates the Codex repository and plugin assets from the maintained
- * Claude sources. Each output is first written to a temporary sibling; only
+ * harness-neutral sources, including repository-only agents. Each output is
+ * first written to a temporary sibling; only
  * after every write succeeds are the destinations replaced together.
  * @param {{root: string, codexPluginRoot?: string, capabilities?: object[], deps?: object, runId?: string}} options
  */

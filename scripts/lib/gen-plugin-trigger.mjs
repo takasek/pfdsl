@@ -20,18 +20,19 @@
 
 import { GEN_SKILL_TRIGGER_PATTERN } from "./gen-skill-trigger.mjs";
 import {
-	DISTRIBUTED_AGENTS,
+	CLAUDE_GENERATED_CAPABILITY_OUTPUTS,
 	DISTRIBUTED_COMMANDS,
 	DISTRIBUTED_SKILLS,
 } from "./harness-inventory.mjs";
 
-// All three alternations are derived from the same lists gen-plugin bundles
-// from, so adding a skill, command or agent cannot land in the assembly and be
-// forgotten in the drift trigger.
+// Cover distributed skills/commands and every generated repository agent,
+// including agents intentionally excluded from the plugin.
 const escapeDots = (name) => name.replace(/\./g, "\\.");
-const AGENT_PATTERNS = DISTRIBUTED_AGENTS.map(
-	(file) => `\\.claude/agents/${escapeDots(file)}`,
-).join("|");
+const AGENT_PATTERNS = CLAUDE_GENERATED_CAPABILITY_OUTPUTS.filter((path) =>
+	path.startsWith(".claude/agents/"),
+)
+	.map(escapeDots)
+	.join("|");
 const SKILL_PATTERNS = DISTRIBUTED_SKILLS.map(
 	(dir) => `\\.claude/skills/${escapeDots(dir)}/`,
 ).join("|");
@@ -46,5 +47,5 @@ const COMMAND_PATTERNS = DISTRIBUTED_COMMANDS.map(
 const GEN_PLUGIN_TRIGGER_PATTERN = `${GEN_SKILL_TRIGGER_PATTERN}|scripts/gen-plugin\\.mjs|scripts/lib/gen-plugin\\.mjs|scripts/lib/bundle-manifest\\.mjs|scripts/gen-plugin-dist-independent\\.mjs|scripts/gen-codex-assets\\.mjs|scripts/lib/gen-codex-assets\\.mjs|scripts/lib/root-instructions\\.mjs|scripts/root-instructions-template/|scripts/lib/markdown-heading\\.mjs|scripts/lib/distribution-sources\\.mjs|scripts/lib/harness-capability-contract\\.mjs|scripts/lib/harness-source-decoder\\.mjs|scripts/lib/git-ignore-oracle\\.mjs|scripts/lib/git-ls-files\\.mjs|scripts/lib/git-environment\\.mjs|scripts/lib/harness-inventory\\.mjs|${SKILL_PATTERNS}|${COMMAND_PATTERNS}|${AGENT_PATTERNS}|^CLAUDE\\.md$|^\\.claude/settings\\.json$|^hooks/|^generated/|^plugin/|^AGENTS\\.md$|^\\.agents/|^\\.codex/|packages/cli/package\\.json|^\\.claude-plugin/marketplace\\.json`;
 
 export const GEN_PLUGIN_TRIGGER = new RegExp(
-	`${GEN_PLUGIN_TRIGGER_PATTERN}|^scripts/harness-template/|scripts/lib/harness-template\\.mjs|scripts/lib/gen-plugin-recovery\\.mjs`,
+	`${GEN_PLUGIN_TRIGGER_PATTERN}|^scripts/harness-template/|^scripts/repo-agent-template/|scripts/lib/harness-template\\.mjs|scripts/lib/gen-plugin-recovery\\.mjs`,
 );

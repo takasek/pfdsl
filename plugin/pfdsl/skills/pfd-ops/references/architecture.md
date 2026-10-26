@@ -141,7 +141,7 @@ bundle 同梱スキル全数ではない — 自分の binding を読まない�
 ### 配布単位
 
 pfdsl / pfd-grill / pfd-ops / pfd-retro / pfd-ecosystem / pfd-upstream-report の6スキルツリーとハーネス別の資産を、`make gen-plugin` で共通正本から組み立てる（ADR-0028。旧 `pfdsl skill sync` は廃止）。
-Claude Code plugin（`plugin/pfdsl/`）にはスキル・pfd-* Markdown コマンド・pfd-lens と pfd-implementer agent・hooks が入り、marketplace 経由で配布される。
+Claude Code plugin（`plugin/pfdsl/`）にはスキル・pfd-* Markdown コマンド・pfd-lens agent・hooks が入り、marketplace 経由で配布される。
 スキル間の相互参照（pfd-retro → pfdsl の review-perspectives、pfd-ecosystem → pfd-ops の scaffold、コマンド → 各スキル）はこの bundle 配布が担保する。
 `hooks/`（PostToolUse の managed issue リマインダ等）も同じ bundle に同梱される。plugin hook はインストール/有効化の同意機構を各ハーネスのプラットフォーム側に委ねる（`install/` + `check-install-sync.mjs --deploy` の配線を pfd-ops が自前で持たずに済む代替経路）。
 

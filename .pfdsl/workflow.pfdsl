@@ -287,9 +287,9 @@ artifact:
     group: generation
   implementer_agent:
     label: 実装委譲agent
-    description: "pfd-implementer agent。実装のみを委譲し、push・PR 作成・issue 操作は呼び出し元に残す。手書きだが gen_plugin が plugin へミラーする（#558）。harness が対応する tools 制限と戻り時の照合を使い、全経路の外向き操作の拒否は保証しない"
-    criteria: make gen-plugin が差分なしで完了して plugin/pfdsl/agents/pfd-implementer.md が実在し、採用リポで plugin を入れただけで pfd-implementer が起動でき、その tools 列に外向きツール面（GitHub MCP）が無い
-    location: "scripts/harness-template/agents/pfd-implementer.md"
+    description: "このリポ専用の pfd-implementer agent。実装のみを委譲し、push・PR 作成・issue 操作は呼び出し元に残す。gen_plugin がリポ専用テンプレートから Claude Code と Codex の定義を生成し、plugin には同梱しない。harness が対応する tools 制限と戻り時の照合を使い、全経路の外向き操作の拒否は保証しない"
+    criteria: make gen-plugin が差分なしで完了して .claude/agents/pfd-implementer.md と .codex/agents/pfd-implementer.toml が生成され、このリポで pfd-implementer を起動できる。Claude Code plugin の agents は pfd-lens.md のみで、Codex plugin に agent は含まれない
+    location: "scripts/repo-agent-template/pfd-implementer.md"
     group: generation
   distributed_advisory_hooks:
     label: plugin配布advisory hooks
@@ -417,7 +417,7 @@ process:
   maintain_distributed_prompt_assets:
     label: 配布プロンプト資産整備
     description: >
-      decisions が指名した配布プロンプト資産の正本を改訂する。
+      decisions が指名した配布プロンプト資産と、このリポ専用の実装 agent の正本を改訂する。
       どの正本が plugin に同梱されるかの一次情報は gen-plugin manifest と pipeline_pfdsl 側にあり、この工程が持つのは正本の整備責任だけである。
       distribution_review_record の配布先で観測した詰まりと、retro_findings の対象固有の failure を各正本の文言・手順へ反映する。
       検証コマンドは正本ごとに異なり、各出力 artifact の criteria が一次情報である。

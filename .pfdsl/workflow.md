@@ -199,13 +199,14 @@ proposal 起草での「既存構造」は対象 spec の現行 frontmatter キ�
 **`make gen-samples` 実行後**: `.dot` / `.svg` / README はいずれも決定論的（純 JS + `@pfdsl/preview-engine` の wasm graphviz）に生成されるため、再生成された全ファイルの差分をそのままステージしてよい（#588）。
 
 配布 skill・command・agent の canonical input は、`scripts/lib/harness-inventory.mjs` が宣言する `scripts/harness-template/skills`・`scripts/harness-template/commands`・`scripts/harness-template/agents` である。ハーネス別の本文は明示 section と raw path variable で表し、指定したファイルだけを厳密に描画する。ルート指示・設定・hook の正本は `scripts/root-instructions-template/INSTRUCTIONS.md`・`.claude/settings.json`・`hooks/` に置く。
+このリポ専用の `pfd-implementer` は `scripts/repo-agent-template/pfd-implementer.md` を正本とし、同じ生成器で `.claude/agents/pfd-implementer.md` と `.codex/agents/pfd-implementer.toml` を生成する。plugin への同梱対象には含めない。
 ルート指示文書は`CLAUDE.md`と`AGENTS.md`のどちらもこのテンプレートからの生成物であり、手書き入力ではない（#1160）。Claude CodeとCodexのadapterは同じinventoryを消費する。`.claude/skills/pfdsl` は中立生成物 `generated/skills/pfdsl` への生成symlinkであり、canonical inputでも編集先でもない。
 
 これらの入力、またはgen-skillの入力を変更したら、`pnpm -r build && make gen-plugin` を実行する。これはClaude Code rootの`plugin/pfdsl/`とCodex native rootの`plugin/pfdsl-codex/`、リポジトリの`CLAUDE.md`・`AGENTS.md`・`.agents/`・`.codex/`を同時に再生成する。公式Codex validator/runtimeはplugin rootの`skills/`を固定するため、異なるClaude Code/Codex skill treeを単一rootに同居させない。生成先は手編集しない。編集元を直して同じコマンドで再生成する。distが無い、または鮮度確認だけを行う場合は`node scripts/gen-plugin-dist-independent.mjs`を使えるが、Claude rootの`plugin/pfdsl/skills/pfdsl/SKILL.md`は含まれない。
 
 Codex pluginのmanifestは`plugin/pfdsl-codex/.codex-plugin/plugin.json`にあり、現在`Skills` capabilityのみを表す。hookはtop-level manifest fieldではなくplugin同梱の`plugin/pfdsl-codex/hooks/hooks.json`を既定discoveryして公開する。Codex runtimeはhook commandへ`CLAUDE_PLUGIN_ROOT`互換環境を与えるため、Claude Codeと同一のhook textを使う。Codex native agentはリポジトリ側の`.codex/agents/`へ生成し、`.codex/hooks.json`はrepo-local hook設定として残す。`.codex/config.toml`はtrusted projectの`workspace-write`と`on-request` approvalを維持しながらsandbox内network accessを有効にする。Codexではcommandとskillが同じplugin skill名前空間を共有するため、同名の場合は生成器がcommand側を`source-command-<name>`へ改名する。
 
-`.claude/skills`・`.claude/commands`・`.claude/agents` の配布対象も生成物であり、手編集しない。メンテナ専用の非配布資産は既存の `.claude/` 正本に残す。`install/` の一次情報は repo ルートの明示リストであり、中立テンプレートへ複製しない。
+`.claude/skills`・`.claude/commands`・`.claude/agents` の配布対象と `pfd-implementer` は生成物であり、手編集しない。ほかの手書きのメンテナ専用資産は既存の `.claude/` 正本に残す。`install/` の一次情報は repo ルートの明示リストであり、中立テンプレートへ複製しない。
 
 再生成漏れは機械的に検出されるため手動チェックは不要である。gen-skill / gen-plugin の identity はpre-commit（各々の入力 staged 時）とCI（check-gen-plugin.yml）、`.dot` / README のドリフトはgraphviz-exporterのvitestテスト、`.svg` のドリフトはpreview-engineのvitestテスト（いずれもpre-commitの`docs/samples/` staged時とCI test）、README `## CLI` セクションのドリフトは`make check-readme-cli`（pre-commitの`packages/cli/src/` / `README.md` staged時とCI test.yml）が検査する。`references/*.md`を含むpluginのdist非依存部分は`scripts/gen-plugin-dist-independent.mjs`が生成し、pre-commitの結合`gen-plugin-bulk` gateはClaude rootの`plugin/pfdsl/`、Codex rootの`plugin/pfdsl-codex/`、`AGENTS.md`、`.agents/`、`.codex/`を同時に比較する。distがstaleでClaude pfdsl SKILL.md部分の検査がskipされても、このdriftはここで止まる（#593。前身は#586のreferences専用検査で、粒度拡張の経緯は`scripts/pre-commit`の当該コメントが一次情報）。
 
@@ -388,7 +389,7 @@ repo scope の agent（`ci-triage` 等、このリポの開発都合の道具）
 **1. agent の選択。** 実装だけを委譲するなら `pfd-implementer`（`tools:` に `mcp__github__*` を含まない）。
 `general-purpose` は `tools: *` で GitHub MCP を丸ごと持つので、実装委譲には使わない。
 呼び出し元が割り当てた worktree で起動し、PR 作成までを一気通貫でやらせる場合のみ `issue-worker` を使う。
-`pfd-implementer.md` は `gen_plugin` が plugin へミラーする配布物でもあるため、リポ固有の agent 名・スクリプトパスを本文に書かない。
+`pfd-implementer` はこのリポ専用の生成 agent であり、plugin には同梱しない。正本と生成先は「生成物の再生成と自動ドリフト検査」を参照する。
 
 **2. 戻り時の確認。** `git log origin/<branch>..HEAD` と open PR 一覧を突合する。
 subagent の push を拒否する repo hook や permission deny は置かない。
