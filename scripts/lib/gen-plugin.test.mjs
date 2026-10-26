@@ -2668,6 +2668,21 @@ describe("target-local consumer probes", () => {
 				if (fixture.target === "codex-plugin") {
 					assert.equal(existsSync(join(result.targetRoot, "agents")), false);
 				}
+				if (fixture.target === "claude-plugin") {
+					assert.deepEqual(readdirSync(join(result.targetRoot, "agents")), [
+						"pfd-lens.md",
+					]);
+				}
+				if (fixture.target.endsWith("-repository")) {
+					const agent =
+						fixture.target === "claude-repository"
+							? ".claude/agents/pfd-implementer.md"
+							: ".codex/agents/pfd-implementer.toml";
+					assert.match(
+						readFileSync(join(result.targetRoot, agent), "utf8"),
+						/Authoritative source: scripts\/repo-agent-template\/pfd-implementer\.md/,
+					);
+				}
 			} finally {
 				rmSync(consumer, { recursive: true, force: true });
 			}

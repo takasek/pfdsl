@@ -194,13 +194,15 @@ function commandCapability(name) {
 	);
 }
 
-function agentCapability(name) {
+function agentCapability(name, { repositoryOnly = false } = {}) {
 	return capability(
 		`agent:${name}`,
 		"agent",
 		{
 			encoding: "harness-agent-template",
-			path: `scripts/harness-template/agents/${name}.md`,
+			path: repositoryOnly
+				? `scripts/repo-agent-template/${name}.md`
+				: `scripts/harness-template/agents/${name}.md`,
 		},
 		fourTargetMappings(
 			mapping(
@@ -209,12 +211,18 @@ function agentCapability(name) {
 				[`.claude/agents/${name}.md`],
 				PROBES.claudeRepository,
 			),
-			mapping(
-				"claude-plugin",
-				"transform",
-				[`agents/${name}.md`],
-				PROBES.claudePlugin,
-			),
+			repositoryOnly
+				? exclusion(
+						"claude-plugin",
+						"This implementation agent belongs to the upstream repository's workflow.",
+						"Adopters who need it must maintain their own local agent.",
+					)
+				: mapping(
+						"claude-plugin",
+						"transform",
+						[`agents/${name}.md`],
+						PROBES.claudePlugin,
+					),
 			mapping(
 				"codex-repository",
 				"transform",
@@ -248,7 +256,7 @@ export const HARNESS_CAPABILITY_CONTRACT = Object.freeze([
 	commandCapability("pfd-init"),
 	commandCapability("pfd-retro"),
 	agentCapability("pfd-lens"),
-	agentCapability("pfd-implementer"),
+	agentCapability("pfd-implementer", { repositoryOnly: true }),
 	capability(
 		"repository-instructions",
 		"repository-instructions",
@@ -392,7 +400,13 @@ function sourceName({ source }) {
 
 function distributedCapabilities(kind) {
 	return HARNESS_CAPABILITY_CONTRACT.filter(
-		(capability) => capability.kind === kind && !capability.source.generated,
+		(capability) =>
+			capability.kind === kind &&
+			!capability.source.generated &&
+			capability.mappings.some(
+				({ target, disposition }) =>
+					target === "claude-plugin" && disposition !== "intentional-exclusion",
+			),
 	);
 }
 
@@ -464,7 +478,18 @@ export const GENERATED_SOURCES = Object.freeze({
 
 export const SKILL_EXCLUSIONS = SOURCE_EXCLUSIONS.skills;
 export const COMMAND_EXCLUSIONS = SOURCE_EXCLUSIONS.commands;
-export const AGENT_EXCLUSIONS = SOURCE_EXCLUSIONS.agents;
+export const AGENT_EXCLUSIONS = Object.freeze({
+	...SOURCE_EXCLUSIONS.agents,
+	...Object.fromEntries(
+		HARNESS_CAPABILITY_CONTRACT.filter(({ kind }) => kind === "agent")
+			.map((entry) => [
+				sourceName(entry),
+				entry.mappings.find(({ target }) => target === "claude-plugin"),
+			])
+			.filter(([, mapping]) => mapping.disposition === "intentional-exclusion")
+			.map(([name, mapping]) => [name, mapping.reason]),
+	),
+});
 export const GENERATED_SKILLS = GENERATED_SOURCES.skills;
 export const GENERATED_COMMANDS = GENERATED_SOURCES.commands;
 export const GENERATED_AGENTS = GENERATED_SOURCES.agents;

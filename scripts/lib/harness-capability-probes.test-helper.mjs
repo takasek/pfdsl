@@ -11,9 +11,9 @@ import {
 import { dirname, join, sep } from "node:path";
 import { capabilitiesForTarget } from "./harness-capability-contract.mjs";
 import {
-	AGENT_EXCLUSIONS,
 	LOCAL_CLAUDE_ROOT_ENTRIES,
 	SKILL_EXCLUSIONS,
+	SOURCE_EXCLUSIONS,
 } from "./harness-inventory.mjs";
 import { splitNulSeparated, tryGit } from "./run-exec.mjs";
 
@@ -160,7 +160,7 @@ function copyClaudeRepositoryFixture(sourceRoot, consumerRoot) {
 			force: true,
 		});
 	}
-	for (const agent of Object.keys(AGENT_EXCLUSIONS)) {
+	for (const agent of Object.keys(SOURCE_EXCLUSIONS.agents)) {
 		rmSync(join(consumerRoot, ".claude/agents", agent), {
 			force: true,
 		});

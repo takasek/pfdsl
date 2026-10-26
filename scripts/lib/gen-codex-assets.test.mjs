@@ -15,9 +15,13 @@ import {
 	hookCapabilityToCodexHooks,
 	skillMarkdownToCodex,
 } from "./gen-codex-assets.mjs";
-import { validateCapabilityContract } from "./harness-capability-contract.mjs";
+import {
+	capabilitiesForTarget,
+	validateCapabilityContract,
+} from "./harness-capability-contract.mjs";
 import { PROBE_FIXTURES } from "./harness-capability-probes.test-helper.mjs";
 import { HARNESS_CAPABILITY_CONTRACT } from "./harness-inventory.mjs";
+import { decodeHarnessSources } from "./harness-source-decoder.mjs";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 
@@ -629,6 +633,25 @@ describe("commandCapabilityToCodexSkill", () => {
 });
 
 describe("agentCapabilityToCodexToml", () => {
+	it("renders the repository-only implementer with its source and Codex responsibilities", () => {
+		const records = decodeHarnessSources({ root });
+		const record = capabilitiesForTarget(records, "codex-repository").find(
+			({ id }) => id === "agent:pfd-implementer",
+		);
+		const output = agentCapabilityToCodexToml(record);
+		assert.match(
+			output,
+			/^# DO NOT EDIT\. Authoritative source: scripts\/repo-agent-template\/pfd-implementer\.md\./,
+		);
+		assert.match(output, /^sandbox_mode = "workspace-write"$/m);
+		const instructions = parseTomlDeveloperInstructions(output);
+		assert.match(instructions, /親 agent が `git fetch`、stage、commit/);
+		assert.doesNotMatch(
+			instructions,
+			/論理単位でコミットする|コミットとして仕上げる/,
+		);
+	});
+
 	it("maps pfd-lens's known read-only tools without selecting a Codex model", () => {
 		const output = agentCapabilityToCodexToml(
 			agentRecord({

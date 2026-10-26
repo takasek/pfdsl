@@ -217,9 +217,9 @@ artifact:
     location: [ "scripts/pfdsl/", ".github/workflows/pfdsl-sweep-completed-chains.yml" ]
     group: gen_sources
   claude_harness_sources:
-    label: 中立のハーネス配布入力
-    description: "配布skill・command・agentの正本はscripts/harness-template/{skills,commands,agents}で、明示的なClaude/Codex sectionとraw path variableから両方の本文を生成する。テンプレート対象はinventoryが宣言し、shared referenceとscriptはliteral payloadである。ルート指示の正本はscripts/root-instructions-template/INSTRUCTIONS.md、settingsとhooksはそれぞれ既存の正本に従う。.claudeの配布対象は生成物であり、メンテナ専用資産は移動しない。.claude/skills/pfdslはgenerated/skills/pfdslへの生成symlinkである。install/はrepoルートの明示ソースから生成し、中立テンプレートに複製しない"
-    location: [ "scripts/harness-template/", "scripts/root-instructions-template/INSTRUCTIONS.md", ".claude/settings.json", "hooks/" ]
+    label: 中立のハーネス生成入力
+    description: "配布skill・command・agentの正本はscripts/harness-template/{skills,commands,agents}で、明示的なClaude/Codex sectionとraw path variableから両方の本文を生成する。このリポ専用のpfd-implementerの正本はscripts/repo-agent-template/pfd-implementer.mdで、repository向けにのみ生成する。テンプレート対象はinventoryが宣言し、shared referenceとscriptはliteral payloadである。ルート指示の正本はscripts/root-instructions-template/INSTRUCTIONS.md、settingsとhooksはそれぞれ既存の正本に従う。.claudeの配布対象は生成物である。.claude/skills/pfdslはgenerated/skills/pfdslへの生成symlinkである。install/はrepoルートの明示ソースから生成し、中立テンプレートに複製しない"
+    location: [ "scripts/harness-template/", "scripts/repo-agent-template/", "scripts/root-instructions-template/INSTRUCTIONS.md", ".claude/settings.json", "hooks/" ]
     group: skill_sources
   harness_inventory:
     label: ハーネス中立の配布inventory
@@ -558,7 +558,7 @@ process:
     tags: [ gen, g ]
   gen_plugin:
     label: Claude Code plugin root 組み立て
-    description: "make gen-pluginのClaude Code adapter。組み立て前に生成専用のplugin rootとrepository assetsをsnapshotして空にし、生成をやめた旧ファイルが残らないよう毎回再構築する。失敗時はsnapshotから復元し、復元未完ならsnapshotを保持して両CLI入口がprimary errorと保存理由・pathを表示する。再試行とdrift検査も残留transactionを報告し、削除はしない。dist非依存の再生成では中立pfdsl skillのSKILL.mdだけを保持する。再構築でignore対象を含む未追跡ファイルが失われる場合は失敗させる。contract検証済みのharness_capability_modelと中立生成済みpfdsl skill、install mirrorから、Claude Code skill tree、Markdown command、Markdown agent、hooks・manifestをplugin/pfdsl/へidentity互換に組み立て、repo-rootのmarketplace記述も更新する。marketplace記述は前世代claude_adapter_outputのrepo-root .claude-plugin/marketplace.jsonを読み、descriptionだけを置換してowner・source.ref等を保持する。あわせてclaude-repository mappingの配布skill・command・agentを中立正本から描画し、ルート指示文書CLAUDE.mdをAGENTS.mdと同じmustacheテンプレートから描画してリポジトリへ書く。全Claude root writeの後、manifest自身を除く全bundleファイルのdigestをファイル単位で.claude-plugin/bundle-manifest.sha256へ記録する。集約値は読み手が計算する（#971, #1264, #1267）"
+    description: "make gen-pluginのClaude Code adapter。組み立て前に生成専用のplugin rootとrepository assetsをsnapshotして空にし、生成をやめた旧ファイルが残らないよう毎回再構築する。失敗時はsnapshotから復元し、復元未完ならsnapshotを保持して両CLI入口がprimary errorと保存理由・pathを表示する。再試行とdrift検査も残留transactionを報告し、削除はしない。dist非依存の再生成では中立pfdsl skillのSKILL.mdだけを保持する。再構築でignore対象を含む未追跡ファイルが失われる場合は失敗させる。contract検証済みのharness_capability_modelと中立生成済みpfdsl skill、install mirrorから、Claude Code skill tree、Markdown command、Markdown agent、hooks・manifestをplugin/pfdsl/へidentity互換に組み立て、repo-rootのmarketplace記述も更新する。marketplace記述は前世代claude_adapter_outputのrepo-root .claude-plugin/marketplace.jsonを読み、descriptionだけを置換してowner・source.ref等を保持する。あわせてclaude-repository mappingのskill・command・agentを中立正本から描画し、配布対象外のpfd-implementerもリポジトリへ生成する。ルート指示文書CLAUDE.mdはAGENTS.mdと同じmustacheテンプレートから描画する。全Claude root writeの後、manifest自身を除く全bundleファイルのdigestをファイル単位で.claude-plugin/bundle-manifest.sha256へ記録する。集約値は読み手が計算する（#971, #1264, #1267）"
     command: make gen-plugin
     location: "scripts/gen-plugin.mjs"
     tags: [ gen, g ]
