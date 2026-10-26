@@ -46,11 +46,12 @@ function toolIdentity(cli) {
 	}
 	return digest.digest("hex");
 }
-const git = (cwd, ...args) =>
+const gitOutput = (cwd, ...args) =>
 	runGit(["-C", cwd, ...args], {
 		env: withoutGitTargetEnvironment(process.env),
 		captureStderr: true,
-	}).trim();
+	});
+const git = (cwd, ...args) => gitOutput(cwd, ...args).trim();
 const read = (wiki, name) => readFileSync(join(wiki, name), "utf8");
 function regular(wiki, name, required = true) {
 	const path = join(wiki, name);
@@ -147,25 +148,43 @@ export function generate({ wiki, repository, cli, expectedRevision }) {
 			readFileSync(new URL("./run-exec.mjs", import.meta.url)),
 	);
 	const key = snapshotKey(wiki, wikiRevision, repository, toolchain);
-	const sourceHash = hash(read(wiki, inputs[0])),
-		companionHash = hash(read(wiki, inputs[1]));
-	const metadata = parse(read(wiki, inputs[0])).frontmatter ?? {};
+	// Git may normalize editor bytes on commit or change line endings on checkout.
+	// Validate and describe the published blobs; retain raw hashes for race detection.
+	const committedInputs = inputs.map((name) =>
+		gitOutput(wiki, "show", `${wikiRevision}:${name}`),
+	);
+	const worktreeInputHashes = inputs.map((name) => hash(read(wiki, name)));
+	const sourceHash = hash(committedInputs[0]),
+		companionHash = hash(committedInputs[1]);
+	const metadata = parse(committedInputs[0]).frontmatter ?? {};
 	if (
 		existsSync(join(wiki, outputs[0])) &&
 		existsSync(join(wiki, outputs[1]))
 	) {
 		try {
-			const page = read(wiki, outputs[0]);
+			const page = gitOutput(wiki, "show", `${wikiRevision}:${outputs[0]}`);
 			const start = page.lastIndexOf(marker);
 			const receipt = JSON.parse(
 				page.slice(start + marker.length).split(" -->")[0],
 			);
 			if (
 				receipt.key === key &&
-				receipt.svgHash === hash(read(wiki, outputs[1])) &&
+				receipt.svgHash ===
+					hash(gitOutput(wiki, "show", `${wikiRevision}:${outputs[1]}`)) &&
 				page === indexPage(metadata, receipt)
 			)
-				return { status: "unchanged", wikiRevision, key };
+				return {
+					status: "unchanged",
+					wikiRevision,
+					key,
+					sourceHash,
+					companionHash,
+					worktreeInputHashes,
+					worktreeOutputHashes: outputs.map((name) => hash(read(wiki, name))),
+					indexHash: hash(page),
+					svgHash: receipt.svgHash,
+					inputWikiRevision: receipt.wikiRevision,
+				};
 		} catch {
 			/* A damaged receipt is regenerated, not trusted. */
 		}
@@ -175,6 +194,9 @@ export function generate({ wiki, repository, cli, expectedRevision }) {
 		const snapshot = join(scratch, "wiki");
 		git(scratch, "clone", "--no-local", "--no-checkout", wiki, snapshot);
 		git(snapshot, "checkout", "--detach", wikiRevision);
+		inputs.forEach((name, index) => {
+			writeFileSync(join(snapshot, name), committedInputs[index]);
+		});
 		rejectUnsupportedReferences(snapshot);
 		const file = join(snapshot, inputs[0]);
 		const invoke = (...args) =>
@@ -210,6 +232,8 @@ export function generate({ wiki, repository, cli, expectedRevision }) {
 			key,
 			sourceHash,
 			companionHash,
+			worktreeInputHashes,
+			worktreeOutputHashes: [hash(index), hash(svg)],
 			indexHash: hash(index),
 			svgHash: hash(svg),
 		};
@@ -218,16 +242,27 @@ export function generate({ wiki, repository, cli, expectedRevision }) {
 	}
 }
 
-/** Commit the generated pair, then use an ordinary non-force push. */
-export function publish({ wiki, result, expectedRemote }) {
+/** Publish source changes with their generated or reusable pair using a non-force push. */
+export function publish({
+	wiki,
+	result,
+	expectedRemote,
+	expectedRemoteRevision = result.wikiRevision,
+	transportWiki = wiki,
+}) {
 	wiki = checkout(wiki);
-	if (result.status === "unchanged") return result;
-	if (result.status !== "generated")
+	const sourceOnly =
+		result.status === "unchanged" &&
+		expectedRemoteRevision !== result.wikiRevision;
+	if (result.status === "unchanged" && !sourceOnly) return result;
+	if (result.status !== "generated" && !sourceOnly)
 		throw new Error("No generated pair to publish");
+	transportWiki = checkout(transportWiki);
 	if (
 		!expectedRemote ||
-		git(wiki, "remote", "get-url", "origin") !== expectedRemote ||
-		git(wiki, "remote", "get-url", "--push", "origin") !== expectedRemote
+		git(transportWiki, "remote", "get-url", "origin") !== expectedRemote ||
+		git(transportWiki, "remote", "get-url", "--push", "origin") !==
+			expectedRemote
 	)
 		throw new Error("Unexpected Wiki remote");
 	const branch = git(wiki, "symbolic-ref", "--short", "HEAD");
@@ -237,30 +272,40 @@ export function publish({ wiki, result, expectedRemote }) {
 		throw new Error("Wiki index must be clean");
 	for (const name of [...inputs, ...outputs]) regular(wiki, name);
 	if (
-		hash(read(wiki, inputs[0])) !== result.sourceHash ||
-		hash(read(wiki, inputs[1])) !== result.companionHash ||
-		hash(read(wiki, outputs[0])) !== result.indexHash ||
-		hash(read(wiki, outputs[1])) !== result.svgHash
+		inputs.some(
+			(name, index) =>
+				hash(read(wiki, name)) !== result.worktreeInputHashes[index],
+		) ||
+		outputs.some(
+			(name, index) =>
+				hash(read(wiki, name)) !== result.worktreeOutputHashes[index],
+		)
 	)
 		throw new Error("Generated snapshot changed");
-	git(wiki, "fetch", "origin", branch);
-	if (git(wiki, "rev-parse", "FETCH_HEAD") !== result.wikiRevision)
+	git(transportWiki, "fetch", "origin", branch);
+	if (git(transportWiki, "rev-parse", "FETCH_HEAD") !== expectedRemoteRevision)
 		throw new Error("Wiki remote conflict: generate from the new revision");
-	git(wiki, "add", "--", ...outputs);
-	git(
-		wiki,
-		"-c",
-		"user.name=github-actions[bot]",
-		"-c",
-		"user.email=41898282+github-actions[bot]@users.noreply.github.com",
-		"commit",
-		"-m",
-		"docs(wiki): generate roadmap index and SVG",
-	);
-	git(wiki, "push", "origin", `HEAD:refs/heads/${branch}`);
+	if (result.status === "generated") {
+		git(wiki, "add", "--", ...outputs);
+		git(
+			wiki,
+			"-c",
+			"user.name=github-actions[bot]",
+			"-c",
+			"user.email=41898282+github-actions[bot]@users.noreply.github.com",
+			"commit",
+			"-m",
+			"docs(wiki): generate roadmap index and SVG",
+		);
+	}
+	const revision = git(wiki, "rev-parse", "HEAD");
+	// Network operations use the editor checkout's own Git authentication settings.
+	if (transportWiki !== wiki)
+		git(transportWiki, "fetch", "--no-tags", wiki, branch);
+	git(transportWiki, "push", "origin", `${revision}:refs/heads/${branch}`);
 	return {
 		status: "published",
-		revision: git(wiki, "rev-parse", "HEAD"),
-		inputWikiRevision: result.wikiRevision,
+		revision,
+		inputWikiRevision: result.inputWikiRevision ?? result.wikiRevision,
 	};
 }
