@@ -272,6 +272,14 @@ it("keeps rejected rename input available for correction", async () => {
 		s.container.querySelector("#node-actions-error")!.textContent,
 	).toContain("already exists");
 	expect(id.value).toBe("a");
+	id.value = "p";
+	s.container.querySelector<HTMLButtonElement>("[data-save-node]")!.click();
+	expect(s.container.querySelector("#node-actions-error")!.textContent).toBe(
+		"",
+	);
+	expect(
+		s.container.querySelector<HTMLElement>(".node-rename-form")!.hidden,
+	).toBe(true);
 });
 
 it.each([

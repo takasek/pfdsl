@@ -140,6 +140,7 @@ export function mountConnections(
 			return;
 		}
 		if (request.type === "renameNode" && result.source === editing.source) {
+			error.textContent = "";
 			endRename(true);
 			return;
 		}
