@@ -1,7 +1,7 @@
 # Wiki roadmap 連携の試作記録（#1519、第1段階）
 
 この記録は採用判断のための内部資料であり、運用の切替宣言ではない。
-第2段階の担当者が実験を再実行し、実環境の未確認点を埋めてから保存先とconsumerの契約を確定するために使う。
+第2段階の担当者が過去の試験証拠と現行生成器を参照し、実環境の未確認点を埋めてからconsumerの契約を確定するために使う。
 初回の調査基準は `8b16e2a3f4620bde95cb8e1045806cc0f130214c`、GitHub状態の確認日は2026-10-24（JST）。
 追加した実Wiki試験の確認日は2026-10-26（JST）であり、その固定版と結果は後段に記す。
 第2段階の参照先とstatusの説明は、2026-10-25の #1519・#1542 の決定とroadmap計画に合わせて更新した。試作の観測結果は当時のものとして保持する。
@@ -31,8 +31,8 @@ companionも本体repoから移す方向とし、切替時に本体側の編集�
 
 この判断は、当初の「Wiki本文の単一PFDフェンスを正本にする」「companionは本体repoに残す」という案を置換する。
 companion本文に図とプレビューの自己リンクを置いた途中案も置換する。
-下に残す単一フェンス抽出・更新候補コマンドと `Roadmap-Trial.md` の公開結果は、旧候補の試作証拠である。
-分離ファイル方式の取得・更新・表示まで受入済みとは扱わず、次の準備実装は独立したPFDファイルを扱う形に変える。
+単一フェンス抽出・更新候補コマンドはGit履歴に退避し、`Roadmap-Trial.md` の公開結果とともに旧候補の試作証拠として残す。
+分離ファイル方式は独立PFDを扱う生成器で検証し、実Wikiでの自動更新・表示の受入とは区別する。
 companionはWiki本文として編集できるが、独立PFDファイルのWeb編集可否はまだ確認していない。
 正式に対応する編集経路は、その確認とGit編集の受入に基づいて決める。
 取得側は同じWiki固定版からcompanionとPFDを取り、SVGはそのPFDと参照先の固定版に対応付ける。
@@ -62,145 +62,21 @@ Wikiに原稿と生成画像を置く案を先に試すのはユーザーの試�
 専用Issueと別repoは却下しておらず、Wikiの権限・通知・表示が要件を満たさない場合に再比較する。
 repo正本案は現行運用の継続先として残すが、独立更新要件を満たす採用案にはしない。
 
-## 再現する試作
+## 旧単一フェンス試作の記録
 
-実装は `scripts/lib/wiki-roadmap-spike.mjs`、実行可能な実験は `scripts/lib/wiki-roadmap-spike.test.mjs`。
-ローカルのbare GitをWikiに見立てる限定試作であり、URLを受け付ける公開アダプタではない。
-本体repoのCLIをビルド後、次で実行する。
+初期試作ではMarkdown内の単一PFDフェンスを抽出し、原稿を保って更新候補を作る方式を検証した。
+ファイル分離方式の採用により、この方式のCLI・取得・編集・公開処理と専用19テストは現行ツリーから削除した。
+旧方式を提供するための互換経路は残さず、必要だったbuild内容の識別処理だけを現行生成器へ移した。
 
-```sh
-node --test scripts/lib/wiki-roadmap-spike.test.mjs
-```
+過去の検証は当時の固定版の証拠として参照し、現行方式の受入根拠にはしない。
+再調査が必要な場合の一次資料は、削除前の固定commitに残っている。
 
-`acquire` はWikiのHEAD、ブロックhash、本体repoのcommitを固定し、本体の配置を複製した `.pfdsl/roadmap.pfdsl` へブロックを抽出する。
-`evaluate` はその同じ実ファイルに `check --strict`、`meta check-links`、`status ready`、`status blocked`、SVG描画を順に適用する。
-試作中はsnapshotを別の編集者へ渡さず、変更の有無を照合する。
-正本の検証失敗を古い描画結果へフォールバックさせない。
-描画のキーは抽出内容、本体repoのcommit、CLI/core/exporterのビルド済みJavaScript、lockfile、Node版である。
-同じキーとSVG hashの一致を確認した場合だけ描画を省く。
-無関係なページと生成物だけのcommitでWiki HEADが変わっても、同じ入力なら再描画しない。
-検証とready/blockedの取得はその場合も行う。
+- [取得・検証・公開の旧試作と9テスト](https://github.com/takasek/pfdsl/blob/cdaaa9be15ea98f50b00dc14f9eaf7f0cb9b7239/scripts/lib/wiki-roadmap-spike.test.mjs)
+- [原稿更新候補の旧実装](https://github.com/takasek/pfdsl/blob/cdaaa9be15ea98f50b00dc14f9eaf7f0cb9b7239/scripts/lib/wiki-roadmap-edit.mjs)と[10テスト](https://github.com/takasek/pfdsl/blob/cdaaa9be15ea98f50b00dc14f9eaf7f0cb9b7239/scripts/lib/wiki-roadmap-edit.test.mjs)
 
-`publish` は生成SVGとmanifestだけを通常commit/pushする。
-公開前に描画結果の本文hashと本体repoのcommitを取得snapshotと照合し、本文が同じでも参照版が異なる結果は拒否する。
-人間の `Roadmap.md` は書き戻さない。
-取得したWiki commitからremoteが進んでいれば競合として止まり、fetchとpushの間の競合も通常pushの非fast-forward拒否へ委ねる。
-無関係なページ更新でも公開時は一旦止め、再取得後に同じ入力なら描画を省く設計である。
-force-pushや自動rebaseは使わない。
-公開commitと再取得時のcurrent commitを分けて返す。
-
-導入する概念はWiki版、本体参照版、抽出内容hash、生成結果のmanifestと入力キーである。
-作業項目の対応付けや完了の判定規則は追加しない。
-既存のCLIの外側に置く理由は、取得・push・イベントがGitHub固有の責務であり、PFDの意味論とは独立しているため。
-現行の `.pfdsl/roadmap.pfdsl` 固定の各consumerをこの試作へ接続する変更は含めない。
-
-## 検証対象と限界
-
-| 実験 | 確認する結果 |
-| --- | --- |
-| 単一フェンス | backtick/tildeの閉じたトップレベルブロックを抽出。欠落・複数・閉じ忘れ・引用中のブロックは拒否 |
-| 通常取得と描画 | 実際のCLIでcheck、ready、blocked、SVGを生成。本体の参照ファイルは取得後の更新から独立 |
-| 生成物・別ページ更新 | 原稿はバイト一致を維持。同じ入力の再取得は描画を省略 |
-| 二者編集と古い描画 | 先行したページ更新を保持し、古い描画の公開と後発編集者のpushを拒否 |
-| 失敗 | clone失敗、ブロック欠落、YAML不正、循環を非成功として返す。既存の生成物があっても失敗を隠さない |
-| 参照 | `basePath`つきlocation、extends、subflowを元の配置で解決し、参照先欠落を拒否 |
-| 実roadmap | 現行HEADのroadmapをWikiページに埋めて抽出し、内容一致とCLI出力を確認 |
-| 往復 | fixtureのready/blockedと内容がWiki移行・復元を通じて一致 |
-| 空白付き原稿 | ページ先頭・末尾の空白を含め、公開後の読戻しで原稿をそのまま比較 |
-| 参照版の取り違え | 本文不変でもpreset変更でSVGが変わる2版を用意し、古い結果の公開をWikiへの変更前に拒否。新しい版の再描画は公開できる |
-
-ローカル試験はGitHubの認証、gollum発火、Web編集の競合UI、Wiki上のSVG表示を証明しない。
-最初の試作の操作経路はテストから呼ぶ関数であった。
-下記の更新候補コマンドを追加したが、実Wikiへの原稿更新を行う運用アダプタはまだない。
-更新候補コマンドは検証用のPFDをLFへ正規化し、Wikiページのフェンス外本文と元の改行を保つ。
-運用の切替は意味の同値性も照合し、任意のMarkdownをバイト同一で往復できるという契約にはしない。
-
-## 原稿の更新候補を作る切替前準備
-
-2026-10-26の所有者指示「#1542の仕様を確定してPRにまとめたら、#1519の切替前準備も続けよう」に基づく。
-今回は、既取得のローカルWikiコピーと本体repoの固定版から、公開しない更新候補を作る経路を追加した。
-Wikiを有効化していない状態でも、登録・構造変更・status変更の原稿往復を検証できるため、この経路を先行する。
-別クラスの案は実環境用の取得runnerとgollum workflowを先に用意することだが、起草時にはWikiが無効で受入不能であり、日常の原稿更新経路も残っていた。
-当初は所有者による有効化後も試験ページ公開とGit取得の受入が未完了であり、原稿更新経路を先行した。
-その後に承認を得て進めた実Wikiの確認結果は、下の「GitHub実環境の到達点と残る確認」に分けて記す。
-残る実環境用runnerとgollum workflowの試験は、今回の試験ページ公開とは分け、対象の公開内容と編集経路の受入条件がそろった段階で続ける。
-既存試作のローカル制限を外して運用アダプタと呼ぶ案は採らない。
-「公開まで一体化する」という前提を外し、取得・候補生成・検証・公開を分ける。
-
-`scripts/wiki-roadmap-edit.mjs` はローカルのrepoとWikiを使う。
-`scripts/lib/wiki-roadmap-spike.mjs` の取得・単一フェンス抽出を再利用し、取得時のWiki版とページ全体hashを期待値として照合する。
-フェンス外の説明・画像参照を保ち、必要ならフェンスを長くして候補本文の終端記号との衝突を避ける。
-差替え後に再抽出して、LF正規化した候補モデルと一致することを確かめる。
-変更後のPFDは既存CLIで作るため、Wiki専用の登録・status・done判定の規則は追加しない。
-
-次はローカルで取得済みのWikiコピー `../pfdsl.wiki` を使う例である。
-本体の文脈とWiki原稿の両方をコミットで固定し、どちらの未コミット変更も入力に含めない。
-候補の編集を始める前に期待版・ページhash・元ページを保存する。
-
-```bash
-code_revision=$(git rev-parse HEAD)
-wiki_revision=$(git -C ../pfdsl.wiki rev-parse HEAD)
-page_hash=$(git -C ../pfdsl.wiki show "$wiki_revision:Roadmap.md" | shasum -a 256 | cut -d ' ' -f 1)
-git -C ../pfdsl.wiki show "$wiki_revision:Roadmap.md" > ../Roadmap.edit-base.md
-```
-
-保存した `../Roadmap.edit-base.md` のPFDブロックを `next-roadmap.pfdsl` へコピーし、既存CLI等で登録・構造・statusの変更を編集する。
-編集後も上で保存した期待版とhashを使い、現在のHEADから取り直して古い候補と組み合わせない。
-同じシェルで、存在しない出力先を指定して候補を生成する。
-
-```bash
-node scripts/wiki-roadmap-edit.mjs \
-  --repo . --wiki ../pfdsl.wiki --repo-revision "$code_revision" \
-  --expected-wiki-revision "$wiki_revision" --expected-page-hash "$page_hash" \
-  --replacement next-roadmap.pfdsl --output ../wiki-edit-candidate
-```
-
-競合時は期待値だけを更新せず、新しい版の原稿を保存し直し、その原稿へ変更を適用し直す。
-構文・グラフ検査の失敗時は候補PFDを修正して再実行する。
-出力先が既存なら、元の出力を保持して新しい出力先を選ぶ。
-
-検証用コピーの論理配置 `.pfdsl/roadmap.pfdsl` を保ったまま、固定したCLIでstrict check・ready・blocked・静的SVGを得る。
-元のモデルが不正でも候補の修正は可能で、元の検査失敗はmanifestのbaselineに失敗として残す。
-候補が不正なら成功出力を作らず、検証に使ったコピーの原稿も復元する。
-PFDのcommandは実行しない。
-元Wikiのページ・Git履歴を更新せず、ネットワーク取得・commit・pushを行わない。
-
-出力は `Roadmap.before.md`、候補 `Roadmap.md`、`roadmap.pfdsl`、`Roadmap.diff`、`Roadmap.svg`、最後に書く完了記録 `manifest.json` である。
-manifestは元Wiki版、元ページとPFDのhash、候補hash、本体の文脈版、実際のCLI等のdigest、変更前後のグラフ検査結果を区別する。
-`referenceResolution: not-verified` と `operationalReady: false` を常に記録する。
-strict checkの成功や候補のready一覧を、#1542の参照先解決・実運用の着手許可・共有doneの証拠としては扱わない。
-この入口はリンク検査を参照解決の代理として実行しない。
-
-候補作成後にWikiが進む可能性は残る。
-将来の公開操作では、manifestの元Wiki版とページhashを実際の送信先で再照合し、不一致なら再取得と再編集を要求する。
-今回の候補生成は、その送信直前の競合検査や実Wiki書込みの代替ではない。
-companionと採用設定はまだ本体repoに残し、cycle-status・監査・ゲート・release-runner・完了チェーン回収のconsumerは切り替えない。
-本体PRの未マージ状態とWiki版の差を扱う既存手順も、この準備段階では維持する。
-
-ローカル検証はページ本文保存、期待版・ページhashの不一致、フェンス欠落・複数・引用内・未閉鎖、CRLF、終端記号との衝突、CLI検証失敗、既存出力の保護、実CLIを使うコマンド入口を対象とする。
-このローカル検証だけで認証・gollum・Web編集・実Wiki上のSVG表示を確認したとは扱わない。
-実Wikiの到達点は下節で区別し、#1519全体はwipを維持する。
-
-### パスの契約
-
-本体repoのcommitと論理パス `.pfdsl/roadmap.pfdsl` を固定する。
-`location`/`command.cwd` は文書位置と `basePath` を使い、extends/subflowは文書位置を使う。
-元の配置を再現することで、抽出先の一時ディレクトリ名に意味を依存させない。
-この試作は全体で1つの参照commitを固定する。運用版のモデル既定とartifactごとの参照先上書きは #1542 のフィールドで解決し、Wiki専用の解決機構を追加しない。取得方針と、参照先がprocessのlocationやcommand.cwdにも及ぶかは #1542 の設計で確定する。
-標準入力は一部のmulti-file検証を省くため、この経路には使わない。
-
-`meta check-links` はURLやglobを検査しない。
-SVG exporterは単一URLにhrefを付けるが、ローカルパスや複数locationにはクリック先を付けない。
-したがって「検証できた相対locationをWikiでクリックできる」は未達である。
-#1497のlocation配列と整合した表示方法は第2段階で決め、GitHub URLへの書換えを正本へ混入させない。
-
-### 失敗と表示の契約
-
-試作は失敗を呼出元へ返し、古い入力の描画を新しいHEADへ公開しない。
-ただしWeb編集から再生成まで、以前のSVGがWikiに残る時間は避けられない。
-manifestだけでは閲覧者に鮮度が伝わらないため、運用前に「最終成功版の図」であることと取得版・失敗状態をページ上へ表示する仕組みが必要である。
-本試作をそのままworkflow化して「常に最新の図」と表示してはならない。
-画像だけの更新でページ原稿を書き戻さない要件との両立は、生成専用statusページまたは外部の状態表示を候補とし、実際のWiki表示で確認する。
+現行生成器の9テストは、原稿保持、無変更時の再利用、生成物の修復、検証失敗時の前回表示保持、未対応参照の拒否、公開先と競合を対象とする。
+修復は戻り値だけでなく実ファイルと検証記録のhashを照合し、公開はremote上のcommitと4ファイルのbytesを直接比較する。
+GitHub固有の認証・gollum・ブラウザ表示の受入は、このローカル検証とは区別する。
 
 ## GitHub実環境の到達点と残る確認
 

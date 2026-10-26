@@ -3,20 +3,20 @@ import {
 	existsSync,
 	lstatSync,
 	mkdtempSync,
+	readdirSync,
 	readFileSync,
 	realpathSync,
 	rmSync,
 	writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
-import { isAbsolute, join, relative } from "node:path";
+import { dirname, isAbsolute, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import {
 	run,
 	git as runGit,
 	withoutGitTargetEnvironment,
 } from "./run-exec.mjs";
-import { toolIdentity } from "./wiki-roadmap-spike.mjs";
 
 // Like gen-samples, load the build output at runtime; it is absent in unbuilt clones.
 const { analyze, loadDependencyClosure, parse, wrapPresetSource } =
@@ -28,6 +28,24 @@ const outputs = ["roadmap.index.md", "roadmap.svg"];
 const inputs = ["roadmap.pfdsl", "roadmap.md"];
 const marker = "<!-- pfdsl-wiki-preview: ";
 const hash = (value) => createHash("sha256").update(value).digest("hex");
+function toolIdentity(cli) {
+	const root = resolve(dirname(cli), "../../..");
+	const digest = createHash("sha256")
+		.update(process.version)
+		.update(readFileSync(join(root, "pnpm-lock.yaml")));
+	for (const name of ["cli", "core", "graphviz-exporter", "preview-engine"]) {
+		const dist = join(root, "packages", name, "dist");
+		for (const file of readdirSync(dist)
+			.filter((file) => file.endsWith(".js"))
+			.sort()) {
+			digest
+				.update(name)
+				.update(file)
+				.update(readFileSync(join(dist, file)));
+		}
+	}
+	return digest.digest("hex");
+}
 const git = (cwd, ...args) =>
 	runGit(["-C", cwd, ...args], {
 		env: withoutGitTargetEnvironment(process.env),
