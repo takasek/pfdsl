@@ -36,7 +36,10 @@ const host = vi.hoisted(() => {
 			this.replacements.push({ uri, range, text });
 		}
 	}
-	let textChanged = (_event: { document: vscode.TextDocument }) => {};
+	let textChanged = (_event: {
+		document: vscode.TextDocument;
+		reason?: vscode.TextDocumentChangeReason | undefined;
+	}) => {};
 	let selectionChanged = (_event: {
 		textEditor: vscode.TextEditor;
 		selections: readonly vscode.Selection[];
@@ -157,6 +160,7 @@ const host = vi.hoisted(() => {
 			Range,
 			Selection: Range,
 			TextEditorSelectionChangeKind: { Keyboard: 1, Mouse: 2, Command: 3 },
+			TextDocumentChangeReason: { Undo: 1, Redo: 2 },
 			WorkspaceEdit,
 			window,
 			commands: {
@@ -195,8 +199,10 @@ const host = vi.hoisted(() => {
 			FileType: { File: 1, Directory: 2 },
 			ExtensionMode: { Development: 2 },
 		},
-		changeDocument: (document: vscode.TextDocument) =>
-			textChanged({ document }),
+		changeDocument: (
+			document: vscode.TextDocument,
+			reason?: vscode.TextDocumentChangeReason,
+		) => textChanged({ document, reason }),
 		changeSelection: (
 			document: vscode.TextDocument,
 			line: number,
@@ -729,6 +735,7 @@ it.each([
 	"createDefinition",
 	"deleteConnector",
 	"toggleFeedback",
+	"renameNode",
 	"nodeClick",
 ] as const)("reuses a moved inactive source tab for %s", async (type) => {
 	const { open } = setup();
@@ -761,16 +768,24 @@ it.each([
 	await panel.receive(
 		type === "nodeClick"
 			? { type, nodeId: "p" }
-			: type === "deleteConnector" || type === "toggleFeedback"
-				? {
-						type,
-						nodeId: "p",
-						source,
-						artifact: "a",
-						process: "p",
-						kind: "input",
-					}
-				: { type, nodeId: "p", source, connector: "->", otherId: "new_result" },
+			: type === "renameNode"
+				? { type, nodeId: "p", newId: "build", label: "Build", source }
+				: type === "deleteConnector" || type === "toggleFeedback"
+					? {
+							type,
+							nodeId: "p",
+							source,
+							artifact: "a",
+							process: "p",
+							kind: "input",
+						}
+					: {
+							type,
+							nodeId: "p",
+							source,
+							connector: "->",
+							otherId: "new_result",
+						},
 	);
 	expect(host.window.showTextDocument).toHaveBeenCalled();
 	for (const [openedDoc, options] of host.window.showTextDocument.mock.calls) {
@@ -976,6 +991,104 @@ it("refreshes a preview edit from the replacement document after the source is c
 		preserveFocus: true,
 	});
 	expect(original.getText()).toBe(source);
+});
+
+it.each([
+	false,
+	true,
+])("identifies a reopened rename across pre-save renders and Undo (undoDuringApply=%s)", async (undoDuringApply) => {
+	const { open } = setup();
+	const before = "a >> p -> b\n";
+	let source = before;
+	const original = document("rename-revision", source);
+	Object.assign(original, { version: 42 });
+	const panel = await open(original);
+	panel.receive({ type: "ready" });
+	Object.assign(original, { isClosed: true });
+	const reopened = document("rename-revision", source);
+	vi.spyOn(reopened, "getText").mockImplementation(() => source);
+	host.api.workspace.openTextDocument.mockResolvedValueOnce(reopened);
+	host.api.workspace.applyEdit.mockImplementationOnce(async () => {
+		source = "a >> build -> b\n";
+		Object.assign(reopened, { version: 2 });
+		host.changeDocument(reopened);
+		if (undoDuringApply) {
+			source = before;
+			Object.assign(reopened, { version: 3 });
+			host.changeDocument(reopened, host.api.TextDocumentChangeReason.Undo);
+			source = "a >> build -> b\n";
+			Object.assign(reopened, { version: 4 });
+			host.changeDocument(reopened, host.api.TextDocumentChangeReason.Redo);
+		}
+		return true;
+	});
+	const request = {
+		type: "renameNode" as const,
+		nodeId: "p",
+		newId: "build",
+		label: "",
+		source: before,
+		requestId: "rename-revision",
+	};
+	await panel.receive(request);
+	expect(
+		panel.messages
+			.filter((m) => m.type === "render")
+			.map((m) => m.sourceRevision),
+	).toEqual([
+		{ epoch: 0, version: 42 },
+		{ epoch: 1, version: 1 },
+		{ epoch: 1, version: 2 },
+		...(undoDuringApply
+			? [
+					{
+						epoch: 1,
+						version: 3,
+						invalidatedRenameRequestId: request.requestId,
+					},
+					{
+						epoch: 1,
+						version: 4,
+						invalidatedRenameRequestId: request.requestId,
+					},
+				]
+			: []),
+	]);
+	expect(panel.messages).toContainEqual({
+		type: "editResult",
+		request,
+		ok: true,
+		sourceRevision: {
+			epoch: 1,
+			version: undoDuringApply ? 4 : 2,
+			invalidatedRenameRequestId: undoDuringApply
+				? request.requestId
+				: undefined,
+		},
+	});
+	const nextVersion = undoDuringApply ? 5 : 3;
+	source = before;
+	Object.assign(reopened, { version: nextVersion });
+	host.changeDocument(reopened, host.api.TextDocumentChangeReason.Undo);
+	expect(panel.messages.at(-1)).toMatchObject({
+		type: "render",
+		editing: { source: before },
+		sourceRevision: {
+			epoch: 1,
+			version: nextVersion,
+			invalidatedRenameRequestId: request.requestId,
+		},
+	});
+	source = "x >> build -> y\n";
+	Object.assign(reopened, { version: nextVersion + 1 });
+	host.changeDocument(reopened);
+	expect(panel.messages.at(-1)).toMatchObject({
+		sourceRevision: {
+			epoch: 1,
+			version: nextVersion + 1,
+			invalidatedRenameRequestId: request.requestId,
+		},
+	});
 });
 
 it.each([

@@ -56,8 +56,14 @@ const connectionsStyles = `
 [data-side="right"] .connection-row, [data-side="right"] .connections-input { grid-template-columns: 32px minmax(0, 1fr); }
 .connections-input { flex-shrink: 0; margin-inline: 14px; }
 .connections-center { align-self: center; text-align: center; overflow-wrap: anywhere; padding: 4px; }
-#node-actions button, #node-actions input { color: inherit; background: var(--pfdsl-editor-background, #fff); font: inherit; margin: 4px; min-width: 0; box-sizing: border-box; overflow-wrap: anywhere; }
-#node-actions input { width: 100%; padding: 4px; }
+.connections-identity { align-self: center; min-width: 0; text-align: center; }
+.connections-identity > button { cursor: text; max-width: 100%; border: 0; padding: 0; }
+.node-rename-form { text-align: left; }
+.node-rename-form label { display: block; }
+#node-actions .node-rename-form input, #node-actions .node-rename-form textarea { margin: 4px 0; }
+#node-actions button, #node-actions input, #node-actions textarea { color: inherit; background: var(--pfdsl-editor-background, #fff); font: inherit; margin: 4px; min-width: 0; box-sizing: border-box; overflow-wrap: anywhere; }
+#node-actions input, #node-actions textarea { width: 100%; padding: 4px; }
+#node-actions textarea { resize: vertical; }
 #node-actions .connection-row button, #node-actions .connections-input > * { border: 0; margin: 0; background: transparent; padding: 4px; }
 #node-actions [data-edge], #node-actions [data-create] { padding: 6px; min-height: 28px; }
 .connection-node { display: inline-block; border: 1px solid currentColor; border-radius: 0; padding: 3px 6px; overflow-wrap: anywhere; max-width: 100%; box-sizing: border-box; }
@@ -73,7 +79,7 @@ const connectionsStyles = `
 .connection-reason { font-size: 0.9em; overflow-wrap: anywhere; max-height: 3em; overflow: auto; padding-inline: 14px; }
 .connection-menu { position: fixed; z-index: 120; padding: 4px 14px; box-sizing: border-box; max-width: calc(100vw - 8px); max-height: calc(100vh - 8px); overflow: auto; background: var(--pfdsl-editor-background, #fff); border: 1px solid var(--pfdsl-panel-border, #777); box-shadow: 0 2px 8px #0003; }
 #node-actions .connection-menu button { display: block; text-align: left; }
-#node-actions button:focus-visible, #node-actions input:focus-visible { outline: 2px solid var(--pfdsl-focusBorder, #007fd4); outline-offset: 1px; }
+#node-actions button:focus-visible, #node-actions input:focus-visible, #node-actions textarea:focus-visible { outline: 2px solid var(--pfdsl-focusBorder, #007fd4); outline-offset: 1px; }
 `;
 export const previewStyles =
 	graphStyles + previewControlsStyles + connectionsStyles;

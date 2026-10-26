@@ -181,6 +181,62 @@ merge済み実装とWiki上のwipの差を検出する監査は、第2段階の�
 
 ## 分離構成のindex・SVG自動生成
 
+### 既存エディタからの正式な公開経路
+
+所有者はPFDの日常編集を既存エディタで行い、公開コマンド1回で検証・Wiki反映・図更新まで済ませる方式を選択した。
+Wikiのdefault branchをcheckoutし、`roadmap.pfdsl` または `roadmap.md` を編集する。
+専用コマンドは未commit・未stageの変更を受け取るので、原稿だけのcommitやpushを先に行わない。
+変更できるのはこの2ファイルであり、ほかのページ・生成物・新しい依存ファイルの追加は、この初期の公開経路に含めない。
+コマンドを実行する本体repoのbuild、Wikiへの通常Git書込権限、Gitのuser.nameとuser.emailが必要である。
+この初期コマンドは、fetch/push両方のorigin URLが `https://github.com/<owner>/<repo>.wiki.git` のcloneを対象にする。
+SSHやURL書換えを設定した既存cloneを変更せず、下のHTTPS cloneを別に用意する。
+
+```bash
+git clone https://github.com/takasek/pfdsl.wiki.git /path/to/wiki
+# Edit roadmap.pfdsl or roadmap.md in your editor before publishing.
+node scripts/wiki-roadmap-publish.mjs --wiki /path/to/wiki --repository takasek/pfdsl
+```
+
+取得済みのWiki版を基に、編集した原文を作業用cloneへコピーし、未公開の原稿commitを作る。
+既存generateで検証・描画して生成物commitを作り、両commitを1回の通常pushで公開する。
+receiptの入力版は、その公開履歴に残る原稿commitを指す。
+Gitの改行正規化がある場合も、検証・描画・receiptの入力hashは公開する原稿commitの内容を使い、編集中の変更検出には手元の元bytesを使う。
+過去の検証済み内容へ戻して既存のindex・SVGを再利用できる場合は、原稿commitだけを公開し、receiptには再利用した生成物の入力版を保持する。
+gollum配送やActionsの追加起動に依存せず、原稿だけが公開される中間状態を作らない。
+remoteへの通信は元のcloneから行い、そのcloneだけに設定したGit認証・通信設定を再利用する。
+認証情報を準備cloneへコピーしたりreceiptへ記録したりしない。
+PFDとcompanionの両方を必ず編集する必要はない。
+
+不正入力ではremoteを変えず、元の編集を手元に保持する。
+古い版からの編集やremoteの競合では、自動merge・force-pushを行わず停止する。
+公開処理が失敗した場合は準備済みcloneの場所・編集前の版・原稿版を返し、調査・復旧まで保持する。
+特に通信切断などで公開結果が不明な場合は、再実行前にremoteの版と準備済みの版を照合する。
+
+成功後、手元の状態が開始時と同じなら、原稿をstageして公開版へfast-forwardし、続けて編集できる状態にする。
+公開中に別の編集を加えていた場合や手元の同期に失敗した場合は、その編集を残し、`status: published` と `localUpdated: false` を返す。
+この場合は公開済みなので同じ編集を再公開せず、保持した編集を新しい公開版へ移してから次の作業を続ける。
+まず元のcheckoutの2ファイルを退避し、公開版のfresh cloneを別の場所に取得する。
+
+```bash
+backup="$(mktemp -d)"
+cp /path/to/wiki/roadmap.pfdsl /path/to/wiki/roadmap.md "$backup/"
+git clone https://github.com/takasek/pfdsl.wiki.git /path/to/wiki-next
+```
+
+`recoveryPath` は公開準備時の原稿を含むcloneである。
+エディタでその2ファイルと退避した2ファイルを比較すると、公開後に追加した編集を区別できる。
+その差分だけをwiki-nextの最新原稿へ手で反映し、先行した他者の変更を保持したうえで、新しいcloneを公開コマンドへ渡す。
+退避ファイルの全文を新しいcloneへ無条件に上書きしない。
+公開前のremote競合で停止した場合は、元のcheckoutのHEADが編集開始時の原稿なので、その版と退避ファイルとの差分を同様に最新cloneへ移す。
+準備cloneの削除だけに失敗した場合は公開成功を維持し、`cleanupWarning` と `cleanupPath` に残存場所を返す。
+
+単に原稿をpushしてからActionsを起動する別案には、原稿公開後に検証が失敗する余地がある。
+定期取得は通常Git pushを扱えるが、図の更新が遅延し、不正原稿の公開前検証にはならない。
+今回は所有者がローカル編集と公開コマンドを選択したため、サーバー側だけで検証する経路、ブラウザ専用のPFD編集面、別の計画repoは採用しない。
+それぞれの経路が必要な採用先では再検討し、このコマンドがその入力を包含するとは扱わない。
+
+### 生成物だけを更新する経路
+
 `scripts/wiki-roadmap-generate.mjs` は、単一フェンスを使う旧試作とは別に、同じWiki commitの `roadmap.pfdsl` と `roadmap.md` を入力にする。
 生成先は `roadmap.index.md` と `roadmap.svg` だけで、手書きの2ファイルは変更しない。
 indexの本文を手で変更しても次の生成で置換するため、説明の正本はcompanionに書く。
@@ -246,5 +302,18 @@ companionに残っていた「自動更新しない」という旧説明は、We
 
 GitでpushしたPFD変更では、この試験中のrun一覧にgollum起動を観測せず、明示的な手動実行で不正入力と復旧を確認した。
 Webでのcompanion編集による自動起動と、GitからのPFD更新の自動配送を同じ受入にしない。
-PFDを日常編集する正式な経路と、その更新を自動生成へ接続する方式は未受入であり、試験中のGit更新には手動実行を併用する。
+この実測時点ではPFDの日常編集経路と自動生成への接続は未受入であり、試験中のGit更新には手動実行を併用した。
+後続の公開コマンドは上節のとおりGit更新イベントに依存せず、編集から検証・図生成・公開までを一つの操作にする。
 fetch後からpush直前の狭い競合窓、共有done、本体repoの参照解決、consumer移行、正本切替も今回の実測範囲には含めない。
+
+### 公開コマンドの実Wiki試験（2026-10-26）
+
+既存の試験PFDのtitleとresultのlabelだけを変更し、公開コマンドを1回実行した。
+statusとグラフ構造、companion、本体repoの正本は変更していない。
+実行結果はpublished・localUpdated=trueであり、原稿版 `ca500917e272011f9249e992e9876effe141c043` と生成物版 `dfccf24ff8877841c992587bd96086dd86c9d640` が、編集前の版 `d6bf5adc681e9eaac96ac8a49bcae13969ca838f` に続く2つのcommitとして公開された。
+公開コマンドはActions起動や手動の生成コマンドを併用せず、手元のcloneもcleanに同期した。
+
+別のcloneで再取得し、receiptのsourceHash・companionHash・svgHashが各ファイルのSHA256と一致することと、receiptが指す原稿版が公開履歴の直前の祖先であることを確認した。
+SVG hashは `b19d84acb11be4da9862f36d12de9e4bf241ae7182952ea63b974611bc58ef9d` で、事前にsource・metadata・描画を確認したSVGとbyte一致した。
+ブラウザでもRoadmap publishing trialの見出し、Trial resultの図、原稿版の表示、画像の読込完了と自然寸法413×121を確認した。
+これはこの版の公開コマンドを使う経路の受入であり、任意のGit pushの自動配送や、本体repoの成果物の参照解決・正本切替の受入ではない。
