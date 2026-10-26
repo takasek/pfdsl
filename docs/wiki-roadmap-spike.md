@@ -15,15 +15,17 @@
 
 | Wiki内のファイル | 役割 | 更新する主体 |
 | --- | --- | --- |
-| `roadmap.index.md` | まとめページ。SVGを埋め込み、companionのWikiプレビューと原文、PFD原文、SVGへリンクする | 人間・承認された編集経路 |
+| `roadmap.index.md` | まとめページ。SVGを埋め込み、companionのWikiプレビューと原文を1行にまとめ、PFD原文へリンクする | 自動生成 |
 | `roadmap.md` | companionの正本。既存companionの内容をWiki本文として記述する | 人間・承認された編集経路 |
 | `roadmap.pfdsl` | 依存関係・進捗を持つPFDの正本 | PFDの編集経路 |
-| `roadmap.svg` | PFDから生成する表示用の図 | 描画処理 |
+| `roadmap.svg` | PFDから生成する表示用の図 | 自動生成 |
 
 companionとPFDは同じbasenameの `roadmap.md` / `roadmap.pfdsl` とし、まとめページだけ `.index.md` で区別する。
 図とリンクはまとめページで閲覧し、companionのプレビューは独立したWikiページで開く。保存上はMarkdown2ファイル・PFD・SVGの4ファイルに分かれる。
 所有者判断により、この分離構成のファイル名は小文字の `roadmap` に揃える。
 Wiki本文のコードブロックをPFDの第二正本として維持しない。
+生成するindexにはPFDのtitle・description、図、companionのpreview/source、PFD原文、最後に検証成功した入力Wiki版・生成時刻・toolchain digest・Actionsへのリンクを載せる。
+SVG単独へのリンクは置かない。
 companionも本体repoから移す方向とし、切替時に本体側の編集可能な第二正本を残さない。
 採用設定・取得処理・workflow等、本体repoに属する実装と設定までWikiへ移すことは要求しない。
 
@@ -300,3 +302,48 @@ main実装が必要な成果物はmerge後、公開物が必要なら公開後�
 Issue closeはdoneの根拠にも契機にもしない。
 merge済み実装とWiki上のwipの差を検出する監査は、第2段階の受入条件として残す。
 #1519全体の受入条件は未達であり、roadmapでは準備成果物 `wiki_roadmap_ready_for_cutover` をwip、切替出力 `wiki_roadmap_integration` をtodoとする。切替は準備の完了と、#1542の参照先解決実装がWiki運用の採用版に含まれることを待つ。
+
+## 分離構成のindex・SVG自動生成
+
+`scripts/wiki-roadmap-generate.mjs` は、単一フェンスを使う旧試作とは別に、同じWiki commitの `roadmap.pfdsl` と `roadmap.md` を入力にする。
+生成先は `roadmap.index.md` と `roadmap.svg` だけで、手書きの2ファイルは変更しない。
+indexの本文を手で変更しても次の生成で置換するため、説明の正本はcompanionに書く。
+この段階では生成したindexにも試験用・本体repoが正本という表示を残す。
+
+ローカルでCLIをbuildした後、cleanなWiki cloneを指定する。
+通常実行は出力をローカルへ書くだけで、`--publish` を付けた場合だけcommit・pushする。
+以下の2コマンドは用途別の選択肢であり、順番に実行する手順ではない。
+ローカル生成の出力は未commitのため、そのまま再実行すると `Wiki checkout must be clean` で停止する。
+ローカルで繰り返し試す場合は生成物を確認してcommitしてから再実行し、公開を選ぶ場合は元のcleanなcloneで最初から `--publish` を指定する。
+`--expected-revision` を省略した場合は実行開始時のHEADを固定する。
+
+```bash
+node scripts/wiki-roadmap-generate.mjs --wiki /path/to/wiki --repository takasek/pfdsl --expected-revision <full-wiki-commit>
+node scripts/wiki-roadmap-generate.mjs --wiki /path/to/wiki --repository takasek/pfdsl --publish
+```
+
+PFDのtitleとdescriptionをMarkdownの文字としてescapeして表示し、固定したWiki snapshotを複製して `check --strict`、`meta check-links`、SVG描画を行う。
+PFDのcommandは実行しない。
+snapshot全体のGit tree（生成先2ファイル以外）、CLI/core/exporter/preview-engineのbuild内容、lockfile、Node版、生成器自身を入力キーに含める。
+extends・subflow・ローカルlinkの変更を見落とさないため、無関係なページ変更でも保守的に再生成する。
+出力だけのcommitではキーが変わらず、index本文とSVGのhashが一致すれば再生成しない。
+生成時刻・入力版・入力と出力のhashはindexのHTML commentに記録し、余分なmanifestファイルは作らない。
+
+検証失敗・開始後のHEAD変更・未commit変更では公開しない。
+公開直前に入力と生成物の一致、stage済み変更がないこと、originのfetch先とpush先、remoteの版を確認する。
+生成物2ファイルだけを同一commitで送り、fetch後の競合は通常のnon-fast-forward拒否へ委ねる。
+検証失敗時には前回のindex・SVGを保持し、indexは「最後に検証成功したsnapshot」と入力版・時刻を示す。
+最新入力の成功を保証する表示ではなく、失敗はActionsの実行結果で確認する。
+
+`.github/workflows/wiki-roadmap-generate.yml` はgollumと手動実行を入口とし、本体repoのbuildから生成器を実行する。
+gollumはworkflowがdefault branchに存在する場合に発火する（[GitHub公式仕様](https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows#gollum)）。
+ActionsのGITHUB_TOKENをcontents: writeで利用する提案であり、このPRのローカル試験は実Wikiへのtoken書込権限、gollum発火、Web編集後の自動更新を証明しない。
+権限不足ならジョブを失敗として止め、認証方式を無断で追加しない。
+Gitで更新する場合の発火も未確認のため、手動実行を併設する。
+
+現在のCLIは #1542 の参照先解決をまだ実装していない。
+coreの依存closureを使い、entry・extends・subflowの実際の読み込み対象を拡張子に依存せず調べる。
+そのいずれかにbaseRefまたはartifact.refがある場合は、無視して成功扱いにせず生成を拒否する。
+依存文書がWiki snapshotの外へ出る場合も生成を拒否する。
+この制限を外し、本体repoのartifact参照を同一の採用実装で解決・検証することが切替前の残件である。
+既存consumerとpipelineの正本入力は変更せず、準備はwip、切替はtodoを維持する。

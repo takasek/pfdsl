@@ -19,7 +19,7 @@ export function toolIdentity(cli) {
 	const digest = createHash("sha256")
 		.update(process.version)
 		.update(readFileSync(join(root, "pnpm-lock.yaml")));
-	for (const name of ["cli", "core", "graphviz-exporter"]) {
+	for (const name of ["cli", "core", "graphviz-exporter", "preview-engine"]) {
 		const dist = join(root, "packages", name, "dist");
 		for (const file of readdirSync(dist)
 			.filter((file) => file.endsWith(".js"))
