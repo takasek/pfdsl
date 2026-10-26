@@ -38,7 +38,7 @@ const host = vi.hoisted(() => {
 	}
 	let textChanged = (_event: {
 		document: vscode.TextDocument;
-		reason?: vscode.TextDocumentChangeReason;
+		reason?: vscode.TextDocumentChangeReason | undefined;
 	}) => {};
 	let selectionChanged = (_event: {
 		textEditor: vscode.TextEditor;
