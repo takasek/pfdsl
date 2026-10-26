@@ -6,6 +6,10 @@ export const GENERATED_DISTRIBUTION_SOURCES = Object.freeze({
 	"CLAUDE.md": "scripts/root-instructions-template/INSTRUCTIONS.md",
 	"AGENTS.md": "scripts/root-instructions-template/INSTRUCTIONS.md",
 	"plugin/pfdsl-codex/GENERATED.md": "scripts/lib/gen-plugin.mjs",
+	// Keep the relocated source discoverable while a review diff still includes
+	// removal of the formerly bundled implementation agent.
+	"plugin/pfdsl/agents/pfd-implementer.md":
+		"scripts/repo-agent-template/pfd-implementer.md",
 	"plugin/pfdsl/skills/pfdsl/SKILL.md": "scripts/skill-template/SKILL.md",
 	"plugin/pfdsl/skills/pfdsl/references/spec.md": "docs/spec/spec.md",
 	"plugin/pfdsl/skills/pfdsl/references/quality-guide.md":
