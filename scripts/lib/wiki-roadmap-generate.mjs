@@ -165,7 +165,16 @@ export function generate({ wiki, repository, cli, expectedRevision }) {
 				receipt.svgHash === hash(read(wiki, outputs[1])) &&
 				page === indexPage(metadata, receipt)
 			)
-				return { status: "unchanged", wikiRevision, key };
+				return {
+					status: "unchanged",
+					wikiRevision,
+					key,
+					sourceHash,
+					companionHash,
+					indexHash: hash(page),
+					svgHash: receipt.svgHash,
+					inputWikiRevision: receipt.wikiRevision,
+				};
 		} catch {
 			/* A damaged receipt is regenerated, not trusted. */
 		}
@@ -218,7 +227,7 @@ export function generate({ wiki, repository, cli, expectedRevision }) {
 	}
 }
 
-/** Commit the generated pair, then use an ordinary non-force push. */
+/** Publish source changes with their generated or reusable pair using a non-force push. */
 export function publish({
 	wiki,
 	result,
@@ -227,8 +236,11 @@ export function publish({
 	transportWiki = wiki,
 }) {
 	wiki = checkout(wiki);
-	if (result.status === "unchanged") return result;
-	if (result.status !== "generated")
+	const sourceOnly =
+		result.status === "unchanged" &&
+		expectedRemoteRevision !== result.wikiRevision;
+	if (result.status === "unchanged" && !sourceOnly) return result;
+	if (result.status !== "generated" && !sourceOnly)
 		throw new Error("No generated pair to publish");
 	transportWiki = checkout(transportWiki);
 	if (
@@ -254,17 +266,19 @@ export function publish({
 	git(transportWiki, "fetch", "origin", branch);
 	if (git(transportWiki, "rev-parse", "FETCH_HEAD") !== expectedRemoteRevision)
 		throw new Error("Wiki remote conflict: generate from the new revision");
-	git(wiki, "add", "--", ...outputs);
-	git(
-		wiki,
-		"-c",
-		"user.name=github-actions[bot]",
-		"-c",
-		"user.email=41898282+github-actions[bot]@users.noreply.github.com",
-		"commit",
-		"-m",
-		"docs(wiki): generate roadmap index and SVG",
-	);
+	if (result.status === "generated") {
+		git(wiki, "add", "--", ...outputs);
+		git(
+			wiki,
+			"-c",
+			"user.name=github-actions[bot]",
+			"-c",
+			"user.email=41898282+github-actions[bot]@users.noreply.github.com",
+			"commit",
+			"-m",
+			"docs(wiki): generate roadmap index and SVG",
+		);
+	}
 	const revision = git(wiki, "rev-parse", "HEAD");
 	// Network operations use the editor checkout's own Git authentication settings.
 	if (transportWiki !== wiki)
@@ -273,6 +287,6 @@ export function publish({
 	return {
 		status: "published",
 		revision,
-		inputWikiRevision: result.wikiRevision,
+		inputWikiRevision: result.inputWikiRevision ?? result.wikiRevision,
 	};
 }

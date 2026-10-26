@@ -118,6 +118,33 @@ test("invalid edits preserve the editor's bytes and leave all public files and l
 	assert.equal(existsSync(join(f.wiki, "roadmap.svg")), false);
 });
 
+test("restoring cached valid content publishes the source commit without regenerating or staging leftover edits", (t) => {
+	const f = fixture(t);
+	writeFileSync(join(f.wiki, "roadmap.pfdsl"), edited);
+	const accepted = publishEdit(options(f));
+	const index = remoteBytes(f, "roadmap.index.md");
+	const svg = remoteBytes(f, "roadmap.svg");
+	writeFileSync(join(f.wiki, "roadmap.pfdsl"), "a >> p -> a\n");
+	git(f.wiki, "add", "roadmap.pfdsl");
+	git(f.wiki, "commit", "-m", "Unvalidated external edit");
+	git(f.wiki, "push");
+	const invalidRevision = git(f.remote, "rev-parse", "master");
+	writeFileSync(join(f.wiki, "roadmap.pfdsl"), edited);
+	const result = publishEdit(options(f));
+	assert.equal(result.status, "published");
+	assert.equal(result.localUpdated, true);
+	assert.equal(result.revision, result.sourceRevision);
+	assert.equal(result.inputWikiRevision, accepted.sourceRevision);
+	assert.equal(git(f.remote, "rev-parse", "master"), result.revision);
+	assert.equal(git(f.remote, "rev-parse", "master^"), invalidRevision);
+	assert.equal(remoteBytes(f, "roadmap.pfdsl"), edited);
+	assert.equal(remoteBytes(f, "roadmap.index.md"), index);
+	assert.equal(remoteBytes(f, "roadmap.svg"), svg);
+	assert.equal(git(f.wiki, "rev-parse", "HEAD"), result.revision);
+	assert.equal(git(f.wiki, "status", "--porcelain"), "");
+	assert.equal(publishEdit(options(f)).status, "unchanged");
+});
+
 test("stale editors and unrelated or staged edits are refused without losing work", (t) => {
 	const f = fixture(t);
 	writeFileSync(join(f.wiki, "roadmap.pfdsl"), edited);
