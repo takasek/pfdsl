@@ -173,7 +173,9 @@ export function applyPreviewEdit(
 			return fail(
 				"ID changes in documents using extends require the CLI rename command. Label changes are available here.",
 			);
-		const renamed = rename(source, request.nodeId, request.newId);
+		const renamed = rename(source, request.nodeId, request.newId, {
+			analysis: model,
+		});
 		// An unchanged ID still checks the rename safety rules (including shared YAML).
 		if (
 			!renamed.ok &&
