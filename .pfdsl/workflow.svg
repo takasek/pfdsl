@@ -201,7 +201,7 @@
 <!-- maintain_distributed_prompt_assets -->
 <g id="node33" class="node">
 <title>maintain_distributed_prompt_assets</title>
-<g id="a_node33"><a xlink:title="配布プロンプト資産整備&#10;&#10;decisions が指名した配布プロンプト資産の正本を改訂する。 どの正本が plugin に同梱されるかの一次情報は gen&#45;plugin manifest と pipeline_pfdsl 側にあり、この工程が持つのは正本の整備責任だけである。 distribution_review_record の配布先で観測した詰まりと、retro_findings の対象固有の failure を各正本の文言・手順へ反映する。 検証コマンドは正本ごとに異なり、各出力 artifact の criteria が一次情報である。&#10;">
+<g id="a_node33"><a xlink:title="配布プロンプト資産整備&#10;&#10;decisions が指名した配布プロンプト資産と、このリポ専用の実装 agent の正本を改訂する。 どの正本が plugin に同梱されるかの一次情報は gen&#45;plugin manifest と pipeline_pfdsl 側にあり、この工程が持つのは正本の整備責任だけである。 distribution_review_record の配布先で観測した詰まりと、retro_findings の対象固有の failure を各正本の文言・手順へ反映する。 検証コマンドは正本ごとに異なり、各出力 artifact の criteria が一次情報である。&#10;">
 <ellipse fill="none" stroke="black" cx="2709.63" cy="-2180.14" rx="154.84" ry="41.3"/>
 <text xml:space="preserve" text-anchor="middle" x="2709.63" y="-2192.74" font-family="Times,serif" font-size="14.00">maintain_distributed_prompt_assets</text>
 <text xml:space="preserve" text-anchor="middle" x="2709.63" y="-2175.94" font-family="Times,serif" font-size="14.00">配布プロンプト資産</text>
@@ -822,7 +822,7 @@
 <!-- implementer_agent -->
 <g id="node32" class="node">
 <title>implementer_agent</title>
-<g id="a_node32"><a xlink:title="実装委譲agent&#10;&#10;pfd&#45;implementer agent。実装のみを委譲し、push・PR 作成・issue 操作は呼び出し元に残す。手書きだが gen_plugin が plugin へミラーする（#558）。harness が対応する tools 制限と戻り時の照合を使い、全経路の外向き操作の拒否は保証しない&#10;criteria: make gen&#45;plugin が差分なしで完了して plugin/pfdsl/agents/pfd&#45;implementer.md が実在し、採用リポで plugin を入れただけで pfd&#45;implementer が起動でき、その tools 列に外向きツール面（GitHub MCP）が無い&#10;location: scripts/harness&#45;template/agents/pfd&#45;implementer.md">
+<g id="a_node32"><a xlink:title="実装委譲agent&#10;&#10;このリポ専用の pfd&#45;implementer agent。実装のみを委譲し、push・PR 作成・issue 操作は呼び出し元に残す。gen_plugin がリポ専用テンプレートから Claude Code と Codex の定義を生成し、plugin には同梱しない。harness が対応する tools 制限と戻り時の照合を使い、全経路の外向き操作の拒否は保証しない&#10;criteria: make gen&#45;plugin が差分なしで完了して .claude/agents/pfd&#45;implementer.md と .codex/agents/pfd&#45;implementer.toml が生成され、このリポで pfd&#45;implementer を起動できる。Claude Code plugin の agents は pfd&#45;lens.md のみで、Codex plugin に agent は含まれない&#10;location: scripts/repo&#45;agent&#45;template/pfd&#45;implementer.md">
 <polygon fill="none" stroke="black" stroke-width="2" points="3076.87,-2382.94 2932.87,-2382.94 2932.87,-2341.34 3076.87,-2341.34 3076.87,-2382.94"/>
 <text xml:space="preserve" text-anchor="middle" x="3004.87" y="-2366.34" font-family="Times,serif" font-size="14.00">implementer_agent</text>
 <text xml:space="preserve" text-anchor="middle" x="3004.87" y="-2349.54" font-family="Times,serif" font-size="14.00">実装委譲agent</text>
