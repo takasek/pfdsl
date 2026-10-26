@@ -18,4 +18,14 @@ API区分は実際のsignal・OOMの証拠そのものではなく、この較�
 
 各回の非再現ログ・派生fixture・付随観測は今回の差分から除いた。
 必要になった場合は [縮小前の固定版](https://github.com/takasek/pfdsl/tree/fbecad945fc10e86b03eb3a2a75fb1a5898d6907/packages/standalone/evidence) から取得できる。
-PRブランチは最終差分の1コミットへまとめ、元の回収ZIPと全量資料は手元で保全している。
+元の回収ZIPと全量資料は手元で保全している。
+
+## Dotクラウドでの追試（2026-10-27受領）
+
+同じAppImage・元fixtureをDebian 13.6／Intel Xeon表示のx86_64／X11で通常2回・観測library付き2回試し、Escape後95.477／108.866／109.235／98.654秒で非再現と報告された。
+全回自動キー・撮影あり、hover中の外部AX取得なし、Escape後AX取得ありで、本文確認は入力ファイルhashと全行の画面照合であり、エディタ内部バイト比較ではない。
+受領した集約記録の前後PID・親子関係・起動識別は一致し、観測群の実app connectedと自然終了通知なしを確認したが、非再現4回の全量archiveは別保全で未受領のため、UI・応答の確認は短報と集約の範囲に限る。
+別起動の較正資料は、識別済みWeb子へのSIGTERM送信、同じviewのreason=0/crashed通知、本体・network存続を裏づけるが、Web子wait-statusは未取得である。
+較正のmaps・hashと同じlibraryのversion関数の逆アセンブルは配布物内WebKitGTK 2.54.0を示し、観測libraryも既存AppDirのGLib/GObjectを参照した。開発packageはビルド用に局所展開し、新しいruntimeは導入していない。
+準備時のAMD表示は別環境で、実試験の仮想化・エミュレーション詳細、GPU renderer、Xvfb有無は不明。core無効、kernelログ権限不足、cgroup OOM情報未取得のため、遅延故障やOOM・原因候補の否定、修正確認には使わず、追加反復は終了した。
+出典は手元保全の `pfdsl-1513-followup-result.zip`（SHA-256 `0b29acd646780fdca4a06414af5f08bab3a6091488ab60b62a6d966d22e54dcf`）。ZIP内19件と較正資料内77件のチェックサムを照合し、非再現ログの全量は本PRへ追加していない。
