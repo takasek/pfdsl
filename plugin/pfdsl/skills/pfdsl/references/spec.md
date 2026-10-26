@@ -195,6 +195,12 @@ source の取得方式と revision の解釈は取得側が供給し、言語は
 basePath は従来どおり Process の location と cwd にも適用する。
 subflow と extends の解決先は変更せず、子 PFD は自分の宣言から有効参照先を決める。
 親の baseRef を子へ暗黙継承せず、表示用プリセットの継承対象にも加えない。
+外部保存モデルの Process の相対 location・command.cwd・subflow・extends を解決する場合、取得側が明示するモデルの基準文脈（取得元・固定版・その集合内の論理ファイル位置）を用い、必要な文脈がなければ解決不能として失敗を報告する。
+これらの基準文脈を baseRef / ref や抽出先の一時ディレクトリから推測しない。
+Process の相対 location と cwd はその文脈で basePath を適用し、subflow と extends は basePath を適用せず論理ファイル位置のディレクトリを基準とする。
+例えばモデルの基準文脈が本体repoの固定版 C0・論理位置 `.pfdsl/roadmap.pfdsl`・basePath `..` なら、Process の location `scripts/review.mjs` と cwd は C0 の `scripts/review.mjs` とrepoルート、extends `./presets.yaml` は C0 の `.pfdsl/presets.yaml` を指す。
+Artifact の参照先が別の固定版 C1 を選んでも、これらを C1 へ切り替えない。
+この条件は外部保存モデルの相対参照を解決する操作に適用し、参照解決を行わない静的検査・描画や、既存のローカルモデルの解決規則は変更しない。
 
 #### artifact 専用フィールド（criteria / revises）
 
@@ -1259,6 +1265,7 @@ ref を Process に指定することは error とする。
 解決入力は、有効参照先、モデルの論理ファイル位置、basePath、location とする。
 取得側は source と revision を固定版とその版のリソース集合のルートへ対応付け、モデルの論理ファイル位置を明示する。
 モデルが外部保存されている場合、抽出先の一時パスから論理位置を推測しない。
+Artifact 以外の相対参照には §2.3 のモデルの基準文脈を用い、その文脈の欠落も解決不能として報告する。
 たとえば論理位置 `.pfdsl/roadmap.pfdsl` と basePath `..` と location `docs/plan.md` は、選択版のルート内の `docs/plan.md` を指す。
 モデル自身が選択版に存在することは要求しない。
 basePath の省略時も論理ファイルのディレクトリを基準とする。
