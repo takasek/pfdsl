@@ -1,11 +1,196 @@
 // @vitest-environment jsdom
 import { afterEach, expect, it, vi } from "vitest";
 import { analyzeSnapshot, prepareDocument } from "./document.js";
+import type { MessageFromWebview } from "./messages.js";
 import { mountPreview } from "./preview.js";
 import * as previewEdits from "./preview-edit.js";
 import { previewStyles } from "./preview-shell.js";
 
 const dispose: Array<() => void> = [];
+
+function renderMessage(source: string) {
+	const { message } = prepareDocument(
+		analyzeSnapshot(source),
+		null,
+		() => null,
+	);
+	if (message.type !== "render") throw new Error(message.message);
+	return message;
+}
+
+it.each([
+	false,
+	true,
+])("follows the exact saved source after undoing a later comment (renderFirst=%s)", async (renderFirst) => {
+	const s = await setup("a >> p -> b\n");
+	s.container
+		.querySelector<HTMLButtonElement>(".connections-identity > button")!
+		.click();
+	s.container.querySelector<HTMLInputElement>('[aria-label="Node ID"]')!.value =
+		"build";
+	s.container.querySelector<HTMLButtonElement>("[data-save-node]")!.click();
+	const request = s.postMessage.mock.calls.at(-1)![0];
+	const result = previewEdits.applyPreviewEdit(s.source, request);
+	if (!result.ok) throw new Error(result.message);
+	const redraw = () =>
+		s.preview.receive({
+			...renderMessage(result.source),
+			sourceRevision: { epoch: 0, version: 3 },
+		});
+	if (renderFirst) await redraw();
+	await s.preview.receive({ type: "editResult", request, ok: true });
+	if (!renderFirst) await redraw();
+	expect(s.container.querySelector<HTMLElement>("#node-actions")!.hidden).toBe(
+		false,
+	);
+	expect(s.container.querySelector(".connections-center")!.textContent).toBe(
+		"build",
+	);
+});
+
+it.each([
+	false,
+	true,
+])("does not follow a reused ID when Undo and replacement coalesce (renderFirst=%s)", async (renderFirst) => {
+	const s = await setup("a >> p -> b\n");
+	s.container
+		.querySelector<HTMLButtonElement>(".connections-identity > button")!
+		.click();
+	s.container.querySelector<HTMLInputElement>('[aria-label="Node ID"]')!.value =
+		"build";
+	s.container.querySelector<HTMLButtonElement>("[data-save-node]")!.click();
+	const request = s.postMessage.mock.calls.at(-1)![0];
+	const redraw = () =>
+		s.preview.receive({
+			...renderMessage("x >> build -> y\n"),
+			sourceRevision: {
+				epoch: 0,
+				version: 3,
+				invalidatedRenameRequestId: request.requestId,
+			},
+		});
+	if (renderFirst) await redraw();
+	await s.preview.receive({ type: "editResult", request, ok: true });
+	if (!renderFirst) await redraw();
+	expect(s.container.querySelector<HTMLElement>("#node-actions")!.hidden).toBe(
+		true,
+	);
+});
+
+it("waits for the reopened document generation and consumes its Undo snapshot", async () => {
+	const s = await setup("a >> p -> b\n");
+	s.container
+		.querySelector<HTMLButtonElement>(".connections-identity > button")!
+		.click();
+	s.container.querySelector<HTMLInputElement>('[aria-label="Node ID"]')!.value =
+		"build";
+	const save =
+		s.container.querySelector<HTMLButtonElement>("[data-save-node]")!;
+	save.click();
+	const request = s.postMessage.mock.calls.at(-1)![0];
+	await s.preview.receive({
+		...renderMessage(s.source),
+		sourceRevision: { epoch: 0, version: 99 },
+	});
+	await s.preview.receive({
+		type: "editResult",
+		request,
+		ok: true,
+		sourceRevision: { epoch: 1, version: 2 },
+	});
+	expect(save.disabled).toBe(true);
+	await s.preview.receive({
+		...renderMessage(s.source),
+		sourceRevision: { epoch: 1, version: 1 },
+	});
+	expect(save.disabled).toBe(true);
+	await s.preview.receive({
+		...renderMessage(s.source),
+		sourceRevision: { epoch: 1, version: 3 },
+	});
+	expect(save.disabled).toBe(false);
+	await s.preview.receive({
+		...renderMessage("x >> build -> y\n"),
+		sourceRevision: { epoch: 1, version: 4 },
+	});
+	expect(s.container.querySelector<HTMLElement>("#node-actions")!.hidden).toBe(
+		true,
+	);
+});
+
+it("does not follow an unrelated render before a rejected rename reply", async () => {
+	const s = await setup("a >> p -> b\n");
+	s.container
+		.querySelector<HTMLButtonElement>(".connections-identity > button")!
+		.click();
+	s.container.querySelector<HTMLInputElement>('[aria-label="Node ID"]')!.value =
+		"build";
+	s.container.querySelector<HTMLButtonElement>("[data-save-node]")!.click();
+	const request = s.postMessage.mock.calls.at(-1)![0];
+	await s.preview.receive(
+		prepareDocument(analyzeSnapshot("x >> build -> y\n"), null, () => null)
+			.message,
+	);
+	expect(s.container.querySelector(".connections-center")!.textContent).toBe(
+		"p",
+	);
+	await s.preview.receive({
+		type: "editResult",
+		request,
+		ok: false,
+		message: "The document changed.",
+	});
+	expect(s.container.querySelector<HTMLElement>("#node-actions")!.hidden).toBe(
+		true,
+	);
+});
+
+it("does not resume rename tracking after closing and reopening the same node", async () => {
+	const s = await setup("a >> p -> b\n");
+	s.container
+		.querySelector<HTMLButtonElement>(".connections-identity > button")!
+		.click();
+	s.container.querySelector<HTMLInputElement>('[aria-label="Node ID"]')!.value =
+		"build";
+	s.container.querySelector<HTMLButtonElement>("[data-save-node]")!.click();
+	const request = s.postMessage.mock.calls.at(-1)![0];
+	const result = previewEdits.applyPreviewEdit(s.source, request);
+	if (!result.ok) throw new Error(result.message);
+	s.container.querySelector<HTMLButtonElement>("#node-actions-close")!.click();
+	s.container
+		.querySelector('[data-node-id="p"]')!
+		.dispatchEvent(new MouseEvent("contextmenu", { bubbles: true }));
+	await s.preview.receive({ type: "editResult", request, ok: true });
+	await s.preview.receive(
+		prepareDocument(analyzeSnapshot(result.source), null, () => null).message,
+	);
+	expect(s.container.querySelector<HTMLElement>("#node-actions")!.hidden).toBe(
+		true,
+	);
+});
+
+it("does not follow a reused ID after Undo has completed the save", async () => {
+	const s = await setup("a >> p -> b\n");
+	s.container
+		.querySelector<HTMLButtonElement>(".connections-identity > button")!
+		.click();
+	s.container.querySelector<HTMLInputElement>('[aria-label="Node ID"]')!.value =
+		"build";
+	s.container.querySelector<HTMLButtonElement>("[data-save-node]")!.click();
+	const request = s.postMessage.mock.calls.at(-1)![0];
+	await s.preview.receive({ type: "editResult", request, ok: true });
+	await s.preview.receive({
+		...renderMessage(s.source),
+		sourceRevision: { epoch: 0, version: 2 },
+	});
+	await s.preview.receive(
+		prepareDocument(analyzeSnapshot("x >> build -> y\n"), null, () => null)
+			.message,
+	);
+	expect(s.container.querySelector<HTMLElement>("#node-actions")!.hidden).toBe(
+		true,
+	);
+});
 
 it.each([
 	"stay",
@@ -72,9 +257,10 @@ it("follows a saved rename after a pre-save render and success reply", async () 
 	const request = s.postMessage.mock.calls.at(-1)![0];
 	const result = previewEdits.applyPreviewEdit(s.source, request);
 	if (!result.ok) throw new Error(result.message);
-	await s.preview.receive(
-		prepareDocument(analyzeSnapshot(s.source), null, () => null).message,
-	);
+	await s.preview.receive({
+		...renderMessage(s.source),
+		sourceRevision: { epoch: 0, version: 0 },
+	});
 	await s.preview.receive({ type: "editResult", request, ok: true });
 	await s.preview.receive(
 		prepareDocument(analyzeSnapshot(result.source), null, () => null).message,
@@ -113,9 +299,10 @@ it.each([
 	const request = s.postMessage.mock.calls.at(-1)![0];
 	// The save's render is superseded: only Undo's original source arrives.
 	const redraw = () =>
-		s.preview.receive(
-			prepareDocument(analyzeSnapshot(s.source), null, () => null).message,
-		);
+		s.preview.receive({
+			...renderMessage(s.source),
+			sourceRevision: { epoch: 0, version: 2 },
+		});
 	if (renderFirst) await redraw();
 	await s.preview.receive({ type: "editResult", request, ok: true });
 	if (!renderFirst) await redraw();
@@ -998,12 +1185,45 @@ async function setup(
 	vi.spyOn(window, "requestAnimationFrame").mockImplementation(() => 0);
 	const container = document.createElement("div");
 	document.body.append(container);
+	let sourceVersion = -1;
+	const appliedVersions = new Map<string, number>();
 	const postMessage = vi.fn();
+	postMessage.mockImplementation((message: MessageFromWebview) => {
+		if ("requestId" in message && message.requestId)
+			appliedVersions.set(message.requestId, sourceVersion + 1);
+	});
 	const preview = mountPreview(container, {
 		postMessage,
 		renderDot: async () =>
 			'<svg width="200" height="100"><g class="node"><title>a</title></g><g class="node"><title>p</title></g><g class="node"><title>b</title></g></svg>',
 	});
+	// Model the host's content versions; ordering tests can supply an explicit version.
+	const receive = preview.receive;
+	preview.receive = (message) => {
+		if (message.type === "render") {
+			sourceVersion = message.sourceRevision?.version ?? sourceVersion + 1;
+			message = {
+				...message,
+				sourceRevision: message.sourceRevision ?? {
+					epoch: 0,
+					version: sourceVersion,
+				},
+			};
+		} else if (
+			message.type === "editResult" &&
+			message.ok &&
+			message.request.type === "renameNode"
+		) {
+			message = {
+				...message,
+				sourceRevision: message.sourceRevision ?? {
+					epoch: 0,
+					version: appliedVersions.get(message.request.requestId!)!,
+				},
+			};
+		}
+		return receive(message);
+	};
 	dispose.push(() => {
 		preview.dispose();
 		container.remove();

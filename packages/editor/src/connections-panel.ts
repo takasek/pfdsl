@@ -5,6 +5,7 @@ import type {
 	MessageFromWebview,
 	MessageToWebview,
 	PreviewEditMessage,
+	SourceRevision,
 } from "./messages.js";
 import {
 	applyPreviewEdit,
@@ -54,12 +55,6 @@ export function mountConnections(
 	const rowEdges = new WeakMap<Element, NormalizedEdge>();
 	let acceptedSource: string | undefined;
 	let acceptedAddition: { side: Side; source: string } | undefined;
-	let acceptedRename:
-		| {
-				request: Extract<PreviewEditRequest, { type: "renameNode" }>;
-				source: string;
-		  }
-		| undefined;
 	let pending:
 		| {
 				request: PreviewEditMessage & { requestId: string };
@@ -67,8 +62,8 @@ export function mountConnections(
 				value?: string;
 				source: string;
 				reopen: boolean;
-				acknowledged?: boolean;
-				rendered?: boolean;
+				appliedRevision?: SourceRevision;
+				followRename?: boolean;
 		  }
 		| undefined;
 	const token = ++serial;
@@ -152,11 +147,11 @@ export function mountConnections(
 			return;
 		}
 		const message = { ...request, requestId: `${token}:${++requestSerial}` };
-		acceptedRename = undefined;
 		pending = {
 			request: message,
 			source: result.source,
 			reopen: !!side,
+			followRename: request.type === "renameNode",
 			...(side ? { side, value: side.input.value } : {}),
 		};
 		error.textContent = "";
@@ -397,7 +392,6 @@ export function mountConnections(
 	centerLabel.className = "connections-center";
 	const centerButton = button("", "Edit node ID and label", () => {
 		if (!editing || !center || pending) return;
-		acceptedRename = undefined;
 		setPopup(undefined);
 		renameSource = editing.source;
 		idInput.value = center;
@@ -650,7 +644,7 @@ export function mountConnections(
 				? popup.trigger
 				: document.activeElement;
 		if (center !== id) {
-			acceptedRename = undefined;
+			if (pending) pending.followRename = false;
 			endRename();
 			for (const side of sides) side.input.value = "";
 			// Navigation abandons input feedback, not the edit already sent to the host.
@@ -690,7 +684,7 @@ export function mountConnections(
 		isOpen: () => center !== undefined,
 		centerId: () => center,
 		close() {
-			acceptedRename = undefined;
+			if (pending) pending.followRename = false;
 			endRename();
 			center = undefined;
 			if (pending) delete pending.side;
@@ -702,41 +696,43 @@ export function mountConnections(
 		resize() {
 			dismissPopup();
 		},
-		update(data: Editing) {
+		update(data: Editing, revision?: SourceRevision): boolean {
 			// Invalid source ends the old editing session, including late replies.
-			if (!data) {
+			if (!data) pending = undefined;
+			if (pending?.request.type === "renameNode" && data) {
+				const applied = pending.appliedRevision;
+				// Wait for success and a snapshot at or after that edit. A pre-save
+				// refresh and Undo may have identical source but different versions.
+				if (
+					!applied ||
+					!revision ||
+					revision.epoch < applied.epoch ||
+					(revision.epoch === applied.epoch &&
+						revision.version < applied.version)
+				)
+					return false;
+				const { request, source, followRename: follow } = pending;
+				if (follow && center === request.nodeId) {
+					if (
+						revision.epoch === applied.epoch &&
+						revision.invalidatedRenameRequestId !== request.requestId &&
+						applied.invalidatedRenameRequestId !== request.requestId &&
+						(data.source === source ||
+							(data.source !== request.source &&
+								data.nodes.some((n) => n.id === request.newId) &&
+								(request.newId === request.nodeId ||
+									!data.nodes.some((n) => n.id === request.nodeId))))
+					)
+						followRename(request);
+					else endRename(renameForm.contains(document.activeElement));
+				}
+				// The first post-save snapshot consumes the intent, including Undo.
 				pending = undefined;
-				acceptedRename = undefined;
 			}
-			// Undo may coalesce the saved render back to the original source.
-			if (pending) pending.rendered = true;
 			const focused =
 				popup?.type === "edge" && menu.contains(document.activeElement)
 					? popup.trigger
 					: document.activeElement;
-			const rename =
-				pending?.request.type === "renameNode" ? pending : acceptedRename;
-			const renameRequest =
-				rename?.request.type === "renameNode" ? rename.request : undefined;
-			if (
-				rename &&
-				renameRequest &&
-				data &&
-				(data.source === rename.source ||
-					(data.source !== renameRequest.source &&
-						data.nodes.some((n) => n.id === renameRequest.newId) &&
-						(pending?.acknowledged ||
-							!data.nodes.some((n) => n.id === renameRequest.nodeId))))
-			) {
-				followRename(renameRequest);
-			}
-			if (data?.source !== acceptedRename?.request.source)
-				acceptedRename = undefined;
-			if (pending?.acknowledged) {
-				if (center === pending.request.nodeId)
-					endRename(renameForm.contains(document.activeElement));
-				pending = undefined;
-			}
 			if (
 				pending &&
 				data?.source !== pending.request.source &&
@@ -762,44 +758,30 @@ export function mountConnections(
 			setPopup(undefined);
 			if (!data?.nodes.some((n) => n.id === center)) {
 				this.close();
-				return;
+				return true;
 			}
 			render(focused);
 			if (reopen) showCandidates(reopen);
+			return true;
 		},
 		result(message: Extract<MessageToWebview, { type: "editResult" }>) {
 			// A reply updates data; the user may already be working elsewhere.
 			if (!pending || message.request.requestId !== pending.request.requestId)
 				return;
-			// Keep selection tracking after unlocking: an original-source render
-			// can be Undo's result or a host refresh preceding the saved render.
-			if (
-				message.ok &&
-				pending.request.type === "renameNode" &&
-				editing?.source === pending.request.source
-			)
-				acceptedRename = {
-					request: pending.request,
-					source: pending.source,
-				};
-			if (
-				message.ok &&
-				pending.request.type === "renameNode" &&
-				!pending.rendered
-			) {
-				pending.acknowledged = true;
+			if (message.ok && pending.request.type === "renameNode") {
+				if (message.sourceRevision) {
+					pending.appliedRevision = message.sourceRevision;
+					return;
+				}
+				pending = undefined;
+				error.textContent =
+					"The saved document could not be synchronized. Reopen Connections and try again.";
+				refreshInputs();
 				return;
 			}
 			const { request, side, value, source, reopen } = pending;
 			pending = undefined;
 			if (message.ok) {
-				if (
-					request.type === "renameNode" &&
-					editing?.nodes.some((n) => n.id === request.newId)
-				)
-					followRename(request);
-				else if (request.type === "renameNode" && center === request.nodeId)
-					endRename(renameForm.contains(document.activeElement));
 				if (
 					request.type === "addConnector" &&
 					editing?.source === request.source
