@@ -29,6 +29,9 @@ Apply them only when the target release includes the referenced changes; specifi
 
 ### PR timing becomes an adopting repository's rule
 
+The status explanation below describes specification v0.0.29 for models without explicit reference targets.
+For the later specification contract, see the reference-target section below.
+
 Specification v0.0.29 and the distributed work-cycle no longer require updating an artifact to `done` in its completion commit or PR, or prescribe when to integrate that update for an artifact stored in another repository.
 The file-based tracker preset also stops requiring the work item's completed status and the artifact's `done` status in the same commit. It still requires both states in the version assessed as complete and retains the graph until that check is finished; commit and PR grouping belong to the adopting repository.
 The meaning of `status` is unchanged: it describes the tree containing the file, and the integration target's value is authoritative when multiple trees exist.
@@ -38,6 +41,7 @@ Specify that location and version in criteria; the new default is availability i
 The update may be included in the same integration that makes the artifact available; the integration target becomes `done` through that integration.
 The adopting repository decides which change unit carries the update; the update itself remains required.
 Status values and diagnostics are unchanged.
+
 This removes a distributed operational requirement; it does not provide equivalent protection through a new audit.
 Closing an issue does not update artifact status, and no close-reason monitor is introduced.
 
@@ -55,6 +59,23 @@ While its roadmap remains in the repository, the upstream repository requires `d
 If external approval or other unfinished work remains, even without further code changes, it integrates the artifact as `wip` (`waiting` for an external dependency), registers the remainder as follow-up work, and updates to `done` there when the evidence and required availability are established.
 See [its binding](https://github.com/takasek/pfdsl/blob/main/.pfdsl/bindings/pfd-ops.md).
 Source: [Issue #1523 and the owner's decision](https://github.com/takasek/pfdsl/issues/1523#issuecomment-6369838044).
+
+### Artifact reference targets: specification only
+
+Specification v0.0.30 defines document-level `baseRef` and artifact-level `ref`, both mappings containing nonblank string `source` and `revision` members.
+An artifact override replaces the whole mapping; it does not merge members with the default.
+An explicit target takes precedence over the containing checkout.
+When criteria do not specify a location or version, that target is the default integration target for acceptance.
+Process locations, command working directories, subflow and extends are independent of these artifact targets.
+For an externally stored model, the acquisition layer must explicitly provide their model context: a source, fixed version and logical model path.
+Resolve their relative paths in that context; if the required context is absent, report resolution failure instead of using the temporary extraction directory.
+Models stored locally and omitting both fields retain their existing behavior.
+
+This specification change does not provide an implementation or announce a CLI/plugin release supporting reference resolution.
+Existing extension fields with these names must conform to the new contract before use with a supporting implementation.
+Do not use a successful check by an older CLI as evidence of support: unknown fields may be ignored.
+Before moving the authoritative roadmap outside the repository, pin an implementation version that supports the contract and verify default targets, artifact overrides and resolution failures using that same version.
+Record the model source and fixed version separately from artifact source versions and logical paths.
 
 ### Track unresolved dependencies in the roadmap
 
