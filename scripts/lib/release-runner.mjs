@@ -341,7 +341,29 @@ function showCliCandidates({ root, capture }) {
 		) {
 			throw new Error("invalid status ready output");
 		}
-		const candidates = releaseMilestoneCandidateArtifactIds(parsed.ready);
+		const metadata = JSON.parse(
+			callCapture(capture, root, process.execPath, [
+				resolve(root, "packages/cli/dist/cli.js"),
+				"meta",
+				"list",
+				resolve(root, ".pfdsl/roadmap.pfdsl"),
+				"--tag",
+				"release_cli",
+				"--json",
+			]),
+		);
+		if (
+			metadata.ok !== true ||
+			metadata.values === null ||
+			typeof metadata.values !== "object" ||
+			Array.isArray(metadata.values)
+		) {
+			throw new Error("invalid release tag metadata");
+		}
+		const candidates = releaseMilestoneCandidateArtifactIds(
+			parsed.ready,
+			Object.keys(metadata.values),
+		);
 		if (candidates.length === 0) {
 			console.log(
 				"No ready CLI release milestones were found; roadmap state is unchanged.",
@@ -354,6 +376,7 @@ function showCliCandidates({ root, capture }) {
 			[
 				"CLI release candidate listing unavailable; the publish workflow succeeded, but candidates were not confirmed.",
 				"Build the CLI, then run `node packages/cli/dist/cli.js status ready .pfdsl/roadmap.pfdsl --json`.",
+				"Select only process IDs also returned by `node packages/cli/dist/cli.js meta list .pfdsl/roadmap.pfdsl --tag release_cli --json`.",
 				"The roadmap is unchanged.",
 			].join("\n"),
 		);

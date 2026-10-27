@@ -160,7 +160,7 @@ issue/PR view の要求フィールド欠落、closing issue の識別情報不�
 
 **`integrate_spec_vXXX` の入力列挙**: `integrate_spec_vXXX` の通常入力には、そのバージョンで spec に統合される全ての変更を引き起こした artifact を列挙する。「実装が完了した artifact のうち、未統合のもの」を漏らさず書く。
 
-**publish_cli_vXXXX の入力列挙**: そのバージョンに含まれる全実装 artifact を入力として列挙する。実装 artifact の追加と同一サイクルで publish の入力集合も更新する（後回しにすると artifact が publish チェーンから切れる）。
+**CLI 公開工程の入力列挙**: `release_cli` タグを持つ工程には、その公開に含まれる全実装 artifact を入力として列挙する。実装 artifact の追加と同一サイクルで公開工程の入力集合も更新する（後回しにすると artifact が公開チェーンから切れる）。版番号は事前予約せず、工程とタグの記述は workflow.md「release milestone artifact の作成規約」に従う。
 
 **1公開イベント = 1 リリース artifact**: 計画段階で複数のリリースに分けていた実装群が結果的に1回の公開にまとまった場合、publish プロセスとリリース artifact も1つに統合する。
 同じ版番号を持つ artifact を複数残すと、図が実在しない公開イベントを主張することになる。

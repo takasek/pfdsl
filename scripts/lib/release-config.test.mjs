@@ -157,7 +157,19 @@ test("pinMarketplaceSourceToTag preserves tab indentation and trailing newline",
 	assert.match(after, /\t"plugins"/);
 });
 
-test("releaseMilestoneCandidateArtifactIds collects outputs of ready processes whose id starts with the given prefix", () => {
+test("release candidates intersect ready processes with tag-selected IDs", () => {
+	const ready = [
+		{ id: "ship_tools", outputs: ["cli_release"] },
+		{ id: "publish_cli_legacy", outputs: ["not_tagged"] },
+		{ id: "ship_extension", outputs: ["extension"] },
+	];
+	assert.deepEqual(
+		releaseMilestoneCandidateArtifactIds(ready, ["ship_tools", "not_ready"]),
+		["cli_release"],
+	);
+});
+
+test("releaseMilestoneCandidateArtifactIds collects outputs of tag-selected ready processes", () => {
 	const ready = [
 		{
 			id: "publish_cli_ansi_color",
@@ -172,12 +184,13 @@ test("releaseMilestoneCandidateArtifactIds collects outputs of ready processes w
 			outputs: ["something"],
 		},
 	];
-	assert.deepEqual(releaseMilestoneCandidateArtifactIds(ready), [
-		"cli_release_ansi_color",
-	]);
+	assert.deepEqual(
+		releaseMilestoneCandidateArtifactIds(ready, ["publish_cli_ansi_color"]),
+		["cli_release_ansi_color"],
+	);
 });
 
-test("releaseMilestoneCandidateArtifactIds returns an empty array when no ready process matches the prefix", () => {
+test("releaseMilestoneCandidateArtifactIds returns an empty array when no ready process is selected by the tag", () => {
 	const ready = [
 		{
 			id: "implement_something",
@@ -186,7 +199,7 @@ test("releaseMilestoneCandidateArtifactIds returns an empty array when no ready 
 			outputs: ["something"],
 		},
 	];
-	assert.deepEqual(releaseMilestoneCandidateArtifactIds(ready), []);
+	assert.deepEqual(releaseMilestoneCandidateArtifactIds(ready, []), []);
 });
 
 test("releaseMilestoneCandidateArtifactIds flattens outputs across multiple matching processes", () => {
@@ -199,19 +212,31 @@ test("releaseMilestoneCandidateArtifactIds flattens outputs across multiple matc
 			outputs: ["cli_release_b1", "cli_release_b2"],
 		},
 	];
-	assert.deepEqual(releaseMilestoneCandidateArtifactIds(ready), [
-		"cli_release_a",
-		"cli_release_b1",
-		"cli_release_b2",
-	]);
+	assert.deepEqual(
+		releaseMilestoneCandidateArtifactIds(ready, [
+			"publish_cli_a",
+			"publish_cli_b",
+		]),
+		["cli_release_a", "cli_release_b1", "cli_release_b2"],
+	);
 });
 
-test("releaseMilestoneCandidateArtifactIds respects a custom prefix", () => {
+test("releaseMilestoneCandidateArtifactIds accepts IDs selected for another release kind", () => {
 	const ready = [
 		{ id: "publish_ext_foo", label: "x", inputs: [], outputs: ["ext_foo"] },
 	];
 	assert.deepEqual(
-		releaseMilestoneCandidateArtifactIds(ready, "publish_ext_"),
+		releaseMilestoneCandidateArtifactIds(ready, ["publish_ext_foo"]),
 		["ext_foo"],
+	);
+});
+
+test("release candidates never fall back to the old prefix", () => {
+	assert.deepEqual(
+		releaseMilestoneCandidateArtifactIds(
+			[{ id: "publish_cli_old", outputs: ["old"] }],
+			[],
+		),
+		[],
 	);
 });

@@ -1,6 +1,5 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-
 import {
 	addedPublishProcesses,
 	evaluateRoadmapPublishGuard,
@@ -8,159 +7,195 @@ import {
 } from "./roadmap-publish-guard.mjs";
 
 const ROADMAP = "/repo/.pfdsl/roadmap.pfdsl";
-
-function edit({ filePath = ROADMAP, oldString = "", newString }) {
-	return {
-		hook_event_name: "PreToolUse",
-		tool_name: "Edit",
-		tool_input: {
-			file_path: filePath,
-			old_string: oldString,
-			new_string: newString,
-		},
-	};
-}
-
-function write({ filePath = ROADMAP, content }) {
-	return {
-		hook_event_name: "PreToolUse",
-		tool_name: "Write",
-		tool_input: { file_path: filePath, content },
-	};
-}
+const document = (processes = "", rest = "") =>
+	`---\nprocess:\n${processes}\n${rest}\n---\na >> ship -> b\n`;
+const existing = document("  ship: { label: Ship, tags: [release_cli] }");
+const edit = (oldString, newString, extra = {}) => ({
+	tool_name: "Edit",
+	tool_input: {
+		file_path: ROADMAP,
+		old_string: oldString,
+		new_string: newString,
+		...extra,
+	},
+});
+const write = (content) => ({
+	tool_name: "Write",
+	tool_input: { file_path: ROADMAP, content },
+});
 
 describe("addedPublishProcesses", () => {
-	it("finds a newly declared publish process", () => {
-		const added = addedPublishProcesses(
-			"  publish_cli_query_tools:\n    label: release\n",
-			"",
+	for (const tag of [
+		"release_cli",
+		"release_extension",
+		"release_standalone",
+	]) {
+		it(`finds an arbitrary process name carrying ${tag}`, () => {
+			assert.deepEqual(
+				addedPublishProcesses(document(`  ship: { tags: [${tag}] }`), ""),
+				["ship"],
+			);
+		});
+	}
+	it("handles block sequences, quoted keys, comments and CRLF", () => {
+		const after = document(
+			'  "ship":\n    tags:\n      - release_cli # release',
+		).replaceAll("\n", "\r\n");
+		assert.deepEqual(addedPublishProcesses(after, ""), ["ship"]);
+	});
+	it("ignores ID prefixes, artifacts, groups and similar tag spellings", () => {
+		const after = document(
+			"  publish_cli_old: { tags: [release_cli_extra] }",
+			"artifact:\n  publish_ext_a: { tags: [release_cli] }\ngroup:\n  releases: { tags: [release_cli] }",
 		);
-		assert.deepEqual(added, ["publish_cli_query_tools"]);
+		assert.deepEqual(addedPublishProcesses(after, ""), []);
 	});
-
-	it("ignores a declaration that was already in the replaced text", () => {
-		const before = "  publish_ext_v0016:\n    label: release\n";
-		const after = "  publish_ext_v0016:\n    label: release ext\n";
-		assert.deepEqual(addedPublishProcesses(after, before), []);
-	});
-
-	it("ignores a flow line that only references a publish process", () => {
-		const added = addedPublishProcesses(
-			"[a, b] >> publish_cli_query_tools -> cli_release_query\n",
-			"",
+	it("ignores flow references, reformatting and removal", () => {
+		const reformatted = document(
+			"  ship:\n    tags: [release_cli]\n    label: Ship",
 		);
-		assert.deepEqual(added, []);
-	});
-
-	it("ignores declarations of anything else", () => {
 		assert.deepEqual(
-			addedPublishProcesses("  integrate_spec_v0042:\n", ""),
+			addedPublishProcesses(`${reformatted}\nc >> ship\n`, existing),
 			[],
 		);
-		assert.deepEqual(addedPublishProcesses("  published_extension:\n", ""), []);
+		assert.deepEqual(addedPublishProcesses(document(), existing), []);
+	});
+	it("notices a tag added to an existing process or a changed release kind", () => {
+		assert.deepEqual(
+			addedPublishProcesses(existing, document("  ship: { label: Ship }")),
+			["ship"],
+		);
+		assert.deepEqual(
+			addedPublishProcesses(
+				existing,
+				existing.replace("release_cli", "release_extension"),
+			),
+			["ship"],
+		);
+	});
+	it("does not turn invalid YAML or a scalar tags field into an added release", () => {
+		assert.deepEqual(
+			addedPublishProcesses(document("  ship: { tags: ["), ""),
+			[],
+		);
+		assert.deepEqual(
+			addedPublishProcesses(document("  ship: { tags: release_cli }"), ""),
+			[],
+		);
 	});
 });
 
 describe("evaluateRoadmapPublishGuard", () => {
-	it("asks before an Edit that adds a publish process, naming release-status", () => {
+	it("does not present release-status as standalone publication evidence", () => {
 		const result = evaluateRoadmapPublishGuard(
-			edit({ newString: "  publish_ext_v0016:\n    label: x\n" }),
+			write(document("  ship: { tags: [release_standalone] }")),
+		);
+		assert.equal(result.decision, "ask");
+		assert.match(result.reason, /release-status.*does not report standalone/);
+		assert.match(
+			result.reason,
+			/separately verify the published standalone distribution/,
+		);
+	});
+	it("compares whole documents for a tag-only Edit", () => {
+		const before = document("  ship: { tags: [] }");
+		const result = evaluateRoadmapPublishGuard(
+			edit("tags: []", "tags: [release_cli]"),
+			{ readFile: () => before },
 		);
 		assert.equal(result.decision, "ask");
 		assert.match(result.reason, /make release-status/);
-		assert.match(result.reason, /publish_ext_v0016/);
+		assert.match(result.reason, /ship/);
 	});
-
-	it("asks on a Write of the roadmap that declares one the file did not have", () => {
+	it("allows editing an artifact tag without a process declaration in the fragment", () => {
+		const before = document(
+			"  ship: { label: Ship }",
+			"artifact:\n  result: { tags: [] }",
+		);
+		assert.equal(
+			evaluateRoadmapPublishGuard(edit("tags: []", "tags: [release_cli]"), {
+				readFile: () => before,
+			}).decision,
+			"allow",
+		);
+	});
+	it("handles replace_all across process and artifact declarations", () => {
+		const before = document(
+			"  ship: { tags: [] }",
+			"artifact:\n  result: { tags: [] }",
+		);
 		const result = evaluateRoadmapPublishGuard(
-			write({ content: "processes:\n  publish_cli_x:\n" }),
-			{
-				readFile: () => "processes:\n",
-			},
+			edit("tags: []", "tags: [release_cli]", { replace_all: true }),
+			{ readFile: () => before },
 		);
 		assert.equal(result.decision, "ask");
+		assert.match(result.reason, /ship/);
+		assert.doesNotMatch(result.reason, /process result/);
 	});
-
-	it("allows a Write that only carries the declarations the file already had", () => {
-		const existing = "processes:\n  publish_cli_x:\n    label: release\n";
-		const result = evaluateRoadmapPublishGuard(write({ content: existing }), {
-			readFile: () => existing,
-		});
-		assert.equal(result.decision, "allow");
+	it("does not guess an Edit whose original is missing or ambiguous", () => {
+		for (const before of [
+			undefined,
+			existing,
+			document("  a: { tags: [] }\n  b: { tags: [] }"),
+		]) {
+			assert.equal(
+				evaluateRoadmapPublishGuard(edit("tags: []", "tags: [release_cli]"), {
+					readFile: () => before,
+				}).decision,
+				"allow",
+			);
+		}
 	});
-
-	it("asks on a Write when the file cannot be read, since nothing rules the declaration out", () => {
-		const result = evaluateRoadmapPublishGuard(
-			write({ content: "  publish_cli_x:\n" }),
-			{
-				readFile: () => undefined,
-			},
+	it("allows ordinary label and flow edits", () => {
+		for (const payload of [
+			edit("label: Ship", "label: Release"),
+			edit("a >> ship", "[a, c] >> ship"),
+		]) {
+			assert.equal(
+				evaluateRoadmapPublishGuard(payload, { readFile: () => existing })
+					.decision,
+				"allow",
+			);
+		}
+	});
+	it("asks for a Write with a new tagged process, including a new file", () => {
+		for (const before of [undefined, document()]) {
+			assert.equal(
+				evaluateRoadmapPublishGuard(write(existing), { readFile: () => before })
+					.decision,
+				"ask",
+			);
+		}
+	});
+	it("allows a Write that carries only existing releases", () => {
+		assert.equal(
+			evaluateRoadmapPublishGuard(write(existing), { readFile: () => existing })
+				.decision,
+			"allow",
 		);
-		assert.equal(result.decision, "ask");
 	});
-
-	it("allows an edit elsewhere in the roadmap", () => {
-		const result = evaluateRoadmapPublishGuard(
-			edit({ newString: "  status: done\n" }),
-		);
-		assert.equal(result.decision, "allow");
-	});
-
-	it("allows the same declaration in another file, where it means nothing", () => {
-		const result = evaluateRoadmapPublishGuard(
-			edit({
-				filePath: "/repo/docs/notes.md",
-				newString: "  publish_ext_v0016:\n",
-			}),
-		);
-		assert.equal(result.decision, "allow");
-	});
-
-	it("ignores tools other than Edit and Write", () => {
-		const result = evaluateRoadmapPublishGuard({
-			hook_event_name: "PreToolUse",
-			tool_name: "Bash",
-			tool_input: { command: "echo publish_ext_v0016:" },
-		});
-		assert.equal(result.decision, "allow");
-	});
-
-	it("ignores a payload with no file_path", () => {
-		const result = evaluateRoadmapPublishGuard({
-			hook_event_name: "PreToolUse",
-			tool_name: "Edit",
-			tool_input: {},
-		});
-		assert.equal(result.decision, "allow");
+	it("ignores other files and tools", () => {
+		for (const payload of [
+			edit("", existing, { file_path: "/repo/notes.md" }),
+			{ tool_name: "Bash", tool_input: { command: "echo release_cli" } },
+			{ tool_name: "Edit", tool_input: {} },
+		]) {
+			assert.equal(evaluateRoadmapPublishGuard(payload).decision, "allow");
+		}
 	});
 });
 
 describe("runRoadmapPublishGuard", () => {
-	it("prints an ask payload when the edit adds a publish process", () => {
-		const input = JSON.stringify(edit({ newString: "  publish_ext_v0016:\n" }));
-		const { shouldOutput, output } = runRoadmapPublishGuard(input, {
-			readFile: () => "",
-		});
-		assert.equal(shouldOutput, true);
-		assert.equal(output.hookSpecificOutput.permissionDecision, "ask");
-	});
-
-	it("produces no output for an unrelated edit", () => {
-		const input = JSON.stringify(edit({ newString: "  status: done\n" }));
-		assert.deepEqual(runRoadmapPublishGuard(input, { readFile: () => "" }), {
-			shouldOutput: false,
-		});
-	});
-
-	it("reads the file on disk for a Write, so an unchanged rewrite stays silent", () => {
-		const existing = "  publish_ext_v0016:\n";
-		const input = JSON.stringify(write({ content: existing }));
+	it("prints an ask payload for a new release and stays silent for a rewrite", () => {
+		const input = JSON.stringify(write(existing));
+		const result = runRoadmapPublishGuard(input, { readFile: () => "" });
+		assert.equal(result.shouldOutput, true);
+		assert.equal(result.output.hookSpecificOutput.permissionDecision, "ask");
 		assert.deepEqual(
 			runRoadmapPublishGuard(input, { readFile: () => existing }),
 			{ shouldOutput: false },
 		);
 	});
-
 	it("silently allows malformed stdin JSON", () => {
 		assert.deepEqual(runRoadmapPublishGuard("not json{{{"), {
 			shouldOutput: false,

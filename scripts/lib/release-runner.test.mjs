@@ -98,8 +98,12 @@ function cliTrace({
 	finalOrigin = origin,
 	gateResults = [],
 	candidateError = false,
+	metadataOutput = JSON.stringify({
+		ok: true,
+		values: { send_tools: { tags: ["release_cli"] } },
+	}),
 	candidateOutput = JSON.stringify({
-		ready: [{ id: "publish_cli_a", outputs: ["cli_release_a"] }],
+		ready: [{ id: "send_tools", outputs: ["cli_release_a"] }],
 	}),
 } = {}) {
 	const calls = [];
@@ -107,7 +111,7 @@ function cliTrace({
 	let remoteTagState = remoteTag;
 	let fetches = 0;
 	const capture = (cmd, args) => {
-		if (cmd !== "git" && cmd !== "gh" && cmd !== "node")
+		if (cmd !== "git" && cmd !== "gh" && cmd !== process.execPath)
 			throw new Error(`unexpected capture ${cmd}`);
 		if (cmd === "git" && args[0] === "status") return "";
 		if (cmd === "git" && args[0] === "rev-parse" && args[1] === "HEAD")
@@ -129,7 +133,9 @@ function cliTrace({
 			return JSON.stringify([
 				{ databaseId: 42, headBranch: "v0.0.1", headSha: SHA },
 			]);
-		if (cmd === "node") {
+		if (cmd === process.execPath) {
+			calls.push([cmd, args]);
+			if (args[1] === "meta") return metadataOutput;
 			if (candidateError) {
 				const error = new Error("dist unavailable");
 				error.status = 1;
@@ -532,6 +538,65 @@ describe("publishRelease", () => {
 				false,
 			);
 		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	it("uses tag metadata to display arbitrarily named ready CLI milestones", () => {
+		const root = packageRoot("cli");
+		const trace = cliTrace({
+			candidateOutput: JSON.stringify({
+				ready: [
+					{ id: "send_tools", outputs: ["cli_release_a"] },
+					{ id: "publish_cli_legacy", outputs: ["legacy"] },
+					{ id: "ship_extension", outputs: ["extension"] },
+				],
+			}),
+			metadataOutput: JSON.stringify({
+				ok: true,
+				values: {
+					send_tools: { tags: ["release_cli"] },
+					not_ready: { tags: ["release_cli"] },
+				},
+			}),
+		});
+		const messages = [];
+		const original = console.log;
+		console.log = (message) => messages.push(message);
+		try {
+			publishRelease({ root, kindArg: "cli", commit: SHA, ...trace });
+			assert.ok(
+				messages.some((line) =>
+					line.startsWith("CLI release candidates: cli_release_a\n"),
+				),
+			);
+			assert.ok(
+				trace.calls.some(
+					([cmd, args]) =>
+						cmd === process.execPath &&
+						args.slice(1).join(" ") ===
+							`meta list ${join(root, ".pfdsl/roadmap.pfdsl")} --tag release_cli --json`,
+				),
+			);
+		} finally {
+			console.log = original;
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	it("reports unavailable candidates when tag metadata is malformed", () => {
+		const root = packageRoot("cli");
+		const trace = cliTrace({ metadataOutput: '{"ok":false,"values":[]}' });
+		const messages = [];
+		const original = console.warn;
+		console.warn = (message) => messages.push(message);
+		try {
+			publishRelease({ root, kindArg: "cli", commit: SHA, ...trace });
+			assert.ok(
+				messages.some((line) => line.includes("candidate listing unavailable")),
+			);
+		} finally {
+			console.warn = original;
 			rmSync(root, { recursive: true, force: true });
 		}
 	});
