@@ -5,6 +5,19 @@ import { runCompanionBindingsCheck } from "./companion-binding-check-steps.mjs";
 
 const PFD_RETRO_PATH = ".pfdsl/bindings/pfd-retro.md";
 const PFD_OPS_PATH = ".pfdsl/bindings/pfd-ops.md";
+const LIFECYCLE_HEADINGS = [
+	"共通原則",
+	"ブランチと作業準備",
+	"変更方針の決定",
+	"実装と検証",
+	"レビュー",
+	"PR と統合",
+];
+const LIFECYCLE_BINDING = [
+	"# pfd-ops バインディング",
+	"## このリポの作業規律",
+	...LIFECYCLE_HEADINGS.map((heading) => `### ${heading}`),
+].join("\n");
 
 function baseDeps(overrides = {}) {
 	return {
@@ -202,18 +215,30 @@ describe("runCompanionBindingsCheck", () => {
 		);
 	});
 
-	it("passes when pfd-ops.md exists and has both required headings", () => {
+	it("passes when pfd-ops.md has the lifecycle entry points", () => {
 		const result = runCompanionBindingsCheck(
 			baseDeps({
 				exists: (path) => path === PFD_OPS_PATH,
-				readFile: (file) =>
-					file === PFD_OPS_PATH
-						? "# pfd-ops バインディング\n\n## このリポの作業規律\n"
-						: "",
+				readFile: (file) => (file === PFD_OPS_PATH ? LIFECYCLE_BINDING : ""),
 			}),
 		);
 		assert.equal(result.exitCode, 0);
 	});
+
+	for (const heading of LIFECYCLE_HEADINGS) {
+		it(`reports a missing lifecycle entry point: ${heading}`, () => {
+			const result = runCompanionBindingsCheck(
+				baseDeps({
+					exists: (path) => path === PFD_OPS_PATH,
+					readFile: () => LIFECYCLE_BINDING.replace(`### ${heading}`, ""),
+				}),
+			);
+			assert.equal(result.exitCode, 1);
+			assert.ok(
+				result.stderrLines.some((line) => line.includes(`"${heading}"`)),
+			);
+		});
+	}
 
 	it("accumulates errors from both checks into one errorCount", () => {
 		const result = runCompanionBindingsCheck({

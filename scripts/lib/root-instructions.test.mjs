@@ -200,15 +200,23 @@ describe("renderRootInstructions", () => {
 					"scripts/root-instructions-template/INSTRUCTIONS.md",
 			});
 			const pointer = output.match(
-				/作業の開始時に `\.pfdsl\/bindings\/pfd-ops\.md`「([^」]+)」を読み/,
+				/作業の開始時に `\.pfdsl\/bindings\/pfd-ops\.md`([^\n]+)/,
 			);
 			assert.ok(pointer, `${target} output must point at the binding`);
-			const heading = pointer[1];
-			assert.ok(
-				required.headings.includes(heading),
-				`${target} points at "${heading}", which the companion check does not require`,
+			const headings = [...pointer[1].matchAll(/「([^」]+)」/g)].map(
+				(match) => match[1],
 			);
-			assert.deepEqual(findMissingHeadings(binding, [heading]), []);
+			assert.ok(
+				headings.length > 0,
+				`${target} must name the binding headings`,
+			);
+			for (const heading of headings) {
+				assert.ok(
+					required.headings.includes(heading),
+					`${target} points at "${heading}", which the companion check does not require`,
+				);
+			}
+			assert.deepEqual(findMissingHeadings(binding, headings), []);
 		}
 	});
 });
