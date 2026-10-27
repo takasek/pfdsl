@@ -562,13 +562,13 @@
 <g id="node22" class="node">
 <title>executor_neutral_work_cycle</title>
 <g id="a_node22"><a xlink:title="実行主体に依存しない work&#45;cycle&#10;&#10;ADR&#45;0048 の後続で未起票。work&#45;cycle.md から実行主体を主語にする規則を外し、PFD 側の protocol だけを残す&#10;criteria:&#10; &#160;work&#45;cycle.md が実行主体を主語にする規則を持たず、1サイクル1プロセスを既定のプリセットとして示し、run の成功と受入の区別と制御主体の単一性を定め、binding の「ワークサイクルの追加手順」スロットを PFD 固有の追加ゲート項目に縮小している。 採用側プローブで、外部の実行主体の完了から done を付けずに受入の確認へ進むことを確かめた&#10; &#160;">
-<polygon fill="#f8f9fa" stroke="black" stroke-width="2" points="958.25,-903.6 742.25,-903.6 742.25,-845.2 958.25,-845.2 958.25,-903.6"/>
+<polygon fill="#d4edda" stroke="black" stroke-width="2" points="958.25,-903.6 742.25,-903.6 742.25,-845.2 958.25,-845.2 958.25,-903.6"/>
 <text xml:space="preserve" text-anchor="middle" x="850.25" y="-887" font-family="Times,serif" font-size="14.00">executor_neutral_work_cycle</text>
 <text xml:space="preserve" text-anchor="middle" x="850.25" y="-870.2" font-family="Times,serif" font-size="14.00">実行主体に依存しな</text>
 <text xml:space="preserve" text-anchor="middle" x="850.25" y="-853.4" font-family="Times,serif" font-size="14.00">い work&#45;cycle</text>
 </a>
 </g>
-<text xml:space="preserve" text-anchor="middle" x="729.81" y="-832.6" font-family="Times,serif" font-size="14.00">todo</text>
+<text xml:space="preserve" text-anchor="middle" x="728.64" y="-832.6" font-family="Times,serif" font-size="14.00">done</text>
 </g>
 <!-- ext_editing_release -->
 <g id="node23" class="node">
@@ -788,14 +788,14 @@
 <g id="node67" class="node">
 <title>writer_free_github_preset</title>
 <g id="a_node67"><a xlink:title="実行主体の書込み規律を外した GitHub Issues プリセット&#10;&#10;ADR&#45;0048 の後続で未起票。実行主体が行う外部書込みの手順と PR 運用をこのリポの binding へ移し、プリセットにはアダプタ自身が外部へ書く場合の読み戻しの原則だけを残す（ADR&#45;0048 D2）&#10;criteria: github&#45;issues&#45;backend.md が実行主体の外部書込みの手順と PR 本文規約を持たず、アダプタ自身の書込みを読み戻す原則を持つ。このリポの PR 作成手順（クローズ参照の扱い等）が binding だけで完結する">
-<polygon fill="#f8f9fa" stroke="black" points="951.05,-1055 749.45,-1055 749.45,-979.8 951.05,-979.8 951.05,-1055"/>
+<polygon fill="#d4edda" stroke="black" points="951.05,-1055 749.45,-1055 749.45,-979.8 951.05,-979.8 951.05,-1055"/>
 <text xml:space="preserve" text-anchor="middle" x="850.25" y="-1038.4" font-family="Times,serif" font-size="14.00">writer_free_github_preset</text>
 <text xml:space="preserve" text-anchor="middle" x="850.25" y="-1021.6" font-family="Times,serif" font-size="14.00">実行主体の書込み規</text>
 <text xml:space="preserve" text-anchor="middle" x="850.25" y="-1004.8" font-family="Times,serif" font-size="14.00">律を外した GitHub</text>
 <text xml:space="preserve" text-anchor="middle" x="850.25" y="-988" font-family="Times,serif" font-size="14.00">Issues プリセット</text>
 </a>
 </g>
-<text xml:space="preserve" text-anchor="middle" x="737.01" y="-967.2" font-family="Times,serif" font-size="14.00">todo</text>
+<text xml:space="preserve" text-anchor="middle" x="735.84" y="-967.2" font-family="Times,serif" font-size="14.00">done</text>
 </g>
 <!-- move_writer_rules_out_of_github_preset&#45;&gt;writer_free_github_preset -->
 <g id="edge46" class="edge">
@@ -818,13 +818,13 @@
 <g id="node62" class="node">
 <title>three_valued_model_retro</title>
 <g id="a_node62"><a xlink:title="3値の model retro と証拠の契約&#10;&#10;ADR&#45;0048 の後続で未起票。pfd&#45;retro を3値の model retro と証拠の契約に絞り、D 層を同じ plugin 内の独立した skill と図の監査レンズへ分ける（ADR&#45;0048 D1）&#10;criteria:&#10; &#160;pfd&#45;retro の結論が実行側の失敗・モデルの改訂候補・変更不要の3値で、変更不要は照合したモデル要素と証拠を名指す。 証拠の契約が版との対応を定め、C 層の汎用項目が配布物から外れている。 D 層は同じ plugin 内の独立した skill と図の監査レンズへ分かれ、L4 滞留監査は配布層への還流として別の節にある&#10; &#160;">
-<polygon fill="#f8f9fa" stroke="black" stroke-width="2" points="947.45,-1151.6 753.05,-1151.6 753.05,-1093.2 947.45,-1093.2 947.45,-1151.6"/>
+<polygon fill="#d4edda" stroke="black" stroke-width="2" points="947.45,-1151.6 753.05,-1151.6 753.05,-1093.2 947.45,-1093.2 947.45,-1151.6"/>
 <text xml:space="preserve" text-anchor="middle" x="850.25" y="-1135" font-family="Times,serif" font-size="14.00">three_valued_model_retro</text>
 <text xml:space="preserve" text-anchor="middle" x="850.25" y="-1118.2" font-family="Times,serif" font-size="14.00">3値の model retro</text>
 <text xml:space="preserve" text-anchor="middle" x="850.25" y="-1101.4" font-family="Times,serif" font-size="14.00">と証拠の契約</text>
 </a>
 </g>
-<text xml:space="preserve" text-anchor="middle" x="740.61" y="-1080.6" font-family="Times,serif" font-size="14.00">todo</text>
+<text xml:space="preserve" text-anchor="middle" x="739.44" y="-1080.6" font-family="Times,serif" font-size="14.00">done</text>
 </g>
 <!-- narrow_retro_to_model&#45;&gt;three_valued_model_retro -->
 <g id="edge43" class="edge">
