@@ -527,6 +527,7 @@ describe("assemblePluginDistIndependent", () => {
 				"pfd-grill",
 				"pfd-ops",
 				"pfd-retro",
+				"pfd-knowledge-audit",
 				"pfd-upstream-report",
 				"pfdsl",
 			].sort(),

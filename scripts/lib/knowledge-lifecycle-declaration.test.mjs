@@ -4,7 +4,7 @@ import { describe, it } from "node:test";
 
 import { HARNESS_CAPABILITY_CONTRACT } from "./harness-inventory.mjs";
 
-// The pfd-retro D-layer adoption declaration is a discrete switch plus a list,
+// The independent knowledge-audit adoption declaration is a discrete switch plus a list,
 // so it lives in the git-managed .pfdsl/config.json under the key
 // `knowledgeLifecycleAudit`: {"mode": "adopt" | "decline", "targets": [...]}.
 // Prose in the binding is never a declaration, and the two earlier line
@@ -16,14 +16,14 @@ const RETIRED_LINES =
 	/^(knowledge-lifecycle-audit|知識成果物ライフサイクル監査):/m;
 
 const read = (path) => readFileSync(path, "utf8");
-const skill = read(".claude/skills/pfd-retro/SKILL.md");
+const skill = read(".claude/skills/pfd-knowledge-audit/SKILL.md");
 const reference = read(
-	".claude/skills/pfd-retro/references/knowledge-lifecycle.md",
+	".claude/skills/pfd-knowledge-audit/references/knowledge-lifecycle.md",
 );
 const scaffoldBinding = read(
-	".claude/skills/pfd-ops/references/scaffold/bindings/pfd-retro.md",
+	".claude/skills/pfd-ops/references/scaffold/bindings/pfd-knowledge-audit.md",
 );
-const repoBinding = read(".pfdsl/bindings/pfd-retro.md");
+const repoBinding = read(".pfdsl/bindings/pfd-knowledge-audit.md");
 const scaffoldConfig = JSON.parse(
 	read(".claude/skills/pfd-ops/references/scaffold/config.json"),
 );
@@ -36,10 +36,10 @@ function section(markdown, heading) {
 	return markdown.slice(start, next === -1 ? undefined : next);
 }
 
-const dSection = section(skill, "D. 知識成果物のライフサイクル（選択項目）");
+const dSection = section(skill, "適用単位");
 const applicability = section(skill, "適用単位");
 
-describe("pfd-retro D-layer declaration in .pfdsl/config.json", () => {
+describe("independent knowledge-audit declaration in .pfdsl/config.json", () => {
 	it("SKILL points to the config key, classifier and audit reference", () => {
 		assert.ok(dSection.includes(CONFIG_PATH));
 		assert.ok(dSection.includes(KEY));

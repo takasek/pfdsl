@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// DO NOT EDIT. Authoritative source: scripts/harness-template/skills/pfd-knowledge-audit/scripts/classify-knowledge-lifecycle.mjs.
 
 import { readFileSync, realpathSync } from "node:fs";
 import { resolve } from "node:path";
@@ -17,7 +18,7 @@ const reasons = {
 		"adopt requires a non-empty targets array of strings with non-whitespace content.",
 };
 
-/** Classify only the declared config; legacy binding lines never add targets. */
+/** Classify only the declared config; the former retro binding never adds targets. */
 export function classifyDeclaration(configText, bindingText = "") {
 	const reports = [];
 	if (

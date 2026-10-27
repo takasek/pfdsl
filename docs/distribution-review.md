@@ -19,13 +19,14 @@
 決定可能な部分は `scripts/check-distributed-prose.mjs` が毎 CI で機械検査する。
 本カタログが扱うのはその上の層 — 語彙でなく**主語**の問題で、機械が判定できないもの。
 
-## protocol の語彙候補を報告する
+## protocol の語彙候補を検査する
 
-`node scripts/report-executor-vocabulary.mjs [--json] [protocol.md ...]` は、指定ファイルの実行主体・配送の語彙を含む文を列挙する報告用の入口である（#1502）。
+`node scripts/report-executor-vocabulary.mjs [--check] [--json] [protocol.md ...]` は、指定ファイルの実行主体・配送の語彙を含む文を列挙する入口である（#1502、#1504）。
 ファイルを省略すると、正本の `scripts/harness-template/skills/pfd-ops/references/work-cycle.md` だけを読む。
 生成ミラーや他の配布文書を自動的に protocol とみなさない。
-報告の存在は終了コードを失敗にせず、引数やファイル読取りのエラーは失敗にする。
-既存の `check-distributed-prose` の失敗条件や CI のゲートは変更しない。
+既定の報告モードは候補があっても成功し、`--check` は候補が1つでもあれば失敗する。引数やファイル読取りのエラーはどちらも失敗する。
+CI の `make check-docs` と pre-commit は同じ正本を `--check` で検査する。pre-commit は index snapshot を使うため、未ステージの編集に影響されない。旧本文を固定した negative fixture と整理後の正本を positive fixture として回帰を検出する。
+これは語彙の再混入を防ぐ限定ゲートであり、責務境界の意味的な正しさは独立レビューで検証する。
 
 対象語は commit・PR・pull request・branch・worktree・subagent・TDD・session・turn とその複数形、およびコミット・プルリクエスト・ブランチ・ワークツリー・サブエージェント・セッション・ターンである。
 Markdown AST の paragraph・heading 内の text を対象にし、コードブロック・インラインコード・リンク先・定義・HTML は除外する。
@@ -67,7 +68,7 @@ Markdown AST の paragraph・heading 内の text を対象にし、コードブ�
 |---|---|
 | 正本と識別子は何か | 作業項目と roadmap の対応。Issue 番号とファイル内 id を同じ表記にする必要はない |
 | 管理対象をどう分類するか | 分類基準の意味と、ラベル／項目フィールドへの表現 |
-| 設計記録はいつ必要で、どこに置くか | binding が要求しない場合の扱いと、要求する場合のコメント／項目追記への配置 |
+| 設計記録・外部書込み・本文規約を誰が決めるか | 採用先の規律に委ね、backend が記録場所・書式・時点を要求していないこと。アダプタ自身の書込みの照合とは区別する |
 | 要求や書式、修正範囲を誰が決めるか | backend 連携から導ける契約か、commit 粒度など採用リポが決める規律か |
 | 更新・完了・回収をどう行うか | 保存先に応じた手段と、確認対象を失わない順序。その差を正当化する契約・消費者 |
 

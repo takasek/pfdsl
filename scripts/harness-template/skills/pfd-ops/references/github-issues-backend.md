@@ -5,7 +5,7 @@ PFD の作業項目を GitHub Issues で管理する流儀。pfdsl 固有では�
 ## 規約
 
 - **一次情報**: GitHub Issue 本体。着手時は本文とコメントを両方取得する。`gh` があれば `gh issue view <number> --json body,comments`、`gh` の無い環境（Claude Code Remote 等）では GitHub MCP server の issue 読取ツールや REST API など、同じ本文とコメントを返す手段を使う。ページ分割される手段ではコメントを全ページ取得する。`roadmap.pfdsl` は依存構造のみ管理する
-- **複数行本文の外部書込み**: issue 本文の作成・編集、issue コメント、PR 本文の作成・編集のように複数行本文を GitHub へ送るたび、セッション固有名を持つ body file にその時点の正本を書く。transport が file 入力を持つときは `--body-file` 等で正本を直接渡し、MCP 等の body 入力しか持たない transport では正本ファイルを読んだ値を手で再構成せずに渡す。実行直後に、**既存 issue / PR の編集では write request の対象番号、新規 issue / PR / comment では write response の stable identifier や URL が指す対象そのもの**を同じ transport またはその backend の参照手段で取り直し、GitHub 側の persisted `body` が改行を含めてその正本と完全一致することを確認する。新規作成に使う操作が対象の identifier を応答として返す契約を持たない場合は、一覧から推測せず、identifier を返す backend API や transport を write 前に選ぶ。本文に `Closes #...` のような必須行や参照がある場合は、その構造も同じ readback 結果で確認し、後続の本文編集でも毎回保たれていることを確認する。issue の `body,comments` 一覧を広く読み、似た本文を見つけて代用しない。write と exact readback の両方を提供する transport が無い場合は他の手段へ勝手に切り替えず、不足している前提条件を報告して停止する。コマンドの成功表示や返された URL は persisted body の証拠にならない
+- **アダプタ自身の書込み**: アダプタが外部へ書く場合は、自ら書いた内容を読み戻して照合する。
 - **作業項目の参照**: 対応は [`work-cycle.md`「作業項目と process の対応」](work-cycle.md#作業項目と-process-の対応) に従う。process の `location:` には issue の URL（`https://<host>/<owner>/<repo>/issues/<number>`）を置く。host・repository・issue 番号を合わせて項目を識別し、別 repository の同番号や pull request の URL を同じ issue とみなさない。監査・GitHub 取得・着手時の照合は、`GH_REPO=[HOST/]OWNER/REPO`、`gh repo set-default` の保存設定、`origin` の順で同じ対象を選ぶ。fork の親 repository は自動推測しない。`GH_REPO` の host 省略時は `GH_HOST`、未設定なら `github.com` を使う。SSH remote は `ssh -G` の hostname を Web host とし、`ssh.github.com` は `github.com` に変換し、SSH 接続 port は引き継がない。SSH を解決できない場合は `GH_REPO` で明示する。別 repository の issue URL は照合から除外して advisory を表示し、その参照先の存在や分類は検査しない。HTTP fallback は引き続き public GitHub のみを対象とする。
 - **ラベル**: roadmap 登録 issue は `flow:managed`、対象外は `flow:exempt`（判定は「ラベル判定基準」節）
 - **登録 metadata**: issue 対応と依存構造を検査する。GitHub の可変 `updatedAt` は保存・同期しない。`priority:` tags は任意の表示値であり、issue labels との完全一致を登録条件にしない。旧 `updated_at` が残る図でも監査はその値を読まない
@@ -20,57 +20,6 @@ roadmap の PFD は、未解決の依存がある（前提が未完了、また�
 
 **判定タイミング**: 起票時に `flow:managed` / `flow:exempt` を判定してから roadmap 追加要否を決める。`flow:managed` の起票と roadmap 追加は同時に行う（後回しにすると依存グラフが stale になり気付き依存に戻る）。
 
-**ラベル付与の許可要否**: `flow:managed`/`flow:exempt` の付与・変更は分類作業であり、issue の close・PR の merge・公開物の publish 等の確定操作ではない。ユーザーへの明示確認なしに実行してよい。
-
-## 設計確定の証拠
-
-issue 本文は依頼内容、コメントは設計選択記録の置き場として分ける。起票時刻を設計決定の時刻とみなさず、終端ゲートはコメントから正本を同定する。設計選択記録を要求するかどうかと、その書式と再承認参照の検査は採用リポの binding が定める。**binding がそれを定めていなければ、このプリセットは記録を要求せず、正本の同定も求めない** — 書式を持たないリポに記録の作成を命じると、行き止まりになるか、実行主体が書式を発明することになる。投稿・編集直後の exact-write readback は本 reference「規約」節の「複数行本文の外部書込み」が引き続き定め、設計選択記録の投稿・編集にも適用する。`cycle-status` / `gate-check` の PASS はその代わりにならない。
-
-## PR 本文規約
-
-本文の参照は、PR が完了させる範囲と現在の base に応じて選ぶ。ユーザーが issue の OPEN 維持を明示した場合は、その指定を守る。
-
-| PR の範囲 | 本文の参照 |
-|---|---|
-| issue 全体の受入条件を満たし、デフォルトブランチへ直接マージする | 完了する issue ごとに `Closes #<issue番号>` |
-| 部分対応、または issue の OPEN 維持が指定されている | `Refs #<issue番号>` と閉じない理由 |
-| デフォルトブランチ以外への中間 PR | `Refs #<issue番号>` と中間 PR である理由 |
-
-複数 issue を完了させる場合は1行ずつ列挙する。
-
-```
-Closes #<issue番号>
-```
-
-[GitHub の仕様](https://docs.github.com/en/issues/tracking-your-work-with-issues/using-issues/linking-a-pull-request-to-an-issue)では、PR 本文の閉じるキーワードはデフォルトブランチを base とする場合に解釈され、マージ時に issue を自動 close する。別のブランチが base なら無視され、リンクも生成されず、その PR のマージは issue を閉じない。このプリセットでは中間 PR に `Closes` を使わず、その本文が最終 PR へ引き継がれると仮定せず、デフォルトブランチへ統合する最終 PR に完了する issue の参照をまとめる。
-
-**閉じる issue が無い PR**: hotfix（次節）に該当しない、部分対応や bookkeeping・ドキュメントの spin-off 等では、行頭に `no-issue: <理由>` と明示する。理由は必須（コロンの後に空でない理由テキストを書く）。対応する issue が存在しても、今回閉じないなら `Refs` と理由に加えてこの宣言を使う。宣言なしに閉じる issue が無いまま PR を出すことは認めない。`no-issue:` は GitHub の自動クローズを無効化しないため、説明中の `resolved #<n>` 等にも注意する。
-
-### PR 作成・本文編集・base 変更後の確認
-
-現在の本文・base と、GitHub が導いた `closingIssuesReferences` を取得し、その base で意図した repository・issue 番号の集合と比較する。`gh` がある場合の取得例:
-
-```
-gh pr view <PR番号> --json body,baseRefName,closingIssuesReferences
-```
-
-`gh` が無い場合も同じ情報を返す backend の参照手段を使い、ページ分割されるクローズ対象は全ページ取得する。本文の作成・編集では「規約」の「複数行本文の外部書込み」に従って exact-write readback も行う。
-中間 PR、部分対応、OPEN 維持が指定された PR など閉じる issue が無い場合は空集合を確認する。base をデフォルトブランチへ変更した場合は、本文が同じでも再確認する。リンクの有無だけを検査する CI は、対象集合の意図との一致を保証しない。
-不一致は現在の base・本文・リンクを調べ、必要な修正後に再読し、解消してからレビューへ渡す。本文の再保存だけで必ず解消すると仮定しない。
-
-## hotfix 運用（issue 省略）
-
-バグ修正で以下をすべて満たす場合、issue 起票・roadmap 更新を省略してよい:
-
-- spec・仕様変更を伴わない（既存動作の回復のみ）
-- PR 単体で完結し、依存解放を要しない
-- PR description に "hotfix" と明記する
-
-**develop 開始前に hotfix 判定を行う** — 3条件の確認前に issue 起票・roadmap 追加を開始しない。issue なし develop は hotfix、または「PR 本文規約」の `no-issue: <理由>` 宣言を伴う場合のみに限る。
-
-## flow:exempt のバッチ管理（親トラッカー issue）
-
-複数の `flow:exempt` issue をまとめて記録・順序管理したい場合、GitHub issue 本文にタスクリスト形式で列挙した親トラッカー issue を1つ立ててよい（roadmap.pfdsl には載せず、親issue自体も exempt）。子issueを close した際は、親issueのタスクリスト該当行を手動で `[x]` に更新する — 本文中の手書き `- [ ] #123` 形式は GitHub のネイティブ task-list 連動（相手issueを convert-to-issue した場合のみ働く自動チェック機能）の対象にならず、close しても自動チェックされない。全件完了で親issue自体を close する。
 
 ## push 駆動の回収（pfdsl-sweep-completed-chains）
 
@@ -98,7 +47,9 @@ gh api repos/<owner>/<repo>/actions/permissions/workflow --jq .can_approve_pull_
 workflow は設定値を事前に読まない。取得する REST endpoint が Administration の読取権限を要し、`GITHUB_TOKEN` に付与できないため、案内は失敗した後に出る。
 同一ブランチへ起票するため、連続する push は既存 PR を更新する。`concurrency` グループで直列化してあり、再計算は冪等である。
 trigger は `flow-sync/pending` への push を除外する。App token で作成した PR ブランチへの push が workflow を起動すると、`concurrency` グループで保留中の run を押し出して回収を取りこぼすためである。
-PR 本文には閉じる issue が無いので `no-issue:` を理由つきで宣言する（「PR 本文規約」参照）。
+同梱 workflow が生成する本文は、閉じる issue を持たない回収提案として `no-issue:` と理由を含む固定説明と実行条件である。
+正しさの根拠は diff にあり人が審査するため、この既存経路は本文の読み戻しを追加していない。
+削除対象の ID や証拠データを本文へ載せ始める場合は、そのデータの読み戻しを加える。
 この bot PR は既定では `GITHUB_TOKEN` で作成される。
 GitHub は `GITHUB_TOKEN` で作成された PR の `pull_request` トリガーの workflow を、書き込み権限を持つ人が承認するまで承認待ち（`action_required`）で保留する（[Triggering a workflow](https://docs.github.com/en/actions/using-workflows/triggering-a-workflow)）。
 保留中は採用リポ自身の CI ゲート（ビルド・テスト・`fmt` 検査等）がこの PR に対して実行されておらず、回収の正しさを担保するのは `sweep-completed-chains.mjs` 自身の検証だけである。

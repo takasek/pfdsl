@@ -235,7 +235,7 @@ it("rejects canonical closure and omitted-branch tag errors, while leaving liter
 		);
 		const literal = join(
 			root,
-			"scripts/harness-template/skills/pfd-retro/references/knowledge-lifecycle.md",
+			"scripts/harness-template/skills/pfd-knowledge-audit/references/knowledge-lifecycle.md",
 		);
 		writeFileSync(literal, "Literal {{example}} and CLAUDE.md.\n");
 		generate(root);
@@ -247,7 +247,7 @@ it("rejects canonical closure and omitted-branch tag errors, while leaving liter
 			readFileSync(
 				join(
 					root,
-					".agents/skills/pfd-retro/references/knowledge-lifecycle.md",
+					".agents/skills/pfd-knowledge-audit/references/knowledge-lifecycle.md",
 				),
 				"utf8",
 			),

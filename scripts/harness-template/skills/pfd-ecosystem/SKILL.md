@@ -52,6 +52,7 @@ roadmap / workflow / pipeline の3種別（ADR-0017）に基づき、 プロジ�
 <scaffold>/pipeline.pfdsl
 <scaffold>/pipeline.md
 <scaffold>/bindings/pfd-retro.md
+<scaffold>/bindings/pfd-knowledge-audit.md
 <scaffold>/bindings/pfd-retro-patterns/sample-pattern.md
 <scaffold>/bindings/pfd-ops.md
 <scaffold>/review-perspectives.md
@@ -60,7 +61,8 @@ roadmap / workflow / pipeline の3種別（ADR-0017）に基づき、 プロジ�
 
 必要な種別のファイルだけを `.pfdsl/` にコピーする（不要な種別はコピーしない）。
 `bindings/pfd-retro.md`・`bindings/pfd-retro-patterns/`・`bindings/pfd-ops.md`・`review-perspectives.md` は種別と無関係（pfd-retro・pfd-ops スキルは全リポ共通で同梱される）— それぞれ `.pfdsl/bindings/pfd-retro.md`・`.pfdsl/bindings/pfd-retro-patterns/`・`.pfdsl/bindings/pfd-ops.md`・`.pfdsl/review-perspectives.md` として常にコピーする（`bindings/pfd-retro.md` がこのファイルを参照する）。
-`config.json` も種別と無関係で、`.pfdsl/config.json` として常にコピーする。採用リポの離散的な宣言（スイッチや一覧）を置くファイルで、雛形は pfd-retro の D 層を `decline` にしてある。
+`bindings/pfd-knowledge-audit.md` も `.pfdsl/bindings/pfd-knowledge-audit.md` としてコピーする。
+`config.json` も種別と無関係で、`.pfdsl/config.json` として常にコピーする。採用リポの離散的な宣言（スイッチや一覧）を置くファイルで、雛形は知識成果物監査を `decline` にしてある。
 `bindings/pfd-retro-patterns/` は事例・観察・反例の置き場で、`sample-pattern.md` は記録の見本を持つ（`bindings/pfd-retro.md` の「事例・観察・反例」節が保存と検索の方法を指す）。
 既に `.pfdsl/` にファイルが存在する場合は上書きしない。
 このステップの前に `.pfdsl/` が存在しなかった場合（新規の採用先）に限り、続けて `node <pfd-ops skill root>/scripts/check-install-sync.mjs --record-migration` を実行する（`<pfd-ops skill root>` は上の scaffold の所在と同じ規則で解決する）。

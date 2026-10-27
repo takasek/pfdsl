@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-/** Advisory report; findings never fail CI. Input errors still fail. */
+/** Report candidates, optionally reject them in the canonical protocol gate. */
 import { readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -13,7 +13,10 @@ const defaultPaths = [
 
 try {
 	const { values, positionals: paths } = parseArgs({
-		options: { json: { type: "boolean", default: false } },
+		options: {
+			json: { type: "boolean", default: false },
+			check: { type: "boolean", default: false },
+		},
 		allowPositionals: true,
 		strict: true,
 	});
@@ -34,9 +37,10 @@ try {
 				`${item.path}:${item.line}:${item.column}: [${item.terms.join(", ")}] ${item.text}`,
 			);
 		console.log(
-			`Executor vocabulary: ${findings.length} candidate sentence(s) in ${files.length} file(s). Advisory only; review meaning manually.`,
+			`Executor vocabulary: ${findings.length} candidate sentence(s) in ${files.length} file(s). ${values.check ? "Check mode; candidates must be resolved." : "Advisory only; review meaning manually."}`,
 		);
 	}
+	if (values.check && findings.length > 0) process.exitCode = 1;
 } catch (error) {
 	console.error(`Executor vocabulary report: ${error.message}`);
 	process.exitCode = 1;

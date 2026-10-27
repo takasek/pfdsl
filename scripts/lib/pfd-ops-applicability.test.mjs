@@ -5,7 +5,7 @@ import { describe, it } from "node:test";
 // These tests verify paths and command arguments, not prose meaning.
 // Applicability and condition changes require independent adopter scenarios.
 const skill = readFileSync(".claude/skills/pfd-ops/SKILL.md", "utf8");
-const retro = readFileSync(".claude/skills/pfd-retro/SKILL.md", "utf8");
+const retro = readFileSync(".pfdsl/bindings/pfd-retro.md", "utf8");
 
 describe("pfd-ops mechanical contracts", () => {
 	it("references existing work-cycle and backend resources", () => {

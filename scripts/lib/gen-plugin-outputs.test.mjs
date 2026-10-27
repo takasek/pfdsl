@@ -27,6 +27,7 @@ const EVERY_GEN_PLUGIN_OUTPUT = [
 	".claude/skills/pfd-grill",
 	".claude/skills/pfd-ops",
 	".claude/skills/pfd-retro",
+	".claude/skills/pfd-knowledge-audit",
 	".claude/skills/pfd-ecosystem",
 	".claude/skills/pfd-upstream-report",
 	".claude/commands/pfd-cycle.md",

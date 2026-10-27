@@ -1,6 +1,12 @@
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import {
+	mkdirSync,
+	mkdtempSync,
+	readFileSync,
+	rmSync,
+	writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, it } from "node:test";
@@ -30,6 +36,7 @@ describe("buildGates", () => {
 	it("always offers the generator gates, whose own triggers decide relevance", () => {
 		const built = ids(gates({}));
 		assert.deepEqual(built, [
+			"executor-protocol",
 			"gen-install",
 			"gen-plugin-skill-md",
 			"gen-plugin-bulk",
@@ -37,6 +44,34 @@ describe("buildGates", () => {
 			"samples-svg",
 			"readme-cli",
 		]);
+	});
+	it("runs the same dist-free protocol check in CI and the staged snapshot, including deletions", () => {
+		const gate = gates({ stagedPresent: [] }).find(
+			(g) => g.id === "executor-protocol",
+		);
+		assert.deepEqual(gate.requireDist, []);
+		assert.deepEqual(gate.commands, [
+			["node", ["scripts/report-executor-vocabulary.mjs", "--check"]],
+		]);
+		for (const path of [
+			"scripts/harness-template/skills/pfd-ops/references/work-cycle.md",
+			"scripts/report-executor-vocabulary.mjs",
+			"scripts/lib/distributed-prose.mjs",
+			"scripts/lib/drift-gates.mjs",
+			"scripts/lib/index-snapshot.mjs",
+			"scripts/pre-commit",
+			"Makefile",
+		])
+			assert.ok(gate.trigger.test(path), path);
+		assert.equal(gate.trigger.test("docs/example.md"), false);
+		const makefile = readFileSync(
+			new URL("../../Makefile", import.meta.url),
+			"utf8",
+		);
+		assert.match(
+			makefile,
+			/check-docs:\n(?:\t[^\n]*\n)*\tnode scripts\/report-executor-vocabulary\.mjs --check\n/,
+		);
 	});
 
 	it("checks tracked and untracked output for every regenerate-then-check gate", () => {

@@ -11,7 +11,7 @@
 
 ## PR 操作の承認範囲
 
-PR 本文と issue 連携の規約は、pfd-ops が roadmap companion の採用宣言から解決するバックエンド reference に従う。
+PR 本文と issue 連携の規約は、`.pfdsl/bindings/pfd-ops.md`「PR 本文規約」に従う。
 PR 作成・更新が承認済みなら、その対象・範囲に対応する issue のクローズ参照を本文に追加するためだけの再確認は不要とする。
 ユーザーが指定した issue の OPEN 維持などの限定は守る。本文のクローズ参照は将来のマージ時の設定であり、即時の issue close や PR merge を実行する承認にはならない。
 

@@ -1,8 +1,10 @@
 ---
-description: 対話・作業の継続後にPFD・セッションイベント・知識成果物を監査し、運用改善に繋げる
+description: PFDと版に対応した実行証拠を照合し、モデル改訂の要否を判断する
 ---
 <!-- DO NOT EDIT. Authoritative source: scripts/harness-template/commands/pfd-retro.md. -->
 
-pfd-retro スキルを起動し、A〜D から適用対象を判定して監査を実行し、findings をスキルの出力表に従って振り分けよ。
+pfd-retro スキルで対象モデルと証拠の対応を確認し、適用する図・仕様・実行証拠の監査を行う。
+実行側の失敗、モデルの改訂候補、変更不要の結論を根拠とともに示し、情報不足は未判定として区別する。
+一般の運用イベントや知識成果物の監査は、採用先が別に選ぶ。
 
 対象範囲の指定（あれば）: $ARGUMENTS

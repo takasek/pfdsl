@@ -11,12 +11,12 @@ import {
 import { tmpdir } from "node:os";
 import { resolve } from "node:path";
 import { describe, it } from "node:test";
-import { classifyDeclaration } from "../harness-template/skills/pfd-retro/scripts/classify-knowledge-lifecycle.mjs";
+import { classifyDeclaration } from "../harness-template/skills/pfd-knowledge-audit/scripts/classify-knowledge-lifecycle.mjs";
 
 const key = "knowledgeLifecycleAudit";
 const json = (declaration) => JSON.stringify({ [key]: declaration });
 const sourcePath =
-	"scripts/harness-template/skills/pfd-retro/scripts/classify-knowledge-lifecycle.mjs";
+	"scripts/harness-template/skills/pfd-knowledge-audit/scripts/classify-knowledge-lifecycle.mjs";
 
 describe("knowledge lifecycle classification", () => {
 	for (const [name, input, state] of [
@@ -153,9 +153,12 @@ describe("distributed classifier CLI", () => {
 			]) {
 				const script = resolve(
 					root,
-					"pfd-retro/scripts/classify-knowledge-lifecycle.mjs",
+					"pfd-knowledge-audit/scripts/classify-knowledge-lifecycle.mjs",
 				);
-				const skill = readFileSync(resolve(root, "pfd-retro/SKILL.md"), "utf8");
+				const skill = readFileSync(
+					resolve(root, "pfd-knowledge-audit/SKILL.md"),
+					"utf8",
+				);
 				assert.ok(skill.includes("scripts/classify-knowledge-lifecycle.mjs"));
 				const output = JSON.parse(
 					execFileSync(process.execPath, [script, adopter], {
