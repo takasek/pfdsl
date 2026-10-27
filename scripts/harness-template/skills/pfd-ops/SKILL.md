@@ -16,10 +16,7 @@ description: |
 
 記法・品質ガイドは pfdsl スキル。本スキルは発火直後に必要な契約と既存 reference へのルーティングだけを持つ。リポ固有のバインディングは各 `.pfdsl` の sibling `.md` companion・`.pfdsl/bindings/<スキル名>.md`・references に置く。
 
-調査・実装・レビューの分担は、利用中のハーネス・モデルとリポジトリの指示に従う。
-既に許可された調査・編集・検証について、工程の移行や定型チェックリストだけを理由に追加承認や同じ内容の再確認を求めない。
-必要な検証・終端ゲートとその必須項目は実施する。
-明示された設計レビュー待機点と、公開・破壊的操作の承認境界は守る。
+PFD が持つのはモデルの受入条件と証拠の契約であり、実行の制御や開発規律は採用先が持つ。
 
 ## 適用単位
 
@@ -39,22 +36,20 @@ node {{{pluginRootExpression}}}/skills/pfd-ops/scripts/check-install-sync.mjs
 
 `.pfdsl/bindings/pfd-ops.md` はリポ固有の追加セルフチェックの一次置き場であり、本ファイルは個別スクリプト名を持たない。
 
-## リポ固有の手順を該当見出しで選ぶ
+## PFD 固有の追加ゲート
 
-`.pfdsl/bindings/pfd-ops.md` があれば、操作を進める前に見出し一覧を階層が分かる形で作る。
-見出し一覧には `##` と `###` を含め、`####` 以深の見出しがあれば、その深さまで含める。
-一覧から今回の操作に関係する見出しを選び、該当する本文だけを読む。
-セルフチェック、設計確認、実装、委譲、終端ゲートでは、見出し名の列挙だけで本文を省略しない。
-親節が適用範囲を定める場合はその記述も読み、関係しない節本文は読まない。
+`.pfdsl/bindings/pfd-ops.md` の「PFD 固有の追加ゲート」があれば、対象モデルの受入に適用される条件を確認する。
+対象の PFD 要素・criteria・宣言・CLI 問い合わせと関係が分からない条件は、追加のモデル条件として扱わない。
+一般の実行規律は、採用先の入口から読み込むもので、このスキルから各段で呼び出さない。
 
 ## 運用ファイルの所在（L2 ディスパッチ）
 
 各運用 `.pfdsl` を扱うときは同名 sibling `.md` も読み、次の一意な経路で詳細を解決する。
 
 - **閲覧・分類・優先順位**: 採用済み roadmap では pfdsl スキルの CLI プリフライトを先に実施し、要求版を満たす CLI で `pfdsl status ready <roadmap.pfdsl> --json` を実行して着手可能集合と各工程の新規 ready 数を取得する。件数は優先順位を決めず、目的・期限・工数と併せて対象を選ぶ。作業項目の分類は roadmap companion が指す採用バックエンドに従う
-- **作業項目への着手**: `references/work-cycle.md` の全手順に従い、`.pfdsl/bindings/pfd-ops.md` に「ワークサイクルの追加手順」節があれば手順1〜3の各段でその追加手順にも従う
-- **終端ゲート**: `references/work-cycle.md` の終端ゲートと、binding の「ワークサイクルの追加手順」が加える項目に従う
-- **知見の振り分け**: `references/work-cycle.md` の運用契約「知見と機械化」と `.pfdsl/workflow.pfdsl` および sibling companion に従い、再発防止の反映先・機械化の判定・hook の決定軸は binding に従う
+- **作業項目への着手**: `references/work-cycle.md` の選択・実行・受入・証拠の契約に従う。実行を制御する主体は1つに保つ
+- **終端ゲート**: `references/work-cycle.md` の終端ゲートと、binding の「PFD 固有の追加ゲート」の該当条件に従う
+- **モデルに関する知見の振り分け**: `references/work-cycle.md` の「知見と機械化」に従い、artifact・process・edge・criteria・boundary と、companion に記した対応関係や採用宣言の不整合を対象にする。`.pfdsl/workflow.pfdsl` と sibling companion はその構造的事実を解決するために読む。一般の開発・記録・監査手順の呼出しは採用先の入口が持つ
 - **GitHub Issues の操作**: roadmap companion が採用を宣言している場合だけ `references/github-issues-backend.md` に従う
 - **ファイルベースの作業項目操作**: roadmap companion が採用を宣言している場合だけ `references/file-based-tracker-backend.md` に従う
 - **変換境界の変更**: `.pfdsl/pipeline.pfdsl` と sibling companion に従う

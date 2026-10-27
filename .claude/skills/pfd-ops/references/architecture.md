@@ -42,16 +42,16 @@ PFD の種別は「この PFD が答える問い」で区別し、定義表・�
 
 ### companion への書き分けルール（一次情報）
 
-findings やゲート項目を companion に書くとき、**どの companion か**の判断基準:
+PFD の構造的事実やモデル固有の条件を companion に書くとき、**どの companion か**の判断基準:
 
 | 書く内容の種類 | 宛先 companion |
 |---|---|
-| issue 固有ゲート・issue 管理バインディング・open PR 規約・issue バックエンド手続き | `roadmap.md` |
-| 繰り返し手続き・知見振り分けルール・`develop` プロセスの運用規約・retro 宛先バインディング | `workflow.md` |
-| 変換コンポーネントの追加・削除・境界変更に関する手続き | `pipeline.md` |
-| ハーネス向け追加指示（PR 本文規約等）| `.pfdsl/bindings/pfd-ops.md` |
+| 作業項目バックエンドの採用宣言・process との対応・roadmap の受入条件 | `roadmap.md` |
+| 繰り返す変換の入力・出力・criteria・知識成果物への経路などの構造的事実 | `workflow.md` |
+| 変換コンポーネントの境界・入出力・生成物の対応関係 | `pipeline.md` |
+| 実行管理・一般の開発規律・PR 本文規約・記録時点・監査の起動手順 | 採用先の入口が読む文書（このリポでは `.pfdsl/bindings/pfd-ops.md` 等） |
 
-この表が一次情報。`pfd-ops SKILL.md` の L2 ディスパッチ・`pfd-retro` の出力振り分け・`.pfdsl/bindings/pfd-retro.md` はすべてここを参照する。
+この表が配置判断の一次情報。配布スキルが companion を読むことは、そこにある一般の実行手順を protocol として呼び出すことを意味しない。採用先は一般の規律の読込みを自身の入口に接続する。
 
 ### companion の記述言語（一次情報）
 
@@ -117,7 +117,7 @@ companion の一覧をここに再掲しないのは、上の表と二重管理�
 
 ### バインディングファイルの命名規則
 
-スキル固有の恒常指示・監査結果等は `.pfdsl/bindings/<スキル名>.md` に置く（例: `.pfdsl/bindings/pfd-retro.md`、`.pfdsl/bindings/pfd-ops.md`）。SKILL.md 側は「`.pfdsl/bindings/<スキル名>.md` が存在すれば読んで従う」とだけ書き、ファイルの中身（具体的な運用手続き）は書かない。1ファイルに集約しない（例えば全スキル分を `workflow.md` に集約しない）のは、companion がスキルと無関係な PFD 操作のたびに毎回丸ごと読まれる既存の読み込みモデルでは、集約するほど無関係な読み込みコストが増えるため。ファイル名（セクション名でなく）を規約にするのは、スキルが増えても既存ファイルへの追記でなく新規ファイル追加で済み、規約自体の変更が不要なため。
+スキル固有のモデル情報・追加の受入条件・監査観点は `.pfdsl/bindings/<スキル名>.md` に置く（例: `.pfdsl/bindings/pfd-retro.md`、`.pfdsl/bindings/pfd-ops.md`）。SKILL.md は、その機能が読む対象と条件を指定し、binding 全体の一般的な実行手順を呼び出さない。実行管理・開発規律を同じ binding に置く採用先は、自身の入口から読む経路を持つ。ファイル名で機能を分け、無関係な本文を全読することを消費方法にしない。
 `bindings/<スキル名>.md` を読む規約を持つスキルの数だけ scaffold にファイルを用意する（内容が空でも実害のないファイル含む）。存在確認のコストは空ファイルでも実質変わらないため、都度作成でなく最初から揃えておく。
 bundle 同梱スキル全数ではない — 自分の binding を読まないスキルの分を置いても、誰も読まないファイルが採用リポに増えるだけである。
 スキルが新たに binding を読み始めたら、その時点で scaffold にも1ファイル追加する。
@@ -136,11 +136,12 @@ bundle 同梱スキル全数ではない — 自分の binding を読まない�
 
 どちらの reference も pfd-ops スキルの一部として plugin に同梱される（ADR-0028）。
 採用リポは roadmap companion で採用したプリセットを宣言し、作業項目の管理では宣言したプリセットの reference だけに従う。
-作業項目の管理以外で GitHub への外部書込みを行うスキル（上流への報告等）が GitHub Issues 版の書込み規約を参照するのは、この宣言と独立である。
+一般の外部書込みや設計記録・本文規約は、採用したバックエンドではなく採用先の実行規律が定める。
+上流への報告などの配布機構が自身の書込みを照合する手続きは、その機構が持つ。
 
 ### 配布単位
 
-pfdsl / pfd-grill / pfd-ops / pfd-retro / pfd-ecosystem / pfd-upstream-report の6スキルツリーとハーネス別の資産を、`make gen-plugin` で共通正本から組み立てる（ADR-0028。旧 `pfdsl skill sync` は廃止）。
+pfdsl / pfd-grill / pfd-ops / pfd-retro / pfd-knowledge-audit / pfd-ecosystem / pfd-upstream-report のスキルツリーとハーネス別の資産を、`make gen-plugin` で共通正本から組み立てる（ADR-0028。旧 `pfdsl skill sync` は廃止）。
 Claude Code plugin（`plugin/pfdsl/`）にはスキル・pfd-* Markdown コマンド・pfd-lens agent・hooks が入り、marketplace 経由で配布される。
 スキル間の相互参照（pfd-retro → pfdsl の review-perspectives、pfd-ecosystem → pfd-ops の scaffold、コマンド → 各スキル）はこの bundle 配布が担保する。
 `hooks/`（PostToolUse の managed issue リマインダ等）も同じ bundle に同梱される。plugin hook はインストール/有効化の同意機構を各ハーネスのプラットフォーム側に委ねる（`install/` + `check-install-sync.mjs --deploy` の配線を pfd-ops が自前で持たずに済む代替経路）。
@@ -174,7 +175,7 @@ GitHub Actions や監査スクリプトを使わないため、`install/` の実
 
 ## L4: リポ固有（配布対象外）
 
-採用リポ固有の事項。各リポの `.md` companion（`roadmap.md` / `workflow.md` 等）に記述する。
+採用リポ固有の事項。モデルの構造的事実は各リポの `.md` companion（`roadmap.md` / `workflow.md` 等）に記述する。一般の実行手順は配置表に従い、採用先の入口が読む文書に置く。
 
 pfdsl 開発リポ固有の例:
 - payoff_log: PFD の効果を収集する目的

@@ -62,6 +62,16 @@ export function buildGates({ stagedPresent }) {
 	// that tree into plugin/. Running gen-plugin first would diff plugin/ against
 	// an install/ that is about to change.
 	return [
+		{
+			id: "executor-protocol",
+			trigger:
+				/^(?:scripts\/harness-template\/skills\/pfd-ops\/references\/work-cycle\.md|scripts\/report-executor-vocabulary\.mjs|scripts\/lib\/(?:distributed-prose|drift-gates|pre-commit-drift|index-snapshot)\.mjs|scripts\/(?:pre-commit|check-drift-gates\.mjs)|Makefile)$/,
+			requireDist: [],
+			commands: /** @type {[string, string[]][]} */ ([
+				["node", ["scripts/report-executor-vocabulary.mjs", "--check"]],
+			]),
+			hint: "Executor vocabulary belongs in adopter rules or the reference driver. Review the reported protocol sentences and re-stage.",
+		},
 		// One gate per file: DriftGate carries a single hint, and the operator
 		// needs the name of the file that is unformatted, not the news that one of
 		// them is.

@@ -38,6 +38,7 @@ describe("harness distribution inventory", () => {
 			"skill:pfd-grill",
 			"skill:pfd-ops",
 			"skill:pfd-retro",
+			"skill:pfd-knowledge-audit",
 			"skill:pfd-ecosystem",
 			"skill:pfd-upstream-report",
 			"skill:pfdsl",
@@ -148,6 +149,7 @@ describe("harness distribution inventory", () => {
 			"pfd-grill",
 			"pfd-ops",
 			"pfd-retro",
+			"pfd-knowledge-audit",
 			"pfd-ecosystem",
 			"pfd-upstream-report",
 		]);

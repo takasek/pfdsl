@@ -437,7 +437,7 @@ marketplaceのpin反映・取得確認とroadmap同期の順序、中断時の�
 
 ## hotfix 運用（issue 省略）
 
-判定3条件と省略規則は L3 reference（`github-issues-backend.md`「hotfix 運用」）が一次情報。このリポでは `[gh_issues, roadmap_pfdsl, spec] >> develop` 通常経路の例外ケースに当たる。
+判定3条件と省略規則は `.pfdsl/bindings/pfd-ops.md`「hotfix 運用（issue 省略）」が一次情報。このリポでは `[gh_issues, roadmap_pfdsl, spec] >> develop` 通常経路の例外ケースに当たる。
 
 ## コアライブラリ型を拡張する場合の設計判断
 

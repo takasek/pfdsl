@@ -19,7 +19,7 @@ description: |
 対象は配布物そのもの（pfd-* スキル本文・reference・agent・command・hook、pfdsl CLI、gate script）と、配布物に無い能力の要望である。
 採用リポ自身の PFD・コード・作業項目の欠陥は対象外で、そちらは pfd-ops が扱う。
 
-pfd-retro の「上流変更ルール」が配布層の finding を検出したときの起票手順でもある。
+pfd-retro の「配布層への還流（配布機構）」が配布層の finding を検出したときの起票手順でもある。
 
 ## 工程1: 実行環境の判定
 
@@ -138,7 +138,7 @@ plugin 構成では、プロジェクトのルートも作業ディレクトリ�
 本文の全文を提示し、明示の承認を待つ。
 承認なしに投稿しない。
 
-投稿は pfd-ops の `references/github-issues-backend.md`「複数行本文の外部書込み」規約に従う。
+この配布機構は、承認された本文と保存された本文を、下の手順で対象を特定して照合する。
 新規起票と既存 issue へのコメントで、write と readback の対象が違う。
 
 まず一時パスを2つ用意する。
@@ -169,7 +169,7 @@ gh api --hostname github.com "repos/takasek/pfdsl/issues/comments/$comment_id" >
 ```
 
 **`gh issue view --json comments` の一覧から似た本文を拾って代用しない。**
-規約はこの読み方を明示的に禁じている。
+この配布機構では、書込み応答が指す対象そのものを読む。
 一覧は自分が今書いたコメントを同定できず、他の誰かの似た本文を通してしまう。
 
 どちらの経路でも、最後に JSON の `body` を decode して正本ファイルと比較する。

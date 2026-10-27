@@ -211,14 +211,14 @@ artifact:
   executor_neutral_work_cycle:
     label: 実行主体に依存しない work-cycle
     description: ADR-0048 の後続で未起票。work-cycle.md から実行主体を主語にする規則を外し、PFD 側の protocol だけを残す
-    status: todo
+    status: wip
     criteria: >
       work-cycle.md が実行主体を主語にする規則を持たず、1サイクル1プロセスを既定のプリセットとして示し、run の成功と受入の区別と制御主体の単一性を定め、binding の「ワークサイクルの追加手順」スロットを PFD 固有の追加ゲート項目に縮小している。
       採用側プローブで、外部の実行主体の完了から done を付けずに受入の確認へ進むことを確かめた
   three_valued_model_retro:
     label: 3値の model retro と証拠の契約
     description: ADR-0048 の後続で未起票。pfd-retro を3値の model retro と証拠の契約に絞り、D 層を同じ plugin 内の独立した skill と図の監査レンズへ分ける（ADR-0048 D1）
-    status: todo
+    status: wip
     criteria: >
       pfd-retro の結論が実行側の失敗・モデルの改訂候補・変更不要の3値で、変更不要は照合したモデル要素と証拠を名指す。
       証拠の契約が版との対応を定め、C 層の汎用項目が配布物から外れている。
@@ -226,7 +226,7 @@ artifact:
   writer_free_github_preset:
     label: 実行主体の書込み規律を外した GitHub Issues プリセット
     description: ADR-0048 の後続で未起票。実行主体が行う外部書込みの手順と PR 運用をこのリポの binding へ移し、プリセットにはアダプタ自身が外部へ書く場合の読み戻しの原則だけを残す（ADR-0048 D2）
-    status: todo
+    status: wip
     criteria: github-issues-backend.md が実行主体の外部書込みの手順と PR 本文規約を持たず、アダプタ自身の書込みを読み戻す原則を持つ。このリポの PR 作成手順（クローズ参照の扱い等）が binding だけで完結する
   backend_neutral_work_item_contract:
     label: バックエンドに依存しない作業項目の対応契約

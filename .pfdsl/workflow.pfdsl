@@ -138,7 +138,7 @@ artifact:
     group: dialogue
   retro_request:
     label: ふりかえり要求
-    description: "retro_skill の選別・検証規則に従い、一回のふりかえりで必要な source set と時点固定 cutoff を指定する実行時入力"
+    description: "bindings_pfd_retro の実行管理規律に従い、一回のふりかえりで必要な source set と時点固定 cutoff を指定する実行時入力"
     criteria: 実行ごとに必要 source set と cutoff が明示され、同じ cutoff で activity を収集できる
     group: decision
   retro_evidence_snapshot:
@@ -180,7 +180,7 @@ artifact:
   findings:
     label: レビュー知見
     description: "実践例レビューで得た品質知見。次世代の対話・整備への還流入力（消費先の一次情報は本図のエッジ）"
-    criteria: レビュー結果が pfd-retro の出力表に finding として記録され、各 finding の振り分け先が本図のエッジのいずれかに定まり、未振り分けの行が残っていない
+    criteria: レビュー結果が .pfdsl/bindings/pfd-retro.md の出力表に finding として記録され、各 finding の振り分け先が本図のエッジのいずれかに定まり、未振り分けの行が残っていない
     group: practice
   adrs:
     label: ADR
@@ -255,7 +255,7 @@ artifact:
   ops_skill_general:
     label: PFD運用スキル（汎用層）
     description: "pfd-ops スキル本体（起動口は /pfd-cycle に限らない）。PFD によるプロジェクト運用プロトコルとワークサイクル。PFDファイル種別の定義（ADR-0017）は ecosystem_skill が一次情報。汎用プロトコル（L1）+ディスパッチ（L2）= SKILL.md 本文 + バックエンド非依存の references（work-cycle.md のサイクル4手順・architecture.md の層構成。L3 の references は ops_skill_l3 側）。L4（リポ固有、配布対象外）は pfd-ops 自体の一部でなく、各採用リポの .pfdsl sibling .md companion に宿る"
-    criteria: /pfd-cycle を起動するとワークサイクルの4手順（選択・実行・終端ゲート・報告）が最後まで走る。make gen-plugin が差分なしで完了する
+    criteria: work-cycle が選択・実行・受入・報告の入出力と版に対応する証拠を定め、run 成功と artifact の受入を区別する。参照 driver は変更可能な既定で1 processを選び、外部の制御主体と同じprocessを重複制御しない。一般の開発規律をbindingの各段から呼び戻さない。make gen-plugin が差分なしで完了する
     location: [ "scripts/harness-template/skills/pfd-ops/SKILL.md", "scripts/harness-template/skills/pfd-ops/references/work-cycle.md", "scripts/harness-template/skills/pfd-ops/references/architecture.md", "scripts/harness-template/commands/pfd-cycle.md" ]
     group: generation
     tags: [ distilled_skill ]
@@ -267,16 +267,23 @@ artifact:
       手書き（生成対象外）で、retro_skill の監査結果がこの層の規約改訂に還流する。
       GitHub Issues 版の採用リポが実際に配置するファイル群は pipeline.pfdsl の ops_install_templates 側で、ファイルベース・トラッカー版は実配置を要しない
     criteria: >-
-      ../scripts/harness-template/skills/pfd-ops/references/github-issues-backend.md に、採用リポが GitHub Issues バックエンドを採用するのに必要な規約（ラベル判定・status 更新と完了チェーン回収・PR 本文規約）が記述されている。
+      ../scripts/harness-template/skills/pfd-ops/references/github-issues-backend.md に、採用リポが GitHub Issues バックエンドを採用するのに必要な規約（ラベル判定・status 更新と完了チェーン回収）が記述され、実行者の設計記録・外部書込み手順・PR 本文規約を持たない。
       ../scripts/harness-template/skills/pfd-ops/references/file-based-tracker-backend.md に、採用リポがリポ内ファイルで作業項目を管理するのに必要な規約（一次情報ファイル・作業項目の参照形式・flow 分類・status 同期・完了規則と完了契約）が記述され、対応の共通契約は work-cycle.md を参照し、GitHub Issues 版の install テンプレートを要求しない
     location: [ "scripts/harness-template/skills/pfd-ops/references/github-issues-backend.md", "scripts/harness-template/skills/pfd-ops/references/file-based-tracker-backend.md" ]
     group: generation
     tags: [ distilled_skill ]
   retro_skill:
-    label: ふりかえり監査スキル
-    description: "/pfd-retro コマンド。図・セッションイベント・知識成果物の監査カタログと、D 層の設定を分類する同梱 scripts/classify-knowledge-lifecycle.mjs。ユーザーの監査介入17件から蒸留（手書き、生成対象外）。A・B 層は任意の PFD レビューにも使う"
-    criteria: "/pfd-retro を起動すると適用した層の findings が振り分け先付きで出力される。D 層は同梱分類器を採用リポに対して実行し、state が adopt のときだけ auditTargets の成果物に適用する。adopt の targets は空白だけの要素を含まない非空の文字列配列とし、有効な対象の文字列は変更せず、対象を推測で補わない。decline は targets を無視して監査しないが、旧宣言行の移行警告は残す。config の欠落・不正は監査せず不備を毎回報告する。分類器の実行・読取・JSON 取得失敗は報告して D 層を止める。binding の散文と旧宣言行は宣言として扱わない。scripts/lib/knowledge-lifecycle-classifier.test.mjs が分類結果と四配布先の実行を検査する。ADR-0039、ADR-0041。make gen-plugin が差分なしで完了する"
+    label: モデルふりかえり監査スキル
+    description: /pfd-retro コマンドとmodel retro。図・仕様の観点と、版に対応する実行証拠をモデルへ照合する契約。配布層への還流は別の配布機構として持つ
+    criteria: 実行側の失敗・モデルの改訂候補・変更不要を根拠とともに区別し、変更不要にもモデル要素と証拠を示す。情報不足を未判定として報告し、一般の運用イベント監査と知識成果物監査を自動起動しない。make gen-plugin が差分なしで完了する
     location: [ "scripts/harness-template/skills/pfd-retro/", "scripts/harness-template/commands/pfd-retro.md" ]
+    group: generation
+    tags: [ distilled_skill ]
+  knowledge_audit_skill:
+    label: 知識成果物監査スキル
+    description: 同じpluginに配布する独立した付属機能pfd-knowledge-audit。旧D層の宣言分類器と観点を持ち、model retroとは採用先で独立に起動する
+    criteria: knowledgeLifecycleAuditを同梱分類器で読み、adopt時だけauditTargetsを監査し、declineは対象を無視する。不正・欠落・旧宣言の警告を報告し、対象を推測せず、分類器失敗を成功にしない。scripts/lib/knowledge-lifecycle-classifier.test.mjsが四配布先での実行を確認する。make gen-pluginが差分なしで完了する
+    location: scripts/harness-template/skills/pfd-knowledge-audit/
     group: generation
     tags: [ distilled_skill ]
   pfd_lens_agent:
@@ -374,7 +381,7 @@ artifact:
     tags: [ distilled_doc ]
   adopter_config:
     label: 採用リポの宣言値
-    description: "このリポ自身が採用リポとして持つ宣言の値（ADR-0042）。pfd-retro D 層の採用と監査対象（knowledgeLifecycleAudit）、completed-chain sweep の有効化（sweepCompletedChains）を持つ。散文の binding はキーを指すだけで値を持たない。sweep の workflow も実行時にこのファイルを読む"
+    description: "このリポ自身が採用リポとして持つ宣言の値（ADR-0042）。知識成果物監査の採用と監査対象（knowledgeLifecycleAudit）、completed-chain sweep の有効化（sweepCompletedChains）を持つ。散文の binding はキーを指すだけで値を持たない。sweep の workflow も実行時にこのファイルを読む"
     criteria: JSON として読め、knowledgeLifecycleAudit が adopt と空でない監査対象を、sweepCompletedChains が有効化を宣言している（scripts/lib/knowledge-lifecycle-declaration.test.mjs が検査する）
     location: ".pfdsl/config.json"
     group: generation
@@ -388,6 +395,12 @@ artifact:
     location: [ ".pfdsl/bindings/pfd-retro.md", ".pfdsl/bindings/pfd-retro-patterns/" ]
     group: generation
     tags: [ distilled_doc ]
+  bindings_knowledge_audit:
+    label: 知識成果物監査バインディング
+    description: このリポで宣言した知識成果物に適用する効果の実測の観点。実行はrootから読む規律により独立して起動する
+    criteria: 宣言対象を増やさず、配布の観点とこのリポの観点を区別し、実行契約への参照が実在する
+    location: .pfdsl/bindings/pfd-knowledge-audit.md
+    group: generation
   roadmap_md:
     label: 計画 companion
     description: "roadmap.pfdsl の sibling。このリポの issue 管理バインディング（GitHub backend、監査スクリプト実パス、L3 reference ポインタ、運用対象の計画 PFD 一覧、issue 固有の終端ゲート項目）。pfd-ops skill が読む L4 ホスト"
@@ -625,8 +638,8 @@ pfdsl_skill >>? review_examples
 retro_skill >>? review_examples
 toolchain >>? review_examples
 
-decisions >> maintain_distributed_prompt_assets -> [distributed_advisory_hooks, ecosystem_skill, grill_skill, implementer_agent, ops_skill_general, ops_skill_l3, pfd_lens_agent, retro_skill, review_perspectives]
-decisions >> maintain_repo_bindings -> [adopter_config, bindings_pfd_ops, bindings_pfd_retro, workflow_md]
+decisions >> maintain_distributed_prompt_assets -> [distributed_advisory_hooks, ecosystem_skill, grill_skill, implementer_agent, knowledge_audit_skill, ops_skill_general, ops_skill_l3, pfd_lens_agent, retro_skill, review_perspectives]
+decisions >> maintain_repo_bindings -> [adopter_config, bindings_knowledge_audit, bindings_pfd_ops, bindings_pfd_retro, workflow_md]
 decisions >> maintain_repo_local_capabilities -> [distribution_review_perspectives, distribution_review_skill, prose_mechanization_audit_skill, spec_stress_skill, vscode_ext_debug_skill]
 
 distributed_advisory_hooks >>? maintain_distributed_prompt_assets
@@ -665,14 +678,16 @@ spec_stress_skill >>? maintain_spec
 
 [retro_evidence_snapshot, retro_request] >> collect_activity -> pre_retro_inventory
 
-retro_skill >>? collect_activity
+bindings_pfd_retro >>? collect_activity
 
 [adopter_config, integrated_repository, pre_retro_inventory] >> plan_retro -> [retro_plan, retro_subject_snapshot]
 
-retro_skill >>? plan_retro
+bindings_pfd_retro >>? plan_retro
 
 [retro_plan, retro_subject_snapshot] >> run_retro -> retro_findings
 
+bindings_knowledge_audit >>? run_retro
+knowledge_audit_skill >>? run_retro
 retro_skill >>? run_retro
 
 [adrs, payoff_log] >> write_article -> article

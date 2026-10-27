@@ -27,6 +27,7 @@ const SKILL_SOURCE_FILES = Object.freeze({
 		"references/file-based-tracker-backend.md",
 		"references/github-issues-backend.md",
 		"references/scaffold/bindings/pfd-ops.md",
+		"references/scaffold/bindings/pfd-knowledge-audit.md",
 		"references/scaffold/bindings/pfd-retro-patterns/sample-pattern.md",
 		"references/scaffold/bindings/pfd-retro.md",
 		"references/scaffold/config.json",
@@ -42,7 +43,8 @@ const SKILL_SOURCE_FILES = Object.freeze({
 		"scripts/collect-report-environment.mjs",
 		"scripts/plugin-version-check.mjs",
 	]),
-	"pfd-retro": Object.freeze([
+	"pfd-retro": Object.freeze(["SKILL.md"]),
+	"pfd-knowledge-audit": Object.freeze([
 		"SKILL.md",
 		"references/knowledge-lifecycle.md",
 		"scripts/classify-knowledge-lifecycle.mjs",
@@ -242,6 +244,7 @@ export const HARNESS_CAPABILITY_CONTRACT = Object.freeze([
 	skillCapability("pfd-grill"),
 	skillCapability("pfd-ops"),
 	skillCapability("pfd-retro"),
+	skillCapability("pfd-knowledge-audit"),
 	skillCapability("pfd-ecosystem"),
 	skillCapability("pfd-upstream-report"),
 	skillCapability("pfdsl", {

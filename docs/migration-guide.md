@@ -51,6 +51,49 @@ If you rename them, use `pfdsl rename` and update references outside the diagram
 Remove local instructions that require adding a prefix on issue creation, and any duplicate placeholder ledger maintained solely for that rule.
 Creating an issue now adds its location without requiring an ID change.
 
+### Separate model protocol from execution rules
+
+The work-cycle contract now describes PFD selection, acceptance and version-matched evidence.
+One process per cycle is a configurable default, and a successful run alone does not establish artifact acceptance.
+Evidence identifies the model version, artifact version and criteria, changed paths and status transitions, and each PFD file/process pair associated with the run.
+No new PFD field, storage format or run-ID scheme is required.
+Source: [Issue #1504](https://github.com/takasek/pfdsl/issues/1504) and its protocol-cleanup prerequisites.
+
+Before updating, retain the previous bundle and identify the execution rules your repository actually uses.
+Preserve those rules in the adopting repository, and connect them from its own root instructions or driver before removing the old call paths.
+The old “additional work-cycle steps” slot no longer invokes general development procedures at each stage.
+The replacement “PFD-specific additional gates” slot accepts only model acceptance conditions tied to named elements, criteria, declarations or queries.
+Do not move all old instructions into that slot.
+
+| Previous source | New responsibility |
+|---|---|
+| work-cycle conversation timing, audit invocation and record markers | Adopter's driver or execution rules |
+| pfd-retro generic operational-event checks and audit execution management | Adopter's operational audit, called from its own entry point |
+| GitHub preset's design-record placement, exact-write procedure, PR body/closing-reference rules and hotfix policy | Adopter's development rules |
+| File tracker's design-record placement and approval-reference policy | Adopter's development rules |
+| pfd-retro knowledge-artifact audit | Independent `pfd-knowledge-audit` skill in the same plugin |
+| Dormant capabilities and nonterminating mechanisms | PFD diagram lenses, limited to modeled process inputs, consumers and acceptance criteria |
+
+The GitHub adapter still owns the principle of checking its own external writes.
+That does not prescribe how a person or another tool writes issue/PR text.
+If you retain the former write procedure, preserve its target-identity and exact persisted-body checks, including after later edits.
+
+`pfd-retro` now distinguishes execution failures, model revision candidates and no-change findings.
+Each conclusion names the model elements and evidence; missing or mismatched evidence remains undecided.
+General operational audits and knowledge-artifact audits are no longer implicitly run by model retro.
+If you used them, add their calls to your own execution entry point.
+Keep existing local observations and audit-management rules; do not overwrite local bindings with fresh scaffolds.
+
+Keep the existing `knowledgeLifecycleAudit` declaration and targets in `.pfdsl/config.json`.
+The classifier and audit reference now live under `pfd-knowledge-audit/`; update local invocations of the old `pfd-retro/scripts/classify-knowledge-lifecycle.mjs` path.
+Move target-specific knowledge-audit rules to `.pfdsl/bindings/pfd-knowledge-audit.md` as needed, preserving local text.
+The classifier still reports retired declarations in the old retro binding, and a declined or malformed declaration must not silently enable an audit.
+
+After updating, check that both standalone diagram review and evidence-based model retro work without a general execution-rules callback.
+Test a successful run whose artifact fails its criteria, multiple processes with the same ID in different files, and missing evidence.
+If knowledge auditing is adopted, run its shipped classifier against the adopting repository from outside that repository and verify the exact declared targets and warnings.
+Confirm that your own driver still reaches each retained local procedure, and that no two drivers control the same process.
+
 ### Keep a local implementation agent if you need one
 
 The Claude Code plugin no longer bundles `pfd-implementer`; its only bundled agent is `pfd-lens`.
