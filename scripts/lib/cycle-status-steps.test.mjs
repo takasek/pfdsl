@@ -33,13 +33,16 @@ const readyJsonOk = (id) =>
 const roadmapWithIssue = (processId, issueNumber) =>
 	roadmapWithIssues([[processId, issueNumber]]);
 
-const roadmapWithIssues = (entries) =>
-	`process:\n${entries
-		.map(
-			([processId, issueNumber]) =>
-				`  ${processId}:\n    label: x\n    location: https://github.com/takasek/pfdsl/issues/${issueNumber}\n`,
-		)
-		.join("")}artifact:\n`;
+const roadmapWithIssues = (entries) => {
+	const processes = new Map();
+	for (const [processId, issueNumber] of entries) {
+		if (!processes.has(processId)) processes.set(processId, []);
+		processes
+			.get(processId)
+			.push(`https://github.com/takasek/pfdsl/issues/${issueNumber}`);
+	}
+	return `process:\n${[...processes].map(([id, locations]) => `  ${id}:\n    label: x\n    location: ${JSON.stringify(locations)}\n`).join("")}artifact:\n`;
+};
 
 // `graph neighbors --json` tags each neighbor with its edge class since #828.
 const neighborsJsonOk = (successors) =>

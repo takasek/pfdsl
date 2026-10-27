@@ -61,13 +61,31 @@ describe("parseReadyOutput", () => {
 });
 
 describe("findProcessIdForIssueNumber", () => {
-	it("resolves every issue linked by a shared process prefix", () => {
+	it("reads YAML location arrays without inferring issue links from IDs or prose", () => {
+		const source = `---
+process:
+  plain:
+    location:
+      - https://github.com/example/project/issues/42
+      - 'https://github.com/example/project/issues/43'
+  i44_unlinked:
+    description: 'location: https://github.com/example/project/issues/44'
+  inline: { location: [https://github.com/example/project/issues/45] }
+---
+seed >> plain -> out
+`;
+		assert.equal(findProcessIdForIssueNumber(source, 42), "plain");
+		assert.equal(findProcessIdForIssueNumber(source, 43), "plain");
+		assert.equal(findProcessIdForIssueNumber(source, 44), null);
+		assert.equal(findProcessIdForIssueNumber(source, 45), "inline");
+	});
+	it("resolves every issue in a shared process location array", () => {
 		const processId = "i1352_i1282_i1283_i1284_i483_improve_preview";
 		const shared = `---
 process:
   ${processId}:
     label: Improve preview
-    location: https://github.com/takasek/pfdsl/issues/1352
+    location: [https://github.com/takasek/pfdsl/issues/1352, https://github.com/takasek/pfdsl/issues/1282, https://github.com/takasek/pfdsl/issues/1283, https://github.com/takasek/pfdsl/issues/1284, https://github.com/takasek/pfdsl/issues/483]
 tag:
   preview: {}
 ---
@@ -289,7 +307,7 @@ describe("isUnregisteredManagedIssue", () => {
 		assert.equal(isUnregisteredManagedIssue([], null), false);
 	});
 });
-it("preflight and flow audit agree on contiguous prefixes and reject near numbers", () => {
+it("preflight and flow audit ignore legacy prefixes without locations", () => {
 	for (const id of [
 		"i1352_i1282_i483_improve_preview",
 		"i4830_near",

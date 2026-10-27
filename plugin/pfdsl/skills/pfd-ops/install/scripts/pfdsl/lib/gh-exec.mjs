@@ -1,9 +1,9 @@
 /**
  * Thin wrapper around `execFileSync("gh", args)`: the gh-CLI backend
- * github-ops.mjs's named operations run against (#1044). GH_HOST is pinned
- * to this repo's own remote host, so an ambient GH_HOST pointing at a
- * different host (a multi-host `gh` login) doesn't make gh reject the repo.
- * Falls back to the ambient env when the host can't be determined.
+ * github-ops.mjs's named operations run against (#1044). GH_HOST and GH_REPO
+ * are pinned to origin, so ambient settings or gh's preferred remote cannot
+ * make the fetched issues differ from the repository used for location matching.
+ * Falls back to the ambient env when the identity can't be determined.
  *
  * Genuine binary absence preserves execFileSync's ENOENT; a missing cwd or
  * an installed command's launch failure remains a real error. github-ops.mjs
@@ -16,22 +16,22 @@
 import { execFileSync } from "node:child_process";
 import { statSync } from "node:fs";
 import { delimiter, resolve } from "node:path";
-import { parseHost } from "./github-rest.mjs";
+import { parseRepositoryIdentity } from "./github-rest.mjs";
 
 /**
- * The host `gh` should target for this repo, derived from its origin remote.
+ * The repository `gh` should target, derived from its origin remote.
  * Returns null if it can't be determined (no git, no origin) — callers then
  * leave the ambient environment untouched.
  * @param {string} cwd
- * @returns {string | null}
+ * @returns {{host: string, owner: string, repo: string} | null}
  */
-function hostFromGitRemote(cwd) {
+function repositoryFromGitRemote(cwd) {
 	try {
 		const remoteUrl = execFileSync("git", ["remote", "get-url", "origin"], {
 			cwd,
 			encoding: "utf-8",
 		}).trim();
-		return parseHost(remoteUrl);
+		return parseRepositoryIdentity(remoteUrl)?.identity ?? null;
 	} catch {
 		return null;
 	}
@@ -44,8 +44,14 @@ function hostFromGitRemote(cwd) {
  */
 export async function execGh(args, opts = {}) {
 	const cwd = opts.cwd ?? process.cwd();
-	const host = hostFromGitRemote(cwd);
-	const env = host ? { ...process.env, GH_HOST: host } : process.env;
+	const repository = repositoryFromGitRemote(cwd);
+	const env = repository
+		? {
+				...process.env,
+				GH_HOST: repository.host,
+				GH_REPO: `${repository.host}/${repository.owner}/${repository.repo}`,
+			}
+		: process.env;
 	try {
 		return execFileSync("gh", args, { cwd, encoding: "utf-8", env });
 	} catch (error) {

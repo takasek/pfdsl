@@ -61,6 +61,26 @@ export function parseHost(remoteUrl) {
 }
 
 /**
+ * Resolve the same repository identity for gh, HTTP and location matching.
+ * Only the documented loopback /git/owner/repo transport represents public GitHub.
+ * @param {string} remoteUrl
+ * @returns {{identity: {host: string, owner: string, repo: string}, httpSupported: boolean} | null}
+ */
+export function parseRepositoryIdentity(remoteUrl) {
+	const ownerRepo = parseOwnerRepo(remoteUrl);
+	const host = parseHost(remoteUrl);
+	if (!ownerRepo || !host) return null;
+	const localProxy =
+		/^http:\/\/(?:[^/@]+@)?(?:127\.0\.0\.1|localhost)(?::\d+)?\/git\/[^/]+\/[^/]+\/?$/.test(
+			remoteUrl,
+		);
+	return {
+		identity: { host: localProxy ? "github.com" : host, ...ownerRepo },
+		httpSupported: host.toLowerCase() === "github.com" || localProxy,
+	};
+}
+
+/**
  * @param {{name: string, description?: string|null}[]} apiLabels
  * @returns {{name: string, description: string}[]}
  */

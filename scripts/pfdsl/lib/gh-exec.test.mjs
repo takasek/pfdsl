@@ -47,6 +47,36 @@ describe("execGh", () => {
 	let originalPath;
 	let fakePath;
 
+	for (const [remote, expected] of [
+		["https://github.com/acme/widget.git", "github.com/acme/widget"],
+		["git@github.com:acme/widget.git", "github.com/acme/widget"],
+		[
+			"https://enterprise.example/acme/widget.git",
+			"enterprise.example/acme/widget",
+		],
+		[
+			"http://local_proxy@127.0.0.1:41729/git/acme/widget",
+			"github.com/acme/widget",
+		],
+	]) {
+		it(`pins the repository identity for ${remote}`, async () => {
+			originalPath = process.env.PATH;
+			fakePath = fakePathWithGh('printf %s "$GH_REPO"');
+			const cwd = join(fakePath, "repo");
+			execFileSync("git", ["init", "-q", cwd]);
+			execFileSync("git", ["-C", cwd, "remote", "add", "origin", remote]);
+			const old = process.env.GH_REPO;
+			process.env.GH_REPO = "github.com/other/repository";
+			process.env.PATH = fakePath;
+			try {
+				assert.equal(await execGh(["issue", "list"], { cwd }), expected);
+			} finally {
+				if (old === undefined) delete process.env.GH_REPO;
+				else process.env.GH_REPO = old;
+			}
+		});
+	}
+
 	afterEach(() => {
 		process.env.PATH = originalPath;
 		if (fakePath) rmSync(fakePath, { recursive: true, force: true });

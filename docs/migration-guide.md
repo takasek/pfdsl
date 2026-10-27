@@ -27,6 +27,30 @@ Record the target only after all potentially applicable steps have been resolved
 These changes are not yet assigned to a published CLI/plugin release.
 Apply them only when the target release includes the referenced changes; specification v0.0.29 is not a CLI/plugin version.
 
+### Link work items through process locations
+
+Work-item correspondence is now defined once in the work-cycle contract and uses `process.location`.
+Both backend presets refer to that contract.
+Issue-number prefixes in process IDs no longer establish a link, and unlinked processes remain valid.
+One work item may link to several processes; one process may link to several work items using a location array.
+Source: [Issue #1497](https://github.com/takasek/pfdsl/issues/1497).
+
+Before updating the bundle and its installed audit scripts, inventory the union of links encoded in existing process IDs and locations.
+For example, `i40_i41_do_work` with only issue 40 in its location also needs issue 41 in the new location array if both links remain intentional.
+Preserve each correspondence or record why it is removed.
+GitHub references must identify the issue's host, repository and number; the installed audit checks only the repository selected by `origin`.
+For a file tracker, use an item-specific URL, such as `file:///absolute/path/work-items.md#t1` or an existing document host's item URL.
+An absolute file URL is not automatically portable between checkouts, and the CLI does not validate URL targets or anchors.
+The adopting repository must check that the reference reaches the intended item.
+Do not use `work-items.md#t1` as a relative location: the current CLI treats the entire string as a filename.
+
+After populating locations, update any local readers that infer links from IDs and install the new audit scripts through the normal bundle update procedure.
+Compare every process-to-item correspondence before and after the update, including shared processes and items with several processes.
+Existing IDs remain valid spellings, but no longer carry correspondence metadata.
+If you rename them, use `pfdsl rename` and update references outside the diagram separately.
+Remove local instructions that require adding a prefix on issue creation, and any duplicate placeholder ledger maintained solely for that rule.
+Creating an issue now adds its location without requiring an ID change.
+
 ### Keep a local implementation agent if you need one
 
 The Claude Code plugin no longer bundles `pfd-implementer`; its only bundled agent is `pfd-lens`.

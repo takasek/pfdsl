@@ -97,23 +97,7 @@ function normalizeIssue(i) {
 // --- Parse frontmatter ---
 
 const fm = parseDocument(fmText).toJS();
-const processes = parseIssueProcesses(fm);
 const outputsByProcess = buildProcessOutputs(body);
-
-// Expand each tracked process into one entry per (issueNumber, output artifact) pair.
-const entries = [];
-for (const proc of processes) {
-	const outputs = outputsByProcess.get(proc.id) ?? [];
-	for (const issueNumber of proc.issueNumbers) {
-		for (const artifactId of outputs) {
-			entries.push({
-				processId: proc.id,
-				issueNumber,
-				artifactId,
-			});
-		}
-	}
-}
 
 // --- Check labels ---
 
@@ -130,6 +114,17 @@ try {
 } catch (e) {
 	if (isGitHubUnavailableError(e)) exitGhUnavailable();
 	throw e;
+}
+// Resolve only after the availability check, preserving the unavailable exit.
+const processes = parseIssueProcesses(fm, githubOps.repository());
+const entries = [];
+for (const proc of processes) {
+	const outputs = outputsByProcess.get(proc.id) ?? [];
+	for (const issueNumber of proc.issueNumbers) {
+		for (const artifactId of outputs) {
+			entries.push({ processId: proc.id, issueNumber, artifactId });
+		}
+	}
 }
 const labelFindings = computeLabelFindings(FLOW_LABELS, labels);
 const labelParts = partitionFindings(labelFindings);

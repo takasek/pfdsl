@@ -45,22 +45,54 @@ export function computeLabelFindings(expectedLabels, actualLabels) {
 }
 
 /**
- * Leading, contiguous iN_ components are the issue references of a process ID.
- * @param {string} id
+ * Read GitHub issue links from location, never from a node's identifier.
+ * A repository identity limits an audit to the issues it can actually read.
+ * @param {string | string[] | undefined} location
+ * @param {{host: string, owner: string, repo: string}} [repository]
  * @returns {number[]}
  */
-export function issueNumbersOfProcessId(id) {
-	const prefix = id.match(/^(?:i\d+_)+/)?.[0] ?? "";
-	return [...prefix.matchAll(/i(\d+)_/g)].map((m) => Number(m[1]));
+export function issueNumbersOfLocation(location, repository) {
+	const result = new Set();
+	for (const value of Array.isArray(location) ? location : [location]) {
+		if (typeof value !== "string") continue;
+		let url;
+		try {
+			url = new URL(value);
+		} catch {
+			continue;
+		}
+		const match = url.pathname.match(
+			/^\/([^/]+)\/([^/]+)\/issues\/([1-9]\d*)\/?$/,
+		);
+		if (!match || url.protocol !== "https:" || url.username || url.password)
+			continue;
+		if (
+			url.host.toLowerCase() !==
+			(repository?.host ?? "github.com").toLowerCase()
+		)
+			continue;
+		if (
+			repository &&
+			(match[1].toLowerCase() !== repository.owner.toLowerCase() ||
+				match[2].toLowerCase() !== repository.repo.toLowerCase())
+		)
+			continue;
+		const number = Number(match[3]);
+		if (Number.isSafeInteger(number)) result.add(number);
+	}
+	return [...result];
 }
 
-/** @param {object} frontmatter @returns {{ id: string, issueNumbers: number[] }[]} */
-export function parseIssueProcesses(frontmatter) {
+/** @param {object} frontmatter @param {{host: string, owner: string, repo: string}} [repository] @returns {{ id: string, issueNumbers: number[] }[]} */
+export function parseIssueProcesses(frontmatter, repository) {
 	const process = frontmatter.process;
 	if (!process) return [];
 	const result = [];
 	for (const id of Object.keys(process)) {
-		const issueNumbers = issueNumbersOfProcessId(id);
+		const issueNumbers = issueNumbersOfLocation(
+			process[id]?.location,
+			repository,
+		);
 		if (issueNumbers.length === 0) continue;
 		result.push({ id, issueNumbers });
 	}

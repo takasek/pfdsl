@@ -231,7 +231,7 @@ artifact:
   backend_neutral_work_item_contract:
     label: バックエンドに依存しない作業項目の対応契約
     description: 両バックエンドの reference に重複している作業項目と process の対応の規則を、protocol に1つだけ置く（対象の規則は ADR-0048 契約6）
-    status: todo
+    status: wip
     criteria: >
       両バックエンドの reference に同じ規則の本文が残らず、どちらも protocol に置いた1つの契約を参照する。
       その契約は作業項目と process を location: で対応付け、1つの作業項目に複数の process を対応させてよく、process id の接頭辞で作業項目を表す規約を持たない。
@@ -288,10 +288,10 @@ process:
   publish_cli_ready_counts:
     label: 新規 ready 数を示す CLI と plugin を公開する
     tags: [ release_cli ]
-  i119_publish_extension:
+  publish_extension:
     label: extension自動公開実装
     location: https://github.com/takasek/pfdsl/issues/119
-  i542_migrate_spec_id_refs:
+  migrate_spec_id_refs:
     label: spec.md 仕様ID参照移行
     description: "spec.md の節番号相互参照を仕様ID参照へ段階移行する。クラスタ単位の段階計画（§15 制約 → §2.x 意味論 → 残り）は #542 が一次情報"
     location: https://github.com/takasek/pfdsl/issues/542
@@ -310,50 +310,44 @@ process:
   publish_cli_edge_kind_conflict:
     label: CLI input / feedback 併記診断公開
     tags: [ release_cli ]
-  i1262_i1445_accept_mac_candidate:
+  accept_mac_candidate:
     label: Mac の受入済み候補を作る
     description: "候補準備と実機受入を同じ工程内で順に行い、配布物とその合格証拠を揃える。準備に合格を要求せず、内部の進捗・担当は Issue で管理する"
-    location: https://github.com/takasek/pfdsl/issues/1445
-  i1445_accept_gui_vscode:
+    location: [ https://github.com/takasek/pfdsl/issues/1262, https://github.com/takasek/pfdsl/issues/1445 ]
+  accept_gui_vscode:
     label: VS Code 統合版の公開範囲を実機受入する
     location: https://github.com/takasek/pfdsl/issues/1445
-  i1262_publish_standalone:
+  publish_standalone:
     label: 配布物の全体受入を完了して公開する
     location: https://github.com/takasek/pfdsl/issues/1262
     tags: [ release_standalone ]
   reduce_work_cycle_protocol:
     label: work-cycle を protocol に絞る
-    description: 未起票のプレースホルダ。起票時に process id へ iN_ を付ける
   narrow_retro_to_model:
     label: pfd-retro を model retro に絞る
-    description: 未起票のプレースホルダ。起票時に process id へ iN_ を付ける
   add_prune_cli:
     label: 完了チェーン回収を CLI 動詞にする
-    description: 未起票のプレースホルダ。起票時に process id へ iN_ を付ける
   move_writer_rules_out_of_github_preset:
     label: GitHub Issues プリセットから書込み規律と PR 運用を外す
-    description: 未起票のプレースホルダ。起票時に process id へ iN_ を付ける
-  i1497_unify_work_item_contract:
+  unify_work_item_contract:
     label: 作業項目の対応契約を1つにする
     location: https://github.com/takasek/pfdsl/issues/1497
   design_adapter_plugin_split:
     label: core と GitHub アダプタの plugin 分割を設計する
-    description: 未起票のプレースホルダ。起票時に process id へ iN_ を付ける
   apply_github_adapter_design:
     label: 設計に従って GitHub アダプタを採用したリポでだけ働かせる
-    description: 未起票のプレースホルダ。起票時に process id へ iN_ を付ける。分割するか宣言で絞るかは入力の設計仕様に従う
-  i1519_prepare_wiki_roadmap_integration:
+    description: 分割するか宣言で絞るかは入力の設計仕様に従う
+  prepare_wiki_roadmap_integration:
     label: Wiki 連携と正本切替の準備を整える
     location: https://github.com/takasek/pfdsl/issues/1519
-  i1519_switch_wiki_roadmap_source:
+  switch_wiki_roadmap_source:
     label: 検証済みの採用版で正本を Wiki へ切り替える
     location: https://github.com/takasek/pfdsl/issues/1519
   implement_artifact_reference:
     label: 確定仕様に従って参照先解決を実装する
-    description: 未起票のプレースホルダ。起票時に process id へ iN_ を付ける
   prepare_artifact_reference_adoption_version:
     label: 参照先解決を含む Wiki 採用版を準備して検証する
-    description: 未起票のプレースホルダ。起票時に process id へ iN_ を付ける。配布形態の確定時に必要な既存公開工程へ接続する
+    description: 配布形態の確定時に必要な既存公開工程へ接続する
 
 tag:
   release_cli:
@@ -372,11 +366,11 @@ statusStyles:
   suspended: { fillcolor: "#e2e3e5", style: filled }
 ---
 
-toolchain >> i119_publish_extension -> published_extension
+toolchain >> publish_extension -> published_extension
 
 [boundary_transition_release_policy, ready_counts_cli] >> publish_cli_ready_counts -> cli_release_ready_counts
 
-[get_by_id_tool, mint_check_tool, spec_id_syntax, spec_v0011] >> i542_migrate_spec_id_refs -> spec_id_refs
+[get_by_id_tool, mint_check_tool, spec_id_syntax, spec_v0011] >> migrate_spec_id_refs -> spec_id_refs
 
 [def_insertion, editor_connector, gui_vscode_acceptance, preview_connector] >> publish_ext_editing -> ext_editing_release
 
@@ -386,12 +380,12 @@ toolchain >> i119_publish_extension -> published_extension
 
 [boundary_transition_release_policy, group_node_clash_diagnostic] >> publish_cli_group_node_clash -> cli_release_group_node_clash
 
+[preview_editing_usability, standalone_pfd_features] >> accept_mac_candidate -> gui_mac_acceptance
 [boundary_transition_release_policy, edge_kind_conflict_diagnostic] >> publish_cli_edge_kind_conflict -> cli_release_edge_kind_conflict
-[preview_editing_usability, standalone_pfd_features] >> i1262_i1445_accept_mac_candidate -> gui_mac_acceptance
 
-gui_vscode_candidate >> i1445_accept_gui_vscode -> gui_vscode_acceptance
+gui_vscode_candidate >> accept_gui_vscode -> gui_vscode_acceptance
 
-gui_mac_acceptance >> i1262_publish_standalone -> standalone_release
+gui_mac_acceptance >> publish_standalone -> standalone_release
 
 [boundary_test_revision_adr, evidence_roundtrip_record, local_pr_status_timing, responsibility_boundary_adr, root_loaded_work_rules] >> reduce_work_cycle_protocol -> executor_neutral_work_cycle
 
@@ -399,7 +393,7 @@ gui_mac_acceptance >> i1262_publish_standalone -> standalone_release
 
 [responsibility_boundary_adr, root_loaded_work_rules] >> move_writer_rules_out_of_github_preset -> writer_free_github_preset
 
-[executor_neutral_work_cycle, writer_free_github_preset] >> i1497_unify_work_item_contract -> backend_neutral_work_item_contract
+[executor_neutral_work_cycle, writer_free_github_preset] >> unify_work_item_contract -> backend_neutral_work_item_contract
 
 responsibility_boundary_adr >> add_prune_cli -> prune_cli
 
@@ -411,6 +405,6 @@ adapter_plugin_split_design >> apply_github_adapter_design -> optional_github_ad
 
 artifact_reference_implementation >> prepare_artifact_reference_adoption_version -> artifact_reference_adoption_version
 
-[responsibility_boundary_adr, toolchain] >> i1519_prepare_wiki_roadmap_integration -> wiki_roadmap_ready_for_cutover
+[responsibility_boundary_adr, toolchain] >> prepare_wiki_roadmap_integration -> wiki_roadmap_ready_for_cutover
 
-[artifact_reference_adoption_version, wiki_roadmap_ready_for_cutover] >> i1519_switch_wiki_roadmap_source -> wiki_roadmap_integration
+[artifact_reference_adoption_version, wiki_roadmap_ready_for_cutover] >> switch_wiki_roadmap_source -> wiki_roadmap_integration

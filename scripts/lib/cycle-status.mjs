@@ -3,7 +3,8 @@
  * git/gh I/O lives in the main script; this module stays testable.
  */
 
-import { issueNumbersOfProcessId } from "../pfdsl/lib/issues-flow-audit.mjs";
+import { parseIssueProcesses } from "../pfdsl/lib/issues-flow-audit.mjs";
+import { parseDocument } from "../pfdsl/lib/yaml-require.mjs";
 
 /**
  * @param {unknown} readyJson - output of `pfdsl status ready --json`
@@ -17,44 +18,37 @@ export function parseReadyOutput(readyJson) {
 }
 
 /**
- * roadmap.pfdsl の `process:` セクション全体を切り出す（次の非インデントキーの行まで、
- * それが無ければ文字列末尾まで）。process ブロックの列挙は、この部分文字列に対してのみ行う
- * ことで artifact: セクション側の location を誤って拾わないようにする。
- * @param {string} pfdslText
- * @returns {string}
- */
-function extractProcessSection(pfdslText) {
-	const withBoundary = pfdslText.match(/^process:\n([\s\S]*?)(?=^\S)/m);
-	if (withBoundary) return withBoundary[1];
-	const toEnd = pfdslText.match(/^process:\n([\s\S]*)$/m);
-	return toEnd ? toEnd[1] : "";
-}
-
-/**
- * issue 番号を iN_ prefix または `location:` に持つ全 process の ID を返す。
+ * Return every process linked to the issue by its location metadata.
  * @param {string} pfdslText - .pfdsl/roadmap.pfdsl の全文
  * @param {number} issueNumber
+ * @param {{host: string, owner: string, repo: string}} [repository]
  * @returns {string[]}
  */
-export function findProcessIdsForIssueNumber(pfdslText, issueNumber) {
-	// 番兵行を足し、最後のエントリも他のエントリと同じ境界規則
-	// (`^  \S` か `^\S` の手前まで) で終端できるようにする。
-	const scanText = `${extractProcessSection(pfdslText)}\n\x00`;
-	const entryPattern = /^ {2}(\S+):\n([\s\S]*?)(?=^ {2}\S|^\S)/gm;
-	const matches = new Set();
-	for (const [, processId, block] of scanText.matchAll(entryPattern)) {
-		if (issueNumbersOfProcessId(processId).includes(issueNumber)) {
-			matches.add(processId);
-		}
-		const match = block.match(/location:\s*\S*\/issues\/(\d+)/);
-		if (match && Number(match[1]) === issueNumber) matches.add(processId);
-	}
-	return [...matches];
+export function findProcessIdsForIssueNumber(
+	pfdslText,
+	issueNumber,
+	repository,
+) {
+	const frontmatter =
+		pfdslText.match(/^---\r?\n([\s\S]*?)^---\s*$/m)?.[1] ?? pfdslText;
+	const document = parseDocument(frontmatter);
+	if (document.errors.length > 0) throw document.errors[0];
+	return parseIssueProcesses(document.toJS() ?? {}, repository)
+		.filter((process) => process.issueNumbers.includes(issueNumber))
+		.map((process) => process.id);
 }
 
 /** Return a unique match, rejecting ambiguous issue ownership. */
-export function findProcessIdForIssueNumber(pfdslText, issueNumber) {
-	const matches = findProcessIdsForIssueNumber(pfdslText, issueNumber);
+export function findProcessIdForIssueNumber(
+	pfdslText,
+	issueNumber,
+	repository,
+) {
+	const matches = findProcessIdsForIssueNumber(
+		pfdslText,
+		issueNumber,
+		repository,
+	);
 	if (matches.length > 1) {
 		throw new Error(
 			`Issue ${issueNumber} matches multiple processes: ${matches.join(", ")}`,

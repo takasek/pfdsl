@@ -268,7 +268,7 @@ artifact:
       GitHub Issues 版の採用リポが実際に配置するファイル群は pipeline.pfdsl の ops_install_templates 側で、ファイルベース・トラッカー版は実配置を要しない
     criteria: >-
       ../scripts/harness-template/skills/pfd-ops/references/github-issues-backend.md に、採用リポが GitHub Issues バックエンドを採用するのに必要な規約（ラベル判定・status 更新と完了チェーン回収・PR 本文規約）が記述されている。
-      ../scripts/harness-template/skills/pfd-ops/references/file-based-tracker-backend.md に、採用リポがリポ内ファイルで作業項目を管理するのに必要な規約（一次情報ファイル・id 規約・flow 分類・status 同期・完了規則と完了契約）が記述され、GitHub Issues 版の install テンプレートを要求しない
+      ../scripts/harness-template/skills/pfd-ops/references/file-based-tracker-backend.md に、採用リポがリポ内ファイルで作業項目を管理するのに必要な規約（一次情報ファイル・作業項目の参照形式・flow 分類・status 同期・完了規則と完了契約）が記述され、対応の共通契約は work-cycle.md を参照し、GitHub Issues 版の install テンプレートを要求しない
     location: [ "scripts/harness-template/skills/pfd-ops/references/github-issues-backend.md", "scripts/harness-template/skills/pfd-ops/references/file-based-tracker-backend.md" ]
     group: generation
     tags: [ distilled_skill ]

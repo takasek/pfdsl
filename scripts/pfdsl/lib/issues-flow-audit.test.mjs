@@ -54,12 +54,58 @@ describe("closed issue audit removal", () => {
 // ---------------------------------------------------------------------------
 
 describe("parseIssueProcesses", () => {
+	it("uses only location links, including arrays and repeated issue ownership", () => {
+		const fm = {
+			process: {
+				i99_legacy: { location: "https://github.com/example/project/issues/4" },
+				shared: {
+					location: [
+						"https://github.com/example/project/issues/4",
+						"https://github.com/example/project/issues/11",
+						"https://github.com/example/project/issues/4",
+					],
+				},
+				i12_unlinked: {},
+				local: { location: "work-items.md#t1" },
+			},
+		};
+		assert.deepEqual(parseIssueProcesses(fm), [
+			{ id: "i99_legacy", issueNumbers: [4] },
+			{ id: "shared", issueNumbers: [4, 11] },
+		]);
+	});
+
+	it("matches the selected repository and rejects lookalike issue links", () => {
+		const fm = {
+			process: {
+				work: {
+					location: [
+						"https://github.com/example/project/issues/42#issuecomment-1",
+						"https://github.com/other/project/issues/43",
+						"https://elsewhere.test/example/project/issues/44",
+						"https://github.com/example/project/pull/45",
+						"https://github.com/example/project/issues/46extra",
+						"https://github.com/example/project/issues/47/extra",
+					],
+				},
+			},
+		};
+		assert.deepEqual(
+			parseIssueProcesses(fm, {
+				host: "github.com",
+				owner: "example",
+				repo: "project",
+			}),
+			[{ id: "work", issueNumbers: [42] }],
+		);
+	});
+
 	it("returns empty array when no process key", () => {
 		const result = parseIssueProcesses({});
 		assert.deepEqual(result, []);
 	});
 
-	it("ignores non-iN_ processes", () => {
+	it("ignores processes without issue locations", () => {
 		const fm = {
 			process: {
 				build_cli: { label: "CLI" },
@@ -70,11 +116,19 @@ describe("parseIssueProcesses", () => {
 		assert.deepEqual(result, []);
 	});
 
-	it("parses iN_ processes and extracts issueNumbers", () => {
+	it("extracts issue numbers from scalar locations", () => {
 		const fm = {
 			process: {
-				i4_build_lint_checker: { label: "Lint", tags: ["priority:high"] },
-				i11_port_skill: { label: "Skill", tags: ["priority:high"] },
+				i4_build_lint_checker: {
+					label: "Lint",
+					tags: ["priority:high"],
+					location: "https://github.com/example/project/issues/4",
+				},
+				i11_port_skill: {
+					label: "Skill",
+					tags: ["priority:high"],
+					location: "https://github.com/example/project/issues/11",
+				},
 			},
 		};
 		const result = parseIssueProcesses(fm);
@@ -86,7 +140,12 @@ describe("parseIssueProcesses", () => {
 
 	it("ignores legacy timestamp snapshots when parsing registration", () => {
 		const absent = parseIssueProcesses({
-			process: { i5_draft_hierarchy_spec: { label: "H" } },
+			process: {
+				i5_draft_hierarchy_spec: {
+					label: "H",
+					location: "https://github.com/example/project/issues/5",
+				},
+			},
 		});
 
 		const present = parseIssueProcesses({
@@ -94,6 +153,7 @@ describe("parseIssueProcesses", () => {
 				i5_draft_hierarchy_spec: {
 					label: "H",
 					updated_at: "2026-06-01T00:00:00Z",
+					location: "https://github.com/example/project/issues/5",
 				},
 			},
 		});
@@ -106,6 +166,7 @@ describe("parseIssueProcesses", () => {
 				i5_draft_hierarchy_spec: {
 					label: "H",
 					tags: ["foo", "priority:high", "priority:low", "bar"],
+					location: "https://github.com/example/project/issues/5",
 				},
 			},
 		};
@@ -115,11 +176,15 @@ describe("parseIssueProcesses", () => {
 		]);
 	});
 
-	it("mixes iN_ and non-iN_ processes correctly", () => {
+	it("selects linked processes among unlinked processes", () => {
 		const fm = {
 			process: {
 				build_cli: { label: "CLI" },
-				i18_sync_issues: { label: "Sync", tags: ["priority:high"] },
+				i18_sync_issues: {
+					label: "Sync",
+					tags: ["priority:high"],
+					location: "https://github.com/example/project/issues/18",
+				},
 				write_docs: { label: "Docs" },
 			},
 		};
@@ -128,10 +193,16 @@ describe("parseIssueProcesses", () => {
 		assert.deepEqual(result[0].issueNumbers, [18]);
 	});
 
-	it("parses concatenated iN_ prefixes when one process is tracked by multiple issues", () => {
+	it("reads multiple issues from location arrays", () => {
 		const fm = {
 			process: {
-				i40_i41_do_work: { label: "Do work" },
+				i40_i41_do_work: {
+					label: "Do work",
+					location: [
+						"https://github.com/example/project/issues/40",
+						"https://github.com/example/project/issues/41",
+					],
+				},
 			},
 		};
 		const result = parseIssueProcesses(fm);

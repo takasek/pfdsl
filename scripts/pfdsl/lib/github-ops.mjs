@@ -23,8 +23,7 @@ import {
 	fetchOpenPrs,
 	fetchPullRequestView,
 	mapLabelsResponse,
-	parseHost,
-	parseOwnerRepo,
+	parseRepositoryIdentity,
 	requireGitHubViewFields,
 	addIssueLabel as restAddIssueLabel,
 } from "./github-rest.mjs";
@@ -113,22 +112,12 @@ function repositoryFromGitRemote(cwd) {
 			{ cause: e },
 		);
 	}
-	const ownerRepo = parseOwnerRepo(remoteUrl);
-	const host = parseHost(remoteUrl);
-	if (!ownerRepo || !host)
+	const repository = parseRepositoryIdentity(remoteUrl);
+	if (!repository)
 		throw new Error(
 			`could not determine host/owner/repo from git remote: ${remoteUrl}`,
 		);
-	// Only the documented loopback /git/owner/repo transport stands for
-	// public GitHub. A different proxy's upstream cannot be inferred.
-	const localProxy =
-		/^http:\/\/(?:[^/@]+@)?(?:127\.0\.0\.1|localhost)(?::\d+)?\/git\/[^/]+\/[^/]+\/?$/.test(
-			remoteUrl,
-		);
-	return {
-		identity: { host, ...ownerRepo },
-		httpSupported: host.toLowerCase() === "github.com" || localProxy,
-	};
+	return repository;
 }
 
 /**
