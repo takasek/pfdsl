@@ -393,7 +393,7 @@ gui_mac_acceptance >> publish_standalone -> standalone_release
 
 [responsibility_boundary_adr, root_loaded_work_rules] >> move_writer_rules_out_of_github_preset -> writer_free_github_preset
 
-[executor_neutral_work_cycle, writer_free_github_preset] >> unify_work_item_contract -> backend_neutral_work_item_contract
+responsibility_boundary_adr >> unify_work_item_contract -> backend_neutral_work_item_contract
 
 responsibility_boundary_adr >> add_prune_cli -> prune_cli
 

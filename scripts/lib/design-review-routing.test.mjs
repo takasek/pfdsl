@@ -30,6 +30,11 @@ function preflight({
 		existsSync: () => true,
 		readFileSync: () => roadmap,
 		githubOps: {
+			repository: () => ({
+				host: "github.com",
+				owner: "takasek",
+				repo: "pfdsl",
+			}),
 			listOpenPrs: async () => [],
 			viewIssue: async ({ number, fields }) => {
 				reads.push({ number, fields });
