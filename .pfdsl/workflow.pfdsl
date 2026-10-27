@@ -476,7 +476,7 @@ process:
     group: decision
   run_retro:
     label: ふりかえり実行
-    description: "凍結された retro_plan と retro_subject_snapshot に前世代の retro_skill を適用し、run identifier と人間判断用 evidence を持つ retro_findings を作る"
+    description: "凍結された retro_plan と retro_subject_snapshot に前世代の retro_skill と、採用宣言に対応する knowledge_audit_skill・ローカル監査規律をそれぞれ適用し、run identifier と人間判断用 evidence を持つ retro_findings を作る"
     group: decision
   draft_adrs:
     label: ADR 起草
@@ -646,6 +646,7 @@ distributed_advisory_hooks >>? maintain_distributed_prompt_assets
 ecosystem_skill >>? maintain_distributed_prompt_assets
 grill_skill >>? maintain_distributed_prompt_assets
 implementer_agent >>? maintain_distributed_prompt_assets
+knowledge_audit_skill >>? maintain_distributed_prompt_assets
 ops_skill_general >>? maintain_distributed_prompt_assets
 ops_skill_l3 >>? maintain_distributed_prompt_assets
 pfd_lens_agent >>? maintain_distributed_prompt_assets
@@ -653,6 +654,7 @@ retro_skill >>? maintain_distributed_prompt_assets
 review_perspectives >>? maintain_distributed_prompt_assets
 
 adopter_config >>? maintain_repo_bindings
+bindings_knowledge_audit >>? maintain_repo_bindings
 bindings_pfd_ops >>? maintain_repo_bindings
 bindings_pfd_retro >>? maintain_repo_bindings
 workflow_md >>? maintain_repo_bindings
@@ -687,6 +689,7 @@ bindings_pfd_retro >>? plan_retro
 [retro_plan, retro_subject_snapshot] >> run_retro -> retro_findings
 
 bindings_knowledge_audit >>? run_retro
+bindings_pfd_retro >>? run_retro
 knowledge_audit_skill >>? run_retro
 retro_skill >>? run_retro
 

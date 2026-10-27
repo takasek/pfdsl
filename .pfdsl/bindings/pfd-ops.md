@@ -93,13 +93,13 @@ JSON のパスは実行時の cwd を基準とし、対象とテストファイ�
 
 ```json
 {
-  "target": "scripts/harness-template/skills/pfd-ops/references/file-based-tracker-backend.md",
-  "from": "binding が定める現行の書式を使い",
-  "to": "常に Format 3 を使い",
-  "tests": ["scripts/lib/pfd-ops-applicability.test.mjs"],
+  "target": "scripts/report-executor-vocabulary.mjs",
+  "from": "\"scripts/harness-template/skills/pfd-ops/references/work-cycle.md\"",
+  "to": "\"missing-protocol.md\"",
+  "tests": ["scripts/report-executor-vocabulary.test.mjs"],
   "expected": {
-    "file": "scripts/lib/pfd-ops-applicability.test.mjs",
-    "name": ["pfd-ops applicability contract", "keeps placement and readback distributed while record policy belongs to the binding"]
+    "file": "scripts/report-executor-vocabulary.test.mjs",
+    "name": ["fails check mode on the historical protocol and passes the cleaned canonical protocol"]
   },
   "timeoutMs": 30000
 }

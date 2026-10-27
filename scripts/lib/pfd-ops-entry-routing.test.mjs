@@ -81,7 +81,7 @@ describe("pfd-ops entry routing", () => {
 		for (const route of [
 			["作業項目への着手", "references/work-cycle.md"],
 			["終端ゲート", "references/work-cycle.md"],
-			["知見の振り分け", "references/work-cycle.md"],
+			["モデルに関する知見の振り分け", "references/work-cycle.md"],
 			["GitHub Issues の操作", "references/github-issues-backend.md"],
 		]) {
 			assert.match(
