@@ -97,7 +97,7 @@ describe("cycle-status artifact selection using the actual graph reader", () => 
 		const result = await runCycleStatus(
 			deps([42], undefined, "process:\n  work: ["),
 		);
-		assert.match(result.gateCheckCommandError, /failed to read/);
+		assert.match(result.gateCheckCommandError, /failed to parse/);
 		assert.equal(result.gateCheckCommand, null);
 		assert.equal(result.wipUpdateCommand, undefined);
 	});
