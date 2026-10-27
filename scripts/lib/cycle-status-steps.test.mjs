@@ -578,7 +578,28 @@ describe("runCycleStatus", () => {
 		);
 	});
 
-	it("identifies origin resolution failures separately from roadmap read failures", async () => {
+	it("reports foreign issue locations without treating the same number as local", async () => {
+		const result = await runCycleStatus(
+			baseDeps({
+				issueNumbers: [42, 43],
+				execGh: async (args) =>
+					JSON.stringify(
+						args[0] === "issue" ? { labels: [{ name: "flow:managed" }] } : [],
+					),
+				readFileSync: () =>
+					roadmapWithIssue("proc_a", 42).replace(
+						"github.com/takasek/pfdsl",
+						"github.com/other/project",
+					),
+			}),
+		);
+		assert.equal(result.gateCheckCommand, null);
+		assert.equal(result.locationDiagnostics.length, 1);
+		assert.equal(result.locationDiagnostics[0].processId, "proc_a");
+		assert.match(result.locationDiagnostics[0].detail, /other\/project/);
+	});
+
+	it("identifies repository resolution failures separately from roadmap read failures", async () => {
 		const deps = baseDeps({
 			issueNumbers: [42],
 			readFileSync: () => roadmapWithIssue("proc_a", 42),
@@ -590,7 +611,7 @@ describe("runCycleStatus", () => {
 		assert.equal(result.gateCheckCommand, null);
 		assert.equal(
 			result.gateCheckCommandError,
-			"failed to resolve origin repository: origin is unavailable",
+			"failed to resolve issue repository: origin is unavailable",
 		);
 	});
 

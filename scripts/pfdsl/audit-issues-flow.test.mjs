@@ -28,7 +28,7 @@ const scriptPath = resolve(__dirname, "audit-issues-flow.mjs");
 function writeRemoteStub(bin) {
 	writeFileSync(
 		join(bin, "git"),
-		`#!${process.execPath}\nif (process.argv.slice(2).join(" ") !== "remote get-url origin") process.exit(64);\nconsole.log("https://github.com/example/project.git");\n`,
+		`#!${process.execPath}\nif (process.argv[2] === "config") process.exit(1);\nif (process.argv.slice(2).join(" ") !== "remote get-url origin") process.exit(64);\nconsole.log("https://github.com/example/project.git");\n`,
 		{ mode: 0o755 },
 	);
 }
@@ -122,7 +122,7 @@ process.stdout.write(JSON.stringify(result));
 		assert.notEqual(result.status, GH_UNAVAILABLE_EXIT_CODE, result.stdout);
 		assert.notEqual(result.status, 0);
 		assert.doesNotMatch(result.stdout, /gh unavailable/);
-		assert.match(result.stderr, /could not read the git remote/);
+		assert.match(result.stderr, /could not read repository selection/);
 	});
 });
 
@@ -207,6 +207,11 @@ esac
 		const result = audit(matching, ["flow:managed"], ["--enforce-issue", "5"]);
 		assert.equal(result.status, 1, result.stdout + result.stderr);
 		assert.match(result.stdout, /#5 missing_process/);
+		assert.match(result.stdout, /foreign_issue_location \[i5_do_it\]/);
+		assert.match(
+			result.stdout,
+			/selected repository is github.com\/example\/project/,
+		);
 	});
 
 	it("passes when only a description differs and the issues are in sync", () => {

@@ -32,7 +32,7 @@ e310ce901188679cd4bfa6663786b761cd7f8907607689939d8a3f1dbd5ded6d  skills/pfd-ops
 
 48944ee889550d5471e56fe2e553ce57c813849475e6a5a3b841581609e4ae2d  skills/pfd-ops/install/.github/workflows/pfdsl-sweep-completed-chains.yml
 
-2b7c3d40c13b0e3cba6219bc58f4e2208b51d23d72bfd59bada808d591bf40fc  skills/pfd-ops/install/scripts/pfdsl/audit-issues-flow.mjs
+24589ec5b7a96323be8bc8866a33e6746845cefff8defe0e59a9c1e130c249a1  skills/pfd-ops/install/scripts/pfdsl/audit-issues-flow.mjs
 
 e5e4a9e59d4a0b82d50ab9219f7b16c71cefa4f938e2feb9a62795aa7a3a4833  skills/pfd-ops/install/scripts/pfdsl/lib/chain-sweep.mjs
 
@@ -40,19 +40,21 @@ c3f2fa839ba9590b4c6ebc97746546e5b626a09435d64d012c85a65622d9c1e5  skills/pfd-ops
 
 438591dd6eb8b35ada1c6abacfc010427608443c0f85ffe833e4d9999b054bd4  skills/pfd-ops/install/scripts/pfdsl/lib/gh-compat.mjs
 
-2978407caca68ecaa7378c067f318a04618fbeea4e052a8a102f5b7468afb40d  skills/pfd-ops/install/scripts/pfdsl/lib/gh-exec.mjs
+bde299aa91c76ab9f4a866cdaea95ff36523549ac97244cb78bc62d0c86a8276  skills/pfd-ops/install/scripts/pfdsl/lib/gh-exec.mjs
 
-cb035cdad3401259f392ced555a58e84b403c93967502bc50a9a4576ae9a6f82  skills/pfd-ops/install/scripts/pfdsl/lib/github-ops.mjs
+99898308ebd0cd55a0833468a35f158bd257eb130ffe87a4fe5b0e86c0fdf85a  skills/pfd-ops/install/scripts/pfdsl/lib/github-ops.mjs
 
-0095255b3032977a92cfe422a15df2936f7665d0efbcccd458e8845bb99ad703  skills/pfd-ops/install/scripts/pfdsl/lib/github-rest.mjs
+64b8d8f3dbd855219ca4a2968156692c9153b026dce7cab5192daf2d9127d7c3  skills/pfd-ops/install/scripts/pfdsl/lib/github-rest.mjs
 
-d7fa0106c0b98c429887f3fb75f7f41e5dd98305f1f0d256c5085e1d47a7eed0  skills/pfd-ops/install/scripts/pfdsl/lib/issues-flow-audit.mjs
+f4cec2445f10cde6e900c6f46dd192048d5a794b8f36e7aeeca5f925a17bfa33  skills/pfd-ops/install/scripts/pfdsl/lib/issues-flow-audit.mjs
 
 0c315f0afc41f21ee0b4914131159b85064b3a39ea633c5b695498c6c41c427e  skills/pfd-ops/install/scripts/pfdsl/lib/proxy-fetch-worker.mjs
 
 5b9d0c069cab90e327286542f7d53ddf9672e5b66c126e65d3cc21882ded82b2  skills/pfd-ops/install/scripts/pfdsl/lib/proxy-fetch.mjs
 
 220d32176e8b5d8942cfb576b22d7942bc6b2b1825e69e919840cd9f54753e87  skills/pfd-ops/install/scripts/pfdsl/lib/ready-compare.mjs
+
+2ce3f222d19254ae7ea293b257a47bbe32732526290c53bc66cb0e5cfe834cc8  skills/pfd-ops/install/scripts/pfdsl/lib/repository-identity.mjs
 
 a8e4d35e456f05babab77d002a20f7230b7942aaf7bb82138bf2007b5926c4f7  skills/pfd-ops/install/scripts/pfdsl/lib/scratch-path.mjs
 
@@ -64,7 +66,7 @@ d6636ad19abcd0019d685f0cbc26db35fb779ea1afa9568d070fb94bb68eb7f2  skills/pfd-ops
 
 08971ced604f5f23661407b50166c71adab67b6f486ee3577843a04fb2b3e427  skills/pfd-ops/references/file-based-tracker-backend.md
 
-f87d5a5ee9a8fd78666acd6c8c36601c8c31edfe21801c18535ed33d89449d24  skills/pfd-ops/references/github-issues-backend.md
+c6f208be09768ed1fef0a3dcfbd82c17aa79addd8c453a2d007c4691d8d72099  skills/pfd-ops/references/github-issues-backend.md
 
 228d188162d8c94214b0cef02400f68da2aa0f213e6ed319a0dd79ea74c9d095  skills/pfd-ops/references/scaffold/bindings/pfd-knowledge-audit.md
 

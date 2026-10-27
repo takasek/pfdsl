@@ -116,7 +116,17 @@ try {
 	throw e;
 }
 // Resolve only after the availability check, preserving the unavailable exit.
-const processes = parseIssueProcesses(fm, githubOps.repository());
+const locationDiagnostics = [];
+const processes = parseIssueProcesses(
+	fm,
+	githubOps.repository(),
+	locationDiagnostics,
+);
+if (locationDiagnostics.length > 0) {
+	console.log("location advisory (does not fail this audit):");
+	for (const finding of locationDiagnostics)
+		console.log(`  ${finding.type} [${finding.processId}] ${finding.detail}`);
+}
 const entries = [];
 for (const proc of processes) {
 	const outputs = outputsByProcess.get(proc.id) ?? [];
@@ -179,7 +189,11 @@ function printFindings(findings) {
 
 const { blocking } = printFindings(findings);
 if (blocking.length === 0 && labelParts.blocking.length === 0) {
-	console.log("roadmap.pfdsl is in sync");
+	console.log(
+		locationDiagnostics.length > 0
+			? "roadmap.pfdsl is in sync for the selected repository; other repository links were not checked"
+			: "roadmap.pfdsl is in sync",
+	);
 	process.exit(0);
 }
 process.exit(1);
