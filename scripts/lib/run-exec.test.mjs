@@ -20,13 +20,16 @@ const root = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 
 describe("run-exec", () => {
 	it("bounds an optional probe without changing other runners", () => {
+		// The fallback fails explicitly if timeout forwarding breaks; it must
+		// not race the timeout with a short, successful natural exit.
 		const result = tryRun(
 			process.execPath,
-			["-e", "setTimeout(() => {}, 150)"],
-			{ cwd: root, timeout: 50, captureStderr: true },
+			["-e", "setTimeout(() => process.exit(73), 10_000)"],
+			{ cwd: root, timeout: 250, captureStderr: true },
 		);
 		assert.equal(result.ok, false);
 		assert.equal(result.status, null);
+		assert.match(result.out, /ETIMEDOUT/);
 	});
 	it("does not treat empty Git target variables as target overrides", () => {
 		assert.equal(

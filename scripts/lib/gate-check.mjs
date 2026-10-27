@@ -524,7 +524,7 @@ export function diffReadySets(beforeIds, afterIds) {
 
 export const MANUAL_GUIDANCE_LINES = [
 	"MANUAL: Before creating the PR, review `3. 反映 — 終端ゲート` in `.claude/skills/pfd-ops/references/work-cycle.md`.",
-	"MANUAL: After creating the PR, review the `PR 作成後` items in the same section.",
+	"MANUAL: After creating the PR, review the `PR 作成後` items under `PR 作成前後の完了確認` in `.pfdsl/bindings/pfd-ops.md` (`PR と統合`).",
 ];
 
 /**

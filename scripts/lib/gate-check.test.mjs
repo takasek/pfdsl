@@ -728,8 +728,30 @@ describe("manual gate guidance", () => {
 	it("points readers to the canonical pre-PR and post-PR checklist sections", () => {
 		assert.deepEqual(gateCheck.MANUAL_GUIDANCE_LINES, [
 			"MANUAL: Before creating the PR, review `3. 反映 — 終端ゲート` in `.claude/skills/pfd-ops/references/work-cycle.md`.",
-			"MANUAL: After creating the PR, review the `PR 作成後` items in the same section.",
+			"MANUAL: After creating the PR, review the `PR 作成後` items under `PR 作成前後の完了確認` in `.pfdsl/bindings/pfd-ops.md` (`PR と統合`).",
 		]);
+	});
+
+	it("resolves the post-PR guidance to a real checklist in its canonical document", () => {
+		const guidance = gateCheck.MANUAL_GUIDANCE_LINES[1];
+		const reference = guidance.match(
+			/under `([^`]+)` in `([^`]+)` \(`([^`]+)`\)/,
+		);
+		assert.ok(
+			reference,
+			"post-PR guidance must name its document and headings",
+		);
+		const [, heading, path, parent] = reference;
+		const source = readFileSync(resolve(root, path), "utf8");
+		const parentSection = source
+			.split(`### ${parent}\n`)[1]
+			?.split(/\n#{1,3} /)[0];
+		assert.ok(parentSection, `missing parent heading: ${parent}`);
+		const checklist = parentSection
+			.split(`#### ${heading}\n`)[1]
+			?.split(/\n#{1,4} /)[0];
+		assert.ok(checklist, `missing checklist heading: ${heading}`);
+		assert.match(checklist, /^- \[ \] \*\*PR 作成後\*\*:/m);
 	});
 
 	it("does not export the retired prose parser or classifiers", () => {
