@@ -33,13 +33,16 @@ const readyJsonOk = (id) =>
 const roadmapWithIssue = (processId, issueNumber) =>
 	roadmapWithIssues([[processId, issueNumber]]);
 
-const roadmapWithIssues = (entries) =>
-	`process:\n${entries
-		.map(
-			([processId, issueNumber]) =>
-				`  ${processId}:\n    label: x\n    location: https://github.com/takasek/pfdsl/issues/${issueNumber}\n`,
-		)
-		.join("")}artifact:\n`;
+const roadmapWithIssues = (entries) => {
+	const processes = new Map();
+	for (const [processId, issueNumber] of entries) {
+		if (!processes.has(processId)) processes.set(processId, []);
+		processes
+			.get(processId)
+			.push(`https://github.com/takasek/pfdsl/issues/${issueNumber}`);
+	}
+	return `process:\n${[...processes].map(([id, locations]) => `  ${id}:\n    label: x\n    location: ${JSON.stringify(locations)}\n`).join("")}artifact:\n`;
+};
 
 // `graph neighbors --json` tags each neighbor with its edge class since #828.
 const neighborsJsonOk = (successors) =>
@@ -569,6 +572,61 @@ describe("runCycleStatus", () => {
 		);
 		assert.equal(result.gateCheckCommand, null);
 		assert.match(result.gateCheckCommandError, /roadmap unreadable/);
+		assert.match(
+			result.gateCheckCommandError,
+			/^failed to read \.pfdsl\/roadmap\.pfdsl:/,
+		);
+	});
+
+	it("reports foreign issue locations without treating the same number as local", async () => {
+		const result = await runCycleStatus(
+			baseDeps({
+				issueNumbers: [42, 43],
+				execGh: async (args) =>
+					JSON.stringify(
+						args[0] === "issue" ? { labels: [{ name: "flow:managed" }] } : [],
+					),
+				readFileSync: () =>
+					roadmapWithIssue("proc_a", 42).replace(
+						"github.com/takasek/pfdsl",
+						"github.com/other/project",
+					),
+			}),
+		);
+		assert.equal(result.gateCheckCommand, null);
+		assert.equal(result.locationDiagnostics.length, 1);
+		assert.equal(result.locationDiagnostics[0].processId, "proc_a");
+		assert.match(result.locationDiagnostics[0].detail, /other\/project/);
+	});
+
+	it("identifies repository resolution failures separately from roadmap read failures", async () => {
+		const deps = baseDeps({
+			issueNumbers: [42],
+			readFileSync: () => roadmapWithIssue("proc_a", 42),
+		});
+		deps.githubOps.repository = () => {
+			throw new Error("origin is unavailable");
+		};
+		const result = await runCycleStatus(deps);
+		assert.equal(result.gateCheckCommand, null);
+		assert.equal(
+			result.gateCheckCommandError,
+			"failed to resolve issue repository: origin is unavailable",
+		);
+	});
+
+	it("identifies invalid roadmap YAML separately from file reads", async () => {
+		const result = await runCycleStatus(
+			baseDeps({
+				issueNumbers: [42],
+				readFileSync: () => "---\nprocess: [\n---\n",
+			}),
+		);
+		assert.equal(result.gateCheckCommand, null);
+		assert.match(
+			result.gateCheckCommandError,
+			/^failed to parse \.pfdsl\/roadmap\.pfdsl:/,
+		);
 	});
 
 	it("reports issueTargets with the gh error when the gh issue lookup throws", async () => {

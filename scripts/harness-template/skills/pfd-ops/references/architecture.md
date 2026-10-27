@@ -155,7 +155,7 @@ node <pfd-ops skill root>/scripts/check-install-sync.mjs --deploy
 
 主な規約:
 - issue が一次情報。`roadmap.pfdsl` は依存構造のみ管理
-- process id は `iN_` prefix（N = issue 番号）。恒久 — issue close 後も剥がさない。出力 artifact id は最初から plain
+- 作業項目との対応契約は `work-cycle.md`「作業項目と process の対応」、issue の参照形式は `github-issues-backend.md` に従う
 - `flow:managed` / `flow:exempt` ラベルで管理対象を分類
 - 未完了作業とその入出力を保って完了チェーンを回収する。`.pfdsl/config.json` で有効にした採用リポでは、デフォルトブランチへの push が `sweep-completed-chains.mjs` を起動して PR を提案し、マージは人が行う
 - `audit-issues-flow.mjs` で読取専用の同期監査

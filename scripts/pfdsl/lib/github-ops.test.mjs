@@ -40,6 +40,11 @@ describe("HTTP repository routing", () => {
 					fetchImpl,
 				});
 				if (supported) {
+					assert.deepEqual(ops.repository(), {
+						host: "github.com",
+						owner: "acme",
+						repo: "app",
+					});
 					assert.deepEqual(
 						await ops.viewIssue({ number: 7, fields: ["number"] }),
 						{ number: 7 },

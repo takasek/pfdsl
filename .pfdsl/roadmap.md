@@ -24,13 +24,6 @@ GitHub Issues。規約と採用手順は `scripts/harness-template/skills/pfd-op
 **保持範囲**: 規則は L3 reference「完了チェーン回収」が一次情報。
 このリポで完了履歴を持つ一次情報は closed issue・git 履歴・`docs/adr/`・`docs/spec/spec-history.md`・npm レジストリ・VS Code Marketplace で、#1052 の一括回収でこれらへの写しを roadmap から落とした。
 
-## 起票前のプレースホルダ
-
-L3 reference の id 規約では、まだ issue が無いプロセスを plain の id で置き、起票時に `iN_` を付けてリネームする。
-この状態は `check` を通ってしまうので、id 規約からの逸脱としてここに記録する。
-該当するプロセスは description を「未起票のプレースホルダ。」で始めて示し、`grep -n '未起票のプレースホルダ' .pfdsl/roadmap.pfdsl` で列挙する。
-起票して `iN_` を付けるときに、description のこの文言も外す。
-
 ## プレビュー改善の管理単位
 
 プレビューの表示・編集・移動の改善実装は `preview_editing_usability` に集約する。
@@ -95,7 +88,7 @@ roadmap差分の有無によらず PR には `check-roadmap-registration.yml` �
 対象集合を PR 自身から導くのは、実行主体が渡すフラグに依存させないため。
 `edited` を trigger に含めるのは `check-closes-reference.yml` と同じ理由で、PR 本文の編集が対象集合を変えるからである。
 
-**`gh` CLI が使えない環境（Claude Code Remote 等）での代替**: `cycle-status.mjs` / `gate-check.mjs`（内部の `audit-issues-flow.mjs`）は `gh` を呼ぶが、`github-ops.mjs` が `GH_TOKEN` / `GITHUB_TOKEN` のある環境では HTTP backend へ落ちる（#489・#1044）。token も無い場合は GitHub MCP server のツール（`list_pull_requests` / `issue_read` / `pull_request_read` 等）で個別に代替する: PR一覧は `list_pull_requests`、設計の確認は `issue_read` で本文とコメントを取得して読む、`audit-issues-flow` 相当は対象 issue の分類と `iN_` process・入出力依存を roadmap.pfdsl の記載と手動突合する。
+**`gh` CLI が使えない環境（Claude Code Remote 等）での代替**: `cycle-status.mjs` / `gate-check.mjs`（内部の `audit-issues-flow.mjs`）は `gh` を呼ぶが、`github-ops.mjs` が `GH_TOKEN` / `GITHUB_TOKEN` のある環境では HTTP backend へ落ちる（#489・#1044）。token も無い場合は GitHub MCP server のツール（`list_pull_requests` / `issue_read` / `pull_request_read` 等）で個別に代替する: PR一覧は `list_pull_requests`、設計の確認は `issue_read` で本文とコメントを取得して読む、`audit-issues-flow` 相当は対象 issue の分類と process の `location:`・入出力依存を roadmap.pfdsl の記載と手動突合する。
 cloud session の開始 checkout が primary の場合、その場所での merge・reset・checkout による更新は案内しない。新しい版を検証する場合は、意図した remote branch の最新 commit SHA を指定した新しい session を開始する。
 このリポの Claude 設定は `worktree.baseRef: "head"` とし、EnterWorktree は現在のローカル HEAD を継承する。新規作業は更新済み `origin/<base>` と同じ commit、既存 PR の継続・検証は対象 PR の完全な commit SHA で session を開始し、EnterWorktree の前後で HEAD の一致を確認する。fetch はローカル HEAD を進めず、未コミット変更も native へコピーされない。古い版を起点にした native を最新版の検証として扱わない。
 native worktree の作成では SessionStart が再実行されると仮定しない。割り当てられた worktree で `make setup`、続いて `node scripts/setup-completion.mjs check` を実行する。内容検査 guard が使う shell parser もこの setup で準備する。

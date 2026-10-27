@@ -6,7 +6,7 @@ PFD の作業項目を GitHub Issues で管理する流儀。pfdsl 固有では�
 
 - **一次情報**: GitHub Issue 本体。着手時は本文とコメントを両方取得する。`gh` があれば `gh issue view <number> --json body,comments`、`gh` の無い環境（Claude Code Remote 等）では GitHub MCP server の issue 読取ツールや REST API など、同じ本文とコメントを返す手段を使う。ページ分割される手段ではコメントを全ページ取得する。`roadmap.pfdsl` は依存構造のみ管理する
 - **複数行本文の外部書込み**: issue 本文の作成・編集、issue コメント、PR 本文の作成・編集のように複数行本文を GitHub へ送るたび、セッション固有名を持つ body file にその時点の正本を書く。transport が file 入力を持つときは `--body-file` 等で正本を直接渡し、MCP 等の body 入力しか持たない transport では正本ファイルを読んだ値を手で再構成せずに渡す。実行直後に、**既存 issue / PR の編集では write request の対象番号、新規 issue / PR / comment では write response の stable identifier や URL が指す対象そのもの**を同じ transport またはその backend の参照手段で取り直し、GitHub 側の persisted `body` が改行を含めてその正本と完全一致することを確認する。新規作成に使う操作が対象の identifier を応答として返す契約を持たない場合は、一覧から推測せず、identifier を返す backend API や transport を write 前に選ぶ。本文に `Closes #...` のような必須行や参照がある場合は、その構造も同じ readback 結果で確認し、後続の本文編集でも毎回保たれていることを確認する。issue の `body,comments` 一覧を広く読み、似た本文を見つけて代用しない。write と exact readback の両方を提供する transport が無い場合は他の手段へ勝手に切り替えず、不足している前提条件を報告して停止する。コマンドの成功表示や返された URL は persisted body の証拠にならない
-- **id 規約**: issue に対応する作業の process id は `iN_` prefix（N = issue 番号）。**恒久** — issue close 後も剥がさない。同一 process が複数 issue に対応する場合は `i40_i41_do_work` のように連結する。対応する出力 artifact の id は最初から plain（prefix なし）。**まだ issue が無いプロセスは plain の id で置く** — `work-cycle.md` の成果物の門番が要求するプレースホルダ後続プロセスは、起票より先にグラフへ入る。採番できない番号を捏造せず、起票時に `iN_` を付けてリネームする。この状態は `check` を通ってしまい機械検出されないので、逸脱として `roadmap.md` に書き残す
+- **作業項目の参照**: 対応は [`work-cycle.md`「作業項目と process の対応」](work-cycle.md#作業項目と-process-の対応) に従う。process の `location:` には issue の URL（`https://<host>/<owner>/<repo>/issues/<number>`）を置く。host・repository・issue 番号を合わせて項目を識別し、別 repository の同番号や pull request の URL を同じ issue とみなさない。監査・GitHub 取得・着手時の照合は、`GH_REPO=[HOST/]OWNER/REPO`、`gh repo set-default` の保存設定、`origin` の順で同じ対象を選ぶ。fork の親 repository は自動推測しない。`GH_REPO` の host 省略時は `GH_HOST`、未設定なら `github.com` を使う。SSH remote は `ssh -G` の hostname を Web host とし、`ssh.github.com` は `github.com` に変換し、SSH 接続 port は引き継がない。SSH を解決できない場合は `GH_REPO` で明示する。別 repository の issue URL は照合から除外して advisory を表示し、その参照先の存在や分類は検査しない。HTTP fallback は引き続き public GitHub のみを対象とする。
 - **ラベル**: roadmap 登録 issue は `flow:managed`、対象外は `flow:exempt`（判定は「ラベル判定基準」節）
 - **登録 metadata**: issue 対応と依存構造を検査する。GitHub の可変 `updatedAt` は保存・同期しない。`priority:` tags は任意の表示値であり、issue labels との完全一致を登録条件にしない。旧 `updated_at` が残る図でも監査はその値を読まない
 - **issue close と進捗**: close は status を動かす契機にしない。成果物の完了判断と status 更新は `work-cycle.md` の完了根拠に従う。未実装のまま廃止する場合も、未完了作業が必要とする入力を保存し、代替や廃止の判断を依存構造へ反映する。デフォルトブランチへの push が起動するのは下の完了チェーン回収（`.pfdsl/config.json` で有効にした場合）だけで、それも PR を提案するところまでであり、マージは人が行う
@@ -157,7 +157,7 @@ issue findings の `blocking:` は監査を失敗させ、`advisory:` だけな�
    ```
 
    `gh` が無い環境では、リポジトリの Labels 画面（Issues → Labels）で同じ名前と説明文を入力する。
-4. `roadmap.pfdsl` を依存構造のみのグラフとして用意し、issue に対応する process に `iN_` prefix を付ける
+4. `roadmap.pfdsl` を依存構造のみのグラフとして用意し、上の「作業項目の参照」に従って issue を対応付ける
 5. リポの `roadmap.md` で本プリセットを指し、リポ URL を記載する
 6. 下の「依存の準備と初回監査」を実行する。配置だけで終了しない
 

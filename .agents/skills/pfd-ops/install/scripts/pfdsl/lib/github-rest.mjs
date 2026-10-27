@@ -28,7 +28,10 @@ const MAX_PAGES = 100;
  * @returns {{owner: string, repo: string} | null}
  */
 export function parseOwnerRepo(remoteUrl) {
-	const stripped = remoteUrl.trim().replace(/\.git$/, "");
+	const stripped = remoteUrl
+		.trim()
+		.replace(/\/+$/, "")
+		.replace(/\.git$/, "");
 	const scpMatch = stripped.match(/^[\w.-]+@[\w.-]+:(.+)$/);
 	const pathPart = scpMatch
 		? scpMatch[1]
@@ -42,22 +45,45 @@ export function parseOwnerRepo(remoteUrl) {
 }
 
 /**
- * Extract the host (authority minus userinfo, keeping an explicit port) from a
- * git remote URL. Handles https, ssh://, and git@ scp-like forms. This is the
- * host `gh` must target: deriving it from the repo's own remote lets callers
- * pin GH_HOST to the repo, neutralizing an ambient GH_HOST that points at a
- * different host (a multi-host `gh` login otherwise fails with "none of the
- * git remotes ... correspond to the GH_HOST environment variable").
+ * Extract the web authority from a remote, keeping HTTPS ports but discarding
+ * SSH transport ports. SSH aliases are resolved by repository-identity.mjs.
  * @param {string} remoteUrl
  * @returns {string | null}
  */
 export function parseHost(remoteUrl) {
 	const url = remoteUrl.trim();
+	if (url.startsWith("ssh://")) {
+		try {
+			return new URL(url).hostname;
+		} catch {
+			return null;
+		}
+	}
 	const scp = url.match(/^[\w.-]+@([\w.-]+(?::\d+)?):/);
 	if (scp) return scp[1];
 	const schemeMatch = url.match(/^\w+:\/\/(?:[^/@]+@)?([^/]+)/);
 	if (schemeMatch) return schemeMatch[1];
 	return null;
+}
+
+/**
+ * Resolve the same repository identity for gh, HTTP and location matching.
+ * Only the documented loopback /git/owner/repo transport represents public GitHub.
+ * @param {string} remoteUrl
+ * @returns {{identity: {host: string, owner: string, repo: string}, httpSupported: boolean} | null}
+ */
+export function parseRepositoryIdentity(remoteUrl) {
+	const ownerRepo = parseOwnerRepo(remoteUrl);
+	const host = parseHost(remoteUrl);
+	if (!ownerRepo || !host) return null;
+	const localProxy =
+		/^http:\/\/(?:[^/@]+@)?(?:127\.0\.0\.1|localhost)(?::\d+)?\/git\/[^/]+\/[^/]+\/?$/.test(
+			remoteUrl,
+		);
+	return {
+		identity: { host: localProxy ? "github.com" : host, ...ownerRepo },
+		httpSupported: host.toLowerCase() === "github.com" || localProxy,
+	};
 }
 
 /**

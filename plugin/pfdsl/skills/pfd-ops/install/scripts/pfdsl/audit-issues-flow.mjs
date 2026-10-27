@@ -97,23 +97,7 @@ function normalizeIssue(i) {
 // --- Parse frontmatter ---
 
 const fm = parseDocument(fmText).toJS();
-const processes = parseIssueProcesses(fm);
 const outputsByProcess = buildProcessOutputs(body);
-
-// Expand each tracked process into one entry per (issueNumber, output artifact) pair.
-const entries = [];
-for (const proc of processes) {
-	const outputs = outputsByProcess.get(proc.id) ?? [];
-	for (const issueNumber of proc.issueNumbers) {
-		for (const artifactId of outputs) {
-			entries.push({
-				processId: proc.id,
-				issueNumber,
-				artifactId,
-			});
-		}
-	}
-}
 
 // --- Check labels ---
 
@@ -130,6 +114,27 @@ try {
 } catch (e) {
 	if (isGitHubUnavailableError(e)) exitGhUnavailable();
 	throw e;
+}
+// Resolve only after the availability check, preserving the unavailable exit.
+const locationDiagnostics = [];
+const processes = parseIssueProcesses(
+	fm,
+	githubOps.repository(),
+	locationDiagnostics,
+);
+if (locationDiagnostics.length > 0) {
+	console.log("location advisory (does not fail this audit):");
+	for (const finding of locationDiagnostics)
+		console.log(`  ${finding.type} [${finding.processId}] ${finding.detail}`);
+}
+const entries = [];
+for (const proc of processes) {
+	const outputs = outputsByProcess.get(proc.id) ?? [];
+	for (const issueNumber of proc.issueNumbers) {
+		for (const artifactId of outputs) {
+			entries.push({ processId: proc.id, issueNumber, artifactId });
+		}
+	}
 }
 const labelFindings = computeLabelFindings(FLOW_LABELS, labels);
 const labelParts = partitionFindings(labelFindings);
@@ -184,7 +189,11 @@ function printFindings(findings) {
 
 const { blocking } = printFindings(findings);
 if (blocking.length === 0 && labelParts.blocking.length === 0) {
-	console.log("roadmap.pfdsl is in sync");
+	console.log(
+		locationDiagnostics.length > 0
+			? "roadmap.pfdsl is in sync for the selected repository; other repository links were not checked"
+			: "roadmap.pfdsl is in sync",
+	);
 	process.exit(0);
 }
 process.exit(1);

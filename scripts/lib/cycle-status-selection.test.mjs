@@ -21,7 +21,7 @@ artifact:
   standalone_pfd_features: { status: wip }
 process:
   i42_i43_accept_mac:
-    location: https://github.com/example/project/issues/42
+    location: [https://github.com/example/project/issues/42, https://github.com/example/project/issues/43]
   i42_prepare_vscode:
     location: https://github.com/example/project/issues/42
   i42_accept_vscode:
@@ -31,7 +31,7 @@ process:
   i44_improve:
     location: https://github.com/example/project/issues/44
   i45_i46_i47_implement:
-    location: https://github.com/example/project/issues/45
+    location: [https://github.com/example/project/issues/45, https://github.com/example/project/issues/46, https://github.com/example/project/issues/47]
 ---
 seed >> i42_i43_accept_mac -> gui_mac_acceptance
 seed >> i42_prepare_vscode -> gui_vscode_candidate
@@ -82,6 +82,26 @@ function deps(issueNumbers, artifact, source = roadmap) {
 }
 
 describe("cycle-status artifact selection using the actual graph reader", () => {
+	it("does not select an artifact through another repository's same-number issue", async () => {
+		const source = roadmap.replaceAll(
+			"https://github.com/example/project/issues/42",
+			"https://github.com/other/project/issues/42",
+		);
+		const result = await runCycleStatus(deps([42], undefined, source));
+		assert.deepEqual(result.unregisteredManagedIssues, [42]);
+		assert.equal(result.gateCheckCommand, null);
+		assert.equal(result.wipUpdateCommand, undefined);
+	});
+
+	it("reports invalid YAML instead of returning partial issue ownership", async () => {
+		const result = await runCycleStatus(
+			deps([42], undefined, "process:\n  work: ["),
+		);
+		assert.match(result.gateCheckCommandError, /failed to parse/);
+		assert.equal(result.gateCheckCommand, null);
+		assert.equal(result.wipUpdateCommand, undefined);
+	});
+
 	for (const [issues, artifact] of [
 		[[42], "gui_mac_acceptance"],
 		[[42], "gui_vscode_candidate"],

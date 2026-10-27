@@ -37,7 +37,7 @@ export function cycleStatusExitCode(result) {
  * @param {{
  *   sh: (file: string, args: string[]) => string,
  *   shTry: (file: string, args: string[]) => {ok: boolean, out: string, status: number|null},
- *   githubOps: {listOpenPrs: () => Promise<any[]>, viewIssue: (params: {number: number, fields: string[]}) => Promise<any>},
+ *   githubOps: {listOpenPrs: () => Promise<any[]>, viewIssue: (params: {number: number, fields: string[]}) => Promise<any>, repository: () => {host: string, owner: string, repo: string}},
  *   existsSync: (path: string) => boolean,
  *   readFileSync: (path: string, encoding: string) => string,
  *   root: string,
@@ -241,27 +241,37 @@ export async function runCycleStatus({
 	let artifactKey = null;
 	const artifactCandidates = new Map();
 	let gateCheckCommandError = null;
+	const locationDiagnostics = [];
 	/** @type {number[]} target issues labelled flow:managed with no process yet */
 	const unregisteredManagedIssues = [];
 	/** @type {number[]} target issues with no flow label and no process yet */
 	const untriagedTargetIssues = [];
 	if (targetIssues.length > 0) {
-		let roadmapText = null;
+		let processIdsByIssue = null;
+		let operation = "read .pfdsl/roadmap.pfdsl";
 		try {
-			roadmapText = readFileSync(
+			const roadmapText = readFileSync(
 				resolve(root, ".pfdsl/roadmap.pfdsl"),
 				"utf-8",
 			);
-		} catch (e) {
-			gateCheckCommandError = `failed to read .pfdsl/roadmap.pfdsl: ${e.message}`;
-		}
-		if (roadmapText !== null) {
-			const processIdsByIssue = new Map(
+			operation = "resolve issue repository";
+			const repository = githubOps.repository();
+			operation = "parse .pfdsl/roadmap.pfdsl";
+			processIdsByIssue = new Map(
 				targetIssues.map((issue) => [
 					issue,
-					findProcessIdsForIssueNumber(roadmapText, issue),
+					findProcessIdsForIssueNumber(
+						roadmapText,
+						issue,
+						repository,
+						locationDiagnostics,
+					),
 				]),
 			);
+		} catch (e) {
+			gateCheckCommandError = `failed to ${operation}: ${e.message}`;
+		}
+		if (processIdsByIssue !== null) {
 			// The one moment the missing roadmap entry is actionable (#963): this
 			// cycle is starting this issue, so its inputs and outputs are in hand.
 			// audit-issues-flow reports the same gap for every open issue, but only
@@ -416,6 +426,15 @@ export async function runCycleStatus({
 	if (releasePendingError) result.releasePendingError = releasePendingError;
 	if (readyError) result.readyError = readyError;
 	if (issueError) result.issueError = issueError;
+	if (locationDiagnostics.length > 0)
+		result.locationDiagnostics = [
+			...new Map(
+				locationDiagnostics.map((finding) => [
+					`${finding.processId}:${finding.location}`,
+					finding,
+				]),
+			).values(),
+		];
 	if (gateCheckCommandError)
 		result.gateCheckCommandError = gateCheckCommandError;
 	return result;

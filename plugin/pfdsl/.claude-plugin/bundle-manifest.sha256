@@ -26,7 +26,7 @@ e07809b079ce3ef3aeb896dc070f3ac507f6fe9eb70e02938c13ca446570ca82  skills/pfd-gri
 
 48944ee889550d5471e56fe2e553ce57c813849475e6a5a3b841581609e4ae2d  skills/pfd-ops/install/.github/workflows/pfdsl-sweep-completed-chains.yml
 
-d863baa74ca31965a69a12df59589a1c158339494cc5ed9aefa08a5a512f7aaa  skills/pfd-ops/install/scripts/pfdsl/audit-issues-flow.mjs
+24589ec5b7a96323be8bc8866a33e6746845cefff8defe0e59a9c1e130c249a1  skills/pfd-ops/install/scripts/pfdsl/audit-issues-flow.mjs
 
 e5e4a9e59d4a0b82d50ab9219f7b16c71cefa4f938e2feb9a62795aa7a3a4833  skills/pfd-ops/install/scripts/pfdsl/lib/chain-sweep.mjs
 
@@ -34,13 +34,13 @@ c3f2fa839ba9590b4c6ebc97746546e5b626a09435d64d012c85a65622d9c1e5  skills/pfd-ops
 
 438591dd6eb8b35ada1c6abacfc010427608443c0f85ffe833e4d9999b054bd4  skills/pfd-ops/install/scripts/pfdsl/lib/gh-compat.mjs
 
-ac6f9e9959367f8d63561cef333cb4bf42ae18d8cbf1a8879651e95ea71bfd84  skills/pfd-ops/install/scripts/pfdsl/lib/gh-exec.mjs
+bde299aa91c76ab9f4a866cdaea95ff36523549ac97244cb78bc62d0c86a8276  skills/pfd-ops/install/scripts/pfdsl/lib/gh-exec.mjs
 
-f3fdafd6610276237be6ee2ce53a68fefcd458c35a85f8cae9b3498ad86b0f23  skills/pfd-ops/install/scripts/pfdsl/lib/github-ops.mjs
+99898308ebd0cd55a0833468a35f158bd257eb130ffe87a4fe5b0e86c0fdf85a  skills/pfd-ops/install/scripts/pfdsl/lib/github-ops.mjs
 
-ffa9ca19362e85a2ee3286c4e1c54b7503cc7a445ff728fec54a4fd0771463ab  skills/pfd-ops/install/scripts/pfdsl/lib/github-rest.mjs
+64b8d8f3dbd855219ca4a2968156692c9153b026dce7cab5192daf2d9127d7c3  skills/pfd-ops/install/scripts/pfdsl/lib/github-rest.mjs
 
-4c805c89a3888800aa458b6edd322f1bbcc2446aa49bb1035395be3571e95c65  skills/pfd-ops/install/scripts/pfdsl/lib/issues-flow-audit.mjs
+f4cec2445f10cde6e900c6f46dd192048d5a794b8f36e7aeeca5f925a17bfa33  skills/pfd-ops/install/scripts/pfdsl/lib/issues-flow-audit.mjs
 
 0c315f0afc41f21ee0b4914131159b85064b3a39ea633c5b695498c6c41c427e  skills/pfd-ops/install/scripts/pfdsl/lib/proxy-fetch-worker.mjs
 
@@ -48,17 +48,19 @@ ffa9ca19362e85a2ee3286c4e1c54b7503cc7a445ff728fec54a4fd0771463ab  skills/pfd-ops
 
 220d32176e8b5d8942cfb576b22d7942bc6b2b1825e69e919840cd9f54753e87  skills/pfd-ops/install/scripts/pfdsl/lib/ready-compare.mjs
 
+2ce3f222d19254ae7ea293b257a47bbe32732526290c53bc66cb0e5cfe834cc8  skills/pfd-ops/install/scripts/pfdsl/lib/repository-identity.mjs
+
 a8e4d35e456f05babab77d002a20f7230b7942aaf7bb82138bf2007b5926c4f7  skills/pfd-ops/install/scripts/pfdsl/lib/scratch-path.mjs
 
 1e5a4bd4e622bfae32b3f86d9832eee5c4f18602618035ee6dc50ac021fd138c  skills/pfd-ops/install/scripts/pfdsl/lib/yaml-require.mjs
 
 d6636ad19abcd0019d685f0cbc26db35fb779ea1afa9568d070fb94bb68eb7f2  skills/pfd-ops/install/scripts/pfdsl/sweep-completed-chains.mjs
 
-dfe6c7de546e3ab77ec9c7dc2a64492b69f753a20ff802a80b00d3011bcfc7e5  skills/pfd-ops/references/architecture.md
+4c262f047866dd86c399db2c40d9b5df991ac0fc92af2f212cd627bb503c1a52  skills/pfd-ops/references/architecture.md
 
-8b1fae0de7d1f6a94048708d0ccff753fb576b4a316201b338c84834b1c2abff  skills/pfd-ops/references/file-based-tracker-backend.md
+aed89dd0a26cb4ab275e6c744528198e485ed4a3a7af5a2e199ae449b96cb970  skills/pfd-ops/references/file-based-tracker-backend.md
 
-689d24acaab69a59dd9b73b33efab6f753ce8dfe36179aaaea62ac13a73f8caf  skills/pfd-ops/references/github-issues-backend.md
+c876fb018eb1e61b092c7a8bec6310ec4d12c7fa8ab4457a4fa45348fa9f375b  skills/pfd-ops/references/github-issues-backend.md
 
 4da6e061033c43a67bd71d55bd816fc3c57ef32f52d0dea19070bcc7c2b79582  skills/pfd-ops/references/scaffold/bindings/pfd-ops.md
 
@@ -82,7 +84,7 @@ deb6cb7549f74139a1414360474a8ec15e67e3298e27f597addf7546978df708  skills/pfd-ops
 
 c1328f9dcb946c35f7bba42306324d82929f7031fb52d459c3b2ee12fd904686  skills/pfd-ops/references/scaffold/workflow.pfdsl
 
-7732eb7ef65cc8d92f75677c1625fe158fe971ea8bee579d6d8cbfbf4c371238  skills/pfd-ops/references/work-cycle.md
+e690e68a4e8c247fdbeae23fafda4da296848a16d142f26d7747762d328f1bfa  skills/pfd-ops/references/work-cycle.md
 
 be85d8e1614e9bf8e6ca3f89f2f591dbfd9deebd5c0e8131ba3309b3fd6537a2  skills/pfd-ops/scripts/check-install-sync.mjs
 

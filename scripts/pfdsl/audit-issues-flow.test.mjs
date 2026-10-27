@@ -25,6 +25,14 @@ import { FLOW_LABELS } from "./lib/issues-flow-audit.mjs";
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const scriptPath = resolve(__dirname, "audit-issues-flow.mjs");
 
+function writeRemoteStub(bin) {
+	writeFileSync(
+		join(bin, "git"),
+		`#!${process.execPath}\nif (process.argv[2] === "config") process.exit(1);\nif (process.argv.slice(2).join(" ") !== "remote get-url origin") process.exit(64);\nconsole.log("https://github.com/example/project.git");\n`,
+		{ mode: 0o755 },
+	);
+}
+
 let emptyBin;
 
 beforeEach(() => {
@@ -57,12 +65,14 @@ artifact:
     status: todo
 process:
   i1_build_output:
+    location: https://github.com/example/project/issues/1
     updated_at: 2020-01-01T00:00:00Z
 ---
 input >> i1_build_output -> output
 `,
 		);
 		const before = readFileSync(roadmap, "utf8");
+		writeRemoteStub(emptyBin);
 		writeFileSync(
 			join(emptyBin, "gh"),
 			`#!${process.execPath}
@@ -112,7 +122,7 @@ process.stdout.write(JSON.stringify(result));
 		assert.notEqual(result.status, GH_UNAVAILABLE_EXIT_CODE, result.stdout);
 		assert.notEqual(result.status, 0);
 		assert.doesNotMatch(result.stdout, /gh unavailable/);
-		assert.match(result.stderr, /could not read the git remote/);
+		assert.match(result.stderr, /could not read repository selection/);
 	});
 });
 
@@ -136,9 +146,10 @@ describe("audit-issues-flow label findings", () => {
 		mkdirSync(join(tree, ".pfdsl"));
 		writeFileSync(
 			join(tree, ".pfdsl/roadmap.pfdsl"),
-			`---\ntype: roadmap\nartifact:\n  out: { status: todo }\nprocess:\n  i5_do_it: { label: Do it, updated_at: "${updatedAt}" }\n---\n>> i5_do_it -> out\n`,
+			`---\ntype: roadmap\nartifact:\n  out: { status: todo }\nprocess:\n  i5_do_it: { label: Do it, location: https://github.com/example/project/issues/5, updated_at: "${updatedAt}" }\n---\n>> i5_do_it -> out\n`,
 		);
 		mkdirSync(join(tree, "bin"));
+		writeRemoteStub(join(tree, "bin"));
 		const gh = join(tree, "bin/gh");
 		writeFileSync(
 			gh,
@@ -183,6 +194,25 @@ esac
 
 	const matching = [managed, exempt];
 	const staleManaged = [{ ...managed, description: "old" }, exempt];
+
+	it("does not register a local issue through a different repository's URL", () => {
+		const roadmap = join(tree, ".pfdsl/roadmap.pfdsl");
+		writeFileSync(
+			roadmap,
+			readFileSync(roadmap, "utf8").replace(
+				"github.com/example/project/issues/5",
+				"github.com/other/project/issues/5",
+			),
+		);
+		const result = audit(matching, ["flow:managed"], ["--enforce-issue", "5"]);
+		assert.equal(result.status, 1, result.stdout + result.stderr);
+		assert.match(result.stdout, /#5 missing_process/);
+		assert.match(result.stdout, /foreign_issue_location \[i5_do_it\]/);
+		assert.match(
+			result.stdout,
+			/selected repository is github.com\/example\/project/,
+		);
+	});
 
 	it("passes when only a description differs and the issues are in sync", () => {
 		const result = audit(staleManaged, ["flow:managed"]);

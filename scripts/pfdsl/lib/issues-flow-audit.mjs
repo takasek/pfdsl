@@ -45,22 +45,69 @@ export function computeLabelFindings(expectedLabels, actualLabels) {
 }
 
 /**
- * Leading, contiguous iN_ components are the issue references of a process ID.
- * @param {string} id
+ * Read GitHub issue links from location, never from a node's identifier.
+ * A repository identity limits an audit to the issues it can actually read.
+ * @param {string | string[] | undefined} location
+ * @param {{host: string, owner: string, repo: string}} [repository]
  * @returns {number[]}
  */
-export function issueNumbersOfProcessId(id) {
-	const prefix = id.match(/^(?:i\d+_)+/)?.[0] ?? "";
-	return [...prefix.matchAll(/i(\d+)_/g)].map((m) => Number(m[1]));
+export function issueNumbersOfLocation(location, repository, diagnostics = []) {
+	const result = new Set();
+	for (const value of Array.isArray(location) ? location : [location]) {
+		if (typeof value !== "string") continue;
+		let url;
+		try {
+			url = new URL(value);
+		} catch {
+			continue;
+		}
+		const match = url.pathname.match(
+			/^\/([^/]+)\/([^/]+)\/issues\/([1-9]\d*)\/?$/,
+		);
+		if (!match || url.protocol !== "https:" || url.username || url.password)
+			continue;
+		const number = Number(match[3]);
+		if (!Number.isSafeInteger(number)) continue;
+		if (
+			url.host.toLowerCase() !==
+				(repository?.host ?? "github.com").toLowerCase() ||
+			(repository &&
+				(match[1].toLowerCase() !== repository.owner.toLowerCase() ||
+					match[2].toLowerCase() !== repository.repo.toLowerCase()))
+		) {
+			const actual = `${url.host}/${match[1]}/${match[2]}`;
+			const expected = repository
+				? `${repository.host}/${repository.owner}/${repository.repo}`
+				: "github.com";
+			diagnostics.push({
+				type: "foreign_issue_location",
+				location: value,
+				issueNumber: number,
+				advisory: true,
+				detail: `location ${value} refers to ${actual}; selected repository is ${expected}. This link is not matched. To audit that repository, select it with GH_REPO=[HOST/]OWNER/REPO.`,
+			});
+			continue;
+		}
+		result.add(number);
+	}
+	return [...result];
 }
 
-/** @param {object} frontmatter @returns {{ id: string, issueNumbers: number[] }[]} */
-export function parseIssueProcesses(frontmatter) {
+/** @param {object} frontmatter @param {{host: string, owner: string, repo: string}} [repository] @returns {{ id: string, issueNumbers: number[] }[]} */
+export function parseIssueProcesses(frontmatter, repository, diagnostics = []) {
 	const process = frontmatter.process;
 	if (!process) return [];
 	const result = [];
 	for (const id of Object.keys(process)) {
-		const issueNumbers = issueNumbersOfProcessId(id);
+		const locationDiagnostics = [];
+		const issueNumbers = issueNumbersOfLocation(
+			process[id]?.location,
+			repository,
+			locationDiagnostics,
+		);
+		diagnostics.push(
+			...locationDiagnostics.map((finding) => ({ ...finding, processId: id })),
+		);
 		if (issueNumbers.length === 0) continue;
 		result.push({ id, issueNumbers });
 	}

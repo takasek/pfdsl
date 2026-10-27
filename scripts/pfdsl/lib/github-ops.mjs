@@ -13,7 +13,6 @@
  * unavailability. Executed backend failures remain real errors (#1085).
  */
 
-import { execFileSync } from "node:child_process";
 import { isGhUnavailableError } from "./gh-compat.mjs";
 import { execGh } from "./gh-exec.mjs";
 import {
@@ -23,12 +22,11 @@ import {
 	fetchOpenPrs,
 	fetchPullRequestView,
 	mapLabelsResponse,
-	parseHost,
-	parseOwnerRepo,
 	requireGitHubViewFields,
 	addIssueLabel as restAddIssueLabel,
 } from "./github-rest.mjs";
 import { proxyAwareFetch } from "./proxy-fetch.mjs";
+import { resolveRepository } from "./repository-identity.mjs";
 
 // How many entries the list operations return. Each one is a single value
 // used by both backends — gh reads it as `--limit`, HTTP truncates its own
@@ -95,46 +93,9 @@ function normalizeIssueViewComments(issue) {
 }
 
 /**
- * @param {string} cwd
- * @returns {{identity: {host: string, owner: string, repo: string}, httpSupported: boolean}}
- */
-function repositoryFromGitRemote(cwd) {
-	let remoteUrl;
-	try {
-		remoteUrl = execFileSync("git", ["remote", "get-url", "origin"], {
-			cwd,
-			encoding: "utf-8",
-		}).trim();
-	} catch (e) {
-		// Rethrown without e.code: a missing git binary is also ENOENT, and
-		// callers would otherwise read it as "gh unavailable" and skip.
-		throw new Error(
-			`could not read the git remote 'origin' to resolve owner/repo: ${e.message}`,
-			{ cause: e },
-		);
-	}
-	const ownerRepo = parseOwnerRepo(remoteUrl);
-	const host = parseHost(remoteUrl);
-	if (!ownerRepo || !host)
-		throw new Error(
-			`could not determine host/owner/repo from git remote: ${remoteUrl}`,
-		);
-	// Only the documented loopback /git/owner/repo transport stands for
-	// public GitHub. A different proxy's upstream cannot be inferred.
-	const localProxy =
-		/^http:\/\/(?:[^/@]+@)?(?:127\.0\.0\.1|localhost)(?::\d+)?\/git\/[^/]+\/[^/]+\/?$/.test(
-			remoteUrl,
-		);
-	return {
-		identity: { host, ...ownerRepo },
-		httpSupported: host.toLowerCase() === "github.com" || localProxy,
-	};
-}
-
-/**
  * @param {object} opts
  * @param {string} [opts.cwd]
- * @param {(args: string[], opts: {cwd: string}) => Promise<string>} [opts.execGhImpl]
+ * @param {(args: string[], opts: {cwd: string, repository: Function}) => Promise<string>} [opts.execGhImpl]
  * @param {typeof fetch} [opts.fetchImpl]
  * @returns {Record<string, Function>}
  */
@@ -143,15 +104,14 @@ export function createGitHubOps({
 	execGhImpl = execGh,
 	fetchImpl = proxyAwareFetch,
 } = {}) {
-	const runGh = (args) => execGhImpl(args, { cwd });
+	const runGh = (args) => execGhImpl(args, { cwd, repository });
 
 	// `cwd` is fixed for this instance, so the repo it names is too. Resolving
 	// it once keeps a gate-check run that walks several issues from spawning
 	// `git remote get-url origin` per operation.
-	/** @type {ReturnType<typeof repositoryFromGitRemote> | undefined} */
+	/** @type {ReturnType<typeof resolveRepository> | undefined} */
 	let repositoryCache;
-	const resolvedRepository = () =>
-		(repositoryCache ??= repositoryFromGitRemote(cwd));
+	const resolvedRepository = () => (repositoryCache ??= resolveRepository(cwd));
 	const repository = () => resolvedRepository().identity;
 	const ownerRepo = () => {
 		if (!resolvedRepository().httpSupported)
