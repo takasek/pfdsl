@@ -114,15 +114,16 @@ export function tagName(kind, version) {
  * Picks out candidate artifact IDs from ready release processes. The result is
  * display-only: the release runner never mutates roadmap state.
  * @param {{id: string, outputs: string[]}[]} readyItems - the `ready` array from `pfdsl status ready --json`
- * @param {string} [prefix]
+ * @param {string[]} taggedProcessIds - IDs selected by the CLI release tag
  * @returns {string[]}
  */
 export function releaseMilestoneCandidateArtifactIds(
 	readyItems,
-	prefix = "publish_cli_",
+	taggedProcessIds,
 ) {
+	const selected = new Set(taggedProcessIds);
 	return readyItems
-		.filter((item) => item.id.startsWith(prefix))
+		.filter((item) => selected.has(item.id))
 		.flatMap((item) => item.outputs);
 }
 

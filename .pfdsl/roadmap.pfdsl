@@ -287,6 +287,7 @@ artifact:
 process:
   publish_cli_ready_counts:
     label: 新規 ready 数を示す CLI と plugin を公開する
+    tags: [ release_cli ]
   i119_publish_extension:
     label: extension自動公開実装
     location: https://github.com/takasek/pfdsl/issues/119
@@ -296,14 +297,19 @@ process:
     location: https://github.com/takasek/pfdsl/issues/542
   publish_ext_editing:
     label: extension 編集支援リリース
+    tags: [ release_extension ]
   publish_cli_group_delete:
     label: CLI group 削除公開
+    tags: [ release_cli ]
   publish_cli_meta_set_extension:
     label: CLI 拡張フィールド更新公開
+    tags: [ release_cli ]
   publish_cli_group_node_clash:
     label: CLI 同名診断公開
+    tags: [ release_cli ]
   publish_cli_edge_kind_conflict:
     label: CLI input / feedback 併記診断公開
+    tags: [ release_cli ]
   i1262_i1445_accept_mac_candidate:
     label: Mac の受入済み候補を作る
     description: "候補準備と実機受入を同じ工程内で順に行い、配布物とその合格証拠を揃える。準備に合格を要求せず、内部の進捗・担当は Issue で管理する"
@@ -314,6 +320,7 @@ process:
   i1262_publish_standalone:
     label: 配布物の全体受入を完了して公開する
     location: https://github.com/takasek/pfdsl/issues/1262
+    tags: [ release_standalone ]
   reduce_work_cycle_protocol:
     label: work-cycle を protocol に絞る
     description: 未起票のプレースホルダ。起票時に process id へ iN_ を付ける
@@ -349,6 +356,12 @@ process:
     description: 未起票のプレースホルダ。起票時に process id へ iN_ を付ける。配布形態の確定時に必要な既存公開工程へ接続する
 
 tag:
+  release_cli:
+    label: CLI と plugin の公開
+  release_extension:
+    label: VS Code 拡張の公開
+  release_standalone:
+    label: standalone の公開
   "priority:high": { style: { color: "#b60205", penwidth: "2" } }
 
 statusStyles:

@@ -427,7 +427,10 @@ roadmap の CLI release milestone（`cli_release_<slug>` 等）はバージョ�
 
 複数の実装 issue を1つの PR/リリースに束ねる場合も、milestone ノードは束ねた内容を表す1つの slug で作成すればよい。「中間バージョンをスキップ/統合するか」という判断自体が発生しない — バージョン番号を roadmap に書かないため、スキップ対象になるバージョン番号付きノードが最初から存在しない。
 
-`make release COMMIT=<SHA>`はroadmap上のreadyな`publish_cli_*`を公開候補として表示し、statusは変更しない。
+公開工程は process の `tags:` に公開種別を付けて示す。CLI と plugin は `release_cli`、VS Code 拡張は `release_extension`、standalone は `release_standalone` を使う。工程 ID の名前は選別条件にしない。
+`make release COMMIT=<SHA>`はroadmap上のreadyな工程と`meta list --tag release_cli`の結果を照合し、その工程の出力を公開候補として表示する。statusは変更しない。
+公開工程を追加する Edit/Write、または既存工程に公開種別タグを追加・変更する Edit/Write では、確認 hook が `make release-status` で公開済みの状態を確認するよう案内する。process 以外のタグや、既存工程への入力追加・整形だけでは案内しない。
+`make release-status` は standalone の公開状態を取得しないため、standalone では対応する作業項目に記録された公開先で配布物と公開版を別途確認する。
 公開後のroadmap同期は`map_deps`が担い、release担当が`published_cli`と`plugin_marketplace_entry`を還流入力として、公開された固定npm版と該当milestoneが要求するplugin配布を確認する。
 確認済みartifactだけを通常PRでdoneへ同期し、未確認の候補は未完了のまま残す。
 marketplaceのpin反映・取得確認とroadmap同期の順序、中断時の再開手順は`pipeline.md`の「PR経由の公開と公開後同期」に従う。
