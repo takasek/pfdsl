@@ -49,7 +49,7 @@ artifact:
     criteria: "見出し・list item・table 行・paragraph の4種別の範囲取得が scripts/lib/spec-id-range.test.mjs で検証され、node scripts/get-spec-id.mjs SPEC_id_syntax docs/adr/0027-spec-id-cross-references.md が実データからブロック全体を返すことで動作確認できる"
   mint_check_tool:
     label: "mint-check ツール (#405)"
-    description: "採番前に slug の既出（定義・strict 参照・forward-ref）を列挙する scripts ツール。既存 forward-ref の slug を別概念で採番する silent 衝突の防止が主目的。tombstone 次元は初 ID 削除まで据え置き（spec_id_tombstones へ）"
+    description: "採番前に slug の既出（定義・strict 参照・forward-ref）を列挙する scripts ツール。既存 forward-ref の slug を別概念で採番する silent 衝突の防止が主目的。tombstone 次元は初 ID 削除まで据え置き（ADR-0027「ID の性質」参照）"
     status: done
     criteria: 定義・strict 参照・forward-ref の全出現種別が file:line で列挙され、既出ゼロ/ありで exit code が分かれることが scripts/lib/mint-check.test.mjs・scripts/lib/mint-check-steps.test.mjs のテストで検証されている
     location: ../scripts/mint-check.mjs
@@ -59,11 +59,6 @@ artifact:
     status: wip
     criteria: docs/spec/spec.md の節番号相互参照が仕様ID参照に置換され、node scripts/check-spec-ids.mjs が dangling 参照なしで通過する
     location: ../docs/spec/spec.md
-  spec_id_tombstones:
-    label: 仕様ID tombstone 機構
-    description: "廃止済み仕様IDの tombstone リスト実体・再定義禁止 lint・mint-check への tombstone 次元追加。初の ID 削除が発生した時点で駆動（ADR-0027 §ID性質、#405 で据え置き）。後続門番のプレースホルダ（ADR-0018）"
-    status: suspended
-    criteria: tombstone リストが記録形式付きで導入され、tombstone 済み ID の再定義が make check-docs 経由のチェックでエラーになり、scripts/mint-check.mjs が tombstone を第4の出現種別として列挙する
   editor_connector:
     label: "エディタ コネクタ編集支援 (#482)"
     description: "ノード前後への新規追加・既存接続の code action/コマンド。edge 挿入ロジックはロジック層に分離し Preview UI (#483) と共用"
@@ -300,9 +295,6 @@ process:
     label: spec.md 仕様ID参照移行
     description: "spec.md の節番号相互参照を仕様ID参照へ段階移行する。クラスタ単位の段階計画（§15 制約 → §2.x 意味論 → 残り）は #542 が一次情報"
     location: https://github.com/takasek/pfdsl/issues/542
-  introduce_tombstones:
-    label: tombstone 機構導入
-    description: "初の ID 削除が発生した時点で起票・着手する。tombstone リスト実体・再定義禁止 lint・mint-check への tombstone 次元追加を含む"
   publish_ext_editing:
     label: extension 編集支援リリース
     tags: [ release_extension ]
@@ -385,8 +377,6 @@ toolchain >> i119_publish_extension -> published_extension
 [boundary_transition_release_policy, ready_counts_cli] >> publish_cli_ready_counts -> cli_release_ready_counts
 
 [get_by_id_tool, mint_check_tool, spec_id_syntax, spec_v0011] >> i542_migrate_spec_id_refs -> spec_id_refs
-
-[mint_check_tool, spec_id_syntax] >> introduce_tombstones -> spec_id_tombstones
 
 [def_insertion, editor_connector, gui_vscode_acceptance, preview_connector] >> publish_ext_editing -> ext_editing_release
 

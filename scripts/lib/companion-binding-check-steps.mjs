@@ -38,7 +38,15 @@ export const REQUIRED_BINDING_HEADINGS = [
 	},
 	{
 		path: ".pfdsl/bindings/pfd-ops.md",
-		headings: ["このリポの作業規律"],
+		headings: [
+			"このリポの作業規律",
+			"共通原則",
+			"ブランチと作業準備",
+			"変更方針の決定",
+			"実装と検証",
+			"レビュー",
+			"PR と統合",
+		],
 		reason: "the root instructions point sessions at it",
 	},
 ];
