@@ -35,9 +35,9 @@ waxa CLI（blank-slate, ツール呼び出し不可）では retrieval 有無を
 ## worktree でのサイクル実行
 
 **サイクルは worktree で回す**: 対象リポジトリの専用 worktree を使い、作成場所と作成手順は利用中のハーネスまたはマシン側の設定に従う。
-worktree を既定とする理由は `.pfdsl/bindings/pfd-ops.md`「このリポの作業規律」の「手順 1 の追加で worktree と upstream を確認する」が一次情報。
+worktree を既定とする理由は `.pfdsl/bindings/pfd-ops.md`「このリポの作業規律」の「ブランチと作業準備」が一次情報。
 消えた編集を探すとき `git stash list` を先に見ることも配布層の同じ手順が持つ。
-過去の干渉の症状と当時の対応記録は `.pfdsl/bindings/pfd-retro-patterns/shared-worktree-interference.md`。現行の復旧は上記の binding「手順 1 の追加で worktree と upstream を確認する」と、この checkout の指示に従う。
+過去の干渉の症状と当時の対応記録は `.pfdsl/bindings/pfd-retro-patterns/shared-worktree-interference.md`。現行の復旧は上記の binding「ブランチと作業準備」と、この checkout の指示に従う。
 
 **worktree 前提**: 新規 worktree では CLI/core が未ビルドのため `check` が失敗する。ゲート実行前に `pnpm install && pnpm -r build` を済ませる。
 `.claude/skills/pfdsl` は gitignore 済の symlink（#348・#714）のため新規 worktree に存在せず、そのままでは `make check-docs` が companion-bindings の dead path で失敗する — `make setup`（または `node scripts/link-repo-skill.mjs`）を先に実行する（ビルドは不要）。
@@ -55,7 +55,7 @@ commit内でinstallerを呼ばず、配置はsetup・preflightが担当する。
 default branchの判定はref名の比較であり、同じcommitを指すfeature branchと解決可能なdetached HEADは許可する。
 pre-commitを経由しないref操作やローカルの誤編集を網羅的に防ぐことは保証しない（ADR-0050）。
 
-**worktree での git 操作**: `git commit` など git コマンドは worktree ディレクトリを指して実行する（理由は `.pfdsl/bindings/pfd-ops.md`「このリポの作業規律」の「手順 2 の追加で worktree 上の変更を検証する」が一次情報）。
+**worktree での git 操作**: `git commit` など git コマンドは worktree ディレクトリを指して実行する（理由は `.pfdsl/bindings/pfd-ops.md`「このリポの作業規律」の「worktree 上の変更を検証する」が一次情報）。
 Codex の変更系 Git は `git -C <絶対パス>`、apply_patch は絶対パスを既定とする。
 作業先は harness の割当と実際の checkout で確認し、repo hook でコマンド文字列やプロセスから所有者・作用先を推定しない。
 Git hook と remote の必須 check は、それぞれ commit 時の検査と main の統合条件を担う。
@@ -128,7 +128,7 @@ develop 完了時点（PR 作成前、マージを待たない）で:
 
 ## レビューの実施粒度
 
-原則（diff の規模に review の重さを合わせる）は `.pfdsl/bindings/pfd-ops.md`「このリポの作業規律」の「終端ゲートの追加項目を検査して完了を確認する」が一次情報。
+原則（diff の規模に review の重さを合わせる）は `.pfdsl/bindings/pfd-ops.md`「このリポの作業規律」の「レビュー」と「PR と統合」が一次情報。
 手段の起動数は、発火した観点と必要な独立性を満たしたうえで差分の規模に合わせる。
 
 - 軽い側: 数十行・1〜2ファイル中心。観点1・2を別 agent 1本で覆える場合はまとめ、追加の角度や agent を増やさない
@@ -184,7 +184,7 @@ spec 統合時の Opus 外部レビューで繰り返し指摘された項目:
 
 ### 委譲時の入力（構造捏造の予防）
 
-一般形（生成物が適合すべき既存構造は実物から読んで委譲入力に明示する）は `.pfdsl/bindings/pfd-ops.md`「このリポの作業規律」の「適用点 3 で実装を委譲し外向き操作の担当を定める」が一次情報。
+一般形（生成物が適合すべき既存構造は実物から読んで委譲入力に明示する）は `.pfdsl/bindings/pfd-ops.md`「このリポの作業規律」の「実装を委譲し外向き操作の担当を定める」が一次情報。
 proposal 起草での「既存構造」は対象 spec の現行 frontmatter キー構造・制約節番号であり、`spec.md` の該当節を読ませる/grep させることで渡す。
 渡さなかった実例が 2026-06-20 の捏造（spec に無い `presentation` ブロック — review-perspectives A「入力充足」の委譲版）で、戻り後レビューで検出した。
 
@@ -235,7 +235,7 @@ push・release は生成出力のstage済み未commit差分も拒否し、stage�
 自動stage・自動コミットは行わない。
 配布する install payload は `scripts/lib/install-templates.mjs` の許可一覧から skill の `installFiles` 宣言を導出し、開発用ファイルを列挙し直さない。
 
-**生成物 drift 検査はコミット分割を制約する**: 規則は `.pfdsl/bindings/pfd-ops.md`「このリポの作業規律」の「終端ゲートの追加項目を検査して完了を確認する」にあるコミット粒度ゲートが一次情報。このリポで該当する検査は`gen-plugin`（inventoryが選ぶ手書き入力と`CLAUDE.md`・settings・hooksからClaude root、Codex root、repository Codex assetsを同時に導出する結合gate）と`gen-install`。
+**生成物 drift 検査はコミット分割を制約する**: 規則は `.pfdsl/bindings/pfd-ops.md`「このリポの作業規律」の「レビュー」と「PR と統合」にあるコミット粒度ゲートが一次情報。このリポで該当する検査は`gen-plugin`（inventoryが選ぶ手書き入力と`CLAUDE.md`・settings・hooksからClaude root、Codex root、repository Codex assetsを同時に導出する結合gate）と`gen-install`。
 
 **出力抑制**: `make gen-samples` / `make gen-skill` はpnpm全パッケージbuild + 全サンプルcheckのwarningを毎回出力するため数百行に及ぶ。実行後は`git status --short docs/samples/ plugin/pfdsl/ plugin/pfdsl-codex/ AGENTS.md .agents/ .codex/`で変更ファイルのみ確認すれば足りる（ビルド自体の成否は非ゼロ終了コードで分かる）。
 
@@ -356,7 +356,7 @@ GUI領域の受入時機は roadmap.md「GUI領域の実装・実機受入・公
 
 ## subagent の worktree 隔離の安全確認
 
-一般形は `.pfdsl/bindings/pfd-ops.md`「このリポの作業規律」の「適用点 3 で実装を委譲し外向き操作の担当を定める」が一次情報。
+一般形は `.pfdsl/bindings/pfd-ops.md`「このリポの作業規律」の「実装を委譲し外向き操作の担当を定める」が一次情報。
 このリポの `issue-worker` は呼び出し元が割り当てた worktree で起動し、起動先の root・branch と割当を確認する。
 手順の正本は `.claude/agents/issue-worker.md` であり、agent 自身が手動で作成した worktree を所有扱いに変えない。
 乗っ取りが実際に起きたのは issue #439 の issue-worker 試走で、呼び出し元ブランチは無傷で復旧できたが、一歩間違えば作業中のコミット履歴を破壊しかねなかった。
@@ -376,14 +376,14 @@ repo scope の agent（`ci-triage` 等、このリポの開発都合の道具）
 
 ## agent を追加するサイクルの動作確認
 
-原則（起動できるかは確かめるまで分からないので送る前に1回呼ぶ・引き渡す検証手順は壊れたことの確認を含む）は `.pfdsl/bindings/pfd-ops.md`「このリポの作業規律」の「手順 2 の追加で worktree 上の変更を検証する」が一次情報。
+原則（起動できるかは確かめるまで分からないので送る前に1回呼ぶ・引き渡す検証手順は壊れたことの確認を含む）は `.pfdsl/bindings/pfd-ops.md`「このリポの作業規律」の「worktree 上の変更を検証する」が一次情報。
 このリポでの実測は #754 — `Agent` tool が `Agent type 'local-check-triage' not found` を返し、引き渡した `git stash push -- <file>` は当該変更のコミット後に空振りして検査が緑を返した。
 前者は「同一セッションからは起動できない」の実例として記録されていたが、harness のドキュメントは定義の追加を検出して再起動なしに使えると述べており、再起動が要るのはディレクトリごと新設した場合等に限られる。
 #754 が当たったのはその例外側だったとみられる — 1事例から一般則を立てた形なので、同種の記録は「この回はこうだった」までに留める。
 
 ## 委譲先の外向き操作の担当
 
-担当範囲と戻り時の確認は `.pfdsl/bindings/pfd-ops.md`「このリポの作業規律」の「適用点 3 で実装を委譲し外向き操作の担当を定める」が一次情報。
+担当範囲と戻り時の確認は `.pfdsl/bindings/pfd-ops.md`「このリポの作業規律」の「実装を委譲し外向き操作の担当を定める」が一次情報。
 ここにはこのリポの実装値のみを書く。
 
 **1. agent の選択。** 実装だけを委譲するなら `pfd-implementer`（`tools:` に `mcp__github__*` を含まない）。
@@ -471,6 +471,6 @@ cycle window の再利用には base tip と開始 commit の同一性も必要�
 
 - **終端ゲートの機械項目と報告材料（pfd-ops 手順3・#462）**: `GH_HOST=github.com node scripts/gate-check.mjs [--base main] [--artifact <key> [--in-progress] | --no-artifact] [--issue <n> ...]` — 内部で `git fetch origin` を試みたうえで `origin/<base>...HEAD` を基準に差分を取る（fetch 失敗時も既存 remote-tracking ref で続行し、ref 自体が無ければ明示エラーで終了する）。**項目名・PASS/FAIL/SKIP の判定・SKIP 条件はここに列挙しない** — スクリプトの出力が自己記述的であり、実行すれば全項目が detail 付きで印字される（#560。列挙をここに置くとスクリプト変更のたび手で追随することになり、追随を保証する機構が無い）。`--artifact <key>` を渡すと status 更新・wip 経由の両方をその artifact に厳密スコープする（省略時はどちらも粗いフォールバック判定になる旨を detail に明示）。出力 artifact を持たないサイクル（`flow:exempt` の bookkeeping 等）は `--no-artifact` で宣言する — `roadmap.pfdsl` を status 以外の理由で触ると、宣言なしでは構造的に FAIL する（#564）。表のほかに報告材料が印字される。**その種類・件数・内容もここに列挙しない** — 同じ理由で、出力が節見出しごと自己記述する（#839）。機械結果に含まれない判断は `scripts/harness-template/skills/pfd-ops/references/work-cycle.md` の「3. 反映 — 終端ゲート」を直接確認する。スクリプトは本文を解析・再印字せず、PR 作成前の同節とPR 作成後の `PR 作成後` 項目への固定案内だけを表示する
 
-- **対象 issue は全て明示する**: 終端の `--issue <n>` は繰り返し指定でき、各 issue の通常読取と、既存の人間確認案内への対象提示に使う。記録固有の PASS/FAIL や確認済み状態は出さない。省略時は対象を推測せず、人間確認を終えたとも扱わない。`cycle-status.mjs` は利用者が選び明示した各 issue を着手前確認の対象とし、その全件を含む `gateCheckCommand` を出す。記録の存在・正本・承認根拠への参照と対応は binding「終端ゲートの追加項目を検査して完了を確認する」で人間が確認する。変更された知識成果物のバイト・行差分は従来どおり報告材料として印字する。
+- **対象 issue は全て明示する**: 終端の `--issue <n>` は繰り返し指定でき、各 issue の通常読取と、既存の人間確認案内への対象提示に使う。記録固有の PASS/FAIL や確認済み状態は出さない。省略時は対象を推測せず、人間確認を終えたとも扱わない。`cycle-status.mjs` は利用者が選び明示した各 issue を着手前確認の対象とし、その全件を含む `gateCheckCommand` を出す。記録の存在・正本・承認根拠への参照と対応は binding「レビュー」と「PR と統合」で人間が確認する。変更された知識成果物のバイト・行差分は従来どおり報告材料として印字する。
 
 選択記録の記録先と再承認は `roadmap.md`「終端ゲート追加項目（issue 固有）」に従う。
