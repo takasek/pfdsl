@@ -61,6 +61,12 @@ it("preserves a legitimate null issue body as an empty body", async () => {
 });
 
 describe("parseOwnerRepo", () => {
+	it("removes the git suffix before a trailing slash", () => {
+		assert.deepEqual(parseOwnerRepo("https://github.com/takasek/pfdsl.git/"), {
+			owner: "takasek",
+			repo: "pfdsl",
+		});
+	});
 	it("https URL with .git suffix", () => {
 		assert.deepEqual(parseOwnerRepo("https://github.com/takasek/pfdsl.git"), {
 			owner: "takasek",

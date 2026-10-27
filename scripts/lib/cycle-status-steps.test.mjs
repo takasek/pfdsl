@@ -572,6 +572,40 @@ describe("runCycleStatus", () => {
 		);
 		assert.equal(result.gateCheckCommand, null);
 		assert.match(result.gateCheckCommandError, /roadmap unreadable/);
+		assert.match(
+			result.gateCheckCommandError,
+			/^failed to read \.pfdsl\/roadmap\.pfdsl:/,
+		);
+	});
+
+	it("identifies origin resolution failures separately from roadmap read failures", async () => {
+		const deps = baseDeps({
+			issueNumbers: [42],
+			readFileSync: () => roadmapWithIssue("proc_a", 42),
+		});
+		deps.githubOps.repository = () => {
+			throw new Error("origin is unavailable");
+		};
+		const result = await runCycleStatus(deps);
+		assert.equal(result.gateCheckCommand, null);
+		assert.equal(
+			result.gateCheckCommandError,
+			"failed to resolve origin repository: origin is unavailable",
+		);
+	});
+
+	it("identifies invalid roadmap YAML separately from file reads", async () => {
+		const result = await runCycleStatus(
+			baseDeps({
+				issueNumbers: [42],
+				readFileSync: () => "---\nprocess: [\n---\n",
+			}),
+		);
+		assert.equal(result.gateCheckCommand, null);
+		assert.match(
+			result.gateCheckCommandError,
+			/^failed to parse \.pfdsl\/roadmap\.pfdsl:/,
+		);
 	});
 
 	it("reports issueTargets with the gh error when the gh issue lookup throws", async () => {
