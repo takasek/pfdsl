@@ -320,6 +320,10 @@ gh pr view <PR番号> --json body,baseRefName,closingIssuesReferences
 
 **develop 開始前に hotfix 判定を行う** — 3条件の確認前に issue 起票・roadmap 追加を開始しない。issue なし develop は hotfix、または「PR 本文規約」の `no-issue: <理由>` 宣言を伴う場合のみに限る。
 
+#### 分類ラベル付与の許可要否
+
+このリポでは、`flow:managed` / `flow:exempt` の付与・変更は分類作業であり、issue の close・PR の merge・公開物の publish 等の確定操作ではないため、ユーザーへの明示確認なしに実行してよい。分類基準と判定タイミングは pfd-ops の `references/github-issues-backend.md` に従う。ユーザーが指定した対象・操作の限定と、実行環境の権限は引き続き守る。
+
 #### flow:exempt のバッチ管理（親トラッカー issue）
 
 複数の `flow:exempt` issue をまとめて記録・順序管理したい場合、GitHub issue 本文にタスクリスト形式で列挙した親トラッカー issue を1つ立ててよい（roadmap.pfdsl には載せず、親issue自体も exempt）。子issueを close した際は、親issueのタスクリスト該当行を手動で `[x]` に更新する — 本文中の手書き `- [ ] #123` 形式は GitHub のネイティブ task-list 連動（相手issueを convert-to-issue した場合のみ働く自動チェック機能）の対象にならず、close しても自動チェックされない。全件完了で親issue自体を close する。

@@ -70,6 +70,7 @@ Do not move all old instructions into that slot.
 | work-cycle conversation timing, audit invocation and record markers | Adopter's driver or execution rules |
 | pfd-retro generic operational-event checks and audit execution management | Adopter's operational audit, called from its own entry point |
 | GitHub preset's design-record placement, exact-write procedure, PR body/closing-reference rules and hotfix policy | Adopter's development rules |
+| GitHub preset's permission to assign or change `flow:managed` / `flow:exempt` without another confirmation | Adopter's execution rules; preserve this policy there if it is still intended, together with local scope and permission limits |
 | File tracker's design-record placement and approval-reference policy | Adopter's development rules |
 | pfd-retro knowledge-artifact audit | Independent `pfd-knowledge-audit` skill in the same plugin |
 | Dormant capabilities and nonterminating mechanisms | PFD diagram lenses, limited to modeled process inputs, consumers and acceptance criteria |
