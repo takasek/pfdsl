@@ -231,7 +231,7 @@ artifact:
   backend_neutral_work_item_contract:
     label: バックエンドに依存しない作業項目の対応契約
     description: 両バックエンドの reference に重複している作業項目と process の対応の規則を、protocol に1つだけ置く（対象の規則は ADR-0048 契約6）
-    status: wip
+    status: done
     criteria: >
       両バックエンドの reference に同じ規則の本文が残らず、どちらも protocol に置いた1つの契約を参照する。
       その契約は作業項目と process を location: で対応付け、1つの作業項目に複数の process を対応させてよく、process id の接頭辞で作業項目を表す規約を持たない。
