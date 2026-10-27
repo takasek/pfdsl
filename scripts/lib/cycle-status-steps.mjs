@@ -247,12 +247,15 @@ export async function runCycleStatus({
 	const untriagedTargetIssues = [];
 	if (targetIssues.length > 0) {
 		let processIdsByIssue = null;
+		let operation = "read .pfdsl/roadmap.pfdsl";
 		try {
 			const roadmapText = readFileSync(
 				resolve(root, ".pfdsl/roadmap.pfdsl"),
 				"utf-8",
 			);
+			operation = "resolve origin repository";
 			const repository = githubOps.repository();
+			operation = "parse .pfdsl/roadmap.pfdsl";
 			processIdsByIssue = new Map(
 				targetIssues.map((issue) => [
 					issue,
@@ -260,7 +263,7 @@ export async function runCycleStatus({
 				]),
 			);
 		} catch (e) {
-			gateCheckCommandError = `failed to read .pfdsl/roadmap.pfdsl: ${e.message}`;
+			gateCheckCommandError = `failed to ${operation}: ${e.message}`;
 		}
 		if (processIdsByIssue !== null) {
 			// The one moment the missing roadmap entry is actionable (#963): this

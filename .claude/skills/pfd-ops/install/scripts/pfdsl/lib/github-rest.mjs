@@ -28,7 +28,10 @@ const MAX_PAGES = 100;
  * @returns {{owner: string, repo: string} | null}
  */
 export function parseOwnerRepo(remoteUrl) {
-	const stripped = remoteUrl.trim().replace(/\.git$/, "");
+	const stripped = remoteUrl
+		.trim()
+		.replace(/\/+$/, "")
+		.replace(/\.git$/, "");
 	const scpMatch = stripped.match(/^[\w.-]+@[\w.-]+:(.+)$/);
 	const pathPart = scpMatch
 		? scpMatch[1]
