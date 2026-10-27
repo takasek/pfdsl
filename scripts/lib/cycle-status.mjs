@@ -28,12 +28,13 @@ export function findProcessIdsForIssueNumber(
 	pfdslText,
 	issueNumber,
 	repository,
+	diagnostics = [],
 ) {
 	const frontmatter =
 		pfdslText.match(/^---\r?\n([\s\S]*?)^---\s*$/m)?.[1] ?? pfdslText;
 	const document = parseDocument(frontmatter);
 	if (document.errors.length > 0) throw document.errors[0];
-	return parseIssueProcesses(document.toJS() ?? {}, repository)
+	return parseIssueProcesses(document.toJS() ?? {}, repository, diagnostics)
 		.filter((process) => process.issueNumbers.includes(issueNumber))
 		.map((process) => process.id);
 }

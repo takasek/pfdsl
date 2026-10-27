@@ -69,7 +69,16 @@ describe("execGh", () => {
 			process.env.GH_REPO = "github.com/other/repository";
 			process.env.PATH = fakePath;
 			try {
-				assert.equal(await execGh(["issue", "list"], { cwd }), expected);
+				assert.equal(
+					await execGh(["issue", "list"], {
+						cwd,
+						repository: () => {
+							const [host, owner, repo] = expected.split("/");
+							return { host, owner, repo };
+						},
+					}),
+					expected,
+				);
 			} finally {
 				if (old === undefined) delete process.env.GH_REPO;
 				else process.env.GH_REPO = old;

@@ -241,6 +241,7 @@ export async function runCycleStatus({
 	let artifactKey = null;
 	const artifactCandidates = new Map();
 	let gateCheckCommandError = null;
+	const locationDiagnostics = [];
 	/** @type {number[]} target issues labelled flow:managed with no process yet */
 	const unregisteredManagedIssues = [];
 	/** @type {number[]} target issues with no flow label and no process yet */
@@ -253,13 +254,18 @@ export async function runCycleStatus({
 				resolve(root, ".pfdsl/roadmap.pfdsl"),
 				"utf-8",
 			);
-			operation = "resolve origin repository";
+			operation = "resolve issue repository";
 			const repository = githubOps.repository();
 			operation = "parse .pfdsl/roadmap.pfdsl";
 			processIdsByIssue = new Map(
 				targetIssues.map((issue) => [
 					issue,
-					findProcessIdsForIssueNumber(roadmapText, issue, repository),
+					findProcessIdsForIssueNumber(
+						roadmapText,
+						issue,
+						repository,
+						locationDiagnostics,
+					),
 				]),
 			);
 		} catch (e) {
@@ -420,6 +426,15 @@ export async function runCycleStatus({
 	if (releasePendingError) result.releasePendingError = releasePendingError;
 	if (readyError) result.readyError = readyError;
 	if (issueError) result.issueError = issueError;
+	if (locationDiagnostics.length > 0)
+		result.locationDiagnostics = [
+			...new Map(
+				locationDiagnostics.map((finding) => [
+					`${finding.processId}:${finding.location}`,
+					finding,
+				]),
+			).values(),
+		];
 	if (gateCheckCommandError)
 		result.gateCheckCommandError = gateCheckCommandError;
 	return result;

@@ -45,17 +45,20 @@ export function parseOwnerRepo(remoteUrl) {
 }
 
 /**
- * Extract the host (authority minus userinfo, keeping an explicit port) from a
- * git remote URL. Handles https, ssh://, and git@ scp-like forms. This is the
- * host `gh` must target: deriving it from the repo's own remote lets callers
- * pin GH_HOST to the repo, neutralizing an ambient GH_HOST that points at a
- * different host (a multi-host `gh` login otherwise fails with "none of the
- * git remotes ... correspond to the GH_HOST environment variable").
+ * Extract the web authority from a remote, keeping HTTPS ports but discarding
+ * SSH transport ports. SSH aliases are resolved by repository-identity.mjs.
  * @param {string} remoteUrl
  * @returns {string | null}
  */
 export function parseHost(remoteUrl) {
 	const url = remoteUrl.trim();
+	if (url.startsWith("ssh://")) {
+		try {
+			return new URL(url).hostname;
+		} catch {
+			return null;
+		}
+	}
 	const scp = url.match(/^[\w.-]+@([\w.-]+(?::\d+)?):/);
 	if (scp) return scp[1];
 	const schemeMatch = url.match(/^\w+:\/\/(?:[^/@]+@)?([^/]+)/);

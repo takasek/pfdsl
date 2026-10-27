@@ -66,6 +66,7 @@ for (const consumer of consumers.slice(0, 2)) {
 					PATH: bin,
 					GH_TOKEN: "",
 					GITHUB_TOKEN: "",
+					GH_REPO: "github.com/example/project",
 				};
 				writeFileSync(
 					join(bin, "gh"),

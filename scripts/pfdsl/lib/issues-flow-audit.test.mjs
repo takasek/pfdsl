@@ -54,6 +54,28 @@ describe("closed issue audit removal", () => {
 // ---------------------------------------------------------------------------
 
 describe("parseIssueProcesses", () => {
+	it("diagnoses foreign issue links without matching them or warning on other work items", () => {
+		const diagnostics = [];
+		assert.deepEqual(
+			parseIssueProcesses(
+				{
+					process: {
+						foreign: { location: "https://github.com/other/app/issues/7" },
+						local: { location: "https://github.com/acme/app/issues/7" },
+						document: { location: "work-items.md#7" },
+					},
+				},
+				{ host: "github.com", owner: "acme", repo: "app" },
+				diagnostics,
+			),
+			[{ id: "local", issueNumbers: [7] }],
+		);
+		assert.equal(diagnostics.length, 1);
+		assert.equal(diagnostics[0].processId, "foreign");
+		assert.match(diagnostics[0].detail, /other\/app/);
+		assert.match(diagnostics[0].detail, /acme\/app/);
+		assert.equal(diagnostics[0].advisory, true);
+	});
 	it("uses only location links, including arrays and repeated issue ownership", () => {
 		const fm = {
 			process: {

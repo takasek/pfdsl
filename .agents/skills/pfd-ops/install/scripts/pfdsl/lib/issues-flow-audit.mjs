@@ -51,7 +51,7 @@ export function computeLabelFindings(expectedLabels, actualLabels) {
  * @param {{host: string, owner: string, repo: string}} [repository]
  * @returns {number[]}
  */
-export function issueNumbersOfLocation(location, repository) {
+export function issueNumbersOfLocation(location, repository, diagnostics = []) {
 	const result = new Set();
 	for (const value of Array.isArray(location) ? location : [location]) {
 		if (typeof value !== "string") continue;
@@ -66,32 +66,47 @@ export function issueNumbersOfLocation(location, repository) {
 		);
 		if (!match || url.protocol !== "https:" || url.username || url.password)
 			continue;
+		const number = Number(match[3]);
+		if (!Number.isSafeInteger(number)) continue;
 		if (
 			url.host.toLowerCase() !==
-			(repository?.host ?? "github.com").toLowerCase()
-		)
+				(repository?.host ?? "github.com").toLowerCase() ||
+			(repository &&
+				(match[1].toLowerCase() !== repository.owner.toLowerCase() ||
+					match[2].toLowerCase() !== repository.repo.toLowerCase()))
+		) {
+			const actual = `${url.host}/${match[1]}/${match[2]}`;
+			const expected = repository
+				? `${repository.host}/${repository.owner}/${repository.repo}`
+				: "github.com";
+			diagnostics.push({
+				type: "foreign_issue_location",
+				location: value,
+				issueNumber: number,
+				advisory: true,
+				detail: `location ${value} refers to ${actual}; selected repository is ${expected}. This link is not matched. To audit that repository, select it with GH_REPO=[HOST/]OWNER/REPO.`,
+			});
 			continue;
-		if (
-			repository &&
-			(match[1].toLowerCase() !== repository.owner.toLowerCase() ||
-				match[2].toLowerCase() !== repository.repo.toLowerCase())
-		)
-			continue;
-		const number = Number(match[3]);
-		if (Number.isSafeInteger(number)) result.add(number);
+		}
+		result.add(number);
 	}
 	return [...result];
 }
 
 /** @param {object} frontmatter @param {{host: string, owner: string, repo: string}} [repository] @returns {{ id: string, issueNumbers: number[] }[]} */
-export function parseIssueProcesses(frontmatter, repository) {
+export function parseIssueProcesses(frontmatter, repository, diagnostics = []) {
 	const process = frontmatter.process;
 	if (!process) return [];
 	const result = [];
 	for (const id of Object.keys(process)) {
+		const locationDiagnostics = [];
 		const issueNumbers = issueNumbersOfLocation(
 			process[id]?.location,
 			repository,
+			locationDiagnostics,
+		);
+		diagnostics.push(
+			...locationDiagnostics.map((finding) => ({ ...finding, processId: id })),
 		);
 		if (issueNumbers.length === 0) continue;
 		result.push({ id, issueNumbers });
