@@ -29,9 +29,9 @@ node <skill-directory>/scripts/classify-knowledge-lifecycle.mjs <repository-root
 旧 binding の散文を宣言や実行手順として採用することはない。
 実行・読取・JSON 取得に失敗したら、その失敗を報告して監査を止め、分類結果を推測しない。
 
-`state` が `adopt` のときだけ `references/knowledge-lifecycle.md` を読み、`auditTargets` の成果物を監査する。
-それ以外の state では監査せず、`reportRequired` が true なら `reports` の不備・移行警告を毎回報告する。
-`decline` でも旧宣言の移行警告は消さない。
+`reportRequired` が true なら、`state` にかかわらず `reports` の不備・移行警告を毎回報告する。
+そのうえで、`state` が `adopt` のときだけ `references/knowledge-lifecycle.md` を読み、`auditTargets` の成果物を監査する。
+それ以外の state では監査しない。
 不足した対象を所在・散文・将来の予定から補わない。
 
 宣言は `{"mode": "adopt" | "decline", "targets": [...]}` の形である。
