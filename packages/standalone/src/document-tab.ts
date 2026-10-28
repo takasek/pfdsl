@@ -49,7 +49,6 @@ interface DocumentTabOptions {
 /** One Monaco editor and preview pair, with private snapshot and refresh state. */
 export function createDocumentTab({
 	parent,
-	key,
 	name,
 	source,
 	path,
@@ -60,6 +59,7 @@ export function createDocumentTab({
 	exportServices,
 	showExportResults,
 }: DocumentTabOptions) {
+	const document = parent.ownerDocument;
 	let snapshot: DocumentModel | undefined;
 	let revision = 0;
 	let sourceVersion = 0;
@@ -83,11 +83,8 @@ export function createDocumentTab({
 	dependencyProblems.setAttribute("aria-label", "Dependency problems");
 	dependencyProblems.hidden = true;
 	previewColumn.append(dependencyProblems);
-	const model = monaco.editor.createModel(
-		source,
-		"pfdsl",
-		monaco.Uri.parse(`inmemory://pfdsl/${encodeURIComponent(key)}`),
-	);
+	// Workspace keys are local to a mount; let Monaco allocate its model identity.
+	const model = monaco.editor.createModel(source, "pfdsl");
 	const editor = monaco.editor.create(editorElement, {
 		model,
 		automaticLayout: true,
@@ -365,7 +362,6 @@ export function createDocumentTab({
 		sourceVersion++;
 		renameTracking.observe(editor.getValue(), event?.isUndoing);
 		normalizedEdges.clear();
-		button.textContent = `${name}${editor.getValue() === source ? "" : " •"}`;
 		requestEditorRender();
 		requestRefresh();
 		onChange?.();
@@ -474,12 +470,10 @@ export function createDocumentTab({
 			path = nextPath;
 			name = nextName;
 			if (readSource) read = readSource;
-			button.textContent = `${name}${editor.getValue() === source ? "" : " •"}`;
 			requestRefresh();
 		},
 		markSaved(value: string) {
 			source = value;
-			button.textContent = `${name}${editor.getValue() === source ? "" : " •"}`;
 		},
 		hasUnsavedText: () => editor.getValue() !== source,
 		normalize() {

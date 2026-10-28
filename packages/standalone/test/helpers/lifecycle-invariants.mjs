@@ -1,8 +1,8 @@
 // Invariants derived from README "Application behavior". They are stated over
-// what the host recorded (dialogs with their displayed text and the button
-// clicked, request and resolution order of every native call, the editor stub,
-// the DOM) and over the fake filesystem. No invariant reads the application's
-// session state, so a remodel of that state cannot blind them.
+// what the host recorded (review payloads and decisions, request and resolution
+// order of every native call, the editor buffer, conflict presentation) and over
+// the fake filesystem. The controller adapter reads public requests and snapshots;
+// the DOM adapter reads displayed content. Neither reads private session state.
 //
 // "Acknowledged" content of a file is what the host saw the application load
 // into the editor (open, Use Current Disk Version, a clean reload), write
@@ -26,7 +26,7 @@
 //    and compares against what the application last learned about it.
 // O  Observation completeness: the panel reflects the files as they are.
 // V  An operation shown in a dialog is refused if its editor was edited before execution.
-import { fsOf } from "./lifecycle-harness.mjs";
+import { fsOf } from "./lifecycle-native.mjs";
 
 const REVIEW = "Review the target";
 const RECREATE = "Recreate missing file";
@@ -298,8 +298,8 @@ export function checkReads({ host, tab, trace, violate }) {
  * P: the panel names the recovery target by its current path, compares against
  * what the application last learned about it, and offers actions that fit.
  */
-export function checkPanel({ host, native, violate, recoveryId, original }) {
-	const panel = host.panel();
+export function checkPanel({ host, violate, recoveryId, original }) {
+	const panel = host.conflict();
 	if (!panel.present) {
 		const receipt = host.ledger?.saves?.findLast((item) =>
 			recoveryId === undefined
@@ -332,10 +332,7 @@ export function checkPanel({ host, native, violate, recoveryId, original }) {
 			"P",
 			"the panel says the original also changed but it is the recovery target",
 		);
-	const target =
-		recoveryId ??
-		[...native.docs.values()].find((doc) => doc.path === panel.recoveryPath)
-			?.id;
+	const target = recoveryId ?? panel.targetId;
 	if (target === undefined) return;
 	const receipts = host.ledger.received.filter((item) => item.id === target);
 	const latest = receipts.at(-1);
@@ -365,9 +362,9 @@ export function checkPanel({ host, native, violate, recoveryId, original }) {
 		}
 	}
 	const unknown = Boolean(latest.unknown);
-	if (panel.review && panel.review.disabled !== unknown)
+	if (panel.actions.review !== !unknown)
 		violate("P", "Review and Save Here… does not follow what is known");
-	if (panel.use && panel.use.disabled !== (unknown || latest.source === null))
+	if (panel.actions.useDisk !== (!unknown && latest.source !== null))
 		violate("P", "Use Current Disk Version… does not follow what is known");
 }
 
@@ -383,7 +380,7 @@ export function checkObservation({
 	recovery,
 	violate,
 }) {
-	const panel = host.panel();
+	const panel = host.conflict();
 	if (!panel.present) {
 		violate("O", "no conflict panel in a recovery state");
 		return;

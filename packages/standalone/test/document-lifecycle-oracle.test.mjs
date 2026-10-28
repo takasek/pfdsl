@@ -2,13 +2,13 @@
 // events, editor/DOM observations and fake native bindings are supplied.
 import assert from "node:assert/strict";
 import test from "node:test";
-import { FakeNative } from "./helpers/lifecycle-harness.mjs";
 import {
 	checkAction,
 	checkObservation,
 	checkPanel,
 	checkReads,
 } from "./helpers/lifecycle-invariants.mjs";
+import { FakeNative } from "./helpers/lifecycle-native.mjs";
 
 const capture = (run) => {
 	const violations = [];
@@ -156,7 +156,7 @@ for (const relation of ["same-binding", "hard-link"])
 					: fs.link(a, 9, "alias.pfdsl");
 			a.file.source = "external";
 			const host = {
-				panel: () => ({
+				conflict: () => ({
 					present: true,
 					preview: "external",
 					recoveryPath: b.path,
@@ -180,7 +180,7 @@ for (const relation of ["same-binding", "hard-link"])
 		});
 
 test("oracle P | an unresolved recovery requires a panel", () => {
-	const host = { panel: () => ({ present: false }) };
+	const host = { conflict: () => ({ present: false }) };
 	assert.ok(
 		capture((violate) =>
 			checkPanel({ host, native, recoveryId: 2, violate }),
@@ -190,7 +190,7 @@ test("oracle P | an unresolved recovery requires a panel", () => {
 
 test("oracle P | recorded unresolved recovery requires a panel without a target hint", () => {
 	const host = {
-		panel: () => ({ present: false }),
+		conflict: () => ({ present: false }),
 		activeTab: () => tabA,
 		isOpen: () => true,
 		ledger: {

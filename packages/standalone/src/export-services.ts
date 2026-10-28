@@ -1,5 +1,5 @@
 import type { ExportFormat } from "@pfdsl/editor";
-import { invoke } from "@tauri-apps/api/core";
+import type { invoke as nativeInvoke } from "@tauri-apps/api/core";
 import type { ExportSelection } from "./export-run.js";
 
 export interface ExportServices {
@@ -12,13 +12,17 @@ export interface ExportServices {
 	pdf(svg: string, width: number, height: number): Promise<Uint8Array>;
 }
 
-export const nativeExportServices: ExportServices = {
-	choose: (name, formats) => invoke("choose_export", { name, formats }),
-	write: (id, format, bytes) =>
-		invoke("write_export", { id, format, bytes: Array.from(bytes) }),
-	release: (id) => invoke("release_export", { id }),
-	pdf: async (svg, width, height) =>
-		new Uint8Array(
-			await invoke<number[]>("export_pdf", { svg, width, height }),
-		),
-};
+export function createNativeExportServices(
+	invoke: typeof nativeInvoke,
+): ExportServices {
+	return {
+		choose: (name, formats) => invoke("choose_export", { name, formats }),
+		write: (id, format, bytes) =>
+			invoke("write_export", { id, format, bytes: Array.from(bytes) }),
+		release: (id) => invoke("release_export", { id }),
+		pdf: async (svg, width, height) =>
+			new Uint8Array(
+				await invoke<number[]>("export_pdf", { svg, width, height }),
+			),
+	};
+}

@@ -10,40 +10,24 @@ test("Save As recovery retains target ownership and refuses intervening edits in
 		join(root, "packages/standalone/node_modules/.host-recovery-"),
 	);
 	const output = join(temp, "main.mjs");
-	const keys = [
-		"document",
-		"window",
-		"self",
-		"setInterval",
-		"calls",
-		"nativeInvoke",
-		"nativeListen",
-		"nativeAcceptance",
-		"reviewEntries",
-		"reviewActive",
-		"reviewBusy",
-		"reviewMenuItems",
-	];
-	const old = new Map(
-		keys.map((key) => [key, Object.getOwnPropertyDescriptor(globalThis, key)]),
-	);
+	let application;
 	let dom;
 	try {
-		globalThis.reviewMenuItems = [];
 		dom = new JSDOM(
 			readFileSync(`${root}/packages/standalone/index.html`, "utf8"),
 		);
-		globalThis.document = dom.window.document;
-		globalThis.window = dom.window;
-		globalThis.self = dom.window;
-		dom.window.__TAURI_INTERNALS__ = {};
+		const document = dom.window.document;
+		const tabs = [];
+		const openTabs = () => tabs.filter((tab) => tab.button.isConnected);
+		const activeTab = () =>
+			openTabs().find(
+				(tab) => tab.button.getAttribute("aria-selected") === "true",
+			);
+		const isDirty = (tab) => tab.button.textContent.endsWith(" •");
+		const tabName = (tab) => tab.button.textContent.replace(/ •$/, "");
 		dom.window.HTMLDialogElement.prototype.showModal = () => {};
 		dom.window.HTMLDialogElement.prototype.close = () => {};
 		let poll;
-		globalThis.setInterval = (fn) => {
-			poll = fn;
-			return 0;
-		};
 		const A = {
 			id: 1,
 			path: "/A/a.pfdsl",
@@ -72,16 +56,16 @@ test("Save As recovery retains target ownership and refuses intervening edits in
 		let releaseAcceptance;
 		let pendingClose = null;
 		let pendingExitAck = null;
-		globalThis.nativeAcceptance = () =>
+		const verifyCorpus = () =>
 			new Promise((resolve) => {
 				releaseAcceptance = resolve;
 			});
-		globalThis.nativeListen = async (_, listener) => {
+		const listen = async (_, listener) => {
 			quitListener = listener;
 			return () => {};
 		};
-		globalThis.calls = [];
-		globalThis.nativeInvoke = async (command, args) => {
+		const calls = [];
+		const invoke = async (command, args) => {
 			calls.push({ command, args });
 			if (command === "document_capabilities")
 				return { save: true, reason: null };
@@ -115,34 +99,67 @@ test("Save As recovery retains target ownership and refuses intervening edits in
 			throw new Error(`unexpected command ${command}`);
 		};
 		await bundleHost(output);
-		await import(pathToFileURL(output).href);
-		const flush = async () => {
-			for (let i = 0; i < 100; i++) await Promise.resolve();
-		};
+		const {
+			mountApplication,
+			createDocumentTab,
+			createTextComparison,
+			createTestMenu,
+		} = await import(pathToFileURL(output).href);
+		let menu;
+		application = mountApplication({
+			document,
+			createDocumentTab(options) {
+				const tab = createDocumentTab(options);
+				tabs.push(tab);
+				return tab;
+			},
+			createTextComparison,
+			scheduler: {
+				setInterval(callback) {
+					poll = callback;
+					return 0;
+				},
+				clearInterval() {},
+			},
+			native: {
+				invoke,
+				listen,
+				verifyCorpus,
+				installMenu: async (command, recent) => {
+					menu = createTestMenu(command, recent);
+					return menu;
+				},
+				setTitle: async () => {},
+				closeWindow: async () => {},
+			},
+		});
+		// A turn boundary allows deliberately pending dialogs and native reads to
+		// reach their observable checkpoints without awaiting those held operations.
+		const nextTurn = () => new Promise((resolve) => setImmediate(resolve));
 		const click = async (selector) => {
 			document.querySelector(selector).click();
-			await flush();
+			await nextTurn();
 		};
 		const command = async (id) => {
-			await flush();
-			const item = globalThis.reviewMenuItems.find((item) => item.id === id);
+			await nextTurn();
+			const item = menu.items.find((item) => item.id === id);
 			assert.ok(item, `Missing menu command ${id}`);
 			if (item.enabled) item.action();
-			await flush();
+			await Promise.race([application.idle(), nextTurn()]);
 		};
 		const dialogClick = async (text) => {
 			[...document.querySelectorAll("dialog button")]
 				.find((b) => b.textContent === text)
 				.click();
-			await flush();
+			await nextTurn();
 		};
 		// Equal display paths can belong to different selected directories.
 		const baselineSelection = selectedDocument;
-		const baselineTabCount = reviewEntries.size;
+		const baselineTabCount = openTabs().length;
 		selectedDocument = { ...A, id: 100, binding: "old-parent:a.pfdsl" };
 		await command("open-file");
-		const oldBinding = reviewActive();
-		oldBinding.tab.setSource("keep old edits");
+		const oldBinding = activeTab();
+		oldBinding.setSource("keep old edits");
 		selectedDocument = {
 			...A,
 			id: 101,
@@ -151,15 +168,15 @@ test("Save As recovery retains target ownership and refuses intervening edits in
 			source: "new folder content",
 		};
 		await command("open-file");
-		const newBinding = reviewActive();
+		const newBinding = activeTab();
 		assert.notEqual(newBinding, oldBinding);
-		assert.equal(newBinding.tab.getSource(), "new folder content");
-		assert.equal(oldBinding.tab.getSource(), "keep old edits");
+		assert.equal(newBinding.getSource(), "new folder content");
+		assert.equal(oldBinding.getSource(), "keep old edits");
 		for (let id = 102; id < 112; id++) {
 			selectedDocument = { ...selectedDocument, id };
 			await command("open-file");
-			assert.equal(reviewActive(), newBinding);
-			assert.equal(reviewEntries.size, baselineTabCount + 2);
+			assert.equal(activeTab(), newBinding);
+			assert.equal(openTabs().length, baselineTabCount + 2);
 			assert.ok(
 				calls.some(
 					(call) =>
@@ -186,8 +203,8 @@ test("Save As recovery retains target ownership and refuses intervening edits in
 		);
 		for (const document of [oldBinding, newBinding]) {
 			decisions = ["discard"];
-			document.navigation.querySelector(".close-document").click();
-			await flush();
+			document.button.parentElement.querySelector(".close-document").click();
+			await nextTurn();
 		}
 		for (const id of [100, 111])
 			assert.ok(
@@ -195,12 +212,12 @@ test("Save As recovery retains target ownership and refuses intervening edits in
 					(call) => call.command === "release_document" && call.args.id === id,
 				),
 			);
-		assert.equal(reviewEntries.size, baselineTabCount);
+		assert.equal(openTabs().length, baselineTabCount);
 		selectedDocument = baselineSelection;
 		saveTarget = B;
 		await command("open-file");
-		const entry = reviewActive();
-		entry.tab.setSource("local");
+		const entry = activeTab();
+		entry.setSource("local");
 		await command("save-as");
 		await dialogClick("Replace Observed Version");
 		// The panel names the target its buttons act on.
@@ -210,14 +227,14 @@ test("Save As recovery retains target ownership and refuses intervening edits in
 			)?.[1];
 		const results = {
 			beforePoll: {
-				disk: entry.session.disk.path,
+				disk: entry.location,
 				recovery: recoveryPath(),
 			},
 		};
 		poll();
-		await flush();
+		await nextTurn();
 		results.afterPoll = {
-			disk: entry.session.disk.path,
+			disk: entry.location,
 			recovery: recoveryPath(),
 		};
 		// Exercise the real host recovery DOM for a reply lost after a clean Save As.
@@ -237,13 +254,13 @@ test("Save As recovery retains target ownership and refuses intervening edits in
 		};
 		saveReply = new Error("native reply lost");
 		await command("open-file");
-		const uncertain = reviewActive();
+		const uncertain = activeTab();
 		await command("save-as");
 		await dialogClick("Replace Observed Version");
-		assert.equal(uncertain.session.isDirty(), true);
-		assert.equal(uncertain.session.disk.path, selectedDocument.path);
+		assert.equal(isDirty(uncertain), true);
+		assert.equal(uncertain.location, selectedDocument.path);
 
-		assert.equal(uncertain.tab.getSource(), A.source);
+		assert.equal(uncertain.getSource(), A.source);
 		assert.match(
 			document.querySelector("#conflicts").textContent,
 			/could not be confirmed/,
@@ -268,8 +285,8 @@ test("Save As recovery retains target ownership and refuses intervening edits in
 			false,
 		);
 		decisions = ["discard"];
-		uncertain.navigation.querySelector(".close-document").click();
-		await flush();
+		uncertain.button.parentElement.querySelector(".close-document").click();
+		await nextTurn();
 		// A manually supplied packet is emitted by the actual native post-publication fault test.
 		if (process.env.PFDSL_NATIVE_SAVE_RECEIPT) {
 			const packet = JSON.parse(
@@ -282,24 +299,22 @@ test("Save As recovery retains target ownership and refuses intervening edits in
 			saveTarget = packet.baseline;
 			saveReply = packet.result;
 			await command("open-file");
-			const nativeFailure = reviewActive();
-			nativeFailure.tab.setSource(packet.buffer);
+			const nativeFailure = activeTab();
+			nativeFailure.setSource(packet.buffer);
 			await command("save-as");
 			await dialogClick("Replace Observed Version");
 			assert.match(
 				document.querySelector("#conflicts").textContent,
 				/Content was published/,
 			);
-			assert.equal(
-				nativeFailure.session.disk.revision,
-				packet.baseline.revision,
-			);
-			assert.equal(
-				nativeFailure.session.usesDocument(packet.baseline.id),
-				true,
-			);
-			assert.equal(nativeFailure.tab.getSource(), packet.buffer);
-			assert.equal(nativeFailure.session.isDirty(), true);
+			// Revision bookkeeping belongs to the DocumentSession unit contract.
+			// The host must retain the original location and dependency-read capability.
+			assert.equal(nativeFailure.location, packet.baseline.path);
+			await nativeFailure.read(packet.baseline.path);
+			assert.equal(calls.at(-1).command, "read_dependency");
+			assert.equal(calls.at(-1).args.id, packet.baseline.id);
+			assert.equal(nativeFailure.getSource(), packet.buffer);
+			assert.equal(isDirty(nativeFailure), true);
 
 			assert.match(
 				document.querySelector("#conflicts").textContent,
@@ -312,8 +327,10 @@ test("Save As recovery retains target ownership and refuses intervening edits in
 				true,
 			);
 			decisions = ["discard"];
-			nativeFailure.navigation.querySelector(".close-document").click();
-			await flush();
+			nativeFailure.button.parentElement
+				.querySelector(".close-document")
+				.click();
+			await nextTurn();
 		}
 		saveReply = null;
 		saveTarget = B;
@@ -322,24 +339,24 @@ test("Save As recovery retains target ownership and refuses intervening edits in
 		// Open B independently while A still owns a failed Save As recovery.
 		selectedDocument = published;
 		await command("open-file");
-		const other = reviewActive();
+		const other = activeTab();
 		assert.notEqual(other, entry);
-		other.tab.setSource("unsaved B buffer");
-		entry.tab.button.click();
+		other.setSource("unsaved B buffer");
+		entry.button.click();
 		await click("#conflicts button:nth-of-type(3)");
 		if (document.querySelector("dialog")) await dialogClick("Use Disk Version");
 		assert.equal(
-			entry.session.disk.path,
+			entry.location,
 			A.path,
 			"a target already open elsewhere must not be adopted",
 		);
-		assert.equal(entry.tab.getSource(), "local");
-		assert.equal(other.tab.getSource(), "unsaved B buffer");
+		assert.equal(entry.getSource(), "local");
+		assert.equal(other.getSource(), "unsaved B buffer");
 		// Finish this separate tab explicitly so later recovery can adopt B.
-		other.tab.setSource(published.source);
-		other.navigation.querySelector(".close-document").click();
-		await flush();
-		entry.tab.button.click();
+		other.setSource(published.source);
+		other.button.parentElement.querySelector(".close-document").click();
+		await nextTurn();
+		entry.button.click();
 		// Recreate B's pending recovery; choose its disk version before an A poll.
 		await command("save-as");
 		await dialogClick("Replace Observed Version");
@@ -347,28 +364,26 @@ test("Save As recovery retains target ownership and refuses intervening edits in
 		pendingInspect = new Promise((resolve) => (release = resolve));
 		await click("#conflicts button:nth-of-type(3)");
 		await dialogClick("Use Disk Version");
-		entry.tab.setSource("typed after confirmation");
+		entry.setSource("typed after confirmation");
 		release(published);
-		await flush();
+		await nextTurn();
 		pendingInspect = null;
 		results.afterUseDisk = {
-			source: entry.tab.getSource(),
-			disk: entry.session.disk.path,
-			tabLocation: entry.tab.location,
-			name: entry.name,
-			entryPath: entry.path,
+			source: entry.getSource(),
+			disk: entry.location,
+			name: tabName(entry),
+			entryPath: entry.button.title,
 		};
 		await click("#conflicts button:nth-of-type(3)");
 		await dialogClick("Use Disk Version");
 		results.afterStableUseDisk = {
-			source: entry.tab.getSource(),
-			disk: entry.session.disk.path,
-			tabLocation: entry.tab.location,
-			name: entry.name,
-			entryPath: entry.path,
+			source: entry.getSource(),
+			disk: entry.location,
+			name: tabName(entry),
+			entryPath: entry.button.title,
 		};
-		if (entry.tab.read) {
-			await entry.tab.read("/B/preset.yaml");
+		if (entry.read) {
+			await entry.read("/B/preset.yaml");
 			results.dependencyCall = calls.at(-1);
 		}
 		assert.equal(results.beforePoll.disk, A.path);
@@ -384,12 +399,11 @@ test("Save As recovery retains target ownership and refuses intervening edits in
 		assert.equal(results.afterUseDisk.disk, A.path);
 		assert.equal(results.afterStableUseDisk.source, published.source);
 		assert.equal(results.afterStableUseDisk.disk, B.path);
-		assert.equal(results.afterStableUseDisk.tabLocation, B.path);
 		assert.equal(results.afterStableUseDisk.name, "b.pfdsl");
 		assert.equal(results.afterStableUseDisk.entryPath, B.path);
 		assert.equal(results.dependencyCall.args.id, 2);
-		const beforeRenameCount = reviewEntries.size;
-		entry.tab.setSource("unsaved after rename");
+		const beforeRenameCount = openTabs().length;
+		entry.setSource("unsaved after rename");
 		selectedDocument = {
 			...published,
 			id: 3,
@@ -404,39 +418,37 @@ test("Save As recovery retains target ownership and refuses intervening edits in
 		});
 		await command("open-file");
 		pendingInspect = null;
-		assert.equal(reviewActive(), entry);
-		assert.equal(reviewEntries.size, beforeRenameCount);
-		assert.equal(entry.session.disk.path, selectedDocument.path);
-		assert.equal(entry.session.disk.id, 3);
+		assert.equal(activeTab(), entry);
+		assert.equal(openTabs().length, beforeRenameCount);
+		assert.equal(entry.location, selectedDocument.path);
 		assert.ok(
 			calls.some(
 				(call) => call.command === "release_document" && call.args.id === B.id,
 			),
 		);
-		assert.equal(entry.path, selectedDocument.path);
-		assert.equal(entry.tab.location, selectedDocument.path);
-		assert.equal(entry.name, "renamed.pfdsl");
-		assert.equal(entry.tab.getSource(), "unsaved after rename");
-		assert.equal(entry.session.isDirty(), true);
-		await entry.tab.read("/C/preset.yaml");
+		assert.equal(entry.button.title, selectedDocument.path);
+		assert.equal(tabName(entry), "renamed.pfdsl");
+		assert.equal(entry.getSource(), "unsaved after rename");
+		assert.equal(isDirty(entry), true);
+		await entry.read("/C/preset.yaml");
 		assert.equal(calls.at(-1).args.id, 3);
-		assert.equal(reviewBusy(), false);
+		await application.idle();
 		assert.equal(
 			typeof quitListener,
 			"function",
 			"normal native Quit must enter the document transaction",
 		);
 		await command("new");
-		const unsaved = reviewActive();
-		unsaved.tab.setSource("unique untitled buffer");
-		const all = [...reviewEntries];
+		const unsaved = activeTab();
+		unsaved.setSource("unique untitled buffer");
+		const all = openTabs();
 		decisions = ["discard", "cancel"];
 		quitListener({ payload: "1" });
 		quitListener({ payload: "1" });
-		await flush();
-		assert.deepEqual([...reviewEntries], all);
-		assert.equal(entry.tab.getSource(), "unsaved after rename");
-		assert.equal(unsaved.tab.getSource(), "unique untitled buffer");
+		await nextTurn();
+		assert.deepEqual(openTabs(), all);
+		assert.equal(entry.getSource(), "unsaved after rename");
+		assert.equal(unsaved.getSource(), "unique untitled buffer");
 		assert.equal(
 			calls.filter(
 				(c) => c.command === "finish_app_exit" && c.args.request === "1",
@@ -454,9 +466,9 @@ test("Save As recovery retains target ownership and refuses intervening edits in
 		).length;
 		decisions = ["discard", "discard"];
 		quitListener({ payload: "1" });
-		await flush();
+		await nextTurn();
 		assert.deepEqual(
-			[...reviewEntries],
+			openTabs(),
 			all,
 			"a delayed duplicate of a cancelled native request must not close documents",
 		);
@@ -472,13 +484,17 @@ test("Save As recovery retains target ownership and refuses intervening edits in
 			binding: "separate:target.pfdsl",
 		};
 		await command("save-as");
-		assert.equal(reviewBusy(), true);
+		assert.equal(
+			await application.command("new"),
+			false,
+			"a foreground operation rejects a second command",
+		);
 		let releaseExitAck;
 		pendingExitAck = new Promise((resolve) => {
 			releaseExitAck = resolve;
 		});
 		quitListener({ payload: "2" });
-		await flush();
+		await nextTurn();
 		assert.equal(
 			calls.find(
 				(c) => c.command === "finish_app_exit" && c.args.request === "2",
@@ -486,15 +502,15 @@ test("Save As recovery retains target ownership and refuses intervening edits in
 			false,
 		);
 		await dialogClick("Keep Editing");
-		assert.equal(reviewBusy(), false);
+		await application.idle();
 		const promptsAfterBusy = calls.filter(
 			(c) => c.command === "confirm_close_document",
 		).length;
 		decisions = ["discard", "discard"];
 		quitListener({ payload: "2" });
-		await flush();
+		await nextTurn();
 		assert.deepEqual(
-			[...reviewEntries],
+			openTabs(),
 			all,
 			"a delayed duplicate of a busy-rejected Quit must retain all buffers",
 		);
@@ -504,10 +520,10 @@ test("Save As recovery retains target ownership and refuses intervening edits in
 		);
 		releaseExitAck();
 		pendingExitAck = null;
-		await flush();
+		await nextTurn();
 		quitListener({ payload: "2" });
-		await flush();
-		assert.deepEqual([...reviewEntries], all);
+		await nextTurn();
+		assert.deepEqual(openTabs(), all);
 		assert.equal(
 			calls.filter((c) => c.command === "confirm_close_document").length,
 			promptsAfterBusy,
@@ -515,9 +531,9 @@ test("Save As recovery retains target ownership and refuses intervening edits in
 		decisions = ["discard", "save"];
 		saveTarget = null;
 		quitListener({ payload: "3" });
-		await flush();
+		await nextTurn();
 		assert.deepEqual(
-			[...reviewEntries],
+			openTabs(),
 			all,
 			"Save As cancellation must cancel Quit and retain earlier Discard decisions",
 		);
@@ -532,7 +548,7 @@ test("Save As recovery retains target ownership and refuses intervening edits in
 			releaseClose = resolve;
 		});
 		quitListener({ payload: "4" });
-		await flush();
+		await nextTurn();
 		selectedDocument = {
 			...B,
 			id: 11,
@@ -543,21 +559,22 @@ test("Save As recovery retains target ownership and refuses intervening edits in
 			revision: "d0",
 		};
 		releaseAcceptance({ path: selectedDocument.path });
-		await flush();
-		const late = reviewActive();
+		await nextTurn();
+		const late = activeTab();
 		assert.notEqual(late, unsaved);
-		late.tab.setSource("unique late editor");
+		late.setSource("unique late editor");
 		pendingClose = null;
 		decisions = ["discard"];
 		releaseClose("discard");
-		await flush();
+		await nextTurn();
 		assert.equal(
-			reviewEntries.size,
+			openTabs().length,
 			all.length + 1,
 			"a document added during Quit must abort before disposing earlier documents",
 		);
-		for (const original of all) assert.equal(reviewEntries.has(original), true);
-		assert.equal(late.tab.getSource(), "unique late editor");
+		for (const original of all)
+			assert.equal(openTabs().includes(original), true);
+		assert.equal(late.getSource(), "unique late editor");
 		assert.equal(
 			calls.find(
 				(c) => c.command === "finish_app_exit" && c.args.request === "4",
@@ -566,8 +583,8 @@ test("Save As recovery retains target ownership and refuses intervening edits in
 		);
 		decisions = ["discard", "discard", "discard"];
 		quitListener({ payload: "5" });
-		await flush();
-		assert.equal(reviewEntries.size, 0);
+		await nextTurn();
+		assert.equal(openTabs().length, 0);
 		assert.equal(
 			calls.find(
 				(c) => c.command === "finish_app_exit" && c.args.request === "5",
@@ -578,8 +595,8 @@ test("Save As recovery retains target ownership and refuses intervening edits in
 		selectedDocument = A;
 		inspectSnapshots.set(A.id, A);
 		await command("open-file");
-		const originalLink = reviewActive();
-		originalLink.tab.setSource("edit original leaf");
+		const originalLink = activeTab();
+		originalLink.setSource("edit original leaf");
 		const alias = {
 			...A,
 			id: 31,
@@ -589,11 +606,12 @@ test("Save As recovery retains target ownership and refuses intervening edits in
 		inspectSnapshots.set(alias.id, alias);
 		selectedDocument = alias;
 		await command("open-file");
-		assert.equal(reviewEntries.size, 2);
-		assert.notEqual(reviewActive(), originalLink);
-		assert.equal(originalLink.session.disk.id, A.id);
-		assert.equal(originalLink.path, A.path);
-		originalLink.tab.button.click();
+		assert.equal(openTabs().length, 2);
+		assert.notEqual(activeTab(), originalLink);
+		await originalLink.read("/A/preset.yaml");
+		assert.equal(calls.at(-1).args.id, A.id);
+		assert.equal(originalLink.button.title, A.path);
+		originalLink.button.click();
 		saveReply = {
 			outcome: "saved",
 			current: { ...A, source: "edit original leaf", revision: "a1" },
@@ -605,18 +623,18 @@ test("Save As recovery retains target ownership and refuses intervening edits in
 			calls.filter((c) => c.command === "save_document").at(-1).args.id,
 			A.id,
 		);
-		assert.equal(originalLink.session.isDirty(), false);
+		assert.equal(isDirty(originalLink), false);
 		quitListener({ payload: "6" });
-		await flush();
-		assert.equal(reviewEntries.size, 0);
+		await nextTurn();
+		assert.equal(openTabs().length, 0);
 		inspectSnapshots.clear();
 		saveReply = null;
 		// Closing must observe changes made after the last poll, even while busy.
 		for (const scenario of ["deleted tab", "moved quit", "unreadable tab"]) {
 			selectedDocument = { ...A, id: 20, identity: `inode:${scenario}` };
 			await command("open-file");
-			const clean = reviewActive();
-			assert.equal(clean.session.isDirty(), false);
+			const clean = activeTab();
+			assert.equal(isDirty(clean), false);
 			const start = calls.length;
 			if (scenario === "unreadable tab")
 				inspectFailure = new Error("disk cannot be inspected");
@@ -629,16 +647,16 @@ test("Save As recovery retains target ownership and refuses intervening edits in
 				});
 			decisions = ["cancel"];
 			if (scenario === "moved quit") quitListener({ payload: "7" });
-			else clean.navigation.querySelector(".close-document").click();
-			await flush();
+			else clean.button.parentElement.querySelector(".close-document").click();
+			await nextTurn();
 			const closingCalls = calls.slice(start);
 			assert.ok(closingCalls.some((c) => c.command === "inspect_document"));
 			assert.ok(
 				closingCalls.some((c) => c.command === "confirm_close_document"),
 			);
-			assert.equal(clean.session.isDirty(), true);
-			assert.equal(reviewEntries.has(clean), true);
-			assert.equal(clean.tab.getSource(), A.source);
+			assert.equal(isDirty(clean), true);
+			assert.equal(openTabs().includes(clean), true);
+			assert.equal(clean.getSource(), A.source);
 			if (scenario === "moved quit")
 				assert.equal(
 					closingCalls.find((c) => c.command === "finish_app_exit").args
@@ -648,23 +666,23 @@ test("Save As recovery retains target ownership and refuses intervening edits in
 			pendingInspect = null;
 			inspectFailure = null;
 			decisions = ["discard"];
-			clean.navigation.querySelector(".close-document").click();
-			await flush();
-			assert.equal(reviewEntries.size, 0);
+			clean.button.parentElement.querySelector(".close-document").click();
+			await nextTurn();
+			assert.equal(openTabs().length, 0);
 		}
 		selectedDocument = { ...A, id: 21, identity: "inode:delayed close" };
 		await command("open-file");
-		const delayed = reviewActive();
+		const delayed = activeTab();
 		let releasePoll;
 		pendingInspect = new Promise((resolve) => {
 			releasePoll = resolve;
 		});
 		const start = calls.length;
 		poll();
-		await flush();
-		delayed.navigation.querySelector(".close-document").click();
-		await flush();
-		assert.equal(reviewEntries.has(delayed), true);
+		await nextTurn();
+		delayed.button.parentElement.querySelector(".close-document").click();
+		await nextTurn();
+		assert.equal(openTabs().includes(delayed), true);
 		assert.equal(
 			calls.slice(start).filter((c) => c.command === "inspect_document").length,
 			1,
@@ -674,12 +692,12 @@ test("Save As recovery retains target ownership and refuses intervening edits in
 			releaseFresh = resolve;
 		});
 		releasePoll(selectedDocument);
-		await flush();
+		await nextTurn();
 		assert.equal(
 			calls.slice(start).filter((c) => c.command === "inspect_document").length,
 			2,
 		);
-		assert.equal(reviewEntries.has(delayed), true);
+		assert.equal(openTabs().includes(delayed), true);
 		assert.equal(
 			calls.slice(start).some((c) => c.command === "confirm_close_document"),
 			false,
@@ -691,32 +709,36 @@ test("Save As recovery retains target ownership and refuses intervening edits in
 			revision: null,
 			identity: null,
 		});
-		await flush();
-		assert.equal(reviewEntries.has(delayed), true);
-		assert.equal(delayed.session.isDirty(), true);
-		assert.equal(delayed.tab.getSource(), A.source);
+		await nextTurn();
+		assert.equal(openTabs().includes(delayed), true);
+		assert.equal(isDirty(delayed), true);
+		assert.equal(delayed.getSource(), A.source);
 		pendingInspect = null;
 		decisions = ["discard"];
-		delayed.navigation.querySelector(".close-document").click();
-		await flush();
-		assert.equal(reviewEntries.size, 0);
+		delayed.button.parentElement.querySelector(".close-document").click();
+		await nextTurn();
+		assert.equal(openTabs().length, 0);
 		// A changes while B's confirmation is pending: the entire native quit is refused.
 		selectedDocument = A;
 		inspectSnapshots.set(A.id, A);
 		await command("open-file");
-		const early = reviewActive();
+		const early = activeTab();
 		selectedDocument = B;
 		inspectSnapshots.set(B.id, B);
 		await command("open-file");
-		const later = reviewActive();
-		later.tab.setSource("dirty B during quit");
+		const later = activeTab();
+		later.setSource("dirty B during quit");
 		let releaseLater;
 		pendingClose = new Promise((resolve) => {
 			releaseLater = resolve;
 		});
 		quitListener({ payload: "21" });
-		await flush();
-		assert.equal(reviewBusy(), true);
+		await nextTurn();
+		assert.equal(
+			await application.command("new"),
+			false,
+			"a foreground operation rejects a second command",
+		);
 		inspectSnapshots.set(A.id, {
 			...A,
 			source: null,
@@ -725,12 +747,12 @@ test("Save As recovery retains target ownership and refuses intervening edits in
 		});
 		releaseLater("discard");
 		pendingClose = null;
-		await flush();
-		assert.equal(reviewEntries.has(early), true);
-		assert.equal(reviewEntries.has(later), true);
-		assert.equal(early.tab.getSource(), A.source);
-		assert.equal(early.session.isDirty(), true);
-		assert.equal(later.tab.getSource(), "dirty B during quit");
+		await nextTurn();
+		assert.equal(openTabs().includes(early), true);
+		assert.equal(openTabs().includes(later), true);
+		assert.equal(early.getSource(), A.source);
+		assert.equal(isDirty(early), true);
+		assert.equal(later.getSource(), "dirty B during quit");
 		assert.equal(
 			calls.find(
 				(c) => c.command === "finish_app_exit" && c.args.request === "21",
@@ -738,13 +760,8 @@ test("Save As recovery retains target ownership and refuses intervening edits in
 			false,
 		);
 	} finally {
-		for (let i = 0; i < 100; i++) await Promise.resolve();
+		application?.dispose();
 		dom?.window.close();
-		for (const key of keys) {
-			const descriptor = old.get(key);
-			if (descriptor) Object.defineProperty(globalThis, key, descriptor);
-			else delete globalThis[key];
-		}
 		rmSync(temp, { recursive: true, force: true });
 	}
 });

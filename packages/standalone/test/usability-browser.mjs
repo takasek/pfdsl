@@ -17,9 +17,13 @@ const server = await createServer({
 	plugins: [
 		{
 			name: "usability-workspace-fixtures",
-			transform(code, id) {
-				if (id === join(root, "src/main.ts"))
-					return `${code}\nwindow.usabilityWorkspace = { open: openDocument, active: () => active?.tab, tabs: () => [...opened].map(entry => entry.tab) };`;
+			transformIndexHtml: {
+				order: "pre",
+				handler(html, context) {
+					return context.originalUrl?.includes("workspace-fixture")
+						? html.replace("/src/main.ts", "/test/helpers/browser-entry.mjs")
+						: html;
+				},
 			},
 		},
 	],
@@ -62,13 +66,13 @@ try {
 			await page.getByRole("button", { name: "Fit", exact: true }).click();
 	}
 	console.log("PASS overflowing tabs and trusted Ctrl+Tab events");
-	await page.goto(server.resolvedUrls.local[0]);
 	// Inject file receipts at the host boundary; keep the real workspace and Monaco.
 	// This does not exercise the native file chooser or filesystem.
-	await page.evaluate(() => {
+	await page.goto(`${server.resolvedUrls.local[0]}?workspace-fixture`);
+	await page.evaluate(async () => {
 		for (const [index, folder] of ["red", "blue"].entries()) {
 			const source = `# ${folder}\n# navigation\na >> p -> b\n`;
-			window.usabilityWorkspace.open("flow.pfdsl", source, {
+			await window.usabilityWorkspace.open({
 				id: index + 1,
 				path: `/work/${folder}/shared/flow.pfdsl`,
 				source,

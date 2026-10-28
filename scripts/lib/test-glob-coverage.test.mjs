@@ -1,17 +1,53 @@
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
-import { dirname, resolve } from "node:path";
+import { dirname, relative, resolve } from "node:path";
 import { describe, it } from "node:test";
 import { fileURLToPath } from "node:url";
+import { parse } from "yaml";
 
 import {
+	extractEntrypointTestGlobs,
 	extractTestGlobs,
 	findUnrunTestFiles,
 	matchesGlob,
 } from "./test-glob-coverage.mjs";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
+
+describe("extractEntrypointTestGlobs", () => {
+	const packages = [
+		{ path: "packages/app", testScript: 'node --test "test/*.test.mjs"' },
+		{ path: "packages/library", testScript: "vitest run --coverage" },
+	];
+	it("includes workspace test scripts at their package working directories", () => {
+		assert.deepEqual(
+			extractEntrypointTestGlobs(
+				["pnpm -r test", 'node --test "scripts/*.test.mjs"'],
+				packages,
+			),
+			["packages/app/test/*.test.mjs", "scripts/*.test.mjs"],
+		);
+	});
+	it("does not credit workspace tests when the entrypoint does not run them", () => {
+		assert.deepEqual(
+			extractEntrypointTestGlobs(
+				["pnpm -r build", 'node --test "scripts/*.test.mjs"'],
+				packages,
+			),
+			["scripts/*.test.mjs"],
+		);
+	});
+	it("retains duplicate execution paths so the repository check can reject them", () => {
+		assert.deepEqual(
+			extractEntrypointTestGlobs(
+				["pnpm -r test", 'node --test "packages/app/test/*.test.mjs"'],
+				packages,
+			),
+			["packages/app/test/*.test.mjs", "packages/app/test/*.test.mjs"],
+		);
+	});
+});
 
 describe("extractTestGlobs", () => {
 	it("extracts the quoted globs of a `node --test` invocation", () => {
@@ -128,46 +164,66 @@ describe("findUnrunTestFiles", () => {
 });
 
 describe("the repository's own test globs", () => {
-	/** Tracked `*.test.mjs` paths, repo-relative — the set that must all be run. */
+	/** Tracked Node test paths, repo-relative — each must run once per entrypoint. */
 	function trackedTestFiles() {
-		const stdout = execFileSync("git", ["ls-files", "*.test.mjs"], {
-			cwd: root,
-			encoding: "utf-8",
-		});
+		const stdout = execFileSync(
+			"git",
+			["ls-files", "*.test.mjs", "*.test.cjs"],
+			{
+				cwd: root,
+				encoding: "utf-8",
+			},
+		);
 		return stdout.split("\n").filter(Boolean);
 	}
 
 	const makefile = readFileSync(resolve(root, "Makefile"), "utf-8");
-	const workflow = readFileSync(
-		resolve(root, ".github/workflows/test.yml"),
-		"utf-8",
+	const recipe = /^test:[^\n]*\n((?:\t[^\n]*\n)*)/m.exec(makefile);
+	assert.ok(recipe, "Makefile must declare the test recipe");
+	const makeCommands = recipe[1]
+		.trim()
+		.split("\n")
+		.map((line) => line.trim());
+	const workflow = parse(
+		readFileSync(resolve(root, ".github/workflows/test.yml"), "utf-8"),
 	);
+	const workflowCommands = workflow.jobs.test.steps.flatMap((step) =>
+		step.run ? step.run.split("\n") : [],
+	);
+	const workspacePackages = JSON.parse(
+		execFileSync("pnpm", ["-r", "list", "--depth", "-1", "--json"], {
+			cwd: root,
+			encoding: "utf8",
+		}),
+	).map(({ path }) => ({
+		path: relative(root, path).replaceAll("\\", "/"),
+		testScript:
+			JSON.parse(readFileSync(resolve(path, "package.json"), "utf8")).scripts
+				?.test ?? "",
+	}));
+	const entrypoints = [
+		["make test", makeCommands],
+		["CI", workflowCommands],
+	].map(([name, commands]) => ({
+		name,
+		globs: extractEntrypointTestGlobs(commands, workspacePackages),
+	}));
 
-	it("`make test` runs every tracked *.test.mjs file", () => {
-		const unrun = findUnrunTestFiles(
-			trackedTestFiles(),
-			extractTestGlobs(makefile),
-		);
-		assert.deepEqual(
-			unrun,
-			[],
-			`Makefile's node --test globs never reach: ${unrun.join(", ")}`,
-		);
-	});
-
-	it("CI runs every tracked *.test.mjs file", () => {
-		const unrun = findUnrunTestFiles(
-			trackedTestFiles(),
-			extractTestGlobs(workflow),
-		);
-		assert.deepEqual(
-			unrun,
-			[],
-			`test.yml's node --test globs never reach: ${unrun.join(", ")}`,
-		);
-	});
+	for (const { name, globs } of entrypoints) {
+		it(`${name} runs every tracked Node test exactly once`, () => {
+			const unexpected = trackedTestFiles().flatMap((file) => {
+				const runs = globs.filter((glob) => matchesGlob(file, glob)).length;
+				return runs === 1 ? [] : [{ file, runs }];
+			});
+			assert.deepEqual(
+				unexpected,
+				[],
+				`${name}: missing or repeated test files`,
+			);
+		});
+	}
 
 	it("CI and `make test` use the same glob set, so a local pass predicts CI", () => {
-		assert.deepEqual(extractTestGlobs(workflow), extractTestGlobs(makefile));
+		assert.deepEqual(entrypoints[1].globs, entrypoints[0].globs);
 	});
 });

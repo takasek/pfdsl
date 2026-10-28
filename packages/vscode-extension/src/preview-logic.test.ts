@@ -12,30 +12,25 @@ describe("buildHtml", () => {
 
 	// The webview runs with scripts enabled, so the policy is what keeps a
 	// crafted .pfdsl from reaching anything but our own bundle.
-	describe("content security policy", () => {
-		const csp =
-			html.match(
-				/http-equiv="Content-Security-Policy" content="([^"]+)"/,
-			)?.[1] ?? "";
-
-		it("denies everything by default", () => {
-			expect(csp).toContain("default-src 'none'");
-		});
-
-		it("allows scripts only from the webview's own cspSource", () => {
-			expect(csp).toContain(
-				"script-src https://cdn.example 'wasm-unsafe-eval'",
-			);
-		});
-
-		it("allows connections only to that same source", () => {
-			expect(csp).toContain("connect-src https://cdn.example");
-		});
-
-		it("allows images only as inline data, never fetched from a host", () => {
-			expect(csp).toContain("img-src data:");
-			expect(csp).not.toMatch(/img-src[^;]*https?:\/\//);
-		});
+	it("allows only the declared webview resource sources in its content security policy", () => {
+		const policies = [
+			...html.matchAll(
+				/http-equiv="Content-Security-Policy" content="([^"]+)"/g,
+			),
+		];
+		expect(policies).toHaveLength(1);
+		const directives = policies[0]![1]!
+			.split(";")
+			.map((directive) => directive.trim().split(/\s+/).join(" "))
+			.filter(Boolean)
+			.sort();
+		expect(directives).toEqual([
+			"connect-src https://cdn.example",
+			"default-src 'none'",
+			"img-src data:",
+			"script-src https://cdn.example 'wasm-unsafe-eval'",
+			"style-src 'unsafe-inline'",
+		]);
 	});
 
 	it("declares the mount points the webview script attaches to", () => {

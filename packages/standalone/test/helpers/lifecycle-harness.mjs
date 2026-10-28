@@ -4,156 +4,16 @@ import { join } from "node:path";
 import { after } from "node:test";
 import { pathToFileURL } from "node:url";
 import { bundleHost, JSDOM, root } from "./host-bundle.mjs";
+import {
+	createLifecycleEvidence,
+	createNativeRecorder,
+} from "./lifecycle-evidence.mjs";
+import { fsOf } from "./lifecycle-native.mjs";
 
-export const TEXT = { disk: "disk v1\n", edited: "edited by the user\n" };
-
-export class FakeNative {
-	constructor() {
-		this.ino = 1000;
-		this.clock = 1;
-		this.docs = new Map();
-	}
-	add(id, name, source) {
-		const doc = {
-			id,
-			path: `/A/${name}`,
-			binding: `dir:${name}`,
-			file: { source, ino: ++this.ino, mtime: ++this.clock },
-			unreadable: false,
-			writes: 0,
-			history: [],
-		};
-		this.docs.set(id, doc);
-		return doc;
-	}
-	/** The selected directory moved: the same file now has another path. */
-	move(doc, path) {
-		doc.history.push(doc.path);
-		doc.path = path;
-	}
-	/**
-	 * A second capability for the same leaf (the folder was selected again): same
-	 * binding and file, new id.
-	 */
-	reselect(doc, id) {
-		const alias = {
-			id,
-			path: doc.path,
-			binding: doc.binding,
-			history: [],
-			get file() {
-				return doc.file;
-			},
-			set file(value) {
-				doc.file = value;
-			},
-			get unreadable() {
-				return doc.unreadable;
-			},
-			set unreadable(value) {
-				doc.unreadable = value;
-			},
-			get writes() {
-				return doc.writes;
-			},
-			set writes(value) {
-				doc.writes = value;
-			},
-		};
-		this.docs.set(id, alias);
-		return alias;
-	}
-	/** Another leaf name for the same file (a hard link): same content and inode. */
-	link(doc, id, name) {
-		const alias = {
-			id,
-			path: `/A/${name}`,
-			binding: `dir:${name}`,
-			file: doc.file,
-			unreadable: false,
-			writes: 0,
-			history: [],
-		};
-		this.docs.set(id, alias);
-		return alias;
-	}
-	snapshot(doc) {
-		if (doc.unreadable) throw new Error("Permission denied (os error 13)");
-		const base = { id: doc.id, path: doc.path, binding: doc.binding };
-		if (!doc.file)
-			return { ...base, source: null, revision: null, identity: null };
-		const identity = `1:${doc.file.ino}`;
-		return {
-			...base,
-			source: doc.file.source,
-			revision: `${identity}:${doc.file.mtime}:${doc.file.source}`,
-			identity,
-		};
-	}
-	save(doc, source, expected) {
-		const result = (outcome, current, message) => ({
-			outcome,
-			current,
-			message,
-			publication: "not-published",
-			targetState: current
-				? current.source === null
-					? "missing"
-					: "readable"
-				: "unreadable",
-		});
-		let current;
-		try {
-			current = this.snapshot(doc);
-		} catch (error) {
-			return result("failed-before-publication", null, String(error));
-		}
-		// expected null means "create": it succeeds only while the target is still absent.
-		if (current.revision !== (expected ?? null))
-			return result(
-				"conflict",
-				current,
-				"The disk changed. Review it before replacing this version.",
-			);
-		if (current.source === source)
-			return result("saved", current, "Already saved.");
-		doc.file = { source, ino: ++this.ino, mtime: ++this.clock };
-		doc.writes++;
-		return {
-			...result("saved", this.snapshot(doc), "Saved."),
-			publication: "published",
-		};
-	}
-}
-
-const keys = [
-	"document",
-	"window",
-	"self",
-	"setInterval",
-	"nativeInvoke",
-	"nativeListen",
-	"nativeAcceptance",
-	"reviewEntries",
-	"reviewActive",
-	"reviewBusy",
-	"reviewMenuItems",
-	"reviewTabs",
-	"reviewTabHook",
-	"reviewNormalize",
-	"reviewSetTitle",
-];
+export { FakeNative, fsOf, InspectGate, TEXT } from "./lifecycle-native.mjs";
 
 export const flush = async () => {
 	for (let i = 0; i < 100; i++) await Promise.resolve();
-};
-
-export const fsOf = (native, doc) => {
-	try {
-		return native.snapshot(doc);
-	} catch {
-		return { unreadable: true };
-	}
 };
 
 /** Buttons whose click approves replacing, creating or adopting a disk version. */
@@ -163,63 +23,24 @@ const APPROVALS = new Set([
 	"Use Disk Version",
 ]);
 
-/**
- * Holds one inspection of an armed target until `release`, which answers with
- * the file as it is at that moment, like a read that finishes late.
- */
-export class InspectGate {
-	constructor(native) {
-		this.native = native;
-		this.ids = new Set();
-		this.held = null;
-	}
-	arm(...ids) {
-		this.ids = new Set(ids);
-	}
-	hold(id) {
-		if (!this.ids.has(id) || this.held) return undefined;
-		return new Promise((resolve, reject) => {
-			this.held = { id, resolve, reject };
-		});
-	}
-	get isHeld() {
-		return Boolean(this.held);
-	}
-	release() {
-		const held = this.held;
-		if (!held) return false;
-		this.held = null;
-		this.ids = new Set();
-		try {
-			held.resolve(this.native.snapshot(this.native.docs.get(held.id)));
-		} catch (error) {
-			held.reject(error);
-		}
-		return true;
-	}
-}
-
-/** Bundles the production host once; every started host re-evaluates it. */
+/** Import one application factory; each host receives separate DOM and native boundaries. */
 export async function createHarness(label, options) {
-	const old = new Map(
-		keys.map((key) => [key, Object.getOwnPropertyDescriptor(globalThis, key)]),
-	);
 	const temp = mkdtempSync(
 		join(root, `packages/standalone/node_modules/.${label}-`),
 	);
 	const output = join(temp, "main.mjs");
 	await bundleHost(output, options);
-	let cellSerial = 0;
+	const {
+		mountApplication,
+		createDocumentTab,
+		createTextComparison,
+		createTestMenu,
+	} = await import(pathToFileURL(output).href);
 	after(() => {
-		for (const key of keys) {
-			const descriptor = old.get(key);
-			if (descriptor) Object.defineProperty(globalThis, key, descriptor);
-			else delete globalThis[key];
-		}
 		rmSync(temp, { recursive: true, force: true });
 	});
 	/**
-	 * Runs the production main.ts over `native`. Every dialog is answered with the
+	 * Mounts the production application over `native`. Every dialog is answered with the
 	 * choice that confirms replacing or creating the target. `handlers` supplies
 	 * confirm_close_document (confirm), choose_save_target (choose) and may
 	 * - lose a save reply (saveFault: "before" or "after" the write);
@@ -236,61 +57,40 @@ export async function createHarness(label, options) {
 	 * application was told about each file and which versions the user approved.
 	 */
 	async function startHost(native, watched, handlers = {}) {
-		globalThis.reviewMenuItems = [];
+		let menu;
+		const recordedTabs = [];
 		const dom = new JSDOM(
 			readFileSync(`${root}/packages/standalone/index.html`, "utf8"),
 		);
-		const log = [];
-		const ledger = {
-			acks: [],
-			received: [],
-			failures: [],
-			saves: [],
-			offered: [],
-		};
-		let seq = 0;
-		const tick = () => ++seq;
+		const evidence = createLifecycleEvidence(native);
+		const { log, ledger, tick, learn } = evidence;
 		let poll;
 		let quitListener;
 		let selected;
 		let selection;
 		let closeSaveOwner;
 		let closeStart = 0;
-		globalThis.document = dom.window.document;
-		globalThis.window = dom.window;
-		globalThis.self = dom.window;
-		globalThis.reviewTabs = [];
-		dom.window.__TAURI_INTERNALS__ = {};
-		globalThis.setInterval = (fn) => {
-			poll = fn;
-			return 0;
-		};
-		const tabs = () => globalThis.reviewTabs;
+		// Monaco/preview integration still requires its browser realm; fake host tests do not.
+		const previousDocument = options?.realDocumentTabs
+			? Object.getOwnPropertyDescriptor(globalThis, "document")
+			: undefined;
+		if (options?.realDocumentTabs) globalThis.document = dom.window.document;
+		const tabs = () => recordedTabs;
 		const activeTab = () =>
 			tabs().find(
 				(tab) =>
 					tab.button.isConnected &&
 					tab.button.getAttribute("aria-selected") === "true",
 			);
-		const know = (id, state) =>
-			ledger.received.push({ seq: tick(), id, ...state });
 		const approve = (id, content, why, tab = closeSaveOwner ?? activeTab()) =>
-			ledger.acks.push({
-				seq: tick(),
-				id,
-				binding: native.docs.get(id)?.binding,
-				content,
-				why,
-				tab,
-			});
-		const learn = (snapshot) =>
-			know(snapshot.id, {
-				source: snapshot.source,
-				revision: snapshot.revision,
-				path: snapshot.path,
-				binding: snapshot.binding,
-			});
-		globalThis.reviewTabHook = (kind, tab, text) => {
+			evidence.approve(id, content, why, tab);
+		const recorder = createNativeRecorder(
+			native,
+			evidence,
+			handlers,
+			() => closeSaveOwner ?? activeTab(),
+		);
+		const hook = (kind, tab, text) => {
 			if (kind === "dispose") log.push({ kind: "dispose", tab, seq: tick() });
 			if (kind === "type") log.push({ kind: "type", tab, text, seq: tick() });
 			if (kind === "setSource") {
@@ -330,13 +130,14 @@ export async function createHarness(label, options) {
 			this.entry = entry;
 			log.push(entry);
 			handlers.onDialog?.(entry);
+			handlers.onDecision?.(entry);
 		};
-		globalThis.nativeAcceptance = () => new Promise(() => {});
-		globalThis.nativeListen = async (_, listener) => {
+		const verifyCorpus = () => new Promise(() => {});
+		const listen = async (_, listener) => {
 			quitListener = listener;
 			return () => {};
 		};
-		globalThis.nativeInvoke = async (command, args) => {
+		let invoke = async (command, args) => {
 			if (command === "select_folder") return handlers.selectFolder?.() ?? null;
 			if (command === "list_documents") return handlers.listDocuments?.() ?? [];
 			if (command === "remember_folder") return;
@@ -367,107 +168,9 @@ export async function createHarness(label, options) {
 				learn(snapshot);
 				return snapshot;
 			}
-			if (command === "choose_save_target") {
-				const chosen = await handlers.choose();
-				if (chosen) {
-					// A candidate target is shown to the user; it is not recorded as seen.
-					ledger.offered.push({
-						seq: tick(),
-						id: chosen.id,
-						source: chosen.source,
-						revision: chosen.revision,
-						path: chosen.path,
-						binding: chosen.binding,
-					});
-					// Choosing a file starts from no acknowledged content.
-					approve(chosen.id, undefined, "chosen");
-				}
-				log.push({
-					kind: "choose",
-					id: chosen?.id,
-					name: args.name,
-					seq: tick(),
-				});
-				return chosen;
-			}
-			if (command === "inspect_document") {
-				const entry = {
-					kind: "inspect",
-					id: args.id,
-					binding: native.docs.get(args.id)?.binding,
-					seq: tick(),
-					doneSeq: undefined,
-					outcome: undefined,
-				};
-				log.push(entry);
-				const finish = (snapshot) => {
-					entry.doneSeq = tick();
-					entry.outcome = "ok";
-					entry.source = snapshot.source;
-					learn(snapshot);
-					handlers.afterInspect?.(args.id, snapshot);
-					return snapshot;
-				};
-				const fail = (error) => {
-					entry.doneSeq = tick();
-					entry.outcome = "error";
-					ledger.failures.push({ id: args.id, seq: entry.doneSeq });
-					throw error;
-				};
-				const held = handlers.inspectGate?.(args.id);
-				if (held) return held.then(finish, fail);
-				let snapshot;
-				try {
-					snapshot = native.snapshot(native.docs.get(args.id));
-				} catch (error) {
-					return fail(error);
-				}
-				return finish(snapshot);
-			}
-			if (command === "save_document") {
-				// Record submission before simulating work on the native side.
-				const submittedSeq = tick();
-				const target = native.docs.get(args.id);
-				const fault = handlers.saveFault?.(args);
-				handlers.beforeSave?.(args);
-				const forced = handlers.saveReply?.(args);
-				const entry = {
-					kind: "save",
-					tab: closeSaveOwner ?? activeTab(),
-					seq: submittedSeq,
-					id: args.id,
-					binding: target.binding,
-					source: args.source,
-					expected: args.expected,
-					fs: fsOf(native, target),
-					outcome: "lost",
-					wrote: false,
-				};
-				log.push(entry);
-				ledger.saves.push(entry);
-				if (forced) {
-					entry.outcome = forced.outcome;
-					if (forced.current) learn(forced.current);
-					else know(args.id, { unknown: true });
-					return forced;
-				}
-				if (fault === "before") {
-					know(args.id, { unknown: true });
-					throw new Error("native reply lost");
-				}
-				const reply = native.save(target, args.source, args.expected);
-				if (fault === "after") {
-					know(args.id, { unknown: true });
-					throw new Error("native reply lost");
-				}
-				entry.outcome = reply.outcome;
-				entry.wrote = reply.publication === "published";
-				if (reply.current) learn(reply.current);
-				else know(args.id, { unknown: true });
-				if (reply.outcome === "saved" && reply.current)
-					approve(args.id, reply.current.source, "save");
-				return reply;
-			}
+			if (command === "choose_save_target") return recorder.choose(args.name);
+			if (command === "inspect_document") return recorder.inspect(args.id);
+			if (command === "save_document") return recorder.save(args);
 			if (command === "confirm_close_document") {
 				const owner = tabs().find(
 					(tab) =>
@@ -501,17 +204,68 @@ export async function createHarness(label, options) {
 			}
 			throw new Error(`unexpected command ${command}`);
 		};
-		await import(`${pathToFileURL(output).href}?cell=${++cellSerial}`);
+		const app = mountApplication({
+			document: dom.window.document,
+			createTextComparison,
+			createDocumentTab(options) {
+				const tab = createDocumentTab(options, {
+					normalize: handlers.normalize,
+					hook,
+				});
+				recordedTabs.push(tab);
+				return tab;
+			},
+			scheduler: {
+				setInterval(fn) {
+					poll = fn;
+					return 0;
+				},
+				clearInterval() {
+					poll = () => {};
+				},
+			},
+			native: {
+				invoke: (...args) => invoke(...args),
+				listen,
+				verifyCorpus,
+				installMenu: async (command, recent) => {
+					menu = createTestMenu(command, recent);
+					return menu;
+				},
+				setTitle: async (title) => handlers.setTitle?.(title),
+				closeWindow: async () => {},
+			},
+		});
 		await flush();
 		const query = (selector) => dom.window.document.querySelector(selector);
-		const busy = () => globalThis.reviewBusy();
+		const isIdle = async () => {
+			let completed = false;
+			void app.idle().then(() => {
+				completed = true;
+			});
+			await flush();
+			return completed;
+		};
 		const settle = async () => {
 			for (let i = 0; i < 60; i++) {
 				await flush();
 				const dialog = query("dialog");
 				if (dialog) {
 					const title = dialog.querySelector("h2").textContent;
+					const kind = {
+						"Review the target": "replace",
+						"Recreate missing file": "recreate",
+						"Discard editor changes": "adopt",
+					}[title];
+					const decision = await handlers.decide?.({ kind }, dialog.entry);
 					const confirm =
+						{
+							replace: "Replace Observed Version",
+							create: "Create File",
+							disk: "Use Disk Version",
+							cancel: "Keep Editing",
+							another: "Choose Another File",
+						}[decision] ??
 						handlers.dialogChoice?.(title, dialog.entry) ??
 						(title === "Review the target"
 							? "Replace Observed Version"
@@ -534,7 +288,7 @@ export async function createHarness(label, options) {
 						.click();
 					continue;
 				}
-				if (!busy()) {
+				if (await isIdle()) {
 					closeSaveOwner = undefined;
 					return;
 				}
@@ -546,8 +300,7 @@ export async function createHarness(label, options) {
 			element.click();
 			await settle();
 		};
-		const menuItem = (id) =>
-			globalThis.reviewMenuItems.find((item) => item.id === id);
+		const menuItem = (id) => menu.items.find((item) => item.id === id);
 		const command = async (id) => {
 			await flush();
 			const item = menuItem(id);
@@ -565,6 +318,8 @@ export async function createHarness(label, options) {
 			settle,
 			click,
 			command,
+			save: () => command("save"),
+			saveAs: () => command("save-as"),
 			menuItem,
 			query,
 			queryAll: all,
@@ -595,6 +350,24 @@ export async function createHarness(label, options) {
 					review: button("Review and Save Here…"),
 					use: button("Use Current Disk Version…"),
 					saveAs: button("Save As…"),
+				};
+			},
+			/** Semantic observations shared with the controller contract tests. */
+			conflict() {
+				const panel = this.panel();
+				return {
+					present: panel.present,
+					targetId: [...native.docs.values()].find(
+						(doc) => doc.path === panel.recoveryPath,
+					)?.id,
+					recoveryPath: panel.recoveryPath,
+					preview: panel.preview,
+					originalAlsoChanged: panel.originalAlsoChanged,
+					actions: {
+						review: Boolean(panel.review && !panel.review.disabled),
+						useDisk: Boolean(panel.use && !panel.use.disabled),
+						saveAs: Boolean(panel.saveAs && !panel.saveAs.disabled),
+					},
 				};
 			},
 			async open(target) {
@@ -649,12 +422,19 @@ export async function createHarness(label, options) {
 			/** Returns the IPC commands that arrived after the host went idle. */
 			async finish() {
 				await settle();
+				app.dispose();
+				await flush();
 				const leaks = [];
-				globalThis.nativeInvoke = async (command) => {
+				invoke = async (command) => {
 					leaks.push(command);
 				};
 				await flush();
 				dom.window.close();
+				if (options?.realDocumentTabs) {
+					if (previousDocument)
+						Object.defineProperty(globalThis, "document", previousDocument);
+					else delete globalThis.document;
+				}
 				return leaks;
 			},
 		};
