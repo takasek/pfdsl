@@ -49,7 +49,6 @@ interface DocumentTabOptions {
 /** One Monaco editor and preview pair, with private snapshot and refresh state. */
 export function createDocumentTab({
 	parent,
-	key,
 	name,
 	source,
 	path,
@@ -84,11 +83,8 @@ export function createDocumentTab({
 	dependencyProblems.setAttribute("aria-label", "Dependency problems");
 	dependencyProblems.hidden = true;
 	previewColumn.append(dependencyProblems);
-	const model = monaco.editor.createModel(
-		source,
-		"pfdsl",
-		monaco.Uri.parse(`inmemory://pfdsl/${encodeURIComponent(key)}`),
-	);
+	// Workspace keys are local to a mount; let Monaco allocate its model identity.
+	const model = monaco.editor.createModel(source, "pfdsl");
 	const editor = monaco.editor.create(editorElement, {
 		model,
 		automaticLayout: true,

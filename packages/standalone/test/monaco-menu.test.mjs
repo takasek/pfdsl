@@ -89,6 +89,8 @@ test("the production document-tab entry loads real Monaco menu contributions", a
 			stdin: {
 				contents: `
 				import { createDocumentTab } from "./src/document-tab.ts";
+				import { mountApplication } from "./src/application.ts";
+				import { createTextComparison } from "./src/text-comparison.ts";
 				import * as monaco from "monaco-editor/editor/editor.api.js";
 				import { EditorExtensionsRegistry } from "monaco-editor/editor/browser/editorExtensions.js";
 				import { MenuId } from "monaco-editor/platform/actions/common/actions.js";
@@ -106,7 +108,7 @@ test("the production document-tab entry loads real Monaco menu contributions", a
 				const execute = (id, ...args) => StandaloneServices.get(ICommandService).executeCommand(id, ...args);
 				const openLink = url => StandaloneServices.get(IOpenerService).open(url);
 				const focusedEditor = () => StandaloneServices.get(ICodeEditorService).getFocusedCodeEditor();
-				export { createDocumentTab, monaco, EditorExtensionsRegistry, MenuId, languageFeatures, applyEdit, execute, openLink, renderMarkdown, focusedEditor };
+				export { createDocumentTab, mountApplication, createTextComparison, monaco, EditorExtensionsRegistry, MenuId, languageFeatures, applyEdit, execute, openLink, renderMarkdown, focusedEditor };
 			`,
 				resolveDir: packageRoot,
 			},
@@ -119,6 +121,86 @@ test("the production document-tab entry loads real Monaco menu contributions", a
 			logLevel: "silent",
 		});
 		const host = await import(pathToFileURL(output).href);
+		await t.test(
+			"simultaneous applications keep real Monaco models distinct despite equal document keys",
+			async () => {
+				const modelsBefore = new Set(host.monaco.editor.getModels());
+				const mounts = [];
+				const mount = () => {
+					const frame = document.createElement("iframe");
+					document.body.append(frame);
+					const child = frame.contentWindow;
+					child.HTMLCanvasElement.prototype.getContext =
+						dom.window.HTMLCanvasElement.prototype.getContext;
+					child.matchMedia = dom.window.matchMedia;
+					child.CSS = dom.window.CSS;
+					child.ResizeObserver = globalThis.ResizeObserver;
+					child.document.open();
+					child.document.write(
+						readFileSync(join(packageRoot, "index.html"), "utf8"),
+					);
+					child.document.close();
+					const mounted = { frame, documents: [], app: null };
+					mounts.push(mounted);
+					mounted.app = host.mountApplication({
+						document: child.document,
+						createTextComparison: host.createTextComparison,
+						createDocumentTab(options) {
+							const tab = host.createDocumentTab(options);
+							const editor = host.monaco.editor.getEditors().at(-1);
+							mounted.documents.push({
+								key: options.key,
+								tab,
+								editor,
+								model: editor.getModel(),
+							});
+							return tab;
+						},
+					});
+					return mounted;
+				};
+				try {
+					const first = mount(),
+						second = mount();
+					await first.app.command("new");
+					await second.app.command("new");
+					assert.equal(first.documents.length, 1);
+					assert.equal(
+						second.documents.length,
+						1,
+						`the second application opens its first document: ${second.frame.contentDocument.querySelector("#status").textContent}`,
+					);
+					const red = first.documents[0],
+						blue = second.documents[0];
+					assert.equal(
+						red.key,
+						blue.key,
+						"workspace keys remain local to each application",
+					);
+					assert.notEqual(red.model.uri.toString(), blue.model.uri.toString());
+					red.tab.setSource("first >> step -> result\n");
+					blue.tab.setSource("second >> step -> result\n");
+					await red.model.undo();
+					assert.equal(red.tab.getSource(), "");
+					assert.equal(blue.tab.getSource(), "second >> step -> result\n");
+					first.app.dispose();
+					await first.app.idle();
+					assert.equal(red.model.isDisposed(), true);
+					assert.equal(host.monaco.editor.getModel(red.model.uri), null);
+					assert.equal(host.monaco.editor.getModel(blue.model.uri), blue.model);
+					blue.tab.setSource("still >> editable -> result\n");
+					assert.equal(blue.tab.getSource(), "still >> editable -> result\n");
+				} finally {
+					for (const mounted of mounts) {
+						mounted.app?.dispose();
+						await mounted.app?.idle();
+						mounted.frame.remove();
+					}
+					await new Promise(setImmediate);
+				}
+				assert.deepEqual(new Set(host.monaco.editor.getModels()), modelsBefore);
+			},
+		);
 
 		async function withEditors(source, check) {
 			const tabs = [];
