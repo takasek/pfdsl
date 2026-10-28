@@ -204,10 +204,14 @@ describe("gate-check package typechecks", () => {
 			join(fixture, "pnpm-workspace.yaml"),
 			"packages:\n  - 'packages/*'\n",
 		);
+		// pnpm's .bin shim resolves its store relative to the invocation path.
+		// Link the compiler entry point so the fixture needs no copied store.
+		mkdirSync(join(fixture, "node_modules/.bin"));
 		symlinkSync(
-			join(root, "node_modules/.bin"),
-			join(fixture, "node_modules/.bin"),
-			"dir",
+			realpathSync(
+				join(root, "node_modules/@typescript/native-preview/bin/tsgo"),
+			),
+			join(fixture, "node_modules/.bin/tsgo"),
 		);
 	});
 	for (const pkg of ["core", "cli", "vscode-extension"]) {
