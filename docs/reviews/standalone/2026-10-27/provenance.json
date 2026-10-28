@@ -76,6 +76,41 @@
       "originalSha256": "fde45e4dd1e078e6c4bae0d6e67ada98197e3b53db79127956b13481e49b942c",
       "savedFile": "sol/README.md",
       "savedSha256": "a21a3deb0a1d83fa51cf3314a7dfc16b159dfa3948ada6ae54df35bc917320fb"
+    },
+    {
+      "reviewer": "claude",
+      "originalFile": "pfdsl-design-review.md",
+      "originalSha256": "1a1cfdc6c71a067664a281f34ff2db29c32ec719f77027d69cdb77b27386474e",
+      "savedFile": "claude/review.md",
+      "savedSha256": "4d11ac644cd1ff95ea3974b8558e51b90a6e7fa239fbb4994c07165dd380e97a"
+    },
+    {
+      "reviewer": "claude",
+      "originalFile": "README.md",
+      "originalSha256": "90f4272a3f56cee2a531d6469bf9f0e4d2084aeb60da177d8136da0c1570cc31",
+      "savedFile": "claude/README.md",
+      "savedSha256": "c8bb0b9967ffb5dc85bc7066ea5786a972aa565bc919cef21e3bbfa377f47695"
+    },
+    {
+      "reviewer": "claude",
+      "originalFile": "work/code-checks/diagnostic-ranges.txt",
+      "originalSha256": "68f92f593fa0142194bd2c51446ee48c79a5089a9e7c253efb10adf1a4ec916c",
+      "savedFile": "claude/evidence/diagnostic-ranges.txt",
+      "savedSha256": "68f92f593fa0142194bd2c51446ee48c79a5089a9e7c253efb10adf1a4ec916c"
+    },
+    {
+      "reviewer": "claude",
+      "originalFile": "work/code-checks/typo-before-check.txt",
+      "originalSha256": "9fe1fd85dcf7ede39d055105fcc9eb5dc49b5222603bbac5792a3dd5a7fd9424",
+      "savedFile": "claude/evidence/typo-before-check.txt",
+      "savedSha256": "89c8a3efebdd482e1752c587214c1d92535eefaf475402e020540e98a8b35888"
+    },
+    {
+      "reviewer": "claude",
+      "originalFile": "work/code-checks/typo-after-check.txt",
+      "originalSha256": "a169fecbf9fd6985a234d9731462c01b7e87e14b6e499bd46e77ab1f374108cd",
+      "savedFile": "claude/evidence/typo-after-check.txt",
+      "savedSha256": "eb9835f79c2860a3aaf0015550596af65bec577753185925e354b8da9d473175"
     }
   ],
   "omittedImages": [
@@ -91,5 +126,6 @@
       "originalSha256": "dbcc8120de6c48d019c60df42a1fe34a58e13c52d7bcf469725c3b038333fc9e",
       "reason": "JPEG bytes are unsupported by the publication guard; original retained locally."
     }
-  ]
+  ],
+  "additionalEvaluationDate": "2026-10-28"
 }
