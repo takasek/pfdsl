@@ -6,6 +6,7 @@ export function createTextComparison(
 	local: string,
 	disk: string | null,
 ) {
+	const document = parent.ownerDocument;
 	const labels = document.createElement("div");
 	labels.className = "comparison-labels";
 	for (const label of [

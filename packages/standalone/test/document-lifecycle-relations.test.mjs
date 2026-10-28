@@ -1,6 +1,6 @@
 // Scenarios that tie a tab to the files around it: a renamed or reselected file,
 // a target open in another tab, line-ending normalization, and the states a
-// failed save or read leaves behind. They drive the production main.ts over the
+// failed save or read leaves behind. They mount the production application.ts over the
 // fake native filesystem and read only what the host records and the DOM shows.
 import assert from "node:assert/strict";
 import test from "node:test";
@@ -704,7 +704,7 @@ test("Use Current Disk Version refuses a recovery target that another tab has op
 });
 
 // Monaco rewrites mixed line endings to one style; the tab stub does the same
-// while a test installs reviewNormalize.
+// when a test passes its normalization function.
 const MIXED = "a >> p\np -> c\r\n";
 const NORMALIZED = "a >> p\r\np -> c\r\n";
 const normalize = (text) => {
@@ -713,85 +713,78 @@ const normalize = (text) => {
 	return text.replace(/\r?\n/g, crlf >= lf ? "\r\n" : "\n");
 };
 
-async function withNormalization(body) {
-	globalThis.reviewNormalize = normalize;
+test("a file with mixed line endings opens clean, stays clean and closes without a write", async () => {
+	const native = new FakeNative();
+	const a = native.add(1, "a.pfdsl", MIXED);
+	const asked = [];
+	const host = await startHost(native, a, {
+		normalize,
+		confirm: async (name) => {
+			asked.push(name);
+			return "cancel";
+		},
+	});
+	const tab = await host.open(a);
 	try {
-		await body();
+		assert.equal(tab.getSource(), NORMALIZED);
+		assert.equal(host.isDirty(tab), false);
+		await host.runPoll();
+		await host.runPoll();
+		assert.equal(host.isDirty(tab), false);
+		assert.equal(host.panel().present, false);
+		a.file = { ...a.file, mtime: ++native.clock };
+		await host.runPoll();
+		assert.equal(host.isDirty(tab), false);
+		assert.equal(tab.setSourceCalls, 0);
+		await host.click(host.closeButton(tab));
+		assert.deepEqual(asked, []);
+		assert.equal(host.isOpen(tab), false);
+		assert.equal(a.writes, 0);
+		assert.equal(a.file.source, MIXED);
 	} finally {
-		delete globalThis.reviewNormalize;
+		assert.deepEqual(await host.finish(), []);
 	}
-}
+});
 
-test("a file with mixed line endings opens clean, stays clean and closes without a write", () =>
-	withNormalization(async () => {
-		const native = new FakeNative();
-		const a = native.add(1, "a.pfdsl", MIXED);
-		const asked = [];
-		const host = await startHost(native, a, {
-			confirm: async (name) => {
-				asked.push(name);
-				return "cancel";
-			},
-		});
-		const tab = await host.open(a);
-		try {
-			assert.equal(tab.getSource(), NORMALIZED);
-			assert.equal(host.isDirty(tab), false);
-			await host.runPoll();
-			await host.runPoll();
-			assert.equal(host.isDirty(tab), false);
-			assert.equal(host.panel().present, false);
-			a.file = { ...a.file, mtime: ++native.clock };
-			await host.runPoll();
-			assert.equal(host.isDirty(tab), false);
-			assert.equal(tab.setSourceCalls, 0);
-			await host.click(host.closeButton(tab));
-			assert.deepEqual(asked, []);
-			assert.equal(host.isOpen(tab), false);
-			assert.equal(a.writes, 0);
-			assert.equal(a.file.source, MIXED);
-		} finally {
-			assert.deepEqual(await host.finish(), []);
-		}
-	}));
+test("an external change to mixed line endings reloads the normalized text without a dirty mark", async () => {
+	const native = new FakeNative();
+	const a = native.add(1, "a.pfdsl", "a >> p\np -> b\n");
+	const host = await startHost(native, a, {
+		normalize,
+	});
+	const tab = await host.open(a);
+	change(native, a, MIXED);
+	try {
+		await host.runPoll();
+		assert.equal(tab.getSource(), NORMALIZED);
+		assert.equal(host.isDirty(tab), false);
+		const reloads = tab.setSourceCalls;
+		await host.runPoll();
+		assert.equal(tab.setSourceCalls, reloads);
+		assert.equal(host.isDirty(tab), false);
+		assert.equal(host.panel().present, false);
+	} finally {
+		assert.deepEqual(await host.finish(), []);
+	}
+});
 
-test("an external change to mixed line endings reloads the normalized text without a dirty mark", () =>
-	withNormalization(async () => {
-		const native = new FakeNative();
-		const a = native.add(1, "a.pfdsl", "a >> p\np -> b\n");
-		const host = await startHost(native, a, {});
-		const tab = await host.open(a);
-		change(native, a, MIXED);
-		try {
-			await host.runPoll();
-			assert.equal(tab.getSource(), NORMALIZED);
-			assert.equal(host.isDirty(tab), false);
-			const reloads = tab.setSourceCalls;
-			await host.runPoll();
-			assert.equal(tab.setSourceCalls, reloads);
-			assert.equal(host.isDirty(tab), false);
-			assert.equal(host.panel().present, false);
-		} finally {
-			assert.deepEqual(await host.finish(), []);
-		}
-	}));
-
-test("a manual Save of a clean mixed-ending tab writes the normalized text without a review", () =>
-	withNormalization(async () => {
-		const native = new FakeNative();
-		const a = native.add(1, "a.pfdsl", MIXED);
-		const host = await startHost(native, a, {});
-		const tab = await host.open(a);
-		try {
-			await host.cmdS();
-			assert.equal(host.log.filter((item) => item.kind === "dialog").length, 0);
-			assert.equal(a.file.source, NORMALIZED);
-			assert.equal(a.writes, 1);
-			assert.equal(host.isDirty(tab), false);
-			await host.cmdS();
-			assert.match(status(host), /Already saved|nothing to save/);
-			assert.equal(a.writes, 1);
-		} finally {
-			assert.deepEqual(await host.finish(), []);
-		}
-	}));
+test("a manual Save of a clean mixed-ending tab writes the normalized text without a review", async () => {
+	const native = new FakeNative();
+	const a = native.add(1, "a.pfdsl", MIXED);
+	const host = await startHost(native, a, {
+		normalize,
+	});
+	const tab = await host.open(a);
+	try {
+		await host.cmdS();
+		assert.equal(host.log.filter((item) => item.kind === "dialog").length, 0);
+		assert.equal(a.file.source, NORMALIZED);
+		assert.equal(a.writes, 1);
+		assert.equal(host.isDirty(tab), false);
+		await host.cmdS();
+		assert.match(status(host), /Already saved|nothing to save/);
+		assert.equal(a.writes, 1);
+	} finally {
+		assert.deepEqual(await host.finish(), []);
+	}
+});

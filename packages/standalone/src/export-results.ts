@@ -9,6 +9,7 @@ export function createExportResults(
 	parent: HTMLElement,
 	report: (message: string) => void,
 ): ExportResultPresenter {
+	const document = parent.ownerDocument;
 	let panel: HTMLElement | undefined;
 	return (name, revision, results) => {
 		if (!panel) {

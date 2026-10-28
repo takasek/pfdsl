@@ -60,6 +60,7 @@ export function createDocumentTab({
 	exportServices,
 	showExportResults,
 }: DocumentTabOptions) {
+	const document = parent.ownerDocument;
 	let snapshot: DocumentModel | undefined;
 	let revision = 0;
 	let sourceVersion = 0;

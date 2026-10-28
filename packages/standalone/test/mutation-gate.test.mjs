@@ -1,6 +1,27 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import test from "node:test";
-import { newlyTagged, selectNames } from "./helpers/mutation-gate.mjs";
+import {
+	MUTATIONS,
+	newlyTagged,
+	selectNames,
+} from "./helpers/mutation-gate.mjs";
+
+test("every lifecycle mutation still matches exactly one production location", () => {
+	for (const [name, mutation] of Object.entries(MUTATIONS)) {
+		const sources = new Map();
+		for (const [file, search, replacement] of mutation.steps) {
+			const source =
+				sources.get(file) ??
+				readFileSync(new URL(`../${file}`, import.meta.url), "utf8");
+			assert.equal(source.split(search).length - 1, 1, `${name}: ${file}`);
+			sources.set(
+				file,
+				source.replace(search, () => replacement),
+			);
+		}
+	}
+});
 
 test("explicit mutation selection always includes exactly one baseline first", () => {
 	assert.deepEqual(selectNames(["M14"]), ["baseline", "M14"]);

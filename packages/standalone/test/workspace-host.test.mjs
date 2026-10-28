@@ -17,10 +17,10 @@ test("native titles follow new, open, edits, Save As, tab switches and final clo
 	const host = await startHost(native, doc, {
 		choose: async () => native.snapshot(target),
 		confirm: async () => "discard",
+		setTitle: async (title) => {
+			writes.push(title);
+		},
 	});
-	globalThis.reviewSetTitle = async (title) => {
-		writes.push(title);
-	};
 	try {
 		await host.newDocument();
 		assert.equal(writes.at(-1), "Untitled 1 — PFDSL");

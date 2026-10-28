@@ -126,24 +126,6 @@ export class FakeNative {
 	}
 }
 
-const keys = [
-	"document",
-	"window",
-	"self",
-	"setInterval",
-	"nativeInvoke",
-	"nativeListen",
-	"nativeAcceptance",
-	"reviewEntries",
-	"reviewActive",
-	"reviewBusy",
-	"reviewMenuItems",
-	"reviewTabs",
-	"reviewTabHook",
-	"reviewNormalize",
-	"reviewSetTitle",
-];
-
 export const flush = async () => {
 	for (let i = 0; i < 100; i++) await Promise.resolve();
 };
@@ -199,27 +181,24 @@ export class InspectGate {
 	}
 }
 
-/** Bundles the production host once; every started host re-evaluates it. */
+/** Import one application factory; each host receives separate DOM and native boundaries. */
 export async function createHarness(label, options) {
-	const old = new Map(
-		keys.map((key) => [key, Object.getOwnPropertyDescriptor(globalThis, key)]),
-	);
 	const temp = mkdtempSync(
 		join(root, `packages/standalone/node_modules/.${label}-`),
 	);
 	const output = join(temp, "main.mjs");
 	await bundleHost(output, options);
-	let cellSerial = 0;
+	const {
+		mountApplication,
+		createDocumentTab,
+		createTextComparison,
+		createTestMenu,
+	} = await import(pathToFileURL(output).href);
 	after(() => {
-		for (const key of keys) {
-			const descriptor = old.get(key);
-			if (descriptor) Object.defineProperty(globalThis, key, descriptor);
-			else delete globalThis[key];
-		}
 		rmSync(temp, { recursive: true, force: true });
 	});
 	/**
-	 * Runs the production main.ts over `native`. Every dialog is answered with the
+	 * Mounts the production application over `native`. Every dialog is answered with the
 	 * choice that confirms replacing or creating the target. `handlers` supplies
 	 * confirm_close_document (confirm), choose_save_target (choose) and may
 	 * - lose a save reply (saveFault: "before" or "after" the write);
@@ -236,7 +215,8 @@ export async function createHarness(label, options) {
 	 * application was told about each file and which versions the user approved.
 	 */
 	async function startHost(native, watched, handlers = {}) {
-		globalThis.reviewMenuItems = [];
+		let menu;
+		const recordedTabs = [];
 		const dom = new JSDOM(
 			readFileSync(`${root}/packages/standalone/index.html`, "utf8"),
 		);
@@ -256,16 +236,12 @@ export async function createHarness(label, options) {
 		let selection;
 		let closeSaveOwner;
 		let closeStart = 0;
-		globalThis.document = dom.window.document;
-		globalThis.window = dom.window;
-		globalThis.self = dom.window;
-		globalThis.reviewTabs = [];
-		dom.window.__TAURI_INTERNALS__ = {};
-		globalThis.setInterval = (fn) => {
-			poll = fn;
-			return 0;
-		};
-		const tabs = () => globalThis.reviewTabs;
+		// Monaco/preview integration still requires its browser realm; fake host tests do not.
+		const previousDocument = options?.realDocumentTabs
+			? Object.getOwnPropertyDescriptor(globalThis, "document")
+			: undefined;
+		if (options?.realDocumentTabs) globalThis.document = dom.window.document;
+		const tabs = () => recordedTabs;
 		const activeTab = () =>
 			tabs().find(
 				(tab) =>
@@ -290,7 +266,7 @@ export async function createHarness(label, options) {
 				path: snapshot.path,
 				binding: snapshot.binding,
 			});
-		globalThis.reviewTabHook = (kind, tab, text) => {
+		const hook = (kind, tab, text) => {
 			if (kind === "dispose") log.push({ kind: "dispose", tab, seq: tick() });
 			if (kind === "type") log.push({ kind: "type", tab, text, seq: tick() });
 			if (kind === "setSource") {
@@ -331,12 +307,12 @@ export async function createHarness(label, options) {
 			log.push(entry);
 			handlers.onDialog?.(entry);
 		};
-		globalThis.nativeAcceptance = () => new Promise(() => {});
-		globalThis.nativeListen = async (_, listener) => {
+		const verifyCorpus = () => new Promise(() => {});
+		const listen = async (_, listener) => {
 			quitListener = listener;
 			return () => {};
 		};
-		globalThis.nativeInvoke = async (command, args) => {
+		let invoke = async (command, args) => {
 			if (command === "select_folder") return handlers.selectFolder?.() ?? null;
 			if (command === "list_documents") return handlers.listDocuments?.() ?? [];
 			if (command === "remember_folder") return;
@@ -501,10 +477,48 @@ export async function createHarness(label, options) {
 			}
 			throw new Error(`unexpected command ${command}`);
 		};
-		await import(`${pathToFileURL(output).href}?cell=${++cellSerial}`);
+		const app = mountApplication({
+			document: dom.window.document,
+			createTextComparison,
+			createDocumentTab(options) {
+				const tab = createDocumentTab(options, {
+					normalize: handlers.normalize,
+					hook,
+				});
+				recordedTabs.push(tab);
+				return tab;
+			},
+			scheduler: {
+				setInterval(fn) {
+					poll = fn;
+					return 0;
+				},
+				clearInterval() {
+					poll = () => {};
+				},
+			},
+			native: {
+				invoke: (...args) => invoke(...args),
+				listen,
+				verifyCorpus,
+				installMenu: async (command, recent) => {
+					menu = createTestMenu(command, recent);
+					return menu;
+				},
+				setTitle: async (title) => handlers.setTitle?.(title),
+				closeWindow: async () => {},
+			},
+		});
 		await flush();
 		const query = (selector) => dom.window.document.querySelector(selector);
-		const busy = () => globalThis.reviewBusy();
+		const isIdle = async () => {
+			let completed = false;
+			void app.idle().then(() => {
+				completed = true;
+			});
+			await flush();
+			return completed;
+		};
 		const settle = async () => {
 			for (let i = 0; i < 60; i++) {
 				await flush();
@@ -534,7 +548,7 @@ export async function createHarness(label, options) {
 						.click();
 					continue;
 				}
-				if (!busy()) {
+				if (await isIdle()) {
 					closeSaveOwner = undefined;
 					return;
 				}
@@ -546,8 +560,7 @@ export async function createHarness(label, options) {
 			element.click();
 			await settle();
 		};
-		const menuItem = (id) =>
-			globalThis.reviewMenuItems.find((item) => item.id === id);
+		const menuItem = (id) => menu.items.find((item) => item.id === id);
 		const command = async (id) => {
 			await flush();
 			const item = menuItem(id);
@@ -649,12 +662,19 @@ export async function createHarness(label, options) {
 			/** Returns the IPC commands that arrived after the host went idle. */
 			async finish() {
 				await settle();
+				app.dispose();
+				await flush();
 				const leaks = [];
-				globalThis.nativeInvoke = async (command) => {
+				invoke = async (command) => {
 					leaks.push(command);
 				};
 				await flush();
 				dom.window.close();
+				if (options?.realDocumentTabs) {
+					if (previousDocument)
+						Object.defineProperty(globalThis, "document", previousDocument);
+					else delete globalThis.document;
+				}
 				return leaks;
 			},
 		};

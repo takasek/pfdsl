@@ -76,10 +76,10 @@ export const MUTATIONS = {
 		what: "review no longer required for a version the document has not acknowledged",
 		guarantee:
 			"Replacing a disk version the document has not acknowledged shows a review",
-		where: "main.ts saveEntry: the review condition",
+		where: "application.ts saveEntry: the review condition",
 		steps: [
 			[
-				"src/main.ts",
+				"src/application.ts",
 				"(chosen || observed || !session.acknowledges(selected))",
 				"(chosen || observed)",
 			],
@@ -146,11 +146,11 @@ export const MUTATIONS = {
 		what: "the panel preview shows the acknowledged baseline, not the observation",
 		guarantee:
 			"The panel compares against the same snapshot its buttons act on",
-		where: "main.ts renderConflict: the preview text",
+		where: "application.ts renderConflict: the preview text",
 		steps: [
 			[
-				"src/main.ts",
-				'text.textContent = observed\n\t\t\t? (observed.source ?? "File is missing")\n\t\t\t: "The current disk content could not be confirmed.";',
+				"src/application.ts",
+				'text.textContent = observed\n\t\t\t\t? (observed.source ?? "File is missing")\n\t\t\t\t: "The current disk content could not be confirmed.";',
 				'text.textContent = entry.session.disk?.source ?? "The current disk content could not be confirmed.";',
 			],
 		],
@@ -198,11 +198,11 @@ export const MUTATIONS = {
 	M10: {
 		what: "closeEntries prepareClose re-read removed",
 		guarantee: "Close starts a fresh read of every target before the decision",
-		where: "main.ts closeEntries: prepareClose",
+		where: "application.ts closeEntries: prepareClose",
 		steps: [
 			[
-				"src/main.ts",
-				'\t\t\t\t\tawait entry.session\n\t\t\t\t\t\t.checkExternal((id) =>\n\t\t\t\t\t\t\tinvoke<DiskSnapshot>("inspect_document", { id }),\n\t\t\t\t\t\t)\n\t\t\t\t\t\t.catch(report);\n',
+				"src/application.ts",
+				'\t\t\t\t\t\tawait entry.session\n\t\t\t\t\t\t\t.checkExternal((id) =>\n\t\t\t\t\t\t\t\tinvoke<DiskSnapshot>("inspect_document", { id }),\n\t\t\t\t\t\t\t)\n\t\t\t\t\t\t\t.catch(report);\n',
 				"",
 			],
 		],
@@ -211,10 +211,10 @@ export const MUTATIONS = {
 		what: "a close Save is not checked against the decision it follows",
 		guarantee:
 			"A Save decision applies to the text shown when it was asked (F1)",
-		where: "main.ts saveEntry: the confirmation plan check",
+		where: "application.ts saveEntry: the confirmation plan check",
 		steps: [
 			[
-				"src/main.ts",
+				"src/application.ts",
 				'if (confirmation && !session.holds(confirmation, "editor")) {',
 				"if (false) {",
 			],
@@ -224,9 +224,13 @@ export const MUTATIONS = {
 		what: "a failed pre-save read is not remembered",
 		guarantee:
 			"A failed read protects the tab whichever entry point saw it (F2)",
-		where: "main.ts saveEntry: the pre-save inspection failure",
+		where: "application.ts saveEntry: the pre-save inspection failure",
 		steps: [
-			["src/main.ts", "session.observe(remembered, { error }, scope);", ""],
+			[
+				"src/application.ts",
+				"session.observe(remembered, { error }, scope);",
+				"",
+			],
 		],
 	},
 	M13: {
@@ -252,8 +256,14 @@ export const MUTATIONS = {
 		what: "a Close Save no-op bypasses its editor-version check",
 		guarantee:
 			"An edit back to acknowledged text during the pre-save read requires a new close decision",
-		where: "main.ts saveEntry: confirmation check before no-op exits",
-		steps: [["src/main.ts", "\t\tif (!checkConfirmation()) return false;", ""]],
+		where: "application.ts saveEntry: confirmation check before no-op exits",
+		steps: [
+			[
+				"src/application.ts",
+				"\t\t\tif (!checkConfirmation()) return false;",
+				"",
+			],
+		],
 	},
 	M15: {
 		what: "rename recovery uses the acknowledged inode instead of the observed inode",

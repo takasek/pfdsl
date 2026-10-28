@@ -1,5 +1,5 @@
 // Cartesian check of the document lifecycle against README "Application behavior".
-// Every cell drives the production main.ts over a fake native filesystem that
+// Every cell mounts the production application.ts over a fake native filesystem that
 // follows documents.rs (revision = inode + mtime + content, save(expected)
 // conflicts on any other revision, identical content is a no-op, a missing
 // target with expected=null is created exclusively).

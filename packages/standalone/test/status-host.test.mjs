@@ -10,13 +10,13 @@ const { startHost } = await createHarness("status-ui");
 
 test("failed native titles do not retry unchanged titles or restore dismissed notices on typing", async () => {
 	const writes = [];
-	globalThis.reviewSetTitle = async (title) => {
+	const setTitle = async (title) => {
 		writes.push(title);
 		throw new Error("Denied");
 	};
 	const native = new FakeNative();
 	const doc = native.add(1, "a.pfdsl", "original");
-	const host = await startHost(native, doc);
+	const host = await startHost(native, doc, { setTitle });
 	try {
 		const a = await host.open(doc);
 		a.type("first edit");
@@ -32,7 +32,6 @@ test("failed native titles do not retry unchanged titles or restore dismissed no
 		);
 	} finally {
 		await host.finish();
-		delete globalThis.reviewSetTitle;
 	}
 });
 
