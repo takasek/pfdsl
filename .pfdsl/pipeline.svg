@@ -395,7 +395,7 @@
 <!-- ops_install_sources -->
 <g id="node12" class="node">
 <title>ops_install_sources</title>
-<g id="a_node12"><a xlink:title="pfd&#45;ops 配布ソース（repo ルート）&#10;&#10;採用リポへ配る読取専用の監査スクリプト、完了チェーン回収スクリプト、その起動に使う GitHub Actions workflow の一次情報。手書きで repo ルート側に実体があり、このリポ自身の運用にも同じ実体を使う。配布対象は scripts/lib/install&#45;templates.mjs の明示リストが決める（同居する repo ローカルのテストを配らないため glob でなく明示リスト）&#10;location: scripts/pfdsl/, .github/workflows/pfdsl&#45;sweep&#45;completed&#45;chains.yml">
+<g id="a_node12"><a xlink:title="pfd&#45;ops 配布ソース（repo ルート）&#10;&#10;採用リポへ配る読取専用の監査スクリプト、CLI prune を呼ぶ完了チェーン回収アダプタ、その起動に使う GitHub Actions workflow の一次情報。保持規則と検証は packages/cli の prune が担い、配布アダプタに複製しない。手書きで repo ルート側に実体があり、このリポ自身の運用にも同じ実体を使う。配布対象は scripts/lib/install&#45;templates.mjs の明示リストが決める&#10;location: scripts/pfdsl/, .github/workflows/pfdsl&#45;sweep&#45;completed&#45;chains.yml">
 <polygon fill="none" stroke="black" stroke-width="2" points="214,-788.3 19.6,-788.3 19.6,-729.9 214,-729.9 214,-788.3"/>
 <text xml:space="preserve" text-anchor="middle" x="116.8" y="-771.7" font-family="Times,serif" font-size="14.00">ops_install_sources</text>
 <text xml:space="preserve" text-anchor="middle" x="116.8" y="-754.9" font-family="Times,serif" font-size="14.00">pfd&#45;ops 配布ソース（repo</text>
