@@ -1,24 +1,24 @@
 // Cartesian check of the document lifecycle against README "Application behavior".
-// Every cell mounts the production application.ts over a fake native filesystem that
+// Every cell drives the production workspace controller over a fake filesystem that
 // follows documents.rs (revision = inode + mtime + content, save(expected)
 // conflicts on any other revision, identical content is a no-op, a missing
 // target with expected=null is created exclusively).
 import assert from "node:assert/strict";
 import test from "node:test";
 import { cell, guardKnownRed } from "./helpers/known-red.mjs";
-import {
-	createHarness,
-	FakeNative,
-	fsOf,
-	InspectGate,
-	TEXT,
-} from "./helpers/lifecycle-harness.mjs";
+import { createHarness } from "./helpers/lifecycle-controller-harness.mjs";
 import {
 	beginAction,
 	checkAction,
 	checkPanel,
 	checkReads,
 } from "./helpers/lifecycle-invariants.mjs";
+import {
+	FakeNative,
+	fsOf,
+	InspectGate,
+	TEXT,
+} from "./helpers/lifecycle-native.mjs";
 
 const { startHost } = await createHarness("lifecycle-invariants");
 
@@ -151,7 +151,7 @@ async function runCell(tabState, event, timing, action) {
 			eventApplied = true;
 			for (const step of EVENT_STEPS[event]) {
 				if (step === "poll") {
-					if (pollNow) await host.runPoll();
+					if (pollNow) await host.poll();
 				} else step(native, doc);
 			}
 			writesAtEvent = doc.writes;
@@ -159,7 +159,7 @@ async function runCell(tabState, event, timing, action) {
 		host = await startHost(native, doc, {
 			choose: () => native.snapshot(target),
 			inspectGate: (id) => gate.hold(id),
-			onDialog() {
+			onDecision() {
 				// The read that was in flight finishes while the dialog is open.
 				if (!gate.isHeld) return;
 				doc.unreadable = false;
@@ -187,30 +187,30 @@ async function runCell(tabState, event, timing, action) {
 				return decisions[name];
 			},
 		});
-		const { log, settle, click } = host;
+		const { log } = host;
 		const tab = await host.open(doc);
 		if (tabState === "dirty") tab.type(TEXT.edited);
 		const guard = await host.open(anchor);
 		guard.type("anchor edit\n");
-		tab.button.click();
+		await host.activate(tab);
 		const alive = () => host.isOpen(tab);
 
 		// Event and observation.
 		if (timing !== "during-confirm")
 			await applyEvent(timing !== "unpolled" && timing !== "in-flight");
-		if (timing === "polled" || timing === "drift") await host.runPoll();
+		if (timing === "polled" || timing === "drift") await host.poll();
 		if (timing === "in-flight") {
 			gate.arm(doc.id);
-			await host.runPoll();
+			host.startPoll();
+			await gate.waitUntilHeld();
 		}
 		const afterPoll = {
 			setSourceCalls: tab.setSourceCalls,
 			dirty: host.isDirty(tab),
-			panel: host.panel().present,
+			panel: host.conflict().present,
 		};
 		if (panelExpected(tabState, event, timing)) {
-			const review = host.panel().review;
-			if (!review || review.disabled)
+			if (!host.conflict().actions.review)
 				violate("panel", "no enabled 'Review and Save Here…' after the poll");
 		}
 		if (timing === "drift") {
@@ -230,29 +230,28 @@ async function runCell(tabState, event, timing, action) {
 		if (action === "cmd-s") {
 			while (presses < 3) {
 				presses++;
-				await host.cmdS();
+				await host.save();
 				if (!alive()) break;
-				if (!host.isDirty(tab) && !host.panel().present) break;
+				if (!host.isDirty(tab) && !host.conflict().present) break;
 			}
 		} else if (action === "save-as") {
-			await host.command("save-as");
+			await host.saveAs();
 		} else if (action === "review") {
-			const button = host.panel().review;
-			if (!button || button.disabled)
+			if (!host.conflict().actions.review)
 				violate("harness", "Review and Save Here… is not available");
-			else await click(button);
+			else await host.review();
 		} else {
 			// A refused Save is retried like a user would, at most three times.
 			const attempts = action.endsWith("save") ? 3 : 1;
 			while (presses < attempts && (presses === 0 || alive())) {
 				presses++;
-				if (action.startsWith("close")) await click(host.closeButton(tab));
+				if (action.startsWith("close")) await host.close(tab);
 				else await host.quit(presses);
 			}
 		}
 		if (timing === "during-confirm" && !eventApplied) await applyEvent(false);
-		if (gate.release()) await settle();
-		await settle();
+		gate.release();
+		await host.idle();
 
 		checkAction({ native, host, tab, trace, violate });
 		if (action.startsWith("close") || action.startsWith("quit"))
@@ -260,7 +259,7 @@ async function runCell(tabState, event, timing, action) {
 		checkPanel({ host, native, violate });
 		const text = tab.getSource();
 		const fs = fsOf(native, doc);
-		const status = host.query("#status").textContent;
+		const status = host.status();
 		const decision = decisions["a.pfdsl"];
 
 		// I2: confirming never ends in a dead end; unreadable files are never written blind.
@@ -380,7 +379,7 @@ async function runCell(tabState, event, timing, action) {
 	} catch (error) {
 		violate("harness", String(error?.stack ?? error));
 	} finally {
-		host?.dom.window.close();
+		host?.dispose();
 	}
 	return violations;
 }
@@ -414,8 +413,8 @@ async function failSaveAs() {
 	});
 	const tab = await host.open(a);
 	tab.type(TEXT.edited);
-	await host.command("save-as");
-	assert.equal(host.panel().recoveryPath, b.path);
+	await host.saveAs();
+	assert.equal(host.conflict().recoveryPath, b.path);
 	host.log.length = 0;
 	return { native, a, b, host, tab };
 }
@@ -428,7 +427,7 @@ test("Save after a failed Save As still reviews and replaces the original docume
 			ino: ++native.ino,
 			mtime: ++native.clock,
 		};
-		await host.cmdS();
+		await host.save();
 		const dialog = host.log.find((item) => item.kind === "dialog");
 		assert.equal(dialog.title, "Review the target");
 		assert.equal(dialog.disk, "external A\n");
@@ -449,7 +448,7 @@ test("Review and Save Here inspects the recovery target again", async () => {
 	const { native, b, host, tab } = await failSaveAs();
 	try {
 		b.file = { source: "later B\n", ino: ++native.ino, mtime: ++native.clock };
-		await host.click(host.panel().review);
+		await host.review();
 		const dialog = host.log.find((item) => item.kind === "dialog");
 		assert.equal(dialog.title, "Review the target");
 		assert.equal(dialog.disk, "later B\n");

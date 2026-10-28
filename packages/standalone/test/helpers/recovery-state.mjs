@@ -1,6 +1,6 @@
 // Builds the recovery states the lifecycle tests start from: a Save As or Save
 // that did not complete, optionally followed by further user steps.
-import { FakeNative, fsOf, InspectGate, TEXT } from "./lifecycle-harness.mjs";
+import { FakeNative, fsOf, InspectGate, TEXT } from "./lifecycle-native.mjs";
 
 /** Applies an external event to a fake file. */
 export function apply(native, doc, event) {
@@ -51,7 +51,7 @@ export async function establish(startHost, failure, history = "none") {
 		onConfirm: undefined,
 		onLate: undefined,
 		useDisk: false,
-		dialogOverride: undefined,
+		decisionOverride: undefined,
 		faults: new Map(),
 		chooser: undefined,
 		beforeSave: undefined,
@@ -61,12 +61,10 @@ export async function establish(startHost, failure, history = "none") {
 		saveFault: (args) => ctx.faults.get(args.id)?.(),
 		beforeSave: (args) => ctx.beforeSave?.(args),
 		inspectGate: (id) => ctx.gate.hold(id),
-		dialogChoice: (title) =>
-			ctx.dialogOverride?.(title) ??
-			(ctx.useDisk && title === "Discard editor changes"
-				? "Use Disk Version"
-				: undefined),
-		onDialog() {
+		decide: (request) =>
+			ctx.decisionOverride?.(request) ??
+			(ctx.useDisk && request.kind === "adopt" ? "disk" : undefined),
+		onDecision() {
 			if (ctx.gate.isHeld) {
 				ctx.onLate?.();
 				ctx.gate.release();
@@ -112,8 +110,8 @@ export async function establish(startHost, failure, history = "none") {
 			change(a, "external A\n");
 		};
 	}
-	if (failure.via === "save-as") await host.command("save-as");
-	else await host.cmdS();
+	if (failure.via === "save-as") await host.saveAs();
+	else await host.save();
 	ctx.recovery = failure.hasB ? b : a;
 	ctx.targets =
 		failure.start === "untitled"
@@ -124,17 +122,17 @@ export async function establish(startHost, failure, history = "none") {
 
 	if (history === "cancel-again") {
 		ctx.chooser = () => native.snapshot(b);
-		ctx.dialogOverride = (title) =>
-			title === "Review the target" ? "Keep Editing" : undefined;
-		await host.command("save-as");
-		ctx.dialogOverride = undefined;
+		ctx.decisionOverride = (request) =>
+			request.kind === "replace" ? "cancel" : undefined;
+		await host.saveAs();
+		ctx.decisionOverride = undefined;
 	} else if (history === "fail-again") {
 		ctx.chooser = () => {
 			const chosen = native.snapshot(b);
 			change(b, "external B again\n");
 			return chosen;
 		};
-		await host.command("save-as");
+		await host.saveAs();
 	} else if (history === "other-fails") {
 		let used = false;
 		ctx.beforeSave = () => {
@@ -142,7 +140,7 @@ export async function establish(startHost, failure, history = "none") {
 			used = true;
 			change(a, "external A during save\n");
 		};
-		await host.cmdS();
+		await host.save();
 		ctx.beforeSave = undefined;
 		ctx.recovery = a;
 		ctx.targets = [a.id];
