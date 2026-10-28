@@ -109,6 +109,8 @@ Commands:
                            Format a .pfdsl file (- = stdin)
   delete <file|-> <id[,id...]> [--write] [--json] [--no-color]
                            Remove artifacts, processes, or groups from a .pfdsl file (- = stdin)
+  prune <file|-> [--write] [--check] [--json] [--no-color]
+                           Remove completed chains from a roadmap (- = stdin)
   rename <file|-> <old> <new> [--write] [--json] [--no-color]
                            Rename an artifact, process, or group id and every reference to it (- = stdin)
   render <file|-> [--format dot|svg|pdf|png] [--no-color]

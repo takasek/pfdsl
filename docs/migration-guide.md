@@ -27,6 +27,27 @@ Record the target only after all potentially applicable steps have been resolved
 These changes are not yet assigned to a published CLI/plugin release.
 Apply them only when the target release includes the referenced changes; specification v0.0.29 is not a CLI/plugin version.
 
+### Use the CLI for completed-chain pruning
+
+Completed-chain retention and verification now live in `pfdsl prune`, shared by both tracker presets.
+Source: [Issue #1567](https://github.com/takasek/pfdsl/issues/1567), implementing ADR-0048 D4.
+First install a CLI release that provides `prune` and verify `pfdsl prune --help` using the entry point selected by your sweep workflow.
+Only then update the plugin and deployed sweep script; until that CLI release is available, retain the previous script and helpers together.
+The adapter checks command availability instead of inferring it from a version number.
+
+`pfdsl prune <roadmap>` previews the transformed source; `--json` reports deletion targets without writing.
+Use `--write` to apply and report deletions, or `--check` to return exit 1 when deletions are needed without changing the file.
+The deployed `sweep-completed-chains.mjs` still accepts `<file> [--write]`, but its stdout is now the CLI's JSON report.
+Update consumers that parse the old human-readable dry-run text to read the `deleted` array.
+Preview or verification failures do not modify the roadmap.
+Input and output validation includes relative dependencies when a file path is supplied; stdin accepts only dependency-free roadmaps.
+
+After updating the deployed adapter, remove its former helpers under `scripts/pfdsl/lib/`: `chain-sweep.mjs`, `cli-id-arg.mjs`, `ready-compare.mjs`, and `scratch-path.mjs`.
+Inspect local changes and callers before removing them; migrate local callers to `prune` rather than retaining a second retention implementation.
+For file-based trackers, replace manual terminal-chain deletion with `prune` after the existing item/artifact completion checks.
+Do not mark unfinished or abandoned artifacts done merely to make them eligible for pruning.
+Before enabling the updated workflow, compare a JSON preview with the expected targets, verify that shared and feedback inputs remain, and run the existing roadmap checks after applying to a copy.
+
 ### Link work items through process locations
 
 Work-item correspondence is now defined once in the work-cycle contract and uses `process.location`.

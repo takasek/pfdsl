@@ -1,8 +1,7 @@
 // Integration coverage for sweep-completed-chains.mjs itself (issue #1125).
-// Pure decision logic (which ids to delete, the ready/blocked comparison)
-// already has focused unit tests under lib/; what only shows up by running
-// the script end to end is where it puts and cleans up its verification
-// scratch file, and how it reacts to that verification failing. Both need
+// Retention and verification are covered by the CLI's prune tests. These
+// adapter scenarios exercise real CLI resolution, forwarding and failures.
+// They also check that preview and refusal leave no temporary files. They need
 // the real `pfdsl` CLI, so this spawns the script as a subprocess against
 // the repo's own build (see resolveCli() in the script under test).
 
@@ -44,18 +43,18 @@ function runSweep(args, envOverrides = {}) {
 }
 
 /**
- * A stand-in for a pre-delete @pfdsl/cli (the published 0.0.26 and earlier):
- * any other command succeeds, `delete` reports the same "unknown command"
+ * A stand-in for a pre-prune @pfdsl/cli:
+ * any other command succeeds, `prune` reports the same "unknown command"
  * shape the real dispatcher uses.
  */
-function writeCliWithoutDelete(path) {
+function writeCliWithoutPrune(path) {
 	writeFileSync(
 		path,
 		[
 			"#!/usr/bin/env node",
 			"const command = process.argv[2];",
-			"if (command === 'delete') {",
-			"\tprocess.stderr.write('unknown command: delete\\n');",
+			"if (command === 'prune') {",
+			"\tprocess.stderr.write('unknown command: prune\\n');",
 			"\tprocess.exit(2);",
 			"}",
 			"process.exit(0);",
@@ -69,7 +68,7 @@ function extraFiles(dirPath, expected) {
 	return readdirSync(dirPath).filter((name) => !expected.includes(name));
 }
 
-describe("sweep-completed-chains: scratch verification location (#1125)", () => {
+describe("sweep-completed-chains: relative dependency validation (#1125)", () => {
 	// sub/roadmap.pfdsl extends sub/preset.pfdsl by a relative path. `check`
 	// resolves that path from the file being checked's own directory, so
 	// verifying a delete candidate anywhere other than sub/ makes `check`
@@ -165,7 +164,7 @@ process:
 	it("refuses to apply a delete candidate that is not canonically formatted, and exits 1", () => {
 		const result = runSweep([file, "--write"]);
 		assert.equal(result.status, 1);
-		assert.match(result.stderr, /not canonically formatted/);
+		assert.match(JSON.parse(result.stdout).error, /not canonically formatted/);
 
 		assert.equal(readFileSync(file, "utf-8"), nonCanonical);
 		assert.deepEqual(
@@ -176,42 +175,34 @@ process:
 	});
 });
 
-describe("sweep-completed-chains: delete-capability gate (#1125 review defect 1)", () => {
-	// A workflow that only `npm install --no-save @pfdsl/cli`s a published
-	// release can resolve a CLI build that predates the `delete` subcommand
-	// (the published 0.0.26 and earlier). Nothing before this gate notices —
-	// resolveCli() only checks the path exists, not what the binary at that
-	// path can do — so the first sign was `delete` itself failing with
-	// "unknown command" mid-run, after sweep targets were already found.
+describe("sweep-completed-chains: prune-capability gate", () => {
+	// A workflow may resolve an older CLI. Probe before requesting a sweep,
+	// including on a roadmap with no deletion targets.
 	let roadmapFile;
 	let oldCli;
 
 	beforeEach(() => {
 		roadmapFile = join(dir, "roadmap.pfdsl");
 		writeFileSync(roadmapFile, "---\ntype: roadmap\n---\n");
-		oldCli = join(dir, "old-cli-no-delete.js");
-		writeCliWithoutDelete(oldCli);
+		oldCli = join(dir, "old-cli-no-prune.js");
+		writeCliWithoutPrune(oldCli);
 	});
 
-	it("fails at startup, before searching for sweep targets, when the resolved CLI has no 'delete'", () => {
+	it("fails at startup when the resolved CLI has no 'prune'", () => {
 		const result = runSweep([roadmapFile], { PFDSL_CLI: oldCli });
 		assert.equal(result.status, 1);
-		assert.match(result.stderr, /delete/);
+		assert.match(result.stderr, /prune/);
 		assert.doesNotMatch(result.stdout, /sweep target/);
 	});
 
 	it("names how to get a capable CLI without guessing a specific version number", () => {
 		const result = runSweep([roadmapFile], { PFDSL_CLI: oldCli });
-		// The floor is described relative to a verified fact (the published
-		// 0.0.26 lacks 'delete'), not a fabricated "requires >= X.Y.Z" — this
-		// repo's own packages/cli/package.json has not been bumped past 0.0.26
-		// since 'delete' was added, so that number cannot be asserted as the
-		// floor without being wrong the moment it is read.
-		assert.match(result.stderr, /0\.0\.26/);
+		// Release preparation assigns the version; the adapter probes capability.
+		assert.match(result.stderr, /release with 'prune'/);
 		assert.match(result.stderr, /pnpm -r build|PFDSL_CLI/);
 	});
 
-	it("still works normally when the resolved CLI does have 'delete'", () => {
+	it("still works normally when the resolved CLI does have 'prune'", () => {
 		const result = runSweep([roadmapFile]);
 		assert.equal(result.status, 0, result.stdout + result.stderr);
 	});
@@ -246,8 +237,7 @@ process:
 	it("dry run reports the quoted id as one sweep target, not split in two", () => {
 		const result = runSweep([roadmapFile]);
 		assert.equal(result.status, 0, result.stdout + result.stderr);
-		const listLine = result.stdout.trim().split("\n").at(-1);
-		const listed = listLine.split(", ").sort();
+		const listed = JSON.parse(result.stdout).deleted;
 		assert.deepEqual(listed, ["a,b", "out", "p1"]);
 	});
 

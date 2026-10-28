@@ -10,8 +10,8 @@ PFD の作業項目を GitHub Issues で管理する流儀。pfdsl 固有では�
 - **ラベル**: roadmap 登録 issue は `flow:managed`、対象外は `flow:exempt`（判定は「ラベル判定基準」節）
 - **登録 metadata**: issue 対応と依存構造を検査する。GitHub の可変 `updatedAt` は保存・同期しない。`priority:` tags は任意の表示値であり、issue labels との完全一致を登録条件にしない。旧 `updated_at` が残る図でも監査はその値を読まない
 - **issue close と進捗**: close は status を動かす契機にしない。成果物の完了判断と status 更新は `work-cycle.md` の完了根拠に従う。未実装のまま廃止する場合も、未完了作業が必要とする入力を保存し、代替や廃止の判断を依存構造へ反映する。デフォルトブランチへの push が起動するのは下の完了チェーン回収（`.pfdsl/config.json` で有効にした場合）だけで、それも PR を提案するところまでであり、マージは人が行う
-- **完了チェーン回収**: roadmap に残すのは、(a) done でない artifact を出力する process と、(b) その入出力として edge に現れる artifact である。(b) に入る done artifact は ready/blocked 判定の入力として残す。完了履歴は closed issue・git 履歴・決定記録・公開レジストリが持つ。`status list <file> --status todo,wip,waiting,suspended` で done でない artifact を列挙し、各 artifact の `graph neighbors <file> <artifact-id>` の `predecessors` から (a) を求める。続けて各 process の `graph neighbors` の `predecessors` と `successors` から (b) を求め、その外側のノード・edge と残存 `revises:` 参照を整理する。削除前後で `status ready <file> --json` と `status blocked <file> --json` の**出力全体**を比較し、`check` と `graph orphans` を確認する。id 集合だけの比較では、ready のまま入力が減る破損を検出できない。
-  この導出・削除・検証の全体を `scripts/pfdsl/sweep-completed-chains.mjs <file>` が行う。`--write` なしでは削除対象を列挙するだけで、`--write` を付けても上の検証が全て通るまでファイルを書き換えない。`.pfdsl/config.json` で有効にした採用リポでは、デフォルトブランチへ push があると `.github/workflows/pfdsl-sweep-completed-chains.yml` がこれを実行し、差分があれば PR を起票する。マージは人が行うので、グラフはレビューを経ない書換えを受けない。
+- **完了チェーン回収**: 保持規則と検証は [`work-cycle.md`「完了チェーンの回収」](work-cycle.md#完了チェーンの回収) の `pfdsl prune` を使う。完了履歴は closed issue・git 履歴・決定記録・公開レジストリが持つ。
+  `scripts/pfdsl/sweep-completed-chains.mjs <file>` は CLI を解決して `prune --json` を呼ぶアダプタで、保持判定や検証を再実装しない。`--write` を付けた場合は CLI に適用も要求する。`.pfdsl/config.json` で有効にした採用リポでは、デフォルトブランチへ push があると `.github/workflows/pfdsl-sweep-completed-chains.yml` がこれを実行し、差分があれば PR を起票する。マージは人が行うので、グラフはレビューを経ない書換えを受けない。
   回収可否の判定はデフォルトブランチだけを読む。まだマージされていないブランチが done artifact を入力に取る process を足していた場合、その組合せはどちらの側からも見えない。統合の時点で「宣言のない id を edge が指す」形になり、roadmap の不変条件がそこで弾く
 
 ## ラベル判定基準
@@ -52,7 +52,7 @@ trigger は `flow-sync/pending` への push を除外する。App token で作�
 削除対象の ID や証拠データを本文へ載せ始める場合は、そのデータの読み戻しを加える。
 この bot PR は既定では `GITHUB_TOKEN` で作成される。
 GitHub は `GITHUB_TOKEN` で作成された PR の `pull_request` トリガーの workflow を、書き込み権限を持つ人が承認するまで承認待ち（`action_required`）で保留する（[Triggering a workflow](https://docs.github.com/en/actions/using-workflows/triggering-a-workflow)）。
-保留中は採用リポ自身の CI ゲート（ビルド・テスト・`fmt` 検査等）がこの PR に対して実行されておらず、回収の正しさを担保するのは `sweep-completed-chains.mjs` 自身の検証だけである。
+保留中は採用リポ自身の CI ゲート（ビルド・テスト・`fmt` 検査等）がこの PR に対して実行されておらず、回収時の検証を担うのはアダプタが呼ぶ `pfdsl prune` である。
 その内訳は `check`・`graph orphans`・`fmt --check`・readiness 比較（`status ready`/`status blocked`）である。
 レビュアーは、CI チェックが付いていない PR や承認待ちのままの PR を「チェックが通った」ではなく「チェックがまだ動いていない」と読むこと。
 
@@ -144,7 +144,8 @@ npm install --prefix . --no-save --package-lock=false --ignore-scripts yaml@2.8.
 `--prefix .` で採用リポへ配置先を固定する（親フォルダの package.json に依存の配置先を引き寄せられないようにする）。
 同じリポで CLI も未保存依存として用意する場合は、上のコマンドの代わりに `npm install --prefix . --no-save --package-lock=false --ignore-scripts yaml@2.8.3 @pfdsl/cli` を使う。
 別々の `npm install --no-save` は先に置いた未保存依存を除去しうるため、保持する未保存依存を同じ install に列挙する。
-公開 CLI が回収に必要な `delete` を持つことは、回収スクリプト自身の起動時チェックで別途確認する。
+公開 CLI が回収に必要な `prune` を持つことは、回収アダプタの起動時チェックで別途確認する。
+新しいアダプタを配置する前に `pfdsl prune --help` の成功を確認し、まだ対応する CLI が公開されていなければ旧アダプタを維持する。
 `package.json` があるリポでは、そのリポの package manager で yaml を開発依存へ追加する（npm なら `npm install --save-dev yaml@2.8.3`）。
 既存の依存宣言・lockfile を尊重し、別の package manager へ切り替えない。
 未保存依存は clean checkout や依存の掃除後には再準備が必要で、CI でも監査の前に用意する。
@@ -169,8 +170,8 @@ import 成功だけを監査成功としない。
 - Node.js 24 以上
 - `gh` CLI、または `GH_TOKEN` / `GITHUB_TOKEN`
 - npm パッケージ `yaml`（上の「依存の準備と初回監査」で採用リポへ用意する）
-- `delete` サブコマンドを持つ版の `@pfdsl/cli`（最初の対応公開版は v0.1.0。v0.0.26 以前には無い。回収スクリプトが判定・削除・検証のすべてをこの CLI 経由で行う）。開発版や解決先の違いもあるため、回収スクリプトは起動時に解決した CLI が `delete` を持つか確かめ、持たなければ対象の有無にかかわらずその場で停止し、直し方を示す
-  - pfdsl リポ自身の workflow は、checkout したツリーが pfdsl workspace（`pnpm-workspace.yaml` と `packages/cli/package.json` を持つ）なら `pnpm -r build` してそのビルドを使う。採用リポのように workspace でなければ `npm install --no-save @pfdsl/cli` で公開版を導入する（フォールバック時は `delete` を含む公開版以降でないと上の起動時チェックで止まる）。運用プロトコルの着手判断が既に `status ready` を要求しているので、`@pfdsl/cli` の導入自体は採用リポにとって新しい前提ではない
+- `prune` サブコマンドを持つ版の `@pfdsl/cli`（回収の判定・削除・検証をこの CLI が担う）。開発版や解決先の違いもあるため、回収スクリプトは起動時に解決した CLI が `prune` を持つか確かめ、持たなければ対象の有無にかかわらずその場で停止し、直し方を示す。対応版が未公開の間は migration guide の更新順に従い、旧 adapter と helpers を一組で維持する
+  - pfdsl リポ自身の workflow は、checkout したツリーが pfdsl workspace（`pnpm-workspace.yaml` と `packages/cli/package.json` を持つ）なら `pnpm -r build` してそのビルドを使う。採用リポのように workspace でなければ `npm install --no-save @pfdsl/cli` で公開版を導入する（フォールバック時は `prune` を含む公開版以降でないと上の起動時チェックで止まる）。運用プロトコルの着手判断が既に `status ready` を要求しているので、`@pfdsl/cli` の導入自体は採用リポにとって新しい前提ではない
   - 回収スクリプトは `PFDSL_CLI`、リポの `packages/cli/dist/cli.js`、`node_modules/@pfdsl/cli/dist/cli.js` の順に CLI を探す
 
 `audit-issues-flow.mjs` が使う named operation はすべて HTTP backend を持つ。`gh` が存在しない（ENOENT）場合も、`GH_TOKEN` または `GITHUB_TOKEN` があれば HTTP backend へ切り替わるため、token のみの環境で監査を実行できる。`gh` が実行されて認証・通信・引数エラーになった場合は HTTP へ切り替えず、そのエラーを報告する。

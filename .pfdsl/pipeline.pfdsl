@@ -213,7 +213,7 @@ artifact:
     group: gen_sources
   ops_install_sources:
     label: pfd-ops 配布ソース（repo ルート）
-    description: "採用リポへ配る読取専用の監査スクリプト、完了チェーン回収スクリプト、その起動に使う GitHub Actions workflow の一次情報。手書きで repo ルート側に実体があり、このリポ自身の運用にも同じ実体を使う。配布対象は scripts/lib/install-templates.mjs の明示リストが決める（同居する repo ローカルのテストを配らないため glob でなく明示リスト）"
+    description: "採用リポへ配る読取専用の監査スクリプト、CLI prune を呼ぶ完了チェーン回収アダプタ、その起動に使う GitHub Actions workflow の一次情報。保持規則と検証は packages/cli の prune が担い、配布アダプタに複製しない。手書きで repo ルート側に実体があり、このリポ自身の運用にも同じ実体を使う。配布対象は scripts/lib/install-templates.mjs の明示リストが決める"
     location: [ "scripts/pfdsl/", ".github/workflows/pfdsl-sweep-completed-chains.yml" ]
     group: gen_sources
   claude_harness_sources:
