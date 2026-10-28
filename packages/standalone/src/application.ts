@@ -253,6 +253,7 @@ export function mountApplication(options: ApplicationOptions) {
 	function render(next: WorkspaceSnapshot) {
 		if (disposed) return;
 		const previousActive = active;
+		const activated = state.activation !== next.activation;
 		const recentChanged = state.recentTargets !== next.recentTargets;
 		state = next;
 		busy = next.busy;
@@ -264,7 +265,7 @@ export function mountApplication(options: ApplicationOptions) {
 			renderedFolder = next.folder;
 			if (next.folder) showFolder(next.folder);
 		}
-		if (active !== previousActive) {
+		if (active !== previousActive || activated) {
 			for (const entry of opened()) {
 				if (entry !== active) entry.tab.deactivate?.();
 				entry.tab.container.style.display = entry === active ? "flex" : "none";

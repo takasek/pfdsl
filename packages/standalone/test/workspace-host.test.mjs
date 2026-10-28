@@ -140,6 +140,51 @@ test("tab activation reveals the selected tab horizontally without moving the do
 	}
 });
 
+test("selecting or reopening the current tab reveals it again without reactivating on other updates", async () => {
+	const native = new FakeNative();
+	const doc = native.add(1, "flow.pfdsl", "a >> p -> b");
+	const host = await startHost(native, doc);
+	try {
+		const tab = await host.open(doc);
+		let activations = 0;
+		const originalActivate = tab.activate;
+		tab.activate = () => {
+			activations++;
+			originalActivate();
+		};
+		const bar = host.query("#tabs");
+		bar.getBoundingClientRect = () => ({ left: 10, right: 310 });
+		tab.button.parentElement.getBoundingClientRect = () => ({
+			left: -90,
+			right: 10,
+		});
+		bar.scrollLeft = 200;
+		tab.button.click();
+		assert.equal(activations, 1);
+		assert.equal(bar.scrollLeft, 100);
+		bar.scrollLeft = 200;
+		await host.open(doc);
+		assert.equal(activations, 2);
+		assert.equal(bar.scrollLeft, 100);
+		assert.equal(
+			host.tabs().filter((entry) => entry.button.isConnected).length,
+			1,
+		);
+		bar.scrollLeft = 200;
+		tab.type("a >> q -> b");
+		tab.report("Formatting complete");
+		await host.settle();
+		assert.equal(
+			activations,
+			2,
+			"editing and notices do not reactivate the tab",
+		);
+		assert.equal(bar.scrollLeft, 200);
+	} finally {
+		await host.finish();
+	}
+});
+
 test("Ctrl+Tab uses one host command from editor and toolbar, with three tabs", async () => {
 	const native = new FakeNative();
 	const host = await startHost(native, native.add(1, "unused.pfdsl", "unused"));

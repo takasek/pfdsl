@@ -118,6 +118,8 @@ export interface WorkspaceDocument {
 export interface WorkspaceSnapshot {
 	readonly documents: readonly WorkspaceDocument[];
 	readonly active: string | null;
+	/** Changes on explicit selection, including selection of the current document. */
+	readonly activation: number;
 	readonly busy: boolean;
 	readonly saveCapability: Readonly<{ save: boolean; reason: string }>;
 	readonly appNotice: string;
@@ -178,6 +180,7 @@ export function createWorkspaceController({
 	let disposed = false,
 		busy = false,
 		serial = 0,
+		activation = 0,
 		active: string | null = null,
 		appNotice = "";
 	let saveCapability = {
@@ -236,6 +239,7 @@ export function createWorkspaceController({
 				}),
 			),
 			active,
+			activation,
 			busy,
 			appNotice,
 			saveCapability: Object.freeze({ ...saveCapability }),
@@ -326,6 +330,7 @@ export function createWorkspaceController({
 				void track(remember(disk.path).catch(report));
 			}
 			active = existing.record.key;
+			activation++;
 			emit();
 			return;
 		}
@@ -346,6 +351,7 @@ export function createWorkspaceController({
 		entries.set(record, { record, editor, notice: null, saveNotice: null });
 		records.add(record);
 		active = key;
+		activation++;
 		emit();
 		if (disk) void track(remember(disk.path).catch(report));
 	}
@@ -672,7 +678,10 @@ export function createWorkspaceController({
 		}
 	}
 	async function dispatch(command: WorkspaceCommand) {
-		if (disposed || (busy && command.type !== "activate"))
+		if (
+			disposed ||
+			(busy && command.type !== "activate" && command.type !== "dismiss")
+		)
 			return { accepted: false };
 		const entry =
 			"key" in command
@@ -681,6 +690,7 @@ export function createWorkspaceController({
 		if (command.type === "activate") {
 			if (entry) {
 				active = entry.record.key;
+				activation++;
 				emit();
 			}
 			return { accepted: !!entry };
@@ -694,12 +704,14 @@ export function createWorkspaceController({
 		if (command.type === "cycle") {
 			const all = [...records],
 				index = all.findIndex((record) => record.key === active);
-			if (all.length)
+			if (all.length) {
 				active =
 					all[
 						(index + (command.direction === "next" ? 1 : all.length - 1)) %
 							all.length
 					]!.key;
+				activation++;
+			}
 			emit();
 			return { accepted: true };
 		}
