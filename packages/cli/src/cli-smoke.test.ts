@@ -19,8 +19,11 @@ describe("dist/cli.js smoke", () => {
 	it.skipIf(!distIsCurrent)(
 		"prune reads stdin once and supports report/check modes",
 		() => {
-			const input =
-				"---\ntype: roadmap\nartifact:\n  a: {status: done}\n  b: {status: done}\nprocess:\n  p: {}\n---\n\na >> p -> b\n";
+			const input = execFileSync(process.execPath, [distCli, "fmt", "-"], {
+				input:
+					"---\ntype: roadmap\nartifact:\n  a: {status: done}\n  b: {status: done}\nprocess:\n  p: {}\n---\n\na >> p -> b\n",
+				encoding: "utf8",
+			});
 			for (const flags of [[], ["--json"], ["--check", "--json"]]) {
 				const result = spawnSync(
 					process.execPath,

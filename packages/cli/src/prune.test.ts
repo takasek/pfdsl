@@ -12,7 +12,7 @@ import { join } from "node:path";
 import { analyze, format } from "@pfdsl/core";
 import { afterEach, beforeEach, expect, it } from "vitest";
 import { run } from "./index.js";
-import { comparableReady, pruneTargets } from "./prune.js";
+import { comparableBlocked, comparableReady, pruneTargets } from "./prune.js";
 
 let dir: string;
 let file: string;
@@ -159,13 +159,135 @@ it("rejects broken input and leaves its bytes unchanged", async () => {
 	expect(readFileSync(file, "utf8")).toBe(input);
 });
 
-it("refuses noncanonical candidate output instead of silently formatting it", async () => {
+it("refuses noncanonical input with an actionable formatting instruction", async () => {
 	const input = source.replace("q -> c", 'q -> "c"');
 	writeFileSync(file, input);
 	const result = await run(["prune", file, "--write"]);
 	expect(result.exitCode).toBe(1);
 	expect(result.stderr).toContain("not canonically formatted");
+	expect(result.stderr).toContain("input");
 	expect(readFileSync(file, "utf8")).toBe(input);
+	expect((await run(["fmt", file, "--write"])).exitCode).toBe(0);
+	expect((await run(["prune", file, "--write"])).exitCode).toBe(0);
+});
+
+it("reformats retained input order when pruning changes topological ranks", async () => {
+	const input = format(
+		`---
+type: roadmap
+artifact:
+  a0: {status: done}
+  a1: {status: done}
+  a2: {status: todo}
+---
+a1 >> p1 -> a0
+[a1, a0] >> p0 -> a2
+`,
+		{ style: "flows" },
+	).output;
+	writeFileSync(file, input);
+	expect((await run(["fmt", file, "--check"])).exitCode).toBe(0);
+	expect((await run(["check", file])).exitCode).toBe(0);
+	const preview = await run(["prune", file]);
+	expect(preview.exitCode, preview.stderr).toBe(0);
+	expect(preview.stdout).toContain("[a0, a1] >> p0 -> a2");
+	expect(readFileSync(file, "utf8")).toBe(input);
+	const result = await run(["prune", file, "--write", "--json"]);
+	expect(result.exitCode, result.stdout + result.stderr).toBe(0);
+	expect(JSON.parse(result.stdout).deleted).toEqual(["p1"]);
+	expect(readFileSync(file, "utf8")).toBe(preview.stdout);
+	expect((await run(["fmt", file, "--check"])).exitCode).toBe(0);
+	expect((await run(["check", file])).exitCode).toBe(0);
+	expect((await run(["prune", file, "--check"])).exitCode).toBe(0);
+});
+
+it("reports an unfinished feedback orphan instead of suggesting ineffective fmt", async () => {
+	const input = format(
+		`---
+type: roadmap
+artifact:
+  a: {status: done}
+  b: {status: done}
+  f: {status: wip}
+---
+f >>? p
+a >> p -> b
+`,
+		{ style: "flows" },
+	).output;
+	writeFileSync(file, input);
+	expect((await run(["fmt", file, "--check"])).exitCode).toBe(0);
+	expect((await run(["check", file])).exitCode).toBe(0);
+	const result = await run(["prune", file, "--write"]);
+	expect(result.exitCode).toBe(1);
+	expect(result.stderr).toContain("orphans");
+	expect(result.stderr).not.toContain("fmt");
+	expect(readFileSync(file, "utf8")).toBe(input);
+});
+
+it.each([
+	"todo",
+	"wip",
+])("retains readiness and blockers when canonical process and blocker order changes (%s)", async (status) => {
+	const input = format(
+		`---
+type: roadmap
+artifact:
+  a: {status: done}
+  b: {status: done}
+  x: {status: ${status}}
+  y: {status: ${status}}
+  z: {status: todo}
+---
+a >> p1 -> b
+b >> q1 -> x
+a >> q2 -> y
+[x, y] >> r -> z
+`,
+		{ style: "flows" },
+	).output;
+	writeFileSync(file, input);
+	const readyBefore = await run(["status", "ready", file, "--json"]);
+	const blockedBefore = await run(["status", "blocked", file, "--json"]);
+	const result = await run(["prune", file, "--write", "--json"]);
+	expect(result.exitCode, result.stdout + result.stderr).toBe(0);
+	expect(JSON.parse(result.stdout).deleted).toEqual(["p1"]);
+	const readyAfter = await run(["status", "ready", file, "--json"]);
+	const blockedAfter = await run(["status", "blocked", file, "--json"]);
+	expect(readyBefore.stdout).not.toBe(readyAfter.stdout);
+	expect(blockedBefore.stdout).not.toBe(blockedAfter.stdout);
+	expect(comparableReady(readyBefore.stdout)).toBe(
+		comparableReady(readyAfter.stdout),
+	);
+	expect(comparableBlocked(blockedBefore.stdout)).toBe(
+		comparableBlocked(blockedAfter.stdout),
+	);
+	expect((await run(["fmt", file, "--check"])).exitCode).toBe(0);
+});
+
+it("ignores blocker order but detects lost blockers and changed labels", () => {
+	const before = {
+		ok: true,
+		blocked: [{ id: "p", label: "Process", blockedBy: ["x", "y"] }],
+	};
+	expect(comparableBlocked(JSON.stringify(before))).toBe(
+		comparableBlocked(
+			JSON.stringify({
+				...before,
+				blocked: [{ ...before.blocked[0], blockedBy: ["y", "x"] }],
+			}),
+		),
+	);
+	for (const change of [{ blockedBy: ["x"] }, { label: "Other" }]) {
+		expect(comparableBlocked(JSON.stringify(before))).not.toBe(
+			comparableBlocked(
+				JSON.stringify({
+					...before,
+					blocked: [{ ...before.blocked[0], ...change }],
+				}),
+			),
+		);
+	}
 });
 
 it("never removes unfinished isolated artifacts and refuses remaining orphans", async () => {
@@ -214,7 +336,7 @@ it.each([
 	);
 });
 
-it("keeps every ready payload field except empty.complete in the comparison", () => {
+it("compares ready input/output membership while preserving other fields except empty.complete", () => {
 	const empty = {
 		ok: true,
 		ready: [],
@@ -233,9 +355,19 @@ it("keeps every ready payload field except empty.complete in the comparison", ()
 	const before = {
 		ok: true,
 		ready: [
-			{ id: "p", inputs: ["a", "b"], outputs: ["c"], newlyReadyCount: 1 },
+			{ id: "p", inputs: ["a", "b"], outputs: ["c", "d"], newlyReadyCount: 1 },
 		],
 	};
+	expect(comparableReady(JSON.stringify(before))).toBe(
+		comparableReady(
+			JSON.stringify({
+				...before,
+				ready: [
+					{ ...before.ready[0], inputs: ["b", "a"], outputs: ["d", "c"] },
+				],
+			}),
+		),
+	);
 	for (const change of [
 		{ inputs: ["a"] },
 		{ outputs: ["d"] },

@@ -140,7 +140,7 @@ process:
 		writeFileSync(file, nonCanonical);
 	});
 
-	it("refuses to apply a delete candidate that is not canonically formatted, and exits 1", () => {
+	it("refuses noncanonical input and exits 1", () => {
 		const result = runSweep([file, "--write"]);
 		assert.equal(result.status, 1);
 		assert.match(JSON.parse(result.stdout).error, /not canonically formatted/);

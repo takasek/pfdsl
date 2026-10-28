@@ -39,6 +39,9 @@ Use `--write` to apply and report deletions, or `--check` to return exit 1 when 
 The deployed `sweep-completed-chains.mjs` still accepts `<file> [--write]`, but its stdout is now the CLI's JSON report.
 Update consumers that parse the old human-readable dry-run text to read the `deleted` array.
 Preview or verification failures do not modify the roadmap.
+When there are deletion targets, input must be canonically formatted; `prune` formats the output itself because removing producers can change canonical edge order.
+Ready and blocked comparisons ignore process, input/output and blocker order but still require identical membership and other fields, except for the completed-process count in an empty ready set.
+Remaining orphan nodes are reported as such; formatting the original cannot repair an orphan created by pruning.
 Input and output validation includes relative dependencies when a file path is supplied; stdin accepts only dependency-free roadmaps.
 
 As part of the same update, remove the adapter's former helpers under `scripts/pfdsl/lib/`: `chain-sweep.mjs`, `cli-id-arg.mjs`, `ready-compare.mjs`, and `scratch-path.mjs`.

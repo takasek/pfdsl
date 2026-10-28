@@ -55,7 +55,7 @@ trigger は `flow-sync/pending` への push を除外する。App token で作�
 この bot PR は既定では `GITHUB_TOKEN` で作成される。
 GitHub は `GITHUB_TOKEN` で作成された PR の `pull_request` トリガーの workflow を、書き込み権限を持つ人が承認するまで承認待ち（`action_required`）で保留する（[Triggering a workflow](https://docs.github.com/en/actions/using-workflows/triggering-a-workflow)）。
 保留中は採用リポ自身の CI ゲート（ビルド・テスト・`fmt` 検査等）がこの PR に対して実行されておらず、回収時の検証を担うのはアダプタが呼ぶ `pfdsl prune` である。
-その内訳は `check`・`graph orphans`・`fmt --check`・readiness 比較（`status ready`/`status blocked`）である。
+その検証は `pfdsl prune` 内で行い、入力・出力の検証、入力の正準書式、変換後の孤立ノード不在、出力の整形、ready・blocked の比較を含む。
 レビュアーは、CI チェックが付いていない PR や承認待ちのままの PR を「チェックが通った」ではなく「チェックがまだ動いていない」と読むこと。
 
 承認なしで CI を走らせるには、GitHub App の installation token で PR を作成する。

@@ -56,7 +56,8 @@ criteria 未達を文言変更で done に帳尻合わせせず、wip を維持�
 完了チェーンの保持規則と検証は、CLI のトップレベル動詞 `pfdsl prune <roadmap>` が担う。
 未完了の出力を持つ process と、その input・output・feedback に現れる artifact を保持する。
 削除対象は保持集合の外にある done artifact と、edge に現れる process であり、未完了の孤立 artifact は削除対象にしない。
-入力を検証し、削除対象があれば変換後の検証・正準書式・孤立ノード不在と、ready（空集合時の完了 process 数を除く）・blocked の出力の同値を確認する。
+入力を検証し、削除対象があれば入力の正準書式と変換後の孤立ノード不在を確認したうえで、出力を整形・検証する。
+ready・blocked は process の列挙順と各 process の input・output・blocker の順序、空集合時の完了 process 数を除いて比較し、それ以外の全フィールドの同値を確認する。
 検証が失敗したら書き換えない。
 
 既定は変換後の本文を stdout に出し、`--json` は削除対象レポートだけを出す。

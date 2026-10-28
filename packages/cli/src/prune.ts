@@ -1,4 +1,4 @@
-import type { analyze } from "@pfdsl/core";
+import { type analyze, compareIds } from "@pfdsl/core";
 
 /** Keep unfinished producers and every artifact on any of their edges. */
 export function pruneTargets({
@@ -30,9 +30,24 @@ export function pruneTargets({
 	].sort();
 }
 
-/** Only the completed-process count may change when pruning. */
+const byId = (a: { id: string }, b: { id: string }) => compareIds(a.id, b.id);
+
+/** Ignore presentation order and the removed completed-process count. */
 export function comparableReady(stdout: string): string {
 	const payload = JSON.parse(stdout);
 	if (payload.empty) delete payload.empty.complete;
+	for (const item of payload.ready ?? []) {
+		item.inputs.sort(compareIds);
+		item.outputs.sort(compareIds);
+	}
+	payload.ready?.sort(byId);
+	return JSON.stringify(payload);
+}
+
+/** Preserve every blocker and field, independent of presentation order. */
+export function comparableBlocked(stdout: string): string {
+	const payload = JSON.parse(stdout);
+	for (const item of payload.blocked ?? []) item.blockedBy.sort(compareIds);
+	payload.blocked?.sort(byId);
 	return JSON.stringify(payload);
 }

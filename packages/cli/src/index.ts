@@ -64,7 +64,7 @@ import {
 	defineCommand,
 	type OptionSpec,
 } from "./command-definition.js";
-import { comparableReady, pruneTargets } from "./prune.js";
+import { comparableBlocked, comparableReady, pruneTargets } from "./prune.js";
 
 export interface CommandResult {
 	stdout: string;
@@ -997,6 +997,12 @@ export function runPrune(file: string, opts: PruneOptions = {}): CommandResult {
 	const deleted = pruneTargets(before);
 	let output = source;
 	if (deleted.length > 0) {
+		const formattedInput = format(source, { style: "flows" });
+		if (
+			hasErrors(formattedInput.diagnostics) ||
+			formattedInput.output !== source
+		)
+			return refuse("input is not canonically formatted; run pfdsl fmt first");
 		const result = deleteNodes(source, deleted);
 		const failed = failIfErrors(
 			result.diagnostics,
@@ -1009,17 +1015,22 @@ export function runPrune(file: string, opts: PruneOptions = {}): CommandResult {
 			return refuse(
 				"YAML anchors, aliases and merge keys (<<) are not supported; expand them before pruning",
 			);
-		output = result.output;
-		const verified = checkSource(output, file, opts);
-		if (verified.exitCode !== 0) return verified;
-		const formatted = format(output, { style: "flows" });
-		if (hasErrors(formatted.diagnostics) || formatted.output !== output)
-			return refuse(
-				"post-prune output is not canonically formatted; run pfdsl fmt first",
-			);
-		const after = analyze(output);
+		const after = analyze(result.output);
 		if (computeOrphans(after.graph).length > 0)
 			return refuse("post-prune graph orphans is non-empty");
+		// Removing producers can change canonical input order even when the
+		// original source was formatted. Format the candidate ourselves.
+		const formatted = format(result.output, { style: "flows" });
+		const formatFailure = failIfErrors(
+			formatted.diagnostics,
+			file,
+			opts.json,
+			opts.color,
+		);
+		if (formatFailure) return formatFailure;
+		output = formatted.output;
+		const verified = checkSource(output, file, opts);
+		if (verified.exitCode !== 0) return verified;
 		const readyAfter = readySource(output, file, queryOpts);
 		if (readyAfter.exitCode !== 0) return readyAfter;
 		if (
@@ -1028,7 +1039,10 @@ export function runPrune(file: string, opts: PruneOptions = {}): CommandResult {
 			return refuse("post-prune status ready output changed");
 		const blockedAfter = blockedSource(output, file, queryOpts);
 		if (blockedAfter.exitCode !== 0) return blockedAfter;
-		if (blockedBefore.stdout !== blockedAfter.stdout)
+		if (
+			comparableBlocked(blockedBefore.stdout) !==
+			comparableBlocked(blockedAfter.stdout)
+		)
 			return refuse("post-prune status blocked output changed");
 	}
 	if (opts.write && deleted.length > 0) writeFileSync(file, output, "utf-8");
@@ -3556,10 +3570,12 @@ Default: print the transformed source without changing the file.
   --json      emit { ok: true, deleted: [...] } instead of source/text
   --no-color  disable ANSI colors
 
-Input and output must pass check. When there are deletions, the output must
-be canonically formatted and have no orphans. Ready and blocked results must
-stay unchanged except for the completed-process count in an empty ready set.
-Run pfdsl fmt first if formatting is refused. Verification failures never write.
+Input and output must pass check. When there are deletions, input must be
+canonically formatted; run pfdsl fmt first if the input is refused. Prune
+rejects remaining orphans and formats the transformed output itself.
+Ready and blocked comparisons ignore process, input/output and blocker
+ordering, plus the completed-process count in an empty ready set. All other
+fields must stay unchanged. Verification failures never write.
 Stdin (-) supports dependency-free roadmaps only; use a file path for
 extends/subflow validation. --write cannot be used with stdin or --check.
 
