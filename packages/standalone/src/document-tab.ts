@@ -366,7 +366,6 @@ export function createDocumentTab({
 		sourceVersion++;
 		renameTracking.observe(editor.getValue(), event?.isUndoing);
 		normalizedEdges.clear();
-		button.textContent = `${name}${editor.getValue() === source ? "" : " •"}`;
 		requestEditorRender();
 		requestRefresh();
 		onChange?.();
@@ -475,12 +474,10 @@ export function createDocumentTab({
 			path = nextPath;
 			name = nextName;
 			if (readSource) read = readSource;
-			button.textContent = `${name}${editor.getValue() === source ? "" : " •"}`;
 			requestRefresh();
 		},
 		markSaved(value: string) {
 			source = value;
-			button.textContent = `${name}${editor.getValue() === source ? "" : " •"}`;
 		},
 		hasUnsavedText: () => editor.getValue() !== source,
 		normalize() {

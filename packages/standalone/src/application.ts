@@ -1,11 +1,4 @@
-import {
-	closeDocuments,
-	type DiskSnapshot,
-	DocumentSession,
-	type OperationPlan,
-	type SaveResult,
-	sameDocument,
-} from "./document-session.js";
+import type { DiskSnapshot, SaveResult } from "./document-session.js";
 import type { createDocumentTab, DocumentTab } from "./document-tab.js";
 import { createExportResults } from "./export-results.js";
 import { createNativeExportServices } from "./export-services.js";
@@ -13,6 +6,14 @@ import type { MenuState, RecentTarget } from "./native-menu.js";
 import { createNativeReferenceServices } from "./reference-services.js";
 import type { createTextComparison } from "./text-comparison.js";
 import { createWindowTitle } from "./window-title.js";
+import {
+	createWorkspaceController,
+	type DecisionAnswer,
+	type DecisionRequest,
+	type WorkspaceCommand,
+	type WorkspaceDocument,
+	type WorkspaceSnapshot,
+} from "./workspace-controller.js";
 
 export type NativeInvoke = typeof import("@tauri-apps/api/core").invoke;
 export interface NativeMenu {
@@ -93,138 +94,228 @@ export function mountApplication(options: ApplicationOptions) {
 		(error) => report(`Could not update the window title: ${String(error)}`),
 	);
 	let nativeMenu: NativeMenu | undefined;
+	let state: WorkspaceSnapshot;
+	interface Entry {
+		key: string;
+		tab: DocumentTab;
+		navigation: HTMLElement;
+		readonly state: WorkspaceDocument;
+		readonly name: string;
+		readonly path: string | null;
+	}
+	// UI objects do not determine membership; every traversal uses the controller snapshot.
+	const entries = new Map<string, Entry>();
+	const opened = () => state.documents.map((item) => entries.get(item.key)!);
+	let active: Entry | undefined;
+	let busy = false;
 	let folderRoot: string | undefined;
 	let recentTargets: RecentTarget[] = [];
-	let saveCapability = {
-		save: false,
-		reason: native
-			? "Checking document saving support…"
-			: "Use the desktop application to save files.",
-	};
+	let saveCapability = { save: false, reason: "" };
 	const saveSupport = document.querySelector<HTMLElement>("#save-support")!;
 	function updateSaveControls() {
 		if (disposed) return;
 		saveSupport.textContent = saveCapability.reason;
 		updateMenu();
 	}
-	async function loadSaveCapability() {
-		try {
-			const capability = await invoke<{ save: boolean; reason: string | null }>(
-				"document_capabilities",
-			);
-			if (
-				typeof capability?.save !== "boolean" ||
-				(!capability.save &&
-					(typeof capability.reason !== "string" || !capability.reason.trim()))
-			) {
-				throw new Error("Invalid document saving capability");
+	const controller = createWorkspaceController({
+		files: {
+			chooseDocument: () => {
+				if (!native)
+					return Promise.reject(
+						new Error("Use the desktop application to choose a file."),
+					);
+				return invoke<DiskSnapshot | null>("select_document");
+			},
+			openPath: (path, recent) =>
+				invoke<DiskSnapshot>(recent ? "open_recent" : "open_document", {
+					path,
+				}),
+			chooseSaveTarget: (name) =>
+				invoke<DiskSnapshot | null>("choose_save_target", { name }),
+			inspect: (id) => invoke<DiskSnapshot>("inspect_document", { id }),
+			save: (request) => invoke<SaveResult>("save_document", request),
+			release: (id) => invoke("release_document", { id }),
+		},
+		editors: {
+			create(initial, events) {
+				const { key, name, source, location } = initial;
+				let renderedLocation = JSON.stringify([location?.id, location?.path]);
+				const tab = createDocumentTab({
+					parent: documents,
+					key,
+					name,
+					source,
+					path: location?.path ?? null,
+					read: readFor(location?.id),
+					referenceServices: native
+						? createNativeReferenceServices(
+								() =>
+									controller
+										.snapshot()
+										.documents.find((item) => item.key === key)?.location?.id,
+								() =>
+									!disposed &&
+									!state.busy &&
+									state.active === key &&
+									state.documents.some((item) => item.key === key),
+								(snapshot, isCurrent) => controller.accept(snapshot, isCurrent),
+								invoke,
+							)
+						: undefined,
+					exportServices: native
+						? createNativeExportServices(invoke)
+						: undefined,
+					showExportResults,
+					reportStatus: events.notice,
+					onChange: events.changed,
+				});
+				const navigation = document.createElement("span");
+				navigation.className = "document-tab";
+				navigation.setAttribute("role", "none");
+				const close = document.createElement("button");
+				close.className = "close-document";
+				close.textContent = "×";
+				close.setAttribute("aria-label", `Close ${name}`);
+				close.setAttribute("tabindex", "-1");
+				navigation.append(tab.button, close);
+				tabs.append(navigation);
+				const entry: Entry = {
+					key,
+					tab,
+					navigation,
+					get state() {
+						return state.documents.find((item) => item.key === key)!;
+					},
+					get name() {
+						return this.state.name;
+					},
+					get path() {
+						return this.state.location?.path ?? null;
+					},
+				};
+				entries.set(key, entry);
+				tab.button.onclick = () => {
+					void controller.dispatch({ type: "activate", key });
+				};
+				close.onclick = () => {
+					void dispatch({ type: "close", keys: [key] });
+				};
+				return {
+					getSource: () => tab.getSource(),
+					getRevision: () => tab.getRevision(),
+					setSource: (value) => tab.setSource(value),
+					markSaved: (value) => tab.markSaved(value),
+					setLocation(path, name, id) {
+						const next = JSON.stringify([id, path]);
+						if (next === renderedLocation) return;
+						renderedLocation = next;
+						tab.setLocation(path, name, readFor(id));
+					},
+					dispose() {
+						tab.dispose();
+						navigation.remove();
+						entries.delete(key);
+					},
+				};
+			},
+		},
+		decisions: { request: presentDecision },
+		...(native
+			? {
+					host: {
+						capabilities: () =>
+							invoke<{ save: boolean; reason: string | null }>(
+								"document_capabilities",
+							),
+						recent: () => invoke<RecentTarget[]>("list_recent"),
+						rememberDocument: (path: string) =>
+							invoke<void>("remember_document", { path }),
+						chooseFolder: () => invoke<string | null>("select_folder"),
+						openRecentFolder: (path: string) =>
+							invoke<string>("open_recent_folder", { path }),
+						listDocuments: () => invoke<string[]>("list_documents"),
+						rememberFolder: (path: string) =>
+							invoke<void>("remember_folder", { path }),
+						finishQuit: (request: string, approved: boolean) =>
+							invoke<void>("finish_app_exit", { request, approved }),
+					},
+				}
+			: {}),
+	});
+	state = controller.snapshot();
+	function dispatch(command: WorkspaceCommand) {
+		const result = controller.dispatch(command);
+		currentCommand = result;
+		return result;
+	}
+	let renderedFolder: WorkspaceSnapshot["folder"] = null;
+	function render(next: WorkspaceSnapshot) {
+		if (disposed) return;
+		const previousActive = active;
+		const recentChanged = state.recentTargets !== next.recentTargets;
+		state = next;
+		busy = next.busy;
+		active = entries.get(next.active ?? "");
+		saveCapability = { ...next.saveCapability };
+		recentTargets = next.recentTargets.map((target) => ({ ...target }));
+		if (recentChanged) nativeMenu?.recent(recentTargets);
+		if (renderedFolder !== next.folder) {
+			renderedFolder = next.folder;
+			if (next.folder) showFolder(next.folder);
+		}
+		if (active !== previousActive) {
+			for (const entry of opened()) {
+				if (entry !== active) entry.tab.deactivate?.();
+				entry.tab.container.style.display = entry === active ? "flex" : "none";
+				entry.tab.button.setAttribute(
+					"aria-selected",
+					String(entry === active),
+				);
 			}
-			saveCapability = {
-				save: capability.save,
-				reason: capability.save ? "" : capability.reason!,
-			};
-		} catch (error) {
-			saveCapability = {
-				save: false,
-				reason: `Could not determine document saving support: ${String(error)}. Saving is disabled.`,
-			};
+			active?.tab.activate();
+			if (active) {
+				const viewport = tabs.getBoundingClientRect(),
+					tab = active.navigation.getBoundingClientRect();
+				if (tab.left < viewport.left)
+					tabs.scrollLeft += tab.left - viewport.left;
+				else if (tab.right > viewport.right)
+					tabs.scrollLeft += Math.min(
+						tab.right - viewport.right,
+						tab.left - viewport.left,
+					);
+			}
 		}
-		for (const entry of opened) {
-			if (entry.notice?.channel === "capability")
-				entry.notice = saveCapability.save
-					? undefined
-					: { ...entry.notice, message: saveCapability.reason };
-		}
-		renderStatus();
-		updateSaveControls();
+		for (const button of document.querySelectorAll<HTMLButtonElement>(
+			"#sidebar, #files button, .close-document, [data-start], #try-sample",
+		))
+			button.disabled = busy;
+		renderWorkspace();
 		renderConflict();
 	}
-	interface Entry {
-		tab: DocumentTab;
-		session: DocumentSession;
-		name: string;
-		navigation: HTMLElement;
-		path: string | null;
-		documentID: number | undefined;
-		notice?:
-			| { message: string; revision: number | string; channel: string }
-			| undefined;
-		saveNotice?: { message: string } | undefined;
-	}
-	const opened = new Set<Entry>();
-	const documentHandles = new Set<number>();
-	async function releaseUnusedDocuments() {
-		for (const id of documentHandles) {
-			// An acceptance document can arrive while an earlier release is pending.
-			if ([...opened].some(({ session }) => session.usesDocument(id))) continue;
-			await invoke("release_document", { id });
-			documentHandles.delete(id);
-		}
-	}
-	let active: Entry | undefined;
-	let serial = 0;
-	let busy = false;
-	let appNotice = "";
 	function renderStatus() {
 		if (disposed) return;
-		for (const entry of opened) {
-			if (entry.notice && entry.notice.revision !== entry.tab.getRevision())
-				entry.notice = undefined;
-		}
-		const lines = [...opened].flatMap((entry) =>
-			entry.saveNotice
+		const lines = [...opened()].flatMap((entry) =>
+			entry.state.saveNotice
 				? [
-						`Save needs attention — ${entry.path ?? entry.name}: ${entry.saveNotice.message}`,
+						`Save needs attention — ${entry.path ?? entry.name}: ${entry.state.saveNotice.message}`,
 					]
 				: [],
 		);
-		if (active?.notice)
+		if (active?.state.notice)
 			lines.push(
-				`Last action — ${active.path ?? active.name}: ${active.notice.message}`,
+				`Last action — ${active.path ?? active.name}: ${active.state.notice.message}`,
 			);
-		if (appNotice) lines.push(`Application notice: ${appNotice}`);
+		if (state.appNotice) lines.push(`Application notice: ${state.appNotice}`);
 		const text = lines.join("\n");
 		if (status.textContent !== text) status.textContent = text;
-		dismissStatus.hidden = !active?.notice && !appNotice;
+		dismissStatus.hidden = !active?.state.notice && !state.appNotice;
 		const summary = active
 			? `Current diagnostics — ${active.path ?? active.name}: ${active.tab.getDiagnosticsSummary?.() ?? "Checking…"}`
 			: "";
 		if (diagnostics.textContent !== summary) diagnostics.textContent = summary;
 	}
-	function notify(
-		message: string,
-		entry: Entry | undefined,
-		channel = "action",
-		revision: number | string | undefined = entry?.tab.getRevision(),
-	) {
-		if (disposed) return;
-		if (entry) {
-			if (!opened.has(entry)) return;
-			if (!message && entry.notice?.channel !== channel) return;
-			entry.notice = message
-				? { message, revision: revision!, channel }
-				: undefined;
-		} else appNotice = message;
-		renderStatus();
-	}
-	function saveNotice(
-		entry: Entry,
-		message: string,
-		resolved = false,
-		revision: number | string = entry.tab.getRevision(),
-	) {
-		if (!opened.has(entry)) return;
-		entry.saveNotice = resolved ? undefined : { message };
-		if (resolved) notify(message, entry, "action", revision);
-		else {
-			entry.notice = undefined;
-			renderStatus();
-		}
-	}
 	dismissStatus.onclick = () => {
-		if (active) active.notice = undefined;
-		appNotice = "";
-		renderStatus();
+		void dispatch({ type: "dismiss" });
 	};
 	const readFor =
 		(id: number | undefined) =>
@@ -240,7 +331,7 @@ export function mountApplication(options: ApplicationOptions) {
 		};
 	function report(error: unknown) {
 		if (disposed) return;
-		notify(String(error), undefined);
+		controller.notify(String(error));
 	}
 	function basename(path: string) {
 		return path.split("/").pop()!;
@@ -269,9 +360,11 @@ export function mountApplication(options: ApplicationOptions) {
 	}
 	function renderWorkspace() {
 		if (disposed) return;
-		for (const entry of opened) {
+		for (const entry of opened()) {
 			entry.navigation.classList.toggle("selected", entry === active);
-			const sameName = [...opened].filter((other) => other.name === entry.name);
+			const sameName = [...opened()].filter(
+				(other) => other.name === entry.name,
+			);
 			let visibleName = entry.name;
 			if (sameName.length > 1 && entry.path) {
 				const parents = sameName
@@ -289,19 +382,22 @@ export function mountApplication(options: ApplicationOptions) {
 					depth++;
 				visibleName += ` — ${parent.slice(-depth).join("/") || "/"}`;
 			}
-			entry.tab.button.textContent = `${visibleName}${entry.session.isDirty() ? " •" : ""}`;
+			entry.tab.button.textContent = `${visibleName}${entry.state.dirty ? " •" : ""}`;
 			entry.tab.button.title = entry.path ?? `${entry.name} — Not saved`;
+			entry.navigation
+				.querySelector(".close-document")!
+				.setAttribute("aria-label", `Close ${entry.name}`);
 		}
 		document.querySelector<HTMLElement>("#start-screen")!.hidden = !!active;
 		document.querySelector<HTMLElement>("#documents")!.hidden = !active;
 		document.querySelector<HTMLElement>("#document-state")!.textContent =
 			!active
 				? ""
-				: active.session.panel()
+				: active.state.conflict
 					? "External change — review required"
 					: !active.path
 						? "Not saved"
-						: active.session.isDirty()
+						: active.state.dirty
 							? "Modified"
 							: "Saved";
 		const location = document.querySelector<HTMLElement>("#document-location")!;
@@ -320,240 +416,66 @@ export function mountApplication(options: ApplicationOptions) {
 			file.setAttribute("aria-current", String(file.title === active?.path));
 		updateSaveControls();
 	}
-	function syncLocation(entry: Entry) {
-		if (disposed || !opened.has(entry)) return;
-		const disk = entry.session.location;
-		if (!disk) return;
-		const name = basename(disk.path);
-		if (
-			entry.path !== disk.path ||
-			entry.name !== name ||
-			entry.documentID !== disk.id
-		) {
-			entry.name = name;
-			entry.path = disk.path;
-			entry.documentID = disk.id;
-			entry.tab.setLocation(disk.path, name, readFor(disk.id));
-		}
-		entry.tab.markSaved(entry.session.savedSource);
-		entry.navigation
-			.querySelector(".close-document")!
-			.setAttribute("aria-label", `Close ${entry.name}`);
-	}
-	function activate(entry: Entry) {
-		if (disposed || !opened.has(entry)) return;
-		active = entry;
-		for (const other of opened) {
-			if (other !== entry) other.tab.deactivate?.();
-			other.tab.container.style.display = other === entry ? "flex" : "none";
-			other.tab.button.setAttribute("aria-selected", String(other === entry));
-		}
-		entry.tab.activate();
-		renderWorkspace();
-		renderConflict();
-		const bar = document.querySelector<HTMLElement>("#tabs")!;
-		const viewport = bar.getBoundingClientRect();
-		const tab = entry.navigation.getBoundingClientRect();
-		if (tab.left < viewport.left) bar.scrollLeft += tab.left - viewport.left;
-		else if (tab.right > viewport.right)
-			bar.scrollLeft += Math.min(
-				tab.right - viewport.right,
-				tab.left - viewport.left,
-			);
-	}
-	function run(action: () => Promise<unknown>) {
-		if (disposed || busy) return;
-		busy = true;
-		updateMenu();
-		for (const button of document.querySelectorAll<HTMLButtonElement>(
-			"#sidebar, #files button, .close-document, [data-start], #try-sample",
-		))
-			button.disabled = true;
-		currentCommand = action()
-			.catch(report)
-			.finally(async () => {
-				await releaseUnusedDocuments().catch(report);
-				busy = false;
-				if (disposed) return;
-				for (const button of document.querySelectorAll<HTMLButtonElement>(
-					"#files button, .close-document, [data-start], #try-sample",
-				))
-					button.disabled = false;
-				updateSaveControls();
-				renderWorkspace();
-				renderConflict();
-			});
-	}
-	function openDocument(
-		name: string,
-		source: string,
-		disk: DiskSnapshot | null,
-	) {
-		if (disposed) return;
-		const existing =
-			disk &&
-			[...opened].find(
-				(entry) => entry.session.disk && sameDocument(entry.session.disk, disk),
-			);
-		if (existing) {
-			if (existing.session.rebindDisk(disk)) {
-				syncLocation(existing);
-				renderWorkspace();
-				void remember(disk.path).catch(report);
-			}
-			activate(existing);
-			return;
-		}
-		let entry: Entry | undefined;
-		const tab = createDocumentTab({
-			parent: documents,
-			key: `document-${++serial}`,
-			name,
-			source,
-			path: disk?.path ?? null,
-			read: readFor(disk?.id),
-			referenceServices: native
-				? createNativeReferenceServices(
-						() => entry?.session.location?.id,
-						() =>
-							!disposed &&
-							!!entry &&
-							!busy &&
-							opened.has(entry) &&
-							active === entry,
-						async (snapshot, isCurrent) => {
-							try {
-								await openSnapshot(snapshot, isCurrent);
-							} finally {
-								await releaseUnusedDocuments();
-							}
-						},
-						invoke,
-					)
-				: undefined,
-			exportServices: native ? createNativeExportServices(invoke) : undefined,
-			showExportResults,
-			reportStatus: (message, channel) => {
-				if (entry) notify(message, entry, channel);
-			},
-			onChange: () => {
-				if (entry) renderWorkspace();
-			},
-		});
-		const navigation = document.createElement("span");
-		navigation.className = "document-tab";
-		navigation.setAttribute("role", "none");
-		const close = document.createElement("button");
-		close.className = "close-document";
-		close.textContent = "×";
-		close.setAttribute("aria-label", `Close ${name}`);
-		close.setAttribute("tabindex", "-1");
-		navigation.append(tab.button, close);
-		tabs.append(navigation);
-		entry = {
-			tab,
-			session: new DocumentSession(tab, disk),
-			name,
-			navigation,
-			path: disk?.path ?? null,
-			documentID: disk?.id,
-		};
-		const current = entry;
-		opened.add(current);
-		tab.button.onclick = () => activate(current);
-		close.onclick = () => run(() => closeEntries([current]));
-		activate(current);
-		if (disk) void remember(disk.path).catch(report);
-	}
-	async function openSnapshot(snapshot: DiskSnapshot, isCurrent = () => true) {
-		try {
-			if (disposed || !isCurrent()) return;
-			if (snapshot.source === null)
-				throw new Error(
-					"This file is missing. Choose its new location or save the retained editor content elsewhere.",
-				);
-			if (
-				![...opened].some(
-					(entry) =>
-						entry.session.disk && sameDocument(entry.session.disk, snapshot),
-				)
-			) {
-				for (const entry of opened) {
-					const previous = entry.session.location;
-					if (!previous?.identity || previous.identity !== snapshot.identity)
-						continue;
-					// Equal inodes can be simultaneous hard links. Only a missing old leaf permits rename recovery.
-					const current = await invoke<DiskSnapshot>("inspect_document", {
-						id: previous.id,
-					}).catch(() => null);
-					if (disposed || !isCurrent()) return;
-					if (!opened.has(entry) || entry.session.location?.id !== previous.id)
-						continue;
-					if (
-						current?.source === null &&
-						entry.session.rebindDisk(snapshot, true)
-					) {
-						syncLocation(entry);
-						renderWorkspace();
-						// Rebinding/activation may invalidate this operation's own origin.
-						openDocument(basename(snapshot.path), snapshot.source, snapshot);
-						return;
-					}
-				}
-			}
-			if (disposed || !isCurrent()) return;
-			openDocument(basename(snapshot.path), snapshot.source, snapshot);
-		} finally {
-			// Before adoption this function is the sole owner; the normal sweep cannot release it.
-			if (
-				[...opened].some(({ session }) => session.usesDocument(snapshot.id))
-			) {
-				documentHandles.add(snapshot.id);
-			} else {
-				await invoke("release_document", { id: snapshot.id });
-			}
-		}
-	}
-	async function remember(path: string) {
-		await invoke("remember_document", { path });
-		await refreshRecent();
-	}
-	async function refreshRecent() {
-		if (!native) return;
-		const recent =
-			await invoke<Array<{ kind: "file" | "folder"; path: string }>>(
-				"list_recent",
-			);
-		if (disposed) return;
-		recentTargets = recent;
-		nativeMenu?.recent(recentTargets);
-	}
-	async function showFolder(root: string) {
-		const paths = await invoke<string[]>("list_documents");
-		if (disposed) return;
-		folderRoot = root;
+	function showFolder(folder: NonNullable<WorkspaceSnapshot["folder"]>) {
+		folderRoot = folder.root;
 		document.querySelector<HTMLElement>("#folder-sidebar")!.hidden = false;
 		document.querySelector<HTMLElement>("#folder-title")!.textContent =
-			basename(root);
-		const toggle = document.querySelector<HTMLButtonElement>("#sidebar")!;
-		toggle.disabled = false;
-		toggle.title = root;
-		updateMenu();
-		const files = document.querySelector<HTMLElement>("#files")!;
-		files.replaceChildren();
-		for (const path of paths) {
+			basename(folder.root);
+		document.querySelector<HTMLButtonElement>("#sidebar")!.title = folder.root;
+		const list = document.querySelector<HTMLElement>("#files")!;
+		list.replaceChildren();
+		for (const path of folder.files) {
 			const button = document.createElement("button");
-			button.textContent = path.slice(root.length + 1);
+			button.textContent = path.slice(folder.root.length + 1);
 			button.title = path;
-			button.onclick = () =>
-				run(async () =>
-					openSnapshot(await invoke<DiskSnapshot>("open_document", { path })),
-				);
-			files.append(button);
+			button.onclick = () => {
+				void dispatch({ type: "open-path", path });
+			};
+			list.append(button);
 		}
-		await invoke("remember_folder", { path: root });
-		await refreshRecent();
-		notify(`Opened ${root}. Save documents explicitly.`, undefined);
+	}
+	async function presentDecision(
+		request: DecisionRequest,
+		signal: AbortSignal,
+	): Promise<DecisionAnswer> {
+		if (signal.aborted) return "cancel";
+		if (request.kind === "close")
+			return invoke<"save" | "discard" | "cancel">("confirm_close_document", {
+				name: request.name,
+				allowSave: request.allowSave,
+			});
+		let answer: string;
+		if (request.kind === "replace")
+			answer = await choose(
+				"Review the target",
+				`Replace the disk version of ${request.target.path} with the editor content? The disk version shown below differs from the editor, and a further change before saving stops the save. Replace Observed Version writes the editor content to this file and resolves this target only after the revision is confirmed. Keep Editing closes this comparison without writing; editor content and unresolved changes remain. Choose Another File opens Save As; cancelling retains the current content and unresolved state. A further disk or editor change stops the save.`,
+				[
+					["cancel", "Keep Editing"],
+					["another", "Choose Another File"],
+					["replace", "Replace Observed Version"],
+				],
+				{ local: request.editor, disk: request.target.source },
+			);
+		else if (request.kind === "recreate")
+			answer = await choose(
+				"Recreate missing file",
+				`Create ${request.target.path} again? A file created by another writer will not be overwritten.`,
+				[
+					["cancel", "Keep Editing"],
+					["create", "Create File"],
+				],
+			);
+		else
+			answer = await choose(
+				"Discard editor changes",
+				`Replace the editor content with the observed current disk version of ${request.target.path}? Use Disk Version retains that disk version without writing and replaces the editor content after a fresh revision check. This resolves the matching external change; any separate unresolved target remains. Keep Editing closes this comparison without writing or replacing the editor; unresolved changes remain.`,
+				[
+					["cancel", "Keep Editing"],
+					["disk", "Use Disk Version"],
+				],
+				{ local: request.editor, disk: request.target.source },
+			);
+		return answer as DecisionAnswer;
 	}
 	function choose(
 		title: string,
@@ -608,193 +530,11 @@ export function mountApplication(options: ApplicationOptions) {
 			dialog.showModal();
 		});
 	}
-	function otherOpenTarget(entry: Entry, target: DiskSnapshot) {
-		return [...opened].find(
-			(item) =>
-				item !== entry &&
-				item.session.disk &&
-				sameDocument(item.session.disk, target),
-		);
-	}
-	function explainOpenTarget(entry: Entry, target: DiskSnapshot) {
-		const other = otherOpenTarget(entry, target);
-		if (!other) return false;
-		saveNotice(
-			entry,
-			`The target is already open as ${other.name}. Both editor buffers are retained. Choose another file or close that tab explicitly.`,
-		);
-		return true;
-	}
-	async function saveEntry(
-		entry: Entry,
-		as = false,
-		observed = false,
-		confirmation?: OperationPlan,
-	): Promise<boolean> {
-		if (disposed) return false;
-		if (!saveCapability.save) {
-			notify(saveCapability.reason, entry, "capability");
-			return false;
-		}
-		const session = entry.session;
-		const checkConfirmation = () => {
-			if (confirmation && !session.holds(confirmation, "editor")) {
-				saveNotice(
-					entry,
-					"The document changed after the decision was asked. Editor content is retained; close it again.",
-				);
-				return false;
-			}
-			return true;
-		};
-		let target = observed ? (session.panel()?.observed ?? null) : session.disk;
-		// A target picked in the chooser has no acknowledged content to compare with.
-		const chosen = as || !target;
-		let inspected = false;
-		if (chosen) {
-			try {
-				target = await invoke<DiskSnapshot | null>("choose_save_target", {
-					name: entry.name.endsWith(".pfdsl")
-						? entry.name
-						: `${entry.name}.pfdsl`,
-				});
-			} catch (error) {
-				saveNotice(
-					entry,
-					`Could not select the save target: ${String(error)}. The save was not attempted. Editor content is retained; try Save As again.`,
-				);
-				return false;
-			}
-			if (!target) return false;
-			documentHandles.add(target.id);
-			if (disposed) return false;
-		} else {
-			// The remembered snapshot may predate an external change; review what is on disk now.
-			const remembered = target!;
-			const scope = session.begin();
-			let fresh: DiskSnapshot;
-			try {
-				fresh = await invoke<DiskSnapshot>("inspect_document", {
-					id: remembered.id,
-				});
-			} catch (error) {
-				session.observe(remembered, { error }, scope);
-				renderWorkspace();
-				renderConflict();
-				saveNotice(
-					entry,
-					`Could not read ${remembered.path}: ${String(error)}. The save was not attempted. Editor content is retained.`,
-				);
-				return false;
-			}
-			// Even a no-op or reload exit must still belong to the Close Save decision.
-			if (!checkConfirmation()) return false;
-			const clean = !session.isDirty();
-			const outcome = session.observe(remembered, { snapshot: fresh }, scope);
-			target = fresh;
-			// A clean editor has nothing to save: it follows the disk instead of replacing it.
-			if (!observed && outcome === "reloaded") {
-				syncLocation(entry);
-				saveNotice(
-					entry,
-					"Reloaded the current disk version; there was nothing to save.",
-					true,
-				);
-				renderWorkspace();
-				renderConflict();
-				return true;
-			}
-			// Normalized line endings still make a manual save write the editor text.
-			if (
-				!observed &&
-				clean &&
-				fresh.source !== null &&
-				session.acknowledges(fresh) &&
-				fresh.source === entry.tab.getSource()
-			) {
-				syncLocation(entry);
-				saveNotice(entry, "Already saved.", true);
-				renderWorkspace();
-				renderConflict();
-				return true;
-			}
-			inspected = true;
-		}
-		if (explainOpenTarget(entry, target!)) return false;
-		const selected = target!;
-		if (!checkConfirmation()) return false;
-		// Identical text leaves nothing to overwrite, so there is nothing to review.
-		const review =
-			selected.source !== null &&
-			selected.source !== entry.tab.getSource() &&
-			(chosen || observed || !session.acknowledges(selected));
-		const recreate = !review && inspected && selected.source === null;
-		const plan = session.plan(recreate ? "recreate" : "save", selected);
-		if (review) {
-			const decision = await choose(
-				"Review the target",
-				`Replace the disk version of ${selected.path} with the editor content? The disk version shown below differs from the editor, and a further change before saving stops the save. Replace Observed Version writes the editor content to this file and resolves this target only after the revision is confirmed. Keep Editing closes this comparison without writing; editor content and unresolved changes remain. Choose Another File opens Save As; cancelling retains the current content and unresolved state. A further disk or editor change stops the save.`,
-				[
-					["cancel", "Keep Editing"],
-					["another", "Choose Another File"],
-					["replace", "Replace Observed Version"],
-				],
-				{ local: plan.editor, disk: plan.disk },
-			);
-			if (decision === "another")
-				return saveEntry(entry, true, false, confirmation);
-			if (decision !== "replace") return false;
-		} else if (recreate) {
-			const decision = await choose(
-				"Recreate missing file",
-				`Create ${selected.path} again? A file created by another writer will not be overwritten.`,
-				[
-					["cancel", "Keep Editing"],
-					["create", "Create File"],
-				],
-			);
-			if (decision !== "create") return false;
-		}
-		const outcome = await session.save(plan, (request) =>
-			invoke<SaveResult>("save_document", {
-				id: request.target!.id,
-				source: request.editor,
-				expected: request.revision,
-			}),
-		);
-		if (outcome.stale) {
-			saveNotice(
-				entry,
-				"The document changed while the review was open. Editor content is retained; review it again.",
-			);
-			renderWorkspace();
-			renderConflict();
-			return false;
-		}
-		if (outcome.saved && session.disk) {
-			syncLocation(entry);
-			await remember(session.disk.path).catch((error) =>
-				report(`Saved; recent targets could not be updated: ${String(error)}`),
-			);
-		}
-		saveNotice(
-			entry,
-			outcome.message ||
-				(outcome.saved
-					? "Saved."
-					: "The save was not accepted. Editor content is retained."),
-			outcome.saved,
-			plan.editorVersion,
-		);
-		renderWorkspace();
-		renderConflict();
-		return outcome.saved;
-	}
 	let renderedEntry: Entry | undefined;
 	let renderedState = "";
 	function renderConflict() {
 		if (disposed) return;
-		const panel = active?.session.panel() ?? null;
+		const panel = active?.state.conflict ?? null;
 		const state = active ? JSON.stringify([panel, saveCapability.save]) : "";
 		if (active === renderedEntry && state === renderedState) return;
 		renderedEntry = active;
@@ -819,18 +559,24 @@ export function mountApplication(options: ApplicationOptions) {
 			conflicts.append(preview);
 			const replace = document.createElement("button");
 			replace.textContent = "Review and Save Here…";
-			replace.disabled = !observed || !saveCapability.save;
+			replace.disabled = !panel.actions.review;
 			replace.title = saveCapability.reason;
-			replace.onclick = () => run(() => saveEntry(entry, false, true));
+			replace.onclick = () => {
+				void dispatch({ type: "save", key: entry.key, mode: "observed" });
+			};
 			const another = document.createElement("button");
 			another.textContent = "Save As…";
-			another.disabled = !saveCapability.save;
+			another.disabled = !panel.actions.saveAs;
 			another.title = saveCapability.reason;
-			another.onclick = () => run(() => saveEntry(entry, true));
+			another.onclick = () => {
+				void dispatch({ type: "save", key: entry.key, mode: "as" });
+			};
 			const use = document.createElement("button");
 			use.textContent = "Use Current Disk Version…";
-			use.disabled = !observed || observed.source === null;
-			use.onclick = () => run(() => useDiskVersion(entry));
+			use.disabled = !panel.actions.adopt;
+			use.onclick = () => {
+				void dispatch({ type: "adopt", key: entry.key });
+			};
 			conflicts.append(replace, another, use);
 			if (panel.originalChanged) {
 				const notice = document.createElement("p");
@@ -839,136 +585,25 @@ export function mountApplication(options: ApplicationOptions) {
 			}
 		}
 	}
-	/** Replaces the editor with the version the panel shows, after a fresh read confirms it. */
-	async function useDiskVersion(entry: Entry) {
-		const session = entry.session;
-		const observed = session.panel()?.observed;
-		if (!observed || explainOpenTarget(entry, observed)) return;
-		const plan = session.plan("adopt", observed);
-		const choice = await choose(
-			"Discard editor changes",
-			`Replace the editor content with the observed current disk version of ${observed.path}? Use Disk Version retains that disk version without writing and replaces the editor content after a fresh revision check. This resolves the matching external change; any separate unresolved target remains. Keep Editing closes this comparison without writing or replacing the editor; unresolved changes remain.`,
-			[
-				["cancel", "Keep Editing"],
-				["disk", "Use Disk Version"],
-			],
-			{ local: plan.editor, disk: plan.disk },
-		);
-		if (choice !== "disk") return;
-		const scope = session.begin();
-		let current: DiskSnapshot;
-		try {
-			current = await invoke<DiskSnapshot>("inspect_document", {
-				id: observed.id,
-			});
-		} catch (error) {
-			session.observe(observed, { error }, scope);
-			saveNotice(
-				entry,
-				`Could not read the recovery target: ${String(error)}. Editor content is retained; review it again.`,
-			);
-			return;
-		}
-		session.observe(observed, { snapshot: current }, scope);
-		if (explainOpenTarget(entry, current)) return;
-		if (!session.adopt(plan)) {
-			saveNotice(
-				entry,
-				session.holds(plan, "editor")
-					? "The disk changed again. Review the new version."
-					: "The editor changed during the read. Your new edits are retained; review again.",
-			);
-			return;
-		}
-		syncLocation(entry);
-		const adoptedRevision = entry.tab.getRevision();
-		await remember(current.path).catch(report);
-		renderWorkspace();
-		saveNotice(
-			entry,
-			"Reloaded the current disk version.",
-			!session.panel(),
-			adoptedRevision,
-		);
-	}
-	function dispose(entry: Entry) {
-		opened.delete(entry);
-		entry.session.dispose();
-		entry.tab.dispose();
-		entry.navigation.remove();
-		if (active === entry) {
-			active = undefined;
-			const next = [...opened].at(-1);
-			if (next) activate(next);
-		}
-		renderConflict();
-		renderWorkspace();
-	}
-	async function closeEntries(entries: Entry[]) {
-		const membership = [...opened];
-		return closeDocuments(
-			entries.map((entry) =>
-				Object.assign(entry, {
-					isDirty: () => entry.session.isDirty(),
-					prepareClose: async () => {
-						// Finish an older poll, then read again for this close request.
-						await entry.session.prepareClose();
-						await entry.session
-							.checkExternal((id) =>
-								invoke<DiskSnapshot>("inspect_document", { id }),
-							)
-							.catch(report);
-					},
-					closeVersion: () => entry.session.closeVersion(),
-					closePlan: () => entry.session.plan("close", null),
-				}),
-			),
-			async (entry) =>
-				invoke<"save" | "discard" | "cancel">("confirm_close_document", {
-					name: entry.name,
-					allowSave: saveCapability.save,
-				}),
-			(entry, plan) => saveEntry(entry, false, false, plan),
-			dispose,
-			() =>
-				!disposed &&
-				opened.size === membership.length &&
-				membership.every((entry) => opened.has(entry)),
-		);
-	}
 	const commands: Record<string, () => void> = {
 		new() {
-			const openNames = new Set([...opened].map((entry) => entry.name));
-			let number = 1;
-			while (openNames.has(`Untitled ${number}`)) number++;
-			openDocument(`Untitled ${number}`, "", null);
-			active?.tab.focus();
+			void dispatch({ type: "new" }).then(() => active?.tab.focus());
 		},
 		format: () => active?.tab.format(),
 		"format-flat": () => active?.tab.format("flat"),
 		normalize: () => active?.tab.normalize(),
-		save: () =>
-			run(async () => {
-				if (active) await saveEntry(active);
-			}),
-		"save-as": () =>
-			run(async () => {
-				if (active) await saveEntry(active, true);
-			}),
-		"open-file": () =>
-			run(async () => {
-				if (!native)
-					throw new Error("Use the desktop application to choose a file.");
-				const snapshot = await invoke<DiskSnapshot | null>("select_document");
-				if (snapshot) await openSnapshot(snapshot);
-			}),
-		open: () =>
-			run(async () => {
-				if (!native)
-					throw new Error("Use the desktop application to choose a folder.");
-				const root = await invoke<string | null>("select_folder");
-				if (root) await showFolder(root);
-			}),
+		save() {
+			void dispatch({ type: "save" });
+		},
+		"save-as"() {
+			void dispatch({ type: "save", mode: "as" });
+		},
+		"open-file"() {
+			void dispatch({ type: "open-file" });
+		},
+		open() {
+			void dispatch({ type: "open-folder" });
+		},
 		sidebar() {
 			if (!folderRoot) return;
 			const sidebar = document.querySelector<HTMLElement>("#folder-sidebar")!;
@@ -1018,12 +653,11 @@ export function mountApplication(options: ApplicationOptions) {
 		button.onclick = () => performCommand(button.dataset.start!);
 	document.querySelector<HTMLButtonElement>("#try-sample")!.onclick = () => {
 		if (disposed || busy) return;
-		openDocument(
-			"Sample",
-			"---\ntitle: Sample flow\n---\nidea >> design -> plan\n",
-			null,
-		);
-		active?.tab.focus?.();
+		void dispatch({
+			type: "new",
+			name: "Sample",
+			source: "---\ntitle: Sample flow\n---\nidea >> design -> plan\n",
+		}).then(() => active?.tab.focus?.());
 	};
 	function performCommand(id: string) {
 		if (disposed || busy || document.querySelector("dialog[open]")) return;
@@ -1038,23 +672,16 @@ export function mountApplication(options: ApplicationOptions) {
 		}
 		if (!active) return;
 		if (id === "close-tab") {
-			const entry = active;
-			run(async () => {
-				await closeEntries([entry]);
-				active?.tab.focus?.();
-			});
+			void dispatch({ type: "close", keys: [active.key] }).then(() =>
+				active?.tab.focus?.(),
+			);
 			return;
 		}
 		if (id === "next-tab" || id === "previous-tab") {
-			const entries = [...opened];
-			const index = entries.indexOf(active);
-			activate(
-				entries[
-					(index + (id === "next-tab" ? 1 : entries.length - 1)) %
-						entries.length
-				]!,
-			);
-			active?.tab.focus?.();
+			void dispatch({
+				type: "cycle",
+				direction: id === "next-tab" ? "next" : "previous",
+			}).then(() => active?.tab.focus?.());
 			return;
 		}
 		const target = document.activeElement as HTMLElement | null;
@@ -1069,18 +696,14 @@ export function mountApplication(options: ApplicationOptions) {
 		active.tab.command(id === "find" ? "actions.find" : id);
 	}
 	function openRecentTarget(target: RecentTarget) {
-		run(async () => {
-			if (target.kind === "folder")
-				await showFolder(
-					await invoke<string>("open_recent_folder", { path: target.path }),
-				);
-			else
-				await openSnapshot(
-					await invoke<DiskSnapshot>("open_recent", { path: target.path }),
-				);
-		});
+		void dispatch(
+			target.kind === "folder"
+				? { type: "open-folder", path: target.path }
+				: { type: "open-path", path: target.path, recent: true },
+		);
 	}
-	renderWorkspace();
+	controller.subscribe(render);
+	render(state);
 	if (native)
 		void native
 			.installMenu(performCommand, openRecentTarget, report, lifetime.signal)
@@ -1096,61 +719,20 @@ export function mountApplication(options: ApplicationOptions) {
 			.catch(report);
 	updateSaveControls();
 	if (native) {
-		void loadSaveCapability();
-		void refreshRecent().catch(report);
 		void native
 			.verifyCorpus(lifetime.signal)
 			.then(async (entry) => {
 				if (entry && !disposed)
-					await openSnapshot(
+					await controller.accept(
 						await invoke<DiskSnapshot>("open_document", { path: entry.path }),
 					);
 			})
 			.catch((error) => report(`Verification failed: ${String(error)}`));
-		let closingRequest: string | null = null;
-		let completedRequest = 0n;
-		const refusingRequests = new Set<string>();
 		void native
-			.listen("pfdsl-quit-requested", ({ payload: request }) => {
-				if (disposed) return;
-				// Native IDs increase monotonically; queued events from a completed request are stale.
-				if (
-					!/^[1-9][0-9]*$/.test(request) ||
-					BigInt(request) <= completedRequest ||
-					closingRequest === request ||
-					refusingRequests.has(request)
-				)
-					return;
-				if (busy || closingRequest !== null) {
-					refusingRequests.add(request);
-					void invoke("finish_app_exit", { request, approved: false })
-						.then(() => {
-							completedRequest =
-								completedRequest > BigInt(request)
-									? completedRequest
-									: BigInt(request);
-						})
-						.catch(report)
-						.finally(() => refusingRequests.delete(request));
-					return;
-				}
-				closingRequest = request;
-				run(async () => {
-					let approved = false;
-					try {
-						approved = await closeEntries([...opened]);
-					} finally {
-						try {
-							await invoke("finish_app_exit", { request, approved });
-							completedRequest =
-								completedRequest > BigInt(request)
-									? completedRequest
-									: BigInt(request);
-						} finally {
-							closingRequest = null;
-						}
-					}
-				});
+			.listen("pfdsl-quit-requested", ({ payload }) => {
+				const foreground = !busy;
+				const request = controller.requestQuit(payload);
+				if (foreground) currentCommand = request;
 			})
 			.then((unlisten) => {
 				if (disposed) {
@@ -1161,27 +743,7 @@ export function mountApplication(options: ApplicationOptions) {
 				return invoke("exit_listener_ready");
 			})
 			.catch(report);
-		const check = async () => {
-			if (disposed || busy) return;
-			for (const entry of opened) {
-				if (disposed || busy) break;
-				try {
-					await entry.session.checkExternal((id) =>
-						invoke<DiskSnapshot>("inspect_document", { id }),
-					);
-					if (opened.has(entry)) {
-						syncLocation(entry);
-						renderWorkspace();
-					}
-				} catch (error) {
-					if (opened.has(entry)) renderWorkspace();
-					report(
-						`Could not check ${entry.name}: ${String(error)}. Editor content is retained.`,
-					);
-				}
-			}
-			renderConflict();
-		};
+		const check = () => controller.refresh();
 		const interval = scheduler.setInterval(() => {
 			void check();
 		}, 1_000);
@@ -1206,6 +768,7 @@ export function mountApplication(options: ApplicationOptions) {
 		/** Wait for the current accepted command and its document-handle cleanup. */
 		async idle() {
 			await currentCommand;
+			await controller.idle();
 		},
 		dispose() {
 			if (disposed) return;
@@ -1215,13 +778,7 @@ export function mountApplication(options: ApplicationOptions) {
 			cleanups.clear();
 			void Promise.resolve(nativeMenu?.dispose()).catch(report);
 			for (const cancel of cancelDialogs) cancel();
-			const pending = [...opened].map((entry) => entry.session.prepareClose());
-			for (const entry of opened) {
-				entry.session.dispose();
-				entry.tab.dispose();
-				entry.navigation.remove();
-			}
-			opened.clear();
+			controller.dispose();
 			active = undefined;
 			diagnostics.remove();
 			dismissStatus.remove();
@@ -1234,11 +791,6 @@ export function mountApplication(options: ApplicationOptions) {
 				"#sidebar, [data-start], #try-sample",
 			))
 				element.onclick = null;
-			void Promise.allSettled(pending)
-				.then(() => {
-					if (!busy) return releaseUnusedDocuments();
-				})
-				.catch(report);
 		},
 	};
 }
