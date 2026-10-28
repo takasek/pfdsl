@@ -5,7 +5,7 @@
 // invoked by hand and never runs in CI. That is how a top-level scripts/
 // test file's own shell-injection guard once sat unrun.
 
-import { matchesGlob as nodeMatchesGlob } from "node:path";
+import { matchesGlob as nodeMatchesGlob, posix } from "node:path";
 
 const NODE_TEST_LINE_RE = /node\s+--test\s+(.*)$/gm;
 const QUOTED_ARG_RE = /"([^"]+)"/g;
@@ -25,6 +25,17 @@ export function extractTestGlobs(source) {
 		}
 	}
 	return globs;
+}
+
+/** Include package-local Node test globs only when this entrypoint runs them. */
+export function extractEntrypointTestGlobs(commands, workspacePackages) {
+	return commands.flatMap((command) =>
+		command.trim() === "pnpm -r test"
+			? workspacePackages.flatMap(({ path, testScript }) =>
+					extractTestGlobs(testScript).map((glob) => posix.join(path, glob)),
+				)
+			: extractTestGlobs(command),
+	);
 }
 
 /**

@@ -194,20 +194,19 @@ describe("gate-check package typechecks", () => {
 		git(["add", `packages/${pkg}/example.test.ts`]);
 	}
 	beforeEach(() => {
-		mkdirSync(join(fixture, "node_modules/@typescript"));
+		mkdirSync(join(fixture, "node_modules/.bin"));
+		// Link the compiler entrypoint itself: pnpm's .bin shim resolves its
+		// sibling .pnpm store relative to the fixture, where that store is absent.
 		symlinkSync(
-			realpathSync(join(root, "node_modules/@typescript/native-preview")),
-			join(fixture, "node_modules/@typescript/native-preview"),
-			"dir",
+			realpathSync(
+				join(root, "node_modules/@typescript/native-preview/bin/tsgo"),
+			),
+			join(fixture, "node_modules/.bin/tsgo"),
+			"file",
 		);
 		writeFileSync(
 			join(fixture, "pnpm-workspace.yaml"),
 			"packages:\n  - 'packages/*'\n",
-		);
-		symlinkSync(
-			join(root, "node_modules/.bin"),
-			join(fixture, "node_modules/.bin"),
-			"dir",
 		);
 	});
 	for (const pkg of ["core", "cli", "vscode-extension"]) {
@@ -223,7 +222,7 @@ describe("gate-check package typechecks", () => {
 				{ cwd: fixture, encoding: "utf8" },
 			);
 			assert.equal(typecheck.status, 1, typecheck.stdout + typecheck.stderr);
-			assert.match(typecheck.stdout, /TS2554/);
+			assert.match(typecheck.stdout + typecheck.stderr, /TS2554/);
 			const result = runGate();
 			assert.equal(result.status, 1, result.stdout + result.stderr);
 			assert.match(result.stdout, new RegExp(`FAIL ${pkg} typecheck`));
