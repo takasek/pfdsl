@@ -4,3 +4,4 @@
 各資料は評価対象の版について記述したもので、後の版の受入結果を示すものではありません。
 
 - [Astra 6とSol 6.1によるStandaloneデザインレビュー（2026-10-13）](standalone/2026-10-13/README.md)
+- [Astra と Sol による Standalone 独立レビューと課題分析（2026-10-27）](standalone/2026-10-27/README.md)
