@@ -1,0 +1,8 @@
+typo-before.pfdsl:32:3: warning [W002]: Artifact 'session_proposals' has no 'criteria' field
+typo-before.pfdsl:38:3: warning [W002]: Artifact 'program' has no 'criteria' field
+typo-before.pfdsl:43:3: warning [W002]: Artifact 'venue_contract' has no 'criteria' field
+typo-before.pfdsl:48:3: warning [W002]: Artifact 'sponsor_agreements' has no 'criteria' field
+typo-before.pfdsl:53:3: warning [W002]: Artifact 'operation_manual' has no 'criteria' field
+typo-before.pfdsl:58:3: warning [W002]: Artifact 'event_record' has no 'criteria' field
+typo-before.pfdsl:63:3: warning [W002]: Artifact 'session_videos' has no 'criteria' field
+typo-before.pfdsl:73:3: warning [W002]: Artifact 'conference_report' has no 'criteria' field
