@@ -89,6 +89,41 @@ beforeEach(() => {
 afterEach(() => rmSync(directory, { recursive: true, force: true }));
 
 describe("fixed reference context", () => {
+	it("validates inherited targets for body-only artifacts", () => {
+		writeFileSync(
+			file,
+			"---\ntype: workflow\nbaseRef: { source: repository, revision: main }\n---\na >> p -> b\n",
+		);
+		const absent = runCheckLinks(file, { json: true });
+		expect(absent.exitCode).toBe(1);
+		expect(
+			JSON.parse(absent.stdout)
+				.failures.map((item: { id: string }) => item.id)
+				.sort(),
+		).toEqual(["a", "b"]);
+		const valid = runCheckLinks(file, {
+			json: true,
+			referenceContext: contextFile,
+		});
+		expect(valid.exitCode).toBe(0);
+		expect(JSON.parse(valid.stdout).referenceResolution.results).toEqual([
+			expect.objectContaining({
+				id: "a",
+				fixedRevision: "C1",
+				result: "target-resolved",
+			}),
+			expect.objectContaining({
+				id: "b",
+				fixedRevision: "C1",
+				result: "target-resolved",
+			}),
+		]);
+		rmSync(main, { recursive: true });
+		expect(
+			runCheckLinks(file, { json: true, referenceContext: contextFile })
+				.exitCode,
+		).toBe(1);
+	});
 	it("rejects scalar writes to the structured artifact ref before changing the file", async () => {
 		const before = readFileSync(file, "utf8");
 		const result = await run(["meta", "set", file, "output", "ref", "main"]);

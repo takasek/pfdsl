@@ -2752,7 +2752,7 @@ export function runCheckLinks(
 	const src = readSource(file);
 	if (isCommandResult(src)) return src;
 
-	const { diagnostics, frontmatter } = analyze(src);
+	const { diagnostics, frontmatter, nodeKinds } = analyze(src);
 	const failed = failIfErrors(diagnostics, file, opts.json, opts.color);
 	if (failed) return failed;
 
@@ -2857,11 +2857,10 @@ export function runCheckLinks(
 		}
 	};
 
-	for (const [id, meta] of Object.entries(frontmatter?.artifact ?? {})) {
-		checkNode(id, "artifact", meta.location);
-	}
-	for (const [id, meta] of Object.entries(frontmatter?.process ?? {})) {
-		checkNode(id, "process", meta.location);
+	for (const [id, kind] of nodeKinds) {
+		if (kind === "artifact" || kind === "process") {
+			checkNode(id, kind, metaFor(frontmatter, id, kind)?.location);
+		}
 	}
 	missing.sort((a, b) => compareIds(a.id, b.id));
 
