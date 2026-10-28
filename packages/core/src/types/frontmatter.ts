@@ -40,6 +40,12 @@ const styleInputSchema = z.looseObject(styleFields);
 export const nodeIndexSchema = z.number().check(z.gte(1), z.multipleOf(1));
 const strings = z.array(z.string());
 const paths = z.union([z.string(), strings]);
+const referenceFields = { source: z.string(), revision: z.string() };
+const referenceInputSchema = z.looseObject(referenceFields);
+export const referenceTargetSchema = z.strictObject({
+	source: z.string().check(z.regex(/\S/)),
+	revision: z.string().check(z.regex(/\S/)),
+});
 const common = {
 	label: text,
 	description: text,
@@ -56,6 +62,7 @@ export const artifactMetaSchema = z.looseObject({
 	status: z.optional(z.enum(STATUS_VALUES)),
 	criteria: text,
 	revises: text,
+	ref: z.optional(referenceTargetSchema),
 });
 export const processMetaSchema = z.looseObject({
 	...common,
@@ -94,6 +101,7 @@ export const frontmatterSchema = z.looseObject({
 	),
 	extends: z.optional(paths),
 	basePath: text,
+	baseRef: z.optional(referenceTargetSchema),
 	type: z.optional(z.enum(PFD_TYPE_VALUES)),
 });
 /** Shape validation precedes semantic rules. Keep string-valued enum errors
@@ -104,7 +112,12 @@ export const frontmatterInputSchema = z.extend(frontmatterSchema, {
 	artifact: z.optional(
 		z.record(
 			z.string(),
-			z.nullable(z.extend(artifactMetaSchema, { status: text })),
+			z.nullable(
+				z.extend(artifactMetaSchema, {
+					status: text,
+					ref: z.optional(referenceInputSchema),
+				}),
+			),
 		),
 	),
 	process: z.optional(z.record(z.string(), z.nullable(processMetaSchema))),
@@ -119,12 +132,14 @@ export const frontmatterInputSchema = z.extend(frontmatterSchema, {
 	),
 	statusStyles: z.optional(z.record(z.string(), styleInputSchema)),
 	type: text,
+	baseRef: z.optional(referenceInputSchema),
 });
 /** Match exactOptionalPropertyTypes: omission, not an explicit undefined value. */
 type DefinedOptionals<T> = T extends object
 	? { [K in keyof T]: DefinedOptionals<Exclude<T[K], undefined>> }
 	: T;
 export type NodeStyle = DefinedOptionals<z.infer<typeof nodeStyleSchema>>;
+export type ReferenceTarget = z.infer<typeof referenceTargetSchema>;
 export type ArtifactMeta = DefinedOptionals<z.infer<typeof artifactMetaSchema>>;
 export type ProcessMeta = DefinedOptionals<z.infer<typeof processMetaSchema>>;
 export type GroupMeta = DefinedOptionals<z.infer<typeof groupMetaSchema>>;

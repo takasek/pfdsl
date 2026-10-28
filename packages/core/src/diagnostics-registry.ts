@@ -289,6 +289,22 @@ export const DIAGNOSTIC_REGISTRY: Readonly<
 		summary:
 			"an artifact-process pair is connected as both a normal input (`>>`) and feedback (`>>?`)",
 	},
+	V037: {
+		severities: ["error"],
+		section: "15.18",
+		summary: "`baseRef` or `ref` contains blank values or additional members",
+	},
+	V038: {
+		severities: ["error"],
+		section: "15.18",
+		summary: "`ref` is specified on a process",
+	},
+	V039: {
+		severities: ["error"],
+		section: "15.18",
+		summary:
+			"an explicit reference target uses an absolute or out-of-collection path",
+	},
 
 	W001: {
 		severities: ["warning"],

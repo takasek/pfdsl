@@ -59,6 +59,34 @@ test("parseReleaseArgs rejects a missing phase and unknown arguments", () => {
 	);
 });
 
+test("parseReleaseArgs accepts an explicit source config only for CLI publication", () => {
+	const args = [
+		"cli",
+		"publish",
+		"--commit",
+		"0123456789abcdef0123456789abcdef01234567",
+		"--source-config",
+		"/settings/wiki.json",
+	];
+	assert.equal(parseReleaseArgs(args).sourceConfig, "/settings/wiki.json");
+	assert.throws(
+		() =>
+			parseReleaseArgs([
+				"cli",
+				"prepare",
+				"--version",
+				"0.0.21",
+				"--source-config",
+				"/settings/wiki.json",
+			]),
+		/only.*CLI publish/,
+	);
+	assert.throws(
+		() => parseReleaseArgs(["libs", ...args.slice(1)]),
+		/only.*CLI publish/,
+	);
+});
+
 test("RELEASE_KINDS has the three known kinds with distinct tag prefixes", () => {
 	assert.deepEqual(Object.keys(RELEASE_KINDS).sort(), [
 		"cli",

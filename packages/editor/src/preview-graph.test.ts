@@ -2,6 +2,31 @@ import { expect, it } from "vitest";
 import { analyzeSnapshot, prepareDocument } from "./document.js";
 import { buildPreviewGraph, neighborhoodDot } from "./preview-graph.js";
 
+it("retains explicit artifact targets across the preview projection", () => {
+	const model = analyzeSnapshot(
+		"---\nbaseRef: {source: repo, revision: main}\nartifact: {a: {location: plan.md, ref: {source: repo, revision: develop}}}\n---\na >> p -> b\n",
+	);
+	const projected = buildPreviewGraph(model, model.frontmatter).frontmatter;
+	expect(projected?.baseRef).toEqual({ source: "repo", revision: "main" });
+	expect(projected?.artifact?.a?.ref).toEqual({
+		source: "repo",
+		revision: "develop",
+	});
+});
+
+it("does not transport cyclic additional reference members", () => {
+	const model = analyzeSnapshot(
+		"---\nbaseRef: &target {source: repo, revision: main, extra: *target}\nartifact: {a: {ref: *target}}\n---\na >> p -> b\n",
+	);
+	const projected = buildPreviewGraph(model, model.frontmatter).frontmatter;
+	expect(() => JSON.stringify(projected)).not.toThrow();
+	expect(projected?.baseRef).toEqual({ source: "repo", revision: "main" });
+	expect(projected?.artifact?.a?.ref).toEqual({
+		source: "repo",
+		revision: "main",
+	});
+});
+
 it("renders only the center's incident primary and feedback connections", () => {
 	const model = analyzeSnapshot("a >> p -> b\nb >>? p\nb >> q -> c\nlonely\n");
 	const data = buildPreviewGraph(model, model.frontmatter);

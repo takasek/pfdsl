@@ -65,5 +65,5 @@ export type MessageFromWebview =
 	| { type: "ready" }
 	| { type: "nodeClick"; nodeId: string; preserveFocus?: boolean }
 	| { type: "openUrl"; url: string }
-	| { type: "openFile"; path: string }
+	| { type: "openFile"; nodeId: string; path: string }
 	| { type: "openLocation"; nodeId: string };

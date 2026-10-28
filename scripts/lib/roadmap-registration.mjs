@@ -36,11 +36,13 @@ export function localClosingIssueNumbers(references, { owner, repo }) {
 /**
  * The argv for the audit run that enforces this PR's own issues.
  * @param {number[]} issueNumbers
+ * @param {string} [roadmapFile] Acquired snapshot, shared with the other consumers.
  * @returns {string[]}
  */
-export function buildAuditArgs(issueNumbers) {
+export function buildAuditArgs(issueNumbers, roadmapFile) {
 	return [
 		AUDIT_SCRIPT,
+		...(roadmapFile ? ["--roadmap", roadmapFile] : []),
 		...issueNumbers.flatMap((n) => ["--enforce-issue", String(n)]),
 	];
 }

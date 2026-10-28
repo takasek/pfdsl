@@ -44,7 +44,7 @@ afterEach(() => {
 });
 
 describe("audit-issues-flow without gh", () => {
-	it("does not require mutable timestamp snapshots or emit repair commands", () => {
+	it("audits an explicit snapshot without reading the repository roadmap or emitting repair commands", () => {
 		// Run the real entry point against a disposable repository, independent
 		// of completed-chain sweeps or other changes to the live roadmap.
 		const fixtureRoot = join(emptyBin, "repo");
@@ -54,7 +54,11 @@ describe("audit-issues-flow without gh", () => {
 		const fixtureScript = join(fixtureScripts, "audit-issues-flow.mjs");
 		copyFileSync(scriptPath, fixtureScript);
 		symlinkSync(join(__dirname, "lib"), join(fixtureScripts, "lib"), "dir");
-		const roadmap = join(fixtureRoot, ".pfdsl/roadmap.pfdsl");
+		const roadmap = join(emptyBin, "selected-roadmap.pfdsl");
+		writeFileSync(
+			join(fixtureRoot, ".pfdsl/roadmap.pfdsl"),
+			"invalid repository fallback",
+		);
 		writeFileSync(
 			roadmap,
 			`---
@@ -84,11 +88,15 @@ process.stdout.write(JSON.stringify(result));
 `,
 			{ mode: 0o755 },
 		);
-		const result = spawnSync(process.execPath, [fixtureScript], {
-			encoding: "utf8",
-			cwd: fixtureRoot,
-			env: { ...process.env, PATH: `${emptyBin}:${process.env.PATH}` },
-		});
+		const result = spawnSync(
+			process.execPath,
+			[fixtureScript, "--roadmap", roadmap],
+			{
+				encoding: "utf8",
+				cwd: fixtureRoot,
+				env: { ...process.env, PATH: `${emptyBin}:${process.env.PATH}` },
+			},
+		);
 		assert.equal(result.status, 0, result.stderr);
 		assert.doesNotMatch(result.stdout, /unknown_issue|missing_process/);
 		assert.doesNotMatch(result.stdout, /stale_updated_at|repair|meta set/);

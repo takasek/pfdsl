@@ -47,6 +47,7 @@ describe("portable preview lifecycle", () => {
 				);
 			expect(postMessage).toHaveBeenCalledWith({
 				type: "openFile",
+				nodeId: "a",
 				path: "new.pfdsl",
 			});
 		} finally {

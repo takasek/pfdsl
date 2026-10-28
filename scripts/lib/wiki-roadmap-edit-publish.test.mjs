@@ -119,6 +119,55 @@ test("invalid edits preserve the editor's bytes and leave all public files and l
 	assert.equal(existsSync(join(f.wiki, "roadmap.svg")), false);
 });
 
+test("publishes an edited Wiki model with independently pinned body references", (t) => {
+	const f = fixture(t);
+	const body = join(f.root, "body");
+	git(f.root, "init", "-b", "main", body);
+	git(body, "config", "user.name", "Test");
+	git(body, "config", "user.email", "test@example.invalid");
+	writeFileSync(join(body, "plan.md"), "Pinned plan\n");
+	git(body, "add", ".");
+	git(body, "commit", "-m", "Body source");
+	const bodyRevision = git(body, "rev-parse", "HEAD");
+	writeFileSync(
+		join(f.wiki, "roadmap.pfdsl"),
+		edited
+			.replace(
+				"artifact:",
+				"basePath: ..\nbaseRef: {source: body, revision: main}\nartifact:",
+			)
+			.replace("a: {status: done}", "a: {status: done, location: plan.md}"),
+	);
+	const result = publishEdit({
+		...options(f),
+		roadmapSource: {
+			adapter: "local-git",
+			source: "wiki",
+			revision: "HEAD",
+			documentId: "roadmap.pfdsl",
+			companionId: "roadmap.md",
+			logicalPath: ".pfdsl/roadmap.pfdsl",
+			basis: { source: "body", revision: bodyRevision },
+		},
+		localSources: { body },
+	});
+	assert.equal(result.status, "published");
+	assert.equal(result.localUpdated, true);
+	const receipt = JSON.parse(
+		remoteBytes(f, "roadmap.index.md")
+			.split("<!-- pfdsl-wiki-preview: ")[1]
+			.split(" -->")[0],
+	);
+	assert.equal(receipt.referenceContext.model.source, "wiki");
+	assert.equal(
+		receipt.referenceContext.model.fixedRevision,
+		result.sourceRevision,
+	);
+	assert.equal(receipt.referenceContext.basis.fixedRevision, bodyRevision);
+	assert.equal(receipt.referenceContext.targets[0].fixedRevision, bodyRevision);
+	assert.equal(git(body, "status", "--porcelain"), "");
+});
+
 test("receipts describe committed inputs when Git normalizes editor line endings", (t) => {
 	for (const eol of ["lf", "crlf"]) {
 		const f = fixture(t);

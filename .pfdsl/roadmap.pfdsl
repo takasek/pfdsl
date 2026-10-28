@@ -262,8 +262,9 @@ artifact:
       実装・公開の完了はこの成果物の受入に含めない
   artifact_reference_implementation:
     label: 参照先を解決できる実装
+    location: [ ../packages/core/src/reference-resolution.ts, ../packages/cli/src/reference-context.ts, ../docs/reference-resolution.md ]
     description: 確定した参照先仕様を消費し、CLI と利用側で解決できる実装を作る（#1566）
-    status: wip
+    status: done
     criteria: 確定仕様の既定・上書き・正常・異常・互換性の契約が実装され、対応する検査が通っている
   artifact_reference_adoption_version:
     label: Wiki 運用で参照先を解決できる採用版

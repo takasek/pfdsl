@@ -4,10 +4,84 @@ import {
 	compareDocumentSources,
 	documentReferences,
 	joinReferencePath,
-	resolveDocumentReference,
+	resolveDocumentReference as resolveScopedDocumentReference,
 } from "./references.js";
 
+function resolveDocumentReference(
+	path: string | null,
+	reference: {
+		field: "location" | "subflow";
+		value: string;
+		kind?: "artifact" | "process";
+		id?: string;
+	},
+	basePath?: string,
+	frontmatter?: Parameters<typeof resolveScopedDocumentReference>[3],
+) {
+	return resolveScopedDocumentReference(
+		path,
+		{
+			kind: reference.field === "subflow" ? "process" : "artifact",
+			id: "a",
+			...reference,
+		},
+		basePath,
+		frontmatter,
+	);
+}
+
 describe("document reference and comparison contracts", () => {
+	it("retains the owning node when references have the same spelling", () => {
+		const model = analyzeSnapshot(
+			"---\nartifact: {a: {location: plan.md}}\nprocess: {p: {location: plan.md, subflow: child.pfdsl}}\n---\na >> p -> b\n",
+		);
+		expect(
+			documentReferences(model).map(({ kind, id, field }) => [kind, id, field]),
+		).toEqual([
+			["artifact", "a", "location"],
+			["process", "p", "location"],
+			["process", "p", "subflow"],
+		]);
+	});
+	it.each([
+		"baseRef",
+		"ref",
+	])("does not resolve an explicit artifact %s to the local checkout", (field) => {
+		const target = { source: "repo", revision: "main" };
+		const fm =
+			field === "baseRef"
+				? { baseRef: target }
+				: { artifact: { a: { ref: target } } };
+		expect(() =>
+			resolveDocumentReference(
+				"/work/a.pfdsl",
+				{ kind: "artifact", id: "a", field: "location", value: "plan.md" },
+				undefined,
+				fm,
+			),
+		).toThrow(/resolution context/);
+		expect(
+			resolveDocumentReference(
+				"/work/a.pfdsl",
+				{ kind: "process", id: "p", field: "location", value: "plan.md" },
+				undefined,
+				fm,
+			),
+		).toEqual({ kind: "path", value: "/work/plan.md" });
+		expect(
+			resolveDocumentReference(
+				"/work/a.pfdsl",
+				{
+					kind: "artifact",
+					id: "a",
+					field: "location",
+					value: "https://example.com/plan",
+				},
+				undefined,
+				fm,
+			),
+		).toEqual({ kind: "url", value: "https://example.com/plan" });
+	});
 	it("extracts decoded values and authored ranges without matching field-like labels", () => {
 		const source =
 			'---\nbasePath: ../assets\nartifact: {"入力": {label: "location: wrong", location: ["one file.pfdsl", "https://example.org/a"]}}\nprocess: {p: {subflow: "child.pfdsl"}}\n---\n入力 >> p -> b\n';

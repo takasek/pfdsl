@@ -306,11 +306,13 @@ function workflowRun(
 	);
 }
 
-export function formatCliCandidateNotice(candidates) {
+export function formatCliCandidateNotice(candidates, roadmap) {
 	return [
 		`CLI release candidates: ${candidates.join(", ")}`,
 		"Verify the published npm artifact, pipeline acceptance, and plugin tag retrieval.",
-		"Then prepare a marketplace pin PR, confirm main retrieves that tag, and use a roadmap PR to synchronize only explicitly confirmed artifacts.",
+		roadmap?.context
+			? "Then prepare a marketplace pin PR and confirm main retrieves that tag. The maintainer must record acceptance evidence for each artifact, then update the fixed Wiki source through scripts/wiki-roadmap-edit-publish.mjs. External done/start-time evidence and real-Wiki acceptance remain required before cutover."
+			: "Then prepare a marketplace pin PR, confirm main retrieves that tag, and use a roadmap PR to synchronize only explicitly confirmed artifacts.",
 	].join("\n");
 }
 
@@ -318,13 +320,14 @@ export function formatExistingVsixNotice(candidate, commit) {
 	return `Existing VSIX candidate found; verify it was packaged from ${commit} before installation/upload. Candidate: ${candidate}`;
 }
 
-function showCliCandidates({ root, capture }) {
+function showCliCandidates({ root, capture, roadmap }) {
+	const roadmapFile = roadmap?.file ?? resolve(root, ".pfdsl/roadmap.pfdsl");
 	try {
 		const output = callCapture(capture, root, process.execPath, [
 			resolve(root, "packages/cli/dist/cli.js"),
 			"status",
 			"ready",
-			resolve(root, ".pfdsl/roadmap.pfdsl"),
+			roadmapFile,
 			"--json",
 		]);
 		const parsed = JSON.parse(output);
@@ -346,10 +349,13 @@ function showCliCandidates({ root, capture }) {
 				resolve(root, "packages/cli/dist/cli.js"),
 				"meta",
 				"list",
-				resolve(root, ".pfdsl/roadmap.pfdsl"),
+				roadmapFile,
 				"--tag",
 				"release_cli",
 				"--json",
+				...(roadmap?.contextFile
+					? ["--reference-context", roadmap.contextFile]
+					: []),
 			]),
 		);
 		if (
@@ -370,13 +376,21 @@ function showCliCandidates({ root, capture }) {
 			);
 			return;
 		}
-		console.log(formatCliCandidateNotice(candidates));
+		if (roadmap?.context)
+			console.log(`Roadmap source: ${JSON.stringify(roadmap.context.model)}`);
+		console.log(formatCliCandidateNotice(candidates, roadmap));
 	} catch {
 		console.warn(
 			[
 				"CLI release candidate listing unavailable; the publish workflow succeeded, but candidates were not confirmed.",
-				"Build the CLI, then run `node packages/cli/dist/cli.js status ready .pfdsl/roadmap.pfdsl --json`.",
-				"Select only process IDs also returned by `node packages/cli/dist/cli.js meta list .pfdsl/roadmap.pfdsl --tag release_cli --json`.",
+				...(roadmap?.context
+					? [
+							"Reacquire the selected external source and rerun candidate selection with its fixed snapshot and reference context; do not use the repository roadmap as a fallback.",
+						]
+					: [
+							"Build the CLI, then run `node packages/cli/dist/cli.js status ready .pfdsl/roadmap.pfdsl --json`.",
+							"Select only process IDs also returned by `node packages/cli/dist/cli.js meta list .pfdsl/roadmap.pfdsl --tag release_cli --json`.",
+						]),
 				"The roadmap is unchanged.",
 			].join("\n"),
 		);
@@ -426,6 +440,7 @@ export function publishRelease({
 	root,
 	kindArg,
 	commit,
+	roadmap,
 	capture = (command, args, options) =>
 		defaultCapture(root, command, args, options),
 	run = (command, args, options) => defaultRun(root, command, args, options),
@@ -486,5 +501,5 @@ export function publishRelease({
 			resumeCommand: kindArg === "libs" ? "make release-libs" : "make release",
 		},
 	);
-	if (kindArg === "cli") showCliCandidates({ root, capture });
+	if (kindArg === "cli") showCliCandidates({ root, capture, roadmap });
 }

@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // Cycle preflight: bundles step-1 mechanical operations (fetch, rebase-behind
 // check, open PR listing, ready listing) into one compact JSON payload.
-// Usage: node scripts/cycle-status.mjs [--base main] [--issue <n> ...] [--artifact <id>]
+// Usage: node scripts/cycle-status.mjs [--base main] [--issue <n> ...] [--artifact <id>] [--source-config <json>]
 
 import { existsSync, readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
@@ -12,6 +12,7 @@ import {
 	runCycleStatus,
 } from "./lib/cycle-status-steps.mjs";
 import { parseIssueNumbers } from "./lib/issue-args.mjs";
+import { acquireConfiguredRoadmap } from "./lib/roadmap-consumer.mjs";
 import { run, tryRun } from "./lib/run-exec.mjs";
 import { createGitHubOps } from "./pfdsl/lib/github-ops.mjs";
 
@@ -29,6 +30,7 @@ try {
 			base: { type: "string" },
 			issue: { type: "string", multiple: true },
 			artifact: { type: "string" },
+			"source-config": { type: "string" },
 		},
 		strict: true,
 		allowPositionals: false,
@@ -56,17 +58,35 @@ const sh = (file, args) => run(file, args, { cwd: root });
 // (#814).
 const shTry = (file, args) => tryRun(file, args, { cwd: root });
 
-const result = await runCycleStatus({
-	sh,
-	shTry,
-	githubOps: createGitHubOps({ cwd: root }),
-	existsSync,
-	readFileSync,
-	root,
-	base,
-	issueNumbers,
-	artifact: values.artifact,
-});
+let roadmap;
+let result;
+try {
+	roadmap = await acquireConfiguredRoadmap({
+		root,
+		sourceConfig: values["source-config"],
+	});
+	result = await runCycleStatus({
+		sh,
+		shTry,
+		githubOps: createGitHubOps({ cwd: root }),
+		existsSync,
+		readFileSync,
+		root,
+		base,
+		issueNumbers,
+		artifact: values.artifact,
+		roadmap,
+		sourceConfig: values["source-config"]
+			? resolve(values["source-config"])
+			: undefined,
+	});
+} catch (error) {
+	console.error(`cycle-status: ${error.message}`);
+	process.exitCode = 1;
+} finally {
+	roadmap?.dispose();
+}
+if (!result) process.exit(1);
 
 console.log(JSON.stringify(result, null, 2));
 

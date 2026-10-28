@@ -104,6 +104,50 @@ function baseDeps(overrides = {}) {
 }
 
 describe("runCycleStatus", () => {
+	it("shares one external snapshot across selection and replaces the local mutation advice", async () => {
+		const calls = [],
+			reads = [];
+		const roadmap = {
+			file: "/snapshot/roadmap.pfdsl",
+			context: { model: { source: "wiki", fixedRevision: "abc" } },
+			key: "fixed",
+		};
+		const result = await runCycleStatus(
+			baseDeps({
+				roadmap,
+				sourceConfig: "/settings/wiki.json",
+				issueNumbers: [12],
+				execGh: async (args) =>
+					JSON.stringify(
+						args[0] === "pr" ? [] : { labels: [{ name: "flow:managed" }] },
+					),
+				readFileSync: (path) => {
+					reads.push(path);
+					return roadmapWithIssue("work", 12);
+				},
+				sh: (file, args) => {
+					if (file === "git") return "";
+					calls.push(args);
+					return args[1] === "status"
+						? readyJsonOk("work")
+						: neighborsJsonOk(["result"]);
+				},
+			}),
+		);
+		assert.deepEqual(reads, [roadmap.file]);
+		assert.equal(calls.length, 2);
+		assert.ok(calls.every((args) => args.includes(roadmap.file)));
+		assert.equal(result.wipUpdateCommand, undefined);
+		assert.match(result.roadmapUpdateGuidance, /wiki-roadmap-edit-publish/);
+		assert.match(
+			result.gateCheckCommand,
+			/--source-config '\/settings\/wiki.json'/,
+		);
+		assert.deepEqual(result.roadmapSource, {
+			source: "wiki",
+			fixedRevision: "abc",
+		});
+	});
 	it("runs preflight without reading or selecting historical cases", async () => {
 		const reads = [];
 		const result = await runCycleStatus(

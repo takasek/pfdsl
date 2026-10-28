@@ -4,9 +4,9 @@
 // gen-plugin identity / output-artifact status update)
 // against the diff from origin/<base> to HEAD, then prints the remaining
 // canonical manual checklist locations as fixed guidance.
-// Usage: node scripts/gate-check.mjs [--base main] [--artifact <key> [--in-progress] | --no-artifact] [--issue <n> ...]
+// Usage: node scripts/gate-check.mjs [--base main] [--artifact <key> [--in-progress] | --no-artifact] [--issue <n> ...] [--source-config <json>]
 
-import { existsSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { dirname, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
@@ -50,6 +50,7 @@ import {
 	revisionPfdReaders,
 } from "./lib/gate-report-revision.mjs";
 import { parseIssueNumbers } from "./lib/issue-args.mjs";
+import { acquireConfiguredRoadmap } from "./lib/roadmap-consumer.mjs";
 import { tryRun } from "./lib/run-exec.mjs";
 import { createGitHubOps } from "./pfdsl/lib/github-ops.mjs";
 
@@ -71,6 +72,7 @@ try {
 			"in-progress": { type: "boolean" },
 			"no-artifact": { type: "boolean" },
 			issue: { type: "string", multiple: true },
+			"source-config": { type: "string" },
 		},
 		strict: true,
 		allowPositionals: false,
@@ -105,6 +107,23 @@ if (!parsedIssues.ok) {
 	process.exit(2);
 }
 const issueNumbers = parsedIssues.numbers;
+let roadmap;
+try {
+	roadmap = await acquireConfiguredRoadmap({
+		root,
+		sourceConfig: values["source-config"],
+	});
+	process.once("exit", () => roadmap.dispose());
+	if (roadmap.context) {
+		roadmap.text = readFileSync(roadmap.file, "utf8");
+		console.log(
+			`Roadmap source: ${JSON.stringify(roadmap.context.model)}; input key ${roadmap.key}`,
+		);
+	}
+} catch (error) {
+	console.error(`gate-check: roadmap acquisition failed: ${error.message}`);
+	process.exit(1);
+}
 
 // Every call names the executable and its arguments separately — `base` and
 // `artifactKey` come from argv and must never be parsed by a shell (#572).
@@ -152,9 +171,73 @@ if (!triggers.ok) {
 	);
 	process.exit(1);
 }
-const pfdslFiles = changedFiles.filter((f) => f.endsWith(".pfdsl"));
+const pfdslFiles = changedFiles.filter(
+	(f) =>
+		f.endsWith(".pfdsl") && (!roadmap.context || f !== ".pfdsl/roadmap.pfdsl"),
+);
 
 const results = [];
+if (roadmap.context) {
+	const cliPath = resolve(root, "packages/cli/dist/cli.js");
+	const { roadmapSourceIdentity } = await import("./lib/roadmap-source.mjs");
+	for (const document of roadmap.documents) {
+		// The entry closure validates raw YAML presets in their proper role.
+		// Only entry/subflow documents are standalone diagram and link targets.
+		if (!document.roles.some((role) => role !== "preset")) continue;
+		const checked = node([
+			cliPath,
+			"check",
+			document.file,
+			"--strict",
+			"--reference-context",
+			document.contextFile,
+		]);
+		results.push({
+			name: `external roadmap check (${document.logicalPath})`,
+			status: checked.ok ? "PASS" : "FAIL",
+			detail: checked.ok ? roadmap.key : checked.out.trim(),
+		});
+		const links = node([
+			cliPath,
+			"meta",
+			"check-links",
+			document.file,
+			"--json",
+			"--reference-context",
+			document.contextFile,
+		]);
+		let linksPassed = false;
+		let linksDetail;
+		try {
+			const report = JSON.parse(links.out);
+			const evidence = report.referenceResolution;
+			if (!evidence || !Array.isArray(evidence.results)) {
+				throw new Error("referenceResolution with results is required");
+			}
+			const record = {
+				...roadmapSourceIdentity(evidence),
+				results: evidence.results.map(({ root, value, ...result }) => ({
+					...result,
+					...(result.kind === "url" ? { value } : {}),
+				})),
+			};
+			console.log(
+				`External roadmap reference evidence: ${JSON.stringify(record)}`,
+			);
+			linksPassed = links.ok && report.ok === true;
+			linksDetail = linksPassed
+				? roadmap.key
+				: "Reference validation failed; see the resolution record above";
+		} catch (error) {
+			linksDetail = `Reference validation did not return a usable resolution record: ${error.message}`;
+		}
+		results.push({
+			name: `external roadmap links (${document.logicalPath})`,
+			status: linksPassed ? "PASS" : "FAIL",
+			detail: linksDetail,
+		});
+	}
+}
 {
 	const inventory = node(["scripts/check-pfdsl-inventory.mjs"]);
 	results.push({
@@ -194,7 +277,11 @@ if (pfdslFiles.length === 0) {
 
 // 2. read-only audit-issues-flow (fails if blocking findings remain)
 {
-	const r = node(["scripts/pfdsl/audit-issues-flow.mjs"]);
+	const r = node([
+		"scripts/pfdsl/audit-issues-flow.mjs",
+		"--roadmap",
+		roadmap.file,
+	]);
 	results.push({
 		name: "audit-issues-flow",
 		...classifyAuditIssuesFlowResult(r.ok, r.status),
@@ -220,6 +307,7 @@ results.push(
 		inProgress,
 		noArtifact,
 		changedFiles,
+		roadmap,
 	}),
 );
 
@@ -248,7 +336,15 @@ for (const number of issueNumbers) {
 
 // 8. wip transition verification (todo→wip at start, protocol4) in .pfdsl/roadmap.pfdsl
 results.push(
-	wipTransitionStep({ exec, base, artifactKey, noArtifact, changedFiles }),
+	wipTransitionStep({
+		exec,
+		base,
+		artifactKey,
+		noArtifact,
+		changedFiles,
+		roadmap,
+		inProgress,
+	}),
 );
 
 // 10. knowledge-artifact size report: collect the measured deltas regardless of
@@ -316,7 +412,11 @@ console.log(formatGateTable(results));
 				? listing.out
 						.split("\n")
 						.map((l) => l.trim())
-						.filter((l) => l.endsWith(".pfdsl"))
+						.filter(
+							(l) =>
+								l.endsWith(".pfdsl") &&
+								(!roadmap.context || l !== ".pfdsl/roadmap.pfdsl"),
+						)
 				: [];
 			const perFile = new Map();
 			for (const sib of dirFiles) {
@@ -404,7 +504,18 @@ console.log(formatGateTable(results));
 // `status ready --json` runs instead of AI graph traversal.
 {
 	const cliPath = resolve(root, "packages/cli/dist/cli.js");
-	if (changedFiles.includes(".pfdsl/roadmap.pfdsl") && existsSync(cliPath)) {
+	if (roadmap.context) {
+		const ready = node([cliPath, "status", "ready", roadmap.file, "--json"]);
+		console.log(
+			`\nExternal roadmap ready at ${roadmap.context.model.fixedRevision}: ${ready.ok ? ready.out.trim() : "unavailable"}`,
+		);
+		console.log(
+			"Ready-set transition is not measured: no previous external revision was supplied.",
+		);
+	} else if (
+		changedFiles.includes(".pfdsl/roadmap.pfdsl") &&
+		existsSync(cliPath)
+	) {
 		const before = exec("git", ["show", `origin/${base}:.pfdsl/roadmap.pfdsl`]);
 		const after = exec("git", ["show", "HEAD:.pfdsl/roadmap.pfdsl"]);
 		if (before.ok && after.ok) {
@@ -499,11 +610,20 @@ if (
 		// so this report and `meta get` cannot disagree about where a node lives.
 		const { analyze, isUnreadableError, isUrlLike, resolveLocationFsPath } =
 			await import(corePath);
+		const readers = revisionPfdReaders({ exec, head: revision.head });
 		const { analyzed, unreadable } = analyzeAdoptedPfdsl({
-			...revisionPfdReaders({ exec, head: revision.head }),
+			...readers,
+			readdirSync: (dir) =>
+				readers
+					.readdirSync(dir)
+					.filter((file) => !roadmap.context || file !== "roadmap.pfdsl"),
 			analyze,
 			isUnreadableError,
 		});
+		if (roadmap.context)
+			console.log(
+				"  External roadmap location results are reported above in their reference contexts; they are not classified as files in the implementation repository.",
+			);
 		const resolveLocation = (file, location, basePath) =>
 			isUrlLike(location)
 				? null

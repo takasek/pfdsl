@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // Audits sync between GitHub issues and .pfdsl/roadmap.pfdsl.
-// Usage: node scripts/pfdsl/audit-issues-flow.mjs [--enforce-issue <n> ...]
+// Usage: node scripts/pfdsl/audit-issues-flow.mjs [--roadmap <snapshot>] [--enforce-issue <n> ...]
 
 import { readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
@@ -30,6 +30,7 @@ const githubOps = createGitHubOps({ cwd: root });
 // Label findings are not about an issue, so they keep their own severity.
 /** @type {number[]} */
 let enforcedIssues = [];
+let roadmapFile = resolve(root, ".pfdsl/roadmap.pfdsl");
 // node:util rather than a shared helper because this file is mirrored into
 // .claude/skills/pfd-ops/install/ and runs in adopting repos, which have no
 // scripts/lib/. Strict parsing keeps removed mutation modes rejected.
@@ -38,10 +39,12 @@ try {
 		args: process.argv.slice(2),
 		options: {
 			"enforce-issue": { type: "string", multiple: true },
+			roadmap: { type: "string" },
 		},
 		strict: true,
 		allowPositionals: false,
 	});
+	if (values.roadmap !== undefined) roadmapFile = resolve(values.roadmap);
 	enforcedIssues = (values["enforce-issue"] ?? []).map((value) => {
 		const n = Number(value);
 		if (!Number.isSafeInteger(n) || n <= 0) {
@@ -58,7 +61,7 @@ try {
 
 // --- Read and split roadmap.pfdsl ---
 
-const raw = readFileSync(resolve(root, ".pfdsl/roadmap.pfdsl"), "utf-8");
+const raw = readFileSync(roadmapFile, "utf-8");
 
 // File starts with "---\n"; frontmatter ends at the next line where trimEnd()==="---"
 const lines = raw.split("\n");

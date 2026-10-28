@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import { resolve } from "node:path";
 import { parseArgs } from "node:util";
+import { readRoadmapSourceConfig } from "./lib/roadmap-source.mjs";
 import { generate, publish } from "./lib/wiki-roadmap-generate.mjs";
 
 try {
@@ -9,15 +10,17 @@ try {
 			wiki: { type: "string" },
 			repository: { type: "string" },
 			"expected-revision": { type: "string" },
+			"source-config": { type: "string" },
 			publish: { type: "boolean", default: false },
 		},
 	});
 	if (!values.wiki || !values.repository)
 		throw new Error(
-			"Required options: --wiki <checkout> --repository <owner/name> [--expected-revision <commit>] [--publish]",
+			"Required options: --wiki <checkout> --repository <owner/name> [--expected-revision <commit>] [--source-config <json>] [--publish]",
 		);
 	const wiki = resolve(values.wiki);
 	const result = generate({
+		...readRoadmapSourceConfig(values["source-config"]),
 		wiki,
 		repository: values.repository,
 		expectedRevision: values["expected-revision"],

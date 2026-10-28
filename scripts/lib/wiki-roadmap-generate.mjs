@@ -2,16 +2,17 @@ import { createHash } from "node:crypto";
 import {
 	existsSync,
 	lstatSync,
-	mkdtempSync,
 	readdirSync,
 	readFileSync,
 	realpathSync,
-	rmSync,
 	writeFileSync,
 } from "node:fs";
-import { tmpdir } from "node:os";
-import { dirname, isAbsolute, join, relative, resolve } from "node:path";
+import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import {
+	acquireRoadmapSource,
+	roadmapSourceIdentity,
+} from "./roadmap-source.mjs";
 import {
 	run,
 	git as runGit,
@@ -19,10 +20,9 @@ import {
 } from "./run-exec.mjs";
 
 // Like gen-samples, load the build output at runtime; it is absent in unbuilt clones.
-const { analyze, loadDependencyClosure, parse, wrapPresetSource } =
-	await import(
-		fileURLToPath(new URL("../../packages/core/dist/index.js", import.meta.url))
-	);
+const { parse } = await import(
+	fileURLToPath(new URL("../../packages/core/dist/index.js", import.meta.url))
+);
 
 const outputs = ["roadmap.index.md", "roadmap.svg"];
 const inputs = ["roadmap.pfdsl", "roadmap.md"];
@@ -92,7 +92,10 @@ function safeText(value) {
 function indexPage(metadata, receipt) {
 	const root = `https://github.com/${receipt.repository}/wiki`;
 	const raw = `https://raw.githubusercontent.com/wiki/${receipt.repository}`;
-	return `# ${safeText(metadata.title || "Roadmap")}\n\n${metadata.description ? `${safeText(metadata.description)}\n\n` : ""}This is a trial preview for issue #1519. The repository roadmap remains authoritative.\n\n![Roadmap diagram](roadmap.svg)\n\nCompanion: [preview](${root}/roadmap) · [source](${raw}/roadmap.md)\n\n[PFD source (roadmap.pfdsl)](${raw}/roadmap.pfdsl)\n\nThis diagram shows the last successfully validated snapshot. Edits may be newer; a failed generation leaves this view unchanged.\n\n- Validation: strict PFD check and local link check passed. External reference resolution is not supported by this generator.\n- Input Wiki revision: \`${receipt.wikiRevision}\`\n- Generated at: ${receipt.generatedAt}\n- Toolchain digest: \`${receipt.toolchain}\`\n- [Generation status](https://github.com/${receipt.repository}/actions/workflows/wiki-roadmap-generate.yml)\n\n${marker}${JSON.stringify(receipt)} -->\n`;
+	const record = JSON.stringify(receipt)
+		.replaceAll("<", "\\u003c")
+		.replaceAll(">", "\\u003e");
+	return `# ${safeText(metadata.title || "Roadmap")}\n\n${metadata.description ? `${safeText(metadata.description)}\n\n` : ""}This is a trial preview for issue #1519. The repository roadmap remains authoritative.\n\n![Roadmap diagram](roadmap.svg)\n\nCompanion: [preview](${root}/roadmap) · [source](${raw}/roadmap.md)\n\n[PFD source (roadmap.pfdsl)](${raw}/roadmap.pfdsl)\n\nThis diagram shows the last successfully validated snapshot. Edits may be newer; a failed generation leaves this view unchanged.\n\n- Validation: strict PFD check and fixed-snapshot reference checks passed.\n- Input Wiki revision: \`${receipt.wikiRevision}\`\n- Generated at: ${receipt.generatedAt}\n- Toolchain digest: \`${receipt.toolchain}\`\n- [Generation status](https://github.com/${receipt.repository}/actions/workflows/wiki-roadmap-generate.yml)\n\n${marker}${record} -->\n`;
 }
 function snapshotKey(wiki, revision, repository, toolchain) {
 	// Include the whole source tree: a preset/subflow/link target may affect validation.
@@ -103,36 +106,15 @@ function snapshotKey(wiki, revision, repository, toolchain) {
 		.filter((entry) => !outputs.includes(entry.slice(entry.indexOf("\t") + 1)));
 	return hash(JSON.stringify([repository, toolchain, tree]));
 }
-function rejectUnsupportedReferences(directory) {
-	directory = realpathSync(directory);
-	loadDependencyClosure(join(directory, inputs[0]), (file) => {
-		const name = relative(directory, file);
-		if (isAbsolute(name) || name === ".." || name.startsWith("../"))
-			throw new Error("Dependency leaves the Wiki snapshot");
-		regular(directory, name);
-		const actual = relative(directory, realpathSync(file));
-		if (isAbsolute(actual) || actual === ".." || actual.startsWith("../"))
-			throw new Error("Dependency leaves the Wiki snapshot");
-		const result = analyze(wrapPresetSource(file, read(directory, name)), {
-			strict: true,
-		});
-		const { frontmatter } = result;
-		if (
-			frontmatter?.baseRef !== undefined ||
-			Object.values(frontmatter?.artifact ?? {}).some(
-				(node) => node?.ref !== undefined,
-			)
-		) {
-			throw new Error(
-				`External reference resolution is not supported: ${name}`,
-			);
-		}
-		return result;
-	});
-}
-
 /** Generate a pair from a committed Wiki snapshot. Never execute PFD commands. */
-export function generate({ wiki, repository, cli, expectedRevision }) {
+export function generate({
+	wiki,
+	repository,
+	cli,
+	expectedRevision,
+	roadmapSource,
+	localSources = {},
+}) {
 	if (!/^[\w-]+\/[\w.-]+$/.test(repository ?? ""))
 		throw new Error("Expected repository owner/name");
 	wiki = checkout(wiki);
@@ -145,9 +127,9 @@ export function generate({ wiki, repository, cli, expectedRevision }) {
 	const toolchain = hash(
 		toolIdentity(cli) +
 			readFileSync(import.meta.filename) +
+			readFileSync(new URL("./roadmap-source.mjs", import.meta.url)) +
 			readFileSync(new URL("./run-exec.mjs", import.meta.url)),
 	);
-	const key = snapshotKey(wiki, wikiRevision, repository, toolchain);
 	// Git may normalize editor bytes on commit or change line endings on checkout.
 	// Validate and describe the published blobs; retain raw hashes for race detection.
 	const committedInputs = inputs.map((name) =>
@@ -157,57 +139,125 @@ export function generate({ wiki, repository, cli, expectedRevision }) {
 	const sourceHash = hash(committedInputs[0]),
 		companionHash = hash(committedInputs[1]);
 	const metadata = parse(committedInputs[0]).frontmatter ?? {};
+	const source =
+		roadmapSource?.source ?? `https://github.com/${repository}.wiki.git`;
 	if (
-		existsSync(join(wiki, outputs[0])) &&
-		existsSync(join(wiki, outputs[1]))
-	) {
-		try {
-			const page = gitOutput(wiki, "show", `${wikiRevision}:${outputs[0]}`);
-			const start = page.lastIndexOf(marker);
-			const receipt = JSON.parse(
-				page.slice(start + marker.length).split(" -->")[0],
-			);
-			if (
-				receipt.key === key &&
-				receipt.svgHash ===
-					hash(gitOutput(wiki, "show", `${wikiRevision}:${outputs[1]}`)) &&
-				page === indexPage(metadata, receipt)
-			)
-				return {
-					status: "unchanged",
-					wikiRevision,
-					key,
-					sourceHash,
-					companionHash,
-					worktreeInputHashes,
-					worktreeOutputHashes: outputs.map((name) => hash(read(wiki, name))),
-					indexHash: hash(page),
-					svgHash: receipt.svgHash,
-					inputWikiRevision: receipt.wikiRevision,
-				};
-		} catch {
-			/* A damaged receipt is regenerated, not trusted. */
-		}
-	}
-	const scratch = mkdtempSync(join(tmpdir(), "pfdsl-wiki-generate-"));
+		roadmapSource &&
+		(roadmapSource.documentId !== inputs[0] ||
+			(roadmapSource.companionId ?? inputs[1]) !== inputs[1])
+	)
+		throw new Error("Wiki generator requires roadmap.pfdsl and roadmap.md");
+	const acquired = acquireRoadmapSource({
+		descriptor: roadmapSource
+			? { ...roadmapSource, revision: wikiRevision }
+			: {
+					adapter: "local-git",
+					source,
+					revision: wikiRevision,
+					documentId: inputs[0],
+					companionId: inputs[1],
+					logicalPath: inputs[0],
+					basis: { source, revision: wikiRevision },
+				},
+		localSources: { ...localSources, [source]: wiki },
+	});
 	try {
-		const snapshot = join(scratch, "wiki");
-		git(scratch, "clone", "--no-local", "--no-checkout", wiki, snapshot);
-		git(snapshot, "checkout", "--detach", wikiRevision);
-		inputs.forEach((name, index) => {
-			writeFileSync(join(snapshot, name), committedInputs[index]);
-		});
-		rejectUnsupportedReferences(snapshot);
-		const file = join(snapshot, inputs[0]);
+		const referenceContext = roadmapSourceIdentity(acquired.context);
+		// The Wiki tree already identifies all source bytes, excluding only our outputs.
+		// Its commit changes on output-only publication and must not cause a loop.
+		const keyContext = {
+			...referenceContext,
+			model: { ...referenceContext.model, fixedRevision: undefined },
+			...(!roadmapSource ? { basis: undefined } : {}),
+		};
+		const key = hash(
+			JSON.stringify([
+				snapshotKey(wiki, wikiRevision, repository, toolchain),
+				keyContext,
+			]),
+		);
+		if (
+			existsSync(join(wiki, outputs[0])) &&
+			existsSync(join(wiki, outputs[1]))
+		) {
+			try {
+				const page = gitOutput(wiki, "show", `${wikiRevision}:${outputs[0]}`);
+				const start = page.lastIndexOf(marker);
+				const receipt = JSON.parse(
+					page.slice(start + marker.length).split(" -->")[0],
+				);
+				if (
+					receipt.key === key &&
+					receipt.svgHash ===
+						hash(gitOutput(wiki, "show", `${wikiRevision}:${outputs[1]}`)) &&
+					page === indexPage(metadata, receipt)
+				)
+					return {
+						status: "unchanged",
+						wikiRevision,
+						key,
+						sourceHash,
+						companionHash,
+						worktreeInputHashes,
+						worktreeOutputHashes: outputs.map((name) => hash(read(wiki, name))),
+						indexHash: hash(page),
+						svgHash: receipt.svgHash,
+						inputWikiRevision: receipt.wikiRevision,
+						referenceContext: receipt.referenceContext,
+					};
+			} catch {
+				/* A damaged receipt is regenerated, not trusted. */
+			}
+		}
+		const file = acquired.file;
 		const invoke = (...args) =>
 			run(process.execPath, [cli, ...args], {
-				cwd: snapshot,
+				cwd: dirname(file),
 				captureStderr: true,
 				env: withoutGitTargetEnvironment(process.env),
 			});
-		invoke("check", file, "--strict");
-		invoke("meta", "check-links", file);
-		const svg = invoke("render", file, "--format", "svg");
+		invoke(
+			"check",
+			file,
+			"--strict",
+			"--reference-context",
+			acquired.contextFile,
+		);
+		const referenceChecks = [];
+		for (const doc of acquired.documents) {
+			if (doc.roles.some((role) => role !== "preset")) {
+				const report = JSON.parse(
+					invoke(
+						"meta",
+						"check-links",
+						doc.file,
+						"--json",
+						"--reference-context",
+						doc.contextFile,
+					),
+				);
+				if (!report.ok || !report.referenceResolution)
+					throw new Error(
+						"Reference validation did not return a successful resolution record",
+					);
+				const evidence = report.referenceResolution;
+				referenceChecks.push({
+					...roadmapSourceIdentity(evidence),
+					results: evidence.results.map(({ root, value, ...result }) => ({
+						...result,
+						...(result.kind === "url" ? { value } : {}),
+					})),
+				});
+			}
+		}
+		const svg = invoke(
+			"render",
+			file,
+			"--format",
+			"svg",
+			"--reference-context",
+			acquired.contextFile,
+		);
 		const receipt = {
 			version: 1,
 			repository,
@@ -217,6 +267,8 @@ export function generate({ wiki, repository, cli, expectedRevision }) {
 			companionHash,
 			svgHash: hash(svg),
 			toolchain,
+			referenceContext,
+			referenceChecks,
 			generatedAt: new Date().toISOString(),
 		};
 		const index = indexPage(metadata, receipt);
@@ -236,9 +288,10 @@ export function generate({ wiki, repository, cli, expectedRevision }) {
 			worktreeOutputHashes: [hash(index), hash(svg)],
 			indexHash: hash(index),
 			svgHash: hash(svg),
+			referenceContext,
 		};
 	} finally {
-		rmSync(scratch, { recursive: true, force: true });
+		acquired.dispose();
 	}
 }
 

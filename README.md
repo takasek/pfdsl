@@ -102,7 +102,7 @@ node packages/cli/dist/cli.js help
 pfdsl <command> [options]
 
 Commands:
-  check <file|-> [--strict] [--hints] [--json] [--no-color]
+  check <file|-> [--reference-context <file>] [--strict] [--hints] [--json] [--no-color]
                            Validate a .pfdsl file (- = stdin)
   explain <code>           Print the summary and spec section for a diagnostic code (e.g. V021)
   fmt <file|-> [--write] [--check] [--no-color]
@@ -111,7 +111,7 @@ Commands:
                            Remove artifacts, processes, or groups from a .pfdsl file (- = stdin)
   rename <file|-> <old> <new> [--write] [--json] [--no-color]
                            Rename an artifact, process, or group id and every reference to it (- = stdin)
-  render <file|-> [--format dot|svg|pdf|png] [--no-color]
+  render <file|-> [--reference-context <file>] [--format dot|svg|pdf|png] [--no-color]
                            Render as Graphviz DOT (default), SVG, PDF, or PNG (- = stdin)
                            PDF/PNG requires puppeteer in the CLI's own Node env (npm install puppeteer)
   diff <a> <b> [--format text|dot|svg] [--json] [--no-color]

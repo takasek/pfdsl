@@ -23,6 +23,23 @@ export {
 export type { LocateResult } from "./locate.js";
 export { locateNode } from "./locate.js";
 export { resolveLocationFsPath } from "./location-path.js";
+export type {
+	ArtifactSnapshotResult,
+	ModelOrigin,
+	ReferenceBinding,
+	ReferenceContext,
+	ReferenceFailure,
+	ReferenceFailureReason,
+	ReferenceResult,
+	ReferenceSnapshot,
+	ResolveReferenceInput,
+} from "./reference-resolution.js";
+export {
+	resolveArtifactSnapshot,
+	resolveReference,
+	selectArtifactReference,
+	validateReferenceContext,
+} from "./reference-resolution.js";
 export { auditGraph };
 
 import {
@@ -103,6 +120,7 @@ export type {
 	PrimaryEdge,
 	ProcessMeta,
 	Range,
+	ReferenceTarget,
 	Statement,
 	Status,
 	StyleAttr,

@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import { resolve } from "node:path";
 import { parseArgs } from "node:util";
+import { readRoadmapSourceConfig } from "./lib/roadmap-source.mjs";
 import { publishEdit } from "./lib/wiki-roadmap-edit-publish.mjs";
 
 try {
@@ -9,12 +10,13 @@ try {
 			wiki: { type: "string" },
 			repository: { type: "string" },
 			"expected-revision": { type: "string" },
+			"source-config": { type: "string" },
 			message: { type: "string" },
 			help: { type: "boolean" },
 		},
 	});
 	const usage =
-		"Usage: node scripts/wiki-roadmap-publish.mjs --wiki <checkout> --repository <owner/name> [--expected-revision <commit>] [--message <commit message>]";
+		"Usage: node scripts/wiki-roadmap-publish.mjs --wiki <checkout> --repository <owner/name> [--expected-revision <commit>] [--message <commit message>] [--source-config <json>]";
 	if (values.help)
 		console.log(
 			`${usage}\n\nPublish unstaged roadmap edits with validation and generated previews.\nRequires a built CLI, a default-branch HTTPS Wiki clone and Git author identity.\nSee docs/wiki-roadmap-spike.md for setup and recovery instructions.`,
@@ -24,6 +26,7 @@ try {
 		console.log(
 			JSON.stringify(
 				publishEdit({
+					...readRoadmapSourceConfig(values["source-config"]),
 					wiki: resolve(values.wiki),
 					repository: values.repository,
 					expectedRevision: values["expected-revision"],

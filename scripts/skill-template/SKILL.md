@@ -89,7 +89,7 @@ statusStyles:
 
 Specification v0.0.30 defines artifact reference targets: document-level `baseRef: { source, revision }` and artifact-level `ref` replacing that whole mapping.
 They select the artifact's reference target; they do not change process locations or command working directories.
-Reference resolution is a separate implementation milestone: do not interpret an older CLI accepting these unknown fields as support, or switch an external roadmap to authoritative use before verifying the chosen implementation version.
+The CLI supports caller-supplied pinned snapshots through `--reference-context <file>` on check, render, meta get/list/check-links, and graph describe. Static check/render success does not establish reference existence; meta check-links records per-location results, while URLs and globs remain skipped. Do not interpret an older CLI accepting these fields as support, or switch an external roadmap to authoritative use before verifying the chosen implementation version.
 
 ## CLI
 

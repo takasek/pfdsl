@@ -162,6 +162,14 @@ function cliTrace({
 }
 
 describe("prepareRelease", () => {
+	it("hands external roadmap follow-up to its validated update entry point", () => {
+		const notice = formatCliCandidateNotice(["cli_release_a"], {
+			context: { model: { source: "wiki", fixedRevision: "abc" } },
+		});
+		assert.match(notice, /wiki-roadmap-edit-publish/);
+		assert.match(notice, /acceptance evidence/);
+		assert.doesNotMatch(notice, /roadmap PR/);
+	});
 	it("rejects main before changing files", () => {
 		const root = packageRoot("cli");
 		const calls = [];
@@ -223,6 +231,34 @@ describe("prepareRelease", () => {
 });
 
 describe("publishRelease", () => {
+	it("selects external candidates from one snapshot and gives metadata its reference context", () => {
+		const root = packageRoot("cli");
+		const trace = cliTrace({ remoteTag: `${SHA}\trefs/tags/v0.0.1\n` });
+		const roadmap = {
+			file: "/snapshot/roadmap.pfdsl",
+			contextFile: "/snapshot/context.json",
+			context: { model: { source: "wiki", fixedRevision: "abc" } },
+		};
+		try {
+			publishRelease({ root, kindArg: "cli", commit: SHA, ...trace, roadmap });
+			const calls = trace.calls
+				.filter(([command]) => command === process.execPath)
+				.map(([, args]) => args);
+			assert.equal(calls.length, 2);
+			assert.ok(calls.every((args) => args.includes(roadmap.file)));
+			assert.deepEqual(calls.find((args) => args[1] === "meta").slice(-2), [
+				"--reference-context",
+				roadmap.contextFile,
+			]);
+			assert.ok(
+				!calls
+					.find((args) => args[1] === "status")
+					.includes("--reference-context"),
+			);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
 	it("checks the complete release output contract before tagging", () => {
 		const root = packageRoot("cli");
 		const trace = cliTrace();

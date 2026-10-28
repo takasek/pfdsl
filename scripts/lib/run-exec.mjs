@@ -26,12 +26,12 @@ const MAX_BUFFER = 32 * 1024 * 1024;
  * Run a command, returning stdout. Throws on a non-zero exit.
  * @param {string} file - executable name, never a command line
  * @param {string[]} args
- * @param {{cwd: string, input?: string, env?: object, captureStderr?: boolean, timeout?: number}} opts
+ * @param {{cwd: string, input?: string, env?: object, captureStderr?: boolean, timeout?: number, encoding?: BufferEncoding|null}} opts
  */
 export function run(
 	file,
 	args,
-	{ cwd, input, env, captureStderr = false, timeout } = {},
+	{ cwd, input, env, captureStderr = false, timeout, encoding = "utf8" } = {},
 ) {
 	// Node echoes a child's stderr to the parent unless stdio is given, and the
 	// callers here relied on that: gate-check's pnpm builds stream progress while
@@ -44,7 +44,7 @@ export function run(
 	// `out` instead of the terminal.
 	return execFileSync(file, args, {
 		cwd,
-		encoding: "utf-8",
+		encoding,
 		maxBuffer: MAX_BUFFER,
 		...(captureStderr ? { stdio: ["pipe", "pipe", "pipe"] } : {}),
 		...(input === undefined ? {} : { input }),

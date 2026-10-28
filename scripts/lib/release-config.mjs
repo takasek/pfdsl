@@ -38,7 +38,7 @@ export const RELEASE_KINDS = {
 /**
  * Parse the two-phase release entrypoint before any repository command runs.
  * @param {string[]} args
- * @returns {{kindArg: string, phase: "prepare" | "publish", version?: string, commit?: string}}
+ * @returns {{kindArg: string, phase: "prepare" | "publish", version?: string, commit?: string, sourceConfig?: string}}
  */
 export function parseReleaseArgs(args) {
 	let parsed;
@@ -48,6 +48,7 @@ export function parseReleaseArgs(args) {
 			options: {
 				version: { type: "string" },
 				commit: { type: "string" },
+				"source-config": { type: "string" },
 			},
 			strict: true,
 			allowPositionals: true,
@@ -72,6 +73,13 @@ export function parseReleaseArgs(args) {
 	}
 
 	const { version, commit } = parsed.values;
+	const sourceConfig = parsed.values["source-config"];
+	if (
+		sourceConfig !== undefined &&
+		(kindArg !== "cli" || phase !== "publish")
+	) {
+		throw new Error("--source-config is only supported for CLI publish");
+	}
 	if (phase === "prepare") {
 		if (commit !== undefined)
 			throw new Error("--commit is not allowed for prepare");
@@ -84,7 +92,13 @@ export function parseReleaseArgs(args) {
 			throw new Error("a full 40-character commit SHA is required for publish");
 	}
 
-	return { kindArg, phase, version, commit };
+	return {
+		kindArg,
+		phase,
+		version,
+		commit,
+		...(sourceConfig === undefined ? {} : { sourceConfig }),
+	};
 }
 
 /**

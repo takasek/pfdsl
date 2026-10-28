@@ -746,8 +746,8 @@ export function mountPreview(container: HTMLElement, host: PreviewHost) {
 		if (!subflow && nodeLocs.length === 0) return;
 		e.preventDefault();
 		if (e.metaKey || e.ctrlKey) {
-			if (subflow) {
-				host.postMessage({ type: "openFile", path: subflow });
+			if (subflow && nodeId) {
+				host.postMessage({ type: "openFile", nodeId, path: subflow });
 			} else if (nodeLocs.length > 0 && nodeId) {
 				host.postMessage({ type: "openLocation", nodeId });
 			}

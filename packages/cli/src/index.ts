@@ -40,11 +40,13 @@ import {
 	type PfdType,
 	parentBoundaryArtifacts,
 	parseIdList,
+	type ReferenceContext,
+	type ReferenceFailure,
 	reindex,
 	rename,
+	resolveArtifactSnapshot,
 	resolveEffectiveFrontmatter,
 	resolveLoadedPresentation,
-	resolveLocationFsPath,
 	type SortKey,
 	STATUS_VALUES,
 	setFrontmatterField,
@@ -64,6 +66,15 @@ import {
 	defineCommand,
 	type OptionSpec,
 } from "./command-definition.js";
+import {
+	checkSnapshotPath,
+	hasExplicitReferences,
+	modelDependencyPath,
+	readReferenceContext,
+	referenceFailureResult,
+	resolveCheckedReference,
+	STATIC_REFERENCE_NOTICE,
+} from "./reference-context.js";
 
 export interface CommandResult {
 	stdout: string;
@@ -73,6 +84,15 @@ export interface CommandResult {
 }
 
 const BOOLEAN_OPTION = { type: "boolean" } as const;
+const REFERENCE_CONTEXT_OPTIONS = {
+	"reference-context": { type: "string", placeholder: "file" },
+} as const;
+function referenceContextOption(flags: Record<string, unknown>): {
+	referenceContext?: string;
+} {
+	const value = flags["reference-context"];
+	return typeof value === "string" ? { referenceContext: value } : {};
+}
 const COMMON_OPTIONS: Record<string, OptionSpec> = {
 	help: BOOLEAN_OPTION,
 };
@@ -155,6 +175,7 @@ const GRAPH_LOCATE_OPTIONS = {
 	"no-color": BOOLEAN_OPTION,
 } as const;
 const GRAPH_DESCRIBE_OPTIONS = {
+	...REFERENCE_CONTEXT_OPTIONS,
 	json: BOOLEAN_OPTION,
 	"no-color": BOOLEAN_OPTION,
 };
@@ -181,10 +202,12 @@ const GRAPH_ORPHANS_OPTIONS = {
 };
 
 const META_GET_OPTIONS = {
+	...REFERENCE_CONTEXT_OPTIONS,
 	json: BOOLEAN_OPTION,
 	"no-color": BOOLEAN_OPTION,
 };
 const META_LIST_OPTIONS = {
+	...REFERENCE_CONTEXT_OPTIONS,
 	tag: { type: "string", multiple: true, placeholder: "t[,t...]" },
 	group: { type: "string", multiple: true, placeholder: "g" },
 	producer: { type: "string", multiple: true, placeholder: "p" },
@@ -220,6 +243,7 @@ const META_REINDEX_OPTIONS = {
 	"no-color": BOOLEAN_OPTION,
 };
 const META_CHECK_LINKS_OPTIONS = {
+	...REFERENCE_CONTEXT_OPTIONS,
 	json: BOOLEAN_OPTION,
 	"no-color": BOOLEAN_OPTION,
 };
@@ -249,6 +273,7 @@ const STATUS_GAPS_OPTIONS = {
 };
 
 const CHECK_OPTIONS = {
+	...REFERENCE_CONTEXT_OPTIONS,
 	strict: BOOLEAN_OPTION,
 	hints: BOOLEAN_OPTION,
 	json: BOOLEAN_OPTION,
@@ -271,6 +296,7 @@ const RENAME_OPTIONS = {
 	"no-color": BOOLEAN_OPTION,
 };
 const RENDER_OPTIONS = {
+	...REFERENCE_CONTEXT_OPTIONS,
 	format: { type: "string", multiple: true, placeholder: "dot|svg|pdf|png" },
 	"no-color": BOOLEAN_OPTION,
 } as const;
@@ -477,6 +503,7 @@ function requireRoadmapType(
 }
 
 export interface CheckOptions {
+	referenceContext?: string;
 	hints?: boolean;
 	strict?: boolean;
 	json?: boolean;
@@ -488,6 +515,12 @@ export function runCheck(file: string, opts: CheckOptions = {}): CommandResult {
 	if (isCommandResult(src)) return src;
 	const entryResult = analyze(src, opts.strict ? { strict: true } : undefined);
 	const { diagnostics, edges, nodeKinds, frontmatter } = entryResult;
+	const contextResult = readReferenceContext(opts.referenceContext);
+	if (!contextResult.ok)
+		return referenceFailureResult([contextResult], opts.json);
+	const context = contextResult.context;
+	let referenceNotice =
+		context !== undefined || hasExplicitReferences(frontmatter);
 	const lines = diagnostics.map((d) => formatDiagnostic(d, file, opts.color));
 	if (hasErrors(diagnostics)) {
 		if (opts.json) {
@@ -502,25 +535,42 @@ export function runCheck(file: string, opts: CheckOptions = {}): CommandResult {
 	}
 
 	// Multi-file checks (subflow + extends) — only run when single-file is clean.
-	// Skipped for stdin (-): relative paths cannot be resolved without a base file.
-	if (file === "-") {
+	// Legacy stdin has no base file; an explicit context supplies a logical position.
+	if (file === "-" && !context) {
 		if (opts.json) {
 			return {
-				stdout: `${JSON.stringify({ ok: true, diagnostics })}\n`,
+				stdout: `${JSON.stringify({ ok: true, diagnostics, ...(referenceNotice ? { referenceResolution: "not-checked" } : {}) })}\n`,
 				stderr: "",
 				exitCode: 0,
 			};
 		}
 		return {
 			stdout: lines.length ? `${lines.join("\n")}\n` : "OK\n",
-			stderr: "",
+			stderr: referenceNotice ? `${STATIC_REFERENCE_NOTICE}\n` : "",
 			exitCode: 0,
 		};
 	}
-	const absFile = resolve(file);
-	const closure = loadDependencyClosure(absFile, (path) =>
-		path === absFile ? entryResult : fileLoader(path, opts.strict),
-	);
+	const dependencyPath = modelDependencyPath(file, frontmatter, context);
+	if (!dependencyPath.ok)
+		return referenceFailureResult([dependencyPath], opts.json);
+	const absFile = dependencyPath.path;
+	const dependencyFailures: ReferenceFailure[] = [];
+	const closure = loadDependencyClosure(absFile, (path) => {
+		if (path === absFile) return entryResult;
+		if (context?.basis) {
+			const failure = checkSnapshotPath(context.basis.root, path);
+			if (failure) {
+				dependencyFailures.push(failure);
+				return null;
+			}
+		}
+		const loaded = fileLoader(path, opts.strict);
+		if (loaded && hasExplicitReferences(loaded.frontmatter))
+			referenceNotice = true;
+		return loaded;
+	});
+	if (dependencyFailures.length)
+		return referenceFailureResult(dependencyFailures, opts.json);
 	const multiDiags = [
 		...closure.diagnostics,
 		...closure.localDiagnostics.filter((d) => d.file !== undefined),
@@ -569,6 +619,7 @@ export function runCheck(file: string, opts: CheckOptions = {}): CommandResult {
 		const payload: Record<string, unknown> = {
 			ok: true,
 			diagnostics: allDiags,
+			...(referenceNotice ? { referenceResolution: "not-checked" } : {}),
 		};
 		if (opts.hints) {
 			payload.hints = hints;
@@ -588,7 +639,7 @@ export function runCheck(file: string, opts: CheckOptions = {}): CommandResult {
 	];
 	return {
 		stdout: allLines.length ? `${allLines.join("\n")}\n` : "OK\n",
-		stderr: "",
+		stderr: referenceNotice ? `${STATIC_REFERENCE_NOTICE}\n` : "",
 		exitCode: 0,
 	};
 }
@@ -1490,6 +1541,7 @@ const STRUCTURAL_CODE = /^(?:FM|P|L|N)\d+$/;
 
 /** Fields whose values are arrays/maps — metadata writes only accept scalars. */
 const NON_SCALAR_FIELDS = new Set([
+	"ref",
 	"tags",
 	"parts",
 	"externalStakeholders",
@@ -1975,6 +2027,7 @@ export function runRename(
 }
 
 export interface GetOptions {
+	referenceContext?: string;
 	id?: string;
 	field?: string;
 	json?: boolean;
@@ -1990,6 +2043,7 @@ function splitCommaList(raw: string): string[] {
 
 const KNOWN_FIELDS: Record<"artifact" | "process" | "group", Set<string>> = {
 	artifact: new Set([
+		"ref",
 		"label",
 		"description",
 		"owner",
@@ -2038,28 +2092,15 @@ const DERIVED_FIELD_SPECS: Record<
 	{
 		kinds: readonly ("artifact" | "process" | "group")[];
 		base: string;
-		compute: (
-			docFsPath: string,
-			meta: Record<string, unknown>,
-			basePath?: string,
-		) => unknown;
 	}
 > = {
 	"location.resolved": {
 		kinds: ["artifact", "process"],
 		base: "location",
-		compute: (docFsPath, meta, basePath) =>
-			resolveLocationDerived(
-				docFsPath,
-				meta.location as string | string[],
-				basePath,
-			),
 	},
 	"command.cwd": {
 		kinds: ["process"],
 		base: "command",
-		compute: (docFsPath, _meta, basePath) =>
-			commandCwdDerived(docFsPath, basePath),
 	},
 };
 
@@ -2069,32 +2110,6 @@ function derivedFieldAcceptedBy(
 	field: string,
 ): boolean {
 	return DERIVED_FIELD_SPECS[field]?.kinds.includes(kind) ?? false;
-}
-
-/** Classify a single `location:` element per spec §15.8 and resolve it if it's not a URL. */
-function resolveLocationElement(
-	docFsPath: string,
-	element: string,
-	basePath?: string,
-): string {
-	return isUrlLike(element)
-		? element
-		: resolveLocationFsPath(docFsPath, element, basePath);
-}
-
-function resolveLocationDerived(
-	docFsPath: string,
-	value: unknown,
-	basePath?: string,
-): unknown {
-	return Array.isArray(value)
-		? value.map((v) => resolveLocationElement(docFsPath, String(v), basePath))
-		: resolveLocationElement(docFsPath, String(value), basePath);
-}
-
-/** The directory commands run in: basePath resolved against the file's dir (§15.8), independent of the command string itself. */
-function commandCwdDerived(docFsPath: string, basePath?: string): string {
-	return resolveLocationFsPath(docFsPath, ".", basePath);
 }
 
 /** Takes the kind the caller already resolved (nodeKinds.get(id)). Listing the
@@ -2118,6 +2133,7 @@ interface NodeFieldsResult {
 	values: Record<string, Record<string, unknown>>;
 	displayFieldsById: Record<string, string[]>;
 	warnText: string;
+	failures: (ReferenceFailure & { id: string; field: string })[];
 }
 
 /**
@@ -2134,7 +2150,7 @@ function collectNodeFields(
 	frontmatter: ReturnType<typeof analyze>["frontmatter"],
 	explicitFields: string[] | undefined,
 	docFsPath: string | null,
-	basePath: string | undefined,
+	context: ReferenceContext | undefined,
 ): NodeFieldsResult {
 	// Keyed by "kind::field" so one warning covers every id sharing that
 	// (kind, field) pair instead of repeating per id (#479 usability re-check).
@@ -2160,6 +2176,7 @@ function collectNodeFields(
 
 	const values: Record<string, Record<string, unknown>> = {};
 	const displayFieldsById: Record<string, string[]> = {};
+	const failures: NodeFieldsResult["failures"] = [];
 
 	for (const { id, kind } of idsAndKinds) {
 		const meta = metaFor(frontmatter, id, kind);
@@ -2167,6 +2184,38 @@ function collectNodeFields(
 		const displayFields: string[] = [];
 		const addField = (field: string) => {
 			if (!displayFields.includes(field)) displayFields.push(field);
+		};
+		const computeDerived = (field: string) => {
+			if (kind === "group") return null;
+			if (
+				docFsPath === null &&
+				!context &&
+				!(
+					kind === "artifact" &&
+					(meta?.ref !== undefined || frontmatter?.baseRef !== undefined)
+				)
+			) {
+				flagStdin(field, id);
+				return null;
+			}
+			const base = field === "command.cwd" ? "." : meta?.location;
+			const one = (value: unknown) => {
+				const result = resolveCheckedReference({
+					docPath: docFsPath,
+					frontmatter,
+					nodeKind: kind,
+					nodeId: id,
+					field: field === "command.cwd" ? "command.cwd" : "location",
+					value: String(value),
+					...(context ? { context } : {}),
+				});
+				if (!result.ok) {
+					failures.push({ ...result, id, field });
+					return null;
+				}
+				return result.value;
+			};
+			return Array.isArray(base) ? base.map(one) : one(base);
 		};
 
 		// Derived fields auto-accompany their base field right after it. Two
@@ -2181,12 +2230,7 @@ function collectNodeFields(
 				if (spec.base !== baseField || meta?.[baseField] === undefined)
 					continue;
 				addField(derived);
-				if (docFsPath === null) {
-					row[derived] = null;
-					flagStdin(derived, id);
-					continue;
-				}
-				row[derived] = spec.compute(docFsPath, meta, basePath);
+				row[derived] = computeDerived(derived);
 			}
 		};
 
@@ -2205,17 +2249,12 @@ function collectNodeFields(
 					addField(field);
 					if (!derivedFieldAcceptedBy(kind, field))
 						flagUnknown(kind, field, id);
-					if (docFsPath === null) {
-						row[field] = null;
-						flagStdin(field, id);
-						continue;
-					}
 					// Asked for by name, so an absent base field answers with null
 					// rather than being dropped from the output.
 					row[field] =
 						meta?.[derivedSpec.base] === undefined
 							? null
-							: derivedSpec.compute(docFsPath, meta, basePath);
+							: computeDerived(field);
 					continue;
 				}
 				addField(field);
@@ -2244,6 +2283,7 @@ function collectNodeFields(
 		values,
 		displayFieldsById,
 		warnText: warnings.length ? `${warnings.join("\n")}\n` : "",
+		failures,
 	};
 }
 
@@ -2267,7 +2307,6 @@ export function runGet(file: string, opts: GetOptions = {}): CommandResult {
 	const failed = failIfErrors(diagnostics, file, opts.json, opts.color);
 	if (failed) return failed;
 
-	const basePath = frontmatter?.basePath;
 	const docFsPath = file === "-" ? null : resolve(file);
 
 	const missing: string[] = [];
@@ -2278,13 +2317,17 @@ export function runGet(file: string, opts: GetOptions = {}): CommandResult {
 		else known.push({ id, kind });
 	}
 
-	const { values, displayFieldsById, warnText } = collectNodeFields(
+	const contextResult = readReferenceContext(opts.referenceContext);
+	if (!contextResult.ok)
+		return referenceFailureResult([contextResult], opts.json);
+	const { values, displayFieldsById, warnText, failures } = collectNodeFields(
 		known,
 		frontmatter,
 		explicitFields,
 		docFsPath,
-		basePath,
+		contextResult.context,
 	);
+	if (failures.length) return referenceFailureResult(failures, opts.json);
 
 	const linesFor = (idsToPrint: string[]) =>
 		idsToPrint.flatMap((id) =>
@@ -2318,6 +2361,7 @@ export function runGet(file: string, opts: GetOptions = {}): CommandResult {
 }
 
 export interface MetaListOptions {
+	referenceContext?: string;
 	tag?: string;
 	group?: string;
 	producer?: string;
@@ -2364,7 +2408,6 @@ export function runMetaList(
 	const failed = failIfErrors(diagnostics, file, opts.json, opts.color);
 	if (failed) return failed;
 
-	const basePath = frontmatter?.basePath;
 	const docFsPath = file === "-" ? null : resolve(file);
 
 	const tagFilter =
@@ -2428,13 +2471,17 @@ export function runMetaList(
 		? `${selectorWarnings.join("\n")}\n`
 		: "";
 
-	const { values, displayFieldsById, warnText } = collectNodeFields(
+	const contextResult = readReferenceContext(opts.referenceContext);
+	if (!contextResult.ok)
+		return referenceFailureResult([contextResult], opts.json);
+	const { values, displayFieldsById, warnText, failures } = collectNodeFields(
 		known,
 		frontmatter,
 		explicitFields,
 		docFsPath,
-		basePath,
+		contextResult.context,
 	);
+	if (failures.length) return referenceFailureResult(failures, opts.json);
 	const combinedWarnText = `${selectorWarnText}${warnText}`;
 
 	if (opts.json) {
@@ -2545,6 +2592,7 @@ export function runMetaValues(
 }
 
 export interface CheckLinksOptions {
+	referenceContext?: string;
 	json?: boolean;
 	color?: boolean;
 }
@@ -2575,8 +2623,15 @@ export function runCheckLinks(
 	const failed = failIfErrors(diagnostics, file, opts.json, opts.color);
 	if (failed) return failed;
 
-	const basePath = frontmatter?.basePath;
 	const docFsPath = resolve(file);
+	const contextResult = readReferenceContext(opts.referenceContext);
+	if (!contextResult.ok)
+		return referenceFailureResult([contextResult], opts.json);
+	const context = contextResult.context;
+	const includeEvidence =
+		context !== undefined || hasExplicitReferences(frontmatter);
+	const failures: (ReferenceFailure & { id: string })[] = [];
+	const results: Record<string, unknown>[] = [];
 
 	const missing: CheckLinksMissing[] = [];
 	const checkNode = (
@@ -2584,14 +2639,87 @@ export function runCheckLinks(
 		kind: "artifact" | "process",
 		location: unknown,
 	) => {
+		if (kind === "artifact" && includeEvidence) {
+			const selected = resolveArtifactSnapshot(frontmatter, id, context);
+			if (!selected.ok) {
+				failures.push({ ...selected, id });
+				results.push({ id, kind, result: "failed", ...selected });
+				return;
+			}
+			if (
+				(location === undefined ||
+					(Array.isArray(location) && location.length === 0)) &&
+				selected.kind === "resource"
+			) {
+				const failure = checkSnapshotPath(
+					selected.snapshot.root,
+					selected.snapshot.root,
+				);
+				if (failure) failures.push({ ...failure, id });
+				results.push({
+					id,
+					kind,
+					reference: selected.reference,
+					source: selected.snapshot.source,
+					fixedRevision: selected.snapshot.fixedRevision,
+					result: failure ? "failed" : "target-resolved",
+					...(failure ?? {}),
+				});
+			}
+		}
 		if (location === undefined) return;
 		const elements = Array.isArray(location) ? location : [location];
 		for (const element of elements) {
 			const value = String(element);
-			if (!isLocationCheckable(value)) continue;
-			const resolvedPath = resolveLocationFsPath(docFsPath, value, basePath);
+			const resolved = resolveCheckedReference({
+				docPath: docFsPath,
+				frontmatter,
+				nodeKind: kind,
+				nodeId: id,
+				field: "location",
+				value,
+				...(context ? { context } : {}),
+			});
+			if (!resolved.ok) {
+				failures.push({ ...resolved, id });
+				results.push({
+					id,
+					kind,
+					location: value,
+					result: "failed",
+					...resolved,
+				});
+				continue;
+			}
+			if (!isLocationCheckable(value)) {
+				results.push({
+					id,
+					nodeKind: kind,
+					location: value,
+					...resolved,
+					result: isUrlLike(value) ? "skipped-url" : "skipped-glob",
+				});
+				continue;
+			}
+			const resolvedPath = resolved.value;
 			if (!existsSync(resolvedPath)) {
 				missing.push({ id, kind, location: value, resolved: resolvedPath });
+				results.push({
+					id,
+					nodeKind: kind,
+					location: value,
+					...resolved,
+					result: "failed",
+					reason: "target-missing",
+				});
+			} else {
+				results.push({
+					id,
+					nodeKind: kind,
+					location: value,
+					...resolved,
+					result: "exists",
+				});
 			}
 		}
 	};
@@ -2604,15 +2732,31 @@ export function runCheckLinks(
 	}
 	missing.sort((a, b) => compareIds(a.id, b.id));
 
+	const referenceResolution = includeEvidence
+		? {
+				adapter: context?.adapter,
+				model: context?.model,
+				logicalPath: context?.logicalPath,
+				basis: context?.basis,
+				targets: context?.targets,
+				results,
+			}
+		: undefined;
 	if (opts.json) {
-		const exitCode = missing.length > 0 ? 1 : 0;
+		const exitCode = missing.length > 0 || failures.length > 0 ? 1 : 0;
 		return {
-			stdout: `${JSON.stringify({ ok: missing.length === 0, missing })}\n`,
+			stdout: `${JSON.stringify({ ok: exitCode === 0, missing, ...(failures.length ? { failures } : {}), ...(referenceResolution ? { referenceResolution } : {}) })}\n`,
 			stderr: "",
 			exitCode,
 		};
 	}
-	if (missing.length === 0) return ok("All location paths exist.\n");
+	if (failures.length) return referenceFailureResult(failures);
+	if (missing.length === 0)
+		return ok(
+			includeEvidence
+				? "All checked location paths exist in the selected snapshots. URLs and globs are not acceptance evidence; use --json for the resolution record.\n"
+				: "All location paths exist.\n",
+		);
 	const lines = missing.map(
 		(m) => `${m.id} (${m.kind})   ${m.location} -> ${m.resolved}`,
 	);
@@ -2642,6 +2786,7 @@ function formatGetLine(
 }
 
 export interface GraphAnalysisOptions {
+	referenceContext?: string;
 	json?: boolean;
 	color?: boolean;
 }
@@ -2848,15 +2993,18 @@ export function runGraphDescribe(
 	const kind = nodeKinds.get(id);
 	if (kind === undefined) return idsNotFoundError(file, [id], opts.json);
 
-	const basePath = frontmatter?.basePath;
 	const docFsPath = file === "-" ? null : resolve(file);
-	const { values, displayFieldsById, warnText } = collectNodeFields(
+	const contextResult = readReferenceContext(opts.referenceContext);
+	if (!contextResult.ok)
+		return referenceFailureResult([contextResult], opts.json);
+	const { values, displayFieldsById, warnText, failures } = collectNodeFields(
 		[{ id, kind }],
 		frontmatter,
 		undefined,
 		docFsPath,
-		basePath,
+		contextResult.context,
 	);
+	if (failures.length) return referenceFailureResult(failures, opts.json);
 	const { predecessors, successors, neighborKind } = computeNeighbors(
 		graph,
 		id,
@@ -3252,6 +3400,7 @@ export { svgToBinary };
 export type CliRenderFormat = RenderFormat | BinaryFormat;
 
 export interface RenderOptions {
+	referenceContext?: string;
 	format?: CliRenderFormat;
 	color?: boolean;
 }
@@ -3265,17 +3414,36 @@ export async function runRender(
 	const { graph, frontmatter, diagnostics } = analyze(graphSrc);
 	const failed = failIfErrors(diagnostics, file, undefined, opts.color);
 	if (failed) return failed;
+	const contextResult = readReferenceContext(opts.referenceContext);
+	if (!contextResult.ok) return referenceFailureResult([contextResult]);
+	const context = contextResult.context;
+	const referenceNotice =
+		context !== undefined || hasExplicitReferences(frontmatter);
 
 	// Resolve extends-inherited statusStyles/tag/group (§2.9.4) so presets
 	// shared across files actually affect rendering, not just `check`.
-	// Skipped for stdin (-): relative extends paths need a base file.
+	// Legacy stdin has no base file; an explicit context supplies a logical position.
 	let effectiveFrontmatter = frontmatter;
-	if (file !== "-") {
+	if (file !== "-" || context) {
+		const dependencyPath = modelDependencyPath(file, frontmatter, context);
+		if (!dependencyPath.ok) return referenceFailureResult([dependencyPath]);
+		const dependencyFailures: ReferenceFailure[] = [];
 		effectiveFrontmatter = resolveEffectiveFrontmatter(
-			resolve(file),
+			dependencyPath.path,
 			frontmatter,
-			fileLoader,
+			(path) => {
+				if (context?.basis) {
+					const failure = checkSnapshotPath(context.basis.root, path);
+					if (failure) {
+						dependencyFailures.push(failure);
+						return null;
+					}
+				}
+				return fileLoader(path);
+			},
 		);
+		if (dependencyFailures.length)
+			return referenceFailureResult(dependencyFailures);
 	}
 
 	if (fmt === "pdf" || fmt === "png") {
@@ -3284,13 +3452,21 @@ export async function runRender(
 		});
 		try {
 			const buf = await svgToBinary(svg, fmt);
-			return { stdout: "", stderr: "", exitCode: 0, binaryOutput: buf };
+			return {
+				stdout: "",
+				stderr: referenceNotice ? `${STATIC_REFERENCE_NOTICE}\n` : "",
+				exitCode: 0,
+				binaryOutput: buf,
+			};
 		} catch (e) {
 			return fail(e instanceof Error ? `${e.message}\n` : String(e));
 		}
 	}
 	const out = await renderGraph(graph, effectiveFrontmatter, { format: fmt });
-	return ok(out.endsWith("\n") ? out : `${out}\n`);
+	return ok(
+		out.endsWith("\n") ? out : `${out}\n`,
+		referenceNotice ? `${STATIC_REFERENCE_NOTICE}\n` : "",
+	);
 }
 
 export type { DiffReport };
@@ -3360,6 +3536,18 @@ export async function runDiff(
 
 declare const __PFDSL_VERSION__: string;
 
+const HELP_REFERENCE_CONTEXT = `
+  --reference-context <file>  JSON describing already acquired, pinned snapshots
+
+The context identifies the original model (source, fixedRevision, documentId,
+extractionId), its logicalPath, an optional model basis, and target bindings
+(source, revision selector, fixedRevision, absolute root). An adapter identifier
+is required. This command does not fetch resources or refresh revision selectors.
+Artifact baseRef/ref select a target; process paths use the model basis.
+Explicit artifact references fail when their context or target is unavailable.
+See docs/reference-resolution.md for the complete JSON format and examples.
+`;
+
 const HELP_CHECK = `${helpUsage("check", "<file|->", CHECK_OPTIONS)}
 
 Validate a .pfdsl file. Use - to read from stdin.
@@ -3370,8 +3558,13 @@ Options:
   --json     output diagnostics as JSON ({ ok, diagnostics, hints? })
   --no-color disable ANSI color codes (also: NO_COLOR env var)
 
+Check performs static analysis only. Explicit references in the document or
+its dependencies are reported as not-checked; success is not evidence of
+artifact existence. Use meta check-links with a pinned context for that check.
+
 For topology queries (terminal artifacts, external inputs, counts) see
 \`pfdsl graph io\` and \`pfdsl graph summary\`.
+${HELP_REFERENCE_CONTEXT}
 `;
 
 const HELP_GRAPH_SUMMARY = `${helpUsage(
@@ -3602,8 +3795,11 @@ Options:
   --format png  PNG (requires: npm install puppeteer)
   --no-color    disable ANSI color codes for diagnostics (also: NO_COLOR env var)
 
+Render performs static analysis only; it does not validate artifact existence.
+
 puppeteer is only needed for --format pdf and png, and must live in the same Node/npm environment as the pfdsl CLI.
 Under a version manager (nvm/nodenv/volta), a mismatched Node version's global install is not resolved — e.g. \`nodenv exec npm install -g puppeteer\`.
+${HELP_REFERENCE_CONTEXT}
 `;
 
 const HELP_DIFF = `${helpUsage("diff", "<a> <b>", DIFF_OPTIONS)}
@@ -3738,7 +3934,7 @@ each node's kind. Existing extension scalar fields can be updated without a
 flag; adding a new unknown field requires --allow-unknown. Except for index,
 new values are stored as strings, even if the old value was a number, boolean,
 or null. Array/map fields (tags, parts, externalStakeholders,
-boundary) and derived read-only fields (location.resolved, command.cwd)
+boundary, ref) and derived read-only fields (location.resolved, command.cwd)
 cannot be set, and existing extension arrays/maps cannot be overwritten.
 
 Each id needs a local frontmatter definition. An id used only in the body is
@@ -3785,7 +3981,10 @@ and is skipped; everything else is resolved (basePath-aware, same as
 check. Cannot be used with stdin (-): there is no file path to resolve
 relative paths against.
 
-  --json      output as JSON ({ ok, missing: {id, kind, location, resolved}[] })
+  --json      output as JSON ({ ok, missing, referenceResolution? })
+              Context reports include original model identity, selected fixed
+              revisions, resolved paths and per-location results. Skipped URLs
+              and globs are not evidence of target existence.
               on parse failure: { ok: false, diagnostics }
   --no-color  disable ANSI color codes (also: NO_COLOR env var)
 
@@ -3793,6 +3992,7 @@ Exit codes:
   0  all checkable location paths exist
   1  one or more location paths do not exist, or parse/validation error
   2  invalid usage (stdin)
+${HELP_REFERENCE_CONTEXT}
 `;
 
 const HELP_GET = `${helpUsage("meta get", "<file|-> <id[,id...]> [field[,field...]]", META_GET_OPTIONS)}
@@ -3826,10 +4026,13 @@ does not depend on the command string itself.
 
 Either derived field may also be requested explicitly in the field
 positional (e.g. location.resolved), in which case only the derived value
-is returned — the base field is not auto-added. Use - to read from stdin:
-since there is no file path to resolve against, derived fields are silently
+is returned — the base field is not auto-added. Use - to read from stdin.
+For legacy local models without a context, there is no file path to resolve
+against: derived fields are silently
 omitted from auto-accompaniment, and an explicit request for one returns
 null with a warning on stderr instead of failing the command.
+With --reference-context, stdin uses the supplied logicalPath and snapshots.
+Explicit references without their required context fail instead of returning null.
 
 A field the node doesn't have prints as \`(unset)\` (JSON: null); this is not an error, and it is what distinguishes the field from one set to the empty string, which prints with nothing after the colon (JSON: "").
 An empty array prints as \`(empty)\` (JSON: []).
@@ -3842,8 +4045,9 @@ for the missing ones.
 
 Exit codes:
   0  success
-  1  one or more requested ids do not exist in the file
+  1  parse/validation or reference-resolution failure, or requested ids not found
   2  invalid usage (missing id, or too many positional arguments)
+${HELP_REFERENCE_CONTEXT}
 `;
 
 const HELP_META_LIST = `${helpUsage(
@@ -3894,6 +4098,7 @@ Exit codes:
   0  success (including zero matches)
   1  parse/validation error
   2  invalid usage (no selector given, or an empty field positional)
+${HELP_REFERENCE_CONTEXT}
 `;
 
 const HELP_META_VALUES = `${helpUsage(
@@ -4032,6 +4237,7 @@ Exit codes:
   0  success
   1  id not found in the file
   2  invalid usage (missing id)
+${HELP_REFERENCE_CONTEXT}
 `;
 
 const HELP_IMPACT = `${helpUsage("graph impact", "<file|-> <id>", GRAPH_IMPACT_OPTIONS)}
@@ -4510,6 +4716,7 @@ const GRAPH_COMMANDS: readonly CommandEntry[] = [
 			const [f, id] = rest;
 			if (!f || !id) return fail(HELP_GRAPH_DESCRIBE, 2);
 			return runGraphDescribe(f, id, {
+				...referenceContextOption(flags),
 				json: flags.json === true,
 				color: resolveColor(flags),
 			});
@@ -4617,6 +4824,7 @@ const META_COMMANDS: readonly CommandEntry[] = [
 			if (!f || !id) return fail(HELP_GET, 2);
 			if (extra.length > 0) return fail(HELP_GET, 2);
 			return runGet(f, {
+				...referenceContextOption(flags),
 				id,
 				...(field !== undefined ? { field } : {}),
 				json: flags.json === true,
@@ -4641,6 +4849,7 @@ const META_COMMANDS: readonly CommandEntry[] = [
 			const groupVal = flags.group;
 			const producerVal = flags.producer;
 			return runMetaList(f, {
+				...referenceContextOption(flags),
 				...(typeof tagVal === "string" ? { tag: tagVal } : {}),
 				...(typeof groupVal === "string" ? { group: groupVal } : {}),
 				...(typeof producerVal === "string" ? { producer: producerVal } : {}),
@@ -4731,6 +4940,7 @@ const META_COMMANDS: readonly CommandEntry[] = [
 			const f = rest[0];
 			if (!f) return fail(HELP_CHECK_LINKS, 2);
 			return runCheckLinks(f, {
+				...referenceContextOption(flags),
 				json: flags.json === true,
 				color: resolveColor(flags),
 			});
@@ -4843,13 +5053,15 @@ export const COMMAND_GROUPS: readonly GroupDefinition[] = [
 export const TOP_LEVEL_COMMANDS: readonly CommandEntry[] = [
 	defineCommand(CHECK_OPTIONS, {
 		name: "check",
-		synopsis: "check <file|-> [--strict] [--hints] [--json] [--no-color]",
+		synopsis:
+			"check <file|-> [--reference-context <file>] [--strict] [--hints] [--json] [--no-color]",
 		description: ["Validate a .pfdsl file (- = stdin)"],
 		help: HELP_CHECK,
 		run: (positional, flags) => {
 			const f = positional[0];
 			if (!f) return fail(HELP_CHECK, 2);
 			return runCheck(f, {
+				...referenceContextOption(flags),
 				hints: flags.hints === true,
 				strict: flags.strict === true,
 				json: flags.json === true,
@@ -4929,7 +5141,8 @@ export const TOP_LEVEL_COMMANDS: readonly CommandEntry[] = [
 	}),
 	defineCommand(RENDER_OPTIONS, {
 		name: "render",
-		synopsis: "render <file|-> [--format dot|svg|pdf|png] [--no-color]",
+		synopsis:
+			"render <file|-> [--reference-context <file>] [--format dot|svg|pdf|png] [--no-color]",
 		description: [
 			"Render as Graphviz DOT (default), SVG, PDF, or PNG (- = stdin)",
 			"PDF/PNG requires puppeteer in the CLI's own Node env (npm install puppeteer)",
@@ -4949,6 +5162,7 @@ export const TOP_LEVEL_COMMANDS: readonly CommandEntry[] = [
 				return fail(`unknown format: ${String(fmt)}\n`, 2);
 			}
 			return runRender(f, {
+				...referenceContextOption(flags),
 				...(fmt ? { format: fmt as CliRenderFormat } : {}),
 				color: resolveColor(flags),
 			});

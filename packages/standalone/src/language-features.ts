@@ -33,7 +33,7 @@ export function registerLanguageFeatures(
 	navigation?:
 		| {
 				open(
-					reference: Pick<DocumentReference, "field" | "value">,
+					reference: Pick<DocumentReference, "kind" | "id" | "field" | "value">,
 				): Promise<void>;
 				run(command: string): Promise<void>;
 		  }
@@ -195,6 +195,8 @@ export function registerLanguageFeatures(
 			async run(
 				_editor,
 				version: number,
+				kind: "artifact" | "process",
+				id: string,
 				field: "location" | "subflow",
 				value: string,
 			) {
@@ -202,12 +204,16 @@ export function registerLanguageFeatures(
 					disposed ||
 					model.getVersionId() !== version ||
 					!documentReferences(snapshot()).some(
-						(ref) => ref.field === field && ref.value === value,
+						(ref) =>
+							ref.kind === kind &&
+							ref.id === id &&
+							ref.field === field &&
+							ref.value === value,
 					)
 				)
 					return;
 				try {
-					await navigation?.open({ field, value });
+					await navigation?.open({ kind, id, field, value });
 				} catch (error) {
 					if (!disposed && model.getVersionId() === version)
 						reportStatus(String(error));
@@ -296,7 +302,12 @@ export function registerLanguageFeatures(
 							),
 					))
 						actions.push(
-							link(`Open ${ref.field}`, openId, [ref.field, ref.value]),
+							link(`Open ${ref.field}`, openId, [
+								ref.kind,
+								ref.id,
+								ref.field,
+								ref.value,
+							]),
 						);
 					const command = current.frontmatter?.process?.[item.nodeId]?.command;
 					if (kind === "process" && command)

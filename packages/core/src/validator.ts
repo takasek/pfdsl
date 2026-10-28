@@ -23,6 +23,7 @@ import {
 } from "./rules/field-placement.js";
 import { indexShape, styleShape } from "./rules/metadata-shape.js";
 import { partsCycle, partsMembership } from "./rules/parts.js";
+import { referenceDeclarations } from "./rules/references.js";
 import { revisesChain } from "./rules/revises.js";
 import {
 	flowStatusAbsence,
@@ -67,6 +68,7 @@ export const RULES: readonly Rule[] = [
 	pfdType, // V031
 	readyGateTypeOmitted, // W006
 	roadmapUndeclaredArtifact, // V035
+	referenceDeclarations, // V037, V038, V039
 ];
 
 export function validate(
