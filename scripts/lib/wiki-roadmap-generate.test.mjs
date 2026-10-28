@@ -385,3 +385,31 @@ test("publishes only the generated pair and refuses competing remote commits", (
 	assert.equal(git(wiki, "rev-parse", "HEAD"), next.wikiRevision);
 	assert.equal(git(remote, "rev-parse", "refs/heads/master"), editorRevision);
 });
+
+test("explicit moving same-Wiki basis ignores output commits but detects basis changes", (t) => {
+	const wiki = fixture(t);
+	const settings = {
+		...options(wiki),
+		roadmapSource: {
+			adapter: "local-git",
+			source: "wiki",
+			revision: "HEAD",
+			documentId: "roadmap.pfdsl",
+			logicalPath: "roadmap.pfdsl",
+			basis: { source: "wiki", revision: "HEAD" },
+		},
+	};
+	const first = generate(settings);
+	assert.equal(first.status, "generated");
+	commit(wiki);
+	const page = read(wiki, "roadmap.index.md");
+	assert.equal(generate(settings).status, "unchanged");
+	assert.equal(read(wiki, "roadmap.index.md"), page);
+	writeFileSync(join(wiki, "basis-input.md"), "Changed source collection\n");
+	commit(wiki);
+	const changed = generate(settings);
+	assert.equal(changed.status, "generated");
+	assert.notEqual(changed.key, first.key);
+	commit(wiki);
+	assert.equal(generate(settings).status, "unchanged");
+});

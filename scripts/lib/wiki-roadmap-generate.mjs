@@ -168,7 +168,19 @@ export function generate({
 		const keyContext = {
 			...referenceContext,
 			model: { ...referenceContext.model, fixedRevision: undefined },
-			...(!roadmapSource ? { basis: undefined } : {}),
+			...(referenceContext.basis?.source === source
+				? {
+						basis: {
+							source,
+							sourceTree: snapshotKey(
+								wiki,
+								referenceContext.basis.fixedRevision,
+								repository,
+								toolchain,
+							),
+						},
+					}
+				: {}),
 		};
 		const key = hash(
 			JSON.stringify([
