@@ -21,6 +21,25 @@ const deferred = () => {
 	});
 	return { promise, resolve };
 };
+async function waitFor(promise, description) {
+	let timer;
+	try {
+		return await Promise.race([
+			promise,
+			new Promise((_, reject) => {
+				timer = setTimeout(
+					() =>
+						reject(
+							new Error(`Timed out after 5000 ms waiting for ${description}`),
+						),
+					5_000,
+				);
+			}),
+		]);
+	} finally {
+		clearTimeout(timer);
+	}
+}
 const disk = (id) => ({
 	id,
 	path: `/work/${id}.pfdsl`,
@@ -107,14 +126,14 @@ test("repeated reference rebinds release each old capability without a foregroun
 		await controller.accept(disk(1));
 		for (const id of [3, 4]) {
 			await controller.accept({ ...disk(1), id });
-			await controller.idle();
+			await waitFor(controller.idle(), "old capabilities to be released");
 			assert.equal(controller.snapshot().documents.length, 1);
 			assert.equal(controller.snapshot().documents[0].location.id, id);
 			assert.deepEqual(subject.releases, id === 3 ? [1] : [1, 3]);
 		}
 	} finally {
 		controller.dispose();
-		await controller.idle();
+		await waitFor(controller.idle(), "workspace disposal");
 	}
 });
 
@@ -146,7 +165,7 @@ test("Save As commits location and saved notice even when old-handle cleanup fai
 		assert.equal(attempts, 2, "the command cleanup retries the failed release");
 	} finally {
 		controller.dispose();
-		await controller.idle();
+		await waitFor(controller.idle(), "workspace disposal");
 	}
 });
 
@@ -174,19 +193,35 @@ test("a sweep already awaiting release cannot consume a later Save As target", a
 		const { key } = controller.snapshot().documents[0];
 		subject.buffers.get(key).setSource("retained body");
 		const accepting = controller.accept(disk(3), () => false);
-		await held.promise;
+		await waitFor(
+			held.promise,
+			"release of invalidated snapshot 3 before Save As",
+		);
 		const saving = controller.dispatch({ type: "save", key, mode: "as" });
-		assert.equal((await requested.promise).target.id, 2);
+		assert.equal(
+			(await waitFor(requested.promise, "Save As confirmation for target 2"))
+				.target.id,
+			2,
+		);
 		finishRelease.resolve();
-		await accepting;
+		await waitFor(accepting, "the held accept cleanup to finish");
 		assert.equal(subject.live.has(2), true);
 		answer.resolve("replace");
-		assert.deepEqual(await saving, { accepted: true, saved: true });
+		assert.deepEqual(
+			await waitFor(saving, "Save As to finish after confirmation"),
+			{
+				accepted: true,
+				saved: true,
+			},
+		);
 	} finally {
 		finishRelease.resolve();
 		answer.resolve("cancel");
 		controller.dispose();
-		await controller.idle();
+		await waitFor(
+			controller.idle(),
+			"workspace disposal after releasing held work",
+		);
 	}
 });
 
@@ -248,38 +283,63 @@ test("workspace binds a pending save and notice to its initiating document while
 			finishQuit: async () => {},
 		},
 	});
-	await controller.ready;
-	await controller.accept(disk(1));
-	await controller.accept(disk(2));
-	const [first, second] = controller.snapshot().documents;
-	buffers.get(first.key).setSource("first edited");
-	const saving = controller.dispatch({
-		type: "save",
-		key: first.key,
-		mode: "as",
-	});
-	const review = await requested.promise;
-	assert.equal(review.document, first.key);
-	assert.equal(review.editor, "first edited");
-	assert.deepEqual(await controller.dispatch({ type: "new" }), {
-		accepted: false,
-	});
-	assert.equal(
-		(await controller.dispatch({ type: "activate", key: second.key })).accepted,
-		true,
-	);
-	answer.resolve("replace");
-	assert.deepEqual(await saving, { accepted: true, saved: true });
-	const snapshot = controller.snapshot();
-	assert.equal(snapshot.active, second.key);
-	assert.deepEqual(writes, [
-		{ id: 3, source: "first edited", expected: "revision:3" },
-	]);
-	assert.equal(snapshot.documents[0].notice.message, "Saved.");
-	assert.equal(snapshot.documents[1].notice, null);
-	assert.equal("session" in snapshot.documents[0], false);
-	controller.dispose();
-	await controller.idle();
+	try {
+		await controller.ready;
+		await controller.accept(disk(1));
+		await controller.accept(disk(2));
+		const [first, second] = controller.snapshot().documents;
+		buffers.get(first.key).setSource("first edited");
+		const saving = controller.dispatch({
+			type: "save",
+			key: first.key,
+			mode: "as",
+		});
+		const review = await waitFor(
+			requested.promise,
+			"Save As confirmation for target 3",
+		);
+		assert.equal(review.document, first.key);
+		assert.equal(review.editor, "first edited");
+		assert.deepEqual(
+			await waitFor(
+				controller.dispatch({ type: "new" }),
+				"new-document rejection while Save As awaits confirmation",
+			),
+			{ accepted: false },
+		);
+		assert.equal(
+			(
+				await waitFor(
+					controller.dispatch({ type: "activate", key: second.key }),
+					"document activation while Save As awaits confirmation",
+				)
+			).accepted,
+			true,
+		);
+		answer.resolve("replace");
+		assert.deepEqual(
+			await waitFor(saving, "Save As to finish after confirmation"),
+			{
+				accepted: true,
+				saved: true,
+			},
+		);
+		const snapshot = controller.snapshot();
+		assert.equal(snapshot.active, second.key);
+		assert.deepEqual(writes, [
+			{ id: 3, source: "first edited", expected: "revision:3" },
+		]);
+		assert.equal(snapshot.documents[0].notice.message, "Saved.");
+		assert.equal(snapshot.documents[1].notice, null);
+		assert.equal("session" in snapshot.documents[0], false);
+	} finally {
+		answer.resolve("cancel");
+		controller.dispose();
+		await waitFor(
+			controller.idle(),
+			"workspace disposal after answering Save As",
+		);
+	}
 	assert.deepEqual(releases.sort(), [1, 2, 3]);
 });
 
@@ -353,8 +413,15 @@ for (const incoming of ["adopted", "invalidated"])
 				key: original.key,
 				mode: "as",
 			});
-			assert.equal((await requested.promise).target.id, 2);
-			await controller.accept(disk(3), () => incoming === "adopted");
+			assert.equal(
+				(await waitFor(requested.promise, "Save As confirmation for target 2"))
+					.target.id,
+				2,
+			);
+			await waitFor(
+				controller.accept(disk(3), () => incoming === "adopted"),
+				`${incoming} snapshot acceptance while Save As awaits confirmation`,
+			);
 			assert.equal(
 				live.has(2),
 				true,
@@ -362,7 +429,13 @@ for (const incoming of ["adopted", "invalidated"])
 			);
 			assert.deepEqual(releases, incoming === "adopted" ? [] : [3]);
 			answer.resolve("replace");
-			assert.deepEqual(await saving, { accepted: true, saved: true });
+			assert.deepEqual(
+				await waitFor(saving, "Save As to finish after confirmation"),
+				{
+					accepted: true,
+					saved: true,
+				},
+			);
 			assert.equal(live.get(2).source, "retained editor");
 			assert.equal(
 				controller
@@ -373,7 +446,10 @@ for (const incoming of ["adopted", "invalidated"])
 		} finally {
 			answer.resolve("cancel");
 			controller.dispose();
-			await controller.idle();
+			await waitFor(
+				controller.idle(),
+				"workspace disposal after answering Save As",
+			);
 		}
 		assert.deepEqual(releases.sort(), [1, 2, 3]);
 	});
