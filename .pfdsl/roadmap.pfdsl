@@ -238,14 +238,21 @@ artifact:
       移行の前に、接頭辞と location: から導かれる作業項目と process の対応をすべて列挙し、移行の後も読取側のスクリプトが同じ対応を導けるか、外した対応ごとに理由が記録されている
   prune_cli:
     label: 完了チェーン回収の CLI 動詞
-    description: ADR-0048 の後続で未起票。完了チェーン回収の保持規則と検証を CLI のトップレベル動詞にし、配置スクリプトは CLI を呼ぶだけにする
-    status: todo
+    description: "ADR-0048 D4 と #1567 に従い、完了チェーン回収の保持規則と検証を CLI のトップレベル動詞にし、配置スクリプトは CLI を呼ぶだけにする"
+    status: done
     criteria: 保持規則と検証が CLI のトップレベル動詞 prune にあり、ADR-0022 の出力モデルに従う。このリポの roadmap に対して旧スクリプトと削除対象が一致する
   adapter_plugin_split_design:
     label: core と GitHub アダプタの plugin 分割の設計仕様
     description: ADR-0048 の後続で未起票。分割の費用が過大と分かった場合は、1つの plugin のまま .pfdsl/config.json の宣言で絞る案へ切り替える（ADR-0048 D5）
     status: todo
     criteria: plugin 間で依存を宣言できるかの確認結果と、分割するか1つの plugin のまま宣言で絞るかの決定、その理由、採用先の移行手順が設計仕様に記録され、所有者が承認している
+  cli_release_prune:
+    label: 完了チェーン回収 CLI とアダプタの公開
+    description: "#1567 の prune と対応する配布アダプタを含む CLI/plugin リリース。版番号は公開時に決める"
+    status: todo
+    criteria: >
+      npm view @pfdsl/cli versions に prune を含む版があり、その版を固定して取得した CLI の prune --help と回収プレビューが成功する。
+      同じ release tag の plugin 配布について .pfdsl/workflow.md の「release milestone artifact の作成規約」と .pfdsl/pipeline.md の公開・pin・取得確認を満たし、採用先が CLI・plugin・アダプタを即座に一括更新する移行手順がある
   optional_github_adapter:
     label: 採用したリポでだけ働く GitHub アダプタ
     description: ADR-0048 の後続で未起票。設計仕様の結論に従い、GitHub Issues バックエンドの reference・hook・CI 設定を、採用を宣言したリポでだけ働かせる
@@ -327,6 +334,10 @@ process:
     label: pfd-retro を model retro に絞る
   add_prune_cli:
     label: 完了チェーン回収を CLI 動詞にする
+    location: https://github.com/takasek/pfdsl/issues/1567
+  publish_cli_prune:
+    label: 完了チェーン回収 CLI とアダプタを公開する
+    tags: [ release_cli ]
   move_writer_rules_out_of_github_preset:
     label: GitHub Issues プリセットから書込み規律と PR 運用を外す
   unify_work_item_contract:
@@ -396,6 +407,8 @@ gui_mac_acceptance >> publish_standalone -> standalone_release
 responsibility_boundary_adr >> unify_work_item_contract -> backend_neutral_work_item_contract
 
 responsibility_boundary_adr >> add_prune_cli -> prune_cli
+
+[boundary_transition_release_policy, prune_cli] >> publish_cli_prune -> cli_release_prune
 
 [backend_neutral_work_item_contract, boundary_test_revision_adr, prune_cli, writer_free_github_preset] >> design_adapter_plugin_split -> adapter_plugin_split_design
 

@@ -64,6 +64,7 @@ import {
 	defineCommand,
 	type OptionSpec,
 } from "./command-definition.js";
+import { comparableBlocked, comparableReady, pruneTargets } from "./prune.js";
 
 export interface CommandResult {
 	stdout: string;
@@ -262,6 +263,12 @@ const FMT_OPTIONS = {
 };
 const DELETE_OPTIONS = {
 	write: BOOLEAN_OPTION,
+	json: BOOLEAN_OPTION,
+	"no-color": BOOLEAN_OPTION,
+};
+const PRUNE_OPTIONS = {
+	write: BOOLEAN_OPTION,
+	check: BOOLEAN_OPTION,
 	json: BOOLEAN_OPTION,
 	"no-color": BOOLEAN_OPTION,
 };
@@ -486,6 +493,14 @@ export interface CheckOptions {
 export function runCheck(file: string, opts: CheckOptions = {}): CommandResult {
 	const src = readSource(file);
 	if (isCommandResult(src)) return src;
+	return checkSource(src, file, opts);
+}
+
+function checkSource(
+	src: string,
+	file: string,
+	opts: CheckOptions,
+): CommandResult {
 	const entryResult = analyze(src, opts.strict ? { strict: true } : undefined);
 	const { diagnostics, edges, nodeKinds, frontmatter } = entryResult;
 	const lines = diagnostics.map((d) => formatDiagnostic(d, file, opts.color));
@@ -518,9 +533,10 @@ export function runCheck(file: string, opts: CheckOptions = {}): CommandResult {
 		};
 	}
 	const absFile = resolve(file);
-	const closure = loadDependencyClosure(absFile, (path) =>
-		path === absFile ? entryResult : fileLoader(path, opts.strict),
+	const reader = editedDependencyLoader(absFile, entryResult, (path) =>
+		fileLoader(path, opts.strict),
 	);
+	const closure = loadDependencyClosure(absFile, reader.load);
 	const multiDiags = [
 		...closure.diagnostics,
 		...closure.localDiagnostics.filter((d) => d.file !== undefined),
@@ -939,6 +955,107 @@ export function runDelete(
 	return ok(output);
 }
 
+export interface PruneOptions {
+	write?: boolean;
+	check?: boolean;
+	json?: boolean;
+	color?: boolean;
+}
+
+export function runPrune(file: string, opts: PruneOptions = {}): CommandResult {
+	if (opts.check && opts.write)
+		return fail("--check cannot be combined with --write\n", 2);
+	if (file === "-" && opts.write)
+		return fail("--write cannot be used with stdin (-)\n", 2);
+	const source = readSource(file);
+	if (isCommandResult(source)) return source;
+	const refuse = (message: string) =>
+		refuseWith(
+			`prune: ${message}; nothing was written`,
+			file,
+			undefined,
+			opts.json,
+			opts.color,
+		);
+	const checked = checkSource(source, file, opts);
+	if (checked.exitCode !== 0) return checked;
+	const before = analyze(source);
+	const typeFail = requireRoadmapType(before.frontmatter?.type, "prune");
+	if (typeFail) return typeFail;
+	if (
+		file === "-" &&
+		(before.frontmatter?.extends ||
+			collectSubflowRefs(before.frontmatter ?? {}).length > 0)
+	) {
+		return refuse("dependency validation requires a file path, not stdin (-)");
+	}
+	const queryOpts = { json: true, color: false };
+	const readyBefore = readySource(source, file, queryOpts);
+	if (readyBefore.exitCode !== 0) return readyBefore;
+	const blockedBefore = blockedSource(source, file, queryOpts);
+	if (blockedBefore.exitCode !== 0) return blockedBefore;
+	const deleted = pruneTargets(before);
+	let output = source;
+	if (deleted.length > 0) {
+		const formattedInput = format(source, { style: "flows" });
+		if (
+			hasErrors(formattedInput.diagnostics) ||
+			formattedInput.output !== source
+		)
+			return refuse("input is not canonically formatted; run pfdsl fmt first");
+		const result = deleteNodes(source, deleted);
+		const failed = failIfErrors(
+			result.diagnostics,
+			file,
+			opts.json,
+			opts.color,
+		);
+		if (failed) return failed;
+		if (result.refusal)
+			return refuse(
+				"YAML anchors, aliases and merge keys (<<) are not supported; expand them before pruning",
+			);
+		const after = analyze(result.output);
+		if (computeOrphans(after.graph).length > 0)
+			return refuse("post-prune graph orphans is non-empty");
+		// Removing producers can change canonical input order even when the
+		// original source was formatted. Format the candidate ourselves.
+		const formatted = format(result.output, { style: "flows" });
+		const formatFailure = failIfErrors(
+			formatted.diagnostics,
+			file,
+			opts.json,
+			opts.color,
+		);
+		if (formatFailure) return formatFailure;
+		output = formatted.output;
+		const verified = checkSource(output, file, opts);
+		if (verified.exitCode !== 0) return verified;
+		const readyAfter = readySource(output, file, queryOpts);
+		if (readyAfter.exitCode !== 0) return readyAfter;
+		if (
+			comparableReady(readyBefore.stdout) !== comparableReady(readyAfter.stdout)
+		)
+			return refuse("post-prune status ready output changed");
+		const blockedAfter = blockedSource(output, file, queryOpts);
+		if (blockedAfter.exitCode !== 0) return blockedAfter;
+		if (
+			comparableBlocked(blockedBefore.stdout) !==
+			comparableBlocked(blockedAfter.stdout)
+		)
+			return refuse("post-prune status blocked output changed");
+	}
+	if (opts.write && deleted.length > 0) writeFileSync(file, output, "utf-8");
+	const report = opts.json
+		? `${JSON.stringify({ ok: true, deleted })}\n`
+		: deleted.length > 0
+			? `Pruned ${deleted.length} id(s): ${deleted.join(", ")}\n`
+			: "";
+	if (opts.check)
+		return { stdout: report, stderr: "", exitCode: deleted.length > 0 ? 1 : 0 };
+	return ok(opts.write || opts.json ? report : output);
+}
+
 export interface ReindexOptions {
 	write?: boolean;
 	check?: boolean;
@@ -1250,7 +1367,14 @@ function emptyReadyText(file: string, breakdown: EmptyReadyBreakdown): string {
 export function runReady(file: string, opts: ReadyOptions = {}): CommandResult {
 	const src = readSource(file);
 	if (isCommandResult(src)) return src;
+	return readySource(src, file, opts);
+}
 
+function readySource(
+	src: string,
+	file: string,
+	opts: ReadyOptions,
+): CommandResult {
 	const { diagnostics, edges, nodeKinds, frontmatter } = analyze(src, {
 		readyGate: true,
 	});
@@ -1420,7 +1544,14 @@ export function runStatusBlocked(
 ): CommandResult {
 	const src = readSource(file);
 	if (isCommandResult(src)) return src;
+	return blockedSource(src, file, opts);
+}
 
+function blockedSource(
+	src: string,
+	file: string,
+	opts: StatusBlockedOptions,
+): CommandResult {
 	const { diagnostics, edges, nodeKinds, frontmatter } = analyze(src, {
 		readyGate: true,
 	});
@@ -3426,6 +3557,32 @@ Options:
   --no-color  disable ANSI color codes (also: NO_COLOR env var)
 `;
 
+const HELP_PRUNE = `${helpUsage("prune", "<file|->", PRUNE_OPTIONS)}
+
+Remove completed chains from a roadmap. Keep processes with any unfinished
+output, and every artifact on their input, output or feedback edges.
+Only done artifacts and processes outside that retained set are removed.
+Unfinished isolated artifacts are never selected for deletion.
+
+Default: print the transformed source without changing the file.
+  --write     apply the transformation and print the deletion report
+  --check     do not write; report deletions and exit 1 if any are needed
+  --json      emit { ok: true, deleted: [...] } instead of source/text
+  --no-color  disable ANSI colors
+
+Input and output must pass check. When there are deletions, input must be
+canonically formatted; run pfdsl fmt first if the input is refused. Prune
+rejects remaining orphans and formats the transformed output itself.
+Ready and blocked comparisons ignore process, input/output and blocker
+ordering, plus the completed-process count in an empty ready set. All other
+fields must stay unchanged. Verification failures never write.
+Stdin (-) supports dependency-free roadmaps only; use a file path for
+extends/subflow validation. --write cannot be used with stdin or --check.
+
+Exit codes: 0 success/no changes in --check; 1 validation error or --check
+found deletions; 2 invalid usage.
+`;
+
 const HELP_DELETE = `${helpUsage("delete", "<file|-> <id[,id...]>", DELETE_OPTIONS)}
 
 Remove one or more ids (artifact, process, or group) from a .pfdsl file in a single
@@ -4901,6 +5058,22 @@ export const TOP_LEVEL_COMMANDS: readonly CommandEntry[] = [
 			if (!f || !idList) return fail(HELP_DELETE, 2);
 			return runDelete(f, idList, {
 				write: flags.write === true,
+				json: flags.json === true,
+				color: resolveColor(flags),
+			});
+		},
+	}),
+	defineCommand(PRUNE_OPTIONS, {
+		name: "prune",
+		synopsis: commandSynopsis("prune", "<file|->", PRUNE_OPTIONS),
+		description: ["Remove completed chains from a roadmap (- = stdin)"],
+		help: HELP_PRUNE,
+		run: (positional, flags) => {
+			const file = positional[0];
+			if (!file || positional.length !== 1) return fail(HELP_PRUNE, 2);
+			return runPrune(file, {
+				write: flags.write === true,
+				check: flags.check === true,
 				json: flags.json === true,
 				color: resolveColor(flags),
 			});

@@ -27,6 +27,29 @@ Record the target only after all potentially applicable steps have been resolved
 These changes are not yet assigned to a published CLI/plugin release.
 Apply them only when the target release includes the referenced changes; specification v0.0.29 is not a CLI/plugin version.
 
+### Use the CLI for completed-chain pruning
+
+Completed-chain retention and verification now live in `pfdsl prune`, shared by both tracker presets.
+Source: [Issue #1567](https://github.com/takasek/pfdsl/issues/1567), implementing ADR-0048 D4.
+Update the CLI, plugin and deployed sweep script together; adopting repositories are expected to update immediately.
+Mixed old/new installations are unsupported. The adapter invokes `prune` directly and forwards its output and exit status without compatibility probes or fallbacks.
+
+`pfdsl prune <roadmap>` previews the transformed source; `--json` reports deletion targets without writing.
+Use `--write` to apply and report deletions, or `--check` to return exit 1 when deletions are needed without changing the file.
+The deployed `sweep-completed-chains.mjs` still accepts `<file> [--write]`, but its stdout is now the CLI's JSON report.
+Update consumers that parse the old human-readable dry-run text to read the `deleted` array.
+Preview or verification failures do not modify the roadmap.
+When there are deletion targets, input must be canonically formatted; `prune` formats the output itself because removing producers can change canonical edge order.
+Ready and blocked comparisons ignore process, input/output and blocker order but still require identical membership and other fields, except for the completed-process count in an empty ready set.
+Remaining orphan nodes are reported as such; formatting the original cannot repair an orphan created by pruning.
+Input and output validation includes relative dependencies when a file path is supplied; stdin accepts only dependency-free roadmaps.
+
+As part of the same update, remove the adapter's former helpers under `scripts/pfdsl/lib/`: `chain-sweep.mjs`, `cli-id-arg.mjs`, `ready-compare.mjs`, and `scratch-path.mjs`.
+Inspect local changes and callers before removing them; migrate local callers to `prune` rather than retaining a second retention implementation.
+For file-based trackers, replace manual terminal-chain deletion with `prune` after the existing item/artifact completion checks.
+Do not mark unfinished or abandoned artifacts done merely to make them eligible for pruning.
+Before enabling the updated workflow, compare a JSON preview with the expected targets, verify that shared and feedback inputs remain, and run the existing roadmap checks after applying to a copy.
+
 ### Link work items through process locations
 
 Work-item correspondence is now defined once in the work-cycle contract and uses `process.location`.
