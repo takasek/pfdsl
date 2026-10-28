@@ -5,7 +5,7 @@
     "astra": "01a17c9b-ed5e-7c01-9cc9-2e5e2990bada",
     "sol": "01a17c9b-f996-76d0-ba21-ed5cc43ed39e"
   },
-  "processing": "PFDSL-related textual excerpts only. Other product evaluation records excluded. Original PFDSL conclusions and priorities retained; private paths removed; links remapped. Image bytes excluded from publication; hashes retained as omittedImages. Full originals retained locally outside the repository.",
+  "processing": "PFDSL-related textual excerpts only. Other product evaluation records excluded. Original PFDSL conclusions and priorities retained; private paths removed; links remapped. Image bytes excluded from publication; hashes retained as omittedImages. Full originals retained locally outside the repository. Saved Claude M1 discovery chronology corrected after evaluator source cross-check; original retained unchanged.",
   "files": [
     {
       "reviewer": "astra",
@@ -82,14 +82,14 @@
       "originalFile": "pfdsl-design-review.md",
       "originalSha256": "1a1cfdc6c71a067664a281f34ff2db29c32ec719f77027d69cdb77b27386474e",
       "savedFile": "claude/review.md",
-      "savedSha256": "4d11ac644cd1ff95ea3974b8558e51b90a6e7fa239fbb4994c07165dd380e97a"
+      "savedSha256": "a601436c006658be28bc021df4910a3624a33157d9fd05a7473cd33c0cc2290a"
     },
     {
       "reviewer": "claude",
       "originalFile": "README.md",
       "originalSha256": "90f4272a3f56cee2a531d6469bf9f0e4d2084aeb60da177d8136da0c1570cc31",
       "savedFile": "claude/README.md",
-      "savedSha256": "c8bb0b9967ffb5dc85bc7066ea5786a972aa565bc919cef21e3bbfa377f47695"
+      "savedSha256": "4e2aeaf27ae4b2ac84b52e915d96533e752f92c8c3f59174531a89300a4a6c4d"
     },
     {
       "reviewer": "claude",

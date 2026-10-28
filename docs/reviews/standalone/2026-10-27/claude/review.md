@@ -2,6 +2,8 @@
 
 保存版注記：2026-10-28 の Claude 評価から pfdsl の論点を保存した。別製品の利用過程だけを省略し、model は提案モデル内の条件を表す。画像・操作の生記録はローカル原本に保持し、公開保存には含めない。モデル内の問題を実アプリの既存不具合として扱わない。
 
+保存後の訂正：M1 の発見時点は、評価者による原資料との再照合を受けて補正した。操作前に把握していたモデルと実アプリの差を、新しい発見として数えない。訂正前の原本はローカルに保持している。
+
 
 対象は pfdsl `d1b5db85ecdb9344a5ed6fff2f1b17632a8ec6e6` の standalone（Tauri）アプリ。
 評価日は 2026-10-28、評価者は Claude（Opus 5.5）で、ほかの評価者の成果物・過去の pfdsl レビュー・`docs/reviews/`・`packages/standalone/ACCEPTANCE*.md`・`evidence/`・`acceptance-kit/` は読んでいない。
@@ -208,7 +210,7 @@ menu の enabled 状態は既存の `MenuState` 更新の仕組みに載せる�
 - browser: 未保存の Sample では上端左「Not saved」と右「Not saved to a file」が並び、同じことを二度言っているように読める（browser `01`）。README の設計では左が状態・右が位置なので、位置欄が「ファイルがない」ことを状態の言葉で言っているのが原因。native の未保存文書で同じかは未確認。
 - native: 衝突 review は見出し「Review the target」、長い説明段落、ボタン「Keep Editing / Choose Another File / Replace Observed Version」。Keep Editing 後の帯は「The disk changed. Your editor content is retained. Recovery target: <絶対パス>」（native `10`・`11`）。target・observed・recovery target は利用者の語彙でない。差分は先頭行から表示され、変更箇所（91・96 行）へは自分でスクロールした。
 - native: 未保存で Close Tab すると標準 alert「Save changes to conference-ops-edit.pfdsl?」Save / Discard / Cancel（native `12`）。
-- model/native: 保存から来た review と、閉じる途中から来た review は、見出し・説明・ボタンが同一だった（native `10` と `13`）。しかし「Replace Observed Version」の結果は、前者は保存して残り、後者は保存してタブが閉じる。設計モデルで両者を同じ確認画面として書いたら「閉じる途中」がモデルから消え、ここで初めて差に気付いた。
+- model/native: 保存から来た review と、閉じる途中から来た review は、見出し・説明・ボタンが同一だった（native `10` と `13`）。しかし「Replace Observed Version」の結果は、前者は保存して残り、後者は保存してタブが閉じる。実アプリで後者が閉じることは既に知っていた。設計モデルを書く過程で、同じ確認画面へ入るだけでは「閉じる途中」の意図を表せない点を認識し、操作前の期待表にもモデルは閉じないと記した。操作はその期待どおりであり、実画面2枚の再比較と合わせて起点別に結果を伝える提案条件へ具体化した。差そのものを操作で新規発見したわけではない。
 
 ### HIG との照合
 
