@@ -9,8 +9,17 @@ export const editor = {
 	},
 	createModel(source) {
 		const range = { fullDocument: true };
+		let text = source,
+			version = 1;
 		return {
-			source,
+			get source() {
+				return text;
+			},
+			set source(value) {
+				text = value;
+				version++;
+			},
+			getVersionId: () => version,
 			getFullModelRange: () => range,
 			dispose() {
 				this.disposed = true;

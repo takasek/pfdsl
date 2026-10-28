@@ -451,6 +451,7 @@ test("a published receipt without a readable result names the target but offers 
 	assert.equal(panel.targetPath, "/B/b.pfdsl");
 	assert.match(panel.state, /Content was published/);
 	assert.equal(panel.message, result.message);
+	assert.equal(doc.disk.revision, "original");
 	// A later read of the target shows it, and the receipt still explains the panel.
 	doc.observe(target, ok(target));
 	assert.equal(doc.panel().observed, target);

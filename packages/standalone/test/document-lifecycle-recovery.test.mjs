@@ -3,7 +3,7 @@
 // disk file. Every cell checks the invariants documented in
 // helpers/lifecycle-invariants.mjs against README "Application behavior".
 import { cell, guardKnownRed } from "./helpers/known-red.mjs";
-import { createHarness } from "./helpers/lifecycle-harness.mjs";
+import { createHarness } from "./helpers/lifecycle-controller-harness.mjs";
 import {
 	beginAction,
 	checkAction,
@@ -108,7 +108,7 @@ async function runCell(failure, aEvent, bEvent, timing, action, history) {
 		const { native, a, b, host, tab } = ctx;
 		const { recovery, targets } = ctx;
 		const original = failure.start === "file" ? a : undefined;
-		if (!host.panel().present)
+		if (!host.conflict().present)
 			violate("harness", "the recovery state was not established");
 		ctx.tabName = host.nameOf(tab);
 		const docOf = (id) => native.docs.get(id);
@@ -146,13 +146,13 @@ async function runCell(failure, aEvent, bEvent, timing, action, history) {
 		} else events();
 		if (timing === "polled") {
 			host.log.length = 0;
-			await host.runPoll();
+			await host.poll();
 			checkInspected({ host, ids: targets, violate, when: "by the poll" });
 			checkObservation({ host, native, original, recovery, violate });
 			checkPanel({ host, native, violate, recoveryId: recovery.id });
-			const panel = host.panel();
+			const panel = host.conflict();
 			const readable = content(native, recovery) !== "unreadable";
-			if (readable && panel.review?.disabled && panel.use?.disabled !== false)
+			if (readable && !panel.actions.review && !panel.actions.useDisk)
 				violate(
 					"D",
 					"no Review or Use action is reachable for a readable target",
@@ -160,30 +160,32 @@ async function runCell(failure, aEvent, bEvent, timing, action, history) {
 		}
 		if (timing === "in-flight") {
 			ctx.gate.arm(gated.id);
-			await host.runPoll();
+			host.startPoll();
+			await ctx.gate.waitUntilHeld();
 		}
 		const trace = beginAction({ host, tab, owned: targets });
 		const alive = () => host.isOpen(tab);
 		let attempts = 0;
 		if (action === "poll") {
-			await host.runPoll();
+			await host.poll();
 			checkInspected({ host, ids: targets, violate, when: "by the poll" });
 			checkObservation({ host, native, original, recovery, violate });
 		} else if (action === "cmd-s") {
 			while (attempts < 3) {
 				attempts++;
-				await host.cmdS();
-				if (!alive() || (!host.isDirty(tab) && !host.panel().present)) break;
+				await host.save();
+				if (!alive() || (!host.isDirty(tab) && !host.conflict().present)) break;
 			}
 		} else if (action === "review" || action === "use") {
 			const pick = () => {
-				const panel = host.panel();
-				return action === "review" ? panel.review : panel.use;
+				const actions = host.conflict().actions;
+				return action === "review" ? actions.review : actions.useDisk;
 			};
-			while (attempts < 3 && alive() && pick() && !pick().disabled) {
+			while (attempts < 3 && alive() && pick()) {
 				attempts++;
 				const mark = host.log.length;
-				await host.click(pick());
+				if (action === "review") await host.review();
+				else await host.useDisk();
 				const first = host.log
 					.slice(mark)
 					.find((item) => item.kind === "inspect" || item.kind === "save");
@@ -192,13 +194,13 @@ async function runCell(failure, aEvent, bEvent, timing, action, history) {
 						"P",
 						`${action} acted on target ${first.id}, not the recovery target ${recovery.id}`,
 					);
-				if (action === "use" || !host.panel().present) break;
+				if (action === "use" || !host.conflict().present) break;
 			}
 		} else {
 			const attemptsAllowed = action === "close-save" ? 3 : 1;
 			while (attempts < attemptsAllowed && (attempts === 0 || alive())) {
 				attempts++;
-				if (action.startsWith("close")) await host.click(host.closeButton(tab));
+				if (action.startsWith("close")) await host.close(tab);
 				else await host.quit(attempts);
 			}
 			if (changedInConfirm && !alive() && action.endsWith("discard"))
@@ -207,7 +209,7 @@ async function runCell(failure, aEvent, bEvent, timing, action, history) {
 					"a decision was applied although a target changed meanwhile",
 				);
 		}
-		if (ctx.gate.release()) await host.settle();
+		if (ctx.gate.release()) await host.idle();
 		checkAction({ native, host, tab, trace, violate });
 		if (action.startsWith("close") || action.startsWith("quit"))
 			checkReads({ host, tab, trace, violate });
@@ -221,7 +223,7 @@ async function runCell(failure, aEvent, bEvent, timing, action, history) {
 				if (content(native, wanted) !== trace.text0)
 					violate(
 						"D",
-						`the save did not reach ${wanted.path} (holds ${JSON.stringify(content(native, wanted))}, status ${JSON.stringify(host.query("#status").textContent)})`,
+						`the save did not reach ${wanted.path} (holds ${JSON.stringify(content(native, wanted))}, status ${JSON.stringify(host.status())})`,
 					);
 			}
 		}
@@ -230,7 +232,7 @@ async function runCell(failure, aEvent, bEvent, timing, action, history) {
 	} catch (error) {
 		violate("harness", String(error?.stack ?? error));
 	} finally {
-		ctx?.host.dom.window.close();
+		ctx?.host.dispose();
 	}
 	return violations;
 }

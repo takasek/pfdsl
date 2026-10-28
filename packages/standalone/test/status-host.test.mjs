@@ -8,15 +8,60 @@ import {
 
 const { startHost } = await createHarness("status-ui");
 
+test("dismiss remains available while a save is waiting for the disk", async () => {
+	const native = new FakeNative();
+	const doc = native.add(1, "a.pfdsl", "original");
+	const inspecting = Promise.withResolvers();
+	const resume = Promise.withResolvers();
+	const host = await startHost(native, doc, {
+		inspectGate: () => {
+			inspecting.resolve();
+			return resume.promise;
+		},
+	});
+	let deadline;
+	try {
+		const tab = await host.open(doc);
+		tab.type("edited");
+		tab.report("Formatting complete");
+		host.menuItem("save").action();
+		await Promise.race([
+			inspecting.promise,
+			new Promise((_, reject) => {
+				deadline = setTimeout(
+					() => reject(new Error("save did not inspect the disk")),
+					5000,
+				);
+			}),
+		]);
+		assert.match(host.query("#status").textContent, /Formatting complete/);
+		host.query("#dismiss-status").click();
+		assert.equal(host.query("#status").textContent, "");
+		assert.equal(
+			host.ledger.saves.length,
+			0,
+			"dismiss does not finish the pending save",
+		);
+		resume.resolve(native.snapshot(doc));
+		await host.settle();
+		assert.match(host.query("#status").textContent, /Saved/);
+		assert.equal(tab.getSource(), "edited");
+	} finally {
+		clearTimeout(deadline);
+		resume.resolve(native.snapshot(doc));
+		await host.finish();
+	}
+});
+
 test("failed native titles do not retry unchanged titles or restore dismissed notices on typing", async () => {
 	const writes = [];
-	globalThis.reviewSetTitle = async (title) => {
+	const setTitle = async (title) => {
 		writes.push(title);
 		throw new Error("Denied");
 	};
 	const native = new FakeNative();
 	const doc = native.add(1, "a.pfdsl", "original");
-	const host = await startHost(native, doc);
+	const host = await startHost(native, doc, { setTitle });
 	try {
 		const a = await host.open(doc);
 		a.type("first edit");
@@ -32,7 +77,6 @@ test("failed native titles do not retry unchanged titles or restore dismissed no
 		);
 	} finally {
 		await host.finish();
-		delete globalThis.reviewSetTitle;
 	}
 });
 

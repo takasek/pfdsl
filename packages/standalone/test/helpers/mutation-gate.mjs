@@ -4,9 +4,11 @@
 //
 // Every mutation is applied to a COPY of the standalone package in a temporary
 // tree (src, test, index.html, package.json; node_modules is linked), the
-// standalone suite runs there, and the worktree itself is never modified. A
-// mutation is caught when at least one failing cell reports an invariant tag
-// (L, R, A, C, U, K, T, P, O, V, D, N2, I1..I6) rather than only a status text.
+// selected witnesses run there, and the worktree itself is never modified.
+// Every selected case must run in the green baseline and each mutant run.
+// A mutation is caught only when each of its named witnesses fails with an
+// invariant tag, rather than only a status text. The full matrices still run
+// in the normal test suite; this gate checks these specific semantic faults.
 // Mutation texts match the current sources; update them with the sources.
 // Each mutation names the guarantee it removes and where that guarantee lives.
 import { spawn } from "node:child_process";
@@ -22,6 +24,7 @@ import {
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { performance } from "node:perf_hooks";
 import { fileURLToPath } from "node:url";
 import { isCliEntrypoint } from "../../../../scripts/lib/cli-entrypoint.mjs";
 
@@ -49,21 +52,6 @@ const INVARIANT_TAGS = new Set([
 	"I6",
 ]);
 
-// The suites that exercise the document lifecycle. The editor tests need
-// packages outside the copied tree and say nothing about these mutations.
-const SUITE = [
-	"close-guard.test.mjs",
-	"document-host-recovery.test.mjs",
-	"document-lifecycle-invariants.test.mjs",
-	"document-lifecycle-memory.test.mjs",
-	"document-lifecycle-oracle.test.mjs",
-	"document-lifecycle-recovery.test.mjs",
-	"document-lifecycle-relations.test.mjs",
-	"document-lifecycle-scenarios.test.mjs",
-	"document-session.test.mjs",
-	"mutation-gate.test.mjs",
-];
-
 /**
  * [file, search text, replacement] steps per mutation. `guarantee` is what the
  * mutation removes and `where` is where that guarantee lives in the sources.
@@ -76,12 +64,12 @@ export const MUTATIONS = {
 		what: "review no longer required for a version the document has not acknowledged",
 		guarantee:
 			"Replacing a disk version the document has not acknowledged shows a review",
-		where: "main.ts saveEntry: the review condition",
+		where: "workspace-controller.ts saveEntry: the review condition",
 		steps: [
 			[
-				"src/main.ts",
-				"(chosen || observed || !session.acknowledges(selected))",
-				"(chosen || observed)",
+				"src/workspace-controller.ts",
+				"(observed || !session.acknowledges(selected))",
+				"(observed)",
 			],
 		],
 	},
@@ -143,15 +131,15 @@ export const MUTATIONS = {
 		],
 	},
 	M6: {
-		what: "the panel preview shows the acknowledged baseline, not the observation",
+		what: "the panel preview shows editor content, not the observation",
 		guarantee:
 			"The panel compares against the same snapshot its buttons act on",
-		where: "main.ts renderConflict: the preview text",
+		where: "application.ts renderConflict: the preview text",
 		steps: [
 			[
-				"src/main.ts",
-				'text.textContent = observed\n\t\t\t? (observed.source ?? "File is missing")\n\t\t\t: "The current disk content could not be confirmed.";',
-				'text.textContent = entry.session.disk?.source ?? "The current disk content could not be confirmed.";',
+				"src/application.ts",
+				'text.textContent = observed\n\t\t\t\t? (observed.source ?? "File is missing")\n\t\t\t\t: "The current disk content could not be confirmed.";',
+				"text.textContent = entry.tab.getSource();",
 			],
 		],
 	},
@@ -198,11 +186,11 @@ export const MUTATIONS = {
 	M10: {
 		what: "closeEntries prepareClose re-read removed",
 		guarantee: "Close starts a fresh read of every target before the decision",
-		where: "main.ts closeEntries: prepareClose",
+		where: "workspace-controller.ts closeEntries: prepareClose",
 		steps: [
 			[
-				"src/main.ts",
-				'\t\t\t\t\tawait entry.session\n\t\t\t\t\t\t.checkExternal((id) =>\n\t\t\t\t\t\t\tinvoke<DiskSnapshot>("inspect_document", { id }),\n\t\t\t\t\t\t)\n\t\t\t\t\t\t.catch(report);\n',
+				"src/workspace-controller.ts",
+				"\t\t\t\t\tawait entry.record.session\n\t\t\t\t\t\t.checkExternal((id) => files.inspect(id))\n\t\t\t\t\t\t.catch(report);\n",
 				"",
 			],
 		],
@@ -211,10 +199,10 @@ export const MUTATIONS = {
 		what: "a close Save is not checked against the decision it follows",
 		guarantee:
 			"A Save decision applies to the text shown when it was asked (F1)",
-		where: "main.ts saveEntry: the confirmation plan check",
+		where: "workspace-controller.ts saveEntry: the confirmation plan check",
 		steps: [
 			[
-				"src/main.ts",
+				"src/workspace-controller.ts",
 				'if (confirmation && !session.holds(confirmation, "editor")) {',
 				"if (false) {",
 			],
@@ -224,9 +212,13 @@ export const MUTATIONS = {
 		what: "a failed pre-save read is not remembered",
 		guarantee:
 			"A failed read protects the tab whichever entry point saw it (F2)",
-		where: "main.ts saveEntry: the pre-save inspection failure",
+		where: "workspace-controller.ts saveEntry: the pre-save inspection failure",
 		steps: [
-			["src/main.ts", "session.observe(remembered, { error }, scope);", ""],
+			[
+				"src/workspace-controller.ts",
+				"session.observe(remembered, { error }, scope);",
+				"",
+			],
 		],
 	},
 	M13: {
@@ -252,8 +244,15 @@ export const MUTATIONS = {
 		what: "a Close Save no-op bypasses its editor-version check",
 		guarantee:
 			"An edit back to acknowledged text during the pre-save read requires a new close decision",
-		where: "main.ts saveEntry: confirmation check before no-op exits",
-		steps: [["src/main.ts", "\t\tif (!checkConfirmation()) return false;", ""]],
+		where:
+			"workspace-controller.ts saveEntry: confirmation check before no-op exits",
+		steps: [
+			[
+				"src/workspace-controller.ts",
+				"if (disposed || !isOpen(entry) || !checkConfirmation()) return false;",
+				"if (disposed || !isOpen(entry)) return false;",
+			],
+		],
 	},
 	M15: {
 		what: "rename recovery uses the acknowledged inode instead of the observed inode",
@@ -301,6 +300,64 @@ export const MUTATIONS = {
 	},
 };
 
+const invariant = (name) => ({
+	file: "document-lifecycle-invariants.test.mjs",
+	name,
+});
+const recovery = (name) => ({
+	file: "document-lifecycle-recovery.test.mjs",
+	name,
+});
+const memory = (name) => ({ file: "document-lifecycle-memory.test.mjs", name });
+const session = (name) => ({ file: "document-session.test.mjs", name });
+
+// These witnesses were observed to fail in the full, green-baseline mutation
+// run before moving the matrices. The presenter witness keeps the UI boundary.
+export const MUTATION_CASES = {
+	M1: [invariant("clean | deleted | drift | cmd-s")],
+	M2: [invariant("clean | deleted | drift | cmd-s")],
+	M3: [
+		recovery("save-as-conflict | A content-changed | B none | polled | cmd-s"),
+	],
+	M4: [
+		memory("plan lifetime | review | edit-undo"),
+		memory("plan lifetime | adopt | edit-undo"),
+	],
+	M5: [recovery("save-as-conflict | A unreadable | B none | polled | cmd-s")],
+	M6: [
+		{
+			file: "document-presenter.test.mjs",
+			name: "presenter | recovery preview and review use the observed target",
+		},
+	],
+	M7: [
+		recovery(
+			"save-as-b-unreadable | A unreadable | B none | during-confirm | close-discard",
+		),
+	],
+	M8: [memory("moved target | Use Current Disk Version before 0 poll(s)")],
+	M9: [invariant("clean | none | polled | quit-save")],
+	M10: [invariant("clean | none | polled | close-save")],
+	M11: [memory("lifetime | pending-inspect | edit | close-save")],
+	M12: [invariant("clean | unreadable | unpolled | cmd-s")],
+	M13: [invariant("dirty | metadata-only | polled | close-save")],
+	M14: [
+		memory("lifetime | pending-inspect | revert-to-acknowledged | close-save"),
+	],
+	M15: [
+		memory(
+			"rename recovery | same-content replacement observed before leaf rename | missing polls: 0",
+		),
+	],
+	M16: [
+		memory("recovery panel | same-binding new capability after failed Save As"),
+	],
+	M17: [
+		session("plan rebind | save | new capability"),
+		session("plan rebind | adopt | moved path"),
+	],
+};
+
 function copyTree() {
 	const tree = mkdtempSync(join(tmpdir(), "pfdsl-mutation-"));
 	const target = join(tree, "packages/standalone");
@@ -331,11 +388,20 @@ function apply(tree, mutation) {
 	}
 }
 
-function runSuite(tree) {
+function runSuite(tree, cases) {
+	const pattern = `^(?:${cases.map(({ name }) => name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("|")})$`;
+	const files = [
+		...new Set(cases.map(({ file }) => `packages/standalone/test/${file}`)),
+	];
 	return new Promise((resolve, reject) => {
 		const child = spawn(
 			process.execPath,
-			["--test", ...SUITE.map((file) => `packages/standalone/test/${file}`)],
+			[
+				"--test",
+				"--test-reporter=spec",
+				`--test-name-pattern=${pattern}`,
+				...files,
+			],
 			{ cwd: tree, stdio: ["ignore", "pipe", "pipe"] },
 		);
 		let output = "";
@@ -386,39 +452,80 @@ export function newlyTagged(cells, baselineCells) {
 		(cell) => cell.tags.length > 0 && !existing.has(cell.label),
 	);
 }
-async function runMutation(name) {
+export function selectedCases(wanted, available = MUTATION_CASES) {
+	const selected = new Map();
+	for (const name of wanted.length ? wanted : Object.keys(available)) {
+		if (!Object.hasOwn(available, name))
+			throw new Error(`Unknown mutation: ${name}`);
+		for (const item of available[name])
+			selected.set(`${item.file}\0${item.name}`, item);
+	}
+	return [...selected.values()];
+}
+export function completeSelection(total, labels, wanted) {
+	return (
+		total === wanted.length &&
+		labels.length === wanted.length &&
+		new Set(labels).size === wanted.length &&
+		wanted.every(({ name }) => labels.includes(name))
+	);
+}
+async function runMutation(name, selected) {
+	const start = performance.now();
 	const tree = copyTree();
 	try {
 		if (name !== "baseline") apply(tree, MUTATIONS[name]);
-		const { output, code } = await runSuite(tree);
+		const { output, code } = await runSuite(tree, selected);
 		const total = Number(/^ℹ tests (\d+)/m.exec(output)?.[1] ?? 0);
 		const failed = Number(/^ℹ fail (\d+)/m.exec(output)?.[1] ?? 0);
 		const cells = failures(output);
 		const tagged = cells.filter((cell) => cell.tags.length > 0);
+		const labels = [
+			...output
+				.split("✖ failing tests:")[0]
+				.matchAll(/^[✔✖] (.+?) \(\d[\d.]*ms\)$/gm),
+		].map((match) => match[1]);
+		const durationMs = performance.now() - start;
 		console.log(
-			`completed ${name}: ${failed}/${total} failing, ${tagged.length} invariant-labelled`,
+			`completed ${name}: ${failed}/${total} failing, ${tagged.length} invariant-labelled, ${durationMs.toFixed(1)}ms`,
 		);
-		return { name, total, failed, tagged, cells, code };
+		return { name, total, failed, tagged, cells, code, labels, durationMs };
 	} finally {
 		rmSync(tree, { recursive: true, force: true });
 	}
 }
 
 async function main() {
+	const start = performance.now();
 	const names = selectNames(process.argv.slice(2));
 	for (const name of names)
 		if (name !== "baseline" && !Object.hasOwn(MUTATIONS, name))
 			throw new Error(`Unknown mutation: ${name}`);
+	const selected = selectedCases(names.filter((name) => name !== "baseline"));
 	// Each suite already runs test files concurrently; bound the number of copied suites.
-	const baseline = await runMutation("baseline");
+	const baseline = await runMutation("baseline", selected);
+	if (
+		baseline.failed ||
+		baseline.code !== 0 ||
+		!completeSelection(baseline.total, baseline.labels, selected)
+	) {
+		console.error(
+			"GATE FAILED: selected baseline must execute every named witness exactly once and pass.",
+		);
+		process.exit(1);
+	}
 	const results = [baseline];
 	for (let offset = 1; offset < names.length; offset += 2)
 		results.push(
-			...(await Promise.all(names.slice(offset, offset + 2).map(runMutation))),
+			...(await Promise.all(
+				names
+					.slice(offset, offset + 2)
+					.map((name) => runMutation(name, selected)),
+			)),
 		);
 
 	let missed = false;
-	for (const { name, total, failed, cells, code } of results) {
+	for (const { name, total, failed, cells, code, labels } of results) {
 		const tagged =
 			name === "baseline"
 				? cells.filter((cell) => cell.tags.length > 0)
@@ -436,11 +543,14 @@ async function main() {
 		for (const cell of tagged.slice(0, 3))
 			console.log(`         e.g. ${cell.label} :: ${cell.tags.join(",")}`);
 		if (
-			total === 0 ||
-			(baseline && total !== baseline.total) ||
+			!completeSelection(total, labels, selected) ||
 			(name === "baseline"
 				? failed !== 0 || code !== 0
-				: tagged.length === 0 || failed === 0 || code !== 1)
+				: !MUTATION_CASES[name].every(({ name: label }) =>
+						tagged.some((cell) => cell.label === label),
+					) ||
+					failed === 0 ||
+					code !== 1)
 		)
 			missed = true;
 		if (name !== "baseline" && tagged.length === 0 && cells.length > 0)
@@ -452,7 +562,9 @@ async function main() {
 			);
 	}
 	if (!existsSync(standalone)) process.exit(2);
-	console.log(missed ? "GATE FAILED" : "gate passed");
+	console.log(
+		`${missed ? "GATE FAILED" : "gate passed"} (${selected.length} selected witnesses; ${(performance.now() - start).toFixed(1)}ms)`,
+	);
 	process.exit(missed ? 1 : 0);
 }
 

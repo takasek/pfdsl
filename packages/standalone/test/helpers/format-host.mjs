@@ -31,6 +31,7 @@ export async function withFormatHost(
 	);
 	const start = instances.length;
 	const tabs = [];
+	let app;
 	try {
 		for (const name of previous.keys())
 			Object.defineProperty(globalThis, name, {
@@ -38,18 +39,14 @@ export async function withFormatHost(
 				configurable: true,
 			});
 		await build({
-			...(entry === "main"
-				? {
-						stdin: {
-							contents:
-								readFileSync(join(packageRoot, "src/main.ts"), "utf8") +
-								"\nexport { performCommand };",
-							resolveDir: join(packageRoot, "src"),
-							sourcefile: "main.ts",
-							loader: "ts",
-						},
-					}
-				: { entryPoints: [join(packageRoot, `src/${entry}.ts`)] }),
+			entryPoints: [
+				join(
+					packageRoot,
+					entry === "main"
+						? "test/helpers/format-entry.mjs"
+						: `src/${entry}.ts`,
+				),
+			],
 			outfile: output,
 			bundle: true,
 			platform: "node",
@@ -78,8 +75,13 @@ export async function withFormatHost(
 		const module = await import(pathToFileURL(output).href);
 		// Formatting uses two explicitly created documents as its fixture.
 		if (entry === "main") {
-			module.performCommand("new");
-			module.performCommand("new");
+			app = module.mountApplication({
+				document: dom.window.document,
+				createDocumentTab: module.createDocumentTab,
+				createTextComparison: module.createTextComparison,
+			});
+			await app.command("new");
+			await app.command("new");
 		}
 		const create = (source, options = {}) => {
 			const statuses = [];
@@ -97,7 +99,7 @@ export async function withFormatHost(
 			return { tab, editor: instances.at(-1), statuses };
 		};
 		await run({
-			command: module.performCommand,
+			command: app?.command,
 			create,
 			document: dom.window.document,
 			window: dom.window,
@@ -117,6 +119,7 @@ export async function withFormatHost(
 			);
 		}
 	} finally {
+		app?.dispose();
 		for (const tab of tabs) tab.dispose();
 		for (const editor of instances.slice(start)) editor.dispose();
 		for (const [name, value] of previous) {

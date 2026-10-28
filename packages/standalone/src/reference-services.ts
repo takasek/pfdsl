@@ -1,5 +1,5 @@
 import type { DirectoryEntry, ReferenceTarget } from "@pfdsl/editor";
-import { invoke } from "@tauri-apps/api/core";
+import type { invoke as nativeInvoke } from "@tauri-apps/api/core";
 import type { ComparisonBaseline } from "./comparison.js";
 import type { DiskSnapshot } from "./document-session.js";
 
@@ -24,6 +24,7 @@ export function createNativeReferenceServices(
 		snapshot: DiskSnapshot,
 		isCurrent: () => boolean,
 	) => Promise<void>,
+	invoke: typeof nativeInvoke,
 ): ReferenceServices {
 	function check() {
 		if (!available())

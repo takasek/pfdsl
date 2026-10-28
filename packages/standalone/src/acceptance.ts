@@ -1,6 +1,6 @@
 import { mountPreview } from "@pfdsl/editor/preview";
 import { renderDotToSvg } from "@pfdsl/preview-engine/renderer";
-import { invoke } from "@tauri-apps/api/core";
+import type { invoke as nativeInvoke } from "@tauri-apps/api/core";
 import { formatSnapshot, processSnapshot } from "./processing.js";
 
 interface Expected {
@@ -32,7 +32,23 @@ const json = (value: unknown) =>
 	);
 
 /** Explicit native acceptance mode exercises the release frontend and native reads against the VS Code baseline. */
-export async function verifyNativeCorpus() {
+export async function verifyNativeCorpus(options: {
+	document: Document;
+	invoke: typeof nativeInvoke;
+	signal: AbortSignal;
+}) {
+	const document = options.document;
+	const window = document.defaultView!;
+	const signal = options.signal;
+	const invoke = async <T>(
+		command: string,
+		args?: Parameters<typeof nativeInvoke>[1],
+	): Promise<T> => {
+		signal.throwIfAborted();
+		const result = await options.invoke<T>(command, args);
+		signal.throwIfAborted();
+		return result;
+	};
 	const text = await invoke<string | null>("acceptance_baseline");
 	if (text === null) return null;
 	const baseline: Baseline = JSON.parse(text);
@@ -58,68 +74,81 @@ export async function verifyNativeCorpus() {
 			return rendered;
 		},
 	});
-	const results = [];
-	for (const entry of baseline.entries) {
-		try {
-			const source = await invoke<string>("read_document", {
-				path: entry.path,
-			});
-			const read = async (path: string) => {
-				try {
-					return await invoke<string>("read_document", { path });
-				} catch {
-					return null;
-				}
-			};
-			const result = await processSnapshot(source, entry.path, read);
-			rendered = null;
-			await preview.receive(result.message);
-			const actual: Expected = {
-				model: json(result.model),
-				frontmatter: json(result.frontmatter),
-				presetDiagnostics: json(result.presetDiagnostics),
-				message: json(result.message),
-				formatOutput: formatSnapshot(source),
-				svg: rendered,
-			};
-			const checks = Object.keys(actual).filter(
-				(key) =>
-					actual[key as keyof Expected] !==
-					entry.expected[key as keyof Expected],
-			);
-			if (source !== entry.source) checks.push("source");
-			if (
-				result.message.type === "render" &&
-				!container.querySelector("#inner > svg")
-			)
-				checks.push("DOM SVG");
-			if (checks.length) failures.push(`${entry.file}: ${checks.join(", ")}`);
-			results.push({
-				file: entry.file,
-				inputSha256: entry.sha256,
-				passed: checks.length === 0,
-				checks,
-			});
-		} catch (error) {
-			failures.push(`${entry.file}: ${String(error)}`);
-		}
-	}
-	preview.dispose();
-	container.remove();
-	window.removeEventListener("error", onError);
-	const report = {
-		reference: baseline.reference,
-		build: baseline.build,
-		execution,
-		userAgent: navigator.userAgent,
-		documentCount: baseline.entries.length,
-		passed: failures.length === 0 && errors.length === 0,
-		results,
-		failures,
-		errors,
+	let cleaned = false;
+	const cleanup = () => {
+		if (cleaned) return;
+		cleaned = true;
+		preview.dispose();
+		container.remove();
+		window.removeEventListener("error", onError);
 	};
-	await invoke("write_acceptance_report", { report: JSON.stringify(report) });
-	return baseline.entries.reduce((largest, entry) =>
-		entry.source.length > largest.source.length ? entry : largest,
-	);
+	signal?.addEventListener("abort", cleanup, { once: true });
+	try {
+		const results = [];
+		for (const entry of baseline.entries) {
+			try {
+				const source = await invoke<string>("read_document", {
+					path: entry.path,
+				});
+				const read = async (path: string) => {
+					try {
+						return await invoke<string>("read_document", { path });
+					} catch {
+						return null;
+					}
+				};
+				const result = await processSnapshot(source, entry.path, read);
+				signal?.throwIfAborted();
+				rendered = null;
+				await preview.receive(result.message);
+				const actual: Expected = {
+					model: json(result.model),
+					frontmatter: json(result.frontmatter),
+					presetDiagnostics: json(result.presetDiagnostics),
+					message: json(result.message),
+					formatOutput: formatSnapshot(source),
+					svg: rendered,
+				};
+				const checks = Object.keys(actual).filter(
+					(key) =>
+						actual[key as keyof Expected] !==
+						entry.expected[key as keyof Expected],
+				);
+				if (source !== entry.source) checks.push("source");
+				if (
+					result.message.type === "render" &&
+					!container.querySelector("#inner > svg")
+				)
+					checks.push("DOM SVG");
+				if (checks.length) failures.push(`${entry.file}: ${checks.join(", ")}`);
+				results.push({
+					file: entry.file,
+					inputSha256: entry.sha256,
+					passed: checks.length === 0,
+					checks,
+				});
+			} catch (error) {
+				failures.push(`${entry.file}: ${String(error)}`);
+			}
+		}
+		cleanup();
+		const report = {
+			reference: baseline.reference,
+			build: baseline.build,
+			execution,
+			userAgent: window.navigator.userAgent,
+			documentCount: baseline.entries.length,
+			passed: failures.length === 0 && errors.length === 0,
+			results,
+			failures,
+			errors,
+		};
+		await invoke("write_acceptance_report", { report: JSON.stringify(report) });
+		return baseline.entries.reduce((largest, entry) =>
+			entry.source.length > largest.source.length ? entry : largest,
+		);
+	} finally {
+		signal?.removeEventListener("abort", cleanup);
+		cleanup();
+	}
 }

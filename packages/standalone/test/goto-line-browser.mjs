@@ -23,15 +23,14 @@ try {
 		plugins: [
 			{
 				name: "goto-line-workspace-fixtures",
-				transform(code, id) {
-					if (id === join(root, "src/main.ts"))
-						return `${code}
-import * as navigationMonaco from "monaco-editor/editor/editor.api.js";
-window.navigationWorkspace = {
- open: openDocument, active: () => active?.tab,
- tabs: () => [...opened].map(entry => entry.tab),
- editors: () => navigationMonaco.editor.getEditors(),
-};`;
+				transformIndexHtml: {
+					order: "pre",
+					handler(html) {
+						return html.replace(
+							"/src/main.ts",
+							"/test/helpers/browser-entry.mjs",
+						);
+					},
 				},
 			},
 		],
@@ -51,10 +50,10 @@ window.navigationWorkspace = {
 	page.on("pageerror", (error) => errors.push(error.message));
 	await page.goto(server.resolvedUrls.local[0]);
 	await page.waitForFunction(() => !!window.navigationWorkspace);
-	await page.evaluate(() => {
+	await page.evaluate(async () => {
 		for (const [index, folder] of ["red", "blue"].entries()) {
 			const source = `# ${folder}\n# navigation\na >> p -> b\n`;
-			window.navigationWorkspace.open("flow.pfdsl", source, {
+			await window.navigationWorkspace.open({
 				id: index + 1,
 				path: `/work/${folder}/shared/flow.pfdsl`,
 				source,
@@ -223,14 +222,12 @@ window.navigationWorkspace = {
 	assert.deepEqual(await source(), originals);
 	const retainedSelections = await selections();
 	// A clean, unsaved tab exercises disposal without native inspect_document calls.
-	await page.evaluate(() =>
-		window.navigationWorkspace.open("Closing", "# closing\na >> p -> b\n"),
-	);
+	await page.evaluate(() => window.navigationWorkspace.new());
 	await page.evaluate(() => window.navigationWorkspace.active().focus());
 	await open();
 	await input.fill(":1:1");
 	await page
-		.getByRole("button", { name: "Close Closing", exact: true })
+		.getByRole("button", { name: "Close Untitled 1", exact: true })
 		.click();
 	await page.waitForFunction(
 		() => window.navigationWorkspace.tabs().length === 2,
