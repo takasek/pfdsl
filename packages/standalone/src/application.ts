@@ -244,8 +244,9 @@ export function mountApplication(options: ApplicationOptions) {
 	});
 	state = controller.snapshot();
 	function dispatch(command: WorkspaceCommand) {
+		const foreground = !busy;
 		const result = controller.dispatch(command);
-		currentCommand = result;
+		if (foreground) currentCommand = result;
 		return result;
 	}
 	let renderedFolder: WorkspaceSnapshot["folder"] = null;
@@ -765,10 +766,10 @@ export function mountApplication(options: ApplicationOptions) {
 			performCommand(id);
 			return currentCommand.then(() => true);
 		},
-		/** Wait for the current accepted command and its document-handle cleanup. */
+		/** Wait for the accepted command; after disposal also drain remaining work. */
 		async idle() {
 			await currentCommand;
-			await controller.idle();
+			if (disposed) await controller.idle();
 		},
 		dispose() {
 			if (disposed) return;

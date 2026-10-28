@@ -77,6 +77,7 @@ test("application import is inert and simultaneous instances own their commands 
 					canCreateDefinition: () => false,
 					getSource: () => options.source,
 					getRevision: () => 0,
+					report: options.reportStatus,
 					markSaved() {},
 					setLocation() {},
 					dispose() {
@@ -153,6 +154,26 @@ test("application import is inert and simultaneous instances own their commands 
 		);
 		await second.app.command("new");
 		assert.equal(second.tabs.length, 2);
+		second.tabs[1].report("An earlier action completed.");
+		const secondOpening = second.app.command("open-file");
+		const dismiss = second.dom.window.document.querySelector("#dismiss-status");
+		assert.equal(dismiss.hidden, false);
+		assert.equal(dismiss.disabled, false);
+		dismiss.click();
+		let settled = false;
+		const idle = second.app.idle().then(() => {
+			settled = true;
+		});
+		await new Promise(setImmediate);
+		assert.equal(
+			settled,
+			false,
+			"a refused UI command cannot replace the accepted operation being awaited",
+		);
+		second.selection.resolve(null);
+		await secondOpening;
+		await idle;
+		assert.equal(settled, true);
 		first.app.dispose();
 		first.app.dispose();
 		first.register();
@@ -206,6 +227,7 @@ test("application import is inert and simultaneous instances own their commands 
 		assert.equal(second.intervals.size, 1);
 	} finally {
 		for (const host of hosts) {
+			host.selection.resolve(null);
 			host.app.dispose();
 			host.dom.window.close();
 		}
