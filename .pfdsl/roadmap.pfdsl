@@ -169,13 +169,6 @@ artifact:
       architecture.md の0段目だけを渡した読み手が再編の各項目の置き場を再現でき、その結果が PR 本文に記録されている。
       make test・make typecheck・make lint が通り、make gen-plugin の後に差分が出ない
     location: ../docs/adr/0048-responsibility-boundary-by-pfd-semantics.md
-  root_loaded_work_rules:
-    label: root の指示から読むこのリポの作業規律
-    description: このリポの開発規律を、binding の「ワークサイクルの追加手順」スロット経由ではなく root の指示から読ませる。配布物の整理より先に統合し、移行の途中でこのリポのセッションが規律を読まなくなる状態を作らない
-    status: done
-    criteria: >
-      生成した CLAUDE.md と AGENTS.md が、このリポの作業規律を置いた binding の節を作業の開始時に読むよう指示し、scripts/check-companion-bindings.mjs が新しい見出しを必須にし、旧見出しの「ワークサイクルの追加手順」だけの binding を失敗させる。
-      このリポで新しく開いたセッションが、着手時にその節を読むことを1回確かめた
   boundary_transition_release_policy:
     label: 責務境界の段階公開方針と移行注記 (#1522)
     description: 配布物に移行中の適用関係を載せ、後続を個別に公開できる条件と採用先へ手順を残す案内の作成時点を定める。公開版ごとの配布レビュー合格は別途確認する
@@ -184,14 +177,6 @@ artifact:
       architecture.md に移行中の適用関係が配布され、workflow.md に後続の段階公開と採用先の手順保持を含む移行案内の作成手順がある。
       公開版ごとの配布レビューを維持し、該当する公開工程から本方針を参照できる
     location: ../.pfdsl/workflow.md
-  local_pr_status_timing:
-    label: 採用先へ移した PR 時点の status 更新手順 (#1523)
-    description: PR と commit に結び付けた done 更新の義務を spec と配布手順から外し、このリポの binding に残す。採用先へ手順保持の方法と配布側の保証の縮小を案内する
-    status: done
-    criteria: >
-      spec のツリーに関する意味論を維持したまま PR 時点の手順が区分 iii へ移り、spec-history と移行案内に変更範囲が記録されている。
-      root の指示から読む binding にこのリポの手順があり、close に基づく代替監査を追加していない
-    location: https://github.com/takasek/pfdsl/issues/1523
   boundary_test_revision_adr:
     label: 契約1を4条件の AND に改める ADR (#1525)
     description: ADR-0048 の契約1を意味論・書込み先・業種中立・名指しの AND に改め、0段目の第3基準を統合し、companion の構造的事実と D3 の運び手を決める ADR。後続の work-cycle と plugin 分割の設計の前提になる
@@ -200,29 +185,6 @@ artifact:
       新しい ADR が Accepted で存在し、ADR-0048 の Status に部分上書きが注記されている。
       architecture.md の0段目と評価入力だけを渡した読み手が、所有者承認済みの独立参照集合11件の置き場・分割・保持条件・情報不足を再現でき、0段目に契約1と別系統の基準が残っていない
     location: https://github.com/takasek/pfdsl/issues/1525
-  evidence_roundtrip_record:
-    label: E0 の往復記録と証拠スキーマ v0 (#1526)
-    description: 数十行の driver で status ready から実行・証拠 JSON・読取専用の検査までを1回通した記録。契約3の保存方式と検査動詞の設計の入力になる
-    status: done
-    criteria: >
-      このリポの roadmap に対して driver が ready を読み1 process 分の証拠 JSON を出し検査器が合否判定するまでを1回通し、スキーマ v0・検査項目・検査できなかった項目と理由・動詞候補名が experiments/ に記録されている。
-      status を書き換える動詞は作っていない
-    location: https://github.com/takasek/pfdsl/issues/1526
-  executor_neutral_work_cycle:
-    label: 実行主体に依存しない work-cycle
-    description: ADR-0048 の後続で未起票。work-cycle.md から実行主体を主語にする規則を外し、PFD 側の protocol だけを残す
-    status: done
-    criteria: >
-      work-cycle.md が実行主体を主語にする規則を持たず、1サイクル1プロセスを既定のプリセットとして示し、run の成功と受入の区別と制御主体の単一性を定め、binding の「ワークサイクルの追加手順」スロットを PFD 固有の追加ゲート項目に縮小している。
-      採用側プローブで、外部の実行主体の完了から done を付けずに受入の確認へ進むことを確かめた
-  three_valued_model_retro:
-    label: 3値の model retro と証拠の契約
-    description: ADR-0048 の後続で未起票。pfd-retro を3値の model retro と証拠の契約に絞り、D 層を同じ plugin 内の独立した skill と図の監査レンズへ分ける（ADR-0048 D1）
-    status: done
-    criteria: >
-      pfd-retro の結論が実行側の失敗・モデルの改訂候補・変更不要の3値で、変更不要は照合したモデル要素と証拠を名指す。
-      証拠の契約が版との対応を定め、C 層の汎用項目が配布物から外れている。
-      D 層は同じ plugin 内の独立した skill と図の監査レンズへ分かれ、L4 滞留監査は配布層への還流として別の節にある
   writer_free_github_preset:
     label: 実行主体の書込み規律を外した GitHub Issues プリセット
     description: ADR-0048 の後続で未起票。実行主体が行う外部書込みの手順と PR 運用をこのリポの binding へ移し、プリセットにはアダプタ自身が外部へ書く場合の読み戻しの原則だけを残す（ADR-0048 D2）
@@ -258,15 +220,6 @@ artifact:
     description: ADR-0048 の後続で未起票。設計仕様の結論に従い、GitHub Issues バックエンドの reference・hook・CI 設定を、採用を宣言したリポでだけ働かせる
     status: todo
     criteria: 設計仕様の結論のとおりに配布され、GitHub Issues バックエンドを採用しないリポでは GitHub アダプタの hook が通知を出さない。採用したリポでは、移行案内に従った後も現行と同じ手順・hook・CI 設定が働く
-  artifact_reference_spec:
-    label: モデルと artifact の参照先の仕様 (#1542)
-    description: 参照先のモデル既定と artifact ごとの上書きを業種中立に定義する。詳細と未決の設計論点は対応 Issue を一次情報とする
-    status: done
-    location: https://github.com/takasek/pfdsl/issues/1542
-    criteria: >
-      モデル既定・artifact 上書き・省略・異常・ツリーとの優先順位と固定版の証拠の契約が、
-      proposal のレビューを経て spec と履歴へ統合され、実装と採用版への後続が登録されている。
-      実装・公開の完了はこの成果物の受入に含めない
   artifact_reference_implementation:
     label: 参照先を解決できる実装
     location: [ ../packages/core/src/reference-resolution.ts, ../packages/cli/src/reference-context.ts, ../docs/reference-resolution.md ]
@@ -329,21 +282,9 @@ process:
     label: 配布物の全体受入を完了して公開する
     location: https://github.com/takasek/pfdsl/issues/1262
     tags: [ release_standalone ]
-  reduce_work_cycle_protocol:
-    label: work-cycle を protocol に絞る
-  narrow_retro_to_model:
-    label: pfd-retro を model retro に絞る
-  add_prune_cli:
-    label: 完了チェーン回収を CLI 動詞にする
-    location: https://github.com/takasek/pfdsl/issues/1567
   publish_cli_prune:
     label: 完了チェーン回収 CLI とアダプタを公開する
     tags: [ release_cli ]
-  move_writer_rules_out_of_github_preset:
-    label: GitHub Issues プリセットから書込み規律と PR 運用を外す
-  unify_work_item_contract:
-    label: 作業項目の対応契約を1つにする
-    location: https://github.com/takasek/pfdsl/issues/1497
   design_adapter_plugin_split:
     label: core と GitHub アダプタの plugin 分割を設計する
   apply_github_adapter_design:
@@ -355,9 +296,6 @@ process:
   switch_wiki_roadmap_source:
     label: 検証済みの採用版で正本を Wiki へ切り替える
     location: https://github.com/takasek/pfdsl/issues/1519
-  implement_artifact_reference:
-    label: 確定仕様に従って参照先解決を実装する
-    location: https://github.com/takasek/pfdsl/issues/1566
   prepare_artifact_reference_adoption_version:
     label: 参照先解決を含む Wiki 採用版を準備して検証する
     description: 配布形態の確定時に必要な既存公開工程へ接続する
@@ -400,23 +338,11 @@ gui_vscode_candidate >> accept_gui_vscode -> gui_vscode_acceptance
 
 gui_mac_acceptance >> publish_standalone -> standalone_release
 
-[boundary_test_revision_adr, evidence_roundtrip_record, local_pr_status_timing, responsibility_boundary_adr, root_loaded_work_rules] >> reduce_work_cycle_protocol -> executor_neutral_work_cycle
-
-[responsibility_boundary_adr, root_loaded_work_rules] >> narrow_retro_to_model -> three_valued_model_retro
-
-[responsibility_boundary_adr, root_loaded_work_rules] >> move_writer_rules_out_of_github_preset -> writer_free_github_preset
-
-responsibility_boundary_adr >> unify_work_item_contract -> backend_neutral_work_item_contract
-
-responsibility_boundary_adr >> add_prune_cli -> prune_cli
-
 [boundary_transition_release_policy, prune_cli] >> publish_cli_prune -> cli_release_prune
 
 [backend_neutral_work_item_contract, boundary_test_revision_adr, prune_cli, writer_free_github_preset] >> design_adapter_plugin_split -> adapter_plugin_split_design
 
 adapter_plugin_split_design >> apply_github_adapter_design -> optional_github_adapter
-
-[artifact_reference_spec, toolchain] >> implement_artifact_reference -> artifact_reference_implementation
 
 artifact_reference_implementation >> prepare_artifact_reference_adoption_version -> artifact_reference_adoption_version
 
