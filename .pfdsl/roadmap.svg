@@ -182,14 +182,14 @@
 <!-- artifact_reference_implementation -->
 <g id="node7" class="node">
 <title>artifact_reference_implementation</title>
-<g id="a_node7"><a xlink:title="参照先を解決できる実装&#10;&#10;確定した参照先仕様を消費し、CLI と利用側で解決できる実装を作る。後続 Issue は未起票&#10;criteria: 確定仕様の既定・上書き・正常・異常・互換性の契約が実装され、対応する検査が通っている">
-<polygon fill="#f8f9fa" stroke="black" points="929.45,-576.6 670.25,-576.6 670.25,-518.2 929.45,-518.2 929.45,-576.6"/>
+<g id="a_node7"><a xlink:title="参照先を解決できる実装&#10;&#10;確定した参照先仕様を消費し、CLI と利用側で解決できる実装を作る（#1566）&#10;criteria: 確定仕様の既定・上書き・正常・異常・互換性の契約が実装され、対応する検査が通っている&#10;location: ../packages/core/src/reference&#45;resolution.ts, ../packages/cli/src/reference&#45;context.ts, ../docs/reference&#45;resolution.md">
+<polygon fill="#d4edda" stroke="black" points="929.45,-576.6 670.25,-576.6 670.25,-518.2 929.45,-518.2 929.45,-576.6"/>
 <text xml:space="preserve" text-anchor="middle" x="799.85" y="-560" font-family="Times,serif" font-size="14.00">artifact_reference_implementation</text>
 <text xml:space="preserve" text-anchor="middle" x="799.85" y="-543.2" font-family="Times,serif" font-size="14.00">参照先を解決できる</text>
 <text xml:space="preserve" text-anchor="middle" x="799.85" y="-526.4" font-family="Times,serif" font-size="14.00">実装</text>
 </a>
 </g>
-<text xml:space="preserve" text-anchor="middle" x="657.81" y="-505.6" font-family="Times,serif" font-size="14.00">todo</text>
+<text xml:space="preserve" text-anchor="middle" x="656.64" y="-505.6" font-family="Times,serif" font-size="14.00">done</text>
 </g>
 <!-- prepare_artifact_reference_adoption_version -->
 <g id="node39" class="node">
@@ -225,7 +225,7 @@
 <!-- implement_artifact_reference -->
 <g id="node31" class="node">
 <title>implement_artifact_reference</title>
-<g id="a_node31"><a xlink:title="確定仕様に従って参照先解決を実装する">
+<g id="a_node31"><a xlink:href="https://github.com/takasek/pfdsl/issues/1566" xlink:title="確定仕様に従って参照先解決を実装する&#10;location: https://github.com/takasek/pfdsl/issues/1566">
 <ellipse fill="none" stroke="black" cx="454.93" cy="-540.4" rx="128.39" ry="41.3"/>
 <text xml:space="preserve" text-anchor="middle" x="454.93" y="-553" font-family="Times,serif" font-size="14.00">implement_artifact_reference</text>
 <text xml:space="preserve" text-anchor="middle" x="454.93" y="-536.2" font-family="Times,serif" font-size="14.00">確定仕様に従って参</text>
