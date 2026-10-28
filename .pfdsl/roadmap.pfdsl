@@ -252,7 +252,7 @@ artifact:
     status: todo
     criteria: >
       npm view @pfdsl/cli versions に prune を含む版があり、その版を固定して取得した CLI の prune --help と回収プレビューが成功する。
-      同じ release tag の plugin 配布について .pfdsl/workflow.md の「release milestone artifact の作成規約」と .pfdsl/pipeline.md の公開・pin・取得確認を満たし、対応 CLI の取得後にアダプタを更新する移行手順がある
+      同じ release tag の plugin 配布について .pfdsl/workflow.md の「release milestone artifact の作成規約」と .pfdsl/pipeline.md の公開・pin・取得確認を満たし、採用先が CLI・plugin・アダプタを即座に一括更新する移行手順がある
   optional_github_adapter:
     label: 採用したリポでだけ働く GitHub アダプタ
     description: ADR-0048 の後続で未起票。設計仕様の結論に従い、GitHub Issues バックエンドの reference・hook・CI 設定を、採用を宣言したリポでだけ働かせる

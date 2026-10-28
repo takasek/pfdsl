@@ -146,8 +146,8 @@ npm install --prefix . --no-save --package-lock=false --ignore-scripts yaml@2.8.
 `--prefix .` で採用リポへ配置先を固定する（親フォルダの package.json に依存の配置先を引き寄せられないようにする）。
 同じリポで CLI も未保存依存として用意する場合は、上のコマンドの代わりに `npm install --prefix . --no-save --package-lock=false --ignore-scripts yaml@2.8.3 @pfdsl/cli` を使う。
 別々の `npm install --no-save` は先に置いた未保存依存を除去しうるため、保持する未保存依存を同じ install に列挙する。
-公開 CLI が回収に必要な `prune` を持つことは、回収アダプタの起動時チェックで別途確認する。
-新しいアダプタを配置する前に `pfdsl prune --help` の成功を確認し、まだ対応する CLI が公開されていなければ旧アダプタを維持する。
+採用先は `prune` 対応 CLI・plugin・配置アダプタを即座に一括更新する。
+旧版との混在や旧アダプタの維持はサポートせず、アダプタは `prune` を直接実行して出力と終了コードを転送する。
 `package.json` があるリポでは、そのリポの package manager で yaml を開発依存へ追加する（npm なら `npm install --save-dev yaml@2.8.3`）。
 既存の依存宣言・lockfile を尊重し、別の package manager へ切り替えない。
 未保存依存は clean checkout や依存の掃除後には再準備が必要で、CI でも監査の前に用意する。
@@ -172,8 +172,8 @@ import 成功だけを監査成功としない。
 - Node.js 24 以上
 - `gh` CLI、または `GH_TOKEN` / `GITHUB_TOKEN`
 - npm パッケージ `yaml`（上の「依存の準備と初回監査」で採用リポへ用意する）
-- `prune` サブコマンドを持つ版の `@pfdsl/cli`（回収の判定・削除・検証をこの CLI が担う）。開発版や解決先の違いもあるため、回収スクリプトは起動時に解決した CLI が `prune` を持つか確かめ、持たなければ対象の有無にかかわらずその場で停止し、直し方を示す。対応版が未公開の間は migration guide の更新順に従い、旧 adapter と helpers を一組で維持する
-  - pfdsl リポ自身の workflow は、checkout したツリーが pfdsl workspace（`pnpm-workspace.yaml` と `packages/cli/package.json` を持つ）なら `pnpm -r build` してそのビルドを使う。採用リポのように workspace でなければ `npm install --no-save @pfdsl/cli` で公開版を導入する（フォールバック時は `prune` を含む公開版以降でないと上の起動時チェックで止まる）。運用プロトコルの着手判断が既に `status ready` を要求しているので、`@pfdsl/cli` の導入自体は採用リポにとって新しい前提ではない
+- `prune` サブコマンドを持つ版の `@pfdsl/cli`（回収の判定・削除・検証をこの CLI が担う）。CLI と配布アダプタを一括更新し、旧版のための能力確認や代替実装は持たない
+  - pfdsl リポ自身の workflow は、checkout したツリーが pfdsl workspace（`pnpm-workspace.yaml` と `packages/cli/package.json` を持つ）なら `pnpm -r build` してそのビルドを使う。採用リポのように workspace でなければ `npm install --no-save @pfdsl/cli` で `prune` を含む公開版を導入する。運用プロトコルの着手判断が既に `status ready` を要求しているので、`@pfdsl/cli` の導入自体は採用リポにとって新しい前提ではない
   - 回収スクリプトは `PFDSL_CLI`、リポの `packages/cli/dist/cli.js`、`node_modules/@pfdsl/cli/dist/cli.js` の順に CLI を探す
 
 `audit-issues-flow.mjs` が使う named operation はすべて HTTP backend を持つ。`gh` が存在しない（ENOENT）場合も、`GH_TOKEN` または `GITHUB_TOKEN` があれば HTTP backend へ切り替わるため、token のみの環境で監査を実行できる。`gh` が実行されて認証・通信・引数エラーになった場合は HTTP へ切り替えず、そのエラーを報告する。

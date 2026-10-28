@@ -46,18 +46,6 @@ if (!cli) {
 	process.exit(1);
 }
 
-const probe = spawnSync(process.execPath, [cli, "prune", "--help"], {
-	encoding: "utf8",
-});
-if (probe.status !== 0 || /unknown command/.test(probe.stderr ?? "")) {
-	console.error(
-		`sweep-completed-chains: the resolved pfdsl CLI (${cli}) has no usable 'prune' command. Upgrade to a release with 'prune', run 'pnpm -r build' in this repo, or set PFDSL_CLI to a build with 'prune'.`,
-	);
-	if (probe.error) console.error(probe.error.message);
-	if (probe.stderr) process.stderr.write(probe.stderr);
-	process.exit(1);
-}
-
 // The adapter's dry run requests a deletion report, while the CLI's default
 // preview returns source. Forward both output streams and failures intact.
 const result = spawnSync(

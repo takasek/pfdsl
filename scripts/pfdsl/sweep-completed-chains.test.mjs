@@ -42,27 +42,6 @@ function runSweep(args, envOverrides = {}) {
 	});
 }
 
-/**
- * A stand-in for a pre-prune @pfdsl/cli:
- * any other command succeeds, `prune` reports the same "unknown command"
- * shape the real dispatcher uses.
- */
-function writeCliWithoutPrune(path) {
-	writeFileSync(
-		path,
-		[
-			"#!/usr/bin/env node",
-			"const command = process.argv[2];",
-			"if (command === 'prune') {",
-			"\tprocess.stderr.write('unknown command: prune\\n');",
-			"\tprocess.exit(2);",
-			"}",
-			"process.exit(0);",
-			"",
-		].join("\n"),
-	);
-}
-
 /** Files in `dirPath` other than the ones the fixture itself put there. */
 function extraFiles(dirPath, expected) {
 	return readdirSync(dirPath).filter((name) => !expected.includes(name));
@@ -175,37 +154,37 @@ process:
 	});
 });
 
-describe("sweep-completed-chains: prune-capability gate", () => {
-	// A workflow may resolve an older CLI. Probe before requesting a sweep,
-	// including on a roadmap with no deletion targets.
-	let roadmapFile;
-	let oldCli;
-
-	beforeEach(() => {
-		roadmapFile = join(dir, "roadmap.pfdsl");
-		writeFileSync(roadmapFile, "---\ntype: roadmap\n---\n");
-		oldCli = join(dir, "old-cli-no-prune.js");
-		writeCliWithoutPrune(oldCli);
-	});
-
-	it("fails at startup when the resolved CLI has no 'prune'", () => {
-		const result = runSweep([roadmapFile], { PFDSL_CLI: oldCli });
-		assert.equal(result.status, 1);
-		assert.match(result.stderr, /prune/);
-		assert.doesNotMatch(result.stdout, /sweep target/);
-	});
-
-	it("names how to get a capable CLI without guessing a specific version number", () => {
-		const result = runSweep([roadmapFile], { PFDSL_CLI: oldCli });
-		// Release preparation assigns the version; the adapter probes capability.
-		assert.match(result.stderr, /release with 'prune'/);
-		assert.match(result.stderr, /pnpm -r build|PFDSL_CLI/);
-	});
-
-	it("still works normally when the resolved CLI does have 'prune'", () => {
-		const result = runSweep([roadmapFile]);
-		assert.equal(result.status, 0, result.stdout + result.stderr);
-	});
+describe("sweep-completed-chains: direct CLI forwarding", () => {
+	for (const write of [false, true]) {
+		it(`forwards the request and CLI exit without a capability probe (write=${write})`, () => {
+			const cli = join(dir, "cli.cjs");
+			const calls = join(dir, "calls.jsonl");
+			writeFileSync(
+				cli,
+				`
+const { appendFileSync } = require('node:fs');
+appendFileSync(${JSON.stringify(calls)}, JSON.stringify(process.argv.slice(2)) + '\\n');
+process.stdout.write('cli report\\n');
+process.stderr.write('cli diagnostic\\n');
+process.exit(2);
+`,
+			);
+			const result = runSweep(
+				["roadmap.pfdsl", ...(write ? ["--write"] : [])],
+				{ PFDSL_CLI: cli },
+			);
+			assert.equal(result.status, 2);
+			assert.equal(result.stdout, "cli report\n");
+			assert.equal(result.stderr, "cli diagnostic\n");
+			assert.deepEqual(
+				readFileSync(calls, "utf8")
+					.trim()
+					.split("\n")
+					.map((line) => JSON.parse(line)),
+				[["prune", "roadmap.pfdsl", "--json", ...(write ? ["--write"] : [])]],
+			);
+		});
+	}
 });
 
 describe("sweep-completed-chains: quoted id containing a comma (#1125 review defect 2)", () => {

@@ -31,9 +31,8 @@ Apply them only when the target release includes the referenced changes; specifi
 
 Completed-chain retention and verification now live in `pfdsl prune`, shared by both tracker presets.
 Source: [Issue #1567](https://github.com/takasek/pfdsl/issues/1567), implementing ADR-0048 D4.
-First install a CLI release that provides `prune` and verify `pfdsl prune --help` using the entry point selected by your sweep workflow.
-Only then update the plugin and deployed sweep script; until that CLI release is available, retain the previous script and helpers together.
-The adapter checks command availability instead of inferring it from a version number.
+Update the CLI, plugin and deployed sweep script together; adopting repositories are expected to update immediately.
+Mixed old/new installations are unsupported. The adapter invokes `prune` directly and forwards its output and exit status without compatibility probes or fallbacks.
 
 `pfdsl prune <roadmap>` previews the transformed source; `--json` reports deletion targets without writing.
 Use `--write` to apply and report deletions, or `--check` to return exit 1 when deletions are needed without changing the file.
@@ -42,7 +41,7 @@ Update consumers that parse the old human-readable dry-run text to read the `del
 Preview or verification failures do not modify the roadmap.
 Input and output validation includes relative dependencies when a file path is supplied; stdin accepts only dependency-free roadmaps.
 
-After updating the deployed adapter, remove its former helpers under `scripts/pfdsl/lib/`: `chain-sweep.mjs`, `cli-id-arg.mjs`, `ready-compare.mjs`, and `scratch-path.mjs`.
+As part of the same update, remove the adapter's former helpers under `scripts/pfdsl/lib/`: `chain-sweep.mjs`, `cli-id-arg.mjs`, `ready-compare.mjs`, and `scratch-path.mjs`.
 Inspect local changes and callers before removing them; migrate local callers to `prune` rather than retaining a second retention implementation.
 For file-based trackers, replace manual terminal-chain deletion with `prune` after the existing item/artifact completion checks.
 Do not mark unfinished or abandoned artifacts done merely to make them eligible for pruning.
