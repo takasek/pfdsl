@@ -11,6 +11,7 @@ const PUBLIC_OPTIONS: Record<string, readonly string[]> = {
 	explain: [],
 	fmt: ["write", "check", "no-color"],
 	delete: ["write", "json", "no-color"],
+	prune: ["write", "check", "json", "no-color"],
 	rename: ["write", "json", "no-color"],
 	render: ["format", "no-color"],
 	diff: ["format", "json", "no-color"],

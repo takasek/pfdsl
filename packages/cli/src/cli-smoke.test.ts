@@ -1,4 +1,4 @@
-import { execFileSync } from "node:child_process";
+import { execFileSync, spawnSync } from "node:child_process";
 import { join, resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import { isDistStale } from "../../../scripts/lib/dist-freshness.mjs";
@@ -16,6 +16,46 @@ const distCli = resolve(__dirname, "../dist/cli.js");
 const distIsCurrent = !isDistStale(distCli);
 
 describe("dist/cli.js smoke", () => {
+	it.skipIf(!distIsCurrent)(
+		"prune reads stdin once and supports report/check modes",
+		() => {
+			const input = execFileSync(process.execPath, [distCli, "fmt", "-"], {
+				input:
+					"---\ntype: roadmap\nartifact:\n  a: {status: done}\n  b: {status: done}\nprocess:\n  p: {}\n---\n\na >> p -> b\n",
+				encoding: "utf8",
+			});
+			for (const flags of [[], ["--json"], ["--check", "--json"]]) {
+				const result = spawnSync(
+					process.execPath,
+					[distCli, "prune", "-", ...flags],
+					{ input, encoding: "utf8" },
+				);
+				expect(result.status, result.stdout + result.stderr).toBe(
+					flags.includes("--check") ? 1 : 0,
+				);
+				if (flags.includes("--json"))
+					expect(JSON.parse(result.stdout).deleted).toEqual(["a", "b", "p"]);
+				else expect(result.stdout).not.toContain("a >> p");
+			}
+		},
+	);
+	it.skipIf(!distIsCurrent)(
+		"prune rejects stdin whose dependencies cannot be validated",
+		() => {
+			for (const input of [
+				"---\ntype: roadmap\nextends: preset.yaml\n---\n",
+				"---\ntype: roadmap\nartifact:\n  a: {status: done}\n  b: {status: done}\nprocess:\n  p: {subflow: child.pfdsl}\n---\na >> p -> b\n",
+			]) {
+				const result = spawnSync(
+					process.execPath,
+					[distCli, "prune", "-", "--json"],
+					{ input, encoding: "utf8" },
+				);
+				expect(result.status).toBe(1);
+				expect(JSON.parse(result.stdout).error).toContain("file path");
+			}
+		},
+	);
 	// A suite that skips every case is green, and reads as one that ran. CI
 	// builds before it tests, so there the bundle must be current and the
 	// skips must not fire; locally they still may (#607).

@@ -12,7 +12,6 @@ import {
 	expect,
 	it,
 } from "vitest";
-import { readyUnchanged } from "../../../scripts/pfdsl/lib/ready-compare.mjs";
 import {
 	COMMAND_GROUPS,
 	HELP,
@@ -23,6 +22,7 @@ import {
 	shouldColorize,
 	TOP_LEVEL_COMMANDS,
 } from "./index.js";
+import { comparableReady } from "./prune.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -110,6 +110,8 @@ describe("command metadata parse surface (#1050)", () => {
 		fmt: "usage: pfdsl fmt <file|-> [--write] [--check] [--no-color]",
 		delete:
 			"usage: pfdsl delete <file|-> <id[,id...]> [--write] [--json] [--no-color]",
+		prune:
+			"usage: pfdsl prune <file|-> [--write] [--check] [--json] [--no-color]",
 		rename:
 			"usage: pfdsl rename <file|-> <old> <new> [--write] [--json] [--no-color]",
 		"meta reindex":
@@ -219,8 +221,8 @@ describe("command metadata parse surface (#1050)", () => {
 		options: Record<string, unknown>;
 	}) => new Set(Object.keys(entry.options).map((name) => `--${name}`));
 
-	it("covers exactly 30 dispatchable command entries", () => {
-		expect(commandTargets).toHaveLength(30);
+	it("covers exactly 31 dispatchable command entries", () => {
+		expect(commandTargets).toHaveLength(31);
 	});
 
 	it.each(
@@ -6951,21 +6953,19 @@ legacy_in >> build_legacy -> legacy_out
 		expect(after.ready).not.toBe(before.ready);
 	});
 
-	// scripts/pfdsl/sweep-completed-chains.mjs does not compare
-	// `status ready`'s whole output byte-for-byte (that breaks on every real
-	// sweep, #1125 defect 5 — see ready-compare.mjs's own doc); it compares
-	// via readyUnchanged instead. That relaxation must not reopen the gap the
-	// two tests above exist to close, so this drives readyUnchanged itself
+	// prune compares `status ready` without empty.complete (#1125 defect 5).
+	// That relaxation must not reopen the gap the two tests above exist to
+	// close, so this drives comparableReady itself
 	// through the same "id set same, an item's declared inputs shrank"
 	// shape — via the same synthetic fixture as the two tests above rather
 	// than a real roadmap.pfdsl node name, so this sweeping that fixture
 	// eventually (this issue's own mechanism) never makes the test stale.
-	it("readyUnchanged still rejects a synthetic corruption that shrinks a ready item's inputs while its id set stays put (#1125 defect 5 regression guard)", async () => {
+	it("comparableReady still detects corruption that shrinks a ready item's inputs while its id set stays put (#1125 defect 5 regression guard)", async () => {
 		// tool_a is a done input of the ready build_feature; deleting only it
 		// (not the process, not tool_b) is exactly the "declared input
 		// silently dropped" corruption the comparison exists to catch, not a
 		// legitimate sweep of a completed chain — same deletion as the test
-		// above, driven through readyUnchanged itself instead of just the
+		// above, driven through comparableReady itself instead of just the
 		// ready id set.
 		const { output, notFound } = deleteNodes(roadmap, ["tool_a"]);
 		expect(notFound).toEqual([]);
@@ -6982,7 +6982,9 @@ legacy_in >> build_legacy -> legacy_out
 		);
 		expect(afterItem.inputs.length).toBe(beforeItem.inputs.length - 1);
 
-		expect(readyUnchanged(before.ready, after.ready)).toBe(false);
+		expect(comparableReady(before.ready)).not.toBe(
+			comparableReady(after.ready),
+		);
 	});
 });
 
