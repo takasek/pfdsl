@@ -9,6 +9,8 @@ on:
 jobs:
   publish-core:
     runs-on: ubuntu-latest
+    # The npm trusted publisher requires this environment, whose deployment policy admits only release tags, so a workflow edited on a branch cannot publish.
+    environment: npm-publish
     permissions:
       contents: read
       id-token: write
@@ -53,6 +55,8 @@ jobs:
 
   publish-graphviz-exporter:
     runs-on: ubuntu-latest
+    # The npm trusted publisher requires this environment, whose deployment policy admits only release tags, so a workflow edited on a branch cannot publish.
+    environment: npm-publish
     needs: publish-core
     permissions:
       contents: read
@@ -98,6 +102,8 @@ jobs:
 
   publish-preview-engine:
     runs-on: ubuntu-latest
+    # The npm trusted publisher requires this environment, whose deployment policy admits only release tags, so a workflow edited on a branch cannot publish.
+    environment: npm-publish
     needs: [publish-core, publish-graphviz-exporter]
     permissions:
       contents: read
