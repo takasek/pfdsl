@@ -103,7 +103,7 @@ describe("parseArgs", () => {
 describe("command metadata parse surface (#1050)", () => {
 	const legacyUsageByCommand: Record<string, string> = {
 		check:
-			"usage: pfdsl check <file|-> [--strict] [--hints] [--json] [--no-color]",
+			"usage: pfdsl check <file|-> [--reference-context <file>] [--strict] [--hints] [--json] [--no-color]",
 		"graph summary":
 			"usage: pfdsl graph summary <file|-> [--json] [--no-color]",
 		"graph io": "usage: pfdsl graph io <file|-> [--json] [--no-color]",
@@ -120,7 +120,7 @@ describe("command metadata parse surface (#1050)", () => {
 			"usage: pfdsl meta sort <file|-> --by <keys> [--write] [--check] [--no-color]",
 		"graph edges": "usage: pfdsl graph edges <file|-> [--json] [--no-color]",
 		render:
-			"usage: pfdsl render <file|-> [--format dot|svg|pdf|png] [--no-color]",
+			"usage: pfdsl render <file|-> [--reference-context <file>] [--format dot|svg|pdf|png] [--no-color]",
 		diff: "usage: pfdsl diff <a> <b> [--format text|dot|svg] [--json] [--no-color]",
 		"status ready":
 			"usage: pfdsl status ready <file|-> [--no-counts] [--json] [--no-color]",
@@ -133,11 +133,11 @@ describe("command metadata parse surface (#1050)", () => {
 		"meta create":
 			"usage: pfdsl meta create <file> <id> [field=value ...] [--write] [--json] [--allow-unknown] [--no-color]",
 		"meta check-links":
-			"usage: pfdsl meta check-links <file> [--json] [--no-color]",
+			"usage: pfdsl meta check-links <file> [--reference-context <file>] [--json] [--no-color]",
 		"meta get":
-			"usage: pfdsl meta get <file|-> <id[,id...]> [field[,field...]] [--json] [--no-color]",
+			"usage: pfdsl meta get <file|-> <id[,id...]> [field[,field...]] [--reference-context <file>] [--json] [--no-color]",
 		"meta list":
-			"usage: pfdsl meta list <file|-> [--tag <t[,t...]>] [--group <g>] [--producer <p>] [field[,field...]] [--json] [--no-color]",
+			"usage: pfdsl meta list <file|-> [--reference-context <file>] [--tag <t[,t...]>] [--group <g>] [--producer <p>] [field[,field...]] [--json] [--no-color]",
 		"meta values":
 			"usage: pfdsl meta values <file|-> <field[,field...]> [--json] [--no-color]",
 		"graph neighbors":
@@ -145,7 +145,7 @@ describe("command metadata parse surface (#1050)", () => {
 		"graph locate":
 			"usage: pfdsl graph locate <file|-> <id> [--field <name[,name...]>] [--json] [--no-color]",
 		"graph describe":
-			"usage: pfdsl graph describe <file|-> <id> [--json] [--no-color]",
+			"usage: pfdsl graph describe <file|-> <id> [--reference-context <file>] [--json] [--no-color]",
 		"graph impact":
 			"usage: pfdsl graph impact <file|-> <id> [--json] [--no-color]",
 		"graph depends-on":
@@ -398,7 +398,11 @@ describe("command metadata parse surface (#1050)", () => {
 			expected: ["write", "check", "no-color"],
 		},
 		{ label: "explain", name: "explain", expected: [] },
-		{ label: "render", name: "render", expected: ["format", "no-color"] },
+		{
+			label: "render",
+			name: "render",
+			expected: ["reference-context", "format", "no-color"],
+		},
 		{
 			label: "diff",
 			name: "diff",

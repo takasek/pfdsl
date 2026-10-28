@@ -38,6 +38,8 @@ export function publishEdit({
 	expectedRemote = `https://github.com/${repository}.wiki.git`,
 	temporaryRoot = tmpdir(),
 	message = "docs(wiki): update the trial roadmap",
+	roadmapSource,
+	localSources,
 }) {
 	if (!/^[\w-]+\/[\w.-]+$/.test(repository ?? ""))
 		throw new Error("Expected repository owner/name");
@@ -110,6 +112,8 @@ export function publishEdit({
 			repository,
 			cli,
 			expectedRevision: sourceRevision,
+			roadmapSource,
+			localSources,
 		});
 		let publication;
 		try {

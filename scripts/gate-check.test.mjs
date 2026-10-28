@@ -149,6 +149,305 @@ function runGate(args = []) {
 	);
 }
 
+it("uses the selected Wiki snapshot and refuses to infer completed work from repository history", () => {
+	for (const pkg of ["core", "cli"]) {
+		mkdirSync(join(fixture, `packages/${pkg}`), { recursive: true });
+		symlinkSync(
+			join(root, `packages/${pkg}/dist`),
+			join(fixture, `packages/${pkg}/dist`),
+			"dir",
+		);
+	}
+	const wiki = join(fixture, "wiki");
+	mkdirSync(wiki);
+	git(["-C", wiki, "init", "--initial-branch=main"]);
+	git(["-C", wiki, "config", "user.email", "test@example.com"]);
+	git(["-C", wiki, "config", "user.name", "Test"]);
+	const text =
+		"---\ntype: roadmap\nartifact:\n  input: {status: done}\n  result: {status: wip, criteria: Reviewed.}\n---\ninput >> work -> result\n";
+	writeFileSync(join(wiki, "roadmap.pfdsl"), text);
+	writeFileSync(join(wiki, "roadmap.md"), "Companion\n");
+	git(["-C", wiki, "add", "."]);
+	git(["-C", wiki, "commit", "-m", "test: source snapshot"]);
+	const wikiRevision = spawnSync("git", ["-C", wiki, "rev-parse", "HEAD"], {
+		encoding: "utf8",
+	}).stdout.trim();
+	mkdirSync(join(fixture, ".pfdsl"));
+	writeFileSync(join(fixture, ".pfdsl/roadmap.pfdsl"), "invalid old roadmap\n");
+	git(["add", ".pfdsl"]);
+	git(["commit", "-m", "test: implementation work"]);
+	const basisRevision = spawnSync("git", ["rev-parse", "HEAD"], {
+		cwd: fixture,
+		encoding: "utf8",
+	}).stdout.trim();
+	const config = join(fixture, "source.json");
+	writeFileSync(
+		config,
+		JSON.stringify({
+			roadmapSource: {
+				adapter: "local-git",
+				source: "wiki",
+				revision: wikiRevision,
+				documentId: "roadmap.pfdsl",
+				companionId: "roadmap.md",
+				logicalPath: ".pfdsl/roadmap.pfdsl",
+				basis: { source: "body", revision: basisRevision },
+			},
+			localSources: { wiki, body: fixture },
+		}),
+	);
+	writeFileSync(
+		join(fixture, "scripts/pfdsl/audit-issues-flow.mjs"),
+		`import {readFileSync} from 'node:fs';\nimport assert from 'node:assert/strict';\nconst index = process.argv.indexOf('--roadmap');\nassert.ok(index > 0);\nassert.equal(readFileSync(process.argv[index + 1], 'utf8'), ${JSON.stringify(text)});\n`,
+	);
+	const invoke = (extra) =>
+		spawnSync(
+			process.execPath,
+			[
+				join(fixture, "scripts/gate-check.mjs"),
+				"--source-config",
+				config,
+				"--artifact",
+				"result",
+				...extra,
+			],
+			{ cwd: fixture, encoding: "utf8" },
+		);
+	const progress = invoke(["--in-progress"]);
+	assert.equal(progress.status, 0, progress.stdout + progress.stderr);
+	assert.match(progress.stdout, new RegExp(wikiRevision));
+	assert.match(progress.stdout, /PASS external roadmap check/);
+	assert.match(progress.stdout, /SKIP wip transition/);
+	assert.doesNotMatch(progress.stdout, /Ready-set diff \(origin/);
+	assert.doesNotMatch(progress.stdout, /invalid old roadmap/);
+	const complete = invoke([]);
+	assert.equal(complete.status, 1, complete.stdout + complete.stderr);
+	assert.match(complete.stdout, /completion evidence/);
+	assert.match(complete.stdout, /external roadmap start-time history/);
+});
+
+function externalClosureConfig({ entry, dependencies = {} }) {
+	for (const pkg of ["core", "cli"]) {
+		mkdirSync(join(fixture, `packages/${pkg}`), { recursive: true });
+		symlinkSync(
+			join(root, `packages/${pkg}/dist`),
+			join(fixture, `packages/${pkg}/dist`),
+			"dir",
+		);
+	}
+	mkdirSync(join(fixture, ".pfdsl"));
+	writeFileSync(join(fixture, "evidence.txt"), "Committed evidence\n");
+	for (const [name, content] of Object.entries(dependencies)) {
+		writeFileSync(join(fixture, ".pfdsl", name), content);
+	}
+	git(["add", ".pfdsl", "evidence.txt"]);
+	git(["commit", "-m", "test: model basis"]);
+	const basisRevision = spawnSync("git", ["rev-parse", "HEAD"], {
+		cwd: fixture,
+		encoding: "utf8",
+	}).stdout.trim();
+	// This working-tree file must not repair a missing file in the selected commit.
+	writeFileSync(join(fixture, "missing.txt"), "Uncommitted decoy\n");
+	const wiki = join(fixture, "wiki");
+	mkdirSync(wiki);
+	git(["-C", wiki, "init", "--initial-branch=main"]);
+	git(["-C", wiki, "config", "user.email", "test@example.com"]);
+	git(["-C", wiki, "config", "user.name", "Test"]);
+	writeFileSync(join(wiki, "roadmap.pfdsl"), entry);
+	writeFileSync(join(wiki, "roadmap.md"), "Companion\n");
+	git(["-C", wiki, "add", "."]);
+	git(["-C", wiki, "commit", "-m", "test: external model"]);
+	const wikiRevision = spawnSync("git", ["-C", wiki, "rev-parse", "HEAD"], {
+		encoding: "utf8",
+	}).stdout.trim();
+	const config = join(fixture, "source.json");
+	writeFileSync(
+		config,
+		JSON.stringify({
+			roadmapSource: {
+				adapter: "local-git",
+				source: "wiki",
+				revision: wikiRevision,
+				documentId: "roadmap.pfdsl",
+				companionId: "roadmap.md",
+				logicalPath: ".pfdsl/roadmap.pfdsl",
+				basis: { source: "body", revision: basisRevision },
+			},
+			localSources: { wiki, body: fixture },
+		}),
+	);
+	return config;
+}
+
+const externalModel = (metadata = "", location = "evidence.txt") =>
+	`---\ntype: roadmap\nbasePath: ..\nbaseRef: {source: body, revision: main}\n${metadata}artifact:\n  input: {status: done, location: ${location}}\n  result: {status: wip, criteria: Reviewed.}\n---\ninput >> work -> result\n`;
+
+it("validates an external raw YAML preset through the entry closure without treating it as a diagram", () => {
+	const config = externalClosureConfig({
+		entry: externalModel("extends: theme.yaml\n"),
+		dependencies: {
+			"theme.yaml": "statusStyles:\n  done: {fillcolor: '#123456'}\n",
+		},
+	});
+	const result = runGate(["--source-config", config]);
+	assert.equal(result.status, 0, result.stdout + result.stderr);
+	assert.match(
+		result.stdout,
+		/PASS external roadmap check \(\.pfdsl\/roadmap.pfdsl\)/,
+	);
+	assert.doesNotMatch(
+		result.stdout,
+		/external roadmap (?:check|links) \(\.pfdsl\/theme.yaml\)/,
+	);
+	assert.doesNotMatch(result.stdout + result.stderr, /L002|P005/);
+});
+
+it("fails external entry links when a location is absent from the fixed artifact target", () => {
+	const config = externalClosureConfig({
+		entry: externalModel("", "missing.txt"),
+	});
+	const result = runGate(["--source-config", config]);
+	assert.equal(result.status, 1, result.stdout + result.stderr);
+	assert.match(
+		result.stdout,
+		/PASS external roadmap check \(\.pfdsl\/roadmap.pfdsl\)/,
+	);
+	assert.match(
+		result.stdout,
+		/FAIL external roadmap links \(\.pfdsl\/roadmap.pfdsl\)/,
+	);
+	assert.match(result.stdout, /missing.txt/);
+});
+
+it("checks every external child location even when the entry links succeed", () => {
+	const config = externalClosureConfig({
+		entry: externalModel("process: {work: {subflow: child.txt}}\n"),
+		dependencies: {
+			"child.txt":
+				"---\nbasePath: ..\nbaseRef: {source: body, revision: main}\nartifact:\n  input: {location: missing.txt}\n---\ninput >> child_work -> result\n",
+		},
+	});
+	const result = runGate(["--source-config", config]);
+	assert.match(
+		result.stdout,
+		/PASS external roadmap check \(\.pfdsl\/roadmap.pfdsl\)/,
+		result.stderr,
+	);
+	assert.equal(result.status, 1, result.stdout + result.stderr);
+	assert.match(
+		result.stdout,
+		/PASS external roadmap links \(\.pfdsl\/roadmap.pfdsl\)/,
+	);
+	assert.match(
+		result.stdout,
+		/FAIL external roadmap links \(\.pfdsl\/child.txt\)/,
+	);
+	assert.match(result.stdout, /missing.txt/);
+});
+
+it("retains replayable reference results for the entry and child without temporary paths", () => {
+	const entry = externalModel("process: {work: {subflow: child.txt}}\n")
+		.replace("revision: main", "revision: target-one")
+		.replace(
+			"criteria: Reviewed.",
+			"criteria: Reviewed., location: evidence.txt, ref: {source: body, revision: target-two}",
+		);
+	const config = externalClosureConfig({
+		entry,
+		dependencies: {
+			"child.txt":
+				"---\nbasePath: ..\nbaseRef: {source: body, revision: target-one}\nartifact:\n  input: {location: evidence.txt}\n---\ninput >> child_work -> result\n",
+		},
+	});
+	const settings = JSON.parse(readFileSync(config, "utf8"));
+	const targets = [];
+	for (const name of ["target-one", "target-two"]) {
+		writeFileSync(join(fixture, "evidence.txt"), `${name} evidence\n`);
+		git(["add", "evidence.txt"]);
+		git(["commit", "-m", `test: ${name}`]);
+		git(["branch", name]);
+		targets.push(
+			spawnSync("git", ["rev-parse", "HEAD"], {
+				cwd: fixture,
+				encoding: "utf8",
+			}).stdout.trim(),
+		);
+	}
+	const result = runGate(["--source-config", config]);
+	assert.equal(result.status, 0, result.stdout + result.stderr);
+	const prefix = "External roadmap reference evidence: ";
+	const records = result.stdout
+		.split("\n")
+		.filter((line) => line.startsWith(prefix))
+		.map((line) => JSON.parse(line.slice(prefix.length)));
+	assert.equal(records.length, 2, result.stdout);
+	const entryRecord = records.find(
+		(record) => record.logicalPath === ".pfdsl/roadmap.pfdsl",
+	);
+	assert.equal(
+		entryRecord.model.fixedRevision,
+		settings.roadmapSource.revision,
+	);
+	assert.equal(
+		entryRecord.basis.fixedRevision,
+		settings.roadmapSource.basis.revision,
+	);
+	assert.deepEqual(
+		entryRecord.targets.map(({ fixedRevision }) => fixedRevision).sort(),
+		[...targets].sort(),
+	);
+	for (const [id, revision] of [
+		["input", targets[0]],
+		["result", targets[1]],
+	]) {
+		assert.ok(
+			entryRecord.results.some(
+				(item) =>
+					item.id === id &&
+					item.fixedRevision === revision &&
+					item.location === "evidence.txt" &&
+					item.result === "exists",
+			),
+			JSON.stringify(entryRecord),
+		);
+	}
+	const childRecord = records.find(
+		(record) => record.logicalPath === ".pfdsl/child.txt",
+	);
+	assert.equal(
+		childRecord.model.fixedRevision,
+		settings.roadmapSource.basis.revision,
+	);
+	assert.ok(
+		childRecord.results.some(
+			(item) =>
+				item.id === "input" &&
+				item.fixedRevision === targets[0] &&
+				item.result === "exists",
+		),
+	);
+	assert.doesNotMatch(
+		JSON.stringify(records),
+		/"root"|"value"|pfdsl-roadmap-source-/,
+	);
+	assert.doesNotMatch(result.stdout, /pfdsl-roadmap-source-/);
+});
+
+it("fails an otherwise successful link command that omits its reference resolution record", () => {
+	const config = externalClosureConfig({ entry: externalModel() });
+	const dist = join(fixture, "packages/cli/dist");
+	rmSync(dist);
+	mkdirSync(dist);
+	writeFileSync(
+		join(dist, "cli.js"),
+		`const {spawnSync} = require('node:child_process');\nconst args = process.argv.slice(2);\nconst result = spawnSync(process.execPath, [${JSON.stringify(join(root, "packages/cli/dist/cli.js"))}, ...args], {encoding: 'utf8'});\nlet output = result.stdout;\nif (args[0] === 'meta' && args[1] === 'check-links') { const report = JSON.parse(output); delete report.referenceResolution; output = JSON.stringify(report); }\nprocess.stdout.write(output);\nprocess.stderr.write(result.stderr);\nprocess.exit(result.status);\n`,
+	);
+	const result = runGate(["--source-config", config]);
+	assert.equal(result.status, 1, result.stdout + result.stderr);
+	assert.match(result.stdout, /FAIL external roadmap links/);
+	assert.match(result.stdout, /resolution record/);
+});
+
 function assertFinalManualGuidance(result) {
 	const expected = [
 		"Manual checks:",

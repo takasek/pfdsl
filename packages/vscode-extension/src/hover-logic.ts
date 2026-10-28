@@ -5,7 +5,10 @@ import {
 	type NodeKind,
 	resolveLocationFsPath,
 } from "@pfdsl/core";
-import { buildHoverLines as buildSharedHoverLines } from "@pfdsl/editor";
+import {
+	buildHoverLines as buildSharedHoverLines,
+	resolveDocumentReference,
+} from "@pfdsl/editor";
 
 export const RUN_COMMAND = "pfdsl._runProcessCommand";
 const GOTO_COMMAND = "pfdsl._gotoNodeDefinition";
@@ -44,7 +47,21 @@ export function buildHoverLines(
 			? {
 					node: (nodeId, icon) =>
 						`[${icon} ${nodeId}](command:${GOTO_COMMAND}?${encodeURIComponent(JSON.stringify([docUri, nodeId]))})`,
-					location: (loc) => locationLink(docUri, loc, frontmatter?.basePath),
+					location: (loc) => {
+						if (kind !== "group") {
+							try {
+								resolveDocumentReference(
+									docUri.startsWith("file:") ? fileURLToPath(docUri) : null,
+									{ kind, id, field: "location", value: loc },
+									frontmatter?.basePath,
+									frontmatter,
+								);
+							} catch {
+								return loc.replace(/[\\[\]]/g, "\\$&");
+							}
+						}
+						return locationLink(docUri, loc, frontmatter?.basePath);
+					},
 					command: (command) =>
 						`${command}  [▶ run](command:${RUN_COMMAND}?${encodeURIComponent(JSON.stringify([command, docUri, frontmatter?.basePath]))})`,
 				}

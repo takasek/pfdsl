@@ -205,8 +205,32 @@ export function outputArtifactStatusStep({
 	inProgress,
 	noArtifact,
 	changedFiles,
+	roadmap,
 }) {
 	const name = "output artifact status update";
+	if (roadmap?.context && !noArtifact) {
+		if (!artifactKey)
+			return {
+				name,
+				status: "FAIL",
+				detail: "external roadmap requires --artifact or --no-artifact",
+			};
+		if (!inProgress)
+			return {
+				name,
+				status: "FAIL",
+				detail:
+					"external roadmap completion evidence is not defined: the maintainer must bind criteria, the fixed source revision, and required merge/publication/acceptance records before done can pass",
+			};
+		return {
+			name,
+			...classifyOutputArtifactStatus({
+				artifactKey,
+				inProgress,
+				status: extractArtifactStatus(roadmap.text, artifactKey),
+			}),
+		};
+	}
 	const roadmapChanged = changedFiles.includes(ROADMAP_PATH);
 
 	if (noArtifact || (!artifactKey && !roadmapChanged)) {
@@ -273,9 +297,18 @@ export function wipTransitionStep({
 	artifactKey,
 	noArtifact,
 	changedFiles,
+	roadmap,
+	inProgress,
 }) {
 	const name = "wip transition";
 	if (noArtifact) return { name, status: "SKIP", detail: NO_ARTIFACT_DETAIL };
+	if (roadmap?.context)
+		return {
+			name,
+			status: inProgress ? "SKIP" : "FAIL",
+			detail:
+				"external roadmap start-time history is not verified; repository commits cannot establish the Wiki transition. The maintainer must define evidence for the cycle start and fixed Wiki revisions before cutover",
+		};
 	if (!changedFiles.includes(ROADMAP_PATH)) {
 		return { name, status: "SKIP", detail: `no ${ROADMAP_PATH} changes` };
 	}

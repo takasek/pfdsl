@@ -3,6 +3,7 @@ import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import {
 	existsSync,
+	mkdirSync,
 	mkdtempSync,
 	readFileSync,
 	rmSync,
@@ -174,7 +175,7 @@ test("failure preserves the previous output pair, and dirty work and stale revis
 	assert.equal(read(wiki, "roadmap.svg"), svg);
 });
 
-test("does not silently ignore reference fields unsupported by the current resolver", (t) => {
+test("does not silently ignore references without a configured local source", (t) => {
 	for (const addition of [
 		"baseRef: {source: github:takasek/pfdsl, revision: main}\n",
 		"artifact: {a: {ref: {source: github:takasek/pfdsl, revision: main}}}\n",
@@ -185,10 +186,7 @@ test("does not silently ignore reference fields unsupported by the current resol
 			`---\n${addition}---\na >> p -> b\n`,
 		);
 		commit(wiki);
-		assert.throws(
-			() => generate(options(wiki)),
-			/reference resolution.*not supported/i,
-		);
+		assert.throws(() => generate(options(wiki)), /unknown source/i);
 	}
 });
 
@@ -203,23 +201,127 @@ test("checks external references in the actual dependency closure regardless of 
 		"---\nbaseRef: {source: github:takasek/pfdsl, revision: main}\n---\na >> q -> b\n",
 	);
 	commit(wiki);
-	assert.throws(
-		() => generate(options(wiki)),
-		/reference resolution.*not supported/i,
-	);
+	assert.throws(() => generate(options(wiki)), /unknown source/i);
 });
 
-test("escapes index metadata and rejects symlink inputs", (t) => {
+test("fixed body references invalidate unchanged Wiki generation when their branch moves", (t) => {
+	const wiki = fixture(t);
+	const body = mkdtempSync(join(tmpdir(), "wiki-reference-body-"));
+	t.after(() => rmSync(body, { recursive: true, force: true }));
+	git(body, "init", "-b", "main");
+	git(body, "config", "user.name", "Test");
+	git(body, "config", "user.email", "test@example.invalid");
+	writeFileSync(join(body, "plan.md"), "First plan\n");
+	const c0 = commit(body);
+	mkdirSync(join(body, ".pfdsl"));
+	writeFileSync(
+		join(wiki, "roadmap.pfdsl"),
+		model
+			.replace(
+				"artifact:",
+				"basePath: ..\nbaseRef: {source: body, revision: main}\nartifact:",
+			)
+			.replace("a: {status: done}", "a: {status: done, location: plan.md}"),
+	);
+	commit(wiki);
+	const settings = {
+		...options(wiki),
+		roadmapSource: {
+			adapter: "local-git",
+			source: "wiki",
+			revision: "HEAD",
+			documentId: "roadmap.pfdsl",
+			companionId: "roadmap.md",
+			logicalPath: ".pfdsl/roadmap.pfdsl",
+			basis: { source: "body", revision: c0 },
+		},
+		localSources: { body },
+	};
+	const configRoot = mkdtempSync(join(tmpdir(), "wiki-source-settings-"));
+	t.after(() => rmSync(configRoot, { recursive: true, force: true }));
+	const configFile = join(configRoot, "source.json");
+	writeFileSync(
+		configFile,
+		JSON.stringify({
+			roadmapSource: settings.roadmapSource,
+			localSources: settings.localSources,
+		}),
+	);
+	const first = JSON.parse(
+		execFileSync(
+			process.execPath,
+			[
+				resolve("scripts/wiki-roadmap-generate.mjs"),
+				"--wiki",
+				wiki,
+				"--repository",
+				"takasek/pfdsl",
+				"--source-config",
+				configFile,
+			],
+			{ encoding: "utf8" },
+		),
+	);
+	commit(wiki);
+	assert.equal(generate(settings).status, "unchanged");
+	writeFileSync(join(body, "plan.md"), "Updated plan\n");
+	const c1 = commit(body);
+	const next = generate(settings);
+	assert.equal(next.status, "generated");
+	assert.notEqual(next.key, first.key);
+	const receipt = JSON.parse(
+		read(wiki, "roadmap.index.md")
+			.split("<!-- pfdsl-wiki-preview: ")[1]
+			.split(" -->")[0],
+	);
+	assert.equal(receipt.referenceContext.basis.fixedRevision, c0);
+	assert.equal(receipt.referenceContext.targets[0].fixedRevision, c1);
+	assert.equal(receipt.referenceContext.model.documentId, "roadmap.pfdsl");
+	assert.equal(receipt.referenceContext.targets[0].root, undefined);
+	const checked = receipt.referenceChecks[0].results.find(
+		(item) => item.id === "a",
+	);
+	assert.equal(checked.result, "exists");
+	assert.equal(checked.logicalPath, "plan.md");
+	assert.equal(checked.source, "body");
+	assert.equal(checked.fixedRevision, c1);
+	assert.equal(checked.root, undefined);
+	assert.equal(checked.value, undefined);
+	commit(wiki);
+	rmSync(join(body, "plan.md"));
+	commit(body);
+	const before = read(wiki, "roadmap.index.md");
+	assert.throws(() => generate(settings));
+	assert.equal(read(wiki, "roadmap.index.md"), before);
+});
+
+test("escapes index metadata and reference identities and rejects symlink inputs", (t) => {
 	const wiki = fixture(t);
 	writeFileSync(
 		join(wiki, "roadmap.pfdsl"),
 		model.replace("Trial roadmap", "'<img src=x> [click](evil)'"),
 	);
-	commit(wiki);
-	generate(options(wiki));
+	const revision = commit(wiki);
+	const source = "wiki--><img src=x>";
+	generate({
+		...options(wiki),
+		roadmapSource: {
+			adapter: "local-git",
+			source,
+			revision,
+			documentId: "roadmap.pfdsl",
+			logicalPath: "roadmap.pfdsl",
+			basis: { source, revision },
+		},
+	});
 	const page = read(wiki, "roadmap.index.md");
 	assert.doesNotMatch(page, /<img/);
 	assert.match(page, /&lt;img/);
+	assert.equal(
+		JSON.parse(page.split("<!-- pfdsl-wiki-preview: ")[1].split(" -->")[0])
+			.referenceContext.model.source,
+		source,
+	);
 	commit(wiki);
 	rmSync(join(wiki, "roadmap.md"));
 	symlinkSync("roadmap.pfdsl", join(wiki, "roadmap.md"));
@@ -282,4 +384,32 @@ test("publishes only the generated pair and refuses competing remote commits", (
 	);
 	assert.equal(git(wiki, "rev-parse", "HEAD"), next.wikiRevision);
 	assert.equal(git(remote, "rev-parse", "refs/heads/master"), editorRevision);
+});
+
+test("explicit moving same-Wiki basis ignores output commits but detects basis changes", (t) => {
+	const wiki = fixture(t);
+	const settings = {
+		...options(wiki),
+		roadmapSource: {
+			adapter: "local-git",
+			source: "wiki",
+			revision: "HEAD",
+			documentId: "roadmap.pfdsl",
+			logicalPath: "roadmap.pfdsl",
+			basis: { source: "wiki", revision: "HEAD" },
+		},
+	};
+	const first = generate(settings);
+	assert.equal(first.status, "generated");
+	commit(wiki);
+	const page = read(wiki, "roadmap.index.md");
+	assert.equal(generate(settings).status, "unchanged");
+	assert.equal(read(wiki, "roadmap.index.md"), page);
+	writeFileSync(join(wiki, "basis-input.md"), "Changed source collection\n");
+	commit(wiki);
+	const changed = generate(settings);
+	assert.equal(changed.status, "generated");
+	assert.notEqual(changed.key, first.key);
+	commit(wiki);
+	assert.equal(generate(settings).status, "unchanged");
 });

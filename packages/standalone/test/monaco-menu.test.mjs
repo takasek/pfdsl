@@ -868,7 +868,7 @@ test("the production document-tab entry loads real Monaco menu contributions", a
 				await withEditors(source, async (create) => {
 					const editor = create({ referenceServices: {} });
 					for (const [column, expected] of [
-						[1, ["location", "draft).md"]],
+						[1, ["artifact", "a", "location", "draft).md"]],
 						[6, ['printf ")"']],
 					]) {
 						const hovers = await Promise.all(
@@ -912,6 +912,125 @@ test("the production document-tab entry loads real Monaco menu contributions", a
 						}
 					}
 				});
+			},
+		);
+		await t.test(
+			"invalid reference declarations cannot become local source links",
+			async () => {
+				await withEditors(
+					"---\nbaseRef: {revision: main}\nartifact: {a: {location: plan.md}}\n---\na >> p -> b\n",
+					async (create) => {
+						const opened = [],
+							statuses = [];
+						const editor = create({
+							reportStatus: (value) => statuses.push(value),
+							referenceServices: {
+								context: async () => "/work/model.pfdsl",
+								inspect: async () => "file",
+								open: async (target) => opened.push(target),
+							},
+						});
+						const model = editor.getModel();
+						const links = (
+							await Promise.all(
+								host.languageFeatures.linkProvider
+									.ordered(model)
+									.map((provider) =>
+										provider.provideLinks(model, {
+											isCancellationRequested: false,
+										}),
+									),
+							)
+						)
+							.filter(Boolean)
+							.flatMap((result) => result.links);
+						assert.equal(links.length, 1);
+						await host.openLink(links[0].url);
+						assert.deepEqual(opened, []);
+						assert.match(statuses.at(-1), /front matter errors/);
+					},
+				);
+			},
+		);
+		await t.test(
+			"explicit artifact references never open local files through source, hover, or preview actions",
+			async () => {
+				for (const declaration of [
+					"baseRef: {source: repo, revision: main}\nartifact: {a: {location: plan.md}, url: {location: https://example.com/plan}}",
+					"artifact: {a: {location: plan.md, ref: {source: repo, revision: develop}}, url: {location: https://example.com/plan}}",
+				]) {
+					const source = `---\n${declaration}\nprocess: {p: {location: plan.md, command: build}}\n---\na >> p -> b\n`;
+					await withEditors(source, async (create, tabs) => {
+						const opened = [],
+							inspected = [],
+							statuses = [];
+						const editor = create({
+							path: "/work/model.pfdsl",
+							reportStatus: (value) => statuses.push(value),
+							referenceServices: {
+								context: async () => "/work/model.pfdsl",
+								inspect: async (path) => {
+									inspected.push(path);
+									return "file";
+								},
+								open: async (target) => opened.push(target),
+							},
+						});
+						const model = editor.getModel();
+						const links = (
+							await Promise.all(
+								host.languageFeatures.linkProvider
+									.ordered(model)
+									.map((provider) =>
+										provider.provideLinks(model, {
+											isCancellationRequested: false,
+										}),
+									),
+							)
+						)
+							.filter(Boolean)
+							.flatMap((result) => result.links);
+						assert.equal(links.length, 3);
+						await host.openLink(links[0].url);
+						assert.deepEqual(opened, []);
+						assert.deepEqual(inspected, []);
+						assert.match(statuses.at(-1), /resolution context/);
+						await editor
+							.getAction("pfdsl.openReference")
+							.run(
+								model.getVersionId(),
+								"artifact",
+								"a",
+								"location",
+								"plan.md",
+							);
+						assert.deepEqual(opened, []);
+						assert.match(statuses.at(-1), /resolution context/);
+						await host.openLink(links[1].url);
+						await host.openLink(links[2].url);
+						assert.deepEqual(opened, [
+							{ kind: "url", value: "https://example.com/plan" },
+							{ kind: "path", value: "/work/plan.md" },
+						]);
+						const tab = tabs[0];
+						tab.activate();
+						let node;
+						for (let attempt = 0; attempt < 200 && !node; attempt++) {
+							node = tab.container.querySelector('#inner [data-node-id="a"]');
+							if (!node) await new Promise((resolve) => setTimeout(resolve, 5));
+						}
+						assert.ok(node);
+						node.dispatchEvent(
+							new dom.window.MouseEvent("click", {
+								bubbles: true,
+								metaKey: true,
+							}),
+						);
+						await new Promise((resolve) => setTimeout(resolve, 10));
+						assert.equal(opened.length, 2);
+						assert.match(statuses.at(-1), /resolution context/);
+					});
+				}
 			},
 		);
 		await t.test(

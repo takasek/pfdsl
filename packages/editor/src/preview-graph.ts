@@ -46,11 +46,29 @@ function previewFrontmatter(
 			),
 		);
 	const projected: Frontmatter = {};
+	if (frontmatter.baseRef)
+		projected.baseRef = {
+			source: frontmatter.baseRef.source,
+			revision: frontmatter.baseRef.revision,
+		};
 	for (const kind of ["artifact", "process"] as const) {
 		projected[kind] = Object.fromEntries(
 			[...graph.nodes].flatMap(([id, nodeKind]) => {
 				const meta = frontmatter[kind]?.[id];
-				return nodeKind === kind && meta ? [[id, scalarFields(meta)]] : [];
+				if (nodeKind !== kind || !meta) return [];
+				const ref =
+					kind === "artifact" ? frontmatter.artifact?.[id]?.ref : undefined;
+				return [
+					[
+						id,
+						{
+							...scalarFields(meta),
+							...(ref
+								? { ref: { source: ref.source, revision: ref.revision } }
+								: {}),
+						},
+					],
+				];
 			}),
 		);
 	}

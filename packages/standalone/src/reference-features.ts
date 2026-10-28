@@ -114,17 +114,26 @@ export function registerReferenceFeatures(
 			input.focus();
 		});
 	}
-	async function open(reference: Pick<DocumentReference, "field" | "value">) {
+	async function open(
+		reference: Pick<DocumentReference, "kind" | "id" | "field" | "value">,
+	) {
 		const service = required();
 		const request = ++generation,
 			version = model.getVersionId();
 		const source = analyzeSnapshot(model.getValue());
+		if (
+			source.diagnostics.some(
+				(d) => d.severity === "error" && d.code.startsWith("FM"),
+			)
+		)
+			throw new Error("Fix front matter errors before opening references.");
 		const path = await service.context();
 		if (!valid(request, version)) return;
 		let target = resolveDocumentReference(
 			path,
 			reference,
 			source.frontmatter?.basePath,
+			source.frontmatter,
 		);
 		if (
 			target.kind === "path" &&
@@ -302,11 +311,27 @@ export function registerReferenceFeatures(
 		async handleMessage(message: MessageFromWebview) {
 			const current = analyzeSnapshot(model.getValue());
 			if (message.type === "openUrl")
-				await open({ field: "location", value: message.url });
-			else if (message.type === "openFile")
-				await open({ field: "subflow", value: message.path });
-			else if (message.type === "openLocation") {
+				await open({
+					kind: "artifact",
+					id: "",
+					field: "location",
+					value: message.url,
+				});
+			else if (message.type === "openFile") {
+				if (
+					current.frontmatter?.process?.[message.nodeId]?.subflow !==
+					message.path
+				)
+					return;
+				await open({
+					kind: "process",
+					id: message.nodeId,
+					field: "subflow",
+					value: message.path,
+				});
+			} else if (message.type === "openLocation") {
 				const kind = current.nodeKinds.get(message.nodeId);
+				if (kind !== "artifact" && kind !== "process") return;
 				const meta = kind && current.frontmatter?.[kind]?.[message.nodeId];
 				const locations = normalizeLocation(
 					meta && "location" in meta ? meta.location : undefined,
@@ -318,7 +343,7 @@ export function registerReferenceFeatures(
 						? locations[0]
 						: await prompt("Open location", locations);
 				if (value && valid(request, version))
-					await open({ field: "location", value });
+					await open({ kind, id: message.nodeId, field: "location", value });
 			}
 		},
 		refresh: comparison.refresh,

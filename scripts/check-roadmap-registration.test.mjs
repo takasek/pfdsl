@@ -60,11 +60,16 @@ afterEach(() => {
 	rmSync(fixture, { recursive: true, force: true });
 });
 
-function runWrapper({ roadmap, prIssue, issues, closingRefs }) {
+function runWrapper({ roadmap, prIssue, issues, closingRefs, sourceConfig }) {
 	writeFileSync(join(fixture, ".pfdsl/roadmap.pfdsl"), roadmap);
 	return spawnSync(
 		process.execPath,
-		[join(fixture, "scripts/check-roadmap-registration.mjs"), "--pr", "1"],
+		[
+			join(fixture, "scripts/check-roadmap-registration.mjs"),
+			"--pr",
+			"1",
+			...(sourceConfig ? ["--source-config", sourceConfig] : []),
+		],
 		{
 			cwd: fixture,
 			encoding: "utf8",
@@ -100,6 +105,62 @@ function closingRef(number, owner = "test", repo = "fixture") {
 }
 
 describe("check-roadmap-registration", () => {
+	it("enforces registration against the fixed external source even when the repository roadmap lacks it", () => {
+		mkdirSync(join(fixture, "packages/core"), { recursive: true });
+		symlinkSync(
+			join(root, "packages/core/dist"),
+			join(fixture, "packages/core/dist"),
+			"dir",
+		);
+		const selected =
+			"---\ntype: roadmap\nartifact:\n  result: {status: wip, criteria: Reviewed.}\nprocess:\n  work: {location: https://github.com/test/fixture/issues/12}\n---\n>> work -> result\n";
+		writeFileSync(join(fixture, ".pfdsl/roadmap.pfdsl"), selected);
+		writeFileSync(join(fixture, ".pfdsl/roadmap.md"), "Companion\n");
+		for (const args of [
+			["config", "user.name", "Test"],
+			["config", "user.email", "test@example.com"],
+			["add", ".pfdsl"],
+			["commit", "-m", "test: fixed source"],
+		]) {
+			const result = spawnSync("git", args, { cwd: fixture, encoding: "utf8" });
+			assert.equal(result.status, 0, result.stderr);
+		}
+		const revision = spawnSync("git", ["rev-parse", "HEAD"], {
+			cwd: fixture,
+			encoding: "utf8",
+		}).stdout.trim();
+		const sourceConfig = join(fixture, "source.json");
+		writeFileSync(
+			sourceConfig,
+			JSON.stringify({
+				roadmapSource: {
+					adapter: "local-git",
+					source: "selected",
+					revision,
+					documentId: ".pfdsl/roadmap.pfdsl",
+					companionId: ".pfdsl/roadmap.md",
+					logicalPath: ".pfdsl/roadmap.pfdsl",
+				},
+				localSources: { selected: fixture },
+			}),
+		);
+		const result = runWrapper({
+			roadmap: "---\nprocess: {}\n---\n",
+			prIssue: 12,
+			sourceConfig,
+			issues: [
+				{
+					number: 12,
+					...labelsAndNoIssues,
+					labels: [{ name: "flow:managed" }],
+				},
+			],
+		});
+		assert.equal(result.status, 0, result.stdout + result.stderr);
+		assert.match(result.stdout, new RegExp(revision));
+		assert.match(result.stdout, /PASS/);
+		assert.doesNotMatch(result.stdout, /missing_process/);
+	});
 	for (const ref of [
 		closingRef(99, "other"),
 		closingRef(99, "test", "other"),

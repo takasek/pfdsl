@@ -18,6 +18,17 @@ spec >> build -> published
 `;
 
 describe("extractDocumentLinks", () => {
+	it("omits unresolved artifact paths while retaining URL and process links", () => {
+		const source =
+			"---\nbaseRef: {source: repo, revision: main}\nartifact: {a: {location: [plan.md, https://example.com/plan]}}\nprocess: {p: {location: script.mjs, subflow: child.pfdsl}}\n---\na >> p -> b\n";
+		expect(
+			extractDocumentLinks(source, DOC_PATH).map((link) => link.target),
+		).toEqual([
+			"https://example.com/plan",
+			"file:///repo/.pfdsl/script.mjs",
+			"file:///repo/.pfdsl/child.pfdsl",
+		]);
+	});
 	it("returns a link for a relative location field", () => {
 		const links = extractDocumentLinks(MINIMAL_PFDSL, DOC_PATH);
 		const specLink = links.find((l) => l.target.includes("/repo/docs/spec.md"));

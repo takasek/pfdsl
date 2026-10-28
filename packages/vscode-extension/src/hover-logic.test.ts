@@ -6,6 +6,27 @@ function tableContent(lines: string[]): string {
 }
 
 describe("buildHoverLines", () => {
+	it("shows unresolved artifact locations as text while preserving process and URL links", () => {
+		const fm = {
+			baseRef: { source: "repo", revision: "main" },
+			artifact: { a: { location: ["plan.md", "https://example.com/plan"] } },
+			process: { p: { location: "script.mjs" } },
+		};
+		const artifact = buildHoverLines(
+			"a",
+			"artifact",
+			fm,
+			"file:///repo/a.pfdsl",
+		).join("\n");
+		expect(artifact).toContain("plan.md");
+		expect(artifact).not.toContain("file:///repo/plan.md");
+		expect(artifact).toContain(
+			"[https://example.com/plan](https://example.com/plan)",
+		);
+		expect(
+			buildHoverLines("p", "process", fm, "file:///repo/a.pfdsl").join("\n"),
+		).toContain("file:///repo/script.mjs");
+	});
 	it("returns header line and separator for id and kind", () => {
 		const lines = buildHoverLines("art1", "artifact", null);
 		expect(lines[0]).toBe("📄 **art1**");

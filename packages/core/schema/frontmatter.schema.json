@@ -100,6 +100,21 @@
 							},
 							"revises": {
 								"type": "string"
+							},
+							"ref": {
+								"type": "object",
+								"properties": {
+									"source": {
+										"type": "string",
+										"pattern": "\\S"
+									},
+									"revision": {
+										"type": "string",
+										"pattern": "\\S"
+									}
+								},
+								"required": ["source", "revision"],
+								"additionalProperties": false
 							}
 						},
 						"additionalProperties": {}
@@ -303,6 +318,21 @@
 		},
 		"basePath": {
 			"type": "string"
+		},
+		"baseRef": {
+			"type": "object",
+			"properties": {
+				"source": {
+					"type": "string",
+					"pattern": "\\S"
+				},
+				"revision": {
+					"type": "string",
+					"pattern": "\\S"
+				}
+			},
+			"required": ["source", "revision"],
+			"additionalProperties": false
 		},
 		"type": {
 			"type": "string",

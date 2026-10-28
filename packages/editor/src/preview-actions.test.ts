@@ -472,6 +472,7 @@ it.each([
 	);
 	expect(s.postMessage).toHaveBeenCalledWith({
 		type: "openFile",
+		nodeId: id,
 		path: "subflow.pfdsl",
 	});
 });

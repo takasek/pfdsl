@@ -41,6 +41,56 @@ function fakeExec(responses = {}) {
 }
 
 const ROADMAP = ".pfdsl/roadmap.pfdsl";
+describe("external roadmap gate evidence", () => {
+	const roadmap = {
+		context: { model: { source: "wiki", fixedRevision: "abc" } },
+		text: "---\nartifact:\n  result: {status: done}\n---\n",
+	};
+	it("does not accept done from repository history when external completion evidence is missing", () => {
+		const { exec, calls } = fakeExec();
+		const row = outputArtifactStatusStep({
+			exec,
+			base: "main",
+			artifactKey: "result",
+			changedFiles: [ROADMAP],
+			roadmap,
+		});
+		assert.equal(row.status, "FAIL");
+		assert.match(row.detail, /completion evidence/);
+		assert.deepEqual(calls, []);
+	});
+	it("checks an in-progress status in the fixed snapshot without reading repository history", () => {
+		for (const status of ["wip", "waiting", "done", "todo"]) {
+			const { exec, calls } = fakeExec();
+			const row = outputArtifactStatusStep({
+				exec,
+				base: "main",
+				artifactKey: "result",
+				inProgress: true,
+				changedFiles: [],
+				roadmap: { ...roadmap, text: roadmap.text.replace("done", status) },
+			});
+			assert.equal(
+				row.status,
+				["wip", "waiting"].includes(status) ? "PASS" : "FAIL",
+			);
+			assert.deepEqual(calls, []);
+		}
+	});
+	it("does not infer external start-time history from the implementation repository", () => {
+		const { exec, calls } = fakeExec();
+		const row = wipTransitionStep({
+			exec,
+			base: "main",
+			artifactKey: "result",
+			changedFiles: [ROADMAP],
+			roadmap,
+		});
+		assert.equal(row.status, "FAIL");
+		assert.match(row.detail, /external.*history/);
+		assert.deepEqual(calls, []);
+	});
+});
 describe("packageTypecheckSteps", () => {
 	for (const pkg of ["core", "cli", "vscode-extension"]) {
 		it(`checks changed ${pkg} test files and skips other packages`, () => {

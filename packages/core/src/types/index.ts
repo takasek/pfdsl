@@ -20,6 +20,7 @@ export type {
 	NodeStyle,
 	PfdType,
 	ProcessMeta,
+	ReferenceTarget,
 	Status,
 	StyleAttr,
 	TagMeta,

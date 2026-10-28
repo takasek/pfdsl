@@ -63,6 +63,7 @@ const host = vi.hoisted(() => {
 		),
 		showInformationMessage: vi.fn(),
 		showWarningMessage: vi.fn(),
+		showErrorMessage: vi.fn(),
 		showQuickPick: vi.fn(async (items: unknown[]) => items[0]),
 		showTextDocument: vi.fn(
 			async (
@@ -1305,6 +1306,19 @@ it.each([
 });
 
 describe("registered preview file navigation", () => {
+	it("reports an unresolved explicit artifact location without opening a local file", async () => {
+		const { open } = setup();
+		const doc = document(
+			"explicit-reference",
+			"---\nbaseRef: {source: repo, revision: main}\nartifact: {a: {location: plan.md}}\n---\na >> p -> b\n",
+		);
+		const panel = await open(doc);
+		await panel.receive({ type: "openLocation", nodeId: "a" });
+		expect(host.api.workspace.openTextDocument).not.toHaveBeenCalled();
+		expect(host.window.showErrorMessage).toHaveBeenCalledWith(
+			expect.stringMatching(/resolution context/),
+		);
+	});
 	it("resolves subflow openFile from the parent document and location from basePath", async () => {
 		const { open } = setup();
 		const doc = document(
@@ -1315,7 +1329,7 @@ describe("registered preview file navigation", () => {
 			{ document: doc, viewColumn: 1 },
 		] as vscode.TextEditor[];
 		const panel = await open(doc);
-		panel.receive({ type: "openFile", path: "child.pfdsl" });
+		panel.receive({ type: "openFile", nodeId: "p", path: "child.pfdsl" });
 		await vi.waitFor(() => {
 			expect(host.window.showTextDocument).toHaveBeenCalledWith(
 				expect.objectContaining({

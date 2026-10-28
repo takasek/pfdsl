@@ -67,6 +67,15 @@ describe("localClosingIssueNumbers", () => {
 });
 
 describe("buildAuditArgs", () => {
+	it("uses the supplied fixed roadmap snapshot for every enforced issue", () => {
+		assert.deepEqual(buildAuditArgs([12], "/snapshot/roadmap.pfdsl"), [
+			"scripts/pfdsl/audit-issues-flow.mjs",
+			"--roadmap",
+			"/snapshot/roadmap.pfdsl",
+			"--enforce-issue",
+			"12",
+		]);
+	});
 	it("enforces every issue the PR closes", () => {
 		assert.deepEqual(buildAuditArgs([12, 34]), [
 			"scripts/pfdsl/audit-issues-flow.mjs",

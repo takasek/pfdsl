@@ -19,6 +19,17 @@ import {
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 
 describe("run-exec", () => {
+	it("preserves binary stdout when explicitly requested and keeps text as the default", () => {
+		const args = [
+			"-e",
+			"process.stdout.write(Buffer.from([0, 255, 254, 13, 10]))",
+		];
+		assert.deepEqual(
+			run(process.execPath, args, { cwd: root, encoding: null }),
+			Buffer.from([0, 255, 254, 13, 10]),
+		);
+		assert.equal(typeof run(process.execPath, args, { cwd: root }), "string");
+	});
 	it("bounds an optional probe without changing other runners", () => {
 		// The fallback fails explicitly if timeout forwarding breaks; it must
 		// not race the timeout with a short, successful natural exit.

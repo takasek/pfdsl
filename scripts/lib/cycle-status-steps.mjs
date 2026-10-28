@@ -44,6 +44,8 @@ export function cycleStatusExitCode(result) {
  *   base: string,
  *   issueNumbers?: number[],
  *   artifact?: string,
+ *   roadmap?: {file: string, context?: {model: object}},
+ *   sourceConfig?: string,
  * }} deps
  */
 export async function runCycleStatus({
@@ -56,7 +58,10 @@ export async function runCycleStatus({
 	base,
 	issueNumbers = [],
 	artifact: requestedArtifact,
+	roadmap,
+	sourceConfig,
 }) {
+	const roadmapFile = roadmap?.file ?? ".pfdsl/roadmap.pfdsl";
 	let fetched = true;
 	try {
 		sh("git", ["fetch", "origin"]);
@@ -183,7 +188,7 @@ export async function runCycleStatus({
 					cliPath,
 					"status",
 					"ready",
-					".pfdsl/roadmap.pfdsl",
+					roadmapFile,
 					"--json",
 				]),
 			);
@@ -250,10 +255,7 @@ export async function runCycleStatus({
 		let processIdsByIssue = null;
 		let operation = "read .pfdsl/roadmap.pfdsl";
 		try {
-			const roadmapText = readFileSync(
-				resolve(root, ".pfdsl/roadmap.pfdsl"),
-				"utf-8",
-			);
+			const roadmapText = readFileSync(resolve(root, roadmapFile), "utf-8");
 			operation = "resolve issue repository";
 			const repository = githubOps.repository();
 			operation = "parse .pfdsl/roadmap.pfdsl";
@@ -318,7 +320,7 @@ export async function runCycleStatus({
 								cliPath,
 								"graph",
 								"neighbors",
-								".pfdsl/roadmap.pfdsl",
+								roadmapFile,
 								processId,
 								"--json",
 							]),
@@ -390,9 +392,12 @@ export async function runCycleStatus({
 	}
 	const gateCheckCommand = gateCheckCommandError
 		? null
-		: buildGateCheckCommand(artifactKey, base, targetIssues);
+		: buildGateCheckCommand(artifactKey, base, targetIssues) +
+			(sourceConfig
+				? ` --source-config ${quoteShellArgument(sourceConfig)}`
+				: "");
 	const wipUpdateCommand =
-		!gateCheckCommandError && artifactKey
+		!roadmap?.context && !gateCheckCommandError && artifactKey
 			? `node packages/cli/dist/cli.js meta set .pfdsl/roadmap.pfdsl ${quoteShellArgument(artifactKey)} status wip`
 			: undefined;
 
@@ -414,6 +419,13 @@ export async function runCycleStatus({
 		issueLookupFailures,
 		blocking: issueLookupFailures.length > 0,
 		wipUpdateCommand,
+		...(roadmap?.context
+			? {
+					roadmapSource: roadmap.context.model,
+					roadmapUpdateGuidance:
+						"Update the external roadmap through scripts/wiki-roadmap-publish.mjs using the acquired source revision. Verify publication before recording the new status; do not edit the temporary snapshot.",
+				}
+			: {}),
 		artifactCandidates: [...artifactCandidates.keys()].sort(),
 		gateCheckCommand,
 		unregisteredManagedIssues,

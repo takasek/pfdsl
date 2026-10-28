@@ -1,8 +1,9 @@
-import { type DiffReport, resolveLocationFsPath } from "@pfdsl/core";
+import type { DiffReport, Frontmatter } from "@pfdsl/core";
 import type { MessageFromWebview, MessageToWebview } from "@pfdsl/editor";
 import {
 	applyPreviewEdit,
 	buildLocations,
+	type DocumentReference,
 	findFrontmatterDefinitionRange,
 	findNodeOccurrenceRanges,
 	nodeIdAtSourcePosition,
@@ -10,6 +11,7 @@ import {
 	positionOfNodeId,
 	RenameTracking,
 	repairResultMessage,
+	resolveDocumentReference,
 } from "@pfdsl/editor";
 import * as vscode from "vscode";
 import {
@@ -295,8 +297,9 @@ type QuickPickLocationItem = vscode.QuickPickItem & {
 async function handleOpenLocation(
 	docFsPath: string,
 	locs: string[],
+	reference: Pick<DocumentReference, "kind" | "id" | "field">,
+	frontmatter: Frontmatter | null,
 	fallbackViewColumn?: vscode.ViewColumn,
-	basePath?: string,
 ): Promise<void> {
 	if (locs.length === 0) return;
 
@@ -311,7 +314,20 @@ async function handleOpenLocation(
 				invalid.push(loc);
 			}
 		} else {
-			const resolvedPath = resolveLocationFsPath(docFsPath, loc, basePath);
+			let resolvedPath: string;
+			try {
+				resolvedPath = resolveDocumentReference(
+					docFsPath,
+					{ ...reference, value: loc },
+					frontmatter?.basePath,
+					frontmatter,
+				).value;
+			} catch (error) {
+				void vscode.window.showErrorMessage(
+					error instanceof Error ? error.message : String(error),
+				);
+				continue;
+			}
 			const resolvedUri = vscode.Uri.file(resolvedPath);
 			let stat: vscode.FileStat | undefined;
 			try {
@@ -544,13 +560,27 @@ export function registerPreview(context: vscode.ExtensionContext): {
 			} else if (msg.type === "openUrl") {
 				vscode.env.openExternal(vscode.Uri.parse(msg.url));
 			} else if (msg.type === "openFile") {
-				const fsPath = resolveLocationFsPath(state.doc.uri.fsPath, msg.path);
+				const { frontmatter } = analyzeDocument(state.doc);
+				if (frontmatter?.process?.[msg.nodeId]?.subflow !== msg.path) return;
 				const srcVc = vscode.window.visibleTextEditors.find(
 					(e) => e.document === state.doc,
 				)?.viewColumn;
-				openFileActivatingExisting(fsPath, srcVc);
+				await handleOpenLocation(
+					state.doc.uri.fsPath,
+					[msg.path],
+					{ kind: "process", id: msg.nodeId, field: "subflow" },
+					frontmatter,
+					srcVc,
+				);
 			} else if (msg.type === "openLocation") {
-				const { frontmatter } = analyzeDocument(state.doc);
+				const { frontmatter, nodeKinds } = analyzeDocument(state.doc);
+				const kind = nodeKinds.get(msg.nodeId);
+				if (kind !== "artifact" && kind !== "process") return;
+				const field =
+					kind === "process" &&
+					frontmatter?.process?.[msg.nodeId]?.location === undefined
+						? "subflow"
+						: "location";
 				const locs = buildLocations(frontmatter)[msg.nodeId] ?? [];
 				const srcVc = vscode.window.visibleTextEditors.find(
 					(e) => e.document === state.doc,
@@ -558,8 +588,9 @@ export function registerPreview(context: vscode.ExtensionContext): {
 				await handleOpenLocation(
 					state.doc.uri.fsPath,
 					locs,
+					{ kind, id: msg.nodeId, field },
+					frontmatter,
 					srcVc,
-					frontmatter?.basePath,
 				);
 			}
 		});

@@ -8,12 +8,12 @@
 // local set the PR can actually register, derived from the PR itself rather than
 // from a flag the runner chooses.
 //
-// Usage: node scripts/check-roadmap-registration.mjs --pr <n>
+// Usage: node scripts/check-roadmap-registration.mjs --pr <n> [--source-config <json>]
 
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
-
+import { acquireConfiguredRoadmap } from "./lib/roadmap-consumer.mjs";
 import {
 	buildAuditArgs,
 	classifyRoadmapRegistration,
@@ -32,7 +32,7 @@ let values;
 try {
 	({ values } = parseArgs({
 		args: process.argv.slice(2),
-		options: { pr: { type: "string" } },
+		options: { pr: { type: "string" }, "source-config": { type: "string" } },
 		strict: true,
 		allowPositionals: false,
 	}));
@@ -70,15 +70,33 @@ try {
 
 let auditExit = 0;
 if (issueNumbers.length > 0) {
-	const result = tryRun(process.execPath, buildAuditArgs(issueNumbers), {
-		cwd: root,
-	});
-	// execFileSync pipes the child's stdout rather than inheriting it, so the
-	// audit's per-issue findings are in `out` and reach the CI log only if this
-	// prints them. Without this the job shows the verdict and none of the
-	// evidence for it.
-	if (result.out) process.stdout.write(result.out);
-	auditExit = result.ok ? 0 : (result.status ?? 1);
+	let roadmap;
+	try {
+		roadmap = await acquireConfiguredRoadmap({
+			root,
+			sourceConfig: values["source-config"],
+		});
+		if (roadmap.context)
+			console.log(`Roadmap source: ${JSON.stringify(roadmap.context.model)}`);
+		const result = tryRun(
+			process.execPath,
+			buildAuditArgs(issueNumbers, roadmap.file),
+			{
+				cwd: root,
+			},
+		);
+		// execFileSync pipes the child's stdout rather than inheriting it, so the
+		// audit's per-issue findings are in `out` and reach the CI log only if this
+		// prints them. Without this the job shows the verdict and none of the
+		// evidence for it.
+		if (result.out) process.stdout.write(result.out);
+		auditExit = result.ok ? 0 : (result.status ?? 1);
+	} catch (error) {
+		console.error(`check-roadmap-registration: ${error.message}`);
+		auditExit = 1;
+	} finally {
+		roadmap?.dispose();
+	}
 }
 
 const verdict = classifyRoadmapRegistration({ issueNumbers, auditExit });

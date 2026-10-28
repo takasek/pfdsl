@@ -164,10 +164,10 @@ rollbackでは更新を停止し、最終Wiki版を取得・検証して本体�
 
 | consumer | 切替案と残る検証 |
 | --- | --- |
-| `audit-issues-flow` / `roadmap-registration` | #1497の共通location契約に取得snapshotを渡す。本体PRへの登録待ちだけを補うadvisoryは再評価 |
-| `cycle-status*` | 選択・ready・wip更新を同じ取得版へ接続。現在のローカル更新コマンド生成を置換 |
-| `gate-check*` | 本体Gitの前後diffから状態更新を推測する検査を、Wiki版と完了根拠へ変更 |
-| `release-runner` | 公開後のroadmap同期PR案内を新しい正本への更新案内に変更 |
+| `audit-issues-flow` / `roadmap-registration` | auditは `--roadmap <snapshot>`、registrationは `--source-config <json>` で固定版を読む。本体PRへの登録待ちだけを補うadvisoryの再評価は切替担当が行う |
+| `cycle-status*` | `--source-config <json>` で選択・ready・issue対応・neighborsを同じ取得版へ接続する。外部版ではローカルwip編集コマンドを出さず、検証付きWiki更新入口を案内する |
+| `gate-check*` | `--source-config <json>` で固定版と参照contextを検証する。外部版のdone・開始時点の証拠契約は未定義のため完了判定を失敗させる。本体Gitの状態履歴では代替しない |
+| `release-runner` | `release.mjs cli publish --source-config <json>` の候補抽出・tag照合は同じ固定版を使い、公開後は検証付きWiki更新入口と担当者の受入証拠確認を案内する |
 | `roadmap-publish-guard` | ローカルEdit hookはWikiに効かない。更新経路側の検証へ移すか廃止 |
 | `pfdsl-sweep-completed-chains.yml` | 切替時に旧正本への自動PRを停止。Wiki上の自動削除は初期範囲に含めない |
 | workflow / pipelineのroadmap入力、`render_previews` | 正本の所在と取得snapshotへの入力を明示。旧ファイルを読ませない |
@@ -178,6 +178,19 @@ main実装が必要な成果物はmerge後、公開物が必要なら公開後�
 Issue closeはdoneの根拠にも契機にもしない。
 merge済み実装とWiki上のwipの差を検出する監査は、第2段階の受入条件として残す。
 #1519全体の受入条件は未達であり、roadmapでは準備成果物 `wiki_roadmap_ready_for_cutover` をwip、切替出力 `wiki_roadmap_integration` をtodoとする。切替は準備の完了と、#1542の参照先解決実装がWiki運用の採用版に含まれることを待つ。
+
+これらの `--source-config` は明示した試験入力だけを選び、`.pfdsl/config.json` や正本の宣言を変更しない。
+設定は生成・更新入口と同じ `roadmapSource` / `localSources` のJSONを使い、一つの実行中は取得済みsnapshotを共有して終了時に破棄する。
+記録したsource・固定revisionとinput keyが検査対象の識別子であり、一時パスを再実行用の正本として扱わない。
+cycleが案内する次のgate実行は設定から改めて取得し、その時点の固定版を報告する。
+gateの `--in-progress` は指定artifactが取得版でwipまたはwaitingであることだけを確認し、開始時点の検査は未検証のSKIPと明記する。
+完了判定に必要なcriteria・Wiki固定版・merge/publication/acceptance記録の対応と、開始時点・wip遷移を結ぶ証拠形式は、切替担当メンテナが確定して実装・受入を行う。
+現行の外部完了gateのFAILを無効化しただけでは切替条件を満たさない。
+
+実切替を担当するメンテナは、旧ファイルの撤去と同時に `.pfdsl/config.json` の `sweepCompletedChains.enabled` をfalseへ変更し、旧roadmap用の `roadmap-publish-guard` のhook登録を外す。
+この準備実装では現在の正本に必要なsweepとhookの設定を維持する。
+ローカルEdit hookはWiki公開を検査した証拠にはならず、Wiki更新入口の検証と受入記録がその境界を担う。
+`retro-reminder-check` / `managed-issue-reminder`、workflow / pipeline / previewの入力配線、merge済み実装とWikiのwip差の監査、実Wikiの採用版検証は切替担当の残る受入対象である。
 
 ## 分離構成のindex・SVG自動生成
 
@@ -273,12 +286,55 @@ ActionsのGITHUB_TOKENをcontents: writeで利用する提案であり、このP
 権限不足ならジョブを失敗として止め、認証方式を無断で追加しない。
 Gitで更新する場合の発火も未確認のため、手動実行を併設する。
 
-現在のCLIは #1542 の参照先解決をまだ実装していない。
+参照解決の準備入口は `scripts/lib/roadmap-source.mjs` の `acquireRoadmapSource` である。
+明示したローカルGit checkoutから原文・モデル基準版・成果物参照版を固定し、CLIへ同じ `--reference-context` を渡す。
+取得側はfetchや元checkoutの更新を行わず、未commitの編集内容も採用しない。
+Gitのblobを直接読み出すため、`export-ignore`・`export-subst`・checkoutの改行設定で検証内容は変わらない。
+内部symlinkは集合内を確認してから通常ファイルの後に配置し、外向きsymlink・循環link・未取得のsubmoduleは取得失敗として止める。
+
+`--source-config <json>` は正本切替前の明示的な試験設定であり、`.pfdsl/config.json` の採用設定を変更しない。
+次はWiki原文と本体repoの基準版を分ける設定例である。
+`source` の識別子はモデルの `baseRef` / `ref` と完全一致させ、checkoutは呼出し側が先に取得する。
+
+```json
+{
+  "roadmapSource": {
+    "adapter": "local-git",
+    "source": "https://github.com/takasek/pfdsl.wiki.git",
+    "revision": "<fixed-wiki-commit>",
+    "documentId": "roadmap.pfdsl",
+    "companionId": "roadmap.md",
+    "logicalPath": ".pfdsl/roadmap.pfdsl",
+    "basis": {
+      "source": "https://github.com/takasek/pfdsl.git",
+      "revision": "<fixed-body-commit>"
+    }
+  },
+  "localSources": {
+    "https://github.com/takasek/pfdsl.wiki.git": "/absolute/path/to/wiki",
+    "https://github.com/takasek/pfdsl.git": "/absolute/path/to/repository"
+  }
+}
+```
+
+```bash
+node scripts/wiki-roadmap-generate.mjs --wiki /absolute/path/to/wiki --repository takasek/pfdsl --expected-revision <fixed-wiki-commit> --source-config /absolute/path/to/source.json
+```
+
+生成器は `--wiki` の現在HEADを原文版として固定し、`--expected-revision` があれば一致を要求する。
+生成器と編集公開コマンドは、その原文版と作業checkoutで設定のWiki取得先を置き換える。
+編集公開では検証用cloneに作った原稿commitが原文版になる。
+通常の取得readerは設定の `revision` を選択する。
+設定省略時の既存trialはWiki自身を基準版とする従来のファイル配置を維持し、未登録の明示参照を手元の同名ファイルで代用しない。
+
 coreの依存closureを使い、entry・extends・subflowの実際の読み込み対象を拡張子に依存せず調べる。
-そのいずれかにbaseRefまたはartifact.refがある場合は、無視して成功扱いにせず生成を拒否する。
-依存文書がWiki snapshotの外へ出る場合も生成を拒否する。
-この制限を外し、本体repoのartifact参照を同一の採用実装で解決・検証することが切替前の残件である。
-既存consumerとpipelineの正本入力は変更せず、準備はwip、切替はtodoを維持する。
+外部保存モデルの子文書は明示したモデル基準版から読み、親の成果物参照版を代用しない。
+参照版の固定後に再生成キーを計算し、Wiki原文が同じでも本体repoの参照branchが進めば再検証する。
+原文Wikiの生成物だけを追加したcommitは原文treeが同じなので再生成しない。
+receiptには原文の取得元・固定版・文書識別子・論理位置、各子文書と成果物の参照先・固定版・確認結果を残し、一時ディレクトリのパスは保存しない。
+URLとglobは確認済みの存在証拠にせず、それぞれのskip結果を残す。
+未知の取得元・版・欠落した基準文脈・対象パス欠落・取得失敗は生成を失敗させ、前回のindexとSVGを保持する。
+実Wikiでの本体repo参照の受入と正本切替は別工程であり、このローカル取得・検証入口の追加だけでは完了しない。
 
 ## マージ後の実環境受入（2026-10-26）
 
