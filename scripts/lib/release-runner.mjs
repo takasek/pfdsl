@@ -311,7 +311,7 @@ export function formatCliCandidateNotice(candidates, roadmap) {
 		`CLI release candidates: ${candidates.join(", ")}`,
 		"Verify the published npm artifact, pipeline acceptance, and plugin tag retrieval.",
 		roadmap?.context
-			? "Then prepare a marketplace pin PR and confirm main retrieves that tag. The maintainer must record acceptance evidence for each artifact, then update the fixed Wiki source through scripts/wiki-roadmap-edit-publish.mjs. External done/start-time evidence and real-Wiki acceptance remain required before cutover."
+			? "Then prepare a marketplace pin PR and confirm main retrieves that tag. The maintainer must record acceptance evidence for each artifact, then update the fixed Wiki source through scripts/wiki-roadmap-publish.mjs. External done/start-time evidence and real-Wiki acceptance remain required before cutover."
 			: "Then prepare a marketplace pin PR, confirm main retrieves that tag, and use a roadmap PR to synchronize only explicitly confirmed artifacts.",
 	].join("\n");
 }

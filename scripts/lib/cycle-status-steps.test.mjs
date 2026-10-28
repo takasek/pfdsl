@@ -138,7 +138,10 @@ describe("runCycleStatus", () => {
 		assert.equal(calls.length, 2);
 		assert.ok(calls.every((args) => args.includes(roadmap.file)));
 		assert.equal(result.wipUpdateCommand, undefined);
-		assert.match(result.roadmapUpdateGuidance, /wiki-roadmap-edit-publish/);
+		assert.match(
+			result.roadmapUpdateGuidance,
+			/scripts\/wiki-roadmap-publish\.mjs/,
+		);
 		assert.match(
 			result.gateCheckCommand,
 			/--source-config '\/settings\/wiki.json'/,

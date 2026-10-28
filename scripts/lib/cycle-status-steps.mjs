@@ -423,7 +423,7 @@ export async function runCycleStatus({
 			? {
 					roadmapSource: roadmap.context.model,
 					roadmapUpdateGuidance:
-						"Update the external roadmap through scripts/wiki-roadmap-edit-publish.mjs using the acquired source revision. Verify publication before recording the new status; do not edit the temporary snapshot.",
+						"Update the external roadmap through scripts/wiki-roadmap-publish.mjs using the acquired source revision. Verify publication before recording the new status; do not edit the temporary snapshot.",
 				}
 			: {}),
 		artifactCandidates: [...artifactCandidates.keys()].sort(),

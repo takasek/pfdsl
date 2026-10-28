@@ -166,7 +166,7 @@ describe("prepareRelease", () => {
 		const notice = formatCliCandidateNotice(["cli_release_a"], {
 			context: { model: { source: "wiki", fixedRevision: "abc" } },
 		});
-		assert.match(notice, /wiki-roadmap-edit-publish/);
+		assert.match(notice, /scripts\/wiki-roadmap-publish\.mjs/);
 		assert.match(notice, /acceptance evidence/);
 		assert.doesNotMatch(notice, /roadmap PR/);
 	});
