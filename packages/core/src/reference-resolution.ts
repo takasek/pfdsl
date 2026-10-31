@@ -186,12 +186,20 @@ export function validateReferenceContext(
 			"logical-path-missing",
 			"The model's logical file position is missing",
 		);
+	const authoredLastSegment = value.logicalPath
+		.replaceAll("\\", "/")
+		.split("/")
+		.pop();
 	const logical = logicalPath(
 		value.logicalPath,
 		"The model's logical file position",
 	);
 	if (!logical.ok) return logical;
-	if (logical.path === "." || logical.path.endsWith("/"))
+	if (
+		authoredLastSegment === "" ||
+		authoredLastSegment === "." ||
+		authoredLastSegment === ".."
+	)
 		return failure(
 			"logical-path-missing",
 			"The model's logical file position must identify a file",
