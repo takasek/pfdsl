@@ -429,7 +429,7 @@ test("Save after a failed Save As still reviews and replaces the original docume
 		};
 		await host.save();
 		const dialog = host.log.find((item) => item.kind === "dialog");
-		assert.equal(dialog.title, "Review the target");
+		assert.equal(dialog.title, "The file changed on disk");
 		assert.equal(dialog.disk, "external A\n");
 		const saves = host.log.filter((item) => item.kind === "save");
 		assert.deepEqual(
@@ -450,7 +450,7 @@ test("Review and Save Here inspects the recovery target again", async () => {
 		b.file = { source: "later B\n", ino: ++native.ino, mtime: ++native.clock };
 		await host.review();
 		const dialog = host.log.find((item) => item.kind === "dialog");
-		assert.equal(dialog.title, "Review the target");
+		assert.equal(dialog.title, "The file changed on disk");
 		assert.equal(dialog.disk, "later B\n");
 		const saves = host.log.filter((item) => item.kind === "save");
 		assert.deepEqual(

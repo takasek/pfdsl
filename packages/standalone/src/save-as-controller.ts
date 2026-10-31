@@ -18,6 +18,7 @@ export interface SaveDecisions {
 	replace(
 		request: {
 			readonly kind: "replace";
+			readonly origin: "save-as";
 			readonly document: string;
 			readonly target: Readonly<DiskSnapshot>;
 			readonly editor: string;
@@ -103,6 +104,7 @@ export function createSaveAsController({
 						const decision = await decisions.replace(
 							{
 								kind: "replace",
+								origin: "save-as",
 								document: key,
 								target: Object.freeze({ ...selected }),
 								editor: plan.editor,

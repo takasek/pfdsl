@@ -88,7 +88,7 @@ for (const confirm of [true, false]) {
 			const host = await startHost(native, a, {
 				confirm: async () => "cancel",
 				dialogChoice: (title) =>
-					title === "Review the target" && !confirm
+					title === "The file changed on disk" && !confirm
 						? "Keep Editing"
 						: undefined,
 			});
@@ -130,8 +130,7 @@ for (const target of ["existing", "new"]) {
 				checkAction({ native, host, tab, trace, violate });
 				assert.equal(c.file?.source, TEXT.edited);
 				const review = host.log.find(
-					(item) =>
-						item.kind === "dialog" && item.title === "Review the target",
+					(item) => item.kind === "dialog" && item.title === "Replace c.pfdsl?",
 				);
 				assert.equal(Boolean(review), target === "existing");
 				assert.deepEqual(await host.finish(), []);
@@ -154,9 +153,12 @@ cell(
 		const tab = await host.open(a);
 		tab.type(TEXT.edited);
 		await host.command("save-as");
-		const review = host.log.find((item) => item.title === "Review the target");
+		const review = host.log.find((item) => item.title === "Replace b.pfdsl?");
 		assert.match(review.text, /disk version .* differs from the editor/);
-		assert.match(review.text, /further change before saving stops the save/);
+		assert.match(
+			review.text,
+			/versions shown and stops if either changes again/,
+		);
 		assert.deepEqual(await host.finish(), []);
 	},
 );
@@ -169,9 +171,9 @@ cell(
 		const host = await startHost(native, a, {
 			confirm: async () => "cancel",
 			dialogChoice: (title) =>
-				title === "Discard editor changes" ? "Use Disk Version" : undefined,
+				title === "Use the disk version?" ? "Use Disk Version" : undefined,
 			onDialog(dialog) {
-				if (dialog.title === "Discard editor changes")
+				if (dialog.title === "Use the disk version?")
 					a.file = { ...a.file, mtime: ++native.clock };
 			},
 		});
@@ -202,7 +204,7 @@ cell(
 				return "before";
 			},
 			dialogChoice: (title) =>
-				ctx.cancel && title === "Review the target"
+				ctx.cancel && title === "The file changed on disk"
 					? "Keep Editing"
 					: undefined,
 		});

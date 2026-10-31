@@ -490,9 +490,9 @@ test("Use Current Disk Version keeps an edit made while its dialog is open", asy
 	const host = await startHost(native, a, {
 		confirm: async () => "cancel",
 		dialogChoice: (title) =>
-			title === "Discard editor changes" ? "Use Disk Version" : undefined,
+			title === "Use the disk version?" ? "Use Disk Version" : undefined,
 		onDialog(dialog) {
-			if (dialog.title === "Discard editor changes")
+			if (dialog.title === "Use the disk version?")
 				tab.type("typed while the dialog was open\n");
 		},
 	});
@@ -604,7 +604,7 @@ test("a published but unconfirmed save keeps its receipt, the buffer and the rec
 				: undefined,
 		confirm: async () => "cancel",
 		dialogChoice: (title) =>
-			title === "Discard editor changes" ? "Use Disk Version" : undefined,
+			title === "Use the disk version?" ? "Use Disk Version" : undefined,
 	});
 	const tab = await host.open(a);
 	tab.type(TEXT.edited);
@@ -616,7 +616,7 @@ test("a published but unconfirmed save keeps its receipt, the buffer and the rec
 			/Content was published, but the save was not accepted/,
 		);
 		assert.match(text(), /Publication occurred; target cannot be read/);
-		assert.match(text(), /Recovery target: \/A\/b\.pfdsl\./);
+		assert.match(text(), /Saving to \/A\/b\.pfdsl\./);
 		assert.equal(host.panel().review.disabled, true);
 		assert.equal(host.panel().use.disabled, true);
 		assert.equal(host.panel().saveAs.disabled, false);
@@ -681,7 +681,7 @@ test("Use Current Disk Version refuses a recovery target that another tab has op
 		},
 		confirm: async () => "cancel",
 		dialogChoice: (title) =>
-			title === "Discard editor changes" ? "Use Disk Version" : undefined,
+			title === "Use the disk version?" ? "Use Disk Version" : undefined,
 	});
 	const first = await host.open(a);
 	first.type(TEXT.edited);

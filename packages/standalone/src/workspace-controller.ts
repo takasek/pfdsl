@@ -68,13 +68,19 @@ export interface WorkspaceHost {
 	finishQuit(request: string, approved: boolean): Promise<void>;
 }
 export type DecisionRequest =
-	| {
-			readonly kind: "replace" | "recreate" | "adopt";
+	| ({
 			readonly document: string;
 			readonly editor: string;
 			readonly editorVersion: number | string;
 			readonly target: Readonly<DiskSnapshot>;
-	  }
+	  } & (
+			| {
+					readonly kind: "replace";
+					readonly origin: "save" | "close" | "save-as";
+			  }
+			| { readonly kind: "recreate"; readonly origin: "save" | "close" }
+			| { readonly kind: "adopt" }
+	  ))
 	| {
 			readonly kind: "close";
 			readonly document: string;
@@ -482,6 +488,7 @@ export function createWorkspaceController({
 		as = false,
 		observed = false,
 		confirmation?: OperationPlan,
+		origin: "save" | "close" = "save",
 	): Promise<boolean> {
 		if (disposed || !isOpen(entry)) return false;
 		if (!saveCapability.save) {
@@ -579,6 +586,7 @@ export function createWorkspaceController({
 			const decision = await decisions.request(
 				{
 					kind: review ? "replace" : "recreate",
+					origin,
 					document: entry.record.key,
 					target: Object.freeze({ ...selected }),
 					editor: plan.editor,
@@ -718,7 +726,7 @@ export function createWorkspaceController({
 					? decision
 					: "cancel";
 			},
-			({ entry }, plan) => saveEntry(entry, false, false, plan),
+			({ entry }, plan) => saveEntry(entry, false, false, plan, "close"),
 			({ entry }) => remove(entry),
 			() =>
 				!disposed &&

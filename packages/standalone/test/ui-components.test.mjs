@@ -344,7 +344,7 @@ test("native menu reaches export, navigation, problems and comparison from the m
 	}
 });
 
-const comparisonStub = `export const editor={createModel(value){const model={value,dispose(){this.disposed=true}};(globalThis.comparisonModels??=[]).push(model);return model},createDiffEditor(element,options){globalThis.diffEditor={element,options,setModel(models){this.models=models},dispose(){this.disposed=true}};return globalThis.diffEditor}};`;
+const comparisonStub = `export const editor={createModel(value){const model={value,dispose(){this.disposed=true}};(globalThis.comparisonModels??=[]).push(model);return model},createDiffEditor(element,options){globalThis.diffEditor={element,options,onDidUpdateDiff(){return {dispose(){}}},setModel(models){this.models=models},dispose(){this.disposed=true}};return globalThis.diffEditor}};`;
 test("native menu skips unchanged properties and coalesces states arriving during an update", async () => {
 	globalThis.reviewMenuItems = [];
 	try {

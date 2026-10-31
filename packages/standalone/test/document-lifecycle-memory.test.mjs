@@ -101,7 +101,7 @@ for (const action of ["review", "recreate", "adopt"])
 				const host = await startHost(native, a, {
 					confirm: async () => "cancel",
 					dialogChoice: (title) =>
-						title === "Discard editor changes" ? "Use Disk Version" : undefined,
+						title === "Use the disk version?" ? "Use Disk Version" : undefined,
 					onDialog() {
 						const before = tab.getSource();
 						tab.type("edited while the review was open\n");
@@ -128,7 +128,7 @@ cell("plan lifetime | adopt | disk changes during review", () =>
 		const host = await startHost(native, a, {
 			confirm: async () => "cancel",
 			dialogChoice: (title) =>
-				title === "Discard editor changes" ? "Use Disk Version" : undefined,
+				title === "Use the disk version?" ? "Use Disk Version" : undefined,
 			onDialog() {
 				change(native, a, "changed after the adoption was shown\n");
 			},
@@ -238,7 +238,7 @@ for (const entry of ["poll", "cmd-s", "close-cancel", "use-disk"])
 								confirm: async (name) =>
 									name === state.name ? state.decision : "discard",
 								dialogChoice: (title) =>
-									state.useDisk && title === "Discard editor changes"
+									state.useDisk && title === "Use the disk version?"
 										? "Use Disk Version"
 										: undefined,
 							});

@@ -28,9 +28,15 @@
 // V  An operation shown in a dialog is refused if its editor was edited before execution.
 import { fsOf } from "./lifecycle-native.mjs";
 
-const REVIEW = "Review the target";
-const RECREATE = "Recreate missing file";
-const CONFIRMING = new Set(["Replace Observed Version", "Create File"]);
+const REVIEW = "The file changed on disk";
+const RECREATE = "The file was deleted";
+const CONFIRMING = new Set([
+	"Overwrite",
+	"Overwrite and Close",
+	"Replace",
+	"Save Again",
+	"Save and Close",
+]);
 
 /** Captures what the action starts from and clears the host log. */
 export function beginAction({ host, tab, owned = [] }) {
@@ -147,7 +153,9 @@ export function checkAction({ native, host, tab, trace, violate }) {
 					item.kind === "dialog" &&
 					item.target === save.id &&
 					CONFIRMING.has(item.choice) &&
-					(item.title === REVIEW || item.title === RECREATE),
+					(item.title === REVIEW ||
+						item.title.startsWith("Replace ") ||
+						item.title === RECREATE),
 			);
 		if (dialog) {
 			if (save.source !== dialog.shownEditor)
@@ -162,7 +170,10 @@ export function checkAction({ native, host, tab, trace, violate }) {
 						"A",
 						`sent expected ${JSON.stringify(save.expected)} but the dialog was built from ${JSON.stringify(built.revision)}`,
 					);
-				if (dialog.title === REVIEW && dialog.disk !== built.source)
+				if (
+					(dialog.title === REVIEW || dialog.title.startsWith("Replace ")) &&
+					dialog.disk !== built.source
+				)
 					violate(
 						"A",
 						`the dialog displayed ${JSON.stringify(dialog.disk)} but the inspection returned ${JSON.stringify(built.source)}`,

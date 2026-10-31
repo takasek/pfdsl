@@ -487,31 +487,56 @@ export function mountApplication(options: ApplicationOptions) {
 				name: request.name,
 				allowSave: request.allowSave,
 			});
+		const entry = opened().find((item) => item.key === request.document);
+		const name =
+			entry?.path === request.target.path
+				? displayName(entry, opened())
+				: request.target.path.split("/").pop()!;
+		const strictness =
+			"This choice applies to the versions shown and stops if either changes again.";
 		let answer: string;
-		if (request.kind === "replace")
+		if (request.kind === "replace") {
+			const savingAs = request.origin === "save-as";
+			const closing = request.origin === "close";
 			answer = await choose(
-				"Review the target",
-				`Replace the disk version of ${request.target.path} with the editor content? The disk version shown below differs from the editor, and a further change before saving stops the save. Replace Observed Version writes the editor content to this file and resolves this target only after the revision is confirmed. Keep Editing closes this comparison without writing; editor content and unresolved changes remain. Choose Another File opens Save As; cancelling retains the current content and unresolved state. A further disk or editor change stops the save.`,
+				savingAs ? `Replace ${name}?` : "The file changed on disk",
+				`The disk version of ${name} differs from the editor. ${strictness}`,
 				[
-					["cancel", "Keep Editing"],
-					["another", "Choose Another File"],
-					["replace", "Replace Observed Version"],
+					[
+						"cancel",
+						savingAs ? "Cancel" : closing ? "Don't Close" : "Keep Editing",
+					],
+					["another", savingAs ? "Choose Another File" : "Save As…"],
+					[
+						"replace",
+						savingAs
+							? "Replace"
+							: closing
+								? "Overwrite and Close"
+								: "Overwrite",
+					],
 				],
 				{ local: request.editor, disk: request.target.source },
 			);
-		else if (request.kind === "recreate")
+		} else if (request.kind === "recreate")
 			answer = await choose(
-				"Recreate missing file",
-				`Create ${request.target.path} again? A file created by another writer will not be overwritten.`,
+				"The file was deleted",
+				`Save ${name} again? ${strictness}`,
 				[
-					["cancel", "Keep Editing"],
-					["create", "Create File"],
+					[
+						"cancel",
+						request.origin === "close" ? "Don't Close" : "Keep Editing",
+					],
+					[
+						"create",
+						request.origin === "close" ? "Save and Close" : "Save Again",
+					],
 				],
 			);
 		else
 			answer = await choose(
-				"Discard editor changes",
-				`Replace the editor content with the observed current disk version of ${request.target.path}? Use Disk Version retains that disk version without writing and replaces the editor content after a fresh revision check. This resolves the matching external change; any separate unresolved target remains. Keep Editing closes this comparison without writing or replacing the editor; unresolved changes remain.`,
+				"Use the disk version?",
+				`Replace the editor content of ${name} with the disk version? ${strictness}`,
 				[
 					["cancel", "Keep Editing"],
 					["disk", "Use Disk Version"],
@@ -587,7 +612,7 @@ export function mountApplication(options: ApplicationOptions) {
 		const entry = active;
 		if (panel) {
 			const message = document.createElement("p");
-			message.textContent = `${panel.state} ${panel.message} Recovery target: ${panel.targetPath}.`;
+			message.textContent = `${panel.state} ${panel.message} Saving to ${panel.targetPath}.`;
 			conflicts.append(message);
 			const preview = document.createElement("details");
 			const summary = document.createElement("summary");

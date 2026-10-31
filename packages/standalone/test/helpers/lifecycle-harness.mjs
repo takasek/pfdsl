@@ -18,8 +18,11 @@ export const flush = async () => {
 
 /** Buttons whose click approves replacing, creating or adopting a disk version. */
 const APPROVALS = new Set([
-	"Replace Observed Version",
-	"Create File",
+	"Replace",
+	"Overwrite and Close",
+	"Save and Close",
+	"Overwrite",
+	"Save Again",
 	"Use Disk Version",
 ]);
 
@@ -105,12 +108,21 @@ export async function createHarness(label, options) {
 			const text = this.querySelector("p").textContent;
 			const target = [...ledger.received, ...ledger.offered]
 				.sort((first, second) => first.seq - second.seq)
-				.findLast((item) => item.path && text.includes(item.path))?.id;
+				.findLast(
+					(item) =>
+						item.path &&
+						text.includes(item.path.split("/").pop()) &&
+						(fields.length === 0 ||
+							fields[1] === (item.source ?? "File is missing")),
+				)?.id;
 			const entry = {
 				kind: "dialog",
 				seq: tick(),
 				tab: closeSaveOwner ?? activeTab(),
 				title: this.querySelector("h2").textContent,
+				buttons: [...this.querySelectorAll("button")].map(
+					(button) => button.textContent,
+				),
 				text,
 				target,
 				editor: fields[0],
@@ -253,33 +265,35 @@ export async function createHarness(label, options) {
 				const dialog = query("dialog");
 				if (dialog) {
 					const title = dialog.querySelector("h2").textContent;
-					const kind = {
-						"Review the target": "replace",
-						"Recreate missing file": "recreate",
-						"Discard editor changes": "adopt",
-					}[title];
+					const kind = title.startsWith("Replace ")
+						? "replace"
+						: {
+								"The file changed on disk": "replace",
+								"The file was deleted": "recreate",
+								"Use the disk version?": "adopt",
+							}[title];
 					const decision = await handlers.decide?.({ kind }, dialog.entry);
+					const buttons = dialog.entry.buttons;
+					const labels = {
+						replace: buttons.at(-1),
+						create: buttons.at(-1),
+						disk: "Use Disk Version",
+						cancel: buttons[0],
+						another: buttons[1],
+					};
 					const confirm =
-						{
-							replace: "Replace Observed Version",
-							create: "Create File",
-							disk: "Use Disk Version",
-							cancel: "Keep Editing",
-							another: "Choose Another File",
-						}[decision] ??
+						labels[decision] ??
 						handlers.dialogChoice?.(title, dialog.entry) ??
-						(title === "Review the target"
-							? "Replace Observed Version"
-							: title === "Recreate missing file"
-								? "Create File"
-								: "Keep Editing");
+						(kind === "replace" || kind === "recreate"
+							? buttons.at(-1)
+							: buttons[0]);
 					dialog.entry.choice = confirm;
 					dialog.entry.editorAtClick = activeTab()?.getSource();
 					dialog.entry.clickSeq = tick();
 					if (APPROVALS.has(confirm) && dialog.entry.target !== undefined)
 						approve(
 							dialog.entry.target,
-							dialog.entry.title === "Recreate missing file"
+							dialog.entry.title === "The file was deleted"
 								? null
 								: dialog.entry.disk,
 							"approval",
@@ -338,7 +352,7 @@ export async function createHarness(label, options) {
 				const paragraphs = [...root.querySelectorAll("p")].map(
 					(item) => item.textContent,
 				);
-				const target = /Recovery target: (.*)\.$/.exec(paragraphs[0] ?? "");
+				const target = /Saving to (.*)\.$/.exec(paragraphs[0] ?? "");
 				const button = (text) =>
 					all("#conflicts button").find((item) => item.textContent === text);
 				return {
