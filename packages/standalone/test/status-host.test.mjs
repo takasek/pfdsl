@@ -215,3 +215,29 @@ test("action notices are hidden on other tabs, retained on return, and expire on
 		await host.finish();
 	}
 });
+
+test("the diagnostic counts go to the first problem only while there are problems", async () => {
+	const native = new FakeNative();
+	const doc = native.add(1, "a.pfdsl", "problem");
+	const host = await startHost(native, doc);
+	try {
+		const tab = await host.open(doc);
+		await host.settle();
+		const calls = [];
+		tab.command = (id) => calls.push(id);
+		const jump = host.query("#diagnostics button");
+		assert.ok(
+			jump,
+			`problem counts are a button: ${host.query("#diagnostics").textContent}`,
+		);
+		assert.match(host.query("#diagnostics").textContent, /1 warning/);
+		jump.click();
+		assert.deepEqual(calls, ["first-problem"]);
+		tab.type("fixed");
+		await host.settle();
+		assert.equal(host.query("#diagnostics button"), null);
+		assert.match(host.query("#diagnostics").textContent, /No problems/);
+	} finally {
+		await host.finish();
+	}
+});

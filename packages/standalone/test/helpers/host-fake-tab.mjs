@@ -32,7 +32,14 @@ export function createDocumentTab(
 			return false;
 		},
 		report: options.reportStatus,
-		getDiagnosticsSummary: () => "No problems",
+		// Each `problem` word in the source stands for one warning.
+		getProblemCount: () => source.match(/\bproblem\b/g)?.length ?? 0,
+		getDiagnosticsSummary() {
+			const count = this.getProblemCount();
+			return count
+				? `0 errors, ${count} warning${count === 1 ? "" : "s"}, 0 informational messages`
+				: "No problems";
+		},
 		dispose() {
 			container.remove();
 			button.remove();
