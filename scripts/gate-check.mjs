@@ -23,6 +23,7 @@ import {
 	formatGateTable,
 	formatRunTreeLine,
 	formatSizeDelta,
+	formatUnclassifiedLocations,
 	parseAuditExternalTerminals,
 	parseAuditTerminals,
 	parseInputConsumedArtifacts,
@@ -637,9 +638,14 @@ if (
 		// be left describing something gone.
 		const deletedFiles = deletions.files;
 		const wasDeleted = new Set(deletedFiles);
+		const { local, unclassified } = collectModeledLocations(
+			analyzed,
+			resolveLocation,
+			isUrlLike,
+		);
 		const { modeled, unmodeled } = classifyChangedFilesByModeling(
 			[...changedFiles, ...deletedFiles],
-			collectModeledLocations(analyzed, resolveLocation),
+			local,
 		);
 		const mark = (path) => (wasDeleted.has(path) ? `${path} (deleted)` : path);
 		console.log("  modeled (confirm the PFD reflects the change):");
@@ -648,11 +654,14 @@ if (
 			const by = models.map((m) => `${m.file}:${m.id}`).join(", ");
 			console.log(`    ${mark(path)} ← ${by}`);
 		}
-		console.log(
-			unreadable.length
-				? "  not matched by readable PFDs (model classification incomplete):"
-				: "  not modeled by any adopted PFD (an N/A here is out-of-scope, not a judgment):",
-		);
+		const unclassifiedLines = formatUnclassifiedLocations(unclassified);
+		if (unclassifiedLines.length) console.log(unclassifiedLines.join("\n"));
+		else
+			console.log(
+				unreadable.length
+					? "  not matched by readable PFDs (model classification incomplete):"
+					: "  not modeled by any adopted PFD (an N/A here is out-of-scope, not a judgment):",
+			);
 		if (unmodeled.length === 0) console.log("    (none)");
 		for (const path of unmodeled) console.log(`    ${mark(path)}`);
 		for (const reason of unreadable) console.log(`  could not read ${reason}`);

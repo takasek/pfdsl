@@ -1,0 +1,9 @@
+---
+baseRef: {source: repo, revision: release}
+artifact:
+  a: {location: docs/plan.md}
+  b: {location: docs/result.md}
+process:
+  p: {location: scripts/build.mjs}
+---
+a >> p -> b

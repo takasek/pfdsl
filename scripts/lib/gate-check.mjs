@@ -15,7 +15,7 @@ export {
 } from "./commit-subject-rules.mjs";
 
 /**
- * Every repo-relative path an adopted PFD claims to model, via the `location:`
+ * Collect local paths and unclassified explicit-target artifact locations via the `location:`
  * field its artifacts and processes carry (#778). This is what lets the
  * terminal gate's "did you reflect the change in the PFD that models it" item
  * say which of a cycle's changed files any PFD models at all — without that,
@@ -30,27 +30,41 @@ export {
  * (a URL), which is also core's classification.
  * @param {Array<{file: string, frontmatter: {artifact?: object, process?: object, basePath?: string}}>} analyzed
  * @param {(file: string, location: string, basePath?: string) => string|null} resolveLocation
- * @returns {Array<{path: string, file: string, id: string}>}
+ * @param {(location: string) => boolean} isUrlLike
+ * @returns {{local: Array<{path: string, file: string, id: string}>, unclassified: Array<{file: string, id: string, location: string}>}}
  */
-export function collectModeledLocations(analyzed, resolveLocation) {
-	const modeled = [];
+export function collectModeledLocations(analyzed, resolveLocation, isUrlLike) {
+	const local = [];
+	const unclassified = [];
 	for (const { file, frontmatter } of analyzed) {
-		const nodes = {
-			...(frontmatter?.artifact ?? {}),
-			...(frontmatter?.process ?? {}),
-		};
-		for (const [id, meta] of Object.entries(nodes)) {
+		const nodes = Object.create(null);
+		for (const section of ["artifact", "process"]) {
+			for (const [id, meta] of Object.entries(frontmatter?.[section] ?? {})) {
+				// Replacing a value preserves the original ID order and process precedence.
+				nodes[id] = { section, meta };
+			}
+		}
+		for (const [id, { section, meta }] of Object.entries(nodes)) {
 			if (!meta?.location) continue;
 			const locations = Array.isArray(meta.location)
 				? meta.location
 				: [meta.location];
 			for (const location of locations) {
+				if (isUrlLike(location)) continue;
+				if (
+					section === "artifact" &&
+					(Object.hasOwn(meta, "ref") ||
+						(frontmatter != null && Object.hasOwn(frontmatter, "baseRef")))
+				) {
+					unclassified.push({ file, id, location });
+					continue;
+				}
 				const resolved = resolveLocation(file, location, frontmatter?.basePath);
 				if (resolved === null) continue;
 				// Path resolution normalizes a trailing slash away, and that slash
 				// is the only mark distinguishing a directory location from a file
 				// one, so it is carried over from what was written.
-				modeled.push({
+				local.push({
 					path: location.endsWith("/") ? `${resolved}/` : resolved,
 					file,
 					id,
@@ -58,7 +72,19 @@ export function collectModeledLocations(analyzed, resolveLocation) {
 			}
 		}
 	}
-	return modeled;
+	return { local, unclassified };
+}
+
+/** Display explicit-target artifacts without asserting unmatched local files are unmodeled. */
+export function formatUnclassifiedLocations(unclassified) {
+	if (unclassified.length === 0) return [];
+	return [
+		"  artifact locations not classified against the local checkout (explicit reference target; needs a reference context):",
+		...unclassified.map(
+			({ file, id, location }) => `    ${file}:${id} → ${location}`,
+		),
+		"  not matched by locally classifiable PFD locations (model classification incomplete):",
+	];
 }
 
 /**
