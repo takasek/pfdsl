@@ -8,11 +8,13 @@ import {
 const scaffold =
 	"scripts/harness-template/skills/pfd-ops/references/scaffold/roadmap.pfdsl";
 const fixture = "packages/core/src/__fixtures__/pipeline-scale.pfdsl";
+const gateFixture = "scripts/lib/fixtures/reference-target-locations.pfdsl";
 const paths = [
 	".pfdsl/workflow.pfdsl",
 	"docs/samples/a.pfdsl",
 	scaffold,
 	fixture,
+	gateFixture,
 ];
 
 describe("tracked PFD check inventory", () => {
@@ -78,8 +80,18 @@ describe("tracked PFD check inventory", () => {
 			/index\.test\.ts/,
 		);
 		assert.match(
+			classifyTrackedPfdsl(paths).entries.find(
+				(item) => item.path === gateFixture,
+			).owner,
+			/gate-check\.test\.mjs/,
+		);
+		assert.match(
 			classifyTrackedPfdsl([]).errors.join("\n"),
 			/stale.*core-fixture/,
+		);
+		assert.match(
+			classifyTrackedPfdsl([]).errors.join("\n"),
+			/stale.*gate-fixture/,
 		);
 		const rule = { id: "duplicate", pattern: /\.pfdsl$/, checks: [] };
 		assert.match(
@@ -89,7 +101,8 @@ describe("tracked PFD check inventory", () => {
 	});
 	it("rejects a requested check that would silently check nothing", () => {
 		assert.throws(
-			() => pfdslCheckPlan(classifyTrackedPfdsl([fixture]), "links"),
+			() =>
+				pfdslCheckPlan(classifyTrackedPfdsl([fixture, gateFixture]), "links"),
 			/no classified/,
 		);
 		assert.throws(

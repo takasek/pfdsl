@@ -32,6 +32,14 @@ export const PFD_CHECK_RULES = [
 		owner:
 			"packages/core/src/index.test.ts parse/normalize/validateGraph; changed-file gate additionally checks the CLI root, not repo-wide multi-file coverage",
 	},
+	{
+		id: "gate-fixture",
+		pattern: /^scripts\/lib\/fixtures\/reference-target-locations\.pfdsl$/,
+		required: true,
+		checks: [],
+		owner:
+			"scripts/lib/gate-check.test.mjs collectModeledLocations, parsed with core analyze",
+	},
 ];
 
 export function classifyTrackedPfdsl(paths, rules = PFD_CHECK_RULES) {
