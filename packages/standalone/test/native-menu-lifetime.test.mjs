@@ -108,7 +108,7 @@ test("disposal during a recent-item read prevents later removals, creation and d
 	);
 	menu.recent([{ kind: "file", path: "/first.pfdsl" }]);
 	await flush();
-	const recent = items.slice(start).find((item) => item.text === "Recent");
+	const recent = items.slice(start).find((item) => item.text === "Open Recent");
 	const previous = [...recent.children];
 	let release;
 	recent.items = () =>
@@ -138,7 +138,7 @@ test("late items() resource handles are released even when installation resource
 		() => {},
 		() => {},
 	);
-	const recent = items.slice(start).find((item) => item.text === "Recent");
+	const recent = items.slice(start).find((item) => item.text === "Open Recent");
 	let release,
 		closes = 0;
 	recent.items = () =>

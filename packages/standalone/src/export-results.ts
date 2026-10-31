@@ -3,6 +3,7 @@ export type ExportResultPresenter = (
 	name: string,
 	revision: number,
 	results: ExportResult[],
+	noticeName?: string,
 ) => void;
 /** Results outlive their originating tab and remain until explicitly dismissed. */
 export function createExportResults(
@@ -11,7 +12,7 @@ export function createExportResults(
 ): ExportResultPresenter {
 	const document = parent.ownerDocument;
 	let panel: HTMLElement | undefined;
-	return (name, revision, results) => {
+	return (name, revision, results, noticeName = name) => {
 		if (!panel) {
 			panel = document.createElement("section");
 			panel.className = "export-results";
@@ -39,7 +40,7 @@ export function createExportResults(
 		batch.append(heading, close, list);
 		panel.append(batch);
 		report(
-			`Export ${name}: ${results.filter((r) => r.status === "saved").length}/${results.length} saved. See export results for paths and failures.`,
+			`Export ${noticeName}: ${results.filter((r) => r.status === "saved").length}/${results.length} saved. See export results for paths and failures.`,
 		);
 	};
 }

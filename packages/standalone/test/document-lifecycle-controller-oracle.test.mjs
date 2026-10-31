@@ -32,6 +32,7 @@ for (const mode of ["selected", "inspected"]) {
 			for (const name of [
 				"document-session.ts",
 				"document-records.ts",
+				"display-name.ts",
 				"save-as-controller.ts",
 				"workspace-controller.ts",
 			])

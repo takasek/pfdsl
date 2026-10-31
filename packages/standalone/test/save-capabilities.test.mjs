@@ -68,7 +68,7 @@ test("saving stays disabled while capability lookup is pending and after failure
 		);
 		assert.equal(
 			host.query("#status").textContent,
-			`Last action — ${doc.path}: ${host.query("#save-support").textContent}`,
+			`Last action — pending.pfdsl: ${host.query("#save-support").textContent}`,
 		);
 	} finally {
 		await host.finish();

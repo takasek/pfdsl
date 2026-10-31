@@ -86,7 +86,7 @@ export function createSaveAsController({
 						return {
 							kind: "blocked",
 							document: key,
-							message: `The target is already open as ${documentName(other)}. Both editor buffers are retained. Choose another file or close that tab explicitly.`,
+							message: `The target is already open as ${other.session.location?.path ?? documentName(other)}. Both editor buffers are retained. Choose another file or close that tab explicitly.`,
 						};
 					if (confirmation && !session.holds(confirmation, "editor"))
 						return {

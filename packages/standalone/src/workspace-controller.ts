@@ -1,3 +1,4 @@
+import { displayName } from "./display-name.js";
 import {
 	type DocumentRecord,
 	DocumentRecords,
@@ -20,6 +21,7 @@ export type WorkspaceCommand =
 	| { type: "open-file" }
 	| { type: "open-path"; path: string; recent?: boolean }
 	| { type: "open-folder"; path?: string }
+	| { type: "clear-recent" }
 	| { type: "activate"; key: string }
 	| { type: "cycle"; direction: "next" | "previous" }
 	| { type: "save"; key?: string; mode?: "normal" | "as" | "observed" }
@@ -57,6 +59,7 @@ export interface WorkspaceFiles extends DocumentFiles {
 export interface WorkspaceHost {
 	capabilities(): Promise<{ save: boolean; reason: string | null }>;
 	recent(): Promise<Array<{ kind: "file" | "folder"; path: string }>>;
+	clearRecent(): Promise<void>;
 	rememberDocument(path: string): Promise<void>;
 	chooseFolder(): Promise<string | null>;
 	openRecentFolder(path: string): Promise<string>;
@@ -110,10 +113,11 @@ export interface WorkspaceDocument {
 	}> | null;
 	readonly notice: Readonly<{
 		message: string;
+		title?: string;
 		revision: number | string;
 		channel: string;
 	}> | null;
-	readonly saveNotice: Readonly<{ message: string }> | null;
+	readonly saveNotice: Readonly<{ message: string; title?: string }> | null;
 }
 export interface WorkspaceSnapshot {
 	readonly documents: readonly WorkspaceDocument[];
@@ -123,6 +127,7 @@ export interface WorkspaceSnapshot {
 	readonly busy: boolean;
 	readonly saveCapability: Readonly<{ save: boolean; reason: string }>;
 	readonly appNotice: string;
+	readonly appNoticeTitle: string;
 	readonly folder: Readonly<{ root: string; files: readonly string[] }> | null;
 	readonly recentTargets: readonly Readonly<{
 		kind: "file" | "folder";
@@ -191,6 +196,8 @@ export function createWorkspaceController({
 	};
 	let folder: WorkspaceSnapshot["folder"] = null;
 	let recentTargets: WorkspaceSnapshot["recentTargets"] = [];
+	// Presentation metadata lives only as long as the notices that reference it.
+	let noticePaths = new Map<string, string>();
 	let closingRequest: string | null = null,
 		completedRequest = 0n;
 	const refusingRequests = new Set<string>();
@@ -204,6 +211,53 @@ export function createWorkspaceController({
 		return promise;
 	}
 	function snapshot(): WorkspaceSnapshot {
+		const named = opened().map(({ record }) => ({
+			name: documentName(record),
+			path: record.session.location?.path ?? null,
+		}));
+		const paths = new Map([
+			...noticePaths,
+			...recentTargets.map((target): [string, string] => [
+				target.path,
+				basename(target.path) || "/",
+			]),
+		]);
+		for (const [index, entry] of opened().entries()) {
+			const name = displayName(named[index]!, named);
+			const location = entry.record.session.location;
+			if (location) paths.set(location.path, name);
+			const target = entry.record.session.panel()?.targetPath;
+			if (target) paths.set(target, name);
+		}
+		if (folder) paths.set(folder.root, basename(folder.root) || "/");
+		const messages = [
+			appNotice,
+			...opened().flatMap((entry) => [
+				entry.notice?.message ?? "",
+				entry.saveNotice?.message ?? "",
+			]),
+		];
+		noticePaths = new Map(
+			[...paths]
+				.filter(([path]) => messages.some((message) => message.includes(path)))
+				.map(([path]): [string, string] => [path, basename(path) || "/"]),
+		);
+		// Replace whole identifiers once; URLs and longer unrelated paths retain their text.
+		const identifiers = [...paths.keys()]
+			.sort((a, b) => b.length - a.length)
+			.map((path) => path.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
+		const identifier = new RegExp(
+			`(^|[\\s("'\x60])(${identifiers.join("|")})(?=$|[\\s:;,'")\x60!?]|\\.(?=\\s|$))`,
+			"g",
+		);
+		const statusText = (message: string) => {
+			return paths.size
+				? message.replace(
+						identifier,
+						(_match, prefix: string, path: string) => prefix + paths.get(path)!,
+					)
+				: message;
+		};
 		return Object.freeze({
 			documents: Object.freeze(
 				opened().map((entry) => {
@@ -232,16 +286,28 @@ export function createWorkspaceController({
 									saveAs: saveCapability.save,
 								}),
 							}),
-						notice: entry.notice && Object.freeze({ ...entry.notice }),
+						notice:
+							entry.notice &&
+							Object.freeze({
+								...entry.notice,
+								message: statusText(entry.notice.message),
+								title: entry.notice.message,
+							}),
 						saveNotice:
-							entry.saveNotice && Object.freeze({ ...entry.saveNotice }),
+							entry.saveNotice &&
+							Object.freeze({
+								...entry.saveNotice,
+								message: statusText(entry.saveNotice.message),
+								title: entry.saveNotice.message,
+							}),
 					});
 				}),
 			),
 			active,
 			activation,
 			busy,
-			appNotice,
+			appNotice: statusText(appNotice),
+			appNoticeTitle: appNotice,
 			saveCapability: Object.freeze({ ...saveCapability }),
 			folder,
 			recentTargets,
@@ -407,7 +473,7 @@ export function createWorkspaceController({
 		if (!other) return false;
 		saveNotice(
 			entry,
-			`The target is already open as ${documentName(other)}. Both editor buffers are retained. Choose another file or close that tab explicitly.`,
+			`The target is already open as ${other.session.location?.path ?? documentName(other)}. Both editor buffers are retained. Choose another file or close that tab explicitly.`,
 		);
 		return true;
 	}
@@ -717,6 +783,12 @@ export function createWorkspaceController({
 		}
 		return run(async () => {
 			switch (command.type) {
+				case "clear-recent": {
+					if (!host) break;
+					await host.clearRecent();
+					await refreshRecent();
+					break;
+				}
 				case "new": {
 					const names = new Set([...records].map(documentName));
 					let number = 1;
@@ -791,7 +863,7 @@ export function createWorkspaceController({
 				if (isOpen(entry)) syncLocation(entry);
 			} catch (error) {
 				report(
-					`Could not check ${documentName(entry.record)}: ${String(error)}. Editor content is retained.`,
+					`Could not check ${entry.record.session.location?.path ?? documentName(entry.record)}: ${String(error)}. Editor content is retained.`,
 				);
 			}
 			emit();

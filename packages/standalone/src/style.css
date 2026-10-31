@@ -29,14 +29,32 @@ button {
 	border-radius: 4px;
 }
 #status {
+	display: block;
+	height: 1.5em;
+	min-width: 0;
+	line-height: 1.5em;
+	grid-column: 1;
+	grid-row: 2;
+	overflow-y: auto;
 	white-space: pre-line;
-	flex-basis: 100%;
 	overflow-wrap: anywhere;
-	margin-left: auto;
 	color: #555;
 }
 #diagnostics {
+	grid-column: 1;
+	grid-row: 1;
+	line-height: 1.5em;
+	min-width: 0;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
 	font-weight: 500;
+}
+#dismiss-status {
+	grid-column: 2;
+	grid-row: 2;
+	align-self: center;
+	padding: 0 6px;
 }
 .diagnostics-jump {
 	font: inherit;
@@ -83,6 +101,10 @@ header {
 	text-align: center;
 }
 footer {
+	display: grid;
+	grid-template-columns: minmax(0, 1fr) auto;
+	grid-template-rows: 1.5em 1.5em;
+	column-gap: 8px;
 	flex-shrink: 0;
 	padding: 4px 10px;
 	border-top: 1px solid #ddd;
@@ -292,8 +314,15 @@ dialog textarea {
 }
 
 #save-support {
+	grid-row: 1;
+	grid-column: 2;
+	max-width: 40vw;
+	height: 1.5em;
+	line-height: 1.5em;
+	white-space: nowrap;
+	overflow: auto;
 	margin: 0;
-	padding: 0.4rem 0.75rem;
+	padding: 0;
 }
 #save-support:empty {
 	display: none;

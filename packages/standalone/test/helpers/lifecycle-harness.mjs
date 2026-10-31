@@ -145,7 +145,8 @@ export async function createHarness(label, options) {
 				return handlers.capabilities
 					? handlers.capabilities()
 					: { save: true, reason: null };
-			if (command === "list_recent") return [];
+			if (command === "list_recent") return handlers.listRecent?.() ?? [];
+			if (command === "clear_recent") return handlers.clearRecent?.();
 			if (command === "remember_document") return handlers.remember?.();
 			if (command === "release_document") return;
 			if (command === "exit_listener_ready") return;

@@ -1,3 +1,4 @@
+import { displayName } from "./display-name.js";
 import type { DiskSnapshot, SaveResult } from "./document-session.js";
 import type { createDocumentTab, DocumentTab } from "./document-tab.js";
 import { createExportResults } from "./export-results.js";
@@ -115,6 +116,7 @@ export function mountApplication(options: ApplicationOptions) {
 	function updateSaveControls() {
 		if (disposed) return;
 		saveSupport.textContent = saveCapability.reason;
+		saveSupport.title = saveCapability.reason;
 		updateMenu();
 	}
 	const controller = createWorkspaceController({
@@ -165,7 +167,10 @@ export function mountApplication(options: ApplicationOptions) {
 					exportServices: native
 						? createNativeExportServices(invoke)
 						: undefined,
-					showExportResults,
+					showExportResults(name, revision, results) {
+						const owner = opened().find((entry) => entry.key === key);
+						showExportResults(name, revision, results, owner?.path ?? name);
+					},
 					reportStatus: events.notice,
 					onChange: events.changed,
 				});
@@ -228,6 +233,7 @@ export function mountApplication(options: ApplicationOptions) {
 								"document_capabilities",
 							),
 						recent: () => invoke<RecentTarget[]>("list_recent"),
+						clearRecent: () => invoke<void>("clear_recent"),
 						rememberDocument: (path: string) =>
 							invoke<void>("remember_document", { path }),
 						chooseFolder: () => invoke<string | null>("select_folder"),
@@ -296,20 +302,34 @@ export function mountApplication(options: ApplicationOptions) {
 	}
 	function renderStatus() {
 		if (disposed) return;
+		const titles: string[] = [];
 		const lines = [...opened()].flatMap((entry) =>
 			entry.state.saveNotice
 				? [
-						`Save needs attention — ${entry.path ?? entry.name}: ${entry.state.saveNotice.message}`,
+						`Save needs attention — ${displayName(entry, opened())}: ${entry.state.saveNotice.message}`,
 					]
 				: [],
 		);
-		if (active?.state.notice)
+		for (const entry of opened())
+			if (entry.state.saveNotice)
+				titles.push(
+					`Save needs attention — ${entry.path ?? entry.name}: ${entry.state.saveNotice.title ?? entry.state.saveNotice.message}`,
+				);
+		if (active?.state.notice) {
 			lines.push(
-				`Last action — ${active.path ?? active.name}: ${active.state.notice.message}`,
+				`Last action — ${displayName(active, opened())}: ${active.state.notice.message}`,
 			);
-		if (state.appNotice) lines.push(`Application notice: ${state.appNotice}`);
+			titles.push(
+				`Last action — ${active.path ?? active.name}: ${active.state.notice.title ?? active.state.notice.message}`,
+			);
+		}
+		if (state.appNotice) {
+			lines.push(`Application notice: ${state.appNotice}`);
+			titles.push(`Application notice: ${state.appNoticeTitle}`);
+		}
 		const text = lines.join("\n");
 		if (status.textContent !== text) status.textContent = text;
+		status.title = titles.join("\n");
 		dismissStatus.hidden = !active?.state.notice && !state.appNotice;
 		const counts = active?.tab.getDiagnosticsSummary?.() ?? "Checking…";
 		const diagnosticsCurrent = active?.tab.areDiagnosticsCurrent?.() ?? true;
@@ -320,9 +340,14 @@ export function mountApplication(options: ApplicationOptions) {
 				: counts.startsWith("Analysis failed:")
 					? "Diagnostic analysis"
 					: "Updating diagnostics";
-		const prefix = active ? `${label} — ${active.path ?? active.name}: ` : "";
+		const prefix = active
+			? `${label} — ${displayName(active, opened())}: `
+			: "";
 		const problems = (active?.tab.getProblemCount?.() ?? 0) > 0;
 		const summary = active ? `${prefix}${counts}` : "";
+		diagnostics.title = active
+			? `${label} — ${active.path ?? active.name}: ${counts}`
+			: "";
 		if (!active) {
 			if (diagnostics.childNodes.length) diagnostics.replaceChildren();
 			return;
@@ -400,26 +425,7 @@ export function mountApplication(options: ApplicationOptions) {
 		if (disposed) return;
 		for (const entry of opened()) {
 			entry.navigation.classList.toggle("selected", entry === active);
-			const sameName = [...opened()].filter(
-				(other) => other.name === entry.name,
-			);
-			let visibleName = entry.name;
-			if (sameName.length > 1 && entry.path) {
-				const parents = sameName
-					.filter((other) => other.path)
-					.map((other) => other.path!.split("/").slice(0, -1));
-				const parent = entry.path.split("/").slice(0, -1);
-				let depth = 1;
-				while (
-					depth < parent.length &&
-					parents.filter(
-						(parts) =>
-							parts.slice(-depth).join("/") === parent.slice(-depth).join("/"),
-					).length > 1
-				)
-					depth++;
-				visibleName += ` — ${parent.slice(-depth).join("/") || "/"}`;
-			}
+			const visibleName = displayName(entry, opened());
 			entry.tab.button.textContent = `${visibleName}${entry.state.dirty ? " •" : ""}`;
 			entry.tab.button.title = entry.path ?? `${entry.name} — Not saved`;
 			entry.navigation
@@ -439,9 +445,8 @@ export function mountApplication(options: ApplicationOptions) {
 							? "Modified"
 							: "Saved";
 		const location = document.querySelector<HTMLElement>("#document-location")!;
-		location.textContent =
-			active?.path ?? (active ? "Not saved to a file" : "");
-		location.title = active?.path ?? (active ? "Not saved to a file" : "");
+		location.textContent = active?.path ?? (active ? "Untitled" : "");
+		location.title = active?.path ?? (active ? "Untitled" : "");
 		location.hidden = !active;
 		document.title = active
 			? `${active.tab.button.textContent} — PFDSL`
@@ -706,6 +711,10 @@ export function mountApplication(options: ApplicationOptions) {
 		}
 		if (id === "close-window") {
 			if (native) currentCommand = native.closeWindow().catch(report);
+			return;
+		}
+		if (id === "clear-recent") {
+			void dispatch({ type: "clear-recent" });
 			return;
 		}
 		if (!active) return;

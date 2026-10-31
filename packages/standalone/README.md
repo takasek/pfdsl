@@ -279,7 +279,9 @@ Drag the divider, or focus it and use Left/Right (Shift for smaller steps), Home
 When no document is open, choose **New**, **Open…**, or **Try a sample**; the sample is opened only on request and is not saved to a file.
 Use the native **File**, **Edit**, **View** and **Window** menus for document commands, formatting, diagram controls and tab navigation.
 Choose **File > Open Folder…** to show the optional folder sidebar and open files as additional tabs.
-The sidebar button and **View > Show/Hide Sidebar** toggle that folder view; recent files and folders are under **File > Recent**.
+The sidebar button and **View > Show/Hide Sidebar** toggle that folder view; recent files and folders are under **File > Open Recent**.
+Recent items show file names or folder names followed by `(Folder)`, with the shortest distinguishing parent suffix when names collide.
+**Clear Menu** clears the stored recent list; it is disabled while busy or when the list is empty.
 Format is an Undoable editor operation, and editor/node navigation uses the shared source positions.
 Choose **View > Normalized edges** to inspect the active tab’s current text without editing it.
 The read-only result uses the same edge sorting and serialization as the VS Code command; errors block the output, while warnings do not.
@@ -309,9 +311,13 @@ These language-support changes have automated editor checks; native keyboard and
 The native host holds a directory capability for each folder explicitly selected for that session.
 Reads stay bound to that directory when its pathname is replaced; relative traversal and symlink escape are rejected.
 
-Choose **File > New**, **File > Open…**, or **File > Recent** to work with documents.
+Choose **File > New**, **File > Open…**, or **File > Open Recent** to work with documents.
 Document names appear in tabs and the window title, while the header shows the current state and location.
 The location stays on one line and truncates long paths with an ellipsis; its title contains the full path, and the text remains selectable and copyable.
+Documents without a file show **Untitled** in the location field; their save state still shows **Not saved**.
+The bottom diagnostics and notices use the same short names as the tabs, with the full text available in their titles.
+Diagnostics reserve one line, and notices scroll within a fixed one-line box so new notices do not move the editor or preview.
+Save failures, unresolved states, action notices and application notices retain their existing lifetimes, with Dismiss reachable beside the notice box.
 Same-name tabs include their parent folders, and completed save messages name the document they belong to.
 **Save** (Command-S) and **Save As…** (Command-Shift-S) are manual operations; there is no autosave or session restoration.
 The recent list stores targets only, never editor content.

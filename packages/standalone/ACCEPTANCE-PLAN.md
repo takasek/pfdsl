@@ -77,12 +77,12 @@ PR #1448の320px・source90%での文字欠け、sidebar併用時の最小26px�
 この極小幅の過去結果を未実施へ戻さず、代表幅の修正やChrome probeの成功をnativeの合格へ転写しない。
 状態：M未実施。記録：未記入。
 
-### GUI-02：Recentとフォルダサイドバー
+### GUI-02：Open Recentとフォルダサイドバー
 
 対応：#1444。対象・入力：M、フォルダ未選択、one/two、A/B。
-操作：開始時にサイドバー切替ボタンが非表示でView > Show Sidebarが無効なことを確認する。Open Folder→ファイル選択→Filesボタン／menuでsidebar閉鎖・再開→File > Recentで文書／フォルダへ再アクセスする。
+操作：開始時にサイドバー切替ボタンが非表示でView > Show Sidebarが無効なことを確認する。Open Folder→ファイル選択→Filesボタン／menuでsidebar閉鎖・再開→File > Open Recentで文書／フォルダへ再アクセスする。
 期待：フォルダ名・階層・選択が対応し、表示中はFilesボタンが現れ、閉鎖で作業幅が戻る。
-Recentを左側や開始画面へ常設せず、本文とdirtyを保つ。
+Open Recentを左側や開始画面へ常設せず、本文とdirtyを保つ。
 状態：M未実施。記録：未記入。
 
 ### GUI-03：開始画面と文書識別
@@ -147,7 +147,7 @@ read-only表示と色以外の差分区別を保ち、取消は内容と未解�
 ### GUI-08：実ファイルの保存・終了回帰
 
 対応：#1444、完了済み#1258/#1438。対象・入力：M、A/B、Untitled、Save As新規／既存、外部変更／削除／rename、書込不能先。
-操作：Open/Folder/Recent、New→Save、Save As上書き／新規／取消、再Open、dirty tab/window/Cmd-Q/menu/Dock QuitのSave/Discard/Cancel、複数dirtyのDiscard→Cancel、保存失敗から回復を行う。
+操作：Open/Folder/Open Recent、New→Save、Save As上書き／新規／取消、再Open、dirty tab/window/Cmd-Q/menu/Dock QuitのSave/Discard/Cancel、複数dirtyのDiscard→Cancel、保存失敗から回復を行う。
 期待：選択した対象だけを保存し、取消・失敗で本文・dirty・保存先・未解決状態を保持する。
 複数tab途中取消で両本文を保持し、Discardはdiskを変えない。
 時間経過・tab/focus変更で自動保存せず、採用済み保存前検査の保証境界を維持する。
