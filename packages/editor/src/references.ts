@@ -1,7 +1,6 @@
 import { isAbsolute, join } from "node:path";
 import {
 	diffGraphs,
-	type Frontmatter,
 	hasErrors,
 	isUrlLike,
 	type Range,
@@ -47,9 +46,14 @@ export function documentReferences(
 export function resolveDocumentReference(
 	path: string | null,
 	reference: Pick<DocumentReference, "kind" | "id" | "field" | "value">,
-	basePath?: string,
-	frontmatter?: Frontmatter | null,
+	model: Pick<DocumentModel, "frontmatter" | "diagnostics">,
 ): ReferenceTarget {
+	if (
+		model.diagnostics.some(
+			(d) => d.severity === "error" && d.code.startsWith("FM"),
+		)
+	)
+		throw new Error("Fix front matter errors before opening references.");
 	if (reference.field === "subflow") {
 		if (!path)
 			throw new Error(
@@ -63,10 +67,7 @@ export function resolveDocumentReference(
 		return { kind: "url", value: reference.value };
 	const resolved = resolveReference({
 		docPath: path ?? "/untitled.pfdsl",
-		frontmatter: {
-			...frontmatter,
-			...(basePath === undefined ? {} : { basePath }),
-		},
+		frontmatter: model.frontmatter,
 		nodeKind: reference.kind,
 		nodeId: reference.id,
 		field: reference.field,

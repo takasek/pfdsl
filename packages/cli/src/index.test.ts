@@ -5734,6 +5734,21 @@ schema >> migrate -> migrated
 });
 
 describe("meta check-links", () => {
+	it("reports resolution failures and missing locations together in text mode", async () => {
+		const f = join(dir, "check-links-mixed.pfdsl");
+		writeFileSync(
+			f,
+			"---\nartifact:\n  a: {ref: {source: repo, revision: main}}\n  b: {location: missing.md}\n---\na >> p -> b\n",
+		);
+		const r = await run(["meta", "check-links", f]);
+		expect(r.exitCode).toBe(1);
+		expect(r.stderr).toBe(
+			"a: unsupported: Explicit artifact references require a supplied resolution context\n",
+		);
+		expect(r.stdout).toBe(
+			`b (artifact)   missing.md -> ${join(dir, "missing.md")}\n`,
+		);
+	});
 	it("reports a missing location file path", async () => {
 		const f = join(dir, "check-links-missing.pfdsl");
 		writeFileSync(

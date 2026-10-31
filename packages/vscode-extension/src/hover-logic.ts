@@ -1,12 +1,8 @@
 import { fileURLToPath, pathToFileURL } from "node:url";
-import {
-	type Frontmatter,
-	isUrlLike,
-	type NodeKind,
-	resolveLocationFsPath,
-} from "@pfdsl/core";
+import { isUrlLike, type NodeKind, resolveLocationFsPath } from "@pfdsl/core";
 import {
 	buildHoverLines as buildSharedHoverLines,
+	type DocumentModel,
 	resolveDocumentReference,
 } from "@pfdsl/editor";
 
@@ -36,9 +32,10 @@ function locationLink(docUri: string, loc: string, basePath?: string): string {
 export function buildHoverLines(
 	id: string,
 	kind: NodeKind,
-	frontmatter: Frontmatter | null,
+	model: Pick<DocumentModel, "frontmatter" | "diagnostics">,
 	docUri?: string,
 ): string[] {
+	const { frontmatter } = model;
 	return buildSharedHoverLines(
 		id,
 		kind,
@@ -53,8 +50,7 @@ export function buildHoverLines(
 								resolveDocumentReference(
 									docUri.startsWith("file:") ? fileURLToPath(docUri) : null,
 									{ kind, id, field: "location", value: loc },
-									frontmatter?.basePath,
-									frontmatter,
+									model,
 								);
 							} catch {
 								return loc.replace(/[\\[\]]/g, "\\$&");

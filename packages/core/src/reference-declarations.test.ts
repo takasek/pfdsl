@@ -1,7 +1,7 @@
 import { Ajv2020 } from "ajv/dist/2020.js";
 import { describe, expect, it } from "vitest";
 import { stringify } from "yaml";
-import { analyze, diffGraphs, format } from "./index.js";
+import { analyze, diffGraphs, format, resolveReference } from "./index.js";
 import { FRONTMATTER_JSON_SCHEMA } from "./json-schema.js";
 
 const target = { source: "https://example.com/project.git", revision: "main" };
@@ -10,6 +10,76 @@ const declarations = [
 	(value: unknown) => ({ baseRef: value }),
 	(value: unknown) => ({ artifact: { a: { ref: value } } }),
 ] as const;
+const resolutionContext = {
+	adapter: "test-snapshots/v1",
+	model: {
+		source: "https://example.com/wiki.git",
+		fixedRevision: "wiki-W",
+		documentId: "Roadmap",
+		extractionId: "pfdsl-block-2",
+	},
+	logicalPath: ".pfdsl/roadmap.pfdsl",
+	basis: {
+		source: target.source,
+		fixedRevision: "commit-C0",
+		root: "/snapshots/C0",
+	},
+	targets: [
+		{
+			source: target.source,
+			revision: target.revision,
+			fixedRevision: "commit-C1",
+			root: "/snapshots/C1",
+		},
+	],
+};
+
+describe("static and resolved absolute reference paths", () => {
+	it.each([
+		{ location: "/x", expectedAbsolute: true },
+		{ location: "\\x", expectedAbsolute: true },
+		{ location: "C:\\x", expectedAbsolute: true },
+		{ location: "C:/x", expectedAbsolute: true },
+		{ location: "C:foo", expectedAbsolute: true },
+		{ location: "c:foo", expectedAbsolute: true },
+		{ location: "x", expectedAbsolute: false },
+		{ location: "https://example.com/x", expectedAbsolute: false },
+	])("agrees for $location", ({ location, expectedAbsolute }) => {
+		const frontmatter = { baseRef: target, artifact: { a: { location } } };
+		const staticResult = analyze(`${source(frontmatter)}a >> p -> b\n`);
+		const staticRejects = staticResult.diagnostics.some(
+			(diagnostic) => diagnostic.code === "V039",
+		);
+		const resolved = resolveReference({
+			docPath: "/temporary/extracted.pfdsl",
+			frontmatter,
+			nodeKind: "artifact",
+			nodeId: "a",
+			field: "location",
+			value: location,
+			context: resolutionContext,
+		});
+		const resolverRejects =
+			!resolved.ok &&
+			resolved.reason === "absolute-path" &&
+			resolved.code === "V039";
+
+		expect(staticRejects).toBe(expectedAbsolute);
+		expect(resolverRejects).toBe(expectedAbsolute);
+		expect(staticRejects).toBe(resolverRejects);
+		if (expectedAbsolute) {
+			expect(resolved).toMatchObject({
+				ok: false,
+				reason: "absolute-path",
+				code: "V039",
+			});
+		} else if (location.startsWith("https://")) {
+			expect(resolved).toMatchObject({ ok: true, kind: "url" });
+		} else {
+			expect(resolved).toMatchObject({ ok: true, kind: "resource" });
+		}
+	});
+});
 
 describe.each([false, true])("reference declarations (strict=%s)", (strict) => {
 	it.each([

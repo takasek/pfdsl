@@ -4,6 +4,7 @@ import { dirname, posix, resolve } from "node:path";
 import { describe, it } from "node:test";
 import { fileURLToPath } from "node:url";
 import { parse as parseYaml } from "yaml";
+import { analyze, isUrlLike } from "../../packages/core/dist/index.js";
 import { GitHubUnavailableError } from "../pfdsl/lib/github-ops.mjs";
 import * as gateCheck from "./gate-check.mjs";
 import {
@@ -21,6 +22,7 @@ import {
 	formatGateTable,
 	formatRunTreeLine,
 	formatSizeDelta,
+	formatUnclassifiedLocations,
 	hasStatusChange,
 	lintCommitSubjects,
 	matchesTrigger,
@@ -1022,9 +1024,200 @@ describe("formatRunTreeLine", () => {
 });
 
 describe("collectModeledLocations", () => {
+	it("excludes only the artifact with its own reference and keeps untargeted artifacts local", () => {
+		const source = readFileSync(
+			new URL("./fixtures/reference-target-locations.pfdsl", import.meta.url),
+			"utf8",
+		)
+			.replace("baseRef: {source: repo, revision: release}\n", "")
+			.replace(
+				"a: {location: docs/plan.md}",
+				"a: {location: docs/plan.md, ref: {source: repo, revision: release}}",
+			);
+		const { frontmatter } = analyze(source);
+		const { local, unclassified } = collectModeledLocations(
+			[{ file: "workflow.pfdsl", frontmatter }],
+			resolveLocation,
+			isUrlLike,
+		);
+		assert.deepEqual(
+			local.map(({ id }) => id),
+			["b", "p"],
+		);
+		assert.deepEqual(unclassified, [
+			{ file: "workflow.pfdsl", id: "a", location: "docs/plan.md" },
+		]);
+	});
+	it("does not model directory contents through an explicit-target directory and skips URLs", () => {
+		const source = readFileSync(
+			new URL("./fixtures/reference-target-locations.pfdsl", import.meta.url),
+			"utf8",
+		)
+			.replace("docs/plan.md", "docs/")
+			.replace("docs/result.md", "https://example.com/result");
+		const { frontmatter } = analyze(source);
+		const calls = [];
+		const { local, unclassified } = collectModeledLocations(
+			[{ file: "workflow.pfdsl", frontmatter }],
+			(...args) => {
+				calls.push(args);
+				return resolveLocation(...args);
+			},
+			isUrlLike,
+		);
+		assert.deepEqual(unclassified, [
+			{ file: "workflow.pfdsl", id: "a", location: "docs/" },
+		]);
+		assert.deepEqual(calls, [
+			["workflow.pfdsl", "scripts/build.mjs", undefined],
+		]);
+		assert.deepEqual(
+			classifyChangedFilesByModeling(["docs/x.md", "scripts/build.mjs"], local),
+			{
+				modeled: [
+					{
+						path: "scripts/build.mjs",
+						models: [{ file: "workflow.pfdsl", id: "p" }],
+					},
+				],
+				unmodeled: ["docs/x.md"],
+			},
+		);
+	});
+	it("keeps empty explicit-target artifact locations unclassified and skips an untargeted scalar", () => {
+		const { local, unclassified } = collectModeledLocations(
+			[
+				{
+					file: "explicit-target.pfdsl",
+					frontmatter: {
+						baseRef: { source: "repo", revision: "release" },
+						artifact: {
+							scalar: { location: "" },
+							array: { location: [""] },
+						},
+					},
+				},
+				{
+					file: "untargeted.pfdsl",
+					frontmatter: { artifact: { empty: { location: "" } } },
+				},
+			],
+			resolveLocation,
+			isUrlLike,
+		);
+		assert.deepEqual(local, []);
+		assert.deepEqual(unclassified, [
+			{ file: "explicit-target.pfdsl", id: "scalar", location: "" },
+			{ file: "explicit-target.pfdsl", id: "array", location: "" },
+		]);
+	});
+	for (const declaration of [undefined, null, "main", {}, { source: "repo" }]) {
+		it(`uses declaration presence even for an invalid target: ${JSON.stringify(declaration)}`, () => {
+			for (const frontmatter of [
+				{ baseRef: declaration, artifact: { a: { location: "docs/plan.md" } } },
+				{ artifact: { a: { location: "docs/plan.md", ref: declaration } } },
+			]) {
+				assert.deepEqual(
+					collectModeledLocations(
+						[{ file: "workflow.pfdsl", frontmatter }],
+						() => assert.fail("Explicit targets must not resolve locally"),
+						isUrlLike,
+					),
+					{
+						local: [],
+						unclassified: [
+							{ file: "workflow.pfdsl", id: "a", location: "docs/plan.md" },
+						],
+					},
+				);
+			}
+		});
+	}
+	it("preserves process precedence over an artifact with the same ID", () => {
+		const frontmatter = {
+			baseRef: {},
+			artifact: { a: { location: "artifact.md" } },
+			process: { a: { location: "process.md" } },
+		};
+		assert.deepEqual(
+			collectModeledLocations(
+				[{ file: "workflow.pfdsl", frontmatter }],
+				resolveLocation,
+				isUrlLike,
+			),
+			{
+				local: [{ file: "workflow.pfdsl", id: "a", path: "process.md" }],
+				unclassified: [],
+			},
+		);
+	});
+	it("preserves model ordering when process metadata overrides an artifact ID", () => {
+		const frontmatter = {
+			artifact: { a: { location: "old.md" }, b: { location: "shared.md" } },
+			process: { a: { location: "shared.md" } },
+		};
+		const { local } = collectModeledLocations(
+			[{ file: "workflow.pfdsl", frontmatter }],
+			resolveLocation,
+			isUrlLike,
+		);
+		assert.deepEqual(
+			local.map(({ id }) => id),
+			["a", "b"],
+		);
+	});
+	it("preserves the merged ordering of numeric IDs across sections", () => {
+		const frontmatter = {
+			artifact: { 2: { location: "shared.md" } },
+			process: { 1: { location: "shared.md" } },
+		};
+		const { local } = collectModeledLocations(
+			[{ file: "workflow.pfdsl", frontmatter }],
+			resolveLocation,
+			isUrlLike,
+		);
+		assert.deepEqual(
+			local.map(({ id }) => id),
+			["1", "2"],
+		);
+	});
+	it("does not classify explicit-target fixture artifacts as modeled local paths", () => {
+		const source = readFileSync(
+			new URL("./fixtures/reference-target-locations.pfdsl", import.meta.url),
+			"utf8",
+		);
+		const { frontmatter } = analyze(source);
+		const collected = collectModeledLocations(
+			[{ file: "workflow.pfdsl", frontmatter }],
+			resolveLocation,
+			isUrlLike,
+		);
+		const { local } = collected;
+		assert.deepEqual(classifyChangedFilesByModeling(["docs/plan.md"], local), {
+			modeled: [],
+			unmodeled: ["docs/plan.md"],
+		});
+		assert.deepEqual(collected.unclassified, [
+			{ file: "workflow.pfdsl", id: "a", location: "docs/plan.md" },
+			{ file: "workflow.pfdsl", id: "b", location: "docs/result.md" },
+		]);
+		assert.equal(
+			formatUnclassifiedLocations(collected.unclassified).join("\n"),
+			[
+				"  artifact locations not classified against the local checkout (explicit reference target; needs a reference context):",
+				"    workflow.pfdsl:a → docs/plan.md",
+				"    workflow.pfdsl:b → docs/result.md",
+				"  not matched by locally classifiable PFD locations (model classification incomplete):",
+			].join("\n"),
+		);
+		assert.deepEqual(formatUnclassifiedLocations([]), []);
+		assert.deepEqual(local, [
+			{ file: "workflow.pfdsl", id: "p", path: "scripts/build.mjs" },
+		]);
+	});
 	// Stands in for the injected @pfdsl/core resolver: the same two decisions
 	// (URLs name nothing in the tree; everything else resolves against the
-	// file's own directory) with none of the build dependency. What core owns
+	// file's own directory). What core owns
 	// is tested in core; what is asserted here is this function's own job —
 	// which nodes it visits, and what it does with each resolution.
 	// The trailing slash is stripped here because path resolution strips it,
@@ -1043,7 +1236,8 @@ describe("collectModeledLocations", () => {
 		const locations = collectModeledLocations(
 			[{ file, frontmatter }],
 			resolveLocation,
-		);
+			isUrlLike,
+		).local;
 		const expected = [
 			["references/github-issues-backend.md", "ops_skill_l3"],
 			["SKILL.md", "ops_skill_general"],
@@ -1103,7 +1297,11 @@ describe("collectModeledLocations", () => {
 	];
 
 	it("resolves companion-relative locations against the .pfdsl directory", () => {
-		const modeled = collectModeledLocations(analyzed, resolveLocation);
+		const { local: modeled } = collectModeledLocations(
+			analyzed,
+			resolveLocation,
+			isUrlLike,
+		);
 		assert.deepEqual(
 			modeled.find((m) => m.id === "spec"),
 			{ path: "docs/spec/spec.md", file: ".pfdsl/workflow.pfdsl", id: "spec" },
@@ -1111,7 +1309,11 @@ describe("collectModeledLocations", () => {
 	});
 
 	it("keeps a sibling location inside the .pfdsl directory", () => {
-		const modeled = collectModeledLocations(analyzed, resolveLocation);
+		const { local: modeled } = collectModeledLocations(
+			analyzed,
+			resolveLocation,
+			isUrlLike,
+		);
 		assert.equal(
 			modeled.find((m) => m.id === "roadmap_pfdsl").path,
 			".pfdsl/roadmap.pfdsl",
@@ -1120,15 +1322,15 @@ describe("collectModeledLocations", () => {
 
 	it("drops URLs, which name nothing in the tree", () => {
 		assert.ok(
-			!collectModeledLocations(analyzed, resolveLocation).some(
+			!collectModeledLocations(analyzed, resolveLocation, isUrlLike).local.some(
 				(m) => m.id === "issues",
 			),
 		);
 	});
 
 	it("takes processes as well as artifacts, and every element of a list location", () => {
-		const paths = collectModeledLocations(analyzed, resolveLocation)
-			.filter((m) => m.id === "flow_sync")
+		const paths = collectModeledLocations(analyzed, resolveLocation, isUrlLike)
+			.local.filter((m) => m.id === "flow_sync")
 			.map((m) => m.path);
 		assert.deepEqual(paths, [
 			"scripts/pfdsl/",
@@ -1138,7 +1340,7 @@ describe("collectModeledLocations", () => {
 
 	it("skips nodes that declare no location", () => {
 		assert.ok(
-			!collectModeledLocations(analyzed, resolveLocation).some(
+			!collectModeledLocations(analyzed, resolveLocation, isUrlLike).local.some(
 				(m) => m.id === "unplaced",
 			),
 		);

@@ -1,5 +1,19 @@
 import { describe, expect, it } from "vitest";
-import { buildHoverLines } from "./hover-logic.js";
+import { buildHoverLines as buildModelHoverLines } from "./hover-logic.js";
+
+function buildHoverLines(
+	id: Parameters<typeof buildModelHoverLines>[0],
+	kind: Parameters<typeof buildModelHoverLines>[1],
+	frontmatter: Parameters<typeof buildModelHoverLines>[2]["frontmatter"],
+	docUri?: string,
+) {
+	return buildModelHoverLines(
+		id,
+		kind,
+		{ frontmatter, diagnostics: [] },
+		docUri,
+	);
+}
 
 function tableContent(lines: string[]): string {
 	return lines.find((l) => l.startsWith("| | |")) ?? "";

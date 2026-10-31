@@ -2882,7 +2882,8 @@ export function runCheckLinks(
 			exitCode,
 		};
 	}
-	if (failures.length) return referenceFailureResult(failures);
+	if (missing.length === 0 && failures.length)
+		return referenceFailureResult(failures);
 	if (missing.length === 0)
 		return ok(
 			includeEvidence
@@ -2892,7 +2893,11 @@ export function runCheckLinks(
 	const lines = missing.map(
 		(m) => `${m.id} (${m.kind})   ${m.location} -> ${m.resolved}`,
 	);
-	return { stdout: `${lines.join("\n")}\n`, stderr: "", exitCode: 1 };
+	return {
+		stdout: `${lines.join("\n")}\n`,
+		stderr: failures.length ? referenceFailureResult(failures).stderr : "",
+		exitCode: 1,
+	};
 }
 
 /**

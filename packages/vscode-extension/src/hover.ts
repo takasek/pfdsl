@@ -108,7 +108,7 @@ export function registerHover(context: vscode.ExtensionContext): void {
 			const kind = nodeKinds.get(id);
 			if (!kind) return null;
 
-			const lines = buildHoverLines(id, kind, frontmatter, doc.uri.toString());
+			const lines = buildHoverLines(id, kind, model, doc.uri.toString());
 
 			const gotoArgs = encodeURIComponent(
 				JSON.stringify([doc.uri.toString(), id]),

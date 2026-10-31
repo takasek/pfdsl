@@ -58,6 +58,12 @@ function resolve(
 }
 
 describe("reference target selection", () => {
+	it("preserves directory locations under an explicit target", () => {
+		expect(resolve({ value: "docs/" })).toMatchObject({
+			ok: true,
+			value: "/snapshots/C1/docs",
+		});
+	});
 	it("resolves the same logical path in distinct fixed snapshots", () => {
 		expect(resolve()).toEqual({
 			ok: true,
@@ -381,6 +387,14 @@ describe("reference context validation", () => {
 		],
 		[{ ...context, logicalPath: "" }, "logical-path-missing"],
 		[{ ...context, logicalPath: "." }, "logical-path-missing"],
+		[{ ...context, logicalPath: "a/." }, "logical-path-missing"],
+		[{ ...context, logicalPath: "a\\." }, "logical-path-missing"],
+		[{ ...context, logicalPath: "a/b/.." }, "logical-path-missing"],
+		[{ ...context, logicalPath: "a/" }, "logical-path-missing"],
+		[{ ...context, logicalPath: "a\\" }, "logical-path-missing"],
+		[{ ...context, logicalPath: "./" }, "logical-path-missing"],
+		[{ ...context, logicalPath: ".." }, "path-outside-root"],
+		[{ ...context, logicalPath: "a/../.." }, "path-outside-root"],
 		[{ ...context, logicalPath: "docs/\0roadmap.pfdsl" }, "context-invalid"],
 		[{ ...context, logicalPath: "/absolute/roadmap.pfdsl" }, "absolute-path"],
 		[{ ...context, targets: null }, "context-invalid"],
@@ -418,5 +432,16 @@ describe("reference context validation", () => {
 			ok: false,
 			reason,
 		});
+	});
+
+	it.each([
+		"docs/roadmap.pfdsl",
+		"a/./b.pfdsl",
+	])("accepts file logical positions: %s", (logicalPath) => {
+		expect(validateReferenceContext({ ...context, logicalPath })).toMatchObject(
+			{
+				ok: true,
+			},
+		);
 	});
 });

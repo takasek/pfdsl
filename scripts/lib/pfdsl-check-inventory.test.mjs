@@ -8,11 +8,13 @@ import {
 const scaffold =
 	"scripts/harness-template/skills/pfd-ops/references/scaffold/roadmap.pfdsl";
 const fixture = "packages/core/src/__fixtures__/pipeline-scale.pfdsl";
+const gateFixture = "scripts/lib/fixtures/reference-target-locations.pfdsl";
 const paths = [
 	".pfdsl/workflow.pfdsl",
 	"docs/samples/a.pfdsl",
 	scaffold,
 	fixture,
+	gateFixture,
 ];
 
 describe("tracked PFD check inventory", () => {
@@ -76,6 +78,12 @@ describe("tracked PFD check inventory", () => {
 			classifyTrackedPfdsl(paths).entries.find((item) => item.path === fixture)
 				.owner,
 			/index\.test\.ts/,
+		);
+		assert.match(
+			classifyTrackedPfdsl(paths).entries.find(
+				(item) => item.path === gateFixture,
+			).owner,
+			/gate-check\.test\.mjs/,
 		);
 		assert.match(
 			classifyTrackedPfdsl([]).errors.join("\n"),

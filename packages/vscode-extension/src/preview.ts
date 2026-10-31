@@ -1,8 +1,9 @@
-import type { DiffReport, Frontmatter } from "@pfdsl/core";
+import type { DiffReport } from "@pfdsl/core";
 import type { MessageFromWebview, MessageToWebview } from "@pfdsl/editor";
 import {
 	applyPreviewEdit,
 	buildLocations,
+	type DocumentModel,
 	type DocumentReference,
 	findFrontmatterDefinitionRange,
 	findNodeOccurrenceRanges,
@@ -298,7 +299,7 @@ async function handleOpenLocation(
 	docFsPath: string,
 	locs: string[],
 	reference: Pick<DocumentReference, "kind" | "id" | "field">,
-	frontmatter: Frontmatter | null,
+	model: Pick<DocumentModel, "frontmatter" | "diagnostics">,
 	fallbackViewColumn?: vscode.ViewColumn,
 ): Promise<void> {
 	if (locs.length === 0) return;
@@ -319,8 +320,7 @@ async function handleOpenLocation(
 				resolvedPath = resolveDocumentReference(
 					docFsPath,
 					{ ...reference, value: loc },
-					frontmatter?.basePath,
-					frontmatter,
+					model,
 				).value;
 			} catch (error) {
 				void vscode.window.showErrorMessage(
@@ -560,7 +560,8 @@ export function registerPreview(context: vscode.ExtensionContext): {
 			} else if (msg.type === "openUrl") {
 				vscode.env.openExternal(vscode.Uri.parse(msg.url));
 			} else if (msg.type === "openFile") {
-				const { frontmatter } = analyzeDocument(state.doc);
+				const model = analyzeDocument(state.doc);
+				const { frontmatter } = model;
 				if (frontmatter?.process?.[msg.nodeId]?.subflow !== msg.path) return;
 				const srcVc = vscode.window.visibleTextEditors.find(
 					(e) => e.document === state.doc,
@@ -569,11 +570,12 @@ export function registerPreview(context: vscode.ExtensionContext): {
 					state.doc.uri.fsPath,
 					[msg.path],
 					{ kind: "process", id: msg.nodeId, field: "subflow" },
-					frontmatter,
+					model,
 					srcVc,
 				);
 			} else if (msg.type === "openLocation") {
-				const { frontmatter, nodeKinds } = analyzeDocument(state.doc);
+				const model = analyzeDocument(state.doc);
+				const { frontmatter, nodeKinds } = model;
 				const kind = nodeKinds.get(msg.nodeId);
 				if (kind !== "artifact" && kind !== "process") return;
 				const field =
@@ -589,7 +591,7 @@ export function registerPreview(context: vscode.ExtensionContext): {
 					state.doc.uri.fsPath,
 					locs,
 					{ kind, id: msg.nodeId, field },
-					frontmatter,
+					model,
 					srcVc,
 				);
 			}
