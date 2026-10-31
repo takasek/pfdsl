@@ -191,7 +191,7 @@ export function validateReferenceContext(
 		"The model's logical file position",
 	);
 	if (!logical.ok) return logical;
-	if (logical.path === ".")
+	if (logical.path === "." || logical.path.endsWith("/"))
 		return failure(
 			"logical-path-missing",
 			"The model's logical file position must identify a file",
