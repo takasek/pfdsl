@@ -74,7 +74,9 @@ export function snapshotCoordinates(
 			statements: model.document.statements.map(statement),
 		},
 		diagnostics: model.diagnostics.map((diagnostic) =>
-			hasBodyRange(diagnostic.code)
+			// A located rule that found no body position keeps the document start.
+			hasBodyRange(diagnostic.code) &&
+			diagnostic.range.start.line >= model.bodyStartLine
 				? { ...diagnostic, range: endpoints(diagnostic.range) }
 				: diagnostic,
 		),
