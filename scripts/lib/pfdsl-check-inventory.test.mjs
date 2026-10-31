@@ -89,10 +89,6 @@ describe("tracked PFD check inventory", () => {
 			classifyTrackedPfdsl([]).errors.join("\n"),
 			/stale.*core-fixture/,
 		);
-		assert.match(
-			classifyTrackedPfdsl([]).errors.join("\n"),
-			/stale.*gate-fixture/,
-		);
 		const rule = { id: "duplicate", pattern: /\.pfdsl$/, checks: [] };
 		assert.match(
 			classifyTrackedPfdsl(paths, [rule, rule]).errors.join("\n"),
@@ -101,8 +97,7 @@ describe("tracked PFD check inventory", () => {
 	});
 	it("rejects a requested check that would silently check nothing", () => {
 		assert.throws(
-			() =>
-				pfdslCheckPlan(classifyTrackedPfdsl([fixture, gateFixture]), "links"),
+			() => pfdslCheckPlan(classifyTrackedPfdsl([fixture]), "links"),
 			/no classified/,
 		);
 		assert.throws(

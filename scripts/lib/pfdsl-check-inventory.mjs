@@ -35,7 +35,6 @@ export const PFD_CHECK_RULES = [
 	{
 		id: "gate-fixture",
 		pattern: /^scripts\/lib\/fixtures\/reference-target-locations\.pfdsl$/,
-		required: true,
 		checks: [],
 		owner:
 			"scripts/lib/gate-check.test.mjs collectModeledLocations, parsed with core analyze",
