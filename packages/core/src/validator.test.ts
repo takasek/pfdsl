@@ -1446,6 +1446,25 @@ describe("graph diagnostic ranges", () => {
 		]);
 	});
 
+	it("V003 ignores an earlier use of the same ID as an artifact", () => {
+		const { tokens } = lex("a >> p\np >> a");
+		const { document } = parseTokens(tokens);
+		const diag = diagnose("a >> p\np >> a", null, { document }).find(
+			(d) => d.code === "V003" && d.message.includes("'a'"),
+		);
+		expect(diag?.range.start).toMatchObject({ line: 2, column: 6 });
+	});
+
+	it("V010 spans the named edge when a declared kind conflicts with its use", () => {
+		const source =
+			"---\nartifact: {p: {label: P}, q: {label: Q}}\n---\na >> p\np -> a\n";
+		const cycles = analyzeSource(source).diagnostics.filter(
+			(d) => d.code === "V010",
+		);
+		expect(cycles.length).toBeGreaterThan(0);
+		for (const d of cycles) expect(d.range.start.line).toBeGreaterThan(3);
+	});
+
 	it("V020 spans the process declaration in front matter", () => {
 		const source = "---\nprocess:\n  orphan: { label: O }\n---\na >> p -> b\n";
 		const diag = analyzeSource(source).diagnostics.find(

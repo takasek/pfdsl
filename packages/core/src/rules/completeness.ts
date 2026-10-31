@@ -39,7 +39,7 @@ export function processCompleteness(ctx: RuleContext): Diagnostic[] {
 				severity: ctx.strictly("warning"),
 				code: "V002",
 				message: `Process '${pid}' has no inputs`,
-				range: ctx.bodyRangeOf(pid),
+				range: ctx.processRangeOf(pid),
 			});
 		}
 	}
@@ -49,7 +49,7 @@ export function processCompleteness(ctx: RuleContext): Diagnostic[] {
 				severity: ctx.strictly("warning"),
 				code: "V003",
 				message: `Process '${pid}' has no outputs`,
-				range: ctx.bodyRangeOf(pid),
+				range: ctx.processRangeOf(pid),
 			});
 		}
 	}
@@ -75,7 +75,7 @@ export function feedbackOnlyProcess(ctx: RuleContext): Diagnostic[] {
 			severity: ctx.strictly("warning"),
 			code: "W008",
 			message: `Process '${pid}' has no normal input; feedback edges are its only inputs`,
-			range: ctx.bodyRangeOf(pid),
+			range: ctx.processRangeOf(pid),
 		});
 	}
 	return diagnostics;

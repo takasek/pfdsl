@@ -32,10 +32,19 @@ export function primaryGraphCycle(ctx: RuleContext): Diagnostic[] {
 					severity: "error",
 					code: "V010",
 					message: `Primary graph contains a cycle involving '${id}' → '${neighbor}'`,
+					// The adjacency came from an input edge `id >> neighbor` or an
+					// output edge `id -> neighbor`; an ID whose declared kind
+					// conflicts with its use (N002) can be on either side.
 					range: ctx.edgeRange(
-						ctx.nodeKinds.get(id) === "process"
-							? { kind: "output", artifact: neighbor, process: id }
-							: { kind: "input", artifact: id, process: neighbor },
+						ctx.edges.find(
+							(e) =>
+								(e.kind === "input" &&
+									e.artifact === id &&
+									e.process === neighbor) ||
+								(e.kind === "output" &&
+									e.process === id &&
+									e.artifact === neighbor),
+						)!,
 					),
 				});
 			} else if (neighborColor !== "black") {

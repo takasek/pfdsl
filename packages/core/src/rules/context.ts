@@ -56,8 +56,8 @@ export interface RuleContext {
 	rangeOf(id: string): Range;
 	/** Range of an edge's first authored occurrence, when the document was supplied. */
 	edgeRange(edge: NormalizedEdge): Range;
-	/** Range of a node ID's first appearance on a body edge, when the document was supplied. */
-	bodyRangeOf(id: string): Range;
+	/** Range of a process ID's first appearance as a process on a body edge, when the document was supplied. */
+	processRangeOf(id: string): Range;
 	/** `error` under --strict, the given severity otherwise. */
 	strictly(severity: DiagnosticSeverity): DiagnosticSeverity;
 }
@@ -73,27 +73,32 @@ function withoutNulls<T>(entries: Record<string, T | null> | undefined) {
 	return out;
 }
 
-/** The first statement writing `edge`, spanning its two endpoint IDs in source order. */
+/** Map key identifying an edge by its kind and endpoints. */
 function edgeRangeKey(edge: NormalizedEdge): string {
 	return JSON.stringify([edge.kind, edge.artifact, edge.process]);
 }
 
 interface BodyRangeIndex {
 	edges: Map<string, Range>;
-	ids: Map<string, Range>;
+	processes: Map<string, Range>;
 }
 
-/** Each edge's and each ID's first authored occurrence, from one pass over the document. */
+/**
+ * Each edge's first authored occurrence, spanning its two endpoint IDs in
+ * source order, and each process ID's first occurrence in the process role,
+ * from one pass over the document.
+ */
 function bodyRangeIndex(document: Document): BodyRangeIndex {
 	const edges = new Map<string, Range>();
-	const ids = new Map<string, Range>();
+	const processes = new Map<string, Range>();
 	for (const stmt of document.statements) {
 		for (const { kind, artifact, process } of edgeOccurrences(stmt)) {
-			for (const id of [artifact, process]) {
-				const seen = ids.get(id.value);
-				if (!seen || id.start.offset < seen.start.offset)
-					ids.set(id.value, { start: id.start, end: id.end });
-			}
+			const seen = processes.get(process.value);
+			if (!seen || process.start.offset < seen.start.offset)
+				processes.set(process.value, {
+					start: process.start,
+					end: process.end,
+				});
 			const key = edgeRangeKey({
 				kind,
 				artifact: artifact.value,
@@ -108,7 +113,7 @@ function bodyRangeIndex(document: Document): BodyRangeIndex {
 			);
 		}
 	}
-	return { edges, ids };
+	return { edges, processes };
 }
 
 export function buildRuleContext(
@@ -169,7 +174,7 @@ export function buildRuleContext(
 		rangeOf: (id) => nodeRanges.get(id) ?? zeroRange(),
 		edgeRange: (edge) =>
 			located()?.edges.get(edgeRangeKey(edge)) ?? zeroRange(),
-		bodyRangeOf: (id) => located()?.ids.get(id) ?? zeroRange(),
+		processRangeOf: (id) => located()?.processes.get(id) ?? zeroRange(),
 		strictly: (severity) => (options.strict ? "error" : severity),
 	};
 }
