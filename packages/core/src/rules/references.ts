@@ -1,4 +1,4 @@
-import { isUrlLike } from "../multifile.js";
+import { isAbsolutePath, isUrlLike } from "../multifile.js";
 import { zeroRange } from "../position.js";
 import { referenceTargetSchema } from "../types/frontmatter.js";
 import type { Diagnostic, Range } from "../types/index.js";
@@ -31,7 +31,7 @@ export function referenceDeclarations(ctx: RuleContext): Diagnostic[] {
 				: [meta.location];
 		for (const location of locations) {
 			// Recognize authored POSIX and Windows absolute paths on every host.
-			if (!isUrlLike(location) && /^(?:[\\/]|[A-Za-z]:[\\/])/.test(location)) {
+			if (!isUrlLike(location) && isAbsolutePath(location)) {
 				diagnostics.push({
 					severity: "error",
 					code: "V039",

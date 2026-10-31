@@ -1,6 +1,6 @@
 import { posix, win32 } from "node:path";
 import { resolveLocationFsPath } from "./location-path.js";
-import { isUrlLike } from "./multifile.js";
+import { isAbsolutePath, isUrlLike } from "./multifile.js";
 import type { Frontmatter, ReferenceTarget } from "./types/frontmatter.js";
 
 /** A resource collection already acquired and pinned by the caller. */
@@ -105,12 +105,6 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 function isText(value: unknown): value is string {
 	return typeof value === "string" && value.trim().length > 0;
-}
-
-function isAbsolutePath(value: string): boolean {
-	// Browser path shims do not implement win32. Authored Windows paths must
-	// still be rejected where a collection-relative path is required.
-	return /^(?:[\\/]|[a-z]:)/i.test(value);
 }
 
 /** Logical paths use collection-relative separators on every host OS. */

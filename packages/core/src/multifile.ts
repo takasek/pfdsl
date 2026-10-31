@@ -19,6 +19,11 @@ export function isUrlLike(value: string): boolean {
 	return value.includes("://");
 }
 
+/** True when a path is absolute or drive-qualified on any host OS. */
+export function isAbsolutePath(value: string): boolean {
+	return /^(?:[\\/]|[a-z]:)/i.test(value);
+}
+
 /**
  * Resolve a relative cross-file reference against the containing file (§2.9.2).
  * Absolute paths and URLs (`://`) are not permitted.
