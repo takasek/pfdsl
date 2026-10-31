@@ -56,6 +56,8 @@ export interface RuleContext {
 	rangeOf(id: string): Range;
 	/** Range of an edge's first authored occurrence, when the document was supplied. */
 	edgeRange(edge: NormalizedEdge): Range;
+	/** Range of a node ID's first appearance on a body edge, when the document was supplied. */
+	bodyRangeOf(id: string): Range;
 	/** `error` under --strict, the given severity otherwise. */
 	strictly(severity: DiagnosticSeverity): DiagnosticSeverity;
 }
@@ -76,18 +78,29 @@ function edgeRangeKey(edge: NormalizedEdge): string {
 	return JSON.stringify([edge.kind, edge.artifact, edge.process]);
 }
 
-/** Each edge's first authored occurrence, from one pass over the document. */
-function edgeRangeIndex(document: Document): Map<string, Range> {
-	const index = new Map<string, Range>();
+interface BodyRangeIndex {
+	edges: Map<string, Range>;
+	ids: Map<string, Range>;
+}
+
+/** Each edge's and each ID's first authored occurrence, from one pass over the document. */
+function bodyRangeIndex(document: Document): BodyRangeIndex {
+	const edges = new Map<string, Range>();
+	const ids = new Map<string, Range>();
 	for (const stmt of document.statements) {
 		for (const { kind, artifact, process } of edgeOccurrences(stmt)) {
+			for (const id of [artifact, process]) {
+				const seen = ids.get(id.value);
+				if (!seen || id.start.offset < seen.start.offset)
+					ids.set(id.value, { start: id.start, end: id.end });
+			}
 			const key = edgeRangeKey({
 				kind,
 				artifact: artifact.value,
 				process: process.value,
 			});
-			if (index.has(key)) continue;
-			index.set(
+			if (edges.has(key)) continue;
+			edges.set(
 				key,
 				kind === "output"
 					? { start: process.start, end: artifact.end }
@@ -95,7 +108,7 @@ function edgeRangeIndex(document: Document): Map<string, Range> {
 			);
 		}
 	}
-	return index;
+	return { edges, ids };
 }
 
 export function buildRuleContext(
@@ -109,7 +122,13 @@ export function buildRuleContext(
 		: options.source
 			? findFrontmatterNodeRanges(options.source)
 			: new Map<string, Range>();
-	let edgeRanges: Map<string, Range> | undefined;
+	let bodyRanges: BodyRangeIndex | undefined;
+	// Built on first use, so documents with no located diagnostic skip it.
+	const located = () => {
+		if (options.document && !bodyRanges)
+			bodyRanges = bodyRangeIndex(options.document);
+		return bodyRanges;
+	};
 
 	const edgeGroups = groupEdges(edges);
 	const edgeProcesses = new Set<string>([
@@ -148,12 +167,9 @@ export function buildRuleContext(
 		nodesWithEdges,
 		primaryAdj,
 		rangeOf: (id) => nodeRanges.get(id) ?? zeroRange(),
-		edgeRange(edge) {
-			if (!options.document) return zeroRange();
-			// Built on first use, so documents with no located diagnostic skip it.
-			edgeRanges ??= edgeRangeIndex(options.document);
-			return edgeRanges.get(edgeRangeKey(edge)) ?? zeroRange();
-		},
+		edgeRange: (edge) =>
+			located()?.edges.get(edgeRangeKey(edge)) ?? zeroRange(),
+		bodyRangeOf: (id) => located()?.ids.get(id) ?? zeroRange(),
 		strictly: (severity) => (options.strict ? "error" : severity),
 	};
 }

@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { analyzeSource } from "./index.js";
 import { lex } from "./lexer.js";
 import { normalize } from "./normalizer.js";
 import { parseTokens } from "./parser.js";
@@ -1364,5 +1365,125 @@ a >> design -> b
 			expect(bMsg).toMatch(/status/);
 			expect(ghostMsg).not.toBe(bMsg);
 		});
+	});
+});
+
+describe("graph diagnostic ranges", () => {
+	/** Line/column spans of one code's diagnostics, with the parsed document available. */
+	function spans(src: string, code: string, options: ValidateOptions = {}) {
+		const { tokens } = lex(src);
+		const { document } = parseTokens(tokens);
+		return diagnose(src, null, { ...options, document })
+			.filter((d) => d.code === code)
+			.map(({ range: { start, end } }) => [
+				[start.line, start.column],
+				[end.line, end.column],
+			]);
+	}
+
+	it("V010 spans the output edge its message names", () => {
+		expect(spans("a >> p -> b\nb >> q -> a", "V010")).toEqual([
+			[
+				[2, 6],
+				[2, 12],
+			],
+		]);
+	});
+
+	it("V010 spans the input edge its message names", () => {
+		expect(spans("x >> q -> a\na >> p -> b\nb >> q", "V010")).toEqual([
+			[
+				[3, 1],
+				[3, 7],
+			],
+		]);
+	});
+
+	it("V001 spans the output edge of the second producer", () => {
+		expect(spans("A >> P -> C\nB >> Q -> C", "V001")).toEqual([
+			[
+				[2, 6],
+				[2, 12],
+			],
+		]);
+	});
+
+	it("V002 spans the process ID where it first appears in the body", () => {
+		expect(spans("a >> q -> b\np -> c\np -> d", "V002")).toEqual([
+			[
+				[2, 1],
+				[2, 2],
+			],
+		]);
+	});
+
+	it("V003 spans the process ID where it first appears in the body", () => {
+		expect(spans("a >> q -> b\nb >> p", "V003")).toEqual([
+			[
+				[2, 6],
+				[2, 7],
+			],
+		]);
+	});
+
+	it("W008 spans the process ID where it first appears in the body", () => {
+		expect(spans("a >> q -> b\nb >>? p -> c", "W008")).toEqual([
+			[
+				[2, 7],
+				[2, 8],
+			],
+		]);
+	});
+
+	it("V011 spans the feedback edge that closes the reverse cycle", () => {
+		expect(
+			spans("a >> p -> b\nb >> q -> c\na >>? q", "V011", { strict: true }),
+		).toEqual([
+			[
+				[3, 1],
+				[3, 8],
+			],
+		]);
+	});
+
+	it("V020 spans the process declaration in front matter", () => {
+		const source = "---\nprocess:\n  orphan: { label: O }\n---\na >> p -> b\n";
+		const diag = analyzeSource(source).diagnostics.find(
+			(d) => d.code === "V020",
+		);
+		expect(diag?.range.start).toMatchObject({ line: 3, column: 3 });
+	});
+
+	it("keeps the document start for these codes without a parsed document", () => {
+		const zero = {
+			start: { line: 1, column: 1, offset: 0 },
+			end: { line: 1, column: 1, offset: 0 },
+		};
+		const diags = diagnose("a >> q -> b\nb >> p\nb >> q -> a\nr -> b").filter(
+			(d) => ["V001", "V002", "V003", "V010"].includes(d.code),
+		);
+		expect([...new Set(diags.map((d) => d.code))].sort()).toEqual([
+			"V001",
+			"V002",
+			"V003",
+			"V010",
+		]);
+		for (const d of diags) expect(d.range).toEqual(zero);
+	});
+
+	it("reads no statements when no graph diagnostic needs a position", () => {
+		const { tokens } = lex("a >> p -> b");
+		const { document } = parseTokens(tokens);
+		const { edges, nodeKinds } = normalize(document, null);
+		let reads = 0;
+		const counted = {
+			type: document.type,
+			get statements() {
+				reads++;
+				return document.statements;
+			},
+		};
+		validate(edges, nodeKinds, null, { document: counted });
+		expect(reads).toBe(0);
 	});
 });
