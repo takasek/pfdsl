@@ -45,17 +45,19 @@ export function collectModeledLocations(analyzed, resolveLocation, isUrlLike) {
 			}
 		}
 		for (const [id, { section, meta }] of Object.entries(nodes)) {
-			if (!meta?.location) continue;
+			const explicitTargetArtifact =
+				meta != null &&
+				section === "artifact" &&
+				(Object.hasOwn(meta, "ref") ||
+					(frontmatter != null && Object.hasOwn(frontmatter, "baseRef")));
+			if (meta?.location === undefined || meta?.location === null) continue;
+			if (!explicitTargetArtifact && !meta.location) continue;
 			const locations = Array.isArray(meta.location)
 				? meta.location
 				: [meta.location];
 			for (const location of locations) {
 				if (isUrlLike(location)) continue;
-				if (
-					section === "artifact" &&
-					(Object.hasOwn(meta, "ref") ||
-						(frontmatter != null && Object.hasOwn(frontmatter, "baseRef")))
-				) {
+				if (explicitTargetArtifact) {
 					unclassified.push({ file, id, location });
 					continue;
 				}

@@ -1084,6 +1084,33 @@ describe("collectModeledLocations", () => {
 			},
 		);
 	});
+	it("keeps empty explicit-target artifact locations unclassified and skips an untargeted scalar", () => {
+		const { local, unclassified } = collectModeledLocations(
+			[
+				{
+					file: "explicit-target.pfdsl",
+					frontmatter: {
+						baseRef: { source: "repo", revision: "release" },
+						artifact: {
+							scalar: { location: "" },
+							array: { location: [""] },
+						},
+					},
+				},
+				{
+					file: "untargeted.pfdsl",
+					frontmatter: { artifact: { empty: { location: "" } } },
+				},
+			],
+			resolveLocation,
+			isUrlLike,
+		);
+		assert.deepEqual(local, []);
+		assert.deepEqual(unclassified, [
+			{ file: "explicit-target.pfdsl", id: "scalar", location: "" },
+			{ file: "explicit-target.pfdsl", id: "array", location: "" },
+		]);
+	});
 	for (const declaration of [undefined, null, "main", {}, { source: "repo" }]) {
 		it(`uses declaration presence even for an invalid target: ${JSON.stringify(declaration)}`, () => {
 			for (const frontmatter of [
