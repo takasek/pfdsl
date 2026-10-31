@@ -6,6 +6,8 @@ export const instances = [];
 export const language = {};
 export const Uri = { parse: (value) => value };
 export const MarkerSeverity = { Error: 8, Warning: 4, Info: 2 };
+export const KeyMod = { CtrlCmd: 2048, WinCtrl: 256 };
+export const KeyCode = { KeyG: 37, KeyL: 42 };
 function offset(model, line, column) {
 	const lines = model.source.split("\n");
 	return (
@@ -15,6 +17,7 @@ function offset(model, line, column) {
 
 export { Range };
 export const editor = {
+	addKeybindingRules() {},
 	CursorChangeReason: { Explicit: 3 },
 	registerLinkOpener() {
 		return { dispose() {} };

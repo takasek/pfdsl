@@ -81,9 +81,12 @@ Select a node and use **Focus selected node** to center it at 100%, or smaller w
 The source editor highlights YAML frontmatter and PFDSL flows.
 Hover a node ID for its metadata, **Go to definition**, and **Find all**.
 Find all opens a literal text search; PFDSL occurrence navigation visits the definition key and semantic node references.
-Right-click in the editor or press F1 to find **Go to PFDSL definition**, **Next PFDSL node occurrence**, **Previous PFDSL node occurrence**, **Insert PFDSL definition**, and **Sort metadata…**.
+Right-click in the editor or press F1 to find **Go to Definition**, **Next PFDSL node occurrence**, **Previous PFDSL node occurrence**, **Insert PFDSL definition**, and **Sort metadata…**.
+The menu bar also reaches these commands: **File › Export**, **View › Compare Structure**, and the **Go** menu with Go to Line/Column, Go to Definition, node occurrences, and problem navigation.
+Click the diagnostic counts at the bottom of the window, or choose **Go › First Problem**, to show the problem F8 shows first; **Go › Next Problem** (F8) and **Go › Previous Problem** (Shift+F8) continue from there.
 Sort metadata accepts multiple keys in priority order; Cancel or Escape returns to the editor without changing the source.
-Press Ctrl+G, or choose **Go to Line/Column...** from F1, to enter a line and optional column (for example, `:3:2`).
+Press Command+L on macOS (Ctrl+L or Ctrl+G elsewhere), or choose **Go › Go to Line/Column…**, to enter a line and optional column (for example, `:3:2`).
+Command+L replaces Monaco's Expand Line Selection.
 Enter confirms the position; Escape restores the starting position without editing the document.
 Line and column values outside the document are clamped using Monaco's standard navigation rules.
 Definition insertion writes `label: ""`, places the cursor inside the empty quotes, and retains the reminder to complete criteria for a produced artifact.

@@ -236,6 +236,80 @@ test("the production document-tab entry loads real Monaco menu contributions", a
 			},
 		);
 		await t.test(
+			"every editor command routed from the native menu exists, without a duplicate definition jump",
+			async () => {
+				await withEditors("# navigation\na >> p -> b\n", async (create) => {
+					const editor = create();
+					for (const id of [
+						"editor.action.gotoLine",
+						"pfdsl.nextNodeOccurrence",
+						"pfdsl.previousNodeOccurrence",
+						"pfdsl.findAll",
+						"editor.action.marker.nextInFiles",
+						"editor.action.marker.prevInFiles",
+						"pfdsl.export.dot",
+						"pfdsl.export.svg",
+						"pfdsl.export.pdf",
+						"pfdsl.export.png",
+						"pfdsl.export.tsv",
+						"pfdsl.export.all",
+						"pfdsl.compareFile",
+						"pfdsl.compareGit",
+						"pfdsl.clearDiff",
+					])
+						assert.ok(editor.getAction(id), id);
+					assert.equal(editor.getAction("pfdsl.jumpToDefinition"), null);
+				});
+			},
+		);
+		await t.test(
+			"Go to Line uses a Command shortcut instead of Control+G on macOS",
+			async () => {
+				await withEditors("# navigation\na >> p -> b\n", async (create) => {
+					const editor = create();
+					const label = editor._standaloneKeybindingService
+						.lookupKeybinding("editor.action.gotoLine")
+						?.getLabel();
+					assert.ok(label, "Go to Line has a keybinding");
+					assert.doesNotMatch(label, /^(Ctrl|⌃)\+?G$/);
+					assert.match(label, /L$/);
+				});
+			},
+		);
+		await t.test(
+			"first-problem shows the problem F8 shows first, from anywhere in the document",
+			async () => {
+				// W002 (warning) on the artifact line comes first in the text; V001
+				// (error) on the last line comes first in F8's severity order.
+				const source =
+					"---\nartifact:\n  b: { label: B }\n---\na >> p -> b\nc >> q -> b\n";
+				await withEditors(source, async (create, tabs) => {
+					const editor = create();
+					const tab = tabs[0];
+					tab.activate();
+					const markers = () =>
+						host.monaco.editor.getModelMarkers({
+							resource: editor.getModel().uri,
+						});
+					for (
+						let i = 0;
+						i < 200 && !markers().some((m) => m.code === "V001");
+						i++
+					)
+						await new Promise((resolve) => setTimeout(resolve, 5));
+					const error = markers().find((m) => m.code === "V001");
+					assert.ok(error, "V001 reaches Monaco");
+					editor.setPosition({ lineNumber: 6, column: 12 });
+					tab.command("first-problem");
+					await new Promise((resolve) => setTimeout(resolve, 20));
+					assert.deepEqual(
+						[editor.getPosition().lineNumber, editor.getPosition().column],
+						[error.startLineNumber, error.startColumn],
+					);
+				});
+			},
+		);
+		await t.test(
 			"actual input focus wins over another editor's delayed blur",
 			async () => {
 				await withEditors("# navigation\na >> p -> b\n", async (create) => {
@@ -545,7 +619,14 @@ test("the production document-tab entry loads real Monaco menu contributions", a
 					).filter(Boolean);
 					assert.equal(hints.flatMap((h) => h.hints).length, 1);
 					editor.setPosition(position);
-					await editor.getAction("pfdsl.jumpToDefinition").run();
+					// The native menu routes Go to Definition through editor.trigger.
+					editor.trigger("test", "editor.action.revealDefinition", null);
+					for (
+						let i = 0;
+						i < 100 && editor.getSelection().startLineNumber !== 3;
+						i++
+					)
+						await new Promise((resolve) => setTimeout(resolve, 5));
 					assert.equal(editor.getSelection().startLineNumber, 3);
 					await editor.getAction("pfdsl.nextNodeOccurrence").run();
 					assert.equal(editor.getSelection().startLineNumber, 7);

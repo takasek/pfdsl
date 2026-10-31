@@ -38,6 +38,15 @@ button {
 #diagnostics {
 	font-weight: 500;
 }
+.diagnostics-jump {
+	font: inherit;
+	color: inherit;
+	background: none;
+	border: none;
+	padding: 0;
+	text-decoration: underline;
+	cursor: pointer;
+}
 main {
 	display: flex;
 	flex: 1;

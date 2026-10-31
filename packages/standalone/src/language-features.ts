@@ -156,13 +156,9 @@ export function registerLanguageFeatures(
 			contextMenuOrder: order,
 			run,
 		});
+	// Go to Definition comes from Monaco's command through the definition
+	// provider below; a separate PFDSL action would list the same jump twice.
 	const registrations: monaco.IDisposable[] = [
-		action(
-			"pfdsl.jumpToDefinition",
-			"Go to PFDSL definition",
-			() => definition(),
-			1,
-		),
 		action(
 			"pfdsl.nextNodeOccurrence",
 			"Next PFDSL node occurrence",

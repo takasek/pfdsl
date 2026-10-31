@@ -311,10 +311,29 @@ export function mountApplication(options: ApplicationOptions) {
 		const text = lines.join("\n");
 		if (status.textContent !== text) status.textContent = text;
 		dismissStatus.hidden = !active?.state.notice && !state.appNotice;
-		const summary = active
-			? `Current diagnostics — ${active.path ?? active.name}: ${active.tab.getDiagnosticsSummary?.() ?? "Checking…"}`
+		const prefix = active
+			? `Current diagnostics — ${active.path ?? active.name}: `
 			: "";
-		if (diagnostics.textContent !== summary) diagnostics.textContent = summary;
+		const counts = active?.tab.getDiagnosticsSummary?.() ?? "Checking…";
+		const problems = (active?.tab.getProblemCount?.() ?? 0) > 0;
+		const summary = active ? `${prefix}${counts}` : "";
+		if (
+			diagnostics.textContent !== summary ||
+			!!diagnostics.querySelector("button") !== problems
+		) {
+			if (!active) diagnostics.replaceChildren();
+			else if (!problems) diagnostics.replaceChildren(summary);
+			else {
+				// The counts lead to the problem F8 shows first.
+				const jump = document.createElement("button");
+				jump.type = "button";
+				jump.className = "diagnostics-jump";
+				jump.textContent = counts;
+				jump.title = "Go to First Problem";
+				jump.onclick = () => performCommand("first-problem");
+				diagnostics.replaceChildren(prefix, jump);
+			}
+		}
 	}
 	dismissStatus.onclick = () => {
 		void dispatch({ type: "dismiss" });

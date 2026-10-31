@@ -387,7 +387,7 @@ MではソースのノードIDをhoverし、`Go to definition`／`Find all`を�
 artifact/processの`index`、processの複数`location`と`boundary`、groupの`color`／`parent`を含む文書で、それぞれの値がhoverへ表示されることを確認する。
 block／flow mapのquoted group keyをhoverし、label・color・parent・artifact/processのmemberを読み、同じ行のmetadata field上には宣言hoverが出ないことを確認する。
 group hoverの`Find all`と、artifact/processを対象とする定義移動・semantic巡回を区別し、既存の巡回・Undo・文書隔離を再確認する。
-右クリックまたはF1から`Go to PFDSL definition`、`Next PFDSL node occurrence`、`Previous PFDSL node occurrence`、`Find all text matching this node`を実行する。
+右クリックまたはF1から`Go to Definition`、`Next PFDSL node occurrence`、`Previous PFDSL node occurrence`、`Find all text matching this node`を実行する。
 quoted/flow keyのID上と同じ行の`label`／`owner`等のfield上を区別し、定義＋body内の同一IDの巡回・折返し、定義なしの案内を確認する。
 Find allは現行拡張と同じliteral文字列検索であり、metadata fieldを除くsemantic参照・巡回とは区別する。
 processのcommand行末の`Command` hintをhoverして複数行の内容を読み、表示だけで実行されないことを確認する。
@@ -397,9 +397,9 @@ labelのみ、criteriaのみ、groupとcriteria、descriptionを含む場合を�
 Linuxで報告された3回の表示プロセス消失は原因未確定であり、Chromiumでの成功をWebKitGTKやMac nativeの合格へ転写しない。
 期待：semantic nodeとfield、定義range、全出現が正しく、図hover廃止と混同しない。
 表示hintと外部実行GUI-33を区別する。
-Go to LineはCtrl+GとF1の`Go to Line/Column...`から開き、行と列を指定して移動する。
+Go to LineはmacOSでCommand+L（他のOSではCtrl+LとCtrl+G）、F1の`Go to Line/Column...`、メニューバーの`Go › Go to Line/Column…`から開き、行と列を指定して移動する。
 無効値は移動せず、範囲外の行・列はMonaco標準の有効範囲へ補正されることを確認する。
-同名のred/blue文書を別フォルダから開き、blueでF1→Go to Line→`:3:1`→Enter→`changed_`入力→Undo、redへ切替→Ctrl+G→`:2:1`→Escapeを行う。
+同名のred/blue文書を別フォルダから開き、blueでF1→Go to Line→`:3:1`→Enter→`changed_`入力→Undo、redへ切替→Command+L→`:2:1`→Escapeを行う。
 タブ往復を繰り返し、Escapeで入力欄が閉じ、開始位置と選択へ戻り、本文・Undo履歴・別文書の位置と選択が保たれることを確認する。
 入力中のタブ切替・閉鎖、F1の`>`とGo to Lineの`:`の切替、候補の上下移動、既存FindのEscapeも確認する。
 Chromiumでの自動検証はnativeの合格にせず、#1445の版・ホスト別受入結果へ記録する。
