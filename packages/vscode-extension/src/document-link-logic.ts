@@ -21,12 +21,7 @@ export function extractDocumentLinks(
 	for (const reference of documentReferences(model)) {
 		let target: string;
 		try {
-			const resolved = resolveDocumentReference(
-				docFsPath,
-				reference,
-				model.frontmatter.basePath,
-				model.frontmatter,
-			);
+			const resolved = resolveDocumentReference(docFsPath, reference, model);
 			target =
 				resolved.kind === "url"
 					? resolved.value

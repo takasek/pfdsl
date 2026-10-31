@@ -129,12 +129,7 @@ export function registerReferenceFeatures(
 			throw new Error("Fix front matter errors before opening references.");
 		const path = await service.context();
 		if (!valid(request, version)) return;
-		let target = resolveDocumentReference(
-			path,
-			reference,
-			source.frontmatter?.basePath,
-			source.frontmatter,
-		);
+		let target = resolveDocumentReference(path, reference, source);
 		if (
 			target.kind === "path" &&
 			(await service.inspect(target.value)) === "directory"
