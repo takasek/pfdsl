@@ -4,7 +4,15 @@ export function createDocumentTab(
 	{ normalize = (text) => text, hook = () => {} } = {},
 ) {
 	let source = normalize(options.source),
-		revision = 0;
+		revision = 0,
+		diagnosticsCurrent = true,
+		problemCount = source.match(/\bproblem\b/g)?.length ?? 0,
+		diagnosticsSummary = summarize(problemCount);
+	function summarize(count) {
+		return count
+			? `0 errors, ${count} warning${count === 1 ? "" : "s"}, 0 informational messages`
+			: "No problems";
+	}
 	const document = options.parent.ownerDocument;
 	const container = document.createElement("div"),
 		button = document.createElement("button");
@@ -32,14 +40,11 @@ export function createDocumentTab(
 			return false;
 		},
 		report: options.reportStatus,
-		// Each `problem` word in the source stands for one warning.
-		getProblemCount: () => source.match(/\bproblem\b/g)?.length ?? 0,
-		getDiagnosticsSummary() {
-			const count = this.getProblemCount();
-			return count
-				? `0 errors, ${count} warning${count === 1 ? "" : "s"}, 0 informational messages`
-				: "No problems";
-		},
+		// Each `problem` word in the source stands for one warning. A refresh
+		// retains the last completed result until finishRefresh publishes another.
+		getProblemCount: () => problemCount,
+		getDiagnosticsSummary: () => diagnosticsSummary,
+		areDiagnosticsCurrent: () => diagnosticsCurrent,
 		dispose() {
 			container.remove();
 			button.remove();
@@ -50,13 +55,21 @@ export function createDocumentTab(
 		type(text) {
 			source = text;
 			revision++;
+			diagnosticsCurrent = false;
 			hook("type", tab, text);
+			options.onChange?.();
+		},
+		finishRefresh() {
+			problemCount = source.match(/\bproblem\b/g)?.length ?? 0;
+			diagnosticsSummary = summarize(problemCount);
+			diagnosticsCurrent = true;
 			options.onChange?.();
 		},
 		setSource(text) {
 			this.setSourceCalls++;
 			source = normalize(text);
 			revision++;
+			diagnosticsCurrent = false;
 			hook("setSource", tab, text);
 			options.onChange?.();
 		},

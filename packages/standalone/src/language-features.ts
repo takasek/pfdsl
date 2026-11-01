@@ -156,8 +156,6 @@ export function registerLanguageFeatures(
 			contextMenuOrder: order,
 			run,
 		});
-	// Go to Definition comes from Monaco's command through the definition
-	// provider below; a separate PFDSL action would list the same jump twice.
 	const registrations: monaco.IDisposable[] = [
 		action(
 			"pfdsl.nextNodeOccurrence",
@@ -179,6 +177,16 @@ export function registerLanguageFeatures(
 		),
 		action("pfdsl.insertDefinition", "Insert PFDSL definition", insert, 5),
 	];
+	// Monaco owns the context-menu entry. This palette-only action keeps the
+	// command in Quick Access and delegates the jump to Monaco's definition action.
+	registrations.push(
+		editor.addAction({
+			id: "pfdsl.goToDefinition",
+			label: "Go to Definition",
+			run: () =>
+				editor.trigger("pfdsl.palette", "editor.action.revealDefinition", null),
+		}),
+	);
 	const gotoId = `${editor.getId()}:pfdsl.hoverDefinition`;
 	const findId = `${editor.getId()}:pfdsl.hoverFindAll`;
 	const finishId = `${editor.getId()}:pfdsl.finishDefinition`;

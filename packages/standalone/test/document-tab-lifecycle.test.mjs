@@ -114,16 +114,36 @@ export async function processSnapshot(...args) {
 		assert.doesNotMatch(first.getDiagnosticsSummary(), /1 warnings|1 errors/);
 		oldEditor.model.source =
 			"---\nartifact:\n  b: {label: B, criteria: Ready}\n---\na >> p -> b\n";
+		const previousSummary = first.getDiagnosticsSummary();
 		oldEditor.callbacks.onDidChangeModelContent();
-		assert.equal(first.getDiagnosticsSummary(), "Checking…");
+		assert.equal(first.getDiagnosticsSummary(), previousSummary);
 		await waitFor(
 			() =>
 				first.getDiagnosticsSummary().includes("0 warnings") ||
 				first.getDiagnosticsSummary() === "No problems",
 		);
-		oldEditor.model.source = "---\nextends: delayed.yaml\n---\na >> p -> b\n";
+		oldEditor.model.source =
+			"---\nartifact:\n  b: {label: B}\n---\na >> p -> b\n";
 		oldEditor.callbacks.onDidChangeModelContent();
-		assert.equal(first.getDiagnosticsSummary(), "Checking…");
+		await waitFor(() => first.getProblemCount() === 1);
+		oldEditor.model.source = "---\nextends: delayed.yaml\n---\na >> p -> b\n";
+		const completedSummary = first.getDiagnosticsSummary();
+		oldEditor.callbacks.onDidChangeModelContent();
+		assert.equal(first.getDiagnosticsSummary(), completedSummary);
+		assert.equal(first.areDiagnosticsCurrent(), false);
+		assert.notDeepEqual(
+			markerCalls.filter((call) => call.model === oldEditor.model).at(-1)
+				.markers,
+			[],
+			"a pending refresh keeps the previous revision's editor markers visible",
+		);
+		oldEditor.triggerCalls.length = 0;
+		first.command("first-problem");
+		assert.deepEqual(
+			oldEditor.triggerCalls,
+			[],
+			"the first-problem command does not navigate while its markers are stale",
+		);
 		await waitFor(() => finishRead);
 		const pendingSnapshot = snapshotCalls.at(-1);
 		assert.equal(pendingSnapshot.finished, false);

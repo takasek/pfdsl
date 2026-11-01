@@ -288,7 +288,7 @@ export function mountApplication(options: ApplicationOptions) {
 			}
 		}
 		for (const button of document.querySelectorAll<HTMLButtonElement>(
-			"#sidebar, #files button, .close-document, [data-start], #try-sample",
+			"#sidebar, #files button, .close-document, [data-start], #try-sample, #diagnostics button",
 		))
 			button.disabled = busy;
 		renderWorkspace();
@@ -311,29 +311,46 @@ export function mountApplication(options: ApplicationOptions) {
 		const text = lines.join("\n");
 		if (status.textContent !== text) status.textContent = text;
 		dismissStatus.hidden = !active?.state.notice && !state.appNotice;
-		const prefix = active
-			? `Current diagnostics — ${active.path ?? active.name}: `
-			: "";
 		const counts = active?.tab.getDiagnosticsSummary?.() ?? "Checking…";
+		const diagnosticsCurrent = active?.tab.areDiagnosticsCurrent?.() ?? true;
+		const label = diagnosticsCurrent
+			? "Current diagnostics"
+			: counts === "Checking…"
+				? "Diagnostics"
+				: counts.startsWith("Analysis failed:")
+					? "Diagnostic analysis"
+					: "Updating diagnostics";
+		const prefix = active ? `${label} — ${active.path ?? active.name}: ` : "";
 		const problems = (active?.tab.getProblemCount?.() ?? 0) > 0;
 		const summary = active ? `${prefix}${counts}` : "";
-		if (
-			diagnostics.textContent !== summary ||
-			!!diagnostics.querySelector("button") !== problems
-		) {
-			if (!active) diagnostics.replaceChildren();
-			else if (!problems) diagnostics.replaceChildren(summary);
-			else {
-				// The counts lead to the problem F8 shows first.
-				const jump = document.createElement("button");
-				jump.type = "button";
-				jump.className = "diagnostics-jump";
-				jump.textContent = counts;
-				jump.title = "Go to First Problem";
-				jump.onclick = () => performCommand("first-problem");
-				diagnostics.replaceChildren(prefix, jump);
-			}
+		if (!active) {
+			if (diagnostics.childNodes.length) diagnostics.replaceChildren();
+			return;
 		}
+		let jump = diagnostics.querySelector<HTMLButtonElement>("button");
+		if (!problems) {
+			if (diagnostics.textContent !== summary || jump)
+				diagnostics.replaceChildren(summary);
+			return;
+		}
+		if (!jump) {
+			// The counts lead to the problem F8 shows first.
+			jump = document.createElement("button");
+			jump.type = "button";
+			jump.className = "diagnostics-jump";
+			jump.title = "Go to First Problem";
+			jump.onclick = () => performCommand("first-problem");
+			diagnostics.replaceChildren(prefix, jump);
+		} else if (diagnostics.firstChild?.nodeType === 3) {
+			diagnostics.firstChild.textContent = prefix;
+		} else {
+			diagnostics.insertBefore(document.createTextNode(prefix), jump);
+		}
+		if (jump.textContent !== counts) jump.textContent = counts;
+		jump.title = diagnosticsCurrent
+			? "Go to First Problem"
+			: "Diagnostics are updating";
+		jump.disabled = busy || !diagnosticsCurrent;
 	}
 	dismissStatus.onclick = () => {
 		void dispatch({ type: "dismiss" });

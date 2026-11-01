@@ -37,9 +37,16 @@ export const editor = {
 			model,
 			callbacks,
 			renders: 0,
+			triggerCalls: [],
 			focus() {},
 			getValue: () => model.source,
 			getModel: () => model,
+			setPosition(position) {
+				this.position = position;
+			},
+			trigger(source, command, payload) {
+				this.triggerCalls.push({ source, command, payload });
+			},
 			render() {
 				this.renders++;
 			},

@@ -268,11 +268,11 @@ export async function installNativeMenu(
 								await separator(),
 								await create("first-problem", "First Problem"),
 								await create(
-									"editor.action.marker.nextInFiles",
+									"editor.action.marker.next",
 									keyed("Next Problem", "F8", "F8"),
 								),
 								await create(
-									"editor.action.marker.prevInFiles",
+									"editor.action.marker.prev",
 									keyed("Previous Problem", "⇧F8", "Shift+F8"),
 								),
 							],

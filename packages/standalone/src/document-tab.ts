@@ -62,6 +62,7 @@ export function createDocumentTab({
 	const document = parent.ownerDocument;
 	let snapshot: DocumentModel | undefined;
 	let revision = 0;
+	let diagnosticsRevision = -1;
 	let sourceVersion = 0;
 	const renameTracking = new RenameTracking();
 	let disposed = false;
@@ -262,8 +263,8 @@ export function createDocumentTab({
 		const currentRevision = ++revision;
 		const snapshotVersion = sourceVersion;
 		const invalidatedRenameRequestId = renameTracking.invalidatedRequestId;
-		diagnosticsSummary = "Checking…";
-		problemCount = 0;
+		// The last result's markers and counts stay visible until this one
+		// completes; First Problem waits for it (areDiagnosticsCurrent).
 		onChange?.();
 		let result: Awaited<ReturnType<typeof processSnapshot>>;
 		try {
@@ -328,6 +329,8 @@ export function createDocumentTab({
 				endColumn: d.range.end.column,
 			})),
 		);
+		diagnosticsRevision = currentRevision;
+		onChange?.();
 		// Publish the editor's visible lines before replacing the matching graph.
 		editor.render();
 		try {
@@ -414,6 +417,13 @@ export function createDocumentTab({
 		canCreateDefinition: () => preview.canCreateDefinition(),
 		command(id: string) {
 			if (id === "first-problem") {
+				const model = editor.getModel();
+				if (
+					diagnosticsRevision !== revision ||
+					!model ||
+					monaco.editor.getModelMarkers({ resource: model.uri }).length === 0
+				)
+					return;
 				// Start a fresh F8 navigation from the document start, so the first
 				// problem is the one F8 shows first (errors before warnings).
 				editor.trigger("pfdsl.menu", "closeMarkersNavigation", null);
@@ -459,6 +469,7 @@ export function createDocumentTab({
 		getRevision: () => model.getVersionId(),
 		getDiagnosticsSummary: () => diagnosticsSummary,
 		getProblemCount: () => problemCount,
+		areDiagnosticsCurrent: () => diagnosticsRevision === revision,
 		setSource(value: string) {
 			editor.pushUndoStop();
 			const eol = value.includes("\r\n") ? "\r\n" : "\n";

@@ -176,8 +176,8 @@ test("native menu reaches export, navigation, problems and comparison from the m
 					"pfdsl.previousNodeOccurrence",
 					"pfdsl.findAll",
 					"first-problem",
-					"editor.action.marker.nextInFiles",
-					"editor.action.marker.prevInFiles",
+					"editor.action.marker.next",
+					"editor.action.marker.prev",
 				]);
 				const compare = submenu(submenu(app, "View"), "Compare Structure");
 				assert.deepEqual(ids(compare), [
@@ -193,8 +193,7 @@ test("native menu reaches export, navigation, problems and comparison from the m
 				])
 					assert.equal(item.accelerator, undefined, item.id);
 				assert.match(
-					go.children.find((x) => x.id === "editor.action.marker.nextInFiles")
-						.text,
+					go.children.find((x) => x.id === "editor.action.marker.next").text,
 					/\(F8\)$/,
 				);
 				const item = (id) => all.find((x) => x.id === id);
@@ -230,8 +229,8 @@ test("native menu reaches export, navigation, problems and comparison from the m
 					"pfdsl.compareGit",
 				])
 					assert.equal(item(id).enabled, true, id);
-				item("editor.action.marker.nextInFiles").action();
-				assert.deepEqual(actions, ["editor.action.marker.nextInFiles"]);
+				item("editor.action.marker.next").action();
+				assert.deepEqual(actions, ["editor.action.marker.next"]);
 			},
 		);
 	} finally {

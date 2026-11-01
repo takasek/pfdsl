@@ -11,8 +11,7 @@ import configuration from "../../vscode-extension/language-configuration.json";
 
 // Go to Line moves from Control+G to Command+L on macOS, as in Xcode (Apple's
 // keyboard guidelines avoid Control as a modifier). Monaco has no per-platform
-// rule, so Ctrl+L also opens it elsewhere, next to the existing Ctrl+G; the key
-// no longer runs Expand Line Selection.
+// rule, so Ctrl+L also opens it elsewhere, next to the existing Ctrl+G.
 monaco.editor.addKeybindingRules([
 	{
 		keybinding: monaco.KeyMod.WinCtrl | monaco.KeyCode.KeyG,
@@ -21,6 +20,24 @@ monaco.editor.addKeybindingRules([
 	{
 		keybinding: monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyL,
 		command: "editor.action.gotoLine",
+		when: "editorFocus",
+	},
+	{
+		keybinding: monaco.KeyCode.F8,
+		command: "-editor.action.marker.nextInFiles",
+	},
+	{
+		keybinding: monaco.KeyMod.Shift | monaco.KeyCode.F8,
+		command: "-editor.action.marker.prevInFiles",
+	},
+	{
+		keybinding: monaco.KeyCode.F8,
+		command: "editor.action.marker.next",
+		when: "editorFocus",
+	},
+	{
+		keybinding: monaco.KeyMod.Shift | monaco.KeyCode.F8,
+		command: "editor.action.marker.prev",
 		when: "editorFocus",
 	},
 ]);

@@ -233,11 +233,94 @@ test("the diagnostic counts go to the first problem only while there are problem
 		assert.match(host.query("#diagnostics").textContent, /1 warning/);
 		jump.click();
 		assert.deepEqual(calls, ["first-problem"]);
+		calls.length = 0;
+		tab.type("problem problem");
+		assert.equal(
+			host.query("#diagnostics button"),
+			jump,
+			"the count button stays mounted while the refresh is pending",
+		);
+		assert.match(jump.textContent, /1 warning/);
+		assert.equal(jump.disabled, true);
+		jump.click();
+		assert.deepEqual(calls, []);
+		tab.finishRefresh();
+		await host.settle();
+		assert.equal(
+			host.query("#diagnostics button"),
+			jump,
+			"a result with problems updates the same button",
+		);
+		assert.equal(jump.disabled, false);
+		assert.match(jump.textContent, /2 warnings/);
 		tab.type("fixed");
+		tab.finishRefresh();
 		await host.settle();
 		assert.equal(host.query("#diagnostics button"), null);
 		assert.match(host.query("#diagnostics").textContent, /No problems/);
 	} finally {
+		await host.finish();
+	}
+});
+
+test("the diagnostic count button is disabled while the application is busy", async () => {
+	const native = new FakeNative();
+	const doc = native.add(1, "a.pfdsl", "problem");
+	const inspecting = Promise.withResolvers();
+	const resume = Promise.withResolvers();
+	const host = await startHost(native, doc, {
+		inspectGate: () => {
+			inspecting.resolve();
+			return resume.promise;
+		},
+	});
+	try {
+		const tab = await host.open(doc);
+		await host.settle();
+		tab.type("problem edit");
+		tab.finishRefresh();
+		host.menuItem("save").action();
+		await inspecting.promise;
+		const jump = host.query("#diagnostics button");
+		assert.ok(jump);
+		assert.equal(jump.disabled, true);
+		resume.resolve(native.snapshot(doc));
+		await host.settle();
+		assert.equal(jump.disabled, false);
+	} finally {
+		resume.resolve(native.snapshot(doc));
+		await host.finish();
+	}
+});
+
+test("diagnostic counts arriving while the application is busy are disabled", async () => {
+	const native = new FakeNative();
+	const doc = native.add(1, "a.pfdsl", "clean");
+	const inspecting = Promise.withResolvers();
+	const resume = Promise.withResolvers();
+	const host = await startHost(native, doc, {
+		inspectGate: () => {
+			inspecting.resolve();
+			return resume.promise;
+		},
+	});
+	try {
+		const tab = await host.open(doc);
+		await host.settle();
+		assert.equal(host.query("#diagnostics button"), null);
+		tab.type("problem");
+		host.menuItem("save").action();
+		await inspecting.promise;
+		tab.finishRefresh();
+		await flush();
+		const jump = host.query("#diagnostics button");
+		assert.ok(jump);
+		assert.equal(jump.disabled, true);
+		resume.resolve(native.snapshot(doc));
+		await host.settle();
+		assert.equal(jump.disabled, false);
+	} finally {
+		resume.resolve(native.snapshot(doc));
 		await host.finish();
 	}
 });
