@@ -11,6 +11,7 @@ import {
 	type OperationPlan,
 	sameDocument,
 } from "./document-session.js";
+import { type Notice, noticeText } from "./notice.js";
 import {
 	createSaveAsController,
 	type DocumentFiles,
@@ -151,7 +152,7 @@ export interface WorkspaceController {
 	snapshot(): WorkspaceSnapshot;
 	subscribe(listener: (snapshot: WorkspaceSnapshot) => void): () => void;
 	notify(
-		message: string,
+		message: Notice,
 		owner?: { document?: string; channel?: string; revision?: number | string },
 	): void;
 	idle(): Promise<void>;
@@ -174,8 +175,12 @@ export function createWorkspaceController({
 	interface Entry {
 		record: DocumentRecord;
 		editor: WorkspaceEditor;
-		notice: WorkspaceDocument["notice"];
-		saveNotice: WorkspaceDocument["saveNotice"];
+		notice:
+			| (Omit<NonNullable<WorkspaceDocument["notice"]>, "message"> & {
+					message: Notice;
+			  })
+			| null;
+		saveNotice: { message: Notice } | null;
 	}
 	const entries = new WeakMap<DocumentRecord, Entry>();
 	const opened = () => [...records].map((record) => entries.get(record)!);
@@ -193,7 +198,7 @@ export function createWorkspaceController({
 		serial = 0,
 		activation = 0,
 		active: string | null = null,
-		appNotice = "";
+		appNotice: Notice = "";
 	let saveCapability = {
 		save: false,
 		reason: host
@@ -202,8 +207,6 @@ export function createWorkspaceController({
 	};
 	let folder: WorkspaceSnapshot["folder"] = null;
 	let recentTargets: WorkspaceSnapshot["recentTargets"] = [];
-	// Presentation metadata lives only as long as the notices that reference it.
-	let noticePaths = new Map<string, string>();
 	let closingRequest: string | null = null,
 		completedRequest = 0n;
 	const refusingRequests = new Set<string>();
@@ -221,49 +224,11 @@ export function createWorkspaceController({
 			name: documentName(record),
 			path: record.session.location?.path ?? null,
 		}));
-		const paths = new Map([
-			...noticePaths,
-			...recentTargets.map((target): [string, string] => [
-				target.path,
-				basename(target.path) || "/",
-			]),
-		]);
-		for (const [index, entry] of opened().entries()) {
-			const name = displayName(named[index]!, named);
-			const location = entry.record.session.location;
-			if (location) paths.set(location.path, name);
-			const target = entry.record.session.panel()?.targetPath;
-			if (target) paths.set(target, name);
-		}
-		if (folder) paths.set(folder.root, basename(folder.root) || "/");
-		const messages = [
-			appNotice,
-			...opened().flatMap((entry) => [
-				entry.notice?.message ?? "",
-				entry.saveNotice?.message ?? "",
-			]),
-		];
-		noticePaths = new Map(
-			[...paths]
-				.filter(([path]) => messages.some((message) => message.includes(path)))
-				.map(([path]): [string, string] => [path, basename(path) || "/"]),
-		);
-		// Replace whole identifiers once; URLs and longer unrelated paths retain their text.
-		const identifiers = [...paths.keys()]
-			.sort((a, b) => b.length - a.length)
-			.map((path) => path.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
-		const identifier = new RegExp(
-			`(^|[\\s("'\x60])(${identifiers.join("|")})(?=$|[\\s:;,'")\x60!?]|\\.(?=\\s|$))`,
-			"g",
-		);
-		const statusText = (message: string) => {
-			return paths.size
-				? message.replace(
-						identifier,
-						(_match, prefix: string, path: string) => prefix + paths.get(path)!,
-					)
-				: message;
-		};
+		const statusText = (notice: Notice) =>
+			noticeText(notice, (subject) => {
+				const target = named.find((entry) => entry.path === subject);
+				return target ? displayName(target, named) : basename(subject) || "/";
+			});
 		return Object.freeze({
 			documents: Object.freeze(
 				opened().map((entry) => {
@@ -297,14 +262,14 @@ export function createWorkspaceController({
 							Object.freeze({
 								...entry.notice,
 								message: statusText(entry.notice.message),
-								title: entry.notice.message,
+								title: noticeText(entry.notice.message),
 							}),
 						saveNotice:
 							entry.saveNotice &&
 							Object.freeze({
 								...entry.saveNotice,
 								message: statusText(entry.saveNotice.message),
-								title: entry.saveNotice.message,
+								title: noticeText(entry.saveNotice.message),
 							}),
 					});
 				}),
@@ -313,7 +278,7 @@ export function createWorkspaceController({
 			activation,
 			busy,
 			appNotice: statusText(appNotice),
-			appNoticeTitle: appNotice,
+			appNoticeTitle: noticeText(appNotice),
 			saveCapability: Object.freeze({ ...saveCapability }),
 			folder,
 			recentTargets,
@@ -325,7 +290,7 @@ export function createWorkspaceController({
 		for (const listener of listeners) listener(state);
 	}
 	function notify(
-		message: string,
+		message: Notice,
 		owner?: { document?: string; channel?: string; revision?: number | string },
 	) {
 		if (disposed) return;
@@ -347,7 +312,7 @@ export function createWorkspaceController({
 	const report = (error: unknown) => notify(String(error));
 	function saveNotice(
 		entry: Entry,
-		message: string,
+		message: Notice,
 		resolved = false,
 		revision = entry.editor.getRevision(),
 	) {
@@ -477,10 +442,12 @@ export function createWorkspaceController({
 	function explainOpenTarget(entry: Entry, target: DiskSnapshot) {
 		const other = records.otherTarget(entry.record.key, target);
 		if (!other) return false;
-		saveNotice(
-			entry,
-			`The target is already open as ${other.session.location?.path ?? documentName(other)}. Both editor buffers are retained. Choose another file or close that tab explicitly.`,
-		);
+		saveNotice(entry, {
+			before: "The target is already open as ",
+			subject: other.session.location?.path ?? documentName(other),
+			after:
+				". Both editor buffers are retained. Choose another file or close that tab explicitly.",
+		});
 		return true;
 	}
 	async function saveEntry(
@@ -527,7 +494,7 @@ export function createWorkspaceController({
 			if (result.message)
 				saveNotice(
 					entry,
-					result.message,
+					result.notice ?? result.message,
 					result.kind === "saved",
 					result.editorVersion ?? entry.editor.getRevision(),
 				);
@@ -542,10 +509,11 @@ export function createWorkspaceController({
 			fresh = await files.inspect(remembered.id);
 		} catch (error) {
 			session.observe(remembered, { error }, scope);
-			saveNotice(
-				entry,
-				`Could not read ${remembered.path}: ${String(error)}. The save was not attempted. Editor content is retained.`,
-			);
+			saveNotice(entry, {
+				before: "Could not read ",
+				subject: remembered.path,
+				after: `: ${String(error)}. The save was not attempted. Editor content is retained.`,
+			});
 			return false;
 		}
 		if (disposed || !isOpen(entry) || !checkConfirmation()) return false;
@@ -831,7 +799,11 @@ export function createWorkspaceController({
 					emit();
 					await host.rememberFolder(root);
 					await refreshRecent();
-					notify(`Opened ${root}. Save documents explicitly.`);
+					notify({
+						before: "Opened ",
+						subject: root,
+						after: ". Save documents explicitly.",
+					});
 					break;
 				}
 				case "save":
@@ -870,9 +842,12 @@ export function createWorkspaceController({
 				await entry.record.session.checkExternal((id) => files.inspect(id));
 				if (isOpen(entry)) syncLocation(entry);
 			} catch (error) {
-				report(
-					`Could not check ${entry.record.session.location?.path ?? documentName(entry.record)}: ${String(error)}. Editor content is retained.`,
-				);
+				notify({
+					before: "Could not check ",
+					subject:
+						entry.record.session.location?.path ?? documentName(entry.record),
+					after: `: ${String(error)}. Editor content is retained.`,
+				});
 			}
 			emit();
 		}

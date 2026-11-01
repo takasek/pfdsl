@@ -80,7 +80,14 @@ export function mountApplication(options: ApplicationOptions) {
 	dismissStatus.textContent = "Dismiss action notice";
 	dismissStatus.hidden = true;
 	status.after(dismissStatus);
-	const presentExportResults = createExportResults(document.body, report);
+	const statusCount = document.createElement("span");
+	statusCount.id = "status-count";
+	dismissStatus.before(statusCount);
+	const presentExportResults = createExportResults(
+		document.body,
+		report,
+		(notice) => controller.notify(notice),
+	);
 	const showExportResults: typeof presentExportResults = (...args) => {
 		if (!disposed) presentExportResults(...args);
 	};
@@ -328,7 +335,35 @@ export function mountApplication(options: ApplicationOptions) {
 			titles.push(`Application notice: ${state.appNoticeTitle}`);
 		}
 		const text = lines.join("\n");
-		if (status.textContent !== text) status.textContent = text;
+		if (status.textContent !== text) {
+			const previous = (status.textContent || "").split("\n");
+			const next = text ? text.split("\n") : [];
+			let changed = 0;
+			for (const [index, line] of next.entries())
+				if (!previous.includes(line)) changed = index;
+			status.textContent = text;
+			// The status has one fixed-height row; include wrapped lines in its offsets.
+			const range = document.createRange();
+			if (
+				status.firstChild &&
+				typeof range.getBoundingClientRect === "function"
+			) {
+				const offset = next
+					.slice(0, changed)
+					.reduce((length, line) => length + line.length + 1, 0);
+				range.setStart(status.firstChild, offset);
+				range.setEnd(status.firstChild, offset + (next[changed]?.length ?? 0));
+				status.scrollTop +=
+					range.getBoundingClientRect().top -
+					status.getBoundingClientRect().top;
+			} else status.scrollTop = changed * status.clientHeight;
+		}
+		const lineCount = text ? text.split("\n").length : 0;
+		const overflow = lineCount > 1 || status.scrollHeight > status.clientHeight;
+		statusCount.textContent = overflow
+			? `${lines.length} ${lines.length === 1 ? "notice" : "notices"}`
+			: "";
+		statusCount.hidden = !overflow;
 		status.title = titles.join("\n");
 		dismissStatus.hidden = !active?.state.notice && !state.appNotice;
 		const counts = active?.tab.getDiagnosticsSummary?.() ?? "Checking…";
@@ -854,6 +889,7 @@ export function mountApplication(options: ApplicationOptions) {
 			active = undefined;
 			diagnostics.remove();
 			dismissStatus.remove();
+			statusCount.remove();
 			status.textContent = "";
 			conflicts.replaceChildren();
 			document.querySelectorAll(".export-results").forEach((panel) => {

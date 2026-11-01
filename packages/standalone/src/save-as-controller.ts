@@ -4,6 +4,7 @@ import type {
 	OperationPlan,
 	SaveResult,
 } from "./document-session.js";
+import type { NoticeParts } from "./notice.js";
 
 export interface DocumentFiles {
 	chooseSaveTarget(name: string): Promise<DiskSnapshot | null>;
@@ -31,6 +32,7 @@ export interface SaveAsResult {
 	kind: "cancelled" | "saved" | "blocked" | "unresolved" | "stale";
 	document: string;
 	message?: string;
+	notice?: NoticeParts;
 	editorVersion?: number | string;
 	cleanupErrors?: readonly string[];
 }
@@ -87,7 +89,13 @@ export function createSaveAsController({
 						return {
 							kind: "blocked",
 							document: key,
-							message: `The target is already open as ${other.session.location?.path ?? documentName(other)}. Both editor buffers are retained. Choose another file or close that tab explicitly.`,
+							message: `The target is already open as ${documentName(other)}. Both editor buffers are retained. Choose another file or close that tab explicitly.`,
+							notice: {
+								before: "The target is already open as ",
+								subject: other.session.location?.path ?? documentName(other),
+								after:
+									". Both editor buffers are retained. Choose another file or close that tab explicitly.",
+							},
 						};
 					if (confirmation && !session.holds(confirmation, "editor"))
 						return {

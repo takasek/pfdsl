@@ -33,6 +33,7 @@ for (const mode of ["selected", "inspected"]) {
 				"document-session.ts",
 				"document-records.ts",
 				"display-name.ts",
+				"notice.ts",
 				"save-as-controller.ts",
 				"workspace-controller.ts",
 			])

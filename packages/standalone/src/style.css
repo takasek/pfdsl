@@ -56,6 +56,18 @@ button {
 	align-self: center;
 	padding: 0 6px;
 }
+#status-count {
+	grid-column: 2;
+	grid-row: 2;
+	align-self: center;
+	justify-self: start;
+}
+#dismiss-status {
+	justify-self: end;
+}
+#status-count:not([hidden]) + #dismiss-status {
+	margin-left: 5.5em;
+}
 .diagnostics-jump {
 	font: inherit;
 	color: inherit;

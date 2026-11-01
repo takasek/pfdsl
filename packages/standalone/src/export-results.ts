@@ -1,4 +1,5 @@
 import type { ExportResult } from "@pfdsl/editor";
+import type { NoticeParts } from "./notice.js";
 export type ExportResultPresenter = (
 	name: string,
 	revision: number,
@@ -9,6 +10,7 @@ export type ExportResultPresenter = (
 export function createExportResults(
 	parent: HTMLElement,
 	report: (message: string) => void,
+	reportNotice?: (notice: NoticeParts) => void,
 ): ExportResultPresenter {
 	const document = parent.ownerDocument;
 	let panel: HTMLElement | undefined;
@@ -39,8 +41,12 @@ export function createExportResults(
 		}
 		batch.append(heading, close, list);
 		panel.append(batch);
-		report(
-			`Export ${noticeName}: ${results.filter((r) => r.status === "saved").length}/${results.length} saved. See export results for paths and failures.`,
-		);
+		const notice = {
+			before: "Export ",
+			subject: noticeName,
+			after: `: ${results.filter((r) => r.status === "saved").length}/${results.length} saved. See export results for paths and failures.`,
+		};
+		if (reportNotice) reportNotice(notice);
+		else report(notice.before + notice.subject + notice.after);
 	};
 }

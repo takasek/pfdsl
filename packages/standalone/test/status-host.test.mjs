@@ -9,6 +9,105 @@ import {
 
 const { startHost } = await createHarness("status-ui");
 
+test("F1 recovery read failures name the Save As target", async () => {
+	const native = new FakeNative();
+	const a = native.add(1, "x/a.pfdsl", "a");
+	const b = native.add(2, "y/b.pfdsl", "b");
+	let failRead = false;
+	const host = await startHost(native, a, {
+		choose: () => native.snapshot(b),
+		saveReply: () => ({
+			outcome: "published-but-unconfirmed",
+			publication: "unknown",
+			targetState: "present",
+			current: native.snapshot(b),
+		}),
+		inspectGate: (id) => {
+			if (failRead && id === b.id) throw new Error("Disk unavailable");
+		},
+	});
+	try {
+		const tab = await host.open(a);
+		tab.type("edited");
+		await host.command("save-as");
+		failRead = true;
+		host.panel().review.click();
+		await host.settle();
+		assert.match(
+			host.query("#status").textContent,
+			/Save needs attention — a.pfdsl: Could not read b.pfdsl:/,
+		);
+	} finally {
+		await host.finish();
+	}
+});
+
+test("F2 free text retains longer paths with spaces and Rust errors verbatim", async () => {
+	const host = await startHost(new FakeNative(), null, {
+		listRecent: () => [{ kind: "folder", path: "/U/Project" }],
+		clearRecent: () => {
+			throw new Error(
+				"Could not open /U/Project 2/x.pfd: gone; Rust: /U/Project: Permission denied (os error 13)",
+			);
+		},
+	});
+	try {
+		await host.command("clear-recent");
+		assert.equal(
+			host.query("#status").textContent,
+			"Application notice: Error: Could not open /U/Project 2/x.pfd: gone; Rust: /U/Project: Permission denied (os error 13)",
+		);
+	} finally {
+		await host.finish();
+	}
+});
+
+test("F3 added and changed lines scroll into view and disclose the count", async () => {
+	const native = new FakeNative();
+	const a = native.add(1, "a.pfdsl", "a");
+	let readError = "Disk unavailable";
+	const host = await startHost(native, a, {
+		inspectGate: () => {
+			throw new Error(readError);
+		},
+		listRecent: () => [{ kind: "file", path: a.path }],
+		clearRecent: () => {
+			throw new Error("Clear failed");
+		},
+	});
+	try {
+		const status = host.query("#status");
+		Object.defineProperty(status, "clientHeight", { value: 20 });
+		Object.defineProperty(status, "scrollHeight", {
+			get: () => status.textContent.split("\n").length * 20,
+		});
+		const tab = await host.open(a);
+		tab.type("edited");
+		await host.command("save");
+		await host.command("clear-recent");
+		assert.equal(status.scrollTop, 20);
+		assert.match(host.query("footer").textContent, /2 notices/);
+		tab.report("New action");
+		assert.equal(status.scrollTop, 20);
+		assert.match(host.query("footer").textContent, /3 notices/);
+		status.scrollTop = 0;
+		tab.report("Changed action");
+		assert.equal(status.scrollTop, 20);
+		tab.report("Changed action\nwith details");
+		assert.equal(host.query("#status-count").textContent, "3 notices");
+		readError = "New read failure";
+		await host.command("save");
+		assert.equal(status.scrollTop, 0);
+		assert.match(status.textContent, /^Save needs attention.*New read failure/);
+		assert.match(
+			status.textContent,
+			/Application notice: Error: Clear failed$/,
+		);
+	} finally {
+		await host.finish();
+	}
+});
+
 test("Clear Menu reaches native storage and refreshes the menu from the start screen", async () => {
 	let targets = [{ kind: "file", path: "/A/flow.pfdsl" }];
 	const calls = [];
@@ -55,8 +154,8 @@ test("bottom lines use tab names, retain every notice and expose full text in ti
 		assert.equal(
 			status.textContent,
 			[
-				`Save needs attention — ${host.nameOf(first)}: Could not read ${host.nameOf(first)}: Error: Cannot inspect ${host.nameOf(first)}. The save was not attempted. Editor content is retained.`,
-				`Last action — ${host.nameOf(second)}: Checked ${host.nameOf(second)}. No changes.`,
+				`Save needs attention — ${host.nameOf(first)}: Could not read ${host.nameOf(first)}: Error: Cannot inspect ${a.path}. The save was not attempted. Editor content is retained.`,
+				`Last action — ${host.nameOf(second)}: Checked ${b.path}. No changes.`,
 				"Application notice: Opened project. Save documents explicitly.",
 			].join("\n"),
 		);
@@ -180,7 +279,7 @@ test("export and external-check notices identify their same-name originating tab
 	}
 });
 
-test("status substitutes whole document identifiers without rewriting URLs or longer paths", async () => {
+test("status retains free-text paths, URLs and longer paths verbatim", async () => {
 	const native = new FakeNative();
 	const doc = native.add(1, "flow.pfdsl", "source");
 	const host = await startHost(native, doc);
@@ -190,7 +289,7 @@ test("status substitutes whole document identifiers without rewriting URLs or lo
 		tab.report(message);
 		assert.equal(
 			host.query("#status").textContent,
-			`Last action — flow.pfdsl: Checked flow.pfdsl. Compare https://host${doc.path} and ${doc.path}.backup and /other${doc.path}; retry 'flow.pfdsl' or (flow.pfdsl).`,
+			`Last action — flow.pfdsl: ${message}`,
 		);
 		assert.equal(
 			host.query("#status").title,
