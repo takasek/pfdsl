@@ -16,14 +16,40 @@ export function createWorkspaceSplit(
 	divider.setAttribute("aria-valuemax", "90");
 	let width = 50;
 	let pointer: number | undefined;
+	/** The percentages both panes' minimum widths (style.css) leave the divider. */
+	function range(): [number, number] {
+		const style = window.getComputedStyle(document.documentElement);
+		const minimum = (name: string) =>
+			Number.parseFloat(style.getPropertyValue(name)) || 0;
+		const available = container.getBoundingClientRect().width - 6;
+		const editor = minimum("--editor-min-width");
+		const preview = minimum("--preview-min-width");
+		if (!(available > editor + preview)) return [10, 90];
+		return [
+			Math.max(10, (editor / available) * 100),
+			Math.min(90, 100 - (preview / available) * 100),
+		];
+	}
 	function set(value: number) {
-		width = Math.max(10, Math.min(90, value));
+		const [low, high] = range();
+		width = Math.max(low, Math.min(high, value));
 		container.style.setProperty("--source-width", `${width}%`);
 		container.style.setProperty("--source-ratio", String(width / 100));
+		divider.setAttribute("aria-valuemin", String(Math.round(low)));
+		divider.setAttribute("aria-valuemax", String(Math.round(high)));
 		divider.setAttribute("aria-valuenow", String(Math.round(width)));
 		changed();
 	}
 	set(50);
+	// The host narrows with the window and the sidebar; keep the value in range.
+	if (typeof window.ResizeObserver === "function") {
+		const observer = new window.ResizeObserver(() => set(width));
+		observer.observe(container);
+		abort.signal.addEventListener("abort", () => observer.disconnect());
+	} else
+		window.addEventListener("resize", () => set(width), {
+			signal: abort.signal,
+		});
 	divider.addEventListener(
 		"keydown",
 		(event) => {
@@ -31,8 +57,8 @@ export function createWorkspaceSplit(
 			const value = {
 				ArrowLeft: width - step,
 				ArrowRight: width + step,
-				Home: 10,
-				End: 90,
+				Home: 0,
+				End: 100,
 			}[event.key];
 			if (value === undefined) return;
 			event.preventDefault();
