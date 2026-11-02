@@ -19,6 +19,8 @@ function setup(width = 1600, height = 800, onStateChange = () => {}) {
 	let visible = true;
 	let rootWidth = 400;
 	let rootHeight = 300;
+	let hostWidth = 400;
+	let hostHeight = 360;
 	let graphWidth = width;
 	let graphHeight = height;
 	const preview = mountPreview(container, {
@@ -31,6 +33,10 @@ function setup(width = 1600, height = 800, onStateChange = () => {}) {
 	});
 	const root = container.querySelector<HTMLElement>("#root")!;
 	const inner = container.querySelector<HTMLElement>("#inner")!;
+	Object.defineProperties(container, {
+		clientWidth: { get: () => (visible ? hostWidth : 0) },
+		clientHeight: { get: () => (visible ? hostHeight : 0) },
+	});
 	Object.defineProperties(root, {
 		clientWidth: { get: () => (visible ? rootWidth : 0) },
 		clientHeight: { get: () => (visible ? rootHeight : 0) },
@@ -54,7 +60,15 @@ function setup(width = 1600, height = 800, onStateChange = () => {}) {
 		show: () => {
 			visible = true;
 		},
+		/** A panel inside the preview takes or returns graph area; the host keeps its size. */
 		resizeRoot: (nextWidth: number, nextHeight = rootHeight) => {
+			rootWidth = nextWidth;
+			rootHeight = nextHeight;
+		},
+		/** The host (window or split) changes size, and the graph area with it. */
+		resizeHost: (nextWidth: number, nextHeight = rootHeight) => {
+			hostWidth += nextWidth - rootWidth;
+			hostHeight += nextHeight - rootHeight;
 			rootWidth = nextWidth;
 			rootHeight = nextHeight;
 		},
@@ -330,7 +344,7 @@ it("fits when a hidden preview becomes visible without another render, then keep
 	expect(disconnect).toHaveBeenCalled();
 });
 
-it("refits only Fit views on root resize and keeps Fit through redraws", async () => {
+it("refits only Fit views on host resize and keeps Fit through panels and redraws", async () => {
 	let resized!: ResizeObserverCallback;
 	vi.stubGlobal(
 		"ResizeObserver",
@@ -344,6 +358,8 @@ it("refits only Fit views on root resize and keeps Fit through redraws", async (
 	);
 	cleanups.push(() => vi.unstubAllGlobals());
 	const s = setup();
+	// The observer reports the mounted host size before the first graph.
+	resized([], {} as ResizeObserver);
 	const editing = {
 		source: "a\n",
 		nodes: [{ id: "a", kind: "artifact" as const, defined: false }],
@@ -351,14 +367,20 @@ it("refits only Fit views on root resize and keeps Fit through redraws", async (
 	await s.preview.receive({ type: "render", dot: "a", editing });
 	s.flush();
 	expect(s.container.querySelector("#zoom-level")!.textContent).toBe("23%");
-	s.resizeRoot(800, 600);
+	s.resizeRoot(400, 200);
+	resized([], {} as ResizeObserver);
+	expect(
+		s.container.querySelector("#zoom-level")!.textContent,
+		"a panel taking graph area is not a host resize",
+	).toBe("23%");
+	s.resizeHost(800, 600);
 	resized([], {} as ResizeObserver);
 	expect(s.container.querySelector("#zoom-level")!.textContent).toBe("48%");
 	s.resizeGraph(800, 400);
 	await s.preview.receive({ type: "render", dot: "a", editing });
 	s.flush();
 	expect(s.container.querySelector("#zoom-level")!.textContent).toBe("48%");
-	s.resizeRoot(900, 600);
+	s.resizeHost(900, 600);
 	window.dispatchEvent(new Event("resize"));
 	expect(s.container.querySelector("#zoom-level")!.textContent).toBe("100%");
 	s.resizeGraph(2000, 500);
@@ -442,13 +464,42 @@ it("refits only Fit views on root resize and keeps Fit through redraws", async (
 			manualView,
 			`manual gesture ${index} should change the view`,
 		).not.toBe(fitView);
-		s.resizeRoot(s.root.clientWidth + 100, 600);
+		s.resizeHost(s.root.clientWidth + 100, 600);
 		resized([], {} as ResizeObserver);
 		expect(
 			s.inner.style.transform,
 			`manual gesture ${index} should clear Fit`,
 		).toBe(manualView);
 	}
+});
+
+it("keeps Fit after a press that does not move the graph", async () => {
+	let resized!: ResizeObserverCallback;
+	vi.stubGlobal(
+		"ResizeObserver",
+		class {
+			constructor(callback: ResizeObserverCallback) {
+				resized = callback;
+			}
+			observe() {}
+			disconnect() {}
+		},
+	);
+	cleanups.push(() => vi.unstubAllGlobals());
+	const s = setup();
+	resized([], {} as ResizeObserver);
+	await s.preview.receive({ type: "render", dot: "a" });
+	s.flush();
+	s.root.dispatchEvent(
+		new MouseEvent("mousedown", { button: 0, clientX: 10, clientY: 10 }),
+	);
+	window.dispatchEvent(
+		new MouseEvent("mousemove", { buttons: 1, clientX: 10, clientY: 10 }),
+	);
+	window.dispatchEvent(new MouseEvent("mouseup", { button: 0 }));
+	s.resizeHost(800, 600);
+	resized([], {} as ResizeObserver);
+	expect(s.container.querySelector("#zoom-level")!.textContent).toBe("48%");
 });
 
 it("fits a graph larger than the wheel zoom floor without cropping", async () => {

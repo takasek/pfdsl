@@ -625,39 +625,31 @@ export function mountPreview(container: HTMLElement, host: PreviewHost) {
 		else refreshMinimap();
 		updateControls();
 	}
-	let rootWidth = root.clientWidth;
-	let rootHeight = root.clientHeight;
-	function resizeGraphViewport() {
-		const width = root.clientWidth;
-		const height = root.clientHeight;
-		const resized = width !== rootWidth || height !== rootHeight;
-		rootWidth = width;
-		rootHeight = height;
-		if (resized && hasPositioned && isFit) fitCurrentGraph();
-		positionGraph();
-	}
 	let containerWidth = container.clientWidth;
 	let containerHeight = container.clientHeight;
+	// Panel content also resizes the graph; only a host resize dismisses menus
+	// and fits a Fit view again, so opening Connections leaves the view alone.
+	function resizeHost() {
+		if (
+			container.clientWidth !== containerWidth ||
+			container.clientHeight !== containerHeight
+		) {
+			containerWidth = container.clientWidth;
+			containerHeight = container.clientHeight;
+			connections.resize();
+			if (hasPositioned && isFit) fitCurrentGraph();
+		}
+		positionGraph();
+	}
 	const resizeObserver =
 		typeof window.ResizeObserver === "function"
-			? new window.ResizeObserver(() => {
-					// Panel content also resizes the graph; only a host resize dismisses menus.
-					if (
-						container.clientWidth !== containerWidth ||
-						container.clientHeight !== containerHeight
-					) {
-						containerWidth = container.clientWidth;
-						containerHeight = container.clientHeight;
-						connections.resize();
-					}
-					resizeGraphViewport();
-				})
+			? new window.ResizeObserver(resizeHost)
 			: undefined;
 	resizeObserver?.observe(root);
 	resizeObserver?.observe(container);
 	on(window, "resize", () => {
 		connections.resize();
-		resizeGraphViewport();
+		resizeHost();
 	});
 	on(fitButton, "click", () => {
 		pendingFocusNodeId = undefined;
@@ -758,6 +750,8 @@ export function mountPreview(container: HTMLElement, host: PreviewHost) {
 			return;
 		}
 		if (!dragging) return;
+		// A press that has not moved yet is a click, not a pan.
+		if (e.clientX - startX === panX && e.clientY - startY === panY) return;
 		isFit = false;
 		panX = e.clientX - startX;
 		panY = e.clientY - startY;
