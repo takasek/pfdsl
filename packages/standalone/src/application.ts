@@ -48,6 +48,9 @@ export interface ApplicationOptions {
 	};
 }
 
+// 706px workspace minimum plus the 227px sidebar.
+const SIDEBAR_AUTO_COLLAPSE_WIDTH = 933;
+
 /** Each mounted host owns its documents, external callbacks and teardown. Importing is inert. */
 export function mountApplication(options: ApplicationOptions) {
 	const { document, createDocumentTab, createTextComparison } = options;
@@ -117,6 +120,8 @@ export function mountApplication(options: ApplicationOptions) {
 	let active: Entry | undefined;
 	let busy = false;
 	let folderRoot: string | undefined;
+	let autoSidebarCollapsed = false;
+	let previousWindowWidth = window.innerWidth;
 	let recentTargets: RecentTarget[] = [];
 	let saveCapability = { save: false, reason: "" };
 	const saveSupport = document.querySelector<HTMLElement>("#save-support")!;
@@ -496,7 +501,9 @@ export function mountApplication(options: ApplicationOptions) {
 	}
 	function showFolder(folder: NonNullable<WorkspaceSnapshot["folder"]>) {
 		folderRoot = folder.root;
-		document.querySelector<HTMLElement>("#folder-sidebar")!.hidden = false;
+		const sidebar = document.querySelector<HTMLElement>("#folder-sidebar")!;
+		autoSidebarCollapsed = window.innerWidth < SIDEBAR_AUTO_COLLAPSE_WIDTH;
+		sidebar.hidden = autoSidebarCollapsed;
 		document.querySelector<HTMLElement>("#folder-title")!.textContent =
 			basename(folder.root);
 		document.querySelector<HTMLButtonElement>("#sidebar")!.title = folder.root;
@@ -511,7 +518,32 @@ export function mountApplication(options: ApplicationOptions) {
 			};
 			list.append(button);
 		}
+		updateMenu();
 	}
+	window.addEventListener(
+		"resize",
+		() => {
+			const currentWindowWidth = window.innerWidth;
+			const crossedBelow =
+				previousWindowWidth >= SIDEBAR_AUTO_COLLAPSE_WIDTH &&
+				currentWindowWidth < SIDEBAR_AUTO_COLLAPSE_WIDTH;
+			const crossedAbove =
+				previousWindowWidth < SIDEBAR_AUTO_COLLAPSE_WIDTH &&
+				currentWindowWidth >= SIDEBAR_AUTO_COLLAPSE_WIDTH;
+			previousWindowWidth = currentWindowWidth;
+			const sidebar = document.querySelector<HTMLElement>("#folder-sidebar")!;
+			if (crossedBelow && !sidebar.hidden) {
+				sidebar.hidden = true;
+				autoSidebarCollapsed = true;
+				updateMenu();
+			} else if (crossedAbove && autoSidebarCollapsed) {
+				sidebar.hidden = false;
+				autoSidebarCollapsed = false;
+				updateMenu();
+			}
+		},
+		{ signal: lifetime.signal },
+	);
 	async function presentDecision(
 		request: DecisionRequest,
 		signal: AbortSignal,
@@ -711,6 +743,8 @@ export function mountApplication(options: ApplicationOptions) {
 			if (!folderRoot) return;
 			const sidebar = document.querySelector<HTMLElement>("#folder-sidebar")!;
 			sidebar.hidden = !sidebar.hidden;
+			autoSidebarCollapsed = false;
+			previousWindowWidth = window.innerWidth;
 			updateMenu();
 			active?.tab.activate();
 		},
