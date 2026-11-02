@@ -62,10 +62,12 @@ export function createDocumentTab({
 	const document = parent.ownerDocument;
 	let snapshot: DocumentModel | undefined;
 	let revision = 0;
+	let diagnosticsRevision = -1;
 	let sourceVersion = 0;
 	const renameTracking = new RenameTracking();
 	let disposed = false;
 	let diagnosticsSummary = "Checking…";
+	let problemCount = 0;
 	const container = document.createElement("div");
 	container.className = "document";
 	const editorElement = document.createElement("div");
@@ -261,7 +263,8 @@ export function createDocumentTab({
 		const currentRevision = ++revision;
 		const snapshotVersion = sourceVersion;
 		const invalidatedRenameRequestId = renameTracking.invalidatedRequestId;
-		diagnosticsSummary = "Checking…";
+		// The last result's markers and counts stay visible until this one
+		// completes; First Problem waits for it (areDiagnosticsCurrent).
 		onChange?.();
 		let result: Awaited<ReturnType<typeof processSnapshot>>;
 		try {
@@ -269,6 +272,7 @@ export function createDocumentTab({
 		} catch (error) {
 			if (!disposed && currentRevision === revision) {
 				diagnosticsSummary = `Analysis failed: ${String(error)}`;
+				problemCount = 0;
 				onChange?.();
 			}
 			return;
@@ -287,6 +291,7 @@ export function createDocumentTab({
 			...result.model.diagnostics,
 			...dependencyDiagnostics,
 		];
+		problemCount = allDiagnostics.length;
 		diagnosticsSummary = allDiagnostics.length
 			? (["error", "warning", "info"] as const)
 					.map((severity) => {
@@ -324,6 +329,8 @@ export function createDocumentTab({
 				endColumn: d.range.end.column,
 			})),
 		);
+		diagnosticsRevision = currentRevision;
+		onChange?.();
 		// Publish the editor's visible lines before replacing the matching graph.
 		editor.render();
 		try {
@@ -353,6 +360,7 @@ export function createDocumentTab({
 		void pending.catch((error) => {
 			if (!disposed && requested === revision) {
 				diagnosticsSummary = `Analysis failed: ${String(error)}`;
+				problemCount = 0;
 				onChange?.();
 			}
 		});
@@ -408,6 +416,22 @@ export function createDocumentTab({
 		},
 		canCreateDefinition: () => preview.canCreateDefinition(),
 		command(id: string) {
+			if (id === "first-problem") {
+				const model = editor.getModel();
+				if (
+					diagnosticsRevision !== revision ||
+					!model ||
+					monaco.editor.getModelMarkers({ resource: model.uri }).length === 0
+				)
+					return;
+				// Start a fresh F8 navigation from the document start, so the first
+				// problem is the one F8 shows first (errors before warnings).
+				editor.trigger("pfdsl.menu", "closeMarkersNavigation", null);
+				editor.setPosition({ lineNumber: 1, column: 1 });
+				editor.focus();
+				editor.trigger("pfdsl.menu", "editor.action.marker.next", null);
+				return;
+			}
 			if (id === "create-definition") {
 				preview.createDefinition();
 				return;
@@ -444,6 +468,8 @@ export function createDocumentTab({
 		getSource: () => editor.getValue(),
 		getRevision: () => model.getVersionId(),
 		getDiagnosticsSummary: () => diagnosticsSummary,
+		getProblemCount: () => problemCount,
+		areDiagnosticsCurrent: () => diagnosticsRevision === revision,
 		setSource(value: string) {
 			editor.pushUndoStop();
 			const eol = value.includes("\r\n") ? "\r\n" : "\n";

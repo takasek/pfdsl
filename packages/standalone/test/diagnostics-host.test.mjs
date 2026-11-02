@@ -30,13 +30,14 @@ test("real analysis summaries reach the active host and distinguish same-name do
 		first.type(
 			"---\nartifact:\n  b: {label: B, criteria: Ready}\n---\na >> p -> b\n",
 		);
-		assert.match(text(), /Checking/);
-		await until(() => !text().includes("Checking"));
+		assert.match(text(), /1 warning/);
+		await until(() => !text().includes("1 warning"));
 		assert.doesNotMatch(text(), /1 warning/);
 		await host.open(b);
 		await until(() => text().includes("1 warning"));
 		assert.match(text(), /Current diagnostics — \/B\/same.pfdsl:/);
 		first.button.click();
+		await until(() => text().includes("Current diagnostics — /A/same.pfdsl:"));
 		assert.match(text(), /Current diagnostics — \/A\/same.pfdsl:/);
 		assert.doesNotMatch(text(), /1 warning/);
 	} finally {

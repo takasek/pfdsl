@@ -236,6 +236,297 @@ test("the production document-tab entry loads real Monaco menu contributions", a
 			},
 		);
 		await t.test(
+			"Monaco keeps one context-menu Go to Definition and a Quick Access action",
+			async () => {
+				await withEditors(
+					"---\nartifact:\n  a: { label: A }\n---\na >> p -> b\n",
+					async (create) => {
+						const editor = create();
+						const quickAccess = editor.getAction("pfdsl.goToDefinition");
+						assert.ok(quickAccess, "Go to Definition remains in Quick Access");
+						assert.equal(quickAccess.label, "Go to Definition");
+						editor.setPosition({ lineNumber: 5, column: 1 });
+						const menuActions = editor
+							.getContribution("editor.contrib.contextmenu")
+							._getMenuActions(editor.getModel(), host.MenuId.EditorContext);
+						const entries = menuActions
+							.filter((action) => /Go to .*definition/i.test(action.label))
+							.map((action) => action.label);
+						assert.deepEqual(entries, ["Go to Definition"]);
+					},
+				);
+			},
+		);
+		await t.test(
+			"every editor command routed from the native menu exists, without a duplicate definition jump",
+			async () => {
+				await withEditors("# navigation\na >> p -> b\n", async (create) => {
+					const editor = create();
+					for (const id of [
+						"editor.action.gotoLine",
+						"pfdsl.nextNodeOccurrence",
+						"pfdsl.previousNodeOccurrence",
+						"pfdsl.findAll",
+						"editor.action.marker.next",
+						"editor.action.marker.prev",
+						"pfdsl.export.dot",
+						"pfdsl.export.svg",
+						"pfdsl.export.pdf",
+						"pfdsl.export.png",
+						"pfdsl.export.tsv",
+						"pfdsl.export.all",
+						"pfdsl.compareFile",
+						"pfdsl.compareGit",
+						"pfdsl.clearDiff",
+					])
+						assert.ok(editor.getAction(id), id);
+					assert.ok(editor.getAction("pfdsl.goToDefinition"));
+					assert.equal(editor.getAction("pfdsl.jumpToDefinition"), null);
+				});
+			},
+		);
+		await t.test(
+			"Go to Line keybindings include all expected platform shortcuts",
+			async () => {
+				await withEditors("# navigation\na >> p -> b\n", async (create) => {
+					const editor = create();
+					const labels = editor._standaloneKeybindingService
+						._getResolver()
+						.getKeybindings()
+						.filter((binding) => binding.command === "editor.action.gotoLine")
+						.map((binding) => binding.resolvedKeybinding.getLabel())
+						.filter(Boolean);
+					assert.ok(labels.length, "Go to Line has resolved keybindings");
+					if (process.platform === "darwin") {
+						assert.ok(
+							!labels.some((label) => /^(Ctrl|⌃)\+?G$/.test(label)),
+							`Control+G is absent: ${labels.join(", ")}`,
+						);
+						assert.ok(
+							labels.some((label) => /⌘L/.test(label)),
+							`Command+L is present: ${labels.join(", ")}`,
+						);
+					} else {
+						assert.ok(
+							labels.some((label) => /Ctrl\+G/.test(label)),
+							`Ctrl+G is present: ${labels.join(", ")}`,
+						);
+						assert.ok(
+							labels.some((label) => /Ctrl\+L/.test(label)),
+							`Ctrl+L is present: ${labels.join(", ")}`,
+						);
+					}
+				});
+			},
+		);
+		await t.test(
+			"first-problem reaches a positioned error below an earlier warning and shows its widget",
+			async () => {
+				const source =
+					"---\nartifact:\n  b: { label: B }\n---\na >> p -> b\n@\n";
+				await withEditors(source, async (create, tabs) => {
+					const editor = create();
+					const tab = tabs[0];
+					tab.activate();
+					const markers = () =>
+						host.monaco.editor.getModelMarkers({
+							resource: editor.getModel().uri,
+						});
+					for (
+						let i = 0;
+						i < 200 && !markers().some((m) => m.code === "L002");
+						i++
+					)
+						await new Promise((resolve) => setTimeout(resolve, 5));
+					const warning = markers().find((m) => m.code === "W002");
+					const error = markers().find((m) => m.code === "L002");
+					assert.ok(warning, "W002 reaches Monaco");
+					assert.ok(error, "positioned L002 reaches Monaco");
+					assert.ok(warning.startLineNumber < error.startLineNumber);
+					editor.setPosition({ lineNumber: 5, column: 12 });
+					tab.command("first-problem");
+					for (
+						let i = 0;
+						i < 100 && !editor.getDomNode().querySelector(".marker-widget");
+						i++
+					)
+						await new Promise((resolve) => setTimeout(resolve, 5));
+					assert.deepEqual(
+						[editor.getPosition().lineNumber, editor.getPosition().column],
+						[error.startLineNumber, error.startColumn],
+					);
+					assert.ok(
+						editor.getDomNode().querySelector(".marker-widget"),
+						"marker navigation widget is shown",
+					);
+				});
+			},
+		);
+		await t.test(
+			"first-problem leaves the caret alone when the active model has no markers",
+			async () => {
+				await withEditors(
+					"# clean document\n# leave the caret here\n# still no problems\n",
+					async (create, tabs) => {
+						const editor = create();
+						const tab = tabs[0];
+						tab.activate();
+						for (let i = 0; i < 100 && !tab.areDiagnosticsCurrent(); i++)
+							await new Promise((resolve) => setTimeout(resolve, 5));
+						assert.equal(tab.areDiagnosticsCurrent(), true);
+						assert.deepEqual(
+							host.monaco.editor.getModelMarkers({
+								resource: editor.getModel().uri,
+							}),
+							[],
+						);
+						editor.setPosition({ lineNumber: 3, column: 8 });
+						const before = editor.getPosition();
+						tabs[0].command("first-problem");
+						assert.deepEqual(editor.getPosition(), before);
+					},
+				);
+			},
+		);
+		await t.test(
+			"first-problem does not navigate old markers while diagnostics refresh",
+			async () => {
+				const source = "---\nextends: parent.yaml\n---\na >> p -> b\n@\n";
+				await withEditors(source, async (create, tabs) => {
+					let holdRead = false;
+					let readHeld = false;
+					const reading = Promise.withResolvers();
+					const release = Promise.withResolvers();
+					const editor = create({
+						path: "/work/entry.pfdsl",
+						read: async () => {
+							if (holdRead) {
+								holdRead = false;
+								readHeld = true;
+								reading.resolve();
+								await release.promise;
+							}
+							return null;
+						},
+					});
+					const tab = tabs[0];
+					const markers = () =>
+						host.monaco.editor.getModelMarkers({
+							resource: editor.getModel().uri,
+						});
+					const waitFor = async (predicate) => {
+						for (let i = 0; i < 200; i++) {
+							if (predicate()) return;
+							await new Promise((resolve) => setTimeout(resolve, 5));
+						}
+						assert.fail("Diagnostics did not reach the editor");
+					};
+					try {
+						tab.activate();
+						await waitFor(() =>
+							markers().some((marker) => marker.code === "L002"),
+						);
+						assert.equal(tab.areDiagnosticsCurrent(), true);
+						holdRead = true;
+						tab.setSource(source.replace("@\n", "# fixed\n"));
+						await Promise.race([reading.promise, waitFor(() => readHeld)]);
+						assert.equal(tab.areDiagnosticsCurrent(), false);
+						// The editor keeps showing the last result while it refreshes.
+						assert.equal(
+							markers().some((marker) => marker.code === "L002"),
+							true,
+						);
+						host.monaco.editor.setModelMarkers(
+							editor.getModel(),
+							"test-stale",
+							[
+								{
+									severity: host.monaco.MarkerSeverity.Error,
+									message: "stale problem",
+									startLineNumber: 5,
+									startColumn: 1,
+									endLineNumber: 5,
+									endColumn: 2,
+								},
+							],
+						);
+						editor.setPosition({ lineNumber: 3, column: 1 });
+						const before = editor.getPosition();
+						tab.command("first-problem");
+						await new Promise((resolve) => setTimeout(resolve, 20));
+						assert.deepEqual(editor.getPosition(), before);
+						release.resolve();
+						await waitFor(() => tab.areDiagnosticsCurrent());
+					} finally {
+						release.resolve();
+					}
+				});
+			},
+		);
+		await t.test(
+			"Next and Previous Problem use current-editor marker actions and F8 bindings",
+			async () => {
+				await withEditors("one\ntwo\nthree\nfour\nfive\n", async (create) => {
+					const editor = create();
+					const resolved = editor._standaloneKeybindingService
+						._getResolver()
+						.getKeybindings();
+					const commandsFor = (labels) =>
+						resolved
+							.filter((binding) =>
+								labels.includes(binding.resolvedKeybinding.getLabel()),
+							)
+							.map((binding) => binding.command);
+					assert.ok(editor.getAction("editor.action.marker.next"));
+					assert.ok(editor.getAction("editor.action.marker.prev"));
+					assert.deepEqual(commandsFor(["F8"]), ["editor.action.marker.next"]);
+					assert.deepEqual(commandsFor(["⇧F8", "Shift+F8"]), [
+						"editor.action.marker.prev",
+					]);
+				});
+			},
+		);
+		await t.test(
+			"diagnostic totals and count remain available while the document refreshes",
+			async () => {
+				const source =
+					"---\nartifact:\n  b: { label: B }\n---\na >> p -> b\n@\n";
+				await withEditors(source, async (create, tabs) => {
+					const editor = create();
+					const tab = tabs[0];
+					tab.activate();
+					for (let i = 0; i < 200 && tab.getProblemCount() === 0; i++)
+						await new Promise((resolve) => setTimeout(resolve, 5));
+					const count = tab.getProblemCount();
+					const summary = tab.getDiagnosticsSummary();
+					assert.ok(count > 0);
+					editor.setValue(`${source}# edit\n`);
+					assert.equal(tab.getProblemCount(), count);
+					assert.equal(tab.getDiagnosticsSummary(), summary);
+				});
+			},
+		);
+		await t.test(
+			"the Go to Line documentation does not claim to replace an unimported action",
+			() => {
+				const readme = readFileSync(join(packageRoot, "README.md"), "utf8");
+				const language = readFileSync(
+					join(packageRoot, "src/language.ts"),
+					"utf8",
+				);
+				assert.equal(
+					/Expand Line Selection/.test(readme),
+					false,
+					"README does not name an unimported action",
+				);
+				assert.equal(
+					/Expand Line Selection/.test(language),
+					false,
+					"language setup comment matches imported contributions",
+				);
+			},
+		);
+		await t.test(
 			"actual input focus wins over another editor's delayed blur",
 			async () => {
 				await withEditors("# navigation\na >> p -> b\n", async (create) => {
@@ -315,7 +606,11 @@ test("the production document-tab entry loads real Monaco menu contributions", a
 					assert.equal(tab.canDiagram(), true);
 					parent = "statusStyles: {done: {fillcolor: magenta}}\n";
 					tab.activate();
-					await waitFor(() => !markers().some((m) => m.code === "V027"));
+					await waitFor(
+						() =>
+							tab.areDiagnosticsCurrent() &&
+							!markers().some((m) => m.code === "V027"),
+					);
 					assert.equal(panel.hidden, true);
 					assert.equal(panel.textContent, "");
 					assert.equal(editor.getValue(), source);
@@ -545,7 +840,14 @@ test("the production document-tab entry loads real Monaco menu contributions", a
 					).filter(Boolean);
 					assert.equal(hints.flatMap((h) => h.hints).length, 1);
 					editor.setPosition(position);
-					await editor.getAction("pfdsl.jumpToDefinition").run();
+					// The native menu routes Go to Definition through editor.trigger.
+					editor.trigger("test", "editor.action.revealDefinition", null);
+					for (
+						let i = 0;
+						i < 100 && editor.getSelection().startLineNumber !== 3;
+						i++
+					)
+						await new Promise((resolve) => setTimeout(resolve, 5));
 					assert.equal(editor.getSelection().startLineNumber, 3);
 					await editor.getAction("pfdsl.nextNodeOccurrence").run();
 					assert.equal(editor.getSelection().startLineNumber, 7);

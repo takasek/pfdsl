@@ -129,7 +129,7 @@ BにAのSavedを現在状態として残さず、A再編集で表示を更新す
 通知消失で未保存／外部変更状態を消さず、取消でbufferと未解決状態を保つ。
 `Current diagnostics`と`Last action`を区別し、後者の発生文書を確認する（#1516）。Aの一時通知はBに表示せず、A編集後は消える。`Dismiss action notice`で一時通知を閉じ、診断と本文は保持される。Aの保存失敗はBへ切替後もAのpath付き`Save needs attention`として残り、Aを編集しても消えず、保存・回復成功で解消する。時間経過や一時通知のdismissで保存失敗を消さない。politeな読み上げで同じ通知を描画ごとに繰り返さないことも確認する。
 状態：M未実施。記録：未記入。時機未観測の変種は未実施。
-読み上げの残件（#1516）：連続入力で `Checking…` と診断件数の変化が過剰に読まれないか、複数文書の保存失敗がある状態で新規通知を出すと既存の全行が再読されないかを VoiceOver 等で確認する。
+読み上げの残件（#1516）：連続入力で `Updating diagnostics` と診断件数の変化が過剰に読まれないか、複数文書の保存失敗がある状態で新規通知を出すと既存の全行が再読されないかを VoiceOver 等で確認する。
 DOM の aria-live 属性検査や診断統合テストだけでは、この確認を完了したと扱わない。
 
 ### GUI-07：外部変更の説明とテキスト比較
@@ -387,7 +387,7 @@ MではソースのノードIDをhoverし、`Go to definition`／`Find all`を�
 artifact/processの`index`、processの複数`location`と`boundary`、groupの`color`／`parent`を含む文書で、それぞれの値がhoverへ表示されることを確認する。
 block／flow mapのquoted group keyをhoverし、label・color・parent・artifact/processのmemberを読み、同じ行のmetadata field上には宣言hoverが出ないことを確認する。
 group hoverの`Find all`と、artifact/processを対象とする定義移動・semantic巡回を区別し、既存の巡回・Undo・文書隔離を再確認する。
-右クリックまたはF1から`Go to PFDSL definition`、`Next PFDSL node occurrence`、`Previous PFDSL node occurrence`、`Find all text matching this node`を実行する。
+右クリックまたはF1から`Go to Definition`、`Next PFDSL node occurrence`、`Previous PFDSL node occurrence`、`Find all text matching this node`を実行する。
 quoted/flow keyのID上と同じ行の`label`／`owner`等のfield上を区別し、定義＋body内の同一IDの巡回・折返し、定義なしの案内を確認する。
 Find allは現行拡張と同じliteral文字列検索であり、metadata fieldを除くsemantic参照・巡回とは区別する。
 processのcommand行末の`Command` hintをhoverして複数行の内容を読み、表示だけで実行されないことを確認する。
@@ -397,9 +397,9 @@ labelのみ、criteriaのみ、groupとcriteria、descriptionを含む場合を�
 Linuxで報告された3回の表示プロセス消失は原因未確定であり、Chromiumでの成功をWebKitGTKやMac nativeの合格へ転写しない。
 期待：semantic nodeとfield、定義range、全出現が正しく、図hover廃止と混同しない。
 表示hintと外部実行GUI-33を区別する。
-Go to LineはCtrl+GとF1の`Go to Line/Column...`から開き、行と列を指定して移動する。
+Go to LineはmacOSでCommand+L（他のOSではCtrl+LとCtrl+G）、F1の`Go to Line/Column...`、メニューバーの`Go › Go to Line/Column…`から開き、行と列を指定して移動する。
 無効値は移動せず、範囲外の行・列はMonaco標準の有効範囲へ補正されることを確認する。
-同名のred/blue文書を別フォルダから開き、blueでF1→Go to Line→`:3:1`→Enter→`changed_`入力→Undo、redへ切替→Ctrl+G→`:2:1`→Escapeを行う。
+同名のred/blue文書を別フォルダから開き、blueでF1→Go to Line→`:3:1`→Enter→`changed_`入力→Undo、redへ切替→Command+L→`:2:1`→Escapeを行う。
 タブ往復を繰り返し、Escapeで入力欄が閉じ、開始位置と選択へ戻り、本文・Undo履歴・別文書の位置と選択が保たれることを確認する。
 入力中のタブ切替・閉鎖、F1の`>`とGo to Lineの`:`の切替、候補の上下移動、既存FindのEscapeも確認する。
 Chromiumでの自動検証はnativeの合格にせず、#1445の版・ホスト別受入結果へ記録する。
@@ -428,7 +428,7 @@ Quick Fix候補の表示中に同じ文書を編集してから適用する時�
 依存先の座標をentry本文の位置と誤認させず、正常なstatusStyles継承への修正後は依存表示が消えることを確認する。
 期待：形式と選択境界が合い、authored未保存source/診断と依存診断を分離する。
 lenient表示と一度読んだ同じ依存snapshotを使い、別tabへ古い結果を漏らさない。
-Mでは`Current diagnostics`が最新snapshotの件数を示し、解析待ちは`Checking…`へ切り替わることを確認する（#1516）。定義追加後のW002入力案内が`Last action`に表示された後、criteriaを入力し、古い案内が消えて最新warning数が減ることを確認する。遅延した旧版の解析失敗と閉鎖済み文書の結果は現在診断へ表示しない。
+Mでは`Current diagnostics`が最新snapshotの件数を示し、解析待ちは直前の件数を残したまま`Updating diagnostics`へ切り替わり、件数ボタンが無効になることを確認する（#1516）。最初の解析が終わる前だけ`Checking…`と表示する。定義追加後のW002入力案内が`Last action`に表示された後、criteriaを入力し、古い案内が消えて最新warning数が減ることを確認する。遅延した旧版の解析失敗と閉鎖済み文書の結果は現在診断へ表示しない。
 状態：M/V各未実施。記録：未記入。
 
 ## 外部参照・構造差分・command

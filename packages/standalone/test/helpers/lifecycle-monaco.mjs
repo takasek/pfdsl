@@ -6,7 +6,10 @@ export const snapshotCalls = [];
 export const linkOpeners = [];
 export const Uri = { parse: (value) => value };
 export const MarkerSeverity = { Error: 8, Warning: 4, Info: 2 };
+export const KeyMod = { CtrlCmd: 2048, WinCtrl: 256 };
+export const KeyCode = { KeyG: 37, KeyL: 42 };
 export const editor = {
+	addKeybindingRules() {},
 	registerLinkOpener(opener) {
 		linkOpeners.push(opener);
 		return { dispose() {} };
@@ -34,9 +37,16 @@ export const editor = {
 			model,
 			callbacks,
 			renders: 0,
+			triggerCalls: [],
 			focus() {},
 			getValue: () => model.source,
 			getModel: () => model,
+			setPosition(position) {
+				this.position = position;
+			},
+			trigger(source, command, payload) {
+				this.triggerCalls.push({ source, command, payload });
+			},
 			render() {
 				this.renders++;
 			},

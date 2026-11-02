@@ -136,6 +136,108 @@ test("native menu registers stable commands, applies document/busy/capability st
 	}
 });
 
+test("native menu reaches export, navigation, problems and comparison from the menu bar", async () => {
+	globalThis.reviewMenuItems = [];
+	try {
+		await bundle(
+			"native-menu",
+			/^@tauri-apps\/api\/menu$/,
+			menuStub,
+			async ({ installNativeMenu }) => {
+				const actions = [];
+				const menu = await installNativeMenu(
+					(id) => actions.push(id),
+					() => {},
+					(error) => assert.fail(String(error)),
+				);
+				const flush = async () => {
+					for (let i = 0; i < 500; i++) await Promise.resolve();
+				};
+				const all = globalThis.reviewMenuItems;
+				const app = all.find((x) => x.appMenu);
+				const submenu = (parent, text) =>
+					parent.children.find((x) => x.text === text);
+				const ids = (parent) =>
+					parent.children.map((x) => x.id).filter(Boolean);
+				const exportMenu = submenu(submenu(app, "File"), "Export");
+				assert.deepEqual(ids(exportMenu), [
+					"pfdsl.export.dot",
+					"pfdsl.export.svg",
+					"pfdsl.export.pdf",
+					"pfdsl.export.png",
+					"pfdsl.export.tsv",
+					"pfdsl.export.all",
+				]);
+				const go = submenu(app, "Go");
+				assert.deepEqual(ids(go), [
+					"editor.action.gotoLine",
+					"editor.action.revealDefinition",
+					"pfdsl.nextNodeOccurrence",
+					"pfdsl.previousNodeOccurrence",
+					"pfdsl.findAll",
+					"first-problem",
+					"editor.action.marker.next",
+					"editor.action.marker.prev",
+				]);
+				const compare = submenu(submenu(app, "View"), "Compare Structure");
+				assert.deepEqual(ids(compare), [
+					"pfdsl.compareFile",
+					"pfdsl.compareGit",
+					"pfdsl.clearDiff",
+				]);
+				// WebView and Monaco own these keys; the label names them instead.
+				for (const item of [
+					...exportMenu.children,
+					...go.children,
+					...compare.children,
+				])
+					assert.equal(item.accelerator, undefined, item.id);
+				assert.match(
+					go.children.find((x) => x.id === "editor.action.marker.next").text,
+					/\(F8\)$/,
+				);
+				const item = (id) => all.find((x) => x.id === id);
+				menu.update({
+					busy: false,
+					document: false,
+					save: false,
+					folder: false,
+					sidebar: false,
+					diagram: false,
+					definition: false,
+				});
+				await flush();
+				for (const id of [
+					"pfdsl.export.svg",
+					"first-problem",
+					"pfdsl.compareGit",
+				])
+					assert.equal(item(id).enabled, false, id);
+				menu.update({
+					busy: false,
+					document: true,
+					save: true,
+					folder: false,
+					sidebar: false,
+					diagram: true,
+					definition: false,
+				});
+				await flush();
+				for (const id of [
+					"pfdsl.export.svg",
+					"first-problem",
+					"pfdsl.compareGit",
+				])
+					assert.equal(item(id).enabled, true, id);
+				item("editor.action.marker.next").action();
+				assert.deepEqual(actions, ["editor.action.marker.next"]);
+			},
+		);
+	} finally {
+		delete globalThis.reviewMenuItems;
+	}
+});
+
 const comparisonStub = `export const editor={createModel(value){const model={value,dispose(){this.disposed=true}};(globalThis.comparisonModels??=[]).push(model);return model},createDiffEditor(element,options){globalThis.diffEditor={element,options,setModel(models){this.models=models},dispose(){this.disposed=true}};return globalThis.diffEditor}};`;
 test("native menu skips unchanged properties and coalesces states arriving during an update", async () => {
 	globalThis.reviewMenuItems = [];

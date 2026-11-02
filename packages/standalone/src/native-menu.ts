@@ -26,6 +26,7 @@ function commandEnabled(id: string, state: MenuState): boolean {
 	if (id === "sidebar") return state.folder;
 	if (!state.document) return false;
 	if (["save", "save-as"].includes(id)) return state.save;
+	if (id.startsWith("pfdsl.export.")) return state.diagram;
 	if (id === "create-definition") return state.definition;
 	if (
 		[
@@ -95,6 +96,17 @@ export async function installNativeMenu(
 			return item;
 		};
 		const separator = () => own(PredefinedMenuItem.new({ item: "Separator" }));
+		const submenu = async (text: string, children: Promise<unknown>[]) =>
+			own(
+				Submenu.new({
+					text,
+					items: (await Promise.all(children)) as MenuItem[],
+				}),
+			);
+		// Monaco owns these keys inside the editor; a native accelerator as well
+		// could run the command twice, so the label names the key instead.
+		const keyed = (label: string, mac: string, other: string) =>
+			`${label} (${navigator.platform.startsWith("Mac") ? mac : other})`;
 		const recent = await own(Submenu.new({ text: "Recent", items: [] }));
 		const sidebar = await own(
 			CheckMenuItem.new({
@@ -168,6 +180,16 @@ export async function installNativeMenu(
 								await separator(),
 								await create("save", "Save", "CmdOrCtrl+S"),
 								await create("save-as", "Save As…", "CmdOrCtrl+Shift+S"),
+								await separator(),
+								await submenu("Export", [
+									create("pfdsl.export.dot", "DOT…"),
+									create("pfdsl.export.svg", "SVG…"),
+									create("pfdsl.export.pdf", "PDF…"),
+									create("pfdsl.export.png", "PNG…"),
+									create("pfdsl.export.tsv", "TSV…"),
+									separator(),
+									create("pfdsl.export.all", "All Formats…"),
+								]),
 							],
 						}),
 					),
@@ -213,6 +235,46 @@ export async function installNativeMenu(
 								await create("font-decrease", "Decrease Text Size"),
 								await create("normalize", "Normalized edges"),
 								await create("node-actions-toggle", "Connections"),
+								await separator(),
+								await submenu("Compare Structure", [
+									create("pfdsl.compareFile", "With File…"),
+									create("pfdsl.compareGit", "With Git Ref…"),
+									create("pfdsl.clearDiff", "Clear Comparison"),
+								]),
+							],
+						}),
+					),
+					await own(
+						Submenu.new({
+							text: "Go",
+							items: [
+								await create(
+									"editor.action.gotoLine",
+									keyed("Go to Line/Column…", "⌘L", "Ctrl+L"),
+								),
+								await create(
+									"editor.action.revealDefinition",
+									keyed("Go to Definition", "⌘F12", "Ctrl+F12"),
+								),
+								await create(
+									"pfdsl.nextNodeOccurrence",
+									"Next Occurrence of Node",
+								),
+								await create(
+									"pfdsl.previousNodeOccurrence",
+									"Previous Occurrence of Node",
+								),
+								await create("pfdsl.findAll", "Find All Occurrences of Node"),
+								await separator(),
+								await create("first-problem", "First Problem"),
+								await create(
+									"editor.action.marker.next",
+									keyed("Next Problem", "F8", "F8"),
+								),
+								await create(
+									"editor.action.marker.prev",
+									keyed("Previous Problem", "⇧F8", "Shift+F8"),
+								),
 							],
 						}),
 					),

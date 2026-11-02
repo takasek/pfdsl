@@ -80,7 +80,7 @@ try {
 		await page.evaluate(() => window.navigationWorkspace.active().focus());
 	};
 	const open = async () => {
-		await page.keyboard.press("Control+g");
+		await page.keyboard.press("ControlOrMeta+l");
 		await input.waitFor({ state: "visible" });
 	};
 	const close = async (key) => {
@@ -88,7 +88,7 @@ try {
 		await input.waitFor({ state: "hidden" });
 	};
 	const originals = await source();
-	// #1518's exact F1 -> edit/Undo -> other tab -> Ctrl+G/Escape sequence.
+	// #1518's exact F1 -> edit/Undo -> other tab -> Go to Line key/Escape sequence.
 	await page.evaluate(() => window.navigationWorkspace.active().focus());
 	await page.keyboard.press("F1");
 	await input.fill(">Go to Line");
@@ -116,7 +116,9 @@ try {
 	await input.fill(":2:1");
 	await close("Escape");
 	assert.deepEqual(await position(0), before);
-	console.log("PASS reported F1, edit/Undo, cross-tab Ctrl+G/Escape scenario");
+	console.log(
+		"PASS reported F1, edit/Undo, cross-tab Go to Line key/Escape scenario",
+	);
 	await page.evaluate(() =>
 		window.navigationWorkspace.editors()[0].setSelection({
 			startLineNumber: 1,
