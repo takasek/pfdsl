@@ -479,7 +479,7 @@ export function mountPreview(container: HTMLElement, host: PreviewHost) {
 			scale,
 			{ width: root.clientWidth, height: root.clientHeight },
 		));
-		isFit = false;
+		fittedHost = undefined;
 		applyTransform();
 	}
 
@@ -491,13 +491,9 @@ export function mountPreview(container: HTMLElement, host: PreviewHost) {
 	let startX = 0;
 	let startY = 0;
 	let hasPositioned = false;
-	let isFit = false;
-	// A host resize refits a Fit view; the refit waits while an error or a
-	// hidden tab leaves no graph area.
-	let refitPending = false;
-	// The host size while shown; a hidden host measures 0.
-	let shownWidth = container.clientWidth;
-	let shownHeight = container.clientHeight;
+	// The host size of the current Fit view; any other view clears it. While
+	// set, the view follows the host's size (a hidden host measures 0).
+	let fittedHost: { width: number; height: number } | undefined;
 	let graphRevision = -1;
 	let minimumScale = MIN_SCALE;
 
@@ -543,7 +539,7 @@ export function mountPreview(container: HTMLElement, host: PreviewHost) {
 		for (const node of nodes) {
 			if ((node as HTMLElement).dataset.nodeId === nodeId) {
 				const nodeRect = node.getBoundingClientRect();
-				if (isFit && nodeTextIsBelowMinimum(node)) {
+				if (fittedHost && nodeTextIsBelowMinimum(node)) {
 					const view = focusNodeView(
 						{ scale, panX, panY },
 						nodeRect,
@@ -551,7 +547,7 @@ export function mountPreview(container: HTMLElement, host: PreviewHost) {
 						{ width: root.clientWidth, height: root.clientHeight },
 					);
 					if (view) {
-						isFit = false;
+						fittedHost = undefined;
 						({ scale, panX, panY } = view);
 						minimumScale = Math.min(minimumScale, scale);
 						applyTransform();
@@ -574,7 +570,7 @@ export function mountPreview(container: HTMLElement, host: PreviewHost) {
 					root.getBoundingClientRect(),
 					{ width: root.clientWidth, height: root.clientHeight },
 				));
-				isFit = false;
+				fittedHost = undefined;
 				applyTransform();
 				if (cue) showCue(node);
 				return;
@@ -590,7 +586,10 @@ export function mountPreview(container: HTMLElement, host: PreviewHost) {
 		if (!view) return false;
 		({ scale, panX, panY } = view);
 		minimumScale = Math.min(MIN_SCALE, scale);
-		isFit = true;
+		fittedHost = {
+			width: container.clientWidth,
+			height: container.clientHeight,
+		};
 		applyTransform();
 		return true;
 	}
@@ -612,16 +611,17 @@ export function mountPreview(container: HTMLElement, host: PreviewHost) {
 	function positionGraph() {
 		if (disposed || graphRevision !== revision || !error.hidden) return;
 		if (root.clientWidth === 0 || root.clientHeight === 0) return;
-		if (!hasPositioned || (refitPending && isFit)) {
+		const hostWidth = container.clientWidth;
+		const hostHeight = container.clientHeight;
+		const hostResized =
+			fittedHost !== undefined &&
+			hostWidth > 0 &&
+			hostHeight > 0 &&
+			(hostWidth !== fittedHost.width || hostHeight !== fittedHost.height);
+		if (!hasPositioned || hostResized) {
 			if (!fitCurrentGraph()) return;
 			hasPositioned = true;
-			// The view now matches the host's current size.
-			if (container.clientWidth > 0 && container.clientHeight > 0) {
-				shownWidth = container.clientWidth;
-				shownHeight = container.clientHeight;
-			}
 		}
-		refitPending = false;
 		if (pendingFocusNodeId) {
 			selectedNodeId = editingData?.nodes.some(
 				(n) => n.id === pendingFocusNodeId,
@@ -640,25 +640,15 @@ export function mountPreview(container: HTMLElement, host: PreviewHost) {
 	let containerWidth = container.clientWidth;
 	let containerHeight = container.clientHeight;
 	// Panel content also resizes the graph; only a host resize dismisses menus
-	// and fits a Fit view again, so opening Connections leaves the view alone.
-	// A hidden host measures 0, which is a change of visibility, not of size:
-	// the refit compares the sizes the host had while shown.
+	// and, through positionGraph, fits a Fit view again.
 	function resizeHost() {
-		const width = container.clientWidth;
-		const height = container.clientHeight;
-		if (width !== containerWidth || height !== containerHeight) {
-			containerWidth = width;
-			containerHeight = height;
-			connections.resize();
-		}
 		if (
-			width > 0 &&
-			height > 0 &&
-			(width !== shownWidth || height !== shownHeight)
+			container.clientWidth !== containerWidth ||
+			container.clientHeight !== containerHeight
 		) {
-			refitPending = hasPositioned && shownWidth > 0 && shownHeight > 0;
-			shownWidth = width;
-			shownHeight = height;
+			containerWidth = container.clientWidth;
+			containerHeight = container.clientHeight;
+			connections.resize();
 		}
 		positionGraph();
 	}
@@ -674,12 +664,11 @@ export function mountPreview(container: HTMLElement, host: PreviewHost) {
 	});
 	on(fitButton, "click", () => {
 		pendingFocusNodeId = undefined;
-		isFit = true;
 		fitCurrentGraph();
 	});
 	on(actualSize, "click", () => {
 		pendingFocusNodeId = undefined;
-		isFit = false;
+		fittedHost = undefined;
 		scale = 1;
 		centerGraph();
 	});
@@ -695,14 +684,14 @@ export function mountPreview(container: HTMLElement, host: PreviewHost) {
 		);
 		if (!view) return;
 		pendingFocusNodeId = undefined;
-		isFit = false;
+		fittedHost = undefined;
 		({ scale, panX, panY } = view);
 		minimumScale = Math.min(minimumScale, scale);
 		applyTransform();
 		showCue(node);
 	});
 	function zoom(deltaY: number, x: number, y: number) {
-		isFit = false;
+		fittedHost = undefined;
 		({ scale, panX, panY } = zoomAt(
 			{ scale, panX, panY },
 			x,
@@ -773,7 +762,7 @@ export function mountPreview(container: HTMLElement, host: PreviewHost) {
 		if (!dragging) return;
 		// A press that has not moved yet is a click, not a pan.
 		if (e.clientX - startX === panX && e.clientY - startY === panY) return;
-		isFit = false;
+		fittedHost = undefined;
 		panX = e.clientX - startX;
 		panY = e.clientY - startY;
 		applyTransform();
@@ -845,7 +834,7 @@ export function mountPreview(container: HTMLElement, host: PreviewHost) {
 		}
 		scale = 1;
 		pendingFocusNodeId = undefined;
-		isFit = false;
+		fittedHost = undefined;
 		panX = 0;
 		panY = 0;
 		requestAnimationFrame(() => centerGraph());
