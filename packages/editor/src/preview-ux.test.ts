@@ -552,10 +552,14 @@ it("refits a Fit view only for host resizes across every short sequence of view 
 		},
 	);
 	cleanups.push(() => vi.unstubAllGlobals());
-	for (const sequence of unique) {
+	// The host may report its size before the first graph, or only after it.
+	for (const [sequence, reportedFirst] of unique.flatMap((q) => [
+		[q, true] as const,
+		[q, false] as const,
+	])) {
 		graph = { width: 1600, height: 800 };
 		const s = setup(graph.width, graph.height);
-		resized([], {} as ResizeObserver);
+		if (reportedFirst) resized([], {} as ResizeObserver);
 		await s.preview.receive({ type: "render", dot: "a" });
 		s.flush();
 		// The model: what the graph area is, and whether the view is still Fit.
@@ -567,7 +571,7 @@ it("refits a Fit view only for host resizes across every short sequence of view 
 		let hostChangedWhileFit = false;
 		let expected = s.inner.style.transform;
 		for (const step of sequence) {
-			const label = `${sequence.join(" > ")}: ${step}`;
+			const label = `${reportedFirst ? "" : "unreported mount: "}${sequence.join(" > ")}: ${step}`;
 			if (step === "hide" || step === "show") {
 				if (hidden === (step === "hide")) continue;
 				hidden = step === "hide";

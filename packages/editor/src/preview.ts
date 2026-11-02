@@ -495,6 +495,9 @@ export function mountPreview(container: HTMLElement, host: PreviewHost) {
 	// A host resize refits a Fit view; the refit waits while an error or a
 	// hidden tab leaves no graph area.
 	let refitPending = false;
+	// The host size while shown; a hidden host measures 0.
+	let shownWidth = container.clientWidth;
+	let shownHeight = container.clientHeight;
 	let graphRevision = -1;
 	let minimumScale = MIN_SCALE;
 
@@ -612,6 +615,11 @@ export function mountPreview(container: HTMLElement, host: PreviewHost) {
 		if (!hasPositioned || (refitPending && isFit)) {
 			if (!fitCurrentGraph()) return;
 			hasPositioned = true;
+			// The view now matches the host's current size.
+			if (container.clientWidth > 0 && container.clientHeight > 0) {
+				shownWidth = container.clientWidth;
+				shownHeight = container.clientHeight;
+			}
 		}
 		refitPending = false;
 		if (pendingFocusNodeId) {
@@ -631,8 +639,6 @@ export function mountPreview(container: HTMLElement, host: PreviewHost) {
 	}
 	let containerWidth = container.clientWidth;
 	let containerHeight = container.clientHeight;
-	let shownWidth = containerWidth;
-	let shownHeight = containerHeight;
 	// Panel content also resizes the graph; only a host resize dismisses menus
 	// and fits a Fit view again, so opening Connections leaves the view alone.
 	// A hidden host measures 0, which is a change of visibility, not of size:
