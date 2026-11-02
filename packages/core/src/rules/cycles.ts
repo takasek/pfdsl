@@ -32,7 +32,20 @@ export function primaryGraphCycle(ctx: RuleContext): Diagnostic[] {
 					severity: "error",
 					code: "V010",
 					message: `Primary graph contains a cycle involving '${id}' → '${neighbor}'`,
-					range: zeroRange(),
+					// The adjacency came from an input edge `id >> neighbor` or an
+					// output edge `id -> neighbor`; an ID whose declared kind
+					// conflicts with its use (N002) can be on either side.
+					range: ctx.edgeRange(
+						ctx.edges.find(
+							(e) =>
+								(e.kind === "input" &&
+									e.artifact === id &&
+									e.process === neighbor) ||
+								(e.kind === "output" &&
+									e.process === id &&
+									e.artifact === neighbor),
+						)!,
+					),
 				});
 			} else if (neighborColor !== "black") {
 				walk(neighbor);
@@ -85,7 +98,7 @@ export function strictFeedback(ctx: RuleContext): Diagnostic[] {
 				severity: "error",
 				code: "V011",
 				message: `Feedback artifact '${e.artifact}' is already an upstream ancestor of process '${e.process}' in the primary graph (reverse cycle)`,
-				range: zeroRange(),
+				range: ctx.edgeRange(e),
 			});
 		}
 	}
