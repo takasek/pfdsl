@@ -11,11 +11,14 @@ const previewControlsStyles = `
 #inner g.node:focus-visible { outline: 2px solid var(--pfdsl-focusBorder, #007fd4); }
 #inner g.node polygon, #inner g.node ellipse, #inner g.node path, #inner g.node rect, #inner g.node circle, #inner g.node polyline { pointer-events: all; }
 #preview-toolbar { flex-shrink: 0; display: flex; align-items: center; gap: 4px; flex-wrap: wrap; padding: 4px 8px; border-bottom: 1px solid var(--pfdsl-panel-border, #555); font: 12px var(--pfdsl-editor-font-family, sans-serif); }
+.preview-toolbar-group { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; }
+.preview-toolbar-group + .preview-toolbar-group { margin-left: 6px; padding-left: 10px; border-left: 1px solid var(--pfdsl-panel-border, #555); }
 #preview-toolbar button { color: inherit; background: transparent; border: 1px solid var(--pfdsl-panel-border, #555); border-radius: 3px; padding: 2px 6px; cursor: pointer; }
 #preview-toolbar button:disabled { opacity: 0.5; cursor: default; }
 #preview-toolbar button:focus-visible { outline: 2px solid var(--pfdsl-focusBorder, #007fd4); }
 #zoom-level { min-width: 4em; text-align: center; }
-#preview-help { padding: 6px 12px; flex-shrink: 0; max-height: 25%; overflow: auto; font: 12px var(--pfdsl-editor-font-family, sans-serif); }
+#preview-help { position: absolute; top: 8px; left: 8px; z-index: 60; width: min(320px, calc(100% - 16px)); max-height: calc(100% - 16px); box-sizing: border-box; padding: 6px 12px; overflow: auto; background: var(--pfdsl-editor-background, #fff); border: 1px solid var(--pfdsl-panel-border, #555); box-shadow: 0 2px 8px #0003; font: 12px var(--pfdsl-editor-font-family, sans-serif); }
+#preview-help[hidden] { display: none; }
 #preview-error { position: absolute; inset: 0; margin: 0; overflow: auto; overflow-wrap: anywhere; font-size: 13px; cursor: text; }
 #preview-error .error-repair { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 12px; white-space: normal; }
 #preview-error .error-repair button { color: var(--pfdsl-editor-foreground, #222); background: transparent; border: 1px solid var(--pfdsl-panel-border, #555); border-radius: 3px; padding: 2px 6px; cursor: pointer; font: inherit; }
@@ -24,17 +27,22 @@ const previewControlsStyles = `
 `;
 export const previewMarkup = `
 <div id="preview-toolbar" role="group" aria-label="Diagram view">
-  <button id="zoom-out" type="button" aria-label="Zoom out" disabled>−</button>
-  <output id="zoom-level" aria-label="Zoom level">100%</output>
-  <button id="zoom-in" type="button" aria-label="Zoom in" disabled>+</button>
-  <button id="fit-graph" type="button" disabled>Fit</button>
-  <button id="actual-size" type="button" disabled>Actual size</button>
-  <button id="focus-selected-node" type="button" title="Select a node, then center it at up to 100% to fit the view" disabled>Focus selected node</button>
-  <button id="node-actions-toggle" type="button" disabled aria-controls="node-actions" aria-expanded="false">Connections</button>
-  <button id="preview-help-toggle" type="button" aria-expanded="false" aria-controls="preview-help">Help</button>
+  <div class="preview-toolbar-group" role="group" aria-label="Zoom">
+    <button id="zoom-out" type="button" aria-label="Zoom out" disabled>−</button>
+    <output id="zoom-level" aria-label="Zoom level">100%</output>
+    <button id="zoom-in" type="button" aria-label="Zoom in" disabled>+</button>
+    <button id="fit-graph" type="button" disabled>Fit</button>
+    <button id="actual-size" type="button" disabled>Actual size</button>
+  </div>
+  <div class="preview-toolbar-group" role="group" aria-label="Selected node">
+    <button id="focus-selected-node" type="button" title="Select a node, then center it at up to 100% to fit the view" disabled>Focus selected node</button>
+    <button id="node-actions-toggle" type="button" disabled aria-controls="node-actions" aria-expanded="false">Connections</button>
+  </div>
+  <div class="preview-toolbar-group" role="group" aria-label="Help">
+    <button id="preview-help-toggle" type="button" aria-expanded="false" aria-controls="preview-help">Help</button>
+  </div>
 </div>
-<div id="preview-help" hidden>Wheel: zoom at the pointer. Drag: pan. Minimap: click or drag to move. Focus selected node: center the selected node at 100%, or smaller to fit the view; select a node first (groups are not supported). Click a node or focus it and press Enter: Connections. Right-click also opens Connections. Double-click a node or choose Go to definition in Connections: go to source. Double-click the background: actual size. Hover a node: read its information. Escape: close. <span data-related-files-help>Ctrl/⌘+Click: open a node's location or subflow.</span></div>
-<div id="root-wrap"><div id="root"><div id="inner"></div></div><div id="preview-error" class="err" role="alert" tabindex="0" hidden></div><div id="minimap"><div id="minimap-svg"></div><div id="minimap-vp"></div></div></div>
+<div id="root-wrap"><div id="root"><div id="inner"></div></div><div id="preview-help" hidden>Wheel: zoom at the pointer. Drag: pan. Minimap: click or drag to move. Focus selected node: center the selected node at 100%, or smaller to fit the view; select a node first (groups are not supported). Click a node or focus it and press Enter: Connections. Right-click also opens Connections. Double-click a node or choose Go to definition in Connections: go to source. Double-click the background: actual size. Hover a node: read its information. Escape: close. <span data-related-files-help>Ctrl/⌘+Click: open a node's location or subflow.</span></div><div id="preview-error" class="err" role="alert" tabindex="0" hidden></div><div id="minimap"><div id="minimap-svg"></div><div id="minimap-vp"></div></div></div>
 <div id="tooltip" role="region" tabindex="0" aria-label="Node information"></div>
 <section id="node-actions" aria-label="Connections" hidden>
   <div class="connections-heading"><strong id="node-actions-title"></strong><button id="create-definition" type="button">Create definition</button><button id="node-actions-close" type="button">Close</button></div>

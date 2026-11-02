@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { afterEach, expect, it, vi } from "vitest";
 import { mountPreview } from "./preview.js";
+import { previewStyles } from "./preview-shell.js";
 
 const cleanups: Array<() => void> = [];
 afterEach(() => {
@@ -57,6 +58,86 @@ function setup(width = 1600, height = 800, onStateChange = () => {}) {
 			container.querySelector<HTMLButtonElement>(`#${id}`)!.click(),
 	};
 }
+
+it("groups toolbar controls by zoom, selected node and help", () => {
+	const s = setup();
+	const toolbar = s.container.querySelector<HTMLElement>("#preview-toolbar")!;
+	const groups = Array.from(
+		toolbar.querySelectorAll<HTMLElement>(":scope > [role='group']"),
+	);
+	expect(toolbar.getAttribute("role")).toBe("group");
+	expect(toolbar.getAttribute("aria-label")).toBe("Diagram view");
+	expect(groups.map((group) => group.getAttribute("aria-label"))).toEqual([
+		"Zoom",
+		"Selected node",
+		"Help",
+	]);
+	expect(
+		groups.map((group) =>
+			Array.from(
+				group.querySelectorAll("button, output"),
+				(control) => control.id,
+			),
+		),
+	).toEqual([
+		["zoom-out", "zoom-level", "zoom-in", "fit-graph", "actual-size"],
+		["focus-selected-node", "node-actions-toggle"],
+		["preview-help-toggle"],
+	]);
+});
+
+it("overlays Help without taking diagram height", () => {
+	const s = setup();
+	const style = document.createElement("style");
+	style.textContent = previewStyles;
+	s.container.append(style);
+	const rootWrap = s.container.querySelector<HTMLElement>("#root-wrap")!;
+	const help = s.container.querySelector<HTMLElement>("#preview-help")!;
+	const toggle = s.container.querySelector<HTMLButtonElement>(
+		"#preview-help-toggle",
+	)!;
+	expect(help.parentElement).toBe(rootWrap);
+	expect(rootWrap.contains(s.root)).toBe(true);
+	expect(help.closest("#root")).toBeNull();
+	expect(window.getComputedStyle(rootWrap).position).toBe("relative");
+	expect(window.getComputedStyle(help).position).toBe("absolute");
+	expect(Number(window.getComputedStyle(help).zIndex)).toBeGreaterThan(50);
+
+	toggle.click();
+	expect(help.hidden).toBe(false);
+	expect(toggle.getAttribute("aria-expanded")).toBe("true");
+	help.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+	expect(help.hidden).toBe(false);
+	toggle.click();
+	expect(help.hidden).toBe(true);
+	expect(toggle.getAttribute("aria-expanded")).toBe("false");
+});
+
+it("closes Help and resets aria-expanded on Escape", () => {
+	const s = setup();
+	const help = s.container.querySelector<HTMLElement>("#preview-help")!;
+	const toggle = s.container.querySelector<HTMLButtonElement>(
+		"#preview-help-toggle",
+	)!;
+	toggle.click();
+	help.dispatchEvent(
+		new KeyboardEvent("keydown", { key: "Escape", bubbles: true }),
+	);
+	expect(help.hidden).toBe(true);
+	expect(toggle.getAttribute("aria-expanded")).toBe("false");
+});
+
+it("closes Help and resets aria-expanded on an outside click", () => {
+	const s = setup();
+	const help = s.container.querySelector<HTMLElement>("#preview-help")!;
+	const toggle = s.container.querySelector<HTMLButtonElement>(
+		"#preview-help-toggle",
+	)!;
+	toggle.click();
+	document.body.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+	expect(help.hidden).toBe(true);
+	expect(toggle.getAttribute("aria-expanded")).toBe("false");
+});
 
 it("fits a large first graph even when opening supplied a cursor focus hint", async () => {
 	const s = setup();
