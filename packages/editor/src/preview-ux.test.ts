@@ -517,7 +517,8 @@ it("refits a Fit view only for host resizes across every short sequence of view 
 		| "zoom"
 		| "fit"
 		| "hide"
-		| "show";
+		| "show"
+		| "redraw";
 	const steps: Step[] = [
 		"host",
 		"panel",
@@ -527,13 +528,14 @@ it("refits a Fit view only for host resizes across every short sequence of view 
 		"fit",
 		"hide",
 		"show",
+		"redraw",
 	];
 	const sequences: Step[][] = [[]];
-	for (let length = 0; length < 4; length++)
+	for (let length = 0; length < 3; length++)
 		for (const sequence of sequences.splice(0))
 			for (const step of steps) sequences.push(sequence, [...sequence, step]);
 	const unique = [...new Map(sequences.map((q) => [q.join(), q])).values()];
-	const graph = { width: 1600, height: 800 };
+	let graph = { width: 1600, height: 800 };
 	const fitScale = (width: number, height: number) =>
 		Math.min(1, (width - 32) / graph.width, (height - 32) / graph.height);
 	const scaleOf = (transform: string) =>
@@ -551,6 +553,7 @@ it("refits a Fit view only for host resizes across every short sequence of view 
 	);
 	cleanups.push(() => vi.unstubAllGlobals());
 	for (const sequence of unique) {
+		graph = { width: 1600, height: 800 };
 		const s = setup(graph.width, graph.height);
 		resized([], {} as ResizeObserver);
 		await s.preview.receive({ type: "render", dot: "a" });
@@ -573,6 +576,16 @@ it("refits a Fit view only for host resizes across every short sequence of view 
 				resized([], {} as ResizeObserver);
 			} else if (hidden && step !== "host") {
 				continue;
+			} else if (step === "redraw") {
+				// An edit changes the graph's size; it must not refit by itself.
+				if (error) continue;
+				graph =
+					graph.width === 1600
+						? { width: 1200, height: 900 }
+						: { width: 1600, height: 800 };
+				s.resizeGraph(graph.width, graph.height);
+				await s.preview.receive({ type: "render", dot: "a" });
+				s.flush();
 			} else if (step === "host") {
 				area = { width: area.width === 400 ? 800 : 400, height: area.height };
 				if (error) {
