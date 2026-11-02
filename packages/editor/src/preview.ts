@@ -492,6 +492,9 @@ export function mountPreview(container: HTMLElement, host: PreviewHost) {
 	let startY = 0;
 	let hasPositioned = false;
 	let isFit = false;
+	// A host resize refits a Fit view; the refit waits while an error or a
+	// hidden tab leaves no graph area.
+	let refitPending = false;
 	let graphRevision = -1;
 	let minimumScale = MIN_SCALE;
 
@@ -606,10 +609,11 @@ export function mountPreview(container: HTMLElement, host: PreviewHost) {
 	function positionGraph() {
 		if (disposed || graphRevision !== revision || !error.hidden) return;
 		if (root.clientWidth === 0 || root.clientHeight === 0) return;
-		if (!hasPositioned) {
+		if (!hasPositioned || (refitPending && isFit)) {
 			if (!fitCurrentGraph()) return;
 			hasPositioned = true;
 		}
+		refitPending = false;
 		if (pendingFocusNodeId) {
 			selectedNodeId = editingData?.nodes.some(
 				(n) => n.id === pendingFocusNodeId,
@@ -637,7 +641,7 @@ export function mountPreview(container: HTMLElement, host: PreviewHost) {
 			containerWidth = container.clientWidth;
 			containerHeight = container.clientHeight;
 			connections.resize();
-			if (hasPositioned && isFit) fitCurrentGraph();
+			refitPending = hasPositioned;
 		}
 		positionGraph();
 	}

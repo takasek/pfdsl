@@ -76,6 +76,11 @@ function setup(width = 1600, height = 800, onStateChange = () => {}) {
 			graphWidth = nextWidth;
 			graphHeight = nextHeight;
 		},
+		/** Only the host changes, as when it resizes while the graph area is hidden. */
+		setHost: (nextWidth: number, nextHeight: number) => {
+			hostWidth = nextWidth;
+			hostHeight = nextHeight;
+		},
 		hide: () => {
 			visible = false;
 		},
@@ -471,6 +476,36 @@ it("refits only Fit views on host resize and keeps Fit through panels and redraw
 			`manual gesture ${index} should clear Fit`,
 		).toBe(manualView);
 	}
+});
+
+it("fits a Fit view again after a host resize made while an error was shown", async () => {
+	let resized!: ResizeObserverCallback;
+	vi.stubGlobal(
+		"ResizeObserver",
+		class {
+			constructor(callback: ResizeObserverCallback) {
+				resized = callback;
+			}
+			observe() {}
+			disconnect() {}
+		},
+	);
+	cleanups.push(() => vi.unstubAllGlobals());
+	const s = setup();
+	s.resizeHost(800, 600);
+	resized([], {} as ResizeObserver);
+	await s.preview.receive({ type: "render", dot: "a" });
+	s.flush();
+	expect(s.container.querySelector("#zoom-level")!.textContent).toBe("48%");
+	await s.preview.receive({ type: "error", message: "P007: Invalid source" });
+	// The error hides the graph area, so the host resize cannot fit it yet.
+	s.resizeRoot(0, 0);
+	s.setHost(400, 360);
+	resized([], {} as ResizeObserver);
+	s.resizeRoot(400, 300);
+	await s.preview.receive({ type: "render", dot: "a" });
+	s.flush();
+	expect(s.container.querySelector("#zoom-level")!.textContent).toBe("23%");
 });
 
 it("keeps Fit after a press that does not move the graph", async () => {
