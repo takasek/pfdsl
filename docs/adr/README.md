@@ -47,19 +47,19 @@
 - **ADR-0013** [v0.0.8 依存順序](0013-v008-dependency-order.md) — integrate_multifile は i52 フィーチャードツールチェーン必須、draft_multifile_specs は並行着手可
 - **ADR-0014** [ゲート項目の反実仮想テスト](0014-gate-item-counterfactual-test.md) — 条件付きゲート項目は充足を反証可能テストで先判定しデフォルトを「書かない」に倒す、payoff は「PFD なしで判断が違ったか」を引用できる時のみ記録する
 - **ADR-0015** [samples は TSV 管理、examples は frontmatter 管理](0015-samples-tsv-examples-frontmatter.md) — 最小構文サンプルは TSV でメタデータ外部管理、realistic domain examples は frontmatter で管理する意図的非対称方針
-- **ADR-0016** [pfd-ops install/ 集約](0016-install-paradigm.md) — 配布可能ファイルを install/ に集約し CI で canonical と deployed の identity を強制する
+- **ADR-0016** [pfd-ops 配布ファイルの `install/` への集約](0016-install-paradigm.md) — リポルートの正本を配布対象一覧に登録し、`make gen-install` で相対パスを保った `install/` を生成する。CI は正本との一致を検査する。
 - **ADR-0017** [PFDファイル種別の3分類](0017-pfd-kind-taxonomy.md) — roadmap / workflow / pipeline を「答える問い」で区別し ecosystem 種別を廃止する
 - **ADR-0018** [成果物の門番は双方向](0018-successor-gatekeeper.md) — 手段成果物（仕様・設計・計画・提案）は終端たりえず、出力時点で消費する後続をプレースホルダ登録する
 - **ADR-0019** [tags はノード横断ラベル + `tag:` 定義ブロック](0019-process-tags.md) — subroutine 却下の代替。tags を Artifact / Process 両種別の横断ラベルとし、`label` / `description` / `style` を持つ `tag:` 定義ブロックを新設（`tagStyles` 廃止・統合、status は Artifact 専用据え置き）
 - **ADR-0020** [仕様制約は具体例トレースで実装前に検証する](0020-spec-constraint-stress-testing.md) — 散文は未定義動作を隠す。境界カテゴリ（粒度・名前・N:M・循環・diamond・部分マップ）の具体例を normative 制約にトレースして判定まで詰め、未定義を spec 決定で潰す。worked example は [サブディレクトリ](0020-spec-stress-testing/boundary-validation-log.md)に保存
 - **ADR-0021** [外部ツール専用フィールドは spec に入れない](0021-no-external-only-spec-fields.md) — 値の意味づけが完全に外部ツール依存で pfdsl 単体（グラフ意味論 / 可視化 / `check`）に寄与しないフィールドは不採用。`schedule:`（#220）を not planned とし `index:`（#221）は単体価値ありとして維持
-- **ADR-0022** [ファイル書き換え CLI は gofmt 出力モデル](0022-cli-mutation-output-model.md) — ファイルを変える CLI は既定で本体を stdout、`--write` でインプレース＋レポートを stdout、`--check` で CI ドリフト検出、stderr は診断専用。副作用と stdout の中身を分離する
+- **ADR-0022** [ファイル全体を変換する CLI の出力モデル](0022-cli-mutation-output-model.md) — `fmt` や `meta reindex` は既定で変換結果を標準出力に出し、`--write` でファイルを更新する。[ADR-0030](0030-cli-command-taxonomy.md#rationale) の `meta set` は `--write` なしで指定フィールドを書き換える。
 - **ADR-0023** [L4 companion から配布層への昇格経路](0023-l4-promotion-route.md) — companion は配布されないため汎用知見が滞留する。固有名詞を含まないルールを昇格候補として検出する「L4 滞留監査」を retro D 層に追加する
 - **ADR-0024** [retro 実行記録と差分計測可能な起動条件](0024-retro-execution-record.md)（Superseded by ADR-0026） — 「たまったら」は基準点なしで判定不能。retro 実行記録を workflow companion に残し、起動条件を前回以降の差分計測形に書き換える
 - **ADR-0025** [レビューカタログは抽象レンズを配布、具体例は repo-local instance](0025-review-catalog-lens-example-split.md) — 「各問いは実際に検出された誤りに由来する」具体例は本質的に repo-local。配布層は A/B/C の観点の枠組みのみ、pfdsl 固有の例示・機構は専用 instance ファイルへ降格する ADR-0023 の鏡像
 - **ADR-0026** [retro トリガーを done イベント駆動に一本化し実行記録を廃止](0026-retro-trigger-done-event.md) — 実行記録は並列 worktree でコンフリクトする上、閾値条件は導入以来一度も単独発火していない。基準点は既存の done イベント（プロトコル4）に一本化し、記録機構ごと廃止する
 - **ADR-0027** [仕様相互参照を安定 ID アンカーに移行する](0027-spec-id-cross-references.md) — 節番号直書きは挿入・並べ替えで崩れる。`[[SPEC_xxx]]` / `[[SPEC_xxx?]]` / `(SPEC_xxx)` の bracket 構文を正式採用し、不透明・永続・欠番許容の ID として renumber 機能なしで運用する
-- **ADR-0028** [pfd-ops の plugin 配布移行と skill sync の廃止](0028-plugin-first-pfd-ops-distribution.md) — pfd-ops を plugin に同梱し `install/` 実配置を `/pfd-init` に統合、`pfdsl skill sync` を削除。採用リポの drift 検知は CI 強制からランタイム hash 照合（pfd-ops 発火時）へ移行、ADR-0016 はリポ内運用として存続
+- **ADR-0028** [pfd-ops の plugin 配布移行と skill sync の廃止](0028-plugin-first-pfd-ops-distribution.md) — pfd-ops を plugin に同梱し `install/` 実配置を `/pfd-init` に統合、`pfdsl skill sync` を削除。採用リポの drift 検知は CI 強制からランタイム hash 照合（pfd-ops 発火時）へ移行、ADR-0016 の相対パスを保つ配置とリポ内の一致検査は存続
 - **ADR-0029** [配布層の欠陥は使い捨て環境での採用初日再現で検出する](0029-adoption-day-probe.md) — ADR-0020（DSL 仕様 stress-test）の配布層版。使い捨て環境で plugin install → `/pfd-init` を実際に辿り、同梱物妥当性・ガイダンス実行可能性・agent 到達性・冪等性の4観点を検証する。初回実施で配布バグ1件（#417）を検出
 - **ADR-0030** [CLIコマンド体系を操作対象の種類で分類する](0030-cli-command-taxonomy.md) — フラットな17コマンドを `graph`（位相への読み取り専用問い合わせ）/ `meta`（field-aware な frontmatter 読み書き）/ `status`（status 由来の計画クエリ）の3グループとトップレベル動詞に再編。エイリアスなし一括切替、旧名は exit 2
 - **ADR-0031** [配布スキルの CLI 呼び出しを素の `pfdsl` に統一する](0031-skill-cli-global-invocation.md) — スキル/エージェント本文の `npx @pfdsl/cli`（約48箇所）を素の `pfdsl` に統一。#67 の npx 化は #524 の preflight 導入で前提が変わり、npx の恒常コスト（約 +0.45s/回）だけが残っていた。版固定 npx を fallback として残置。issue #67 を改訂

@@ -1,6 +1,6 @@
 # ADR-0022: ファイルを書き換える CLI コマンドは gofmt 出力モデルに従う
 
-- Status: Accepted
+- Status: Accepted（既定で標準出力にプレビューを出す規約は `fmt` や `meta reindex` のようなファイル全体の変換に適用する。`meta set` は指定フィールドを `--write` なしで直接書き換える。[ADR-0030「Rationale」第4項](0030-cli-command-taxonomy.md#rationale)）
 - Date: 2026-06-27
 
 ## Context

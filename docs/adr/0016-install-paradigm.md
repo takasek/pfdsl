@@ -1,6 +1,6 @@
 # ADR-0016: pfd-ops 配布可能ファイルの install/ 集約
 
-- Status: Accepted（採用リポへの配布経路は ADR-0028 が改訂。配布物のディレクトリ構造は ADR-0032 がさらに改訂。リポ内運用は存続）
+- Status: Accepted（相対パスを保つ配置と CI の一致検査は存続。現在はリポルートのファイルが正本で、新しい配布対象を一覧に登録し、`make gen-install` で `install/` を生成する。採用リポへの配布経路は [ADR-0028](0028-plugin-first-pfd-ops-distribution.md)、配布先のディレクトリ構造は [ADR-0032](0032-pfd-ops-install-dedicated-dir.md) が改訂）
 - Date: 2026-06-15
 
 ## Context
@@ -33,5 +33,5 @@ CI ワークフロー（`check-pfd-ops-sync.yml`）が canonical（`install/X`�
 
 - PR #56（install/ 集約の実装）
 - PR #62（adopt 手順の `cp -r` 1コマンド化）
-- `.claude/skills/pfd-ops/install/` — canonical ファイル群
+- [一方向の生成に切り替えた変更](https://github.com/takasek/pfdsl/commit/e6265bb7de5b41df779542f6ff68546aee3f1c52)、[現在の配布対象一覧](../../scripts/lib/install-templates.mjs)
 - `.github/workflows/check-pfd-ops-sync.yml` — drift 検出 CI
