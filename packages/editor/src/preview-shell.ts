@@ -60,8 +60,10 @@ const connectionsStyles = `
 .connections-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(48px, 20%) minmax(0, 1fr); min-height: 0; }
 .connections-side { display: flex; flex-direction: column; min-width: 0; min-height: 0; position: relative; }
 .connections-list { overflow-y: auto; scrollbar-gutter: stable; padding-inline: 14px; min-height: 30px; max-height: 180px; flex: 1; }
-.connection-row, .connections-input { display: grid; grid-template-columns: minmax(0, 1fr) 32px; gap: 0; align-items: center; border: 1px solid var(--pfdsl-panel-border, #777); margin: 4px 0; }
-[data-side="right"] .connection-row, [data-side="right"] .connections-input { grid-template-columns: 32px minmax(0, 1fr); }
+.connection-row { display: flex; align-items: center; margin: 4px 0; }
+.connection-row > [data-neighbor] { flex: 1 1 auto; min-width: 0; }
+.connections-input { display: grid; grid-template-columns: minmax(0, 1fr) 32px; gap: 0; align-items: center; border: 1px solid var(--pfdsl-panel-border, #777); margin: 4px 0; }
+[data-side="right"] .connections-input { grid-template-columns: 32px minmax(0, 1fr); }
 .connections-input { flex-shrink: 0; margin-inline: 14px; }
 .connections-center { align-self: center; text-align: center; overflow-wrap: anywhere; padding: 4px; }
 .connections-identity { align-self: center; min-width: 0; text-align: center; }
@@ -74,6 +76,7 @@ const connectionsStyles = `
 #node-actions textarea { resize: vertical; }
 #node-actions .connection-row button, #node-actions .connections-input > * { border: 0; margin: 0; background: transparent; padding: 4px; }
 #node-actions [data-edge], #node-actions [data-create] { padding: 6px; min-height: 28px; }
+#node-actions .connection-row > [data-edge] { flex: 0 1000 32px; min-width: 16px; padding-inline: 2px; }
 .connection-node { display: inline-block; border: 1px solid currentColor; border-radius: 0; padding: 3px 6px; overflow-wrap: anywhere; max-width: 100%; box-sizing: border-box; }
 .connection-node[data-kind="process"] { border-radius: 999px; }
 #node-actions [data-edge]::before { content: ''; display: block; border-top: 2px solid currentColor; width: 100%; }

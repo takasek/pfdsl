@@ -953,7 +953,7 @@ it("treats blank labels as absent in center, neighbor and candidate names", asyn
 	);
 });
 
-it("uses kind outlines, distinct connection strokes, shared borders and scroll padding", async () => {
+it("uses kind outlines, distinct connection strokes, a single node frame, a shrinking arrow and scroll padding", async () => {
 	const s = await setup("a >> p\nb >>? p\n");
 	const style = document.createElement("style");
 	// JSDOM cannot resolve CSS variables; use the stylesheet's theme fallbacks.
@@ -966,9 +966,17 @@ it("uses kind outlines, distinct connection strokes, shared borders and scroll p
 		window.getComputedStyle(s.container.querySelector(selector)!);
 	expect(css(".connections-center").borderRadius).toBe("999px");
 	expect(css('[data-neighbor="a"] .connection-node').borderRadius).toBe("0");
-	expect(css(".connection-row").borderTopWidth).toBe("1px");
+	// A row's node draws its own outline, so the row adds no second frame.
+	expect(css(".connection-row").borderTopStyle).not.toBe("solid");
 	expect(css(".connections-input").borderTopWidth).toBe("1px");
 	expect(css("[data-edge]").borderTopWidth).toBe("0px");
+	// The arrow gives up width before the node text wraps, down to its head.
+	expect(css(".connection-row").display).toBe("flex");
+	expect(css("[data-edge]").flexBasis).toBe("32px");
+	expect(css("[data-edge]").minWidth).toBe("16px");
+	expect(Number(css("[data-edge]").flexShrink)).toBeGreaterThan(
+		Number(css("[data-neighbor]").flexShrink) * 100,
+	);
 	for (const selector of [
 		".connections-list",
 		".connection-candidates",
