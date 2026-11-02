@@ -22,6 +22,63 @@ export interface RectLike {
 	height: number;
 }
 
+/** Apple HIG's 10 pt macOS minimum text size, taken as 10 CSS px: https://developer.apple.com/design/human-interface-guidelines/typography */
+export const MINIMUM_READABLE_FONT_SIZE_PX = 10;
+
+/** On-screen text size for an SVG font size; undefined when the measurements cannot be used. */
+export function screenFontSize(
+	fontSize: number,
+	svgWidth: number,
+	viewBoxWidth: number,
+	scale: number,
+): number | undefined {
+	if (
+		![fontSize, svgWidth, viewBoxWidth, scale].every(Number.isFinite) ||
+		fontSize < 0 ||
+		svgWidth <= 0 ||
+		viewBoxWidth <= 0 ||
+		scale <= 0
+	)
+		return undefined;
+	const size = (fontSize * svgWidth * scale) / viewBoxWidth;
+	return Number.isFinite(size) ? size : undefined;
+}
+
+/** An unknown size counts as readable, so the view is not moved on a guess. */
+export function fontSizeBelowMinimum(size: number | undefined): boolean {
+	return size !== undefined && size < MINIMUM_READABLE_FONT_SIZE_PX;
+}
+
+/** Whether the whole graph lies inside the viewport; both rects come from getBoundingClientRect. */
+export function graphFitsViewport(
+	graph: RectLike,
+	viewport: RectLike,
+): boolean {
+	if (
+		![
+			graph.left,
+			graph.top,
+			graph.width,
+			graph.height,
+			viewport.left,
+			viewport.top,
+			viewport.width,
+			viewport.height,
+		].every(Number.isFinite) ||
+		graph.width < 0 ||
+		graph.height < 0 ||
+		viewport.width <= 0 ||
+		viewport.height <= 0
+	)
+		return false;
+	return (
+		graph.left >= viewport.left &&
+		graph.top >= viewport.top &&
+		graph.left + graph.width <= viewport.left + viewport.width &&
+		graph.top + graph.height <= viewport.top + viewport.height
+	);
+}
+
 /** Bounds on zoom: below the floor a graph is unreadable, above the ceiling it is unusable. */
 export const MIN_SCALE = 0.05;
 export const MAX_SCALE = 10;
