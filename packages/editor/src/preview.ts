@@ -9,12 +9,15 @@ import {
 	centerPan,
 	fitGraph,
 	focusNodeView,
+	fontSizeBelowMinimum,
+	graphFitsViewport,
 	MAX_SCALE,
 	MIN_SCALE,
 	minimapScale,
 	minimapViewport,
 	panFromMinimapPoint,
 	panToCenterNode,
+	screenFontSize,
 	shouldReleaseDrag,
 	zoomAt,
 } from "./webview-logic.js";
@@ -476,6 +479,7 @@ export function mountPreview(container: HTMLElement, host: PreviewHost) {
 			scale,
 			{ width: root.clientWidth, height: root.clientHeight },
 		));
+		isFit = false;
 		applyTransform();
 	}
 
@@ -487,6 +491,7 @@ export function mountPreview(container: HTMLElement, host: PreviewHost) {
 	let startX = 0;
 	let startY = 0;
 	let hasPositioned = false;
+	let isFit = false;
 	let graphRevision = -1;
 	let minimumScale = MIN_SCALE;
 
@@ -531,12 +536,39 @@ export function mountPreview(container: HTMLElement, host: PreviewHost) {
 		const nodes = inner.querySelectorAll("g.node");
 		for (const node of nodes) {
 			if ((node as HTMLElement).dataset.nodeId === nodeId) {
+				const nodeRect = node.getBoundingClientRect();
+				if (isFit && nodeTextIsBelowMinimum(node)) {
+					const view = focusNodeView(
+						{ scale, panX, panY },
+						nodeRect,
+						root.getBoundingClientRect(),
+						{ width: root.clientWidth, height: root.clientHeight },
+					);
+					if (view) {
+						isFit = false;
+						({ scale, panX, panY } = view);
+						minimumScale = Math.min(minimumScale, scale);
+						applyTransform();
+						if (cue) showCue(node);
+						return;
+					}
+				}
+				if (
+					graphFitsViewport(
+						inner.getBoundingClientRect(),
+						root.getBoundingClientRect(),
+					)
+				) {
+					if (cue) showCue(node);
+					return;
+				}
 				({ panX, panY } = panToCenterNode(
 					{ scale, panX, panY },
-					node.getBoundingClientRect(),
+					nodeRect,
 					root.getBoundingClientRect(),
 					{ width: root.clientWidth, height: root.clientHeight },
 				));
+				isFit = false;
 				applyTransform();
 				if (cue) showCue(node);
 				return;
@@ -552,8 +584,23 @@ export function mountPreview(container: HTMLElement, host: PreviewHost) {
 		if (!view) return false;
 		({ scale, panX, panY } = view);
 		minimumScale = Math.min(MIN_SCALE, scale);
+		isFit = true;
 		applyTransform();
 		return true;
+	}
+
+	function nodeTextIsBelowMinimum(node: Element): boolean {
+		const fontSize = node.querySelector("text")?.getAttribute("font-size");
+		const viewBox = inner.querySelector("svg")?.getAttribute("viewBox");
+		if (!fontSize?.trim() || !viewBox) return false;
+		const values = viewBox
+			.trim()
+			.split(/[\s,]+/)
+			.map(Number);
+		if (values.length !== 4) return false;
+		return fontSizeBelowMinimum(
+			screenFontSize(Number(fontSize), inner.offsetWidth, values[2]!, scale),
+		);
 	}
 
 	function positionGraph() {
@@ -578,6 +625,17 @@ export function mountPreview(container: HTMLElement, host: PreviewHost) {
 		else refreshMinimap();
 		updateControls();
 	}
+	let rootWidth = root.clientWidth;
+	let rootHeight = root.clientHeight;
+	function resizeGraphViewport() {
+		const width = root.clientWidth;
+		const height = root.clientHeight;
+		const resized = width !== rootWidth || height !== rootHeight;
+		rootWidth = width;
+		rootHeight = height;
+		if (resized && hasPositioned && isFit) fitCurrentGraph();
+		positionGraph();
+	}
 	let containerWidth = container.clientWidth;
 	let containerHeight = container.clientHeight;
 	const resizeObserver =
@@ -592,21 +650,23 @@ export function mountPreview(container: HTMLElement, host: PreviewHost) {
 						containerHeight = container.clientHeight;
 						connections.resize();
 					}
-					positionGraph();
+					resizeGraphViewport();
 				})
 			: undefined;
 	resizeObserver?.observe(root);
 	resizeObserver?.observe(container);
 	on(window, "resize", () => {
 		connections.resize();
-		positionGraph();
+		resizeGraphViewport();
 	});
 	on(fitButton, "click", () => {
 		pendingFocusNodeId = undefined;
+		isFit = true;
 		fitCurrentGraph();
 	});
 	on(actualSize, "click", () => {
 		pendingFocusNodeId = undefined;
+		isFit = false;
 		scale = 1;
 		centerGraph();
 	});
@@ -622,12 +682,14 @@ export function mountPreview(container: HTMLElement, host: PreviewHost) {
 		);
 		if (!view) return;
 		pendingFocusNodeId = undefined;
+		isFit = false;
 		({ scale, panX, panY } = view);
 		minimumScale = Math.min(minimumScale, scale);
 		applyTransform();
 		showCue(node);
 	});
 	function zoom(deltaY: number, x: number, y: number) {
+		isFit = false;
 		({ scale, panX, panY } = zoomAt(
 			{ scale, panX, panY },
 			x,
@@ -696,6 +758,7 @@ export function mountPreview(container: HTMLElement, host: PreviewHost) {
 			return;
 		}
 		if (!dragging) return;
+		isFit = false;
 		panX = e.clientX - startX;
 		panY = e.clientY - startY;
 		applyTransform();
@@ -767,6 +830,7 @@ export function mountPreview(container: HTMLElement, host: PreviewHost) {
 		}
 		scale = 1;
 		pendingFocusNodeId = undefined;
+		isFit = false;
 		panX = 0;
 		panY = 0;
 		requestAnimationFrame(() => centerGraph());

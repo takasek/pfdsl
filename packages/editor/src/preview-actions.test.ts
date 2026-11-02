@@ -12,7 +12,23 @@ afterEach(() => {
 	vi.restoreAllMocks();
 });
 const svg =
-	'<svg width="200" height="100"><g class="node"><title>a</title><polygon points="0,0 40,0 40,30"/><text>A</text></g><g class="node"><title>p</title><text>P</text></g></svg>';
+	'<svg width="200" height="100" viewBox="0 0 200 100"><g class="node"><title>a</title><polygon points="0,0 40,0 40,30"/><text font-size="14">A</text></g><g class="node"><title>p</title><text font-size="14">P</text></g></svg>';
+
+it("focuses a Connections navigation target when Fit made its text unreadable", async () => {
+	const renderDot = vi.fn(async (_dot: string) =>
+		svg.replace('viewBox="0 0 200 100"', 'viewBox="0 0 4000 1000"'),
+	);
+	const s = setup(renderDot, { width: 4000, height: 1000 });
+	await s.preview.receive(s.message);
+	expect(s.container.querySelector("#zoom-level")!.textContent).toBe("9.2%");
+	vi.spyOn(s.node("p"), "getBoundingClientRect").mockReturnValue(
+		new DOMRect(80, 70, 40 * 0.092, 20 * 0.092),
+	);
+	s.node("a").dispatchEvent(new MouseEvent("contextmenu", { bubbles: true }));
+	s.container.querySelector<HTMLButtonElement>('[data-neighbor="p"]')!.click();
+	expect(s.container.querySelector("#zoom-level")!.textContent).toBe("100%");
+	expect(s.node("p").classList.contains("pfdsl-focus-cue")).toBe(true);
+});
 
 it("makes unpainted node shapes hit targets only in the main graph", async () => {
 	const shapes =

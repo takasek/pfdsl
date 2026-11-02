@@ -17,23 +17,30 @@ function setup(width = 1600, height = 800, onStateChange = () => {}) {
 	const container = document.createElement("div");
 	document.body.append(container);
 	let visible = true;
+	let rootWidth = 400;
+	let rootHeight = 300;
+	let graphWidth = width;
+	let graphHeight = height;
 	const preview = mountPreview(container, {
 		postMessage() {},
 		onStateChange,
 		renderDot: async (dot) => {
 			if (dot === "reject") throw new Error("Graphviz <failure>\n".repeat(30));
-			return `<svg width="${width}" height="${height}"><g class="node"><title>${dot}</title></g></svg>`;
+			return `<svg width="${graphWidth}" height="${graphHeight}" viewBox="0 0 ${graphWidth} ${graphHeight}"><g class="node"><title>${dot}</title><text font-size="14">${dot}</text></g></svg>`;
 		},
 	});
 	const root = container.querySelector<HTMLElement>("#root")!;
 	const inner = container.querySelector<HTMLElement>("#inner")!;
 	Object.defineProperties(root, {
-		clientWidth: { get: () => (visible ? 400 : 0) },
-		clientHeight: { get: () => (visible ? 300 : 0) },
+		clientWidth: { get: () => (visible ? rootWidth : 0) },
+		clientHeight: { get: () => (visible ? rootHeight : 0) },
 	});
+	vi.spyOn(root, "getBoundingClientRect").mockImplementation(
+		() => new DOMRect(0, 0, visible ? rootWidth : 0, visible ? rootHeight : 0),
+	);
 	Object.defineProperties(inner, {
-		offsetWidth: { value: width },
-		offsetHeight: { value: height },
+		offsetWidth: { get: () => graphWidth },
+		offsetHeight: { get: () => graphHeight },
 	});
 	cleanups.push(() => {
 		preview.dispose();
@@ -46,6 +53,14 @@ function setup(width = 1600, height = 800, onStateChange = () => {}) {
 		inner,
 		show: () => {
 			visible = true;
+		},
+		resizeRoot: (nextWidth: number, nextHeight = rootHeight) => {
+			rootWidth = nextWidth;
+			rootHeight = nextHeight;
+		},
+		resizeGraph: (nextWidth: number, nextHeight: number) => {
+			graphWidth = nextWidth;
+			graphHeight = nextHeight;
 		},
 		hide: () => {
 			visible = false;
@@ -64,6 +79,63 @@ it("fits a large first graph even when opening supplied a cursor focus hint", as
 	s.flush();
 	expect(s.inner.style.transform).toBe("translate(16px, 58px) scale(0.23)");
 	expect(s.container.querySelector("#zoom-level")!.textContent).toBe("23%");
+});
+
+it("raises a fitted unreadable selection to the same view as Focus selected node", async () => {
+	const s = setup();
+	await s.preview.receive({ type: "render", dot: "a" });
+	s.flush();
+	const node = s.inner.querySelector<HTMLElement>("g.node")!;
+	vi.spyOn(node, "getBoundingClientRect").mockReturnValue(
+		new DOMRect(170, 120, 23, 11.5),
+	);
+	expect(s.container.querySelector("#zoom-level")!.textContent).toBe("23%");
+	await s.preview.receive({ type: "focus", nodeId: "a" });
+	expect(s.container.querySelector("#zoom-level")!.textContent).toBe("100%");
+	expect(node.classList.contains("pfdsl-focus-cue")).toBe(true);
+
+	const manual = setup();
+	await manual.preview.receive({ type: "render", dot: "a" });
+	manual.flush();
+	manual.root.dispatchEvent(
+		new WheelEvent("wheel", {
+			deltaY: -1,
+			clientX: 100,
+			clientY: 100,
+			cancelable: true,
+		}),
+	);
+	const manualView = manual.inner.style.transform;
+	const manualNode = manual.inner.querySelector<HTMLElement>("g.node")!;
+	vi.spyOn(manual.inner, "getBoundingClientRect").mockReturnValue(
+		new DOMRect(-100, -80, 404, 202),
+	);
+	vi.spyOn(manualNode, "getBoundingClientRect").mockReturnValue(
+		new DOMRect(40, 50, 10, 8),
+	);
+	await manual.preview.receive({ type: "focus", nodeId: "a" });
+	expect(manual.container.querySelector("#zoom-level")!.textContent).toBe(
+		"25.3%",
+	);
+	expect(manual.inner.style.transform).not.toBe(manualView);
+	expect(manualNode.classList.contains("pfdsl-focus-cue")).toBe(true);
+});
+
+it("keeps a readable graph stationary while it remains fully visible", async () => {
+	const s = setup(200, 100);
+	await s.preview.receive({ type: "render", dot: "a" });
+	s.flush();
+	const node = s.inner.querySelector<HTMLElement>("g.node")!;
+	vi.spyOn(s.inner, "getBoundingClientRect").mockReturnValue(
+		new DOMRect(100, 100, 200, 100),
+	);
+	vi.spyOn(node, "getBoundingClientRect").mockReturnValue(
+		new DOMRect(140, 130, 40, 20),
+	);
+	const fittedView = s.inner.style.transform;
+	await s.preview.receive({ type: "focus", nodeId: "a" });
+	expect(s.inner.style.transform).toBe(fittedView);
+	expect(node.classList.contains("pfdsl-focus-cue")).toBe(true);
 });
 
 it("offers Fit and 100%, preserving manual view through redraw and error recovery", async () => {
@@ -256,6 +328,127 @@ it("fits when a hidden preview becomes visible without another render, then keep
 	expect(s.inner.style.transform).toBe(view);
 	s.preview.dispose();
 	expect(disconnect).toHaveBeenCalled();
+});
+
+it("refits only Fit views on root resize and keeps Fit through redraws", async () => {
+	let resized!: ResizeObserverCallback;
+	vi.stubGlobal(
+		"ResizeObserver",
+		class {
+			constructor(callback: ResizeObserverCallback) {
+				resized = callback;
+			}
+			observe() {}
+			disconnect() {}
+		},
+	);
+	cleanups.push(() => vi.unstubAllGlobals());
+	const s = setup();
+	const editing = {
+		source: "a\n",
+		nodes: [{ id: "a", kind: "artifact" as const, defined: false }],
+	};
+	await s.preview.receive({ type: "render", dot: "a", editing });
+	s.flush();
+	expect(s.container.querySelector("#zoom-level")!.textContent).toBe("23%");
+	s.resizeRoot(800, 600);
+	resized([], {} as ResizeObserver);
+	expect(s.container.querySelector("#zoom-level")!.textContent).toBe("48%");
+	s.resizeGraph(800, 400);
+	await s.preview.receive({ type: "render", dot: "a", editing });
+	s.flush();
+	expect(s.container.querySelector("#zoom-level")!.textContent).toBe("48%");
+	s.resizeRoot(900, 600);
+	window.dispatchEvent(new Event("resize"));
+	expect(s.container.querySelector("#zoom-level")!.textContent).toBe("100%");
+	s.resizeGraph(2000, 500);
+	await s.preview.receive({ type: "render", dot: "a", editing });
+	s.flush();
+	s.click("fit-graph");
+	const node = s.inner.querySelector<HTMLElement>("g.node")!;
+	vi.spyOn(node, "getBoundingClientRect").mockReturnValue(
+		new DOMRect(100, 100, 40, 20),
+	);
+	const manualGestures = [
+		() =>
+			s.root.dispatchEvent(
+				new WheelEvent("wheel", { deltaY: -1, cancelable: true }),
+			),
+		() => s.click("zoom-in"),
+		() => {
+			s.root.dispatchEvent(
+				new MouseEvent("mousedown", { button: 0, clientX: 10, clientY: 10 }),
+			);
+			window.dispatchEvent(
+				new MouseEvent("mousemove", {
+					buttons: 1,
+					clientX: 30,
+					clientY: 30,
+				}),
+			);
+			window.dispatchEvent(new MouseEvent("mouseup", { button: 0 }));
+		},
+		() => {
+			const minimap = s.container.querySelector<HTMLElement>("#minimap")!;
+			minimap.dispatchEvent(
+				new MouseEvent("mousedown", {
+					bubbles: true,
+					button: 0,
+					clientX: 20,
+					clientY: 20,
+				}),
+			);
+			window.dispatchEvent(new MouseEvent("mouseup", { button: 0 }));
+		},
+		() => {
+			const minimap = s.container.querySelector<HTMLElement>("#minimap")!;
+			minimap.dispatchEvent(
+				new MouseEvent("mousedown", {
+					bubbles: true,
+					button: 0,
+					clientX: 20,
+					clientY: 20,
+				}),
+			);
+			window.dispatchEvent(
+				new MouseEvent("mousemove", {
+					buttons: 1,
+					clientX: 30,
+					clientY: 30,
+				}),
+			);
+			window.dispatchEvent(new MouseEvent("mouseup", { button: 0 }));
+		},
+		() => s.click("actual-size"),
+		() => {
+			s.root.dispatchEvent(new MouseEvent("dblclick", { bubbles: true }));
+			s.flush();
+		},
+		() => {
+			node.dispatchEvent(new MouseEvent("contextmenu", { bubbles: true }));
+			expect(
+				s.container.querySelector<HTMLButtonElement>("#focus-selected-node")!
+					.disabled,
+			).toBe(false);
+			s.click("focus-selected-node");
+		},
+	];
+	for (const [index, applyManualGesture] of manualGestures.entries()) {
+		if (index > 0) s.click("fit-graph");
+		const fitView = s.inner.style.transform;
+		applyManualGesture();
+		const manualView = s.inner.style.transform;
+		expect(
+			manualView,
+			`manual gesture ${index} should change the view`,
+		).not.toBe(fitView);
+		s.resizeRoot(s.root.clientWidth + 100, 600);
+		resized([], {} as ResizeObserver);
+		expect(
+			s.inner.style.transform,
+			`manual gesture ${index} should clear Fit`,
+		).toBe(manualView);
+	}
 });
 
 it("fits a graph larger than the wheel zoom floor without cropping", async () => {
