@@ -2,6 +2,7 @@ import { analyze, analyzeSource, type NodeKind } from "@pfdsl/core";
 import { describe, expect, it } from "vitest";
 import {
 	findDefinitionEditTarget,
+	findNearDefinedNodeIds,
 	findUndefinedNodeKind,
 } from "./def-insertion-logic.js";
 
@@ -11,6 +12,12 @@ function analyzeFor(src: string): {
 } {
 	const { nodeKinds, frontmatter } = analyze(src);
 	return { nodeKinds, frontmatter };
+}
+
+function frontmatterWith(kind: "artifact" | "process", ids: string[]) {
+	const definitions = ids.map((id) => `${id}: {label: ${id}}`).join(", ");
+	return analyzeFor(`---\n${kind}: {${definitions}}\n---\na >> p -> b\n`)
+		.frontmatter!;
 }
 
 describe("findUndefinedNodeKind", () => {
@@ -68,6 +75,77 @@ a >> p -> b
 		expect(
 			findUndefinedNodeKind(nodeKinds, frontmatter, "nope"),
 		).toBeUndefined();
+	});
+});
+
+describe("findNearDefinedNodeIds", () => {
+	it("finds a same-kind definition one insertion away", () => {
+		expect(
+			findNearDefinedNodeIds(
+				frontmatterWith("artifact", ["venue_contract"]),
+				"artifact",
+				"venue_contractX",
+			),
+		).toEqual(["venue_contract"]);
+	});
+
+	it("recognizes an adjacent transposition", () => {
+		expect(
+			findNearDefinedNodeIds(
+				frontmatterWith("artifact", ["contract"]),
+				"artifact",
+				"conract",
+			),
+		).toEqual(["contract"]);
+	});
+
+	it.each([
+		["ch06", "ch05"],
+		["release_v3", "release_v2"],
+		["plugin_c", "plugin_a"],
+		["a", "b"],
+	])("does not suggest sequential ID %s for %s", (id, candidate) => {
+		expect(
+			findNearDefinedNodeIds(
+				frontmatterWith("artifact", [candidate]),
+				"artifact",
+				id,
+			),
+		).toEqual([]);
+	});
+
+	it("does not use a definition from another kind", () => {
+		expect(
+			findNearDefinedNodeIds(
+				frontmatterWith("process", ["venue_contract"]),
+				"artifact",
+				"venue_contractX",
+			),
+		).toEqual([]);
+	});
+
+	it("does not suggest IDs at edit distance two", () => {
+		expect(
+			findNearDefinedNodeIds(
+				frontmatterWith("artifact", ["drift_report"]),
+				"artifact",
+				"diff_report",
+			),
+		).toEqual([]);
+	});
+
+	it("returns multiple candidates in dictionary order", () => {
+		expect(
+			findNearDefinedNodeIds(
+				frontmatterWith("artifact", [
+					"venue_contractY",
+					"venue_contractA",
+					"venue_contract",
+				]),
+				"artifact",
+				"venue_contractX",
+			),
+		).toEqual(["venue_contract", "venue_contractA", "venue_contractY"]);
 	});
 });
 
