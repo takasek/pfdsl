@@ -77,12 +77,12 @@ PR #1448の320px・source90%での文字欠け、sidebar併用時の最小26px�
 この極小幅の過去結果を未実施へ戻さず、代表幅の修正やChrome probeの成功をnativeの合格へ転写しない。
 状態：M未実施。記録：未記入。
 
-### GUI-02：Recentとフォルダサイドバー
+### GUI-02：Open Recentとフォルダサイドバー
 
 対応：#1444。対象・入力：M、フォルダ未選択、one/two、A/B。
-操作：開始時にサイドバー切替ボタンが非表示でView > Show Sidebarが無効なことを確認する。Open Folder→ファイル選択→Filesボタン／menuでsidebar閉鎖・再開→File > Recentで文書／フォルダへ再アクセスする。
+操作：開始時にサイドバー切替ボタンが非表示でView > Show Sidebarが無効なことを確認する。Open Folder→ファイル選択→Filesボタン／menuでsidebar閉鎖・再開→File > Open Recentで文書／フォルダへ再アクセスする。
 期待：フォルダ名・階層・選択が対応し、表示中はFilesボタンが現れ、閉鎖で作業幅が戻る。
-Recentを左側や開始画面へ常設せず、本文とdirtyを保つ。
+Open Recentを左側や開始画面へ常設せず、本文とdirtyを保つ。
 状態：M未実施。記録：未記入。
 
 ### GUI-03：開始画面と文書識別
@@ -135,11 +135,17 @@ DOM の aria-live 属性検査や診断統合テストだけでは、この確�
 ### GUI-07：外部変更の説明とテキスト比較
 
 対応：#1444のR42〜44、#1258の既存保護。対象・入力：M、dirty A、独立writer、長い日本語・長い行・離れた挿入／削除／変更。
-操作：外部変更→保存比較で対象・Editor content/Observed disk content・各選択の結果を読む。別コピーでKeep Editing/取消、Use Disk、明示Replaceを実行し、比較中再変更と外部削除も試す。
+操作：外部変更→保存比較で対象・Editor content/Observed disk content・各選択の結果を読む。保存からの`The file changed on disk`で`Keep Editing`／`Save As…`／`Overwrite`、タブを閉じる途中では`Don't Close`／`Save As…`／`Overwrite and Close`を確認する。
+Save Asでは保存先のファイル名を含む`Replace <name>?`と`Cancel`／`Choose Another File`／`Replace`を確認する。
+削除時の`The file was deleted`は保存から`Keep Editing`／`Save Again`、閉じる途中では`Don't Close`／`Save and Close`を確認する。
+`Use the disk version?`の`Keep Editing`／`Use Disk Version`、比較中の再変更、各操作の取消も試す。
 期待：対象path・比較版・保持／利用する版、buffer/disk/未解決状態への作用と左右行対応・前後文脈を追える。
 read-only表示と色以外の差分区別を保ち、取消は内容と未解決状態を保持する。
 再競合は再確認し、file不在ではUse diskを無効にする。
 自動競合解決・確認削減を追加しない。
+各確認は表示した版だけに適用され、editorまたはdiskが再変更されたら中止する説明を保つ。
+バナーは`Saving to <path>.`で同じ保存対象の完全pathを表示し、Save As失敗後に原本と保存先が異なる場合も対象を取り違えない。
+比較は最初の違いを左右とも表示して開き、同一内容なら先頭を保つ。
 回復案内が必要な間は操作通知のdismissや現在診断の更新で失われず、回復後は解消済みの保存失敗が残らないことを確認する（#1516）。
 入口：既存の`Review and Save Here…`／`Use Current Disk Version…`と保存前比較。比較はMonacoのread-onlyな左右diff editorを使い、変更gutter・行対応・overviewと独立した長行scrollを確認する。`Editor content`と`Observed disk content`は既存のOperationPlanに束縛された版で、表示部品自身は文書やdiskを書き換えない。
 状態：M未実施。記録：未記入。#1260の構造差分とは別。
@@ -147,7 +153,7 @@ read-only表示と色以外の差分区別を保ち、取消は内容と未解�
 ### GUI-08：実ファイルの保存・終了回帰
 
 対応：#1444、完了済み#1258/#1438。対象・入力：M、A/B、Untitled、Save As新規／既存、外部変更／削除／rename、書込不能先。
-操作：Open/Folder/Recent、New→Save、Save As上書き／新規／取消、再Open、dirty tab/window/Cmd-Q/menu/Dock QuitのSave/Discard/Cancel、複数dirtyのDiscard→Cancel、保存失敗から回復を行う。
+操作：Open/Folder/Open Recent、New→Save、Save As上書き／新規／取消、再Open、dirty tab/window/Cmd-Q/menu/Dock QuitのSave/Discard/Cancel、複数dirtyのDiscard→Cancel、保存失敗から回復を行う。
 期待：選択した対象だけを保存し、取消・失敗で本文・dirty・保存先・未解決状態を保持する。
 複数tab途中取消で両本文を保持し、Discardはdiskを変えない。
 時間経過・tab/focus変更で自動保存せず、採用済み保存前検査の保証境界を維持する。

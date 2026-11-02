@@ -11,13 +11,13 @@ import { fsOf } from "./lifecycle-native.mjs";
 
 const root = fileURLToPath(new URL("../../../../", import.meta.url));
 const titles = {
-	replace: "Review the target",
-	recreate: "Recreate missing file",
-	adopt: "Discard editor changes",
+	replace: "The file changed on disk",
+	recreate: "The file was deleted",
+	adopt: "Use the disk version?",
 };
 const labels = {
-	replace: "Replace Observed Version",
-	create: "Create File",
+	replace: "Overwrite",
+	create: "Save Again",
 	disk: "Use Disk Version",
 	cancel: "Keep Editing",
 	another: "Choose Another File",
@@ -162,7 +162,10 @@ export async function createHarness(label, { sourceRoot = root } = {}) {
 							kind: "dialog",
 							tab,
 							seq: tick(),
-							title: titles[request.kind],
+							title:
+								request.kind === "replace" && request.origin === "save-as"
+									? `Replace ${target.path.split("/").pop()}?`
+									: titles[request.kind],
 							target: target.id,
 							editor: request.editor,
 							disk: target.source,
@@ -188,7 +191,20 @@ export async function createHarness(label, { sourceRoot = root } = {}) {
 									: "cancel";
 						const answer = await (handlers.decide?.(request, entry) ??
 							defaultAnswer);
-						entry.choice = labels[answer];
+						entry.choice =
+							answer === "replace"
+								? request.origin === "save-as"
+									? "Replace"
+									: request.origin === "close"
+										? "Overwrite and Close"
+										: "Overwrite"
+								: answer === "create" && request.origin === "close"
+									? "Save and Close"
+									: answer === "cancel" && request.origin === "close"
+										? "Don't Close"
+										: answer === "another" && request.origin !== "save-as"
+											? "Save As…"
+											: labels[answer];
 						entry.editorAtClick = tab.getSource();
 						entry.clickSeq = tick();
 						if (["replace", "create", "disk"].includes(answer))

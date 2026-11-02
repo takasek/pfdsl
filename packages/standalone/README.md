@@ -279,7 +279,9 @@ Drag the divider, or focus it and use Left/Right (Shift for smaller steps), Home
 When no document is open, choose **New**, **Open…**, or **Try a sample**; the sample is opened only on request and is not saved to a file.
 Use the native **File**, **Edit**, **View** and **Window** menus for document commands, formatting, diagram controls and tab navigation.
 Choose **File > Open Folder…** to show the optional folder sidebar and open files as additional tabs.
-The sidebar button and **View > Show/Hide Sidebar** toggle that folder view; recent files and folders are under **File > Recent**.
+The sidebar button and **View > Show/Hide Sidebar** toggle that folder view; recent files and folders are under **File > Open Recent**.
+Recent items show file names or folder names followed by `(Folder)`, with the shortest distinguishing parent suffix when names collide.
+**Clear Menu** clears the stored recent list; it is disabled while busy or when the list is empty.
 Format is an Undoable editor operation, and editor/node navigation uses the shared source positions.
 Choose **View > Normalized edges** to inspect the active tab’s current text without editing it.
 The read-only result uses the same edge sorting and serialization as the VS Code command; errors block the output, while warnings do not.
@@ -309,9 +311,13 @@ These language-support changes have automated editor checks; native keyboard and
 The native host holds a directory capability for each folder explicitly selected for that session.
 Reads stay bound to that directory when its pathname is replaced; relative traversal and symlink escape are rejected.
 
-Choose **File > New**, **File > Open…**, or **File > Recent** to work with documents.
+Choose **File > New**, **File > Open…**, or **File > Open Recent** to work with documents.
 Document names appear in tabs and the window title, while the header shows the current state and location.
 The location stays on one line and truncates long paths with an ellipsis; its title contains the full path, and the text remains selectable and copyable.
+Documents without a file show **Untitled** in the location field; their save state still shows **Not saved**.
+The bottom diagnostics and notices use the same short names as the tabs, with the full text available in their titles.
+Diagnostics reserve one line, and notices scroll within a fixed one-line box so new notices do not move the editor or preview.
+Save failures, unresolved states, action notices and application notices retain their existing lifetimes, with Dismiss reachable beside the notice box.
 Same-name tabs include their parent folders, and completed save messages name the document they belong to.
 **Save** (Command-S) and **Save As…** (Command-Shift-S) are manual operations; there is no autosave or session restoration.
 The recent list stores targets only, never editor content.
@@ -333,11 +339,18 @@ Clean external changes reload automatically; dirty changes, deletion, and public
 A change that leaves the file's content identical (a touch, a permission change, or a replacement with the same bytes) is not treated as a disk change.
 The conflict panel identifies the recovery target and lets you compare its observed contents, choose another destination, or explicitly load the current disk version.
 The panel names the recovery target by the path it was last observed at, and compares against the same snapshot its buttons act on.
+Its banner says **Saving to** followed by that full path.
 A failed read of a tracked target is remembered the same way whichever action saw it: the background check, Save, a close or Use Current Disk Version.
 Every Save inspects its target first.
 A clean editor reloads a changed version instead of saving over it, while a tab that shows unsaved state is never reloaded by Save.
 When the target's contents differ from the editor, replacing a disk version the document has not acknowledged, or a file picked in the chooser, always shows a review that compares the editor with that fresh inspection.
 Replace sends the text and revision the review showed, and if the document or the observed disk version changes while the review is open the save is not sent.
+For a changed file, **The file changed on disk** offers **Keep Editing**, **Save As…**, and **Overwrite** from Save; closing a tab instead offers **Don't Close**, **Save As…**, and **Overwrite and Close**.
+Save As names the selected file in `Replace <name>?` and offers **Cancel**, **Choose Another File**, and **Replace**.
+For a deleted file, **The file was deleted** offers **Keep Editing** and **Save Again** from Save, or **Don't Close** and **Save and Close** while closing.
+**Use the disk version?** offers **Keep Editing** and **Use Disk Version** without writing to disk.
+Each review states that the choice applies to the versions shown and stops if either changes again.
+The read-only text comparison opens at the first computed difference in both panes, or stays at the top when the contents match.
 Save As rejects a target already open by selected directory/leaf binding.
 Distinct hard-link names are separate tabs and save targets; saving atomically replaces only the selected name.
 External reloads acknowledge the text applied by Monaco, which normalizes mixed line endings to a single style; reloading or closing a clean tab does not rewrite the disk file, while a manual save writes the normalized editor text.

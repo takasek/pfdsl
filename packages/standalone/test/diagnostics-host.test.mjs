@@ -26,7 +26,8 @@ test("real analysis summaries reach the active host and distinguish same-name do
 		const text = () => host.query("#diagnostics").textContent;
 		await until(() => text().includes("1 warning"));
 		assert.doesNotMatch(text(), /hints/);
-		assert.match(text(), /Current diagnostics — \/A\/same.pfdsl:/);
+		assert.match(text(), /Current diagnostics — same.pfdsl:/);
+		assert.match(host.query("#diagnostics").title, /\/A\/same.pfdsl:/);
 		first.type(
 			"---\nartifact:\n  b: {label: B, criteria: Ready}\n---\na >> p -> b\n",
 		);
@@ -35,10 +36,10 @@ test("real analysis summaries reach the active host and distinguish same-name do
 		assert.doesNotMatch(text(), /1 warning/);
 		await host.open(b);
 		await until(() => text().includes("1 warning"));
-		assert.match(text(), /Current diagnostics — \/B\/same.pfdsl:/);
+		assert.match(text(), /Current diagnostics — same.pfdsl — B:/);
 		first.button.click();
-		await until(() => text().includes("Current diagnostics — /A/same.pfdsl:"));
-		assert.match(text(), /Current diagnostics — \/A\/same.pfdsl:/);
+		await until(() => text().includes("Current diagnostics — same.pfdsl — A:"));
+		assert.match(text(), /Current diagnostics — same.pfdsl — A:/);
 		assert.doesNotMatch(text(), /1 warning/);
 	} finally {
 		await host.finish();

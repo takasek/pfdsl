@@ -5,6 +5,7 @@ import {
 	PredefinedMenuItem,
 	Submenu,
 } from "@tauri-apps/api/menu";
+import { displayName } from "./display-name.js";
 
 export interface MenuState {
 	busy: boolean;
@@ -107,7 +108,9 @@ export async function installNativeMenu(
 		// could run the command twice, so the label names the key instead.
 		const keyed = (label: string, mac: string, other: string) =>
 			`${label} (${navigator.platform.startsWith("Mac") ? mac : other})`;
-		const recent = await own(Submenu.new({ text: "Recent", items: [] }));
+		let clearRecent: MenuItem | undefined;
+		let recentCount = 0;
+		const recent = await own(Submenu.new({ text: "Open Recent", items: [] }));
 		const sidebar = await own(
 			CheckMenuItem.new({
 				id: "sidebar",
@@ -320,6 +323,8 @@ export async function installNativeMenu(
 								await item.setEnabled(enabled);
 						}
 						if (disposed) return;
+						await clearRecent?.setEnabled(!state.busy && recentCount > 0);
+						if (disposed) return;
 						if (!previous || previous.busy !== state.busy)
 							await recent.setEnabled(!state.busy);
 						if (disposed) return;
@@ -348,6 +353,8 @@ export async function installNativeMenu(
 			recent(targets: RecentTarget[]) {
 				if (disposed) return;
 				enqueue(async () => {
+					clearRecent = undefined;
+					recentCount = targets.length;
 					// Tauri returns fresh resource handles from items(), including after disposal.
 					const previous = await recent.items();
 					for (const item of previous) resources.add(item);
@@ -361,12 +368,16 @@ export async function installNativeMenu(
 						if (disposed) return;
 						await close(item);
 					}
+					const named = targets.map((target) => ({
+						path: target.path,
+						name: `${target.path.split("/").pop() || "/"}${target.kind === "folder" ? " (Folder)" : ""}`,
+					}));
 					for (const [index, target] of targets.entries()) {
 						if (disposed) return;
 						const item = await own(
 							MenuItem.new({
 								id: `recent-${index}`,
-								text: `${target.kind === "folder" ? "Folder: " : ""}${target.path}`,
+								text: displayName(named[index]!, named),
 								action: () => {
 									if (!disposed) openRecent(target);
 								},
@@ -375,6 +386,26 @@ export async function installNativeMenu(
 						if (disposed) return;
 						await recent.append(item);
 					}
+					if (disposed) return;
+					const divider = await separator();
+					if (disposed) return;
+					await recent.append(divider);
+					if (disposed) return;
+					clearRecent = await own(
+						MenuItem.new({
+							id: "clear-recent",
+							text: "Clear Menu",
+							enabled:
+								!(pendingState ?? appliedState)?.busy &&
+								!!appliedState &&
+								recentCount > 0,
+							action: () => {
+								if (!disposed) command("clear-recent");
+							},
+						}),
+					);
+					if (disposed) return;
+					await recent.append(clearRecent);
 				});
 			},
 		};

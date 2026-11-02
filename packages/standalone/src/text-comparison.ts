@@ -42,6 +42,21 @@ export function createTextComparison(
 		minimap: { enabled: false },
 		scrollBeyondLastLine: false,
 	});
+	let revealed = false;
+	const diffListener = editor.onDidUpdateDiff(() => {
+		if (revealed) return;
+		const changes = editor.getLineChanges();
+		if (changes === null) return;
+		revealed = true;
+		const first = changes[0];
+		if (!first) return;
+		editor
+			.getOriginalEditor()
+			.revealLineInCenter(Math.max(1, first.originalStartLineNumber));
+		editor
+			.getModifiedEditor()
+			.revealLineInCenter(Math.max(1, first.modifiedStartLineNumber));
+	});
 	editor.setModel({ original, modified });
 	if (disk === null) {
 		const notice = document.createElement("p");
@@ -51,6 +66,7 @@ export function createTextComparison(
 	}
 	return {
 		dispose() {
+			diffListener.dispose();
 			editor.dispose();
 			original.dispose();
 			modified.dispose();

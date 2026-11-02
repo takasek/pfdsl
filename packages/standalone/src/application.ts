@@ -1,3 +1,4 @@
+import { displayName } from "./display-name.js";
 import type { DiskSnapshot, SaveResult } from "./document-session.js";
 import type { createDocumentTab, DocumentTab } from "./document-tab.js";
 import { createExportResults } from "./export-results.js";
@@ -79,7 +80,14 @@ export function mountApplication(options: ApplicationOptions) {
 	dismissStatus.textContent = "Dismiss action notice";
 	dismissStatus.hidden = true;
 	status.after(dismissStatus);
-	const presentExportResults = createExportResults(document.body, report);
+	const statusCount = document.createElement("span");
+	statusCount.id = "status-count";
+	dismissStatus.before(statusCount);
+	const presentExportResults = createExportResults(
+		document.body,
+		report,
+		(notice) => controller.notify(notice),
+	);
 	const showExportResults: typeof presentExportResults = (...args) => {
 		if (!disposed) presentExportResults(...args);
 	};
@@ -115,6 +123,7 @@ export function mountApplication(options: ApplicationOptions) {
 	function updateSaveControls() {
 		if (disposed) return;
 		saveSupport.textContent = saveCapability.reason;
+		saveSupport.title = saveCapability.reason;
 		updateMenu();
 	}
 	const controller = createWorkspaceController({
@@ -165,7 +174,10 @@ export function mountApplication(options: ApplicationOptions) {
 					exportServices: native
 						? createNativeExportServices(invoke)
 						: undefined,
-					showExportResults,
+					showExportResults(name, revision, results) {
+						const owner = opened().find((entry) => entry.key === key);
+						showExportResults(name, revision, results, owner?.path ?? name);
+					},
 					reportStatus: events.notice,
 					onChange: events.changed,
 				});
@@ -228,6 +240,7 @@ export function mountApplication(options: ApplicationOptions) {
 								"document_capabilities",
 							),
 						recent: () => invoke<RecentTarget[]>("list_recent"),
+						clearRecent: () => invoke<void>("clear_recent"),
 						rememberDocument: (path: string) =>
 							invoke<void>("remember_document", { path }),
 						chooseFolder: () => invoke<string | null>("select_folder"),
@@ -296,20 +309,62 @@ export function mountApplication(options: ApplicationOptions) {
 	}
 	function renderStatus() {
 		if (disposed) return;
+		const titles: string[] = [];
 		const lines = [...opened()].flatMap((entry) =>
 			entry.state.saveNotice
 				? [
-						`Save needs attention — ${entry.path ?? entry.name}: ${entry.state.saveNotice.message}`,
+						`Save needs attention — ${displayName(entry, opened())}: ${entry.state.saveNotice.message}`,
 					]
 				: [],
 		);
-		if (active?.state.notice)
+		for (const entry of opened())
+			if (entry.state.saveNotice)
+				titles.push(
+					`Save needs attention — ${entry.path ?? entry.name}: ${entry.state.saveNotice.title ?? entry.state.saveNotice.message}`,
+				);
+		if (active?.state.notice) {
 			lines.push(
-				`Last action — ${active.path ?? active.name}: ${active.state.notice.message}`,
+				`Last action — ${displayName(active, opened())}: ${active.state.notice.message}`,
 			);
-		if (state.appNotice) lines.push(`Application notice: ${state.appNotice}`);
+			titles.push(
+				`Last action — ${active.path ?? active.name}: ${active.state.notice.title ?? active.state.notice.message}`,
+			);
+		}
+		if (state.appNotice) {
+			lines.push(`Application notice: ${state.appNotice}`);
+			titles.push(`Application notice: ${state.appNoticeTitle}`);
+		}
 		const text = lines.join("\n");
-		if (status.textContent !== text) status.textContent = text;
+		if (status.textContent !== text) {
+			const previous = (status.textContent || "").split("\n");
+			const next = text ? text.split("\n") : [];
+			let changed = 0;
+			for (const [index, line] of next.entries())
+				if (!previous.includes(line)) changed = index;
+			status.textContent = text;
+			// The status has one fixed-height row; include wrapped lines in its offsets.
+			const range = document.createRange();
+			if (
+				status.firstChild &&
+				typeof range.getBoundingClientRect === "function"
+			) {
+				const offset = next
+					.slice(0, changed)
+					.reduce((length, line) => length + line.length + 1, 0);
+				range.setStart(status.firstChild, offset);
+				range.setEnd(status.firstChild, offset + (next[changed]?.length ?? 0));
+				status.scrollTop +=
+					range.getBoundingClientRect().top -
+					status.getBoundingClientRect().top;
+			} else status.scrollTop = changed * status.clientHeight;
+		}
+		const lineCount = text ? text.split("\n").length : 0;
+		const overflow = lineCount > 1 || status.scrollHeight > status.clientHeight;
+		statusCount.textContent = overflow
+			? `${lines.length} ${lines.length === 1 ? "notice" : "notices"}`
+			: "";
+		statusCount.hidden = !overflow;
+		status.title = titles.join("\n");
 		dismissStatus.hidden = !active?.state.notice && !state.appNotice;
 		const counts = active?.tab.getDiagnosticsSummary?.() ?? "Checking…";
 		const diagnosticsCurrent = active?.tab.areDiagnosticsCurrent?.() ?? true;
@@ -320,9 +375,14 @@ export function mountApplication(options: ApplicationOptions) {
 				: counts.startsWith("Analysis failed:")
 					? "Diagnostic analysis"
 					: "Updating diagnostics";
-		const prefix = active ? `${label} — ${active.path ?? active.name}: ` : "";
+		const prefix = active
+			? `${label} — ${displayName(active, opened())}: `
+			: "";
 		const problems = (active?.tab.getProblemCount?.() ?? 0) > 0;
 		const summary = active ? `${prefix}${counts}` : "";
+		diagnostics.title = active
+			? `${label} — ${active.path ?? active.name}: ${counts}`
+			: "";
 		if (!active) {
 			if (diagnostics.childNodes.length) diagnostics.replaceChildren();
 			return;
@@ -400,26 +460,7 @@ export function mountApplication(options: ApplicationOptions) {
 		if (disposed) return;
 		for (const entry of opened()) {
 			entry.navigation.classList.toggle("selected", entry === active);
-			const sameName = [...opened()].filter(
-				(other) => other.name === entry.name,
-			);
-			let visibleName = entry.name;
-			if (sameName.length > 1 && entry.path) {
-				const parents = sameName
-					.filter((other) => other.path)
-					.map((other) => other.path!.split("/").slice(0, -1));
-				const parent = entry.path.split("/").slice(0, -1);
-				let depth = 1;
-				while (
-					depth < parent.length &&
-					parents.filter(
-						(parts) =>
-							parts.slice(-depth).join("/") === parent.slice(-depth).join("/"),
-					).length > 1
-				)
-					depth++;
-				visibleName += ` — ${parent.slice(-depth).join("/") || "/"}`;
-			}
+			const visibleName = displayName(entry, opened());
 			entry.tab.button.textContent = `${visibleName}${entry.state.dirty ? " •" : ""}`;
 			entry.tab.button.title = entry.path ?? `${entry.name} — Not saved`;
 			entry.navigation
@@ -439,9 +480,8 @@ export function mountApplication(options: ApplicationOptions) {
 							? "Modified"
 							: "Saved";
 		const location = document.querySelector<HTMLElement>("#document-location")!;
-		location.textContent =
-			active?.path ?? (active ? "Not saved to a file" : "");
-		location.title = active?.path ?? (active ? "Not saved to a file" : "");
+		location.textContent = active?.path ?? (active ? "Untitled" : "");
+		location.title = active?.path ?? (active ? "Untitled" : "");
 		location.hidden = !active;
 		document.title = active
 			? `${active.tab.button.textContent} — PFDSL`
@@ -482,31 +522,56 @@ export function mountApplication(options: ApplicationOptions) {
 				name: request.name,
 				allowSave: request.allowSave,
 			});
+		const entry = opened().find((item) => item.key === request.document);
+		const name =
+			entry?.path === request.target.path
+				? displayName(entry, opened())
+				: request.target.path.split("/").pop()!;
+		const strictness =
+			"This choice applies to the versions shown and stops if either changes again.";
 		let answer: string;
-		if (request.kind === "replace")
+		if (request.kind === "replace") {
+			const savingAs = request.origin === "save-as";
+			const closing = request.origin === "close";
 			answer = await choose(
-				"Review the target",
-				`Replace the disk version of ${request.target.path} with the editor content? The disk version shown below differs from the editor, and a further change before saving stops the save. Replace Observed Version writes the editor content to this file and resolves this target only after the revision is confirmed. Keep Editing closes this comparison without writing; editor content and unresolved changes remain. Choose Another File opens Save As; cancelling retains the current content and unresolved state. A further disk or editor change stops the save.`,
+				savingAs ? `Replace ${name}?` : "The file changed on disk",
+				`The disk version of ${name} differs from the editor. ${strictness}`,
 				[
-					["cancel", "Keep Editing"],
-					["another", "Choose Another File"],
-					["replace", "Replace Observed Version"],
+					[
+						"cancel",
+						savingAs ? "Cancel" : closing ? "Don't Close" : "Keep Editing",
+					],
+					["another", savingAs ? "Choose Another File" : "Save As…"],
+					[
+						"replace",
+						savingAs
+							? "Replace"
+							: closing
+								? "Overwrite and Close"
+								: "Overwrite",
+					],
 				],
 				{ local: request.editor, disk: request.target.source },
 			);
-		else if (request.kind === "recreate")
+		} else if (request.kind === "recreate")
 			answer = await choose(
-				"Recreate missing file",
-				`Create ${request.target.path} again? A file created by another writer will not be overwritten.`,
+				"The file was deleted",
+				`Save ${name} again? ${strictness}`,
 				[
-					["cancel", "Keep Editing"],
-					["create", "Create File"],
+					[
+						"cancel",
+						request.origin === "close" ? "Don't Close" : "Keep Editing",
+					],
+					[
+						"create",
+						request.origin === "close" ? "Save and Close" : "Save Again",
+					],
 				],
 			);
 		else
 			answer = await choose(
-				"Discard editor changes",
-				`Replace the editor content with the observed current disk version of ${request.target.path}? Use Disk Version retains that disk version without writing and replaces the editor content after a fresh revision check. This resolves the matching external change; any separate unresolved target remains. Keep Editing closes this comparison without writing or replacing the editor; unresolved changes remain.`,
+				"Use the disk version?",
+				`Replace the editor content of ${name} with the disk version? ${strictness}`,
 				[
 					["cancel", "Keep Editing"],
 					["disk", "Use Disk Version"],
@@ -582,7 +647,7 @@ export function mountApplication(options: ApplicationOptions) {
 		const entry = active;
 		if (panel) {
 			const message = document.createElement("p");
-			message.textContent = `${panel.state} ${panel.message} Recovery target: ${panel.targetPath}.`;
+			message.textContent = `${panel.state} ${panel.message} Saving to ${panel.targetPath}.`;
 			conflicts.append(message);
 			const preview = document.createElement("details");
 			const summary = document.createElement("summary");
@@ -708,6 +773,10 @@ export function mountApplication(options: ApplicationOptions) {
 			if (native) currentCommand = native.closeWindow().catch(report);
 			return;
 		}
+		if (id === "clear-recent") {
+			void dispatch({ type: "clear-recent" });
+			return;
+		}
 		if (!active) return;
 		if (id === "close-tab") {
 			void dispatch({ type: "close", keys: [active.key] }).then(() =>
@@ -820,6 +889,7 @@ export function mountApplication(options: ApplicationOptions) {
 			active = undefined;
 			diagnostics.remove();
 			dismissStatus.remove();
+			statusCount.remove();
 			status.textContent = "";
 			conflicts.replaceChildren();
 			document.querySelectorAll(".export-results").forEach((panel) => {

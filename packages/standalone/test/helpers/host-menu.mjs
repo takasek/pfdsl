@@ -4,6 +4,7 @@ export function createTestMenu(command, openRecent = () => {}) {
 		"new",
 		"open-file",
 		"open",
+		"clear-recent",
 		"close-window",
 		"close-tab",
 		"save",
@@ -34,22 +35,30 @@ export function createTestMenu(command, openRecent = () => {}) {
 		action: () => command(id),
 	}));
 	let disposed = false;
+	let recentCount = 0;
+	let busy = false;
 	return {
 		items,
 		update(state) {
 			if (disposed) return;
+			busy = state.busy;
 			for (const item of items) {
 				item.enabled =
 					!state.busy &&
-					(["new", "open-file", "open", "close-window"].includes(item.id) ||
-						(item.id === "sidebar"
-							? state.folder
-							: state.document &&
-								(!["save", "save-as"].includes(item.id) || state.save)));
+					(item.id === "clear-recent"
+						? recentCount > 0
+						: ["new", "open-file", "open", "close-window"].includes(item.id) ||
+							(item.id === "sidebar"
+								? state.folder
+								: state.document &&
+									(!["save", "save-as"].includes(item.id) || state.save)));
 			}
 		},
 		recent(targets) {
 			if (disposed) return;
+			recentCount = targets.length;
+			items.find((item) => item.id === "clear-recent").enabled =
+				!busy && recentCount > 0;
 			for (const [index, target] of targets.entries())
 				items.push({
 					id: `recent-${index}`,

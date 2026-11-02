@@ -1,3 +1,4 @@
+import { displayName } from "./display-name.js";
 import {
 	type DocumentRecord,
 	DocumentRecords,
@@ -10,6 +11,7 @@ import {
 	type OperationPlan,
 	sameDocument,
 } from "./document-session.js";
+import { type Notice, noticeText } from "./notice.js";
 import {
 	createSaveAsController,
 	type DocumentFiles,
@@ -20,6 +22,7 @@ export type WorkspaceCommand =
 	| { type: "open-file" }
 	| { type: "open-path"; path: string; recent?: boolean }
 	| { type: "open-folder"; path?: string }
+	| { type: "clear-recent" }
 	| { type: "activate"; key: string }
 	| { type: "cycle"; direction: "next" | "previous" }
 	| { type: "save"; key?: string; mode?: "normal" | "as" | "observed" }
@@ -57,6 +60,7 @@ export interface WorkspaceFiles extends DocumentFiles {
 export interface WorkspaceHost {
 	capabilities(): Promise<{ save: boolean; reason: string | null }>;
 	recent(): Promise<Array<{ kind: "file" | "folder"; path: string }>>;
+	clearRecent(): Promise<void>;
 	rememberDocument(path: string): Promise<void>;
 	chooseFolder(): Promise<string | null>;
 	openRecentFolder(path: string): Promise<string>;
@@ -65,13 +69,19 @@ export interface WorkspaceHost {
 	finishQuit(request: string, approved: boolean): Promise<void>;
 }
 export type DecisionRequest =
-	| {
-			readonly kind: "replace" | "recreate" | "adopt";
+	| ({
 			readonly document: string;
 			readonly editor: string;
 			readonly editorVersion: number | string;
 			readonly target: Readonly<DiskSnapshot>;
-	  }
+	  } & (
+			| {
+					readonly kind: "replace";
+					readonly origin: "save" | "close" | "save-as";
+			  }
+			| { readonly kind: "recreate"; readonly origin: "save" | "close" }
+			| { readonly kind: "adopt" }
+	  ))
 	| {
 			readonly kind: "close";
 			readonly document: string;
@@ -110,10 +120,11 @@ export interface WorkspaceDocument {
 	}> | null;
 	readonly notice: Readonly<{
 		message: string;
+		title?: string;
 		revision: number | string;
 		channel: string;
 	}> | null;
-	readonly saveNotice: Readonly<{ message: string }> | null;
+	readonly saveNotice: Readonly<{ message: string; title?: string }> | null;
 }
 export interface WorkspaceSnapshot {
 	readonly documents: readonly WorkspaceDocument[];
@@ -123,6 +134,7 @@ export interface WorkspaceSnapshot {
 	readonly busy: boolean;
 	readonly saveCapability: Readonly<{ save: boolean; reason: string }>;
 	readonly appNotice: string;
+	readonly appNoticeTitle: string;
 	readonly folder: Readonly<{ root: string; files: readonly string[] }> | null;
 	readonly recentTargets: readonly Readonly<{
 		kind: "file" | "folder";
@@ -140,7 +152,7 @@ export interface WorkspaceController {
 	snapshot(): WorkspaceSnapshot;
 	subscribe(listener: (snapshot: WorkspaceSnapshot) => void): () => void;
 	notify(
-		message: string,
+		message: Notice,
 		owner?: { document?: string; channel?: string; revision?: number | string },
 	): void;
 	idle(): Promise<void>;
@@ -163,8 +175,12 @@ export function createWorkspaceController({
 	interface Entry {
 		record: DocumentRecord;
 		editor: WorkspaceEditor;
-		notice: WorkspaceDocument["notice"];
-		saveNotice: WorkspaceDocument["saveNotice"];
+		notice:
+			| (Omit<NonNullable<WorkspaceDocument["notice"]>, "message"> & {
+					message: Notice;
+			  })
+			| null;
+		saveNotice: { message: Notice } | null;
 	}
 	const entries = new WeakMap<DocumentRecord, Entry>();
 	const opened = () => [...records].map((record) => entries.get(record)!);
@@ -182,7 +198,7 @@ export function createWorkspaceController({
 		serial = 0,
 		activation = 0,
 		active: string | null = null,
-		appNotice = "";
+		appNotice: Notice = "";
 	let saveCapability = {
 		save: false,
 		reason: host
@@ -204,6 +220,15 @@ export function createWorkspaceController({
 		return promise;
 	}
 	function snapshot(): WorkspaceSnapshot {
+		const named = opened().map(({ record }) => ({
+			name: documentName(record),
+			path: record.session.location?.path ?? null,
+		}));
+		const statusText = (notice: Notice) =>
+			noticeText(notice, (subject) => {
+				const target = named.find((entry) => entry.path === subject);
+				return target ? displayName(target, named) : basename(subject) || "/";
+			});
 		return Object.freeze({
 			documents: Object.freeze(
 				opened().map((entry) => {
@@ -232,16 +257,28 @@ export function createWorkspaceController({
 									saveAs: saveCapability.save,
 								}),
 							}),
-						notice: entry.notice && Object.freeze({ ...entry.notice }),
+						notice:
+							entry.notice &&
+							Object.freeze({
+								...entry.notice,
+								message: statusText(entry.notice.message),
+								title: noticeText(entry.notice.message),
+							}),
 						saveNotice:
-							entry.saveNotice && Object.freeze({ ...entry.saveNotice }),
+							entry.saveNotice &&
+							Object.freeze({
+								...entry.saveNotice,
+								message: statusText(entry.saveNotice.message),
+								title: noticeText(entry.saveNotice.message),
+							}),
 					});
 				}),
 			),
 			active,
 			activation,
 			busy,
-			appNotice,
+			appNotice: statusText(appNotice),
+			appNoticeTitle: noticeText(appNotice),
 			saveCapability: Object.freeze({ ...saveCapability }),
 			folder,
 			recentTargets,
@@ -253,7 +290,7 @@ export function createWorkspaceController({
 		for (const listener of listeners) listener(state);
 	}
 	function notify(
-		message: string,
+		message: Notice,
 		owner?: { document?: string; channel?: string; revision?: number | string },
 	) {
 		if (disposed) return;
@@ -275,7 +312,7 @@ export function createWorkspaceController({
 	const report = (error: unknown) => notify(String(error));
 	function saveNotice(
 		entry: Entry,
-		message: string,
+		message: Notice,
 		resolved = false,
 		revision = entry.editor.getRevision(),
 	) {
@@ -405,10 +442,12 @@ export function createWorkspaceController({
 	function explainOpenTarget(entry: Entry, target: DiskSnapshot) {
 		const other = records.otherTarget(entry.record.key, target);
 		if (!other) return false;
-		saveNotice(
-			entry,
-			`The target is already open as ${documentName(other)}. Both editor buffers are retained. Choose another file or close that tab explicitly.`,
-		);
+		saveNotice(entry, {
+			before: "The target is already open as ",
+			subject: other.session.location?.path ?? documentName(other),
+			after:
+				". Both editor buffers are retained. Choose another file or close that tab explicitly.",
+		});
 		return true;
 	}
 	async function saveEntry(
@@ -416,6 +455,7 @@ export function createWorkspaceController({
 		as = false,
 		observed = false,
 		confirmation?: OperationPlan,
+		origin: "save" | "close" = "save",
 	): Promise<boolean> {
 		if (disposed || !isOpen(entry)) return false;
 		if (!saveCapability.save) {
@@ -454,7 +494,7 @@ export function createWorkspaceController({
 			if (result.message)
 				saveNotice(
 					entry,
-					result.message,
+					result.notice ?? result.message,
 					result.kind === "saved",
 					result.editorVersion ?? entry.editor.getRevision(),
 				);
@@ -469,10 +509,11 @@ export function createWorkspaceController({
 			fresh = await files.inspect(remembered.id);
 		} catch (error) {
 			session.observe(remembered, { error }, scope);
-			saveNotice(
-				entry,
-				`Could not read ${remembered.path}: ${String(error)}. The save was not attempted. Editor content is retained.`,
-			);
+			saveNotice(entry, {
+				before: "Could not read ",
+				subject: remembered.path,
+				after: `: ${String(error)}. The save was not attempted. Editor content is retained.`,
+			});
 			return false;
 		}
 		if (disposed || !isOpen(entry) || !checkConfirmation()) return false;
@@ -513,6 +554,7 @@ export function createWorkspaceController({
 			const decision = await decisions.request(
 				{
 					kind: review ? "replace" : "recreate",
+					origin,
 					document: entry.record.key,
 					target: Object.freeze({ ...selected }),
 					editor: plan.editor,
@@ -652,7 +694,7 @@ export function createWorkspaceController({
 					? decision
 					: "cancel";
 			},
-			({ entry }, plan) => saveEntry(entry, false, false, plan),
+			({ entry }, plan) => saveEntry(entry, false, false, plan, "close"),
 			({ entry }) => remove(entry),
 			() =>
 				!disposed &&
@@ -717,6 +759,12 @@ export function createWorkspaceController({
 		}
 		return run(async () => {
 			switch (command.type) {
+				case "clear-recent": {
+					if (!host) break;
+					await host.clearRecent();
+					await refreshRecent();
+					break;
+				}
 				case "new": {
 					const names = new Set([...records].map(documentName));
 					let number = 1;
@@ -751,7 +799,11 @@ export function createWorkspaceController({
 					emit();
 					await host.rememberFolder(root);
 					await refreshRecent();
-					notify(`Opened ${root}. Save documents explicitly.`);
+					notify({
+						before: "Opened ",
+						subject: root,
+						after: ". Save documents explicitly.",
+					});
 					break;
 				}
 				case "save":
@@ -790,9 +842,12 @@ export function createWorkspaceController({
 				await entry.record.session.checkExternal((id) => files.inspect(id));
 				if (isOpen(entry)) syncLocation(entry);
 			} catch (error) {
-				report(
-					`Could not check ${documentName(entry.record)}: ${String(error)}. Editor content is retained.`,
-				);
+				notify({
+					before: "Could not check ",
+					subject:
+						entry.record.session.location?.path ?? documentName(entry.record),
+					after: `: ${String(error)}. Editor content is retained.`,
+				});
 			}
 			emit();
 		}

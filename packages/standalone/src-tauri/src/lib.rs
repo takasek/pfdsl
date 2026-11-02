@@ -111,6 +111,7 @@ pub fn run() {
             release_document,
             confirm_close_document,
             list_recent,
+            clear_recent,
             open_recent,
             remember_document,
             remember_folder,
@@ -258,7 +259,10 @@ fn recent_path(app: &tauri::AppHandle) -> Result<PathBuf, String> {
 #[derive(serde::Serialize, serde::Deserialize)]
 struct RecentTarget { kind: String, path: String }
 fn read_recent(app: &tauri::AppHandle) -> Result<Vec<RecentTarget>, String> {
-    match std::fs::read_to_string(recent_path(app)?) {
+    read_recent_file(&recent_path(app)?)
+}
+fn read_recent_file(destination: &std::path::Path) -> Result<Vec<RecentTarget>, String> {
+    match std::fs::read_to_string(destination) {
         Ok(source) => serde_json::from_str(&source).map_err(|e| format!("Could not read recent targets: {e}")),
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(vec![]),
         Err(error) => Err(error.to_string()),
@@ -266,6 +270,11 @@ fn read_recent(app: &tauri::AppHandle) -> Result<Vec<RecentTarget>, String> {
 }
 #[tauri::command]
 fn list_recent(app: tauri::AppHandle) -> Result<Vec<RecentTarget>, String> { read_recent(&app) }
+#[tauri::command]
+fn clear_recent(app: tauri::AppHandle) -> Result<(), String> { clear_recent_file(&recent_path(&app)?) }
+fn clear_recent_file(destination: &std::path::Path) -> Result<(), String> {
+    write_recent(destination, &[])
+}
 #[tauri::command]
 fn remember_document(path: String, app: tauri::AppHandle, folders: State<'_, Folders>) -> Result<(), String> {
     let entries = folders.documents.lock().map_err(|e| e.to_string())?;
@@ -276,7 +285,9 @@ fn remember_target(app: &tauri::AppHandle, kind: &str, path: String) -> Result<(
     let mut recent = read_recent(app)?;
     recent.retain(|p| p.path != path || p.kind != kind);
     recent.insert(0, RecentTarget { kind: kind.into(), path }); recent.truncate(20);
-    let destination = recent_path(app)?;
+    write_recent(&recent_path(app)?, &recent)
+}
+fn write_recent(destination: &std::path::Path, recent: &[RecentTarget]) -> Result<(), String> {
     std::fs::create_dir_all(destination.parent().unwrap()).map_err(|e| e.to_string())?;
     let staged = destination.with_extension(format!("{}.tmp", std::process::id()));
     std::fs::write(&staged, serde_json::to_vec(&recent).map_err(|e| e.to_string())?).map_err(|e| e.to_string())?;
@@ -301,6 +312,25 @@ fn open_recent_folder(path: String, app: tauri::AppHandle, folders: State<'_, Fo
 fn open_recent(path: String, app: tauri::AppHandle, folders: State<'_, Folders>) -> Result<documents::Snapshot, String> {
     if !read_recent(&app)?.iter().any(|p| p.kind == "file" && p.path == path) { return Err("Unknown recent target".into()); }
     add_document(documents::Document::selected(&PathBuf::from(path))?, &folders)
+}
+
+#[cfg(test)]
+mod recent_tests {
+    use super::*;
+
+    #[test]
+    fn clear_recent_writes_empty_list_and_lists_no_targets() {
+        let directory = std::env::temp_dir().join(format!("pfdsl-clear-recent-{}", std::process::id()));
+        assert!(!directory.exists(), "test directory must be unique");
+        let destination = directory.join("recent-documents.json");
+        write_recent(&destination, &[RecentTarget { kind: "file".into(), path: "/work/flow.pfdsl".into() }]).unwrap();
+        assert_eq!(read_recent_file(&destination).unwrap().len(), 1);
+        clear_recent_file(&destination).unwrap();
+        assert_eq!(std::fs::read_to_string(&destination).unwrap(), "[]");
+        assert!(read_recent_file(&destination).unwrap().is_empty());
+        assert_eq!(std::fs::read_dir(&directory).unwrap().count(), 1, "no staged file remains");
+        std::fs::remove_dir_all(directory).unwrap();
+    }
 }
 
 #[cfg(test)]

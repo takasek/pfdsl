@@ -52,6 +52,7 @@ const disk = (id) => ({
 function handleWorkspace({
 	release = async () => {},
 	decide = async () => "replace",
+	host = {},
 } = {}) {
 	const live = new Map([1, 2, 3, 4].map((id) => [id, disk(id)])),
 		buffers = new Map(),
@@ -113,10 +114,66 @@ function handleWorkspace({
 			listDocuments: async () => [],
 			rememberFolder: async () => {},
 			finishQuit: async () => {},
+			...host,
 		},
 	});
 	return { controller, live, buffers, releases, remembered };
 }
+
+test("Clear Menu clears storage and refreshes recent targets without a document", async () => {
+	let targets = [{ kind: "file", path: "/work/one.pfdsl" }];
+	const calls = [];
+	const { controller } = handleWorkspace({
+		host: {
+			recent: async () => {
+				calls.push("list");
+				return targets;
+			},
+			clearRecent: async () => {
+				calls.push("clear");
+				targets = [];
+			},
+		},
+	});
+	try {
+		await controller.ready;
+		assert.equal(controller.snapshot().recentTargets.length, 1);
+		await controller.dispatch({ type: "clear-recent" });
+		assert.deepEqual(calls, ["list", "clear", "list"]);
+		assert.deepEqual(controller.snapshot().recentTargets, []);
+	} finally {
+		controller.dispose();
+	}
+});
+
+test("Clear Menu reports write and refresh failures through the application notice", async () => {
+	for (const failure of ["write", "refresh"]) {
+		let cleared = false;
+		const { controller } = handleWorkspace({
+			host: {
+				recent: async () => {
+					if (cleared) throw new Error("Recent refresh failed");
+					return [{ kind: "folder", path: "/work" }];
+				},
+				clearRecent: async () => {
+					if (failure === "write") throw new Error("Recent write failed");
+					cleared = true;
+				},
+			},
+		});
+		try {
+			await controller.ready;
+			await controller.dispatch({ type: "clear-recent" });
+			assert.match(
+				controller.snapshot().appNotice,
+				new RegExp(`Recent ${failure} failed`),
+			);
+			assert.equal(controller.snapshot().busy, false);
+		} finally {
+			controller.dispose();
+		}
+	}
+});
 
 test("repeated reference rebinds release each old capability without a foreground command", async () => {
 	const subject = handleWorkspace(),

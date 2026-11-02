@@ -89,7 +89,7 @@ export async function runSaveAsCase(name, createSubject) {
 		if (!noReview)
 			equal("review.content-and-target", reviews[0], {
 				kind: "review",
-				title: "Review the target",
+				title: `Replace ${before.target.path.split("/").pop()}?`,
 				editor: SAVE_AS_TEXT.local,
 				disk: before.target.source,
 				id: before.target.id,

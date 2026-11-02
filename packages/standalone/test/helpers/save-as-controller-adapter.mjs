@@ -203,7 +203,7 @@ export async function createSaveAsControllerAdapter({
 					async replace(request) {
 						const review = {
 							kind: "review",
-							title: "Review the target",
+							title: `Replace ${request.target.path.split("/").pop()}?`,
 							editor: request.editor,
 							disk: request.target.source,
 							id: request.target.id,

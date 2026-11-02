@@ -37,6 +37,112 @@ async function bundle(name, source, stub, run) {
 	}
 }
 
+test("display names use the shortest distinguishing parent and retain path-less names", async () => {
+	await bundle("display-name", /^unused$/, "", async ({ displayName }) => {
+		const entries = [
+			{ name: "flow.pfdsl", path: "/A/shared/flow.pfdsl" },
+			{ name: "flow.pfdsl", path: "/B/shared/flow.pfdsl" },
+			{ name: "flow.pfdsl", path: "/other/flow.pfdsl" },
+			{ name: "unique.pfdsl", path: "/A/unique.pfdsl" },
+			{ name: "Sample" },
+			{ name: "Sample" },
+		];
+		assert.deepEqual(
+			entries.map((entry) => displayName(entry, entries)),
+			[
+				"flow.pfdsl — A/shared",
+				"flow.pfdsl — B/shared",
+				"flow.pfdsl — other",
+				"unique.pfdsl",
+				"Sample",
+				"Sample",
+			],
+		);
+	});
+});
+
+test("Open Recent labels files and folders, clears through dispatch and follows busy and empty state", async () => {
+	globalThis.reviewMenuItems = [];
+	try {
+		await bundle(
+			"native-menu",
+			/^@tauri-apps\/api\/menu$/,
+			menuStub,
+			async ({ installNativeMenu }) => {
+				const actions = [],
+					opened = [],
+					errors = [];
+				const menu = await installNativeMenu(
+					(id) => actions.push(id),
+					(target) => opened.push(target),
+					(error) => errors.push(error),
+				);
+				const flush = async () => {
+					for (let i = 0; i < 1000; i++) await Promise.resolve();
+				};
+				const state = {
+					busy: false,
+					document: false,
+					save: true,
+					folder: false,
+					sidebar: false,
+					diagram: false,
+					definition: false,
+				};
+				menu.update(state);
+				menu.recent([]);
+				await flush();
+				const recent = globalThis.reviewMenuItems.find(
+					(item) => item.text === "Open Recent",
+				);
+				assert.ok(recent);
+				assert.equal(recent.children.at(-1).text, "Clear Menu");
+				assert.equal(recent.children.at(-1).enabled, false);
+				const targets = [
+					{ kind: "file", path: "/A/shared/a.pfdsl" },
+					{ kind: "file", path: "/B/shared/a.pfdsl" },
+					{ kind: "folder", path: "/A/work" },
+					{ kind: "folder", path: "/B/work" },
+					{ kind: "file", path: "/A/work" },
+				];
+				menu.recent(targets);
+				await flush();
+				assert.deepEqual(
+					recent.children.slice(0, -2).map((item) => item.text),
+					[
+						"a.pfdsl — A/shared",
+						"a.pfdsl — B/shared",
+						"work (Folder) — A",
+						"work (Folder) — B",
+						"work",
+					],
+				);
+				assert.equal(recent.children.at(-2).item, "Separator");
+				const clear = recent.children.at(-1);
+				assert.equal(clear.id, "clear-recent");
+				assert.equal(clear.enabled, true);
+				recent.children[1].action();
+				assert.deepEqual(opened, [targets[1]]);
+				clear.action();
+				assert.deepEqual(actions, ["clear-recent"]);
+				menu.update({ ...state, busy: true });
+				await flush();
+				assert.equal(clear.enabled, false);
+				menu.update(state);
+				await flush();
+				assert.equal(clear.enabled, true);
+				menu.recent([]);
+				await flush();
+				assert.equal(recent.children.at(-1).enabled, false);
+				assert.deepEqual(errors, []);
+				menu.dispose();
+			},
+		);
+	} finally {
+		delete globalThis.reviewMenuItems;
+	}
+});
+
 test("native menu registers stable commands, applies document/busy/capability state and replaces recent items", async () => {
 	globalThis.reviewMenuItems = [];
 	try {
@@ -238,7 +344,7 @@ test("native menu reaches export, navigation, problems and comparison from the m
 	}
 });
 
-const comparisonStub = `export const editor={createModel(value){const model={value,dispose(){this.disposed=true}};(globalThis.comparisonModels??=[]).push(model);return model},createDiffEditor(element,options){globalThis.diffEditor={element,options,setModel(models){this.models=models},dispose(){this.disposed=true}};return globalThis.diffEditor}};`;
+const comparisonStub = `export const editor={createModel(value){const model={value,dispose(){this.disposed=true}};(globalThis.comparisonModels??=[]).push(model);return model},createDiffEditor(element,options){globalThis.diffEditor={element,options,onDidUpdateDiff(){return {dispose(){}}},setModel(models){this.models=models},dispose(){this.disposed=true}};return globalThis.diffEditor}};`;
 test("native menu skips unchanged properties and coalesces states arriving during an update", async () => {
 	globalThis.reviewMenuItems = [];
 	try {

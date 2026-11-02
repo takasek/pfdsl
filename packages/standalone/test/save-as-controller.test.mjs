@@ -137,8 +137,10 @@ test("choosing another file stays in one operation and releases the unused earli
 			"editor",
 			"editorVersion",
 			"kind",
+			"origin",
 			"target",
 		]);
+		assert.equal(request.origin, "save-as");
 		assert.equal(Object.isFrozen(request.target), true);
 		subject.choose(disk(3, null));
 		return "another";

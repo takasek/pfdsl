@@ -28,6 +28,7 @@ export function createDocumentTab(
 		read: options.read,
 		references: options.referenceServices,
 		exportServices: options.exportServices,
+		exportResults: options.showExportResults,
 		setSourceCalls: 0,
 		activate() {},
 		deactivate() {},

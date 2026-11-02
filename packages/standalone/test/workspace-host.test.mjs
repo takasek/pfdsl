@@ -379,8 +379,8 @@ test("tabs own selection and close controls while the header shows only state an
 		assert.equal(close.getAttribute("tabindex"), "-1");
 		assert.equal(close.getAttribute("aria-label"), "Close Untitled 1");
 		assert.equal(host.dom.window.document.title, "Untitled 1 — PFDSL");
-		assert.equal(location.textContent, "Not saved to a file");
-		assert.equal(location.title, "Not saved to a file");
+		assert.equal(location.textContent, "Untitled");
+		assert.equal(location.title, "Untitled");
 		applyProductionStyles(host);
 		const style = host.dom.window.getComputedStyle.bind(host.dom.window);
 		assert.equal(style(wrapper).backgroundColor, "rgb(230, 240, 255)");

@@ -1,17 +1,20 @@
 import type { ExportResult } from "@pfdsl/editor";
+import type { NoticeParts } from "./notice.js";
 export type ExportResultPresenter = (
 	name: string,
 	revision: number,
 	results: ExportResult[],
+	noticeName?: string,
 ) => void;
 /** Results outlive their originating tab and remain until explicitly dismissed. */
 export function createExportResults(
 	parent: HTMLElement,
 	report: (message: string) => void,
+	reportNotice?: (notice: NoticeParts) => void,
 ): ExportResultPresenter {
 	const document = parent.ownerDocument;
 	let panel: HTMLElement | undefined;
-	return (name, revision, results) => {
+	return (name, revision, results, noticeName = name) => {
 		if (!panel) {
 			panel = document.createElement("section");
 			panel.className = "export-results";
@@ -38,8 +41,12 @@ export function createExportResults(
 		}
 		batch.append(heading, close, list);
 		panel.append(batch);
-		report(
-			`Export ${name}: ${results.filter((r) => r.status === "saved").length}/${results.length} saved. See export results for paths and failures.`,
-		);
+		const notice = {
+			before: "Export ",
+			subject: noticeName,
+			after: `: ${results.filter((r) => r.status === "saved").length}/${results.length} saved. See export results for paths and failures.`,
+		};
+		if (reportNotice) reportNotice(notice);
+		else report(notice.before + notice.subject + notice.after);
 	};
 }

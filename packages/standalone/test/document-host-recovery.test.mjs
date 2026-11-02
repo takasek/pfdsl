@@ -187,7 +187,7 @@ test("Save As recovery retains target ownership and refuses intervening edits in
 		// A canceled Save As releases the newly selected target immediately.
 		saveTarget = { ...B, id: 112, source: "existing target" };
 		await command("save-as");
-		await dialogClick("Keep Editing");
+		await dialogClick("Cancel");
 		assert.ok(
 			calls.some(
 				(call) => call.command === "release_document" && call.args.id === 112,
@@ -219,10 +219,10 @@ test("Save As recovery retains target ownership and refuses intervening edits in
 		const entry = activeTab();
 		entry.setSource("local");
 		await command("save-as");
-		await dialogClick("Replace Observed Version");
+		await dialogClick("Replace");
 		// The panel names the target its buttons act on.
 		const recoveryPath = () =>
-			/Recovery target: (.*)\.$/.exec(
+			/Saving to (.*)\.$/.exec(
 				document.querySelector("#conflicts p")?.textContent ?? "",
 			)?.[1];
 		const results = {
@@ -256,7 +256,7 @@ test("Save As recovery retains target ownership and refuses intervening edits in
 		await command("open-file");
 		const uncertain = activeTab();
 		await command("save-as");
-		await dialogClick("Replace Observed Version");
+		await dialogClick("Replace");
 		assert.equal(isDirty(uncertain), true);
 		assert.equal(uncertain.location, selectedDocument.path);
 
@@ -267,7 +267,7 @@ test("Save As recovery retains target ownership and refuses intervening edits in
 		);
 		assert.match(
 			document.querySelector("#conflicts").textContent,
-			/Recovery target: \/uncertain\/b.pfdsl/,
+			/Saving to \/uncertain\/b.pfdsl/,
 		);
 		const recoveryButtons = [...document.querySelectorAll("#conflicts button")];
 		assert.equal(
@@ -302,7 +302,7 @@ test("Save As recovery retains target ownership and refuses intervening edits in
 			const nativeFailure = activeTab();
 			nativeFailure.setSource(packet.buffer);
 			await command("save-as");
-			await dialogClick("Replace Observed Version");
+			await dialogClick("Replace");
 			assert.match(
 				document.querySelector("#conflicts").textContent,
 				/Content was published/,
@@ -359,7 +359,7 @@ test("Save As recovery retains target ownership and refuses intervening edits in
 		entry.button.click();
 		// Recreate B's pending recovery; choose its disk version before an A poll.
 		await command("save-as");
-		await dialogClick("Replace Observed Version");
+		await dialogClick("Replace");
 		let release;
 		pendingInspect = new Promise((resolve) => (release = resolve));
 		await click("#conflicts button:nth-of-type(3)");
@@ -501,7 +501,7 @@ test("Save As recovery retains target ownership and refuses intervening edits in
 			).args.approved,
 			false,
 		);
-		await dialogClick("Keep Editing");
+		await dialogClick("Cancel");
 		await application.idle();
 		const promptsAfterBusy = calls.filter(
 			(c) => c.command === "confirm_close_document",
