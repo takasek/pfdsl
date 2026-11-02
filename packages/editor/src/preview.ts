@@ -101,7 +101,7 @@ export function mountPreview(container: HTMLElement, host: PreviewHost) {
 		help.hidden = !open;
 		helpToggle.setAttribute("aria-expanded", String(open));
 	}
-	on(helpToggle, "click", () => setHelpOpen(help.hidden));
+	on(helpToggle, "click", () => setHelpOpen(Boolean(help.hidden)));
 	on(document, "click", (event) => {
 		const target = event.target;
 		if (
@@ -224,10 +224,7 @@ export function mountPreview(container: HTMLElement, host: PreviewHost) {
 	on(container, "keydown", (e) => {
 		if (e.key === "Escape" && !e.isComposing) {
 			hideHover();
-			if (!help.hidden) {
-				setHelpOpen(false);
-				return;
-			}
+			if (!help.hidden) setHelpOpen(false);
 			closeActions();
 		}
 	});

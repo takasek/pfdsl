@@ -127,6 +127,33 @@ it("closes Help and resets aria-expanded on Escape", () => {
 	expect(toggle.getAttribute("aria-expanded")).toBe("false");
 });
 
+it("closes Connections too when Escape closes Help over it", async () => {
+	const s = setup();
+	await s.preview.receive({
+		type: "render",
+		dot: "a",
+		editing: {
+			source: "a\n",
+			nodes: [{ id: "a", kind: "artifact" as const, defined: false }],
+		},
+	});
+	s.flush();
+	s.click("node-actions-toggle");
+	const actions = s.container.querySelector<HTMLElement>("#node-actions")!;
+	expect(actions.hidden).toBe(false);
+	const toggle = s.container.querySelector<HTMLButtonElement>(
+		"#preview-help-toggle",
+	)!;
+	toggle.click();
+	toggle.dispatchEvent(
+		new KeyboardEvent("keydown", { key: "Escape", bubbles: true }),
+	);
+	expect(s.container.querySelector<HTMLElement>("#preview-help")!.hidden).toBe(
+		true,
+	);
+	expect(actions.hidden).toBe(true);
+});
+
 it("closes Help and resets aria-expanded on an outside click", () => {
 	const s = setup();
 	const help = s.container.querySelector<HTMLElement>("#preview-help")!;
