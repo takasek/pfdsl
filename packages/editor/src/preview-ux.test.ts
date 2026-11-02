@@ -508,6 +508,103 @@ it("fits a Fit view again after a host resize made while an error was shown", as
 	expect(s.container.querySelector("#zoom-level")!.textContent).toBe("23%");
 });
 
+it("keeps Fit refits to host resizes across every short sequence of view events", async () => {
+	type Step = "host" | "panel" | "error" | "recover" | "zoom" | "fit";
+	const steps: Step[] = ["host", "panel", "error", "recover", "zoom", "fit"];
+	const sequences: Step[][] = [[]];
+	for (let length = 0; length < 4; length++)
+		for (const sequence of sequences.splice(0))
+			for (const step of steps) sequences.push(sequence, [...sequence, step]);
+	const unique = [...new Map(sequences.map((q) => [q.join(), q])).values()];
+	const graph = { width: 1600, height: 800 };
+	const fitScale = (width: number, height: number) =>
+		Math.min(1, (width - 32) / graph.width, (height - 32) / graph.height);
+	const scaleOf = (transform: string) =>
+		Number(/scale\(([^)]+)\)/.exec(transform)?.[1]);
+	let resized!: ResizeObserverCallback;
+	vi.stubGlobal(
+		"ResizeObserver",
+		class {
+			constructor(callback: ResizeObserverCallback) {
+				resized = callback;
+			}
+			observe() {}
+			disconnect() {}
+		},
+	);
+	cleanups.push(() => vi.unstubAllGlobals());
+	for (const sequence of unique) {
+		const s = setup(graph.width, graph.height);
+		resized([], {} as ResizeObserver);
+		await s.preview.receive({ type: "render", dot: "a" });
+		s.flush();
+		// The model: what the graph area is, and whether the view is still Fit.
+		let area = { width: 400, height: 300 };
+		let panel = false;
+		let error = false;
+		let fit = true;
+		let hostChangedWhileFit = false;
+		let expected = scaleOf(s.inner.style.transform);
+		for (const step of sequence) {
+			const label = `${sequence.join(" > ")}: ${step}`;
+			if (step === "host") {
+				area = { width: area.width === 400 ? 800 : 400, height: area.height };
+				if (error) {
+					s.setHost(area.width, area.height + 60);
+					resized([], {} as ResizeObserver);
+				} else {
+					s.resizeHost(area.width, area.height - (panel ? 60 : 0));
+					resized([], {} as ResizeObserver);
+				}
+				if (fit) hostChangedWhileFit = true;
+			} else if (step === "panel") {
+				if (error) continue;
+				panel = !panel;
+				s.resizeRoot(area.width, area.height - (panel ? 60 : 0));
+				resized([], {} as ResizeObserver);
+			} else if (step === "error") {
+				if (error) continue;
+				error = true;
+				await s.preview.receive({
+					type: "error",
+					message: "P007: Invalid source",
+				});
+				s.resizeRoot(0, 0);
+				resized([], {} as ResizeObserver);
+			} else if (step === "recover") {
+				if (!error) continue;
+				error = false;
+				s.resizeRoot(area.width, area.height - (panel ? 60 : 0));
+				await s.preview.receive({ type: "render", dot: "a" });
+				s.flush();
+			} else if (step === "zoom") {
+				if (error) continue;
+				s.click("zoom-in");
+				fit = false;
+				hostChangedWhileFit = false;
+				expected = scaleOf(s.inner.style.transform);
+			} else {
+				if (error) continue;
+				s.click("fit-graph");
+				fit = true;
+				hostChangedWhileFit = false;
+				expected = scaleOf(s.inner.style.transform);
+				expect(expected, label).toBeCloseTo(
+					fitScale(area.width, area.height - (panel ? 60 : 0)),
+				);
+			}
+			if (error) continue;
+			const actual = scaleOf(s.inner.style.transform);
+			if (fit && hostChangedWhileFit) {
+				expected = fitScale(area.width, area.height - (panel ? 60 : 0));
+				hostChangedWhileFit = false;
+			}
+			expect(actual, label).toBeCloseTo(expected);
+		}
+		s.preview.dispose();
+	}
+});
+
 it("keeps Fit after a press that does not move the graph", async () => {
 	let resized!: ResizeObserverCallback;
 	vi.stubGlobal(
