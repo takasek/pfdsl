@@ -94,7 +94,7 @@ describe("findNearDefinedNodeIds", () => {
 			findNearDefinedNodeIds(
 				frontmatterWith("artifact", ["contract"]),
 				"artifact",
-				"conract",
+				"conrtact",
 			),
 		).toEqual(["contract"]);
 	});
@@ -104,6 +104,8 @@ describe("findNearDefinedNodeIds", () => {
 		["release_v3", "release_v2"],
 		["plugin_c", "plugin_a"],
 		["a", "b"],
+		["ch０６", "ch０５"],
+		["plugin_𝔹", "plugin_𝔸"],
 	])("does not suggest sequential ID %s for %s", (id, candidate) => {
 		expect(
 			findNearDefinedNodeIds(

@@ -72,8 +72,8 @@ function hasOptimalStringAlignmentDistanceOne(left: string, right: string) {
 }
 
 function areSequentialIds(left: string, right: string) {
-	const leftNumberParts = left.split(/[0-9]+/g);
-	const rightNumberParts = right.split(/[0-9]+/g);
+	const leftNumberParts = left.split(/\p{Nd}+/gu);
+	const rightNumberParts = right.split(/\p{Nd}+/gu);
 	if (
 		leftNumberParts.length === rightNumberParts.length &&
 		leftNumberParts.every((part, index) => part === rightNumberParts[index])
@@ -89,10 +89,11 @@ function areSequentialIds(left: string, right: string) {
 		if (differingSegment !== -1) return false;
 		differingSegment = index;
 	}
+	// Count code points, as the edit distance does.
 	return (
 		differingSegment !== -1 &&
-		leftSegments[differingSegment]!.length === 1 &&
-		rightSegments[differingSegment]!.length === 1
+		Array.from(leftSegments[differingSegment]!).length === 1 &&
+		Array.from(rightSegments[differingSegment]!).length === 1
 	);
 }
 
