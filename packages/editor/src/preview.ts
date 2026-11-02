@@ -631,17 +631,28 @@ export function mountPreview(container: HTMLElement, host: PreviewHost) {
 	}
 	let containerWidth = container.clientWidth;
 	let containerHeight = container.clientHeight;
+	let shownWidth = containerWidth;
+	let shownHeight = containerHeight;
 	// Panel content also resizes the graph; only a host resize dismisses menus
 	// and fits a Fit view again, so opening Connections leaves the view alone.
+	// A hidden host measures 0, which is a change of visibility, not of size:
+	// the refit compares the sizes the host had while shown.
 	function resizeHost() {
-		if (
-			container.clientWidth !== containerWidth ||
-			container.clientHeight !== containerHeight
-		) {
-			containerWidth = container.clientWidth;
-			containerHeight = container.clientHeight;
+		const width = container.clientWidth;
+		const height = container.clientHeight;
+		if (width !== containerWidth || height !== containerHeight) {
+			containerWidth = width;
+			containerHeight = height;
 			connections.resize();
-			refitPending = hasPositioned;
+		}
+		if (
+			width > 0 &&
+			height > 0 &&
+			(width !== shownWidth || height !== shownHeight)
+		) {
+			refitPending = hasPositioned && shownWidth > 0 && shownHeight > 0;
+			shownWidth = width;
+			shownHeight = height;
 		}
 		positionGraph();
 	}

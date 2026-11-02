@@ -508,9 +508,26 @@ it("fits a Fit view again after a host resize made while an error was shown", as
 	expect(s.container.querySelector("#zoom-level")!.textContent).toBe("23%");
 });
 
-it("keeps Fit refits to host resizes across every short sequence of view events", async () => {
-	type Step = "host" | "panel" | "error" | "recover" | "zoom" | "fit";
-	const steps: Step[] = ["host", "panel", "error", "recover", "zoom", "fit"];
+it("refits a Fit view only for host resizes across every short sequence of view events", async () => {
+	type Step =
+		| "host"
+		| "panel"
+		| "error"
+		| "recover"
+		| "zoom"
+		| "fit"
+		| "hide"
+		| "show";
+	const steps: Step[] = [
+		"host",
+		"panel",
+		"error",
+		"recover",
+		"zoom",
+		"fit",
+		"hide",
+		"show",
+	];
 	const sequences: Step[][] = [[]];
 	for (let length = 0; length < 4; length++)
 		for (const sequence of sequences.splice(0))
@@ -542,12 +559,21 @@ it("keeps Fit refits to host resizes across every short sequence of view events"
 		let area = { width: 400, height: 300 };
 		let panel = false;
 		let error = false;
+		let hidden = false;
 		let fit = true;
 		let hostChangedWhileFit = false;
-		let expected = scaleOf(s.inner.style.transform);
+		let expected = s.inner.style.transform;
 		for (const step of sequence) {
 			const label = `${sequence.join(" > ")}: ${step}`;
-			if (step === "host") {
+			if (step === "hide" || step === "show") {
+				if (hidden === (step === "hide")) continue;
+				hidden = step === "hide";
+				if (hidden) s.hide();
+				else s.show();
+				resized([], {} as ResizeObserver);
+			} else if (hidden && step !== "host") {
+				continue;
+			} else if (step === "host") {
 				area = { width: area.width === 400 ? 800 : 400, height: area.height };
 				if (error) {
 					s.setHost(area.width, area.height + 60);
@@ -582,24 +608,27 @@ it("keeps Fit refits to host resizes across every short sequence of view events"
 				s.click("zoom-in");
 				fit = false;
 				hostChangedWhileFit = false;
-				expected = scaleOf(s.inner.style.transform);
+				expected = s.inner.style.transform;
 			} else {
 				if (error) continue;
 				s.click("fit-graph");
 				fit = true;
 				hostChangedWhileFit = false;
-				expected = scaleOf(s.inner.style.transform);
-				expect(expected, label).toBeCloseTo(
+				expected = s.inner.style.transform;
+				expect(scaleOf(expected), label).toBeCloseTo(
 					fitScale(area.width, area.height - (panel ? 60 : 0)),
 				);
 			}
-			if (error) continue;
-			const actual = scaleOf(s.inner.style.transform);
+			if (error || hidden) continue;
+			const actual = s.inner.style.transform;
 			if (fit && hostChangedWhileFit) {
-				expected = fitScale(area.width, area.height - (panel ? 60 : 0));
+				expect(scaleOf(actual), label).toBeCloseTo(
+					fitScale(area.width, area.height - (panel ? 60 : 0)),
+				);
+				expected = actual;
 				hostChangedWhileFit = false;
 			}
-			expect(actual, label).toBeCloseTo(expected);
+			expect(actual, label).toBe(expected);
 		}
 		s.preview.dispose();
 	}
