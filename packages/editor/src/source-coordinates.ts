@@ -6,6 +6,16 @@ import type {
 	Statement,
 } from "@pfdsl/core";
 
+/**
+ * Codes whose core range uses body offsets: lexer/parser ranges and the graph
+ * diagnostics located on body edges or IDs. Metadata (V020's declaration
+ * included) and document-wide diagnostics already have their own full-source
+ * or zero-range contract.
+ */
+export function hasBodyRange(code: string): boolean {
+	return /^([LP]\d+|V00[123]|V01[01]|V036|W008)$/.test(code);
+}
+
 /** Adapt only core's body positions to the editor snapshot's full-source UTF-16 coordinates. */
 export function snapshotCoordinates(
 	model: ReturnType<typeof analyzeSource>,
@@ -63,11 +73,10 @@ export function snapshotCoordinates(
 			...model.document,
 			statements: model.document.statements.map(statement),
 		},
-		// Lexer/parser ranges and V036's edge range share body offsets. Metadata
-		// and document-wide diagnostics already have their own full-source or
-		// zero-range contract.
 		diagnostics: model.diagnostics.map((diagnostic) =>
-			/^([LP]\d+|V036)$/.test(diagnostic.code)
+			// A located rule that found no body position keeps the document start.
+			hasBodyRange(diagnostic.code) &&
+			diagnostic.range.start.line >= model.bodyStartLine
 				? { ...diagnostic, range: endpoints(diagnostic.range) }
 				: diagnostic,
 		),

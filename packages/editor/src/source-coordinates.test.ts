@@ -7,7 +7,7 @@ import {
 	nodeIdAtSourcePosition,
 	positionOfNodeId,
 } from "./index.js";
-import { snapshotCoordinates } from "./source-coordinates.js";
+import { hasBodyRange, snapshotCoordinates } from "./source-coordinates.js";
 
 const ids = [
 	["ascii", "ascii"],
@@ -101,10 +101,9 @@ describe.each(["\n", "\r\n"])("editor source coordinates with %j", (eol) => {
 		const raw = analyzeSource(source);
 		const model = analyzeSnapshot(source);
 		expect(model.sourceMap).toEqual(raw.sourceMap);
-		expect(model.diagnostics.filter((d) => !/^[LP]\d+$/.test(d.code))).toEqual(
-			raw.diagnostics.filter((d) => !/^[LP]\d+$/.test(d.code)),
+		expect(model.diagnostics.filter((d) => !hasBodyRange(d.code))).toEqual(
+			raw.diagnostics.filter((d) => !hasBodyRange(d.code)),
 		);
-		expect(model.diagnostics.some((d) => d.code === "V010")).toBe(true);
 		expect(model.diagnostics.some((d) => d.code === "W007")).toBe(true);
 	});
 });
@@ -191,5 +190,99 @@ it.each([
 	expect(diagnostic.range).toEqual({
 		start: { line: 5, column: 1, offset: start },
 		end: { line: 5, column: '"成果😀" >>? p'.length + 1, offset: end },
+	});
+});
+
+it.each([
+	"\n",
+	"\r\n",
+])("adapts body-derived graph diagnostic ranges to full-source UTF-16 coordinates (%j)", (eol) => {
+	const prefix = ["---", "process:", "  orphan: { label: O }", "---", ""].join(
+		eol,
+	);
+	const body = [
+		'"成果😀" >> p -> b',
+		"b >> q -> c",
+		"c >> r -> b",
+		"s -> d",
+		"",
+	].join(eol);
+	const source = prefix + body;
+	const diagnostics = analyzeSnapshot(source).diagnostics;
+	/** The first `length` UTF-16 units of the unique `text` on `line`. */
+	const span = (line: number, text: string, length = text.length) => {
+		const offset = source.indexOf(text);
+		const column = offset - source.lastIndexOf("\n", offset - 1);
+		return {
+			start: { line, column, offset },
+			end: { line, column: column + length, offset: offset + length },
+		};
+	};
+
+	expect(diagnostics.find((d) => d.code === "V010")!.range).toEqual(
+		span(7, "r -> b"),
+	);
+	expect(diagnostics.find((d) => d.code === "V002")!.range).toEqual(
+		span(8, "s -> d", 1),
+	);
+	// Front-matter declarations already carry full-source coordinates.
+	expect(diagnostics.find((d) => d.code === "V020")!.range).toEqual(
+		analyzeSource(source).diagnostics.find((d) => d.code === "V020")!.range,
+	);
+});
+
+describe.each(["\n", "\r\n"])("located graph diagnostics with %j", (eol) => {
+	const prefix = ["---", "process:", "  orphan: { label: O }", "---", ""].join(
+		eol,
+	);
+	const bodyStartLine = 5;
+	const covered = ["V001", "V002", "V003", "V010", "W008", "V036"];
+	const body = [
+		'"成果😀" >> p -> b',
+		"b >> q -> c",
+		"c >> r -> b",
+		"s -> d",
+		"d >> t",
+		"x >>? w -> y",
+		"e >> u -> f",
+		"e >>? u",
+		"",
+	].join(eol);
+	const source = prefix + body;
+	const diagnostics = analyzeSnapshot(source).diagnostics;
+
+	it("triggers every converted graph code the check below relies on", () => {
+		for (const code of covered)
+			expect(
+				diagnostics.some((d) => d.code === code),
+				code,
+			).toBe(true);
+	});
+
+	it("puts each converted graph diagnostic on source text naming its subject", () => {
+		for (const d of diagnostics.filter((d) => covered.includes(d.code))) {
+			expect(hasBodyRange(d.code), d.code).toBe(true);
+			expect(d.range.start.line, d.code).toBeGreaterThanOrEqual(bodyStartLine);
+			const text = source.slice(d.range.start.offset, d.range.end.offset);
+			const named = [...d.message.matchAll(/'([^']+)'/g)].map((m) => m[1]!);
+			expect(
+				named.some((id) => text.includes(id)),
+				`${d.code} ${JSON.stringify(text)} ${d.message}`,
+			).toBe(true);
+		}
+	});
+
+	it("leaves a graph diagnostic that fell back to the document start unconverted", () => {
+		const model = analyzeSource(source);
+		const zero = {
+			start: { line: 1, column: 1, offset: 0 },
+			end: { line: 1, column: 1, offset: 0 },
+		};
+		const fallback = { ...model.diagnostics[0]!, code: "V010", range: zero };
+		const adapted = snapshotCoordinates(
+			{ ...model, diagnostics: [fallback] },
+			source,
+		);
+		expect(adapted.diagnostics[0]!.range).toEqual(zero);
 	});
 });
