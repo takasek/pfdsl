@@ -105,7 +105,11 @@ metadata contains row if {
     some offset, line in split(b.text, "\n")
     replacement_line(line)
     some ref in regex.find_n(`ADR-[0-9]*`, line, -1)
-    row := {"doc": doc, "line": source_line(b, offset), "block": b, "ref": ref}
+    # Blank source lines are omitted from block text. Bound each item's
+    # possible location by the number of text lines before and after it.
+    first := b.line + offset
+    last := b.end_line - count(split(b.text, "\n")) + 1 + offset
+    row := {"doc": doc, "line": source_line(b, offset), "first": first, "last": last, "text": line, "ref": ref}
 }
 # When blank lines were stripped, the block start is the reliable fallback.
 source_line(b, offset) := b.line + offset if {
@@ -118,8 +122,9 @@ deny contains finding("adr-replacement", row.doc, row.line, concat("", ["Replace
 deny contains finding("adr-replacement", row.doc, l.line, "Replacement link does not resolve to the named ADR") if {
     some row in metadata
     some l in row.doc.links
-    l.line >= row.block.line
-    l.line <= row.block.end_line
+    l.line >= row.first
+    l.line <= row.last
+    contains(row.text, l.text)
     row.ref in regex.find_n(`ADR-[0-9]+`, l.text, -1)
     exists_id(row.ref)
     not correct_target(l, row.ref)

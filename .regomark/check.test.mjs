@@ -99,3 +99,8 @@ test("checks a replacement link on its physical line in a loose list", (t) => {
 		"# ADR-0001: Old\n\n- Date: 2026\n\n- Status: Superseded by [ADR-0002: New](missing.md)\n";
 	assert.deepEqual(check(t, { old }), [["adr-replacement", "0001-old.md", 5]]);
 });
+
+test("ignores related links outside the replacement declaration", (t) => {
+	const old = first + "\n- Related: [PR implementing ADR-0002](https://example.org/pr/3)\n";
+	assert.deepEqual(check(t, { old }), []);
+});
