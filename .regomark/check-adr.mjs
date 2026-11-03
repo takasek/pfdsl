@@ -1,6 +1,9 @@
 import { spawn } from "node:child_process";
 import { readFileSync } from "node:fs";
+import { parseArgs } from "node:util";
 import { fromMarkdown } from "mdast-util-from-markdown";
+
+const { values } = parseArgs({ options: { json: { type: "boolean" } }, strict: true });
 
 // dump supplies resolved links and their physical lines. A list block's text
 // has no blank lines, so it cannot tell us which item owns a link.
@@ -94,7 +97,7 @@ for (const doc of documents) {
 		}
 	}
 }
-if (process.argv.includes("--json")) {
+if (values.json) {
 	console.log(JSON.stringify(findings));
 } else {
 	for (const { path, line, rule, message } of findings) {
