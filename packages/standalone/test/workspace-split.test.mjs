@@ -89,6 +89,23 @@ test("keeps the divider's range within the pane minimum widths", async () => {
 			window.dispatchEvent(new window.Event("resize"));
 			assert.equal(divider.getAttribute("aria-valuemax"), "65");
 			assert.equal(divider.getAttribute("aria-valuenow"), "65");
+			// At the native minimum, both panes exactly fill the available space.
+			tab.container.getBoundingClientRect = () =>
+				new window.DOMRect(0, 0, 706, 600);
+			window.dispatchEvent(new window.Event("resize"));
+			for (const name of ["Home", "End", "ArrowLeft", "ArrowRight"]) {
+				key(name);
+				assert.equal(divider.getAttribute("aria-valuemin"), "63");
+				assert.equal(divider.getAttribute("aria-valuemax"), "63");
+				assert.equal(divider.getAttribute("aria-valuenow"), "63");
+				assert.ok(
+					Math.abs(
+						Number(tab.container.style.getPropertyValue("--source-ratio")) *
+							700 -
+							440,
+					) < 1e-10,
+				);
+			}
 			tab.dispose();
 		},
 	);

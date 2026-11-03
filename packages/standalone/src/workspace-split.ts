@@ -24,7 +24,7 @@ export function createWorkspaceSplit(
 		const available = container.getBoundingClientRect().width - 6;
 		const editor = minimum("--editor-min-width");
 		const preview = minimum("--preview-min-width");
-		if (!(available > editor + preview)) return [10, 90];
+		if (!(available > 0 && available >= editor + preview)) return [10, 90];
 		return [
 			Math.max(10, (editor / available) * 100),
 			Math.min(90, 100 - (preview / available) * 100),
