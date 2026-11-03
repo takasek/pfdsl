@@ -1,6 +1,6 @@
 # ADR-0034: pfdsl は `.pfdsl` frontmatter のフォーマットを所有する
 
-- Status: Accepted
+- Status: Accepted（再整形の範囲は [ADR-0037](0037-folded-scalar-wrap-preservation.md) が狭めた。所有の判断は維持）
 - Date: 2026-07-28
 
 ## Context

@@ -50,7 +50,7 @@
 - **ADR-0014** [ゲート項目の反実仮想テスト](0014-gate-item-counterfactual-test.md) — 条件付きゲート項目は充足を反証可能テストで先判定しデフォルトを「書かない」に倒す、payoff は「PFD なしで判断が違ったか」を引用できる時のみ記録する
 - **ADR-0015** [samples は TSV 管理、examples は frontmatter 管理](0015-samples-tsv-examples-frontmatter.md) — 最小構文サンプルは TSV でメタデータ外部管理、realistic domain examples は frontmatter で管理する意図的非対称方針
 - **ADR-0016** [pfd-ops install/ 集約](0016-install-paradigm.md)（配布経路は ADR-0028、配布物のディレクトリ構造は ADR-0032 が改訂。`install/` を編集の起点とする向きと配布対象を列挙しない方針は ADR-0052 が部分置換） — 配布可能ファイルを install/ に集約し CI で canonical と deployed の identity を強制する
-- **ADR-0017** [PFDファイル種別の3分類](0017-pfd-kind-taxonomy.md) — roadmap / workflow / pipeline を「答える問い」で区別し ecosystem 種別を廃止する
+- **ADR-0017** [PFDファイル種別の3分類](0017-pfd-kind-taxonomy.md)（種別を判定する「主役」の表現は ADR-0035 が部分置換） — roadmap / workflow / pipeline を「答える問い」で区別し ecosystem 種別を廃止する
 - **ADR-0018** [成果物の門番は双方向](0018-successor-gatekeeper.md) — 手段成果物（仕様・設計・計画・提案）は終端たりえず、出力時点で消費する後続をプレースホルダ登録する
 - **ADR-0019** [tags はノード横断ラベル + `tag:` 定義ブロック](0019-process-tags.md) — subroutine 却下の代替。tags を Artifact / Process 両種別の横断ラベルとし、`label` / `description` / `style` を持つ `tag:` 定義ブロックを新設（`tagStyles` 廃止・統合、status は Artifact 専用据え置き）
 - **ADR-0020** [仕様制約は具体例トレースで実装前に検証する](0020-spec-constraint-stress-testing.md) — 散文は未定義動作を隠す。境界カテゴリ（粒度・名前・N:M・循環・diamond・部分マップ）の具体例を normative 制約にトレースして判定まで詰め、未定義を spec 決定で潰す。worked example は [サブディレクトリ](0020-spec-stress-testing/boundary-validation-log.md)に保存
@@ -67,7 +67,7 @@
 - **ADR-0031** [配布スキルの CLI 呼び出しを素の `pfdsl` に統一する](0031-skill-cli-global-invocation.md) — スキル/エージェント本文の `npx @pfdsl/cli`（約48箇所）を素の `pfdsl` に統一。#67 の npx 化は #524 の preflight 導入で前提が変わり、npx の恒常コスト（約 +0.45s/回）だけが残っていた。版固定 npx を fallback として残置。issue #67 を改訂
 - **ADR-0032** [pfd-ops 配布物を専用ディレクトリ `scripts/pfdsl/` に隔離する](0032-pfd-ops-install-dedicated-dir.md) — 採用リポの `scripts/lib/gh-exec.mjs` 等は pfdsl 由来か自リポ独自か区別がつかなかった。実体スクリプトを `scripts/pfdsl/` へ集約し、ワークフロー本体は fat workflow のまま参照パスだけ更新する。初版で試みた composite action 化は独立レビューで棄却 — ADR-0016 が却下した cross-directory coupling は plugin 配布移行後も本質的に解消していないと判明した
 - **ADR-0033** [作業項目が列挙する案の集合を設計空間とみなさない](0033-generate-a-comparison-alternative.md) — 「立ち止まれ」型の規則は原理的に効かない（信号は既に検出されている）。「比較対象を生成する」を1原則とし work-cycle 手順1・手順2 の3適用点に置く。前提の1文 → 前提を否定した案の生成 → 却下理由の語彙制限（「手間」「大がかり」「スコープ外」を無効化）
-- **ADR-0034** [pfdsl は frontmatter フォーマットを所有する](0034-pfdsl-owns-frontmatter-format.md) — `fmt`・`meta set`・`sort`・`reindex`・`insert-definition` の frontmatter 書き換えを CST（`yaml` パッケージの `Document`）ベースへ統一し、正規表現による行・文字位置ベースの手術コードを廃止する。破壊的変更として既存ファイルは再整形される
+- **ADR-0034** [pfdsl は frontmatter フォーマットを所有する](0034-pfdsl-owns-frontmatter-format.md)（再整形の範囲は ADR-0037 が狭めた） — `fmt`・`meta set`・`sort`・`reindex`・`insert-definition` の frontmatter 書き換えを CST（`yaml` パッケージの `Document`）ベースへ統一し、正規表現による行・文字位置ベースの手術コードを廃止する。破壊的変更として既存ファイルは再整形される
 - **ADR-0035** [種別を分ける軸は判断の有無、読み手はファイル分割の軸](0035-kind-axis-is-judgment.md) — ADR-0017 の「主役」表現は LLM 担当の判断と境界起因の人手を判定できない。判定軸を判断の有無に一本化し、実行主体は `owner` で表す。読み手軸は種別軸にすると変換チェーンの終端がファイル境界になり縫い代が 2.7 倍になるため、ファイル分割の軸として積極利用する側に格上げする
 - **ADR-0036** [配布プロンプトは公開境界でレビューし、承認済み commit を記録する](0036-distribution-review-gate.md) — 散文の規約は #340 → PR #374 → #674 の同型再発を止めなかった。決定可能な違反は毎 CI の機械検査、残りは sandbox に隔離した subagent を利用側の読み手として走らせるレビューが見る。承認済み commit hash と配布ツリーの齟齬で `make release` を止め、ADR-0029 が持たなかった起動条件を公開境界の希少性に置く
 - **ADR-0037** [frontmatter の所有は表現の正準化までとし、著者の改行意図は保存する](0037-folded-scalar-wrap-preservation.md) — ADR-0034 の全文再直列化は folded scalar (`>`) の手書き折返しを5経路すべてで畳んでいた。インデント幅は正準化する一方、改行位置は著者の意図として保存する線引きを追加し、`renderFrontmatterCst` の後処理1箇所で実装する。PR #712 のバイト範囲スプライス方式は破棄する
