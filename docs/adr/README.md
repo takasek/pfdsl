@@ -25,7 +25,7 @@
 - **ADR-0045** [依存閉包を共有し、編集の拒否を影響する関係に絞る](0045-dependency-closure-and-scoped-edit-gates.md) — check は全依存を検査し、rename/delete は具体的に壊れうる group 継承・変更後 boundary だけを依存側の拒否対象にする。
 
 - **ADR-0038** [retro-patterns を事例記録へ移す](0038-retro-case-migration.md) — 対策の抽出・自動選別を終了し、再発防止を既存の操作手順・入力・道具・テストが所有する。検索できる証拠と毎サイクルの retro、独立レビューを維持する。
-- **ADR-0039** [配布層の所有範囲を提供すると決めた用途で定める](0039-distribution-scope-by-provided-purpose.md)（区分 ii の要件、D 層・設計記録の配置・再承認参照の区分、readback の置き場所、`takasek/common` を移設先とした記述は ADR-0048 が部分置換） — ADR-0023 の昇格基準は「固有名詞を含まず全利用者に効く」だけを条件としたため、PFD 運用に固有の用途を持たない規律（git 衛生・委譲・設計記録の書式）が配布層を占めた。3区分を定め、昇格の0段目に「提供すると決めた用途に入るか」を置き、区分 iii を採用リポの binding へ移す。知識成果物ライフサイクル監査は binding の採用宣言で有効化する選択項目にする
+- **ADR-0039** [配布層の所有範囲を提供すると決めた用途で定める](0039-distribution-scope-by-provided-purpose.md)（区分の境界は ADR-0040 で明確化、D 層の採用宣言の記法は ADR-0041 で変更。区分 ii の要件、D 層・設計記録の配置・再承認参照の区分、readback の置き場所、`takasek/common` を移設先とした記述は ADR-0048 が部分置換） — ADR-0023 の昇格基準は「固有名詞を含まず全利用者に効く」だけを条件としたため、PFD 運用に固有の用途を持たない規律（git 衛生・委譲・設計記録の書式）が配布層を占めた。3区分を定め、昇格の0段目に「提供すると決めた用途に入るか」を置き、区分 iii を採用リポの binding へ移す。知識成果物ライフサイクル監査は binding の採用宣言で有効化する選択項目にする
 - **ADR-0040** [監査の対象についての契約と、1回の監査の実行管理を別の区分に置く](0040-audit-target-versus-run-management.md)（知識成果物のライフサイクル監査の項目を区分 ii とした記述は ADR-0048 が部分置換） — ADR-0039 の0段目は「終端監査の契約」を区分 i に挙げたが、実行 ID・cutoff・checkpoint 等で1回の監査を凍結する規律はどの区分の文言にも当たらなかった。監査に関わる区分 i・ii の項目は監査の対象について何を判定するか、その実行管理は区分 iii とし、自リポ binding の昇格指示も0段目に揃える
 - **ADR-0041** [pfd-retro D 層の採用宣言を3値の構造化宣言にする](0041-retro-d-layer-declaration-token.md) — ADR-0039 の決定は変えず、宣言を `.pfdsl/config.json` の `knowledgeLifecycleAudit`（`mode` と `targets`）にする。宣言が無い・不正な状態は監査せず所有者へ毎回報告し、宣言を知らない旧版の採用先と選んだ採用先を区別する
 - **ADR-0042** [採用先の宣言の値を `.pfdsl/config.json` に置く](0042-adopter-config-file.md) — 切り替えや列挙のような宣言の値は採用先が git 管理する `.pfdsl/config.json` に置き、散文の binding はそのキーを指す。completed-chain sweep は同ファイルで有効にしない限り動かさない。移行状態の置き場所もここに予約する
@@ -56,7 +56,7 @@
 - **ADR-0020** [仕様制約は具体例トレースで実装前に検証する](0020-spec-constraint-stress-testing.md) — 散文は未定義動作を隠す。境界カテゴリ（粒度・名前・N:M・循環・diamond・部分マップ）の具体例を normative 制約にトレースして判定まで詰め、未定義を spec 決定で潰す。worked example は [サブディレクトリ](0020-spec-stress-testing/boundary-validation-log.md)に保存
 - **ADR-0021** [外部ツール専用フィールドは spec に入れない](0021-no-external-only-spec-fields.md) — 値の意味づけが完全に外部ツール依存で pfdsl 単体（グラフ意味論 / 可視化 / `check`）に寄与しないフィールドは不採用。`schedule:`（#220）を not planned とし `index:`（#221）は単体価値ありとして維持
 - **ADR-0022** [ファイル書き換え CLI は gofmt 出力モデル](0022-cli-mutation-output-model.md)（`meta set` を対象外とした適用範囲は ADR-0030 が部分置換） — ファイルを変える CLI は既定で本体を stdout、`--write` でインプレース＋レポートを stdout、`--check` で CI ドリフト検出、stderr は診断専用。副作用と stdout の中身を分離する
-- **ADR-0023** [L4 companion から配布層への昇格経路](0023-l4-promotion-route.md) — companion は配布されないため汎用知見が滞留する。固有名詞を含まないルールを昇格候補として検出する「L4 滞留監査」を retro D 層に追加する
+- **ADR-0023** [L4 companion から配布層への昇格経路](0023-l4-promotion-route.md)（昇格基準は ADR-0039 が改訂） — companion は配布されないため汎用知見が滞留する。固有名詞を含まないルールを昇格候補として検出する「L4 滞留監査」を retro D 層に追加する
 - **ADR-0024** [retro 実行記録と差分計測可能な起動条件](0024-retro-execution-record.md)（Superseded by ADR-0026） — 「たまったら」は基準点なしで判定不能。retro 実行記録を workflow companion に残し、起動条件を前回以降の差分計測形に書き換える
 - **ADR-0025** [レビューカタログは抽象レンズを配布、具体例は repo-local instance](0025-review-catalog-lens-example-split.md) — 「各問いは実際に検出された誤りに由来する」具体例は本質的に repo-local。配布層は A/B/C の観点の枠組みのみ、pfdsl 固有の例示・機構は専用 instance ファイルへ降格する ADR-0023 の鏡像
 - **ADR-0026** [retro トリガーを done イベント駆動に一本化し実行記録を廃止](0026-retro-trigger-done-event.md) — 実行記録は並列 worktree でコンフリクトする上、閾値条件は導入以来一度も単独発火していない。基準点は既存の done イベント（プロトコル4）に一本化し、記録機構ごと廃止する
