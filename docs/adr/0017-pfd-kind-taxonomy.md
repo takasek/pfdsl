@@ -1,6 +1,6 @@
 # ADR-0017: PFDファイル種別を3種別に定義する
 
-- Status: Accepted、Superseded in part by [ADR-0035](0035-kind-axis-is-judgment.md)（種別を判定する「主役」の表現。種別の定義表・問診リスト・1種別1ファイル原則は存続）
+- Status: Accepted、Superseded in part by [ADR-0035](0035-kind-axis-is-judgment.md)（種別を判定する「主役」の表現と、読み手が別のときのファイル分割を例外とした扱い。ADR-0035 は後者を推奨に格上げした。種別の定義表・問診リスト・1種別1ファイル原則は存続）
 - Date: 2026-06-17
 
 ## Context
