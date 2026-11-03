@@ -5,6 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
 
+// Opt-in scenarios for maintainers with regomark installed.
 // Run the real checker in a throwaway Git repository, never against edited ADRs.
 const first = "# ADR-0001: Old\n\n- Status: Superseded by ADR-0002\n";
 const next =
