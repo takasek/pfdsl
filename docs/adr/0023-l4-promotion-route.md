@@ -1,6 +1,6 @@
 # ADR-0023: L4 companion から配布層への昇格経路
 
-- Status: Accepted（ADR-0039 で昇格基準を改訂）
+- Status: Accepted、Superseded in part by [ADR-0039](0039-distribution-scope-by-provided-purpose.md)（昇格の判定条件。昇格経路は存続）
 - Date: 2026-07-03
 
 ## Context

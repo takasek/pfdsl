@@ -1,6 +1,6 @@
 # ADR-0049: standalone の文書セッションを対象別観測と操作計画で表す
 
-- Status: Accepted（#1431 で実装。Mac 実機の再受入は所有者が担当）
+- Status: Accepted
 - Date: 2026-10-12
 - 対象: #1258、PR #1431
 

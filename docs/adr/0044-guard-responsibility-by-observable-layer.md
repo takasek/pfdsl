@@ -1,6 +1,6 @@
 # ADR-0044: worktree 運用ガードの責務を、効果を観測できる層へ移す
 
-- Status: Superseded in part by [ADR-0050](0050-simplify-agent-operation-protection.md)（repo policy・harness の隔離前提・委譲先拒否・関連する移行方針と GitHub の責務）。Git 層の pre-commit・共有 shim・setup は維持する。ADR-0046・0047 による過去の置換も ADR-0050 に統合した。
+- Status: Accepted、Superseded in part by [ADR-0050](0050-simplify-agent-operation-protection.md)（repo policy・harness の隔離前提・委譲先拒否・関連する移行方針と GitHub の責務）。Git 層の pre-commit・共有 shim・setup は維持する。ADR-0046・0047 による過去の置換も ADR-0050 に統合した。
 - Date: 2026-10-04
 
 ## Context
