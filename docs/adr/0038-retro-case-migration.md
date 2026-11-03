@@ -1,6 +1,7 @@
 # ADR-0038: retro-patterns を事例記録へ移し、再発防止を操作の適用点で所有する
 
-Status: Accepted（#1175 の承認済み方針。実装と初期検証を同じ変更束でレビューする）
+- Status: Accepted
+- Date: 2026-09-13
 
 ## 決定と理由
 
