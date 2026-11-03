@@ -1,8 +1,9 @@
 # ADR-0047: agent 操作を有限の判定表で決める
 
-## 目的
+- Status: Superseded by [ADR-0050](0050-simplify-agent-operation-protection.md)。主体・所有・作用先の判定表とその repo policy を撤去する。以下は当時の契約と未完了受入の記録として保持する。
+- Date: 2026-10-12
 
-Status: Superseded by [ADR-0050](0050-simplify-agent-operation-protection.md)。主体・所有・作用先の判定表とその repo policy を撤去する。以下は当時の契約と未完了受入の記録として保持する。
+## 目的
 
 通常の agent（Claude の親・subagent、Codex の親・子）が、操作先と責務を取り違えることを防ぐ。
 敵対者、shell と Git の全構文の網羅、script file・alias の内部は対象外とする。

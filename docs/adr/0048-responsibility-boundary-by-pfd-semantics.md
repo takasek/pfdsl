@@ -1,6 +1,6 @@
 # ADR-0048: PFDSL の責務を、PFD の意味論なしには成立しない判断に限る
 
-- Status: Accepted; 契約1、D3 の対応記録の運び手、companion の構造的事実の定義は [ADR-0051](0051-conjunctive-boundary-test.md)で部分上書き
+- Status: Accepted、Superseded in part by [ADR-0051](0051-conjunctive-boundary-test.md)（契約1、D3 の対応記録の運び手、companion の構造的事実の定義）
 - Date: 2026-10-21
 
 ## Context

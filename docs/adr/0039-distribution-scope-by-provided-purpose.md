@@ -1,6 +1,6 @@
 # ADR-0039: 配布層の所有範囲を提供すると決めた用途で定め、汎用性では定めない
 
-- Status: Accepted（区分の境界を ADR-0040 で明確化。D 層の採用宣言の記法は ADR-0041 で変更）、Superseded in part by ADR-0048（区分 ii の要件、D 層の区分、設計記録の配置と再承認参照の backend の事実の区分、複数行本文の readback の置き場所、`takasek/common` を移設先とした記述）
+- Status: Accepted（区分の境界は [ADR-0040](0040-audit-target-versus-run-management.md)、D 層の採用宣言の記法は [ADR-0041](0041-retro-d-layer-declaration-token.md) が改訂）、Superseded in part by [ADR-0048](0048-responsibility-boundary-by-pfd-semantics.md)（区分 ii の要件、D 層の区分、設計記録の配置と再承認参照の backend の事実の区分、複数行本文の readback の置き場所、`takasek/common` を移設先とした記述）
 - Date: 2026-09-19
 
 ## Context
