@@ -1,3 +1,11 @@
+:root {
+	/* Monaco's 419px search field plus its 14px scrollbar, rounded up. */
+	--editor-min-width: 440px;
+	/* The widest toolbar group is 255px including spacing. */
+	--preview-min-width: 260px;
+	--workspace-divider-width: 6px;
+}
+
 html,
 body {
 	height: 100%;
@@ -194,11 +202,21 @@ button:disabled {
 	height: 100%;
 }
 .editor {
-	width: calc((100% - 6px) * var(--source-ratio, 0.5));
+	width: calc(
+		(100% - var(--workspace-divider-width)) *
+		var(--source-ratio, 0.5)
+	);
+	min-width: var(--editor-min-width);
+	max-width: calc(
+		100% -
+		var(--preview-min-width) -
+		var(--workspace-divider-width)
+	);
 	flex-shrink: 0;
 }
 .preview-column {
 	flex: 1;
+	min-width: var(--preview-min-width);
 	display: flex;
 	flex-direction: column;
 }
@@ -226,7 +244,7 @@ button:disabled {
 	background: #fff5e6;
 }
 .workspace-divider {
-	width: 6px;
+	width: var(--workspace-divider-width);
 	flex-shrink: 0;
 	cursor: col-resize;
 	background: #e5e5e5;
