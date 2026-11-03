@@ -1,6 +1,6 @@
 # ADR-0028: pfd-ops の plugin 配布移行と skill sync の廃止
 
-- Status: Accepted
+- Status: Accepted、Superseded in part by [ADR-0043](0043-applied-migration-state.md)（Decision 論点4「バージョン skew の trade-off」のうち、上流 main との版差の通知）
 - Date: 2026-07-10
 
 ## Context
