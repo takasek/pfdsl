@@ -1,6 +1,6 @@
 // Explicit list of repo-root-relative paths distributed via the pfd-ops
-// skill's install/ mirror (ADR-0015 / #63; redesigned to a one-direction
-// generator by #547).
+// skill's install/ mirror (ADR-0016 / #63; redesigned to a one-direction
+// generator by #547, recorded as ADR-0052).
 //
 // This is a hand-maintained list rather than a glob over scripts/pfdsl/**
 // because scripts/pfdsl/ also holds repo-local files (this repo's own
