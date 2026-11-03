@@ -12,6 +12,8 @@
 
 ## 一覧
 
+- **ADR-0052** [pfd-ops の `install/` をリポルートの正本から生成し、配布対象を明示的に列挙する](0052-install-generated-from-repo-root.md) — 手作業の複写を忘れて CI の一致検査が落ちた。リポルートを正本、`install/` を一方向の生成物とし、配布しないテストが同居するため配布対象は明示した一覧で決める。ADR-0016 の `install/` を canonical とする向きと、列挙しない方針を部分置換する。
+
 - **ADR-0051** [中核の境界を4条件の AND とし、判定前に規則を分割する](0051-conjunctive-boundary-test.md) — 意味論・判定と書込みの対象・中立性・名指しを全て必要条件とし、混合文は条件と例外を保って分割する。companion の構造的事実を定義し、process/run の対応は対象 PFD ファイルの識別情報とファイル内 process ID の組で運ぶ。ADR-0048 の契約1、D3 の運び手、構造的事実の未決事項を部分置換する。
 
 - **ADR-0050** [agent 操作の保護を減らし、検査と統合の層へ分担する](0050-simplify-agent-operation-protection.md) — ローカルの誤編集・stage の残余を受け入れ、操作・所有判定 guard と専用依存を撤去する。Git hook、内容検査、生成器、CI の残る消費者を維持し、個人 wrapper を repo の前提にしない。ADR-0046・0047 を置換し、ADR-0044 を部分置換する。
@@ -47,7 +49,7 @@
 - **ADR-0013** [v0.0.8 依存順序](0013-v008-dependency-order.md) — integrate_multifile は i52 フィーチャードツールチェーン必須、draft_multifile_specs は並行着手可
 - **ADR-0014** [ゲート項目の反実仮想テスト](0014-gate-item-counterfactual-test.md) — 条件付きゲート項目は充足を反証可能テストで先判定しデフォルトを「書かない」に倒す、payoff は「PFD なしで判断が違ったか」を引用できる時のみ記録する
 - **ADR-0015** [samples は TSV 管理、examples は frontmatter 管理](0015-samples-tsv-examples-frontmatter.md) — 最小構文サンプルは TSV でメタデータ外部管理、realistic domain examples は frontmatter で管理する意図的非対称方針
-- **ADR-0016** [pfd-ops 配布ファイルの `install/` への集約](0016-install-paradigm.md) — リポルートの正本を配布対象一覧に登録し、`make gen-install` で相対パスを保った `install/` を生成する。CI は正本との一致を検査する。
+- **ADR-0016** [pfd-ops install/ 集約](0016-install-paradigm.md)（配布経路は ADR-0028、配布物のディレクトリ構造は ADR-0032 が改訂。`install/` を canonical とする向きと配布対象を列挙しない方針は ADR-0052 が部分置換） — 配布可能ファイルを install/ に集約し CI で canonical と deployed の identity を強制する
 - **ADR-0017** [PFDファイル種別の3分類](0017-pfd-kind-taxonomy.md) — roadmap / workflow / pipeline を「答える問い」で区別し ecosystem 種別を廃止する
 - **ADR-0018** [成果物の門番は双方向](0018-successor-gatekeeper.md) — 手段成果物（仕様・設計・計画・提案）は終端たりえず、出力時点で消費する後続をプレースホルダ登録する
 - **ADR-0019** [tags はノード横断ラベル + `tag:` 定義ブロック](0019-process-tags.md) — subroutine 却下の代替。tags を Artifact / Process 両種別の横断ラベルとし、`label` / `description` / `style` を持つ `tag:` 定義ブロックを新設（`tagStyles` 廃止・統合、status は Artifact 専用据え置き）
