@@ -100,9 +100,20 @@ export function mountPreview(container: HTMLElement, host: PreviewHost) {
 	) as HTMLButtonElement;
 	if (host.canOpenRelatedFiles === false)
 		container.querySelector("[data-related-files-help]")?.remove();
-	on(helpToggle, "click", () => {
-		help.hidden = !help.hidden;
-		helpToggle.setAttribute("aria-expanded", String(!help.hidden));
+	function setHelpOpen(open: boolean) {
+		help.hidden = !open;
+		helpToggle.setAttribute("aria-expanded", String(open));
+	}
+	on(helpToggle, "click", () => setHelpOpen(Boolean(help.hidden)));
+	on(document, "click", (event) => {
+		const target = event.target;
+		if (
+			!help.hidden &&
+			target instanceof window.Node &&
+			!help.contains(target) &&
+			!helpToggle.contains(target)
+		)
+			setHelpOpen(false);
 	});
 
 	let descriptions: Record<string, Array<[string, string]>> = {};
@@ -216,6 +227,7 @@ export function mountPreview(container: HTMLElement, host: PreviewHost) {
 	on(container, "keydown", (e) => {
 		if (e.key === "Escape" && !e.isComposing) {
 			hideHover();
+			if (!help.hidden) setHelpOpen(false);
 			closeActions();
 		}
 	});
