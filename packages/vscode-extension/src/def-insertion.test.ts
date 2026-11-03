@@ -331,6 +331,154 @@ describe("definition Quick Fix", () => {
 		expect(host.api.window.showInformationMessage).not.toHaveBeenCalled();
 	});
 
+	it("offers the near ID first and replaces only the occurrence under the caret", () => {
+		const source = [
+			"---",
+			"artifact:",
+			"  venue_contract: {label: Venue}",
+			"---",
+			"venue_contractX >> build -> venue_contractX",
+			"",
+		].join("\n");
+		const id = "venue_contractX";
+		const document = host.document(source, id);
+		host.textDocuments.push(document);
+		const offset = source.indexOf(id);
+		const preceding = source.slice(0, offset).split("\n");
+		const position = new host.api.Position(
+			preceding.length - 1,
+			preceding.at(-1)!.length,
+		);
+		const actions = host.providers[0]!.provideCodeActions(
+			document,
+			new host.api.Range(position, position),
+		)!;
+
+		expect(actions.map(({ title }) => title)).toEqual([
+			'Replace with "venue_contract"',
+			'Insert artifact definition for "venue_contractX"',
+		]);
+		expect(actions[0]!.kind).toBe("quickfix");
+		expect(Reflect.get(actions[0]!, "isPreferred")).toBeUndefined();
+		expect(Reflect.get(actions[0]!, "diagnostics")).toBeUndefined();
+		expect(actions[0]!.command).toBeUndefined();
+		const replacement = actions[0]!.edit!.replacements[0]!;
+		expect(actions[0]!.edit!.replacements).toHaveLength(1);
+		expect(document.getText(replacement.range)).toBe(id);
+		expect(replacement.text).toBe("venue_contract");
+		document.apply(actions[0]!.edit!);
+		expect(document.getText()).toContain(
+			"venue_contract >> build -> venue_contractX",
+		);
+	});
+
+	it("keeps only the insertion action when there is no near ID", () => {
+		const source =
+			"---\nartifact: {unrelated: {label: Other}}\n---\ninput >> build -> missing_id\n";
+		const id = "missing_id";
+		const document = host.document(source, id);
+		const preceding = source.slice(0, source.indexOf(id)).split("\n");
+		const position = new host.api.Position(
+			preceding.length - 1,
+			preceding.at(-1)!.length,
+		);
+		const actions = host.providers[0]!.provideCodeActions(
+			document,
+			new host.api.Range(position, position),
+		);
+		expect(actions?.map(({ title }) => title)).toEqual([
+			'Insert artifact definition for "missing_id"',
+		]);
+	});
+
+	it("preserves quoted IDs when replacing the occurrence under the caret", () => {
+		const source = [
+			"---",
+			"artifact:",
+			'  "venue contract": {label: Venue}',
+			"---",
+			'"venue contractX" >> build -> "venue contractX"',
+			"",
+		].join("\n");
+		const id = "venue contractX";
+		const document = host.document(source, id);
+		const preceding = source.slice(0, source.indexOf(id)).split("\n");
+		const position = new host.api.Position(
+			preceding.length - 1,
+			preceding.at(-1)!.length,
+		);
+		const actions = host.providers[0]!.provideCodeActions(
+			document,
+			new host.api.Range(position, position),
+		)!;
+		const replacement = actions[0]!.edit!.replacements[0]!;
+
+		expect(actions[0]!.title).toBe('Replace with "venue contract"');
+		expect(document.getText(replacement.range)).toBe('"venue contractX"');
+		expect(replacement.text).toBe('"venue contract"');
+		document.apply(actions[0]!.edit!);
+		expect(document.getText()).toContain(
+			'"venue contract" >> build -> "venue contractX"',
+		);
+	});
+
+	it("quotes a trailing hyphen before an adjacent arrow when replacing an ID", () => {
+		const source = [
+			"---",
+			"artifact:",
+			"  venue-: {label: Venue}",
+			"---",
+			"venueX>>build -> venueX",
+			"",
+		].join("\n");
+		const id = "venueX";
+		const document = host.document(source, id);
+		const preceding = source.slice(0, source.indexOf(id)).split("\n");
+		const position = new host.api.Position(
+			preceding.length - 1,
+			preceding.at(-1)!.length,
+		);
+		const actions = host.providers[0]!.provideCodeActions(
+			document,
+			new host.api.Range(position, position),
+		)!;
+		const replacement = actions.find(
+			({ title }) => title === 'Replace with "venue-"',
+		)!;
+		const edit = replacement.edit!.replacements[0]!;
+
+		expect(edit.text).toBe('"venue-"');
+		document.apply(replacement.edit!);
+		expect(document.getText()).toContain('"venue-">>build -> venueX');
+	});
+
+	it("offers a near-ID replacement when aliased frontmatter cannot be extended", () => {
+		const source = [
+			"---",
+			"definitions: &definitions",
+			"  venue_contract: {label: Venue}",
+			"artifact: *definitions",
+			"---",
+			"venue_contractX >> build -> venue_contractX",
+			"",
+		].join("\n");
+		const id = "venue_contractX";
+		const document = host.document(source, id);
+		const preceding = source.slice(0, source.indexOf(id)).split("\n");
+		const position = new host.api.Position(
+			preceding.length - 1,
+			preceding.at(-1)!.length,
+		);
+		const actions = host.providers[0]!.provideCodeActions(
+			document,
+			new host.api.Range(position, position),
+		);
+
+		expect(actions?.map(({ title }) => title)).toEqual([
+			'Replace with "venue_contract"',
+		]);
+	});
+
 	it.each([
 		"closed",
 		"definition removed",

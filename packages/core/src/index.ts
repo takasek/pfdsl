@@ -48,7 +48,7 @@ import {
 	splitBodyIntoSegments,
 } from "./formatter.js";
 
-export { formatId, parseIdList } from "./formatter.js";
+export { formatId, formatIdBefore, parseIdList } from "./formatter.js";
 
 import { loadFrontmatter, loadFrontmatterModel } from "./frontmatter.js";
 import type { FrontmatterSource } from "./frontmatter-source.js";
