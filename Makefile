@@ -135,6 +135,10 @@ check-readme-cli:
 check-fmt:
 	node scripts/check-pfdsl-inventory.mjs --run fmt
 
+.PHONY: check-adr
+check-adr:
+	regomark check --no-judge
+
 # location: の参照先実在ガード。スコープは check-fmt と同じ理由で運用 .pfdsl のみ
 # — docs/ の教材と core の fixture は例示パスを意図して持つので、解決することは
 # そもそもそれらの性質ではない（#937）。pre-commit 側の対は drift-gates.mjs の
