@@ -137,7 +137,7 @@ check-fmt:
 
 .PHONY: check-adr
 check-adr:
-	regomark check --no-judge
+	node .regomark/check-adr.mjs
 
 # location: の参照先実在ガード。スコープは check-fmt と同じ理由で運用 .pfdsl のみ
 # — docs/ の教材と core の fixture は例示パスを意図して持つので、解決することは

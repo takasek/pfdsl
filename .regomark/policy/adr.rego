@@ -105,11 +105,7 @@ metadata contains row if {
     some offset, line in split(b.text, "\n")
     replacement_line(line)
     some ref in regex.find_n(`ADR-[0-9]*`, line, -1)
-    # Blank source lines are omitted from block text. Bound each item's
-    # possible location by the number of text lines before and after it.
-    first := b.line + offset
-    last := b.end_line - count(split(b.text, "\n")) + 1 + offset
-    row := {"doc": doc, "line": source_line(b, offset), "first": first, "last": last, "text": line, "ref": ref}
+    row := {"doc": doc, "line": source_line(b, offset), "ref": ref}
 }
 # When blank lines were stripped, the block start is the reliable fallback.
 source_line(b, offset) := b.line + offset if {
@@ -118,22 +114,6 @@ source_line(b, offset) := b.line + offset if {
 deny contains finding("adr-replacement", row.doc, row.line, concat("", ["Replacement refers to missing ", row.ref])) if {
     some row in metadata
     not exists_id(row.ref)
-}
-deny contains finding("adr-replacement", row.doc, l.line, "Replacement link does not resolve to the named ADR") if {
-    some row in metadata
-    some l in row.doc.links
-    l.line >= row.first
-    l.line <= row.last
-    contains(row.text, l.text)
-    row.ref in regex.find_n(`ADR-[0-9]+`, l.text, -1)
-    exists_id(row.ref)
-    not correct_target(l, row.ref)
-}
-correct_target(l, ref) if {
-    some doc in adrs
-    id(doc) == ref
-    doc.path == l.target
-    l.kind == "file"
 }
 
 # A missing link has no location in links; cite the index list block.

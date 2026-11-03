@@ -4,6 +4,7 @@ import { cpSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
+import { fileURLToPath } from "node:url";
 
 // Opt-in scenarios for maintainers with regomark installed.
 // Run the real checker in a throwaway Git repository, never against edited ADRs.
@@ -36,8 +37,8 @@ function check(t, { old = first, newer = next, list = index } = {}) {
 		writeFileSync(join(docs, name), body);
 
 	const run = spawnSync(
-		"regomark",
-		["check", "--no-judge", "--format", "json"],
+		process.execPath,
+		[fileURLToPath(new URL("./check-adr.mjs", import.meta.url)), "--json"],
 		{ cwd: dir, encoding: "utf8" },
 	);
 	if (run.error) throw run.error;
@@ -102,6 +103,42 @@ test("checks a replacement link on its physical line in a loose list", (t) => {
 });
 
 test("ignores related links outside the replacement declaration", (t) => {
-	const old = first + "\n- Related: [PR implementing ADR-0002](https://example.org/pr/3)\n";
+	const old =
+		first +
+		"\n- Related: [PR implementing ADR-0002](https://example.org/pr/3)\n";
 	assert.deepEqual(check(t, { old }), []);
+});
+
+test("distinguishes the same label on different loose-list items", (t) => {
+	const old =
+		first +
+		"\n- Related: [ADR-0002](https://example.org/pr/3)\n\n- Date: 2026\n";
+	assert.deepEqual(check(t, { old }), []);
+	const broken = old.replace("by ADR-0002", "by [ADR-0002](missing.md)");
+	assert.deepEqual(check(t, { old: broken }), [
+		["adr-replacement", "0001-old.md", 3],
+	]);
+});
+
+test("checks replacements in nested list items and reference-style fields", (t) => {
+	const nested =
+		"# ADR-0001: Old\n\n- Top\n  - Nested\n    - Status: Superseded by [ADR-0002](missing.md)\n";
+	const referenced =
+		"# ADR-0001: Old\n\n- [Status:][field] Superseded by [ADR-0002](missing.md)\n\n[field]: https://example.org/status\n";
+	assert.deepEqual(check(t, { old: nested }), [
+		["adr-replacement", "0001-old.md", 5],
+	]);
+	assert.deepEqual(check(t, { old: referenced }), [
+		["adr-replacement", "0001-old.md", 3],
+	]);
+});
+
+test("reports a bad replacement link alongside other policy violations", (t) => {
+	const old = first
+		.replace("# ADR-0001", "# ADR-0999")
+		.replace("by ADR-0002", "by [ADR-0002](missing.md)");
+	assert.deepEqual(check(t, { old }), [
+		["adr-heading", "0001-old.md", 1],
+		["adr-replacement", "0001-old.md", 3],
+	]);
 });

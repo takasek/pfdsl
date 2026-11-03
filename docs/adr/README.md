@@ -5,7 +5,7 @@
 ## 手元で ADR を検査する
 
 [regomark v0.3.0 のリリース](https://github.com/babarot/regomark/releases/tag/v0.3.0)から OS・CPU に対応するバイナリを取得し、`regomark` を PATH に置く。
-リポジトリのルートで次を実行する。
+Markdown の読取りにはこのリポジトリの Node.js 依存を使う。初回は `make setup` で準備し、リポジトリのルートで次を実行する。
 
 ```sh
 make check-adr
