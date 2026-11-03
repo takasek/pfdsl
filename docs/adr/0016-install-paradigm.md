@@ -1,6 +1,6 @@
 # ADR-0016: pfd-ops 配布可能ファイルの install/ 集約
 
-- Status: Accepted（配布物のディレクトリ構造は [ADR-0032](0032-pfd-ops-install-dedicated-dir.md) が改訂）、Superseded in part by [ADR-0028](0028-plugin-first-pfd-ops-distribution.md)（採用リポへの配布経路）と [ADR-0052](0052-install-generated-from-repo-root.md)（`install/` を編集の起点として deployed へ複写する向きと、配布対象を列挙しない方針。配布テンプレートとしての `install/`、相対パスを保つ配置、CI の一致検査は存続）
+- Status: Accepted（配布物のディレクトリ構造は [ADR-0032](0032-pfd-ops-install-dedicated-dir.md) が改訂）、Superseded in part by [ADR-0028](0028-plugin-first-pfd-ops-distribution.md)（採用リポへの配布経路と、採用リポでの CI による一致検査）と [ADR-0052](0052-install-generated-from-repo-root.md)（`install/` を編集の起点として deployed へ複写する向きと、配布対象を列挙しない方針。配布テンプレートとしての `install/`、相対パスを保つ配置、このリポの CI による一致検査は存続）
 - Date: 2026-06-15
 
 ## Context

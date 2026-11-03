@@ -1,6 +1,6 @@
 # ADR-0041: pfd-retro D 層の採用宣言を3値の構造化宣言にし、宣言が無い状態を報告する
 
-- Status: Accepted（同日、宣言の置き場所を binding の行から `.pfdsl/config.json` へ移して改訂。置き場所の原則は ADR-0042）
+- Status: Accepted（同日改訂 — 宣言の置き場所を binding の行から `.pfdsl/config.json` へ移した。置き場所の原則は ADR-0042 が定める）
 - Date: 2026-09-30
 
 ## Context
