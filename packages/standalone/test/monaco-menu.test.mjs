@@ -959,6 +959,284 @@ test("the production document-tab entry loads real Monaco menu contributions", a
 			},
 		);
 		await t.test(
+			"near ID code actions come first and replace only the occurrence under the caret",
+			async () => {
+				const id = "venue_contractX";
+				const source = [
+					"---",
+					"artifact:",
+					"  venue_contract: {label: Venue}",
+					"---",
+					"venue_contractX >> build -> venue_contractX",
+					"",
+				].join("\n");
+				await withEditors(source, async (create) => {
+					const editor = create();
+					const model = editor.getModel();
+					const position = model.getPositionAt(source.indexOf(id));
+					const token = {
+						isCancellationRequested: false,
+						onCancellationRequested() {
+							return { dispose() {} };
+						},
+					};
+					const actions = (
+						await Promise.all(
+							host.languageFeatures.codeActionProvider
+								.ordered(model)
+								.map((provider) =>
+									provider.provideCodeActions(
+										model,
+										new host.monaco.Range(
+											position.lineNumber,
+											position.column,
+											position.lineNumber,
+											position.column,
+										),
+										{ trigger: 1 },
+										token,
+									),
+								),
+						)
+					)
+						.filter(Boolean)
+						.flatMap((result) => result.actions)
+						.filter(({ title }) => title.includes("venue_contract"));
+					assert.deepEqual(
+						actions.map(({ title }) => title),
+						[
+							'Replace with "venue_contract"',
+							'Insert artifact definition for "venue_contractX"',
+						],
+					);
+					const replacement = actions[0];
+					const edit = replacement.edit.edits[0];
+					assert.equal(replacement.kind, "quickfix");
+					assert.equal(replacement.isPreferred, undefined);
+					assert.equal(replacement.diagnostics, undefined);
+					assert.equal(model.getValueInRange(edit.textEdit.range), id);
+					assert.equal(edit.textEdit.text, "venue_contract");
+					assert.equal(edit.versionId, model.getVersionId());
+					assert.equal(replacement.command, undefined);
+					await host.applyEdit(replacement.edit);
+					assert.ok(
+						model
+							.getValue()
+							.endsWith("venue_contract >> build -> venue_contractX\n"),
+					);
+				});
+			},
+		);
+		await t.test(
+			"near ID code actions keep only insertion when there is no candidate",
+			async () => {
+				const id = "missing_id";
+				const source =
+					"---\nartifact: {unrelated: {label: Other}}\n---\ninput >> build -> missing_id\n";
+				await withEditors(source, async (create) => {
+					const editor = create();
+					const model = editor.getModel();
+					const position = model.getPositionAt(source.indexOf(id));
+					const token = {
+						isCancellationRequested: false,
+						onCancellationRequested() {
+							return { dispose() {} };
+						},
+					};
+					const actions = (
+						await Promise.all(
+							host.languageFeatures.codeActionProvider
+								.ordered(model)
+								.map((provider) =>
+									provider.provideCodeActions(
+										model,
+										new host.monaco.Range(
+											position.lineNumber,
+											position.column,
+											position.lineNumber,
+											position.column,
+										),
+										{ trigger: 1 },
+										token,
+									),
+								),
+						)
+					)
+						.filter(Boolean)
+						.flatMap((result) => result.actions)
+						.filter(({ title }) => title.includes(id));
+					assert.deepEqual(
+						actions.map(({ title }) => title),
+						['Insert artifact definition for "missing_id"'],
+					);
+				});
+			},
+		);
+		await t.test("near ID code actions preserve quoted IDs", async () => {
+			const id = "venue contractX";
+			const source = [
+				"---",
+				"artifact:",
+				'  "venue contract": {label: Venue}',
+				"---",
+				'"venue contractX" >> build -> "venue contractX"',
+				"",
+			].join("\n");
+			await withEditors(source, async (create) => {
+				const editor = create();
+				const model = editor.getModel();
+				const position = model.getPositionAt(source.indexOf(id));
+				const token = {
+					isCancellationRequested: false,
+					onCancellationRequested() {
+						return { dispose() {} };
+					},
+				};
+				const actions = (
+					await Promise.all(
+						host.languageFeatures.codeActionProvider
+							.ordered(model)
+							.map((provider) =>
+								provider.provideCodeActions(
+									model,
+									new host.monaco.Range(
+										position.lineNumber,
+										position.column,
+										position.lineNumber,
+										position.column,
+									),
+									{ trigger: 1 },
+									token,
+								),
+							),
+					)
+				)
+					.filter(Boolean)
+					.flatMap((result) => result.actions)
+					.filter(({ title }) => title.includes("venue contract"));
+				const replacement = actions[0];
+				const edit = replacement.edit.edits[0];
+				assert.equal(replacement.title, 'Replace with "venue contract"');
+				assert.equal(
+					model.getValueInRange(edit.textEdit.range),
+					'"venue contractX"',
+				);
+				assert.equal(edit.textEdit.text, '"venue contract"');
+				await host.applyEdit(replacement.edit);
+				assert.ok(
+					model
+						.getValue()
+						.includes('"venue contract" >> build -> "venue contractX"'),
+				);
+			});
+		});
+		await t.test(
+			"near ID code actions quote a trailing hyphen before an adjacent arrow",
+			async () => {
+				const id = "venueX";
+				const source = [
+					"---",
+					"artifact:",
+					"  venue-: {label: Venue}",
+					"---",
+					"venueX>>build -> venueX",
+					"",
+				].join("\n");
+				await withEditors(source, async (create) => {
+					const editor = create();
+					const model = editor.getModel();
+					const position = model.getPositionAt(source.indexOf(id));
+					const token = {
+						isCancellationRequested: false,
+						onCancellationRequested() {
+							return { dispose() {} };
+						},
+					};
+					const actions = (
+						await Promise.all(
+							host.languageFeatures.codeActionProvider
+								.ordered(model)
+								.map((provider) =>
+									provider.provideCodeActions(
+										model,
+										new host.monaco.Range(
+											position.lineNumber,
+											position.column,
+											position.lineNumber,
+											position.column,
+										),
+										{ trigger: 1 },
+										token,
+									),
+								),
+						)
+					)
+						.filter(Boolean)
+						.flatMap((result) => result.actions);
+					const replacement = actions.find(
+						({ title }) => title === 'Replace with "venue-"',
+					);
+					assert.ok(replacement);
+					const edit = replacement.edit.edits[0];
+					assert.equal(edit.textEdit.text, '"venue-"');
+					await host.applyEdit(replacement.edit);
+					assert.ok(model.getValue().includes('"venue-">>build -> venueX'));
+				});
+			},
+		);
+		await t.test(
+			"near ID code actions remain available when aliased frontmatter cannot be extended",
+			async () => {
+				const id = "venue_contractX";
+				const source = [
+					"---",
+					"definitions: &definitions",
+					"  venue_contract: {label: Venue}",
+					"artifact: *definitions",
+					"---",
+					"venue_contractX >> build -> venue_contractX",
+					"",
+				].join("\n");
+				await withEditors(source, async (create) => {
+					const editor = create();
+					const model = editor.getModel();
+					const position = model.getPositionAt(source.indexOf(id));
+					const token = {
+						isCancellationRequested: false,
+						onCancellationRequested() {
+							return { dispose() {} };
+						},
+					};
+					const actions = (
+						await Promise.all(
+							host.languageFeatures.codeActionProvider
+								.ordered(model)
+								.map((provider) =>
+									provider.provideCodeActions(
+										model,
+										new host.monaco.Range(
+											position.lineNumber,
+											position.column,
+											position.lineNumber,
+											position.column,
+										),
+										{ trigger: 1 },
+										token,
+									),
+								),
+						)
+					)
+						.filter(Boolean)
+						.flatMap((result) => result.actions)
+						.filter(({ title }) => title.includes("venue_contract"));
+					assert.deepEqual(
+						actions.map(({ title }) => title),
+						['Replace with "venue_contract"'],
+					);
+				});
+			},
+		);
+		await t.test(
 			"metadata sort accepts ordered keys and cancellation keeps editor state",
 			async () => {
 				const source =

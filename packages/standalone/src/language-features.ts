@@ -1,4 +1,4 @@
-import type { Range as SourceRange } from "@pfdsl/core";
+import { formatIdBefore, type Range as SourceRange } from "@pfdsl/core";
 import {
 	analyzeSnapshot,
 	applyPreviewEdit,
@@ -7,6 +7,7 @@ import {
 	documentReferences,
 	findDefinitionEditTarget,
 	findFrontmatterDefinitionRange,
+	findNearDefinedNodeIds,
 	findNodeOccurrenceRanges,
 	findUndefinedNodeKind,
 	nextNodeOccurrenceRange,
@@ -402,11 +403,36 @@ export function registerLanguageFeatures(
 						current.frontmatter,
 						item.nodeId,
 					);
-					const result = kind && insertion(item.nodeId);
-					if (!result?.ok) return { actions: [], dispose() {} };
+					if (!kind) return { actions: [], dispose() {} };
 					const version = model.getVersionId();
+					const replacements = findNearDefinedNodeIds(
+						current.frontmatter,
+						kind,
+						item.nodeId,
+					).map((candidate) => ({
+						title: `Replace with "${candidate}"`,
+						kind: "quickfix",
+						edit: {
+							edits: [
+								{
+									resource: model.uri,
+									versionId: version,
+									textEdit: {
+										range: range(item.range),
+										text: formatIdBefore(
+											candidate,
+											model.getValue()[item.range.end.offset],
+										),
+									},
+								},
+							],
+						},
+					}));
+					const result = insertion(item.nodeId);
+					if (!result.ok) return { actions: replacements, dispose() {} };
 					return {
 						actions: [
+							...replacements,
 							{
 								title: `Insert ${kind} definition for "${item.nodeId}"`,
 								kind: "quickfix",

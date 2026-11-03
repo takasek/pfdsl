@@ -3,18 +3,60 @@ import {
 	centerPan,
 	clampScale,
 	fitGraph,
+	fontSizeBelowMinimum,
+	graphFitsViewport,
 	MAX_SCALE,
 	MIN_SCALE,
+	MINIMUM_READABLE_FONT_SIZE_PX,
 	minimapScale,
 	minimapViewport,
 	panFromMinimapPoint,
 	panToCenterNode,
+	screenFontSize,
 	shouldReleaseDrag,
 	ZOOM_STEP,
 	zoomAt,
 } from "./webview-logic.js";
 
 const view = (scale = 1, panX = 0, panY = 0) => ({ scale, panX, panY });
+
+describe("screenFontSize", () => {
+	it("converts SVG font units to screen pixels at the current scale", () => {
+		expect(screenFontSize(14, 92, 69, 0.5)).toBeCloseTo(9.3333, 4);
+	});
+
+	it("leaves unreadable measurements undefined", () => {
+		expect(screenFontSize(14, 92, 0, 0.5)).toBeUndefined();
+		expect(screenFontSize(Number.NaN, 92, 69, 0.5)).toBeUndefined();
+	});
+});
+
+describe("fontSizeBelowMinimum", () => {
+	it("uses the 10px threshold and treats an unreadable measurement as readable", () => {
+		expect(MINIMUM_READABLE_FONT_SIZE_PX).toBe(10);
+		expect(fontSizeBelowMinimum(9.99)).toBe(true);
+		expect(fontSizeBelowMinimum(10)).toBe(false);
+		expect(fontSizeBelowMinimum(undefined)).toBe(false);
+	});
+});
+
+describe("graphFitsViewport", () => {
+	it("checks whether every graph edge stays within the viewport", () => {
+		const viewport = { left: 10, top: 20, width: 400, height: 300 };
+		expect(
+			graphFitsViewport(
+				{ left: 10, top: 20, width: 400, height: 300 },
+				viewport,
+			),
+		).toBe(true);
+		expect(
+			graphFitsViewport(
+				{ left: 9, top: 20, width: 400, height: 300 },
+				viewport,
+			),
+		).toBe(false);
+	});
+});
 
 describe("fitGraph", () => {
 	it("fits a wide graph with a margin without magnifying a small graph", () => {
