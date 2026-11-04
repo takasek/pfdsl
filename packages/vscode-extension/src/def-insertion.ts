@@ -1,8 +1,9 @@
-import { insertDefinition } from "@pfdsl/core";
+import { formatIdBefore, insertDefinition } from "@pfdsl/core";
 import {
 	findDefinitionEditTarget,
+	findNearDefinedNodeIds,
 	findUndefinedNodeKind,
-	nodeIdAtSourcePosition,
+	nodeOccurrenceAtSourcePosition,
 } from "@pfdsl/editor";
 import * as vscode from "vscode";
 import { analyzeDocument, LANGUAGE_ID } from "./analyze.js";
@@ -70,16 +71,40 @@ export function registerDefInsertion(context: vscode.ExtensionContext): void {
 			if (document.languageId !== LANGUAGE_ID) return;
 			const model = analyzeDocument(document);
 			const source = document.getText();
-			const id = nodeIdAtSourcePosition(model, source, range.start);
-			if (id === undefined) return;
+			const occurrence = nodeOccurrenceAtSourcePosition(
+				model,
+				source,
+				range.start,
+			);
+			if (!occurrence) return;
+			const { nodeId: id } = occurrence;
 			const { frontmatter, nodeKinds, bodyStartLine } = model;
 			const kind = findUndefinedNodeKind(nodeKinds, frontmatter, id);
 			if (!kind) return;
 
+			const actions = findNearDefinedNodeIds(frontmatter, kind, id).map(
+				(candidate) => {
+					const action = new vscode.CodeAction(
+						`Replace with "${candidate}"`,
+						vscode.CodeActionKind.QuickFix,
+					);
+					const { start, end } = occurrence.range;
+					action.edit = new vscode.WorkspaceEdit();
+					action.edit.replace(
+						document.uri,
+						new vscode.Range(
+							new vscode.Position(start.line - 1, start.column - 1),
+							new vscode.Position(end.line - 1, end.column - 1),
+						),
+						formatIdBefore(candidate, source[occurrence.range.end.offset]),
+					);
+					return action;
+				},
+			);
 			const { inserted, output } = insertDefinition(source, kind, id, {
 				label: "",
 			});
-			if (!inserted) return;
+			if (!inserted) return actions.length > 0 ? actions : undefined;
 
 			const action = new vscode.CodeAction(
 				`Insert ${kind} definition for "${id}"`,
@@ -106,7 +131,7 @@ export function registerDefInsertion(context: vscode.ExtensionContext): void {
 				title: "Edit inserted definition",
 				arguments: [document.uri.toString(), kind, id],
 			};
-			return [action];
+			return [...actions, action];
 		},
 	};
 

@@ -23,27 +23,33 @@ make check-adr
 - **誤記・ID 等の事実修正**: その場で編集する（履歴は git が保持）
 - **同日の設計続行による改訂**: 本文を書き直し、Status 行に改訂注記を付ける（例: ADR-0009）
 - **後日の翻意**: 旧 ADR は編集せず新 ADR で上書きし、旧 Status を `Superseded by ADR-NNNN` に変更する。過去の判断の記録を消さないことが ADR の存在意義
+- **一部の置換と改訂の注記**: 後続 ADR が旧 ADR の述べた決定の一部を別の内容に置き換えたら、旧 Status に `Superseded in part by ADR-NNNN（置き換えた部分）` を付ける。旧 ADR の決定を保ったまま、決めていなかった範囲・条件・記法を後続 ADR が足した場合や明確にした場合は、`（… は ADR-NNNN が改訂）` を付ける。足した条件が旧 ADR の述べた判定や手順の結果を変える場合は、置換として扱う。一覧の行にも同じ範囲の注記を括弧で付け、要約は旧 ADR 自身の決定のまま残す。ADR 自身を書き直したときの注記（上の「同日の設計続行による改訂」）では、後続 ADR による改訂と取り違えないよう、他の ADR を「が改訂」の主語にしない
+- **ADR に書かないもの**: 進捗・担当・移行の段取り・完了後に消す一時的な記述は作業項目に置き、Status にも本文にも書かない。満たすべき条件として書けるものは、条件として書く
+- **他 ADR の参照**: 他の ADR の決定の一部を指すときは、項番号と見出しを併記する。ADR 全体を指すときは番号だけでよい
+- **適用範囲**: 「一部の置換と改訂の注記」「ADR に書かないもの」「他 ADR の参照」は、新しく書く ADR と、既存 ADR の Status 行・一覧に適用する。既存 ADR の本文は、誤記・事実修正を除いて遡って書き換えない
 - **受理時の蒸留判定**: 適用可能なルールを含む ADR は、受理時に品質ガイド（pfdsl スキル）への1行蒸留の要否を判定する。ADR は根拠の恒久記録、ガイドは執筆時の参照物 — 執筆・レビュー時に ADR 全読は要求しない
 
 ## 一覧
+
+- **ADR-0052** [pfd-ops の `install/` をリポルートの正本から生成し、配布対象を明示的に列挙する](0052-install-generated-from-repo-root.md) — 手作業の複写を忘れて CI の一致検査が落ちた。リポルートを正本、`install/` を一方向の生成物とし、配布しないテストが同居するため配布対象は明示した一覧で決める。ADR-0016 の `install/` を編集の起点とする向きと、列挙しない方針を部分置換する。
 
 - **ADR-0051** [中核の境界を4条件の AND とし、判定前に規則を分割する](0051-conjunctive-boundary-test.md) — 意味論・判定と書込みの対象・中立性・名指しを全て必要条件とし、混合文は条件と例外を保って分割する。companion の構造的事実を定義し、process/run の対応は対象 PFD ファイルの識別情報とファイル内 process ID の組で運ぶ。ADR-0048 の契約1、D3 の運び手、構造的事実の未決事項を部分置換する。
 
 - **ADR-0050** [agent 操作の保護を減らし、検査と統合の層へ分担する](0050-simplify-agent-operation-protection.md) — ローカルの誤編集・stage の残余を受け入れ、操作・所有判定 guard と専用依存を撤去する。Git hook、内容検査、生成器、CI の残る消費者を維持し、個人 wrapper を repo の前提にしない。ADR-0046・0047 を置換し、ADR-0044 を部分置換する。
 
-- **ADR-0048** [PFDSL の責務を、PFD の意味論なしには成立しない判断に限る](0048-responsibility-boundary-by-pfd-semantics.md)（契約1、D3 の運び手、companion の構造的事実は ADR-0051 が部分置換） — ADR-0039 の「提供すると決めた用途」は動機による判定で、どの規律にも付けられた。PFD の意味論を除いても成り立つ規則を中核から外し、書き換え先を PFD の要素・companion の構造的事実・`.pfdsl/config.json`・CLI が導出できる状態に限る。区分 ii に「判定の論理が PFD の語彙で書ける」を加え、D 層は所有者の決定による付属機能、配布機構は区分の外の別枠とする。retro の3値の結論、版と対応した証拠、run の成功と受入の区別、制御主体の単一性、意味論を定義しないアダプタを契約とし、判断点 D1〜D6 を記録する。ADR-0039 の区分 ii と `takasek/common` を移設先とした記述、ADR-0040 の D 層の区分を部分置換する。
+- **ADR-0048** [PFDSL の責務を、PFD の意味論なしには成立しない判断に限る](0048-responsibility-boundary-by-pfd-semantics.md)（契約1、D3 の運び手は ADR-0051 が部分置換。companion の構造的事実の定義は ADR-0051 が改訂） — ADR-0039 の「提供すると決めた用途」は動機による判定で、どの規律にも付けられた。PFD の意味論を除いても成り立つ規則を中核から外し、書き換え先を PFD の要素・companion の構造的事実・`.pfdsl/config.json`・CLI が導出できる状態に限る。区分 ii に「判定の論理が PFD の語彙で書ける」を加え、D 層は所有者の決定による付属機能、配布機構は区分の外の別枠とする。retro の3値の結論、版と対応した証拠、run の成功と受入の区別、制御主体の単一性、意味論を定義しないアダプタを契約とし、判断点 D1〜D6 を記録する。ADR-0039 の区分 ii と `takasek/common` を移設先とした記述、ADR-0040 の D 層の区分を部分置換する。
 
 - **ADR-0047** [agent 操作を有限の判定表で決める](0047-agent-operation-decision-table.md)（ADR-0050 が置換） — 操作先と責務の取り違えを防ぎ、通常動線を維持する。ADR-0044・ADR-0046 の関連 hook 条項を部分置換し、判定表と性質1〜8を契約とした。
 
 - **ADR-0045** [依存閉包を共有し、編集の拒否を影響する関係に絞る](0045-dependency-closure-and-scoped-edit-gates.md) — check は全依存を検査し、rename/delete は具体的に壊れうる group 継承・変更後 boundary だけを依存側の拒否対象にする。
 
 - **ADR-0038** [retro-patterns を事例記録へ移す](0038-retro-case-migration.md) — 対策の抽出・自動選別を終了し、再発防止を既存の操作手順・入力・道具・テストが所有する。検索できる証拠と毎サイクルの retro、独立レビューを維持する。
-- **ADR-0039** [配布層の所有範囲を提供すると決めた用途で定める](0039-distribution-scope-by-provided-purpose.md)（区分 ii の要件、D 層・設計記録の配置・再承認参照の区分、readback の置き場所、`takasek/common` を移設先とした記述は ADR-0048 が部分置換） — ADR-0023 の昇格基準は「固有名詞を含まず全利用者に効く」だけを条件としたため、PFD 運用に固有の用途を持たない規律（git 衛生・委譲・設計記録の書式）が配布層を占めた。3区分を定め、昇格の0段目に「提供すると決めた用途に入るか」を置き、区分 iii を採用リポの binding へ移す。知識成果物ライフサイクル監査は binding の採用宣言で有効化する選択項目にする
+- **ADR-0039** [配布層の所有範囲を提供すると決めた用途で定める](0039-distribution-scope-by-provided-purpose.md)（区分の境界は ADR-0040 が改訂。D 層の採用宣言の置き場所と記法は ADR-0041、区分 ii の要件、D 層の区分、設計記録の配置と再承認参照の backend の事実の区分、複数行本文の readback の置き場所、`takasek/common` を移設先とした記述は ADR-0048 が部分置換） — ADR-0023 の昇格基準は「固有名詞を含まず全利用者に効く」だけを条件としたため、PFD 運用に固有の用途を持たない規律（git 衛生・委譲・設計記録の書式）が配布層を占めた。3区分を定め、昇格の0段目に「提供すると決めた用途に入るか」を置き、区分 iii を採用リポの binding へ移す。知識成果物ライフサイクル監査は binding の採用宣言で有効化する選択項目にする
 - **ADR-0040** [監査の対象についての契約と、1回の監査の実行管理を別の区分に置く](0040-audit-target-versus-run-management.md)（知識成果物のライフサイクル監査の項目を区分 ii とした記述は ADR-0048 が部分置換） — ADR-0039 の0段目は「終端監査の契約」を区分 i に挙げたが、実行 ID・cutoff・checkpoint 等で1回の監査を凍結する規律はどの区分の文言にも当たらなかった。監査に関わる区分 i・ii の項目は監査の対象について何を判定するか、その実行管理は区分 iii とし、自リポ binding の昇格指示も0段目に揃える
 - **ADR-0041** [pfd-retro D 層の採用宣言を3値の構造化宣言にする](0041-retro-d-layer-declaration-token.md) — ADR-0039 の決定は変えず、宣言を `.pfdsl/config.json` の `knowledgeLifecycleAudit`（`mode` と `targets`）にする。宣言が無い・不正な状態は監査せず所有者へ毎回報告し、宣言を知らない旧版の採用先と選んだ採用先を区別する
 - **ADR-0042** [採用先の宣言の値を `.pfdsl/config.json` に置く](0042-adopter-config-file.md) — 切り替えや列挙のような宣言の値は採用先が git 管理する `.pfdsl/config.json` に置き、散文の binding はそのキーを指す。completed-chain sweep は同ファイルで有効にしない限り動かさない。移行状態の置き場所もここに予約する
-- **ADR-0043** [採用先が移行を適用した版を `.pfdsl/config.json` に記録する](0043-applied-migration-state.md) — 採用先が移行を適用し終えた plugin の版（Claude Code では bundle の集約 hash も）をキー `appliedMigration` に置き、`check-install-sync.mjs` は読むだけで照合する。記録するのは検証後に明示実行する `--record-migration` だけで、記録より古い plugin からの `--deploy` と `--record-migration` は exit 3 で拒否する。「最後に見た版」・別ファイル・SessionStart hook・manifest からの推定・CLI での照合は見送った
-- **ADR-0044** [worktree 運用ガードの責務を、効果を観測できる層へ移す](0044-guard-responsibility-by-observable-layer.md)（ADR-0050 が部分置換） — Git pre-commit・共有 shim・setup は維持する。repo policy・隔離前提・委譲先拒否・移行方針・GitHub の責務は ADR-0050 に従う。
+- **ADR-0043** [採用先が移行を適用した版を `.pfdsl/config.json` に記録する](0043-applied-migration-state.md) — 採用先が移行を適用し終えた plugin の版（Claude Code では bundle の集約 hash も）をキー `appliedMigration` に置き、`check-install-sync.mjs` は読むだけで照合する。記録するのは検証後に明示実行する `--record-migration` だけで、記録より古い plugin からの `--deploy` と `--record-migration` は exit 3 で拒否する。「最後に見た版」・別ファイル・SessionStart hook・manifest からの推定・CLI での照合は見送った。2026-10-05 の改訂で、ADR-0028 論点4の上流 main との版差の通知を廃止した
+- **ADR-0044** [worktree 運用ガードの責務を、効果を観測できる層へ移す](0044-guard-responsibility-by-observable-layer.md)（repo policy・harness の隔離前提・委譲先拒否・関連する移行方針と GitHub の責務は ADR-0050 が部分置換） — Git pre-commit・共有 shim・setup は維持する。repo policy・隔離前提・委譲先拒否・移行方針・GitHub の責務は ADR-0050 に従う。
 - **ADR-0046** [native 所有者の肯定証拠で sibling 誤判定を補正する](0046-native-worktree-ownership.md)（ADR-0050 が置換） — 変更系 Git の確定済み sibling に native 所有証拠を用いて補正する契約と、当時の受入証拠を記録する。
 - **ADR-0049** [standalone の文書セッションを対象別観測と操作計画で表す](0049-standalone-document-session-model.md) — 重なり合う可変フィールドを、承認済みの基準・対象別の観測・未解決の保存・世代の4つに限り、衝突・dirty・パネル表示・終了判断を導出する。観測は単一の入口を通し、確認と実行を操作計画で結ぶ。入口ごとの個別修正は却下した
 
@@ -62,25 +68,25 @@ make check-adr
 - **ADR-0013** [v0.0.8 依存順序](0013-v008-dependency-order.md) — integrate_multifile は i52 フィーチャードツールチェーン必須、draft_multifile_specs は並行着手可
 - **ADR-0014** [ゲート項目の反実仮想テスト](0014-gate-item-counterfactual-test.md) — 条件付きゲート項目は充足を反証可能テストで先判定しデフォルトを「書かない」に倒す、payoff は「PFD なしで判断が違ったか」を引用できる時のみ記録する
 - **ADR-0015** [samples は TSV 管理、examples は frontmatter 管理](0015-samples-tsv-examples-frontmatter.md) — 最小構文サンプルは TSV でメタデータ外部管理、realistic domain examples は frontmatter で管理する意図的非対称方針
-- **ADR-0016** [pfd-ops install/ 集約](0016-install-paradigm.md) — 配布可能ファイルを install/ に集約し CI で canonical と deployed の identity を強制する
-- **ADR-0017** [PFDファイル種別の3分類](0017-pfd-kind-taxonomy.md) — roadmap / workflow / pipeline を「答える問い」で区別し ecosystem 種別を廃止する
+- **ADR-0016** [pfd-ops install/ 集約](0016-install-paradigm.md)（採用リポへの配布経路と採用リポでの CI による一致検査は ADR-0028、`install/` を編集の起点とする向きと配布対象を列挙しない方針は ADR-0052 が部分置換。配布物のディレクトリ構造は ADR-0032 が改訂） — 配布可能ファイルを install/ に集約し CI で canonical と deployed の identity を強制する
+- **ADR-0017** [PFDファイル種別の3分類](0017-pfd-kind-taxonomy.md)（種別を判定する「主役」の表現と、読み手が別のときのファイル分割を例外とした扱いは ADR-0035 が部分置換） — roadmap / workflow / pipeline を「答える問い」で区別し ecosystem 種別を廃止する
 - **ADR-0018** [成果物の門番は双方向](0018-successor-gatekeeper.md) — 手段成果物（仕様・設計・計画・提案）は終端たりえず、出力時点で消費する後続をプレースホルダ登録する
 - **ADR-0019** [tags はノード横断ラベル + `tag:` 定義ブロック](0019-process-tags.md) — subroutine 却下の代替。tags を Artifact / Process 両種別の横断ラベルとし、`label` / `description` / `style` を持つ `tag:` 定義ブロックを新設（`tagStyles` 廃止・統合、status は Artifact 専用据え置き）
 - **ADR-0020** [仕様制約は具体例トレースで実装前に検証する](0020-spec-constraint-stress-testing.md) — 散文は未定義動作を隠す。境界カテゴリ（粒度・名前・N:M・循環・diamond・部分マップ）の具体例を normative 制約にトレースして判定まで詰め、未定義を spec 決定で潰す。worked example は [サブディレクトリ](0020-spec-stress-testing/boundary-validation-log.md)に保存
 - **ADR-0021** [外部ツール専用フィールドは spec に入れない](0021-no-external-only-spec-fields.md) — 値の意味づけが完全に外部ツール依存で pfdsl 単体（グラフ意味論 / 可視化 / `check`）に寄与しないフィールドは不採用。`schedule:`（#220）を not planned とし `index:`（#221）は単体価値ありとして維持
-- **ADR-0022** [ファイル書き換え CLI は gofmt 出力モデル](0022-cli-mutation-output-model.md) — ファイルを変える CLI は既定で本体を stdout、`--write` でインプレース＋レポートを stdout、`--check` で CI ドリフト検出、stderr は診断専用。副作用と stdout の中身を分離する
-- **ADR-0023** [L4 companion から配布層への昇格経路](0023-l4-promotion-route.md) — companion は配布されないため汎用知見が滞留する。固有名詞を含まないルールを昇格候補として検出する「L4 滞留監査」を retro D 層に追加する
+- **ADR-0022** [ファイル書き換え CLI は gofmt 出力モデル](0022-cli-mutation-output-model.md)（適用範囲は ADR-0030 が部分置換し、`meta set` を対象外とした） — ファイルを変える CLI は既定で本体を stdout、`--write` でインプレース＋レポートを stdout、`--check` で CI ドリフト検出、stderr は診断専用。副作用と stdout の中身を分離する
+- **ADR-0023** [L4 companion から配布層への昇格経路](0023-l4-promotion-route.md)（昇格の判定条件は ADR-0039 が部分置換） — companion は配布されないため汎用知見が滞留する。固有名詞を含まないルールを昇格候補として検出する「L4 滞留監査」を retro D 層に追加する
 - **ADR-0024** [retro 実行記録と差分計測可能な起動条件](0024-retro-execution-record.md)（Superseded by ADR-0026） — 「たまったら」は基準点なしで判定不能。retro 実行記録を workflow companion に残し、起動条件を前回以降の差分計測形に書き換える
 - **ADR-0025** [レビューカタログは抽象レンズを配布、具体例は repo-local instance](0025-review-catalog-lens-example-split.md) — 「各問いは実際に検出された誤りに由来する」具体例は本質的に repo-local。配布層は A/B/C の観点の枠組みのみ、pfdsl 固有の例示・機構は専用 instance ファイルへ降格する ADR-0023 の鏡像
 - **ADR-0026** [retro トリガーを done イベント駆動に一本化し実行記録を廃止](0026-retro-trigger-done-event.md) — 実行記録は並列 worktree でコンフリクトする上、閾値条件は導入以来一度も単独発火していない。基準点は既存の done イベント（プロトコル4）に一本化し、記録機構ごと廃止する
 - **ADR-0027** [仕様相互参照を安定 ID アンカーに移行する](0027-spec-id-cross-references.md) — 節番号直書きは挿入・並べ替えで崩れる。`[[SPEC_xxx]]` / `[[SPEC_xxx?]]` / `(SPEC_xxx)` の bracket 構文を正式採用し、不透明・永続・欠番許容の ID として renumber 機能なしで運用する
-- **ADR-0028** [pfd-ops の plugin 配布移行と skill sync の廃止](0028-plugin-first-pfd-ops-distribution.md) — pfd-ops を plugin に同梱し `install/` 実配置を `/pfd-init` に統合、`pfdsl skill sync` を削除。採用リポの drift 検知は CI 強制からランタイム hash 照合（pfd-ops 発火時）へ移行、ADR-0016 はリポ内運用として存続
+- **ADR-0028** [pfd-ops の plugin 配布移行と skill sync の廃止](0028-plugin-first-pfd-ops-distribution.md)（論点4の上流 main との版差の通知は ADR-0043 が部分置換） — pfd-ops を plugin に同梱し `install/` 実配置を `/pfd-init` に統合、`pfdsl skill sync` を削除。採用リポの drift 検知は CI 強制からランタイム hash 照合（pfd-ops 発火時）へ移行、ADR-0016 はリポ内運用として存続
 - **ADR-0029** [配布層の欠陥は使い捨て環境での採用初日再現で検出する](0029-adoption-day-probe.md) — ADR-0020（DSL 仕様 stress-test）の配布層版。使い捨て環境で plugin install → `/pfd-init` を実際に辿り、同梱物妥当性・ガイダンス実行可能性・agent 到達性・冪等性の4観点を検証する。初回実施で配布バグ1件（#417）を検出
 - **ADR-0030** [CLIコマンド体系を操作対象の種類で分類する](0030-cli-command-taxonomy.md) — フラットな17コマンドを `graph`（位相への読み取り専用問い合わせ）/ `meta`（field-aware な frontmatter 読み書き）/ `status`（status 由来の計画クエリ）の3グループとトップレベル動詞に再編。エイリアスなし一括切替、旧名は exit 2
 - **ADR-0031** [配布スキルの CLI 呼び出しを素の `pfdsl` に統一する](0031-skill-cli-global-invocation.md) — スキル/エージェント本文の `npx @pfdsl/cli`（約48箇所）を素の `pfdsl` に統一。#67 の npx 化は #524 の preflight 導入で前提が変わり、npx の恒常コスト（約 +0.45s/回）だけが残っていた。版固定 npx を fallback として残置。issue #67 を改訂
 - **ADR-0032** [pfd-ops 配布物を専用ディレクトリ `scripts/pfdsl/` に隔離する](0032-pfd-ops-install-dedicated-dir.md) — 採用リポの `scripts/lib/gh-exec.mjs` 等は pfdsl 由来か自リポ独自か区別がつかなかった。実体スクリプトを `scripts/pfdsl/` へ集約し、ワークフロー本体は fat workflow のまま参照パスだけ更新する。初版で試みた composite action 化は独立レビューで棄却 — ADR-0016 が却下した cross-directory coupling は plugin 配布移行後も本質的に解消していないと判明した
 - **ADR-0033** [作業項目が列挙する案の集合を設計空間とみなさない](0033-generate-a-comparison-alternative.md) — 「立ち止まれ」型の規則は原理的に効かない（信号は既に検出されている）。「比較対象を生成する」を1原則とし work-cycle 手順1・手順2 の3適用点に置く。前提の1文 → 前提を否定した案の生成 → 却下理由の語彙制限（「手間」「大がかり」「スコープ外」を無効化）
-- **ADR-0034** [pfdsl は frontmatter フォーマットを所有する](0034-pfdsl-owns-frontmatter-format.md) — `fmt`・`meta set`・`sort`・`reindex`・`insert-definition` の frontmatter 書き換えを CST（`yaml` パッケージの `Document`）ベースへ統一し、正規表現による行・文字位置ベースの手術コードを廃止する。破壊的変更として既存ファイルは再整形される
+- **ADR-0034** [pfdsl は frontmatter フォーマットを所有する](0034-pfdsl-owns-frontmatter-format.md)（再整形の範囲は ADR-0037 が改訂） — `fmt`・`meta set`・`sort`・`reindex`・`insert-definition` の frontmatter 書き換えを CST（`yaml` パッケージの `Document`）ベースへ統一し、正規表現による行・文字位置ベースの手術コードを廃止する。破壊的変更として既存ファイルは再整形される
 - **ADR-0035** [種別を分ける軸は判断の有無、読み手はファイル分割の軸](0035-kind-axis-is-judgment.md) — ADR-0017 の「主役」表現は LLM 担当の判断と境界起因の人手を判定できない。判定軸を判断の有無に一本化し、実行主体は `owner` で表す。読み手軸は種別軸にすると変換チェーンの終端がファイル境界になり縫い代が 2.7 倍になるため、ファイル分割の軸として積極利用する側に格上げする
 - **ADR-0036** [配布プロンプトは公開境界でレビューし、承認済み commit を記録する](0036-distribution-review-gate.md) — 散文の規約は #340 → PR #374 → #674 の同型再発を止めなかった。決定可能な違反は毎 CI の機械検査、残りは sandbox に隔離した subagent を利用側の読み手として走らせるレビューが見る。承認済み commit hash と配布ツリーの齟齬で `make release` を止め、ADR-0029 が持たなかった起動条件を公開境界の希少性に置く
 - **ADR-0037** [frontmatter の所有は表現の正準化までとし、著者の改行意図は保存する](0037-folded-scalar-wrap-preservation.md) — ADR-0034 の全文再直列化は folded scalar (`>`) の手書き折返しを5経路すべてで畳んでいた。インデント幅は正準化する一方、改行位置は著者の意図として保存する線引きを追加し、`renderFrontmatterCst` の後処理1箇所で実装する。PR #712 のバイト範囲スプライス方式は破棄する

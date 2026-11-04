@@ -9,12 +9,15 @@ import {
 	centerPan,
 	fitGraph,
 	focusNodeView,
+	fontSizeBelowMinimum,
+	graphFitsViewport,
 	MAX_SCALE,
 	MIN_SCALE,
 	minimapScale,
 	minimapViewport,
 	panFromMinimapPoint,
 	panToCenterNode,
+	screenFontSize,
 	shouldReleaseDrag,
 	zoomAt,
 } from "./webview-logic.js";
@@ -97,9 +100,20 @@ export function mountPreview(container: HTMLElement, host: PreviewHost) {
 	) as HTMLButtonElement;
 	if (host.canOpenRelatedFiles === false)
 		container.querySelector("[data-related-files-help]")?.remove();
-	on(helpToggle, "click", () => {
-		help.hidden = !help.hidden;
-		helpToggle.setAttribute("aria-expanded", String(!help.hidden));
+	function setHelpOpen(open: boolean) {
+		help.hidden = !open;
+		helpToggle.setAttribute("aria-expanded", String(open));
+	}
+	on(helpToggle, "click", () => setHelpOpen(Boolean(help.hidden)));
+	on(document, "click", (event) => {
+		const target = event.target;
+		if (
+			!help.hidden &&
+			target instanceof window.Node &&
+			!help.contains(target) &&
+			!helpToggle.contains(target)
+		)
+			setHelpOpen(false);
 	});
 
 	let descriptions: Record<string, Array<[string, string]>> = {};
@@ -213,6 +227,7 @@ export function mountPreview(container: HTMLElement, host: PreviewHost) {
 	on(container, "keydown", (e) => {
 		if (e.key === "Escape" && !e.isComposing) {
 			hideHover();
+			if (!help.hidden) setHelpOpen(false);
 			closeActions();
 		}
 	});
@@ -476,6 +491,7 @@ export function mountPreview(container: HTMLElement, host: PreviewHost) {
 			scale,
 			{ width: root.clientWidth, height: root.clientHeight },
 		));
+		fittedHost = undefined;
 		applyTransform();
 	}
 
@@ -487,6 +503,9 @@ export function mountPreview(container: HTMLElement, host: PreviewHost) {
 	let startX = 0;
 	let startY = 0;
 	let hasPositioned = false;
+	// The host size of the current Fit view; any other view clears it. While
+	// set, the view follows the host's size (a hidden host measures 0).
+	let fittedHost: { width: number; height: number } | undefined;
 	let graphRevision = -1;
 	let minimumScale = MIN_SCALE;
 
@@ -531,12 +550,39 @@ export function mountPreview(container: HTMLElement, host: PreviewHost) {
 		const nodes = inner.querySelectorAll("g.node");
 		for (const node of nodes) {
 			if ((node as HTMLElement).dataset.nodeId === nodeId) {
+				const nodeRect = node.getBoundingClientRect();
+				if (fittedHost && nodeTextIsBelowMinimum(node)) {
+					const view = focusNodeView(
+						{ scale, panX, panY },
+						nodeRect,
+						root.getBoundingClientRect(),
+						{ width: root.clientWidth, height: root.clientHeight },
+					);
+					if (view) {
+						fittedHost = undefined;
+						({ scale, panX, panY } = view);
+						minimumScale = Math.min(minimumScale, scale);
+						applyTransform();
+						if (cue) showCue(node);
+						return;
+					}
+				}
+				if (
+					graphFitsViewport(
+						inner.getBoundingClientRect(),
+						root.getBoundingClientRect(),
+					)
+				) {
+					if (cue) showCue(node);
+					return;
+				}
 				({ panX, panY } = panToCenterNode(
 					{ scale, panX, panY },
-					node.getBoundingClientRect(),
+					nodeRect,
 					root.getBoundingClientRect(),
 					{ width: root.clientWidth, height: root.clientHeight },
 				));
+				fittedHost = undefined;
 				applyTransform();
 				if (cue) showCue(node);
 				return;
@@ -552,14 +598,39 @@ export function mountPreview(container: HTMLElement, host: PreviewHost) {
 		if (!view) return false;
 		({ scale, panX, panY } = view);
 		minimumScale = Math.min(MIN_SCALE, scale);
+		fittedHost = {
+			width: container.clientWidth,
+			height: container.clientHeight,
+		};
 		applyTransform();
 		return true;
+	}
+
+	function nodeTextIsBelowMinimum(node: Element): boolean {
+		const fontSize = node.querySelector("text")?.getAttribute("font-size");
+		const viewBox = inner.querySelector("svg")?.getAttribute("viewBox");
+		if (!fontSize?.trim() || !viewBox) return false;
+		const values = viewBox
+			.trim()
+			.split(/[\s,]+/)
+			.map(Number);
+		if (values.length !== 4) return false;
+		return fontSizeBelowMinimum(
+			screenFontSize(Number(fontSize), inner.offsetWidth, values[2]!, scale),
+		);
 	}
 
 	function positionGraph() {
 		if (disposed || graphRevision !== revision || !error.hidden) return;
 		if (root.clientWidth === 0 || root.clientHeight === 0) return;
-		if (!hasPositioned) {
+		const hostWidth = container.clientWidth;
+		const hostHeight = container.clientHeight;
+		const hostResized =
+			fittedHost !== undefined &&
+			hostWidth > 0 &&
+			hostHeight > 0 &&
+			(hostWidth !== fittedHost.width || hostHeight !== fittedHost.height);
+		if (!hasPositioned || hostResized) {
 			if (!fitCurrentGraph()) return;
 			hasPositioned = true;
 		}
@@ -580,26 +651,28 @@ export function mountPreview(container: HTMLElement, host: PreviewHost) {
 	}
 	let containerWidth = container.clientWidth;
 	let containerHeight = container.clientHeight;
+	// Panel content also resizes the graph; only a host resize dismisses menus
+	// and, through positionGraph, fits a Fit view again.
+	function resizeHost() {
+		if (
+			container.clientWidth !== containerWidth ||
+			container.clientHeight !== containerHeight
+		) {
+			containerWidth = container.clientWidth;
+			containerHeight = container.clientHeight;
+			connections.resize();
+		}
+		positionGraph();
+	}
 	const resizeObserver =
 		typeof window.ResizeObserver === "function"
-			? new window.ResizeObserver(() => {
-					// Panel content also resizes the graph; only a host resize dismisses menus.
-					if (
-						container.clientWidth !== containerWidth ||
-						container.clientHeight !== containerHeight
-					) {
-						containerWidth = container.clientWidth;
-						containerHeight = container.clientHeight;
-						connections.resize();
-					}
-					positionGraph();
-				})
+			? new window.ResizeObserver(resizeHost)
 			: undefined;
 	resizeObserver?.observe(root);
 	resizeObserver?.observe(container);
 	on(window, "resize", () => {
 		connections.resize();
-		positionGraph();
+		resizeHost();
 	});
 	on(fitButton, "click", () => {
 		pendingFocusNodeId = undefined;
@@ -607,6 +680,7 @@ export function mountPreview(container: HTMLElement, host: PreviewHost) {
 	});
 	on(actualSize, "click", () => {
 		pendingFocusNodeId = undefined;
+		fittedHost = undefined;
 		scale = 1;
 		centerGraph();
 	});
@@ -622,12 +696,14 @@ export function mountPreview(container: HTMLElement, host: PreviewHost) {
 		);
 		if (!view) return;
 		pendingFocusNodeId = undefined;
+		fittedHost = undefined;
 		({ scale, panX, panY } = view);
 		minimumScale = Math.min(minimumScale, scale);
 		applyTransform();
 		showCue(node);
 	});
 	function zoom(deltaY: number, x: number, y: number) {
+		fittedHost = undefined;
 		({ scale, panX, panY } = zoomAt(
 			{ scale, panX, panY },
 			x,
@@ -696,6 +772,9 @@ export function mountPreview(container: HTMLElement, host: PreviewHost) {
 			return;
 		}
 		if (!dragging) return;
+		// A press that has not moved yet is a click, not a pan.
+		if (e.clientX - startX === panX && e.clientY - startY === panY) return;
+		fittedHost = undefined;
 		panX = e.clientX - startX;
 		panY = e.clientY - startY;
 		applyTransform();
@@ -767,6 +846,7 @@ export function mountPreview(container: HTMLElement, host: PreviewHost) {
 		}
 		scale = 1;
 		pendingFocusNodeId = undefined;
+		fittedHost = undefined;
 		panX = 0;
 		panY = 0;
 		requestAnimationFrame(() => centerGraph());

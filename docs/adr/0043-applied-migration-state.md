@@ -1,6 +1,6 @@
 # ADR-0043: 採用先が移行を適用した版を `.pfdsl/config.json` に記録し、照合は読むだけにする
 
-- Status: Accepted
+- Status: Accepted（2026-10-05 改訂 — 当初は上流 main との版差の通知を変えないとしたが、Decision「範囲」の方針更新で廃止に書き直した。当初の記述は git 履歴を参照）
 - Date: 2026-10-04
 
 ## Context

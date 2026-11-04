@@ -1,6 +1,6 @@
 # ADR-0022: ファイルを書き換える CLI コマンドは gofmt 出力モデルに従う
 
-- Status: Accepted
+- Status: Accepted、Superseded in part by [ADR-0030](0030-cli-command-taxonomy.md#rationale)（適用範囲。Rationale 第4項「唯一の明示的例外」が、指定フィールドだけを書き換える `meta set` を本 ADR の出力モデルの対象外とした）
 - Date: 2026-06-27
 
 ## Context
