@@ -1,0 +1,202 @@
+#!/usr/bin/env node
+// Audits sync between GitHub issues and .pfdsl/roadmap.pfdsl.
+// Usage: node scripts/pfdsl/audit-issues-flow.mjs [--roadmap <snapshot>] [--enforce-issue <n> ...]
+
+import { readFileSync } from "node:fs";
+import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
+import { parseArgs } from "node:util";
+import {
+	createGitHubOps,
+	GITHUB_UNAVAILABLE_EXIT_CODE,
+	isGitHubUnavailableError,
+} from "./lib/github-ops.mjs";
+import {
+	buildProcessOutputs,
+	computeFindings,
+	computeLabelFindings,
+	FLOW_LABELS,
+	parseIssueProcesses,
+	partitionFindings,
+} from "./lib/issues-flow-audit.mjs";
+import { parseDocument } from "./lib/yaml-require.mjs";
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const root = resolve(__dirname, "../..");
+const githubOps = createGitHubOps({ cwd: root });
+
+// Every finding for an issue named here fails the audit.
+// Once any issue is named, the findings for all other issues only advise.
+// Label findings are not about an issue, so they keep their own severity.
+/** @type {number[]} */
+let enforcedIssues = [];
+let roadmapFile = resolve(root, ".pfdsl/roadmap.pfdsl");
+// node:util rather than a shared helper because this file is mirrored into
+// .claude/skills/pfd-ops/install/ and runs in adopting repos, which have no
+// scripts/lib/. Strict parsing keeps removed mutation modes rejected.
+try {
+	const { values } = parseArgs({
+		args: process.argv.slice(2),
+		options: {
+			"enforce-issue": { type: "string", multiple: true },
+			roadmap: { type: "string" },
+		},
+		strict: true,
+		allowPositionals: false,
+	});
+	if (values.roadmap !== undefined) roadmapFile = resolve(values.roadmap);
+	enforcedIssues = (values["enforce-issue"] ?? []).map((value) => {
+		const n = Number(value);
+		if (!Number.isSafeInteger(n) || n <= 0) {
+			throw new TypeError(
+				`--enforce-issue expects an issue number, got '${value}'`,
+			);
+		}
+		return n;
+	});
+} catch (err) {
+	console.error(`audit-issues-flow: ${err.message}`);
+	process.exit(1);
+}
+
+// --- Read and split roadmap.pfdsl ---
+
+const raw = readFileSync(roadmapFile, "utf-8");
+
+// File starts with "---\n"; frontmatter ends at the next line where trimEnd()==="---"
+const lines = raw.split("\n");
+let fmEnd = -1;
+for (let i = 1; i < lines.length; i++) {
+	if (lines[i].trimEnd() === "---") {
+		fmEnd = i;
+		break;
+	}
+}
+if (fmEnd === -1) throw new Error("No closing --- found in roadmap.pfdsl");
+
+const fmText = `${lines.slice(1, fmEnd).join("\n")}\n`;
+const body = lines.slice(fmEnd + 1).join("\n");
+
+// --- Fetch labels from GitHub ---
+
+async function fetchLabels() {
+	return await githubOps.listLabels();
+}
+
+// --- Fetch issues from GitHub ---
+
+async function fetchIssues() {
+	return (await githubOps.listIssues()).map(normalizeIssue);
+}
+
+function normalizeIssue(i) {
+	return {
+		number: i.number,
+		state: i.state,
+		labels: i.labels.map((l) => l.name),
+	};
+}
+
+// --- Parse frontmatter ---
+
+const fm = parseDocument(fmText).toJS();
+const outputsByProcess = buildProcessOutputs(body);
+
+// --- Check labels ---
+
+function exitGhUnavailable() {
+	console.log(
+		"GitHub operations unavailable: skipping GitHub-dependent checks (label sync, issue sync); to run them, install and authenticate the gh CLI, or set GH_TOKEN or GITHUB_TOKEN",
+	);
+	process.exit(GITHUB_UNAVAILABLE_EXIT_CODE);
+}
+
+let labels;
+try {
+	labels = await fetchLabels();
+} catch (e) {
+	if (isGitHubUnavailableError(e)) exitGhUnavailable();
+	throw e;
+}
+// Resolve only after the availability check, preserving the unavailable exit.
+const locationDiagnostics = [];
+const processes = parseIssueProcesses(
+	fm,
+	githubOps.repository(),
+	locationDiagnostics,
+);
+if (locationDiagnostics.length > 0) {
+	console.log("location advisory (does not fail this audit):");
+	for (const finding of locationDiagnostics)
+		console.log(`  ${finding.type} [${finding.processId}] ${finding.detail}`);
+}
+const entries = [];
+for (const proc of processes) {
+	const outputs = outputsByProcess.get(proc.id) ?? [];
+	for (const issueNumber of proc.issueNumbers) {
+		for (const artifactId of outputs) {
+			entries.push({ processId: proc.id, issueNumber, artifactId });
+		}
+	}
+}
+const labelFindings = computeLabelFindings(FLOW_LABELS, labels);
+const labelParts = partitionFindings(labelFindings);
+
+// Label findings are printed here but do not end the audit: the issue-level
+// findings below are independent of them, and stopping would hide those until
+// the labels were fixed. The exit code is decided at the end.
+function fmtLabelFinding(f) {
+	return `  ${f.type} [${f.name}] ${f.detail}`;
+}
+
+if (labelParts.blocking.length > 0) {
+	console.log("label:");
+	for (const f of labelParts.blocking) console.log(fmtLabelFinding(f));
+}
+if (labelParts.advisory.length > 0) {
+	console.log("label advisory (does not fail this audit):");
+	for (const f of labelParts.advisory) console.log(fmtLabelFinding(f));
+}
+
+// --- Compute and print findings ---
+
+let issues;
+try {
+	issues = await fetchIssues();
+} catch (e) {
+	if (isGitHubUnavailableError(e)) exitGhUnavailable();
+	throw e;
+}
+const findings = computeFindings(entries, issues);
+
+function printFindings(findings) {
+	const parts = partitionFindings(findings, { enforcedIssues });
+	const { blocking, advisory } = parts;
+
+	function fmtFinding(f) {
+		const pid = f.processId ? ` [${f.processId}]` : "";
+		const aid = f.artifactId ? ` -> ${f.artifactId}` : "";
+		return `  #${f.issueNumber} ${f.type}${pid}${aid} ${f.detail}`;
+	}
+
+	if (blocking.length > 0) {
+		console.log("blocking:");
+		for (const f of blocking) console.log(fmtFinding(f));
+	}
+	if (advisory.length > 0) {
+		console.log("advisory (does not fail this audit):");
+		for (const f of advisory) console.log(fmtFinding(f));
+	}
+	return parts;
+}
+
+const { blocking } = printFindings(findings);
+if (blocking.length === 0 && labelParts.blocking.length === 0) {
+	console.log(
+		locationDiagnostics.length > 0
+			? "roadmap.pfdsl is in sync for the selected repository; other repository links were not checked"
+			: "roadmap.pfdsl is in sync",
+	);
+	process.exit(0);
+}
+process.exit(1);

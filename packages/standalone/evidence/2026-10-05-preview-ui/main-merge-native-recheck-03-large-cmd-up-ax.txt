@@ -1,0 +1,129 @@
+Window: "PFDSL", App: PFDSL.
+0 standard window PFDSL, Secondary Actions: Raise
+	1 scroll area
+		2 HTML content Description: PFDSL, URL: tauri://localhost
+			3 container
+				4 text PFDSL
+				5 button Open folder…
+				6 button Format
+				7 text Changes stay in this window.
+			8 container
+				9 container PFD files
+				10 container Documents
+					11 tab (selected) Welcome •
+					12 tab (selectable) 日本語
+				13 editor (settable) Editor content, Value: [editor: Editor content], Secondary Actions: Show Writing Tools
+					14 text (settable) ---
+title: Large native pan exercise
+layout:
+  direction: LR
+---
+seed >> step_01 -> artifact_01
+artifact_01 >> step_02 -> artifact_02
+artifact_02 >> step_03 -> artifact_03
+artifact_03 >> step_04 -> artifact_04
+artifact_04 >> step_05 -> artifact_05
+artifact_05 >> step_06 -> artifact_06
+artifact_06 >> step_07 -> artifact_07
+artifact_07 >> step_08 -> artifact_08
+artifact_08 >> step_09 -> artifact_09
+artifact_09 >> step_10 -> artifact_10
+artifact_10 >> step_11 -> artifact_11
+artifact_11 >> step_12 -
+				15 container Diagram view
+					16 button Zoom out
+					17 container Zoom level
+						18 text 100%
+					19 button Zoom in
+					20 button Fit
+					21 button 100%
+					22 button (collapsed) Node actions, Secondary Actions: Expand
+					23 button (collapsed) Help, Secondary Actions: Expand
+				24 container
+					25 text Large native pan exercise
+					26 button Node artifact_01. Enter for Node actions.
+					27 button Node step_02. Enter for Node actions.
+					28 button Node artifact_02. Enter for Node actions.
+					29 button Node step_03. Enter for Node actions.
+					30 button Node artifact_03. Enter for Node actions.
+					31 button Node step_04. Enter for Node actions.
+					32 button Node artifact_04. Enter for Node actions.
+					33 button Node step_05. Enter for Node actions.
+					34 button Node artifact_05. Enter for Node actions.
+					35 button Node step_06. Enter for Node actions.
+					36 button Node artifact_06. Enter for Node actions.
+					37 button Node step_07. Enter for Node actions.
+					38 button Node artifact_07. Enter for Node actions.
+					39 button Node step_08. Enter for Node actions.
+					40 button Node artifact_08. Enter for Node actions.
+					41 button Node step_09. Enter for Node actions.
+					42 button Node artifact_09. Enter for Node actions.
+					43 button Node step_10. Enter for Node actions.
+					44 button Node artifact_10. Enter for Node actions.
+					45 button Node step_11. Enter for Node actions.
+					46 button Node artifact_11. Enter for Node actions.
+					47 button Node step_12. Enter for Node actions.
+					48 button Node artifact_12. Enter for Node actions.
+					49 button Node step_13. Enter for Node actions.
+					50 button Node artifact_13. Enter for Node actions.
+					51 button Node step_14. Enter for Node actions.
+					52 button Node artifact_14. Enter for Node actions.
+					53 button Node step_15. Enter for Node actions.
+					54 button Node artifact_15. Enter for Node actions.
+					55 button Node step_16. Enter for Node actions.
+					56 button Node artifact_16. Enter for Node actions.
+					57 button Node step_17. Enter for Node actions.
+					58 button Node artifact_17. Enter for Node actions.
+					59 button Node step_18. Enter for Node actions.
+					60 button Node artifact_18. Enter for Node actions.
+					61 button Node step_19. Enter for Node actions.
+					62 button Node artifact_19. Enter for Node actions.
+					63 button Node step_20. Enter for Node actions.
+					64 button Node artifact_20. Enter for Node actions.
+					65 button Node step_21. Enter for Node actions.
+					66 button Node artifact_21. Enter for Node actions.
+					67 button Node step_22. Enter for Node actions.
+					68 button Node artifact_22. Enter for Node actions.
+					69 button Node step_23. Enter for Node actions.
+					70 button Node artifact_23. Enter for Node actions.
+					71 button Node step_24. Enter for Node actions.
+					72 button Node artifact_24. Enter for Node actions.
+					73 button Node step_25. Enter for Node actions.
+					74 button Node artifact_25. Enter for Node actions.
+					75 button Node step_26. Enter for Node actions.
+					76 button Node artifact_26. Enter for Node actions.
+					77 button Node step_27. Enter for Node actions.
+					78 button Node artifact_27. Enter for Node actions.
+					79 button Node step_28. Enter for Node actions.
+					80 button Node artifact_28. Enter for Node actions.
+					81 button Node step_29. Enter for Node actions.
+					82 button Node artifact_29. Enter for Node actions.
+					83 button Node step_30. Enter for Node actions.
+					84 button Node artifact_30. Enter for Node actions.
+					85 button Node step_31. Enter for Node actions.
+					86 button Node artifact_31. Enter for Node actions.
+					87 button Node step_32. Enter for Node actions.
+					88 button Node artifact_32. Enter for Node actions.
+					89 button Node step_33. Enter for Node actions.
+					90 button Node artifact_33. Enter for Node actions.
+					91 button Node step_34. Enter for Node actions.
+					92 button Node artifact_34. Enter for Node actions.
+					93 button Node step_35. Enter for Node actions.
+					94 button Node artifact_35. Enter for Node actions.
+					95 button Node seed. Enter for Node actions.
+					96 button Node step_01. Enter for Node actions.
+				97 container
+					98 text Large native pan exercise artifact_01 step_02 artifact_02 step_03 artifact_03 step_04 artifact_04 step_05 artifact_05 step_06 artifact_06 step_07 artifact_07 step_08 artifact_08 step_09 artifact_09 step_10 artifact_10 step_11 artifact_11 step_12 artifact_12 step_13 artifact_13 step_14 artifact_14 step_15 artifact_15 step_16 artifact_16 step_17 artifact_17 step_18 artifact_18 step_19 artifact_19 step_20 artifact_20 step_21 artifact_21 step_22 artifact_22 step_23 artifact_23 step_24 artifact_24 step_25 artifact_25 step_26 artifact_26 step_27 artifact_27 step_28 artifact_28 step_29 artifact_29 step_30 artifact_30 step_31 artifact_31 step_32 artifact_32 step_33 artifact_33 step_34 artifact_34 step_35 artifact_35 seed step_01
+				99 menu Secondary Actions: Cancel
+				100 menu Secondary Actions: Cancel
+	101 close button
+	102 full screen button Help: this button also has an action to zoom the window, Secondary Actions: zoom the window
+	103 minimize button
+	104 text PFDSL
+105 menu bar
+	106 PFDSL
+	107 File
+	108 Edit
+	109 View
+	110 Window
+	111 Help

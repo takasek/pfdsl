@@ -1,26 +1,51 @@
-#!/usr/bin/env node
-// Single source of truth for the gen-plugin drift trigger pattern, shared by
-// scripts/gate-check.mjs (JS RegExp import) and scripts/pre-commit (a POSIX
-// sh script that captures the raw ERE string via command substitution,
-// since it cannot `import` JS). Keep this ERE-compatible for `grep -E`.
+// Single source of truth for the gen-plugin drift trigger pattern, imported as
+// a RegExp by scripts/gate-check.mjs and scripts/check-drift-gates.mjs.
 //
-// Superset of GEN_SKILL_TRIGGER: gen-plugin.mjs re-runs gen-skill.mjs
-// internally (see scripts/gen-plugin.mjs), plus bundles pfd-grill/
-// pfd-ops/pfd-retro/pfd-ecosystem/pfd-cycle/pfd-init/pfd-lens and derives
-// plugin.json's version from the CLI package.json.
+// Superset of GEN_SKILL_TRIGGER: gen-plugin.mjs re-runs gen-skill.mjs internally (see scripts/gen-plugin.mjs).
+// It also bundles pfd-grill/pfd-ops/pfd-retro/pfd-ecosystem/pfd-cycle/pfd-init.
+// The harness-neutral inventory lists bundled agents. plugin.json's version derives from packages/cli/package.json.
+//
+// Includes scripts/gen-plugin-dist-independent.mjs (#593, split rationale
+// in scripts/lib/gen-plugin.mjs's assemblePluginDistIndependent): a change
+// to it is itself a drift-check target, so it must trigger the same gate
+// that regenerates and diffs plugin/ in scripts/check-drift-gates.mjs.
+// Its own gen-install.mjs dependency doesn't need adding here — not because
+// gen-install can't affect plugin/'s contents (it can: mirrorDir("pfd-ops",
+// …) in scripts/lib/gen-plugin.mjs copies the whole pfd-ops skill tree,
+// install/ included, into plugin/pfdsl/skills/pfd-ops/install/), but because
+// a template-source-only change is already blocked by GEN_INSTALL_TRIGGER's
+// own gate, declared ahead of these in scripts/check-drift-gates.mjs, until install/ is
+// regenerated and re-staged too — and that staged install/ path itself
+// matches this pattern's `\.claude/skills/pfd-ops/` alternative.
 
-import { realpathSync } from "node:fs";
-import { fileURLToPath } from "node:url";
 import { GEN_SKILL_TRIGGER_PATTERN } from "./gen-skill-trigger.mjs";
+import {
+	CLAUDE_GENERATED_CAPABILITY_OUTPUTS,
+	DISTRIBUTED_COMMANDS,
+	DISTRIBUTED_SKILLS,
+} from "./harness-inventory.mjs";
 
-export const GEN_PLUGIN_TRIGGER_PATTERN = `${GEN_SKILL_TRIGGER_PATTERN}|scripts/gen-plugin\\.mjs|scripts/lib/gen-plugin\\.mjs|\\.claude/skills/pfd-ecosystem/|\\.claude/skills/pfd-ops/|\\.claude/skills/pfd-retro/|\\.claude/skills/pfd-grill/|\\.claude/commands/pfd-cycle\\.md|\\.claude/commands/pfd-init\\.md|\\.claude/commands/pfd-retro\\.md|\\.claude/agents/pfd-lens\\.md|^hooks/|packages/cli/package\\.json`;
+// Cover distributed skills/commands and every generated repository agent,
+// including agents intentionally excluded from the plugin.
+const escapeDots = (name) => name.replace(/\./g, "\\.");
+const AGENT_PATTERNS = CLAUDE_GENERATED_CAPABILITY_OUTPUTS.filter((path) =>
+	path.startsWith(".claude/agents/"),
+)
+	.map(escapeDots)
+	.join("|");
+const SKILL_PATTERNS = DISTRIBUTED_SKILLS.map(
+	(dir) => `\\.claude/skills/${escapeDots(dir)}/`,
+).join("|");
+const COMMAND_PATTERNS = DISTRIBUTED_COMMANDS.map(
+	(file) => `\\.claude/commands/${escapeDots(file)}`,
+).join("|");
 
-export const GEN_PLUGIN_TRIGGER = new RegExp(GEN_PLUGIN_TRIGGER_PATTERN);
+// `^generated/` and `^plugin/` cover the generated source and distribution sides, mirroring what GEN_INSTALL_TRIGGER already does for install/: a hand-edit there is about to be overwritten by the next assembly, and the drift gate is what tells the author so instead of letting the edit ship and then vanish (#666, same shape as #579).
+// `.claude-plugin/marketplace\.json` joins it for the same reason: its
+// per-plugin description is generated (assemblePluginDistIndependent, #685)
+// even though the file lives outside plugin/pfdsl/.
+const GEN_PLUGIN_TRIGGER_PATTERN = `${GEN_SKILL_TRIGGER_PATTERN}|scripts/gen-plugin\\.mjs|scripts/lib/gen-plugin\\.mjs|scripts/lib/bundle-manifest\\.mjs|scripts/gen-plugin-dist-independent\\.mjs|scripts/gen-codex-assets\\.mjs|scripts/lib/gen-codex-assets\\.mjs|scripts/lib/root-instructions\\.mjs|scripts/root-instructions-template/|scripts/lib/markdown-heading\\.mjs|scripts/lib/distribution-sources\\.mjs|scripts/lib/harness-capability-contract\\.mjs|scripts/lib/harness-source-decoder\\.mjs|scripts/lib/git-ignore-oracle\\.mjs|scripts/lib/git-ls-files\\.mjs|scripts/lib/git-environment\\.mjs|scripts/lib/harness-inventory\\.mjs|${SKILL_PATTERNS}|${COMMAND_PATTERNS}|${AGENT_PATTERNS}|^CLAUDE\\.md$|^\\.claude/settings\\.json$|^hooks/|^generated/|^plugin/|^AGENTS\\.md$|^\\.agents/|^\\.codex/|packages/cli/package\\.json|^\\.claude-plugin/marketplace\\.json`;
 
-// CLI mode: print the raw ERE pattern string for shell command substitution.
-// realpathSync (not a raw string compare) matters here: on macOS, import.meta.url
-// reflects the ESM loader's realpath-resolved location (e.g. /tmp -> /private/tmp),
-// so a plain argv[1] comparison mismatches when the invocation path crosses a symlink.
-if (process.argv[1] && fileURLToPath(import.meta.url) === realpathSync(process.argv[1])) {
-	console.log(GEN_PLUGIN_TRIGGER_PATTERN);
-}
+export const GEN_PLUGIN_TRIGGER = new RegExp(
+	`${GEN_PLUGIN_TRIGGER_PATTERN}|^scripts/harness-template/|^scripts/repo-agent-template/|scripts/lib/harness-template\\.mjs|scripts/lib/gen-plugin-recovery\\.mjs`,
+);

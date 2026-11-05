@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { analyze } from "./index.js";
 import {
 	buildPresentationChain,
 	buildProducedConsumed,
@@ -9,9 +10,12 @@ import {
 	isUrlLike,
 	loadExtendsChain,
 	loadSubflowGraph,
+	parentBoundaryArtifacts,
 	resolveEffectiveFrontmatter,
+	resolveLoadedPresentation,
 	resolvePresentation,
 	resolveRefPath,
+	subflowBoundaryDiagnostics,
 	validatePresetKeys,
 	validateSubflowBoundary,
 	wrapPresetSource,
@@ -21,8 +25,27 @@ import type { NormalizedEdge } from "./types/index.js";
 
 type FakeDoc = { frontmatter: Frontmatter | null };
 
+/**
+ * Where a loader diagnostic points: its `file`, or "<entry>" when the key is
+ * absent. A key present with an undefined value is neither, so it shows up as
+ * `undefined` and fails the comparison.
+ */
+function fileOf(d: { file?: string }): string | undefined {
+	return Object.hasOwn(d, "file") ? d.file : "<entry>";
+}
+
 function makeLoad(docs: Record<string, FakeDoc>) {
 	return (path: string): FakeDoc | null => docs[path] ?? null;
+}
+
+/** A loader that also records how many times each path was asked for. */
+function makeCountingLoad(docs: Record<string, FakeDoc>) {
+	const calls = new Map<string, number>();
+	const load = (path: string): FakeDoc | null => {
+		calls.set(path, (calls.get(path) ?? 0) + 1);
+		return docs[path] ?? null;
+	};
+	return { load, calls };
 }
 
 describe("collectExtendsRefs", () => {
@@ -112,6 +135,33 @@ describe("isUrlLike", () => {
 });
 
 describe("loadSubflowGraph", () => {
+	// resolveRefPath is unit-tested directly, but the wiring around this call —
+	// the V021 code, the message, and the `continue` that keeps the load going —
+	// was reached only through extends:, never through subflow: (#638).
+	it.each([
+		["an absolute path", "/abs/child.pfdsl", "absolute"],
+		["a URL", "https://example.com/child.pfdsl", "url"],
+	])("reports %s in subflow: as V021 and keeps loading", (_name, ref, reason) => {
+		const docs = makeLoad({
+			"/p/main.pfdsl": {
+				frontmatter: {
+					process: {
+						P1: { subflow: ref },
+						P2: { subflow: "./ok.pfdsl" },
+					},
+				},
+			},
+			"/p/ok.pfdsl": { frontmatter: {} },
+		});
+		const result = loadSubflowGraph("/p/main.pfdsl", docs);
+		const v021 = result.diagnostics.filter((d) => d.code === "V021");
+		expect(v021).toHaveLength(1);
+		expect(v021[0]?.message).toContain(reason);
+		expect(v021[0]?.message).toContain(ref);
+		// The good sibling still loaded: the bad ref is skipped, not fatal.
+		expect(result.docs.has("/p/ok.pfdsl")).toBe(true);
+	});
+
 	it("loads the entry and its subflow children", () => {
 		const docs = makeLoad({
 			"/p/main.pfdsl": {
@@ -149,6 +199,132 @@ describe("loadSubflowGraph", () => {
 		});
 		const result = loadSubflowGraph("/p/self.pfdsl", docs);
 		expect(result.diagnostics.some((d) => d.code === "V022")).toBe(true);
+	});
+
+	// §16: one diagnostic per independent cycle, never just the first.
+	it("reports both disjoint subflow cycles, not only the first", () => {
+		const docs = makeLoad({
+			"/p/a.pfdsl": {
+				frontmatter: {
+					process: { P: { subflow: "./b.pfdsl" }, Q: { subflow: "./c.pfdsl" } },
+				},
+			},
+			"/p/b.pfdsl": {
+				frontmatter: { process: { R: { subflow: "./a.pfdsl" } } },
+			},
+			"/p/c.pfdsl": {
+				frontmatter: { process: { S: { subflow: "./a.pfdsl" } } },
+			},
+		});
+		const result = loadSubflowGraph("/p/a.pfdsl", docs);
+		expect(result.diagnostics.filter((d) => d.code === "V022")).toHaveLength(2);
+	});
+
+	// A diagnostic without `file` belongs to the loader's entry, the same
+	// convention subflowBoundaryDiagnostics uses for its boundary diagnostics.
+	it("leaves `file` off the entry's own diagnostics and names the nested file for the rest", () => {
+		const docs = makeLoad({
+			"/p/main.pfdsl": {
+				frontmatter: {
+					process: {
+						A: { subflow: "./gone.pfdsl" },
+						B: { subflow: "/abs/b.pfdsl" },
+						C: { subflow: "./child.pfdsl" },
+					},
+				},
+			},
+			"/p/child.pfdsl": {
+				frontmatter: {
+					process: {
+						D: { subflow: "./child-gone.pfdsl" },
+						E: { subflow: "https://example.com/e.pfdsl" },
+					},
+				},
+			},
+		});
+		const { diagnostics } = loadSubflowGraph("/p/main.pfdsl", docs);
+		expect(diagnostics.map((d) => [d.code, fileOf(d)])).toEqual([
+			["V021", "<entry>"],
+			["V021", "<entry>"],
+			["V021", "/p/child.pfdsl"],
+			["V021", "/p/child.pfdsl"],
+		]);
+	});
+
+	// One report per (referencing file, missing path): the message names no
+	// process, so a second one from the same file would be an identical line,
+	// while a different file's reference is a different thing to fix.
+	it("reports a missing child once per referencing file and still loads it once", () => {
+		const { load, calls } = makeCountingLoad({
+			"/p/main.pfdsl": {
+				frontmatter: {
+					process: {
+						P: { subflow: "./a.pfdsl" },
+						Q: { subflow: "./b.pfdsl" },
+						R: { subflow: "./x.pfdsl" },
+					},
+				},
+			},
+			"/p/a.pfdsl": {
+				frontmatter: { process: { S: { subflow: "./x.pfdsl" } } },
+			},
+			"/p/b.pfdsl": {
+				frontmatter: { process: { T: { subflow: "./x.pfdsl" } } },
+			},
+		});
+		const { diagnostics } = loadSubflowGraph("/p/main.pfdsl", load);
+		expect(diagnostics.map((d) => [d.code, fileOf(d)])).toEqual([
+			["V021", "/p/a.pfdsl"],
+			["V021", "/p/b.pfdsl"],
+			["V021", "<entry>"],
+		]);
+		expect(calls.get("/p/x.pfdsl")).toBe(1);
+	});
+
+	it("reports a missing child once when one file's processes all point at it", () => {
+		const { load, calls } = makeCountingLoad({
+			"/p/main.pfdsl": {
+				frontmatter: {
+					process: {
+						P: { subflow: "./x.pfdsl" },
+						Q: { subflow: "./x.pfdsl" },
+					},
+				},
+			},
+		});
+		const { diagnostics } = loadSubflowGraph("/p/main.pfdsl", load);
+		expect(diagnostics.map((d) => [d.code, fileOf(d)])).toEqual([
+			["V021", "<entry>"],
+		]);
+		expect(calls.get("/p/x.pfdsl")).toBe(1);
+	});
+
+	it("leaves `file` off a cycle the entry closes itself, and names the nested file that closes one", () => {
+		const self = loadSubflowGraph(
+			"/p/self.pfdsl",
+			makeLoad({
+				"/p/self.pfdsl": {
+					frontmatter: { process: { P: { subflow: "./self.pfdsl" } } },
+				},
+			}),
+		);
+		expect(self.diagnostics.map((d) => [d.code, fileOf(d)])).toEqual([
+			["V022", "<entry>"],
+		]);
+		const hop = loadSubflowGraph(
+			"/p/a.pfdsl",
+			makeLoad({
+				"/p/a.pfdsl": {
+					frontmatter: { process: { P: { subflow: "./b.pfdsl" } } },
+				},
+				"/p/b.pfdsl": {
+					frontmatter: { process: { Q: { subflow: "./a.pfdsl" } } },
+				},
+			}),
+		);
+		expect(hop.diagnostics.map((d) => [d.code, fileOf(d)])).toEqual([
+			["V022", "/p/b.pfdsl"],
+		]);
 	});
 
 	it("reports a multi-hop subflow cycle (a->b->c->a) (§15.11)", () => {
@@ -288,15 +464,6 @@ describe("computeTerminals", () => {
 		expect(computeTerminals(edges)).toEqual(new Set(["c"]));
 	});
 
-	it("artifact consumed by input edge is not terminal", () => {
-		// a is consumed by P via input, so a is not terminal
-		const edges: NormalizedEdge[] = [
-			{ kind: "input", artifact: "a", process: "P" },
-			{ kind: "output", process: "P", artifact: "b" },
-		];
-		expect(computeTerminals(edges)).not.toContain("a");
-	});
-
 	it("empty edges produce empty terminals", () => {
 		expect(computeTerminals([])).toEqual(new Set());
 	});
@@ -413,7 +580,11 @@ describe("validateSubflowBoundary", () => {
 		expect(diags.some((d) => d.code === "V030")).toBe(true);
 	});
 
-	it("M5 — dangling value in boundary map → V030", () => {
+	// The two early returns in validateSubflowBoundary exist to stop a broken
+	// map from also reporting the bijection mismatch it causes. Asserting the
+	// whole code list is what makes those guards testable: with either one
+	// removed, a V034 joins the set below (#609).
+	it("M5 — dangling value in boundary map → V030 alone, with no cascading V034", () => {
 		const diags = validateSubflowBoundary({
 			processId: "P",
 			parentNormalInputs: new Set(["order"]),
@@ -422,10 +593,10 @@ describe("validateSubflowBoundary", () => {
 			childOpenInputs: new Set(["incoming_order"]),
 			childTerminals: new Set([]),
 		});
-		expect(diags.some((d) => d.code === "V030")).toBe(true);
+		expect(diags.map((d) => d.code)).toEqual(["V030"]);
 	});
 
-	it("X1 — side crossing: input mapped to terminal → V033", () => {
+	it("X1 — side crossing: input mapped to terminal → V033 alone, with no cascading V034", () => {
 		const diags = validateSubflowBoundary({
 			processId: "P",
 			parentNormalInputs: new Set(["order"]),
@@ -434,23 +605,13 @@ describe("validateSubflowBoundary", () => {
 			childOpenInputs: new Set(["incoming_order"]),
 			childTerminals: new Set(["outgoing_parcel"]),
 		});
-		expect(diags.some((d) => d.code === "V033")).toBe(true);
+		expect(diags.map((d) => d.code)).toEqual(["V033", "V033"]);
 	});
 
-	it("X4 — swap map (input→child terminal side, output→child open input side) → no errors", () => {
-		// parent input 'a' maps to child terminal 'a' (wrong side)
-		// parent output 'b' maps to child open input 'b' (wrong side)
-		// boundary: { a: 'b', b: 'a' }
-		// parent inputs {a} should map to child open inputs {b}
-		// parent outputs {b} should map to child terminals {a}
-		// Actually X4 from spec says this IS valid (swap map). Let me verify:
-		// parentNormalInputs = {a}, parentOutputs = {b}
-		// boundaryMap = { a: 'b', b: 'a' }
-		// effective: a -> 'b', b -> 'a'
-		// side check: a ∈ parentNormalInputs, effective 'b' → is 'b' in childOpenInputs? childOpenInputs = {b} YES → OK
-		// side check: b ∈ parentOutputs, effective 'a' → is 'a' in childTerminals? childTerminals = {a} YES → OK
-		// bijection input: mapped = {b} == childOpenInputs {b} ✓
-		// bijection output: mapped = {a} == childTerminals {a} ✓
+	it("X4 — swap map (parent 'a'→child 'b', parent 'b'→child 'a') → no errors", () => {
+		// The names cross, but each side stays on its own side: parent input 'a'
+		// maps to child open input 'b', parent output 'b' to child terminal 'a'.
+		// Both mappings are bijective within their side, so this is legal.
 		const diags = validateSubflowBoundary({
 			processId: "P",
 			parentNormalInputs: new Set(["a"]),
@@ -502,17 +663,70 @@ describe("validateSubflowBoundary", () => {
 		expect(diags.some((d) => d.code === "V034")).toBe(true);
 	});
 
-	it("all subflow boundary diagnostics have severity error", () => {
-		const diags = validateSubflowBoundary({
-			processId: "P",
-			parentNormalInputs: new Set(["order"]),
-			parentOutputs: new Set([]),
-			boundaryMap: {},
-			childOpenInputs: new Set(["incoming_order"]),
-			childTerminals: new Set([]),
-		});
-		expect(diags.length).toBeGreaterThan(0);
-		for (const d of diags) {
+	// Every code this function can emit is an error per §16 — asserting that
+	// over one input would only cover whichever code that input happens to
+	// produce, so each code gets an input that provokes it.
+	const severityCases: Array<{
+		code: string;
+		input: Parameters<typeof validateSubflowBoundary>[0];
+	}> = [
+		{
+			code: "V030",
+			input: {
+				processId: "P",
+				parentNormalInputs: new Set(["order"]),
+				parentOutputs: new Set([]),
+				boundaryMap: { nonexistent: "order" },
+				childOpenInputs: new Set(["order"]),
+				childTerminals: new Set([]),
+			},
+		},
+		{
+			code: "V032",
+			input: {
+				processId: "P",
+				parentNormalInputs: new Set(["a", "b"]),
+				parentOutputs: new Set([]),
+				boundaryMap: { a: "b" },
+				childOpenInputs: new Set(["b", "c"]),
+				childTerminals: new Set([]),
+			},
+		},
+		{
+			code: "V033",
+			input: {
+				processId: "P",
+				parentNormalInputs: new Set(["order"]),
+				parentOutputs: new Set(["shipment"]),
+				boundaryMap: {
+					order: "outgoing_parcel",
+					shipment: "incoming_order",
+				},
+				childOpenInputs: new Set(["incoming_order"]),
+				childTerminals: new Set(["outgoing_parcel"]),
+			},
+		},
+		{
+			code: "V034",
+			input: {
+				processId: "P",
+				parentNormalInputs: new Set(["order"]),
+				parentOutputs: new Set([]),
+				boundaryMap: {},
+				childOpenInputs: new Set(["incoming_order"]),
+				childTerminals: new Set([]),
+			},
+		},
+	];
+
+	it.each(severityCases)("$code is emitted with severity error", ({
+		code,
+		input,
+	}) => {
+		const diags = validateSubflowBoundary(input);
+		const matching = diags.filter((d) => d.code === code);
+		expect(matching.length).toBeGreaterThan(0);
+		for (const d of matching) {
 			expect(d.severity).toBe("error");
 		}
 	});
@@ -553,6 +767,89 @@ describe("loadExtendsChain", () => {
 		expect(result.diagnostics.some((d) => d.code === "V027")).toBe(true);
 	});
 
+	// §16: one diagnostic per independent cycle, never just the first.
+	it("reports both disjoint extends cycles, not only the first", () => {
+		const docs = makeLoad({
+			"/p/a.pfdsl": { frontmatter: { extends: ["./b.pfdsl", "./c.pfdsl"] } },
+			"/p/b.pfdsl": { frontmatter: { extends: "./a.pfdsl" } },
+			"/p/c.pfdsl": { frontmatter: { extends: "./a.pfdsl" } },
+		});
+		const result = loadExtendsChain("/p/a.pfdsl", docs);
+		expect(result.diagnostics.filter((d) => d.code === "V027")).toHaveLength(2);
+	});
+
+	it("leaves `file` off the entry's own diagnostics and names the nested preset for the rest", () => {
+		const docs = makeLoad({
+			"/p/main.pfdsl": {
+				frontmatter: {
+					extends: ["./gone.yaml", "/abs/m.yaml", "./preset.yaml"],
+				},
+			},
+			"/p/preset.yaml": {
+				frontmatter: {
+					extends: ["./preset-gone.yaml", "https://example.com/p.yaml"],
+				},
+			},
+		});
+		const { diagnostics } = loadExtendsChain("/p/main.pfdsl", docs);
+		expect(diagnostics.map((d) => [d.code, fileOf(d)])).toEqual([
+			["V026", "<entry>"],
+			["V026", "<entry>"],
+			["V026", "/p/preset.yaml"],
+			["V026", "/p/preset.yaml"],
+		]);
+	});
+
+	it("reports a missing preset once per referencing file and still loads it once", () => {
+		const { load, calls } = makeCountingLoad({
+			"/p/main.pfdsl": {
+				frontmatter: { extends: ["./p1.yaml", "./p2.yaml", "./x.yaml"] },
+			},
+			"/p/p1.yaml": { frontmatter: { extends: "./x.yaml" } },
+			"/p/p2.yaml": { frontmatter: { extends: "./x.yaml" } },
+		});
+		const { diagnostics } = loadExtendsChain("/p/main.pfdsl", load);
+		expect(diagnostics.map((d) => [d.code, fileOf(d)])).toEqual([
+			["V026", "/p/p1.yaml"],
+			["V026", "/p/p2.yaml"],
+			["V026", "<entry>"],
+		]);
+		expect(calls.get("/p/x.yaml")).toBe(1);
+	});
+
+	it("reports a missing preset once when one file lists it twice", () => {
+		const { load, calls } = makeCountingLoad({
+			"/p/main.pfdsl": { frontmatter: { extends: ["./x.yaml", "./x.yaml"] } },
+		});
+		const { diagnostics } = loadExtendsChain("/p/main.pfdsl", load);
+		expect(diagnostics.map((d) => [d.code, fileOf(d)])).toEqual([
+			["V026", "<entry>"],
+		]);
+		expect(calls.get("/p/x.yaml")).toBe(1);
+	});
+
+	it("leaves `file` off an extends cycle the entry closes itself, and names the preset that closes one", () => {
+		const self = loadExtendsChain(
+			"/p/self.pfdsl",
+			makeLoad({
+				"/p/self.pfdsl": { frontmatter: { extends: "./self.pfdsl" } },
+			}),
+		);
+		expect(self.diagnostics.map((d) => [d.code, fileOf(d)])).toEqual([
+			["V027", "<entry>"],
+		]);
+		const hop = loadExtendsChain(
+			"/p/a.pfdsl",
+			makeLoad({
+				"/p/a.pfdsl": { frontmatter: { extends: "./b.pfdsl" } },
+				"/p/b.pfdsl": { frontmatter: { extends: "./a.pfdsl" } },
+			}),
+		);
+		expect(hop.diagnostics.map((d) => [d.code, fileOf(d)])).toEqual([
+			["V027", "/p/b.pfdsl"],
+		]);
+	});
+
 	it("reports multi-hop extends cycle (a→b→c→a) as V027", () => {
 		const docs = makeLoad({
 			"/p/a.pfdsl": { frontmatter: { extends: "./b.pfdsl" } },
@@ -561,6 +858,27 @@ describe("loadExtendsChain", () => {
 		});
 		const result = loadExtendsChain("/p/a.pfdsl", docs);
 		expect(result.diagnostics.some((d) => d.code === "V027")).toBe(true);
+	});
+
+	// The subflow loader has the same guard as the extends loader, but only the
+	// extends side had a diamond test — removing the subflow guard left every
+	// test green even though the shared child was then loaded once per parent
+	// (#637).
+	it("diamond: a subflow reached from two parents is loaded once", () => {
+		const { load, calls } = makeCountingLoad({
+			"/p/main.pfdsl": {
+				frontmatter: {
+					process: {
+						P1: { subflow: "./shared.pfdsl" },
+						P2: { subflow: "./shared.pfdsl" },
+					},
+				},
+			},
+			"/p/shared.pfdsl": { frontmatter: {} },
+		});
+		const result = loadSubflowGraph("/p/main.pfdsl", load);
+		expect(result.diagnostics).toEqual([]);
+		expect(calls.get("/p/shared.pfdsl")).toBe(1);
 	});
 
 	it("diamond: shared preset loaded once, no diagnostics", () => {
@@ -600,6 +918,143 @@ describe("loadExtendsChain", () => {
 // ---------------------------------------------------------------------------
 
 describe("buildPresentationChain", () => {
+	it("preserves the expanded public chain for a shared DAG", () => {
+		const load = makeLoad({
+			"/p/main.pfdsl": { frontmatter: { extends: ["./a.yaml", "./b.yaml"] } },
+			"/p/a.yaml": { frontmatter: { extends: "./base.yaml" } },
+			"/p/b.yaml": { frontmatter: { extends: "./base.yaml" } },
+			"/p/base.yaml": { frontmatter: {} },
+		});
+		const { docs } = loadExtendsChain("/p/main.pfdsl", load);
+		expect(
+			buildPresentationChain("/p/main.pfdsl", docs).map(({ path }) => path),
+		).toEqual([
+			"/p/base.yaml",
+			"/p/a.yaml",
+			"/p/base.yaml",
+			"/p/b.yaml",
+			"/p/main.pfdsl",
+		]);
+	});
+
+	it("preserves first appearance of tag keys during effective DAG resolution", () => {
+		const fm: Frontmatter = { extends: ["./a.yaml", "./b.yaml"] };
+		const load = makeLoad({
+			"/p/a.yaml": {
+				frontmatter: { extends: "./base.yaml", tag: { a: { color: "blue" } } },
+			},
+			"/p/b.yaml": { frontmatter: { extends: "./base.yaml" } },
+			"/p/base.yaml": { frontmatter: { tag: { x: { color: "red" } } } },
+		});
+		expect(
+			Object.keys(
+				resolveEffectiveFrontmatter("/p/main.pfdsl", fm, load)?.tag ?? {},
+			),
+		).toEqual(["x", "a"]);
+	});
+
+	it("preserves the legacy cyclic fallback chain and effective styles", () => {
+		const files: Record<string, FakeDoc> = {
+			"/p/main.pfdsl": {
+				frontmatter: { extends: ["./a.yaml", "./c.yaml", "./b.yaml"] },
+			},
+			"/p/a.yaml": {
+				frontmatter: {
+					extends: "./b.yaml",
+					statusStyles: { done: { fillcolor: "red" } },
+					tag: { shared: { color: "red" } },
+				},
+			},
+			"/p/b.yaml": { frontmatter: { extends: "./a.yaml" } },
+			"/p/c.yaml": {
+				frontmatter: {
+					statusStyles: { done: { fillcolor: "blue" } },
+					tag: { shared: { color: "blue" } },
+				},
+			},
+		};
+		const load = makeLoad(files);
+		const { docs, diagnostics } = loadExtendsChain("/p/main.pfdsl", load);
+		expect(diagnostics.some(({ code }) => code === "V027")).toBe(true);
+		const chain = buildPresentationChain("/p/main.pfdsl", docs);
+		expect(chain.map(({ path }) => path)).toEqual([
+			"/p/b.yaml",
+			"/p/a.yaml",
+			"/p/c.yaml",
+			"/p/a.yaml",
+			"/p/b.yaml",
+			"/p/main.pfdsl",
+		]);
+		expect(resolvePresentation(chain).statusStyles?.done?.fillcolor).toBe(
+			"red",
+		);
+		expect(
+			resolveEffectiveFrontmatter(
+				"/p/main.pfdsl",
+				files["/p/main.pfdsl"]!.frontmatter,
+				load,
+			)?.tag?.shared?.color,
+		).toBe("red");
+	});
+
+	it("preserves later-parent precedence in the expanded public chain", () => {
+		const load = makeLoad({
+			"/p/main.pfdsl": {
+				frontmatter: { extends: ["./left.yaml", "./right.yaml"] },
+			},
+			"/p/left.yaml": {
+				frontmatter: {
+					extends: "./base.yaml",
+					statusStyles: { done: { fillcolor: "green", color: "black" } },
+				},
+			},
+			"/p/right.yaml": { frontmatter: { extends: "./base.yaml" } },
+			"/p/base.yaml": {
+				frontmatter: { statusStyles: { done: { fillcolor: "red" } } },
+			},
+		});
+		const { docs } = loadExtendsChain("/p/main.pfdsl", load);
+		const chain = buildPresentationChain("/p/main.pfdsl", docs);
+		expect(chain.map(({ path }) => path)).toEqual([
+			"/p/base.yaml",
+			"/p/left.yaml",
+			"/p/base.yaml",
+			"/p/right.yaml",
+			"/p/main.pfdsl",
+		]);
+		expect(resolvePresentation(chain).statusStyles?.done).toEqual({
+			fillcolor: "red",
+			color: "black",
+		});
+	});
+
+	it("bounds a layered shared DAG by distinct files rather than inheritance routes", () => {
+		const files: Record<string, FakeDoc> = {
+			"/p/base.yaml": {
+				frontmatter: { statusStyles: { done: { fillcolor: "red" } } },
+			},
+		};
+		let refs = ["./base.yaml"];
+		for (let depth = 0; depth < 18; depth++) {
+			for (const side of ["a", "b"])
+				files[`/p/${side}${depth}.yaml`] = { frontmatter: { extends: refs } };
+			refs = [`./a${depth}.yaml`, `./b${depth}.yaml`];
+		}
+		files["/p/main.pfdsl"] = { frontmatter: { extends: refs } };
+		const { load, calls } = makeCountingLoad(files);
+		const { docs } = loadExtendsChain("/p/main.pfdsl", load);
+		let reads = 0;
+		const get = docs.get.bind(docs);
+		docs.get = (path) => {
+			reads++;
+			return get(path);
+		};
+		const resolved = resolveLoadedPresentation("/p/main.pfdsl", docs);
+		expect(reads).toBe(38);
+		expect([...calls.values()].every((count) => count === 1)).toBe(true);
+		expect(resolved.statusStyles?.done?.fillcolor).toBe("red");
+	});
+
 	it("single file, no extends → chain of just the entry", () => {
 		const docs = makeLoad({
 			"/p/main.pfdsl": { frontmatter: { statusStyles: {} } },
@@ -679,6 +1134,33 @@ describe("buildPresentationChain", () => {
 // ---------------------------------------------------------------------------
 
 describe("validatePresetKeys", () => {
+	it.each([
+		["an isolated node", "x\n"],
+		["graph edges", "a >> p -> b\n"],
+	])("rejects a preset with %s even without forbidden keys", (_name, body) => {
+		const doc = analyze(`---\nstatusStyles: {}\n---\n${body}`);
+		expect(
+			validatePresetKeys("/p/p.pfdsl", doc.frontmatter, doc.document),
+		).toEqual([expect.objectContaining({ code: "V028", severity: "error" })]);
+	});
+
+	it.each([
+		"",
+		"# Presentation settings only\n\n# No graph declarations\n",
+	])("accepts a presentation-only preset with body %j", (body) => {
+		const doc = analyze(`---\nstatusStyles: {}\n---\n${body}`);
+		expect(
+			validatePresetKeys("/p/p.pfdsl", doc.frontmatter, doc.document),
+		).toEqual([]);
+	});
+
+	it("rejects graph content without frontmatter", () => {
+		const doc = analyze("x\n");
+		expect(
+			validatePresetKeys("/p/p.pfdsl", doc.frontmatter, doc.document),
+		).toEqual([expect.objectContaining({ code: "V028", severity: "error" })]);
+	});
+
 	it("returns [] when fm is null", () => {
 		expect(validatePresetKeys("/p/p.yaml", null)).toEqual([]);
 	});
@@ -847,6 +1329,195 @@ describe("resolvePresentation", () => {
 // resolveEffectiveFrontmatter
 // ---------------------------------------------------------------------------
 
+describe("resolveLoadedPresentation", () => {
+	it("preserves lenient values for a prototype-sensitive invalid status preset", () => {
+		const docs = new Map<string, FakeDoc>([
+			["/p/main.pfdsl", { frontmatter: { extends: "./a.yaml" } }],
+			[
+				"/p/a.yaml",
+				{
+					frontmatter: {
+						statusStyles: JSON.parse(
+							'{"__proto__":{"done":{"fillcolor":"red"}}}',
+						),
+					},
+				},
+			],
+		]);
+		for (const excludeEntry of [false, true]) {
+			const actual = resolveLoadedPresentation("/p/main.pfdsl", docs, {
+				excludeEntry,
+			});
+			const expected = resolvePresentation(
+				buildPresentationChain("/p/main.pfdsl", docs).filter(
+					({ path }) => !(excludeEntry && path === "/p/main.pfdsl"),
+				),
+			);
+			expect(actual.statusStyles?.done?.fillcolor).toBe("red");
+			expect(Object.getPrototypeOf(actual.statusStyles)).toEqual(
+				Object.getPrototypeOf(expected.statusStyles),
+			);
+		}
+	});
+
+	it("preserves prototype-sensitive tag and group metadata from presets", () => {
+		const docs = new Map<string, FakeDoc>([
+			["/p/main.pfdsl", { frontmatter: { extends: "./a.yaml" } }],
+			[
+				"/p/a.yaml",
+				{
+					frontmatter: {
+						tag: {
+							["__proto__"]: {
+								style: { fillcolor: "red" },
+								inherited: { label: "Inherited" },
+							},
+							inherited: { style: { color: "white" } },
+						},
+						group: {
+							["__proto__"]: { label: "Proto", inherited: { color: "blue" } },
+							inherited: { label: "Inherited" },
+						},
+					},
+				},
+			],
+		]);
+		for (const excludeEntry of [false, true]) {
+			const expected = resolvePresentation(
+				buildPresentationChain("/p/main.pfdsl", docs).filter(
+					({ path }) => !(excludeEntry && path === "/p/main.pfdsl"),
+				),
+			);
+			const actual = resolveLoadedPresentation("/p/main.pfdsl", docs, {
+				excludeEntry,
+			});
+			expect(actual.tag?.__proto__?.style?.fillcolor).toBe("red");
+			expect(actual.group?.__proto__?.label).toBe("Proto");
+			expect(actual.tag?.inherited).toEqual(expected.tag?.inherited);
+			expect(actual.group?.inherited).toEqual(expected.group?.inherited);
+			expect(Object.getPrototypeOf(actual.tag)).toEqual(
+				Object.getPrototypeOf(expected.tag),
+			);
+			expect(Object.getPrototypeOf(actual.group)).toEqual(
+				Object.getPrototypeOf(expected.group),
+			);
+			expect(Object.keys(actual.tag ?? {})).toEqual(
+				Object.keys(expected.tag ?? {}),
+			);
+		}
+	});
+
+	it("matches expanded merging for shared attributes and extension values", () => {
+		const docs = new Map<string, FakeDoc>([
+			[
+				"/p/main.pfdsl",
+				{
+					frontmatter: {
+						extends: ["./left.yaml", "./right.yaml"],
+						group: { team: { label: "Local" } },
+					},
+				},
+			],
+			[
+				"/p/left.yaml",
+				{
+					frontmatter: {
+						extends: "./base.yaml",
+						statusStyles: { done: { color: "black", fillcolor: "blue" } },
+						tag: {
+							shared: { style: { color: "blue" }, custom: ["left"] },
+							left: { label: "Left" },
+						},
+						group: { team: { color: "blue", custom: { left: true } } },
+					},
+				},
+			],
+			[
+				"/p/right.yaml",
+				{
+					frontmatter: {
+						extends: ["./base.yaml", "./missing.yaml", "/invalid.yaml"],
+					},
+				},
+			],
+			[
+				"/p/base.yaml",
+				{
+					frontmatter: {
+						statusStyles: { done: { fillcolor: "red" } },
+						tag: {
+							shared: { style: { fillcolor: "red" }, custom: { base: true } },
+						},
+						group: { team: { label: "Base", custom: ["base"] } },
+					},
+				},
+			],
+		]);
+		const expanded = buildPresentationChain("/p/main.pfdsl", docs);
+		for (const excludeEntry of [false, true]) {
+			const expected = resolvePresentation(
+				expanded.filter(
+					({ path }) => !(excludeEntry && path === "/p/main.pfdsl"),
+				),
+			);
+			const actual = resolveLoadedPresentation("/p/main.pfdsl", docs, {
+				excludeEntry,
+			});
+			expect(actual).toEqual(expected);
+			expect(Object.keys(actual.tag ?? {})).toEqual(
+				Object.keys(expected.tag ?? {}),
+			);
+		}
+		expect(
+			resolveLoadedPresentation("/p/main.pfdsl", docs).statusStyles?.done,
+		).toEqual({ fillcolor: "red", color: "black" });
+		expect(
+			resolveLoadedPresentation("/p/main.pfdsl", docs, { excludeEntry: true })
+				.group?.team?.label,
+		).toBe("Base");
+	});
+
+	it("discards partial DAG results when a later parent reaches a cycle", () => {
+		const docs = new Map<string, FakeDoc>([
+			[
+				"/p/main.pfdsl",
+				{
+					frontmatter: {
+						extends: ["./c.yaml", "./a.yaml", "./b.yaml"],
+						group: { local: { label: "Local" } },
+					},
+				},
+			],
+			[
+				"/p/a.yaml",
+				{
+					frontmatter: {
+						extends: "./b.yaml",
+						statusStyles: { done: { fillcolor: "red" } },
+					},
+				},
+			],
+			["/p/b.yaml", { frontmatter: { extends: "./a.yaml" } }],
+			[
+				"/p/c.yaml",
+				{ frontmatter: { statusStyles: { done: { fillcolor: "blue" } } } },
+			],
+		]);
+		for (const excludeEntry of [false, true]) {
+			const chain = buildPresentationChain("/p/main.pfdsl", docs).filter(
+				({ path }) => !(excludeEntry && path === "/p/main.pfdsl"),
+			);
+			expect(
+				resolveLoadedPresentation("/p/main.pfdsl", docs, { excludeEntry }),
+			).toEqual(resolvePresentation(chain));
+		}
+		expect(
+			resolveLoadedPresentation("/p/main.pfdsl", docs, { excludeEntry: true })
+				.group,
+		).toBeUndefined();
+	});
+});
+
 describe("resolveEffectiveFrontmatter", () => {
 	it("merges preset statusStyles/tag/group into the entry frontmatter", () => {
 		const load = makeLoad({
@@ -895,7 +1566,7 @@ describe("resolveEffectiveFrontmatter", () => {
 		expect(resolveEffectiveFrontmatter("/p/main.pfdsl", fm, load)).toBe(fm);
 	});
 
-	it("null entry frontmatter with presets still yields merged presentation", () => {
+	it("null entry frontmatter does not resurrect disk extends", () => {
 		const load = makeLoad({
 			"/p/main.pfdsl": { frontmatter: { extends: "./p.yaml" } },
 			"/p/p.yaml": {
@@ -903,7 +1574,7 @@ describe("resolveEffectiveFrontmatter", () => {
 			},
 		});
 		const eff = resolveEffectiveFrontmatter("/p/main.pfdsl", null, load);
-		expect(eff?.statusStyles?.done?.fillcolor).toBe("green");
+		expect(eff).toBeNull();
 	});
 });
 
@@ -928,5 +1599,67 @@ describe("wrapPresetSource", () => {
 
 	it("wraps .yml as well", () => {
 		expect(wrapPresetSource("/p/p.yml", "tag: {}")).toBe("---\ntag: {}\n---\n");
+	});
+});
+
+describe("parentBoundaryArtifacts", () => {
+	it("collects the normal inputs and the outputs of one process, not its feedback inputs or another process's edges", () => {
+		const edges: NormalizedEdge[] = [
+			{ kind: "input", artifact: "a", process: "P" },
+			{ kind: "feedback", artifact: "fb", process: "P" },
+			{ kind: "output", process: "P", artifact: "b" },
+			{ kind: "input", artifact: "x", process: "Q" },
+			{ kind: "output", process: "Q", artifact: "y" },
+		];
+		expect(parentBoundaryArtifacts(edges, "P")).toEqual({
+			inputs: new Set(["a"]),
+			outputs: new Set(["b"]),
+		});
+	});
+});
+
+describe("subflowBoundaryDiagnostics", () => {
+	const child = analyze("order >> pack -> shipment\n");
+	const parentSource = (body: string) =>
+		`---\nprocess:\n  P:\n    subflow: ./child.pfdsl\n---\n${body}\n`;
+	const check = (body: string) => {
+		const parent = analyze(parentSource(body));
+		const docs: Record<string, ReturnType<typeof analyze>> = {
+			"/p/parent.pfdsl": parent,
+			"/p/child.pfdsl": child,
+		};
+		return subflowBoundaryDiagnostics(
+			"/p/parent.pfdsl",
+			parent.edges,
+			parent.frontmatter,
+			(path) => docs[path] ?? null,
+		);
+	};
+
+	it("reports nothing when the parent's boundary matches the child's", () => {
+		const result = check("order >> P -> shipment");
+		expect(result.diagnostics).toEqual([]);
+		expect([...result.docs.keys()]).toEqual([
+			"/p/parent.pfdsl",
+			"/p/child.pfdsl",
+		]);
+	});
+
+	it("reports a boundary mismatch (V034)", () => {
+		const result = check("order >> P -> z");
+		expect(result.diagnostics.map((d) => d.code)).toContain("V034");
+	});
+
+	it("reports a missing child (V021) and skips its boundary check", () => {
+		const parent = analyze(parentSource("order >> P -> z"));
+		const result = subflowBoundaryDiagnostics(
+			"/p/parent.pfdsl",
+			parent.edges,
+			parent.frontmatter,
+			(path) => (path === "/p/parent.pfdsl" ? parent : null),
+		);
+		expect(result.diagnostics.map((d) => d.code)).toEqual(["V021"]);
+		// The entry's own diagnostic carries no `file`, like its boundary ones.
+		expect(fileOf(result.diagnostics[0]!)).toBe("<entry>");
 	});
 });

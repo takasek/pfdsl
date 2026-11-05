@@ -1,10 +1,45 @@
+import { compareIds } from "./compare.js";
 import type { Graph, NodeKind } from "./types/index.js";
 
+export interface GraphNeighbor {
+	id: string;
+	/** `primary` for `>>` / `->`, `feedback` for `>>?`. */
+	kind: "primary" | "feedback";
+}
+
 export interface Neighbors {
-	/** Nodes with a primary edge pointing into this node. */
-	predecessors: string[];
-	/** Nodes this node has a primary edge pointing to. */
-	successors: string[];
+	/** Nodes with an edge pointing into this node. */
+	predecessors: GraphNeighbor[];
+	/** Nodes this node has an edge pointing to. */
+	successors: GraphNeighbor[];
+	/**
+	 * The kind every neighbor above has, or `null` for a group (which has
+	 * none). Every edge runs artifact -> process or process -> artifact, so
+	 * this is the opposite of the queried node's own kind — see
+	 * `oppositeNodeKind`.
+	 */
+	neighborKind: NodeKind | null;
+}
+
+/**
+ * The kind a node's neighbors all share. `buildGraph` assigns each edge's
+ * endpoints by the edge's kind (`input`/`feedback`: artifact -> process,
+ * `output`: process -> artifact), and N002 rejects a file that uses one id as
+ * both, so the two sides never hold the same kind. A group is declared in
+ * front matter and never appears on an edge, so it has no opposite. Listing
+ * the three kinds exhaustively lets tsc flag a new NodeKind instead of
+ * silently sorting it under "no opposite" (#607).
+ */
+function oppositeNodeKind(kind: NodeKind | undefined): NodeKind | null {
+	if (kind === undefined) return null;
+	switch (kind) {
+		case "artifact":
+			return "process";
+		case "process":
+			return "artifact";
+		case "group":
+			return null;
+	}
 }
 
 function buildAdjacency(graph: Graph): {
@@ -24,12 +59,57 @@ function buildAdjacency(graph: Graph): {
 	return { out, in: inn };
 }
 
-/** Direct producer/consumer neighbors of a node — the immediate in/out edges only (§ issue #479 `neighbors`). */
+/**
+ * The same two maps for feedback (`>>?`) edges: `out` from the artifact that
+ * feeds back to the processes it reaches, `in` from the process to the
+ * artifacts reaching it. Kept separate from `buildAdjacency` rather than folded
+ * into it, because every reachability query below depends on the primary maps
+ * holding primary edges alone.
+ */
+function buildFeedbackAdjacency(graph: Graph): {
+	out: Map<string, string[]>;
+	in: Map<string, string[]>;
+} {
+	const out = new Map<string, string[]>();
+	const inn = new Map<string, string[]>();
+	for (const e of graph.feedbackEdges) {
+		const outArr = out.get(e.artifact);
+		if (outArr) outArr.push(e.process);
+		else out.set(e.artifact, [e.process]);
+		const inArr = inn.get(e.process);
+		if (inArr) inArr.push(e.artifact);
+		else inn.set(e.process, [e.artifact]);
+	}
+	return { out, in: inn };
+}
+
+/**
+ * Direct producer/consumer neighbors of a node — the immediate in/out edges
+ * only (§ issue #479 `neighbors`), `>>?` feedback edges included and tagged as
+ * such (#828).
+ *
+ * The reachability queries below stay primary-only on purpose: they rest on
+ * V010's guarantee that the primary graph is a DAG, which a walk over feedback
+ * edges would break. `neighbors` takes one step rather than a closure, so that
+ * argument does not reach it — and omitting feedback here hides the very edges
+ * an audit of feedback wiring is looking for.
+ */
 export function computeNeighbors(graph: Graph, id: string): Neighbors {
 	const { out, in: inn } = buildAdjacency(graph);
+	const fb = buildFeedbackAdjacency(graph);
+	const tag =
+		(kind: GraphNeighbor["kind"]) =>
+		(n: string): GraphNeighbor => ({ id: n, kind });
 	return {
-		predecessors: inn.get(id) ?? [],
-		successors: out.get(id) ?? [],
+		predecessors: [
+			...(inn.get(id) ?? []).map(tag("primary")),
+			...(fb.in.get(id) ?? []).map(tag("feedback")),
+		],
+		successors: [
+			...(out.get(id) ?? []).map(tag("primary")),
+			...(fb.out.get(id) ?? []).map(tag("feedback")),
+		],
+		neighborKind: oppositeNodeKind(graph.nodes.get(id)),
 	};
 }
 
@@ -84,22 +164,77 @@ export function computePaths(
 export interface NodeStats {
 	id: string;
 	kind: NodeKind;
+	/** Primary (`>>` / `->`) in-edges. */
 	fanIn: number;
+	/** Primary out-edges. */
 	fanOut: number;
+	/** Feedback (`>>?`) in-edges, kept out of `fanIn`. */
+	feedbackFanIn: number;
+	/** Feedback out-edges, kept out of `fanOut`. */
+	feedbackFanOut: number;
 }
 
-/** Fan-in/fan-out per node, ranked by total degree descending then id ascending (§ issue #479 `hubs`/`stats`). */
+export interface GraphOrphan {
+	id: string;
+	kind: NodeKind;
+}
+
+/**
+ * Nodes wired to nothing — no primary edge and no feedback edge (§518).
+ *
+ * Deliberately not `computeStats(...).filter(degree === 0)`, which is what
+ * this used to be. That reading counted only primary edges and treated every
+ * node kind alike, so it reported two shapes that are wired: a `group`, which
+ * is a container and by construction never carries an edge, and a node held
+ * only by `>>?`. Both are stable per-file false positives, and a check whose
+ * output is mostly noise fails by going unread rather than by failing
+ * (#676/#704).
+ */
+export function computeOrphans(graph: Graph): GraphOrphan[] {
+	const fb = buildFeedbackAdjacency(graph);
+	const wired = new Set<string>([...fb.in.keys(), ...fb.out.keys()]);
+	for (const e of graph.primaryEdges) {
+		wired.add(e.from);
+		wired.add(e.to);
+	}
+	return [...graph.nodes.entries()]
+		.filter(([id, kind]) => kind !== "group" && !wired.has(id))
+		.map(([id, kind]) => ({ id, kind }))
+		.sort((a, b) => compareIds(a.id, b.id));
+}
+
+/**
+ * Fan-in/fan-out per node, ranked by total degree descending then id ascending
+ * (§ issue #479 `hubs`/`stats`).
+ *
+ * Feedback (`>>?`) degree is reported in its own pair of fields and stays out
+ * of both the primary counts and the sort key, because the command's readers
+ * ask different questions of it (#831). Bottleneck ranking reads an artifact's
+ * fan-out as how many processes it gates, and a feedback edge gates nothing —
+ * `groupEdges` keeps it out of `processInputs`, so readiness never waits on
+ * one. Hub detection for restructuring wants the connection counted. Reporting
+ * the two apart answers both without either reading the other's number.
+ *
+ * A node's feedback degree is one-sided by construction: an edge's endpoints
+ * are an artifact and a process, so an artifact only ever gains
+ * `feedbackFanOut` and a process only `feedbackFanIn`. The god-process lens
+ * therefore reads a process fan-out that folding feedback in would not have
+ * touched — what it would have moved is that lens's ranking, not its column.
+ */
 export function computeStats(graph: Graph): NodeStats[] {
 	const { out, in: inn } = buildAdjacency(graph);
+	const fb = buildFeedbackAdjacency(graph);
 	const stats: NodeStats[] = [...graph.nodes.entries()].map(([id, kind]) => ({
 		id,
 		kind,
 		fanIn: inn.get(id)?.length ?? 0,
 		fanOut: out.get(id)?.length ?? 0,
+		feedbackFanIn: fb.in.get(id)?.length ?? 0,
+		feedbackFanOut: fb.out.get(id)?.length ?? 0,
 	}));
 	stats.sort((a, b) => {
 		const degreeDiff = b.fanIn + b.fanOut - (a.fanIn + a.fanOut);
-		return degreeDiff !== 0 ? degreeDiff : a.id.localeCompare(b.id);
+		return degreeDiff !== 0 ? degreeDiff : compareIds(a.id, b.id);
 	});
 	return stats;
 }

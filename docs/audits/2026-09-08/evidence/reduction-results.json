@@ -1,0 +1,101 @@
+{
+  "commit": "827bcb1cb96238f918dad84dc6453176f131e029",
+  "method": "Actual pure functions with synthetic inputs; no GitHub or product file I/O.",
+  "multiIssueSync": [
+    {
+      "round": 0,
+      "metadata": {
+        "updated_at": "old",
+        "tags": []
+      },
+      "findings": [
+        {
+          "type": "stale_updated_at",
+          "issue": 40
+        },
+        {
+          "type": "priority_drift",
+          "issue": 40
+        },
+        {
+          "type": "stale_updated_at",
+          "issue": 41
+        },
+        {
+          "type": "priority_drift",
+          "issue": 41
+        }
+      ]
+    },
+    {
+      "round": 1,
+      "metadata": {
+        "updated_at": "time-41",
+        "tags": [
+          "priority:low"
+        ]
+      },
+      "findings": [
+        {
+          "type": "stale_updated_at",
+          "issue": 40
+        },
+        {
+          "type": "priority_drift",
+          "issue": 40
+        }
+      ]
+    },
+    {
+      "round": 2,
+      "metadata": {
+        "updated_at": "time-40",
+        "tags": [
+          "priority:high"
+        ]
+      },
+      "findings": [
+        {
+          "type": "stale_updated_at",
+          "issue": 41
+        },
+        {
+          "type": "priority_drift",
+          "issue": 41
+        }
+      ]
+    }
+  ],
+  "size": {
+    "deltas": [
+      {
+        "path": ".claude/skills/a/SKILL.md",
+        "beforeBytes": 1000,
+        "afterBytes": 0,
+        "beforeLines": 100,
+        "afterLines": 0
+      },
+      {
+        "path": ".claude/skills/b/SKILL.md",
+        "beforeBytes": 100,
+        "afterBytes": 150,
+        "beforeLines": 10,
+        "afterLines": 15
+      }
+    ],
+    "totalByteChange": -950,
+    "withoutOverride": {
+      "status": "FAIL",
+      "detail": ".claude/skills/b/SKILL.md: +50 bytes / +5 lines (100 → 150 bytes)"
+    },
+    "withOverride": {
+      "status": "PASS",
+      "detail": "growth accepted via Size-Override: .claude/skills/b/SKILL.md: +50 bytes / +5 lines (100 → 150 bytes)"
+    }
+  },
+  "reviewSelfReport": {
+    "name": "Review record",
+    "status": "PASS",
+    "detail": "1 record(s)"
+  }
+}

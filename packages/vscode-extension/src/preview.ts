@@ -1,98 +1,294 @@
+import type { DiffReport } from "@pfdsl/core";
+import type { MessageFromWebview, MessageToWebview } from "@pfdsl/editor";
 import {
-	type AnalyzeResult,
-	type DiffReport,
-	type IdNode,
-	resolveLocationFsPath,
-	type Statement,
-} from "@pfdsl/core";
-import { exportDot } from "@pfdsl/graphviz-exporter";
+	applyPreviewEdit,
+	buildLocations,
+	type DocumentModel,
+	type DocumentReference,
+	findFrontmatterDefinitionRange,
+	findNodeOccurrenceRanges,
+	nodeIdAtSourcePosition,
+	type PreviewEditMessage,
+	positionOfNodeId,
+	RenameTracking,
+	repairResultMessage,
+	resolveDocumentReference,
+} from "@pfdsl/editor";
 import * as vscode from "vscode";
 import {
 	analyzeDocument,
-	resolveEffectiveFrontmatterForUri,
+	dropAnalyzeCache,
+	preparePreviewForDocument,
 } from "./analyze.js";
-import { findFrontmatterDefinition } from "./jump.js";
-import {
-	buildDescriptions,
-	buildLocations,
-	buildSubflows,
-} from "./location-utils.js";
-import type { MessageFromWebview, MessageToWebview } from "./messages.js";
+import { type DirectoryAccess, expandDirectory } from "./expand-directory.js";
+import { PreviewController } from "./preview-controller.js";
+import { buildHtml } from "./preview-logic.js";
 import { requireActivePfdslEditor } from "./utils.js";
 
 interface PreviewState {
 	panel: vscode.WebviewPanel;
+	previewViewType: string;
 	doc: vscode.TextDocument;
-	webviewReady: boolean;
-	pendingFocusNodeId?: string;
-	pendingDiff?: DiffReport | null; // null = clearDiff
+	documentEpoch: number;
+	renameTracking: RenameTracking;
+	sourceViewColumn: vscode.ViewColumn;
+	controller: PreviewController;
+	disposed: boolean;
 }
 
-function idsOfStatement(stmt: Statement): IdNode[] {
-	switch (stmt.type) {
-		case "chain": {
-			const ids: IdNode[] = [...stmt.head.ids];
-			for (const seg of stmt.segments) {
-				ids.push(seg.process);
-				if (seg.output) ids.push(...seg.output.ids);
-			}
-			return ids;
+function setSourceDocument(state: PreviewState, doc: vscode.TextDocument) {
+	if (state.doc !== doc) {
+		state.documentEpoch++;
+		state.renameTracking = new RenameTracking();
+	}
+	state.doc = doc;
+}
+
+async function prepareEditSource(state: PreviewState) {
+	if (state.doc.isClosed) {
+		let current: vscode.TextDocument;
+		try {
+			current = await vscode.workspace.openTextDocument(state.doc.uri);
+		} catch {
+			if (!state.disposed)
+				vscode.window.showInformationMessage(
+					"The source document could not be reopened.",
+				);
+			return;
 		}
-		case "input-edge":
-			return [...stmt.artifact.ids, stmt.process];
-		case "feedback-edge":
-			return [...stmt.artifact.ids, stmt.process];
-		case "output-edge":
-			return [stmt.process, ...stmt.artifact.ids];
-		case "node-decl":
-			return [stmt.id];
+		if (state.disposed) return;
+		if (current.isClosed) {
+			vscode.window.showInformationMessage(
+				"The source document could not be reopened.",
+			);
+			return;
+		}
+		setSourceDocument(state, current);
+		dropAnalyzeCache(current.uri);
+		state.controller.update();
+	}
+	const source = state.doc.getText();
+	const version = state.doc.version;
+	const isCurrent = () =>
+		!state.disposed &&
+		!state.doc.isClosed &&
+		state.doc.version === version &&
+		state.doc.getText() === source;
+	const encoding = state.doc.encoding?.replace(/bom$/, "");
+	const diskEncoding =
+		encoding === "utf8"
+			? "utf-8"
+			: encoding === "utf16le"
+				? "utf-16le"
+				: encoding === "utf16be"
+					? "utf-16be"
+					: undefined;
+	if (
+		diskEncoding &&
+		state.doc.uri.scheme === "file" &&
+		state.doc.isDirty === false &&
+		!vscode.window.visibleTextEditors.some(
+			(editor) => editor.document === state.doc,
+		)
+	) {
+		let diskSource: string;
+		try {
+			diskSource = new TextDecoder(diskEncoding, { fatal: true }).decode(
+				await vscode.workspace.fs.readFile(state.doc.uri),
+			);
+		} catch {
+			if (!state.disposed)
+				vscode.window.showInformationMessage(
+					"The source file could not be read.",
+				);
+			return;
+		}
+		if (!isCurrent()) return;
+		if (diskSource !== source) {
+			vscode.window.showInformationMessage(
+				"The file changed outside VS Code. Reload the source file before editing from the preview.",
+			);
+			return;
+		}
+	}
+	return { source, isCurrent };
+}
+
+function sourceColumnOutsidePreview(
+	state: PreviewState,
+	preferredColumn: vscode.ViewColumn,
+): vscode.ViewColumn {
+	const groups = vscode.window.tabGroups.all;
+	const previewGroup = groups.find((group) =>
+		group.tabs.some(
+			(tab) =>
+				tab.input instanceof vscode.TabInputWebview &&
+				// VS Code prefixes a webview tab's type with "mainThreadWebview-".
+				tab.input.viewType.endsWith(state.previewViewType) &&
+				tab.label === state.panel.title,
+		),
+	);
+	const preferredGroup = groups.find(
+		(group) => group.viewColumn === preferredColumn,
+	);
+	const sourceGroups = groups.filter(
+		(group) =>
+			group !== previewGroup &&
+			group.tabs.some(
+				(tab) =>
+					tab.input instanceof vscode.TabInputText &&
+					tab.input.uri.toString() === state.doc.uri.toString(),
+			),
+	);
+	const sourceGroup =
+		sourceGroups.find((group) => group.viewColumn === preferredColumn) ??
+		sourceGroups[0];
+	if (sourceGroup) return sourceGroup.viewColumn;
+	return preferredGroup && preferredGroup !== previewGroup
+		? preferredColumn
+		: vscode.ViewColumn.Beside;
+}
+
+async function editFromPreview(
+	state: PreviewState,
+	request: PreviewEditMessage,
+) {
+	let appliedEpoch = state.documentEpoch;
+	const reply = (ok: boolean, message?: string) => {
+		if (!state.disposed)
+			void state.panel.webview.postMessage({
+				type: "editResult",
+				request,
+				ok,
+				...(ok && request.type === "renameNode"
+					? {
+							sourceRevision: {
+								epoch: appliedEpoch,
+								version: state.doc.version,
+								invalidatedRenameRequestId:
+									state.renameTracking.invalidatedRequestId,
+							},
+						}
+					: {}),
+				...(message === undefined ? {} : { message }),
+			});
+	};
+	const snapshot = await prepareEditSource(state);
+	if (!snapshot?.isCurrent()) {
+		reply(
+			false,
+			"The source could not be checked. Reopen Connections and try again.",
+		);
+		return;
+	}
+	const result = applyPreviewEdit(snapshot.source, request);
+	if (!result.ok) {
+		vscode.window.showInformationMessage(result.message);
+		reply(false, result.message);
+		return;
+	}
+	if (!snapshot.isCurrent()) {
+		reply(false, "The document changed. Reopen Connections and try again.");
+		return;
+	}
+	let openedSource: vscode.TextEditor | undefined;
+	if (
+		!vscode.window.visibleTextEditors.some(
+			(editor) => editor.document === state.doc,
+		)
+	) {
+		// Open the source outside the preview before making it dirty.
+		try {
+			openedSource = await vscode.window.showTextDocument(state.doc, {
+				viewColumn: sourceColumnOutsidePreview(state, state.sourceViewColumn),
+				preserveFocus: true,
+				preview: false,
+			});
+		} catch {
+			reply(
+				false,
+				"The source could not be opened. Reopen Connections and try again.",
+			);
+			return;
+		}
+		if (!snapshot.isCurrent()) {
+			reply(false, "The document changed. Reopen Connections and try again.");
+			return;
+		}
+	}
+	const edit = new vscode.WorkspaceEdit();
+	edit.replace(
+		state.doc.uri,
+		new vscode.Range(
+			state.doc.positionAt(result.edit.startOffset),
+			state.doc.positionAt(result.edit.endOffset),
+		),
+		result.edit.text,
+	);
+	appliedEpoch = state.documentEpoch;
+	state.renameTracking.begin(request, result.source);
+	if (!(await vscode.workspace.applyEdit(edit))) {
+		vscode.window.showInformationMessage(
+			"The preview edit could not be applied.",
+		);
+		reply(false, "The preview edit could not be applied.");
+		return;
+	}
+	if (state.disposed || state.doc.getText() !== result.source) {
+		reply(false, "The document changed while applying the preview edit.");
+		return;
+	}
+	state.renameTracking.observe(result.source);
+	reply(true);
+	if (request.repair && request.type === "deleteConnector")
+		vscode.window.showInformationMessage(
+			repairResultMessage(request, snapshot.source, result.source),
+		);
+	if (result.selection) {
+		const { start, end } = result.selection;
+		const range = new vscode.Range(
+			new vscode.Position(start.line - 1, start.column - 1),
+			new vscode.Position(end.line - 1, end.column - 1),
+		);
+		const sourceColumn =
+			vscode.window.visibleTextEditors.find(
+				(editor) => editor.document === state.doc,
+			)?.viewColumn ?? state.sourceViewColumn;
+		const editor =
+			request.type !== "createDefinition" &&
+			openedSource?.document === state.doc
+				? openedSource
+				: await vscode.window.showTextDocument(state.doc, {
+						viewColumn: sourceColumnOutsidePreview(state, sourceColumn),
+						...(request.type === "createDefinition"
+							? { selection: range }
+							: {}),
+						preserveFocus: request.type !== "createDefinition",
+					});
+		if (state.disposed || state.doc.getText() !== result.source) return;
+		if (request.type === "createDefinition")
+			editor.selection = new vscode.Selection(range.start, range.end);
+		editor.revealRange(range);
+		if (request.type === "createDefinition")
+			vscode.window.showInformationMessage(
+				result.needsCriteria
+					? "Edit the new label. Add criteria describing how this produced artifact is judged complete (W002)."
+					: "Edit the new label and complete any required metadata.",
+			);
 	}
 }
 
-function nodeIdAtCursor(
-	result: AnalyzeResult,
-	pos: vscode.Position,
-): string | undefined {
-	// vscode pos: 0-indexed; core positions: 1-indexed
-	const line = pos.line + 1;
-	const col = pos.character + 1;
-	for (const stmt of result.document.statements) {
-		for (const id of idsOfStatement(stmt)) {
-			if (
-				id.start.line === line &&
-				col >= id.start.column &&
-				col <= id.end.column
-			) {
-				return id.value;
-			}
-		}
-	}
-	return undefined;
-}
-
-async function expandDirectory(dirUri: vscode.Uri): Promise<string[]> {
-	let entries: [string, vscode.FileType][];
-	try {
-		entries = await vscode.workspace.fs.readDirectory(dirUri);
-	} catch {
-		return [];
-	}
-	const files: string[] = [];
-	for (const [name, type] of entries) {
-		if (type === vscode.FileType.File) {
-			files.push(vscode.Uri.joinPath(dirUri, name).fsPath);
-		}
-	}
-	if (files.length === 0) {
-		for (const [name, type] of entries) {
-			if (type === vscode.FileType.Directory) {
-				const sub = await expandDirectory(vscode.Uri.joinPath(dirUri, name));
-				files.push(...sub);
-			}
-		}
-	}
-	return files;
-}
+/** The vscode filesystem, shaped for expandDirectory: fsPaths in, fsPaths out. */
+const workspaceDirectoryAccess: DirectoryAccess = {
+	read: async (path) =>
+		(await vscode.workspace.fs.readDirectory(vscode.Uri.file(path))).map(
+			([name, type]) => ({
+				name,
+				isDirectory: type === vscode.FileType.Directory,
+			}),
+		),
+	join: (path, name) => vscode.Uri.joinPath(vscode.Uri.file(path), name).fsPath,
+};
 
 type QuickPickLocationItem = vscode.QuickPickItem & {
 	fsPath?: string;
@@ -102,18 +298,36 @@ type QuickPickLocationItem = vscode.QuickPickItem & {
 async function handleOpenLocation(
 	docFsPath: string,
 	locs: string[],
+	reference: Pick<DocumentReference, "kind" | "id" | "field">,
+	model: Pick<DocumentModel, "frontmatter" | "diagnostics">,
 	fallbackViewColumn?: vscode.ViewColumn,
-	basePath?: string,
 ): Promise<void> {
 	if (locs.length === 0) return;
 
 	const items: QuickPickLocationItem[] = [];
+	const invalid: string[] = [];
 	for (const loc of locs) {
 		if (loc.includes("://")) {
-			const url = new URL(loc);
-			items.push({ label: url.hostname, description: loc, url: loc });
+			try {
+				const url = new URL(loc);
+				items.push({ label: url.hostname, description: loc, url: loc });
+			} catch {
+				invalid.push(loc);
+			}
 		} else {
-			const resolvedPath = resolveLocationFsPath(docFsPath, loc, basePath);
+			let resolvedPath: string;
+			try {
+				resolvedPath = resolveDocumentReference(
+					docFsPath,
+					{ ...reference, value: loc },
+					model,
+				).value;
+			} catch (error) {
+				void vscode.window.showErrorMessage(
+					error instanceof Error ? error.message : String(error),
+				);
+				continue;
+			}
 			const resolvedUri = vscode.Uri.file(resolvedPath);
 			let stat: vscode.FileStat | undefined;
 			try {
@@ -122,10 +336,13 @@ async function handleOpenLocation(
 				// treat as file if stat fails
 			}
 			if (stat?.type === vscode.FileType.Directory) {
-				const children = await expandDirectory(resolvedUri);
+				const children = await expandDirectory(
+					workspaceDirectoryAccess,
+					resolvedPath,
+				);
 				if (children.length === 0) {
 					vscode.window.showWarningMessage(`No files found in ${loc}`);
-					return;
+					continue;
 				}
 				for (const child of children) {
 					items.push({
@@ -144,6 +361,12 @@ async function handleOpenLocation(
 		}
 	}
 
+	if (invalid.length > 0) {
+		void vscode.window.showWarningMessage(
+			`Skipped invalid location URLs: ${invalid.join(", ")}`,
+		);
+	}
+	if (items.length === 0) return;
 	if (items.length === 1) {
 		const item = items[0]!;
 		if (item.url) {
@@ -181,94 +404,39 @@ async function openFileActivatingExisting(
 	}
 }
 
-function dotForDocument(doc: vscode.TextDocument): {
-	dot?: string;
-	error?: string;
-} {
-	const { graph, frontmatter, diagnostics } = analyzeDocument(doc);
-	const fatal = diagnostics.find((d) => d.severity === "error");
-	if (fatal) return { error: `${fatal.code}: ${fatal.message}` };
-	try {
-		const effectiveFrontmatter = resolveEffectiveFrontmatterForUri(
-			doc.uri,
-			frontmatter,
-		);
-		return { dot: exportDot(graph, effectiveFrontmatter) };
-	} catch (e) {
-		return { error: `Export failed: ${(e as Error).message}` };
-	}
-}
-
-function buildHtml(
-	scriptUri: vscode.Uri,
-	cspSource: string,
-	isDebug: boolean,
-): string {
-	return `<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="UTF-8" />
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src ${cspSource} 'wasm-unsafe-eval'; style-src 'unsafe-inline'; img-src data:; connect-src ${cspSource};" />
-<style>
-html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: var(--vscode-editor-background); color: var(--vscode-editor-foreground); }
-body { display: flex; flex-direction: column; }
-#root-wrap { flex: 1; min-height: 0; position: relative; }
-#root { width: 100%; height: 100%; overflow: hidden; cursor: grab; position: relative; }
-#inner { position: absolute; top: 0; left: 0; }
-.err { padding: 12px; color: var(--vscode-errorForeground); white-space: pre-wrap; font-family: var(--vscode-editor-font-family); }
-#tooltip { position: fixed; background: var(--vscode-editorHoverWidget-background, #2d2d2d); color: var(--vscode-editorHoverWidget-foreground, #ccc); border: 1px solid var(--vscode-editorHoverWidget-border, #454545); padding: 4px 8px; border-radius: 3px; font-size: 12px; max-width: 360px; pointer-events: none; display: none; z-index: 100; word-break: break-word; }
-#tooltip .tt-table { border-collapse: collapse; }
-#tooltip .tt-key { text-align: right; color: var(--vscode-descriptionForeground, #888); font-style: italic; font-size: 0.9em; white-space: nowrap; width: 1%; padding-right: 6px; vertical-align: top; }
-#tooltip .tt-val { text-align: left; vertical-align: top; }
-#tooltip .tt-body { padding-bottom: 4px; }
-#tooltip .tt-hint { color: var(--vscode-descriptionForeground, #888); font-style: italic; font-size: 0.9em; margin-top: 4px; padding-top: 4px; border-top: 1px solid var(--vscode-editorHoverWidget-border, #454545); }
-#diff-panel { display: none; flex-shrink: 0; max-height: 200px; overflow-y: auto; padding: 6px 12px; font-family: var(--vscode-editor-font-family); font-size: var(--vscode-editor-font-size, 12px); border-top: 1px solid var(--vscode-panel-border, #333); background: var(--vscode-editor-background); }
-.diff-add { color: var(--vscode-gitDecoration-addedResourceForeground, #4caf50); white-space: pre; }
-.diff-remove { color: var(--vscode-gitDecoration-deletedResourceForeground, #f44336); white-space: pre; }
-.diff-change { color: var(--vscode-gitDecoration-modifiedResourceForeground, #e2c08d); white-space: pre; }
-.diff-none { color: var(--vscode-descriptionForeground, #888); font-style: italic; }
-#minimap { position: absolute; bottom: 12px; right: 12px; max-width: 160px; max-height: 120px; background: var(--vscode-editor-background); border: 1px solid var(--vscode-panel-border, #555); border-radius: 4px; overflow: hidden; z-index: 50; opacity: 0.85; display: none; cursor: crosshair; }
-#minimap-svg { position: absolute; top: 0; left: 0; pointer-events: none; }
-#minimap-vp { position: absolute; border: 1.5px solid var(--vscode-focusBorder, #007fd4); background: rgba(0,127,212,0.12); pointer-events: none; }
-</style>
-<script>window.__PFDSL_DEBUG__ = ${isDebug};</script>
-</head>
-<body>
-<div id="root-wrap"><div id="root"><div id="inner"></div></div><div id="minimap"><div id="minimap-svg"></div><div id="minimap-vp"></div></div></div>
-<div id="tooltip"></div>
-<div id="diff-panel"></div>
-<script type="module" src="${scriptUri}"></script>
-</body>
-</html>`;
-}
-
 function jumpToNode(
-	doc: vscode.TextDocument,
+	state: PreviewState,
 	nodeId: string,
-	preferDefinition = false,
+	preserveFocus = false,
 ): void {
+	const { doc } = state;
 	let targetPos: vscode.Position | undefined;
-	if (preferDefinition) {
-		targetPos = findFrontmatterDefinition(doc, nodeId);
+	let targetEnd: vscode.Position | undefined;
+	const definition = findFrontmatterDefinitionRange(
+		analyzeDocument(doc),
+		nodeId,
+	);
+	if (definition) {
+		targetPos = new vscode.Position(
+			definition.start.line - 1,
+			definition.start.column - 1,
+		);
+		targetEnd = new vscode.Position(
+			definition.end.line - 1,
+			definition.end.column - 1,
+		);
 	}
 	if (!targetPos) {
-		const result = analyzeDocument(doc);
-		outer: for (const stmt of result.document.statements) {
-			for (const id of idsOfStatement(stmt)) {
-				if (id.value === nodeId) {
-					targetPos = new vscode.Position(
-						id.start.line - 1,
-						id.start.column - 1,
-					);
-					break outer;
-				}
-			}
-		}
+		const found = positionOfNodeId(
+			analyzeDocument(doc).document.statements,
+			nodeId,
+		);
+		if (found) targetPos = new vscode.Position(found.line, found.column);
 	}
 	if (!targetPos) return;
 	const range = new vscode.Range(
 		targetPos,
-		targetPos.translate(0, nodeId.length),
+		targetEnd ?? targetPos.translate(0, nodeId.length),
 	);
 	const existingEditor = vscode.window.visibleTextEditors.find(
 		(e) => e.document === doc,
@@ -276,20 +444,24 @@ function jumpToNode(
 	if (existingEditor) {
 		existingEditor.selection = new vscode.Selection(
 			targetPos,
-			targetPos.translate(0, nodeId.length),
+			targetEnd ?? targetPos.translate(0, nodeId.length),
 		);
 		existingEditor.revealRange(range);
+		if (preserveFocus) return;
 		const vc = existingEditor.viewColumn;
 		if (vc !== undefined) {
 			vscode.window.showTextDocument(doc, {
 				viewColumn: vc,
 				preserveFocus: false,
+				preview: false,
 			});
 		}
-	} else {
+	} else if (!preserveFocus) {
 		vscode.window.showTextDocument(doc, {
+			viewColumn: sourceColumnOutsidePreview(state, state.sourceViewColumn),
 			selection: range,
 			preserveFocus: false,
+			preview: false,
 		});
 	}
 }
@@ -301,37 +473,26 @@ export function registerPreview(context: vscode.ExtensionContext): {
 	const panels = new Map<string, PreviewState>();
 	let activePreviewDocUri: string | null = null;
 
-	function sendUpdate(state: PreviewState): void {
-		if (!state.webviewReady) return;
-		const { dot, error } = dotForDocument(state.doc);
-		const focusNodeId = state.pendingFocusNodeId;
-		delete state.pendingFocusNodeId;
+	function renderUpdate(
+		state: PreviewState,
+		focusNodeId: string | undefined,
+	): void {
+		const { message } = preparePreviewForDocument(state.doc);
 		state.panel.title = `PFDSL Preview — ${state.doc.uri.path.split("/").pop() ?? ""}`;
-		if (error) {
-			state.panel.webview.postMessage({ type: "error", message: error });
-		} else {
-			const { frontmatter } = analyzeDocument(state.doc);
-			const descriptions = buildDescriptions(frontmatter);
-			const locations = buildLocations(frontmatter);
-			const subflows = buildSubflows(frontmatter);
-			state.panel.webview.postMessage({
-				type: "render",
-				dot,
-				focusNodeId,
-				descriptions,
-				locations,
-				subflows,
-			});
-		}
-		if ("pendingDiff" in state) {
-			const d = state.pendingDiff;
-			delete state.pendingDiff;
-			state.panel.webview.postMessage(
-				d == null
-					? ({ type: "clearDiff" } satisfies MessageToWebview)
-					: ({ type: "diff", report: d } satisfies MessageToWebview),
-			);
-		}
+		state.panel.webview.postMessage(
+			message.type === "render"
+				? {
+						...message,
+						...(focusNodeId !== undefined ? { focusNodeId } : {}),
+						sourceRevision: {
+							epoch: state.documentEpoch,
+							version: state.doc.version,
+							invalidatedRenameRequestId:
+								state.renameTracking.invalidatedRequestId,
+						},
+					}
+				: message,
+		);
 	}
 
 	function createPanel(
@@ -339,13 +500,19 @@ export function registerPreview(context: vscode.ExtensionContext): {
 		focusNodeId?: string,
 	): PreviewState {
 		const docUri = doc.uri.toString();
+		const previewViewType = `pfdslPreview-${encodeURIComponent(docUri)}`;
+		const sourceViewColumn =
+			vscode.window.visibleTextEditors.find((editor) => editor.document === doc)
+				?.viewColumn ??
+			vscode.window.activeTextEditor?.viewColumn ??
+			vscode.ViewColumn.One;
 		const scriptUri = vscode.Uri.joinPath(
 			context.extensionUri,
 			"dist",
 			"webview.js",
 		);
 		const panel = vscode.window.createWebviewPanel(
-			"pfdslPreview",
+			previewViewType,
 			"PFDSL Preview",
 			{ viewColumn: vscode.ViewColumn.Beside, preserveFocus: true },
 			{
@@ -355,56 +522,77 @@ export function registerPreview(context: vscode.ExtensionContext): {
 			},
 		);
 		const webviewScriptUri = panel.webview.asWebviewUri(scriptUri);
-		const isDebug = context.extensionMode === vscode.ExtensionMode.Development;
 		panel.webview.html = buildHtml(
-			webviewScriptUri,
+			webviewScriptUri.toString(),
 			panel.webview.cspSource,
-			isDebug,
 		);
 
 		const state: PreviewState = {
 			panel,
+			previewViewType,
 			doc,
-			webviewReady: false,
-			...(focusNodeId ? { pendingFocusNodeId: focusNodeId } : {}),
+			documentEpoch: 0,
+			renameTracking: new RenameTracking(),
+			sourceViewColumn,
+			disposed: false,
+			controller: new PreviewController(
+				(focus) => renderUpdate(state, focus),
+				(message) => {
+					panel.webview.postMessage(message);
+				},
+				focusNodeId || undefined,
+			),
 		};
-
-		panel.webview.onDidReceiveMessage((msg: MessageFromWebview) => {
+		panel.webview.onDidReceiveMessage(async (msg: MessageFromWebview) => {
+			if (state.disposed) return;
 			if (msg.type === "ready") {
-				state.webviewReady = true;
-				sendUpdate(state);
+				state.controller.markReady();
+			} else if (
+				msg.type === "createDefinition" ||
+				msg.type === "addConnector" ||
+				msg.type === "deleteConnector" ||
+				msg.type === "toggleFeedback" ||
+				msg.type === "renameNode"
+			) {
+				await editFromPreview(state, msg);
 			} else if (msg.type === "nodeClick") {
-				const editor = vscode.window.visibleTextEditors.find(
-					(e) => e.document === state.doc,
-				);
-				const cursorId = editor
-					? nodeIdAtCursor(analyzeDocument(state.doc), editor.selection.active)
-					: undefined;
-				jumpToNode(state.doc, msg.nodeId, cursorId === msg.nodeId);
+				jumpToNode(state, msg.nodeId, msg.preserveFocus);
 			} else if (msg.type === "openUrl") {
 				vscode.env.openExternal(vscode.Uri.parse(msg.url));
 			} else if (msg.type === "openFile") {
-				const { frontmatter } = analyzeDocument(state.doc);
-				const fsPath = resolveLocationFsPath(
-					state.doc.uri.fsPath,
-					msg.path,
-					frontmatter?.basePath,
-				);
+				const model = analyzeDocument(state.doc);
+				const { frontmatter } = model;
+				if (frontmatter?.process?.[msg.nodeId]?.subflow !== msg.path) return;
 				const srcVc = vscode.window.visibleTextEditors.find(
 					(e) => e.document === state.doc,
 				)?.viewColumn;
-				openFileActivatingExisting(fsPath, srcVc);
+				await handleOpenLocation(
+					state.doc.uri.fsPath,
+					[msg.path],
+					{ kind: "process", id: msg.nodeId, field: "subflow" },
+					model,
+					srcVc,
+				);
 			} else if (msg.type === "openLocation") {
-				const { frontmatter } = analyzeDocument(state.doc);
+				const model = analyzeDocument(state.doc);
+				const { frontmatter, nodeKinds } = model;
+				const kind = nodeKinds.get(msg.nodeId);
+				if (kind !== "artifact" && kind !== "process") return;
+				const field =
+					kind === "process" &&
+					frontmatter?.process?.[msg.nodeId]?.location === undefined
+						? "subflow"
+						: "location";
 				const locs = buildLocations(frontmatter)[msg.nodeId] ?? [];
 				const srcVc = vscode.window.visibleTextEditors.find(
 					(e) => e.document === state.doc,
 				)?.viewColumn;
-				handleOpenLocation(
+				await handleOpenLocation(
 					state.doc.uri.fsPath,
 					locs,
+					{ kind, id: msg.nodeId, field },
+					model,
 					srcVc,
-					frontmatter?.basePath,
 				);
 			}
 		});
@@ -416,6 +604,8 @@ export function registerPreview(context: vscode.ExtensionContext): {
 		});
 
 		panel.onDidDispose(() => {
+			state.disposed = true;
+			state.controller.dispose();
 			panels.delete(docUri);
 			if (activePreviewDocUri === docUri) activePreviewDocUri = null;
 		});
@@ -429,16 +619,7 @@ export function registerPreview(context: vscode.ExtensionContext): {
 		const state = activePreviewDocUri
 			? panels.get(activePreviewDocUri)
 			: undefined;
-		if (!state) return;
-		if (state.webviewReady) {
-			state.panel.webview.postMessage(
-				report == null
-					? ({ type: "clearDiff" } satisfies MessageToWebview)
-					: ({ type: "diff", report } satisfies MessageToWebview),
-			);
-		} else {
-			state.pendingDiff = report;
-		}
+		state?.controller.postDiff(report);
 	}
 
 	function getActivePreviewDoc(): vscode.TextDocument | undefined {
@@ -457,18 +638,29 @@ export function registerPreview(context: vscode.ExtensionContext): {
 			const existing = panels.get(docUri);
 			if (existing) {
 				existing.panel.reveal(vscode.ViewColumn.Beside, true);
-				sendUpdate(existing);
+				existing.controller.update();
 				return;
 			}
 
 			const result = analyzeDocument(doc);
-			const focusNodeId = nodeIdAtCursor(result, editor.selection.active);
+			const focusNodeId = nodeIdAtSourcePosition(
+				result,
+				doc.getText(),
+				editor.selection.active,
+			);
 			createPanel(doc, focusNodeId);
 		}),
 
 		vscode.workspace.onDidChangeTextDocument((e) => {
 			const state = panels.get(e.document.uri.toString());
-			if (state) sendUpdate(state);
+			if (state) {
+				setSourceDocument(state, e.document);
+				state.renameTracking.observe(
+					e.document.getText(),
+					e.reason === vscode.TextDocumentChangeReason.Undo,
+				);
+				state.controller.update();
+			}
 		}),
 
 		vscode.window.onDidChangeTextEditorSelection((e) => {
@@ -481,17 +673,24 @@ export function registerPreview(context: vscode.ExtensionContext): {
 				} satisfies MessageToWebview);
 				return;
 			}
-			const selectedText = e.textEditor.document.getText(sel);
-			const result = analyzeDocument(state.doc);
-			const allIds = new Set(
-				result.document.statements
-					.flatMap(idsOfStatement)
-					.map((id) => id.value),
-			);
-			if (allIds.has(selectedText)) {
+			const model = analyzeDocument(state.doc);
+			const source = state.doc.getText();
+			const nodeId = nodeIdAtSourcePosition(model, source, sel.active);
+			const selectedText = state.doc.getText(sel);
+			const isNodeSelection =
+				nodeId !== undefined &&
+				(selectedText === nodeId ||
+					findNodeOccurrenceRanges(model, source, nodeId).some(
+						({ start, end }) =>
+							start.line === sel.start.line + 1 &&
+							start.column === sel.start.character + 1 &&
+							end.line === sel.end.line + 1 &&
+							end.column === sel.end.character + 1,
+					));
+			if (nodeId && isNodeSelection) {
 				state.panel.webview.postMessage({
 					type: "focus",
-					nodeId: selectedText,
+					nodeId,
 				} satisfies MessageToWebview);
 			} else {
 				state.panel.webview.postMessage({

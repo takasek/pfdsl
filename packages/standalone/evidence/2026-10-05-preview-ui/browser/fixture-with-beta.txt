@@ -1,0 +1,19 @@
+---
+title: Experience fixture
+artifact:
+  a:
+    label: Alpha
+  lonely:
+    label: Lonely
+  b:
+    label: Beta
+process:
+  p:
+    label: Prepare
+  q:
+    label: Qualify
+---
+a >> p -> b
+b >>? p
+b >> q -> c
+lonely

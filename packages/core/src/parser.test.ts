@@ -14,6 +14,13 @@ function parse(src: string) {
 	return parseTokens(tokens);
 }
 
+function errorCodes(src: string): string[] {
+	const { diagnostics } = parse(src);
+	return diagnostics
+		.filter((d) => d.severity === "error")
+		.map((d) => d.code ?? "");
+}
+
 describe("parseTokens", () => {
 	it("empty input → empty document", () => {
 		const { document } = parse("");
@@ -99,13 +106,6 @@ describe("parseTokens", () => {
 	});
 
 	describe("negative tests — error codes", () => {
-		function errorCodes(src: string): string[] {
-			const { diagnostics } = parse(src);
-			return diagnostics
-				.filter((d) => d.severity === "error")
-				.map((d) => d.code ?? "");
-		}
-
 		it("P002: empty artifact set [ ]", () => {
 			expect(errorCodes("[] >> P -> B")).toContain("P002");
 		});
@@ -191,10 +191,11 @@ describe("parseTokens", () => {
 		});
 
 		it("blank line forces statement boundary: [a,b]\\n\\n>> P -> X errors", () => {
-			const { diagnostics } = parse("[a, b]\n\n>> P -> X");
-			expect(
-				diagnostics.filter((d) => d.severity === "error").length,
-			).toBeGreaterThan(0);
+			// The set becomes a statement of its own, so it is missing its `>>`
+			// (P005) and the orphaned continuation is a syntax error (P001).
+			const codes = errorCodes("[a, b]\n\n>> P -> X");
+			expect(codes).toContain("P005");
+			expect(codes).toContain("P001");
 		});
 
 		it("comment line between is allowed (no blank): [a,b]\\n# note\\n>> P -> X", () => {
@@ -209,25 +210,12 @@ describe("parseTokens", () => {
 			expect(document.statements).toHaveLength(1);
 		});
 
-		it("forbid trailing operator: A >>\\n P -> B errors", () => {
-			const { diagnostics } = parse("A >>\n P -> B");
-			expect(
-				diagnostics.filter((d) => d.severity === "error").length,
-			).toBeGreaterThan(0);
+		it("forbid trailing operator: A >>\\n P -> B is P006 (no process after >>)", () => {
+			expect(errorCodes("A >>\n P -> B")).toContain("P006");
 		});
 
-		it("forbid trailing arrow: A >> P ->\\n B errors", () => {
-			const { diagnostics } = parse("A >> P ->\n B");
-			expect(
-				diagnostics.filter((d) => d.severity === "error").length,
-			).toBeGreaterThan(0);
-		});
-
-		it("forbid ID adjacent to ID without separator: A B errors", () => {
-			const { diagnostics } = parse("A B");
-			expect(
-				diagnostics.filter((d) => d.severity === "error").length,
-			).toBeGreaterThan(0);
+		it("forbid trailing arrow: A >> P ->\\n B is P007 (no artifact after ->)", () => {
+			expect(errorCodes("A >> P ->\n B")).toContain("P007");
 		});
 
 		it("semicolon separates node-decls: A; B are two valid node-decls", () => {
@@ -239,10 +227,11 @@ describe("parseTokens", () => {
 		});
 
 		it("blank line + comment + statement: terminator wins", () => {
-			const { diagnostics } = parse("[a, b]\n\n# note\n  >> P -> X");
-			expect(
-				diagnostics.filter((d) => d.severity === "error").length,
-			).toBeGreaterThan(0);
+			// A comment cannot re-open a statement the blank line already ended,
+			// so this fails exactly as the comment-less form does.
+			const codes = errorCodes("[a, b]\n\n# note\n  >> P -> X");
+			expect(codes).toContain("P005");
+			expect(codes).toContain("P001");
 		});
 	});
 

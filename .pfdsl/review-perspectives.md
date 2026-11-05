@@ -4,18 +4,18 @@
 
 ## A. 図 vs 現実
 
-- **エッジ実在性**: README はサンプル描画物から書かれず、リンクのみ
+- **エッジ実在性**: README はサンプル描画物から書かれず、リンクのみ。roadmap の `i273_implement_blocked_by` は却下された `blockedBy:` フィールド統合を説明したまま、実際の出力は最終決定の `status: waiting / suspended` 分割だったため、プロセス説明を最終変換へ合わせた（2026-08-23）
 - **駆動源**: issue 起票の駆動源は対話で、レビュー知見は `>>?`
-- **名前の一般化水準**: `cli_tool` → 実際は `packages/` 全体 = toolchain
-- **偽の不変性**: 仕様書は実装知見の issue 経由で改訂される → maintain プロセスが要る。`pfd_lens_agent` は `workflow.pfdsl` で open input 扱いだが、他のスキル成果物（`retro_skill` 等）が `distill_ops` の出力として更新経路を持つのと非対称 — 保守プロセスへの接続が欠落している
-- **入力充足**: 修正開発に `base_code`・PoC が欠落、ADR 起草に参照図が欠落 → ID 捏造が発生。`assemble_plugin`（旧 `bundle_skills`）は `.claude/commands/pfd-*.md`・`.claude/agents/pfd-lens.md` も実際には消費するが artifact 化されておらず入力エッジに現れない（2026-07-10、pfd-lens 監査で検出。修正は新規 artifact 設計を要するため未着手）
+- **名前の一般化水準**: roadmap の `cli_tool` → 実際は `packages/` 全体 = toolchain（#783 で `toolchain` へ改名し `location` を `../packages/` へ広げ、workflow.pfdsl の同名ノードと粒度を揃えた）。workflow の `review_perspectives` は A/B 監査カタログと記した一方、実体は normative 仕様を問う C も含む A/B/C カタログだったため description を広げた（2026-08-23）
+- **偽の不変性**: 仕様書は実装知見の issue 経由で改訂される → maintain プロセスが要る。同型で、スキル成果物のうち一部だけが整備プロセスの出力として更新経路を持ち他は open input のまま残る非対称が起きる（`pfd_lens_agent`）。`status: done` の external input が実際には進み続けている場合、後続が依存するのは版でなく存在であることと現行版の一次情報の所在を description に書いて解消する（`adrs` / `toolchain`）
+- **入力充足**: 修正開発に `base_code`・PoC が欠落、ADR 起草に参照図が欠落 → ID 捏造が発生。プロセスの description が集約対象として名指しする素材が artifact 化されておらず入力エッジに現れない形も同型（`gen_plugin` の `.claude/commands/pfd-*.md`・`.claude/agents/pfd-lens.md`）。description が既存出力の読み返しを述べるのに入力エッジが無い場合、通常入力は循環になるため `>>?` で表す（`deploy_install_layer` の `installed_l3_layer`）
 - **status 単調性**: `check` の W003 が機械検出する
 - **同種対称性**: `published_cli` が持つ全消費エッジを `published_libraries` も持つか。`quality_guide` 新設時に `findings.criteria` の反映先列挙への追随が漏れた（読み直しで検出、2026-07-08）。`grill_skill`（#481）追加時も同型の見落としを検出（対策は `.pfdsl/workflow.md`「配布スキルの新規追加時の横断照合」参照、2026-07-19）
 
 ## B. 粒度・型
 
 - **万能成果物**: `dialogue` → お題・提案・判断の3型に分割
-- **プロセス実在性（双方向）**: `payoff_log` 追記は対話の終端動作。逆に、ADR 起草は突合検証を固有入力に持つと委譲失敗で判明
+- **プロセス実在性（双方向）**: `payoff_log` 追記は対話の終端動作。逆に、ADR 起草は突合検証を固有入力に持つと委譲失敗で判明。計画時に分けたリリースが1回の公開にまとまると、publish プロセスと release artifact が現実にない公開イベントを主張したまま残る — 版番号を書いて初めて同一版を指す兄弟として現れる（`cli_release_grill_tolerance` と `cli_release_query_tools` がともに npm 0.0.21 で、`cli_release_tolerance_query` へ統合。規約は `.pfdsl/roadmap.md`「1公開イベント = 1 リリース artifact」）。逆に、CLI・libraries・VSIX の3公開イベントを単一 `release_tag` と `publish_packages` へ束ねると、各 tag が別種の公開物を生成する偽依存と、同時には生じない複数出力が現れる。VSCode release の `.vsix` 生成後に tag push が失敗すると残存物は生じるが、tag 処理は `.vsix` を読まないため、部分成功を理由に `vsix_package >> create_tag` と分けると時間順を偽の入力依存へ変えてしまう。一方、ローカルインストール検証は candidate を実際に読むため、`vsix_candidate >> verify_vsix -> vsix_package` という独立変換になる（#978、2026-08-23）
 - **自動化は description**: 自動 publish は `publish_cli` の description、close 時 flow 同期は `map_deps` の description に記す
 - **並列主張への挑戦**: ADR-0004 基準3
 
@@ -23,7 +23,7 @@
 
 - **対称性の欠け**: terminal は feedback 消費を除外、open input は除外なし → 階層跨ぎ feedback 表現不能。extends の絶対パス禁止は §16 にあり subflow 側に無い
 - **字義 vs 実装**: 孤立 node-decl は字義では境界不一致 error、実装は無視
-- **能力の否定記述**: 「`check` は循環を検出しない」が V010 実装後も skill 本文と runtime-pipeline companion の2箇所に残存（2026-07-08 検出・修正）
+- **能力の否定記述**: 「`check` は循環を検出しない」が V010 実装後も skill 本文と pipeline companion の2箇所に残存（2026-07-08 検出・修正）
 - **同名異義**: 「terminal artifact」が §3.3 / subflow 境界 / `graph io` で三様
 - **三点登記〔機構〕**: §15.X・§16・実装コードの3点対称登記。二重割当（V025 が group 循環と subflow 境界の両方に発行）を検出
 - **stale 前方参照〔機構〕**: `[[SPEC_xxx?]]` と `(SPEC_xxx)` の id 一致を `check-forward-ref-markers.mjs` が検出（#326）
@@ -39,7 +39,7 @@
 - **出力形式**: text 出力と JSON 出力が同じ情報を表しているか、キー名（camelCase 等）が既存コマンドと揃っているかを確認する
 - **エラーモードの出力規約**: `--json` 指定時の失敗（parse エラー・id 未検出・書き込み拒否等）が `{ ok: false, ... }` の形で stdout に出るか、stderr が空かを確認する
 - **exit code の意味**: 0=成功・1=検証/実行エラー・2=usage エラーという区分が新設コマンドでも保たれているかを確認する
-- **stdout・stderr の規律（ADR-0022）**: gofmt モデル（プレビュー/--write/--check）と、成果物・診断情報の出力先分離が守られているかを確認する
+- **stdout・stderr の規律（ADR-0022）**: ファイルを書き換えるコマンドが gofmt モデル（プレビュー/--write/--check）に従うかと、成果物・診断情報の出力先分離が守られているかを確認する。例外は ADR-0030 がこのモデルの対象外とした `meta set` だけである
 - **ライブラリ公開 API 名の追従**: エクスポートされる型・関数名がコマンド名の改名に追随しているか、旧称（例: `AuditSync*`）が残存していないかを確認する
 - **生成物の再生成と冪等性**: `make gen-plugin` / `make gen-readme-cli` を再実行して diff が出ないかを確認する（ヘルプ文言変更時は特に）
 - **バージョンと変更記録**: 破壊的変更なら次回リリースの semver 扱い（0.x は minor bump）が ADR の Consequences に記録されているかを確認する

@@ -1,6 +1,8 @@
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join, resolve } from "node:path";
+import { dirname, join, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
+import { analyze, deleteNodes } from "@pfdsl/core";
 import {
 	afterAll,
 	afterEach,
@@ -9,41 +11,65 @@ import {
 	describe,
 	expect,
 	it,
-	vi,
 } from "vitest";
-import { parseArgs, run, runCheck, runDiff, shouldColorize } from "./index.js";
+import {
+	COMMAND_GROUPS,
+	HELP,
+	parseArgs,
+	run,
+	runCheck,
+	runDiff,
+	shouldColorize,
+	TOP_LEVEL_COMMANDS,
+} from "./index.js";
+import { comparableReady } from "./prune.js";
 
-// Lets "meta get -" tests inject stdin content without touching the real fd 0
-// (which would otherwise hang/behave unpredictably under the test runner).
-// All other fs calls pass through to the real implementation unchanged.
-let stdinOverride: string | null = null;
-vi.mock("node:fs", async (importOriginal) => {
-	const actual = await importOriginal<typeof import("node:fs")>();
-	return {
-		...actual,
-		readFileSync: (path: unknown, opts?: unknown) => {
-			if (path === 0 && stdinOverride !== null) return stdinOverride;
-			return (actual.readFileSync as (...a: unknown[]) => unknown)(path, opts);
-		},
-	};
-});
+const __dirname = dirname(fileURLToPath(import.meta.url));
+
+/** A stdin the CLI will read for a `-` argument, without touching fd 0. */
+const withStdin = (input: string) => ({ readStdin: () => input });
+/** Colour is decided from these, so a test states them instead of patching the process. */
+const onATty = { stdout: { isTTY: true }, env: {} };
 
 let dir: string;
 const valid = "req >> design -> spec\nspec >> impl -> code\n";
 const validWithStatus =
 	"---\nartifact:\n  spec:\n    status: wip\n    criteria: spec criteria\n  code:\n    status: todo\n    criteria: code criteria\n---\nreq >> design -> spec\nspec >> impl -> code\n";
 const invalid = "req >> design -> spec\nother -> spec\n"; // V001: dual generators (always error)
-const conflict = "req >> design -> spec\nother -> spec\n"; // dual generators
+// Same V001, but with declarations to write into. `meta set` judges the result
+// of the write rather than the original (#1125), so reaching its failure path
+// takes a file whose mutation actually lands and still leaves the error.
+const invalidDeclared = `---
+type: roadmap
+artifact:
+  spec: { label: Spec, status: todo }
+  req: { label: Req, status: done }
+  other: { label: Other, status: done }
+process:
+  design: { label: Design }
+  build: { label: Build }
+---
+req >> design -> spec
+other >> build -> spec
+`;
 const warningOnly =
 	"---\nartifact:\n  bundle:\n    parts: [orphan]\n---\nreq >> design -> bundle\n"; // W001: orphan has no edges
+// V002 (process with no inputs): a warning by default, an error under --strict.
+const incomplete = "P -> B\n";
+const mixedInputFeedback = "a >> p -> b\na >>? p\n";
+const inlineComment =
+	"---\nartifact:\n  spec:\n    criteria: Details are in issue #123\n---\nspec >> P -> output\n";
 
 beforeAll(() => {
 	dir = mkdtempSync(join(tmpdir(), "pfdsl-cli-"));
 	writeFileSync(join(dir, "valid.pfdsl"), valid);
 	writeFileSync(join(dir, "valid-with-status.pfdsl"), validWithStatus);
 	writeFileSync(join(dir, "invalid.pfdsl"), invalid);
-	writeFileSync(join(dir, "conflict.pfdsl"), conflict);
+	writeFileSync(join(dir, "invalid-declared.pfdsl"), invalidDeclared);
 	writeFileSync(join(dir, "warning-only.pfdsl"), warningOnly);
+	writeFileSync(join(dir, "incomplete.pfdsl"), incomplete);
+	writeFileSync(join(dir, "mixed-input-feedback.pfdsl"), mixedInputFeedback);
+	writeFileSync(join(dir, "inline-comment.pfdsl"), inlineComment);
 });
 
 afterAll(() => {
@@ -65,6 +91,365 @@ describe("parseArgs", () => {
 			flags: { format: "svg" },
 		});
 	});
+	it("parses --format=svg", () => {
+		expect(parseArgs(["render", "a.pfdsl", "--format=svg"])).toEqual({
+			command: "render",
+			positional: ["a.pfdsl"],
+			flags: { format: "svg" },
+		});
+	});
+});
+
+describe("command metadata parse surface (#1050)", () => {
+	const legacyUsageByCommand: Record<string, string> = {
+		check:
+			"usage: pfdsl check <file|-> [--reference-context <file>] [--strict] [--hints] [--json] [--no-color]",
+		"graph summary":
+			"usage: pfdsl graph summary <file|-> [--json] [--no-color]",
+		"graph io": "usage: pfdsl graph io <file|-> [--json] [--no-color]",
+		fmt: "usage: pfdsl fmt <file|-> [--write] [--check] [--no-color]",
+		delete:
+			"usage: pfdsl delete <file|-> <id[,id...]> [--write] [--json] [--no-color]",
+		prune:
+			"usage: pfdsl prune <file|-> [--write] [--check] [--json] [--no-color]",
+		rename:
+			"usage: pfdsl rename <file|-> <old> <new> [--write] [--json] [--no-color]",
+		"meta reindex":
+			"usage: pfdsl meta reindex <file|-> [--write] [--check] [--renumber] [--json] [--no-color]",
+		"meta sort":
+			"usage: pfdsl meta sort <file|-> --by <keys> [--write] [--check] [--no-color]",
+		"graph edges": "usage: pfdsl graph edges <file|-> [--json] [--no-color]",
+		render:
+			"usage: pfdsl render <file|-> [--reference-context <file>] [--format dot|svg|pdf|png] [--no-color]",
+		diff: "usage: pfdsl diff <a> <b> [--format text|dot|svg] [--json] [--no-color]",
+		"status ready":
+			"usage: pfdsl status ready <file|-> [--no-counts] [--json] [--no-color]",
+		"status list":
+			"usage: pfdsl status list <file|-> --status <status[,status...]> [--json] [--no-color]",
+		"status blocked":
+			"usage: pfdsl status blocked <file|-> [--json] [--no-color]",
+		"meta set":
+			"usage: pfdsl meta set <file> <id[,id...]> <field> <value> [--allow-unknown] [--json] [--no-color]",
+		"meta create":
+			"usage: pfdsl meta create <file> <id> [field=value ...] [--write] [--json] [--allow-unknown] [--no-color]",
+		"meta check-links":
+			"usage: pfdsl meta check-links <file> [--reference-context <file>] [--json] [--no-color]",
+		"meta get":
+			"usage: pfdsl meta get <file|-> <id[,id...]> [field[,field...]] [--reference-context <file>] [--json] [--no-color]",
+		"meta list":
+			"usage: pfdsl meta list <file|-> [--reference-context <file>] [--tag <t[,t...]>] [--group <g>] [--producer <p>] [field[,field...]] [--json] [--no-color]",
+		"meta values":
+			"usage: pfdsl meta values <file|-> <field[,field...]> [--json] [--no-color]",
+		"graph neighbors":
+			"usage: pfdsl graph neighbors <file|-> <id> [--json] [--no-color]",
+		"graph locate":
+			"usage: pfdsl graph locate <file|-> <id> [--field <name[,name...]>] [--json] [--no-color]",
+		"graph describe":
+			"usage: pfdsl graph describe <file|-> <id> [--reference-context <file>] [--json] [--no-color]",
+		"graph impact":
+			"usage: pfdsl graph impact <file|-> <id> [--json] [--no-color]",
+		"graph depends-on":
+			"usage: pfdsl graph depends-on <file|-> <id> [--json] [--no-color]",
+		"graph path":
+			"usage: pfdsl graph path <file|-> <from> <to> [--limit <n>] [--json] [--no-color]",
+		"graph stats":
+			"usage: pfdsl graph stats <file|-> [--limit <n>] [--json] [--no-color]",
+		"graph orphans":
+			"usage: pfdsl graph orphans <file|-> [--json] [--no-color]",
+		"status gaps":
+			"usage: pfdsl status gaps <roadmap> <flow> [<flow>...] [--json] [--no-color]",
+		explain: "usage: pfdsl explain <code>",
+	};
+
+	const commandTargets = [
+		...TOP_LEVEL_COMMANDS.map((entry) => ({
+			label: entry.name,
+			argv: [entry.name] as const,
+			legacyUsage: legacyUsageByCommand[entry.name],
+			entry,
+		})),
+		...COMMAND_GROUPS.flatMap((group) =>
+			group.commands.map((entry) => ({
+				label: `${group.name} ${entry.name}`,
+				argv: [group.name, entry.name] as const,
+				legacyUsage: legacyUsageByCommand[`${group.name} ${entry.name}`],
+				entry,
+			})),
+		),
+	];
+
+	const groupTargets = COMMAND_GROUPS.map((group) => ({
+		label: group.name,
+		argv: [group.name] as const,
+		group,
+	}));
+	const legacyGroupListingLines: Record<string, string[]> = {
+		graph: [
+			"  summary <file|->            Print artifact/process/edge counts",
+			"  io <file|->                 Print external inputs and terminal artifacts",
+			"  stats <file|-> [--limit]    Rank nodes by primary degree, feedback degree apart",
+			"  neighbors <file|-> <id>     Direct predecessors/successors of a node, feedback included",
+			"  locate <file|-> <id>        Frontmatter declaration line and body edge lines of a node",
+			"  describe <file|-> <id>      Kind, fields, neighbors, and locate lines of a node, in one call",
+			"  impact <file|-> <id>        Full downstream closure of a node",
+			"  depends-on <file|-> <id>    Full upstream closure of a node",
+			"  path <file|-> <from> <to> [--limit]",
+			"  edges <file|->              Canonical edge list",
+			"  orphans <file|->            Nodes with neither predecessor nor successor",
+		],
+		meta: [
+			"  create <file> <id> [field=value ...]           Create a body node's frontmatter definition",
+			"  get <file|-> <id[,id...]> [field[,field...]]   Print field values",
+			"  list <file|-> [--tag|--group|--producer] [field[,field...]]",
+			"  values <file|-> <field[,field...]>             Print a field's values in use, with counts",
+			"  set <file> <id> <field> <value>                Set a field value in place",
+			"  sort <file|-> --by <keys>                      Sort node definitions",
+			"  reindex <file|->                               Assign topological index: values",
+			"  check-links <file>                             Verify location: file paths exist",
+		],
+		status: [
+			"  ready <file|-> [--no-counts]      List ready-to-start processes",
+			"  blocked <file|->                  List not-ready processes and their blocking inputs",
+			"  list <file|-> --status <s[,s...]> List artifacts by status",
+			"  gaps <roadmap> <flow> [<flow>...] Find todo artifacts missing from the roadmap",
+		],
+	};
+	const usageFlagNames = (usageLine: string) =>
+		new Set(usageLine.match(/--[a-z-]+/g) ?? []);
+
+	const expectedUsageFlagNames = (entry: {
+		options: Record<string, unknown>;
+	}) => new Set(Object.keys(entry.options).map((name) => `--${name}`));
+
+	it("covers exactly 31 dispatchable command entries", () => {
+		expect(commandTargets).toHaveLength(31);
+	});
+
+	it.each(
+		commandTargets,
+	)("$label rejects an unknown option with command help", async ({
+		label,
+		argv,
+	}) => {
+		const r = await run([...argv, "--definitely-not-a-flag"]);
+		const help = (await run([...argv, "--help"])).stdout;
+		expect(r.exitCode).toBe(2);
+		expect(r.stderr).toBe(
+			`${label}: unknown option --definitely-not-a-flag\n${help}`,
+		);
+	});
+
+	it("meta sort --by without a value reports a command-formatted error", async () => {
+		const f = join(dir, "sort-missing-by.pfdsl");
+		writeFileSync(f, "z >> p -> a\n");
+		const r = await run(["meta", "sort", f, "--by"]);
+		const help = (await run(["meta", "sort", "--help"])).stdout;
+		expect(r.exitCode).toBe(2);
+		expect(r.stderr).toBe(`meta sort: option --by requires a value\n${help}`);
+	});
+
+	it("graph path --limit without a value reports a command-formatted error", async () => {
+		const f = join(dir, "path-missing-limit.pfdsl");
+		writeFileSync(f, "req >> design -> spec\n");
+		const r = await run(["graph", "path", f, "req", "spec", "--limit"]);
+		const help = (await run(["graph", "path", "--help"])).stdout;
+		expect(r.exitCode).toBe(2);
+		expect(r.stderr).toBe(
+			`graph path: option --limit requires a value\n${help}`,
+		);
+	});
+
+	it("meta sort repeats --by as a comma-joined string (#1050)", async () => {
+		const f = join(dir, "sort-repeat-by.pfdsl");
+		writeFileSync(f, "z >> p -> a\n");
+		const repeated = await run(["meta", "sort", f, "--by", "a", "--by", "b"]);
+		const joined = await run(["meta", "sort", f, "--by", "a,b"]);
+		expect(repeated.exitCode).toBe(joined.exitCode);
+		expect(repeated.stdout).toBe(joined.stdout);
+		expect(repeated.stderr).toBe(joined.stderr);
+	});
+
+	it("graph --bogus reports the unknown group flag", async () => {
+		const r = await run(["graph", "--bogus"]);
+		const help = (await run(["graph", "--help"])).stdout;
+		expect(r.exitCode).toBe(2);
+		expect(r.stderr).toBe(`graph: unknown option --bogus\n${help}`);
+	});
+
+	it.each([
+		{ label: "help", argv: ["help"] },
+		{ label: "--version", argv: ["--version"] },
+		{ label: "-V", argv: ["-V"] },
+		{ label: "-h", argv: ["-h"] },
+		{ label: "--help", argv: ["--help"] },
+	])("$label rejects an unknown option", async ({ label, argv }) => {
+		const r = await run([...argv, "--bogus"]);
+		expect(r.exitCode).toBe(2);
+		expect(r.stderr).toContain(`${label}: unknown option --bogus`);
+	});
+
+	it.each([
+		["help"],
+		["--version"],
+		["-V"],
+		["-h"],
+		["--help"],
+	])("%s remains a successful standalone pseudo command", async (word) => {
+		const r = await run([word]);
+		expect(r.exitCode).toBe(0);
+	});
+
+	it.each([
+		{
+			label: "graph stats",
+			argv: ["graph", "stats", "valid.pfdsl"],
+		},
+		{
+			label: "graph path",
+			argv: ["graph", "path", "valid.pfdsl", "req", "spec"],
+		},
+	])("$label names a missing value option when another flag follows", async ({
+		label,
+		argv,
+	}) => {
+		const r = await run([...argv, "--limit", "--json"]);
+		expect(r.exitCode).toBe(2);
+		expect(r.stderr).toContain(`${label}: option --limit requires a value`);
+	});
+
+	it.each(
+		groupTargets,
+	)("$label rejects an unknown option before subcommand resolution", async ({
+		label,
+		argv,
+	}) => {
+		const r = await run([...argv, "--definitely-not-a-flag"]);
+		const help = (await run([...argv, "--help"])).stdout;
+		expect(r.exitCode).toBe(2);
+		expect(r.stderr).toBe(
+			`${label}: unknown option --definitely-not-a-flag\n${help}`,
+		);
+	});
+
+	it.each(commandTargets)("$label help keeps the legacy usage line", async ({
+		argv,
+		legacyUsage,
+	}) => {
+		const r = await run([...argv, "--help"]);
+		expect(r.exitCode).toBe(0);
+		expect(r.stdout.split("\n")[0]).toBe(legacyUsage);
+	});
+
+	it.each(
+		commandTargets,
+	)("$label help usage flags stay in sync with metadata", async ({
+		argv,
+		entry,
+	}) => {
+		const r = await run([...argv, "--help"]);
+		expect(r.exitCode).toBe(0);
+		const usageLine = r.stdout.split("\n")[0] ?? "";
+		expect(usageFlagNames(usageLine)).toEqual(expectedUsageFlagNames(entry));
+	});
+
+	it.each(groupTargets)("$label group help stays wired to dispatch", async ({
+		argv,
+	}) => {
+		const r = await run([...argv, "--help"]);
+		expect(r.exitCode).toBe(0);
+		expect(r.stdout).toContain(`usage: pfdsl ${argv[0]} <subcommand> ...`);
+	});
+
+	it.each(
+		groupTargets,
+	)("$label group help preserves its compact legacy listing", async ({
+		argv,
+	}) => {
+		const r = await run([...argv, "--help"]);
+		expect(r.exitCode).toBe(0);
+		expect(r.stdout.split("\n")).toEqual(
+			expect.arrayContaining(legacyGroupListingLines[argv[0]] ?? []),
+		);
+		expect(r.stdout).toContain("All subcommands accept --json and --no-color.");
+	});
+
+	it.each([
+		{ label: "fmt", argv: ["fmt", "placeholder.pfdsl"] },
+		{ label: "explain", argv: ["explain", "V001"] },
+		{ label: "render", argv: ["render", "placeholder.pfdsl"] },
+	])("$label rejects an unconsumed --json flag", async ({ label, argv }) => {
+		const r = await run([...argv, "--json"]);
+		expect(r.exitCode).toBe(2);
+		expect(r.stderr).toContain(`${label}: unknown option --json`);
+	});
+
+	it("formats a command parse error with its own help", async () => {
+		const r = await run(["check", "placeholder.pfdsl", "--bogus"]);
+		const help = (await run(["check", "--help"])).stdout;
+		expect(r.exitCode).toBe(2);
+		expect(r.stderr).toBe(`check: unknown option --bogus\n${help}`);
+		expect(r.stderr).not.toContain("To specify a positional argument");
+	});
+
+	it.each([
+		{
+			label: "fmt",
+			name: "fmt",
+			expected: ["write", "check", "no-color"],
+		},
+		{ label: "explain", name: "explain", expected: [] },
+		{
+			label: "render",
+			name: "render",
+			expected: ["reference-context", "format", "no-color"],
+		},
+		{
+			label: "diff",
+			name: "diff",
+			expected: ["format", "json", "no-color"],
+		},
+	])("$label declares the flags its handler reads", ({ name, expected }) => {
+		const entry = TOP_LEVEL_COMMANDS.find(
+			(candidate) => candidate.name === name,
+		);
+		expect(entry).toBeDefined();
+		expect(Object.keys(entry?.options ?? {})).toEqual(expected);
+	});
+
+	// #1050 design decision: strict second parsing intentionally accepts --flag=value.
+	it("render accepts --format=svg", async () => {
+		const r = await run(["render", join(dir, "valid.pfdsl"), "--format=svg"]);
+		expect(r.exitCode).toBe(0);
+		expect(r.stdout).toContain("<svg");
+	});
+
+	// #1050 design decision: boolean flags do not consume following positionals.
+	it("check accepts --json before the file", async () => {
+		const r = await run(["check", "--json", join(dir, "valid.pfdsl")]);
+		expect(r.exitCode).toBe(0);
+		expect(JSON.parse(r.stdout)).toMatchObject({ ok: true });
+	});
+
+	// #1050 design decision: boolean flags do not consume following positionals.
+	it("graph io accepts --json before the file", async () => {
+		const r = await run(["graph", "io", "--json", join(dir, "valid.pfdsl")]);
+		expect(r.exitCode).toBe(0);
+		expect(JSON.parse(r.stdout)).toMatchObject({
+			ok: true,
+			externalInputs: ["req"],
+			externalTerminals: [],
+		});
+	});
+
+	it("handler exceptions still escape parseArgs dispatch (#1050)", async () => {
+		await expect(
+			run(["check", "-"], {
+				readStdin: () => {
+					throw new TypeError("boom");
+				},
+			}),
+		).rejects.toThrow(TypeError);
+	});
 });
 
 describe("check", () => {
@@ -72,14 +457,39 @@ describe("check", () => {
 		const r = await run(["check", join(dir, "valid.pfdsl")]);
 		expect(r.exitCode).toBe(0);
 	});
-	it("returns 1 for completeness violation", async () => {
+	it("returns 1 and names V001 for a dual-generator artifact", async () => {
 		const r = await run(["check", join(dir, "invalid.pfdsl")]);
 		expect(r.exitCode).toBe(1);
 		expect(r.stderr).toMatch(/error/);
+		expect(r.stderr).toContain("V001");
 	});
-	it("returns 1 for dual-generator", async () => {
-		const r = await run(["check", join(dir, "conflict.pfdsl")]);
+	it("returns 0 for a completeness warning without --strict", async () => {
+		const r = await run(["check", join(dir, "incomplete.pfdsl")]);
+		expect(r.exitCode).toBe(0);
+		expect(r.stdout).toContain("V002");
+	});
+	it("--strict promotes the completeness warning to an error and returns 1", async () => {
+		const r = await run(["check", join(dir, "incomplete.pfdsl"), "--strict"]);
 		expect(r.exitCode).toBe(1);
+		expect(r.stderr).toContain("V002");
+	});
+	it("--strict leaves an already-valid file at 0", async () => {
+		const r = await run(["check", join(dir, "valid.pfdsl"), "--strict"]);
+		expect(r.exitCode).toBe(0);
+	});
+	it("reports FM003 as a warning for an inline plain-scalar comment", async () => {
+		const r = await run(["check", join(dir, "inline-comment.pfdsl")]);
+		expect(r.exitCode).toBe(0);
+		expect(r.stdout).toContain("FM003");
+	});
+	it("promotes FM003 to an error under --strict", async () => {
+		const r = await run([
+			"check",
+			join(dir, "inline-comment.pfdsl"),
+			"--strict",
+		]);
+		expect(r.exitCode).toBe(1);
+		expect(r.stderr).toContain("FM003");
 	});
 	it("returns 1 with readable message for missing file, no stack trace", async () => {
 		const r = await run(["check", join(dir, "nonexistent.pfdsl")]);
@@ -97,6 +507,20 @@ describe("check", () => {
 });
 
 describe("fmt", () => {
+	it("surfaces FM003 without changing the inline plain-scalar value", async () => {
+		const r = await run(["fmt", join(dir, "inline-comment.pfdsl")]);
+		expect(r.exitCode).toBe(0);
+		expect(r.stdout).toContain("    criteria: Details are in issue #123\n");
+		expect(r.stderr).toContain("FM003");
+		expect(r.stderr).not.toMatch(/\n\n$/);
+	});
+
+	it("does not surface existing non-FM003 warnings", async () => {
+		const r = await run(["fmt", join(dir, "warning-only.pfdsl")]);
+		expect(r.exitCode).toBe(0);
+		expect(r.stderr).toBe("");
+	});
+
 	it("prints flows formatted output to stdout (default)", async () => {
 		const r = await run(["fmt", join(dir, "valid.pfdsl")]);
 		expect(r.exitCode).toBe(0);
@@ -109,6 +533,27 @@ describe("fmt", () => {
 		expect(r.exitCode).toBe(0);
 		const after = readFileSync(f, "utf-8");
 		expect(after).toContain("req >> design");
+	});
+
+	it("--write leaves a CRLF file on CRLF (#656)", async () => {
+		const f = join(dir, "fmt-write-crlf.pfdsl");
+		writeFileSync(f, "   req>>design->spec\r\n");
+		const r = await run(["fmt", f, "--write"]);
+		expect(r.exitCode).toBe(0);
+		const after = readFileSync(f, "utf-8");
+		expect(after).toContain("req >> design");
+		expect(after.replace(/\r\n/g, "")).not.toContain("\n");
+	});
+
+	// Before #656 a CRLF file could never satisfy --check, since fmt's output
+	// was LF no matter what went in. A repo on CRLF could not put fmt --check
+	// in CI at all.
+	it("--check exits 0 for a formatted CRLF file (#656)", async () => {
+		const f = join(dir, "fmt-check-crlf.pfdsl");
+		writeFileSync(f, valid.replace(/\n/g, "\r\n"));
+		const r = await run(["fmt", f, "--check"]);
+		expect(r.exitCode).toBe(0);
+		expect(r.stdout).toBe("");
 	});
 
 	it("--check exits 1 and prints 'not formatted' when the file is not formatted, without writing", async () => {
@@ -130,14 +575,12 @@ describe("fmt", () => {
 	});
 
 	it("--check is allowed with stdin (-)", async () => {
-		stdinOverride = "   req>>design->spec\n";
-		try {
-			const r = await run(["fmt", "-", "--check"]);
-			expect(r.exitCode).toBe(1);
-			expect(r.stdout).toBe("not formatted\n");
-		} finally {
-			stdinOverride = null;
-		}
+		const r = await run(
+			["fmt", "-", "--check"],
+			withStdin("   req>>design->spec\n"),
+		);
+		expect(r.exitCode).toBe(1);
+		expect(r.stdout).toBe("not formatted\n");
 	});
 
 	it("--check combined with --write is rejected (exit 2)", async () => {
@@ -146,6 +589,812 @@ describe("fmt", () => {
 		const r = await run(["fmt", f, "--check", "--write"]);
 		expect(r.exitCode).toBe(2);
 		expect(r.stderr).toBe("--check cannot be combined with --write\n");
+	});
+});
+
+describe("delete", () => {
+	const src = "req >> design -> spec\nspec >> impl -> code\n";
+
+	it("prints the document with the id removed to stdout by default, without writing", async () => {
+		const f = join(dir, "delete-default.pfdsl");
+		writeFileSync(f, src);
+		const r = await run(["delete", f, "spec"]);
+		expect(r.exitCode).toBe(0);
+		expect(r.stdout).toBe("req >> design\nimpl -> code\n");
+		expect(readFileSync(f, "utf-8")).toBe(src);
+	});
+
+	it("--write rewrites the file in place", async () => {
+		const f = join(dir, "delete-write.pfdsl");
+		writeFileSync(f, src);
+		const r = await run(["delete", f, "spec", "--write"]);
+		expect(r.exitCode).toBe(0);
+		expect(readFileSync(f, "utf-8")).toBe("req >> design\nimpl -> code\n");
+	});
+
+	it("--write with stdin is rejected (exit 2)", async () => {
+		const r = await run(["delete", "-", "spec", "--write"], withStdin(src));
+		expect(r.exitCode).toBe(2);
+		expect(r.stderr).toBe("--write cannot be used with stdin (-)\n");
+	});
+
+	it("--json reports { ok: true, deleted, notFound }, unchanged by --write", async () => {
+		const withoutWrite = join(dir, "delete-json.pfdsl");
+		writeFileSync(withoutWrite, src);
+		const r1 = await run(["delete", withoutWrite, "spec,nope", "--json"]);
+		expect(r1.exitCode).toBe(0);
+		expect(JSON.parse(r1.stdout)).toEqual({
+			ok: true,
+			deleted: ["spec"],
+			notFound: ["nope"],
+		});
+		expect(readFileSync(withoutWrite, "utf-8")).toBe(src);
+
+		const withWrite = join(dir, "delete-json-write.pfdsl");
+		writeFileSync(withWrite, src);
+		const r2 = await run([
+			"delete",
+			withWrite,
+			"spec,nope",
+			"--json",
+			"--write",
+		]);
+		expect(r2.exitCode).toBe(0);
+		expect(JSON.parse(r2.stdout)).toEqual({
+			ok: true,
+			deleted: ["spec"],
+			notFound: ["nope"],
+		});
+		expect(readFileSync(withWrite, "utf-8")).toBe(
+			"req >> design\nimpl -> code\n",
+		);
+	});
+
+	it("a nonexistent id lands in notFound and exits 0 (idempotent)", async () => {
+		const f = join(dir, "delete-notfound.pfdsl");
+		writeFileSync(f, src);
+		const r = await run(["delete", f, "nope"]);
+		expect(r.exitCode).toBe(0);
+		expect(r.stdout).toBe(src);
+		expect(readFileSync(f, "utf-8")).toBe(src);
+	});
+
+	it("a file with a validation error prints diagnostics and exits 1, without reporting notFound", async () => {
+		const r = await run(["delete", join(dir, "invalid.pfdsl"), "spec"]);
+		expect(r.exitCode).toBe(1);
+		expect(r.stdout).toBe("");
+		expect(r.stderr).toContain("V001");
+		expect(r.stderr).not.toContain("notFound");
+	});
+
+	it("--json on a file with a validation error returns { ok: false, diagnostics } without notFound", async () => {
+		const r = await run([
+			"delete",
+			join(dir, "invalid.pfdsl"),
+			"spec",
+			"--json",
+		]);
+		expect(r.exitCode).toBe(1);
+		expect(r.stderr).toBe("");
+		const parsed = JSON.parse(r.stdout);
+		expect(parsed.ok).toBe(false);
+		expect(parsed.notFound).toBeUndefined();
+		expect(Array.isArray(parsed.diagnostics)).toBe(true);
+		expect(parsed.diagnostics.length).toBeGreaterThan(0);
+	});
+
+	it("missing id argument prints help (exit 2)", async () => {
+		const r = await run(["delete", join(dir, "valid.pfdsl")]);
+		expect(r.exitCode).toBe(2);
+	});
+
+	it("a quoted id containing a comma is treated as a single id, not split (#1125 review defect 2)", async () => {
+		const f = join(dir, "delete-quoted-comma-id.pfdsl");
+		const quotedSrc = `---
+artifact:
+  "a,b":
+    label: A-B
+  c:
+    label: C
+process:
+  p:
+    label: P
+---
+["a,b", c] >> p
+`;
+		writeFileSync(f, quotedSrc);
+		const r = await run(["delete", f, '"a,b"', "--json"]);
+		expect(r.exitCode).toBe(0);
+		expect(JSON.parse(r.stdout)).toEqual({
+			ok: true,
+			deleted: ["a,b"],
+			notFound: [],
+		});
+	});
+});
+
+/**
+ * A fresh temp directory for each test of the enclosing describe, removed
+ * after it; returns a writer that puts `content` at `name` there and
+ * returns the file's path.
+ */
+function tempFiles(): (name: string, content: string) => string {
+	let d = "";
+	beforeEach(() => {
+		d = mkdtempSync(join(tmpdir(), "pfdsl-rename-"));
+	});
+	afterEach(() => {
+		rmSync(d, { recursive: true, force: true });
+	});
+	return (name, content) => {
+		const f = join(d, name);
+		writeFileSync(f, content);
+		return f;
+	};
+}
+
+describe("rename", () => {
+	const artifactSrc = "req >> design -> spec\nspec >> impl -> code\n";
+
+	it("--help documents which references are rewritten, the refusals, and the cross-file blind spot", async () => {
+		const r = await run(["rename", "--help"]);
+		expect(r.exitCode).toBe(0);
+		expect(r.stdout).toContain("boundary: { <new>: <old> }");
+		expect(r.stdout).toContain("both a group and an artifact/process");
+		expect(r.stdout).toContain(
+			"outside the reachable dependencies is not inspected or rewritten",
+		);
+	});
+
+	it("--help says a stdin (-) preview skips the extends checks a file path gets", async () => {
+		const r = await run(["rename", "--help"]);
+		const prose = r.stdout.replace(/\s+/g, " ");
+		expect(prose).toContain(
+			"With -, the extends: checks are skipped because relative paths cannot be resolved",
+		);
+		expect(prose).toContain(
+			"a preview from stdin can succeed where the same file path is refused",
+		);
+	});
+
+	it("renames an artifact across frontmatter and body, printing the rewritten file to stdout by default", async () => {
+		const f = join(dir, "rename-artifact-default.pfdsl");
+		writeFileSync(f, artifactSrc);
+		const r = await run(["rename", f, "spec", "design_doc"]);
+		expect(r.exitCode).toBe(0);
+		expect(r.stdout).toBe(
+			"req >> design -> design_doc\ndesign_doc >> impl -> code\n",
+		);
+		expect(readFileSync(f, "utf-8")).toBe(artifactSrc);
+	});
+
+	it("--write rewrites the file in place and reports kind: artifact via --json", async () => {
+		const f = join(dir, "rename-artifact-write.pfdsl");
+		writeFileSync(f, artifactSrc);
+		const r = await run([
+			"rename",
+			f,
+			"spec",
+			"design_doc",
+			"--write",
+			"--json",
+		]);
+		expect(r.exitCode).toBe(0);
+		expect(JSON.parse(r.stdout)).toEqual({
+			ok: true,
+			kind: "artifact",
+			from: "spec",
+			to: "design_doc",
+		});
+		expect(readFileSync(f, "utf-8")).toBe(
+			"req >> design -> design_doc\ndesign_doc >> impl -> code\n",
+		);
+	});
+
+	it("renames a process, reporting kind: process via --json", async () => {
+		const f = join(dir, "rename-process.pfdsl");
+		writeFileSync(f, artifactSrc);
+		const r = await run(["rename", f, "design", "design_v2", "--json"]);
+		expect(r.exitCode).toBe(0);
+		expect(JSON.parse(r.stdout)).toEqual({
+			ok: true,
+			kind: "process",
+			from: "design",
+			to: "design_v2",
+		});
+	});
+
+	// >=3 groups (layer1sub's parent: references layer1, other is unrelated),
+	// a comment on the renamed group's declaration, a folded (>) description,
+	// and members declared in both flow ({ group: layer1 }) and block style.
+	const grouped = `---
+description: >
+  Roadmap for the
+  Q3 initiative.
+group:
+  layer1: # ingestion layer
+    label: "Layer 1"
+    color: lightblue
+  layer1sub:
+    label: "Sub layer"
+    parent: layer1
+  other:
+    label: "Other layer"
+artifact:
+  raw: { group: layer1, label: Raw }
+  processed:
+    label: Processed
+    group: layer1
+  done:
+    label: Done
+process:
+  ingest: { group: layer1, label: Ingest }
+  transform:
+    label: Transform
+    group: layer1
+---
+raw >> ingest -> processed
+processed >> transform -> done
+`;
+
+	it("renames a group: the declaration key, the child group's parent:, and every member's group: — byte-exact", async () => {
+		const f = join(dir, "rename-group-full.pfdsl");
+		writeFileSync(f, grouped);
+		const r = await run(["rename", f, "layer1", "layerx", "--write"]);
+		expect(r.exitCode).toBe(0);
+		expect(readFileSync(f, "utf-8")).toBe(`---
+description: >
+  Roadmap for the
+  Q3 initiative.
+group:
+  layerx:
+    # ingestion layer
+    label: "Layer 1"
+    color: lightblue
+  layer1sub:
+    label: "Sub layer"
+    parent: layerx
+  other:
+    label: "Other layer"
+artifact:
+  raw: { group: layerx, label: Raw }
+  processed:
+    label: Processed
+    group: layerx
+  done:
+    label: Done
+process:
+  ingest: { group: layerx, label: Ingest }
+  transform:
+    label: Transform
+    group: layerx
+---
+raw >> ingest -> processed
+processed >> transform -> done
+`);
+	});
+
+	it("--json on a group rename reports { ok, kind: group, from, to, members, children }", async () => {
+		const f = join(dir, "rename-group-json.pfdsl");
+		writeFileSync(f, grouped);
+		const r = await run(["rename", f, "layer1", "layerx", "--json"]);
+		expect(r.exitCode).toBe(0);
+		expect(JSON.parse(r.stdout)).toEqual({
+			ok: true,
+			kind: "group",
+			from: "layer1",
+			to: "layerx",
+			members: ["raw", "processed", "ingest", "transform"],
+			children: ["layer1sub"],
+		});
+	});
+
+	// --- refusals ---
+
+	it("exits 2 with help when a positional argument is missing", async () => {
+		const f = join(dir, "rename-missing-arg.pfdsl");
+		writeFileSync(f, grouped);
+		const r = await run(["rename", f, "layer1"]);
+		expect(r.exitCode).toBe(2);
+		expect(readFileSync(f, "utf-8")).toBe(grouped);
+	});
+
+	it("exits 2 with help on an extra positional argument", async () => {
+		const f = join(dir, "rename-extra-arg.pfdsl");
+		writeFileSync(f, grouped);
+		const r = await run(["rename", f, "layer1", "layerx", "extra"]);
+		expect(r.exitCode).toBe(2);
+		expect(readFileSync(f, "utf-8")).toBe(grouped);
+	});
+
+	it("exits 2 when old and new are the same id", async () => {
+		const f = join(dir, "rename-same-id.pfdsl");
+		writeFileSync(f, grouped);
+		const r = await run(["rename", f, "layer1", "layer1"]);
+		expect(r.exitCode).toBe(2);
+		expect(readFileSync(f, "utf-8")).toBe(grouped);
+	});
+
+	it("--write with stdin is rejected (exit 2)", async () => {
+		const r = await run(
+			["rename", "-", "spec", "design_doc", "--write"],
+			withStdin(artifactSrc),
+		);
+		expect(r.exitCode).toBe(2);
+		expect(r.stderr).toBe("--write cannot be used with stdin (-)\n");
+	});
+
+	// `rename` follows `delete`'s output model: stdin is a valid preview
+	// source as long as --write is not requested.
+	it("allows stdin for a preview (no --write)", async () => {
+		const r = await run(
+			["rename", "-", "spec", "design_doc"],
+			withStdin(artifactSrc),
+		);
+		expect(r.exitCode).toBe(0);
+		expect(r.stdout).toBe(
+			"req >> design -> design_doc\ndesign_doc >> impl -> code\n",
+		);
+	});
+
+	// `""` is a valid quoted id, so an empty argument names it rather than
+	// being a missing one.
+	it("renames the empty id away", async () => {
+		const r = await run(["rename", "-", "", "x"], withStdin('"" >> p -> b\n'));
+		expect(r.exitCode).toBe(0);
+		expect(r.stdout).toBe("x >> p -> b\n");
+	});
+
+	it("renames onto the empty id, quoting it so the result re-reads", async () => {
+		const r = await run(["rename", "-", "a", ""], withStdin("a >> p -> b\n"));
+		expect(r.exitCode).toBe(0);
+		expect(r.stdout).toBe('"" >> p -> b\n');
+		const reread = analyze(r.stdout);
+		expect(reread.diagnostics.filter((d) => d.severity === "error")).toEqual(
+			[],
+		);
+		expect(reread.edges.map((e) => e.artifact)).toContain("");
+	});
+
+	it("exits 1 on a structural (FM/P/L) diagnostic and leaves the file untouched", async () => {
+		const broken = `---
+group:
+  layer1: [unterminated
+---
+a
+`;
+		const f = join(dir, "rename-structural.pfdsl");
+		writeFileSync(f, broken);
+		const r = await run(["rename", f, "layer1", "layerx"]);
+		expect(r.exitCode).toBe(1);
+		expect(r.stderr).toMatch(/\[FM\d+\]/);
+		expect(readFileSync(f, "utf-8")).toBe(broken);
+	});
+
+	// The result is judged, not the input (same contract as `meta set`): a
+	// validation error the input already had surfaces as its own diagnostic
+	// on the refused result.
+	const invalidStatus = `---
+artifact:
+  a: { status: bogus }
+---
+a >> p -> b
+`;
+	const inputErrorMessage =
+		"the result would have errors (an error already in the input also blocks the rename)";
+
+	it("refuses an input with a validation error, printing that diagnostic (V007) and leaving the file untouched", async () => {
+		const f = join(dir, "rename-input-v007.pfdsl");
+		writeFileSync(f, invalidStatus);
+		const r = await run(["rename", f, "b", "bb", "--write"]);
+		expect(r.exitCode).toBe(1);
+		expect(r.stderr).toContain("[V007]");
+		expect(r.stderr).toContain(
+			`rename: refusing to write ${f}: ${inputErrorMessage}`,
+		);
+		expect(readFileSync(f, "utf-8")).toBe(invalidStatus);
+	});
+
+	it("--json reports the input's validation error (V007) as diagnostics on refusal", async () => {
+		const f = join(dir, "rename-input-v007-json.pfdsl");
+		writeFileSync(f, invalidStatus);
+		const r = await run(["rename", f, "b", "bb", "--json"]);
+		expect(r.exitCode).toBe(1);
+		expect(r.stderr).toBe("");
+		const parsed = JSON.parse(r.stdout);
+		expect(parsed.ok).toBe(false);
+		expect(parsed.error).toBe(
+			`rename: refusing to write ${f}: ${inputErrorMessage}`,
+		);
+		expect(parsed.diagnostics.map((d: { code: string }) => d.code)).toContain(
+			"V007",
+		);
+	});
+
+	it.each([
+		[
+			"a process declaration",
+			"process:\n  g:\n    label: P\n",
+			"a >> g -> b",
+			"a process",
+		],
+		["a body process", "", "a >> g -> b", "a process"],
+		[
+			"an artifact declaration",
+			"artifact:\n  g:\n    label: A\n",
+			"g >> p",
+			"an artifact",
+		],
+		["an isolated body node", "", "g\na >> p -> b", "an artifact"],
+	])("exits 1 when old is a group and also %s (ambiguous), naming the clash", async (name, extra, body, clash) => {
+		const ambiguous = `---\ngroup:\n  g:\n    label: G\n${extra}---\n${body}\n`;
+		const f = join(dir, `rename-ambiguous-${name.replace(/ /g, "-")}.pfdsl`);
+		writeFileSync(f, ambiguous);
+		const r = await run(["rename", f, "g", "h"]);
+		expect(r.exitCode).toBe(1);
+		expect(r.stderr).toBe(
+			`rename: 'g' is declared twice in ${f} — as a group and as ${clash}; this is invalid and cannot be renamed unambiguously\n`,
+		);
+		expect(readFileSync(f, "utf-8")).toBe(ambiguous);
+	});
+
+	it("exits 1 when old is not found at all (neither a group nor an artifact/process)", async () => {
+		const f = join(dir, "rename-not-found.pfdsl");
+		writeFileSync(f, grouped);
+		const r = await run(["rename", f, "ghost", "gx"]);
+		expect(r.exitCode).toBe(1);
+		expect(r.stderr).toBe(`error: id(s) not found in ${f}: ghost\n`);
+		expect(readFileSync(f, "utf-8")).toBe(grouped);
+	});
+
+	it("--json reports a not-found old as { ok: false, missing }, like the other id commands", async () => {
+		const f = join(dir, "rename-not-found-json.pfdsl");
+		writeFileSync(f, grouped);
+		const r = await run(["rename", f, "ghost", "gx", "--json"]);
+		expect(r.exitCode).toBe(1);
+		expect(JSON.parse(r.stdout)).toEqual({ ok: false, missing: ["ghost"] });
+	});
+
+	it("exits 1 when new already exists as an artifact id, leaving the file untouched", async () => {
+		const f = join(dir, "rename-new-is-artifact.pfdsl");
+		writeFileSync(f, artifactSrc);
+		const r = await run(["rename", f, "design", "spec"]);
+		expect(r.exitCode).toBe(1);
+		expect(r.stderr).toContain("spec");
+		expect(r.stderr).toContain("artifact");
+		expect(readFileSync(f, "utf-8")).toBe(artifactSrc);
+	});
+
+	it("exits 1 when new already exists as a process id, leaving the file untouched", async () => {
+		const f = join(dir, "rename-new-is-process.pfdsl");
+		writeFileSync(f, artifactSrc);
+		const r = await run(["rename", f, "spec", "impl"]);
+		expect(r.exitCode).toBe(1);
+		expect(r.stderr).toContain("impl");
+		expect(r.stderr).toContain("process");
+		expect(readFileSync(f, "utf-8")).toBe(artifactSrc);
+	});
+
+	it("exits 1 when new already exists as a group id, leaving the file untouched", async () => {
+		const f = join(dir, "rename-new-is-group.pfdsl");
+		writeFileSync(f, grouped);
+		const r = await run(["rename", f, "layer1", "other"]);
+		expect(r.exitCode).toBe(1);
+		expect(r.stderr).toContain("other");
+		expect(readFileSync(f, "utf-8")).toBe(grouped);
+	});
+
+	// Renaming an artifact/process id onto an existing group id is refused
+	// too: group and node ids share one namespace, and the normalizer would
+	// register the renamed artifact first and silently drop the group.
+	it("exits 1 when new (an artifact rename target) collides with an existing group id", async () => {
+		const f = join(dir, "rename-artifact-new-is-group.pfdsl");
+		writeFileSync(f, grouped);
+		const r = await run(["rename", f, "raw", "other"]);
+		expect(r.exitCode).toBe(1);
+		expect(r.stderr).toContain("other");
+		expect(readFileSync(f, "utf-8")).toBe(grouped);
+	});
+
+	describe("frontmatter with YAML anchors, aliases or merge keys", () => {
+		const write = tempFiles();
+
+		const cases: [string, string, string][] = [
+			[
+				"an alias used as a group key",
+				"---\nkey: &key g\ngroup:\n  *key : {}\nartifact:\n  a: {group: g}\n---\na\n",
+				"g",
+			],
+			[
+				"an aliased parts: sequence",
+				"---\nrefs: &refs [a]\nartifact:\n  a: {}\n  b: {parts: *refs}\n---\na\nb\n",
+				"a",
+			],
+			[
+				"an anchored declaration key reused as values",
+				"---\ngroup:\n  &key g: {}\nartifact:\n  a: {group: *key, label: *key}\n---\na\n",
+				"g",
+			],
+			[
+				"an aliased declaration",
+				"---\ngroup:\n  g: {}\nartifact:\n  a: &a {group: g}\n  b: *a\n---\na\nb\n",
+				"g",
+			],
+			[
+				"a merge key",
+				"---\ngroup:\n  g: {}\nartifact:\n  a: {<<: {group: g}}\n---\na\n",
+				"g",
+			],
+		];
+
+		it.each(
+			cases,
+		)("refuses %s with exit 1, leaving the file untouched", async (_name, src, oldId) => {
+			const f = write("anchored.pfdsl", src);
+			const r = await run(["rename", f, oldId, "new", "--write"]);
+			expect(r.exitCode).toBe(1);
+			expect(r.stdout).toBe("");
+			expect(r.stderr).toContain(
+				"YAML anchors, aliases and merge keys (<<) are not supported by rename",
+			);
+			expect(readFileSync(f, "utf-8")).toBe(src);
+		});
+
+		it.each(
+			cases,
+		)("refuses %s from stdin with { ok: false, error } under --json", async (_name, src, oldId) => {
+			const r = await run(
+				["rename", "-", oldId, "new", "--json"],
+				withStdin(src),
+			);
+			expect(r.exitCode).toBe(1);
+			const payload = JSON.parse(r.stdout);
+			expect(payload.ok).toBe(false);
+			expect(payload.error).toContain(
+				"YAML anchors, aliases and merge keys (<<) are not supported by rename",
+			);
+		});
+
+		it("--help lists the refusal", async () => {
+			const r = await run(["rename", "--help"]);
+			expect(r.stdout.replace(/\s+/g, " ")).toContain(
+				"A frontmatter using YAML anchors, aliases or merge keys (<<) anywhere is refused",
+			);
+		});
+	});
+
+	describe("with an extends: preset", () => {
+		const write = tempFiles();
+
+		const withExtends = `---
+extends: ./preset.yaml
+group:
+  local:
+    label: Local
+artifact:
+  a: { group: local }
+---
+a
+`;
+		const withOverride = `---
+extends: ./preset.yaml
+group:
+  shared:
+    label: Local override
+artifact:
+  a: { group: shared }
+---
+a
+`;
+		const preset = `group:
+  shared: { label: S }
+`;
+
+		it("exits 1 when new already exists in the effective (extends-resolved) frontmatter", async () => {
+			const f = write("main.pfdsl", withExtends);
+			write("preset.yaml", preset);
+			const r = await run(["rename", f, "local", "shared"]);
+			expect(r.exitCode).toBe(1);
+			expect(readFileSync(f, "utf-8")).toBe(withExtends);
+		});
+
+		it("exits 1 when old is also defined by the extends: preset (partial override)", async () => {
+			const f = write("main.pfdsl", withOverride);
+			write("preset.yaml", preset);
+			const r = await run(["rename", f, "shared", "renamed"]);
+			expect(r.exitCode).toBe(1);
+			expect(r.stderr).toContain("preset");
+			expect(readFileSync(f, "utf-8")).toBe(withOverride);
+		});
+
+		it("not-declared-locally message names the preset when old is inherited, not locally defined", async () => {
+			const inheritingOnly = `---
+extends: ./preset.yaml
+artifact:
+  a: { group: shared }
+---
+a
+`;
+			const f = write("main.pfdsl", inheritingOnly);
+			write("preset.yaml", preset);
+			const r = await run(["rename", f, "shared", "renamed"]);
+			expect(r.exitCode).toBe(1);
+			expect(r.stderr).toContain("preset");
+			expect(readFileSync(f, "utf-8")).toBe(inheritingOnly);
+		});
+
+		it("refuses (V026) when the extends: target file does not exist, leaving the file untouched", async () => {
+			const missingPreset = `---
+extends: ./missing.yaml
+group:
+  g1:
+    label: G1
+---
+a
+`;
+			const f = write("main.pfdsl", missingPreset);
+			const r = await run(["rename", f, "g1", "g2"]);
+			expect(r.exitCode).toBe(1);
+			expect(r.stderr).toContain("V026");
+			expect(readFileSync(f, "utf-8")).toBe(missingPreset);
+		});
+
+		it("allows rename with a readable preset's unrelated V028 while check still rejects it", async () => {
+			const f = write("main.pfdsl", withExtends);
+			write("preset.yaml", `${preset}artifact:\n  x: { label: X }\n`);
+			const checked = await run(["check", f]);
+			expect(checked.exitCode).toBe(1);
+			expect(checked.stderr).toContain("V028");
+
+			const r = await run(["rename", f, "local", "renamed", "--write"]);
+			expect(r.exitCode).toBe(0);
+			expect(readFileSync(f, "utf-8")).toContain("renamed:");
+			writeFileSync(f, withExtends);
+			const json = await run(["rename", f, "local", "renamed", "--json"]);
+			expect(json.exitCode).toBe(0);
+			expect(JSON.parse(json.stdout)).toMatchObject({
+				ok: true,
+				from: "local",
+				to: "renamed",
+			});
+		});
+	});
+
+	// Acceptance: rename a boundary artifact with a real child file on disk.
+	describe("subflow boundary preservation with a real child file", () => {
+		const write = tempFiles();
+
+		const child = "order >> pack -> shipment\n";
+
+		it("renaming a boundary artifact adds boundary: {new: old}, and check on the result stays clean", async () => {
+			const parent = [
+				"---",
+				"process:",
+				"  P:",
+				"    subflow: ./child.pfdsl",
+				"---",
+				"order >> P -> shipment",
+			].join("\n");
+			const parentFile = write("parent.pfdsl", parent);
+			write("child.pfdsl", child);
+
+			const r = await run([
+				"rename",
+				parentFile,
+				"order",
+				"order_v2",
+				"--write",
+			]);
+			expect(r.exitCode).toBe(0);
+			const rewritten = readFileSync(parentFile, "utf-8");
+			expect(analyze(rewritten).frontmatter?.process?.P?.boundary).toEqual({
+				order_v2: "order",
+			});
+			expect(rewritten).toContain("order_v2 >> P -> shipment");
+
+			const checkResult = await run(["check", parentFile]);
+			expect(checkResult.exitCode).toBe(0);
+		});
+
+		it("renaming an already-mapped boundary key renames the key, keeping the child-side value", async () => {
+			const parent = [
+				"---",
+				"process:",
+				"  P:",
+				"    subflow: ./child.pfdsl",
+				"    boundary: { incoming_order: order }",
+				"---",
+				"incoming_order >> P -> shipment",
+			].join("\n");
+			const parentFile = write("parent.pfdsl", parent);
+			write("child.pfdsl", child);
+
+			const r = await run([
+				"rename",
+				parentFile,
+				"incoming_order",
+				"incoming_order_v2",
+				"--write",
+			]);
+			expect(r.exitCode).toBe(0);
+			const rewritten = readFileSync(parentFile, "utf-8");
+			expect(rewritten).toContain("boundary: { incoming_order_v2: order }");
+
+			const checkResult = await run(["check", parentFile]);
+			expect(checkResult.exitCode).toBe(0);
+		});
+
+		it("renaming a non-boundary artifact adds no boundary: entry", async () => {
+			const parent = [
+				"---",
+				"process:",
+				"  P:",
+				"    subflow: ./child.pfdsl",
+				"---",
+				"order >> P -> shipment",
+				"unrelated >> other",
+			].join("\n");
+			const parentFile = write("parent.pfdsl", parent);
+			write("child.pfdsl", child);
+
+			const r = await run([
+				"rename",
+				parentFile,
+				"unrelated",
+				"unrelated_v2",
+				"--write",
+			]);
+			expect(r.exitCode).toBe(0);
+			const rewritten = readFileSync(parentFile, "utf-8");
+			expect(rewritten).not.toContain("boundary:");
+
+			const checkResult = await run(["check", parentFile]);
+			expect(checkResult.exitCode).toBe(0);
+		});
+
+		it("allows a rename unrelated to an existing subflow boundary error (V034)", async () => {
+			// The child's terminal is `shipment`; the parent's output `z`
+			// does not match it — a V034 the input already has, unrelated to
+			// the `q` being renamed.
+			const parent = [
+				"---",
+				"process:",
+				"  P:",
+				"    subflow: ./child.pfdsl",
+				"---",
+				"order >> P -> z",
+				"q >> r -> s",
+			].join("\n");
+			const parentFile = write("parent.pfdsl", parent);
+			write("child.pfdsl", child);
+
+			const r = await run(["rename", parentFile, "q", "q2", "--write"]);
+			expect(r.exitCode).toBe(0);
+			expect(readFileSync(parentFile, "utf-8")).toContain("q2 >> r -> s");
+			expect((await run(["check", parentFile])).stderr).toContain("[V034]");
+		});
+
+		// A boundary artifact is still subject to the new-ID collision refusal.
+		it("refuses renaming a boundary artifact onto another boundary artifact's id (new already exists), leaving the file untouched", async () => {
+			const parent = [
+				"---",
+				"process:",
+				"  P:",
+				"    subflow: ./child.pfdsl",
+				"    boundary: { shipment: shipment, order_v2: order }",
+				"---",
+				"order_v2 >> P -> shipment",
+			].join("\n");
+			const parentFile = write("parent.pfdsl", parent);
+			write("child.pfdsl", child);
+
+			const r = await run(["rename", parentFile, "order_v2", "shipment"]);
+			expect(r.exitCode).toBe(1);
+			expect(r.stderr).toBe(
+				`rename: 'shipment' already exists as an artifact id in ${parentFile}\n`,
+			);
+			expect(readFileSync(parentFile, "utf-8")).toBe(parent);
+		});
 	});
 });
 
@@ -230,17 +1479,14 @@ req >> design -> spec
 		expect(readFileSync(f, "utf-8")).toBe(src);
 	});
 
-	it("--json on parse error emits { ok: false, diagnostics } on stdout, empty stderr", async () => {
-		const f = join(dir, "reindex-bad-json.pfdsl");
-		const src = "req >> design -> spec\nother -> spec\n"; // V001: dual generators (always error)
-		writeFileSync(f, src);
-		const r = await run(["meta", "reindex", f, "--json"]);
-		expect(r.exitCode).toBe(1);
-		expect(r.stderr).toBe("");
-		const parsed = JSON.parse(r.stdout);
-		expect(parsed.ok).toBe(false);
-		expect(Array.isArray(parsed.diagnostics)).toBe(true);
-		expect(parsed.diagnostics.length).toBeGreaterThan(0);
+	it("--write leaves a CRLF file on CRLF (#644)", async () => {
+		const f = join(dir, "reindex-crlf.pfdsl");
+		writeFileSync(f, declared.replace(/\n/g, "\r\n"));
+		const r = await run(["meta", "reindex", f, "--write", "--renumber"]);
+		expect(r.exitCode).toBe(0);
+		const after = readFileSync(f, "utf-8");
+		expect(after).toContain("index:");
+		expect(after.replace(/\r\n/g, "")).not.toContain("\n");
 	});
 });
 
@@ -275,6 +1521,16 @@ z >> p -> a
 		const aIdx = after.indexOf("  a:");
 		const zIdx = after.indexOf("  z:");
 		expect(aIdx).toBeLessThan(zIdx);
+	});
+
+	it("--write leaves a CRLF file on CRLF (#644)", async () => {
+		const f = join(dir, "sort-crlf.pfdsl");
+		writeFileSync(f, unsorted.replace(/\n/g, "\r\n"));
+		const r = await run(["meta", "sort", f, "--by", "id", "--write"]);
+		expect(r.exitCode).toBe(0);
+		const after = readFileSync(f, "utf-8");
+		expect(after.indexOf("  a:")).toBeLessThan(after.indexOf("  z:"));
+		expect(after.replace(/\r\n/g, "")).not.toContain("\n");
 	});
 
 	it("--check exits 1 when not sorted", async () => {
@@ -365,21 +1621,6 @@ describe("graph edges", () => {
 		expect(r.exitCode).toBe(0);
 		expect(r.stdout).toContain("req >> design");
 		expect(r.stdout).toContain("design -> spec");
-	});
-
-	it("--json on parse error emits { ok: false, diagnostics } on stdout, empty stderr", async () => {
-		const r = await run([
-			"graph",
-			"edges",
-			join(dir, "invalid.pfdsl"),
-			"--json",
-		]);
-		expect(r.exitCode).toBe(1);
-		expect(r.stderr).toBe("");
-		const parsed = JSON.parse(r.stdout);
-		expect(parsed.ok).toBe(false);
-		expect(Array.isArray(parsed.diagnostics)).toBe(true);
-		expect(parsed.diagnostics.length).toBeGreaterThan(0);
 	});
 });
 
@@ -477,6 +1718,45 @@ describe("render", () => {
 });
 
 describe("diff", () => {
+	it.each([
+		">>",
+		">>?",
+	])("preserves colliding endpoints through text, JSON and DOT for %s", async (op) => {
+		const a = join(dir, `collision-${op.length}-a.pfdsl`);
+		const b = join(dir, `collision-${op.length}-b.pfdsl`);
+		const base =
+			'["a -> b", a] >> hub -> seed\nseed >> c -> out1\nseed >> "b -> c" -> out2\n';
+		writeFileSync(a, `${base}"a -> b" ${op} c\n`);
+		writeFileSync(b, `${base}a ${op} "b -> c"\n`);
+		const text = await run(["diff", a, b]);
+		expect(text.exitCode).toBe(0);
+		const section = op === ">>" ? "edge" : "feedback";
+		expect(text.stdout).toContain(`+ ${section} a -> "b -> c"`);
+		expect(text.stdout).toContain(`- ${section} "a -> b" -> c`);
+		const json = await run(["diff", a, b, "--json"]);
+		expect(json.exitCode).toBe(0);
+		const report = JSON.parse(json.stdout).diff;
+		expect(Object.keys(report)).toEqual([
+			"addedNodes",
+			"removedNodes",
+			"changedNodes",
+			"addedEdges",
+			"removedEdges",
+			"addedFeedback",
+			"removedFeedback",
+		]);
+		expect(op === ">>" ? report.addedEdges : report.addedFeedback).toEqual([
+			'a -> "b -> c"',
+		]);
+		expect(op === ">>" ? report.removedEdges : report.removedFeedback).toEqual([
+			'"a -> b" -> c',
+		]);
+		const dot = await run(["diff", a, b, "--format", "dot"]);
+		expect(dot.exitCode).toBe(0);
+		expect(dot.stdout).not.toContain("_nodiff");
+		expect(dot.stdout).toContain('"a -> b" -> "c"');
+		expect(dot.stdout).toContain('"a" -> "b -> c"');
+	});
 	it("reports added and removed edges", async () => {
 		const a = join(dir, "diff-a.pfdsl");
 		const b = join(dir, "diff-b.pfdsl");
@@ -488,14 +1768,6 @@ describe("diff", () => {
 		expect(r.stdout).toContain("+ edge spec -> impl");
 		expect(r.stdout).toContain("+ edge impl -> code");
 		expect(r.stdout).not.toContain("- edge");
-	});
-
-	it("fails with an error when a file cannot be read", async () => {
-		const a = join(dir, "diff-a.pfdsl");
-		writeFileSync(a, "req >> design -> spec\n");
-		const r = await runDiff(a, join(dir, "does-not-exist.pfdsl"));
-		expect(r.exitCode).not.toBe(0);
-		expect(r.stderr).toBeTruthy();
 	});
 
 	it("CLI diff output for identical files", async () => {
@@ -615,15 +1887,13 @@ describe("diff", () => {
 	it("one side may be stdin (-)", async () => {
 		const b = join(dir, "diff-stdin-b.pfdsl");
 		writeFileSync(b, "req >> design -> spec\n");
-		stdinOverride = "req >> design -> spec\nspec >> impl -> code\n";
-		try {
-			const r = await run(["diff", "-", b]);
-			expect(r.exitCode).toBe(0);
-			expect(r.stdout).toContain("- node code");
-			expect(r.stdout).toContain("- node impl");
-		} finally {
-			stdinOverride = null;
-		}
+		const r = await run(
+			["diff", "-", b],
+			withStdin("req >> design -> spec\nspec >> impl -> code\n"),
+		);
+		expect(r.exitCode).toBe(0);
+		expect(r.stdout).toContain("- node code");
+		expect(r.stdout).toContain("- node impl");
 	});
 });
 
@@ -643,16 +1913,6 @@ describe("graph io", () => {
 		expect(r.stdout).not.toMatch(/terminal artifacts/);
 	});
 
-	it("--json on parse error emits { ok: false, diagnostics } on stdout, empty stderr", async () => {
-		const r = await run(["graph", "io", join(dir, "invalid.pfdsl"), "--json"]);
-		expect(r.exitCode).toBe(1);
-		expect(r.stderr).toBe("");
-		const parsed = JSON.parse(r.stdout);
-		expect(parsed.ok).toBe(false);
-		expect(Array.isArray(parsed.diagnostics)).toBe(true);
-		expect(parsed.diagnostics.length).toBeGreaterThan(0);
-	});
-
 	it("artifact with externalStakeholders is excluded from terminal artifacts", async () => {
 		const src = [
 			"---",
@@ -670,13 +1930,51 @@ describe("graph io", () => {
 		expect(r.stdout).toMatch(/external inputs:.*req/);
 	});
 
-	it("--json returns externalInputs and terminals arrays", async () => {
+	it("artifact with externalStakeholders is listed under external-stakeholder terminals", async () => {
+		const src = [
+			"---",
+			"artifact:",
+			"  report:",
+			"    externalStakeholders: [規制当局]",
+			"---",
+			"req >> analyze -> report",
+		].join("\n");
+		const f = join(dir, "ext-stakeholders.pfdsl");
+		writeFileSync(f, src);
+		const r = await run(["graph", "io", f]);
+		expect(r.exitCode).toBe(0);
+		expect(r.stdout).toMatch(/external-stakeholder terminals:.*report/);
+	});
+
+	it("--json returns externalInputs, terminals, and externalTerminals arrays", async () => {
 		const r = await run(["graph", "io", join(dir, "valid.pfdsl"), "--json"]);
 		expect(r.exitCode).toBe(0);
 		expect(JSON.parse(r.stdout)).toEqual({
 			ok: true,
 			externalInputs: ["req"],
 			terminals: ["code"],
+			externalTerminals: [],
+		});
+	});
+
+	it("--json includes externalTerminals for artifacts with externalStakeholders", async () => {
+		const src = [
+			"---",
+			"artifact:",
+			"  report:",
+			"    externalStakeholders: [規制当局]",
+			"---",
+			"req >> analyze -> report",
+		].join("\n");
+		const f = join(dir, "ext-stakeholders.pfdsl");
+		writeFileSync(f, src);
+		const r = await run(["graph", "io", f, "--json"]);
+		expect(r.exitCode).toBe(0);
+		expect(JSON.parse(r.stdout)).toEqual({
+			ok: true,
+			externalInputs: ["req"],
+			terminals: [],
+			externalTerminals: ["report"],
 		});
 	});
 });
@@ -700,21 +1998,6 @@ describe("graph summary", () => {
 		const r = await run(["graph", "summary", join(dir, "invalid.pfdsl")]);
 		expect(r.exitCode).toBe(1);
 		expect(r.stdout).not.toMatch(/artifacts:/);
-	});
-
-	it("--json on parse error emits { ok: false, diagnostics } on stdout, empty stderr", async () => {
-		const r = await run([
-			"graph",
-			"summary",
-			join(dir, "invalid.pfdsl"),
-			"--json",
-		]);
-		expect(r.exitCode).toBe(1);
-		expect(r.stderr).toBe("");
-		const parsed = JSON.parse(r.stdout);
-		expect(parsed.ok).toBe(false);
-		expect(Array.isArray(parsed.diagnostics)).toBe(true);
-		expect(parsed.diagnostics.length).toBeGreaterThan(0);
 	});
 
 	it("--json returns counts", async () => {
@@ -841,6 +2124,38 @@ describe("stdin (-)", () => {
 		expect(r.exitCode).toBe(2);
 		expect(r.stderr).toContain("--write");
 	});
+
+	it("check - reports a clean document as OK", async () => {
+		const r = await run(["check", "-"], withStdin(validWithStatus));
+		expect(r.exitCode).toBe(0);
+		expect(r.stdout).toContain("OK");
+	});
+
+	it("check - names the source as '-' when it reports a warning", async () => {
+		const r = await run(["check", "-"], withStdin(warningOnly));
+		expect(r.exitCode).toBe(0);
+		expect(r.stdout).toContain("W001");
+		expect(r.stdout).toContain("-:1:1:");
+	});
+
+	// #428: the stdin + --json success path hardcoded `diagnostics: []`, so
+	// warnings the file-path and non-json stdin paths both report were dropped.
+	// cli-smoke covers this too, but only when the bundle is current.
+	it("check - --json keeps the warnings the non-json path prints (#428)", async () => {
+		const r = await run(["check", "-", "--json"], withStdin(warningOnly));
+		expect(r.exitCode).toBe(0);
+		const parsed = JSON.parse(r.stdout);
+		expect(parsed.ok).toBe(true);
+		expect(
+			(parsed.diagnostics as Array<{ code: string }>).map((d) => d.code),
+		).toContain("W001");
+	});
+
+	it("check - reports errors from stdin with exit 1", async () => {
+		const r = await run(["check", "-"], withStdin(invalid));
+		expect(r.exitCode).toBe(1);
+		expect(r.stderr).toMatch(/error/);
+	});
 });
 
 describe("help / unknown", () => {
@@ -853,49 +2168,128 @@ describe("help / unknown", () => {
 		const r = await run(["nonsense"]);
 		expect(r.exitCode).toBe(2);
 	});
+
+	it.each([
+		"graph",
+		"meta",
+		"status",
+	])("unknown %s subcommand returns 2 and prints that group's help", async (group) => {
+		const r = await run([group, "nonsense"]);
+		expect(r.exitCode).toBe(2);
+		expect(r.stderr).toContain(`unknown ${group} subcommand`);
+		expect(r.stderr).toContain(`pfdsl ${group}`);
+	});
 });
 
-describe("--no-color / NO_COLOR (#180)", () => {
-	afterEach(() => {
-		delete process.env.NO_COLOR;
-	});
+// Seven hand-copied "--help returns help text" cases each asserted one
+// substring, so a subcommand could lose its whole usage line and flag list and
+// still pass on the command name alone. One table, stating the usage line and
+// the flags each subcommand documents (#614).
+describe("--help on a subcommand", () => {
+	const cases: Array<{ name: string; argv: string[]; flags: string[] }> = [
+		{
+			name: "status ready",
+			argv: ["status", "ready"],
+			flags: ["--no-counts", "--json", "--no-color"],
+		},
+		{
+			name: "status gaps",
+			argv: ["status", "gaps"],
+			flags: ["--json", "--no-color"],
+		},
+		{
+			name: "status list",
+			argv: ["status", "list"],
+			flags: ["--status", "--json", "--no-color"],
+		},
+		{
+			name: "status blocked",
+			argv: ["status", "blocked"],
+			flags: ["--json", "--no-color"],
+		},
+		{
+			name: "meta set",
+			argv: ["meta", "set"],
+			flags: ["--json", "--no-color"],
+		},
+		{
+			name: "meta get",
+			argv: ["meta", "get"],
+			flags: ["--json", "--no-color"],
+		},
+		{
+			name: "meta check-links",
+			argv: ["meta", "check-links"],
+			flags: ["--json", "--no-color"],
+		},
+		{
+			name: "graph orphans",
+			argv: ["graph", "orphans"],
+			flags: ["--json", "--no-color"],
+		},
+	];
 
-	it("check output without no-color contains OK (no ANSI codes present in plain output)", async () => {
-		const r = await run(["check", join(dir, "valid-with-status.pfdsl")]);
+	it.each(
+		cases,
+	)("$name prints its usage line and documents every flag it takes", async ({
+		name,
+		argv,
+		flags,
+	}) => {
+		const r = await run([...argv, "--help"]);
+		expect(r.exitCode).toBe(0);
+		expect(r.stderr).toBe("");
+		expect(r.stdout).toContain(`usage: pfdsl ${name}`);
+		for (const flag of flags) expect(r.stdout).toContain(flag);
+	});
+});
+
+// Five more copies asserted only `exitCode === 1`, which an argument error
+// produces just as well. The file that could not be read is the thing worth
+// naming (#614).
+describe("a file argument that does not exist", () => {
+	const missing = () => join(dir, "nonexistent.pfdsl");
+
+	const cases: Array<{ name: string; argv: () => string[] }> = [
+		{ name: "status ready", argv: () => ["status", "ready", missing()] },
+		{
+			name: "status list",
+			argv: () => ["status", "list", missing(), "--status", "todo"],
+		},
+		{ name: "status blocked", argv: () => ["status", "blocked", missing()] },
+		{
+			name: "meta check-links",
+			argv: () => ["meta", "check-links", missing()],
+		},
+		{ name: "graph orphans", argv: () => ["graph", "orphans", missing()] },
+		{ name: "check", argv: () => ["check", missing()] },
+		{ name: "diff", argv: () => ["diff", join(dir, "valid.pfdsl"), missing()] },
+	];
+
+	it.each(cases)("$name exits 1 and names the unreadable file", async ({
+		argv,
+	}) => {
+		const r = await run(argv());
+		expect(r.exitCode).toBe(1);
+		expect(r.stderr).toContain(missing());
+		expect(r.stderr).toContain("No such file or directory");
+	});
+});
+
+// The three cases that used to live here passed `valid.pfdsl`, which produces
+// no diagnostics — and severity words are the only thing the CLI colours, so
+// "no ANSI in the output" held whether or not --no-color and NO_COLOR worked
+// at all (#615). The colour switches are actually exercised against an invalid
+// file in the two #435 describes below, and per-subcommand acceptance in the
+// #508 table. What was worth keeping is the plain-output assertion.
+describe("a clean check", () => {
+	it("prints OK", async () => {
+		const r = await run(["check", join(dir, "valid-with-status.pfdsl")], {
+			stdout: { isTTY: false },
+			env: {},
+		});
 		expect(r.exitCode).toBe(0);
 		expect(r.stdout).toContain("OK");
-	});
-
-	it("--no-color flag is accepted and does not break check", async () => {
-		const r = await run(["check", join(dir, "valid.pfdsl"), "--no-color"]);
-		expect(r.exitCode).toBe(0);
-		// No ANSI escape sequences in output
-		expect(r.stdout).not.toContain("\x1b[");
-		expect(r.stderr).not.toContain("\x1b[");
-	});
-
-	it("NO_COLOR env var suppresses ANSI codes", async () => {
-		process.env.NO_COLOR = "1";
-		const r = await run(["check", join(dir, "valid.pfdsl")]);
-		expect(r.exitCode).toBe(0);
-		expect(r.stdout).not.toContain("\x1b[");
-		expect(r.stderr).not.toContain("\x1b[");
-	});
-
-	it("--no-color is accepted by all subcommands (fmt, graph edges, render)", async () => {
-		const fmt = await run(["fmt", join(dir, "valid.pfdsl"), "--no-color"]);
-		expect(fmt.exitCode).toBe(0);
-
-		const norm = await run([
-			"graph",
-			"edges",
-			join(dir, "valid.pfdsl"),
-			"--no-color",
-		]);
-		expect(norm.exitCode).toBe(0);
-
-		const graph = await run(["render", join(dir, "valid.pfdsl"), "--no-color"]);
-		expect(graph.exitCode).toBe(0);
 	});
 });
 
@@ -919,68 +2313,141 @@ describe("ANSI color for check diagnostics (#435)", () => {
 });
 
 describe("run() wires color into the check command (#435)", () => {
-	const originalIsTTY = process.stdout.isTTY;
-
-	afterEach(() => {
-		Object.defineProperty(process.stdout, "isTTY", {
-			value: originalIsTTY,
-			configurable: true,
-		});
-		delete process.env.NO_COLOR;
-	});
-
 	it("emits ANSI codes on a TTY with no NO_COLOR and no --no-color flag", async () => {
-		Object.defineProperty(process.stdout, "isTTY", {
-			value: true,
-			configurable: true,
-		});
-		const r = await run(["check", join(dir, "invalid.pfdsl")]);
+		const r = await run(["check", join(dir, "invalid.pfdsl")], onATty);
 		expect(r.stderr).toContain("\x1b[31merror\x1b[0m");
 	});
 
 	it("suppresses ANSI codes on a TTY when --no-color is passed", async () => {
-		Object.defineProperty(process.stdout, "isTTY", {
-			value: true,
-			configurable: true,
-		});
-		const r = await run(["check", join(dir, "invalid.pfdsl"), "--no-color"]);
+		const r = await run(
+			["check", join(dir, "invalid.pfdsl"), "--no-color"],
+			onATty,
+		);
 		expect(r.stderr).not.toContain("\x1b[");
 	});
 
 	it("suppresses ANSI codes on a TTY when NO_COLOR env is set", async () => {
-		Object.defineProperty(process.stdout, "isTTY", {
-			value: true,
-			configurable: true,
+		const r = await run(["check", join(dir, "invalid.pfdsl")], {
+			stdout: { isTTY: true },
+			env: { NO_COLOR: "1" },
 		});
-		process.env.NO_COLOR = "1";
-		const r = await run(["check", join(dir, "invalid.pfdsl")]);
 		expect(r.stderr).not.toContain("\x1b[");
 	});
 });
 
+// Every --json-capable command owes the same contract on a file that fails to
+// validate: exit 1, the failure in the payload, and stderr left clean for
+// warnings. Thirteen hand-copied cases used to state this, and the six graph
+// ones had drifted into asserting only that `diagnostics` was an array —
+// an empty array would have satisfied them. One table states it once, so a
+// command added later joins the contract by adding a row.
+describe("--json failure payload on a file that does not validate", () => {
+	const invalidFile = () => join(dir, "invalid.pfdsl");
+
+	const cases: Array<{ name: string; argv: () => string[] }> = [
+		{ name: "check", argv: () => ["check", invalidFile(), "--json"] },
+		{
+			name: "delete",
+			argv: () => ["delete", invalidFile(), "spec", "--json"],
+		},
+		{
+			name: "meta reindex",
+			argv: () => ["meta", "reindex", invalidFile(), "--json"],
+		},
+		{
+			name: "meta set",
+			argv: () => [
+				"meta",
+				"set",
+				join(dir, "invalid-declared.pfdsl"),
+				"spec",
+				"status",
+				"done",
+				"--json",
+			],
+		},
+		{
+			name: "meta get",
+			argv: () => ["meta", "get", invalidFile(), "spec", "status", "--json"],
+		},
+		{
+			name: "graph edges",
+			argv: () => ["graph", "edges", invalidFile(), "--json"],
+		},
+		{ name: "graph io", argv: () => ["graph", "io", invalidFile(), "--json"] },
+		{
+			name: "graph summary",
+			argv: () => ["graph", "summary", invalidFile(), "--json"],
+		},
+		{
+			name: "graph neighbors",
+			argv: () => ["graph", "neighbors", invalidFile(), "spec", "--json"],
+		},
+		{
+			name: "graph impact",
+			argv: () => ["graph", "impact", invalidFile(), "spec", "--json"],
+		},
+		{
+			name: "graph depends-on",
+			argv: () => ["graph", "depends-on", invalidFile(), "spec", "--json"],
+		},
+		{
+			name: "graph path",
+			argv: () => ["graph", "path", invalidFile(), "spec", "code", "--json"],
+		},
+		{
+			name: "graph stats",
+			argv: () => ["graph", "stats", invalidFile(), "--json"],
+		},
+		{
+			name: "graph orphans",
+			argv: () => ["graph", "orphans", invalidFile(), "--json"],
+		},
+		{
+			name: "status ready",
+			argv: () => ["status", "ready", invalidFile(), "--json"],
+		},
+		{
+			name: "diff",
+			argv: () => ["diff", invalidFile(), invalidFile(), "--json"],
+		},
+	];
+
+	it.each(
+		cases,
+	)("$name exits 1 with { ok: false, diagnostics: [...] } on stdout and empty stderr", async ({
+		argv,
+	}) => {
+		const r = await run(argv());
+		expect(r.exitCode).toBe(1);
+		expect(r.stderr).toBe("");
+		const parsed = JSON.parse(r.stdout);
+		expect(parsed.ok).toBe(false);
+		expect(Array.isArray(parsed.diagnostics)).toBe(true);
+		expect(parsed.diagnostics.length).toBeGreaterThan(0);
+	});
+
+	// status gaps is absent here on purpose: it takes two files, and which of
+	// the two failed to parse is the thing worth asserting. Its own describe
+	// covers each side against the fixtures it already builds.
+});
+
 describe("--no-color wired into all diagnostic-emitting commands (#508)", () => {
-	const originalIsTTY = process.stdout.isTTY;
-
-	beforeEach(() => {
-		Object.defineProperty(process.stdout, "isTTY", {
-			value: true,
-			configurable: true,
-		});
-	});
-
-	afterEach(() => {
-		Object.defineProperty(process.stdout, "isTTY", {
-			value: originalIsTTY,
-			configurable: true,
-		});
-	});
-
 	const invalidFile = () => join(dir, "invalid.pfdsl");
 
 	const cases: Array<{ name: string; argv: (noColor: boolean) => string[] }> = [
 		{
 			name: "fmt",
 			argv: (nc) => ["fmt", invalidFile(), ...(nc ? ["--no-color"] : [])],
+		},
+		{
+			name: "delete",
+			argv: (nc) => [
+				"delete",
+				invalidFile(),
+				"spec",
+				...(nc ? ["--no-color"] : []),
+			],
 		},
 		{
 			name: "meta reindex",
@@ -1045,10 +2512,10 @@ describe("--no-color wired into all diagnostic-emitting commands (#508)", () => 
 			argv: (nc) => [
 				"meta",
 				"set",
-				invalidFile(),
-				"x",
-				"label",
-				"y",
+				join(dir, "invalid-declared.pfdsl"),
+				"spec",
+				"status",
+				"done",
 				...(nc ? ["--no-color"] : []),
 			],
 		},
@@ -1178,10 +2645,10 @@ describe("--no-color wired into all diagnostic-emitting commands (#508)", () => 
 	)("$name emits ANSI red on TTY without --no-color, suppresses it with --no-color", async ({
 		argv,
 	}) => {
-		const withColor = await run(argv(false));
+		const withColor = await run(argv(false), onATty);
 		expect(withColor.stderr).toContain("\x1b[31merror\x1b[0m");
 
-		const noColor = await run(argv(true));
+		const noColor = await run(argv(true), onATty);
 		expect(noColor.stderr).not.toContain("\x1b[");
 	});
 });
@@ -1225,6 +2692,21 @@ describe("shouldColorize (#435)", () => {
 });
 
 describe("--json output (#181)", () => {
+	it("check reports a mixed input and feedback pair as V036", async () => {
+		const r = await run(["check", join(dir, "mixed-input-feedback.pfdsl")]);
+		expect(r.exitCode).toBe(1);
+		expect(r.stderr).toContain("V036");
+	});
+
+	it("check --json includes the FM003 warning", async () => {
+		const r = await run(["check", join(dir, "inline-comment.pfdsl"), "--json"]);
+		expect(r.exitCode).toBe(0);
+		const parsed = JSON.parse(r.stdout);
+		expect(parsed.diagnostics).toContainEqual(
+			expect.objectContaining({ code: "FM003", severity: "warning" }),
+		);
+	});
+
 	it("check --json returns { ok: true, diagnostics: [] } for valid file", async () => {
 		const r = await run([
 			"check",
@@ -1277,6 +2759,104 @@ describe("--json output (#181)", () => {
 });
 
 describe("multifile check — subflow", () => {
+	it("attributes a nested missing reference to its parent and reports a shared missing child once", async () => {
+		const entry = join(dir, "missing-nested-parent.pfdsl");
+		const child = join(dir, "missing-nested-child.pfdsl");
+		writeFileSync(
+			entry,
+			"---\nprocess:\n  p:\n    subflow: ./missing-nested-child.pfdsl\n---\na >> p -> b\n",
+		);
+		writeFileSync(
+			child,
+			"---\nprocess:\n  q:\n    subflow: ./absent.pfdsl\n  r:\n    subflow: ./absent.pfdsl\n---\na >> q -> b\na >> r -> c\n",
+		);
+		const r = await run(["check", entry, "--json"]);
+		expect(r.exitCode).toBe(1);
+		const errors = JSON.parse(r.stdout).diagnostics.filter(
+			(d: { code: string }) => d.code === "V021",
+		);
+		expect(errors).toHaveLength(1);
+		expect(errors[0]).toMatchObject({ file: child });
+	});
+	it("reports child-local graph errors with their source file", async () => {
+		const entry = join(dir, "closure-parent.pfdsl");
+		const child = join(dir, "closure-child.pfdsl");
+		writeFileSync(
+			entry,
+			"---\nprocess:\n  p:\n    subflow: ./closure-child.pfdsl\n---\na >> p -> b\n",
+		);
+		writeFileSync(child, "a >> q -> b\na >> r -> b\n");
+		const r = await run(["check", entry, "--json"]);
+		expect(r.exitCode).toBe(1);
+		expect(JSON.parse(r.stdout).diagnostics).toContainEqual(
+			expect.objectContaining({ code: "V001", file: child }),
+		);
+	});
+
+	it("checks a grandchild boundary even when the entry boundary matches", async () => {
+		const entry = join(dir, "nested-parent.pfdsl");
+		const child = join(dir, "nested-child.pfdsl");
+		writeFileSync(
+			entry,
+			"---\nprocess:\n  p:\n    subflow: ./nested-child.pfdsl\n---\na >> p -> b\n",
+		);
+		writeFileSync(
+			child,
+			"---\nprocess:\n  q:\n    subflow: ./nested-grandchild.pfdsl\n---\na >> q -> b\n",
+		);
+		writeFileSync(join(dir, "nested-grandchild.pfdsl"), "wrong >> r -> b\n");
+		const r = await run(["check", entry, "--json"]);
+		expect(r.exitCode).toBe(1);
+		expect(JSON.parse(r.stdout).diagnostics).toContainEqual(
+			expect.objectContaining({ code: "V034", file: child }),
+		);
+	});
+
+	it("checks child presets and reports a shared malformed preset only once", async () => {
+		const entry = join(dir, "preset-closure-parent.pfdsl");
+		const broken = join(dir, "shared-broken.yaml");
+		writeFileSync(
+			entry,
+			"---\nprocess:\n  p:\n    subflow: ./preset-closure-child.pfdsl\n  s:\n    subflow: ./preset-closure-second.pfdsl\n---\na >> p -> b\na >> s -> c\n",
+		);
+		writeFileSync(
+			join(dir, "preset-closure-child.pfdsl"),
+			"---\nextends: ./shared-broken.yaml\n---\na >> q -> b\n",
+		);
+		writeFileSync(
+			join(dir, "preset-closure-second.pfdsl"),
+			"---\nextends: ./shared-broken.yaml\n---\na >> r -> c\n",
+		);
+		writeFileSync(broken, "statusStyles: [\n");
+		const r = await run(["check", entry, "--json"]);
+		expect(r.exitCode).toBe(1);
+		expect(
+			JSON.parse(r.stdout).diagnostics.filter(
+				(d: { code: string; file: string }) =>
+					d.code === "FM002" && d.file === broken,
+			),
+		).toHaveLength(1);
+	});
+
+	it("applies strict validation to a child's warnings", async () => {
+		const entry = join(dir, "strict-closure-parent.pfdsl");
+		const child = join(dir, "strict-closure-child.pfdsl");
+		writeFileSync(
+			entry,
+			"---\nprocess:\n  p:\n    subflow: ./strict-closure-child.pfdsl\n---\na >> p -> b\n",
+		);
+		writeFileSync(
+			child,
+			"---\nprocess:\n  unused:\n    label: Unused\n---\na >> q -> b\n",
+		);
+		expect((await run(["check", entry])).exitCode).toBe(0);
+		const r = await run(["check", entry, "--strict", "--json"]);
+		expect(r.exitCode).toBe(1);
+		expect(JSON.parse(r.stdout).diagnostics).toContainEqual(
+			expect.objectContaining({ file: child, severity: "error" }),
+		);
+	});
+
 	const parentValid = [
 		"---",
 		"process:",
@@ -1336,7 +2916,276 @@ describe("multifile check — subflow", () => {
 	});
 });
 
+describe("multifile check — which file a loader diagnostic points at", () => {
+	let d: string;
+	beforeEach(() => {
+		d = mkdtempSync(join(tmpdir(), "pfdsl-mf-attr-"));
+	});
+	afterEach(() => {
+		rmSync(d, { recursive: true, force: true });
+	});
+
+	/** The `check` text lines that carry `code`. */
+	const linesFor = (stderr: string, code: string) =>
+		stderr.split("\n").filter((line) => line.includes(`[${code}]`));
+	const jsonFor = (stdout: string, code: string) =>
+		JSON.parse(stdout).diagnostics.filter(
+			(x: { code: string }) => x.code === code,
+		);
+	const prefixOf = (line: string | undefined, prefix: string) =>
+		line?.slice(0, prefix.length);
+
+	it("prints the entry's own loader diagnostics under the path as given, and leaves `file` off them in --json", async () => {
+		writeFileSync(
+			join(d, "entry.pfdsl"),
+			"---\nextends: ./gone.yaml\nprocess:\n  p:\n    subflow: ./gone.pfdsl\n---\na >> p -> b\n",
+		);
+		// `join` would normalize the `./` away, which hides the difference
+		// between the path as given and its resolved form.
+		const given = `${d}/./entry.pfdsl`;
+		const text = await run(["check", given]);
+		expect(text.exitCode).toBe(1);
+		for (const code of ["V021", "V026"]) {
+			const prefix = `${given}:1:1: error [${code}]`;
+			const [line, ...rest] = linesFor(text.stderr, code);
+			expect(rest).toEqual([]);
+			expect(prefixOf(line, prefix)).toBe(prefix);
+		}
+		const json = await run(["check", given, "--json"]);
+		for (const code of ["V021", "V026"]) {
+			const found = jsonFor(json.stdout, code);
+			expect(found).toHaveLength(1);
+			expect(found[0]).not.toHaveProperty("file");
+		}
+	});
+
+	// The loader run for a child reports that child's own reference without a
+	// `file`, so the entry would be named unless the CLI says otherwise.
+	it("keeps a child's own missing preset on the child, even when two children miss the same preset", async () => {
+		writeFileSync(
+			join(d, "entry.pfdsl"),
+			"---\nprocess:\n  p:\n    subflow: ./a.pfdsl\n  q:\n    subflow: ./b.pfdsl\n---\nin >> p -> mid\nin >> q -> out\n",
+		);
+		writeFileSync(
+			join(d, "a.pfdsl"),
+			"---\nextends: ./missing.yaml\n---\nin >> pa -> mid\n",
+		);
+		writeFileSync(
+			join(d, "b.pfdsl"),
+			"---\nextends: ./missing.yaml\n---\nin >> qb -> out\n",
+		);
+		const r = await run(["check", join(d, "entry.pfdsl"), "--json"]);
+		expect(r.exitCode).toBe(1);
+		expect(
+			jsonFor(r.stdout, "V026").map((x: { file?: string }) => x.file),
+		).toEqual([join(d, "a.pfdsl"), join(d, "b.pfdsl")]);
+	});
+
+	it("reports a child missing from two files once for each, under each file", async () => {
+		writeFileSync(
+			join(d, "entry.pfdsl"),
+			"---\nprocess:\n  p:\n    subflow: ./a.pfdsl\n  q:\n    subflow: ./b.pfdsl\n---\nin >> p -> mid\nin >> q -> out\n",
+		);
+		const a = join(d, "a.pfdsl");
+		const b = join(d, "b.pfdsl");
+		writeFileSync(
+			a,
+			"---\nprocess:\n  pa:\n    subflow: ./x.pfdsl\n---\nin >> pa -> mid\n",
+		);
+		writeFileSync(
+			b,
+			"---\nprocess:\n  qb:\n    subflow: ./x.pfdsl\n---\nin >> qb -> out\n",
+		);
+		const json = await run(["check", join(d, "entry.pfdsl"), "--json"]);
+		expect(
+			jsonFor(json.stdout, "V021").map((x: { file?: string }) => x.file),
+		).toEqual([a, b]);
+		const text = await run(["check", join(d, "entry.pfdsl")]);
+		expect(
+			linesFor(text.stderr, "V021").map((line) => line.slice(0, a.length + 4)),
+		).toEqual([`${a}:1:1`, `${b}:1:1`]);
+	});
+
+	it("reports a shared preset's own missing preset once, under the shared preset", async () => {
+		writeFileSync(
+			join(d, "entry.pfdsl"),
+			"---\nprocess:\n  p:\n    subflow: ./a.pfdsl\n  q:\n    subflow: ./b.pfdsl\n---\nin >> p -> mid\nin >> q -> out\n",
+		);
+		writeFileSync(
+			join(d, "a.pfdsl"),
+			"---\nextends: ./s.yaml\n---\nin >> pa -> mid\n",
+		);
+		writeFileSync(
+			join(d, "b.pfdsl"),
+			"---\nextends: ./s.yaml\n---\nin >> qb -> out\n",
+		);
+		writeFileSync(join(d, "s.yaml"), "extends: ./m.yaml\n");
+		const r = await run(["check", join(d, "entry.pfdsl"), "--json"]);
+		expect(r.exitCode).toBe(1);
+		const found = jsonFor(r.stdout, "V026");
+		expect(found).toHaveLength(1);
+		expect(found[0]).toMatchObject({ file: join(d, "s.yaml") });
+	});
+
+	/** A child whose preset chain comes back to the entry, which also misses a preset. */
+	const writeChainReachingEntry = () => {
+		writeFileSync(
+			join(d, "entry.pfdsl"),
+			"---\nextends: ./gone.yaml\nprocess:\n  p:\n    subflow: ./child.pfdsl\n---\nin >> p -> out\n",
+		);
+		writeFileSync(
+			join(d, "child.pfdsl"),
+			"---\nextends: ./back.yaml\n---\nin >> q -> out\n",
+		);
+		writeFileSync(join(d, "back.yaml"), "extends: ./entry.pfdsl\n");
+	};
+
+	it("reports the entry's missing preset once when a child's preset chain reaches the entry", async () => {
+		writeChainReachingEntry();
+		const r = await run(["check", join(d, "entry.pfdsl"), "--json"]);
+		expect(r.exitCode).toBe(1);
+		const found = jsonFor(r.stdout, "V026");
+		expect(found).toHaveLength(1);
+		expect(found[0]).not.toHaveProperty("file");
+	});
+
+	// The entry reached as a preset is still the file `check` was given: it is
+	// printed under the path as given and carries no `file`, like its V026.
+	it("names the entry one way when a preset chain reaches it and its own presets are validated", async () => {
+		writeChainReachingEntry();
+		const given = `${d}/./entry.pfdsl`;
+		const text = await run(["check", given]);
+		expect(text.exitCode).toBe(1);
+		for (const code of ["V026", "V028"]) {
+			const lines = linesFor(text.stderr, code);
+			expect(lines.length).toBeGreaterThan(0);
+			const prefix = `${given}:1:1: error [${code}]`;
+			expect(lines.map((line) => prefixOf(line, prefix))).toEqual(
+				lines.map(() => prefix),
+			);
+		}
+		const lines = linesFor(text.stderr, "V028");
+		const json = await run(["check", given, "--json"]);
+		const found = jsonFor(json.stdout, "V028");
+		expect(found).toHaveLength(lines.length);
+		for (const diagnostic of found)
+			expect(diagnostic).not.toHaveProperty("file");
+	});
+});
+
+describe("a refused edit names the file each diagnostic belongs to", () => {
+	let d: string;
+	beforeEach(() => {
+		d = mkdtempSync(join(tmpdir(), "pfdsl-refuse-attr-"));
+	});
+	afterEach(() => {
+		rmSync(d, { recursive: true, force: true });
+	});
+
+	const lineFor = (stderr: string, code: string) =>
+		stderr.split("\n").find((line) => line.includes(`[${code}]`));
+	const startOf = (line: string | undefined, prefix: string) =>
+		line?.slice(0, prefix.length);
+
+	it("check attributes a nested boundary error while unrelated rename remains allowed", async () => {
+		const entry = join(d, "entry.pfdsl");
+		const child = join(d, "child.pfdsl");
+		writeFileSync(
+			entry,
+			"---\nprocess:\n  p:\n    subflow: ./child.pfdsl\n---\na >> p -> b\nb >> p2 -> c\n",
+		);
+		writeFileSync(
+			child,
+			"---\nprocess:\n  q:\n    subflow: ./grandchild.pfdsl\n---\na >> q -> b\n",
+		);
+		writeFileSync(join(d, "grandchild.pfdsl"), "wrong >> r -> b\n");
+		const r = await run(["rename", entry, "p2", "p3"]);
+		expect(r.exitCode).toBe(0);
+		expect(r.stdout).toContain("p3");
+		const checked = await run(["check", entry]);
+		expect(checked.exitCode).toBe(1);
+		const prefix = `${child}:1:1: error [V034]`;
+		expect(startOf(lineFor(checked.stderr, "V034"), prefix)).toBe(prefix);
+	});
+
+	// Unreadable preset metadata prevents safe group classification.
+	const presetEntry = (extra: string) =>
+		`---\nextends: ./preset.yaml\n${extra}---\na >> p -> b\n`;
+
+	it.each([
+		["rename", presetEntry("artifact:\n  a: {}\n"), ["rename", "a", "c"]],
+		["delete", presetEntry("group:\n  g: { label: G }\n"), ["delete", "g"]],
+	])("%s reports a preset's unreadable metadata under the preset", async (_name, source, [
+		command,
+		...args
+	]) => {
+		const entry = join(d, "entry.pfdsl");
+		const preset = join(d, "preset.yaml");
+		writeFileSync(entry, source);
+		writeFileSync(preset, "statusStyles: {done: {fillcolor: 42}}\n");
+		const text = await run([command!, entry, ...args]);
+		expect(text.exitCode).toBe(1);
+		expect(lineFor(text.stderr, "FM004")).toContain(`${preset}:`);
+		const json = await run([command!, entry, ...args, "--json"]);
+		expect(json.exitCode).toBe(1);
+		expect(JSON.parse(json.stdout).diagnostics).toContainEqual(
+			expect.objectContaining({ code: "FM004", file: preset }),
+		);
+	});
+});
+
 describe("multifile check — extends", () => {
+	it.each([
+		["isolated-node", "x\n"],
+		["edge", "x >> q -> y\n"],
+	])("check rejects %s graph content in presets without blocking a safe rename", async (name, body) => {
+		const entry = join(dir, `${name}-preset-entry.pfdsl`);
+		const preset = join(dir, `${name}-preset.pfdsl`);
+		writeFileSync(
+			entry,
+			`---\nextends: ./${name}-preset.pfdsl\nartifact:\n  a: {}\n---\na >> p -> b\n`,
+		);
+		writeFileSync(preset, `---\nstatusStyles: {}\n---\n${body}`);
+		const checked = await run(["check", entry, "--json"]);
+		expect(checked.exitCode).toBe(1);
+		expect(checked.stderr).toBe("");
+		expect(JSON.parse(checked.stdout)).toMatchObject({
+			ok: false,
+			diagnostics: expect.arrayContaining([
+				expect.objectContaining({
+					code: "V028",
+					severity: "error",
+					file: preset,
+				}),
+			]),
+		});
+		const renamed = await run(["rename", entry, "a", "c"]);
+		expect(renamed.exitCode).toBe(0);
+		expect(renamed.stdout).toContain("c >> p -> b");
+		expect(readFileSync(entry, "utf-8")).toContain("a >> p -> b");
+	});
+
+	it.each([
+		"",
+		"# Presentation settings only\n\n# No graph declarations\n",
+	])("accepts a presentation-only preset with body %j in check and rename", async (body) => {
+		const entry = join(dir, "presentation-preset-entry.pfdsl");
+		writeFileSync(
+			entry,
+			"---\nextends: ./presentation-preset.pfdsl\nartifact:\n  a: {}\n---\na >> p -> b\n",
+		);
+		writeFileSync(
+			join(dir, "presentation-preset.pfdsl"),
+			`---\nstatusStyles: {}\n---\n${body}`,
+		);
+		const checked = await run(["check", entry, "--json"]);
+		expect(checked.exitCode).toBe(0);
+		expect(JSON.parse(checked.stdout).ok).toBe(true);
+		const renamed = await run(["rename", entry, "a", "c"]);
+		expect(renamed.exitCode).toBe(0);
+		expect(renamed.stdout).toContain("c >> p -> b");
+	});
+
 	const presetValid = [
 		"statusStyles:",
 		"  done:",
@@ -1383,6 +3232,34 @@ describe("multifile check — extends", () => {
 		}
 	});
 
+	// The non-json branch above was covered; --json builds its own payload and
+	// was not, so the machine-readable shape of a preset failure went unchecked
+	// (#638).
+	it("preset with forbidden key → --json emits { ok: false, diagnostics }", async () => {
+		const d = mkdtempSync(join(tmpdir(), "pfdsl-mf-extends-json-"));
+		try {
+			writeFileSync(join(d, "main.pfdsl"), mainFile);
+			writeFileSync(join(d, "preset.yaml"), presetContaminated);
+			const r = await run(["check", join(d, "main.pfdsl"), "--json"]);
+			expect(r.exitCode).toBe(1);
+			expect(r.stderr).toBe("");
+			const parsed = JSON.parse(r.stdout);
+			expect(parsed.ok).toBe(false);
+			expect(
+				(parsed.diagnostics as Array<{ code: string; severity: string }>).map(
+					(d) => d.code,
+				),
+			).toContain("V028");
+			expect(
+				(parsed.diagnostics as Array<{ severity: string }>).every(
+					(d) => d.severity === "error",
+				),
+			).toBe(true);
+		} finally {
+			rmSync(d, { recursive: true, force: true });
+		}
+	});
+
 	it("missing preset file → exit 1 with V026", async () => {
 		const d = mkdtempSync(join(tmpdir(), "pfdsl-mf-extends-"));
 		try {
@@ -1397,6 +3274,34 @@ describe("multifile check — extends", () => {
 });
 
 describe("status ready", () => {
+	it("does not list the shipped scaffold until its milestone is activated", async () => {
+		const scaffold = readFileSync(
+			resolve(
+				__dirname,
+				"../../../.claude/skills/pfd-ops/references/scaffold/roadmap.pfdsl",
+			),
+			"utf8",
+		);
+		for (const source of [
+			scaffold,
+			scaffold.replace(/label: .*/g, "label: Example"),
+		]) {
+			const r = await run(
+				["status", "ready", "-", "--json"],
+				withStdin(source),
+			);
+			expect(r.exitCode).toBe(0);
+			expect(JSON.parse(r.stdout)).toMatchObject({ ok: true, ready: [] });
+			expect(JSON.parse(r.stdout)).not.toHaveProperty("best");
+		}
+		const active = scaffold.replace(
+			"    status: suspended",
+			"    status: todo",
+		);
+		const r = await run(["status", "ready", "-", "--json"], withStdin(active));
+		expect(JSON.parse(r.stdout).ready[0].id).toBe("start_work");
+	});
+
 	// Fixtures written in beforeAll(dir):
 	//   valid.pfdsl: "req >> design -> spec\nspec >> impl -> code\n"  (no status)
 	//   invalid.pfdsl: dual generators (V001, always error)
@@ -1417,10 +3322,77 @@ describe("status ready", () => {
 		expect(r.stdout).not.toContain("impl");
 	});
 
+	it("uses the process ID in text output when its label is blank", async () => {
+		const f = withStatus(
+			'---\nartifact:\n  req: {status: done}\nprocess:\n  design: {label: "   "}\n---\nreq >> design -> spec\n',
+		);
+		const r = await run(["status", "ready", f]);
+		expect(r.stdout).toMatch(/^ {4}design\s+"design"\s+inputs:/m);
+	});
+
+	it("uses the process ID for a blank label in JSON display values", async () => {
+		const f = withStatus(
+			'---\nartifact:\n  req: {status: done}\nprocess:\n  design: {label: ""}\n---\nreq >> design -> spec\n',
+		);
+		const r = await run(["status", "ready", f, "--json"]);
+		expect(JSON.parse(r.stdout).ready[0]).toMatchObject({
+			id: "design",
+			label: "design",
+		});
+	});
+
 	it("excludes process whose input is not done", async () => {
 		const f = withStatus(
 			"---\nartifact:\n  req:\n    status: todo\n---\nreq >> design -> spec\n",
 		);
+		const r = await run(["status", "ready", f]);
+		expect(r.exitCode).toBe(0);
+		expect(r.stdout).toContain("No ready processes.");
+		expect(r.stdout).not.toContain("design");
+	});
+
+	it("says how many processes are blocked and where to list them", async () => {
+		const f = withStatus(
+			"---\nartifact:\n  req:\n    status: todo\n---\nreq >> design -> spec\n",
+		);
+		const r = await run(["status", "ready", f]);
+		expect(r.exitCode).toBe(0);
+		expect(r.stdout).toContain("blocked: 1");
+		expect(r.stdout).toContain(`status blocked ${f}`);
+	});
+
+	it("names the processes that are already in progress", async () => {
+		const f = withStatus(
+			"---\nartifact:\n  req:\n    status: done\n  spec:\n    status: wip\n---\nreq >> design -> spec\n",
+		);
+		const r = await run(["status", "ready", f]);
+		expect(r.exitCode).toBe(0);
+		expect(r.stdout).toContain("in progress");
+		expect(r.stdout).toContain("design");
+		expect(r.stdout).not.toContain("Check artifact statuses.");
+	});
+
+	it("names the processes parked on waiting or suspended outputs", async () => {
+		const f = withStatus(
+			"---\nartifact:\n  req:\n    status: done\n  spec:\n    status: waiting\n---\nreq >> design -> spec\n",
+		);
+		const r = await run(["status", "ready", f]);
+		expect(r.exitCode).toBe(0);
+		expect(r.stdout).toContain("parked");
+		expect(r.stdout).toContain("design");
+	});
+
+	it("counts the processes whose outputs are all done", async () => {
+		const f = withStatus(
+			"---\nartifact:\n  req:\n    status: done\n  spec:\n    status: done\n---\nreq >> design -> spec\n",
+		);
+		const r = await run(["status", "ready", f]);
+		expect(r.exitCode).toBe(0);
+		expect(r.stdout).toContain("complete: 1");
+	});
+
+	it("keeps the generic hint when nothing can be classified", async () => {
+		const f = withStatus("---\nartifact: {}\n---\nreq -> spec\n");
 		const r = await run(["status", "ready", f]);
 		expect(r.exitCode).toBe(0);
 		expect(r.stdout).toBe("No ready processes. Check artifact statuses.\n");
@@ -1434,7 +3406,7 @@ describe("status ready", () => {
 		expect(r.stdout).toContain("impl");
 	});
 
-	it("--json returns structured output", async () => {
+	it("--json lists the ready processes under { ok, ready }", async () => {
 		const f = withStatus(
 			"---\nartifact:\n  req:\n    status: done\n---\nreq >> design -> spec\n",
 		);
@@ -1449,28 +3421,76 @@ describe("status ready", () => {
 		expect(parsed.best).toBeUndefined();
 	});
 
-	it("--json --best includes best field", async () => {
+	it("--json includes each process's completion count", async () => {
 		const f = withStatus(
 			"---\nartifact:\n  req:\n    status: done\n---\nreq >> design -> spec\n",
 		);
-		const r = await run(["status", "ready", f, "--json", "--best"]);
+		const r = await run(["status", "ready", f, "--json"]);
 		expect(r.exitCode).toBe(0);
 		const parsed = JSON.parse(r.stdout);
-		expect(parsed.best).toBeDefined();
-		expect(parsed.best.id).toBe("design");
-		expect(parsed.best.outputs).toContain("spec");
+		expect(parsed.ready[0].newlyReadyCount).toBe(0);
+		expect(parsed.ready[0].id).toBe("design");
+		expect(parsed.ready[0].outputs).toContain("spec");
 	});
 
-	it("--best marks recommended process with *", async () => {
+	it("--json carries the empty-set breakdown that the human output explains", async () => {
+		const f = withStatus(
+			"---\nartifact:\n  req:\n    status: done\n  spec:\n    status: wip\n  gate:\n    status: todo\n---\nreq >> design -> spec\ngate >> impl -> code\n",
+		);
+		const r = await run(["status", "ready", f, "--json"]);
+		expect(r.exitCode).toBe(0);
+		const parsed = JSON.parse(r.stdout);
+		expect(parsed.ready).toEqual([]);
+		expect(parsed.empty).toEqual({
+			inProgress: ["design"],
+			parked: [],
+			complete: 0,
+			blocked: 1,
+		});
+	});
+
+	it("--json breakdown names parked processes and counts complete ones", async () => {
+		const f = withStatus(
+			"---\nartifact:\n  req:\n    status: done\n  spec:\n    status: waiting\n  code:\n    status: done\n---\nreq >> design -> spec\nspec >> impl -> code\n",
+		);
+		const r = await run(["status", "ready", f, "--json"]);
+		expect(r.exitCode).toBe(0);
+		const parsed = JSON.parse(r.stdout);
+		expect(parsed.empty.parked).toEqual(["design"]);
+		expect(parsed.empty.inProgress).toEqual([]);
+		expect(parsed.empty.blocked).toBe(1);
+	});
+
+	it("--json breakdown counts processes whose outputs are all done", async () => {
+		const f = withStatus(
+			"---\nartifact:\n  req:\n    status: done\n  spec:\n    status: done\n---\nreq >> design -> spec\n",
+		);
+		const r = await run(["status", "ready", f, "--json"]);
+		expect(r.exitCode).toBe(0);
+		const parsed = JSON.parse(r.stdout);
+		expect(parsed.empty.complete).toBe(1);
+	});
+
+	it("--json omits empty when there is something ready", async () => {
+		const f = withStatus(
+			"---\nartifact:\n  req:\n    status: done\n---\nreq >> design -> spec\n",
+		);
+		const r = await run(["status", "ready", f, "--json"]);
+		expect(r.exitCode).toBe(0);
+		expect(JSON.parse(r.stdout).empty).toBeUndefined();
+	});
+
+	it("--no-counts keeps the ready list without recommending a process", async () => {
 		const r = await run([
 			"status",
 			"ready",
 			join(dir, "valid.pfdsl"),
-			"--best",
+			"--no-counts",
 		]);
 		expect(r.exitCode).toBe(0);
-		expect(r.stdout).toMatch(/\*/);
-		expect(r.stdout).toContain("recommended next");
+		expect(r.stdout).not.toContain("*");
+		expect(r.stdout).not.toContain("newly ready:");
+		expect(r.stdout).toContain("design");
 	});
 
 	it("rejects file with type: workflow (exit 2)", async () => {
@@ -1487,8 +3507,8 @@ describe("status ready", () => {
 		expect(r.stdout).toBe("");
 	});
 
-	it("rejects file with type: runtime-pipeline (exit 2)", async () => {
-		const f = withStatus("---\ntype: runtime-pipeline\n---\nA >> P -> B\n");
+	it("rejects file with type: pipeline (exit 2)", async () => {
+		const f = withStatus("---\ntype: pipeline\n---\nA >> P -> B\n");
 		const r = await run(["status", "ready", f]);
 		expect(r.exitCode).toBe(2);
 		expect(r.stderr).toContain("type: roadmap");
@@ -1496,7 +3516,7 @@ describe("status ready", () => {
 
 	it("accepts file with type: roadmap", async () => {
 		const f = withStatus(
-			"---\ntype: roadmap\nartifact:\n  req:\n    status: done\n---\nreq >> design -> spec\n",
+			"---\ntype: roadmap\nartifact:\n  req:\n    status: done\n  spec:\n    status: todo\n---\nreq >> design -> spec\n",
 		);
 		const r = await run(["status", "ready", f]);
 		expect(r.exitCode).toBe(0);
@@ -1527,34 +3547,14 @@ describe("status ready", () => {
 		expect(parsed.warnings?.[0]?.code).toBe("W006");
 	});
 
-	it("does not surface non-W006 warnings (e.g. W005) as ready warnings (#308)", async () => {
+	it("does not surface non-W006 warnings (e.g. W003) as ready warnings (#308)", async () => {
 		const f = withStatus(
-			"---\ntype: roadmap\nartifact:\n  req:\n    status: done\n  spec: {}\n---\nreq >> design -> spec\n",
+			"---\ntype: roadmap\nartifact:\n  req:\n    status: wip\n  spec:\n    status: done\n---\nreq >> design -> spec\n",
 		);
 		const r = await run(["status", "ready", f, "--json"]);
 		const parsed = JSON.parse(r.stdout);
-		expect(r.stderr).not.toContain("W005");
+		expect(r.stderr).not.toContain("W003");
 		expect(parsed.warnings).toBeUndefined();
-	});
-
-	it("missing file returns exit 1", async () => {
-		const r = await run(["status", "ready", join(dir, "nonexistent.pfdsl")]);
-		expect(r.exitCode).toBe(1);
-	});
-
-	it("--json on parse error emits { ok: false, diagnostics } on stdout, empty stderr", async () => {
-		const r = await run([
-			"status",
-			"ready",
-			join(dir, "invalid.pfdsl"),
-			"--json",
-		]);
-		expect(r.exitCode).toBe(1);
-		expect(r.stderr).toBe("");
-		const parsed = JSON.parse(r.stdout);
-		expect(parsed.ok).toBe(false);
-		expect(Array.isArray(parsed.diagnostics)).toBe(true);
-		expect(parsed.diagnostics.length).toBeGreaterThan(0);
 	});
 
 	it("missing argument returns exit 2", async () => {
@@ -1562,18 +3562,9 @@ describe("status ready", () => {
 		expect(r.exitCode).toBe(2);
 	});
 
-	it("--help returns help text", async () => {
-		const r = await run(["status", "ready", "--help"]);
-		expect(r.exitCode).toBe(0);
-		expect(r.stdout).toContain("pfdsl status ready");
-	});
-
-	it("--best prefers process that removes last blocker, not just any consumer", async () => {
-		// A -> x; B -> y; [x(done?), y] >> C; [x] >> D
-		// After A completes: C still needs y (todo), D immediately ready.
-		// --best should prefer A (unblocks D) over B (doesn't unblock anyone yet).
-		// But here we test the opposite: B is NOT preferred because completing A
-		// truly unblocks D while completing B only satisfies one of C's two inputs.
+	it("counts only newly ready consumers whose last blocker is removed", async () => {
+		// Both x and y are explicitly unfinished. Completing x unlocks side,
+		// while completing y alone cannot unlock merge.
 		const src = [
 			"---",
 			"artifact:",
@@ -1583,6 +3574,8 @@ describe("status ready", () => {
 			"    status: done",
 			"  y:",
 			"    status: todo",
+			"  x:",
+			"    status: todo",
 			"---",
 			"req_a >> make_x -> x",
 			"req_b >> make_y -> y",
@@ -1591,23 +3584,18 @@ describe("status ready", () => {
 		].join("\n");
 		const f = join(dir, "ready-heuristic.pfdsl");
 		writeFileSync(f, src);
-		const r = await run(["status", "ready", f, "--json", "--best"]);
-		expect(r.exitCode).toBe(0);
-		const parsed = JSON.parse(r.stdout);
-		// make_x unblocks `side` (last missing input) — 1 newly-ready process
-		// make_y unblocks nothing (merge still needs x which is todo)
-		// make_x should be chosen as best
-		expect(parsed.best.id).toBe("make_x");
-	});
-
-	it("--best not passed: no computation overhead, best absent from JSON", async () => {
-		const f = withStatus(
-			"---\nartifact:\n  req:\n    status: done\n---\nreq >> design -> spec\n",
-		);
 		const r = await run(["status", "ready", f, "--json"]);
 		expect(r.exitCode).toBe(0);
 		const parsed = JSON.parse(r.stdout);
-		expect(parsed.best).toBeUndefined();
+		expect(
+			parsed.ready.map((p: { id: string; newlyReadyCount: number }) => [
+				p.id,
+				p.newlyReadyCount,
+			]),
+		).toEqual([
+			["make_x", 1],
+			["make_y", 0],
+		]);
 	});
 
 	it("excludes process whose output artifacts are all done", async () => {
@@ -1625,6 +3613,33 @@ describe("status ready", () => {
 	});
 });
 
+describe("delete group", () => {
+	it("delete removes a group in place, retaining its members and children", async () => {
+		const f = join(dir, "delete-group-cli.pfdsl");
+		const source =
+			"---\ngroup:\n  g: { label: Group }\n  child: { parent: g }\nartifact:\n  a: { group: g }\nprocess:\n  p: { group: g }\n---\na >> p -> b\n";
+		writeFileSync(f, source);
+		const preview = await run(["delete", f, "g", "--json"]);
+		expect(JSON.parse(preview.stdout)).toEqual({
+			ok: true,
+			deleted: ["g"],
+			notFound: [],
+		});
+		expect(readFileSync(f, "utf8")).toBe(source);
+		const written = await run(["delete", f, "g", "--json", "--write"]);
+		expect(written.exitCode).toBe(0);
+		expect(JSON.parse(written.stdout)).toEqual({
+			ok: true,
+			deleted: ["g"],
+			notFound: [],
+		});
+		const { frontmatter } = analyze(readFileSync(f, "utf8"));
+		expect(frontmatter?.group).toEqual({ child: {} });
+		expect(frontmatter?.artifact?.a).toEqual({});
+		expect(frontmatter?.process?.p).toEqual({});
+	});
+});
+
 describe("meta set", () => {
 	const base = `---
 artifact:
@@ -1636,6 +3651,85 @@ artifact:
 req >> design -> spec
 `;
 
+	it("exits 1 when the id is in the body but has no frontmatter entry", async () => {
+		const f = join(dir, "set-body-only-id.pfdsl");
+		writeFileSync(f, "req >> design -> spec\n");
+		const r = await run(["meta", "set", f, "spec", "status", "done"]);
+		expect(r.exitCode).toBe(1);
+		expect(r.stderr).toContain("'spec' has no frontmatter definition");
+		expect(r.stderr).toContain(`pfdsl meta create --write -- ${f} spec`);
+		expect(readFileSync(f, "utf-8")).toBe("req >> design -> spec\n");
+	});
+
+	it("--json reports that same case as undefinedIds rather than missing", async () => {
+		const f = join(dir, "set-body-only-id-json.pfdsl");
+		writeFileSync(f, "req >> design -> spec\n");
+		const r = await run(["meta", "set", f, "spec", "status", "done", "--json"]);
+		expect(r.exitCode).toBe(1);
+		expect(JSON.parse(r.stdout)).toEqual({
+			ok: false,
+			missing: [],
+			undefinedIds: [{ id: "spec", kind: "artifact" }],
+			error: expect.stringContaining(`pfdsl meta create --write -- ${f} spec`),
+		});
+	});
+
+	it("refuses stdin, since it has nowhere to write the result", async () => {
+		const r = await run(["meta", "set", "-", "req", "status", "done"]);
+		expect(r.exitCode).toBe(2);
+		expect(r.stderr).toContain("stdin");
+	});
+
+	// Status is the roadmap's to carry (§15.14, §15.15). ready / blocked /
+	// status gaps already refuse an explicit non-roadmap type; meta set did not,
+	// so the CLI itself could write the state W007 reports (#923).
+	const flowBase = (type: string) => `---
+type: ${type}
+artifact:
+  req:
+    label: Requirements
+  spec:
+    label: Spec
+---
+req >> design -> spec
+`;
+
+	it.each([
+		"workflow",
+		"pipeline",
+	])("refuses to set status in a %s file and leaves it untouched", async (type) => {
+		const f = join(dir, `set-status-${type}.pfdsl`);
+		writeFileSync(f, flowBase(type));
+		const r = await run(["meta", "set", f, "req", "status", "done"]);
+		expect(r.exitCode).toBe(2);
+		expect(r.stderr).toContain(`type: ${type}`);
+		expect(readFileSync(f, "utf-8")).toBe(flowBase(type));
+	});
+
+	it("still sets non-status fields in a workflow file", async () => {
+		const f = join(dir, "set-label-workflow.pfdsl");
+		writeFileSync(f, flowBase("workflow"));
+		const r = await run(["meta", "set", f, "req", "label", "Reqs"]);
+		expect(r.exitCode).toBe(0);
+		expect(readFileSync(f, "utf-8")).toContain("label: Reqs");
+	});
+
+	it("sets status when type: roadmap is explicit", async () => {
+		const f = join(dir, "set-status-roadmap.pfdsl");
+		writeFileSync(f, `---\ntype: roadmap\n${base.slice(4)}`);
+		const r = await run(["meta", "set", f, "req", "status", "done"]);
+		expect(r.exitCode).toBe(0);
+		expect(readFileSync(f, "utf-8")).not.toContain("status: todo");
+	});
+
+	it("sets status when type is omitted (treated as roadmap)", async () => {
+		const f = join(dir, "set-status-untyped.pfdsl");
+		writeFileSync(f, base);
+		const r = await run(["meta", "set", f, "req", "status", "done"]);
+		expect(r.exitCode).toBe(0);
+		expect(readFileSync(f, "utf-8")).not.toContain("status: todo");
+	});
+
 	it("rewrites artifact status in place and exits 0", async () => {
 		const f = join(dir, "status-set-write.pfdsl");
 		writeFileSync(f, base);
@@ -1644,6 +3738,57 @@ req >> design -> spec
 		const after = readFileSync(f, "utf-8");
 		expect(after).toContain("status: done");
 		expect(after).not.toContain("status: todo");
+	});
+
+	// The reproduction from #644: a file written on Windows came back with an
+	// LF frontmatter glued onto a CRLF body, and the untouched sibling field
+	// carrying a quoted \r.
+	it("leaves a CRLF file on CRLF, siblings included (#644)", async () => {
+		const f = join(dir, "status-set-crlf.pfdsl");
+		const src = `---
+artifact:
+  req:
+    status: todo
+    criteria: approved
+---
+req >> design -> spec
+`.replace(/\n/g, "\r\n");
+		writeFileSync(f, src);
+		const r = await run(["meta", "set", f, "req", "status", "done"]);
+		expect(r.exitCode).toBe(0);
+		const after = readFileSync(f, "utf-8");
+		expect(after).toContain("status: done");
+		expect(after).toContain("criteria: approved");
+		expect(after.replace(/\r\n/g, "")).not.toContain("\n");
+	});
+
+	it("keeps a leading comment above the field it rewrites", async () => {
+		// No longer a regression test: #510's guard (surgical indent-detection
+		// mistaking a leading comment's deeper indent for the child indent) has
+		// no implementation left to protect, since ADR-0034 moved meta set onto
+		// the yaml CST and the 6-space indent below is canonicalized either way.
+		// What it still checks is that the comment survives the rewrite, which
+		// the CST path could plausibly drop (#615).
+		const f = join(dir, "status-set-comment-first.pfdsl");
+		writeFileSync(
+			f,
+			`---
+artifact:
+  req:
+    # why this exists
+      status: todo
+  spec:
+    status: done
+---
+req >> design -> spec
+`,
+		);
+		const r = await run(["meta", "set", f, "req", "status", "wip"]);
+		expect(r.stderr).not.toContain("refusing to write");
+		expect(r.exitCode).toBe(0);
+		const after = readFileSync(f, "utf-8");
+		expect(after).toContain("# why this exists");
+		expect(after).toContain("    status: wip");
 	});
 
 	it("exits 1 when artifact id not found", async () => {
@@ -1670,12 +3815,6 @@ req >> design -> spec
 		expect(r2.exitCode).toBe(2);
 	});
 
-	it("--help returns help text", async () => {
-		const r = await run(["meta", "set", "--help"]);
-		expect(r.exitCode).toBe(0);
-		expect(r.stdout).toContain("meta set");
-	});
-
 	it("warns (W006) on stderr when type: is omitted (#308)", async () => {
 		const f = join(dir, "status-set-no-type.pfdsl");
 		writeFileSync(f, base);
@@ -1684,15 +3823,15 @@ req >> design -> spec
 		expect(r.stderr).toContain("W006");
 	});
 
-	it("does not surface non-W006 warnings (e.g. W005) as meta set warnings (#308)", async () => {
-		const f = join(dir, "status-set-w005.pfdsl");
+	it("does not surface non-W006 warnings (e.g. W003) as meta set warnings (#308)", async () => {
+		const f = join(dir, "status-set-w003.pfdsl");
 		writeFileSync(
 			f,
-			"---\ntype: roadmap\nartifact:\n  req:\n    status: todo\n  spec: {}\n---\nreq >> design -> spec\n",
+			"---\ntype: roadmap\nartifact:\n  req:\n    status: todo\n  spec:\n    status: done\n  extra:\n    status: wip\n  output_done:\n    status: done\n---\nreq >> design -> spec\nextra >> other -> output_done\n",
 		);
 		const r = await run(["meta", "set", f, "req", "status", "done", "--json"]);
 		const parsed = JSON.parse(r.stdout);
-		expect(r.stderr).not.toContain("W005");
+		expect(r.stderr).not.toContain("W003");
 		expect(parsed.warnings).toBeUndefined();
 	});
 
@@ -1729,18 +3868,21 @@ spec >> impl -> code
 		expect(r.stdout).not.toContain("newly ready:");
 	});
 
+	// Ready is a roadmap notion, so a write to any other kind reports none.
+	// The status field can no longer reach this path at all (#923 refuses it),
+	// so the remaining writable fields carry the case.
 	it("non-roadmap file (type: workflow): no newly-ready line in output", async () => {
 		const nonRoadmap = `---
 type: workflow
 artifact:
   req:
-    status: todo
+    label: Requirements
 ---
 req >> design -> spec
 `;
 		const f = join(dir, "status-set-non-roadmap.pfdsl");
 		writeFileSync(f, nonRoadmap);
-		const r = await run(["meta", "set", f, "req", "status", "done"]);
+		const r = await run(["meta", "set", f, "req", "label", "Reqs"]);
 		expect(r.exitCode).toBe(0);
 		expect(r.stdout).not.toContain("newly ready:");
 	});
@@ -1767,6 +3909,26 @@ req >> design -> spec
 		expect(parsed.newlyReady).toHaveLength(0);
 	});
 
+	// #1125 defect 6: the "before" ready snapshot went through
+	// computeReadyIds(src), which treats ANY diagnostic-severity error on the
+	// original file — not just a structural one — as "not a roadmap" and
+	// returns isRoadmap: false. A V007 (invalid status enum value) is exactly
+	// the kind of error `meta set` is often used to cure, so a write that
+	// fixes it and leaves a clean result still silently skipped the
+	// post-mutation newlyReady recomputation.
+	it("--json still reports newlyReady when the original file had a non-structural error the write cures", async () => {
+		const f = join(dir, "status-set-json-newly-ready-from-error.pfdsl");
+		writeFileSync(
+			f,
+			"---\ntype: roadmap\nartifact:\n  req:\n    status: finished\n  spec:\n    status: todo\n---\nreq >> design -> spec\n",
+		);
+		const r = await run(["meta", "set", f, "req", "status", "done", "--json"]);
+		expect(r.exitCode).toBe(0);
+		const parsed = JSON.parse(r.stdout);
+		expect(parsed.ok).toBe(true);
+		expect(parsed.newlyReady).toContain("design");
+	});
+
 	it("rewrites status in place on 4-space-indented frontmatter (#430)", async () => {
 		const fourSpace = `---
 artifact:
@@ -1786,7 +3948,10 @@ req >> design -> spec
 		expect(after).not.toContain("status: todo");
 	});
 
-	it("handles artifact ids containing regex metacharacters (#430)", async () => {
+	// Also not a regression test any more: #430 was about building a RegExp
+	// from the id, and the CST path (frontmatter-cst.ts's doc.setIn) never
+	// does. Kept as a smoke test that punctuation-bearing ids round-trip (#615).
+	it("writes to an artifact id containing punctuation", async () => {
 		const withMetaId = `---
 artifact:
   req(v2):
@@ -1891,7 +4056,9 @@ req >> design -> spec
 		const r = await run(["meta", "set", f, "spec", "owner", "alice"]);
 		expect(r.exitCode).toBe(0);
 		const after = readFileSync(f, "utf-8");
-		expect(after).toMatch(/spec:\n {4}owner: alice\n/);
+		// A new field is appended as the node's last mapping entry (yaml CST
+		// `setIn`, ADR-0034) rather than spliced in right after the header.
+		expect(after).toMatch(/ {4}owner: alice\n/);
 		// existing fields survive
 		expect(after).toContain("label: Old Label");
 	});
@@ -1970,18 +4137,6 @@ b >> p1 -> c
 		expect(readFileSync(f, "utf-8")).toBe(generic);
 	});
 
-	it("--json on parse error emits { ok: false, diagnostics } on stdout, empty stderr", async () => {
-		const f = join(dir, "meta-set-parse-error.pfdsl");
-		writeFileSync(f, "req >> design -> spec\nother -> spec\n"); // V001: dual generators
-		const r = await run(["meta", "set", f, "spec", "status", "done", "--json"]);
-		expect(r.exitCode).toBe(1);
-		expect(r.stderr).toBe("");
-		const parsed = JSON.parse(r.stdout);
-		expect(parsed.ok).toBe(false);
-		expect(Array.isArray(parsed.diagnostics)).toBe(true);
-		expect(parsed.diagnostics.length).toBeGreaterThan(0);
-	});
-
 	it("writes flow-indicator values (}, comma) into a flow-style entry intact", async () => {
 		const flowStyle = `---
 process:
@@ -2037,6 +4192,49 @@ req >> design -> spec
 		expect(typeof parsed.error).toBe("string");
 		expect(parsed.error).toContain("refusing to write");
 		expect(readFileSync(f, "utf-8")).toBe(selfRevises);
+	});
+
+	// The pre-mutation gate judges the result, not the original (#1125): a
+	// `meta set` that cures every error is allowed through, while one that
+	// leaves an error standing is not. `revises: spec` on `spec` above covers
+	// the third case, a mutation that adds an error.
+	it("refuses to write when the result still carries an unrelated error", async () => {
+		const twoGaps = `---
+type: roadmap
+artifact:
+  req: { label: Req, status: done }
+  spec: { label: Spec }
+  other: { label: Other }
+process:
+  design: { label: Design }
+  build: { label: Build }
+---
+req >> design -> spec
+req >> build -> other
+`;
+		const f = join(dir, "meta-set-residual-error.pfdsl");
+		writeFileSync(f, twoGaps);
+		const r = await run(["meta", "set", f, "spec", "status", "wip"]);
+		expect(r.exitCode).toBe(1);
+		expect(r.stderr).toContain("refusing to write");
+		expect(readFileSync(f, "utf-8")).toBe(twoGaps);
+	});
+
+	it("still stops before mutating when the front matter cannot be parsed", async () => {
+		const unparseable = `---
+type: roadmap
+artifact:
+  spec: [unclosed
+---
+req >> design -> spec
+`;
+		const f = join(dir, "meta-set-unparseable.pfdsl");
+		writeFileSync(f, unparseable);
+		const r = await run(["meta", "set", f, "spec", "status", "wip"]);
+		expect(r.exitCode).toBe(1);
+		expect(r.stderr).toContain("FM002");
+		expect(r.stderr).not.toContain("refusing to write");
+		expect(readFileSync(f, "utf-8")).toBe(unparseable);
 	});
 
 	it("rejects a field invalid for the node kind (exit 2)", async () => {
@@ -2100,7 +4298,10 @@ req >> design -> spec
 		const r = await run(["meta", "set", f, "spec", "description", "short."]);
 		expect(r.exitCode).toBe(0);
 		const after = readFileSync(f, "utf-8");
-		expect(after).toContain("description: short.");
+		// The yaml CST (ADR-0034) keeps the field's original block-literal
+		// style when replacing its value, rather than flattening to a plain
+		// scalar — "short." lands as the block's sole line.
+		expect(after).toContain("description: |-\n      short.\n");
 		expect(after).not.toContain("line one.");
 		expect(after).toContain("status: done");
 		const check = await run(["check", f]);
@@ -2128,7 +4329,8 @@ req >> design -> spec
 		const r = await run(["meta", "set", f, "spec", "description", "short."]);
 		expect(r.exitCode).toBe(0);
 		const after = readFileSync(f, "utf-8");
-		expect(after).toContain("description: short.");
+		// See the block-literal-style note on the previous test.
+		expect(after).toContain("description: |-\n      short.\n");
 		expect(after).not.toContain("line one.");
 		expect(after).not.toContain("line three.");
 		expect(after).toContain("status: done");
@@ -2164,6 +4366,8 @@ artifact:
 
   target:
     status: done
+  zz:
+    status: todo
 ---
 target >> p -> zz
 `;
@@ -2207,11 +4411,27 @@ target >> p -> zz
 });
 
 describe("status gaps", () => {
-	const roadmapWith = (artifacts: string) => {
+	// The body decides what the roadmap produces, and producing is what counts
+	// as tracking — a declaration alone leaves the artifact unbuilt. `req` (the
+	// body's source id) and the body's produced id both need a frontmatter
+	// declaration with a `status:` too (V035, #1125); auto-fill whichever
+	// `artifacts` did not already declare, rather than repeating them at every
+	// call site.
+	const roadmapWith = (
+		artifacts: string,
+		body = "req >> build -> output\n",
+	) => {
+		const target = /->\s*(\S+)/.exec(body)?.[1];
+		const declared = (id: string) =>
+			new RegExp(`^  ${id}:`, "m").test(artifacts);
+		const autoDeclare = ["req", target]
+			.filter((id): id is string => id !== undefined && !declared(id))
+			.map((id) => `  ${id}:\n    status: todo\n`)
+			.join("");
 		const f = join(dir, "as-roadmap.pfdsl");
 		writeFileSync(
 			f,
-			`---\ntype: roadmap\nartifact:\n${artifacts}---\nreq >> build -> output\n`,
+			`---\ntype: roadmap\nartifact:\n${autoDeclare}${artifacts}---\n${body}`,
 		);
 		return f;
 	};
@@ -2221,37 +4441,136 @@ describe("status gaps", () => {
 		return f;
 	};
 
-	it("exits 0 when all todo flow artifacts are in the roadmap", async () => {
+	// The selector is the reserved tag, not status: a flow file carrying status
+	// is itself a violation (W007), so the old status: todo selector could only
+	// ever match files that were already wrong (#787).
+	const TRACKED = "    tags: [roadmap-tracked]\n";
+
+	it("exits 0 when every tagged flow artifact is in the roadmap", async () => {
 		const rm = roadmapWith("  output:\n    status: todo\n");
-		const fl = flowWith("  output:\n    status: todo\n");
+		const fl = flowWith(`  output:\n${TRACKED}`);
 		const r = await run(["status", "gaps", rm, fl]);
 		expect(r.exitCode).toBe(0);
-		expect(r.stdout).toContain("tracked");
+		expect(r.stdout).toContain("tracked in the roadmap");
 	});
 
-	it("exits 1 and reports gap when todo flow artifact is not in the roadmap", async () => {
+	it("exits 1 and reports gap when a tagged flow artifact is not in the roadmap", async () => {
 		const rm = roadmapWith("  other:\n    status: done\n");
-		const fl = flowWith(
-			"  missing_artifact:\n    status: todo\n    label: Missing\n",
-		);
+		const fl = flowWith(`  missing_artifact:\n${TRACKED}    label: Missing\n`);
 		const r = await run(["status", "gaps", rm, fl]);
 		expect(r.exitCode).toBe(1);
 		expect(r.stdout).toContain("missing_artifact");
 		expect(r.stdout).toContain("Missing");
 	});
 
-	it("ignores non-todo artifacts in flow files", async () => {
+	it("uses the artifact ID in text output when a gap label is blank", async () => {
 		const rm = roadmapWith("  other:\n    status: done\n");
-		const fl = flowWith(
-			"  done_art:\n    status: done\n  wip_art:\n    status: wip\n",
+		const fl = flowWith(`  missing_artifact:\n${TRACKED}    label: "  "\n`);
+		const r = await run(["status", "gaps", rm, fl]);
+		expect(r.stdout).toMatch(
+			/^ {2}missing_artifact\s+"missing_artifact"\s+in:/m,
 		);
+	});
+
+	it("uses the artifact ID for a blank gap label in JSON display values", async () => {
+		const rm = roadmapWith("  other:\n    status: done\n");
+		const fl = flowWith(`  missing_artifact:\n${TRACKED}    label: ""\n`);
+		const r = await run(["status", "gaps", rm, fl, "--json"]);
+		expect(JSON.parse(r.stdout).gaps).toEqual([
+			expect.objectContaining({
+				artifactId: "missing_artifact",
+				label: "missing_artifact",
+			}),
+		]);
+	});
+
+	it("ignores untagged artifacts in flow files", async () => {
+		const rm = roadmapWith("  other:\n    status: done\n");
+		const fl = flowWith("  plain_art:\n    label: Plain\n");
 		const r = await run(["status", "gaps", rm, fl]);
 		expect(r.exitCode).toBe(0);
 	});
 
+	it("ignores artifacts carrying other tags", async () => {
+		const rm = roadmapWith("  other:\n    status: done\n");
+		const fl = flowWith("  tagged_art:\n    tags: [distilled_doc]\n");
+		const r = await run(["status", "gaps", rm, fl]);
+		expect(r.exitCode).toBe(0);
+		expect(r.stdout).toMatch(/verified nothing/i);
+	});
+
+	// `tags:` written without brackets parses as a plain string, and a substring
+	// test on it would accept any value containing the tag as a fragment. The
+	// schema now rejects this malformed value before selection.
+	it("rejects a scalar tags: value before matching reserved tags", async () => {
+		const rm = roadmapWith("  other:\n    status: done\n");
+		const fl = flowWith(
+			"  gap_art:\n    tags: not-really-roadmap-tracked-thing\n    label: Gap\n",
+		);
+		const r = await run(["status", "gaps", rm, fl, "--json"]);
+		expect(r.exitCode).toBe(1);
+		expect(JSON.parse(r.stdout).diagnostics).toContainEqual(
+			expect.objectContaining({ code: "FM004" }),
+		);
+	});
+
+	it("does not match a tag that merely contains the reserved value", async () => {
+		const rm = roadmapWith("  other:\n    status: done\n");
+		const fl = flowWith("  gap_art:\n    tags: [not-roadmap-tracked-either]\n");
+		const r = await run(["status", "gaps", rm, fl, "--json"]);
+		expect(r.exitCode).toBe(0);
+		expect(JSON.parse(r.stdout).trackedArtifactCount).toBe(0);
+	});
+
+	// The gap the command reports is "nothing in the roadmap builds this", so an
+	// id the roadmap only ever consumes is not tracked by it (#787).
+	it("reports a gap when the roadmap only consumes the id and never produces it", async () => {
+		const rm = join(dir, "as-roadmap-consumes.pfdsl");
+		writeFileSync(
+			rm,
+			"---\ntype: roadmap\nartifact:\n  source_only:\n    status: todo\n  built:\n    status: done\n---\nsource_only >> build -> built\n",
+		);
+		const fl = flowWith(`  source_only:\n${TRACKED}    label: Source\n`);
+		const r = await run(["status", "gaps", rm, fl, "--json"]);
+		expect(r.exitCode).toBe(1);
+		const parsed = JSON.parse(r.stdout);
+		expect(parsed.gaps).toHaveLength(1);
+		expect(parsed.gaps[0].artifactId).toBe("source_only");
+	});
+
+	it("distinguishes an empty-target check from an actual pass when nothing is tagged", async () => {
+		const rm = roadmapWith("  other:\n    status: done\n");
+		const fl = flowWith("  plain_art:\n    label: Plain\n");
+		const r = await run(["status", "gaps", rm, fl]);
+		expect(r.exitCode).toBe(0);
+		expect(r.stdout).not.toContain("tracked in the roadmap");
+		expect(r.stdout).toMatch(/roadmap-tracked/);
+	});
+
+	it("--json reports trackedArtifactCount: 0 when nothing is tagged", async () => {
+		const rm = roadmapWith("  other:\n    status: done\n");
+		const fl = flowWith("  plain_art:\n    label: Plain\n");
+		const r = await run(["status", "gaps", rm, fl, "--json"]);
+		expect(r.exitCode).toBe(0);
+		const parsed = JSON.parse(r.stdout);
+		expect(parsed.ok).toBe(true);
+		expect(parsed.trackedArtifactCount).toBe(0);
+	});
+
+	it("--json reports trackedArtifactCount reflecting the scanned tagged artifacts when gaps exist", async () => {
+		const rm = roadmapWith("  other:\n    status: done\n");
+		const fl = flowWith(`  gap_art:\n${TRACKED}    label: Gap\n`);
+		const r = await run(["status", "gaps", rm, fl, "--json"]);
+		const parsed = JSON.parse(r.stdout);
+		expect(parsed.trackedArtifactCount).toBe(1);
+	});
+
 	it("--json returns structured output with ok=true when no gaps", async () => {
-		const rm = roadmapWith("  tracked:\n    status: todo\n");
-		const fl = flowWith("  tracked:\n    status: todo\n");
+		const rm = roadmapWith(
+			"  tracked:\n    status: todo\n",
+			"req >> build -> tracked\n",
+		);
+		const fl = flowWith(`  tracked:\n${TRACKED}`);
 		const r = await run(["status", "gaps", rm, fl, "--json"]);
 		expect(r.exitCode).toBe(0);
 		const parsed = JSON.parse(r.stdout);
@@ -2261,7 +4580,7 @@ describe("status gaps", () => {
 
 	it("--json returns structured output with gaps when untracked", async () => {
 		const rm = roadmapWith("  other:\n    status: done\n");
-		const fl = flowWith("  gap_art:\n    status: todo\n    label: Gap\n");
+		const fl = flowWith(`  gap_art:\n${TRACKED}    label: Gap\n`);
 		const r = await run(["status", "gaps", rm, fl, "--json"]);
 		expect(r.exitCode).toBe(1);
 		const parsed = JSON.parse(r.stdout);
@@ -2269,11 +4588,23 @@ describe("status gaps", () => {
 		expect(parsed.gaps).toHaveLength(1);
 		expect(parsed.gaps[0].artifactId).toBe("gap_art");
 		expect(parsed.gaps[0].label).toBe("Gap");
-		expect(parsed.gaps[0].status).toBe("todo");
+	});
+
+	// A tagged flow artifact matches the roadmap by id alone: the roadmap's own
+	// status is not consulted, so a done roadmap entry still counts as tracked.
+	it("counts a tagged artifact as tracked whatever status the roadmap gives it", async () => {
+		const rm = roadmapWith(
+			"  shared:\n    status: done\n",
+			"req >> build -> shared\n",
+		);
+		const fl = flowWith(`  shared:\n${TRACKED}`);
+		const r = await run(["status", "gaps", rm, fl, "--json"]);
+		expect(r.exitCode).toBe(0);
+		expect(JSON.parse(r.stdout).gaps).toHaveLength(0);
 	});
 
 	it("--json on roadmap parse error emits { ok: false, diagnostics } on stdout, empty stderr", async () => {
-		const fl = flowWith("  output:\n    status: todo\n");
+		const fl = flowWith(`  output:\n${TRACKED}`);
 		const r = await run([
 			"status",
 			"gaps",
@@ -2312,7 +4643,7 @@ describe("status gaps", () => {
 			nonRoadmap,
 			"---\ntype: workflow\nartifact:\n  x:\n    status: done\n---\n",
 		);
-		const fl = flowWith("  y:\n    status: todo\n");
+		const fl = flowWith(`  y:\n${TRACKED}`);
 		const r = await run(["status", "gaps", nonRoadmap, fl]);
 		expect(r.exitCode).toBe(2);
 		expect(r.stderr).toContain("roadmap");
@@ -2323,7 +4654,7 @@ describe("status gaps", () => {
 		const anotherRoadmap = join(dir, "as-roadmap2.pfdsl");
 		writeFileSync(
 			anotherRoadmap,
-			"---\ntype: roadmap\nartifact:\n  y:\n    status: todo\n---\nreq >> build -> y\n",
+			"---\ntype: roadmap\nartifact:\n  req:\n    status: todo\n  y:\n    status: todo\n---\nreq >> build -> y\n",
 		);
 		const r = await run(["status", "gaps", rm, anotherRoadmap]);
 		expect(r.exitCode).toBe(2);
@@ -2341,23 +4672,20 @@ describe("status gaps", () => {
 		expect(r.exitCode).toBe(2);
 	});
 
-	it("--help returns help text", async () => {
-		const r = await run(["status", "gaps", "--help"]);
-		expect(r.exitCode).toBe(0);
-		expect(r.stdout).toContain("status gaps");
-	});
-
 	it("accepts multiple flow files", async () => {
-		const rm = roadmapWith("  tracked:\n    status: todo\n");
+		const rm = roadmapWith(
+			"  tracked:\n    status: todo\n",
+			"req >> build -> tracked\n",
+		);
 		const fl1 = join(dir, "as-flow1.pfdsl");
 		const fl2 = join(dir, "as-flow2.pfdsl");
 		writeFileSync(
 			fl1,
-			"---\ntype: workflow\nartifact:\n  tracked:\n    status: todo\n---\n",
+			`---\ntype: workflow\nartifact:\n  tracked:\n${TRACKED}---\n`,
 		);
 		writeFileSync(
 			fl2,
-			"---\ntype: runtime-pipeline\nartifact:\n  gap_only:\n    status: todo\n---\n",
+			`---\ntype: pipeline\nartifact:\n  gap_only:\n${TRACKED}---\n`,
 		);
 		const r = await run(["status", "gaps", rm, fl1, fl2, "--json"]);
 		expect(r.exitCode).toBe(1);
@@ -2372,7 +4700,7 @@ describe("status gaps", () => {
 			rm,
 			"---\nartifact:\n  output:\n    status: todo\n---\nreq >> build -> output\n",
 		);
-		const fl = flowWith("  output:\n    status: todo\n");
+		const fl = flowWith(`  output:\n${TRACKED}`);
 		const r = await run(["status", "gaps", rm, fl]);
 		expect(r.exitCode).toBe(0);
 		expect(r.stderr).toContain("W006");
@@ -2384,7 +4712,7 @@ describe("status gaps", () => {
 			rm,
 			"---\nartifact:\n  output:\n    status: todo\n---\nreq >> build -> output\n",
 		);
-		const fl = flowWith("  output:\n    status: todo\n");
+		const fl = flowWith(`  output:\n${TRACKED}`);
 		const r = await run(["status", "gaps", rm, fl, "--json"]);
 		const parsed = JSON.parse(r.stdout);
 		expect(parsed.warnings?.[0]?.code).toBe("W006");
@@ -2404,8 +4732,29 @@ describe("status list", () => {
 		);
 		const r = await run(["status", "list", f, "--status", "todo"]);
 		expect(r.exitCode).toBe(0);
-		expect(r.stdout).toContain("a");
-		expect(r.stdout).not.toContain('"b"');
+		// A bare toContain("a") would also be satisfied by the word "Artifacts"
+		// in the header, so match the count and the row itself.
+		expect(r.stdout).toContain("Artifacts (1):");
+		expect(r.stdout).toMatch(/^ {2}a\s+"a"\s+status: todo$/m);
+		expect(r.stdout).not.toMatch(/^ {2}b\s/m);
+	});
+
+	it("uses the artifact ID in text output when its label is empty", async () => {
+		const f = withStatus(
+			'---\nartifact:\n  a: {label: "", status: todo}\n---\nx >> p -> a\n',
+		);
+		const r = await run(["status", "list", f, "--status", "todo"]);
+		expect(r.stdout).toMatch(/^ {2}a\s+"a"\s+status: todo$/m);
+	});
+
+	it("uses the artifact ID for a blank label in JSON display values", async () => {
+		const f = withStatus(
+			'---\nartifact:\n  a: {label: " ", status: todo}\n---\nx >> p -> a\n',
+		);
+		const r = await run(["status", "list", f, "--status", "todo", "--json"]);
+		expect(JSON.parse(r.stdout).items).toEqual([
+			{ id: "a", label: "a", status: "todo" },
+		]);
 	});
 
 	it("lists artifacts matching multiple comma-separated statuses", async () => {
@@ -2414,9 +4763,10 @@ describe("status list", () => {
 		);
 		const r = await run(["status", "list", f, "--status", "todo,wip"]);
 		expect(r.exitCode).toBe(0);
-		expect(r.stdout).toContain("a");
-		expect(r.stdout).toContain("b");
-		expect(r.stdout).not.toContain('"c"');
+		expect(r.stdout).toContain("Artifacts (2):");
+		expect(r.stdout).toMatch(/^ {2}a\s+"a"\s+status: todo$/m);
+		expect(r.stdout).toMatch(/^ {2}b\s+"b"\s+status: wip$/m);
+		expect(r.stdout).not.toMatch(/^ {2}c\s/m);
 	});
 
 	it("excludes artifacts without a matching status", async () => {
@@ -2428,7 +4778,7 @@ describe("status list", () => {
 		expect(r.stdout).toBe("No artifacts match status: todo.\n");
 	});
 
-	it("--json returns structured output", async () => {
+	it("--json lists the matching items under { ok, items }", async () => {
 		const f = withStatus(
 			"---\nartifact:\n  a:\n    status: todo\n    label: Alpha\n---\nx >> p -> a\n",
 		);
@@ -2454,23 +4804,6 @@ describe("status list", () => {
 		]);
 		expect(r.exitCode).toBe(2);
 	});
-
-	it("missing file returns exit 1", async () => {
-		const r = await run([
-			"status",
-			"list",
-			join(dir, "nonexistent.pfdsl"),
-			"--status",
-			"todo",
-		]);
-		expect(r.exitCode).toBe(1);
-	});
-
-	it("--help returns help text", async () => {
-		const r = await run(["status", "list", "--help"]);
-		expect(r.exitCode).toBe(0);
-		expect(r.stdout).toContain("pfdsl status list");
-	});
 });
 
 describe("status blocked", () => {
@@ -2490,6 +4823,25 @@ describe("status blocked", () => {
 		expect(r.stdout).toContain("req");
 	});
 
+	it("uses the process ID in text output when its label is blank", async () => {
+		const f = withStatus(
+			'---\nartifact:\n  req: {status: todo}\nprocess:\n  design: {label: "  "}\n---\nreq >> design -> spec\n',
+		);
+		const r = await run(["status", "blocked", f]);
+		expect(r.stdout).toMatch(/^ {2}design\s+"design"\s+blocked by:/m);
+	});
+
+	it("uses the process ID for a blank label in JSON display values", async () => {
+		const f = withStatus(
+			'---\nartifact:\n  req: {status: todo}\nprocess:\n  design: {label: ""}\n---\nreq >> design -> spec\n',
+		);
+		const r = await run(["status", "blocked", f, "--json"]);
+		expect(JSON.parse(r.stdout).blocked[0]).toMatchObject({
+			id: "design",
+			label: "design",
+		});
+	});
+
 	it("excludes processes whose inputs are all done", async () => {
 		const f = withStatus(
 			"---\nartifact:\n  req:\n    status: done\n---\nreq >> design -> spec\n",
@@ -2499,7 +4851,7 @@ describe("status blocked", () => {
 		expect(r.stdout).toBe("No blocked processes.\n");
 	});
 
-	it("--json returns structured output", async () => {
+	it("--json lists the blocked processes with their unmet inputs", async () => {
 		const f = withStatus(
 			"---\nartifact:\n  req:\n    status: waiting\n---\nreq >> design -> spec\n",
 		);
@@ -2522,17 +4874,6 @@ describe("status blocked", () => {
 		const r = await run(["status", "blocked", join(dir, "valid.pfdsl")]);
 		expect(r.exitCode).toBe(0);
 		expect(r.stderr).toContain("W006");
-	});
-
-	it("missing file returns exit 1", async () => {
-		const r = await run(["status", "blocked", join(dir, "nonexistent.pfdsl")]);
-		expect(r.exitCode).toBe(1);
-	});
-
-	it("--help returns help text", async () => {
-		const r = await run(["status", "blocked", "--help"]);
-		expect(r.exitCode).toBe(0);
-		expect(r.stdout).toContain("pfdsl status blocked");
 	});
 });
 
@@ -2619,6 +4960,29 @@ spec >> build -> code
 		expect(r.stdout).toBe(
 			`spec.location: docs/spec.md\nspec.location.resolved: ${resolve(dir, "..", "docs/spec.md")}\n`,
 		);
+	});
+
+	it("reports an auto-added derived field it cannot compute, rather than dropping it", async () => {
+		// Omitting it silently reads as "this node has no location", and makes the
+		// key set of --json depend on whether the input came from a file or a pipe.
+		// Not-applicable (no base field) still omits; applicable-but-uncomputable
+		// answers with null (#510).
+		const r = await run(
+			["meta", "get", "-", "spec", "location"],
+			withStdin(base),
+		);
+		expect(r.exitCode).toBe(0);
+		expect(r.stdout).toContain("spec.location.resolved:");
+		expect(r.stderr).toContain("no file path when reading from stdin");
+	});
+
+	it("still omits a derived field whose base field the node does not have", async () => {
+		const r = await run(
+			["meta", "get", "-", "spec", "status"],
+			withStdin(base),
+		);
+		expect(r.exitCode).toBe(0);
+		expect(r.stdout).not.toContain("command.cwd");
 	});
 
 	it("resolves location for a process the same way as for an artifact", async () => {
@@ -2743,7 +5107,40 @@ req -> spec
 		writeFileSync(f, base);
 		const r = await run(["meta", "get", f, "code", "location"]);
 		expect(r.exitCode).toBe(0);
-		expect(r.stdout).toBe("code.location: \n");
+		expect(r.stdout).toBe("code.location: (unset)\n");
+	});
+
+	// Both states printed as a bare `id.field: ` before, so text mode said less
+	// than --json (which has "" against null) and a reader who needed the
+	// difference had to re-run with --json (#844).
+	it("distinguishes an unset field from one set to the empty string", async () => {
+		const f = join(dir, "get-unset-vs-empty.pfdsl");
+		writeFileSync(
+			f,
+			'---\nartifact:\n  spec:\n    criteria: c\n    label: ""\n---\nspec >> build -> code\n',
+		);
+		const r = await run(["meta", "get", f, "spec", "label,owner"]);
+		expect(r.exitCode).toBe(0);
+		expect(r.stdout).toBe("spec.label: \nspec.owner: (unset)\n");
+	});
+
+	it("renders an empty array as (empty) in text while preserving [] in JSON", async () => {
+		const f = join(dir, "get-empty-array.pfdsl");
+		writeFileSync(
+			f,
+			"---\nartifact:\n  spec:\n    tags: []\n---\nreq -> spec\n",
+		);
+
+		const textResult = await run(["meta", "get", f, "spec", "tags"]);
+		expect(textResult.exitCode).toBe(0);
+		expect(textResult.stdout).toBe("spec.tags: (empty)\n");
+
+		const jsonResult = await run(["meta", "get", f, "spec", "tags", "--json"]);
+		expect(jsonResult.exitCode).toBe(0);
+		expect(JSON.parse(jsonResult.stdout)).toEqual({
+			ok: true,
+			values: { spec: { tags: [] } },
+		});
 	});
 
 	it("emits JSON with raw location plus derived location.resolved when --json is passed", async () => {
@@ -2809,29 +5206,14 @@ req -> spec
 		expect(r.stderr).not.toContain("error:");
 	});
 
-	it("--json on parse error emits { ok: false, diagnostics } on stdout, empty stderr", async () => {
-		const r = await run([
-			"meta",
-			"get",
-			join(dir, "invalid.pfdsl"),
-			"spec",
-			"status",
-			"--json",
-		]);
-		expect(r.exitCode).toBe(1);
-		expect(r.stderr).toBe("");
-		const parsed = JSON.parse(r.stdout);
-		expect(parsed.ok).toBe(false);
-		expect(Array.isArray(parsed.diagnostics)).toBe(true);
-		expect(parsed.diagnostics.length).toBeGreaterThan(0);
-	});
-
 	it("warns on stderr for an unrecognized field name but still succeeds", async () => {
 		const f = join(dir, "get-unknown-field.pfdsl");
 		writeFileSync(f, base);
 		const r = await run(["meta", "get", f, "spec", "lable"]);
 		expect(r.exitCode).toBe(0);
-		expect(r.stdout).toBe("spec.lable: \n");
+		// A misspelled field is unset like any other the node doesn't have; the
+		// warning, not the value, is what says the name itself is wrong.
+		expect(r.stdout).toBe("spec.lable: (unset)\n");
 		expect(r.stderr).toContain("warning");
 		expect(r.stderr).toContain("lable");
 	});
@@ -2865,6 +5247,14 @@ req -> spec
 		expect(r.exitCode).toBe(0);
 	});
 
+	it("exits 2 when the field positional is present but empty", async () => {
+		const f = join(dir, "get-empty-field.pfdsl");
+		writeFileSync(f, base);
+		const r = await run(["meta", "get", f, "spec", ""]);
+		expect(r.exitCode).toBe(2);
+		expect(r.stderr).toContain("field is required");
+	});
+
 	it("exits 2 with usage help when the id positional is missing", async () => {
 		const f = join(dir, "get-missing-id.pfdsl");
 		writeFileSync(f, base);
@@ -2882,36 +5272,22 @@ req -> spec
 	});
 
 	it("returns null with a warning when an explicit derived field is requested from stdin", async () => {
-		stdinOverride = `---
-process:
-  build:
-    location: src/build.ts
-    command: npm run build
----
-req >> build -> out
-`;
-		try {
-			const r = await run([
-				"meta",
-				"get",
-				"-",
-				"build",
-				"location.resolved,command.cwd",
-				"--json",
-			]);
-			expect(r.exitCode).toBe(0);
-			expect(JSON.parse(r.stdout)).toEqual({
-				ok: true,
-				values: {
-					build: { "location.resolved": null, "command.cwd": null },
-				},
-			});
-			expect(r.stderr).toContain("stdin");
-			expect(r.stderr).toContain("location.resolved");
-			expect(r.stderr).toContain("command.cwd");
-		} finally {
-			stdinOverride = null;
-		}
+		const r = await run(
+			["meta", "get", "-", "build", "location.resolved,command.cwd", "--json"],
+			withStdin(
+				"---\nprocess:\n  build:\n    location: src/build.ts\n    command: npm run build\n---\nreq >> build -> out\n",
+			),
+		);
+		expect(r.exitCode).toBe(0);
+		expect(JSON.parse(r.stdout)).toEqual({
+			ok: true,
+			values: {
+				build: { "location.resolved": null, "command.cwd": null },
+			},
+		});
+		expect(r.stderr).toContain("stdin");
+		expect(r.stderr).toContain("location.resolved");
+		expect(r.stderr).toContain("command.cwd");
 	});
 
 	it("round-trips a relative location unchanged through meta set then meta get", async () => {
@@ -2941,15 +5317,438 @@ req -> spec
 			`spec.location: ../docs/spec.md\nspec.location.resolved: ${resolve(dir, "../docs/spec.md")}\n`,
 		);
 	});
+});
 
-	it("--help returns help text", async () => {
-		const r = await run(["meta", "get", "--help"]);
+describe("meta list", () => {
+	const base = `---
+artifact:
+  spec:
+    status: done
+    tags: [design, backend]
+    group: core
+  code:
+    status: todo
+    tags: [backend]
+    group: core
+  docs:
+    status: done
+    tags: [design]
+process:
+  build:
+    tags: [backend]
+  write: {}
+group:
+  core:
+    label: Core
+---
+req >> design -> spec
+spec >> build -> code
+spec >> write -> docs
+`;
+
+	it("--tag matches a node whose tags: array includes it", async () => {
+		const f = join(dir, "list-tag.pfdsl");
+		writeFileSync(f, base);
+		const r = await run(["meta", "list", f, "--tag", "design", "status"]);
 		expect(r.exitCode).toBe(0);
-		expect(r.stdout).toContain("pfdsl meta get");
+		expect(r.stdout).toBe("docs.status: done\nspec.status: done\n");
+	});
+
+	it("--group matches the group: field exactly", async () => {
+		const f = join(dir, "list-group.pfdsl");
+		writeFileSync(f, base);
+		const r = await run(["meta", "list", f, "--group", "core", "status"]);
+		expect(r.exitCode).toBe(0);
+		expect(r.stdout).toBe("code.status: todo\nspec.status: done\n");
+	});
+
+	it("--producer matches an artifact reachable via the process's output edge, not the process itself", async () => {
+		const f = join(dir, "list-producer.pfdsl");
+		writeFileSync(f, base);
+		const r = await run(["meta", "list", f, "--producer", "build"]);
+		expect(r.exitCode).toBe(0);
+		expect(r.stdout).toBe(
+			"code.status: todo\ncode.tags: backend\ncode.group: core\n",
+		);
+	});
+
+	it("combines multiple selectors with AND", async () => {
+		const f = join(dir, "list-and.pfdsl");
+		writeFileSync(f, base);
+		const r = await run([
+			"meta",
+			"list",
+			f,
+			"--tag",
+			"design",
+			"--group",
+			"core",
+			"status",
+		]);
+		expect(r.exitCode).toBe(0);
+		expect(r.stdout).toBe("spec.status: done\n");
+	});
+
+	it("zero matches is not an error", async () => {
+		const f = join(dir, "list-empty.pfdsl");
+		writeFileSync(f, base);
+		const r = await run(["meta", "list", f, "--tag", "nonexistent"]);
+		expect(r.exitCode).toBe(0);
+		expect(r.stdout).toBe("No nodes match the given selectors.\n");
+	});
+
+	it("--json emits { ok, values } — zero matches as an empty object", async () => {
+		const f = join(dir, "list-empty-json.pfdsl");
+		writeFileSync(f, base);
+		const r = await run(["meta", "list", f, "--tag", "nonexistent", "--json"]);
+		expect(r.exitCode).toBe(0);
+		expect(JSON.parse(r.stdout)).toEqual({ ok: true, values: {} });
+	});
+
+	it("--json emits the same { ok, values } shape as meta get", async () => {
+		const f = join(dir, "list-json.pfdsl");
+		writeFileSync(f, base);
+		const r = await run([
+			"meta",
+			"list",
+			f,
+			"--group",
+			"core",
+			"status",
+			"--json",
+		]);
+		expect(r.exitCode).toBe(0);
+		expect(JSON.parse(r.stdout)).toEqual({
+			ok: true,
+			values: { code: { status: "todo" }, spec: { status: "done" } },
+		});
+	});
+
+	it("renders an empty array as (empty) in text while preserving [] in JSON", async () => {
+		const f = join(dir, "list-empty-array-value.pfdsl");
+		writeFileSync(
+			f,
+			"---\nartifact:\n  spec:\n    tags: []\n    group: core\n---\nreq -> spec\n",
+		);
+
+		const textResult = await run([
+			"meta",
+			"list",
+			f,
+			"--group",
+			"core",
+			"tags",
+		]);
+		expect(textResult.exitCode).toBe(0);
+		expect(textResult.stdout).toBe("spec.tags: (empty)\n");
+
+		const jsonResult = await run([
+			"meta",
+			"list",
+			f,
+			"--group",
+			"core",
+			"tags",
+			"--json",
+		]);
+		expect(jsonResult.exitCode).toBe(0);
+		expect(JSON.parse(jsonResult.stdout)).toEqual({
+			ok: true,
+			values: { spec: { tags: [] } },
+		});
+	});
+
+	it("no selector at all is a usage error (exit 2)", async () => {
+		const f = join(dir, "list-no-selector.pfdsl");
+		writeFileSync(f, base);
+		const r = await run(["meta", "list", f]);
+		expect(r.exitCode).toBe(2);
+	});
+
+	it("warns on an unrecognized field name, same as meta get", async () => {
+		const f = join(dir, "list-unknown-field.pfdsl");
+		writeFileSync(f, base);
+		const r = await run(["meta", "list", f, "--tag", "design", "bogus"]);
+		expect(r.exitCode).toBe(0);
+		expect(r.stderr).toContain("'bogus' is not a recognized field");
+	});
+
+	it("warns when a --tag value matches no node's tags, without failing", async () => {
+		const f = join(dir, "list-tag-unused.pfdsl");
+		writeFileSync(f, base);
+		const r = await run(["meta", "list", f, "--tag", "nonexistent"]);
+		expect(r.exitCode).toBe(0);
+		expect(r.stderr).toContain("'nonexistent'");
+	});
+
+	it("warns per unmatched value when --tag has multiple comma-separated values", async () => {
+		const f = join(dir, "list-tag-multi-unused.pfdsl");
+		writeFileSync(f, base);
+		const r = await run(["meta", "list", f, "--tag", "design,bogus1,bogus2"]);
+		expect(r.exitCode).toBe(0);
+		expect(r.stderr).toContain("'bogus1'");
+		expect(r.stderr).toContain("'bogus2'");
+		expect(r.stderr).not.toContain("'design'");
+	});
+
+	it("does not warn for a --tag value that does match a node", async () => {
+		const f = join(dir, "list-tag-used.pfdsl");
+		writeFileSync(f, base);
+		const r = await run(["meta", "list", f, "--tag", "design", "status"]);
+		expect(r.exitCode).toBe(0);
+		expect(r.stderr).toBe("");
+	});
+
+	it("warns when --group matches no node's group field", async () => {
+		const f = join(dir, "list-group-unused.pfdsl");
+		writeFileSync(f, base);
+		const r = await run(["meta", "list", f, "--group", "nonexistent"]);
+		expect(r.exitCode).toBe(0);
+		expect(r.stderr).toContain("'nonexistent'");
+	});
+
+	it("warns when --producer names a process id that does not exist", async () => {
+		const f = join(dir, "list-producer-missing.pfdsl");
+		writeFileSync(f, base);
+		const r = await run(["meta", "list", f, "--producer", "bogus"]);
+		expect(r.exitCode).toBe(0);
+		expect(r.stderr).toContain("'bogus'");
+	});
+
+	it("warns when --producer names a process with no output edges", async () => {
+		const f = join(dir, "list-producer-no-outputs.pfdsl");
+		const noOutput = `---
+artifact:
+  spec: {}
+process:
+  investigate: {}
+---
+spec >> investigate
+`;
+		writeFileSync(f, noOutput);
+		const r = await run(["meta", "list", f, "--producer", "investigate"]);
+		expect(r.exitCode).toBe(0);
+		expect(r.stderr).toContain("'investigate'");
+	});
+
+	it("does not warn when an AND combination yields zero matches but every selector value matches individually", async () => {
+		const f = join(dir, "list-and-zero-no-warning.pfdsl");
+		writeFileSync(f, base);
+		const r = await run([
+			"meta",
+			"list",
+			f,
+			"--tag",
+			"design",
+			"--producer",
+			"build",
+			"status",
+		]);
+		expect(r.exitCode).toBe(0);
+		expect(r.stdout).toBe("No nodes match the given selectors.\n");
+		expect(r.stderr).toBe("");
+	});
+
+	it("keeps exit code 0 when a selector value warning fires", async () => {
+		const f = join(dir, "list-tag-unused-exit.pfdsl");
+		writeFileSync(f, base);
+		const r = await run(["meta", "list", f, "--tag", "nonexistent", "--json"]);
+		expect(r.exitCode).toBe(0);
+		expect(r.stderr).toContain("'nonexistent'");
+	});
+});
+
+// The selector-value warning added in #848 catches a typo but does not answer
+// "which values exist" — an agent that wanted the vocabulary still had to
+// grep the frontmatter, or chain `graph stats --json` into `meta get` over
+// every id and aggregate the rows itself (#844).
+describe("meta values", () => {
+	const base = `---
+artifact:
+  spec:
+    status: done
+    tags: [design, backend]
+    group: core
+  code:
+    status: todo
+    tags: [backend]
+    group: core
+  docs:
+    status: done
+    tags: [design]
+process:
+  build:
+    tags: [backend]
+    group: tooling
+  write: {}
+group:
+  core:
+    label: Core
+  archived:
+    label: Archived
+---
+spec >> build -> code
+spec >> write -> docs
+`;
+
+	it("counts each value of a scalar field, ascending by value", async () => {
+		const f = join(dir, "values-status.pfdsl");
+		writeFileSync(f, base);
+		const r = await run(["meta", "values", f, "status"]);
+		expect(r.exitCode).toBe(0);
+		expect(r.stdout).toBe("status.done: 2\nstatus.todo: 1\n");
+	});
+
+	// An array field counts per element, not per node: a node tagged
+	// [design, backend] is one occurrence of each.
+	it("counts each element of an array field", async () => {
+		const f = join(dir, "values-tags.pfdsl");
+		writeFileSync(f, base);
+		const r = await run(["meta", "values", f, "tags"]);
+		expect(r.exitCode).toBe(0);
+		expect(r.stdout).toBe("tags.backend: 3\ntags.design: 2\n");
+	});
+
+	// `group` and `tag` both have optional frontmatter declaration sections
+	// (spec §2.7.2 / §2.8), and a declared value no node uses is exactly what
+	// a reader looking for the vocabulary wants to see — as a count of 0,
+	// rather than as a separate list needing its own rule.
+	it("includes a declared but unused group as a count of zero", async () => {
+		const f = join(dir, "values-group.pfdsl");
+		writeFileSync(f, base);
+		const r = await run(["meta", "values", f, "group"]);
+		expect(r.exitCode).toBe(0);
+		expect(r.stdout).toBe(
+			"group.archived: 0\ngroup.core: 2\ngroup.tooling: 1\n",
+		);
+	});
+
+	it("accepts several fields at once", async () => {
+		const f = join(dir, "values-multi.pfdsl");
+		writeFileSync(f, base);
+		const r = await run(["meta", "values", f, "status,tags"]);
+		expect(r.exitCode).toBe(0);
+		expect(r.stdout).toBe(
+			"status.done: 2\nstatus.todo: 1\ntags.backend: 3\ntags.design: 2\n",
+		);
+	});
+
+	// `counts`, not the `values` key meta get / meta list use: the shape
+	// underneath is { [field]: { [value]: count } }, not { [id]: { ... } }.
+	it("--json emits { ok, counts: { [field]: { [value]: count } } }", async () => {
+		const f = join(dir, "values-json.pfdsl");
+		writeFileSync(f, base);
+		const r = await run(["meta", "values", f, "group", "--json"]);
+		expect(r.exitCode).toBe(0);
+		expect(JSON.parse(r.stdout)).toEqual({
+			ok: true,
+			counts: { group: { archived: 0, core: 2, tooling: 1 } },
+		});
+	});
+
+	it("reports a field no node sets as an empty table, not an error", async () => {
+		const f = join(dir, "values-empty.pfdsl");
+		writeFileSync(f, base);
+		const r = await run(["meta", "values", f, "owner"]);
+		expect(r.exitCode).toBe(0);
+		expect(r.stdout).toBe("owner: (no values)\n");
+	});
+
+	// `boundary` is a map, so its value has no vocabulary to enumerate. Naming
+	// the shape keeps that distinguishable from a field no node sets, which is
+	// the collapse this command exists to undo.
+	it("counts an object-valued field under (object) rather than stringifying it", async () => {
+		const f = join(dir, "values-object.pfdsl");
+		writeFileSync(
+			f,
+			"---\nprocess:\n  build:\n    subflow: child.pfdsl\n    boundary: { spec: inner_spec }\n---\nspec >> build -> code\n",
+		);
+		const r = await run(["meta", "values", f, "boundary"]);
+		expect(r.exitCode).toBe(0);
+		expect(r.stdout).toBe("boundary.(object): 1\n");
+	});
+
+	it("warns for a field name that is not recognized on any kind", async () => {
+		const f = join(dir, "values-unknown.pfdsl");
+		writeFileSync(f, base);
+		const r = await run(["meta", "values", f, "bogus"]);
+		expect(r.exitCode).toBe(0);
+		expect(r.stderr).toContain("'bogus' is not a recognized field");
+	});
+
+	it("exits 2 when the field argument is missing", async () => {
+		const f = join(dir, "values-missing.pfdsl");
+		writeFileSync(f, base);
+		const r = await run(["meta", "values", f]);
+		expect(r.exitCode).toBe(2);
+	});
+});
+
+// group is a NodeKind alongside artifact and process, with its own field set
+// (label|color|parent), and meta had no coverage of it at all (#607).
+describe("meta get / set on a group id", () => {
+	const grouped = `---
+group:
+  backend: { label: Backend, color: lightyellow }
+  db: { label: DB Layer, parent: backend }
+artifact:
+  schema: { group: db, criteria: schema criteria }
+---
+schema >> migrate -> migrated
+`;
+
+	it("reads a single group field", async () => {
+		const f = join(dir, "group-get-one.pfdsl");
+		writeFileSync(f, grouped);
+		const r = await run(["meta", "get", f, "db", "label"]);
+		expect(r.exitCode).toBe(0);
+		expect(r.stdout).toBe("db.label: DB Layer\n");
+	});
+
+	it("reads every set field of a group when no field is named", async () => {
+		const f = join(dir, "group-get-all.pfdsl");
+		writeFileSync(f, grouped);
+		const r = await run(["meta", "get", f, "db", "--json"]);
+		expect(r.exitCode).toBe(0);
+		expect(JSON.parse(r.stdout)).toEqual({
+			ok: true,
+			values: { db: { label: "DB Layer", parent: "backend" } },
+		});
+	});
+
+	it("warns that status is not a group field, since group has its own field set", async () => {
+		const f = join(dir, "group-get-unknown-field.pfdsl");
+		writeFileSync(f, grouped);
+		const r = await run(["meta", "get", f, "db", "status"]);
+		expect(r.exitCode).toBe(0);
+		expect(r.stderr).toContain("'status' is not a recognized field for 'db'");
+	});
+
+	it("writes a group field in place", async () => {
+		const f = join(dir, "group-set.pfdsl");
+		writeFileSync(f, grouped);
+		const r = await run(["meta", "set", f, "db", "label", "Database"]);
+		expect(r.exitCode).toBe(0);
+		expect(readFileSync(f, "utf-8")).toContain("label: Database");
 	});
 });
 
 describe("meta check-links", () => {
+	it("reports resolution failures and missing locations together in text mode", async () => {
+		const f = join(dir, "check-links-mixed.pfdsl");
+		writeFileSync(
+			f,
+			"---\nartifact:\n  a: {ref: {source: repo, revision: main}}\n  b: {location: missing.md}\n---\na >> p -> b\n",
+		);
+		const r = await run(["meta", "check-links", f]);
+		expect(r.exitCode).toBe(1);
+		expect(r.stderr).toBe(
+			"a: unsupported: Explicit artifact references require a supplied resolution context\n",
+		);
+		expect(r.stdout).toBe(
+			`b (artifact)   missing.md -> ${join(dir, "missing.md")}\n`,
+		);
+	});
 	it("reports a missing location file path", async () => {
 		const f = join(dir, "check-links-missing.pfdsl");
 		writeFileSync(
@@ -3036,7 +5835,7 @@ req >> design -> spec
 		expect(r.stdout).toContain("design");
 	});
 
-	it("--json returns structured output", async () => {
+	it("--json reports the unresolvable locations under { ok: false, missing }", async () => {
 		const f = join(dir, "check-links-json.pfdsl");
 		writeFileSync(
 			f,
@@ -3066,21 +5865,6 @@ req -> spec
 		const r = await run(["meta", "check-links", "-"]);
 		expect(r.exitCode).toBe(2);
 	});
-
-	it("missing file returns exit 1", async () => {
-		const r = await run([
-			"meta",
-			"check-links",
-			join(dir, "nonexistent.pfdsl"),
-		]);
-		expect(r.exitCode).toBe(1);
-	});
-
-	it("--help returns help text", async () => {
-		const r = await run(["meta", "check-links", "--help"]);
-		expect(r.exitCode).toBe(0);
-		expect(r.stdout).toContain("pfdsl meta check-links");
-	});
 });
 
 describe("graph analysis", () => {
@@ -3092,25 +5876,66 @@ spec >> review -> report
 `;
 
 	describe("neighbors", () => {
-		it("prints predecessors and successors as text", async () => {
+		// The neighbor kind is named once per list rather than per id, because
+		// every neighbor has the same one (every edge runs artifact -> process
+		// or the reverse). Without it the caller has to run `describe` on each
+		// neighbor to learn which are artifacts — what an audit agent did with
+		// eight of them (#844). The queried node's own kind leads the output, so
+		// the answer carries the derivation, not just its result.
+		it("prints the queried node, then predecessors and successors, as text", async () => {
 			const f = join(dir, "neighbors.pfdsl");
 			writeFileSync(f, base);
 			const r = await run(["graph", "neighbors", f, "spec"]);
 			expect(r.exitCode).toBe(0);
 			expect(r.stdout).toBe(
-				"predecessors: design\nsuccessors: build, review\n",
+				"spec (artifact)\npredecessors (process): design\nsuccessors (process): build, review\n",
 			);
 		});
 
-		it("emits JSON", async () => {
+		it("--json emits the queried node's id and kind, neighborKind, and the two lists", async () => {
 			const f = join(dir, "neighbors-json.pfdsl");
 			writeFileSync(f, base);
 			const r = await run(["graph", "neighbors", f, "spec", "--json"]);
 			expect(r.exitCode).toBe(0);
 			expect(JSON.parse(r.stdout)).toEqual({
 				ok: true,
-				predecessors: ["design"],
-				successors: ["build", "review"],
+				id: "spec",
+				kind: "artifact",
+				neighborKind: "process",
+				predecessors: [{ id: "design", kind: "primary" }],
+				successors: [
+					{ id: "build", kind: "primary" },
+					{ id: "review", kind: "primary" },
+				],
+			});
+		});
+
+		// Without the annotation a `>>?` neighbor is indistinguishable from a
+		// producer/consumer, and before #828 it was absent from both outputs.
+		const withFeedback = `${base}report >>? design\n`;
+
+		it("annotates a feedback neighbor as such in text", async () => {
+			const f = join(dir, "neighbors-feedback.pfdsl");
+			writeFileSync(f, withFeedback);
+			const r = await run(["graph", "neighbors", f, "design"]);
+			expect(r.exitCode).toBe(0);
+			expect(r.stdout).toBe(
+				"design (process)\npredecessors (artifact): req, report (feedback)\nsuccessors (artifact): spec\n",
+			);
+		});
+
+		it("--json tags a feedback neighbor with kind: feedback", async () => {
+			const f = join(dir, "neighbors-feedback-json.pfdsl");
+			writeFileSync(f, withFeedback);
+			const r = await run(["graph", "neighbors", f, "report", "--json"]);
+			expect(r.exitCode).toBe(0);
+			expect(JSON.parse(r.stdout)).toEqual({
+				ok: true,
+				id: "report",
+				kind: "artifact",
+				neighborKind: "process",
+				predecessors: [{ id: "review", kind: "primary" }],
+				successors: [{ id: "design", kind: "feedback" }],
 			});
 		});
 
@@ -3134,19 +5959,21 @@ spec >> review -> report
 			});
 		});
 
-		it("--json on parse error emits { ok: false, diagnostics } on stdout, empty stderr", async () => {
-			const r = await run([
-				"graph",
-				"neighbors",
-				join(dir, "invalid.pfdsl"),
-				"spec",
-				"--json",
-			]);
-			expect(r.exitCode).toBe(1);
-			expect(r.stderr).toBe("");
-			const parsed = JSON.parse(r.stdout);
-			expect(parsed.ok).toBe(false);
-			expect(Array.isArray(parsed.diagnostics)).toBe(true);
+		// A group never appears on an edge (N004), so it has no neighbors and no
+		// opposite kind — the lists stay unannotated rather than claiming one.
+		it("omits the neighbor kind for a group, whose neighbors are empty", async () => {
+			const f = join(dir, "neighbors-group.pfdsl");
+			writeFileSync(
+				f,
+				"---\ngroup:\n  core:\n    label: Core\nartifact:\n  spec:\n    group: core\n---\nreq >> design -> spec\n",
+			);
+			const r = await run(["graph", "neighbors", f, "core"]);
+			expect(r.exitCode).toBe(0);
+			expect(r.stdout).toBe(
+				"core (group)\npredecessors: (none)\nsuccessors: (none)\n",
+			);
+			const j = await run(["graph", "neighbors", f, "core", "--json"]);
+			expect(JSON.parse(j.stdout).neighborKind).toBe(null);
 		});
 
 		it("exits 2 when the id argument is missing", async () => {
@@ -3182,7 +6009,7 @@ spec >> review -> report
 			expect(r.stdout).toBe("(none)\n");
 		});
 
-		it("emits JSON", async () => {
+		it("--json emits the downstream set under { ok, impact }", async () => {
 			const f = join(dir, "impact-json.pfdsl");
 			writeFileSync(f, base);
 			const r = await run(["graph", "impact", f, "spec", "--json"]);
@@ -3212,21 +6039,6 @@ spec >> review -> report
 				ok: false,
 				missing: ["nonexistent"],
 			});
-		});
-
-		it("--json on parse error emits { ok: false, diagnostics } on stdout, empty stderr", async () => {
-			const r = await run([
-				"graph",
-				"impact",
-				join(dir, "invalid.pfdsl"),
-				"spec",
-				"--json",
-			]);
-			expect(r.exitCode).toBe(1);
-			expect(r.stderr).toBe("");
-			const parsed = JSON.parse(r.stdout);
-			expect(parsed.ok).toBe(false);
-			expect(Array.isArray(parsed.diagnostics)).toBe(true);
 		});
 	});
 
@@ -3258,21 +6070,6 @@ spec >> review -> report
 				missing: ["nonexistent"],
 			});
 		});
-
-		it("--json on parse error emits { ok: false, diagnostics } on stdout, empty stderr", async () => {
-			const r = await run([
-				"graph",
-				"depends-on",
-				join(dir, "invalid.pfdsl"),
-				"spec",
-				"--json",
-			]);
-			expect(r.exitCode).toBe(1);
-			expect(r.stderr).toBe("");
-			const parsed = JSON.parse(r.stdout);
-			expect(parsed.ok).toBe(false);
-			expect(Array.isArray(parsed.diagnostics)).toBe(true);
-		});
 	});
 
 	describe("path", () => {
@@ -3292,7 +6089,7 @@ spec >> review -> report
 			expect(r.stdout).toBe("no path found\n");
 		});
 
-		it("emits JSON", async () => {
+		it("--json emits every path between the two nodes", async () => {
 			const f = join(dir, "path-json.pfdsl");
 			writeFileSync(f, base);
 			const r = await run(["graph", "path", f, "spec", "code", "--json"]);
@@ -3327,22 +6124,6 @@ spec >> review -> report
 				ok: false,
 				missing: ["nonexistent"],
 			});
-		});
-
-		it("--json on parse error emits { ok: false, diagnostics } on stdout, empty stderr", async () => {
-			const r = await run([
-				"graph",
-				"path",
-				join(dir, "invalid.pfdsl"),
-				"spec",
-				"code",
-				"--json",
-			]);
-			expect(r.exitCode).toBe(1);
-			expect(r.stderr).toBe("");
-			const parsed = JSON.parse(r.stdout);
-			expect(parsed.ok).toBe(false);
-			expect(Array.isArray(parsed.diagnostics)).toBe(true);
 		});
 
 		it("exits 2 when the to argument is missing", async () => {
@@ -3440,6 +6221,66 @@ p3 -> d
 			);
 		});
 
+		// The suffix appears only on rows that have feedback, so scanning a file
+		// without any (roadmap.pfdsl has none) is unchanged (#831).
+		it("appends the feedback degree only to rows that carry one", async () => {
+			const f = join(dir, "stats-feedback.pfdsl");
+			writeFileSync(f, `${base}report >>? design\n`);
+			const r = await run(["graph", "stats", f]);
+			expect(r.exitCode).toBe(0);
+			const rows = r.stdout.split("\n");
+			expect(rows.find((l) => l.startsWith("design "))).toBe(
+				"design (process)   fan-in=1  fan-out=1  total=2  feedback-in=1",
+			);
+			expect(rows.find((l) => l.startsWith("report "))).toBe(
+				"report (artifact)   fan-in=1  fan-out=0  total=1  feedback-out=1",
+			);
+			expect(rows.find((l) => l.startsWith("spec "))).toBe(
+				"spec (artifact)   fan-in=1  fan-out=2  total=3",
+			);
+		});
+
+		it("--json reports the feedback degree in its own fields", async () => {
+			const f = join(dir, "stats-feedback-json.pfdsl");
+			writeFileSync(f, `${base}report >>? design\n`);
+			const r = await run(["graph", "stats", f, "--json"]);
+			expect(r.exitCode).toBe(0);
+			const stats = JSON.parse(r.stdout).stats as {
+				id: string;
+				fanIn: number;
+				fanOut: number;
+				feedbackFanIn: number;
+				feedbackFanOut: number;
+			}[];
+			expect(stats.find((s) => s.id === "design")).toEqual({
+				id: "design",
+				kind: "process",
+				fanIn: 1,
+				fanOut: 1,
+				feedbackFanIn: 1,
+				feedbackFanOut: 0,
+			});
+			// The ranking stays on the primary degree: spec (3) still leads design,
+			// which would tie it at 3 if feedback counted.
+			expect(stats[0]?.id).toBe("spec");
+		});
+
+		// --limit cuts the list after the primary-degree sort, so a node whose
+		// connection is mostly feedback can fall outside the window: on
+		// .pfdsl/workflow.pfdsl six of the twenty best-connected nodes do, one of
+		// them at primary rank 56. A connectivity sweep has to read the full
+		// listing, which is what the pfd-ecosystem skill now says.
+		it("--limit cuts on the primary degree, dropping feedback-heavy rows", async () => {
+			const f = join(dir, "stats-limit-feedback.pfdsl");
+			writeFileSync(f, `${base}report >>? design\nreport >>? build\n`);
+			const r = await run(["graph", "stats", f, "--limit", "2"]);
+			expect(r.exitCode).toBe(0);
+			// report has the highest feedback degree (2) and the lowest primary
+			// degree of the two, so the window keeps neither of its rows.
+			expect(r.stdout).not.toContain("report ");
+			expect(r.stdout.split("\n").filter(Boolean)).toHaveLength(2);
+		});
+
 		it("--limit caps the number of rows", async () => {
 			const f = join(dir, "stats-limit.pfdsl");
 			writeFileSync(f, base);
@@ -3448,7 +6289,7 @@ p3 -> d
 			expect(r.stdout.trim().split("\n")).toHaveLength(1);
 		});
 
-		it("emits JSON", async () => {
+		it("--json emits per-node degree stats in rank order", async () => {
 			const f = join(dir, "stats-json.pfdsl");
 			writeFileSync(f, base);
 			const r = await run(["graph", "stats", f, "--json"]);
@@ -3460,6 +6301,8 @@ p3 -> d
 				kind: "artifact",
 				fanIn: 1,
 				fanOut: 2,
+				feedbackFanIn: 0,
+				feedbackFanOut: 0,
 			});
 		});
 
@@ -3501,20 +6344,6 @@ p3 -> d
 			expect(r.stderr).toBe("");
 			expect(() => JSON.parse(r.stdout)).not.toThrow();
 		});
-
-		it("--json on parse error emits { ok: false, diagnostics } on stdout, empty stderr", async () => {
-			const r = await run([
-				"graph",
-				"stats",
-				join(dir, "invalid.pfdsl"),
-				"--json",
-			]);
-			expect(r.exitCode).toBe(1);
-			expect(r.stderr).toBe("");
-			const parsed = JSON.parse(r.stdout);
-			expect(parsed.ok).toBe(false);
-			expect(Array.isArray(parsed.diagnostics)).toBe(true);
-		});
 	});
 
 	describe("orphans", () => {
@@ -3538,7 +6367,7 @@ p3 -> d
 			expect(r.stdout).toBe("(none)\n");
 		});
 
-		it("emits JSON", async () => {
+		it("--json emits the nodes that no edge reaches", async () => {
 			const f = join(dir, "orphans-json.pfdsl");
 			writeFileSync(
 				f,
@@ -3551,57 +6380,328 @@ p3 -> d
 			expect(parsed.orphans).toEqual([{ id: "floater", kind: "artifact" }]);
 		});
 
-		it("--json on parse error emits { ok: false, diagnostics } on stdout, empty stderr", async () => {
+		// Groups never carry edges, so counting them made every group in a file
+		// an orphan — five of the five rows this repo's pipeline.pfdsl
+		// reported were groups, leaving zero real findings among them (#676).
+		it("does not report a group", async () => {
+			const f = join(dir, "orphans-group.pfdsl");
+			writeFileSync(
+				f,
+				`---\ngroup:\n  planning:\n    label: "Planning"\nartifact:\n  req:\n    status: todo\n    group: planning\n  spec:\n    status: done\n---\nreq >> design -> spec\n`,
+			);
+			const r = await run(["graph", "orphans", f]);
+			expect(r.exitCode).toBe(0);
+			expect(r.stdout).toBe("(none)\n");
+		});
+
+		// `>>?` is how a node that feeds practice rather than a pipeline stage is
+		// meant to be wired, and the help text promises "fully disconnected"
+		// (#704).
+		it("does not report a node held only by a feedback edge", async () => {
+			const f = join(dir, "orphans-feedback.pfdsl");
+			writeFileSync(f, `${base}guide >>? design\n`);
+			const r = await run(["graph", "orphans", f]);
+			expect(r.exitCode).toBe(0);
+			expect(r.stdout).toBe("(none)\n");
+		});
+	});
+
+	describe("locate", () => {
+		const src = `---
+artifact:
+  spec:
+    label: Spec
+process:
+  design:
+    label: Design
+---
+req >> design -> spec
+`;
+
+		it("prints the declaration line then the edge line(s) as text", async () => {
+			const f = join(dir, "locate.pfdsl");
+			writeFileSync(f, src);
+			const r = await run(["graph", "locate", f, "design"]);
+			expect(r.exitCode).toBe(0);
+			expect(r.stdout).toBe(`${f}:6: declaration\n${f}:9: edge\n`);
+		});
+
+		it("--json emits { ok, id, declarationLine, edgeLines, fieldLines }", async () => {
+			const f = join(dir, "locate-json.pfdsl");
+			writeFileSync(f, src);
+			const r = await run(["graph", "locate", f, "design", "--json"]);
+			expect(r.exitCode).toBe(0);
+			expect(JSON.parse(r.stdout)).toEqual({
+				ok: true,
+				id: "design",
+				declarationLine: 6,
+				edgeLines: [9],
+				fieldLines: {},
+			});
+		});
+
+		it("--field <name> adds the field's key line to --json fieldLines", async () => {
+			const f = join(dir, "locate-field-json.pfdsl");
+			writeFileSync(f, src);
 			const r = await run([
 				"graph",
-				"orphans",
-				join(dir, "invalid.pfdsl"),
+				"locate",
+				f,
+				"design",
+				"--field",
+				"label",
 				"--json",
 			]);
+			expect(r.exitCode).toBe(0);
+			expect(JSON.parse(r.stdout)).toEqual({
+				ok: true,
+				id: "design",
+				declarationLine: 6,
+				edgeLines: [9],
+				fieldLines: { label: 7 },
+			});
+		});
+
+		it("--field <name> prints a field line right after declaration, before edge lines", async () => {
+			const f = join(dir, "locate-field-text.pfdsl");
+			writeFileSync(f, src);
+			const r = await run(["graph", "locate", f, "design", "--field", "label"]);
+			expect(r.exitCode).toBe(0);
+			expect(r.stdout).toBe(
+				`${f}:6: declaration\n${f}:7: field label\n${f}:9: edge\n`,
+			);
+		});
+
+		it("--field with multiple comma-separated names prints them in line order, not request order", async () => {
+			const f = join(dir, "locate-field-multi.pfdsl");
+			const multi = `---
+artifact:
+  spec:
+    label: Spec
+    description: a description
+    status: done
+---
+x -> spec
+`;
+			writeFileSync(f, multi);
+			const r = await run([
+				"graph",
+				"locate",
+				f,
+				"spec",
+				"--field",
+				"status,label",
+			]);
+			expect(r.exitCode).toBe(0);
+			expect(r.stdout).toBe(
+				`${f}:3: declaration\n${f}:4: field label\n${f}:6: field status\n${f}:8: edge\n`,
+			);
+		});
+
+		it("--field naming a field the node doesn't have: null in JSON, no text line, stderr warning", async () => {
+			const f = join(dir, "locate-field-missing.pfdsl");
+			writeFileSync(f, src);
+			const jsonRun = await run([
+				"graph",
+				"locate",
+				f,
+				"design",
+				"--field",
+				"bogus",
+				"--json",
+			]);
+			expect(jsonRun.exitCode).toBe(0);
+			expect(JSON.parse(jsonRun.stdout)).toEqual({
+				ok: true,
+				id: "design",
+				declarationLine: 6,
+				edgeLines: [9],
+				fieldLines: { bogus: null },
+			});
+			expect(jsonRun.stderr).toContain("'bogus'");
+
+			const textRun = await run([
+				"graph",
+				"locate",
+				f,
+				"design",
+				"--field",
+				"bogus",
+			]);
+			expect(textRun.exitCode).toBe(0);
+			expect(textRun.stdout).toBe(`${f}:6: declaration\n${f}:9: edge\n`);
+			expect(textRun.stderr).toContain("'bogus'");
+		});
+
+		it("a bare --field flag with no value is a usage error (exit 2)", async () => {
+			const f = join(dir, "locate-field-bare.pfdsl");
+			writeFileSync(f, src);
+			const r = await run(["graph", "locate", f, "design", "--field"]);
+			expect(r.exitCode).toBe(2);
+		});
+
+		it("uses - as the file part of a text line when reading from stdin", async () => {
+			const r = await run(["graph", "locate", "-", "design"], withStdin(src));
+			expect(r.exitCode).toBe(0);
+			expect(r.stdout).toBe("-:6: declaration\n-:9: edge\n");
+		});
+
+		it("a node declared only via a bare node-decl has no declaration line, only edge line(s)", async () => {
+			const f = join(dir, "locate-isolated.pfdsl");
+			writeFileSync(f, "req >> design -> spec\niso\n");
+			const r = await run(["graph", "locate", f, "iso", "--json"]);
+			expect(r.exitCode).toBe(0);
+			expect(JSON.parse(r.stdout)).toEqual({
+				ok: true,
+				id: "iso",
+				declarationLine: null,
+				edgeLines: [2],
+				fieldLines: {},
+			});
+		});
+
+		it("exits 1 with the shared id(s)-not-found message when the id is not found", async () => {
+			const f = join(dir, "locate-notfound.pfdsl");
+			writeFileSync(f, src);
+			const r = await run(["graph", "locate", f, "nonexistent"]);
+			expect(r.exitCode).toBe(1);
+			expect(r.stderr).toBe(`error: id(s) not found in ${f}: nonexistent\n`);
+		});
+
+		it("--json on id-not-found emits { ok: false, missing } on stdout, empty stderr", async () => {
+			const f = join(dir, "locate-notfound-json.pfdsl");
+			writeFileSync(f, src);
+			const r = await run(["graph", "locate", f, "nonexistent", "--json"]);
 			expect(r.exitCode).toBe(1);
 			expect(r.stderr).toBe("");
-			const parsed = JSON.parse(r.stdout);
-			expect(parsed.ok).toBe(false);
-			expect(Array.isArray(parsed.diagnostics)).toBe(true);
+			expect(JSON.parse(r.stdout)).toEqual({
+				ok: false,
+				missing: ["nonexistent"],
+			});
 		});
 
-		it("missing file returns exit 1", async () => {
-			const r = await run(["graph", "orphans", join(dir, "nonexistent.pfdsl")]);
-			expect(r.exitCode).toBe(1);
+		it("exits 2 when the id argument is missing", async () => {
+			const f = join(dir, "locate-missing.pfdsl");
+			writeFileSync(f, src);
+			const r = await run(["graph", "locate", f]);
+			expect(r.exitCode).toBe(2);
 		});
+	});
 
-		it("--help returns help text", async () => {
-			const r = await run(["graph", "orphans", "--help"]);
+	describe("describe", () => {
+		const src = `---
+artifact:
+  spec:
+    label: Spec
+process:
+  design:
+    label: Design
+---
+req >> design -> spec
+`;
+
+		// The neighbor lists carry the kind their members share, from the same
+		// shared renderer as `graph neighbors`: describe already led with the
+		// node's own kind, but bare neighbor ids still cost a describe per
+		// neighbor to classify (#844).
+		it("prints kind, fields, neighbors, and locate lines as text", async () => {
+			const f = join(dir, "describe.pfdsl");
+			writeFileSync(f, src);
+			const r = await run(["graph", "describe", f, "design"]);
 			expect(r.exitCode).toBe(0);
-			expect(r.stdout).toContain("pfdsl graph orphans");
+			expect(r.stdout).toBe(
+				`design (process)\ndesign.label: Design\npredecessors (artifact): req\nsuccessors (artifact): spec\n${f}:6: declaration\n${f}:9: edge\n`,
+			);
+		});
+
+		it("--json emits { ok, id, kind, meta, neighborKind, predecessors, successors, declarationLine, edgeLines }", async () => {
+			const f = join(dir, "describe-json.pfdsl");
+			writeFileSync(f, src);
+			const r = await run(["graph", "describe", f, "design", "--json"]);
+			expect(r.exitCode).toBe(0);
+			expect(JSON.parse(r.stdout)).toEqual({
+				ok: true,
+				id: "design",
+				kind: "process",
+				meta: { label: "Design" },
+				neighborKind: "artifact",
+				predecessors: [{ id: "req", kind: "primary" }],
+				successors: [{ id: "spec", kind: "primary" }],
+				declarationLine: 6,
+				edgeLines: [9],
+			});
+		});
+
+		// group is a NodeKind alongside artifact/process, with no edges of its
+		// own — describe still resolves it (unlike graph.nodes-based
+		// subcommands, which only ever see artifact/process).
+		it("resolves a group id, with empty predecessors/successors and no edge lines", async () => {
+			const f = join(dir, "describe-group.pfdsl");
+			writeFileSync(
+				f,
+				"---\ngroup:\n  core:\n    label: Core\nartifact:\n  spec:\n    group: core\n---\nreq >> design -> spec\n",
+			);
+			const r = await run(["graph", "describe", f, "core", "--json"]);
+			expect(r.exitCode).toBe(0);
+			expect(JSON.parse(r.stdout)).toEqual({
+				ok: true,
+				id: "core",
+				kind: "group",
+				meta: { label: "Core" },
+				neighborKind: null,
+				predecessors: [],
+				successors: [],
+				declarationLine: 3,
+				edgeLines: [],
+			});
+		});
+
+		it("exits 1 with the shared id(s)-not-found message when the id is not found", async () => {
+			const f = join(dir, "describe-notfound.pfdsl");
+			writeFileSync(f, src);
+			const r = await run(["graph", "describe", f, "nonexistent"]);
+			expect(r.exitCode).toBe(1);
+			expect(r.stderr).toBe(`error: id(s) not found in ${f}: nonexistent\n`);
+		});
+
+		it("--json on id-not-found emits { ok: false, missing } on stdout, empty stderr", async () => {
+			const f = join(dir, "describe-notfound-json.pfdsl");
+			writeFileSync(f, src);
+			const r = await run(["graph", "describe", f, "nonexistent", "--json"]);
+			expect(r.exitCode).toBe(1);
+			expect(r.stderr).toBe("");
+			expect(JSON.parse(r.stdout)).toEqual({
+				ok: false,
+				missing: ["nonexistent"],
+			});
+		});
+
+		it("exits 2 when the id argument is missing", async () => {
+			const f = join(dir, "describe-missing.pfdsl");
+			writeFileSync(f, src);
+			const r = await run(["graph", "describe", f]);
+			expect(r.exitCode).toBe(2);
 		});
 	});
 });
 
 // Regression tests for the code-review findings on the restructure PR (#506).
 describe("review hardening", () => {
-	const invalidSrc = "req >> design -> spec\nother -> spec\n"; // V001
+	// diff's own { ok: false, diagnostics } case lives in the shared
+	// "--json failure payload" table, which additionally requires the
+	// diagnostics array to be non-empty — this copy had dropped that (#614).
 
-	it("diff --json emits { ok: false, diagnostics } when an input fails to parse", async () => {
-		const bad = join(dir, "review-diff-bad.pfdsl");
-		const good = join(dir, "review-diff-good.pfdsl");
-		writeFileSync(bad, invalidSrc);
-		writeFileSync(good, "req >> design -> spec\n");
-		const r = await run(["diff", bad, good, "--json"]);
-		expect(r.exitCode).toBe(1);
-		expect(r.stderr).toBe("");
-		const parsed = JSON.parse(r.stdout);
-		expect(parsed.ok).toBe(false);
-		expect(Array.isArray(parsed.diagnostics)).toBe(true);
-	});
-
-	it("meta set --json on an edge-only id (no frontmatter entry) emits { ok: false, missing }", async () => {
+	it("meta set --json on an edge-only id reports its absent definition", async () => {
 		const f = join(dir, "review-set-edge-only.pfdsl");
 		writeFileSync(f, "req >> design -> spec\n");
 		const r = await run(["meta", "set", f, "req", "status", "done", "--json"]);
 		expect(r.exitCode).toBe(1);
 		expect(r.stderr).toBe("");
-		expect(JSON.parse(r.stdout)).toEqual({ ok: false, missing: ["req"] });
+		expect(JSON.parse(r.stdout)).toMatchObject({
+			ok: false,
+			missing: [],
+			undefinedIds: [{ id: "req", kind: "artifact" }],
+		});
 	});
 
 	it("graph path --limit 0 does not claim 'no path found' when paths exist", async () => {
@@ -3682,5 +6782,313 @@ describe("review hardening", () => {
 		const r = await run(["fmt", f, "--mode", "flat"]);
 		expect(r.exitCode).toBe(2);
 		expect(r.stderr).toContain("removed");
+	});
+});
+
+// #902: the command table (COMMAND_GROUPS / TOP_LEVEL_COMMANDS) is the single
+// source both the dispatcher and every help listing are derived from, so a
+// command that dispatches but is missing from help (or vice versa) cannot
+// happen. These tests assert the two derived surfaces — the live dispatch
+// behavior and the live help text — agree with each other, not just with the
+// table (a table that no code path reads would pass a table-only check).
+describe("command table / help parity (#902)", () => {
+	/** Names introduced by a two-space-indented listing line, e.g. "  summary <file|-> ...". */
+	function namesInListing(text: string): string[] {
+		return [...text.matchAll(/^ {2}(\S+)/gm)].map((m) => m[1]!);
+	}
+
+	it.each(
+		COMMAND_GROUPS,
+	)("$name group: help's Subcommands list matches its dispatchable names", async (group) => {
+		const help = await run([group.name, "--help"]);
+		expect(help.exitCode).toBe(0);
+		const subcommandsSection = help.stdout
+			.split("Subcommands:\n")[1]!
+			.split("\n\nAll subcommands accept")[0]!;
+		const listed = namesInListing(subcommandsSection).sort();
+		const dispatchable = group.commands.map((c) => c.name).sort();
+		expect(listed).toEqual(dispatchable);
+	});
+
+	// Anchored to the first line, not `toContain`: a body copied from the
+	// neighbouring command mentions that command's own path further down (in
+	// an example line), so a substring match can find the expected path in a
+	// body that opens by naming a different command (#953).
+	it.each(
+		COMMAND_GROUPS,
+	)("$name group: every listed subcommand's --help exits 0 with a matching usage line", async (group) => {
+		for (const cmd of group.commands) {
+			const r = await run([group.name, cmd.name, "--help"]);
+			expect(r.exitCode).toBe(0);
+			expect(r.stdout.split("\n")[0]).toMatch(
+				new RegExp(`^usage: pfdsl ${group.name} ${cmd.name}(\\s|$)`),
+			);
+		}
+	});
+
+	it("top-level HELP Commands section names all dispatch with --help", async () => {
+		const commandsSection =
+			HELP.split("Commands:\n")[1]!.split("\n\nCommand groups")[0]!;
+		const names = namesInListing(commandsSection);
+		expect(names).toEqual(TOP_LEVEL_COMMANDS.map((c) => c.name));
+		for (const name of names) {
+			const r = await run([name, "--help"]);
+			expect(r.exitCode).toBe(0);
+		}
+	});
+
+	it.each(
+		TOP_LEVEL_COMMANDS,
+	)("$name: synopsis matches the first line of its own --help", (entry) => {
+		const firstLine = entry.help.split("\n")[0]!;
+		expect(firstLine).toBe(`usage: pfdsl ${entry.synopsis}`);
+	});
+
+	/** Every entry in either table, paired with the argv path that reaches it. */
+	const helpPaths = [
+		...TOP_LEVEL_COMMANDS.map((entry) => ({ path: [entry.name], entry })),
+		...COMMAND_GROUPS.flatMap((g) =>
+			g.commands.map((entry) => ({ path: [g.name, entry.name], entry })),
+		),
+	];
+
+	// The checks above read the first line of `entry.help`, and separately that
+	// `--help` exits 0 — neither one ties the text `--help` actually prints to
+	// the constant the table holds. A `help:` field pointed at the wrong
+	// constant changes what users read while both checks stay green (#953).
+	it.each(
+		helpPaths.map((h) => [h.path.join(" "), h] as const),
+	)("pfdsl %s --help prints the body its table entry holds", async (_label, {
+		path,
+		entry,
+	}) => {
+		const r = await run([...path, "--help"]);
+		expect(r.exitCode).toBe(0);
+		expect(r.stdout).toBe(entry.help);
+	});
+
+	// Catches the copy that the usage-line checks cannot: a body duplicated
+	// from a neighbour and then edited only in its first line still documents
+	// the wrong command's arguments. Exact equality is the right bar — the
+	// bodies share a near-verbatim `--no-color` line, so any similarity
+	// threshold loose enough to catch near-copies also flags legitimately
+	// distinct bodies (#953).
+	it("no two commands share a help body below the usage line", () => {
+		const seen = new Map<string, string>();
+		const duplicates: string[] = [];
+		for (const { path, entry } of helpPaths) {
+			const label = path.join(" ");
+			const body = entry.help.split("\n").slice(1).join("\n");
+			const previous = seen.get(body);
+			if (previous) duplicates.push(`${label} duplicates ${previous}`);
+			else seen.set(body, label);
+		}
+		expect(duplicates).toEqual([]);
+	});
+
+	// The two tables are separate arrays, and `dispatch` resolves groups
+	// first: a top-level entry sharing a group's name would be listed in HELP
+	// while never reaching its own `run`. That is the #902 defect with the
+	// two surfaces swapped — help promises a command the dispatcher does not
+	// deliver — so the tables have to stay disjoint.
+	it("no top-level command shares a name with a command group", () => {
+		const groupNames = COMMAND_GROUPS.map((g) => g.name);
+		const shadowed = TOP_LEVEL_COMMANDS.map((c) => c.name).filter((n) =>
+			groupNames.includes(n),
+		);
+		expect(shadowed).toEqual([]);
+	});
+});
+
+describe("deleteNodes preserves the planning queries (#1125)", () => {
+	// The sweep's own correctness condition, stated the way the backend
+	// reference states it: `status ready` and `status blocked` must be
+	// compared by their whole output, because comparing id sets alone passes
+	// a sweep that leaves a process ready while quietly taking an input away.
+	// Both cases below run against a fixture rather than `.pfdsl/roadmap.pfdsl`
+	// so that sweeping this repo's own roadmap never turns them stale.
+	const roadmap = `---
+type: roadmap
+artifact:
+  tool_a: { label: Tool A, status: done }
+  tool_b: { label: Tool B, status: done }
+  legacy_in: { label: Legacy In, status: done }
+  legacy_out: { label: Legacy Out, status: done }
+  feature: { label: Feature, status: todo }
+process:
+  build_legacy: { label: Build Legacy }
+  build_feature: { label: Build Feature }
+---
+
+legacy_in >> build_legacy -> legacy_out
+
+[tool_a, tool_b] >> build_feature -> feature
+`;
+
+	const planningQueries = async (source: string) => {
+		const f = join(
+			dir,
+			`planning-${Math.random().toString(36).slice(2)}.pfdsl`,
+		);
+		writeFileSync(f, source);
+		const ready = await run(["status", "ready", f, "--json"]);
+		const blocked = await run(["status", "blocked", f, "--json"]);
+		return { ready: ready.stdout, blocked: blocked.stdout, file: f };
+	};
+
+	const readyIds = (stdout: string): string[] =>
+		JSON.parse(stdout).ready.map((r: { id: string }) => r.id);
+
+	it("leaves both queries whole-output identical when a done chain is swept", async () => {
+		// build_legacy's chain is done end to end, so nothing still open reads it.
+		const { output, notFound } = deleteNodes(roadmap, [
+			"build_legacy",
+			"legacy_in",
+			"legacy_out",
+		]);
+		expect(notFound).toEqual([]);
+
+		const before = await planningQueries(roadmap);
+		const after = await planningQueries(output);
+		expect(after.ready).toBe(before.ready);
+		expect(after.blocked).toBe(before.blocked);
+
+		const checked = await run(["check", after.file]);
+		expect(checked.exitCode).toBe(0);
+		const orphans = await run(["graph", "orphans", after.file, "--json"]);
+		expect(JSON.parse(orphans.stdout).orphans).toEqual([]);
+	});
+
+	it("detects an input taken from a process that stays ready", async () => {
+		// The failure the reference names: tool_a is a done input of the ready
+		// build_feature, so dropping it leaves the ready id set untouched. A
+		// check written against ids alone would pass this; the whole-output
+		// comparison above is only worth running because it does not.
+		const { output } = deleteNodes(roadmap, ["tool_a"]);
+		const before = await planningQueries(roadmap);
+		const after = await planningQueries(output);
+
+		expect(readyIds(after.ready)).toEqual(readyIds(before.ready));
+		expect(after.ready).not.toBe(before.ready);
+	});
+
+	// prune compares `status ready` without empty.complete (#1125 defect 5).
+	// That relaxation must not reopen the gap the two tests above exist to
+	// close, so this drives comparableReady itself
+	// through the same "id set same, an item's declared inputs shrank"
+	// shape — via the same synthetic fixture as the two tests above rather
+	// than a real roadmap.pfdsl node name, so this sweeping that fixture
+	// eventually (this issue's own mechanism) never makes the test stale.
+	it("comparableReady still detects corruption that shrinks a ready item's inputs while its id set stays put (#1125 defect 5 regression guard)", async () => {
+		// tool_a is a done input of the ready build_feature; deleting only it
+		// (not the process, not tool_b) is exactly the "declared input
+		// silently dropped" corruption the comparison exists to catch, not a
+		// legitimate sweep of a completed chain — same deletion as the test
+		// above, driven through comparableReady itself instead of just the
+		// ready id set.
+		const { output, notFound } = deleteNodes(roadmap, ["tool_a"]);
+		expect(notFound).toEqual([]);
+
+		const before = await planningQueries(roadmap);
+		const after = await planningQueries(output);
+
+		expect(readyIds(after.ready)).toEqual(readyIds(before.ready));
+		const beforeItem = JSON.parse(before.ready).ready.find(
+			(r: { id: string }) => r.id === "build_feature",
+		);
+		const afterItem = JSON.parse(after.ready).ready.find(
+			(r: { id: string }) => r.id === "build_feature",
+		);
+		expect(afterItem.inputs.length).toBe(beforeItem.inputs.length - 1);
+
+		expect(comparableReady(before.ready)).not.toBe(
+			comparableReady(after.ready),
+		);
+	});
+});
+
+describe("FM004 string-sequence diagnostics", () => {
+	it.each([
+		false,
+		true,
+	])("rejects a mapping element with strict=%s", async (strict) => {
+		const file = join(dir, `bad-sequence-${strict}.pfdsl`);
+		writeFileSync(
+			file,
+			"---\nartifact:\n  a:\n    tags:\n      - x: y\n---\na >> p -> b\n",
+		);
+		const result = await run([
+			"check",
+			file,
+			"--json",
+			...(strict ? ["--strict"] : []),
+		]);
+		expect(result.exitCode).toBe(1);
+		expect(result.stderr).toBe("");
+		expect(JSON.parse(result.stdout).diagnostics).toContainEqual(
+			expect.objectContaining({
+				code: "FM004",
+				severity: "error",
+				range: expect.objectContaining({
+					start: expect.objectContaining({ line: 5, column: 9 }),
+				}),
+			}),
+		);
+	});
+	it("reports an invalid extends element rather than crashing in path resolution", async () => {
+		const file = join(dir, "bad-extends.pfdsl");
+		writeFileSync(file, "---\nextends: [{x: y}]\n---\na >> p -> b\n");
+		const result = await run(["check", file]);
+		expect(result.exitCode).toBe(1);
+		expect(result.stderr).toContain("FM004");
+		expect(result.stderr).toContain("extends");
+	});
+	it("explains FM004", async () => {
+		const result = await run(["explain", "FM004"]);
+		expect(result.exitCode).toBe(0);
+		expect(result.stdout).toContain("invalid type");
+	});
+});
+
+describe("FM004 in referenced files", () => {
+	it("reports invalid extends elements inside a nested preset", async () => {
+		const entry = join(dir, "preset-entry.pfdsl");
+		const middle = join(dir, "preset-middle.yaml");
+		const broken = join(dir, "preset-broken.yaml");
+		writeFileSync(
+			entry,
+			"---\nextends: ./preset-middle.yaml\n---\na >> p -> b\n",
+		);
+		writeFileSync(middle, "extends: [./preset-broken.yaml]\n");
+		writeFileSync(broken, "extends:\n  - x: y\n");
+		const result = await run(["check", entry, "--json"]);
+		expect(result.exitCode).toBe(1);
+		const diagnostics = JSON.parse(result.stdout).diagnostics;
+		expect(diagnostics).toContainEqual(
+			expect.objectContaining({
+				code: "FM004",
+				file: broken,
+				range: expect.objectContaining({
+					start: expect.objectContaining({ line: 2, column: 5, offset: 13 }),
+				}),
+			}),
+		);
+	});
+	it("reports invalid tags in a subflow child", async () => {
+		const entry = join(dir, "sequence-parent.pfdsl");
+		const child = join(dir, "sequence-child.pfdsl");
+		writeFileSync(
+			entry,
+			"---\nprocess:\n  p:\n    subflow: ./sequence-child.pfdsl\n---\na >> p -> b\n",
+		);
+		writeFileSync(
+			child,
+			"---\nartifact:\n  a:\n    tags: [42]\n---\na >> q -> b\n",
+		);
+		const result = await run(["check", entry, "--json"]);
+		expect(result.exitCode).toBe(1);
+		expect(JSON.parse(result.stdout).diagnostics).toContainEqual(
+			expect.objectContaining({ code: "FM004", file: child }),
+		);
 	});
 });

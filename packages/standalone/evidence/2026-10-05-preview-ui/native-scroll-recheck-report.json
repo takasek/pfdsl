@@ -1,0 +1,106 @@
+{
+	"schemaVersion": 1,
+	"date": "2026-10-05",
+	"scope": "Independent ordinary native replay of the exact current Large Cmd+Up discrepancy",
+	"execution": {
+		"app": "<checkout>/packages/standalone/src-tauri/target/debug/bundle/macos/PFDSL.app",
+		"binary": "Contents/MacOS/pfdsl-desktop",
+		"binarySha256Before": "68a76bae1ff661517f48cbfdd07ca115fd4c9fa2b547de7cbfcf985b5c1e7a29",
+		"binarySha256After": "68a76bae1ff661517f48cbfdd07ca115fd4c9fa2b547de7cbfcf985b5c1e7a29",
+		"pid": 70623,
+		"launch": "cua.getApp(full .app path) after parent-owned app was quit",
+		"acceptanceEnvironmentUsed": false,
+		"cleanup": {
+			"method": "Cmd+Q in owned app",
+			"toolObservation": "Computer Use server error -10005: App quit",
+			"psExitCode": 1,
+			"psOutput": "",
+			"pidAbsentConfirmed": true
+		}
+	},
+	"independence": {
+		"implementationSourceRead": false,
+		"diffRead": false,
+		"designRead": false,
+		"previousEvidenceModified": false,
+		"acceptanceOrIndexModified": false,
+		"gitMetadataOperations": false,
+		"externalWrites": false,
+		"otherAppsOrUserDocumentsModified": false
+	},
+	"fixture": {
+		"shortSha256": "a26577062a828e18dcde0b95e16b33b028635a60f2c631bd21e04629a1c3aeba",
+		"largeSha256": "df31c828012b30c62a503753d677497b0a3e4c0010b5d7192e49483389f06ef8",
+		"largeNodeCount": 71,
+		"sameLargeFixtureAsPreviousNativeDisplayRecheck": true,
+		"largeDescription": "seed, step_01..35, artifact_01..35; 40 content lines and final empty displayed line41"
+	},
+	"sequence": [
+		"Fresh ordinary native launch and initial full-window screenshot",
+		"Replace initial Japanese source with exact Foreground redraw test short fixture; capture AX and screenshot",
+		"Replace entire editor source with exact previous Large native pan exercise fixture; capture tail AX and visible tail/caret41",
+		"Send exactly one Cmd+Up; immediately request AX and screenshot with no intervening action or deliberate wait",
+		"Only after the after-key capture, select Welcome and return to Japanese tab; capture both",
+		"Cmd+Q; confirm owned PID absent"
+	],
+	"captureTimes": {
+		"beforeCaptureRequested": "2026-10-05T08:07:29.681Z",
+		"cmdUpRequested": "2026-10-05T08:07:42.365Z",
+		"afterCaptureRequested": "2026-10-05T08:07:42.371Z",
+		"afterCaptureCompleted": "2026-10-05T08:07:42.953Z",
+		"interveningRepairAction": false
+	},
+	"observations": [
+		{
+			"scenario": "Short source/minimap identity",
+			"result": "observed-pass",
+			"ax": "Exact four short content lines plus final newline; graph/minimap AX title Foreground redraw test and raw/refine/final",
+			"visibleEditor": "New title line2 and raw >> refine -> final line4",
+			"mainSvg": "Same short title and raw -> refine -> final",
+			"minimap": "Same title and three-node graph, no initial Japanese content retained",
+			"evidence": ["02-short"]
+		},
+		{
+			"scenario": "Before Cmd+Up",
+			"ax": "Caret-region tail beginning ct_22 and artifact_22 >> step_23 -> artifact_23, through artifact_34 >> step_35 -> artifact_35",
+			"visibleEditor": "Current Large source tail lines15-41; top partially clipped line14; black visible caret on empty line41 at column1",
+			"mainSvg": "Current Large chain segment seed/step_01/artifact_01/step_02 at100%",
+			"minimap": "Current long horizontal chain; tiny labels not visually readable",
+			"evidence": ["03-before-cmd-up"]
+		},
+		{
+			"scenario": "Immediate next capture after one Cmd+Up",
+			"result": "observed-pass-no-discrepancy-reproduced",
+			"ax": "Current Large source beginning, including title/layout/header and body starting seed >> step_01 -> artifact_01",
+			"visibleEditor": "Viewport now starts at line1; title Large native pan exercise on line2, layout LR on lines3-4, body from line6; visible black caret at column1 before --- on line1",
+			"mainSvg": "Current Large graph remains at100%",
+			"minimap": "Current long horizontal chain; AX title and71 node IDs remain current Large",
+			"noRepairActionsBeforeCapture": true,
+			"evidence": ["04-immediately-after-cmd-up"]
+		},
+		{
+			"scenario": "One later normal tab round trip",
+			"result": "observed-pass",
+			"otherTab": "Welcome shows original Welcome to PFDSL / idea >> design -> plan source and matching main/minimap at100%; AX source textarea omitted while unfocused",
+			"returnTab": "Japanese tab returns to current Large source beginning and100% with corresponding long graph/minimap; AX source also current Large beginning",
+			"ordering": "Round trip occurs after successful immediate Cmd+Up capture, not as a repair",
+			"evidence": ["05-other-tab", "06-large-tab-return"]
+		}
+	],
+	"remainingDiscrepancies": [],
+	"proofLimits": [
+		"One focused ordinary native replay on this exact hash. Earlier e0a697 binary navigation discrepancy remains frozen and is not reclassified.",
+		"CUA requested the next AX/screenshot immediately after pressKey resolved, using the tool automatic capture wait. This is not an instrumented first-animation-frame or stopped-frame timing measurement.",
+		"No independent OS frontmost identity established; screenshots were normal full-window captures. No Window menu, Raise, activation, or tab operation was used to repair the Cmd+Up capture.",
+		"Long Monaco AX text is a caret-centered source fragment, not a full-source dump. Visible source/caret/viewport are proved separately by screenshots.",
+		"Large minimap is a very small long-chain shape; all71 labels are not visually readable. Its AX title/IDs are separate semantic evidence.",
+		"No full native corpus, connector variants, preview editing, Format/Undo/Redo, coordinate hover/drag/pan, IME, file picker, disk-save/reopen, or error recovery was repeated in this focused replay."
+	],
+	"evidence": {
+		"axSnapshotCount": 6,
+		"consolidatedAx": "native-scroll-recheck-ax.txt",
+		"selectedScreenshotCount": 5,
+		"largeAxNodeCount": 71,
+		"largeAxIdsExactlyMatchFixture": true
+	}
+}

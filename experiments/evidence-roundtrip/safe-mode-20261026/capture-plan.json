@@ -1,0 +1,12 @@
+{
+  "processId": "i542_migrate_spec_id_refs",
+  "paths": [
+    "docs/spec/spec.md",
+    ".pfdsl/roadmap.pfdsl"
+  ],
+  "outputPaths": {
+    "spec_id_refs": [
+      "docs/spec/spec.md"
+    ]
+  }
+}

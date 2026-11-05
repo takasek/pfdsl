@@ -1,0 +1,14 @@
+pnpm -r typecheck
+Scope: 6 of 7 workspace projects
+packages/core typecheck$ tsgo --noEmit
+packages/core typecheck: Done
+packages/metadata-exporter typecheck$ tsgo --noEmit
+packages/graphviz-exporter typecheck$ tsgo --noEmit
+packages/metadata-exporter typecheck: Done
+packages/graphviz-exporter typecheck: Done
+packages/preview-engine typecheck$ tsgo --noEmit
+packages/preview-engine typecheck: Done
+packages/cli typecheck$ tsgo --noEmit
+packages/vscode-extension typecheck$ tsgo --noEmit
+packages/vscode-extension typecheck: Done
+packages/cli typecheck: Done

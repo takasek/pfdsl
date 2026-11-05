@@ -1,109 +1,55 @@
 #!/bin/sh
-pnpm biome check --write packages/ --no-errors-on-unmatched
-
-staged_packages=$(git diff --cached --name-only --diff-filter=d -- packages/)
-if [ -n "$staged_packages" ] && ! git diff --quiet -- $staged_packages; then
-  echo "Biome formatted files. Review changes and re-stage."
+# Branch policy comes from this checkout's HEAD; gates use the working tree.
+if [ ! -x ./scripts/hooks/check-default-branch ]; then
+  echo "error: scripts/hooks/check-default-branch is missing or not executable." >&2
   exit 1
 fi
-
-# When .pfdsl files are staged, verify snapshots are up-to-date.
-# Runs vitest -u to regenerate, then fails if any snapshot file changed.
-if git diff --cached --name-only | grep -q '\.pfdsl$'; then
-  pnpm --filter @pfdsl/core exec vitest run -u 2>/dev/null
-  if ! git diff --quiet -- packages/core/src/__snapshots__/; then
-    echo "Snapshots are stale. Run 'pnpm --filter @pfdsl/core exec vitest run -u' and re-stage the snapshot file."
-    exit 1
-  fi
-fi
-
-# When operational .pfdsl/ files are staged, verify they are canonically
-# formatted. Scoped to .pfdsl/ — hand-authored teaching material under docs/
-# is intentionally exempt, since fmt can materialize implied nodes there (#529).
-staged_ops_pfdsl=$(git diff --cached --name-only --diff-filter=d | grep -E '^\.pfdsl/.*\.pfdsl$' || true)
-if [ -n "$staged_ops_pfdsl" ]; then
-  if node scripts/lib/dist-freshness.mjs packages/cli/dist/cli.js; then
-    for f in $staged_ops_pfdsl; do
-      if ! node packages/cli/dist/cli.js fmt "$f" --check >/dev/null 2>&1; then
-        echo "$f is not canonically formatted. Run 'make fmt-pfdsl' and re-stage."
-        exit 1
-      fi
-    done
-  else
-    echo "note: skipping .pfdsl fmt check (packages/cli/dist/cli.js missing or stale) — run 'pnpm -r build' to enable locally; CI verifies it."
-  fi
-fi
-
-# When .md files are staged, reject mid-sentence line breaks (see #302).
-staged_md=$(git diff --cached --name-only --diff-filter=d -- '*.md')
-if [ -n "$staged_md" ]; then
-  if ! node scripts/check-md-linebreaks.mjs $staged_md; then
-    exit 1
-  fi
-fi
-
-# Shared shape for "regenerate/verify derived output, fail if stale" checks.
-# require_dist: space-separated dist files that must exist first, or "-" if
-# none needed. check_cmd: a command that itself returns non-zero when the
-# derived output is stale (regenerate-then-diff, or a drift-asserting test).
-check_drift() {
-  trigger=$1; require_dist=$2; check_cmd=$3; hint=$4
-  if ! git diff --cached --name-only | grep -qE "$trigger"; then
-    return 0
-  fi
-  if [ "$require_dist" != "-" ]; then
-    for f in $require_dist; do
-      if ! node scripts/lib/dist-freshness.mjs "$f"; then
-        echo "note: skipping drift check ($f missing or stale vs its src/) — run 'pnpm -r build' to enable locally; CI verifies it."
-        return 0
-      fi
-    done
-  fi
-  if ! eval "$check_cmd" >/dev/null 2>&1; then
-    echo "$hint"
-    exit 1
-  fi
+guard=$(git show HEAD:scripts/hooks/check-default-branch) || {
+  echo "error: cannot read scripts/hooks/check-default-branch from HEAD; default branch protection refuses this commit." >&2
+  exit 1
 }
+printf '%s\n' "$guard" | sh || exit 1
 
-# CI runs these three checks via different mechanisms (dedicated workflow
-# for gen-skill since it also needs its own checkout for cross-repo
-# install-skill consumption; inline `make check-readme-cli` step in
-# test.yml; a vitest test for gen-samples since dogfooding the exporter
-# is itself the check). Left as-is — no functional difference, and
-# converging them isn't worth the churn (see #265).
+# Validate the exact guard being committed before it becomes the next HEAD.
+case "$(git ls-files --stage -- scripts/hooks/check-default-branch)" in
+  "100755 "*) ;;
+  *) echo "error: the indexed scripts/hooks/check-default-branch must be an executable regular file." >&2; exit 1 ;;
+esac
+proposed_guard=$(git show :scripts/hooks/check-default-branch) || {
+  echo "error: cannot read scripts/hooks/check-default-branch from the index; refusing to commit an unvalidated guard." >&2
+  exit 1
+}
+printf '%s\n' "$proposed_guard" | sh -n || exit 1
+printf '%s\n' "$proposed_guard" | sh || exit 1
 
-# gen-skill.mjs embeds `pfdsl help` output, so it needs the CLI dist. Only
-# regenerates the .claude/skills/pfdsl dev working copy — the tracked
-# distribution copy (skills/pfdsl, for `gh skill install`) was removed in
-# favor of the plugin marketplace (#366).
-# Trigger pattern is sourced from scripts/lib/gen-skill-trigger.mjs (single
-# source of truth shared with gate-check.mjs) since this sh script can't import JS.
-gen_skill_trigger=$(node scripts/lib/gen-skill-trigger.mjs) || { echo "gen-skill trigger derivation failed"; exit 1; }
-check_drift "$gen_skill_trigger" "packages/cli/dist/cli.js" \
-  "node scripts/gen-skill.mjs --out .claude/skills/pfdsl" \
-  "The .claude/skills/pfdsl dev copy failed to regenerate. Run 'make gen-skill' and investigate."
+# Biome's own exit code decides the outcome (#723). The previous shape wrote
+# fixes and then inferred failure from "did a staged file change", which a
+# syntax error slips through: biome can't parse the file, so it can't format
+# it, so nothing changes even though biome exits non-zero (#596). --staged
+# scopes the check to the files this commit stages, so the paths live only in
+# biome.json's files.includes.
+# scripts/check-biome.mjs fails on a diagnostic of any severity (#747). The
+# flags it replaced reached errors and, with --error-on-warnings, warnings
+# (#742) — info severity was covered by neither, so those diagnostics printed
+# and exited 0, accumulating until they drowned the new ones. The wrapper
+# reports the failure itself, including what to run.
+# Biome checks index-exported files too: --staged alone chooses paths but reads
+# their worktree content. check-drift-gates runs Biome first in isolation.
 
-# gen-plugin.mjs bundles pfd-ecosystem/pfd-retro/commands plus the pfdsl skill
-# (via gen-skill.mjs) into plugin/pfdsl/; needs the CLI dist for the same
-# reason as the gen-skill check above (see #400/#401).
-# Trigger pattern is sourced from scripts/lib/gen-plugin-trigger.mjs (single
-# source of truth shared with gate-check.mjs).
-gen_plugin_trigger=$(node scripts/lib/gen-plugin-trigger.mjs) || { echo "gen-plugin trigger derivation failed"; exit 1; }
-check_drift "$gen_plugin_trigger" "packages/cli/dist/cli.js" \
-  "node scripts/gen-plugin.mjs && git diff --quiet -- plugin" \
-  "plugin/pfdsl is stale. Run 'make gen-plugin' and re-stage the plugin files."
-
-# The .dot/README drift guard is a vitest test that imports @pfdsl/core (→ dist).
-check_drift '^docs/samples/' \
-  "packages/core/dist/index.js packages/graphviz-exporter/dist/index.js" \
-  "pnpm --filter @pfdsl/graphviz-exporter exec vitest run index.test" \
-  "docs/samples drift: run 'make gen-samples' and re-stage .dot / README.md."
-
-# Verifies the README `## CLI` generated block matches `pfdsl help` output;
-# reads packages/cli/dist/cli.js directly.
-check_drift '^(packages/cli/src/|README\.md)' "packages/cli/dist/cli.js" \
-  "node scripts/gen-readme-cli.mjs && git diff --quiet -- README.md" \
-  "README.md CLI section is stale. Run 'make gen-readme-cli' and re-stage README.md."
+# Every remaining gate: .pfdsl canonical format, markdown
+# line breaks, and the "regenerate the derived output, fail if it changed"
+# checks. They live in scripts/check-drift-gates.mjs, which evaluates all of
+# them and reports every failing one at once — the sh versions here exited on
+# the first, so a commit with two problems took two attempts to discover the
+# second (#755, #759). Their declaration order, triggers and hints are
+# documented there.
+#
+# Biome stays an immediate exit: with a file it cannot parse, the later
+# checks' verdicts are not trustworthy, and a generator crashing on the broken
+# file would be reported as drift.
+if ! node scripts/check-drift-gates.mjs --with-biome; then
+  exit 1
+fi
 
 # Advisory-only (see #463): reminds to consider pfd-retro when a commit
 # marks a roadmap artifact done. Never blocks the commit.

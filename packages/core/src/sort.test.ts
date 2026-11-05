@@ -119,6 +119,27 @@ a >> p -> b
 });
 
 describe("sort --by topological", () => {
+	it("keeps a producer before a consumer with an additional source input", () => {
+		const src = `---
+artifact:
+  final: {}
+  built: {}
+  other: {}
+  start: {}
+process:
+  P2: {}
+  P1: {}
+---
+start >> P1 -> built
+[built, other] >> P2 -> final
+`;
+		const { output } = sort(src, { by: ["topological"] });
+		expect(nodeOrder(output, "process")).toEqual(["P1", "P2"]);
+		const artifacts = nodeOrder(output, "artifact");
+		expect(artifacts.indexOf("built")).toBeLessThan(artifacts.indexOf("final"));
+		expect(sort(output, { by: ["topological"] }).changed).toBe(false);
+	});
+
 	it("sorts nodes in topological order (source before sink)", () => {
 		const src = `---
 artifact:
@@ -243,8 +264,12 @@ artifact:
 b >> p -> a
 `;
 		const { output } = sort(src, { by: ["id"] });
-		// After sorting: a then b, blank line preserved between them
-		expect(output).toContain("\n\n");
+		// After sorting: a then b. The blank line travels with the node that
+		// carried it (yaml's `spaceBefore` is a leading-gap flag on the node
+		// itself), so it now renders right after the section header, before
+		// `a` — a blank (whitespace-only) line rather than the fully-empty
+		// "\n\n" the old line-splicing implementation produced.
+		expect(output).toMatch(/\n[ \t]*\n/);
 		expect(nodeOrder(output, "artifact")).toEqual(["a", "b"]);
 	});
 
@@ -282,6 +307,21 @@ b >> p -> a
 		const { output, changed } = sort(src, { by: ["index"] });
 		expect(changed).toBe(true);
 		expect(nodeOrder(output, "artifact")).toEqual(["a", "b"]);
+	});
+
+	it("sorts a whole section written as a single flow-style line, preserving its one-line form", () => {
+		const src = `---
+artifact: { z: { label: Z, index: 2 }, a: { label: A, index: 1 } }
+---
+a >> p -> z
+`;
+		const { output, changed } = sort(src, { by: ["index"] });
+		expect(changed).toBe(true);
+		expect(nodeOrder(output, "artifact")).toEqual(["a", "z"]);
+		// still a single flow-style line, not exploded to block style
+		expect(output).toContain(
+			"artifact: { a: { label: A, index: 1 }, z: { label: Z, index: 2 } }",
+		);
 	});
 
 	it("preserves the body (non-frontmatter) unchanged", () => {
@@ -322,5 +362,82 @@ a >> p -> b
 		const { output, changed } = sort(src, { by: ["id"] });
 		expect(changed).toBe(false);
 		expect(output).toBe(src);
+	});
+
+	it("keeps a CRLF source on CRLF (#644)", () => {
+		const src = [
+			"---",
+			"artifact:",
+			"  z: { label: Z }",
+			"  a: { label: A }",
+			"---",
+			"a >> p -> z",
+			"",
+		].join("\r\n");
+		const { output, changed } = sort(src, { by: ["id"] });
+		expect(changed).toBe(true);
+		expect(output.replace(/\r\n/g, "")).not.toContain("\n");
+	});
+
+	// Document#toString({ lineWidth: 0 }) would otherwise collapse a folded
+	// (`>`) scalar's hand-chosen line wraps onto one continuation line (#815).
+	it("preserves a folded scalar's hand-wrapped line breaks", () => {
+		const src = `---
+artifact:
+  z:
+    description: >
+      Hello
+      world.
+    label: Z
+  a: { label: A }
+---
+a >> p -> z
+`;
+		const { output, changed } = sort(src, { by: ["id"] });
+		expect(changed).toBe(true);
+		expect(output).toBe(`---
+artifact:
+  a: { label: A }
+  z:
+    description: >
+      Hello
+      world.
+    label: Z
+---
+a >> p -> z
+`);
+	});
+
+	// parseFrontmatterCst's yamlText slice excludes the closing fence's own
+	// line break (#644), so when a fold is the last field in the frontmatter,
+	// the write path used to lose that newline on re-splice — gluing the
+	// closing fence onto the fold's last continuation line (#815).
+	it("preserves a folded scalar's hand-wrapped line breaks when the fold is the frontmatter's last field", () => {
+		const src = `---
+artifact:
+  m: { label: M }
+  a: { label: A }
+  z:
+    label: Z
+    description: >
+      Hello
+      world.
+---
+a >> p -> z
+`;
+		const { output, changed } = sort(src, { by: ["id"] });
+		expect(changed).toBe(true);
+		expect(output).toBe(`---
+artifact:
+  a: { label: A }
+  m: { label: M }
+  z:
+    label: Z
+    description: >
+      Hello
+      world.
+---
+a >> p -> z
+`);
 	});
 });

@@ -1,0 +1,11 @@
+import {buildPresentationChain,resolvePresentation} from '/path/to/pfdsl/packages/core/dist/index.js';
+import {writeFileSync} from 'node:fs';
+const results=[];
+for(const depth of [5,10,15,18]) {
+ const docs=new Map();
+ for(let i=0;i<=depth;i++)for(const side of ['a','b'])docs.set(`/virtual/${side}${i}.yaml`,{frontmatter:i===depth?{statusStyles:{done:{color:'red'}}}:{extends:[`a${i+1}.yaml`,`b${i+1}.yaml`]}});
+ const t=performance.now();const chain=buildPresentationChain('/virtual/a0.yaml',docs);const resolved=resolvePresentation(chain);
+ results.push({depth,distinctDocs:docs.size,chainEntries:chain.length,ms:performance.now()-t,resolved});
+}
+writeFileSync('/tmp/pfdsl-audit/core-cli/presentation-results.json',JSON.stringify(results,null,2)+'\n');
+console.log(JSON.stringify(results,null,2));

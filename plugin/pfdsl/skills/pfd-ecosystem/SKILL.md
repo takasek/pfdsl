@@ -1,18 +1,20 @@
 ---
 name: pfd-ecosystem
+summary: ecosystem bootstrap
 description: |
   Use when bootstrapping or restructuring a project's PFD set (roadmap /
-  workflow / runtime-pipeline) — initializing .pfdsl/ in a new repo, when
+  workflow / pipeline) — initializing .pfdsl/ in a new repo, when
   .pfdsl/ is still scaffold, choosing which PFD kinds a project needs, or
   redesigning the kind structure. Interviews the user to pick needed kinds,
   prunes artifacts interactively, and grows the graphs. Prerequisite step
   before /pfd-cycle. The PFD kind taxonomy (ADR-0017: kind table, intake
   questions, one-file-per-kind rule) lives in references/kind-taxonomy.md.
 ---
+<!-- DO NOT EDIT. Authoritative source: scripts/harness-template/skills/pfd-ecosystem/SKILL.md. -->
 
 # pfd-ecosystem: プロジェクト PFD セット対話的構築
 
-roadmap / workflow / runtime-pipeline の3種別（ADR-0017）に基づき、 プロジェクトの `.pfdsl/` セットを scaffold から実際のグラフに育てる。
+roadmap / workflow / pipeline の3種別（ADR-0017）に基づき、 プロジェクトの `.pfdsl/` セットを scaffold から実際のグラフに育てる。
 **いきなり全部書かない** — 問診で必要な種別を絞り、ユーザーと対話しながら剪定する。
 
 ## ステップ 0: pfdsl スキルを起動する
@@ -25,7 +27,7 @@ roadmap / workflow / runtime-pipeline の3種別（ADR-0017）に基づき、 �
 
 - ルートの `README.md`
 - ディレクトリ構成（`ls` で主要ディレクトリを確認）
-- `.pfdsl/roadmap.pfdsl`（存在する場合）— 大きい図は全文 Read せず `pfdsl graph summary <file>`（件数）・`graph io <file>`（外部入力・終端）でまず輪郭を掴む。再構築（restructuring）検討時は `graph stats <file> --limit <n>` で hub ノード（fan-in/fan-out 高）も確認する
+- `.pfdsl/roadmap.pfdsl`（存在する場合）— 大きい図は全文 Read せず `pfdsl graph summary <file>`（件数）・`graph io <file>`（外部入力・終端）でまず輪郭を掴む。再構築（restructuring）検討時は `graph stats <file> --limit <n>` で hub ノード（fan-in/fan-out 高）も確認する。`fan-in` / `fan-out` / `total` と順位は primary エッジのみを数え、還流は `feedback-in` / `feedback-out`（`--json` では `feedbackFanIn` / `feedbackFanOut`）に分けて出る。**還流込みの接続度で hub を探すときは `--limit` を付けない** — 切り落としは primary 順で起きるため、還流の多いノードほど窓の外に落ちる（実測では接続度上位20件のうち6件が `--limit 20` に入らない）
 
 把握できたら、リポジトリの目的をひと言で要約してユーザーに提示する。
 
@@ -38,35 +40,55 @@ roadmap / workflow / runtime-pipeline の3種別（ADR-0017）に基づき、 �
 ステップ 2 で Yes になった種別のテンプレートを `.pfdsl/` にコピーする。
 テンプレートは pfd-ops スキルの `references/scaffold/` にある。所在はロード元で異なる（ADR-0028）:
 
-- plugin 経由（通常）: `${CLAUDE_PLUGIN_ROOT}/skills/pfd-ops/references/scaffold/` — CLAUDE_PLUGIN_ROOT は plugin ロード時に実パスへ置換される変数（`${CLAUDE_PLUGIN_ROOT}` の形でのみ置換対象）。上のパスが置換されず変数名のまま見えている場合は plugin 外ロードなので次項のパスを使う
+- plugin 経由（通常）: `${CLAUDE_PLUGIN_ROOT}/skills/pfd-ops/references/scaffold/`
 - repo-local: `.claude/skills/pfd-ops/references/scaffold/`
+
+どちらのロード元かの判定（`${CLAUDE_PLUGIN_ROOT}` が置換されず変数名のまま見える場合の扱い）と、どちらも解決しない場合の3つ目の分岐は、pfd-ops SKILL.md「発火時の必須セルフチェック」の変数解決規則が一次情報 — ここには複製しない。
 
 ```
 <scaffold>/roadmap.pfdsl
 <scaffold>/roadmap.md
 <scaffold>/workflow.pfdsl
 <scaffold>/workflow.md
-<scaffold>/runtime-pipeline.pfdsl
-<scaffold>/runtime-pipeline.md
+<scaffold>/pipeline.pfdsl
+<scaffold>/pipeline.md
 <scaffold>/bindings/pfd-retro.md
+<scaffold>/bindings/pfd-knowledge-audit.md
+<scaffold>/bindings/pfd-retro-patterns/sample-pattern.md
 <scaffold>/bindings/pfd-ops.md
+<scaffold>/review-perspectives.md
+<scaffold>/config.json
 ```
 
 必要な種別のファイルだけを `.pfdsl/` にコピーする（不要な種別はコピーしない）。
-`bindings/pfd-retro.md`・`bindings/pfd-ops.md` は種別と無関係（pfd-retro・pfd-ops スキルは全リポ共通で同梱される）— それぞれ `.pfdsl/bindings/pfd-retro.md`・`.pfdsl/bindings/pfd-ops.md` として常にコピーする。
+`bindings/pfd-retro.md`・`bindings/pfd-retro-patterns/`・`bindings/pfd-ops.md`・`review-perspectives.md` は種別と無関係（pfd-retro・pfd-ops スキルは全リポ共通で同梱される）— それぞれ `.pfdsl/bindings/pfd-retro.md`・`.pfdsl/bindings/pfd-retro-patterns/`・`.pfdsl/bindings/pfd-ops.md`・`.pfdsl/review-perspectives.md` として常にコピーする（`bindings/pfd-retro.md` がこのファイルを参照する）。
+`bindings/pfd-knowledge-audit.md` も `.pfdsl/bindings/pfd-knowledge-audit.md` としてコピーする。
+`config.json` も種別と無関係で、`.pfdsl/config.json` として常にコピーする。採用リポの離散的な宣言（スイッチや一覧）を置くファイルで、雛形は知識成果物監査を `decline` にしてある。
+`bindings/pfd-retro-patterns/` は事例・観察・反例の置き場で、`sample-pattern.md` は記録の見本を持つ（`bindings/pfd-retro.md` の「事例・観察・反例」節が保存と検索の方法を指す）。
 既に `.pfdsl/` にファイルが存在する場合は上書きしない。
+このステップの前に `.pfdsl/` が存在しなかった場合（新規の採用先）に限り、続けて `node <pfd-ops skill root>/scripts/check-install-sync.mjs --record-migration` を実行する（`<pfd-ops skill root>` は上の scaffold の所在と同じ規則で解決する）。
+新規の採用先には適用すべき移行が無いので、現在の plugin の版を `appliedMigration` に記録して始める。
+`.pfdsl/` が既にあった場合は、`config.json` をこのステップで新規に作っても実行しない。0.0.26 以前の採用先は `config.json` を持たない（0.1.0 の scaffold で導入された）ため、再実行で `config.json` が新規に作られても、その採用先は適用していない移行を適用済みと主張することになる。
+そのような採用先は、出力が指す migration guide を適用し、検証が通ってから記録する。
+companion をどの言語で書くかは pfd-ops スキルの `references/architecture.md`「companion の記述言語」節に従う。
 
-## ステップ 3.5: GitHub Issues バックエンド（L3）の採用・更新（任意）
+## ステップ 3.5: 作業項目バックエンド（L3）の採用・更新（任意）
 
-作業項目を GitHub Issues で管理する場合、リポ側自動化（GitHub Actions workflow・監査スクリプト）をリポルートへ実配置する:
+作業項目の一次情報と同期手段を選ぶ。プリセットは2つある — GitHub Issues とファイルベース・トラッカー。どちらも任意で、採用しない場合は `roadmap.pfdsl` の依存構造管理のみで運用する。
+
+**GitHub Issues を使う場合**は、リポ側自動化（GitHub Actions workflow・監査スクリプト）をリポルートへ実配置する:
 
 ```bash
 node <pfd-ops skill root>/scripts/check-install-sync.mjs --deploy
 ```
 
 `<pfd-ops skill root>` はステップ 3 と同じ規則で解決する（plugin: `${CLAUDE_PLUGIN_ROOT}/skills/pfd-ops`、repo-local: `.claude/skills/pfd-ops`）。
-既導入リポでは同じコマンドが refresh になる — ローカル編集されたファイルは上書きせず警告するので、上書きする場合のみユーザーに確認して `--force` を付ける。
-バックエンド規約の詳細は pfd-ops スキルの `references/github-issues-backend.md`。
+既導入リポでは同じコマンドが refresh になる — ローカル編集されたファイルは上書きせず警告するので、編集を捨てて上書きする場合のみユーザーに確認して `--overwrite-local-edits` を付ける（編集を抱えた旧ファイルを編集ごと削除するのは別フラグ `--delete-edited-orphans`。編集の無い旧ファイルはフラグ無しで削除される）。
+配置後は pfd-ops スキルの `references/github-issues-backend.md`「依存の準備と初回監査」に従い、依存の準備から監査実行まで進める。
+配置される completed-chain sweep の workflow は、`.pfdsl/config.json` で有効にしない限り動かない。有効にするかは同じ reference の「push 駆動の回収」節を示してユーザーに確認し、判断を config のキー `sweepCompletedChains` に残す。
+ファイル配置だけでは導入完了にならない。
+
+**リポ内 markdown ファイルで管理する場合**は、リポルートへの実配置手順は無い（GitHub Actions を使わないため）。バックエンド規約の詳細は pfd-ops スキルの `references/file-based-tracker-backend.md`。
 
 ## ステップ 4: 種別ごとに対話しながら構築する
 
@@ -87,8 +109,10 @@ node <pfd-ops skill root>/scripts/check-install-sync.mjs --deploy
 二者択一ではない — 前向きの列挙を既定の形としつつ、詰まった箇所ごとに grill で掘る。
 
 いずれの経路でも pfdsl スキルの品質ガイドに従って記法を確認する。雛形のプレースホルダは実際のノード名に置き換える（プレースホルダのまま残さない）。
+roadmap の雛形は出力 artifact を `suspended` にして着手候補から外してある。
+ノード名・完了条件を実データに置き換えた後、着手対象の出力 artifact を `todo` に戻す。
 
 ## ステップ 5: 検証とゲート
 
-- 各 `.pfdsl` ファイルに対して `pfdsl check <file>` が通ること
-- **roadmap.pfdsl を採用している場合のみ**: 作成した `.pfdsl` が `roadmap.pfdsl` に artifact として登録されているか確認する（未登録なら pfd-ops スキルの「成果物の門番」に従って登録する）。roadmap 未採用のリポではこの項目は N/A
+- 各 `.pfdsl` ファイルに対して `pfdsl check <file> --strict` が通ること
+- **roadmap.pfdsl を採用している場合のみ**: 作成した `.pfdsl` の登録要否は、pfd-ops の `references/work-cycle.md`「着手可能性と受け入れ」の判定基準に従う。登録対象は `roadmap.pfdsl` に artifact として登録されているか確認し、未登録なら同 reference の「成果物の門番」に従って登録する。roadmap 未採用のリポではこの項目は N/A

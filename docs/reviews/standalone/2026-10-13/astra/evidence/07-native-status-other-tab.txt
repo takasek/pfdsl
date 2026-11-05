@@ -1,0 +1,58 @@
+Window: "PFDSL Design Review 01a1339d", App: PFDSL Design Review 01a1339d.
+0 standard window PFDSL Design Review 01a1339d, Secondary Actions: Raise
+	1 scroll area
+		2 HTML content Description: PFDSL, URL: tauri://localhost
+			3 container
+				4 text PFDSL
+				5 button New
+				6 button Open file…
+				7 button Open folder…
+				8 button Save
+				9 button Save As…
+				10 button Format flows
+				11 button Format flat
+				12 button Normalized edges
+				13 text Saved.
+			14 container
+				15 heading Recent, Value: 2
+					16 text Recent
+				17 container Recent targets
+					18 button [local artifact: native-a.pfdsl], Help: [local artifact: [local] artifact: native-a.pfdsl]
+				19 heading Folder files, Value: 2
+					20 text Folder files
+				21 container PFD files
+				22 container Documents
+					23 tab (selected) Welcome, Value: on
+					24 button Close Welcome
+					25 tab (selectable) [local artifact: native-a.pfdsl] •
+					26 button Close [local artifact: native-a.pfdsl]
+				27 editor (settable) Editor content, Value: [editor: Editor content]
+				28 container Diagram view
+					29 button Zoom out
+					30 container Zoom level
+						31 text 100%
+					32 button Zoom in
+					33 button Fit
+					34 button 100%
+					35 button (collapsed) Node actions, Secondary Actions: Expand
+					36 button (collapsed) Help, Secondary Actions: Expand
+				37 container
+					38 text Welcome to PFDSL
+					39 button Node design. Enter for Node actions.
+					40 button Node plan. Enter for Node actions.
+					41 button Node idea. Enter for Node actions.
+				42 container
+					43 text Welcome to PFDSL design plan idea
+				44 menu Secondary Actions: Cancel
+				45 menu Secondary Actions: Cancel
+	46 close button
+	47 full screen button Help: this button also has an action to zoom the window, Secondary Actions: zoom the window
+	48 minimize button
+	49 text PFDSL Design Review 01a1339d
+50 menu bar
+	51 PFDSL Design Review 01a1339d
+	52 File
+	53 Edit
+	54 View
+	55 Window
+	56 Help

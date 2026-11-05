@@ -1,0 +1,290 @@
+/**
+ * Named GitHub operations: the sole entry point for production calls that
+ * promise gh/HTTP fallback parity. Each fallback-supported operation has a
+ * gh-CLI implementation and an HTTP (REST/GraphQL) implementation, and both
+ * return the same parsed JS value — callers never JSON.parse the result
+ * themselves. Operations that enter through this module but cannot fall back
+ * fail under their own name. Production calls that intentionally require gh
+ * and make no fallback promise remain outside this module.
+ *
+ * Backend selection keeps the discipline execGh (gh-exec.mjs) always had:
+ * try gh first; when it's missing (ENOENT) and a GH_TOKEN/GITHUB_TOKEN is
+ * available, fall back to HTTP. With neither route, expose operation-level
+ * unavailability. Executed backend failures remain real errors (#1085).
+ */
+
+import { isGhUnavailableError } from "./gh-compat.mjs";
+import { execGh } from "./gh-exec.mjs";
+import {
+	fetchAllIssues,
+	fetchAllLabels,
+	fetchIssueView,
+	fetchOpenPrs,
+	fetchPullRequestView,
+	mapLabelsResponse,
+	requireGitHubViewFields,
+	addIssueLabel as restAddIssueLabel,
+} from "./github-rest.mjs";
+import { proxyAwareFetch } from "./proxy-fetch.mjs";
+import { resolveRepository } from "./repository-identity.mjs";
+
+// How many entries the list operations return. Each one is a single value
+// used by both backends — gh reads it as `--limit`, HTTP truncates its own
+// walk to it. Two separately written caps is what let the backends disagree
+// about a repo past the limit while the parity claim above still stood.
+const LABEL_LIST_LIMIT = 100;
+const ISSUE_LIST_LIMIT = 1000;
+const PR_LIST_LIMIT = 100;
+
+/** No selectable backend exists for this operation; executed failures are never this type. */
+export class GitHubUnavailableError extends Error {
+	constructor(operation, options) {
+		super(
+			`GitHub operation unavailable: ${operation} (gh CLI absent and no HTTP token)`,
+			options,
+		);
+		this.name = "GitHubUnavailableError";
+		this.operation = operation;
+	}
+}
+
+export function isGitHubUnavailableError(error) {
+	return error instanceof GitHubUnavailableError;
+}
+export const GITHUB_UNAVAILABLE_EXIT_CODE = 2;
+
+async function rejectSaturatedList(operation, limit, itemsPromise) {
+	// A result with exactly `limit` entries may be the complete list or a
+	// cap-truncated list; neither backend reports which one it is. Rejecting
+	// both cases keeps a cap-bound result from being mistaken for a full list.
+	const items = await itemsPromise;
+	if (items.length >= limit)
+		throw new Error(
+			`github-ops: ${operation} hit its list limit of ${limit}; refusing a possibly truncated result`,
+		);
+	return items;
+}
+
+function commentDatabaseIdFromUrl(url) {
+	const match = typeof url === "string" && url.match(/#issuecomment-(\d+)$/);
+	if (!match) return undefined;
+	const databaseId = Number(match[1]);
+	return Number.isSafeInteger(databaseId) ? databaseId : undefined;
+}
+
+function normalizeIssueViewComments(issue) {
+	if (!Array.isArray(issue?.comments)) return issue;
+	return {
+		...issue,
+		comments: issue.comments.map((comment) => {
+			const normalized = {
+				id: comment.id,
+				databaseId: comment.databaseId ?? commentDatabaseIdFromUrl(comment.url),
+				author: comment.author,
+				body: comment.body === null ? "" : comment.body,
+				createdAt: comment.createdAt,
+				url: comment.url,
+			};
+			return Object.fromEntries(
+				Object.entries(normalized).filter(([, value]) => value !== undefined),
+			);
+		}),
+	};
+}
+
+/**
+ * @param {object} opts
+ * @param {string} [opts.cwd]
+ * @param {(args: string[], opts: {cwd: string, repository: Function}) => Promise<string>} [opts.execGhImpl]
+ * @param {typeof fetch} [opts.fetchImpl]
+ * @returns {Record<string, Function>}
+ */
+export function createGitHubOps({
+	cwd = process.cwd(),
+	execGhImpl = execGh,
+	fetchImpl = proxyAwareFetch,
+} = {}) {
+	const runGh = (args) => execGhImpl(args, { cwd, repository });
+
+	// `cwd` is fixed for this instance, so the repo it names is too. Resolving
+	// it once keeps a gate-check run that walks several issues from spawning
+	// `git remote get-url origin` per operation.
+	/** @type {ReturnType<typeof resolveRepository> | undefined} */
+	let repositoryCache;
+	const resolvedRepository = () => (repositoryCache ??= resolveRepository(cwd));
+	const repository = () => resolvedRepository().identity;
+	const ownerRepo = () => {
+		if (!resolvedRepository().httpSupported)
+			throw new Error(
+				`github-ops: unsupported HTTP fallback host: ${repository().host}; use the gh CLI for this repository`,
+			);
+		const { owner, repo } = repository();
+		return { owner, repo };
+	};
+
+	/**
+	 * Runs `ghCall`, and on a genuine gh-unavailable ENOENT with a token
+	 * present, checks HTTP host support, then runs `httpCall` for this repo.
+	 * A missing gh with no token becomes GitHubUnavailableError. Other gh
+	 * errors remain unchanged. `httpCall` undefined means this operation has no HTTP
+	 * implementation: once gh is confirmed unavailable and a token is
+	 * present (so HTTP fallback would otherwise be attempted), that is
+	 * reported as a named, operation-specific error rather than the
+	 * misleading original ENOENT.
+	 * @param {string} operation
+	 * @param {() => Promise<any>} ghCall
+	 * @param {((ctx: {owner?: string, repo?: string, token: string}) => Promise<any>) | undefined} httpCall
+	 */
+	async function withFallback(operation, ghCall, httpCall) {
+		try {
+			return await ghCall();
+		} catch (e) {
+			if (!isGhUnavailableError(e)) throw e;
+			const token = process.env.GH_TOKEN || process.env.GITHUB_TOKEN;
+			if (!token) throw new GitHubUnavailableError(operation, { cause: e });
+			if (!httpCall)
+				throw new Error(
+					`github-ops: '${operation}' has no HTTP backend implementation; the gh CLI is required for this operation`,
+				);
+			return await httpCall({ ...ownerRepo(), token });
+		}
+	}
+
+	function withListFallback(operation, limit, ghCall, httpCall) {
+		return rejectSaturatedList(
+			operation,
+			limit,
+			withFallback(operation, ghCall, httpCall),
+		);
+	}
+
+	return {
+		/** @returns {Promise<{name: string, description: string}[]>} */
+		listLabels: () =>
+			withListFallback(
+				"listLabels",
+				LABEL_LIST_LIMIT,
+				async () => {
+					const out = await runGh([
+						"label",
+						"list",
+						"--json",
+						"name,description",
+						"--limit",
+						String(LABEL_LIST_LIMIT),
+					]);
+					// gh's `--json name,description` and the REST labels payload
+					// carry the same two fields, so one mapping serves both.
+					return mapLabelsResponse(JSON.parse(out));
+				},
+				async ({ owner, repo, token }) =>
+					(await fetchAllLabels(owner, repo, token, fetchImpl)).slice(
+						0,
+						LABEL_LIST_LIMIT,
+					),
+			),
+
+		/** @returns {Promise<Array<{number: number, state: string, stateReason: string|null, labels: {name:string}[]}>>} */
+		listIssues: () =>
+			withListFallback(
+				"listIssues",
+				ISSUE_LIST_LIMIT,
+				async () => {
+					const out = await runGh([
+						"issue",
+						"list",
+						"--state",
+						"all",
+						"--json",
+						"number,state,stateReason,labels",
+						"--limit",
+						String(ISSUE_LIST_LIMIT),
+					]);
+					return JSON.parse(out);
+				},
+				({ owner, repo, token }) =>
+					fetchAllIssues(owner, repo, token, fetchImpl, ISSUE_LIST_LIMIT),
+			),
+
+		/**
+		 * @param {{number: number, fields: string[]}} params
+		 * @returns {Promise<Record<string, unknown>>}
+		 */
+		viewIssue: ({ number, fields }) =>
+			withFallback(
+				"viewIssue",
+				async () => {
+					const out = await runGh([
+						"issue",
+						"view",
+						String(number),
+						"--json",
+						fields.join(","),
+					]);
+					return normalizeIssueViewComments(JSON.parse(out));
+				},
+				({ owner, repo, token }) =>
+					fetchIssueView(owner, repo, token, number, fields, fetchImpl),
+			).then((value) => requireGitHubViewFields("issue view", fields, value)),
+
+		/** @returns {{host: string, owner: string, repo: string}} */
+		repository,
+
+		/**
+		 * @param {{number: number, fields: string[]}} params
+		 * @returns {Promise<Record<string, unknown>>}
+		 */
+		viewPr: ({ number, fields }) =>
+			withFallback(
+				"viewPr",
+				async () => {
+					const out = await runGh([
+						"pr",
+						"view",
+						String(number),
+						"--json",
+						fields.join(","),
+					]);
+					return JSON.parse(out);
+				},
+				({ owner, repo, token }) =>
+					fetchPullRequestView(owner, repo, token, number, fields, fetchImpl),
+			).then((value) => requireGitHubViewFields("pr view", fields, value)),
+
+		/** @returns {Promise<Array<{number: number, title: string}>>} */
+		listOpenPrs: () =>
+			withListFallback(
+				"listOpenPrs",
+				PR_LIST_LIMIT,
+				async () => {
+					const out = await runGh([
+						"pr",
+						"list",
+						"--state",
+						"open",
+						"--json",
+						"number,title",
+						"--limit",
+						String(PR_LIST_LIMIT),
+					]);
+					return JSON.parse(out);
+				},
+				({ owner, repo, token }) =>
+					fetchOpenPrs(owner, repo, token, fetchImpl, PR_LIST_LIMIT),
+			),
+
+		/**
+		 * @param {{number: number, label: string}} params
+		 * @returns {Promise<void>}
+		 */
+		addIssueLabel: ({ number, label }) =>
+			withFallback(
+				"addIssueLabel",
+				async () => {
+					await runGh(["issue", "edit", String(number), "--add-label", label]);
+				},
+				({ owner, repo, token }) =>
+					restAddIssueLabel(owner, repo, token, number, label, fetchImpl),
+			),
+	};
+}

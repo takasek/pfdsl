@@ -1,0 +1,15 @@
+{
+  "commit": "827bcb1cb96238f918dad84dc6453176f131e029",
+  "environment": {
+    "node": "v26.5.0",
+    "platform": "darwin",
+    "arch": "arm64"
+  },
+  "markdownFiles": 7,
+  "localLinksChecked": 191,
+  "jsonFilesParsed": 14,
+  "scriptsSyntaxChecked": 8,
+  "trackedProductDiff": [],
+  "allUntrackedUnderAuditDirectory": true,
+  "errors": []
+}

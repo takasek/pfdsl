@@ -1,10 +1,7 @@
 # subflow 仕様の agent 実書きプローブ（sonnet 被験者実験）
 
-ADR-0020 の付随資料（第3弾）。`boundary-validation-log.md` の手トレース・
-`spec-v0011-review.md` の机上レビューに対し、本ログは**読者実験**を記録する:
-spec v0.0.11 だけを読ませた sonnet subagent 3体に subflow の実タスクを課し、
-CLI `check` を正解器として採点した。狙いは「仕様が論理的に完結しているか」ではなく
-「初見の読者が仕様のどこで迷い・誤読し・回避行動を取るか」の検出。
+ADR-0020 の付随資料（第3弾）。`boundary-validation-log.md` の手トレース・`spec-v0011-review.md` の机上レビューに対し、本ログは**読者実験**を記録する:
+spec v0.0.11 だけを読ませた sonnet subagent 3体に subflow の実タスクを課し、CLI `check` を正解器として採点した。狙いは「仕様が論理的に完結しているか」ではなく「初見の読者が仕様のどこで迷い・誤読し・回避行動を取るか」の検出。
 
 **実験プロトコル**（再現用）:
 
@@ -28,10 +25,8 @@ bug_report >>? impl
 code >> package -> release_pkg
 ```
 
-**結果**: check **PASS**（W002 のみ）。被験者の戦略は
-「`bug_report >>? impl` を親に残し、**子フローには bug_report を一切登場させない**」。
-理由も正確: 子で `bug_report` に触れると（生成元が無いため）open input 集合に混入し
-全単射が崩れることを §2.9.3 の字義から読み取った。
+**結果**: check **PASS**（W002 のみ）。被験者の戦略は「`bug_report >>? impl` を親に残し、**子フローには bug_report を一切登場させない**」。
+理由も正確: 子で `bug_report` に触れると（生成元が無いため）open input 集合に混入し全単射が崩れることを §2.9.3 の字義から読み取った。
 
 **被験者が申告した曖昧点**:
 
@@ -41,20 +36,14 @@ code >> package -> release_pkg
 3. 確信度: 中〜高（境界ロジックは高、グレーゾーン解釈で減点）
 
 **反例としての読み**: check は通ったが、**課題の「意味を保存せよ」は満たせていない**。
-フラット版では bug_report が実装工程に還流することが図に描けていたのに、
-階層化後の子フロー（write_code → self_review）には「どの工程が bug_report を受けて直すのか」を
-書く合法手段が無い。つまり現行仕様では、feedback ループに触れるプロセスを subflow 化すると
-**エラーになるか、情報を捨てるかの二択**になる。これは spec-v0011-review **F1**
-（open input 定義の feedback 除外漏れ）の利用者側から見た症状であり、
-F1 修正（open input = 生成元なし **かつ** `>>` で消費）により
-「子で `bug_report >>? write_code` と書ける」が成立して解消する。
+フラット版では bug_report が実装工程に還流することが図に描けていたのに、階層化後の子フロー（write_code → self_review）には「どの工程が bug_report を受けて直すのか」を書く合法手段が無い。つまり現行仕様では、feedback ループに触れるプロセスを subflow 化すると **エラーになるか、情報を捨てるかの二択**になる。これは spec-v0011-review **F1**
+（open input 定義の feedback 除外漏れ）の利用者側から見た症状であり、F1 修正（open input = 生成元なし **かつ** `>>` で消費）により「子で `bug_report >>? write_code` と書ける」が成立して解消する。
 
 ---
 
 ## 実験B: 変更禁止の共有子フローを boundary で再利用（実書き）
 
-**課題**: 共有ライブラリ `fulfillment_lib.pfdsl`（変更禁止・独立命名・副産物 terminal 付き）を
-親の `order >> fulfill -> shipment` に `subflow:` で接続せよ。親側 ID は `order` / `shipment` を使いたい。
+**課題**: 共有ライブラリ `fulfillment_lib.pfdsl`（変更禁止・独立命名・副産物 terminal 付き）を親の `order >> fulfill -> shipment` に `subflow:` で接続せよ。親側 ID は `order` / `shipment` を使いたい。
 
 ```pfdsl
 incoming_order >> validate -> valid_order
@@ -62,21 +51,14 @@ valid_order >> pick -> picked_items
 picked_items >> pack -> [outgoing_parcel, packing_slip]
 ```
 
-仕掛けた罠: 子の terminal が `{outgoing_parcel, packing_slip}` の2件あるため、
-課題文の「出力は shipment のみ」の形のままでは全単射が成立しない。
+仕掛けた罠: 子の terminal が `{outgoing_parcel, packing_slip}` の2件あるため、課題文の「出力は shipment のみ」の形のままでは全単射が成立しない。
 N:M マップ（禁止）に走るか、親の出力 edge を増やすか、諦めて子を改変するかの分岐点。
 
-**結果**: check **PASS**。被験者は罠を正しく検知し、
-親を `order >> fulfill -> [shipment, delivery_slip]` に広げ、
-3組の完全な `boundary:` マップ（`order:incoming_order, shipment:outgoing_parcel,
-delivery_slip:packing_slip`）を書いた。N:M 濫用にも子の改変にも走らなかった。
+**結果**: check **PASS**。被験者は罠を正しく検知し、親を `order >> fulfill -> [shipment, delivery_slip]` に広げ、3組の完全な `boundary:` マップ（`order:incoming_order, shipment:outgoing_parcel, delivery_slip:packing_slip`）を書いた。N:M 濫用にも子の改変にも走らなかった。
 side 整合・全単射の手トレースも正確。
 
-**被験者が申告した曖昧点**: N:M 禁止の理由は書いてあるが、
-「子の terminal 数 > 親の出力 edge 数」という単純なカーディナリティ不一致に対して
-**「親側の edge を増やして全 terminal を露出させるのが正攻法」という例が仕様に無い**。
-実装者が boundary の N:M 濫用に走るリスクを指摘（= spec-v0011-review **F12** の提案と同内容が
-初見読者から独立に出た。誘導の1文と例を §2.9.3 に足す価値の傍証）。
+**被験者が申告した曖昧点**: N:M 禁止の理由は書いてあるが、「子の terminal 数 > 親の出力 edge 数」という単純なカーディナリティ不一致に対して **「親側の edge を増やして全 terminal を露出させるのが正攻法」という例が仕様に無い**。
+実装者が boundary の N:M 濫用に走るリスクを指摘（= spec-v0011-review **F12** の提案と同内容が初見読者から独立に出た。誘導の1文と例を §2.9.3 に足す価値の傍証）。
 
 ---
 
@@ -119,10 +101,7 @@ side 整合・全単射の手トレースも正確。
 3. **F12 誘導**（親出力を増やすのが正攻法、の1文+例）— 実験Bの被験者提案どおり
 4. **F21 明文化**（W003 はファイル内で閉じる、を明記）— 実験Aの副産物
 
-**手法メモ**: 「spec だけ読ませた agent + CLI 正解器」は安価に再現できる
-（本実験は3体・計約20万 token）。仕様の大型追加時に、手トレース（ADR-0020 Decision）の後段として
-1ラウンド挟む価値がある。オラクル型（実験C）は被験者の確信度の自己申告が
-「曖昧箇所の座標」をそのまま返すため、特に費用対効果が高い。
+**手法メモ**: 「spec だけ読ませた agent + CLI 正解器」は安価に再現できる（本実験は3体・計約20万 token）。仕様の大型追加時に、手トレース（ADR-0020 Decision）の後段として1ラウンド挟む価値がある。オラクル型（実験C）は被験者の確信度の自己申告が「曖昧箇所の座標」をそのまま返すため、特に費用対効果が高い。
 
 ---
 
@@ -139,13 +118,10 @@ F1 採用（spec v0.0.12 統合・checker 修正）後に、実験Cと同一の5
 | 4 | side 越境マップ | error | error | 高 | ✅ |
 | 5 | swap マップ | pass | pass | 高 | ✅ |
 
-**5/5 正解・全問確信度「高」**。Case 2 は v0.0.12 の新定義（open input の feedback 除外）を
-仕様文から正しく導出しての pass 判定であり、F1 の修正文面が haiku 級の読者にも到達可能なことを示す。
-唯一の注記は Case 4 の「越境」という語の多義性（cross-file とも読める）への言及のみで、
-文脈から解決できたと自己申告している。
+**5/5 正解・全問確信度「高」**。Case 2 は v0.0.12 の新定義（open input の feedback 除外）を仕様文から正しく導出しての pass 判定であり、F1 の修正文面が haiku 級の読者にも到達可能なことを示す。
+唯一の注記は Case 4 の「越境」という語の多義性（cross-file とも読める）への言及のみで、文脈から解決できたと自己申告している。
 
 **読み**: sonnet × v0.0.11 が 5/5 だが2問「中」だったのに対し、haiku × v0.0.12 は 5/5 全問「高」。
-モデルと spec の2変数が同時に動いているため厳密な帰属はできないが、より弱いモデルがより高い確信度で
-全問正解したことは「v0.0.12 の境界仕様は haiku 級の精読者に安全に委譲できる」ことの直接の証拠になる。
+モデルと spec の2変数が同時に動いているため厳密な帰属はできないが、より弱いモデルがより高い確信度で全問正解したことは「v0.0.12 の境界仕様は haiku 級の精読者に安全に委譲できる」ことの直接の証拠になる。
 厳密な前後比較（同一モデル × v0.0.11/v0.0.12）は #300 の編集整備の効果測定として実施する価値がある。
 コスト: haiku 1体 約5.3万 token・68秒 — オラクル型はモデル勾配測定の限界費用が極めて低い。

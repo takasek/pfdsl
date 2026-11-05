@@ -1,0 +1,14 @@
+APPDIR_SHA256SUMS: OK
+PFDSL.AppImage: OK
+SOURCE_COMMIT: OK
+build-environment.txt: OK
+frontend/assets/base91-DOY1bT5-.js: OK
+frontend/assets/duckdb-BzlFElZV.js: OK
+frontend/assets/editor.worker-DWPaKKV_.js: OK
+frontend/assets/expat-CX7Bg68x.js: OK
+frontend/assets/graphviz-BKX3zE1B.js: OK
+frontend/assets/index-CIDEMuNr.js: OK
+frontend/assets/index-DYw9prY3.css: OK
+frontend/assets/zstd-Dx_4Lof7.js: OK
+frontend/index.html: OK
+frontend/processing.js: OK

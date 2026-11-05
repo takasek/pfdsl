@@ -19,7 +19,7 @@
  */
 
 import { readFileSync } from "node:fs";
-import { execSync } from "node:child_process";
+import { gitLsFiles } from "./lib/run-exec.mjs";
 import { findSpecIdDefinitions } from "./lib/spec-id-check.mjs";
 import { computeRange } from "./lib/spec-id-range.mjs";
 
@@ -30,13 +30,7 @@ if (!id) {
 	process.exit(1);
 }
 
-const files =
-	fileArgs.length > 0
-		? fileArgs
-		: execSync('git ls-files "docs/**/*.md"', { encoding: "utf8" })
-				.trim()
-				.split("\n")
-				.filter(Boolean);
+const files = fileArgs.length > 0 ? fileArgs : gitLsFiles(["docs/**/*.md"]);
 
 const matches = [];
 const textByFile = new Map();
@@ -64,7 +58,10 @@ if (matches.length > 1) {
 const [match] = matches;
 const text = textByFile.get(match.file);
 const { startLine, endLine } = computeRange(text, match.line);
-const block = text.split("\n").slice(startLine - 1, endLine).join("\n");
+const block = text
+	.split("\n")
+	.slice(startLine - 1, endLine)
+	.join("\n");
 
 console.log(block);
 console.error(`${match.file}:${startLine}-${endLine}`);

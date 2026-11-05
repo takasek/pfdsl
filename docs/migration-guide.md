@@ -1,0 +1,617 @@
+# Migration guide
+
+Use this guide when upgrading an existing pfdsl installation.
+Release-specific cleanup instructions live here; distributed skills link here rather than retaining old migration rules.
+Run applicable steps in the adopting repository, preserving local changes and following its approval rules.
+
+## Choosing the update range
+
+Record both the installed and target CLI/plugin releases, including the bundle revision when package versions alone are ambiguous.
+Read the entries introduced after the installed release and through the target release, in release order; skip entries outside that interval.
+Changing a version number alone is not evidence that old local copies have been cleaned up.
+Apply the applicable release-specific changes first, complete the shared [Verify the cleanup](#verify-the-cleanup) step, and only then record the applied migration state when that feature is available.
+
+Run `pfdsl --version` using the CLI selected by the adopting repository and read the installed plugin's `.claude-plugin/plugin.json` or `.codex-plugin/plugin.json` for its current version.
+For a Git checkout, record its commit ID with `git rev-parse HEAD`; retain the Claude plugin's `.claude-plugin/bundle-manifest.sha256` when present, because a package version alone does not distinguish development bundles.
+Identify the target from the release tag or installed target bundle, rather than treating upstream main as a published release.
+
+For the last migration actually completed, first inspect `.pfdsl/config.json`'s `appliedMigration` and the repository history that committed it with the migration changes and checks.
+If no record exists, use upgrade PRs, release notes and retained previous plugin checkouts to establish the previous identity and which cleanup steps were verified.
+The currently installed plugin and an install manifest describe installed files, not proof that the repository completed those migrations.
+If the previous identity or completion is unknown, keep it unknown: inspect the potentially applicable entries through the target release against the repository's actual files, preserve local edits and verify each required action or its inapplicability.
+Do not infer a previous release or record the target merely to silence a notice.
+Record the target only after all potentially applicable steps have been resolved and their checks pass; report unresolved decisions until then.
+
+## Unreleased CLI/plugin — after CLI/plugin v0.2.0
+
+These changes are not yet assigned to a published CLI/plugin release.
+Apply them only when the target release includes the referenced changes; specification v0.0.29 is not a CLI/plugin version.
+
+### Use the CLI for completed-chain pruning
+
+Completed-chain retention and verification now live in `pfdsl prune`, shared by both tracker presets.
+Source: [Issue #1567](https://github.com/takasek/pfdsl/issues/1567), implementing ADR-0048 D4.
+Update the CLI, plugin and deployed sweep script together; adopting repositories are expected to update immediately.
+Mixed old/new installations are unsupported. The adapter invokes `prune` directly and forwards its output and exit status without compatibility probes or fallbacks.
+
+`pfdsl prune <roadmap>` previews the transformed source; `--json` reports deletion targets without writing.
+Use `--write` to apply and report deletions, or `--check` to return exit 1 when deletions are needed without changing the file.
+The deployed `sweep-completed-chains.mjs` still accepts `<file> [--write]`, but its stdout is now the CLI's JSON report.
+Update consumers that parse the old human-readable dry-run text to read the `deleted` array.
+Preview or verification failures do not modify the roadmap.
+When there are deletion targets, input must be canonically formatted; `prune` formats the output itself because removing producers can change canonical edge order.
+Ready and blocked comparisons ignore process, input/output and blocker order but still require identical membership and other fields, except for the completed-process count in an empty ready set.
+Remaining orphan nodes are reported as such; formatting the original cannot repair an orphan created by pruning.
+Input and output validation includes relative dependencies when a file path is supplied; stdin accepts only dependency-free roadmaps.
+
+As part of the same update, remove the adapter's former helpers under `scripts/pfdsl/lib/`: `chain-sweep.mjs`, `cli-id-arg.mjs`, `ready-compare.mjs`, and `scratch-path.mjs`.
+Inspect local changes and callers before removing them; migrate local callers to `prune` rather than retaining a second retention implementation.
+For file-based trackers, replace manual terminal-chain deletion with `prune` after the existing item/artifact completion checks.
+Do not mark unfinished or abandoned artifacts done merely to make them eligible for pruning.
+Before enabling the updated workflow, compare a JSON preview with the expected targets, verify that shared and feedback inputs remain, and run the existing roadmap checks after applying to a copy.
+
+### Link work items through process locations
+
+Work-item correspondence is now defined once in the work-cycle contract and uses `process.location`.
+Both backend presets refer to that contract.
+Issue-number prefixes in process IDs no longer establish a link, and unlinked processes remain valid.
+One work item may link to several processes; one process may link to several work items using a location array.
+Source: [Issue #1497](https://github.com/takasek/pfdsl/issues/1497).
+
+Before updating the bundle and its installed audit scripts, inventory the union of links encoded in existing process IDs and locations.
+For example, `i40_i41_do_work` with only issue 40 in its location also needs issue 41 in the new location array if both links remain intentional.
+Preserve each correspondence or record why it is removed.
+GitHub references must identify the issue's host, repository and number; the installed audit checks only the repository selected by `origin`.
+For a file tracker, use an item-specific URL, such as `file:///absolute/path/work-items.md#t1` or an existing document host's item URL.
+An absolute file URL is not automatically portable between checkouts, and the CLI does not validate URL targets or anchors.
+The adopting repository must check that the reference reaches the intended item.
+Do not use `work-items.md#t1` as a relative location: the current CLI treats the entire string as a filename.
+
+After populating locations, update any local readers that infer links from IDs and install the new audit scripts through the normal bundle update procedure.
+Compare every process-to-item correspondence before and after the update, including shared processes and items with several processes.
+Existing IDs remain valid spellings, but no longer carry correspondence metadata.
+If you rename them, use `pfdsl rename` and update references outside the diagram separately.
+Remove local instructions that require adding a prefix on issue creation, and any duplicate placeholder ledger maintained solely for that rule.
+Creating an issue now adds its location without requiring an ID change.
+
+### Separate model protocol from execution rules
+
+The work-cycle contract now describes PFD selection, acceptance and version-matched evidence.
+One process per cycle is a configurable default, and a successful run alone does not establish artifact acceptance.
+Evidence identifies the model version, artifact version and criteria, changed paths and status transitions, and each PFD file/process pair associated with the run.
+No new PFD field, storage format or run-ID scheme is required.
+Source: [Issue #1504](https://github.com/takasek/pfdsl/issues/1504) and its protocol-cleanup prerequisites.
+
+Before updating, retain the previous bundle and identify the execution rules your repository actually uses.
+Preserve those rules in the adopting repository, and connect them from its own root instructions or driver before removing the old call paths.
+The old “additional work-cycle steps” slot no longer invokes general development procedures at each stage.
+The replacement “PFD-specific additional gates” slot accepts only model acceptance conditions tied to named elements, criteria, declarations or queries.
+Do not move all old instructions into that slot.
+
+| Previous source | New responsibility |
+|---|---|
+| work-cycle conversation timing, audit invocation and record markers | Adopter's driver or execution rules |
+| pfd-retro generic operational-event checks and audit execution management | Adopter's operational audit, called from its own entry point |
+| GitHub preset's design-record placement, exact-write procedure, PR body/closing-reference rules and hotfix policy | Adopter's development rules |
+| GitHub preset's permission to assign or change `flow:managed` / `flow:exempt` without another confirmation | Adopter's execution rules; preserve this policy there if it is still intended, together with local scope and permission limits |
+| File tracker's design-record placement and approval-reference policy | Adopter's development rules |
+| pfd-retro knowledge-artifact audit | Independent `pfd-knowledge-audit` skill in the same plugin |
+| Dormant capabilities and nonterminating mechanisms | PFD diagram lenses, limited to modeled process inputs, consumers and acceptance criteria |
+
+The GitHub adapter still owns the principle of checking its own external writes.
+That does not prescribe how a person or another tool writes issue/PR text.
+If you retain the former write procedure, preserve its target-identity and exact persisted-body checks, including after later edits.
+
+`pfd-retro` now distinguishes execution failures, model revision candidates and no-change findings.
+Each conclusion names the model elements and evidence; missing or mismatched evidence remains undecided.
+General operational audits and knowledge-artifact audits are no longer implicitly run by model retro.
+If you used them, add their calls to your own execution entry point.
+Keep existing local observations and audit-management rules; do not overwrite local bindings with fresh scaffolds.
+
+Keep the existing `knowledgeLifecycleAudit` declaration and targets in `.pfdsl/config.json`.
+The classifier and audit reference now live under `pfd-knowledge-audit/`; update local invocations of the old `pfd-retro/scripts/classify-knowledge-lifecycle.mjs` path.
+Move target-specific knowledge-audit rules to `.pfdsl/bindings/pfd-knowledge-audit.md` as needed, preserving local text.
+The classifier still reports retired declarations in the old retro binding, and a declined or malformed declaration must not silently enable an audit.
+
+After updating, check that both standalone diagram review and evidence-based model retro work without a general execution-rules callback.
+Test a successful run whose artifact fails its criteria, multiple processes with the same ID in different files, and missing evidence.
+If knowledge auditing is adopted, run its shipped classifier against the adopting repository from outside that repository and verify the exact declared targets and warnings.
+Confirm that your own driver still reaches each retained local procedure, and that no two drivers control the same process.
+
+### Keep a local implementation agent if you need one
+
+The Claude Code plugin no longer bundles `pfd-implementer`; its only bundled agent is `pfd-lens`.
+The upstream repository continues generating its own Claude Code and Codex implementation agents from a repository-only template.
+The Codex native plugin continues to contain no agents.
+Source: [Issue #1503](https://github.com/takasek/pfdsl/issues/1503).
+
+If your repository uses the bundled `pfd-implementer` and wants to keep it, migrate before replacing the installed bundle:
+
+1. Retain `agents/pfd-implementer.md` from the installed Claude plugin, or recover that rendered file from the previous release's retained bundle.
+2. Copy it into your repository as `.claude/agents/pfd-implementer.md`. If that file already exists, compare and merge the definitions while preserving local changes.
+3. Remove the copied generated-file notice and adapt the instructions, tools and delegation references to your repository. The local copy is now your responsibility and will no longer receive plugin updates. Do not copy the upstream Mustache template as a ready-to-run agent.
+4. Start a new Claude Code session after upgrading, confirm the repository-local agent is available, and run a small delegated task using your normal workflow. Update any plugin-qualified invocation to select the local agent.
+
+Repositories that do not use this agent need no replacement.
+Existing repository-local agents are not deleted by this distribution change.
+
+### PR timing becomes an adopting repository's rule
+
+The status explanation below describes specification v0.0.29 for models without explicit reference targets.
+For the later specification contract, see the reference-target section below.
+
+Specification v0.0.29 and the distributed work-cycle no longer require updating an artifact to `done` in its completion commit or PR, or prescribe when to integrate that update for an artifact stored in another repository.
+The file-based tracker preset also stops requiring the work item's completed status and the artifact's `done` status in the same commit. It still requires both states in the version assessed as complete and retains the graph until that check is finished; commit and PR grouping belong to the adopting repository.
+The meaning of `status` is unchanged: it describes the tree containing the file, and the integration target's value is authoritative when multiple trees exist.
+The shared work-cycle requires updating output artifacts to `done` once criteria are supported by evidence.
+It now adds availability at the location and version needed by downstream work as a condition.
+Specify that location and version in criteria; the new default is availability in the integration target when neither is specified.
+The update may be included in the same integration that makes the artifact available; the integration target becomes `done` through that integration.
+The adopting repository decides which change unit carries the update; the update itself remains required.
+Status values and diagnostics are unchanged.
+
+This removes a distributed operational requirement; it does not provide equivalent protection through a new audit.
+Closing an issue does not update artifact status, and no close-reason monitor is introduced.
+
+If your repository relies on the former timing rule, preserve it as your own rule before upgrading:
+
+1. Read the installed bundle's `pfd-ops/references/work-cycle.md`, section `進捗と完了根拠`, or retain that file from the installed release tag or bundle archive.
+2. Copy the relevant timing into `.pfdsl/bindings/pfd-ops.md` or your execution environment's instructions, preserving local differences. For example, require a `done` update to accompany the completion change when both can be integrated in one PR, and explicitly assign the later update when the completed artifact is stored elsewhere.
+3. Ensure your root instructions or execution environment load that local rule. Do not assume that a future distributed work-cycle will continue loading a general workflow extension slot.
+4. Exercise your normal completion path and confirm that the status update reaches the intended integration tree. Include the separate-repository case if your project uses it. An unchanged `pfdsl check` result does not verify this timing.
+
+Keeping this rule is an adopting repository's choice, not a new mandatory migration check for projects that do not use it.
+This entry supersedes the v0.1.0 entry's instruction under [Roadmap declarations and status (V035)](#roadmap-declarations-and-status-v035) to change local instructions so that `done` must accompany the completion PR.
+When upgrading across that older interval to a release containing this change, do not introduce that obligation unless your repository chooses to retain it.
+While its roadmap remains in the repository, the upstream repository requires `done` in the completion PR when the merge alone satisfies criteria.
+If external approval or other unfinished work remains, even without further code changes, it integrates the artifact as `wip` (`waiting` for an external dependency), registers the remainder as follow-up work, and updates to `done` there when the evidence and required availability are established.
+See [its binding](https://github.com/takasek/pfdsl/blob/main/.pfdsl/bindings/pfd-ops.md).
+Source: [Issue #1523 and the owner's decision](https://github.com/takasek/pfdsl/issues/1523#issuecomment-6369838044).
+
+### Artifact reference targets: specification only
+
+Specification v0.0.30 defines document-level `baseRef` and artifact-level `ref`, both mappings containing nonblank string `source` and `revision` members.
+An artifact override replaces the whole mapping; it does not merge members with the default.
+An explicit target takes precedence over the containing checkout.
+When criteria do not specify a location or version, that target is the default integration target for acceptance.
+Process locations, command working directories, subflow and extends are independent of these artifact targets.
+For an externally stored model, the acquisition layer must explicitly provide their model context: a source, fixed version and logical model path.
+Resolve their relative paths in that context; if the required context is absent, report resolution failure instead of using the temporary extraction directory.
+Models stored locally and omitting both fields retain their existing behavior.
+
+This specification change does not provide an implementation or announce a CLI/plugin release supporting reference resolution.
+Existing extension fields with these names must conform to the new contract before use with a supporting implementation.
+Do not use a successful check by an older CLI as evidence of support: unknown fields may be ignored.
+Before moving the authoritative roadmap outside the repository, pin an implementation version that supports the contract and verify default targets, artifact overrides and resolution failures using that same version.
+Record the model source and fixed version separately from artifact source versions and logical paths.
+
+### Track unresolved dependencies in the roadmap
+
+**Behavior change:** The roadmap PFD now includes work with an unresolved dependency: a prerequisite is unfinished, or another task is waiting for its output.
+The former shared rule only checked whether the work gated another task; it did not include work solely because its own prerequisite was unfinished.
+The GitHub preset also listed task types, including releases, as managed examples. A release awaiting unfinished implementation remains included under the new criterion.
+A new feature whose prerequisites are all complete and whose output nobody is waiting for is not included solely because it creates a product capability or a final deliverable.
+The separate rule about which artifacts may be graph terminals is unchanged.
+
+**Clarifications:** Task-type lists are removed, “dependency graph” means the roadmap PFD, and “add a chain” is replaced by adding input artifacts, a process, output artifacts and their dependencies.
+The file-based preset's terminal deletion unit is different: the terminal artifact, its sole producer and related edges; it excludes input artifacts. The preset names this deletion unit explicitly rather than calling both units a chain.
+
+**Affected installations:** Repositories using the distributed work-cycle or either the GitHub Issues or file-based work-item preset, when the target bundle includes this change.
+
+**Action:** Review all open work items, including both managed and exempt items, against the new criterion and adjust their labels or equivalent fields and roadmap representation.
+Do not reopen or relabel closed historical items as part of this migration.
+For work that qualifies, register the relevant input artifacts, process, output artifacts and dependencies in the roadmap PFD.
+Before removing an entry that no longer qualifies, inspect its consumers and preserve inputs still needed by other work.
+
+**Verification:** Apply the criterion to the following cases with each backend you use, then inspect the resulting graph with `pfdsl check`, `graph orphans`, `status ready` and `status blocked`.
+Confirm that the retained dependencies and readiness results match the actual prerequisites; syntax checks alone do not validate classification.
+
+| Work at the time of classification | Include in roadmap? | Reason |
+| --- | --- | --- |
+| An artifact that another task is waiting for | Yes | Another task depends on the unfinished output |
+| A release awaiting unfinished implementation | Yes | Its prerequisite is unfinished |
+| A new feature with all prerequisites complete and no waiting consumer | No | Neither condition applies |
+| A spelling correction with all prerequisites complete and no waiting consumer | No | Neither condition applies |
+| Research whose result another task is waiting for | Yes | Another task depends on the result |
+
+For GitHub Issues, use `flow:managed` for included work and `flow:exempt` otherwise; use the equivalent fields in the file-based tracker.
+Source: [PR #1541](https://github.com/takasek/pfdsl/pull/1541), including the owner's revised dependency-only criterion of 2026-10-25.
+
+## CLI/plugin v0.2.0 — after CLI/plugin v0.1.0
+
+This section covers the changes after CLI/plugin v0.1.0 that need action in an adopting repository.
+CLI/plugin v0.2.0 is the release target; use its published tag and package once available, rather than upstream main or a preparation branch.
+This interval includes specification versions v0.0.27 and v0.0.28; specification and package versions are separate.
+
+A dependency range such as `^0.1.0` does not admit v0.2.0.
+If the repository declares `@pfdsl/cli` in `package.json`, update its declared range and lockfile through the repository's package manager, then verify the resolved CLI reports `0.2.0` before running the migration checks.
+
+### Ready counts replace recommendations
+
+`status ready --best` and the `best` JSON field have been removed.
+Replace executable calls and active instructions with `pfdsl status ready <roadmap.pfdsl> --json` and choose from the returned `ready` items using the project's goals, deadlines and effort.
+Each item now includes `newlyReadyCount`: the additional processes that would become ready if all of that process's outputs became done, excluding currently ready processes.
+Counts are not priorities, and zero does not mean a process is unnecessary.
+Text output includes counts by default; `--no-counts` hides them in text but JSON still includes them.
+Update consumers that require the former recommendation field or parse the text layout, then exercise them with the target CLI; retain historical commands in dated records.
+Source: commit `e71e70f3`.
+
+### Conflicting normal and feedback inputs
+
+Specification v0.0.28 rejects a normal input (`a >> p`) and a feedback input (`a >>? p`) for the same artifact/process pair with V036, including in ordinary `check` mode.
+For each reported pair, choose the intended relationship and remove the other edge, preserving unrelated connections.
+Run `pfdsl check <file>` and the repository's strict checks afterwards; do not suppress the error or replace every feedback edge globally.
+Source: [Issue #1467](https://github.com/takasek/pfdsl/issues/1467).
+
+### Explicit labels when creating definitions
+
+`meta create` no longer adds an ID-derived `label`; an empty or whitespace-only label is displayed as no explicit label.
+Existing explicit labels are retained.
+If a caller depends on a newly created definition containing a label, pass `label=...` explicitly and check the saved definition and rendered result.
+Otherwise no label migration is needed.
+Source: commits `cd73be2b` and `9558ee56`.
+
+### GitHub operation availability
+
+The distributed issue audit still exits with code 2 when no GitHub backend is available, and with a failure for authentication, network, remote-resolution or response errors.
+Argument errors now exit with code 1; code 2 is reserved for backend unavailability.
+Issue and PR views reject missing requested fields, malformed closing-issue identities and incomplete pagination metadata instead of accepting empty or partial results.
+When upgrading locally maintained callers of `createGitHubOps`, replace `isGhUnavailableError` with `isGitHubUnavailableError` imported from `github-ops.mjs`.
+The operation API now throws `GitHubUnavailableError` when gh is absent and neither `GH_TOKEN` nor `GITHUB_TOKEN` is set; raw `ENOENT` is no longer its public availability contract.
+An available token still enables the HTTP fallback, and an operation with no HTTP implementation remains an error.
+Refresh deployed audit/helper files together through the normal bundle update path, preserving local edits.
+The upstream repository's check inventory and terminal report revision changes do not add a new adopter CI requirement.
+
+### Sweep workflow authentication
+
+For adopters of the GitHub Issues backend, refresh the deployed workflow and helper files together, preserving local modifications and the existing `sweepCompletedChains.enabled` choice.
+The workflow can now open its PR with a GitHub App installation token.
+If choosing that path, configure the repository variable `REPO_AUTOMATION_APP_CLIENT_ID` and matching secret `REPO_AUTOMATION_APP_PRIVATE_KEY` for an App installed on the repository with Contents and Pull requests write permissions.
+The legacy `PFDSL_SWEEP_APP_CLIENT_ID` / `PFDSL_SWEEP_APP_PRIVATE_KEY` pair remains supported; the shared Client ID takes precedence and must have its own matching key.
+A Client ID without a usable matching key fails rather than silently selecting the other credentials.
+Without either Client ID, the workflow keeps using `GITHUB_TOKEN`; check the PR's actual workflow runs and any approval or repository-permission requirements before treating CI as passed.
+After the next enabled sweep, check its job result, proposed PR and CI results; no deployed file or successful local check proves that the App installation or hosted workflow ran successfully.
+No App configuration is required when the backend is not adopted or the sweep remains disabled.
+Source: commits `ca0e3e9b`, `52dd9ef3`, and `29436a03`.
+
+### Structural diff consumers
+
+`diff` now reports added and removed frontmatter metadata for surviving nodes and quotes edge endpoint IDs using DSL spelling where needed.
+If automation parses edge display strings or relies on a node with newly added metadata being unchanged, update it to the target output and test IDs containing spaces, quotes or arrows.
+Do not use a split on ` -> ` to identify edge endpoints.
+Source: commits `3d123476` and `9685e2b2`.
+
+### Group and node IDs
+
+Specification v0.0.27 forbids a group ID from also being an artifact or process ID in the same file.
+`check` reports N004 for conflicting frontmatter declarations, body edges, and standalone body nodes.
+For an existing conflict, choose a distinct group ID and edit the group declaration key and its `group:` / `parent:` references together, keeping the artifact/process ID and its body occurrences unchanged.
+Run `check` afterwards; `rename` refuses the ambiguous input and cannot choose which identity to rename.
+
+`delete` now accepts group IDs.
+It keeps member nodes and child groups, moving their `group:` / `parent:` references to the nearest declared ancestor outside the deletion batch, including inherited preset ancestors for files on disk.
+When no ancestor remains, it removes those references.
+Deleting a local override cannot remove the group supplied by a preset and is refused; edit the preset declaration instead.
+If a child inherits its relationship to the deleted group from a preset, deletion is refused until that preset relationship is updated.
+An explicit local child `parent` can be promoted to a remaining ancestor, but removing it is refused if a preset would supply a parent again.
+Group deletion with `extends` requires a file path so ancestors can be resolved.
+`delete` refuses YAML anchors, aliases and merge keys; expand them before retrying.
+Preview the change before using `--write`, including when deleting several groups at once.
+
+### Dependency checks during edits
+
+`check` validates the complete reachable dependency graph, including child diagrams, presets and nested boundaries.
+`rename` and `delete` use the same dependency loader but refuse only dependencies needed to safely perform the edit.
+Readable preset style errors and unrelated child errors no longer block these commands; run `check` separately for full validation.
+Missing or unreadable presets still prevent reliable group classification.
+Deleting a preset-only group now exits with code 1 and asks you to edit its preset declaration; a batch containing such a group writes nothing.
+Deleting an artifact that changes a surviving subflow boundary requires a readable child and a valid resulting boundary.
+Deleting the process that owns a broken subflow reference remains allowed, as does deleting a surplus boundary artifact that repairs the mismatch.
+Group renaming refuses inherited child-parent relationships that cannot be updated in the local file.
+If an edit changes the file's exposed boundary, a subflow that remains reachable and refers back to this file must not gain new boundary errors.
+Parents outside the reachable dependency graph are not inspected or rewritten; check them separately.
+
+### Metadata extension fields
+
+`meta set` updates an existing extension scalar field without an additional flag.
+An existing scalar YAML key retains its type when updated.
+If multiple keys become the same field name, or a field uses a collection key, rewrite it with one scalar key before editing; the command refuses these cases without writing.
+Adding a new unknown field requires `--allow-unknown`; existing arrays/maps remain unsupported.
+This collection restriction applies to extension fields; existing known-field updates such as replacing a `location` array with a string still work.
+Empty local definitions can receive fields, but `meta set` refuses to edit a definition accessed through an alias; expand that definition first.
+Updating the original anchored definition retains YAML's shared-value behavior for its aliases.
+Values are stored as strings, except for the existing numeric `index` field.
+For a value beginning with `-`, put options before `--` and the value after it, for example `meta set diagram.pfdsl a label --json -- --help`.
+The existing CLI rules for reserved names still apply: `status` uses the roadmap/status checks, `index` requires a number, and collection or derived field names remain unavailable through `meta set`.
+The issue audit remains read-only and checks issue classification and registration without requiring an `updated_at` snapshot or an exact priority match.
+Existing `updated_at` fields are ignored by the audit; they do not need to be repaired or removed.
+
+For JSON consumers, `missing` now contains only IDs absent from the file.
+Failures with exit code 1 return JSON when `--json` is set; invalid usage with exit code 2 still reports text on stderr.
+When an ID exists in the body without a frontmatter definition, the failure payload instead includes `undefinedIds: [{id, kind}]`, `missing`, and a recovery message in `error`.
+Add the definition before retrying; `meta set` does not create it implicitly.
+Use `meta create <file> <id> [field=value ...]` to create a body node's definition explicitly, then retry `meta set`.
+The creation command previews by default and writes only with `--write` after validating the complete result.
+Include `status=todo` for a roadmap artifact and meaningful `criteria=...` for a produced artifact.
+Existing definitions and invalid requests leave the file unchanged.
+Preview definition creation remains tracked with its host UI acceptance in [Issue #1282](https://github.com/takasek/pfdsl/issues/1282).
+
+### Record the applied migration state
+
+pfd-ops now compares the running plugin with `appliedMigration` in the repository's `.pfdsl/config.json`: the plugin release the repository has finished migrating to ([ADR-0043](adr/0043-applied-migration-state.md)).
+The comparison runs on every pfd-ops start (`check-install-sync.mjs`) in every repository that has a `.pfdsl/` directory, and it only reads the record.
+
+Until the key exists, every run prints a notice that the repository predates migration-state tracking and points back to "Choosing the update range" above.
+The notice is not a failure.
+
+After you finish applying this guide, record the state once your checks pass (see [Verify the cleanup](#verify-the-cleanup), which applies to every update range).
+Run the following from the repository root, with the pfd-ops skill root of the plugin you are migrating to (`${CLAUDE_PLUGIN_ROOT}/skills/pfd-ops` in Claude Code, the installed plugin's `skills/pfd-ops` in Codex):
+
+```sh
+node <pfd-ops skill root>/scripts/check-install-sync.mjs --record-migration
+```
+
+The command writes the running plugin's version, and its bundle hash where the plugin has one, into `.pfdsl/config.json` and keeps every other key.
+Commit that change together with the migration it records.
+It cannot be combined with `--deploy`, `--overwrite-local-edits` or `--delete-edited-orphans` (exit 2), and it writes nothing, exiting with 3 after saying why, when the running plugin's version is unknown (a repo-local copy), when the plugin is older than the recorded state, or when `.pfdsl/config.json` is not valid JSON or does not contain a JSON object.
+A malformed `appliedMigration` does not stop it: the command overwrites that key, and a plain run or `--deploy` keeps failing on such a record until you do.
+You may write the key by hand, in the form `{"appliedMigration": {"pluginVersion": "0.2.0", "bundleHash": "<64 hex digits>"}}` when migrating to v0.2.0, but the command computes the identity of the actual running plugin for you.
+A Codex plugin has no bundle manifest, so its record has no `bundleHash`.
+
+Once recorded, later runs say nothing while the plugin matches the record.
+A newer plugin prints the range of this guide to read, which is the cue to migrate and record again.
+A plugin older than the record is told to update, and `--deploy` and `--record-migration` are refused with exit 3 until it does, so an old `install/` cannot roll back files a newer release placed.
+If `.pfdsl/config.json` is not valid JSON or has a malformed `appliedMigration`, the run fails naming the file instead of ignoring it.
+
+Verify by running `check-install-sync.mjs` again: it prints no migration notice.
+Source: [#1319](https://github.com/takasek/pfdsl/issues/1319).
+
+## CLI/plugin v0.1.0 — after CLI/plugin v0.0.26
+
+This section covers the changes between CLI/plugin v0.0.26 and v0.1.0, including specification versions v0.0.22–v0.0.26.
+CLI/package versions and specification versions are separate.
+A development build made between these releases can report package version 0.0.26 while containing some of these changes; identify it by its bundle revision.
+The [specification history](spec/spec-history.md) provides additional technical context, not a substitute for this guide's CLI and workflow migration coverage.
+
+A dependency range written for 0.0.x, such as `^0.0.26`, does not admit 0.1.0.
+If the repository declares `@pfdsl/cli` in `package.json`, change the declared range to the target release.
+
+Before editing, record the installed CLI/plugin identity, the affected files, and validation results with the intended upgrade.
+Edit the adopting repository's sources, not plugin caches or generated distribution files.
+
+### Optional knowledge lifecycle audit
+
+The pfd-retro D layer now requires an explicit declaration in the repository's `.pfdsl/config.json`, a git-managed file for adopter-side declared values ([ADR-0042](adr/0042-adopter-config-file.md)).
+An old D heading, extra audit rules, or a declaration line in `.pfdsl/bindings/pfd-retro.md` no longer enable it.
+The former Japanese declaration line (`知識成果物ライフサイクル監査: 採用する`) is not recognized; retro reports that the declaration has moved.
+
+Ask the repository owner whether to continue this audit, then add one of these to `.pfdsl/config.json` (create the file if it does not exist, and keep any other keys):
+
+- `"knowledgeLifecycleAudit": {"mode": "adopt", "targets": [...]}` — continue the audit. List each artifact to audit as a string, such as `"docs/adr/"` or `"the criteria of .pfdsl/roadmap.pfdsl"`; only listed artifacts are audited.
+- `"knowledgeLifecycleAudit": {"mode": "decline"}` — stop the audit; retro neither audits nor reports the D layer.
+
+Until a valid declaration exists, retro does not audit the D layer and reports on every run what is wrong and that the owner must declare it.
+This covers a missing file, invalid JSON, a missing key, an invalid `mode`, and `adopt` without a non-empty list of targets.
+Do not infer the targets from descriptions or future plans.
+Replace the old declaration in the binding with a pointer to the config key; the current binding scaffold has the wording.
+If declining, remove obsolete active D-layer instructions and links after checking their consumers; retain historical records and content needed by other audit layers.
+See [ADR-0039](adr/0039-distribution-scope-by-provided-purpose.md), [ADR-0041](adr/0041-retro-d-layer-declaration-token.md), and [Issue #1275](https://github.com/takasek/pfdsl/issues/1275).
+
+### Retro catalog retirement
+
+This interval also retires the former retro catalog and its dedicated notification paths.
+Follow [the retro binding migration instructions in #1177](https://github.com/takasek/pfdsl/issues/1177) for preserving evidence, moving needed countermeasures, and retiring old consumers.
+Those instructions predate explicit D-layer adoption: also apply the D-layer choice above, whether or not the catalog was already migrated.
+
+### Repository-level work discipline leaves the distributed skills
+
+The distributed skills no longer carry rules that each repository decides for itself ([ADR-0039](adr/0039-distribution-scope-by-provided-purpose.md), category iii).
+After upgrading, three distributed files no longer carry such rules.
+The examples below are not exhaustive.
+
+- The pfd-ops work cycle (`references/work-cycle.md`) keeps only the PFD-specific contract. Removed rules include the comparison-target principle and its application points, fixing a baseline before measuring a change, checking that an existing mechanism actually observes the property it is named to guard, git hygiene in shared trees, delegation control, the generic terminal-gate items, and the split between machine-checked and human-checked items.
+- The work-item backend presets (`references/github-issues-backend.md`, `references/file-based-tracker-backend.md`) no longer define the design-record format (Format 3), its reapproval-reference grammar, the commit steps that produce approval evidence, the commit granularity of a design record, or the scope rule for unrelated bug fixes.
+- The pfd-retro skill no longer defines the execution contract of one audit run (run ID, cutoff, required sources, frozen inventory, and checkpoints). It now tells the auditor to check the pfd-retro binding for such a section before collecting sources.
+
+The work cycle follows an optional `## ワークサイクルの追加手順` section of `.pfdsl/bindings/pfd-ops.md` in steps 1 to 3 when that section exists.
+The current pfd-ops binding scaffold contains that heading, but a binding created from an earlier scaffold does not; add the heading yourself if you keep any rule there.
+
+To see exactly what was removed, compare these three files between your installed release and the target release.
+Ask the owner which removed rules to keep, and write the kept rules into the pfd-ops or pfd-retro binding in your own words.
+Do not copy the upstream repository's own bindings wholesale: they contain that repository's decisions, not defaults.
+If you keep none of them, no action is needed.
+Source commits include `8dfd50f5`, `57de2d68`, `b2ed2450`, `f3f0dc4c`, `1ecbbb24`, and `6b031144`.
+
+### Frontmatter types and declaration keys (FM004)
+
+Known fields now enforce their declared types, including strings, numbers, arrays, and mappings.
+Correct reported type errors using the current specification, preserving meaning rather than deleting metadata or converting every value to a string.
+
+Keys in `artifact`, `process`, `group`, and `tag` declarations must be YAML strings.
+Quote numeric, boolean, or null-like ID spellings, or use `!!str` where appropriate.
+If earlier coercion may have collapsed distinct keys, compare the original source and history before restoring definitions or references; do not invent missing data.
+See [specification history v0.0.23–v0.0.24](spec/spec-history.md), [#1272](https://github.com/takasek/pfdsl/issues/1272), and [#1290](https://github.com/takasek/pfdsl/issues/1290).
+
+### Roadmap declarations and status (V035)
+
+Roadmap artifacts used in body edges require frontmatter declarations and explicit status.
+Add missing declarations and set status from actual progress, not merely to pass validation.
+Update custom handling of the former W005 diagnostic to account for V035, which is an error even outside strict mode.
+
+The status field describes the tree containing the file.
+For PR-based work, a completed artifact's `done` update belongs in the completion PR; it need not wait for a post-merge update.
+Review stale `wip` values against completion evidence before changing them.
+If local instructions still defer `done` updates until after merging, update those instructions to include the status change in the completion PR.
+
+### Mixed normal and feedback edges (V036)
+
+When the same artifact is connected to the same process through both `>>` and `>>?`, `check` reports an error in both normal and strict modes.
+Keep the edge kind that matches the dependency and remove the other connection.
+
+### IDs beginning with a hyphen (L002)
+
+A body ID beginning with `-` must use quoted-ID syntax.
+Preserve the ID and check every reference when quoting it.
+Do not apply a blanket replacement to hyphens: frontmatter delimiters and edge operators are unrelated syntax.
+
+### Topological order (`meta sort --by topological`)
+
+The topological order now places every producer before its consumers by graph rank.
+Earlier releases ordered nodes by first appearance in the edge list, which could place a process after one that consumes its output.
+A file sorted with v0.0.26 can therefore fail `pfdsl meta sort --by topological --check` after the upgrade, although nobody edited it.
+The same order numbers nodes in `meta reindex`: the default run keeps existing `index:` values, but `--renumber` can assign different numbers than before.
+
+If the repository runs `meta sort --by topological --check`, run `pfdsl meta sort --by topological --write` on each reported file, review the reordered declarations, and commit them.
+Only declaration order changes; the graph does not.
+Verify that the check passes afterwards.
+Source commit: `6353f4c8`.
+
+### Files reported as skipped on every deploy
+
+This applies to repositories that deploy the GitHub Issues backend files (`.github/workflows/`, `scripts/pfdsl/`) with `check-install-sync.mjs --deploy`.
+
+Symptom: the same files appear under `Skipped (locally modified; ...)` on every deploy, although nobody edited them.
+
+Cause: installers before [#1314](https://github.com/takasek/pfdsl/pull/1314) wrote the new canonical hash into `.claude/pfd-ops-install-manifest.json` even for files they skipped.
+The manifest then no longer describes the file on disk, and the current installer cannot tell that state from a local edit.
+The current installer preserves a mismatched entry and does not repair it automatically.
+Neither the manifest hash nor the latest canonical hash proves that the file is unedited.
+
+Recovery compares each file's bytes with every version of that file in the upstream history.
+An unedited distributed copy is byte-identical to some upstream version of the same path, whether that version was released or came from an untagged development or repository-local build.
+Every step below preserves the files and the manifest until the comparison has finished.
+
+1. Save the current manifest and list the candidate paths.
+   The read-only check lists every file that differs from the bundled copy, which includes all skipped files and writes nothing.
+
+   ```sh
+   cp .claude/pfd-ops-install-manifest.json .claude/pfd-ops-install-manifest.json.before
+   node <pfd-ops skill root>/scripts/check-install-sync.mjs --target .
+   ```
+
+   Copy the paths marked `different from bundled version` into the `for` line of step 3.
+
+2. Clone the upstream history, including its tags, outside the adopting repository.
+
+   ```sh
+   UP="$(mktemp -d)/pfdsl.git"
+   git clone --quiet --bare --filter=blob:none https://github.com/takasek/pfdsl.git "$UP"
+   ```
+
+3. Run the following from the adopting repository root, once per path from step 1.
+   A deployed target path is the file's path below `install/`, so the upstream file is `.claude/skills/pfd-ops/install/<deployed path>` in every commit that touched it.
+   The loop compares Git blob IDs, which identify the exact bytes, so it needs no file contents from the clone.
+   The install directory moved to `scripts/pfdsl/` in v0.0.23 ([ADR-0032](adr/0032-pfd-ops-install-dedicated-dir.md)), so a current path only has history from that move on.
+
+   ```sh
+   for rel in scripts/pfdsl/lib/gh-exec.mjs scripts/pfdsl/lib/proxy-fetch.mjs; do
+     want=$(git hash-object --no-filters "$rel")
+     found=
+     for c in $(git -C "$UP" log --all --full-history --format=%H -- ".claude/skills/pfd-ops/install/$rel"); do
+       if [ "$(git -C "$UP" rev-parse -q --verify "$c:.claude/skills/pfd-ops/install/$rel" 2>/dev/null)" = "$want" ]; then
+         found=$c
+         break
+       fi
+     done
+     if [ -n "$found" ]; then
+       tag=$(git -C "$UP" tag --contains "$found" --list 'v[0-9]*' | sort -V | head -n 1)
+       echo "$rel: match at $found (first release tag containing it: ${tag:-none})"
+     else
+       echo "$rel: NO MATCH"
+     fi
+   done
+   ```
+
+   Use a name other than `path` for the loop variable: in zsh it is tied to `PATH`.
+   `--no-filters` hashes the bytes on disk, so a file whose line endings were converted does not match; treat that as a difference to inspect.
+
+4. Decide from the result.
+   A match means the file is byte-identical to that upstream version, so it carries no local edit.
+   A match with `none` as the release tag is an unreleased upstream version, for example from a development build or a repository-local install.
+   `NO MATCH` means the file differs from every version in the clone: it carries a local edit, or comes from a source that is not in the upstream history.
+   Do not overwrite it; inspect the difference against the nearest version and carry the needed edits into the current file by hand.
+
+5. Only if every listed path matched, redeploy with overwrite.
+   The redeploy also adds the sweep workflow described in the next section; it does nothing until the repository enables it, but read that section before committing the deployed files.
+
+   ```sh
+   node <pfd-ops skill root>/scripts/check-install-sync.mjs --target . --deploy --overwrite-local-edits
+   ```
+
+   `--overwrite-local-edits` is not limited to one path: it overwrites every file that differs from the bundled copy, so a file you did not compare loses its edits.
+   If any skipped path did not match, merge manually instead of using the flag.
+   The overwrite rewrites the manifest entries for the files it copies, so the same files are no longer reported on the next deploy.
+   Delete `.claude/pfd-ops-install-manifest.json.before` once the redeploy is reviewed.
+
+The installer's ordinary deployment and orphan-handling options are documented in the [installer guidance](../.claude/skills/pfd-ops/references/architecture.md#配置ファイルの鮮度セルフチェック).
+
+### GitHub Issues backend: new completed-chain sweep workflow
+
+This applies to repositories that deploy the GitHub Issues backend files with `check-install-sync.mjs --deploy`.
+
+Redeploying now adds a workflow and its script:
+
+- `.github/workflows/pfdsl-sweep-completed-chains.yml`
+- `scripts/pfdsl/sweep-completed-chains.mjs`, with the helpers `chain-sweep.mjs`, `cli-id-arg.mjs`, `ready-compare.mjs`, and `scratch-path.mjs` under `scripts/pfdsl/lib/`
+
+The sweep is disabled unless the repository enables it in `.pfdsl/config.json` ([ADR-0042](adr/0042-adopter-config-file.md)):
+
+```json
+{"sweepCompletedChains": {"enabled": true}}
+```
+
+Deployed files have to be committed to reach the team and CI, so the workflow file itself is expected to be committed with the other deployed files.
+Whether it acts is decided by that key, which the installer never overwrites.
+Without the key, or with `enabled` set to anything other than the boolean `true`, each run checks out the repository, emits a notice that the sweep is disabled, and succeeds without doing anything else.
+If `.pfdsl/config.json` is not valid JSON or the key has the wrong shape, the run fails and names the file, so a broken declaration does not silently stop the sweep.
+Ask the repository owner whether to enable it, after settling the points below.
+
+Behavior once enabled, from the workflow file:
+
+- Trigger: every `push` to a branch other than `flow-sync/pending`, the sweep's own pull request branch. The job runs only when the pushed ref is the repository's default branch and does nothing otherwise.
+- Action: it runs `node scripts/pfdsl/sweep-completed-chains.mjs .pfdsl/roadmap.pfdsl --write`, which removes chains whose artifacts are all done from the roadmap.
+  When the roadmap changes, it opens a pull request from the branch `flow-sync/pending` titled `chore(plan): sweep completed chains`, touching only `.pfdsl/roadmap.pfdsl`. A person merges it.
+- Permissions: the workflow requests `contents: write` and `pull-requests: write`.
+- Concurrency: runs share the group `flow-sync`, and a run in progress is not cancelled by a newer one.
+
+Points to settle before enabling:
+
+- By default the pull request is created with `GITHUB_TOKEN`, so GitHub holds the repository's own `pull_request` workflow runs for it in an approval-required state (`action_required`) until someone with write access approves them.
+  The pull request body says so, and that the sweep's own checks are the only verification it has received until then.
+  If the default branch requires status checks, this pull request does not report them until those runs are approved.
+  To have them start without approval, set the repository variable `REPO_AUTOMATION_APP_CLIENT_ID` and the secret `REPO_AUTOMATION_APP_PRIVATE_KEY` for a GitHub App installed on the repository with Contents and Pull requests write access.
+  The workflow then opens the pull request with a short-lived token of that App.
+  Existing `PFDSL_SWEEP_APP_CLIENT_ID` and `PFDSL_SWEEP_APP_PRIVATE_KEY` settings remain supported when the shared Client ID is absent.
+  When migrating, register the shared private-key secret first, then set the shared Client ID; a configured shared Client ID requires its matching secret and never falls back to the legacy key.
+  A repository without the variable keeps using `GITHUB_TOKEN`.
+- Creating the pull request requires that the repository, and its organization if it restricts this, allows GitHub Actions to create pull requests (Settings, Actions, General, Workflow permissions).
+  This setting is GitHub's requirement for the pull-request step; the workflow file does not check it beforehand.
+  When the step fails, a later step adds an error annotation to the run naming the setting and a compare URL for opening the pull request by hand, and the run ends as failed.
+  A rule that blocks creating the `flow-sync/pending` branch also blocks the step.
+- The workflow installs the published `@pfdsl/cli` with an unpinned `npm install --no-save @pfdsl/cli`, and the sweep script stops at startup unless that CLI has the `delete` subcommand.
+  `@pfdsl/cli` 0.0.26 and earlier lack `delete`; v0.1.0 is the first release that has it.
+  Because the install is unpinned, the workflow uses whatever release the npm `latest` tag names when it runs.
+- Once enabled, the script fails when `.pfdsl/roadmap.pfdsl` is missing or does not pass `check`, so enabling it in a repository without that file gives a failed run on every push to the default branch.
+- Deployment copies files only; it does not install runtime dependencies (the installer prints this).
+  The workflow itself needs no dependency beyond the published CLI above.
+  The first audit and local runs of `audit-issues-flow.mjs` need the `yaml` package: follow the section 依存の準備と初回監査 in the [GitHub Issues backend reference](../.claude/skills/pfd-ops/references/github-issues-backend.md).
+
+To stop a sweep that was enabled, set `enabled` to `false` or remove the key.
+To also stop the workflow from starting at all, disable it on GitHub ([Disabling and enabling a workflow](https://docs.github.com/en/actions/how-tos/manage-workflow-runs/disable-and-enable-workflows)); do not delete the deployed file, because the next deploy copies it again.
+
+## Verify the cleanup
+
+Validate affected diagrams with the intended CLI and run the repository's relevant checks.
+Report the before/after diagnostics, changed files, inapplicable steps, and unresolved decisions.
+Do not report an adopter as migrated until these checks have run there.
+
+## Maintaining this guide
+
+This guide is maintained once, during release preparation, and not by an obligation on each change.
+Release preparation lists every commit since the previous release tag that touched distributed files, classifies each as requiring adopter action or not, and has a maintainer confirm the classification.
+For each commit that requires action, it writes an entry with the previous behavior, affected installations, action, verification, and source issue or commit.
+It assigns the actual destination release and retains historical sections and their links.
+Do not guess future release numbers or discard older instructions after publishing.
+If an interval requires no action for a package family, record that all commits were classified and none required action in its release preparation record, rather than inventing cleanup steps.
+Link the relevant section from release notes when release notes are produced.
+The repository's [workflow procedure](../.pfdsl/workflow.md#採用先への移行案内) owns the commit listing command and the release review steps.

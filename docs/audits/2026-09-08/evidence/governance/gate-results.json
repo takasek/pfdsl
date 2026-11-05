@@ -1,0 +1,131 @@
+{
+  "freshness": {
+    "coreStale": true,
+    "cliStale": false
+  },
+  "driftGate": {
+    "file": ".pfdsl/roadmap.pfdsl",
+    "commands": [
+      [
+        "pnpm",
+        [
+          "--filter",
+          "@pfdsl/core",
+          "exec",
+          "vitest",
+          "run",
+          "-u"
+        ]
+      ],
+      [
+        "node",
+        [
+          "scripts/check-generated-drift.mjs",
+          "--",
+          "packages/core/src/__snapshots__/"
+        ]
+      ],
+      [
+        "node",
+        [
+          "packages/cli/dist/cli.js",
+          "fmt",
+          ".pfdsl/roadmap.pfdsl",
+          "--check"
+        ]
+      ],
+      [
+        "node",
+        [
+          "packages/cli/dist/cli.js",
+          "meta",
+          "check-links",
+          ".pfdsl/roadmap.pfdsl"
+        ]
+      ]
+    ],
+    "result": {
+      "failures": [],
+      "notes": []
+    }
+  },
+  "registrationTrigger": {
+    "pull_request": {
+      "types": [
+        "opened",
+        "synchronize",
+        "reopened",
+        "edited"
+      ],
+      "paths": [
+        ".pfdsl/roadmap.pfdsl"
+      ]
+    }
+  },
+  "scopedRegistration": {
+    "enforcedIssues": [
+      1
+    ],
+    "findings": [
+      {
+        "type": "stale_updated_at",
+        "issueNumber": 2,
+        "processId": "i2_work",
+        "artifactId": "out2",
+        "detail": "process: old, issue: new",
+        "fixVia": "file"
+      }
+    ],
+    "partitions": {
+      "fixable": [
+        {
+          "type": "stale_updated_at",
+          "issueNumber": 2,
+          "processId": "i2_work",
+          "artifactId": "out2",
+          "detail": "process: old, issue: new",
+          "fixVia": "file"
+        }
+      ],
+      "manual": [],
+      "advisory": []
+    }
+  },
+  "preflight": {
+    "calls": [
+      [
+        "git",
+        [
+          "fetch",
+          "origin"
+        ]
+      ],
+      [
+        "git",
+        [
+          "log",
+          "--oneline",
+          "HEAD..origin/main"
+        ]
+      ]
+    ],
+    "result": {
+      "fetched": true,
+      "behindBase": 1,
+      "staleTree": {
+        "base": "main",
+        "message": "This tree is 1 commits behind origin/main, so this preflight ran from that older version of itself. Its judgments — including which checks exist at all — would describe the old tree, not this cycle. Start the cycle's branch from origin/main (git switch -c <branch> origin/main) and re-run."
+      }
+    },
+    "exitCode": 1
+  },
+  "review": {
+    "records": [
+      {
+        "tool": "correctness"
+      }
+    ],
+    "lateUnreviewedPackagesChange": [],
+    "hookOnlyNoRecord": []
+  }
+}

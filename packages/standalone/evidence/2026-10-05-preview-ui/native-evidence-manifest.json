@@ -1,0 +1,98 @@
+{
+	"evidenceDate": "2026-10-05",
+	"scope": "native build, Rust unit tests, automatic native corpus and frozen independent ordinary native GUI review only",
+	"privacy": "No crash attachment text, device UUID, crash reporter key or incident identifier retained. Host user/checkout/corpus paths are normalized in text/JSON. Selected screenshots show synthetic in-app content only. Saved JSON is formatted by the repository formatter; stored fingerprints cover its canonical whitespace.",
+	"files": {
+		"native-gui-ax.txt": {
+			"sha256": "53028c48a66c39c3cbb237dbe6507342a90d664b36f2f9dc5be5bd78c2eb396a",
+			"source": "<native-gui-review>/*.ax.txt",
+			"sourceSha256": null
+		},
+		"native-gui-01-startup.png": {
+			"sha256": "4959458d6a0414fc1dbad957eb735d958ae28ae07c6cb67a2fa5d45a8c78b1f8",
+			"source": "<native-gui-review>/01-startup.png",
+			"sourceSha256": "4959458d6a0414fc1dbad957eb735d958ae28ae07c6cb67a2fa5d45a8c78b1f8"
+		},
+		"native-gui-06-label-edited.png": {
+			"sha256": "4d8240f009ee7fdb3ca3fc16ca2096ff78379fc0852d25542b2945d0e22fe79a",
+			"source": "<native-gui-review>/06-label-edited.png",
+			"sourceSha256": "4d8240f009ee7fdb3ca3fc16ca2096ff78379fc0852d25542b2945d0e22fe79a"
+		},
+		"native-gui-14-output-fit.png": {
+			"sha256": "6dec7ef8ba512be787ef523140ac14dec1b347b9178f7850f349becc32795a20",
+			"source": "<native-gui-review>/14-output-fit.png",
+			"sourceSha256": "6dec7ef8ba512be787ef523140ac14dec1b347b9178f7850f349becc32795a20"
+		},
+		"native-gui-18-recovery-error.png": {
+			"sha256": "9fa57395752c11faff3a471a8a0abc4b3337d1efe97788083e1284eea797fcba",
+			"source": "<native-gui-review>/18-recovery-error.png",
+			"sourceSha256": "9fa57395752c11faff3a471a8a0abc4b3337d1efe97788083e1284eea797fcba"
+		},
+		"native-gui-19-recovery-restored.png": {
+			"sha256": "e5f1e9d6c1f5276ea9eda377875fba8ed6c3f996261679cf75ef8455faa45790",
+			"source": "<native-gui-review>/19-recovery-restored.png",
+			"sourceSha256": "e5f1e9d6c1f5276ea9eda377875fba8ed6c3f996261679cf75ef8455faa45790"
+		},
+		"native-gui-21-final-raised.png": {
+			"sha256": "c34a95e0ef06d8e249d8f7548a1f8087f03a620ac74d4832b20ce48fe6e668bd",
+			"source": "<native-gui-review>/21-final-raised.png",
+			"sourceSha256": "c34a95e0ef06d8e249d8f7548a1f8087f03a620ac74d4832b20ce48fe6e668bd"
+		},
+		"native-gui-report.json": {
+			"sha256": "6e342854194b88768f41ab0c5199ddbaa570ed3c02f3b4fe7d24a0319df36576",
+			"source": "<native-gui-review>/native-experience-report.json",
+			"sourceSha256": "2b8c973d39dd60f98fba9df6fe474a13e884d24e5a4dcd11857734724c606c80"
+		},
+		"native-gui-review.md": {
+			"sha256": "fc4502886ce984bda1296f636aab3ed7de2cc1ed74a81b17db793dec0d3f36fa",
+			"source": "<native-gui-review>/native-experience-report.md",
+			"sourceSha256": "5a1420b2b42f472633215fd63ec3f216d56e863330e409605070c90d5b8c8985"
+		},
+		"native-corpus-report.json": {
+			"sha256": "6846bfb7dec7868d904e1cd50f2c5e0872fa660567f47be654b0044ae415023e",
+			"source": "<native-corpus>/native-report.json",
+			"sourceSha256": "a78a4accd638222ec5f320441af525abf9d5e3c22756e51f95937e998f17b003"
+		},
+		"native-baseline-fingerprints.json": {
+			"sha256": "204a30f4fbad8533b088e8ad2bbaefff6d9339f03a0666143c71ceb0a53a74db",
+			"source": "<native-corpus>/baseline.json",
+			"sourceSha256": "976aa1f0abf66e0a2c5572b73af16fff815c205d7354d1c5a2fd0ec4b333160d"
+		},
+		"native-corpus-lifecycle.json": {
+			"sha256": "a614e071f149f631edd6f7c283f61880ab3f12bb5d6db9a8128d1b3d90ebcb63",
+			"source": "<native-corpus>/lifecycle.json",
+			"sourceSha256": "58802f44e9a5f792cbc3930492bd8a444a432422986a61a8e21dd400dbbeca99"
+		},
+		"native-build-and-tests.txt": {
+			"sha256": "b23f6fc2769e036b658f624986705c80a8f12c3b88363a7a111fb2d385a5e3f1",
+			"source": "<build/test log excerpts>",
+			"sourceSha256": null
+		},
+		"native-gui-fixture-01-actions.pfdsl.txt": {
+			"sha256": "18f5a7ef16ff8ae2e04fab47810e35eb96741bedf8b58018eaad155e09145d98",
+			"source": "<native-gui-review>/corpus/01-actions.pfdsl",
+			"sourceSha256": "18f5a7ef16ff8ae2e04fab47810e35eb96741bedf8b58018eaad155e09145d98"
+		},
+		"native-gui-fixture-02-separate-tab.pfdsl.txt": {
+			"sha256": "725e1279e44fa6b80918100f3c533e9d89fba8dbd6f454db4b5e43aa91aa03c5",
+			"source": "<native-gui-review>/corpus/02-separate-tab.pfdsl",
+			"sourceSha256": "725e1279e44fa6b80918100f3c533e9d89fba8dbd6f454db4b5e43aa91aa03c5"
+		},
+		"native-gui-fixture-03-large.pfdsl.txt": {
+			"sha256": "df31c828012b30c62a503753d677497b0a3e4c0010b5d7192e49483389f06ef8",
+			"source": "<native-gui-review>/corpus/03-large.pfdsl",
+			"sourceSha256": "df31c828012b30c62a503753d677497b0a3e4c0010b5d7192e49483389f06ef8"
+		},
+		"native-gui-fixture-04-error-recovery.pfdsl.txt": {
+			"sha256": "e097e4dde5262fb9b77f573b4c178fb1b0a216d7ac06843a43951d3b8a02943f",
+			"source": "<native-gui-review>/corpus/04-error-recovery.pfdsl",
+			"sourceSha256": "e097e4dde5262fb9b77f573b4c178fb1b0a216d7ac06843a43951d3b8a02943f"
+		}
+	},
+	"buildLogSourceSha256": "79498a5a743d1d3e6f65662dd57e17500c74ad31db74158bd7e17af29d88657f",
+	"testLogSourceSha256": "ba7c18083a189b119fd799d996e87f563eee7fe95338d6a547966af0e7851aa3",
+	"evidenceReview": {
+		"result": "Original fingerprints and proof boundaries reviewed; final large-graph stale minimap clarified in saved MD/JSON and ACCEPTANCE.",
+		"frozenOriginalReports": "Original review files retained unchanged; saved copies carry a concrete evidence clarification."
+	}
+}

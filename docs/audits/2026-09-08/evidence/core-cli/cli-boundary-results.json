@@ -1,0 +1,23 @@
+{
+  "formatWrite": {
+    "status": 0,
+    "stdout": "",
+    "stderr": "",
+    "original": "\"a#b\" >> P -> c\n",
+    "after": "a#b >> P -> c\n",
+    "beforeEdges": 2,
+    "afterEdges": 0
+  },
+  "diff": {
+    "text": {
+      "status": 0,
+      "stdout": "+ edge p -> y\n+ edge q -> x\n- edge p -> x\n- edge q -> y\n",
+      "stderr": ""
+    },
+    "dot": {
+      "status": 0,
+      "stdout": "digraph PFDSL {\n  rankdir=LR;\n  newrank=true;\n  label=\"diff\\ngreen = added · red = removed · yellow = changed\";\n  labelloc=\"t\";\n\n  \"_nodiff\" [shape=note, label=\"No structural or metadata changes\"];\n}\n",
+      "stderr": ""
+    }
+  }
+}

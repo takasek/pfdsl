@@ -7,7 +7,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
-import { listInstallFiles } from "../../.claude/skills/pfd-ops/scripts/check-install-sync.mjs";
+import { listInstallFiles } from "../harness-template/skills/pfd-ops/scripts/check-install-sync.mjs";
 
 /**
  * Compare every file under canonicalDir against its counterpart at the same
@@ -20,7 +20,9 @@ export function checkScaffoldSync(canonicalDir, deployedDir) {
 	return listInstallFiles(canonicalDir).map((rel) => {
 		const deployedPath = join(deployedDir, rel);
 		if (!existsSync(deployedPath)) return { path: rel, status: "missing" };
-		const same = readFileSync(join(canonicalDir, rel)).equals(readFileSync(deployedPath));
+		const same = readFileSync(join(canonicalDir, rel)).equals(
+			readFileSync(deployedPath),
+		);
 		return { path: rel, status: same ? "ok" : "modified" };
 	});
 }

@@ -1,0 +1,169 @@
+{
+	"schemaVersion": 1,
+	"date": "2026-10-05",
+	"scope": "Independent focused ordinary native display consistency review",
+	"execution": {
+		"app": "<checkout>/packages/standalone/src-tauri/target/debug/bundle/macos/PFDSL.app",
+		"binary": "Contents/MacOS/pfdsl-desktop",
+		"binarySha256Before": "e0a697fa4007ee13831bc79f4285264fc244048bd72f76d6ee4d23c57831a5a9",
+		"binarySha256After": "e0a697fa4007ee13831bc79f4285264fc244048bd72f76d6ee4d23c57831a5a9",
+		"pid": 84454,
+		"launch": "cua.getApp(full .app path), ordinary route after parent-owned app was quit",
+		"acceptanceEnvironmentUsed": false,
+		"directSubprocessLaunchAttempted": false,
+		"cleanup": {
+			"method": "Cmd+Q through owned CUA app",
+			"toolObservation": "Computer Use server error -10005: App quit",
+			"psExitCode": 1,
+			"psOutput": "",
+			"pidAbsentConfirmed": true
+		}
+	},
+	"independence": {
+		"implementationSourceRead": false,
+		"diffRead": false,
+		"designRead": false,
+		"priorFrozenEvidenceModified": false,
+		"acceptanceDocumentModified": false,
+		"gitMetadataOperations": false,
+		"externalWrites": false,
+		"otherUserDocumentsModified": false,
+		"otherApplicationsModifiedOrQuit": false
+	},
+	"observations": [
+		{
+			"scenario": "Initial short source replacement",
+			"result": "observed-pass",
+			"ax": "Exact four content lines plus final newline; Monaco displays an empty line 5",
+			"visibleEditor": "title Foreground redraw test on line 2; raw >> refine -> final on line 4",
+			"mainSvg": "Foreground redraw test with raw -> refine -> final",
+			"minimap": "Same title and three-node graph; Japanese initial content gone",
+			"evidence": ["02-short"]
+		},
+		{
+			"scenario": "Single Undo and single Redo of short replacement",
+			"result": "observed-pass",
+			"ax": "Undo restores original Japanese source; Redo restores exact short fixture",
+			"visibleEditor": "Japanese original after Undo, short title/body after Redo",
+			"mainSvg": "Japanese original after Undo; short graph after Redo",
+			"minimap": "Corresponding original and short graphs",
+			"evidence": ["03-short-undo", "04-short-redo"]
+		},
+		{
+			"scenario": "Format and its single Undo/Redo",
+			"result": "observed-pass-with-ax-refresh-caveat",
+			"ax": "Extra spaces -> canonical -> extra spaces -> canonical after editor/caret refresh",
+			"visibleEditor": "Line 4 changes between raw   >>   refine   ->   final and raw >> refine -> final",
+			"mainSvg": "Same short graph throughout",
+			"minimap": "Same short graph throughout",
+			"caveat": "The immediate Format and Undo AX textarea retained the previous spacing. Focusing the editor refreshed Format AX; a subsequent Up key refreshed Undo AX. Immediate AX alone is insufficient.",
+			"evidence": [
+				"05-unformatted",
+				"06-formatted",
+				"07-format-undo",
+				"08-format-undo-focused",
+				"09-format-undo-caret",
+				"10-format-redo"
+			]
+		},
+		{
+			"scenario": "Node actions Create definition and label edit",
+			"result": "observed-pass",
+			"ax": "artifact.raw.label inserted as raw; selected label changed to Raw source",
+			"visibleEditor": "Definition appears on lines 3-5; selected raw label is editable",
+			"mainSvg": "raw box gains a second raw label, then Raw source",
+			"minimap": "Same raw/Raw source label changes",
+			"evidence": [
+				"12-node-actions",
+				"13-preview-create",
+				"14-preview-label",
+				"15-label-undo",
+				"16-label-redo"
+			],
+			"undoRedo": "One Undo restores raw label; one Redo restores Raw source in AX/editor/main/minimap"
+		},
+		{
+			"scenario": "71-node large source replacement and Fit/100%",
+			"result": "observed-pass-with-resolution-limit",
+			"ax": "Top/tail source fragments belong to current Large fixture; 71 unique node buttons exactly match seed, step_01..35, artifact_01..35; minimap AX title/IDs also current Large fixture",
+			"visibleEditor": "After paste, current Large body tail at lines 15-41; after tab return, title/layout and body start at lines 1-32",
+			"mainSvg": "After paste 100% shows seed, step_01, artifact_01; Fit6.2% shows long whole chain; reset100% shows step_17, artifact_17, step_18, artifact_18, step_19 and title",
+			"minimap": "Long horizontal chain replaces the prior three-node graph; complete label readability is limited by scale",
+			"evidence": [
+				"17-large-end",
+				"18-large-top",
+				"19-large-fit",
+				"20-window-item",
+				"23-large-return",
+				"24-large-hundred",
+				"26-large-return-hundred"
+			]
+		},
+		{
+			"scenario": "Source and zoom separation across two tabs",
+			"result": "observed-pass",
+			"ax": "Welcome retains Second display tab/order >> bill -> invoice at110%; Japanese tab retains current Large source at6.2%, later100%",
+			"visibleEditor": "Each tab shows its own current title/body on return",
+			"mainSvg": "Corresponding short/large graph and saved zoom on each return",
+			"minimap": "Corresponding short/long shape, no prior-document minimap observed",
+			"evidence": [
+				"22-second-zoom",
+				"23-large-return",
+				"24-large-hundred",
+				"25-second-return",
+				"26-large-return-hundred"
+			]
+		},
+		{
+			"scenario": "Cmd+Up source caret/viewport navigation",
+			"result": "not-passed-observed-discrepancy",
+			"ax": "After Cmd+Up textarea exposes current Large source beginning",
+			"visibleEditor": "Saved image still displays current Large tail lines15-41 and a current-line box on line41. Caret line41 is a sequential reviewer observation, not independently established by the retained image.",
+			"mainSvg": "Current Large graph",
+			"minimap": "Current Large long chain",
+			"regularWindowPath": "The reviewer sequentially observed Window menu PFDSL with makeKeyAndOrderFront: and selected it without viewport refresh. Menu/action identity is not independently recoverable from the retained screenshots or AX excerpts.",
+			"recovery": "Tab away and back visibly displays current Large beginning",
+			"classification": "Concrete cursor/viewport navigation discrepancy under CUA; visible tail is current Large source, not prior document. No product-versus-foreground/tool root cause assigned.",
+			"evidence": [
+				"18-large-top",
+				"19-large-fit",
+				"20-window-item",
+				"23-large-return"
+			]
+		},
+		{
+			"scenario": "AX SVG node click followed by Return",
+			"result": "not-certified-focus-route",
+			"observation": "AX click on Node refine did not move keyboard focus; Return inserted a blank editor line. A single Undo removed it before subsequent actions. Node actions toolbar route succeeded.",
+			"evidence": ["11-preview-menu", "12-node-actions"]
+		}
+	],
+	"proofLimits": [
+		"No OS foreground/frontmost identity was independently established; screenshots were normal full-window captures. Window menu makeKeyAndOrderFront: was observed and used once, without treating it as foreground activation.",
+		"No coordinate mouse/hover/drag/pan acceptance was performed; prior coordinate noWindowsAvailable evidence remains a separate frozen run and is not reclassified.",
+		"No native IME, file picker, disk-save/reopen, full regression corpus, error-recovery, or connector variants were repeated in this focused review.",
+		"Monaco AX text is a caret-centered fragment for long documents, not a full source dump or guaranteed viewport representation.",
+		"Large minimap is visually a long chain; every label cannot be read at its tiny scale. AX title/71 IDs provide separate semantic evidence.",
+		"This hash-bound run does not erase or reclassify observations on the prior d005c101 build."
+	],
+	"evidence": {
+		"axSnapshotCount": 26,
+		"consolidatedAx": "native-display-recheck-ax.txt",
+		"selectedScreenshots": [
+			"native-display-recheck-02-short.png",
+			"native-display-recheck-06-formatted.png",
+			"native-display-recheck-14-preview-label.png",
+			"native-display-recheck-20-window-item.png",
+			"native-display-recheck-23-large-return.png",
+			"native-display-recheck-24-large-hundred.png",
+			"native-display-recheck-25-second-return.png"
+		],
+		"fixtures": [
+			"native-display-recheck-short-fixture.pfdsl.txt",
+			"native-display-recheck-large-fixture.pfdsl.txt",
+			"native-display-recheck-second-fixture.pfdsl.txt"
+		],
+		"largeAxNodeCount": 71,
+		"largeAxNodeIdsMatchFixture": true
+	}
+}

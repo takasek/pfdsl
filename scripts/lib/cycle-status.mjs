@@ -3,97 +3,155 @@
  * git/gh I/O lives in the main script; this module stays testable.
  */
 
-/**
- * @param {Array<{conclusion?: string|null, status?: string}>} [statusCheckRollup]
- * @returns {"NONE"|"PASS"|"FAIL"|"PENDING"|"UNKNOWN"}
- */
-export function summarizeCiStatus(statusCheckRollup) {
-	if (!statusCheckRollup || statusCheckRollup.length === 0) return "NONE";
-	const conclusions = statusCheckRollup.map((c) => c.conclusion ?? null);
-	if (conclusions.some((c) => c === "FAILURE" || c === "ERROR")) return "FAIL";
-	if (conclusions.some((c) => c === null || c === "PENDING" || c === "IN_PROGRESS")) return "PENDING";
-	if (conclusions.every((c) => c === "SUCCESS")) return "PASS";
-	return "UNKNOWN";
-}
+import { parseIssueProcesses } from "../pfdsl/lib/issues-flow-audit.mjs";
+import { parseDocument } from "../pfdsl/lib/yaml-require.mjs";
 
 /**
- * @param {Array<{number: number, title: string, headRefName: string, statusCheckRollup?: Array}>} prs
- * @param {RegExp} flowSyncPattern
- * @returns {{openFlowSyncPRs: Array<{number: number, title: string, ci: string}>, otherOpenPRs: Array<{number: number, title: string}>}}
- */
-export function classifyPRs(prs, flowSyncPattern = /^flow-sync\//) {
-	const openFlowSyncPRs = [];
-	const otherOpenPRs = [];
-	for (const pr of prs) {
-		if (flowSyncPattern.test(pr.headRefName)) {
-			openFlowSyncPRs.push({ number: pr.number, title: pr.title, ci: summarizeCiStatus(pr.statusCheckRollup) });
-		} else {
-			otherOpenPRs.push({ number: pr.number, title: pr.title });
-		}
-	}
-	return { openFlowSyncPRs, otherOpenPRs };
-}
-
-/**
- * @param {unknown} readyJson - output of `pfdsl status ready --best --json`
- * @returns {{ready: string[], best: string | null, bestOutputs: string[]}}
+ * @param {unknown} readyJson - output of `pfdsl status ready --json`
+ * @returns {{ready: Array<{id: string, label: string, inputs: string[], outputs: string[], newlyReadyCount: number}>}}
  */
 export function parseReadyOutput(readyJson) {
 	if (!readyJson || typeof readyJson !== "object" || readyJson.ok !== true) {
-		return { ready: [], best: null, bestOutputs: [] };
+		return { ready: [] };
 	}
-	const ready = (readyJson.ready ?? []).map((p) => p.id);
-	const best = readyJson.best?.id ?? null;
-	const bestOutputs = readyJson.best?.outputs ?? [];
-	return { ready, best, bestOutputs };
+	return { ready: readyJson.ready ?? [] };
 }
 
 /**
- * roadmap.pfdsl 内の `<processId>:` ブロック（次の同インデントキーまで）を抜き出す。
- * @param {string} pfdslText
- * @param {string} processId
- * @returns {string | null}
- */
-function findProcessBlock(pfdslText, processId) {
-	const re = new RegExp(`^  ${processId}:\\n([\\s\\S]*?)(?=^  \\S|^\\S)`, "m");
-	const match = pfdslText.match(re);
-	return match ? match[1] : null;
-}
-
-/**
+ * Return every process linked to the issue by its location metadata.
  * @param {string} pfdslText - .pfdsl/roadmap.pfdsl の全文
- * @param {string} processId
- * @returns {number | null}
+ * @param {number} issueNumber
+ * @param {{host: string, owner: string, repo: string}} [repository]
+ * @returns {string[]}
  */
-export function findIssueNumberForProcess(pfdslText, processId) {
-	const block = findProcessBlock(pfdslText, processId);
-	if (!block) return null;
-	const match = block.match(/location:\s*\S*\/issues\/(\d+)/);
-	return match ? Number(match[1]) : null;
+export function findProcessIdsForIssueNumber(
+	pfdslText,
+	issueNumber,
+	repository,
+	diagnostics = [],
+) {
+	const frontmatter =
+		pfdslText.match(/^---\r?\n([\s\S]*?)^---\s*$/m)?.[1] ?? pfdslText;
+	const document = parseDocument(frontmatter);
+	if (document.errors.length > 0) throw document.errors[0];
+	return parseIssueProcesses(document.toJS() ?? {}, repository, diagnostics)
+		.filter((process) => process.issueNumbers.includes(issueNumber))
+		.map((process) => process.id);
+}
+
+/** Return a unique match, rejecting ambiguous issue ownership. */
+export function findProcessIdForIssueNumber(
+	pfdslText,
+	issueNumber,
+	repository,
+) {
+	const matches = findProcessIdsForIssueNumber(
+		pfdslText,
+		issueNumber,
+		repository,
+	);
+	if (matches.length > 1) {
+		throw new Error(
+			`Issue ${issueNumber} matches multiple processes: ${matches.join(", ")}`,
+		);
+	}
+	return matches[0] ?? null;
 }
 
 /**
+ * Whether the issue about to be started owes a roadmap entry (#963).
+ *
+ * `audit-issues-flow.mjs` reports the same gap, but only as advisory: a managed
+ * issue's entry lands on the branch that implements it, so every other session
+ * sees the gap until that branch merges, and failing on it made the terminal
+ * gate red on issues the failing cycle does not own. The gap is worth
+ * acting on at exactly one moment — when this cycle starts that very issue —
+ * which is the moment this preflight runs.
+ * @param {string[]} labelNames the issue's label names
+ * @param {string | null} processId the process tracking it, or null when none
+ * @returns {boolean}
+ */
+export function isUnregisteredManagedIssue(labelNames, processId) {
+	if (processId !== null) return false;
+	return (labelNames ?? []).includes("flow:managed");
+}
+
+/**
+ * Quote one value for a POSIX shell command line.
+ * @param {string | number} value
+ * @returns {string}
+ */
+export function quoteShellArgument(value) {
+	const argument = String(value);
+	if (/^[A-Za-z0-9._-]+$/.test(argument)) return argument;
+	return `'${argument.replaceAll("'", "'\\''")}'`;
+}
+
+/**
+ * The gate-check invocation for this cycle. `--issue` is folded in for the
+ * same reason `--artifact` is: the operator copies this line verbatim, so a
+ * flag left out here is a check that silently SKIPs every cycle (#669). It is
+ * repeated per issue so the terminal manual review retains every target.
  * @param {string | null} artifactKey
  * @param {string} base
- * @returns {string | null}
+ * @param {number[]} [issueNumbers]
+ * @returns {string}
  */
-export function buildGateCheckCommand(artifactKey, base) {
-	if (!artifactKey) return null;
-	return `node scripts/gate-check.mjs --base ${base} --artifact ${artifactKey}`;
+export function buildGateCheckCommand(artifactKey, base, issueNumbers = []) {
+	const issueFlags = issueNumbers
+		.map((n) => ` --issue ${quoteShellArgument(n)}`)
+		.join("");
+	const artifactFlag = artifactKey
+		? `--artifact ${quoteShellArgument(artifactKey)}`
+		: "--no-artifact";
+	return `node scripts/gate-check.mjs --base ${quoteShellArgument(base)} ${artifactFlag}${issueFlags}`;
 }
 
-const DESIGN_UNSETTLED_PATTERNS = [/design TBD/i, /設計未確定/, /設計未合意/];
+/**
+ * The paths named by `git status --porcelain`, tracked edits and untracked
+ * files alike — both reach the next commit through `git add -A`.
+ *
+ * A rename entry names two paths; the destination is where the content sits
+ * now, so that is the one a reader has to deal with. The status field is two
+ * columns plus a space, which is why the path is taken by offset rather than
+ * by splitting on whitespace: a path may contain spaces.
+ * @param {string} porcelainOutput - output of `git status --porcelain`
+ * @returns {string[]}
+ */
+export function parsePorcelainPaths(porcelainOutput) {
+	return porcelainOutput
+		.split("\n")
+		.filter((line) => line.length > 3)
+		.map((line) => {
+			const path = line.slice(3);
+			const arrow = path.indexOf(" -> ");
+			return arrow >= 0 && line.startsWith("R") ? path.slice(arrow + 4) : path;
+		});
+}
 
 /**
- * work-cycle.md 手順1が定義する「設計未合意フレーズ」を issue 本文から検出する。
- * @param {string | undefined | null} body
- * @param {RegExp[]} patterns
- * @returns {{designUnsettled: boolean, matchedLines: string[]}}
+ * The publishing backlog as material, from a `scripts/release-status.mjs` run
+ * (#814). That script exits 1 whenever something is unpublished, which is the
+ * ordinary state between releases — so failure is read as the signal, not as a
+ * broken run, and the reason stays in the text it printed. Nothing here parses
+ * that text: this is report material a person reads, and a parser would couple
+ * the preflight to release-status's formatting for no judgment it makes.
+ *
+ * `needsAction` is release-status's exit code and nothing added to it. What
+ * that code covers, and why it stops where it does, is documented once at its
+ * definition — `needsAction` in ./release-status-check.mjs. Restating the list
+ * here would be a third copy to keep in step (#880).
+ * @param {{ok: boolean, out: string, status: number|null}} result - a tryRun result
+ * @returns {{needsAction: boolean, report: string[]}}
  */
-export function detectDesignUnsettled(body, patterns = DESIGN_UNSETTLED_PATTERNS) {
-	if (!body) return { designUnsettled: false, matchedLines: [] };
-	const matchedLines = body.split("\n").filter((line) => patterns.some((p) => p.test(line)));
-	return { designUnsettled: matchedLines.length > 0, matchedLines };
+export function summarizeReleasePending(result) {
+	return {
+		needsAction: !result.ok,
+		report: result.out
+			.split("\n")
+			.map((line) => line.trimEnd())
+			.filter((line) => line !== ""),
+	};
 }
 
 /**

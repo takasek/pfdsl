@@ -1,5 +1,5 @@
-import { describe, it, beforeEach, afterEach } from "node:test";
 import assert from "node:assert/strict";
+import { afterEach, beforeEach, describe, it } from "node:test";
 
 import { proxyAwareFetch } from "./proxy-fetch.mjs";
 
@@ -30,7 +30,9 @@ describe("proxyAwareFetch", () => {
 			calledWith = { url, init };
 			return { ok: true, status: 200 };
 		};
-		const res = await proxyAwareFetch("https://api.github.com/x", { method: "GET" });
+		const res = await proxyAwareFetch("https://api.github.com/x", {
+			method: "GET",
+		});
 		assert.equal(res.status, 200);
 		assert.equal(calledWith.url, "https://api.github.com/x");
 	});

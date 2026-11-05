@@ -1,0 +1,29 @@
+{
+  "panes": [
+    {
+      "height": 645,
+      "type": "ASIDE",
+      "width": 227
+    },
+    {
+      "height": 601.5,
+      "type": "document",
+      "width": 1053
+    },
+    {
+      "height": 601.5,
+      "type": "editor",
+      "width": 350.890625
+    },
+    {
+      "height": 601.5,
+      "type": "preview pfdsl-preview",
+      "width": 702.109375
+    }
+  ],
+  "viewport": {
+    "dpr": 2,
+    "height": 720,
+    "width": 1280
+  }
+}

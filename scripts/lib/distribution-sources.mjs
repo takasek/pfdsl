@@ -1,0 +1,32 @@
+// Files rendered from another source rather than mirrored or hand-authored
+// verbatim — bundled distribution files plus the repository-root instruction
+// documents. This mapping is shared by the distribution reviewer and Codex
+// ownership notices so both send maintainers to the same editable source.
+export const GENERATED_DISTRIBUTION_SOURCES = Object.freeze({
+	"CLAUDE.md": "scripts/root-instructions-template/INSTRUCTIONS.md",
+	"AGENTS.md": "scripts/root-instructions-template/INSTRUCTIONS.md",
+	"plugin/pfdsl-codex/GENERATED.md": "scripts/lib/gen-plugin.mjs",
+	// Keep the relocated source discoverable while a review diff still includes
+	// removal of the formerly bundled implementation agent.
+	"plugin/pfdsl/agents/pfd-implementer.md":
+		"scripts/repo-agent-template/pfd-implementer.md",
+	"plugin/pfdsl/skills/pfdsl/SKILL.md": "scripts/skill-template/SKILL.md",
+	"plugin/pfdsl/skills/pfdsl/references/spec.md": "docs/spec/spec.md",
+	"plugin/pfdsl/skills/pfdsl/references/quality-guide.md":
+		"docs/quality-guide.md",
+	"plugin/pfdsl/skills/pfdsl/references/review-perspectives.md":
+		"docs/review-perspectives.md",
+	// Aggregated from many files, so the pointer is the directory: no single
+	// source file answers "where does this line come from".
+	"plugin/pfdsl/skills/pfdsl/references/examples.md": "docs/examples/",
+	"plugin/pfdsl/skills/pfdsl/references/samples.md": "docs/samples/",
+});
+
+export function canonicalPluginSkillSource(relativePath) {
+	const install = relativePath.match(/^pfd-ops\/install\/(.+)$/);
+	if (install) return install[1];
+	return (
+		GENERATED_DISTRIBUTION_SOURCES[`plugin/pfdsl/skills/${relativePath}`] ??
+		`scripts/harness-template/skills/${relativePath}`
+	);
+}

@@ -1,0 +1,73 @@
+{
+  "sessionId": "c861eb1e-a647-4b36-9554-ac43d8401f0a",
+  "recordSha256": "1515fdef6f61ea87f2e535c1c3394f05316f6349442d60075a263373450905d3",
+  "recordLines": 24,
+  "requests": [
+    {
+      "line": 16,
+      "requestDigest": "3dbe795a335eec603ee9e260aff9e4ce7d63ea5983e8c8b777091c402077fd34",
+      "reconstructedDigestMatches": true,
+      "allShapeAndBlobDigestsMatch": true,
+      "frozenPromptMatchesExactly": true,
+      "frozenPrompt": {
+        "characters": 9052,
+        "sha256": "a5e10b830135cd2b71eccd0851f31f2d11e6194995282de56366700cca4fb2e3"
+      },
+      "toolNames": [
+        "advisor"
+      ],
+      "inputMessages": [
+        {
+          "role": "user",
+          "blocks": [
+            {
+              "type": "text",
+              "characters": 567,
+              "sha256": "6a379e89a830600e3a9373573d8f4bcf397c201811ef1fbdd6a4a70b72243614"
+            },
+            {
+              "type": "text",
+              "characters": 9052,
+              "sha256": "a5e10b830135cd2b71eccd0851f31f2d11e6194995282de56366700cca4fb2e3"
+            }
+          ]
+        },
+        {
+          "role": "system",
+          "blocks": [
+            {
+              "type": "text",
+              "characters": 2990,
+              "sha256": "8cca57f3725d9fe87d886323404b20fae856a9643e7dd95df97de43a82828ae0"
+            }
+          ]
+        }
+      ],
+      "excludedMarkerCounts": {
+        "pfd-cycle": 0,
+        "AGENTS.md": 0,
+        "CLAUDE.md": 0,
+        "MEMORY_SUMMARY": 0,
+        "Available skills": 0
+      },
+      "systemBlocks": [
+        {
+          "characters": 62,
+          "sha256": "0d7062851dd7bd7e66d4be4f12ac4951e3d2f587ec408295333a49963bd3f6b7"
+        },
+        {
+          "characters": 2025,
+          "sha256": "469950f24f4587cba6043a859ce59c18b493398337569599b7ed5661fa995fa1"
+        },
+        {
+          "characters": 5488,
+          "sha256": "0b33fce0f74ba3e07229e73b0bc06ef6999220b5e970e8400b35f80a4ebe65c7"
+        }
+      ]
+    }
+  ],
+  "toolCallBlocks": [],
+  "privateIntrinsicMetadata": "Account identifier and environment metadata remain; their plaintext is omitted. Independent reviewer checks their meaning.",
+  "limits": "Proves consistency of the recorded request body, not transport headers or unrecorded server-side additions.",
+  "publicationNote": "This is a public rendering. Original hashes and exact-match audits refer to private originals; see publication-redactions.json."
+}

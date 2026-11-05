@@ -1,0 +1,134 @@
+#!/usr/bin/env node
+/**
+ * check-drift-gates.mjs
+ *
+ * The pre-commit gates, including optional Biome. Reports every failing one in a single
+ * pass, so clearing two of them costs one commit attempt rather than two
+ * (takasek/pfdsl#755, #759).
+ *
+ * The gates live in scripts/lib/drift-gates.mjs rather than in
+ * scripts/pre-commit because the sh version passed each check to `eval` as a
+ * command line — the one place in this repo where check logic sat outside
+ * scripts/lib and its tests. Commands are named as executable + argv
+ * (scripts/check-no-shell-strings.mjs). Which gates exist, in which order, and
+ * how the per-file ones are derived from the staged paths is documented there.
+ *
+ * CI runs these checks via different mechanisms (a dedicated workflow for
+ * gen-skill, since it also needs its own checkout for cross-repo install-skill
+ * consumption; an inline `make check-readme-cli` step in test.yml; a vitest
+ * test for gen-samples, since dogfooding the exporter is itself the check).
+ * Left as-is — no functional difference, and converging them isn't worth the
+ * churn (see #265).
+ *
+ * The .claude/skills/pfdsl dev copy has no gate of its own because it is a symlink to generated/skills/pfdsl (#714), so the tracked-copy gates cover the same bytes.
+ * Its trigger pattern (scripts/lib/gen-skill-trigger.mjs) is still used by gate-check.mjs.
+ *
+ * Usage: node scripts/check-drift-gates.mjs
+ */
+import { spawnSync } from "node:child_process";
+import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
+import { parseArgs } from "node:util";
+
+import { isDistStale } from "./lib/dist-freshness.mjs";
+import { pluginRecoveryNotice } from "./lib/gen-plugin-recovery.mjs";
+import { withIndexSnapshot } from "./lib/index-snapshot.mjs";
+import { gitDiffNames } from "./lib/run-exec.mjs";
+
+const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+const { values } = parseArgs({
+	options: {
+		"index-snapshot": { type: "boolean" },
+		"with-biome": { type: "boolean" },
+	},
+	strict: true,
+});
+
+if (!values["index-snapshot"]) {
+	try {
+		const recovery = pluginRecoveryNotice(root);
+		if (recovery) console.error(recovery);
+		const status = withIndexSnapshot(root, (snapshot, env) => {
+			const result = spawnSync(
+				process.execPath,
+				[
+					resolve(snapshot, "scripts/check-drift-gates.mjs"),
+					"--index-snapshot",
+					...(values["with-biome"] ? ["--with-biome"] : []),
+				],
+				{ cwd: snapshot, env, stdio: "inherit" },
+			);
+			if (result.error) throw result.error;
+			return result.status ?? 1;
+		});
+		if (status !== 0)
+			console.error(
+				"The preceding generator diagnostics refer to an isolated checkout. Isolated verification data are discarded; the original checkout is unchanged. Existing recovery data in the original checkout remain preserved.",
+			);
+		process.exit(status);
+	} catch (error) {
+		console.error(error instanceof Error ? error.message : error);
+		process.exit(1);
+	}
+}
+
+if (values["with-biome"]) {
+	const result = spawnSync(
+		process.execPath,
+		["scripts/check-biome.mjs", "--staged", "--no-errors-on-unmatched"],
+		{ cwd: root, stdio: "inherit" },
+	);
+	if (result.status !== 0 || result.error) process.exit(result.status ?? 1);
+}
+
+// Gate definitions import generator inventories. Read them only after export
+// so unstaged generator code cannot affect the selected checks.
+const { buildGates } = await import("./lib/drift-gates.mjs");
+const { runDriftGates } = await import("./lib/pre-commit-drift.mjs");
+
+/** @param {string[]} args */
+function stagedPaths(args) {
+	return gitDiffNames(["--cached", ...args], { cwd: root });
+}
+
+// Triggers see deletions and both sides of a move: moving a generator input
+// out of a trigger pattern still changes what the generator writes, and with
+// rename detection git would report only the new path.
+const staged = stagedPaths(["--no-renames"]);
+// Deletions are staged changes, but not files a per-file check can be run on.
+const stagedPresent = stagedPaths(["--diff-filter=d"]);
+
+const { failures, notes } = runDriftGates(buildGates({ stagedPresent }), {
+	stagedFiles: staged,
+	// The gates name their dist files relative to the repository root, as their
+	// hints and commands do; git already runs at `root` above. Resolving here
+	// keeps that true of the freshness question too, which was the one thing
+	// still asked against process.cwd() (#771).
+	isDistFresh: (path) => !isDistStale(resolve(root, path)),
+	runCommand: (file, args) => {
+		const result = spawnSync(file, args, {
+			cwd: root,
+			encoding: "utf8",
+			maxBuffer: 32 * 1024 * 1024,
+		});
+		// Warnings on a successful retry and failure diagnostics must reach the
+		// operator. Keep routine stdout quiet, but retain it when a gate fails.
+		if (result.stderr) process.stderr.write(result.stderr);
+		if (result.status !== 0 || result.error) {
+			if (result.stdout) console.log(result.stdout.trimEnd());
+			if (result.error) console.error(result.error.message);
+		}
+		return result.status === 0 && !result.error;
+	},
+});
+
+for (const note of notes) {
+	console.log(note);
+}
+for (const failure of failures) {
+	console.log(failure.hint);
+}
+
+if (failures.length > 0) {
+	process.exit(1);
+}

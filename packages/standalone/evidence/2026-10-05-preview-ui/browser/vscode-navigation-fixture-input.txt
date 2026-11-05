@@ -1,0 +1,13 @@
+---
+artifact:
+  status:
+    label: State
+  a:
+    label: Alpha
+    status: todo
+process:
+  p:
+    label: Prepare
+---
+a >> p -> a
+status >> p

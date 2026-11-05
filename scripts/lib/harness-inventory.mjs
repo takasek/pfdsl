@@ -1,0 +1,539 @@
+import { INSTALL_TEMPLATE_PATHS } from "./install-templates.mjs";
+
+// The maintained product inventory is harness-neutral; adapters decide how
+// each source entry is rendered for their target harness.
+const PROBES = Object.freeze({
+	claudeRepository: "claude-repository-consumer",
+	claudePlugin: "claude-plugin-consumer",
+	codexRepository: "codex-repository-consumer",
+	codexPlugin: "codex-plugin-consumer",
+});
+
+function mapping(target, disposition, outputs, probe) {
+	return Object.freeze({
+		target,
+		disposition,
+		outputs: Object.freeze(outputs),
+		probe: Object.freeze({ kind: probe }),
+	});
+}
+
+const SKILL_SOURCE_FILES = Object.freeze({
+	"pfd-ecosystem": Object.freeze(["SKILL.md", "references/kind-taxonomy.md"]),
+	"pfd-grill": Object.freeze(["SKILL.md"]),
+	"pfd-ops": Object.freeze([
+		"SKILL.md",
+		"references/architecture.md",
+		"references/file-based-tracker-backend.md",
+		"references/github-issues-backend.md",
+		"references/scaffold/bindings/pfd-ops.md",
+		"references/scaffold/bindings/pfd-knowledge-audit.md",
+		"references/scaffold/bindings/pfd-retro-patterns/sample-pattern.md",
+		"references/scaffold/bindings/pfd-retro.md",
+		"references/scaffold/config.json",
+		"references/scaffold/pipeline.md",
+		"references/scaffold/pipeline.pfdsl",
+		"references/scaffold/review-perspectives.md",
+		"references/scaffold/roadmap.md",
+		"references/scaffold/roadmap.pfdsl",
+		"references/scaffold/workflow.md",
+		"references/scaffold/workflow.pfdsl",
+		"references/work-cycle.md",
+		"scripts/check-install-sync.mjs",
+		"scripts/collect-report-environment.mjs",
+		"scripts/plugin-version-check.mjs",
+	]),
+	"pfd-retro": Object.freeze(["SKILL.md"]),
+	"pfd-knowledge-audit": Object.freeze([
+		"SKILL.md",
+		"references/knowledge-lifecycle.md",
+		"scripts/classify-knowledge-lifecycle.mjs",
+	]),
+	"pfd-upstream-report": Object.freeze(["SKILL.md"]),
+});
+
+// Only these files use the harness template language. Other references and
+// executable scripts are literal payloads, including any template examples.
+const SKILL_TEMPLATE_FILES = Object.freeze({
+	"pfd-grill": ["SKILL.md"],
+	"pfd-ops": [
+		"SKILL.md",
+		"references/architecture.md",
+		"references/scaffold/bindings/pfd-ops.md",
+		"references/scaffold/bindings/pfd-retro.md",
+		"references/scaffold/review-perspectives.md",
+		"references/scaffold/roadmap.md",
+	],
+	"pfd-retro": ["SKILL.md"],
+	"pfd-ecosystem": ["SKILL.md"],
+	"pfd-upstream-report": ["SKILL.md"],
+});
+
+export const CLAUDE_GENERATED_CAPABILITY_OUTPUTS = Object.freeze([
+	...Object.keys(SKILL_SOURCE_FILES).map((name) => `.claude/skills/${name}`),
+	...["pfd-cycle", "pfd-init", "pfd-retro"].map(
+		(name) => `.claude/commands/${name}.md`,
+	),
+	...["pfd-lens", "pfd-implementer"].map((name) => `.claude/agents/${name}.md`),
+]);
+
+function exclusion(target, reason, impact) {
+	return Object.freeze({
+		target,
+		disposition: "intentional-exclusion",
+		reason,
+		impact,
+	});
+}
+
+function fourTargetMappings(
+	claudeRepository,
+	claudePlugin,
+	codexRepository,
+	codexPlugin,
+) {
+	return Object.freeze([
+		claudeRepository,
+		claudePlugin,
+		codexRepository,
+		codexPlugin,
+	]);
+}
+
+function capability(id, kind, source, mappings) {
+	return Object.freeze({
+		id,
+		kind,
+		source: Object.freeze(source),
+		mappings,
+	});
+}
+
+function skillCapability(name, source = {}) {
+	const files = SKILL_SOURCE_FILES[name];
+	return capability(
+		`skill:${name}`,
+		"skill",
+		{
+			encoding: "harness-skill-template",
+			path: `scripts/harness-template/skills/${name}`,
+			...(files ? { files } : {}),
+			...(name === "pfd-ops"
+				? {
+						installFiles: Object.freeze(
+							INSTALL_TEMPLATE_PATHS.map((path) => `install/${path}`),
+						),
+					}
+				: {}),
+			templates: SKILL_TEMPLATE_FILES[name] ?? [],
+			...source,
+		},
+		fourTargetMappings(
+			mapping(
+				"claude-repository",
+				source.generated ? "native" : "transform",
+				[`.claude/skills/${name}`],
+				PROBES.claudeRepository,
+			),
+			mapping(
+				"claude-plugin",
+				source.generated ? "native" : "transform",
+				[`skills/${name}`],
+				PROBES.claudePlugin,
+			),
+			mapping(
+				"codex-repository",
+				"transform",
+				[`.agents/skills/${name}`],
+				PROBES.codexRepository,
+			),
+			mapping(
+				"codex-plugin",
+				"transform",
+				[`skills/${name}`],
+				PROBES.codexPlugin,
+			),
+		),
+	);
+}
+
+function commandCapability(name) {
+	const codexSkillName =
+		name === "pfd-retro" ? "source-command-pfd-retro" : name;
+	return capability(
+		`command:${name}`,
+		"command",
+		{
+			encoding: "harness-command-template",
+			path: `scripts/harness-template/commands/${name}.md`,
+		},
+		fourTargetMappings(
+			mapping(
+				"claude-repository",
+				"transform",
+				[`.claude/commands/${name}.md`],
+				PROBES.claudeRepository,
+			),
+			mapping(
+				"claude-plugin",
+				"transform",
+				[`commands/${name}.md`],
+				PROBES.claudePlugin,
+			),
+			mapping(
+				"codex-repository",
+				"transform",
+				[`.agents/skills/${codexSkillName}`],
+				PROBES.codexRepository,
+			),
+			mapping(
+				"codex-plugin",
+				"transform",
+				[`skills/${codexSkillName}`],
+				PROBES.codexPlugin,
+			),
+		),
+	);
+}
+
+function agentCapability(name, { repositoryOnly = false } = {}) {
+	return capability(
+		`agent:${name}`,
+		"agent",
+		{
+			encoding: "harness-agent-template",
+			path: repositoryOnly
+				? `scripts/repo-agent-template/${name}.md`
+				: `scripts/harness-template/agents/${name}.md`,
+		},
+		fourTargetMappings(
+			mapping(
+				"claude-repository",
+				"transform",
+				[`.claude/agents/${name}.md`],
+				PROBES.claudeRepository,
+			),
+			repositoryOnly
+				? exclusion(
+						"claude-plugin",
+						"This implementation agent belongs to the upstream repository's workflow.",
+						"Adopters who need it must maintain their own local agent.",
+					)
+				: mapping(
+						"claude-plugin",
+						"transform",
+						[`agents/${name}.md`],
+						PROBES.claudePlugin,
+					),
+			mapping(
+				"codex-repository",
+				"transform",
+				[`.codex/agents/${name}.toml`],
+				PROBES.codexRepository,
+			),
+			exclusion(
+				"codex-plugin",
+				"Codex plugin manifests do not support subagent declarations.",
+				"Codex plugin users cannot invoke the repository's pfd subagents.",
+			),
+		),
+	);
+}
+
+export const HARNESS_CAPABILITY_CONTRACT = Object.freeze([
+	skillCapability("pfd-grill"),
+	skillCapability("pfd-ops"),
+	skillCapability("pfd-retro"),
+	skillCapability("pfd-knowledge-audit"),
+	skillCapability("pfd-ecosystem"),
+	skillCapability("pfd-upstream-report"),
+	skillCapability("pfdsl", {
+		encoding: "claude-skill",
+		path: ".claude/skills/pfdsl",
+		generated: Object.freeze({
+			reason: "generated symlink to the neutral rendered skill tree",
+			target: "generated/skills/pfdsl",
+		}),
+	}),
+	commandCapability("pfd-cycle"),
+	commandCapability("pfd-init"),
+	commandCapability("pfd-retro"),
+	agentCapability("pfd-lens"),
+	agentCapability("pfd-implementer", { repositoryOnly: true }),
+	capability(
+		"repository-instructions",
+		"repository-instructions",
+		{
+			encoding: "root-instructions-template",
+			path: "scripts/root-instructions-template/INSTRUCTIONS.md",
+		},
+		fourTargetMappings(
+			mapping(
+				"claude-repository",
+				"transform",
+				["CLAUDE.md"],
+				PROBES.claudeRepository,
+			),
+			exclusion(
+				"claude-plugin",
+				"Repository instructions are not bundled with a Claude plugin.",
+				"Claude plugin users do not receive repository maintainer instructions.",
+			),
+			mapping(
+				"codex-repository",
+				"transform",
+				["AGENTS.md"],
+				PROBES.codexRepository,
+			),
+			exclusion(
+				"codex-plugin",
+				"Repository instructions are not bundled with a Codex plugin.",
+				"Codex plugin users do not receive repository maintainer instructions.",
+			),
+		),
+	),
+	capability(
+		"repository-hooks",
+		"repository-hooks",
+		{ encoding: "claude-settings", path: ".claude/settings.json" },
+		fourTargetMappings(
+			mapping(
+				"claude-repository",
+				"native",
+				[".claude/settings.json"],
+				PROBES.claudeRepository,
+			),
+			exclusion(
+				"claude-plugin",
+				"Claude plugin hooks are declared by the plugin hook capability.",
+				"Claude plugin users receive only plugin-scoped hook registration.",
+			),
+			mapping(
+				"codex-repository",
+				"transform",
+				[".codex/config.toml", ".codex/hooks.json"],
+				PROBES.codexRepository,
+			),
+			exclusion(
+				"codex-plugin",
+				"Repository hook settings are not bundled with a Codex plugin.",
+				"Codex plugin users receive only plugin-scoped hook registration.",
+			),
+		),
+	),
+	capability(
+		"plugin-hooks",
+		"hook",
+		{ encoding: "plugin-hooks", path: "hooks/hooks.json" },
+		fourTargetMappings(
+			exclusion(
+				"claude-repository",
+				"Plugin hooks are not installed as repository hooks.",
+				"Repository users receive only the repository hook capability.",
+			),
+			mapping("claude-plugin", "native", ["hooks"], PROBES.claudePlugin),
+			exclusion(
+				"codex-repository",
+				"Plugin hooks are not installed as repository hooks.",
+				"Repository users receive only the repository hook capability.",
+			),
+			mapping("codex-plugin", "transform", ["hooks"], PROBES.codexPlugin),
+		),
+	),
+	capability(
+		"plugin-metadata",
+		"plugin-metadata",
+		{
+			encoding: "cli-package-metadata",
+			path: "packages/cli/package.json",
+			identity: Object.freeze({
+				name: "pfdsl",
+				author: Object.freeze({ name: "takasek" }),
+				homepage: "https://github.com/takasek/pfdsl",
+				license: "MIT",
+			}),
+		},
+		fourTargetMappings(
+			exclusion(
+				"claude-repository",
+				"Plugin metadata is not installed in a Claude repository.",
+				"Claude repository users do not receive a plugin manifest.",
+			),
+			mapping(
+				"claude-plugin",
+				"transform",
+				[
+					"manifest:.claude-plugin/plugin.json:name",
+					"manifest:.claude-plugin/plugin.json:description",
+					"manifest:.claude-plugin/plugin.json:version",
+					"manifest:.claude-plugin/plugin.json:author",
+					"manifest:.claude-plugin/plugin.json:homepage",
+					"manifest:.claude-plugin/plugin.json:license",
+				],
+				PROBES.claudePlugin,
+			),
+			exclusion(
+				"codex-repository",
+				"Plugin metadata is not installed in a Codex repository.",
+				"Codex repository users do not receive a plugin manifest.",
+			),
+			mapping(
+				"codex-plugin",
+				"transform",
+				[
+					"manifest:.codex-plugin/plugin.json:name",
+					"manifest:.codex-plugin/plugin.json:version",
+					"manifest:.codex-plugin/plugin.json:description",
+					"manifest:.codex-plugin/plugin.json:author",
+					"manifest:.codex-plugin/plugin.json:homepage",
+					"manifest:.codex-plugin/plugin.json:repository",
+					"manifest:.codex-plugin/plugin.json:license",
+					"manifest:.codex-plugin/plugin.json:skills",
+					"manifest:.codex-plugin/plugin.json:interface",
+				],
+				PROBES.codexPlugin,
+			),
+		),
+	),
+]);
+
+function sourceName({ source }) {
+	return source.path.slice(source.path.lastIndexOf("/") + 1);
+}
+
+function distributedCapabilities(kind) {
+	return HARNESS_CAPABILITY_CONTRACT.filter(
+		(capability) =>
+			capability.kind === kind &&
+			!capability.source.generated &&
+			capability.mappings.some(
+				({ target, disposition }) =>
+					target === "claude-plugin" && disposition !== "intentional-exclusion",
+			),
+	);
+}
+
+export const DISTRIBUTED_SKILLS = Object.freeze(
+	distributedCapabilities("skill").map(sourceName),
+);
+
+export const DISTRIBUTED_COMMANDS = Object.freeze(
+	distributedCapabilities("command").map(sourceName),
+);
+
+export const DISTRIBUTED_AGENTS = Object.freeze(
+	distributedCapabilities("agent").map(sourceName),
+);
+
+/**
+ * Developer-local entries under `.claude/` that this repo gitignores. They are
+ * neither a distributed source nor a maintained artifact, and a checkout may or
+ * may not have them — so every surface that enumerates `.claude/` has to pass
+ * over them rather than classify them.
+ *
+ * They cannot go in `SOURCE_EXCLUSIONS.root`: entries there are asserted to
+ * exist, and as files, which would move the failure to every checkout lacking
+ * one and could not hold a directory at all.
+ */
+export const LOCAL_CLAUDE_ROOT_ENTRIES = Object.freeze({
+	"settings.local.json": "per-developer harness settings overlay",
+	worktrees: "per-developer git worktrees",
+});
+
+export const SOURCE_EXCLUSIONS = Object.freeze({
+	root: Object.freeze({}),
+	skills: Object.freeze({
+		"distribution-review": "maintainer-only review workflow for this bundle",
+		"prose-mechanization-audit": "audits this repository's prose assets",
+		"spec-history-finalize": "finalizes this repository's release history",
+		"spec-stress-test": "hardens this repository's normative specification",
+		"vscode-ext-debug": "debugs the extension this repository builds",
+	}),
+	commands: Object.freeze({}),
+	agents: Object.freeze({
+		"ci-triage.md": "reads this repo's GitHub Actions logs",
+		"issue-worker.md": "encodes this repo's worktree and PR conventions",
+		"local-check-triage.md":
+			"triages this repo's make/pre-commit/test failures",
+		"vscode-ext-debugger.md": "debugs the extension this repo builds",
+	}),
+});
+
+export const GENERATED_SOURCES = Object.freeze({
+	skills: Object.freeze(
+		Object.fromEntries(
+			HARNESS_CAPABILITY_CONTRACT.filter(
+				(capability) =>
+					capability.kind === "skill" && capability.source.generated,
+			).map((capability) => [
+				sourceName(capability),
+				Object.freeze({
+					reason: capability.source.generated.reason,
+					source: capability.source.path,
+					target: capability.source.generated.target,
+				}),
+			]),
+		),
+	),
+	commands: Object.freeze({}),
+	agents: Object.freeze({}),
+});
+
+export const SKILL_EXCLUSIONS = SOURCE_EXCLUSIONS.skills;
+export const COMMAND_EXCLUSIONS = SOURCE_EXCLUSIONS.commands;
+export const AGENT_EXCLUSIONS = Object.freeze({
+	...SOURCE_EXCLUSIONS.agents,
+	...Object.fromEntries(
+		HARNESS_CAPABILITY_CONTRACT.filter(({ kind }) => kind === "agent")
+			.map((entry) => [
+				sourceName(entry),
+				entry.mappings.find(({ target }) => target === "claude-plugin"),
+			])
+			.filter(([, mapping]) => mapping.disposition === "intentional-exclusion")
+			.map(([name, mapping]) => [name, mapping.reason]),
+	),
+});
+export const GENERATED_SKILLS = GENERATED_SOURCES.skills;
+export const GENERATED_COMMANDS = GENERATED_SOURCES.commands;
+export const GENERATED_AGENTS = GENERATED_SOURCES.agents;
+
+function claudePluginEntries(kind, prefix) {
+	return distributedCapabilities(kind).map((capability) => {
+		const mapping = capability.mappings.find(
+			({ target }) => target === "claude-plugin",
+		);
+		const output = mapping.outputs.find((surface) =>
+			surface.startsWith(prefix),
+		);
+		return output.slice(prefix.length);
+	});
+}
+
+export const CLAUDE_PLUGIN_MIRRORS = Object.freeze([
+	Object.freeze({
+		dest: "skills",
+		src: ".claude/skills",
+		trees: Object.freeze(claudePluginEntries("skill", "skills/")),
+	}),
+	Object.freeze({
+		dest: "commands",
+		src: ".claude/commands",
+		files: Object.freeze(claudePluginEntries("command", "commands/")),
+	}),
+	Object.freeze({
+		dest: "agents",
+		src: ".claude/agents",
+		files: Object.freeze(claudePluginEntries("agent", "agents/")),
+	}),
+	Object.freeze({
+		dest: "hooks",
+		src: "hooks",
+		whole: HARNESS_CAPABILITY_CONTRACT.find(
+			(capability) => capability.id === "plugin-hooks",
+		).mappings.some(
+			(mapping) =>
+				mapping.target === "claude-plugin" &&
+				mapping.outputs?.includes("hooks"),
+		),
+	}),
+]);

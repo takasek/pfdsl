@@ -1,0 +1,46 @@
+{
+  "measuredAt": "2026-09-26T14:06:45+0900",
+  "prototypeCommit": "1157f187",
+  "architecture": "arm64",
+  "unit": "bytes",
+  "method": {
+    "logical": "Sum of regular file lengths, excluding symlinks.",
+    "allocated": "du -sk on each existing artifact, multiplied by 1024.",
+    "compressed": "ditto -c -k --sequesterRsrc --keepParent per component.",
+    "scope": "Existing prototype artifacts. Electron is not packaged; its runtime, shared frontend and host are separate components. Not a signed/notarized DMG measurement. OS-provided WebKit is excluded from the Tauri application size."
+  },
+  "components": {
+    "tauriApp": {
+      "path": "src-tauri/target/release/bundle/macos/PFDSL Prototype.app",
+      "fileCount": 2,
+      "logicalBytes": 17881760,
+      "allocatedBytes": 17887232,
+      "zipBytes": 10703219
+    },
+    "electronRuntime": {
+      "path": "electron/node_modules/electron/dist/Electron.app",
+      "fileCount": 258,
+      "logicalBytes": 288997924,
+      "allocatedBytes": 289873920,
+      "zipBytes": 120319644
+    },
+    "sharedFrontend": {
+      "path": "dist",
+      "fileCount": 9,
+      "logicalBytes": 12530720,
+      "allocatedBytes": 12546048,
+      "zipBytes": 8118648
+    },
+    "electronHost": {
+      "paths": [
+        "electron/main.cjs",
+        "electron/preload.cjs",
+        "electron/workspace.cjs",
+        "electron/policy.cjs",
+        "electron/package.json"
+      ],
+      "logicalBytes": 13195,
+      "note": "Host source size only; no separate ZIP or allocated-size measurement."
+    }
+  }
+}

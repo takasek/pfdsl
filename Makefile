@@ -1,43 +1,53 @@
-.PHONY: setup
+# link-repo-skill.mjs points .claude/skills/pfdsl (gitignored, #348) at the tracked generated copy, a symlink that lets a branch switch synchronise the skill an agent reads through git (#714).
+# It used to be a separately generated directory, which needed a built CLI to bootstrap and silently kept the previous branch's version until someone re-ran the generator.
+.PHONY: setup setup-unlocked setup-deps setup-artifacts preflight
 setup:
-	pnpm install
-	cp scripts/hooks/pre-commit-shim $$(git rev-parse --git-common-dir)/hooks/pre-commit
-	chmod +x $$(git rev-parse --git-common-dir)/hooks/pre-commit
-	@if [ ! -d .claude/skills/pfdsl ]; then $(MAKE) bootstrap-pfdsl-skill; fi
+	node scripts/setup-completion.mjs run
 
-# .claude/skills/pfdsl is generated + gitignored (#348), not tracked in git.
-# gen-skill.mjs needs a built CLI (packages/cli/dist/cli.js) to render the CLI
-# help section, so build the packages first, then generate the skill once.
-.PHONY: bootstrap-pfdsl-skill
-bootstrap-pfdsl-skill:
-	pnpm --filter @pfdsl/core build
-	pnpm --filter @pfdsl/graphviz-exporter build
-	pnpm --filter @pfdsl/metadata-exporter build
-	pnpm --filter @pfdsl/preview-engine build
-	pnpm --filter @pfdsl/cli build
-	node scripts/gen-skill.mjs --out .claude/skills/pfdsl
+setup-unlocked:
+	$(MAKE) setup-deps
+	$(MAKE) setup-artifacts
+	node scripts/setup-completion.mjs write
+
+setup-deps:
+	rm -f node_modules/.pfdsl-setup-complete
+	pnpm install
+	node scripts/setup-shell-parser.mjs
+
+setup-artifacts:
+	node scripts/shared-hooks.mjs install
+	node scripts/link-repo-skill.mjs
+
+preflight: setup-artifacts
+	node scripts/setup-completion.mjs check
 
 .PHONY: build
-build:
+build: preflight
 	pnpm -r build
 
 .PHONY: test
-test:
+test: build
 	pnpm -r test
-	node --test "scripts/lib/*.test.mjs" "scripts/pfdsl/lib/*.test.mjs"
+	node --test "scripts/*.test.mjs" "scripts/lib/*.test.mjs" "scripts/pfdsl/*.test.mjs" "scripts/pfdsl/lib/*.test.mjs" "hooks/*.test.mjs" "hooks/lib/*.test.mjs" "plugin/pfdsl/hooks/lib/*.test.mjs" "plugin/pfdsl-codex/hooks/lib/*.test.mjs" "packages/vscode-extension/smoke/*.test.mjs" "experiments/evidence-roundtrip/*.test.mjs" "experiments/standalone/src/*.test.mjs" "experiments/standalone/electron/*.test.cjs"
 	node scripts/check-script-imports.mjs
+	node scripts/check-no-shell-strings.mjs
+	node scripts/check-cli-conventions.mjs
+
+.PHONY: coverage
+coverage:
+	pnpm -r coverage
 
 .PHONY: typecheck
-typecheck:
+typecheck: build
 	pnpm -r typecheck
 
 .PHONY: lint
 lint:
-	pnpm biome check packages/
+	node scripts/check-biome.mjs .
 
 .PHONY: format
 format:
-	pnpm biome check --write packages/
+	pnpm biome check --write .
 
 .PHONY: build-deps
 build-deps:
@@ -45,11 +55,38 @@ build-deps:
 	pnpm --filter @pfdsl/graphviz-exporter build
 	pnpm --filter @pfdsl/metadata-exporter build
 	pnpm --filter @pfdsl/preview-engine build
+	pnpm --filter @pfdsl/editor build
 	pnpm --filter @pfdsl/cli build
 
 .PHONY: vscode-build
 vscode-build: build-deps
-	pnpm --filter pfdsl build
+	pnpm --filter ./packages/vscode-extension build
+
+# Native desktop build on macOS/Linux. MODE=dev starts Tauri with Vite.
+# Keep the caller's toolchain first; rustup's default location is a fallback.
+MODE ?= build
+.PHONY: standalone
+standalone: export PATH := $(PATH):$(if $(CARGO_HOME),$(CARGO_HOME),$(HOME)/.cargo)/bin
+standalone: preflight
+	@case "$(MODE)" in build|dev) ;; *) echo "Use make standalone MODE=build or MODE=dev." >&2; exit 1 ;; esac
+	@case "$$(uname -s)" in \
+		Darwin) xcode-select -p >/dev/null || { echo "Install Xcode Command Line Tools: xcode-select --install" >&2; exit 1; } ;; \
+		Linux) ;; \
+		*) echo "make standalone supports macOS and Linux; Windows and other hosts are not supported." >&2; exit 1 ;; \
+	esac
+	@cargo --version && rustc --version || { echo "Install stable Rust with rustup: https://v2.tauri.app/start/prerequisites/#rust" >&2; exit 1; }
+	$(MAKE) build-deps
+	@if [ "$(MODE)" = dev ]; then \
+		pnpm --filter @pfdsl/standalone tauri dev; \
+	elif [ "$$(uname -s)" = Darwin ]; then \
+		pnpm --filter @pfdsl/standalone tauri build --bundles app -- --locked; \
+	else \
+		pnpm --filter @pfdsl/standalone tauri build --no-bundle -- --locked; \
+	fi
+
+.PHONY: test-vscode-smoke
+test-vscode-smoke: vscode-build
+	pnpm --filter ./packages/vscode-extension test:smoke
 
 # One command to start a dev session: build, open the extension window, then
 # watch for changes in the foreground (Ctrl+C to stop).
@@ -69,13 +106,14 @@ vscode-dev: vscode-build
 	@echo "Watching for changes (Ctrl+C to stop)..."
 	pnpm --filter pfdsl watch
 
-# vscode-extension を .vsix にパッケージし vscode-v<version> タグを打って push する。
-# VERSION=x.y.z を渡すと package.json を更新してコミットしてからパッケージする。
-# tag を打つ前に build/test/check-docs/gen-skill identity を検査する (scripts/release.mjs)。
-# 例: make vscode-package VERSION=0.0.13
+# VS Code release preparation leaves the version diff for the normal PR flow.
 .PHONY: vscode-package
 vscode-package: vscode-build
-	node scripts/release.mjs vscode $(if $(VERSION),--version $(VERSION))
+	node scripts/release.mjs vscode publish $(if $(COMMIT),--commit $(COMMIT))
+
+.PHONY: vscode-prepare
+vscode-prepare:
+	node scripts/release.mjs vscode prepare $(if $(VERSION),--version $(VERSION))
 
 .PHONY: gen-samples
 gen-samples: build-deps
@@ -88,86 +126,114 @@ gen-readme-cli:
 .PHONY: check-readme-cli
 check-readme-cli:
 	node scripts/gen-readme-cli.mjs
-	@git diff --exit-code README.md || (echo "README.md CLI section is stale. Run 'make gen-readme-cli' and commit the result." && exit 1)
+	@git diff --exit-code README.md packages/cli/README.md || (echo "A README's CLI section is stale. Run 'make gen-readme-cli' and commit the result." && exit 1)
 
-# Canonical-fmt guard for operational .pfdsl/ files only (#529). docs/ teaching
-# material is exempt, since fmt can materialize implied nodes there.
+# Canonical-fmt guard for operational .pfdsl/ files and the distributed
+# scaffold's .pfdsl/ templates (#529, #685). docs/ teaching material is
+# exempt, since fmt can materialize implied nodes there.
 .PHONY: check-fmt
 check-fmt:
-	@find .pfdsl -name "*.pfdsl" -type f | sort | while read f; do \
-		echo "fmt --check $$f"; \
-		node packages/cli/dist/cli.js fmt "$$f" --check || \
-			{ echo "$$f is not canonically formatted. Run 'make fmt-pfdsl' and commit the result."; exit 1; }; \
-	done
-	@echo "check-fmt: all passed"
+	node scripts/check-pfdsl-inventory.mjs --run fmt
 
-# Rewrite the operational .pfdsl/ files to canonical fmt (companion to check-fmt).
+.PHONY: check-adr
+check-adr:
+	node .regomark/check-adr.mjs
+
+# location: の参照先実在ガード。スコープは check-fmt と同じ理由で運用 .pfdsl のみ
+# — docs/ の教材と core の fixture は例示パスを意図して持つので、解決することは
+# そもそもそれらの性質ではない（#937）。pre-commit 側の対は drift-gates.mjs の
+# pfdsl-links ゲートで、そちらは staged 分だけを見る。両方要るのは、他所のファイル
+# 移動で壊れた location: は当の .pfdsl を触らないコミットでは staged に現れないため。
+.PHONY: check-links
+check-links: check-pfdsl
+	node scripts/check-pfdsl-inventory.mjs --run links
+
+# Runs `check` (non-strict) against operational .pfdsl/. Unlike check-scaffold
+# (--strict, distributed scaffold only), operational files carry in-flight
+# status and are deliberately exempt from --strict, so this target has to
+# exist on its own for a rule like V035 (#1125) to ever fire against them —
+# check-scaffold's --strict scope never reaches .pfdsl/, and check-docs
+# scopes to docs/. Wired as a check-links prerequisite so the existing CI
+# step (`make check-links`) runs it too, rather than adding a new CI step.
+.PHONY: check-pfdsl
+check-pfdsl:
+	node scripts/check-pfdsl-inventory.mjs --run operational
+
+.PHONY: check-pfdsl-inventory
+check-pfdsl-inventory:
+	node scripts/check-pfdsl-inventory.mjs
+
+# The distributed scaffold must pass the check the skills themselves
+# prescribe: pfd-grill gates on `check --strict` and pfd-ecosystem on
+# `check`, so a scaffold that fails either hands every adopting repo a file
+# that fails their own gate the moment they copy it. check-fmt above covers
+# formatting only, which is how a strict-mode failure survived it (found by
+# the 2026-08-04 distribution review). Operational .pfdsl/ files are exempt
+# here — they carry statuses and in-flight nodes that strict mode rejects by
+# design.
+.PHONY: check-scaffold
+check-scaffold:
+	node scripts/check-pfdsl-inventory.mjs --run scaffold
+
+# Rewrite the operational .pfdsl/ and scaffold .pfdsl/ files to canonical fmt
+# (companion to check-fmt).
 .PHONY: fmt-pfdsl
 fmt-pfdsl:
-	@find .pfdsl -name "*.pfdsl" -type f | sort | while read f; do \
+	@find .pfdsl scripts/harness-template/skills/pfd-ops/references/scaffold -name "*.pfdsl" -type f | sort | while read f; do \
 		node packages/cli/dist/cli.js fmt "$$f" --write || exit 1; \
 	done
 
 .PHONY: check-docs
 check-docs:
-	@find docs -name "*.pfdsl" -type f | sort | while read f; do \
-		echo "check $$f"; \
-		node packages/cli/dist/cli.js check "$$f" || exit 1; \
-		node packages/cli/dist/cli.js render "$$f" --format dot > /dev/null || exit 1; \
-	done
-	@echo "check-docs: all passed"
+	node scripts/check-pfdsl-inventory.mjs --run docs
 	node scripts/check-doc-examples.mjs
 	node scripts/check-diag-registry.mjs
 	node scripts/check-forward-ref-markers.mjs
 	node scripts/check-spec-ids.mjs
 	node scripts/check-companion-bindings.mjs
+	node scripts/check-distributed-prose.mjs
+	node scripts/report-executor-vocabulary.mjs --check
+	node scripts/check-skill-wiring.mjs
 
 .PHONY: gen-skill
 gen-skill: check-docs
-	node scripts/gen-skill.mjs --out .claude/skills/pfdsl
+	node scripts/gen-skill.mjs --out generated/skills/pfdsl
 
+.PHONY: gen-install
+gen-install:
+	node scripts/gen-install.mjs
+
+# gen-plugin.mjs runs gen-skill and gen-install itself, inside its lock and
+# snapshot, so they are not prerequisites here: a first pass outside the lock
+# would race a concurrent generator, and a failed run would restore that first
+# pass's output instead of the state before the run.
 .PHONY: gen-plugin
-gen-plugin: gen-skill
+gen-plugin: check-docs
 	node scripts/gen-plugin.mjs
 
 .PHONY: push
-push: check-docs
-	@if ! git diff --quiet HEAD -- docs/samples docs/examples plugin .claude-plugin; then \
-		echo "docs/samples, docs/examples, plugin, または .claude-plugin に差分があります。コミットしてから push してください。"; \
-		git diff --stat HEAD -- docs/samples docs/examples plugin .claude-plugin; \
-		exit 1; \
-	fi
-	$(MAKE) gen-samples
-	@if ! git diff --quiet HEAD -- docs/samples; then \
-		echo "gen-samples で docs/samples が更新されました。自動コミットします。"; \
-		git add docs/samples && git commit -m "chore: regenerate docs/samples"; \
-	fi
-	$(MAKE) gen-plugin
-	@if ! git diff --quiet HEAD -- plugin .claude-plugin; then \
-		echo "gen-plugin でプラグインが更新されました。自動コミットします。"; \
-		git add plugin .claude-plugin && git commit -m "chore: regenerate plugin"; \
-	fi
+push: test typecheck lint check-docs
+	node scripts/check-generation.mjs --gen-plugin push --samples
 	git push
 
 .PHONY: release-status
 release-status:
 	node scripts/release-status.mjs
 
-# @pfdsl/cli を npm 公開する。VERSION= を指定するか packages/cli/package.json の version を使い
-# v<version> タグを打って push し、publish-cli.yml (OIDC) を起動する。
-# VERSION= を指定した場合は package.json を更新してコミットしてからタグを打つ。
-# tag を打つ前に build/test/check-docs/gen-skill identity を検査する (scripts/release.mjs)。
-# 例: make release VERSION=0.0.8
+# Prepare the CLI version diff for a normal PR.
+.PHONY: release-prepare
+release-prepare:
+	node scripts/release.mjs cli prepare $(if $(VERSION),--version $(VERSION))
+
+# Publish the exact merged commit named by COMMIT.
 .PHONY: release
 release:
-	node scripts/release.mjs cli $(if $(VERSION),--version $(VERSION))
+	node scripts/release.mjs cli publish $(if $(COMMIT),--commit $(COMMIT))
 
-# ライブラリ群（core/graphviz-exporter/preview-engine）を npm 公開する。
-# VERSION= を指定するか packages/core/package.json の version を使い
-# lib-v<version> タグを打って push し、publish-libraries.yml (OIDC) を起動する。
-# VERSION= を指定した場合は3パッケージの package.json を同時に更新してコミットしてからタグを打つ。
-# tag を打つ前に build/test/check-docs/gen-skill identity を検査する (scripts/release.mjs)。
-# 例: make release-libs VERSION=0.0.2
+.PHONY: release-libs-prepare
+release-libs-prepare:
+	node scripts/release.mjs libs prepare $(if $(VERSION),--version $(VERSION))
+
 .PHONY: release-libs
 release-libs:
-	node scripts/release.mjs libs $(if $(VERSION),--version $(VERSION))
+	node scripts/release.mjs libs publish $(if $(COMMIT),--commit $(COMMIT))

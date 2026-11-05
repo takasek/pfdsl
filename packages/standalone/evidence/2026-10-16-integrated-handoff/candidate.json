@@ -1,0 +1,46 @@
+{
+	"sourceCommit": "ebca71b5c1b89acb86e184002a17694f03e4b310",
+	"uncommittedDiff": false,
+	"planCommit": "ebca71b5c1b89acb86e184002a17694f03e4b310",
+	"planSha256": "1ad9722c94a0dcc8cd35ebad8666233cf7e07eecf43217b4af486747f2592f5f",
+	"platform": "darwin-arm64",
+	"macSigning": "adhoc linker-signed executable; no sealed resources, no team, no notarization",
+	"buildCommands": [
+		"make build",
+		"pnpm --dir packages/standalone tauri build --bundles app",
+		"vsce package --no-dependencies --out <candidate.vsix>"
+	],
+	"files": [
+		{
+			"name": "pfdsl-0.0.18-ebca71b5.vsix",
+			"path": "packages/standalone/src-tauri/target/acceptance-1445/pfdsl-0.0.18-ebca71b5.vsix",
+			"sha256": "ab8a1904b2040a01f27db3a3b0811c7c0f9cfae709f87e1ac4e814d79e7df29c"
+		},
+		{
+			"name": "PFDSL-0.1.0-ebca71b5-adhoc.app.zip",
+			"path": "packages/standalone/src-tauri/target/acceptance-1445/PFDSL-0.1.0-ebca71b5-adhoc.app.zip",
+			"sha256": "2b47adaab1522b040e56a0b9caa2e64d01d194d08f2299cc7637f4ba6563187a"
+		}
+	],
+	"macExecutable": {
+		"path": "packages/standalone/src-tauri/target/release/bundle/macos/PFDSL.app/Contents/MacOS/pfdsl-desktop",
+		"sha256": "157cc5a2086b8067334d6f741840edb62e3a61bdaf2fb343709a27a1b09c9307"
+	},
+	"frontendAssets": {
+		"base91-DOY1bT5-.js": "ef188a16e7ad9e0a356d435fb40ddb8fa04edb7b0428a5e6abd1d2b805347bab",
+		"codicon-DF1abBS2.ttf": "77f902557231f95c4c71ae517d09a1a842753656f5f665086b3e5ad8095538da",
+		"duckdb-BzlFElZV.js": "eaf3ce6bb5425dcfd5ba4f86e1a9a20fea83a2faf3aff6c270bfd6f3238a3861",
+		"editor.worker-DWPaKKV_.js": "9ae6f27737ab392047db742b346c1711b685cee3b38b0fe04718eb9a9de6e0a2",
+		"expat-CX7Bg68x.js": "8d79780e091dfac1e6c221bb34d7ac58e72934b7e308c8814068af3c44e3022b",
+		"graphviz-BKX3zE1B.js": "136af8b7680116ce7458c02e8a9e1579ccf22506911ced8df37227b4d6fa4428",
+		"index-BbNpBGfx.css": "91e52072f4354c1084a5a4739cc5e4cccbc88d32add33154b333a0c3f5ae1a53",
+		"index-sd9efuED.js": "67bc57e8c5c63d9aa91680caac81295f735471fa83ec50856bae3bbaa337766c",
+		"zstd-Dx_4Lof7.js": "892c4e85dd6eea08a14eaf34b66cf2d16695806146acb015fa40eec3860e4312"
+	},
+	"vscodeAssets": {
+		"extension.cjs": "f1bc2c46d958e81929694b1f6ff8aa7dd73a1bc7e5ab967ff728e1527aefd165",
+		"webview.js": "2684297ae8e61404ae8ca9b8225346af6e170df723d88a809e26eef6cf940e20",
+		"analysis-host.cjs": "d16109756a61567488c59be603b4074fbc4e1d1ff10bab84366a6a09ebd9f9d9"
+	},
+	"pathBase": "candidate checkout (paths are relative)"
+}

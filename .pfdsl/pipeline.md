@@ -1,0 +1,196 @@
+# pipeline.md — 変換境界の補足（pipeline.pfdsl の companion）
+
+`pipeline.pfdsl` のグラフが運べない、変換境界に関する補足をここに置く。pfd-ops skill の L2 ディスパッチがこのファイルを参照する。
+
+この図は「システムが動くとき、データは何に変換されるか。変換の境界はどこか」だけに答える。
+収録範囲は**判断を含まない決定的変換**である（ADR-0035）。
+判断・承認・裁量が変換の一部であるものは workflow.pfdsl 側にあり、実行主体が人か LLM か機械かは判定に使わない。
+
+互いに独立した3本のチェーンを持つ。
+
+- **b層**: .pfdsl ドキュメント変換（source → 構文木 → 正準化グラフ → 各出力）
+- **生成**: 一次ソース → リポ内生成物（スキル・install/・plugin・描画物）
+- **配布・公開**: plugin → 採用リポ／ユーザー環境、タグ → npm・Marketplace
+
+3本は互いにエッジで繋がらない。
+`group` は成果物の存在様式（住処）で切り、層識別は `tags` で表す（両者は独立の軸）。
+
+ファイルが実用上の限界に近づいた場合の分割候補は「読み手が完全に別」の線であり、b層（読み手は CLI ユーザー・VSCode 拡張ユーザー）と生成・配布（読み手はメンテナ・採用リポ）の間に入る。
+現時点では分割していない。
+
+## Linux native の検証用ビルドと受渡し
+
+`.github/workflows/desktop.yml` の `linux-native` は、PR head または main push の source commit を checkout し、Debian 13 / x86_64 で frontend・Rust unit・no-bundle native build を実行する。
+executable / AppImage の artifact 名は producer の run attempt を含め、再実行時も旧成果物を保持する。
+後続 runtime job は producer output の AppImage artifact ID を取得し、空 ID を拒否してから download する。
+成功時だけ、native executable、同じ build の frontend、source commit、依存版、各ファイルの SHA-256 を tar.gz にまとめ、14日保持の Actions artifact として検証担当へ渡す。
+同じ job はビルド済み native を検証用 AppImage にまとめ、展開物に WebKitGTK 4.1・JavaScriptCoreGTK 4.1・GLESv2・GL dispatch があることを確認して別 artifact に渡す。
+別の Debian 13 job は system WebKitGTK/GLES がない条件で展開物の native `ldd` と GLES の実 `dlopen`・symbol lookup を検査する。
+起動時の動的依存は native の `ldd` だけでは網羅できず、今回の GLES 検査も target graphics driver や GUI 起動の成功を意味しない。
+AppImage、frontend、source commit、外側と展開後の regular file の hash を配送し、対象環境では FUSE を使わず展開した AppRun から起動できる。
+corpus の fingerprint は外側 AppImage でなく内側 native executable に合わせ、対象 desktop の依存解決・起動・実操作を同梱検査の成功から推定しない。
+これは d 層の開発用ビルドを対象環境へ渡す経路であり、npm・Marketplace・macOS 配布の release request や公開タグを消費・生成しない。
+検証担当は source commit と hash を照合し、対象 Linux の実行依存を確認して GUI 操作・native corpus の受入を行う。
+CI の unit・compile 成功と対象 desktop の実操作結果は別に記録する。
+現在の pipeline 図は d 層ホストのビルド・受入を変換ノードとしてモデル化していないため、その生成・配送境界を本節で明示する。
+
+## a-g 層との対応
+
+- **a（言語仕様）**: `docs/spec/spec.md`。図に現れない — validate が適用する V/W ルールの根拠だが、実装へ反映されるのは設計時であり、実行時に読まれる入力ではないため
+- **b（処理系）**: `tags: [b]` の process 群。実体は `@pfdsl/core` + `graphviz-exporter` + `preview-engine` + `metadata-exporter` の4パッケージ（各 process の `location` 参照）
+- **c（PFD読み書き分析skill）**: `pfdsl_skill`。bのホストとしては図外（次節）だが、`gen_skill` の生成物であり `gen_plugin` の同梱素材でもあるため、その2つの役では図に現れる
+- **d（編集ホスト）**: `packages/vscode-extension/` と `packages/standalone/`。共通の文書処理・preview DOM は private な `packages/editor/`。図に現れない — bのホストであり、データを供給も保管もしないため（次節）
+- **e（a,bの配布）**: `push_cli_release_tag` / `publish_cli`、`push_libraries_release_tag` / `publish_libraries`、`package_vscode_release` / `verify_vsix` / `upload_vsix`。ADR-0035 までは workflow.pfdsl 側にあったが、release request 以降の変換に判断は入らないためこちらへ移した。リリース可否・版数の判断は workflow.pfdsl の3種の decide process が持ち、この図は kind ごとの release request を入力として受ける
+- **f（PFD運用フレームワーク）**: `tags: [f1]`（L1+L2 汎用層）/ `tags: [f2]`（L3 バックエンドプリセット層。採用リポが選択できる GitHub Issues 版とファイルベース・トラッカー版の2種）。f2 は規約本文（`ops_skill_l3`。2種の reference を location に列挙する）と GitHub Issues 版の採用テンプレート（`ops_install_templates`）の2 artifact に分かれる — 前者は手書き、後者は `gen_install` の生成物であり、生成経路も ADR-0035 でこの図へ移った（`ops_install_sources` → `gen_install` → `ops_install_templates`）。ファイルベース・トラッカー版は実配置を要しないため採用テンプレートを持たない。内容・retro フィードバックの一次情報は workflow.pfdsl の `ops_skill_general` / `ops_skill_l3`
+- **g（fの配布）**: `tags: [g]` の process 群。make gen-plugin（Claude Code / Codex両対応の組み立て）・Claude Code plugin marketplace（既存のインストール経路）・現在のCodexが同じ `.claude-plugin/marketplace.json` 互換経路で利用するClaude-compatible published artifact・check-install-sync.mjs（実配置とランタイム照合）が実装。`gen_plugin` と `gen_install` は生成でもあるため `gen` タグも併せ持つ
+
+## ホスト（c/d）とbの関係
+
+`@pfdsl/cli`（cが指示する実行主体）と `vscode-extension`（d）は互いに依存しない。
+CLI は `@pfdsl/core`・`graphviz-exporter`・`preview-engine` を呼ぶ。
+VS Code と Tauri の文書解析・表示 packet・位置解決は `@pfdsl/editor` を通り、preview は両ホストが同じ `mountPreview` を利用する。
+その共有層は core、browser 用の `graphviz-exporter/dot` と `preview-engine/renderer` を呼び、ファイルアクセス・エディタ操作・外部起動は各ホストが持つ。
+`metadata-exporter` は引き続き vscode-extension のみが import し、Tauri の出力導線は後続工程である（`packages/cli/src/index.ts`、`packages/editor/src/` と各ホストの実入口を照合）。
+
+**ホストはグラフに現れない。** c/d はb層パイプラインを起動・実行する側であって、変換に投入されるデータでも変換結果でもない。
+`>>` 入力にすると「bがc/dに依存する」向きに逆転し（実際はc/dがbを呼ぶ側で、bはc/dの存在を知らない）、tag で表すにしても is-a（層識別）と is-called-by（呼び出し関係）が同じ名前空間に混在して誤読を招く — いずれも過去の版で実際に踏んだ誤りである。
+呼び出し経路の情報は各 process の description（「双方が呼ぶ」「拡張のみが呼ぶ」等）とこの節で運ぶ。
+
+- b の全 process は CLI・VSCode 拡張の双方から呼ばれる。例外は `export_metadata`（CLI サブコマンドがなく、拡張の `pfdsl.export` のみが呼ぶ）
+- 人間の読み手は artifact 側の `externalStakeholders`（CLIユーザー / VSCode拡張ユーザー / CI）で表す
+- 拡張の preview / hover / codelens / jump / document-link 等の UI 専用機能は、出力がエディタ内の一時表示のみで保存・再利用されないため artifact 化しない（設計判断）
+
+## 変換境界の定義
+
+- **parse（`@pfdsl/core` の `parse()`）**: frontmatter 読込 → lex → parse の3段を1トランザクションとして扱う。宣言 ID の YAML キー型は文字列化前に検査する。出力は `document`（構文木）と型検査済み `frontmatter`、FM/L/P 診断。個別サブコマンドとしては露出しない内部境界
+- **normalize（`normalizer.ts` + `buildGraph`）**: parse の出力からエッジリスト・ノード種別・孤立ノード集合・`Graph` 構造を組み立てる。個別の CLI `normalize` コマンドは公開しない。グラフの閲覧は `graph` コマンド群が担う（ADR-0030）
+- **validate（`validator.ts`）**: 正準化グラフと frontmatter に V/W ルールを適用し、解析時のソース位置索引から宣言位置を取得して診断を生成する。単独の `validateGraph` は従来の `source` 引数も利用できる。CLI `check` は parse→normalize→validate を1回で実行する。VSCode 拡張は `analyzeSource()` 経由で同じ validate をエディタ内リアルタイム診断に使う（`diagnostics.ts`）
+- **collect_diagnostics（`index.ts` の `analyze()`）**: parse・normalize・validate の診断を集約する。CLI と VSCode は集約後の結果を受け取る。
+
+`analyzeSource()` は同じ解析 snapshot に frontmatter の宣言・フィールド・文字列値の位置索引を付けて返す。
+VSCode の URI・version 単位の解析 cache はこの snapshot を jump・link・run hint・diagnostic に共有する。
+描画用の継承解決は cache せず、渡された entry frontmatter の `extends` と local 設定を正本として依存プリセットだけを loader へ渡す。
+依存プリセットは保存済みファイルを読み、untitled 文書の相対 extends は解決しない。
+無効な YAML・型不正の metadata を描画・操作の消費者へ渡さない契約と、renderer の寛容な解決・strict check の診断は維持する。
+- **generate_frontmatter_schema**: Zod の型・値制約から外部検証用 JSON Schema を生成する。空宣言を許可する文書形状を公開し、後続の意味検証へ委譲するために緩めた読込み用スキーマは公開しない。変換コードはビルド時だけ使い、core の通常入口へ含めない。
+- **format（`formatter.ts`）**: ソーステキストから独立に再 lex/parse し整形済みテキストを生成する。check の parse 結果を再利用しない別経路。frontmatter は yaml CST（`frontmatter-cst.ts`）経由で正準化する（ADR-0034）
+- **sort_meta（`sort.ts` の `sort(source, opts)`）**: 入力はソーステキストと、`metadata_sort_request` が表す優先順付きのソートキー列（`opts.by`）。format と同じく独立再 parse し、構文木を受け取る経路ではない。frontmatter の並べ替えは yaml CST（`frontmatter-cst.ts`）経由（ADR-0034）
+- **set_meta（`frontmatter-cst.ts` の `setFrontmatterField(source, kind, id, field, value)`）**: 入力はソーステキストと、`metadata_update_request` が表すノード種別・ID・フィールド名・更新値。指定ノードの指定フィールドだけを yaml CST 上で書き換える。対象ノードの定義が無い場合の新規挿入は `insert-definition.ts` が担う
+- **reindex_meta（`reindex.ts` の `reindex(source, opts)`）**: ソーステキストを入力に取り、`computeTopoOrder` の順序に沿って `index` フィールドを採番し直す。位相順を要するため内部で `analyze()` を通す点が sort_meta / set_meta と異なる
+- **render_graph（`graphviz-exporter` の `exportDot(graph, frontmatter)`）**: 正準化グラフと frontmatter（layout / title / statusStyles）から DOT 文字列を組む
+- **export_image**: DOT→SVG は `@hpcc-js/wasm`（`preview-engine` の `renderDotToSvg`）で外部依存なし。PDF/PNG は `svgToBinary` が `puppeteer` を動的 import し、未インストール時は明示エラーで失敗する（フォールバックしない）
+- **export_metadata（`metadata-exporter` の `extractMetadata(graph, frontmatter)`）**: VSCode 拡張の `pfdsl.export`（`export.ts`）のみが呼ぶ
+- **diff_graphs（`diff.ts` の `diffGraphs(a, b, fmA, fmB)`）**: 入力は2組の（グラフ, frontmatter）。元の文書は `parse`・`normalize`、比較対象文書は同じ処理を独立に適用する `parse_comparison`・`normalize_comparison` を通り、それぞれのグラフとfrontmatterを渡す。
+
+生成・公開チェーン（ADR-0035 で workflow.pfdsl から移動）:
+
+- **gen_skill（`scripts/gen-skill.mjs`）**: 一次ソース（skill-template / spec / samples / examples / review-perspectives）からリポ内 pfdsl スキルを組む。`references/*.md` の生成は `packages/cli/dist` に触れない `scripts/lib/gen-skill-refs.mjs` に切り出し済みで、SKILL.md（`pfdsl help` 埋め込み）のみ dist を必要とする（#586）。
+同モジュールを単体で呼ぶ CLI エントリもあったが、`scripts/pre-commit` が呼び出しをやめた後は誰も起動しておらず削除した（#668）。
+dist 非依存の手動再生成は `scripts/gen-plugin-dist-independent.mjs` が担う
+
+`gen_skill` の素材には `toolchain` も含む。
+`scripts/gen-skill.mjs` はローカルビルドの CLI help と `packages/cli/package.json` の version を SKILL.md に埋め込み、`packages/core/src/types/frontmatter.ts` とテンプレートのフィールドも照合する。
+CLI help・version だけが変わっても生成内容が変わるため、ビルドの前提だけでなくデータ入力として配線する。
+
+- **gen_install（`scripts/lib/install-templates.mjs` の明示リスト）**: repo ルートの配布ソースから `install/` ミラーを一方向で再生成する。生成の向きは repo ルート → `install/` → `plugin/` の一本のみ（#547 で双方向 sync を廃止）
+- **plugin root assembly（`scripts/gen-plugin.mjs`）**: `pnpm -r build && make gen-plugin` が、中立テンプレートの source topology と schemaを中立capability recordへdecodeして四target contractを検証し、その同じrecord objectから両ハーネスの出力を生成する。pfdsl skillの中立な生成正本は`generated/skills/pfdsl`であり、`.claude/skills/pfdsl`はそこへの生成symlinkなので手編集しない。組み立て前に専有rootをsnapshotして空から再構築するため、生成をやめた追跡済みファイルはGitの削除差分になり、生成失敗時は元のrootへ戻る。再構築でignore対象を含む未追跡ファイルが失われる場合は生成を失敗させる。dist非依存の経路では中立skillの`SKILL.md`だけを保持する。Claude Code adapterはplugin tree・manifestを`plugin/pfdsl/`へidentity互換に組み立て、repo-rootの`.claude-plugin/marketplace.json`も更新する。Codex adapterは生成済みClaude rootやmanifestを読まず、repositoryの`AGENTS.md`・`.agents/`・`.codex/`とnative skill tree・manifest・hooksを`plugin/pfdsl-codex/`へ生成する。公式Codex validator/runtimeはplugin rootの`skills/`を固定するため、二つのrootを混在させない。内部でgen_installを実行するため、pluginが古い`install/`から組まれることはない
+
+復元未完時には両 generator CLI が primary error を先に表示し、snapshot の保存理由と recovery path を続ける。
+再試行と `check-generated-drift.mjs` は `plugin/.pfdsl-gen-txn-*` の残留を専用診断で示すが、active transaction や cleanup 失敗もあり得るため、全件を rollback failure と断定しない。
+再試行は保存済みデータの復元・削除を行わないため、元のエラーと snapshot を確認してから復旧を判断する。
+
+Claude adapter が改版する repo-root `.claude-plugin/marketplace.json` は、前世代の `claude_adapter_output` から `gen_plugin` へのフィードバック入力である。
+生成器はこの既存 JSON を読み、plugin の description だけを書き換え、owner・source.ref 等を保持する。
+`claude_adapter_output` の location は専有 root `plugin/pfdsl/` 全体とこの repo-root JSON を指し、skill の追加や bundle manifest も生成器の出力範囲として含む。
+
+- **render_previews（`make gen-samples`）**: 機能カタログとロードマップを dot/svg に描画する。`.dot` / README は graphviz-exporter、`.svg` は preview-engine の wasm graphviz で生成され、いずれも決定論的（#588）
+- **push_cli_release_tag / publish_cli**: `make release COMMIT=<SHA>` は準備PRがmergeされた明示commitを検査し、そのSHAへ`v*` tagを作成・pushする。
+このtag上の`plugin/pfdsl/`が公開snapshotとなり、`publish-cli.yml`が同じtagのcommitから`@pfdsl/cli`をnpm publishする（Trusted Publishing / OIDC）。
+mainへのcommit/push、marketplaceのpin更新、roadmapのdone更新はrunnerの担当に含めない。
+- **pin_plugin_marketplace / install_plugin**: 公開されたCLI版と同じtagのpluginを取得確認した後、通常PRでmainのmarketplace参照を実在tagへ更新する。
+merge後のmainから参照と取得先を確認し、Claude Code marketplaceと現在のCodex互換経路がこの参照から公開snapshotを消費する。
+tag内のmarketplaceは公開前のpinを保持しており、配布先を選ぶ正本はmainの`.claude-plugin/marketplace.json`である。
+- **push_libraries_release_tag / publish_libraries**: `make release-libs COMMIT=<SHA>` が明示commitの`lib-v*` tagをpushし、`publish-libraries.yml`がそのcommitからcore → graphviz-exporter → preview-engineの順でnpm publishする。
+CLI・librariesとも手動再開はrelease tagを指定し、workflowはbranch指定を拒否してeventのSHAをcheckoutする。
+- **package_vscode_release / verify_vsix / upload_vsix**: `make vscode-package COMMIT=<SHA>`は明示commitから未検証`.vsix`を生成し、成功後に`vscode-v*` tagをpushする。
+1回の実行が正常完了したときの`.vsix` candidateとremote tagを同じprocessの複数出力とし、tagに対応するpublish workflowは置かない。
+人がcandidateをローカルインストールして拡張の起動を確認した後、検証済み`.vsix`をmarketplace.visualstudio.comへアップロードする。
+
+### PR経由の公開と公開後同期
+
+release担当が通常branchで`make release-prepare VERSION=<VERSION>`を実行し、版数と生成物の差分を通常PRへまとめる。
+librariesは`make release-libs-prepare`、VS Codeは`make vscode-prepare`を使う。
+prepareは差分だけを残し、commit・push・PR作成は通常の作業手順が担当する。
+人間が準備PRをmergeした後、release担当はcleanなcheckoutで、公開するfull SHAがHEADと最新origin/mainに一致することを確認する。
+そのSHAを`COMMIT`へ渡し、版数変更後の最終commitに既存のbuild・test・文書・生成整合・distribution-review等の検査を適用してtagを公開する。
+実行時には公開操作そのものの承認を得る。
+
+CLI公開後、release担当は公開された`@pfdsl/cli@<VERSION>`を新しく取得し、今回のmilestoneが要求する挙動を確認する。
+`cli_release_pipeline_kind`では`type: pipeline`の受理と旧値`runtime-pipeline`への規定どおりの応答を確認する。
+同じ版のremote tagが検証したSHAを指すことと、そこから取得した`plugin/pfdsl/`のreader-first資産・bundle manifestの整合も確認する。
+このtagを指すmarketplace更新を通常PRとして準備し、人間のmerge後にmainのpfdslエントリの`url`・`path`・`ref`を読み戻し、その参照先からpluginを取得して確認する。
+tagが取得できるだけの段階では、marketplace経由の配布完了とは扱わない。
+この経路はClaude-compatibleな`plugin/pfdsl/`を対象とし、`plugin/pfdsl-codex/`の別marketplace配布を開始しない。
+
+runnerのready表示は候補一覧であり、公開・取得・criteria確認の成功を表さない。
+公開物確認後のroadmap同期はworkflow.pfdslの`map_deps`が担う。
+release担当は`published_cli`と`plugin_marketplace_entry`を還流入力として、確認済みartifactだけをローカルCLIの`meta set <roadmap> <artifact> status done`で変更し、確認した版・tag/SHA・結果を本文へ記したroadmap同期PRを作る。
+後でmainのpinが進んでも再確認できるよう、配布確認時のmain commitも同じ本文へ残す。
+他のready候補と、公開または確認に失敗したartifactは未完了のまま残し、残作業を既存の追跡issueへ引き継ぐ。
+版数準備PR、marketplace pin PR、確認後のroadmap同期PRの順で進め、review・mergeは人間が行う。
+
+中断後は新しい状態台帳を作らず、準備差分・既存PR・remote tag・workflow・npm版・marketplace参照・artifact statusから再開位置を確認する。
+ローカルtagだけがある場合は対象SHAの一致を確認してpushから再開する。
+remote tagが同じSHAなら再作成や再pushをせず公開結果の確認へ進み、同名tagが別SHAを指す場合は止める。
+公開済みtagの確認は、その後mainが進んだことだけではやり直さない。
+CLIが未ビルド等で候補一覧を取得できなければ、公開workflowの確認結果と候補未確認を分けて表示する。
+CLIをbuildした後、`status ready`で候補を確認して公開物の検証へ続ける。
+VS Codeのremote tagから再開する場合、packageの名前・版に対応する通常ファイルのVSIXが必要である。
+同名ファイルだけでは対象SHAから生成された証拠にならないため、インストール・アップロード前に生成元を確認し、不明なら対象SHAから作り直す。
+workflowの失敗・未検出やnpm版の未取得を成功へ読み替えず、同じtagの確認または対象を明示した再実行から再開する。
+marketplace更新済みでmilestone未確認なら、残る取得確認とroadmap同期から続ける。
+
+**判断の境界は kind ごとの release request にある。** リリースするか・どの版で切るかは workflow.pfdsl の `decide_cli_release` / `decide_libraries_release` / `decide_vscode_release` が判断し、request 以降の変換に判断は入らない。CLI と libraries は tag が対応する publish workflow をゲートする。VSCode拡張は `scripts/release.mjs` の実行順どおり `.vsix` 生成後に tag を push するが、tag 処理は `.vsix` ファイルを読まないため両者をデータ依存の別 process にせず、同じ process の必須出力として順序を description に記す。ローカル検証は candidate を実際に読む別 process であり、検証済み package だけを upload へ渡す。
+そのため公開チェーン全体がこの図の収録対象になる。
+
+**`manual_no_judgment`のprocessは、公開するかの判断を終えた後の人手手順を表す。**
+VSIXのローカル検証・アップロードと、公開済みpluginのmarketplace参照更新が該当する。
+実行主体が人でも、入力を消費して公開物や参照を作る変換はこの図に置く（ADR-0035）。
+
+## plugin 配布チェーンの依存
+
+`decode_harness_capabilities` はテンプレート・inventory・toolchainに加え、実行時のGit ignore判定素材を読む。
+repository内のignore規則だけでなくGit indexとclone固有のinfo/excludeも回答に影響するため、`.gitignore`だけの決定論的な入力とみなさない。
+`check_install_sync` は配置済みファイルと同梱canonical、採用先の設定スナップショットにある `appliedMigration` と実行中pluginのidentityを比較する。
+上流mainとの差は取得・通知しない。
+旧呼出しとの互換で `--upstream` を付けても追加の処理は無い（ADR-0043）。
+
+- **同梱対象リストの一元化（`harness_inventory`）**: 同梱スキル・コマンド・agent・hookと生成分類の一次情報に加え、各capabilityの`claude-repository`・`claude-plugin`・`codex-repository`・`codex-plugin` mappingは`scripts/lib/harness-inventory.mjs`が持つ。スキル・agentを追加するときは四targetすべてへnative・transform・intentional exclusionのいずれか一つを宣言する。PFD側の照合先はworkflow.pfdsl companionの「配布スキルの新規追加時の横断照合」が一次情報（ADR-0035以前の二重モデル化とその乖離の経緯もそちら）。
+- **二重ハーネスのadapter境界**: `decode_harness_capabilities`が中立正本の source encoding とハーネス別の描画済み本文を中立recordへ閉じ込め、`gen_plugin`と`assemble_codex_plugin`はcontract検証済みの同じrecord objectを兄弟入力としてそれぞれのrootを作る。Claude Code rootは`plugin/pfdsl/`、Codex native rootは`plugin/pfdsl-codex/`である。Codex adapterは生成済みClaude rootやmanifestを入力にせず、run固有のtemporary siblingへstageし、rootのassembly lock下でまとめて置換する。公式Codex validator/runtimeがroot直下の`skills/`を固定するため、異なるskill treeを単一rootに置かない。Codex plugin manifestのcapabilityは現在Skillsのみだが、同梱の`hooks/hooks.json`は既定discoveryで公開され、Codex runtimeの`CLAUDE_PLUGIN_ROOT`互換環境でhook commandを解決する。native agentとrepo-local hook設定はリポジトリの`.codex/`へ出力する。command skillの所有manifestは削除・改名後のstale dirを掃除し、commandとskillの出力名が衝突する場合はcommandを`source-command-<name>`へ改名する。`codex_plugin_dist`はCodex native rootの検証済み成果物だが、repo-owned native marketplace/install pathには渡さず、現在のCodex互換導入でも使わない。外部のCodex marketplace構築者が自身のnative sourceとして扱う検証済みhandoff surfaceであり、現在のCodex互換導入は`.claude-plugin/marketplace.json`が同じClaude-compatible published artifactを指す経路を使う。
+- **正本と生成物**: 配布対象の正本は `scripts/harness-template/skills`・`scripts/harness-template/commands`・`scripts/harness-template/agents` である。本文の `claude` / `codex` section と raw path variable を厳密に検査して両方を生成する。未知タグは出力されない分岐内でも拒否し、inventory が指定しない shared reference・script は literal payload としてコピーする。このリポ専用の `pfd-implementer` は `scripts/repo-agent-template/pfd-implementer.md` から Claude/Codex の repository agent を生成し、plugin へは配布しない。ほかのメンテナ専用資産は `.claude/` に残す。pfdsl skill は `scripts/skill-template/SKILL.md` から `generated/skills/pfdsl` に生成し、`.claude/skills/pfdsl` はその symlink である。`install/` は repo ルートの明示リストから生成し、中立正本に複製しない。`.claude/` の配布対象と `pfd-implementer`、`plugin/pfdsl/`、`plugin/pfdsl-codex/`、`CLAUDE.md`、`AGENTS.md`、`.agents/`、`.codex/` は生成物なので手編集しない。正本を更新して `pnpm -r build && make gen-plugin` で再生成し、dist が無い場合は `node scripts/gen-plugin-dist-independent.mjs` で dist 非依存部分を生成する。生成前の snapshot と削除対象は配布先の専有パスに限定し、手書きのメンテナ専用資産と設定を含めない。
+
+## ハーネスsurface変更前の四target確認
+
+Claude Code起点かCodex起点かを問わず、source topology、semantic schema、delivery mapping、output surfaceのいずれかを変更する前に、影響するcapabilityについて`claude-repository`・`claude-plugin`・`codex-repository`・`codex-plugin`の四targetすべての処分をnative・transform・intentional exclusionから一つずつ決める。
+Nativeまたはtransformを選ぶtargetには、そのtargetの生成物だけを読むtarget-local consumer probeと対象output surfaceを同時に宣言する。
+Intentional exclusionを選ぶtargetには、空でない理由と利用者への影響範囲を宣言し、そのcapabilityが対象targetへ混入しないfixtureを対応づける。
+変更をadapter出力へ進める前に、source decoder closure、四target mappingの一意性、probe fixtureとの対応、各adapterのoutput closureが検査対象になっていることを確認する。
+Claude outputをCodexの期待値に使わず、Codex outputをClaudeの期待値に使わない。各probeは対象targetのrootだけをfixtureとして読み、兄弟rootが無い状態でも成功しなければならない。
+- **`deploy_install_layer` のコピー元は plugin 同梱 canonical**: `check-install-sync.mjs --deploy` は `<skill root>/install/` から採用リポルートへコピーする。ローカル編集された配置済みファイルは hash 不一致として skip・警告され、`--overwrite-local-edits` でのみ上書きされる（ADR-0028）。canonical から消えた旧ファイルは、ローカル編集が無ければフラグ無しで削除され、編集を抱えている場合のみ独立した `--delete-edited-orphans` を要する（#603。単一 `--force` は掃除の意図で渡したときに新パスのカスタマイズまで巻き戻した）。canonical 側のリネームで新旧パスが `missing` / `orphaned` に分かれた場合は `Possible renames` として対で報告され、旧パスのローカル編集を新パスへ引き継ぐ手掛かりになる。
+このコピーの向きが成立するのは target が採用リポの場合だけなので、実行のたび target の役割を上流マーカーで分類し、上流リポ・canonical 不明と判定した回は `--deploy` を案内も実行もしない（#971）。
+更新時のローカル編集判定は前回配置の manifest hash と現ファイルを比較する。
+前回と同じファイルは通常更新し、新 canonical と既に同一のファイルも新 hash へ収束する。
+skip したファイルの旧記録は維持し、未記録の相違ファイルは manifest に追加しない。
+実行依存は配置とは別に準備するため、deploy 出力から GitHub Issues バックエンド reference の「依存の準備と初回監査」へ案内する。
+- **採用リポの drift 検知はランタイムのみ**: `check-pfd-ops-sync.yml` は採用リポへ配布されない。pfd-ops 発火時の `check_install_sync` が唯一の安全網で、警告への対応は pfd-ops の `references/architecture.md`「配置ファイルの鮮度セルフチェック」が定める。
+
+## モデル化対象外のツール
+
+`scripts/gate-check.mjs`・`scripts/check-scaffold-sync.mjs` 等、このリポ自身の開発フローだけを検証するツールはこの図の対象外とする。pfdsl の実行時変換でも配布物でもないため、pfd-ops 終端ゲート「変換コンポーネントを追加・変更・削除した場合...」の判定で、この種のツールの新規追加・変更は該当なしと扱ってよい。採用リポへ配布する `scripts/pfdsl/audit-issues-flow.mjs` は `ops_install_sources` に含める。
+
+## エラー・例外処理
+
+- `package_vscode_release` は正常完了時の出力をモデル化する。`.vsix` 生成後に tag 作成または push が失敗すると `.vsix` やローカル tag が残ることがあるが、remote に tag が無い限り release は未完了であり、それらの残存物を正常成果物とは扱わない。`verify_vsix` が失敗した場合は remote tag が残る一方、検証済み `vsix_package` は生産されず `upload_vsix` がブロックされる
+- 診断は `severity: "error" | "warning"` を持つ。`check --strict` は一部の警告（例: V011 フィードバック検証）をエラー昇格させる
+- `svgToBinary`（PDF/PNG化）は `puppeteer` が未インストールだと例外を投げる（メッセージ本文は `packages/graphviz-exporter/src/index.ts` が一次情報）。SVG化（wasm 経路）はこの依存を必要としない
+- primary graph（`>>` / `->`）の循環は `check` が V010 error として検出する（`>>?` は対象外）。循環する構造は `>>?` か改版 artifact で表現する — pfdsl skill の品質ガイド参照

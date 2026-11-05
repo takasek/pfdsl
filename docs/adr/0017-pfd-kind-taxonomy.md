@@ -1,6 +1,6 @@
 # ADR-0017: PFDファイル種別を3種別に定義する
 
-- Status: Accepted
+- Status: Accepted、Superseded in part by [ADR-0035](0035-kind-axis-is-judgment.md)（種別を判定する「主役」の表現と、読み手が別のときのファイル分割を例外とした扱い。ADR-0035 は後者を推奨に格上げした。種別の定義表・問診リスト・1種別1ファイル原則は存続）
 - Date: 2026-06-17
 
 ## Context
@@ -19,7 +19,7 @@ PFDファイルの種別を以下の3種別に定義する。種別は「このP
 |---|---|
 | **roadmap** | 何を何の前に作る必要があるか。今着手できる作業はどれか |
 | **workflow** | この作業はどう繰り返されるか。誰が何をトリガーに何を行うか |
-| **runtime-pipeline** | システムが動くとき、データは何に変換されるか。変換の境界はどこか |
+| **pipeline** | システムが動くとき、データは何に変換されるか。変換の境界はどこか |
 
 ### 種別の選び方（問診リスト）
 
@@ -29,13 +29,17 @@ PFDファイルの種別を以下の3種別に定義する。種別は「このP
 |---|---|
 | 実装すべき作業に依存関係があり、着手順を管理したいか？ | roadmap |
 | 定常的に繰り返す作業サイクルがあるか？ | workflow |
-| システムがデータを受け取り変換して出力するパイプラインがあるか？ | runtime-pipeline |
+| システムがデータを受け取り変換して出力するパイプラインがあるか？ | pipeline |
 
 複数YesならそのぶんファイルがあるのがYes。全部Noなら1ファイルで足りる。
 
-**workflow か runtime-pipeline か迷ったら:**
-人・チームの判断やトリガーが主役 → workflow / データの変換経路が主役 → runtime-pipeline。
-同一ドメインに両方存在してよい（例: 週次再学習サイクル=workflow、ログ→モデル変換=runtime-pipeline）。
+**workflow か pipeline か迷ったら:**
+判断・承認・裁量が変換の一部なら workflow / 入力が揃えば判断なしに出力が決まるなら pipeline。
+同一ドメインに両方存在してよい（例: 週次再学習サイクル=workflow、ログ→モデル変換=pipeline）。
+
+この判定基準は ADR-0035 で改訂した。
+当初は「人・チームの判断やトリガーが主役 → workflow / データの変換経路が主役 → pipeline」と書いていたが、判断を含むが担当が LLM エージェントである変換と、判断は不要だが境界の問題で人手になっている変換を、どちらも誤った側へ落とすことが判明した。
+実行主体は判定に使わず `owner` フィールドで表す。
 
 ### ファイル vs group の使い分け
 
@@ -44,7 +48,7 @@ PFDファイルの種別を以下の3種別に定義する。種別は「このP
 ### statusの使い方
 
 roadmapではartifactの進捗可視化に使う（todo→wip→done）。
-それ以外の種別ではstatusを通常書かない（workflowとruntime-pipelineには「完了」の概念がない）。
+それ以外の種別ではstatusを通常書かない（workflowとpipelineには「完了」の概念がない）。
 
 ### 外部ステークホルダーの表現
 
@@ -64,7 +68,7 @@ artifact:
 `owner`（内部責任者）と `externalStakeholders`（外部届け先）は対称的なフィールドとして機能する。
 `externalStakeholders` も `owner` も消費エッジも持たない artifact は終端監査の検出対象となる（CLIサポート予定）。
 
-組織境界をまたぐ引き継ぎ（チーム間合意・外部提出・差し戻しループ）は workflow か runtime-pipeline に吸収し、組織境界は `owner` フィールドで表現する。
+組織境界をまたぐ引き継ぎ（チーム間合意・外部提出・差し戻しループ）は workflow か pipeline に吸収し、組織境界は `owner` フィールドで表現する。
 独立した種別（stakeholder-handoff）を設ける必要はない（後述）。
 
 ### 種別分類の対象スコープ
@@ -76,7 +80,7 @@ PFDSLの記法は一回性のドキュメント（イベント当日の手順書
 
 ### 「問いの単位」で種別を切る
 
-roadmap / workflow / runtime-pipeline はそれぞれ「他の種別では答えられない固有の問い」を持つ。
+roadmap / workflow / pipeline はそれぞれ「他の種別では答えられない固有の問い」を持つ。
 種別をこの基準で定義することで、ファイル分割の判断を「どちらが正しいか」という主観の議論から 「この図が答える問いはどれか」という検証可能な問いへ変換できる。
 
 ### ecosystem を廃止した理由
@@ -105,11 +109,19 @@ ecosystem が提供していた「他の種別では答えられない固有の�
 
 ## Consequences
 
-- pfd-opsスキルの種別説明を3種別（roadmap / workflow / runtime-pipeline）に更新する
+- pfd-opsスキルの種別説明を3種別（roadmap / workflow / pipeline）に更新する
 - 新規プロジェクトのPFD設計時に問診リストを参照する手順をpfd-opsスキルに追記する
 - 既存のpfd-opsプロトコル（着手判断・進捗更新・終端監査）はそのまま適用できる
 - `externalStakeholders` フィールドのサポートを仕様書・CLIに追加する（終端監査の走査対象）
 - ecosystem を使っていたプロジェクトは workflow へ移行する（このリポジトリでは移行済み）
+
+### 種別名の改名（#670）
+
+第3種別の名称を `runtime-pipeline` から `pipeline` へ改名した。
+`runtime` の限定は「実行時のデータ変換」を示唆するが、ADR-0035 が確定させた判定基準は判断の有無であって実行時／設計時の別ではない。
+Polaris の `sdk-build-pipeline` はビルド時に走るため実行時ではないが、判断を含まないためこの種別に分類される — `runtime` を冠したままではこの分類と名称が食い違う。
+互換受理・移行支援は設けない破壊的変更で、旧値は列挙外の値として扱われる（V031）。
+本文中の `runtime-pipeline` はすべて `pipeline` に置き換えた。
 
 ## References
 
@@ -117,3 +129,5 @@ ecosystem が提供していた「他の種別では答えられない固有の�
 - `docs/adr/0017-kind-taxonomy/` — 仮想プロジェクトの設計成果物と横断審査レポート（ecosystem廃止実験v2レポートを含む）
 - ADR-0007（.pfdslディレクトリ規約）
 - ADR-0008（グループは存在様式で切る）
+- ADR-0035（種別を分ける軸は判断の有無、読み手はファイル分割の軸）— 本 ADR の判定基準の改訂
+- `docs/adr/0017-kind-taxonomy/audience-axis-experiment/` — 読み手軸を種別軸にした場合の比較実験

@@ -1,66 +1,103 @@
 ---
 name: pfd-retro
+summary: model retrospective audit
 description: |
-  Use after a sustained stretch of design dialogue or work sessions, when the
-  user asks for a retrospective, or before consolidating decision records
-  (e.g. ADRs, where the repo keeps them). Audits the PFDs, the session's
-  events, and the knowledge artifacts for the failure modes that practice
-  has actually produced, then routes findings into ops improvements.
-  Complements pfd-ops (which runs the cycle; this skill improves it).
+  Use when auditing a PFD model against execution evidence, reviewing a
+  diagram's dependencies or boundaries, or investigating whether observed
+  work requires a model change. Returns evidence-backed execution failures,
+  model revision candidates, or no-change findings. General work practices
+  and knowledge-document maintenance belong to separate audits.
 ---
+<!-- DO NOT EDIT. Authoritative source: scripts/harness-template/skills/pfd-retro/SKILL.md. -->
 
-# PFD retrospective audit
+# PFD model retrospective
 
-ユーザーの気付きに依存していた監査を再現可能にする。対象3層: 図（PFD）、セッションで実際に起きたこと、知識成果物。各問いには実例があり、すべて実際に検出された誤りに由来する。
+PFD の状態・構造と、版が対応した証拠を照合する。
+観測された失敗をすべてモデルの欠陥へ変換しない。
+結論が対象にするのは、PFD の要素、companion の構造的事実、宣言、そこから導出される状態である。
 
-A・B 層はセッション文脈不要 — 任意の PFD のレビューに単体で適用できる（品質ガイドが「書くときのルール」、A・B は「問い詰めるときのプロンプト」）。C・D 層はふりかえり固有。
+## 適用単位と入力
 
-## A・B. 図の監査（任意の PFD レビューに適用可）
+採用済みの任意の PFD に適用でき、roadmap の存在を前提にしない。
+図だけの A・B 監査は対象モデルとその版を入力とし、実行の成功や成果物の受入まで保証しない。
+実行結果との照合には、pfd-ops の `references/work-cycle.md`「実行との対応と証拠」の入力が必要である。
+対象モデルの版・成果物の版・criteria と、変更パス・status 遷移・対象 PFD ファイルと process ID・実行との対応・型付きの乖離を確認する。
+作業項目 backend を採用している場合は、その項目との対応も含める。
+図が無い、または scaffold の場合は、その図に固有の監査だけが非適用になる。
 
-問い詰めに入る前の機械的な下ごしらえとして、`graph orphans <file>` で predecessor・successor どちらも持たないノード（配線忘れの典型）を検出しておく — エッジ実在性の問いを個別ノードへ総当たりする前に、明らかな配線漏れを機械側で洗い出せる。
+証拠不足・版の不一致・対象ファイルを特定できない場合は、該当する判定を保留し、不足情報を示す。
+これは「変更不要」という結論ではない。
+証拠の収集・凍結・保存方式や、監査の実行管理はこのスキルの規則に含めない。
+一般の作業実践への監査や知識成果物監査を、モデル監査から自動起動しない。
 
-対象が大きい図・複数図の場合は pfd-lens agent（`.claude/agents/pfd-lens.md`）へ委譲する。pfd-lens はセッション文脈不要な read-only agent で、A・B カタログを自ら読み込み file:line アンカー付き findings を返す — main context にカタログ全文・対象図・思考過程を載せずに済む。返った findings は C・D 層の監査結果と合流させて出力表へ振り分ける。
+## A・B. 図の監査
 
-小さい図1枚のみのレビューであれば委譲の cold start（agent 起動オーバーヘッド）が割に合わないため main thread でカタログを直接参照する。全文 Read の前に `pfdsl graph io <file> --json`（終端 artifact・外部入力）と `graph edges <file> --json`（正準エッジ一覧）で機械的に輪郭を掴んでおくと、目視との食い違いが監査の当たりになる。カタログ本文は `.pfdsl/bindings/pfd-retro.md` が示す一次情報を読むこと（例: `.pfdsl/review-perspectives.md`）。記載がない場合は pfdsl スキルの `references/review-perspectives.md`（plugin なら `${CLAUDE_PLUGIN_ROOT}/skills/pfdsl/references/`、repo-local なら `.claude/skills/pfdsl/references/`）を読む。それも無い場合のみ下記カテゴリ名で監査する。A = 図 vs 現実（エッジ実在性・駆動源・名前の一般化水準・偽の不変性・入力充足）、B = 粒度・型（万能成果物・プロセス実在性・並列主張・修正案への再挑戦・型違い）。
+`graph orphans <file>`、`graph io <file> --json`、`graph edges <file> --json` で図の輪郭を確認する。
+`terminals` と `externalTerminals` の両方を対象にする。
+エッジの実在性、駆動源、粒度、型、終端の消費者を、対象 node・edge・criteria と照合する。
 
-カタログの C 系（仕様・制約）は図でなく normative 仕様文書を問い詰める観点であり、リポが DSL・プロトコル等の仕様を保守している場合のみ適用する。実行手順（具体例の構築・agent プローブ）がリポにあれば `.pfdsl/bindings/pfd-retro.md` が指す。
+観点カタログは、`.pfdsl/bindings/pfd-retro.md` が示す所在を使う。
+指定がなければ pfdsl スキルの `references/review-perspectives.md`（plugin なら `${CLAUDE_PLUGIN_ROOT}/skills/pfdsl/references/`、repo-local なら `.claude/skills/pfdsl/references/`）を使う。
+到達できなければ不足したカタログを示し、その観点の監査を保留する。
+binding が指すのはカタログや対象モデルの情報であり、一般の実行手順をこのスキルへ取り込むスロットではない。
+pfd-lens は同じ A・B 観点を使う読取専用の監査手段であり、利用方法は実行側が選べる。
 
-## C. 運用イベント監査
+カタログの C 系は図ではなく normative 仕様への観点で、対象仕様を保守している場合に限り適用する。
+仕様の所在・適用条件が不足していれば、その判定を保留する。
 
-- **忘れ物 = 構造の欠落**: セッション中に実際に忘れた作業（例: issue クローズ、tag 更新）は、図に無いエッジ・ゲートに無い項目として読み、両方に反映する。個別「更新したか」より「edge が無い」を機械的に探す方が安い — 同型の複数件を1回の監査で束ねて検出できる
-- **起票 issue の roadmap 未追加スキャン**: セッション中に起票した issue を列挙し、全て `roadmap.pfdsl` の artifact として登録済みか機械的に確認する。「起票したが roadmap に追加しなかった」は「edge が無い」の典型型（例: issue 起票後に roadmap 追加を忘れてユーザー指摘まで気付かなかった）。`gh issue list --state open` と `pfdsl meta get <roadmap.pfdsl> <id,...> location --json`（対象 id は `graph edges <roadmap.pfdsl> --json` から）を突合すると漏れが見える
-- **委譲の失敗様式**: subagent の誤り（ID 捏造等）はプロセスの入力不足の発見として扱う
-- **片肺更新スキャン**: companion `.md` を更新したセッションでは、対応する `.pfdsl` 本体（同じ変換をモデル化しているノード・エッジ・description・criteria）も更新が必要でないか確認する。機械列挙が先: `git diff --name-only <range>` で「`.md` が変更され sibling `.pfdsl` が未変更」のペア（と逆方向）を列挙してから中身を判断する — 全ファイル読みより安い。`.md` は手続き散文、`.pfdsl` は構造の一次置き場 — 片方だけ更新して構造反映が漏れるのが典型パターン。逆方向（`.pfdsl` だけ更新して companion 記述が古いまま）も同様に確認する
-- **決定の先取り（責務境界の圧縮）スキャン**: PFD が複数の逐次プロセス（例: まとめ→MTG→見直し）としてモデル化する作業を現実の1セッションが一気に片付けた回では、生成物が最上流プロセスの出力 artifact に書き込まれ、そのプロセス単独の入力からは導けない下流の決定を含みがち。A層「駆動源」レンズで静的には検出できるが、C層に運用トリガーが無いと能動的に見に行けない。会議・集中作業の後は、その回で done にした上流成果物の criteria/description に生産プロセスの入力から導けない内容が混じっていないか点検し、混じっていれば (a) 責務境界を実態に合わせ再モデル化する、または (b) 生成物を実際の生産プロセスへ付け替える
-- **リンク切れスキャン**: セッション中に `.pfdsl` の `location:` を追加・変更したら `meta check-links <file>` で参照先ファイルの実在を機械確認する。リンク切れは「参照は書いたが実体が動いた／消えた」形の忘れ物
-- **暗黙の設計判断**: 作業中に下したが記録されていない選択はないか（例: グルーピング基準が問われるまで暗黙だった）
-- **選択前の着手**: 実装に入る前に issue 本文を再確認したか。複数の実装方針が列挙されており最終選択が明記されていない issue は「設計未確定」と同等 — 着手前に選択を確定させたか
-- **保留した違和感の想起**: 他の C・D 層項目をすべて確認し終えた後、セッションログを遡り「これでいいのか」と一瞬迷ったが立ち止まらず流した判断・スキップした検証・声に出さず流した疑問はないか自問する。他の項目は git diff・issue 一覧等の機械列挙が起点になるが、この種の迷いは実行者の記憶にしか残らず、明示的に想起するステップを置かないとユーザーに聞かれるまで出てこない（例: 「完了基準を満たした」と報告しつつ実地検証はせず文言修正のみで済ませた、ゲート項目が "presence-only" で実質不通過判定できていないと自分で気づきつつ流した）。「特になし」で終える場合はその旨を報告に明示する
+## 実行証拠との照合
 
-## D. 知識成果物のライフサイクル
+「作業を忘れた」「追加の作業が生じた」という観測は、構造欠落の仮説を検査する契機である。
+既存の入力・criteria が十分だったのに実行が従わなかった場合と、モデル自体に必要な要素が無かった場合を分ける。
+同様に、実行の分担に失敗したことだけから入力 edge を増やさない。
+対象モデル・criteria と証拠のどこが矛盾するかを示す。
 
-- **スケール監査**: 増え続ける成果物の消費方法は全読を要求していないか（例: 設計決定記録（ADR 等）の知見をガイド1行に蒸留して全読不要にする）
-- **同期在庫**: 知見の複数経路（ガイド蒸留・設計決定記録・issue）で、片方にだけ届いて滞留している在庫はないか（例: 知見が設計決定記録にはあるがガイドに未反映の状態、lint 候補が issue に未同期の状態 — いずれも監査質問で検出できる）
-- **列挙ドリフト**: 同じリストが2箇所に存在しないか。一次情報を1つに定め、他はポインタにする
-- **改訂規約**: 増え続ける成果物に改訂・廃止の規約があるか（例: 設計決定記録の一覧の改訂・廃止規約）
-- **休眠能力**: 能力成果物（スキル・ツール）に運用側の起動条件（いつ・誰が・何を契機に呼ぶか）が定義されているか。道具を作っただけでは気付き依存は解消されない（例: 監査スキル自体の起動条件が pfd-ops プロトコルに明記されていなかった）。起動条件は既存の機械判定可能なイベントに紐づいているか、それとも判定のために新たな記録機構を要る条件かも確認する — 後者は運用コストに見合っているか要検討
-- **L4 滞留監査**: companion のルールのうち固有名詞（リポ名・パッケージ名・ツール名・パス）を含まないものは汎用ルールの疑いがある — 配布層（L3 reference / スキル SKILL.md 本文）への昇格候補として検出する。companion（L4）は配布されないため、汎用知見が滞留すると採用リポに永久に届かない。昇格宛先の判定は出力表「ゲート項目」行の書き分けルール参照に従い、昇格の実施は「出力」節の上流変更ルールに従う
-- **配布スキル本文の蒸留監査**: 配布スキル本文の手順リストで、複数の追記が同一原則に統合できるものはないか。追記の堆積は原則への蒸留候補である — 各行について「これはまだ原則か、個別事故の傷跡か」を問う
+モデル改訂候補は次の6型と修正先を対応付ける。
 
-## 出力
-
-検出した findings を以下の宛先に振り分ける。**発見経緯（いつ・何のサイクルで見つけたか）は宛先に書かない** — コミットメッセージ・PR 本文・issue コメントが記録場所。宛先には「ルール・基準・構造」だけを書く。
-
-| finding の種類 | 宛先 |
+| 観測された乖離 | モデルの改訂候補 |
 |---|---|
-| ツール・チェッカー品質ルール | 上流ツールスキルの品質ガイド（companion で宛先を指定） |
-| 設計判断の記録 | 設計決定記録（ADR 等。companion で所在を指定。運用しないリポでは新設を提案する） |
-| 未着手作業の発見 | issue 起票 + roadmap.pfdsl に依存チェーン追加 |
-| ゲート項目の追加・修正 | 該当する PFD の criteria または sibling companion の終端ゲート（**ルール文のみ。発見括弧禁止**）。どの companion に書くかは `pfd-ops/references/architecture.md` の「companion への書き分けルール」表に従う |
-| 能力成果物の起動条件漏れ | 当該スキルまたは workflow.pfdsl の description に追記。当該スキルが配布 bundle 内（`.claude/skills/pfd-*`）の場合は `.pfdsl/bindings/<当該スキル名>.md` |
-| 体感した効果 | 効果ログ（companion で宛先を指定。未定義の場合は記録しない） |
-| 監査の新パターン発見 | `.pfdsl/bindings/pfd-retro.md`。問いの構造・パターン種別・具体例をここに書く |
+| 追加の入力が必要だった | 入力 edge、必要なら入力の producer |
+| 想定した工程の分割が成立しなかった | process の統合・分割 |
+| feedback が必要だった | `>>?` edge、または版 artifact |
+| 成果物の定義が曖昧だった | artifact の分割・改名、description・criteria |
+| criteria が観測不能だった | 観測可能な criteria |
+| 下流の判断を上流で先取りした | 出力の付け替え、または境界の再モデル化 |
 
-宛先の上書き・追加は pfd-ops の workflow companion に従う。配布物（`.claude/skills/pfd-*` 配下）への finding 反映手続きは `.pfdsl/bindings/pfd-retro.md` に従う。
+companion の構造的事実も、対応する node・edge・境界・宣言と矛盾がないか確認する。
+モデル内に表せる事実は図を正本とし、モデル間の対応だけを companion に置く。
+一般の実行手順の改善を、この表の型に無理に当てはめない。
 
-各 companion の終端ゲートセクションはチェックリストであり発見記録ではない。追加するのはルール文1行のみ。
+## 結論と出力
+
+各 finding は、対象モデルの版、PFD ファイルと node・edge・criteria、対応する証拠とその版、次の結論のいずれかを示す。
+行位置を示せる資料には file:line を付ける。
+
+| 結論 | 根拠と扱い |
+|---|---|
+| 実行側の失敗 | 既存のモデル条件と、実行が満たさなかった条件を名指す。実行側へ返し、pfd-ops・pfd-retro の新しい規則へ変換しない |
+| モデルの改訂候補 | 上の6型、観測した乖離、影響する要素、改訂候補を示す。モデル所有者の判断へ渡す |
+| 変更不要 | 照合したモデル要素と具体的な証拠を名指し、変更が不要な理由を示す。単なる所見0件や実行成功では代替しない |
+
+異なる観測には異なる結論を出せる。
+未判定の観測は3値の結論を持つ finding と混ぜず、不足した入力と再判定条件を示す。
+対象外の事項は、対象モデルと適用条件を示して非適用とする。
+既存の規則だけで済む失敗とモデル欠陥が併存する場合は、根拠の異なる finding に分ける。
+
+改訂候補の宛先は対象の PFD 要素と構造的 companion である。
+候補の提示は変更権限を与えない。
+一般の開発規律、他の道具の設定や作業記録の書式を書き換える出力は持たない。
+モデル所有者が判断するための根拠と、未判定事項を渡す。
+
+## 配布層への還流（配布機構）
+
+モデル監査とは別に、companion に残る一般化可能な規則を `pfd-ops/references/architecture.md`「昇格先の判定ルール」の0段目で点検できる。
+判定単位は規則であり、同じ節の具体例や固有名詞の存在だけで除外しない。
+意味論・対象・中立性・名指しを満たす候補と、採用先の実行規律へ置くものを区別する。
+情報不足は非該当とせず保留する。
+scaffold の未記入行は既に配布されるため、滞留候補にしない。
+
+この監査は配布を維持するための機構であり、中核や付属機能の範囲を広げる根拠にしない。
+候補を直せるのは配布物の上流であり、採用先のコピーは編集しない。
+採用先からの提案は pfd-upstream-report の経路を使い、外部書込みの権限は採用先に従う。
+実行規律の宛先は、採用先から実際に読める既存の規律とする。
+private な共有場所が公開された採用先から読めるとは仮定しない。

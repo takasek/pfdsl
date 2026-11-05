@@ -1,0 +1,7 @@
+{
+	"time_utc": "2026-10-13T07:39:47.662571+00:00",
+	"action": "deliberate external write to disposable external.pfdsl",
+	"before_sha256": "f1854888508c98a50df6c3ced981146e34ec5e84381b842b6a6abcb52e8ad00f",
+	"after_sha256": "1447553983de9795806e041cad00fea5bdbd09130b924ab8e88bae4fe0b6ddc6",
+	"added_marker": "DELIBERATE_EXTERNAL_V2"
+}

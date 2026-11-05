@@ -1,194 +1,102 @@
 #!/usr/bin/env node
+
 // Generates the pfdsl Claude skill to a target directory.
 // Run: node scripts/gen-skill.mjs --out .claude/skills/pfdsl
 // The --out path must contain '.claude/' or 'skills/' (safety check).
 
-import { readFileSync, writeFileSync, readdirSync, mkdirSync, existsSync } from "node:fs";
-import { dirname, relative, resolve, sep } from "node:path";
-import { fileURLToPath } from "node:url";
-
 import { execFileSync } from "node:child_process";
-
-import { findMissingFields } from "./lib/skill-field-drift.mjs";
-import { resolveCompanions } from "./lib/sample-companions.mjs";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
+import { writeSkillRefs } from "./lib/gen-skill-refs.mjs";
 import { renderCliSection } from "./lib/skill-cli-section.mjs";
-import { buildExamplesMd } from "./lib/examples-index.mjs";
+import { findMissingFields } from "./lib/skill-field-drift.mjs";
+import { injectGeneratedHeader } from "./lib/skill-header.mjs";
+import { parseSkillOutDir } from "./lib/skill-out-dir.mjs";
+import { findUnresolvedTemplateTokens } from "./lib/template-tokens.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const root = resolve(__dirname, "..");
 
 // --- Parse args ---
 
-const outIdx = process.argv.indexOf("--out");
-if (outIdx === -1 || !process.argv[outIdx + 1] || process.argv[outIdx + 1].startsWith("-")) {
-  console.error("Usage: node scripts/gen-skill.mjs --out <skill-dir>");
-  console.error("Example: node scripts/gen-skill.mjs --out .claude/skills/pfdsl");
-  process.exit(2);
-}
+const outDir = parseSkillOutDir("scripts/gen-skill.mjs", process.argv.slice(2));
 
-const outDir = resolve(process.cwd(), process.argv[outIdx + 1]);
+// --- 1/1b/1c/2/2b. Write references/*.md (build-independent — see scripts/lib/gen-skill-refs.mjs) ---
 
-const parts = outDir.split(/[\\/]/);
-if (!parts.includes(".claude") && !parts.includes("skills")) {
-  console.error(`Error: output path must contain a '.claude' or 'skills' directory component — got: ${outDir}`);
-  console.error("This check prevents accidentally writing to the wrong location.");
-  process.exit(1);
-}
-
-const refsDir = resolve(outDir, "references");
-mkdirSync(refsDir, { recursive: true });
-
-// --- Helpers ---
-
-function buildExamplesIndexMd(dir) {
-  const entries = readdirSync(dir)
-    .filter((f) => f.endsWith(".pfdsl"))
-    .sort()
-    .map((f) => ({ id: f.replace(".pfdsl", ""), source: readFileSync(resolve(dir, f), "utf-8") }));
-
-  if (entries.length === 0) {
-    console.warn(`warn: no .pfdsl files found in ${dir}`);
-  }
-  const header = `<!-- DO NOT EDIT — generated from docs/examples/ in https://github.com/takasek/pfdsl -->\n\n# PFDSL Examples Reference\n\nRealistic domain examples demonstrating the quality guide. Use the index to Read only the relevant line range.\n\n`;
-  return { md: buildExamplesMd(entries, header), count: entries.length };
-}
-
-// --- 1. Copy spec ---
-
-const specSrc = readFileSync(resolve(root, "docs/spec/spec.md"), "utf-8");
-const specVersion = specSrc.match(/^# PFDSL仕様書 (v[\d.]+)/m)?.[1] ?? "unknown";
-const baseHeader = (src) =>
-  `<!-- DO NOT EDIT — snapshot distributed with pfdsl skill. Authoritative source: https://github.com/takasek/pfdsl/blob/main/${src} -->\n\n`;
-writeFileSync(resolve(refsDir, "spec.md"), baseHeader("docs/spec/spec.md") + specSrc);
-console.log("references/spec.md ← docs/spec/spec.md");
-
-// --- 1b. Copy review perspectives ---
-
-const promptsSrc = readFileSync(resolve(root, "docs/review-perspectives.md"), "utf-8");
-writeFileSync(resolve(refsDir, "review-perspectives.md"), baseHeader("docs/review-perspectives.md") + promptsSrc);
-console.log("references/review-perspectives.md ← docs/review-perspectives.md");
-
-// --- 1c. Copy quality guide ---
-
-const qualityGuideSrc = readFileSync(resolve(root, "docs/quality-guide.md"), "utf-8");
-writeFileSync(resolve(refsDir, "quality-guide.md"), baseHeader("docs/quality-guide.md") + qualityGuideSrc);
-console.log("references/quality-guide.md ← docs/quality-guide.md");
-
-// --- 2. Generate samples.md from TSV ---
-
-const samplesDir = resolve(root, "docs/samples");
-const tsv = readFileSync(resolve(samplesDir, "samples.tsv"), "utf-8");
-const rows = tsv
-  .trim()
-  .split("\n")
-  .slice(1)
-  .map((line) => {
-    const [id, summary, description] = line.split("\t");
-    return { id: id.trim(), summary: summary?.trim() ?? "", description: description?.trim() ?? "" };
-  });
-
-const sampleFileIds = readdirSync(samplesDir)
-  .filter((f) => f.endsWith(".pfdsl"))
-  .map((f) => f.replace(".pfdsl", ""));
-const { companionsById, orphans } = resolveCompanions(rows.map((r) => r.id), sampleFileIds);
-for (const id of orphans) {
-  console.warn(`  warn: ${id}.pfdsl exists but has no entry in samples.tsv — will not appear in references/samples.md`);
-}
-
-let samplesMd = `<!-- DO NOT EDIT — generated from docs/samples/ in https://github.com/takasek/pfdsl -->\n\n# PFDSL Samples Reference\n\nAnnotated .pfdsl files illustrating each language feature.\n\n`;
-let sampleCount = 0;
-
-for (const { id, summary, description } of rows) {
-  const pfdslPath = resolve(samplesDir, `${id}.pfdsl`);
-  if (!existsSync(pfdslPath)) {
-    console.warn(`  warn: ${id}.pfdsl not found, skipping`);
-    continue;
-  }
-  const src = readFileSync(pfdslPath, "utf-8");
-  const fence = src.includes("```") ? "````" : "```";
-  samplesMd += `## ${id} — ${summary}\n\n${description}\n\n${fence}pfdsl\n${src}${fence}\n\n`;
-  for (const cid of companionsById.get(id) ?? []) {
-    const csrc = readFileSync(resolve(samplesDir, `${cid}.pfdsl`), "utf-8");
-    const cfence = csrc.includes("```") ? "````" : "```";
-    samplesMd += `Companion file \`${cid}.pfdsl\` referenced above:\n\n${cfence}pfdsl\n${csrc}${cfence}\n\n`;
-  }
-  samplesMd += `---\n\n`;
-  sampleCount++;
-}
-
-if (sampleCount === 0) {
-  console.warn("warn: no sample .pfdsl files found — references/samples.md will contain no examples");
-}
-writeFileSync(resolve(refsDir, "samples.md"), samplesMd);
-console.log(`references/samples.md ← docs/samples/*.pfdsl via samples.tsv (${sampleCount} samples)`);
-
-// --- 2b. Generate examples.md from frontmatter ---
-
-const { md: examplesMd, count: exampleCount } = buildExamplesIndexMd(resolve(root, "docs/examples"));
-writeFileSync(resolve(refsDir, "examples.md"), examplesMd);
-console.log(`references/examples.md ← docs/examples/*.pfdsl (${exampleCount} examples)`);
+const specVersion = writeSkillRefs(root, outDir);
 
 // --- 3. Write SKILL.md from template ---
 
-const templateSrc = readFileSync(resolve(__dirname, "skill-template/SKILL.md"), "utf-8");
+const templateSrc = readFileSync(
+	resolve(__dirname, "skill-template/SKILL.md"),
+	"utf-8",
+);
 
-const frontmatterTs = readFileSync(resolve(root, "packages/core/src/types/frontmatter.ts"), "utf-8");
+const frontmatterTs = readFileSync(
+	resolve(root, "packages/core/src/types/frontmatter.ts"),
+	"utf-8",
+);
 const missingFields = findMissingFields(frontmatterTs, templateSrc);
 if (missingFields.length > 0) {
-  console.error("Error: typed frontmatter fields missing from skill-template 'Frontmatter structure' section:");
-  for (const f of missingFields) console.error(`  - ${f}`);
-  console.error("Add them to the yaml block (or the pointer line below it) in scripts/skill-template/SKILL.md.");
-  process.exit(1);
+	console.error(
+		"Error: typed frontmatter fields missing from skill-template 'Frontmatter structure' section:",
+	);
+	for (const f of missingFields) console.error(`  - ${f}`);
+	console.error(
+		"Add them to the yaml block (or the pointer line below it) in scripts/skill-template/SKILL.md.",
+	);
+	process.exit(1);
 }
 
 const cliPath = resolve(root, "packages/cli/dist/cli.js");
 if (!existsSync(cliPath)) {
-  console.error("Error: packages/cli/dist/cli.js not found. Run 'pnpm -r build' first.");
-  process.exit(1);
+	console.error(
+		"Error: packages/cli/dist/cli.js not found. Run 'pnpm -r build' first.",
+	);
+	process.exit(1);
 }
-const helpOutput = execFileSync(process.execPath, [cliPath, "help"], { encoding: "utf-8" });
+const helpOutput = execFileSync(process.execPath, [cliPath, "help"], {
+	encoding: "utf-8",
+});
 
 // The skill documents the command surface of the CLI it was generated against,
 // so it declares that version as the minimum the reader's CLI must satisfy.
 // Auto-injected from package.json so the preflight can never drift from reality.
 const cliVersion = JSON.parse(
-  readFileSync(resolve(root, "packages/cli/package.json"), "utf-8"),
+	readFileSync(resolve(root, "packages/cli/package.json"), "utf-8"),
 ).version;
 if (!cliVersion) {
-  console.error("Error: packages/cli/package.json has no 'version' field — cannot stamp the skill's required CLI version.");
-  process.exit(1);
+	console.error(
+		"Error: packages/cli/package.json has no 'version' field — cannot stamp the skill's required CLI version.",
+	);
+	process.exit(1);
 }
 
-const skillMd = templateSrc
+const skillMd = injectGeneratedHeader(templateSrc)
 	.replace(/\{\{specVersion\}\}/g, specVersion)
 	.replace(/\{\{cliVersion\}\}/g, cliVersion)
 	.replace("{{cliCommands}}", renderCliSection(helpOutput));
 
 // Fail loudly if the template carries a placeholder nobody substituted — a
 // typo'd or newly-added {{name}} would otherwise ship as a literal to readers.
-const leftover = [...new Set(skillMd.match(/\{\{[^{}]*\}\}/g) ?? [])];
+const leftover = findUnresolvedTemplateTokens(skillMd);
 if (leftover.length > 0) {
-  console.error(`Error: unreplaced template placeholder(s) in generated SKILL.md: ${leftover.join(", ")}`);
-  console.error("Every {{...}} in scripts/skill-template/SKILL.md needs a matching .replace() in scripts/gen-skill.mjs.");
-  process.exit(1);
+	console.error(
+		`Error: unreplaced template placeholder(s) in generated SKILL.md: ${leftover.join(", ")}`,
+	);
+	console.error(
+		"Every {{...}} in scripts/skill-template/SKILL.md needs a matching .replace() in scripts/gen-skill.mjs.",
+	);
+	process.exit(1);
 }
 
 writeFileSync(resolve(outDir, "SKILL.md"), skillMd);
 console.log("SKILL.md → generated from skill-template/SKILL.md");
 
-// --- 4. Write CLAUDE.md guard (in-repo working copy only, .claude/ outputs) ---
-// .claude/skills/pfdsl is a generated + gitignored working copy (#348); the
-// marketplace plugin copy (plugin/pfdsl/skills/pfdsl, #366) intentionally
-// omits this dev-only guard.
-// Must check the path *relative to the repo root*, not raw absolute path
-// components — the repo itself may be checked out under a directory that
-// contains a literal ".claude" segment (e.g. a worktree at .claude/worktrees/*),
-// which would otherwise false-positive for every --out target.
-const relOutParts = relative(root, outDir).split(sep);
-if (relOutParts[0] === ".claude") {
-  const claudeMd = readFileSync(resolve(__dirname, "skill-template/CLAUDE.md"), "utf-8");
-  writeFileSync(resolve(outDir, "CLAUDE.md"), claudeMd);
-  console.log("CLAUDE.md → generated from skill-template/CLAUDE.md (in-repo working copy guard)");
-}
+// No skill-root CLAUDE.md guard is written: .claude/skills/pfdsl is now a
+// symlink to this output rather than a second copy (#714), so anything written
+// beside SKILL.md lands in the distributed bundle. The "DO NOT EDIT" header
+// injected above already tells a reader the file is generated.
 
 console.log(`\nSkill written to: ${outDir}`);

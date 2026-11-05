@@ -59,7 +59,7 @@ vX.X.X → vX.X.Y
 ### マージ後の扱い
 
 削除しない。`docs/spec/proposals/` に歴史的記録として保持する。
-spec §20（変更点リスト）と対になる証跡。
+`docs/spec/spec-history.md`（変更点リスト）と対になる証跡。
 
 ## Rationale
 

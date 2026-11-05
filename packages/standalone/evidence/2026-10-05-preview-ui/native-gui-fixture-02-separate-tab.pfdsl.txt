@@ -1,0 +1,12 @@
+---
+title: Separate tab
+artifact:
+  demand:
+    label: Tab two demand
+  invoice:
+    label: Tab two invoice
+process:
+  bill:
+    label: Bill customer
+---
+demand >> bill -> invoice

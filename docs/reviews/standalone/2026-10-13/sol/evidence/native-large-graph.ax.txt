@@ -1,0 +1,13 @@
+Window: "PFDSL Review Sol", App: PFDSL Review Sol.
+0 standard window PFDSL Review Sol, Secondary Actions: Raise
+	1 close button
+	2 full screen button Help: this button also has an action to zoom the window, Secondary Actions: zoom the window
+	3 minimize button
+	4 text PFDSL Review Sol
+5 menu bar
+	6 PFDSL Review Sol
+	7 File
+	8 Edit
+	9 View
+	10 Window
+	11 Help

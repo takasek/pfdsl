@@ -8,24 +8,49 @@
 import { existsSync, readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 
-const IMPORT_RE = /import\s+(?:[\s\S]*?\bfrom\s+)?["']([^"']+)["']/g;
+import { extractRelativeImports } from "./relative-imports.mjs";
+
+export { extractRelativeImports };
+
+// A dynamic import whose argument does not open with a string literal: an
+// identifier, a template literal, a concatenation. Matched against
+// comment-stripped source, because several scripts in this repo *explain* the
+// construct in prose — including this module's own header. The extraction above
+// deliberately does not strip comments: stripComments drops from `//` to the
+// end of the line, so a URL inside a string would take a real import sharing
+// that line with it. Losing an edge is the worse error there; here it only
+// costs a missed warning.
+const UNANALYZABLE_IMPORT_RE = /\bimport\s*\(\s*(?!["'])/g;
 
 /**
- * Extract the specifier of every `import ... from "..."` (or side-effect
- * `import "..."`) statement whose specifier is relative (starts with `./` or
- * `../`). Bare specifiers (npm packages) and `node:` builtins are ignored.
+ * Count the dynamic `import()` calls whose target cannot be determined without
+ * running the code. Callers that reason about a whole module closure need this:
+ * such an edge is invisible to the walk, so a closure-wide claim ("nothing here
+ * touches packages/cli/dist") would quietly stop covering whatever it reaches.
+ *
+ * A count rather than positions, because the offsets would be into the
+ * comment-stripped copy and so would not point where a reader expects.
  * @param {string} source
- * @returns {string[]}
+ * @returns {number}
  */
-export function extractRelativeImports(source) {
-	const specifiers = [];
-	for (const match of source.matchAll(IMPORT_RE)) {
-		const specifier = match[1];
-		if (specifier.startsWith("./") || specifier.startsWith("../")) {
-			specifiers.push(specifier);
+export function countUnanalyzableImports(source) {
+	return [...stripComments(source).matchAll(UNANALYZABLE_IMPORT_RE)].length;
+}
+
+/**
+ * Every relative import edge in `files`, each resolved against its own file's
+ * directory. The checks below differ only in which edges they keep, so the
+ * read-and-resolve half lives here once.
+ * @param {string[]} files - absolute paths to .mjs files
+ * @returns {Generator<{file: string, specifier: string, resolved: string}>}
+ */
+function* relativeImportEdges(files) {
+	for (const file of files) {
+		const source = readFileSync(file, "utf-8");
+		for (const specifier of extractRelativeImports(source)) {
+			yield { file, specifier, resolved: resolve(dirname(file), specifier) };
 		}
 	}
-	return specifiers;
 }
 
 /**
@@ -35,15 +60,132 @@ export function extractRelativeImports(source) {
  * @returns {Array<{file: string, specifier: string, resolved: string}>}
  */
 export function findBrokenImports(files) {
-	const broken = [];
-	for (const file of files) {
+	return [...relativeImportEdges(files)].filter(
+		({ resolved }) => !existsSync(resolved),
+	);
+}
+
+/**
+ * Walks the relative-import graph starting at entryFile and returns the set
+ * of every file reached (entryFile included). Used by guards (e.g.
+ * scripts/lib/gen-plugin.test.mjs, scripts/lib/gen-plugin-trigger.test.mjs)
+ * that assert something of a module's whole closure, not just its direct
+ * source.
+ *
+ * Throws when a file in the closure contains a dynamic import this walk cannot
+ * follow. Every caller states a property of the *entire* closure, so an edge
+ * the walk misses does not weaken the answer visibly — it shrinks the set the
+ * property is checked against while the assertion still passes. Refusing to
+ * return is the only outcome those callers can act on.
+ * @param {string} entryFile - absolute path
+ * @returns {Set<string>}
+ */
+export function collectModuleClosure(entryFile) {
+	const seen = new Set();
+	const queue = [entryFile];
+	while (queue.length > 0) {
+		const file = queue.pop();
+		if (seen.has(file)) continue;
+		seen.add(file);
 		const source = readFileSync(file, "utf-8");
+		const unanalyzable = countUnanalyzableImports(source);
+		if (unanalyzable > 0) {
+			throw new Error(
+				`${file}: ${unanalyzable} dynamic import(s) with a non-literal specifier — the module closure cannot be computed statically. Give the import a literal specifier, or drop the closure-wide guard that reads this file.`,
+			);
+		}
 		for (const specifier of extractRelativeImports(source)) {
-			const resolved = resolve(dirname(file), specifier);
-			if (!existsSync(resolved)) {
-				broken.push({ file, specifier, resolved });
-			}
+			queue.push(resolve(dirname(file), specifier));
 		}
 	}
-	return broken;
+	return seen;
+}
+
+// Strips `//` and `/* */` comments before scanning for forbidden references,
+// so a file is free to *explain in prose* why it avoids packages/cli/dist
+// without that explanation itself tripping the check.
+function stripComments(source) {
+	return source.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/[^\n]*/g, "");
+}
+
+/**
+ * Flags a file that reaches gh-exec.mjs through a relative import while not
+ * being on the allow-list, enforcing the import boundary #1044 introduced:
+ * production code must reach the gh CLI only through github-ops.mjs's named
+ * operations, never through gh-exec.mjs's execGh directly.
+ *
+ * Reuses extractRelativeImports rather than a dedicated parser — a second
+ * import-statement grammar would drift from the one findBrokenImports
+ * already maintains.
+ *
+ * Scope: static specifiers only. A dynamic `import()` built from a variable
+ * reaches gh-exec.mjs without being seen here. collectModuleClosure refuses
+ * to return in that situation, but the same fail-closed rule cannot be
+ * borrowed for this check: 7 of the production scripts this runs over already
+ * carry such an import (`countUnanalyzableImports` over the same file set as
+ * scripts/check-script-imports.mjs, 2026-08-30), so failing closed would emit
+ * 7 standing false positives and the check would be read as noise rather than
+ * as a boundary. The boundary is a discipline aid against the ordinary way of
+ * reaching gh — writing `execGh` at a call site — not a containment barrier.
+ * @param {string[]} files - absolute paths to .mjs files to check
+ * @param {{ghExecPath: string, allowed: string[]}} opts - ghExecPath is
+ *   gh-exec.mjs's absolute path; allowed is the absolute paths permitted to
+ *   import it
+ * @returns {Array<{file: string, specifier: string}>}
+ */
+export function findGhExecImportBoundaryViolations(
+	files,
+	{ ghExecPath, allowed },
+) {
+	return [...relativeImportEdges(files)]
+		.filter(
+			({ file, resolved }) =>
+				resolved === ghExecPath && !allowed.includes(file),
+		)
+		.map(({ file, specifier }) => ({ file, specifier }));
+}
+
+/**
+ * Flags files that import node:child_process or reference packages/cli/dist
+ * outside of a comment — the two ways a "dist-independent" script could
+ * secretly gain a build dependency (either by spawning the CLI, or by
+ * reading its dist output directly).
+ *
+ * `allowed` exempts a file from the first rule only. The rule's material —
+ * "does this source text mention node:child_process" — cannot tell a module
+ * that spawns one fixed unrelated command from one that spawns the CLI build,
+ * and the second rule catches the latter only where the build path is spelled
+ * literally. So an exemption is worth granting exactly when the module's
+ * executable and subcommand are fixed in its source and held there by its own
+ * test: scripts/lib/git-ignore-oracle.mjs runs `git check-ignore` and nothing
+ * else (takasek/pfdsl#1134). A module that takes the executable as an argument
+ * — scripts/lib/run-exec.mjs and its `run(file, args)` — must not be exempted,
+ * since that reopens the indirect path for every file in the closure.
+ *
+ * Scope, in the same sense the gh-exec boundary above states its own: this
+ * check never verifies the property the exemption rests on. An edit to an
+ * exempted file that adds a second, different spawn passes here and is caught
+ * only by that file's own test. Like that boundary, the exemption is a
+ * discipline aid — adding a spawn to this closure takes a deliberate edit to
+ * this list, which a reviewer sees — not a containment barrier.
+ * @param {string[]} files - absolute paths
+ * @param {{allowed?: string[]}} [opts] - absolute paths permitted to import
+ *   node:child_process
+ * @returns {Array<{file: string, reason: string}>}
+ */
+export function findDistDependentFiles(files, { allowed = [] } = {}) {
+	const violations = [];
+	for (const file of files) {
+		const code = stripComments(readFileSync(file, "utf-8"));
+		if (/node:child_process/.test(code) && !allowed.includes(file)) {
+			violations.push({
+				file,
+				reason: "imports node:child_process (that's how CLI dist gets invoked)",
+			});
+		}
+		if (/dist[\\/]cli\.js|cli[\\/]dist/.test(code)) {
+			violations.push({ file, reason: "references packages/cli/dist" });
+		}
+	}
+	return violations;
 }

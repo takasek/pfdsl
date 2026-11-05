@@ -1,0 +1,119 @@
+[
+  {
+    "name": "05-label-cjk",
+    "svgSize": [
+      436.0,
+      67.0
+    ],
+    "pdfSizePoints": [
+      327.12,
+      49.919998
+    ],
+    "pdfSizeScaleRatio": [
+      0.7502752293577982,
+      0.7450745970149254
+    ],
+    "pdfDeviationFrom075ScalePoints": [
+      0.12000000000000455,
+      -0.33000200000000035
+    ],
+    "appPngSize": [
+      436,
+      67
+    ],
+    "svgNodes": 3,
+    "svgEdges": 2,
+    "svgTextElements": 6,
+    "uniqueNormalizedLabels": 6,
+    "matchedTextElementOccurrences": 6,
+    "missingLabels": [],
+    "pdfPageCount": 1,
+    "pdfTextCharacters": 31,
+    "svgBytesEqualNative": true,
+    "svgLabelsEqualNative": true,
+    "nativePdfTextCharacters": 31,
+    "visualInspection": "PDF render, Electron app PNG, Native PDF render inspected; no visible clipping or missing glyphs."
+  },
+  {
+    "name": "13-preset",
+    "svgSize": [
+      522.0,
+      61.0
+    ],
+    "pdfSizePoints": [
+      391.91998,
+      46.079998
+    ],
+    "pdfSizeScaleRatio": [
+      0.7508045593869732,
+      0.7554098032786886
+    ],
+    "pdfDeviationFrom075ScalePoints": [
+      0.41998000000000957,
+      0.32999800000000334
+    ],
+    "appPngSize": [
+      522,
+      61
+    ],
+    "svgNodes": 5,
+    "svgEdges": 4,
+    "svgTextElements": 8,
+    "uniqueNormalizedLabels": 8,
+    "matchedTextElementOccurrences": 8,
+    "missingLabels": [],
+    "pdfPageCount": 1,
+    "pdfTextCharacters": 54,
+    "svgBytesEqualNative": true,
+    "svgLabelsEqualNative": true,
+    "nativePdfTextCharacters": 54,
+    "visualInspection": "PDF render, Electron app PNG, Native PDF render inspected; no visible clipping or missing glyphs."
+  },
+  {
+    "name": "pfdsl_implementation_flow",
+    "svgSize": [
+      2294.0,
+      2867.0
+    ],
+    "pdfSizePoints": [
+      1721.0399,
+      2149.9199
+    ],
+    "pdfSizeScaleRatio": [
+      0.7502353530950305,
+      0.7498848622253226
+    ],
+    "pdfDeviationFrom075ScalePoints": [
+      0.5398999999999887,
+      -0.3301000000001295
+    ],
+    "appPngSize": [
+      2294,
+      2867
+    ],
+    "svgNodes": 81,
+    "svgEdges": 112,
+    "svgTextElements": 202,
+    "uniqueNormalizedLabels": 155,
+    "matchedTextElementOccurrences": 201,
+    "missingLabels": [
+      {
+        "label": "リリース候補版",
+        "expectedOccurrences": 1,
+        "actualOccurrences": 0
+      }
+    ],
+    "pdfPageCount": 1,
+    "pdfTextCharacters": 2630,
+    "svgBytesEqualNative": true,
+    "svgLabelsEqualNative": true,
+    "nativePdfTextCharacters": 2620,
+    "visualInspection": "PDF render, Electron app PNG, Native PDF render inspected; no visible clipping or missing glyphs.",
+    "textExtractionAnomaly": {
+      "expected": "リリース候補版",
+      "actual": "リリース候\n版\n補",
+      "visibleLabel": "Correct and complete in flow-crop-2-0.png",
+      "classification": "PDFKit plain-text reading-order difference; not a missing drawn glyph"
+    }
+  }
+]

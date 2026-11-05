@@ -1,0 +1,19 @@
+{
+	"name": "pfdsl-standalone-prototype",
+	"private": true,
+	"type": "module",
+	"scripts": {
+		"build": "vite build",
+		"test": "node --test src/*.test.mjs",
+		"tauri": "tauri"
+	},
+	"dependencies": {
+		"@tauri-apps/api": "2.11.1",
+		"monaco-editor": "0.57.0",
+		"path-browserify": "1.0.1"
+	},
+	"devDependencies": {
+		"@tauri-apps/cli": "2.11.5",
+		"vite": "8.3.1"
+	}
+}

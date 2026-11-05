@@ -19,6 +19,43 @@ function buildFromSource(src: string) {
 }
 
 describe("exportDot", () => {
+	it("quotes hyphenated group ids, including nested groups", () => {
+		const { graph, frontmatter } = buildFromSource(`---
+group:
+  outer-group: { label: Outer }
+  inner-group: { label: Inner, parent: outer-group }
+process:
+  do-work: { group: inner-group }
+---
+input-data >> do-work -> output-data
+`);
+		const dot = exportDot(graph, frontmatter);
+		expect(dot).toContain('subgraph "cluster_outer-group" {');
+		expect(dot).toContain('subgraph "cluster_inner-group" {');
+		expect(dot).toContain('"input-data" -> "do-work";');
+		expect(dot).toContain('"do-work" -> "output-data";');
+	});
+
+	it.each([
+		"",
+		"   ",
+	])("omits blank group labels from graph clusters (%j)", (label) => {
+		const source = [
+			"---",
+			"group:",
+			`  g: { label: ${JSON.stringify(label)} }`,
+			"artifact:",
+			"  a: { group: g }",
+			"---",
+			"a >> p -> out",
+			"",
+		].join("\n");
+		const { graph, frontmatter } = buildFromSource(source);
+		const dot = exportDot(graph, frontmatter);
+		expect(dot).not.toContain('label=""');
+		expect(dot).not.toContain('label="   "');
+	});
+
 	it("emits a digraph with default rankdir LR", () => {
 		const { graph, frontmatter } = buildFromSource("req >> design -> spec\n");
 		const dot = exportDot(graph, frontmatter);
@@ -903,12 +940,20 @@ spec >> P -> X
 			expect(dot).not.toContain("href=");
 		});
 
-		it("does not crash when location is a non-string YAML value", () => {
+		it.each([
+			["scalar", 42],
+			["array of non-strings", [42]],
+			["array mixing strings and non-strings", ["docs/spec.md", 42]],
+			["array of objects", [{ path: "docs/spec.md" }]],
+		])("does not crash when location is a %s", (_name, location) => {
 			const fm = {
-				artifact: { spec: { label: "仕様書", location: 42 } },
+				artifact: { spec: { label: "仕様書", location } },
 			} as unknown as Parameters<typeof exportDot>[1];
 			const { graph } = buildFromSource("spec >> P -> X");
 			expect(() => exportDot(graph, fm)).not.toThrow();
+			const dot = exportDot(graph, fm);
+			expect(dot).not.toContain("location:");
+			expect(dot).not.toContain("href=");
 		});
 
 		it("includes location in tooltip after description", () => {
@@ -920,8 +965,12 @@ spec >> P -> X
 `;
 			const { graph, frontmatter } = buildFromSource(src);
 			const dot = exportDot(graph, frontmatter);
-			expect(dot).toContain("docs/spec.md");
-			expect(dot).toContain("詳細");
+			// The order is the claim: location is appended last (node-attrs.ts),
+			// after the description. Asserting each substring separately left
+			// that free to swap (#615).
+			expect(dot).toContain(
+				'tooltip="仕様書\\n\\n詳細\\nlocation: docs/spec.md"',
+			);
 		});
 
 		it("includes location in tooltip when no description", () => {
@@ -1008,7 +1057,9 @@ spec >> P -> X
 `;
 			const { graph, frontmatter } = buildFromSource(src);
 			const dot = exportDot(graph, frontmatter);
-			expect(dot).toContain("TL承認済み");
+			// With the "criteria: " prefix the exporter writes, as the revises
+			// case below already asserts for its own field (#615).
+			expect(dot).toContain("criteria: TL承認済み");
 		});
 
 		it("includes criteria and description both in tooltip", () => {
@@ -1053,24 +1104,73 @@ v2 >> P -> X
 	});
 });
 
-describe("fixture files", () => {
-	const files = readdirSync(samplesDir)
-		.filter((f) => f.endsWith(".pfdsl"))
-		.sort();
-	for (const f of files) {
-		it(f.replace(".pfdsl", ""), () => {
-			const src = readFileSync(resolve(samplesDir, f), "utf-8");
-			const expected = readFileSync(
-				resolve(samplesDir, f.replace(".pfdsl", ".dot")),
-				"utf-8",
-			);
-			const { graph, frontmatter } = buildFromSource(src);
-			expect(exportDot(graph, frontmatter)).toBe(expected);
-		});
-	}
-});
-
 describe("exportDiffDot", () => {
+	const collisionBase =
+		'["a -> b", a] >> hub -> seed\nseed >> c -> out1\nseed >> "b -> c" -> out2\n';
+	it.each([
+		undefined,
+		2,
+	])("renders a label matching its node ID once in the diff graph (maxWidth=%s)", (maxWidth) => {
+		const layout =
+			maxWidth === undefined ? "" : `layout: { maxWidth: ${maxWidth} }\n`;
+		const a = analyze(
+			"---\nartifact:\n  spec: { status: todo }\n---\nspec >> P -> X\n",
+		);
+		const b = analyze(
+			`---\n${layout}artifact:\n  spec: { status: done, label: spec }\n---\nspec >> P -> X\n`,
+		);
+		const dot = exportDiffDot(a.graph, a.frontmatter, b.graph, b.frontmatter);
+		expect(dot).toContain('"spec" [shape=box, label="spec", style="filled"');
+		expect(dot).not.toContain('label="spec\\n');
+	});
+	it("renders whitespace-only node labels as the ID in the diff graph", () => {
+		const a = analyze("spec >> P -> out\n");
+		const b = analyze(
+			'---\nartifact:\n  spec: { label: "   " }\n---\nspec >> P -> out\n',
+		);
+		const dot = exportDiffDot(a.graph, a.frontmatter, b.graph, b.frontmatter);
+		expect(dot).toContain('"spec" [shape=box, label="spec"');
+		expect(dot).not.toContain('label="spec\\n');
+	});
+	it.each([
+		">>",
+		">>?",
+	])("renders an edge-only replacement with colliding display keys for %s", (op) => {
+		const a = analyze(`${collisionBase}"a -> b" ${op} c\n`);
+		const b = analyze(`${collisionBase}a ${op} "b -> c"\n`);
+		const dot = exportDiffDot(a.graph, a.frontmatter, b.graph, b.frontmatter);
+		expect(dot).not.toContain("_nodiff");
+		expect(dot).toContain(
+			op === ">>"
+				? '"a -> b" -> "c" [color="#dc3545", style=dashed]'
+				: '"a -> b" -> "c" [style=dashed, color="#dc3545", constraint=false]',
+		);
+		expect(dot).toContain(
+			op === ">>"
+				? '"a" -> "b -> c" [color="#28a745"]'
+				: '"a" -> "b -> c" [style=dashed, color="#28a745", constraint=false]',
+		);
+	});
+	it.each([
+		">>",
+		">>?",
+	])("renders both colliding edges added to the same graph for %s", (op) => {
+		const a = analyze(collisionBase);
+		const b = analyze(`${collisionBase}"a -> b" ${op} c\na ${op} "b -> c"\n`);
+		const dot = exportDiffDot(a.graph, a.frontmatter, b.graph, b.frontmatter);
+		expect(dot).not.toContain("_nodiff");
+		expect(dot).toContain('"a -> b" -> "c"');
+		expect(dot).toContain('"a" -> "b -> c"');
+	});
+	it("renders an edge-only change with ordinary IDs", () => {
+		const a = analyze("req >> design -> spec\nspec >> impl -> code\n");
+		const b = analyze(
+			"req >> design -> spec\nspec >> impl -> code\nreq >> impl\n",
+		);
+		const dot = exportDiffDot(a.graph, a.frontmatter, b.graph, b.frontmatter);
+		expect(dot).not.toContain("_nodiff");
+		expect(dot).toContain('"req" -> "impl" [color="#28a745"]');
+	});
 	it("added node is styled with green fillcolor", () => {
 		const a = analyze("req >> design -> spec\n");
 		const b = analyze("req >> design -> spec\nnewnode >> design\n");
@@ -1141,9 +1241,11 @@ spec >> P -> X
 	});
 });
 
-// Deterministic drift guard for docs/samples (.dot + README). The .svg is
-// graphviz-version-dependent and excluded. Mechanically enforces what
-// `make gen-samples` produces so a stale exporter / un-regenerated sample is
+// Deterministic drift guard for docs/samples (.dot + README). The .svg guard
+// lives in @pfdsl/preview-engine's index.test.ts instead, since it needs
+// renderDotToSvg and preview-engine depends on this package (a guard here
+// would be a circular dependency). Mechanically enforces what `make
+// gen-samples` produces so a stale exporter / un-regenerated sample is
 // caught in pre-commit (vitest) and CI rather than by a human gate.
 describe("docs/samples drift", () => {
 	const pfdslFiles = readdirSync(samplesDir)
@@ -1158,6 +1260,9 @@ describe("docs/samples drift", () => {
 	);
 	const readme = readFileSync(resolve(samplesDir, "README.md"), "utf-8");
 
+	// One pass per sample: an earlier "fixture files" describe ran the same
+	// comparison with the arguments swapped, so every sample was parsed and
+	// exported twice for one assertion's worth of information (#615).
 	for (const f of pfdslFiles) {
 		const base = f.replace(/\.pfdsl$/, "");
 		it(`${base}.dot equals exportDot(source)`, () => {

@@ -1,0 +1,135 @@
+{
+  "date": "2026-10-26",
+  "classification": "preparation-blocked",
+  "acceptanceRelaxed": false,
+  "workExecuted": false,
+  "codex": {
+    "version": "0.164.0-alpha.11.1",
+    "sessionId": "01a17598-090f-7133-a097-37faf7d2534e",
+    "workingDirectory": "/private/tmp",
+    "options": [
+      "exec",
+      "--sandbox",
+      "read-only",
+      "--json",
+      "-c",
+      "project_doc_max_bytes=0",
+      "-c",
+      "features.skip_host_skill_discovery=true",
+      "-c",
+      "features.plugins=false",
+      "-c",
+      "memories.use_memories=false",
+      "-c",
+      "memories.generate_memories=false",
+      "--skip-git-repo-check"
+    ],
+    "prompt": "Preparation probe only. Do not call tools or execute work. Reply with the single word READY.",
+    "assistantReply": "READY",
+    "toolCalls": 0,
+    "messages": [
+      {
+        "role": "developer",
+        "characters": 21546,
+        "sha256": "2181ecc51528326182f349c9d83effa598156a4a307e9fd50bc7bd050496fa7a",
+        "containsGlobalGuidance": false,
+        "containsSkillsCatalog": false,
+        "containsMemorySummary": false,
+        "containsPfdCycle": false
+      },
+      {
+        "role": "developer",
+        "characters": 6555,
+        "sha256": "ca51b41dc5b14b5c91b172d1c1d36281188111fc78857f93b8042c109634010a",
+        "containsGlobalGuidance": false,
+        "containsSkillsCatalog": true,
+        "containsMemorySummary": false,
+        "containsPfdCycle": false
+      },
+      {
+        "role": "developer",
+        "characters": 2400,
+        "sha256": "3edd51083129388f52e881435e93e4b981e00c5ee3d62ab5d32e22c428fd504b",
+        "containsGlobalGuidance": false,
+        "containsSkillsCatalog": false,
+        "containsMemorySummary": false,
+        "containsPfdCycle": false
+      },
+      {
+        "role": "developer",
+        "characters": 271,
+        "sha256": "6ded806e3cdbb35599ecaf8742574bc5274908472b1729090010c404c2151e8e",
+        "containsGlobalGuidance": false,
+        "containsSkillsCatalog": false,
+        "containsMemorySummary": false,
+        "containsPfdCycle": false
+      },
+      {
+        "role": "user",
+        "characters": 4015,
+        "sha256": "c25e0c1e3b746a0ba181c8f951d2324a0a4e1a7591bb2ef18a8e0e24e3543e38",
+        "containsGlobalGuidance": true,
+        "containsSkillsCatalog": false,
+        "containsMemorySummary": false,
+        "containsPfdCycle": false
+      },
+      {
+        "role": "user",
+        "characters": 92,
+        "sha256": "95f6cb2ff75bdfeb4b99d352a951b38c0b4e09d678ee6164a5b79d9157a0969f",
+        "containsGlobalGuidance": false,
+        "containsSkillsCatalog": false,
+        "containsMemorySummary": false,
+        "containsPfdCycle": false
+      },
+      {
+        "role": "assistant",
+        "characters": 5,
+        "sha256": "c2e3ac47f4a325469c1a2d5f117e463ec943c721986d5d9f09ac4540b7d80526",
+        "containsGlobalGuidance": false,
+        "containsSkillsCatalog": false,
+        "containsMemorySummary": false,
+        "containsPfdCycle": false
+      }
+    ],
+    "result": "Global guidance and skills catalog remained in actual model input; strict isolation not achieved.",
+    "sourceDisclosure": "Parent audited the private local rollout. Instruction bodies and authentication data are omitted; hashes do not make the private inputs independently reproducible."
+  },
+  "claude": {
+    "version": "2.1.309 (Claude Code)",
+    "sessionId": "707c02ad-a58b-48bd-85b1-9f2e5323cd2b",
+    "options": [
+      "--bare",
+      "--disable-slash-commands",
+      "--tools",
+      "",
+      "--setting-sources",
+      "",
+      "--strict-mcp-config",
+      "--mcp-config",
+      "{\"mcpServers\":{}}",
+      "--print",
+      "--output-format",
+      "json",
+      "--system-prompt-snapshot",
+      "on"
+    ],
+    "prompt": "Preparation probe only. Do not call tools or execute work. Reply with the single word READY.",
+    "exitCode": 1,
+    "isError": true,
+    "terminalReason": "api_error",
+    "result": "Not logged in · Please run /login",
+    "durationApiMs": 0,
+    "totalCostUsd": 0,
+    "inputTokens": 0,
+    "outputTokens": 0,
+    "apiKeyPresent": false,
+    "helpObservation": "This installed version states bare does not read OAuth/keychain; it accepts ANTHROPIC_API_KEY or an apiKeyHelper supplied through settings (third-party providers use their own credentials).",
+    "resultMeaning": "Authentication failed before driver generation. This does not demonstrate isolation or successful work."
+  },
+  "nextConditions": [
+    "Provide authentication supported by bare, or an environment satisfying the original isolation condition.",
+    "Select a still-ready real process and freeze protocol, CLI, checker, model and input versions before starting its work.",
+    "Run driver, capture after versions, execute the read-only checker and preserve both negative cases."
+  ]
+}

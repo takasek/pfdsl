@@ -1,0 +1,59 @@
+[
+  {
+    "name": "05-label-cjk",
+    "svgSize": [
+      436.0,
+      67.0
+    ],
+    "pdfSize": [
+      436,
+      67
+    ],
+    "svgNodes": 3,
+    "svgEdges": 2,
+    "svgTextElements": 6,
+    "uniqueNormalizedLabels": 6,
+    "matchedTextElementOccurrences": 6,
+    "missingLabels": [],
+    "pdfPageCount": 1,
+    "pdfTextCharacters": 31
+  },
+  {
+    "name": "13-preset",
+    "svgSize": [
+      522.0,
+      61.0
+    ],
+    "pdfSize": [
+      522,
+      61
+    ],
+    "svgNodes": 5,
+    "svgEdges": 4,
+    "svgTextElements": 8,
+    "uniqueNormalizedLabels": 8,
+    "matchedTextElementOccurrences": 8,
+    "missingLabels": [],
+    "pdfPageCount": 1,
+    "pdfTextCharacters": 54
+  },
+  {
+    "name": "pfdsl_implementation_flow",
+    "svgSize": [
+      2294.0,
+      2867.0
+    ],
+    "pdfSize": [
+      2294,
+      2867
+    ],
+    "svgNodes": 81,
+    "svgEdges": 112,
+    "svgTextElements": 202,
+    "uniqueNormalizedLabels": 155,
+    "matchedTextElementOccurrences": 202,
+    "missingLabels": [],
+    "pdfPageCount": 1,
+    "pdfTextCharacters": 2620
+  }
+]

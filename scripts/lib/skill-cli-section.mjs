@@ -23,18 +23,25 @@ export function renderCliSection(helpOutput) {
 		if (command) {
 			// Inline description separated by a run of spaces (e.g. the `help` entry).
 			const [signature, inlineDesc] = command[1].split(/ {3,}/, 2);
-			entries.push({ signature: signature.trim(), desc: inlineDesc?.trim() ?? null });
+			entries.push({
+				signature: signature.trim(),
+				desc: inlineDesc?.trim() ?? null,
+			});
 			continue;
 		}
 		const detail = line.match(/^ {4,}(\S.*)$/);
 		if (detail && entries.length > 0) {
 			const last = entries[entries.length - 1];
 			// First non-flag detail line is the command's short description.
-			if (last.desc === null && !detail[1].startsWith("--")) last.desc = detail[1].trim();
+			if (last.desc === null && !detail[1].startsWith("--"))
+				last.desc = detail[1].trim();
 		}
 	}
 
 	return entries
-		.map(({ signature, desc }) => `pfdsl ${signature}${desc ? `   # ${desc}` : ""}`)
+		.map(
+			({ signature, desc }) =>
+				`pfdsl ${signature}${desc ? `   # ${desc}` : ""}`,
+		)
 		.join("\n");
 }

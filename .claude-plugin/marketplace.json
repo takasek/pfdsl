@@ -8,12 +8,12 @@
 	"plugins": [
 		{
 			"name": "pfdsl",
-			"description": "PFD-DSL authoring toolkit: syntax/CLI reference (pfdsl skill), ecosystem bootstrap (pfd-ecosystem skill), retrospective audit (pfd-retro skill), and /pfd-cycle, /pfd-init commands.",
+			"description": "PFD-DSL authoring toolkit: syntax/CLI reference (pfdsl skill), backward-dialogue diagram construction (pfd-grill skill), project operations (pfd-ops skill), model retrospective audit (pfd-retro skill), PFD knowledge artifact audit (pfd-knowledge-audit skill), ecosystem bootstrap (pfd-ecosystem skill), upstream defect report (pfd-upstream-report skill), and /pfd-cycle, /pfd-init, /pfd-retro commands.",
 			"source": {
 				"source": "git-subdir",
 				"url": "https://github.com/takasek/pfdsl.git",
 				"path": "plugin/pfdsl",
-				"ref": "v0.0.23"
+				"ref": "v0.2.0"
 			}
 		}
 	]

@@ -1,5 +1,5 @@
-import { describe, it } from "node:test";
 import assert from "node:assert/strict";
+import { describe, it } from "node:test";
 
 import { resolveCompanions } from "./sample-companions.mjs";
 
@@ -37,7 +37,9 @@ describe("resolveCompanions", () => {
 			["12-subflow", "12-subflow-detail"],
 			["12-subflow", "12-subflow-detail", "12-subflow-detail-extra"],
 		);
-		assert.deepEqual(companionsById.get("12-subflow-detail"), ["12-subflow-detail-extra"]);
+		assert.deepEqual(companionsById.get("12-subflow-detail"), [
+			"12-subflow-detail-extra",
+		]);
 		assert.equal(companionsById.has("12-subflow"), false);
 	});
 
@@ -46,6 +48,9 @@ describe("resolveCompanions", () => {
 			["14-boundary"],
 			["14-boundary", "14-boundary-detail", "14-boundary-alt"],
 		);
-		assert.deepEqual(companionsById.get("14-boundary"), ["14-boundary-alt", "14-boundary-detail"]);
+		assert.deepEqual(companionsById.get("14-boundary"), [
+			"14-boundary-alt",
+			"14-boundary-detail",
+		]);
 	});
 });

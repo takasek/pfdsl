@@ -14,7 +14,9 @@
 import { execFileSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 
-const WORKER_SCRIPT = fileURLToPath(new URL("./proxy-fetch-worker.mjs", import.meta.url));
+const WORKER_SCRIPT = fileURLToPath(
+	new URL("./proxy-fetch-worker.mjs", import.meta.url),
+);
 
 /**
  * @type {typeof fetch}
@@ -23,12 +25,26 @@ export async function proxyAwareFetch(url, init = {}) {
 	if (!process.env.HTTPS_PROXY && !process.env.https_proxy) {
 		return fetch(url, init);
 	}
-	const request = { url: String(url), method: init.method ?? "GET", headers: init.headers ?? {}, body: init.body };
-	const out = execFileSync(process.execPath, ["--use-env-proxy", WORKER_SCRIPT], {
-		input: JSON.stringify(request),
-		encoding: "utf-8",
-		maxBuffer: 64 * 1024 * 1024,
-	});
+	const request = {
+		url: String(url),
+		method: init.method ?? "GET",
+		headers: init.headers ?? {},
+		body: init.body,
+	};
+	const out = execFileSync(
+		process.execPath,
+		["--use-env-proxy", WORKER_SCRIPT],
+		{
+			input: JSON.stringify(request),
+			encoding: "utf-8",
+			maxBuffer: 64 * 1024 * 1024,
+		},
+	);
 	const { ok, status, bodyText } = JSON.parse(out);
-	return { ok, status, json: async () => JSON.parse(bodyText), text: async () => bodyText };
+	return {
+		ok,
+		status,
+		json: async () => JSON.parse(bodyText),
+		text: async () => bodyText,
+	};
 }

@@ -1,0 +1,131 @@
+{
+  "evaluationDate": "2026-10-27",
+  "pfdslCommit": "d1b5db85ecdb9344a5ed6fff2f1b17632a8ec6e6",
+  "threads": {
+    "astra": "01a17c9b-ed5e-7c01-9cc9-2e5e2990bada",
+    "sol": "01a17c9b-f996-76d0-ba21-ed5cc43ed39e"
+  },
+  "processing": "PFDSL-related textual excerpts only. Other product evaluation records excluded. Original PFDSL conclusions and priorities retained; private paths removed; links remapped. Image bytes excluded from publication; hashes retained as omittedImages. Full originals retained locally outside the repository. Saved Claude M1 discovery chronology corrected after evaluator source cross-check; original retained unchanged.",
+  "files": [
+    {
+      "reviewer": "astra",
+      "originalFile": "review.md",
+      "originalSha256": "d089cfc03e28bb03a6286d1bb2636e9aef81f3e618a3b196371284ccf6a58a84",
+      "savedFile": "astra/review.md",
+      "savedSha256": "c153c730c5857f456031caa1ae407140c4015857b016b047f85db1e41487c6f4"
+    },
+    {
+      "reviewer": "astra",
+      "originalFile": "first-impression.md",
+      "originalSha256": "72f0e52abc71c72d54c7c2904fe13c4c918ff5fea409063d09d23b227cc6c926",
+      "savedFile": "astra/first-impression.md",
+      "savedSha256": "165fd3e3b9f3697d5223af465410f58a666bc57cc1d7be567c2068b2846fff10"
+    },
+    {
+      "reviewer": "sol",
+      "originalFile": "design-review.md",
+      "originalSha256": "668128af29a66cb6c6f7df17ffa92c99604d9c0ebcdbc81618749329fd309848",
+      "savedFile": "sol/design-review.md",
+      "savedSha256": "92e67d092fdfba83ae59f552446e5ec5899784d7a63835a501c408906740eeed"
+    },
+    {
+      "reviewer": "sol",
+      "originalFile": "task-log.md",
+      "originalSha256": "3604de128c55b4cbea5c3c226f3540c808c5b1bbbe7a88543a58404f2873faf0",
+      "savedFile": "sol/task-log.md",
+      "savedSha256": "bf2c5874f9f21f24f94f21e3fcafedf2f2cd9dd259e3a2adddcf6548a4a3da9f"
+    },
+    {
+      "reviewer": "sol",
+      "originalFile": "first-impression.md",
+      "originalSha256": "3693f78a70b6346ecb6b45dc6e35728626d4e03e7d728e163955e58df2634554",
+      "savedFile": "sol/first-impression.md",
+      "savedSha256": "2078dae8289a4d2c4f5cecab21ac3c94cd8d85e94a11ef5fce9d0bab213b8ee4"
+    },
+    {
+      "reviewer": "sol",
+      "originalFile": "evidence/native-cycle.ax.txt",
+      "originalSha256": "7cc981bedbafe532ce1227defe10121ee332a69cc6c5cad71c62cf54f1c9f38e",
+      "savedFile": "sol/evidence/native-cycle.ax.txt",
+      "savedSha256": "7cc981bedbafe532ce1227defe10121ee332a69cc6c5cad71c62cf54f1c9f38e"
+    },
+    {
+      "reviewer": "sol",
+      "originalFile": "evidence/native-reopened.ax.txt",
+      "originalSha256": "4a7e94555416e6494241ff7bb4cc9c3450f439b511c2384f19b7d605a25fc441",
+      "savedFile": "sol/evidence/native-reopened.ax.txt",
+      "savedSha256": "b00e26895e3213eed126f6a1627159b8cd87c6891da7db4ac287f566761ed992"
+    },
+    {
+      "reviewer": "sol",
+      "originalFile": "evidence/medium-check.json",
+      "originalSha256": "14b496ce02edb352ec74e14edd93761c614b317122ccaa6631e29551074e78bc",
+      "savedFile": "sol/evidence/medium-check.json",
+      "savedSha256": "14b496ce02edb352ec74e14edd93761c614b317122ccaa6631e29551074e78bc"
+    },
+    {
+      "reviewer": "astra",
+      "originalFile": "README.md",
+      "originalSha256": "b576cf2128a25c08e3ab8b36a9945c6fa4cff0381a5d1003e8577275dfd67a21",
+      "savedFile": "astra/README.md",
+      "savedSha256": "194d4699914512ef71f5eacaeb094f28144a47d64ab38e93cd837012297efd5b"
+    },
+    {
+      "reviewer": "sol",
+      "originalFile": "README.md",
+      "originalSha256": "fde45e4dd1e078e6c4bae0d6e67ada98197e3b53db79127956b13481e49b942c",
+      "savedFile": "sol/README.md",
+      "savedSha256": "a21a3deb0a1d83fa51cf3314a7dfc16b159dfa3948ada6ae54df35bc917320fb"
+    },
+    {
+      "reviewer": "claude",
+      "originalFile": "pfdsl-design-review.md",
+      "originalSha256": "1a1cfdc6c71a067664a281f34ff2db29c32ec719f77027d69cdb77b27386474e",
+      "savedFile": "claude/review.md",
+      "savedSha256": "a601436c006658be28bc021df4910a3624a33157d9fd05a7473cd33c0cc2290a"
+    },
+    {
+      "reviewer": "claude",
+      "originalFile": "README.md",
+      "originalSha256": "90f4272a3f56cee2a531d6469bf9f0e4d2084aeb60da177d8136da0c1570cc31",
+      "savedFile": "claude/README.md",
+      "savedSha256": "4e2aeaf27ae4b2ac84b52e915d96533e752f92c8c3f59174531a89300a4a6c4d"
+    },
+    {
+      "reviewer": "claude",
+      "originalFile": "work/code-checks/diagnostic-ranges.txt",
+      "originalSha256": "68f92f593fa0142194bd2c51446ee48c79a5089a9e7c253efb10adf1a4ec916c",
+      "savedFile": "claude/evidence/diagnostic-ranges.txt",
+      "savedSha256": "68f92f593fa0142194bd2c51446ee48c79a5089a9e7c253efb10adf1a4ec916c"
+    },
+    {
+      "reviewer": "claude",
+      "originalFile": "work/code-checks/typo-before-check.txt",
+      "originalSha256": "9fe1fd85dcf7ede39d055105fcc9eb5dc49b5222603bbac5792a3dd5a7fd9424",
+      "savedFile": "claude/evidence/typo-before-check.txt",
+      "savedSha256": "89c8a3efebdd482e1752c587214c1d92535eefaf475402e020540e98a8b35888"
+    },
+    {
+      "reviewer": "claude",
+      "originalFile": "work/code-checks/typo-after-check.txt",
+      "originalSha256": "a169fecbf9fd6985a234d9731462c01b7e87e14b6e499bd46e77ab1f374108cd",
+      "savedFile": "claude/evidence/typo-after-check.txt",
+      "savedSha256": "eb9835f79c2860a3aaf0015550596af65bec577753185925e354b8da9d473175"
+    }
+  ],
+  "omittedImages": [
+    {
+      "reviewer": "astra",
+      "originalFile": "evidence/09-browser-connections-600.png",
+      "originalSha256": "3b63d438e339d56a7450f293749f4c73bf4a401294265b4d927587cabed3f4f7",
+      "reason": "JPEG bytes are unsupported by the publication guard; original retained locally."
+    },
+    {
+      "reviewer": "sol",
+      "originalFile": "evidence/13-native-cycle.jpg",
+      "originalSha256": "dbcc8120de6c48d019c60df42a1fe34a58e13c52d7bcf469725c3b038333fc9e",
+      "reason": "JPEG bytes are unsupported by the publication guard; original retained locally."
+    }
+  ],
+  "additionalEvaluationDate": "2026-10-28"
+}

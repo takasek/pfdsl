@@ -1,0 +1,8 @@
+{
+	"time_utc": "2026-10-13T07:42:51.095958+00:00",
+	"action": "deliberate rename parent to parent-moved",
+	"old_file_exists": false,
+	"new_file_exists": true,
+	"before_sha256": "576d03913fd482b3886512f3688ac2301ae15b61626dcdf0193d670787cf2527",
+	"after_sha256": "576d03913fd482b3886512f3688ac2301ae15b61626dcdf0193d670787cf2527"
+}

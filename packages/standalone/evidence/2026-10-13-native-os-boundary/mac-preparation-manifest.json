@@ -1,0 +1,13 @@
+{
+	"sourceCommit": "3e6240ee7f776f55be69aaf379de41aedd35da1f",
+	"originalExecutableSha256": "1e0e9ba2861ec5dca4bd8ab6b9ed39ee44027f692d9a7e5428916a140b2b755b",
+	"fixtures": {
+		"a.pfdsl": "01061ccca6422e1b9a1155ad0d99a19f01b07f8a1249a9771a08fc4e36f8f4ee",
+		"b.pfdsl": "e00a097f86c57f6b770e3fd2c6fff0513e41454fd00512d6d21de5275de092b8",
+		"conflict.pfdsl": "7a167cbd7fa39c7273cb314f8738aa549573a1bdbd5c9dd5aa8702f63a97d912"
+	},
+	"acceptanceExecutableSha256": "9e86d544f2c90fd9d8195d10534e523c7045e9d0d4d8d275922f05e2915c1146",
+	"signing": "Local ad-hoc signing on the acceptance copy only.",
+	"macOS": "27.0.1",
+	"architecture": "arm64"
+}

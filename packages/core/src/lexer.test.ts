@@ -159,3 +159,30 @@ describe("lex", () => {
 		});
 	});
 });
+
+describe("bare ids start with a letter, a number or _ (spec §4.1)", () => {
+	it.each(["-x", "---", "-処理"])("rejects a bare %s", (id) => {
+		const { diagnostics } = lex(`a >> ${id} -> b\n`);
+		expect(diagnostics.map((d) => d.code)).toContain("L002");
+	});
+
+	it.each(["-x", "---", "-処理"])("accepts %s quoted", (id) => {
+		const { tokens, diagnostics } = lex(`a >> ${JSON.stringify(id)} -> b\n`);
+		expect(diagnostics).toEqual([]);
+		expect(tokens.filter((t) => t.type === "ID").map((t) => t.value)).toEqual([
+			"a",
+			id,
+			"b",
+		]);
+	});
+
+	it("still reads a hyphen after the first character", () => {
+		const { tokens, diagnostics } = lex("a-b >> _c-d -> 1-e\n");
+		expect(diagnostics).toEqual([]);
+		expect(tokens.filter((t) => t.type === "ID").map((t) => t.value)).toEqual([
+			"a-b",
+			"_c-d",
+			"1-e",
+		]);
+	});
+});

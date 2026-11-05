@@ -5,6 +5,18 @@ const BREAK_CHARS = /[、。，．,.\s()（）「」『』【】[\]=]/;
 
 // Times New Roman em widths (per 1000 units), font size = 14pt
 const FONT_SIZE = 14;
+
+export function isDisplayableLabel(value: unknown): value is string {
+	return typeof value === "string" && value.trim().length > 0;
+}
+
+export function displayNodeLabel(
+	id: string,
+	value: unknown,
+): string | undefined {
+	return isDisplayableLabel(value) && value !== id ? value : undefined;
+}
+
 const CHAR_EM: Record<string, number> = {
 	" ": 250,
 	"!": 333,
@@ -133,6 +145,14 @@ export function wrapLabel(text: string, maxWidthPx: number): string {
 		const testLine = currentLine + char;
 
 		if (measureTextWidth(testLine) > maxWidthPx && currentLine.length > 0) {
+			// A character that may not open a line hangs past the width instead
+			// of being carried over — otherwise the overflow check moves it to
+			// the next line and puts a 、 or ） at its head.
+			if (LINE_HEAD_FORBIDDEN.test(char)) {
+				currentLine = testLine;
+				continue;
+			}
+
 			let breakIndex = -1;
 
 			if (!BREAK_CHARS.test(char)) {
@@ -153,13 +173,14 @@ export function wrapLabel(text: string, maxWidthPx: number): string {
 
 			if (breakIndex >= 0) {
 				const breakChar = currentLine[breakIndex]!;
-				if (LINE_HEAD_FORBIDDEN.test(breakChar)) {
-					lines.push(currentLine.substring(0, breakIndex + 1));
-					currentLine = currentLine.substring(breakIndex + 1) + char;
-				} else {
-					lines.push(currentLine.substring(0, breakIndex));
-					currentLine = currentLine.substring(breakIndex + 1) + char;
-				}
+				// Whitespace is consumed by the break; every other break
+				// character carries meaning ('.', '=', '(' …) and stays at the
+				// end of the line it broke, or the label silently loses it.
+				const dropsAtBreak = /\s/.test(breakChar);
+				lines.push(
+					currentLine.substring(0, dropsAtBreak ? breakIndex : breakIndex + 1),
+				);
+				currentLine = currentLine.substring(breakIndex + 1) + char;
 			} else {
 				lines.push(currentLine);
 				currentLine = char;

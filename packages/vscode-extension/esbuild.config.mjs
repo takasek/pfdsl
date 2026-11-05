@@ -1,6 +1,22 @@
+import { parseArgs } from "node:util";
 import { build, context } from "esbuild";
 
-const watch = process.argv.includes("--watch");
+// strict parsing, not includes("--watch"): a typo'd or --watch=true form is
+// invisible to includes(), so `pnpm watch` builds once and exits as though it
+// were watching (#648).
+let watch;
+try {
+	const { values } = parseArgs({
+		args: process.argv.slice(2),
+		options: { watch: { type: "boolean" } },
+		strict: true,
+		allowPositionals: false,
+	});
+	watch = values.watch === true;
+} catch (err) {
+	console.error(`esbuild.config: ${err.message}`);
+	process.exit(2);
+}
 
 const extensionOptions = {
 	entryPoints: ["src/extension.ts"],
@@ -19,6 +35,8 @@ const webviewOptions = {
 	bundle: true,
 	outfile: "dist/webview.js",
 	platform: "browser",
+	// Shared graph export uses core's pure path helpers; use the same browser shim as the standalone host.
+	alias: { path: "path-browserify" },
 	format: "esm",
 	target: "es2020",
 	sourcemap: true,
@@ -32,5 +50,14 @@ if (watch) {
 	]);
 	await Promise.all([extCtx.watch(), wvCtx.watch()]);
 } else {
-	await Promise.all([build(extensionOptions), build(webviewOptions)]);
+	await Promise.all([
+		build(extensionOptions),
+		build(webviewOptions),
+		// The corpus probe loads the same snapshot adapter as the registered providers.
+		build({
+			...extensionOptions,
+			entryPoints: ["src/analyze.ts"],
+			outfile: "dist/analysis-host.cjs",
+		}),
+	]);
 }

@@ -9,26 +9,40 @@
  * not-yet-implemented construct reserved for #328 and are ignored here.
  */
 
+import { isHeading } from "./markdown-heading.mjs";
+
 const FORWARD_REF_RE = /\[\[SPEC_([A-Za-z0-9_]+)\?\]\]/g;
-const HEADING_RE = /^#{1,6}\s/;
-const IMPLEMENTS_TRAILING_RE = /\(SPEC_([A-Za-z0-9_]+)\)\s*$/;
-const FENCE_RE = /^(```|~~~)/;
+const IMPLEMENTS_TRAILING_RE = /(?:\(SPEC_[A-Za-z0-9_]+\)\s*)+$/;
+// A run of three or more backticks or tildes at the start of a line. A backtick fence's info string cannot contain a backtick, or the line is inline code rather than a fence.
+const FENCE_OPEN_RE = /^(`{3,}(?!.*`)|~{3,})/;
+const FENCE_CLOSE_RE = /^(`{3,}|~{3,})\s*$/;
 
 /**
+ * Visits each line outside a fenced code block. A fence closes only on a line
+ * of the opener's character, at least as long as the opener, with nothing after
+ * it (CommonMark), so a differing marker or a shorter run inside a block does
+ * not end it. Fences indented under a list item are not recognized.
  * @param {string} text
  * @param {(line: string, lineNumber: number, hits: Array<{line: number, id: string}>) => void} visit
  */
 export function forEachNonFencedLine(text, visit) {
 	const lines = text.split("\n");
-	let inFence = false;
+	let fence = null;
 	for (let i = 0; i < lines.length; i++) {
 		const line = lines[i];
-		if (FENCE_RE.test(line)) {
-			inFence = !inFence;
+		if (fence === null) {
+			const open = FENCE_OPEN_RE.exec(line);
+			if (open) {
+				fence = open[1];
+				continue;
+			}
+			visit(line, i + 1);
 			continue;
 		}
-		if (inFence) continue;
-		visit(line, i + 1);
+		const close = FENCE_CLOSE_RE.exec(line);
+		if (close && close[1][0] === fence[0] && close[1].length >= fence.length) {
+			fence = null;
+		}
 	}
 }
 
@@ -39,9 +53,7 @@ export function forEachNonFencedLine(text, visit) {
 export function findForwardRefMarkers(text) {
 	const hits = [];
 	forEachNonFencedLine(text, (line, lineNumber) => {
-		FORWARD_REF_RE.lastIndex = 0;
-		let match;
-		while ((match = FORWARD_REF_RE.exec(line)) !== null) {
+		for (const match of line.matchAll(FORWARD_REF_RE)) {
 			hits.push({ line: lineNumber, id: `SPEC_${match[1]}` });
 		}
 	});
@@ -55,10 +67,12 @@ export function findForwardRefMarkers(text) {
 export function findImplementsMarkers(text) {
 	const hits = [];
 	forEachNonFencedLine(text, (line, lineNumber) => {
-		if (!HEADING_RE.test(line)) return;
+		if (!isHeading(line)) return;
 		const match = IMPLEMENTS_TRAILING_RE.exec(line);
 		if (!match) return;
-		hits.push({ line: lineNumber, id: `SPEC_${match[1]}` });
+		for (const id of match[0].matchAll(/\((SPEC_[A-Za-z0-9_]+)\)/g)) {
+			hits.push({ line: lineNumber, id: id[1] });
+		}
 	});
 	return hits;
 }

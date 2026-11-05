@@ -1,0 +1,10 @@
+i542_migrate_spec_id_refs.label: spec.md 仕様ID参照移行
+i542_migrate_spec_id_refs.description: spec.md の節番号相互参照を仕様ID参照へ段階移行する。クラスタ単位の段階計画（§15 制約 → §2.x 意味論 → 残り）は #542 が一次情報
+i542_migrate_spec_id_refs.location: https://github.com/takasek/pfdsl/issues/542
+i542_migrate_spec_id_refs.location.resolved: https://github.com/takasek/pfdsl/issues/542
+spec_id_refs.label: 仕様ID相互参照化済み spec.md
+spec_id_refs.description: 節番号直書きの相互参照を仕様ID参照へ段階移行した spec.md。ADR 確定後に別 issue として起票する（#328 移行方針）。後続門番のプレースホルダ（ADR-0018）
+spec_id_refs.status: todo
+spec_id_refs.criteria: docs/spec/spec.md の節番号相互参照が仕様ID参照に置換され、node scripts/check-spec-ids.mjs が dangling 参照なしで通過する
+spec_id_refs.location: ../docs/spec/spec.md
+spec_id_refs.location.resolved: CHECKOUT_ROOT/docs/spec/spec.md

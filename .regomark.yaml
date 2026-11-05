@@ -1,0 +1,4 @@
+documents: docs/adr
+policy: .regomark/policy
+entrypoint: adr
+exclude: [docs/adr/0001-v0.0.2.md]

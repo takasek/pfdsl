@@ -1,0 +1,1476 @@
+import { analyze, diffGraphs } from "@pfdsl/core";
+import type { MessageFromWebview, MessageToWebview } from "@pfdsl/editor";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import type * as vscode from "vscode";
+
+// Only host callbacks and postMessage are faked. Parsing, DOT generation,
+// requireActivePfdslEditor and registerPreview are the production modules.
+const host = vi.hoisted(() => {
+	const uri = (path: string) => ({
+		path,
+		fsPath: path,
+		scheme: "file",
+		toString: () => `file://${path}`,
+	});
+	const commands = new Map<string, () => unknown>();
+	const panels: ReturnType<typeof createPanel>[] = [];
+	const tabGroups: vscode.TabGroup[] = [];
+	class Position {
+		constructor(
+			public line: number,
+			public character: number,
+		) {}
+		translate(line: number, character: number) {
+			return new Position(this.line + line, this.character + character);
+		}
+	}
+	class Range {
+		constructor(
+			public start: Position,
+			public end: Position,
+		) {}
+	}
+	class WorkspaceEdit {
+		replacements: Array<{ uri: unknown; range: Range; text: string }> = [];
+		replace(uri: unknown, range: Range, text: string) {
+			this.replacements.push({ uri, range, text });
+		}
+	}
+	let textChanged = (_event: {
+		document: vscode.TextDocument;
+		reason?: vscode.TextDocumentChangeReason | undefined;
+	}) => {};
+	let selectionChanged = (_event: {
+		textEditor: vscode.TextEditor;
+		selections: readonly vscode.Selection[];
+		kind?: vscode.TextEditorSelectionChangeKind;
+	}) => {};
+	const window = {
+		activeTextEditor: undefined as vscode.TextEditor | undefined,
+		visibleTextEditors: [] as vscode.TextEditor[],
+		tabGroups: { all: tabGroups },
+		createWebviewPanel: (viewType: string) => {
+			const panel = createPanel(viewType);
+			panel.viewColumn = (window.activeTextEditor?.viewColumn ?? 1) + 1;
+			panels.push(panel);
+			return panel;
+		},
+		onDidChangeTextEditorSelection: vi.fn(
+			(callback: typeof selectionChanged) => {
+				selectionChanged = callback;
+				return { dispose() {} };
+			},
+		),
+		showInformationMessage: vi.fn(),
+		showWarningMessage: vi.fn(),
+		showErrorMessage: vi.fn(),
+		showQuickPick: vi.fn(async (items: unknown[]) => items[0]),
+		showTextDocument: vi.fn(
+			async (
+				document: vscode.TextDocument,
+				_options?: vscode.TextDocumentShowOptions,
+			) => ({
+				document,
+				selection: undefined,
+				revealRange: vi.fn(),
+			}),
+		),
+	};
+	const openTextDocument = vi.fn(async (value: ReturnType<typeof uri>) => ({
+		uri: value,
+	}));
+	function createPanel(viewType: string) {
+		let receive = (_message: MessageFromWebview) => {};
+		let disposed = () => {};
+		let viewChanged = (_event: { webviewPanel: { active: boolean } }) => {};
+		const messages: MessageToWebview[] = [];
+		const panel = {
+			title: "PFDSL Preview",
+			viewType,
+			viewColumn: 2,
+			active: true,
+			messages,
+			webview: {
+				html: "",
+				cspSource: "test-source",
+				asWebviewUri: (value: unknown) => value,
+				postMessage: (message: MessageToWebview) => {
+					messages.push(message);
+					return Promise.resolve(true);
+				},
+				onDidReceiveMessage: (callback: typeof receive) => {
+					receive = callback;
+					return { dispose() {} };
+				},
+			},
+			onDidDispose: (callback: () => void) => {
+				disposed = callback;
+				return { dispose() {} };
+			},
+			onDidChangeViewState: (callback: typeof viewChanged) => {
+				viewChanged = callback;
+				return { dispose() {} };
+			},
+			reveal: vi.fn(),
+			dispose: () => disposed(),
+			receive: (message: MessageFromWebview) => receive(message),
+			activate: () => viewChanged({ webviewPanel: { active: true } }),
+		};
+		return panel;
+	}
+	return {
+		uri,
+		commands,
+		panels,
+		window,
+		setTabGroups: (groups: vscode.TabGroup[]) => {
+			tabGroups.splice(0, tabGroups.length, ...groups);
+		},
+		createTabGroup: (
+			viewColumn: vscode.ViewColumn,
+			panel?: ReturnType<typeof createPanel>,
+		) => {
+			const group: vscode.TabGroup = {
+				isActive: false,
+				viewColumn,
+				activeTab: undefined,
+				tabs: [],
+			};
+			if (panel) {
+				const tab = {
+					get label() {
+						return panel.title;
+					},
+					group,
+					// VS Code reports a webview tab's type with this internal prefix.
+					input: new host.api.TabInputWebview(
+						`mainThreadWebview-${panel.viewType}`,
+					),
+					isActive: true,
+					isDirty: false,
+					isPinned: true,
+					isPreview: false,
+				} as vscode.Tab;
+				(group.tabs as vscode.Tab[]).push(tab);
+				Object.assign(group, { activeTab: tab });
+			}
+			return group;
+		},
+		api: {
+			Position,
+			Range,
+			Selection: Range,
+			TextEditorSelectionChangeKind: { Keyboard: 1, Mouse: 2, Command: 3 },
+			TextDocumentChangeReason: { Undo: 1, Redo: 2 },
+			WorkspaceEdit,
+			window,
+			commands: {
+				registerCommand: (name: string, callback: () => unknown) => {
+					commands.set(name, callback);
+					return { dispose() {} };
+				},
+			},
+			workspace: {
+				applyEdit: vi.fn(async (_edit: WorkspaceEdit) => true),
+				openTextDocument,
+				fs: {
+					stat: vi.fn(async () => ({ type: 1 })),
+					readDirectory: vi.fn(async () => []),
+					readFile: vi.fn(),
+				},
+				onDidChangeTextDocument: (callback: typeof textChanged) => {
+					textChanged = callback;
+					return { dispose() {} };
+				},
+			},
+			Uri: {
+				file: uri,
+				parse: (value: string) => ({ toString: () => value }),
+				joinPath: (base: { path: string }, ...parts: string[]) =>
+					uri([base.path, ...parts].join("/")),
+			},
+			ViewColumn: { One: 1, Beside: 2 },
+			TabInputText: class {
+				constructor(public uri: vscode.Uri) {}
+			},
+			TabInputWebview: class {
+				constructor(public viewType: string) {}
+			},
+			env: { openExternal: vi.fn(async () => true) },
+			FileType: { File: 1, Directory: 2 },
+			ExtensionMode: { Development: 2 },
+		},
+		changeDocument: (
+			document: vscode.TextDocument,
+			reason?: vscode.TextDocumentChangeReason,
+		) => textChanged({ document, reason }),
+		changeSelection: (
+			document: vscode.TextDocument,
+			line: number,
+			character: number,
+			startCharacter = character - 1,
+			kind: vscode.TextEditorSelectionChangeKind | null = 1,
+		) =>
+			selectionChanged({
+				...(kind === null ? {} : { kind }),
+				textEditor: { document } as vscode.TextEditor,
+				selections: [
+					{
+						active: { line, character },
+						start: { line, character: startCharacter },
+						end: { line, character },
+						isEmpty: startCharacter === character,
+					},
+				] as vscode.Selection[],
+			}),
+	};
+});
+
+vi.mock("vscode", () => host.api);
+
+import { clearAnalyzeCache } from "./analyze.js";
+import { registerPreview } from "./preview.js";
+
+const first = diffGraphs(
+	analyze("a >> p -> b").graph,
+	analyze("a >> p -> c").graph,
+);
+const latest = diffGraphs(
+	analyze("a >> p -> b").graph,
+	analyze("a >> p -> d").graph,
+);
+
+function document(name: string, source = "a >> p -> b"): vscode.TextDocument {
+	return {
+		uri: host.uri(`/test/${name}.pfdsl`),
+		languageId: "pfdsl",
+		version: 1,
+		getText: (range?: vscode.Range) => {
+			if (!range) return source;
+			const offset = ({ line, character }: vscode.Position) =>
+				source
+					.split("\n")
+					.slice(0, line)
+					.reduce((sum, text) => sum + text.length + 1, 0) + character;
+			return source.slice(offset(range.start), offset(range.end));
+		},
+		positionAt: (offset: number) => {
+			const lines = source.slice(0, offset).split("\n");
+			return new host.api.Position(lines.length - 1, lines.at(-1)!.length);
+		},
+	} as unknown as vscode.TextDocument;
+}
+
+function setup() {
+	const context = {
+		extensionUri: host.uri("/extension"),
+		extensionMode: 1,
+		subscriptions: [],
+	} as unknown as vscode.ExtensionContext;
+	const preview = registerPreview(context);
+	async function open(doc: vscode.TextDocument, viewColumn = 1) {
+		host.window.activeTextEditor = {
+			document: doc,
+			viewColumn,
+			selection: { active: { line: 0, character: 0 } },
+		} as vscode.TextEditor;
+		await host.commands.get("pfdsl.preview")!();
+		const panel = host.panels[host.panels.length - 1]!;
+		host.setTabGroups([
+			host.createTabGroup(viewColumn),
+			host.createTabGroup(panel.viewColumn, panel),
+		]);
+		return panel;
+	}
+	return { preview, open };
+}
+
+it.each([
+	["foo bar://x", "valid-location.txt"],
+	["valid-location.txt", "foo bar://x"],
+])("opens the valid preview location when another URI is invalid: %j", async (...locs) => {
+	const { open } = setup();
+	const panel = await open(
+		document(
+			"mixed",
+			`---\nartifact:\n  b:\n    location: ${JSON.stringify(locs)}\n---\na >> p -> b\n`,
+		),
+	);
+	await panel.receive({ type: "openLocation", nodeId: "b" });
+	await vi.waitFor(() =>
+		expect(host.api.workspace.openTextDocument).toHaveBeenCalledWith(
+			expect.objectContaining({ fsPath: "/test/valid-location.txt" }),
+		),
+	);
+	expect(host.window.showWarningMessage).toHaveBeenCalledWith(
+		expect.stringContaining("foo bar://x"),
+	);
+});
+
+it("reports all-invalid preview locations without opening anything", async () => {
+	const { open } = setup();
+	const panel = await open(
+		document(
+			"invalid",
+			'---\nartifact:\n  b:\n    location: ["foo bar://x", "bad url://x"]\n---\na >> p -> b\n',
+		),
+	);
+	await panel.receive({ type: "openLocation", nodeId: "b" });
+	await vi.waitFor(() =>
+		expect(host.window.showWarningMessage).toHaveBeenCalledWith(
+			expect.stringContaining("foo bar://x"),
+		),
+	);
+	expect(host.api.workspace.openTextDocument).not.toHaveBeenCalled();
+	expect(host.window.showQuickPick).not.toHaveBeenCalled();
+});
+
+it("continues across an empty directory and reports every invalid URL", async () => {
+	const { open } = setup();
+	host.api.workspace.fs.stat.mockResolvedValueOnce({ type: 2 });
+	const panel = await open(
+		document(
+			"empty-dir",
+			'---\nartifact:\n  b:\n    location: ["foo bar://x", "empty-dir/", "bad url://y", "https://example.com"]\n---\na >> p -> b\n',
+		),
+	);
+	await panel.receive({ type: "openLocation", nodeId: "b" });
+	expect(host.api.env.openExternal).toHaveBeenCalled();
+	expect(host.window.showWarningMessage).toHaveBeenCalledWith(
+		expect.stringContaining("foo bar://x, bad url://y"),
+	);
+});
+
+it.each([
+	["valid-location.txt"],
+	["valid-location.txt", "other.txt"],
+	["https://example.com/result", "valid-location.txt"],
+])("keeps valid preview location behavior: %j", async (...locs) => {
+	const { open } = setup();
+	const panel = await open(
+		document(
+			"valid",
+			`---\nartifact:\n  b:\n    location: ${JSON.stringify(locs)}\n---\na >> p -> b\n`,
+		),
+	);
+	await panel.receive({ type: "openLocation", nodeId: "b" });
+	await vi.waitFor(() =>
+		expect(
+			host.api.workspace.openTextDocument.mock.calls.length +
+				host.api.env.openExternal.mock.calls.length,
+		).toBe(1),
+	);
+	expect(host.window.showWarningMessage).not.toHaveBeenCalled();
+	expect(host.window.showQuickPick.mock.calls.length).toBe(
+		locs.length > 1 ? 1 : 0,
+	);
+});
+
+beforeEach(() => {
+	vi.clearAllMocks();
+	clearAnalyzeCache();
+	host.panels.length = 0;
+	host.setTabGroups([]);
+	host.commands.clear();
+	host.window.activeTextEditor = undefined;
+	host.api.workspace.applyEdit.mockClear();
+	host.api.workspace.fs.readFile.mockReset();
+	host.api.workspace.openTextDocument
+		.mockReset()
+		.mockImplementation(async (value) => ({ uri: value }));
+	host.window.visibleTextEditors = [];
+});
+
+it.each([
+	true,
+	false,
+])("reports a successful repair only when flagged (%s)", async (repair) => {
+	const { open } = setup();
+	const before = "a >> p -> b\na >>? p\n";
+	let source = before;
+	const doc = document("repair", source);
+	vi.spyOn(doc, "getText").mockImplementation(() => source);
+	host.api.workspace.applyEdit.mockImplementationOnce(async (edit) => {
+		expect(edit.replacements).toHaveLength(1);
+		source = "p -> b\na >>? p\n";
+		return true;
+	});
+	const panel = await open(doc);
+	const request = {
+		type: "deleteConnector" as const,
+		nodeId: "a",
+		source,
+		artifact: "a",
+		process: "p",
+		kind: "input" as const,
+		...(repair ? { repair: true as const } : {}),
+	};
+	await panel.receive(request);
+	expect(panel.messages).toContainEqual({
+		type: "editResult",
+		request,
+		ok: true,
+	});
+	if (repair)
+		expect(host.window.showInformationMessage).toHaveBeenCalledWith(
+			expect.stringMatching(/^Removed the normal input 'a' >> 'p'\. W008: /),
+		);
+	else expect(host.window.showInformationMessage).not.toHaveBeenCalled();
+});
+
+it("focuses a selected semantic definition key and ignores an identically named field", async () => {
+	const { open } = setup();
+	const doc = document(
+		"semantic-focus",
+		"---\nartifact:\n  a: {label: A, status: todo}\n  status: {label: State}\n---\na >> p -> status\n",
+	);
+	const panel = await open(doc);
+	panel.receive({ type: "ready" });
+	host.changeSelection(doc, 2, 3);
+	expect(panel.messages.at(-1)).toEqual({ type: "focus", nodeId: "a" });
+	host.changeSelection(doc, 2, 22);
+	expect(panel.messages.at(-1)).toEqual({ type: "clearFocus" });
+	host.changeSelection(doc, 5, 16, 0);
+	expect(panel.messages.at(-1)).toEqual({ type: "clearFocus" });
+});
+
+it("synchronizes node selections regardless of kind and clears focus for an empty selection", async () => {
+	const { open } = setup();
+	const doc = document("cursor-focus");
+	const panel = await open(doc);
+	panel.receive({ type: "ready" });
+	for (const kind of [1, 2, 3, null]) {
+		const count = panel.messages.length;
+		host.changeSelection(doc, 0, 6, 5, kind);
+		expect(panel.messages).toHaveLength(count + 1);
+		expect(panel.messages.at(-1)).toEqual({ type: "focus", nodeId: "p" });
+	}
+	// A plain caret move keeps the existing VS Code behavior: it clears the focus.
+	host.changeSelection(doc, 0, 5, 5, 3);
+	expect(panel.messages.at(-1)).toEqual({ type: "clearFocus" });
+});
+
+it.each([
+	undefined,
+	false,
+])("handles nodeClick preserveFocus=%s at the definition", async (preserveFocus) => {
+	const { open } = setup();
+	const doc = document(
+		"node-jump",
+		"---\nartifact:\n  a: {label: A}\n---\na >> p -> b\n",
+	);
+	const panel = await open(doc);
+	const editor = {
+		document: doc,
+		viewColumn: 1,
+		selection: { active: { line: 4, character: 5 } },
+		revealRange: vi.fn(),
+	};
+	host.window.visibleTextEditors = [editor as unknown as vscode.TextEditor];
+	await panel.receive({
+		type: "nodeClick",
+		nodeId: "a",
+		...(preserveFocus === undefined ? {} : { preserveFocus }),
+	});
+	expect(editor.selection).toMatchObject({ start: { line: 2, character: 2 } });
+	expect(host.window.showTextDocument).toHaveBeenLastCalledWith(doc, {
+		viewColumn: 1,
+		preserveFocus: preserveFocus ?? false,
+		preview: false,
+	});
+});
+
+it("does not open a hidden source for a preserveFocus nodeClick", async () => {
+	const { open } = setup();
+	const doc = document(
+		"hidden-node-jump",
+		"---\nartifact:\n  a: {label: A}\n---\na >> p -> b\n",
+	);
+	const panel = await open(doc);
+
+	await panel.receive({ type: "nodeClick", nodeId: "a", preserveFocus: true });
+
+	expect(host.window.showTextDocument).not.toHaveBeenCalled();
+});
+
+it("updates a visible source selection without reopening or activating it", async () => {
+	const { open } = setup();
+	const doc = document(
+		"visible-node-jump",
+		"---\nartifact:\n  a: {label: A}\n---\na >> p -> b\n",
+	);
+	const panel = await open(doc);
+	const editor = {
+		document: doc,
+		viewColumn: 1,
+		selection: { active: { line: 4, character: 5 } },
+		revealRange: vi.fn(),
+	};
+	host.window.visibleTextEditors = [editor as unknown as vscode.TextEditor];
+
+	await panel.receive({ type: "nodeClick", nodeId: "a", preserveFocus: true });
+
+	expect(editor.selection).toMatchObject({ start: { line: 2, character: 2 } });
+	expect(editor.revealRange).toHaveBeenCalledWith(expect.any(host.api.Range));
+	expect(host.window.showTextDocument).not.toHaveBeenCalled();
+});
+
+it("opens a hidden source when nodeClick does not preserve focus", async () => {
+	const { open } = setup();
+	const doc = document(
+		"focused-node-jump",
+		"---\nartifact:\n  a: {label: A}\n---\na >> p -> b\n",
+	);
+	const panel = await open(doc);
+
+	await panel.receive({ type: "nodeClick", nodeId: "a" });
+
+	expect(host.window.showTextDocument).toHaveBeenCalledWith(
+		doc,
+		expect.objectContaining({
+			selection: expect.any(host.api.Range),
+			preserveFocus: false,
+		}),
+	);
+});
+
+it("opens a hidden source beside the actual preview group when its remembered column now points there", async () => {
+	const { open } = setup();
+	const doc = document(
+		"hidden-source-column",
+		"---\nartifact:\n  a: {label: A}\n---\na >> p\n",
+	);
+	const panel = await open(doc, 3);
+	Object.assign(panel, { viewColumn: 4 });
+	host.setTabGroups([host.createTabGroup(3, panel)]);
+	await panel.receive({ type: "nodeClick", nodeId: "a", preserveFocus: false });
+	expect(host.window.showTextDocument).toHaveBeenCalledWith(doc, {
+		viewColumn: host.api.ViewColumn.Beside,
+		selection: expect.any(host.api.Range),
+		preserveFocus: false,
+		preview: false,
+	});
+});
+
+it("uses the remembered column when its editor group still exists outside the preview", async () => {
+	const { open } = setup();
+	const doc = document(
+		"remembered-source-column",
+		"---\nartifact:\n  a: {label: A}\n---\na >> p\n",
+	);
+	const panel = await open(doc, 3);
+	Object.assign(panel, { viewColumn: 3 });
+	await panel.receive({ type: "nodeClick", nodeId: "a", preserveFocus: false });
+	expect(host.window.showTextDocument).toHaveBeenCalledWith(doc, {
+		viewColumn: 3,
+		selection: expect.any(host.api.Range),
+		preserveFocus: false,
+		preview: false,
+	});
+});
+
+it("finds the right preview group when separate documents share a tab label", async () => {
+	const { open } = setup();
+	const first = await open(document("folder-a/flow"), 1);
+	const targetDoc = document("folder-b/flow");
+	const target = await open(targetDoc, 3);
+	first.receive({ type: "ready" });
+	target.receive({ type: "ready" });
+	host.setTabGroups([
+		host.createTabGroup(2, first),
+		host.createTabGroup(3, target),
+	]);
+
+	await target.receive({
+		type: "nodeClick",
+		nodeId: "a",
+		preserveFocus: false,
+	});
+
+	expect(host.window.showTextDocument).toHaveBeenCalledWith(targetDoc, {
+		viewColumn: host.api.ViewColumn.Beside,
+		selection: expect.any(host.api.Range),
+		preserveFocus: false,
+		preview: false,
+	});
+});
+
+it("focuses a quoted authored definition key selected with its quotes", async () => {
+	const { open } = setup();
+	const doc = document(
+		"quoted-focus",
+		'---\nartifact:\n  "my input": {label: Input}\n---\n"my input" >> p -> b\n',
+	);
+	const panel = await open(doc);
+	panel.receive({ type: "ready" });
+	host.changeSelection(doc, 2, 12, 2);
+	expect(panel.messages.at(-1)).toEqual({ type: "focus", nodeId: "my input" });
+});
+
+it("applies source-bound node creation as one WorkspaceEdit and rejects a stale or disposed request", async () => {
+	const { open } = setup();
+	const source = "a >> p -> b\n";
+	const doc = document("editing", source);
+	const panel = await open(doc);
+	panel.receive({ type: "ready" });
+	await panel.receive({ type: "createDefinition", nodeId: "b", source });
+	expect(host.api.workspace.applyEdit).toHaveBeenCalledTimes(1);
+	const edit = host.api.workspace.applyEdit.mock.calls[0]![0];
+	expect(edit.replacements).toHaveLength(1);
+	expect(edit.replacements[0]!.text).toContain('label: ""');
+	expect(edit.replacements[0]!.range.start).toEqual(
+		new host.api.Position(0, 0),
+	);
+	expect(edit.replacements[0]!.range.end).toEqual(new host.api.Position(0, 0));
+	expect(edit.replacements[0]!.text).not.toContain("a >> p");
+	await panel.receive({
+		type: "addConnector",
+		nodeId: "a",
+		source: "older",
+		connector: ">>",
+		otherId: "q",
+	});
+	expect(host.api.workspace.applyEdit).toHaveBeenCalledTimes(1);
+	panel.dispose();
+	await panel.receive({
+		type: "addConnector",
+		nodeId: "a",
+		source,
+		connector: ">>",
+		otherId: "q",
+	});
+	expect(host.api.workspace.applyEdit).toHaveBeenCalledTimes(1);
+});
+
+it("returns producer refusals and stale refusals to the requesting form without an editor edit", async () => {
+	const { open } = setup();
+	const source = "a >> p -> b\nc >> q -> d\n";
+	const doc = document("producer-refusal", source);
+	const panel = await open(doc);
+	for (const candidateSource of [source, "older"]) {
+		const request = {
+			type: "addConnector" as const,
+			requestId: `refusal:${candidateSource}`,
+			nodeId: "q",
+			source: candidateSource,
+			connector: "->" as const,
+			otherId: "b",
+		};
+		await panel.receive(request);
+		expect(panel.messages.at(-1)).toEqual({
+			type: "editResult",
+			request,
+			ok: false,
+			message: expect.any(String),
+		});
+		expect(doc.getText()).toBe(source);
+		expect(host.api.workspace.applyEdit).not.toHaveBeenCalled();
+	}
+});
+
+it.each([
+	false,
+	true,
+])("reveals a local preview connection (create=%s) while preserving preview focus and source selection", async (create) => {
+	const { open } = setup();
+	let source = "first >> task -> old\na >> p -> b\nlast >> finish -> end\n";
+	const original = source;
+	const doc = document("connection-edit", source);
+	vi.spyOn(doc, "getText").mockImplementation(() => source);
+	host.api.workspace.applyEdit.mockImplementationOnce(async (edit) => {
+		const replacement = edit.replacements[0]!;
+		const offset = (pos: { line: number; character: number }) =>
+			original
+				.split("\n")
+				.slice(0, pos.line)
+				.reduce((n, line) => n + line.length + 1, 0) + pos.character;
+		source =
+			original.slice(0, offset(replacement.range.start)) +
+			replacement.text +
+			original.slice(offset(replacement.range.end));
+		return true;
+	});
+	const panel = await open(doc);
+	const request = {
+		type: "addConnector" as const,
+		requestId: `connection:${create}`,
+		nodeId: "p",
+		source,
+		connector: "->" as const,
+		otherId: "new_result",
+		create,
+	};
+	await panel.receive(request);
+	expect(panel.messages).toContainEqual({
+		type: "editResult",
+		request,
+		ok: true,
+	});
+	const replacement =
+		host.api.workspace.applyEdit.mock.calls[0]![0].replacements[0]!;
+	expect(analyze(source).frontmatter).toBeNull();
+	expect(replacement.range.start.line).toBe(2);
+	expect(replacement.range.end.line).toBe(2);
+	expect(replacement.text).toBe("p -> new_result\n");
+	expect(source).toBe(
+		"first >> task -> old\na >> p -> b\np -> new_result\nlast >> finish -> end\n",
+	);
+	const editor = await host.window.showTextDocument.mock.results.at(-1)!.value;
+	expect(host.window.showTextDocument).toHaveBeenCalledWith(doc, {
+		viewColumn: 1,
+		preserveFocus: true,
+		preview: false,
+	});
+	expect(editor.selection).toBeUndefined();
+	expect(editor.revealRange).toHaveBeenCalledWith(
+		new host.api.Range(
+			new host.api.Position(2, "p -> new_result".length),
+			new host.api.Position(2, "p -> new_result".length),
+		),
+	);
+	expect(host.window.showInformationMessage).not.toHaveBeenCalled();
+});
+
+it.each([
+	"addConnector",
+	"createDefinition",
+	"deleteConnector",
+	"toggleFeedback",
+	"renameNode",
+	"nodeClick",
+] as const)("reuses a moved inactive source tab for %s", async (type) => {
+	const { open } = setup();
+	const source = "a >> p -> b\n";
+	const doc = document(`inactive-tab-${type}`, source);
+	const panel = await open(doc);
+	const movedGroup = host.createTabGroup(4);
+	(movedGroup.tabs as vscode.Tab[]).push({
+		input: new host.api.TabInputText(host.uri(doc.uri.path) as vscode.Uri),
+		group: movedGroup,
+		isActive: false,
+	} as vscode.Tab);
+	host.setTabGroups([...host.window.tabGroups.all, movedGroup]);
+	host.window.visibleTextEditors = [];
+	if (type !== "nodeClick")
+		host.api.workspace.applyEdit.mockImplementationOnce(async (edit) => {
+			const replacement = edit.replacements[0]!;
+			const offset = (position: { line: number; character: number }) =>
+				source
+					.split("\n")
+					.slice(0, position.line)
+					.reduce((sum, line) => sum + line.length + 1, 0) + position.character;
+			vi.spyOn(doc, "getText").mockReturnValue(
+				source.slice(0, offset(replacement.range.start)) +
+					replacement.text +
+					source.slice(offset(replacement.range.end)),
+			);
+			return true;
+		});
+	await panel.receive(
+		type === "nodeClick"
+			? { type, nodeId: "p" }
+			: type === "renameNode"
+				? { type, nodeId: "p", newId: "build", label: "Build", source }
+				: type === "deleteConnector" || type === "toggleFeedback"
+					? {
+							type,
+							nodeId: "p",
+							source,
+							artifact: "a",
+							process: "p",
+							kind: "input",
+						}
+					: {
+							type,
+							nodeId: "p",
+							source,
+							connector: "->",
+							otherId: "new_result",
+						},
+	);
+	expect(host.window.showTextDocument).toHaveBeenCalled();
+	for (const [openedDoc, options] of host.window.showTextDocument.mock.calls) {
+		expect(openedDoc).toBe(doc);
+		expect(options?.viewColumn).toBe(4);
+	}
+	expect(
+		host.window.showTextDocument.mock.calls.at(-1)?.[1]?.preserveFocus,
+	).toBe(type !== "createDefinition" && type !== "nodeClick");
+	if (type !== "nodeClick")
+		expect(panel.messages).toContainEqual(
+			expect.objectContaining({ type: "editResult", ok: true }),
+		);
+});
+
+it("keeps definition creation in the visible split source group", async () => {
+	const { open } = setup();
+	const source = "a >> p -> b\n";
+	const doc = document("visible-split", source);
+	const panel = await open(doc);
+	for (const column of [1, 4]) {
+		const group =
+			column === 1
+				? host.window.tabGroups.all[0]!
+				: host.createTabGroup(column);
+		(group.tabs as vscode.Tab[]).push({
+			input: new host.api.TabInputText(doc.uri),
+			group,
+		} as vscode.Tab);
+		if (column === 4) host.setTabGroups([...host.window.tabGroups.all, group]);
+	}
+	host.window.visibleTextEditors = [
+		{ document: doc, viewColumn: 4 } as vscode.TextEditor,
+	];
+	host.api.workspace.applyEdit.mockImplementationOnce(async (edit) => {
+		vi.spyOn(doc, "getText").mockReturnValue(
+			edit.replacements[0]!.text + source,
+		);
+		return true;
+	});
+	await panel.receive({ type: "createDefinition", nodeId: "b", source });
+	expect(host.window.showTextDocument).toHaveBeenCalledWith(
+		doc,
+		expect.objectContaining({ viewColumn: 4, preserveFocus: false }),
+	);
+});
+
+it.each([
+	"addConnector",
+	"createDefinition",
+	"deleteConnector",
+	"toggleFeedback",
+] as const)("keeps one source tab when the dirty-file tracker runs during %s", async (type) => {
+	const { open } = setup();
+	const source = "a >> p -> b\n";
+	const doc = document(`dirty-tracker-${type}`, source);
+	const panel = await open(doc);
+	host.setTabGroups([host.createTabGroup(1, panel)]);
+	const sourceColumns = new Set<number>();
+	const previewColumns = new Set<number>();
+	let dirty = false;
+	host.window.showTextDocument.mockImplementation(async (document, options) => {
+		const column = options?.viewColumn ?? 1;
+		await Promise.resolve();
+		sourceColumns.add(column);
+		if (options?.preview ?? !dirty) previewColumns.add(column);
+		else previewColumns.delete(column);
+		return {
+			document,
+			viewColumn: column,
+			selection: undefined,
+			revealRange: vi.fn(),
+		};
+	});
+	host.api.workspace.applyEdit.mockImplementationOnce(async (edit) => {
+		dirty = true;
+		const replacement = edit.replacements[0]!;
+		const offset = (position: { line: number; character: number }) =>
+			source
+				.split("\n")
+				.slice(0, position.line)
+				.reduce((sum, line) => sum + line.length + 1, 0) + position.character;
+		vi.spyOn(doc, "getText").mockReturnValue(
+			source.slice(0, offset(replacement.range.start)) +
+				replacement.text +
+				source.slice(offset(replacement.range.end)),
+		);
+		// VS Code's dirty-file tracker opens an unrepresented dirty model inactive in the active group.
+		if (sourceColumns.size === 0) sourceColumns.add(1);
+		return true;
+	});
+	await panel.receive(
+		type === "deleteConnector" || type === "toggleFeedback"
+			? {
+					type,
+					nodeId: "p",
+					source,
+					artifact: "a",
+					process: "p",
+					kind: "input",
+				}
+			: { type, nodeId: "p", source, connector: "->", otherId: "new_result" },
+	);
+	expect(sourceColumns).toEqual(new Set([host.api.ViewColumn.Beside]));
+	expect(previewColumns.size).toBe(0);
+	expect(panel.messages).toContainEqual(
+		expect.objectContaining({ type: "editResult", ok: true }),
+	);
+});
+
+it.each([
+	"changed",
+	"closed",
+	"disposed",
+])("does not edit when the source becomes %s while its editor opens", async (state) => {
+	const { open } = setup();
+	const source = "a >> p -> b\n";
+	const doc = document(`opening-${state}`, source);
+	const panel = await open(doc);
+	host.window.showTextDocument.mockImplementationOnce(async (document) => {
+		if (state === "changed") Object.assign(doc, { version: 2 });
+		else if (state === "closed") Object.assign(doc, { isClosed: true });
+		else panel.dispose();
+		return { document, selection: undefined, revealRange: vi.fn() };
+	});
+	await panel.receive({
+		type: "addConnector",
+		nodeId: "p",
+		source,
+		connector: "->",
+		otherId: "new_result",
+	});
+	expect(host.api.workspace.applyEdit).not.toHaveBeenCalled();
+	expect(doc.getText()).toBe(source);
+	const replies = panel.messages.filter(
+		(message) => message.type === "editResult",
+	);
+	expect(replies).toEqual(
+		state === "disposed" ? [] : [expect.objectContaining({ ok: false })],
+	);
+});
+
+it("replies with a failure when the source editor cannot be opened", async () => {
+	const { open } = setup();
+	const source = "a >> p -> b\n";
+	const doc = document("opening-failed", source);
+	const panel = await open(doc);
+	host.window.showTextDocument.mockRejectedValueOnce(
+		new Error("another editor opened in the meantime"),
+	);
+	const request = {
+		type: "addConnector" as const,
+		nodeId: "p",
+		source,
+		connector: "->" as const,
+		otherId: "new_result",
+	};
+	await expect(panel.receive(request)).resolves.toBeUndefined();
+	expect(host.api.workspace.applyEdit).not.toHaveBeenCalled();
+	expect(doc.getText()).toBe(source);
+	expect(panel.messages).toContainEqual({
+		type: "editResult",
+		request,
+		ok: false,
+		message: expect.any(String),
+	});
+});
+
+it("refreshes a preview edit from the replacement document after the source is closed", async () => {
+	const { preview, open } = setup();
+	const source = "a >> p -> b\n";
+	const original = document("reopened-source", source);
+	const panel = await open(original, 1);
+	Object.assign(panel, { viewColumn: 2 });
+	host.setTabGroups([host.createTabGroup(1, panel)]);
+	panel.receive({ type: "ready" });
+	Object.assign(original, { isClosed: true });
+	host.api.workspace.openTextDocument.mockResolvedValueOnce(
+		document("reopened-source", source),
+	);
+	const reopened = document("reopened-source", `${source}p -> after_close\n`);
+	Object.assign(reopened, { version: 2 });
+	host.api.workspace.applyEdit.mockImplementationOnce(async () => {
+		host.changeDocument(reopened);
+		return true;
+	});
+	await panel.receive({
+		type: "addConnector",
+		nodeId: "p",
+		source,
+		connector: "->",
+		otherId: "after_close",
+	});
+	expect(preview.getActivePreviewDoc()).toBe(reopened);
+	expect(
+		panel.messages.filter((m) => m.type === "render").at(-1),
+	).toMatchObject({
+		type: "render",
+		editing: { source: reopened.getText() },
+	});
+	expect(host.window.showTextDocument).toHaveBeenCalledWith(reopened, {
+		viewColumn: host.api.ViewColumn.Beside,
+		preserveFocus: true,
+	});
+	expect(original.getText()).toBe(source);
+});
+
+it.each([
+	false,
+	true,
+])("identifies a reopened rename across pre-save renders and Undo (undoDuringApply=%s)", async (undoDuringApply) => {
+	const { open } = setup();
+	const before = "a >> p -> b\n";
+	let source = before;
+	const original = document("rename-revision", source);
+	Object.assign(original, { version: 42 });
+	const panel = await open(original);
+	panel.receive({ type: "ready" });
+	Object.assign(original, { isClosed: true });
+	const reopened = document("rename-revision", source);
+	vi.spyOn(reopened, "getText").mockImplementation(() => source);
+	host.api.workspace.openTextDocument.mockResolvedValueOnce(reopened);
+	host.api.workspace.applyEdit.mockImplementationOnce(async () => {
+		source = "a >> build -> b\n";
+		Object.assign(reopened, { version: 2 });
+		host.changeDocument(reopened);
+		if (undoDuringApply) {
+			source = before;
+			Object.assign(reopened, { version: 3 });
+			host.changeDocument(reopened, host.api.TextDocumentChangeReason.Undo);
+			source = "a >> build -> b\n";
+			Object.assign(reopened, { version: 4 });
+			host.changeDocument(reopened, host.api.TextDocumentChangeReason.Redo);
+		}
+		return true;
+	});
+	const request = {
+		type: "renameNode" as const,
+		nodeId: "p",
+		newId: "build",
+		label: "",
+		source: before,
+		requestId: "rename-revision",
+	};
+	await panel.receive(request);
+	expect(
+		panel.messages
+			.filter((m) => m.type === "render")
+			.map((m) => m.sourceRevision),
+	).toEqual([
+		{ epoch: 0, version: 42 },
+		{ epoch: 1, version: 1 },
+		{ epoch: 1, version: 2 },
+		...(undoDuringApply
+			? [
+					{
+						epoch: 1,
+						version: 3,
+						invalidatedRenameRequestId: request.requestId,
+					},
+					{
+						epoch: 1,
+						version: 4,
+						invalidatedRenameRequestId: request.requestId,
+					},
+				]
+			: []),
+	]);
+	expect(panel.messages).toContainEqual({
+		type: "editResult",
+		request,
+		ok: true,
+		sourceRevision: {
+			epoch: 1,
+			version: undoDuringApply ? 4 : 2,
+			invalidatedRenameRequestId: undoDuringApply
+				? request.requestId
+				: undefined,
+		},
+	});
+	const nextVersion = undoDuringApply ? 5 : 3;
+	source = before;
+	Object.assign(reopened, { version: nextVersion });
+	host.changeDocument(reopened, host.api.TextDocumentChangeReason.Undo);
+	expect(panel.messages.at(-1)).toMatchObject({
+		type: "render",
+		editing: { source: before },
+		sourceRevision: {
+			epoch: 1,
+			version: nextVersion,
+			invalidatedRenameRequestId: request.requestId,
+		},
+	});
+	source = "x >> build -> y\n";
+	Object.assign(reopened, { version: nextVersion + 1 });
+	host.changeDocument(reopened);
+	expect(panel.messages.at(-1)).toMatchObject({
+		sourceRevision: {
+			epoch: 1,
+			version: nextVersion + 1,
+			invalidatedRenameRequestId: request.requestId,
+		},
+	});
+});
+
+it.each([
+	"addConnector",
+	"createDefinition",
+] as const)("rejects %s from a closed preview when the file changed outside the editor", async (type) => {
+	const { preview, open } = setup();
+	const source = "a >> p -> b\n";
+	const original = document(`external-${type}`, source);
+	const panel = await open(original);
+	panel.receive({ type: "ready" });
+	Object.assign(original, { isClosed: true });
+	const diskSource = `external >> rebuild -> result\n${source}`;
+	const current = document(`external-${type}`, diskSource);
+	host.api.workspace.openTextDocument.mockResolvedValueOnce(current);
+	await panel.receive(
+		type === "addConnector"
+			? { type, nodeId: "p", source, connector: "->", otherId: "new_result" }
+			: { type, nodeId: "b", source },
+	);
+	expect(host.api.workspace.applyEdit).not.toHaveBeenCalled();
+	expect(host.api.workspace.openTextDocument).toHaveBeenCalledWith(
+		original.uri,
+	);
+	expect(preview.getActivePreviewDoc()).toBe(current);
+	expect(
+		panel.messages.filter((m) => m.type === "render").at(-1),
+	).toMatchObject({
+		type: "render",
+		editing: { source: diskSource },
+	});
+	expect(host.window.showInformationMessage).toHaveBeenCalledWith(
+		"The document changed. Reopen Connections and try again.",
+	);
+	expect(host.window.showTextDocument).not.toHaveBeenCalled();
+	expect(current.getText()).toBe(diskSource);
+});
+
+it.each([
+	"unavailable",
+	"disposed",
+	"closed",
+])("does not edit while reopening a source that becomes %s", async (state) => {
+	const { open } = setup();
+	const source = "a >> p -> b\n";
+	const original = document(`reopen-${state}`, source);
+	const panel = await open(original);
+	panel.receive({ type: "ready" });
+	Object.assign(original, { isClosed: true });
+	if (state === "unavailable")
+		host.api.workspace.openTextDocument.mockRejectedValueOnce(
+			new Error("File not found"),
+		);
+	else if (state === "disposed")
+		host.api.workspace.openTextDocument.mockImplementationOnce(async () => {
+			panel.dispose();
+			return original;
+		});
+	else host.api.workspace.openTextDocument.mockResolvedValueOnce(original);
+	await panel.receive({
+		type: "addConnector",
+		nodeId: "p",
+		source,
+		connector: "->",
+		otherId: "new_result",
+	});
+	expect(host.api.workspace.applyEdit).not.toHaveBeenCalled();
+	expect(host.window.showTextDocument).not.toHaveBeenCalled();
+	expect(panel.messages.filter((m) => m.type !== "editResult")).toHaveLength(1);
+	if (state !== "disposed")
+		expect(host.window.showInformationMessage).toHaveBeenCalledWith(
+			"The source document could not be reopened.",
+		);
+	else expect(host.window.showInformationMessage).not.toHaveBeenCalled();
+});
+
+it.each([
+	"utf8",
+	"utf8bom",
+	"utf16le",
+	"utf16be",
+])("rejects an external file change while a hidden clean %s document is retained", async (encoding) => {
+	const { open } = setup();
+	const source = "a >> p -> b\n";
+	const doc = document(`retained-${encoding}`, source);
+	const panel = await open(doc);
+	Object.assign(doc, { isDirty: false, isClosed: false, encoding });
+	host.window.activeTextEditor = undefined;
+	const diskSource = `external >> rebuild -> result\n${source}`;
+	const bytes = Buffer.from(
+		diskSource,
+		encoding.startsWith("utf16") ? "utf16le" : "utf8",
+	);
+	if (encoding === "utf16be") bytes.swap16();
+	host.api.workspace.fs.readFile.mockResolvedValueOnce(bytes);
+	await panel.receive({
+		type: "addConnector",
+		nodeId: "p",
+		source,
+		connector: "->",
+		otherId: "new_result",
+	});
+	expect(host.api.workspace.applyEdit).not.toHaveBeenCalled();
+	expect(host.window.showInformationMessage).toHaveBeenCalledWith(
+		"The file changed outside VS Code. Reload the source file before editing from the preview.",
+	);
+	expect(host.api.workspace.fs.readFile).toHaveBeenCalledWith(doc.uri);
+});
+
+it.each([
+	"clean",
+	"dirty",
+	"bom",
+	"unknown-encoding",
+])("keeps hidden source editing when the buffer is %s", async (state) => {
+	const { open } = setup();
+	const source = "a >> p -> b\n";
+	const doc = document(`hidden-${state}`, source);
+	const panel = await open(doc);
+	Object.assign(doc, {
+		isDirty: state === "dirty",
+		isClosed: false,
+		encoding: state === "unknown-encoding" ? undefined : "utf8",
+	});
+	host.api.workspace.fs.readFile.mockResolvedValueOnce(
+		Buffer.from(
+			`${state === "bom" ? "\ufeff" : ""}${source}`,
+			state === "unknown-encoding" ? "utf16le" : "utf8",
+		),
+	);
+	host.api.workspace.applyEdit.mockImplementationOnce(async () => {
+		vi.spyOn(doc, "getText").mockReturnValue(`${source}p -> new_result\n`);
+		return true;
+	});
+	await panel.receive({
+		type: "addConnector",
+		nodeId: "p",
+		source,
+		connector: "->",
+		otherId: "new_result",
+	});
+	expect(host.api.workspace.applyEdit).toHaveBeenCalledTimes(1);
+	expect(host.window.showTextDocument).toHaveBeenCalledWith(doc, {
+		viewColumn: 1,
+		preserveFocus: true,
+		preview: false,
+	});
+	if (state === "dirty" || state === "unknown-encoding")
+		expect(host.api.workspace.fs.readFile).not.toHaveBeenCalled();
+	else expect(host.api.workspace.fs.readFile).toHaveBeenCalledWith(doc.uri);
+});
+
+it("stops a hidden clean preview edit if its file cannot be read", async () => {
+	const { open } = setup();
+	const source = "a >> p -> b\n";
+	const doc = document("unreadable-hidden", source);
+	const panel = await open(doc);
+	Object.assign(doc, { isDirty: false, encoding: "utf8" });
+	host.api.workspace.fs.readFile.mockRejectedValueOnce(
+		new Error("File not found"),
+	);
+	await panel.receive({
+		type: "addConnector",
+		nodeId: "p",
+		source,
+		connector: "->",
+		otherId: "new_result",
+	});
+	expect(host.api.workspace.applyEdit).not.toHaveBeenCalled();
+	expect(host.window.showInformationMessage).toHaveBeenCalledWith(
+		"The source file could not be read.",
+	);
+});
+
+it.each([
+	"closed",
+	"moved",
+	"group removed",
+])("keeps definition creation outside the preview column (source: %s)", async (state) => {
+	const { open } = setup();
+	const source = "a >> p -> b\n";
+	const doc = document("definition-column", source);
+	const panel = await open(doc, 3);
+	if (state === "moved")
+		host.window.visibleTextEditors = [
+			{ document: doc, viewColumn: 5 },
+		] as vscode.TextEditor[];
+	if (state === "moved")
+		host.setTabGroups([...host.window.tabGroups.all, host.createTabGroup(5)]);
+	if (state === "group removed") {
+		Object.assign(panel, { viewColumn: 4 });
+		host.setTabGroups([host.createTabGroup(3, panel)]);
+	}
+	host.api.workspace.applyEdit.mockImplementationOnce(async (edit) => {
+		vi.spyOn(doc, "getText").mockReturnValue(
+			edit.replacements[0]!.text + source,
+		);
+		return true;
+	});
+	await panel.receive({ type: "createDefinition", nodeId: "b", source });
+	expect(host.window.showTextDocument).toHaveBeenCalledWith(
+		doc,
+		expect.objectContaining({
+			viewColumn:
+				state === "moved"
+					? 5
+					: state === "group removed"
+						? host.api.ViewColumn.Beside
+						: 3,
+			preserveFocus: false,
+			selection: expect.any(host.api.Range),
+		}),
+	);
+});
+
+describe("registered preview file navigation", () => {
+	it("reports an unresolved explicit artifact location without opening a local file", async () => {
+		const { open } = setup();
+		const doc = document(
+			"explicit-reference",
+			"---\nbaseRef: {source: repo, revision: main}\nartifact: {a: {location: plan.md}}\n---\na >> p -> b\n",
+		);
+		const panel = await open(doc);
+		await panel.receive({ type: "openLocation", nodeId: "a" });
+		expect(host.api.workspace.openTextDocument).not.toHaveBeenCalled();
+		expect(host.window.showErrorMessage).toHaveBeenCalledWith(
+			expect.stringMatching(/resolution context/),
+		);
+	});
+	it("resolves subflow openFile from the parent document and location from basePath", async () => {
+		const { open } = setup();
+		const doc = document(
+			"flows/parent",
+			"---\nbasePath: ../\nartifact:\n  b:\n    location: docs/result.md\nprocess:\n  p:\n    subflow: child.pfdsl\n---\na >> p -> b\n",
+		);
+		host.window.visibleTextEditors = [
+			{ document: doc, viewColumn: 1 },
+		] as vscode.TextEditor[];
+		const panel = await open(doc);
+		panel.receive({ type: "openFile", nodeId: "p", path: "child.pfdsl" });
+		await vi.waitFor(() => {
+			expect(host.window.showTextDocument).toHaveBeenCalledWith(
+				expect.objectContaining({
+					uri: expect.objectContaining({ fsPath: "/test/flows/child.pfdsl" }),
+				}),
+				{ viewColumn: 1 },
+			);
+		});
+		panel.receive({ type: "openLocation", nodeId: "b" });
+		await vi.waitFor(() => {
+			expect(host.window.showTextDocument).toHaveBeenCalledWith(
+				expect.objectContaining({
+					uri: expect.objectContaining({ fsPath: "/test/docs/result.md" }),
+				}),
+				{ viewColumn: 1 },
+			);
+		});
+		expect(host.api.workspace.openTextDocument).toHaveBeenCalledTimes(2);
+	});
+});
+
+describe("registered preview notification lifecycle", () => {
+	it("delivers the latest queued diff after render and never resends it", async () => {
+		const { preview, open } = setup();
+		const doc = document("first");
+		const panel = await open(doc);
+		preview.postDiff(first);
+		preview.postDiff(latest);
+		host.changeDocument(doc);
+		expect(panel.messages).toEqual([]);
+		panel.receive({ type: "ready" });
+		expect(panel.messages.map((message) => message.type)).toEqual([
+			"render",
+			"diff",
+		]);
+		expect(panel.messages[1]).toEqual({ type: "diff", report: latest });
+		expect(panel.messages[0]).toMatchObject({
+			type: "render",
+			focusNodeId: "a",
+			dot: expect.stringContaining("digraph"),
+		});
+		host.changeDocument(doc);
+		panel.receive({ type: "ready" });
+		expect(panel.messages.map((message) => message.type)).toEqual([
+			"render",
+			"diff",
+			"render",
+			"render",
+		]);
+		expect(panel.messages[2]).not.toHaveProperty("focusNodeId", "a");
+	});
+
+	it("delivers a queued clear after an error and only once", async () => {
+		const { preview, open } = setup();
+		const doc = document("invalid", "a >> p -> b\nc >> q -> b");
+		const panel = await open(doc);
+		preview.postDiff(first);
+		preview.postDiff(null);
+		panel.receive({ type: "ready" });
+		host.changeDocument(doc);
+		expect(panel.messages.map((message) => message.type)).toEqual([
+			"error",
+			"clearDiff",
+			"error",
+		]);
+		expect(panel.messages[0]).toMatchObject({
+			message: expect.stringContaining("V001"),
+		});
+	});
+
+	it("delivers a diff that replaces a queued clear", async () => {
+		const { preview, open } = setup();
+		const panel = await open(document("clear-then-diff"));
+		preview.postDiff(null);
+		preview.postDiff(latest);
+		panel.receive({ type: "ready" });
+		expect(panel.messages[1]).toEqual({ type: "diff", report: latest });
+		expect(panel.messages).toHaveLength(2);
+	});
+
+	it("sends immediate updates after ready without redrawing", async () => {
+		const { preview, open } = setup();
+		const panel = await open(document("ready"));
+		panel.receive({ type: "ready" });
+		preview.postDiff(first);
+		preview.postDiff(null);
+		expect(panel.messages.slice(1)).toEqual([
+			{ type: "diff", report: first },
+			{ type: "clearDiff" },
+		]);
+	});
+
+	it("keeps pending requests with their panel and routes new ones on activation", async () => {
+		const { preview, open } = setup();
+		const firstDoc = document("one");
+		const one = await open(firstDoc);
+		preview.postDiff(first);
+		const two = await open(document("two"));
+		preview.postDiff(latest);
+		one.receive({ type: "ready" });
+		two.receive({ type: "ready" });
+		expect(one.messages[1]).toEqual({ type: "diff", report: first });
+		expect(two.messages[1]).toEqual({ type: "diff", report: latest });
+		one.activate();
+		expect(preview.getActivePreviewDoc()).toBe(firstDoc);
+		preview.postDiff(null);
+		expect(one.messages[2]).toEqual({ type: "clearDiff" });
+		expect(two.messages).toHaveLength(2);
+	});
+
+	it("drops disposed-panel pending work and ignores an old ready callback", async () => {
+		const { preview, open } = setup();
+		const doc = document("reopened");
+		const old = await open(doc);
+		preview.postDiff(first);
+		old.dispose();
+		expect(preview.getActivePreviewDoc()).toBeUndefined();
+		preview.postDiff(latest);
+		const reopened = await open(doc);
+		old.receive({ type: "ready" });
+		reopened.receive({ type: "ready" });
+		expect(old.messages).toEqual([]);
+		expect(reopened.messages.map((message) => message.type)).toEqual([
+			"render",
+		]);
+	});
+
+	it("reuses an existing panel and preserves another panel on disposal", async () => {
+		const { preview, open } = setup();
+		const doc = document("existing");
+		const one = await open(doc);
+		one.receive({ type: "ready" });
+		await open(doc);
+		expect(host.panels).toHaveLength(1);
+		expect(one.reveal).toHaveBeenCalledWith(2, true);
+		const twoDoc = document("active");
+		const two = await open(twoDoc);
+		one.dispose();
+		expect(preview.getActivePreviewDoc()).toBe(twoDoc);
+		preview.postDiff(latest);
+		two.receive({ type: "ready" });
+		expect(two.messages[1]).toEqual({ type: "diff", report: latest });
+	});
+});

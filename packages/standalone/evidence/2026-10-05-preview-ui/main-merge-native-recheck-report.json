@@ -1,0 +1,265 @@
+{
+	"schemaVersion": 1,
+	"date": "2026-10-05",
+	"checkout": "<checkout>",
+	"mode": "blind native UI short recheck",
+	"sourceDiffDesignPastReportsRead": false,
+	"app": {
+		"path": "<checkout>/packages/standalone/src-tauri/target/debug/bundle/macos/PFDSL.app",
+		"executable": "<checkout>/packages/standalone/src-tauri/target/debug/bundle/macos/PFDSL.app/Contents/MacOS/pfdsl-desktop",
+		"sha256Before": "f6005842e1a7de061d531d09da67002b46d9c9eae89ebac1a19f04bca4451412",
+		"sha256After": "f6005842e1a7de061d531d09da67002b46d9c9eae89ebac1a19f04bca4451412"
+	},
+	"fixtures": [
+		{
+			"path": "<checkout>/packages/standalone/evidence/2026-10-05-preview-ui/native-scroll-recheck-short-fixture.pfdsl.txt",
+			"sha256Before": "a26577062a828e18dcde0b95e16b33b028635a60f2c631bd21e04629a1c3aeba",
+			"sha256After": "a26577062a828e18dcde0b95e16b33b028635a60f2c631bd21e04629a1c3aeba"
+		},
+		{
+			"path": "<checkout>/packages/standalone/evidence/2026-10-05-preview-ui/native-scroll-recheck-large-fixture.pfdsl.txt",
+			"sha256Before": "df31c828012b30c62a503753d677497b0a3e4c0010b5d7192e49483389f06ef8",
+			"sha256After": "df31c828012b30c62a503753d677497b0a3e4c0010b5d7192e49483389f06ef8"
+		}
+	],
+	"ownership": {
+		"beforeLaunch": "ps output contained only the probe commands; no pfdsl-desktop executable process",
+		"parentCorpusPid": 88331,
+		"parentCorpusPidRunning": false,
+		"ownedPid": 93529,
+		"ownedPidPpid": 1,
+		"ownedPidStartLocal": "2026-10-05 18:17:27 Asia/Tokyo",
+		"launch": "CUA getApp with absolute .app path",
+		"initialTabs": ["Welcome", "日本語"],
+		"initialSelectedTab": "日本語",
+		"documentScope": "Owned startup unsaved sample tabs, authorized by parent after initial observation; Welcome replaced, 日本語 left as startup sample.",
+		"quit": "CUA super+q; next AX returned Computer Use server error -10005: App quit",
+		"afterQuitProbe": {
+			"command": "ps -p 93529 -o pid,ppid,lstart,command",
+			"exitCode": 1,
+			"output": "PID PPID STARTED COMMAND header only",
+			"pidPresent": false
+		}
+	},
+	"preparation": {
+		"backgroundScreenshotObserved": true,
+		"windowMenuToPfdslCount": 1,
+		"newTabInvestigation": "File menu exposed Close Window / Close All only. Escape and Cmd+N left menu AX unchanged; a screenshot while menu was open was unavailable. Observed menu Cancel secondary action restored window state. New document shortcut behavior was not determined.",
+		"scopeAdjustment": "Parent explicitly allowed owning startup sample tabs without creating more tabs.",
+		"cmdUpInterveningRepairActions": []
+	},
+	"checks": [
+		{
+			"id": "short_identity",
+			"result": "observed_pass",
+			"sourceTitle": "Foreground redraw test",
+			"sourceGraph": "raw >> refine -> final",
+			"axNodeIds": ["final", "raw", "refine"],
+			"visibleMainDiagram": "raw -> refine -> final",
+			"visibleMinimap": "same title and raw/refine/final chain",
+			"evidence": [
+				"<checkout>/packages/standalone/evidence/2026-10-05-preview-ui/main-merge-native-recheck-01-short.png",
+				"<checkout>/packages/standalone/evidence/2026-10-05-preview-ui/main-merge-native-recheck-01-short-ax.txt"
+			]
+		},
+		{
+			"id": "large_cmd_up_immediate",
+			"result": "observed_pass_with_visual_limits",
+			"eofVisibleBefore": "line 41 caret",
+			"afterKeyVisible": "line 1, opening ---, line 2 title, caret before first character",
+			"axSourcePrefix": "--- / title: Large native pan exercise / layout / direction: LR / seed >> step_01 -> artifact_01",
+			"axNodeCount": 71,
+			"axNodeIds": [
+				"artifact_01",
+				"artifact_02",
+				"artifact_03",
+				"artifact_04",
+				"artifact_05",
+				"artifact_06",
+				"artifact_07",
+				"artifact_08",
+				"artifact_09",
+				"artifact_10",
+				"artifact_11",
+				"artifact_12",
+				"artifact_13",
+				"artifact_14",
+				"artifact_15",
+				"artifact_16",
+				"artifact_17",
+				"artifact_18",
+				"artifact_19",
+				"artifact_20",
+				"artifact_21",
+				"artifact_22",
+				"artifact_23",
+				"artifact_24",
+				"artifact_25",
+				"artifact_26",
+				"artifact_27",
+				"artifact_28",
+				"artifact_29",
+				"artifact_30",
+				"artifact_31",
+				"artifact_32",
+				"artifact_33",
+				"artifact_34",
+				"artifact_35",
+				"seed",
+				"step_01",
+				"step_02",
+				"step_03",
+				"step_04",
+				"step_05",
+				"step_06",
+				"step_07",
+				"step_08",
+				"step_09",
+				"step_10",
+				"step_11",
+				"step_12",
+				"step_13",
+				"step_14",
+				"step_15",
+				"step_16",
+				"step_17",
+				"step_18",
+				"step_19",
+				"step_20",
+				"step_21",
+				"step_22",
+				"step_23",
+				"step_24",
+				"step_25",
+				"step_26",
+				"step_27",
+				"step_28",
+				"step_29",
+				"step_30",
+				"step_31",
+				"step_32",
+				"step_33",
+				"step_34",
+				"step_35"
+			],
+			"mainDiagramVisiblePrefix": "seed -> step_01 -> artifact_01 -> step_02",
+			"minimap": "thin full-chain horizontal strip; labels individually unreadable",
+			"interveningActionsBetweenCmdUpAndCapture": [],
+			"observedIdentityMismatch": false,
+			"evidence": [
+				"<checkout>/packages/standalone/evidence/2026-10-05-preview-ui/main-merge-native-recheck-02-large-end.png",
+				"<checkout>/packages/standalone/evidence/2026-10-05-preview-ui/main-merge-native-recheck-03-large-cmd-up.png",
+				"<checkout>/packages/standalone/evidence/2026-10-05-preview-ui/main-merge-native-recheck-03-large-cmd-up-ax.txt"
+			]
+		},
+		{
+			"id": "tab_return_retention",
+			"result": "observed_pass_with_readback_limits",
+			"alternateTab": "日本語",
+			"alternateGraph": "日本語のフロー / input / build / output",
+			"returnedTab": "Welcome •",
+			"sourceVisible": "Large native pan exercise, opening frontmatter and source prefix remain",
+			"axNodeCount": 71,
+			"axNodeIdsEqualToBefore": true,
+			"mainDiagramVisiblePrefix": "seed -> step_01 -> artifact_01 -> step_02",
+			"minimap": "same thin full-chain strip",
+			"observedIdentityMismatch": false,
+			"evidence": [
+				"<checkout>/packages/standalone/evidence/2026-10-05-preview-ui/main-merge-native-recheck-alternate-tab-ax.txt",
+				"<checkout>/packages/standalone/evidence/2026-10-05-preview-ui/main-merge-native-recheck-04-large-return.png",
+				"<checkout>/packages/standalone/evidence/2026-10-05-preview-ui/main-merge-native-recheck-04-large-return-ax.txt"
+			]
+		}
+	],
+	"proofLimits": [
+		"One ordinary native app launch, one short and one 71-node fixture only.",
+		"AX editor text is viewport bounded; no complete byte-for-byte source readback after tab return.",
+		"Large main diagram viewport shows the chain prefix only; full graph identities are present in 71 AX controls.",
+		"Large minimap labels are individually unreadable at this scale; its thin-chain shape is consistent.",
+		"No hover, pan, window-close, IME, or folder-picker acceptance was inferred.",
+		"Quit was cleanup, not a window-close acceptance test.",
+		"CUA menu/screenshot limitations are not classified as product defects.",
+		"No disk document save, folder opening, runtime-source change, Git metadata operation, or external service write."
+	],
+	"observations": [
+		{
+			"name": "01-short",
+			"savedAt": "2026-10-05T09:20:33.246Z",
+			"details": "Welcome startup tab replaced by short fixture via editor click, Cmd+A, paste. No disk document saved.",
+			"axCharacters": 1477,
+			"axTruncated": false
+		},
+		{
+			"name": "02-large-end",
+			"savedAt": "2026-10-05T09:20:52.282Z",
+			"details": "Welcome replaced by exact large fixture, then Cmd+Down. Visible caret on line 41 at EOF.",
+			"axCharacters": 6370,
+			"axTruncated": false
+		},
+		{
+			"name": "03-large-cmd-up",
+			"savedAt": "2026-10-05T09:20:52.818Z",
+			"details": "Cmd+Up followed immediately by combined AX/screenshot capture. No tab switch, Raise, menu, focus click, or other repair between key and capture.",
+			"axCharacters": 6370,
+			"axTruncated": false
+		},
+		{
+			"name": "04-large-return",
+			"savedAt": "2026-10-05T09:21:33.353Z",
+			"details": "Clicked 日本語 startup tab, observed its title and three graph nodes, then clicked Welcome. Large title, first source lines, 71 graph AX node controls, diagram prefix and thin minimap remain.",
+			"axCharacters": 6342,
+			"axTruncated": false
+		}
+	],
+	"findings": [],
+	"imageEncodingNormalization": {
+		"method": "macOS sips JPEG to PNG; no resize/crop/redraw; original and PNG decoded BMP raster bytes compared equal",
+		"images": [
+			{
+				"path": "<checkout>/packages/standalone/evidence/2026-10-05-preview-ui/main-merge-native-recheck-01-short.png",
+				"originalCuaEncoding": "JPEG",
+				"originalCuaBytes": 162273,
+				"originalCuaSha256": "006e4125698174bfd496422a8c9730d2fe3cdf64db7537dc82851d88a5a8ba38",
+				"savedEncoding": "PNG",
+				"decodedRasterIdentical": true,
+				"decodedRasterShape": [2560, -1600, 24],
+				"decodedRasterSha256": "16daa7a67b3f42c2146c97d49adba7d4eb4c7c8d24283ee911b9f89750a2cb8a"
+			},
+			{
+				"path": "<checkout>/packages/standalone/evidence/2026-10-05-preview-ui/main-merge-native-recheck-02-large-end.png",
+				"originalCuaEncoding": "JPEG",
+				"originalCuaBytes": 382835,
+				"originalCuaSha256": "496aca4f64f75d8a4176144835f144ec8e8ec94b9a562caf6b4ad9d4e4ad9efd",
+				"savedEncoding": "PNG",
+				"decodedRasterIdentical": true,
+				"decodedRasterShape": [2560, -1600, 24],
+				"decodedRasterSha256": "3d00944d6083d9550d3f25451874ef0e67b9b20bf89a66eb869e372ba7e500f7"
+			},
+			{
+				"path": "<checkout>/packages/standalone/evidence/2026-10-05-preview-ui/main-merge-native-recheck-03-large-cmd-up.png",
+				"originalCuaEncoding": "JPEG",
+				"originalCuaBytes": 403284,
+				"originalCuaSha256": "f962fa538181a0f02b926b28b88da365db40f49a67f3282564c7e0ea383019d3",
+				"savedEncoding": "PNG",
+				"decodedRasterIdentical": true,
+				"decodedRasterShape": [2560, -1600, 24],
+				"decodedRasterSha256": "b6c04b72e6bd72bc049a984374dd6fa89a42492b15614b4adc94dc85321a8295"
+			},
+			{
+				"path": "<checkout>/packages/standalone/evidence/2026-10-05-preview-ui/main-merge-native-recheck-04-large-return.png",
+				"originalCuaEncoding": "JPEG",
+				"originalCuaBytes": 403737,
+				"originalCuaSha256": "44766677da958bc2a6bebb734ce181be597ead535067c3f15f481fa2e98bcfba",
+				"savedEncoding": "PNG",
+				"decodedRasterIdentical": true,
+				"decodedRasterShape": [2560, -1600, 24],
+				"decodedRasterSha256": "a823bc415f2a77c33e15965338537d99a3b14b588968dded1a007c8953fdcbb8"
+			}
+		]
+	},
+	"textNormalization": {
+		"jsonIndentation": "tabs",
+		"markdownFinalBlankLines": 1,
+		"axFinalBlankLines": 1
+	}
+}

@@ -5,6 +5,7 @@ import type {
 } from "@pfdsl/core";
 import * as vscode from "vscode";
 import { analyzeDocument, dropAnalyzeCache, LANGUAGE_ID } from "./analyze.js";
+import { coreRangeToVscode } from "./diagnostics-logic.js";
 
 export const SEVERITY_MAP: Record<
 	DiagnosticSeverity,
@@ -14,22 +15,6 @@ export const SEVERITY_MAP: Record<
 	warning: vscode.DiagnosticSeverity.Warning,
 	info: vscode.DiagnosticSeverity.Information,
 };
-
-export interface VscodeRangeLike {
-	startLine: number;
-	startColumn: number;
-	endLine: number;
-	endColumn: number;
-}
-
-export function coreRangeToVscode(r: CoreRange): VscodeRangeLike {
-	return {
-		startLine: r.start.line - 1,
-		startColumn: r.start.column - 1,
-		endLine: r.end.line - 1,
-		endColumn: r.end.column - 1,
-	};
-}
 
 function toVscodeRange(r: CoreRange): vscode.Range {
 	const { startLine, startColumn, endLine, endColumn } = coreRangeToVscode(r);

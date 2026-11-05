@@ -1,0 +1,118 @@
+{
+	"evidence_zip": {
+		"bytes": 9979503,
+		"sha256": "7a6845f86334771ea2717ab75f2480e78a231b561124edb288bb7cc485217531",
+		"manifest_files_verified": 136,
+		"crc_ok": true,
+		"complete_file_set": true
+	},
+	"layer": "Separate Inspector binary diagnosis; original accepted AppImage statuses unchanged",
+	"source_commit": "8261f877d5cae8aa653a5310edfbd9e387acb116",
+	"diagnostic_run": 37720330151,
+	"diagnostic_artifact": 11525926292,
+	"diagnostic_appimage_sha256": "700212eab2ca31bcb24eb9b865647d4190312e6667f313395782a9c534c3f425",
+	"diagnostic_inner_sha256": "02fd853b3cc6c00d27f3e630bd0e65be30b8b6a042d2f7d7377d033775a8e761",
+	"original_checklist_whole_bytes_unchanged": true,
+	"original_matrix": {
+		"conditions": 133,
+		"host_cells": 399,
+		"passed": 202,
+		"historical_failed": 3,
+		"unverified": 7,
+		"not_applicable": 187
+	},
+	"observer": {
+		"records": 424,
+		"kinds": {
+			"armed": 1,
+			"class": 20,
+			"frame": 401,
+			"svg-adoption": 1,
+			"stopped": 1
+		},
+		"computed_state_vs_captured_presentation_mismatch": true,
+		"root_cause_confirmed": false,
+		"svg_adoptions": [
+			{
+				"utc": "2026-10-08T07:05:15.211Z",
+				"ms": 757540,
+				"kind": "svg-adoption",
+				"target": 17,
+				"removed": [
+					{
+						"uid": 10,
+						"tag": "svg",
+						"connected": false
+					}
+				],
+				"added": [
+					{
+						"uid": 18,
+						"tag": "svg",
+						"connected": true
+					}
+				],
+				"cueCount": 0
+			}
+		]
+	},
+	"model_states": {
+		"before": {
+			"eol": "\r\n",
+			"byte_length": 481,
+			"CRLF": 21,
+			"lone_lf": 0,
+			"sha256": "ac2c1375c5dde8b7f5ab3f39713f7b7a80fd833a42e4bfc52ad936e9fbb1ad90"
+		},
+		"after": {
+			"eol": "\r\n",
+			"byte_length": 522,
+			"CRLF": 24,
+			"lone_lf": 0,
+			"sha256": "ab5a42759973773166fa161e5adaf0ff39af2e280bdc0a6fe38cf4452203dfc6"
+		},
+		"undo": {
+			"eol": "\r\n",
+			"byte_length": 481,
+			"CRLF": 21,
+			"lone_lf": 0,
+			"sha256": "ac2c1375c5dde8b7f5ab3f39713f7b7a80fd833a42e4bfc52ad936e9fbb1ad90"
+		},
+		"redo": {
+			"eol": "\r\n",
+			"byte_length": 522,
+			"CRLF": 24,
+			"lone_lf": 0,
+			"sha256": "ab5a42759973773166fa161e5adaf0ff39af2e280bdc0a6fe38cf4452203dfc6"
+		}
+	},
+	"model_before_equals_undo": true,
+	"model_after_equals_redo": true,
+	"model_proof_scope": "Actual model of the diagnostic binary; no original AppImage save-bytes or editor-paint success claim",
+	"settings_current_baseline_restored": {
+		"gnome": true,
+		"gtk_enable_animations": true,
+		"xsettings_owner": true,
+		"xsettings_owner_properties": true,
+		"xfconf_xsettings": true
+	},
+	"gnome_current_baseline": {
+		"effective": true,
+		"type": "b",
+		"user_override_exists": false,
+		"user_value": null,
+		"user_type": null
+	},
+	"previous_historical_override_existence_restoration_proven": false,
+	"reduced_motion_effective": false,
+	"source_and_payload_preservation": "Parent inspected dot records, did not execute Linux GUI",
+	"additional_observation": "Trusted Types createHTML error during breakpoint-assisted model inspection; normal original-binary causality untested",
+	"independent_video_review": {
+		"settled_input_build_strict_weak_blue_pixels": 0,
+		"input_identical_frames": 37,
+		"build_local_decoder_max_channel_difference": 5,
+		"build_submitted_decoder_max_channel_difference": 4,
+		"exact_build_metrics_independently_reproduced": false,
+		"gui_rerun": false
+	}
+}

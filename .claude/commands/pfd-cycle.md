@@ -1,9 +1,18 @@
 ---
 description: 計画PFDから次の着手可能プロセスを選んで完了させ、知見をリポジトリ成果物に反映する
 ---
+<!-- DO NOT EDIT. Authoritative source: scripts/harness-template/commands/pfd-cycle.md. -->
 
-pfd-ops スキルを起動し、その「ワークサイクル」手順を 1〜4 まで完遂せよ。終端ゲートは全項目を明示的に確認すること。
+これは pfd-ops の protocol を利用する参照 driver である。
+同じ process を外部の orchestrator が制御している場合は重ねて実行しない。
+その場合は pfd-ops が定める着手可能集合・入出力・criteria を外部へ渡し、返された証拠を受け入れる。
 
-サイクル完了後、続けて pfd-retro スキルを起動し3層監査（A/B 図監査・C 運用イベント・D 知識成果物）を実行せよ。findings は pfd-retro の出力表と workflow companion の振り分け手続きに従って即座に反映すること。
+pfd-ops スキルで対象モデルの適用条件と契約を確認し、選択・実行・終端ゲート・報告へ進む。
+既定では1サイクルに1 process を選ぶが、依頼に応じて複数を選んでよい。
+どの場合も、実行と各 PFD ファイル・process ID の対応を証拠に残す。
+run の成功だけで done にせず、criteria と版に対応した成果物の受入を確認する。
+
+done 遷移とサイクル終結のモデル監査は、pfd-ops の `references/work-cycle.md`「定期監査」の対象と証拠を pfd-retro に渡して行う。
+一般の開発規律、実行管理、知識成果物監査の呼出しは採用先の入口が定める。
 
 引数（あれば作業選択の指定として扱う）: $ARGUMENTS

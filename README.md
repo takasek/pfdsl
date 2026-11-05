@@ -66,11 +66,14 @@ Feature-by-feature syntax examples with rendered `.dot` and `.svg`: [docs/sample
 - **Pipeline** — lexer → parser → normalizer → validator → canonical sorter → formatter (`@pfdsl/core`)
 - **DOT / SVG** — Graphviz export and Wasm-based rendering (`@pfdsl/graphviz-exporter`, `@pfdsl/preview-engine`)
 - **CLI** — `pfdsl check / fmt / render / diff` plus `graph` / `meta` / `status` command groups (`@pfdsl/cli`)
+- **GitHub Actions** — [reusable SVG generation workflow](docs/reusable-pfdsl-svg.md) for sibling `.svg` files, with automatic or manual runs and direct push or PR output
 - **VSCode extension** — syntax highlighting, diagnostics, hover, document formatter, live SVG preview (`@pfdsl/vscode-extension`)
 - **Claude Code skill** — syntax reference, CLI guidance, workflow for editing `.pfdsl` files (`.claude/skills/pfdsl/`); installable via `/plugin marketplace add takasek/pfdsl` + `/plugin install pfdsl@pfdsl`
 
 
 ## Quick start
+
+Upgrading an existing installation? Read the [migration guide](docs/migration-guide.md) for version-specific cleanup and validation steps.
 
 ```bash
 pnpm install
@@ -99,21 +102,27 @@ node packages/cli/dist/cli.js help
 pfdsl <command> [options]
 
 Commands:
-  check <file|-> [--strict] [--hints] [--json] [--no-color]
+  check <file|-> [--reference-context <file>] [--strict] [--hints] [--json] [--no-color]
                            Validate a .pfdsl file (- = stdin)
   explain <code>           Print the summary and spec section for a diagnostic code (e.g. V021)
   fmt <file|-> [--write] [--check] [--no-color]
                            Format a .pfdsl file (- = stdin)
-  render <file|-> [--format dot|svg|pdf|png] [--no-color]
+  delete <file|-> <id[,id...]> [--write] [--json] [--no-color]
+                           Remove artifacts, processes, or groups from a .pfdsl file (- = stdin)
+  prune <file|-> [--write] [--check] [--json] [--no-color]
+                           Remove completed chains from a roadmap (- = stdin)
+  rename <file|-> <old> <new> [--write] [--json] [--no-color]
+                           Rename an artifact, process, or group id and every reference to it (- = stdin)
+  render <file|-> [--reference-context <file>] [--format dot|svg|pdf|png] [--no-color]
                            Render as Graphviz DOT (default), SVG, PDF, or PNG (- = stdin)
                            PDF/PNG requires puppeteer in the CLI's own Node env (npm install puppeteer)
   diff <a> <b> [--format text|dot|svg] [--json] [--no-color]
                            Structural diff (text), or visual diff DOT/SVG
 
 Command groups (run `pfdsl <group>` for their subcommands):
-  graph summary|io|stats|neighbors|impact|depends-on|path|edges|orphans
+  graph summary|io|stats|neighbors|locate|describe|impact|depends-on|path|edges|orphans
                            Read-only queries on the graph topology
-  meta get|set|sort|reindex|check-links
+  meta create|get|list|values|set|sort|reindex|check-links
                            Read and write frontmatter metadata
   status ready|blocked|list|gaps
                            Planning queries derived from artifact status
@@ -133,16 +142,26 @@ Exit codes:
 See [packages/vscode-extension/README.md](packages/vscode-extension/README.md) for full feature docs.
 
 ```bash
-pnpm --filter @pfdsl/vscode-extension build
+make setup
+make vscode-dev
 ```
 
-Open the repo in VS Code and press `F5` to launch an Extension Development Host with `@pfdsl/vscode-extension` loaded. In the host, `.pfdsl` files get:
+Run these commands from the clone or worktree root with VS Code's `code` command available on your PATH.
+`make vscode-dev` builds the extension and its dependencies, opens `packages/vscode-extension` as the VS Code workspace, and watches source changes.
+Press `F5` in that window to launch an Extension Development Host with PFDSL loaded. In the host, `.pfdsl` files get:
 
 - syntax highlighting (TextMate grammar; YAML embedded in frontmatter)
 - inline diagnostics (parse / normalize / validate)
 - hover metadata for artifacts and processes (label, owner, status, tags, parts)
 - `Format Document` / `pfdsl.format`
 - `PFDSL: Open Preview to the Side` (`pfdsl.preview`) — live SVG, refreshes on edit
+
+## Standalone desktop app
+
+Build for the current host with `make setup` followed by `make standalone`: a macOS `.app` or a Linux native executable.
+Use `make standalone MODE=dev` on either OS to run the development app with hot reload.
+See [desktop build prerequisites and commands](packages/standalone/README.md#building-and-development) for OS dependencies, output locations, Linux feature limits, and troubleshooting.
+Windows builds are not supported by this application yet.
 
 ## Claude Code skill
 
@@ -171,11 +190,11 @@ After changing `docs/spec/spec.md`, `docs/samples/`, or the skill template, rege
 make gen-skill
 ```
 
-The script copies `docs/spec/spec.md` and `docs/samples/` into `references/` alongside `SKILL.md`. `make gen-plugin` (which depends on `gen-skill`) regenerates the marketplace plugin's copy too.
+The script copies `docs/spec/spec.md` and `docs/samples/` into `references/` alongside `SKILL.md`. `make gen-plugin` (which runs `gen-skill` itself) regenerates the marketplace plugin's copy too.
 
 ## pfd-cycle suite (cross-project)
 
-A suite of Claude Code skills and commands for **PFD-driven project operations**: issue prioritization, progress tracking, artifact management, and session-learning routing across `roadmap` / `workflow` / `runtime-pipeline` PFDs.
+A suite of Claude Code skills and commands for **PFD-driven project operations**: issue prioritization, progress tracking, artifact management, and session-learning routing across `roadmap` / `workflow` / `pipeline` PFDs.
 
 Adopt it in any repo through the plugin:
 
@@ -185,7 +204,7 @@ Adopt it in any repo through the plugin:
 /pfd-init
 ```
 
-`/pfd-init` copies the `.pfdsl/` scaffold for the PFD kinds your project needs, and (optionally, step 3.5) deploys the GitHub-Issues backend automation — workflows and audit scripts — to the repo root, via the `check-install-sync.mjs` script bundled with the `pfd-ops` skill. Running it again refreshes an already-adopted repo: locally edited files are warned about rather than overwritten, unless you pass `--force`.
+`/pfd-init` copies the `.pfdsl/` scaffold for the PFD kinds your project needs, and (optionally, step 3.5) deploys the GitHub-Issues backend automation — workflows and audit scripts — to the repo root, via the `check-install-sync.mjs` script bundled with the `pfd-ops` skill. Running it again refreshes an already-adopted repo. Files a later release dropped are removed and new ones copied without any extra flag; what the extra flags govern is whether a local edit standing in the way is discarded — `--overwrite-local-edits` for an edit on a path that survives, `--delete-edited-orphans` for one on a path that is going away. A rename on the canonical side is reported as a `Possible renames` pair so a local edit on the old path can be carried over to the new one first.
 
 Once adopted, use `/pfd-cycle` to run a work cycle and `/pfd-retro` to audit and improve the process.
 

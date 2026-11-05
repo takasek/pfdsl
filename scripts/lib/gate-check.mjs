@@ -3,6 +3,118 @@
  * Process/git I/O lives in the main script; this module stays testable.
  */
 
+import { parse as parseYaml } from "yaml";
+import {
+	GITHUB_UNAVAILABLE_EXIT_CODE,
+	isGitHubUnavailableError,
+} from "../pfdsl/lib/github-ops.mjs";
+
+export {
+	lintCommitSubjects,
+	parseCommitLogLines,
+} from "./commit-subject-rules.mjs";
+
+/**
+ * Collect local paths and unclassified explicit-target artifact locations via the `location:`
+ * field its artifacts and processes carry (#778). This is what lets the
+ * terminal gate's "did you reflect the change in the PFD that models it" item
+ * say which of a cycle's changed files any PFD models at all — without that,
+ * a change in an unmodeled area (the check scripts, historically) and a change
+ * someone judged irrelevant both come out as the same silent "N/A".
+ *
+ * `resolveLocation` is injected rather than written here because spec §15.8
+ * owns what a `location:` resolves to (the file's own directory, or the
+ * frontmatter's `basePath` when it has one) and @pfdsl/core already implements
+ * it — a second reading of that rule here would be free to drift from the one
+ * the CLI applies. It returns null for anything that names nothing in the tree
+ * (a URL), which is also core's classification.
+ * @param {Array<{file: string, frontmatter: {artifact?: object, process?: object, basePath?: string}}>} analyzed
+ * @param {(file: string, location: string, basePath?: string) => string|null} resolveLocation
+ * @param {(location: string) => boolean} isUrlLike
+ * @returns {{local: Array<{path: string, file: string, id: string}>, unclassified: Array<{file: string, id: string, location: string}>}}
+ */
+export function collectModeledLocations(analyzed, resolveLocation, isUrlLike) {
+	const local = [];
+	const unclassified = [];
+	for (const { file, frontmatter } of analyzed) {
+		const nodes = Object.create(null);
+		for (const section of ["artifact", "process"]) {
+			for (const [id, meta] of Object.entries(frontmatter?.[section] ?? {})) {
+				// Replacing a value preserves the original ID order and process precedence.
+				nodes[id] = { section, meta };
+			}
+		}
+		for (const [id, { section, meta }] of Object.entries(nodes)) {
+			const explicitTargetArtifact =
+				meta != null &&
+				section === "artifact" &&
+				(Object.hasOwn(meta, "ref") ||
+					(frontmatter != null && Object.hasOwn(frontmatter, "baseRef")));
+			if (meta?.location === undefined || meta?.location === null) continue;
+			if (!explicitTargetArtifact && !meta.location) continue;
+			const locations = Array.isArray(meta.location)
+				? meta.location
+				: [meta.location];
+			for (const location of locations) {
+				if (isUrlLike(location)) continue;
+				if (explicitTargetArtifact) {
+					unclassified.push({ file, id, location });
+					continue;
+				}
+				const resolved = resolveLocation(file, location, frontmatter?.basePath);
+				if (resolved === null) continue;
+				// Path resolution normalizes a trailing slash away, and that slash
+				// is the only mark distinguishing a directory location from a file
+				// one, so it is carried over from what was written.
+				local.push({
+					path: location.endsWith("/") ? `${resolved}/` : resolved,
+					file,
+					id,
+				});
+			}
+		}
+	}
+	return { local, unclassified };
+}
+
+/** Display explicit-target artifacts without asserting unmatched local files are unmodeled. */
+export function formatUnclassifiedLocations(unclassified) {
+	if (unclassified.length === 0) return [];
+	return [
+		"  artifact locations not classified against the local checkout (explicit reference target; needs a reference context):",
+		...unclassified.map(
+			({ file, id, location }) => `    ${file}:${id} → ${location}`,
+		),
+		"  not matched by locally classifiable PFD locations (model classification incomplete):",
+	];
+}
+
+/**
+ * Split a cycle's changed files by whether any adopted PFD models them (#778).
+ * Report material, not a verdict: whether a modeled path's change actually
+ * needed the PFD updated, and whether an unmodeled one should have been in a
+ * PFD at all, are both judgments the gate leaves to the reader.
+ * @param {string[]} changedFiles repo-relative
+ * @param {Array<{path: string, file: string, id: string}>} modeledLocations
+ * @returns {{modeled: Array<{path: string, models: Array<{file: string, id: string}>}>, unmodeled: string[]}}
+ */
+export function classifyChangedFilesByModeling(changedFiles, modeledLocations) {
+	const modeled = [];
+	const unmodeled = [];
+	for (const path of changedFiles) {
+		const models = modeledLocations
+			.filter((location) =>
+				location.path.endsWith("/")
+					? path.startsWith(location.path)
+					: path === location.path,
+			)
+			.map(({ file, id }) => ({ file, id }));
+		if (models.length > 0) modeled.push({ path, models });
+		else unmodeled.push(path);
+	}
+	return { modeled, unmodeled };
+}
+
 /**
  * @param {string[]} files
  * @param {RegExp} pattern
@@ -12,13 +124,13 @@ export function matchesTrigger(files, pattern) {
 	return files.some((f) => pattern.test(f));
 }
 
-// audit-issues-flow.mjs exits with this code when the gh CLI is unavailable
-// (ENOENT), distinct from exit code 1 (real findings) — see #489, #492.
-export const AUDIT_ISSUES_FLOW_GH_UNAVAILABLE_EXIT_CODE = 2;
+// Preserve the audit subprocess exit contract; raw backend error shapes stay internal.
+export const AUDIT_ISSUES_FLOW_GH_UNAVAILABLE_EXIT_CODE =
+	GITHUB_UNAVAILABLE_EXIT_CODE;
 
 /**
  * Map an `node scripts/pfdsl/audit-issues-flow.mjs` subprocess result to a
- * gate-check row. Exit code 2 (gh CLI unavailable) degrades to SKIP instead
+ * gate-check row. Exit code 2 (GitHub operations unavailable) degrades to SKIP instead
  * of FAIL, so a missing gh binary doesn't get conflated with an actual
  * roadmap/issue sync drift.
  * @param {boolean} ok
@@ -28,9 +140,16 @@ export const AUDIT_ISSUES_FLOW_GH_UNAVAILABLE_EXIT_CODE = 2;
 export function classifyAuditIssuesFlowResult(ok, exitStatus) {
 	if (ok) return { status: "PASS" };
 	if (exitStatus === AUDIT_ISSUES_FLOW_GH_UNAVAILABLE_EXIT_CODE) {
-		return { status: "SKIP", detail: "gh CLI unavailable; GitHub-dependent checks skipped (see #492)" };
+		return {
+			status: "SKIP",
+			detail:
+				"GitHub operations unavailable; GitHub-dependent checks skipped (see #492)",
+		};
 	}
-	return { status: "FAIL", detail: "re-run: node scripts/pfdsl/audit-issues-flow.mjs (findings)" };
+	return {
+		status: "FAIL",
+		detail: "re-run: node scripts/pfdsl/audit-issues-flow.mjs (findings)",
+	};
 }
 
 /**
@@ -38,10 +157,137 @@ export function classifyAuditIssuesFlowResult(ok, exitStatus) {
  * @returns {string}
  */
 export function formatGateTable(results) {
-	const symbol = (status) => (status === "PASS" ? "✓" : status === "FAIL" ? "✗" : "-");
+	const symbol = (status) =>
+		status === "PASS" ? "✓" : status === "FAIL" ? "✗" : "-";
 	return results
-		.map((r) => `  ${symbol(r.status)} ${r.status.padEnd(4)} ${r.name}${r.detail ? ` — ${r.detail}` : ""}`)
+		.map(
+			(r) =>
+				`  ${symbol(r.status)} ${r.status.padEnd(4)} ${r.name}${r.detail ? ` — ${r.detail}` : ""}`,
+		)
 		.join("\n");
+}
+
+/**
+ * One line reporting which tree this gate actually ran against (#840).
+ *
+ * A worktree session's shell cwd can drift back to the main checkout between
+ * commands; a gate run there is silently checking a tree without the
+ * branch's changes, and a PASS from it reads exactly like a PASS from the
+ * worktree. Reporting the inspected tree makes that distinction checkable
+ * after the run; it does not prevent a run in the wrong checkout.
+ * @param {{root: string, mainRoot: string, branch: string | null}} params
+ *   - root: the tree gate-check actually inspected (its own script location,
+ *     not cwd — see the call site for why those can differ).
+ *   - mainRoot: the repo's main checkout, from `git rev-parse --git-common-dir`.
+ *   - branch: the branch checked out at `root`, or null when it could not be
+ *     resolved (detached HEAD, or the git calls failed).
+ * @returns {string}
+ */
+export function formatRunTreeLine({ root, mainRoot, branch }) {
+	const treeKind = root === mainRoot ? "main checkout" : "linked worktree";
+	const branchLabel = branch ? `branch ${branch}` : "branch unresolved";
+	return `gate-check: running in ${treeKind} (${root}), ${branchLabel}`;
+}
+
+/** Shared by both checks scoped to the output artifact, so they cannot drift apart. */
+export const NO_ARTIFACT_DETAIL =
+	"cycle declared it has no roadmap output artifact (--no-artifact)";
+
+/**
+ * Why an issue lookup failed, and what that costs the issue's rows.
+ *
+ * Every failure used to read "gh CLI unavailable", which is true of exactly one
+ * of them. The other two — gh running and answering with an error, and the REST
+ * fallback returning a shape JSON.parse rejects — wore a sentence naming a
+ * cause that was not theirs, and took a SKIP that the reader had every reason
+ * to attribute to their environment (#745).
+ *
+ * Only operation-level unavailability degrades to SKIP (#1085). Executed
+ * backend failures, including an unrelated ENOENT, always FAIL.
+ * @param {{code?: string, message?: string}} error
+ * @returns {{status: 'SKIP'|'FAIL', detail: string}}
+ */
+export function classifyIssueLookupFailure(error) {
+	// Only the operation API can identify unavailable backends (#1085).
+	if (isGitHubUnavailableError(error)) {
+		return { status: "SKIP", detail: error.message };
+	}
+	return {
+		status: "FAIL",
+		detail: `issue lookup failed: ${error?.message ?? String(error)}`,
+	};
+}
+
+/**
+ * Classify the output-artifact status-update gate (item 6).
+ * @param {{artifactKey?: string, noArtifact?: boolean, roadmapChanged?: boolean, changed?: boolean, status?: string, inProgress?: boolean}} params
+ *   - artifactKey: the --artifact CLI flag value, if given.
+ *   - noArtifact: the cycle declared it owns no output artifact (--no-artifact).
+ *     Wins over everything else — it is a statement about the work, not the diff.
+ *   - roadmapChanged: whether .pfdsl/roadmap.pfdsl appears in the changed-files list.
+ *     Only consulted when artifactKey is absent.
+ *   - changed: whether a status: change was detected (precise per-artifact
+ *     check when artifactKey is set, presence-only fallback otherwise).
+ *     Not evaluated (may be undefined) in the SKIP case.
+ *   - status: the named artifact's status at HEAD.
+ *   - inProgress: the cycle explicitly declared it will remain incomplete.
+ * @returns {{status: 'PASS'|'FAIL'|'SKIP', detail?: string}}
+ */
+export function classifyOutputArtifactStatus({
+	artifactKey,
+	noArtifact,
+	roadmapChanged,
+	changed,
+	status,
+	inProgress,
+}) {
+	// A declaration beats inference. Bookkeeping cycles (a rename, a location:)
+	// touch roadmap.pfdsl without owning an output artifact, and no reading of
+	// the diff distinguishes those from a cycle that forgot its status update —
+	// the check FAILed on every one of them, which is how a gate stops being read.
+	if (noArtifact) {
+		return { status: "SKIP", detail: NO_ARTIFACT_DETAIL };
+	}
+	if (!artifactKey && !roadmapChanged) {
+		return {
+			status: "SKIP",
+			detail:
+				"work item has no roadmap output artifact (roadmap.pfdsl untouched); " +
+				"if this is roadmap-managed work, pass --artifact <key> for a strict check",
+		};
+	}
+	if (artifactKey) {
+		if (inProgress) {
+			const intentionallyIncomplete = status === "wip" || status === "waiting";
+			return {
+				status: intentionallyIncomplete ? "PASS" : "FAIL",
+				detail: intentionallyIncomplete
+					? undefined
+					: `--in-progress declared for artifact '${artifactKey}', but HEAD status is '${status ?? "unset"}'; expected wip or waiting`,
+			};
+		}
+		if (status !== "done") {
+			return {
+				status: "FAIL",
+				detail:
+					`artifact '${artifactKey}' has status '${status ?? "unset"}' at HEAD; ` +
+					"completed cycles must set it to done in this PR per this repository's PR status timing binding (.pfdsl/bindings/pfd-ops.md), " +
+					"or pass --in-progress for an intentionally incomplete cycle",
+			};
+		}
+		return {
+			status: changed ? "PASS" : "FAIL",
+			detail: changed
+				? undefined
+				: `artifact '${artifactKey}' is done at HEAD, but its status did not change in this PR`,
+		};
+	}
+	return {
+		status: changed ? "PASS" : "FAIL",
+		detail: changed
+			? "presence-only check; pass --artifact <key> to verify the specific output artifact"
+			: "no status: line changed in .pfdsl/roadmap.pfdsl — pass --artifact <key>, or --no-artifact if this cycle produces none",
+	};
 }
 
 /**
@@ -66,10 +312,32 @@ export function hasStatusChange(diffText) {
  * @returns {string | undefined}
  */
 export function extractArtifactStatus(text, artifactKey) {
-	const block = text.match(new RegExp(`\\n {2}${artifactKey}:\\n([\\s\\S]*?)(?=\\n {2}\\S+:\\n|$)`));
-	if (!block) return undefined;
-	const status = block[1].match(/status:\s*(\S+)/);
-	return status ? status[1] : undefined;
+	const lines = text.split(/\r?\n/);
+	if (lines[0]?.trimEnd() !== "---") return undefined;
+	const closingDelimiter = lines.findIndex(
+		(line, index) => index > 0 && line.trimEnd() === "---",
+	);
+	if (closingDelimiter < 0) return undefined;
+
+	let frontmatter;
+	try {
+		frontmatter = parseYaml(lines.slice(1, closingDelimiter).join("\n"));
+	} catch {
+		return undefined;
+	}
+	if (!frontmatter || typeof frontmatter !== "object") return undefined;
+	if (!Object.hasOwn(frontmatter, "artifact")) return undefined;
+
+	const artifacts = frontmatter.artifact;
+	if (!artifacts || typeof artifacts !== "object" || Array.isArray(artifacts))
+		return undefined;
+	if (!Object.hasOwn(artifacts, artifactKey)) return undefined;
+
+	const artifact = artifacts[artifactKey];
+	if (!artifact || typeof artifact !== "object" || Array.isArray(artifact))
+		return undefined;
+	if (!Object.hasOwn(artifact, "status")) return undefined;
+	return typeof artifact.status === "string" ? artifact.status : undefined;
 }
 
 /**
@@ -81,7 +349,10 @@ export function extractArtifactStatus(text, artifactKey) {
  * @returns {boolean}
  */
 export function statusChangedForArtifact(beforeText, afterText, artifactKey) {
-	return extractArtifactStatus(beforeText, artifactKey) !== extractArtifactStatus(afterText, artifactKey);
+	return (
+		extractArtifactStatus(beforeText, artifactKey) !==
+		extractArtifactStatus(afterText, artifactKey)
+	);
 }
 
 /**
@@ -95,31 +366,34 @@ export function statusChangedForArtifact(beforeText, afterText, artifactKey) {
  */
 export function wipTransitionDetected(fileSnapshots, artifactKey) {
 	if (artifactKey) {
-		return fileSnapshots.some((text) => extractArtifactStatus(text, artifactKey) === "wip");
+		return fileSnapshots.some(
+			(text) => extractArtifactStatus(text, artifactKey) === "wip",
+		);
 	}
 	return fileSnapshots.some((text) => /status:\s*wip/.test(text));
 }
 
 /**
- * Path trigger for the vscode-extension typecheck gate (roadmap.md
+ * Path trigger for the vscode-extension typecheck gate (workflow.md
  * "vscode-extension を変更した場合" note). Mirrors GEN_PLUGIN_TRIGGER's
  * trigger-then-run shape.
  */
 export const VSCODE_EXT_TRIGGER = /^packages\/vscode-extension\//;
 
-// Conventional Commits subject line: type(scope)!: description.
-// Scope and ! are optional; type must be one of the conventional set.
-const CONVENTIONAL_COMMIT_PATTERN =
-	/^(feat|fix|refactor|docs|chore|test|style|perf|build|ci|revert)(\([\w.,/-]+\))?!?: .+/;
-
 /**
- * Lint commit subjects against the Conventional Commits format (message
- * format only — commit granularity is a judgment call left to code review).
- * @param {string[]} subjects
- * @returns {Array<{subject: string, ok: boolean}>}
+ * Parse a `<label> a, b, c` list line out of `pfdsl graph io` text output.
+ * @param {string} auditText
+ * @param {string} label line prefix, including its trailing colon
+ * @returns {string[]}
  */
-export function lintCommitSubjects(subjects) {
-	return subjects.map((subject) => ({ subject, ok: CONVENTIONAL_COMMIT_PATTERN.test(subject) }));
+function parseAuditLine(auditText, label) {
+	const line = auditText.split("\n").find((l) => l.startsWith(label));
+	if (!line) return [];
+	return line
+		.slice(label.length)
+		.split(",")
+		.map((s) => s.trim())
+		.filter(Boolean);
 }
 
 /**
@@ -129,13 +403,19 @@ export function lintCommitSubjects(subjects) {
  * @returns {string[]}
  */
 export function parseAuditTerminals(auditText) {
-	const line = auditText.split("\n").find((l) => l.startsWith("terminal artifacts:"));
-	if (!line) return [];
-	return line
-		.slice("terminal artifacts:".length)
-		.split(",")
-		.map((s) => s.trim())
-		.filter(Boolean);
+	return parseAuditLine(auditText, "terminal artifacts:");
+}
+
+/**
+ * Parse the `external-stakeholder terminals: a, b, c` line out of
+ * `pfdsl graph io` text output — terminals kept out of the plain
+ * `terminal artifacts:` line solely because they declare a non-empty
+ * externalStakeholders.
+ * @param {string} auditText
+ * @returns {string[]}
+ */
+export function parseAuditExternalTerminals(auditText) {
+	return parseAuditLine(auditText, "external-stakeholder terminals:");
 }
 
 /**
@@ -149,6 +429,108 @@ export function parseAuditTerminals(auditText) {
 export function diffNewTerminals(beforeTerminals, afterTerminals) {
 	const before = new Set(beforeTerminals);
 	return afterTerminals.filter((t) => !before.has(t));
+}
+
+/**
+ * Artifact ids consumed by a normal `>>` input edge, read out of a
+ * `pfdsl graph edges --json` payload (#671).
+ *
+ * Feedback (`>>?`) edges are deliberately excluded: `graph io`'s `terminals`
+ * is the spec's **audit-terminal** (§15.11), which ignores feedback
+ * consumption, so counting a sibling's feedback edge as consumption would
+ * classify the same artifact differently depending on which file its
+ * feedback consumer happens to sit in.
+ *
+ * An unparseable or failed payload yields no consumers, which leaves the
+ * caller's terminals reported as terminal — the pre-#671 behaviour, i.e. the
+ * side that asks for a look rather than the side that stays silent.
+ * @param {string} edgesJson stdout of `pfdsl graph edges <file> --json`
+ * @returns {string[]} consumed artifact ids, first-seen order, deduplicated
+ */
+export function parseInputConsumedArtifacts(edgesJson) {
+	let payload;
+	try {
+		payload = JSON.parse(edgesJson);
+	} catch {
+		return [];
+	}
+	if (!payload?.ok || !Array.isArray(payload.edges)) return [];
+	const consumed = new Set();
+	for (const e of payload.edges) {
+		if (e?.kind === "input" && typeof e.artifact === "string") {
+			consumed.add(e.artifact);
+		}
+	}
+	return [...consumed];
+}
+
+/**
+ * Directories whose sibling `.pfdsl` files share one artifact-id namespace,
+ * i.e. where "same id means the same artifact" holds (#671).
+ *
+ * This is a convention of *this repo's* operational PFD set, not a spec rule
+ * — spec §2.9.1 keeps ids file-local precisely so that unrelated graphs may
+ * reuse a name. `docs/samples/` is the counterexample that forces the list to
+ * exist rather than composing every directory: its diagrams are mutually
+ * unrelated tutorials that reuse `spec` / `code` freely, so composing them
+ * would file a genuine gatekeeper violation under the sibling heading.
+ */
+export const SIBLING_ID_NAMESPACE_DIRS = [".pfdsl"];
+
+/**
+ * Whether sibling `.pfdsl` files in `dir` may be composed for the terminal
+ * report (#671).
+ * @param {string} dir repo-relative directory, as `path.dirname` yields it
+ * @returns {boolean}
+ */
+export function sharesSiblingIdNamespace(dir) {
+	return SIBLING_ID_NAMESPACE_DIRS.includes(dir);
+}
+
+/**
+ * For each file, the artifacts consumed by *every other* file in the set
+ * (#671). Callers hand over the already-parsed per-file consumer lists, so
+ * the N graphs are parsed N times rather than N² — and so this stays a pure
+ * function the tests can drive without git or the CLI.
+ * @param {Iterable<[string, string[]]>} perFileConsumed file → consumed ids
+ * @returns {Map<string, string[]>} file → ids consumed by the other files
+ */
+export function buildSiblingConsumedMap(perFileConsumed) {
+	const entries = [...perFileConsumed];
+	const byFile = new Map();
+	for (const [file] of entries) {
+		const union = new Set();
+		for (const [other, consumed] of entries) {
+			if (other === file) continue;
+			for (const a of consumed) union.add(a);
+		}
+		byFile.set(file, [...union]);
+	}
+	return byFile;
+}
+
+/**
+ * Split new terminal artifacts by whether a sibling graph consumes them
+ * (#671). Splitting the report is the whole point: ADR-0035 moved the
+ * generation chain into `pipeline.pfdsl`, so a generation source
+ * declared in `workflow.pfdsl` is terminal *in its own file* while its real
+ * consumer sits next door. Reporting those together with genuinely
+ * unconsumed artifacts buries real gatekeeper violations among known-benign
+ * entries.
+ *
+ * Neither partition is a PASS/FAIL: classifying an artifact as means vs.
+ * deliverable stays MANUAL, and a sibling-consumed entry still needs the
+ * claimed edge confirmed before it is recorded as N/A.
+ * @param {string[]} newTerminals
+ * @param {string[]} consumedInSiblings artifact ids consumed by sibling graphs
+ * @returns {{terminal: string[], consumedInSibling: string[]}}
+ */
+export function partitionNewTerminals(newTerminals, consumedInSiblings) {
+	const consumed = new Set(consumedInSiblings);
+	return {
+		terminal: newTerminals.filter((t) => !consumed.has(t)),
+		consumedInSibling: newTerminals.filter((t) => consumed.has(t)),
+	};
 }
 
 /**
@@ -168,48 +550,99 @@ export function diffReadySets(beforeIds, afterIds) {
 	};
 }
 
-/**
- * Repo-relative path to the terminal-gate checklist (workcycle step 3). This
- * file is the single source of truth for wording — gate-check derives its
- * MANUAL: list from it instead of duplicating the text.
- */
-export const GATE_CHECKLIST_SOURCE_PATH = ".claude/skills/pfd-ops/references/work-cycle.md";
-
-/**
- * Parse the terminal-gate checklist (workcycle step 3) into raw item strings.
- * @param {string} skillMdText
- * @returns {string[]}
- */
-export function extractGateChecklist(skillMdText) {
-	const lines = skillMdText.split("\n");
-	const items = [];
-	let inChecklist = false;
-	for (const line of lines) {
-		if (/^3\. \*\*反映/.test(line)) {
-			inChecklist = true;
-			continue;
-		}
-		if (inChecklist && /^4\. \*\*報告/.test(line)) break;
-		if (!inChecklist) continue;
-		const m = line.match(/^\s*-\s\[ \]\s(.+)$/);
-		if (m) items.push(m[1].trim());
-	}
-	return items;
-}
-
-// Checklist items already covered by gate-check's own mechanized checks,
-// matched by substring since the checklist source file's wording is the
-// source of truth.
-const COVERED_BY_GATE_CHECK = [
-	"出力 artifact の status を更新した",
-	"変更した全 .pfdsl が",
-	"Conventional Commits 形式に従う",
+export const MANUAL_GUIDANCE_LINES = [
+	"MANUAL: Before creating the PR, review `3. 反映 — 終端ゲート` in `.claude/skills/pfd-ops/references/work-cycle.md`.",
+	"MANUAL: After creating the PR, review the `PR 作成後` items under `PR 作成前後の完了確認` in `.pfdsl/bindings/pfd-ops.md` (`PR と統合`).",
 ];
 
 /**
- * @param {string[]} checklistItems
- * @returns {string[]}
+ * Print the final manual-check directions before applying the gate exit code.
+ * @param {Array<{status: string}>} results
+ * @param {{issueNumbers?: number[], log?: (line: string) => void, exit?: (code: number) => void}} io
  */
-export function deriveManualItems(checklistItems) {
-	return checklistItems.filter((item) => !COVERED_BY_GATE_CHECK.some((kw) => item.includes(kw)));
+export function finishGateCheck(
+	results,
+	{ issueNumbers = [], log = console.log, exit = process.exit } = {},
+) {
+	log("\nManual checks:");
+	for (const line of MANUAL_GUIDANCE_LINES) log(`  ${line}`);
+	log(
+		issueNumbers.length > 0
+			? `  MANUAL: Review the issue comments and approval evidence for ${issueNumbers.map((n) => `#${n}`).join(", ")} under .pfdsl/bindings/pfd-ops.md. No record or approval verdict is produced here.`
+			: "  MANUAL: no --issue given; no issue review is implied. Pass every target explicitly for terminal review.",
+	);
+	if (results.some((result) => result.status === "FAIL")) exit(1);
+}
+
+// Prose that accumulates procedure, wherever this repo keeps it. #669 named
+// the first three and left the reason for that particular list unwritten; the
+// companions were the gap (#732/#752), and being the largest of the set they
+// were the ones the audit most needed. `.pfdsl/*.md` covers them by shape
+// rather than by name, so a fourth companion arrives already tracked, while
+// the graphs beside them stay out — a .pfdsl file's size moves for reasons
+// this audit is not about.
+export const SIZE_TRACKED_PATTERNS = [
+	/^\.pfdsl\/[^/]+\.md$/,
+	/^\.pfdsl\/bindings\//,
+	/^docs\/adr\//,
+	/(^|\/)SKILL\.md$/,
+];
+/**
+ * The package layers this branch touched, read off the diff.
+ *
+ * The companion used to require the runner to name these in the PR body, and
+ * three cycles in a row forgot to (#801). The claim was never the evidence:
+ * the diff is, and it is available at gate time while the PR body is not. So
+ * this is report material — printed for whoever writes the PR, judged by
+ * nobody. What the declaration was for (noticing a layer mismatch before
+ * starting) is a planning-time concern, and a line written at PR time was
+ * always past the point where it could serve that.
+ * @param {string[]} changedFiles
+ * @returns {string[]} package directory names, sorted and deduplicated
+ */
+export function derivePackageLayers(changedFiles) {
+	const layers = new Set();
+	for (const file of changedFiles) {
+		const match = /^packages\/([^/]+)\//.exec(file);
+		if (match) layers.add(match[1]);
+	}
+	return [...layers].sort();
+}
+
+/**
+ * One tracked knowledge artifact's size across the range under review.
+ * @typedef {{path: string, beforeBytes: number, afterBytes: number,
+ *            beforeLines: number, afterLines: number}} SizeDelta
+ */
+
+/**
+ * One line describing a measured delta in the human-review report.
+ * @param {SizeDelta} d
+ * @returns {string}
+ */
+export function formatSizeDelta(d) {
+	const sign = (n) => (n >= 0 ? `+${n}` : `${n}`);
+	const bytes = sign(d.afterBytes - d.beforeBytes);
+	const lines = sign(d.afterLines - d.beforeLines);
+	return `${d.path}: ${bytes} bytes / ${lines} lines (${d.beforeBytes} → ${d.afterBytes} bytes)`;
+}
+
+/**
+ * Union two parsed commit-log lists, de-duplicated by sha, first-seen order
+ * preserved (#834). `a`'s entries win ties — collectCycleWindow calls this
+ * with the "base commits this tree lacks" list first and the "base commits
+ * landed since the branch started" list second, and the two can overlap.
+ * @param {{sha: string, subject: string}[]} a
+ * @param {{sha: string, subject: string}[]} b
+ * @returns {{sha: string, subject: string}[]}
+ */
+export function unionCommitLogEntries(a, b) {
+	const seen = new Set();
+	const result = [];
+	for (const entry of [...a, ...b]) {
+		if (seen.has(entry.sha)) continue;
+		seen.add(entry.sha);
+		result.push(entry);
+	}
+	return result;
 }

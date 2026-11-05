@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest";
+import { analyzeSource } from "./index.js";
 import { lex } from "./lexer.js";
 import { normalize } from "./normalizer.js";
 import { parseTokens } from "./parser.js";
-import type { Frontmatter } from "./types/index.js";
+import type { Frontmatter, Status } from "./types/index.js";
+import { PFD_TYPE_VALUES, STATUS_VALUES } from "./types/index.js";
 import { type ValidateOptions, validate } from "./validator.js";
 
 function diagnose(
@@ -51,6 +53,31 @@ describe("validate", () => {
 		expect(strictDiags.find((d) => d.code === "V002")?.severity).toBe("error");
 	});
 
+	it("W008: process whose only input is feedback", () => {
+		expect(codes("A >> P -> B\nB >>? Q -> C")).toContain("W008");
+	});
+
+	it("W008: not emitted once the process has a normal input", () => {
+		expect(codes("A >> P -> B\n[A, B] >> Q -> C\nB >>? Q")).not.toContain(
+			"W008",
+		);
+	});
+
+	it("W008: not emitted for a process with no inputs at all (V002 covers it)", () => {
+		expect(codes("P -> B")).not.toContain("W008");
+	});
+
+	it("W008 severity is warning by default, error with --strict", () => {
+		const src = "A >> P -> B\nB >>? Q -> C";
+		expect(diagnose(src).find((d) => d.code === "W008")?.severity).toBe(
+			"warning",
+		);
+		expect(
+			diagnose(src, null, { strict: true }).find((d) => d.code === "W008")
+				?.severity,
+		).toBe("error");
+	});
+
 	it("V003: process with no outputs", () => {
 		expect(codes("A >> P")).toContain("V003");
 	});
@@ -65,7 +92,7 @@ describe("validate", () => {
 	it("V004: parts member is a process", () => {
 		const fm: Frontmatter = { artifact: { C: { parts: ["P"] } } };
 		const diags = diagnose("A >> P -> B", fm);
-		expect(diags.map((d) => d.code)).toContain("V004");
+		expect(diags.map((d) => d.code)).toEqual(["V004"]);
 	});
 
 	it("V004: parts member is a front-matter-only process (not in body)", () => {
@@ -73,13 +100,20 @@ describe("validate", () => {
 			process: { ghost: {} },
 			artifact: { C: { parts: ["ghost"] } },
 		};
-		expect(codes("", fm)).toContain("V004");
+		// This member has no edges either, and W001 says exactly that — but
+		// parts.ts suppresses it for a process, whose real problem V004 already
+		// names. Asserting the whole set is what holds that guard in place.
+		expect(codes("", fm)).toEqual(["V020", "V004"]);
 	});
 
-	it("V005: parts self-reference", () => {
+	it("V005: parts self-reference, which is also reported as a one-node cycle", () => {
 		const fm: Frontmatter = { artifact: { A: { parts: ["A"] } } };
 		const diags = diagnose("A >> P -> B", fm);
-		expect(diags.map((d) => d.code)).toContain("V005");
+		// Both fire, and that is the intended set: §15.5 lists self-reference and
+		// cycle as separate errors, and suppressing V006 here would make the
+		// cycle walk depend on another rule's findings. Pinned as a set so a
+		// future change to either rule has to state which one it means.
+		expect(diags.map((d) => d.code)).toEqual(["V005", "V006"]);
 	});
 
 	it("V006: parts cycle", () => {
@@ -88,6 +122,15 @@ describe("validate", () => {
 		};
 		const diags = diagnose("", fm);
 		expect(diags.map((d) => d.code)).toContain("V006");
+	});
+
+	it("a feedback edge from outside a subflow process's downstream stays silent", () => {
+		// §15.3 permits both a disconnected feedback artifact and a downstream
+		// one, and the primary graph cannot tell a disconnected-but-wirable edge
+		// from a legitimate generation loop — so nothing is reported here.
+		const fm: Frontmatter = { process: { P: { subflow: "./child.pfdsl" } } };
+		const diags = diagnose("A >> P -> B\nX >>? P", fm, { strict: true });
+		expect(diags.filter((d) => d.code.startsWith("W0"))).toHaveLength(0);
 	});
 
 	it("valid chain: no errors", () => {
@@ -126,25 +169,26 @@ describe("validate", () => {
 		expect(codes("A >> P -> B", fm)).toContain("V007");
 	});
 
-	it("V029: index must be a positive integer (zero rejected)", () => {
-		const fm = {
-			artifact: { B: { index: 0 } },
-		} as unknown as Frontmatter;
-		expect(codes("A >> P -> B", fm)).toContain("V029");
+	// One case per disjunct of the `typeof idx !== "number" ||
+	// !Number.isInteger(idx) || idx < 1` guard; the non-number disjunct was the
+	// one no test reached (#609).
+	it.each([
+		["a non-number", { artifact: { B: { index: "high" } } }],
+		["zero", { artifact: { B: { index: 0 } } }],
+		["a non-integer", { process: { P: { index: 1.5 } } }],
+		["a negative number", { artifact: { B: { index: -3 } } }],
+	])("V029: index rejects %s", (_name, fm) => {
+		expect(codes("A >> P -> B", fm as unknown as Frontmatter)).toContain(
+			"V029",
+		);
 	});
 
-	it("V029: index must be a positive integer (non-integer rejected)", () => {
+	it("V029: names the offending value in the message, whatever its type", () => {
 		const fm = {
-			process: { P: { index: 1.5 } },
+			artifact: { B: { index: "high" } },
 		} as unknown as Frontmatter;
-		expect(codes("A >> P -> B", fm)).toContain("V029");
-	});
-
-	it("V029: index must be a positive integer (negative rejected)", () => {
-		const fm = {
-			artifact: { B: { index: -3 } },
-		} as unknown as Frontmatter;
-		expect(codes("A >> P -> B", fm)).toContain("V029");
+		const v029 = diagnose("A >> P -> B", fm).find((d) => d.code === "V029");
+		expect(v029?.message).toContain("'high'");
 	});
 
 	it("V029: valid positive-integer index produces no error", () => {
@@ -240,14 +284,6 @@ a >> design -> b
 		expect(cs).not.toContain("V003");
 	});
 
-	it("V002/V003: process with output but no input still triggers V002", () => {
-		expect(codes("P -> B")).toContain("V002");
-	});
-
-	it("V002/V003: process with input but no output still triggers V003", () => {
-		expect(codes("A >> P")).toContain("V003");
-	});
-
 	describe("W001: parts member without edges", () => {
 		it("warns when a parts member has no edges in the graph", () => {
 			const fm: Frontmatter = {
@@ -321,6 +357,152 @@ a >> design -> b
 		});
 	});
 
+	describe("V036: input and feedback for the same artifact-process pair", () => {
+		it("does not report V036 for distinct pairs containing quoted NUL IDs", () => {
+			const src =
+				'"a\0b" >> "c" -> out\n"a" >>? "b\0c"\nseed >> "b\0c" -> result';
+			expect(diagnose(src).filter((d) => d.code === "V036")).toEqual([]);
+		});
+
+		it("reports one error in both modes and does not also report V011", () => {
+			const src = "a >> p -> b\na >>? p";
+			for (const options of [undefined, { strict: true }]) {
+				const diags = diagnose(src, null, options);
+				expect(diags.map((d) => d.code)).toEqual(["V036"]);
+				expect(diags[0]?.severity).toBe("error");
+				expect(diags[0]?.message).toContain(
+					"both as an input (>>) and as feedback (>>?)",
+				);
+			}
+		});
+
+		it("reports the same conflict when feedback is written first", () => {
+			const diags = diagnose("a >>? p\na >> p -> b");
+			expect(diags.map((d) => d.code)).toEqual(["V036"]);
+		});
+
+		it("does not report a conflict when the two edge kinds target different processes", () => {
+			expect(codes("a >> p -> b\na >>? q")).not.toContain("V036");
+		});
+
+		it("reports one V036 per conflicting pair", () => {
+			const diags = diagnose("b >> q -> c\na >> p -> d\nb >>? q\na >>? p");
+			expect(diags.filter((d) => d.code === "V036")).toHaveLength(2);
+		});
+
+		describe("range", () => {
+			/** Line/column span of each V036, analyzed with the parsed document available. */
+			function v036Spans(src: string) {
+				const { tokens } = lex(src);
+				const { document } = parseTokens(tokens);
+				return diagnose(src, null, { document })
+					.filter((d) => d.code === "V036")
+					.map(({ range: { start, end } }) => [
+						[start.line, start.column],
+						[end.line, end.column],
+					]);
+			}
+
+			it("spans the feedback edge from its artifact to its process", () => {
+				expect(v036Spans("a >> p -> b\na >>? p")).toEqual([
+					[
+						[2, 1],
+						[2, 8],
+					],
+				]);
+			});
+
+			it("points at the feedback edge when it is written before the input", () => {
+				expect(v036Spans("a >>? p\na >> p -> b")).toEqual([
+					[
+						[1, 1],
+						[1, 8],
+					],
+				]);
+			});
+
+			it("points at a feedback segment inside a chain", () => {
+				expect(v036Spans("x >> q -> a >>? p\na >> p -> b")).toEqual([
+					[
+						[1, 11],
+						[1, 18],
+					],
+				]);
+			});
+
+			it("starts at the conflicting ID of a multi-artifact expression", () => {
+				expect(v036Spans("[c, a] >>? p\na >> p -> b\nc >> s -> d")).toEqual([
+					[
+						[1, 5],
+						[1, 13],
+					],
+				]);
+			});
+
+			it("uses the first feedback occurrence of a repeated edge", () => {
+				expect(v036Spans("a >> p -> b\na >>? p\na >>? p")).toEqual([
+					[
+						[2, 1],
+						[2, 8],
+					],
+				]);
+			});
+
+			it("falls back to the document start without a parsed document", () => {
+				const [diag] = diagnose("a >> p -> b\na >>? p").filter(
+					(d) => d.code === "V036",
+				);
+				expect(diag?.range).toEqual({
+					start: { line: 1, column: 1, offset: 0 },
+					end: { line: 1, column: 1, offset: 0 },
+				});
+			});
+
+			it("reads the document's statements once however many pairs conflict", () => {
+				const ids = Array.from({ length: 50 }, (_, i) => `a${i}`).join(", ");
+				const src = `[${ids}] >> p -> b\n[${ids}] >>? p`;
+				const { tokens } = lex(src);
+				const { document } = parseTokens(tokens);
+				const { edges, nodeKinds } = normalize(document, null);
+				let reads = 0;
+				const counted = {
+					type: document.type,
+					get statements() {
+						reads++;
+						return document.statements;
+					},
+				};
+				const diags = validate(edges, nodeKinds, null, { document: counted });
+				expect(diags.filter((d) => d.code === "V036")).toHaveLength(50);
+				expect(reads).toBe(1);
+			});
+
+			it("reads no statements when nothing conflicts", () => {
+				const { tokens } = lex("a >> p -> b");
+				const { document } = parseTokens(tokens);
+				const { edges, nodeKinds } = normalize(document, null);
+				let reads = 0;
+				const counted = {
+					type: document.type,
+					get statements() {
+						reads++;
+						return document.statements;
+					},
+				};
+				validate(edges, nodeKinds, null, { document: counted });
+				expect(reads).toBe(0);
+			});
+		});
+
+		it("keeps an identical repeated input as an N003 warning only", () => {
+			const { tokens } = lex("a >> p -> b\na >> p");
+			const { document } = parseTokens(tokens);
+			const diags = normalize(document, null).diagnostics;
+			expect(diags.map((d) => d.code)).toEqual(["N003"]);
+			expect(diags[0]?.severity).toBe("warning");
+		});
+	});
+
 	describe("V010: primary-graph cycle detection", () => {
 		it("detects a direct cycle between two processes", () => {
 			// a >> p -> b  +  b >> q -> a  forms a cycle in the primary graph
@@ -329,6 +511,41 @@ a >> design -> b
 
 		it("detects a longer cycle spanning three processes", () => {
 			expect(codes("a >> p -> b\nb >> q -> c\nc >> r -> a")).toContain("V010");
+		});
+
+		it("reports all independent cycles, not just the first", () => {
+			// Two disjoint cycles: a→p→b→q→a and c→r→d→s→c. Reporting only the
+			// first would leave the second silent until the first is fixed, one
+			// re-run per cycle. V019 already reports every revises cycle; the
+			// primary-graph check answers the same way.
+			const cs = codes("a >> p -> b\nb >> q -> a\nc >> r -> d\nd >> s -> c");
+			expect(cs.filter((c) => c === "V010")).toHaveLength(2);
+		});
+
+		it("each V010 names an edge of the cycle it reports, so the two are distinguishable", () => {
+			const firstCycle = new Set(["a", "p", "b", "q"]);
+			const secondCycle = new Set(["c", "r", "d", "s"]);
+			const diags = diagnose(
+				"a >> p -> b\nb >> q -> a\nc >> r -> d\nd >> s -> c",
+			);
+			// Classify by the quoted node ids, not by substring: every message
+			// shares the wording, so a bare includes() would match either one.
+			const reported = diags
+				.filter((d) => d.code === "V010")
+				.map((d) => {
+					const [, from, to] = d.message.match(/'([^']+)' → '([^']+)'/) ?? [];
+					return { from, to };
+				});
+			expect(
+				reported.filter(
+					(e) => firstCycle.has(e.from ?? "") && firstCycle.has(e.to ?? ""),
+				),
+			).toHaveLength(1);
+			expect(
+				reported.filter(
+					(e) => secondCycle.has(e.from ?? "") && secondCycle.has(e.to ?? ""),
+				),
+			).toHaveLength(1);
 		});
 
 		it("does not report V010 for a valid acyclic graph", () => {
@@ -633,6 +850,37 @@ a >> design -> b
 		});
 	});
 
+	// §16 requires every cycle-detecting code to report one diagnostic per
+	// independent cycle. V010 used to stop after the first; these lock the rule
+	// for the codes that live in this module so none of them regresses to it.
+	describe("cycle codes report every independent cycle (§16)", () => {
+		it("V006 reports both disjoint parts cycles", () => {
+			const fm: Frontmatter = {
+				artifact: {
+					a: { parts: ["b"] },
+					b: { parts: ["a"] },
+					c: { parts: ["d"] },
+					d: { parts: ["c"] },
+				},
+			};
+			expect(codes("", fm).filter((c) => c === "V006")).toHaveLength(2);
+		});
+
+		it("V025 reports both disjoint group parent cycles", () => {
+			const fm: Frontmatter = {
+				group: {
+					g1: { parent: "g2" },
+					g2: { parent: "g1" },
+					g3: { parent: "g4" },
+					g4: { parent: "g3" },
+				},
+			};
+			expect(codes("A >> P -> B", fm).filter((c) => c === "V025")).toHaveLength(
+				2,
+			);
+		});
+	});
+
 	describe("V025: cycle in group parent chain", () => {
 		it("errors when group parent forms a direct cycle (A → B → A)", () => {
 			const fm: Frontmatter = {
@@ -697,40 +945,15 @@ a >> design -> b
 	});
 
 	describe("W003: status non-monotonicity (output done while input not done)", () => {
-		it("warns when output artifact is done but input artifact is not done", () => {
+		// Every non-done status counts as "not done" for the monotonicity rule,
+		// so the case list is derived rather than spelled out — a status added
+		// later joins the assertion instead of slipping past it.
+		it.each(
+			STATUS_VALUES.filter((s): s is Status => s !== "done"),
+		)("warns when output artifact is done but input artifact is %s", (status) => {
 			const fm: Frontmatter = {
 				artifact: {
-					inp: { status: "wip", criteria: "x" },
-					out: { status: "done", criteria: "y" },
-				},
-			};
-			expect(codes("inp >> P -> out", fm)).toContain("W003");
-		});
-
-		it("warns when output artifact is done but input artifact is todo", () => {
-			const fm: Frontmatter = {
-				artifact: {
-					inp: { status: "todo", criteria: "x" },
-					out: { status: "done", criteria: "y" },
-				},
-			};
-			expect(codes("inp >> P -> out", fm)).toContain("W003");
-		});
-
-		it("warns when output artifact is done but input artifact is waiting", () => {
-			const fm: Frontmatter = {
-				artifact: {
-					inp: { status: "waiting", criteria: "x" },
-					out: { status: "done", criteria: "y" },
-				},
-			};
-			expect(codes("inp >> P -> out", fm)).toContain("W003");
-		});
-
-		it("warns when output artifact is done but input artifact is suspended", () => {
-			const fm: Frontmatter = {
-				artifact: {
-					inp: { status: "suspended", criteria: "x" },
+					inp: { status, criteria: "x" },
 					out: { status: "done", criteria: "y" },
 				},
 			};
@@ -864,18 +1087,10 @@ a >> design -> b
 			expect(codes("A >> P -> B", fm)).toContain("V031");
 		});
 
-		it("no V031 for type: roadmap", () => {
-			const fm: Frontmatter = { type: "roadmap" };
-			expect(codes("A >> P -> B", fm)).not.toContain("V031");
-		});
-
-		it("no V031 for type: workflow", () => {
-			const fm: Frontmatter = { type: "workflow" };
-			expect(codes("A >> P -> B", fm)).not.toContain("V031");
-		});
-
-		it("no V031 for type: runtime-pipeline", () => {
-			const fm: Frontmatter = { type: "runtime-pipeline" };
+		// V031 accepts exactly the declared enum, so the accepted cases are the
+		// enum itself — a type added later is asserted without editing this file.
+		it.each(PFD_TYPE_VALUES)("no V031 for type: %s", (type) => {
+			const fm: Frontmatter = { type };
 			expect(codes("A >> P -> B", fm)).not.toContain("V031");
 		});
 
@@ -912,102 +1127,382 @@ a >> design -> b
 		});
 	});
 
-	describe("W005: produced artifact with no status (roadmap files only)", () => {
-		// W005 fires only when type: roadmap and a produced artifact has no status field.
-		// Source artifacts (input-only) and non-roadmap files are exempt.
+	describe("W007: status declared in a non-roadmap file (#787)", () => {
+		// A flow file that explicitly declares any kind other than roadmap must
+		// not carry status at all — progress belongs to the roadmap.
 
-		it("warns when produced artifact has no status (frontmatter declared)", () => {
-			const fm: Frontmatter = { type: "roadmap", artifact: { B: {} } };
-			expect(codes("A >> P -> B", fm)).toContain("W005");
-		});
-
-		it("warns when produced artifact has no status (not declared in frontmatter)", () => {
-			// B is produced by P but has no frontmatter entry; type: roadmap triggers W005.
-			const fm: Frontmatter = { type: "roadmap" };
-			expect(codes("A >> P -> B", fm)).toContain("W005");
-		});
-
-		it("no W005 when type is absent (non-roadmap intent)", () => {
-			expect(codes("A >> P -> B")).not.toContain("W005");
-		});
-
-		it("no W005 when type is workflow", () => {
-			const fm: Frontmatter = { type: "workflow" };
-			expect(codes("A >> P -> B", fm)).not.toContain("W005");
-		});
-
-		it("no W005 when type is runtime-pipeline", () => {
-			const fm: Frontmatter = { type: "runtime-pipeline" };
-			expect(codes("A >> P -> B", fm)).not.toContain("W005");
-		});
-
-		it("no W005 when produced artifact has status: done", () => {
+		// Every explicit kind other than roadmap is a flow kind, so driving the
+		// cases off the enum keeps the claim true for kinds added later.
+		it.each(
+			PFD_TYPE_VALUES.filter((type) => type !== "roadmap"),
+		)("warns when an artifact has status in a %s file", (type) => {
 			const fm: Frontmatter = {
-				type: "roadmap",
-				artifact: { B: { status: "done" } },
+				type,
+				artifact: { B: { status: "wip" } },
 			};
-			expect(codes("A >> P -> B", fm)).not.toContain("W005");
+			expect(codes("A >> P -> B", fm)).toContain("W007");
 		});
 
-		it("no W005 when produced artifact has status: wip", () => {
+		// W007 asks only whether a status is present, so every member of the
+		// enum must trigger it.
+		it.each(STATUS_VALUES)("warns for status: %s", (status) => {
+			const fm: Frontmatter = {
+				type: "workflow",
+				artifact: { B: { status } },
+			};
+			expect(codes("A >> P -> B", fm)).toContain("W007");
+		});
+
+		it("warns for a source artifact too (input-only)", () => {
+			// W007 does not exempt source artifacts: the rule is that a flow
+			// file carries no status anywhere.
+			const fm: Frontmatter = {
+				type: "workflow",
+				artifact: { A: { status: "done" } },
+			};
+			const diags = diagnose("A >> P -> B", fm);
+			expect(
+				diags.filter((d) => d.code === "W007" && d.message.includes("'A'")),
+			).toHaveLength(1);
+		});
+
+		it("no W007 when no artifact declares a status", () => {
+			const fm: Frontmatter = {
+				type: "workflow",
+				artifact: { A: {}, B: { label: "B" } },
+			};
+			expect(codes("A >> P -> B", fm)).not.toContain("W007");
+		});
+
+		it("no W007 in a roadmap file", () => {
 			const fm: Frontmatter = {
 				type: "roadmap",
 				artifact: { B: { status: "wip" } },
 			};
-			expect(codes("A >> P -> B", fm)).not.toContain("W005");
+			expect(codes("A >> P -> B", fm)).not.toContain("W007");
 		});
 
-		it("no W005 when produced artifact has status: todo", () => {
-			const fm: Frontmatter = {
-				type: "roadmap",
-				artifact: { B: { status: "todo" } },
-			};
-			expect(codes("A >> P -> B", fm)).not.toContain("W005");
+		it("no W007 when type is absent (treated as roadmap, W006 territory)", () => {
+			const fm: Frontmatter = { artifact: { B: { status: "wip" } } };
+			expect(codes("A >> P -> B", fm)).not.toContain("W007");
 		});
 
-		it("no W005 when produced artifact has status: waiting", () => {
+		it("reports one diagnostic per offending artifact", () => {
 			const fm: Frontmatter = {
-				type: "roadmap",
-				artifact: { B: { status: "waiting" } },
-			};
-			expect(codes("A >> P -> B", fm)).not.toContain("W005");
-		});
-
-		it("no W005 when produced artifact has status: suspended", () => {
-			const fm: Frontmatter = {
-				type: "roadmap",
-				artifact: { B: { status: "suspended" } },
-			};
-			expect(codes("A >> P -> B", fm)).not.toContain("W005");
-		});
-
-		it("no W005 for source artifact (input-only)", () => {
-			// A is source — no process outputs it, so W005 does not apply to A.
-			const fm: Frontmatter = {
-				type: "roadmap",
-				artifact: { A: {}, B: { status: "todo" } },
+				type: "workflow",
+				artifact: { A: { status: "done" }, B: { status: "wip" } },
 			};
 			const diags = diagnose("A >> P -> B", fm);
-			expect(
-				diags.filter((d) => d.code === "W005" && d.message.includes("'A'")),
-			).toHaveLength(0);
+			expect(diags.filter((d) => d.code === "W007")).toHaveLength(2);
 		});
 
-		it("W005 severity is warning in non-strict mode", () => {
-			const fm: Frontmatter = { type: "roadmap" };
-			const diags = diagnose("A >> P -> B", fm);
-			const w005 = diags.find((d) => d.code === "W005");
-			expect(w005?.severity).toBe("warning");
+		it("W007 severity is warning in non-strict mode", () => {
+			const fm: Frontmatter = {
+				type: "workflow",
+				artifact: { B: { status: "wip" } },
+			};
+			const w007 = diagnose("A >> P -> B", fm).find((d) => d.code === "W007");
+			expect(w007?.severity).toBe("warning");
 		});
 
-		it("W005 becomes error in strict mode", () => {
-			const fm: Frontmatter = { type: "roadmap" };
+		it("W007 becomes error in strict mode", () => {
+			const fm: Frontmatter = {
+				type: "workflow",
+				artifact: { B: { status: "wip" } },
+			};
 			const { tokens } = lex("A >> P -> B");
 			const { document } = parseTokens(tokens);
 			const { edges, nodeKinds } = normalize(document, fm);
 			const diags = validate(edges, nodeKinds, fm, { strict: true });
-			const w005 = diags.find((d) => d.code === "W005");
-			expect(w005?.severity).toBe("error");
+			const w007 = diags.find((d) => d.code === "W007");
+			expect(w007?.severity).toBe("error");
 		});
+	});
+
+	describe("V035: undeclared artifact used on an edge (roadmap only, #1125)", () => {
+		// Reproduces the ghost-node scenario: a frontmatter artifact block gets
+		// deleted but the edge line that mentions it survives. Nothing else in
+		// the checker catches this — check passes, graph orphans reports none,
+		// meta get returns {}, and status ready still counts the id as a
+		// satisfied input.
+
+		it("errors when an edge-only artifact has no frontmatter declaration", () => {
+			const fm: Frontmatter = {
+				type: "roadmap",
+				artifact: { C: { status: "done" } },
+			};
+			expect(codes("[ghost, B] >> P -> C", fm)).toContain("V035");
+		});
+
+		it("does not error when every edge artifact is declared with a status", () => {
+			const fm: Frontmatter = {
+				type: "roadmap",
+				artifact: {
+					A: { status: "done" },
+					B: { status: "done" },
+					C: { status: "todo" },
+				},
+			};
+			expect(codes("[A, B] >> P -> C", fm)).not.toContain("V035");
+		});
+
+		it("does not fire in a workflow file with the same implicit artifact", () => {
+			const fm: Frontmatter = { type: "workflow", artifact: { C: {} } };
+			expect(codes("[ghost, B] >> P -> C", fm)).not.toContain("V035");
+		});
+
+		it("does not fire in a pipeline file with the same implicit artifact", () => {
+			const fm: Frontmatter = { type: "pipeline", artifact: { C: {} } };
+			expect(codes("[ghost, B] >> P -> C", fm)).not.toContain("V035");
+		});
+
+		it("does not fire when type is omitted", () => {
+			expect(codes("[ghost, B] >> P -> C")).not.toContain("V035");
+		});
+
+		it("does not flag process ids, only artifacts", () => {
+			// P has no frontmatter process: entry either, but V035 looks only at
+			// artifacts — a process's own declaration gap is V020/V003 territory.
+			const fm: Frontmatter = {
+				type: "roadmap",
+				artifact: { A: { status: "done" }, C: { status: "todo" } },
+			};
+			const diags = diagnose("A >> P -> C", fm);
+			expect(
+				diags.filter((d) => d.code === "V035" && d.message.includes("'P'")),
+			).toHaveLength(0);
+		});
+
+		it("reports one diagnostic per undeclared artifact", () => {
+			const fm: Frontmatter = {
+				type: "roadmap",
+				artifact: { C: { status: "todo" } },
+			};
+			const diags = diagnose("[ghost1, ghost2] >> P -> C", fm);
+			expect(diags.filter((d) => d.code === "V035")).toHaveLength(2);
+		});
+
+		it("is an unconditional error, unaffected by --strict", () => {
+			const fm: Frontmatter = {
+				type: "roadmap",
+				artifact: { C: { status: "todo" } },
+			};
+			const lenient = diagnose("[ghost, B] >> P -> C", fm).find(
+				(d) => d.code === "V035",
+			);
+			const { tokens } = lex("[ghost, B] >> P -> C");
+			const { document } = parseTokens(tokens);
+			const { edges, nodeKinds } = normalize(document, fm);
+			const strict = validate(edges, nodeKinds, fm, { strict: true }).find(
+				(d) => d.code === "V035",
+			);
+			expect(lenient?.severity).toBe("error");
+			expect(strict?.severity).toBe("error");
+		});
+
+		// #1125 follow-up: a declaration with no `status:` (including an empty
+		// `id: {}` block) is no longer enough to satisfy V035 — it must also
+		// carry a status. This is the strengthened half of the rule, which now
+		// covers the produced-artifact-missing-status case a separate warning
+		// used to check on its own.
+		it("errors when a declaration exists but has no status (empty block)", () => {
+			const fm: Frontmatter = {
+				type: "roadmap",
+				artifact: { A: { status: "done" }, B: {} },
+			};
+			expect(codes("A >> P -> B", fm)).toContain("V035");
+		});
+
+		it("errors when a declaration exists but has no status (other fields present)", () => {
+			const fm: Frontmatter = {
+				type: "roadmap",
+				artifact: { A: { status: "done" }, B: { label: "B" } },
+			};
+			expect(codes("A >> P -> B", fm)).toContain("V035");
+		});
+
+		it("does not error when the declaration has a status", () => {
+			const fm: Frontmatter = {
+				type: "roadmap",
+				artifact: { A: { status: "done" }, B: { status: "todo" } },
+			};
+			expect(codes("A >> P -> B", fm)).not.toContain("V035");
+		});
+
+		it("does not flag a missing-status source artifact in a workflow file", () => {
+			const fm: Frontmatter = { type: "workflow", artifact: { B: {} } };
+			expect(codes("A >> P -> B", fm)).not.toContain("V035");
+		});
+
+		it("does not fire on a declared artifact that never appears on an edge (#1125 review defect 3)", () => {
+			const fm: Frontmatter = {
+				type: "roadmap",
+				artifact: { future: {} },
+			};
+			expect(codes("", fm)).not.toContain("V035");
+		});
+
+		it("still fires on a status-less artifact that does appear on an edge, alongside an unconnected declaration", () => {
+			const fm: Frontmatter = {
+				type: "roadmap",
+				artifact: { A: { status: "done" }, B: {}, future: {} },
+			};
+			expect(codes("A >> P -> B", fm)).toContain("V035");
+		});
+
+		it("distinguishes 'no declaration' from 'declared without status' in the message", () => {
+			const fm: Frontmatter = {
+				type: "roadmap",
+				artifact: { A: { status: "done" }, B: {} },
+			};
+			const diags = diagnose("[ghost, A] >> P -> B", fm);
+			const v035 = diags.filter((d) => d.code === "V035");
+			expect(v035).toHaveLength(2);
+			const ghostMsg = v035.find((d) => d.message.includes("'ghost'"))?.message;
+			const bMsg = v035.find((d) => d.message.includes("'B'"))?.message;
+			expect(ghostMsg).toMatch(/no frontmatter declaration/);
+			expect(bMsg).not.toMatch(/no frontmatter declaration/);
+			expect(bMsg).toMatch(/status/);
+			expect(ghostMsg).not.toBe(bMsg);
+		});
+	});
+});
+
+describe("graph diagnostic ranges", () => {
+	/** Line/column spans of one code's diagnostics, with the parsed document available. */
+	function spans(src: string, code: string, options: ValidateOptions = {}) {
+		const { tokens } = lex(src);
+		const { document } = parseTokens(tokens);
+		return diagnose(src, null, { ...options, document })
+			.filter((d) => d.code === code)
+			.map(({ range: { start, end } }) => [
+				[start.line, start.column],
+				[end.line, end.column],
+			]);
+	}
+
+	it("V010 spans the output edge its message names", () => {
+		expect(spans("a >> p -> b\nb >> q -> a", "V010")).toEqual([
+			[
+				[2, 6],
+				[2, 12],
+			],
+		]);
+	});
+
+	it("V010 spans the input edge its message names", () => {
+		expect(spans("x >> q -> a\na >> p -> b\nb >> q", "V010")).toEqual([
+			[
+				[3, 1],
+				[3, 7],
+			],
+		]);
+	});
+
+	it("V001 spans the output edge of the second producer", () => {
+		expect(spans("A >> P -> C\nB >> Q -> C", "V001")).toEqual([
+			[
+				[2, 6],
+				[2, 12],
+			],
+		]);
+	});
+
+	it("V002 spans the process ID where it first appears in the body", () => {
+		expect(spans("a >> q -> b\np -> c\np -> d", "V002")).toEqual([
+			[
+				[2, 1],
+				[2, 2],
+			],
+		]);
+	});
+
+	it("V003 spans the process ID where it first appears in the body", () => {
+		expect(spans("a >> q -> b\nb >> p", "V003")).toEqual([
+			[
+				[2, 6],
+				[2, 7],
+			],
+		]);
+	});
+
+	it("W008 spans the process ID where it first appears in the body", () => {
+		expect(spans("a >> q -> b\nb >>? p -> c", "W008")).toEqual([
+			[
+				[2, 7],
+				[2, 8],
+			],
+		]);
+	});
+
+	it("V011 spans the feedback edge that closes the reverse cycle", () => {
+		expect(
+			spans("a >> p -> b\nb >> q -> c\na >>? q", "V011", { strict: true }),
+		).toEqual([
+			[
+				[3, 1],
+				[3, 8],
+			],
+		]);
+	});
+
+	it("V003 ignores an earlier use of the same ID as an artifact", () => {
+		const { tokens } = lex("a >> p\np >> a");
+		const { document } = parseTokens(tokens);
+		const diag = diagnose("a >> p\np >> a", null, { document }).find(
+			(d) => d.code === "V003" && d.message.includes("'a'"),
+		);
+		expect(diag?.range.start).toMatchObject({ line: 2, column: 6 });
+	});
+
+	it("V010 spans the named edge when a declared kind conflicts with its use", () => {
+		const source =
+			"---\nartifact: {p: {label: P}, q: {label: Q}}\n---\na >> p\np -> a\n";
+		const cycles = analyzeSource(source).diagnostics.filter(
+			(d) => d.code === "V010",
+		);
+		expect(cycles.length).toBeGreaterThan(0);
+		for (const d of cycles) expect(d.range.start.line).toBeGreaterThan(3);
+	});
+
+	it("V020 spans the process declaration in front matter", () => {
+		const source = "---\nprocess:\n  orphan: { label: O }\n---\na >> p -> b\n";
+		const diag = analyzeSource(source).diagnostics.find(
+			(d) => d.code === "V020",
+		);
+		expect(diag?.range.start).toMatchObject({ line: 3, column: 3 });
+	});
+
+	it("keeps the document start for these codes without a parsed document", () => {
+		const zero = {
+			start: { line: 1, column: 1, offset: 0 },
+			end: { line: 1, column: 1, offset: 0 },
+		};
+		const diags = diagnose("a >> q -> b\nb >> p\nb >> q -> a\nr -> b").filter(
+			(d) => ["V001", "V002", "V003", "V010"].includes(d.code),
+		);
+		expect([...new Set(diags.map((d) => d.code))].sort()).toEqual([
+			"V001",
+			"V002",
+			"V003",
+			"V010",
+		]);
+		for (const d of diags) expect(d.range).toEqual(zero);
+	});
+
+	it("reads no statements when no graph diagnostic needs a position", () => {
+		const { tokens } = lex("a >> p -> b");
+		const { document } = parseTokens(tokens);
+		const { edges, nodeKinds } = normalize(document, null);
+		let reads = 0;
+		const counted = {
+			type: document.type,
+			get statements() {
+				reads++;
+				return document.statements;
+			},
+		};
+		validate(edges, nodeKinds, null, { document: counted });
+		expect(reads).toBe(0);
 	});
 });

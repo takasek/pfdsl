@@ -1,0 +1,68 @@
+name: repair generated conflicts
+run-name: "${{ inputs.mode == 'validate' && 'Validate' || 'Repair' }} generated conflicts for PR #${{ inputs.pull-request }}"
+
+on:
+  workflow_dispatch:
+    inputs:
+      pull-request:
+        description: Open same-repository PR targeting main
+        type: string
+        required: true
+      mode:
+        description: Validate prepares and checks a repair without publishing it
+        type: choice
+        options: [repair, validate]
+        default: repair
+
+# Called jobs narrow their own permissions; only publication has write access.
+permissions:
+  contents: write
+  pull-requests: read
+
+concurrency:
+  group: generated-repair-${{ inputs.pull-request }}
+  cancel-in-progress: false
+
+jobs:
+  attempt-1:
+    uses: ./.github/workflows/repair-generated-conflicts-attempt.yml
+    with:
+      pull-request: ${{ inputs.pull-request }}
+      mode: ${{ inputs.mode }}
+      attempt: 1
+    secrets:
+      REPO_AUTOMATION_APP_PRIVATE_KEY: ${{ secrets.REPO_AUTOMATION_APP_PRIVATE_KEY }}
+
+  attempt-2:
+    needs: attempt-1
+    if: needs.attempt-1.outputs.retry == 'true'
+    uses: ./.github/workflows/repair-generated-conflicts-attempt.yml
+    with:
+      pull-request: ${{ inputs.pull-request }}
+      mode: ${{ inputs.mode }}
+      attempt: 2
+    secrets:
+      REPO_AUTOMATION_APP_PRIVATE_KEY: ${{ secrets.REPO_AUTOMATION_APP_PRIVATE_KEY }}
+
+  attempt-3:
+    needs: attempt-2
+    if: needs.attempt-2.outputs.retry == 'true'
+    uses: ./.github/workflows/repair-generated-conflicts-attempt.yml
+    with:
+      pull-request: ${{ inputs.pull-request }}
+      mode: ${{ inputs.mode }}
+      attempt: 3
+    secrets:
+      REPO_AUTOMATION_APP_PRIVATE_KEY: ${{ secrets.REPO_AUTOMATION_APP_PRIVATE_KEY }}
+
+  retry-limit:
+    needs: attempt-3
+    if: needs.attempt-3.outputs.retry == 'true'
+    runs-on: ubuntu-latest
+    permissions: {}
+    steps:
+      - name: Explain repeated concurrent changes
+        run: |
+          echo '::error::The PR or conflicting main changes continued across three repair attempts. Rerun after those updates settle.'
+          echo 'Repair could not stabilize after three attempts. No repair was pushed. Rerun after the concurrent updates settle.' >> "$GITHUB_STEP_SUMMARY"
+          exit 1

@@ -1,0 +1,178 @@
+import { describe, expect, it } from "vitest";
+import { analyzeSnapshot } from "./document.js";
+import {
+	buildDescriptions,
+	buildLocations,
+	buildSubflows,
+	normalizeLocation,
+} from "./location-utils.js";
+
+it.each([
+	"constructor",
+	"toString",
+	"__proto__",
+])("keeps authored %s metadata through preview message serialization", (id) => {
+	const source = `---\nprocess:\n  ${id}:\n    label: Authored\n    subflow: child.pfdsl\n---\na >> ${id} -> b\n`;
+	const fm = analyzeSnapshot(source).frontmatter;
+	expect(JSON.parse(JSON.stringify(buildDescriptions(fm)))).toEqual({
+		[id]: [
+			["**", "Authored"],
+			["subflow", "child.pfdsl"],
+		],
+	});
+	expect(JSON.parse(JSON.stringify(buildLocations(fm)))).toEqual({
+		[id]: ["child.pfdsl"],
+	});
+	expect(JSON.parse(JSON.stringify(buildSubflows(fm)))).toEqual({
+		[id]: "child.pfdsl",
+	});
+});
+
+describe("normalizeLocation", () => {
+	it("wraps a non-empty string in an array", () => {
+		expect(normalizeLocation("docs/spec.md")).toEqual(["docs/spec.md"]);
+	});
+
+	it("returns empty array for empty string", () => {
+		expect(normalizeLocation("")).toEqual([]);
+	});
+
+	it("filters non-string items from an array", () => {
+		expect(normalizeLocation(["a.ts", 42, "b.ts", ""])).toEqual([
+			"a.ts",
+			"b.ts",
+		]);
+	});
+
+	it("returns empty array for null/undefined/number", () => {
+		expect(normalizeLocation(null)).toEqual([]);
+		expect(normalizeLocation(undefined)).toEqual([]);
+		expect(normalizeLocation(42)).toEqual([]);
+	});
+});
+
+describe("buildLocations", () => {
+	it("returns empty object for null frontmatter", () => {
+		expect(buildLocations(null)).toEqual({});
+	});
+
+	it("normalizes scalar string location for artifact", () => {
+		const fm = { artifact: { spec: { location: "docs/spec.md" } } };
+		expect(buildLocations(fm)).toEqual({ spec: ["docs/spec.md"] });
+	});
+
+	it("normalizes array location for artifact", () => {
+		const fm = { artifact: { spec: { location: ["a.ts", "b.ts"] } } };
+		expect(buildLocations(fm)).toEqual({ spec: ["a.ts", "b.ts"] });
+	});
+
+	it("includes artifact URL locations", () => {
+		const fm = {
+			artifact: { spec: { location: "https://example.com/spec" } },
+		};
+		expect(buildLocations(fm)).toEqual({ spec: ["https://example.com/spec"] });
+	});
+
+	it("includes URL-only process locations", () => {
+		const fm = {
+			process: { P: { location: "https://example.com/doc" } },
+		};
+		expect(buildLocations(fm)).toEqual({ P: ["https://example.com/doc"] });
+	});
+
+	it("includes file-path process locations", () => {
+		const fm = { process: { P: { subflow: "child.pfdsl" } } };
+		expect(buildLocations(fm)).toEqual({ P: ["child.pfdsl"] });
+	});
+
+	it("prefers location over subflow when both are present", () => {
+		const fm = {
+			process: { P: { location: "https://x.com/", subflow: "child.pfdsl" } },
+		};
+		expect(buildLocations(fm)).toEqual({ P: ["https://x.com/"] });
+	});
+});
+
+describe("buildDescriptions", () => {
+	it("returns empty object for null frontmatter", () => {
+		expect(buildDescriptions(null)).toEqual({});
+	});
+
+	it("includes description and criteria as separate rows", () => {
+		const fm = {
+			artifact: { a: { description: "詳細", criteria: "承認済み" } },
+		};
+		expect(buildDescriptions(fm)).toEqual({
+			a: [
+				["", "詳細"],
+				["criteria", "承認済み"],
+			],
+		});
+	});
+
+	it("puts label as bold row before description", () => {
+		const fm = {
+			artifact: { a: { label: "Spec", description: "詳細" } },
+		};
+		expect(buildDescriptions(fm)).toEqual({
+			a: [
+				["**", "Spec"],
+				["", "詳細"],
+			],
+		});
+	});
+
+	it.each([
+		"",
+		" \t ",
+	])("omits blank artifact and process labels from tooltip rows for %j", (label) => {
+		expect(
+			buildDescriptions({
+				artifact: { a: { label } },
+				process: { p: { label } },
+			}),
+		).toEqual({});
+	});
+
+	it("appends comma-joined locations for array location", () => {
+		const fm = {
+			artifact: { a: { location: ["x.ts", "y.ts"] } },
+		};
+		expect(buildDescriptions(fm)).toEqual({ a: [["location", "x.ts, y.ts"]] });
+	});
+
+	it("includes process description and other fields as rows", () => {
+		const fm = {
+			process: { P: { description: "proc desc", command: "make run" } },
+		};
+		expect(buildDescriptions(fm)).toEqual({
+			P: [
+				["", "proc desc"],
+				["command", "make run"],
+			],
+		});
+	});
+
+	it("includes process location as a row", () => {
+		const fm = {
+			process: { P: { location: "https://github.com/example/repo/issues/1" } },
+		};
+		expect(buildDescriptions(fm)).toEqual({
+			P: [["location", "https://github.com/example/repo/issues/1"]],
+		});
+	});
+});
+
+describe("buildSubflows", () => {
+	it("returns subflow when location absent", () => {
+		const fm = { process: { P: { subflow: "child.pfdsl" } } };
+		expect(buildSubflows(fm)).toEqual({ P: "child.pfdsl" });
+	});
+
+	it("omits subflow when process has a location", () => {
+		const fm = {
+			process: { P: { subflow: "child.pfdsl", location: "child.pfdsl" } },
+		};
+		expect(buildSubflows(fm)).toEqual({});
+	});
+});

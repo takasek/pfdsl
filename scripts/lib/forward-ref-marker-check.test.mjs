@@ -1,11 +1,57 @@
-import { describe, it } from "node:test";
 import assert from "node:assert/strict";
+import { describe, it } from "node:test";
 import {
 	findForwardRefMarkers,
 	findImplementsMarkers,
-	matchResolvedForwardRefs,
+	forEachNonFencedLine,
 	formatResolvedForwardRefs,
+	matchResolvedForwardRefs,
 } from "./forward-ref-marker-check.mjs";
+
+describe("forEachNonFencedLine", () => {
+	const visited = (lines) => {
+		const seen = [];
+		forEachNonFencedLine(lines.join("\n"), (line) => seen.push(line));
+		return seen;
+	};
+
+	it("keeps a fence open through a line of the other fence character", () => {
+		assert.deepEqual(visited(["```", "~~~", "inside", "```", "outside"]), [
+			"outside",
+		]);
+		assert.deepEqual(visited(["~~~", "```", "inside", "~~~", "outside"]), [
+			"outside",
+		]);
+	});
+
+	it("closes a fence only with a run at least as long as the opener", () => {
+		assert.deepEqual(visited(["````", "```", "inside", "````", "outside"]), [
+			"outside",
+		]);
+		assert.deepEqual(visited(["```", "inside", "````", "outside"]), [
+			"outside",
+		]);
+	});
+
+	it("does not close a fence on a line that carries text after the marker", () => {
+		assert.deepEqual(visited(["```", "```js", "inside", "```", "outside"]), [
+			"outside",
+		]);
+	});
+
+	it("opens a fence with an info string", () => {
+		assert.deepEqual(visited(["```md", "inside", "```", "outside"]), [
+			"outside",
+		]);
+	});
+
+	it("does not open a fence on a backtick run that contains another backtick", () => {
+		assert.deepEqual(visited(["```code``` text", "outside"]), [
+			"```code``` text",
+			"outside",
+		]);
+	});
+});
 
 describe("findForwardRefMarkers", () => {
 	it("finds a single marker", () => {
@@ -73,8 +119,16 @@ describe("findForwardRefMarkers", () => {
 });
 
 describe("findImplementsMarkers", () => {
+	it("recognizes both trailing IDs for the same heading", () => {
+		assert.deepEqual(findImplementsMarkers("### Rule (SPEC_old) (SPEC_new)"), [
+			{ line: 1, id: "SPEC_old" },
+			{ line: 1, id: "SPEC_new" },
+		]);
+	});
+
 	it("finds a single marker on a heading line", () => {
-		const text = "line one\n## Multifile (SPEC_multifile_cross_ref)\nline three";
+		const text =
+			"line one\n## Multifile (SPEC_multifile_cross_ref)\nline three";
 		const hits = findImplementsMarkers(text);
 		assert.equal(hits.length, 1);
 		assert.equal(hits[0].line, 2);
@@ -135,8 +189,12 @@ describe("matchResolvedForwardRefs", () => {
 	});
 
 	it("matches when forward-ref and implements share the same id", () => {
-		const forwardRefHits = [{ file: "spec.md", line: 10, id: "SPEC_multifile" }];
-		const implementsHits = [{ file: "spec.md", line: 20, id: "SPEC_multifile" }];
+		const forwardRefHits = [
+			{ file: "spec.md", line: 10, id: "SPEC_multifile" },
+		];
+		const implementsHits = [
+			{ file: "spec.md", line: 20, id: "SPEC_multifile" },
+		];
 		const resolved = matchResolvedForwardRefs(forwardRefHits, implementsHits);
 		assert.equal(resolved.length, 1);
 		assert.equal(resolved[0].id, "SPEC_multifile");
@@ -145,7 +203,9 @@ describe("matchResolvedForwardRefs", () => {
 	});
 
 	it("matches ids across multiple files", () => {
-		const forwardRefHits = [{ file: "spec.md", line: 10, id: "SPEC_multifile" }];
+		const forwardRefHits = [
+			{ file: "spec.md", line: 10, id: "SPEC_multifile" },
+		];
 		const implementsHits = [
 			{ file: "other.md", line: 5, id: "SPEC_multifile" },
 		];
@@ -156,7 +216,9 @@ describe("matchResolvedForwardRefs", () => {
 	});
 
 	it("collects multiple implements hits for the same forward-ref id", () => {
-		const forwardRefHits = [{ file: "spec.md", line: 10, id: "SPEC_multifile" }];
+		const forwardRefHits = [
+			{ file: "spec.md", line: 10, id: "SPEC_multifile" },
+		];
 		const implementsHits = [
 			{ file: "a.md", line: 1, id: "SPEC_multifile" },
 			{ file: "b.md", line: 2, id: "SPEC_multifile" },

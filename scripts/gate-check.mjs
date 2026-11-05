@@ -1,75 +1,260 @@
 #!/usr/bin/env node
 // Terminal-gate aggregate checker: runs the mechanically-verifiable items
-// from pfd-ops step 3 (check / audit-issues-flow / check-md-linebreaks /
-// gen-plugin identity / snapshot freshness / output-artifact status update)
+// from pfd-ops step 3 (check / audit-issues-flow /
+// gen-plugin identity / output-artifact status update)
 // against the diff from origin/<base> to HEAD, then prints the remaining
-// checklist items (extracted from the work-cycle checklist itself) as
-// MANUAL: lines.
-// Usage: node scripts/gate-check.mjs [--base main] [--artifact <key>]
+// canonical manual checklist locations as fixed guidance.
+// Usage: node scripts/gate-check.mjs [--base main] [--artifact <key> [--in-progress] | --no-artifact] [--issue <n> ...] [--source-config <json>]
 
-import { execSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
-import { resolve, dirname } from "node:path";
+import { dirname, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { parseArgs } from "node:util";
 import {
-	extractGateChecklist,
-	deriveManualItems,
-	matchesTrigger,
-	formatGateTable,
-	hasStatusChange,
-	statusChangedForArtifact,
-	GATE_CHECKLIST_SOURCE_PATH,
-	VSCODE_EXT_TRIGGER,
-	lintCommitSubjects,
-	wipTransitionDetected,
-	parseAuditTerminals,
+	buildSiblingConsumedMap,
+	classifyAuditIssuesFlowResult,
+	classifyChangedFilesByModeling,
+	classifyIssueLookupFailure,
+	collectModeledLocations,
+	derivePackageLayers,
 	diffNewTerminals,
 	diffReadySets,
-	classifyAuditIssuesFlowResult,
+	finishGateCheck,
+	formatGateTable,
+	formatRunTreeLine,
+	formatSizeDelta,
+	formatUnclassifiedLocations,
+	parseAuditExternalTerminals,
+	parseAuditTerminals,
+	parseInputConsumedArtifacts,
+	partitionNewTerminals,
+	sharesSiblingIdNamespace,
 } from "./lib/gate-check.mjs";
-import { GEN_PLUGIN_TRIGGER } from "./lib/gen-plugin-trigger.mjs";
+import {
+	analyzeAdoptedPfdsl,
+	changedFilesSince,
+	checkDocsStep,
+	collectCycleWindow,
+	collectSizeDeltas,
+	commitSubjectStep,
+	deletedFilesSince,
+	formatCycleWindowReport,
+	genPluginIdentityStep,
+	outputArtifactStatusStep,
+	packageTypecheckSteps,
+	triggerPathsSince,
+	wipTransitionStep,
+} from "./lib/gate-check-steps.mjs";
+import {
+	pinRevisionExec,
+	resolveReportRevision,
+	revisionPfdReaders,
+} from "./lib/gate-report-revision.mjs";
+import { parseIssueNumbers } from "./lib/issue-args.mjs";
+import { acquireConfiguredRoadmap } from "./lib/roadmap-consumer.mjs";
+import { tryRun } from "./lib/run-exec.mjs";
+import { createGitHubOps } from "./pfdsl/lib/github-ops.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const root = resolve(__dirname, "..");
+const githubOps = createGitHubOps({ cwd: root });
 
-const args = process.argv.slice(2);
-const flag = (name) => {
-	const idx = args.indexOf(name);
-	return idx >= 0 ? args[idx + 1] : undefined;
-};
-const base = flag("--base") ?? "main";
-const artifactKey = flag("--artifact");
-
-function sh(cmd, input) {
-	return execSync(cmd, { cwd: root, encoding: "utf-8", input });
+// strict parsing, not an indexOf sweep: a hand-rolled lookup drops the
+// --artifact=key form and any typo'd flag, and this script's response to a
+// missing --artifact is to downgrade to a coarse audit and report PASS — the
+// caller is told nothing (#648).
+let values;
+try {
+	({ values } = parseArgs({
+		args: process.argv.slice(2),
+		options: {
+			base: { type: "string" },
+			artifact: { type: "string" },
+			"in-progress": { type: "boolean" },
+			"no-artifact": { type: "boolean" },
+			issue: { type: "string", multiple: true },
+			"source-config": { type: "string" },
+		},
+		strict: true,
+		allowPositionals: false,
+	}));
+} catch (err) {
+	console.error(`gate-check: ${err.message}`);
+	process.exit(2);
 }
-function trySh(cmd, input) {
-	try {
-		return { ok: true, out: sh(cmd, input) };
-	} catch (e) {
-		return { ok: false, out: e.stdout || e.message, status: e.status };
+const base = values.base ?? "main";
+const artifactKey = values.artifact;
+const inProgress = values["in-progress"] === true;
+// Declared, not inferred: a bookkeeping cycle touches roadmap.pfdsl without
+// owning an output artifact, and the diff cannot tell that apart from a cycle
+// that forgot its status update (#564).
+const noArtifact = values["no-artifact"] === true;
+if (noArtifact && artifactKey) {
+	console.error(
+		"gate-check: --artifact and --no-artifact are mutually exclusive",
+	);
+	process.exit(2);
+}
+if (inProgress && (!artifactKey || noArtifact)) {
+	console.error(
+		"gate-check: --in-progress requires --artifact and is mutually exclusive with --no-artifact",
+	);
+	process.exit(2);
+}
+// Explicit issue targets for source reads and terminal human review.
+const parsedIssues = parseIssueNumbers(values.issue);
+if (!parsedIssues.ok) {
+	console.error(`gate-check: ${parsedIssues.message}`);
+	process.exit(2);
+}
+const issueNumbers = parsedIssues.numbers;
+let roadmap;
+try {
+	roadmap = await acquireConfiguredRoadmap({
+		root,
+		sourceConfig: values["source-config"],
+	});
+	process.once("exit", () => roadmap.dispose());
+	if (roadmap.context) {
+		roadmap.text = readFileSync(roadmap.file, "utf8");
+		console.log(
+			`Roadmap source: ${JSON.stringify(roadmap.context.model)}; input key ${roadmap.key}`,
+		);
 	}
-}
-
-// Best-effort — a stale/missing origin ref surfaces as a clear diff failure below.
-trySh("git fetch origin");
-
-// --diff-filter=d excludes deleted paths — a deleted .pfdsl/.md would
-// otherwise fail the check/linebreaks gates against a file that no longer exists.
-const diffFiles = trySh(`git diff --diff-filter=d --name-only origin/${base}...HEAD`);
-if (!diffFiles.ok) {
-	console.error(`gate-check: failed to diff against origin/${base}: ${diffFiles.out.trim()}`);
+} catch (error) {
+	console.error(`gate-check: roadmap acquisition failed: ${error.message}`);
 	process.exit(1);
 }
-const changedFiles = diffFiles.out.trim().split("\n").filter(Boolean);
-const pfdslFiles = changedFiles.filter((f) => f.endsWith(".pfdsl"));
-const mdFiles = changedFiles.filter((f) => f.endsWith(".md"));
+
+// Every call names the executable and its arguments separately — `base` and
+// `artifactKey` come from argv and must never be parsed by a shell (#572).
+const rawExec = (file, execArgs, input) =>
+	tryRun(file, execArgs, {
+		cwd: root,
+		captureStderr: file === "git",
+		...(input === undefined ? {} : { input }),
+	});
+let exec = rawExec;
+const node = (execArgs, input) => exec(process.execPath, execArgs, input);
+
+// Best-effort — a stale/missing origin ref surfaces as a clear diff failure below, while a usable existing ref is labelled unverified in the cycle window.
+const fetchResult = exec("git", ["fetch", "origin"]);
+let revision;
+try {
+	revision = resolveReportRevision({ exec, base });
+	exec = pinRevisionExec(exec, revision);
+} catch (error) {
+	console.error(
+		`gate-check: could not resolve report revision: ${error.message}`,
+	);
+	process.exit(1);
+}
+console.log(
+	`Report revision: head ${revision.head}; base origin/${base} ${revision.baseTip}; merge-base ${revision.mergeBase}; measured ${new Date().toISOString()}`,
+);
+if (!fetchResult.ok)
+	console.log(
+		"Report origin freshness: unverified (fetch failed; existing base ref used)",
+	);
+
+const diff = changedFilesSince({ exec, base });
+if (!diff.ok) {
+	console.error(
+		`gate-check: failed to diff against origin/${base}: ${diff.error}`,
+	);
+	process.exit(1);
+}
+const changedFiles = diff.files;
+const triggers = triggerPathsSince({ exec, base });
+if (!triggers.ok) {
+	console.error(
+		`gate-check: failed to diff against origin/${base}: ${triggers.error}`,
+	);
+	process.exit(1);
+}
+const pfdslFiles = changedFiles.filter(
+	(f) =>
+		f.endsWith(".pfdsl") && (!roadmap.context || f !== ".pfdsl/roadmap.pfdsl"),
+);
 
 const results = [];
+if (roadmap.context) {
+	const cliPath = resolve(root, "packages/cli/dist/cli.js");
+	const { roadmapSourceIdentity } = await import("./lib/roadmap-source.mjs");
+	for (const document of roadmap.documents) {
+		// The entry closure validates raw YAML presets in their proper role.
+		// Only entry/subflow documents are standalone diagram and link targets.
+		if (!document.roles.some((role) => role !== "preset")) continue;
+		const checked = node([
+			cliPath,
+			"check",
+			document.file,
+			"--strict",
+			"--reference-context",
+			document.contextFile,
+		]);
+		results.push({
+			name: `external roadmap check (${document.logicalPath})`,
+			status: checked.ok ? "PASS" : "FAIL",
+			detail: checked.ok ? roadmap.key : checked.out.trim(),
+		});
+		const links = node([
+			cliPath,
+			"meta",
+			"check-links",
+			document.file,
+			"--json",
+			"--reference-context",
+			document.contextFile,
+		]);
+		let linksPassed = false;
+		let linksDetail;
+		try {
+			const report = JSON.parse(links.out);
+			const evidence = report.referenceResolution;
+			if (!evidence || !Array.isArray(evidence.results)) {
+				throw new Error("referenceResolution with results is required");
+			}
+			const record = {
+				...roadmapSourceIdentity(evidence),
+				results: evidence.results.map(({ root, value, ...result }) => ({
+					...result,
+					...(result.kind === "url" ? { value } : {}),
+				})),
+			};
+			console.log(
+				`External roadmap reference evidence: ${JSON.stringify(record)}`,
+			);
+			linksPassed = links.ok && report.ok === true;
+			linksDetail = linksPassed
+				? roadmap.key
+				: "Reference validation failed; see the resolution record above";
+		} catch (error) {
+			linksDetail = `Reference validation did not return a usable resolution record: ${error.message}`;
+		}
+		results.push({
+			name: `external roadmap links (${document.logicalPath})`,
+			status: linksPassed ? "PASS" : "FAIL",
+			detail: linksDetail,
+		});
+	}
+}
+{
+	const inventory = node(["scripts/check-pfdsl-inventory.mjs"]);
+	results.push({
+		name: "tracked .pfdsl inventory",
+		status: inventory.ok ? "PASS" : "FAIL",
+		detail: inventory.out.trim(),
+	});
+}
 
 // 1. pfdsl check on changed .pfdsl files
 if (pfdslFiles.length === 0) {
-	results.push({ name: "pfdsl check", status: "SKIP", detail: "no .pfdsl changes" });
+	results.push({
+		name: "pfdsl check",
+		status: "SKIP",
+		detail: "no .pfdsl changes",
+	});
 } else {
 	const cliPath = resolve(root, "packages/cli/dist/cli.js");
 	if (!existsSync(cliPath)) {
@@ -79,157 +264,118 @@ if (pfdslFiles.length === 0) {
 			detail: "packages/cli/dist/cli.js not built; run 'pnpm -r build' first",
 		});
 	} else {
-		const failed = pfdslFiles.filter((f) => !trySh(`node "${cliPath}" check "${f}"`).ok);
+		const failed = pfdslFiles.filter((f) => !node([cliPath, "check", f]).ok);
 		results.push({
 			name: "pfdsl check",
 			status: failed.length === 0 ? "PASS" : "FAIL",
-			detail: failed.length === 0 ? `${pfdslFiles.length} file(s)` : `failed: ${failed.join(", ")}`,
+			detail:
+				failed.length === 0
+					? `${pfdslFiles.length} file(s)`
+					: `failed: ${failed.join(", ")}`,
 		});
 	}
 }
 
-// 2. audit-issues-flow (no --fix: fails if manual findings remain)
+// 2. read-only audit-issues-flow (fails if blocking findings remain)
 {
-	const r = trySh("node scripts/pfdsl/audit-issues-flow.mjs");
-	results.push({ name: "audit-issues-flow", ...classifyAuditIssuesFlowResult(r.ok, r.status) });
-}
-
-// 3. check-md-linebreaks on changed .md files
-if (mdFiles.length === 0) {
-	results.push({ name: "check-md-linebreaks", status: "SKIP", detail: "no .md changes" });
-} else {
-	const r = trySh(`node scripts/check-md-linebreaks.mjs ${mdFiles.map((f) => `"${f}"`).join(" ")}`);
-	results.push({ name: "check-md-linebreaks", status: r.ok ? "PASS" : "FAIL" });
-}
-
-// 4. gen-plugin identity (only when skill/plugin-source paths changed)
-if (!matchesTrigger(changedFiles, GEN_PLUGIN_TRIGGER)) {
-	results.push({ name: "gen-plugin identity", status: "SKIP", detail: "no skill/plugin-source changes" });
-} else {
-	const r = trySh("node scripts/gen-plugin.mjs && git diff --exit-code -- plugin");
-	results.push({ name: "gen-plugin identity", status: r.ok ? "PASS" : "FAIL" });
-}
-
-// 5. snapshot freshness (only when .pfdsl files changed)
-if (pfdslFiles.length === 0) {
-	results.push({ name: "snapshot freshness", status: "SKIP", detail: "no .pfdsl changes" });
-} else {
-	const vitestRun = trySh("pnpm --filter @pfdsl/core exec vitest run -u");
-	if (!vitestRun.ok) {
-		results.push({
-			name: "snapshot freshness",
-			status: "FAIL",
-			detail: `vitest run failed: ${vitestRun.out.trim().slice(-200)}`,
-		});
-	} else {
-		const r = trySh("git diff --quiet -- packages/core/src/__snapshots__/");
-		results.push({
-			name: "snapshot freshness",
-			status: r.ok ? "PASS" : "FAIL",
-			detail: r.ok ? undefined : "snapshots stale; re-stage packages/core/src/__snapshots__/",
-		});
-	}
-}
-
-// 6. output artifact status update in .pfdsl/roadmap.pfdsl
-{
-	if (artifactKey) {
-		const before = trySh(`git show origin/${base}:.pfdsl/roadmap.pfdsl`);
-		const after = trySh("git show HEAD:.pfdsl/roadmap.pfdsl");
-		if (!before.ok || !after.ok) {
-			results.push({
-				name: "output artifact status update",
-				status: "FAIL",
-				detail: `could not read .pfdsl/roadmap.pfdsl at origin/${base} or HEAD`,
-			});
-		} else {
-			const changed = statusChangedForArtifact(before.out, after.out, artifactKey);
-			results.push({
-				name: "output artifact status update",
-				status: changed ? "PASS" : "FAIL",
-				detail: changed ? undefined : `no status: change detected for artifact '${artifactKey}'`,
-			});
-		}
-	} else {
-		const diffResult = trySh(`git diff origin/${base}...HEAD -- .pfdsl/roadmap.pfdsl`);
-		if (!diffResult.ok) {
-			results.push({ name: "output artifact status update", status: "FAIL", detail: diffResult.out.trim() });
-		} else {
-			const changed = hasStatusChange(diffResult.out);
-			results.push({
-				name: "output artifact status update",
-				status: changed ? "PASS" : "FAIL",
-				detail: changed
-					? "presence-only check; pass --artifact <key> to verify the specific output artifact"
-					: "no status: line changed in .pfdsl/roadmap.pfdsl",
-			});
-		}
-	}
-}
-
-// 7. vscode-extension typecheck (only when packages/vscode-extension/ changed)
-if (!matchesTrigger(changedFiles, VSCODE_EXT_TRIGGER)) {
-	results.push({ name: "vscode-extension typecheck", status: "SKIP", detail: "no vscode-extension changes" });
-} else {
-	const r = trySh("pnpm --filter @pfdsl/vscode-extension typecheck");
+	const r = node([
+		"scripts/pfdsl/audit-issues-flow.mjs",
+		"--roadmap",
+		roadmap.file,
+	]);
 	results.push({
-		name: "vscode-extension typecheck",
-		status: r.ok ? "PASS" : "FAIL",
-		detail: r.ok ? undefined : r.out.trim().slice(-200),
+		name: "audit-issues-flow",
+		...classifyAuditIssuesFlowResult(r.ok, r.status),
 	});
 }
 
-// 8. commit subject lint (Conventional Commits message format; granularity stays MANUAL)
-{
-	const subjectsOut = trySh(`git log origin/${base}..HEAD --format=%s`);
-	if (!subjectsOut.ok) {
-		results.push({ name: "commit subject lint", status: "FAIL", detail: subjectsOut.out.trim() });
-	} else {
-		const subjects = subjectsOut.out.trim().split("\n").filter(Boolean);
-		if (subjects.length === 0) {
-			results.push({ name: "commit subject lint", status: "SKIP", detail: "no commits in range" });
-		} else {
-			const linted = lintCommitSubjects(subjects);
-			const failed = linted.filter((r) => !r.ok);
-			results.push({
-				name: "commit subject lint",
-				status: failed.length === 0 ? "PASS" : "FAIL",
-				detail: failed.length === 0 ? `${subjects.length} commit(s)` : `not Conventional Commits: ${failed.map((r) => r.subject).join(", ")}`,
-			});
-		}
-	}
-}
+// 3. check-docs: the whole documentation/prose check suite CI runs, as one
+// step (#721). Unconditional — it is whole-repo by construction, and at ~4s it
+// costs less than the two steps below it.
+results.push(checkDocsStep({ exec }));
 
-// 9. wip transition verification (todo→wip at start, protocol4) in .pfdsl/roadmap.pfdsl
-if (!changedFiles.includes(".pfdsl/roadmap.pfdsl")) {
-	results.push({ name: "wip transition", status: "SKIP", detail: "no .pfdsl/roadmap.pfdsl changes" });
-} else {
-	const shasOut = trySh(`git log --format=%H origin/${base}..HEAD -- .pfdsl/roadmap.pfdsl`);
-	if (!shasOut.ok) {
-		results.push({ name: "wip transition", status: "FAIL", detail: shasOut.out.trim() });
-	} else {
-		const shas = shasOut.out.trim().split("\n").filter(Boolean);
-		const snapshots = shas
-			.map((sha) => trySh(`git show ${sha}:.pfdsl/roadmap.pfdsl`))
-			.filter((r) => r.ok)
-			.map((r) => r.out);
-		const detected = wipTransitionDetected(snapshots, artifactKey);
+// 4. gen-plugin identity (only when skill/plugin/install-source paths changed)
+results.push(
+	genPluginIdentityStep({ exec, node, triggerPaths: triggers.files }),
+);
+
+// 5. output artifact status update in .pfdsl/roadmap.pfdsl
+results.push(
+	outputArtifactStatusStep({
+		exec,
+		base,
+		artifactKey,
+		inProgress,
+		noArtifact,
+		changedFiles,
+		roadmap,
+	}),
+);
+
+// 6. package typechecks (only for changed packages, including deletions)
+results.push(...packageTypecheckSteps({ exec, triggerPaths: triggers.files }));
+
+// 7. commit subject lint (Conventional Commits message format;
+// granularity stays MANUAL)
+results.push(commitSubjectStep({ exec, base }));
+
+// Preserve ordinary issue reads and their error handling. Reading source
+// material does not validate a design record or establish human approval.
+for (const number of issueNumbers) {
+	try {
+		await githubOps.viewIssue({
+			number,
+			fields: ["body", "comments", "createdAt"],
+		});
+	} catch (e) {
 		results.push({
-			name: "wip transition",
-			status: detected ? "PASS" : "FAIL",
-			detail: detected
-				? artifactKey
-					? `wip found for '${artifactKey}'`
-					: "presence-only check; pass --artifact <key> to verify the specific output artifact"
-				: artifactKey
-					? `no status: wip snapshot found for artifact '${artifactKey}'`
-					: "no status: wip found in any commit snapshot",
+			name: `issue read (#${number})`,
+			...classifyIssueLookupFailure(e),
 		});
 	}
 }
 
-const skillMdPath = resolve(root, GATE_CHECKLIST_SOURCE_PATH);
-const manualItems = deriveManualItems(extractGateChecklist(readFileSync(skillMdPath, "utf-8")));
+// 8. wip transition verification (todo→wip at start, protocol4) in .pfdsl/roadmap.pfdsl
+results.push(
+	wipTransitionStep({
+		exec,
+		base,
+		artifactKey,
+		noArtifact,
+		changedFiles,
+		roadmap,
+		inProgress,
+	}),
+);
+
+// 10. knowledge-artifact size report: collect the measured deltas regardless of
+// issue metadata so the terminal output always shows changed knowledge artifacts.
+const deletions = deletedFilesSince({ exec, base });
+const sizeReport = collectSizeDeltas({
+	exec,
+	base,
+	changedFiles: [...changedFiles, ...deletions.files],
+	comparisonRef: revision.mergeBase,
+	headRef: revision.head,
+});
+
+// `root` here is this script's own location (resolved from import.meta.url
+// above), not the shell's cwd. Report the tree gate-check actually inspected
+// so the result can be matched to the intended checkout after the run (#840).
+const mainRootLookup = exec("git", ["rev-parse", "--git-common-dir"]);
+const branchLookup = rawExec("git", ["rev-parse", "--abbrev-ref", "HEAD"]);
+// Either lookup failing (e.g. no git on PATH) must not stop the gate itself
+// — only this report line degrades, to a null-branch/root-as-mainRoot line
+// via formatRunTreeLine.
+const mainRoot = mainRootLookup.ok
+	? dirname(resolve(root, mainRootLookup.out.trim()))
+	: root;
+const resolvedBranch = branchLookup.ok ? branchLookup.out.trim() : null;
+// A detached HEAD prints the literal string "HEAD" here, which is not a
+// branch name.
+const branch =
+	resolvedBranch && resolvedBranch !== "HEAD" ? resolvedBranch : null;
+console.log(formatRunTreeLine({ root, mainRoot, branch }));
 
 console.log("gate-check:");
 console.log(formatGateTable(results));
@@ -240,24 +386,115 @@ console.log(formatGateTable(results));
 {
 	const cliPath = resolve(root, "packages/cli/dist/cli.js");
 	if (pfdslFiles.length > 0 && existsSync(cliPath)) {
-		const newTerminalsByFile = [];
+		// Artifacts consumed by the *other* .pfdsl files sitting in the same
+		// directory, at HEAD (#671). ADR-0035 split the graphs by judgment axis,
+		// which leaves a generation source declared in one file and consumed in
+		// its sibling; `graph io` runs per file and cannot see across. Composing
+		// the sets here rather than in the CLI is deliberate — spec §2.9.1 keeps
+		// ids file-local and forbids a flattened cross-file view, so "same id
+		// means the same artifact" is a local convention of this repo's .pfdsl/,
+		// which pipeline.md already declares out of modeling scope. Which
+		// directories that convention covers is SIBLING_ID_NAMESPACE_DIRS' job;
+		// this function only does the git + CLI I/O around it.
+		const siblingConsumedByDir = new Map();
+		const siblingConsumedFor = (file) => {
+			const dir = dirname(file);
+			if (!sharesSiblingIdNamespace(dir)) return [];
+			const cached = siblingConsumedByDir.get(dir);
+			if (cached) return cached.get(file) ?? [];
+			const listing = exec("git", [
+				"ls-tree",
+				"--name-only",
+				"HEAD",
+				"--",
+				`${dir}/`,
+			]);
+			const dirFiles = listing.ok
+				? listing.out
+						.split("\n")
+						.map((l) => l.trim())
+						.filter(
+							(l) =>
+								l.endsWith(".pfdsl") &&
+								(!roadmap.context || l !== ".pfdsl/roadmap.pfdsl"),
+						)
+				: [];
+			const perFile = new Map();
+			for (const sib of dirFiles) {
+				const src = exec("git", ["show", `HEAD:${sib}`]);
+				if (!src.ok) continue;
+				const edges = node([cliPath, "graph", "edges", "-", "--json"], src.out);
+				if (!edges.ok) continue;
+				perFile.set(sib, parseInputConsumedArtifacts(edges.out));
+			}
+			const byTarget = buildSiblingConsumedMap(perFile);
+			siblingConsumedByDir.set(dir, byTarget);
+			return byTarget.get(file) ?? [];
+		};
+
+		// One entry per audit category `graph io` reports. Adding a third is a row
+		// in `parsedReports`, not a further copy of the collect-and-print pair.
+		const terminalsReport = {
+			parse: parseAuditTerminals,
+			heading:
+				"New terminal artifacts (classify means vs. deliverable; register todo consumer if missing)",
+			byFile: [],
+		};
+		const externalTerminalsReport = {
+			parse: parseAuditExternalTerminals,
+			heading:
+				"New external-stakeholder terminal artifacts (verify each has a genuine external consumer, not a mistakenly-tagged means artifact)",
+			byFile: [],
+		};
+		const parsedReports = [terminalsReport, externalTerminalsReport];
+		// Not an audit category of its own: `graph io` never reports it. The
+		// terminals split fills it, so it is kept out of the collect loop and
+		// only joins for printing.
+		const siblingConsumedReport = {
+			heading:
+				"New terminal artifacts consumed in a sibling graph (confirm the sibling's input edge exists, then record N/A — do NOT add a todo consumer, that recreates the double modeling ADR-0035 removed)",
+			byFile: [],
+		};
 		for (const f of pfdslFiles) {
-			const before = trySh(`git show origin/${base}:${f}`);
-			const after = trySh(`git show HEAD:${f}`);
+			const before = exec("git", ["show", `origin/${base}:${f}`]);
+			const after = exec("git", ["show", `HEAD:${f}`]);
 			if (!after.ok) continue;
-			const beforeAudit = before.ok ? trySh(`node "${cliPath}" graph io -`, before.out) : { ok: true, out: "" };
-			const afterAudit = trySh(`node "${cliPath}" graph io -`, after.out);
+			const beforeAudit = before.ok
+				? node([cliPath, "graph", "io", "-"], before.out)
+				: { ok: true, out: "" };
+			const afterAudit = node([cliPath, "graph", "io", "-"], after.out);
 			if (!afterAudit.ok) continue;
-			const newTerminals = diffNewTerminals(
-				beforeAudit.ok ? parseAuditTerminals(beforeAudit.out) : [],
-				parseAuditTerminals(afterAudit.out),
-			);
-			if (newTerminals.length > 0) newTerminalsByFile.push({ file: f, newTerminals });
+			for (const report of parsedReports) {
+				const added = diffNewTerminals(
+					beforeAudit.ok ? report.parse(beforeAudit.out) : [],
+					report.parse(afterAudit.out),
+				);
+				if (added.length === 0) continue;
+				if (report !== terminalsReport) {
+					report.byFile.push({ file: f, added });
+					continue;
+				}
+				const split = partitionNewTerminals(added, siblingConsumedFor(f));
+				if (split.terminal.length > 0) {
+					report.byFile.push({ file: f, added: split.terminal });
+				}
+				if (split.consumedInSibling.length > 0) {
+					siblingConsumedReport.byFile.push({
+						file: f,
+						added: split.consumedInSibling,
+					});
+				}
+			}
 		}
-		if (newTerminalsByFile.length > 0) {
-			console.log("\nNew terminal artifacts (classify means vs. deliverable; register todo consumer if missing):");
-			for (const { file, newTerminals } of newTerminalsByFile) {
-				console.log(`  ${file}: ${newTerminals.join(", ")}`);
+		for (const { heading, byFile } of [
+			terminalsReport,
+			siblingConsumedReport,
+			externalTerminalsReport,
+		]) {
+			if (byFile.length === 0) continue;
+			console.log(`\n${heading}:`);
+			for (const { file, added } of byFile) {
+				console.log(`  ${file}: ${added.join(", ")}`);
 			}
 		}
 	}
@@ -268,26 +505,169 @@ console.log(formatGateTable(results));
 // `status ready --json` runs instead of AI graph traversal.
 {
 	const cliPath = resolve(root, "packages/cli/dist/cli.js");
-	if (changedFiles.includes(".pfdsl/roadmap.pfdsl") && existsSync(cliPath)) {
-		const before = trySh(`git show origin/${base}:.pfdsl/roadmap.pfdsl`);
-		const after = trySh("git show HEAD:.pfdsl/roadmap.pfdsl");
+	if (roadmap.context) {
+		const ready = node([cliPath, "status", "ready", roadmap.file, "--json"]);
+		console.log(
+			`\nExternal roadmap ready at ${roadmap.context.model.fixedRevision}: ${ready.ok ? ready.out.trim() : "unavailable"}`,
+		);
+		console.log(
+			"Ready-set transition is not measured: no previous external revision was supplied.",
+		);
+	} else if (
+		changedFiles.includes(".pfdsl/roadmap.pfdsl") &&
+		existsSync(cliPath)
+	) {
+		const before = exec("git", ["show", `origin/${base}:.pfdsl/roadmap.pfdsl`]);
+		const after = exec("git", ["show", "HEAD:.pfdsl/roadmap.pfdsl"]);
 		if (before.ok && after.ok) {
-			const beforeReady = trySh(`node "${cliPath}" status ready - --json`, before.out);
-			const afterReady = trySh(`node "${cliPath}" status ready - --json`, after.out);
+			const beforeReady = node(
+				[cliPath, "status", "ready", "-", "--json"],
+				before.out,
+			);
+			const afterReady = node(
+				[cliPath, "status", "ready", "-", "--json"],
+				after.out,
+			);
 			if (beforeReady.ok && afterReady.ok) {
 				const beforeIds = JSON.parse(beforeReady.out).ready.map((p) => p.id);
 				const afterIds = JSON.parse(afterReady.out).ready.map((p) => p.id);
-				const { newlyReady, noLongerReady } = diffReadySets(beforeIds, afterIds);
+				const { newlyReady, noLongerReady } = diffReadySets(
+					beforeIds,
+					afterIds,
+				);
 				console.log(`\nReady-set diff (origin/${base} → HEAD):`);
-				console.log(`  newly ready: ${newlyReady.length > 0 ? newlyReady.join(", ") : "(none)"}`);
-				console.log(`  no longer ready: ${noLongerReady.length > 0 ? noLongerReady.join(", ") : "(none)"}`);
+				console.log(
+					`  newly ready: ${newlyReady.length > 0 ? newlyReady.join(", ") : "(none)"}`,
+				);
+				console.log(
+					`  no longer ready: ${noLongerReady.length > 0 ? noLongerReady.join(", ") : "(none)"}`,
+				);
 			}
 		}
 	}
 }
 
-console.log("\nMANUAL (judge and confirm each):");
-for (const item of manualItems) console.log(`  MANUAL: ${item}`);
+// Report material: the size of every tracked knowledge artifact this branch
+// touched. The numbers are always printed for human review.
+console.log(
+	`\nKnowledge-artifact size (${revision.mergeBase} → ${revision.head}):`,
+);
+for (const d of sizeReport.deltas) console.log(`  ${formatSizeDelta(d)}`);
+for (const reason of sizeReport.unreadable)
+	console.log(`  could not be measured: ${reason}`);
+if (!deletions.ok)
+	console.log(`  deleted paths could not be measured: ${deletions.error}`);
+if (
+	sizeReport.deltas.length === 0 &&
+	sizeReport.unreadable.length === 0 &&
+	deletions.ok
+)
+	console.log("  (none)");
 
-const hasFail = results.some((r) => r.status === "FAIL");
-if (hasFail) process.exit(1);
+// Report material: the cycle window (#834), which collectCycleWindow's own doc
+// comment defines and motivates. Not a verdict — it hands the runner a starting
+// point for re-reading what the cycle wrote outside the repo (issue bodies,
+// comments, PR bodies) against conventions base may have retired since, and
+// `git rebase` fixes the tree, not those.
+//
+// Printed unconditionally, including the empty case: an empty window is itself
+// the record the pfd-ops binding's work-cycle steps ask for ("窓が空だったなら1行
+// そう記録する"). A failed measurement says so out loud, unlike the report
+// blocks above that fall silent — silence here is indistinguishable from the
+// empty window, which is the reading #834 exists to stop.
+{
+	const window = collectCycleWindow({ exec, base });
+	console.log(
+		"\nCycle window (base commits this tree lacked, or that landed after its first commit):",
+	);
+	for (const line of formatCycleWindowReport({ fetchResult, window })) {
+		console.log(`  ${line}`);
+	}
+}
+
+// Report material: the package layers the diff touched, for the PR body. Not a
+// verdict — the diff already is the answer, so there is nothing for the runner
+// to get wrong and nothing for a gate to catch (#801).
+{
+	const layers = derivePackageLayers(changedFiles);
+	if (layers.length > 0) {
+		console.log(`\nPackage layers touched: ${layers.join(", ")}`);
+	}
+}
+
+// Report material: which of this cycle's changed files any adopted PFD claims
+// to model — see collectModeledLocations in lib/gate-check.mjs for why (#778).
+// Which side a given path belongs on, and whether an unmodeled one should have
+// been in a PFD at all, both stay the reader's call.
+{
+	const corePath = resolve(root, "packages/core/dist/index.js");
+	console.log("\nChanged files vs. the adopted PFDs' `location:` fields:");
+	if (!existsSync(corePath)) {
+		console.log(
+			"  could not be measured: packages/core/dist not built (run 'pnpm -r build')",
+		);
+	} else {
+		// The same pair the CLI applies to a `location:` element (spec §15.8),
+		// so this report and `meta get` cannot disagree about where a node lives.
+		const { analyze, isUnreadableError, isUrlLike, resolveLocationFsPath } =
+			await import(corePath);
+		const readers = revisionPfdReaders({ exec, head: revision.head });
+		const { analyzed, unreadable } = analyzeAdoptedPfdsl({
+			...readers,
+			readdirSync: (dir) =>
+				readers
+					.readdirSync(dir)
+					.filter((file) => !roadmap.context || file !== "roadmap.pfdsl"),
+			analyze,
+			isUnreadableError,
+		});
+		if (roadmap.context)
+			console.log(
+				"  External roadmap location results are reported above in their reference contexts; they are not classified as files in the implementation repository.",
+			);
+		const resolveLocation = (file, location, basePath) =>
+			isUrlLike(location)
+				? null
+				: relative(
+						root,
+						resolveLocationFsPath(resolve(root, file), location, basePath),
+					);
+		// Deletions are in scope here even though every other gate excludes
+		// them: the item asks about additions, changes and deletions alike, and
+		// a deleted file is the case where the PFD modeling it is likeliest to
+		// be left describing something gone.
+		const deletedFiles = deletions.files;
+		const wasDeleted = new Set(deletedFiles);
+		const { local, unclassified } = collectModeledLocations(
+			analyzed,
+			resolveLocation,
+			isUrlLike,
+		);
+		const { modeled, unmodeled } = classifyChangedFilesByModeling(
+			[...changedFiles, ...deletedFiles],
+			local,
+		);
+		const mark = (path) => (wasDeleted.has(path) ? `${path} (deleted)` : path);
+		console.log("  modeled (confirm the PFD reflects the change):");
+		if (modeled.length === 0) console.log("    (none)");
+		for (const { path, models } of modeled) {
+			const by = models.map((m) => `${m.file}:${m.id}`).join(", ");
+			console.log(`    ${mark(path)} ← ${by}`);
+		}
+		const unclassifiedLines = formatUnclassifiedLocations(unclassified);
+		if (unclassifiedLines.length) console.log(unclassifiedLines.join("\n"));
+		else
+			console.log(
+				unreadable.length
+					? "  not matched by readable PFDs (model classification incomplete):"
+					: "  not modeled by any adopted PFD (an N/A here is out-of-scope, not a judgment):",
+			);
+		if (unmodeled.length === 0) console.log("    (none)");
+		for (const path of unmodeled) console.log(`    ${mark(path)}`);
+		for (const reason of unreadable) console.log(`  could not read ${reason}`);
+		if (!deletions.ok)
+			console.log(`  deleted paths could not be measured: ${deletions.error}`);
+	}
+}
+
+finishGateCheck(results, { issueNumbers });

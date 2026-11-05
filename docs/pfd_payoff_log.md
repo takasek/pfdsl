@@ -4,6 +4,18 @@ PFD が効果を発揮した局面の事例ログ。体感した時点で追記�
 
 追記の判定（ADR-0014）: 反実仮想テスト「依存グラフ／プロセス分解がなければこの判断・作業は違っていたか」を満たし、違いを1行で引用できる時のみ書く。引用できなければ書かない（後付けの捏造を排除する）。
 
+## 2026-08-30 PFD の location 対応が workflow 契約の同期漏れを防ぐ
+
+- 局面: PR #1077 の終端ゲートが `.github/workflows/pr-diff-images.yml` を `workflow.pfdsl` の `merge_pr` に対応付け、`pr_diagrams` の契約更新を同じ PR に要求した
+- 効果: コードと workflow だけなら base 非互換時の部分生成と同一 PR 再実行時の置換を PFD に反映しないまま完了していた。ADR-0014 反実仮想: `location:` による変換コンポーネントの対応がなければ、終端ゲートは `.github/workflows/pr-diff-images.yml` を `pr_diagrams` の構造同期対象として示せず、契約更新は同じ PR の必須作業にならなかった
+- 参照: PR #1077、issue #1066、`workflow.pfdsl` の `merge_pr` / `pr_diagrams`
+
+## 2026-08-29 A/B 監査が plugin 配送経路の不一致を後続作業へ変換
+
+- 局面: PR #1025 の pfd-retro で runtime-pipeline PFD を A/B 観点から監査し、plugin 配送経路のモデルと実体の不一致を検出した
+- 効果: 不一致を個別の違和感で終わらせず、配送経路を検証可能にする後続 issue #1026 として切り出せた。ADR-0014 反実仮想: PFD のプロセス分解と A/B 監査がなければ、配送経路の不一致は PR #1025 の対象外として見過ごされ、#1026 は起票されなかった
+- 参照: PR #1025、issue #1026、pfd-retro A/B 監査
+
 ## 2026-07-08 図に描いた一次ソース主張が抽出リファクタの同期を強制する
 - 局面: pfdsl skill の品質ガイドを docs/quality-guide.md へ切り出すリファクタ（PR #369）
 - 効果: workflow.pfdsl の skill_template.description が「品質ガイドの正本」と主張していたため、quality_guide artifact の新設と maintain_template / gen_skill エッジの更新が必須作業として浮上した。
@@ -144,3 +156,38 @@ PFD が効果を発揮した局面の事例ログ。体感した時点で追記�
 - 効果: セッション文脈（会話履歴・作業中の issue・直前の編集内容）を一切持たない agent が、カタログのフォールバックチェーン（binding → 一次情報 → instance）だけを頼りに、実在する構造欠陥6件を file:line アンカー付きで検出した（#390）。「実測できるかどうかのデモ」のつもりが、そのまま dogfood の実 finding を生んだ。反実仮想: main thread（セッション文脈込み）で同じ監査をしていたら、直前の #357/#386 作業に注意が引かれ `workflow.pfdsl` 自体の unrelated な構造欠陥は見落とされていた可能性が高い — 「セッション文脈が無いこと」自体が独立した視点として機能した
 - 学習: A/B 層の main thread からの隔離（#357 の設計動機）は「context 節約」だけでなく「作業中の思考に引きずられないレビュー」という副次効果を持つ。実測要件（criteria の「実測1回」）を書き換えて緩和せず実際に踏んだ（#384 での criteria 書き換えは差し戻され、本ラウンドで正規の実測に置き換わった）ことで、この効果が確認できた
 - 参照: #357、#384（初回実装・criteria 差し戻し）、#386（実測issue）、#390（今回検出した findings）、`.claude/agents/pfd-lens.md`
+
+## 2026-08-23 入力反実仮想が時間順の偽依存を除去
+
+- 局面: issue #978 の release pipeline 再設計で、VSCode release の `.vsix` 生成後に tag push が失敗する部分成功をどうモデル化するか独立設計レビューと再検証した
+- 効果: 「tag 処理は `.vsix` を読むか」という入力反実仮想により、時間順を `vsix_package >> create_tag` という偽依存へ変える案を撤回できた。正常完了時の未検証 `.vsix` と remote tag は単一 process の複数出力、candidate を実際に読むローカル検証は独立 process とし、途中失敗の残存物は companion の例外記述へ分離した。実装にない recovery path と制御 token をグラフへ持ち込まず、検証済み package の criteria も生産経路へ一致させられた
+- 参照: issue #978、PR #989、`docs/quality-guide.md`「複数出力は正常完了時の成果物を表す」
+
+## 2026-08-27 終端ゲートが競合しない否定案を公開前に検出
+
+- 局面: issue #910 の設計記録・実装・レビュー・初回コミットを完了し、PR 作成前の終端ゲートを実行
+- 効果: 設計記録は必須3行と時点照合を満たしていたが、否定案が「注記する」に対する「注記しない」で、採用した配置手段の対立仮説になっていないことを MANUAL 項目が検出した。公開前だったため、ユーザー承認を得て別クラスの配置案を再記録し、未公開コミットを作り直してから PR #1000 を作成できた。ゲートが無ければ、比較対象を生成した外形だけを持つ無効な設計記録が正本として残った
+- 学習: 内容を守る規則は検出できるだけでは足りず、対象成果物を書き直せる時点に置く必要がある。否定案の競合性は新規記録の生成時と既存記録の選択時に検査し、終端確認は取りこぼしを止める安全網にする
+- 参照: issue #910、PR #1000、ADR-0033、`.pfdsl/bindings/pfd-retro-patterns/catalog-consulted-after-the-artifact.md`
+
+## 2026-08-29 A/B監査が独立CI jobのcriteria反映漏れを検出
+
+- 局面: issue #891 で VS Code webview smoke test を独立した `vscode-smoke` job として追加し、Ubuntu固有のElectron sandbox失敗を修正した後にpfd-retroを実行した。
+- 効果: コード・全テスト・CIはgreenだったが、A「到達性（出力側）」が `.pfdsl/workflow.pfdsl` の `integrated_repository.criteria` は従来の `test` jobだけを要求し、新設した`vscode-smoke` jobを要求していない片肺更新を検出した。図のcriteriaを両jobの成功へ同期し、webview smokeが失敗したcommitを統合済みリポジトリとして扱う経路を閉じた。
+- 学習: 既存CIへ独立jobを追加する変更は、workflowファイルだけでなく、統合済み状態を定義するPFD artifactのcriteriaも変える。コード差分にPFDが無くても、A/B監査は新しいゲートと成果物定義の不一致を検出できる。
+- 参照: issue #891、PR #1033、`.pfdsl/workflow.pfdsl` の `integrated_repository`、`.pfdsl/bindings/pfd-retro-patterns/implicit-environment-assumption.md`
+
+## 2026-08-29 Codex native handoff を外部境界として明示
+
+- 局面: issue #1026 の runtime pipeline delivery boundary 修正で、初稿は `codex_plugin_dist` を内部 install へ接続しないだけで、未消費の means terminal として残した
+- 効果: pfd-lens A/B の終端監査がこの状態を検出し、repo-owned native marketplace を捏造せず、実在する外部 Codex marketplace 構築者を `externalStakeholders` に追加して verified handoff surface へ修正した
+- 反実仮想: graph io / 終端監査がなければ、「接続しない」という正しい否定だけで consumer 不在の理由が正本に残らなかった
+- 参照: issue #1026、commit d1f5098d、`.pfdsl/runtime-pipeline.pfdsl`、pfd-lens A/B
+
+## 2026-09-06 依存グラフが「消してよい完了ノード」の境界を機械的に決めた
+
+- 局面: issue #1052 で `.pfdsl/roadmap.pfdsl`（161ノード・200エッジ、artifact の 73/83 が done）から完了済みチェーンを一括削除する
+- 効果: 削除対象を「done 履歴かどうか」でなく「open process の入出力として edge に現れるか」で決められた。`status ready` / `status blocked` / `graph neighbors` が残すべき done artifact 10件を名指ししたため、完了済みでも判定入力として生きているノードを取り違えずに 161→28 ノードへ落とせた。削除の前後で ready/blocked の結果が一致することが、判定に要るノードを削っていないことの検査になった
+- 反実仮想: 依存グラフが無ければ削除の単位は「closed issue に対応するノード」しか取れず、`spec_v0011` や `def_insertion` のように close 済みでも open process の入力である artifact を巻き込むか、逆に安全側に倒して削除自体を諦めていた
+- 学習: close イベント駆動の降格規則は「その瞬間に終端だったチェーン」しか見ないので、下流が後から完了したチェーンは誰の視界にも入らない。イベント駆動の掃除には、状態から対象を導く定期的な回収が対になる
+- 参照: issue #1052、`.claude/skills/pfd-ops/references/github-issues-backend.md`「終端でなかったチェーンの回収」、`.pfdsl/workflow.pfdsl` の `map_deps`

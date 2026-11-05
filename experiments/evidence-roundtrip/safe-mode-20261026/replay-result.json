@@ -1,0 +1,16 @@
+{
+  "targetCommit": "3ac0190a589bdc8b02ac4de57a0da0cd6bd353a8",
+  "targetPaths": [
+    ".pfdsl/roadmap.pfdsl",
+    "docs/spec/spec.md"
+  ],
+  "driverRerun": false,
+  "exitCode": 0,
+  "result": {
+    "status": "PASS",
+    "errors": []
+  },
+  "note": "Only the pinned artifact files were restored; the live checkout already contains the separate E0 done update.",
+  "privateOriginalTargetCommit": "e530706e3865c3eae9c7bb12f84453dd8ccda778",
+  "publicReplayCommit": "3ac0190a589bdc8b02ac4de57a0da0cd6bd353a8"
+}

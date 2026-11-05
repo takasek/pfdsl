@@ -1,113 +1,97 @@
 #!/usr/bin/env node
 // Cycle preflight: bundles step-1 mechanical operations (fetch, rebase-behind
-// check, flow-sync PR check, ready listing) into one compact JSON payload.
-// Usage: node scripts/cycle-status.mjs [--base main]
+// check, open PR listing, ready listing) into one compact JSON payload.
+// Usage: node scripts/cycle-status.mjs [--base main] [--issue <n> ...] [--artifact <id>] [--source-config <json>]
 
-import { execSync } from "node:child_process";
-import { existsSync } from "node:fs";
-import { resolve, dirname } from "node:path";
+import { existsSync, readFileSync } from "node:fs";
+import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { readFileSync } from "node:fs";
+import { parseArgs } from "node:util";
 import {
-	classifyPRs,
-	parseReadyOutput,
-	countBehind,
-	findIssueNumberForProcess,
-	detectDesignUnsettled,
-	buildGateCheckCommand,
-} from "./lib/cycle-status.mjs";
-import { execGh } from "./pfdsl/lib/gh-exec.mjs";
+	cycleStatusExitCode,
+	runCycleStatus,
+} from "./lib/cycle-status-steps.mjs";
+import { parseIssueNumbers } from "./lib/issue-args.mjs";
+import { acquireConfiguredRoadmap } from "./lib/roadmap-consumer.mjs";
+import { run, tryRun } from "./lib/run-exec.mjs";
+import { createGitHubOps } from "./pfdsl/lib/github-ops.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const root = resolve(__dirname, "..");
 
-const args = process.argv.slice(2);
-const baseFlagIdx = args.indexOf("--base");
-const base = baseFlagIdx >= 0 ? args[baseFlagIdx + 1] : "main";
-
-function sh(cmd) {
-	return execSync(cmd, { cwd: root, encoding: "utf-8" });
-}
-
-let fetched = true;
+// strict parsing, not an indexOf sweep: --base=foo was skipped outright, so
+// the preflight measured the lag against main while reporting the branch the
+// caller had asked for nowhere at all (#648).
+let values;
 try {
-	sh("git fetch origin");
-} catch {
-	fetched = false;
+	({ values } = parseArgs({
+		args: process.argv.slice(2),
+		options: {
+			base: { type: "string" },
+			issue: { type: "string", multiple: true },
+			artifact: { type: "string" },
+			"source-config": { type: "string" },
+		},
+		strict: true,
+		allowPositionals: false,
+	}));
+} catch (err) {
+	console.error(`cycle-status: ${err.message}`);
+	process.exit(2);
 }
+const base = values.base ?? "main";
+// Retain every explicit target in the source reads and terminal review command.
+const parsedIssues = parseIssueNumbers(values.issue);
+if (!parsedIssues.ok) {
+	console.error(`cycle-status: ${parsedIssues.message}`);
+	process.exit(2);
+}
+const issueNumbers = parsedIssues.numbers;
 
-let behindBase = null;
-let behindBaseError = null;
+// `base` comes from argv; naming the executable and arguments separately keeps
+// it out of a shell (#572).
+const sh = (file, args) => run(file, args, { cwd: root });
+// stderr is left inherited, not captured: release-status warns there about a
+// distribution review it could not read at all, and that warning is the one
+// reading its stdout cannot carry. Capturing it would drop it — `run` returns
+// stdout alone — so it goes to the terminal while stdout becomes the report
+// (#814).
+const shTry = (file, args) => tryRun(file, args, { cwd: root });
+
+let roadmap;
+let result;
 try {
-	behindBase = countBehind(sh(`git log --oneline HEAD..origin/${base}`));
-} catch (e) {
-	behindBaseError = e.message;
+	roadmap = await acquireConfiguredRoadmap({
+		root,
+		sourceConfig: values["source-config"],
+	});
+	result = await runCycleStatus({
+		sh,
+		shTry,
+		githubOps: createGitHubOps({ cwd: root }),
+		existsSync,
+		readFileSync,
+		root,
+		base,
+		issueNumbers,
+		artifact: values.artifact,
+		roadmap,
+		sourceConfig: values["source-config"]
+			? resolve(values["source-config"])
+			: undefined,
+	});
+} catch (error) {
+	console.error(`cycle-status: ${error.message}`);
+	process.exitCode = 1;
+} finally {
+	roadmap?.dispose();
 }
-
-let openFlowSyncPRs = [];
-let otherOpenPRs = [];
-let prError = null;
-try {
-	const prJson = JSON.parse(
-		await execGh(["pr", "list", "--state", "open", "--json", "number,title,headRefName,statusCheckRollup"], { cwd: root }),
-	);
-	({ openFlowSyncPRs, otherOpenPRs } = classifyPRs(prJson));
-} catch (e) {
-	prError = e.message;
-}
-
-const cliPath = resolve(root, "packages/cli/dist/cli.js");
-let ready = [];
-let best = null;
-let bestOutputs = [];
-let readyError = null;
-if (existsSync(cliPath)) {
-	try {
-		const readyJson = JSON.parse(sh(`node "${cliPath}" status ready .pfdsl/roadmap.pfdsl --best --json`));
-		({ ready, best, bestOutputs } = parseReadyOutput(readyJson));
-	} catch (e) {
-		readyError = e.message;
-	}
-} else {
-	readyError = "packages/cli/dist/cli.js not built; run 'pnpm -r build' first";
-}
-
-let designUnsettled = null;
-let designUnsettledLines = [];
-let designUnsettledError = null;
-if (best) {
-	try {
-		const roadmapText = readFileSync(resolve(root, ".pfdsl/roadmap.pfdsl"), "utf-8");
-		const issueNumber = findIssueNumberForProcess(roadmapText, best);
-		if (issueNumber) {
-			const body = await execGh(["issue", "view", String(issueNumber), "--json", "body", "--jq", ".body"], { cwd: root });
-			({ designUnsettled, matchedLines: designUnsettledLines } = detectDesignUnsettled(body));
-		} else {
-			designUnsettledError = `no issue number found for process '${best}' in .pfdsl/roadmap.pfdsl`;
-		}
-	} catch (e) {
-		designUnsettledError = e.message;
-	}
-}
-
-// bestOutputs[0] のみ使う。複数出力プロセス（例: 1プロセスが複数 artifact を生成する edge）は
-// 最初の出力のみを gate-check の対象にする単純化。
-const gateCheckCommand = buildGateCheckCommand(bestOutputs[0] ?? null, base);
-
-const result = {
-	fetched,
-	behindBase,
-	openFlowSyncPRs,
-	otherOpenPRs,
-	ready,
-	best,
-	designUnsettled,
-	designUnsettledLines,
-	gateCheckCommand,
-};
-if (behindBaseError) result.behindBaseError = behindBaseError;
-if (prError) result.prError = prError;
-if (readyError) result.readyError = readyError;
-if (designUnsettledError) result.designUnsettledError = designUnsettledError;
+if (!result) process.exit(1);
 
 console.log(JSON.stringify(result, null, 2));
+
+// Non-zero so a caller that only reads the exit status still stops: the payload
+// carries no judgments in either case, and such a preflight is exactly the
+// output a reader mistakes for "checked, nothing wrong" (#716, #744).
+const exitCode = cycleStatusExitCode(result);
+if (exitCode !== 0) process.exit(exitCode);

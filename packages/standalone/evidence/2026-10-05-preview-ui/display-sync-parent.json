@@ -1,0 +1,108 @@
+{
+	"snapshotStage": "First synchronization repair, before the cursor/scroll render scheduler",
+	"kind": "Parent-authored transcription of executed checks and native CUA observations; not an independent review or raw GUI capture",
+	"date": "2026-10-05",
+	"baselineCommit": "dd5df03f5808025a527075cacc681d5aadae1c95",
+	"sourceSha256": {
+		"packages/editor/src/preview.ts": "c04a17f8b43dd7c33a881cfb06e25aefae94936b1aa6a6e30164b6f6c7699bbc",
+		"packages/editor/src/preview-ux.test.ts": "1eb8bc90e8cb472b4e5889d2d72e84acd81d962f1f8292acd67121e9af982133",
+		"packages/standalone/src/document-tab.ts": "081c740651fc46bd8d74df2b3d9fbccb0e98e86b4eb676c398411bb2c994b888"
+	},
+	"tests": {
+		"red": {
+			"exitCode": 1,
+			"passed": 7,
+			"failed": 2,
+			"observed": [
+				"new main / old minimap with paused frames",
+				"old minimap retained after hidden-tab update"
+			]
+		},
+		"green": {
+			"exitCode": 0,
+			"passed": 9,
+			"failed": 0
+		},
+		"editor": {
+			"exitCode": 0,
+			"passed": 220,
+			"failed": 0
+		},
+		"extension": {
+			"exitCode": 0,
+			"passed": 137,
+			"failed": 0
+		},
+		"standalone": {
+			"exitCode": 0,
+			"passed": 5,
+			"failed": 0
+		},
+		"typecheck": {
+			"exitCode": 0
+		},
+		"build": {
+			"exitCode": 0
+		},
+		"nativeBuild": {
+			"exitCode": 0
+		}
+	},
+	"logs": {
+		"red": {
+			"temporaryFilename": "pfdsl-native-display-red-01a10a12.log",
+			"sha256": "47ff5a265121ba9b68140c6bcb4e638969f783e8ad395e370dfbde738e69d864"
+		},
+		"green": {
+			"temporaryFilename": "pfdsl-native-display-green-01a10a12.log",
+			"sha256": "ef431955264c0c0ed363fcb7c4c868292d876475e0e9dc705e06575892fc5f06"
+		},
+		"build": {
+			"temporaryFilename": "pfdsl-native-display-build-01a10a12.log",
+			"sha256": "ec636ec0b58dc830ebce6bdd22cffdffd0ad421ddbfe65dc7bf975ece97e0299"
+		},
+		"editor": {
+			"temporaryFilename": "pfdsl-native-display-editor-test-01a10a12.log",
+			"sha256": "d058c0f1ec872236255d0f50d5ec1998cc121c998c98d7c157bc15d4abded4ae"
+		},
+		"extension": {
+			"temporaryFilename": "pfdsl-native-display-extension-test-01a10a12.log",
+			"sha256": "db7f2ccd8fe85c4c31652b444c0025ce14327f820098ba0c3f2ab55886fe1e36"
+		},
+		"standalone": {
+			"temporaryFilename": "pfdsl-native-display-standalone-test-01a10a12.log",
+			"sha256": "33f377773bbd9b391060aeb1a56dbc472c236eab4225584f147affb3cac7d90b"
+		},
+		"typecheck": {
+			"temporaryFilename": "pfdsl-native-display-typecheck-01a10a12.log",
+			"sha256": "906ed7b7e589f67dc21ac9dd445214bc3a57d3820b6531a8e6c8233b5c903597"
+		},
+		"nativeBuild": {
+			"temporaryFilename": "pfdsl-native-display-app-build-01a10a12.log",
+			"sha256": "e8dea8d39302269169b2971e8d94fd8c5bb493b89ff252d21c014811b345fc45"
+		}
+	},
+	"nativeReplay": {
+		"input": "---\ntitle: Foreground redraw test\n---\nraw >> refine -> final\n",
+		"launch": "Ordinary cua.getApp, assigned debug .app. Window menu PFDSL entry selected for full-window capture; foreground focus was not independently measured.",
+		"beforeSha256": "842cc46e7be18eee3fdb11fcaacdaf7ca6731841dacf8c0c6d25c12a8950d558",
+		"before": {
+			"modelAXAndMain": "Foreground redraw test",
+			"visibleEditorAndMinimap": "Welcome to PFDSL",
+			"matched": false
+		},
+		"afterSha256": "e0a697fa4007ee13831bc79f4285264fc244048bd72f76d6ee4d23c57831a5a9",
+		"after": {
+			"modelAXVisibleEditorMainAndMinimap": "Foreground redraw test",
+			"matched": true
+		},
+		"captures": "Native screenshots were inspected in the parent chat; this JSON is a transcription and does not embed those images.",
+		"cleanup": "Each parent trial was quit. A process readback confirmed no PFDSL executable process before independent UI review."
+	},
+	"proofLimits": [
+		"OS/automation cause of frame suspension is not established",
+		"physical OS repaint cannot be forced by this source synchronization",
+		"focused replay is not full native GUI/IME acceptance",
+		"unchanged package checks from dd5df03f are historical; new targeted checks are listed here"
+	]
+}

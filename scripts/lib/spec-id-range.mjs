@@ -10,18 +10,14 @@
  * `line` into `computeRange`.
  */
 
-const HEADING_RE = /^(#{1,6})\s/;
+import { headingLevel } from "./markdown-heading.mjs";
+
 const LIST_ITEM_RE = /^(\s*)(?:[-*+]|\d+[.)])\s/;
 const TABLE_ROW_RE = /^\s*\|/;
 const FENCE_RE = /^(```|~~~)/;
 
 function isBlank(line) {
 	return line.trim() === "";
-}
-
-function headingLevel(line) {
-	const match = HEADING_RE.exec(line);
-	return match ? match[1].length : null;
 }
 
 function listItemIndent(line) {
@@ -86,12 +82,17 @@ function computeHeadingRange(lines, lineIndex) {
 
 function computeListItemRange(lines, lineIndex) {
 	const indent = listItemIndent(lines[lineIndex]);
-	const endIndex = findBoundary(lines, lineIndex + 1, (line) => {
-		if (isBlank(line)) return false;
-		if (listItemIndent(line) === indent) return true; // next sibling item
-		return leadingWhitespaceLength(line) < indent; // dedent past the item
-	});
-	return { startIndex: lineIndex, endIndex: endIndex - 1 };
+	let endIndex = lineIndex;
+	for (let i = lineIndex + 1; i < lines.length; i++) {
+		const line = lines[i];
+		if (isBlank(line)) continue;
+		const leading = leadingWhitespaceLength(line);
+		if (listItemIndent(line) === indent || leading < indent) break;
+		// After a blank line, only an indented block can continue this item.
+		if (leading === indent && i > endIndex + 1) break;
+		endIndex = i;
+	}
+	return { startIndex: lineIndex, endIndex };
 }
 
 function computeTableRowRange(lineIndex) {

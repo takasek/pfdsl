@@ -1,19 +1,45 @@
 import { auditGraph } from "./audit.js";
 
 export type { AuditResult, ConsumerAsymmetryHint } from "./audit.js";
+export { compareIds } from "./compare.js";
 export type { DiagnosticRegistryEntry } from "./diagnostics-registry.js";
 export { DIAGNOSTIC_REGISTRY } from "./diagnostics-registry.js";
 export type { EdgeGroups } from "./edge-groups.js";
 export { groupEdges } from "./edge-groups.js";
-export type { Neighbors, NodeStats } from "./graph-analysis.js";
+export type {
+	GraphNeighbor,
+	GraphOrphan,
+	Neighbors,
+	NodeStats,
+} from "./graph-analysis.js";
 export {
 	computeDependsOn,
 	computeImpact,
 	computeNeighbors,
+	computeOrphans,
 	computePaths,
 	computeStats,
 } from "./graph-analysis.js";
+export type { LocateResult } from "./locate.js";
+export { locateNode } from "./locate.js";
 export { resolveLocationFsPath } from "./location-path.js";
+export type {
+	ArtifactSnapshotResult,
+	ModelOrigin,
+	ReferenceBinding,
+	ReferenceContext,
+	ReferenceFailure,
+	ReferenceFailureReason,
+	ReferenceResult,
+	ReferenceSnapshot,
+	ResolveReferenceInput,
+} from "./reference-resolution.js";
+export {
+	resolveArtifactSnapshot,
+	resolveReference,
+	selectArtifactReference,
+	validateReferenceContext,
+} from "./reference-resolution.js";
 export { auditGraph };
 
 import {
@@ -21,8 +47,25 @@ import {
 	formatEdges,
 	splitBodyIntoSegments,
 } from "./formatter.js";
-import { loadFrontmatter } from "./frontmatter.js";
-import { escapeRe } from "./frontmatter-text.js";
+
+export { formatId, formatIdBefore, parseIdList } from "./formatter.js";
+
+import { loadFrontmatter, loadFrontmatterModel } from "./frontmatter.js";
+import type { FrontmatterSource } from "./frontmatter-source.js";
+
+export type {
+	FrontmatterSource,
+	SourceDeclaration,
+	SourceField,
+	SourceValue,
+} from "./frontmatter-source.js";
+
+import {
+	parseFrontmatterCst,
+	renderFrontmatterCst,
+	setFrontmatterField,
+} from "./frontmatter-cst.js";
+import { detectChildIndent, escapeRe } from "./frontmatter-text.js";
 import { buildGraph } from "./graph.js";
 import { lex } from "./lexer.js";
 import { normalize } from "./normalizer.js";
@@ -35,11 +78,18 @@ import type {
 	Graph,
 	NodeKind,
 	NormalizedEdge,
+	Token,
 } from "./types/index.js";
 import { validate } from "./validator.js";
 
-export type { DiffReport } from "./diff.js";
-export { diffGraphs } from "./diff.js";
+export type {
+	ClassifiedFeedbackEdge,
+	ClassifiedPrimaryEdge,
+	DetailedDiffReport,
+	DiffReport,
+	EdgeDiffStatus,
+} from "./diff.js";
+export { diffGraphs, diffGraphsDetailed } from "./diff.js";
 export type { LexResult } from "./lexer.js";
 export { ID_PATTERN } from "./lexer.js";
 export type { NormalizeResult } from "./normalizer.js";
@@ -70,14 +120,20 @@ export type {
 	PrimaryEdge,
 	ProcessMeta,
 	Range,
+	ReferenceTarget,
 	Statement,
 	Status,
 	StyleAttr,
 	Token,
 	TokenType,
 } from "./types/index.js";
-export { PFD_TYPE_VALUES, STATUS_VALUES, STYLE_ATTRS } from "./types/index.js";
-export { escapeRe };
+export {
+	isRoadmapType,
+	PFD_TYPE_VALUES,
+	STATUS_VALUES,
+	STYLE_ATTRS,
+} from "./types/index.js";
+export { detectChildIndent, escapeRe, setFrontmatterField };
 
 export interface ParseDocResult {
 	document: Document;
@@ -104,6 +160,8 @@ export interface AnalyzeResult {
 
 interface ParsedBody extends ParseDocResult {
 	body: string;
+	tokens: Token[];
+	sourceMap: FrontmatterSource;
 }
 
 /**
@@ -112,13 +170,17 @@ interface ParsedBody extends ParseDocResult {
  * format() continues on from here with normalize/validate/segment work that
  * parse() doesn't need.
  */
-function parseBody(source: string): ParsedBody {
+function parseBody(
+	source: string,
+	frontmatterOptions?: { strict?: boolean },
+): ParsedBody {
 	const {
 		frontmatter,
 		body,
 		diagnostics: fmDiags,
 		bodyStartLine,
-	} = loadFrontmatter(source);
+		sourceMap,
+	} = loadFrontmatterModel(source, frontmatterOptions);
 	const { tokens: rawTokens, diagnostics: lexDiags } = lex(body);
 	const lineOffset = bodyStartLine - 1;
 	const tokens =
@@ -130,12 +192,30 @@ function parseBody(source: string): ParsedBody {
 				}))
 			: rawTokens;
 	const { document, diagnostics: parseDiags } = parseTokens(tokens);
+	const sourceLexDiags =
+		lineOffset > 0
+			? lexDiags.map((diagnostic) => ({
+					...diagnostic,
+					range: {
+						start: {
+							...diagnostic.range.start,
+							line: diagnostic.range.start.line + lineOffset,
+						},
+						end: {
+							...diagnostic.range.end,
+							line: diagnostic.range.end.line + lineOffset,
+						},
+					},
+				}))
+			: lexDiags;
 	return {
 		document,
 		frontmatter,
 		bodyStartLine,
 		body,
-		diagnostics: [...fmDiags, ...lexDiags, ...parseDiags],
+		tokens,
+		sourceMap,
+		diagnostics: [...fmDiags, ...sourceLexDiags, ...parseDiags],
 	};
 }
 
@@ -145,6 +225,8 @@ export function parse(source: string): ParseDocResult {
 	return { document, frontmatter, bodyStartLine, diagnostics };
 }
 
+export type { DeleteNodesOptions, DeleteNodesResult } from "./delete-nodes.js";
+export { deleteNodes } from "./delete-nodes.js";
 export type { InsertDefinitionResult } from "./insert-definition.js";
 export { insertDefinition } from "./insert-definition.js";
 export type {
@@ -153,6 +235,8 @@ export type {
 	ReindexResult,
 } from "./reindex.js";
 export { reindex } from "./reindex.js";
+export type { RenameRefusal, RenameResult } from "./rename.js";
+export { rename } from "./rename.js";
 
 export type {
 	SortKey,
@@ -177,6 +261,16 @@ export function hasErrors(diags: readonly Diagnostic[]): boolean {
 	return diags.some((d) => d.severity === "error");
 }
 
+/**
+ * True for an error reporting a document that could not be read —
+ * frontmatter (FM), lexer (L), or parser (P) — so there is no trustworthy
+ * structure to rewrite. A validation (V) or normalizer (N) error is not one:
+ * the document was read, and its content is what is wrong.
+ */
+export function isUnreadableError(d: Diagnostic): boolean {
+	return d.severity === "error" && /^(?:FM|L|P)\d+$/.test(String(d.code));
+}
+
 export { resolveMeta } from "./meta.js";
 
 export interface AnalyzeOptions {
@@ -188,19 +282,32 @@ export function analyze(
 	source: string,
 	opts: AnalyzeOptions = {},
 ): AnalyzeResult {
+	const { sourceMap: _sourceMap, ...result } = analyzeSource(source, opts);
+	return result;
+}
+
+/** Analyze one source snapshot and retain its authored frontmatter positions. */
+export function analyzeSource(
+	source: string,
+	opts: AnalyzeOptions = {},
+): AnalyzeResult & { sourceMap: FrontmatterSource } {
 	const {
 		document,
 		frontmatter,
 		bodyStartLine,
 		diagnostics: parseDiags,
-	} = parse(source);
+		sourceMap,
+	} = parseBody(source, opts.strict ? { strict: true } : undefined);
 	const {
 		edges,
 		nodeKinds,
 		isolatedNodes,
 		diagnostics: normDiags,
 	} = normalize(document, frontmatter);
-	const valOpts: import("./validator.js").ValidateOptions = { source };
+	const valOpts: import("./validator.js").ValidateOptions = {
+		sourceMap,
+		document,
+	};
 	if (opts.strict) valOpts.strict = true;
 	if (opts.readyGate) valOpts.readyGate = true;
 	const valDiags = validate(edges, nodeKinds, frontmatter, valOpts);
@@ -213,6 +320,7 @@ export function analyze(
 		nodeKinds,
 		isolatedNodes,
 		graph,
+		sourceMap,
 		diagnostics: [...parseDiags, ...normDiags, ...valDiags],
 	};
 }
@@ -222,6 +330,18 @@ export interface FormatOptions {
 	skipValidation?: boolean;
 }
 
+export type {
+	DependencyClosure,
+	DependencyDiagnostic,
+	DependencyDocument,
+	DependencyOptions,
+	DependencyReference,
+	DependencyRole,
+} from "./dependency-closure.js";
+export {
+	loadDependencyClosure,
+	loadDependencyClosureAsync,
+} from "./dependency-closure.js";
 export type {
 	DocWithFrontmatter,
 	LoadedGraph,
@@ -238,9 +358,12 @@ export {
 	isUrlLike,
 	loadExtendsChain,
 	loadSubflowGraph,
+	parentBoundaryArtifacts,
 	resolveEffectiveFrontmatter,
+	resolveLoadedPresentation,
 	resolvePresentation,
 	resolveRefPath,
+	subflowBoundaryDiagnostics,
 	validatePresetKeys,
 	validateSubflowBoundary,
 	wrapPresetSource,
@@ -252,6 +375,7 @@ export function format(source: string, opts: FormatOptions = {}): FormatResult {
 		document,
 		frontmatter,
 		body,
+		tokens,
 		diagnostics: parseDiags,
 	} = parseBody(source);
 	const {
@@ -262,9 +386,24 @@ export function format(source: string, opts: FormatOptions = {}): FormatResult {
 	} = normalize(document, frontmatter);
 	const valDiags = opts.skipValidation
 		? []
-		: validate(edges, nodeKinds, frontmatter, { source });
+		: validate(edges, nodeKinds, frontmatter, { source, document });
 
-	const frontmatterSection = source.slice(0, source.length - body.length);
+	// Frontmatter is canonicalized through the yaml CST (ADR-0034) rather than
+	// passed through verbatim. Left untouched when absent, when the fence is
+	// malformed (FM001), or when the fence is well-formed but its YAML
+	// content doesn't parse (FM002) — `Document#toString()` throws on a
+	// Document carrying parse errors, and parseDiags already surfaces both
+	// diagnostics to the caller, so there is nothing safe to rewrite here.
+	// LF is passed explicitly here, unlike the other callers of
+	// renderFrontmatterCst which pass the source's own newline (#644): format
+	// re-emits the body from parsed statements, which are LF, so both halves are
+	// assembled on LF and the whole output is converted once at the end (#656).
+	const rawFrontmatterSection = source.slice(0, source.length - body.length);
+	const frontmatterCst = parseFrontmatterCst(source);
+	const frontmatterSection =
+		frontmatterCst.present && frontmatterCst.doc.errors.length === 0
+			? renderFrontmatterCst(frontmatterCst.doc, "\n", frontmatterCst.yamlText)
+			: rawFrontmatterSection;
 
 	// Format segment by segment to preserve comment lines. Isolated-node
 	// detection is done once above for the whole document (edgeNodes there
@@ -272,20 +411,76 @@ export function format(source: string, opts: FormatOptions = {}): FormatResult {
 	// only need segEdges — recomputing isolated per segment against the full
 	// file's frontmatter would flag nearly every other node as isolated
 	// relative to that single segment (issue #368).
-	const segments = splitBodyIntoSegments(body);
-	const formattedBody = segments
-		.map((seg) => {
-			if (seg.kind === "comment") return seg.text;
-			const { tokens: segToks } = lex(seg.text);
-			const { document: segDoc } = parseTokens(segToks);
-			const { edges: segEdges } = normalize(segDoc, frontmatter);
-			const segGraph = buildGraph(segEdges, nodeKinds);
-			const segSorted = sortEdges(segEdges, segGraph);
-			return opts.style === "flows"
-				? formatAsFlows(segSorted)
-				: formatEdges(segSorted);
-		})
-		.join("");
+	const formatCanonicalBody = (segmentBody: string): string =>
+		splitBodyIntoSegments(segmentBody)
+			.map((seg) => {
+				if (seg.kind === "comment") return seg.text;
+				const { tokens: segToks } = lex(seg.text);
+				const { document: segDoc } = parseTokens(segToks);
+				const { edges: segEdges } = normalize(segDoc, frontmatter);
+				const segGraph = buildGraph(segEdges, nodeKinds);
+				const segSorted = sortEdges(segEdges, segGraph);
+				return opts.style === "flows"
+					? formatAsFlows(segSorted)
+					: formatEdges(segSorted);
+			})
+			.join("");
+
+	const comments = tokens.filter((token) => token.type === "COMMENT");
+	const rawRanges: { start: number; end: number }[] = [];
+	let commentCursor = 0;
+	for (const statement of document.statements) {
+		while (
+			commentCursor < comments.length &&
+			comments[commentCursor]!.start.offset < statement.start.offset
+		)
+			commentCursor++;
+		const internalComment = comments[commentCursor];
+		if (
+			!internalComment ||
+			internalComment.start.offset >= statement.end.offset
+		)
+			continue;
+
+		let end = statement.end.offset;
+		let trailingCursor = commentCursor + 1;
+		while (
+			trailingCursor < comments.length &&
+			comments[trailingCursor]!.start.offset < end
+		)
+			trailingCursor++;
+		const trailingComment = comments[trailingCursor];
+		if (
+			trailingComment &&
+			trailingComment.start.line === statement.end.line &&
+			/^[ \t\r]*$/.test(body.slice(end, trailingComment.start.offset))
+		)
+			end = trailingComment.end.offset;
+		rawRanges.push({ start: statement.start.offset, end });
+	}
+
+	const consumeRawSeparator = (offset: number): number => {
+		let cursor = offset;
+		while (/[ \t\r]/.test(body[cursor] ?? "")) cursor++;
+		if (body[cursor] === ";") {
+			cursor++;
+			while (/[ \t\r]/.test(body[cursor] ?? "")) cursor++;
+			if (body[cursor] === "\n") cursor++;
+			return cursor;
+		}
+		if (body[cursor] === "\n") return cursor + 1;
+		return offset;
+	};
+
+	const formattedBodyParts: string[] = [];
+	let bodyOffset = 0;
+	for (const { start, end } of rawRanges) {
+		formattedBodyParts.push(formatCanonicalBody(body.slice(bodyOffset, start)));
+		formattedBodyParts.push(body.slice(start, end), "\n");
+		bodyOffset = consumeRawSeparator(end);
+	}
+	formattedBodyParts.push(formatCanonicalBody(body.slice(bodyOffset)));
+	const formattedBody = formattedBodyParts.join("");
 
 	// Isolated nodes are rendered exactly once, as a trailing block at the
 	// very end of the file (after all segments), instead of once per segment.
@@ -297,8 +492,16 @@ export function format(source: string, opts: FormatOptions = {}): FormatResult {
 				? formatAsFlows([], isolatedIds)
 				: formatEdges([], isolatedIds);
 
+	// Canonical output uses LF, while preserved statements and the FM001/FM002
+	// frontmatter fallback can retain source CRLF. Convert the whole output
+	// without doubling a carriage return that is already present.
+	const output = frontmatterSection + formattedBody + isolatedBlock;
 	return {
-		output: frontmatterSection + formattedBody + isolatedBlock,
+		output:
+			frontmatterCst.newline === "\r\n"
+				? output.replace(/\r?\n/g, "\r\n")
+				: output,
 		diagnostics: [...parseDiags, ...normDiags, ...valDiags],
 	};
 }
+export { inputFeedbackConflictPairs } from "./rules/edge-kinds.js";

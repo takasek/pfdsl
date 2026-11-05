@@ -1,0 +1,30 @@
+# Native build log excerpt
+
+   Compiling pfdsl-desktop v0.1.0 (<checkout>/packages/standalone/src-tauri)
+warning: pfdsl-desktop@0.1.0: STATIC_VCRUNTIME is deprecated; use build.windows.staticVCRuntime in tauri.conf.json or tauri_build::WindowsAttributes::static_vc_runtime instead.
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 32.99s
+       Built application at: <checkout>/packages/standalone/src-tauri/target/debug/pfdsl-desktop
+    Bundling PFDSL.app (<checkout>/packages/standalone/src-tauri/target/debug/bundle/macos/PFDSL.app)
+    Finished 1 bundle at:
+        <checkout>/packages/standalone/src-tauri/target/debug/bundle/macos/PFDSL.app
+
+
+# Rust unit-test log excerpt
+
+running 2 tests
+test workspace::tests::keeps_the_selected_folder_bound_when_its_path_is_replaced ... ok
+test workspace::tests::reads_only_files_inside_user_selected_folders ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/main.rs (packages/standalone/src-tauri/target/debug/deps/pfdsl_desktop-427b4214c96872b6)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests pfdsl_desktop
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s

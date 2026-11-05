@@ -1,0 +1,27 @@
+[
+  {
+    "class": "HEADER",
+    "height": 75,
+    "width": 1280
+  },
+  {
+    "class": "ASIDE",
+    "height": 725,
+    "width": 227
+  },
+  {
+    "class": "document",
+    "height": 681.5,
+    "width": 1053
+  },
+  {
+    "class": "editor",
+    "height": 681.5,
+    "width": 350.890625
+  },
+  {
+    "class": "preview pfdsl-preview",
+    "height": 681.5,
+    "width": 702.109375
+  }
+]

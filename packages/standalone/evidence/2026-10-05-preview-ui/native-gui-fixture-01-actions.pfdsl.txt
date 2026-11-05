@@ -1,0 +1,14 @@
+---
+title: Native action review
+artifact:
+  review:
+    label: Review record
+  reserve:
+    label: Reserved output
+process:
+  inspect:
+    label: Inspect manuscript
+---
+brief >> draft -> manuscript >> inspect -> review
+review >>? draft
+reserve

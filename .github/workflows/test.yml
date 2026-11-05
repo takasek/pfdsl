@@ -9,23 +9,23 @@ jobs:
   test:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      - uses: pnpm/action-setup@v6
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
 
-      - uses: actions/setup-node@v6
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 24
           cache: pnpm
 
       - run: pnpm install --frozen-lockfile
 
+      - run: node scripts/setup-shell-parser.mjs
+
       - run: make lint
 
-      # .claude/skills/pfdsl is generated + gitignored (#348) and absent on a
-      # fresh checkout — bootstrap it before the plain 'pnpm -r build' below
-      # (which would otherwise fail at the CLI's onSuccess bundling step).
-      - run: make bootstrap-pfdsl-skill
+      # .claude/skills/pfdsl is gitignored (#348) and absent on a fresh checkout, so link it to the tracked generated copy the way `make setup` does (#714) and checks that read the repo-local skill path resolve.
+      - run: node scripts/link-repo-skill.mjs
 
       - run: pnpm -r build
 
@@ -33,17 +33,41 @@ jobs:
 
       - run: pnpm -r test
 
-      - run: node --test "scripts/lib/*.test.mjs" "scripts/pfdsl/lib/*.test.mjs"
+      - run: node --test "scripts/*.test.mjs" "scripts/lib/*.test.mjs" "scripts/pfdsl/*.test.mjs" "scripts/pfdsl/lib/*.test.mjs" "hooks/*.test.mjs" "hooks/lib/*.test.mjs" "plugin/pfdsl/hooks/lib/*.test.mjs" "plugin/pfdsl-codex/hooks/lib/*.test.mjs" "packages/vscode-extension/smoke/*.test.mjs" "experiments/evidence-roundtrip/*.test.mjs" "experiments/standalone/src/*.test.mjs" "experiments/standalone/electron/*.test.cjs"
 
       - run: node scripts/check-script-imports.mjs
 
-      - run: make check-docs
+      - run: node scripts/check-no-shell-strings.mjs
+      - run: node scripts/check-cli-conventions.mjs
+
+      # check-docs runs as the prerequisite of make gen-plugin in the required check-gen-plugin.yml job on the same events and build.
 
       - run: make check-fmt
 
+      - run: make check-links
+
+      - run: make check-scaffold
+
       - run: make check-readme-cli
 
-      - name: Verify snapshots are up-to-date with .pfdsl files
-        run: |
-          pnpm --filter @pfdsl/core exec vitest run -u
-          git diff --exit-code packages/core/src/__snapshots__/
+  vscode-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: /tmp/pfdsl-vscode-smoke-cache/pfdsl
+          key: vscode-smoke-${{ runner.os }}-vscode-1.132.1-test-electron-${{ hashFiles('pnpm-lock.yaml') }}
+
+      - run: pnpm install --frozen-lockfile
+
+      - run: xvfb-run --auto-servernum make test-vscode-smoke

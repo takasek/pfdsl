@@ -3,13 +3,17 @@
   "private": true,
   "packageManager": "pnpm@10.33.2",
   "scripts": {
-    "test": "pnpm -r test",
+    "test": "pnpm -r build && pnpm -r test",
     "build": "pnpm -r build",
-    "typecheck": "pnpm -r typecheck"
+    "typecheck": "pnpm -r build && pnpm -r typecheck"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.4.14",
     "@typescript/native-preview": "7.0.0-dev.20260707.2",
+    "mdast-util-from-markdown": "^2.1.0",
+    "mdast-util-gfm-table": "^2.0.0",
+    "micromark-extension-gfm-table": "^2.0.0",
+    "mustache": "^4.2.0",
     "typescript": "^5.4.0",
     "yaml": "^2.4.0"
   }

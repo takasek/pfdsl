@@ -1,0 +1,74 @@
+{
+	"archive": {
+		"name": "pfdsl-1513-recovery.zip",
+		"sha256": "94043d751c1e468e0645b3a276a654fbdc1285ed06bd242cedfafc1ad7857696"
+	},
+	"files": [
+		{
+			"path": "native-session-02b.log",
+			"archivePath": "evidence/native-session-02b.log",
+			"bytes": 1576,
+			"sha256": "4e41ffbc2db0bb4d917ecf8bb61011eb40ab66607f9294bb653fa63f21698da1"
+		},
+		{
+			"path": "native-session-03.log",
+			"archivePath": "evidence/native-session-03.log",
+			"bytes": 170,
+			"sha256": "4ddfb99a693924cf97e9b10a982fb513b3950563a90087070b0b77e7efe03233"
+		},
+		{
+			"path": "native-session-04.log",
+			"archivePath": "evidence/native-session-04.log",
+			"bytes": 634,
+			"sha256": "30ac340165fe1ad1b4c55160ac851bb0a5fbb6ba486d62c4e336ee5d5c50d356"
+		},
+		{
+			"path": "native-session-05.log",
+			"archivePath": "evidence/native-session-05.log",
+			"bytes": 255,
+			"sha256": "272f12328e493b756cf48effe59116c1230f4fe6a92087dc933942bc3d314a0c"
+		},
+		{
+			"path": "s03-native-processes.txt",
+			"archivePath": "evidence/s03-native-processes.txt",
+			"bytes": 181,
+			"sha256": "610aea7382633f5c48680c0caa554d2d6684d5b79f3586ab8b403efdc7bfa8c1"
+		},
+		{
+			"path": "s04-native-processes.txt",
+			"archivePath": "evidence/s04-native-processes.txt",
+			"bytes": 177,
+			"sha256": "f867c5d26ea1c2ceb65f72778bb0a2e818b8f598222d341dd729237c71b3dfe7"
+		},
+		{
+			"path": "s05-native-processes.txt",
+			"archivePath": "evidence/s05-native-processes.txt",
+			"bytes": 135,
+			"sha256": "ade3425434cf6f253a985cadf5cc6461ae2415d0594131ef5726c47892471870"
+		},
+		{
+			"path": "hover-rich.pfdsl.txt",
+			"archivePath": "repro/hover/hover-rich.pfdsl",
+			"bytes": 377,
+			"sha256": "1a3457175367b886fff0de6d304f490be891d7dfe43f15c7df726ab3184e5933"
+		},
+		{
+			"path": "AppRun.txt",
+			"archivePath": "artifact/squashfs-root/AppRun",
+			"bytes": 274,
+			"sha256": "eb0b254ac0dae6543e6dd7cd02e1baf40a060de95b927313122d6b46323c00aa"
+		},
+		{
+			"path": "linuxdeploy-plugin-gtk.sh.txt",
+			"archivePath": "artifact/squashfs-root/apprun-hooks/linuxdeploy-plugin-gtk.sh",
+			"bytes": 1690,
+			"sha256": "8d79a3a79b35629cd47fd570f6d89f37294e534555ab067be0d96b34d2937d82"
+		},
+		{
+			"path": "LOCAL_RECOVERY_FINDINGS.txt",
+			"archivePath": "LOCAL_RECOVERY_FINDINGS.txt",
+			"bytes": 11891,
+			"sha256": "30943a9fbf976c1bfd83ca5a76db4264d78f8a2fd792ede348ef4cd2bc2be421"
+		}
+	]
+}

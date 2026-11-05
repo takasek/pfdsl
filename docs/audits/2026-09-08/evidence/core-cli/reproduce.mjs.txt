@@ -1,0 +1,36 @@
+import {analyze,format} from '/path/to/pfdsl/packages/core/dist/index.js';
+import {run} from '/path/to/pfdsl/packages/cli/dist/index.js';
+import {writeFileSync,mkdtempSync} from 'node:fs';
+import {join} from 'node:path';
+import assert from 'node:assert/strict';
+const out='/tmp/pfdsl-audit/core-cli';
+const result={format:[],types:[],multifile:{}};
+for (const source of ['"a#b" >> P -> c\n','[a, b]\n# note\n>> P -> c\n','a >> P -> c\n']) {
+ const before=analyze(source);const f=format(source,{style:'flows'});const after=analyze(f.output);
+ result.format.push({source,beforeDiags:before.diagnostics,beforeEdges:before.edges,formatDiags:f.diagnostics,output:f.output,afterDiags:after.diagnostics,afterEdges:after.edges});
+}
+assert.equal(result.format[0].beforeEdges.length,2);assert.equal(result.format[0].afterEdges.length,0);
+assert.equal(result.format[1].beforeEdges.length,3);assert.equal(result.format[1].afterEdges.length,0);
+for (const source of ['---\nartifact:\n  a:\n    parts: 42\n---\na >> P -> b\n','---\nartifact:\n  a:\n    label: 42\n---\na >> P -> b\n']) {
+ for (const command of ['check','render']) {try {result.types.push({source,command,result:await run([command,'-'],{readStdin:()=>source})});}catch(e){result.types.push({source,command,thrown:String(e)});}}
+}
+const root=mkdtempSync(join(out,'fixtures-'));
+const file=(name,body)=>{const path=join(root,name);writeFileSync(path,body);return path;};
+const check=async path=>{try{return await run(['check',path,'--json']);}catch(e){return {thrown:String(e)};}};
+const parent=file('parent.pfdsl','---\nprocess:\n  P:\n    subflow: child.pfdsl\n---\na >> P -> b\n');
+const child=file('child.pfdsl','a >> Q -> b\na >> R -> b\n');
+result.multifile.invalidChild={entry:await check(parent),direct:await check(child)};
+file('child.pfdsl','---\nprocess:\n  Q:\n    subflow: grandchild.pfdsl\n---\na >> Q -> b\n');
+file('grandchild.pfdsl','x >> R -> y\n');
+result.multifile.deepBoundary={entry:await check(parent),direct:await check(child)};
+const entry=file('extends.pfdsl','---\nextends: preset.yaml\n---\na >> P -> b\n');
+result.multifile.presets={};
+for(const [key,body] of Object.entries({invalidYaml:'statusStyles: [\n',unknownStyle:'statusStyles:\n  done:\n    unknown_style: red\n',forbiddenKey:'artifact:\n  a: {}\n'})) {
+file('preset.yaml',body);result.multifile.presets[key]=await check(entry);
+}
+const nullProc=file('null-process.pfdsl','---\nprocess:\n  P:\n---\na >> P -> b\n');
+result.types.push({case:'null-process-file',result:await check(nullProc)});
+const numberExtends=file('number-extends.pfdsl','---\nextends: 42\n---\na >> P -> b\n');
+result.types.push({case:'number-extends-file',result:await check(numberExtends)});
+writeFileSync(join(out,'results.json'),JSON.stringify(result,null,2)+'\n');
+console.log(JSON.stringify(result,null,2));

@@ -1,0 +1,29 @@
+#!/bin/sh
+# Checkout-local Git state protection; never copied into the shared hook.
+default_ref=$(git symbolic-ref --quiet refs/remotes/origin/HEAD) || {
+  echo "error: cannot resolve origin/HEAD; default branch protection refuses this commit." >&2
+  exit 1
+}
+case "$default_ref" in
+  refs/remotes/origin/?*) default_branch=${default_ref#refs/remotes/origin/} ;;
+  *) echo "error: invalid origin/HEAD; default branch protection refuses this commit." >&2; exit 1 ;;
+esac
+git rev-parse --verify "$default_ref^{commit}" >/dev/null 2>&1 || {
+  echo "error: origin/HEAD does not resolve to a commit; default branch protection refuses this commit." >&2
+  exit 1
+}
+head_ref=$(git symbolic-ref --quiet HEAD)
+head_status=$?
+case "$head_status:$head_ref" in
+  0:refs/heads/?*) ;;
+  1:) ;;
+  *) echo "error: cannot resolve a valid HEAD; default branch protection refuses this commit." >&2; exit 1 ;;
+esac
+git rev-parse --verify 'HEAD^{commit}' >/dev/null 2>&1 || {
+  echo "error: HEAD does not resolve to a commit; default branch protection refuses this commit." >&2
+  exit 1
+}
+if [ "$head_ref" = "refs/heads/$default_branch" ]; then
+  echo "error: commits on the default branch '$default_branch' are refused. Use a feature worktree and a pull request." >&2
+  exit 1
+fi

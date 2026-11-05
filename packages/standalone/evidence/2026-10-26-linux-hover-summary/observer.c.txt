@@ -1,0 +1,45 @@
+#define _GNU_SOURCE
+#include <glib-object.h>
+#include <dlfcn.h>
+#include <stdio.h>
+#include <time.h>
+#include <unistd.h>
+
+static void event(const char *kind, gpointer view, int reason) {
+    struct timespec real, mono;
+    clock_gettime(CLOCK_REALTIME, &real);
+    clock_gettime(CLOCK_MONOTONIC, &mono);
+    const char *name = reason == 0 ? "crashed" : reason == 1 ? "exceeded-memory-limit" : reason == 2 ? "terminated-by-api" : "unknown";
+    fprintf(stderr, "{\"pfdsl_observer\":\"%s\",\"pid\":%ld,\"view\":\"%p\",\"epochSeconds\":%ld.%09ld,\"monotonic\":%ld.%09ld,\"reason\":%d,\"reasonName\":\"%s\"}\n", kind, (long)getpid(), view, real.tv_sec, real.tv_nsec, mono.tv_sec, mono.tv_nsec, reason, name);
+    fflush(stderr);
+}
+
+static void terminated(gpointer view, gint reason, gpointer data) {
+    (void)data;
+    event("web-process-terminated", view, reason);
+}
+
+static void attach(GObject *object) {
+    typedef GType (*TypeFunction)(void);
+    TypeFunction web_type = (TypeFunction)dlsym(RTLD_DEFAULT, "webkit_web_view_get_type");
+    if (!object || !web_type || !g_type_is_a(G_OBJECT_TYPE(object), web_type())) return;
+    if (g_object_get_data(object, "pfdsl-1513-observer-connected")) return;
+    gulong handler = g_signal_connect_data(object, "web-process-terminated", G_CALLBACK(terminated), NULL, NULL, 0);
+    if (handler) {
+        g_object_set_data(object, "pfdsl-1513-observer-connected", GINT_TO_POINTER(1));
+        event("connected", object, -1);
+    }
+}
+
+GObject *g_object_new_with_properties(GType type, guint count, const char *names[], const GValue values[]) {
+    typedef GObject *(*NewFunction)(GType, guint, const char **, const GValue *);
+    NewFunction original = (NewFunction)dlsym(RTLD_NEXT, "g_object_new_with_properties");
+    if (!original) _exit(125);
+    GObject *object = original(type, count, names, values);
+    attach(object);
+    return object;
+}
+
+__attribute__((constructor)) static void loaded(void) {
+    event("loaded", NULL, -1);
+}

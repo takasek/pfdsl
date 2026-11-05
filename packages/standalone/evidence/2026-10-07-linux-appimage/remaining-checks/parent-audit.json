@@ -1,0 +1,63 @@
+{
+	"archive_sha256": "0bc1630f20e528ca374afb8c769f329037686cf276ed7f6b0749e3414e1738a4",
+	"source_head": "8261f877d5cae8aa653a5310edfbd9e387acb116",
+	"outer_manifest_files_checked": 237,
+	"prior_original_manifest_files_checked": 1133,
+	"prior_supplement_manifest_files_checked": 68,
+	"rows": 133,
+	"cells": 399,
+	"counts": {
+		"成功": 202,
+		"対象外": 187,
+		"失敗": 3,
+		"未実施": 7
+	},
+	"hosts": {
+		"native": {
+			"成功": 72,
+			"対象外": 54,
+			"失敗": 1,
+			"未実施": 6
+		},
+		"vscode": {
+			"成功": 107,
+			"失敗": 1,
+			"対象外": 24,
+			"未実施": 1
+		},
+		"cli": {
+			"対象外": 109,
+			"成功": 23,
+			"失敗": 1
+		}
+	},
+	"changed_cells": [["I1283-019", "vscode", "未実施", "成功"]],
+	"all_other_cells_identical": true,
+	"reassembly": {
+		"archive_name": "pfdsl-1411-8261-remaining-checks-evidence.zip",
+		"archive_size_bytes": 48137199,
+		"archive_sha256": "0bc1630f20e528ca374afb8c769f329037686cf276ed7f6b0749e3414e1738a4",
+		"parts": [
+			{
+				"name": "pfdsl-1411-8261-remaining-checks-evidence.zip.part01",
+				"size_bytes": 12100000,
+				"sha256": "b0eedec83c58836530f20f0c85f549e98c8306d57ea322822594f1b877134a3d"
+			},
+			{
+				"name": "pfdsl-1411-8261-remaining-checks-evidence.zip.part02",
+				"size_bytes": 12100000,
+				"sha256": "85b54abbfc8fd8af18130e955e5c20b9b7e902c1b122c132defe25f27861f003"
+			},
+			{
+				"name": "pfdsl-1411-8261-remaining-checks-evidence.zip.part03",
+				"size_bytes": 12100000,
+				"sha256": "b6065edb34e49d128a45ce8395ed1b885cf5f42736a21dd4176a39a44916b3f8"
+			},
+			{
+				"name": "pfdsl-1411-8261-remaining-checks-evidence.zip.part04",
+				"size_bytes": 11837199,
+				"sha256": "d18316fec3a4bcc409d5ce60be2931230e089b8d8db69d4eb24e5aa9f0400d8b"
+			}
+		]
+	}
+}

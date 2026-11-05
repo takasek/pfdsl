@@ -1,0 +1,66 @@
+{
+  "criteria": [
+    {
+      "value": "npm view @pfdsl/cli@0.0.25 version returns 0.0.25",
+      "rejectedAsLatestOnly": true
+    },
+    {
+      "value": "npm view @pfdsl/cli version returns 0.0.25",
+      "rejectedAsLatestOnly": true
+    },
+    {
+      "value": "npm view @pfdsl/cli versions contains 0.0.25",
+      "rejectedAsLatestOnly": false
+    }
+  ],
+  "pinnedCriteriaGate": {
+    "exitCode": 1,
+    "stdoutLines": [],
+    "stderrLines": [
+      "fixture.pfdsl: released: criteria names a latest-only version query: npm view @pfdsl/cli@0.0.25 version returns 0.0.25",
+      "\nA latest-only accessor resolves the dist-tag `latest`, so the criteria is false for every version but the newest. State membership in the version list instead (npm view <pkg> versions, vsce's versions array).",
+      "check-criteria-judgeability: 1 error(s)"
+    ]
+  },
+  "shellImports": [
+    {
+      "source": "import {execSync} from 'node:child_process'; execSync('echo probe');",
+      "findings": [
+        {
+          "line": 1,
+          "reason": "imports execSync from child_process"
+        }
+      ]
+    },
+    {
+      "source": "import * as cp from 'node:child_process'; cp.execSync('echo probe');",
+      "findings": []
+    },
+    {
+      "source": "import cp from 'node:child_process'; cp.execSync('echo probe');",
+      "findings": []
+    }
+  ],
+  "permissiveArgv": {
+    "source": "import {parseArgs} from 'node:util'; const {values}=parseArgs({strict:false});",
+    "findings": []
+  },
+  "retrospectiveTriggers": [
+    {
+      "command": "git commit -m done",
+      "detected": true
+    },
+    {
+      "command": "git -C /repo/worktree commit -m done",
+      "detected": false
+    },
+    {
+      "command": "/path/to/codex/bin/codex-git-routine.mjs commit /repo/worktree codex/example message",
+      "detected": false
+    },
+    {
+      "command": "echo \"git commit is the next step\"",
+      "detected": true
+    }
+  ]
+}

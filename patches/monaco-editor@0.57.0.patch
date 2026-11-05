@@ -1,0 +1,29 @@
+diff --git a/esm/vs/editor/browser/services/abstractCodeEditorService.js b/esm/vs/editor/browser/services/abstractCodeEditorService.js
+index e4cec02cabbcb9d96db8bcf3e3ac98e85bb3ed8b..9d950e022b4e256304a7728c5b1f086e9d22a957 100644
+--- a/esm/vs/editor/browser/services/abstractCodeEditorService.js
++++ b/esm/vs/editor/browser/services/abstractCodeEditorService.js
+@@ -1,3 +1,4 @@
++import { getActiveElement } from '../../../base/browser/dom.js';
+ import { Emitter } from '../../../base/common/event.js';
+ import { Disposable, toDisposable } from '../../../base/common/lifecycle.js';
+ import { LinkedList } from '../../../base/common/linkedList.js';
+@@ -66,6 +67,19 @@ let AbstractCodeEditorService = class AbstractCodeEditorService extends Disposab
+     getFocusedCodeEditor() {
+         let editorWithWidgetFocus = null;
+         const editors = this.listCodeEditors();
++        // Blur notifications can lag behind focus moving into another editor's widget.
++        const activeElement = getActiveElement();
++        let focusedEditor = null;
++        for (const editor of editors) {
++            const container = editor.getDomNode();
++            // Prefer the innermost editor, including editors embedded in Peek widgets.
++            if (container?.contains(activeElement) && (!focusedEditor || focusedEditor.getDomNode().contains(container))) {
++                focusedEditor = editor;
++            }
++        }
++        if (focusedEditor) {
++            return focusedEditor;
++        }
+         for (const editor of editors) {
+             if (editor.hasTextFocus()) {
+                 // bingo!

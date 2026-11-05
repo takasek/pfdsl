@@ -1,40 +1,31 @@
 import * as vscode from "vscode";
-import { LANGUAGE_ID } from "./analyze.js";
+import { analyzeDocument, LANGUAGE_ID } from "./analyze.js";
 import { extractDocumentLinks } from "./document-link-logic.js";
+import { type DirectoryAccess, expandDirectory } from "./expand-directory.js";
 
 const OPEN_DIR_COMMAND = "pfdsl._openDirLocation";
 
-async function expandDirectory(dirUri: vscode.Uri): Promise<string[]> {
-	let entries: [string, vscode.FileType][];
-	try {
-		entries = await vscode.workspace.fs.readDirectory(dirUri);
-	} catch {
-		return [];
-	}
-	const files: string[] = [];
-	for (const [name, type] of entries) {
-		if (type === vscode.FileType.File) {
-			files.push(vscode.Uri.joinPath(dirUri, name).fsPath);
-		}
-	}
-	if (files.length === 0) {
-		for (const [name, type] of entries) {
-			if (type === vscode.FileType.Directory) {
-				const sub = await expandDirectory(vscode.Uri.joinPath(dirUri, name));
-				files.push(...sub);
-			}
-		}
-	}
-	return files;
-}
+/** The vscode filesystem, shaped for expandDirectory: fsPaths in, fsPaths out. */
+const workspaceDirectoryAccess: DirectoryAccess = {
+	read: async (path) =>
+		(await vscode.workspace.fs.readDirectory(vscode.Uri.file(path))).map(
+			([name, type]) => ({
+				name,
+				isDirectory: type === vscode.FileType.Directory,
+			}),
+		),
+	join: (path, name) => vscode.Uri.joinPath(vscode.Uri.file(path), name).fsPath,
+};
 
 export function registerDocumentLinks(context: vscode.ExtensionContext): void {
 	context.subscriptions.push(
 		vscode.commands.registerCommand(
 			OPEN_DIR_COMMAND,
 			async (dirFsPath: string) => {
-				const dirUri = vscode.Uri.file(dirFsPath);
-				const children = await expandDirectory(dirUri);
+				const children = await expandDirectory(
+					workspaceDirectoryAccess,
+					dirFsPath,
+				);
 				if (children.length === 0) {
 					vscode.window.showWarningMessage(`No files found in ${dirFsPath}`);
 					return;
@@ -62,16 +53,28 @@ export function registerDocumentLinks(context: vscode.ExtensionContext): void {
 
 	const provider: vscode.DocumentLinkProvider = {
 		async provideDocumentLinks(doc) {
-			const links = extractDocumentLinks(doc.getText(), doc.uri.fsPath);
-			return await Promise.all(
-				links.map(async ({ line, startChar, endChar, target }) => {
-					const range = new vscode.Range(line, startChar, line, endChar);
-					if (target.startsWith("file://")) {
-						const fsPath = target.slice("file://".length);
-						const uri = vscode.Uri.file(fsPath);
+			const links = extractDocumentLinks(analyzeDocument(doc), doc.uri.fsPath);
+			const resolved = await Promise.all(
+				links.map(async ({ line, startChar, endLine, endChar, target }) => {
+					const range = new vscode.Range(
+						line,
+						startChar,
+						endLine ?? line,
+						endChar,
+					);
+					let uri: vscode.Uri;
+					try {
+						uri = vscode.Uri.parse(target);
+					} catch {
+						// VS Code rejects a URI with characters its scheme does not
+						// accept. That value has no link; the others still do.
+						return undefined;
+					}
+					if (uri.scheme === "file") {
+						const fsPath = uri.fsPath;
 						let stat: vscode.FileStat | undefined;
 						try {
-							stat = await vscode.workspace.fs.stat(uri);
+							stat = await vscode.workspace.fs.stat(vscode.Uri.file(fsPath));
 						} catch {
 							// treat as file
 						}
@@ -84,11 +87,11 @@ export function registerDocumentLinks(context: vscode.ExtensionContext): void {
 							link.tooltip = "Open file in folder…";
 							return link;
 						}
-						return new vscode.DocumentLink(range, uri);
 					}
-					return new vscode.DocumentLink(range, vscode.Uri.parse(target));
+					return new vscode.DocumentLink(range, uri);
 				}),
 			);
+			return resolved.filter((link) => link !== undefined);
 		},
 	};
 

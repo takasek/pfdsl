@@ -1,0 +1,278 @@
+{
+  "flow": [
+    {
+      "name": "lowercase-control",
+      "canonicalBefore": true,
+      "errorsBefore": [],
+      "consumedIds": [
+        "input",
+        "product"
+      ],
+      "findings": [
+        {
+          "type": "closed_in_flow",
+          "issueNumber": 1,
+          "processId": "i1_build",
+          "artifactId": "product",
+          "hasDownstream": true,
+          "detail": "issue is closed — delete the chain if terminal, or clear iN_ issue-tracking fields on the process if downstream processes consume the output",
+          "fixVia": "flow"
+        }
+      ],
+      "beforeProduct": {
+        "status": "done"
+      },
+      "afterProduct": {
+        "status": "done"
+      },
+      "beforeEdges": [
+        {
+          "kind": "input",
+          "artifact": "input",
+          "process": "i1_build"
+        },
+        {
+          "kind": "output",
+          "process": "i1_build",
+          "artifact": "product"
+        },
+        {
+          "kind": "input",
+          "artifact": "product",
+          "process": "i2_use"
+        },
+        {
+          "kind": "output",
+          "process": "i2_use",
+          "artifact": "result"
+        }
+      ],
+      "afterEdges": [
+        {
+          "kind": "input",
+          "artifact": "input",
+          "process": "i1_build"
+        },
+        {
+          "kind": "output",
+          "process": "i1_build",
+          "artifact": "product"
+        },
+        {
+          "kind": "input",
+          "artifact": "product",
+          "process": "i2_use"
+        },
+        {
+          "kind": "output",
+          "process": "i2_use",
+          "artifact": "result"
+        }
+      ],
+      "errorsAfter": []
+    },
+    {
+      "name": "uppercase",
+      "canonicalBefore": true,
+      "errorsBefore": [],
+      "consumedIds": [
+        "input"
+      ],
+      "findings": [
+        {
+          "type": "closed_in_flow",
+          "issueNumber": 1,
+          "processId": "i1_build",
+          "artifactId": "Product",
+          "hasDownstream": false,
+          "detail": "issue is closed — delete the chain if terminal, or clear iN_ issue-tracking fields on the process if downstream processes consume the output",
+          "fixVia": "flow"
+        }
+      ],
+      "beforeProduct": {
+        "status": "done"
+      },
+      "afterProduct": null,
+      "beforeEdges": [
+        {
+          "kind": "input",
+          "artifact": "input",
+          "process": "i1_build"
+        },
+        {
+          "kind": "output",
+          "process": "i1_build",
+          "artifact": "Product"
+        },
+        {
+          "kind": "input",
+          "artifact": "Product",
+          "process": "i2_use"
+        },
+        {
+          "kind": "output",
+          "process": "i2_use",
+          "artifact": "result"
+        }
+      ],
+      "afterEdges": [
+        {
+          "kind": "input",
+          "artifact": "Product",
+          "process": "i2_use"
+        },
+        {
+          "kind": "output",
+          "process": "i2_use",
+          "artifact": "result"
+        }
+      ],
+      "errorsAfter": []
+    },
+    {
+      "name": "revises",
+      "canonicalBefore": true,
+      "errorsBefore": [],
+      "consumedIds": [
+        "input"
+      ],
+      "findings": [
+        {
+          "type": "closed_in_flow",
+          "issueNumber": 1,
+          "processId": "i1_build",
+          "artifactId": "product",
+          "hasDownstream": false,
+          "detail": "issue is closed — delete the chain if terminal, or clear iN_ issue-tracking fields on the process if downstream processes consume the output",
+          "fixVia": "flow"
+        }
+      ],
+      "beforeProduct": {
+        "status": "done"
+      },
+      "afterProduct": null,
+      "beforeEdges": [
+        {
+          "kind": "input",
+          "artifact": "input",
+          "process": "i1_build"
+        },
+        {
+          "kind": "output",
+          "process": "i1_build",
+          "artifact": "product"
+        },
+        {
+          "kind": "input",
+          "artifact": "input",
+          "process": "i2_use"
+        },
+        {
+          "kind": "output",
+          "process": "i2_use",
+          "artifact": "result"
+        }
+      ],
+      "afterEdges": [
+        {
+          "kind": "input",
+          "artifact": "input",
+          "process": "i2_use"
+        },
+        {
+          "kind": "output",
+          "process": "i2_use",
+          "artifact": "result"
+        }
+      ],
+      "errorsAfter": [
+        {
+          "severity": "error",
+          "code": "V016",
+          "message": "'revises' target 'product' of artifact 'result' not found in this file",
+          "range": {
+            "start": {
+              "line": 1,
+              "column": 1,
+              "offset": 0
+            },
+            "end": {
+              "line": 1,
+              "column": 1,
+              "offset": 0
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "parserEquivalence": [
+    {
+      "body": "a >> i1_p -> b\n",
+      "coreOutputs": [
+        {
+          "kind": "output",
+          "process": "i1_p",
+          "artifact": "b"
+        }
+      ],
+      "auditOutputs": [
+        [
+          "i1_p",
+          [
+            "b"
+          ]
+        ]
+      ],
+      "errorCodes": []
+    },
+    {
+      "body": "a >> i1_p\ni1_p -> b\n",
+      "coreOutputs": [
+        {
+          "kind": "output",
+          "process": "i1_p",
+          "artifact": "b"
+        }
+      ],
+      "auditOutputs": [],
+      "errorCodes": []
+    },
+    {
+      "body": "a >> i1_p -> b >> i2_q -> c\n",
+      "coreOutputs": [
+        {
+          "kind": "output",
+          "process": "i1_p",
+          "artifact": "b"
+        },
+        {
+          "kind": "output",
+          "process": "i2_q",
+          "artifact": "c"
+        }
+      ],
+      "auditOutputs": [
+        [
+          "i2_q",
+          [
+            "c"
+          ]
+        ]
+      ],
+      "errorCodes": []
+    },
+    {
+      "body": "a >> i1_p -> b # note\n",
+      "coreOutputs": [
+        {
+          "kind": "output",
+          "process": "i1_p",
+          "artifact": "b"
+        }
+      ],
+      "auditOutputs": [],
+      "errorCodes": []
+    }
+  ]
+}

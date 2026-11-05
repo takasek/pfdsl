@@ -4,6 +4,7 @@ import type {
 	Diagnostic,
 	Document,
 	Frontmatter,
+	IdNode,
 	NormalizedEdge,
 	Statement,
 } from "./types/index.js";
@@ -13,6 +14,50 @@ export interface NormalizeResult {
 	nodeKinds: Map<string, "artifact" | "process" | "group">;
 	isolatedNodes: Set<string>;
 	diagnostics: Diagnostic[];
+}
+
+/** One authored edge, with the ID nodes it was written with. */
+export interface EdgeOccurrence {
+	kind: NormalizedEdge["kind"];
+	artifact: IdNode;
+	process: IdNode;
+}
+
+/** The edges one statement writes, in source order, as `normalize` derives them. */
+export function edgeOccurrences(stmt: Statement): EdgeOccurrence[] {
+	const between = (
+		kind: NormalizedEdge["kind"],
+		expr: ArtifactExpr,
+		process: IdNode,
+	) => expr.ids.map((artifact) => ({ kind, artifact, process }));
+	switch (stmt.type) {
+		case "chain": {
+			const out: EdgeOccurrence[] = [];
+			let current = stmt.head;
+			for (const seg of stmt.segments) {
+				out.push(
+					...between(
+						seg.op === ">>" ? "input" : "feedback",
+						current,
+						seg.process,
+					),
+				);
+				if (seg.output !== null) {
+					out.push(...between("output", seg.output, seg.process));
+					current = seg.output;
+				}
+			}
+			return out;
+		}
+		case "input-edge":
+			return between("input", stmt.artifact, stmt.process);
+		case "feedback-edge":
+			return between("feedback", stmt.artifact, stmt.process);
+		case "output-edge":
+			return between("output", stmt.artifact, stmt.process);
+		case "node-decl":
+			return [];
+	}
 }
 
 function edgeKey(edge: NormalizedEdge): string {
@@ -31,16 +76,31 @@ export function normalize(
 	const nodeKinds = new Map<string, "artifact" | "process" | "group">();
 	const declaredNodes = new Set<string>(); // node-decl で宣言されたID（孤立候補）
 	const edgeNodes = new Set<string>(); // edge に参加したID
+	const groupClashes = new Set<string>();
+
+	function reportGroupClash(id: string, kind: "artifact" | "process"): void {
+		const key = `${id}\0${kind}`;
+		if (groupClashes.has(key)) return;
+		groupClashes.add(key);
+		diagnostics.push({
+			severity: "error",
+			code: "N004",
+			message: `'${id}' is declared as a group and also used as ${kind === "artifact" ? "an" : "a"} ${kind}`,
+			range: zeroRange(),
+		});
+	}
 
 	// Pre-populate from front matter (takes priority)
 	for (const id of Object.keys(fm?.artifact ?? {})) {
 		nodeKinds.set(id, "artifact");
+		if (Object.hasOwn(fm?.group ?? {}, id)) reportGroupClash(id, "artifact");
 	}
 	for (const id of Object.keys(fm?.group ?? {})) {
 		if (!nodeKinds.has(id)) nodeKinds.set(id, "group");
 	}
 	for (const id of Object.keys(fm?.process ?? {})) {
-		if (nodeKinds.has(id)) {
+		if (Object.hasOwn(fm?.group ?? {}, id)) reportGroupClash(id, "process");
+		if (nodeKinds.get(id) === "artifact") {
 			diagnostics.push({
 				severity: "error",
 				code: "N001",
@@ -54,11 +114,16 @@ export function normalize(
 
 	function inferKind(id: string, kind: "artifact" | "process"): void {
 		const existing = nodeKinds.get(id);
+		if (Object.hasOwn(fm?.group ?? {}, id)) reportGroupClash(id, kind);
 		if (existing === undefined) {
 			nodeKinds.set(id, kind);
 			return;
 		}
 		if (existing !== kind) {
+			if (existing === "group") {
+				nodeKinds.set(id, kind);
+				return;
+			}
 			diagnostics.push({
 				severity: "error",
 				code: "N002",
@@ -143,6 +208,8 @@ export function normalize(
 				declaredNodes.add(id);
 				// kind: front matter優先、なければArtifact既定（§5.1.3）
 				if (!nodeKinds.has(id)) nodeKinds.set(id, "artifact");
+				else if (nodeKinds.get(id) === "group")
+					reportGroupClash(id, "artifact");
 				break;
 			}
 		}

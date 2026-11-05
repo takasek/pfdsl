@@ -1,0 +1,358 @@
+{
+	"kind": "fingerprint summary of native baseline",
+	"reference": "9bdfb3082292638d75a359d8602509b20b626883",
+	"build": {
+		"frontend": [
+			{
+				"file": "packages/standalone/dist/assets/base91-DOY1bT5-.js",
+				"sha256": "ef188a16e7ad9e0a356d435fb40ddb8fa04edb7b0428a5e6abd1d2b805347bab"
+			},
+			{
+				"file": "packages/standalone/dist/assets/duckdb-BzlFElZV.js",
+				"sha256": "eaf3ce6bb5425dcfd5ba4f86e1a9a20fea83a2faf3aff6c270bfd6f3238a3861"
+			},
+			{
+				"file": "packages/standalone/dist/assets/editor.worker-DWPaKKV_.js",
+				"sha256": "9ae6f27737ab392047db742b346c1711b685cee3b38b0fe04718eb9a9de6e0a2"
+			},
+			{
+				"file": "packages/standalone/dist/assets/expat-CX7Bg68x.js",
+				"sha256": "8d79780e091dfac1e6c221bb34d7ac58e72934b7e308c8814068af3c44e3022b"
+			},
+			{
+				"file": "packages/standalone/dist/assets/graphviz-BKX3zE1B.js",
+				"sha256": "136af8b7680116ce7458c02e8a9e1579ccf22506911ced8df37227b4d6fa4428"
+			},
+			{
+				"file": "packages/standalone/dist/assets/index-Bhq5YRen.js",
+				"sha256": "30862c67c53eef585d8c2b0a416cb9c953a78f27b07a24991817dbc93e8d8abf"
+			},
+			{
+				"file": "packages/standalone/dist/assets/index-BuKc0sUX.css",
+				"sha256": "4e732cd5d308344fde1323f1682b7b6331bc62bc3e317d3c9d54ac269f7a5265"
+			},
+			{
+				"file": "packages/standalone/dist/assets/zstd-Dx_4Lof7.js",
+				"sha256": "892c4e85dd6eea08a14eaf34b66cf2d16695806146acb015fa40eec3860e4312"
+			},
+			{
+				"file": "packages/standalone/dist/index.html",
+				"sha256": "b5ffe748c7833ee7cb9702c16852c6a31dce70aa9aba3002ea5cdf7107373e72"
+			},
+			{
+				"file": "packages/standalone/dist/processing.js",
+				"sha256": "e47e466423787349603a154ea29913586e354bc4eee1abae6139a25f5645f809"
+			}
+		],
+		"nativeExecutable": {
+			"path": "<checkout>/packages/standalone/src-tauri/target/debug/bundle/macos/PFDSL.app/Contents/MacOS/pfdsl-desktop",
+			"sha256": "d005c101d6154b81f7fdcc7eabd0d73ed0e2f940100f723f98268224d3c620b2"
+		}
+	},
+	"documentCount": 23,
+	"entries": [
+		{
+			"file": "docs/samples/01-simple-chain.pfdsl",
+			"inputSha256": "8ae485923230f1ebf878879b2be8167e0982f11b9b5b8800c2e20ccb2e938f14",
+			"expectedSnapshotSha256": "17a181210069ac7475ee64ccc1391e092ed61a826a1d7918219eb1156cbda921",
+			"expectedFields": [
+				"model",
+				"frontmatter",
+				"presetDiagnostics",
+				"message",
+				"formatOutput",
+				"svg"
+			]
+		},
+		{
+			"file": "docs/samples/02-feedback.pfdsl",
+			"inputSha256": "27ed17c9d7d668da8e28dc4eb655ba65d8e88f81e4401f7f9a5aa89364fc22c0",
+			"expectedSnapshotSha256": "84ce7967fa0b0842ca0eda8524cbc65c60e02b33fef1bfc2c51514c746bc5e64",
+			"expectedFields": [
+				"model",
+				"frontmatter",
+				"presetDiagnostics",
+				"message",
+				"formatOutput",
+				"svg"
+			]
+		},
+		{
+			"file": "docs/samples/03-set-input.pfdsl",
+			"inputSha256": "c90198977cc07611e4a68a7d5807fcf299bd3009ee3d85319501e365c0d470dc",
+			"expectedSnapshotSha256": "57af2a3a40683ae2a847ff009d8410baac5e18d939db0f78da0d595431044d04",
+			"expectedFields": [
+				"model",
+				"frontmatter",
+				"presetDiagnostics",
+				"message",
+				"formatOutput",
+				"svg"
+			]
+		},
+		{
+			"file": "docs/samples/04-set-output.pfdsl",
+			"inputSha256": "9e8996b2fa27afb24f9054e16d8a48fbf418d815319775a6199ff84834fcc9fb",
+			"expectedSnapshotSha256": "3f1538c0d0f39d2494c4daa1c4a66a55311359cea5dd17cb7c677974006e95ad",
+			"expectedFields": [
+				"model",
+				"frontmatter",
+				"presetDiagnostics",
+				"message",
+				"formatOutput",
+				"svg"
+			]
+		},
+		{
+			"file": "docs/samples/05-label-cjk.pfdsl",
+			"inputSha256": "455c875a2855c2275f04489712ea167a7fcacfe8b7e74528abff5f956ba4e347",
+			"expectedSnapshotSha256": "5f1c1fab8772d83b1711871fdea7731a7db0e7de95c229931f55e4274f05dce6",
+			"expectedFields": [
+				"model",
+				"frontmatter",
+				"presetDiagnostics",
+				"message",
+				"formatOutput",
+				"svg"
+			]
+		},
+		{
+			"file": "docs/samples/06-status-styles.pfdsl",
+			"inputSha256": "c8149520105a4e638e2ca7491677742fa380586c00da5a546d35ca364f335b9f",
+			"expectedSnapshotSha256": "a4265565f328db8159250935fc1ad8017bdb7f8e513d530d86659945b6137a5c",
+			"expectedFields": [
+				"model",
+				"frontmatter",
+				"presetDiagnostics",
+				"message",
+				"formatOutput",
+				"svg"
+			]
+		},
+		{
+			"file": "docs/samples/08-groups.pfdsl",
+			"inputSha256": "0d16be3f585aab54a96e41250fe30fc91cf6947c6c451f3af501a1d7e87115d4",
+			"expectedSnapshotSha256": "af534d689764877b1d163ec70cfa1f91316d26c27135bde76f088e5b853f1970",
+			"expectedFields": [
+				"model",
+				"frontmatter",
+				"presetDiagnostics",
+				"message",
+				"formatOutput",
+				"svg"
+			]
+		},
+		{
+			"file": "docs/samples/09-parts.pfdsl",
+			"inputSha256": "b90c34658274f5c59f6f20e94ac6e795e69b0474e3653fe085ca6bfc4562f8c1",
+			"expectedSnapshotSha256": "25390e01f50287d545764e7d3f339042e0502f2f2d66158b15b83e74fdcc429e",
+			"expectedFields": [
+				"model",
+				"frontmatter",
+				"presetDiagnostics",
+				"message",
+				"formatOutput",
+				"svg"
+			]
+		},
+		{
+			"file": "docs/samples/10-layout-tb.pfdsl",
+			"inputSha256": "6770b007867ff30fefbd65110d7a87989b5986f15d72fba05865832468f602c5",
+			"expectedSnapshotSha256": "9161f8094bce5eadf85384919926e96f4e2eeec80ae9a6a7cb0fd42de6121ed3",
+			"expectedFields": [
+				"model",
+				"frontmatter",
+				"presetDiagnostics",
+				"message",
+				"formatOutput",
+				"svg"
+			]
+		},
+		{
+			"file": "docs/samples/11-external-stakeholders.pfdsl",
+			"inputSha256": "2882a9c494d37bef42a578577400d18677592e2b05d284ceb808b75cae88ecc4",
+			"expectedSnapshotSha256": "015b6e3a81df9ae59bfd4913624bca68ff795f79e8dc413f8b452f2afe24f076",
+			"expectedFields": [
+				"model",
+				"frontmatter",
+				"presetDiagnostics",
+				"message",
+				"formatOutput",
+				"svg"
+			]
+		},
+		{
+			"file": "docs/samples/12-subflow-detail.pfdsl",
+			"inputSha256": "5a3c38cca3c0e6a16f6293256ca70aebeed3194ccd5311107650cc1ef712be4f",
+			"expectedSnapshotSha256": "2f81b2ab4b2ee8f51dcc7e4883056b0e0e657da59f2304aefa7945b5a4c3f4f8",
+			"expectedFields": [
+				"model",
+				"frontmatter",
+				"presetDiagnostics",
+				"message",
+				"formatOutput",
+				"svg"
+			]
+		},
+		{
+			"file": "docs/samples/12-subflow.pfdsl",
+			"inputSha256": "1af6b5abd702b156697a04e60b5e3b8fcaff2929b109555cc8668991a845039d",
+			"expectedSnapshotSha256": "9dec9c59aa6a069849ed2b0f0a61fd679e735825129a75d1b47c6d88b941e42c",
+			"expectedFields": [
+				"model",
+				"frontmatter",
+				"presetDiagnostics",
+				"message",
+				"formatOutput",
+				"svg"
+			]
+		},
+		{
+			"file": "docs/samples/13-preset-base.pfdsl",
+			"inputSha256": "4dc9dd763a0cdf98a8447efd4ce8d8aa2e270fc58ec91f192973c0e434aa7a92",
+			"expectedSnapshotSha256": "17a56a71afd4bbfb46329e5a88ec8dd5c8cc8e6119935f19f9e774e40b4df4cb",
+			"expectedFields": [
+				"model",
+				"frontmatter",
+				"presetDiagnostics",
+				"message",
+				"formatOutput",
+				"svg"
+			]
+		},
+		{
+			"file": "docs/samples/13-preset.pfdsl",
+			"inputSha256": "09bc5ce8e9ea74fbcedc415de15eb98f15cf7c86a3e62249accaae3a91592913",
+			"expectedSnapshotSha256": "b620a479e57b2f2f7ef38ee6ed669e91119bb7a6027c1eebad84995b6fe04329",
+			"expectedFields": [
+				"model",
+				"frontmatter",
+				"presetDiagnostics",
+				"message",
+				"formatOutput",
+				"svg"
+			]
+		},
+		{
+			"file": "docs/samples/14-boundary-detail.pfdsl",
+			"inputSha256": "636ea5a5bea8f7b026e6866775b64d4711156f5d2e6ab5933009431d1184ffbd",
+			"expectedSnapshotSha256": "95f8b57ffc3607eff65c5d5421f3838126593de518058b24ba1a16433b539249",
+			"expectedFields": [
+				"model",
+				"frontmatter",
+				"presetDiagnostics",
+				"message",
+				"formatOutput",
+				"svg"
+			]
+		},
+		{
+			"file": "docs/samples/14-boundary.pfdsl",
+			"inputSha256": "ec8409d4ca03c9b3f36f0af57fd9c2ecdc07f13544c229795e431d14f1b41212",
+			"expectedSnapshotSha256": "87b6074270d5d76397bf859e372889e787d2a377fd6c0579b967dfea4c443f38",
+			"expectedFields": [
+				"model",
+				"frontmatter",
+				"presetDiagnostics",
+				"message",
+				"formatOutput",
+				"svg"
+			]
+		},
+		{
+			"file": "docs/samples/15-index.pfdsl",
+			"inputSha256": "89de3ef7988d4de5c96bd69722df21ae29849bea72c318556de6578ae5f90a4e",
+			"expectedSnapshotSha256": "b9e9c81f9c115fab213350adbd13a591e353d0a231501c7966e128fce726735b",
+			"expectedFields": [
+				"model",
+				"frontmatter",
+				"presetDiagnostics",
+				"message",
+				"formatOutput",
+				"svg"
+			]
+		},
+		{
+			"file": "docs/samples/16-basepath.pfdsl",
+			"inputSha256": "a847a4c6f4a6cb9a44bac07bfc45d798490e6c3da891525067e313952bd9a714",
+			"expectedSnapshotSha256": "c90cc8e5578ab0dcd16d83fbb37b5085957736faec2c1914e8aa055c68a12812",
+			"expectedFields": [
+				"model",
+				"frontmatter",
+				"presetDiagnostics",
+				"message",
+				"formatOutput",
+				"svg"
+			]
+		},
+		{
+			"file": "docs/samples/17-type.pfdsl",
+			"inputSha256": "46464f87a14fa6d909b4727fe3be19e732743b0d1efedde72ea9c22f1ab19683",
+			"expectedSnapshotSha256": "2d1ded373e8db60a9981100b10cdc57423ff6139ff41fa10b99ad94417364ffd",
+			"expectedFields": [
+				"model",
+				"frontmatter",
+				"presetDiagnostics",
+				"message",
+				"formatOutput",
+				"svg"
+			]
+		},
+		{
+			"file": "docs/samples/pfdsl_implementation_flow.pfdsl",
+			"inputSha256": "e5502371d8b442d16257f04c1b6743e3b7f196e3b12673d18333bd494b4ea9df",
+			"expectedSnapshotSha256": "6d20c88799f38991fafb54ceda2cc7d390e1541b83b167d67ed8bf9950a34407",
+			"expectedFields": [
+				"model",
+				"frontmatter",
+				"presetDiagnostics",
+				"message",
+				"formatOutput",
+				"svg"
+			]
+		},
+		{
+			"file": ".pfdsl/roadmap.pfdsl",
+			"inputSha256": "6b257b635a797a52f8afad32037e4f593db2e90fea76b3d567d198191be233fa",
+			"expectedSnapshotSha256": "3e626dc467c778b41b7c5c7703cf085759aced8887148dffd44ea34efa2dfb94",
+			"expectedFields": [
+				"model",
+				"frontmatter",
+				"presetDiagnostics",
+				"message",
+				"formatOutput",
+				"svg"
+			]
+		},
+		{
+			"file": ".pfdsl/workflow.pfdsl",
+			"inputSha256": "5f8650e82621c95c7f495ea80d3fcf3094167a80d58712c8d90d8371d12e5a6f",
+			"expectedSnapshotSha256": "bb3309ee05b4b30a5c1aff75c71c8e88a63eddb313a5e8e2a52117eb17555349",
+			"expectedFields": [
+				"model",
+				"frontmatter",
+				"presetDiagnostics",
+				"message",
+				"formatOutput",
+				"svg"
+			]
+		},
+		{
+			"file": ".pfdsl/pipeline.pfdsl",
+			"inputSha256": "687f43d41c99e5b84c0bdba1bf29a5a67c0b2b0ad080ac6fe7024ce5081c9ae5",
+			"expectedSnapshotSha256": "ca9d99bf62d4a5ceabb8035d66d49cfbe2e90a0f6d58a6aa40f3b3da04e85d94",
+			"expectedFields": [
+				"model",
+				"frontmatter",
+				"presetDiagnostics",
+				"message",
+				"formatOutput",
+				"svg"
+			]
+		}
+	],
+	"preservation": {
+		"originalBaselineSha256": "976aa1f0abf66e0a2c5572b73af16fff815c205d7354d1c5a2fd0ec4b333160d",
+		"omitted": "Raw source, absolute corpus paths and expanded expected model/diagnostic/DOT/SVG payloads. This summary pins baseline inputs and expected snapshots; it is not the full executable comparison baseline."
+	}
+}

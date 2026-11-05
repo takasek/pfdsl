@@ -1,0 +1,159 @@
+import { Range } from "monaco-editor/editor/common/core/range.js";
+
+export { Selection } from "monaco-editor/editor/common/core/selection.js";
+// Controlled Monaco selection/edit boundary; formatter and host stay production code.
+export const instances = [];
+export const language = {};
+export const Uri = { parse: (value) => value };
+export const MarkerSeverity = { Error: 8, Warning: 4, Info: 2 };
+export const KeyMod = { CtrlCmd: 2048, WinCtrl: 256 };
+export const KeyCode = { KeyG: 37, KeyL: 42 };
+function offset(model, line, column) {
+	const lines = model.source.split("\n");
+	return (
+		lines.slice(0, line - 1).reduce((n, s) => n + s.length + 1, 0) + column - 1
+	);
+}
+
+export { Range };
+export const editor = {
+	addKeybindingRules() {},
+	CursorChangeReason: { Explicit: 3 },
+	registerLinkOpener() {
+		return { dispose() {} };
+	},
+	createModel(source) {
+		return {
+			source,
+			getValue() {
+				return this.source;
+			},
+			getPositionAt(value) {
+				const lines = this.source.slice(0, value).split("\n");
+				return { lineNumber: lines.length, column: lines.at(-1).length + 1 };
+			},
+			getLineCount() {
+				return this.source.split("\n").length;
+			},
+			getLineMaxColumn(line) {
+				return this.source.split("\n")[line - 1].replace(/\r$/, "").length + 1;
+			},
+			getValueInRange(range) {
+				return this.source.slice(
+					offset(this, range.startLineNumber, range.startColumn),
+					offset(this, range.endLineNumber, range.endColumn),
+				);
+			},
+			getFullModelRange() {
+				const last = this.getLineCount();
+				return new Range(1, 1, last, this.getLineMaxColumn(last));
+			},
+			dispose() {
+				this.disposed = true;
+			},
+		};
+	},
+	create(_element, { model }) {
+		const callbacks = {};
+		const instance = {
+			getId: () => `range-${instances.indexOf(instance)}`,
+			model,
+			callbacks,
+			actions: [],
+			edits: [],
+			cursorEvents: [],
+			undoStops: 0,
+			focusCalls: 0,
+			emitCursorChange(source, position = this.position, reason = 3) {
+				const event = {
+					position: position ?? { lineNumber: 1, column: 1 },
+					source,
+					reason,
+				};
+				this.cursorEvents.push(event);
+				callbacks.onDidChangeCursorPosition?.(event);
+			},
+			focus() {
+				this.focusCalls++;
+			},
+			setPosition(position) {
+				this.position = position;
+				this.emitCursorChange("api", position);
+			},
+			setSelection(selection) {
+				this.selection = selection;
+				this.setPosition({
+					lineNumber: selection.positionLineNumber,
+					column: selection.positionColumn,
+				});
+			},
+			revealPositionInCenter(position) {
+				this.revealed = position;
+			},
+			revealRangeInCenter(range) {
+				this.revealed = range;
+			},
+			selection: null,
+			getSelection() {
+				return this.selection;
+			},
+			getValue: () => model.source,
+			getModel: () => model,
+			render() {},
+			layout() {},
+			dispose() {
+				this.disposed = true;
+			},
+			addAction(action) {
+				this.actions.push(action);
+				return {
+					dispose: () => {
+						action.disposed = true;
+					},
+				};
+			},
+			pushUndoStop() {
+				this.undoStops++;
+			},
+			executeEdits(origin, edits, selections) {
+				this.edits.push({ origin, edits });
+				if (edits.length !== 1) throw Error("Expected one edit");
+				const { range, text } = edits[0];
+				const start = offset(model, range.startLineNumber, range.startColumn);
+				const end = offset(model, range.endLineNumber, range.endColumn);
+				model.source =
+					model.source.slice(0, start) + text + model.source.slice(end);
+				if (selections) this.selection = selections[0];
+				callbacks.onDidChangeModelContent?.();
+				this.emitCursorChange(origin);
+			},
+		};
+		for (const event of [
+			"onDidScrollChange",
+			"onDidChangeCursorSelection",
+			"onDidChangeModelContent",
+			"onDidChangeCursorPosition",
+		])
+			instance[event] = (callback) => {
+				callbacks[event] = callback;
+				return { dispose() {} };
+			};
+		instances.push(instance);
+		return instance;
+	},
+	setModelMarkers() {},
+};
+
+// Language registration is outside this controlled editor seam.
+export const languages = new Proxy(
+	{
+		register() {},
+		setLanguageConfiguration() {},
+		setMonarchTokensProvider() {},
+	},
+	{
+		get(target, key) {
+			return target[key] ?? (() => ({ dispose() {} }));
+		},
+	},
+);

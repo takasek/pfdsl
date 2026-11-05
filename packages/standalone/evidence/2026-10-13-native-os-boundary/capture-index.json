@@ -1,0 +1,232 @@
+[
+	{
+		"file": "evidence/01-startup-0.jpg",
+		"captured_utc": "2026-10-13T07:32:52.965834+00:00",
+		"sha256": "5e049c27b94b237b404ec723cdace9462d8a0a1e68c761936e2cc12c5ed8163d"
+	},
+	{
+		"file": "evidence/02-l1-ctrl-s.jpg",
+		"captured_utc": "2026-10-13T07:34:39.213273+00:00",
+		"sha256": "7d5822cb1e2cfd96099a626acfc57ac976a244a1148f8659c52782556da0dab9"
+	},
+	{
+		"file": "evidence/03-l1-ctrl-shift-s.jpg",
+		"captured_utc": "2026-10-13T07:34:51.681209+00:00",
+		"sha256": "3be1ced9c4d77ce18888ee948b986d9311a6a7e571ed54da1eaa60b2ec5323ea"
+	},
+	{
+		"file": "evidence/04-l2-initial-dialog.jpg",
+		"captured_utc": "2026-10-13T07:35:06.897126+00:00",
+		"sha256": "c1599e751e6c8ad5c259ff50db310c29149dce51283dac381779fed694aec163"
+	},
+	{
+		"file": "evidence/05-l2-return-retains.jpg",
+		"captured_utc": "2026-10-13T07:35:07.421124+00:00",
+		"sha256": "3be1ced9c4d77ce18888ee948b986d9311a6a7e571ed54da1eaa60b2ec5323ea"
+	},
+	{
+		"file": "evidence/06-l2-escape-retains.jpg",
+		"captured_utc": "2026-10-13T07:35:33.976970+00:00",
+		"sha256": "3be1ced9c4d77ce18888ee948b986d9311a6a7e571ed54da1eaa60b2ec5323ea"
+	},
+	{
+		"file": "evidence/07-l2-dialog-x-retains.jpg",
+		"captured_utc": "2026-10-13T07:36:02.880812+00:00",
+		"sha256": "3be1ced9c4d77ce18888ee948b986d9311a6a7e571ed54da1eaa60b2ec5323ea"
+	},
+	{
+		"file": "evidence/08-l2-keep-editing-retains.jpg",
+		"captured_utc": "2026-10-13T07:36:17.520734+00:00",
+		"sha256": "12f6ba5a14592d1011257c61a5554301b4c1867c14344a25a95cef14549227dc"
+	},
+	{
+		"file": "evidence/09-l2-cancel-retains.jpg",
+		"captured_utc": "2026-10-13T07:36:33.292645+00:00",
+		"sha256": "98f1364fb7a8c606485c2ee89cce381c0bbdf7f9c00877747984f72e6d41b488"
+	},
+	{
+		"file": "evidence/10-l2-discard-closes.jpg",
+		"captured_utc": "2026-10-13T07:36:50.840542+00:00",
+		"sha256": "11362b6385c297f9908d841d4079381486167c5b0f637d904221bd7c87d8431a"
+	},
+	{
+		"file": "evidence/11-l2-two-docs-before-close.jpg",
+		"captured_utc": "2026-10-13T07:37:56.752166+00:00",
+		"sha256": "fff1fd39d90f738e1db89d83ca67f5b01d45599028bbbbf5cab1162c2fb6fa8d"
+	},
+	{
+		"file": "evidence/12-l2-native-window-close-first.jpg",
+		"captured_utc": "2026-10-13T07:37:57.036164+00:00",
+		"sha256": "7dacafc2d7c9faa9b7745df59e5649486a1f72e76c517154dbcef1a875e81f49"
+	},
+	{
+		"file": "evidence/13-l2-discard-a-pending-b.jpg",
+		"captured_utc": "2026-10-13T07:38:09.724093+00:00",
+		"sha256": "c2c07f2d9bf6b0ab1b3cc7cb3f97ee4d1955463946f5919902b7b3200a921555"
+	},
+	{
+		"file": "evidence/14-l2-cancel-b-retains.jpg",
+		"captured_utc": "2026-10-13T07:38:27.159999+00:00",
+		"sha256": "fcc144fd17514623681c81261e1335219f2d49bae9dd9ef2dde4b06d44ad6ca6"
+	},
+	{
+		"file": "evidence/15-l2-cancel-b-also-retains-a.jpg",
+		"captured_utc": "2026-10-13T07:38:40.899919+00:00",
+		"sha256": "d1736f7b4ca02e0381bd959c67985f06978627c85dd5b34e6f9cb841a00e7b3a"
+	},
+	{
+		"file": "evidence/16-l3-local-before-external-change.jpg",
+		"captured_utc": "2026-10-13T07:39:46.939531+00:00",
+		"sha256": "a1dc17ddad0321cda912d552898674073b69eceaf433e71f90ebd3cc4d2a2174"
+	},
+	{
+		"file": "evidence/17-l3-conflict-panel.jpg",
+		"captured_utc": "2026-10-13T07:40:01.471447+00:00",
+		"sha256": "0007c3f5a1c1011968bf7ad2bbe66e981d7ff4498debe393e910016f9cf1abd6"
+	},
+	{
+		"file": "evidence/18-l3-observed-external-comparison.jpg",
+		"captured_utc": "2026-10-13T07:40:13.911375+00:00",
+		"sha256": "00209e5cf32c4a41891e6a490b78331f2524ffa5f2ad350c6149d8ee643d3f00"
+	},
+	{
+		"file": "evidence/19-l3-observed-external-expanded.jpg",
+		"captured_utc": "2026-10-13T07:40:26.339303+00:00",
+		"sha256": "3a720384290407194028cb47098ee983a6e1eece2408820a3709ca909eb89ac2"
+	},
+	{
+		"file": "evidence/20-l3-external-marker-comparison.jpg",
+		"captured_utc": "2026-10-13T07:40:41.119217+00:00",
+		"sha256": "bd5fe59a4b1ad13c981d13d3e4a53ad08ebc92602fbdfbef2dbf4f3c2b31f2c7"
+	},
+	{
+		"file": "evidence/21-l3-use-current-disk-confirmation.jpg",
+		"captured_utc": "2026-10-13T07:40:53.475145+00:00",
+		"sha256": "e694e3c16823e2f5f290885dac14655cd2dccbc39dc6e23e61ce16402d8fa5cf"
+	},
+	{
+		"file": "evidence/22-l3-both-marker-comparison.jpg",
+		"captured_utc": "2026-10-13T07:41:19.934979+00:00",
+		"sha256": "81bb95d9d46e16b36a7dcb7b2c67591b82b092bb88e389558e5f58f9395adc9a"
+	},
+	{
+		"file": "evidence/23-l3-adoption-keep-editing-retains.jpg",
+		"captured_utc": "2026-10-13T07:41:20.422976+00:00",
+		"sha256": "6f4b6b20c2d4f85adb0c35527c866b3039abfe84a0182c0c3bbc07f63c3e636c"
+	},
+	{
+		"file": "evidence/24-l3-disk-version-adopted.jpg",
+		"captured_utc": "2026-10-13T07:41:51.154799+00:00",
+		"sha256": "641c472783b3c0b1c7a354020fdc1f3d67100981559318fa2a9339e58279579a"
+	},
+	{
+		"file": "evidence/25-l4-before-parent-move.jpg",
+		"captured_utc": "2026-10-13T07:42:50.358452+00:00",
+		"sha256": "dbe5890fab543298230f5d8b926b027d6bae03684ea150a151edef05f2956e02"
+	},
+	{
+		"file": "evidence/26-l4-parent-move-read-error.jpg",
+		"captured_utc": "2026-10-13T07:43:08.382346+00:00",
+		"sha256": "782aec631ec1e0d00f9c2575563ee7107cf2ba67093d349e14c3899d58e574b8"
+	},
+	{
+		"file": "evidence/27-l4-dirty-close-read-error-confirmation.jpg",
+		"captured_utc": "2026-10-13T07:43:50.958133+00:00",
+		"sha256": "c29401d0e65dba17261e6c0fdb517614bcb41a16a6c2db35fdc59e80a9149b18"
+	},
+	{
+		"file": "evidence/28-l4-cancel-retains-unreadable-body.jpg",
+		"captured_utc": "2026-10-13T07:44:09.518007+00:00",
+		"sha256": "b9e2283f0c2ae02e6f4ddc531b6303d125ff0885d4b8acc3968df05208fdbc32"
+	},
+	{
+		"file": "evidence/29-l2-ctrl-q-observation.jpg",
+		"captured_utc": "2026-10-13T07:44:09.794005+00:00",
+		"sha256": "b9e2283f0c2ae02e6f4ddc531b6303d125ff0885d4b8acc3968df05208fdbc32"
+	},
+	{
+		"file": "evidence/30-l2-window-initial-confirmation.jpg",
+		"captured_utc": "2026-10-13T07:45:02.701684+00:00",
+		"sha256": "58686b4446d88f420ee445db196de52f55660b6e653544f483dff8c839b2df9d"
+	},
+	{
+		"file": "evidence/31-l2-window-return-retains.jpg",
+		"captured_utc": "2026-10-13T07:45:02.917683+00:00",
+		"sha256": "48fe312797fcc014640b616e6b5f419b276335b4a5e02a0ac2efab44e5e27917"
+	},
+	{
+		"file": "evidence/32-l2-window-escape-retains.jpg",
+		"captured_utc": "2026-10-13T07:45:03.361681+00:00",
+		"sha256": "1fe50e09e0f934881efb36d73c60bffec63857348f929293117d9c6783e158f8"
+	},
+	{
+		"file": "evidence/33-l2-window-x-before.jpg",
+		"captured_utc": "2026-10-13T07:45:34.681487+00:00",
+		"sha256": "04269bf5c113c0db82d76434589843e61db493cbf62151859542e32ec691754e"
+	},
+	{
+		"file": "evidence/34-l2-window-dialog-x-retains.jpg",
+		"captured_utc": "2026-10-13T07:45:34.945485+00:00",
+		"sha256": "dcb9b4b0c53fad57dde956f3e18385a1a81cad4223e95d40267278e5cb74c742"
+	},
+	{
+		"file": "evidence/35-l2-window-keep-before.jpg",
+		"captured_utc": "2026-10-13T07:45:35.229484+00:00",
+		"sha256": "20b321d89238c60f4b330fb6e60a85a55c5791099f092e2fb87bb9ccdc4e2743"
+	},
+	{
+		"file": "evidence/36-l2-window-keep-editing-retains.jpg",
+		"captured_utc": "2026-10-13T07:45:58.245349+00:00",
+		"sha256": "646479a10284ea7f41cfec78455d739c26ee5d5d595ca3941c31de351b50dcd7"
+	},
+	{
+		"file": "evidence/37-l2-window-cancel-before.jpg",
+		"captured_utc": "2026-10-13T07:45:58.521348+00:00",
+		"sha256": "6312d69aea59e197f9e9034e3b53ba2f17dc761b3671d374deac17a5da55955e"
+	},
+	{
+		"file": "evidence/38-l2-window-cancel-retains.jpg",
+		"captured_utc": "2026-10-13T07:45:58.769346+00:00",
+		"sha256": "4085ea371c2c0baccedd5ff5afd167678ef7024edd5b6a43f9029c3858612cb2"
+	},
+	{
+		"file": "evidence/39-l2-window-cancellations-a-retained.jpg",
+		"captured_utc": "2026-10-13T07:46:42.517077+00:00",
+		"sha256": "cfc5f0c103899821055a427b74f4a63732ea95f1edd9f00975de9f8d4c32efa8"
+	},
+	{
+		"file": "evidence/40-l2-window-cancellations-b-retained.jpg",
+		"captured_utc": "2026-10-13T07:46:42.997073+00:00",
+		"sha256": "8701244ccfeabbad68baf25ce8ebae80ef3ea5faf6b59085c030a5eebef84e99"
+	},
+	{
+		"file": "evidence/41-l2-final-close-a.jpg",
+		"captured_utc": "2026-10-13T07:46:43.285070+00:00",
+		"sha256": "6393ffcb7919bc301c089fd916a698b693ae5a39b5e70c896c8ec3ddef5768f1"
+	},
+	{
+		"file": "evidence/42-l2-final-close-b.jpg",
+		"captured_utc": "2026-10-13T07:47:06.728901+00:00",
+		"sha256": "b55b45f38b37f2dcfa4c583ab311d7b90ae3f26ca2bb8ebaace487ac667ab0f4"
+	},
+	{
+		"file": "evidence/43-l2-final-close-move.jpg",
+		"captured_utc": "2026-10-13T07:47:30.140720+00:00",
+		"sha256": "86d436c4e1c776508c6ab53edbbdad34548a5f093bd4d3761042956e3f588965"
+	},
+	{
+		"file": "evidence/44-l2-final-close-move-confirmation.jpg",
+		"captured_utc": "2026-10-13T07:47:51.676574+00:00",
+		"sha256": "63a9e06b6af214c5ae95bc75e327627aa8eacfea593f39d040edbbfa56f65de1"
+	},
+	{
+		"file": "evidence/45-l2-final-normal-exit.jpg",
+		"captured_utc": "2026-10-13T07:48:16.924408+00:00",
+		"sha256": "eded38830d46334239592eb6978934a5e488b065adb42cf99d85838817c61171"
+	},
+	{
+		"file": "evidence/46-normal-exit-terminal-status.jpg",
+		"captured_utc": "2026-10-13T07:48:55.056158+00:00",
+		"sha256": "ee2abc0acd9b590bf9988b02df4f97e60f31a5dabbf39baaa3618867be27e5aa"
+	}
+]

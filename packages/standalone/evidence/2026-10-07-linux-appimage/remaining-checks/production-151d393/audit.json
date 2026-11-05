@@ -1,0 +1,464 @@
+{
+	"sourceCommit": "151d39345c6945c3fe11a75f558068d011cbe197",
+	"run": 37819347003,
+	"attempt": 1,
+	"artifact": 11569256223,
+	"verificationDateUTC": "2026-10-08",
+	"originalReport": {
+		"name": "pfdsl-151d393-production-acceptance.md",
+		"sha256": "45c2ba437679f8f98111a0c660728ad75d44010719d9dea41006091956dac9ba"
+	},
+	"archives": [
+		{
+			"name": "pfdsl-151d393-evidence.zip",
+			"bytes": 10620494,
+			"sha256": "ae6bc38cd2c0ed48fed71b6d105ef69ffc3cbe454645fe45207886e80e77d23d",
+			"regularFileEntries": 192
+		},
+		{
+			"name": "pfdsl-151d393-native-recording.zip",
+			"bytes": 10027313,
+			"sha256": "b46c3c1fd78a842c38951cf0ec6320a5491f741cc311e6937c1924b4d4bd213e",
+			"regularFileEntries": 2
+		},
+		{
+			"name": "pfdsl-151d393-code-recording.zip",
+			"bytes": 9617625,
+			"sha256": "11a59f412463708675ad82abaac0811e38a2f1557c07d17a1a21886e2196a6f8",
+			"regularFileEntries": 2
+		},
+		{
+			"name": "pfdsl-151d393-extra-recording.zip",
+			"bytes": 7155576,
+			"sha256": "4072b33df468140e4d43bb20de82c04189fd30306ab6118ec96b7586c4ee983b",
+			"regularFileEntries": 3
+		}
+	],
+	"parentArchiveChecks": {
+		"crc": "passed",
+		"safePathsAndTypes": "passed",
+		"duplicateContentsConsistent": true,
+		"manifests": {
+			"SHA256SUMS-pfdsl-151d393-code-recording.txt": 1,
+			"SHA256SUMS-pfdsl-151d393-evidence.txt": 191,
+			"SHA256SUMS-pfdsl-151d393-extra-recording.txt": 2,
+			"SHA256SUMS-pfdsl-151d393-native-recording.txt": 1
+		},
+		"totalListedFileChecksums": 195,
+		"allConditionEvidenceLinksExist": true,
+		"frontendMatchesPreviouslyDownloadedPayload": true,
+		"attachedScriptsExecuted": false,
+		"linuxGUIRerunByParent": false
+	},
+	"conditionCounts": {
+		"PASS": 26,
+		"UNVERIFIED": 3,
+		"BLOCKED": 1
+	},
+	"conditions": [
+		{
+			"id": "IDENTITY",
+			"host": "both",
+			"status": "PASS",
+			"evidence": [
+				"identity/github-run.json",
+				"identity/github-artifacts.json",
+				"identity/preservation-final.json"
+			]
+		},
+		{
+			"id": "EXTRACTION",
+			"host": "native",
+			"status": "PASS",
+			"evidence": [
+				"identity/zip-safety-production.json",
+				"identity/tar-safety.json",
+				"identity/outer-manifest-check.txt",
+				"identity/appdir-manifest-check.txt"
+			]
+		},
+		{
+			"id": "FRONTEND",
+			"host": "both",
+			"status": "PASS",
+			"evidence": [
+				"identity/frontend-equality.json",
+				"identity/exit-status.json",
+				"identity/final-identity.txt"
+			]
+		},
+		{
+			"id": "RUNTIME",
+			"host": "native",
+			"status": "PASS",
+			"evidence": [
+				"identity/native-ldd.txt",
+				"identity/gles-ldd.txt",
+				"evidence/native.log",
+				"evidence/native.exit",
+				"evidence/native-hover-open.jpg"
+			]
+		},
+		{
+			"id": "I1284-014",
+			"host": "native",
+			"status": "PASS",
+			"evidence": [
+				"evidence/native-input-cue-fit-immediate.jpg",
+				"evidence/native-hover-build-110-cue.jpg",
+				"evidence/native-input-cue-expired.jpg",
+				"evidence/timing/native-timing-summary.json"
+			]
+		},
+		{
+			"id": "I1284-015",
+			"host": "native",
+			"status": "PASS",
+			"evidence": [
+				"evidence/native-editor-build-cue-immediate.jpg",
+				"evidence/native-input-100pct.jpg",
+				"evidence/timing/native-timing-summary.json"
+			]
+		},
+		{
+			"id": "I1284-016",
+			"host": "native",
+			"status": "PASS",
+			"evidence": [
+				"evidence/native-rapid-a.jpg",
+				"evidence/native-rapid-b0.jpg",
+				"evidence/timing/native-151.6.png",
+				"evidence/timing/native-151.7333.png",
+				"evidence/actions.jsonl"
+			]
+		},
+		{
+			"id": "I1284-017",
+			"host": "native",
+			"status": "PASS",
+			"evidence": [
+				"evidence/native-same-target-rerender.jpg",
+				"evidence/native-ordinary-edit.jpg",
+				"evidence/native-edit-undo.jpg",
+				"evidence/native-edit-redo.jpg"
+			]
+		},
+		{
+			"id": "ZOOM_FIT",
+			"host": "native",
+			"status": "PASS",
+			"evidence": [
+				"evidence/native-input-cue-fit-immediate.jpg",
+				"evidence/native-long-dashed-lowfit-cue.jpg",
+				"evidence/native-status-lowfit-cue.jpg"
+			]
+		},
+		{
+			"id": "ZOOM_100",
+			"host": "native",
+			"status": "PASS",
+			"evidence": [
+				"evidence/native-input-100pct.jpg",
+				"evidence/native-output-cue-minus.jpg"
+			]
+		},
+		{
+			"id": "ZOOM_PAN",
+			"host": "native",
+			"status": "PASS",
+			"evidence": [
+				"evidence/native-output-cue-110.jpg",
+				"evidence/native-output-cue-minus.jpg",
+				"evidence/native-output-cue-pan.jpg"
+			]
+		},
+		{
+			"id": "EDGES",
+			"host": "native",
+			"status": "PASS",
+			"evidence": ["evidence/native-edge-cue.jpg"]
+		},
+		{
+			"id": "STYLE_LONG",
+			"host": "native",
+			"status": "PASS",
+			"evidence": [
+				"fixtures/styles-long.pfdsl",
+				"evidence/native-long-dashed-100-cue.jpg",
+				"evidence/native-long-dashed-100-expired.jpg",
+				"evidence/native-status-100-cue.jpg"
+			]
+		},
+		{
+			"id": "MINIMAP",
+			"host": "native",
+			"status": "PASS",
+			"evidence": [
+				"evidence/native-rapid-b0.jpg",
+				"evidence/native-output-cue-pan.jpg",
+				"evidence/native-long-dashed-100-cue.jpg"
+			]
+		},
+		{
+			"id": "INTERACTION",
+			"host": "native",
+			"status": "PASS",
+			"evidence": [
+				"evidence/native-cue-node-actions.jpg",
+				"evidence/native-node-actions-settled.jpg",
+				"evidence/native-help.jpg"
+			]
+		},
+		{
+			"id": "NORMAL_CREATE_UNDO_REDO",
+			"host": "native",
+			"status": "PASS",
+			"evidence": [
+				"evidence/native-definition-baseline.jpg",
+				"evidence/native-create-undo.jpg",
+				"evidence/native-create-redo-stable.jpg",
+				"evidence/native-create-restored.jpg",
+				"evidence/native.log",
+				"evidence/timing/native-create-417.500.png"
+			]
+		},
+		{
+			"id": "I1284-021",
+			"host": "native",
+			"status": "UNVERIFIED",
+			"evidence": ["evidence/native-definition-baseline.jpg"]
+		},
+		{
+			"id": "CODE_HOST",
+			"host": "Code",
+			"status": "PASS",
+			"evidence": [
+				"evidence/code-preview-baseline.jpg",
+				"evidence/code-exthost.log",
+				"identity/extension-dist.sha256",
+				"identity/code-executable.sha256"
+			]
+		},
+		{
+			"id": "CODE_EDITOR_CUE",
+			"host": "Code",
+			"status": "PASS",
+			"evidence": [
+				"evidence/code-editor-input-selection-cue.jpg",
+				"evidence/code-editor-input-expired.jpg",
+				"evidence/timing/code-timing-summary.json"
+			]
+		},
+		{
+			"id": "CODE_HOVER_CUE",
+			"host": "Code",
+			"status": "PASS",
+			"evidence": [
+				"evidence/code-hover-build-cue.jpg",
+				"evidence/code-hover-build-expired.jpg",
+				"evidence/timing/code-timing-summary.json"
+			]
+		},
+		{
+			"id": "CODE_ZOOM_MINIMAP",
+			"host": "Code",
+			"status": "PASS",
+			"evidence": [
+				"evidence/code-output-100-cue.jpg",
+				"evidence/code-output-110-cue.jpg"
+			]
+		},
+		{
+			"id": "CODE_EDIT",
+			"host": "Code",
+			"status": "PASS",
+			"evidence": [
+				"evidence/code-label-edit.jpg",
+				"evidence/code-edit-undo.jpg",
+				"evidence/code-edit-redo.jpg",
+				"evidence/code-edit-restored.jpg"
+			]
+		},
+		{
+			"id": "B_PUBLISHER",
+			"host": "desktop",
+			"status": "BLOCKED",
+			"evidence": [
+				"evidence/B-settings-before.json",
+				"evidence/B-xfconf-before.json",
+				"evidence/processes-final.json"
+			]
+		},
+		{
+			"id": "B_NATIVE_REDUCE",
+			"host": "native",
+			"status": "UNVERIFIED",
+			"evidence": [
+				"evidence/B-settings-before.json",
+				"evidence/B-final-invariance.json"
+			]
+		},
+		{
+			"id": "B_CODE_REDUCE",
+			"host": "Code",
+			"status": "UNVERIFIED",
+			"evidence": [
+				"evidence/B-final-invariance.json",
+				"evidence/code-startup.jpg"
+			]
+		},
+		{
+			"id": "B_PRESERVATION",
+			"host": "desktop",
+			"status": "PASS",
+			"evidence": [
+				"evidence/B-final-invariance.json",
+				"evidence/B-settings-final.json"
+			]
+		},
+		{
+			"id": "CORPUS",
+			"host": "native",
+			"status": "PASS",
+			"evidence": [
+				"evidence/corpus-prepare.log",
+				"evidence/corpus-prepare.exit",
+				"corpus/native-report.json",
+				"evidence/corpus.exit"
+			]
+		},
+		{
+			"id": "PRESERVATION",
+			"host": "all",
+			"status": "PASS",
+			"evidence": [
+				"identity/preservation-final.json",
+				"identity/final-identity.txt",
+				"evidence/processes-final.json",
+				"identity/fixtures-final.sha256"
+			]
+		},
+		{
+			"id": "HOVER_100_EXTRA",
+			"host": "native",
+			"status": "PASS",
+			"evidence": [
+				"evidence/native-extra-hover100-cue.jpg",
+				"evidence/native-extra-hover100-expired.jpg",
+				"evidence/native-extra.mkv",
+				"evidence/timing/native-extra-hover100-88.600.png"
+			]
+		},
+		{
+			"id": "ZOOM_IN_EXTRA",
+			"host": "native",
+			"status": "PASS",
+			"evidence": [
+				"evidence/native-extra-build100-cue.jpg",
+				"evidence/native-extra-build110-cue.jpg",
+				"evidence/native-extra-build-expired.jpg"
+			]
+		}
+	],
+	"selectedOriginalEvidence": [
+		{
+			"path": "identity/preservation-final.json",
+			"sha256": "35ba3ca4d2a6cd9eb0852c9aed9dfb5ba24de7aa10a4a45be1808fce541b5186",
+			"bytes": 1385
+		},
+		{
+			"path": "identity/frontend-equality.json",
+			"sha256": "1a88cf946292f206b95f5430b5a6757567e90dd4d6b571c3e48b10bae01756f7",
+			"bytes": 2103
+		},
+		{
+			"path": "evidence/B-final-invariance.json",
+			"sha256": "2f6ba92d71774e034cba2b916483ff51106a0ab2d231015755dc4ace8d2a4870",
+			"bytes": 305
+		},
+		{
+			"path": "evidence/timing/native-timing-summary.json",
+			"sha256": "fe2d508d8895bf7222971a2dc34521f2acac52c1d4997176375788cd8089a267",
+			"bytes": 885
+		},
+		{
+			"path": "evidence/timing/code-timing-summary.json",
+			"sha256": "3c3dedcfafab71a422bf9eacef8334050f584c028ecc6b37d1b0bc82a29ec84d",
+			"bytes": 500
+		},
+		{
+			"path": "corpus/native-report.json",
+			"sha256": "b696b0736b63f62f4c2f1b156760fc16d9d24b200e0f2e173c6cd4a8ef33069f",
+			"bytes": 5494
+		},
+		{
+			"path": "evidence/native-normal.mkv",
+			"sha256": "c3416ad2e906fbf116facce7a61448c8b55060f06465b3b8c97bde7de63c7afb",
+			"bytes": 12540948
+		},
+		{
+			"path": "evidence/code-normal.mkv",
+			"sha256": "65e3b3d53ae59deb8bd1cba326c89e4498769826217eb5533a87e3c39acd18a6",
+			"bytes": 11295448
+		},
+		{
+			"path": "evidence/native-extra.mkv",
+			"sha256": "b3c46a856e3108c25cf95d570c40e9345417e6fe406fdfa2999fa6e4dbb82c76",
+			"bytes": 3628221
+		},
+		{
+			"path": "evidence/timing/native-151.6.png",
+			"sha256": "ab66771ba79b0d4fea7d8cca30f69bebeb7c7c0db98854580bf2066601b89ce5",
+			"bytes": 206147
+		},
+		{
+			"path": "evidence/timing/native-151.7333.png",
+			"sha256": "adfefcaaa4740c040e4485e66be478917accadeb7c5cabd511a97a6e64855271",
+			"bytes": 205895
+		},
+		{
+			"path": "evidence/native-extra-hover100-cue.jpg",
+			"sha256": "9b846e609804996355680c952d0933d5300fa26aa911f39f472f9b467f44bbe1",
+			"bytes": 107036
+		},
+		{
+			"path": "evidence/native-long-dashed-100-cue.jpg",
+			"sha256": "636fc3a5d8a95535a683a259ebeb60a74f55d1ba8890fbc8716d4bea11dd3c67",
+			"bytes": 132636
+		},
+		{
+			"path": "evidence/code-hover-build-cue.jpg",
+			"sha256": "161639b1027dad5cfb89fdbd6a93265e9c839f45cfe99452f941495705c0a975",
+			"bytes": 128652
+		}
+	],
+	"preservation": {
+		"outerManifestPass": 14,
+		"appDirManifestPass": 304,
+		"settingsWrites": 0,
+		"settingsComparisonsUnchanged": 9,
+		"fixtureOriginalsUnchanged": 3,
+		"appExitCodes": {
+			"native": 0,
+			"extraNative": 0,
+			"corpus": 0,
+			"vscode": 0
+		}
+	},
+	"corpus": {
+		"documentCount": 23,
+		"passed": true,
+		"failures": [],
+		"errors": [],
+		"executionSHA256": "513bce5c1fcf93ee32bf9b4fef1a668d1adb2d5676f41ebfede0ca45a4eaf70e"
+	},
+	"historical8261Matrix": {
+		"conditions": 133,
+		"hostCells": 399,
+		"passed": 202,
+		"historicalFailed": 3,
+		"unverified": 7,
+		"notApplicable": 187,
+		"changed": false
+	}
+}

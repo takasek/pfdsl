@@ -56,7 +56,6 @@ digraph PFDSL {
   "implement_preview_engine" [shape=ellipse, label="implement_preview_engine\nプレビューエンジン実装", width=2.70];
   "implement_preview_minimap" [shape=ellipse, label="implement_preview_minimap\nminimap実装", width=2.80];
   "implement_preview_panel" [shape=ellipse, label="implement_preview_panel\nプレビューパネル実装", width=2.60];
-  "implement_skill_sync" [shape=ellipse, label="implement_skill_sync\nskill sync実装", width=2.30];
   "implement_syntax_highlight" [shape=ellipse, label="implement_syntax_highlight\nシンタックスハイライト実装", width=2.90];
   "implement_validator" [shape=ellipse, label="implement_validator\nValidator実装", width=2.20];
   "integrate_core_modules" [shape=ellipse, label="integrate_core_modules\nコアモジュール統合", width=2.50];
@@ -78,7 +77,6 @@ digraph PFDSL {
   "release_marketplace" [shape=ellipse, label="release_marketplace\nMarketplace公開", width=2.20];
   "repo_scaffold" [shape=box, label="repo_scaffold\nリポジトリ骨格", width=1.70, xlabel="done", fillcolor="lightgray", fontcolor="dimgray", style="filled"];
   "shared_types" [shape=box, label="shared_types\n共有型定義", width=1.50, xlabel="done", fillcolor="lightgray", fontcolor="dimgray", style="filled"];
-  "skill_sync_command" [shape=box, label="skill_sync_command\nskill syncコマンド", tooltip="skill syncコマンド\n\n`pfdsl skill sync pfd-ops`。外部採用リポの pfd-ops を一発最新化。npm同梱（tsup onSuccessで dist/skills/pfd-ops へコピー）+ L3採用済み判定で install/ 条件付き上書き + L4 scaffold + gh ラベル確認。consumer = 外部プロジェクトでの pfd-ops 運用（#90、設計 docs/superpowers/specs/2026-06-16-pfd-ops-sync-command-design.md）。v0.0.5 で公開予定", width=2.10, xlabel="done", fillcolor="lightgray", fontcolor="dimgray", style="filled", penwidth="2"];
   "spec_v0_0_2" [shape=box, label="spec_v0_0_2\nPFDSL仕様書 v0.0.2", width=2.10, xlabel="done", fillcolor="lightgray", fontcolor="dimgray", style="filled", penwidth="2"];
   "syntax_highlight" [shape=box, label="syntax_highlight\nシンタックスハイライト", width=2.50, xlabel="done", fillcolor="lightgray", fontcolor="dimgray", style="filled"];
   "token_spec" [shape=box, label="token_spec\nトークン規則", width=1.50, xlabel="done", fillcolor="lightgray", fontcolor="dimgray", style="filled"];
@@ -197,8 +195,6 @@ digraph PFDSL {
   "implement_group_fill_export" -> "group_fill_export";
   "preview_panel" -> "implement_preview_minimap";
   "implement_preview_minimap" -> "preview_minimap";
-  "cli_tool" -> "implement_skill_sync";
-  "implement_skill_sync" -> "skill_sync_command";
   "workflow_usage" -> "implement_validator" [style=dashed, color="#888888", constraint=false];
   "workflow_usage" -> "implement_formatter" [style=dashed, color="#888888", constraint=false];
   "workflow_usage" -> "implement_preview_engine" [style=dashed, color="#888888", constraint=false];

@@ -1,8 +1,97 @@
+import { compareIds } from "./compare.js";
+import { ID_PATTERN } from "./lexer.js";
 import type { NormalizedEdge } from "./types/index.js";
 
 export type BodySegment =
 	| { kind: "edges"; text: string }
 	| { kind: "comment"; text: string };
+
+// A bare spelling is one the lexer reads back as the same single id.
+const BARE_ID_RE = new RegExp(`^(?:${ID_PATTERN.source})$`, "u");
+
+export function formatId(id: string): string {
+	if (BARE_ID_RE.test(id)) return id;
+	return quoteId(id);
+}
+
+/**
+ * `formatId`'s spelling of `id` for a position directly followed by `next`
+ * in the source. The lexer ends a bare id before a `-` that starts `->`, so
+ * a bare spelling ending in `-` right before `>` would lose that dash to an
+ * arrow; it is quoted there instead.
+ */
+export function formatIdBefore(id: string, next: string | undefined): string {
+	const bare = formatId(id);
+	return bare.endsWith("-") && next === ">" ? quoteId(id) : bare;
+}
+
+/** The `"..."`-quoted spelling of `id`, which `formatId` falls back to when the bare one is not a valid id token. */
+function quoteId(id: string): string {
+	let escaped = "";
+	for (const char of id) {
+		if (char === "\\") escaped += "\\\\";
+		else if (char === '"') escaped += '\\"';
+		else if (char === "\n") escaped += "\\n";
+		else if (char === "\t") escaped += "\\t";
+		else escaped += char;
+	}
+	return `"${escaped}"`;
+}
+
+/**
+ * Splits a comma-separated CLI argument into ids, the parse-side counterpart
+ * of `formatId`: a comma inside a `"..."`-quoted id is part of that one id,
+ * not a separator (#1125 review defect 2 — a naive `split(",")` breaks a
+ * quoted id like `"a,b"` into two ids `"a` and `b"`). Escapes inside the
+ * quotes follow the same set the lexer accepts for a quoted identifier in
+ * the body notation (`\\`, `\"`, `\n`, `\t`; any other escaped character is
+ * kept literally, backslash and all), so a round trip through `formatId`
+ * reproduces the original id exactly.
+ *
+ * Only for arguments that name ids (an id list for `delete`/`get`/`meta
+ * set`). A list of statuses, tags, or field names is never quoted, so those
+ * callers keep using the plain `split(",")` this does not replace.
+ */
+export function parseIdList(raw: string): string[] {
+	const ids: string[] = [];
+	let i = 0;
+	const n = raw.length;
+	while (i < n) {
+		while (i < n && (raw[i] === "," || /\s/.test(raw[i]!))) i++;
+		if (i >= n) break;
+		if (raw[i] === '"') {
+			i++;
+			let value = "";
+			while (i < n && raw[i] !== '"') {
+				if (raw[i] === "\\" && i + 1 < n) {
+					const esc = raw[i + 1];
+					if (esc === '"') value += '"';
+					else if (esc === "\\") value += "\\";
+					else if (esc === "n") value += "\n";
+					else if (esc === "t") value += "\t";
+					else value += `\\${esc}`;
+					i += 2;
+				} else {
+					value += raw[i];
+					i++;
+				}
+			}
+			i++; // skip closing quote (or end of string, if unterminated)
+			ids.push(value);
+		} else {
+			let value = "";
+			while (i < n && raw[i] !== ",") {
+				value += raw[i];
+				i++;
+			}
+			const trimmed = value.trim();
+			if (trimmed.length > 0) ids.push(trimmed);
+		}
+		while (i < n && raw[i] !== ",") i++; // discard trailing junk before the next comma
+		if (i < n) i++; // skip the comma
+	}
+	return ids;
+}
 
 export function splitBodyIntoSegments(body: string): BodySegment[] {
 	if (body === "") return [];
@@ -34,12 +123,13 @@ export function formatEdges(
 ): string {
 	const lines: string[] = [];
 	for (const e of sortedEdges) {
-		if (e.kind === "input") lines.push(`${e.artifact} >> ${e.process}`);
+		if (e.kind === "input")
+			lines.push(`${formatId(e.artifact)} >> ${formatId(e.process)}`);
 		else if (e.kind === "feedback")
-			lines.push(`${e.artifact} >>? ${e.process}`);
-		else lines.push(`${e.process} -> ${e.artifact}`);
+			lines.push(`${formatId(e.artifact)} >>? ${formatId(e.process)}`);
+		else lines.push(`${formatId(e.process)} -> ${formatId(e.artifact)}`);
 	}
-	for (const id of sortedIsolated) lines.push(id);
+	for (const id of sortedIsolated) lines.push(formatId(id));
 	if (lines.length === 0) return "";
 	return `${lines.join("\n")}\n`;
 }
@@ -89,22 +179,28 @@ export function formatAsFlows(
 	const processOrder = [...byProcess.keys()].sort((a, b) => {
 		const diff =
 			(rankProxy.get(a) ?? offset * 2) - (rankProxy.get(b) ?? offset * 2);
-		return diff !== 0 ? diff : a.localeCompare(b);
+		return diff !== 0 ? diff : compareIds(a, b);
 	});
 
 	const lines: string[] = [];
 	for (const proc of processOrder) {
 		const { inputs, outputs, feedbacks } = byProcess.get(proc)!;
-		for (const fb of feedbacks) lines.push(`${fb} >>? ${proc}`);
+		for (const fb of feedbacks)
+			lines.push(`${formatId(fb)} >>? ${formatId(proc)}`);
 		if (inputs.length === 0 && outputs.length === 0) continue;
 		const fmtIds = (ids: string[]) =>
-			ids.length === 1 ? ids[0]! : `[${ids.join(", ")}]`;
-		let stmt = inputs.length > 0 ? `${fmtIds(inputs)} >> ${proc}` : proc;
+			ids.length === 1
+				? formatId(ids[0]!)
+				: `[${ids.map((id) => formatId(id)).join(", ")}]`;
+		let stmt =
+			inputs.length > 0
+				? `${fmtIds(inputs)} >> ${formatId(proc)}`
+				: formatId(proc);
 		if (outputs.length > 0) stmt += ` -> ${fmtIds(outputs)}`;
 		lines.push(stmt);
 	}
 
-	for (const id of sortedIsolated) lines.push(id);
+	for (const id of sortedIsolated) lines.push(formatId(id));
 	if (lines.length === 0) return "";
 	return `${lines.join("\n")}\n`;
 }

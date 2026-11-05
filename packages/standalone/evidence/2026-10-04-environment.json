@@ -1,0 +1,9 @@
+{
+	"date": "2026-10-04",
+	"architecture": "arm64",
+	"macOS": "27.0",
+	"macOSBuild": "26A428",
+	"binary": "/Users/m5/.codex/worktrees/fae1/pfdsl/packages/standalone/src-tauri/target/release/bundle/macos/PFDSL.app/Contents/MacOS/pfdsl-desktop: Mach-O 64-bit executable arm64",
+	"report": "2026-10-04-native-report.json",
+	"scope": "Local release app, exact executable and frontend hashes; GUI and IME observations are separate in ACCEPTANCE.md."
+}

@@ -1,0 +1,1121 @@
+import type { DiffReport } from "@pfdsl/core";
+import { renderDotToSvg } from "@pfdsl/preview-engine/renderer";
+import { mountConnections } from "./connections-panel.js";
+import { buildDiffPanelHtml } from "./diff-panel.js";
+import type { MessageFromWebview, MessageToWebview } from "./messages.js";
+import { FOCUS_CUE_DURATION_MS, previewMarkup } from "./preview-shell.js";
+import { unwrapAnchors } from "./svg-anchors.js";
+import {
+	centerPan,
+	fitGraph,
+	focusNodeView,
+	fontSizeBelowMinimum,
+	graphFitsViewport,
+	MAX_SCALE,
+	MIN_SCALE,
+	minimapScale,
+	minimapViewport,
+	panFromMinimapPoint,
+	panToCenterNode,
+	screenFontSize,
+	shouldReleaseDrag,
+	zoomAt,
+} from "./webview-logic.js";
+
+export interface PreviewHost {
+	postMessage(message: MessageFromWebview): void;
+	onStateChange?: () => void;
+	/** Hosts without related-file navigation omit its gestures and help. */
+	canOpenRelatedFiles?: boolean;
+	renderDot?: (dot: string) => Promise<string>;
+}
+
+const SYNC_ECHO_TIMEOUT_MS = 1000;
+export const NODE_CLICK_DELAY_MS = 500;
+
+function prepareGraphNode(
+	node: HTMLElement,
+	label: (id: string) => string,
+): string | undefined {
+	const title = node.querySelector(":scope > title");
+	const id = title?.textContent;
+	if (!id) return undefined;
+	node.dataset.nodeId = id;
+	node.setAttribute("tabindex", "0");
+	node.setAttribute("role", "button");
+	node.setAttribute("aria-label", label(id));
+	title.remove();
+	return id;
+}
+
+/** Distinguishes repair requests of previews mounted in the same document. */
+let repairSerial = 0;
+
+/** Mount one independent preview. Transport and lifetime belong to its host. */
+export function mountPreview(container: HTMLElement, host: PreviewHost) {
+	const document = container.ownerDocument;
+	const window = document.defaultView!;
+	const abort = new window.AbortController();
+	let disposed = false;
+	let revision = 0;
+	container.classList.add("pfdsl-preview");
+	container.innerHTML = previewMarkup;
+	const renderDot = host.renderDot ?? renderDotToSvg;
+	function on<K extends keyof GlobalEventHandlersEventMap>(
+		target: EventTarget,
+		type: K,
+		callback: (e: GlobalEventHandlersEventMap[K]) => void,
+		options?: AddEventListenerOptions,
+	) {
+		target.addEventListener(type, callback as EventListener, {
+			...options,
+			signal: abort.signal,
+		});
+	}
+	function requestAnimationFrame(callback: FrameRequestCallback) {
+		window.requestAnimationFrame((time) => {
+			if (!disposed) callback(time);
+		});
+	}
+	const root = container.querySelector("#root") as HTMLDivElement;
+	const inner = container.querySelector("#inner") as HTMLDivElement;
+	const tooltip = container.querySelector("#tooltip") as HTMLDivElement;
+	const error = container.querySelector("#preview-error") as HTMLDivElement;
+	const zoomLevel = container.querySelector("#zoom-level") as HTMLOutputElement;
+	const focusSelected = container.querySelector<HTMLButtonElement>(
+		"#focus-selected-node",
+	)!;
+	const viewButtons = ["zoom-out", "zoom-in", "fit-graph", "actual-size"].map(
+		(id) => container.querySelector(`#${id}`) as HTMLButtonElement,
+	);
+	const [zoomOut, zoomIn, fitButton, actualSize] = viewButtons as [
+		HTMLButtonElement,
+		HTMLButtonElement,
+		HTMLButtonElement,
+		HTMLButtonElement,
+	];
+	const help = container.querySelector("#preview-help") as HTMLDivElement;
+	const helpToggle = container.querySelector(
+		"#preview-help-toggle",
+	) as HTMLButtonElement;
+	if (host.canOpenRelatedFiles === false)
+		container.querySelector("[data-related-files-help]")?.remove();
+	function setHelpOpen(open: boolean) {
+		help.hidden = !open;
+		helpToggle.setAttribute("aria-expanded", String(open));
+	}
+	on(helpToggle, "click", () => setHelpOpen(Boolean(help.hidden)));
+	on(document, "click", (event) => {
+		const target = event.target;
+		if (
+			!help.hidden &&
+			target instanceof window.Node &&
+			!help.contains(target) &&
+			!helpToggle.contains(target)
+		)
+			setHelpOpen(false);
+	});
+
+	let descriptions: Record<string, Array<[string, string]>> = {};
+	let locations: Record<string, string[]> = {};
+	let subflows: Record<string, string> = {};
+	let pendingFocusNodeId: string | undefined;
+	let pendingFocusCue = false;
+	let editingData: Extract<MessageToWebview, { type: "render" }>["editing"];
+	let selectedNodeId: string | undefined;
+	let recoverConnectionsId: string | undefined;
+	let lastFocusedNodeId: string | undefined;
+	let hoverId: string | undefined;
+	let hideTimer: number | undefined;
+	let cueTimer: number | undefined;
+	let cuedNode: Element | undefined;
+	let cueRing: HTMLDivElement | undefined;
+	let syncEchoNodeId: string | undefined;
+	let syncEchoTimer: number | undefined;
+	let clickTimer: number | undefined;
+	function cancelNodeClick() {
+		if (clickTimer !== undefined) window.clearTimeout(clickTimer);
+		clickTimer = undefined;
+	}
+	function clearSyncEcho() {
+		if (syncEchoTimer !== undefined) window.clearTimeout(syncEchoTimer);
+		syncEchoTimer = undefined;
+		syncEchoNodeId = undefined;
+	}
+	function synchronizeNode(id: string) {
+		clearSyncEcho();
+		syncEchoNodeId = id;
+		// Both hosts can report the selection made by this message. A missing
+		// report must not suppress a later editor navigation indefinitely.
+		syncEchoTimer = window.setTimeout(clearSyncEcho, SYNC_ECHO_TIMEOUT_MS);
+		host.postMessage({ type: "nodeClick", nodeId: id, preserveFocus: true });
+	}
+	const actions = container.querySelector<HTMLElement>("#node-actions")!;
+	const actionsToggle = container.querySelector<HTMLButtonElement>(
+		"#node-actions-toggle",
+	)!;
+	const connections = mountConnections(container, {
+		postMessage: host.postMessage,
+		onRename(oldId, newId) {
+			if (selectedNodeId === oldId) selectedNodeId = newId;
+			if (lastFocusedNodeId === oldId) lastFocusedNodeId = newId;
+			if (pendingFocusNodeId === oldId) pendingFocusNodeId = newId;
+			if (recoverConnectionsId === oldId) recoverConnectionsId = newId;
+		},
+		navigate(id) {
+			selectedNodeId = pendingFocusNodeId = id;
+			pendingFocusCue = true;
+			positionGraph();
+			synchronizeNode(id);
+		},
+		close: closeActions,
+		onOpenChange(open) {
+			actionsToggle.setAttribute("aria-expanded", String(open));
+		},
+	});
+	function closeActions() {
+		cancelNodeClick();
+		recoverConnectionsId = undefined;
+		connections.close();
+		actionsToggle.focus();
+	}
+	function openActions(
+		id: string,
+		preserveFocus = false,
+		focusHeading = false,
+	) {
+		cancelNodeClick();
+		if (graphRevision !== revision) return;
+		recoverConnectionsId = undefined;
+		selectedNodeId = id;
+		const node = [...inner.querySelectorAll<HTMLElement>("g.node")].find(
+			(node) => node.dataset.nodeId === id,
+		);
+		if (node) showCue(node);
+		else clearCue();
+		connections.open(id, focusHeading);
+		updateControls();
+		if (!preserveFocus) synchronizeNode(id);
+		host.onStateChange?.();
+	}
+	on(actionsToggle, "click", (event) => {
+		if (connections.isOpen()) {
+			closeActions();
+			return;
+		}
+		const id = selectedNodeId ?? editingData?.nodes[0]?.id;
+		if (id) openActions(id, false, event.detail === 0);
+	});
+	on(root, "contextmenu", (e) => {
+		const id = (e.target as Element).closest<HTMLElement>("g.node")?.dataset
+			.nodeId;
+		if (id) {
+			e.preventDefault();
+			hideHover();
+			openActions(id);
+		}
+	});
+	on(root, "keydown", (e) => {
+		const id = (e.target as Element).closest<HTMLElement>("g.node")?.dataset
+			.nodeId;
+		if (id && ["Enter", " ", "ContextMenu"].includes(e.key)) {
+			e.preventDefault();
+			hideHover();
+			openActions(id, false, true);
+		}
+	});
+	on(container, "keydown", (e) => {
+		if (e.key === "Escape" && !e.isComposing) {
+			hideHover();
+			if (!help.hidden) setHelpOpen(false);
+			closeActions();
+		}
+	});
+	function clearCue() {
+		if (cueTimer !== undefined) window.clearTimeout(cueTimer);
+		cueTimer = undefined;
+		cuedNode?.classList.remove("pfdsl-focus-cue");
+		cuedNode = undefined;
+		cueRing?.remove();
+		cueRing = undefined;
+	}
+	function positionCue() {
+		if (!cuedNode || !cueRing) return;
+		const bounds = cuedNode.getBoundingClientRect();
+		const origin = inner.getBoundingClientRect();
+		const padding = 4 / scale;
+		Object.assign(cueRing.style, {
+			left: `${(bounds.left - origin.left) / scale - padding}px`,
+			top: `${(bounds.top - origin.top) / scale - padding}px`,
+			width: `${bounds.width / scale + 2 * padding}px`,
+			height: `${bounds.height / scale + 2 * padding}px`,
+			outlineWidth: `${2 / scale}px`,
+		});
+	}
+	function showCue(node: Element) {
+		clearCue();
+		cuedNode = node;
+		node.classList.add("pfdsl-focus-cue");
+		// Keep the decoration outside SVG: group outline/shadow does not paint on
+		// the tested WebKitGTK runtime, and the original shape styling must survive.
+		cueRing = document.createElement("div");
+		cueRing.className = "pfdsl-focus-ring";
+		cueRing.setAttribute("aria-hidden", "true");
+		positionCue();
+		inner.append(cueRing);
+		cueTimer = window.setTimeout(clearCue, FOCUS_CUE_DURATION_MS);
+	}
+	function cancelHide() {
+		if (hideTimer !== undefined) window.clearTimeout(hideTimer);
+		hideTimer = undefined;
+	}
+	function hideHover() {
+		cancelHide();
+		hoverId = undefined;
+		tooltip.replaceChildren();
+		tooltip.style.display = "none";
+	}
+	function scheduleHide() {
+		cancelHide();
+		hideTimer = window.setTimeout(hideHover, 180);
+	}
+	on(tooltip, "mouseenter", cancelHide);
+	on(tooltip, "mouseleave", scheduleHide);
+	on(tooltip, "focusin", cancelHide);
+	on(tooltip, "focusout", (e) => {
+		if (!tooltip.contains(e.relatedTarget as Node | null)) scheduleHide();
+	});
+	function clampTooltip(x: number, y: number) {
+		const rect = tooltip.getBoundingClientRect();
+		tooltip.style.left = `${Math.max(8, Math.min(x, window.innerWidth - rect.width - 8))}px`;
+		tooltip.style.top = `${Math.max(8, Math.min(y, window.innerHeight - rect.height - 8))}px`;
+	}
+
+	const diffPanel = container.querySelector("#diff-panel") as HTMLDivElement;
+	let currentDiff: DiffReport | null = null;
+
+	function renderDiffPanel(report: DiffReport): void {
+		diffPanel.innerHTML = buildDiffPanelHtml(report);
+		diffPanel.style.display = "block";
+	}
+
+	function clearDiffPanel(): void {
+		currentDiff = null;
+		diffPanel.innerHTML = "";
+		diffPanel.style.display = "none";
+	}
+
+	const modKey = window.navigator.platform.startsWith("Mac") ? "⌘" : "Ctrl";
+
+	async function showHover(node: Element, x: number, y: number) {
+		if (graphRevision !== revision) return;
+		cancelHide();
+		const nodeId = (node as HTMLElement).dataset.nodeId;
+		if (!nodeId) return;
+		if (hoverId === nodeId) {
+			clampTooltip(x + 14, y + 14);
+			return;
+		}
+		hoverId = nodeId;
+		const desc: Array<[string, string]> | undefined = Object.hasOwn(
+			descriptions,
+			nodeId,
+		)
+			? descriptions[nodeId]
+			: [
+					["**", nodeId],
+					[
+						"kind",
+						editingData?.nodes.find((n) => n.id === nodeId)?.kind ?? "node",
+					],
+				];
+		const nodeLocs = Object.hasOwn(locations, nodeId) ? locations[nodeId]! : [];
+		const subflow = (node as HTMLElement).dataset.subflow;
+		const hint =
+			host.canOpenRelatedFiles === false
+				? null
+				: subflow
+					? `${modKey}+Click to open subflow`
+					: nodeLocs.length > 1
+						? `${modKey}+Click to open location…`
+						: nodeLocs.length === 1
+							? nodeLocs[0]!.includes("://")
+								? `${modKey}+Click to open URL`
+								: `${modKey}+Click to open file`
+							: null;
+		if (!desc && !hint) {
+			hideHover();
+			return;
+		}
+		const parts: string[] = [];
+		if (desc) {
+			let hintInjected = false;
+			const rows = desc
+				.map(([k, v]) => {
+					const vHtml = escapeHtml(v).replace(/\n/g, "<br>");
+					let cellExtra = "";
+					if (hint && !hintInjected) {
+						if (
+							(subflow && k === "subflow") ||
+							(!subflow && nodeLocs.length > 0 && k === "location")
+						) {
+							cellExtra = `<div class="tt-hint">${escapeHtml(hint)}</div>`;
+							hintInjected = true;
+						}
+					}
+					if (k === "**")
+						return `<tr><td colspan="2" class="tt-body"><strong>${vHtml}</strong>${cellExtra}</td></tr>`;
+					if (!k)
+						return `<tr><td colspan="2" class="tt-body">${vHtml}${cellExtra}</td></tr>`;
+					return `<tr><td class="tt-key">${escapeHtml(k)}</td><td class="tt-val" data-field="${escapeHtml(k)}">${vHtml}${cellExtra}</td></tr>`;
+				})
+				.join("");
+			parts.push(`<table class="tt-table">${rows}</table>`);
+			if (hint && !hintInjected) {
+				parts.push(`<div class="tt-hint">${escapeHtml(hint)}</div>`);
+			}
+		} else if (hint) {
+			parts.push(`<div class="tt-hint">${escapeHtml(hint)}</div>`);
+		}
+		tooltip.innerHTML = parts.join("");
+		tooltip.style.display = "block";
+		clampTooltip(x + 14, y + 14);
+	}
+	on(root, "mousemove", (e) => {
+		if (dragging || minimapDragging) return;
+		const node = (e.target as Element).closest?.("g.node");
+		if (!node) {
+			scheduleHide();
+			return;
+		}
+		void showHover(node, e.clientX, e.clientY);
+	});
+	on(root, "focusin", (e) => {
+		const node = (e.target as Element).closest?.("g.node");
+		if (!node) return;
+		selectedNodeId = (node as HTMLElement).dataset.nodeId;
+		root.scrollLeft = root.scrollTop = 0;
+		if (selectedNodeId && selectedNodeId !== lastFocusedNodeId)
+			focusNode(selectedNodeId, true);
+		lastFocusedNodeId = selectedNodeId;
+		updateControls();
+		host.onStateChange?.();
+		const rect = node.getBoundingClientRect();
+		void showHover(node, rect.right, rect.bottom);
+	});
+	on(root, "scroll", () => {
+		root.scrollLeft = root.scrollTop = 0;
+	});
+
+	on(root, "mouseleave", (e) => {
+		scheduleHide();
+		if (e.buttons === 0) {
+			dragging = false;
+			root.style.cursor = "grab";
+		}
+	});
+
+	const MINIMAP_W = 160;
+	const MINIMAP_H = 120;
+	const minimap = container.querySelector("#minimap") as HTMLDivElement;
+	const minimapSvg = container.querySelector("#minimap-svg") as HTMLDivElement;
+	const minimapVp = container.querySelector("#minimap-vp") as HTMLDivElement;
+	let mmScale = 1;
+	let svgNatW = 0;
+	let svgNatH = 0;
+
+	function clearMinimap() {
+		minimapSvg.replaceChildren();
+		minimap.style.display = "none";
+		svgNatW = svgNatH = 0;
+	}
+
+	function updateMinimapVp() {
+		if (!svgNatW || !svgNatH) return;
+		const vp = minimapViewport(
+			{ scale, panX, panY },
+			{ width: root.clientWidth, height: root.clientHeight },
+			mmScale,
+		);
+		minimapVp.style.left = `${vp.left}px`;
+		minimapVp.style.top = `${vp.top}px`;
+		minimapVp.style.width = `${vp.width}px`;
+		minimapVp.style.height = `${vp.height}px`;
+	}
+
+	function refreshMinimap() {
+		const svgEl = inner.querySelector("svg");
+		if (!svgEl) {
+			minimap.style.display = "none";
+			return;
+		}
+		svgNatW = inner.offsetWidth;
+		svgNatH = inner.offsetHeight;
+		if (!svgNatW || !svgNatH) {
+			minimap.style.display = "none";
+			return;
+		}
+		mmScale = minimapScale(
+			{ width: svgNatW, height: svgNatH },
+			{ width: MINIMAP_W, height: MINIMAP_H },
+		);
+		const scaledW = svgNatW * mmScale;
+		const scaledH = svgNatH * mmScale;
+		minimap.style.width = `${scaledW}px`;
+		minimap.style.height = `${scaledH}px`;
+		const clone = svgEl.cloneNode(true) as SVGSVGElement;
+		for (const node of clone.querySelectorAll("g.node")) {
+			node.classList.remove("pfdsl-focus-cue");
+			node.removeAttribute("tabindex");
+			node.removeAttribute("role");
+			node.removeAttribute("aria-label");
+		}
+		clone.setAttribute("width", String(scaledW));
+		clone.setAttribute("height", String(scaledH));
+		clone.style.width = `${scaledW}px`;
+		clone.style.height = `${scaledH}px`;
+		minimapSvg.replaceChildren(clone);
+		minimap.style.display = "block";
+		updateMinimapVp();
+	}
+
+	let minimapDragRect: DOMRect | null = null;
+
+	function panToMinimapPoint(clientX: number, clientY: number) {
+		if (!svgNatW || !svgNatH) return;
+		({ panX, panY } = panFromMinimapPoint(
+			clientX,
+			clientY,
+			minimapDragRect ?? minimap.getBoundingClientRect(),
+			mmScale,
+			scale,
+			{ width: root.clientWidth, height: root.clientHeight },
+		));
+		fittedHost = undefined;
+		applyTransform();
+	}
+
+	let scale = 1;
+	let panX = 0;
+	let panY = 0;
+	let dragging = false;
+	let minimapDragging = false;
+	let startX = 0;
+	let startY = 0;
+	let hasPositioned = false;
+	// The host size of the current Fit view; any other view clears it. While
+	// set, the view follows the host's size (a hidden host measures 0).
+	let fittedHost: { width: number; height: number } | undefined;
+	let graphRevision = -1;
+	let minimumScale = MIN_SCALE;
+
+	function updateControls() {
+		const hasGraph = inner.querySelector("svg") !== null && error.hidden;
+		for (const button of viewButtons) button.disabled = !hasGraph;
+		zoomOut.disabled ||= scale <= minimumScale;
+		zoomIn.disabled ||= scale >= MAX_SCALE;
+		zoomLevel.textContent = `${Number((scale * 100).toFixed(1))}%`;
+		focusSelected.disabled =
+			!hasGraph || graphRevision !== revision || !selectedGraphNode();
+	}
+
+	function selectedGraphNode() {
+		if (!editingData?.nodes.some((node) => node.id === selectedNodeId)) return;
+		return [...inner.querySelectorAll<HTMLElement>("g.node")].find(
+			(node) => node.dataset.nodeId === selectedNodeId,
+		);
+	}
+
+	function applyTransform() {
+		root.scrollLeft = root.scrollTop = 0;
+		inner.style.transform = `translate(${panX}px, ${panY}px) scale(${scale})`;
+		inner.style.transformOrigin = "0 0";
+		positionCue();
+		updateControls();
+		updateMinimapVp();
+	}
+
+	function centerGraph() {
+		const w = inner.offsetWidth;
+		const h = inner.offsetHeight;
+		({ panX, panY } = centerPan(
+			{ width: root.clientWidth, height: root.clientHeight },
+			{ width: w, height: h },
+			scale,
+		));
+		applyTransform();
+	}
+
+	function focusNode(nodeId: string, cue = false) {
+		const nodes = inner.querySelectorAll("g.node");
+		for (const node of nodes) {
+			if ((node as HTMLElement).dataset.nodeId === nodeId) {
+				const nodeRect = node.getBoundingClientRect();
+				if (fittedHost && nodeTextIsBelowMinimum(node)) {
+					const view = focusNodeView(
+						{ scale, panX, panY },
+						nodeRect,
+						root.getBoundingClientRect(),
+						{ width: root.clientWidth, height: root.clientHeight },
+					);
+					if (view) {
+						fittedHost = undefined;
+						({ scale, panX, panY } = view);
+						minimumScale = Math.min(minimumScale, scale);
+						applyTransform();
+						if (cue) showCue(node);
+						return;
+					}
+				}
+				if (
+					graphFitsViewport(
+						inner.getBoundingClientRect(),
+						root.getBoundingClientRect(),
+					)
+				) {
+					if (cue) showCue(node);
+					return;
+				}
+				({ panX, panY } = panToCenterNode(
+					{ scale, panX, panY },
+					nodeRect,
+					root.getBoundingClientRect(),
+					{ width: root.clientWidth, height: root.clientHeight },
+				));
+				fittedHost = undefined;
+				applyTransform();
+				if (cue) showCue(node);
+				return;
+			}
+		}
+	}
+
+	function fitCurrentGraph() {
+		const view = fitGraph(
+			{ width: root.clientWidth, height: root.clientHeight },
+			{ width: inner.offsetWidth, height: inner.offsetHeight },
+		);
+		if (!view) return false;
+		({ scale, panX, panY } = view);
+		minimumScale = Math.min(MIN_SCALE, scale);
+		fittedHost = {
+			width: container.clientWidth,
+			height: container.clientHeight,
+		};
+		applyTransform();
+		return true;
+	}
+
+	function nodeTextIsBelowMinimum(node: Element): boolean {
+		const fontSize = node.querySelector("text")?.getAttribute("font-size");
+		const viewBox = inner.querySelector("svg")?.getAttribute("viewBox");
+		if (!fontSize?.trim() || !viewBox) return false;
+		const values = viewBox
+			.trim()
+			.split(/[\s,]+/)
+			.map(Number);
+		if (values.length !== 4) return false;
+		return fontSizeBelowMinimum(
+			screenFontSize(Number(fontSize), inner.offsetWidth, values[2]!, scale),
+		);
+	}
+
+	function positionGraph() {
+		if (disposed || graphRevision !== revision || !error.hidden) return;
+		if (root.clientWidth === 0 || root.clientHeight === 0) return;
+		const hostWidth = container.clientWidth;
+		const hostHeight = container.clientHeight;
+		const hostResized =
+			fittedHost !== undefined &&
+			hostWidth > 0 &&
+			hostHeight > 0 &&
+			(hostWidth !== fittedHost.width || hostHeight !== fittedHost.height);
+		if (!hasPositioned || hostResized) {
+			if (!fitCurrentGraph()) return;
+			hasPositioned = true;
+		}
+		if (pendingFocusNodeId) {
+			selectedNodeId = editingData?.nodes.some(
+				(n) => n.id === pendingFocusNodeId,
+			)
+				? pendingFocusNodeId
+				: undefined;
+			focusNode(pendingFocusNodeId, pendingFocusCue);
+			pendingFocusNodeId = undefined;
+			pendingFocusCue = false;
+			host.onStateChange?.();
+		}
+		if (minimapSvg.firstElementChild) updateMinimapVp();
+		else refreshMinimap();
+		updateControls();
+	}
+	let containerWidth = container.clientWidth;
+	let containerHeight = container.clientHeight;
+	// Panel content also resizes the graph; only a host resize dismisses menus
+	// and, through positionGraph, fits a Fit view again.
+	function resizeHost() {
+		if (
+			container.clientWidth !== containerWidth ||
+			container.clientHeight !== containerHeight
+		) {
+			containerWidth = container.clientWidth;
+			containerHeight = container.clientHeight;
+			connections.resize();
+		}
+		positionGraph();
+	}
+	const resizeObserver =
+		typeof window.ResizeObserver === "function"
+			? new window.ResizeObserver(resizeHost)
+			: undefined;
+	resizeObserver?.observe(root);
+	resizeObserver?.observe(container);
+	on(window, "resize", () => {
+		connections.resize();
+		resizeHost();
+	});
+	on(fitButton, "click", () => {
+		pendingFocusNodeId = undefined;
+		fitCurrentGraph();
+	});
+	on(actualSize, "click", () => {
+		pendingFocusNodeId = undefined;
+		fittedHost = undefined;
+		scale = 1;
+		centerGraph();
+	});
+	on(focusSelected, "click", () => {
+		if (graphRevision !== revision || !error.hidden) return;
+		const node = selectedGraphNode();
+		if (!node) return;
+		const view = focusNodeView(
+			{ scale, panX, panY },
+			node.getBoundingClientRect(),
+			root.getBoundingClientRect(),
+			{ width: root.clientWidth, height: root.clientHeight },
+		);
+		if (!view) return;
+		pendingFocusNodeId = undefined;
+		fittedHost = undefined;
+		({ scale, panX, panY } = view);
+		minimumScale = Math.min(minimumScale, scale);
+		applyTransform();
+		showCue(node);
+	});
+	function zoom(deltaY: number, x: number, y: number) {
+		fittedHost = undefined;
+		({ scale, panX, panY } = zoomAt(
+			{ scale, panX, panY },
+			x,
+			y,
+			deltaY,
+			minimumScale,
+		));
+		applyTransform();
+	}
+	on(zoomOut, "click", () =>
+		zoom(1, root.clientWidth / 2, root.clientHeight / 2),
+	);
+	on(zoomIn, "click", () =>
+		zoom(-1, root.clientWidth / 2, root.clientHeight / 2),
+	);
+
+	on(
+		root,
+		"wheel",
+		(e) => {
+			e.preventDefault();
+			const rect = root.getBoundingClientRect();
+			zoom(e.deltaY, e.clientX - rect.left, e.clientY - rect.top);
+		},
+		{ passive: false },
+	);
+
+	let nodePress: { id: string; x: number; y: number } | undefined;
+	on(root, "mousedown", (e) => {
+		cancelNodeClick();
+		if (e.button === 2 && (e.target as Element).closest?.("g.node")) {
+			e.preventDefault();
+			return;
+		}
+		if (e.button !== 0) return;
+		const id = (e.target as Element).closest<HTMLElement>("g.node")?.dataset
+			.nodeId;
+		nodePress =
+			id && !e.metaKey && !e.ctrlKey
+				? { id, x: e.clientX, y: e.clientY }
+				: undefined;
+		e.preventDefault();
+		dragging = true;
+		startX = e.clientX - panX;
+		startY = e.clientY - panY;
+		root.style.cursor = "grabbing";
+	});
+
+	on(window, "mousemove", (e) => {
+		if (
+			nodePress &&
+			Math.hypot(e.clientX - nodePress.x, e.clientY - nodePress.y) > 4
+		)
+			nodePress = undefined;
+		if (
+			shouldReleaseDrag(e.buttons, {
+				graph: dragging,
+				minimap: minimapDragging,
+			})
+		) {
+			releaseDrag();
+			return;
+		}
+		if (minimapDragging) {
+			panToMinimapPoint(e.clientX, e.clientY);
+			return;
+		}
+		if (!dragging) return;
+		// A press that has not moved yet is a click, not a pan.
+		if (e.clientX - startX === panX && e.clientY - startY === panY) return;
+		fittedHost = undefined;
+		panX = e.clientX - startX;
+		panY = e.clientY - startY;
+		applyTransform();
+	});
+
+	function releaseDrag() {
+		nodePress = undefined;
+		dragging = false;
+		minimapDragging = false;
+		minimapDragRect = null;
+		root.style.cursor = "grab";
+	}
+	on(window, "mouseup", (e) => {
+		const press = nodePress;
+		releaseDrag();
+		if (
+			!press ||
+			e.button !== 0 ||
+			e.metaKey ||
+			e.ctrlKey ||
+			Math.hypot(e.clientX - press.x, e.clientY - press.y) > 4
+		)
+			return;
+		const id = (e.target as Element).closest?.<HTMLElement>("#inner g.node")
+			?.dataset.nodeId;
+		if (
+			id !== press.id ||
+			!inner.contains(e.target as Node) ||
+			graphRevision !== revision
+		)
+			return;
+		hideHover();
+		cancelNodeClick();
+		// Keep the node under the second click until dblclick can be dispatched.
+		clickTimer = window.setTimeout(() => openActions(id), NODE_CLICK_DELAY_MS);
+	});
+
+	on(root, "click", (e) => {
+		if (graphRevision !== revision) return;
+		if (host.canOpenRelatedFiles === false) return;
+		const node = (e.target as Element).closest("g.node");
+		if (!node) return;
+		const el = node as HTMLElement;
+		const subflow = el.dataset.subflow;
+		const nodeId = el.dataset.nodeId;
+		const nodeLocs =
+			nodeId && Object.hasOwn(locations, nodeId) ? locations[nodeId]! : [];
+		if (!subflow && nodeLocs.length === 0) return;
+		e.preventDefault();
+		if (e.metaKey || e.ctrlKey) {
+			if (subflow && nodeId) {
+				host.postMessage({ type: "openFile", nodeId, path: subflow });
+			} else if (nodeLocs.length > 0 && nodeId) {
+				host.postMessage({ type: "openLocation", nodeId });
+			}
+		}
+	});
+
+	on(root, "dblclick", (e) => {
+		cancelNodeClick();
+		const node = (e.target as Element).closest("g.node");
+		if (node) {
+			const nodeId = (node as HTMLElement).dataset.nodeId;
+			if (nodeId) {
+				openActions(nodeId, true);
+				host.postMessage({ type: "nodeClick", nodeId });
+				return;
+			}
+		}
+		scale = 1;
+		pendingFocusNodeId = undefined;
+		fittedHost = undefined;
+		panX = 0;
+		panY = 0;
+		requestAnimationFrame(() => centerGraph());
+	});
+
+	on(minimap, "mousedown", (e) => {
+		minimapDragging = true;
+		minimapDragRect = minimap.getBoundingClientRect();
+		panToMinimapPoint(e.clientX, e.clientY);
+	});
+
+	const HTML_ESCAPES: Record<string, string> = {
+		"&": "&amp;",
+		"<": "&lt;",
+		">": "&gt;",
+		'"': "&quot;",
+		"'": "&#39;",
+	};
+	function escapeHtml(s: string): string {
+		return s.replace(/[&<>"']/g, (c) => HTML_ESCAPES[c]!);
+	}
+
+	const repairToken = ++repairSerial;
+	let repairRequestSerial = 0;
+	type Repair = Extract<MessageToWebview, { type: "error" }>["repair"];
+	let pendingRepair: string | undefined;
+	let shownRepair: Repair;
+	let repairButtons: HTMLButtonElement[] = [];
+	let repairNotice: HTMLElement | undefined;
+	function clearRepair() {
+		pendingRepair = undefined;
+		shownRepair = undefined;
+		repairButtons = [];
+		repairNotice = undefined;
+	}
+	function showError(message: string, repair?: Repair) {
+		// Selection may already have cleared while typing. Only remember the
+		// open panel's center, never its input, source selection or DOM focus.
+		recoverConnectionsId = connections.centerId() ?? recoverConnectionsId;
+		const previewFocused =
+			actions.contains(document.activeElement) ||
+			root.contains(document.activeElement) ||
+			error.contains(document.activeElement);
+		// A host may resend the unchanged error while a repair is applied; only a
+		// different source or pair makes the pending request obsolete.
+		const pending =
+			repair &&
+			shownRepair?.source === repair.source &&
+			shownRepair.artifact === repair.artifact &&
+			shownRepair.process === repair.process
+				? pendingRepair
+				: undefined;
+		selectedNodeId = pendingFocusNodeId = undefined;
+		lastFocusedNodeId = undefined;
+		hideHover();
+		connections.update(undefined);
+		clearCue();
+		editingData = undefined;
+		actionsToggle.disabled = true;
+		error.textContent = message;
+		clearRepair();
+		if (repair) {
+			shownRepair = repair;
+			pendingRepair = pending;
+			const controls = document.createElement("div");
+			controls.className = "error-repair";
+			repairNotice = document.createElement("span");
+			for (const [label, kind] of [
+				["Keep normal input", "feedback"],
+				["Keep feedback", "input"],
+			] as const) {
+				const button = document.createElement("button");
+				button.type = "button";
+				button.textContent = label;
+				button.disabled = pending !== undefined;
+				button.onclick = () => {
+					pendingRepair = `repair:${repairToken}:${++repairRequestSerial}`;
+					for (const control of repairButtons) control.disabled = true;
+					repairNotice!.textContent = "";
+					host.postMessage({
+						type: "deleteConnector",
+						nodeId: repair.artifact,
+						...repair,
+						kind,
+						repair: true,
+						requestId: pendingRepair,
+					});
+				};
+				repairButtons.push(button);
+				controls.append(button);
+			}
+			controls.append(repairNotice);
+			error.append(controls);
+		}
+		error.hidden = false;
+		root.hidden = true;
+		inner.replaceChildren();
+		clearMinimap();
+		tooltip.style.display = "none";
+		releaseDrag();
+		updateControls();
+		if (previewFocused) error.focus();
+		host.onStateChange?.();
+	}
+
+	let deferredRender: Extract<MessageToWebview, { type: "render" }> | undefined;
+	async function receive(msg: MessageToWebview) {
+		if (disposed) return;
+		if (msg.type === "editResult") {
+			connections.result(msg);
+			if (deferredRender) await receive(deferredRender);
+			if (pendingRepair && msg.request.requestId === pendingRepair && !msg.ok) {
+				pendingRepair = undefined;
+				repairNotice!.textContent =
+					msg.message ?? "The edit could not be applied.";
+				for (const button of repairButtons) button.disabled = false;
+			}
+			return;
+		}
+		const panelFocused = actions.contains(document.activeElement);
+		if (msg.type === "render") {
+			if (!connections.update(msg.editing, msg.sourceRevision)) {
+				deferredRender = msg;
+				return;
+			}
+			deferredRender = undefined;
+		}
+		const currentRevision =
+			msg.type === "render" || msg.type === "error" ? ++revision : revision;
+		if (msg.type === "error") {
+			deferredRender = undefined;
+			cancelNodeClick();
+			clearSyncEcho();
+			showError(msg.message, msg.repair);
+			return;
+		}
+		if (msg.type === "focus") {
+			const echo = syncEchoNodeId === msg.nodeId;
+			clearSyncEcho();
+			if (echo) return;
+			if (msg.nodeId !== recoverConnectionsId) recoverConnectionsId = undefined;
+			cancelNodeClick();
+			pendingFocusNodeId = msg.nodeId;
+			pendingFocusCue = true;
+			positionGraph();
+			if (connections.isOpen()) connections.open(msg.nodeId);
+			return;
+		}
+		if (msg.type === "clearFocus") {
+			cancelNodeClick();
+			clearSyncEcho();
+			pendingFocusNodeId = undefined;
+			pendingFocusCue = false;
+			selectedNodeId = undefined;
+			updateControls();
+			host.onStateChange?.();
+			return;
+		}
+		if (msg.type === "diff") {
+			currentDiff = msg.report;
+			renderDiffPanel(msg.report);
+			return;
+		}
+		if (msg.type === "clearDiff") {
+			clearDiffPanel();
+			return;
+		}
+		if (msg.type !== "render") return;
+		updateControls();
+		cancelNodeClick();
+		clearSyncEcho();
+		clearRepair();
+		error.replaceChildren();
+		hideHover();
+		if (panelFocused && !connections.isOpen()) helpToggle.focus();
+		clearCue();
+		// The cursor hint supplied while opening must not displace the initial Fit.
+		if (hasPositioned && msg.focusNodeId !== undefined) {
+			if (msg.focusNodeId !== recoverConnectionsId)
+				recoverConnectionsId = undefined;
+			pendingFocusNodeId = msg.focusNodeId;
+			pendingFocusCue = false;
+		}
+		try {
+			const svg = await renderDot(msg.dot);
+			if (disposed || currentRevision !== revision) return;
+			descriptions = msg.descriptions ?? {};
+			locations = msg.locations ?? {};
+			subflows = msg.subflows ?? {};
+			editingData = msg.editing;
+			if (!editingData?.nodes.some((n) => n.id === selectedNodeId))
+				selectedNodeId = undefined;
+			if (!editingData?.nodes.some((n) => n.id === lastFocusedNodeId))
+				lastFocusedNodeId = undefined;
+			actionsToggle.disabled = !editingData?.nodes.length;
+			inner.innerHTML = svg;
+			error.hidden = true;
+			error.textContent = "";
+			root.hidden = false;
+			graphRevision = currentRevision;
+			if (recoverConnectionsId !== undefined) {
+				connections.open(recoverConnectionsId);
+				recoverConnectionsId = undefined;
+			}
+			host.onStateChange?.();
+			updateControls();
+			for (const node of inner.querySelectorAll<HTMLElement>("g.node")) {
+				const id = prepareGraphNode(
+					node,
+					(id) => `Node ${id}. Click or press Enter for Connections.`,
+				);
+				if (id) {
+					const sf = Object.hasOwn(subflows, id) ? subflows[id] : undefined;
+					if (sf) node.dataset.subflow = sf;
+				}
+			}
+			// Unwrap graphviz URL anchors: VSCode's handleInnerClick crashes
+			// (DataCloneError) on SVGAElement.href, so the <a> must be removed
+			// entirely. Cmd+Click is handled via dataset.location instead.
+			unwrapAnchors(inner);
+			for (const el of inner.querySelectorAll("[*|title], title")) {
+				if (el.tagName === "title") el.remove();
+				else el.removeAttributeNS("http://www.w3.org/1999/xlink", "title");
+			}
+			// Keep both graphs on the same revision even when native frames pause.
+			clearMinimap();
+			positionGraph();
+			requestAnimationFrame(() => {
+				if (currentRevision !== revision) return;
+				positionGraph();
+			});
+			if (currentDiff) renderDiffPanel(currentDiff);
+		} catch (e) {
+			if (disposed || currentRevision !== revision) return;
+			showError((e as Error).message);
+		}
+	}
+
+	host.postMessage({ type: "ready" });
+	return {
+		receive,
+		canCreateDefinition() {
+			return (
+				!disposed &&
+				graphRevision === revision &&
+				editingData?.nodes.find((n) => n.id === selectedNodeId)?.defined ===
+					false
+			);
+		},
+		createDefinition() {
+			if (this.canCreateDefinition() && selectedNodeId && editingData)
+				host.postMessage({
+					type: "createDefinition",
+					nodeId: selectedNodeId,
+					source: editingData.source,
+				});
+		},
+		dispose() {
+			recoverConnectionsId = undefined;
+			cancelNodeClick();
+			clearSyncEcho();
+			hideHover();
+			connections.close();
+			connections.dispose();
+			clearCue();
+			disposed = true;
+			revision++;
+			resizeObserver?.disconnect();
+			abort.abort();
+		},
+	};
+}

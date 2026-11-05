@@ -1,10 +1,50 @@
-import { describe, it } from "node:test";
 import assert from "node:assert/strict";
+import { describe, it } from "node:test";
 import {
 	extractPathReferences,
-	resolveCheckTarget,
+	extractRelativeMarkdownLinks,
 	findMissingHeadings,
+	resolveCheckTarget,
 } from "./companion-binding-check.mjs";
+
+describe("parsed companion references", () => {
+	it("checks used reference destinations but not unused definitions or code examples", () => {
+		const text =
+			"[guide][ref] ![image](docs/image.png 'preview') ` [example](docs/fake.md) `\n\n[ref]: docs/guide.md\n[unused]: docs/unused.md";
+		assert.deepEqual(extractPathReferences(text), [
+			"docs/guide.md",
+			"docs/image.png",
+		]);
+	});
+
+	it("resolves relative references and titled links for the relative-path checker", () => {
+		const text =
+			"[guide][ref] [other](./other.md 'details')\n\n[ref]: ../guide.md#intro";
+		assert.deepEqual(extractRelativeMarkdownLinks(text), [
+			"../guide.md",
+			"./other.md",
+		]);
+	});
+
+	it("ignores paths and apparent headings throughout a code block", () => {
+		const text =
+			"````md\n```\n# Required\n`docs/fake.md` [fake](./fake.md)\n````\n";
+		assert.deepEqual(extractPathReferences(text), []);
+		assert.deepEqual(extractRelativeMarkdownLinks(text), []);
+		assert.deepEqual(findMissingHeadings(text, ["Required"]), ["Required"]);
+	});
+
+	it("retains the raw ATX heading policy", () => {
+		assert.deepEqual(
+			findMissingHeadings("Setext\n===\n\n  # Indented\n\n# Raw\n", [
+				"Setext",
+				"Indented",
+				"Raw",
+			]),
+			["Setext", "Indented"],
+		);
+	});
+});
 
 describe("extractPathReferences", () => {
 	it("extracts inline-code paths starting with docs/, .claude/, scripts/, packages/", () => {
@@ -19,7 +59,8 @@ describe("extractPathReferences", () => {
 	});
 
 	it("ignores non-path inline code and npm package names", () => {
-		const text = "Run `onSuccess` and import `@pfdsl/core` and use `docs` as a word.";
+		const text =
+			"Run `onSuccess` and import `@pfdsl/core` and use `docs` as a word.";
 		assert.deepEqual(extractPathReferences(text), []);
 	});
 
@@ -34,8 +75,11 @@ describe("extractPathReferences", () => {
 	});
 
 	it("skips inline code inside fenced code blocks", () => {
-		const text = "```\n`docs/should-not-be-checked.md`\n```\nBut `docs/should-be-checked.md` is fine.";
-		assert.deepEqual(extractPathReferences(text), ["docs/should-be-checked.md"]);
+		const text =
+			"```\n`docs/should-not-be-checked.md`\n```\nBut `docs/should-be-checked.md` is fine.";
+		assert.deepEqual(extractPathReferences(text), [
+			"docs/should-be-checked.md",
+		]);
 	});
 
 	it("extracts a path token embedded in a command inside inline code", () => {
@@ -90,7 +134,8 @@ describe("resolveCheckTarget", () => {
 
 describe("findMissingHeadings", () => {
 	it("returns an empty array when all required headings are present", () => {
-		const text = "# Title\n\n## pfd-retro バインディング\n\n### retro 実行記録\n";
+		const text =
+			"# Title\n\n## pfd-retro バインディング\n\n### retro 実行記録\n";
 		assert.deepEqual(
 			findMissingHeadings(text, ["pfd-retro バインディング", "retro 実行記録"]),
 			[],
@@ -106,9 +151,72 @@ describe("findMissingHeadings", () => {
 	});
 
 	it("does not match heading text appearing outside a heading line", () => {
-		const text = "# Title\n\nprose mentioning retro 実行記録 in passing, not as a heading.\n";
+		const text =
+			"# Title\n\nprose mentioning retro 実行記録 in passing, not as a heading.\n";
 		assert.deepEqual(findMissingHeadings(text, ["retro 実行記録"]), [
 			"retro 実行記録",
 		]);
+	});
+});
+
+describe("extractRelativeMarkdownLinks", () => {
+	it("extracts sibling and parent-relative markdown link targets (#1231 follow-up)", () => {
+		const text =
+			"see [a](sibling-case.md) and [b](../pfd-retro.md) and [c](./nested/other.md)";
+		assert.deepEqual(extractRelativeMarkdownLinks(text), [
+			"sibling-case.md",
+			"../pfd-retro.md",
+			"./nested/other.md",
+		]);
+	});
+
+	it("leaves the repo-relative prefixes to extractPathReferences", () => {
+		const text =
+			"see [a](docs/spec/spec.md) and [b](.claude/skills/x/SKILL.md) and [c](scripts/x.mjs) and [d](packages/cli/src/i.ts)";
+		assert.deepEqual(extractRelativeMarkdownLinks(text), []);
+	});
+
+	it("ignores absolute URLs, root-absolute paths and in-page anchors", () => {
+		const text =
+			"[a](https://example.com/x.md) [b](http://e.com/y.md) [c](/abs/z.md) [d](#section) [e](mailto:x@e.invalid)";
+		assert.deepEqual(extractRelativeMarkdownLinks(text), []);
+	});
+
+	it("ignores non-markdown targets, which this check cannot resolve", () => {
+		const text = "[a](image.png) [b](../data.json)";
+		assert.deepEqual(extractRelativeMarkdownLinks(text), []);
+	});
+
+	it("drops an anchor suffix so the file part can be resolved", () => {
+		assert.deepEqual(
+			extractRelativeMarkdownLinks("[a](../pfd-retro.md#出力)"),
+			["../pfd-retro.md"],
+		);
+	});
+
+	it("ignores links inside fenced blocks, as the path check does", () => {
+		const text = "```\n[a](sibling-case.md)\n```\n[b](real-case.md)\n";
+		assert.deepEqual(extractRelativeMarkdownLinks(text), ["real-case.md"]);
+	});
+
+	it("deduplicates repeated targets", () => {
+		const text = "[a](../pfd-retro.md) [b](../pfd-retro.md)";
+		assert.deepEqual(extractRelativeMarkdownLinks(text), ["../pfd-retro.md"]);
+	});
+});
+
+describe("extractRelativeMarkdownLinks title attributes", () => {
+	it("extracts a target carrying a title attribute", () => {
+		assert.deepEqual(
+			extractRelativeMarkdownLinks('[a](../pfd-retro.md "current procedure")'),
+			["../pfd-retro.md"],
+		);
+	});
+
+	it("extracts a target carrying both an anchor and a title", () => {
+		assert.deepEqual(
+			extractRelativeMarkdownLinks('[a](../pfd-retro.md#出力 "out")'),
+			["../pfd-retro.md"],
+		);
 	});
 });

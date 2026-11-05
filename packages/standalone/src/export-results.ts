@@ -1,0 +1,52 @@
+import type { ExportResult } from "@pfdsl/editor";
+import type { NoticeParts } from "./notice.js";
+export type ExportResultPresenter = (
+	name: string,
+	revision: number,
+	results: ExportResult[],
+	noticeName?: string,
+) => void;
+/** Results outlive their originating tab and remain until explicitly dismissed. */
+export function createExportResults(
+	parent: HTMLElement,
+	report: (message: string) => void,
+	reportNotice?: (notice: NoticeParts) => void,
+): ExportResultPresenter {
+	const document = parent.ownerDocument;
+	let panel: HTMLElement | undefined;
+	return (name, revision, results, noticeName = name) => {
+		if (!panel) {
+			panel = document.createElement("section");
+			panel.className = "export-results";
+			panel.setAttribute("aria-label", "Export results");
+			parent.append(panel);
+		}
+		const batch = document.createElement("section");
+		const heading = document.createElement("h2");
+		heading.textContent = `${name} — export of editor revision ${revision}`;
+		const close = document.createElement("button");
+		close.textContent = "Dismiss";
+		close.onclick = () => {
+			batch.remove();
+			if (!panel?.children.length) {
+				panel?.remove();
+				panel = undefined;
+			}
+		};
+		const list = document.createElement("ul");
+		for (const result of results) {
+			const item = document.createElement("li");
+			item.textContent = `${result.format.toUpperCase()}: ${result.status === "saved" ? `Saved ${result.savedPath}` : `${result.status}: ${result.error}`}${result.warnings.length ? ` — Warning: ${result.warnings.join("; ")}` : ""}`;
+			list.append(item);
+		}
+		batch.append(heading, close, list);
+		panel.append(batch);
+		const notice = {
+			before: "Export ",
+			subject: noticeName,
+			after: `: ${results.filter((r) => r.status === "saved").length}/${results.length} saved. See export results for paths and failures.`,
+		};
+		if (reportNotice) reportNotice(notice);
+		else report(notice.before + notice.subject + notice.after);
+	};
+}

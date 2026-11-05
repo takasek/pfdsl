@@ -1,41 +1,57 @@
-import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
+import { parseArgs as parseNodeArgs } from "node:util";
 import {
 	analyze,
 	auditGraph,
 	type ConsumerAsymmetryHint,
+	collectSubflowRefs,
+	compareIds,
 	computeDependsOn,
 	computeImpact,
 	computeNeighbors,
 	computeOpenInputs,
+	computeOrphans,
 	computePaths,
 	computeStats,
 	computeTerminals,
 	diffGraphs as coreDiffGraphs,
+	type DependencyClosure,
 	DIAGNOSTIC_REGISTRY,
 	type Diagnostic,
 	type DiagnosticRegistryEntry,
 	type DiffReport,
-	escapeRe,
+	deleteNodes,
 	format,
 	formatEdges,
+	type GraphNeighbor,
+	type GraphOrphan,
+	type GroupMeta,
 	groupEdges,
 	hasErrors,
 	type IndexChange,
+	insertDefinition,
+	isRoadmapType,
 	isUrlLike,
-	loadExtendsChain,
-	loadSubflowGraph,
+	loadDependencyClosure,
+	loadFrontmatter,
+	locateNode,
 	type NodeKind,
 	type PfdType,
+	parentBoundaryArtifacts,
+	parseIdList,
+	type ReferenceContext,
+	type ReferenceFailure,
 	reindex,
+	rename,
+	resolveArtifactSnapshot,
 	resolveEffectiveFrontmatter,
-	resolveLocationFsPath,
-	resolveRefPath,
+	resolveLoadedPresentation,
 	type SortKey,
 	STATUS_VALUES,
+	setFrontmatterField,
 	sort,
 	sortEdges,
-	validatePresetKeys,
 	validateSubflowBoundary,
 	wrapPresetSource,
 } from "@pfdsl/core";
@@ -45,6 +61,21 @@ import {
 	renderDiff,
 	renderGraph,
 } from "@pfdsl/preview-engine";
+import {
+	type CommandEntry,
+	defineCommand,
+	type OptionSpec,
+} from "./command-definition.js";
+import { comparableBlocked, comparableReady, pruneTargets } from "./prune.js";
+import {
+	checkSnapshotPath,
+	hasExplicitReferences,
+	modelDependencyPath,
+	readReferenceContext,
+	referenceFailureResult,
+	resolveCheckedReference,
+	STATIC_REFERENCE_NOTICE,
+} from "./reference-context.js";
 
 export interface CommandResult {
 	stdout: string;
@@ -52,6 +83,235 @@ export interface CommandResult {
 	exitCode: number;
 	binaryOutput?: Buffer;
 }
+
+const BOOLEAN_OPTION = { type: "boolean" } as const;
+const REFERENCE_CONTEXT_OPTIONS = {
+	"reference-context": { type: "string", placeholder: "file" },
+} as const;
+function referenceContextOption(flags: Record<string, unknown>): {
+	referenceContext?: string;
+} {
+	const value = flags["reference-context"];
+	return typeof value === "string" ? { referenceContext: value } : {};
+}
+const COMMON_OPTIONS: Record<string, OptionSpec> = {
+	help: BOOLEAN_OPTION,
+};
+const NO_OPTIONS = {};
+
+function formatSynopsisFlag(name: string, spec: OptionSpec): string {
+	if (spec.type === "boolean")
+		return spec.required ? `--${name}` : `[--${name}]`;
+	const placeholder = spec.placeholder ?? name;
+	const value = placeholder.includes("|") ? placeholder : `<${placeholder}>`;
+	const option = `--${name} ${value}`;
+	return spec.required ? option : `[${option}]`;
+}
+
+function formatSynopsisFlags(
+	options: Record<string, OptionSpec>,
+	positionalSuffix = "",
+): string {
+	const entries = Object.entries(options).map(([name, spec]) =>
+		formatSynopsisFlag(name, spec),
+	);
+	if (positionalSuffix) {
+		const outputOptionIndex = Object.keys(options).findIndex(
+			(name) => name === "json" || name === "no-color",
+		);
+		entries.splice(
+			outputOptionIndex === -1 ? entries.length : outputOptionIndex,
+			0,
+			positionalSuffix,
+		);
+	}
+	return entries.length > 0 ? ` ${entries.join(" ")}` : "";
+}
+
+function commandSynopsis(
+	path: string,
+	positional: string,
+	options: Record<string, OptionSpec>,
+	positionalSuffix = "",
+): string {
+	const parts = [
+		path,
+		positional,
+		formatSynopsisFlags(options, positionalSuffix),
+	]
+		.map((part) => part.trim())
+		.filter((part) => part.length > 0);
+	return parts.join(" ");
+}
+
+function helpUsage(
+	path: string,
+	positional: string,
+	options: Record<string, OptionSpec>,
+	positionalSuffix = "",
+): string {
+	return `usage: pfdsl ${commandSynopsis(path, positional, options, positionalSuffix)}`;
+}
+
+const GRAPH_SUMMARY_OPTIONS = {
+	json: BOOLEAN_OPTION,
+	"no-color": BOOLEAN_OPTION,
+};
+const GRAPH_IO_OPTIONS = {
+	json: BOOLEAN_OPTION,
+	"no-color": BOOLEAN_OPTION,
+};
+const GRAPH_STATS_OPTIONS = {
+	limit: { type: "string", multiple: true, placeholder: "n" },
+	json: BOOLEAN_OPTION,
+	"no-color": BOOLEAN_OPTION,
+} as const;
+const GRAPH_NEIGHBORS_OPTIONS = {
+	json: BOOLEAN_OPTION,
+	"no-color": BOOLEAN_OPTION,
+};
+const GRAPH_LOCATE_OPTIONS = {
+	field: { type: "string", multiple: true, placeholder: "name[,name...]" },
+	json: BOOLEAN_OPTION,
+	"no-color": BOOLEAN_OPTION,
+} as const;
+const GRAPH_DESCRIBE_OPTIONS = {
+	...REFERENCE_CONTEXT_OPTIONS,
+	json: BOOLEAN_OPTION,
+	"no-color": BOOLEAN_OPTION,
+};
+const GRAPH_IMPACT_OPTIONS = {
+	json: BOOLEAN_OPTION,
+	"no-color": BOOLEAN_OPTION,
+};
+const GRAPH_DEPENDS_ON_OPTIONS = {
+	json: BOOLEAN_OPTION,
+	"no-color": BOOLEAN_OPTION,
+};
+const GRAPH_PATH_OPTIONS = {
+	limit: { type: "string", multiple: true, placeholder: "n" },
+	json: BOOLEAN_OPTION,
+	"no-color": BOOLEAN_OPTION,
+} as const;
+const GRAPH_EDGES_OPTIONS = {
+	json: BOOLEAN_OPTION,
+	"no-color": BOOLEAN_OPTION,
+};
+const GRAPH_ORPHANS_OPTIONS = {
+	json: BOOLEAN_OPTION,
+	"no-color": BOOLEAN_OPTION,
+};
+
+const META_GET_OPTIONS = {
+	...REFERENCE_CONTEXT_OPTIONS,
+	json: BOOLEAN_OPTION,
+	"no-color": BOOLEAN_OPTION,
+};
+const META_LIST_OPTIONS = {
+	...REFERENCE_CONTEXT_OPTIONS,
+	tag: { type: "string", multiple: true, placeholder: "t[,t...]" },
+	group: { type: "string", multiple: true, placeholder: "g" },
+	producer: { type: "string", multiple: true, placeholder: "p" },
+	json: BOOLEAN_OPTION,
+	"no-color": BOOLEAN_OPTION,
+} as const;
+const META_VALUES_OPTIONS = {
+	json: BOOLEAN_OPTION,
+	"no-color": BOOLEAN_OPTION,
+};
+const META_SET_OPTIONS = {
+	"allow-unknown": BOOLEAN_OPTION,
+	json: BOOLEAN_OPTION,
+	"no-color": BOOLEAN_OPTION,
+};
+const META_CREATE_OPTIONS = {
+	write: BOOLEAN_OPTION,
+	json: BOOLEAN_OPTION,
+	"allow-unknown": BOOLEAN_OPTION,
+	"no-color": BOOLEAN_OPTION,
+};
+const META_SORT_OPTIONS = {
+	by: { type: "string", multiple: true, placeholder: "keys", required: true },
+	write: BOOLEAN_OPTION,
+	check: BOOLEAN_OPTION,
+	"no-color": BOOLEAN_OPTION,
+} as const;
+const META_REINDEX_OPTIONS = {
+	write: BOOLEAN_OPTION,
+	check: BOOLEAN_OPTION,
+	renumber: BOOLEAN_OPTION,
+	json: BOOLEAN_OPTION,
+	"no-color": BOOLEAN_OPTION,
+};
+const META_CHECK_LINKS_OPTIONS = {
+	...REFERENCE_CONTEXT_OPTIONS,
+	json: BOOLEAN_OPTION,
+	"no-color": BOOLEAN_OPTION,
+};
+
+const STATUS_READY_OPTIONS = {
+	"no-counts": BOOLEAN_OPTION,
+	json: BOOLEAN_OPTION,
+	"no-color": BOOLEAN_OPTION,
+};
+const STATUS_BLOCKED_OPTIONS = {
+	json: BOOLEAN_OPTION,
+	"no-color": BOOLEAN_OPTION,
+};
+const STATUS_LIST_OPTIONS = {
+	status: {
+		type: "string",
+		multiple: true,
+		placeholder: "status[,status...]",
+		required: true,
+	},
+	json: BOOLEAN_OPTION,
+	"no-color": BOOLEAN_OPTION,
+} as const;
+const STATUS_GAPS_OPTIONS = {
+	json: BOOLEAN_OPTION,
+	"no-color": BOOLEAN_OPTION,
+};
+
+const CHECK_OPTIONS = {
+	...REFERENCE_CONTEXT_OPTIONS,
+	strict: BOOLEAN_OPTION,
+	hints: BOOLEAN_OPTION,
+	json: BOOLEAN_OPTION,
+	"no-color": BOOLEAN_OPTION,
+};
+const EXPLAIN_OPTIONS = NO_OPTIONS;
+const FMT_OPTIONS = {
+	write: BOOLEAN_OPTION,
+	check: BOOLEAN_OPTION,
+	"no-color": BOOLEAN_OPTION,
+};
+const DELETE_OPTIONS = {
+	write: BOOLEAN_OPTION,
+	json: BOOLEAN_OPTION,
+	"no-color": BOOLEAN_OPTION,
+};
+const PRUNE_OPTIONS = {
+	write: BOOLEAN_OPTION,
+	check: BOOLEAN_OPTION,
+	json: BOOLEAN_OPTION,
+	"no-color": BOOLEAN_OPTION,
+};
+const RENAME_OPTIONS = {
+	write: BOOLEAN_OPTION,
+	json: BOOLEAN_OPTION,
+	"no-color": BOOLEAN_OPTION,
+};
+const RENDER_OPTIONS = {
+	...REFERENCE_CONTEXT_OPTIONS,
+	format: { type: "string", multiple: true, placeholder: "dot|svg|pdf|png" },
+	"no-color": BOOLEAN_OPTION,
+} as const;
+const DIFF_OPTIONS = {
+	format: { type: "string", multiple: true, placeholder: "text|dot|svg" },
+	json: BOOLEAN_OPTION,
+	"no-color": BOOLEAN_OPTION,
+} as const;
 
 function ok(stdout = "", stderr = ""): CommandResult {
 	return { stdout, stderr, exitCode: 0 };
@@ -92,13 +352,35 @@ export function shouldColorize(input: ShouldColorizeInput): boolean {
 	return Boolean(input.stream.isTTY);
 }
 
+/**
+ * The process-level inputs the CLI reads. Held behind an interface so a test
+ * can hand the CLI a stdin and a TTY state directly, instead of patching
+ * node:fs and process.stdout out from under it.
+ */
+export interface CliHost {
+	/** Reads standard input, for a `-` file argument. */
+	readStdin(): string;
+	/** The stream colour would be written to. */
+	stdout: { isTTY?: boolean };
+	/** The environment consulted for NO_COLOR. */
+	env: { NO_COLOR?: string };
+}
+
+const nodeHost: CliHost = {
+	readStdin: () => readFileSync(0, "utf-8"),
+	stdout: process.stdout,
+	env: process.env,
+};
+
+let host: CliHost = nodeHost;
+
 function isCommandResult(v: string | CommandResult): v is CommandResult {
 	return typeof v === "object";
 }
 
 function readSource(file: string): string | CommandResult {
 	if (file === "-") {
-		return readFileSync(0, "utf-8");
+		return host.readStdin();
 	}
 	try {
 		return readFileSync(file, "utf-8");
@@ -118,17 +400,48 @@ function readSource(file: string): string | CommandResult {
  * Shared file loader for `loadExtendsChain` and `loadSubflowGraph`: reads +
  * analyzes a file by absolute path.
  */
-function fileLoader(path: string): ReturnType<typeof analyze> | null {
+function fileLoader(
+	path: string,
+	strict = false,
+): ReturnType<typeof analyze> | null {
 	try {
 		const src = readFileSync(path, "utf-8");
-		return analyze(wrapPresetSource(path, src));
+		const wrapped = wrapPresetSource(path, src);
+		const result = analyze(wrapped, strict ? { strict: true } : undefined);
+		if (wrapped !== src) {
+			// Raw YAML presets gain a synthetic opening fence for analysis.
+			result.diagnostics = result.diagnostics.map((diagnostic) => ({
+				...diagnostic,
+				range: {
+					start: {
+						...diagnostic.range.start,
+						line: Math.max(1, diagnostic.range.start.line - 1),
+						offset: Math.max(0, diagnostic.range.start.offset - 4),
+					},
+					end: {
+						...diagnostic.range.end,
+						line: Math.max(1, diagnostic.range.end.line - 1),
+						offset: Math.max(0, diagnostic.range.end.offset - 4),
+					},
+				},
+			}));
+		}
+		return result;
 	} catch {
 		return null;
 	}
 }
 
-function diagText(diags: Diagnostic[], file: string, color = false): string {
-	return `${diags.map((d) => formatDiagnostic(d, file, color)).join("\n")}\n`;
+/**
+ * One line per diagnostic. A diagnostic that carries a `file` belongs to that
+ * file; the rest belong to `file`, the one the command was given.
+ */
+function diagText(
+	diags: (Diagnostic & { file?: string })[],
+	file: string,
+	color = false,
+): string {
+	return `${diags.map((d) => formatDiagnostic(d, d.file ?? file, color)).join("\n")}\n`;
 }
 
 /**
@@ -147,7 +460,7 @@ function failJson(
 }
 
 function failIfErrors(
-	diags: Diagnostic[],
+	diags: (Diagnostic & { file?: string })[],
 	file: string,
 	json = false,
 	color = false,
@@ -158,7 +471,46 @@ function failIfErrors(
 	return fail(diagText(errs, file, color));
 }
 
+/**
+ * An exit-1 refusal: `message`, preceded by the error diagnostics that
+ * caused it when there are any. With --json: `{ ok: false, error }`, plus
+ * `diagnostics` when given.
+ */
+function refuseWith(
+	message: string,
+	file: string,
+	errs: (Diagnostic & { file?: string })[] | undefined,
+	json = false,
+	color = false,
+): CommandResult {
+	if (json) {
+		return failJson(
+			errs ? { error: message, diagnostics: errs } : { error: message },
+		);
+	}
+	const diagLines = errs ? diagText(errs, file, color) : "";
+	return fail(`${diagLines}${message}\n`);
+}
+
+/**
+ * Refuse an operation that only a roadmap may take part in (§15.14). `subject`
+ * names what is being refused and opens the message. An omitted `type:` reads
+ * as roadmap, so only an explicit other kind is turned away — the callers all
+ * defer to `isRoadmapType` for that, rather than each restating the condition.
+ */
+function requireRoadmapType(
+	pfdType: PfdType | undefined,
+	subject: string,
+): CommandResult | null {
+	if (isRoadmapType(pfdType)) return null;
+	return fail(
+		`${subject} requires a roadmap file (type: roadmap). This file has type: ${pfdType}\n`,
+		2,
+	);
+}
+
 export interface CheckOptions {
+	referenceContext?: string;
 	hints?: boolean;
 	strict?: boolean;
 	json?: boolean;
@@ -168,10 +520,22 @@ export interface CheckOptions {
 export function runCheck(file: string, opts: CheckOptions = {}): CommandResult {
 	const src = readSource(file);
 	if (isCommandResult(src)) return src;
-	const { diagnostics, edges, nodeKinds, frontmatter } = analyze(
-		src,
-		opts.strict ? { strict: true } : undefined,
-	);
+	return checkSource(src, file, opts);
+}
+
+function checkSource(
+	src: string,
+	file: string,
+	opts: CheckOptions,
+): CommandResult {
+	const entryResult = analyze(src, opts.strict ? { strict: true } : undefined);
+	const { diagnostics, edges, nodeKinds, frontmatter } = entryResult;
+	const contextResult = readReferenceContext(opts.referenceContext);
+	if (!contextResult.ok)
+		return referenceFailureResult([contextResult], opts.json);
+	const context = contextResult.context;
+	let referenceNotice =
+		context !== undefined || hasExplicitReferences(frontmatter);
 	const lines = diagnostics.map((d) => formatDiagnostic(d, file, opts.color));
 	if (hasErrors(diagnostics)) {
 		if (opts.json) {
@@ -186,67 +550,50 @@ export function runCheck(file: string, opts: CheckOptions = {}): CommandResult {
 	}
 
 	// Multi-file checks (subflow + extends) — only run when single-file is clean.
-	// Skipped for stdin (-): relative paths cannot be resolved without a base file.
-	if (file === "-") {
+	// Legacy stdin has no base file; an explicit context supplies a logical position.
+	if (file === "-" && !context) {
 		if (opts.json) {
 			return {
-				stdout: `${JSON.stringify({ ok: true, diagnostics })}\n`,
+				stdout: `${JSON.stringify({ ok: true, diagnostics, ...(referenceNotice ? { referenceResolution: "not-checked" } : {}) })}\n`,
 				stderr: "",
 				exitCode: 0,
 			};
 		}
 		return {
 			stdout: lines.length ? `${lines.join("\n")}\n` : "OK\n",
-			stderr: "",
+			stderr: referenceNotice ? `${STATIC_REFERENCE_NOTICE}\n` : "",
 			exitCode: 0,
 		};
 	}
-	const absFile = resolve(file);
-	const multiDiags: Diagnostic[] = [];
-
-	// --- Subflow checks ---
-	const subflowGraph = loadSubflowGraph(absFile, fileLoader);
-	multiDiags.push(...subflowGraph.diagnostics);
-
-	for (const [pid, pmeta] of Object.entries(frontmatter?.process ?? {})) {
-		if (typeof pmeta.subflow !== "string") continue;
-		const resolved = resolveRefPath(absFile, pmeta.subflow);
-		if (!resolved.ok) continue; // already in subflowGraph.diagnostics
-		const childDoc = subflowGraph.docs.get(resolved.path);
-		if (!childDoc) continue; // missing file — already in diagnostics
-		const childEdges = childDoc.edges;
-		const childOpenInputs = computeOpenInputs(childEdges);
-		const childTerminals = computeTerminals(childEdges);
-		const parentNormalInputs = new Set(
-			edges
-				.filter((e) => e.kind === "input" && e.process === pid)
-				.map((e) => e.artifact),
-		);
-		const parentOutputs = new Set(
-			edges
-				.filter((e) => e.kind === "output" && e.process === pid)
-				.map((e) => e.artifact),
-		);
-		multiDiags.push(
-			...validateSubflowBoundary({
-				processId: pid,
-				parentNormalInputs,
-				parentOutputs,
-				boundaryMap: (pmeta.boundary as Record<string, string>) ?? {},
-				childOpenInputs,
-				childTerminals,
-			}),
-		);
-	}
-
-	// --- Extends checks ---
-	const extendsChain = loadExtendsChain(absFile, fileLoader);
-	multiDiags.push(...extendsChain.diagnostics);
-
-	for (const [path, doc] of extendsChain.docs) {
-		if (path === absFile) continue; // skip entry file itself
-		multiDiags.push(...validatePresetKeys(path, doc.frontmatter));
-	}
+	const dependencyPath = modelDependencyPath(file, frontmatter, context);
+	if (!dependencyPath.ok)
+		return referenceFailureResult([dependencyPath], opts.json);
+	const absFile = dependencyPath.path;
+	const dependencyFailures: ReferenceFailure[] = [];
+	const reader = editedDependencyLoader(absFile, entryResult, (path) =>
+		fileLoader(path, opts.strict),
+	);
+	const closure = loadDependencyClosure(absFile, (path) => {
+		if (path === absFile) return entryResult;
+		if (context?.basis) {
+			const failure = checkSnapshotPath(context.basis.root, path);
+			if (failure) {
+				dependencyFailures.push(failure);
+				return null;
+			}
+		}
+		const loaded = reader.load(path);
+		if (loaded && hasExplicitReferences(loaded.frontmatter))
+			referenceNotice = true;
+		return loaded;
+	});
+	if (dependencyFailures.length)
+		return referenceFailureResult(dependencyFailures, opts.json);
+	const multiDiags = [
+		...closure.diagnostics,
+		...closure.localDiagnostics.filter((d) => d.file !== undefined),
+		...closure.presetDiagnostics,
+	];
 
 	if (hasErrors(multiDiags)) {
 		const errs = multiDiags.filter((d) => d.severity === "error");
@@ -258,7 +605,7 @@ export function runCheck(file: string, opts: CheckOptions = {}): CommandResult {
 			};
 		}
 		return fail(
-			`${errs.map((d) => formatDiagnostic(d, file, opts.color)).join("\n")}\n`,
+			`${errs.map((d) => formatDiagnostic(d, d.file ?? file, opts.color)).join("\n")}\n`,
 		);
 	}
 
@@ -290,6 +637,7 @@ export function runCheck(file: string, opts: CheckOptions = {}): CommandResult {
 		const payload: Record<string, unknown> = {
 			ok: true,
 			diagnostics: allDiags,
+			...(referenceNotice ? { referenceResolution: "not-checked" } : {}),
 		};
 		if (opts.hints) {
 			payload.hints = hints;
@@ -304,12 +652,12 @@ export function runCheck(file: string, opts: CheckOptions = {}): CommandResult {
 
 	const allLines = [
 		...lines,
-		...multiDiags.map((d) => formatDiagnostic(d, file, opts.color)),
+		...multiDiags.map((d) => formatDiagnostic(d, d.file ?? file, opts.color)),
 		...extraLines,
 	];
 	return {
 		stdout: allLines.length ? `${allLines.join("\n")}\n` : "OK\n",
-		stderr: "",
+		stderr: referenceNotice ? `${STATIC_REFERENCE_NOTICE}\n` : "",
 		exitCode: 0,
 	};
 }
@@ -331,19 +679,434 @@ export function runFmt(file: string, opts: FmtOptions = {}): CommandResult {
 	const { output, diagnostics } = format(source, { style: "flows" });
 	const failed = failIfErrors(diagnostics, file, undefined, opts.color);
 	if (failed) return failed;
+	const inlineCommentWarnings = diagnostics.filter((d) => d.code === "FM003");
+	const warningText = inlineCommentWarnings.length
+		? diagText(inlineCommentWarnings, file, opts.color)
+		: "";
 	if (opts.check) {
 		const changed = output !== source;
 		return {
 			stdout: changed ? "not formatted\n" : "",
-			stderr: "",
+			stderr: warningText,
 			exitCode: changed ? 1 : 0,
 		};
 	}
 	if (opts.write) {
 		writeFileSync(file, output, "utf-8");
-		return ok();
+		return { stdout: "", stderr: warningText, exitCode: 0 };
 	}
+	return { stdout: output, stderr: warningText, exitCode: 0 };
+}
+
+export interface DeleteOptions {
+	write?: boolean;
+	json?: boolean;
+	color?: boolean;
+}
+
+/** Only missing or unreadable presentation sources prevent reliable group classification. */
+function unsafePresentationDiagnostics(
+	closure: DependencyClosure<ReturnType<typeof analyze>>,
+) {
+	return [
+		...closure.diagnostics.filter((d) => d.code === "V026"),
+		...closure.localDiagnostics.filter(
+			(d) =>
+				d.file !== undefined && closure.docs.get(d.file)?.frontmatter === null,
+		),
+	].filter((d) => d.severity === "error");
+}
+
+/** Use the edited snapshot for every disk alias affected by this file's write. */
+function editedDependencyLoader(
+	entry: string,
+	after: ReturnType<typeof analyze>,
+	load: (path: string) => ReturnType<typeof analyze> | null,
+) {
+	// Writes also affect symlinks and hardlinks to the edited file. Use the
+	// result snapshot for those aliases, rather than reading their old bytes.
+	const identity = (path: string) => {
+		try {
+			const stat = statSync(path);
+			return `${stat.dev}:${stat.ino}`;
+		} catch {
+			return null;
+		}
+	};
+	const entryIdentity = identity(entry);
+	const aliases = new Map<string, boolean>([[entry, true]]);
+	const isEntry = (path: string) => {
+		if (!aliases.has(path))
+			aliases.set(
+				path,
+				entryIdentity !== null && identity(path) === entryIdentity,
+			);
+		return aliases.get(path)!;
+	};
+	return {
+		isEntry,
+		load: (path: string) => (isEntry(path) ? after : load(path)),
+	};
+}
+
+/** Compare only reachable references back to an entry whose exposed boundary changed. */
+function introducedReturnBoundaryErrors(
+	entry: string,
+	before: ReturnType<typeof analyze>,
+	after: ReturnType<typeof analyze>,
+	load: (path: string) => ReturnType<typeof analyze> | null,
+): Diagnostic[] {
+	const signature = (doc: typeof before) =>
+		JSON.stringify([
+			[...computeOpenInputs(doc.edges)].sort(),
+			[...computeTerminals(doc.edges)].sort(),
+		]);
+	if (
+		signature(before) === signature(after) ||
+		collectSubflowRefs(after.frontmatter ?? {}).length === 0
+	)
+		return [];
+	const reader = editedDependencyLoader(entry, after, load);
+	const { isEntry } = reader;
+	const closure = loadDependencyClosure(entry, reader.load);
+	const errors: Diagnostic[] = [];
+	for (const ref of closure.references) {
+		if (
+			ref.kind !== "subflow" ||
+			ref.to === undefined ||
+			!isEntry(ref.to) ||
+			ref.process === undefined
+		)
+			continue;
+		const pid = ref.process;
+		const savedParent = closure.docs.get(ref.from)!;
+		const validate = (parent: typeof before, child: typeof before) => {
+			const { inputs, outputs } = parentBoundaryArtifacts(parent.edges, pid);
+			return validateSubflowBoundary({
+				processId: pid,
+				parentNormalInputs: inputs,
+				parentOutputs: outputs,
+				boundaryMap: parent.frontmatter?.process?.[pid]?.boundary ?? {},
+				childOpenInputs: computeOpenInputs(child.edges),
+				childTerminals: computeTerminals(child.edges),
+			});
+		};
+		const previous = new Set(
+			validate(isEntry(ref.from) ? before : savedParent, before).map((d) =>
+				JSON.stringify([d.code, d.message]),
+			),
+		);
+		errors.push(
+			...validate(savedParent, after)
+				.filter((d) => !previous.has(JSON.stringify([d.code, d.message])))
+				.map((d) => (ref.from === entry ? d : { ...d, file: ref.from })),
+		);
+	}
+	return errors;
+}
+
+/**
+ * `deleteNodes` leaves output untouched when the input already has an error.
+ * Its resulting notFound is not evidence that the requested IDs are absent,
+ * so failIfErrors takes over before deleted/notFound are read.
+ */
+export function runDelete(
+	file: string,
+	idList: string,
+	opts: DeleteOptions = {},
+): CommandResult {
+	if (file === "-" && opts.write) {
+		return fail("--write cannot be used with stdin (-)\n", 2);
+	}
+	const ids = parseIdList(idList);
+	if (ids.length === 0) return fail(HELP_DELETE, 2);
+
+	const source = readSource(file);
+	if (isCommandResult(source)) return source;
+
+	const analysis = analyze(source);
+	const absFile = file === "-" ? null : resolve(file);
+	const loaded = new Map<string, ReturnType<typeof analyze> | null>();
+	const load = (path: string) => {
+		if (path === absFile) return analysis;
+		if (!loaded.has(path)) loaded.set(path, fileLoader(path));
+		return loaded.get(path) ?? null;
+	};
+	const failedInput = failIfErrors(
+		analysis.diagnostics,
+		file,
+		opts.json,
+		opts.color,
+	);
+	if (failedInput) return failedInput;
+	const refuse = (error: string, errs?: Diagnostic[]): CommandResult =>
+		refuseWith(error, file, errs, opts.json, opts.color);
+	let groups: Record<string, GroupMeta> | undefined;
+	const deletedGroupIds = new Set(
+		ids.filter((id) => Object.hasOwn(analysis.frontmatter?.group ?? {}, id)),
+	);
+	const needsPresetGroups =
+		deletedGroupIds.size > 0 || ids.some((id) => !analysis.nodeKinds.has(id));
+	if (analysis.frontmatter?.extends !== undefined && needsPresetGroups) {
+		if (absFile === null)
+			return refuse(
+				"delete: group deletion with extends requires a file path so preset ancestors can be resolved",
+			);
+		const closure = loadDependencyClosure(absFile, load, { subflows: false });
+		const { docs } = closure;
+		const errors = unsafePresentationDiagnostics(closure);
+		if (errors.length > 0) {
+			return opts.json
+				? failJson({ diagnostics: errors })
+				: fail(
+						`${errors.map((d) => formatDiagnostic(d, d.file ?? file, opts.color)).join("\n")}\n`,
+					);
+		}
+		const presetGroups =
+			resolveLoadedPresentation(absFile, docs, {
+				excludeEntry: true,
+			}).group ?? {};
+		for (const id of ids) {
+			if (Object.hasOwn(presetGroups, id) && !analysis.nodeKinds.has(id)) {
+				return refuse(
+					`delete: '${id}' comes from a preset and cannot be deleted in this file; edit its declaration in the preset`,
+				);
+			}
+			if (
+				Object.hasOwn(analysis.frontmatter.group ?? {}, id) &&
+				Object.hasOwn(presetGroups, id)
+			)
+				return refuse(
+					`delete: '${id}' is also defined by a preset; the local entry is a partial override and cannot delete that group here`,
+				);
+		}
+		groups = resolveLoadedPresentation(absFile, docs).group;
+		for (const [childId, meta] of Object.entries(presetGroups)) {
+			const parent = groups?.[childId]?.parent;
+			if (
+				typeof meta.parent !== "string" ||
+				parent === undefined ||
+				!deletedGroupIds.has(parent)
+			)
+				continue;
+			let ancestor = groups?.[parent]?.parent;
+			const visited = new Set<string>();
+			while (ancestor !== undefined && deletedGroupIds.has(ancestor)) {
+				if (visited.has(ancestor))
+					return refuse(
+						"delete: the affected group parent chain is circular; update the preset relationship first",
+					);
+				visited.add(ancestor);
+				ancestor = groups?.[ancestor]?.parent;
+			}
+			const localParent = Object.hasOwn(
+				analysis.frontmatter.group?.[childId] ?? {},
+				"parent",
+			);
+			if (
+				!localParent ||
+				ancestor === undefined ||
+				!Object.hasOwn(groups ?? {}, ancestor)
+			) {
+				return refuse(
+					`delete: '${childId}' has a parent relationship supplied by a preset that cannot be cleared or updated here; update that preset relationship before deleting the group`,
+				);
+			}
+		}
+	}
+	const { output, deleted, notFound, diagnostics, refusal } = deleteNodes(
+		source,
+		ids,
+		groups === undefined ? {} : { groups },
+	);
+	const failed = failIfErrors(diagnostics, file, opts.json, opts.color);
+	if (failed) return failed;
+	if (refusal)
+		return refuse(
+			`delete: YAML anchors, aliases and merge keys (<<) are not supported; expand them before deleting IDs in ${file}; nothing was written`,
+		);
+	if (absFile !== null && deleted.length > 0) {
+		const resultAnalysis = analyze(output);
+		const changed = Object.entries(
+			resultAnalysis.frontmatter?.process ?? {},
+		).filter(([pid, meta]) => {
+			if (typeof meta.subflow !== "string") return false;
+			const before = parentBoundaryArtifacts(analysis.edges, pid);
+			const after = parentBoundaryArtifacts(resultAnalysis.edges, pid);
+			const signature = (
+				boundary: ReturnType<typeof parentBoundaryArtifacts>,
+			) =>
+				JSON.stringify([
+					[...boundary.inputs].sort(),
+					[...boundary.outputs].sort(),
+				]);
+			return (
+				signature(before) !== signature(after) ||
+				JSON.stringify(analysis.frontmatter?.process?.[pid]?.boundary ?? {}) !==
+					JSON.stringify(meta.boundary ?? {})
+			);
+		});
+		if (changed.length > 0) {
+			const reader = editedDependencyLoader(absFile, resultAnalysis, load);
+			const closure = loadDependencyClosure(absFile, reader.load);
+			const errors: Diagnostic[] = [];
+			for (const [pid, meta] of changed) {
+				const childRef = closure.references.find(
+					(ref) =>
+						ref.kind === "subflow" &&
+						ref.from === absFile &&
+						ref.process === pid,
+				);
+				const child = childRef?.to ? closure.docs.get(childRef.to) : undefined;
+				if (
+					!child ||
+					child.diagnostics.some(
+						(d) => d.severity === "error" && /^[LPN]/.test(d.code),
+					)
+				) {
+					return refuse(
+						`delete: cannot validate the changed boundary of '${pid}'; its subflow is missing or cannot be parsed; nothing was written`,
+					);
+				}
+				const { inputs, outputs } = parentBoundaryArtifacts(
+					resultAnalysis.edges,
+					pid,
+				);
+				errors.push(
+					...validateSubflowBoundary({
+						processId: pid,
+						parentNormalInputs: inputs,
+						parentOutputs: outputs,
+						boundaryMap: meta.boundary ?? {},
+						childOpenInputs: computeOpenInputs(child.edges),
+						childTerminals: computeTerminals(child.edges),
+					}),
+				);
+			}
+			const failedBoundary = failIfErrors(errors, file, opts.json, opts.color);
+			if (failedBoundary) return failedBoundary;
+		}
+		const returnErrors = introducedReturnBoundaryErrors(
+			absFile,
+			analysis,
+			resultAnalysis,
+			load,
+		);
+		if (returnErrors.length > 0)
+			return refuse(
+				"delete: the edited file is also a reachable subflow; its changed boundary would break a referring process; nothing was written",
+				returnErrors,
+			);
+	}
+
+	if (opts.write) writeFileSync(file, output, "utf-8");
+
+	if (opts.json) {
+		return ok(`${JSON.stringify({ ok: true, deleted, notFound })}\n`);
+	}
+	if (opts.write) return ok("");
 	return ok(output);
+}
+
+export interface PruneOptions {
+	write?: boolean;
+	check?: boolean;
+	json?: boolean;
+	color?: boolean;
+}
+
+export function runPrune(file: string, opts: PruneOptions = {}): CommandResult {
+	if (opts.check && opts.write)
+		return fail("--check cannot be combined with --write\n", 2);
+	if (file === "-" && opts.write)
+		return fail("--write cannot be used with stdin (-)\n", 2);
+	const source = readSource(file);
+	if (isCommandResult(source)) return source;
+	const refuse = (message: string) =>
+		refuseWith(
+			`prune: ${message}; nothing was written`,
+			file,
+			undefined,
+			opts.json,
+			opts.color,
+		);
+	const checked = checkSource(source, file, opts);
+	if (checked.exitCode !== 0) return checked;
+	const before = analyze(source);
+	const typeFail = requireRoadmapType(before.frontmatter?.type, "prune");
+	if (typeFail) return typeFail;
+	if (
+		file === "-" &&
+		(before.frontmatter?.extends ||
+			collectSubflowRefs(before.frontmatter ?? {}).length > 0)
+	) {
+		return refuse("dependency validation requires a file path, not stdin (-)");
+	}
+	const queryOpts = { json: true, color: false };
+	const readyBefore = readySource(source, file, queryOpts);
+	if (readyBefore.exitCode !== 0) return readyBefore;
+	const blockedBefore = blockedSource(source, file, queryOpts);
+	if (blockedBefore.exitCode !== 0) return blockedBefore;
+	const deleted = pruneTargets(before);
+	let output = source;
+	if (deleted.length > 0) {
+		const formattedInput = format(source, { style: "flows" });
+		if (
+			hasErrors(formattedInput.diagnostics) ||
+			formattedInput.output !== source
+		)
+			return refuse("input is not canonically formatted; run pfdsl fmt first");
+		const result = deleteNodes(source, deleted);
+		const failed = failIfErrors(
+			result.diagnostics,
+			file,
+			opts.json,
+			opts.color,
+		);
+		if (failed) return failed;
+		if (result.refusal)
+			return refuse(
+				"YAML anchors, aliases and merge keys (<<) are not supported; expand them before pruning",
+			);
+		const after = analyze(result.output);
+		if (computeOrphans(after.graph).length > 0)
+			return refuse("post-prune graph orphans is non-empty");
+		// Removing producers can change canonical input order even when the
+		// original source was formatted. Format the candidate ourselves.
+		const formatted = format(result.output, { style: "flows" });
+		const formatFailure = failIfErrors(
+			formatted.diagnostics,
+			file,
+			opts.json,
+			opts.color,
+		);
+		if (formatFailure) return formatFailure;
+		output = formatted.output;
+		const verified = checkSource(output, file, opts);
+		if (verified.exitCode !== 0) return verified;
+		const readyAfter = readySource(output, file, queryOpts);
+		if (readyAfter.exitCode !== 0) return readyAfter;
+		if (
+			comparableReady(readyBefore.stdout) !== comparableReady(readyAfter.stdout)
+		)
+			return refuse("post-prune status ready output changed");
+		const blockedAfter = blockedSource(output, file, queryOpts);
+		if (blockedAfter.exitCode !== 0) return blockedAfter;
+		if (
+			comparableBlocked(blockedBefore.stdout) !==
+			comparableBlocked(blockedAfter.stdout)
+		)
+			return refuse("post-prune status blocked output changed");
+	}
+	if (opts.write && deleted.length > 0) writeFileSync(file, output, "utf-8");
+	const report = opts.json
+		? `${JSON.stringify({ ok: true, deleted })}\n`
+		: deleted.length > 0
+			? `Pruned ${deleted.length} id(s): ${deleted.join(", ")}\n`
+			: "";
+	if (opts.check)
+		return { stdout: report, stderr: "", exitCode: deleted.length > 0 ? 1 : 0 };
+	return ok(opts.write || opts.json ? report : output);
 }
 
 export interface ReindexOptions {
@@ -480,16 +1243,57 @@ export function runGraphEdges(
 }
 
 export interface ReadyOptions {
-	best?: boolean;
+	noCounts?: boolean;
 	json?: boolean;
 	color?: boolean;
+}
+
+function labelForDisplay(label: string | undefined, id: string): string {
+	return label?.trim() ? label : id;
+}
+
+export interface StatusReadyItem {
+	id: string;
+	label: string;
+	inputs: string[];
+	outputs: string[];
+	newlyReadyCount: number;
+}
+
+/**
+ * Whether an input artifact stops gating its consumers. An omitted status
+ * counts as satisfied — a roadmap that tracks status on only some artifacts
+ * must not have the untracked ones read as unfinished.
+ */
+const inputSatisfied = (status: string | undefined): boolean =>
+	status === "done" || status === undefined;
+
+/** Shared by the current ready set and single-process completion forecasts. */
+function processReady(
+	inputs: string[],
+	outputs: string[],
+	statusOf: (id: string) => string | undefined,
+): boolean {
+	return (
+		inputs.every((id) => inputSatisfied(statusOf(id))) &&
+		(outputs.length === 0 ||
+			outputs.some((id) => {
+				const status = statusOf(id);
+				return (
+					status !== "done" &&
+					status !== "wip" &&
+					status !== "waiting" &&
+					status !== "suspended"
+				);
+			}))
+	);
 }
 
 /**
  * Core ready-process algorithm operating on pre-analyzed data.
  * "Ready" = all input artifacts done/undefined AND at least one output still actionable (not done/wip/suspended/waiting).
  * Returns processInputs and processOutputs maps in addition to readyIds so
- * callers (e.g. runReady --best) can reuse the already-built maps.
+ * callers can reuse the already-built maps for completion forecasts.
  */
 function computeReadyIdsCore(
 	edges: ReturnType<typeof analyze>["edges"],
@@ -502,29 +1306,19 @@ function computeReadyIdsCore(
 	readyIds: string[];
 	processInputs: Map<string, string[]>;
 	processOutputs: Map<string, string[]>;
+	artifactConsumers: Map<string, string[]>;
 } {
-	const { processInputs, processOutputs } = groupEdges(edges);
+	const { processInputs, processOutputs, artifactConsumers } =
+		groupEdges(edges);
 
 	const readyIds: string[] = [];
 	for (const [pid, inputs] of processInputs) {
 		if (nodeKinds.get(pid) !== "process") continue;
-		const allInputsDone = inputs.every((aid) => {
-			const s = artifactMeta[aid]?.status;
-			return s === "done" || s === undefined;
-		});
-		if (!allInputsDone) continue;
 		const outputs = processOutputs.get(pid) ?? [];
-		const outputsInert =
-			outputs.length > 0 &&
-			outputs.every((aid) => {
-				const s = artifactMeta[aid]?.status;
-				return (
-					s === "done" || s === "suspended" || s === "waiting" || s === "wip"
-				);
-			});
-		if (!outputsInert) readyIds.push(pid);
+		if (processReady(inputs, outputs, (id) => artifactMeta[id]?.status))
+			readyIds.push(pid);
 	}
-	return { readyIds, processInputs, processOutputs };
+	return { readyIds, processInputs, processOutputs, artifactConsumers };
 }
 
 /**
@@ -543,128 +1337,182 @@ function computeReadyIds(src: string): {
 		return { readyIds: [], isRoadmap: false, warnings: [] };
 
 	const warnings = diagnostics.filter((d) => d.code === "W006");
-	const pfdType = frontmatter?.type;
-	const isRoadmap = pfdType === undefined || pfdType === "roadmap";
-	if (!isRoadmap) return { readyIds: [], isRoadmap: false, warnings };
+	if (!isRoadmapType(frontmatter?.type))
+		return { readyIds: [], isRoadmap: false, warnings };
 
 	const artifactMeta = frontmatter?.artifact ?? {};
 	const { readyIds } = computeReadyIdsCore(edges, nodeKinds, artifactMeta);
 	return { readyIds, isRoadmap: true, warnings };
 }
 
+/** Why the ready set came out empty, one bucket per non-ready process. */
+export interface EmptyReadyBreakdown {
+	inProgress: string[];
+	parked: string[];
+	complete: number;
+	blocked: number;
+}
+
+/**
+ * Classify every non-ready process into the bucket that explains it.
+ * Each falls into one: blocked on its inputs, or (inputs done) named by
+ * whichever output status is holding it. Both the human text and the --json
+ * payload render this one result, so the two cannot answer the question to
+ * different degrees (#741).
+ */
+function classifyEmptyReady(
+	processInputs: Map<string, string[]>,
+	processOutputs: Map<string, string[]>,
+	nodeKinds: ReturnType<typeof analyze>["nodeKinds"],
+	artifactMeta: NonNullable<
+		ReturnType<typeof analyze>["frontmatter"]
+	>["artifact"] &
+		object,
+): EmptyReadyBreakdown {
+	const statusOf = (aid: string) => artifactMeta[aid]?.status;
+	const inProgress: string[] = [];
+	const parked: string[] = [];
+	let complete = 0;
+	let blocked = 0;
+	for (const [pid, inputs] of processInputs) {
+		if (nodeKinds.get(pid) !== "process") continue;
+		const isBlocked = inputs.some((aid) => !inputSatisfied(statusOf(aid)));
+		if (isBlocked) {
+			blocked++;
+			continue;
+		}
+		const outputStatuses = (processOutputs.get(pid) ?? []).map(statusOf);
+		if (outputStatuses.includes("wip")) inProgress.push(pid);
+		else if (outputStatuses.some((s) => s === "waiting" || s === "suspended"))
+			parked.push(pid);
+		else if (outputStatuses.length > 0) complete++;
+	}
+	inProgress.sort(compareIds);
+	parked.sort(compareIds);
+	return { inProgress, parked, complete, blocked };
+}
+
+/**
+ * Explain why the ready set came out empty.
+ * Every cause is legitimate — the sole process already being wip is the one a
+ * freshly adopted roadmap hits first — but the bare "Check artifact statuses"
+ * hint reads as if the statuses had been mistyped, so it sent readers looking
+ * for a fault that was not there (#710).
+ */
+function emptyReadyText(file: string, breakdown: EmptyReadyBreakdown): string {
+	const { inProgress, parked, complete, blocked } = breakdown;
+	const lines: string[] = [];
+	if (inProgress.length > 0)
+		lines.push(`  in progress (outputs wip): ${inProgress.join(", ")}`);
+	if (parked.length > 0)
+		lines.push(`  parked (outputs waiting/suspended): ${parked.join(", ")}`);
+	if (complete > 0) lines.push(`  complete: ${complete}`);
+	if (blocked > 0)
+		lines.push(
+			`  blocked: ${blocked} — run \`pfdsl status blocked ${file}\` for what each is waiting on`,
+		);
+
+	if (lines.length === 0)
+		return "No ready processes. Check artifact statuses.\n";
+	return `No ready processes.\n${lines.join("\n")}\n`;
+}
+
 export function runReady(file: string, opts: ReadyOptions = {}): CommandResult {
 	const src = readSource(file);
 	if (isCommandResult(src)) return src;
+	return readySource(src, file, opts);
+}
 
+function readySource(
+	src: string,
+	file: string,
+	opts: ReadyOptions,
+): CommandResult {
 	const { diagnostics, edges, nodeKinds, frontmatter } = analyze(src, {
 		readyGate: true,
 	});
 	const earlyFail = failIfErrors(diagnostics, file, opts.json, opts.color);
 	if (earlyFail) return earlyFail;
 
-	const READY_REQUIRED_TYPE = "roadmap" satisfies PfdType;
-	const pfdType = frontmatter?.type;
-	if (pfdType !== undefined && pfdType !== READY_REQUIRED_TYPE) {
-		return fail(
-			`ready requires a roadmap file (type: roadmap). This file has type: ${pfdType}\n`,
-			2,
-		);
-	}
+	const typeFail = requireRoadmapType(frontmatter?.type, "ready");
+	if (typeFail) return typeFail;
 
 	const warnings = diagnostics.filter((d) => d.code === "W006");
 	const warnText = warnings.length ? diagText(warnings, file, opts.color) : "";
 
 	const artifactMeta = frontmatter?.artifact ?? {};
 
-	const { readyIds, processInputs, processOutputs } = computeReadyIdsCore(
-		edges,
-		nodeKinds,
-		artifactMeta,
-	);
+	const { readyIds, processInputs, processOutputs, artifactConsumers } =
+		computeReadyIdsCore(edges, nodeKinds, artifactMeta);
 
-	// best-next: prefer the process that would actually make the most downstream processes ready.
-	// A consumer counts only if completing pid removes its LAST remaining blocker
-	// (i.e. all other inputs of that consumer are already done/undefined).
-	let bestId: string | undefined;
-	if (opts.best && readyIds.length > 0) {
-		// Precompute artifact → consuming processes (O(m) once)
-		const { artifactConsumers, processOutputs: processOutputLists } =
-			groupEdges(edges);
-		// Precompute process output artifact sets (O(m) once)
-		const processOutputSets = new Map<string, Set<string>>();
-		for (const [pid, outputs] of processOutputLists) {
-			processOutputSets.set(pid, new Set(outputs));
+	const beforeReady = new Set(readyIds);
+	const countNewlyReady = (pid: string): number => {
+		const completed = new Set(processOutputs.get(pid) ?? []);
+		// Only consumers of changed inputs can enter the ready set. The same
+		// predicate also checks output activity, including overlapping outputs.
+		const candidates = new Set<string>();
+		for (const id of completed) {
+			for (const consumer of artifactConsumers.get(id) ?? [])
+				candidates.add(consumer);
 		}
-		// Count consumers that would become ready after pid completes (O(m) per pid, but
-		// pid iterates only its own outputs × their consumers, total O(m) across all pids)
-		const countUnlocked = (pid: string): number => {
-			const outputs = processOutputSets.get(pid) ?? new Set();
-			const unlocked = new Set<string>();
-			for (const aid of outputs) {
-				for (const consumer of artifactConsumers.get(aid) ?? []) {
-					if (unlocked.has(consumer)) continue;
-					// Consumer becomes ready if all its inputs (other than ones pid outputs) are done
-					const otherInputsAllDone =
-						processInputs.get(consumer)?.every((inp) => {
-							if (outputs.has(inp)) return true; // pid will satisfy this
-							const s = artifactMeta[inp]?.status;
-							return s === "done" || s === undefined;
-						}) ?? true;
-					if (otherInputsAllDone) unlocked.add(consumer);
-				}
-			}
-			return unlocked.size;
-		};
-		// Precompute counts then find max in O(n) — avoid O(n log n) sort + allocation
-		const counts = new Map<string, number>(
-			readyIds.map((pid) => [pid, countUnlocked(pid)]),
-		);
-		bestId = readyIds.reduce((best, pid) => {
-			const bc = counts.get(best) ?? 0;
-			const pc = counts.get(pid) ?? 0;
-			return pc > bc || (pc === bc && pid < best) ? pid : best;
-		});
-	}
-
-	type ReadyItem = {
-		id: string;
-		label: string;
-		inputs: string[];
-		outputs: string[];
+		let count = 0;
+		for (const consumer of candidates) {
+			if (
+				!beforeReady.has(consumer) &&
+				processReady(
+					processInputs.get(consumer) ?? [],
+					processOutputs.get(consumer) ?? [],
+					(id) => (completed.has(id) ? "done" : artifactMeta[id]?.status),
+				)
+			)
+				count++;
+		}
+		return count;
 	};
-	const toItem = (pid: string): ReadyItem => ({
+
+	const toItem = (pid: string): StatusReadyItem => ({
 		id: pid,
-		label: frontmatter?.process?.[pid]?.label ?? pid,
+		label: labelForDisplay(frontmatter?.process?.[pid]?.label, pid),
 		inputs: processInputs.get(pid) ?? [],
 		outputs: processOutputs.get(pid) ?? [],
+		newlyReadyCount: countNewlyReady(pid),
 	});
 
 	const readyItems = readyIds.map(toItem);
-	const bestItem = bestId ? toItem(bestId) : undefined;
+
+	const breakdown =
+		readyItems.length === 0
+			? classifyEmptyReady(
+					processInputs,
+					processOutputs,
+					nodeKinds,
+					artifactMeta,
+				)
+			: undefined;
 
 	if (opts.json) {
 		const payload: Record<string, unknown> = { ok: true, ready: readyItems };
-		if (opts.best && bestItem) payload.best = bestItem;
+		if (breakdown) payload.empty = breakdown;
 		if (warnings.length) payload.warnings = warnings;
 		return ok(`${JSON.stringify(payload)}\n`, warnText);
 	}
 
-	if (readyItems.length === 0) {
-		return ok("No ready processes. Check artifact statuses.\n", warnText);
+	if (breakdown) {
+		return ok(emptyReadyText(file, breakdown), warnText);
 	}
 
 	const lines: string[] = [`Ready processes (${readyItems.length}):`];
-	for (const item of readyItems) {
-		const marker = opts.best && item.id === bestId ? "*" : " ";
-		const inputs = item.inputs.join(", ");
+	if (!opts.noCounts)
 		lines.push(
-			`  ${marker} ${item.id.padEnd(20)} "${item.label}"   inputs: [${inputs}]`,
+			"Newly ready = additional processes ready after all outputs complete; not a priority ranking. Zero does not mean unnecessary.",
 		);
-	}
-	if (opts.best && bestItem) {
-		lines.push("");
+	for (const item of readyItems) {
+		const inputs = item.inputs.join(", ");
+		const count = opts.noCounts
+			? ""
+			: `   newly ready: ${item.newlyReadyCount}`;
 		lines.push(
-			"* = recommended next (removes the last blocker for the most downstream processes)",
+			`    ${item.id.padEnd(20)} "${item.label}"   inputs: [${inputs}]${count}`,
 		);
 	}
 	return ok(`${lines.join("\n")}\n`, warnText);
@@ -712,10 +1560,10 @@ export function runStatusList(
 		)
 		.map(([id, meta]) => ({
 			id,
-			label: meta.label ?? id,
+			label: labelForDisplay(meta.label, id),
 			status: meta.status as string,
 		}))
-		.sort((a, b) => a.id.localeCompare(b.id));
+		.sort((a, b) => compareIds(a.id, b.id));
 
 	if (opts.json) {
 		return ok(`${JSON.stringify({ ok: true, items })}\n`);
@@ -749,21 +1597,22 @@ export function runStatusBlocked(
 ): CommandResult {
 	const src = readSource(file);
 	if (isCommandResult(src)) return src;
+	return blockedSource(src, file, opts);
+}
 
+function blockedSource(
+	src: string,
+	file: string,
+	opts: StatusBlockedOptions,
+): CommandResult {
 	const { diagnostics, edges, nodeKinds, frontmatter } = analyze(src, {
 		readyGate: true,
 	});
 	const earlyFail = failIfErrors(diagnostics, file, opts.json, opts.color);
 	if (earlyFail) return earlyFail;
 
-	const BLOCKED_REQUIRED_TYPE = "roadmap" satisfies PfdType;
-	const pfdType = frontmatter?.type;
-	if (pfdType !== undefined && pfdType !== BLOCKED_REQUIRED_TYPE) {
-		return fail(
-			`blocked requires a roadmap file (type: roadmap). This file has type: ${pfdType}\n`,
-			2,
-		);
-	}
+	const typeFail = requireRoadmapType(frontmatter?.type, "blocked");
+	if (typeFail) return typeFail;
 
 	const warnings = diagnostics.filter((d) => d.code === "W006");
 	const warnText = warnings.length ? diagText(warnings, file, opts.color) : "";
@@ -774,18 +1623,17 @@ export function runStatusBlocked(
 	const blockedItems: StatusBlockedItem[] = [];
 	for (const [pid, inputs] of processInputs) {
 		if (nodeKinds.get(pid) !== "process") continue;
-		const blockedBy = inputs.filter((aid) => {
-			const s = artifactMeta[aid]?.status;
-			return s !== "done" && s !== undefined;
-		});
+		const blockedBy = inputs.filter(
+			(aid) => !inputSatisfied(artifactMeta[aid]?.status),
+		);
 		if (blockedBy.length === 0) continue;
 		blockedItems.push({
 			id: pid,
-			label: frontmatter?.process?.[pid]?.label ?? pid,
+			label: labelForDisplay(frontmatter?.process?.[pid]?.label, pid),
 			blockedBy,
 		});
 	}
-	blockedItems.sort((a, b) => a.id.localeCompare(b.id));
+	blockedItems.sort((a, b) => compareIds(a.id, b.id));
 
 	if (opts.json) {
 		const payload: Record<string, unknown> = {
@@ -809,182 +1657,176 @@ export function runStatusBlocked(
 }
 
 export interface MetaSetOptions {
+	allowUnknown?: boolean;
 	json?: boolean;
 	color?: boolean;
 }
 
-/** Fields whose values are arrays/maps — meta set only writes scalars. */
+/**
+ * Diagnostic codes reporting a document that could not be read rather than one
+ * whose content is wrong: front matter (FM), lexer (L), parser (P), and
+ * normalizer (N). A rewrite cannot cure these and cannot be trusted to land
+ * correctly on top of them, so they gate a mutation before it runs. Validation
+ * codes (V) describe content a mutation may be fixing and are judged on the
+ * result instead.
+ */
+const STRUCTURAL_CODE = /^(?:FM|P|L|N)\d+$/;
+
+/** Fields whose values are arrays/maps — metadata writes only accept scalars. */
 const NON_SCALAR_FIELDS = new Set([
+	"ref",
 	"tags",
 	"parts",
 	"externalStakeholders",
 	"boundary",
 ]);
 
-/**
- * Render a value as a single-line YAML scalar, double-quoting when a bare
- * scalar would misparse (YAML indicators, colon, quotes, leading/trailing
- * whitespace, ...). Inner spaces are fine bare ("make spec").
- */
-function yamlScalar(value: string, quoteAmbiguous = true): string {
-	// Core-schema resolution: bare true/null/42/2026-07-19 etc. re-type to
-	// boolean/null/number/date on parse, so string fields must quote them
-	// (integer fields like index pass quoteAmbiguous=false to stay bare).
-	const resolvesToNonString =
-		/^(?:true|false|null|yes|no|on|off|~)$/i.test(value) ||
-		(value.trim() !== "" && !Number.isNaN(Number(value))) ||
-		/^\d{4}-\d{2}-\d{2}/.test(value);
-	const needsQuoting =
-		value === "" ||
-		/[:#"'\\\n,{}[\]]/.test(value) ||
-		/^[\s&*!|>%@`?-]/.test(value) ||
-		/^\s|\s$/.test(value) ||
-		(quoteAmbiguous && resolvesToNonString);
-	if (!needsQuoting) return value;
-	return `"${value
-		.replace(/\\/g, "\\\\")
-		.replace(/"/g, '\\"')
-		.replace(/\n/g, "\\n")}"`;
+function scalarFieldValueError(field: string, value: string): string | null {
+	if (field.includes("."))
+		return `'${field}' is a derived read-only field and cannot be set`;
+	if (NON_SCALAR_FIELDS.has(field)) return `'${field}' is not a scalar field`;
+	if (
+		field === "status" &&
+		!STATUS_VALUES.includes(value as (typeof STATUS_VALUES)[number])
+	)
+		return `invalid status '${value}' (valid: ${STATUS_VALUES.join(" | ")})`;
+	if (field === "index" && !/^\d+$/.test(value))
+		return `index must be a non-negative integer, got '${value}'`;
+	return null;
 }
 
-/**
- * Split a flow-map inner text ("key: val, key2: val2") into its top-level
- * entries, honoring double- and single-quoted strings so commas inside
- * quoted values do not split.
- */
-function splitFlowEntries(inner: string): string[] {
-	const parts: string[] = [];
-	let cur = "";
-	let quote: '"' | "'" | null = null;
-	for (let i = 0; i < inner.length; i++) {
-		const ch = inner[i]!;
-		if (quote === '"') {
-			cur += ch;
-			if (ch === "\\") cur += inner[++i] ?? "";
-			else if (ch === '"') quote = null;
-		} else if (quote === "'") {
-			cur += ch;
-			if (ch === "'") {
-				// YAML single-quote escape: '' stays inside the string
-				if (inner[i + 1] === "'") cur += inner[++i]!;
-				else quote = null;
-			}
-		} else if (ch === '"' || ch === "'") {
-			quote = ch;
-			cur += ch;
-		} else if (ch === ",") {
-			parts.push(cur);
-			cur = "";
-		} else {
-			cur += ch;
-		}
-	}
-	if (cur.trim() !== "") parts.push(cur);
-	return parts;
-}
-
-/**
- * Rewrite one node's field in the raw source, preserving all other
- * formatting. The id is escaped since quoted ids may contain regex
- * metacharacters (#430). Two styles are supported:
- *   block-style: "<indent><id>:\n  <fields>..."
- *   flow-style:  "<indent><id>: { key: val, ... }"  (#415)
- * Returns null when the id has no frontmatter entry.
- */
-function setFieldInSource(
-	src: string,
+function scalarFieldKindError(
+	kind: NodeKind,
 	id: string,
 	field: string,
-	scalar: string,
+	meta: Record<string, unknown> | undefined,
+	allowUnknown = false,
 ): string | null {
-	const frontmatterMatch = /^---\n([\s\S]*?\n)---\n/.exec(src);
-	const fmBlock = frontmatterMatch?.[1];
-	if (!frontmatterMatch || !fmBlock) return null;
-	const fmBodyStart = frontmatterMatch[0].length - fmBlock.length - 4; // after "---\n"
+	const exists = meta !== undefined && Object.hasOwn(meta, field);
+	if (
+		!KNOWN_FIELDS[kind].has(field) &&
+		exists &&
+		meta[field] !== null &&
+		typeof meta[field] === "object"
+	)
+		return `'${field}' is not a scalar field (id: ${id})`;
+	if (
+		!exists &&
+		!KNOWN_FIELDS[kind].has(field) &&
+		Object.values(KNOWN_FIELDS).some((fields) => fields.has(field))
+	)
+		return `'${field}' is not a valid ${kind} field (id: ${id})`;
+	if (!KNOWN_FIELDS[kind].has(field) && !exists && !allowUnknown)
+		return `unknown ${kind} field '${field}' (id: ${id}); use --allow-unknown to add it`;
+	return null;
+}
 
-	const escapedId = escapeRe(id);
-	const escapedField = escapeRe(field);
-	// Match only the line's own leading indent: "[ \t]+", not "\s+". "\s"
-	// includes "\n", so with the "m" anchor it would start on a preceding blank
-	// line and swallow the newline plus indent, inflating the detected node
-	// indent and making the block-style rewrite silently no-op (#530).
-	const headerRe = new RegExp(`^([ \\t]+)${escapedId}:\\s*\\n`, "m");
-	const headerMatch = headerRe.exec(fmBlock);
+export interface MetaCreateOptions extends MetaSetOptions {
+	write?: boolean;
+}
 
-	// Flow-style body match is quote-aware: a "}" inside a quoted value must
-	// not terminate the map.
-	const flowHeaderRe = new RegExp(
-		`^([ \\t]+)${escapedId}:\\s*(\\{(?:"(?:[^"\\\\]|\\\\.)*"|'(?:[^']|'')*'|[^}"'])*\\})[ \\t]*$`,
-		"m",
-	);
-	const flowMatch = headerMatch ? null : flowHeaderRe.exec(fmBlock);
-
-	if (!headerMatch && !flowMatch) return null;
-
-	let newFm: string;
-	if (flowMatch) {
-		// Flow-style: split "{ ... }" into top-level entries (quote-aware, so a
-		// decoy "field:" inside another value's string is never matched), then
-		// replace the matching entry or append a new one.
-		const flowBody = flowMatch[2]!;
-		const entries = splitFlowEntries(flowBody.slice(1, -1));
-		const keyRe = new RegExp(`^\\s*${escapedField}:`);
-		const idx = entries.findIndex((e) => keyRe.test(e));
-		const newEntry = `${field}: ${scalar}`;
-		if (idx >= 0) entries[idx] = newEntry;
-		else entries.push(newEntry);
-		const newFlowBody = `{ ${entries.map((e) => e.trim()).join(", ")} }`;
-		const matchedLine = flowMatch[0]!;
-		const newLine = matchedLine.replace(flowBody, newFlowBody);
-		newFm =
-			fmBlock.slice(0, flowMatch.index) +
-			newLine +
-			fmBlock.slice(flowMatch.index + matchedLine.length);
-	} else {
-		// Block-style. Detect indent width from the header line (#430).
-		const nodeIndent = headerMatch![1]!.length;
-		const afterHeader = fmBlock.slice(
-			headerMatch!.index + headerMatch![0].length,
-		);
-		const afterHeaderNl = afterHeader.indexOf("\n");
-		const firstLine =
-			afterHeaderNl === -1 ? afterHeader : afterHeader.slice(0, afterHeaderNl);
-		const firstLineIndent = firstLine.length - firstLine.trimStart().length;
-		const childIndent =
-			firstLine.trim() !== "" && firstLineIndent > nodeIndent
-				? firstLineIndent
-				: nodeIndent * 2;
-
-		const nodePad = " ".repeat(nodeIndent);
-		const childPad = " ".repeat(childIndent);
-
-		// Replace "<childPad><field>: <old>" under this node — including any
-		// deeper-indented continuation lines (multi-line block scalars), so
-		// replacing them never leaves orphan lines — or insert after the header.
-		// Both the walk to the field and the continuation consumption tolerate
-		// blank lines, which are legal inside block scalars: the walk accepts
-		// whitespace-only lines, and the consumption takes blank lines only
-		// when a deeper-indented line follows (a trailing blank belongs to the
-		// mapping, not the scalar).
-		const fieldLineRe = new RegExp(
-			`(${nodePad}${escapedId}:[ \\t]*\\n(?:(?:${childPad}[^\\n]*|[ \\t]*)\\n)*?)${childPad}${escapedField}:[^\\n]*\\n(?:(?:[ \\t]*\\n)*${childPad} +[^\\n]*\\n)*`,
-		);
-		if (fieldLineRe.test(fmBlock)) {
-			newFm = fmBlock.replace(
-				fieldLineRe,
-				`$1${childPad}${field}: ${scalar}\n`,
-			);
-		} else {
-			newFm = fmBlock.replace(
-				new RegExp(`(${nodePad}${escapedId}:[ \\t]*\\n)`),
-				`$1${childPad}${field}: ${scalar}\n`,
-			);
-		}
+/** Create one body node's local definition through core's CST insertion. */
+export function runMetaCreate(
+	file: string,
+	id: string,
+	assignments: readonly string[] = [],
+	opts: MetaCreateOptions = {},
+): CommandResult {
+	const reject = (error: string, exitCode = 1): CommandResult =>
+		opts.json
+			? failJson({ error: `meta create: ${error}` }, exitCode)
+			: fail(`meta create: ${error}\n`, exitCode);
+	if (file === "-") return reject("cannot be used with stdin (-)", 2);
+	const fields = new Map<string, string | number>();
+	for (const assignment of assignments) {
+		const equal = assignment.indexOf("=");
+		if (equal < 1)
+			return reject(`expected field=value, got '${assignment}'`, 2);
+		const field = assignment.slice(0, equal);
+		const value = assignment.slice(equal + 1);
+		if (fields.has(field)) return reject(`duplicate field '${field}'`, 2);
+		const error = scalarFieldValueError(field, value);
+		if (error) return reject(error, 2);
+		fields.set(field, field === "index" ? Number(value) : value);
 	}
-
-	return (
-		src.slice(0, fmBodyStart) + newFm + src.slice(fmBodyStart + fmBlock.length)
+	const src = readSource(file);
+	if (isCommandResult(src))
+		return opts.json
+			? failJson({ error: src.stderr.trimEnd() }, src.exitCode)
+			: src;
+	const authored = analyze(src);
+	const structural = authored.diagnostics.filter(
+		(d) => d.severity === "error" && STRUCTURAL_CODE.test(String(d.code)),
 	);
+	if (structural.length > 0) {
+		const reason = structural.some((d) => String(d.code).startsWith("FM"))
+			? "cannot parse frontmatter"
+			: structural.some(
+						(d) => d.code === "N001" || d.code === "N002" || d.code === "N004",
+					)
+				? `ambiguous node kind for '${id}'`
+				: "cannot create a definition in a document with structural errors";
+		return refuseWith(
+			`meta create: ${reason}; nothing was written`,
+			file,
+			structural,
+			opts.json,
+			opts.color,
+		);
+	}
+	const kind = authored.nodeKinds.get(id);
+	if (kind === undefined) return reject(`id '${id}' not found in ${file}`);
+	if (Object.hasOwn(authored.frontmatter?.[kind] ?? {}, id))
+		return reject(`'${id}' already has a frontmatter definition in ${file}`);
+	if (kind !== "artifact" && kind !== "process")
+		return reject(`cannot infer artifact or process kind for '${id}'`);
+	for (const field of fields.keys()) {
+		const error = scalarFieldKindError(
+			kind,
+			id,
+			field,
+			undefined,
+			opts.allowUnknown,
+		);
+		if (error) return reject(error, 2);
+	}
+	if (fields.has("status")) {
+		const failed = requireRoadmapType(
+			authored.frontmatter?.type,
+			"setting status",
+		);
+		if (failed) return reject(failed.stderr.trimEnd(), failed.exitCode);
+	}
+	const inserted = insertDefinition(src, kind, id, Object.fromEntries(fields));
+	if (!inserted.inserted)
+		return reject(
+			`could not create the frontmatter definition of '${id}' in ${file}; expand aliased or non-map sections first; nothing was written`,
+		);
+	const newSrc = inserted.output + loadFrontmatter(src).body;
+	const resulting = analyze(newSrc);
+	if (hasErrors(resulting.diagnostics))
+		return refuseWith(
+			`meta create: refusing to write ${file}: the result would have errors; nothing was written`,
+			file,
+			resulting.diagnostics.filter((d) => d.severity === "error"),
+			opts.json,
+			opts.color,
+		);
+	const line = locateNode(resulting.document, newSrc, id, kind).declarationLine;
+	if (opts.write) writeFileSync(file, newSrc, "utf-8");
+	if (opts.json)
+		return ok(
+			`${JSON.stringify({ ok: true, id, kind, created: true, written: opts.write === true, line, ...(opts.write ? {} : { output: newSrc }) })}\n`,
+		);
+	return opts.write
+		? ok(`created ${kind} '${id}' at ${file}:${line}\n`)
+		: ok(newSrc);
+}
+
+/** Quote one argument for a copyable POSIX shell recovery command. */
+function quoteShellArgument(argument: string): string {
+	if (/^[A-Za-z0-9_./-]+$/.test(argument)) return argument;
+	return `'${argument.replaceAll("'", "'\\''")}'`;
 }
 
 export function runMetaSet(
@@ -997,78 +1839,134 @@ export function runMetaSet(
 	if (file === "-") {
 		return fail("meta set cannot be used with stdin (-)\n", 2);
 	}
-	if (field.includes(".")) {
-		return fail(
-			`meta set: '${field}' is a derived read-only field and cannot be set\n`,
-			2,
-		);
-	}
-	if (NON_SCALAR_FIELDS.has(field)) {
-		return fail(`meta set: '${field}' is not a scalar field\n`, 2);
-	}
-	if (
-		field === "status" &&
-		!STATUS_VALUES.includes(value as (typeof STATUS_VALUES)[number])
-	) {
-		return fail(
-			`meta set: invalid status '${value}' (valid: ${STATUS_VALUES.join(" | ")})\n`,
-			2,
-		);
-	}
-	if (field === "index" && !/^\d+$/.test(value)) {
-		return fail(
-			`meta set: index must be a non-negative integer, got '${value}'\n`,
-			2,
-		);
-	}
-	const ids = splitCommaList(idList);
+	const valueError = scalarFieldValueError(field, value);
+	if (valueError) return fail(`meta set: ${valueError}\n`, 2);
+	const ids = parseIdList(idList);
 	if (ids.length === 0) return fail(HELP_META_SET, 2);
 
 	const src = readSource(file);
 	if (isCommandResult(src)) return src;
 
-	const { diagnostics, nodeKinds } = analyze(src);
-	const failed = failIfErrors(diagnostics, file, opts.json, opts.color);
+	const { diagnostics, edges, nodeKinds, frontmatter } = analyze(src);
+	// This gate asks "would this write leave a broken file?", not "is the file
+	// broken now?" (#1125). A `meta set` is often the cure for the very error
+	// a pre-mutation check would trip on — V035 rejects a roadmap artifact
+	// declared without a `status:`, which is the state `meta set <id> status`
+	// exists to close (#415). Judging the original there would make the fix
+	// unreachable, so validation errors are judged on the result instead, by
+	// the post-mutation gate below.
+	//
+	// Structural diagnostics stay here. FM / P / L / N report a document that
+	// could not be read, tokenized, parsed, or normalized, so `frontmatter`
+	// and `nodeKinds` below cannot be trusted to describe it — the type check,
+	// the id lookup, and the field/kind pairing all read them. Those are the
+	// pre-check's unnamed second job, and dropping it wholesale would drop
+	// them with it.
+	const unreadable = diagnostics.filter((d) =>
+		STRUCTURAL_CODE.test(String(d.code)),
+	);
+	const failed = failIfErrors(unreadable, file, opts.json, opts.color);
 	if (failed) return failed;
+
+	// Progress belongs to the roadmap (§15.15), so writing status into a file
+	// that declares another kind would have the CLI produce the state W007
+	// reports. An omitted type is read as roadmap, same as the ready gate.
+	if (field === "status") {
+		const typeFail = requireRoadmapType(
+			frontmatter?.type,
+			"meta set: setting status",
+		);
+		if (typeFail) return typeFail;
+	}
 
 	// Validate every id and field/kind pairing before touching anything, so a
 	// multi-id call is atomic: either all writes land or none do.
 	const missing = ids.filter((id) => !nodeKinds.has(id));
-	if (missing.length > 0) {
-		return idsNotFoundError(file, missing, opts.json);
+	const undefinedIds = ids.flatMap((id) => {
+		const kind = nodeKinds.get(id);
+		return kind && !Object.hasOwn(frontmatter?.[kind] ?? {}, id)
+			? [{ id, kind }]
+			: [];
+	});
+	if (undefinedIds.length > 0) {
+		const messages = undefinedIds.map(
+			({ id, kind }) =>
+				`'${id}' has no frontmatter definition in ${file}. Run pfdsl meta create --write -- ${quoteShellArgument(file)} ${quoteShellArgument(id)}${kind === "artifact" && frontmatter?.type === "roadmap" ? " status=todo" : ""} before using meta set.`,
+		);
+		if (missing.length > 0)
+			messages.push(`id(s) not found in ${file}: ${missing.join(", ")}`);
+		const error = messages.join("\n");
+		if (opts.json) return failJson({ missing, undefinedIds, error });
+		return fail(`meta set: ${error}\n`);
 	}
+	if (missing.length > 0) return idsNotFoundError(file, missing, opts.json);
 	for (const id of ids) {
 		const kind = nodeKinds.get(id);
 		if (kind !== "artifact" && kind !== "process" && kind !== "group") continue;
-		if (!KNOWN_FIELDS[kind].has(field)) {
-			return fail(
-				`meta set: '${field}' is not a valid ${kind} field (id: ${id})\n`,
-				2,
-			);
-		}
+		const error = scalarFieldKindError(
+			kind,
+			id,
+			field,
+			frontmatter?.[kind]?.[id],
+			opts.allowUnknown,
+		);
+		if (error) return fail(`meta set: ${error}\n`, 2);
 	}
 
-	// Snapshot ready set before mutation (roadmap only)
-	const { readyIds: beforeIds, isRoadmap } = computeReadyIds(src);
+	// Snapshot ready set before mutation (roadmap only). Computed directly
+	// from the analyze(src) result already gated for structural errors above,
+	// not via computeReadyIds(src) — that helper treats ANY diagnostic-
+	// severity error (not just a structural one) as "not a roadmap" and
+	// returns isRoadmap: false. A validation error like V007 (invalid status
+	// enum value) is exactly the kind of thing `meta set` is often used to
+	// cure (#415's V035 is the same shape), so reading isRoadmap from the
+	// unmutated original would make the post-mutation newlyReady
+	// recomputation below silently skip every such write, even one that
+	// lands cleanly (#1125 defect 6). `frontmatter`/`nodeKinds`/`edges` are
+	// already known safe to read at this point (the structural gate above
+	// covers exactly that), so isRoadmapType + computeReadyIdsCore read them
+	// directly instead.
+	const isRoadmap = isRoadmapType(frontmatter?.type);
+	const beforeIds = isRoadmap
+		? computeReadyIdsCore(edges, nodeKinds, frontmatter?.artifact ?? {})
+				.readyIds
+		: [];
 	const beforeSet = new Set(beforeIds);
 
-	const scalar = yamlScalar(value, field !== "index");
+	// Quoting for the new value is left to the yaml package's own core-schema
+	// judgment (ADR-0034) — pass a number for the integer-typed index field,
+	// a string for everything else.
+	const parsedValue: string | number =
+		field === "index" ? Number(value) : value;
 	let newSrc = src;
 	for (const id of ids) {
-		const applied = setFieldInSource(newSrc, id, field, scalar);
+		const kind = nodeKinds.get(id) as NodeKind;
+		const applied = setFrontmatterField(newSrc, kind, id, field, parsedValue);
 		if (applied === null) {
-			if (opts.json) return failJson({ missing: [id] });
-			return fail(`error: '${id}' not found in ${file}\n`);
+			const error = `meta set: could not update the frontmatter definition of '${id}' in ${file}; aliased definitions and ambiguous or non-scalar field keys cannot be edited here. Expand the aliased definition and use one scalar YAML key per field; nothing was written`;
+			return opts.json ? failJson({ error }) : fail(`${error}\n`);
 		}
 		newSrc = applied;
 	}
 
-	// Safety net: never write a rewrite that introduces errors the original
-	// didn't have (rewriter bug or unsupported YAML style).
-	if (hasErrors(analyze(newSrc).diagnostics)) {
-		const message = `meta set: refusing to write ${file}: the rewrite would introduce errors`;
-		if (opts.json) return failJson({ error: message });
-		return fail(`${message}\n`);
+	// The gate on the write: the result must be clean. That covers an error the
+	// rewrite introduced (rewriter bug or unsupported YAML style) and one the
+	// original already had and this write did not cure — since the pre-check
+	// above no longer judges the original, both arrive here.
+	const resulting = analyze(newSrc).diagnostics;
+	if (hasErrors(resulting)) {
+		// Report the errors themselves, not just the refusal. This is the only
+		// place a validation error on the input surfaces now, and `meta set`
+		// shares the `{ ok: false, diagnostics: [...] }` failure contract with
+		// every other diagnostic-emitting command (#508). The `error` line
+		// carries what diagnostics cannot: that nothing was written.
+		return refuseWith(
+			`meta set: refusing to write ${file}: the result would have errors`,
+			file,
+			resulting.filter((d) => d.severity === "error"),
+			opts.json,
+			opts.color,
+		);
 	}
 	writeFileSync(file, newSrc, "utf-8");
 
@@ -1093,7 +1991,176 @@ export function runMetaSet(
 	return ok("", warnText);
 }
 
+export interface RenameOptions {
+	write?: boolean;
+	json?: boolean;
+	color?: boolean;
+}
+
+/**
+ * Rename one of this file's own ids — artifact, process, or group — and
+ * every reference to it in this file, in one atomic in-place rewrite. It
+ * rewrites body edges, so it is a top-level whole-file command beside
+ * `delete`, not a `meta` subcommand (ADR-0030).
+ *
+ * Core `rename` resolves `<old>`'s kind and refuses what this one file
+ * shows. This command adds what needs other files, for a file on disk: a
+ * group `<old>` or `<new>` an `extends:` preset declares (§2.9.4), and
+ * inherited child-parent relationships the local rewrite cannot update.
+ * The local result is re-validated before it is emitted or written;
+ * unrelated dependency errors remain the responsibility of `check`.
+ *
+ * A file that references this one from outside — a parent's
+ * `subflow:`/`boundary:`, another file's `extends:` — is never rewritten.
+ */
+export function runRename(
+	file: string,
+	oldId: string,
+	newId: string,
+	opts: RenameOptions = {},
+): CommandResult {
+	if (file === "-" && opts.write) {
+		return fail("--write cannot be used with stdin (-)\n", 2);
+	}
+	if (oldId === newId) {
+		return fail(`rename: '${oldId}' and '${newId}' must differ\n`, 2);
+	}
+
+	const source = readSource(file);
+	if (isCommandResult(source)) return source;
+
+	const refuse = (message: string, errs?: Diagnostic[]): CommandResult =>
+		refuseWith(message, file, errs, opts.json, opts.color);
+
+	const analysis = analyze(source);
+	const result = rename(source, oldId, newId, { analysis });
+	if (!result.ok && result.reason === "unreadable") {
+		if (opts.json) return failJson({ diagnostics: result.diagnostics });
+		return fail(diagText(result.diagnostics, file, opts.color));
+	}
+	if (!result.ok && result.reason === "unsupportedYaml") {
+		return refuse(
+			`rename: YAML anchors, aliases and merge keys (<<) are not supported by rename, and the frontmatter of ${file} uses one; edit it by hand or expand them first`,
+		);
+	}
+
+	// Groups declared by the extends: presets, for a file on disk (a relative
+	// ref cannot be resolved from stdin, the same reason runCheck skips its
+	// multi-file checks there).
+	const absFile = file === "-" ? null : resolve(file);
+	const loaded = new Map<string, ReturnType<typeof analyze> | null>();
+	const load = (path: string) => {
+		if (path === absFile) return analysis;
+		if (!loaded.has(path)) loaded.set(path, fileLoader(path));
+		return loaded.get(path) ?? null;
+	};
+	let presetGroup: Record<string, unknown> | undefined;
+	if (absFile !== null && analysis.frontmatter?.extends !== undefined) {
+		// The entry file is already read and analyzed; only presets are loaded.
+		const closure = loadDependencyClosure(absFile, load, { subflows: false });
+		const { docs } = closure;
+		const failedExtends = failIfErrors(
+			unsafePresentationDiagnostics(closure),
+			file,
+			opts.json,
+			opts.color,
+		);
+		if (failedExtends) return failedExtends;
+		presetGroup = resolveLoadedPresentation(absFile, docs, {
+			excludeEntry: true,
+		}).group;
+		if (result.ok && result.kind === "group") {
+			const groups = resolveLoadedPresentation(absFile, docs).group ?? {};
+			for (const [childId, meta] of Object.entries(groups)) {
+				if (
+					meta.parent === oldId &&
+					!Object.hasOwn(analysis.frontmatter?.group?.[childId] ?? {}, "parent")
+				) {
+					return refuse(
+						`rename: '${childId}' has a parent relationship supplied by a preset that cannot be renamed here; update that preset relationship first`,
+					);
+				}
+			}
+		}
+	}
+	const presetDeclares = (id: string): boolean =>
+		presetGroup !== undefined && Object.hasOwn(presetGroup, id);
+	const article = (kind: NodeKind): string =>
+		kind === "artifact" ? "an" : "a";
+
+	if (!result.ok && result.reason === "ambiguous") {
+		return refuse(
+			`rename: '${oldId}' is declared twice in ${file} — as a group and as ${article(result.clashingKind)} ${result.clashingKind}; this is invalid and cannot be renamed unambiguously`,
+		);
+	}
+	if (!result.ok && result.reason === "notFound") {
+		if (!presetDeclares(oldId)) {
+			return idsNotFoundError(file, [oldId], opts.json);
+		}
+		return refuse(
+			`rename: '${oldId}' is not declared in ${file} — it comes from a preset and must be renamed there`,
+		);
+	}
+	// A local group entry that a preset also defines only partially
+	// overrides it, so it is not the declaration to rename.
+	if (result.kind === "group" && presetDeclares(oldId)) {
+		return refuse(
+			`rename: '${oldId}' is also defined by a preset extended from ${file}; the local entry is a partial override and cannot be renamed here`,
+		);
+	}
+	if (!result.ok) {
+		return refuse(
+			`rename: '${newId}' already exists as ${article(result.existingKind)} ${result.existingKind} id in ${file}`,
+		);
+	}
+	if (presetDeclares(newId)) {
+		return refuse(`rename: '${newId}' already exists as a group id in ${file}`);
+	}
+
+	// The local result must remain valid. Ordinary child mappings survive the
+	// rename, but a reachable child may refer back to this edited file.
+	const { output } = result;
+	const resultAnalysis = analyze(output);
+	const resultDiags = [...resultAnalysis.diagnostics];
+	if (hasErrors(resultDiags)) {
+		const errs = resultDiags.filter((d) => d.severity === "error");
+		const message = `rename: refusing to write ${file}: the result would have errors (an error already in the input also blocks the rename)`;
+		return refuse(message, errs);
+	}
+	if (absFile !== null) {
+		const returnErrors = introducedReturnBoundaryErrors(
+			absFile,
+			analysis,
+			resultAnalysis,
+			load,
+		);
+		if (returnErrors.length > 0)
+			return refuse(
+				"rename: the edited file is also a reachable subflow; its changed boundary would break a referring process; nothing was written",
+				returnErrors,
+			);
+	}
+
+	if (opts.write) writeFileSync(file, output, "utf-8");
+
+	if (opts.json) {
+		const payload = {
+			ok: true,
+			kind: result.kind,
+			from: oldId,
+			to: newId,
+			...(result.kind === "group"
+				? { members: result.members, children: result.children }
+				: {}),
+		};
+		return ok(`${JSON.stringify(payload)}\n`);
+	}
+	if (opts.write) return ok("");
+	return ok(output);
+}
+
 export interface GetOptions {
+	referenceContext?: string;
 	id?: string;
 	field?: string;
 	json?: boolean;
@@ -1109,6 +2176,7 @@ function splitCommaList(raw: string): string[] {
 
 const KNOWN_FIELDS: Record<"artifact" | "process" | "group", Set<string>> = {
 	artifact: new Set([
+		"ref",
 		"label",
 		"description",
 		"owner",
@@ -1145,75 +2213,78 @@ const KNOWN_FIELDS: Record<"artifact" | "process" | "group", Set<string>> = {
  * can also be requested explicitly via the field positional, in which case
  * only the derived value is returned (the base field is not auto-added).
  */
-const DERIVED_FIELDS: Record<"artifact" | "process" | "group", Set<string>> = {
-	artifact: new Set(["location.resolved"]),
-	process: new Set(["location.resolved", "command.cwd"]),
-	group: new Set(),
+/**
+ * Everything about a derived field in one entry: which kinds accept it, which
+ * field it derives from, and how it is computed. The two paths that produce
+ * derived fields — the auto-add beside a base field, and an explicit request
+ * by name — read the same entry, so they cannot disagree. Adding one means
+ * adding an entry, not editing four places.
+ */
+const DERIVED_FIELD_SPECS: Record<
+	string,
+	{
+		kinds: readonly ("artifact" | "process" | "group")[];
+		base: string;
+	}
+> = {
+	"location.resolved": {
+		kinds: ["artifact", "process"],
+		base: "location",
+	},
+	"command.cwd": {
+		kinds: ["process"],
+		base: "command",
+	},
 };
 
-/** Classify a single `location:` element per spec §15.8 and resolve it if it's not a URL. */
-function resolveLocationElement(
-	docFsPath: string,
-	element: string,
-	basePath?: string,
-): string {
-	return isUrlLike(element)
-		? element
-		: resolveLocationFsPath(docFsPath, element, basePath);
+/** Which derived fields each kind accepts — read off the specs, never listed twice. */
+function derivedFieldAcceptedBy(
+	kind: "artifact" | "process" | "group",
+	field: string,
+): boolean {
+	return DERIVED_FIELD_SPECS[field]?.kinds.includes(kind) ?? false;
 }
 
-function resolveLocationDerived(
-	docFsPath: string,
-	value: unknown,
-	basePath?: string,
-): unknown {
-	return Array.isArray(value)
-		? value.map((v) => resolveLocationElement(docFsPath, String(v), basePath))
-		: resolveLocationElement(docFsPath, String(value), basePath);
-}
-
-/** The directory commands run in: basePath resolved against the file's dir (§15.8), independent of the command string itself. */
-function commandCwdDerived(docFsPath: string, basePath?: string): string {
-	return resolveLocationFsPath(docFsPath, ".", basePath);
-}
-
-export function runGet(file: string, opts: GetOptions = {}): CommandResult {
-	if (!opts.id) return fail(`error: id is required\n\n${HELP_GET}`, 2);
-	const ids = splitCommaList(opts.id);
-	if (ids.length === 0) return fail(`error: id is required\n\n${HELP_GET}`, 2);
-
-	// Omitted field positional means "all set fields"; present-but-empty
-	// (e.g. an empty/blank field positional) is still a usage error.
-	const explicitFields =
-		opts.field !== undefined ? splitCommaList(opts.field) : undefined;
-	if (explicitFields !== undefined && explicitFields.length === 0) {
-		return fail(`error: field is required\n\n${HELP_GET}`, 2);
+/** Takes the kind the caller already resolved (nodeKinds.get(id)). Listing the
+ * three kinds exhaustively lets tsc flag a new NodeKind instead (#607). */
+function metaFor(
+	frontmatter: ReturnType<typeof analyze>["frontmatter"],
+	id: string,
+	kind: NodeKind,
+): Record<string, unknown> | undefined {
+	switch (kind) {
+		case "artifact":
+			return frontmatter?.artifact?.[id];
+		case "process":
+			return frontmatter?.process?.[id];
+		case "group":
+			return frontmatter?.group?.[id];
 	}
+}
 
-	const src = readSource(file);
-	if (isCommandResult(src)) return src;
+interface NodeFieldsResult {
+	values: Record<string, Record<string, unknown>>;
+	displayFieldsById: Record<string, string[]>;
+	warnText: string;
+	failures: (ReferenceFailure & { id: string; field: string })[];
+}
 
-	const { diagnostics, frontmatter, nodeKinds } = analyze(src);
-	const failed = failIfErrors(diagnostics, file, opts.json, opts.color);
-	if (failed) return failed;
-
-	const basePath = frontmatter?.basePath;
-	const docFsPath = file === "-" ? null : resolve(file);
-
-	const metaFor = (id: string): Record<string, unknown> | undefined => {
-		switch (nodeKinds.get(id)) {
-			case "artifact":
-				return frontmatter?.artifact?.[id];
-			case "process":
-				return frontmatter?.process?.[id];
-			case "group":
-				return frontmatter?.group?.[id];
-			default:
-				return undefined;
-		}
-	};
-
-	const missing: string[] = [];
+/**
+ * Shared field-rendering core of `meta get` and `meta list`: for each
+ * (id, kind) pair, builds the row of field values — the explicit field list,
+ * or (when omitted) every field set on the node, raw, in frontmatter order —
+ * plus derived fields (`location.resolved`, `command.cwd`) auto-added right
+ * after their base field. Also collects the warning families both commands
+ * emit (an unrecognized field name; a derived field unresolvable from stdin)
+ * into one formatted block.
+ */
+function collectNodeFields(
+	idsAndKinds: readonly { id: string; kind: NodeKind }[],
+	frontmatter: ReturnType<typeof analyze>["frontmatter"],
+	explicitFields: string[] | undefined,
+	docFsPath: string | null,
+	context: ReferenceContext | undefined,
+): NodeFieldsResult {
 	// Keyed by "kind::field" so one warning covers every id sharing that
 	// (kind, field) pair instead of repeating per id (#479 usability re-check).
 	const unknownFieldIds = new Map<string, string[]>();
@@ -1238,36 +2309,62 @@ export function runGet(file: string, opts: GetOptions = {}): CommandResult {
 
 	const values: Record<string, Record<string, unknown>> = {};
 	const displayFieldsById: Record<string, string[]> = {};
+	const failures: NodeFieldsResult["failures"] = [];
 
-	for (const id of ids) {
-		const kind = nodeKinds.get(id);
-		if (kind === undefined) {
-			missing.push(id);
-			continue;
-		}
-		const meta = metaFor(id);
+	for (const { id, kind } of idsAndKinds) {
+		const meta = metaFor(frontmatter, id, kind);
 		const row: Record<string, unknown> = {};
 		const displayFields: string[] = [];
 		const addField = (field: string) => {
 			if (!displayFields.includes(field)) displayFields.push(field);
 		};
-
-		// Derived fields auto-accompany their base field right after it, but
-		// only when the node actually has the base field and we have a real
-		// file path to resolve against (not stdin).
-		const addLocationResolvedIfApplicable = () => {
-			if (meta?.location === undefined || docFsPath === null) return;
-			row["location.resolved"] = resolveLocationDerived(
-				docFsPath,
-				meta.location,
-				basePath,
-			);
-			addField("location.resolved");
+		const computeDerived = (field: string) => {
+			if (kind === "group") return null;
+			if (
+				docFsPath === null &&
+				!context &&
+				!(
+					kind === "artifact" &&
+					(meta?.ref !== undefined || frontmatter?.baseRef !== undefined)
+				)
+			) {
+				flagStdin(field, id);
+				return null;
+			}
+			const base = field === "command.cwd" ? "." : meta?.location;
+			const one = (value: unknown) => {
+				const result = resolveCheckedReference({
+					docPath: docFsPath,
+					frontmatter,
+					nodeKind: kind,
+					nodeId: id,
+					field: field === "command.cwd" ? "command.cwd" : "location",
+					value: String(value),
+					...(context ? { context } : {}),
+				});
+				if (!result.ok) {
+					failures.push({ ...result, id, field });
+					return null;
+				}
+				return result.value;
+			};
+			return Array.isArray(base) ? base.map(one) : one(base);
 		};
-		const addCommandCwdIfApplicable = () => {
-			if (meta?.command === undefined || docFsPath === null) return;
-			row["command.cwd"] = commandCwdDerived(docFsPath, basePath);
-			addField("command.cwd");
+
+		// Derived fields auto-accompany their base field right after it. Two
+		// different conditions, deliberately kept apart: a node without the base
+		// field does not get the derived one at all (it does not apply), while a
+		// node that has it but cannot be resolved against a real path answers
+		// with null and says why. Dropping the latter silently would read as
+		// "this node has no location", and would make the key set of --json
+		// depend on whether the input arrived as a file or a pipe (#510).
+		const addDerivedFor = (baseField: string) => {
+			for (const [derived, spec] of Object.entries(DERIVED_FIELD_SPECS)) {
+				if (spec.base !== baseField || meta?.[baseField] === undefined)
+					continue;
+				addField(derived);
+				row[derived] = computeDerived(derived);
+			}
 		};
 
 		if (explicitFields === undefined) {
@@ -1276,37 +2373,27 @@ export function runGet(file: string, opts: GetOptions = {}): CommandResult {
 			for (const field of meta ? Object.keys(meta) : []) {
 				row[field] = meta![field];
 				addField(field);
-				if (field === "location") addLocationResolvedIfApplicable();
-				if (field === "command") addCommandCwdIfApplicable();
+				addDerivedFor(field);
 			}
 		} else {
 			for (const field of explicitFields) {
-				if (field === "location.resolved" || field === "command.cwd") {
+				const derivedSpec = DERIVED_FIELD_SPECS[field];
+				if (derivedSpec) {
 					addField(field);
-					if (!DERIVED_FIELDS[kind].has(field)) flagUnknown(kind, field, id);
-					if (docFsPath === null) {
-						row[field] = null;
-						flagStdin(field, id);
-						continue;
-					}
-					if (field === "location.resolved") {
-						row[field] =
-							meta?.location === undefined
-								? null
-								: resolveLocationDerived(docFsPath, meta.location, basePath);
-					} else {
-						row[field] =
-							meta?.command === undefined
-								? null
-								: commandCwdDerived(docFsPath, basePath);
-					}
+					if (!derivedFieldAcceptedBy(kind, field))
+						flagUnknown(kind, field, id);
+					// Asked for by name, so an absent base field answers with null
+					// rather than being dropped from the output.
+					row[field] =
+						meta?.[derivedSpec.base] === undefined
+							? null
+							: computeDerived(field);
 					continue;
 				}
 				addField(field);
 				if (!KNOWN_FIELDS[kind].has(field)) flagUnknown(kind, field, id);
 				row[field] = meta?.[field] ?? null;
-				if (field === "location") addLocationResolvedIfApplicable();
-				if (field === "command") addCommandCwdIfApplicable();
+				addDerivedFor(field);
 			}
 		}
 
@@ -1325,7 +2412,55 @@ export function runGet(file: string, opts: GetOptions = {}): CommandResult {
 			`warning: cannot resolve '${field}' for ${affectedIds.length === 1 ? `'${affectedIds[0]}'` : `id(s) ${affectedIds.join(", ")}`}: no file path when reading from stdin`,
 	);
 	const warnings = [...unknownWarnings, ...stdinWarnings];
-	const warnText = warnings.length ? `${warnings.join("\n")}\n` : "";
+	return {
+		values,
+		displayFieldsById,
+		warnText: warnings.length ? `${warnings.join("\n")}\n` : "",
+		failures,
+	};
+}
+
+export function runGet(file: string, opts: GetOptions = {}): CommandResult {
+	if (!opts.id) return fail(`error: id is required\n\n${HELP_GET}`, 2);
+	const ids = parseIdList(opts.id);
+	if (ids.length === 0) return fail(`error: id is required\n\n${HELP_GET}`, 2);
+
+	// Omitted field positional means "all set fields"; present-but-empty
+	// (e.g. an empty/blank field positional) is still a usage error.
+	const explicitFields =
+		opts.field !== undefined ? splitCommaList(opts.field) : undefined;
+	if (explicitFields !== undefined && explicitFields.length === 0) {
+		return fail(`error: field is required\n\n${HELP_GET}`, 2);
+	}
+
+	const src = readSource(file);
+	if (isCommandResult(src)) return src;
+
+	const { diagnostics, frontmatter, nodeKinds } = analyze(src);
+	const failed = failIfErrors(diagnostics, file, opts.json, opts.color);
+	if (failed) return failed;
+
+	const docFsPath = file === "-" ? null : resolve(file);
+
+	const missing: string[] = [];
+	const known: { id: string; kind: NodeKind }[] = [];
+	for (const id of ids) {
+		const kind = nodeKinds.get(id);
+		if (kind === undefined) missing.push(id);
+		else known.push({ id, kind });
+	}
+
+	const contextResult = readReferenceContext(opts.referenceContext);
+	if (!contextResult.ok)
+		return referenceFailureResult([contextResult], opts.json);
+	const { values, displayFieldsById, warnText, failures } = collectNodeFields(
+		known,
+		frontmatter,
+		explicitFields,
+		docFsPath,
+		contextResult.context,
+	);
+	if (failures.length) return referenceFailureResult(failures, opts.json);
 
 	const linesFor = (idsToPrint: string[]) =>
 		idsToPrint.flatMap((id) =>
@@ -1358,7 +2493,239 @@ export function runGet(file: string, opts: GetOptions = {}): CommandResult {
 	return ok(lines.length ? `${lines.join("\n")}\n` : "", warnText);
 }
 
+export interface MetaListOptions {
+	referenceContext?: string;
+	tag?: string;
+	group?: string;
+	producer?: string;
+	field?: string;
+	json?: boolean;
+	color?: boolean;
+}
+
+/** True when a node's tags: array (if any) includes at least one of `filter`. */
+function matchesAnyTag(
+	meta: Record<string, unknown> | undefined,
+	filter: Set<string>,
+): boolean {
+	const tags = meta?.tags;
+	if (!Array.isArray(tags)) return false;
+	return tags.some((t) => filter.has(String(t)));
+}
+
+export function runMetaList(
+	file: string,
+	opts: MetaListOptions = {},
+): CommandResult {
+	if (
+		opts.tag === undefined &&
+		opts.group === undefined &&
+		opts.producer === undefined
+	) {
+		return fail(
+			`error: at least one selector is required (--tag, --group, --producer)\n\n${HELP_META_LIST}`,
+			2,
+		);
+	}
+
+	const explicitFields =
+		opts.field !== undefined ? splitCommaList(opts.field) : undefined;
+	if (explicitFields !== undefined && explicitFields.length === 0) {
+		return fail(`error: field is required\n\n${HELP_META_LIST}`, 2);
+	}
+
+	const src = readSource(file);
+	if (isCommandResult(src)) return src;
+
+	const { diagnostics, frontmatter, nodeKinds, graph } = analyze(src);
+	const failed = failIfErrors(diagnostics, file, opts.json, opts.color);
+	if (failed) return failed;
+
+	const docFsPath = file === "-" ? null : resolve(file);
+
+	const tagFilter =
+		opts.tag !== undefined ? new Set(splitCommaList(opts.tag)) : undefined;
+	const producerOutputs =
+		opts.producer !== undefined
+			? new Set(
+					graph.primaryEdges
+						.filter((e) => e.kind === "output" && e.from === opts.producer)
+						.map((e) => e.to),
+				)
+			: undefined;
+
+	const known: { id: string; kind: NodeKind }[] = [];
+	// Tracked independent of tagFilter/opts.group/producerOutputs matching so
+	// a selector value's use across the whole file, not just within the AND
+	// intersection with other selectors, decides whether it warns (#844):
+	// an AND combination legitimately narrowing to zero rows is not a typo.
+	const usedTags = new Set<string>();
+	let groupUsed = false;
+	for (const [id, kind] of nodeKinds) {
+		// meta list only ever selects artifact/process — --producer can only
+		// ever match an artifact, and --tag/--group read a field group nodes
+		// don't have, but the kind check keeps that implicit rather than
+		// depending on the two selectors to exclude group on their own.
+		if (kind !== "artifact" && kind !== "process") continue;
+		const meta = metaFor(frontmatter, id, kind);
+		const tags = meta?.tags;
+		if (tagFilter !== undefined && Array.isArray(tags))
+			for (const t of tags) usedTags.add(String(t));
+		if (opts.group !== undefined && meta?.group === opts.group)
+			groupUsed = true;
+		if (tagFilter !== undefined && !matchesAnyTag(meta, tagFilter)) continue;
+		if (opts.group !== undefined && meta?.group !== opts.group) continue;
+		if (producerOutputs !== undefined && !producerOutputs.has(id)) continue;
+		known.push({ id, kind });
+	}
+	known.sort((a, b) => compareIds(a.id, b.id));
+
+	const selectorWarnings: string[] = [];
+	if (tagFilter !== undefined) {
+		for (const t of tagFilter) {
+			if (!usedTags.has(t)) {
+				selectorWarnings.push(
+					`warning: '${t}' does not match any node's tag (possible typo?)`,
+				);
+			}
+		}
+	}
+	if (opts.group !== undefined && !groupUsed) {
+		selectorWarnings.push(
+			`warning: '${opts.group}' does not match any node's group (possible typo?)`,
+		);
+	}
+	if (opts.producer !== undefined && producerOutputs?.size === 0) {
+		selectorWarnings.push(
+			`warning: '${opts.producer}' has no output edges (possible typo?)`,
+		);
+	}
+	const selectorWarnText = selectorWarnings.length
+		? `${selectorWarnings.join("\n")}\n`
+		: "";
+
+	const contextResult = readReferenceContext(opts.referenceContext);
+	if (!contextResult.ok)
+		return referenceFailureResult([contextResult], opts.json);
+	const { values, displayFieldsById, warnText, failures } = collectNodeFields(
+		known,
+		frontmatter,
+		explicitFields,
+		docFsPath,
+		contextResult.context,
+	);
+	if (failures.length) return referenceFailureResult(failures, opts.json);
+	const combinedWarnText = `${selectorWarnText}${warnText}`;
+
+	if (opts.json) {
+		return ok(`${JSON.stringify({ ok: true, values })}\n`, combinedWarnText);
+	}
+
+	if (known.length === 0) {
+		return ok("No nodes match the given selectors.\n", combinedWarnText);
+	}
+	const lines = known.flatMap(({ id }) =>
+		(displayFieldsById[id] ?? []).map((field) =>
+			formatGetLine(id, field, values),
+		),
+	);
+	return ok(lines.length ? `${lines.join("\n")}\n` : "", combinedWarnText);
+}
+
+/**
+ * Fields whose values may also be declared in a frontmatter section of their
+ * own, where declaring is optional and a node may use an undeclared value
+ * (spec §2.7.2 / §2.8). `meta values` seeds those declarations at a count of
+ * 0, so a declared-but-unused value appears in the table instead of being
+ * absent from it. The section name differs from the field name for `tags`,
+ * which is why this is a table rather than an identity.
+ */
+const DECLARATION_SECTION_FOR_FIELD: Record<string, "group" | "tag"> = {
+	group: "group",
+	tags: "tag",
+};
+
+export interface MetaValuesOptions {
+	json?: boolean;
+	color?: boolean;
+}
+
+/**
+ * The vocabulary of a field: every value in use, with how many nodes use it.
+ * Answers "which values can I pass to `meta list --group`" without a grep of
+ * the frontmatter — the selector warning (#848) tells a caller that a value
+ * is wrong but not which ones are right (#844). Raw frontmatter fields only:
+ * a derived field (location.resolved, command.cwd) has no vocabulary to
+ * enumerate and is reported as unrecognized.
+ */
+export function runMetaValues(
+	file: string,
+	field: string,
+	opts: MetaValuesOptions = {},
+): CommandResult {
+	const fields = splitCommaList(field);
+	if (fields.length === 0) return fail(HELP_META_VALUES, 2);
+
+	const src = readSource(file);
+	if (isCommandResult(src)) return src;
+	const { diagnostics, frontmatter, nodeKinds } = analyze(src);
+	const failed = failIfErrors(diagnostics, file, opts.json, opts.color);
+	if (failed) return failed;
+
+	const counts: Record<string, Record<string, number>> = {};
+	const unknownFields: string[] = [];
+	for (const f of fields) {
+		const tally = new Map<string, number>();
+		const section = DECLARATION_SECTION_FOR_FIELD[f];
+		if (section) {
+			for (const declared of Object.keys(frontmatter?.[section] ?? {}))
+				tally.set(declared, 0);
+		}
+		for (const [id, kind] of nodeKinds) {
+			const v = metaFor(frontmatter, id, kind)?.[f];
+			if (v === undefined || v === null) continue;
+			for (const one of Array.isArray(v) ? v : [v]) {
+				// A map-valued field (boundary) has no vocabulary of its own;
+				// naming the shape keeps it apart from a field nobody sets,
+				// which String() would not (it yields "[object Object]").
+				const key =
+					typeof one === "object" && one !== null ? "(object)" : String(one);
+				tally.set(key, (tally.get(key) ?? 0) + 1);
+			}
+		}
+		if (!Object.values(KNOWN_FIELDS).some((known) => known.has(f)))
+			unknownFields.push(f);
+		counts[f] = Object.fromEntries(
+			[...tally.entries()].sort(([a], [b]) => compareIds(a, b)),
+		);
+	}
+
+	const warnText = unknownFields.length
+		? `${unknownFields
+				.map(
+					(f) =>
+						`warning: '${f}' is not a recognized field for any node kind (possible typo?)`,
+				)
+				.join("\n")}\n`
+		: "";
+
+	if (opts.json) {
+		// `counts`, not `values`: `meta get` / `meta list` already use `values`
+		// for `{ [id]: { [field]: value } }`, and one key naming two shapes
+		// across the same command group makes the name useless as a
+		// discriminator to whoever reads the payload.
+		return ok(`${JSON.stringify({ ok: true, counts })}\n`, warnText);
+	}
+	const lines = fields.flatMap((f) => {
+		const entries = Object.entries(counts[f] ?? {});
+		if (entries.length === 0) return [`${f}: (no values)`];
+		return entries.map(([value, count]) => `${f}.${value}: ${count}`);
+	});
+	return ok(`${lines.join("\n")}\n`, warnText);
+}
+
 export interface CheckLinksOptions {
+	referenceContext?: string;
 	json?: boolean;
 	color?: boolean;
 }
@@ -1385,12 +2752,19 @@ export function runCheckLinks(
 	const src = readSource(file);
 	if (isCommandResult(src)) return src;
 
-	const { diagnostics, frontmatter } = analyze(src);
+	const { diagnostics, frontmatter, nodeKinds } = analyze(src);
 	const failed = failIfErrors(diagnostics, file, opts.json, opts.color);
 	if (failed) return failed;
 
-	const basePath = frontmatter?.basePath;
 	const docFsPath = resolve(file);
+	const contextResult = readReferenceContext(opts.referenceContext);
+	if (!contextResult.ok)
+		return referenceFailureResult([contextResult], opts.json);
+	const context = contextResult.context;
+	const includeEvidence =
+		context !== undefined || hasExplicitReferences(frontmatter);
+	const failures: (ReferenceFailure & { id: string })[] = [];
+	const results: Record<string, unknown>[] = [];
 
 	const missing: CheckLinksMissing[] = [];
 	const checkNode = (
@@ -1398,52 +2772,158 @@ export function runCheckLinks(
 		kind: "artifact" | "process",
 		location: unknown,
 	) => {
+		if (kind === "artifact" && includeEvidence) {
+			const selected = resolveArtifactSnapshot(frontmatter, id, context);
+			if (!selected.ok) {
+				failures.push({ ...selected, id });
+				results.push({ id, kind, result: "failed", ...selected });
+				return;
+			}
+			if (
+				(location === undefined ||
+					(Array.isArray(location) && location.length === 0)) &&
+				selected.kind === "resource"
+			) {
+				const failure = checkSnapshotPath(
+					selected.snapshot.root,
+					selected.snapshot.root,
+				);
+				if (failure) failures.push({ ...failure, id });
+				results.push({
+					id,
+					kind,
+					reference: selected.reference,
+					source: selected.snapshot.source,
+					fixedRevision: selected.snapshot.fixedRevision,
+					result: failure ? "failed" : "target-resolved",
+					...(failure ?? {}),
+				});
+			}
+		}
 		if (location === undefined) return;
 		const elements = Array.isArray(location) ? location : [location];
 		for (const element of elements) {
 			const value = String(element);
-			if (!isLocationCheckable(value)) continue;
-			const resolvedPath = resolveLocationFsPath(docFsPath, value, basePath);
+			const resolved = resolveCheckedReference({
+				docPath: docFsPath,
+				frontmatter,
+				nodeKind: kind,
+				nodeId: id,
+				field: "location",
+				value,
+				...(context ? { context } : {}),
+			});
+			if (!resolved.ok) {
+				failures.push({ ...resolved, id });
+				results.push({
+					id,
+					kind,
+					location: value,
+					result: "failed",
+					...resolved,
+				});
+				continue;
+			}
+			if (!isLocationCheckable(value)) {
+				results.push({
+					id,
+					nodeKind: kind,
+					location: value,
+					...resolved,
+					result: isUrlLike(value) ? "skipped-url" : "skipped-glob",
+				});
+				continue;
+			}
+			const resolvedPath = resolved.value;
 			if (!existsSync(resolvedPath)) {
 				missing.push({ id, kind, location: value, resolved: resolvedPath });
+				results.push({
+					id,
+					nodeKind: kind,
+					location: value,
+					...resolved,
+					result: "failed",
+					reason: "target-missing",
+				});
+			} else {
+				results.push({
+					id,
+					nodeKind: kind,
+					location: value,
+					...resolved,
+					result: "exists",
+				});
 			}
 		}
 	};
 
-	for (const [id, meta] of Object.entries(frontmatter?.artifact ?? {})) {
-		checkNode(id, "artifact", meta.location);
+	for (const [id, kind] of nodeKinds) {
+		if (kind === "artifact" || kind === "process") {
+			checkNode(id, kind, metaFor(frontmatter, id, kind)?.location);
+		}
 	}
-	for (const [id, meta] of Object.entries(frontmatter?.process ?? {})) {
-		checkNode(id, "process", meta.location);
-	}
-	missing.sort((a, b) => a.id.localeCompare(b.id));
+	missing.sort((a, b) => compareIds(a.id, b.id));
 
+	const referenceResolution = includeEvidence
+		? {
+				adapter: context?.adapter,
+				model: context?.model,
+				logicalPath: context?.logicalPath,
+				basis: context?.basis,
+				targets: context?.targets,
+				results,
+			}
+		: undefined;
 	if (opts.json) {
-		const exitCode = missing.length > 0 ? 1 : 0;
+		const exitCode = missing.length > 0 || failures.length > 0 ? 1 : 0;
 		return {
-			stdout: `${JSON.stringify({ ok: missing.length === 0, missing })}\n`,
+			stdout: `${JSON.stringify({ ok: exitCode === 0, missing, ...(failures.length ? { failures } : {}), ...(referenceResolution ? { referenceResolution } : {}) })}\n`,
 			stderr: "",
 			exitCode,
 		};
 	}
-	if (missing.length === 0) return ok("All location paths exist.\n");
+	if (missing.length === 0 && failures.length)
+		return referenceFailureResult(failures);
+	if (missing.length === 0)
+		return ok(
+			includeEvidence
+				? "All checked location paths exist in the selected snapshots. URLs and globs are not acceptance evidence; use --json for the resolution record.\n"
+				: "All location paths exist.\n",
+		);
 	const lines = missing.map(
 		(m) => `${m.id} (${m.kind})   ${m.location} -> ${m.resolved}`,
 	);
-	return { stdout: `${lines.join("\n")}\n`, stderr: "", exitCode: 1 };
+	return {
+		stdout: `${lines.join("\n")}\n`,
+		stderr: failures.length ? referenceFailureResult(failures).stderr : "",
+		exitCode: 1,
+	};
 }
 
+/**
+ * One `id.field: value` line.
+ * A field the node doesn't set reads `(unset)`, while an empty array reads `(empty)` and an empty string prints nothing after the colon.
+ * JSON preserves those values as null, [], and "".
+ * The markers are bracketed like `graph neighbors`'s `(none)`.
+ */
 function formatGetLine(
 	id: string,
 	field: string,
 	values: Record<string, Record<string, unknown>>,
 ): string {
 	const v = values[id]?.[field];
-	const display = Array.isArray(v) ? v.join(", ") : v === null ? "" : String(v);
+	const display = Array.isArray(v)
+		? v.length === 0
+			? "(empty)"
+			: v.join(", ")
+		: v === null
+			? "(unset)"
+			: String(v);
 	return `${id}.${field}: ${display}`;
 }
 
 export interface GraphAnalysisOptions {
+	referenceContext?: string;
 	json?: boolean;
 	color?: boolean;
 }
@@ -1475,6 +2955,28 @@ function idsNotFoundError(
 	return fail(`error: id(s) not found in ${file}: ${ids.join(", ")}\n`, 1);
 }
 
+/**
+ * Text rendering shared by `graph neighbors` and `graph describe`: one
+ * `<role> (<neighborKind>): <ids>` line, feedback neighbors annotated. The
+ * kind is on the role rather than on each id because every neighbor has the
+ * same one — every edge runs artifact -> process or the reverse (#844). A
+ * group has no neighbors and so no kind to name; its line keeps the bare
+ * `<role>: (none)` form.
+ */
+function renderNeighborLine(
+	role: "predecessors" | "successors",
+	ns: GraphNeighbor[],
+	neighborKind: NodeKind | null,
+): string {
+	const ids =
+		ns
+			.map((n) => (n.kind === "feedback" ? `${n.id} (feedback)` : n.id))
+			.join(", ") || "(none)";
+	return neighborKind === null
+		? `${role}: ${ids}`
+		: `${role} (${neighborKind}): ${ids}`;
+}
+
 export function runNeighbors(
 	file: string,
 	id: string,
@@ -1482,15 +2984,198 @@ export function runNeighbors(
 ): CommandResult {
 	const loaded = loadGraph(file, opts.json, opts.color);
 	if (isGraphLoadFailure(loaded)) return loaded;
-	if (!loaded.graph.nodes.has(id))
-		return idsNotFoundError(file, [id], opts.json);
-	const { predecessors, successors } = computeNeighbors(loaded.graph, id);
-	if (opts.json) {
-		return ok(`${JSON.stringify({ ok: true, predecessors, successors })}\n`);
-	}
-	return ok(
-		`predecessors: ${predecessors.join(", ") || "(none)"}\nsuccessors: ${successors.join(", ") || "(none)"}\n`,
+	// One lookup for both the existence check and the kind the output leads
+	// with — the same kind `neighborKind` is derived from.
+	const kind = loaded.graph.nodes.get(id);
+	if (kind === undefined) return idsNotFoundError(file, [id], opts.json);
+	const { predecessors, successors, neighborKind } = computeNeighbors(
+		loaded.graph,
+		id,
 	);
+	if (opts.json) {
+		return ok(
+			`${JSON.stringify({ ok: true, id, kind, neighborKind, predecessors, successors })}\n`,
+		);
+	}
+	const lines = [
+		`${id} (${kind})`,
+		renderNeighborLine("predecessors", predecessors, neighborKind),
+		renderNeighborLine("successors", successors, neighborKind),
+	];
+	return ok(`${lines.join("\n")}\n`);
+}
+
+/**
+ * Text rendering shared by `graph locate` and `graph describe`: one
+ * `<file>:<line>: <kind>` line per occurrence — declaration, then the found
+ * field lines, then edge lines. Field lines are ordered by line, not by the
+ * order they were asked for, so the whole list reads top-to-bottom like the
+ * file does; each line names its field, so the correspondence with the
+ * request survives the reordering. `fields`/`fieldLines` default to empty,
+ * so `graph describe` (which never requests fields) renders exactly as
+ * before.
+ */
+function renderLocateLines(
+	file: string,
+	declarationLine: number | null,
+	edgeLines: readonly number[],
+	fields: readonly string[] = [],
+	fieldLines: Record<string, number | null> = {},
+): string[] {
+	const lines: string[] = [];
+	if (declarationLine !== null) {
+		lines.push(`${file}:${declarationLine}: declaration`);
+	}
+	const foundFields = fields
+		.map((field) => ({ field, line: fieldLines[field] }))
+		.filter(
+			(f): f is { field: string; line: number } =>
+				f.line !== null && f.line !== undefined,
+		)
+		.sort((a, b) => a.line - b.line);
+	for (const { field, line } of foundFields) {
+		lines.push(`${file}:${line}: field ${field}`);
+	}
+	for (const line of edgeLines) lines.push(`${file}:${line}: edge`);
+	return lines;
+}
+
+export interface GraphLocateOptions extends GraphAnalysisOptions {
+	field?: string;
+}
+
+/**
+ * Where <id> appears in the file: its frontmatter declaration key line (if
+ * any), every body line it's mentioned on, and (with `--field`) the line of
+ * each named field within its declaration block. `loadGraph` doesn't expose
+ * the source text it read, and `locateNode` needs it, so this reads and
+ * analyzes the file itself rather than going through that shared loader.
+ */
+export function runGraphLocate(
+	file: string,
+	id: string,
+	opts: GraphLocateOptions = {},
+): CommandResult {
+	const fields = opts.field !== undefined ? splitCommaList(opts.field) : [];
+
+	const src = readSource(file);
+	if (isCommandResult(src)) return src;
+	const { diagnostics, document, nodeKinds } = analyze(src);
+	const failed = failIfErrors(diagnostics, file, opts.json, opts.color);
+	if (failed) return failed;
+	// nodeKinds rather than graph.nodes: the two hold the same id set (the
+	// graph's node map is seeded from nodeKinds), and locateNode needs the
+	// kind to know which frontmatter section to look the id up in.
+	const kind = nodeKinds.get(id);
+	if (kind === undefined) return idsNotFoundError(file, [id], opts.json);
+
+	const { declarationLine, edgeLines, fieldLines } = locateNode(
+		document,
+		src,
+		id,
+		kind,
+		fields,
+	);
+
+	// A requested field with no line in the node's declaration block is
+	// usually a typo — warn, same style as meta get's unknown-field warning
+	// (#844) — without failing the command.
+	const missingFieldWarnings = fields
+		.filter((field) => fieldLines[field] === null)
+		.map(
+			(field) =>
+				`warning: '${field}' has no line in '${id}'s declaration block (possible typo?)`,
+		);
+	const warnText = missingFieldWarnings.length
+		? `${missingFieldWarnings.join("\n")}\n`
+		: "";
+
+	if (opts.json) {
+		return ok(
+			`${JSON.stringify({ ok: true, id, declarationLine, edgeLines, fieldLines })}\n`,
+			warnText,
+		);
+	}
+	const lines = renderLocateLines(
+		file,
+		declarationLine,
+		edgeLines,
+		fields,
+		fieldLines,
+	);
+	return ok(lines.length ? `${lines.join("\n")}\n` : "", warnText);
+}
+
+/**
+ * One node's full picture in a single call: kind, every frontmatter field
+ * (`collectNodeFields`, same as `meta get`/`meta list`), direct
+ * predecessors/successors (`computeNeighbors`, same as `graph neighbors`),
+ * and where it appears in the file (`locateNode`, same as `graph locate`) —
+ * folding several read-only queries an agent would otherwise make
+ * separately into one (#829). Existence is checked via `nodeKinds` rather
+ * than `graph.nodes` — the same id set either way, but the kind this
+ * command reports (and `collectNodeFields` needs) is what that map holds.
+ */
+export function runGraphDescribe(
+	file: string,
+	id: string,
+	opts: GraphAnalysisOptions = {},
+): CommandResult {
+	const src = readSource(file);
+	if (isCommandResult(src)) return src;
+	const { diagnostics, document, frontmatter, nodeKinds, graph } = analyze(src);
+	const failed = failIfErrors(diagnostics, file, opts.json, opts.color);
+	if (failed) return failed;
+
+	const kind = nodeKinds.get(id);
+	if (kind === undefined) return idsNotFoundError(file, [id], opts.json);
+
+	const docFsPath = file === "-" ? null : resolve(file);
+	const contextResult = readReferenceContext(opts.referenceContext);
+	if (!contextResult.ok)
+		return referenceFailureResult([contextResult], opts.json);
+	const { values, displayFieldsById, warnText, failures } = collectNodeFields(
+		[{ id, kind }],
+		frontmatter,
+		undefined,
+		docFsPath,
+		contextResult.context,
+	);
+	if (failures.length) return referenceFailureResult(failures, opts.json);
+	const { predecessors, successors, neighborKind } = computeNeighbors(
+		graph,
+		id,
+	);
+	const { declarationLine, edgeLines } = locateNode(document, src, id, kind);
+
+	if (opts.json) {
+		return ok(
+			`${JSON.stringify({
+				ok: true,
+				id,
+				kind,
+				meta: values[id],
+				neighborKind,
+				predecessors,
+				successors,
+				declarationLine,
+				edgeLines,
+			})}\n`,
+			warnText,
+		);
+	}
+
+	const fieldLines = (displayFieldsById[id] ?? []).map((field) =>
+		formatGetLine(id, field, values),
+	);
+	const lines = [
+		`${id} (${kind})`,
+		...fieldLines,
+		renderNeighborLine("predecessors", predecessors, neighborKind),
+		renderNeighborLine("successors", successors, neighborKind),
+		...renderLocateLines(file, declarationLine, edgeLines),
+	];
+	return ok(`${lines.join("\n")}\n`, warnText);
 }
 
 export function runImpact(
@@ -1563,10 +3248,16 @@ export function runStats(file: string, opts: StatsOptions = {}): CommandResult {
 	const all = computeStats(loaded.graph);
 	const stats = opts.limit !== undefined ? all.slice(0, opts.limit) : all;
 	if (opts.json) return ok(`${JSON.stringify({ ok: true, stats })}\n`);
-	const lines = stats.map(
-		(s) =>
-			`${s.id} (${s.kind})   fan-in=${s.fanIn}  fan-out=${s.fanOut}  total=${s.fanIn + s.fanOut}`,
-	);
+	const lines = stats.map((s) => {
+		// Appended rather than columnar: most files carry no feedback at all, and
+		// a pair of zeroes on every row would cost more than it tells.
+		const feedback = [
+			s.feedbackFanIn ? `feedback-in=${s.feedbackFanIn}` : "",
+			s.feedbackFanOut ? `feedback-out=${s.feedbackFanOut}` : "",
+		].filter(Boolean);
+		const suffix = feedback.length ? `  ${feedback.join("  ")}` : "";
+		return `${s.id} (${s.kind})   fan-in=${s.fanIn}  fan-out=${s.fanOut}  total=${s.fanIn + s.fanOut}${suffix}`;
+	});
 	const hint =
 		opts.limit === undefined && all.length > STATS_HINT_THRESHOLD
 			? `(${all.length} nodes total — pass --limit <n> to narrow)\n`
@@ -1579,21 +3270,19 @@ export interface GraphOrphansOptions {
 	color?: boolean;
 }
 
-export interface GraphOrphan {
-	id: string;
-	kind: NodeKind;
-}
+// The shape moved to core with computeOrphans; re-exported because this
+// package publishes dist/index.d.ts as a type surface and the name was
+// already on it.
+export type { GraphOrphan };
 
-/** Nodes with neither predecessor nor successor — fully disconnected from the graph (§518). */
+/** Nodes wired to nothing — no primary edge and no feedback edge (§518). */
 export function runGraphOrphans(
 	file: string,
 	opts: GraphOrphansOptions = {},
 ): CommandResult {
 	const loaded = loadGraph(file, opts.json, opts.color);
 	if (isGraphLoadFailure(loaded)) return loaded;
-	const orphans: GraphOrphan[] = computeStats(loaded.graph)
-		.filter((s) => s.fanIn === 0 && s.fanOut === 0)
-		.map((s) => ({ id: s.id, kind: s.kind }));
+	const orphans: GraphOrphan[] = computeOrphans(loaded.graph);
 	if (opts.json) return ok(`${JSON.stringify({ ok: true, orphans })}\n`);
 	if (orphans.length === 0) return ok("(none)\n");
 	return ok(`${orphans.map((o) => `${o.id} (${o.kind})`).join("\n")}\n`);
@@ -1679,16 +3368,18 @@ export function runGraphIo(
 	const loaded = loadForAudit(file, opts.json, opts.color);
 	if ("exitCode" in loaded) return loaded;
 	const { edges, nodeKinds, artifactMeta } = loaded;
-	const { terminals, externalInputs } = auditGraph(
+	const { terminals, externalInputs, externalTerminals } = auditGraph(
 		edges,
 		nodeKinds,
 		artifactMeta,
 	);
 	if (opts.json) {
-		return ok(`${JSON.stringify({ ok: true, externalInputs, terminals })}\n`);
+		return ok(
+			`${JSON.stringify({ ok: true, externalInputs, terminals, externalTerminals })}\n`,
+		);
 	}
 	return ok(
-		`external inputs: ${externalInputs.join(", ")}\nterminal artifacts: ${terminals.join(", ")}\n`,
+		`external inputs: ${externalInputs.join(", ")}\nterminal artifacts: ${terminals.join(", ")}\nexternal-stakeholder terminals: ${externalTerminals.join(", ")}\n`,
 	);
 }
 
@@ -1701,14 +3392,26 @@ export interface StatusGap {
 	file: string;
 	artifactId: string;
 	label: string;
-	status: string;
 }
 
 export interface StatusGapsResult {
 	ok: boolean;
 	gaps: StatusGap[];
+	/** Number of roadmap-tracked artifacts scanned across all flow files, tracked or not. */
+	trackedArtifactCount: number;
 	warnings?: Diagnostic[];
 }
+
+/**
+ * The tag a flow artifact carries to say "this one is an individually tracked
+ * deliverable, so the roadmap must have a chain that builds it". The selector
+ * used to be `status: todo`, but a flow file may not carry status at all
+ * (W007, §15.15) — that selector could only match files already in violation.
+ * An opt-in tag also keeps the check quiet by default: comparing every flow id
+ * against the roadmap flags 42 of this repo's own 47 workflow artifacts, which
+ * are process byproducts nobody ever meant to track one by one.
+ */
+const ROADMAP_TRACKED_TAG = "roadmap-tracked";
 
 export function runStatusGaps(
 	roadmapFile: string,
@@ -1736,26 +3439,23 @@ export function runStatusGaps(
 		? diagText(warnings, roadmapFile, opts.color)
 		: "";
 
-	const ROADMAP_REQUIRED_TYPE = "roadmap" satisfies PfdType;
-	if (
-		roadmapFm?.type !== undefined &&
-		roadmapFm.type !== ROADMAP_REQUIRED_TYPE
-	) {
+	if (!isRoadmapType(roadmapFm?.type)) {
 		return fail(
-			`status gaps: roadmap file must have type: roadmap. Got type: ${roadmapFm.type}\n`,
+			`status gaps: roadmap file must have type: roadmap. Got type: ${roadmapFm?.type}\n`,
 			2,
 		);
 	}
 
-	// Collect all artifact IDs that appear in the roadmap (declared or in edges)
-	const roadmapArtifactIds = new Set<string>(
-		Object.keys(roadmapFm?.artifact ?? {}),
-	);
+	// The question is whether the roadmap builds the artifact, so only ids it
+	// produces count. An id it merely consumes is an external input there —
+	// present in the file, but with nothing in it that produces the thing.
+	const roadmapArtifactIds = new Set<string>();
 	for (const e of roadmapEdges) {
-		roadmapArtifactIds.add(e.artifact);
+		if (e.kind === "output") roadmapArtifactIds.add(e.artifact);
 	}
 
 	const gaps: StatusGap[] = [];
+	let trackedArtifactCount = 0;
 
 	for (const flowFile of flowFiles) {
 		const flowSrc = readSource(flowFile);
@@ -1765,29 +3465,37 @@ export function runStatusGaps(
 		const flowFail = failIfErrors(flowDiags, flowFile, opts.json, opts.color);
 		if (flowFail) return flowFail;
 
-		const flowType = flowFm?.type;
-		if (flowType === ROADMAP_REQUIRED_TYPE) {
+		// The flow argument is the mirror case: an explicit roadmap is refused,
+		// while an omitted type is left alone (it is not claiming to be one).
+		if (flowFm?.type === "roadmap") {
 			return fail(
-				`status gaps: flow file must be workflow or runtime-pipeline, not roadmap: ${flowFile}\n`,
+				`status gaps: flow file must be workflow or pipeline, not roadmap: ${flowFile}\n`,
 				2,
 			);
 		}
 
 		for (const [aid, meta] of Object.entries(flowFm?.artifact ?? {})) {
-			if (meta.status === "todo") {
-				if (!roadmapArtifactIds.has(aid)) {
-					gaps.push({
-						file: flowFile,
-						artifactId: aid,
-						label: meta.label ?? aid,
-						status: "todo",
-					});
-				}
+			// Array.isArray first: `tags:` written without brackets parses as a
+			// plain string, and String#includes would then accept any value with
+			// the tag as a substring.
+			if (!Array.isArray(meta.tags) || !meta.tags.includes(ROADMAP_TRACKED_TAG))
+				continue;
+			trackedArtifactCount++;
+			if (!roadmapArtifactIds.has(aid)) {
+				gaps.push({
+					file: flowFile,
+					artifactId: aid,
+					label: labelForDisplay(meta.label, aid),
+				});
 			}
 		}
 	}
 
-	const result: StatusGapsResult = { ok: gaps.length === 0, gaps };
+	const result: StatusGapsResult = {
+		ok: gaps.length === 0,
+		gaps,
+		trackedArtifactCount,
+	};
 	if (warnings.length) result.warnings = warnings;
 
 	if (opts.json) {
@@ -1800,13 +3508,20 @@ export function runStatusGaps(
 	}
 
 	if (gaps.length === 0) {
+		if (trackedArtifactCount === 0) {
+			return ok(
+				`No artifacts tagged ${ROADMAP_TRACKED_TAG} found in the flow files — this check verified nothing. ` +
+					`It only inspects artifacts whose tags include ${ROADMAP_TRACKED_TAG}; without that tag this check has no target.\n`,
+				warnText,
+			);
+		}
 		return ok(
-			"All todo artifacts in flow files are tracked in the roadmap.\n",
+			`All ${ROADMAP_TRACKED_TAG} artifacts in flow files are tracked in the roadmap.\n`,
 			warnText,
 		);
 	}
 
-	const lines: string[] = [`Untracked todo artifacts (${gaps.length}):`];
+	const lines: string[] = [`Untracked artifacts (${gaps.length}):`];
 	for (const g of gaps) {
 		lines.push(`  ${g.artifactId.padEnd(20)} "${g.label}"   in: ${g.file}`);
 	}
@@ -1822,6 +3537,7 @@ export { svgToBinary };
 export type CliRenderFormat = RenderFormat | BinaryFormat;
 
 export interface RenderOptions {
+	referenceContext?: string;
 	format?: CliRenderFormat;
 	color?: boolean;
 }
@@ -1835,17 +3551,36 @@ export async function runRender(
 	const { graph, frontmatter, diagnostics } = analyze(graphSrc);
 	const failed = failIfErrors(diagnostics, file, undefined, opts.color);
 	if (failed) return failed;
+	const contextResult = readReferenceContext(opts.referenceContext);
+	if (!contextResult.ok) return referenceFailureResult([contextResult]);
+	const context = contextResult.context;
+	const referenceNotice =
+		context !== undefined || hasExplicitReferences(frontmatter);
 
 	// Resolve extends-inherited statusStyles/tag/group (§2.9.4) so presets
 	// shared across files actually affect rendering, not just `check`.
-	// Skipped for stdin (-): relative extends paths need a base file.
+	// Legacy stdin has no base file; an explicit context supplies a logical position.
 	let effectiveFrontmatter = frontmatter;
-	if (file !== "-") {
+	if (file !== "-" || context) {
+		const dependencyPath = modelDependencyPath(file, frontmatter, context);
+		if (!dependencyPath.ok) return referenceFailureResult([dependencyPath]);
+		const dependencyFailures: ReferenceFailure[] = [];
 		effectiveFrontmatter = resolveEffectiveFrontmatter(
-			resolve(file),
+			dependencyPath.path,
 			frontmatter,
-			fileLoader,
+			(path) => {
+				if (context?.basis) {
+					const failure = checkSnapshotPath(context.basis.root, path);
+					if (failure) {
+						dependencyFailures.push(failure);
+						return null;
+					}
+				}
+				return fileLoader(path);
+			},
 		);
+		if (dependencyFailures.length)
+			return referenceFailureResult(dependencyFailures);
 	}
 
 	if (fmt === "pdf" || fmt === "png") {
@@ -1854,13 +3589,21 @@ export async function runRender(
 		});
 		try {
 			const buf = await svgToBinary(svg, fmt);
-			return { stdout: "", stderr: "", exitCode: 0, binaryOutput: buf };
+			return {
+				stdout: "",
+				stderr: referenceNotice ? `${STATIC_REFERENCE_NOTICE}\n` : "",
+				exitCode: 0,
+				binaryOutput: buf,
+			};
 		} catch (e) {
 			return fail(e instanceof Error ? `${e.message}\n` : String(e));
 		}
 	}
 	const out = await renderGraph(graph, effectiveFrontmatter, { format: fmt });
-	return ok(out.endsWith("\n") ? out : `${out}\n`);
+	return ok(
+		out.endsWith("\n") ? out : `${out}\n`,
+		referenceNotice ? `${STATIC_REFERENCE_NOTICE}\n` : "",
+	);
 }
 
 export type { DiffReport };
@@ -1930,7 +3673,19 @@ export async function runDiff(
 
 declare const __PFDSL_VERSION__: string;
 
-const HELP_CHECK = `usage: pfdsl check <file|-> [--strict] [--hints] [--json] [--no-color]
+const HELP_REFERENCE_CONTEXT = `
+  --reference-context <file>  JSON describing already acquired, pinned snapshots
+
+The context identifies the original model (source, fixedRevision, documentId,
+extractionId), its logicalPath, an optional model basis, and target bindings
+(source, revision selector, fixedRevision, absolute root). An adapter identifier
+is required. This command does not fetch resources or refresh revision selectors.
+Artifact baseRef/ref select a target; process paths use the model basis.
+Explicit artifact references fail when their context or target is unavailable.
+See docs/reference-resolution.md for the complete JSON format and examples.
+`;
+
+const HELP_CHECK = `${helpUsage("check", "<file|->", CHECK_OPTIONS)}
 
 Validate a .pfdsl file. Use - to read from stdin.
 
@@ -1940,11 +3695,20 @@ Options:
   --json     output diagnostics as JSON ({ ok, diagnostics, hints? })
   --no-color disable ANSI color codes (also: NO_COLOR env var)
 
+Check performs static analysis only. Explicit references in the document or
+its dependencies are reported as not-checked; success is not evidence of
+artifact existence. Use meta check-links with a pinned context for that check.
+
 For topology queries (terminal artifacts, external inputs, counts) see
 \`pfdsl graph io\` and \`pfdsl graph summary\`.
+${HELP_REFERENCE_CONTEXT}
 `;
 
-const HELP_GRAPH_SUMMARY = `usage: pfdsl graph summary <file|-> [--json] [--no-color]
+const HELP_GRAPH_SUMMARY = `${helpUsage(
+	"graph summary",
+	"<file|->",
+	GRAPH_SUMMARY_OPTIONS,
+)}
 
 Print aggregate counts for the graph: artifacts, processes, primary edges,
 external inputs, and terminal artifacts. Use - to read from stdin.
@@ -1959,15 +3723,18 @@ Exit codes:
   2  invalid usage
 `;
 
-const HELP_GRAPH_IO = `usage: pfdsl graph io <file|-> [--json] [--no-color]
+const HELP_GRAPH_IO = `${helpUsage("graph io", "<file|->", GRAPH_IO_OPTIONS)}
 
 Print the graph's boundary: external inputs (artifacts consumed but never
 produced — where the flow starts) and terminal artifacts (produced but never
 consumed — where it ends). Artifacts with externalStakeholders are treated
-as having an external consumer and excluded from terminals. Use - to read
-from stdin.
+as having an external consumer and excluded from terminal artifacts; they
+are reported separately as external-stakeholder terminals, since the
+externalStakeholders declaration itself is what needs auditing (it is easy
+to attach it to a means artifact by mistake, which would otherwise vanish
+from the terminal-artifact audit unexamined). Use - to read from stdin.
 
-  --json      output as JSON ({ ok, externalInputs: string[], terminals: string[] })
+  --json      output as JSON ({ ok, externalInputs: string[], terminals: string[], externalTerminals: string[] })
               on failure: { ok: false, diagnostics }
   --no-color  disable ANSI color codes (also: NO_COLOR env var)
 
@@ -1977,7 +3744,7 @@ Exit codes:
   2  invalid usage
 `;
 
-const HELP_FMT = `usage: pfdsl fmt <file|-> [--write] [--check] [--no-color]
+const HELP_FMT = `${helpUsage("fmt", "<file|->", FMT_OPTIONS)}
 
 Format a .pfdsl file, grouping each process with its inputs and outputs.
 Use - to read from stdin (--write not allowed with stdin; --check is allowed).
@@ -1989,7 +3756,155 @@ Options:
   --no-color  disable ANSI color codes (also: NO_COLOR env var)
 `;
 
-const HELP_REINDEX = `usage: pfdsl meta reindex <file|-> [--write] [--check] [--renumber] [--json] [--no-color]
+const HELP_PRUNE = `${helpUsage("prune", "<file|->", PRUNE_OPTIONS)}
+
+Remove completed chains from a roadmap. Keep processes with any unfinished
+output, and every artifact on their input, output or feedback edges.
+Only done artifacts and processes outside that retained set are removed.
+Unfinished isolated artifacts are never selected for deletion.
+
+Default: print the transformed source without changing the file.
+  --write     apply the transformation and print the deletion report
+  --check     do not write; report deletions and exit 1 if any are needed
+  --json      emit { ok: true, deleted: [...] } instead of source/text
+  --no-color  disable ANSI colors
+
+Input and output must pass check. When there are deletions, input must be
+canonically formatted; run pfdsl fmt first if the input is refused. Prune
+rejects remaining orphans and formats the transformed output itself.
+Ready and blocked comparisons ignore process, input/output and blocker
+ordering, plus the completed-process count in an empty ready set. All other
+fields must stay unchanged. Verification failures never write.
+Stdin (-) supports dependency-free roadmaps only; use a file path for
+extends/subflow validation. --write cannot be used with stdin or --check.
+
+Exit codes: 0 success/no changes in --check; 1 validation error or --check
+found deletions; 2 invalid usage.
+`;
+
+const HELP_DELETE = `${helpUsage("delete", "<file|-> <id[,id...]>", DELETE_OPTIONS)}
+
+Remove one or more ids (artifact, process, or group) from a .pfdsl file in a single
+atomic pass: the frontmatter declaration, every body edge occurrence, and
+every surviving node's revises:/parts:/boundary: reference to the deleted id.
+Deleting a group keeps its member nodes and child groups, moving their
+group:/parent: references to the nearest declared ancestor not being deleted. If there
+is no ancestor, the references are cleared. Extension field values are left
+unchanged.
+Preset ancestors are resolved for files on disk. A local override of a preset
+group cannot delete that group; edit its preset declaration instead. Group
+deletion with extends requires a file path, rather than stdin.
+A preset-only group is also refused; edit its declaration in the preset.
+A child relationship inherited from a preset must be updated in that preset
+before its parent group can be deleted.
+An explicit local child parent can be promoted to a surviving ancestor, but
+cannot be cleared when a preset would supply a parent again.
+Deleting an artifact that changes a surviving subflow boundary requires that
+child to be readable and the resulting boundary to match. Removing a process
+with a broken subflow reference is allowed. Unrelated dependency errors do
+not block deletion; use check for full dependency validation.
+YAML anchors, aliases and merge keys (<<) are unsupported; expand them first.
+An id that exists nowhere in the file is a no-op, not an error — it is
+reported in notFound rather than failing the call. Use - to read from stdin
+(--write not allowed with stdin).
+
+Output follows the gofmt model: the rewritten file goes to stdout (preview);
+with --write it is written in place instead. Diagnostics go to stderr.
+
+Options:
+  --write     rewrite the file in place (cannot be used with -)
+  --json      emit { ok: true, deleted: [...], notFound: [...] } instead of
+              the rewritten document — same shape whether or not --write is
+              also given
+              on parse/validation failure: { ok: false, diagnostics } (exit 1)
+              on refusal: { ok: false, error } (exit 1)
+  --no-color  disable ANSI color codes (also: NO_COLOR env var)
+
+Exit codes:
+  0  success (including ids not found — idempotent)
+  1  parse/validation error or unsupported rewrite; nothing is deleted or written
+  2  invalid usage (missing arguments, or --write combined with stdin)
+`;
+
+const HELP_RENAME = `${helpUsage("rename", "<file|-> <old> <new>", RENAME_OPTIONS)}
+
+Rename an artifact, process, or group id and every reference to it in this
+file, in a single atomic pass. Use - to read from stdin (--write not
+allowed with stdin).
+
+Values of extension fields are never rewritten, even when they contain an id.
+
+What is rewritten depends on <old>'s kind:
+  - artifact/process: the frontmatter declaration key; every body edge
+    occurrence (chains, sets, feedback >>?, comments and continuation lines
+    untouched); other artifacts' revises:/parts: references; a subflow
+    process's boundary: KEYS naming it (boundary: VALUES are the child
+    file's own ids and are never touched). If <old> is a normal input/output
+    of a subflow process whose boundary: does not already map it, a
+    boundary: { <new>: <old> } entry is added so the child file's id set
+    still matches by identity (spec §2.9.3) — the child file itself is
+    never read or written.
+  - group: the group's own declaration key, every other group's parent:
+    reference, and every artifact's/process's group: field. The body never
+    references groups (spec §2.8), so only the frontmatter changes.
+
+<old> must be this file's own id: a group only if it has a local group:
+declaration (own-property, not the derived node-kind table — an id
+declared as both a group and an artifact/process is invalid and refused,
+not disambiguated by a --kind flag). <new> must not already exist as an
+artifact, process, or group id — locally, or as a group inherited via
+extends: (§2.9.4). A group only partially overridden from a preset (also
+defined there) is refused: rename it at the preset instead.
+
+A frontmatter using YAML anchors, aliases or merge keys (<<) anywhere is
+refused: a rewrite through a shared node would miss a reference or change
+every place that shares it. Edit such a file by hand, or expand them first.
+
+This is a one-file command. A parent outside the reachable dependencies is not inspected or rewritten;
+check it separately. Other files' subflow:/boundary: references and extends:
+references naming this file are never rewritten.
+
+After the rewrite, local result errors prevent output or writing. Inherited
+group collisions and child-parent relationships that cannot be updated here
+are refused. Missing or unreadable presets prevent reliable group checks.
+Unrelated child errors and readable preset style errors do not block rename;
+use check for full dependency validation. Child paths and ordinary boundary
+mappings are preserved. If the renamed boundary belongs to a file also used
+as a reachable subflow, new errors in those referring boundaries are refused.
+
+With -, the extends: checks are skipped because relative paths
+cannot be resolved without a file on disk, so a preview from stdin can
+succeed where the same file path is refused.
+
+Layout: the body keeps its bytes outside the rewritten id tokens, so set
+members keep their order. The frontmatter is re-rendered through the YAML
+CST like meta set (comments and quoting kept, flow spacing normalized). A
+file kept formatted may need pfdsl fmt --write afterwards.
+
+  --write     rewrite the file in place (cannot be used with -)
+  --json      emit { ok: true, kind, from, to } (kind: "artifact" | "process"
+              | "group"; a group rename also reports members: string[] and
+              children: string[]) instead of the rewritten document — same
+              shape whether or not --write is also given
+              on refusal: { ok: false, diagnostics } / { ok: false, error }
+              / { ok: false, missing: [<old>] } when <old> is not found
+  --no-color  disable ANSI color codes (also: NO_COLOR env var)
+
+Exit codes:
+  0  success
+  1  <old> not found, ambiguous (both a group and an artifact/process),
+     <new> already exists, YAML anchors/aliases/merge keys in the
+     frontmatter, an extends: preset conflict, a parse/validation error in
+     the input, or the rewrite was refused
+  2  invalid usage (missing/extra argument, stdin with --write, or <old>
+     equal to <new>)
+`;
+
+const HELP_REINDEX = `${helpUsage(
+	"meta reindex",
+	"<file|->",
+	META_REINDEX_OPTIONS,
+)}
 
 Assign integer index: values to nodes in topological order. Processes and
 artifacts are numbered with independent counters. Use - to read from stdin.
@@ -2009,7 +3924,7 @@ Options:
   --no-color  disable ANSI color codes (also: NO_COLOR env var)
 `;
 
-const HELP_SORT = `usage: pfdsl meta sort <file|-> --by <keys> [--write] [--check] [--no-color]
+const HELP_SORT = `${helpUsage("meta sort", "<file|->", META_SORT_OPTIONS)}
 
 Sort artifact and process node definitions within each frontmatter section.
 Each section is sorted independently. Use - to read from stdin.
@@ -2022,7 +3937,7 @@ Options:
   --no-color    disable ANSI color codes (also: NO_COLOR env var)
 `;
 
-const HELP_GRAPH_EDGES = `usage: pfdsl graph edges <file|-> [--json] [--no-color]
+const HELP_GRAPH_EDGES = `${helpUsage("graph edges", "<file|->", GRAPH_EDGES_OPTIONS)}
 
 Print canonical edge list. Use - to read from stdin.
 
@@ -2032,7 +3947,7 @@ Options:
   --no-color  disable ANSI color codes (also: NO_COLOR env var)
 `;
 
-const HELP_RENDER = `usage: pfdsl render <file|-> [--format dot|svg|pdf|png] [--no-color]
+const HELP_RENDER = `${helpUsage("render", "<file|->", RENDER_OPTIONS)}
 
 Print a Graphviz representation. Use - to read from stdin.
 
@@ -2043,11 +3958,14 @@ Options:
   --format png  PNG (requires: npm install puppeteer)
   --no-color    disable ANSI color codes for diagnostics (also: NO_COLOR env var)
 
+Render performs static analysis only; it does not validate artifact existence.
+
 puppeteer is only needed for --format pdf and png, and must live in the same Node/npm environment as the pfdsl CLI.
 Under a version manager (nvm/nodenv/volta), a mismatched Node version's global install is not resolved — e.g. \`nodenv exec npm install -g puppeteer\`.
+${HELP_REFERENCE_CONTEXT}
 `;
 
-const HELP_DIFF = `usage: pfdsl diff <a> <b> [--format text|dot|svg] [--json] [--no-color]
+const HELP_DIFF = `${helpUsage("diff", "<a> <b>", DIFF_OPTIONS)}
 
 Show structural differences between two .pfdsl files. Either side may be -
 to read from stdin, e.g. \`git show HEAD:f.pfdsl | pfdsl diff - f.pfdsl\`.
@@ -2063,20 +3981,26 @@ Options:
   --no-color     disable ANSI color codes for diagnostics (also: NO_COLOR env var)
 `;
 
-const HELP_READY = `usage: pfdsl status ready <file|-> [--best] [--json] [--no-color]
+const HELP_READY = `${helpUsage("status ready", "<file|->", STATUS_READY_OPTIONS)}
 
 List processes whose every input artifact has status: done (or no status set).
 Only applies to roadmap files (type: roadmap). Use - to read from stdin.
 Omitting type: is treated as roadmap and allowed, with a warning (W006).
 
 Options:
-  --best      highlight the process that unblocks the most downstream work
-  --json      output as JSON ({ ok, ready: [{id, label, inputs, outputs}], best?, warnings? })
+  --no-counts omit completion counts and their explanation from text only
+  --json      output as JSON ({ ok, ready: [{id, label, inputs, outputs, newlyReadyCount}], empty?, warnings? })
+              empty (only when ready is []): { inProgress, parked, complete, blocked }
               on parse failure: { ok: false, diagnostics }
   --no-color  disable ANSI color codes (also: NO_COLOR env var)
+
+newlyReadyCount is the ready-set difference after this process's outputs become done.
+Already ready processes and consumers with only inert outputs are excluded.
+Counts do not rank priority, deadlines or effort; zero does not mean unnecessary.
+Existing list order is preserved. JSON always includes counts, even with --no-counts.
 `;
 
-const HELP_STATUS_LIST = `usage: pfdsl status list <file|-> --status <status[,status...]> [--json] [--no-color]
+const HELP_STATUS_LIST = `${helpUsage("status list", "<file|->", STATUS_LIST_OPTIONS)}
 
 List artifacts whose status matches one of the given values. Use - to read
 from stdin.
@@ -2093,7 +4017,11 @@ Exit codes:
   2  invalid usage (missing/unknown --status)
 `;
 
-const HELP_STATUS_BLOCKED = `usage: pfdsl status blocked <file|-> [--json] [--no-color]
+const HELP_STATUS_BLOCKED = `${helpUsage(
+	"status blocked",
+	"<file|->",
+	STATUS_BLOCKED_OPTIONS,
+)}
 
 List processes that are not ready: for each, the input artifacts whose
 status is not done (or unset). Only applies to roadmap files (type:
@@ -2110,35 +4038,103 @@ Exit codes:
   2  invalid usage
 `;
 
-const HELP_META_SET = `usage: pfdsl meta set <file> <id[,id...]> <field> <value> [--json] [--no-color]
+const HELP_META_CREATE = `${helpUsage("meta create", "<file> <id> [field=value ...]", META_CREATE_OPTIONS)}
+
+Create a frontmatter definition for one node already present in the body.
+The artifact or process kind is inferred from the authored graph. Existing
+definitions, absent ids, ambiguous kinds and unreadable frontmatter are
+refused. No label is added unless label=value is supplied.
+Without initial fields, the definition is an empty mapping.
+The id argument is one semantic ID, not a DSL-quoted ID list. Use shell
+quoting to pass spaces as one argument, for example 'my process'. Do not
+include the DSL's surrounding double quotes. Literal quotes and commas
+inside the semantic ID are retained. In contrast, meta set accepts a DSL-quoted ID list.
+Without --write, print the completed source as a preview. With --write, report
+the created definition's file and line. Comments, quotes, folded line breaks,
+the source's line endings and the body are preserved by the core CST writer.
+
+Initial fields use positional field=value arguments, split at the first =.
+Commas and further = characters in values are preserved. Quote arguments
+containing spaces. Duplicate fields are refused. Fields follow meta set's
+scalar, known-kind, derived-field, status and index validation. Unknown fields
+require --allow-unknown; it cannot bypass known field validation. Only index
+is stored as a number; other values are strings. For a roadmap artifact,
+provide status=todo or another valid status explicitly. Status requires a
+roadmap file. The completed source must have no errors before any write;
+every failure leaves the original file unchanged.
+
+Examples:
+  pfdsl meta create plan.pfdsl 'my process' --write
+  pfdsl meta create plan.pfdsl build location=src/build.ts updated_at=2026-10-05 --allow-unknown --write
+  pfdsl meta create plan.pfdsl release status=todo --write
+
+  --write          write the completed source in place
+  --json           output { ok, id, kind, created, written, line, output? }
+                   output is the complete source when previewing;
+                   failures return { ok: false, error, diagnostics? }
+  --allow-unknown  permit new extension scalar fields
+  --no-color       disable ANSI color codes
+
+Exit codes:
+  0  success
+  1  creation refused or resulting source has errors
+  2  invalid usage or field value
+`;
+
+const HELP_META_SET = `${helpUsage("meta set", "<file> <id[,id...]> <field> <value>", META_SET_OPTIONS)}
 
 Set a scalar frontmatter field on one or more nodes, rewriting the file in
-place while preserving its formatting. Multiple comma-separated ids get the
-same value; the call is atomic (all writes land or none do). Quote values
-containing spaces.
+place. The frontmatter is re-emitted in canonical form, except that a folded
+(>) scalar keeps the line breaks its author wrote for as long as its value is
+unchanged — give a folded field a new value and it is re-serialized. Multiple
+comma-separated ids get the same value; the call is atomic (all writes land or
+none do). Quote values containing spaces. For a value beginning with -, put
+options before -- and the value after it.
 
 Field-aware validation: status must be one of todo | wip | done | waiting |
-suspended; index must be a non-negative integer; the field must be valid for
-each node's kind. Array/map fields (tags, parts, externalStakeholders,
-boundary) and derived read-only fields (location.resolved, command.cwd)
-cannot be set.
+suspended; index must be a non-negative integer; known fields must be valid for
+each node's kind. Existing extension scalar fields can be updated without a
+flag; adding a new unknown field requires --allow-unknown. Except for index,
+new values are stored as strings, even if the old value was a number, boolean,
+or null. Array/map fields (tags, parts, externalStakeholders,
+boundary, ref) and derived read-only fields (location.resolved, command.cwd)
+cannot be set, and existing extension arrays/maps cannot be overwritten.
 
+Each id needs a local frontmatter definition. An id used only in the body is
+reported separately from an id absent from the file. Use pfdsl meta create
+<file> <id> [field=value ...] --write first; meta set never creates a definition
+implicitly.
+Empty definitions can receive fields. A definition accessed through a YAML
+alias must be expanded first. Editing the original anchored definition also
+changes values read through its aliases, following YAML's shared-value behavior.
+An existing scalar field key keeps its YAML type. Fields whose
+keys are collections, or whose keys become the same name when read, must be
+rewritten with one scalar YAML key before editing.
+
+Setting status requires a roadmap file: an explicit type: other than roadmap
+is refused (spec §2.10/§15.14), since progress belongs to the roadmap — a file
+that carries status under another kind is also reported by check (W007, §15.15).
+Other fields are writable on any kind.
 When setting status on a roadmap file, reports which processes became newly
 ready after the change (once, after all writes).
 Omitting type: is treated as roadmap and allowed, with a warning (W006).
 
+  --allow-unknown  allow a new extension scalar field; does not bypass known
+                   field validation or create node definitions
   --json      emit JSON ({ ok, newlyReady: string[], warnings? }) instead of text
-              on failure: { ok: false, diagnostics } / { ok: false, missing } /
-              { ok: false, error }
+              on failure (exit 1): { ok: false, diagnostics } / { ok: false, missing } /
+              { ok: false, missing, undefinedIds: {id, kind}[], error } /
+              { ok: false, error }. missing lists ids absent from the file;
+              undefinedIds lists existing nodes without frontmatter definitions.
   --no-color  disable ANSI color codes (also: NO_COLOR env var)
 
 Exit codes:
   0  success
-  1  id not found in the file, or the rewrite was refused
-  2  invalid usage (missing argument, invalid field or value)
+  1  id not found, frontmatter definition absent, or the rewrite was refused
+  2  invalid usage (missing argument, invalid field or value); text on stderr
 `;
 
-const HELP_CHECK_LINKS = `usage: pfdsl meta check-links <file> [--json] [--no-color]
+const HELP_CHECK_LINKS = `${helpUsage("meta check-links", "<file>", META_CHECK_LINKS_OPTIONS)}
 
 Verify that every artifact/process \`location:\` file path exists on disk
 (dead-link detection). Each location element is classified per spec §15.8:
@@ -2148,7 +4144,10 @@ and is skipped; everything else is resolved (basePath-aware, same as
 check. Cannot be used with stdin (-): there is no file path to resolve
 relative paths against.
 
-  --json      output as JSON ({ ok, missing: {id, kind, location, resolved}[] })
+  --json      output as JSON ({ ok, missing, referenceResolution? })
+              Context reports include original model identity, selected fixed
+              revisions, resolved paths and per-location results. Skipped URLs
+              and globs are not evidence of target existence.
               on parse failure: { ok: false, diagnostics }
   --no-color  disable ANSI color codes (also: NO_COLOR env var)
 
@@ -2156,9 +4155,10 @@ Exit codes:
   0  all checkable location paths exist
   1  one or more location paths do not exist, or parse/validation error
   2  invalid usage (stdin)
+${HELP_REFERENCE_CONTEXT}
 `;
 
-const HELP_GET = `usage: pfdsl meta get <file|-> <id[,id...]> [field[,field...]] [--json] [--no-color]
+const HELP_GET = `${helpUsage("meta get", "<file|-> <id[,id...]> [field[,field...]]", META_GET_OPTIONS)}
 
 Print field values for one or more artifact/process/group ids.
 
@@ -2189,17 +4189,18 @@ does not depend on the command string itself.
 
 Either derived field may also be requested explicitly in the field
 positional (e.g. location.resolved), in which case only the derived value
-is returned — the base field is not auto-added. Use - to read from stdin:
-since there is no file path to resolve against, derived fields are silently
+is returned — the base field is not auto-added. Use - to read from stdin.
+For legacy local models without a context, there is no file path to resolve
+against: derived fields are silently
 omitted from auto-accompaniment, and an explicit request for one returns
 null with a warning on stderr instead of failing the command.
+With --reference-context, stdin uses the supplied logicalPath and snapshots.
+Explicit references without their required context fail instead of returning null.
 
-A field the node doesn't have prints as an empty value (JSON: null); this is
-not an error. A node that exists but has no frontmatter entry at all yields
-an empty row (JSON: {}, no text lines). Requesting a field name that isn't a
-recognized frontmatter or derived key prints a warning to stderr (possible
-typo) but still returns the value (empty, since it's genuinely unset) — this
-does not fail the command.
+A field the node doesn't have prints as \`(unset)\` (JSON: null); this is not an error, and it is what distinguishes the field from one set to the empty string, which prints with nothing after the colon (JSON: "").
+An empty array prints as \`(empty)\` (JSON: []).
+A node that exists but has no frontmatter entry at all yields an empty row (JSON: {}, no text lines).
+Requesting a field name that isn't a recognized frontmatter or derived key prints a warning to stderr (possible typo) but still returns the value (\`(unset)\`, since it's genuinely unset) — this does not fail the command.
 
 If some requested ids exist and others don't, values for the found ids are
 still printed (to stdout, or under "values" in --json) alongside the error
@@ -2207,16 +4208,121 @@ for the missing ones.
 
 Exit codes:
   0  success
-  1  one or more requested ids do not exist in the file
+  1  parse/validation or reference-resolution failure, or requested ids not found
   2  invalid usage (missing id, or too many positional arguments)
+${HELP_REFERENCE_CONTEXT}
 `;
 
-const HELP_NEIGHBORS = `usage: pfdsl graph neighbors <file|-> <id> [--json] [--no-color]
+const HELP_META_LIST = `${helpUsage(
+	"meta list",
+	"<file|->",
+	META_LIST_OPTIONS,
+	"[field[,field...]]",
+)}
+
+Print field values for every artifact/process node matching the given
+selectors — a supply-side counterpart to \`meta get\`'s explicit id list.
+At least one selector is required; multiple selectors combine with AND, so
+\`--producer p --tag t\` reads as "the artifacts p produces that are tagged
+t" — the successors-filtered-by-tag query, without a separate neighbors
+call.
+
+  --tag <t[,t...]>    matches when the node's tags: array includes any of
+                      the given tags (OR within the comma-separated list)
+  --group <g>         matches when the node's group: field exactly equals
+                      <g>. No parent-group traversal: a node in a nested
+                      child group is not matched by an ancestor group's id.
+  --producer <p>      matches an artifact reachable via process <p>'s
+                      output edge (process -> artifact). Only artifacts can
+                      match this selector; a process id is never selected.
+
+  [field[,field...]]  comma-separated field names. Omit the positional
+                      entirely to print every field set in each matched
+                      node's frontmatter entry, plus applicable derived
+                      fields (location.resolved, command.cwd) — same
+                      semantics as \`meta get\`. Passing it as an empty or
+                      blank string is a usage error rather than the same
+                      thing as omitting it.
+  --json              emit JSON ({ ok, values: { [id]: { [field]: value } } }),
+                      the same shape as \`meta get\` --json
+                      on parse failure: { ok: false, diagnostics }
+  --no-color          disable ANSI color codes (also: NO_COLOR env var)
+
+Matched nodes are printed in id order. Zero matches is not an error: text
+mode prints "No nodes match the given selectors."; --json prints an empty
+values object. Both exit 0.
+
+A selector value that no node uses at all (checked per value, independent of
+the AND combination with other selectors) prints a warning to stderr —
+possible typo — without changing the exit code; an AND combination that
+legitimately narrows to zero rows does not warn.
+
+Exit codes:
+  0  success (including zero matches)
+  1  parse/validation error
+  2  invalid usage (no selector given, or an empty field positional)
+${HELP_REFERENCE_CONTEXT}
+`;
+
+const HELP_META_VALUES = `${helpUsage(
+	"meta values",
+	"<file|-> <field[,field...]>",
+	META_VALUES_OPTIONS,
+)}
+
+Print the vocabulary of a field: every value in use across the file's nodes,
+with the number of nodes using it. Answers "which values can I pass to
+\`meta list --group\`" — the selector warning that \`meta list\` prints says a
+value is wrong, not which ones are right.
+
+  <field[,field...]>  comma-separated frontmatter field names (required).
+                      Raw fields only: a derived field (location.resolved,
+                      command.cwd) has no vocabulary of its own and is
+                      reported as unrecognized.
+  --json              emit JSON ({ ok, counts: { [field]: { [value]: count } } })
+                      — the key is counts, not the values key meta get and
+                      meta list use: the shape underneath is a different one
+                      on parse failure: { ok: false, diagnostics }
+  --no-color          disable ANSI color codes (also: NO_COLOR env var)
+
+An array field (tags) counts per element, so a node tagged [a, b] is one
+occurrence of each. A map-valued field (boundary) has no vocabulary of its
+own and counts under \`(object)\`. Values are printed in the same order ids
+are elsewhere.
+
+\`group\` and \`tags\` may also be declared in a frontmatter section of their
+own, and declaring is optional — a node may use an undeclared value (§2.7.2,
+§2.8). A declared value no node uses is printed with a count of 0, so the
+table covers both what is declared and what is used.
+
+A field no node sets prints \`<field>: (no values)\`; this is not an error.
+A field name that isn't recognized on any node kind prints a warning to
+stderr (possible typo) without changing the exit code.
+
+Exit codes:
+  0  success (including a field with no values)
+  1  parse/validation error
+  2  invalid usage (missing or empty field argument)
+`;
+
+const HELP_NEIGHBORS = `${helpUsage("graph neighbors", "<file|-> <id>", GRAPH_NEIGHBORS_OPTIONS)}
 
 Print the direct predecessors (in-edges) and successors (out-edges) of a
 node — its immediate producer(s)/consumer(s) only, not the full closure.
+Feedback (\`>>?\`) neighbors are included, annotated \`(feedback)\` in text.
 
-  --json      output as JSON ({ ok, predecessors: string[], successors: string[] })
+Text mode leads with \`<id> (<kind>)\`, then names the kind the neighbors
+share on each list: \`predecessors (process): design\`. Every edge runs
+artifact -> process or process -> artifact, so all of a node's neighbors
+have the kind opposite its own — naming it per list saves a \`describe\` per
+neighbor to classify them. A group has no edges, so its lists stay bare
+(\`predecessors: (none)\`) and \`neighborKind\` is null.
+
+  --json      output as JSON ({ ok, id, kind, neighborKind, predecessors,
+              successors }), each neighbor { id, kind: "primary" | "feedback" }
+              — the neighbor's own \`kind\` is the edge's, the top-level
+              \`kind\` is the queried node's, and \`neighborKind\` is the kind
+              every neighbor has (null for a group)
               on failure: { ok: false, diagnostics } / { ok: false, missing }
   --no-color  disable ANSI color codes (also: NO_COLOR env var)
 
@@ -2226,7 +4332,78 @@ Exit codes:
   2  invalid usage (missing id)
 `;
 
-const HELP_IMPACT = `usage: pfdsl graph impact <file|-> <id> [--json] [--no-color]
+const HELP_GRAPH_LOCATE = `${helpUsage(
+	"graph locate",
+	"<file|-> <id>",
+	GRAPH_LOCATE_OPTIONS,
+)}
+
+Print every place <id> appears in the file: its frontmatter declaration key
+line (\`declaration\`), and every body line naming it (\`edge\`) — whether in
+an edge or in a bare node-decl. These are the line numbers a Read/Edit tool
+call needs, without opening the whole file first. Text mode prints one
+occurrence per line, declaration before edge, each edge line ascending.
+
+By default, line granularity is the node, not the field: a declaration line
+points at the id's key, and the fields under it are on the lines that
+follow. \`--field <name[,name...]>\` narrows past that: it adds one line per
+named field, pointing at that field's own key within the id's declaration
+block, printed after the declaration line and ordered by line rather than
+by the order asked for (each line names its field, so text output as a
+whole reads top-to-bottom like the file). A named field with no line is
+skipped in text mode and printed as null in --json, with a warning on
+stderr (possible typo) — that covers both a declaration block without the
+field and a node that has no frontmatter block at all, the latter being the
+case where the declaration line is null as well.
+
+  --field <name[,name...]>  also locate these frontmatter fields within
+                             <id>'s declaration block
+  --json      output as JSON ({ ok, id, declarationLine: number | null,
+              edgeLines: number[], fieldLines: { [name]: number | null } })
+              on failure: { ok: false, diagnostics } / { ok: false, missing }
+  --no-color  disable ANSI color codes (also: NO_COLOR env var)
+
+Exit codes:
+  0  success (including a --field name the node doesn't have)
+  1  id not found in the file
+  2  invalid usage (missing id, or --field given with no value)
+`;
+
+const HELP_GRAPH_DESCRIBE = `${helpUsage(
+	"graph describe",
+	"<file|-> <id>",
+	GRAPH_DESCRIBE_OPTIONS,
+)}
+
+Print a single node's full picture in one call: its kind (artifact/process/
+group), every frontmatter field (same rendering as \`meta get\`/\`meta list\`),
+its direct predecessors/successors (same as \`graph neighbors\`, feedback
+(\`>>?\`) neighbors included and annotated \`(feedback)\` in text), and where
+it appears in the file (same as \`graph locate\`) — folding several
+read-only queries an agent would otherwise make separately into one.
+
+Only the node named by <id> is described: neighbors are listed by id, so
+their fields take a \`describe\` (or \`meta get\`) of their own. Their kind
+does not — the neighbor lists name it once (\`predecessors (artifact): req\`,
+\`neighborKind\` in --json), the same as \`graph neighbors\`.
+
+  --json      output as JSON ({ ok, id, kind, meta, neighborKind,
+              predecessors, successors, declarationLine: number | null,
+              edgeLines: number[] }), each neighbor
+              { id, kind: "primary" | "feedback" } — that \`kind\` is the
+              edge's, while \`neighborKind\` is the kind the neighbors
+              themselves share (null for a group, which has none)
+              on failure: { ok: false, diagnostics } / { ok: false, missing }
+  --no-color  disable ANSI color codes (also: NO_COLOR env var)
+
+Exit codes:
+  0  success
+  1  id not found in the file
+  2  invalid usage (missing id)
+${HELP_REFERENCE_CONTEXT}
+`;
+
+const HELP_IMPACT = `${helpUsage("graph impact", "<file|-> <id>", GRAPH_IMPACT_OPTIONS)}
 
 Print the full downstream closure reachable from <id> via primary edges
 (everything <id> unblocks, transitively), excluding <id> itself. Text mode
@@ -2242,7 +4419,11 @@ Exit codes:
   2  invalid usage (missing id)
 `;
 
-const HELP_DEPENDS_ON = `usage: pfdsl graph depends-on <file|-> <id> [--json] [--no-color]
+const HELP_DEPENDS_ON = `${helpUsage(
+	"graph depends-on",
+	"<file|-> <id>",
+	GRAPH_DEPENDS_ON_OPTIONS,
+)}
 
 Print the full upstream closure <id> depends on via primary edges
 (everything that must exist for <id> to exist), excluding <id> itself. Text
@@ -2258,7 +4439,7 @@ Exit codes:
   2  invalid usage (missing id)
 `;
 
-const HELP_PATH = `usage: pfdsl graph path <file|-> <from> <to> [--limit <n>] [--json] [--no-color]
+const HELP_PATH = `${helpUsage("graph path", "<file|-> <from> <to>", GRAPH_PATH_OPTIONS)}
 
 Print all simple paths from <from> to <to> via primary edges (empty if
 none exist). Answers "is <from> a prerequisite of <to>, and how". Text mode
@@ -2276,15 +4457,26 @@ Exit codes:
   2  invalid usage (missing from/to, or invalid --limit)
 `;
 
-const HELP_STATS = `usage: pfdsl graph stats <file|-> [--limit <n>] [--json] [--no-color]
+const HELP_STATS = `${helpUsage("graph stats", "<file|->", GRAPH_STATS_OPTIONS)}
 
 Print fan-in/fan-out per node, ranked by total degree descending (hubs
-first) then id ascending. Text mode prints a hint to stderr suggesting
+first) then id ascending.
+
+\`fan-in\`, \`fan-out\`, \`total\` and the ranking cover primary (\`>>\` / \`->\`)
+edges only, so fan-out reads as what a node gates or produces. Feedback
+(\`>>?\`) degree is reported apart, as a \`feedback-in=N\` / \`feedback-out=N\`
+suffix on the rows that have one, and is in none of those three numbers:
+a node held only by \`>>?\` prints \`total=0\` (\`graph orphans\` still counts
+it as wired). Because --limit cuts after the primary sort, a sweep for
+raw connectivity has to read the full listing.
+
+Text mode prints a hint to stderr suggesting
 --limit when the file has more than ${STATS_HINT_THRESHOLD} nodes and --limit wasn't given
 (kept off stdout so \`stats <file> | ...\` pipelines aren't affected).
 
   --limit <n>  only print the top n rows
-  --json       output as JSON ({ ok, stats: {id, kind, fanIn, fanOut}[] })
+  --json       output as JSON ({ ok, stats: {id, kind, fanIn, fanOut,
+               feedbackFanIn, feedbackFanOut}[] })
                on parse failure: { ok: false, diagnostics }
   --no-color   disable ANSI color codes (also: NO_COLOR env var)
 
@@ -2293,12 +4485,13 @@ Exit codes:
   2  invalid usage
 `;
 
-const HELP_GRAPH_ORPHANS = `usage: pfdsl graph orphans <file|-> [--json] [--no-color]
+const HELP_GRAPH_ORPHANS = `${helpUsage("graph orphans", "<file|->", GRAPH_ORPHANS_OPTIONS)}
 
-Print nodes with neither predecessor nor successor — fully disconnected
-from the graph. Distinct from \`graph io\`'s external inputs (no predecessor
-only) and terminals (no successor only): an orphan has neither. Use - to
-read from stdin.
+Print nodes wired to nothing — no primary edge and no \`>>?\` feedback edge,
+so fully disconnected from the graph. Groups are containers that never
+carry edges and are not counted. Distinct from \`graph io\`'s external
+inputs (no predecessor only) and terminals (no successor only): an orphan
+has neither. Use - to read from stdin.
 
   --json      output as JSON ({ ok, orphans: {id, kind}[] })
               on parse failure: { ok: false, diagnostics }
@@ -2310,28 +4503,35 @@ Exit codes:
   2  invalid usage
 `;
 
-const HELP_STATUS_GAPS = `usage: pfdsl status gaps <roadmap> <flow> [<flow>...] [--json] [--no-color]
+const HELP_STATUS_GAPS = `${helpUsage("status gaps", "<roadmap> <flow> [<flow>...]", STATUS_GAPS_OPTIONS)}
 
-Cross-check todo artifacts in workflow/runtime-pipeline files against the roadmap.
-Reports artifacts with status: todo in flow files that have no corresponding entry
-in the roadmap, indicating a build chain is missing.
+Cross-check roadmap-tracked artifacts in workflow/pipeline files against
+the roadmap. Reports flow artifacts whose tags include roadmap-tracked and that
+no process in the roadmap produces, indicating a build chain is missing. An id
+the roadmap only consumes is an external input there, so it counts as missing.
 Omitting type: on the roadmap file is treated as roadmap and allowed, with a warning (W006).
+The tag is opt-in: tag the flow artifacts that are individually tracked
+deliverables. Comparing every flow artifact id instead would flag the routine
+byproducts a process diagram is mostly made of. Flow files carry no status
+(W007, spec §15.15), so status cannot be the selector here.
+If nothing carries the tag, this check has no target and says so rather than
+reporting a pass.
 
   <roadmap>  path to a .pfdsl file with type: roadmap
-  <flow>     one or more .pfdsl files with type: workflow or runtime-pipeline
+  <flow>     one or more .pfdsl files with type: workflow or pipeline
 
 Options:
-  --json      output as JSON ({ ok, gaps: [{file, artifactId, label, status}], warnings? })
+  --json      output as JSON ({ ok, gaps: [{file, artifactId, label}], trackedArtifactCount, warnings? })
               on parse failure: { ok: false, diagnostics }
   --no-color  disable ANSI color codes (also: NO_COLOR env var)
 
 Exit codes:
-  0  all todo artifacts are tracked in the roadmap
-  1  one or more todo artifacts have no roadmap entry
+  0  every roadmap-tracked flow artifact has a roadmap entry
+  1  one or more roadmap-tracked artifacts have no roadmap entry
   2  invalid usage
 `;
 
-const HELP_EXPLAIN = `usage: pfdsl explain <code>
+const HELP_EXPLAIN = `${helpUsage("explain", "<code>", EXPLAIN_OPTIONS)}
 
 Print the one-line summary and spec section for a diagnostic code (e.g. V021).
 Codes come from the FM/L/N/P/V/W families reported by \`pfdsl check\`.
@@ -2368,217 +4568,263 @@ function runExplain(code: string): CommandResult {
 	return ok(`${lines.join("\n")}\n`);
 }
 
-const HELP_GRAPH_GROUP = `usage: pfdsl graph <subcommand> ...
-
-Read-only queries on the graph topology. Run
-\`pfdsl graph <subcommand> --help\` for details on each.
-
-Subcommands:
-  summary <file|->            Print artifact/process/edge counts
-  io <file|->                 Print external inputs and terminal artifacts
-  stats <file|-> [--limit]    Rank nodes by fan-in/fan-out degree
-  neighbors <file|-> <id>     Direct predecessors/successors of a node
-  impact <file|-> <id>        Full downstream closure of a node
-  depends-on <file|-> <id>    Full upstream closure of a node
-  path <file|-> <from> <to> [--limit]
-                              All simple paths between two nodes
-  edges <file|->              Canonical edge list
-  orphans <file|->            Nodes with neither predecessor nor successor
-
-All subcommands accept --json and --no-color.
-`;
-
-const HELP_META_GROUP = `usage: pfdsl meta <subcommand> ...
-
-Read and write frontmatter metadata. Run
-\`pfdsl meta <subcommand> --help\` for details on each.
-
-Subcommands:
-  get <file|-> <id[,id...]> [field[,field...]]   Print field values
-  set <file> <id> <field> <value>                Set a field value in place
-  sort <file|-> --by <keys>                      Sort node definitions
-  reindex <file|->                               Assign topological index: values
-  check-links <file>                             Verify location: file paths exist
-
-All subcommands accept --json and --no-color.
-`;
-
-const HELP_STATUS_GROUP = `usage: pfdsl status <subcommand> ...
-
-Planning queries derived from artifact status. Run
-\`pfdsl status <subcommand> --help\` for details on each.
-
-Subcommands:
-  ready <file|-> [--best]           List ready-to-start processes
-  blocked <file|->                  List not-ready processes and their blocking inputs
-  list <file|-> --status <s[,s...]> List artifacts by status
-  gaps <roadmap> <flow> [<flow>...] Find todo artifacts missing from the roadmap
-
-All subcommands accept --json and --no-color.
-`;
-
-export const HELP = `pfdsl <command> [options]
-
-Commands:
-  check <file|-> [--strict] [--hints] [--json] [--no-color]
-                           Validate a .pfdsl file (- = stdin)
-  explain <code>           Print the summary and spec section for a diagnostic code (e.g. V021)
-  fmt <file|-> [--write] [--check] [--no-color]
-                           Format a .pfdsl file (- = stdin)
-  render <file|-> [--format dot|svg|pdf|png] [--no-color]
-                           Render as Graphviz DOT (default), SVG, PDF, or PNG (- = stdin)
-                           PDF/PNG requires puppeteer in the CLI's own Node env (npm install puppeteer)
-  diff <a> <b> [--format text|dot|svg] [--json] [--no-color]
-                           Structural diff (text), or visual diff DOT/SVG
-
-Command groups (run \`pfdsl <group>\` for their subcommands):
-  graph summary|io|stats|neighbors|impact|depends-on|path|edges|orphans
-                           Read-only queries on the graph topology
-  meta get|set|sort|reindex|check-links
-                           Read and write frontmatter metadata
-  status ready|blocked|list|gaps
-                           Planning queries derived from artifact status
-
-  help                     Show this help
-
-Exit codes:
-  0  success (warnings are non-fatal)
-  1  error (parse/validation error, or file cannot be read)
-  2  invalid usage (missing argument, unknown flag or subcommand)
-`;
-
 export interface CliArgs {
 	command: string;
 	positional: string[];
 	flags: Record<string, string | boolean>;
 }
 
-export function parseArgs(argv: readonly string[]): CliArgs {
-	const [command = "help", ...rest] = argv;
-	const positional: string[] = [];
+function normalizeValues(
+	values: Record<string, string | string[] | boolean | undefined>,
+): Record<string, string | boolean> {
 	const flags: Record<string, string | boolean> = {};
-	for (let i = 0; i < rest.length; i++) {
-		const a = rest[i]!;
-		if (a.startsWith("--")) {
-			const key = a.slice(2);
-			const next = rest[i + 1];
-			if (next !== undefined && !next.startsWith("--")) {
-				const prev = flags[key];
-				// Repeated string flag: join with comma so --by a --by b ≡ --by a,b
-				flags[key] = typeof prev === "string" ? `${prev},${next}` : next;
-				i++;
-			} else {
-				flags[key] = true;
+	for (const [key, value] of Object.entries(values)) {
+		if (value === undefined) continue;
+		flags[key] = Array.isArray(value) ? value.join(",") : value;
+	}
+	return flags;
+}
+
+function parseNodeParseArgs(
+	args: readonly string[],
+	options: Record<string, OptionSpec>,
+	strict: boolean,
+): Omit<CliArgs, "command"> {
+	const { positionals, values } = parseNodeArgs({
+		args: [...args],
+		options,
+		allowPositionals: true,
+		strict,
+	});
+	return {
+		positional: positionals,
+		flags: normalizeValues(
+			values as Record<string, string | string[] | boolean | undefined>,
+		),
+	};
+}
+
+function parseFallbackArgs(args: readonly string[]): Omit<CliArgs, "command"> {
+	return parseNodeParseArgs(args, COMMON_OPTIONS, false);
+}
+
+function parseStrictArgs(
+	args: readonly string[],
+	options: Record<string, OptionSpec>,
+): Omit<CliArgs, "command"> {
+	return parseNodeParseArgs(args, { ...COMMON_OPTIONS, ...options }, true);
+}
+
+function extractParseArgsOption(message: string): string | undefined {
+	const unknownOption = /^Unknown option '([^']+)'/.exec(message);
+	if (unknownOption) {
+		const option = unknownOption[1];
+		if (typeof option === "string") return option;
+	}
+	const option = /^Option '([^']+)'/.exec(message);
+	if (!option) return undefined;
+	const value = option[1];
+	if (typeof value !== "string") return undefined;
+	return value.replace(/[ <].*$/, "");
+}
+
+function hasRemovedFmtMode(argv: readonly string[]): boolean {
+	if (argv[0] !== "fmt") return false;
+	return argv
+		.slice(1)
+		.some((arg) => arg === "--mode" || arg.startsWith("--mode="));
+}
+
+function parseArgsErrorResult(
+	error: unknown,
+	context: { label: string; help: string },
+): CommandResult {
+	if (error && typeof error === "object") {
+		const message =
+			"message" in error ? String((error as { message: string }).message) : "";
+		const code =
+			"code" in error ? String((error as { code: string }).code) : "";
+		// The option name still comes from the error message on a best-effort basis; if that parse fails, we fall back to invalid usage.
+		switch (code) {
+			case "ERR_PARSE_ARGS_UNKNOWN_OPTION": {
+				const option = extractParseArgsOption(message);
+				if (option) {
+					return fail(
+						`${context.label}: unknown option ${option}\n${context.help}`,
+						2,
+					);
+				}
+				return fail(
+					`${context.label}: invalid option usage\n${context.help}`,
+					2,
+				);
 			}
-		} else {
-			positional.push(a);
+			case "ERR_PARSE_ARGS_INVALID_OPTION_VALUE":
+			case "ERR_PARSE_ARGS_MISSING_OPTION_VALUE": {
+				const option = extractParseArgsOption(message);
+				if (option) {
+					return fail(
+						`${context.label}: option ${option} requires a value\n${context.help}`,
+						2,
+					);
+				}
+				return fail(
+					`${context.label}: invalid option usage\n${context.help}`,
+					2,
+				);
+			}
+			default:
+				return fail(
+					`${context.label}: invalid option usage\n${context.help}`,
+					2,
+				);
 		}
 	}
-	return { command, positional, flags };
+	throw error;
+}
+
+export function parseArgs(argv: readonly string[]): CliArgs {
+	const [command = "help", ...rest] = argv;
+	if (VERSION_WORDS.has(command) || HELP_WORDS.has(command)) {
+		const parsed = parseStrictArgs(rest, NO_OPTIONS);
+		return { command, positional: parsed.positional, flags: parsed.flags };
+	}
+	const group = COMMAND_GROUPS.find((g) => g.name === command);
+	if (group) {
+		const subcommand = rest[0];
+		if (subcommand !== undefined && !subcommand.startsWith("-")) {
+			const entry = group.commands.find((c) => c.name === subcommand);
+			if (entry) {
+				const parsed = parseStrictArgs(rest.slice(1), entry.options);
+				return {
+					command,
+					positional: [subcommand, ...parsed.positional],
+					flags: parsed.flags,
+				};
+			}
+		}
+		const parsed = parseStrictArgs(rest, NO_OPTIONS);
+		return { command, positional: parsed.positional, flags: parsed.flags };
+	}
+	const entry = TOP_LEVEL_COMMANDS.find((c) => c.name === command);
+	if (!entry) {
+		const parsed = parseFallbackArgs(rest);
+		return { command, positional: parsed.positional, flags: parsed.flags };
+	}
+	const parsed = parseStrictArgs(rest, entry.options);
+	return { command, positional: parsed.positional, flags: parsed.flags };
 }
 
 /**
  * Parse the optional --limit flag shared by graph path/stats: undefined when
- * absent, the parsed non-negative integer, or a usage-error CommandResult
- * (including a bare --limit with no value, which parseArgs yields as `true`).
+ * absent, the parsed non-negative integer, or a usage-error CommandResult when
+ * the value is not a non-negative integer. A bare --limit with no value no
+ * longer arrives here — the strict parse rejects it before dispatch (#1050).
  */
 function parseLimitFlag(
-	flags: Record<string, string | boolean>,
+	flags: { limit?: string | undefined },
 	help: string,
 ): number | CommandResult | undefined {
 	const limitFlag = flags.limit;
 	if (limitFlag === undefined) return undefined;
-	if (limitFlag === true) return fail(help, 2);
 	const n = Number(limitFlag);
 	if (!Number.isInteger(n) || n < 0) return fail(help, 2);
 	return n;
 }
 
 /** Resolves --no-color/NO_COLOR/TTY for a dispatched command (ADR/#180, #435, #508). */
-function resolveColor(flags: Record<string, string | boolean>): boolean {
+function resolveColor(flags: { "no-color"?: boolean | undefined }): boolean {
 	return shouldColorize({
 		noColorFlag: flags["no-color"] === true,
-		stream: process.stdout,
-		env: process.env,
+		stream: host.stdout,
+		env: host.env,
 	});
 }
 
-function runGraphGroup(
-	positional: string[],
-	flags: Record<string, string | boolean>,
-): CommandResult {
-	const [sub, ...rest] = positional;
-	if (!sub)
-		return flags.help ? ok(HELP_GRAPH_GROUP) : fail(HELP_GRAPH_GROUP, 2);
-	switch (sub) {
-		case "summary": {
-			if (flags.help) return ok(HELP_GRAPH_SUMMARY);
+/** A `pfdsl <name> <subcommand> ...` group: dispatch table plus the pieces its own group help is built from. */
+interface GroupDefinition {
+	name: string;
+	description: string;
+	columnWidth: number;
+	commands: readonly CommandEntry[];
+}
+
+/**
+ * Renders one listing line (or, when the synopsis is at least as wide as
+ * columnWidth, the synopsis on its own line followed by the description
+ * lines indented under it). Shared by every group's "Subcommands:" section
+ * and the top-level HELP's "Commands:"/"Command groups:" sections, so a name
+ * that dispatches always has exactly one place it can go missing from: the
+ * table itself.
+ */
+function renderListingEntry(
+	synopsis: string,
+	description: readonly string[],
+	columnWidth: number,
+): string {
+	const indent = " ".repeat(2 + columnWidth);
+	const [first = "", ...rest] = description;
+	const lines =
+		synopsis.length < columnWidth
+			? [`  ${synopsis.padEnd(columnWidth)}${first}`]
+			: [`  ${synopsis}`, `${indent}${first}`];
+	for (const line of rest) lines.push(`${indent}${line}`);
+	return lines.join("\n");
+}
+
+function renderGroupHelp(group: GroupDefinition): string {
+	const entries = group.commands
+		.map((c) =>
+			renderListingEntry(c.synopsis, c.description, group.columnWidth),
+		)
+		.join("\n");
+	return `usage: pfdsl ${group.name} <subcommand> ...
+
+${group.description}. Run
+\`pfdsl ${group.name} <subcommand> --help\` for details on each.
+
+Subcommands:
+${entries}
+
+All subcommands accept --json and --no-color.
+`;
+}
+
+const GRAPH_COMMANDS: readonly CommandEntry[] = [
+	defineCommand(GRAPH_SUMMARY_OPTIONS, {
+		name: "summary",
+		synopsis: "summary <file|->",
+		description: ["Print artifact/process/edge counts"],
+		help: HELP_GRAPH_SUMMARY,
+		run: (rest, flags) => {
 			const f = rest[0];
 			if (!f) return fail(HELP_GRAPH_SUMMARY, 2);
 			return runGraphSummary(f, {
 				json: flags.json === true,
 				color: resolveColor(flags),
 			});
-		}
-		case "io": {
-			if (flags.help) return ok(HELP_GRAPH_IO);
+		},
+	}),
+	defineCommand(GRAPH_IO_OPTIONS, {
+		name: "io",
+		synopsis: "io <file|->",
+		description: ["Print external inputs and terminal artifacts"],
+		help: HELP_GRAPH_IO,
+		run: (rest, flags) => {
 			const f = rest[0];
 			if (!f) return fail(HELP_GRAPH_IO, 2);
 			return runGraphIo(f, {
 				json: flags.json === true,
 				color: resolveColor(flags),
 			});
-		}
-		case "edges": {
-			if (flags.help) return ok(HELP_GRAPH_EDGES);
-			const f = rest[0];
-			if (!f) return fail(HELP_GRAPH_EDGES, 2);
-			return runGraphEdges(f, {
-				json: flags.json === true,
-				color: resolveColor(flags),
-			});
-		}
-		case "neighbors": {
-			if (flags.help) return ok(HELP_NEIGHBORS);
-			const [f, id] = rest;
-			if (!f || !id) return fail(HELP_NEIGHBORS, 2);
-			return runNeighbors(f, id, {
-				json: flags.json === true,
-				color: resolveColor(flags),
-			});
-		}
-		case "impact": {
-			if (flags.help) return ok(HELP_IMPACT);
-			const [f, id] = rest;
-			if (!f || !id) return fail(HELP_IMPACT, 2);
-			return runImpact(f, id, {
-				json: flags.json === true,
-				color: resolveColor(flags),
-			});
-		}
-		case "depends-on": {
-			if (flags.help) return ok(HELP_DEPENDS_ON);
-			const [f, id] = rest;
-			if (!f || !id) return fail(HELP_DEPENDS_ON, 2);
-			return runDependsOn(f, id, {
-				json: flags.json === true,
-				color: resolveColor(flags),
-			});
-		}
-		case "path": {
-			if (flags.help) return ok(HELP_PATH);
-			const [f, from, to] = rest;
-			if (!f || !from || !to) return fail(HELP_PATH, 2);
-			const limit = parseLimitFlag(flags, HELP_PATH);
-			if (limit !== undefined && typeof limit !== "number") return limit;
-			return runPath(f, from, to, {
-				...(limit !== undefined ? { limit } : {}),
-				json: flags.json === true,
-				color: resolveColor(flags),
-			});
-		}
-		case "stats": {
-			if (flags.help) return ok(HELP_STATS);
+		},
+	}),
+	defineCommand(GRAPH_STATS_OPTIONS, {
+		name: "stats",
+		synopsis: "stats <file|-> [--limit]",
+		description: ["Rank nodes by primary degree, feedback degree apart"],
+		help: HELP_STATS,
+		run: (rest, flags) => {
 			const f = rest[0];
 			if (!f) return fail(HELP_STATS, 2);
 			const limit = parseLimitFlag(flags, HELP_STATS);
@@ -2588,42 +4834,215 @@ function runGraphGroup(
 				json: flags.json === true,
 				color: resolveColor(flags),
 			});
-		}
-		case "orphans": {
-			if (flags.help) return ok(HELP_GRAPH_ORPHANS);
+		},
+	}),
+	defineCommand(GRAPH_NEIGHBORS_OPTIONS, {
+		name: "neighbors",
+		synopsis: "neighbors <file|-> <id>",
+		description: [
+			"Direct predecessors/successors of a node, feedback included",
+		],
+		help: HELP_NEIGHBORS,
+		run: (rest, flags) => {
+			const [f, id] = rest;
+			if (!f || !id) return fail(HELP_NEIGHBORS, 2);
+			return runNeighbors(f, id, {
+				json: flags.json === true,
+				color: resolveColor(flags),
+			});
+		},
+	}),
+	defineCommand(GRAPH_LOCATE_OPTIONS, {
+		name: "locate",
+		synopsis: "locate <file|-> <id>",
+		description: ["Frontmatter declaration line and body edge lines of a node"],
+		help: HELP_GRAPH_LOCATE,
+		run: (rest, flags) => {
+			const [f, id] = rest;
+			if (!f || !id) return fail(HELP_GRAPH_LOCATE, 2);
+			const fieldVal = flags.field;
+			return runGraphLocate(f, id, {
+				...(typeof fieldVal === "string" ? { field: fieldVal } : {}),
+				json: flags.json === true,
+				color: resolveColor(flags),
+			});
+		},
+	}),
+	defineCommand(GRAPH_DESCRIBE_OPTIONS, {
+		name: "describe",
+		synopsis: "describe <file|-> <id>",
+		description: [
+			"Kind, fields, neighbors, and locate lines of a node, in one call",
+		],
+		help: HELP_GRAPH_DESCRIBE,
+		run: (rest, flags) => {
+			const [f, id] = rest;
+			if (!f || !id) return fail(HELP_GRAPH_DESCRIBE, 2);
+			return runGraphDescribe(f, id, {
+				...referenceContextOption(flags),
+				json: flags.json === true,
+				color: resolveColor(flags),
+			});
+		},
+	}),
+	defineCommand(GRAPH_IMPACT_OPTIONS, {
+		name: "impact",
+		synopsis: "impact <file|-> <id>",
+		description: ["Full downstream closure of a node"],
+		help: HELP_IMPACT,
+		run: (rest, flags) => {
+			const [f, id] = rest;
+			if (!f || !id) return fail(HELP_IMPACT, 2);
+			return runImpact(f, id, {
+				json: flags.json === true,
+				color: resolveColor(flags),
+			});
+		},
+	}),
+	defineCommand(GRAPH_DEPENDS_ON_OPTIONS, {
+		name: "depends-on",
+		synopsis: "depends-on <file|-> <id>",
+		description: ["Full upstream closure of a node"],
+		help: HELP_DEPENDS_ON,
+		run: (rest, flags) => {
+			const [f, id] = rest;
+			if (!f || !id) return fail(HELP_DEPENDS_ON, 2);
+			return runDependsOn(f, id, {
+				json: flags.json === true,
+				color: resolveColor(flags),
+			});
+		},
+	}),
+	defineCommand(GRAPH_PATH_OPTIONS, {
+		name: "path",
+		synopsis: "path <file|-> <from> <to> [--limit]",
+		description: ["All simple paths between two nodes"],
+		help: HELP_PATH,
+		run: (rest, flags) => {
+			const [f, from, to] = rest;
+			if (!f || !from || !to) return fail(HELP_PATH, 2);
+			const limit = parseLimitFlag(flags, HELP_PATH);
+			if (limit !== undefined && typeof limit !== "number") return limit;
+			return runPath(f, from, to, {
+				...(limit !== undefined ? { limit } : {}),
+				json: flags.json === true,
+				color: resolveColor(flags),
+			});
+		},
+	}),
+	defineCommand(GRAPH_EDGES_OPTIONS, {
+		name: "edges",
+		synopsis: "edges <file|->",
+		description: ["Canonical edge list"],
+		help: HELP_GRAPH_EDGES,
+		run: (rest, flags) => {
+			const f = rest[0];
+			if (!f) return fail(HELP_GRAPH_EDGES, 2);
+			return runGraphEdges(f, {
+				json: flags.json === true,
+				color: resolveColor(flags),
+			});
+		},
+	}),
+	defineCommand(GRAPH_ORPHANS_OPTIONS, {
+		name: "orphans",
+		synopsis: "orphans <file|->",
+		description: ["Nodes with neither predecessor nor successor"],
+		help: HELP_GRAPH_ORPHANS,
+		run: (rest, flags) => {
 			const f = rest[0];
 			if (!f) return fail(HELP_GRAPH_ORPHANS, 2);
 			return runGraphOrphans(f, {
 				json: flags.json === true,
 				color: resolveColor(flags),
 			});
-		}
-		default:
-			return fail(`unknown graph subcommand: ${sub}\n${HELP_GRAPH_GROUP}`, 2);
-	}
-}
+		},
+	}),
+];
 
-function runMetaGroup(
-	positional: string[],
-	flags: Record<string, string | boolean>,
-): CommandResult {
-	const [sub, ...rest] = positional;
-	if (!sub) return flags.help ? ok(HELP_META_GROUP) : fail(HELP_META_GROUP, 2);
-	switch (sub) {
-		case "get": {
-			if (flags.help) return ok(HELP_GET);
+const META_COMMANDS: readonly CommandEntry[] = [
+	defineCommand(META_CREATE_OPTIONS, {
+		name: "create",
+		synopsis: "create <file> <id> [field=value ...]",
+		description: ["Create a body node's frontmatter definition"],
+		help: HELP_META_CREATE,
+		run: (rest, flags) => {
+			const [file, id, ...fields] = rest;
+			if (!file || !id) return fail(HELP_META_CREATE, 2);
+			return runMetaCreate(file, id, fields, {
+				write: flags.write === true,
+				json: flags.json === true,
+				allowUnknown: flags["allow-unknown"] === true,
+				color: resolveColor(flags),
+			});
+		},
+	}),
+	defineCommand(META_GET_OPTIONS, {
+		name: "get",
+		synopsis: "get <file|-> <id[,id...]> [field[,field...]]",
+		description: ["Print field values"],
+		help: HELP_GET,
+		run: (rest, flags) => {
 			const [f, id, field, ...extra] = rest;
 			if (!f || !id) return fail(HELP_GET, 2);
 			if (extra.length > 0) return fail(HELP_GET, 2);
 			return runGet(f, {
+				...referenceContextOption(flags),
 				id,
 				...(field !== undefined ? { field } : {}),
 				json: flags.json === true,
 				color: resolveColor(flags),
 			});
-		}
-		case "set": {
-			if (flags.help) return ok(HELP_META_SET);
+		},
+	}),
+	defineCommand(META_LIST_OPTIONS, {
+		name: "list",
+		synopsis: "list <file|-> [--tag|--group|--producer] [field[,field...]]",
+		description: ["Print field values for nodes matching selectors"],
+		help: HELP_META_LIST,
+		run: (rest, flags) => {
+			const [f, field, ...extra] = rest;
+			if (!f) return fail(HELP_META_LIST, 2);
+			if (extra.length > 0) return fail(HELP_META_LIST, 2);
+			// No `=== true` guard on the three: a value-taking option that was
+			// given no value never reaches `run`, because the strict parse
+			// rejects it first (#1050). Before that parse existed, a bare
+			// `--tag` arrived here as `true` and had to be caught by hand.
+			const tagVal = flags.tag;
+			const groupVal = flags.group;
+			const producerVal = flags.producer;
+			return runMetaList(f, {
+				...referenceContextOption(flags),
+				...(typeof tagVal === "string" ? { tag: tagVal } : {}),
+				...(typeof groupVal === "string" ? { group: groupVal } : {}),
+				...(typeof producerVal === "string" ? { producer: producerVal } : {}),
+				...(field !== undefined ? { field } : {}),
+				json: flags.json === true,
+				color: resolveColor(flags),
+			});
+		},
+	}),
+	defineCommand(META_VALUES_OPTIONS, {
+		name: "values",
+		synopsis: "values <file|-> <field[,field...]>",
+		description: ["Print a field's values in use, with counts"],
+		help: HELP_META_VALUES,
+		run: (rest, flags) => {
+			const [f, field, ...extra] = rest;
+			if (!f || field === undefined) return fail(HELP_META_VALUES, 2);
+			if (extra.length > 0) return fail(HELP_META_VALUES, 2);
+			return runMetaValues(f, field, {
+				json: flags.json === true,
+				color: resolveColor(flags),
+			});
+		},
+	}),
+	defineCommand(META_SET_OPTIONS, {
+		name: "set",
+		synopsis: "set <file> <id> <field> <value>",
+		description: ["Set a field value in place"],
+		help: HELP_META_SET,
+		run: (rest, flags) => {
 			const [f, id, field, value, ...extra] = rest;
 			if (!f || !id || !field || value === undefined)
 				return fail(HELP_META_SET, 2);
@@ -2634,25 +5053,36 @@ function runMetaGroup(
 				);
 			}
 			return runMetaSet(f, id, field, value, {
+				allowUnknown: flags["allow-unknown"] === true,
 				json: flags.json === true,
 				color: resolveColor(flags),
 			});
-		}
-		case "sort": {
-			if (flags.help) return ok(HELP_SORT);
+		},
+	}),
+	defineCommand(META_SORT_OPTIONS, {
+		name: "sort",
+		synopsis: "sort <file|-> --by <keys>",
+		description: ["Sort node definitions"],
+		help: HELP_SORT,
+		run: (rest, flags) => {
 			const f = rest[0];
 			if (!f) return fail(HELP_SORT, 2);
 			const byVal = flags.by;
-			if (!byVal || byVal === true) return fail(HELP_SORT, 2);
+			if (!byVal) return fail(HELP_SORT, 2);
 			return runSort(f, {
 				by: String(byVal),
 				write: flags.write === true,
 				check: flags.check === true,
 				color: resolveColor(flags),
 			});
-		}
-		case "reindex": {
-			if (flags.help) return ok(HELP_REINDEX);
+		},
+	}),
+	defineCommand(META_REINDEX_OPTIONS, {
+		name: "reindex",
+		synopsis: "reindex <file|->",
+		description: ["Assign topological index: values"],
+		help: HELP_REINDEX,
+		run: (rest, flags) => {
 			const f = rest[0];
 			if (!f) return fail(HELP_REINDEX, 2);
 			return runReindex(f, {
@@ -2662,41 +5092,78 @@ function runMetaGroup(
 				json: flags.json === true,
 				color: resolveColor(flags),
 			});
-		}
-		case "check-links": {
-			if (flags.help) return ok(HELP_CHECK_LINKS);
+		},
+	}),
+	defineCommand(META_CHECK_LINKS_OPTIONS, {
+		name: "check-links",
+		synopsis: "check-links <file>",
+		description: ["Verify location: file paths exist"],
+		help: HELP_CHECK_LINKS,
+		run: (rest, flags) => {
 			const f = rest[0];
 			if (!f) return fail(HELP_CHECK_LINKS, 2);
 			return runCheckLinks(f, {
+				...referenceContextOption(flags),
 				json: flags.json === true,
 				color: resolveColor(flags),
 			});
-		}
-		default:
-			return fail(`unknown meta subcommand: ${sub}\n${HELP_META_GROUP}`, 2);
-	}
-}
+		},
+	}),
+];
 
-function runStatusGroup(
-	positional: string[],
-	flags: Record<string, string | boolean>,
-): CommandResult {
-	const [sub, ...rest] = positional;
-	if (!sub)
-		return flags.help ? ok(HELP_STATUS_GROUP) : fail(HELP_STATUS_GROUP, 2);
-	switch (sub) {
-		case "ready": {
-			if (flags.help) return ok(HELP_READY);
+const STATUS_COMMANDS: readonly CommandEntry[] = [
+	defineCommand(STATUS_READY_OPTIONS, {
+		name: "ready",
+		synopsis: "ready <file|-> [--no-counts]",
+		description: ["List ready-to-start processes"],
+		help: HELP_READY,
+		run: (rest, flags) => {
 			const f = rest[0];
 			if (!f) return fail(HELP_READY, 2);
 			return runReady(f, {
-				best: flags.best === true,
+				noCounts: flags["no-counts"] === true,
 				json: flags.json === true,
 				color: resolveColor(flags),
 			});
-		}
-		case "gaps": {
-			if (flags.help) return ok(HELP_STATUS_GAPS);
+		},
+	}),
+	defineCommand(STATUS_BLOCKED_OPTIONS, {
+		name: "blocked",
+		synopsis: "blocked <file|->",
+		description: ["List not-ready processes and their blocking inputs"],
+		help: HELP_STATUS_BLOCKED,
+		run: (rest, flags) => {
+			const f = rest[0];
+			if (!f) return fail(HELP_STATUS_BLOCKED, 2);
+			return runStatusBlocked(f, {
+				json: flags.json === true,
+				color: resolveColor(flags),
+			});
+		},
+	}),
+	defineCommand(STATUS_LIST_OPTIONS, {
+		name: "list",
+		synopsis: "list <file|-> --status <s[,s...]>",
+		description: ["List artifacts by status"],
+		help: HELP_STATUS_LIST,
+		run: (rest, flags) => {
+			const f = rest[0];
+			if (!f) return fail(HELP_STATUS_LIST, 2);
+			const statusVal = flags.status;
+			if (!statusVal) return fail(HELP_STATUS_LIST, 2);
+			return runStatusList(f, {
+				status: String(statusVal),
+				json: flags.json === true,
+				color: resolveColor(flags),
+			});
+		},
+	}),
+	defineCommand(STATUS_GAPS_OPTIONS, {
+		name: "gaps",
+		synopsis: "gaps <roadmap> <flow> [<flow>...]",
+		description: ["Find todo artifacts missing from the roadmap"],
+		help: HELP_STATUS_GAPS,
+		run: (rest, flags) => {
 			const [roadmapFile, ...flowFiles] = rest;
 			if (!roadmapFile || flowFiles.length === 0)
 				return fail(HELP_STATUS_GAPS, 2);
@@ -2704,78 +5171,163 @@ function runStatusGroup(
 				json: flags.json === true,
 				color: resolveColor(flags),
 			});
-		}
-		case "blocked": {
-			if (flags.help) return ok(HELP_STATUS_BLOCKED);
-			const f = rest[0];
-			if (!f) return fail(HELP_STATUS_BLOCKED, 2);
-			return runStatusBlocked(f, {
-				json: flags.json === true,
-				color: resolveColor(flags),
-			});
-		}
-		case "list": {
-			if (flags.help) return ok(HELP_STATUS_LIST);
-			const f = rest[0];
-			if (!f) return fail(HELP_STATUS_LIST, 2);
-			const statusVal = flags.status;
-			if (!statusVal || statusVal === true) return fail(HELP_STATUS_LIST, 2);
-			return runStatusList(f, {
-				status: String(statusVal),
-				json: flags.json === true,
-				color: resolveColor(flags),
-			});
-		}
-		default:
-			return fail(`unknown status subcommand: ${sub}\n${HELP_STATUS_GROUP}`, 2);
-	}
-}
+		},
+	}),
+];
 
-export async function run(argv: readonly string[]): Promise<CommandResult> {
-	const { command, positional, flags } = parseArgs(argv);
-	switch (command) {
-		case "--version":
-		case "-V":
-			return ok(`${__PFDSL_VERSION__}\n`);
-		case "help":
-		case "--help":
-		case "-h":
-			return ok(HELP);
-		case "graph":
-			return runGraphGroup(positional, flags);
-		case "meta":
-			return runMetaGroup(positional, flags);
-		case "status":
-			return runStatusGroup(positional, flags);
-		case "check": {
-			if (flags.help) return ok(HELP_CHECK);
+/**
+ * The command-group dispatch surface (#902): `graph`/`meta`/`status`. Both
+ * `dispatch`'s three group cases and every group's own `--help` text are
+ * derived from this — a subcommand added to a group's `commands` here
+ * dispatches and is listed by construction, so the two cannot drift apart.
+ */
+export const COMMAND_GROUPS: readonly GroupDefinition[] = [
+	{
+		name: "graph",
+		description: "Read-only queries on the graph topology",
+		columnWidth: 28,
+		commands: GRAPH_COMMANDS,
+	},
+	{
+		name: "meta",
+		description: "Read and write frontmatter metadata",
+		// 47, not 48: the hand-written listing this replaced aligned its
+		// single-line entries at column 49 but indented `list`'s wrapped
+		// description at 50. One width cannot reproduce both, so the
+		// single-line entries (six of them) keep their column and the wrapped
+		// line loses one space (#902).
+		columnWidth: 47,
+		commands: META_COMMANDS,
+	},
+	{
+		name: "status",
+		description: "Planning queries derived from artifact status",
+		columnWidth: 34,
+		commands: STATUS_COMMANDS,
+	},
+];
+
+/**
+ * The top-level command dispatch surface (#902), excluding `--version`/`-V`/
+ * `help`/`--help`/`-h` (not commands, handled directly in `dispatch`) and the
+ * three command groups above (their own table). `HELP`'s Commands section is
+ * rendered from this, same reasoning as `COMMAND_GROUPS`.
+ */
+export const TOP_LEVEL_COMMANDS: readonly CommandEntry[] = [
+	defineCommand(CHECK_OPTIONS, {
+		name: "check",
+		synopsis:
+			"check <file|-> [--reference-context <file>] [--strict] [--hints] [--json] [--no-color]",
+		description: ["Validate a .pfdsl file (- = stdin)"],
+		help: HELP_CHECK,
+		run: (positional, flags) => {
 			const f = positional[0];
 			if (!f) return fail(HELP_CHECK, 2);
 			return runCheck(f, {
+				...referenceContextOption(flags),
 				hints: flags.hints === true,
 				strict: flags.strict === true,
 				json: flags.json === true,
 				color: resolveColor(flags),
 			});
-		}
-		case "fmt": {
-			if (flags.help) return ok(HELP_FMT);
+		},
+	}),
+	defineCommand(EXPLAIN_OPTIONS, {
+		name: "explain",
+		synopsis: "explain <code>",
+		description: [
+			"Print the summary and spec section for a diagnostic code (e.g. V021)",
+		],
+		help: HELP_EXPLAIN,
+		run: (positional) => {
+			const code = positional[0];
+			if (!code) return fail(HELP_EXPLAIN, 2);
+			return runExplain(code);
+		},
+	}),
+	defineCommand(FMT_OPTIONS, {
+		name: "fmt",
+		synopsis: "fmt <file|-> [--write] [--check] [--no-color]",
+		description: ["Format a .pfdsl file (- = stdin)"],
+		help: HELP_FMT,
+		// The removed `--mode` is answered by `hasRemovedFmtMode` in `dispatch`,
+		// ahead of the strict parse that would otherwise reject it as an unknown
+		// option and flatten its message (#631's "the lookup decides what to say,
+		// not what to do"). A second check here would never run.
+		run: (positional, flags) => {
 			const f = positional[0];
 			if (!f) return fail(HELP_FMT, 2);
-			if (flags.mode !== undefined) {
-				return fail(
-					"fmt: --mode was removed; fmt always formats in flows style\n",
-					2,
-				);
-			}
 			return runFmt(f, {
 				write: flags.write === true,
 				check: flags.check === true,
 				color: resolveColor(flags),
 			});
-		}
-		case "render": {
-			if (flags.help) return ok(HELP_RENDER);
+		},
+	}),
+	defineCommand(DELETE_OPTIONS, {
+		name: "delete",
+		synopsis: "delete <file|-> <id[,id...]> [--write] [--json] [--no-color]",
+		description: [
+			"Remove artifacts, processes, or groups from a .pfdsl file (- = stdin)",
+		],
+		help: HELP_DELETE,
+		run: (positional, flags) => {
+			const [f, idList] = positional;
+			if (!f || !idList) return fail(HELP_DELETE, 2);
+			return runDelete(f, idList, {
+				write: flags.write === true,
+				json: flags.json === true,
+				color: resolveColor(flags),
+			});
+		},
+	}),
+	defineCommand(PRUNE_OPTIONS, {
+		name: "prune",
+		synopsis: commandSynopsis("prune", "<file|->", PRUNE_OPTIONS),
+		description: ["Remove completed chains from a roadmap (- = stdin)"],
+		help: HELP_PRUNE,
+		run: (positional, flags) => {
+			const file = positional[0];
+			if (!file || positional.length !== 1) return fail(HELP_PRUNE, 2);
+			return runPrune(file, {
+				write: flags.write === true,
+				check: flags.check === true,
+				json: flags.json === true,
+				color: resolveColor(flags),
+			});
+		},
+	}),
+	defineCommand(RENAME_OPTIONS, {
+		name: "rename",
+		synopsis: "rename <file|-> <old> <new> [--write] [--json] [--no-color]",
+		description: [
+			"Rename an artifact, process, or group id and every reference to it (- = stdin)",
+		],
+		help: HELP_RENAME,
+		run: (positional, flags) => {
+			const [f, oldId, newId, ...extra] = positional;
+			// `""` is a valid quoted id, so only an absent argument is missing.
+			if (!f || oldId === undefined || newId === undefined) {
+				return fail(HELP_RENAME, 2);
+			}
+			if (extra.length > 0) return fail(HELP_RENAME, 2);
+			return runRename(f, oldId, newId, {
+				write: flags.write === true,
+				json: flags.json === true,
+				color: resolveColor(flags),
+			});
+		},
+	}),
+	defineCommand(RENDER_OPTIONS, {
+		name: "render",
+		synopsis:
+			"render <file|-> [--reference-context <file>] [--format dot|svg|pdf|png] [--no-color]",
+		description: [
+			"Render as Graphviz DOT (default), SVG, PDF, or PNG (- = stdin)",
+			"PDF/PNG requires puppeteer in the CLI's own Node env (npm install puppeteer)",
+		],
+		help: HELP_RENDER,
+		run: (positional, flags) => {
 			const f = positional[0];
 			if (!f) return fail(HELP_RENDER, 2);
 			const fmt = flags.format;
@@ -2789,12 +5341,18 @@ export async function run(argv: readonly string[]): Promise<CommandResult> {
 				return fail(`unknown format: ${String(fmt)}\n`, 2);
 			}
 			return runRender(f, {
+				...referenceContextOption(flags),
 				...(fmt ? { format: fmt as CliRenderFormat } : {}),
 				color: resolveColor(flags),
 			});
-		}
-		case "diff": {
-			if (flags.help) return ok(HELP_DIFF);
+		},
+	}),
+	defineCommand(DIFF_OPTIONS, {
+		name: "diff",
+		synopsis: "diff <a> <b> [--format text|dot|svg] [--json] [--no-color]",
+		description: ["Structural diff (text), or visual diff DOT/SVG"],
+		help: HELP_DIFF,
+		run: async (positional, flags) => {
 			const [a, b] = positional;
 			if (!a || !b) return fail(HELP_DIFF, 2);
 			const fmt = flags.format;
@@ -2811,14 +5369,158 @@ export async function run(argv: readonly string[]): Promise<CommandResult> {
 				json: flags.json === true,
 				color: resolveColor(flags),
 			});
-		}
-		case "explain": {
-			if (flags.help) return ok(HELP_EXPLAIN);
-			const code = positional[0];
-			if (!code) return fail(HELP_EXPLAIN, 2);
-			return runExplain(code);
-		}
-		default:
-			return fail(`unknown command: ${command}\n${HELP}`, 2);
+		},
+	}),
+];
+
+/** Alignment column shared by every listing block in `HELP`; the per-group counterpart is `GroupDefinition.columnWidth`. */
+const TOP_LEVEL_COLUMN_WIDTH = 25;
+
+/**
+ * argv words `dispatch` answers before consulting the tables. They are not
+ * commands — they take no arguments, and `HELP` documents `help` in its own
+ * fixed line rather than as a listing entry — so keeping them out of
+ * `TOP_LEVEL_COMMANDS` avoids entries whose `run`/`synopsis` nothing reads.
+ */
+export const VERSION_WORDS = new Set(["--version", "-V"]);
+export const HELP_WORDS = new Set(["help", "--help", "-h"]);
+
+export const HELP = (() => {
+	const topLevelEntries = TOP_LEVEL_COMMANDS.map((c) =>
+		renderListingEntry(c.synopsis, c.description, TOP_LEVEL_COLUMN_WIDTH),
+	).join("\n");
+	const groupEntries = COMMAND_GROUPS.map((g) =>
+		renderListingEntry(
+			`${g.name} ${g.commands.map((c) => c.name).join("|")}`,
+			[g.description],
+			TOP_LEVEL_COLUMN_WIDTH,
+		),
+	).join("\n");
+	const helpEntry = renderListingEntry(
+		"help",
+		["Show this help"],
+		TOP_LEVEL_COLUMN_WIDTH,
+	);
+	return `pfdsl <command> [options]
+
+Commands:
+${topLevelEntries}
+
+Command groups (run \`pfdsl <group>\` for their subcommands):
+${groupEntries}
+
+${helpEntry}
+
+Exit codes:
+  0  success (warnings are non-fatal)
+  1  error (parse/validation error, or file cannot be read)
+  2  invalid usage (missing argument, unknown flag or subcommand)
+`;
+})();
+
+function parseErrorContext(argv: readonly string[]): {
+	label: string;
+	help: string;
+} {
+	const command = argv[0] ?? "help";
+	const topLevelEntry = TOP_LEVEL_COMMANDS.find(
+		(entry) => entry.name === command,
+	);
+	if (topLevelEntry) {
+		return { label: topLevelEntry.name, help: topLevelEntry.help };
 	}
+	const group = COMMAND_GROUPS.find((entry) => entry.name === command);
+	if (group) {
+		const subcommand = argv[1];
+		const entry =
+			subcommand && !subcommand.startsWith("-")
+				? group.commands.find((candidate) => candidate.name === subcommand)
+				: undefined;
+		if (entry)
+			return { label: `${group.name} ${entry.name}`, help: entry.help };
+		return { label: group.name, help: renderGroupHelp(group) };
+	}
+	return { label: command, help: HELP };
+}
+
+/**
+ * Dispatches `positional`/`flags` within one group: no subcommand falls back
+ * to the group's own help (ok on `--help`, usage-error fail otherwise), an
+ * unrecognized subcommand fails with the group help appended, and `--help`
+ * on a recognized subcommand short-circuits to its own help text before
+ * `run` sees the call (every case's own `if (flags.help) ...` used to sit at
+ * the top of its switch case, ahead of argument validation, so lifting it
+ * here changes nothing observable).
+ */
+async function runGroup(
+	group: GroupDefinition,
+	positional: string[],
+	flags: Record<string, string | boolean>,
+): Promise<CommandResult> {
+	const [sub, ...rest] = positional;
+	// Rendered only on the two branches that print it: the group help was a
+	// module-level constant before the table, so building it on every
+	// `pfdsl <group> <sub> ...` call would be work this refactor added to the
+	// path scripts actually run.
+	if (!sub) {
+		const groupHelp = renderGroupHelp(group);
+		return flags.help ? ok(groupHelp) : fail(groupHelp, 2);
+	}
+	const entry = group.commands.find((c) => c.name === sub);
+	if (!entry)
+		return fail(
+			`unknown ${group.name} subcommand: ${sub}\n${renderGroupHelp(group)}`,
+			2,
+		);
+	if (flags.help) return ok(entry.help);
+	return await entry.run(rest, flags);
+}
+
+/**
+ * Runs one CLI invocation. `hostOverride` replaces the process-level inputs
+ * for the duration of the call — a test supplies a stdin or a TTY state
+ * through it rather than reaching into node:fs or process.stdout.
+ */
+export async function run(
+	argv: readonly string[],
+	hostOverride?: Partial<CliHost>,
+): Promise<CommandResult> {
+	const previousHost = host;
+	if (hostOverride) host = { ...host, ...hostOverride };
+	try {
+		return await dispatch(argv);
+	} finally {
+		host = previousHost;
+	}
+}
+
+async function dispatch(argv: readonly string[]): Promise<CommandResult> {
+	if (hasRemovedFmtMode(argv)) {
+		return fail(
+			"fmt: --mode was removed; fmt always formats in flows style\n",
+			2,
+		);
+	}
+	const errorContext = parseErrorContext(argv);
+	let parsed: CliArgs;
+	try {
+		parsed = parseArgs(argv);
+	} catch (error) {
+		return parseArgsErrorResult(error, errorContext);
+	}
+	const { command, positional, flags } = parsed;
+	if (VERSION_WORDS.has(command)) return ok(`${__PFDSL_VERSION__}\n`);
+	if (HELP_WORDS.has(command)) return ok(HELP);
+	// Group names are read off COMMAND_GROUPS rather than written out here:
+	// a fourth group added to the table has to dispatch, or the table would
+	// be the source of truth for the help listing only — the half-derived
+	// state #902 is about. The same reasoning is why this function holds no
+	// per-command branch at all: a `case` written here would dispatch while
+	// staying out of every listing, which is exactly the defect being fixed.
+	const group = COMMAND_GROUPS.find((g) => g.name === command);
+	if (group) return runGroup(group, positional, flags);
+	const entry = TOP_LEVEL_COMMANDS.find((c) => c.name === command);
+	if (!entry) return fail(`unknown command: ${command}\n${HELP}`, 2);
+	if (flags.help) return ok(entry.help);
+	return await entry.run(positional, flags);
 }

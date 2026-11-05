@@ -2,8 +2,12 @@ import { readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
+import { parseFrontmatterCst } from "./frontmatter-cst.js";
 import {
+	analyze,
 	format,
+	inputFeedbackConflictPairs,
+	isUnreadableError,
 	normalizeDocument,
 	parse,
 	resolveMeta,
@@ -11,12 +15,222 @@ import {
 } from "./index.js";
 import { lex } from "./lexer.js";
 import { parseTokens } from "./parser.js";
+import { zeroRange } from "./position.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const samplePath = resolve(__dirname, "__fixtures__/pipeline-scale.pfdsl");
 const sampleSource = readFileSync(samplePath, "utf-8");
 
+it("finds sorted unique conflicts from edges alone", () => {
+	const { edges } = analyze(
+		"z >> q -> out\na >> p -> b\nz >>? q\na >>? p\na >>? p\n",
+	);
+	expect(inputFeedbackConflictPairs(edges)).toEqual([
+		{ artifact: "a", process: "p" },
+		{ artifact: "z", process: "q" },
+	]);
+	expect(inputFeedbackConflictPairs([])).toEqual([]);
+});
+
+function semanticSnapshot(source: string) {
+	const result = analyze(source);
+	return {
+		edges: result.edges.map((edge) => JSON.stringify(edge)).sort(),
+		nodeKinds: [...result.nodeKinds.entries()].sort(([a], [b]) =>
+			a.localeCompare(b),
+		),
+		isolatedNodes: [...result.isolatedNodes].sort(),
+	};
+}
+
+function assertFormatPreservesSemantics(
+	source: string,
+	style: "flat" | "flows",
+	expectedOutput: string,
+) {
+	const before = semanticSnapshot(source);
+	const result = format(source, { style });
+	const errors = result.diagnostics.filter(
+		(diagnostic) => diagnostic.severity === "error",
+	);
+	expect(errors).toHaveLength(0);
+	expect(result.output).toBe(expectedOutput);
+	const after = analyze(result.output);
+	expect(
+		after.diagnostics.filter((diagnostic) => diagnostic.severity === "error"),
+	).toHaveLength(0);
+	expect(semanticSnapshot(result.output)).toEqual(before);
+	expect(format(result.output, { style }).output).toBe(result.output);
+}
+
 describe("public API", () => {
+	it.each([
+		"\n",
+		"\r\n",
+	])("locates V036 at the feedback edge after frontmatter with %j newlines", (newline) => {
+		const source = [
+			"---",
+			"type: workflow",
+			"---",
+			"a >> p -> b",
+			"a >>? p",
+			"",
+		].join(newline);
+		for (const result of [analyze(source), format(source)]) {
+			const diagnostic = result.diagnostics.find(
+				(item) => item.code === "V036",
+			);
+			expect(diagnostic?.range.start).toMatchObject({ line: 5, column: 1 });
+			expect(diagnostic?.range.end).toMatchObject({ line: 5, column: 8 });
+		}
+	});
+
+	it.each([
+		"\n",
+		"\r\n",
+	])("locates lexer diagnostics after long frontmatter with %j newlines", (newline) => {
+		const frontmatter = [
+			"---",
+			...Array.from({ length: 108 }, (_, i) => `# line ${i}`),
+			"---",
+		].join(newline);
+		for (const [body, code, column] of [
+			["a1 >> @@ -> a2", "L002", 7],
+			['a1 >> P -> "unterminated', "L001", 12],
+		] as const) {
+			const source = `${frontmatter}${newline}${newline}${body}${newline}`;
+			for (const result of [parse(source), analyze(source), format(source)]) {
+				const diagnostic = result.diagnostics.find(
+					(item) => item.code === code,
+				);
+				expect(diagnostic?.range.start).toMatchObject({ line: 112, column });
+				expect(diagnostic?.range.end.line).toBe(112);
+			}
+		}
+	});
+
+	it("keeps lexer diagnostic lines unchanged without frontmatter", () => {
+		const result = analyze("\na1 >> @@ -> a2\n");
+		expect(
+			result.diagnostics.find((item) => item.code === "L002")?.range.start,
+		).toMatchObject({ line: 2, column: 7 });
+	});
+
+	it("analyze: warns when a plain frontmatter scalar is truncated by an inline comment", () => {
+		const src =
+			"---\nartifact:\n  spec:\n    criteria: Details are in issue #123\n---\nspec >> P -> output\n";
+
+		expect(analyze(src).diagnostics).toContainEqual({
+			severity: "warning",
+			code: "FM003",
+			message:
+				"Inline comment may truncate an intended plain-scalar value; quote the value or use a block scalar.",
+			range: {
+				start: { line: 4, column: 36, offset: 57 },
+				end: { line: 4, column: 37, offset: 58 },
+			},
+		});
+	});
+
+	it("analyze: locates an inline-comment warning in LF and CRLF frontmatter", () => {
+		for (const [newline, offset] of [
+			["\n", 57],
+			["\r\n", 60],
+		] as const) {
+			const src = [
+				"---",
+				"artifact:",
+				"  spec:",
+				"    criteria: Details are in issue #123",
+				"---",
+				"spec >> P -> output",
+				"",
+			].join(newline);
+			const diagnostic = analyze(src).diagnostics.find(
+				(d) => d.code === "FM003",
+			);
+			expect(diagnostic?.range).toEqual({
+				start: { line: 4, column: 36, offset },
+				end: { line: 4, column: 37, offset: offset + 1 },
+			});
+		}
+	});
+
+	it("analyze: excludes quoted, block, flow, comment-only, and empty scalar values", () => {
+		const src =
+			'---\nartifact:\n  quoted:\n    label: "Quoted # value"\n  quoted_with_comment:\n    label: "value" # comment\n  multiline_quoted:\n    description: "first line\n      example: value # quoted text"\n  single:\n    label: \'Single # value\'\n  single_with_comment:\n    label: \'value\' # comment\n  folded:\n    description: >\n      example: value # folded text\n  folded_with_comment:\n    description: > # comment\n      value\n  literal:\n    description: |\n      example: value # literal text\n  literal_with_comment:\n    description: | # comment\n      value\n  flow_with_comment:\n    tags: [value] # comment\n  map_with_comment:\n    style: {key: value} # comment\n  empty:\n    label: # only a comment\n# standalone comment\n---\nquoted >> P -> output\n';
+
+		expect(analyze(src).diagnostics.map((d) => d.code)).not.toContain("FM003");
+	});
+
+	it("analyze: excludes mapping keys, scalar styles, collection comments, and hashes without a separator", () => {
+		const src =
+			'---\n? key # comment\n: value\nquoted: "value" # comment\nblock: > # comment\n  value\nflow: [value] # comment\nno_separator: value#123\n---\ninput >> P -> output\n';
+
+		expect(parse(src).frontmatter).toEqual({
+			key: "value",
+			quoted: "value",
+			block: "value\n",
+			flow: ["value"],
+			no_separator: "value#123",
+		});
+		expect(analyze(src).diagnostics.map((d) => d.code)).not.toContain("FM003");
+	});
+
+	it("analyze: detects an inline plain-scalar comment for an unknown field", () => {
+		const src = "---\ncustom: intended value #123\n---\ninput >> P -> output\n";
+
+		expect(analyze(src).diagnostics.map((d) => d.code)).toContain("FM003");
+	});
+
+	it("analyze: warns for a block sequence plain scalar followed by a comment (regression: Pair-only CST traversal)", () => {
+		const src =
+			"---\nmetadata:\n  steps:\n    - intended value #123\n---\nstep >> P -> output\n";
+
+		expect(parse(src).frontmatter).toEqual({
+			metadata: { steps: ["intended value"] },
+		});
+		expect(analyze(src).diagnostics).toContainEqual({
+			severity: "warning",
+			code: "FM003",
+			message:
+				"Inline comment may truncate an intended plain-scalar value; quote the value or use a block scalar.",
+			range: {
+				start: { line: 4, column: 22, offset: 44 },
+				end: { line: 4, column: 23, offset: 45 },
+			},
+		});
+	});
+
+	it("analyze: warns for a flow collection plain scalar followed by a comment (regression: flow-path exclusion)", () => {
+		const src =
+			"---\ntags: [one, intended value # comment\n]\n---\ninput >> P -> output\n";
+
+		expect(parse(src).frontmatter).toEqual({
+			tags: ["one", "intended value"],
+		});
+		expect(analyze(src).diagnostics).toContainEqual({
+			severity: "warning",
+			code: "FM003",
+			message:
+				"Inline comment may truncate an intended plain-scalar value; quote the value or use a block scalar.",
+			range: {
+				start: { line: 2, column: 28, offset: 31 },
+				end: { line: 2, column: 29, offset: 32 },
+			},
+		});
+	});
+
+	it("analyze: promotes the inline-comment diagnostic in strict mode", () => {
+		const src =
+			"---\nartifact:\n  spec:\n    criteria: Details are in issue #123\n---\nspec >> P -> output\n";
+
+		expect(
+			analyze(src, { strict: true }).diagnostics.find((d) => d.code === "FM003")
+				?.severity,
+		).toBe("error");
+	});
+
 	it("parse: parses the sample .pfdsl file without syntax errors", () => {
 		const result = parse(sampleSource);
 		const errors = result.diagnostics.filter((d) => d.severity === "error");
@@ -60,6 +274,57 @@ describe("public API", () => {
 		expect(output).toBe("# section A\nA >> P -> B\n");
 	});
 
+	it("format: preserves a comment inside a chain for flat and flows", () => {
+		const src = "[a,b]\n# note\n>> P -> c\n";
+		for (const style of ["flat", "flows"] as const)
+			assertFormatPreservesSemantics(src, style, src);
+	});
+
+	it("format: keeps an internally commented statement raw beside a normal statement", () => {
+		const src = "Z>>Q; A # keep\n  >>   P\n";
+		const expected = "Z >> Q\nA # keep\n  >>   P\n";
+		for (const style of ["flat", "flows"] as const)
+			assertFormatPreservesSemantics(src, style, expected);
+	});
+
+	it("format: consumes a statement separator after a raw commented statement", () => {
+		for (const src of [
+			"A # keep\n  >>   P; Z   >>   Q\n",
+			"A # keep\n  >>   P;\nZ>>Q\n",
+			"A # keep\n  >>   P;   \nZ>>Q\n",
+		]) {
+			const expected = "A # keep\n  >>   P\nZ >> Q\n";
+			for (const style of ["flat", "flows"] as const)
+				assertFormatPreservesSemantics(src, style, expected);
+		}
+	});
+
+	it("format: preserves an indented internal comment and trailing comment in CRLF", () => {
+		const src = [
+			"---",
+			"title: Demo",
+			"---",
+			"[A,B]",
+			"  # keep",
+			"  >>   P -> C # tail",
+			"",
+		].join("\r\n");
+		for (const style of ["flat", "flows"] as const)
+			assertFormatPreservesSemantics(src, style, src);
+	});
+
+	it("format: does not attach a later same-line statement to an earlier raw statement", () => {
+		const src = "A # keep\n  >> P Q -> B # tail\n";
+		const expected = "A # keep\n  >> P\nQ -> B\n";
+		for (const style of ["flat", "flows"] as const)
+			assertFormatPreservesSemantics(src, style, expected);
+	});
+
+	it("format: does not treat quoted hashes or trailing-only comments as raw triggers", () => {
+		const src = '"A#B"   >>   P\nA >> P # tail\n';
+		expect(format(src, { style: "flat" }).output).toBe('"A#B" >> P\nA >> P\n');
+	});
+
 	it("format: preserves comment between two edge blocks", () => {
 		const src = "A >> P\nP -> B\n# separator\nX >> Q\nQ -> Y\n";
 		const { output } = format(src, { style: "flows" });
@@ -76,6 +341,150 @@ describe("public API", () => {
 		const src = "# just a comment\n";
 		const { output } = format(src);
 		expect(output).toBe("# just a comment\n");
+	});
+
+	describe("format: frontmatter CST canonicalization (ADR-0034)", () => {
+		it("collapses runs of blank lines to one", () => {
+			const src =
+				"---\ntitle: T\n\n\n\nartifact:\n  a:\n    label: A\n---\na >> P -> b\n";
+			const { output } = format(src);
+			expect(output).toContain("title: T\n\nartifact:");
+			expect(output).not.toContain("\n\n\n");
+		});
+
+		it("normalizes extra spacing after a colon", () => {
+			const src = "---\ntitle:    T\n---\na >> P -> b\n";
+			const { output } = format(src);
+			expect(output).toContain("title: T\n");
+		});
+
+		it("preserves frontmatter comments and blank lines", () => {
+			const src =
+				"---\n# top comment\ntitle: T\n\nartifact:\n  a:\n    label: A # trailing\n---\na >> P -> b\n";
+			const { output } = format(src);
+			expect(output).toContain("# top comment\ntitle: T\n\nartifact:");
+			expect(output).toContain("label: A # trailing");
+		});
+
+		it("normalizes indentation to 2 spaces", () => {
+			const src =
+				"---\nartifact:\n    a:\n        label: A\n---\na >> P -> b\n";
+			const { output } = format(src);
+			expect(output).toContain("artifact:\n  a:\n    label: A\n");
+		});
+
+		it("preserves flow-style collections as flow-style", () => {
+			const src = "---\nartifact: { a: { label: A } }\n---\na >> P -> b\n";
+			const { output } = format(src);
+			expect(output).toContain("artifact: { a: { label: A } }\n");
+		});
+
+		it("does not throw when the fences are well-formed but the YAML content is invalid (FM002)", () => {
+			const src = "---\n: bad: yaml\n---\na >> P -> b\n";
+			expect(() => format(src)).not.toThrow();
+			const { output, diagnostics } = format(src);
+			expect(output).toContain(": bad: yaml");
+			expect(diagnostics.some((d) => d.code === "FM002")).toBe(true);
+		});
+
+		// Canonicalizing the notation is format's job; rewriting the file's byte
+		// representation is not. The write path preserves line endings (#644) and
+		// fmt is held to the same rule (#656).
+		it("keeps a CRLF source on CRLF, body included", () => {
+			const src =
+				"---\nartifact:\n  a:\n    label: A\n---\na >> P -> b\n".replace(
+					/\n/g,
+					"\r\n",
+				);
+			const { output } = format(src);
+			expect(output).toContain("label: A");
+			expect(output.replace(/\r\n/g, "")).not.toContain("\n");
+		});
+
+		it("keeps a CRLF source on CRLF when the frontmatter does not parse (FM002)", () => {
+			const src = "---\n: bad: yaml\n---\na >> P -> b\n".replace(/\n/g, "\r\n");
+			const { output } = format(src);
+			expect(output.replace(/\r\n/g, "")).not.toContain("\n");
+		});
+
+		it("keeps a LF source on LF", () => {
+			const src = "---\nartifact:\n  a:\n    label: A\n---\na >> P -> b\n";
+			expect(format(src).output).not.toContain("\r");
+		});
+
+		// Document#toString({ lineWidth: 0 }) would otherwise collapse a folded
+		// (`>`) scalar's hand-chosen line wraps onto one continuation line (#815).
+		it("preserves a folded scalar's hand-wrapped line breaks", () => {
+			const src =
+				"---\nartifact:\n  a:\n    description: >\n      Hello\n      world.\n    status: todo\n---\na >> P -> b\n";
+			const { output } = format(src);
+			expect(output).toBe(
+				"---\nartifact:\n  a:\n    description: >\n      Hello\n      world.\n    status: todo\n---\na >> P\nP -> b\n",
+			);
+		});
+
+		it("is idempotent for a folded scalar's hand-wrapped line breaks", () => {
+			const src =
+				"---\nartifact:\n  a:\n    description: >\n      Hello\n      world.\n    status: todo\n---\na >> P -> b\n";
+			const { output: first } = format(src);
+			const { output: second } = format(first);
+			expect(second).toBe(first);
+		});
+
+		// The write path preserves the source's own line ending (#644); a
+		// folded scalar's preserved wraps must not introduce a bare LF into an
+		// otherwise all-CRLF file.
+		it("preserves a folded scalar's hand-wrapped line breaks in a CRLF file without introducing a bare LF", () => {
+			const src =
+				"---\nartifact:\n  a:\n    description: >\n      Hello\n      world.\n    status: todo\n---\na >> P -> b\n".replace(
+					/\n/g,
+					"\r\n",
+				);
+			const { output: first } = format(src);
+			expect(first).toContain(
+				"description: >\r\n      Hello\r\n      world.\r\n",
+			);
+			expect(first.replace(/\r\n/g, "")).not.toContain("\n");
+			const { output: second } = format(first);
+			expect(second).toBe(first);
+		});
+
+		// parseFrontmatterCst's yamlText slice excludes the closing fence's own
+		// line break (#644), so when a fold is the last field in the
+		// frontmatter, the write path used to lose that newline on re-splice —
+		// gluing the closing fence onto the fold's last continuation line (#815).
+		it("preserves a folded scalar's hand-wrapped line breaks when the fold is the frontmatter's last field", () => {
+			const src =
+				"---\nartifact:\n  a:\n    status: todo\n    description: >\n      Hello\n      world.\n---\na >> P -> b\n";
+			const { output } = format(src);
+			expect(output).toBe(
+				"---\nartifact:\n  a:\n    status: todo\n    description: >\n      Hello\n      world.\n---\na >> P\nP -> b\n",
+			);
+		});
+
+		// collectFoldedScalars used to build a fold's path from only the
+		// isPair steps on its visit path, dropping the sequence index — a
+		// numeric map key inside a sequence element then read back as that
+		// dropped index and resolved to a *different* seq element, splicing
+		// one fold's wraps onto it (#815). ADR-0037 already scopes fold
+		// preservation out of sequences; ensure fmt is idempotent and doesn't
+		// cross-contaminate seq elements now that the skip is explicit.
+		it("does not move a sequence element's folded wraps onto another element (ADR-0037, #815)", () => {
+			const src =
+				"---\nseqfield:\n  - 3: >\n      shared value\n      wrapped here\n  - one\n  - two\n  - >\n      shared value\n      wrapped here\n---\na >> P -> b\n";
+			const { output: first } = format(src);
+			const cst = parseFrontmatterCst(first);
+			expect(cst.doc.toJSON()).toEqual({
+				seqfield: [
+					{ "3": "shared value wrapped here\n" },
+					"one",
+					"two",
+					"shared value wrapped here\n",
+				],
+			});
+			const { output: second } = format(first);
+			expect(second).toBe(first);
+		});
 	});
 
 	it("format: isolated frontmatter node appears exactly once across multiple flow segments (regression #368)", () => {
@@ -135,5 +544,24 @@ describe("public API", () => {
 		it("returns undefined when fm is null", () => {
 			expect(resolveMeta(null, "artifact", "art1")).toBeUndefined();
 		});
+	});
+});
+
+describe("isUnreadableError", () => {
+	it.each([
+		["FM004", true],
+		["L001", true],
+		["P001", true],
+		["V007", false],
+		["N001", false],
+	])("%s error -> %s", (code, expected) => {
+		expect(
+			isUnreadableError({
+				severity: "error",
+				code,
+				message: "",
+				range: zeroRange(),
+			}),
+		).toBe(expected);
 	});
 });

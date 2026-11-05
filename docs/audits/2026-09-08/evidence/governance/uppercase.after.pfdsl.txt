@@ -1,0 +1,14 @@
+---
+type: roadmap
+artifact:
+  input:
+    status: done
+  result:
+    status: todo
+process:
+  i2_use:
+    tags: [ priority:medium ]
+    updated_at: now
+---
+
+Product >> i2_use -> result

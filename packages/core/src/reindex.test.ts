@@ -18,6 +18,19 @@ function indices(src: string): {
 }
 
 describe("reindex", () => {
+	it("numbers a producer before a consumer with an additional source input", () => {
+		const src = `---
+process:
+  P2: {}
+  P1: {}
+---
+start >> P1 -> built
+[built, other] >> P2 -> final
+`;
+		const { output } = reindex(src, { renumber: true });
+		expect(indices(output).process).toEqual({ P1: 1, P2: 2 });
+	});
+
 	it("renumber: assigns topological indices with independent counters", () => {
 		const src = `---
 artifact:
@@ -208,7 +221,11 @@ spec >> design -> out
 		expect(output).not.toContain("{ index: 1}");
 	});
 
-	it("is a safe no-op for a node in an inline flow-style section one-liner (#493)", () => {
+	it("writes into a node in an inline flow-style section one-liner (#493)", () => {
+		// Originally a regression test for the surgical writer, which had to
+		// skip a flow-style section entirely (splicing a block-style `index:`
+		// line into a one-liner would have produced broken YAML). The yaml CST
+		// (ADR-0034) writes into flow maps natively, so this now succeeds.
 		const src = `---
 artifact: { a: { label: A } }
 process:
@@ -219,10 +236,8 @@ a >> p -> b
 `;
 		const { output, changes, diagnostics } = reindex(src, { renumber: true });
 		expect(diagnostics.filter((d) => d.severity === "error")).toEqual([]);
-		// the flow-style artifact section is left untouched (splicing a
-		// block-style index: line into it would produce broken YAML)
-		expect(output).toContain("artifact: { a: { label: A } }");
-		expect(changes.some((c) => c.id === "a")).toBe(false);
+		expect(output).toContain("artifact: { a: { label: A, index: 1 }");
+		expect(changes.some((c) => c.id === "a")).toBe(true);
 		// the ordinary block-style process section still gets its index
 		expect(changes.some((c) => c.id === "p")).toBe(true);
 		const { diagnostics: reparsed } = analyze(output);
@@ -235,5 +250,93 @@ a >> p -> b
 		expect(diagnostics.some((d) => d.severity === "error")).toBe(true);
 		expect(changes).toHaveLength(0);
 		expect(output).toBe(src);
+	});
+
+	it("keeps a CRLF source on CRLF (#644)", () => {
+		const src = [
+			"---",
+			"artifact:",
+			"  a: { label: A }",
+			"  b: { label: B }",
+			"---",
+			"a >> p -> b",
+			"",
+		].join("\r\n");
+		const { output, changes } = reindex(src);
+		expect(changes.length).toBeGreaterThan(0);
+		expect(output.replace(/\r\n/g, "")).not.toContain("\n");
+	});
+
+	// Document#toString({ lineWidth: 0 }) would otherwise collapse a folded
+	// (`>`) scalar's hand-chosen line wraps onto one continuation line (#815).
+	it("preserves a folded scalar's hand-wrapped line breaks", () => {
+		const src = `---
+artifact:
+  a:
+    description: >
+      Hello
+      world.
+    label: A
+  b: { label: B }
+---
+a >> p -> b
+`;
+		const { output, changes } = reindex(src);
+		expect(changes.length).toBeGreaterThan(0);
+		expect(output).toBe(`---
+artifact:
+  a:
+    description: >
+      Hello
+      world.
+    label: A
+    index: 1
+  b: { label: B, index: 2 }
+process:
+  p:
+    index: 1
+---
+a >> p -> b
+`);
+	});
+
+	// parseFrontmatterCst's yamlText slice excludes the closing fence's own
+	// line break (#644), so when a fold is the last field in the frontmatter,
+	// the write path used to lose that newline on re-splice — gluing the
+	// closing fence onto the fold's last continuation line, or (with
+	// --renumber) swallowing the following field's added `index:` into the
+	// fold's decoded value with no error reported (#815).
+	it("preserves a folded scalar's hand-wrapped line breaks when the fold is the frontmatter's last field", () => {
+		const src = `---
+artifact:
+  a:
+    label: A
+  b:
+    label: B
+    description: >
+      Hello
+      world.
+---
+a >> p -> b
+`;
+		const { output, changes } = reindex(src, { renumber: true });
+		expect(changes.length).toBeGreaterThan(0);
+		expect(output).toBe(`---
+artifact:
+  a:
+    label: A
+    index: 1
+  b:
+    label: B
+    description: >
+      Hello
+      world.
+    index: 2
+process:
+  p:
+    index: 1
+---
+a >> p -> b
+`);
 	});
 });

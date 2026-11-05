@@ -1,0 +1,62 @@
+import { readFileSync, writeFileSync } from 'node:fs';
+import { createRequire } from 'node:module';
+import { runInNewContext } from 'node:vm';
+import { resolve } from 'node:path';
+const root = '/path/to/pfdsl';
+const out = '/tmp/pfdsl-audit/governance';
+const require = createRequire(`${root}/package.json`);
+const { parseDocument } = require('yaml');
+const core = await import(`${root}/packages/core/dist/index.js`);
+const audit = await import(`${root}/scripts/pfdsl/lib/issues-flow-audit.mjs`);
+const entry = readFileSync(`${root}/scripts/pfdsl/audit-issues-flow.mjs`, 'utf8');
+// Execute the actual unexported production function, not a rewritten oracle.
+const start = entry.indexOf('function getConsumedArtifactIds(body) {');
+const end = entry.indexOf('\nconst consumedIds =', start);
+const consumed = runInNewContext(`(${entry.slice(start, end).trim()})`);
+
+function flowProbe(name, product, withRevises = false) {
+  const source = `---\ntype: roadmap\nartifact:\n  input:\n    status: done\n  ${product}:\n    status: done\n  result:\n    status: todo\n${withRevises ? `    revises: ${product}\n` : ''}process:\n  i1_build:\n    tags: [priority:medium]\n    updated_at: old\n  i2_use:\n    tags: [priority:medium]\n    updated_at: now\n---\ninput >> i1_build -> ${product}\n${withRevises ? 'input' : product} >> i2_use -> result\n`;
+  const before = core.format(source,{style:'flows'}).output;
+  const parts = before.split(/^---\s*$/m);
+  const doc = parseDocument(parts[1]);
+  const fm = doc.toJS();
+  const body = parts.slice(2).join('---');
+  const outputs = audit.buildProcessOutputs(body);
+  const consumedIds = consumed(body);
+  const entries = audit.parseIssueProcesses(fm).flatMap(p =>
+    p.issueNumbers.flatMap(issueNumber => (outputs.get(p.id) ?? []).map(artifactId => ({
+      processId:p.id, issueNumber, artifactId, status:fm.artifact?.[artifactId]?.status,
+      hasDownstream:consumedIds.has(artifactId), updatedAt:p.updatedAt, priorities:p.priorities
+    }))));
+  const issues = [
+    {number:1,state:'CLOSED',stateReason:'COMPLETED',labels:['flow:managed','priority:medium'],updatedAt:'now'},
+    {number:2,state:'OPEN',labels:['flow:managed','priority:medium'],updatedAt:'now'}
+  ];
+  const findings = audit.computeFindings(entries, issues);
+  const map = new Map(issues.map(i => [i.number,i]));
+  audit.applyFixes(doc, findings, map);
+  const newBody = audit.applyClosedInFlowFixes(doc, body, findings, map);
+  const after = `---\n${doc.toString({lineWidth:0})}---\n${newBody}`;
+  writeFileSync(`${out}/${name}.before.pfdsl`,before);
+  writeFileSync(`${out}/${name}.after.pfdsl`,after);
+  const oldAnalysis = core.analyze(before);
+  const newAnalysis = core.analyze(after);
+  return {
+    name, canonicalBefore:core.format(before,{style:'flows'}).output===before,
+    errorsBefore:oldAnalysis.diagnostics.filter(d=>d.severity==='error'),
+    consumedIds:[...consumedIds], findings,
+    beforeProduct:oldAnalysis.frontmatter.artifact[product],
+    afterProduct:newAnalysis.frontmatter.artifact[product]??null,
+    beforeEdges:oldAnalysis.edges, afterEdges:newAnalysis.edges,
+    errorsAfter:newAnalysis.diagnostics.filter(d=>d.severity==='error'),
+  };
+}
+const outputs = {
+  flow:[flowProbe('lowercase-control','product'), flowProbe('uppercase','Product'), flowProbe('revises','product',true)],
+  parserEquivalence: ['a >> i1_p -> b\n','a >> i1_p\ni1_p -> b\n','a >> i1_p -> b >> i2_q -> c\n','a >> i1_p -> b # note\n'].map(body=>({
+    body, coreOutputs:core.analyze(body).edges.filter(e=>e.op==='->'||e.kind==='output'), auditOutputs:[...audit.buildProcessOutputs(body)],
+    errorCodes:core.analyze(body).diagnostics.filter(d=>d.severity==='error').map(d=>d.code),
+  })),
+};
+writeFileSync(`${out}/results.json`,JSON.stringify(outputs,null,2)+'\n');
+console.log(JSON.stringify(outputs,null,2));

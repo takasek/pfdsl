@@ -351,7 +351,7 @@ source >> build -> output
 
 ## 17-type — type field
 
-`type:` declares the PFD kind (`roadmap`, `workflow`, `runtime-pipeline`). Values outside the enum cause an error (V031). `pfdsl status ready` rejects any explicit non-`roadmap` type; omitting `type:` is treated as `roadmap` and allowed, with a warning (W006).
+`type:` declares the PFD kind (`roadmap`, `workflow`, `pipeline`). Values outside the enum cause an error (V031). `pfdsl status ready` rejects any explicit non-`roadmap` type; omitting `type:` is treated as `roadmap` and allowed, with a warning (W006). Status belongs to the roadmap: an artifact carrying `status:` under an explicit non-`roadmap` type is a warning (W007), and `pfdsl meta set` refuses to write one.
 
 ```pfdsl
 ---
@@ -368,6 +368,35 @@ process:
     label: Build
 ---
 requirements >> build -> implementation
+```
+
+---
+
+## 18-reference-targets — Artifact reference targets
+
+Specification example: `baseRef: { source, revision }` sets the artifact default; an artifact's `ref` replaces it. Reference resolution requires a supporting implementation and acquisition context; older CLI checks do not verify it.
+
+```pfdsl
+---
+title: Artifact reference targets
+description: Specification example with logical model path .pfdsl/roadmap.pfdsl in each selected source. The acquisition context must supply that path; this sample's physical docs/samples path is not its logical path. Reference resolution requires a supporting implementation; older CLI checks do not verify it.
+basePath: ..
+baseRef: { source: https://example.com/project.git, revision: main }
+artifact:
+  accepted_plan:
+    label: Accepted plan
+    location: docs/plan.md
+    criteria: The plan has been accepted at its effective reference target.
+  working_plan:
+    label: Working plan
+    location: docs/plan.md
+    ref: { source: https://example.com/project.git, revision: develop }
+    criteria: The revised plan is available at its effective reference target.
+process:
+  revise:
+    label: Revise plan
+---
+accepted_plan >> revise -> working_plan
 ```
 
 ---
@@ -523,10 +552,6 @@ artifact:
     label: プレビューminimap
     status: done
     description: "vscode拡張プレビューパネルへのminimapオーバーレイ、ドラッグでメインビュー追従（#17/#81）"
-  skill_sync_command:
-    label: skill syncコマンド
-    status: done
-    description: "`pfdsl skill sync pfd-ops`。外部採用リポの pfd-ops を一発最新化。npm同梱（tsup onSuccessで dist/skills/pfd-ops へコピー）+ L3採用済み判定で install/ 条件付き上書き + L4 scaffold + gh ラベル確認。consumer = 外部プロジェクトでの pfd-ops 運用（#90、設計 docs/superpowers/specs/2026-06-16-pfd-ops-sync-command-design.md）。v0.0.5 で公開予定"
 
 process:
   define_architecture:
@@ -605,8 +630,6 @@ process:
     label: groupクラスタ塗り実装
   implement_preview_minimap:
     label: minimap実装
-  implement_skill_sync:
-    label: skill sync実装
 ---
 
 # Phase 0: アーキテクチャ定義
@@ -696,8 +719,6 @@ cli_tool >> write_agent_skill -> agent_skill
 cli_tool >> implement_pdf_png_export -> pdf_png_export
 graphviz_exporter >> implement_group_fill_export -> group_fill_export
 preview_panel >> implement_preview_minimap -> preview_minimap
-
-cli_tool >> implement_skill_sync -> skill_sync_command
 ```
 
 ---

@@ -1,0 +1,164 @@
+:root {
+	font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+	color: #25332d;
+	background: #fafbf9;
+	font-size: 13px;
+}
+* {
+	box-sizing: border-box;
+}
+body {
+	margin: 0;
+	height: 100vh;
+	display: flex;
+	flex-direction: column;
+	overflow: hidden;
+}
+header {
+	min-height: 56px;
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	padding: 0 16px;
+	border-bottom: 1px solid #dce2dc;
+	background: #f1f5f0;
+}
+header strong {
+	font-size: 19px;
+	letter-spacing: 1px;
+}
+.badge {
+	font-size: 9px;
+	letter-spacing: 1px;
+	color: #718073;
+	margin-right: 16px;
+}
+button,
+select {
+	font: inherit;
+	background: white;
+	border: 1px solid #d3dbd3;
+	border-radius: 5px;
+	padding: 5px 9px;
+	color: inherit;
+	cursor: pointer;
+}
+button:hover {
+	background: #e7eee6;
+}
+button:disabled {
+	opacity: 0.4;
+	cursor: default;
+}
+select {
+	max-width: 260px;
+}
+.spacer {
+	flex: 1;
+}
+#tabs {
+	display: flex;
+	gap: 2px;
+	min-height: 37px;
+	background: #edf1ec;
+	overflow-x: auto;
+}
+.tab {
+	border: 0;
+	line-height: 16px;
+	border-radius: 0;
+	background: transparent;
+	padding: 10px 13px;
+	white-space: nowrap;
+	border-bottom: 2px solid transparent;
+}
+.tab.active {
+	background: #fff;
+	border-bottom-color: #3e7256;
+}
+.tab .close {
+	margin-left: 12px;
+	color: #899389;
+}
+main {
+	display: grid;
+	grid-template-columns: minmax(250px, 45%) minmax(250px, 55%);
+	flex: 1;
+	min-height: 0;
+}
+.editor-pane,
+.preview-pane {
+	display: flex;
+	flex-direction: column;
+	min-width: 0;
+	min-height: 0;
+}
+.editor-pane {
+	border-right: 1px solid #dce2dc;
+}
+.pane-label {
+	height: 35px;
+	padding: 6px 14px;
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	font-size: 10px;
+	letter-spacing: 1.2px;
+	color: #788679;
+	border-bottom: 1px solid #edf0ed;
+}
+.pane-label button {
+	font-size: 10px;
+	padding: 2px 7px;
+	margin-left: auto;
+}
+#editor,
+#preview {
+	flex: 1;
+	min-height: 0;
+}
+#preview {
+	position: relative;
+	overflow: hidden;
+	background: #fff;
+	touch-action: none;
+}
+#drawing {
+	position: absolute;
+	transform-origin: 0 0;
+}
+#drawing svg {
+	display: block;
+	max-width: none;
+}
+#drawing .node {
+	cursor: pointer;
+}
+#placeholder {
+	position: absolute;
+	inset: 40% 20px auto;
+	text-align: center;
+	color: #8d988d;
+}
+footer {
+	display: flex;
+	align-items: center;
+	gap: 14px;
+	min-height: 34px;
+	padding: 4px 12px;
+	border-top: 1px solid #dce2dc;
+	font-size: 11px;
+}
+footer button {
+	font-size: 10px;
+	padding: 3px 8px;
+}
+#status {
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	max-width: 65vw;
+}
+#status.error {
+	color: #b13f35;
+}

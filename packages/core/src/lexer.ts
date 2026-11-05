@@ -189,7 +189,7 @@ export function lex(source: string): LexResult {
 		}
 
 		// (`-` followed by `>` already caught as ARROW_OUTPUT; `>>` already caught as ARROW_INPUT)
-		if (isBareIdChar(ch)) {
+		if (isBareIdStart(ch)) {
 			const start = currentPos();
 			let value = "";
 			while (pos < source.length) {
@@ -219,6 +219,12 @@ export function lex(source: string): LexResult {
 
 	tokens.push(makeToken("EOF", "", "", currentPos(), currentPos()));
 	return { tokens, diagnostics };
+}
+
+// A bare id starts with a letter, a number or `_`; `-` may follow (spec §4.1,
+// the same rule as ID_PATTERN).
+function isBareIdStart(ch: string): boolean {
+	return ch === "_" || BARE_ID_RE.test(ch);
 }
 
 function isBareIdChar(ch: string): boolean {

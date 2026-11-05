@@ -1,0 +1,4 @@
+---
+title: Foreground redraw test
+---
+raw >> refine -> final

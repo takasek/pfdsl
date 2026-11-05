@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { lex } from "./lexer.js";
-import { normalize } from "./normalizer.js";
+import { edgeOccurrences, normalize } from "./normalizer.js";
 import { parseTokens } from "./parser.js";
 import type { Frontmatter, NormalizedEdge } from "./types/index.js";
 
@@ -10,7 +10,64 @@ function edges(src: string, fm = null): NormalizedEdge[] {
 	return normalize(document, fm).edges;
 }
 
+function isolated(src: string, fm: Frontmatter | null = null): string[] {
+	const { tokens } = lex(src);
+	const { document } = parseTokens(tokens);
+	return [...normalize(document, fm).isolatedNodes].sort();
+}
+
 describe("normalize", () => {
+	it("retains N002 when a group is also used in both node roles", () => {
+		const { document } = parseTokens(lex("x >> p -> b\na >> x -> c").tokens);
+		const { diagnostics } = normalize(document, { group: { x: {} } });
+		expect(diagnostics.filter((d) => d.code === "N004")).toHaveLength(2);
+		expect(diagnostics.filter((d) => d.code === "N002")).toHaveLength(2);
+	});
+	it.each([
+		"artifact",
+		"process",
+	] as const)("N004: reports a group also declared as %s", (kind) => {
+		const fm = { group: { x: {} }, [kind]: { x: {} } } as Frontmatter;
+		const { document } = parseTokens(lex("").tokens);
+		const { diagnostics } = normalize(document, fm);
+		expect(diagnostics).toEqual([
+			expect.objectContaining({
+				code: "N004",
+				severity: "error",
+				message: expect.stringMatching(new RegExp(`group.*${kind}`)),
+			}),
+		]);
+	});
+
+	it.each([
+		["x >> p", "artifact"],
+		["a >> x -> b", "process"],
+		["x", "artifact"],
+	])("N004: reports group usage in %s as %s once", (body, kind) => {
+		const fm = { group: { x: {} } } as Frontmatter;
+		const { document } = parseTokens(lex(body).tokens);
+		const { diagnostics } = normalize(document, fm);
+		expect(diagnostics).toEqual([
+			expect.objectContaining({
+				code: "N004",
+				severity: "error",
+				message: expect.stringMatching(new RegExp(`group.*${kind}`)),
+			}),
+		]);
+	});
+
+	it("reports all conflicting kinds without duplicate group diagnostics", () => {
+		const fm = {
+			artifact: { x: {} },
+			process: { x: {} },
+			group: { x: {} },
+		} as Frontmatter;
+		const { document } = parseTokens(lex("x >> p").tokens);
+		const { diagnostics } = normalize(document, fm);
+		expect(diagnostics.filter((d) => d.code === "N001")).toHaveLength(1);
+		expect(diagnostics.filter((d) => d.code === "N004")).toHaveLength(2);
+	});
+
 	it("chain A >> P -> B produces 2 edges", () => {
 		const result = edges("A >> P -> B");
 		expect(result).toHaveLength(2);
@@ -103,13 +160,14 @@ describe("normalize", () => {
 		).toBe(true);
 	});
 
-	it("front matter artifact declaration takes priority", () => {
-		const fm = { artifact: { P: { label: "Override" } } };
-		const { diagnostics } = (() => {
-			const { tokens } = lex("A >> P");
-			const { document } = parseTokens(tokens);
-			return normalize(document, fm as any);
-		})();
+	it("front matter artifact declaration wins over the process role the body implies", () => {
+		// Body position makes P a process; front matter declares it an artifact.
+		// The declaration decides the kind, and the conflict is reported.
+		const fm = { artifact: { P: { label: "Override" } } } as Frontmatter;
+		const { tokens } = lex("A >> P");
+		const { document } = parseTokens(tokens);
+		const { diagnostics, nodeKinds } = normalize(document, fm);
+		expect(nodeKinds.get("P")).toBe("artifact");
 		expect(diagnostics.some((d) => d.code === "N002")).toBe(true);
 	});
 
@@ -172,5 +230,62 @@ describe("normalize", () => {
 		const { document } = parseTokens(tokens);
 		const { isolatedNodes } = normalize(document, fm);
 		expect(isolatedNodes.has("idle")).toBe(true);
+	});
+});
+
+// A group takes part in no edge by design, so it must not be collected as an
+// isolated node — otherwise `fmt` writes it into the body as a standalone
+// declaration the user never typed. Nothing tested this (#637).
+describe("isolated nodes", () => {
+	it("collects an artifact declared only in frontmatter", () => {
+		const fm = { artifact: { orphan: {} } } as unknown as Frontmatter;
+		expect(isolated("A >> P -> B", fm)).toEqual(["orphan"]);
+	});
+
+	it("does not collect a group, which is not part of the edge graph", () => {
+		const fm = {
+			group: { backend: { label: "Backend" } },
+		} as unknown as Frontmatter;
+		expect(isolated("A >> P -> B", fm)).toEqual([]);
+	});
+
+	it("collects the artifacts but not the group when both are declared", () => {
+		const fm = {
+			group: { backend: {} },
+			artifact: { orphan: {} },
+		} as unknown as Frontmatter;
+		expect(isolated("A >> P -> B", fm)).toEqual(["orphan"]);
+	});
+
+	it("does not collect a node that an edge already mentions", () => {
+		const fm = { artifact: { A: { label: "A" } } } as unknown as Frontmatter;
+		expect(isolated("A >> P -> B", fm)).toEqual([]);
+	});
+});
+
+describe("edgeOccurrences", () => {
+	// Every statement form, chains whose segments mix >> and >>?, bare and
+	// bracketed artifact lists, and a chain ending without an output.
+	it.each([
+		"a >> p -> b",
+		"[a, b] >>? p",
+		"p -> [x, y]",
+		"[a, b] >> p",
+		"node",
+		"x >> q -> a >>? p -> [b, c] >> r",
+		"[a, b] >>? p -> c >> q",
+		"a >> p -> b >>? q",
+	])("yields the edges normalize derives from %j, in order", (src) => {
+		const { tokens } = lex(src);
+		const { document, diagnostics } = parseTokens(tokens);
+		expect(diagnostics).toEqual([]);
+		const occurrences = document.statements
+			.flatMap(edgeOccurrences)
+			.map(({ kind, artifact, process }) =>
+				kind === "output"
+					? { kind, process: process.value, artifact: artifact.value }
+					: { kind, artifact: artifact.value, process: process.value },
+			);
+		expect(occurrences).toEqual(normalize(document, null).edges);
 	});
 });

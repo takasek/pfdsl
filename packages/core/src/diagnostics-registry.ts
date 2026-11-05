@@ -2,8 +2,8 @@ import type { DiagnosticSeverity } from "./types/index.js";
 
 export interface DiagnosticRegistryEntry {
 	/** Severities this code can be emitted with. Usually one entry; two for
-	 * codes whose severity depends on `options?.strict` (V002, V003, V020,
-	 * W002, W005). */
+	 * codes whose severity depends on `options?.strict` (FM003, V002, V003,
+	 * V020, W002). */
 	severities: readonly DiagnosticSeverity[];
 	/** Spec section number (without the `§` prefix) that normatively defines
 	 * the condition this code checks, e.g. "15.11". Matches spec.md §16's
@@ -40,6 +40,17 @@ export const DIAGNOSTIC_REGISTRY: Readonly<
 		severities: ["error"],
 		section: "2.1",
 		summary: "front matter YAML is malformed",
+	},
+	FM003: {
+		severities: ["warning", "error"],
+		section: "2.1",
+		summary: "an inline comment may truncate an intended plain-scalar value",
+	},
+
+	FM004: {
+		severities: ["error"],
+		section: "2.1",
+		summary: "a known front matter field has an invalid type",
 	},
 
 	P001: {
@@ -266,6 +277,34 @@ export const DIAGNOSTIC_REGISTRY: Readonly<
 		summary:
 			"boundary set mismatch (bijection violation between parent I/O and child open input / terminal)",
 	},
+	V035: {
+		severities: ["error"],
+		section: "15.16",
+		summary:
+			"a roadmap file has an edge artifact with no frontmatter declaration (ghost node), or a declaration with no `status:`",
+	},
+	V036: {
+		severities: ["error"],
+		section: "15.4",
+		summary:
+			"an artifact-process pair is connected as both a normal input (`>>`) and feedback (`>>?`)",
+	},
+	V037: {
+		severities: ["error"],
+		section: "15.18",
+		summary: "`baseRef` or `ref` contains blank values or additional members",
+	},
+	V038: {
+		severities: ["error"],
+		section: "15.18",
+		summary: "`ref` is specified on a process",
+	},
+	V039: {
+		severities: ["error"],
+		section: "15.18",
+		summary:
+			"an explicit reference target uses an absolute or out-of-collection path",
+	},
 
 	W001: {
 		severities: ["warning"],
@@ -288,16 +327,22 @@ export const DIAGNOSTIC_REGISTRY: Readonly<
 		section: "15.13",
 		summary: "`index:` is duplicated within the same namespace",
 	},
-	W005: {
-		severities: ["warning", "error"],
-		section: "15.15",
-		summary: "a roadmap file's produced artifact has no `status:` set",
-	},
 	W006: {
 		severities: ["warning"],
 		section: "15.14",
 		summary:
 			"a file with no `type:` is treated as roadmap in a ready-gate context (ready / status-set / audit-sync)",
+	},
+	W007: {
+		severities: ["warning", "error"],
+		section: "15.15",
+		summary: "a non-roadmap file's artifact has `status:` set",
+	},
+	W008: {
+		severities: ["warning", "error"],
+		section: "15.2",
+		summary:
+			"a process has no normal input; feedback edges are its only inputs",
 	},
 
 	L001: {
@@ -326,10 +371,18 @@ export const DIAGNOSTIC_REGISTRY: Readonly<
 		section: "15.4",
 		summary: "the same edge is stated more than once",
 	},
+	N004: {
+		severities: ["error"],
+		section: "15.17",
+		summary: "a group ID is also declared or used as an artifact or process ID",
+	},
 };
 
 const CODE_RE = /code:\s*"([A-Z]+\d+)"/g;
+// Both spellings of "warning by default, error under --strict": the inline
+// ternary, and the ctx.strictly() helper the rule modules call.
 const STRICT_TERNARY_RE = /options\?\.strict\s*\?\s*"error"\s*:\s*"warning"/;
+const STRICTLY_CALL_RE = /strictly\(\s*"(error|warning|info)"\s*\)/;
 const PLAIN_SEVERITY_RE = /"(error|warning|info)"/;
 
 /**
@@ -357,8 +410,9 @@ export function extractDiagnosticCodesFromSource(
 		const window = source.slice(windowStart, windowEnd);
 
 		let severities: string[];
-		if (STRICT_TERNARY_RE.test(window)) {
-			severities = ["warning", "error"];
+		if (STRICT_TERNARY_RE.test(window) || STRICTLY_CALL_RE.test(window)) {
+			const strictlyMatch = window.match(STRICTLY_CALL_RE);
+			severities = [strictlyMatch?.[1] ?? "warning", "error"];
 		} else {
 			const sevMatch = window.match(PLAIN_SEVERITY_RE);
 			severities = sevMatch?.[1] !== undefined ? [sevMatch[1]] : [];

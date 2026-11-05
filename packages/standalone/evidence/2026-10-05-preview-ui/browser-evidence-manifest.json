@@ -1,0 +1,126 @@
+{
+	"sourceReportSha256": "26180fda2246858db6e5d08341baf5970629fa7cb8d1db033483f754c5d137e6",
+	"selection": "All structured browser observations and fixtures, five selected screenshots; not the full temporary screenshot set. Absolute checkout and temporary paths normalized. Frozen observations retain their executed asset versions. Saved JSON uses canonical repository formatting; stored fingerprints include it.",
+	"files": [
+		{
+			"file": "create-edit-undo-redo.json",
+			"originalSha256": "7874a54ae24fa71ab2b9d2feeca2d2adbe97a150f30c87f94945123d76ade200",
+			"storedSha256": "97e781e7f003cc6adab76d641bd1104e2c24ffc220e897a12180e622a4e40d85"
+		},
+		{
+			"file": "connections.json",
+			"originalSha256": "c724a1e792781abddb57d05a2be31df2bbc77c4f15fe2e1b76e6df3c0c2fbbda",
+			"storedSha256": "305c963b1d162e086e684c27e426dfb9142d0e36fc539c6a34fc8d6189f5021e"
+		},
+		{
+			"file": "hover-p.json",
+			"originalSha256": "5459ffe7a8dde15ff97f57904802bd78e64c6ee1974d1acaf328d0cfdacfea04",
+			"storedSha256": "8081efc461695c541455b2441d66e88f5a8857244f4b8d994a810e41e72e6d6b"
+		},
+		{
+			"file": "hover-gestures.json",
+			"originalSha256": "3d02678ee1ddf114f2be2e3b8d77d5c923a9fc3cf0a89bf85459863ac59e0e5f",
+			"storedSha256": "3b6d29c1dc8eb2b6ba96b6812c11b02742342ea5488a846611e3277b7a720665"
+		},
+		{
+			"file": "definition-one-operation.json",
+			"originalSha256": "2614d7b34b695c335a07f6878815042834b53a7363c80b199535a2dadbd398eb",
+			"storedSha256": "5eb46c6aa0485f3c563813f98b600feb58e12d7ad11a25947b52f8bb9f913130"
+		},
+		{
+			"file": "keyboard-actions.json",
+			"originalSha256": "c9c4e40b62e5a3fdcbb62f3f3888aec1ded2eddfd4328699c3e91ef1c005a5ca",
+			"storedSha256": "c2e1474d764f19b69d97e84946a3c1c8cc14f18538477c26da2cb09219d29a29"
+		},
+		{
+			"file": "asset-hashes.json",
+			"originalSha256": "5750675aad2b3e765898a13dfccd51dfff97c8cd0c009c5bf6cb7eba101207b9",
+			"storedSha256": "b2457374a603edb117ee466606da9765df56eaf8ea4bf9d92faa5da0b4ecdc2a"
+		},
+		{
+			"file": "tab-switch.json",
+			"originalSha256": "587af5e72c78464d2eef35032cac558b3c58efed86adfde2b602cfe3e508d853",
+			"storedSha256": "3d55750445155c9c8dea11841ea74ec5e8fb1bb86a7ee0c28acb9e86a8e571dc"
+		},
+		{
+			"file": "asset-hashes-final.json",
+			"originalSha256": "6ae5ae5651f94f76d4b3d3d793e6011c588d27b2f1f6434ab79c5903b2211994",
+			"storedSha256": "21bf0974d57210fdc6241411ac2f31f2d4f7d41f9757722c811ab096b295be68"
+		},
+		{
+			"file": "final-browser-quoted-new-failure.json",
+			"originalSha256": "a03805876745d6e9a5b54e6ee0b0ab297c57f7bc74593529f8e72c266f6998bd",
+			"storedSha256": "129f347f219885ba5091d892184e8271f05ccf4136a11c1c4e2a45ea3bec41de"
+		},
+		{
+			"file": "vscode-navigation.json",
+			"originalSha256": "7e1255847aa9553bc51491c41e4b5ef4d07d5ebebbe00da955b7ee4978e67112",
+			"storedSha256": "682652034a790fa9d3ed34e627188e292f37deae1443b72793c7b3bf0cdc27c9"
+		},
+		{
+			"file": "cue-selection-redraw.json",
+			"originalSha256": "9190168190384b9c5e1a58e76306e185361dc00d18b807c5219478d1650143cc",
+			"storedSha256": "b29bde77ceebb162dd18f6dd833fb5415c03d7c89e06781238b4c0a68dc0b672"
+		},
+		{
+			"file": "cleanup-final.json",
+			"originalSha256": "f49e776fa49de7da3bf1fb8db87f1667a6c8c8655522dd04a9170b6e0f95080e",
+			"storedSha256": "498f713acfbf85d785fb4793913b2a54d5b6701a05a76018bfd607f35f672328"
+		},
+		{
+			"file": "final-browser-cue.json",
+			"originalSha256": "e26f9c38a8f68a9a8cd3af43d494e078b979058c42a611c9ea11f1c4fdcd78b0",
+			"storedSha256": "8824a6dfa3a86f8e44e2524ffcf87ffa0ae83bb503459ceb69d4d40f99f942c0"
+		},
+		{
+			"file": "stale-menus.json",
+			"originalSha256": "e15b2d17674e5f6d9a2168c83ef59841dbfa69d61c067615a671c913937b137e",
+			"storedSha256": "1c4e9339d8b0f96e1bad96db1b6e8455c7496becffaa9ab32b58c702bff8a8b2"
+		},
+		{
+			"file": "final-browser-recheck.json",
+			"originalSha256": "e9d6f5d533cb3e669a7825dc07fed06813ff9ad8970dd50c00822293b2d9695c",
+			"storedSha256": "3512c6feccdd43df4d0fd7cf7ab612c650d7a0bab927e76e98d275862c93fef6"
+		},
+		{
+			"file": "fixture-input.txt",
+			"originalSha256": "68507d9be3084939ae6df379dfddfe2cfd14ad65ef47cf68253435bdfaccd739",
+			"storedSha256": "68507d9be3084939ae6df379dfddfe2cfd14ad65ef47cf68253435bdfaccd739"
+		},
+		{
+			"file": "fixture-with-beta.txt",
+			"originalSha256": "e4010de8c343e2af494858ec129219bc7957e12dc240d785b7288264adedc628",
+			"storedSha256": "e4010de8c343e2af494858ec129219bc7957e12dc240d785b7288264adedc628"
+		},
+		{
+			"file": "vscode-navigation-fixture-input.txt",
+			"originalSha256": "cd93f833f18afe17944dcf88eaf3c474818e70fc3c0885287396598bc7fb2265",
+			"storedSha256": "cd93f833f18afe17944dcf88eaf3c474818e70fc3c0885287396598bc7fb2265"
+		},
+		{
+			"file": "final-browser-cue-a.png",
+			"originalSha256": "16b2225e567fb52b705f065016376fba641305f941c5cde57cfa4930fecea03f",
+			"storedSha256": "16b2225e567fb52b705f065016376fba641305f941c5cde57cfa4930fecea03f"
+		},
+		{
+			"file": "hover-viewport-edge.png",
+			"originalSha256": "b1ac1cdc83ca95ac9c61842ffd857c02eb03bc7b3fbfad8160e83f947abb6e67",
+			"storedSha256": "b1ac1cdc83ca95ac9c61842ffd857c02eb03bc7b3fbfad8160e83f947abb6e67"
+		},
+		{
+			"file": "final-browser-quoted-connectors.png",
+			"originalSha256": "7fe810c4f683254e3b65edf1f19ef605733faf4fcb64b5f101d130c44e165bfe",
+			"storedSha256": "7fe810c4f683254e3b65edf1f19ef605733faf4fcb64b5f101d130c44e165bfe"
+		},
+		{
+			"file": "vscode-cycle-status-body.png",
+			"originalSha256": "ced73de92527e6107eb980889a0da4ff6d50e2d689c22c97ee74c7008fd20f72",
+			"storedSha256": "ced73de92527e6107eb980889a0da4ff6d50e2d689c22c97ee74c7008fd20f72"
+		},
+		{
+			"file": "vscode-direct-chord-definition.png",
+			"originalSha256": "e2511d72d201ed208fa5f193104d9869b21903c902feb0e3fd50e89b81cf0027",
+			"storedSha256": "e2511d72d201ed208fa5f193104d9869b21903c902feb0e3fd50e89b81cf0027"
+		}
+	]
+}

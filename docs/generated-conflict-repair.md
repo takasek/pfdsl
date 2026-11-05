@@ -1,0 +1,65 @@
+# Repair generated conflicts
+
+Run **repair generated conflicts** from the Actions tab on `main`, entering the number of an open PR in this repository whose base is `main`.
+Choose `repair` to publish a repair; this mode requires `main` as the workflow branch.
+To test workflow changes before merge, select their branch and choose `validate`.
+Validation runs the same merge, generation and verification, uploads a repair bundle if changes are needed, and reports the result in the Actions summary.
+It never starts the publication job, creates an App token or pushes changes.
+Selecting another workflow branch in repair mode stops before checkout and explains how to select main or use validate instead.
+The workflow integrates main as observed at the start of preparation into that PR and regenerates the outputs owned by `scripts/lib/gen-plugin-outputs.mjs`.
+It also repairs tracked `.pfdsl/**/*.svg` snapshots when a matching tracked, regular sibling `.pfdsl` source is available without conflicts, including diagrams directly inside `.pfdsl`.
+This recursive scope matches the default paths of `render-pfdsl-svg.yml`.
+The default namespace is owned by `scripts/lib/operational-svg-contract.mjs`; CI checks the workflow's push paths, dispatch/call defaults and execution fallbacks against that contract.
+Repair preparation and the trusted-main publisher use the same sibling-source mapping, while arbitrary workflow input patterns do not expand repair permissions.
+After building and regenerating the plugin, it renders every eligible operational SVG from the merged sources with the built CLI.
+Orphan SVGs, symbolic links, and canonical `.pfdsl` conflicts require manual resolution.
+Other generated diagrams, such as `docs/samples/` outputs owned by `make gen-samples`, are outside this renderer contract and require manual resolution.
+Plugin generation and SVG rendering have separate output checks; neither stage may modify the other stage's files or canonical sources.
+It stops if any conflict requires a canonical source or code decision.
+The job log and Actions run summary list the source files requiring manual resolution and explain the next steps.
+Merge main into the PR branch locally and resolve the listed source conflicts.
+Regenerate plugin outputs with `make gen-plugin`.
+For operational SVGs, run `make build` and render each matching source after resolving its conflicts.
+For example, replace the pipeline snapshot only after rendering succeeds:
+
+```sh
+svg_tmp=$(mktemp)
+if node packages/cli/dist/cli.js render .pfdsl/pipeline.pfdsl --format svg > "$svg_tmp"; then
+  mv "$svg_tmp" .pfdsl/pipeline.svg
+else
+  rm "$svg_tmp"
+  exit 1
+fi
+```
+
+Finish the merge after regenerating its outputs, then commit and push.
+Rerun this workflow if generated files still need repair.
+The stopped run does not push any changes.
+It does not merge the PR into main.
+
+The preparation job runs the PR's merged generators and tests without a publication credential.
+It builds the packages, runs `make gen-plugin`, and checks the full tests, lint, typecheck, and generated drift.
+SVG rendering must succeed before its captured output replaces a snapshot.
+A fresh publication job executes only trusted main code, checks that canonical files match Git's automatic merge, and pushes one ordinary merge or repair commit to the existing PR branch.
+The publisher independently derives eligible SVG paths from Git's automatic merge tree and rejects changes to their file type.
+It verifies the change boundary, not the correctness of SVG bytes; rendering and tests run in preparation without a publication credential.
+After pushing, it verifies the branch through Git rather than the PR API, whose head information may lag behind the push.
+If that verification fails, the error states that the push already succeeded and asks you to check the branch before rerunning.
+If main advances while preparation runs, publication checks whether the verified repair merges cleanly with the newer main.
+When it does, the repair is published without changing its verified tree; use the standard Update branch action to integrate the newer main if needed.
+When conflicts remain, or the PR head or branch changes, the workflow automatically starts fresh preparation and verification on separate runners.
+It makes at most three attempts, using a distinct artifact for each attempt.
+If concurrent changes still prevent publication, the run reports the retry limit and asks you to rerun after the updates settle.
+Source conflicts, verification errors, authentication failures, and ambiguous post-push failures stop the run instead of retrying.
+An already synchronized PR produces no commit.
+Repair mode still rechecks concurrent updates with read-only permissions, even when preparation found no changes.
+
+Publication always uses the shared `takasek-pr-bot` GitHub App so repair pushes automatically trigger downstream PR checks.
+Configure repository variable `REPO_AUTOMATION_APP_CLIENT_ID` and secret `REPO_AUTOMATION_APP_PRIVATE_KEY` for an App installed on this repository.
+The App needs Contents and Workflows write access, and Pull requests read access to recheck the target PR.
+Its credential is used only in the fresh publication job.
+An absent or insufficient credential stops publication without switching authentication modes.
+
+The workflow must first be present on the default branch before GitHub accepts a manual dispatch.
+An extension to the accepted generated paths must reach main before Actions can publish repairs using it.
+Before that, branch-mode validation or explicitly authorized local preparation can verify a repair, but does not count as an Actions publication.

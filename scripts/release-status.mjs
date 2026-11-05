@@ -1,16 +1,28 @@
 #!/usr/bin/env node
-// Checks published versions of all packages against local package.json versions.
+// Checks published versions of all packages against local package.json
+// versions, plus the release gates that run nowhere else (distribution
+// review currency, spec-history currency, and the migration guide's Unreleased
+// section, which is shown here but only blocks a CLI/plugin release).
 // Usage: node scripts/release-status.mjs
-// Exit 1 if any package is behind or has a fetch error.
+// Exit 1 if anything is left to do before the next publication — see
+// needsAction in lib/release-status-check.mjs for what that covers.
 
 import { readFileSync } from "node:fs";
-import { resolve, dirname } from "node:path";
+import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { execSync } from "node:child_process";
+import { git as rawGit } from "./lib/run-exec.mjs";
+
+// These probes fail as a matter of course — an unreleased tag has no ref yet —
+// so their stderr is captured rather than printed as if something broke.
+const git = (args) => rawGit(args, { captureStderr: true });
+
+import { runReleaseGates } from "./lib/release-gates.mjs";
 import {
 	compareVersions,
+	formatPluginBundleStatus,
 	formatResults,
-	formatSkillBundleStatus,
+	needsAction,
+	readPluginBundleStatus,
 } from "./lib/release-status-check.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -32,18 +44,12 @@ async function fetchNpmVersion(packageName) {
 function findBumpCommit(version, packageDir) {
 	try {
 		const pkgPath = `${packageDir}/package.json`;
-		const hashes = execSync(`git log --format="%H" -- ${pkgPath}`, {
-			encoding: "utf-8",
-			stdio: ["pipe", "pipe", "pipe"],
-		})
+		const hashes = git(["log", "--format=%H", "--", pkgPath])
 			.trim()
 			.split("\n")
 			.filter(Boolean);
 		for (const hash of hashes) {
-			const content = execSync(`git show ${hash}:${pkgPath}`, {
-				encoding: "utf-8",
-				stdio: ["pipe", "pipe", "pipe"],
-			});
+			const content = git(["show", `${hash}:${pkgPath}`]);
 			if (JSON.parse(content).version === version) return hash;
 		}
 		return null;
@@ -56,20 +62,14 @@ function fetchCommitsAhead(version, packageDir, tagPrefix = "v") {
 	const tag = `${tagPrefix}${version}`;
 	let baseRef;
 	try {
-		execSync(`git rev-parse ${tag}`, {
-			encoding: "utf-8",
-			stdio: ["pipe", "pipe", "pipe"],
-		});
+		git(["rev-parse", tag]);
 		baseRef = tag;
 	} catch {
 		baseRef = findBumpCommit(version, packageDir);
 		if (!baseRef) return 0;
 	}
 	try {
-		const out = execSync(`git log ${baseRef}..HEAD --oneline -- ${packageDir}`, {
-			encoding: "utf-8",
-			stdio: ["pipe", "pipe", "pipe"],
-		});
+		const out = git(["log", `${baseRef}..HEAD`, "--oneline", "--", packageDir]);
 		return out.trim().split("\n").filter(Boolean).length;
 	} catch {
 		return 0;
@@ -164,65 +164,61 @@ const results = await Promise.all(
 			publishedVersion = await pkg.fetchPublishedVersion();
 			status = compareVersions(localVersion, publishedVersion);
 			if (status === "equal") {
-				commitsAhead = fetchCommitsAhead(localVersion, pkg.packageDir, pkg.tagPrefix);
+				commitsAhead = fetchCommitsAhead(
+					localVersion,
+					pkg.packageDir,
+					pkg.tagPrefix,
+				);
 			}
 		} catch (e) {
 			publishedVersion = `error: ${e.message}`;
 			status = "error";
 		}
-		return { name: pkg.name, registry: pkg.registry, localVersion, publishedVersion, status, commitsAhead };
+		return {
+			name: pkg.name,
+			registry: pkg.registry,
+			localVersion,
+			publishedVersion,
+			status,
+			commitsAhead,
+		};
 	}),
 );
 
-// .claude/skills and .claude/commands are bundled into @pfdsl/cli's dist at
-// build time (tsup.config.ts onSuccess) and only reach adopting repos via a
-// CLI release — editing them doesn't touch packages/cli/package.json, so the
-// per-package commitsAhead check above misses this drift entirely.
+// CLI and plugin releases share v* tags, but their delivered contents differ.
 function findLatestCliTag() {
 	try {
 		// 'v[0-9]*' (not 'v*') so this matches CLI tags like v0.0.17 without
 		// also matching lib-v* / vscode-v* (both start with 'v' after the
 		// prefix, and glob 'v*' would match "vscode-v0.0.17" too).
-		return execSync("git describe --tags --match 'v[0-9]*' --abbrev=0", {
-			encoding: "utf-8",
-			stdio: ["pipe", "pipe", "pipe"],
-		}).trim();
+		return git([
+			"describe",
+			"--tags",
+			"--match",
+			"v[0-9]*",
+			"--abbrev=0",
+		]).trim();
 	} catch {
 		return null;
 	}
 }
 
-// Keep in sync with tsup.config.ts's onSuccess allowlist — .claude/skills/
-// also holds skills that aren't bundled into the CLI (spec-stress-test,
-// vscode-ext-debug), which would be false positives here.
-const BUNDLED_SKILL_DIRS = ["pfd-ops", "pfd-retro", "pfd-ecosystem", "pfdsl"].map(
-	(name) => `.claude/skills/${name}`,
-);
+const pluginBundleTag = findLatestCliTag();
+const pluginBundle = readPluginBundleStatus(git, pluginBundleTag);
 
-function countSkillBundleCommits(sinceTag) {
-	if (!sinceTag) return 0;
-	try {
-		const paths = [...BUNDLED_SKILL_DIRS, ".claude/commands"].join(" ");
-		const out = execSync(`git log ${sinceTag}..HEAD --oneline -- ${paths}`, {
-			encoding: "utf-8",
-			stdio: ["pipe", "pipe", "pipe"],
-		});
-		return out.trim().split("\n").filter(Boolean).length;
-	} catch (e) {
-		console.warn(`warn: could not count skill bundle commits since ${sinceTag}: ${e.message}`);
-		return 0;
-	}
+const gates = runReleaseGates(root, { mode: "status" });
+for (const gate of gates) {
+	for (const warning of gate.warnings ?? []) console.warn(warning);
 }
-
-const skillBundleTag = findLatestCliTag();
-const skillBundleCommits = countSkillBundleCommits(skillBundleTag);
 
 console.log("release-status:");
 console.log(formatResults(results));
-console.log(formatSkillBundleStatus(skillBundleCommits, skillBundleTag));
+console.log(formatPluginBundleStatus(pluginBundle, pluginBundleTag));
+for (const gate of gates) console.log(gate.lines.join("\n"));
 
-const needsAction =
-	results.some(
-		(r) => r.status === "local-ahead" || r.status === "error" || r.commitsAhead > 0,
-	) || skillBundleCommits > 0;
-if (needsAction) process.exit(1);
+const pending = needsAction({
+	results,
+	pluginChangedFiles: pluginBundle.changedFiles,
+	gates,
+});
+if (pending) process.exit(1);

@@ -43,6 +43,21 @@ describe("sortEdges", () => {
 		]);
 	});
 
+	it("merge shape: input edges sort by source-side (upstream) rank, not process-side rank", () => {
+		// D(0) >> E(1) -> A(2); Z(0) >> P(3); A(2) >> P(3) -> Out(4).
+		// Both A>>P and Z>>P share the same process (P, rank 3), so a
+		// process-side edgeRank would tie them and fall back to the lex
+		// tiebreak (A before Z). The current source-side rule instead ranks
+		// them by artifact rank (Z=0 before A=2), producing [Z, A] under P.
+		// A chain fixture can't distinguish these two rules — see #646.
+		const result = sorted("D >> E -> A\nZ >> P\nA >> P -> Out");
+		const intoP = result.filter((e) => e.kind === "input" && e.process === "P");
+		expect(intoP).toEqual([
+			{ kind: "input", artifact: "Z", process: "P" },
+			{ kind: "input", artifact: "A", process: "P" },
+		]);
+	});
+
 	it("within same rank: >> before ->", () => {
 		const result = sorted("[a, b] >> P -> [x, y]");
 		const inputs = result.filter((e) => e.kind === "input");
@@ -82,12 +97,24 @@ describe("sortEdges", () => {
 		expect(result[0]).toMatchObject({ artifact: "a" });
 	});
 
-	it("cyclic primary graph: terminates and emits all edges with rank-0 fallback", () => {
+	// The case above passes whether the component is keyed by its smallest or
+	// its largest id — a/b sort before x/y either way. Here the two answers
+	// disagree: keyed by min, {m,z} (m) comes before {n}; keyed by max, {m,z}
+	// (z) comes after (#637).
+	it("keys a component by its smallest id, not its largest", () => {
+		const result = sorted("m >> P1 -> z\nn >> P2 -> o");
+		expect(result[0]).toMatchObject({ artifact: "m" });
+	});
+
+	// The timeout is the non-termination check: a cycle that made ranking loop
+	// forever would hang here rather than return. Measuring elapsed time inside
+	// the test instead would assert on machine speed, not on termination.
+	it("cyclic primary graph: terminates and emits all edges with rank-0 fallback", {
+		timeout: 1000,
+	}, () => {
 		// A -> P1 -> B -> P2 -> A forms a cycle on the primary graph.
 		// No source ⇒ all ranks fall back to 0 ⇒ stable sort by kind then lex key.
-		const start = Date.now();
 		const result = sorted("A >> P1 -> B\nB >> P2 -> A");
-		expect(Date.now() - start).toBeLessThan(1000);
 		expect(result).toEqual([
 			{ kind: "input", artifact: "A", process: "P1" },
 			{ kind: "input", artifact: "B", process: "P2" },
@@ -98,6 +125,23 @@ describe("sortEdges", () => {
 });
 
 describe("computeTopoOrder", () => {
+	it.each([
+		"start >> P1 -> built\n[built, other] >> P2 -> final",
+		"[built, other] >> P2 -> final\nstart >> P1 -> built",
+		"start >> P1 -> built\n[built, other] >> P2 -> final\nfinal >>? P1",
+	])("places every primary source before its target: %s", (source) => {
+		const order = topoOrder(source);
+		for (const [from, to] of [
+			["start", "P1"],
+			["P1", "built"],
+			["built", "P2"],
+			["other", "P2"],
+			["P2", "final"],
+		]) {
+			expect(order.indexOf(from!)).toBeLessThan(order.indexOf(to!));
+		}
+	});
+
 	it("orders a simple chain: artifact, process, artifact, ...", () => {
 		expect(topoOrder("A >> P -> B")).toEqual(["A", "P", "B"]);
 	});

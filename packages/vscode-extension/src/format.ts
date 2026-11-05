@@ -1,11 +1,11 @@
-import * as vscode from "vscode";
-import { LANGUAGE_ID } from "./analyze.js";
 import {
 	clampSelectionToBody,
 	computeFullDocumentFormatOutput,
 	computeRangeFormatOutput,
 	type FormatStyle,
-} from "./format-logic.js";
+} from "@pfdsl/editor";
+import * as vscode from "vscode";
+import { LANGUAGE_ID } from "./analyze.js";
 
 function formatWholeDocument(
 	doc: vscode.TextDocument,

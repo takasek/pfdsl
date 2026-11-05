@@ -1,0 +1,106 @@
+import assert from 'node:assert/strict';
+import { createRequire } from 'node:module';
+import { writeFileSync } from 'node:fs';
+import { join } from 'node:path';
+import vm from 'node:vm';
+const repo = '/path/to/pfdsl';
+const out = '/tmp/pfdsl-audit/render-editor';
+const req = createRequire(join(repo, 'packages/vscode-extension/package.json'));
+const { build } = req('esbuild');
+const { JSDOM } = req('jsdom');
+const core = await import(join(repo,'packages/core/dist/index.js'));
+const graphviz = await import(join(repo,'packages/graphviz-exporter/dist/index.js'));
+const previewEngine = await import(join(repo,'packages/preview-engine/dist/index.js'));
+async function load(file, mocks = {}, globals = {}) {
+  const bundle = await build({ entryPoints: [join(repo, file)], bundle: true, packages: 'external', platform: 'node', format: 'cjs', write: false, logLevel: 'silent' });
+  const module = { exports: {} };
+  vm.runInNewContext(bundle.outputFiles[0].text, {
+    module, exports: module.exports, console, Buffer, process,
+    require: name => name === '@pfdsl/core' ? core : name === '@pfdsl/graphviz-exporter' ? graphviz : name === '@pfdsl/preview-engine' ? previewEngine : Object.hasOwn(mocks, name) ? mocks[name] : req(name), ...globals,
+  }, { filename: file });
+  return module.exports;
+}
+function uri(path) { return { scheme: 'file', path, fsPath: path, toString: () => `file://${path}` }; }
+function document(path, source) { return { uri: uri(path), version: 1, languageId: 'pfdsl', getText: () => source }; }
+function vscodeHarness(doc) {
+  const commands = new Map(), panels = [], opened = [], messages = [];
+  const vscode = {
+    Uri: { file: uri, joinPath: (base, ...parts) => uri(join(base.fsPath, ...parts)), parse: value => ({ toString: () => value }) },
+    ViewColumn: { Beside: 2 }, ExtensionMode: { Development: 2 }, FileType: { Directory: 2 },
+    commands: { registerCommand: (id, fn) => { commands.set(id, fn); return {}; }, executeCommand: async id => commands.get(id)?.() },
+    window: {
+      activeTextEditor: { document: doc, selection: { active: { line: 0, character: 0 } } }, visibleTextEditors: [],
+      createWebviewPanel: () => {
+        const panel = { webview: { cspSource: 'mock:', asWebviewUri: u => u, postMessage: msg => messages.push(msg), onDidReceiveMessage: fn => { panel.receive = fn; return {}; } }, onDidChangeViewState: fn => { panel.changeViewState = fn; return {}; }, onDidDispose: () => ({}), reveal: () => {} };
+        panels.push(panel); return panel;
+      },
+      onDidChangeTextEditorSelection: () => ({}), showTextDocument: async doc => opened.push(doc.uri.fsPath),
+      showErrorMessage: text => messages.push({ type: 'errorDialog', text }), showInformationMessage: text => messages.push({ type: 'infoDialog', text }),
+    },
+    workspace: { onDidChangeTextDocument: fn => { vscode.changeDocument = fn; return {}; }, fs: { readDirectory: async () => [], stat: async () => ({ type: 1 }) }, openTextDocument: async u => ({ uri: u }) }, env: { openExternal: () => {} },
+  };
+  return { vscode, commands, panels, opened, messages, context: { subscriptions: [], extensionUri: uri('/extension'), extensionMode: 1 } };
+}
+const results = {};
+const edgeA = core.analyze('a >> p -> x\nb >> q -> y\n');
+const edgeB = core.analyze('a >> p -> y\nb >> q -> x\n');
+results.edgeDiff = {diagnosticsA:edgeA.diagnostics,diagnosticsB:edgeB.diagnostics,report:core.diffGraphs(edgeA.graph,edgeB.graph,edgeA.frontmatter,edgeB.frontmatter),dot:graphviz.exportDiffDot(edgeA.graph,edgeA.frontmatter,edgeB.graph,edgeB.frontmatter)};
+assert.equal(results.edgeDiff.report.addedEdges.length,2);
+assert.match(results.edgeDiff.dot, /_nodiff/);
+const subflowSource = '---\nbasePath: ../\nprocess:\n  build:\n    subflow: child.pfdsl\n---\na >> build -> b\n';
+const docPath = '/repo/.pfdsl/root.pfdsl';
+const linkModule = await load('packages/vscode-extension/src/document-link-logic.ts');
+const subflow = vscodeHarness(document(docPath, subflowSource));
+const preview = await load('packages/vscode-extension/src/preview.ts', { vscode: subflow.vscode });
+preview.registerPreview(subflow.context);
+await subflow.commands.get('pfdsl.preview')();
+subflow.panels[0].receive({ type: 'openFile', path: 'child.pfdsl' });
+await new Promise(resolve => setImmediate(resolve));
+results.subflow = { diagnostics: core.analyze(subflowSource).diagnostics, editorTarget: linkModule.extractDocumentLinks(subflowSource, docPath)[0].target, previewTarget: subflow.opened[0] };
+assert.equal(results.subflow.editorTarget, 'file:///repo/.pfdsl/child.pfdsl');
+assert.equal(results.subflow.previewTarget, '/repo/child.pfdsl');
+const locations = { quotedArray: '    location: ["docs/a.md", "docs/b.md"]', commaInValue: '    location: ["docs/a,b.md"]', comment: '    location: docs/a.md # explanation', scheme: '    location: ssh://host/path', scalarControl: '    location: "docs/a.md"' };
+results.locations = {};
+for (const [name, line] of Object.entries(locations)) {
+  const source = `---\nartifact:\n  a:\n${line}\n---\na >> build -> b\n`;
+  results.locations[name] = { analyzed: core.analyze(source).frontmatter.artifact.a.location, targets: linkModule.extractDocumentLinks(source, docPath).map(x => x.target) };
+}
+assert.equal(results.locations.quotedArray.targets[0], 'file:///repo/.pfdsl/"docs/a.md"');
+assert.equal(results.locations.commaInValue.targets.length, 2);
+assert.match(results.locations.comment.targets[0], / # explanation$/);
+assert.match(results.locations.scheme.targets[0], /^file:/);
+assert.equal(results.locations.scalarControl.targets[0], 'file:///repo/.pfdsl/docs/a.md');
+const before = '---\nartifact:\n  a:\n    label: Before\n---\na >> build -> b\n';
+const after = before.replace('Before', 'After');
+writeFileSync(join(out, 'before.pfdsl'), before);
+const diff = vscodeHarness(document(docPath, after));
+diff.vscode.window.showQuickPick = async () => ({ id: 'file' });
+diff.vscode.window.showOpenDialog = async () => [uri(join(out, 'before.pfdsl'))];
+let sentReport;
+const diffModule = await load('packages/vscode-extension/src/diff.ts', { vscode: diff.vscode });
+diffModule.registerDiff(diff.context, report => { sentReport = report; });
+await diff.commands.get('pfdsl.diff')();
+const a = core.analyze(before), b = core.analyze(after);
+const expected = core.diffGraphs(a.graph, b.graph, a.frontmatter, b.frontmatter);
+results.diffMetadata = { actual: sentReport, expected };
+assert.deepEqual(Array.from(sentReport.changedNodes), []);
+assert.deepEqual(expected.changedNodes, ['a']);
+const dom = new JSDOM('<div id="root"><div id="inner"></div></div><div id="tooltip"></div><div id="diff-panel"></div><div id="minimap"><div id="minimap-svg"></div><div id="minimap-vp"></div></div>');
+let completeLoad;
+const pendingLoad = new Promise(resolve => { completeLoad = resolve; });
+await load('packages/vscode-extension/src/webview.ts', { '@hpcc-js/wasm': { Graphviz: { load: () => pendingLoad } } }, {
+  window: dom.window, document: dom.window.document, navigator: { platform: 'MacIntel' },
+  acquireVsCodeApi: () => ({ postMessage: () => {} }), requestAnimationFrame: () => {},
+});
+dom.window.dispatchEvent(new dom.window.MessageEvent('message', { data: { type: 'render', dot: 'old valid source' } }));
+dom.window.dispatchEvent(new dom.window.MessageEvent('message', { data: { type: 'error', message: 'CURRENT SOURCE IS INVALID' } }));
+const duringError = dom.window.document.querySelector('#inner').innerHTML;
+completeLoad({ dot: () => '<svg><g class="node"><title>old_node</title></g></svg>' });
+await new Promise(resolve => setImmediate(resolve));
+const afterLoad = dom.window.document.querySelector('#inner').innerHTML;
+results.staleRender = { duringError, afterLoad };
+assert.match(duringError, /CURRENT SOURCE IS INVALID/);
+assert.match(afterLoad, /old_node/);
+assert.doesNotMatch(afterLoad, /CURRENT SOURCE IS INVALID/);
+writeFileSync(join(out, 'results.json'), JSON.stringify(results, null, 2) + '\n');
+console.log(JSON.stringify(results, null, 2));

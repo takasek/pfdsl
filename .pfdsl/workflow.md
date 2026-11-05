@@ -6,11 +6,19 @@
 
 実践・レビューで得た知見は3経路に振り分ける:
 
-1. **即時ルール化** — 配布スキル群の直接改訂。pfdsl スキルの品質ガイドは `quality_guide` artifact（= docs/quality-guide.md）を、スキル本文は `skill_template` artifact（= scripts/skill-template/SKILL.md）を、pfd-grill / pfd-ops / pfd-retro / pfd-ecosystem は `.claude/skills/` 配下の SKILL.md・references を直接改訂する。スキル改善は issue を通さず対話から直接行う（`maintain_template` プロセス）
+1. **即時ルール化** — 配布スキル群の正本 `scripts/harness-template/skills`・`scripts/harness-template/commands`・`scripts/harness-template/agents` を直接改訂する。ハーネス別の本文は明示的な `claude` / `codex` section と raw path variable で表し、inventory が指定したテンプレートだけを描画する。`.claude/` の配布対象と `.agents/`・`.codex/`・両 plugin root は生成物であり、正本の改訂後に `make gen-plugin` で再生成する。メンテナ専用の `.claude/` 資産、別系統の `scripts/skill-template/SKILL.md`、repo ルート由来の `install/` payload はそれぞれ既存の正本に従う。配布層へ載せるかは `scripts/harness-template/skills/pfd-ops/references/architecture.md`「昇格先の判定ルール」に従い、0段目の区分 i・ii に入らない規律はこの経路でなく binding か利用者環境へ置く。pfdsl スキルの品質ガイドは `quality_guide` artifact（= docs/quality-guide.md）を、スキル本文は `skill_template` artifact（= scripts/skill-template/SKILL.md）を直接改訂する（`maintain_template` プロセス）。知識正本の整備工程は `knowledge_maintenance` tag の3つで、改訂・検証手順が実際に違うところで分かれる。1つの正本 asset の整備工程を調べるときはその artifact の producer を問い合わせる。どの正本が plugin に同梱されるかは gen-plugin manifest と `pipeline_pfdsl` が一次情報で、この図の artifact ノードが持つのは配送 membership でなく整備責任である。人間の `decisions` が変更対象を指名し、採用した `retro_findings` の具体的観察を全 `knowledge_maintenance` プロセスが feedback evidence として対象固有の文言・規則・機構へ反映する。知識正本・仕様・サンプル・ADR・PFD・companion・README を改版する工程は自身の現行出力も feedback の改版基準として読み、既存内容を保った差分改訂を行う。現行出力は変更権限ではなく、各工程の通常入力だけが改訂を駆動する。単発納品物の `article` は改版サイクルを持たず、issue と repository の外部状態は既存の `issue_updates` および `integrated_repository` 還流で表すため、自己 baseline を重ねない。スキル改善は issue を通さず対話から直接行う
 2. **設計決定** — ADR 起草（`docs/adr/`）。ADR 化した判断は適用ルールのガイド蒸留要否も判定する
 3. **作業項目** — issue 起票 + 依存グラフ更新（`roadmap.pfdsl`。手段は roadmap.md 参照）
 
+`maintain_repo_bindings` は binding・companionに加えて、現行の `adopter_config` も改版基準として読む。
+`.pfdsl/config.json` の一方の宣言値を変更するときも、もう一方を含む既存値を保持して差分改訂する。
+
+今回の監査で得た所見を起票する前に、共通の方針判断・調査・修正を一度に進める利点が大きいものは、一つの作業項目にまとめる。まとめた場合も、各所見の受入条件は残す。この整理のために、過去の類似 issue を追加で探索する必要はない。
+
 このリポが pfdsl スキルの上流であるため経路1（品質ガイド改訂）が成立する。配布先リポでは経路1は存在しない場合がある。
+
+散文として書く前の機械化の検討と、hook で機械化する場合に decision を選ぶ軸（防ぎたい害が実行そのものか、結果の読み違いか）は、`.pfdsl/bindings/pfd-ops.md`「このリポの作業規律」の「再発防止を手順へ反映し機械化を判断する」が一次情報（ADR-0039 で配布層から移設）。
+このリポの既存機構は pre-commit・`gate-check.mjs`・CI であり、追加する検査の対象と重複をここに照合する。過去事例の記録は現行規約と分け、運用責任の終了は `.pfdsl/bindings/pfd-retro.md` に従う。
 
 ## 学習ループ
 
@@ -24,18 +32,123 @@
 
 waxa CLI（blank-slate, ツール呼び出し不可）では retrieval 有無を測定できない制約を確認済み — 同種の抽出判断を検証する際は empirical-prompt-tuning（実 Read tool_uses 計測可）を使う。
 
-## code-review / simplify の実施粒度
+## worktree でのサイクル実行
 
-pfd-ops 終端ゲート「実装規模・品質基準は companion で定義」の実体はここ。
-diff の規模に review の重さを合わせる。scoped な小〜中規模修正（数十行、1-2ファイル中心）に `/code-review` の高効度設定（8角度 finder × 候補ごと検証 agent、計10体以上の subagent 起動）をかけると diff サイズに対して過剰 — 軽い level（角度を絞る）を選ぶか、そもそも subagent を使わず自分で Read/Grep して直接レビューする。8角度並列 + 全候補検証の重量級構成は大規模 PR 向け。
+**サイクルは worktree で回す**: 対象リポジトリの専用 worktree を使い、作成場所と作成手順は利用中のハーネスまたはマシン側の設定に従う。
+worktree を既定とする理由は `.pfdsl/bindings/pfd-ops.md`「このリポの作業規律」の「ブランチと作業準備」が一次情報。
+消えた編集を探すとき `git stash list` を先に見ることも配布層の同じ手順が持つ。
+過去の干渉の症状と当時の対応記録は `.pfdsl/bindings/pfd-retro-patterns/shared-worktree-interference.md`。現行の復旧は上記の binding「ブランチと作業準備」と、この checkout の指示に従う。
+
+**worktree 前提**: 新規 worktree では CLI/core が未ビルドのため `check` が失敗する。ゲート実行前に `pnpm install && pnpm -r build` を済ませる。
+`.claude/skills/pfdsl` は gitignore 済の symlink（#348・#714）のため新規 worktree に存在せず、そのままでは `make check-docs` が companion-bindings の dead path で失敗する — `make setup`（または `node scripts/link-repo-skill.mjs`）を先に実行する（ビルドは不要）。
+`make setup` が入れる pre-commit hook のシムについては CLAUDE.md「セットアップ」節が一次情報。
+`build`（したがって `test`・`typecheck`）は `preflight` で共有shimとスキルリンクを修復し、依存markerを検査してから実行する。
+依存が未準備なら `make setup` を先に実行する。
+共有shimは `scripts/pre-commit` へ委譲するだけで、default branch判定はcheckoutの `scripts/hooks/check-default-branch`、通常gateはcheckoutの `scripts/pre-commit` が持つ。
+commit内でinstallerを呼ばず、配置はsetup・preflightが担当する。
+新installer同士はcommon dirのlock内で内容を再読し、checkoutのshimと完全一致する内容だけを受理する。
+共有shimが同一なら、checkout側の判定・gateが異なっても交互・並行setupを行える（#1415、ADR-0044「Git層」）。
+異なる既存hookは自動上書きしないため、内容と対象を確認して現行shimへ明示的に置き換えてからsetupする。
+旧checkout・旧shimとの後方互換や自動移行は提供しない。
+共有lockの待機は5秒で打ち切る。
+異常終了でlockが残った場合は、installerが実行中でないことを確認してから診断に表示されたlockだけを除去し、再実行する。
+default branchの判定はref名の比較であり、同じcommitを指すfeature branchと解決可能なdetached HEADは許可する。
+pre-commitを経由しないref操作やローカルの誤編集を網羅的に防ぐことは保証しない（ADR-0050）。
+
+**worktree での git 操作**: `git commit` など git コマンドは worktree ディレクトリを指して実行する（理由は `.pfdsl/bindings/pfd-ops.md`「このリポの作業規律」の「worktree 上の変更を検証する」が一次情報）。
+Codex の変更系 Git は `git -C <絶対パス>`、apply_patch は絶対パスを既定とする。
+作業先は harness の割当と実際の checkout で確認し、repo hook でコマンド文字列やプロセスから所有者・作用先を推定しない。
+Git hook と remote の必須 check は、それぞれ commit 時の検査と main の統合条件を担う。
+
+## develop のレビュー
+
+### 分類の循環を確認する
+
+レビューから、リテラルや特殊ケースの分類を既存の宣言・データから導く一般化の指摘を受けた実装者は、採用する前にそのデータを正しさの基準とする検査があるか、分類の出力がどの検査の入力になるかを調べる。
+分類を使う検査が同じ宣言を正しさの基準として実体と比較するなら、宣言が実体からずれたときに対象が分類されず、不一致が検査対象の不在へ化ける。
+例えば出力宣言だけを `CLAUDE.md` から `RENAMED.md` へ変え、実体の書込み先を `CLAUDE.md` のままにした場合、宣言から分類を導くと実体が検査集合に入らず緑になりうる（実例は `.pfdsl/bindings/pfd-retro-patterns/classification-derived-from-what-it-checks.md`）。
+この循環がある場合に限って別の分類根拠を検討し、宣言から導く一般化を一律に禁じない。
+
+### レビューの観点と記録
+
+レビューの menu は手段の優先順でなく、担保する観点で組む。品質だけを見るレビューで findings が無くても、設計の採用理由や事実主張の誤りが残った実例が #836 にある。
+ここでの「コード変更」は、従来の `packages/` または `scripts/` の変更に加え、配置場所を問わず実行・import されるソース、スクリプト、フックの変更を含む。`hooks/` や skill 配下の `scripts/` も対象であり、パス名だけで除外しない。
+コード変更のあるサイクルではレビューを省略しない。散文・PFD のみのサイクルは差分の規模で観点1の要否を判断できるが、観点2〜4の発火条件を満たす場合はその観点を省略しない。省略する場合も観点ごとの非発火・未実施を区別して理由を PR 本文に記す。機械が読む文書・設定の抽出対象を変える場合は観点2の対象とし、拡張子だけで散文のみと判断しない。
+変更したパス・フィールドが読み込み処理の入力になり、その値が抽出・選択・生成・判定結果に使われるかで判断する。新規・移動・削除では変更前後を調べ、確認した読取経路、または対象外と判断した探索範囲と根拠を `.pfdsl/bindings/pfd-ops.md` の終端ゲートに従って PR 本文へ含める。既知パスとの不一致だけで対象外にしない。
+
+1. **観点1 — 品質（簡素化・保守性）。** コード変更では発火する。散文・PFD のみの変更では差分の規模と内容から要否を判断し、非発火なら理由を記す。品質の確認だけを correctness の根拠にしない。
+2. **観点2 — correctness。** コード変更と、機械が読む文書・設定の抽出対象を変えるサイクルで発火する。ブリーフには (a) 差分が導入・変更した事実主張（コメント・JSDoc・doc 散文・criteria 文言）を列挙し、それぞれ偽になる入力・状態を構成して反証を試みること、(b) 変更行の外の消費者（散文を含む）を、`.pfdsl/bindings/pfd-ops.md` の終端ゲートが求める影響先確認と終了判断に従って調べることを含める。条件撤去では `.pfdsl/bindings/` のカタログ・運用文書も探索に含める。
+3. **観点3 — 設計妥当性。** このサイクルで実装・運用方式を新たに選ぶか、着手前に確定していた方式を変更した場合に発火する。着手前の issue 記録・ユーザー指示・既存規約で方式が確定し、その実装だけを行う回は非発火である。適用点1が義務として求める「前提を外した案」や、そこから「何もしない」に至ったため追加した競合実装案を記録・比較・却下したことだけでは、新しい方式選択と数えない。ブリーフには (a) 結論・採用理由を伏せて同じ設計問題を独立に解かせること、(b) 採用案の adoption rationale を名指しし、実装がそれを満たさない箇所を探させることを含める。観点2 の要件も満たした場合に限り、観点2 の別実行は要さない。
+方式が既決で新しい選択が無い場合は、その根拠となる着手前の記録・指示・規約を PR 本文に記す。発火した回は検討対象を絞れるが、結論を知らない別主体による独立解は省かない。起動不能で実施できなかった回は非発火と扱わず、未実施としてユーザーへ返す。
+独立解は、解答を含まない `origin/<base>` の別ツリーを用意し、そのツリーだけを読むようブリーフに指定して担保する。変更後のツリーを見せて「差分を読むな」と指示するだけでは、成果物そのものから結論が漏れる。最終差分を確認する reviewer は採用案を見ているため、観点3(a) の独立解を兼ねられない。
+4. **観点4 — 体験（シナリオ実行）。** ユーザー可視の挙動・同梱内容を変える回に発火する。ブリーフには (a) 成果物と現実的シナリオのみを渡し変更意図を渡さないこと、(b) 詰まった箇所・誤読した箇所を原因となる記述や出力の引用付きで報告させること、(c) 合否判定を実物の checker・実行結果で確認すること、(d) 変更が壊しうる既存動線を最低1本含めることを含める。変更目的と差分を見た最終差分 reviewer は (a) の盲検シナリオを兼ねられない。原因の推測は観測の引用と分け、起票時に事実として転写しない。`distribution-review` と `spec-stress-test` が担当する領域では、その専用手段を使う。
+
+発火条件と実施時の重さは別軸である。各観点について発火して実施、条件を満たさず非発火、発火したが未実施を区別し、軽量化・非発火・未実施の理由を PR 本文に記す。別主体による独立性を自分の読直しで代替しない。finding には入力・状態から誤出力・誤誘導に至る failure scenario を伴わせる。
+
+### レビューの実施と手段
+
+レビューは、実装時の会話・推論を引き継がない別 agent に依頼する。要件・最終差分・必要な一次資料を渡し、実装側の結論や採用理由を先に与えない。
+レビュー担当は一次資料から目的と scope を確かめ、指定一覧を探索範囲の上限にしない。差分と関係する消費者を読み、正常・失敗・非該当の入力で主張の反証を試みる。測った版と条件が最終成果へ適用できるかも確認する。自己レビューは準備として行い、別文脈のレビューの代替にしない。
+観点1・2は最終差分の別 agent 1本で覆ってよい。観点3が発火する場合は、結論を知らない別 agent に解答を含まないツリーを渡して独立に設計させ、その後に最終差分の reviewer が採用理由と実装を確認する。観点4が発火する場合は変更意図を知らない別 agent にシナリオを渡す。観点を agent 数へ機械的に一対一対応させず、各観点の独立性を保つ。
+指摘は根拠となる箇所と failure scenario を添えて返し、実装側が一次資料で確認して対応する。リテラルや特殊ケースの分類を既存の宣言・データから導く指摘を採用する前には、「分類の循環を確認する」へ戻る。
+保護の追加を求める指摘は、ADR-0050 の責務と受け入れた残余に照らして扱う。
+網羅性を高めるために新しい分類器・判定表・deny パターンを足さない。
+各観点の状態、確認範囲・根拠・未確認、未解決の指摘を PR 本文に記録する。
+
+使える手段を観点とブリーフ要件に合わせて選ぶ。`/simplify` は固定4角度で品質を探すが、correctness を明示的に探さないため観点2を兼ねない。`/code-review` は観点2の要件を実際に満たせる範囲で使い、不足する反証・消費者探索は別のレビューで補う。観点4には成果物とシナリオだけを渡した agent、または領域に対応する専用 skill を使う。
+`code-reviewer` agent を Agent tool で起動するには `pr-review-toolkit` / `feature-dev` plugin のいずれかが必要である。起動可否は harness と plugin の版に依存するため、過去の記録でなくその回の実体を確認する。`/code-review` の `disable-model-invocation` は2026-07-28時点で `false` だった。
+#561 の48サイクルでは自己レビューで気付かなかった指摘が85%のサイクルで出た。#836 では `/simplify` に findings が無い回にも別観点が採用理由の不成立と JSDoc の誤りを検出した。これらは観点と別主体の必要性を支える実測であり、特定の手段を固定する根拠ではない。
+
+配布プロンプトの利用側シナリオは、公開前または明示的な検証依頼がある場合に、この作業 checkout の `.claude/skills/distribution-review/SKILL.md` を直接読んで模擬実行する。通常の編集では `docs/distribution-review/reviewed.json` を進めず、公開時のゲートに残す。
+
+### backend 契約を変える回の比較
+
+作業項目 backend の契約を変える回は、片方の reference だけの変更でも、`docs/distribution-review.md`「backend 契約の比較」に従って両 backend と責任範囲の正本を最終差分レビューの入力に含める。
+共通契約・backend 固有の連携方法・採用リポが決める規律を区別し、条件や操作順序の変更では同節の採用側シナリオで要求と次の操作を確認する。
+共有 reference の変更が backend の契約へ影響する場合も対象とし、誤字・リンク修正など要求や操作を変えない変更は追加シナリオの対象外とする。
+既に同じ版・条件で確認済みなら結果を再利用し、方式の評価実験を毎回全件繰り返さない。
+結果と未確認範囲は既存の PR 本文にまとめる。
+
+### レビュー結果の記録
+
+**レビューは最終差分に対して実施し、指摘があれば通常の追加コミットで修正する。** レビュー後に差分が増えた場合は、追加部分とその影響を確認する。
+レビュー結果と未解決の指摘は PR 本文で人間が確認する。`Review:` trailer の有無・値・件数はゲート条件にしない。
+記録漏れに気付いた場合は実施内容を追記し、未実施ならレビューを行う。記録を整えるために過去コミットを再作成しない。履歴や日時の変更は、過去にレビューした証拠にはならない。
+
+## develop 完了時の確認
+
+develop 完了時点（PR 作成前、マージを待たない）で:
+
+- [ ] 変更が公開物の挙動・同梱内容を変える場合（CLI 出力・拡張機能の動作変化に加え、plugin 同梱物 = 配布スキル群・pfd-* コマンド・agents（`make gen-plugin` の対象）の変更を含む — パスでなく挙動と同梱内容で判定）、npm 公開・Marketplace 公開が必要か確認した（`make release-status` で behind を確認。pending をどこかへ書き写す必要はない — 次サイクルのプリフライトが `releasePending` として毎回一次情報から取り直す。#814）
+- [ ] CLIコマンドを追加・変更した場合、コマンド定義テーブル（`packages/cli/src/index.ts` の `COMMAND_GROUPS` / `TOP_LEVEL_COMMANDS`。dispatcher と help 列挙の双方がここから導かれる #902）を更新し、`make gen-readme-cli` で root README と `packages/cli/README.md` の両方を再生成してコミットした（#850 以降、後者も生成物。drift は pre-commit の `readme-cli` ゲートと CI の `make check-readme-cli` が検出する）
+- [ ] 実装を subagent へ委譲した場合、戻り時に `git log origin/<branch>..HEAD` と open PR 一覧を確認し、委譲先がブリーフの留保作業（push・PR 作成・issue 操作）を実行していないか照合した
+- [ ] コード変更のあるサイクルでは、観点1（品質）と観点2（correctness）の実施記録が入っていることを、コミット直前に確認した。観点3（設計妥当性）が観点2の要件も満たしたと記録されている場合に限り、観点2の別実行記録に代えてよい。レビュー実施とコミット作成の間に他の作業（PR 作成・push 等）を挟むと記載を失念しやすい — 実施済みで未記載のまま次の作業に進んでいないか、コミット直前に再確認する
+
+**`docs/spec/spec.md` / `docs/samples/` を変更した場合**: 本 companion の「生成物の再生成と自動ドリフト検査」に従う（再生成手続きの一次情報はそちら。ここには複製しない）。
+
+## レビューの実施粒度
+
+原則（diff の規模に review の重さを合わせる）は `.pfdsl/bindings/pfd-ops.md`「このリポの作業規律」の「レビュー」と「PR と統合」が一次情報。
+手段の起動数は、発火した観点と必要な独立性を満たしたうえで差分の規模に合わせる。
+
+- 軽い側: 数十行・1〜2ファイル中心。観点1・2を別 agent 1本で覆える場合はまとめ、追加の角度や agent を増やさない
+- 重い側: `/code-review` の既定 fan-out（8角度 finder × 候補ごと検証 agent、計10体以上の subagent 起動）は大規模 PR 向け
 
 ## payoff_log 追記条件
 
 PFD の効果を体感した局面は `docs/pfd_payoff_log.md`（`payoff_log` artifact）に **日付・局面・効果・参照** の形式で追記する。pfdsl の効果実証が目的（このリポ固有の動機）。
 
+終端ゲートで確認する:
+
+- [ ] ADR-0014 の反実仮想テスト「依存グラフ／プロセス分解がなければ、この判断・作業は違っていたか」を適用し、Yes かつ違いを1行で引用できる局面を `docs/pfd_payoff_log.md` に追記した。該当しない場合は追記しない
+
 ## spec バージョンの権威
 
-**spec のバージョンはタイトル行（`# PFDSL仕様書 vX.Y.Z`）が唯一の権威。** §20 の changelog 節は変更点の記述であり、バージョンの確認に使わない。バージョンを参照・更新する際は必ずタイトル行を読み、タイトル行を更新してからコミットする。§20 冒頭やその他の本文で版番号を再記載しない（タイトル行との二重管理になり bump 時の同期漏れを生む。changelog 見出しの「vX.Y.Z からの主な変更点（vA.B.C）」形式は変更点の記述として許容する）。
+**spec のバージョンはタイトル行（`# PFDSL仕様書 vX.Y.Z`）が唯一の権威。** `docs/spec/spec-history.md` の changelog は変更点の記述であり、バージョンの確認に使わない。バージョンを参照・更新する際は必ずタイトル行を読み、タイトル行を更新してからコミットする。changelog 冒頭やその他の本文で版番号を再記載しない（タイトル行との二重管理になり bump 時の同期漏れを生む。changelog 見出しの「vX.Y.Z からの主な変更点（vA.B.C）」形式は変更点の記述として許容する）。
+
+**changelog エントリは maintain_spec（統合フェーズ）でタイトル行 bump と同じ作業の中で書く** — 消費する `spec_proposals` に概要・設計判断・影響範囲がすでに揃っているので、この時点が最も情報が新鮮。「同一コミットである必要はない」（複数コミットに分けてよい、spec.md と spec-history.md が別ファイルになった #692 以降 per-commit では機械強制しない）だけであり、「release まで書かなくてよい」という意味ではない。
+
+`make release` の pre-tag checks（`scripts/check-spec-history.mjs`）はこの手続きの取りこぼしを拾うブロッキングな安全網であり、一次的な執筆トリガーではない。#689 の distribution review ゲートと機構は同型だが、あちらは「レビューは公開境界でのみ走る」性質そのものが正当な設計（プロンプトの読み手は公開時にしか現れない）なのに対し、こちらは integrate 時点で書ける・書くべき情報を release まで持ち越す理由がない。忘れた場合の検出が release-status（非ブロッキング）と release（ブロッキング）に付いている、という位置づけ。
 
 ## 実装 PR での spec 直接更新
 
@@ -44,10 +157,11 @@ issue が spec 変更を明示しており、変更が単一の制約節・sever
 ## spec_proposals ライフサイクル
 
 `docs/spec/proposals/*.md` は `draft_proposals` が生成し `maintain_spec`（integrate フェーズ）が消費する中間成果物。
+提案文書の criteria は起草内容が統合判断に使える状態を指し、後続の spec 統合完了を要求しない。
 
 - **作成タイミング**: issue 着手時、spec 改版の起草フェーズ
 - **消費**: `maintain_spec` で spec 本文に統合される
-- **マージ後**: 削除しない。歴史的記録として残す（spec §20 の変更点リストと対になる証跡）
+- **マージ後**: 削除しない。歴史的記録として残す（`docs/spec/spec-history.md` の変更点リストと対になる証跡）
 - **形式**: 概要 / 仕様変更 / 設計判断 / 影響範囲 の4セクション（詳細 + 完全チェックリストは ADR-0012）
 
 ### spec 直接変更（draft_proposals スキップ）の条件
@@ -61,42 +175,238 @@ issue が spec 変更を明示しており、変更が単一の制約節・sever
 
 ### 起草チェックリスト（最頻発ミス）
 
-統合（`integrate_spec`）時の Opus 外部レビューで繰り返し指摘された項目:
+spec 統合時の Opus 外部レビューで繰り返し指摘された項目:
 
 - [ ] 型専用フィールドを追加した場合、逆型指定の error を制約節（§15.X）と §16 の両方に対称記載した
 - [ ] 例示は front matter と flow edge が self-consistent（metadata フィールドを示す例は対応 edge も明示）
 
-上記は個別 proposal 段階では見えず、統合時に他フィールドとの対称性比較で発覚する。`integrate_spec` では外部レビューを推奨する。
+上記は個別 proposal 段階では見えず、統合時に他フィールドとの対称性比較で発覚する。spec 統合のサイクルでは外部レビューを推奨する。
 
 ### 委譲時の入力（構造捏造の予防）
 
-proposal 起草を subagent に委譲する場合、対象 spec の**現行 frontmatter キー構造・制約節番号**を委譲入力に明示する（`spec.md` の該当節を読ませる/grep させる）。渡さないと存在しない構造を捏造する（2026-06-20: spec に無い `presentation` ブロックを捏造 — review-perspectives A「入力充足」の委譲版。戻り後レビューで検出したが、入力を渡せば捏造自体を予防できる）。
+一般形（生成物が適合すべき既存構造は実物から読んで委譲入力に明示する）は `.pfdsl/bindings/pfd-ops.md`「このリポの作業規律」の「実装を委譲し外向き操作の担当を定める」が一次情報。
+proposal 起草での「既存構造」は対象 spec の現行 frontmatter キー構造・制約節番号であり、`spec.md` の該当節を読ませる/grep させることで渡す。
+渡さなかった実例が 2026-06-20 の捏造（spec に無い `presentation` ブロック — review-perspectives A「入力充足」の委譲版）で、戻り後レビューで検出した。
 
 ## .pfdsl 変更後のスナップショット更新
 
-`packages/core/src/__fixtures__/` 内のフィクスチャ `.pfdsl` を変更した場合、`pnpm --filter @pfdsl/core exec vitest run -u` でスナップショットを更新してからコミットする。pre-commit hook（`.pfdsl` staged 時）と CI の両方で更新漏れを自動検出する。`.pfdsl/roadmap.pfdsl` / `.pfdsl/workflow.pfdsl` 等の運用 PFD を変更してもスナップショットは変化しない（fixture ベースのため）。
+`packages/core/src/__fixtures__/` 内のフィクスチャ `.pfdsl` を変更した場合、`pnpm --filter @pfdsl/core exec vitest run -u` でスナップショットを更新してからコミットする。更新漏れは通常の core test と CI で検出する。`.pfdsl/roadmap.pfdsl` / `.pfdsl/workflow.pfdsl` 等の運用 PFD を変更してもスナップショットは変化しない（fixture ベースのため）。
 
 ## 生成物の再生成と自動ドリフト検査（gen-skill / gen-plugin / gen-samples / gen-readme-cli）
 
-`docs/spec/spec.md` / `docs/samples/` を変更したら `make gen-skill`（スキル `references/`）・`make gen-samples`（サンプル `.dot` / README / `.svg`）で生成物を再生成する。`packages/cli/src/` の CLI コマンド定義を変更したら `make gen-readme-cli`（README `## CLI` セクション）で再生成する。`.claude/skills/pfd-grill` / `.claude/skills/pfd-ops` / `.claude/skills/pfd-retro` / `.claude/skills/pfd-ecosystem` / `.claude/agents/pfd-lens.md` / `.claude/commands/pfd-cycle.md` / `.claude/commands/pfd-init.md` / `.claude/commands/pfd-retro.md` または gen-skill の入力を変更したら `make gen-plugin`（`plugin/pfdsl/`、marketplace 配布プラグイン。gen-skill 分は内部で自動実行）で再生成する（ADR-0028 で pfd-ops も同梱対象に追加）。再生成漏れは機械的に検出されるため手動チェックは不要 — gen-skill / gen-plugin の identity は pre-commit（各々の入力 staged 時）と CI（check-gen-plugin.yml）、`.dot` / README のドリフトは graphviz-exporter の vitest テスト（pre-commit の `docs/samples/` staged 時と CI test）、README `## CLI` セクションのドリフトは `make check-readme-cli`（pre-commit の `packages/cli/src/` / `README.md` staged 時と CI test.yml）が検査する。`.svg` は graphviz バージョン依存のため検査対象外（roadmap.md ゲート参照）。
+`docs/spec/spec.md` / `docs/samples/` を変更したら `make gen-skill`（スキル `references/`）・`make gen-samples`（サンプル `.dot` / README / `.svg`）で生成物を再生成する。`packages/cli/src/` の CLI コマンド定義を変更したら `make gen-readme-cli`（README `## CLI` セクション）で再生成する。
 
-**dist 鮮度の機械検査**: pre-commit の drift 検査（README `## CLI` セクション・gen-skill・gen-plugin）は対象 dist（`packages/cli/dist/cli.js` 等）を実行または import して出力を取得する。`scripts/lib/dist-freshness.mjs` が dist の mtime を sibling `src/` の最新 mtime と比較し、dist が存在しない場合と同様に古い場合も検査を skip して「run 'pnpm -r build'」を促す（#450/#452）。skip は「検査対象が信頼できないので判定を CI に委ねる」意味であり、ローカルで検査 PASS しなかったからといって drift が無いとは限らない — コミット前に `pnpm -r build` を済ませて skip を解消してから判断する。
+**`make gen-samples` 実行後**: `.dot` / `.svg` / README はいずれも決定論的（純 JS + `@pfdsl/preview-engine` の wasm graphviz）に生成されるため、再生成された全ファイルの差分をそのままステージしてよい（#588）。
 
-**出力抑制**: `make gen-samples` / `make gen-skill` は pnpm 全パッケージビルド + 全サンプル check の warning を毎回出力するため数百行に及ぶ。実行後は `git status --short docs/samples/ .claude/skills/pfdsl/ plugin/pfdsl/` で変更ファイルのみ確認すれば足りる（ビルド自体の成否は非ゼロ終了コードで分かる）。
+配布 skill・command・agent の canonical input は、`scripts/lib/harness-inventory.mjs` が宣言する `scripts/harness-template/skills`・`scripts/harness-template/commands`・`scripts/harness-template/agents` である。ハーネス別の本文は明示 section と raw path variable で表し、指定したファイルだけを厳密に描画する。ルート指示・設定・hook の正本は `scripts/root-instructions-template/INSTRUCTIONS.md`・`.claude/settings.json`・`hooks/` に置く。
+このリポ専用の `pfd-implementer` は `scripts/repo-agent-template/pfd-implementer.md` を正本とし、同じ生成器で `.claude/agents/pfd-implementer.md` と `.codex/agents/pfd-implementer.toml` を生成する。plugin への同梱対象には含めない。
+ルート指示文書は`CLAUDE.md`と`AGENTS.md`のどちらもこのテンプレートからの生成物であり、手書き入力ではない（#1160）。Claude CodeとCodexのadapterは同じinventoryを消費する。`.claude/skills/pfdsl` は中立生成物 `generated/skills/pfdsl` への生成symlinkであり、canonical inputでも編集先でもない。
 
-**配布スキルの新規追加時の横断照合**: 新しい配布スキル（`.claude/skills/pfd-*`）を追加したら、`grep -rn "<既存スキルID>\b" .pfdsl/ scripts/` で既存の兄弟スキル（例: `retro_skill`）の全参照箇所を洗い出し、新スキルにも同じ箇所（`workflow.pfdsl` の `distill_ops` 出力エッジ・`publish_cli` 入力エッジ・`gen_plugin` 入力エッジ、`runtime-pipeline.pfdsl` の `assemble_plugin` 入力エッジ）が揃っているか1つずつ照合する。`scripts/gen-plugin.mjs` の静的リストと `plugin.json` description は pre-commit の drift 検査が機械的に強制するが、PFD 側のこれらのエッジは check で強制されず目視追随に依存する（#481 で `grill_skill` 追加時に発見。当初 `distill_ops`・`publish_cli`・`assemble_plugin` の3箇所を見落とし、pfd-retro の A層「同種対称性」監査で気付いた）。
+これらの入力、またはgen-skillの入力を変更したら、`pnpm -r build && make gen-plugin` を実行する。これはClaude Code rootの`plugin/pfdsl/`とCodex native rootの`plugin/pfdsl-codex/`、リポジトリの`CLAUDE.md`・`AGENTS.md`・`.agents/`・`.codex/`を同時に再生成する。公式Codex validator/runtimeはplugin rootの`skills/`を固定するため、異なるClaude Code/Codex skill treeを単一rootに同居させない。生成先は手編集しない。編集元を直して同じコマンドで再生成する。distが無い、または鮮度確認だけを行う場合は`node scripts/gen-plugin-dist-independent.mjs`を使えるが、Claude rootの`plugin/pfdsl/skills/pfdsl/SKILL.md`は含まれない。
+
+Codex pluginのmanifestは`plugin/pfdsl-codex/.codex-plugin/plugin.json`にあり、現在`Skills` capabilityのみを表す。hookはtop-level manifest fieldではなくplugin同梱の`plugin/pfdsl-codex/hooks/hooks.json`を既定discoveryして公開する。Codex runtimeはhook commandへ`CLAUDE_PLUGIN_ROOT`互換環境を与えるため、Claude Codeと同一のhook textを使う。Codex native agentはリポジトリ側の`.codex/agents/`へ生成し、`.codex/hooks.json`はrepo-local hook設定として残す。`.codex/config.toml`はtrusted projectの`workspace-write`と`on-request` approvalを維持しながらsandbox内network accessを有効にする。Codexではcommandとskillが同じplugin skill名前空間を共有するため、同名の場合は生成器がcommand側を`source-command-<name>`へ改名する。
+
+`.claude/skills`・`.claude/commands`・`.claude/agents` の配布対象と `pfd-implementer` は生成物であり、手編集しない。ほかの手書きのメンテナ専用資産は既存の `.claude/` 正本に残す。`install/` の一次情報は repo ルートの明示リストであり、中立テンプレートへ複製しない。
+
+再生成漏れは機械的に検出されるため手動チェックは不要である。gen-skill / gen-plugin の identity はpre-commit（各々の入力 staged 時）とCI（check-gen-plugin.yml）、`.dot` / README のドリフトはgraphviz-exporterのvitestテスト、`.svg` のドリフトはpreview-engineのvitestテスト（いずれもpre-commitの`docs/samples/` staged時とCI test）、README `## CLI` セクションのドリフトは`make check-readme-cli`（pre-commitの`packages/cli/src/` / `README.md` staged時とCI test.yml）が検査する。`references/*.md`を含むpluginのdist非依存部分は`scripts/gen-plugin-dist-independent.mjs`が生成し、pre-commitの結合`gen-plugin-bulk` gateはClaude rootの`plugin/pfdsl/`、Codex rootの`plugin/pfdsl-codex/`、`AGENTS.md`、`.agents/`、`.codex/`を同時に比較する。distがstaleでClaude pfdsl SKILL.md部分の検査がskipされても、このdriftはここで止まる（#593。前身は#586のreferences専用検査で、粒度拡張の経緯は`scripts/pre-commit`の当該コメントが一次情報）。
+
+**dist 鮮度の機械検査**: pre-commit の drift 検査（README `## CLI` セクション・gen-skill の SKILL.md 部分・gen-plugin）は対象 dist（`packages/cli/dist/cli.js` 等）を実行または import して出力を取得する。`scripts/lib/dist-freshness.mjs` が dist の mtime を sibling `src/` の最新 mtime と比較し、dist が存在しない場合と同様に古い場合も検査を skip して「run 'pnpm -r build'」を促す（#450/#452）。skip は「検査対象が信頼できないので判定を CI に委ねる」意味であり、ローカルで検査 PASS しなかったからといって drift が無いとは限らない — コミット前に `pnpm -r build` を済ませて skip を解消してから判断する。gen-skill の `references/*.md` 部分と gen-plugin の SKILL.md 以外の部分は dist に触れないため、この skip の影響を受けない（#586 / #593）。
+
+**pfd-ops `install/` は生成物**: `.claude/skills/pfd-ops/install/**` は手編集しない。
+生成の構造（ソース・生成器・向き）は `pipeline.pfdsl` の `ops_install_sources >> gen_install -> ops_install_templates` が一次情報 — ここには手続きだけを書く。
+配布対象は `scripts/lib/install-templates.mjs` の明示リストが決める（`scripts/pfdsl/` には配布しない repo ローカルの `*.test.mjs` が同居するため、glob でなく明示リストにしている）。
+テンプレートを増減したらこのリストも更新する。
+
+drift 検査は pre-commit（`gen-install` の check_drift。他の drift 検査と違い dist を要求しないので、ビルド未実施でもローカルで走る）と CI（`check-pfd-ops-sync.yml`）が行う。
+pre-commit は index の凍結コピーを隔離した repository に展開し、その中の生成器・入力・出力・trigger を使って検査する。
+無関係な未stage編集や未追跡生成物は検査へ混ざらず、成功・失敗とも元の作業ツリーと index を書き換えない。
+隔離先を作る入口自身とその bootstrap helper は作業ツリーから実行するため、これらの未stage破損まで隔離する保証はない。
+隔離先で生成器の回復処理が失敗した場合も一時データは破棄され、元の作業ツリーに既存の回復データがあればそのまま残る。
+`GIT_INDEX_FILE` を使う hook ではその index を凍結し、隔離先の子プロセスには元 repository の Git target 環境を渡さない。
+不足する生成物や手編集した生成物を検出したら、明示的に `make gen-plugin` で2ホップをまとめて再生成し、意図した生成元と生成物を一緒にstageする。
+ビルドは元の鮮度検査に通り、ビルド入力が index と一致するときだけ隔離先へコピーする。
+その条件を満たさない dist 依存ゲートは従来どおり skip を報告するため、skip は同一性の確認済みを意味しない。
+
+終端ゲートと release は `scripts/check-generation.mjs --gen-plugin <terminal|release>` で同じ隔離検査を行い、生成出力契約全体を比較する。
+終端ゲートは index、push・release は公開対象の HEAD を隔離入力に使う。
+push・release は生成出力のstage済み未commit差分も拒否し、stage済みの修復で不整合な HEAD を隠せないようにする。
+これらの入口は生成物の未stage差分も先に検出する。
+`make push` は `--gen-plugin push --samples` で repository assets・install を含む plugin 出力とサンプルを検査し、不整合なら手動の再生成・コミットを促して停止する。
+自動stage・自動コミットは行わない。
+配布する install payload は `scripts/lib/install-templates.mjs` の許可一覧から skill の `installFiles` 宣言を導出し、開発用ファイルを列挙し直さない。
+
+**生成物 drift 検査はコミット分割を制約する**: 規則は `.pfdsl/bindings/pfd-ops.md`「このリポの作業規律」の「レビュー」と「PR と統合」にあるコミット粒度ゲートが一次情報。このリポで該当する検査は`gen-plugin`（inventoryが選ぶ手書き入力と`CLAUDE.md`・settings・hooksからClaude root、Codex root、repository Codex assetsを同時に導出する結合gate）と`gen-install`。
+
+**出力抑制**: `make gen-samples` / `make gen-skill` はpnpm全パッケージbuild + 全サンプルcheckのwarningを毎回出力するため数百行に及ぶ。実行後は`git status --short docs/samples/ plugin/pfdsl/ plugin/pfdsl-codex/ AGENTS.md .agents/ .codex/`で変更ファイルのみ確認すれば足りる（ビルド自体の成否は非ゼロ終了コードで分かる）。
+
+**配布スキルの新規追加時の横断照合**: `scripts/check-skill-wiring.mjs`（`make check-docs` 経由で CI も実行）は、図に宣言された手書きの同梱 artifact の生成元と `pipeline.pfdsl` の `gen_plugin` への配送経路を検査し、欠落を file:line で報告する。producer の重複は native V001 が担い、既存の `make check-fmt` と `make check-links` でも拒否される。manifest への所属だけでは図の参加者になるとは限らず、未宣言の配布資産に artifact 登録を要求しない。図への参加は pfd-ops の成果物の門番の基準で判断する。
+
+検査対象は手書きリストでなく既存データから導く（列挙を持つとそれ自体が追随漏れの対象になる）。同梱されるかは `scripts/lib/gen-plugin.mjs` の `PLUGIN_MIRRORS`（組み立てと `distribution-review` の逆写像が既に読んでいる同梱マニフェスト）が答え、artifact の `location:` とエッジは `@pfdsl/core` の `analyze()` から取る。`pfdsl_skill` はマニフェストが「rendered, not mirrored」として除外するため特別扱いが要らない。
+
+**2つの要件は要求範囲が異なる（#944）**: `gen_plugin` への到達は図に宣言された同梱の手書き artifact に要求する。workflow 側の producer の存在は `workflow.pfdsl` が整備対象として宣言している artifact にのみ要求する。この図は配送 membership でなく整備責任を持つため、生成元がなければ整備契約が欠ける。command 正本は `ops_skill_general`・`retro_skill`・`ecosystem_skill` の location に含め、`maintain_distributed_prompt_assets` が整備する。生成済みcommand/command由来skillの配送は `pipeline.pfdsl` が持つ。両図が宣言する artifact は workflow 側の宣言を採り、finding は1件に畳む。
+
+照合先は ADR-0035 の描き直しで4箇所から2箇所に減った。旧 `publish_cli` 入力エッジは判断部分が3種の release 判断になり素材列挙を持たなくなり、`pipeline.pfdsl` の旧 `assemble_plugin` は `workflow.pfdsl` の旧 `gen_plugin` と同一物の二重モデル化だったため統合した。実際にこの二重化は `pfd_lens_agent` / `implementer_agent` が片方の図にしか無いという乖離を生んでいた。
+
+**判断軸による分担（ADR-0035）**: 判断を含まない生成・公開の変換は `pipeline.pfdsl` が持つ。`make gen-skill` / `make gen-install` / `make gen-plugin` / `make gen-samples` と、release request 以降の tag push・npm publish・vsix 生成・marketplace アップロードがそちらにある。`make gen-plugin` はClaude root、Codex root、repository Codex assetsを組み立て、結合drift gateがまとめて検査する。この図に残るのは「release kind ごとに公開するか・どの版で切るか」の判断（`decide_cli_release` / `decide_libraries_release` / `decide_vscode_release`）までであり、判断出力は3種の release request として pipeline.pfdsl へ渡す。生成コマンドの手続き・drift 検査の話はこの companion が引き続き一次情報として持つ（グラフで運べない散文のため）。
+
+**生成の一次ソースは `graph io` の終端に出る（ADR-0035 の副作用）**: `gen_skill` / `gen_plugin` / `push_cli_release_tag` / `push_libraries_release_tag` / `package_vscode_release` が消費する生成の一次ソースは、この図では消費者を持たない終端 artifact として報告される。消費側のエッジは `pipeline.pfdsl` に実在するが、`graph io` はファイル単位で走るため参照できない。該当する artifact をここに列挙しない — 一次情報は消費側のエッジであり、現在の集合は下記の機械振り分けが `.pfdsl/` を横断して毎回そこから取り直す。
+
+**これらに `todo` プレースホルダの消費者を立てない。** 立てると ADR-0035 が解消した二重モデル化（同一変換を2ファイルが別ノードIDで持つ状態）を作り直すことになる。`references/work-cycle.md`「成果物の門番」の後続側判定では「消費者は sibling の `pipeline.pfdsl` に在る」と記録して該当なしとする。
+
+**この振り分けは `gate-check.mjs` が機械的に行う（#671）**: 新規終端の報告は、`.pfdsl/` 内の他の `.pfdsl` を `graph edges --json` で読み、`>>` 入力エッジで消費されているものを別見出し「New terminal artifacts consumed in a sibling graph」へ分ける。ただし振り分けは PASS/FAIL でなく報告材料であり、手段か納品物かの分類は MANUAL のまま残る。sibling 見出しに出た artifact は、該当なしと記録する前に消費側のエッジを実際に確認する。
+
+**本来の見出しに残ったことは、それだけでは門番違反の確定ではない。** sibling が構文エラー等で `graph edges --json` に落ちた場合、その図の消費エッジは黙って読み飛ばされ、消費者は0件として扱われる（読めなかった側に倒すと本物の違反を沈黙させるため、見に行けと言う側に倒してある）。門番違反と言えるのは、sibling が読めたうえで消費者が無いときである。判定時は `.pfdsl/pipeline.pfdsl` を単体で `graph edges` に通し、パースが通ることを確かめてから結論する。
+
+合成を CLI でなく `gate-check.mjs` に置いたのは spec §2.9.1 が ID をファイルローカルに保ち、複数ファイルを跨いだ平坦化ビューの構成を禁じているためである。「同名 ID は同じ成果物」はこのリポの `.pfdsl/` のローカルな慣行であり、規範ではない。慣行が及ぶ範囲は `scripts/lib/gate-check.mjs` の `SIBLING_ID_NAMESPACE_DIRS` が持ち、`.pfdsl/` だけを列挙する — `docs/samples/` は互いに無関係なチュートリアル図が `spec` / `code` を使い回しており、同一ディレクトリという理由だけで合成すると本物の門番違反が sibling 見出しへ落ちる。`>>?` フィードバック消費も合成の対象に入れない — `graph io` の `terminals` は spec §15.11 の audit-terminal でフィードバック消費を無視するため、sibling 側だけフィードバックを数えると同じ artifact が消費者の置き場所次第で別分類になる。
+
+## 採用先への移行案内
+
+### ADR-0048 の後続を段階的に公開する
+
+#1522 の方針に従い、ADR-0048 の後続を1回の公開へ束ねることは要求しない。
+配布する `pfd-ops/references/architecture.md` の「責務境界の移行中の適用関係」が、0段目と移設前の手順の適用関係を説明する。
+既存手順は対応する変更が公開版へ入るまで有効であり、この注記は配布レビューの免除や公開済みの証拠ではない。
+CLI の修正を先に公開する場合も既存の release runner を使い、その版に含む配布物のレビューと以下の移行案内手続きを通す。
+CLI だけを別経路で公開したり、marketplace の参照先だけを変えたりして、既存ゲートを回避しない。
+
+各公開準備では、対象区間で区分 iii の手順が削除・移設されたかを以下の手続きで確認する。
+該当する変更には、旧手順の取得元、採用先の binding または利用者環境へ残す方法、その読込み経路の確認、配布側が引き続き保証する範囲を記す。
+手順を残すかどうかは採用先が判断し、配布の縮小を同等の防御が残った変更とは案内しない。
+移行注記の作成・検証は E0 の準備や完了を待たず、配布レビューの合格記録は公開対象の版ごとに確認する。
+
+### 公開区間ごとの移行案内
+
+`maintain_adopter_guidance` が、更新前後の公開版で必要な移行だけを選ぶ正本 `migration_guide` を保守する。
+配布物にはガイドへの安定した参照だけを持たせ、旧機構の判定・回復処理や版別手順を蓄積しない。
+
+ガイドの保守は公開準備で1回まとめて行う。
+変更 PR ごとの記載義務は置かない — 変更の実装者に「採用先への影響を自分で気づいて書く」ことを課す形は、気づかなかった変更がそのまま漏れる。
+公開準備の担当が、対象区間の全コミットを1件ずつ影響ありか無しかに振り分け、人が確認する。
+
+公開担当は `decide_cli_release`・`decide_libraries_release`・`decide_vscode_release` の判断前に、次を行う。
+
+1. 前回の対応する公開 tag（CLI/plugin は `v[0-9]*`、ライブラリは `lib-v*`、拡張は `vscode-v*`）から公開対象 SHA までの、配布物に触れたコミットを列挙する。`v*` は `vscode-v*` にも一致するので使わない。
+
+   ```sh
+   node scripts/list-migration-candidates.mjs --from <前回の公開 tag> --to <公開対象 SHA>
+   ```
+
+   `--to` を省くと `HEAD` までを列挙する。
+   このスクリプトは、マージコミットを除いた `<hash> <subject>` を、`DISTRIBUTION_ROOTS`・`packages/`・`docs/spec/` のいずれかに触れたものだけ出力する。
+   対象パスは `scripts/lib/migration-candidates.mjs` が `DISTRIBUTION_ROOTS` から組み立てるので、ルートを変えても手作業での同期は要らない。
+   配布物の一次情報は `scripts/lib/distribution-roots.mjs` の `DISTRIBUTION_ROOTS`（配布 bundle のルート。生成器を import しない共有定義）と、`scripts/lib/distribution-sources.mjs` の `GENERATED_DISTRIBUTION_SOURCES`（生成物と生成元の対応）である。
+   手書きの生成元は、pre-commit と CI の同一性検査により生成物と同じ変更で更新される。
+   そのため生成物のルートを指定すれば、スキル・コマンド・agent・hook・scaffold・`install/` の生成元の一覧をここへ複製せずに拾える。
+   生成器だけを変えて出力だけが変わったコミットも、生成物のルートで拾える。
+   `packages/` と `docs/spec/` は CLI と仕様の変更を拾うために加える。
+2. 列挙した各コミットを、採用先の作業を要するもの（ファイル・呼出し・運用設定・診断の扱いの変更）と、要さないものに分ける。分類の手段は問わないが、分類そのものを人が確認する。同じ区間の後のコミットで取り消された・上書きされた変更は、コミット単体でなく区間全体の差分で要否を判断する。
+3. 要するものごとに、旧挙動、該当条件、必要操作、検証方法、根拠 issue/commit をガイドの項目に書く。
+4. 未公開項目を実際の公開先の版へ対応付け、CLI/plugin・ライブラリ・拡張と仕様の版を混同しない。複数版を飛ばす更新でも対象区間の項目を順に選べること、旧節とリンクを保持することを確認する。未公開の時点の状態に依存する記述（公開先の版が未定であること、npm の `latest` の版、未公開の変更を取得する方法等）は、公開時点の事実へ書き換える。
+5. 要するコミットが無い公開では、対象区間と、全コミットを分類して影響なしと確認したことを公開準備の既存記録へ残す。
+
+これは公開判断の必須確認である。
+release runner の `migration-guide` ゲートが CLI/plugin の公開で確かめるのは、`docs/migration-guide.md` に、CLI/plugin を名指すレベル2の見出しのうち `Unreleased` で始まるもの（大文字小文字は区別しない）が残っていないことだけで、列挙したコミットが漏れなく分類されたかは判定しない。
+見出しは、手順 4 で実際の公開先の版へ書き換えると解消する。
+ライブラリと拡張の公開は、この見出しが残っていても止めない。
+`make release-status` は同じ見出しが残っていることを表示するが、失敗にはしない。
+リリースノートを作る場合は該当節へリンクする。
+
+最終差分レビューでは、ガイドの対象区間、正本のリンク、必要な知見を保存したまま旧経路を終了できることを確認する。
+手順の用意・公開と、採用先での適用済み証拠は区別する。
+
+## 配布プロンプトのレビューと承認記録（`review_distribution`）
+
+`make release` は `docs/distribution-review/reviewed.json` の commit と HEAD の間に配布 `.md` の差分があると pre-tag checks で止まる。
+逃げ道は用意していない。
+公開は稀で、かつ利用側が実際にその散文を渡される唯一の瞬間なので、その希少性自体を起動条件に使っている（ADR-0029 が起動条件ゼロで休眠した反省）。
+
+**hash を進めるのは差分モードだけである。**
+全文モードは実行記録と修正だけを残す。
+全体を見る分ひとつの変更に対する解像度が差分モードに劣るため、これで承認済みとすると差分観点の穴を見逃したまま記録が進む。
+全文モードで直したものは未レビュー差分として残り、次の差分モードが必ず拾う。
+
+**記録コミットで配布プロンプトを触らないこと。**
+触ると記録が指す内容と HEAD の内容がその場でずれ、自分で自分を無効化する。
+修正は先にコミットし、`reviewed.json` の更新は別コミットにする。
+
+**`distribution_review_skill` は終端 artifact として報告される。**
+`maintain_repo_local_capabilities` が生産し、`review_distribution` へは `>>?` でしか入らないため、primary の消費エッジを持たない。
+能力成果物が世代をまたいで還流する形（ADR-0011）の帰結であって欠陥ではない。
+`pfdsl_skill` と違い消費者は sibling の `pipeline.pfdsl` に**無い** — このスキルは配布されないので `gen_plugin` の入力にならない。
+`references/work-cycle.md`「成果物の門番」の後続側判定では、手段（能力成果物）であり後続門番を要さないものとして扱う。
+
+**この手順は配布しない。**
+`.claude/skills/distribution-review/` は repo-local であり、上の「配布スキルの新規追加時の横断照合」の対象外である（`pipeline.pfdsl` の `gen_plugin` 入力エッジに足さない）。
+利用側リポには配布という行為自体が無く、この手順の実施先が存在しない。
+`spec_stress_skill` / `vscode_ext_debug_skill` と同じ扱いで、各 artifact の producer 関係にだけ現れる。
 
 ## 新 frontmatter フィールド追加時の sample 追加
 
-frontmatter に新フィールドを追加する develop では、対応する `docs/samples/` のサンプルファイルを同一 PR で追加する（「フィールドが仕様にあるがサンプルに示されていない」状態を防ぐ設計ルール）。生成物の再生成・ドリフト検査は上記のとおり機械的に強制される。
+**新 frontmatter フィールドを追加した場合**: 対応する feature sample（`docs/samples/`）を同一 PR で追加する（生成物 `.dot` / README / `references/` の再生成・ドリフト検査は pre-commit と CI が強制する）。加えて `packages/core/src/__fixtures__/pipeline-scale.pfdsl` にもそのフィールドを追記する（fixture がスナップショットの入力であり、feature sample とは別に網羅性を担う）。
+
+「フィールドが仕様にあるがサンプルに示されていない」状態を防ぐ設計ルール。
 
 ## VS Code 拡張の UI 動作確認
 
-`vscode-extension` の挙動変更（webview インタラクション・クリック動作等）を含む develop は、PR 作成前に `/vscode-ext-debug` スキルを用いてビルド後の実動作を確認する。確認結果をユーザーから受け取るまでサイクル完了とみなさない（pfd-ops 手順2）。
+GUI領域の受入時機は roadmap.md「GUI領域の実装・実機受入・公開」の運用原則を参照し、対象Issue・担当・公開範囲・進捗・残件は同節が案内する共通受入Issueで一元管理する。
+共通受入Issueの適用範囲では、以下の実機確認待ちより同節の手順を優先する。
+通常の型検査・自動test・CIは維持する。
 
-## subagent へ worktree 作成を委譲する場合の安全確認
+**vscode-extension を変更した場合**: `pnpm --filter @pfdsl/vscode-extension typecheck` を実行してエラーがないことを確認してからコミットする。`noUncheckedIndexedAccess` / `exactOptionalPropertyTypes` の strict 設定により、他パッケージの型変更が vscode-extension 側でエラーを起こす場合がある。vscode-extension の挙動変更全体を実動作確認の対象とする。クリック・ホバー等の UI 挙動変更（DocumentLinkProvider・HoverProvider 等）や preview/export の描画内容変更（statusStyles・tag・group 解決ロジック等）はその例である。挙動変更を含む場合は `/vscode-ext-debug` スキルで PR 作成前にビルド後の実動作を確認し、ユーザーの確認結果を受け取るまで完了とみなさない。
 
-`.claude/agents/` の agent に worktree 作成を含むフローを委譲する場合、`superpowers:using-git-worktrees` skill の Step 0（既存 isolation 検出時は再利用）を素通しにしない。subagent は呼び出し元セッションが使用中の worktree 内で起動されることがあり、Step 0 はその共有 worktree を「既存の分離ワークスペース」と誤認識して乗っ取る（issue #439 の issue-worker 試走で発生。呼び出し元ブランチは無傷で復旧できたが、一歩間違えば作業中のコミット履歴を破壊しかねない）。agent 定義側で「Step 0 をバイパスし常に新規 worktree を作成する」旨を明記する（例: `.claude/agents/issue-worker.md`）。
+## subagent の worktree 隔離の安全確認
+
+一般形は `.pfdsl/bindings/pfd-ops.md`「このリポの作業規律」の「実装を委譲し外向き操作の担当を定める」が一次情報。
+このリポの `issue-worker` は呼び出し元が割り当てた worktree で起動し、起動先の root・branch と割当を確認する。
+手順の正本は `.claude/agents/issue-worker.md` であり、agent 自身が手動で作成した worktree を所有扱いに変えない。
+乗っ取りが実際に起きたのは issue #439 の issue-worker 試走で、呼び出し元ブランチは無傷で復旧できたが、一歩間違えば作業中のコミット履歴を破壊しかねなかった。
+
+## workflow.pfdsl に登録する agent の範囲
+
+一般形（登録するのは図の変換の参加者だけで、参加者性の代理を基準に据えない）は pfd-ops の `references/work-cycle.md`「成果物の門番」が一次情報。
+判定はその一般形どおり2節で行う — その agent を要求している図のプロセスを名指しできるか、または生産・消費している図の成果物を名指しできるか。
+下の PreToolUse ガードの節が前者しか書いていないのは、そこで扱う機構がいずれも前者で決着したためで、判定を1節に狭める規定ではない。
+`PLUGIN_AGENT_FILES`（plugin 同梱物）への所属は出発点として使ってよいが、基準ではない。
+同梱は参加者性の代理であり、基準として閉じると参加者でありながら同梱されていない agent が機械的に落ちる。
+
+登録済みの一覧とそれぞれの要求元は `workflow.pfdsl` の artifact 定義と各 artifact の producer 関係が一次情報。`node packages/cli/dist/cli.js graph neighbors .pfdsl/workflow.pfdsl <agent artifact ID>` で対象 agent artifact の producer を引き、artifact 定義を参照する。
+
+repo scope の agent（`ci-triage` 等、このリポの開発都合の道具）はいずれも、要求している図のプロセスも、生産・消費している図の成果物も名指しできない。
+この結果が現状 `PLUGIN_AGENT_FILES` の内外と一致しているのは観測であって、判定規則ではない。
+
+## agent を追加するサイクルの動作確認
+
+原則（起動できるかは確かめるまで分からないので送る前に1回呼ぶ・引き渡す検証手順は壊れたことの確認を含む）は `.pfdsl/bindings/pfd-ops.md`「このリポの作業規律」の「worktree 上の変更を検証する」が一次情報。
+このリポでの実測は #754 — `Agent` tool が `Agent type 'local-check-triage' not found` を返し、引き渡した `git stash push -- <file>` は当該変更のコミット後に空振りして検査が緑を返した。
+前者は「同一セッションからは起動できない」の実例として記録されていたが、harness のドキュメントは定義の追加を検出して再起動なしに使えると述べており、再起動が要るのはディレクトリごと新設した場合等に限られる。
+#754 が当たったのはその例外側だったとみられる — 1事例から一般則を立てた形なので、同種の記録は「この回はこうだった」までに留める。
+
+## 委譲先の外向き操作の担当
+
+担当範囲と戻り時の確認は `.pfdsl/bindings/pfd-ops.md`「このリポの作業規律」の「実装を委譲し外向き操作の担当を定める」が一次情報。
+ここにはこのリポの実装値のみを書く。
+
+**1. agent の選択。** 実装だけを委譲するなら `pfd-implementer`（`tools:` に `mcp__github__*` を含まない）。
+`general-purpose` は `tools: *` で GitHub MCP を丸ごと持つので、実装委譲には使わない。
+呼び出し元が割り当てた worktree で起動し、PR 作成までを一気通貫でやらせる場合のみ `issue-worker` を使う。
+`pfd-implementer` はこのリポ専用の生成 agent であり、plugin には同梱しない。正本と生成先は「生成物の再生成と自動ドリフト検査」を参照する。
+
+**2. 戻り時の確認。** `git log origin/<branch>..HEAD` と open PR 一覧を突合する。
+subagent の push を拒否する repo hook や permission deny は置かない。
+ツール制限を経由しない Bash 等の書込みまで防ぐとは説明しない（ADR-0050）。
+
+## hook の artifact 登録基準（#854）
+
+一般形は上の「workflow.pfdsl に登録する agent の範囲」と同じく、pfd-ops の `references/work-cycle.md`「成果物の門番」が一次情報。
+このリポでの適用対象は `.claude/settings.json` に配線された hook 全般（PreToolUse ガードと PostToolUse advisory の双方）で、登録先は対象 artifact の分類と producer 関係を記録する `workflow.pfdsl`。
+登録しない側に当たるのは `closes-create-guard` / `roadmap-publish-guard` 等で、いずれも個別事故への対処であって図のプロセスの出力ではない。
+
+artifact 登録済みの一覧とそれぞれの要求元は `workflow.pfdsl` の artifact 定義と各 artifact の producer 関係が一次情報。`node packages/cli/dist/cli.js graph neighbors .pfdsl/workflow.pfdsl <hook artifact ID>` で対象 hook artifact の producer を引き、artifact 定義を参照する。
+PostToolUse advisory であっても、要求元の手順を名指しできれば登録側になる。advisory か guard かは判定軸ではなく、要求元の手順を名指しできるかどうかで判定する。
+**issue 番号に紐づくことは非参加者の判定根拠にならない** — 既存の登録 artifact にも issue 由来の機構がある。区別は出自の issue でなく、運用手順がその機構を要求しているか（＝図のプロセスの出力として生まれるか）で付ける。
+
+判定に迷う新規 hook は、その hook を要求している図のプロセスを名指しできるかで振り分ける。
+binding・companion・guard の分類に当たることは根拠にならない — 同じ分類には登録しない側も含まれうる。要求している図のプロセスを名指しできることが根拠になる。
 
 ## flow:exempt issue の roadmap 追加除外
 
@@ -104,28 +414,66 @@ frontmatter に新フィールドを追加する develop では、対応する `
 
 ## develop 着手時の artifact status 更新
 
-汎用ルール（着手時 todo→wip、PR を待たない）は pfd-ops プロトコル「進捗更新」が一次情報。このリポでは flow-sync が merge 後に `done` へ自動遷移させるが、`todo` → `wip` は人手のため着手と同時に行う。
+着手時の todo→wip と、完了根拠に基づく done 更新は pfd-ops の `references/work-cycle.md`「進捗と完了根拠」に従う。
+commit・PR と結び付けた更新時点は binding「PR で統合する成果物の status 更新」に従う。
+
+## workflow.pfdsl に status を書かない
+
+汎用ルール（flow 種別の artifact に `status:` を書かない。同一 id が複数の図に現れる場合も一次情報は roadmap 側に一元化する）は `docs/quality-guide.md`「進捗 status は roadmap にだけ書く」が一次情報。かつて `article` が両図に現れ、workflow 側にも status を書いたため #763 の食い違いが起きた。現在の `article` は workflow にだけあり、進捗と公開先は依存グラフの対象外である issue #12 で確認する。
 
 ## release milestone artifact の作成規約
 
-roadmap の CLI release milestone（`cli_release_<slug>` 等）はバージョン番号の事前予約ではない。**下流作業がそれを入力として要求する時点**でのみ作成する（pfd-ops プロトコル2・5の適用）。バージョン番号は roadmap 本体に書かず、done 後の label/criteria に事実として付記するのみ — 番号を先に書いて後から実態と合わせる運用（#278 導入前の運用）は廃止した。
+roadmap の CLI release milestone（`cli_release_<slug>` 等）はバージョン番号の事前予約ではない。掲載要否は pfd-ops の `references/work-cycle.md`「着手可能性と受け入れ」の基準に従い、成果物の終端性は同「成果物の門番」で確認する。バージョン番号は roadmap 本体に書かず、done 後の label/criteria に事実として付記するのみ — 番号を先に書いて後から実態と合わせる運用（#278 導入前の運用）は廃止した。
 
 複数の実装 issue を1つの PR/リリースに束ねる場合も、milestone ノードは束ねた内容を表す1つの slug で作成すればよい。「中間バージョンをスキップ/統合するか」という判断自体が発生しない — バージョン番号を roadmap に書かないため、スキップ対象になるバージョン番号付きノードが最初から存在しない。
 
-`make release cli` は roadmap 上 ready になった `publish_cli_*` プロセスの出力を機械的に done 化する（バージョン番号からの artifact ID 逆算はしない）。計画外リリースで ready な milestone が無ければ何もしない。
+公開工程は process の `tags:` に公開種別を付けて示す。CLI と plugin は `release_cli`、VS Code 拡張は `release_extension`、standalone は `release_standalone` を使う。工程 ID の名前は選別条件にしない。
+`make release COMMIT=<SHA>`はroadmap上のreadyな工程と`meta list --tag release_cli`の結果を照合し、その工程の出力を公開候補として表示する。statusは変更しない。
+公開工程を追加する Edit/Write、または既存工程に公開種別タグを追加・変更する Edit/Write では、確認 hook が `make release-status` で公開済みの状態を確認するよう案内する。process 以外のタグや、既存工程への入力追加・整形だけでは案内しない。
+`make release-status` は standalone の公開状態を取得しないため、standalone では対応する作業項目に記録された公開先で配布物と公開版を別途確認する。
+公開後のroadmap同期は`map_deps`が担い、release担当が`published_cli`と`plugin_marketplace_entry`を還流入力として、公開された固定npm版と該当milestoneが要求するplugin配布を確認する。
+確認済みartifactだけを通常PRでdoneへ同期し、未確認の候補は未完了のまま残す。
+marketplaceのpin反映・取得確認とroadmap同期の順序、中断時の再開手順は`pipeline.md`の「PR経由の公開と公開後同期」に従う。
 
 ## hotfix 運用（issue 省略）
 
-判定3条件と省略規則は L3 reference（`github-issues-backend.md`「hotfix 運用」）が一次情報。このリポでは `[gh_issues, roadmap_pfdsl, spec] >> develop` 通常経路の例外ケースに当たる。
+判定3条件と省略規則は `.pfdsl/bindings/pfd-ops.md`「hotfix 運用（issue 省略）」が一次情報。このリポでは `[gh_issues, roadmap_pfdsl, spec] >> develop` 通常経路の例外ケースに当たる。
 
 ## コアライブラリ型を拡張する場合の設計判断
 
 vscode-extension 等で新しいノード種別をホバー対応する場合、「`NodeKind`（コア公開型）に追加する」vs「provider 内で独自チェックする」の選択が生じる。判断基準: `analyze()` の `nodeKinds` マップに新種別が自然に乗る（frontmatter でスコープが確定する）なら型に追加する。provider ローカルの一時的な判定なら独自チェックにとどめる。コアへの変更は全パッケージの再ビルドと `Record<NodeKind, ...>` の exhaustive check 修正が必要になるため、影響範囲を確認してから選択する。
 
-## CI成果物の格納先変更時の workflow.pfdsl 更新
-
-CI が生成・push する成果物（`pr_diagrams` 等）の格納先・push 方式を変える PR では、対応する `workflow.pfdsl` artifact の `description` / `criteria` / `location` を同一 PR で更新する。格納先の変更は artifact の定義を変えるため、workflow 図と実装が乖離する。
-
 ## 終端ゲートの根拠
 
+### 検査対象と報告版の対応
+
+追跡下の `.pfdsl` の分類は `scripts/lib/pfdsl-check-inventory.mjs` が正本であり、Makefile の graph・strict・fmt・render・location 検査が同じ分類を使う（#1185）。
+`git ls-files -z` で分類宣言から独立に列挙し、未分類・曖昧な割当・生成元の欠落を失敗にする。
+scaffold 正本は `scripts/harness-template/` で検証し、4つの生成先は正本の検証と `check-gen-plugin.yml` の再生成・drift 検査へ委譲する。
+core fixture の parse・normalize・validateGraph は package test が持ち、CLI の exit と multi-file の repo-wide 検証済みとは扱わない。
+新しい root を追加する場合は、必要な検査軸と検査責任を分類へ同時に追加する。
+root の全域分類は、読み込まれた子の診断範囲を保証しない。
+
+終端報告は冒頭の `Report revision` が示す head・base tip・merge-base と測定時刻を対象とする（#1190）。
+知識成果物のサイズは merge-base→head の blob 差、変更・削除一覧はその PR 差分、location 突合は head の PFD blob、cycle window は固定した base/head の履歴から測る。
+head の表示と未 commit の作業ファイルを混ぜない。
+新規ファイルの比較元不在と blob 読取不能、削除なしと削除列挙失敗、完全なモデル分類と読み取れたモデルだけの分類を区別する。
+fetch 失敗時の既存 base は鮮度未確認として全報告の冒頭にも示す。
+報告材料の欠落は表示し、人間向け材料を新しい合否判定にはしない。
+
+作業者と PR 本文作成者は、報告を利用する直前に記載された対象版と最終差分を対応させる。
+reviewer へ渡した後に commit を追加した場合は、新しい head で再測定して報告を置き換える。
+base が進んだ場合は cycle window を再測定し、merge-base も変わればサイズと変更・削除の突合も再測定する。
+rebase 後の cycle window は、外部に書いた issue・PR 本文が新しい規約と整合するかを再読する材料であり、サイクル開始から最初の commit までの時間帯を完全に復元する証拠ではない。
+同じ head・merge-base・モデル blob と検査実装を使い、前回の取得が完全だった材料は再利用できる。
+cycle window の再利用には base tip と開始 commit の同一性も必要で、鮮度未確認・部分測定・測定不能の結果を後から完全な報告として再利用しない。
+
+### 機械検査と人間確認
+
 汎用ゲート項目（status 更新 / check 通過 / 論理単位コミット / PR 集約）に加え、このリポでは issue 固有項目を合成する。issue 固有項目は `roadmap.md` を参照。
+
+- **終端ゲートの機械項目と報告材料（pfd-ops 手順3・#462）**: `GH_HOST=github.com node scripts/gate-check.mjs [--base main] [--artifact <key> [--in-progress] | --no-artifact] [--issue <n> ...]` — 内部で `git fetch origin` を試みたうえで `origin/<base>...HEAD` を基準に差分を取る（fetch 失敗時も既存 remote-tracking ref で続行し、ref 自体が無ければ明示エラーで終了する）。**項目名・PASS/FAIL/SKIP の判定・SKIP 条件はここに列挙しない** — スクリプトの出力が自己記述的であり、実行すれば全項目が detail 付きで印字される（#560。列挙をここに置くとスクリプト変更のたび手で追随することになり、追随を保証する機構が無い）。`--artifact <key>` を渡すと status 更新・wip 経由の両方をその artifact に厳密スコープする（省略時はどちらも粗いフォールバック判定になる旨を detail に明示）。出力 artifact を持たないサイクル（`flow:exempt` の bookkeeping 等）は `--no-artifact` で宣言する — `roadmap.pfdsl` を status 以外の理由で触ると、宣言なしでは構造的に FAIL する（#564）。表のほかに報告材料が印字される。**その種類・件数・内容もここに列挙しない** — 同じ理由で、出力が節見出しごと自己記述する（#839）。機械結果に含まれない判断は `scripts/harness-template/skills/pfd-ops/references/work-cycle.md` の「3. 反映 — 終端ゲート」を直接確認する。スクリプトは本文を解析・再印字せず、PR 作成前の同節と、PR 作成後の `.pfdsl/bindings/pfd-ops.md`「PR と統合」内の「PR 作成前後の完了確認」にある `PR 作成後` 項目への固定案内だけを表示する
+
+- **対象 issue は全て明示する**: 終端の `--issue <n>` は繰り返し指定でき、各 issue の通常読取と、既存の人間確認案内への対象提示に使う。記録固有の PASS/FAIL や確認済み状態は出さない。省略時は対象を推測せず、人間確認を終えたとも扱わない。`cycle-status.mjs` は利用者が選び明示した各 issue を着手前確認の対象とし、その全件を含む `gateCheckCommand` を出す。記録の存在・正本・承認根拠への参照と対応は binding「レビュー」と「PR と統合」で人間が確認する。変更された知識成果物のバイト・行差分は従来どおり報告材料として印字する。
+
+選択記録の記録先と再承認は `roadmap.md`「終端ゲート追加項目（issue 固有）」に従う。

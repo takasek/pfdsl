@@ -1,25 +1,67 @@
 #!/usr/bin/env node
 // Audits sync between GitHub issues and .pfdsl/roadmap.pfdsl.
-// Usage: node scripts/pfdsl/audit-issues-flow.mjs [--fix]
+// Usage: node scripts/pfdsl/audit-issues-flow.mjs [--roadmap <snapshot>] [--enforce-issue <n> ...]
 
-import { readFileSync, writeFileSync } from "node:fs";
+import { readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-
-import { parseIssueProcesses, buildProcessOutputs, computeFindings, applyFixes, applyClosedInFlowFixes, computeLabelFindings, FLOW_LABELS } from "./lib/issues-flow-audit.mjs";
-import { isGhUnavailableError, GH_UNAVAILABLE_EXIT_CODE } from "./lib/gh-compat.mjs";
-import { execGh } from "./lib/gh-exec.mjs";
+import { parseArgs } from "node:util";
+import {
+	createGitHubOps,
+	GITHUB_UNAVAILABLE_EXIT_CODE,
+	isGitHubUnavailableError,
+} from "./lib/github-ops.mjs";
+import {
+	buildProcessOutputs,
+	computeFindings,
+	computeLabelFindings,
+	FLOW_LABELS,
+	parseIssueProcesses,
+	partitionFindings,
+} from "./lib/issues-flow-audit.mjs";
 import { parseDocument } from "./lib/yaml-require.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const root = resolve(__dirname, "../..");
+const githubOps = createGitHubOps({ cwd: root });
 
-const fix = process.argv.includes("--fix");
+// Every finding for an issue named here fails the audit.
+// Once any issue is named, the findings for all other issues only advise.
+// Label findings are not about an issue, so they keep their own severity.
+/** @type {number[]} */
+let enforcedIssues = [];
+let roadmapFile = resolve(root, ".pfdsl/roadmap.pfdsl");
+// node:util rather than a shared helper because this file is mirrored into
+// .claude/skills/pfd-ops/install/ and runs in adopting repos, which have no
+// scripts/lib/. Strict parsing keeps removed mutation modes rejected.
+try {
+	const { values } = parseArgs({
+		args: process.argv.slice(2),
+		options: {
+			"enforce-issue": { type: "string", multiple: true },
+			roadmap: { type: "string" },
+		},
+		strict: true,
+		allowPositionals: false,
+	});
+	if (values.roadmap !== undefined) roadmapFile = resolve(values.roadmap);
+	enforcedIssues = (values["enforce-issue"] ?? []).map((value) => {
+		const n = Number(value);
+		if (!Number.isSafeInteger(n) || n <= 0) {
+			throw new TypeError(
+				`--enforce-issue expects an issue number, got '${value}'`,
+			);
+		}
+		return n;
+	});
+} catch (err) {
+	console.error(`audit-issues-flow: ${err.message}`);
+	process.exit(1);
+}
 
 // --- Read and split roadmap.pfdsl ---
 
-const flowPath = resolve(root, ".pfdsl/roadmap.pfdsl");
-const raw = readFileSync(flowPath, "utf-8");
+const raw = readFileSync(roadmapFile, "utf-8");
 
 // File starts with "---\n"; frontmatter ends at the next line where trimEnd()==="---"
 const lines = raw.split("\n");
@@ -32,133 +74,104 @@ for (let i = 1; i < lines.length; i++) {
 }
 if (fmEnd === -1) throw new Error("No closing --- found in roadmap.pfdsl");
 
-const fmText = lines.slice(1, fmEnd).join("\n") + "\n";
+const fmText = `${lines.slice(1, fmEnd).join("\n")}\n`;
 const body = lines.slice(fmEnd + 1).join("\n");
 
 // --- Fetch labels from GitHub ---
 
 async function fetchLabels() {
-	const out = await execGh(["label", "list", "--json", "name,description", "--limit", "100"]);
-	return JSON.parse(out).map((l) => ({ name: l.name, description: l.description ?? "" }));
+	return await githubOps.listLabels();
 }
 
 // --- Fetch issues from GitHub ---
 
 async function fetchIssues() {
-	const out = await execGh([
-		"issue", "list",
-		"--state", "all",
-		"--json", "number,state,stateReason,labels,updatedAt",
-		"--limit", "500",
-	]);
-	return JSON.parse(out).map((i) => ({
+	return (await githubOps.listIssues()).map(normalizeIssue);
+}
+
+function normalizeIssue(i) {
+	return {
 		number: i.number,
 		state: i.state,
-		stateReason: i.stateReason ?? null,
 		labels: i.labels.map((l) => l.name),
-		updatedAt: i.updatedAt,
-	}));
+	};
 }
 
 // --- Parse frontmatter ---
 
-const doc = parseDocument(fmText);
-const fm = doc.toJS();
-const processes = parseIssueProcesses(fm);
+const fm = parseDocument(fmText).toJS();
 const outputsByProcess = buildProcessOutputs(body);
-
-// Mark artifacts that are consumed (have downstream) in the flow body
-function getConsumedArtifactIds(body) {
-	const consumed = new Set();
-	for (const line of body.split('\n')) {
-		const idx = line.indexOf('>>');
-		if (idx < 0) continue;
-		const left = line.slice(0, idx);
-		for (const m of left.matchAll(/\b([a-z][a-z0-9_]*)\b/g)) {
-			consumed.add(m[1]);
-		}
-	}
-	return consumed;
-}
-
-const consumedIds = getConsumedArtifactIds(body);
-
-// Expand each tracked process into one entry per (issueNumber, output artifact) pair.
-// NOTE: if a single process ever has both multiple issueNumbers AND multiple outputs,
-// this cross-product can pair an issue with an output it doesn't actually track (e.g.
-// issue #5 closing could act on an output really tracked by issue #6). This is a known,
-// accepted limitation — see docs/superpowers/specs/2026-07-04-issue-tracking-id-on-process-design.md
-// ("1 processが複数出力artifactを持つ場合"). Not present in current roadmap.pfdsl data.
-// Separately, applyClosedInFlowFixes guards against fully deleting a shared sole-output
-// process until every one of its tracking issues is closed, so a still-open sibling issue
-// never loses its tracked process out from under it.
-const entries = [];
-for (const proc of processes) {
-	const outputs = outputsByProcess.get(proc.id) ?? [];
-	for (const issueNumber of proc.issueNumbers) {
-		for (const artifactId of outputs) {
-			entries.push({
-				processId: proc.id,
-				issueNumber,
-				artifactId,
-				status: fm.artifact?.[artifactId]?.status,
-				hasDownstream: consumedIds.has(artifactId),
-				updatedAt: proc.updatedAt,
-				priorities: proc.priorities,
-			});
-		}
-	}
-}
 
 // --- Check labels ---
 
 function exitGhUnavailable() {
-	console.log("gh unavailable: skipping GitHub-dependent checks (label sync, issue sync)");
-	process.exit(GH_UNAVAILABLE_EXIT_CODE);
+	console.log(
+		"GitHub operations unavailable: skipping GitHub-dependent checks (label sync, issue sync); to run them, install and authenticate the gh CLI, or set GH_TOKEN or GITHUB_TOKEN",
+	);
+	process.exit(GITHUB_UNAVAILABLE_EXIT_CODE);
 }
 
 let labels;
 try {
 	labels = await fetchLabels();
 } catch (e) {
-	if (isGhUnavailableError(e)) exitGhUnavailable();
+	if (isGitHubUnavailableError(e)) exitGhUnavailable();
 	throw e;
 }
-const labelFindings = computeLabelFindings(FLOW_LABELS, labels);
-
-if (labelFindings.length > 0) {
-	console.log("label:");
-	for (const f of labelFindings) {
-		console.log(`  ${f.type} [${f.name}] ${f.detail}`);
-	}
-	if (fix) {
-		for (const f of labelFindings) {
-			if (f.type === "label_missing") {
-				await execGh(["label", "create", f.name, "--description", f.description, "--color", "ededed"]);
-			} else if (f.type === "label_description_mismatch") {
-				await execGh(["label", "edit", f.name, "--description", f.description]);
-			}
+// Resolve only after the availability check, preserving the unavailable exit.
+const locationDiagnostics = [];
+const processes = parseIssueProcesses(
+	fm,
+	githubOps.repository(),
+	locationDiagnostics,
+);
+if (locationDiagnostics.length > 0) {
+	console.log("location advisory (does not fail this audit):");
+	for (const finding of locationDiagnostics)
+		console.log(`  ${finding.type} [${finding.processId}] ${finding.detail}`);
+}
+const entries = [];
+for (const proc of processes) {
+	const outputs = outputsByProcess.get(proc.id) ?? [];
+	for (const issueNumber of proc.issueNumbers) {
+		for (const artifactId of outputs) {
+			entries.push({ processId: proc.id, issueNumber, artifactId });
 		}
-		console.log("fixed label findings");
-	} else {
-		process.exit(1);
 	}
 }
+const labelFindings = computeLabelFindings(FLOW_LABELS, labels);
+const labelParts = partitionFindings(labelFindings);
 
-// --- First pass: compute and print findings ---
+// Label findings are printed here but do not end the audit: the issue-level
+// findings below are independent of them, and stopping would hide those until
+// the labels were fixed. The exit code is decided at the end.
+function fmtLabelFinding(f) {
+	return `  ${f.type} [${f.name}] ${f.detail}`;
+}
+
+if (labelParts.blocking.length > 0) {
+	console.log("label:");
+	for (const f of labelParts.blocking) console.log(fmtLabelFinding(f));
+}
+if (labelParts.advisory.length > 0) {
+	console.log("label advisory (does not fail this audit):");
+	for (const f of labelParts.advisory) console.log(fmtLabelFinding(f));
+}
+
+// --- Compute and print findings ---
 
 let issues;
 try {
 	issues = await fetchIssues();
 } catch (e) {
-	if (isGhUnavailableError(e)) exitGhUnavailable();
+	if (isGitHubUnavailableError(e)) exitGhUnavailable();
 	throw e;
 }
-let findings = computeFindings(entries, issues);
+const findings = computeFindings(entries, issues);
 
 function printFindings(findings) {
-	const fixable = findings.filter((f) => f.fixVia);
-	const manual = findings.filter((f) => !f.fixVia);
+	const parts = partitionFindings(findings, { enforcedIssues });
+	const { blocking, advisory } = parts;
 
 	function fmtFinding(f) {
 		const pid = f.processId ? ` [${f.processId}]` : "";
@@ -166,57 +179,24 @@ function printFindings(findings) {
 		return `  #${f.issueNumber} ${f.type}${pid}${aid} ${f.detail}`;
 	}
 
-	if (fixable.length > 0) {
-		console.log("fixable:");
-		for (const f of fixable) console.log(fmtFinding(f));
+	if (blocking.length > 0) {
+		console.log("blocking:");
+		for (const f of blocking) console.log(fmtFinding(f));
 	}
-	if (manual.length > 0) {
-		console.log("manual:");
-		for (const f of manual) console.log(fmtFinding(f));
+	if (advisory.length > 0) {
+		console.log("advisory (does not fail this audit):");
+		for (const f of advisory) console.log(fmtFinding(f));
 	}
+	return parts;
 }
 
-if (findings.length === 0) {
-	console.log("roadmap.pfdsl is in sync");
+const { blocking } = printFindings(findings);
+if (blocking.length === 0 && labelParts.blocking.length === 0) {
+	console.log(
+		locationDiagnostics.length > 0
+			? "roadmap.pfdsl is in sync for the selected repository; other repository links were not checked"
+			: "roadmap.pfdsl is in sync",
+	);
 	process.exit(0);
 }
-
-printFindings(findings);
-
-if (!fix) {
-	process.exit(1);
-}
-
-// --- Apply fixes ---
-
-// 1. Add flow:managed label to issues missing it
-const missingLabel = findings.filter((f) => f.fixVia === "github");
-for (const f of missingLabel) {
-	await execGh(["issue", "edit", String(f.issueNumber), "--add-label", "flow:managed"]);
-}
-
-// 2. Re-fetch issues (labeling changes updatedAt), recompute
-issues = await fetchIssues();
-findings = computeFindings(entries, issues);
-
-// 3. Apply document and body fixes
-const issuesByNumber = new Map(issues.map((i) => [i.number, i]));
-const docBefore = doc.toString({ lineWidth: 0 });
-applyFixes(doc, findings, issuesByNumber);
-const newBody = applyClosedInFlowFixes(doc, body, findings, issuesByNumber);
-const docAfter = doc.toString({ lineWidth: 0 });
-
-if (docAfter !== docBefore || newBody !== body) {
-	const newRaw = "---\n" + docAfter + "---\n" + newBody;
-	writeFileSync(flowPath, newRaw, "utf-8");
-	console.log("updated .pfdsl/roadmap.pfdsl");
-}
-
-// 4. Report remaining manual findings
-const remaining = findings.filter((f) => !f.fixVia);
-if (remaining.length > 0) {
-	console.log("remaining manual findings:");
-	printFindings(remaining);
-	process.exit(1);
-}
-process.exit(0);
+process.exit(1);

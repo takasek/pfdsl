@@ -1,16 +1,42 @@
-import { describe, it } from "node:test";
 import assert from "node:assert/strict";
+import { describe, it } from "node:test";
 import {
+	findDanglingStrictRefs,
+	findDuplicateDefinitions,
 	findSpecIdDefinitions,
 	findStrictRefs,
-	findDuplicateDefinitions,
-	findDanglingStrictRefs,
 	formatSpecIdViolations,
 } from "./spec-id-check.mjs";
 
+describe("parsed code exclusion", () => {
+	it("keeps SPEC markers in separate table cells outside code spans", () => {
+		const text =
+			"| a | b |\n| --- | --- |\n| ` | (SPEC_real) [[SPEC_real]] |\n| ` | text |";
+		assert.deepEqual(findSpecIdDefinitions(text), [
+			{ line: 3, id: "SPEC_real" },
+		]);
+		assert.deepEqual(findStrictRefs(text), [{ line: 3, id: "SPEC_real" }]);
+	});
+	it("ignores multiline code examples while preserving real marker line numbers", () => {
+		const text =
+			"😀 `example\r\n(SPEC_quoted) [[SPEC_quoted]]\r\n` (SPEC_real) [[SPEC_real]]\r\n";
+		assert.deepEqual(findSpecIdDefinitions(text), [
+			{ line: 3, id: "SPEC_real" },
+		]);
+		assert.deepEqual(findStrictRefs(text), [{ line: 3, id: "SPEC_real" }]);
+	});
+
+	it("does not create markers by joining prose across code spans", () => {
+		const text = "(SPEC_`example`fake) [[SPEC_`example`fake]]";
+		assert.deepEqual(findSpecIdDefinitions(text), []);
+		assert.deepEqual(findStrictRefs(text), []);
+	});
+});
+
 describe("findSpecIdDefinitions", () => {
 	it("finds a single marker on a heading line", () => {
-		const text = "line one\n## Multifile (SPEC_multifile_cross_ref)\nline three";
+		const text =
+			"line one\n## Multifile (SPEC_multifile_cross_ref)\nline three";
 		const hits = findSpecIdDefinitions(text);
 		assert.equal(hits.length, 1);
 		assert.equal(hits[0].line, 2);
@@ -69,6 +95,19 @@ describe("findSpecIdDefinitions", () => {
 		assert.deepEqual(findSpecIdDefinitions(text), []);
 	});
 
+	it("keeps a four-backtick block open through a three-backtick line", () => {
+		const text = [
+			"````md",
+			"```",
+			"## Fake heading (SPEC_inside_fence)",
+			"````",
+			"## Real heading (SPEC_outside_fence)",
+		].join("\n");
+		const hits = findSpecIdDefinitions(text);
+		assert.equal(hits.length, 1);
+		assert.equal(hits[0].id, "SPEC_outside_fence");
+	});
+
 	it("ignores markers inside an inline code span", () => {
 		const text = "See `(SPEC_inline_example)` for the syntax.";
 		assert.deepEqual(findSpecIdDefinitions(text), []);
@@ -87,7 +126,8 @@ describe("findSpecIdDefinitions", () => {
 	});
 
 	it("handles single and double backtick spans mixed on the same line", () => {
-		const text = "`(SPEC_single)` then ``(SPEC_double)`` then (SPEC_real) is defined.";
+		const text =
+			"`(SPEC_single)` then ``(SPEC_double)`` then (SPEC_real) is defined.";
 		const hits = findSpecIdDefinitions(text);
 		assert.equal(hits.length, 1);
 		assert.equal(hits[0].id, "SPEC_real");
@@ -125,9 +165,12 @@ describe("findStrictRefs", () => {
 	});
 
 	it("ignores strict references inside a fenced code block", () => {
-		const text = ["```", "[[SPEC_inside_fence]]", "```", "[[SPEC_outside_fence]]"].join(
-			"\n",
-		);
+		const text = [
+			"```",
+			"[[SPEC_inside_fence]]",
+			"```",
+			"[[SPEC_outside_fence]]",
+		].join("\n");
 		const hits = findStrictRefs(text);
 		assert.equal(hits.length, 1);
 		assert.equal(hits[0].id, "SPEC_outside_fence");
@@ -144,7 +187,8 @@ describe("findStrictRefs", () => {
 	});
 
 	it("handles single and double backtick spans mixed on the same line", () => {
-		const text = "`[[SPEC_single]]` then ``[[SPEC_double]]`` then [[SPEC_real]] is a ref.";
+		const text =
+			"`[[SPEC_single]]` then ``[[SPEC_double]]`` then [[SPEC_real]] is a ref.";
 		const hits = findStrictRefs(text);
 		assert.equal(hits.length, 1);
 		assert.equal(hits[0].id, "SPEC_real");
@@ -189,10 +233,7 @@ describe("findDanglingStrictRefs", () => {
 	it("returns an empty array when every strict ref has a matching definition", () => {
 		const strictRefHits = [{ file: "a.md", line: 1, id: "SPEC_foo" }];
 		const definitionHits = [{ file: "b.md", line: 1, id: "SPEC_foo" }];
-		assert.deepEqual(
-			findDanglingStrictRefs(strictRefHits, definitionHits),
-			[],
-		);
+		assert.deepEqual(findDanglingStrictRefs(strictRefHits, definitionHits), []);
 	});
 
 	it("flags a strict ref with no matching definition anywhere", () => {

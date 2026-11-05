@@ -1,0 +1,365 @@
+mod workspace;
+mod documents;
+mod native_directory;
+mod exit;
+mod exit_gate;
+mod references;
+mod exports;
+mod pdf;
+
+use std::path::PathBuf;
+use std::sync::Mutex;
+use tauri::{Manager, State};
+use tauri_plugin_dialog::{DialogExt, MessageDialogButtons, MessageDialogResult};
+
+struct Folders {
+    roots: Mutex<Vec<workspace::Folder>>,
+    acceptance: Option<PathBuf>,
+    documents: Mutex<documents::Registry>,
+}
+
+#[tauri::command]
+fn document_capabilities() -> native_directory::Capabilities { native_directory::capabilities() }
+
+#[tauri::command]
+async fn select_folder(
+    app: tauri::AppHandle,
+    folders: State<'_, Folders>,
+) -> Result<Option<String>, String> {
+    let Some(folder) = app.dialog().file().blocking_pick_folder() else {
+        return Ok(None);
+    };
+    let root = workspace::Folder::open(&folder.into_path().map_err(|e| e.to_string())?)?;
+    let path = root.path.to_string_lossy().into_owned();
+    folders.roots.lock().map_err(|e| e.to_string())?.push(root);
+    Ok(Some(path))
+}
+
+#[tauri::command]
+fn list_documents(folders: State<'_, Folders>) -> Result<Vec<String>, String> {
+    let roots = folders.roots.lock().map_err(|e| e.to_string())?;
+    let root = roots.last().ok_or("Choose a folder first")?;
+    workspace::documents(root)
+}
+
+#[tauri::command]
+fn read_document(path: String, folders: State<'_, Folders>) -> Result<String, String> {
+    let roots = folders.roots.lock().map_err(|e| e.to_string())?;
+    workspace::read(&roots, &PathBuf::from(path))
+}
+
+pub fn run() {
+    let acceptance = std::env::var("PFDSL_ACCEPTANCE_ROOT").ok().map(|path| {
+        PathBuf::from(path)
+            .canonicalize()
+            .expect("Invalid acceptance corpus")
+    });
+    let roots = acceptance
+        .iter()
+        .map(|path| workspace::Folder::open(path).expect("Could not open acceptance corpus"))
+        .collect();
+    let verifying = acceptance.is_some();
+    tauri::Builder::default()
+        .plugin(tauri_plugin_dialog::init())
+        .manage(exit_gate::ExitGate::default())
+        .manage(exports::Exports::default())
+        .on_window_event(|window, event| {
+            if let tauri::WindowEvent::CloseRequested { api, .. } = event {
+                api.prevent_close();
+                exit::request(window.app_handle());
+            }
+        })
+        .manage(Folders {
+            roots: Mutex::new(roots),
+            acceptance,
+            documents: Mutex::new(documents::Registry::default()),
+        })
+        .setup(move |app| {
+            exit::install(app.handle()).map_err(std::io::Error::other)?;
+            if verifying {
+                use tauri::Manager;
+                app.get_webview_window("main")
+                    .ok_or("Main window is unavailable")?
+                    .set_title("PFDSL — Acceptance")?;
+            }
+            Ok(())
+        })
+        .invoke_handler(tauri::generate_handler![
+            references::reference_context,
+            references::inspect_reference,
+            references::reference_directory,
+            references::open_reference,
+            references::choose_comparison,
+            references::compare_git,
+            references::run_process,
+            exports::choose_export,
+            exports::write_export,
+            exports::release_export,
+            exports::export_pdf,
+            exit::finish_app_exit,
+            exit::exit_listener_ready,
+            document_capabilities,
+            select_folder,
+            list_documents,
+            read_document,
+            select_document,
+            open_document,
+            inspect_document,
+            save_document,
+            choose_save_target,
+            read_dependency,
+            release_document,
+            confirm_close_document,
+            list_recent,
+            clear_recent,
+            open_recent,
+            remember_document,
+            remember_folder,
+            open_recent_folder,
+            acceptance_baseline,
+            acceptance_executable,
+            write_acceptance_report
+        ])
+        .build(tauri::generate_context!())
+        .expect("Could not start PFDSL")
+        .run(|app, event| {
+            if matches!(event, tauri::RunEvent::Ready) && std::env::var("PFDSL_STARTUP_SMOKE").as_deref() == Ok("1") {
+                // Setup has already installed the native exit guard; this is not frontend or GUI acceptance.
+                println!("PFDSL_NATIVE_STARTUP_READY");
+            }
+            if let tauri::RunEvent::ExitRequested { api, .. } = event {
+                if !app.state::<exit_gate::ExitGate>().take_approval() {
+                    api.prevent_exit();
+                    exit::request(app);
+                }
+            }
+        });
+}
+
+#[tauri::command]
+fn acceptance_executable(folders: State<'_, Folders>) -> Result<(String, String), String> {
+    use sha2::{Digest, Sha256};
+    folders
+        .acceptance
+        .as_ref()
+        .ok_or("Acceptance mode is not enabled")?;
+    let path = std::env::current_exe().map_err(|e| e.to_string())?;
+    let bytes = std::fs::read(&path).map_err(|e| e.to_string())?;
+    Ok((
+        path.to_string_lossy().into_owned(),
+        format!("{:x}", Sha256::digest(bytes)),
+    ))
+}
+
+#[tauri::command]
+fn acceptance_baseline(folders: State<'_, Folders>) -> Result<Option<String>, String> {
+    let roots = folders.roots.lock().map_err(|e| e.to_string())?;
+    folders
+        .acceptance
+        .as_ref()
+        .map(|root| workspace::read(&roots, &root.join("baseline.json")))
+        .transpose()
+}
+
+#[tauri::command]
+fn write_acceptance_report(report: String, folders: State<'_, Folders>) -> Result<(), String> {
+    let path = folders
+        .acceptance
+        .as_ref()
+        .ok_or("Acceptance mode is not enabled")?;
+    let roots = folders.roots.lock().map_err(|e| e.to_string())?;
+    let root = roots
+        .iter()
+        .find(|root| &root.path == path)
+        .ok_or("Acceptance folder is unavailable")?;
+    root.write_acceptance_report(&report)
+}
+
+fn add_document(document: documents::Document, folders: &Folders) -> Result<documents::Snapshot, String> {
+    let mut entries = folders.documents.lock().map_err(|e| e.to_string())?;
+    entries.insert(document)
+}
+
+#[tauri::command]
+async fn select_document(app: tauri::AppHandle, folders: State<'_, Folders>) -> Result<Option<documents::Snapshot>, String> {
+    let Some(file) = app.dialog().file().add_filter("PFDSL", &["pfdsl"]).blocking_pick_file() else { return Ok(None); };
+    let path = file.into_path().map_err(|e| e.to_string())?;
+    let document = documents::Document::selected(&path)?;
+    Ok(Some(add_document(document, &folders)?))
+}
+
+#[tauri::command]
+fn open_document(path: String, folders: State<'_, Folders>) -> Result<documents::Snapshot, String> {
+    let roots = folders.roots.lock().map_err(|e| e.to_string())?;
+    add_document(documents::Document::inside(&roots, &PathBuf::from(path))?, &folders)
+}
+#[tauri::command]
+fn inspect_document(id: usize, folders: State<'_, Folders>) -> Result<documents::Snapshot, String> {
+    let entries = folders.documents.lock().map_err(|e| e.to_string())?;
+    entries.get(id).ok_or("Unknown document")?.inspect(id)
+}
+#[tauri::command]
+fn save_document(id: usize, source: String, expected: Option<String>, folders: State<'_, Folders>) -> Result<documents::SaveResult, String> {
+    let mut entries = folders.documents.lock().map_err(|e| e.to_string())?;
+    Ok(entries.get_mut(id).ok_or("Unknown document")?.save(id, &source, expected.as_deref()))
+}
+#[tauri::command]
+async fn choose_save_target(name: String, app: tauri::AppHandle, folders: State<'_, Folders>) -> Result<Option<documents::Snapshot>, String> {
+    native_directory::require_save()?;
+    let Some(file) = app.dialog().file().add_filter("PFDSL", &["pfdsl"]).set_file_name(name).blocking_save_file() else { return Ok(None); };
+    let path = file.into_path().map_err(|e| e.to_string())?;
+    Ok(Some(add_document(documents::Document::selected(&path)?, &folders)?))
+}
+#[tauri::command]
+fn read_dependency(id: usize, path: String, folders: State<'_, Folders>) -> Result<String, String> {
+    let entries = folders.documents.lock().map_err(|e| e.to_string())?;
+    entries.get(id).ok_or("Unknown document")?.read_dependency(&PathBuf::from(path))
+}
+#[tauri::command]
+fn release_document(id: usize, folders: State<'_, Folders>) -> Result<(), String> {
+    folders.documents.lock().map_err(|e| e.to_string())?.remove(id);
+    Ok(())
+}
+
+#[tauri::command]
+async fn confirm_close_document(name: String, allow_save: bool, window: tauri::Window) -> Result<String, String> {
+    let capability = native_directory::capabilities();
+    let (message, buttons) = close_prompt(&name, capability, allow_save);
+    let decision = window.dialog().message(message)
+        .title("PFDSL").parent(&window)
+        .buttons(buttons)
+        .blocking_show_with_result();
+    Ok(close_decision(decision, capability.save && allow_save).into())
+}
+
+fn close_decision(decision: MessageDialogResult, can_save: bool) -> &'static str {
+    match decision {
+        MessageDialogResult::Yes if can_save => "save",
+        MessageDialogResult::No if can_save => "discard",
+        MessageDialogResult::Custom(ref choice) if choice == "Save" && can_save => "save",
+        MessageDialogResult::Custom(ref choice) if choice == "Discard" => "discard",
+        _ => "cancel",
+    }
+}
+
+fn close_prompt(name: &str, capability: native_directory::Capabilities, allow_save: bool) -> (String, MessageDialogButtons) {
+    let (message, buttons) = if capability.save && allow_save {
+        (format!("Save changes to {name}?"), MessageDialogButtons::YesNoCancelCustom("Save".into(), "Discard".into(), "Cancel".into()))
+    } else {
+        (format!("{} Discard changes to {name}? Choose Keep Editing or Cancel to retain the editor content.", capability.reason.unwrap_or("Document saving support could not be confirmed.")), MessageDialogButtons::YesNoCancelCustom("Keep Editing".into(), "Discard".into(), "Cancel".into()))
+    };
+    (message, buttons)
+}
+
+fn recent_path(app: &tauri::AppHandle) -> Result<PathBuf, String> {
+    let directory = std::env::var_os("PFDSL_DOCUMENTS_STATE_DIR").map(PathBuf::from)
+        .map(Ok).unwrap_or_else(|| app.path().app_local_data_dir().map_err(|e| e.to_string()))?;
+    Ok(directory.join("recent-documents.json"))
+}
+#[derive(serde::Serialize, serde::Deserialize)]
+struct RecentTarget { kind: String, path: String }
+fn read_recent(app: &tauri::AppHandle) -> Result<Vec<RecentTarget>, String> {
+    read_recent_file(&recent_path(app)?)
+}
+fn read_recent_file(destination: &std::path::Path) -> Result<Vec<RecentTarget>, String> {
+    match std::fs::read_to_string(destination) {
+        Ok(source) => serde_json::from_str(&source).map_err(|e| format!("Could not read recent targets: {e}")),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(vec![]),
+        Err(error) => Err(error.to_string()),
+    }
+}
+#[tauri::command]
+fn list_recent(app: tauri::AppHandle) -> Result<Vec<RecentTarget>, String> { read_recent(&app) }
+#[tauri::command]
+fn clear_recent(app: tauri::AppHandle) -> Result<(), String> { clear_recent_file(&recent_path(&app)?) }
+fn clear_recent_file(destination: &std::path::Path) -> Result<(), String> {
+    write_recent(destination, &[])
+}
+#[tauri::command]
+fn remember_document(path: String, app: tauri::AppHandle, folders: State<'_, Folders>) -> Result<(), String> {
+    let entries = folders.documents.lock().map_err(|e| e.to_string())?;
+    if !entries.values().any(|d| d.observed_path().ok().is_some_and(|p| p.to_string_lossy() == path)) { return Err("The target has not been selected".into()); }
+    remember_target(&app, "file", path)
+}
+fn remember_target(app: &tauri::AppHandle, kind: &str, path: String) -> Result<(), String> {
+    let mut recent = read_recent(app)?;
+    recent.retain(|p| p.path != path || p.kind != kind);
+    recent.insert(0, RecentTarget { kind: kind.into(), path }); recent.truncate(20);
+    write_recent(&recent_path(app)?, &recent)
+}
+fn write_recent(destination: &std::path::Path, recent: &[RecentTarget]) -> Result<(), String> {
+    std::fs::create_dir_all(destination.parent().unwrap()).map_err(|e| e.to_string())?;
+    let staged = destination.with_extension(format!("{}.tmp", std::process::id()));
+    std::fs::write(&staged, serde_json::to_vec(&recent).map_err(|e| e.to_string())?).map_err(|e| e.to_string())?;
+    std::fs::rename(&staged, destination).map_err(|e| e.to_string())
+}
+#[tauri::command]
+fn remember_folder(path: String, app: tauri::AppHandle, folders: State<'_, Folders>) -> Result<(), String> {
+    let roots = folders.roots.lock().map_err(|e| e.to_string())?;
+    if !roots.iter().any(|root| root.path.to_string_lossy() == path) { return Err("The folder has not been selected".into()); }
+    remember_target(&app, "folder", path)
+}
+#[tauri::command]
+fn open_recent_folder(path: String, app: tauri::AppHandle, folders: State<'_, Folders>) -> Result<String, String> {
+    if !read_recent(&app)?.iter().any(|p| p.kind == "folder" && p.path == path) { return Err("Unknown recent folder".into()); }
+    let root = workspace::Folder::open(&PathBuf::from(&path))?;
+    let result = root.path.to_string_lossy().into_owned();
+    folders.roots.lock().map_err(|e| e.to_string())?.push(root);
+    Ok(result)
+}
+
+#[tauri::command]
+fn open_recent(path: String, app: tauri::AppHandle, folders: State<'_, Folders>) -> Result<documents::Snapshot, String> {
+    if !read_recent(&app)?.iter().any(|p| p.kind == "file" && p.path == path) { return Err("Unknown recent target".into()); }
+    add_document(documents::Document::selected(&PathBuf::from(path))?, &folders)
+}
+
+#[cfg(test)]
+mod recent_tests {
+    use super::*;
+
+    #[test]
+    fn clear_recent_writes_empty_list_and_lists_no_targets() {
+        let directory = std::env::temp_dir().join(format!("pfdsl-clear-recent-{}", std::process::id()));
+        assert!(!directory.exists(), "test directory must be unique");
+        let destination = directory.join("recent-documents.json");
+        write_recent(&destination, &[RecentTarget { kind: "file".into(), path: "/work/flow.pfdsl".into() }]).unwrap();
+        assert_eq!(read_recent_file(&destination).unwrap().len(), 1);
+        clear_recent_file(&destination).unwrap();
+        assert_eq!(std::fs::read_to_string(&destination).unwrap(), "[]");
+        assert!(read_recent_file(&destination).unwrap().is_empty());
+        assert_eq!(std::fs::read_dir(&directory).unwrap().count(), 1, "no staged file remains");
+        std::fs::remove_dir_all(directory).unwrap();
+    }
+}
+
+#[cfg(test)]
+mod document_capability_tests {
+ use super::*;
+ #[test] fn close_never_offers_save_without_both_native_and_frontend_support() {
+  for native_save in [false, true] { for frontend_save in [false, true] {
+   let capability = native_directory::Capabilities { save: native_save, reason: if native_save { None } else { Some("Unsupported saving") }, directory_tracking: "selected-path", protection_metadata: false };
+   let (message, buttons) = close_prompt("dirty.pfdsl", capability, frontend_save);
+   if native_save && frontend_save {
+    assert!(matches!(buttons, MessageDialogButtons::YesNoCancelCustom(_, _, _)));
+    assert!(message.contains("Save changes"));
+   } else {
+    match buttons { MessageDialogButtons::YesNoCancelCustom(keep, discard, cancel) => { assert_eq!(keep, "Keep Editing", "Return must retain unsaved content"); assert_eq!(discard, "Discard"); assert_eq!(cancel, "Cancel", "dismissal must retain unsaved content"); }, _ => panic!("Save must not be offered") }
+    assert!(message.contains("Discard changes"));
+    assert!(message.contains(if native_save { "could not be confirmed" } else { "Unsupported saving" }));
+   }
+  } }
+ }
+ #[test] fn unavailable_save_requires_explicit_discard() {
+  for result in [MessageDialogResult::Ok, MessageDialogResult::Cancel, MessageDialogResult::Yes, MessageDialogResult::No, MessageDialogResult::Custom("Cancel".into()), MessageDialogResult::Custom("Keep Editing".into()), MessageDialogResult::Custom("Save".into())] {
+   assert_eq!(close_decision(result, false), "cancel", "default and dismissed results must retain the editor");
+  }
+  assert_eq!(close_decision(MessageDialogResult::Custom("Discard".into()), false), "discard");
+ }
+ #[test] fn supported_close_decisions_keep_their_existing_meaning() {
+  for result in [MessageDialogResult::Yes, MessageDialogResult::Custom("Save".into())] { assert_eq!(close_decision(result, true), "save"); }
+  for result in [MessageDialogResult::No, MessageDialogResult::Custom("Discard".into())] { assert_eq!(close_decision(result, true), "discard"); }
+  for result in [MessageDialogResult::Cancel, MessageDialogResult::Ok, MessageDialogResult::Custom("Cancel".into())] { assert_eq!(close_decision(result, true), "cancel"); }
+ }
+
+}

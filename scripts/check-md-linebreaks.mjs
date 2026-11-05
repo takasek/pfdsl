@@ -10,98 +10,65 @@
  *   - fenced code blocks (``` or ~~~)
  *   - sub-bullet lines (the continuation itself starts with a list marker)
  *   - continuations preceded by a blank line (indented code block / loose list para)
+ *   - breaks with markdown structure on either side: heading, table row,
+ *     blockquote, raw HTML (#770 — these end on non-boundary characters, so
+ *     without the skip every line next to them would report a violation)
  *
  * Usage:
  *   node scripts/check-md-linebreaks.mjs [files...]
  *   (no args → all git-tracked *.md files)
+ *   node scripts/check-md-linebreaks.mjs --staged
+ *   (only staged *.md files, reading their index contents)
  *
  * Exit 0 = clean, Exit 1 = violations found.
  */
 
-import { readFileSync } from 'fs';
-import { execSync } from 'child_process';
+import { readFileSync } from "node:fs";
+import { isCliEntrypoint } from "./lib/cli-entrypoint.mjs";
+import { checkFile as checkFileText } from "./lib/md-linebreaks.mjs";
+import { runMdLinebreaksCheck } from "./lib/md-linebreaks-steps.mjs";
+import { git, gitDiffNames, gitLsFiles } from "./lib/run-exec.mjs";
 
-const BOUNDARY = new Set([...'。！？」』）…～.!?:*']);
-const CLOSE = new Set([...'`])}'  ]);
-const LIST_RE = /^(\s*)([-*+]|\d+[.)]) /;
-
-function endsAtBoundary(line) {
-  const r = line.trimEnd();
-  if (!r) return true;
-  const c = r[r.length - 1];
-  return BOUNDARY.has(c) || CLOSE.has(c);
+/**
+ * Reads filePath and runs lib/md-linebreaks.mjs's pure checkFile against it.
+ */
+export function checkFile(filePath) {
+	return checkFileText(filePath, readFileSync(filePath, "utf8"));
 }
 
-function checkFile(filePath) {
-  const text = readFileSync(filePath, 'utf8');
-  const lines = text.split('\n');
-  const violations = [];
-  let inFence = false;
-  // Track YAML frontmatter (--- ... ---)
-  let inFrontmatter = lines[0]?.trim() === '---';
-
-  for (let i = 1; i < lines.length; i++) {
-    const line = lines[i];
-    const stripped = line.trimStart();
-
-    // Close frontmatter on second ---
-    if (inFrontmatter) {
-      if (stripped === '---') inFrontmatter = false;
-      continue;
-    }
-
-    // Fence delimiters toggle state and are skipped themselves
-    if (stripped.startsWith('```') || stripped.startsWith('~~~')) {
-      inFence = !inFence;
-      continue;
-    }
-    if (inFence) continue;
-
-    // Only check indented continuation lines that are not list markers
-    if (!line || line[0] !== ' ' || !stripped || LIST_RE.test(stripped)) continue;
-
-    const prev = lines[i - 1];
-
-    // Blank line before → indented code block or loose list paragraph; skip
-    if (!prev || !prev.trim()) continue;
-
-    if (!endsAtBoundary(prev)) {
-      violations.push({
-        file: filePath,
-        line: i + 1,
-        prev: prev.trimEnd(),
-        cont: stripped,
-      });
-    }
-  }
-
-  return violations;
+/** Formats one violation for the CLI. */
+export function formatViolation(v) {
+	return `${v.file}:${v.line}: mid-sentence line break\n  prev: …${v.prev.slice(-80)}\n  cont: ${v.cont.slice(0, 80)}`;
 }
 
-const args = process.argv.slice(2);
-const files = args.length > 0
-  ? args
-  : execSync('git ls-files "*.md"', { encoding: 'utf8' }).trim().split('\n').filter(Boolean);
+// CLI mode: `node scripts/check-md-linebreaks.mjs [files...]`.
+if (isCliEntrypoint(import.meta.url, process.argv[1])) {
+	const args = process.argv.slice(2);
+	const staged = args[0] === "--staged";
+	if (staged && args.length !== 1) {
+		console.error(
+			"--staged checks all staged Markdown files; do not pass paths.",
+		);
+		process.exit(1);
+	}
+	if (args[0] === "--") args.shift();
+	const listFiles = () =>
+		staged
+			? gitDiffNames(["--cached", "--diff-filter=d", "--", "*.md"])
+			: gitLsFiles(["*.md"]);
 
-let total = 0;
-for (const file of files) {
-  let violations;
-  try {
-    violations = checkFile(file);
-  } catch (e) {
-    console.error(`Error reading ${file}: ${e.message}`);
-    process.exit(1);
-  }
-  for (const v of violations) {
-    console.log(`${v.file}:${v.line}: mid-sentence line break`);
-    console.log(`  prev: …${v.prev.slice(-80)}`);
-    console.log(`  cont: ${v.cont.slice(0, 80)}`);
-    total++;
-  }
+	const { exitCode, messages } = runMdLinebreaksCheck({
+		args: staged ? [] : args,
+		listFiles,
+		// Keep Git's hook environment, including GIT_INDEX_FILE: commits that
+		// supply an alternate index must check the same content they will write.
+		// Explicit stage 0 keeps a filename like 0:foo.md from selecting foo.md.
+		readFile: (file) =>
+			staged ? git(["show", `:0:${file}`]) : readFileSync(file, "utf8"),
+	});
+	for (const { stream, text } of messages) {
+		if (stream === "log") console.log(text);
+		else console.error(text);
+	}
+	process.exit(exitCode);
 }
-
-if (total > 0) {
-  console.error(`\n${total} violation(s) found.`);
-  process.exit(1);
-}
-console.log('check-md-linebreaks: OK');

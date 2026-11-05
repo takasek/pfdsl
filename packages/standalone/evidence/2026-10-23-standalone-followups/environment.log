@@ -1,0 +1,50 @@
+7ffff6753000-7ffff68c2000 r--p 00000000 fe:10 5693584                    /tmp/app/squashfs-root/usr/lib/libjavascriptcoregtk-4.1.so.0
+7ffff68c2000-7ffff81ef000 r-xp 0016f000 fe:10 5693584                    /tmp/app/squashfs-root/usr/lib/libjavascriptcoregtk-4.1.so.0
+7ffff81ef000-7ffff86ec000 r--p 01a9c000 fe:10 5693584                    /tmp/app/squashfs-root/usr/lib/libjavascriptcoregtk-4.1.so.0
+7ffff86ec000-7ffff8760000 r--p 01f98000 fe:10 5693584                    /tmp/app/squashfs-root/usr/lib/libjavascriptcoregtk-4.1.so.0
+7ffff8760000-7ffff8785000 rw-p 0200c000 fe:10 5693584                    /tmp/app/squashfs-root/usr/lib/libjavascriptcoregtk-4.1.so.0
+7ffff8785000-7ffff878d000 r--p 02031000 fe:10 5693584                    /tmp/app/squashfs-root/usr/lib/libjavascriptcoregtk-4.1.so.0
+7ffff879a000-7ffff87fb000 rw-p 0203a000 fe:10 5693584                    /tmp/app/squashfs-root/usr/lib/libjavascriptcoregtk-4.1.so.0
+7ffff92df000-7ffff99fa000 r--p 00000000 fe:10 5693648                    /tmp/app/squashfs-root/usr/lib/libwebkit2gtk-4.1.so.0
+7ffff99fa000-7ffffd835000 r-xp 0071b000 fe:10 5693648                    /tmp/app/squashfs-root/usr/lib/libwebkit2gtk-4.1.so.0
+7ffffd835000-7ffffef5c000 r--p 04556000 fe:10 5693648                    /tmp/app/squashfs-root/usr/lib/libwebkit2gtk-4.1.so.0
+7ffffef5c000-7fffff23a000 r--p 05c7d000 fe:10 5693648                    /tmp/app/squashfs-root/usr/lib/libwebkit2gtk-4.1.so.0
+7fffff23a000-7fffff288000 rw-p 05f5b000 fe:10 5693648                    /tmp/app/squashfs-root/usr/lib/libwebkit2gtk-4.1.so.0
+7fffff2b7000-7fffff2fd000 rw-p 05fa9000 fe:10 5693648                    /tmp/app/squashfs-root/usr/lib/libwebkit2gtk-4.1.so.0
+ea9fbeccfe53a285391bfdafc9021149bd369e6823adc25a588688d8b948c3d6  /tmp/app/squashfs-root/usr/lib/libwebkit2gtk-4.1.so.0
+PRETTY_NAME="Debian GNU/Linux 13 (trixie)"
+NAME="Debian GNU/Linux"
+VERSION_ID="13"
+VERSION="13 (trixie)"
+VERSION_CODENAME=trixie
+DEBIAN_VERSION_FULL=13.7
+ID=debian
+HOME_URL="https://www.debian.org/"
+SUPPORT_URL="https://www.debian.org/support"
+BUG_REPORT_URL="https://bugs.debian.org/"
+x86_64
+github_run_id=39477198995
+github_run_attempt=1
+v24.22.0
+10.33.2
+rustc 1.99.1 (58cf8f9c3 2026-10-13)
+cargo 1.99.1 (5f94df478 2026-08-27)
+3.24.49
+2.54.0
+libc6:amd64	2.41-12+deb13u4
+libgtk-3-0t64:amd64	3.24.49-3
+libwebkit2gtk-4.1-0:amd64	2.54.0-1~deb13u2
+packages/standalone/src-tauri/target/release/pfdsl-desktop: ELF 64-bit LSB pie executable, x86-64, version 1 (SYSV), dynamically linked, interpreter /lib64/ld-linux-x86-64.so.2, for GNU/Linux 3.2.0, BuildID[sha1]=370c95f765a011f6893a985603cfcf078b5bccf1, not stripped
+	linux-vdso.so.1 (0x00007f7ff459d000)
+PRETTY_NAME="Debian GNU/Linux 13 (trixie)"
+NAME="Debian GNU/Linux"
+VERSION_ID="13"
+VERSION="13 (trixie)"
+VERSION_CODENAME=trixie
+DEBIAN_VERSION_FULL=13.7
+ID=debian
+HOME_URL="https://www.debian.org/"
+SUPPORT_URL="https://www.debian.org/support"
+BUG_REPORT_URL="https://bugs.debian.org/"
+9259 /run/rosetta/rosetta ././/lib/x86_64-linux-gnu/webkit2gtk-4.1/WebKitNetworkProcess 1 32
+9289 /run/rosetta/rosetta ././/lib/x86_64-linux-gnu/webkit2gtk-4.1/WebKitWebProcess 4 35

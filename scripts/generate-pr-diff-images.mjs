@@ -18,10 +18,17 @@
 //   GH_TOKEN           — GitHub token (phase 2 only)
 
 import { execFileSync } from "node:child_process";
-import { appendFileSync, mkdirSync, writeFileSync, existsSync, unlinkSync } from "node:fs";
-import { dirname, join, basename } from "node:path";
-import { fileURLToPath } from "node:url";
+import {
+	appendFileSync,
+	existsSync,
+	mkdirSync,
+	readFileSync,
+	unlinkSync,
+	writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
+import { basename, dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 
 import { parseHost } from "./pfdsl/lib/github-rest.mjs";
 
@@ -33,7 +40,10 @@ const root = join(__dirname, "..");
 const ghEnv = (() => {
 	try {
 		const host = parseHost(
-			execFileSync("git", ["remote", "get-url", "origin"], { cwd: root, encoding: "utf-8" }).trim(),
+			execFileSync("git", ["remote", "get-url", "origin"], {
+				cwd: root,
+				encoding: "utf-8",
+			}).trim(),
 		);
 		return host ? { ...process.env, GH_HOST: host } : process.env;
 	} catch {
@@ -49,11 +59,15 @@ if (mode !== "generate" && mode !== "update-pr") {
 
 const baseSha = process.env.BASE_SHA;
 const prNumber = process.env.PR_NUMBER;
-const changedFiles = (process.env.CHANGED_FILES ?? "").split("\n").filter(Boolean);
+const changedFiles = (process.env.CHANGED_FILES ?? "")
+	.split("\n")
+	.filter(Boolean);
 const repo = process.env.GITHUB_REPOSITORY;
 
 if (!baseSha || !prNumber || changedFiles.length === 0 || !repo) {
-	console.error("Missing required env: BASE_SHA, PR_NUMBER, CHANGED_FILES, GITHUB_REPOSITORY");
+	console.error(
+		"Missing required env: BASE_SHA, PR_NUMBER, CHANGED_FILES, GITHUB_REPOSITORY",
+	);
 	process.exit(1);
 }
 
@@ -79,6 +93,30 @@ function renderDiffSvg(aPath, bPath) {
 		[cliPath, "diff", aPath, bPath, "--format", "svg"],
 		{ encoding: "utf-8", cwd: root },
 	);
+}
+
+function renderDiagnostic(error) {
+	const stderr =
+		error && typeof error === "object" && "stderr" in error
+			? String(error.stderr)
+			: "";
+	const ansiPattern = new RegExp(`${String.fromCharCode(27)}\\[[0-9;]*m`, "g");
+	const plain = stderr.replace(ansiPattern, "");
+	for (const line of plain.split("\n")) {
+		const diagnostic = line.match(/\[([A-Z]\d{3})\]:\s*(.+)$/);
+		if (diagnostic) return `${diagnostic[1]}: ${diagnostic[2].trim()}`;
+		const compact = line.match(/^([A-Z]\d{3}):\s*(.+)$/);
+		if (compact) return `${compact[1]}: ${compact[2].trim()}`;
+	}
+	return "Render failed with the current CLI.";
+}
+
+function removeIfExists(filePath) {
+	try {
+		unlinkSync(filePath);
+	} catch {
+		/* ignore */
+	}
 }
 
 function getBaseContent(filePath) {
@@ -110,31 +148,54 @@ if (mode === "generate") {
 		const baseContent = getBaseContent(file);
 		const headPath = join(root, file);
 		const headExists = existsSync(headPath);
+		const beforePath = join(svgDir, `${stem}.before.svg`);
+		const afterPath = join(svgDir, `${stem}.after.svg`);
+		const diffPath = join(svgDir, `${stem}.diff.svg`);
+		const unavailablePath = join(svgDir, `${stem}.before-unavailable.txt`);
+		for (const artifact of [beforePath, afterPath, diffPath, unavailablePath]) {
+			removeIfExists(artifact);
+		}
 
 		try {
 			// Before SVG (base version)
+			let baseRenderFailed = false;
 			if (baseContent) {
 				writeFileSync(tmpFile, baseContent, "utf-8");
-				const svg = renderSvg(tmpFile);
-				writeFileSync(join(svgDir, `${stem}.before.svg`), svg, "utf-8");
+				try {
+					const svg = renderSvg(tmpFile);
+					writeFileSync(beforePath, svg, "utf-8");
+				} catch (error) {
+					baseRenderFailed = true;
+					writeFileSync(unavailablePath, renderDiagnostic(error), "utf-8");
+				}
 			}
 
 			// After SVG (head version)
 			if (headExists) {
 				const svg = renderSvg(headPath);
-				writeFileSync(join(svgDir, `${stem}.after.svg`), svg, "utf-8");
+				writeFileSync(afterPath, svg, "utf-8");
 			}
 
 			// Diff SVG (overlay). Missing side → empty graph: an added file
 			// renders all-green, a deleted file all-red.
-			writeFileSync(emptyTmp, "", "utf-8");
-			const aPath = baseContent ? tmpFile : emptyTmp;
-			const bPath = headExists ? headPath : emptyTmp;
-			const diffSvg = renderDiffSvg(aPath, bPath);
-			writeFileSync(join(svgDir, `${stem}.diff.svg`), diffSvg, "utf-8");
+			if (!baseRenderFailed) {
+				writeFileSync(emptyTmp, "", "utf-8");
+				const aPath = baseContent ? tmpFile : emptyTmp;
+				const bPath = headExists ? headPath : emptyTmp;
+				const diffSvg = renderDiffSvg(aPath, bPath);
+				writeFileSync(diffPath, diffSvg, "utf-8");
+			}
 		} finally {
-			try { unlinkSync(tmpFile); } catch { /* ignore */ }
-			try { unlinkSync(emptyTmp); } catch { /* ignore */ }
+			try {
+				unlinkSync(tmpFile);
+			} catch {
+				/* ignore */
+			}
+			try {
+				unlinkSync(emptyTmp);
+			} catch {
+				/* ignore */
+			}
 		}
 	}
 
@@ -157,9 +218,15 @@ const sections = changedFiles.map((file) => {
 	const relDir = dirname(sanitized);
 	const rawDir = relDir === "." ? rawBase : `${rawBase}/${relDir}`;
 	const lines = [`### \`${file}\``];
+	const unavailablePath = join(outDir, `${sanitized}.before-unavailable.txt`);
 
 	if (existsSync(join(outDir, `${sanitized}.before.svg`))) {
 		lines.push(`**Before**\n![before](${rawDir}/${stem}.before.svg)`);
+	} else if (existsSync(unavailablePath)) {
+		const diagnostic = readFileSync(unavailablePath, "utf-8").trim();
+		lines.push(
+			`**Before**\nUnavailable: the base revision is not accepted by the current CLI (${diagnostic})`,
+		);
 	}
 	if (existsSync(join(outDir, `${sanitized}.after.svg`))) {
 		lines.push(`**After**\n![after](${rawDir}/${stem}.after.svg)`);

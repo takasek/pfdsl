@@ -1,132 +1,112 @@
-import { describe, it } from "node:test";
 import assert from "node:assert/strict";
+import { describe, it } from "node:test";
+import { parseIssueProcesses } from "../pfdsl/lib/issues-flow-audit.mjs";
 import {
-	classifyPRs,
-	parseReadyOutput,
-	countBehind,
-	summarizeCiStatus,
-	detectDesignUnsettled,
-	findIssueNumberForProcess,
 	buildGateCheckCommand,
+	countBehind,
+	findProcessIdForIssueNumber,
+	isUnregisteredManagedIssue,
+	parsePorcelainPaths,
+	parseReadyOutput,
+	summarizeReleasePending,
 } from "./cycle-status.mjs";
 
-describe("summarizeCiStatus", () => {
-	it("returns NONE for empty/missing rollup", () => {
-		assert.equal(summarizeCiStatus([]), "NONE");
-		assert.equal(summarizeCiStatus(undefined), "NONE");
-	});
-
-	it("returns PASS when all checks succeeded", () => {
-		assert.equal(summarizeCiStatus([{ conclusion: "SUCCESS" }, { conclusion: "SUCCESS" }]), "PASS");
-	});
-
-	it("returns FAIL when any check failed", () => {
-		assert.equal(summarizeCiStatus([{ conclusion: "SUCCESS" }, { conclusion: "FAILURE" }]), "FAIL");
-	});
-
-	it("returns PENDING when any check is still running", () => {
-		assert.equal(summarizeCiStatus([{ conclusion: null, status: "IN_PROGRESS" }]), "PENDING");
-	});
-
-	it("FAIL takes precedence over PENDING", () => {
-		assert.equal(summarizeCiStatus([{ conclusion: "FAILURE" }, { conclusion: null }]), "FAIL");
-	});
-});
-
-describe("classifyPRs", () => {
-	it("splits flow-sync PRs from other open PRs", () => {
-		const prs = [
-			{ number: 1, title: "flow sync", headRefName: "flow-sync/2026-07-06" },
-			{ number: 2, title: "feature work", headRefName: "feat/foo" },
-		];
-		const { openFlowSyncPRs, otherOpenPRs } = classifyPRs(prs);
-		assert.deepEqual(openFlowSyncPRs, [{ number: 1, title: "flow sync", ci: "NONE" }]);
-		assert.deepEqual(otherOpenPRs, [{ number: 2, title: "feature work" }]);
-	});
-
-	it("includes CI status on flow-sync PRs from statusCheckRollup", () => {
-		const prs = [
-			{
-				number: 1,
-				title: "flow sync",
-				headRefName: "flow-sync/2026-07-06",
-				statusCheckRollup: [{ conclusion: "SUCCESS" }],
-			},
-		];
-		const { openFlowSyncPRs } = classifyPRs(prs);
-		assert.deepEqual(openFlowSyncPRs, [{ number: 1, title: "flow sync", ci: "PASS" }]);
-	});
-
-	it("returns empty lists for no PRs", () => {
-		assert.deepEqual(classifyPRs([]), { openFlowSyncPRs: [], otherOpenPRs: [] });
-	});
-
-	it("accepts a custom flow-sync pattern", () => {
-		const prs = [{ number: 3, title: "custom", headRefName: "sync/x" }];
-		const { openFlowSyncPRs } = classifyPRs(prs, /^sync\//);
-		assert.equal(openFlowSyncPRs.length, 1);
-	});
-});
-
 describe("parseReadyOutput", () => {
-	it("extracts ready ids, best id, and best outputs", () => {
+	it("preserves ready decision material without selecting a process", () => {
 		const json = {
 			ok: true,
-			ready: [{ id: "a", label: "A" }, { id: "b", label: "B" }],
-			best: { id: "a", label: "A", outputs: ["a_out"] },
+			ready: [
+				{
+					id: "a",
+					label: "A",
+					inputs: ["seed"],
+					outputs: ["a_out"],
+					newlyReadyCount: 0,
+				},
+				{
+					id: "b",
+					label: "B",
+					inputs: ["seed"],
+					outputs: ["b_out"],
+					newlyReadyCount: 2,
+				},
+			],
 		};
-		assert.deepEqual(parseReadyOutput(json), { ready: ["a", "b"], best: "a", bestOutputs: ["a_out"] });
+		assert.deepEqual(parseReadyOutput(json), {
+			ready: json.ready,
+		});
 	});
 
 	it("returns empty when ok is false", () => {
-		assert.deepEqual(parseReadyOutput({ ok: false }), { ready: [], best: null, bestOutputs: [] });
+		assert.deepEqual(parseReadyOutput({ ok: false }), {
+			ready: [],
+		});
 	});
 
 	it("returns empty for missing/invalid input", () => {
-		assert.deepEqual(parseReadyOutput(null), { ready: [], best: null, bestOutputs: [] });
-		assert.deepEqual(parseReadyOutput(undefined), { ready: [], best: null, bestOutputs: [] });
+		assert.deepEqual(parseReadyOutput(null), {
+			ready: [],
+		});
+		assert.deepEqual(parseReadyOutput(undefined), {
+			ready: [],
+		});
 	});
 
-	it("returns null best and empty bestOutputs when absent", () => {
+	it("returns an empty ready list when no candidate exists", () => {
 		const json = { ok: true, ready: [] };
-		assert.deepEqual(parseReadyOutput(json), { ready: [], best: null, bestOutputs: [] });
+		assert.deepEqual(parseReadyOutput(json), {
+			ready: [],
+		});
 	});
 });
 
-describe("detectDesignUnsettled", () => {
-	it("returns false for a body with no unsettled-design phrases", () => {
-		assert.deepEqual(detectDesignUnsettled("実装方針は A に決定。"), {
-			designUnsettled: false,
-			matchedLines: [],
-		});
+describe("findProcessIdForIssueNumber", () => {
+	it("reads YAML location arrays without inferring issue links from IDs or prose", () => {
+		const source = `---
+process:
+  plain:
+    location:
+      - https://github.com/example/project/issues/42
+      - 'https://github.com/example/project/issues/43'
+  i44_unlinked:
+    description: 'location: https://github.com/example/project/issues/44'
+  inline: { location: [https://github.com/example/project/issues/45] }
+---
+seed >> plain -> out
+`;
+		assert.equal(findProcessIdForIssueNumber(source, 42), "plain");
+		assert.equal(findProcessIdForIssueNumber(source, 43), "plain");
+		assert.equal(findProcessIdForIssueNumber(source, 44), null);
+		assert.equal(findProcessIdForIssueNumber(source, 45), "inline");
 	});
-
-	it("detects '設計未確定' and returns the matched line", () => {
-		const body = "## 概要\n設計未確定な点がある。\n続き";
-		assert.deepEqual(detectDesignUnsettled(body), {
-			designUnsettled: true,
-			matchedLines: ["設計未確定な点がある。"],
-		});
+	it("resolves every issue in a shared process location array", () => {
+		const processId = "i1352_i1282_i1283_i1284_i483_improve_preview";
+		const shared = `---
+process:
+  ${processId}:
+    label: Improve preview
+    location: [https://github.com/takasek/pfdsl/issues/1352, https://github.com/takasek/pfdsl/issues/1282, https://github.com/takasek/pfdsl/issues/1283, https://github.com/takasek/pfdsl/issues/1284, https://github.com/takasek/pfdsl/issues/483]
+tag:
+  preview: {}
+---
+source >> ${processId} -> preview
+`;
+		for (const issue of [1352, 1282, 1283, 1284, 483]) {
+			assert.equal(findProcessIdForIssueNumber(shared, issue), processId);
+		}
+		for (const issue of [135, 13520, 128, 12820, 48, 4830]) {
+			assert.equal(findProcessIdForIssueNumber(shared, issue), null);
+		}
 	});
-
-	it("detects 'design TBD' case-insensitively", () => {
-		const body = "Approach: design TBD, need discussion";
-		const { designUnsettled, matchedLines } = detectDesignUnsettled(body);
-		assert.equal(designUnsettled, true);
-		assert.deepEqual(matchedLines, ["Approach: design TBD, need discussion"]);
-	});
-
-	it("returns false for empty/missing body", () => {
-		assert.deepEqual(detectDesignUnsettled(""), { designUnsettled: false, matchedLines: [] });
-		assert.deepEqual(detectDesignUnsettled(undefined), { designUnsettled: false, matchedLines: [] });
-	});
-});
-
-describe("findIssueNumberForProcess", () => {
-	const pfdsl = `artifacts:
+	// The top-level key is the singular `process:`, matching the real
+	// .pfdsl/roadmap.pfdsl (confirmed by reading the file directly — an earlier
+	// version of this task's brief assumed a plural `processes:` key and a
+	// per-process `outputs:` field, neither of which exists there).
+	const pfdsl = `artifact:
   spec_id_syntax:
     label: 仕様ID構文
-processes:
+    location: https://github.com/takasek/pfdsl/issues/999
+process:
   i402_implement_get_by_id:
     label: get-by-ID ツール実装
     location: https://github.com/takasek/pfdsl/issues/402
@@ -137,18 +117,40 @@ processes:
   i435_implement_ansi_color:
     label: 診断 ANSI カラー実装
     location: https://github.com/takasek/pfdsl/issues/435
+tag:
+  some_tag: {}
 `;
 
-	it("extracts the issue number from the process block's location", () => {
-		assert.equal(findIssueNumberForProcess(pfdsl, "i405_implement_mint_check"), 405);
+	it("returns the processId whose location matches the issue number", () => {
+		assert.equal(
+			findProcessIdForIssueNumber(pfdsl, 405),
+			"i405_implement_mint_check",
+		);
 	});
 
 	it("does not bleed into a neighboring process's location", () => {
-		assert.equal(findIssueNumberForProcess(pfdsl, "i402_implement_get_by_id"), 402);
+		assert.equal(
+			findProcessIdForIssueNumber(pfdsl, 402),
+			"i402_implement_get_by_id",
+		);
 	});
 
-	it("returns null for an unknown process id", () => {
-		assert.equal(findIssueNumberForProcess(pfdsl, "i999_nonexistent"), null);
+	it("resolves the last process entry in the section, proving the section boundary (before tag:) is handled", () => {
+		assert.equal(
+			findProcessIdForIssueNumber(pfdsl, 435),
+			"i435_implement_ansi_color",
+		);
+	});
+
+	it("does not match an issue number that only appears in the artifact section", () => {
+		// issue 999 is only referenced from spec_id_syntax's location, in
+		// artifact:, not process:. A naive scan across the whole file would wrongly
+		// resolve this.
+		assert.equal(findProcessIdForIssueNumber(pfdsl, 999), null);
+	});
+
+	it("returns null for an issue number with no matching process at all", () => {
+		assert.equal(findProcessIdForIssueNumber(pfdsl, 1), null);
 	});
 });
 
@@ -160,8 +162,43 @@ describe("buildGateCheckCommand", () => {
 		);
 	});
 
-	it("returns null when artifactKey is missing", () => {
-		assert.equal(buildGateCheckCommand(null, "main"), null);
+	it("appends --issue when the cycle's issue is known", () => {
+		assert.equal(
+			buildGateCheckCommand("mint_check_tool", "main", [669]),
+			"node scripts/gate-check.mjs --base main --artifact mint_check_tool --issue 669",
+		);
+	});
+
+	it("repeats --issue for every issue the cycle closes", () => {
+		assert.equal(
+			buildGateCheckCommand("mint_check_tool", "main", [667, 668]),
+			"node scripts/gate-check.mjs --base main --artifact mint_check_tool --issue 667 --issue 668",
+		);
+	});
+
+	it("omits --issue when no issue is known", () => {
+		assert.equal(
+			buildGateCheckCommand("mint_check_tool", "main", []),
+			"node scripts/gate-check.mjs --base main --artifact mint_check_tool",
+		);
+	});
+
+	it("builds the explicit no-artifact command when artifactKey is missing", () => {
+		assert.equal(
+			buildGateCheckCommand(null, "main", [969]),
+			"node scripts/gate-check.mjs --base main --no-artifact --issue 969",
+		);
+	});
+
+	it("quotes dynamic values that contain shell-special characters", () => {
+		assert.equal(
+			buildGateCheckCommand("artifact key", "release candidate", [969]),
+			"node scripts/gate-check.mjs --base 'release candidate' --artifact 'artifact key' --issue 969",
+		);
+		assert.equal(
+			buildGateCheckCommand("artifact's output", "main"),
+			"node scripts/gate-check.mjs --base main --artifact 'artifact'\\''s output'",
+		);
 	});
 });
 
@@ -174,4 +211,117 @@ describe("countBehind", () => {
 		assert.equal(countBehind(""), 0);
 		assert.equal(countBehind("\n"), 0);
 	});
+});
+
+describe("summarizeReleasePending", () => {
+	it("reports needsAction when release-status exited non-zero", () => {
+		const summary = summarizeReleasePending({
+			ok: false,
+			status: 1,
+			out: "release-status:\n@pfdsl/cli 0.0.25 (37 commits ahead)\n",
+		});
+		assert.equal(summary.needsAction, true);
+		assert.deepEqual(summary.report, [
+			"release-status:",
+			"@pfdsl/cli 0.0.25 (37 commits ahead)",
+		]);
+	});
+
+	it("reports needsAction false when everything is published", () => {
+		const summary = summarizeReleasePending({
+			ok: true,
+			status: 0,
+			out: "release-status:\nall packages current\n",
+		});
+		assert.equal(summary.needsAction, false);
+	});
+
+	it("drops blank lines so the report carries only the material", () => {
+		const summary = summarizeReleasePending({
+			ok: true,
+			status: 0,
+			out: "\nrelease-status:\n\n  spec history: current  \n\n",
+		});
+		assert.deepEqual(summary.report, [
+			"release-status:",
+			"  spec history: current",
+		]);
+	});
+
+	it("returns an empty report when the command produced no output", () => {
+		assert.deepEqual(
+			summarizeReleasePending({ ok: true, status: 0, out: "" }).report,
+			[],
+		);
+	});
+});
+
+describe("parsePorcelainPaths", () => {
+	it("returns the path of every entry, tracked or not", () => {
+		assert.deepEqual(
+			parsePorcelainPaths(
+				" M scripts/gate-check.mjs\n?? notes.txt\nA  x.mjs\n",
+			),
+			["scripts/gate-check.mjs", "notes.txt", "x.mjs"],
+		);
+	});
+
+	it("returns an empty list for a clean tree", () => {
+		assert.deepEqual(parsePorcelainPaths(""), []);
+		assert.deepEqual(parsePorcelainPaths("\n"), []);
+	});
+
+	// A rename is one entry naming two paths. The destination is where the
+	// content sits now, so that is the path a reader has to deal with.
+	it("takes the destination of a rename", () => {
+		assert.deepEqual(parsePorcelainPaths("R  old.mjs -> new.mjs\n"), [
+			"new.mjs",
+		]);
+	});
+
+	// Porcelain v1 pads the status to two columns, so a path is never shorter
+	// than its line minus three — but a path containing " -> " outside a rename
+	// entry would be split by a naive replace.
+	it("keeps a space-bearing path intact", () => {
+		assert.deepEqual(parsePorcelainPaths("?? docs/a b.md\n"), ["docs/a b.md"]);
+	});
+});
+
+describe("isUnregisteredManagedIssue", () => {
+	it("reports a flow:managed issue with no process in the roadmap", () => {
+		assert.equal(isUnregisteredManagedIssue(["flow:managed"], null), true);
+	});
+
+	it("stays quiet once the issue has a tracked process", () => {
+		assert.equal(
+			isUnregisteredManagedIssue(["flow:managed"], "i956_generate_codex"),
+			false,
+		);
+	});
+
+	it("stays quiet for flow:exempt issues, which are absent by design", () => {
+		assert.equal(isUnregisteredManagedIssue(["flow:exempt"], null), false);
+	});
+
+	it("stays quiet for an unlabelled issue: triage is a different finding", () => {
+		assert.equal(isUnregisteredManagedIssue([], null), false);
+	});
+});
+it("preflight and flow audit ignore legacy prefixes without locations", () => {
+	for (const id of [
+		"i1352_i1282_i483_improve_preview",
+		"i4830_near",
+		"work_i483_later",
+		"i1352_gap_i483",
+	]) {
+		const source = `process:\n  ${id}:\n    label: Work\n`;
+		const issues =
+			parseIssueProcesses({ process: { [id]: {} } })[0]?.issueNumbers ?? [];
+		for (const issue of [1352, 1282, 483, 4830, 135]) {
+			assert.equal(
+				findProcessIdForIssueNumber(source, issue),
+				issues.includes(issue) ? id : null,
+			);
+		}
+	}
 });

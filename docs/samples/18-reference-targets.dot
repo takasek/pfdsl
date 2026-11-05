@@ -1,0 +1,13 @@
+digraph PFDSL {
+  rankdir=LR;
+  newrank=true;
+  label="Artifact reference targets";
+  labelloc="t";
+
+  "accepted_plan" [shape=box, label="accepted_plan\nAccepted plan", tooltip="Accepted plan\ncriteria: The plan has been accepted at its effective reference target.\nlocation: docs/plan.md", penwidth="2"];
+  "revise" [shape=ellipse, label="revise\nRevise plan"];
+  "working_plan" [shape=box, label="working_plan\nWorking plan", tooltip="Working plan\ncriteria: The revised plan is available at its effective reference target.\nlocation: docs/plan.md", penwidth="2"];
+
+  "accepted_plan" -> "revise";
+  "revise" -> "working_plan";
+}

@@ -1,4 +1,5 @@
 import type { Frontmatter, Graph, NodeKind, Status } from "@pfdsl/core";
+import { compareIds } from "@pfdsl/core";
 
 export interface MetadataRecord {
 	kind: NodeKind;
@@ -26,7 +27,7 @@ export function extractMetadata(
 ): MetadataRecord[] {
 	return [...graph.nodes.entries()]
 		.filter(([, kind]) => kind !== "group") // group IDs are subgraph containers, not nodes
-		.sort(([a], [b]) => a.localeCompare(b))
+		.sort(([a], [b]) => compareIds(a, b))
 		.map(([id, kind]) => {
 			if (kind === "artifact") {
 				const meta = frontmatter?.artifact?.[id];

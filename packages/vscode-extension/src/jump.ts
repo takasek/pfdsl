@@ -1,17 +1,22 @@
-import { ID_PATTERN } from "@pfdsl/core";
+import type { Range } from "@pfdsl/core";
+import {
+	findFrontmatterDefinitionRange,
+	nextNodeOccurrenceRange,
+	nodeIdAtSourcePosition,
+} from "@pfdsl/editor";
 import * as vscode from "vscode";
-import { findFrontmatterDefinitionInText } from "./jump-logic.js";
+import { analyzeDocument } from "./analyze.js";
 
-export type { FrontmatterPosition } from "./jump-logic.js";
-export { findFrontmatterDefinitionInText } from "./jump-logic.js";
+export type { FrontmatterPosition } from "@pfdsl/editor";
+export { findFrontmatterDefinitionInText } from "@pfdsl/editor";
 
 export function findFrontmatterDefinition(
 	doc: vscode.TextDocument,
 	nodeId: string,
 ): vscode.Position | undefined {
-	const pos = findFrontmatterDefinitionInText(doc.getText(), nodeId);
-	if (!pos) return undefined;
-	return new vscode.Position(pos.line, pos.column);
+	const range = findFrontmatterDefinitionRange(analyzeDocument(doc), nodeId);
+	if (!range) return undefined;
+	return new vscode.Position(range.start.line - 1, range.start.column - 1);
 }
 
 export function registerDefinitionJump(context: vscode.ExtensionContext): void {
@@ -20,22 +25,41 @@ export function registerDefinitionJump(context: vscode.ExtensionContext): void {
 			const editor = vscode.window.activeTextEditor;
 			if (!editor || editor.document.languageId !== "pfdsl") return;
 			const { document: doc, selection } = editor;
-			const range = doc.getWordRangeAtPosition(selection.active, ID_PATTERN);
-			if (!range) return;
-			const nodeId = doc.getText(range);
-			const pos = findFrontmatterDefinition(doc, nodeId);
-			if (!pos) {
+			const model = analyzeDocument(doc);
+			const nodeId = nodeIdAtSourcePosition(
+				model,
+				doc.getText(),
+				selection.active,
+			);
+			if (nodeId === undefined) return;
+			const range = findFrontmatterDefinitionRange(model, nodeId);
+			if (!range) {
 				vscode.window.showInformationMessage(
 					`No frontmatter definition found for "${nodeId}"`,
 				);
 				return;
 			}
-			const defRange = new vscode.Range(pos, pos.translate(0, nodeId.length));
-			editor.selection = new vscode.Selection(
-				pos,
-				pos.translate(0, nodeId.length),
+			selectSourceRange(editor, range);
+		}),
+		vscode.commands.registerCommand("pfdsl.cycleNodeOccurrence", () => {
+			const editor = vscode.window.activeTextEditor;
+			if (!editor || editor.document.languageId !== "pfdsl") return;
+			const range = nextNodeOccurrenceRange(
+				analyzeDocument(editor.document),
+				editor.document.getText(),
+				editor.selection.active,
 			);
-			editor.revealRange(defRange);
+			if (range) selectSourceRange(editor, range);
 		}),
 	);
+}
+
+function selectSourceRange(editor: vscode.TextEditor, range: Range): void {
+	const start = new vscode.Position(
+		range.start.line - 1,
+		range.start.column - 1,
+	);
+	const end = new vscode.Position(range.end.line - 1, range.end.column - 1);
+	editor.selection = new vscode.Selection(start, end);
+	editor.revealRange(new vscode.Range(start, end));
 }

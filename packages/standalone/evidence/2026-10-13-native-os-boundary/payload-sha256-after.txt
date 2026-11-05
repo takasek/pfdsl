@@ -1,0 +1,2 @@
+7cb57ef7004af60bd52d4edbf66e877da77c732e606fa8f331ae0f256f5d83f5  ../PFDSL.AppImage
+9d3b607871c1fb7a728c73e5584a550e49aa7e4b9c4f1a48ace5537628c71a3f  usr/bin/pfdsl-desktop

@@ -1,10 +1,10 @@
-import { describe, it } from "node:test";
 import assert from "node:assert/strict";
+import { describe, it } from "node:test";
 import {
-	normalizeId,
 	findOccurrencesInText,
 	formatOccurrences,
 	mintCheckExitCode,
+	normalizeId,
 } from "./mint-check.mjs";
 
 describe("normalizeId", () => {
@@ -23,8 +23,18 @@ describe("findOccurrencesInText", () => {
 		const occ = findOccurrencesInText("SPEC_foo", "spec.md", text);
 		assert.equal(occ.length, 1);
 		assert.deepEqual(
-			{ kind: occ[0].kind, file: occ[0].file, line: occ[0].line, text: occ[0].text },
-			{ kind: "definition", file: "spec.md", line: 2, text: "## Heading (SPEC_foo)" },
+			{
+				kind: occ[0].kind,
+				file: occ[0].file,
+				line: occ[0].line,
+				text: occ[0].text,
+			},
+			{
+				kind: "definition",
+				file: "spec.md",
+				line: 2,
+				text: "## Heading (SPEC_foo)",
+			},
 		);
 	});
 
@@ -72,7 +82,9 @@ describe("findOccurrencesInText", () => {
 	});
 
 	it("ignores markers inside a fenced code block", () => {
-		const text = ["```", "(SPEC_foo)", "```", "outside [[SPEC_foo?]]"].join("\n");
+		const text = ["```", "(SPEC_foo)", "```", "outside [[SPEC_foo?]]"].join(
+			"\n",
+		);
 		const occ = findOccurrencesInText("SPEC_foo", "spec.md", text);
 		assert.equal(occ.length, 1);
 		assert.equal(occ[0].kind, "forward-ref");
@@ -80,15 +92,28 @@ describe("findOccurrencesInText", () => {
 	});
 
 	it("returns an empty array when the slug is never used", () => {
-		assert.deepEqual(findOccurrencesInText("SPEC_unused", "spec.md", "nothing here"), []);
+		assert.deepEqual(
+			findOccurrencesInText("SPEC_unused", "spec.md", "nothing here"),
+			[],
+		);
 	});
 });
 
 describe("formatOccurrences", () => {
 	it("formats each occurrence as 'file:line: kind text'", () => {
 		const occurrences = [
-			{ kind: "definition", file: "spec.md", line: 2, text: "## Heading (SPEC_foo)" },
-			{ kind: "strict-ref", file: "spec.md", line: 9, text: "see [[SPEC_foo]]" },
+			{
+				kind: "definition",
+				file: "spec.md",
+				line: 2,
+				text: "## Heading (SPEC_foo)",
+			},
+			{
+				kind: "strict-ref",
+				file: "spec.md",
+				line: 9,
+				text: "see [[SPEC_foo]]",
+			},
 		];
 		assert.equal(
 			formatOccurrences(occurrences),

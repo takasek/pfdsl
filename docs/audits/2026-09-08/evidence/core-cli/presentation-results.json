@@ -1,0 +1,54 @@
+[
+  {
+    "depth": 5,
+    "distinctDocs": 12,
+    "chainEntries": 63,
+    "ms": 0.276875000000004,
+    "resolved": {
+      "statusStyles": {
+        "done": {
+          "color": "red"
+        }
+      }
+    }
+  },
+  {
+    "depth": 10,
+    "distinctDocs": 22,
+    "chainEntries": 2047,
+    "ms": 2.4914579999999944,
+    "resolved": {
+      "statusStyles": {
+        "done": {
+          "color": "red"
+        }
+      }
+    }
+  },
+  {
+    "depth": 15,
+    "distinctDocs": 32,
+    "chainEntries": 65535,
+    "ms": 28.803917,
+    "resolved": {
+      "statusStyles": {
+        "done": {
+          "color": "red"
+        }
+      }
+    }
+  },
+  {
+    "depth": 18,
+    "distinctDocs": 38,
+    "chainEntries": 524287,
+    "ms": 160.096834,
+    "resolved": {
+      "statusStyles": {
+        "done": {
+          "color": "red"
+        }
+      }
+    }
+  }
+]

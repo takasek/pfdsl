@@ -1,0 +1,109 @@
+{
+	"schemaVersion": 1,
+	"createdAt": "2026-10-05T09:28:49.748882Z",
+	"checkout": "<checkout>",
+	"inventoryScope": "All 11 current files saved by this blind native recheck; manifest itself is excluded because a self hash is not defined.",
+	"files": [
+		{
+			"path": "<checkout>/packages/standalone/evidence/2026-10-05-preview-ui/main-merge-native-recheck-01-short-ax.txt",
+			"bytes": 1487,
+			"sha256": "10d9269109e82d701f60cee7d911a5de4e15352b09d028a671c479c028f6d1f1",
+			"beforeParentWhitespaceNormalizationSha256": "0e1bf18d1b502310d56d57796e4206a444ff8b1f9e6c4975dd81757d2f121dc9"
+		},
+		{
+			"path": "<checkout>/packages/standalone/evidence/2026-10-05-preview-ui/main-merge-native-recheck-01-short.png",
+			"bytes": 232988,
+			"sha256": "d637a0d06b0b57286433366c6086995a66ea79c75967d8a205434705112d6334"
+		},
+		{
+			"path": "<checkout>/packages/standalone/evidence/2026-10-05-preview-ui/main-merge-native-recheck-02-large-end-ax.txt",
+			"bytes": 6380,
+			"sha256": "53185376eb3dde91bebd409ee3e791c8f8b080612ebd74e788d905b5c62aa52b",
+			"beforeParentWhitespaceNormalizationSha256": "17859384af1a349d818ba0e6f6cc16a0f64d3535e22e42298798f9585f175b00"
+		},
+		{
+			"path": "<checkout>/packages/standalone/evidence/2026-10-05-preview-ui/main-merge-native-recheck-02-large-end.png",
+			"bytes": 684796,
+			"sha256": "a64c377297ab4b5799adaa68ec8eb921328566ee92a3f7317b48a3750ec7fac8"
+		},
+		{
+			"path": "<checkout>/packages/standalone/evidence/2026-10-05-preview-ui/main-merge-native-recheck-03-large-cmd-up-ax.txt",
+			"bytes": 6380,
+			"sha256": "ca6ec8f76d6efa45c25f28ad5cc621e98616433c4c914f2348cb1483f3dcaaa4",
+			"beforeParentWhitespaceNormalizationSha256": "3b352430f3aac621226b43461ff9815b7d5eb47d8bb8cde1d07108795dd42839"
+		},
+		{
+			"path": "<checkout>/packages/standalone/evidence/2026-10-05-preview-ui/main-merge-native-recheck-03-large-cmd-up.png",
+			"bytes": 724088,
+			"sha256": "8a549d70326f2703c4b12eb129398d4c43ab4780381269f6b65e6762db7e0394"
+		},
+		{
+			"path": "<checkout>/packages/standalone/evidence/2026-10-05-preview-ui/main-merge-native-recheck-04-large-return-ax.txt",
+			"bytes": 6352,
+			"sha256": "3578c22e40fb09a32e07c90c7952a8dfa1ead5c666f6e4401d5b1eb200ebc4ee",
+			"beforeParentWhitespaceNormalizationSha256": "567654d240e2a0aefbcc6af55479082c479e18b64affebeba701be74401b80c2"
+		},
+		{
+			"path": "<checkout>/packages/standalone/evidence/2026-10-05-preview-ui/main-merge-native-recheck-04-large-return.png",
+			"bytes": 726263,
+			"sha256": "a3e2a2d71c190db503ffe232d88f0366efa29fafcf87e08a9afb5e54af6b91cc"
+		},
+		{
+			"path": "<checkout>/packages/standalone/evidence/2026-10-05-preview-ui/main-merge-native-recheck-alternate-tab-ax.txt",
+			"bytes": 1405,
+			"sha256": "d84902990e0ff582f5e4766fb39731a1778d0b83b711af4b1ab7c267cd09043b",
+			"beforeParentWhitespaceNormalizationSha256": "53e293a8a70b7749ddea322053194d211fc45f037ce780fd492d55406062e311"
+		},
+		{
+			"path": "<checkout>/packages/standalone/evidence/2026-10-05-preview-ui/main-merge-native-recheck-report.json",
+			"bytes": 10377,
+			"sha256": "63219df7a1398af7390bfcb4a488decfd329c3e9057ba0f8fb9b60723acf9bf6",
+			"beforeParentFormattingSha256": "0ef2b31c2aed06e8a5c6f934b2403a9d59c9c08a312ff5b86d58c9215f003e81"
+		},
+		{
+			"path": "<checkout>/packages/standalone/evidence/2026-10-05-preview-ui/main-merge-native-recheck-report.md",
+			"bytes": 5215,
+			"sha256": "56620b2b2a9667c905a40d894f89db0e68754fb2ca67b8814b63963d1cfa5eea",
+			"beforeParentWhitespaceNormalizationSha256": "f19a00890e722468de9159b9984afeafc3b7dd825b77dfcec80bbdd6a8c86abb"
+		}
+	],
+	"inputs": [
+		{
+			"path": "<checkout>/packages/standalone/evidence/2026-10-05-preview-ui/native-scroll-recheck-short-fixture.pfdsl.txt",
+			"sha256Before": "a26577062a828e18dcde0b95e16b33b028635a60f2c631bd21e04629a1c3aeba",
+			"sha256After": "a26577062a828e18dcde0b95e16b33b028635a60f2c631bd21e04629a1c3aeba"
+		},
+		{
+			"path": "<checkout>/packages/standalone/evidence/2026-10-05-preview-ui/native-scroll-recheck-large-fixture.pfdsl.txt",
+			"sha256Before": "df31c828012b30c62a503753d677497b0a3e4c0010b5d7192e49483389f06ef8",
+			"sha256After": "df31c828012b30c62a503753d677497b0a3e4c0010b5d7192e49483389f06ef8"
+		}
+	],
+	"executable": {
+		"path": "<checkout>/packages/standalone/src-tauri/target/debug/bundle/macos/PFDSL.app",
+		"executable": "<checkout>/packages/standalone/src-tauri/target/debug/bundle/macos/PFDSL.app/Contents/MacOS/pfdsl-desktop",
+		"sha256Before": "f6005842e1a7de061d531d09da67002b46d9c9eae89ebac1a19f04bca4451412",
+		"sha256After": "f6005842e1a7de061d531d09da67002b46d9c9eae89ebac1a19f04bca4451412"
+	},
+	"imageEncodingNormalization": "Four CUA JPEG screenshots were transcoded to true PNG; decoded raster bytes identical.",
+	"textNormalization": {
+		"jsonIndentation": "tabs",
+		"markdownFinalBlankLines": 1,
+		"axFinalBlankLines": 1
+	},
+	"parentNormalization": {
+		"files": ["main-merge-native-recheck-report.json"],
+		"reason": "Biome formatting after reviewer completion; observations and image pixels unchanged."
+	},
+	"parentWhitespaceNormalization": {
+		"files": [
+			"main-merge-native-recheck-01-short-ax.txt",
+			"main-merge-native-recheck-02-large-end-ax.txt",
+			"main-merge-native-recheck-03-large-cmd-up-ax.txt",
+			"main-merge-native-recheck-04-large-return-ax.txt",
+			"main-merge-native-recheck-alternate-tab-ax.txt",
+			"main-merge-native-recheck-report.md"
+		],
+		"reason": "Removed trailing blank lines after reviewer completion; text observations and image pixels unchanged."
+	}
+}

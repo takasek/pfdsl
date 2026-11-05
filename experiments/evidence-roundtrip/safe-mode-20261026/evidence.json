@@ -1,0 +1,38 @@
+{
+  "schemaVersion": 0,
+  "runId": "5aa6d436-8c45-41ce-871f-d39d6caf6293",
+  "processId": "i542_migrate_spec_id_refs",
+  "workItemIds": [
+    "542"
+  ],
+  "versions": {
+    "model": "a88afdfa2c1dbb5a8263ddb24441dc20c708ef1923c074cd82b8adf66421b0d5",
+    "artifacts": "6440d9e394c9ee6fd15289b01241208eeb585e6f6ec7f07feb06d97bc0749dae",
+    "criteria": "0c5a5fd19118559a4f18781a707e4b1b8b8e50ab858b30b063473813effacbd1"
+  },
+  "resultVersions": {
+    "model": "b1cd01a226e6ecac54f80618a6d209b7ddbcb65b08d63a01d4932f33475bfe07",
+    "artifacts": "385402ec253d1b4bf6e680bf4ea400b01137d6ff9599615f297974dbfbdbf7c0",
+    "criteria": "0c5a5fd19118559a4f18781a707e4b1b8b8e50ab858b30b063473813effacbd1"
+  },
+  "changedPaths": [
+    "docs/spec/spec.md",
+    ".pfdsl/roadmap.pfdsl"
+  ],
+  "transitions": [
+    {
+      "artifactId": "spec_id_refs",
+      "from": "todo",
+      "to": "wip"
+    }
+  ],
+  "acceptanceEvidence": [
+    "experiments/evidence-roundtrip/safe-mode-20261026/checks.json"
+  ],
+  "deviations": [
+    {
+      "type": "unchanged",
+      "reason": "No model revision is requested: issue #542 explicitly allows staged migration; only the section 15.1 cluster was migrated and the complete artifact criteria remain unmet, so spec_id_refs stays wip."
+    }
+  ]
+}

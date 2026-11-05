@@ -1,0 +1,1192 @@
+import assert from "node:assert/strict";
+import { describe, it } from "node:test";
+import { cycleStatusExitCode, runCycleStatus } from "./cycle-status-steps.mjs";
+
+const ROOT = "/repo";
+const CLI_PATH = "/repo/packages/cli/dist/cli.js";
+const TARGET_REPOSITORY = {
+	host: "github.com",
+	owner: "takasek",
+	repo: "pfdsl",
+};
+
+const readyJsonOk = (id) =>
+	JSON.stringify({
+		ok: true,
+		ready: [
+			{
+				id: id ?? "a",
+				label: "Candidate",
+				inputs: ["seed"],
+				outputs: ["output"],
+				newlyReadyCount: 2,
+			},
+		],
+	});
+
+// The top-level key is the singular `process:`, matching the real
+// .pfdsl/roadmap.pfdsl (an earlier version of this task's brief assumed a
+// plural `processes:` key and a per-process `outputs:` field; neither exists
+// there — outputs are derived from `>> processId -> artifact` flow-arrow
+// lines elsewhere in the file, resolved at runtime via the built CLI's
+// `graph neighbors` command rather than parsed from this section).
+const roadmapWithIssue = (processId, issueNumber) =>
+	roadmapWithIssues([[processId, issueNumber]]);
+
+const roadmapWithIssues = (entries) => {
+	const processes = new Map();
+	for (const [processId, issueNumber] of entries) {
+		if (!processes.has(processId)) processes.set(processId, []);
+		processes
+			.get(processId)
+			.push(`https://github.com/takasek/pfdsl/issues/${issueNumber}`);
+	}
+	return `process:\n${[...processes].map(([id, locations]) => `  ${id}:\n    label: x\n    location: ${JSON.stringify(locations)}\n`).join("")}artifact:\n`;
+};
+
+// `graph neighbors --json` tags each neighbor with its edge class since #828.
+const neighborsJsonOk = (successors) =>
+	JSON.stringify({
+		ok: true,
+		predecessors: [],
+		successors: successors.map((id) => ({ id, kind: "primary" })),
+	});
+
+// A stand-in for createGitHubOps in these tests, which predate the named-op
+// API and assert against raw `gh` argv shapes (#1044). Adapts each test's
+// `execGh`-shaped fake (an (args: string[]) => Promise<string>, matching what
+// gh-exec.mjs's execGh used to be called with directly) into the two
+// operations runCycleStatus now calls through githubOps, so every existing
+// test body — including the ones asserting on the raw argv it recorded —
+// keeps working unchanged.
+function githubOpsFromExecGh(execGh) {
+	return {
+		listOpenPrs: async () =>
+			JSON.parse(
+				await execGh([
+					"pr",
+					"list",
+					"--state",
+					"open",
+					"--json",
+					"number,title",
+				]),
+			),
+		viewIssue: async ({ number, fields }) =>
+			JSON.parse(
+				await execGh([
+					"issue",
+					"view",
+					String(number),
+					"--json",
+					fields.join(","),
+				]),
+			),
+		repository: () => TARGET_REPOSITORY,
+	};
+}
+
+function baseDeps(overrides = {}) {
+	const { execGh, githubOps, ...rest } = overrides;
+	return {
+		sh: () => "",
+		shTry: () => ({ ok: true, out: "", status: 0 }),
+		githubOps:
+			githubOps ??
+			githubOpsFromExecGh(execGh ?? (async () => JSON.stringify([]))),
+		existsSync: () => true,
+		readFileSync: () => "",
+		readdirSync: () => [],
+		root: ROOT,
+		base: "main",
+		...rest,
+	};
+}
+
+describe("runCycleStatus", () => {
+	it("shares one external snapshot across selection and replaces the local mutation advice", async () => {
+		const calls = [],
+			reads = [];
+		const roadmap = {
+			file: "/snapshot/roadmap.pfdsl",
+			context: { model: { source: "wiki", fixedRevision: "abc" } },
+			key: "fixed",
+		};
+		const result = await runCycleStatus(
+			baseDeps({
+				roadmap,
+				sourceConfig: "/settings/wiki.json",
+				issueNumbers: [12],
+				execGh: async (args) =>
+					JSON.stringify(
+						args[0] === "pr" ? [] : { labels: [{ name: "flow:managed" }] },
+					),
+				readFileSync: (path) => {
+					reads.push(path);
+					return roadmapWithIssue("work", 12);
+				},
+				sh: (file, args) => {
+					if (file === "git") return "";
+					calls.push(args);
+					return args[1] === "status"
+						? readyJsonOk("work")
+						: neighborsJsonOk(["result"]);
+				},
+			}),
+		);
+		assert.deepEqual(reads, [roadmap.file]);
+		assert.equal(calls.length, 2);
+		assert.ok(calls.every((args) => args.includes(roadmap.file)));
+		assert.equal(result.wipUpdateCommand, undefined);
+		assert.match(
+			result.roadmapUpdateGuidance,
+			/scripts\/wiki-roadmap-publish\.mjs/,
+		);
+		assert.match(
+			result.gateCheckCommand,
+			/--source-config '\/settings\/wiki.json'/,
+		);
+		assert.deepEqual(result.roadmapSource, {
+			source: "wiki",
+			fixedRevision: "abc",
+		});
+	});
+	it("runs preflight without reading or selecting historical cases", async () => {
+		const reads = [];
+		const result = await runCycleStatus(
+			baseDeps({
+				readdirSync: (path) => {
+					reads.push(path);
+					throw new Error("historical cases are unavailable");
+				},
+			}),
+		);
+		assert.deepEqual(reads, []);
+		assert.equal(result.preArtifactPatterns, undefined);
+		assert.equal(result.preArtifactSelection, undefined);
+		assert.equal(result.preArtifactPatternsError, undefined);
+		assert.equal(result.fetched, true);
+		assert.equal(cycleStatusExitCode(result), 0);
+	});
+
+	it("uses a non-zero exit code for blocking lookup failures only", () => {
+		assert.equal(cycleStatusExitCode({ blocking: true }), 1);
+		assert.equal(cycleStatusExitCode({ blocking: false }), 0);
+		assert.equal(cycleStatusExitCode({}), 0);
+	});
+
+	it("reports fetched:false when git fetch throws, without aborting the rest", async () => {
+		const result = await runCycleStatus(
+			baseDeps({
+				sh: (_file, args) => {
+					if (args.includes("fetch")) throw new Error("no network");
+					if (args.includes("log")) return "";
+					return readyJsonOk(null);
+				},
+			}),
+		);
+		assert.equal(result.fetched, false);
+	});
+
+	it("sets behindBaseError and leaves behindBase null when the log command throws", async () => {
+		const result = await runCycleStatus(
+			baseDeps({
+				sh: (_file, args) => {
+					if (args.includes("log")) throw new Error("fatal: bad revision");
+					if (args.includes("--porcelain")) return "";
+					return readyJsonOk(null);
+				},
+			}),
+		);
+		assert.equal(result.behindBase, null);
+		assert.equal(result.behindBaseError, "fatal: bad revision");
+	});
+
+	it("counts behindBase from git log output on success", async () => {
+		const result = await runCycleStatus(
+			baseDeps({
+				sh: (_file, args) => {
+					if (args.includes("log")) return "abc commit one\ndef commit two\n";
+					return readyJsonOk(null);
+				},
+			}),
+		);
+		assert.equal(result.behindBase, 2);
+		assert.equal(result.behindBaseError, undefined);
+	});
+
+	it("refuses to produce judgments when the tree is behind base", async () => {
+		const calls = [];
+		const ghCalls = [];
+		const result = await runCycleStatus(
+			baseDeps({
+				sh: (file, args) => {
+					calls.push([file, args]);
+					if (args.includes("log")) return "abc commit one\ndef commit two\n";
+					return readyJsonOk("proc_a");
+				},
+				execGh: async (args) => {
+					ghCalls.push(args);
+					return JSON.stringify([]);
+				},
+			}),
+		);
+		assert.equal(result.behindBase, 2);
+		assert.equal(result.staleTree.base, "main");
+		assert.match(result.staleTree.message, /2 commits behind origin\/main/);
+		// Every judgment is withheld, not merely annotated: an old tree's output
+		// cannot say whether a check ran and passed or does not exist there (#716).
+		assert.equal(result.ready, undefined);
+		assert.equal(result.best, undefined);
+		assert.equal(result.issueTargets, undefined);
+		assert.equal(result.gateCheckCommand, undefined);
+		assert.equal(result.preArtifactPatterns, undefined);
+		assert.ok(!calls.some(([, args]) => args.includes(CLI_PATH)));
+		assert.deepEqual(ghCalls, []);
+	});
+
+	// #744: `commitsAheadOfBase` closes the committed path from one cycle into
+	// the next, and leaves the working tree's. Switching branches carries
+	// uncommitted edits along, so the previous cycle's changes are still there
+	// to be swept into this cycle's first commit.
+	it("refuses to produce judgments when the tree has uncommitted changes", async () => {
+		const calls = [];
+		const ghCalls = [];
+		const result = await runCycleStatus(
+			baseDeps({
+				sh: (file, args) => {
+					calls.push([file, args]);
+					if (args.includes("--porcelain"))
+						return " M scripts/gate-check.mjs\n?? notes.txt\n";
+					if (args.includes("log")) return "";
+					return readyJsonOk("proc_a");
+				},
+				execGh: async (args) => {
+					ghCalls.push(args);
+					return JSON.stringify([]);
+				},
+			}),
+		);
+		assert.deepEqual(result.uncommittedFiles, [
+			"scripts/gate-check.mjs",
+			"notes.txt",
+		]);
+		assert.match(result.dirtyTree.message, /uncommitted/i);
+		assert.equal(result.ready, undefined);
+		assert.equal(result.best, undefined);
+		assert.equal(result.issueTargets, undefined);
+		assert.equal(result.gateCheckCommand, undefined);
+		assert.equal(result.preArtifactPatterns, undefined);
+		assert.ok(!calls.some(([, args]) => args.includes(CLI_PATH)));
+		assert.deepEqual(ghCalls, []);
+	});
+
+	it("says nothing about a dirty tree when the tree is clean", async () => {
+		const result = await runCycleStatus(
+			baseDeps({
+				sh: (_file, args) => {
+					if (args.includes("--porcelain")) return "";
+					if (args.includes("log")) return "";
+					return readyJsonOk("proc_a");
+				},
+			}),
+		);
+		assert.equal(result.dirtyTree, undefined);
+		assert.equal(result.uncommittedFiles, undefined);
+		assert.equal(result.best, undefined);
+	});
+
+	// A tree that is both behind and dirty is reported as behind: that verdict
+	// says the script itself is the wrong version, which makes every other
+	// judgment — including the dirty one — unreliable (#716).
+	it("reports a stale tree ahead of a dirty one", async () => {
+		const result = await runCycleStatus(
+			baseDeps({
+				sh: (_file, args) => {
+					if (args.includes("--porcelain"))
+						return " M scripts/gate-check.mjs\n";
+					if (args.includes("log")) return "abc one\n";
+					return readyJsonOk("proc_a");
+				},
+			}),
+		);
+		assert.ok(result.staleTree);
+		assert.equal(result.dirtyTree, undefined);
+	});
+
+	it("sets dirtyTreeError and keeps judging when git status itself fails", async () => {
+		const result = await runCycleStatus(
+			baseDeps({
+				sh: (_file, args) => {
+					if (args.includes("--porcelain"))
+						throw new Error("fatal: not a git repo");
+					if (args.includes("log")) return "";
+					return readyJsonOk("proc_a");
+				},
+			}),
+		);
+		assert.equal(result.dirtyTreeError, "fatal: not a git repo");
+		assert.equal(result.best, undefined);
+	});
+
+	it("sets prError and an empty PR list when gh pr list fails", async () => {
+		const result = await runCycleStatus(
+			baseDeps({
+				execGh: async () => {
+					throw new Error("gh: not authenticated");
+				},
+			}),
+		);
+		assert.deepEqual(result.openPRs, []);
+		assert.equal(result.prError, "gh: not authenticated");
+	});
+
+	it("lists all open PRs without special handling for old flow-sync branches", async () => {
+		const result = await runCycleStatus(
+			baseDeps({
+				execGh: async (args) => {
+					if (args[0] === "pr") {
+						return JSON.stringify([
+							{ number: 1, title: "sync", headRefName: "flow-sync/x" },
+							{ number: 2, title: "feature", headRefName: "feat/x" },
+						]);
+					}
+					return "";
+				},
+			}),
+		);
+		assert.deepEqual(result.openPRs, [
+			{ number: 1, title: "sync" },
+			{ number: 2, title: "feature" },
+		]);
+		assert.equal(result.prError, undefined);
+	});
+
+	it("sets a fixed readyError and skips the CLI call when the built CLI is missing", async () => {
+		const calls = [];
+		const result = await runCycleStatus(
+			baseDeps({
+				sh: (file, args) => {
+					calls.push([file, args]);
+					return "";
+				},
+				existsSync: () => false,
+			}),
+		);
+		assert.equal(
+			result.readyError,
+			"packages/cli/dist/cli.js not built; run 'pnpm -r build' first",
+		);
+		assert.deepEqual(result.ready, []);
+		assert.equal(result.best, undefined);
+		assert.ok(!calls.some(([, args]) => args.includes(CLI_PATH)));
+	});
+
+	it("sets readyError when the built CLI call throws", async () => {
+		const result = await runCycleStatus(
+			baseDeps({
+				sh: (_file, args) => {
+					if (args.includes(CLI_PATH)) throw new Error("cli crashed");
+					return "";
+				},
+			}),
+		);
+		assert.equal(result.readyError, "cli crashed");
+		assert.deepEqual(result.ready, []);
+		assert.equal(result.best, undefined);
+	});
+
+	it("preserves ready completion counts from a successful CLI call", async () => {
+		const result = await runCycleStatus(
+			baseDeps({
+				sh: (_file, args) => {
+					if (args.includes(CLI_PATH)) return readyJsonOk(null);
+					return "";
+				},
+			}),
+		);
+		assert.deepEqual(result.ready, JSON.parse(readyJsonOk(null)).ready);
+		assert.equal(result.best, undefined);
+	});
+
+	const issueJson = ({ body, comments = [], labels = [] }) =>
+		JSON.stringify({ body, comments, labels });
+	const runForIssueBodies = (issueNumbers, bodies) =>
+		runCycleStatus(
+			baseDeps({
+				issueNumbers,
+				execGh: async (args) => {
+					if (args[0] === "issue") return issueJson({ body: bodies[args[2]] });
+					return JSON.stringify([]);
+				},
+			}),
+		);
+
+	it("resolves only the target issue explicitly given by --issue", async () => {
+		const calls = [];
+		const result = await runCycleStatus(
+			baseDeps({
+				issueNumbers: [669],
+				sh: (_file, args) => {
+					if (args.includes(CLI_PATH)) return readyJsonOk("proc_a");
+					return "";
+				},
+				readFileSync: () => roadmapWithIssue("proc_a", 42),
+				execGh: async (args) => {
+					calls.push(args);
+					if (args[0] === "issue") return issueJson({ body: "普通の説明文。" });
+					return JSON.stringify([]);
+				},
+			}),
+		);
+		assert.deepEqual(result.issueTargets, [
+			{
+				issue: 669,
+				source: "flag",
+			},
+		]);
+		assert.equal(result.issueError, undefined);
+		assert.ok(calls.some((c) => c[0] === "issue" && c.includes("669")));
+		assert.ok(!calls.some((c) => c[0] === "issue" && c.includes("42")));
+	});
+
+	it("keeps the issues it could read when one lookup throws", async () => {
+		const result = await runCycleStatus(
+			baseDeps({
+				issueNumbers: [667, 668],
+				execGh: async (args) => {
+					if (args[0] === "issue") {
+						if (args[2] === "668") throw new Error("gh: issue not found");
+						return issueJson({ body: "普通の説明文。" });
+					}
+					return JSON.stringify([]);
+				},
+			}),
+		);
+		assert.deepEqual(
+			result.issueTargets.map((d) => d.issue),
+			[667, 668],
+		);
+		assert.equal(result.issueError, "gh: issue not found");
+	});
+
+	it("builds a gate-check command naming every issue the cycle closes", async () => {
+		const result = await runCycleStatus(
+			baseDeps({
+				issueNumbers: [667, 668],
+				sh: (_file, args) => {
+					if (args.includes("neighbors")) return neighborsJsonOk(["art_a"]);
+					if (args.includes(CLI_PATH)) return readyJsonOk(null);
+					return "";
+				},
+				readFileSync: () =>
+					roadmapWithIssues([
+						["proc_a", 667],
+						["proc_a", 668],
+					]),
+				execGh: async (args) => {
+					if (args[0] === "issue") return issueJson({ body: "普通の説明文。" });
+					return JSON.stringify([]);
+				},
+			}),
+		);
+		assert.match(result.gateCheckCommand, /--issue 667 --issue 668$/);
+	});
+
+	it("reports the current branch and how far HEAD leads the base", async () => {
+		const result = await runCycleStatus(
+			baseDeps({
+				sh: (_file, args) => {
+					if (args.includes("rev-parse")) return "feat/second-cycle\n";
+					if (args.join(" ").includes("origin/main..HEAD"))
+						return "abc one\ndef two\n";
+					return "";
+				},
+			}),
+		);
+		assert.equal(result.currentBranch, "feat/second-cycle");
+		assert.equal(result.commitsAheadOfBase, 2);
+	});
+
+	it("reports commitsAheadOfBase 0 for a branch cut fresh from the base", async () => {
+		const result = await runCycleStatus(baseDeps({ sh: () => "" }));
+		assert.equal(result.commitsAheadOfBase, 0);
+	});
+
+	it("sets headStateError and leaves both head fields null when git cannot answer", async () => {
+		const result = await runCycleStatus(
+			baseDeps({
+				sh: (_file, args) => {
+					if (args.includes("rev-parse"))
+						throw new Error("fatal: not a git repository");
+					return "";
+				},
+			}),
+		);
+		assert.equal(result.currentBranch, null);
+		assert.equal(result.commitsAheadOfBase, null);
+		assert.equal(result.headStateError, "fatal: not a git repository");
+	});
+
+	it("does not claim design review is required when an issue enumerates ordinary steps", async () => {
+		const result = await runCycleStatus(
+			baseDeps({
+				issueNumbers: [1008],
+				execGh: async (args) => {
+					if (args[0] === "issue")
+						return issueJson({
+							body: "## 実装手順\n1. 準備する\n2. 実行する\n",
+						});
+					return JSON.stringify([]);
+				},
+			}),
+		);
+		assert.equal("reviewRecordTemplate" in result, false);
+		assert.equal("designReviewRequirements" in result, false);
+	});
+
+	it("keeps later Markdown enumeration advisory instead of turning it into a review gate", async () => {
+		const bodies = {
+			1009: "## 対応案\n1. 案A\n",
+			1010: "普通の説明文。",
+			1008: "## 対応案\n1. 案A\n2. 案B\n",
+		};
+		const result = await runForIssueBodies([1009, 1010, 1008], bodies);
+		assert.equal("reviewRecordTemplate" in result, false);
+		assert.equal("designReviewRequirements" in result, false);
+	});
+
+	it("keeps ordinary fallback for a multi-issue set without multiple options", async () => {
+		const bodies = {
+			1009: "## 対応案\n1. 案A\n",
+			1010: "普通の説明文。",
+		};
+		const result = await runForIssueBodies([1009, 1010], bodies);
+		assert.equal("reviewRecordTemplate" in result, false);
+	});
+
+	it("asks for an explicit target while still returning decision material", async () => {
+		const calls = [];
+		const result = await runCycleStatus(
+			baseDeps({
+				sh: (_file, args) => {
+					if (args.includes(CLI_PATH)) return readyJsonOk(null);
+					return "";
+				},
+				execGh: async (args) => {
+					calls.push(args);
+					return JSON.stringify([]);
+				},
+			}),
+		);
+		assert.deepEqual(result.issueTargets, []);
+		assert.equal(
+			result.issueError,
+			"No --issue given. Choose a target from the ready list and rerun with --issue <number>; counts do not rank priority.",
+		);
+		assert.ok(!calls.some((c) => c[0] === "issue"));
+	});
+
+	it("does not read the roadmap to select an issue automatically", async () => {
+		const result = await runCycleStatus(
+			baseDeps({
+				sh: (_file, args) => {
+					if (args.includes(CLI_PATH)) return readyJsonOk("proc_a");
+					return "";
+				},
+				readFileSync: () => {
+					throw new Error("must not select a target");
+				},
+			}),
+		);
+		assert.deepEqual(result.issueTargets, []);
+		assert.match(result.issueError, /Choose a target/);
+		assert.equal(result.ready[0].newlyReadyCount, 2);
+	});
+
+	it("preserves an explicit target's roadmap read failure as the gate-command error", async () => {
+		const result = await runCycleStatus(
+			baseDeps({
+				issueNumbers: [42],
+				sh: (_file, args) => {
+					if (args.includes(CLI_PATH)) return readyJsonOk("proc_a");
+					return "";
+				},
+				readFileSync: () => {
+					throw new Error("roadmap unreadable");
+				},
+			}),
+		);
+		assert.equal(result.gateCheckCommand, null);
+		assert.match(result.gateCheckCommandError, /roadmap unreadable/);
+		assert.match(
+			result.gateCheckCommandError,
+			/^failed to read \.pfdsl\/roadmap\.pfdsl:/,
+		);
+	});
+
+	it("reports foreign issue locations without treating the same number as local", async () => {
+		const result = await runCycleStatus(
+			baseDeps({
+				issueNumbers: [42, 43],
+				execGh: async (args) =>
+					JSON.stringify(
+						args[0] === "issue" ? { labels: [{ name: "flow:managed" }] } : [],
+					),
+				readFileSync: () =>
+					roadmapWithIssue("proc_a", 42).replace(
+						"github.com/takasek/pfdsl",
+						"github.com/other/project",
+					),
+			}),
+		);
+		assert.equal(result.gateCheckCommand, null);
+		assert.equal(result.locationDiagnostics.length, 1);
+		assert.equal(result.locationDiagnostics[0].processId, "proc_a");
+		assert.match(result.locationDiagnostics[0].detail, /other\/project/);
+	});
+
+	it("identifies repository resolution failures separately from roadmap read failures", async () => {
+		const deps = baseDeps({
+			issueNumbers: [42],
+			readFileSync: () => roadmapWithIssue("proc_a", 42),
+		});
+		deps.githubOps.repository = () => {
+			throw new Error("origin is unavailable");
+		};
+		const result = await runCycleStatus(deps);
+		assert.equal(result.gateCheckCommand, null);
+		assert.equal(
+			result.gateCheckCommandError,
+			"failed to resolve issue repository: origin is unavailable",
+		);
+	});
+
+	it("identifies invalid roadmap YAML separately from file reads", async () => {
+		const result = await runCycleStatus(
+			baseDeps({
+				issueNumbers: [42],
+				readFileSync: () => "---\nprocess: [\n---\n",
+			}),
+		);
+		assert.equal(result.gateCheckCommand, null);
+		assert.match(
+			result.gateCheckCommandError,
+			/^failed to parse \.pfdsl\/roadmap\.pfdsl:/,
+		);
+	});
+
+	it("reports issueTargets with the gh error when the gh issue lookup throws", async () => {
+		const result = await runCycleStatus(
+			baseDeps({
+				issueNumbers: [669],
+				execGh: async (args) => {
+					if (args[0] === "issue") throw new Error("gh: issue not found");
+					return JSON.stringify([]);
+				},
+			}),
+		);
+		assert.deepEqual(result.issueTargets, [{ issue: 669, source: "flag" }]);
+		assert.equal(result.issueError, "gh: issue not found");
+		assert.equal(result.gateCheckCommand, null);
+		assert.equal(
+			result.gateCheckCommandError,
+			"cannot determine whether issue 669 is flow:exempt because its labels could not be fetched: gh: issue not found",
+		);
+	});
+
+	// Resolve the artifact via the explicit issue's process and graph neighbors.
+	it("resolves the gate-check artifact through the explicit issue's process", async () => {
+		const calls = [];
+		const result = await runCycleStatus(
+			baseDeps({
+				issueNumbers: [42],
+				sh: (_file, args) => {
+					calls.push(args);
+					if (args.includes("neighbors"))
+						return neighborsJsonOk(["proc_a_out"]);
+					if (args.includes(CLI_PATH)) return readyJsonOk("proc_a");
+					return "";
+				},
+				readFileSync: () => roadmapWithIssue("proc_a", 42),
+			}),
+		);
+		// The resolved issue rides along: the operator copies this line verbatim,
+		// so the checks that need --issue would otherwise SKIP every cycle (#669).
+		assert.equal(
+			result.gateCheckCommand,
+			"node scripts/gate-check.mjs --base main --artifact proc_a_out --issue 42",
+		);
+		assert.ok(
+			calls.some(
+				(args) => args.includes("neighbors") && args.includes("proc_a"),
+			),
+		);
+	});
+
+	// #828 widened `graph neighbors` to report `>>?` neighbors alongside the
+	// producer/consumer ones. The artifact under gate is the process's output, so
+	// a feedback neighbor must not be picked up as one.
+	it("takes the gate-check artifact from a primary successor, not a feedback one", async () => {
+		const result = await runCycleStatus(
+			baseDeps({
+				issueNumbers: [42],
+				sh: (_file, args) => {
+					if (args.includes("neighbors"))
+						return JSON.stringify({
+							ok: true,
+							predecessors: [],
+							successors: [
+								{ id: "loops_back", kind: "feedback" },
+								{ id: "proc_a_out", kind: "primary" },
+							],
+						});
+					if (args.includes(CLI_PATH)) return readyJsonOk("proc_a");
+					return "";
+				},
+				readFileSync: () => roadmapWithIssue("proc_a", 42),
+			}),
+		);
+		assert.equal(
+			result.gateCheckCommand,
+			"node scripts/gate-check.mjs --base main --artifact proc_a_out --issue 42",
+		);
+	});
+
+	it("resolves the gate-check artifact through the process an explicit --issue maps to", async () => {
+		const result = await runCycleStatus(
+			baseDeps({
+				issueNumbers: [669],
+				sh: (_file, args) => {
+					if (args.includes("neighbors")) return neighborsJsonOk(["art_x"]);
+					if (args.includes(CLI_PATH)) return readyJsonOk(null);
+					return "";
+				},
+				readFileSync: () => roadmapWithIssue("proc_x", 669),
+				execGh: async (args) => {
+					if (args[0] === "issue") return issueJson({ body: "普通の説明文。" });
+					return JSON.stringify([]);
+				},
+			}),
+		);
+		assert.equal(
+			result.gateCheckCommand,
+			"node scripts/gate-check.mjs --base main --artifact art_x --issue 669",
+		);
+		assert.equal(
+			result.wipUpdateCommand,
+			"node packages/cli/dist/cli.js meta set .pfdsl/roadmap.pfdsl art_x status wip",
+		);
+	});
+
+	it("quotes the artifact key in both suggested shell commands", async () => {
+		const result = await runCycleStatus(
+			baseDeps({
+				issueNumbers: [669],
+				sh: (_file, args) => {
+					if (args.includes("neighbors")) return neighborsJsonOk(["art key"]);
+					if (args.includes(CLI_PATH)) return readyJsonOk(null);
+					return "";
+				},
+				readFileSync: () => roadmapWithIssue("proc_x", 669),
+				execGh: async (args) => {
+					if (args[0] === "issue") return issueJson({ body: "普通の説明文。" });
+					return JSON.stringify([]);
+				},
+			}),
+		);
+		assert.equal(
+			result.gateCheckCommand,
+			"node scripts/gate-check.mjs --base main --artifact 'art key' --issue 669",
+		);
+		assert.equal(
+			result.wipUpdateCommand,
+			"node packages/cli/dist/cli.js meta set .pfdsl/roadmap.pfdsl 'art key' status wip",
+		);
+	});
+
+	// This is the actual shape of #800/#772/#794 themselves: all three are
+	// flow:exempt, so none has a roadmap process to resolve an artifact from.
+	it("falls back to --no-artifact when the --issue's issue has no roadmap process (exempt issue)", async () => {
+		const result = await runCycleStatus(
+			baseDeps({
+				issueNumbers: [800],
+				readFileSync: () => roadmapWithIssue("proc_x", 42),
+				execGh: async (args) => {
+					if (args[0] === "issue")
+						return issueJson({
+							body: "普通の説明文。",
+							labels: [{ name: "flow:exempt" }],
+						});
+					return JSON.stringify([]);
+				},
+			}),
+		);
+		assert.equal(
+			result.gateCheckCommand,
+			"node scripts/gate-check.mjs --base main --no-artifact --issue 800",
+		);
+		assert.equal(result.wipUpdateCommand, undefined);
+	});
+
+	it("uses the shared process's artifact when every --issue resolves to the same process", async () => {
+		const result = await runCycleStatus(
+			baseDeps({
+				issueNumbers: [667, 668],
+				sh: (_file, args) => {
+					if (args.includes("neighbors"))
+						return neighborsJsonOk(["shared_art"]);
+					return "";
+				},
+				readFileSync: () =>
+					roadmapWithIssues([
+						["proc_shared", 667],
+						["proc_shared", 668],
+					]),
+				execGh: async (args) => {
+					if (args[0] === "issue") return issueJson({ body: "普通の説明文。" });
+					return JSON.stringify([]);
+				},
+			}),
+		);
+		assert.equal(
+			result.gateCheckCommand,
+			"node scripts/gate-check.mjs --base main --artifact shared_art --issue 667 --issue 668",
+		);
+	});
+
+	it("requires artifact selection when target issues resolve to different processes", async () => {
+		const result = await runCycleStatus(
+			baseDeps({
+				issueNumbers: [667, 668],
+				sh: (_file, args) => {
+					if (args.includes("neighbors"))
+						return neighborsJsonOk([
+							args.includes("proc_a") ? "out_a" : "out_b",
+						]);
+					return "";
+				},
+				readFileSync: () =>
+					roadmapWithIssues([
+						["proc_a", 667],
+						["proc_b", 668],
+					]),
+				execGh: async (args) => {
+					if (args[0] === "issue") return issueJson({ body: "普通の説明文。" });
+					return JSON.stringify([]);
+				},
+			}),
+		);
+		assert.equal(result.gateCheckCommand, null);
+		assert.equal(result.wipUpdateCommand, undefined);
+		assert.match(result.gateCheckCommandError, /--artifact/);
+	});
+
+	it("returns a null gate-check command until a target is selected", async () => {
+		const result = await runCycleStatus(baseDeps());
+		assert.equal(result.gateCheckCommand, null);
+		assert.equal(
+			result.gateCheckCommandError,
+			"Choose a target and rerun with --issue <number> to resolve a gate-check command.",
+		);
+	});
+
+	it("reports why a managed process output cannot be resolved", async () => {
+		const result = await runCycleStatus(
+			baseDeps({
+				issueNumbers: [969],
+				sh: (_file, args) => {
+					if (args.includes("neighbors")) throw new Error("broken neighbors");
+					if (args.includes(CLI_PATH)) return readyJsonOk(null);
+					return "";
+				},
+				readFileSync: () => roadmapWithIssue("proc_x", 969),
+				execGh: async (args) => {
+					if (args[0] === "issue") return issueJson({ body: "普通の説明文。" });
+					return JSON.stringify([]);
+				},
+			}),
+		);
+		assert.equal(result.gateCheckCommand, null);
+		assert.equal(
+			result.gateCheckCommandError,
+			"failed to resolve the output artifact for process 'proc_x': broken neighbors",
+		);
+	});
+
+	it("reports that the built CLI is required to resolve a managed process output", async () => {
+		const result = await runCycleStatus(
+			baseDeps({
+				issueNumbers: [969],
+				existsSync: () => false,
+				readFileSync: () => roadmapWithIssue("proc_x", 969),
+				execGh: async (args) => {
+					if (args[0] === "issue") return issueJson({ body: "普通の説明文。" });
+					return JSON.stringify([]);
+				},
+			}),
+		);
+		assert.equal(result.gateCheckCommand, null);
+		assert.equal(
+			result.gateCheckCommandError,
+			"failed to resolve the output artifact for process 'proc_x': packages/cli/dist/cli.js not built; run 'pnpm -r build' first",
+		);
+	});
+
+	it("reports when graph neighbors has no primary output artifact", async () => {
+		const result = await runCycleStatus(
+			baseDeps({
+				issueNumbers: [969],
+				sh: (_file, args) => {
+					if (args.includes("neighbors")) return neighborsJsonOk([]);
+					if (args.includes(CLI_PATH)) return readyJsonOk(null);
+					return "";
+				},
+				readFileSync: () => roadmapWithIssue("proc_x", 969),
+				execGh: async (args) => {
+					if (args[0] === "issue") return issueJson({ body: "普通の説明文。" });
+					return JSON.stringify([]);
+				},
+			}),
+		);
+		assert.equal(result.gateCheckCommand, null);
+		assert.equal(
+			result.gateCheckCommandError,
+			"failed to resolve the output artifact for process 'proc_x': graph neighbors returned no primary successor",
+		);
+	});
+});
+
+describe("runCycleStatus release pending", () => {
+	it("carries the publishing backlog as report material, non-zero exit and all", async () => {
+		const result = await runCycleStatus(
+			baseDeps({
+				shTry: (_file, args) => {
+					assert.ok(args[0].endsWith("scripts/release-status.mjs"));
+					return {
+						ok: false,
+						status: 1,
+						out: "release-status:\n@pfdsl/cli 0.0.25 (37 commits ahead)\n",
+					};
+				},
+			}),
+		);
+		assert.deepEqual(result.releasePending, {
+			needsAction: true,
+			report: ["release-status:", "@pfdsl/cli 0.0.25 (37 commits ahead)"],
+		});
+	});
+
+	it("sets releasePendingError and leaves the field null when the runner throws", async () => {
+		const result = await runCycleStatus(
+			baseDeps({
+				shTry: () => {
+					throw new Error("spawn failed");
+				},
+			}),
+		);
+		assert.equal(result.releasePending, null);
+		assert.equal(result.releasePendingError, "spawn failed");
+	});
+});
+
+describe("runCycleStatus — unregistered flow:managed target issue (#963)", () => {
+	const issueJsonWithLabels = (labels) =>
+		JSON.stringify({ body: "普通の説明文。", comments: [], labels });
+
+	it("names a flow:managed target issue that has no process in the roadmap", async () => {
+		const result = await runCycleStatus(
+			baseDeps({
+				issueNumbers: [956],
+				sh: (_file, args) => {
+					if (args.includes(CLI_PATH)) return readyJsonOk(null);
+					return "";
+				},
+				readFileSync: () => roadmapWithIssue("proc_a", 42),
+				execGh: async (args) => {
+					if (args[0] === "issue")
+						return issueJsonWithLabels([{ name: "flow:managed" }]);
+					return JSON.stringify([]);
+				},
+			}),
+		);
+		assert.deepEqual(result.unregisteredManagedIssues, [956]);
+		assert.equal(result.gateCheckCommand, null);
+		assert.equal(
+			result.gateCheckCommandError,
+			"issue 956 is flow:managed but has no process in .pfdsl/roadmap.pfdsl",
+		);
+	});
+
+	it("stays quiet for a flow:exempt target issue", async () => {
+		const result = await runCycleStatus(
+			baseDeps({
+				issueNumbers: [963],
+				sh: (_file, args) => {
+					if (args.includes(CLI_PATH)) return readyJsonOk(null);
+					return "";
+				},
+				readFileSync: () => roadmapWithIssue("proc_a", 42),
+				execGh: async (args) => {
+					if (args[0] === "issue")
+						return issueJsonWithLabels([{ name: "flow:exempt" }]);
+					return JSON.stringify([]);
+				},
+			}),
+		);
+		assert.deepEqual(result.unregisteredManagedIssues, []);
+	});
+
+	it("does not attach a resolved artifact to a mixed set containing an unregistered managed issue", async () => {
+		const result = await runCycleStatus(
+			baseDeps({
+				issueNumbers: [42, 956],
+				sh: (_file, args) => {
+					if (args.includes("neighbors")) throw new Error("should not resolve");
+					if (args.includes(CLI_PATH)) return readyJsonOk(null);
+					return "";
+				},
+				readFileSync: () => roadmapWithIssue("proc_a", 42),
+				execGh: async (args) => {
+					if (args[0] !== "issue") return JSON.stringify([]);
+					const labels = args[2] === "956" ? [{ name: "flow:managed" }] : [];
+					return issueJsonWithLabels(labels);
+				},
+			}),
+		);
+		assert.equal(result.gateCheckCommand, null);
+		assert.equal(
+			result.gateCheckCommandError,
+			"issue 956 is flow:managed but has no process in .pfdsl/roadmap.pfdsl",
+		);
+	});
+
+	it("stays quiet when the managed issue already has a tracked process", async () => {
+		const result = await runCycleStatus(
+			baseDeps({
+				issueNumbers: [42],
+				sh: (_file, args) => {
+					if (args.includes(CLI_PATH)) return readyJsonOk(null);
+					return "";
+				},
+				readFileSync: () => roadmapWithIssue("proc_a", 42),
+				execGh: async (args) => {
+					if (args[0] === "issue")
+						return issueJsonWithLabels([{ name: "flow:managed" }]);
+					return JSON.stringify([]);
+				},
+			}),
+		);
+		assert.deepEqual(result.unregisteredManagedIssues, []);
+	});
+});
+
+describe("runCycleStatus — untriaged target issue (#983)", () => {
+	const issueJsonWithLabels = (labels) =>
+		JSON.stringify({ body: "普通の説明文。", comments: [], labels });
+
+	it("names a target issue with no flow labels and no tracked process", async () => {
+		const result = await runCycleStatus(
+			baseDeps({
+				issueNumbers: [983],
+				sh: (_file, args) => {
+					if (args.includes(CLI_PATH)) return readyJsonOk(null);
+					return "";
+				},
+				readFileSync: () => roadmapWithIssue("proc_a", 42),
+				execGh: async (args) => {
+					if (args[0] === "issue") return issueJsonWithLabels([]);
+					return JSON.stringify([]);
+				},
+			}),
+		);
+		assert.deepEqual(result.untriagedTargetIssues, [983]);
+	});
+
+	for (const label of ["flow:managed", "flow:exempt"]) {
+		it(`stays quiet for a target issue labelled ${label}`, async () => {
+			const result = await runCycleStatus(
+				baseDeps({
+					issueNumbers: [983],
+					sh: (_file, args) => {
+						if (args.includes(CLI_PATH)) return readyJsonOk(null);
+						return "";
+					},
+					readFileSync: () => roadmapWithIssue("proc_a", 42),
+					execGh: async (args) => {
+						if (args[0] === "issue")
+							return issueJsonWithLabels([{ name: label }]);
+						return JSON.stringify([]);
+					},
+				}),
+			);
+			assert.deepEqual(result.untriagedTargetIssues, []);
+		});
+	}
+
+	it("stays quiet when the target issue already has a tracked process", async () => {
+		const result = await runCycleStatus(
+			baseDeps({
+				issueNumbers: [42],
+				sh: (_file, args) => {
+					if (args.includes(CLI_PATH)) return readyJsonOk(null);
+					return "";
+				},
+				readFileSync: () => roadmapWithIssue("proc_a", 42),
+				execGh: async (args) => {
+					if (args[0] === "issue") return issueJsonWithLabels([]);
+					return JSON.stringify([]);
+				},
+			}),
+		);
+		assert.deepEqual(result.untriagedTargetIssues, []);
+	});
+});
+
+describe("runCycleStatus — issue lookup failure and unregisteredManagedIssues", () => {
+	it("retains every issue lookup failure in the blocking display reason", async () => {
+		const result = await runCycleStatus(
+			baseDeps({
+				issueNumbers: [956, 957],
+				execGh: async (args) => {
+					if (args[0] === "issue")
+						throw new Error(`lookup failed for ${args[2]}`);
+					return JSON.stringify([]);
+				},
+			}),
+		);
+		assert.deepEqual(result.issueLookupFailures, [
+			{ issue: 956, error: "lookup failed for 956" },
+			{ issue: 957, error: "lookup failed for 957" },
+		]);
+		assert.match(result.issueError, /956.*lookup failed for 956/);
+		assert.match(result.issueError, /957.*lookup failed for 957/);
+		assert.equal(result.blocking, true);
+	});
+
+	it("excludes an issue whose label lookup failed, and says so via issueError", async () => {
+		const result = await runCycleStatus(
+			baseDeps({
+				issueNumbers: [956],
+				sh: (_file, args) => {
+					if (args.includes(CLI_PATH)) return readyJsonOk(null);
+					return "";
+				},
+				readFileSync: () => roadmapWithIssue("proc_a", 42),
+				execGh: async (args) => {
+					if (args[0] === "issue") throw new Error("gh: network unreachable");
+					return JSON.stringify([]);
+				},
+			}),
+		);
+		// Reporting it as unregistered would be a false positive (its labels are
+		// unknown); reporting nothing at all would hide that the check never ran.
+		assert.deepEqual(result.unregisteredManagedIssues, []);
+		assert.deepEqual(result.untriagedTargetIssues, []);
+		assert.match(result.issueError, /network unreachable/);
+		assert.deepEqual(result.issueLookupFailures, [
+			{ issue: 956, error: "gh: network unreachable" },
+		]);
+		assert.equal(result.blocking, true);
+	});
+});

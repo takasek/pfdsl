@@ -1,0 +1,138 @@
+---
+name: prose-mechanization-audit
+description: |
+  Use to sweep this repo's prose assets (skills, commands, agents, `.pfdsl`
+  companions and bindings, CLAUDE.md) against the mechanism ledger that hooks
+  and check scripts actually form — prose still teaching a discipline a hook
+  now enforces, prose re-explaining what a script already prints, the same
+  paragraph restated within one layer, and prose whose taught command form a
+  guard now denies. Use when asked to audit these prose assets against the
+  hooks and checks, including a tanaoroshi request about this repo's prose
+  and mechanisms. Releases do not trigger this audit.
+---
+
+# 散文資産と機械化台帳の突合 sweep
+
+pfd-ops の運用契約「知見と機械化」とそれが指す binding にある散文の機械化検討は**書く時点**の規律であり、既に書かれて堆積した散文を洗う工程はどこにも無い。
+このスキルがその工程になる（#915）。
+ユーザーが散文と機構の突合を求めたときに実行する。
+`/tanaoroshi` 等の棚卸し依頼も、対象がこのリポの散文と hook・check ならこの手順を使う。
+リリースや追加ファイル数は起動条件にしない。
+
+## 対象
+
+- **散文資産**: `.claude/skills/`・`.claude/commands/`・`.claude/agents/`・`.pfdsl/*.md`・`.pfdsl/bindings/*.md`・`CLAUDE.md`
+- **機械化台帳**: `.claude/settings.json` が配線する hook と `scripts/` の実体
+
+`.pfdsl/bindings/pfd-retro-patterns/` は当時の観測と判断を残す歴史資料なので、現行規約の整理対象には含めない。
+`docs/spec/` は規範であって運用散文ではないため対象外。
+
+## 読む範囲を絞る
+
+前回 sweep の commit は `docs/asset-sweep/prose-mechanization.json` が持つ。
+
+```sh
+cat docs/asset-sweep/prose-mechanization.json   # 無ければ初回（下記の初回分岐へ）
+```
+
+このファイルが存在しないことは初回を意味する（`docs/asset-sweep/README.md`）。
+先回りして空のレコードを置く運用ではないので、不在は異常ではない。
+
+工程1 は毎回全件を実測する（台帳は小さく、差分で追うと配線だけ変わった機構を見落とす）。
+工程2 と工程5 は前回 sweep 以降に**増えた機構**を起点にする — 陳腐化させた側が新しい機構のほうであり、散文は古いまま動かないからである。
+
+```sh
+git diff --name-only --diff-filter=A --no-renames <前回 sweep commit> HEAD -- scripts/ hooks/ \
+  | grep -E '^(scripts|hooks)/[^/]+\.mjs$' | grep -v '\.test\.mjs$'
+```
+
+絞り込みは `scripts/`・`hooks/` 直下の非テスト `.mjs` を起点にする。
+`scripts/lib/` と `*.test.mjs` は独立した機構ではないが、起点の実装を読むときは追う。
+素の `-- scripts/ hooks/` で見ると、1つの check を実装分割しただけの refactor が機構3件に見える。
+
+工程3 と工程4 は散文側の変更分を起点にしてよい。
+
+```sh
+git diff --name-only <前回 sweep commit> HEAD -- .claude/skills/ .claude/commands/ .claude/agents/ \
+  .pfdsl/ CLAUDE.md ':!.pfdsl/bindings/pfd-retro-patterns'
+```
+
+除外指定を落とすと、過去事例を現行規約として直す対象へ混ぜてしまう。
+
+記録が無い（初回）場合は工程2〜5 でこの絞り込みが効かず、対象は散文資産の全件になる。
+
+## 1. hook / check 台帳を実測で列挙する
+
+一次情報は `.claude/settings.json` の配線と `scripts/` の実体のみ。
+issue の「見送り」「実装予定」の記述を台帳の代わりに読まない — 現物より遅れる（#650 で見送りとされた候補 C・D・H・I が後続サイクルで実装済みだった）。
+
+```sh
+node -e 'const s=JSON.parse(require("fs").readFileSync(".claude/settings.json","utf8"));
+for (const [event, entries] of Object.entries(s.hooks))
+  for (const e of entries)
+    for (const h of e.hooks) console.log(event, e.matcher ?? "*", h.command);'
+ls scripts/check-*.mjs
+```
+
+各機構について「何を検出し、deny / ask / advisory のどれで返すか」「メッセージが運ぶ情報は何か」を1行で書き出す。
+この1行が以降4工程すべての突合材料になるので、実際の出力文言まで見る（regex や条件式だけを読んで挙動を要約しない）。
+
+## 2. 機械化済み対策を語る散文を検出する
+
+台帳の各機構について、その機構が既に強制している規律を、散文がなお「気をつけて守れ」の形で説明していないか探す。
+判定は**残すか消すかの二択ではない**。機構の出力文言が全情報を運ぶなら散文は削除し、運ばない残余（機構が拾えない範囲・deny された後にどう直すか）だけを残す。
+どちらかを選ぶ前に機構を実際に走らせて出力を読む — 文言を推測したまま「hook が言うから消せる」と判断すると、消した情報がどこにも無くなる。
+先例の形を使う場合も、今回の機構が同じ入力・失敗時の扱い・通知・回復情報を持つかを実物から確認する。挙動や条件が異なるなら、先例の書き方だけを理由に説明を消さない。
+
+## 3. スクリプト出力を再説明する散文を検出する
+
+散文が、スクリプトが実行時に自分で印字する内容（項目名・判定条件・フィールドの意味）を先回りして列挙していないか探す。
+列挙は実装が変わるたび手で追随することになり、追随を保証する機構は無い（#560）。
+該当したら、散文からは一次情報の所在（どのファイルのどの定数・どの JSDoc が持つか）だけを指し、内容の複製を落とす。
+落とせない残余は「実行前に知っている必要がある入力契約」だけである — この区別が付かないうちは落とさない。
+
+## 4. 層内の同文再掲を検出する
+
+同じ層（スキル本文どうし・companion どうし・binding どうし）に、同じ規律を述べた段落が複数箇所へ写されていないか探す。
+
+各層で特徴的な語を `git grep -n` で当て、ヒットした本文を開いて重複を確認する。語の一致を意味の一致とはみなさない。
+複数箇所に同じ規律がある場合、**どれが一次情報かを決めてから**残りをポインタへ落とす。
+決めずに1箇所を消すと、残った側が一次情報を主張できないまま参照されることになる。
+
+## 5. 散文と機械の矛盾を検出する
+
+散文が教えるコマンド形・手順を、hook が deny / ask しないか確かめる。
+散文の中のコマンド例を実際に台帳の guard へ当てる。
+guard が読むのは生のコマンド行ではなく hook の payload なので、`{"tool_name":"Bash","tool_input":{"command":"<散文が教えるコマンド>"}}` を標準入力へ渡す。
+判定が出なければ allow である（guard は allow のとき何も印字しない）。
+実例: work-cycle.md が教えていた `gh issue view --comments` の形は本文を返さないため、そのまま従うと設計確定コメントは読めても本文を読み落とす（#912）。
+矛盾を見つけたら、散文と機構のどちらが正しいかを決める — 散文を直すとは限らない。
+
+## 各工程の直後に検査する
+
+```sh
+make check-docs
+```
+
+散文を削除・ポインタ化・書き換えた工程の直後に回す。
+Markdown の改行規約は pre-commit の staged 検査が担う。
+最後にまとめて回すと、どの工程の編集が壊したかを切り分ける手戻りが出る。
+散文を消す編集では `check-companion-bindings`（必須見出しの実在）が特に落ちやすい — 一次情報へのポインタだけを残したつもりで、見出しごと落としている場合がある。
+
+## 記録する
+
+結果を `docs/asset-sweep/<YYYY-MM-DD>-prose-mechanization.md` に書く。
+何を削除・ポインタ化・修正したか、判定に迷ったが手を付けなかった項目とその理由を含める。
+
+記録の2コミット手順は `docs/asset-sweep/README.md`「記録の確定」が一次情報。1コミット目には工程1〜5 の散文変更と実行記録を含め、2コミット目で `docs/asset-sweep/prose-mechanization.json` を確定する。
+
+実行記録の冒頭に、前回の記録の `date` からの日数・その間に追加された機構の件数・本回の findings 件数を書く。
+これらは監査範囲と結果の記録であり、次回の実行やリリースを強制する閾値には使わない。
+初回は前回が無いので、代わりに #915 のマージ日からの日数を書く。
+
+## このスキルを配布しない理由
+
+利用側リポは突合の片側である hook・check 台帳を持たない — `scripts/lib/gen-plugin.mjs` が配る `trees` / `files` / `whole` の一覧に `scripts/` も `.claude/settings.json` も入っていない。
+散文の側は事情が違い、`pfd-ops` 等の配布スキル本文は利用側リポにも実体として届く。
+ただしそれらの上流はこのリポであり、利用側で編集する経路が無いので、突合して直す工程はこちら側にしか置けない。
+`scripts/lib/gen-plugin.mjs` の `PLUGIN_SKILL_DIRS` に載せなければ配布されない — `distribution-review` / `spec-stress-test` / `vscode-ext-debug` と同じ扱い。

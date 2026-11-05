@@ -2,16 +2,97 @@ import { strict as assert } from "node:assert";
 import { test } from "node:test";
 
 import {
-	RELEASE_KINDS,
 	bumpVersionInPackageJson,
-	tagName,
+	parseReleaseArgs,
 	pinMarketplaceSourceToTag,
-	filesToCommitForBump,
-	releaseMilestoneArtifactIds,
+	RELEASE_KINDS,
+	releaseMilestoneCandidateArtifactIds,
+	tagName,
 } from "./release-config.mjs";
 
+test("parseReleaseArgs requires prepare to carry a version", () => {
+	assert.deepEqual(
+		parseReleaseArgs(["cli", "prepare", "--version", "0.0.21"]),
+		{
+			kindArg: "cli",
+			phase: "prepare",
+			version: "0.0.21",
+			commit: undefined,
+		},
+	);
+	assert.throws(
+		() => parseReleaseArgs(["cli", "prepare"]),
+		/--version is required for prepare/,
+	);
+	assert.throws(
+		() => parseReleaseArgs(["cli", "prepare", "--version", ""]),
+		/--version is required for prepare/,
+	);
+});
+
+test("parseReleaseArgs requires publish to carry a full commit and rejects version", () => {
+	const commit = "0123456789abcdef0123456789abcdef01234567";
+	assert.deepEqual(parseReleaseArgs(["libs", "publish", "--commit", commit]), {
+		kindArg: "libs",
+		phase: "publish",
+		version: undefined,
+		commit,
+	});
+	assert.throws(
+		() => parseReleaseArgs(["libs", "publish", "--version", "0.0.21"]),
+		/--version is not allowed for publish/,
+	);
+	assert.throws(
+		() => parseReleaseArgs(["libs", "publish", "--commit", "abc"]),
+		/full 40-character commit SHA is required/,
+	);
+});
+
+test("parseReleaseArgs rejects a missing phase and unknown arguments", () => {
+	assert.throws(
+		() => parseReleaseArgs(["cli"]),
+		/expected release kind and phase/,
+	);
+	assert.throws(
+		() => parseReleaseArgs(["cli", "publish", "--unknown"]),
+		/Unknown option/,
+	);
+});
+
+test("parseReleaseArgs accepts an explicit source config only for CLI publication", () => {
+	const args = [
+		"cli",
+		"publish",
+		"--commit",
+		"0123456789abcdef0123456789abcdef01234567",
+		"--source-config",
+		"/settings/wiki.json",
+	];
+	assert.equal(parseReleaseArgs(args).sourceConfig, "/settings/wiki.json");
+	assert.throws(
+		() =>
+			parseReleaseArgs([
+				"cli",
+				"prepare",
+				"--version",
+				"0.0.21",
+				"--source-config",
+				"/settings/wiki.json",
+			]),
+		/only.*CLI publish/,
+	);
+	assert.throws(
+		() => parseReleaseArgs(["libs", ...args.slice(1)]),
+		/only.*CLI publish/,
+	);
+});
+
 test("RELEASE_KINDS has the three known kinds with distinct tag prefixes", () => {
-	assert.deepEqual(Object.keys(RELEASE_KINDS).sort(), ["cli", "libs", "vscode"]);
+	assert.deepEqual(Object.keys(RELEASE_KINDS).sort(), [
+		"cli",
+		"libs",
+		"vscode",
+	]);
 	const prefixes = Object.values(RELEASE_KINDS).map((k) => k.tagPrefix);
 	assert.equal(new Set(prefixes).size, prefixes.length);
 });
@@ -33,13 +114,16 @@ test("libs kind targets the three library packages and watches publish-libraries
 });
 
 test("vscode kind has no GHA workflow to watch (local vsce packaging instead)", () => {
-	assert.deepEqual(RELEASE_KINDS.vscode.packages, ["packages/vscode-extension/package.json"]);
+	assert.deepEqual(RELEASE_KINDS.vscode.packages, [
+		"packages/vscode-extension/package.json",
+	]);
 	assert.equal(RELEASE_KINDS.vscode.tagPrefix, "vscode-v");
 	assert.equal(RELEASE_KINDS.vscode.workflow, null);
 });
 
 test("bumpVersionInPackageJson rewrites only the version field, preserving key order and trailing newline", () => {
-	const before = '{\n\t"name": "@pfdsl/cli",\n\t"version": "0.0.17",\n\t"type": "module"\n}\n';
+	const before =
+		'{\n\t"name": "@pfdsl/cli",\n\t"version": "0.0.17",\n\t"type": "module"\n}\n';
 	const after = bumpVersionInPackageJson(before, "0.0.18");
 	assert.equal(
 		after,
@@ -94,43 +178,93 @@ test("pinMarketplaceSourceToTag updates ref on an already-pinned source", () => 
 });
 
 test("pinMarketplaceSourceToTag preserves tab indentation and trailing newline", () => {
-	const before = '{\n\t"plugins": [\n\t\t{ "name": "pfdsl", "source": "./plugin/pfdsl" }\n\t]\n}\n';
+	const before =
+		'{\n\t"plugins": [\n\t\t{ "name": "pfdsl", "source": "./plugin/pfdsl" }\n\t]\n}\n';
 	const after = pinMarketplaceSourceToTag(before, "v0.0.19");
 	assert.match(after, /\n$/);
 	assert.match(after, /\t"plugins"/);
 });
 
-test("filesToCommitForBump includes plugin/pfdsl for cli releases, since gen-plugin mirrors packages/cli/package.json's version", () => {
-	assert.deepEqual(filesToCommitForBump("cli", RELEASE_KINDS.cli), ["packages/cli/package.json", "plugin"]);
-});
-
-test("filesToCommitForBump excludes plugin/pfdsl for libs and vscode releases, which don't touch the cli version", () => {
-	assert.deepEqual(filesToCommitForBump("libs", RELEASE_KINDS.libs), RELEASE_KINDS.libs.packages);
-	assert.deepEqual(filesToCommitForBump("vscode", RELEASE_KINDS.vscode), RELEASE_KINDS.vscode.packages);
-});
-
-test("releaseMilestoneArtifactIds collects outputs of ready processes whose id starts with the given prefix", () => {
+test("release candidates intersect ready processes with tag-selected IDs", () => {
 	const ready = [
-		{ id: "publish_cli_ansi_color", label: "x", inputs: [], outputs: ["cli_release_ansi_color"] },
-		{ id: "implement_something", label: "x", inputs: [], outputs: ["something"] },
+		{ id: "ship_tools", outputs: ["cli_release"] },
+		{ id: "publish_cli_legacy", outputs: ["not_tagged"] },
+		{ id: "ship_extension", outputs: ["extension"] },
 	];
-	assert.deepEqual(releaseMilestoneArtifactIds(ready), ["cli_release_ansi_color"]);
+	assert.deepEqual(
+		releaseMilestoneCandidateArtifactIds(ready, ["ship_tools", "not_ready"]),
+		["cli_release"],
+	);
 });
 
-test("releaseMilestoneArtifactIds returns an empty array when no ready process matches the prefix", () => {
-	const ready = [{ id: "implement_something", label: "x", inputs: [], outputs: ["something"] }];
-	assert.deepEqual(releaseMilestoneArtifactIds(ready), []);
+test("releaseMilestoneCandidateArtifactIds collects outputs of tag-selected ready processes", () => {
+	const ready = [
+		{
+			id: "publish_cli_ansi_color",
+			label: "x",
+			inputs: [],
+			outputs: ["cli_release_ansi_color"],
+		},
+		{
+			id: "implement_something",
+			label: "x",
+			inputs: [],
+			outputs: ["something"],
+		},
+	];
+	assert.deepEqual(
+		releaseMilestoneCandidateArtifactIds(ready, ["publish_cli_ansi_color"]),
+		["cli_release_ansi_color"],
+	);
 });
 
-test("releaseMilestoneArtifactIds flattens outputs across multiple matching processes", () => {
+test("releaseMilestoneCandidateArtifactIds returns an empty array when no ready process is selected by the tag", () => {
+	const ready = [
+		{
+			id: "implement_something",
+			label: "x",
+			inputs: [],
+			outputs: ["something"],
+		},
+	];
+	assert.deepEqual(releaseMilestoneCandidateArtifactIds(ready, []), []);
+});
+
+test("releaseMilestoneCandidateArtifactIds flattens outputs across multiple matching processes", () => {
 	const ready = [
 		{ id: "publish_cli_a", label: "x", inputs: [], outputs: ["cli_release_a"] },
-		{ id: "publish_cli_b", label: "x", inputs: [], outputs: ["cli_release_b1", "cli_release_b2"] },
+		{
+			id: "publish_cli_b",
+			label: "x",
+			inputs: [],
+			outputs: ["cli_release_b1", "cli_release_b2"],
+		},
 	];
-	assert.deepEqual(releaseMilestoneArtifactIds(ready), ["cli_release_a", "cli_release_b1", "cli_release_b2"]);
+	assert.deepEqual(
+		releaseMilestoneCandidateArtifactIds(ready, [
+			"publish_cli_a",
+			"publish_cli_b",
+		]),
+		["cli_release_a", "cli_release_b1", "cli_release_b2"],
+	);
 });
 
-test("releaseMilestoneArtifactIds respects a custom prefix", () => {
-	const ready = [{ id: "publish_ext_foo", label: "x", inputs: [], outputs: ["ext_foo"] }];
-	assert.deepEqual(releaseMilestoneArtifactIds(ready, "publish_ext_"), ["ext_foo"]);
+test("releaseMilestoneCandidateArtifactIds accepts IDs selected for another release kind", () => {
+	const ready = [
+		{ id: "publish_ext_foo", label: "x", inputs: [], outputs: ["ext_foo"] },
+	];
+	assert.deepEqual(
+		releaseMilestoneCandidateArtifactIds(ready, ["publish_ext_foo"]),
+		["ext_foo"],
+	);
+});
+
+test("release candidates never fall back to the old prefix", () => {
+	assert.deepEqual(
+		releaseMilestoneCandidateArtifactIds(
+			[{ id: "publish_cli_old", outputs: ["old"] }],
+			[],
+		),
+		[],
+	);
 });

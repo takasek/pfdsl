@@ -18,44 +18,15 @@
  */
 
 import { readFileSync } from "node:fs";
-import { execSync } from "node:child_process";
-import {
-	findForwardRefMarkers,
-	findImplementsMarkers,
-	matchResolvedForwardRefs,
-	formatResolvedForwardRefs,
-} from "./lib/forward-ref-marker-check.mjs";
+import { runForwardRefMarkerCheck } from "./lib/forward-ref-marker-check-steps.mjs";
+import { gitLsFiles } from "./lib/run-exec.mjs";
 
 const args = process.argv.slice(2);
-const files =
-	args.length > 0
-		? args
-		: execSync('git ls-files "docs/**/*.md"', { encoding: "utf8" })
-				.trim()
-				.split("\n")
-				.filter(Boolean);
+const listFiles = () => gitLsFiles(["docs/**/*.md"]);
 
-const forwardRefHits = [];
-const implementsHits = [];
-for (const file of files) {
-	const text = readFileSync(file, "utf8");
-	for (const hit of findForwardRefMarkers(text)) {
-		forwardRefHits.push({ file, ...hit });
-	}
-	for (const hit of findImplementsMarkers(text)) {
-		implementsHits.push({ file, ...hit });
-	}
-}
-
-const resolved = matchResolvedForwardRefs(forwardRefHits, implementsHits);
-
-if (resolved.length > 0) {
-	console.log(
-		`check-forward-ref-markers: ${resolved.length} forward-ref marker(s) likely resolved — confirm and update the referenced text:\n`,
-	);
-	console.log(formatResolvedForwardRefs(resolved));
-} else {
-	console.log(
-		"check-forward-ref-markers: no resolved forward-ref markers found",
-	);
-}
+const { lines } = runForwardRefMarkerCheck({
+	args,
+	listFiles,
+	readFile: (file) => readFileSync(file, "utf8"),
+});
+for (const line of lines) console.log(line);

@@ -1,0 +1,16 @@
+# Public copy: checkout paths made relative; original local log retained.
+
+ RUN  v1.6.1 packages/editor
+
+ ✓ src/connector-logic.test.ts  (50 tests) 13ms
+ ✓ src/preview-graph.test.ts  (2 tests) 10ms
+ ✓ src/edit-navigation-contract.test.ts  (6 tests) 26ms
+ ✓ src/preview-ux.test.ts  (11 tests) 53ms
+ ✓ src/preview-actions.test.ts  (14 tests) 104ms
+ ✓ src/connections-panel.test.ts  (52 tests) 193ms
+
+ Test Files  6 passed (6)
+      Tests  135 passed (135)
+   Start at  09:11:38
+   Duration  604ms (transform 226ms, setup 0ms, collect 657ms, tests 399ms, environment 617ms, prepare 209ms)
+

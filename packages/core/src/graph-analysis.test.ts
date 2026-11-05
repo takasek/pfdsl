@@ -4,10 +4,11 @@ import {
 	computeDependsOn,
 	computeImpact,
 	computeNeighbors,
+	computeOrphans,
 	computePaths,
 	computeStats,
 } from "./graph-analysis.js";
-import type { NormalizedEdge } from "./types/index.js";
+import type { Graph, NormalizedEdge } from "./types/index.js";
 
 // req >> design -> spec >> build -> code
 //                spec >> review -> report
@@ -31,25 +32,82 @@ const kinds = new Map<string, "artifact" | "process">([
 const graph = buildGraph(edges, kinds);
 
 describe("computeNeighbors", () => {
+	// `report >>? design`: the report feeds back into the process that produced
+	// the spec it reviews.
+	const withFeedback = buildGraph(
+		[...edges, { kind: "feedback", artifact: "report", process: "design" }],
+		kinds,
+	);
+
 	it("returns predecessors (in-edges) and successors (out-edges) of an artifact", () => {
 		expect(computeNeighbors(graph, "spec")).toEqual({
-			predecessors: ["design"],
-			successors: ["build", "review"],
+			predecessors: [{ id: "design", kind: "primary" }],
+			successors: [
+				{ id: "build", kind: "primary" },
+				{ id: "review", kind: "primary" },
+			],
+			neighborKind: "process",
 		});
 	});
 
 	it("returns predecessors and successors of a process", () => {
 		expect(computeNeighbors(graph, "build")).toEqual({
-			predecessors: ["spec"],
-			successors: ["code"],
+			predecessors: [{ id: "spec", kind: "primary" }],
+			successors: [{ id: "code", kind: "primary" }],
+			neighborKind: "artifact",
 		});
 	});
 
 	it("returns empty arrays for a node with no edges on one side", () => {
 		expect(computeNeighbors(graph, "req")).toEqual({
 			predecessors: [],
-			successors: ["design"],
+			successors: [{ id: "design", kind: "primary" }],
+			neighborKind: "process",
 		});
+	});
+
+	// A `>>?` neighbor is a direct edge of the node, so a query for direct
+	// neighbors that omits it returns an image with the feedback wiring missing
+	// — which is exactly what audits of feedback wiring use this for (#828).
+	it("reports the artifact of an incoming feedback edge as a predecessor", () => {
+		expect(computeNeighbors(withFeedback, "design")).toEqual({
+			predecessors: [
+				{ id: "req", kind: "primary" },
+				{ id: "report", kind: "feedback" },
+			],
+			successors: [{ id: "spec", kind: "primary" }],
+			neighborKind: "artifact",
+		});
+	});
+
+	it("reports the process of an outgoing feedback edge as a successor", () => {
+		expect(computeNeighbors(withFeedback, "report")).toEqual({
+			predecessors: [{ id: "review", kind: "primary" }],
+			successors: [{ id: "design", kind: "feedback" }],
+			neighborKind: "process",
+		});
+	});
+
+	// Every edge runs artifact -> process or process -> artifact (`buildGraph`
+	// assigns the endpoints per edge kind, and N002 rejects a file that uses one
+	// id as both), so a node's neighbors all share the opposite kind. Reporting
+	// it once per query saves the caller a `describe` per neighbor (#844).
+	it("reports the neighbors' shared kind as the opposite of an artifact's", () => {
+		expect(computeNeighbors(graph, "spec").neighborKind).toBe("process");
+	});
+
+	it("reports the neighbors' shared kind as the opposite of a process's", () => {
+		expect(computeNeighbors(graph, "build").neighborKind).toBe("artifact");
+	});
+
+	// A group is declared in front matter but never appears on an edge (N004
+	// again), so it has no neighbors and no opposite kind to name.
+	it("reports no neighbor kind for a group", () => {
+		const withGroup = buildGraph(
+			edges,
+			new Map([...kinds, ["frontend", "group" as const]]),
+		);
+		expect(computeNeighbors(withGroup, "frontend").neighborKind).toBe(null);
 	});
 });
 
@@ -94,11 +152,143 @@ describe("computePaths", () => {
 });
 
 describe("computeStats", () => {
+	// The test below only pins the top entry, which is the sole node with the
+	// highest degree — the "then id asc" half of the contract went unchecked
+	// even though the fixture has three nodes tied at degree 2 (#637).
+	it("breaks a degree tie by id, ascending", () => {
+		const tied = computeStats(graph)
+			.filter((s) => s.fanIn + s.fanOut === 2)
+			.map((s) => s.id);
+		expect(tied).toEqual([...tied].sort());
+		expect(tied.length).toBeGreaterThan(1);
+	});
+
 	it("computes fan-in/fan-out per node, sorted by total degree desc then id asc", () => {
 		const stats = computeStats(graph);
 		const spec = stats.find((s) => s.id === "spec");
-		expect(spec).toEqual({ id: "spec", kind: "artifact", fanIn: 1, fanOut: 2 });
+		expect(spec).toEqual({
+			id: "spec",
+			kind: "artifact",
+			fanIn: 1,
+			fanOut: 2,
+			feedbackFanIn: 0,
+			feedbackFanOut: 0,
+		});
 		// spec has the highest total degree (3) among all nodes
 		expect(stats[0]?.id).toBe("spec");
+	});
+
+	// `report >>? design`. Why the feedback degree is reported apart rather than
+	// added in: see computeStats' doc comment (#831).
+	const withFeedback = buildGraph(
+		[...edges, { kind: "feedback", artifact: "report", process: "design" }],
+		kinds,
+	);
+
+	it("counts an incoming feedback edge in feedbackFanIn, not fanIn", () => {
+		const design = computeStats(withFeedback).find((s) => s.id === "design");
+		expect(design).toEqual({
+			id: "design",
+			kind: "process",
+			fanIn: 1,
+			fanOut: 1,
+			feedbackFanIn: 1,
+			feedbackFanOut: 0,
+		});
+	});
+
+	it("counts an outgoing feedback edge in feedbackFanOut, not fanOut", () => {
+		const report = computeStats(withFeedback).find((s) => s.id === "report");
+		expect(report).toEqual({
+			id: "report",
+			kind: "artifact",
+			fanIn: 1,
+			fanOut: 0,
+			feedbackFanIn: 0,
+			feedbackFanOut: 1,
+		});
+	});
+
+	// Two consumers read the ranking itself. Letting feedback into the sort key
+	// would reorder it: on .pfdsl/workflow.pfdsl, 33 of 73 nodes carry feedback
+	// and every one of the top 10 places changes.
+	it("ranks on the primary degree alone, ignoring feedback", () => {
+		const ids = (g: Graph) => computeStats(g).map((s) => s.id);
+		expect(ids(withFeedback)).toEqual(ids(graph));
+	});
+
+	// A node held only by `>>?` — workflow.pfdsl's pfdsl_skill is the real one.
+	// It is the sharpest case of the primary-only sort key: zero primary degree
+	// puts it near the bottom however much feedback it carries, which is why the
+	// skill tells a connectivity sweep not to pass --limit.
+	it("gives a node held only by feedback a zero primary degree", () => {
+		const heldOnlyByFeedback = buildGraph(
+			[...edges, { kind: "feedback", artifact: "guide", process: "review" }],
+			new Map([...kinds, ["guide", "artifact"] as const]),
+		);
+		const stats = computeStats(heldOnlyByFeedback);
+		expect(stats.find((s) => s.id === "guide")).toEqual({
+			id: "guide",
+			kind: "artifact",
+			fanIn: 0,
+			fanOut: 0,
+			feedbackFanIn: 0,
+			feedbackFanOut: 1,
+		});
+		// Last place, tied at primary degree 0 with nothing else here.
+		expect(stats.at(-1)?.id).toBe("guide");
+	});
+});
+
+describe("computeOrphans", () => {
+	it("returns nothing when every node carries a primary edge", () => {
+		expect(computeOrphans(graph)).toEqual([]);
+	});
+
+	it("returns a node wired to nothing at all", () => {
+		const withStray = buildGraph(
+			edges,
+			new Map([...kinds, ["stray", "artifact"]]),
+		);
+		expect(computeOrphans(withStray)).toEqual([
+			{ id: "stray", kind: "artifact" },
+		]);
+	});
+
+	// A group is a container for artifacts and processes and never carries an
+	// edge, so counting it as a node makes every group in the file an orphan.
+	// Measured before the fix: pipeline.pfdsl reported 5 orphans, all 5
+	// of them groups (#676).
+	it("never reports a group, which by construction has no edges", () => {
+		const withGroup = buildGraph(
+			edges,
+			new Map<string, "artifact" | "process" | "group">([
+				...kinds,
+				["planning", "group"],
+			]),
+		);
+		expect(computeOrphans(withGroup)).toEqual([]);
+	});
+
+	// A node reachable only by `>>?` is a shape the notation supports on
+	// purpose: workflow.pfdsl's pfdsl_skill says so in its own description
+	// (#704). "Fully disconnected" is what the help text already promises.
+	it("does not report a node held only by a feedback edge", () => {
+		const withFeedback = buildGraph(
+			[...edges, { kind: "feedback", artifact: "guide", process: "review" }],
+			new Map([...kinds, ["guide", "artifact"]]),
+		);
+		expect(computeOrphans(withFeedback)).toEqual([]);
+	});
+
+	it("reports a node whose only would-be partner is itself unwired", () => {
+		const two = buildGraph(
+			edges,
+			new Map([...kinds, ["stray_a", "artifact"], ["stray_b", "artifact"]]),
+		);
+		expect(computeOrphans(two).map((o) => o.id)).toEqual([
+			"stray_a",
+			"stray_b",
+		]);
 	});
 });

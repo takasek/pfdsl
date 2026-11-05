@@ -1,0 +1,288 @@
+import { analyzeSource, format } from "@pfdsl/core";
+import { describe, expect, it } from "vitest";
+import {
+	analyzeDependencySnapshot,
+	analyzeSnapshot,
+	findNodeOccurrenceRanges,
+	nodeIdAtSourcePosition,
+	positionOfNodeId,
+} from "./index.js";
+import { hasBodyRange, snapshotCoordinates } from "./source-coordinates.js";
+
+const ids = [
+	["ascii", "ascii"],
+	["日本語", "日本語"],
+	["成果😀", '"成果😀"'],
+	["𐐀node", "𐐀node"],
+] as const;
+
+describe.each(["\n", "\r\n"])("editor source coordinates with %j", (eol) => {
+	describe.each([false, true])("frontmatter %s", (withFrontmatter) => {
+		it.each(
+			ids,
+		)("selects and resolves all authored occurrences of %s", (id, token) => {
+			const prefix = withFrontmatter
+				? [
+						"---",
+						'title: "先行😀"',
+						`artifact: {${token}: {}}`,
+						"---",
+						"",
+					].join(eol)
+				: "";
+			const body = `"先行😀😀" >> p -> ${token}${eol}${token} >> next -> finish${eol}`;
+			const source = prefix + body;
+			const model = analyzeSnapshot(source);
+			const ranges = findNodeOccurrenceRanges(model, source, id);
+			expect(ranges).toHaveLength(withFrontmatter ? 3 : 2);
+			for (const range of ranges) {
+				expect(source.slice(range.start.offset, range.end.offset)).toBe(token);
+				const line = source.split("\n")[range.start.line - 1]!;
+				expect(line.slice(range.start.column - 1, range.end.column - 1)).toBe(
+					token,
+				);
+				expect(
+					nodeIdAtSourcePosition(model, source, {
+						line: range.start.line - 1,
+						character: range.end.column - 1,
+					}),
+				).toBe(id);
+			}
+			const bodyLine = withFrontmatter ? 4 : 0;
+			expect(positionOfNodeId(model.document.statements, id)).toEqual({
+				line: bodyLine,
+				column: source.split("\n")[bodyLine]!.indexOf(token),
+			});
+			// Core's formatter and body-relative AST stay on their existing contract.
+			const raw = analyzeSource(source);
+			expect(raw.document.statements[0]!.start.offset).toBe(0);
+			expect(
+				format(source).diagnostics.filter((d) => d.severity === "error"),
+			).toEqual([]);
+		});
+
+		it.each([
+			['"先行😀😀" >> p -> @', "L002", "@"],
+			['["先行😀😀", ] >> p', "P003", "]"],
+		])("maps the %s diagnostic to the exact offending source span", (body, code, token) => {
+			const prefix = withFrontmatter
+				? ["---", "title: Keep", "---", ""].join(eol)
+				: "";
+			const source = prefix + body + eol;
+			const diagnostic = analyzeSnapshot(source).diagnostics.find(
+				(d) => d.code === code,
+			)!;
+			expect(diagnostic).toBeDefined();
+			expect(
+				source.slice(
+					diagnostic.range.start.offset,
+					diagnostic.range.end.offset,
+				),
+			).toBe(token);
+			const line = source.split("\n")[diagnostic.range.start.line - 1]!;
+			expect(
+				line.slice(
+					diagnostic.range.start.column - 1,
+					diagnostic.range.end.column - 1,
+				),
+			).toBe(token);
+		});
+	});
+
+	it("preserves frontmatter diagnostics and document-wide zero ranges", () => {
+		const source = [
+			"---",
+			"type: pipeline",
+			'artifact: {"成果😀": {status: done}}',
+			"---",
+			'"成果😀" >> p -> "成果😀"',
+			"",
+		].join(eol);
+		const raw = analyzeSource(source);
+		const model = analyzeSnapshot(source);
+		expect(model.sourceMap).toEqual(raw.sourceMap);
+		expect(model.diagnostics.filter((d) => !hasBodyRange(d.code))).toEqual(
+			raw.diagnostics.filter((d) => !hasBodyRange(d.code)),
+		);
+		expect(model.diagnostics.some((d) => d.code === "W007")).toBe(true);
+	});
+});
+
+it("retains raw YAML dependency coordinates after removing only the wrapper", () => {
+	const source = 'title: "先行😀"\ngroup: {g: {parent: 2}}\n';
+	const diagnostic = analyzeDependencySnapshot(
+		"/project/preset.yaml",
+		source,
+	).diagnostics.find((d) => d.code === "FM004")!;
+	expect(
+		source.slice(diagnostic.range.start.offset, diagnostic.range.end.offset),
+	).toBe("2");
+	expect(diagnostic.range.start.line).toBe(2);
+});
+
+it.each(["ascii", "日本語"])("retains ordinary editor columns for %s", (id) => {
+	const source = `input >> p -> ${id}\n`;
+	const model = analyzeSnapshot(source);
+	const range = findNodeOccurrenceRanges(model, source, id)[0]!;
+	expect(range.start.column).toBe(source.indexOf(id) + 1);
+	expect(range.end.column).toBe(source.indexOf(id) + id.length + 1);
+});
+
+it.each([
+	"\n",
+	"\r\n",
+])("adapts every statement and expression endpoint without mutating core (%j)", (eol) => {
+	const prefix = ["---", "title: Keep", "---", ""].join(eol);
+	const body = [
+		'["成果😀", 日本語] >> p -> "次😀" >> q',
+		'"成果😀" >> p',
+		'"成果😀" >>? p',
+		'p -> "成果😀"',
+		'"成果😀"',
+		"",
+	].join(eol);
+	const source = prefix + body;
+	const raw = analyzeSource(source);
+	const before = structuredClone(raw.document);
+	const model = snapshotCoordinates(raw, source);
+	expect(model.document.statements.map((s) => s.type)).toEqual([
+		"chain",
+		"input-edge",
+		"feedback-edge",
+		"output-edge",
+		"node-decl",
+	]);
+	function assertEndpoints(value: unknown) {
+		if (Array.isArray(value)) {
+			for (const child of value) assertEndpoints(child);
+		} else if (value && typeof value === "object") {
+			if ("offset" in value && "line" in value && "column" in value) {
+				const position = value as {
+					offset: number;
+					line: number;
+					column: number;
+				};
+				const previous = source.slice(0, position.offset).split("\n");
+				expect(position.line).toBe(previous.length);
+				expect(position.column).toBe(previous.at(-1)!.length + 1);
+			} else {
+				for (const child of Object.values(value)) assertEndpoints(child);
+			}
+		}
+	}
+	assertEndpoints(model.document);
+	expect(raw.document).toEqual(before);
+	expect(raw.document.statements[0]!.start.offset).toBe(0);
+});
+
+it.each([
+	"\n",
+	"\r\n",
+])("adapts the V036 edge range to full-source UTF-16 coordinates (%j)", (eol) => {
+	const prefix = ["---", "title: Keep", "---", ""].join(eol);
+	const body = ['"成果😀" >> p -> b', '"成果😀" >>? p', ""].join(eol);
+	const source = prefix + body;
+	const diagnostic = analyzeSnapshot(source).diagnostics.find(
+		(d) => d.code === "V036",
+	)!;
+	const start = source.indexOf('"成果😀" >>? p');
+	const end = start + '"成果😀" >>? p'.length;
+	expect(diagnostic.range).toEqual({
+		start: { line: 5, column: 1, offset: start },
+		end: { line: 5, column: '"成果😀" >>? p'.length + 1, offset: end },
+	});
+});
+
+it.each([
+	"\n",
+	"\r\n",
+])("adapts body-derived graph diagnostic ranges to full-source UTF-16 coordinates (%j)", (eol) => {
+	const prefix = ["---", "process:", "  orphan: { label: O }", "---", ""].join(
+		eol,
+	);
+	const body = [
+		'"成果😀" >> p -> b',
+		"b >> q -> c",
+		"c >> r -> b",
+		"s -> d",
+		"",
+	].join(eol);
+	const source = prefix + body;
+	const diagnostics = analyzeSnapshot(source).diagnostics;
+	/** The first `length` UTF-16 units of the unique `text` on `line`. */
+	const span = (line: number, text: string, length = text.length) => {
+		const offset = source.indexOf(text);
+		const column = offset - source.lastIndexOf("\n", offset - 1);
+		return {
+			start: { line, column, offset },
+			end: { line, column: column + length, offset: offset + length },
+		};
+	};
+
+	expect(diagnostics.find((d) => d.code === "V010")!.range).toEqual(
+		span(7, "r -> b"),
+	);
+	expect(diagnostics.find((d) => d.code === "V002")!.range).toEqual(
+		span(8, "s -> d", 1),
+	);
+	// Front-matter declarations already carry full-source coordinates.
+	expect(diagnostics.find((d) => d.code === "V020")!.range).toEqual(
+		analyzeSource(source).diagnostics.find((d) => d.code === "V020")!.range,
+	);
+});
+
+describe.each(["\n", "\r\n"])("located graph diagnostics with %j", (eol) => {
+	const prefix = ["---", "process:", "  orphan: { label: O }", "---", ""].join(
+		eol,
+	);
+	const bodyStartLine = 5;
+	const covered = ["V001", "V002", "V003", "V010", "W008", "V036"];
+	const body = [
+		'"成果😀" >> p -> b',
+		"b >> q -> c",
+		"c >> r -> b",
+		"s -> d",
+		"d >> t",
+		"x >>? w -> y",
+		"e >> u -> f",
+		"e >>? u",
+		"",
+	].join(eol);
+	const source = prefix + body;
+	const diagnostics = analyzeSnapshot(source).diagnostics;
+
+	it("triggers every converted graph code the check below relies on", () => {
+		for (const code of covered)
+			expect(
+				diagnostics.some((d) => d.code === code),
+				code,
+			).toBe(true);
+	});
+
+	it("puts each converted graph diagnostic on source text naming its subject", () => {
+		for (const d of diagnostics.filter((d) => covered.includes(d.code))) {
+			expect(hasBodyRange(d.code), d.code).toBe(true);
+			expect(d.range.start.line, d.code).toBeGreaterThanOrEqual(bodyStartLine);
+			const text = source.slice(d.range.start.offset, d.range.end.offset);
+			const named = [...d.message.matchAll(/'([^']+)'/g)].map((m) => m[1]!);
+			expect(
+				named.some((id) => text.includes(id)),
+				`${d.code} ${JSON.stringify(text)} ${d.message}`,
+			).toBe(true);
+		}
+	});
+
+	it("leaves a graph diagnostic that fell back to the document start unconverted", () => {
+		const model = analyzeSource(source);
+		const zero = {
+			start: { line: 1, column: 1, offset: 0 },
+			end: { line: 1, column: 1, offset: 0 },
+		};
+		const fallback = { ...model.diagnostics[0]!, code: "V010", range: zero };
+		const adapted = snapshotCoordinates(
+			{ ...model, diagnostics: [fallback] },
+			source,
+		);
+		expect(adapted.diagnostics[0]!.range).toEqual(zero);
+	});
+});

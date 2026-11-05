@@ -1,9 +1,11 @@
 import * as path from "node:path";
-import { ID_PATTERN } from "@pfdsl/core";
+import {
+	findFrontmatterDefinitionRange,
+	nodeOccurrenceAtSourcePosition,
+} from "@pfdsl/editor";
 import * as vscode from "vscode";
 import { analyzeDocument, LANGUAGE_ID } from "./analyze.js";
 import { buildHoverLines, RUN_COMMAND } from "./hover-logic.js";
-import { findFrontmatterDefinition } from "./jump.js";
 
 export { buildHoverLines } from "./hover-logic.js";
 
@@ -42,25 +44,30 @@ export function registerHover(context: vscode.ExtensionContext): void {
 			(docUriStr: string, nodeId: string) => {
 				const uri = vscode.Uri.parse(docUriStr);
 				vscode.workspace.openTextDocument(uri).then((doc) => {
-					const pos = findFrontmatterDefinition(doc, nodeId);
-					if (!pos) {
+					const range = findFrontmatterDefinitionRange(
+						analyzeDocument(doc),
+						nodeId,
+					);
+					if (!range) {
 						vscode.window.showInformationMessage(
 							`No frontmatter definition found for "${nodeId}"`,
 						);
 						return;
 					}
-					const defRange = new vscode.Range(
-						pos,
-						pos.translate(0, nodeId.length),
+					const pos = new vscode.Position(
+						range.start.line - 1,
+						range.start.column - 1,
 					);
+					const end = new vscode.Position(
+						range.end.line - 1,
+						range.end.column - 1,
+					);
+					const defRange = new vscode.Range(pos, end);
 					const existing = vscode.window.visibleTextEditors.find(
 						(e) => e.document.uri.toString() === docUriStr,
 					);
 					if (existing) {
-						existing.selection = new vscode.Selection(
-							pos,
-							pos.translate(0, nodeId.length),
-						);
+						existing.selection = new vscode.Selection(pos, end);
 						existing.revealRange(defRange);
 						const vc = existing.viewColumn;
 						if (vc !== undefined) {
@@ -79,15 +86,29 @@ export function registerHover(context: vscode.ExtensionContext): void {
 
 	const provider: vscode.HoverProvider = {
 		provideHover(doc, pos) {
-			const range = doc.getWordRangeAtPosition(pos, ID_PATTERN);
-			if (!range) return null;
-			const id = doc.getText(range);
-
-			const { frontmatter, nodeKinds } = analyzeDocument(doc);
+			const model = analyzeDocument(doc);
+			const occurrence = nodeOccurrenceAtSourcePosition(
+				model,
+				doc.getText(),
+				pos,
+			);
+			if (!occurrence) return null;
+			const id = occurrence.nodeId;
+			const range = new vscode.Range(
+				new vscode.Position(
+					occurrence.range.start.line - 1,
+					occurrence.range.start.column - 1,
+				),
+				new vscode.Position(
+					occurrence.range.end.line - 1,
+					occurrence.range.end.column - 1,
+				),
+			);
+			const { frontmatter, nodeKinds } = model;
 			const kind = nodeKinds.get(id);
 			if (!kind) return null;
 
-			const lines = buildHoverLines(id, kind, frontmatter, doc.uri.toString());
+			const lines = buildHoverLines(id, kind, model, doc.uri.toString());
 
 			const gotoArgs = encodeURIComponent(
 				JSON.stringify([doc.uri.toString(), id]),
