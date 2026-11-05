@@ -24,13 +24,14 @@ function setup(width = 1600, height = 800, onStateChange = () => {}) {
 	let hostHeight = 360;
 	let graphWidth = width;
 	let graphHeight = height;
+	const renderDot = vi.fn(async (dot: string) => {
+		if (dot === "reject") throw new Error("Graphviz <failure>\n".repeat(30));
+		return `<svg width="${graphWidth}" height="${graphHeight}" viewBox="0 0 ${graphWidth} ${graphHeight}"><g class="node"><title>${dot}</title><text font-size="14">${dot}</text></g></svg>`;
+	});
 	const preview = mountPreview(container, {
 		postMessage() {},
 		onStateChange,
-		renderDot: async (dot) => {
-			if (dot === "reject") throw new Error("Graphviz <failure>\n".repeat(30));
-			return `<svg width="${graphWidth}" height="${graphHeight}" viewBox="0 0 ${graphWidth} ${graphHeight}"><g class="node"><title>${dot}</title><text font-size="14">${dot}</text></g></svg>`;
-		},
+		renderDot,
 	});
 	const root = container.querySelector<HTMLElement>("#root")!;
 	const inner = container.querySelector<HTMLElement>("#inner")!;
@@ -56,6 +57,7 @@ function setup(width = 1600, height = 800, onStateChange = () => {}) {
 	return {
 		container,
 		preview,
+		renderDot,
 		root,
 		inner,
 		show: () => {
@@ -390,42 +392,272 @@ it.each([
 it.each([
 	"parse",
 	"renderer",
-])("shows %s errors outside transformed graph and clears stale minimap", async (kind) => {
+])("keeps the last valid diagram and view through %s errors until recovery", async (kind) => {
 	const s = setup();
 	await s.preview.receive({ type: "render", dot: "a" });
 	s.flush();
 	s.click("zoom-in");
 	const view = s.inner.style.transform;
-	const message = `P007: Invalid <source> ${"x".repeat(1000)}`;
+	const svg = s.inner.querySelector("svg");
+	const minimapSvg = s.container.querySelector("#minimap-svg svg");
+	const message = `V010: Cycle <source> ${"x".repeat(1000)}`;
 	if (kind === "parse") await s.preview.receive({ type: "error", message });
 	else await s.preview.receive({ type: "render", dot: "reject" });
 	const error = s.container.querySelector<HTMLElement>("#preview-error")!;
 	expect(error.hidden).toBe(false);
 	expect(error.closest("#inner")).toBeNull();
 	expect(error.textContent).toBe(
-		kind === "parse" ? message : "Graphviz <failure>\n".repeat(30),
+		"The source has errors. Showing the last valid diagram (read-only).\n" +
+			(kind === "parse" ? message : "Graphviz <failure>\n".repeat(30)),
 	);
 	expect(error.querySelector("source")).toBeNull();
-	expect(s.inner.children).toHaveLength(0);
-	expect(s.container.querySelector("#minimap-svg")!.children).toHaveLength(0);
+	expect(s.root.hidden).toBe(false);
+	expect(s.inner.querySelector("svg")).toBe(svg);
+	expect(s.container.querySelector("#minimap-svg svg")).toBe(minimapSvg);
+	expect(s.inner.style.transform).toBe(view);
 	expect(
 		s.container.querySelector<HTMLElement>("#minimap")!.style.display,
-	).toBe("none");
+	).toBe("block");
 	expect(
 		s.container.querySelector<HTMLButtonElement>("#zoom-in")!.disabled,
-	).toBe(true);
+	).toBe(false);
+	await s.preview.receive({ type: "error", message: "P007: Invalid source" });
+	expect(s.inner.querySelector("svg")).toBe(svg);
+	expect(s.container.querySelector("#minimap-svg svg")).toBe(minimapSvg);
+	expect(s.inner.style.transform).toBe(view);
+	expect(error.textContent).toContain("P007: Invalid source");
 	const wheel = new WheelEvent("wheel", { deltaY: -1, cancelable: true });
 	error.dispatchEvent(wheel);
 	expect(wheel.defaultPrevented).toBe(false);
 	await s.preview.receive({ type: "render", dot: "new" });
 	s.flush();
 	expect(error.hidden).toBe(true);
+	expect(s.inner.querySelector("svg")).not.toBe(svg);
 	expect(s.inner.style.transform).toBe(view);
 	expect(
 		s.container
 			.querySelector("#minimap-svg [data-node-id]")!
 			.getAttribute("data-node-id"),
 	).toBe("new");
+});
+
+it.each([
+	false,
+	true,
+])("keeps view buttons enabled but defers selected-node focus while rendering (stale: %s)", async (stale) => {
+	const s = setup();
+	const message = {
+		type: "render" as const,
+		dot: "a",
+		editing: {
+			source: "a >> p",
+			nodes: [{ id: "a", kind: "artifact" as const, defined: false }],
+		},
+	};
+	await s.preview.receive(message);
+	s.flush();
+	if (stale) await s.preview.receive({ type: "error", message: "V010: Cycle" });
+	await s.preview.receive({ type: "focus", nodeId: "a" });
+	expect(
+		s.container.querySelector<HTMLButtonElement>("#focus-selected-node")!
+			.disabled,
+	).toBe(false);
+	let resolve!: (svg: string) => void;
+	s.renderDot.mockImplementationOnce(
+		() =>
+			new Promise((done) => {
+				resolve = done;
+			}),
+	);
+	const pending = s.preview.receive(message);
+	if (!stale) {
+		s.inner
+			.querySelector("g.node")!
+			.dispatchEvent(new MouseEvent("mousemove", { bubbles: true }));
+		expect(
+			s.container.querySelector<HTMLElement>("#tooltip")!.style.display,
+		).toBe("none");
+	}
+	for (const id of ["zoom-in", "zoom-out", "fit-graph", "actual-size"])
+		expect(
+			s.container.querySelector<HTMLButtonElement>(`#${id}`)!.disabled,
+			id,
+		).toBe(false);
+	expect(
+		s.container.querySelector<HTMLButtonElement>("#focus-selected-node")!
+			.disabled,
+	).toBe(true);
+	const before = s.inner.style.transform;
+	s.click("zoom-in");
+	expect(s.inner.style.transform).not.toBe(before);
+	resolve('<svg><g class="node"><title>a</title></g></svg>');
+	await pending;
+});
+
+it("carries focus for a new node through recovery rendering instead of consuming it on the stale diagram", async () => {
+	const s = setup();
+	await s.preview.receive({ type: "render", dot: "a" });
+	s.flush();
+	await s.preview.receive({ type: "error", message: "V010: Cycle" });
+	let resolve!: (svg: string) => void;
+	s.renderDot.mockImplementationOnce(
+		() =>
+			new Promise((done) => {
+				resolve = done;
+			}),
+	);
+	const pending = s.preview.receive({
+		type: "render",
+		dot: "b",
+		editing: {
+			source: "b >> p",
+			nodes: [{ id: "b", kind: "artifact", defined: false }],
+		},
+	});
+	await s.preview.receive({ type: "focus", nodeId: "b" });
+	window.dispatchEvent(new Event("resize"));
+	s.flush();
+	resolve('<svg><g class="node"><title>b</title></g></svg>');
+	await pending;
+	s.flush();
+	expect(
+		s.inner
+			.querySelector('[data-node-id="b"]')!
+			.classList.contains("pfdsl-focus-cue"),
+	).toBe(true);
+	expect(
+		s.container.querySelector<HTMLButtonElement>("#focus-selected-node")!
+			.disabled,
+	).toBe(false);
+});
+
+it("caps the stale banner at half the preview and scrolls the remaining error body", async () => {
+	const s = setup();
+	s.resizeHost(260, 180);
+	const style = document.createElement("style");
+	style.textContent = previewStyles;
+	s.container.append(style);
+	await s.preview.receive({ type: "render", dot: "a" });
+	await s.preview.receive({
+		type: "error",
+		message: "Long error\n".repeat(100),
+	});
+	const error = s.container.querySelector<HTMLElement>("#preview-error")!;
+	const notice = error.querySelector<HTMLElement>(".stale-notice")!;
+	const body = error.querySelector<HTMLElement>(".error-body")!;
+	const outerStyle = window.getComputedStyle(error);
+	expect(outerStyle.maxHeight).toBe("50%");
+	expect(outerStyle.overflow).toBe("hidden");
+	expect(window.getComputedStyle(notice).flexShrink).toBe("0");
+	expect(body.contains(notice)).toBe(false);
+	expect(window.getComputedStyle(body).maxHeight).toBe("8em");
+	expect(window.getComputedStyle(body).minHeight).toBe("0");
+	expect(window.getComputedStyle(body).overflow).toBe("auto");
+});
+
+it("keeps the stale notice outside the scrolling error body and repair controls", async () => {
+	const s = setup();
+	const style = document.createElement("style");
+	style.textContent = previewStyles;
+	s.container.append(style);
+	await s.preview.receive({ type: "error", message: "Initial error" });
+	const error = s.container.querySelector<HTMLElement>("#preview-error")!;
+	expect(error.textContent).toBe("Initial error");
+	expect(window.getComputedStyle(error).overflow).toBe("auto");
+	await s.preview.receive({ type: "render", dot: "a" });
+	await s.preview.receive({
+		type: "error",
+		message: "Long error\n".repeat(100),
+		repair: { source: "a >> p\na >>? p", artifact: "a", process: "p" },
+	});
+	const notice = error.querySelector<HTMLElement>(".stale-notice");
+	const body = error.querySelector<HTMLElement>(".error-body");
+	expect(notice).not.toBeNull();
+	expect(body).not.toBeNull();
+	expect(notice!.textContent).toBe(
+		"The source has errors. Showing the last valid diagram (read-only).",
+	);
+	expect(body!.contains(notice)).toBe(false);
+	expect(body!.textContent).toContain("Long error");
+	expect(body!.querySelectorAll(".error-repair button")).toHaveLength(2);
+	expect(window.getComputedStyle(error).overflow).toBe("hidden");
+	expect(window.getComputedStyle(error).display).toBe("flex");
+	expect(window.getComputedStyle(error).flexDirection).toBe("column");
+	expect(window.getComputedStyle(notice!).flexShrink).toBe("0");
+	expect(window.getComputedStyle(body!).overflow).toBe("auto");
+	expect(window.getComputedStyle(body!).minHeight).toBe("0");
+});
+
+it("keeps stale diagram view controls, caret focus, pan and minimap usable", async () => {
+	const s = setup();
+	await s.preview.receive({ type: "render", dot: "a" });
+	s.flush();
+	await s.preview.receive({ type: "error", message: "V010: Cycle" });
+	expect(s.root.hidden).toBe(false);
+	const initial = s.inner.style.transform;
+	s.click("zoom-in");
+	expect(s.inner.style.transform).not.toBe(initial);
+	s.click("actual-size");
+	expect(s.container.querySelector("#zoom-level")!.textContent).toBe("100%");
+	const node = s.inner.querySelector("g.node")!;
+	vi.spyOn(node, "getBoundingClientRect").mockReturnValue(
+		new DOMRect(900, 600, 60, 30),
+	);
+	await s.preview.receive({ type: "focus", nodeId: "a" });
+	expect(node.classList.contains("pfdsl-focus-cue")).toBe(true);
+	expect(
+		s.container.querySelector<HTMLButtonElement>("#focus-selected-node")!
+			.disabled,
+	).toBe(false);
+	s.click("focus-selected-node");
+	const beforePan = s.inner.style.transform;
+	s.root.dispatchEvent(
+		new MouseEvent("mousedown", {
+			button: 0,
+			clientX: 10,
+			clientY: 10,
+			bubbles: true,
+		}),
+	);
+	window.dispatchEvent(
+		new MouseEvent("mousemove", { buttons: 1, clientX: 30, clientY: 40 }),
+	);
+	window.dispatchEvent(new MouseEvent("mouseup"));
+	expect(s.inner.style.transform).not.toBe(beforePan);
+	const beforeMinimap = s.inner.style.transform;
+	s.container
+		.querySelector("#minimap")!
+		.dispatchEvent(
+			new MouseEvent("mousedown", { clientX: 100, clientY: 50, bubbles: true }),
+		);
+	window.dispatchEvent(new MouseEvent("mouseup"));
+	expect(s.inner.style.transform).not.toBe(beforeMinimap);
+	s.click("fit-graph");
+	expect(s.inner.style.transform).toBe(initial);
+});
+
+it("keeps the stale error banner until a valid asynchronous render completes", async () => {
+	const s = setup();
+	await s.preview.receive({ type: "render", dot: "a" });
+	await s.preview.receive({ type: "error", message: "V010: Cycle" });
+	const error = s.container.querySelector<HTMLElement>("#preview-error")!;
+	const style = document.createElement("style");
+	style.textContent = previewStyles;
+	s.container.append(style);
+	expect(window.getComputedStyle(error).position).toBe("static");
+	expect(error.parentElement).toBe(s.container);
+	s.click("preview-help-toggle");
+	s.container.dispatchEvent(
+		new KeyboardEvent("keydown", { key: "Escape", bubbles: true }),
+	);
+	expect(error.textContent).toContain("Showing the last valid diagram");
+	const pending = s.preview.receive({ type: "render", dot: "new" });
+	expect(error.textContent).toContain("V010: Cycle");
+	await s.preview.receive({ type: "error", message: "P007: Later error" });
+	await pending;
+	expect(error.hidden).toBe(false);
+	expect(error.textContent).toContain("P007: Later error");
+	expect(s.inner.querySelector("[data-node-id='a']")).not.toBeNull();
 });
 
 it("fits when a hidden preview becomes visible without another render, then keeps its view on resize", async () => {

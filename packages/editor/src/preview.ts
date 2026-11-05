@@ -58,6 +58,10 @@ export function mountPreview(container: HTMLElement, host: PreviewHost) {
 	const abort = new window.AbortController();
 	let disposed = false;
 	let revision = 0;
+	// The displayed DOM and its description/location maps belong to the last
+	// completed render. Editing still requires the current graph revision.
+	let showingStaleDiagram = false;
+	let staleRevision = -1;
 	container.classList.add("pfdsl-preview");
 	container.innerHTML = previewMarkup;
 	const renderDot = host.renderDot ?? renderDotToSvg;
@@ -119,6 +123,7 @@ export function mountPreview(container: HTMLElement, host: PreviewHost) {
 	let descriptions: Record<string, Array<[string, string]>> = {};
 	let locations: Record<string, string[]> = {};
 	let subflows: Record<string, string> = {};
+	let displayedNodeKinds = new Map<string, "artifact" | "process">();
 	let pendingFocusNodeId: string | undefined;
 	let pendingFocusCue = false;
 	let editingData: Extract<MessageToWebview, { type: "render" }>["editing"];
@@ -185,7 +190,7 @@ export function mountPreview(container: HTMLElement, host: PreviewHost) {
 		focusHeading = false,
 	) {
 		cancelNodeClick();
-		if (graphRevision !== revision) return;
+		if (showingStaleDiagram || graphRevision !== revision) return;
 		recoverConnectionsId = undefined;
 		selectedNodeId = id;
 		const node = [...inner.querySelectorAll<HTMLElement>("g.node")].find(
@@ -308,7 +313,8 @@ export function mountPreview(container: HTMLElement, host: PreviewHost) {
 	const modKey = window.navigator.platform.startsWith("Mac") ? "⌘" : "Ctrl";
 
 	async function showHover(node: Element, x: number, y: number) {
-		if (graphRevision !== revision) return;
+		if (!canViewGraph() || (!showingStaleDiagram && graphRevision !== revision))
+			return;
 		cancelHide();
 		const nodeId = (node as HTMLElement).dataset.nodeId;
 		if (!nodeId) return;
@@ -324,15 +330,12 @@ export function mountPreview(container: HTMLElement, host: PreviewHost) {
 			? descriptions[nodeId]
 			: [
 					["**", nodeId],
-					[
-						"kind",
-						editingData?.nodes.find((n) => n.id === nodeId)?.kind ?? "node",
-					],
+					["kind", displayedNodeKinds.get(nodeId) ?? "node"],
 				];
 		const nodeLocs = Object.hasOwn(locations, nodeId) ? locations[nodeId]! : [];
 		const subflow = (node as HTMLElement).dataset.subflow;
 		const hint =
-			host.canOpenRelatedFiles === false
+			showingStaleDiagram || host.canOpenRelatedFiles === false
 				? null
 				: subflow
 					? `${modKey}+Click to open subflow`
@@ -348,6 +351,8 @@ export function mountPreview(container: HTMLElement, host: PreviewHost) {
 			return;
 		}
 		const parts: string[] = [];
+		if (showingStaleDiagram)
+			parts.push('<div class="tt-hint">From the last valid diagram</div>');
 		if (desc) {
 			let hintInjected = false;
 			const rows = desc
@@ -508,19 +513,34 @@ export function mountPreview(container: HTMLElement, host: PreviewHost) {
 	let fittedHost: { width: number; height: number } | undefined;
 	let graphRevision = -1;
 	let minimumScale = MIN_SCALE;
+	function canViewGraph() {
+		return (
+			inner.querySelector("svg") !== null &&
+			(showingStaleDiagram || error.hidden)
+		);
+	}
+	function isDisplayedGraphCurrent() {
+		return (
+			canViewGraph() &&
+			(showingStaleDiagram ? staleRevision : graphRevision) === revision
+		);
+	}
 
 	function updateControls() {
-		const hasGraph = inner.querySelector("svg") !== null && error.hidden;
+		const hasGraph = canViewGraph();
 		for (const button of viewButtons) button.disabled = !hasGraph;
 		zoomOut.disabled ||= scale <= minimumScale;
 		zoomIn.disabled ||= scale >= MAX_SCALE;
 		zoomLevel.textContent = `${Number((scale * 100).toFixed(1))}%`;
-		focusSelected.disabled =
-			!hasGraph || graphRevision !== revision || !selectedGraphNode();
+		focusSelected.disabled = !isDisplayedGraphCurrent() || !selectedGraphNode();
 	}
 
 	function selectedGraphNode() {
-		if (!editingData?.nodes.some((node) => node.id === selectedNodeId)) return;
+		if (
+			!showingStaleDiagram &&
+			!editingData?.nodes.some((node) => node.id === selectedNodeId)
+		)
+			return;
 		return [...inner.querySelectorAll<HTMLElement>("g.node")].find(
 			(node) => node.dataset.nodeId === selectedNodeId,
 		);
@@ -621,7 +641,7 @@ export function mountPreview(container: HTMLElement, host: PreviewHost) {
 	}
 
 	function positionGraph() {
-		if (disposed || graphRevision !== revision || !error.hidden) return;
+		if (disposed || !isDisplayedGraphCurrent()) return;
 		if (root.clientWidth === 0 || root.clientHeight === 0) return;
 		const hostWidth = container.clientWidth;
 		const hostHeight = container.clientHeight;
@@ -635,8 +655,12 @@ export function mountPreview(container: HTMLElement, host: PreviewHost) {
 			hasPositioned = true;
 		}
 		if (pendingFocusNodeId) {
-			selectedNodeId = editingData?.nodes.some(
-				(n) => n.id === pendingFocusNodeId,
+			selectedNodeId = (
+				showingStaleDiagram
+					? [...inner.querySelectorAll<HTMLElement>("g.node")].some(
+							(node) => node.dataset.nodeId === pendingFocusNodeId,
+						)
+					: editingData?.nodes.some((n) => n.id === pendingFocusNodeId)
 			)
 				? pendingFocusNodeId
 				: undefined;
@@ -685,7 +709,7 @@ export function mountPreview(container: HTMLElement, host: PreviewHost) {
 		centerGraph();
 	});
 	on(focusSelected, "click", () => {
-		if (graphRevision !== revision || !error.hidden) return;
+		if (!isDisplayedGraphCurrent()) return;
 		const node = selectedGraphNode();
 		if (!node) return;
 		const view = focusNodeView(
@@ -803,6 +827,7 @@ export function mountPreview(container: HTMLElement, host: PreviewHost) {
 		if (
 			id !== press.id ||
 			!inner.contains(e.target as Node) ||
+			showingStaleDiagram ||
 			graphRevision !== revision
 		)
 			return;
@@ -813,7 +838,7 @@ export function mountPreview(container: HTMLElement, host: PreviewHost) {
 	});
 
 	on(root, "click", (e) => {
-		if (graphRevision !== revision) return;
+		if (showingStaleDiagram || graphRevision !== revision) return;
 		if (host.canOpenRelatedFiles === false) return;
 		const node = (e.target as Element).closest("g.node");
 		if (!node) return;
@@ -906,7 +931,22 @@ export function mountPreview(container: HTMLElement, host: PreviewHost) {
 		clearCue();
 		editingData = undefined;
 		actionsToggle.disabled = true;
-		error.textContent = message;
+		showingStaleDiagram = inner.querySelector("svg") !== null;
+		staleRevision = revision;
+		error.classList.toggle("stale-diagram", showingStaleDiagram);
+		if (showingStaleDiagram) root.parentElement!.before(error);
+		else root.after(error);
+		let errorBody = error;
+		if (showingStaleDiagram) {
+			const notice = document.createElement("div");
+			notice.className = "stale-notice";
+			notice.textContent =
+				"The source has errors. Showing the last valid diagram (read-only).";
+			errorBody = document.createElement("div");
+			errorBody.className = "error-body";
+			error.replaceChildren(notice, "\n", errorBody);
+		}
+		errorBody.textContent = message;
 		clearRepair();
 		if (repair) {
 			shownRepair = repair;
@@ -939,12 +979,14 @@ export function mountPreview(container: HTMLElement, host: PreviewHost) {
 				controls.append(button);
 			}
 			controls.append(repairNotice);
-			error.append(controls);
+			errorBody.append(controls);
 		}
 		error.hidden = false;
-		root.hidden = true;
-		inner.replaceChildren();
-		clearMinimap();
+		root.hidden = !showingStaleDiagram;
+		if (!showingStaleDiagram) {
+			inner.replaceChildren();
+			clearMinimap();
+		}
 		tooltip.style.display = "none";
 		releaseDrag();
 		updateControls();
@@ -1018,8 +1060,6 @@ export function mountPreview(container: HTMLElement, host: PreviewHost) {
 		updateControls();
 		cancelNodeClick();
 		clearSyncEcho();
-		clearRepair();
-		error.replaceChildren();
 		hideHover();
 		if (panelFocused && !connections.isOpen()) helpToggle.focus();
 		clearCue();
@@ -1036,6 +1076,9 @@ export function mountPreview(container: HTMLElement, host: PreviewHost) {
 			descriptions = msg.descriptions ?? {};
 			locations = msg.locations ?? {};
 			subflows = msg.subflows ?? {};
+			displayedNodeKinds = new Map(
+				msg.editing?.nodes.map(({ id, kind }) => [id, kind]),
+			);
 			editingData = msg.editing;
 			if (!editingData?.nodes.some((n) => n.id === selectedNodeId))
 				selectedNodeId = undefined;
@@ -1043,6 +1086,10 @@ export function mountPreview(container: HTMLElement, host: PreviewHost) {
 				lastFocusedNodeId = undefined;
 			actionsToggle.disabled = !editingData?.nodes.length;
 			inner.innerHTML = svg;
+			showingStaleDiagram = false;
+			clearRepair();
+			error.classList.remove("stale-diagram");
+			root.after(error);
 			error.hidden = true;
 			error.textContent = "";
 			root.hidden = false;
@@ -1091,6 +1138,7 @@ export function mountPreview(container: HTMLElement, host: PreviewHost) {
 		canCreateDefinition() {
 			return (
 				!disposed &&
+				!showingStaleDiagram &&
 				graphRevision === revision &&
 				editingData?.nodes.find((n) => n.id === selectedNodeId)?.defined ===
 					false
