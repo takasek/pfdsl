@@ -1,8 +1,9 @@
-# GitHub アダプタの配布と採用宣言（所有者判断案）
+# GitHub アダプタの配布と採用宣言
 
-**単一の `pfdsl` plugin を維持し、リポジトリごとの明示宣言で GitHub Issues アダプタを有効にする案を推奨する。**
-所有者には [ADR-0048 D5](../../adr/0048-responsibility-boundary-by-pfd-semantics.md) の代替案への切替と、以下の既定無効・一括移行の契約を承認するか判断していただく。
-2026-11-05 時点の設計案であり、承認後に roadmap の後続工程 `apply_github_adapter_design` が実装する。
+**単一の `pfdsl` plugin を配布し、GitHub Issues を採用したリポジトリの明示宣言でアダプタを有効にする。**
+2026-11-05、所有者は plugin の導入・更新をハーネス側で管理することを条件に、[ADR-0048 D5](../../adr/0048-responsibility-boundary-by-pfd-semantics.md) の単一 plugin 案を承認した。
+GitHub 用コードと hook は plugin に同梱し、採用リポだけが GitHub 用の設定と配置ファイルを管理する。
+実装は roadmap の後続工程 `apply_github_adapter_design` が担う。
 
 ## 依存を誰が解決するか
 
@@ -31,9 +32,9 @@ Codex では片方が欠けた状態、無効な状態、片方だけ更新さ�
 代償として GitHub 用ファイルは非採用者にも配布され、登録済み hook の入口は呼ばれ得る。その入口を含む全経路が宣言を守ることを配布側が検証する。
 今回必要な結果は「採用したリポでだけ働く」ことであり、ホスト別の依存管理を引き受ける費用に見合う物理分割の要求はない。非採用環境への同梱自体が禁止されるか、Codex 両経路で依存・版解決が保証される場合は分割を再評価する。
 
-## 提案する採用契約
+## 採用契約
 
-採用先が管理する `.pfdsl/config.json` のトップレベルに次のキーを加える。値は今回の提案である。
+GitHub Issues の採用先が管理する `.pfdsl/config.json` のトップレベルに次のキーを加える。
 
 ```json
 { "githubIssues": { "enabled": true } }

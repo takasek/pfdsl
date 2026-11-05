@@ -206,7 +206,7 @@ artifact:
   adapter_plugin_split_design:
     label: core と GitHub アダプタの plugin 分割の設計仕様
     description: ADR-0048 の後続で未起票。分割の費用が過大と分かった場合は、1つの plugin のまま .pfdsl/config.json の宣言で絞る案へ切り替える（ADR-0048 D5）
-    status: wip
+    status: done
     criteria: plugin 間で依存を宣言できるかの確認結果と、分割するか1つの plugin のまま宣言で絞るかの決定、その理由、採用先の移行手順が設計仕様に記録され、所有者が承認している
     location: ../docs/superpowers/specs/2026-11-05-github-adapter-design.md
   cli_release_prune:
