@@ -65,6 +65,13 @@ describe("computeRange — table row", () => {
 });
 
 describe("computeRange — list item", () => {
+	it("stops before a separate block following the final top-level item", () => {
+		const text = ["* old rule (SPEC_old)", "", "---", "", "### Next rule"].join(
+			"\n",
+		);
+		assert.deepEqual(computeRange(text, 1), { startLine: 1, endLine: 1 });
+	});
+
 	it("ends at the next sibling item at the same indent", () => {
 		const text = ["- item one (SPEC_i1)", "  continuation", "- item two"].join(
 			"\n",

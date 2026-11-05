@@ -12,7 +12,7 @@
 import { isHeading } from "./markdown-heading.mjs";
 
 const FORWARD_REF_RE = /\[\[SPEC_([A-Za-z0-9_]+)\?\]\]/g;
-const IMPLEMENTS_TRAILING_RE = /\(SPEC_([A-Za-z0-9_]+)\)\s*$/;
+const IMPLEMENTS_TRAILING_RE = /(?:\(SPEC_[A-Za-z0-9_]+\)\s*)+$/;
 // A run of three or more backticks or tildes at the start of a line. A backtick fence's info string cannot contain a backtick, or the line is inline code rather than a fence.
 const FENCE_OPEN_RE = /^(`{3,}(?!.*`)|~{3,})/;
 const FENCE_CLOSE_RE = /^(`{3,}|~{3,})\s*$/;
@@ -70,7 +70,9 @@ export function findImplementsMarkers(text) {
 		if (!isHeading(line)) return;
 		const match = IMPLEMENTS_TRAILING_RE.exec(line);
 		if (!match) return;
-		hits.push({ line: lineNumber, id: `SPEC_${match[1]}` });
+		for (const id of match[0].matchAll(/\((SPEC_[A-Za-z0-9_]+)\)/g)) {
+			hits.push({ line: lineNumber, id: id[1] });
+		}
 	});
 	return hits;
 }

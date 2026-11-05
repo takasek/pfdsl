@@ -119,6 +119,13 @@ describe("findForwardRefMarkers", () => {
 });
 
 describe("findImplementsMarkers", () => {
+	it("recognizes both trailing IDs for the same heading", () => {
+		assert.deepEqual(findImplementsMarkers("### Rule (SPEC_old) (SPEC_new)"), [
+			{ line: 1, id: "SPEC_old" },
+			{ line: 1, id: "SPEC_new" },
+		]);
+	});
+
 	it("finds a single marker on a heading line", () => {
 		const text =
 			"line one\n## Multifile (SPEC_multifile_cross_ref)\nline three";
