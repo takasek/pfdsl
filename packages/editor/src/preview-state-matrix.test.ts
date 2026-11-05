@@ -25,6 +25,27 @@ const operations: Array<{
 	check(s: Harness, expected: boolean, variant: string): void | Promise<void>;
 }> = [
 	{
+		name: "diagnostic node mark",
+		expected: [true, true, true, true, false],
+		check(s, expected) {
+			const mark = s.target().querySelector(".pfdsl-diagnostic-mark");
+			expect(mark !== null).toBe(expected);
+			if (expected)
+				expect(mark?.getAttribute("data-severity")).toBe(
+					["C", "D"].includes(s.state) ? "error" : "warning",
+				);
+		},
+	},
+	{
+		name: "stale node aria label guides source navigation",
+		expected: [false, false, true, true, false],
+		check(s, expected) {
+			const label = s.target().getAttribute("aria-label") ?? "";
+			expect(label.includes("Double-click to go to source.")).toBe(expected);
+			if (expected) expect(label).not.toContain("Connections");
+		},
+	},
+	{
 		name: "view buttons",
 		expected: [true, true, true, true, false],
 		check(s, expected) {
@@ -214,6 +235,9 @@ async function setup(state: State) {
 		dot: "main",
 		graph: buildPreviewGraph(analyzeSnapshot(source), null),
 		locations: { a: ["a.md"] },
+		nodeDiagnostics: {
+			a: [{ severity: "warning", code: "W007", message: "Warning" }],
+		},
 		descriptions: {
 			a: [
 				["**", "A"],
@@ -230,7 +254,13 @@ async function setup(state: State) {
 			],
 		},
 	};
-	const error = { type: "error" as const, message: "V010: Cycle" };
+	const error: MessageToWebview = {
+		type: "error",
+		message: "V010: Cycle",
+		nodeDiagnostics: {
+			a: [{ severity: "error", code: "V010", message: "Cycle" }],
+		},
+	};
 	let finish: ((svg: string) => void) | undefined;
 	let pending: Promise<void> | undefined;
 	cleanups.push(async () => {

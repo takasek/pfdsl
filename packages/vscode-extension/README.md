@@ -38,6 +38,8 @@ Double-click a node to go to its source; double-click the background to return t
 Editing and error recovery preserve your zoom and pan.
 When the source has errors, the last valid diagram and minimap remain available as read-only references, with a persistent banner identifying the old diagram and showing the error at normal text size.
 If no valid diagram has been rendered, the preview shows the error with an empty diagram area.
+Nodes with diagnostics show a severity mark; hover or keyboard focus lists each diagnostic's severity, code, and message.
+On the last valid diagram, these marks reflect the current source, and the diagnostic section is labeled **Current source**.
 
 For an undefined node, **Insert artifact/process definition** in Quick Fix inserts its frontmatter definition with `label: ""` and places the cursor inside the empty quotes so you can type the label.
 A produced artifact should also declare meaningful completion `criteria` (W002 warns when absent; strict validation treats it as an error).

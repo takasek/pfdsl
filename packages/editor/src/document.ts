@@ -13,7 +13,7 @@ import {
 	buildLocations,
 	buildSubflows,
 } from "./location-utils.js";
-import type { MessageToWebview } from "./messages.js";
+import type { MessageToWebview, NodeDiagnostics } from "./messages.js";
 import { buildPreviewGraph } from "./preview-graph.js";
 import { blockingDiagnosticMessage } from "./preview-logic.js";
 import { snapshotCoordinates } from "./source-coordinates.js";
@@ -135,5 +135,14 @@ export function prepareDocument(
 			};
 		}
 	}
+	const nodeDiagnostics: NodeDiagnostics = Object.create(null);
+	for (const { nodeIds, severity, code, message } of model.diagnostics) {
+		for (const id of nodeIds ?? []) {
+			nodeDiagnostics[id] ??= [];
+			nodeDiagnostics[id].push({ severity, code, message });
+		}
+	}
+	if (Object.keys(nodeDiagnostics).length > 0)
+		message.nodeDiagnostics = nodeDiagnostics;
 	return { model, frontmatter, presetDiagnostics, message };
 }
