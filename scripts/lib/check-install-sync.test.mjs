@@ -57,6 +57,14 @@ function makeSkillRoot() {
 	return skillRoot;
 }
 
+function enableGithubIssues(target) {
+	writeFile(
+		target,
+		".pfdsl/config.json",
+		JSON.stringify({ githubIssues: { enabled: true } }),
+	);
+}
+
 describe("listInstallFiles", () => {
 	it("enumerates nested files under install/ as relative paths", () => {
 		const installDir = join(tmp, "install");
@@ -85,13 +93,12 @@ describe("listInstallFiles", () => {
 });
 
 describe("checkInstallSync", () => {
-	it("reports not-adopted when zero deployed files exist at target", () => {
+	it("reports all missing when zero deployed files exist at target", () => {
 		const skillRoot = makeSkillRoot();
 		const targetRoot = join(tmp, "target-empty");
 		mkdirSync(targetRoot, { recursive: true });
 
-		const { adopted, results } = checkInstallSync(skillRoot, targetRoot);
-		assert.equal(adopted, false);
+		const { results } = checkInstallSync(skillRoot, targetRoot);
 		assert.ok(results.every((r) => r.status === "missing"));
 	});
 
@@ -102,8 +109,7 @@ describe("checkInstallSync", () => {
 		writeFile(targetRoot, "sub/b.txt", "locally-edited"); // differs -> modified
 		// (no scripts/audit... third file expected: only 2 files declared above)
 
-		const { adopted, results } = checkInstallSync(skillRoot, targetRoot);
-		assert.equal(adopted, true);
+		const { results } = checkInstallSync(skillRoot, targetRoot);
 		const byPath = Object.fromEntries(results.map((r) => [r.path, r.status]));
 		assert.equal(byPath["a.txt"], "ok");
 		assert.equal(byPath["sub/b.txt"], "modified");
@@ -667,7 +673,7 @@ describe("UPSTREAM_MARKERS against this repo", () => {
 describe("CLI output", () => {
 	const scriptPath = fileURLToPath(
 		new URL(
-			"../../.claude/skills/pfd-ops/scripts/check-install-sync.mjs",
+			"../harness-template/skills/pfd-ops/scripts/check-install-sync.mjs",
 			import.meta.url,
 		),
 	);
@@ -704,6 +710,7 @@ describe("CLI output", () => {
 		const target = join(tmp, name);
 		mkdirSync(target, { recursive: true });
 		writeFile(target, ".git", "gitdir: elsewhere\n");
+		enableGithubIssues(target);
 		for (const marker of markers) {
 			writeFile(target, marker.path, `prelude\n${marker.mustContain}\n`);
 		}
@@ -833,6 +840,7 @@ describe("CLI output", () => {
 	it("describes both outdated and edited adopter files as different from the bundle", () => {
 		const skillRoot = makeSkillRoot();
 		const target = join(tmp, "target-adopter-differences");
+		enableGithubIssues(target);
 		deployInstall(skillRoot, target);
 		writeFile(join(skillRoot, "install"), "a.txt", "new-canonical-a");
 		writeFile(target, "sub/b.txt", "user-edit-b");
@@ -854,11 +862,14 @@ describe("CLI output", () => {
 			"canonical\n",
 		);
 		const target = join(tmp, "target-adopter-still-works");
+		enableGithubIssues(target);
 		mkdirSync(target, { recursive: true });
 		writeFile(target, ".git", "gitdir: elsewhere\n");
 
 		const first = runCli(skillRoot, target);
-		assert.match(first.stdout, /To adopt it/);
+		assert.equal(first.status, 1);
+		assert.match(first.stdout, /missing: scripts\/lib\/fixture-tool.mjs/);
+		assert.match(first.stdout, /--deploy/);
 
 		const deployed = runCli(skillRoot, target, ["--deploy"]);
 		assert.equal(deployed.status, 0);
@@ -866,6 +877,23 @@ describe("CLI output", () => {
 			readFileSync(join(target, "scripts/lib/fixture-tool.mjs"), "utf-8"),
 			"canonical\n",
 		);
+	});
+
+	it("uses the containing repository for its declaration and deployed files", () => {
+		const skillRoot = makeSkillRoot();
+		const target = join(tmp, "target-repo");
+		const subdirectory = join(target, "subdirectory");
+		writeFile(target, ".git", "gitdir: elsewhere\n");
+		enableGithubIssues(subdirectory);
+
+		assert.equal(runCli(skillRoot, subdirectory, ["--deploy"]).status, 0);
+		assert.equal(existsSync(join(subdirectory, "a.txt")), false);
+		assert.equal(existsSync(join(target, "a.txt")), false);
+
+		enableGithubIssues(target);
+		assert.equal(runCli(skillRoot, subdirectory, ["--deploy"]).status, 0);
+		assert.equal(readFileSync(join(target, "a.txt"), "utf8"), "canonical-a");
+		assert.equal(existsSync(join(subdirectory, "a.txt")), false);
 	});
 
 	it("surfaces rename candidates on --deploy, not just on a bare check", () => {
@@ -876,6 +904,7 @@ describe("CLI output", () => {
 		// up as a failure here instead of matching the real tree by accident.
 		const skillRoot = join(tmp, "skill-cli");
 		const targetRoot = join(tmp, "target-cli");
+		enableGithubIssues(targetRoot);
 		writeFile(
 			join(skillRoot, "install"),
 			"scripts/lib/fixture-tool.mjs",
@@ -908,6 +937,7 @@ describe("CLI output", () => {
 		// before the deletion is reported rather than after it (#603).
 		const skillRoot = join(tmp, "skill-cli-order");
 		const targetRoot = join(tmp, "target-cli-order");
+		enableGithubIssues(targetRoot);
 		writeFile(
 			join(skillRoot, "install"),
 			"scripts/lib/fixture-tool.mjs",
@@ -952,6 +982,7 @@ describe("CLI output", () => {
 		// canonical content, which is how #603 lost its customization.
 		const skillRoot = join(tmp, "skill-cli-copied");
 		const targetRoot = join(tmp, "target-cli-copied");
+		enableGithubIssues(targetRoot);
 		writeFile(
 			join(skillRoot, "install"),
 			"scripts/lib/fixture-tool.mjs",
@@ -1110,7 +1141,7 @@ describe("parseArgs", () => {
 describe("applied migration state", () => {
 	const scriptPath = fileURLToPath(
 		new URL(
-			"../../.claude/skills/pfd-ops/scripts/check-install-sync.mjs",
+			"../harness-template/skills/pfd-ops/scripts/check-install-sync.mjs",
 			import.meta.url,
 		),
 	);
@@ -1587,7 +1618,7 @@ describe("applied migration state", () => {
 			});
 
 			const { stdout } = run(plugin, target);
-			assert.match(stdout, /not adopted/);
+			assert.doesNotMatch(stdout, /--deploy|out of sync/);
 			assert.match(stdout, /migration-guide\.md/);
 		});
 
@@ -1619,6 +1650,82 @@ describe("applied migration state", () => {
 	});
 
 	describe("--deploy", () => {
+		it("preserves legacy files and the manifest on repeated disabled deployments", () => {
+			const plugin = makeInstalledPlugin("optional", { claude: "0.2.0" });
+			writeFile(join(plugin.skillRoot, "install"), "old.txt", "old");
+			for (const [i, config] of [
+				undefined,
+				{ sweepCompletedChains: { enabled: true } },
+				{ githubIssues: { enabled: false } },
+			].entries()) {
+				const target = makeAdopter(`optional-${i}`, config);
+				writeFile(target, "old.txt", "locally edited");
+				writeFile(target, "orphan.txt", "obsolete");
+				const manifest = JSON.stringify({
+					files: [{ path: "orphan.txt", hash: hexOf("obsolete") }],
+				});
+				writeFile(target, ".claude/pfd-ops-install-manifest.json", manifest);
+				for (const flags of [
+					[],
+					["--deploy"],
+					["--deploy", "--overwrite-local-edits", "--delete-edited-orphans"],
+				]) {
+					const result = run(plugin, target, flags);
+					assert.equal(result.status, 0, result.stderr);
+					assert.match(result.stdout, /appliedMigration/);
+					assert.doesNotMatch(
+						result.stdout,
+						/old\.txt|orphan\.txt|--deploy|Copied:/,
+					);
+					assert.equal(
+						readFileSync(join(target, "old.txt"), "utf8"),
+						"locally edited",
+					);
+					assert.equal(
+						readFileSync(join(target, "orphan.txt"), "utf8"),
+						"obsolete",
+					);
+					assert.equal(
+						readFileSync(
+							join(target, ".claude/pfd-ops-install-manifest.json"),
+							"utf8",
+						),
+						manifest,
+					);
+				}
+			}
+		});
+
+		it("rejects invalid adoption declarations before checking or deploying files", () => {
+			const plugin = withInstallFile(
+				makeInstalledPlugin("invalid-declaration"),
+			);
+			for (const [i, githubIssues] of [
+				null,
+				[],
+				{},
+				true,
+				{ enabled: "true" },
+			].entries()) {
+				const target = makeAdopter(`invalid-declaration-${i}`, {
+					githubIssues,
+				});
+				for (const flags of [[], ["--deploy"]]) {
+					const result = run(plugin, target, flags);
+					assert.equal(result.status, 3);
+					assert.match(result.stderr, /\.pfdsl\/config\.json.*githubIssues/);
+					assert.equal(
+						existsSync(join(target, "scripts/fixture-tool.mjs")),
+						false,
+					);
+					assert.equal(
+						existsSync(join(target, ".claude/pfd-ops-install-manifest.json")),
+						false,
+					);
+				}
+			}
+		});
+
 		function withInstallFile(plugin) {
 			writeFile(
 				join(plugin.skillRoot, "install"),
@@ -1671,12 +1778,13 @@ describe("applied migration state", () => {
 				appliedMigration: { pluginVersion: "0.3.0" },
 			});
 			const outOfSync = makeAdopter("hint-older-out-of-sync", {
+				githubIssues: { enabled: true },
 				appliedMigration: { pluginVersion: "0.3.0" },
 			});
 			writeFile(outOfSync, "scripts/fixture-tool.mjs", "locally edited\n");
 
 			const first = run(plugin, notAdopted);
-			assert.match(first.stdout, /not adopted/);
+			assert.match(first.stdout, /update the plugin/i);
 			assert.doesNotMatch(first.stdout, /To adopt it/);
 
 			const second = run(plugin, outOfSync);
@@ -1702,6 +1810,7 @@ describe("applied migration state", () => {
 				makeInstalledPlugin("deploy-newer", { claude: "0.2.0" }),
 			);
 			const target = makeAdopter("deploy-newer-adopter", {
+				githubIssues: { enabled: true },
 				appliedMigration: { pluginVersion: "0.1.0" },
 			});
 
@@ -1730,10 +1839,10 @@ describe("applied migration state", () => {
 				const plugin = withInstallFile(
 					makeInstalledPlugin(`deploy-${name}`, pluginOptions),
 				);
-				const target = makeAdopter(
-					`deploy-${name}-adopter`,
-					recorded === undefined ? {} : { appliedMigration: recorded },
-				);
+				const target = makeAdopter(`deploy-${name}-adopter`, {
+					githubIssues: { enabled: true },
+					appliedMigration: recorded,
+				});
 				assert.equal(run(plugin, target, ["--deploy"]).status, 0, name);
 				assert.equal(
 					existsSync(join(target, "scripts/fixture-tool.mjs")),

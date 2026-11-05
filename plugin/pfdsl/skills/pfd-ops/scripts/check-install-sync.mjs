@@ -304,15 +304,14 @@ export function classifyTarget(skillRoot, targetRoot) {
 /**
  * Compare canonical install/ files against their deployed copies at
  * targetRoot. Returns per-file status ("ok" | "modified" | "missing" |
- * "orphaned"), an overall `adopted` flag (true iff at least one file is
- * deployed), and `renameCandidates` pairing orphans with their likely
+ * "orphaned") and `renameCandidates` pairing orphans with their likely
  * successors. "orphaned" covers a file this tool previously deployed (per the
  * deploy manifest) whose canonical source no longer exists — otherwise such
  * files would be invisible to every check, since they aren't part of the
  * current install/ listing at all.
  * @param {string} skillRoot
  * @param {string} targetRoot
- * @returns {{ results: Array<{path: string, status: "ok"|"modified"|"missing"|"orphaned"}>, adopted: boolean, renameCandidates: Array<{from: string, to: string, reason: string}> }}
+ * @returns {{ results: Array<{path: string, status: "ok"|"modified"|"missing"|"orphaned"}>, renameCandidates: Array<{from: string, to: string, reason: string}> }}
  */
 export function checkInstallSync(skillRoot, targetRoot) {
 	const installDir = resolve(skillRoot, "install");
@@ -338,13 +337,12 @@ export function checkInstallSync(skillRoot, targetRoot) {
 	}));
 
 	const allResults = [...results, ...orphaned];
-	const adopted = allResults.some((r) => r.status !== "missing");
 	const renameCandidates = detectRenameCandidates(
 		installDir,
 		results.filter((r) => r.status === "missing").map((r) => r.path),
 		orphanEntries,
 	);
-	return { results: allResults, adopted, renameCandidates };
+	return { results: allResults, renameCandidates };
 }
 
 /**
@@ -490,6 +488,17 @@ function readConfigFile(targetRoot) {
 		);
 	}
 	return { text, config };
+}
+
+function githubIssuesEnabled(config) {
+	const declaration = config?.githubIssues;
+	if (declaration === undefined) return false;
+	if (!isPlainObject(declaration) || typeof declaration.enabled !== "boolean") {
+		throw new Error(
+			`${CONFIG_RELATIVE_PATH}: githubIssues must be an object with a boolean enabled field`,
+		);
+	}
+	return declaration.enabled;
 }
 
 /**
@@ -767,6 +776,7 @@ function printRenameCandidates(candidates) {
  * @param {string} skillRoot
  * @param {string} targetRoot
  * @param {boolean} deployRequested
+ * @param {boolean} enabled
  * @returns {boolean} whether any deployed file differs from this copy's install/
  */
 function reportNonDeployableTarget(
@@ -774,6 +784,7 @@ function reportNonDeployableTarget(
 	skillRoot,
 	targetRoot,
 	deployRequested,
+	enabled,
 ) {
 	if (role.kind === "upstream") {
 		console.log(
@@ -790,6 +801,10 @@ function reportNonDeployableTarget(
 		);
 	}
 
+	if (!enabled) {
+		if (deployRequested) console.log("Refusing to deploy.");
+		return false;
+	}
 	const { results } = checkInstallSync(skillRoot, targetRoot);
 	const issues = results.filter((r) => r.status !== "ok");
 	if (issues.length === 0) {
@@ -827,14 +842,14 @@ async function main() {
 		process.exit(2);
 	}
 	const skillRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
-	const targetRoot = resolve(args.target);
 
 	let exitCode = 0;
 
 	// Decided once, then answered from in all three places that speak about
 	// --deploy. Asking separately per branch is how they drift apart, and the
 	// two that only print text would keep pointing at the one that writes.
-	const role = classifyTarget(skillRoot, targetRoot);
+	const role = classifyTarget(skillRoot, resolve(args.target));
+	const targetRoot = role.repoRoot;
 	const deployable = role.kind === "adopter";
 	const running = readPluginIdentity(resolve(skillRoot, "../.."));
 	// A plain check must not end by telling the reader to run the --deploy that
@@ -872,6 +887,15 @@ async function main() {
 		if (notice !== null) console.log(notice);
 		if (refused) process.exit(3);
 	}
+	let enabled = false;
+	if (!args.recordMigration) {
+		try {
+			enabled = githubIssuesEnabled(readConfigFile(targetRoot)?.config);
+		} catch (e) {
+			console.error(e instanceof Error ? e.message : String(e));
+			process.exit(3);
+		}
+	}
 	if (!deployable) {
 		if (args.recordMigration) {
 			console.error(
@@ -886,6 +910,7 @@ async function main() {
 			skillRoot,
 			targetRoot,
 			args.deploy,
+			enabled,
 		);
 		// 3, not the 2 a malformed argv exits with: the argv was well-formed and
 		// this refusal is about the target, so a caller reading only the code can
@@ -901,6 +926,12 @@ async function main() {
 		} catch (e) {
 			console.error(e instanceof Error ? e.message : String(e));
 			process.exit(3);
+		}
+	} else if (!enabled) {
+		if (args.deploy) {
+			console.log(
+				"Skipped deployment: GitHub Issues is not enabled in this repository.",
+			);
 		}
 	} else if (args.deploy) {
 		// Read the pre-deploy state: deployInstall rewrites the manifest and may
@@ -958,47 +989,29 @@ async function main() {
 			console.log("Nothing to deploy: install/ is empty.");
 		}
 	} else {
-		const { results, adopted, renameCandidates } = checkInstallSync(
+		const { results, renameCandidates } = checkInstallSync(
 			skillRoot,
 			targetRoot,
 		);
-		if (!adopted) {
-			// The full path, not the bare filename: the reader is standing
-			// in their repo root while this script lives in a plugin
-			// cache outside it, so a bare name — or a relative one —
-			// makes them reconstruct the path the caller just used.
-			// --target is spelled out for the same reason it is resolved
-			// rather than echoed verbatim: it defaults to the cwd, so a
-			// reader who copies this line from a different directory
-			// deploys into that other directory instead of the repo the
-			// line was printed about.
-			const adoptHint = `\nTo adopt it, run: node ${fileURLToPath(import.meta.url)} --target ${targetRoot} --deploy`;
+		const issues = results.filter((r) => r.status !== "ok");
+		if (issues.length === 0) {
 			console.log(
-				`The GitHub Issues backend (L3) is not adopted in this repo — no pfd-ops install/ files are deployed.${deployRefused ? "" : adoptHint}`,
+				"pfd-ops install/ files are in sync with the deployed copies.",
 			);
 		} else {
-			const issues = results.filter((r) => r.status !== "ok");
-			if (issues.length === 0) {
-				console.log(
-					"pfd-ops install/ files are in sync with the deployed copies.",
-				);
-			} else {
-				console.log("pfd-ops install/ files are out of sync:");
-				for (const r of issues) {
-					const label =
-						r.status === "modified"
-							? "different from bundled version"
-							: r.status;
-					console.log(`  ${label}: ${r.path}`);
-				}
-				printRenameCandidates(renameCandidates);
-				if (!deployRefused) {
-					console.log(
-						"Run with --deploy to refresh. Files that carry no local edit are copied, and orphans that carry none are removed, without any further flag — add --overwrite-local-edits or --delete-edited-orphans only to discard the edits standing in the way.",
-					);
-				}
-				exitCode = 1;
+			console.log("pfd-ops install/ files are out of sync:");
+			for (const r of issues) {
+				const label =
+					r.status === "modified" ? "different from bundled version" : r.status;
+				console.log(`  ${label}: ${r.path}`);
 			}
+			printRenameCandidates(renameCandidates);
+			if (!deployRefused) {
+				console.log(
+					`Run with --deploy to refresh: node ${fileURLToPath(import.meta.url)} --target ${targetRoot} --deploy\nFiles that carry no local edit are copied, and orphans that carry none are removed. Add --overwrite-local-edits or --delete-edited-orphans only to discard local edits.`,
+				);
+			}
+			exitCode = 1;
 		}
 	}
 

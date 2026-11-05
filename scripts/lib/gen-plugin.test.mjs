@@ -2819,6 +2819,11 @@ describe("Codex generated consumers", () => {
 		const sourcePath = "scripts/pfdsl/audit-issues-flow.mjs";
 		try {
 			fixture.prepare(repoRoot, consumer);
+			mkdirSync(join(consumer, ".pfdsl"), { recursive: true });
+			writeFileSync(
+				join(consumer, ".pfdsl/config.json"),
+				JSON.stringify({ githubIssues: { enabled: true } }),
+			);
 			writeFileSync(join(consumer, ".git"), "gitdir: elsewhere\n");
 			mkdirSync(join(consumer, "scripts/lib"), { recursive: true });
 			writeFileSync(
@@ -3005,7 +3010,7 @@ describe("Codex generated consumers", () => {
 				[join(skillsRoot, "pfd-ops/scripts/check-install-sync.mjs")],
 				{ cwd: consumer, encoding: "utf-8" },
 			);
-			assert.match(output, /not adopted/);
+			assert.equal(output, "");
 			const pfdslHelp = execFileSync(
 				process.execPath,
 				[join(repoRoot, "packages/cli/dist/cli.js"), "--help"],
@@ -3165,7 +3170,7 @@ describe("Codex generated consumers", () => {
 				],
 				{ cwd: consumer, encoding: "utf-8" },
 			);
-			assert.match(output, /not adopted/);
+			assert.equal(output, "");
 		} finally {
 			rmSync(consumer, { recursive: true, force: true });
 		}
@@ -3177,9 +3182,14 @@ describe("Codex generated consumers", () => {
 
 		const consumer = mkdtempSync(join(tmpdir(), "generated-hook-consumer-"));
 		try {
-			const roadmap = join(consumer, ".pfdsl/roadmap.pfdsl");
+			const checkout = join(consumer, "checkout");
+			const cwd = join(checkout, "src");
+			mkdirSync(cwd, { recursive: true });
+			mkdirSync(join(checkout, ".git"));
+			const roadmap = join(checkout, ".pfdsl/roadmap.pfdsl");
 			mkdirSync(dirname(roadmap), { recursive: true });
 			writeFileSync(roadmap, "artifact:\n  delivery:\n    status: wip\n");
+			const config = join(checkout, ".pfdsl/config.json");
 
 			for (const [plugin, consumerName] of [
 				[pluginRoot, "Claude"],
@@ -3217,29 +3227,38 @@ describe("Codex generated consumers", () => {
 					assert.match(command, /\$\{CLAUDE_PLUGIN_ROOT\}/, consumerName);
 					assert.doesNotMatch(command, /\$\{PLUGIN_ROOT\}/, consumerName);
 				}
-				const managedIssueOutput = execFileSync(
-					"/bin/sh",
-					["-c", managedIssueCommand],
-					{
-						cwd: consumer,
+				const runHook = (input) =>
+					execFileSync("/bin/sh", ["-c", managedIssueCommand], {
+						cwd: pluginCopy,
 						encoding: "utf-8",
 						env: {
 							...hookHostEnvironment,
 							CLAUDE_PLUGIN_ROOT: pluginCopy,
 						},
-						input: JSON.stringify({
-							tool_name: "Bash",
-							tool_input: {
-								command: "gh issue create --label flow:managed --title example",
-							},
-							tool_response: {
-								stdout: "https://github.com/takasek/pfdsl/issues/654\\n",
-								stderr: "",
-							},
-						}),
+						input,
+					});
+				const managedCreate = JSON.stringify({
+					cwd,
+					tool_name: "Bash",
+					tool_input: {
+						command: "gh issue create --label flow:managed --title example",
 					},
-				);
-				const parsedOutput = JSON.parse(managedIssueOutput);
+					tool_response: {
+						stdout: "https://github.com/takasek/pfdsl/issues/654\\n",
+						stderr: "",
+					},
+				});
+				rmSync(config, { force: true });
+				assert.equal(runHook(managedCreate), "", consumerName);
+				writeFileSync(config, '{"githubIssues":{"enabled":false}}');
+				assert.equal(runHook(managedCreate), "", consumerName);
+				writeFileSync(config, "{");
+				const diagnostic = JSON.parse(runHook(managedCreate)).hookSpecificOutput
+					.additionalContext;
+				assert.match(diagnostic, /config\.json/);
+				assert.doesNotMatch(diagnostic, /#654/);
+				writeFileSync(config, '{"githubIssues":{"enabled":true}}');
+				const parsedOutput = JSON.parse(runHook(managedCreate));
 				assert.equal(
 					parsedOutput.hookSpecificOutput.hookEventName,
 					"PostToolUse",
@@ -3250,6 +3269,7 @@ describe("Codex generated consumers", () => {
 				);
 				for (const input of [
 					JSON.stringify({
+						cwd,
 						tool_name: "Bash",
 						tool_input: {
 							command: "gh issue create --label flow:managed --title example",
@@ -3258,6 +3278,7 @@ describe("Codex generated consumers", () => {
 					}),
 					"not json{{{",
 					JSON.stringify({
+						cwd,
 						tool_name: "Bash",
 						tool_input: { command: "gh issue list --label flow:managed" },
 						tool_response: {
@@ -3266,19 +3287,7 @@ describe("Codex generated consumers", () => {
 						},
 					}),
 				]) {
-					assert.equal(
-						execFileSync("/bin/sh", ["-c", managedIssueCommand], {
-							cwd: consumer,
-							encoding: "utf-8",
-							env: {
-								...hookHostEnvironment,
-								CLAUDE_PLUGIN_ROOT: pluginCopy,
-							},
-							input,
-						}),
-						"",
-						consumerName,
-					);
+					assert.equal(runHook(input), "", consumerName);
 				}
 			}
 		} finally {

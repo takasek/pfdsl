@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import {
+	copyFileSync,
 	mkdirSync,
 	mkdtempSync,
 	readFileSync,
@@ -24,6 +25,7 @@ const steps = workflow.jobs["sweep-completed-chains"].steps;
 
 const CONFIG_PATH = ".pfdsl/config.json";
 const ENABLED_CONFIG = JSON.stringify({
+	githubIssues: { enabled: true },
 	sweepCompletedChains: { enabled: true },
 });
 
@@ -144,28 +146,56 @@ test("every step after the gate is conditioned on the opt-in", () => {
 const DISABLED_CONFIGS = [
 	["file absent", null],
 	["empty object", "{}"],
+	["legacy sweep opt-in alone", '{"sweepCompletedChains":{"enabled":true}}'],
+	["GitHub opt-in alone", '{"githubIssues":{"enabled":true}}'],
+	[
+		"GitHub disabled with sweep enabled",
+		'{"githubIssues":{"enabled":false},"sweepCompletedChains":{"enabled":true}}',
+	],
+	[
+		"GitHub enabled with sweep disabled",
+		'{"githubIssues":{"enabled":true},"sweepCompletedChains":{"enabled":false}}',
+	],
 	["key absent (other keys only)", '{"other": {"enabled": true}}'],
-	["sweepCompletedChains empty", '{"sweepCompletedChains": {}}'],
-	["enabled false", '{"sweepCompletedChains": {"enabled": false}}'],
+	[
+		"sweepCompletedChains empty",
+		'{"githubIssues":{"enabled":true},"sweepCompletedChains": {}}',
+	],
+	[
+		"enabled false",
+		'{"githubIssues":{"enabled":true},"sweepCompletedChains": {"enabled": false}}',
+	],
 	[
 		'enabled the string "true"',
-		'{"sweepCompletedChains": {"enabled": "true"}}',
+		'{"githubIssues":{"enabled":true},"sweepCompletedChains": {"enabled": "true"}}',
 	],
-	["enabled the number 1", '{"sweepCompletedChains": {"enabled": 1}}'],
-	["enabled null", '{"sweepCompletedChains": {"enabled": null}}'],
+	[
+		"enabled the number 1",
+		'{"githubIssues":{"enabled":true},"sweepCompletedChains": {"enabled": 1}}',
+	],
+	[
+		"enabled null",
+		'{"githubIssues":{"enabled":true},"sweepCompletedChains": {"enabled": null}}',
+	],
 ];
 
 const ENABLED_CONFIGS = [
 	["exactly the opt-in", ENABLED_CONFIG],
 	[
 		"opt-in beside other keys",
-		'{"other": [1, 2], "sweepCompletedChains": {"enabled": true, "extra": "x"}}',
+		'{"githubIssues":{"enabled":true}, "other": [1, 2], "sweepCompletedChains": {"enabled": true, "extra": "x"}}',
 	],
 ];
 
 const BROKEN_CONFIGS = [
 	["malformed JSON", "{"],
 	["empty file", ""],
+	["githubIssues null", '{"githubIssues":null}'],
+	["githubIssues enabled absent", '{"githubIssues":{}}'],
+	[
+		"githubIssues enabled string with sweep enabled",
+		'{"githubIssues":{"enabled":"true"},"sweepCompletedChains":{"enabled":true}}',
+	],
 	["top level null", "null"],
 	["top level array", "[]"],
 	["top level string", '"x"'],
@@ -203,6 +233,7 @@ for (const [label, text] of DISABLED_CONFIGS) {
 			assert.match(notice, /disabled/);
 			assert.ok(notice.includes(CONFIG_PATH), notice);
 			assert.ok(notice.includes("sweepCompletedChains"), notice);
+			assert.ok(notice.includes("githubIssues"), notice);
 			assert.doesNotMatch(result.stdout, /::error::/);
 		});
 	});
@@ -299,22 +330,16 @@ for (const shape of ["no-package", "no-package-manager", "workspace"]) {
 						roadmap,
 						"---\ntype: roadmap\nartifact:\n  input: { status: done }\n  output: { status: done }\nprocess:\n  work: {}\n---\ninput >> work -> output\n",
 					);
-					const result = spawnSync(
-						process.execPath,
-						[
-							join(root, "scripts/pfdsl/sweep-completed-chains.mjs"),
-							roadmap,
-							"--write",
-						],
-						{
-							cwd: dir,
-							encoding: "utf8",
-							env: {
-								...process.env,
-								PFDSL_CLI: join(root, "packages/cli/dist/cli.js"),
-							},
-						},
-					);
+					mkdirSync(join(dir, "scripts/pfdsl/lib"), { recursive: true });
+					for (const path of [
+						"scripts/pfdsl/sweep-completed-chains.mjs",
+						"scripts/pfdsl/lib/github-issues-config.mjs",
+					]) {
+						copyFileSync(join(root, path), join(dir, path));
+					}
+					const { result } = runShellStep(step, dir, {
+						PFDSL_CLI: join(root, "packages/cli/dist/cli.js"),
+					});
 					assert.equal(result.status, 0, result.stdout + result.stderr);
 					assert.doesNotMatch(readFileSync(roadmap, "utf8"), /input >> work/);
 					swept = true;

@@ -8,6 +8,7 @@ import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import {
 	copyFileSync,
+	existsSync,
 	mkdirSync,
 	mkdtempSync,
 	readFileSync,
@@ -51,6 +52,10 @@ describe("audit-issues-flow without gh", () => {
 		const fixtureScripts = join(fixtureRoot, "scripts/pfdsl");
 		mkdirSync(fixtureScripts, { recursive: true });
 		mkdirSync(join(fixtureRoot, ".pfdsl"));
+		writeFileSync(
+			join(fixtureRoot, ".pfdsl/config.json"),
+			'{"githubIssues":{"enabled":true}}',
+		);
 		const fixtureScript = join(fixtureScripts, "audit-issues-flow.mjs");
 		copyFileSync(scriptPath, fixtureScript);
 		symlinkSync(join(__dirname, "lib"), join(fixtureScripts, "lib"), "dir");
@@ -98,6 +103,7 @@ process.stdout.write(JSON.stringify(result));
 			},
 		);
 		assert.equal(result.status, 0, result.stderr);
+		assert.match(result.stdout, /roadmap.pfdsl is in sync/);
 		assert.doesNotMatch(result.stdout, /unknown_issue|missing_process/);
 		assert.doesNotMatch(result.stdout, /stale_updated_at|repair|meta set/);
 		assert.equal(readFileSync(roadmap, "utf8"), before);
@@ -153,6 +159,10 @@ describe("audit-issues-flow label findings", () => {
 		);
 		mkdirSync(join(tree, ".pfdsl"));
 		writeFileSync(
+			join(tree, ".pfdsl/config.json"),
+			'{"githubIssues":{"enabled":true}}',
+		);
+		writeFileSync(
 			join(tree, ".pfdsl/roadmap.pfdsl"),
 			`---\ntype: roadmap\nartifact:\n  out: { status: todo }\nprocess:\n  i5_do_it: { label: Do it, location: https://github.com/example/project/issues/5, updated_at: "${updatedAt}" }\n---\n>> i5_do_it -> out\n`,
 		);
@@ -198,6 +208,39 @@ esac
 			[join(tree, "scripts/pfdsl/audit-issues-flow.mjs"), ...args],
 			{ encoding: "utf-8", env },
 		);
+	}
+
+	for (const [config, expectedStatus] of [
+		[null, 0],
+		['{"sweepCompletedChains":{"enabled":true}}', 0],
+		['{"githubIssues":{"enabled":false}}', 0],
+		['{"githubIssues":{"enabled":1}}', 1],
+		["{", 1],
+	]) {
+		it(`checks config ${config} before GitHub calls`, () => {
+			const file = join(tree, ".pfdsl/config.json");
+			if (config === null) rmSync(file);
+			else writeFileSync(file, config);
+			const calls = join(tree, "calls");
+			for (const name of ["gh", "git"]) {
+				writeFileSync(
+					join(tree, "bin", name),
+					`#!/bin/sh\necho called >> "${calls}"\nexit 1\n`,
+					{ mode: 0o755 },
+				);
+			}
+			const result = audit([], []);
+			assert.equal(
+				result.status,
+				expectedStatus,
+				result.stdout + result.stderr,
+			);
+			assert.match(
+				result.stdout + result.stderr,
+				expectedStatus === 0 ? /not applicable/i : /config\.json/,
+			);
+			assert.equal(existsSync(calls), false);
+		});
 	}
 
 	const matching = [managed, exempt];
