@@ -19,7 +19,7 @@ async function waitFor(predicate) {
 	assert.fail("Document preview did not finish rendering");
 }
 
-test("standalone document host disposal blocks pending snapshots and queued editor repaint without affecting the next document", async () => {
+test("standalone document host disposal blocks pending snapshots and queued editor repaint without affecting the next document", async (t) => {
 	const packageRoot = fileURLToPath(new URL("../", import.meta.url));
 	const temporary = mkdtempSync(join(packageRoot, "node_modules/.lifecycle-"));
 	const output = join(temporary, "document-tab.mjs");
@@ -105,6 +105,32 @@ export async function processSnapshot(...args) {
 		first.activate();
 		assert.equal(first.getDiagnosticsSummary(), "Checking…");
 		await waitFor(() => first.container.querySelector("#inner svg"));
+		await t.test(
+			"document view capability follows Fit independently of Connections",
+			() => {
+				const fit = first.container.querySelector("#fit-graph");
+				const connections = first.container.querySelector(
+					"#node-actions-toggle",
+				);
+				const previous = {
+					fit: fit.disabled,
+					connections: connections.disabled,
+				};
+				try {
+					fit.disabled = false;
+					connections.disabled = true;
+					assert.equal(first.canDiagram(), false);
+					assert.equal(first.canViewDiagram?.(), true);
+					fit.disabled = true;
+					connections.disabled = false;
+					assert.equal(first.canDiagram(), true);
+					assert.equal(first.canViewDiagram(), false);
+				} finally {
+					fit.disabled = previous.fit;
+					connections.disabled = previous.connections;
+				}
+			},
+		);
 		assert.notEqual(first.getDiagnosticsSummary(), "Checking…");
 		const oldEditor = instances.at(-1);
 		oldEditor.model.source =

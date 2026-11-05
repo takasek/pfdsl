@@ -90,6 +90,7 @@ test("disposing a mounted menu closes each item once and suppresses subsequent c
 		folder: true,
 		sidebar: true,
 		diagram: true,
+		diagramView: true,
 		definition: true,
 	});
 	menu.recent([{ kind: "file", path: "/late.pfdsl" }]);

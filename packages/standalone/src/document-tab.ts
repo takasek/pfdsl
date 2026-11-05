@@ -409,6 +409,10 @@ export function createDocumentTab({
 		focus() {
 			editor.focus();
 		},
+		canViewDiagram() {
+			return !previewElement.querySelector<HTMLButtonElement>("#fit-graph")!
+				.disabled;
+		},
 		canDiagram() {
 			return !previewElement.querySelector<HTMLButtonElement>(
 				"#node-actions-toggle",

@@ -74,6 +74,7 @@ test("application import is inert and simultaneous instances own their commands 
 					deactivate() {},
 					focus() {},
 					canDiagram: () => false,
+					canViewDiagram: () => false,
 					canCreateDefinition: () => false,
 					getSource: () => options.source,
 					getRevision: () => 0,
@@ -369,6 +370,63 @@ test("disposal cancels an in-flight close decision and releases document handles
 			dom.window.document.querySelectorAll("#tabs button").length,
 			0,
 		);
+	} finally {
+		app.dispose();
+		dom.window.close();
+	}
+});
+
+test("application forwards independent view and editing capabilities from the active tab to the native menu", async () => {
+	const output = join(temp, "menu-capabilities.mjs");
+	await bundleHost(output);
+	const { mountApplication, createDocumentTab, createTextComparison } =
+		await import(pathToFileURL(output).href);
+	const dom = new JSDOM(
+		readFileSync(join(root, "packages/standalone/index.html"), "utf8"),
+	);
+	const updates = [];
+	let activeTab;
+	const app = mountApplication({
+		document: dom.window.document,
+		createDocumentTab(options) {
+			activeTab = createDocumentTab(options, {
+				diagramView: true,
+				diagram: false,
+			});
+			return activeTab;
+		},
+		createTextComparison,
+		scheduler: { setInterval: () => 0, clearInterval() {} },
+		native: {
+			invoke: async (command) => {
+				if (command === "document_capabilities")
+					return { save: true, reason: null };
+				if (command === "list_recent") return [];
+			},
+			listen: async () => () => {},
+			installMenu: async () => ({
+				update(state) {
+					updates.push({ ...state });
+				},
+				recent() {},
+				dispose() {},
+			}),
+			verifyCorpus: async () => null,
+			setTitle: async () => {},
+			closeWindow: async () => {},
+		},
+	});
+	try {
+		await flush();
+		await app.command("new");
+		await app.idle();
+		await flush();
+		assert.equal(activeTab.button.getAttribute("aria-selected"), "true");
+		const state = updates.at(-1);
+		assert.equal(state.document, true);
+		assert.equal(state.busy, false);
+		assert.equal(state.diagram, false);
+		assert.equal(state.diagramView, true);
 	} finally {
 		app.dispose();
 		dom.window.close();
