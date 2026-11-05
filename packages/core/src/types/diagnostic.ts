@@ -12,4 +12,7 @@ export interface Diagnostic {
 	code: string;
 	message: string;
 	range: Range;
+	/** IDs of the artifacts, processes, or groups targeted by this diagnostic.
+	 * Omitted when unknown; present lists are nonempty and contain no duplicates. */
+	nodeIds?: string[];
 }

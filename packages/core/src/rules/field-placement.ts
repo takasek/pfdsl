@@ -15,6 +15,7 @@ export function processOnlyFields(ctx: RuleContext): Diagnostic[] {
 			diagnostics.push({
 				severity: "error",
 				code: "V012",
+				nodeIds: [pid],
 				message: `'criteria' is not allowed on process '${pid}'`,
 				range: zeroRange(),
 			});
@@ -23,6 +24,7 @@ export function processOnlyFields(ctx: RuleContext): Diagnostic[] {
 			diagnostics.push({
 				severity: "error",
 				code: "V015",
+				nodeIds: [pid],
 				message: `'revises' is not allowed on process '${pid}'`,
 				range: zeroRange(),
 			});
@@ -50,6 +52,7 @@ export function artifactOnlyFields(ctx: RuleContext): Diagnostic[] {
 			diagnostics.push({
 				severity: ctx.strictly("warning"),
 				code: "W002",
+				nodeIds: [aid],
 				message: `Artifact '${aid}' has no 'criteria' field`,
 				range: ctx.rangeOf(aid),
 			});
@@ -58,6 +61,7 @@ export function artifactOnlyFields(ctx: RuleContext): Diagnostic[] {
 			diagnostics.push({
 				severity: "error",
 				code: "V014",
+				nodeIds: [aid],
 				message: `'command' is not allowed on artifact '${aid}'`,
 				range: zeroRange(),
 			});
@@ -74,6 +78,7 @@ export function subflowOnArtifact(ctx: RuleContext): Diagnostic[] {
 			diagnostics.push({
 				severity: "error",
 				code: "V023",
+				nodeIds: [id],
 				message: `'subflow' is not allowed on artifact '${id}'`,
 				range: zeroRange(),
 			});
@@ -91,6 +96,7 @@ export function boundaryWithoutSubflow(ctx: RuleContext): Diagnostic[] {
 			diagnostics.push({
 				severity: "error",
 				code: "V024",
+				nodeIds: [pid],
 				message: `'boundary' on process '${pid}' requires 'subflow'`,
 				range: zeroRange(),
 			});

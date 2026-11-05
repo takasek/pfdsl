@@ -21,6 +21,7 @@ export function partsMembership(ctx: RuleContext): Diagnostic[] {
 				diagnostics.push({
 					severity: "error",
 					code: "V004",
+					nodeIds: [...new Set([artifactId, partId])],
 					message: `Parts member '${partId}' of '${artifactId}' is a process`,
 					range: zeroRange(),
 				});
@@ -29,6 +30,7 @@ export function partsMembership(ctx: RuleContext): Diagnostic[] {
 				diagnostics.push({
 					severity: "error",
 					code: "V005",
+					nodeIds: [artifactId],
 					message: `'${artifactId}' cannot include itself in parts`,
 					range: zeroRange(),
 				});
@@ -40,6 +42,7 @@ export function partsMembership(ctx: RuleContext): Diagnostic[] {
 				diagnostics.push({
 					severity: "warning",
 					code: "W001",
+					nodeIds: [...new Set([artifactId, partId])],
 					message: `Parts member '${partId}' of '${artifactId}' has no edges`,
 					range: zeroRange(),
 				});
@@ -49,6 +52,7 @@ export function partsMembership(ctx: RuleContext): Diagnostic[] {
 			diagnostics.push({
 				severity: "error",
 				code: "V007",
+				nodeIds: [artifactId],
 				message: `Invalid status '${meta.status}' on artifact '${artifactId}'. Allowed: ${STATUS_VALUES.join(", ")}`,
 				range: zeroRange(),
 			});
@@ -69,6 +73,7 @@ export function partsCycle(ctx: RuleContext): Diagnostic[] {
 			diagnostics.push({
 				severity: "error",
 				code: "V006",
+				nodeIds: [...new Set([...path, id])],
 				message: `Cycle in parts: ${[...path, id].join(" → ")}`,
 				range: zeroRange(),
 			});

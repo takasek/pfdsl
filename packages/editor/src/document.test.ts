@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { analyzeDependencySnapshot } from "./document.js";
 import { analyzeSnapshot, preloadPresets, prepareDocument } from "./index.js";
 
 describe("V036 error repair", () => {
@@ -33,6 +34,40 @@ describe("V036 error repair", () => {
 });
 
 describe("shared document pipeline", () => {
+	it("snapshot coordinate conversion retains target IDs", () => {
+		const source = "---\ntitle: Example\n---\np -> a\nq -> a\n";
+		const diagnostic = analyzeSnapshot(source).diagnostics.find(
+			(d) => d.code === "V001",
+		)!;
+		expect(diagnostic.nodeIds).toEqual(["a", "p", "q"]);
+		expect(
+			source.slice(diagnostic.range.start.offset, diagnostic.range.end.offset),
+		).toBe("q -> a");
+	});
+
+	it("raw YAML snapshots and dependency diagnostics retain file-local IDs", async () => {
+		const source = "group:\n  g: {parent: h}\n  h: {parent: g}\n";
+		expect(
+			analyzeDependencySnapshot(
+				"/project/preset.yaml",
+				source,
+			).diagnostics.find((d) => d.code === "V025")?.nodeIds,
+		).toEqual(["h", "g"]);
+		const model = analyzeSnapshot("---\nextends: preset.yaml\n---\na\n");
+		const load = await preloadPresets(
+			"/project/main.pfdsl",
+			model,
+			async () => source,
+		);
+		const result = prepareDocument(model, "/project/main.pfdsl", load);
+		expect(result.presetDiagnostics).toContainEqual(
+			expect.objectContaining({
+				code: "V025",
+				file: "/project/preset.yaml",
+				nodeIds: ["h", "g"],
+			}),
+		);
+	});
 	it("reports raw YAML dependency positions in the original file", async () => {
 		const source = "group:\n  g: {parent: 2}\n";
 		const model = analyzeSnapshot("---\nextends: preset.yaml\n---\na\n");
