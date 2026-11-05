@@ -219,7 +219,7 @@ artifact:
   optional_github_adapter:
     label: 採用したリポでだけ働く GitHub アダプタ
     description: ADR-0048 の後続で未起票。設計仕様の結論に従い、GitHub Issues バックエンドの reference・hook・CI 設定を、採用を宣言したリポでだけ働かせる
-    status: todo
+    status: wip
     criteria: 設計仕様の結論のとおりに配布され、GitHub Issues バックエンドを採用しないリポでは GitHub アダプタの hook が通知を出さない。採用したリポでは、移行案内に従った後も現行と同じ手順・hook・CI 設定が働く
   artifact_reference_implementation:
     label: 参照先を解決できる実装
