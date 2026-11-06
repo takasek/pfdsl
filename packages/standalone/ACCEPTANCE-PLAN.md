@@ -405,7 +405,7 @@ quoted/flow keyのID上と同じ行の`label`／`owner`等のfield上を区別�
 Find allは現行拡張と同じliteral文字列検索であり、metadata fieldを除くsemantic参照・巡回とは区別する。
 processのcommand行末の`Command` hintをhoverして複数行の内容を読み、表示だけで実行されないことを確認する。
 hoverを残したまま編集・文書切替・閉鎖し、旧版のリンクが新しい文書や版へ作用しないことを確認する。
-2026-10-21の使用感レポートの15行fixtureでも、14行目のpackage_manifestでShow Hover→撮影→Escape→本文編集を行う。
+Linuxの#1513再試験では、[採取手順](evidence/2026-10-26-linux-hover-summary/NEXT-LINUX-RUN.md)でログ採取を開始し、回収した377バイトの元fixtureの14行目のpackage_manifestでShow Hover→撮影→Escape→本文編集を行う。
 labelのみ、criteriaのみ、groupとcriteria、descriptionを含む場合を分け、Linux nativeではWebKitWebProcessの存否・終了時刻・stderr・利用可能な終了理由を記録する。
 Linuxで報告された3回の表示プロセス消失は原因未確定であり、Chromiumでの成功をWebKitGTKやMac nativeの合格へ転写しない。
 期待：semantic nodeとfield、定義range、全出現が正しく、図hover廃止と混同しない。
