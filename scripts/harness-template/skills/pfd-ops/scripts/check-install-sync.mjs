@@ -927,6 +927,11 @@ async function main() {
 			process.exit(3);
 		}
 	} else if (!enabled) {
+		if (existsSync(join(targetRoot, MANIFEST_RELATIVE_PATH))) {
+			console.log(
+				`Warning: a deploy manifest exists (${MANIFEST_RELATIVE_PATH}), but GitHub Issues is not enabled. Review the adapter declaration or legacy-file cleanup instructions: https://github.com/takasek/pfdsl/blob/main/docs/migration-guide.md#declare-the-github-issues-adapter-before-updating`,
+			);
+		}
 		if (args.deploy) {
 			console.log(
 				"Skipped deployment: GitHub Issues is not enabled in this repository.",

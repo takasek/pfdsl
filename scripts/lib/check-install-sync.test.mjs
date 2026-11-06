@@ -1650,6 +1650,14 @@ describe("applied migration state", () => {
 	});
 
 	describe("--deploy", () => {
+		it("does not warn about deployment history when no manifest exists", () => {
+			const plugin = makeInstalledPlugin("fresh-optional", { claude: "0.2.0" });
+			const target = makeAdopter("fresh-optional");
+			const result = run(plugin, target);
+			assert.equal(result.status, 0, result.stderr);
+			assert.doesNotMatch(result.stdout, /Warning:.*deploy manifest/);
+		});
+
 		it("preserves legacy files and the manifest on repeated disabled deployments", () => {
 			const plugin = makeInstalledPlugin("optional", { claude: "0.2.0" });
 			writeFile(join(plugin.skillRoot, "install"), "old.txt", "old");
@@ -1673,6 +1681,14 @@ describe("applied migration state", () => {
 					const result = run(plugin, target, flags);
 					assert.equal(result.status, 0, result.stderr);
 					assert.match(result.stdout, /appliedMigration/);
+					assert.match(
+						result.stdout,
+						/Warning:.*deploy manifest.*GitHub Issues is not enabled/,
+					);
+					assert.match(
+						result.stdout,
+						/migration-guide\.md#declare-the-github-issues-adapter-before-updating/,
+					);
 					assert.doesNotMatch(
 						result.stdout,
 						/old\.txt|orphan\.txt|--deploy|Copied:/,

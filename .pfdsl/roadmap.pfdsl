@@ -218,8 +218,10 @@ artifact:
       同じ release tag の plugin 配布について .pfdsl/workflow.md の「release milestone artifact の作成規約」と .pfdsl/pipeline.md の公開・pin・取得確認を満たし、採用先が CLI・plugin・アダプタを即座に一括更新する移行手順がある
   optional_github_adapter:
     label: 採用したリポでだけ働く GitHub アダプタ
-    description: ADR-0048 の後続で未起票。設計仕様の結論に従い、GitHub Issues バックエンドの reference・hook・CI 設定を、採用を宣言したリポでだけ働かせる
-    status: done
+    description: >
+      ADR-0048 の後続で未起票。設計仕様の結論に従い、GitHub Issues バックエンドの reference・hook・CI 設定を、採用を宣言したリポでだけ働かせる。
+      実装とローカル検証は PR #1587 で実施済み。実 GitHub Actions での sweep PR 作成の検証が残る
+    status: wip
     criteria: 設計仕様の結論のとおりに配布され、GitHub Issues バックエンドを採用しないリポでは GitHub アダプタの hook が通知を出さない。採用したリポでは、移行案内に従った後も現行と同じ手順・hook・CI 設定が働く
   artifact_reference_implementation:
     label: 参照先を解決できる実装
