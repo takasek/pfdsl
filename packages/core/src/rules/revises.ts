@@ -20,6 +20,7 @@ function collectRevises(ctx: RuleContext): {
 			diagnostics.push({
 				severity: "error",
 				code: "V016",
+				nodeIds: [aid],
 				message: `'revises' on artifact '${aid}' must be a string, got ${typeof target}`,
 				range: zeroRange(),
 			});
@@ -29,6 +30,7 @@ function collectRevises(ctx: RuleContext): {
 			diagnostics.push({
 				severity: "error",
 				code: "V017",
+				nodeIds: [aid],
 				message: `Artifact '${aid}' revises itself`,
 				range: zeroRange(),
 			});
@@ -38,6 +40,7 @@ function collectRevises(ctx: RuleContext): {
 			diagnostics.push({
 				severity: "error",
 				code: "V016",
+				nodeIds: [aid, target],
 				message: `'revises' target '${target}' of artifact '${aid}' not found in this file`,
 				range: zeroRange(),
 			});
@@ -67,6 +70,7 @@ export function revisesChain(ctx: RuleContext): Diagnostic[] {
 			diagnostics.push({
 				severity: "error",
 				code: "V018",
+				nodeIds: [...new Set([target, ...revisors])],
 				message: `Artifact '${target}' is revised by multiple artifacts: ${revisors.join(", ")}`,
 				range: zeroRange(),
 			});
@@ -85,6 +89,7 @@ export function revisesChain(ctx: RuleContext): Diagnostic[] {
 			diagnostics.push({
 				severity: "error",
 				code: "V019",
+				nodeIds: [...new Set([id, target])],
 				message: `Cycle detected in 'revises' chain involving '${id}'`,
 				range: zeroRange(),
 			});

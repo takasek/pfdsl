@@ -22,15 +22,18 @@ export function primaryGraphCycle(ctx: RuleContext): Diagnostic[] {
 		}
 	}
 	for (const n of allNodes) color.set(n, "white");
+	const stack: string[] = [];
 
 	function walk(id: string): void {
 		color.set(id, "gray");
+		stack.push(id);
 		for (const neighbor of ctx.primaryAdj.get(id) ?? []) {
 			const neighborColor = color.get(neighbor);
 			if (neighborColor === "gray") {
 				diagnostics.push({
 					severity: "error",
 					code: "V010",
+					nodeIds: stack.slice(stack.indexOf(neighbor)),
 					message: `Primary graph contains a cycle involving '${id}' → '${neighbor}'`,
 					// The adjacency came from an input edge `id >> neighbor` or an
 					// output edge `id -> neighbor`; an ID whose declared kind
@@ -51,6 +54,7 @@ export function primaryGraphCycle(ctx: RuleContext): Diagnostic[] {
 				walk(neighbor);
 			}
 		}
+		stack.pop();
 		color.set(id, "black");
 	}
 
@@ -97,6 +101,7 @@ export function strictFeedback(ctx: RuleContext): Diagnostic[] {
 			diagnostics.push({
 				severity: "error",
 				code: "V011",
+				nodeIds: [...new Set([e.artifact, e.process])],
 				message: `Feedback artifact '${e.artifact}' is already an upstream ancestor of process '${e.process}' in the primary graph (reverse cycle)`,
 				range: ctx.edgeRange(e),
 			});
@@ -120,6 +125,7 @@ export function groupParentCycle(ctx: RuleContext): Diagnostic[] {
 				diagnostics.push({
 					severity: "error",
 					code: "V025",
+					nodeIds: [...new Set([id, parent])],
 					message: `Cycle detected in 'parent' chain involving group '${id}' → '${parent}'`,
 					range: zeroRange(),
 				});

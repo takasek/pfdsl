@@ -77,6 +77,8 @@ Double-click a node or use **Go to definition** in Connections to move to its de
 **Create definition** adds an empty label and focuses the editor with the cursor inside its quotation marks, ready to type.
 Use **Fit** to see the whole diagram or **Actual size** to restore 100%; the zoom display shows the current scale.
 Select a node and use **Focus selected node** to center it at 100%, or smaller when needed to fit the diagram viewport. Groups are not supported by this action.
+Nodes with diagnostics show a severity mark; hover or keyboard focus lists each diagnostic's severity, code, and message.
+On the last valid diagram, these marks reflect the current source, and the diagnostic section is labeled **Current source**.
 
 The source editor highlights YAML frontmatter and PFDSL flows.
 Hover a node ID for its metadata, **Go to definition**, and **Find all**.

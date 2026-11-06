@@ -2,7 +2,11 @@ import type { DiffReport } from "@pfdsl/core";
 import { renderDotToSvg } from "@pfdsl/preview-engine/renderer";
 import { mountConnections } from "./connections-panel.js";
 import { buildDiffPanelHtml } from "./diff-panel.js";
-import type { MessageFromWebview, MessageToWebview } from "./messages.js";
+import type {
+	MessageFromWebview,
+	MessageToWebview,
+	NodeDiagnostics,
+} from "./messages.js";
 import { FOCUS_CUE_DURATION_MS, previewMarkup } from "./preview-shell.js";
 import { unwrapAnchors } from "./svg-anchors.js";
 import {
@@ -62,6 +66,7 @@ export function mountPreview(container: HTMLElement, host: PreviewHost) {
 	// completed render. Editing still requires the current graph revision.
 	let showingStaleDiagram = false;
 	let staleRevision = -1;
+	let nodeDiagnostics: NodeDiagnostics = {};
 	container.classList.add("pfdsl-preview");
 	container.innerHTML = previewMarkup;
 	const renderDot = host.renderDot ?? renderDotToSvg;
@@ -325,6 +330,66 @@ export function mountPreview(container: HTMLElement, host: PreviewHost) {
 
 	const modKey = window.navigator.platform.startsWith("Mac") ? "⌘" : "Ctrl";
 
+	function diagnosticsFor(id: string) {
+		return Object.hasOwn(nodeDiagnostics, id) ? nodeDiagnostics[id]! : [];
+	}
+
+	function updateNodeDiagnostics(table: NodeDiagnostics = {}) {
+		nodeDiagnostics = table;
+		for (const node of container.querySelectorAll<HTMLElement>(
+			"#inner g.node, #minimap-svg g.node",
+		)) {
+			node.querySelector(".pfdsl-diagnostic-mark")?.remove();
+			const id = node.dataset.nodeId;
+			if (!id) continue;
+			const problems = diagnosticsFor(id);
+			const severity = problems.some((d) => d.severity === "error")
+				? "error"
+				: problems.some((d) => d.severity === "warning")
+					? "warning"
+					: "info";
+			const summary =
+				problems.length === 0
+					? ""
+					: problems.length === 1
+						? `1 ${severity}. `
+						: `${problems.length} problems, most severe: ${severity}. `;
+			if (inner.contains(node))
+				node.setAttribute(
+					"aria-label",
+					`Node ${id}. ${summary}${showingStaleDiagram ? "Double-click to go to source." : "Click or press Enter for Connections."}`,
+				);
+			if (problems.length === 0) continue;
+			const svgNode = node as unknown as SVGGraphicsElement;
+			// getBBox is native in SVG hosts; DOM-only test hosts may omit it.
+			const box = svgNode.getBBox?.() ?? { x: 0, y: 0, width: 0 };
+			const mark = document.createElementNS("http://www.w3.org/2000/svg", "g");
+			mark.classList.add("pfdsl-diagnostic-mark");
+			mark.dataset.severity = severity;
+			mark.setAttribute(
+				"transform",
+				`translate(${box.x + box.width} ${box.y})`,
+			);
+			mark.setAttribute("pointer-events", "none");
+			mark.setAttribute("aria-hidden", "true");
+			const shape = document.createElementNS(
+				"http://www.w3.org/2000/svg",
+				severity === "warning" ? "polygon" : "circle",
+			);
+			if (severity === "warning") shape.setAttribute("points", "0,-9 9,7 -9,7");
+			else shape.setAttribute("r", "8");
+			const text = document.createElementNS(
+				"http://www.w3.org/2000/svg",
+				"text",
+			);
+			text.setAttribute("x", "0");
+			text.setAttribute("y", "4");
+			text.textContent = severity === "info" ? "i" : "!";
+			mark.append(shape, text);
+			node.append(mark);
+		}
+	}
+
 	async function showHover(node: Element, x: number, y: number) {
 		if (!canViewGraph() || (!showingStaleDiagram && graphRevision !== revision))
 			return;
@@ -394,6 +459,12 @@ export function mountPreview(container: HTMLElement, host: PreviewHost) {
 			}
 		} else if (hint) {
 			parts.push(`<div class="tt-hint">${escapeHtml(hint)}</div>`);
+		}
+		const problems = diagnosticsFor(nodeId);
+		if (problems.length > 0) {
+			parts.push(
+				`<section class="tt-diagnostics"><strong>${showingStaleDiagram ? "Current source" : "Diagnostics"}</strong>${problems.map((d) => `<div>${escapeHtml(`${d.severity} ${d.code}: ${d.message}`)}</div>`).join("")}</section>`,
+			);
 		}
 		tooltip.innerHTML = parts.join("");
 		tooltip.style.display = "block";
@@ -1040,6 +1111,7 @@ export function mountPreview(container: HTMLElement, host: PreviewHost) {
 			cancelNodeClick();
 			clearSyncEcho();
 			showError(msg.message, msg.repair);
+			updateNodeDiagnostics(msg.nodeDiagnostics);
 			return;
 		}
 		if (msg.type === "focus") {
@@ -1131,6 +1203,7 @@ export function mountPreview(container: HTMLElement, host: PreviewHost) {
 			// (DataCloneError) on SVGAElement.href, so the <a> must be removed
 			// entirely. Cmd+Click is handled via dataset.location instead.
 			unwrapAnchors(inner);
+			updateNodeDiagnostics(msg.nodeDiagnostics);
 			for (const el of inner.querySelectorAll("[*|title], title")) {
 				if (el.tagName === "title") el.remove();
 				else el.removeAttributeNS("http://www.w3.org/1999/xlink", "title");
@@ -1146,6 +1219,7 @@ export function mountPreview(container: HTMLElement, host: PreviewHost) {
 		} catch (e) {
 			if (disposed || currentRevision !== revision) return;
 			showError((e as Error).message);
+			updateNodeDiagnostics(msg.nodeDiagnostics);
 		}
 	}
 
