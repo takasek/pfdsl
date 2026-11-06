@@ -120,6 +120,9 @@ export async function closeSourceTab(
 				.getByRole("tab", { name: /^PFDSL Preview/ })
 				.count(),
 			groups: await page.locator(".editor-group-container").count(),
+			previewFocused: await (await findWebviewFrame(page)).evaluate(() =>
+				document.hasFocus(),
+			),
 		}),
 		log,
 		timeoutMs = coldRenderTimeoutMs,
@@ -136,7 +139,8 @@ export async function closeSourceTab(
 				(state) =>
 					state.sourceTabs === 0 &&
 					state.previewTabs === 1 &&
-					state.groups === 1,
+					state.groups === 1 &&
+					state.previewFocused,
 				{ timeoutMs },
 			);
 		},
@@ -1242,7 +1246,13 @@ async function assertPreviewEditingFocus(session) {
 		"pointer candidate connection",
 	);
 	for (const id of ["a", "p"]) {
-		await frame.locator(`[data-neighbor="${id}"]`).press("Enter");
+		const neighbor = frame.locator(`[data-neighbor="${id}"]`);
+		await waitForInteraction(
+			`neighbor ${id} is ready`,
+			() => neighbor.isEnabled(),
+			(ready) => ready,
+		);
+		await neighbor.press("Enter");
 		await waitForInteraction(
 			`neighbor ${id} keeps visible Connections focus`,
 			() =>

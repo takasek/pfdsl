@@ -165,6 +165,7 @@ it("focuses a Connections navigation target when Fit made its text unreadable", 
 		new DOMRect(80, 70, 40 * 0.092, 20 * 0.092),
 	);
 	s.node("a").dispatchEvent(new MouseEvent("contextmenu", { bubbles: true }));
+	await s.preview.receive({ type: "focus", nodeId: "a" });
 	s.container.querySelector<HTMLButtonElement>('[data-neighbor="p"]')!.click();
 	expect(s.container.querySelector("#zoom-level")!.textContent).toBe("100%");
 	expect(s.node("p").classList.contains("pfdsl-focus-cue")).toBe(true);
@@ -244,6 +245,7 @@ it.each([
 			type: "nodeClick",
 			nodeId: "a",
 			preserveFocus: true,
+			syncId: expect.any(Number),
 		});
 		expect(
 			s.container.querySelector("#node-actions-title")!.textContent,
@@ -307,6 +309,7 @@ it.each([
 			type: "nodeClick",
 			nodeId: "p",
 			preserveFocus: true,
+			syncId: expect.any(Number),
 		});
 	}
 });
@@ -381,6 +384,105 @@ it("consumes a synchronization echo once without moving or repeating the cue", a
 	expect(inner.querySelector(".pfdsl-focus-ring")).not.toBe(consumedRing);
 });
 
+it("keeps the current edge menu through delayed navigation echoes", async () => {
+	vi.useFakeTimers();
+	const s = setup();
+	await s.preview.receive(s.message);
+	s.node("a").dispatchEvent(
+		new KeyboardEvent("keydown", { key: "Enter", bubbles: true }),
+	);
+	const neighbor = s.container.querySelector<HTMLButtonElement>(
+		'[data-neighbor="p"]',
+	)!;
+	expect(neighbor.disabled).toBe(true);
+	neighbor.click();
+	expect(
+		s.container.querySelector("#node-actions-title")!.textContent,
+	).toContain("a");
+	expect(
+		s.postMessage.mock.calls.filter(([m]) => m.type === "nodeClick"),
+	).toHaveLength(1);
+	await s.preview.receive({ type: "focus", nodeId: "a" });
+	expect(neighbor.disabled).toBe(false);
+	neighbor.click();
+	const edge = s.container.querySelector<HTMLButtonElement>("[data-edge]")!;
+	edge.click();
+	const menu = s.container.querySelector<HTMLElement>(".connection-menu")!;
+	const focused = document.activeElement;
+	expect(menu.hidden).toBe(false);
+	await s.preview.receive({ type: "focus", nodeId: "p" });
+	expect(
+		s.container.querySelector("#node-actions-title")!.textContent,
+	).toContain("p");
+	expect(edge.isConnected).toBe(true);
+	expect(menu.hidden).toBe(false);
+	expect(document.activeElement).toBe(focused);
+	window.dispatchEvent(new Event("resize"));
+	expect(menu.hidden).toBe(true);
+	expect(document.activeElement).toBe(edge);
+});
+
+it("acknowledges no-op synchronization without suppressing a later source navigation", async () => {
+	const s = setup();
+	await s.preview.receive(s.message);
+	s.node("a").dispatchEvent(
+		new KeyboardEvent("keydown", { key: "Enter", bubbles: true }),
+	);
+	await s.preview.receive({
+		type: "nodeSyncComplete",
+		syncId: s.postMessage.mock.calls.at(-1)![0].syncId,
+	});
+	s.container.querySelector<HTMLButtonElement>('[data-neighbor="p"]')!.click();
+	// A host need not emit a selection event when a was already selected.
+	await s.preview.receive({ type: "focus", nodeId: "p" });
+	await s.preview.receive({ type: "focus", nodeId: "a" });
+	expect(
+		s.container.querySelector("#node-actions-title")!.textContent,
+	).toContain("a");
+});
+
+it("allows repeated visits after each synchronization completes", async () => {
+	const s = setup();
+	await s.preview.receive(s.message);
+	s.node("a").dispatchEvent(
+		new KeyboardEvent("keydown", { key: "Enter", bubbles: true }),
+	);
+	await s.preview.receive({ type: "focus", nodeId: "a" });
+	for (const id of ["p", "a"]) {
+		s.container
+			.querySelector<HTMLButtonElement>(`[data-neighbor="${id}"]`)!
+			.click();
+		const edge = s.container.querySelector("[data-edge]");
+		await s.preview.receive({ type: "focus", nodeId: id });
+		expect(s.container.querySelector("[data-edge]")).toBe(edge);
+	}
+	const edge = s.container.querySelector("[data-edge]");
+	await s.preview.receive({ type: "focus", nodeId: "a" });
+	expect(s.container.querySelector("[data-edge]")).not.toBe(edge);
+});
+
+it("does not release a newer synchronization for an old no-op acknowledgement", async () => {
+	vi.useFakeTimers();
+	const s = setup();
+	await s.preview.receive(s.message);
+	s.node("a").dispatchEvent(
+		new KeyboardEvent("keydown", { key: "Enter", bubbles: true }),
+	);
+	const oldId = s.postMessage.mock.calls.at(-1)![0].syncId;
+	await vi.advanceTimersByTimeAsync(1000);
+	s.container.querySelector<HTMLButtonElement>('[data-neighbor="p"]')!.click();
+	const neighbor = s.container.querySelector<HTMLButtonElement>(
+		'[data-neighbor="a"]',
+	)!;
+	await s.preview.receive({ type: "nodeSyncComplete", syncId: oldId });
+	expect(neighbor.disabled).toBe(true);
+	await s.preview.receive({
+		type: "nodeSyncComplete",
+		syncId: s.postMessage.mock.calls.at(-1)![0].syncId,
+	});
+	expect(neighbor.disabled).toBe(false);
+});
+
 it.each([
 	"Enter",
 	"contextmenu",
@@ -403,7 +505,14 @@ it.each([
 	await vi.advanceTimersByTimeAsync(NODE_CLICK_DELAY_MS);
 	expect(s.container.querySelector(".pfdsl-focus-ring")).toBe(ring);
 	expect(s.postMessage.mock.calls).toEqual([
-		[{ type: "nodeClick", nodeId: "a", preserveFocus: true }],
+		[
+			{
+				type: "nodeClick",
+				nodeId: "a",
+				preserveFocus: true,
+				syncId: expect.any(Number),
+			},
+		],
 	]);
 });
 
@@ -454,6 +563,7 @@ it("synchronizes editor, graph and Connections without taking editor focus", asy
 		type: "nodeClick",
 		nodeId: "a",
 		preserveFocus: true,
+		syncId: expect.any(Number),
 	});
 	expect(s.node("a").classList.contains("pfdsl-focus-cue")).toBe(true);
 	expect(
@@ -486,6 +596,7 @@ it("offers Go to definition for a defined center and keeps Create definition for
 		type: "nodeClick",
 		nodeId: "p",
 	});
+	await s.preview.receive({ type: "focus", nodeId: "p" });
 	s.container.querySelector<HTMLButtonElement>('[data-neighbor="a"]')!.click();
 	expect(definition.textContent).toBe("Create definition");
 	definition.click();

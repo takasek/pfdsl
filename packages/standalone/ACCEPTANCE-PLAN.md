@@ -199,6 +199,8 @@ Connectionsから追加・削除・feedback切替・定義作成を適用し、e
 期待：全体図を保って対象へ移動し、editor・図・Connectionsが同じnodeを指す。
 editor操作はeditorのfocusを保ち、閉じたConnectionsを開かず、開いていれば中心を追従する。
 Connectionsの近隣移動はeditorのcursorも移し、focusはConnectionsに残す。
+近隣をa→p→aと続けて移動し、source同期中だけ近隣buttonが無効になり、完了後に再び移動できることを確認する。
+同位置への同期でも無効状態が残らず、最後の中心で辺のmenuを開いてwindowをresizeすると、menuが閉じて同じ辺へfocusが戻ることを確認する。
 図の単clickはdouble click判定の待ち時間後にConnectionsを開き、同期のechoではpanを変えず合図を繰り返さない。
 図のdouble clickは単click処理を取り消し、Connectionsを同じnodeで開いてsourceへ移動しeditorにfocusする。
 Vではsourceを閉じてからdouble clickとGo to definitionを各々試し、previewを覆わない別groupへsourceが開いてfocusすること、単click同期だけではsourceを開かないことを確認する。
@@ -405,7 +407,7 @@ quoted/flow keyのID上と同じ行の`label`／`owner`等のfield上を区別�
 Find allは現行拡張と同じliteral文字列検索であり、metadata fieldを除くsemantic参照・巡回とは区別する。
 processのcommand行末の`Command` hintをhoverして複数行の内容を読み、表示だけで実行されないことを確認する。
 hoverを残したまま編集・文書切替・閉鎖し、旧版のリンクが新しい文書や版へ作用しないことを確認する。
-2026-10-21の使用感レポートの15行fixtureでも、14行目のpackage_manifestでShow Hover→撮影→Escape→本文編集を行う。
+Linuxの#1513再試験では、[採取手順](evidence/2026-10-26-linux-hover-summary/NEXT-LINUX-RUN.md)でログ採取を開始し、回収した377バイトの元fixtureの14行目のpackage_manifestでShow Hover→撮影→Escape→本文編集を行う。
 labelのみ、criteriaのみ、groupとcriteria、descriptionを含む場合を分け、Linux nativeではWebKitWebProcessの存否・終了時刻・stderr・利用可能な終了理由を記録する。
 Linuxで報告された3回の表示プロセス消失は原因未確定であり、Chromiumでの成功をWebKitGTKやMac nativeの合格へ転写しない。
 期待：semantic nodeとfield、定義range、全出現が正しく、図hover廃止と混同しない。
