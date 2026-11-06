@@ -73,15 +73,15 @@
 <!-- adapter_plugin_split_design -->
 <g id="node3" class="node">
 <title>adapter_plugin_split_design</title>
-<g id="a_node3"><a xlink:title="core と GitHub アダプタの plugin 分割の設計仕様&#10;&#10;ADR&#45;0048 の後続で未起票。分割の費用が過大と分かった場合は、1つの plugin のまま .pfdsl/config.json の宣言で絞る案へ切り替える（ADR&#45;0048 D5）&#10;criteria: plugin 間で依存を宣言できるかの確認結果と、分割するか1つの plugin のまま宣言で絞るかの決定、その理由、採用先の移行手順が設計仕様に記録され、所有者が承認している">
-<polygon fill="#f8f9fa" stroke="black" points="989.23,-1227 773.23,-1227 773.23,-1151.8 989.23,-1151.8 989.23,-1227"/>
+<g id="a_node3"><a xlink:title="core と GitHub アダプタの plugin 分割の設計仕様&#10;&#10;ADR&#45;0048 の後続で未起票。分割の費用が過大と分かった場合は、1つの plugin のまま .pfdsl/config.json の宣言で絞る案へ切り替える（ADR&#45;0048 D5）&#10;criteria: plugin 間で依存を宣言できるかの確認結果と、分割するか1つの plugin のまま宣言で絞るかの決定、その理由、採用先の移行手順が設計仕様に記録され、所有者が承認している&#10;location: ../docs/superpowers/specs/2026&#45;11&#45;05&#45;github&#45;adapter&#45;design.md">
+<polygon fill="#d4edda" stroke="black" points="989.23,-1227 773.23,-1227 773.23,-1151.8 989.23,-1151.8 989.23,-1227"/>
 <text xml:space="preserve" text-anchor="middle" x="881.23" y="-1210.4" font-family="Times,serif" font-size="14.00">adapter_plugin_split_design</text>
 <text xml:space="preserve" text-anchor="middle" x="881.23" y="-1193.6" font-family="Times,serif" font-size="14.00">core と GitHub</text>
 <text xml:space="preserve" text-anchor="middle" x="881.23" y="-1176.8" font-family="Times,serif" font-size="14.00">アダプタの plugin</text>
 <text xml:space="preserve" text-anchor="middle" x="881.23" y="-1160" font-family="Times,serif" font-size="14.00">分割の設計仕様</text>
 </a>
 </g>
-<text xml:space="preserve" text-anchor="middle" x="760.78" y="-1139.2" font-family="Times,serif" font-size="14.00">todo</text>
+<text xml:space="preserve" text-anchor="middle" x="759.62" y="-1139.2" font-family="Times,serif" font-size="14.00">done</text>
 </g>
 <!-- apply_github_adapter_design -->
 <g id="node4" class="node">
