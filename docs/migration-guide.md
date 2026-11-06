@@ -27,6 +27,16 @@ Record the target only after all potentially applicable steps have been resolved
 These changes are not yet assigned to a published CLI/plugin release.
 Apply them only when the target release includes the referenced changes; specification v0.0.29 is not a CLI/plugin version.
 
+### Declare the GitHub Issues adapter before updating
+
+The harness installs and updates the pfdsl plugin. Only repositories that use the GitHub Issues preset need to maintain the adapter declaration and deployed files.
+
+1. Record the current CLI, plugin bundle, backend choice, sweep setting and local changes to deployed files. If the roadmap companion and the intended backend disagree, resolve the choice with the owner.
+2. For an existing GitHub Issues adopter, add `"githubIssues": {"enabled": true}` to the existing `.pfdsl/config.json` before updating. Preserve other keys, including the separate `sweepCompletedChains.enabled` switch.
+3. Update the CLI, plugin and deployed adapter together. Run the target plugin’s install-sync check and normal `--deploy`, reconcile skipped local edits, verify the YAML dependency and run the first issue audit and a sweep preview. Confirm the managed-issue notification and intended workflow setting, including the repository host on GitHub Enterprise.
+4. File-based and unconfigured repositories can omit the key. If a legacy sweep workflow remains, disable its old sweep switch **before** updating. Review local edits and remove obsolete workflow files, audit callers and deployed scripts through the repository’s normal review process.
+5. Record the applied migration after verification. If interrupted, suspend automatic sweeps, restore the previous CLI, plugin, deployed files and config together, verify the old audit and preview, then restore the previous sweep setting.
+
 ### Use the CLI for completed-chain pruning
 
 Completed-chain retention and verification now live in `pfdsl prune`, shared by both tracker presets.

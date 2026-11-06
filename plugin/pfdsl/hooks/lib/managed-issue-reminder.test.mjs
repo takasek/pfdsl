@@ -1,4 +1,7 @@
 import assert from "node:assert/strict";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { describe, it } from "node:test";
 
 import {
@@ -259,14 +262,48 @@ describe("formatManagedIssueAdvisory", () => {
 });
 
 describe("runManagedIssueReminder", () => {
-	it("prints the advisory for a successful managed create", () => {
-		const input = JSON.stringify(
-			payload({ command: "gh issue create --label flow:managed" }),
-		);
-		const { shouldOutput, output } = runManagedIssueReminder(input);
+	it("checks the event checkout for the same successful managed create", (t) => {
+		const root = mkdtempSync(join(tmpdir(), "managed-issue-reminder-"));
+		t.after(() => rmSync(root, { recursive: true, force: true }));
+		const cwd = join(root, "src");
+		mkdirSync(cwd);
+		mkdirSync(join(root, ".git"));
+		mkdirSync(join(root, ".pfdsl"));
+		const configPath = join(root, ".pfdsl/config.json");
+		const event = payload({ command: "gh issue create --label flow:managed" });
+		const run = (cwd) =>
+			runManagedIssueReminder(JSON.stringify({ ...event, cwd }));
+		assert.deepEqual(run(undefined), { shouldOutput: false });
+		assert.deepEqual(run("src"), { shouldOutput: false });
+		assert.deepEqual(run(cwd), { shouldOutput: false });
+		for (const config of [{}, { githubIssues: { enabled: false } }]) {
+			writeFileSync(configPath, JSON.stringify(config));
+			assert.deepEqual(run(cwd), { shouldOutput: false });
+		}
+		writeFileSync(configPath, '{"githubIssues":{"enabled":true}}');
+		const { shouldOutput, output } = run(cwd);
 		assert.equal(shouldOutput, true);
 		assert.equal(output.hookSpecificOutput.hookEventName, "PostToolUse");
 		assert.match(output.hookSpecificOutput.additionalContext, /#671/);
+		const nested = join(cwd, "linked-checkout");
+		mkdirSync(nested);
+		writeFileSync(join(nested, ".git"), "gitdir: /another/worktrees/linked\n");
+		assert.deepEqual(run(nested), { shouldOutput: false });
+		for (const invalid of [
+			"{",
+			"null",
+			'{"githubIssues":null}',
+			'{"githubIssues":{}}',
+			'{"githubIssues":{"enabled":"true"}}',
+		]) {
+			writeFileSync(configPath, invalid);
+			const diagnostic = run(cwd).output.hookSpecificOutput.additionalContext;
+			assert.match(diagnostic, /config\.json/);
+			assert.doesNotMatch(diagnostic, /#671/);
+		}
+		rmSync(configPath);
+		mkdirSync(configPath);
+		assert.match(run(cwd).output.hookSpecificOutput.additionalContext, /Cannot check GitHub Issues adoption/);
 	});
 
 	it("produces no output for an exempt create", () => {

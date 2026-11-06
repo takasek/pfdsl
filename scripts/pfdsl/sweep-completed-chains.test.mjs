@@ -8,11 +8,14 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import {
+	copyFileSync,
 	mkdirSync,
 	mkdtempSync,
 	readdirSync,
 	readFileSync,
+	realpathSync,
 	rmSync,
+	symlinkSync,
 	writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
@@ -24,19 +27,36 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const scriptPath = resolve(__dirname, "sweep-completed-chains.mjs");
 const cliPath = resolve(__dirname, "../../packages/cli/dist/cli.js");
 
+let sandbox;
+let adapter;
 let dir;
 let sub;
 
 beforeEach(() => {
-	dir = mkdtempSync(join(tmpdir(), "sweep-completed-chains-test-"));
+	sandbox = mkdtempSync(join(tmpdir(), "sweep-completed-chains-test-"));
+	dir = join(sandbox, "adopter");
+	const scripts = join(dir, "scripts/pfdsl");
+	mkdirSync(join(scripts, "lib"), { recursive: true });
+	adapter = join(scripts, "sweep-completed-chains.mjs");
+	copyFileSync(scriptPath, adapter);
+	copyFileSync(
+		join(__dirname, "lib/github-issues-config.mjs"),
+		join(scripts, "lib/github-issues-config.mjs"),
+	);
+	mkdirSync(join(dir, ".pfdsl"));
+	writeFileSync(
+		join(dir, ".pfdsl/config.json"),
+		'{"githubIssues":{"enabled":true}}',
+	);
 });
 
 afterEach(() => {
-	rmSync(dir, { recursive: true, force: true });
+	rmSync(sandbox, { recursive: true, force: true });
 });
 
-function runSweep(args, envOverrides = {}) {
-	return spawnSync(process.execPath, [scriptPath, ...args], {
+function runSweep(args, envOverrides = {}, cwd = dir) {
+	return spawnSync(process.execPath, [adapter, ...args], {
+		cwd,
 		encoding: "utf-8",
 		env: { ...process.env, PFDSL_CLI: cliPath, ...envOverrides },
 	});
@@ -147,11 +167,81 @@ process:
 
 		assert.equal(readFileSync(file, "utf-8"), nonCanonical);
 		assert.deepEqual(
-			extraFiles(dir, ["roadmap.pfdsl"]),
+			extraFiles(dir, ["roadmap.pfdsl", "scripts", ".pfdsl"]),
 			[],
 			"no scratch file should remain after a failed fmt check",
 		);
 	});
+});
+
+describe("deployed sweep adapter adoption", () => {
+	for (const [config, expectedStatus] of [
+		['{"sweepCompletedChains":{"enabled":true}}', 0],
+		['{"githubIssues":{"enabled":false}}', 0],
+		['{"githubIssues":{}}', 1],
+		[
+			'{"githubIssues":{"enabled":true},"sweepCompletedChains":{"enabled":false}}',
+			23,
+		],
+	]) {
+		it(`checks the deployed repository config before CLI resolution: ${config}`, () => {
+			writeFileSync(join(dir, ".pfdsl/config.json"), config);
+			const cli = join(dir, "cli.cjs");
+			writeFileSync(cli, "process.exit(23);");
+			writeFileSync(join(dir, "roadmap.pfdsl"), "");
+			const result = runSweep(["roadmap.pfdsl"], { PFDSL_CLI: cli });
+			assert.equal(
+				result.status,
+				expectedStatus,
+				result.stdout + result.stderr,
+			);
+			if (expectedStatus === 0) assert.match(result.stdout, /not applicable/i);
+			if (expectedStatus === 1) assert.match(result.stderr, /config\.json/);
+		});
+	}
+});
+
+describe("deployed sweep checkout boundary", () => {
+	for (const kind of [
+		"absolute",
+		"other cwd",
+		"symlink",
+		"nested repository",
+		"nested worktree",
+	]) {
+		it(`rejects ${kind} before the CLI can write`, () => {
+			const nested = kind.startsWith("nested");
+			const foreign = join(nested ? dir : sandbox, "other");
+			mkdirSync(foreign);
+			if (kind === "nested worktree")
+				writeFileSync(
+					join(foreign, ".git"),
+					"gitdir: /other/worktrees/fixture",
+				);
+			if (kind === "nested repository") mkdirSync(join(foreign, ".git"));
+			const file = join(foreign, "roadmap.pfdsl");
+			writeFileSync(file, "original");
+			let arg = file;
+			if (kind === "symlink") {
+				arg = join(dir, "link.pfdsl");
+				symlinkSync(file, arg);
+			}
+			if (kind === "other cwd") arg = "roadmap.pfdsl";
+			const cli = join(dir, "cli.cjs");
+			writeFileSync(
+				cli,
+				'require("node:fs").writeFileSync(process.argv[3], "overwritten");',
+			);
+			const result = runSweep(
+				[arg, "--write"],
+				{ PFDSL_CLI: cli },
+				kind === "other cwd" ? foreign : dir,
+			);
+			assert.equal(readFileSync(file, "utf8"), "original");
+			assert.equal(result.status, 1, result.stdout + result.stderr);
+			assert.match(result.stderr, /checkout/);
+		});
+	}
 });
 
 describe("sweep-completed-chains: direct CLI forwarding", () => {
@@ -159,6 +249,7 @@ describe("sweep-completed-chains: direct CLI forwarding", () => {
 		it(`forwards the request and CLI exit without a capability probe (write=${write})`, () => {
 			const cli = join(dir, "cli.cjs");
 			const calls = join(dir, "calls.jsonl");
+			writeFileSync(join(dir, "roadmap.pfdsl"), "");
 			writeFileSync(
 				cli,
 				`
@@ -181,7 +272,14 @@ process.exit(2);
 					.trim()
 					.split("\n")
 					.map((line) => JSON.parse(line)),
-				[["prune", "roadmap.pfdsl", "--json", ...(write ? ["--write"] : [])]],
+				[
+					[
+						"prune",
+						realpathSync(join(dir, "roadmap.pfdsl")),
+						"--json",
+						...(write ? ["--write"] : []),
+					],
+				],
 			);
 		});
 	}

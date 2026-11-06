@@ -206,8 +206,9 @@ artifact:
   adapter_plugin_split_design:
     label: core と GitHub アダプタの plugin 分割の設計仕様
     description: ADR-0048 の後続で未起票。分割の費用が過大と分かった場合は、1つの plugin のまま .pfdsl/config.json の宣言で絞る案へ切り替える（ADR-0048 D5）
-    status: todo
+    status: done
     criteria: plugin 間で依存を宣言できるかの確認結果と、分割するか1つの plugin のまま宣言で絞るかの決定、その理由、採用先の移行手順が設計仕様に記録され、所有者が承認している
+    location: ../docs/superpowers/specs/2026-11-05-github-adapter-design.md
   cli_release_prune:
     label: 完了チェーン回収 CLI とアダプタの公開
     description: "#1567 の prune と対応する配布アダプタを含む CLI/plugin リリース。版番号は公開時に決める"
@@ -217,8 +218,10 @@ artifact:
       同じ release tag の plugin 配布について .pfdsl/workflow.md の「release milestone artifact の作成規約」と .pfdsl/pipeline.md の公開・pin・取得確認を満たし、採用先が CLI・plugin・アダプタを即座に一括更新する移行手順がある
   optional_github_adapter:
     label: 採用したリポでだけ働く GitHub アダプタ
-    description: ADR-0048 の後続で未起票。設計仕様の結論に従い、GitHub Issues バックエンドの reference・hook・CI 設定を、採用を宣言したリポでだけ働かせる
-    status: todo
+    description: >
+      ADR-0048 の後続で未起票。設計仕様の結論に従い、GitHub Issues バックエンドの reference・hook・CI 設定を、採用を宣言したリポでだけ働かせる。
+      実装とローカル検証は PR #1587 で実施済み。実 GitHub Actions での sweep PR 作成の検証が残る
+    status: wip
     criteria: 設計仕様の結論のとおりに配布され、GitHub Issues バックエンドを採用しないリポでは GitHub アダプタの hook が通知を出さない。採用したリポでは、移行案内に従った後も現行と同じ手順・hook・CI 設定が働く
   artifact_reference_implementation:
     label: 参照先を解決できる実装

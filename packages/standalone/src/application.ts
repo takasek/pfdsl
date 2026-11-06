@@ -458,6 +458,7 @@ export function mountApplication(options: ApplicationOptions) {
 			folder: !!folderRoot,
 			sidebar,
 			diagram: active?.tab.canDiagram() ?? false,
+			diagramView: active?.tab.canViewDiagram() ?? false,
 			definition: active?.tab.canCreateDefinition() ?? false,
 		});
 	}

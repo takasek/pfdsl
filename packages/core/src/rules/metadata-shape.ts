@@ -27,6 +27,7 @@ export function indexShape(ctx: RuleContext): Diagnostic[] {
 				diagnostics.push({
 					severity: "error",
 					code: "V029",
+					nodeIds: [id],
 					message: `Invalid index '${String(idx)}' on ${kind} '${id}'. Must be a positive integer`,
 					range: ctx.rangeOf(id),
 				});
@@ -37,6 +38,7 @@ export function indexShape(ctx: RuleContext): Diagnostic[] {
 				diagnostics.push({
 					severity: "warning",
 					code: "W004",
+					nodeIds: [...new Set([id, prev])],
 					message: `Duplicate index ${idx} on ${kind} '${id}' (also on '${prev}')`,
 					range: ctx.rangeOf(id),
 				});

@@ -36,7 +36,7 @@ Open PRは#1451（完了chain回収）、#361（記事計画）、#122（公開�
 | H04/H05：移動とhover非競合 | Connections中心更新、主図維持、text hover、#1448の実V smokeと独立シナリオ | A。旧hover pointer方式は仕様置換 | D：GUI-09/11/17/20/22 |
 | H06/H07：editor／Connections共通cue | `editor/src/preview.ts`、`preview-actions.test.ts` | A | D：GUI-11 |
 | H08/H09：寿命、再描画非再発火、view／色、reduced-motion | 同cue test、CSS reduced-motion、revision/disposeとpending requestId、#1448の成功／拒否probe | A | D：GUI-11/16 |
-| #1352 P01/P02：全文error、minimap排除と正常回復 | `preview-ux.test.ts`のparse/renderer例外、主図とminimap同時commit、hidden tab復帰 | A。制御例外をnative実測としない | D：GUI-18 |
+| #1352 P01/P02、#1570：全文error、旧図/minimapの読み取り専用保持、常設の帯と正常回復 | `preview-ux.test.ts`のparse/renderer例外、主図とminimap同時commit、hidden tab復帰、旧図の操作制限 | A。制御例外をnative実測としない | D：GUI-18 |
 | P03/P04：初回Fit、100%、倍率、Help、view保持 | `preview-ux.test.ts`、共有toolbar、両README、#1448 browser／V smoke | A | D：GUI-17 |
 | P05：定義labelと次metadata、W002、Undo | 共有`edit-navigation-contract.test.ts`、Monaco／VS Code adapter、#1450レビュー | A | D：GUI-19/28 |
 | P06：cloneからbuild／起動 | root／拡張README、`.vscode/launch.json`、`tasks.json`はworkspace rootから`make vscode-build`、正しいpackage `pfdsl` | B→A：本worktreeのsetup／workspace buildで対象空振りなしを確認。実F5は既存#1448 smokeと区別 | D：GUI-37 |

@@ -35,7 +35,11 @@ Select a node ID in the source or a node in the preview, then use **Focus select
 The toolbar shows the current zoom level; **Help** lists the gestures.
 Wheel to zoom at the pointer, drag the diagram to pan, and click or drag the minimap to move.
 Double-click a node to go to its source; double-click the background to return to 100%.
-Editing and error recovery preserve your zoom and pan; syntax and rendering errors appear separately at normal text size with the minimap hidden.
+Editing and error recovery preserve your zoom and pan.
+When the source has errors, the last valid diagram and minimap remain available as read-only references, with a persistent banner identifying the old diagram and showing the error at normal text size.
+If no valid diagram has been rendered, the preview shows the error with an empty diagram area.
+Nodes with diagnostics show a severity mark; hover or keyboard focus lists each diagnostic's severity, code, and message.
+On the last valid diagram, these marks reflect the current source, and the diagnostic section is labeled **Current source**.
 
 For an undefined node, **Insert artifact/process definition** in Quick Fix inserts its frontmatter definition with `label: ""` and places the cursor inside the empty quotes so you can type the label.
 A produced artifact should also declare meaningful completion `criteria` (W002 warns when absent; strict validation treats it as an error).

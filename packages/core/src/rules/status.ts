@@ -25,6 +25,7 @@ export function statusMonotonicity(ctx: RuleContext): Diagnostic[] {
 				diagnostics.push({
 					severity: "warning",
 					code: "W003",
+					nodeIds: [...new Set([pid, aid])],
 					message: `Process '${pid}' outputs a 'done' artifact but input '${aid}' has status '${status}'`,
 					range: zeroRange(),
 				});
@@ -50,6 +51,7 @@ export function flowStatusAbsence(ctx: RuleContext): Diagnostic[] {
 		diagnostics.push({
 			severity: ctx.strictly("warning"),
 			code: "W007",
+			nodeIds: [aid],
 			message: `Artifact '${aid}' has 'status' set in a '${type}' file; status belongs to the roadmap`,
 			range: ctx.rangeOf(aid),
 		});
@@ -103,6 +105,7 @@ export function roadmapUndeclaredArtifact(ctx: RuleContext): Diagnostic[] {
 			diagnostics.push({
 				severity: "error",
 				code: "V035",
+				nodeIds: [id],
 				message: `Artifact '${id}' appears on an edge but has no frontmatter declaration`,
 				range: zeroRange(),
 			});
@@ -110,6 +113,7 @@ export function roadmapUndeclaredArtifact(ctx: RuleContext): Diagnostic[] {
 			diagnostics.push({
 				severity: "error",
 				code: "V035",
+				nodeIds: [id],
 				message: `Artifact '${id}' appears on an edge but its frontmatter declaration has no 'status' field`,
 				range: ctx.rangeOf(id),
 			});

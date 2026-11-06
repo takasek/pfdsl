@@ -149,8 +149,9 @@ test("file picker waits for the selected fixture result before accepting", async
 
 test("source close targets its own close button and checks tab and preview survival", async () => {
 	const observations = [
-		{ sourceTabs: 1, previewTabs: 1, groups: 2 },
-		{ sourceTabs: 0, previewTabs: 1, groups: 1 },
+		{ sourceTabs: 1, previewTabs: 1, groups: 2, previewFocused: false },
+		{ sourceTabs: 0, previewTabs: 1, groups: 1, previewFocused: false },
+		{ sourceTabs: 0, previewTabs: 1, groups: 1, previewFocused: true },
 	];
 	const clicks = [];
 	const sourceTab = {
@@ -165,7 +166,37 @@ test("source close targets its own close button and checks tab and preview survi
 	assert.deepEqual(clicks, [
 		{ role: "button", options: { name: /^Close \(/ } },
 	]);
-	assert.deepEqual(state, { sourceTabs: 0, previewTabs: 1, groups: 1 });
+	assert.deepEqual(state, {
+		sourceTabs: 0,
+		previewTabs: 1,
+		groups: 1,
+		previewFocused: true,
+	});
+	assert.equal(
+		observations.length,
+		0,
+		"tab removal alone must not release the next gesture",
+	);
+});
+
+test("source close fails when focus remains outside the preview", async () => {
+	await assert.rejects(
+		closeSourceTab(
+			{},
+			{ getByRole: () => ({ click: async () => {} }) },
+			{
+				readState: async () => ({
+					sourceTabs: 0,
+					previewTabs: 1,
+					groups: 1,
+					previewFocused: false,
+				}),
+				log: () => {},
+				timeoutMs: 1,
+			},
+		),
+		/previewFocused.*false/,
+	);
 });
 
 test("an absent source and one group do not pass when the preview was closed", async () => {
