@@ -4,6 +4,56 @@ import { fileURLToPath } from "node:url";
 import { withFormatHost } from "./helpers/format-host.mjs";
 import { instances, Selection } from "./helpers/range-monaco.mjs";
 
+test("same-position preview synchronization does not swallow a later source move", async () => {
+	await withFormatHost(
+		"document-tab",
+		fileURLToPath(new URL("./helpers/range-monaco.mjs", import.meta.url)),
+		instances,
+		async ({ create, window }) => {
+			const { tab, editor } = create(
+				"---\nartifact:\n  a: {label: A}\nprocess:\n  p: {label: P}\n---\na >> p\n",
+			);
+			tab.activate();
+			for (
+				let attempt = 0;
+				attempt < 1000 && !tab.container.querySelector("#inner svg");
+				attempt++
+			)
+				await new Promise((resolve) => setTimeout(resolve, 5));
+			const setPosition = editor.setPosition;
+			editor.setPosition = function (position) {
+				// Like Monaco, an unchanged collapsed cursor emits no cursor event.
+				if (
+					this.position?.lineNumber === position.lineNumber &&
+					this.position?.column === position.column
+				)
+					return;
+				return setPosition.call(this, position);
+			};
+			const a = { lineNumber: 3, column: 3 };
+			editor.setPosition(a);
+			tab.container
+				.querySelector('#inner [data-node-id="a"]')
+				.dispatchEvent(
+					new window.KeyboardEvent("keydown", { key: "Enter", bubbles: true }),
+				);
+			const neighbor = tab.container.querySelector('[data-neighbor="p"]');
+			assert.equal(
+				neighbor.disabled,
+				false,
+				"the no-op acknowledgement releases navigation",
+			);
+			neighbor.click();
+			assert.deepEqual(editor.position, { lineNumber: 5, column: 3 });
+			editor.setPosition(a);
+			assert.match(
+				tab.container.querySelector("#node-actions-title").textContent,
+				/a \(A\)/,
+			);
+		},
+	);
+});
+
 test("standalone syncs non-preview cursor changes and ignores preview-edit recentering", async () => {
 	await withFormatHost(
 		"document-tab",

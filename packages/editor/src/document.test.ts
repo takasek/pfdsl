@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { analyzeDependencySnapshot } from "./document.js";
 import { analyzeSnapshot, preloadPresets, prepareDocument } from "./index.js";
 
 describe("V036 error repair", () => {
@@ -16,6 +17,25 @@ describe("V036 error repair", () => {
 			type: "error",
 			message: `${first.code}: ${first.message}`,
 			repair: { source, artifact: "a", process: "p" },
+			nodeDiagnostics: {
+				a: [{ severity: "error", code: "V036", message: first.message }],
+				p: [{ severity: "error", code: "V036", message: first.message }],
+				...(source.startsWith("z")
+					? Object.fromEntries(
+							["z", "q"].map((id) => [
+								id,
+								[
+									{
+										severity: "error",
+										code: "V036",
+										message:
+											"Artifact 'z' is connected to process 'q' both as an input (>>) and as feedback (>>?); keep only one connection",
+									},
+								],
+							]),
+						)
+					: {}),
+			},
 		});
 	});
 	it.each([
@@ -33,6 +53,74 @@ describe("V036 error repair", () => {
 });
 
 describe("shared document pipeline", () => {
+	it.each([
+		"warning",
+		"error",
+	] as const)("sends ordered current node diagnostics in the %s message", (severity) => {
+		const model = analyzeSnapshot("a >> p -> b\n");
+		const range = {
+			start: { line: 1, column: 1, offset: 0 },
+			end: { line: 1, column: 2, offset: 1 },
+		};
+		model.diagnostics = [
+			{ severity, code: "V010", message: "First", nodeIds: ["a", "p"], range },
+			{
+				severity: "info",
+				code: "I001",
+				message: "Second",
+				nodeIds: ["a"],
+				range,
+			},
+			{ severity: "warning", code: "W006", message: "Document only", range },
+		];
+		expect(prepareDocument(model, null, () => null).message).toMatchObject({
+			type: severity === "error" ? "error" : "render",
+			nodeDiagnostics: {
+				a: [
+					{ severity, code: "V010", message: "First" },
+					{ severity: "info", code: "I001", message: "Second" },
+				],
+				p: [{ severity, code: "V010", message: "First" }],
+			},
+		});
+	});
+
+	it("snapshot coordinate conversion retains target IDs", () => {
+		const source = "---\ntitle: Example\n---\np -> a\nq -> a\n";
+		const diagnostic = analyzeSnapshot(source).diagnostics.find(
+			(d) => d.code === "V001",
+		)!;
+		expect(diagnostic.nodeIds).toEqual(["a", "p", "q"]);
+		expect(
+			source.slice(diagnostic.range.start.offset, diagnostic.range.end.offset),
+		).toBe("q -> a");
+	});
+
+	it("raw YAML snapshots and dependency diagnostics retain file-local IDs", async () => {
+		const source = "group:\n  g: {parent: h}\n  h: {parent: g}\n";
+		expect(
+			analyzeDependencySnapshot(
+				"/project/preset.yaml",
+				source,
+			).diagnostics.find((d) => d.code === "V025")?.nodeIds,
+		).toEqual(["h", "g"]);
+		const model = analyzeSnapshot("---\nextends: preset.yaml\n---\na\n");
+		const load = await preloadPresets(
+			"/project/main.pfdsl",
+			model,
+			async () => source,
+		);
+		const result = prepareDocument(model, "/project/main.pfdsl", load);
+		expect(result.presetDiagnostics).toContainEqual(
+			expect.objectContaining({
+				code: "V025",
+				file: "/project/preset.yaml",
+				nodeIds: ["h", "g"],
+			}),
+		);
+		expect(result.message).not.toHaveProperty("nodeDiagnostics.h");
+		expect(result.message).not.toHaveProperty("nodeDiagnostics.g");
+	});
 	it("reports raw YAML dependency positions in the original file", async () => {
 		const source = "group:\n  g: {parent: 2}\n";
 		const model = analyzeSnapshot("---\nextends: preset.yaml\n---\na\n");

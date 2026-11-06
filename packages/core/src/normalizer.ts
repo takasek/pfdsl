@@ -85,6 +85,7 @@ export function normalize(
 		diagnostics.push({
 			severity: "error",
 			code: "N004",
+			nodeIds: [id],
 			message: `'${id}' is declared as a group and also used as ${kind === "artifact" ? "an" : "a"} ${kind}`,
 			range: zeroRange(),
 		});
@@ -104,6 +105,7 @@ export function normalize(
 			diagnostics.push({
 				severity: "error",
 				code: "N001",
+				nodeIds: [id],
 				message: `'${id}' declared as both artifact and process in front matter`,
 				range: zeroRange(),
 			});
@@ -127,6 +129,7 @@ export function normalize(
 			diagnostics.push({
 				severity: "error",
 				code: "N002",
+				nodeIds: [id],
 				message: `'${id}' used as both artifact and process`,
 				range: zeroRange(),
 			});
@@ -139,6 +142,7 @@ export function normalize(
 			diagnostics.push({
 				severity: "warning",
 				code: "N003",
+				nodeIds: [...new Set([edge.artifact, edge.process])],
 				message: "Duplicate edge",
 				range: zeroRange(),
 			});

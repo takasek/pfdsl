@@ -493,6 +493,62 @@ it("does not open a hidden source for a preserveFocus nodeClick", async () => {
 	expect(host.window.showTextDocument).not.toHaveBeenCalled();
 });
 
+it("acknowledges synchronization when the source is hidden", async () => {
+	const { open } = setup();
+	const panel = await open(document("hidden-sync"));
+	host.window.visibleTextEditors = [];
+	await panel.receive({
+		type: "nodeClick",
+		nodeId: "a",
+		preserveFocus: true,
+		syncId: 41,
+	});
+	expect(panel.messages.at(-1)).toEqual({
+		type: "nodeSyncComplete",
+		syncId: 41,
+	});
+});
+
+it.each([
+	{ reversed: false, cursors: 1 },
+	{ reversed: true, cursors: 1 },
+	{ reversed: false, cursors: 2 },
+])("acknowledges only a complete same-direction single selection ($reversed, $cursors)", async ({
+	reversed,
+	cursors,
+}) => {
+	const { open } = setup();
+	const doc = document("no-op-sync", "a >> p\n");
+	const panel = await open(doc);
+	const start = new host.api.Position(0, 0);
+	const end = new host.api.Position(0, 1);
+	const selection = {
+		anchor: reversed ? end : start,
+		active: reversed ? start : end,
+	};
+	host.window.visibleTextEditors = [
+		{
+			document: doc,
+			selection,
+			selections: Array.from({ length: cursors }, () => selection),
+			revealRange: vi.fn(),
+		} as unknown as vscode.TextEditor,
+	];
+	const count = panel.messages.length;
+	await panel.receive({
+		type: "nodeClick",
+		nodeId: "a",
+		preserveFocus: true,
+		syncId: 42,
+	});
+	if (reversed || cursors > 1) expect(panel.messages).toHaveLength(count);
+	else
+		expect(panel.messages.at(-1)).toEqual({
+			type: "nodeSyncComplete",
+			syncId: 42,
+		});
+});
+
 it("updates a visible source selection without reopening or activating it", async () => {
 	const { open } = setup();
 	const doc = document(

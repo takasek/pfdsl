@@ -41,6 +41,7 @@ export function inputFeedbackConflict(ctx: RuleContext): Diagnostic[] {
 	return inputFeedbackConflictPairs(ctx.edges).map(({ artifact, process }) => ({
 		severity: "error",
 		code: "V036",
+		nodeIds: [...new Set([artifact, process])],
 		message: `Artifact '${artifact}' is connected to process '${process}' both as an input (>>) and as feedback (>>?); keep only one connection`,
 		range: ctx.edgeRange({ kind: "feedback", artifact, process }),
 	}));

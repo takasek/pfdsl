@@ -1,4 +1,4 @@
-import type { DiffReport } from "@pfdsl/core";
+import type { Diagnostic, DiffReport } from "@pfdsl/core";
 import type { PreviewEditRequest } from "./preview-edit.js";
 import type { PreviewGraph } from "./preview-graph.js";
 
@@ -9,6 +9,12 @@ export interface SourceRevision {
 	/** Rename whose node disappeared during Undo, including discarded snapshots. */
 	invalidatedRenameRequestId?: string | undefined;
 }
+
+/** Current entry-source problems, in diagnostic order for each target ID. */
+export type NodeDiagnostics = Record<
+	string,
+	Array<Pick<Diagnostic, "severity" | "code" | "message">>
+>;
 
 /** Transport identity is separate from the source edit calculation. */
 export type PreviewEditMessage = PreviewEditRequest & {
@@ -27,6 +33,7 @@ export type MessageToWebview =
 	| {
 			type: "render";
 			dot: string;
+			nodeDiagnostics?: NodeDiagnostics;
 			sourceRevision?: SourceRevision;
 			focusNodeId?: string;
 			descriptions?: Record<string, Array<[string, string]>>;
@@ -45,9 +52,11 @@ export type MessageToWebview =
 	| {
 			type: "error";
 			message: string;
+			nodeDiagnostics?: NodeDiagnostics;
 			repair?: { source: string; artifact: string; process: string };
 	  }
 	| { type: "focus"; nodeId: string }
+	| { type: "nodeSyncComplete"; syncId: number }
 	| { type: "clearFocus" }
 	| { type: "diff"; report: DiffReport }
 	| { type: "clearDiff" }
@@ -63,7 +72,12 @@ export type MessageToWebview =
 export type MessageFromWebview =
 	| PreviewEditMessage
 	| { type: "ready" }
-	| { type: "nodeClick"; nodeId: string; preserveFocus?: boolean }
+	| {
+			type: "nodeClick";
+			nodeId: string;
+			preserveFocus?: boolean;
+			syncId?: number;
+	  }
 	| { type: "openUrl"; url: string }
 	| { type: "openFile"; nodeId: string; path: string }
 	| { type: "openLocation"; nodeId: string };
