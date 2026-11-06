@@ -1,4 +1,7 @@
 {
+	"githubIssues": {
+		"enabled": true
+	},
 	"sweepCompletedChains": {
 		"enabled": true
 	},

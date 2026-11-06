@@ -75,7 +75,10 @@ companion をどの言語で書くかは pfd-ops スキルの `references/archit
 
 作業項目の一次情報と同期手段を選ぶ。プリセットは2つある — GitHub Issues とファイルベース・トラッカー。どちらも任意で、採用しない場合は `roadmap.pfdsl` の依存構造管理のみで運用する。
 
-**GitHub Issues を使う場合**は、リポ側自動化（GitHub Actions workflow・監査スクリプト）をリポルートへ実配置する:
+既存の宣言と選択が矛盾する場合は所有者と解消する。GitHub Issues から切り替える場合は旧 workflow の sweep を先に停止し、GitHub の採用宣言を外して companion を更新する。配置済みファイルの整理は移行ガイドに従う。
+
+**GitHub Issues を使う場合**は、既存のキーを保って `.pfdsl/config.json` に `"githubIssues": {"enabled": true}` を保存し、roadmap companion に採用するプリセットとリポジトリを記す。
+宣言を保存した後、リポ側自動化（GitHub Actions workflow・監査スクリプト）をリポルートへ実配置する:
 
 ```bash
 node <pfd-ops skill root>/scripts/check-install-sync.mjs --deploy

@@ -2,7 +2,7 @@
 
 # GitHub Issues バックエンド（pfd-ops プリセット）
 
-PFD の作業項目を GitHub Issues で管理する流儀。pfdsl 固有ではなく、採用したいリポが選べる再利用可能パターン。採用リポは `roadmap.md` でこのプリセットを指す。
+PFD の作業項目を GitHub Issues で管理する流儀。pfdsl 固有ではなく、採用したいリポが選べる再利用可能パターン。採用リポは `.pfdsl/config.json` で `githubIssues.enabled` を true にし、`roadmap.md` でこのプリセットを指す。
 
 ## 規約
 
@@ -13,7 +13,7 @@ PFD の作業項目を GitHub Issues で管理する流儀。pfdsl 固有では�
 - **登録 metadata**: issue 対応と依存構造を検査する。GitHub の可変 `updatedAt` は保存・同期しない。`priority:` tags は任意の表示値であり、issue labels との完全一致を登録条件にしない。旧 `updated_at` が残る図でも監査はその値を読まない
 - **issue close と進捗**: close は status を動かす契機にしない。成果物の完了判断と status 更新は `work-cycle.md` の完了根拠に従う。未実装のまま廃止する場合も、未完了作業が必要とする入力を保存し、代替や廃止の判断を依存構造へ反映する。デフォルトブランチへの push が起動するのは下の完了チェーン回収（`.pfdsl/config.json` で有効にした場合）だけで、それも PR を提案するところまでであり、マージは人が行う
 - **完了チェーン回収**: 保持規則と検証は [`work-cycle.md`「完了チェーンの回収」](work-cycle.md#完了チェーンの回収) の `pfdsl prune` を使う。完了履歴は closed issue・git 履歴・決定記録・公開レジストリが持つ。
-  `scripts/pfdsl/sweep-completed-chains.mjs <file>` は CLI を解決して `prune --json` を呼ぶアダプタで、保持判定や検証を再実装しない。`--write` を付けた場合は CLI に適用も要求する。`.pfdsl/config.json` で有効にした採用リポでは、デフォルトブランチへ push があると `.github/workflows/pfdsl-sweep-completed-chains.yml` がこれを実行し、差分があれば PR を起票する。マージは人が行うので、グラフはレビューを経ない書換えを受けない。
+  `scripts/pfdsl/sweep-completed-chains.mjs <file>` は CLI を解決して `prune --json` を呼ぶアダプタで、保持判定や検証を再実装しない。配置先 checkout 内の roadmap を対象にする。別の場所にある図を手動で整理する場合は、その図に対して CLI の `pfdsl prune` を実行する。`--write` を付けた場合は CLI に適用も要求する。`.pfdsl/config.json` で有効にした採用リポでは、デフォルトブランチへ push があると `.github/workflows/pfdsl-sweep-completed-chains.yml` がこれを実行し、差分があれば PR を起票する。マージは人が行うので、グラフはレビューを経ない書換えを受けない。
   回収可否の判定はデフォルトブランチだけを読む。まだマージされていないブランチが done artifact を入力に取る process を足していた場合、その組合せはどちらの側からも見えない。統合の時点で「宣言のない id を edge が指す」形になり、roadmap の不変条件がそこで弾く
 
 ## ラベル判定基準
@@ -26,8 +26,8 @@ roadmap の PFD は、未解決の依存がある（前提が未完了、また�
 ## push 駆動の回収（pfdsl-sweep-completed-chains）
 
 有効にした採用リポでは、デフォルトブランチへ push されると `.github/workflows/pfdsl-sweep-completed-chains.yml` が `scripts/pfdsl/sweep-completed-chains.mjs .pfdsl/roadmap.pfdsl --write` を実行し、差分があれば `flow-sync/pending` ブランチへ PR を起票する。回収が読むのはデフォルトブランチの roadmap だけで、それが変わるのは push のときだからである。issue close は status を動かさないので、close 契機は push 契機に包含される。bot はデフォルトブランチへ直接書かず、マージは人が行う。
-回収は採用リポの `.pfdsl/config.json` が `{"sweepCompletedChains": {"enabled": true}}` を宣言したときだけ行う。
-宣言が無い、または `enabled` が真偽値の `true` でなければ、workflow は checkout の直後に無効である旨を通知して何もせず成功で終わる。`.pfdsl/config.json` が JSON として読めない、または値の形が違う場合は失敗する。
+回収は採用リポの `.pfdsl/config.json` で `githubIssues.enabled` と `sweepCompletedChains.enabled` が両方とも真偽値の true のときだけ行う。
+採用宣言が無い場合と明示的な false では、workflow は checkout 後に終了する。不正な JSON や型の異なる採用宣言はエラーとして扱う。
 workflow ファイル自体は他の配置ファイルとともに commit してよい。有効にするかどうかは所有者が判断し、その判断をこのキーに残す。
 
 `GITHUB_TOKEN` で PR を作る経路には、リポジトリ設定の前提がある。
@@ -89,8 +89,8 @@ issue findings の `blocking:` は監査を失敗させ、`advisory:` だけな�
 
 ## 採用手順
 
-1. pfdsl plugin を導入する（`/plugin marketplace add takasek/pfdsl` + `/plugin install pfdsl@pfdsl`）— pfd-ops スキル本体はリポでなく plugin から供給される
-2. `install/` 以下のファイルをリポルートに実配置する（`/pfd-init` ステップ3.5、または直接 `node <pfd-ops skill root>/scripts/check-install-sync.mjs --deploy`）。
+1. 利用中のハーネスから pfdsl plugin を導入する。{{#claude}}Claude Code では `/plugin marketplace add takasek/pfdsl` の後に `/plugin install pfdsl@pfdsl` を実行する。{{/claude}}{{#codex}}Codex では利用中の互換 marketplace、または外部構築者が提供する native marketplace から導入する。{{/codex}}
+2. 既存のキーを保って `.pfdsl/config.json` に `"githubIssues": {"enabled": true}` を保存した後、`install/` 以下のファイルをリポルートに実配置する（`/pfd-init` ステップ3.5、または直接 `node <pfd-ops skill root>/scripts/check-install-sync.mjs --deploy`）。
    配置ファイルと plugin 同梱 canonical の drift は pfd-ops 発火時のランタイム hash 照合が警告する（設計根拠: ADR-0028）
 3. GitHub の `flow:managed` / `flow:exempt` ラベルを、監査が要求する説明文つきで作成または更新する。
    説明文は監査が照合する値で、異なると advisory の所見になる（それだけでは監査は失敗しない。下の「同期監査」）。

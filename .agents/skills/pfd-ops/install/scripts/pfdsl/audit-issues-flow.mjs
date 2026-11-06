@@ -6,6 +6,7 @@ import { readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
+import { requireGitHubIssues } from "./lib/github-issues-config.mjs";
 import {
 	createGitHubOps,
 	GITHUB_UNAVAILABLE_EXIT_CODE,
@@ -19,11 +20,9 @@ import {
 	parseIssueProcesses,
 	partitionFindings,
 } from "./lib/issues-flow-audit.mjs";
-import { parseDocument } from "./lib/yaml-require.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const root = resolve(__dirname, "../..");
-const githubOps = createGitHubOps({ cwd: root });
 
 // Every finding for an issue named here fails the audit.
 // Once any issue is named, the findings for all other issues only advise.
@@ -58,6 +57,11 @@ try {
 	console.error(`audit-issues-flow: ${err.message}`);
 	process.exit(1);
 }
+
+requireGitHubIssues(root, "audit-issues-flow");
+const githubOps = createGitHubOps({ cwd: root });
+// An unadopted repository need not have the YAML dependency installed.
+const { parseDocument } = await import("./lib/yaml-require.mjs");
 
 // --- Read and split roadmap.pfdsl ---
 

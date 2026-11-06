@@ -23,6 +23,10 @@ beforeEach(() => {
 	cpSync(join(root, "scripts"), join(fixture, "scripts"), { recursive: true });
 	symlinkSync(join(root, "node_modules"), join(fixture, "node_modules"), "dir");
 	mkdirSync(join(fixture, ".pfdsl"));
+	writeFileSync(
+		join(fixture, ".pfdsl/config.json"),
+		JSON.stringify({ githubIssues: { enabled: true } }),
+	);
 	mkdirSync(join(fixture, "bin"));
 	writeFileSync(
 		join(fixture, "bin/gh"),

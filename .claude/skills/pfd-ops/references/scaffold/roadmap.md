@@ -9,7 +9,7 @@
 
 ## バックエンド
 
-(roadmap の作業項目バックエンドとしての採否を記載する。GitHub Issues を使う場合は `<pfd-ops skill root>/references/github-issues-backend.md` を、リポ内 markdown ファイルで管理する場合は `<pfd-ops skill root>/references/file-based-tracker-backend.md` を参照する。GitHub Issues を作業項目バックエンドに採用しない場合でも、roadmap 管理外の gap 記録などに利用しているなら、その用途と参照先を別に明記する。`<pfd-ops skill root>` は plugin 経由なら `${CLAUDE_PLUGIN_ROOT}/skills/pfd-ops`。上のパスが置換されず変数名のまま見えている場合は repo-local `.claude/skills/pfd-ops` を使い、それも無ければ pfd-ops の SKILL.md を読んでいる位置から相対で辿る。)
+(roadmap の作業項目バックエンドとしての採否を記載する。GitHub Issues を使う場合は `.pfdsl/config.json` で `githubIssues.enabled` を true にして `<pfd-ops skill root>/references/github-issues-backend.md` を、リポ内 markdown ファイルで管理する場合は `<pfd-ops skill root>/references/file-based-tracker-backend.md` を参照する。GitHub Issues を作業項目バックエンドに採用しない場合でも、roadmap 管理外の gap 記録などに利用しているなら、その用途と参照先を別に明記する。`<pfd-ops skill root>` は plugin 経由なら `${CLAUDE_PLUGIN_ROOT}/skills/pfd-ops`。上のパスが置換されず変数名のまま見えている場合は repo-local `.claude/skills/pfd-ops` を使い、それも無ければ pfd-ops の SKILL.md を読んでいる位置から相対で辿る。)
 
 ## このリポのインスタンス値
 

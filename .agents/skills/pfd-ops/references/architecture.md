@@ -46,7 +46,7 @@ PFD の構造的事実やモデル固有の条件を companion に書くとき�
 
 | 書く内容の種類 | 宛先 companion |
 |---|---|
-| 作業項目バックエンドの採用宣言・process との対応・roadmap の受入条件 | `roadmap.md` |
+| 作業項目バックエンドの説明・process との対応・roadmap の受入条件 | `roadmap.md` |
 | 繰り返す変換の入力・出力・criteria・知識成果物への経路などの構造的事実 | `workflow.md` |
 | 変換コンポーネントの境界・入出力・生成物の対応関係 | `pipeline.md` |
 | 実行管理・一般の開発規律・PR 本文規約・記録時点・監査の起動手順 | 採用先の入口が読む文書（このリポでは `.pfdsl/bindings/pfd-ops.md` 等） |
@@ -135,7 +135,7 @@ bundle 同梱スキル全数ではない — 自分の binding を読まない�
 | ファイルベース・トラッカー（リポ内 markdown ファイル） | `references/file-based-tracker-backend.md` | 要らない |
 
 どちらの reference も pfd-ops スキルの一部として plugin に同梱される（ADR-0028）。
-採用リポは roadmap companion で採用したプリセットを宣言し、作業項目の管理では宣言したプリセットの reference だけに従う。
+GitHub Issues は `.pfdsl/config.json` の `githubIssues.enabled` が真偽値の true の場合に有効にする。roadmap companion は採用したプリセットの参照先と運用を説明する。
 一般の外部書込みや設計記録・本文規約は、採用したバックエンドではなく採用先の実行規律が定める。
 上流への報告などの配布機構が自身の書込みを照合する手続きは、その機構が持つ。
 
@@ -148,7 +148,7 @@ Codex native plugin（`plugin/pfdsl-codex/`）にはスキル・command 由来�
 
 ### GitHub Issues プリセット
 
-GitHub Issues プリセットを採用するには `install/` テンプレートをリポルートへ実配置する（`/pfd-init` のステップ 3.5 が実行する）:
+GitHub Issues プリセットを採用するには上記の宣言を保存してから `install/` テンプレートをリポルートへ実配置する（`/pfd-init` のステップ 3.5 が実行する）:
 
 ```bash
 node <pfd-ops skill root>/scripts/check-install-sync.mjs --deploy
@@ -210,7 +210,7 @@ pfdsl 開発リポ固有の例:
 ### 配置ファイルの鮮度セルフチェック
 
 採用先では、出力の先頭に移行状態の通知が出ることがある。末尾だけを読んで済ませず、先にその通知を後述の「出力の意味と対応」で扱う。
-deploy 関連の対応は出力末尾が名指しするため、移行状態の通知を扱った後で、その指示に従う。スクリプトは target の役割を分類し、`--deploy` が正しい向きの場合だけ案内するので、drift だけを根拠に反射的に deploy しない。GitHub Issues バックエンドを採用していないリポでは、未採用である旨と `--deploy` の案内が出る — これは報告であって指示ではない。そのリポが別のバックエンドを採用している、またはどれも採用していないなら、案内に従わず未採用のまま進む。
+未採用リポでは移行状態の照合だけを行い、GitHub 用の配置・更新・不要ファイルの削除を行わない。採用リポでは配置差分を確認してから deploy の案内に従う。
 
 素の `--deploy` はローカル編集がないファイルをコピーし、ローカル編集がない orphan を削除する。`--overwrite-local-edits` は残るパスのローカル編集を canonical で上書きし、`--delete-edited-orphans` は消えるパスのローカル編集ごと削除する。旧ファイルの掃除ではまず素の deploy を実行し、編集済みとして残ったパスだけについて追加 flag の要否を判断する。
 誰も編集していないのに同じファイルが deploy のたびに `Skipped` として残る場合は、旧版から更新した採用先に特有の状態である可能性がある。flag で上書きする前、また上流へ報告する前に、上流リポの [migration guide](https://github.com/takasek/pfdsl/blob/main/docs/migration-guide.md#files-reported-as-skipped-on-every-deploy) の該当節で確かめ方を確認する。
@@ -243,8 +243,8 @@ deploy 関連の対応は出力末尾が名指しするため、移行状態の�
 ## 「採用」とは
 
 L3 プリセットのいずれかを当該リポの作業項目バックエンドとして使う状態。
-どのプリセットを採用したかは roadmap companion の宣言が一次情報である。
-GitHub Issues プリセットは連携ワークフローの実配置を伴うため、`install/` 由来のファイルがリポルートに1つ以上存在すれば、その配置について「採用済み」と判定する。
+GitHub Issues の採用は `.pfdsl/config.json` の `githubIssues.enabled` で判定し、ファイルベースの採用は roadmap companion に記載する。
+`install/` 由来のファイルが残っていても、それだけで GitHub Issues を有効にしない。
 ファイルベース・トラッカーは実配置を伴わないので、この判定の対象にならない。
 
 「L3」= 選択できるバックエンド・プリセット群（GitHub Issues・ファイルベース・トラッカー）、「バックエンド」= 作業項目管理の一次情報源と同期機構を指す。
