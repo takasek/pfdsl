@@ -225,6 +225,12 @@ export function createDocumentTab({
 					editor.revealPositionInCenter(editorPosition);
 					if (!message.preserveFocus) editor.focus();
 				}
+				// Monaco emits cursor changes synchronously; no-op positions emit none.
+				if (message.syncId !== undefined)
+					void preview.receive({
+						type: "nodeSyncComplete",
+						syncId: message.syncId,
+					});
 			} else if (
 				message.type === "openFile" ||
 				message.type === "openLocation" ||

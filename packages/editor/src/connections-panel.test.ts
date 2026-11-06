@@ -1199,6 +1199,11 @@ async function setup(
 	postMessage.mockImplementation((message: MessageFromWebview) => {
 		if ("requestId" in message && message.requestId)
 			appliedVersions.set(message.requestId, sourceVersion + 1);
+		if (message.type === "nodeClick" && message.syncId !== undefined)
+			void preview.receive({
+				type: "nodeSyncComplete",
+				syncId: message.syncId,
+			});
 	});
 	const preview = mountPreview(container, {
 		postMessage,
@@ -1973,6 +1978,7 @@ it("toggles semantic input from either endpoint, retains center through redraw a
 		type: "nodeClick",
 		nodeId: "a",
 		preserveFocus: true,
+		syncId: expect.any(Number),
 	});
 	s.postMessage.mockClear();
 	s.container.querySelector<HTMLButtonElement>("#create-definition")!.click();
