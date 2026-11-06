@@ -102,13 +102,15 @@ test("the production document-tab entry loads real Monaco menu contributions", a
 				import { IOpenerService } from "monaco-editor/platform/opener/common/opener.js";
 				import { ICodeEditorService } from "monaco-editor/editor/browser/services/codeEditorService.js";
 				import { renderMarkdown } from "monaco-editor/base/browser/markdownRenderer.js";
+				import { IMarkdownRendererService } from "monaco-editor/platform/markdown/browser/markdownRenderer.js";
 				errorHandler.unexpectedErrorHandler = error => { throw error; };
 				const languageFeatures = StandaloneServices.get(ILanguageFeaturesService);
 				const applyEdit = edit => StandaloneServices.get(IBulkEditService).apply(edit);
 				const execute = (id, ...args) => StandaloneServices.get(ICommandService).executeCommand(id, ...args);
 				const openLink = url => StandaloneServices.get(IOpenerService).open(url);
 				const focusedEditor = () => StandaloneServices.get(ICodeEditorService).getFocusedCodeEditor();
-				export { createDocumentTab, mountApplication, createTextComparison, monaco, EditorExtensionsRegistry, MenuId, languageFeatures, applyEdit, execute, openLink, renderMarkdown, focusedEditor };
+				const renderEditorMarkdown = (...args) => StandaloneServices.get(IMarkdownRendererService).render(...args);
+				export { createDocumentTab, mountApplication, createTextComparison, monaco, EditorExtensionsRegistry, MenuId, languageFeatures, applyEdit, execute, openLink, renderMarkdown, renderEditorMarkdown, focusedEditor };
 			`,
 				resolveDir: packageRoot,
 			},
@@ -1271,6 +1273,93 @@ test("the production document-tab entry loads real Monaco menu contributions", a
 			},
 		);
 		await t.test(
+			"hover table headings have explicit roles before the rendered content is attached",
+			async () => {
+				const source =
+					'---\ngroup:\n  delivery: { label: Delivery }\nartifact:\n  package_manifest:\n    label: "package manifest"\n    criteria: "Checksums match the packaged files"\n    group: delivery\nprocess:\n  package_release: { label: Package release }\n  publish_release: { label: Publish release }\n---\nsource >> package_release -> package_manifest\npackage_manifest >> publish_release -> announcement\n';
+				await withEditors(source, async (create) => {
+					const editor = create();
+					const model = editor.getModel();
+					const hovers = await Promise.all(
+						host.languageFeatures.hoverProvider
+							.ordered(model)
+							.map((provider) =>
+								provider.provideHover(
+									model,
+									{ lineNumber: 14, column: 1 },
+									{ isCancellationRequested: false },
+								),
+							),
+					);
+					const contents = hovers
+						.filter(Boolean)
+						.flatMap((hover) => hover.contents);
+					let headings = 0;
+					const text = [];
+					for (const content of contents) {
+						const rendered = host.renderEditorMarkdown(content);
+						try {
+							assert.equal(rendered.element.isConnected, false);
+							text.push(rendered.element.textContent);
+							for (const cell of rendered.element.querySelectorAll(
+								"thead > tr > th",
+							)) {
+								headings++;
+								assert.equal(cell.getAttribute("role"), "columnheader");
+							}
+						} finally {
+							rendered.dispose();
+						}
+					}
+					assert.equal(
+						headings,
+						2,
+						"the metadata table retains both column headings",
+					);
+					for (const expected of [
+						"Checksums match",
+						"delivery (Delivery)",
+						"Go to definition",
+						"Find all",
+					])
+						assert.ok(text.join(" ").includes(expected), expected);
+				});
+			},
+		);
+		await t.test(
+			"Markdown table roles preserve cells and leave body headers unclassified",
+			() => {
+				const rendered = host.renderEditorMarkdown({
+					value:
+						"| Name | Value |\n| --- | --- |\n| *owner* | [Docs](https://example.com) |\n\n<table><tbody><tr><th>Row</th><td>Value</td></tr></tbody></table>",
+					supportHtml: true,
+					isTrusted: false,
+				});
+				try {
+					assert.deepEqual(
+						[...rendered.element.querySelectorAll("thead th")].map((cell) =>
+							cell.getAttribute("role"),
+						),
+						["columnheader", "columnheader"],
+					);
+					assert.equal(
+						rendered.element.querySelector("tbody th").getAttribute("role"),
+						null,
+					);
+					assert.equal(
+						rendered.element.querySelector("em").textContent,
+						"owner",
+					);
+					assert.equal(
+						rendered.element.querySelector("a").getAttribute("data-href"),
+						"https://example.com",
+					);
+				} finally {
+					rendered.dispose();
+				}
+			},
+		);
+		await t.test(
 			"authored hover Markdown cannot acquire executable command trust",
 			async () => {
 				const source =
@@ -1293,6 +1382,18 @@ test("the production document-tab entry loads real Monaco menu contributions", a
 					assert.ok(
 						contents.some((c) => c.value.includes("Open documentation")),
 					);
+					for (const content of contents.filter((c) => !c.isTrusted)) {
+						const rendered = host.renderEditorMarkdown(content);
+						try {
+							assert.equal(
+								rendered.element.querySelectorAll('a[data-href^="command:"]')
+									.length,
+								0,
+							);
+						} finally {
+							rendered.dispose();
+						}
+					}
 					for (const content of contents.filter((c) => c.isTrusted)) {
 						assert.ok(!content.value.includes("<command:"));
 						assert.match(content.value, /\[Open location\]/);
@@ -1467,7 +1568,7 @@ test("the production document-tab entry loads real Monaco menu contributions", a
 							.flatMap((h) => h.contents)
 							.filter((c) => c.isTrusted);
 						const rendered = trusted.map((content) =>
-							host.renderMarkdown(content),
+							host.renderEditorMarkdown(content),
 						);
 						try {
 							const links = rendered.flatMap((item) => [

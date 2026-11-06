@@ -8,6 +8,9 @@ import "monaco-editor/editor/contrib/inlayHints/browser/inlayHintsContribution.j
 import "monaco-editor/editor/contrib/links/browser/links.js";
 import { language as yaml } from "monaco-editor/languages/definitions/yaml/yaml.js";
 import configuration from "../../vscode-extension/language-configuration.json";
+import { registerMarkdownRenderer } from "./markdown-renderer.js";
+
+registerMarkdownRenderer();
 
 // Go to Line moves from Control+G to Command+L on macOS, as in Xcode (Apple's
 // keyboard guidelines avoid Control as a modifier). Monaco has no per-platform

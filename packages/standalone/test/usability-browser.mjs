@@ -285,6 +285,13 @@ try {
 		await page.locator(".monaco-hover").textContent(),
 		/Checksums match/,
 	);
+	assert.deepEqual(
+		await page
+			.locator(".monaco-hover thead > tr > th")
+			.evaluateAll((cells) => cells.map((cell) => cell.getAttribute("role"))),
+		["columnheader", "columnheader"],
+		"the real hover exposes explicit column roles",
+	);
 	const screenshot = join(
 		mkdtempSync(join(tmpdir(), "pfdsl-usability-")),
 		"hover.png",

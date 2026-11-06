@@ -408,6 +408,8 @@ Find allは現行拡張と同じliteral文字列検索であり、metadata field
 processのcommand行末の`Command` hintをhoverして複数行の内容を読み、表示だけで実行されないことを確認する。
 hoverを残したまま編集・文書切替・閉鎖し、旧版のリンクが新しい文書や版へ作用しないことを確認する。
 Linuxの#1513再試験では、[採取手順](evidence/2026-10-26-linux-hover-summary/NEXT-LINUX-RUN.md)でログ採取を開始し、回収した377バイトの元fixtureの14行目のpackage_manifestでShow Hover→撮影→Escape→本文編集を行う。
+修正候補の検証では、[role付与の範囲と比較条件](evidence/2026-11-06-hover-role-workaround.md)に従い、表示中の実hover DOM、AT-SPIの対象・数値role・GetRoleName応答、同一Web子の生存を対応付ける。
+Chromiumのrole属性検査、最小HTMLの非再現、空文字の正常応答は、Linux製品版の受入や読み上げ同等性の証明と分ける。
 labelのみ、criteriaのみ、groupとcriteria、descriptionを含む場合を分け、Linux nativeではWebKitWebProcessの存否・終了時刻・stderr・利用可能な終了理由を記録する。
 Linuxで報告された3回の表示プロセス消失は原因未確定であり、Chromiumでの成功をWebKitGTKやMac nativeの合格へ転写しない。
 期待：semantic nodeとfield、定義range、全出現が正しく、図hover廃止と混同しない。
