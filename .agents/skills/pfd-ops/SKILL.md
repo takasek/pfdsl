@@ -52,7 +52,7 @@ node ${PLUGIN_ROOT}/skills/pfd-ops/scripts/check-install-sync.mjs
 - **作業項目への着手**: `references/work-cycle.md` の選択・実行・受入・証拠の契約に従う。実行を制御する主体は1つに保つ
 - **終端ゲート**: `references/work-cycle.md` の終端ゲートと、binding の「PFD 固有の追加ゲート」の該当条件に従う
 - **モデルに関する知見の振り分け**: `references/work-cycle.md` の「知見と機械化」に従い、artifact・process・edge・criteria・boundary と、companion に記した対応関係や採用宣言の不整合を対象にする。`.pfdsl/workflow.pfdsl` と sibling companion はその構造的事実を解決するために読む。一般の開発・記録・監査手順の呼出しは採用先の入口が持つ
-- **GitHub Issues の操作**: roadmap companion が採用を宣言している場合だけ `references/github-issues-backend.md` に従う
+- **GitHub Issues の操作**: 対象リポの `.pfdsl/config.json` で `githubIssues.enabled` が真偽値の true の場合だけ `references/github-issues-backend.md` に従う
 - **ファイルベースの作業項目操作**: roadmap companion が採用を宣言している場合だけ `references/file-based-tracker-backend.md` に従う
 - **変換境界の変更**: `.pfdsl/pipeline.pfdsl` と sibling companion に従う
 - **companion と binding の配置判断**: `references/architecture.md` に従う

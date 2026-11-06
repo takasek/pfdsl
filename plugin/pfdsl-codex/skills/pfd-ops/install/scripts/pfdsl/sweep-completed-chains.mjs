@@ -4,12 +4,16 @@
 // Usage: node scripts/pfdsl/sweep-completed-chains.mjs <file> [--write]
 
 import { spawnSync } from "node:child_process";
-import { existsSync } from "node:fs";
+import { existsSync, realpathSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
 
-const root = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
+import { requireGitHubIssues } from "./lib/github-issues-config.mjs";
+
+const root = realpathSync(
+	resolve(dirname(fileURLToPath(import.meta.url)), "../.."),
+);
 let file;
 let write;
 try {
@@ -28,6 +32,30 @@ try {
 } catch (error) {
 	console.error(`sweep-completed-chains: ${error.message}`);
 	process.exit(2);
+}
+
+requireGitHubIssues(root, "sweep-completed-chains");
+
+// Follow the supplied file, including symlinks, before checking ownership.
+// A .git directory (repository) or .git file (worktree/submodule) starts
+// a separate checkout even when its path is inside this deployment.
+try {
+	file = realpathSync(file);
+	for (
+		let directory = dirname(file);
+		directory !== root;
+		directory = dirname(directory)
+	) {
+		if (
+			directory === dirname(directory) ||
+			existsSync(resolve(directory, ".git"))
+		) {
+			throw new Error(`target is outside the deployed checkout: ${file}`);
+		}
+	}
+} catch (error) {
+	console.error(`sweep-completed-chains: ${error.message}`);
+	process.exit(1);
 }
 
 // An explicit override must resolve on its own; never silently fall back.

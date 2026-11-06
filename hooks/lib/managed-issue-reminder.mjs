@@ -1,4 +1,6 @@
 // Candidate-H decision logic for the PostToolUse managed-issue reminder.
+import { lstatSync, readFileSync, realpathSync } from "node:fs";
+import { dirname, isAbsolute, join } from "node:path";
 
 const CREATED_ISSUE_URL = /https:\/\/[^\s/]+\/[^\s/]+\/[^\s/]+\/issues\/(\d+)/;
 const LABEL_FLAGS = ["--label", "-l"];
@@ -228,6 +230,38 @@ export function formatManagedIssueAdvisory(payload) {
 	);
 }
 
+function githubIssuesEnabled(cwd) {
+	if (typeof cwd !== "string" || !isAbsolute(cwd)) return false;
+	let root = realpathSync(cwd);
+	while (!lstatSync(join(root, ".git"), { throwIfNoEntry: false })) {
+		const parent = dirname(root);
+		if (parent === root) return false;
+		root = parent;
+	}
+	const path = join(root, ".pfdsl/config.json");
+	let text;
+	try {
+		text = readFileSync(path, "utf8");
+	} catch (error) {
+		if (error.code === "ENOENT") return false;
+		throw error;
+	}
+	let config;
+	try {
+		config = JSON.parse(text);
+	} catch (error) {
+		throw new Error(`${path}: ${error.message}`);
+	}
+	if (!config || typeof config !== "object" || Array.isArray(config)) {
+		throw new Error(`${path}: expected a configuration object`);
+	}
+	if (!Object.hasOwn(config, "githubIssues")) return false;
+	if (typeof config.githubIssues?.enabled !== "boolean") {
+		throw new Error(`${path}: githubIssues.enabled must be a boolean`);
+	}
+	return config.githubIssues.enabled;
+}
+
 export function runManagedIssueReminder(inputText) {
 	let payload;
 	try {
@@ -235,8 +269,13 @@ export function runManagedIssueReminder(inputText) {
 	} catch {
 		return { shouldOutput: false };
 	}
-	const advisory = formatManagedIssueAdvisory(payload);
+	let advisory = formatManagedIssueAdvisory(payload);
 	if (!advisory) return { shouldOutput: false };
+	try {
+		if (!githubIssuesEnabled(payload.cwd)) return { shouldOutput: false };
+	} catch (error) {
+		advisory = `Cannot check GitHub Issues adoption: ${error.message}`;
+	}
 	return {
 		shouldOutput: true,
 		output: {

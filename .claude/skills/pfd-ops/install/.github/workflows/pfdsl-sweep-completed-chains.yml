@@ -66,12 +66,15 @@ jobs:
                 fail("is not valid JSON: " + e.message);
               }
               if (!isObject(config)) fail("must contain a JSON object at the top level");
+              const github = config.githubIssues;
+              if (github !== undefined && (!isObject(github) || typeof github.enabled !== "boolean"))
+                fail("githubIssues must be an object with a boolean enabled");
               const sweep = config.sweepCompletedChains;
               if (sweep !== undefined && !isObject(sweep)) fail("has a sweepCompletedChains that is not an object");
-              enabled = sweep !== undefined && sweep.enabled === true;
+              enabled = github?.enabled === true && sweep?.enabled === true;
             }
             if (!enabled) {
-              console.log("::notice::The completed-chain sweep is disabled. To enable it, commit " + file + " containing {\"sweepCompletedChains\": {\"enabled\": true}}.");
+              console.log("::notice::The completed-chain sweep is disabled. To enable it, commit " + file + " with both githubIssues.enabled and sweepCompletedChains.enabled set to true.");
             }
             fs.appendFileSync(process.env.GITHUB_OUTPUT, "enabled=" + enabled + "\n");
           '
