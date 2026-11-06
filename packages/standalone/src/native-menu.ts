@@ -14,6 +14,7 @@ export interface MenuState {
 	folder: boolean;
 	sidebar: boolean;
 	diagram: boolean;
+	diagramView: boolean;
 	definition: boolean;
 }
 export interface RecentTarget {
@@ -29,16 +30,9 @@ function commandEnabled(id: string, state: MenuState): boolean {
 	if (["save", "save-as"].includes(id)) return state.save;
 	if (id.startsWith("pfdsl.export.")) return state.diagram;
 	if (id === "create-definition") return state.definition;
-	if (
-		[
-			"fit-graph",
-			"actual-size",
-			"zoom-in",
-			"zoom-out",
-			"node-actions-toggle",
-		].includes(id)
-	)
-		return state.diagram;
+	if (["fit-graph", "actual-size", "zoom-in", "zoom-out"].includes(id))
+		return state.diagramView;
+	if (id === "node-actions-toggle") return state.diagram;
 	return true;
 }
 

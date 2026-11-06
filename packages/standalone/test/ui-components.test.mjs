@@ -37,6 +37,52 @@ async function bundle(name, source, stub, run) {
 	}
 }
 
+test("native menu keeps stale diagram view commands enabled while Connections and Export stay disabled", async () => {
+	globalThis.reviewMenuItems = [];
+	try {
+		await bundle(
+			"native-menu",
+			/^@tauri-apps\/api\/menu$/,
+			menuStub,
+			async ({ installNativeMenu }) => {
+				const menu = await installNativeMenu(
+					() => {},
+					() => {},
+					assert.fail,
+				);
+				try {
+					menu.update({
+						busy: false,
+						document: true,
+						save: true,
+						folder: false,
+						sidebar: false,
+						diagram: false,
+						diagramView: true,
+						definition: false,
+					});
+					for (let i = 0; i < 500; i++) await Promise.resolve();
+					const item = (id) =>
+						globalThis.reviewMenuItems.find((entry) => entry.id === id);
+					for (const id of ["fit-graph", "actual-size", "zoom-in", "zoom-out"])
+						assert.equal(item(id).enabled, true, id);
+					assert.equal(item("node-actions-toggle").enabled, false);
+					const exports = globalThis.reviewMenuItems.filter((entry) =>
+						entry.id?.startsWith("pfdsl.export."),
+					);
+					assert.ok(exports.length > 0);
+					for (const entry of exports)
+						assert.equal(entry.enabled, false, entry.id);
+				} finally {
+					menu.dispose();
+				}
+			},
+		);
+	} finally {
+		delete globalThis.reviewMenuItems;
+	}
+});
+
 test("display names use the shortest distinguishing parent and retain path-less names", async () => {
 	await bundle("display-name", /^unused$/, "", async ({ displayName }) => {
 		const entries = [
@@ -87,6 +133,7 @@ test("Open Recent labels files and folders, clears through dispatch and follows 
 					folder: false,
 					sidebar: false,
 					diagram: false,
+					diagramView: false,
 					definition: false,
 				};
 				menu.update(state);
@@ -170,6 +217,7 @@ test("native menu registers stable commands, applies document/busy/capability st
 					folder: false,
 					sidebar: false,
 					diagram: false,
+					diagramView: false,
 					definition: false,
 				});
 				await flush();
@@ -189,6 +237,7 @@ test("native menu registers stable commands, applies document/busy/capability st
 					folder: true,
 					sidebar: true,
 					diagram: true,
+					diagramView: true,
 					definition: false,
 				});
 				await flush();
@@ -203,6 +252,7 @@ test("native menu registers stable commands, applies document/busy/capability st
 					folder: true,
 					sidebar: true,
 					diagram: true,
+					diagramView: true,
 					definition: true,
 				});
 				await flush();
@@ -224,6 +274,7 @@ test("native menu registers stable commands, applies document/busy/capability st
 					folder: true,
 					sidebar: true,
 					diagram: true,
+					diagramView: true,
 				});
 				await flush();
 				for (const id of [
@@ -310,6 +361,7 @@ test("native menu reaches export, navigation, problems and comparison from the m
 					folder: false,
 					sidebar: false,
 					diagram: false,
+					diagramView: false,
 					definition: false,
 				});
 				await flush();
@@ -326,6 +378,7 @@ test("native menu reaches export, navigation, problems and comparison from the m
 					folder: false,
 					sidebar: false,
 					diagram: true,
+					diagramView: true,
 					definition: false,
 				});
 				await flush();
@@ -369,6 +422,7 @@ test("native menu skips unchanged properties and coalesces states arriving durin
 					folder: false,
 					sidebar: false,
 					diagram: true,
+					diagramView: true,
 					definition: false,
 				};
 				const writes = () =>

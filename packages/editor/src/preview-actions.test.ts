@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, expect, it, vi } from "vitest";
-import { analyzeSnapshot } from "./document.js";
+import { analyzeSnapshot, prepareDocument } from "./document.js";
 import { mountPreview, NODE_CLICK_DELAY_MS } from "./preview.js";
 import { buildPreviewGraph } from "./preview-graph.js";
 import { FOCUS_CUE_DURATION_MS, previewStyles } from "./preview-shell.js";
@@ -13,6 +13,146 @@ afterEach(() => {
 });
 const svg =
 	'<svg width="200" height="100" viewBox="0 0 200 100"><g class="node"><title>a</title><polygon points="0,0 40,0 40,30"/><text font-size="14">A</text></g><g class="node"><title>p</title><text font-size="14">P</text></g></svg>';
+
+it("blocks stale diagram editing and related files while double-click only navigates to source", async () => {
+	vi.useFakeTimers();
+	const s = setup();
+	await s.preview.receive({
+		...s.message,
+		locations: { a: ["a.md"] },
+		subflows: { p: "p.pfdsl" },
+	});
+	s.node("a").dispatchEvent(new MouseEvent("contextmenu", { bubbles: true }));
+	await s.preview.receive({ type: "error", message: "V010: Cycle" });
+	expect(s.root.hidden).toBe(false);
+	s.postMessage.mockClear();
+	for (const id of ["a", "p"]) {
+		const node = s.node(id);
+		for (const key of ["Enter", " ", "ContextMenu"])
+			node.dispatchEvent(new KeyboardEvent("keydown", { key, bubbles: true }));
+		node.dispatchEvent(new MouseEvent("contextmenu", { bubbles: true }));
+		node.dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
+		node.dispatchEvent(new MouseEvent("mouseup", { bubbles: true }));
+		await vi.advanceTimersByTimeAsync(NODE_CLICK_DELAY_MS);
+		for (const modifier of ["ctrlKey", "metaKey"])
+			node.dispatchEvent(
+				new MouseEvent("click", { [modifier]: true, bubbles: true }),
+			);
+	}
+	s.container.querySelector<HTMLButtonElement>("#node-actions-toggle")!.click();
+	await s.preview.receive({ type: "focus", nodeId: "a" });
+	expect(s.preview.canCreateDefinition()).toBe(false);
+	s.preview.createDefinition();
+	s.container.querySelector<HTMLButtonElement>("#create-definition")!.click();
+	expect(s.postMessage).not.toHaveBeenCalled();
+	s.node("a").dispatchEvent(new MouseEvent("dblclick", { bubbles: true }));
+	expect(s.postMessage.mock.calls).toEqual([
+		[{ type: "nodeClick", nodeId: "a" }],
+	]);
+	expect(s.container.querySelector<HTMLElement>("#node-actions")!.hidden).toBe(
+		true,
+	);
+	const repair = { source: "a >> p\na >>? p", artifact: "a", process: "p" };
+	await s.preview.receive({ type: "error", message: "V036: Conflict", repair });
+	const error = s.container.querySelector<HTMLElement>("#preview-error")!;
+	expect(error.textContent).toContain("Showing the last valid diagram");
+	const buttons = [...error.querySelectorAll<HTMLButtonElement>("button")];
+	expect(buttons.map((button) => button.textContent)).toEqual([
+		"Keep normal input",
+		"Keep feedback",
+	]);
+	buttons[0]!.click();
+	const request = s.postMessage.mock.calls.at(-1)![0];
+	expect(request).toMatchObject({
+		type: "deleteConnector",
+		repair: true,
+		...repair,
+	});
+	await s.preview.receive({ type: "editResult", request, ok: true });
+	expect(error.hidden).toBe(false);
+	expect(error.textContent).toContain("Showing the last valid diagram");
+});
+
+it("labels stale pointer and keyboard hover with last valid descriptions and hides related-file hints", async () => {
+	const s = setup();
+	await s.preview.receive({
+		...s.message,
+		descriptions: {
+			a: [
+				["**", "Old <label>"],
+				["description", "Old details"],
+			],
+		},
+		locations: { a: ["old.md"] },
+	});
+	await s.preview.receive({ type: "error", message: "V010: Cycle" });
+	const node = s.node("a");
+	expect(node).not.toBeNull();
+	const tooltip = s.container.querySelector<HTMLElement>("#tooltip")!;
+	for (const event of [
+		new MouseEvent("mousemove", { bubbles: true }),
+		new FocusEvent("focusin", { bubbles: true }),
+	]) {
+		node.dispatchEvent(event);
+		expect(tooltip.style.display).toBe("block");
+		expect(tooltip.textContent).toMatch(/^From the last valid diagram/);
+		expect(tooltip.textContent).toContain("Old <label>");
+		expect(tooltip.textContent).toContain("Old details");
+		expect(tooltip.textContent).not.toContain("Click to open");
+		expect(tooltip.querySelector("label")).toBeNull();
+	}
+});
+
+it.each([
+	"pointer",
+	"keyboard",
+])("retains undefined node kinds in %s hover after V010 and refreshes them on recovery", async (gesture) => {
+	const s = setup(
+		vi.fn(
+			async (_dot: string) =>
+				'<svg><g class="node"><title>idea</title></g><g class="node"><title>design</title></g><g class="node"><title>plan</title></g></svg>',
+		),
+	);
+	const source = "idea >> design -> plan\n";
+	const prepare = (text: string) =>
+		prepareDocument(analyzeSnapshot(text), null, () => null).message;
+	const hover = (id: string) => {
+		s.node(id).dispatchEvent(
+			gesture === "keyboard"
+				? new FocusEvent("focusin", { bubbles: true })
+				: new MouseEvent("mousemove", { bubbles: true }),
+		);
+		return s.container.querySelector<HTMLElement>(
+			'#tooltip [data-field="kind"]',
+		)!.textContent;
+	};
+	const valid = prepare(source);
+	expect(valid.type).toBe("render");
+	await s.preview.receive(valid);
+	expect(hover("design")).toBe("process");
+	expect(hover("idea")).toBe("artifact");
+	const error = prepare(`${source}plan >> design\n`);
+	expect(error).toMatchObject({
+		type: "error",
+		message: expect.stringContaining("V010"),
+	});
+	await s.preview.receive(error);
+	s.postMessage.mockClear();
+	expect(hover("design")).toBe("process");
+	expect(hover("idea")).toBe("artifact");
+	expect(s.container.querySelector("#tooltip")!.textContent).toMatch(
+		/^From the last valid diagram/,
+	);
+	expect(s.preview.canCreateDefinition()).toBe(false);
+	expect(
+		s.container.querySelector<HTMLButtonElement>("#node-actions-toggle")!
+			.disabled,
+	).toBe(true);
+	s.preview.createDefinition();
+	expect(s.postMessage).not.toHaveBeenCalled();
+	await s.preview.receive(prepare("design >> implement -> idea\n"));
+	expect(hover("design")).toBe("artifact");
+});
 
 it("focuses a Connections navigation target when Fit made its text unreadable", async () => {
 	const renderDot = vi.fn(async (_dot: string) =>

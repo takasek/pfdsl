@@ -20,6 +20,9 @@ const previewControlsStyles = `
 #preview-help { position: absolute; top: 8px; left: 8px; z-index: 60; width: min(320px, calc(100% - 16px)); max-height: calc(100% - 16px); box-sizing: border-box; padding: 6px 12px; overflow: auto; background: var(--pfdsl-editor-background, #fff); border: 1px solid var(--pfdsl-panel-border, #555); box-shadow: 0 2px 8px #0003; font: 12px var(--pfdsl-editor-font-family, sans-serif); }
 #preview-help[hidden] { display: none; }
 #preview-error { position: absolute; inset: 0; margin: 0; overflow: auto; overflow-wrap: anywhere; font-size: 13px; cursor: text; }
+#preview-error.stale-diagram { position: static; display: flex; flex-direction: column; flex-shrink: 0; max-height: 50%; overflow: hidden; box-sizing: border-box; border-bottom: 1px solid var(--pfdsl-panel-border, #555); }
+#preview-error.stale-diagram .stale-notice { flex-shrink: 0; }
+#preview-error.stale-diagram .error-body { max-height: 8em; min-height: 0; overflow: auto; }
 #preview-error .error-repair { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 12px; white-space: normal; }
 #preview-error .error-repair button { color: var(--pfdsl-editor-foreground, #222); background: transparent; border: 1px solid var(--pfdsl-panel-border, #555); border-radius: 3px; padding: 2px 6px; cursor: pointer; font: inherit; }
 #preview-error .error-repair button:disabled { opacity: 0.5; cursor: default; }

@@ -1,7 +1,12 @@
 /** A document view fake: state belongs to the returned tab, never to globals. */
 export function createDocumentTab(
 	options,
-	{ normalize = (text) => text, hook = () => {} } = {},
+	{
+		normalize = (text) => text,
+		hook = () => {},
+		diagram = true,
+		diagramView = true,
+	} = {},
 ) {
 	let source = normalize(options.source),
 		revision = 0,
@@ -35,7 +40,10 @@ export function createDocumentTab(
 		focus() {},
 		command() {},
 		canDiagram() {
-			return true;
+			return diagram;
+		},
+		canViewDiagram() {
+			return diagramView;
 		},
 		canCreateDefinition() {
 			return false;

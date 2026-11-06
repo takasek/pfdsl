@@ -983,9 +983,18 @@ async function assertPreviewUsability(session) {
 	assert.equal(errorGeometry.whiteSpace, "pre-wrap");
 	assert.equal(errorGeometry.overflowWrap, "anywhere");
 	assert.equal(errorGeometry.outsideGraph, true);
-	assert.equal(await frame.locator("#minimap").isVisible(), false);
-	assert.equal(await frame.locator("#minimap-svg svg").count(), 0);
-	assert.equal(await frame.locator("#zoom-in").isDisabled(), true);
+	assert.equal(
+		await frame.locator("#preview-error .stale-notice").textContent(),
+		"The source has errors. Showing the last valid diagram (read-only).",
+	);
+	assert.equal(await frame.locator("#inner svg").count(), 1);
+	assert.equal(await frame.locator("#minimap").isVisible(), true);
+	assert.equal(await frame.locator("#minimap-svg svg").count(), 1);
+	assert.equal(await frame.locator("#zoom-in").isDisabled(), false);
+	await frame
+		.locator('#inner g.node[data-node-id="requirements"]')
+		.click({ button: "right" });
+	assert.equal(await frame.locator("#node-actions").isVisible(), false);
 	await editFixture(session, "requirements >> design -> recovered\n");
 	await waitForColdRender(
 		frame.locator('#inner g.node[data-node-id="recovered"]'),

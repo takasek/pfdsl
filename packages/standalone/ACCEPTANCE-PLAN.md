@@ -285,7 +285,9 @@ API差分：`deleteConnector`／`toggleFeedback`は`nodeId/source/artifact/proce
 #1517変種：source検索でnodeを選び（Vはnode IDを選択）、Focus selected nodeを押す。
 通常nodeは100%で中央へ、表示領域より大きいnodeは100%を上限として全体が収まる倍率で中央へ移ることを確認する。
 Connectionsの表示中も残った図の領域で中央化し、panel・本文・Undoを変更しない。
-未選択、groupだけの選択、エラー中、描画中は操作を無効とし、正常化だけでは古い選択を復元しない。
+Focus selected nodeは未選択、groupだけの選択、旧図が無いエラー中と描画中は無効とし、旧図の表示中は有効とする（旧図のnodeを選択している場合）。
+回復用の描画中もFocus selected nodeを無効にし、その間に届くsource選択は次の図の完成後に適用する。
+正常化だけでは古い選択を復元しない。
 通常のsource選択は倍率を保ち、明示操作後の再描画だけで再ズームせず、FitとActual sizeは従来の意味を維持する。
 期待：初回全体を把握しFitとActual sizeを区別して戻れ、倍率表示は従来どおり100%等を示す。
 通常再描画は視点を不必要に戻さず、倍率・基本操作と説明が一致する。
@@ -303,7 +305,12 @@ sourceへの入力focus、本文・Undo、pan/zoomを復帰処理が変更せず
 削除／改名後にUndoで同IDを戻しても、自動復帰しないことを確認する。
 V036では、エディタの波線が`a >>? p`の`a`から`p`までに出ることを確認する。
 図が止まったerror表示の「Keep normal input」と「Keep feedback」をそれぞれ別の試行でkeyboardとpointerから選び、各1回のUndoで併記へ戻ることを確認する。
-期待：診断はzoom/pan外の通常サイズで読め、古い図/minimapを現行として残さない。
+期待：診断はzoom/pan外の通常サイズで読める。
+最後に妥当だった図がある場合は、同じSVGとminimap、倍率とpanを読み取り専用で保持し、現在のsourceにエラーがあることと旧版であることを常設の帯で示す。
+長い診断本文をスクロールしても帯の注意書きが見え、保存成功や通知を閉じる操作では消えず、次の妥当な描画の完了で消えることを確認する。
+旧図からConnectionsを開く操作、Actions、定義作成、Cmd/Ctrl+clickによる参照先とsubflowの表示を止め、パン・ズーム・Fit・Actual size・minimap・hoverとsource選択による追従を許す。
+旧図のnodeのダブルクリックはsourceへの移動だけを要求し、現在の解析結果に同じIDがあれば移動し、無ければ移動せず、Connectionsは開かない。
+初めから不正で旧図が無い場合は最初のエラーと空の図の領域を表示する。
 文書別件数と行列から正しい位置へ戻り、修正後現在図と操作が回復する。
 「Keep normal input」はfeedbackだけを、「Keep feedback」は通常入力だけを消し、どちらも既定として選ばれていない。
 修復後、Mはステータス表示、Vは情報メッセージで、消した接続と新しく出た診断（通常入力を消した場合のW008）を示し、図が再描画される。
