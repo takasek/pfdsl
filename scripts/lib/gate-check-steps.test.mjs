@@ -825,6 +825,7 @@ describe("commitSubjectStep", () => {
 		assert.deepEqual(logCall?.split(" ").sort(), [
 			"--format=%h%x09%s",
 			"--no-merges",
+			"^refs/remotes/origin/main",
 			"git",
 			"log",
 			"origin/release..HEAD",

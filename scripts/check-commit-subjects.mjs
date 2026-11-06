@@ -22,7 +22,9 @@
  * `--head` defaults to HEAD; CI fetches the event payload's PR head as Git
  * data, verifies its SHA, and passes FETCH_HEAD without checking out PR code.
  *
- * Usage: node scripts/check-commit-subjects.mjs --base <ref> [--head <ref>]
+ * For repository PR checks, --exclude-main also excludes commits reachable
+ * from origin/main, which may be newer than an integration branch.
+ * Usage: node scripts/check-commit-subjects.mjs --base <ref> [--head <ref>] [--exclude-main]
  */
 
 import { parseArgs } from "node:util";
@@ -39,6 +41,7 @@ try {
 		options: {
 			base: { type: "string" },
 			head: { type: "string", default: "HEAD" },
+			"exclude-main": { type: "boolean" },
 		},
 		strict: true,
 		allowPositionals: false,
@@ -51,7 +54,7 @@ try {
 if (!values.base) {
 	console.error("check-commit-subjects: missing --base <ref>");
 	console.error(
-		"Usage: node scripts/check-commit-subjects.mjs --base <ref> [--head <ref>]",
+		"Usage: node scripts/check-commit-subjects.mjs --base <ref> [--head <ref>] [--exclude-main]",
 	);
 	process.exit(2);
 }
@@ -60,6 +63,7 @@ const result = checkCommitSubjects({
 	exec: tryRun,
 	baseRef: values.base,
 	headRef: values.head,
+	excludeMain: values["exclude-main"],
 });
 
 const detail = result.detail ? ` — ${result.detail}` : "";

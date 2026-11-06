@@ -511,6 +511,7 @@ export function commitSubjectStep({ exec, base, check = checkCommitSubjects }) {
 		exec,
 		baseRef: `origin/${base}`,
 		headRef: "HEAD",
+		excludeMain: true,
 	});
 }
 
