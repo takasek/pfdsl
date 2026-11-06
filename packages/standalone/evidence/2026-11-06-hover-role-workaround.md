@@ -33,27 +33,16 @@ Monacoの内部service APIへの依存は局所化し、更新時は実モジュ
 MutationObserverによる後付けは公開前の付与を保証しない。
 今回は既定rendererの局所ラップを採用し、任意thの独自分類は追加しない。
 
-## Linux 製品版での再試験
-
-対象はGUI-27 / GUI-44。
-元AppImageを保持し、修正版のcommit・配布物SHA-256と、実際にロードしたWebKitの版・Build ID・SHA-256を別に記録する。
-元377バイトfixtureのSHA-256を照合し、既存の[採取手順](2026-10-26-linux-hover-summary/NEXT-LINUX-RUN.md)で同一PID/start tickの観測を開始する。
-
-1. 14行目のpackage_manifestでShow Hoverし、実際のhover DOMに2つの列thと明示columnheaderがあること、criteriaとgroupを読めることを採取する。
-2. DOM確認を加えた試行と、元手順の撮影→Escape→編集の試行は区別する。
-3. AT-SPI照会を加える試行は対象object path・数値role・Web子のowner PID・要求時刻・実応答を保存する。
-4. 撮影、Escape、本文編集と同一Web子の生存を対応付け、既存の180秒観測窓まで確認する。
-5. artifact / process / group、複数タブ、比較表示後でもhoverを表示し、URL・場所・定義移動・Find all・明示Run操作を確認する。
-6. 著者のcommandリンクは実行不能のままであること、通常GFM表の値と見出し関連付け、読み上げを確認する。
-7. tbodyの行thを含む著者HTMLは未対応の対照として別試行にし、既知の回避範囲と混同しない。
-
-異常が出たら以降の入力を止め、対象PID/start tick、signal、スタック、stderrを保全する。
-修正前後は同じWebKit・入力・操作条件で比較する。
-短い非再現だけで解消にせず、対象版・ホスト別の結果を既存受入記録へ残す。
-
-## ローカル検証
+## 検証結果と今後の扱い
 
 実Monaco結合検査は修正前にrole欠落で失敗し、修正後は成功した。
 表示前DOM、通常GFM表の値・リンク、未対応のtbody th、著者commandリンクの除去、生成actionのURLを検査する。
 Chromiumでは元fixtureの実hover DOMの2列role、撮影、Escape、後続編集とpage errorなしを確認した。
-Linux製品版の再試験とアクセシビリティ受入は未実施。
+Linux製品版では、同一の実ロードWebKit・元fixture・共通手順で修正前後を各1回比較した。
+対象見出しへのGetRoleName後、修正前はWeb子終了、修正版は正常応答・編集反映・Escape後180秒の生存を確認した。
+今回の条件では回避候補を支持するが、各1回の比較と操作時刻等の差があり、完全解消とは断定しない。
+Linux製品版のDOM属性・読み上げと、比較試行での終了signal・stackは未確認である。
+
+版・証拠・制約・再開点は[#1513の調査レポート](https://github.com/takasek/pfdsl/issues/1513#issuecomment-6679268239)に記録した。
+追加調査はここで止め、同症状が再発した場合に必要な範囲で再開する。
+未確認事項を埋めるための診断版作成や追加試験は、今回の継続作業にはしない。
