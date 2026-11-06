@@ -133,8 +133,20 @@ export async function closeSourceTab(
 		"close source tab",
 		async () => {
 			await sourceTab.getByRole("button", { name: /^Close \(/ }).click();
-			return expectEventually(
+			await expectEventually(
 				"source hidden and preview retained",
+				readState,
+				(state) =>
+					state.sourceTabs === 0 &&
+					state.previewTabs === 1 &&
+					state.groups === 1,
+				{ timeoutMs },
+			);
+			// Closing a group can leave VS Code focus on the workbench body.
+			// Explicitly activate the surviving preview before the next gesture.
+			await page.getByRole("tab", { name: /^PFDSL Preview/ }).click();
+			return expectEventually(
+				"surviving preview focused",
 				readState,
 				(state) =>
 					state.sourceTabs === 0 &&

@@ -1,3 +1,10 @@
+export {
+	IMarkdownRendererService,
+	IOpenerService,
+	MarkdownRendererService,
+	StandaloneServices,
+} from "./markdown-service-stub.mjs";
+
 import { Range } from "monaco-editor/editor/common/core/range.js";
 
 export { Selection } from "monaco-editor/editor/common/core/selection.js";
