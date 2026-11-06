@@ -33,13 +33,14 @@ export function mountConnections(
 	container: HTMLElement,
 	host: {
 		postMessage(request: MessageFromWebview): void;
-		navigate(id: string): void;
+		navigate(id: string): boolean;
 		close(): void;
 		onOpenChange(open: boolean): void;
 		onRename?(oldId: string, newId: string): void;
 	},
 ) {
 	const document = container.ownerDocument;
+	let navigationPending = false;
 	const panel = container.querySelector<HTMLElement>("#node-actions")!;
 	const title = panel.querySelector<HTMLElement>("#node-actions-title")!;
 	const error = panel.querySelector<HTMLElement>("#node-actions-error")!;
@@ -594,9 +595,10 @@ export function mountConnections(
 				row.className = "connection-row";
 				rowEdges.set(row, edge);
 				const neighbor = button("", `Go to ${nodeName(id)}`, () => {
-					host.navigate(id);
+					if (host.navigate(id) === false) return;
 					open(id, true);
 				});
+				neighbor.disabled = navigationPending;
 				const badge = document.createElement("span");
 				shape(badge, id);
 				neighbor.append(badge);
@@ -676,6 +678,14 @@ export function mountConnections(
 		host.close();
 	return {
 		open,
+		setNavigationPending(pending: boolean) {
+			navigationPending = pending;
+			panel.setAttribute("aria-busy", String(pending));
+			for (const button of panel.querySelectorAll<HTMLButtonElement>(
+				"[data-neighbor]",
+			))
+				button.disabled = pending;
+		},
 		dispose() {
 			document.removeEventListener("pointerdown", outsidePointer);
 			document.removeEventListener("scroll", anchorMoved, true);

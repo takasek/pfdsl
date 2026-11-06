@@ -48,6 +48,7 @@ export type MessageToWebview =
 			repair?: { source: string; artifact: string; process: string };
 	  }
 	| { type: "focus"; nodeId: string }
+	| { type: "nodeSyncComplete"; syncId: number }
 	| { type: "clearFocus" }
 	| { type: "diff"; report: DiffReport }
 	| { type: "clearDiff" }
@@ -63,7 +64,12 @@ export type MessageToWebview =
 export type MessageFromWebview =
 	| PreviewEditMessage
 	| { type: "ready" }
-	| { type: "nodeClick"; nodeId: string; preserveFocus?: boolean }
+	| {
+			type: "nodeClick";
+			nodeId: string;
+			preserveFocus?: boolean;
+			syncId?: number;
+	  }
 	| { type: "openUrl"; url: string }
 	| { type: "openFile"; nodeId: string; path: string }
 	| { type: "openLocation"; nodeId: string };

@@ -408,7 +408,7 @@ function jumpToNode(
 	state: PreviewState,
 	nodeId: string,
 	preserveFocus = false,
-): void {
+): boolean {
 	const { doc } = state;
 	let targetPos: vscode.Position | undefined;
 	let targetEnd: vscode.Position | undefined;
@@ -433,7 +433,7 @@ function jumpToNode(
 		);
 		if (found) targetPos = new vscode.Position(found.line, found.column);
 	}
-	if (!targetPos) return;
+	if (!targetPos) return false;
 	const range = new vscode.Range(
 		targetPos,
 		targetEnd ?? targetPos.translate(0, nodeId.length),
@@ -442,12 +442,19 @@ function jumpToNode(
 		(e) => e.document === doc,
 	);
 	if (existingEditor) {
+		const previous = existingEditor.selection;
+		const selectionChanged =
+			existingEditor.selections?.length !== 1 ||
+			previous?.anchor?.line !== range.start.line ||
+			previous?.anchor?.character !== range.start.character ||
+			previous?.active?.line !== range.end.line ||
+			previous?.active?.character !== range.end.character;
 		existingEditor.selection = new vscode.Selection(
 			targetPos,
 			targetEnd ?? targetPos.translate(0, nodeId.length),
 		);
 		existingEditor.revealRange(range);
-		if (preserveFocus) return;
+		if (preserveFocus) return selectionChanged;
 		const vc = existingEditor.viewColumn;
 		if (vc !== undefined) {
 			vscode.window.showTextDocument(doc, {
@@ -464,6 +471,7 @@ function jumpToNode(
 			preview: false,
 		});
 	}
+	return false;
 }
 
 export function registerPreview(context: vscode.ExtensionContext): {
@@ -556,7 +564,12 @@ export function registerPreview(context: vscode.ExtensionContext): {
 			) {
 				await editFromPreview(state, msg);
 			} else if (msg.type === "nodeClick") {
-				jumpToNode(state, msg.nodeId, msg.preserveFocus);
+				const changed = jumpToNode(state, msg.nodeId, msg.preserveFocus);
+				if (msg.syncId !== undefined && !changed)
+					state.panel.webview.postMessage({
+						type: "nodeSyncComplete",
+						syncId: msg.syncId,
+					} satisfies MessageToWebview);
 			} else if (msg.type === "openUrl") {
 				vscode.env.openExternal(vscode.Uri.parse(msg.url));
 			} else if (msg.type === "openFile") {

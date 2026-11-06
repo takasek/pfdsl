@@ -135,25 +135,35 @@ export function mountPreview(container: HTMLElement, host: PreviewHost) {
 	let cueTimer: number | undefined;
 	let cuedNode: Element | undefined;
 	let cueRing: HTMLDivElement | undefined;
-	let syncEchoNodeId: string | undefined;
-	let syncEchoTimer: number | undefined;
+	let syncEcho: { nodeId: string; syncId: number; timer: number } | undefined;
+	let syncSerial = 0;
 	let clickTimer: number | undefined;
 	function cancelNodeClick() {
 		if (clickTimer !== undefined) window.clearTimeout(clickTimer);
 		clickTimer = undefined;
 	}
 	function clearSyncEcho() {
-		if (syncEchoTimer !== undefined) window.clearTimeout(syncEchoTimer);
-		syncEchoTimer = undefined;
-		syncEchoNodeId = undefined;
+		if (syncEcho) window.clearTimeout(syncEcho.timer);
+		syncEcho = undefined;
+		connections.setNavigationPending(false);
 	}
 	function synchronizeNode(id: string) {
-		clearSyncEcho();
-		syncEchoNodeId = id;
-		// Both hosts can report the selection made by this message. A missing
-		// report must not suppress a later editor navigation indefinitely.
-		syncEchoTimer = window.setTimeout(clearSyncEcho, SYNC_ECHO_TIMEOUT_MS);
-		host.postMessage({ type: "nodeClick", nodeId: id, preserveFocus: true });
+		if (syncEcho) return;
+		const syncId = ++syncSerial;
+		// Serialize preserveFocus selection synchronization. Hosts acknowledge no-ops;
+		// the deadline also releases navigation if the host stops responding.
+		syncEcho = {
+			nodeId: id,
+			syncId,
+			timer: window.setTimeout(clearSyncEcho, SYNC_ECHO_TIMEOUT_MS),
+		};
+		connections.setNavigationPending(true);
+		host.postMessage({
+			type: "nodeClick",
+			nodeId: id,
+			preserveFocus: true,
+			syncId,
+		});
 	}
 	const actions = container.querySelector<HTMLElement>("#node-actions")!;
 	const actionsToggle = container.querySelector<HTMLButtonElement>(
@@ -168,10 +178,12 @@ export function mountPreview(container: HTMLElement, host: PreviewHost) {
 			if (recoverConnectionsId === oldId) recoverConnectionsId = newId;
 		},
 		navigate(id) {
+			if (syncEcho) return false;
 			selectedNodeId = pendingFocusNodeId = id;
 			pendingFocusCue = true;
 			positionGraph();
 			synchronizeNode(id);
+			return true;
 		},
 		close: closeActions,
 		onOpenChange(open) {
@@ -191,6 +203,7 @@ export function mountPreview(container: HTMLElement, host: PreviewHost) {
 	) {
 		cancelNodeClick();
 		if (showingStaleDiagram || graphRevision !== revision) return;
+		if (!preserveFocus && syncEcho) return;
 		recoverConnectionsId = undefined;
 		selectedNodeId = id;
 		const node = [...inner.querySelectorAll<HTMLElement>("g.node")].find(
@@ -997,6 +1010,10 @@ export function mountPreview(container: HTMLElement, host: PreviewHost) {
 	let deferredRender: Extract<MessageToWebview, { type: "render" }> | undefined;
 	async function receive(msg: MessageToWebview) {
 		if (disposed) return;
+		if (msg.type === "nodeSyncComplete") {
+			if (syncEcho?.syncId === msg.syncId) clearSyncEcho();
+			return;
+		}
 		if (msg.type === "editResult") {
 			connections.result(msg);
 			if (deferredRender) await receive(deferredRender);
@@ -1026,7 +1043,7 @@ export function mountPreview(container: HTMLElement, host: PreviewHost) {
 			return;
 		}
 		if (msg.type === "focus") {
-			const echo = syncEchoNodeId === msg.nodeId;
+			const echo = syncEcho?.nodeId === msg.nodeId;
 			clearSyncEcho();
 			if (echo) return;
 			if (msg.nodeId !== recoverConnectionsId) recoverConnectionsId = undefined;
