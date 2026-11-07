@@ -59,5 +59,6 @@ jobs:
           node scripts/check-commit-subjects.mjs
           --base "origin/$BASE_REF"
           --head FETCH_HEAD
+          --exclude-main
         env:
           BASE_REF: ${{ github.base_ref }}

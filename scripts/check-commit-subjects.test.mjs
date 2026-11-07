@@ -142,6 +142,29 @@ describe("check-commit-subjects CLI", () => {
 		assert.match(r.stdout, /add a side thing/);
 	});
 
+	it("excludes published main history while checking work from either merge parent", () => {
+		const base = headSha(root);
+		git(root, ["update-ref", "refs/remotes/origin/topic", base]);
+		const published = commit(root, "already published on main");
+		git(root, ["update-ref", "refs/remotes/origin/main", published]);
+		git(root, ["checkout", "-q", "-b", "pr-work", base]);
+		commit(root, "fix: branch work");
+		git(root, ["merge", "--no-ff", "-m", "merge main", published]);
+		const args = ["--base", "origin/topic", "--exclude-main"];
+		const clean = runCli(root, args);
+		assert.equal(clean.status, 0, clean.stdout + clean.stderr);
+		assert.match(clean.stdout, /PASS.*1 commit/);
+
+		git(root, ["checkout", "-q", "-b", "unpublished-side", published]);
+		commit(root, "invalid side work");
+		git(root, ["checkout", "-q", "pr-work"]);
+		git(root, ["merge", "--no-ff", "-m", "merge side", "unpublished-side"]);
+		const bad = runCli(root, args);
+		assert.equal(bad.status, 1, bad.stdout + bad.stderr);
+		assert.match(bad.stdout, /invalid side work/);
+		assert.doesNotMatch(bad.stdout, /already published on main/);
+	});
+
 	it("exits 2 on an unknown flag even when the range is complete", () => {
 		// A bare --nope would exit 2 through the missing-base branch too, so
 		// dropping `strict: true` would leave that version of this test green
@@ -248,7 +271,7 @@ describe("check-commit-subjects workflow", () => {
 						// origin/<base_ref>, not the payload's base.sha: that value is
 						// the base tip as of the event and stops matching the gate's
 						// range once the base advances.
-						run: 'node scripts/check-commit-subjects.mjs --base "origin/$BASE_REF" --head FETCH_HEAD',
+						run: 'node scripts/check-commit-subjects.mjs --base "origin/$BASE_REF" --head FETCH_HEAD --exclude-main',
 						env: {
 							// biome-ignore lint/suspicious/noTemplateCurlyInString: a GitHub Actions expression, not an interpolation
 							BASE_REF: "${{ github.base_ref }}",
@@ -352,6 +375,7 @@ describe("check-commit-subjects workflow", () => {
 			"origin/$BASE_REF",
 			"--head",
 			"FETCH_HEAD",
+			"--exclude-main",
 		]);
 	});
 

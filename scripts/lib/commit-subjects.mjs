@@ -21,13 +21,18 @@ import {
 } from "./commit-subject-rules.mjs";
 
 /**
- * @param {{exec: (file: string, args: string[]) => {ok: boolean, out: string}, baseRef: string, headRef: string}} params
+ * @param {{exec: (file: string, args: string[]) => {ok: boolean, out: string}, baseRef: string, headRef: string, excludeMain?: boolean}} params
  *   `baseRef` and `headRef` are refs, not a base branch name: the gate passes
  *   `origin/<base>` and `HEAD`, and CI passes the branch it fetched and the
  *   head SHA from the event payload.
  * @returns {{name: string, status: 'PASS'|'FAIL'|'SKIP', detail?: string}}
  */
-export function checkCommitSubjects({ exec, baseRef, headRef }) {
+export function checkCommitSubjects({
+	exec,
+	baseRef,
+	headRef,
+	excludeMain = false,
+}) {
 	const name = "commit subject lint";
 	// The sha-prefixed format, not a bare `%s`: a commit made with
 	// --allow-empty-message has an empty subject, and a plain newline split
@@ -38,6 +43,11 @@ export function checkCommitSubjects({ exec, baseRef, headRef }) {
 		"log",
 		"--no-merges",
 		`${baseRef}..${headRef}`,
+		// A topic PR can bring in commits already accepted on main. Exclude
+		// only that ancestry so unpublished commits on side parents still count.
+		...(excludeMain && baseRef !== "origin/main"
+			? ["^refs/remotes/origin/main"]
+			: []),
 		"--format=%h%x09%s",
 	]);
 	if (!logOut.ok) return { name, status: "FAIL", detail: logOut.out.trim() };
