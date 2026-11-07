@@ -177,27 +177,6 @@ artifact:
       architecture.md に移行中の適用関係が配布され、workflow.md に後続の段階公開と採用先の手順保持を含む移行案内の作成手順がある。
       公開版ごとの配布レビューを維持し、該当する公開工程から本方針を参照できる
     location: ../.pfdsl/workflow.md
-  boundary_test_revision_adr:
-    label: 契約1を4条件の AND に改める ADR (#1525)
-    description: ADR-0048 の契約1を意味論・書込み先・業種中立・名指しの AND に改め、0段目の第3基準を統合し、companion の構造的事実と D3 の運び手を決める ADR。後続の work-cycle と plugin 分割の設計の前提になる
-    status: done
-    criteria: >
-      新しい ADR が Accepted で存在し、ADR-0048 の Status に部分上書きが注記されている。
-      architecture.md の0段目と評価入力だけを渡した読み手が、所有者承認済みの独立参照集合11件の置き場・分割・保持条件・情報不足を再現でき、0段目に契約1と別系統の基準が残っていない
-    location: https://github.com/takasek/pfdsl/issues/1525
-  writer_free_github_preset:
-    label: 実行主体の書込み規律を外した GitHub Issues プリセット
-    description: ADR-0048 の後続で未起票。実行主体が行う外部書込みの手順と PR 運用をこのリポの binding へ移し、プリセットにはアダプタ自身が外部へ書く場合の読み戻しの原則だけを残す（ADR-0048 D2）
-    status: done
-    criteria: github-issues-backend.md が実行主体の外部書込みの手順と PR 本文規約を持たず、アダプタ自身の書込みを読み戻す原則を持つ。このリポの PR 作成手順（クローズ参照の扱い等）が binding だけで完結する
-  backend_neutral_work_item_contract:
-    label: バックエンドに依存しない作業項目の対応契約
-    description: 両バックエンドの reference に重複している作業項目と process の対応の規則を、protocol に1つだけ置く（対象の規則は ADR-0048 契約6）
-    status: done
-    criteria: >
-      両バックエンドの reference に同じ規則の本文が残らず、どちらも protocol に置いた1つの契約を参照する。
-      その契約は作業項目と process を location: で対応付け、1つの作業項目に複数の process を対応させてよく、process id の接頭辞で作業項目を表す規約を持たない。
-      移行の前に、接頭辞と location: から導かれる作業項目と process の対応をすべて列挙し、移行の後も読取側のスクリプトが同じ対応を導けるか、外した対応ごとに理由が記録されている
   prune_cli:
     label: 完了チェーン回収の CLI 動詞
     description: "ADR-0048 D4 と #1567 に従い、完了チェーン回収の保持規則と検証を CLI のトップレベル動詞にし、配置スクリプトは CLI を呼ぶだけにする"
@@ -288,8 +267,6 @@ process:
   publish_cli_prune:
     label: 完了チェーン回収 CLI とアダプタを公開する
     tags: [ release_cli ]
-  design_adapter_plugin_split:
-    label: core と GitHub アダプタの plugin 分割を設計する
   apply_github_adapter_design:
     label: 設計に従って GitHub アダプタを採用したリポでだけ働かせる
     description: 分割するか宣言で絞るかは入力の設計仕様に従う
@@ -342,8 +319,6 @@ gui_vscode_candidate >> accept_gui_vscode -> gui_vscode_acceptance
 gui_mac_acceptance >> publish_standalone -> standalone_release
 
 [boundary_transition_release_policy, prune_cli] >> publish_cli_prune -> cli_release_prune
-
-[backend_neutral_work_item_contract, boundary_test_revision_adr, prune_cli, writer_free_github_preset] >> design_adapter_plugin_split -> adapter_plugin_split_design
 
 adapter_plugin_split_design >> apply_github_adapter_design -> optional_github_adapter
 
