@@ -159,12 +159,25 @@ test("source close targets its own close button and checks tab and preview survi
 			click: async () => clicks.push({ role, options }),
 		}),
 	};
-	const state = await closeSourceTab({}, sourceTab, {
+	const page = {
+		getByRole: (role, options) => ({
+			click: async () => {
+				assert.equal(
+					observations.length,
+					1,
+					"wait for tab removal before focusing preview",
+				);
+				clicks.push({ role, options });
+			},
+		}),
+	};
+	const state = await closeSourceTab(page, sourceTab, {
 		readState: async () => observations.shift(),
 		log: () => {},
 	});
 	assert.deepEqual(clicks, [
 		{ role: "button", options: { name: /^Close \(/ } },
+		{ role: "tab", options: { name: /^PFDSL Preview/ } },
 	]);
 	assert.deepEqual(state, {
 		sourceTabs: 0,
@@ -182,7 +195,7 @@ test("source close targets its own close button and checks tab and preview survi
 test("source close fails when focus remains outside the preview", async () => {
 	await assert.rejects(
 		closeSourceTab(
-			{},
+			{ getByRole: () => ({ click: async () => {} }) },
 			{ getByRole: () => ({ click: async () => {} }) },
 			{
 				readState: async () => ({

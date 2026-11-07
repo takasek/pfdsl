@@ -1,3 +1,9 @@
+export {
+	IMarkdownRendererService,
+	IOpenerService,
+	MarkdownRendererService,
+	StandaloneServices,
+} from "./markdown-service-stub.mjs";
 // Controlled Monaco boundary; document-tab and formatting stay production code.
 export const instances = [];
 export const language = {};

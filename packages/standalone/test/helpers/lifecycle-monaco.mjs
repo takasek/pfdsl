@@ -1,3 +1,9 @@
+export {
+	IMarkdownRendererService,
+	IOpenerService,
+	MarkdownRendererService,
+	StandaloneServices,
+} from "./markdown-service-stub.mjs";
 // A controlled editor seam: document-tab and its preview remain production code.
 export const instances = [];
 export const language = {};

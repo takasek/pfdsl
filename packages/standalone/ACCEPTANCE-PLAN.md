@@ -408,6 +408,8 @@ Find allは現行拡張と同じliteral文字列検索であり、metadata field
 processのcommand行末の`Command` hintをhoverして複数行の内容を読み、表示だけで実行されないことを確認する。
 hoverを残したまま編集・文書切替・閉鎖し、旧版のリンクが新しい文書や版へ作用しないことを確認する。
 Linuxの#1513再試験では、[採取手順](evidence/2026-10-26-linux-hover-summary/NEXT-LINUX-RUN.md)でログ採取を開始し、回収した377バイトの元fixtureの14行目のpackage_manifestでShow Hover→撮影→Escape→本文編集を行う。
+2026-11-06の回避候補と比較結果は[実装の根拠](evidence/2026-11-06-hover-role-workaround.md)と[#1513の調査レポート](https://github.com/takasek/pfdsl/issues/1513#issuecomment-6679268239)を参照する。
+#1513の追加調査は同症状の再発時に必要な範囲で再開し、以下の対照条件も再開時の参考とする。
 labelのみ、criteriaのみ、groupとcriteria、descriptionを含む場合を分け、Linux nativeではWebKitWebProcessの存否・終了時刻・stderr・利用可能な終了理由を記録する。
 Linuxで報告された3回の表示プロセス消失は原因未確定であり、Chromiumでの成功をWebKitGTKやMac nativeの合格へ転写しない。
 期待：semantic nodeとfield、定義range、全出現が正しく、図hover廃止と混同しない。
@@ -601,7 +603,8 @@ debug/ad-hoc署名appの成功を正式配布物へ転写しない。
 操作：Save/Save As無効理由とキー非書込み、closeの保持既定／明示Discard、外部変更の採用取消を確認する。
 期待：UI/nativeで保存不可を守り取消で本文を保つ。
 露出しない独立Quit入口は未実施と分け、Mac保存／Quitを転写しない。
-GUI-27のhover再試験も同じ対象版で行う（#1513）。配布物のSHA-256、OS・WebKitGTK版、CPU実行方式、X11/Wayland・描画環境、fixtureのSHA-256、操作時刻を固定する。撮影なし／撮影あり／自動キー操作を区別し、labelのみ・criteriaのみ・group＋criteria・descriptionありを比較する。アプリ・network・WebKitWebProcessのPIDと終了時刻、stderr、利用できるexit status・signal・crash/core・OOM情報を保存する。元ホスト、別Linux、Macの結果は別行に残す。プロセス存否だけで原因を断定せず、非再現だけで解消扱いにしない。
+以下の#1513のhover再試験は、GUI-27に記した再発時の調査再開方針に従う。
+再開時はGUI-27のhover再試験も同じ対象版で行う（#1513）。配布物のSHA-256、OS・WebKitGTK版、CPU実行方式、X11/Wayland・描画環境、fixtureのSHA-256、操作時刻を固定する。撮影なし／撮影あり／自動キー操作を区別し、labelのみ・criteriaのみ・group＋criteria・descriptionありを比較する。アプリ・network・WebKitWebProcessのPIDと終了時刻、stderr、利用できるexit status・signal・crash/core・OOM情報を保存する。元ホスト、別Linux、Macの結果は別行に残す。プロセス存否だけで原因を断定せず、非再現だけで解消扱いにしない。
 原記録の回収で得た377バイトのfixtureは [hover-rich.pfdsl.txt](evidence/2026-10-26-linux-hover-recovery/hover-rich.pfdsl.txt) をバイト列のまま `.pfdsl` へコピーして開く（SHA-256 `1a3457175367b886fff0de6d304f490be891d7dfe43f15c7df726ab3184e5933`）。
 10月23日の378バイト版とは末尾の改行が1個異なるため、両方を試す場合は別の入力条件として記録する。
 操作前にWebKitWebProcessのPIDと実ロードされたライブラリのパス・ハッシュ・版の根拠を保存し、可能な終了通知・stderr・core／OOM情報の採取を開始してから操作する。
