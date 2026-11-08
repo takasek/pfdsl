@@ -7,7 +7,7 @@
  * built first — see `make build-deps`). Catches the spec/implementation
  * drift described in #299: a code emitted by the checker but undocumented
  * in §16, a stale code documented but no longer emitted, or a severity
- * that disagrees between the two.
+ * or definition section that disagrees between the two.
  *
  * Usage:
  *   node scripts/check-diag-registry.mjs
@@ -20,7 +20,9 @@ import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import {
 	diffDiagRegistry,
+	diffDiagSections,
 	evaluateDiagRegistryDiff,
+	parseSpecDiagSections,
 	parseSpecDiagTable,
 } from "./lib/diag-registry-check.mjs";
 import { isDistStale } from "./lib/dist-freshness.mjs";
@@ -54,6 +56,10 @@ emitLinesAndExit(
 		missingInSpec,
 		staleInSpec,
 		severityMismatches,
+		sectionMismatches: diffDiagSections(
+			parseSpecDiagSections(specText),
+			DIAGNOSTIC_REGISTRY,
+		),
 		specCodesCount: Object.keys(specCodes).length,
 	}),
 );
