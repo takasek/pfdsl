@@ -1,19 +1,18 @@
 /**
  * check-spec-ids.mjs orchestration: the argv-vs-git-ls-files file list, the
- * per-file read loop, and the `duplicates.length > 0 || dangling.length > 0`
- * exit-code branch were untested (#645) — only the pure matchers in
- * lib/spec-id-check.mjs had tests. That `||` is the exact branch #645 calls
- * out as unverified: flipping it to `&&` would wrongly pass a file with
- * duplicates only or dangling refs only, since neither alone would satisfy an
- * `&&`. Tests below cover each independently for that reason.
+ * per-file read loop, and independent failure branches are tested separately
+ * from the pure matchers in lib/spec-id-check.mjs (#645). Each violation kind
+ * must fail on its own, including block ownership and bare section references.
  *
  * `listFiles`/`readFile` are injected so a test can supply canned file lists
  * and contents without touching git or the filesystem.
  */
 
 import {
+	findBareSectionReferences,
 	findDanglingStrictRefs,
 	findDuplicateDefinitions,
+	findMultipleIdsOnBlock,
 	findSpecIdDefinitions,
 	findStrictRefs,
 	formatSpecIdViolations,
@@ -28,8 +27,23 @@ export function runSpecIdCheck({ args, listFiles, readFile }) {
 
 	const definitionHits = [];
 	const strictRefHits = [];
+	const fileViolations = [];
+	let multipleIdBlocks = 0;
+	let bareSectionReferences = 0;
 	for (const file of files) {
 		const text = readFile(file);
+		for (const hit of findMultipleIdsOnBlock(text)) {
+			multipleIdBlocks++;
+			fileViolations.push(
+				`multiple ids on one block at ${file}:${hit.line}: ${hit.ids.join(", ")}`,
+			);
+		}
+		for (const hit of findBareSectionReferences(text)) {
+			bareSectionReferences++;
+			fileViolations.push(
+				`bare section reference §${hit.section} at ${file}:${hit.line} — section ${hit.section} has id ${hit.id}; use [[${hit.id}]]`,
+			);
+		}
 		for (const hit of findSpecIdDefinitions(text))
 			definitionHits.push({ file, ...hit });
 		for (const hit of findStrictRefs(text))
@@ -39,13 +53,19 @@ export function runSpecIdCheck({ args, listFiles, readFile }) {
 	const duplicates = findDuplicateDefinitions(definitionHits);
 	const dangling = findDanglingStrictRefs(strictRefHits, definitionHits);
 
-	if (duplicates.length > 0 || dangling.length > 0) {
+	if (
+		duplicates.length > 0 ||
+		dangling.length > 0 ||
+		fileViolations.length > 0
+	) {
 		return {
 			exitCode: 1,
 			stdoutLines: [],
 			stderrLines: [
-				`check-spec-ids: ${duplicates.length} duplicate definition(s), ${dangling.length} dangling strict reference(s):\n`,
-				formatSpecIdViolations(duplicates, dangling),
+				`check-spec-ids: ${duplicates.length} duplicate definition(s), ${dangling.length} dangling strict reference(s), ${multipleIdBlocks} block(s) with multiple ids, ${bareSectionReferences} bare section reference(s):\n`,
+				[formatSpecIdViolations(duplicates, dangling), ...fileViolations]
+					.filter(Boolean)
+					.join("\n"),
 			],
 		};
 	}

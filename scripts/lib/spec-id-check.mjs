@@ -14,6 +14,7 @@
 import { fromMarkdown } from "mdast-util-from-markdown";
 import { gfmTableFromMarkdown } from "mdast-util-gfm-table";
 import { gfmTable } from "micromark-extension-gfm-table";
+import { createBlockLocator } from "./spec-id-range.mjs";
 
 const DEFINITION_RE = /\(SPEC_([A-Za-z0-9_]+)\)/g;
 const STRICT_REF_RE = /\[\[SPEC_([A-Za-z0-9_]+)\]\]/g;
@@ -55,6 +56,43 @@ export function findSpecIdDefinitions(text) {
 	nonCodeLines(text).forEach((line, index) => {
 		for (const match of line.matchAll(DEFINITION_RE)) {
 			hits.push({ line: index + 1, id: `SPEC_${match[1]}` });
+		}
+	});
+	return hits;
+}
+
+/** @returns {Array<{line: number, ids: string[]}>} */
+export function findMultipleIdsOnBlock(text) {
+	const locate = createBlockLocator(text);
+	const blocks = new Map();
+	for (const hit of findSpecIdDefinitions(text)) {
+		const block = locate(hit.line);
+		const key = block ?? `line:${hit.line}`;
+		if (!blocks.has(key)) {
+			blocks.set(key, { line: block?.startLine ?? hit.line, ids: [] });
+		}
+		blocks.get(key).ids.push(hit.id);
+	}
+	return [...blocks.values()].filter(({ ids }) => ids.length > 1);
+}
+
+/** @returns {Array<{line: number, section: string, id: string}>} */
+export function findBareSectionReferences(text) {
+	const lines = nonCodeLines(text);
+	const sections = new Map();
+	for (const hit of findSpecIdDefinitions(text)) {
+		const heading = /^#{1,6}\s+(\d+(?:\.\d+)*)\.?\s/.exec(lines[hit.line - 1]);
+		if (heading) sections.set(heading[1], hit.id);
+	}
+	const hits = [];
+	lines.forEach((line, index) => {
+		for (const match of line.matchAll(/§ ?(\d+(?:\.\d+)*)(?!\.?\d)/g)) {
+			if (sections.has(match[1]))
+				hits.push({
+					line: index + 1,
+					section: match[1],
+					id: sections.get(match[1]),
+				});
 		}
 	});
 	return hits;
