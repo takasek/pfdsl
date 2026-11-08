@@ -34,7 +34,7 @@ mapping key ではない YAML プレーンスカラー値の同一行に空白�
 
 ---
 
-### 2.1 YAML front matter
+### 2.1 YAML front matter (SPEC_yaml_front_matter)
 
 空の front matter を除き、ルートは mapping でなければならない。
 本仕様で型を定義したフィールドは、読み込み時に型を検査する。
@@ -80,7 +80,7 @@ process:
 
 ---
 
-### 2.2 front matter キー
+### 2.2 front matter キー (SPEC_front_matter_keys)
 
 すべて任意とする。
 
@@ -94,18 +94,18 @@ process:
 | layout       | レイアウト補助情報                                  |
 | artifact     | 成果物定義                                      |
 | process      | プロセス定義                                     |
-| group        | グループ定義（§2.8参照）                             |
-| tag          | タグ定義（label / description / style、§2.7.4参照） |
-| statusStyles | status → DOT属性 マッピング（§2.7参照）              |
-| extends      | 継承するプリセットファイルへの相対パス（文字列または文字列の配列、§2.9.4参照） |
-| baseRef      | Artifact の既定の参照先（source / revision の mapping、§2.3参照） |
-| type         | PFD の種別（roadmap \| workflow \| pipeline、§2.10参照） |
+| group        | グループ定義（[[SPEC_group_definition]]参照）                             |
+| tag          | タグ定義（label / description / style、[[SPEC_tag_definitions]]参照） |
+| statusStyles | status → DOT属性 マッピング（[[SPEC_status_tags_style_mapping]]参照）              |
+| extends      | 継承するプリセットファイルへの相対パス（文字列または文字列の配列、[[SPEC_extends_inheritance]]参照） |
+| baseRef      | Artifact の既定の参照先（source / revision の mapping、[[SPEC_id_metadata]]参照） |
+| type         | PFD の種別（roadmap \| workflow \| pipeline、[[SPEC_type_field]]参照） |
 
 未定義キーを含んでもよい。処理系は無視してよい。
 
 ---
 
-### 2.3 IDメタデータ定義
+### 2.3 IDメタデータ定義 (SPEC_id_metadata)
 
 front matter では、本文中で使用する Artifact / Process ID に対し追加情報を定義してよい。
 
@@ -132,14 +132,14 @@ process:
 
 label は表示名として利用してよい。
 description は可視化バックエンドでのツールチップ（tooltip）に使用してよい。
-status / tags は §2.7 を参照。
-artifact / process に対して group を指定することで、ノードをグループへ所属させてよい（§2.8参照）。
+status / tags は [[SPEC_status_tags_style_mapping]] を参照。
+artifact / process に対して group を指定することで、ノードをグループへ所属させてよい（[[SPEC_group_definition]]参照）。
 
 #### document-level フィールド（basePath）
 
 個々の ID メタデータに先立ち、フロントマター全体に効く document-level フィールドを規定する。
 
-**basePath** — フロントマター全体に適用するパス解決基準（省略可能な文字列）。`location:` のファイルパス解決と `command:` の実行ディレクトリ（cwd）の両方に適用する。値は含む `.pfdsl` ファイルのディレクトリからの相対パスで指定する。省略時は `.pfdsl` ファイルのディレクトリをデフォルトとして後方互換を保つ。`subflow:` / `extends:` のクロスファイル参照の解決基準には影響しない（それらは常に含む `.pfdsl` ファイルの位置を基準とする。§2.9.2 が優先）。
+**basePath** — フロントマター全体に適用するパス解決基準（省略可能な文字列）。`location:` のファイルパス解決と `command:` の実行ディレクトリ（cwd）の両方に適用する。値は含む `.pfdsl` ファイルのディレクトリからの相対パスで指定する。省略時は `.pfdsl` ファイルのディレクトリをデフォルトとして後方互換を保つ。`subflow:` / `extends:` のクロスファイル参照の解決基準には影響しない（それらは常に含む `.pfdsl` ファイルの位置を基準とする。[[SPEC_interfile_references]] が優先）。
 
 ```yaml
 ---
@@ -204,7 +204,7 @@ Artifact の参照先が別の固定版 C1 を選んでも、これらを C1 へ
 
 #### artifact 専用フィールド（criteria / revises）
 
-`status` も Artifact 専用フィールドである（§2.7 参照）。`tags` は Artifact / Process 両方に指定できる（`group` §2.8 と対称。§2.7.2 参照）。
+`status` も Artifact 専用フィールドである（[[SPEC_status_tags_style_mapping]] 参照）。`tags` は Artifact / Process 両方に指定できる（`group` [[SPEC_group_definition]] と対称。[[SPEC_tags_field]] 参照）。
 
 **criteria** — 成果物の完了条件（任意文字列）。`status` を問わず事前宣言として設定可。モデル内で完了根拠を自己文書化する。1 Artifact につき 0 または 1 個。[[SPEC_criteria_constraint]] 参照。
 
@@ -269,9 +269,9 @@ artifact:
 
 **command** — プロセスに対応する実行可能なコマンド文字列（任意文字列）。グラフ意味論に影響しない。1 Process につき 0 または 1 個。
 
-**subflow** — 当該プロセスを子フローへ展開するビューリンク（文字列、子 `.pfdsl` への相対パス）。1 Process につき 0 または 1 個。ビューリンクの意味論・パス解決規則・境界整合・絶対パス禁止などの規範は §2.9.3（意味論）と [[SPEC_subflow_boundary_constraint]]（機械検証）に一本化する。
+**subflow** — 当該プロセスを子フローへ展開するビューリンク（文字列、子 `.pfdsl` への相対パス）。1 Process につき 0 または 1 個。ビューリンクの意味論・パス解決規則・境界整合・絶対パス禁止などの規範は [[SPEC_subflow_expansion]]（意味論）と [[SPEC_subflow_boundary_constraint]]（機械検証）に一本化する。
 
-**boundary** — `subflow:` を持つプロセス専用の任意フィールド。親の境界 artifact ID を子の境界 artifact ID へ対応づけるマップ（`親ID: 子ID`）。独立に命名された子フローの再利用に用いる。全単射・side 整合などの規範は §2.9.3 / [[SPEC_subflow_boundary_constraint]] 参照。
+**boundary** — `subflow:` を持つプロセス専用の任意フィールド。親の境界 artifact ID を子の境界 artifact ID へ対応づけるマップ（`親ID: 子ID`）。独立に命名された子フローの再利用に用いる。全単射・side 整合などの規範は [[SPEC_subflow_expansion]] / [[SPEC_subflow_boundary_constraint]] 参照。
 
 ```yaml
 process:
@@ -351,11 +351,11 @@ layout 以下の未定義キーは実装依存とする。
 
 ---
 
-### 2.7 status / tags / Style マッピング
+### 2.7 status / tags / Style マッピング (SPEC_status_tags_style_mapping)
 
-Artifact に進捗状態 status を、Artifact / Process に任意ラベル tags を付与してよい。可視化バックエンド（Graphviz 等）はこれらを node 属性へ反映してよい。status は Artifact 専用（Process には付与しない）。tags は Artifact / Process の両方を対象とする（`group` §2.8 と対称）。
+Artifact に進捗状態 status を、Artifact / Process に任意ラベル tags を付与してよい。可視化バックエンド（Graphviz 等）はこれらを node 属性へ反映してよい。status は Artifact 専用（Process には付与しない）。tags は Artifact / Process の両方を対象とする（`group` [[SPEC_group_definition]] と対称）。
 
-#### 2.7.1 status
+#### 2.7.1 status (SPEC_status_field)
 
 ```yaml
 artifact:
@@ -369,15 +369,15 @@ artifact:
   * `done` — 完了・受入済み（成果物が確定し受け入れられた。例: ソフトウェア工程では完了した変更が main に統合された状態）
   * `waiting` — 外部要因で着手不能（locus of control: 他者。レビュー待ち・外部ベンダー回答待ち等）
   * `suspended` — 自主的な一時中断・再開予定あり（locus of control: 自分たち）
-* 明示的な有効参照先（§2.3）がない Artifact の値は、そのファイルを含むツリーが示す状態である。複数のツリーがある場合は統合先（例: main）のツリーの値を正とする。
+* 明示的な有効参照先（[[SPEC_id_metadata]]）がない Artifact の値は、そのファイルを含むツリーが示す状態である。複数のツリーがある場合は統合先（例: main）のツリーの値を正とする。
 * 明示的な有効参照先がある Artifact は、その参照先で成果物を照合する。場所・版を criteria に明記した場合はその条件が done の前提となり、記載がなければ有効参照先を done の既定の統合先とする。criteria は ref や location の解決式を自動変更しない。
 * PFD を含むツリーの版は状態宣言の版を、有効参照先は成果物の照合対象の版を識別する。参照先の宣言だけで status を変更したり、正本とするモデル版を自動選択したりしない。同じ成果物について矛盾する状態宣言がある場合、正本モデル版は採用先が定める。
 * 1 Artifact につき 0 個または 1 個
 * 列挙外の値は error
 
-#### 2.7.2 tags
+#### 2.7.2 tags (SPEC_tags_field)
 
-`tags` は **Artifact / Process の両方**に指定してよい（`group` §2.8 と対称）。ノードへ横断的な性質ラベルを付与し、同じ性質を持つノード群（成果物でも工程でもよい）を束ねる。
+`tags` は **Artifact / Process の両方**に指定してよい（`group` [[SPEC_group_definition]] と対称）。ノードへ横断的な性質ラベルを付与し、同じ性質を持つノード群（成果物でも工程でもよい）を束ねる。
 
 ```yaml
 artifact:
@@ -390,10 +390,10 @@ process:
 
 * 任意文字列の配列（0..N 個）
 * Artifact / Process のどちらにも付与できる
-* 文字列の内容は検証しない（自由ラベル）。要素型は §2.1 の FM004 で検査する。
-* `tag` セクション（§2.7.4）で宣言されていないタグを使ってもよい（宣言は任意。未宣言タグは error/warning とせず無視する）
+* 文字列の内容は検証しない（自由ラベル）。要素型は [[SPEC_yaml_front_matter]] の FM004 で検査する。
+* `tag` セクション（[[SPEC_tag_definitions]]）で宣言されていないタグを使ってもよい（宣言は任意。未宣言タグは error/warning とせず無視する）
 
-#### 2.7.3 statusStyles
+#### 2.7.3 statusStyles (SPEC_status_styles)
 
 ```yaml
 statusStyles:
@@ -409,9 +409,9 @@ statusStyles:
 * 許可外属性キーは error
 * status は Artifact 専用のため statusStyles も Artifact node にのみ適用される
 
-#### 2.7.4 tag 定義
+#### 2.7.4 tag 定義 (SPEC_tag_definitions)
 
-`tag` は front matter のトップレベルキーで、`artifact` / `process` / `group` と同階層に置く（§2.2）。タグごとに `label` / `description` / `style` を宣言してよい。タグの「意味」と「見た目」を front matter 内に一元管理する（`group` が `label` + `color` を1ブロックに持つのと対称）。
+`tag` は front matter のトップレベルキーで、`artifact` / `process` / `group` と同階層に置く（[[SPEC_front_matter_keys]]）。タグごとに `label` / `description` / `style` を宣言してよい。タグの「意味」と「見た目」を front matter 内に一元管理する（`group` が `label` + `color` を1ブロックに持つのと対称）。
 
 ```yaml
 tag:
@@ -426,8 +426,8 @@ tag:
 * キーがタグ ID（front matter 内で一意）
 * label: 可視化・文書でのタグ表示名（省略可）
 * description: タグの意味の説明（省略可）
-* style: DOT 属性マップ（省略可）。許可属性は §2.7.3 と同じ（fillcolor | color | fontcolor | style | penwidth、許可外は error）
-* `tag` 宣言は任意。ノードは未宣言のタグも使える（§2.7.2）。宣言すると label/description/style が紐づく
+* style: DOT 属性マップ（省略可）。許可属性は [[SPEC_status_styles]] と同じ（fillcolor | color | fontcolor | style | penwidth、許可外は error）
+* `tag` 宣言は任意。ノードは未宣言のタグも使える（[[SPEC_tags_field]]）。宣言すると label/description/style が紐づく
 * 未定義キーは処理系が無視してよい
 
 #### 2.7.5 適用順
@@ -441,11 +441,11 @@ tag:
 
 ---
 
-### 2.8 Group 定義
+### 2.8 Group 定義 (SPEC_group_definition)
 
 任意の Artifact または Process を、名前付きグループへ所属させてよい。グループは可視化バックエンドでの領域分割（Graphviz の `subgraph cluster`）に対応する。意味論には影響しない。
 
-#### 2.8.1 グループ宣言
+#### 2.8.1 グループ宣言 (SPEC_group_declaration)
 
 ```yaml
 group:
@@ -508,33 +508,33 @@ subgraph cluster_g1 {
 * label / color が未指定の場合は対応する属性行を省略する
 * edge はグループ外（digraph 直下）に出力する
 
-#### 2.8.4 制約
+#### 2.8.4 制約 (SPEC_group_constraints)
 
 * V025: `parent` チェーンに循環が存在する場合は error（[[SPEC_constraints]] 参照）
 
 ---
 
-### 2.9 マルチファイル意味論
+### 2.9 マルチファイル意味論 (SPEC_multifile_semantics)
 
 複数の `.pfdsl` ファイルにまたがる参照（`subflow:` による階層展開・`extends:` によるプリセット継承）の共通前提を規定する。
 
 本節は `subflow:` / `extends:` のみを対象とする。`location:` / `revises:` のクロスファイル参照の意味論は対象外であり、引き続き将来の拡張に委ねる（[[SPEC_location_command_constraint]] / [[SPEC_revises_constraint]] 参照）。
 
-#### 2.9.1 ファイルローカル ID スコープ
+#### 2.9.1 ファイルローカル ID スコープ (SPEC_file_local_id_scope)
 
 各 `.pfdsl` ファイルは独立した ID 名前空間を持つ。artifact ID および process ID はファイル内でのみ一意であればよい。グローバルレジストリは持たない。
 
 異なるファイルが同名 ID を持っていても衝突しない。制約 V001（[[SPEC_single_producer_constraint]] 単一生成元制約）/ V002・V003（[[SPEC_process_completeness_constraint]] プロセス完全性制約）はファイル単位で成立すれば十分とする。
 
-W003（status 非単調, [[SPEC_status_style_constraint]]）を含む status 系検査も同様にファイル単位で閉じる。各ファイルの status 宣言のみを見て評価し、複数ファイルを跨いだ平坦化ビューを構成しない。境界 artifact のメタデータ権威（親優先, §2.9.3）と組み合わせた場合も、検査はファイル単位で行うため、平坦化ビューでのみ現れる非単調は警告対象としない。
+W003（status 非単調, [[SPEC_status_style_constraint]]）を含む status 系検査も同様にファイル単位で閉じる。各ファイルの status 宣言のみを見て評価し、複数ファイルを跨いだ平坦化ビューを構成しない。境界 artifact のメタデータ権威（親優先, [[SPEC_subflow_expansion]]）と組み合わせた場合も、検査はファイル単位で行うため、平坦化ビューでのみ現れる非単調は警告対象としない。
 
-#### 2.9.2 ファイル間参照規則
+#### 2.9.2 ファイル間参照規則 (SPEC_interfile_references)
 
 ファイル間参照は常に相対パスで記述する。パス解決の基準は「含む `.pfdsl` ファイルの位置」とし、`location:` フィールドのパス解決規則（[[SPEC_location_command_constraint]]）と一致する。
 
 絶対パス・リポジトリルート相対パス・URL（`://` 形式）は `subflow:` および `extends:` の値として不可とする。
 
-#### 2.9.3 subflow（階層展開）
+#### 2.9.3 subflow（階層展開） (SPEC_subflow_expansion)
 
 `subflow:` フィールドを持つプロセス（展開プロセス）は、指定した子 `.pfdsl` の要約ビューとして機能する。subflow はビューリンクであり、子フローを親フロー内に複製するものではない。
 
@@ -586,9 +586,9 @@ order >> order_fulfill -> fulfilled_order
 
 境界整合制約の詳細は [[SPEC_subflow_boundary_constraint]] 参照。
 
-#### 2.9.4 extends（プリセット継承）
+#### 2.9.4 extends（プリセット継承） (SPEC_extends_inheritance)
 
-`extends:` フロントマターキーを使い、複数の `.pfdsl` ファイルで `statusStyles` / `tag`（§2.7.4 tag 定義ブロック）/ `group` の定義を共有できる。これらは純粋な presentation 系設定であり、`artifact` / `process` 定義およびボディのエッジ文は共有しない（§2.9.1 ファイルローカル ID スコープを保つため）。
+`extends:` フロントマターキーを使い、複数の `.pfdsl` ファイルで `statusStyles` / `tag`（[[SPEC_tag_definitions]] tag 定義ブロック）/ `group` の定義を共有できる。これらは純粋な presentation 系設定であり、`artifact` / `process` 定義およびボディのエッジ文は共有しない（[[SPEC_file_local_id_scope]] ファイルローカル ID スコープを保つため）。
 
 ```yaml
 # 単一プリセット
@@ -639,13 +639,13 @@ spec >> implement -> test
 
 **diamond の値衝突 worked example**: `A extends [B, C]`・`B extends D`・`C extends D` の菱形で、D が `tag.x.style.color: red` を定義し、B が同属性を `green`・C が `blue` に上書きする場合を考える。A の実効値は優先度の低い順に `resolve(B) → resolve(C) → A のローカル` を深マージして得る。`resolve(B)` は D の `red` を B の `green` で上書きした `green`、`resolve(C)` は同様に `blue` を返す。配列で後にある C が B より高優先のため後マージで勝ち、A がローカル上書きを持たなければ `tag.x.style.color` は `blue`（C 経由）に決定する。プリセット D へ複数経路が到達しても、優先度順の後マージにより解決は一意である。
 
-`tag` は §2.7.4 で導入された tag 定義ブロックであり、extends 共有対象に含まれる。`tag` の各タグ ID も深マージ対象であるため、ローカルで特定タグの style のみ上書きしつつプリセットの label / description / 他タグ定義を引き継ぐことができる。
+`tag` は [[SPEC_tag_definitions]] で導入された tag 定義ブロックであり、extends 共有対象に含まれる。`tag` の各タグ ID も深マージ対象であるため、ローカルで特定タグの style のみ上書きしつつプリセットの label / description / 他タグ定義を引き継ぐことができる。
 
 **共有対象外キーの非継承**: extends で共有されるのは `statusStyles` / `tag` / `group` のみである。`layout` / `title` / `dslVersion` 等その他のトップレベルキーは各ファイル固有であり、プリセットから継承されない。
 
 制約の詳細は [[SPEC_extends_constraint]] 参照。
 
-#### 2.9.5 プリセットファイル形式
+#### 2.9.5 プリセットファイル形式 (SPEC_preset_file_format)
 
 プリセットファイル（`.yaml` 拡張子を推奨）は presentation 系キーのみを含む YAML ファイルである。
 
@@ -680,7 +680,7 @@ group:
 
 ---
 
-### 2.10 type フィールド
+### 2.10 type フィールド (SPEC_type_field)
 
 フロントマターのトップレベルに `type:` フィールドを指定することで、PFD ファイルの種別を自己記述できる。
 
@@ -723,8 +723,8 @@ type: roadmap   # または workflow / pipeline
 
 終端成果物 = 通常入力（`>>`）で消費されない成果物とする。フィードバック入力（`>>?`）による消費の有無で、二つの部分クラスに分かれる。二つの述語は「フィードバック入力でのみ消費される成果物」の扱いだけが異なる。
 
-* **audit-terminal**（終端監査の対象）— 通常入力で消費されない成果物。フィードバック消費は無視するため、通常入力・フィードバック入力のいずれでも消費されない成果物に加え、フィードバック入力でのみ消費される成果物も含む。終端監査（`pfdsl graph io`）はこれらを「消費者が疑わしい終端」として列挙する。`externalStakeholders`（§2.3）を宣言した audit-terminal は `terminals` でなく `externalTerminals` に分けて報告される。両者は排他であり、`terminals` の意味論自体は変わらない。
-* **boundary-terminal**（subflow 境界判定の対象）— 通常入力でもフィードバック入力でも消費されない成果物。フィードバック入力でのみ消費される成果物は横断的な修正ループの要素として除外し、terminal に数えない（§2.9.3）。
+* **audit-terminal**（終端監査の対象）— 通常入力で消費されない成果物。フィードバック消費は無視するため、通常入力・フィードバック入力のいずれでも消費されない成果物に加え、フィードバック入力でのみ消費される成果物も含む。終端監査（`pfdsl graph io`）はこれらを「消費者が疑わしい終端」として列挙する。`externalStakeholders`（[[SPEC_id_metadata]]）を宣言した audit-terminal は `terminals` でなく `externalTerminals` に分けて報告される。両者は排他であり、`terminals` の意味論自体は変わらない。
+* **boundary-terminal**（subflow 境界判定の対象）— 通常入力でもフィードバック入力でも消費されない成果物。フィードバック入力でのみ消費される成果物は横断的な修正ループの要素として除外し、terminal に数えない（[[SPEC_subflow_expansion]]）。
 
 audit-terminal は boundary-terminal を包含し、両者はフィードバックのみ消費の成果物の一点でのみ食い違う（監査は列挙し、境界判定は除外する）。
 
@@ -906,7 +906,7 @@ A >> P
 この edge が主張するのは「P が出力を作るには A が要る」という変換の形であって、A が生成される頻度ではない。
 したがって「A は毎回できるわけではない」ことは `>>` を避ける理由にならない。
 生成の頻度が他と異なる依存を区別したい場合は、§9.2 のフィードバック入力へ逃がすのではなく、その依存を別の Artifact として分割する。
-`status:`（§2.7）は roadmap 種別のファイルでしか使えないため（[[SPEC_non_roadmap_status_constraint]]）、workflow / pipeline でこの目的に用いることはできない。
+`status:`（[[SPEC_status_tags_style_mapping]]）は roadmap 種別のファイルでしか使えないため（[[SPEC_non_roadmap_status_constraint]]）、workflow / pipeline でこの目的に用いることはできない。
 
 ### 9.2 フィードバック入力
 
@@ -1075,7 +1075,7 @@ edge に1つ以上参加している Process は少なくとも1入力・1出力
 ただしそのような Process は、自身が変換する対象をグラフ上に持たない。
 フィードバック入力は §9.2 の通り補助入力であり、プロセスの駆動源の代役にはならないためである。
 通常入力がゼロでフィードバック入力のみを持つ Process は warning (W008; strict mode では error)。
-subflow 展開プロセスについては境界整合のため通常入力を1つ以上持つべきという規定が §2.9.3 に既にあるが、そちらは対応する診断コードを持たない助言であった。
+subflow 展開プロセスについては境界整合のため通常入力を1つ以上持つべきという規定が [[SPEC_subflow_expansion]] に既にあるが、そちらは対応する診断コードを持たない助言であった。
 W008 はその要求に機械検証を与え、同時に対象を全 Process へ広げる新しい制約である — 直前の「フィードバック入力のみを持つ Process も1入力を満たす」は V002 の充足条件としては変わらないが、その状態自体は W008 の対象になる。
 graph body 内の node-decl（edge を持たない孤立ノード）は完全性制約の対象外とする。
 フロントマター `process:` セクションで宣言された Process は [[SPEC_orphan_process_constraint]] の孤立宣言制約の対象となる。
@@ -1098,7 +1098,7 @@ A >>? P
 2. A を消費する具体的な手順が P の側に実在する。手順が無い `>>?` は、消費者を持たない成果物を消費されているかのように見せる。
 3. A が P の Primary Graph 上の下流にある（P から `>>` / `->` を辿って A へ到達できる）か、A と P が非連結である。前者は後ろ向きのフィードバックであり、A から P への通常入力は §16 の V010（循環）に当たるため `>>?` が唯一の表現になる。後者は別系統の産物を補助入力として持ち込む形である。
 
-**適用条件でないもの。** subflow 展開プロセスの境界配線（§2.9.3・[[SPEC_subflow_boundary_constraint]]）のコストを避けるために `>>?` を選ぶことは、本仕様の意図する用法ではない。
+**適用条件でないもの。** subflow 展開プロセスの境界配線（[[SPEC_subflow_expansion]]・[[SPEC_subflow_boundary_constraint]]）のコストを避けるために `>>?` を選ぶことは、本仕様の意図する用法ではない。
 境界配線を足せば `>>` で表現できる依存を `>>?` で代替すると、未了の配線がグラフ上「検査を通過した状態」として現れ、負債として認識されないまま定着する。
 ただしこの診断には上の条件3の判定が先立つ。
 A が P の下流にある場合は境界配線をどれだけ足しても V010 の循環になり `>>` は原理的に取れないため、条件3を確かめずに「配線の手抜き」と診断すると、正当な後ろ向きフィードバックを error へ書き換えることになる。
@@ -1135,10 +1135,10 @@ artifact.C.parts = [Ca, Cb]
 
 ### 15.6 status / Style 制約 (SPEC_status_style_constraint)
 
-* artifact.X.status は §2.7.1 の列挙値のみ許可。列挙外は error
-* statusStyles のキーは §2.7.1 の列挙値のみ許可。列挙外は error
-* statusStyles および `tag.<id>.style` の属性キーは §2.7.3 の許可属性のみ。許可外は error
-* tags 配列の各要素は任意文字列（内容は検証しない。要素型は §2.1 の FM004 で検査する）
+* artifact.X.status は [[SPEC_status_field]] の列挙値のみ許可。列挙外は error
+* statusStyles のキーは [[SPEC_status_field]] の列挙値のみ許可。列挙外は error
+* statusStyles および `tag.<id>.style` の属性キーは [[SPEC_status_styles]] の許可属性のみ。許可外は error
+* tags 配列の各要素は任意文字列（内容は検証しない。要素型は [[SPEC_yaml_front_matter]] の FM004 で検査する）
 * Process の出力 Artifact が `status: done` なのに、明示 status を持つ入力 Artifact が `done` 未満の場合は warning (W003)。status 未宣言の入力 Artifact は対象外
 
 ### 15.7 criteria 制約 (SPEC_criteria_constraint)
@@ -1158,7 +1158,7 @@ artifact.C.parts = [Ca, Cb]
 
 URL に分類されない `?` を含む文字列（例: `docs/file?v=1`）は glob とみなす。クエリ文字列形式のローカルパスを使う場合は `file://` 形式の URL として記述すること。
 
-ファイルパスの場合、処理系はファイルの存在を検証してよい（dead link 検出）。相対パスの解決基準は、`basePath:` が指定されている場合はそれをフロントマターレベルで `.pfdsl` ファイルのディレクトリから解決した絶対パス、指定がない場合は含む `.pfdsl` ファイルのディレクトリとする。クロスファイル参照（別 `.pfdsl` への相対パス）は構文上許容するが、その意味論の完全な定義は引き続き対象外とし将来の拡張に委ねる（§2.9 のマルチファイル意味論は `subflow:` / `extends:` のみを対象とする）[[SPEC_crossfile_semantics?]]。
+ファイルパスの場合、処理系はファイルの存在を検証してよい（dead link 検出）。相対パスの解決基準は、`basePath:` が指定されている場合はそれをフロントマターレベルで `.pfdsl` ファイルのディレクトリから解決した絶対パス、指定がない場合は含む `.pfdsl` ファイルのディレクトリとする。クロスファイル参照（別 `.pfdsl` への相対パス）は構文上許容するが、その意味論の完全な定義は引き続き対象外とし将来の拡張に委ねる（[[SPEC_multifile_semantics]] のマルチファイル意味論は `subflow:` / `extends:` のみを対象とする）[[SPEC_crossfile_semantics?]]。
 
 明示的な有効参照先を持つ Artifact のファイルパスは、[[SPEC_reference_resolution_constraint]] が定める選択版の集合内の論理位置を基準とする。
 URL の文字列と既存のリンク表示は参照先で書き換えない。
@@ -1174,7 +1174,7 @@ URL・glob のリンク検査を省いたことを、参照先における受入
 * 線形チェーン制約: `revises:` チェーンは単方向の単一リンクリストでなければならない（最新版 → 前版 → … の方向）。複数の Artifact が同一 Artifact を `revises:` で参照することは error（分岐した改版系列）。この制約は「最新版はどれか」を一意に機械判定するための意図的な単純化である。分岐する版系列（同一版から社内版と提出版を派生等）が必要な場合は、別 ID 系列に分けて表現する
 * 循環参照は error
 * `revises:` を Process に指定した場合は error
-* クロスファイル revises の意味論は引き続き対象外とし将来の拡張に委ねる（`location:` のクロスファイル参照扱いと同様、§2.9 のマルチファイル意味論は `subflow:` / `extends:` のみを対象とする、[[SPEC_location_command_constraint]] 参照）[[SPEC_crossfile_semantics?]]
+* クロスファイル revises の意味論は引き続き対象外とし将来の拡張に委ねる（`location:` のクロスファイル参照扱いと同様、[[SPEC_multifile_semantics]] のマルチファイル意味論は `subflow:` / `extends:` のみを対象とする、[[SPEC_location_command_constraint]] 参照）[[SPEC_crossfile_semantics?]]
 
 ### 15.10 孤立宣言プロセス制約 (SPEC_orphan_process_constraint)
 
@@ -1190,9 +1190,9 @@ graph body の node-decl で宣言された孤立ノード（edge なし）は [
 
 `subflow:` を持つ Process（展開プロセス）に対し、checker は以下の境界整合を検証する。`boundary:` マップがある場合は親の境界 ID をマップで変換してから照合する（マップがなければ恒等変換）。
 
-* 展開プロセスの通常入力エッジ（`>>`）が指す artifact の **ID 集合**（マップ適用後）と、子フローの **open input artifact**（生成元プロセス `->` を持たず `>>` で消費されるもの。判定は §2.9.3 参照）の **ID 集合**は一致しなければならない（全単射・集合一致）。展開プロセスのフィードバック入力（`>>?`）、および子フローの「生成元なし・`>>?` のみ消費」の artifact は照合対象外
-* 展開プロセスの出力エッジ（`->`）が指す artifact の **ID 集合**（マップ適用後）と、子フローの **terminal artifact**（`>>` でも `>>?` でも消費されない artifact。判定は §2.9.3 参照）の **ID 集合**は一致しなければならない（全単射・集合一致）
-* 境界 ID 協定・メタデータ権威・粒度差の扱いの詳細は §2.9.3 参照
+* 展開プロセスの通常入力エッジ（`>>`）が指す artifact の **ID 集合**（マップ適用後）と、子フローの **open input artifact**（生成元プロセス `->` を持たず `>>` で消費されるもの。判定は [[SPEC_subflow_expansion]] 参照）の **ID 集合**は一致しなければならない（全単射・集合一致）。展開プロセスのフィードバック入力（`>>?`）、および子フローの「生成元なし・`>>?` のみ消費」の artifact は照合対象外
+* 展開プロセスの出力エッジ（`->`）が指す artifact の **ID 集合**（マップ適用後）と、子フローの **terminal artifact**（`>>` でも `>>?` でも消費されない artifact。判定は [[SPEC_subflow_expansion]] 参照）の **ID 集合**は一致しなければならない（全単射・集合一致）
+* 境界 ID 協定・メタデータ権威・粒度差の扱いの詳細は [[SPEC_subflow_expansion]] 参照
 * `subflow:` の値がファイルパスとして存在しない場合は error
 * `subflow:` の値が絶対パスまたは URL（`://` を含む）の場合は error
 * 循環 subflow（自己参照および多段循環を含む、subflow グラフ全体における任意の循環）は error
@@ -1210,9 +1210,9 @@ graph body の node-decl で宣言された孤立ノード（edge なし）は [
 
 1. **パス存在**: `extends:` に指定されたファイルが存在しない場合は error
 2. **循環参照禁止**: 自己参照（`extends: ./self`）および多段循環を含む、extends グラフ全体における任意の循環は error。checker が深さ優先で検出する
-3. **プリセット汚染禁止**: プリセットファイルが許容トップレベルキー（`extends` / `statusStyles` / `tag` / `group`）以外のキー（`artifact:` / `process:` / `layout:` / `title:` 等）を含む場合は error（§2.9.5 ホワイトリスト）
+3. **プリセット汚染禁止**: プリセットファイルが許容トップレベルキー（`extends` / `statusStyles` / `tag` / `group`）以外のキー（`artifact:` / `process:` / `layout:` / `title:` 等）を含む場合は error（[[SPEC_preset_file_format]] ホワイトリスト）
 4. **相対パスのみ**: `extends:` の値が絶対パスまたは URL（`://` を含む）の場合は error
-5. **継承解決順**: §2.9.4 に従う（属性レベル深マージ・決定的解決アルゴリズム・ローカル prevail）
+5. **継承解決順**: [[SPEC_extends_inheritance]] に従う（属性レベル深マージ・決定的解決アルゴリズム・ローカル prevail）
 
 ### 15.13 index 制約 (SPEC_index_constraint)
 
@@ -1231,7 +1231,7 @@ graph body の node-decl で宣言された孤立ノード（edge なし）は [
 * `type:` に `roadmap` 以外の値を明示指定したファイルにおいて、artifact に `status:` が設定されている場合: warning (W007; strict mode では error)。列挙外の値（V031 で error になる値）を指定したファイルも対象に入る — 判定は「`roadmap` と明示されているか」だけを見る
 * produced artifact / source artifact を区別しない。当該ファイルのいずれの artifact も対象とする
 * `type:` が省略されているファイルは W007 の対象外とする。省略は種別を宣言しないため、種別に紐づくこの制約を課さない（[[SPEC_type_constraint]] の「省略時は roadmap として扱う」は `status ready` / `meta set`（status 設定時）/ `status gaps` に限った例外であり、`check` には及ばない）
-* 同一 id が複数のファイルに現れうるため、進捗 status の一次情報は roadmap 側に一元化する。flow 種別のファイルが status を宣言すると、2つの図が同じ対象について異なる状態を主張しうる。status 系検査はファイル単位で閉じる（§2.9.1）ため、W003（status 非単調, [[SPEC_status_style_constraint]]）ではこの形を検出できない
+* 同一 id が複数のファイルに現れうるため、進捗 status の一次情報は roadmap 側に一元化する。flow 種別のファイルが status を宣言すると、2つの図が同じ対象について異なる状態を主張しうる。status 系検査はファイル単位で閉じる（[[SPEC_file_local_id_scope]]）ため、W003（status 非単調, [[SPEC_status_style_constraint]]）ではこの形を検出できない
 
 ### 15.16 roadmap 内の未宣言 artifact・status 欠落制約 (SPEC_roadmap_artifact_declaration_and_status)
 
@@ -1247,7 +1247,7 @@ graph body の node-decl で宣言された孤立ノード（edge なし）は [
 
 ### 15.17 Group とノードの ID 衝突 (SPEC_group_node_id_collision)
 
-同一ファイル内で、`group:` に宣言された ID を Artifact または Process の ID として宣言・使用してはならない（§2.8.1）。
+同一ファイル内で、`group:` に宣言された ID を Artifact または Process の ID として宣言・使用してはならない（[[SPEC_group_declaration]]）。
 違反は strict mode の有無に関わらず error（N004）とし、診断は group と衝突したノード種別を示す。
 対象は `artifact:` / `process:` の宣言、graph body の edge から推論される役割、および孤立ノード宣言である。
 group ID の孤立宣言は Artifact と衝突する。front matter で Process と宣言された ID の孤立宣言は、既存の front matter 優先規則（§5.1）に従い Process のままとする。
@@ -1265,7 +1265,7 @@ ref を Process に指定することは error（V038）とする。
 解決入力は、有効参照先、モデルの論理ファイル位置、basePath、location とする。
 取得側は source と revision を固定版とその版のリソース集合のルートへ対応付け、モデルの論理ファイル位置を明示する。
 モデルが外部保存されている場合、抽出先の一時パスから論理位置を推測しない。
-Artifact 以外の相対参照には §2.3 のモデルの基準文脈を用い、その文脈の欠落も解決不能として報告する。
+Artifact 以外の相対参照には [[SPEC_id_metadata]] のモデルの基準文脈を用い、その文脈の欠落も解決不能として報告する。
 たとえば論理位置 `.pfdsl/roadmap.pfdsl` と basePath `..` と location `docs/plan.md` は、選択版のルート内の `docs/plan.md` を指す。
 モデル自身が選択版に存在することは要求しない。
 basePath の省略時も論理ファイルのディレクトリを基準とする。
@@ -1296,7 +1296,7 @@ W と C1 / C2、各 artifact ID、論理位置と Wiki 内の原文識別を証�
 同じ検証中に main が進んでも C1 を使い、次回の検証では再解決した版を記録する。
 この例の W / C1 / C2 は記録項目の説明であり実測の証拠ではない。
 
-対象 PFD ファイルとファイル内 process ID による実行対象識別（§2.9.1）と、成果物の参照先は役割が異なる。
+対象 PFD ファイルとファイル内 process ID による実行対象識別（[[SPEC_file_local_id_scope]]）と、成果物の参照先は役割が異なる。
 同じモデル版から異なる参照先の成果物を生成できるため、成果物の参照先だけを process/run の対象識別の代替としてはならない。
 モデルと成果物が同じ集合・版にある場合は取得元と固定版の情報を共用できるが、対象 PFD・process ID と artifact ID の対応は区別する。
 本仕様は証拠の保存形式や run ID 形式を新設しない。
@@ -1307,10 +1307,10 @@ W と C1 / C2、各 artifact ID、論理位置と Wiki 内の原文識別を証�
 
 | コード | severity | 定義節 | 条件 |
 |---|---|---|---|
-| FM001 | error | §2.1 | front matter の閉じ `---` がない |
-| FM002 | error | §2.1 | front matter の YAML が不正 |
-| FM003 | warning (--strict: error) | §2.1 | プレーンスカラー値の inline comment により意図した値が切り詰められる可能性がある |
-| FM004 | error | §2.1 | 既知の front matter フィールドに型違反がある |
+| FM001 | error | [[SPEC_yaml_front_matter]] | front matter の閉じ `---` がない |
+| FM002 | error | [[SPEC_yaml_front_matter]] | front matter の YAML が不正 |
+| FM003 | warning (--strict: error) | [[SPEC_yaml_front_matter]] | プレーンスカラー値の inline comment により意図した値が切り詰められる可能性がある |
+| FM004 | error | [[SPEC_yaml_front_matter]] | 既知の front matter フィールドに型違反がある |
 | P001 | error | §8 | 構文不正（汎用トークンエラー） |
 | P002 | error | §11 | artifact 集合内で識別子が期待される位置に無い |
 | P003 | error | §11 | artifact 集合内でカンマの後に識別子が無い |
@@ -1344,7 +1344,7 @@ W と C1 / C2、各 artifact ID、論理位置と Wiki 内の原文識別を証�
 | V022 | error | [[SPEC_subflow_boundary_constraint]] | 循環 subflow（自己参照・多段含む） |
 | V023 | error | [[SPEC_subflow_boundary_constraint]] | `subflow:` を Artifact に指定 |
 | V024 | error | [[SPEC_subflow_boundary_constraint]] | `boundary:` を `subflow:` のないプロセスに指定 |
-| V025 | error | §2.8.4 | group `parent` チェーンの循環 |
+| V025 | error | [[SPEC_group_constraints]] | group `parent` チェーンの循環 |
 | V026 | error | [[SPEC_extends_constraint]] | `extends:` のパスが不在、または絶対パス・URL |
 | V027 | error | [[SPEC_extends_constraint]] | 循環 extends（自己参照・多段含む） |
 | V028 | error | [[SPEC_extends_constraint]] | プリセットファイルが許容外トップレベルキーを含む |
