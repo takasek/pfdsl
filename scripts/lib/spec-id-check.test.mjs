@@ -5,10 +5,35 @@ import {
 	findDanglingStrictRefs,
 	findDuplicateDefinitions,
 	findMultipleIdsOnBlock,
+	findNumberedSectionIds,
 	findSpecIdDefinitions,
 	findStrictRefs,
 	formatSpecIdViolations,
 } from "./spec-id-check.mjs";
+
+describe("findNumberedSectionIds", () => {
+	// CommonMark ATX headings allow up to three spaces of indentation, setext
+	// headings carry no leading `#`, and headings may sit in a block quote.
+	for (const [name, text] of [
+		["an indented ATX heading", "   ### 15.1 X (SPEC_a)"],
+		["a setext heading", "15.1 X (SPEC_a)\n---"],
+		["a heading in a block quote", "> ### 15.1 X (SPEC_a)"],
+	]) {
+		it(`maps the section number of ${name} to its id`, () => {
+			assert.deepEqual([...findNumberedSectionIds(text)], [["15.1", "SPEC_a"]]);
+		});
+	}
+	it("ignores heading-like lines in code and unnumbered headings", () => {
+		const text = "```\n### 2.3 X (SPEC_code)\n```\n\n## Other (SPEC_b)";
+		assert.deepEqual([...findNumberedSectionIds(text)], []);
+	});
+	it("finds bare references to an indented numbered heading", () => {
+		assert.deepEqual(
+			findBareSectionReferences("   ### 15.1 X (SPEC_a)\n\nsee §15.1"),
+			[{ line: 3, section: "15.1", id: "SPEC_a" }],
+		);
+	});
+});
 
 describe("findBareSectionReferences", () => {
 	it("matches exact numbered sections and sentence-final punctuation", () => {

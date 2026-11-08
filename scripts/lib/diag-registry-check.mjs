@@ -4,7 +4,7 @@
  * import live in the main script; this module stays testable without a build.
  */
 
-import { findSpecIdDefinitions } from "./spec-id-check.mjs";
+import { findNumberedSectionIds } from "./spec-id-check.mjs";
 
 const SEVERITY_LABELS = {
 	error: ["error"],
@@ -65,12 +65,9 @@ function specDiagRows(specText) {
 
 /** @returns {Record<string, string | null>} */
 export function parseSpecDiagSections(specText) {
-	const lines = specText.split("\n");
-	const sectionsById = new Map();
-	for (const { line, id } of findSpecIdDefinitions(specText)) {
-		const match = /^#{1,6}\s+(\d+(?:\.\d+)*)\.?\s/.exec(lines[line - 1]);
-		if (match) sectionsById.set(id, match[1]);
-	}
+	const sectionsById = new Map(
+		[...findNumberedSectionIds(specText)].map(([section, id]) => [id, section]),
+	);
 	const result = {};
 	for (const { code, sectionCell } of specDiagRows(specText)) {
 		const literal = /^§(\d+(?:\.\d+)*)$/.exec(sectionCell);

@@ -32,6 +32,12 @@ describe("diagnostic definition sections", () => {
 			[],
 		);
 	});
+	it("resolves a SPEC id defined on an indented CommonMark heading", () => {
+		const sections = parseSpecDiagSections(
+			`   ### 15.11 Rule (SPEC_x)\n\n${TABLE_HEADER}| V001 | error | [[SPEC_x]] | rule |\n`,
+		);
+		assert.deepEqual(sections, { V001: "15.11" });
+	});
 	it("reports mismatches only for codes on both sides", () => {
 		assert.deepEqual(
 			diffDiagSections(

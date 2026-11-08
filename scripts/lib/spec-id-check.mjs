@@ -45,13 +45,48 @@ function nonCodeLines(text, { maskHtml = false } = {}) {
 		}
 		for (const child of node.children ?? []) visit(child);
 	}
-	visit(
-		fromMarkdown(text, {
-			extensions: [gfmTable()],
-			mdastExtensions: [gfmTableFromMarkdown()],
-		}),
-	);
+	visit(parseMarkdown(text));
 	return chars.join("").split("\n");
+}
+
+function parseMarkdown(text) {
+	return fromMarkdown(text, {
+		extensions: [gfmTable()],
+		mdastExtensions: [gfmTableFromMarkdown()],
+	});
+}
+
+function textContent(node) {
+	return node.value ?? (node.children ?? []).map(textContent).join("");
+}
+
+/**
+ * Maps the section number of each numbered heading that carries a
+ * definition to that definition's id. Headings come from the CommonMark
+ * tree, so indented ATX, setext and nested headings count, and heading-like
+ * lines inside code do not.
+ * @param {string} text
+ * @returns {Map<string, string>} section number → SPEC id
+ */
+export function findNumberedSectionIds(text) {
+	const definitions = findSpecIdDefinitions(text);
+	const sections = new Map();
+	function visit(node) {
+		if (node.type === "heading") {
+			const number = /^\s*(\d+(?:\.\d+)*)\.?\s/.exec(textContent(node));
+			const hit = definitions.find(
+				({ line }) =>
+					node.position.start.line <= line && line <= node.position.end.line,
+			);
+			if (number && hit && !sections.has(number[1])) {
+				sections.set(number[1], hit.id);
+			}
+			return;
+		}
+		for (const child of node.children ?? []) visit(child);
+	}
+	visit(parseMarkdown(text));
+	return sections;
 }
 
 /**
@@ -86,11 +121,7 @@ export function findMultipleIdsOnBlock(text) {
 /** @returns {Array<{line: number, section: string, id: string}>} */
 export function findBareSectionReferences(text) {
 	const lines = nonCodeLines(text);
-	const sections = new Map();
-	for (const hit of findSpecIdDefinitions(text)) {
-		const heading = /^#{1,6}\s+(\d+(?:\.\d+)*)\.?\s/.exec(lines[hit.line - 1]);
-		if (heading) sections.set(heading[1], hit.id);
-	}
+	const sections = findNumberedSectionIds(text);
 	const hits = [];
 	lines.forEach((line, index) => {
 		for (const match of line.matchAll(/§ ?(\d+(?:\.\d+)*)(?!\.?\d)/g)) {
