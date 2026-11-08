@@ -138,14 +138,38 @@ describe("findImplementsMarkers", () => {
 		);
 	});
 
-	it("does not match (SPEC_xxx) when not on a heading line", () => {
+	it("matches paragraph definitions under ADR-0027 block syntax", () => {
 		const text = "This is prose that mentions (SPEC_foo) in passing.";
-		assert.deepEqual(findImplementsMarkers(text), []);
+		assert.deepEqual(findImplementsMarkers(text), [
+			{ line: 1, id: "SPEC_foo" },
+		]);
 	});
 
-	it("does not match a heading whose trailing text isn't the marker", () => {
+	it("matches heading definitions with trailing text under ADR-0027", () => {
 		const text = "## Some heading (SPEC_foo) trailing text";
-		assert.deepEqual(findImplementsMarkers(text), []);
+		assert.deepEqual(findImplementsMarkers(text), [
+			{ line: 1, id: "SPEC_foo" },
+		]);
+	});
+	it("resolves forward references to list item definitions", () => {
+		const text = "* rule (SPEC_old)\n\n[[SPEC_old?]]";
+		const withFile = (hits) => hits.map((hit) => ({ file: "a.md", ...hit }));
+		assert.deepEqual(
+			matchResolvedForwardRefs(
+				withFile(findForwardRefMarkers(text)),
+				withFile(findImplementsMarkers(text)),
+			),
+			[
+				{
+					id: "SPEC_old",
+					forwardRefs: [{ file: "a.md", line: 3, id: "SPEC_old" }],
+					implements: [{ file: "a.md", line: 1, id: "SPEC_old" }],
+				},
+			],
+		);
+	});
+	it("ignores list definitions inside fenced code", () => {
+		assert.deepEqual(findImplementsMarkers("```\n* rule (SPEC_old)\n```"), []);
 	});
 
 	it("tolerates trailing whitespace after the marker", () => {

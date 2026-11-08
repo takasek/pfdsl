@@ -3,9 +3,9 @@
  * check-forward-ref-markers.mjs
  *
  * Scans docs/**\/*.md for `[[SPEC_<slug>?]]` forward-ref markers and matches
- * them against `(SPEC_<slug>)` id definitions trailing a heading line. A
- * match suggests the forward-ref may now be resolved (the referenced feature
- * has landed) (#326).
+ * them against `(SPEC_<slug>)` id definitions — the same definitions
+ * check-spec-ids accepts (any block outside code). A match suggests the
+ * forward-ref may now be resolved (the referenced feature has landed) (#326).
  *
  * This cannot determine staleness automatically — only a human can judge
  * whether the referenced feature truly supersedes the forward-ref. It always

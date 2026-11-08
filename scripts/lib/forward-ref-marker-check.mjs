@@ -1,18 +1,16 @@
 /**
  * Pure functions for marker-based forward-reference resolution: matches
  * `[[SPEC_<slug>?]]` forward-ref markers (anywhere in prose) against
- * `(SPEC_<slug>)` id definitions (trailing on a heading line) by id. This
+ * `(SPEC_<slug>)` id definitions outside parsed code by id. This
  * only does the mechanical cross-referencing — whether a match means the
  * forward-ref is actually stale is left to human judgment. See #326.
  *
- * Note: strict references `[[SPEC_<slug>]]` (no trailing `?`) are a separate,
- * not-yet-implemented construct reserved for #328 and are ignored here.
+ * Strict references `[[SPEC_<slug>]]` are checked by spec-id-check.mjs.
  */
 
-import { isHeading } from "./markdown-heading.mjs";
+import { findSpecIdDefinitions } from "./spec-id-check.mjs";
 
 const FORWARD_REF_RE = /\[\[SPEC_([A-Za-z0-9_]+)\?\]\]/g;
-const IMPLEMENTS_TRAILING_RE = /\(SPEC_([A-Za-z0-9_]+)\)\s*$/;
 // A run of three or more backticks or tildes at the start of a line. A backtick fence's info string cannot contain a backtick, or the line is inline code rather than a fence.
 const FENCE_OPEN_RE = /^(`{3,}(?!.*`)|~{3,})/;
 const FENCE_CLOSE_RE = /^(`{3,}|~{3,})\s*$/;
@@ -65,14 +63,7 @@ export function findForwardRefMarkers(text) {
  * @returns {Array<{line: number, id: string}>}
  */
 export function findImplementsMarkers(text) {
-	const hits = [];
-	forEachNonFencedLine(text, (line, lineNumber) => {
-		if (!isHeading(line)) return;
-		const match = IMPLEMENTS_TRAILING_RE.exec(line);
-		if (!match) return;
-		hits.push({ line: lineNumber, id: `SPEC_${match[1]}` });
-	});
-	return hits;
+	return findSpecIdDefinitions(text);
 }
 
 /**
