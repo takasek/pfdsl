@@ -4934,6 +4934,18 @@ describe("explain", () => {
 		expect(r.stdout).toContain("FM001 (error):");
 	});
 
+	it("prints the stable spec ID next to the section when the section has one", async () => {
+		const r = await run(["explain", "V021"]);
+		expect(r.stdout).toContain(
+			"Defined in: spec §15.11 (SPEC_subflow_boundary_constraint)\n",
+		);
+	});
+
+	it("prints only the section number when the section has no spec ID", async () => {
+		const r = await run(["explain", "P004"]);
+		expect(r.stdout).toContain("Defined in: spec §9\n");
+	});
+
 	it("points to the spec.md full text as a fallback", async () => {
 		const r = await run(["explain", "V021"]);
 		expect(r.stdout).toContain("docs/spec/spec.md");

@@ -4533,7 +4533,8 @@ Exit codes:
 
 const HELP_EXPLAIN = `${helpUsage("explain", "<code>", EXPLAIN_OPTIONS)}
 
-Print the one-line summary and spec section for a diagnostic code (e.g. V021).
+Print the one-line summary and spec section for a diagnostic code (e.g. V021),
+with the section's stable spec ID when it has one.
 Codes come from the FM/L/N/P/V/W families reported by \`pfdsl check\`.
 
   <code>  a diagnostic code, e.g. V021, P004, W002, FM001
@@ -4561,7 +4562,7 @@ function runExplain(code: string): CommandResult {
 	}
 	const lines = [
 		`${code} (${severityLabel(entry.severities)}): ${entry.summary}`,
-		`Defined in: spec §${entry.section}`,
+		`Defined in: spec §${entry.section}${entry.specId ? ` (${entry.specId})` : ""}`,
 		"",
 		`Full text: docs/spec/spec.md §${entry.section} (references/spec.md when using the pfdsl skill)`,
 	];
