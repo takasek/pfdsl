@@ -1,6 +1,6 @@
 /**
  * Pure functions for the SPEC_<id> strict-reference lint (#328): matches
- * `(SPEC_<id>)` id definitions outside parsed code blocks and code spans
+ * `(SPEC_<id>)` id definitions outside parsed code and HTML
  * (heading, list item, table row, or bare paragraph) against `[[SPEC_<id>]]` strict
  * references, so callers can flag (a) an id defined more than once and (b) a
  * strict reference with no matching definition anywhere in the corpus.
@@ -21,12 +21,19 @@ const STRICT_REF_RE = /\[\[SPEC_([A-Za-z0-9_]+)\]\]/g;
 
 /**
  * Masks parsed code blocks and code spans without joining surrounding prose
- * or changing line numbers. SPEC syntax remains matched against source text.
+ * or changing line numbers. With `maskHtml`, HTML (blocks, comments and inline
+ * tags) is masked too: a definition must sit in one of ADR-0027's block kinds,
+ * while references stay checked wherever a reader can meet them.
+ * SPEC syntax remains matched against source text.
  */
-function nonCodeLines(text) {
+function nonCodeLines(text, { maskHtml = false } = {}) {
 	const chars = text.split("");
 	function visit(node) {
-		if (node.type === "code" || node.type === "inlineCode") {
+		if (
+			node.type === "code" ||
+			node.type === "inlineCode" ||
+			(maskHtml && node.type === "html")
+		) {
 			for (
 				let i = node.position.start.offset;
 				i < node.position.end.offset;
@@ -53,7 +60,7 @@ function nonCodeLines(text) {
  */
 export function findSpecIdDefinitions(text) {
 	const hits = [];
-	nonCodeLines(text).forEach((line, index) => {
+	nonCodeLines(text, { maskHtml: true }).forEach((line, index) => {
 		for (const match of line.matchAll(DEFINITION_RE)) {
 			hits.push({ line: index + 1, id: `SPEC_${match[1]}` });
 		}

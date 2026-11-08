@@ -66,6 +66,35 @@ describe("findMultipleIdsOnBlock", () => {
 	});
 });
 
+describe("HTML exclusion", () => {
+	// ADR-0027 defines markers on headings, list items, table rows and
+	// paragraphs, and rejects invisible HTML-comment markers. References in
+	// HTML are still checked, so a stale or mistyped one cannot hide there.
+	it("ignores a definition inside an HTML comment but checks its reference", () => {
+		const text = "<!-- (SPEC_x) [[SPEC_x]] -->";
+		assert.deepEqual(findSpecIdDefinitions(text), []);
+		assert.deepEqual(findStrictRefs(text), [{ line: 1, id: "SPEC_x" }]);
+	});
+	it("ignores definitions inside a CommonMark HTML block", () => {
+		const text = "<div>\nrule (SPEC_a)\nmore (SPEC_b)\n</div>";
+		assert.deepEqual(findSpecIdDefinitions(text), []);
+		assert.deepEqual(findMultipleIdsOnBlock(text), []);
+	});
+	it("checks references and bare section references inside an HTML block", () => {
+		const text =
+			"## 2.3 Rule (SPEC_x)\n\n<details>\n[[SPEC_typo]] §2.3\n</details>";
+		assert.deepEqual(findStrictRefs(text), [{ line: 4, id: "SPEC_typo" }]);
+		assert.deepEqual(findBareSectionReferences(text), [
+			{ line: 4, section: "2.3", id: "SPEC_x" },
+		]);
+	});
+	it("keeps a definition in paragraph text between inline HTML tags", () => {
+		assert.deepEqual(findSpecIdDefinitions("rule <span>(SPEC_a)</span>"), [
+			{ line: 1, id: "SPEC_a" },
+		]);
+	});
+});
+
 describe("parsed code exclusion", () => {
 	it("keeps SPEC markers in separate table cells outside code spans", () => {
 		const text =
