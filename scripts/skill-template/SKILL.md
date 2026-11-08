@@ -174,3 +174,9 @@ Declare a new group under `group:` before moving nodes into it: a `group:` value
 | PFD のレビュー・監査 | `references/review-perspectives.md`（A/B/C カタログ。A/B は図、C は normative 仕様文書（自リポ保守の仕様がある場合）の監査。書くルールは `references/quality-guide.md`、問い詰めはこちら） |
 
 `references/spec.md` は full spec {{specVersion}}（20節・大型）— 全読せず、節見出し（`## N.`）とエラーコードで該当箇所だけ読む。
+
+`references/spec.md` の `[[SPEC_xxx]]` は節の安定 ID への参照で、ファイルやリンクではない。`[[SPEC_xxx?]]` はまだ定義されていない ID を指す。
+定義は見出し末尾の `(SPEC_xxx)` にあり、括弧を含むので `grep -nF '(SPEC_xxx)' references/spec.md` のように固定文字列で検索する。
+見出しに付いた ID の範囲は、その見出しから次の同じかより上位の見出しの手前までである。
+規則を引用するときは、付け直されることがある節番号でなく ID を使う。ID の無い節は節番号と見出しで引用する。
+定義が見つからない ID は、誤記か、手元の spec より新しい ID か、廃止された ID である。
