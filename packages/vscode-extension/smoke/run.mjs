@@ -132,6 +132,32 @@ export async function closeSourceTab(
 		page,
 		"close source tab",
 		async () => {
+			const middleFrame = (await findWebviewFrame(page)).parentFrame();
+			await middleFrame.evaluate(() => {
+				if (window.__diagLog) return;
+				window.__diagLog = [];
+				const note = (dir, channel) =>
+					window.__diagLog.push({
+						t: Math.round(performance.now()),
+						dir,
+						channel,
+						hasFocus: document.hasFocus(),
+					});
+				const original = MessagePort.prototype.postMessage;
+				const seen = new WeakSet();
+				MessagePort.prototype.postMessage = function (...args) {
+					const channel = args[0]?.channel;
+					if (channel === "did-focus" || channel === "did-blur")
+						note("out", channel);
+					if (!seen.has(this)) {
+						seen.add(this);
+						this.addEventListener("message", (e) => {
+							if (e.data?.channel === "focus") note("in", "focus");
+						});
+					}
+					return original.apply(this, args);
+				};
+			});
 			await sourceTab.getByRole("button", { name: /^Close \(/ }).click();
 			await expectEventually(
 				"source hidden and preview retained",
@@ -193,11 +219,19 @@ export async function closeSourceTab(
 				}
 				return -1;
 			};
-			await trace("after-close");
+			const clickAt = await middleFrame.evaluate(() => performance.now());
 			await previewTab.click();
-			await trace("after-tab-click");
 			const first = await focused(5_000);
 			console.log("DIAG", JSON.stringify({ tag: "first-wait", ms: first }));
+			console.log(
+				"DIAG",
+				JSON.stringify({
+					tag: "port-log",
+					ms: first,
+					clickAt: Math.round(clickAt),
+					log: await middleFrame.evaluate(() => window.__diagLog.splice(0)),
+				}),
+			);
 			if (first < 0) {
 				console.log("DIAG STUCK");
 				await trace("stuck");
