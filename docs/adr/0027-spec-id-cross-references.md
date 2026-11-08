@@ -1,6 +1,6 @@
 # ADR-0027: 仕様相互参照を安定 ID アンカーに移行する (SPEC_id_syntax)
 
-- Status: Accepted
+- Status: Accepted（1つのブロックに1つの ID・ID を持つ節への節番号参照・採番前の確認の範囲・リスト項目の範囲は ADR-0053 が改訂）、Superseded in part by [ADR-0053](0053-spec-id-permanence-and-one-id-per-block.md)（tombstone に記録する対象を、main の履歴に入った ID に限る部分）
 - Date: 2026-07-09
 
 ## Context

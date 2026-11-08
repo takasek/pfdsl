@@ -31,6 +31,7 @@ make check-adr
 
 ## 一覧
 
+- **ADR-0053** [仕様 ID の永続性を main の履歴から適用し、1つのブロックに1つの ID だけを許す](0053-spec-id-permanence-and-one-id-per-block.md) — 統合ブランチで付けた ID と main 側の ID が同じ節で衝突し、両方を残した統合が既存の検査を通った。永続性は ID が main の履歴に入った時点から掛け、1つのブロックに1つの ID だけを許し、ID を持つ節への節番号参照を lint で禁じる。ADR-0027 が決めていなかった条件を足し、tombstone に記録する対象を main の履歴に入った ID に限る部分を部分置換する。
 - **ADR-0052** [pfd-ops の `install/` をリポルートの正本から生成し、配布対象を明示的に列挙する](0052-install-generated-from-repo-root.md) — 手作業の複写を忘れて CI の一致検査が落ちた。リポルートを正本、`install/` を一方向の生成物とし、配布しないテストが同居するため配布対象は明示した一覧で決める。ADR-0016 の `install/` を編集の起点とする向きと、列挙しない方針を部分置換する。
 
 - **ADR-0051** [中核の境界を4条件の AND とし、判定前に規則を分割する](0051-conjunctive-boundary-test.md) — 意味論・判定と書込みの対象・中立性・名指しを全て必要条件とし、混合文は条件と例外を保って分割する。companion の構造的事実を定義し、process/run の対応は対象 PFD ファイルの識別情報とファイル内 process ID の組で運ぶ。ADR-0048 の契約1、D3 の運び手、構造的事実の未決事項を部分置換する。
@@ -79,7 +80,7 @@ make check-adr
 - **ADR-0024** [retro 実行記録と差分計測可能な起動条件](0024-retro-execution-record.md)（Superseded by ADR-0026） — 「たまったら」は基準点なしで判定不能。retro 実行記録を workflow companion に残し、起動条件を前回以降の差分計測形に書き換える
 - **ADR-0025** [レビューカタログは抽象レンズを配布、具体例は repo-local instance](0025-review-catalog-lens-example-split.md) — 「各問いは実際に検出された誤りに由来する」具体例は本質的に repo-local。配布層は A/B/C の観点の枠組みのみ、pfdsl 固有の例示・機構は専用 instance ファイルへ降格する ADR-0023 の鏡像
 - **ADR-0026** [retro トリガーを done イベント駆動に一本化し実行記録を廃止](0026-retro-trigger-done-event.md) — 実行記録は並列 worktree でコンフリクトする上、閾値条件は導入以来一度も単独発火していない。基準点は既存の done イベント（プロトコル4）に一本化し、記録機構ごと廃止する
-- **ADR-0027** [仕様相互参照を安定 ID アンカーに移行する](0027-spec-id-cross-references.md) — 節番号直書きは挿入・並べ替えで崩れる。`[[SPEC_xxx]]` / `[[SPEC_xxx?]]` / `(SPEC_xxx)` の bracket 構文を正式採用し、不透明・永続・欠番許容の ID として renumber 機能なしで運用する
+- **ADR-0027** [仕様相互参照を安定 ID アンカーに移行する](0027-spec-id-cross-references.md)（1つのブロックに1つの ID・ID を持つ節への節番号参照・採番前の確認の範囲・リスト項目の範囲は ADR-0053 が改訂、tombstone に記録する対象を main の履歴に入った ID に限る部分は ADR-0053 が部分置換） — 節番号直書きは挿入・並べ替えで崩れる。`[[SPEC_xxx]]` / `[[SPEC_xxx?]]` / `(SPEC_xxx)` の bracket 構文を正式採用し、不透明・永続・欠番許容の ID として renumber 機能なしで運用する
 - **ADR-0028** [pfd-ops の plugin 配布移行と skill sync の廃止](0028-plugin-first-pfd-ops-distribution.md)（論点4の上流 main との版差の通知は ADR-0043 が部分置換） — pfd-ops を plugin に同梱し `install/` 実配置を `/pfd-init` に統合、`pfdsl skill sync` を削除。採用リポの drift 検知は CI 強制からランタイム hash 照合（pfd-ops 発火時）へ移行、ADR-0016 はリポ内運用として存続
 - **ADR-0029** [配布層の欠陥は使い捨て環境での採用初日再現で検出する](0029-adoption-day-probe.md) — ADR-0020（DSL 仕様 stress-test）の配布層版。使い捨て環境で plugin install → `/pfd-init` を実際に辿り、同梱物妥当性・ガイダンス実行可能性・agent 到達性・冪等性の4観点を検証する。初回実施で配布バグ1件（#417）を検出
 - **ADR-0030** [CLIコマンド体系を操作対象の種類で分類する](0030-cli-command-taxonomy.md) — フラットな17コマンドを `graph`（位相への読み取り専用問い合わせ）/ `meta`（field-aware な frontmatter 読み書き）/ `status`（status 由来の計画クエリ）の3グループとトップレベル動詞に再編。エイリアスなし一括切替、旧名は exit 2
