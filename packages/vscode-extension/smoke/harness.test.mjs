@@ -192,6 +192,34 @@ test("source close targets its own close button and checks tab and preview survi
 	);
 });
 
+test("source close activates the preview again when a tab click does not reach the content frame", async () => {
+	let tabClicks = 0;
+	const state = await closeSourceTab(
+		{
+			getByRole: () => ({
+				click: async () => {
+					tabClicks += 1;
+				},
+			}),
+		},
+		{ getByRole: () => ({ click: async () => {} }) },
+		{
+			// VS Code drops the first activation; only a later one reaches the frame.
+			readState: async () => ({
+				sourceTabs: 0,
+				previewTabs: 1,
+				groups: 1,
+				previewFocused: tabClicks >= 2,
+			}),
+			log: () => {},
+			timeoutMs: 1_000,
+			activationRetryMs: 10,
+		},
+	);
+	assert.equal(state.previewFocused, true);
+	assert.equal(tabClicks, 2, "stop activating once the frame has focus");
+});
+
 test("source close fails when focus remains outside the preview", async () => {
 	await assert.rejects(
 		closeSourceTab(

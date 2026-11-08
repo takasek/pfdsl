@@ -30,6 +30,7 @@ const vscodeVersion = "1.132.1";
 const cdpTimeoutMs = 30_000;
 export const coldRenderTimeoutMs = 30_000;
 const interactionTimeoutMs = 1_000;
+const previewActivationRetryMs = 2_000;
 const extensionHostLogFilePattern = /^exthost.*\.log$/i;
 const maxExtensionHostLogFiles = 4;
 const maxExtensionHostLogEntries = 200;
@@ -75,13 +76,17 @@ export async function collectWorkbenchInteractionState(page) {
 	});
 }
 
+function logWorkbenchOperation(event) {
+	console.log("Workbench operation:", JSON.stringify(event));
+}
+
 export async function withWorkbenchOperation(
 	page,
 	label,
 	operation,
 	{
 		readState = collectWorkbenchInteractionState,
-		log = (event) => console.log("Workbench operation:", JSON.stringify(event)),
+		log = logWorkbenchOperation,
 	} = {},
 ) {
 	const snapshot = async () => {
@@ -126,6 +131,7 @@ export async function closeSourceTab(
 		}),
 		log,
 		timeoutMs = coldRenderTimeoutMs,
+		activationRetryMs = previewActivationRetryMs,
 	} = {},
 ) {
 	return withWorkbenchOperation(
@@ -144,17 +150,38 @@ export async function closeSourceTab(
 			);
 			// Closing a group can leave VS Code focus on the workbench body.
 			// Explicitly activate the surviving preview before the next gesture.
-			await page.getByRole("tab", { name: /^PFDSL Preview/ }).click();
-			return expectEventually(
-				"surviving preview focused",
-				readState,
-				(state) =>
-					state.sourceTabs === 0 &&
-					state.previewTabs === 1 &&
-					state.groups === 1 &&
-					state.previewFocused,
-				{ timeoutMs },
-			);
+			// VS Code skips the message that focuses the content frame when its 250 ms blur poll lands inside the activation, and nothing sends it again, so one click can never recover.
+			const deadline = performance.now() + timeoutMs;
+			let failure;
+			for (let attempt = 1; ; attempt += 1) {
+				if (attempt > 1)
+					(log ?? logWorkbenchOperation)({
+						label: "close source tab",
+						phase: "activate preview again",
+						attempt,
+					});
+				await page.getByRole("tab", { name: /^PFDSL Preview/ }).click();
+				try {
+					return await expectEventually(
+						"surviving preview focused",
+						readState,
+						(state) =>
+							state.sourceTabs === 0 &&
+							state.previewTabs === 1 &&
+							state.groups === 1 &&
+							state.previewFocused,
+						{
+							timeoutMs: Math.min(
+								activationRetryMs,
+								deadline - performance.now(),
+							),
+						},
+					);
+				} catch (error) {
+					failure = error;
+				}
+				if (performance.now() >= deadline) throw failure;
+			}
 		},
 		{
 			...(log ? { log } : {}),
