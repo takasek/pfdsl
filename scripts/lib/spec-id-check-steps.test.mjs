@@ -4,6 +4,17 @@ import { describe, it } from "node:test";
 import { runSpecIdCheck } from "./spec-id-check-steps.mjs";
 
 describe("runSpecIdCheck", () => {
+	it("exits 2 instead of passing when the default listing is empty", () => {
+		const result = runSpecIdCheck({
+			args: [],
+			listFiles: () => [],
+			readFile: () => "",
+		});
+		assert.equal(result.exitCode, 2);
+		assert.deepEqual(result.stdoutLines, []);
+		assert.match(result.stderrLines[0], /no docs\/\*\*\/\*\.md files/);
+	});
+
 	it("counts every violation kind in the failure heading", () => {
 		const texts = {
 			"a.md": "## 2.3 Rule (SPEC_a) (SPEC_b)\n§2.3 §2.3\n[[SPEC_missing]]",

@@ -19,11 +19,18 @@
  */
 
 import { readFileSync } from "node:fs";
+import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import { emitLinesAndExit } from "./lib/emit-lines.mjs";
 import { gitLsFiles } from "./lib/run-exec.mjs";
 import { runSpecIdCheck } from "./lib/spec-id-check-steps.mjs";
 
 const args = process.argv.slice(2);
+
+// The default corpus is the repository's docs, wherever this is run from.
+if (args.length === 0) {
+	process.chdir(resolve(dirname(fileURLToPath(import.meta.url)), ".."));
+}
 const listFiles = () => gitLsFiles(["docs/**/*.md"]);
 
 emitLinesAndExit(

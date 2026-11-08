@@ -20,10 +20,20 @@ import {
 
 /**
  * @param {{args: string[], listFiles: () => string[], readFile: (file: string) => string}} deps
- * @returns {{exitCode: 0|1, stdoutLines: string[], stderrLines: string[]}}
+ * @returns {{exitCode: 0|1|2, stdoutLines: string[], stderrLines: string[]}}
  */
 export function runSpecIdCheck({ args, listFiles, readFile }) {
 	const files = args.length > 0 ? args : listFiles();
+	if (files.length === 0) {
+		// An empty corpus would pass every check.
+		return {
+			exitCode: 2,
+			stdoutLines: [],
+			stderrLines: [
+				"check-spec-ids: no docs/**/*.md files to scan — run inside the repository or pass files explicitly.",
+			],
+		};
+	}
 
 	const definitionHits = [];
 	const strictRefHits = [];
