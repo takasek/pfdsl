@@ -144,7 +144,82 @@ export async function closeSourceTab(
 			);
 			// Closing a group can leave VS Code focus on the workbench body.
 			// Explicitly activate the surviving preview before the next gesture.
-			await page.getByRole("tab", { name: /^PFDSL Preview/ }).click();
+			const previewTab = page.getByRole("tab", { name: /^PFDSL Preview/ });
+			const trace = async (tag) => {
+				const frames = page.frames().map((f) => f.url().slice(0, 60));
+				const inner = await findWebviewFrame(page);
+				const middle = inner.parentFrame();
+				const describe = () => {
+					const a = document.activeElement;
+					return {
+						hasFocus: document.hasFocus(),
+						active: a
+							? { tag: a.tagName, id: a.id, cls: String(a.className).slice(0, 40) }
+							: null,
+						activeFrameExists: !!document.getElementById("active-frame"),
+						activeIsActiveFrame:
+							a === document.getElementById("active-frame"),
+					};
+				};
+				console.log(
+					"DIAG",
+					JSON.stringify({
+						tag,
+						frameCount: frames.length,
+						frames,
+						rootFrames: (
+							await Promise.all(
+								page
+									.frames()
+									.map(async (f) =>
+										f.url().startsWith("vscode-webview://")
+											? await f.locator("#root").count()
+											: 0,
+									),
+							)
+						).reduce((a, b) => a + b, 0),
+						top: await page.evaluate(describe),
+						middle: await middle.evaluate(describe),
+						inner: await inner.evaluate(describe),
+					}),
+				);
+			};
+			const focused = async (budget) => {
+				const start = performance.now();
+				while (performance.now() - start < budget) {
+					if ((await readState()).previewFocused)
+						return Math.round(performance.now() - start);
+					await new Promise((r) => setTimeout(r, 20));
+				}
+				return -1;
+			};
+			await trace("after-close");
+			await previewTab.click();
+			await trace("after-tab-click");
+			const first = await focused(5_000);
+			console.log("DIAG", JSON.stringify({ tag: "first-wait", ms: first }));
+			if (first < 0) {
+				console.log("DIAG STUCK");
+				await trace("stuck");
+				let recovered = false;
+				for (let i = 1; i <= 3 && !recovered; i++) {
+					await previewTab.click();
+					const ms = await focused(3_000);
+					await trace(`after-retab-${i}`);
+					console.log("DIAG", JSON.stringify({ tag: `retab-${i}`, ms }));
+					recovered = ms >= 0;
+				}
+				if (recovered) console.log("DIAG RECOVERED by=retab");
+				else {
+					const inner = await findWebviewFrame(page);
+					await inner.evaluate(() => window.focus());
+					const ms = await focused(3_000);
+					await trace("after-window-focus");
+					console.log("DIAG", JSON.stringify({ tag: "window-focus", ms }));
+					if (ms >= 0) console.log("DIAG RECOVERED by=window-focus");
+					else console.log("DIAG UNRECOVERED");
+				}
+			}
 			return expectEventually(
 				"surviving preview focused",
 				readState,
