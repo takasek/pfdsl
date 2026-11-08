@@ -189,7 +189,7 @@ Declare a new group under `group:` before moving nodes into it: a `group:` value
 `references/spec.md` は full spec v0.0.30（20節・大型）— 全読せず、節見出し（`## N.`）とエラーコードで該当箇所だけ読む。
 
 `references/spec.md` の `[[SPEC_xxx]]` は節の安定 ID への参照で、ファイルやリンクではない。`[[SPEC_xxx?]]` はまだ定義されていない ID を指す。
-定義は見出し末尾の `(SPEC_xxx)` にあり、括弧を含むので `grep -nF '(SPEC_xxx)' references/spec.md` のように固定文字列で検索する。
+定義は見出しなどの末尾の `(SPEC_xxx)` にあり、括弧を含むので `grep -nF '(SPEC_xxx)' <skill-directory>/references/spec.md` のように固定文字列で検索する。
 見出しに付いた ID の範囲は、その見出しから次の同じかより上位の見出しの手前までである。
-規則を引用するときは、付け直されることがある節番号でなく ID を使う。ID の無い節は節番号と見出しで引用する。
-定義が見つからない ID は、誤記か、手元の spec より新しい ID か、廃止された ID である。
+規則を引用するときは、付け直されることがある節番号でなく ID を使う。1つの ID が複数の規則を含むときは、診断コードや規則の要約を添える。ID の無い節は節番号と見出しで引用する。
+定義が見つからない ID は、誤記か、手元の spec より新しい ID か、廃止された ID である。手元ではこれらを区別できないので、規則を推測で断定せず、ID の出所と参照した版を確かめる。
