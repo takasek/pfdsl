@@ -149,7 +149,7 @@ export function diffDiagRegistry(specCodes, registry) {
 }
 
 /**
- * check-diag-registry.mjs orchestration: four independent drift kinds each
+ * check-diag-registry.mjs orchestration: independent drift kinds each
  * set `failed` and print their own message; none of that wiring was tested
  * (#645) — only parseSpecDiagTable/diffDiagRegistry had tests. This guards
  * against e.g. an accidental `else if` between checks, which would

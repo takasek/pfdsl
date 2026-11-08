@@ -220,7 +220,7 @@ const noDiff = {
 };
 
 describe("evaluateDiagRegistryDiff", () => {
-	it("refuses a call that omits one of the four drift kinds", () => {
+	it("refuses a call that omits one of the drift kinds", () => {
 		const { sectionMismatches: _omitted, ...withoutSections } = noDiff;
 		assert.throws(
 			() => evaluateDiagRegistryDiff({ ...withoutSections, specCodesCount: 1 }),
@@ -272,18 +272,19 @@ describe("evaluateDiagRegistryDiff", () => {
 		assert.match(result.stderrLines[0], /Severity mismatch.*W002/);
 	});
 
-	it("reports all four drift kinds together when all are present", () => {
+	it("reports all drift kinds together when all are present", () => {
 		const result = evaluateDiagRegistryDiff({
 			missingInSpec: ["V999"],
 			staleInSpec: ["V013"],
 			severityMismatches: ["W002"],
 			sectionMismatches: ["V001"],
-			specIdMismatches: [],
+			specIdMismatches: ["V002"],
 			specCodesCount: 3,
 		});
 		assert.equal(result.exitCode, 1);
-		assert.equal(result.stderrLines.length, 5);
+		assert.equal(result.stderrLines.length, 6);
 		assert.match(result.stderrLines[3], /Section mismatch.*V001/);
-		assert.match(result.stderrLines[4], /check-diag-registry: FAILED/);
+		assert.match(result.stderrLines[4], /Spec ID mismatch.*V002/);
+		assert.match(result.stderrLines[5], /check-diag-registry: FAILED/);
 	});
 });
