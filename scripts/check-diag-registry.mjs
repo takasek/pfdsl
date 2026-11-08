@@ -6,8 +6,8 @@
  * DIAGNOSTIC_REGISTRY exported by @pfdsl/core (packages/core/dist, must be
  * built first — see `make build-deps`). Catches the spec/implementation
  * drift described in #299: a code emitted by the checker but undocumented
- * in §16, a stale code documented but no longer emitted, or a severity
- * or definition section that disagrees between the two.
+ * in §16, a stale code documented but no longer emitted, or a severity,
+ * definition section or spec ID that disagrees between the two.
  *
  * Usage:
  *   node scripts/check-diag-registry.mjs
@@ -21,8 +21,10 @@ import { fileURLToPath } from "node:url";
 import {
 	diffDiagRegistry,
 	diffDiagSections,
+	diffDiagSpecIds,
 	evaluateDiagRegistryDiff,
 	parseSpecDiagSections,
+	parseSpecDiagSpecIds,
 	parseSpecDiagTable,
 } from "./lib/diag-registry-check.mjs";
 import { isDistStale } from "./lib/dist-freshness.mjs";
@@ -58,6 +60,10 @@ emitLinesAndExit(
 		severityMismatches,
 		sectionMismatches: diffDiagSections(
 			parseSpecDiagSections(specText),
+			DIAGNOSTIC_REGISTRY,
+		),
+		specIdMismatches: diffDiagSpecIds(
+			parseSpecDiagSpecIds(specText),
 			DIAGNOSTIC_REGISTRY,
 		),
 		specCodesCount: Object.keys(specCodes).length,

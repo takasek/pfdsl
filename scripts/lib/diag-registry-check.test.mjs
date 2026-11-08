@@ -3,8 +3,10 @@ import { describe, it } from "node:test";
 import {
 	diffDiagRegistry,
 	diffDiagSections,
+	diffDiagSpecIds,
 	evaluateDiagRegistryDiff,
 	parseSpecDiagSections,
+	parseSpecDiagSpecIds,
 	parseSpecDiagTable,
 } from "./diag-registry-check.mjs";
 
@@ -63,11 +65,70 @@ describe("diagnostic definition sections", () => {
 			staleInSpec: [],
 			severityMismatches: [],
 			sectionMismatches: ["V001"],
+			specIdMismatches: [],
 			specCodesCount: 1,
 		});
 		assert.equal(result.exitCode, 1);
 		assert.deepEqual(result.stdoutLines, []);
 		assert.match(result.stderrLines[0], /Section mismatch.*V001/);
+	});
+});
+
+describe("diagnostic spec IDs", () => {
+	const specIds = (rows) => parseSpecDiagSpecIds(`${TABLE_HEADER}${rows}`);
+
+	it("reads the ID from a reference cell and null from a literal section", () => {
+		assert.deepEqual(
+			specIds(
+				"| V001 | error | [[SPEC_x]] | rule |\n| V002 | error | §9 | rule |\n",
+			),
+			{ V001: "SPEC_x", V002: null },
+		);
+	});
+	it("accepts a registry that matches both kinds of cell", () => {
+		assert.deepEqual(
+			diffDiagSpecIds(
+				{ V001: "SPEC_x", V002: null },
+				{ V001: { specId: "SPEC_x" }, V002: {} },
+			),
+			[],
+		);
+	});
+	it("reports a registry entry that lacks the ID in the table", () => {
+		assert.deepEqual(diffDiagSpecIds({ V001: "SPEC_x" }, { V001: {} }), [
+			"V001",
+		]);
+	});
+	it("reports a registry entry that has a different ID", () => {
+		assert.deepEqual(
+			diffDiagSpecIds({ V001: "SPEC_x" }, { V001: { specId: "SPEC_y" } }),
+			["V001"],
+		);
+	});
+	it("reports a registry ID on a section the table cites by number", () => {
+		assert.deepEqual(
+			diffDiagSpecIds({ V001: null }, { V001: { specId: "SPEC_x" } }),
+			["V001"],
+		);
+	});
+	it("ignores codes that exist on only one side", () => {
+		assert.deepEqual(
+			diffDiagSpecIds({ V001: "SPEC_x" }, { V002: { specId: "SPEC_y" } }),
+			[],
+		);
+	});
+	it("fails on spec ID mismatches alone", () => {
+		const result = evaluateDiagRegistryDiff({
+			missingInSpec: [],
+			staleInSpec: [],
+			severityMismatches: [],
+			sectionMismatches: [],
+			specIdMismatches: ["V001"],
+			specCodesCount: 1,
+		});
+		assert.equal(result.exitCode, 1);
+		assert.deepEqual(result.stdoutLines, []);
+		assert.match(result.stderrLines[0], /Spec ID mismatch.*V001/);
 	});
 });
 
@@ -155,6 +216,7 @@ const noDiff = {
 	staleInSpec: [],
 	severityMismatches: [],
 	sectionMismatches: [],
+	specIdMismatches: [],
 };
 
 describe("evaluateDiagRegistryDiff", () => {
@@ -216,6 +278,7 @@ describe("evaluateDiagRegistryDiff", () => {
 			staleInSpec: ["V013"],
 			severityMismatches: ["W002"],
 			sectionMismatches: ["V001"],
+			specIdMismatches: [],
 			specCodesCount: 3,
 		});
 		assert.equal(result.exitCode, 1);
