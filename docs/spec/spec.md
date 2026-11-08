@@ -514,7 +514,7 @@ subgraph cluster_g1 {
 
 #### 2.8.4 制約 (SPEC_group_constraints)
 
-* V025: `parent` チェーンに循環が存在する場合は error（[[SPEC_constraints]] 参照）
+* V025: `parent` チェーンに循環が存在する場合は error
 
 ---
 
