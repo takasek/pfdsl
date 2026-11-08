@@ -76,7 +76,7 @@ export function pfdType(ctx: RuleContext): Diagnostic[] {
 /**
  * V035: in a roadmap, every artifact id that appears on an edge must carry a
  * frontmatter declaration, and that declaration must carry a `status:`
- * (§15.16/§15.17). Scoped to `ctx.nodesWithEdges`, not all of `ctx.nodeKinds`
+ * (§15.16). Scoped to `ctx.nodesWithEdges`, not all of `ctx.nodeKinds`
  * (which also holds ids declared in frontmatter but never used on any edge,
  * e.g. a `future:` artifact parked for later — those are not this rule's
  * concern, and the diagnostic's own wording says "appears on an edge"). An
