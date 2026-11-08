@@ -5,8 +5,8 @@
  * I/O-free, so this sibling file holds the injectable, I/O-shaped wrapper
  * instead of putting it there.
  *
- * `readFile` is injected so a test can supply canned file contents without
- * touching the filesystem.
+ * `listFiles` and `readFile` are injected so a test can supply tracked paths
+ * and canned file contents without touching git or the filesystem.
  */
 
 import {
@@ -16,20 +16,28 @@ import {
 	normalizeId,
 } from "./mint-check.mjs";
 
-const DEFAULT_FILE = "docs/spec/spec.md";
 const USAGE = "usage: node scripts/mint-check.mjs <slug> [files...]";
 
 /**
- * @param {{slugArg?: string, fileArgs: string[], readFile: (file: string) => string}} args
+ * @param {{slugArg?: string, fileArgs: string[], listFiles: () => string[], readFile: (file: string) => string}} args
  * @returns {{exitCode: 0|1|2, stdout: string|null, stderr: string}}
  */
-export function runMintCheck({ slugArg, fileArgs, readFile }) {
+export function runMintCheck({ slugArg, fileArgs, listFiles, readFile }) {
 	if (!slugArg) {
 		return { exitCode: 2, stdout: null, stderr: USAGE };
 	}
 
 	const id = normalizeId(slugArg);
-	const files = fileArgs.length > 0 ? fileArgs : [DEFAULT_FILE];
+	const files = fileArgs.length > 0 ? fileArgs : listFiles();
+	if (files.length === 0) {
+		// An empty corpus would report every slug as safe to mint.
+		return {
+			exitCode: 2,
+			stdout: null,
+			stderr:
+				"mint-check: no docs/**/*.md files to scan — run inside the repository or pass files explicitly.",
+		};
+	}
 
 	const occurrences = [];
 	for (const file of files) {

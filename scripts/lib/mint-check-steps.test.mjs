@@ -18,17 +18,30 @@ describe("runMintCheck", () => {
 		);
 	});
 
-	it("defaults the file list to docs/spec/spec.md when no files are given", () => {
+	it("exits 2 instead of reporting safe when the default listing is empty", () => {
+		const result = runMintCheck({
+			slugArg: "foo",
+			fileArgs: [],
+			listFiles: () => [],
+			readFile: () => "",
+		});
+		assert.equal(result.exitCode, 2);
+		assert.equal(result.stdout, null);
+		assert.match(result.stderr, /no docs\/\*\*\/\*\.md files/);
+	});
+
+	it("uses listFiles when no files are given", () => {
 		const calls = [];
 		runMintCheck({
 			slugArg: "foo",
 			fileArgs: [],
+			listFiles: () => ["docs/adr/rule.md", "docs/spec/spec.md"],
 			readFile: (file) => {
 				calls.push(file);
 				return "";
 			},
 		});
-		assert.deepEqual(calls, ["docs/spec/spec.md"]);
+		assert.deepEqual(calls, ["docs/adr/rule.md", "docs/spec/spec.md"]);
 	});
 
 	it("reads every given file instead of the default when files are given", () => {
@@ -36,6 +49,9 @@ describe("runMintCheck", () => {
 		runMintCheck({
 			slugArg: "foo",
 			fileArgs: ["a.md", "b.md"],
+			listFiles: () => {
+				throw new Error("must not list explicit files");
+			},
 			readFile: (file) => {
 				calls.push(file);
 				return "";
