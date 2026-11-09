@@ -4951,6 +4951,15 @@ describe("explain", () => {
 		expect(r.stdout).toContain("docs/spec/spec.md");
 	});
 
+	it("explains how to look up a spec ID instead of listing diagnostic codes", async () => {
+		const r = await run(["explain", "SPEC_subflow_expansion"]);
+		expect(r.exitCode).toBe(2);
+		expect(r.stderr).toContain("spec ID, not a diagnostic code");
+		expect(r.stderr).toContain("(SPEC_subflow_expansion)");
+		expect(r.stderr).toContain("references/spec.md");
+		expect(r.stderr).not.toContain("Known codes");
+	});
+
 	it("exits 2 and lists known codes for an unknown code", async () => {
 		const r = await run(["explain", "X999"]);
 		expect(r.exitCode).toBe(2);

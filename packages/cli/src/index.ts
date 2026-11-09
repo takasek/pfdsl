@@ -4552,6 +4552,12 @@ function severityLabel(
 }
 
 function runExplain(code: string): CommandResult {
+	if (code.startsWith("SPEC_")) {
+		return fail(
+			`${code} is a spec ID, not a diagnostic code. Find its definition by searching references/spec.md in the pfdsl skill for "(${code})".\n`,
+			2,
+		);
+	}
 	const entry = DIAGNOSTIC_REGISTRY[code];
 	if (!entry) {
 		const known = Object.keys(DIAGNOSTIC_REGISTRY).sort();
