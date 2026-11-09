@@ -2,12 +2,135 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
 	diffDiagRegistry,
+	diffDiagSections,
+	diffDiagSpecIds,
 	evaluateDiagRegistryDiff,
+	parseSpecDiagSections,
+	parseSpecDiagSpecIds,
 	parseSpecDiagTable,
 } from "./diag-registry-check.mjs";
 
 const TABLE_HEADER =
 	"| コード | severity | 定義節 | 条件 |\n|---|---|---|---|\n";
+
+describe("diagnostic definition sections", () => {
+	it("matches a literal §15.11 section", () => {
+		const sections = parseSpecDiagSections(
+			`${TABLE_HEADER}| V001 | error | §15.11 | rule |\n`,
+		);
+		assert.deepEqual(sections, { V001: "15.11" });
+		assert.deepEqual(
+			diffDiagSections(sections, { V001: { section: "15.11" } }),
+			[],
+		);
+	});
+	it("resolves a SPEC id to its numbered heading", () => {
+		const sections = parseSpecDiagSections(
+			`### 15.11. Rule (SPEC_x) (explanation)\n\n${TABLE_HEADER}| V001 | error | [[SPEC_x]] | rule |\n`,
+		);
+		assert.deepEqual(sections, { V001: "15.11" });
+		assert.deepEqual(
+			diffDiagSections(sections, { V001: { section: "15.11" } }),
+			[],
+		);
+	});
+	it("resolves a SPEC id defined on an indented CommonMark heading", () => {
+		const sections = parseSpecDiagSections(
+			`   ### 15.11 Rule (SPEC_x)\n\n${TABLE_HEADER}| V001 | error | [[SPEC_x]] | rule |\n`,
+		);
+		assert.deepEqual(sections, { V001: "15.11" });
+	});
+	it("reports mismatches only for codes on both sides", () => {
+		assert.deepEqual(
+			diffDiagSections(
+				{ V001: "15.1", V002: "2" },
+				{ V001: { section: "15.11" }, V003: { section: "3" } },
+			),
+			["V001"],
+		);
+	});
+	it("reports unresolved ids, including definitions inside code", () => {
+		const sections = parseSpecDiagSections(
+			`\`\`\`\n## 15.11 Rule (SPEC_x)\n\`\`\`\n${TABLE_HEADER}| V001 | error | [[SPEC_x]] | rule |\n`,
+		);
+		assert.deepEqual(sections, { V001: null });
+		assert.deepEqual(
+			diffDiagSections(sections, { V001: { section: "15.11" } }),
+			["V001"],
+		);
+	});
+	it("fails on section mismatches alone", () => {
+		const result = evaluateDiagRegistryDiff({
+			missingInSpec: [],
+			staleInSpec: [],
+			severityMismatches: [],
+			sectionMismatches: ["V001"],
+			specIdMismatches: [],
+			specCodesCount: 1,
+		});
+		assert.equal(result.exitCode, 1);
+		assert.deepEqual(result.stdoutLines, []);
+		assert.match(result.stderrLines[0], /Section mismatch.*V001/);
+	});
+});
+
+describe("diagnostic spec IDs", () => {
+	const specIds = (rows) => parseSpecDiagSpecIds(`${TABLE_HEADER}${rows}`);
+
+	it("reads the ID from a reference cell and null from a literal section", () => {
+		assert.deepEqual(
+			specIds(
+				"| V001 | error | [[SPEC_x]] | rule |\n| V002 | error | §9 | rule |\n",
+			),
+			{ V001: "SPEC_x", V002: null },
+		);
+	});
+	it("accepts a registry that matches both kinds of cell", () => {
+		assert.deepEqual(
+			diffDiagSpecIds(
+				{ V001: "SPEC_x", V002: null },
+				{ V001: { specId: "SPEC_x" }, V002: {} },
+			),
+			[],
+		);
+	});
+	it("reports a registry entry that lacks the ID in the table", () => {
+		assert.deepEqual(diffDiagSpecIds({ V001: "SPEC_x" }, { V001: {} }), [
+			"V001",
+		]);
+	});
+	it("reports a registry entry that has a different ID", () => {
+		assert.deepEqual(
+			diffDiagSpecIds({ V001: "SPEC_x" }, { V001: { specId: "SPEC_y" } }),
+			["V001"],
+		);
+	});
+	it("reports a registry ID on a section the table cites by number", () => {
+		assert.deepEqual(
+			diffDiagSpecIds({ V001: null }, { V001: { specId: "SPEC_x" } }),
+			["V001"],
+		);
+	});
+	it("ignores codes that exist on only one side", () => {
+		assert.deepEqual(
+			diffDiagSpecIds({ V001: "SPEC_x" }, { V002: { specId: "SPEC_y" } }),
+			[],
+		);
+	});
+	it("fails on spec ID mismatches alone", () => {
+		const result = evaluateDiagRegistryDiff({
+			missingInSpec: [],
+			staleInSpec: [],
+			severityMismatches: [],
+			sectionMismatches: [],
+			specIdMismatches: ["V001"],
+			specCodesCount: 1,
+		});
+		assert.equal(result.exitCode, 1);
+		assert.deepEqual(result.stdoutLines, []);
+		assert.match(result.stderrLines[0], /Spec ID mismatch.*V001/);
+	});
+});
 
 describe("parseSpecDiagTable", () => {
 	it("parses plain error/warning rows", () => {
@@ -88,9 +211,23 @@ describe("diffDiagRegistry", () => {
 	});
 });
 
-const noDiff = { missingInSpec: [], staleInSpec: [], severityMismatches: [] };
+const noDiff = {
+	missingInSpec: [],
+	staleInSpec: [],
+	severityMismatches: [],
+	sectionMismatches: [],
+	specIdMismatches: [],
+};
 
 describe("evaluateDiagRegistryDiff", () => {
+	it("refuses a call that omits one of the drift kinds", () => {
+		const { sectionMismatches: _omitted, ...withoutSections } = noDiff;
+		assert.throws(
+			() => evaluateDiagRegistryDiff({ ...withoutSections, specCodesCount: 1 }),
+			/sectionMismatches/,
+		);
+	});
+
 	it("exits 0 with an OK message carrying the spec code count when there is no drift", () => {
 		const result = evaluateDiagRegistryDiff({ ...noDiff, specCodesCount: 42 });
 		assert.equal(result.exitCode, 0);
@@ -135,15 +272,19 @@ describe("evaluateDiagRegistryDiff", () => {
 		assert.match(result.stderrLines[0], /Severity mismatch.*W002/);
 	});
 
-	it("reports all three drift kinds together when all are present", () => {
+	it("reports all drift kinds together when all are present", () => {
 		const result = evaluateDiagRegistryDiff({
 			missingInSpec: ["V999"],
 			staleInSpec: ["V013"],
 			severityMismatches: ["W002"],
+			sectionMismatches: ["V001"],
+			specIdMismatches: ["V002"],
 			specCodesCount: 3,
 		});
 		assert.equal(result.exitCode, 1);
-		assert.equal(result.stderrLines.length, 4);
-		assert.match(result.stderrLines[3], /check-diag-registry: FAILED/);
+		assert.equal(result.stderrLines.length, 6);
+		assert.match(result.stderrLines[3], /Section mismatch.*V001/);
+		assert.match(result.stderrLines[4], /Spec ID mismatch.*V002/);
+		assert.match(result.stderrLines[5], /check-diag-registry: FAILED/);
 	});
 });

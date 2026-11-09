@@ -1,12 +1,124 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
+	findBareSectionReferences,
 	findDanglingStrictRefs,
 	findDuplicateDefinitions,
+	findMultipleIdsOnBlock,
+	findNumberedSectionIds,
 	findSpecIdDefinitions,
 	findStrictRefs,
 	formatSpecIdViolations,
 } from "./spec-id-check.mjs";
+
+describe("findNumberedSectionIds", () => {
+	// CommonMark ATX headings allow up to three spaces of indentation, setext
+	// headings carry no leading `#`, and headings may sit in a block quote.
+	for (const [name, text] of [
+		["an indented ATX heading", "   ### 15.1 X (SPEC_a)"],
+		["a setext heading", "15.1 X (SPEC_a)\n---"],
+		["a heading in a block quote", "> ### 15.1 X (SPEC_a)"],
+	]) {
+		it(`maps the section number of ${name} to its id`, () => {
+			assert.deepEqual([...findNumberedSectionIds(text)], [["15.1", "SPEC_a"]]);
+		});
+	}
+	it("ignores heading-like lines in code and unnumbered headings", () => {
+		const text = "```\n### 2.3 X (SPEC_code)\n```\n\n## Other (SPEC_b)";
+		assert.deepEqual([...findNumberedSectionIds(text)], []);
+	});
+	it("finds bare references to an indented numbered heading", () => {
+		assert.deepEqual(
+			findBareSectionReferences("   ### 15.1 X (SPEC_a)\n\nsee §15.1"),
+			[{ line: 3, section: "15.1", id: "SPEC_a" }],
+		);
+	});
+});
+
+describe("findBareSectionReferences", () => {
+	it("matches exact numbered sections and sentence-final punctuation", () => {
+		const text =
+			"## 2.3. Rule (SPEC_x)\n§2.3。 § 2.3. §2.30 §2.3.1\n### 15.1 A (SPEC_a)\n§15.11 §15.1";
+		assert.deepEqual(findBareSectionReferences(text), [
+			{ line: 2, section: "2.3", id: "SPEC_x" },
+			{ line: 2, section: "2.3", id: "SPEC_x" },
+			{ line: 4, section: "15.1", id: "SPEC_a" },
+		]);
+	});
+	it("ignores code, unnumbered headings, and unlabelled child sections", () => {
+		const text =
+			"## 2.7 Rule (SPEC_x)\n§2.7.5 `§2.7`\n```\n§2.7\n## 3 Code (SPEC_code)\n```\n## 4 No id\n## Other (SPEC_y)\n§3 §4";
+		assert.deepEqual(findBareSectionReferences(text), []);
+	});
+});
+
+describe("findMultipleIdsOnBlock", () => {
+	it("CommonMark List items: groups the first paragraph's continuation but separates later paragraphs", () => {
+		assert.deepEqual(
+			findMultipleIdsOnBlock(
+				"- first (SPEC_a)\n  continuation (SPEC_b)\n\n  second (SPEC_c)",
+			),
+			[{ line: 1, ids: ["SPEC_a", "SPEC_b"] }],
+		);
+	});
+	it("CommonMark keeps a non-one ordered marker in the preceding paragraph", () => {
+		assert.deepEqual(
+			findMultipleIdsOnBlock("paragraph (SPEC_a)\n2. rule (SPEC_b)"),
+			[{ line: 1, ids: ["SPEC_a", "SPEC_b"] }],
+		);
+	});
+	it("CommonMark separates an ATX heading from the following paragraph without a blank line", () => {
+		assert.deepEqual(
+			findMultipleIdsOnBlock("### Rule (SPEC_a)\nDescription (SPEC_b)"),
+			[],
+		);
+	});
+	it("rejects two ids on one heading block", () => {
+		assert.deepEqual(findMultipleIdsOnBlock("### Rule (SPEC_a) (SPEC_b)"), [
+			{ line: 1, ids: ["SPEC_a", "SPEC_b"] },
+		]);
+	});
+	it("accepts one id per separate heading", () => {
+		assert.deepEqual(
+			findMultipleIdsOnBlock("### A (SPEC_a)\n### B (SPEC_b)"),
+			[],
+		);
+	});
+	it("groups definitions on different lines of one paragraph", () => {
+		assert.deepEqual(findMultipleIdsOnBlock("rule (SPEC_a)\nand (SPEC_b)"), [
+			{ line: 1, ids: ["SPEC_a", "SPEC_b"] },
+		]);
+	});
+});
+
+describe("HTML exclusion", () => {
+	// ADR-0027 defines markers on headings, list items, table rows and
+	// paragraphs, and rejects invisible HTML-comment markers. References in
+	// HTML are still checked, so a stale or mistyped one cannot hide there.
+	it("ignores a definition inside an HTML comment but checks its reference", () => {
+		const text = "<!-- (SPEC_x) [[SPEC_x]] -->";
+		assert.deepEqual(findSpecIdDefinitions(text), []);
+		assert.deepEqual(findStrictRefs(text), [{ line: 1, id: "SPEC_x" }]);
+	});
+	it("ignores definitions inside a CommonMark HTML block", () => {
+		const text = "<div>\nrule (SPEC_a)\nmore (SPEC_b)\n</div>";
+		assert.deepEqual(findSpecIdDefinitions(text), []);
+		assert.deepEqual(findMultipleIdsOnBlock(text), []);
+	});
+	it("checks references and bare section references inside an HTML block", () => {
+		const text =
+			"## 2.3 Rule (SPEC_x)\n\n<details>\n[[SPEC_typo]] §2.3\n</details>";
+		assert.deepEqual(findStrictRefs(text), [{ line: 4, id: "SPEC_typo" }]);
+		assert.deepEqual(findBareSectionReferences(text), [
+			{ line: 4, section: "2.3", id: "SPEC_x" },
+		]);
+	});
+	it("keeps a definition in paragraph text between inline HTML tags", () => {
+		assert.deepEqual(findSpecIdDefinitions("rule <span>(SPEC_a)</span>"), [
+			{ line: 1, id: "SPEC_a" },
+		]);
+	});
+});
 
 describe("parsed code exclusion", () => {
 	it("keeps SPEC markers in separate table cells outside code spans", () => {

@@ -5,6 +5,7 @@ import {
 	mkdirSync,
 	mkdtempSync,
 	rmSync,
+	symlinkSync,
 	utimesSync,
 	writeFileSync,
 } from "node:fs";
@@ -26,17 +27,24 @@ describe("check-diag-registry orchestration", () => {
 	function makeFixture() {
 		const root = mkdtempSync(join(tmpdir(), "check-diag-registry-"));
 		temporaryRoots.push(root);
+		// Copy the checker with its whole library directory and link the
+		// installed packages, so a new import in the checker's dependency
+		// chain does not break the fixture before the freshness check runs.
 		for (const relativePath of [
 			"scripts/check-diag-registry.mjs",
-			"scripts/lib/diag-registry-check.mjs",
-			"scripts/lib/dist-freshness.mjs",
-			"scripts/lib/emit-lines.mjs",
+			"scripts/lib",
 			"docs/spec/spec.md",
 		]) {
 			const destination = join(root, relativePath);
 			mkdirSync(dirname(destination), { recursive: true });
-			cpSync(join(repositoryRoot, relativePath), destination);
+			cpSync(join(repositoryRoot, relativePath), destination, {
+				recursive: true,
+			});
 		}
+		symlinkSync(
+			join(repositoryRoot, "node_modules"),
+			join(root, "node_modules"),
+		);
 		const sourceFile = join(root, "packages/core/src/index.ts");
 		mkdirSync(dirname(sourceFile), { recursive: true });
 		writeFileSync(sourceFile, "export {};\n");

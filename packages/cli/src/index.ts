@@ -4533,7 +4533,8 @@ Exit codes:
 
 const HELP_EXPLAIN = `${helpUsage("explain", "<code>", EXPLAIN_OPTIONS)}
 
-Print the one-line summary and spec section for a diagnostic code (e.g. V021).
+Print the one-line summary and spec section for a diagnostic code (e.g. V021),
+with the section's stable spec ID when it has one.
 Codes come from the FM/L/N/P/V/W families reported by \`pfdsl check\`.
 
   <code>  a diagnostic code, e.g. V021, P004, W002, FM001
@@ -4551,6 +4552,12 @@ function severityLabel(
 }
 
 function runExplain(code: string): CommandResult {
+	if (code.startsWith("SPEC_")) {
+		return fail(
+			`${code} is a spec ID, not a diagnostic code. Find its definition by searching references/spec.md in the pfdsl skill for "(${code})".\n`,
+			2,
+		);
+	}
 	const entry = DIAGNOSTIC_REGISTRY[code];
 	if (!entry) {
 		const known = Object.keys(DIAGNOSTIC_REGISTRY).sort();
@@ -4561,9 +4568,9 @@ function runExplain(code: string): CommandResult {
 	}
 	const lines = [
 		`${code} (${severityLabel(entry.severities)}): ${entry.summary}`,
-		`Defined in: spec §${entry.section}`,
+		`Defined in: spec §${entry.section}${entry.specId ? ` (${entry.specId})` : ""}`,
 		"",
-		`Full text: docs/spec/spec.md §${entry.section} (references/spec.md when using the pfdsl skill)`,
+		`Full text: references/spec.md §${entry.section} in the pfdsl skill (docs/spec/spec.md in the pfdsl repository)`,
 	];
 	return ok(`${lines.join("\n")}\n`);
 }

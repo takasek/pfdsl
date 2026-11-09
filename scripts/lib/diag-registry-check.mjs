@@ -4,6 +4,8 @@
  * import live in the main script; this module stays testable without a build.
  */
 
+import { findNumberedSectionIds } from "./spec-id-check.mjs";
+
 const SEVERITY_LABELS = {
 	error: ["error"],
 	warning: ["warning"],
@@ -19,6 +21,20 @@ const SEVERITY_LABELS = {
  * @returns {Record<string, string[]>}
  */
 export function parseSpecDiagTable(specText) {
+	const result = {};
+	for (const { code, severityCell } of specDiagRows(specText)) {
+		const severities = SEVERITY_LABELS[severityCell];
+		if (!severities) {
+			throw new Error(
+				`spec.md §16 table: unrecognized severity "${severityCell}" for code ${code}`,
+			);
+		}
+		result[code] = severities;
+	}
+	return result;
+}
+
+function specDiagRows(specText) {
 	const lines = specText.split("\n");
 	const headerIdx = lines.findIndex((l) =>
 		/^\|\s*コード\s*\|\s*severity\s*\|/.test(l),
@@ -27,7 +43,7 @@ export function parseSpecDiagTable(specText) {
 		throw new Error("§16 diagnostic code table header not found in spec.md");
 	}
 
-	const result = {};
+	const result = [];
 	// Row format: | CODE | severity | §section | condition text |
 	const ROW_RE = /^\|\s*([A-Z]+\d+)\s*\|\s*([^|]+?)\s*\|/;
 
@@ -37,16 +53,70 @@ export function parseSpecDiagTable(specText) {
 		const m = line.match(ROW_RE);
 		if (!m) continue;
 		const [, code, severityCell] = m;
-		const severities = SEVERITY_LABELS[severityCell];
-		if (!severities) {
-			throw new Error(
-				`spec.md §16 table: unrecognized severity "${severityCell}" for code ${code}`,
-			);
-		}
-		result[code] = severities;
+		result.push({
+			code,
+			severityCell,
+			sectionCell: line.slice(m[0].length).split("|")[0].trim(),
+		});
 	}
 
 	return result;
+}
+
+/** @returns {Record<string, string | null>} */
+export function parseSpecDiagSections(specText) {
+	const sectionsById = new Map(
+		[...findNumberedSectionIds(specText)].map(([section, id]) => [id, section]),
+	);
+	const result = {};
+	for (const { code, sectionCell } of specDiagRows(specText)) {
+		const literal = /^§(\d+(?:\.\d+)*)$/.exec(sectionCell);
+		const ref = /^\[\[(SPEC_[A-Za-z0-9_]+)\]\]$/.exec(sectionCell);
+		result[code] = literal
+			? literal[1]
+			: ref
+				? (sectionsById.get(ref[1]) ?? null)
+				: null;
+	}
+	return result;
+}
+
+/**
+ * @param {Record<string, string | null>} specSections
+ * @param {Record<string, {section: string}>} registry
+ * @returns {string[]}
+ */
+export function diffDiagSections(specSections, registry) {
+	return Object.keys(specSections)
+		.filter(
+			(code) =>
+				code in registry && specSections[code] !== registry[code].section,
+		)
+		.sort();
+}
+
+/** @returns {Record<string, string | null>} code -> spec ID, null for a cell that cites a section number */
+export function parseSpecDiagSpecIds(specText) {
+	const result = {};
+	for (const { code, sectionCell } of specDiagRows(specText)) {
+		result[code] =
+			/^\[\[(SPEC_[A-Za-z0-9_]+)\]\]$/.exec(sectionCell)?.[1] ?? null;
+	}
+	return result;
+}
+
+/**
+ * @param {Record<string, string | null>} specIds
+ * @param {Record<string, {specId?: string}>} registry
+ * @returns {string[]}
+ */
+export function diffDiagSpecIds(specIds, registry) {
+	return Object.keys(specIds)
+		.filter(
+			(code) =>
+				code in registry && specIds[code] !== (registry[code].specId ?? null),
+		)
+		.sort();
 }
 
 /**
@@ -79,25 +149,38 @@ export function diffDiagRegistry(specCodes, registry) {
 }
 
 /**
- * check-diag-registry.mjs orchestration: three independent drift kinds each
+ * check-diag-registry.mjs orchestration: independent drift kinds each
  * set `failed` and print their own message; none of that wiring was tested
  * (#645) — only parseSpecDiagTable/diffDiagRegistry had tests. This guards
- * against e.g. an accidental `else if` between the three checks, which would
+ * against e.g. an accidental `else if` between checks, which would
  * silently stop reporting all but the first kind of drift found.
  *
  * No I/O: takes the already-diffed result plus the spec code count for the
  * OK message. The dynamic `import()` of packages/core/dist/index.js stays a
  * module-load boundary in the main script, not injected here.
  *
- * @param {{missingInSpec: string[], staleInSpec: string[], severityMismatches: string[], specCodesCount: number}} args
+ * @param {{missingInSpec: string[], staleInSpec: string[], severityMismatches: string[], sectionMismatches: string[], specIdMismatches: string[], specCodesCount: number}} args
  * @returns {{exitCode: 0|1, stdoutLines: string[], stderrLines: string[]}}
  */
 export function evaluateDiagRegistryDiff({
 	missingInSpec,
 	staleInSpec,
 	severityMismatches,
+	sectionMismatches,
+	specIdMismatches,
 	specCodesCount,
 }) {
+	for (const [name, value] of Object.entries({
+		missingInSpec,
+		staleInSpec,
+		severityMismatches,
+		sectionMismatches,
+		specIdMismatches,
+	})) {
+		if (!Array.isArray(value)) {
+			throw new TypeError(`evaluateDiagRegistryDiff: ${name} must be an array`);
+		}
+	}
 	const stderrLines = [];
 	let failed = false;
 
@@ -117,6 +200,20 @@ export function evaluateDiagRegistryDiff({
 		failed = true;
 		stderrLines.push(
 			`Severity mismatch between spec.md §16 table and core registry: ${severityMismatches.join(", ")}`,
+		);
+	}
+
+	if (sectionMismatches.length > 0) {
+		failed = true;
+		stderrLines.push(
+			`Section mismatch between spec.md §16 table and core registry: ${sectionMismatches.join(", ")}`,
+		);
+	}
+
+	if (specIdMismatches.length > 0) {
+		failed = true;
+		stderrLines.push(
+			`Spec ID mismatch between spec.md §16 table and core registry: ${specIdMismatches.join(", ")}`,
 		);
 	}
 

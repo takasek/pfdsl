@@ -42,14 +42,17 @@ pfdsl スキル本文の CLI プリフライトは採用リポ向けに `pfdsl` 
 
 ## 新しい仕様 ID を確認して採番する
 
-新規 ID を採番する前に slug の既出を確認する（ADR-0027「ID の性質」）。機械列挙は `node scripts/mint-check.mjs <slug>` を使う（定義・strict 参照・forward-ref の全出現を file:line で列挙し、既出ありなら exit 1。tombstone 次元は初 ID 削除まで据え置き #405）。
+新規 ID を採番する前に slug の既出を確認する（ADR-0027「ID の性質」）。機械列挙は `node scripts/mint-check.mjs <slug>` を使う（既定で `docs/**/*.md` を走査し、定義・strict 参照・forward-ref の全出現を file:line で列挙し、既出ありなら exit 1。tombstone 次元は main の履歴にある ID の初回削除まで据え置き #405）。
+1つのブロックに付ける ID は1つだけで、別名は付けない（ADR-0053）。採番した節を同じファイルの中で `§N.M` と番号で参照し続けると `check-spec-ids` が落ちるので、参照も `[[SPEC_xxx]]` へ置き換える。
 採番しようとした slug が既存 forward-ref（`[[SPEC_xxx?]]`）と一致した場合、その forward-ref が予約した概念と同一かを確認し、別概念なら slug を変える。
 削除された ID は再利用しない。
 
 ## 削除を確定する前に上流の意図を確認する
 
-仕様 ID の定義を廃止する場合は、`docs/adr/0027-spec-id-cross-references.md`「ID の性質」を確認し、初回の廃止では tombstone リスト・再定義禁止 lint・mint-check の対応を同じ変更で導入する。
-定義を移動して同じ ID が存続する場合は廃止に含めない。
+仕様 ID の定義を廃止する場合は、`docs/adr/0027-spec-id-cross-references.md`「ID の性質」と `docs/adr/0053-spec-id-permanence-and-one-id-per-block.md` を確認し、main の履歴にある ID の初回の廃止では tombstone リスト・再定義禁止 lint・mint-check の対応を同じ変更で導入する。
+main の履歴に入る前の ID の改名・削除は廃止に含めない。
+ブロックの内容ごと定義を移し、同じ ID が同じ内容を指し続ける場合も廃止に含めない。
+マーカーだけを別の内容のブロックへ付け替えるのは廃止として扱う。
 
 削除を確定する前に、対象と関連する consumer・兄弟実装・正本や生成・配送境界について、削除判断に関わる未確認の意図や変更がないか確認する。
 呼び出し元ゼロだけで不要と判断する場合、並行した上流変更がある場合、正本や生成・配送境界を削る場合は、判断に必要な履歴と差分を読み、所有者の意図と削除後の影響を確かめる。

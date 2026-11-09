@@ -19,6 +19,8 @@
  */
 
 import { readFileSync } from "node:fs";
+import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import { gitLsFiles } from "./lib/run-exec.mjs";
 import { findSpecIdDefinitions } from "./lib/spec-id-check.mjs";
 import { computeRange } from "./lib/spec-id-range.mjs";
@@ -28,6 +30,11 @@ const [id, ...fileArgs] = process.argv.slice(2);
 if (!id) {
 	console.error("usage: node scripts/get-spec-id.mjs SPEC_xxx [files...]");
 	process.exit(1);
+}
+
+// The default corpus is the repository's docs, wherever this is run from.
+if (fileArgs.length === 0) {
+	process.chdir(resolve(dirname(fileURLToPath(import.meta.url)), ".."));
 }
 
 const files = fileArgs.length > 0 ? fileArgs : gitLsFiles(["docs/**/*.md"]);
