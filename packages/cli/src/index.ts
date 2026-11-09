@@ -4570,7 +4570,7 @@ function runExplain(code: string): CommandResult {
 		`${code} (${severityLabel(entry.severities)}): ${entry.summary}`,
 		`Defined in: spec §${entry.section}${entry.specId ? ` (${entry.specId})` : ""}`,
 		"",
-		`Full text: docs/spec/spec.md §${entry.section} (references/spec.md when using the pfdsl skill)`,
+		`Full text: references/spec.md §${entry.section} in the pfdsl skill (docs/spec/spec.md in the pfdsl repository)`,
 	];
 	return ok(`${lines.join("\n")}\n`);
 }

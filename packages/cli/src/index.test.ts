@@ -4951,6 +4951,13 @@ describe("explain", () => {
 		expect(r.stdout).toContain("docs/spec/spec.md");
 	});
 
+	it("names the skill's spec before the upstream repository path", async () => {
+		const r = await run(["explain", "V021"]);
+		expect(r.stdout).toContain(
+			"Full text: references/spec.md §15.11 in the pfdsl skill (docs/spec/spec.md in the pfdsl repository)",
+		);
+	});
+
 	it("explains how to look up a spec ID instead of listing diagnostic codes", async () => {
 		const r = await run(["explain", "SPEC_subflow_expansion"]);
 		expect(r.exitCode).toBe(2);
