@@ -95,6 +95,30 @@ export function diffDiagSections(specSections, registry) {
 		.sort();
 }
 
+/** @returns {Record<string, string | null>} code -> spec ID, null for a cell that cites a section number */
+export function parseSpecDiagSpecIds(specText) {
+	const result = {};
+	for (const { code, sectionCell } of specDiagRows(specText)) {
+		result[code] =
+			/^\[\[(SPEC_[A-Za-z0-9_]+)\]\]$/.exec(sectionCell)?.[1] ?? null;
+	}
+	return result;
+}
+
+/**
+ * @param {Record<string, string | null>} specIds
+ * @param {Record<string, {specId?: string}>} registry
+ * @returns {string[]}
+ */
+export function diffDiagSpecIds(specIds, registry) {
+	return Object.keys(specIds)
+		.filter(
+			(code) =>
+				code in registry && specIds[code] !== (registry[code].specId ?? null),
+		)
+		.sort();
+}
+
 /**
  * Compares the spec.md table entries against the DIAGNOSTIC_REGISTRY.
  *
@@ -125,7 +149,7 @@ export function diffDiagRegistry(specCodes, registry) {
 }
 
 /**
- * check-diag-registry.mjs orchestration: four independent drift kinds each
+ * check-diag-registry.mjs orchestration: independent drift kinds each
  * set `failed` and print their own message; none of that wiring was tested
  * (#645) — only parseSpecDiagTable/diffDiagRegistry had tests. This guards
  * against e.g. an accidental `else if` between checks, which would
@@ -135,7 +159,7 @@ export function diffDiagRegistry(specCodes, registry) {
  * OK message. The dynamic `import()` of packages/core/dist/index.js stays a
  * module-load boundary in the main script, not injected here.
  *
- * @param {{missingInSpec: string[], staleInSpec: string[], severityMismatches: string[], sectionMismatches: string[], specCodesCount: number}} args
+ * @param {{missingInSpec: string[], staleInSpec: string[], severityMismatches: string[], sectionMismatches: string[], specIdMismatches: string[], specCodesCount: number}} args
  * @returns {{exitCode: 0|1, stdoutLines: string[], stderrLines: string[]}}
  */
 export function evaluateDiagRegistryDiff({
@@ -143,6 +167,7 @@ export function evaluateDiagRegistryDiff({
 	staleInSpec,
 	severityMismatches,
 	sectionMismatches,
+	specIdMismatches,
 	specCodesCount,
 }) {
 	for (const [name, value] of Object.entries({
@@ -150,6 +175,7 @@ export function evaluateDiagRegistryDiff({
 		staleInSpec,
 		severityMismatches,
 		sectionMismatches,
+		specIdMismatches,
 	})) {
 		if (!Array.isArray(value)) {
 			throw new TypeError(`evaluateDiagRegistryDiff: ${name} must be an array`);
@@ -181,6 +207,13 @@ export function evaluateDiagRegistryDiff({
 		failed = true;
 		stderrLines.push(
 			`Section mismatch between spec.md §16 table and core registry: ${sectionMismatches.join(", ")}`,
+		);
+	}
+
+	if (specIdMismatches.length > 0) {
+		failed = true;
+		stderrLines.push(
+			`Spec ID mismatch between spec.md §16 table and core registry: ${specIdMismatches.join(", ")}`,
 		);
 	}
 

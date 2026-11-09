@@ -4934,9 +4934,37 @@ describe("explain", () => {
 		expect(r.stdout).toContain("FM001 (error):");
 	});
 
+	it("prints the stable spec ID next to the section when the section has one", async () => {
+		const r = await run(["explain", "V021"]);
+		expect(r.stdout).toContain(
+			"Defined in: spec §15.11 (SPEC_subflow_boundary_constraint)\n",
+		);
+	});
+
+	it("prints only the section number when the section has no spec ID", async () => {
+		const r = await run(["explain", "P004"]);
+		expect(r.stdout).toContain("Defined in: spec §9\n");
+	});
+
 	it("points to the spec.md full text as a fallback", async () => {
 		const r = await run(["explain", "V021"]);
 		expect(r.stdout).toContain("docs/spec/spec.md");
+	});
+
+	it("names the skill's spec before the upstream repository path", async () => {
+		const r = await run(["explain", "V021"]);
+		expect(r.stdout).toContain(
+			"Full text: references/spec.md §15.11 in the pfdsl skill (docs/spec/spec.md in the pfdsl repository)",
+		);
+	});
+
+	it("explains how to look up a spec ID instead of listing diagnostic codes", async () => {
+		const r = await run(["explain", "SPEC_subflow_expansion"]);
+		expect(r.exitCode).toBe(2);
+		expect(r.stderr).toContain("spec ID, not a diagnostic code");
+		expect(r.stderr).toContain("(SPEC_subflow_expansion)");
+		expect(r.stderr).toContain("references/spec.md");
+		expect(r.stderr).not.toContain("Known codes");
 	});
 
 	it("exits 2 and lists known codes for an unknown code", async () => {
