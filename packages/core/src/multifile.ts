@@ -283,7 +283,7 @@ export function validateSubflowBoundary(
 	// Build effective map: parent ID -> child ID (using boundaryMap or identity)
 	const effective = new Map<string, string>();
 	for (const p of parentBoundary) {
-		effective.set(p, boundaryMap[p] ?? p);
+		effective.set(p, Object.hasOwn(boundaryMap, p) ? boundaryMap[p]! : p);
 	}
 
 	// C3 — effective map must be injective

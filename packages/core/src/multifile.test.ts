@@ -692,6 +692,20 @@ describe("validateSubflowBoundary", () => {
 		]);
 	});
 
+	// An ID that names an Object.prototype member has no map entry: the
+	// effective map must not read the inherited function.
+	it("identity-maps a boundary ID named like an Object.prototype member", () => {
+		const diags = validateSubflowBoundary({
+			processId: "P",
+			parentNormalInputs: new Set(["constructor"]),
+			parentOutputs: new Set(["toString"]),
+			boundaryMap: {},
+			childOpenInputs: new Set(["constructor"]),
+			childTerminals: new Set(["toString"]),
+		});
+		expect(diags).toEqual([]);
+	});
+
 	it("X4 — swap map (parent 'a'→child 'b', parent 'b'→child 'a') → no errors", () => {
 		// The names cross, but each side stays on its own side: parent input 'a'
 		// maps to child open input 'b', parent output 'b' to child terminal 'a'.
