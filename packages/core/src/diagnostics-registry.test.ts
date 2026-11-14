@@ -88,6 +88,13 @@ describe("DIAGNOSTIC_REGISTRY summaries name the conditions spec §16 assigns", 
 		const summary = DIAGNOSTIC_REGISTRY.V032?.summary ?? "";
 		expect(summary).toMatch(/injective/);
 		expect(summary).not.toMatch(/bijection/);
+		expect(summary).not.toMatch(/surjective/);
+	});
+
+	it("V033 covers the identity map, not only an explicit `boundary:` map", () => {
+		const summary = DIAGNOSTIC_REGISTRY.V033?.summary ?? "";
+		expect(summary).toMatch(/effective/);
+		expect(summary).toMatch(/identity/);
 	});
 
 	it("V034 names the non-surjective case", () => {

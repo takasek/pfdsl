@@ -311,7 +311,8 @@ export const DIAGNOSTIC_REGISTRY: Readonly<
 		severities: ["error"],
 		section: "15.11",
 		specId: "SPEC_subflow_boundary_constraint",
-		summary: "`boundary:` map crosses sides (input <-> output)",
+		summary:
+			"effective boundary map (including the identity map) crosses sides (input <-> output)",
 	},
 	V034: {
 		severities: ["error"],

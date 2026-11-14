@@ -647,6 +647,18 @@ describe("validateSubflowBoundary", () => {
 		expect(diags.map((d) => d.code)).toEqual(["V033", "V033"]);
 	});
 
+	it("X1b — side crossing through the identity map, with no `boundary:` at all → V033 alone, with no V034", () => {
+		const diags = validateSubflowBoundary({
+			processId: "P",
+			parentNormalInputs: new Set(["a"]),
+			parentOutputs: new Set(["out"]),
+			boundaryMap: {},
+			childOpenInputs: new Set(["x"]),
+			childTerminals: new Set(["a", "out"]),
+		});
+		expect(diags.map((d) => d.code)).toEqual(["V033"]);
+	});
+
 	it("X4 — swap map (parent 'a'→child 'b', parent 'b'→child 'a') → no errors", () => {
 		// The names cross, but each side stays on its own side: parent input 'a'
 		// maps to child open input 'b', parent output 'b' to child terminal 'a'.
