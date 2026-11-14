@@ -1242,7 +1242,7 @@ graph body の node-decl で宣言された孤立ノード（edge なし）は [
 
 * `type: roadmap` のファイルにおいて、body の edge に現れる artifact id は、必ず front matter の `artifact:` に宣言を持ち、かつその宣言が `status:` を持たなければならない。いずれかを欠く場合は error (V035)
 * 違反は2つの形を区別する。(a) 宣言そのものが無い（宣言ブロックを削除しても body の edge 行が残った場合に生じる「幽霊ノード」）。(b) 宣言はあるが `status:` が無い（空宣言 `id: {}` を含む）。診断メッセージはどちらの形かを読み手が判別できる文言にする。コードはどちらも V035
-* 対象は artifact id のみ。process id の宣言欠落は既存の V020（[[SPEC_orphan_process_constraint]]）/ V003（[[SPEC_process_completeness_constraint]]）が扱うため、V035 の対象外とする
+* 対象は artifact id のみ。process は edge 上の位置から種別が決まり（§5.1）、roadmap でも front matter の `process:` に宣言を持たなくてよい。宣言の欠落そのものはどの規則も error・warning としない。edge に参加した process の入出力の欠落は V002 / V003（[[SPEC_process_completeness_constraint]]）、宣言されたが edge に参加しない process は V020（[[SPEC_orphan_process_constraint]]）が扱う
 * `type:` が `roadmap` 以外（`workflow` / `pipeline`）または省略されているファイルは V035 の対象外とする
 * strict mode の有無に関わらず常に error（`ctx.strictly(...)` を経由しない）。`check-scaffold` は運用中の `.pfdsl/` を `--strict` の対象から意図的に除外しているため、strict 依存の severity では運用ファイルで警告に留まり実効性を持たない
 * (a) について: 宣言ブロックを削除しても body の edge 行が残ると、label も status も criteria も持たない「幽霊ノード」がグラフに残る
