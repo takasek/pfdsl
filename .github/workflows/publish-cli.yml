@@ -11,6 +11,8 @@ on:
 jobs:
   publish:
     runs-on: ubuntu-latest
+    # The npm trusted publisher requires this environment, whose deployment policy admits only release tags, so a workflow edited on a branch cannot publish.
+    environment: npm-publish
     permissions:
       contents: read
       id-token: write
