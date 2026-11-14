@@ -61,3 +61,14 @@ describe("pfdsl skill: reading references/spec.md by section number", () => {
 		assert.equal(m, null, `section count found: ${m?.[0]}`);
 	});
 });
+
+// SKILL.md is the only frontmatter reference most readers open. A reader
+// who takes `boundary:` for a complete table is surprised when an unmapped
+// ID is matched by identity and raises V033 / V034 (spec §15.11).
+describe("pfdsl skill: the boundary: field comment", () => {
+	it("says unmapped boundary IDs are matched to the child by identity", () => {
+		const line = skill.split("\n").find((l) => /^\s*boundary:/.test(l));
+		assert.ok(line, "boundary: line not found");
+		assert.match(line, /同じ ID/);
+	});
+});
