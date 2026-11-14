@@ -595,6 +595,18 @@ describe("validateSubflowBoundary", () => {
 		expect(diags.map((d) => d.code)).toEqual(["V034"]);
 	});
 
+	it("M7 — unmapped parent ID whose identity target is not a child boundary → V034 alone, not V030", () => {
+		const diags = validateSubflowBoundary({
+			processId: "P",
+			parentNormalInputs: new Set(["in", "extra"]),
+			parentOutputs: new Set(["out"]),
+			boundaryMap: { in: "x" },
+			childOpenInputs: new Set(["x"]),
+			childTerminals: new Set(["out"]),
+		});
+		expect(diags.map((d) => d.code)).toEqual(["V034"]);
+	});
+
 	it("M5 — dangling key in boundary map → V030", () => {
 		const diags = validateSubflowBoundary({
 			processId: "P",
