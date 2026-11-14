@@ -61,7 +61,7 @@ process:
     command: npm run build  # 対応する実行コマンド
     estimate: 2d            # 工数見積もり（形式自由）
     subflow: child.pfdsl    # 子 PFD への展開リンク（§2.9.3）
-    boundary: { parent_id: child_id }  # subflow の親→子 artifact ID 対応表（1:1）。マップに無い境界 ID は子の同じ ID と照合する
+    boundary: { parent_id: child_id }  # subflow の親→子 artifact ID 対応表（1:1。載せない親の入出力は子の同じ ID と照合）
 
 group:
   <id>:
