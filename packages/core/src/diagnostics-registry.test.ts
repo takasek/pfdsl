@@ -83,6 +83,17 @@ describe("DIAGNOSTIC_REGISTRY summaries name the conditions spec §16 assigns", 
 		expect(summary).toMatch(/absolute/);
 		expect(summary).toMatch(/URL/);
 	});
+
+	it("V032 names non-injectivity only, not the non-surjective case V034 reports", () => {
+		const summary = DIAGNOSTIC_REGISTRY.V032?.summary ?? "";
+		expect(summary).toMatch(/injective/);
+		expect(summary).not.toMatch(/bijection/);
+	});
+
+	it("V034 names the non-surjective case", () => {
+		const summary = DIAGNOSTIC_REGISTRY.V034?.summary ?? "";
+		expect(summary).toMatch(/surjective/);
+	});
 });
 
 describe("DIAGNOSTIC_REGISTRY vs. real source", () => {

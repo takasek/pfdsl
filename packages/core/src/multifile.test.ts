@@ -568,6 +568,33 @@ describe("validateSubflowBoundary", () => {
 		expect(diags.some((d) => d.code === "V032")).toBe(true);
 	});
 
+	// §15.11 assigns non-injectivity to V032 and a non-surjective effective
+	// map to V034 (#1599). Pinning the whole code list fixes which code each
+	// condition gets, and that V032 suppresses the V034 its collision causes.
+	it("M4b — non-injective map that also leaves a child ID unmapped → V032 alone", () => {
+		const diags = validateSubflowBoundary({
+			processId: "P",
+			parentNormalInputs: new Set(["a", "b"]),
+			parentOutputs: new Set([]),
+			boundaryMap: { a: "b" },
+			childOpenInputs: new Set(["b", "c"]),
+			childTerminals: new Set([]),
+		});
+		expect(diags.map((d) => d.code)).toEqual(["V032"]);
+	});
+
+	it("M6 — injective but non-surjective map (a child open input left unmapped) → V034 alone", () => {
+		const diags = validateSubflowBoundary({
+			processId: "P",
+			parentNormalInputs: new Set(["in"]),
+			parentOutputs: new Set(["out"]),
+			boundaryMap: { in: "x" },
+			childOpenInputs: new Set(["x", "y"]),
+			childTerminals: new Set(["out"]),
+		});
+		expect(diags.map((d) => d.code)).toEqual(["V034"]);
+	});
+
 	it("M5 — dangling key in boundary map → V030", () => {
 		const diags = validateSubflowBoundary({
 			processId: "P",

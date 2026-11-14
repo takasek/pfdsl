@@ -1208,9 +1208,10 @@ graph body の node-decl で宣言された孤立ノード（edge なし）は [
 
 * マップのキーは展開プロセスの境界 artifact ID（通常入力エッジまたは出力エッジが指す artifact）でなければならない。境界でない ID（フィードバック入力含む）をキーにした場合は error
 * マップの値は子フローの境界 artifact ID（open input または terminal）でなければならない。子の境界でない値は error
-* 明示マップと未マップ境界の恒等対応を合わせた**実効対応は全単射**でなければならない（非単射・非全射は error）
+* 明示マップと未マップ境界の恒等対応を合わせた**実効対応は全単射**でなければならない。複数の親 ID が同じ子 ID へ対応する非単射は error (V032)。非全射（対応先にならない子の open input / terminal が残る）と、恒等対応の先が子の境界に無い場合は、上の ID 集合の一致に違反するので error (V034)
 * **side 整合**: 親の通常入力境界はマップで子の open input へ、親の出力境界は子の terminal へのみ対応づけられる。入力↔出力の越境マップは error
 * `boundary:` を `subflow:` のないプロセスに指定した場合は error
+* 1つの展開プロセスについて、checker はキー・値の検証（V030）、非単射（V032）と side 整合（V033）、ID 集合の一致（V034）の順に判定する。先の段で error を報告した展開プロセスには後の段を適用しない。先の誤りから派生する集合の不一致を重ねて報告しないためである
 
 ### 15.12 extends 制約 (SPEC_extends_constraint)
 
@@ -1357,9 +1358,9 @@ W と C1 / C2、各 artifact ID、論理位置と Wiki 内の原文識別を証�
 | V029 | error | [[SPEC_index_constraint]] | `index:` が正整数でない |
 | V030 | error | [[SPEC_subflow_boundary_constraint]] | `boundary:` マップのキーまたは値が親/子の境界 artifact でない |
 | V031 | error | [[SPEC_type_constraint]] | `type:` に列挙外の値 |
-| V032 | error | [[SPEC_subflow_boundary_constraint]] | `boundary:` マップが全単射でない |
+| V032 | error | [[SPEC_subflow_boundary_constraint]] | `boundary:` マップを含む実効対応が単射でない（複数の親 ID が同じ子 ID へ対応する） |
 | V033 | error | [[SPEC_subflow_boundary_constraint]] | `boundary:` マップの side 越境（入力↔出力） |
-| V034 | error | [[SPEC_subflow_boundary_constraint]] | 境界集合の不一致（親 I/O と子 open input / terminal の全単射違反） |
+| V034 | error | [[SPEC_subflow_boundary_constraint]] | 境界集合の不一致（実効対応を適用した親の通常入力・出力の ID 集合が、子の open input / terminal の集合と一致しない。非全射を含む） |
 | V035 | error | [[SPEC_roadmap_artifact_declaration_and_status]] | roadmap ファイルの edge 上の artifact が front matter に宣言を持たない（幽霊ノード）、または宣言はあるが `status:` が未設定 |
 | V036 | error | [[SPEC_duplicate_edge_constraint]] | 同じ artifact / process の組が通常入力 (`>>`) と feedback (`>>?`) の両方で接続されている |
 | V037 | error | [[SPEC_reference_resolution_constraint]] | source / revision が空文字列・空白だけ、または追加メンバーがある |
