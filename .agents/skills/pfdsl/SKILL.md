@@ -186,7 +186,9 @@ Declare a new group under `group:` before moving nodes into it: a `group:` value
 | フィールドの正確な仕様 | `references/spec.md` §3–5（モデル・識別子・型推論）・§14（正準順序） |
 | PFD のレビュー・監査 | `references/review-perspectives.md`（A/B/C カタログ。A/B は図、C は normative 仕様文書（自リポ保守の仕様がある場合）の監査。書くルールは `references/quality-guide.md`、問い詰めはこちら） |
 
-`references/spec.md` は full spec v0.0.30（20節・大型）— 全読せず、節見出し（`## N.`）とエラーコードで該当箇所だけ読む。
+`references/spec.md` は full spec v0.0.30（大型）— 全読せず、該当箇所だけ読む。
+規則本文の多くは `###`・`####` の小節にあるので、`pfdsl explain` が示す節番号は見出しの深さを問わない形で検索する（例: §15.16 なら `grep -nE '^#+ 15\.16\.? ' <skill-directory>/references/spec.md`）。
+explain が節番号の横に仕様 ID を示す場合は、次の段落のとおり ID で検索してもよい。
 
 `references/spec.md` の `[[SPEC_xxx]]` は節の安定 ID への参照で、ファイルやリンクではない。`[[SPEC_xxx?]]` はまだ定義されていない ID を指す。
 定義は見出しなどの末尾の `(SPEC_xxx)` にあり、括弧を含むので `grep -nF '(SPEC_xxx)' <skill-directory>/references/spec.md` のように固定文字列で検索する。
