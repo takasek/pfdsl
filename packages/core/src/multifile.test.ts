@@ -659,6 +659,39 @@ describe("validateSubflowBoundary", () => {
 		expect(diags.map((d) => d.code)).toEqual(["V033"]);
 	});
 
+	// With no `boundary:` entry for the ID, the side crossing comes from the
+	// identity map; "boundary maps" would send the reader looking for a map
+	// entry that does not exist.
+	it("V033 message names the identity match when the ID has no boundary: entry", () => {
+		const diags = validateSubflowBoundary({
+			processId: "P",
+			parentNormalInputs: new Set(["a"]),
+			parentOutputs: new Set(["b"]),
+			boundaryMap: {},
+			childOpenInputs: new Set(["b"]),
+			childTerminals: new Set(["a"]),
+		});
+		expect(diags.map((d) => d.message)).toEqual([
+			"input 'a' has no boundary: entry and matches child terminal 'a' by identity (side mismatch) on process 'P'",
+			"output 'b' has no boundary: entry and matches child open input 'b' by identity (side mismatch) on process 'P'",
+		]);
+	});
+
+	it("V033 message keeps naming the map when an explicit boundary: entry crosses sides", () => {
+		const diags = validateSubflowBoundary({
+			processId: "P",
+			parentNormalInputs: new Set(["order"]),
+			parentOutputs: new Set(["shipment"]),
+			boundaryMap: { order: "outgoing_parcel", shipment: "incoming_order" },
+			childOpenInputs: new Set(["incoming_order"]),
+			childTerminals: new Set(["outgoing_parcel"]),
+		});
+		expect(diags.map((d) => d.message)).toEqual([
+			"boundary maps input 'order' to terminal 'outgoing_parcel' (side mismatch) on process 'P'",
+			"boundary maps output 'shipment' to open input 'incoming_order' (side mismatch) on process 'P'",
+		]);
+	});
+
 	it("X4 — swap map (parent 'a'→child 'b', parent 'b'→child 'a') → no errors", () => {
 		// The names cross, but each side stays on its own side: parent input 'a'
 		// maps to child open input 'b', parent output 'b' to child terminal 'a'.
