@@ -235,8 +235,7 @@ export const DIAGNOSTIC_REGISTRY: Readonly<
 		severities: ["error"],
 		section: "15.11",
 		specId: "SPEC_subflow_boundary_constraint",
-		summary:
-			"subflow path must be relative — absolute paths and URLs are rejected",
+		summary: "subflow file is missing, or its path is absolute / a URL",
 	},
 	V022: {
 		severities: ["error"],
@@ -305,20 +304,22 @@ export const DIAGNOSTIC_REGISTRY: Readonly<
 		severities: ["error"],
 		section: "15.11",
 		specId: "SPEC_subflow_boundary_constraint",
-		summary: "`boundary:` map is not a bijection",
+		summary:
+			"effective boundary map is not injective (two or more parent IDs map to the same child ID)",
 	},
 	V033: {
 		severities: ["error"],
 		section: "15.11",
 		specId: "SPEC_subflow_boundary_constraint",
-		summary: "`boundary:` map crosses sides (input <-> output)",
+		summary:
+			"effective boundary map (including the identity map) crosses sides (input <-> output)",
 	},
 	V034: {
 		severities: ["error"],
 		section: "15.11",
 		specId: "SPEC_subflow_boundary_constraint",
 		summary:
-			"boundary set mismatch (bijection violation between parent I/O and child open input / terminal)",
+			"boundary set mismatch: after mapping, parent inputs / outputs differ from child open inputs / terminals (including a non-surjective map)",
 	},
 	V035: {
 		severities: ["error"],
