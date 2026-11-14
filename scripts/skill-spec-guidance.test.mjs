@@ -7,7 +7,16 @@ import { describe, it } from "node:test";
 // `###` / `####` subsections, and top-level headings put a dot after the
 // number (`## 9.`), so the advertised search has to reach both.
 const skill = readFileSync("scripts/skill-template/SKILL.md", "utf8");
-const spec = readFileSync("docs/spec/spec.md", "utf8");
+// Read the copy adopters receive, not docs/spec/spec.md: the guidance has to
+// work on what the reader actually has.
+const spec = readFileSync(
+	"plugin/pfdsl/skills/pfdsl/references/spec.md",
+	"utf8",
+);
+const registry = readFileSync(
+	"packages/core/src/diagnostics-registry.ts",
+	"utf8",
+);
 
 function headingSearchPattern() {
 	const m = /grep -nE '(\^#\+ [^']+)'/.exec(skill);
@@ -32,6 +41,19 @@ describe("pfdsl skill: reading references/spec.md by section number", () => {
 		const re = patternFor("15.1", headingSearchPattern());
 		const hits = spec.split("\n").filter((line) => re.test(line));
 		assert.equal(hits.length, 1, hits.join("\n"));
+	});
+
+	it("the heading search finds exactly one heading for every section `explain` can print", () => {
+		const template = headingSearchPattern();
+		const sections = new Set(
+			[...registry.matchAll(/\bsection: "([\d.]+)"/g)].map((m) => m[1]),
+		);
+		assert.ok(sections.size > 0, "no sections found in the registry");
+		const misses = [...sections].filter((section) => {
+			const re = patternFor(section, template);
+			return spec.split("\n").filter((line) => re.test(line)).length !== 1;
+		});
+		assert.deepEqual(misses, []);
 	});
 
 	it("does not state a section count that drifts as the spec grows", () => {
