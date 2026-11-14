@@ -73,6 +73,18 @@ describe("DIAGNOSTIC_REGISTRY section/summary metadata", () => {
 	});
 });
 
+// The summary is what `pfdsl explain` prints, so it has to name every
+// condition the code is raised for (spec §16) and nothing it is not raised
+// for. These pin the conditions spec.md assigns to each code.
+describe("DIAGNOSTIC_REGISTRY summaries name the conditions spec §16 assigns", () => {
+	it("V021 names a missing subflow file as well as an absolute path / URL", () => {
+		const summary = DIAGNOSTIC_REGISTRY.V021?.summary ?? "";
+		expect(summary).toMatch(/missing/);
+		expect(summary).toMatch(/absolute/);
+		expect(summary).toMatch(/URL/);
+	});
+});
+
 describe("DIAGNOSTIC_REGISTRY vs. real source", () => {
 	// Walking the tree beats naming the files: a hard-coded list silently stops
 	// covering a code when the emitting rule moves to a new module, which is

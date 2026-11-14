@@ -235,8 +235,7 @@ export const DIAGNOSTIC_REGISTRY: Readonly<
 		severities: ["error"],
 		section: "15.11",
 		specId: "SPEC_subflow_boundary_constraint",
-		summary:
-			"subflow path must be relative — absolute paths and URLs are rejected",
+		summary: "subflow file is missing, or its path is absolute / a URL",
 	},
 	V022: {
 		severities: ["error"],
