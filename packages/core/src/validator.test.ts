@@ -1262,7 +1262,7 @@ a >> design -> b
 
 		it("does not flag process ids, only artifacts", () => {
 			// P has no frontmatter process: entry either, but V035 looks only at
-			// artifacts — a process's own declaration gap is V020/V003 territory.
+			// artifacts — a process needs no declaration (spec §15.16, #1598).
 			const fm: Frontmatter = {
 				type: "roadmap",
 				artifact: { A: { status: "done" }, C: { status: "todo" } },
@@ -1271,6 +1271,20 @@ a >> design -> b
 			expect(
 				diags.filter((d) => d.code === "V035" && d.message.includes("'P'")),
 			).toHaveLength(0);
+		});
+
+		// §15.16 says a roadmap process needs no frontmatter declaration: no
+		// rule reports the missing declaration itself, in either mode (#1598).
+		it("reports nothing for an undeclared process whose inputs and outputs are complete", () => {
+			const fm: Frontmatter = {
+				type: "roadmap",
+				artifact: {
+					A: { status: "done", criteria: "exists" },
+					C: { status: "todo", criteria: "exists" },
+				},
+			};
+			expect(codes("A >> P -> C", fm)).toEqual([]);
+			expect(codes("A >> P -> C", fm, { strict: true })).toEqual([]);
 		});
 
 		it("reports one diagnostic per undeclared artifact", () => {

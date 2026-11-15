@@ -1199,6 +1199,9 @@ graph body の node-decl で宣言された孤立ノード（edge なし）は [
 * 展開プロセスの通常入力エッジ（`>>`）が指す artifact の **ID 集合**（マップ適用後）と、子フローの **open input artifact**（生成元プロセス `->` を持たず `>>` で消費されるもの。判定は [[SPEC_subflow_expansion]] 参照）の **ID 集合**は一致しなければならない（全単射・集合一致）。展開プロセスのフィードバック入力（`>>?`）、および子フローの「生成元なし・`>>?` のみ消費」の artifact は照合対象外
 * 展開プロセスの出力エッジ（`->`）が指す artifact の **ID 集合**（マップ適用後）と、子フローの **terminal artifact**（`>>` でも `>>?` でも消費されない artifact。判定は [[SPEC_subflow_expansion]] 参照）の **ID 集合**は一致しなければならない（全単射・集合一致）
 * 境界 ID 協定・メタデータ権威・粒度差の扱いの詳細は [[SPEC_subflow_expansion]] 参照
+* 照合には、`boundary:` の明示マップと、マップに無い境界 ID の恒等対応を合わせた**実効対応**を使う。`boundary:` が無ければ実効対応はすべて恒等対応である。実効対応は全単射でなければならない。複数の親 ID が同じ子 ID へ対応する非単射は error (V032)。非全射（対応先にならない子の open input / terminal が残る）と、恒等対応の先が子の境界に無い場合は、上の ID 集合の一致に違反するので error (V034)
+* **side 整合**: 実効対応は、親の通常入力境界を子の open input へ、親の出力境界を子の terminal へのみ対応づける。入力↔出力の越境は、明示マップによるものも恒等対応によるものも error (V033)
+* 1つの展開プロセスについて、checker はマップのキー・値の検証（V030）、非単射（V032）と side 整合（V033）、ID 集合の一致（V034）の順に判定する。先の段で error を報告した展開プロセスには後の段を適用しない。先の誤りから派生する集合の不一致を重ねて報告しないためである
 * `subflow:` の値がファイルパスとして存在しない場合は error
 * `subflow:` の値が絶対パスまたは URL（`://` を含む）の場合は error
 * 循環 subflow（自己参照および多段循環を含む、subflow グラフ全体における任意の循環）は error
@@ -1208,8 +1211,6 @@ graph body の node-decl で宣言された孤立ノード（edge なし）は [
 
 * マップのキーは展開プロセスの境界 artifact ID（通常入力エッジまたは出力エッジが指す artifact）でなければならない。境界でない ID（フィードバック入力含む）をキーにした場合は error
 * マップの値は子フローの境界 artifact ID（open input または terminal）でなければならない。子の境界でない値は error
-* 明示マップと未マップ境界の恒等対応を合わせた**実効対応は全単射**でなければならない（非単射・非全射は error）
-* **side 整合**: 親の通常入力境界はマップで子の open input へ、親の出力境界は子の terminal へのみ対応づけられる。入力↔出力の越境マップは error
 * `boundary:` を `subflow:` のないプロセスに指定した場合は error
 
 ### 15.12 extends 制約 (SPEC_extends_constraint)
@@ -1243,7 +1244,7 @@ graph body の node-decl で宣言された孤立ノード（edge なし）は [
 
 * `type: roadmap` のファイルにおいて、body の edge に現れる artifact id は、必ず front matter の `artifact:` に宣言を持ち、かつその宣言が `status:` を持たなければならない。いずれかを欠く場合は error (V035)
 * 違反は2つの形を区別する。(a) 宣言そのものが無い（宣言ブロックを削除しても body の edge 行が残った場合に生じる「幽霊ノード」）。(b) 宣言はあるが `status:` が無い（空宣言 `id: {}` を含む）。診断メッセージはどちらの形かを読み手が判別できる文言にする。コードはどちらも V035
-* 対象は artifact id のみ。process id の宣言欠落は既存の V020（[[SPEC_orphan_process_constraint]]）/ V003（[[SPEC_process_completeness_constraint]]）が扱うため、V035 の対象外とする
+* 対象は artifact id のみ。process は edge 上の位置から種別が決まり（§5.1）、roadmap でも front matter の `process:` に宣言を持たなくてよい。宣言の欠落そのものはどの規則も error・warning としない。edge に参加した process の入出力の欠落は V002 / V003（[[SPEC_process_completeness_constraint]]）、宣言されたが edge に参加しない process は V020（[[SPEC_orphan_process_constraint]]）が扱う
 * `type:` が `roadmap` 以外（`workflow` / `pipeline`）または省略されているファイルは V035 の対象外とする
 * strict mode の有無に関わらず常に error（`ctx.strictly(...)` を経由しない）。`check-scaffold` は運用中の `.pfdsl/` を `--strict` の対象から意図的に除外しているため、strict 依存の severity では運用ファイルで警告に留まり実効性を持たない
 * (a) について: 宣言ブロックを削除しても body の edge 行が残ると、label も status も criteria も持たない「幽霊ノード」がグラフに残る
@@ -1357,9 +1358,9 @@ W と C1 / C2、各 artifact ID、論理位置と Wiki 内の原文識別を証�
 | V029 | error | [[SPEC_index_constraint]] | `index:` が正整数でない |
 | V030 | error | [[SPEC_subflow_boundary_constraint]] | `boundary:` マップのキーまたは値が親/子の境界 artifact でない |
 | V031 | error | [[SPEC_type_constraint]] | `type:` に列挙外の値 |
-| V032 | error | [[SPEC_subflow_boundary_constraint]] | `boundary:` マップが全単射でない |
-| V033 | error | [[SPEC_subflow_boundary_constraint]] | `boundary:` マップの side 越境（入力↔出力） |
-| V034 | error | [[SPEC_subflow_boundary_constraint]] | 境界集合の不一致（親 I/O と子 open input / terminal の全単射違反） |
+| V032 | error | [[SPEC_subflow_boundary_constraint]] | `boundary:` マップを含む実効対応が単射でない（複数の親 ID が同じ子 ID へ対応する） |
+| V033 | error | [[SPEC_subflow_boundary_constraint]] | 実効対応（恒等対応を含む）の side 越境（入力↔出力） |
+| V034 | error | [[SPEC_subflow_boundary_constraint]] | 境界集合の不一致（実効対応を適用した親の通常入力・出力の ID 集合が、子の open input / terminal の集合と一致しない。非全射を含む） |
 | V035 | error | [[SPEC_roadmap_artifact_declaration_and_status]] | roadmap ファイルの edge 上の artifact が front matter に宣言を持たない（幽霊ノード）、または宣言はあるが `status:` が未設定 |
 | V036 | error | [[SPEC_duplicate_edge_constraint]] | 同じ artifact / process の組が通常入力 (`>>`) と feedback (`>>?`) の両方で接続されている |
 | V037 | error | [[SPEC_reference_resolution_constraint]] | source / revision が空文字列・空白だけ、または追加メンバーがある |
