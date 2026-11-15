@@ -568,6 +568,45 @@ describe("validateSubflowBoundary", () => {
 		expect(diags.some((d) => d.code === "V032")).toBe(true);
 	});
 
+	// §15.11 assigns non-injectivity to V032 and a non-surjective effective
+	// map to V034 (#1599). Pinning the whole code list fixes which code each
+	// condition gets, and that V032 suppresses the V034 its collision causes.
+	it("M4b — non-injective map that also leaves a child ID unmapped → V032 alone", () => {
+		const diags = validateSubflowBoundary({
+			processId: "P",
+			parentNormalInputs: new Set(["a", "b"]),
+			parentOutputs: new Set([]),
+			boundaryMap: { a: "b" },
+			childOpenInputs: new Set(["b", "c"]),
+			childTerminals: new Set([]),
+		});
+		expect(diags.map((d) => d.code)).toEqual(["V032"]);
+	});
+
+	it("M6 — injective but non-surjective map (a child open input left unmapped) → V034 alone", () => {
+		const diags = validateSubflowBoundary({
+			processId: "P",
+			parentNormalInputs: new Set(["in"]),
+			parentOutputs: new Set(["out"]),
+			boundaryMap: { in: "x" },
+			childOpenInputs: new Set(["x", "y"]),
+			childTerminals: new Set(["out"]),
+		});
+		expect(diags.map((d) => d.code)).toEqual(["V034"]);
+	});
+
+	it("M7 — unmapped parent ID whose identity target is not a child boundary → V034 alone, not V030", () => {
+		const diags = validateSubflowBoundary({
+			processId: "P",
+			parentNormalInputs: new Set(["in", "extra"]),
+			parentOutputs: new Set(["out"]),
+			boundaryMap: { in: "x" },
+			childOpenInputs: new Set(["x"]),
+			childTerminals: new Set(["out"]),
+		});
+		expect(diags.map((d) => d.code)).toEqual(["V034"]);
+	});
+
 	it("M5 — dangling key in boundary map → V030", () => {
 		const diags = validateSubflowBoundary({
 			processId: "P",
@@ -606,6 +645,65 @@ describe("validateSubflowBoundary", () => {
 			childTerminals: new Set(["outgoing_parcel"]),
 		});
 		expect(diags.map((d) => d.code)).toEqual(["V033", "V033"]);
+	});
+
+	it("X1b — side crossing through the identity map, with no `boundary:` at all → V033 alone, with no V034", () => {
+		const diags = validateSubflowBoundary({
+			processId: "P",
+			parentNormalInputs: new Set(["a"]),
+			parentOutputs: new Set(["out"]),
+			boundaryMap: {},
+			childOpenInputs: new Set(["x"]),
+			childTerminals: new Set(["a", "out"]),
+		});
+		expect(diags.map((d) => d.code)).toEqual(["V033"]);
+	});
+
+	// With no `boundary:` entry for the ID, the side crossing comes from the
+	// identity map; "boundary maps" would send the reader looking for a map
+	// entry that does not exist.
+	it("V033 message names the identity match when the ID has no boundary: entry", () => {
+		const diags = validateSubflowBoundary({
+			processId: "P",
+			parentNormalInputs: new Set(["a"]),
+			parentOutputs: new Set(["b"]),
+			boundaryMap: {},
+			childOpenInputs: new Set(["b"]),
+			childTerminals: new Set(["a"]),
+		});
+		expect(diags.map((d) => d.message)).toEqual([
+			"input 'a' has no boundary: entry and matches child terminal 'a' by identity (side mismatch) on process 'P'",
+			"output 'b' has no boundary: entry and matches child open input 'b' by identity (side mismatch) on process 'P'",
+		]);
+	});
+
+	it("V033 message keeps naming the map when an explicit boundary: entry crosses sides", () => {
+		const diags = validateSubflowBoundary({
+			processId: "P",
+			parentNormalInputs: new Set(["order"]),
+			parentOutputs: new Set(["shipment"]),
+			boundaryMap: { order: "outgoing_parcel", shipment: "incoming_order" },
+			childOpenInputs: new Set(["incoming_order"]),
+			childTerminals: new Set(["outgoing_parcel"]),
+		});
+		expect(diags.map((d) => d.message)).toEqual([
+			"boundary maps input 'order' to terminal 'outgoing_parcel' (side mismatch) on process 'P'",
+			"boundary maps output 'shipment' to open input 'incoming_order' (side mismatch) on process 'P'",
+		]);
+	});
+
+	// An ID that names an Object.prototype member has no map entry: the
+	// effective map must not read the inherited function.
+	it("identity-maps a boundary ID named like an Object.prototype member", () => {
+		const diags = validateSubflowBoundary({
+			processId: "P",
+			parentNormalInputs: new Set(["constructor"]),
+			parentOutputs: new Set(["toString"]),
+			boundaryMap: {},
+			childOpenInputs: new Set(["constructor"]),
+			childTerminals: new Set(["toString"]),
+		});
+		expect(diags).toEqual([]);
 	});
 
 	it("X4 — swap map (parent 'a'→child 'b', parent 'b'→child 'a') → no errors", () => {

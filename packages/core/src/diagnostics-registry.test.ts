@@ -73,6 +73,36 @@ describe("DIAGNOSTIC_REGISTRY section/summary metadata", () => {
 	});
 });
 
+// The summary is what `pfdsl explain` prints, so it has to name every
+// condition the code is raised for (spec §16) and nothing it is not raised
+// for. These pin the conditions spec.md assigns to each code.
+describe("DIAGNOSTIC_REGISTRY summaries name the conditions spec §16 assigns", () => {
+	it("V021 names a missing subflow file as well as an absolute path / URL", () => {
+		const summary = DIAGNOSTIC_REGISTRY.V021?.summary ?? "";
+		expect(summary).toMatch(/missing/);
+		expect(summary).toMatch(/absolute/);
+		expect(summary).toMatch(/URL/);
+	});
+
+	it("V032 names non-injectivity only, not the non-surjective case V034 reports", () => {
+		const summary = DIAGNOSTIC_REGISTRY.V032?.summary ?? "";
+		expect(summary).toMatch(/injective/);
+		expect(summary).not.toMatch(/bijection/);
+		expect(summary).not.toMatch(/surjective/);
+	});
+
+	it("V033 covers the identity map, not only an explicit `boundary:` map", () => {
+		const summary = DIAGNOSTIC_REGISTRY.V033?.summary ?? "";
+		expect(summary).toMatch(/effective/);
+		expect(summary).toMatch(/identity/);
+	});
+
+	it("V034 names the non-surjective case", () => {
+		const summary = DIAGNOSTIC_REGISTRY.V034?.summary ?? "";
+		expect(summary).toMatch(/surjective/);
+	});
+});
+
 describe("DIAGNOSTIC_REGISTRY vs. real source", () => {
 	// Walking the tree beats naming the files: a hard-coded list silently stops
 	// covering a code when the emitting rule moves to a new module, which is

@@ -212,6 +212,24 @@ export interface SubflowBoundaryContext {
 }
 
 /**
+ * V033 message. Without a `boundary:` entry the crossing comes from the
+ * identity map, so the message says so instead of blaming a map entry the
+ * file does not have.
+ */
+function sideMismatchMessage(
+	parentSide: "input" | "output",
+	parentId: string,
+	childSide: "terminal" | "open input",
+	childId: string,
+	boundaryMap: Record<string, string>,
+	processId: string,
+): string {
+	return Object.hasOwn(boundaryMap, parentId)
+		? `boundary maps ${parentSide} '${parentId}' to ${childSide} '${childId}' (side mismatch) on process '${processId}'`
+		: `${parentSide} '${parentId}' has no boundary: entry and matches child ${childSide} '${childId}' by identity (side mismatch) on process '${processId}'`;
+}
+
+/**
  * Validate the boundary between a parent process and its subflow child (§15.11).
  * Returns V030 (dangling key/value), V032 (non-injective), V033 (side mismatch),
  * or V034 (set mismatch) diagnostics for any violations.
@@ -265,7 +283,7 @@ export function validateSubflowBoundary(
 	// Build effective map: parent ID -> child ID (using boundaryMap or identity)
 	const effective = new Map<string, string>();
 	for (const p of parentBoundary) {
-		effective.set(p, boundaryMap[p] ?? p);
+		effective.set(p, Object.hasOwn(boundaryMap, p) ? boundaryMap[p]! : p);
 	}
 
 	// C3 — effective map must be injective
@@ -290,7 +308,14 @@ export function validateSubflowBoundary(
 			diagnostics.push({
 				severity: "error",
 				code: "V033",
-				message: `boundary maps input '${p}' to terminal '${c}' (side mismatch) on process '${processId}'`,
+				message: sideMismatchMessage(
+					"input",
+					p,
+					"terminal",
+					c,
+					boundaryMap,
+					processId,
+				),
 				range: zeroRange(),
 			});
 		}
@@ -301,7 +326,14 @@ export function validateSubflowBoundary(
 			diagnostics.push({
 				severity: "error",
 				code: "V033",
-				message: `boundary maps output '${p}' to open input '${c}' (side mismatch) on process '${processId}'`,
+				message: sideMismatchMessage(
+					"output",
+					p,
+					"open input",
+					c,
+					boundaryMap,
+					processId,
+				),
 				range: zeroRange(),
 			});
 		}
