@@ -11,8 +11,12 @@ import { fileURLToPath } from "node:url";
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 
 /** @param {string} target */
-function dryRun(target) {
-	return execFileSync("make", ["-n", target], { cwd: root, encoding: "utf8" })
+function dryRun(target, env = process.env) {
+	return execFileSync("make", ["--no-print-directory", "-n", target], {
+		cwd: root,
+		encoding: "utf8",
+		env,
+	})
 		.split("\n")
 		.map((line) => line.trim())
 		.filter(Boolean);
@@ -20,18 +24,23 @@ function dryRun(target) {
 
 const runs = (script) => (line) => line.startsWith(`node scripts/${script}`);
 
-it("make push runs all checks before generation and shares one build", () => {
-	const recipe = dryRun("push");
-	const generate = recipe.findIndex(runs("check-generation.mjs"));
-	for (const target of ["test", "typecheck", "lint", "check-docs"]) {
-		for (const line of dryRun(target)) {
-			const at = recipe.indexOf(line);
-			assert.ok(at >= 0 && at < generate, `${line} runs before generation`);
+for (const directoryOutput of [false, true]) {
+	it(`make push runs all checks before generation and shares one build (directory output ${directoryOutput})`, () => {
+		const env = directoryOutput
+			? { ...process.env, MAKEFLAGS: "w", MAKELEVEL: "1" }
+			: process.env;
+		const recipe = dryRun("push", env);
+		const generate = recipe.findIndex(runs("check-generation.mjs"));
+		for (const target of ["test", "typecheck", "lint", "check-docs"]) {
+			for (const line of dryRun(target, env)) {
+				const at = recipe.indexOf(line);
+				assert.ok(at >= 0 && at < generate, `${line} runs before generation`);
+			}
 		}
-	}
-	assert.equal(recipe.filter((line) => line === "pnpm -r build").length, 1);
-	assert.ok(generate < recipe.indexOf("git push"));
-});
+		assert.equal(recipe.filter((line) => line === "pnpm -r build").length, 1);
+		assert.ok(generate < recipe.indexOf("git push"));
+	});
+}
 
 it("make push checks all generated surfaces and never stages or commits edits", () => {
 	const recipe = dryRun("push");
