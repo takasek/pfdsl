@@ -6,7 +6,7 @@ import type { RuleContext } from "./context.js";
 const STATUS_SET: ReadonlySet<string> = new Set(STATUS_VALUES);
 
 /**
- * V004 / V005 / W001: what a `parts:` list may name (§15.5).
+ * V004 / V005 / W001: what a `parts:` list may name ([[SPEC_parts_constraint]]).
  * A member must be an artifact, must not be the owner itself, and should take
  * part in at least one edge — otherwise it is declared but never produced.
  *
@@ -61,7 +61,7 @@ export function partsMembership(ctx: RuleContext): Diagnostic[] {
 	return diagnostics;
 }
 
-/** V006: `parts:` must not form a cycle (§15.5). One diagnostic per cycle (§16). */
+/** V006: `parts:` must not form a cycle ([[SPEC_parts_constraint]]). One diagnostic per cycle (the diagnostic code table). */
 export function partsCycle(ctx: RuleContext): Diagnostic[] {
 	const diagnostics: Diagnostic[] = [];
 	const visited = new Set<string>();

@@ -180,7 +180,7 @@ export interface GraphOrphan {
 }
 
 /**
- * Nodes wired to nothing — no primary edge and no feedback edge (§518).
+ * Nodes wired to nothing — no primary edge and no feedback edge (#518).
  *
  * Deliberately not `computeStats(...).filter(degree === 0)`, which is what
  * this used to be. That reading counted only primary edges and treated every

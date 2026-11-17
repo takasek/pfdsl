@@ -10,7 +10,7 @@ import type { AnalyzeResult } from "./index.js";
  * Rewrite group id `oldId` to `newId` in `source`: its declaration key (kept
  * in place among its siblings), every other group's `parent:` reference, and
  * every artifact's/process's `group:` field. Only the frontmatter changes —
- * the body never references groups (spec §2.8). Applied through the yaml
+ * the body never references groups (spec [[SPEC_group_definition]]). Applied through the yaml
  * CST (ADR-0034), so comments, quoting, flow-vs-block style and folded (`>`)
  * scalars elsewhere survive. Returns the whole document, the rewritten
  * members (artifacts before processes, each in declaration order) and the

@@ -2,11 +2,11 @@
 /**
  * check-diag-registry.mjs
  *
- * Diffs the `docs/spec/spec.md` §16 diagnostic code table against the
+ * Diffs the `docs/spec/spec.md` Diagnostic code table against the
  * DIAGNOSTIC_REGISTRY exported by @pfdsl/core (packages/core/dist, must be
  * built first — see `make build-deps`). Catches the spec/implementation
  * drift described in #299: a code emitted by the checker but undocumented
- * in §16, a stale code documented but no longer emitted, or a severity,
+ * in the diagnostic code table, a stale code documented but no longer emitted, or a severity,
  * definition section or spec ID that disagrees between the two.
  *
  * Usage:

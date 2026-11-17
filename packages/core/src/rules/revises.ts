@@ -53,7 +53,7 @@ function collectRevises(ctx: RuleContext): {
 }
 
 /**
- * V016 – V019: the `revises:` chain (§15.9). A revision must point at an
+ * V016 – V019: the `revises:` chain ([[SPEC_revises_constraint]]). A revision must point at an
  * artifact declared in the same file, not at itself; a given artifact may be
  * revised by at most one successor; and the chain must not close into a cycle.
  */
@@ -77,7 +77,7 @@ export function revisesChain(ctx: RuleContext): Diagnostic[] {
 		}
 	}
 
-	// V019: one diagnostic per independent cycle (§16).
+	// V019: one diagnostic per independent cycle (the diagnostic code table).
 	const color = new Map<string, "white" | "gray" | "black">();
 	for (const id of Object.keys(ctx.artifactMeta)) color.set(id, "white");
 	function walk(id: string): boolean {

@@ -38,7 +38,7 @@ function extendsLoader(path: string): ReturnType<typeof analyzeSource> | null {
 }
 
 /**
- * Resolve `extends:`-inherited statusStyles/tag/group (§2.9.4) for a document
+ * Resolve `extends:`-inherited statusStyles/tag/group ([[SPEC_extends_inheritance]]) for a document
  * identified by `uri`, so preview/export match CLI `graph` rendering (#427).
  * Skipped for non-`file` schemes (e.g. untitled documents) — relative extends
  * paths need a real file location to resolve against.

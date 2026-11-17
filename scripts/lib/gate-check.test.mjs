@@ -595,7 +595,7 @@ describe("parseInputConsumedArtifacts", () => {
 	});
 
 	it("ignores feedback edges, matching audit-terminal semantics", () => {
-		// `graph io`'s terminals are the spec's audit-terminal (§15.11): an
+		// `graph io`'s terminals are audit-terminal in spec.md's 終端成果物 section: an
 		// artifact consumed only via `>>?` stays terminal. A sibling's feedback
 		// edge must not rescue it either, or the same artifact would be classed
 		// differently depending on which file its feedback consumer sits in.

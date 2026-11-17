@@ -74,9 +74,9 @@ describe("DIAGNOSTIC_REGISTRY section/summary metadata", () => {
 });
 
 // The summary is what `pfdsl explain` prints, so it has to name every
-// condition the code is raised for (spec §16) and nothing it is not raised
+// condition the code is raised for (spec.md's diagnostic code table) and nothing it is not raised
 // for. These pin the conditions spec.md assigns to each code.
-describe("DIAGNOSTIC_REGISTRY summaries name the conditions spec §16 assigns", () => {
+describe("DIAGNOSTIC_REGISTRY summaries name the conditions in the diagnostic code table", () => {
 	it("V021 names a missing subflow file as well as an absolute path / URL", () => {
 		const summary = DIAGNOSTIC_REGISTRY.V021?.summary ?? "";
 		expect(summary).toMatch(/missing/);

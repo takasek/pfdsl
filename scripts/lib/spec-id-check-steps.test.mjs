@@ -17,7 +17,7 @@ describe("runSpecIdCheck", () => {
 
 	it("counts every violation kind in the failure heading", () => {
 		const texts = {
-			"a.md": "## 2.3 Rule (SPEC_a) (SPEC_b)\n§2.3 §2.3\n[[SPEC_missing]]",
+			"a.md": "## 2.3 Rule (SPEC_a) (SPEC_b)\n§2.3 §2.3\n[[SPEC_missing]]", // spec-ref-literal: synthetic specification fixture
 			"b.md": "## Other (SPEC_a)",
 		};
 		const result = runSpecIdCheck({
@@ -35,7 +35,7 @@ describe("runSpecIdCheck", () => {
 		const result = runSpecIdCheck({
 			args: ["a.md"],
 			listFiles: () => [],
-			readFile: () => "## 2.3 Rule (SPEC_x)\nsee §2.3",
+			readFile: () => "## 2.3 Rule (SPEC_x)\nsee §2.3", // spec-ref-literal: synthetic specification fixture
 		});
 		assert.equal(result.exitCode, 1);
 		assert.equal(
@@ -44,13 +44,13 @@ describe("runSpecIdCheck", () => {
 		);
 		assert.equal(
 			result.stderrLines[1],
-			"bare section reference §2.3 at a.md:2 — section 2.3 has id SPEC_x; use [[SPEC_x]]",
+			"bare section reference §2.3 at a.md:2 — section 2.3 has id SPEC_x; use [[SPEC_x]]", // spec-ref-literal: specification reference syntax example
 		);
 	});
 	it("does not resolve bare references against another file", () => {
 		const texts = {
 			"a.md": "## 2.3 Rule (SPEC_x)",
-			"b.md": "see §2.3",
+			"b.md": "see §2.3", // spec-ref-literal: synthetic specification fixture
 		};
 		assert.equal(
 			runSpecIdCheck({
@@ -112,7 +112,7 @@ describe("runSpecIdCheck", () => {
 		const result = runSpecIdCheck({
 			args: ["a.md"],
 			listFiles: () => [],
-			readFile: () => "## Heading (SPEC_foo)\nsee [[SPEC_foo]]",
+			readFile: () => "## Heading (SPEC_foo)\nsee [[SPEC_foo]]", // spec-ref-literal: synthetic specification fixture
 		});
 		assert.equal(result.exitCode, 0);
 		assert.deepEqual(result.stdoutLines, [
@@ -148,7 +148,7 @@ describe("runSpecIdCheck", () => {
 		const result = runSpecIdCheck({
 			args: ["a.md"],
 			listFiles: () => [],
-			readFile: () => "see [[SPEC_bar]]",
+			readFile: () => "see [[SPEC_bar]]", // spec-ref-literal: synthetic specification fixture
 		});
 		assert.equal(result.exitCode, 1);
 		assert.match(

@@ -4,7 +4,7 @@ import { referenceTargetSchema } from "../types/frontmatter.js";
 import type { Diagnostic, Range } from "../types/index.js";
 import type { RuleContext } from "./context.js";
 
-/** V037–V039: declarations can be checked without fetching their targets (§15.18). */
+/** V037–V039: declarations can be checked without fetching their targets ([[SPEC_reference_resolution_constraint]]). */
 export function referenceDeclarations(ctx: RuleContext): Diagnostic[] {
 	const diagnostics: Diagnostic[] = [];
 	const checkTarget = (

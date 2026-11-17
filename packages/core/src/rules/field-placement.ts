@@ -4,7 +4,7 @@ import type { RuleContext } from "./context.js";
 
 /**
  * V012 / V015: fields that belong to an artifact, rejected on a process
- * (§15.7, §15.9). `location:` is deliberately absent — it is legal on both
+ * ([[SPEC_criteria_constraint]], [[SPEC_revises_constraint]]). `location:` is deliberately absent — it is legal on both
  * since #310.
  */
 export function processOnlyFields(ctx: RuleContext): Diagnostic[] {
@@ -34,9 +34,9 @@ export function processOnlyFields(ctx: RuleContext): Diagnostic[] {
 }
 
 /**
- * W002 / V014: a produced artifact should say how it is judged done (§15.7),
+ * W002 / V014: a produced artifact should say how it is judged done ([[SPEC_criteria_constraint]]),
  * and `command:` belongs to the process that makes it, not to the artifact
- * (§15.8).
+ * ([[SPEC_location_command_constraint]]).
  *
  * W002 applies only to produced artifacts: a source artifact has no process to
  * attach a completion criterion to.
@@ -70,7 +70,7 @@ export function artifactOnlyFields(ctx: RuleContext): Diagnostic[] {
 	return diagnostics;
 }
 
-/** V023: `subflow:` names a child graph for a process, never for an artifact (§15.11). */
+/** V023: `subflow:` names a child graph for a process, never for an artifact ([[SPEC_subflow_boundary_constraint]]). */
 export function subflowOnArtifact(ctx: RuleContext): Diagnostic[] {
 	const diagnostics: Diagnostic[] = [];
 	for (const [id, rawMeta] of Object.entries(ctx.artifactMeta)) {
@@ -87,7 +87,7 @@ export function subflowOnArtifact(ctx: RuleContext): Diagnostic[] {
 	return diagnostics;
 }
 
-/** V024: `boundary:` remaps a subflow's ids, so it needs one to remap (§15.11). */
+/** V024: `boundary:` remaps a subflow's ids, so it needs one to remap ([[SPEC_subflow_boundary_constraint]]). */
 export function boundaryWithoutSubflow(ctx: RuleContext): Diagnostic[] {
 	const diagnostics: Diagnostic[] = [];
 	for (const [pid, rawMeta] of Object.entries(ctx.processMeta)) {

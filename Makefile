@@ -192,6 +192,7 @@ check-docs:
 	node scripts/check-spec-ids.mjs
 	# spec.md is distributed alone, so its strict references must resolve within it.
 	node scripts/check-spec-ids.mjs docs/spec/spec.md
+	node scripts/check-spec-references.mjs
 	node scripts/check-companion-bindings.mjs
 	node scripts/check-distributed-prose.mjs
 	node scripts/report-executor-vocabulary.mjs --check

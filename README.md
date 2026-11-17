@@ -51,11 +51,11 @@ spec >> P -> impl
 - Allowed style attrs: `fillcolor | color | fontcolor | style | penwidth`
 - Apply order: `tags` reverse-merge (first tag wins) → `statusStyles` overrides last (`status` artifact-only)
 
-See [docs/spec/spec.md §2.7](docs/spec/spec.md) for full rules.
+See the [status, tags and style rules](docs/spec/spec.md) ([[SPEC_status_tags_style_mapping]]) for details.
 
 ## `index:` field (external tool numbering)
 
-Artifacts and processes accept an optional `index:` integer. `pfdsl reindex` auto-assigns values in topological order; external tools (e.g. pfd-tools) read them as `D{index}` / `P{index}`. See [docs/spec/spec.md §2.3](docs/spec/spec.md) for constraints.
+Artifacts and processes accept an optional `index:` integer. `pfdsl reindex` auto-assigns values in topological order; external tools (e.g. pfd-tools) read them as `D{index}` / `P{index}`. See the [metadata rules](docs/spec/spec.md) ([[SPEC_id_metadata]]) for constraints.
 
 ## Samples
 

@@ -221,7 +221,7 @@ export function lex(source: string): LexResult {
 	return { tokens, diagnostics };
 }
 
-// A bare id starts with a letter, a number or `_`; `-` may follow (spec §4.1,
+// A bare id starts with a letter, a number or `_`; `-` may follow (spec.md's bare-id rules,
 // the same rule as ID_PATTERN).
 function isBareIdStart(ch: string): boolean {
 	return ch === "_" || BARE_ID_RE.test(ch);

@@ -1,6 +1,6 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
-exports[`public API > format: matches golden canonical output for sample file (locks spec §14 ordering) 1`] = `
+exports[`public API > format: matches golden canonical output for sample file (spec.md's canonical ordering rules) 1`] = `
 "---
 title: Pipeline Scale Test Fixture
 description: Fixed fixture for snapshot testing pipeline throughput. Represents structural patterns of a real roadmap without coupling to production planning data.

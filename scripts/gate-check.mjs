@@ -390,7 +390,7 @@ console.log(formatGateTable(results));
 		// directory, at HEAD (#671). ADR-0035 split the graphs by judgment axis,
 		// which leaves a generation source declared in one file and consumed in
 		// its sibling; `graph io` runs per file and cannot see across. Composing
-		// the sets here rather than in the CLI is deliberate — spec §2.9.1 keeps
+		// the sets here rather than in the CLI is deliberate — spec [[SPEC_file_local_id_scope]] keeps
 		// ids file-local and forbids a flattened cross-file view, so "same id
 		// means the same artifact" is a local convention of this repo's .pfdsl/,
 		// which pipeline.md already declares out of modeling scope. Which
@@ -607,7 +607,7 @@ if (
 			"  could not be measured: packages/core/dist not built (run 'pnpm -r build')",
 		);
 	} else {
-		// The same pair the CLI applies to a `location:` element (spec §15.8),
+		// The same pair the CLI applies to a `location:` element (spec [[SPEC_location_command_constraint]]),
 		// so this report and `meta get` cannot disagree about where a node lives.
 		const { analyze, isUnreadableError, isUrlLike, resolveLocationFsPath } =
 			await import(corePath);

@@ -32,7 +32,7 @@ describe("sortEdges", () => {
 		expect(result[1]).toEqual({ kind: "output", process: "P", artifact: "B" });
 	});
 
-	it("sequential chain: rank-driven full edge order A >> P -> B >> Q -> C (locks spec §14.2)", () => {
+	it("sequential chain: rank-driven full edge order A >> P -> B >> Q -> C (spec.md's rank ordering rule)", () => {
 		// ranks: A=0, P=1, B=2, Q=3, C=4. Edges sort by source-side rank, then kind, then lex.
 		const result = sorted("A >> P -> B >> Q -> C");
 		expect(result).toEqual([
@@ -76,7 +76,7 @@ describe("sortEdges", () => {
 		expect(inputs[1]).toEqual({ kind: "input", artifact: "b", process: "P" });
 	});
 
-	it("feedback edges placed by process rank (spec §14.5): sits between target process inputs and outputs", () => {
+	it("feedback edges placed by process rank (spec.md's feedback edge ordering rule): sits between target process inputs and outputs", () => {
 		// Chain: req(0) >> design(1) -> spec(2) >> impl(3) -> code(4)
 		// Feedback spec >>? impl: source artifact is in main component; edge rank = impl rank (3).
 		// At rank 3, kind ordering puts feedback (1) before output (2).

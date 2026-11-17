@@ -9,7 +9,7 @@ const STYLE_ATTR_SET: ReadonlySet<string> = new Set(STYLE_ATTRS);
 
 /**
  * V029 / W004: `index:` must be a positive integer, and must be unique within
- * its namespace (§15.13). Artifacts and processes are numbered independently,
+ * its namespace ([[SPEC_index_constraint]]). Artifacts and processes are numbered independently,
  * so the same index on one of each is fine.
  */
 export function indexShape(ctx: RuleContext): Diagnostic[] {
@@ -55,7 +55,7 @@ export function indexShape(ctx: RuleContext): Diagnostic[] {
 
 /**
  * V008 / V009: `statusStyles:` may only be keyed by a status, and both it and
- * `tag.<id>.style` may only carry known attributes (§15.6).
+ * `tag.<id>.style` may only carry known attributes ([[SPEC_status_style_constraint]]).
  */
 export function styleShape(ctx: RuleContext): Diagnostic[] {
 	const diagnostics: Diagnostic[] = [];

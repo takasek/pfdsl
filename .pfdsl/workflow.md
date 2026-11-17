@@ -168,7 +168,7 @@ issue が spec 変更を明示しており、変更が単一の制約節・sever
 
 実装 PR 内で spec に小規模追加を行う場合、`draft_proposals → spec_proposals → maintain_spec` 経路はスキップしてよい。スキップ可能条件:
 
-- 変更が単一 issue の実装に付随する制約節（§15.X）と §16 への追記のみ
+- 変更が単一 issue の実装に付随する制約節と診断コード表への追記のみ
 - 他の spec 提案との cross-validation が不要（既存節との矛盾・対称性チェックが自明）
 
 上記を満たさない場合（新フィールド設計・複数節にまたがる変更・spec バージョン統合）は draft_proposals を経由する。
@@ -177,7 +177,7 @@ issue が spec 変更を明示しており、変更が単一の制約節・sever
 
 spec 統合時の Opus 外部レビューで繰り返し指摘された項目:
 
-- [ ] 型専用フィールドを追加した場合、逆型指定の error を制約節（§15.X）と §16 の両方に対称記載した
+- [ ] 型専用フィールドを追加した場合、逆型指定の error を制約節と診断コード表の両方に対称記載した
 - [ ] 例示は front matter と flow edge が self-consistent（metadata フィールドを示す例は対応 edge も明示）
 
 上記は個別 proposal 段階では見えず、統合時に他フィールドとの対称性比較で発覚する。spec 統合のサイクルでは外部レビューを推奨する。
@@ -257,7 +257,7 @@ push・release は生成出力のstage済み未commit差分も拒否し、stage�
 
 **本来の見出しに残ったことは、それだけでは門番違反の確定ではない。** sibling が構文エラー等で `graph edges --json` に落ちた場合、その図の消費エッジは黙って読み飛ばされ、消費者は0件として扱われる（読めなかった側に倒すと本物の違反を沈黙させるため、見に行けと言う側に倒してある）。門番違反と言えるのは、sibling が読めたうえで消費者が無いときである。判定時は `.pfdsl/pipeline.pfdsl` を単体で `graph edges` に通し、パースが通ることを確かめてから結論する。
 
-合成を CLI でなく `gate-check.mjs` に置いたのは spec §2.9.1 が ID をファイルローカルに保ち、複数ファイルを跨いだ平坦化ビューの構成を禁じているためである。「同名 ID は同じ成果物」はこのリポの `.pfdsl/` のローカルな慣行であり、規範ではない。慣行が及ぶ範囲は `scripts/lib/gate-check.mjs` の `SIBLING_ID_NAMESPACE_DIRS` が持ち、`.pfdsl/` だけを列挙する — `docs/samples/` は互いに無関係なチュートリアル図が `spec` / `code` を使い回しており、同一ディレクトリという理由だけで合成すると本物の門番違反が sibling 見出しへ落ちる。`>>?` フィードバック消費も合成の対象に入れない — `graph io` の `terminals` は spec §15.11 の audit-terminal でフィードバック消費を無視するため、sibling 側だけフィードバックを数えると同じ artifact が消費者の置き場所次第で別分類になる。
+合成を CLI でなく `gate-check.mjs` に置いたのは spec [[SPEC_file_local_id_scope]] が ID をファイルローカルに保ち、複数ファイルを跨いだ平坦化ビューの構成を禁じているためである。「同名 ID は同じ成果物」はこのリポの `.pfdsl/` のローカルな慣行であり、規範ではない。慣行が及ぶ範囲は `scripts/lib/gate-check.mjs` の `SIBLING_ID_NAMESPACE_DIRS` が持ち、`.pfdsl/` だけを列挙する — `docs/samples/` は互いに無関係なチュートリアル図が `spec` / `code` を使い回しており、同一ディレクトリという理由だけで合成すると本物の門番違反が sibling 見出しへ落ちる。`>>?` フィードバック消費も合成の対象に入れない — `graph io` の `terminals` は spec.md「終端成果物」の audit-terminal でフィードバック消費を無視するため、sibling 側だけフィードバックを数えると同じ artifact が消費者の置き場所次第で別分類になる。
 
 ## 採用先への移行案内
 

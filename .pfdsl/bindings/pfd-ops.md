@@ -38,12 +38,29 @@ pfdsl スキル本文の CLI プリフライトは採用リポ向けに `pfdsl` 
 ## spec 参照では get-by-ID で必要な節だけ読む
 
 `docs/` 内の `(SPEC_xxx)` 定義済みブロックを参照する際は、ファイル全文を Read せず `node scripts/get-spec-id.mjs SPEC_xxx` で該当ブロックのみ取得する（レンジ規則は ADR-0027）。
-参照先が `[[SPEC_xxx]]` / `[[SPEC_xxx?]]` で書かれている本文を追うときが起動契機。
+参照先が `[[SPEC_xxx]]` / `[[SPEC_xxx?]]` で書かれている本文を追うときが起動契機<!-- spec-ref-literal: specification reference syntax example -->。
+
+## 仕様書外の現行参照を検査する
+
+このリポの現行参照は `node scripts/check-spec-references.mjs` で検査する。
+`make check-docs` もこの検査を含む。
+対象はコード・テスト・スキルの入力元、ルートとdocs直下の現行Markdown、運用companionとbindingであり、具体的な選択は `selectSpecReferenceSources` が持つ。
+ADR・版履歴・統合済みproposal・監査やレビューの証拠・過去計画・生成コピーは現在の仕様に合わせて書き換えない。
+
+このリポの現行参照では既存の仕様IDを使い、IDのない対象は可変な節番号を外して見出し名や規則の要点で示す。
+新しいIDの採番は既存の段階移行と分けて判断する。
+名前で示した未IDの規則について、検査は見出し改名や引用内容の正しさを保証しない。
+診断表とexplainの節番号は `check-diag-registry` が照合する。
+
+コード文字列やMarkdownのコード内にある参照も検査する。
+構文例、固定版の事例、実出力のassertionとして数値・仮IDをそのまま必要とする行は、同じ物理行に理由付きの `spec-ref-literal: <reason>` コメントを付ける。
+注記はその行だけに作用し、テストファイル全体や次の行を除外しない。
+原文のままのfixtureと、そのfixtureを根拠に現行仕様を説明する文を混同しない。
 
 ## 新しい仕様 ID を確認して採番する
 
 新規 ID を採番する前に slug の既出を確認する（ADR-0027「ID の性質」）。機械列挙は `node scripts/mint-check.mjs <slug>` を使う（既定で `docs/**/*.md` を走査し、定義・strict 参照・forward-ref の全出現を file:line で列挙し、既出ありなら exit 1。tombstone 次元は main の履歴にある ID の初回削除まで据え置き #405）。
-1つのブロックに付ける ID は1つだけで、別名は付けない（ADR-0053）。採番した節を同じファイルの中で `§N.M` と番号で参照し続けると `check-spec-ids` が落ちるので、参照も `[[SPEC_xxx]]` へ置き換える。
+1つのブロックに付ける ID は1つだけで、別名は付けない（ADR-0053）。採番した節を同じファイルの中で `§N.M` と番号で参照し続けると `check-spec-ids` が落ちるので、参照も `[[SPEC_xxx]]` へ置き換える<!-- spec-ref-literal: specification reference syntax example -->。
 採番しようとした slug が既存 forward-ref（`[[SPEC_xxx?]]`）と一致した場合、その forward-ref が予約した概念と同一かを確認し、別概念なら slug を変える。
 削除された ID は再利用しない。
 

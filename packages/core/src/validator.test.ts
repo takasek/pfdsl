@@ -109,7 +109,7 @@ describe("validate", () => {
 	it("V005: parts self-reference, which is also reported as a one-node cycle", () => {
 		const fm: Frontmatter = { artifact: { A: { parts: ["A"] } } };
 		const diags = diagnose("A >> P -> B", fm);
-		// Both fire, and that is the intended set: §15.5 lists self-reference and
+		// Both fire, and that is the intended set: [[SPEC_parts_constraint]] lists self-reference and
 		// cycle as separate errors, and suppressing V006 here would make the
 		// cycle walk depend on another rule's findings. Pinned as a set so a
 		// future change to either rule has to state which one it means.
@@ -125,7 +125,7 @@ describe("validate", () => {
 	});
 
 	it("a feedback edge from outside a subflow process's downstream stays silent", () => {
-		// §15.3 permits both a disconnected feedback artifact and a downstream
+		// [[SPEC_feedback_validity_constraint]] permits both a disconnected feedback artifact and a downstream
 		// one, and the primary graph cannot tell a disconnected-but-wirable edge
 		// from a legitimate generation loop — so nothing is reported here.
 		const fm: Frontmatter = { process: { P: { subflow: "./child.pfdsl" } } };
@@ -850,10 +850,10 @@ a >> design -> b
 		});
 	});
 
-	// §16 requires every cycle-detecting code to report one diagnostic per
+	// the diagnostic code table requires every cycle-detecting code to report one diagnostic per
 	// independent cycle. V010 used to stop after the first; these lock the rule
 	// for the codes that live in this module so none of them regresses to it.
-	describe("cycle codes report every independent cycle (§16)", () => {
+	describe("cycle codes report every independent cycle (the diagnostic code table)", () => {
 		it("V006 reports both disjoint parts cycles", () => {
 			const fm: Frontmatter = {
 				artifact: {
@@ -1262,7 +1262,7 @@ a >> design -> b
 
 		it("does not flag process ids, only artifacts", () => {
 			// P has no frontmatter process: entry either, but V035 looks only at
-			// artifacts — a process needs no declaration (spec §15.16, #1598).
+			// artifacts — a process needs no declaration (spec [[SPEC_roadmap_artifact_declaration_and_status]], #1598).
 			const fm: Frontmatter = {
 				type: "roadmap",
 				artifact: { A: { status: "done" }, C: { status: "todo" } },
@@ -1273,7 +1273,7 @@ a >> design -> b
 			).toHaveLength(0);
 		});
 
-		// §15.16 says a roadmap process needs no frontmatter declaration: no
+		// [[SPEC_roadmap_artifact_declaration_and_status]] says a roadmap process needs no frontmatter declaration: no
 		// rule reports the missing declaration itself, in either mode (#1598).
 		it("reports nothing for an undeclared process whose inputs and outputs are complete", () => {
 			const fm: Frontmatter = {

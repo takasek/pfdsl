@@ -255,7 +255,7 @@ describe("public API", () => {
 		expect(errors).toHaveLength(0);
 	});
 
-	it("format: matches golden canonical output for sample file (locks spec §14 ordering)", () => {
+	it("format: matches golden canonical output for sample file (spec.md's canonical ordering rules)", () => {
 		const { output, diagnostics } = format(sampleSource);
 		const errors = diagnostics.filter((d) => d.severity === "error");
 		expect(errors).toHaveLength(0);

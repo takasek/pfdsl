@@ -7,13 +7,14 @@ export interface DiagnosticRegistryEntry {
 	severities: readonly DiagnosticSeverity[];
 	/** Spec section number (without the `§` prefix) that normatively defines
 	 * the condition this code checks, e.g. "15.11". Must equal the section
-	 * number that spec.md §16's 定義節 cell resolves to: the cell is either
-	 * `§N.M` or a `[[SPEC_x]]` reference to the numbered heading that defines
+	 * number resolved from the 定義節 cell of spec.md's diagnostic code table.
+	 * The cell is either
+	 * `§N.M` or a `[[SPEC_x]]` reference to the numbered heading that defines // spec-ref-literal: specification reference syntax example
 	 * SPEC_x (checked by scripts/check-diag-registry.mjs). Used by
 	 * `pfdsl explain <code>`. */
 	section: string;
-	/** Stable spec ID of that section, present when spec.md §16's 定義節 cell
-	 * is a `[[SPEC_x]]` reference. Section numbers can be renumbered; this ID
+	/** Stable spec ID of that section, present when the diagnostic table's 定義節 cell
+	 * is a `[[SPEC_x]]` reference. Section numbers can be renumbered; this ID // spec-ref-literal: specification reference syntax example
 	 * is what adopters should cite. Used by `pfdsl explain <code>`. */
 	specId?: string;
 	/** One-line English summary of the condition this code checks, for

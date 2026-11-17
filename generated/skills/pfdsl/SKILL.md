@@ -29,8 +29,8 @@ description: |
 
 ```yaml
 title: ...
-type: roadmap     # roadmap | workflow | pipeline（§2.10）。`ready` は roadmap のみ対象。省略可
-extends: presets.yaml   # 表示系キー（statusStyles 等）のプリセット継承（§2.9.4）
+type: roadmap     # roadmap | workflow | pipeline（[[SPEC_type_field]]）。`ready` は roadmap のみ対象。省略可
+extends: presets.yaml   # 表示系キー（statusStyles 等）のプリセット継承（[[SPEC_extends_inheritance]]）
 basePath: ../     # location:/command: の解決基準ディレクトリ。省略時はこの .pfdsl のディレクトリ
 layout:
   direction: LR   # LR | RL | TB | BT (default LR)
@@ -61,7 +61,7 @@ process:
     tags: [ tag1, tag2 ]    # Artifact / Process 両方に指定可（group と対称）
     command: npm run build  # 対応する実行コマンド
     estimate: 2d            # 工数見積もり（形式自由）
-    subflow: child.pfdsl    # 子 PFD への展開リンク（§2.9.3）
+    subflow: child.pfdsl    # 子 PFD への展開リンク（[[SPEC_subflow_expansion]]）
     boundary: { parent_id: child_id }  # subflow の親→子 artifact ID 対応表（1:1。載せない親の入出力は子の同じ ID と照合）
 
 group:
@@ -86,7 +86,7 @@ statusStyles:
 
 **値にコロン＋空白（`: `）を含むなら引用符で囲む。** `description: 例: 対応するケース` のようなプレーンスカラーは YAML がネストした mapping と解釈し、frontmatter 全体が `FM002: Invalid YAML in front matter` で失敗する。`label` / `description` / `criteria` 等の文字列値に `: ` が入る場合は `description: "例: 対応するケース"` のようにダブルクォートで囲むか、folded scalar（`>`）で書く。`tags` 等のシーケンス要素（`- 例: 対応するケース`）では FM002 すら出ず、要素が文字列でなく1キーの mapping として黙って読まれるため、`check` が通っても同じく引用符で囲む。値の中の `#` の扱いは `references/spec.md` の FM003 を参照。
 
-その他のトップレベルフィールド（`version` / `dslVersion` 等）と各フィールドの正確な仕様は `references/spec.md` §2、機能別の最小例は `references/samples.md` を参照。
+その他のトップレベルフィールド（`version` / `dslVersion` 等）と各フィールドの正確な仕様は `references/spec.md` の「ファイル形式」、機能別の最小例は `references/samples.md` を参照。
 
 Specification v0.0.30 defines artifact reference targets: document-level `baseRef: { source, revision }` and artifact-level `ref` replacing that whole mapping.
 They select the artifact's reference target; they do not change process locations or command working directories.
@@ -125,7 +125,7 @@ Full flag reference: `pfdsl help`. If a command above is reported as `unknown co
 - **V010 primary graph is a DAG**: no cycle via `>>` / `->` (feedback `>>?` is exempt)
 - **V020 declared process needs edges**: any process declared in frontmatter `process:` must participate in at least one edge
 
-Full V/W list: `references/spec.md` §15–16.
+Full V/W list: the constraints ([[SPEC_constraints]]) and diagnostic code table in `references/spec.md`.
 
 ## Writing quality PFDs
 
@@ -181,15 +181,15 @@ Declare a new group under `group:` before moving nodes into it: a `group:` value
 | status 更新・読解・小編集 | 本文で完結（references 不要） |
 | 特定の構文・フィールドの書き方 | `references/samples.md`（機能別の最小例） |
 | 新規 PFD の執筆・設計判断 | `references/quality-guide.md`（必読）+ `references/examples.md`（実戦ドメインの設計パターン。先頭の Index で該当例の行範囲を特定し、そこだけ Read する） |
-| check エラーの対処 | `pfdsl explain <code>`（例: V021）でコード→節番号+一行要約を即時解決。節本文が要る場合のみフォールバックとして `references/spec.md` をエラーコードで grep（ヒット先は §15 制約・§16 エラー方針のいずれか） |
-| フィールドの正確な仕様 | `references/spec.md` §3–5（モデル・識別子・型推論）・§14（正準順序） |
+| check エラーの対処 | `pfdsl explain <code>`（例: V021）でコード→節番号+一行要約を即時解決。節本文が要る場合のみフォールバックとして `references/spec.md` をエラーコードで grep（ヒット先は制約・エラー方針のいずれか） |
+| フィールドの正確な仕様 | `references/spec.md` の「モデル構成要素」「識別子」「ID種別推論」「正準順序（fmt が従う規範）」 |
 | PFD のレビュー・監査 | `references/review-perspectives.md`（A/B/C カタログ。A/B は図、C は normative 仕様文書（自リポ保守の仕様がある場合）の監査。書くルールは `references/quality-guide.md`、問い詰めはこちら） |
 
 `references/spec.md` は full spec v0.0.30（大型）— 全読せず、該当箇所だけ読む。
-規則本文の多くは `###`・`####` の小節にあるので、`pfdsl explain` が示す節番号は見出しの深さを問わない形で検索する（例: §15.16 なら `grep -nE '^#+ 15\.16\.? ' <skill-directory>/references/spec.md`）。
+規則本文の多くは `###`・`####` の小節にあるので、`pfdsl explain` が示す節番号は見出しの深さを問わない形で検索する（例: §15.16 なら `grep -nE '^#+ 15\.16\.? ' <skill-directory>/references/spec.md`）<!-- spec-ref-literal: example of looking up the section number printed by explain -->。
 explain が節番号の横に仕様 ID を示す場合は、次の段落のとおり ID で検索してもよい。
 
-`references/spec.md` の `[[SPEC_xxx]]` は節の安定 ID への参照で、ファイルやリンクではない。`[[SPEC_xxx?]]` はまだ定義されていない ID を指す。
+`references/spec.md` の `[[SPEC_xxx]]` は節の安定 ID への参照で、ファイルやリンクではない。`[[SPEC_xxx?]]` はまだ定義されていない ID を指す<!-- spec-ref-literal: specification reference syntax example -->。
 定義は見出しなどの末尾の `(SPEC_xxx)` にあり、括弧を含むので `grep -nF '(SPEC_xxx)' <skill-directory>/references/spec.md` のように固定文字列で検索する。
 見出しに付いた ID の範囲は、その見出しから次の同じかより上位の見出しの手前までである。
 規則を引用するときは、付け直されることがある節番号でなく ID を使う。1つの ID が複数の規則を含むときは、診断コードや規則の要約を添える。ID の無い節は節番号と見出しで引用する。

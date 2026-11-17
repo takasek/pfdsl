@@ -7,14 +7,14 @@ import type { NormalizedEdge } from "./types/index.js";
 
 /**
  * Result of resolving a cross-file reference (`subflow:` / `extends:`).
- * Relative paths resolve against the containing file's directory (§2.9.2).
+ * Relative paths resolve against the containing file's directory ([[SPEC_interfile_references]]).
  * Absolute paths and URLs are rejected.
  */
 export type RefResult =
 	| { ok: true; path: string }
 	| { ok: false; reason: "absolute" | "url" };
 
-/** True when a value is a URL rather than a filesystem path (contains `://`), per spec §15.8. */
+/** True when a value is a URL rather than a filesystem path (contains `://`), per spec [[SPEC_location_command_constraint]]. */
 export function isUrlLike(value: string): boolean {
 	return value.includes("://");
 }
@@ -25,7 +25,7 @@ export function isAbsolutePath(value: string): boolean {
 }
 
 /**
- * Resolve a relative cross-file reference against the containing file (§2.9.2).
+ * Resolve a relative cross-file reference against the containing file ([[SPEC_interfile_references]]).
  * Absolute paths and URLs (`://`) are not permitted.
  */
 export function resolveRefPath(fromFile: string, ref: string): RefResult {
@@ -40,14 +40,14 @@ export interface SubflowRef {
 	ref: string;
 }
 
-/** Collect the `extends:` preset references from a frontmatter, in order (§2.9.4). */
+/** Collect the `extends:` preset references from a frontmatter, in order ([[SPEC_extends_inheritance]]). */
 export function collectExtendsRefs(fm: Frontmatter): string[] {
 	const ext = fm.extends;
 	if (ext === undefined) return [];
 	return Array.isArray(ext) ? [...ext] : [ext];
 }
 
-/** Collect the `subflow:` references declared by processes (§2.9.3). */
+/** Collect the `subflow:` references declared by processes ([[SPEC_subflow_expansion]]). */
 export function collectSubflowRefs(fm: Frontmatter): SubflowRef[] {
 	const refs: SubflowRef[] = [];
 	for (const [process, meta] of Object.entries(fm.process ?? {})) {
@@ -82,7 +82,7 @@ function attributedTo(entryPath: string, from: string): { file?: string } {
 }
 
 /**
- * Recursively load an entry .pfdsl and its `subflow:` children (§2.9.3 / §15.11).
+ * Recursively load an entry .pfdsl and its `subflow:` children ([[SPEC_subflow_expansion]] / [[SPEC_subflow_boundary_constraint]]).
  * `load` reads + analyzes a file by absolute path, returning null when absent.
  * Detects self-referential and multi-hop subflow cycles (V022) and missing
  * paths (V021). Shared children reached by multiple parents load once. A
@@ -170,9 +170,9 @@ export function buildProducedConsumed(edges: NormalizedEdge[]): {
 /**
  * Compute the set of "open input" artifacts in a flow:
  * artifacts that have NO output edge producing them AND are consumed by at
- * least one normal `>>` input edge (§15.11). Unproduced artifacts consumed
+ * least one normal `>>` input edge ([[SPEC_subflow_boundary_constraint]]). Unproduced artifacts consumed
  * only via `>>?` are cross-cutting loop elements, excluded symmetrically to
- * feedback-consumed terminals (§2.9.3).
+ * feedback-consumed terminals ([[SPEC_subflow_expansion]]).
  */
 export function computeOpenInputs(edges: NormalizedEdge[]): Set<string> {
 	const { produced, consumed } = buildProducedConsumed(edges);
@@ -180,13 +180,13 @@ export function computeOpenInputs(edges: NormalizedEdge[]): Set<string> {
 }
 
 /**
- * Compute the set of **boundary-terminal** artifacts in a flow (§15.11):
+ * Compute the set of **boundary-terminal** artifacts in a flow ([[SPEC_subflow_boundary_constraint]]):
  * artifacts that appear in the flow but are consumed by NEITHER `>>` (input)
  * NOR `>>?` (feedback). Used for subflow boundary validation.
  *
  * This is stricter than `auditGraph`'s `terminals` (audit.ts), the spec's
  * **audit-terminal**, which ignores feedback consumption. The two terms are
- * distinct by design — see spec §15.11 "audit-terminal と boundary-terminal".
+ * distinct by design — see spec.md's 終端成果物 section for the comparison.
  */
 export function computeTerminals(edges: NormalizedEdge[]): Set<string> {
 	const all = new Set<string>();
@@ -198,7 +198,7 @@ export function computeTerminals(edges: NormalizedEdge[]): Set<string> {
 	return new Set([...all].filter((a) => !consumed.has(a)));
 }
 
-/** Context for validating a single subflow boundary (§15.11). */
+/** Context for validating a single subflow boundary ([[SPEC_subflow_boundary_constraint]]). */
 export interface SubflowBoundaryContext {
 	processId: string;
 	/** Artifact IDs from parent's `>>` (normal input, NOT feedback) edges into this process. */
@@ -230,7 +230,7 @@ function sideMismatchMessage(
 }
 
 /**
- * Validate the boundary between a parent process and its subflow child (§15.11).
+ * Validate the boundary between a parent process and its subflow child ([[SPEC_subflow_boundary_constraint]]).
  * Returns V030 (dangling key/value), V032 (non-injective), V033 (side mismatch),
  * or V034 (set mismatch) diagnostics for any violations.
  */
@@ -401,7 +401,7 @@ function formatSetDiff(
 }
 
 /**
- * The artifacts on `pid`'s side of a subflow boundary (§15.11): its normal
+ * The artifacts on `pid`'s side of a subflow boundary ([[SPEC_subflow_boundary_constraint]]): its normal
  * `>>` inputs (not `>>?` feedback) and its `->` outputs.
  */
 export function parentBoundaryArtifacts(
@@ -421,7 +421,7 @@ export function parentBoundaryArtifacts(
 /**
  * Load `entryPath`'s subflow graph through `load` and validate every
  * subflow process's boundary in every loaded parent against its child
- * (§15.11). Returns the loader's diagnostics (V021 / V022) followed by the
+ * ([[SPEC_subflow_boundary_constraint]]). Returns the loader's diagnostics (V021 / V022) followed by the
  * boundary ones, and the loaded documents. A child whose path is invalid or
  * whose file is missing is only reported by the loader.
  */
@@ -467,7 +467,7 @@ export function subflowBoundaryDiagnostics<
 }
 
 /**
- * Recursively load an entry file and its `extends:` preset chain (§2.9.4 / §15.12).
+ * Recursively load an entry file and its `extends:` preset chain ([[SPEC_extends_inheritance]] / [[SPEC_extends_constraint]]).
  * `load` reads + analyzes a file by absolute path, returning null when absent.
  * Detects self-referential and multi-hop extends cycles (V027) and missing
  * paths / invalid paths (V026). Diamond-shaped presets (same file reachable via
@@ -536,7 +536,7 @@ export function loadExtendsChain<T extends DocWithFrontmatter>(
 
 /**
  * Build the ordered chain for `resolvePresentation` from an already-loaded
- * extends graph (§2.9.4 決定的解決アルゴリズム). `resolve(F)` merges
+ * extends graph ([[SPEC_extends_inheritance]] 決定的解決アルゴリズム). `resolve(F)` merges
  * `resolve(P1) → … → resolve(Pn) → F のローカル定義`, so each preset's own
  * extends must resolve before the preset's own locals, and the entry file's
  * locals must land last. This public API preserves the expanded post-order
@@ -658,7 +658,7 @@ export function wrapPresetSource(path: string, src: string): string {
 
 /**
  * Resolve the `extends:` chain of `entryPath` and merge the resulting
- * statusStyles / tag / group into a copy of `frontmatter` (§2.9.4), so
+ * statusStyles / tag / group into a copy of `frontmatter` ([[SPEC_extends_inheritance]]), so
  * renderers (CLI graph, VS Code preview/export) share one resolution path.
  * Chain diagnostics are intentionally dropped — rendering is lenient; strict
  * validation happens in `check`. Returns `frontmatter` as-is when the chain
@@ -689,7 +689,7 @@ export function resolveEffectiveFrontmatter<T extends DocWithFrontmatter>(
 	return effective;
 }
 
-/** Allowed top-level keys in a preset file (§2.9.5). */
+/** Allowed top-level keys in a preset file ([[SPEC_preset_file_format]]). */
 const PRESET_ALLOWED_KEYS = new Set([
 	"extends",
 	"statusStyles",
@@ -698,7 +698,7 @@ const PRESET_ALLOWED_KEYS = new Set([
 ]);
 
 /**
- * Validate presentation-only keys and absence of graph content (§2.9.5).
+ * Validate presentation-only keys and absence of graph content ([[SPEC_preset_file_format]]).
  * Returns V028 diagnostics for forbidden keys or supplied graph statements.
  */
 export function validatePresetKeys(
@@ -737,7 +737,7 @@ export interface ResolvedPresentation {
 /**
  * Merge statusStyles / tag / group from a sequence of frontmatters in order
  * (lowest priority first, local last). Each element's values override the
- * previous at attribute level (§2.9.4 "属性レベル深マージ").
+ * previous at attribute level ([[SPEC_extends_inheritance]] "属性レベル深マージ").
  */
 export function resolvePresentation(
 	chain: { path: string; fm: Frontmatter | null }[],

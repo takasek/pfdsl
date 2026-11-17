@@ -38,13 +38,13 @@ export interface AuditResult {
 /**
  * Inspect the primary graph for terminal artifacts and external inputs.
  *
- * `terminals` here is the spec's **audit-terminal** (§15.11): produced and
+ * `terminals` here is the **audit-terminal** from spec.md's 終端成果物 section: produced and
  * not consumed by a normal `>>` input, ignoring feedback (`>>?`) consumption.
  * This intentionally differs from `computeTerminals` in multifile.ts, which
  * computes the stricter **boundary-terminal** (also excludes artifacts
  * consumed only via feedback) used for subflow boundary validation. The two
- * terms are distinct by design — see spec §15.11 "audit-terminal と
- * boundary-terminal" — not a bug to converge.
+ * terms are distinct by design — see spec.md's 終端成果物 section for
+ * audit-terminal and boundary-terminal — not a bug to converge.
  *
  * `externalInputs` delegates to `computeOpenInputs` (multifile.ts), which
  * implements the same "consumed by `>>`, not produced" check.

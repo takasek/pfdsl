@@ -101,14 +101,14 @@ describe("resolveRefPath", () => {
 		});
 	});
 
-	it("rejects an absolute path (§2.9.2)", () => {
+	it("rejects an absolute path ([[SPEC_interfile_references]])", () => {
 		expect(resolveRefPath("/proj/a/main.pfdsl", "/abs/x.pfdsl")).toEqual({
 			ok: false,
 			reason: "absolute",
 		});
 	});
 
-	it("rejects a URL (§2.9.2)", () => {
+	it("rejects a URL ([[SPEC_interfile_references]])", () => {
 		expect(resolveRefPath("/proj/a/main.pfdsl", "https://x/y.pfdsl")).toEqual({
 			ok: false,
 			reason: "url",
@@ -177,7 +177,7 @@ describe("loadSubflowGraph", () => {
 		expect(result.diagnostics).toEqual([]);
 	});
 
-	it("reports a missing subflow path as an error (§15.11)", () => {
+	it("reports a missing subflow path as an error ([[SPEC_subflow_boundary_constraint]])", () => {
 		const docs = makeLoad({
 			"/p/main.pfdsl": {
 				frontmatter: { process: { P: { subflow: "./gone.pfdsl" } } },
@@ -191,7 +191,7 @@ describe("loadSubflowGraph", () => {
 		});
 	});
 
-	it("reports a self-referential subflow as a cycle error (§15.11)", () => {
+	it("reports a self-referential subflow as a cycle error ([[SPEC_subflow_boundary_constraint]])", () => {
 		const docs = makeLoad({
 			"/p/self.pfdsl": {
 				frontmatter: { process: { P: { subflow: "./self.pfdsl" } } },
@@ -201,7 +201,7 @@ describe("loadSubflowGraph", () => {
 		expect(result.diagnostics.some((d) => d.code === "V022")).toBe(true);
 	});
 
-	// §16: one diagnostic per independent cycle, never just the first.
+	// the diagnostic code table: one diagnostic per independent cycle, never just the first.
 	it("reports both disjoint subflow cycles, not only the first", () => {
 		const docs = makeLoad({
 			"/p/a.pfdsl": {
@@ -327,7 +327,7 @@ describe("loadSubflowGraph", () => {
 		]);
 	});
 
-	it("reports a multi-hop subflow cycle (a->b->c->a) (§15.11)", () => {
+	it("reports a multi-hop subflow cycle (a->b->c->a) ([[SPEC_subflow_boundary_constraint]])", () => {
 		const docs = makeLoad({
 			"/p/a.pfdsl": {
 				frontmatter: { process: { P: { subflow: "./b.pfdsl" } } },
@@ -404,7 +404,7 @@ describe("computeOpenInputs", () => {
 		expect(computeOpenInputs(edges)).toEqual(new Set(["a"]));
 	});
 
-	it("artifact with no producer consumed ONLY by feedback is NOT an open input (§2.9.3 symmetric feedback exclusion)", () => {
+	it("artifact with no producer consumed ONLY by feedback is NOT an open input ([[SPEC_subflow_expansion]] symmetric feedback exclusion)", () => {
 		// x >>? P  (x has no producer and only a feedback consumer)
 		// x is a cross-cutting loop element, not part of the boundary contract
 		const edges: NormalizedEdge[] = [
@@ -568,7 +568,7 @@ describe("validateSubflowBoundary", () => {
 		expect(diags.some((d) => d.code === "V032")).toBe(true);
 	});
 
-	// §15.11 assigns non-injectivity to V032 and a non-surjective effective
+	// [[SPEC_subflow_boundary_constraint]] assigns non-injectivity to V032 and a non-surjective effective
 	// map to V034 (#1599). Pinning the whole code list fixes which code each
 	// condition gets, and that V032 suppresses the V034 its collision causes.
 	it("M4b — non-injective map that also leaves a child ID unmapped → V032 alone", () => {
@@ -761,7 +761,7 @@ describe("validateSubflowBoundary", () => {
 		expect(diags.some((d) => d.code === "V034")).toBe(true);
 	});
 
-	// Every code this function can emit is an error per §16 — asserting that
+	// Every code this function can emit is an error per the diagnostic code table — asserting that
 	// over one input would only cover whichever code that input happens to
 	// produce, so each code gets an input that provokes it.
 	const severityCases: Array<{
@@ -865,7 +865,7 @@ describe("loadExtendsChain", () => {
 		expect(result.diagnostics.some((d) => d.code === "V027")).toBe(true);
 	});
 
-	// §16: one diagnostic per independent cycle, never just the first.
+	// the diagnostic code table: one diagnostic per independent cycle, never just the first.
 	it("reports both disjoint extends cycles, not only the first", () => {
 		const docs = makeLoad({
 			"/p/a.pfdsl": { frontmatter: { extends: ["./b.pfdsl", "./c.pfdsl"] } },
