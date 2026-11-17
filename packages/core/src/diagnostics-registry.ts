@@ -71,47 +71,47 @@ export const DIAGNOSTIC_REGISTRY: Readonly<
 	},
 	P002: {
 		severities: ["error"],
-		section: "11",
+		section: "8",
 		summary: "expected an identifier in an artifact set",
 	},
 	P003: {
 		severities: ["error"],
-		section: "11",
+		section: "8",
 		summary: "expected an identifier after a comma in an artifact set",
 	},
 	P004: {
 		severities: ["error"],
-		section: "9",
+		section: "8",
 		summary: "expected an artifact expression after `->`",
 	},
 	P005: {
 		severities: ["error"],
-		section: "9",
+		section: "8",
 		summary: "expected `>>` or `>>?` after an artifact",
 	},
 	P006: {
 		severities: ["error"],
-		section: "9",
+		section: "8",
 		summary: "expected a process identifier",
 	},
 	P007: {
 		severities: ["error"],
-		section: "10",
+		section: "8",
 		summary: "expected an artifact expression after `->` in a chain",
 	},
 	P008: {
 		severities: ["error"],
-		section: "10",
+		section: "8",
 		summary: "expected a process identifier in a chain continuation",
 	},
 	P010: {
 		severities: ["error"],
-		section: "10",
+		section: "8",
 		summary: "expected an artifact expression in a chain continuation",
 	},
 	P011: {
 		severities: ["error"],
-		section: "11",
+		section: "8",
 		summary: "artifact set is missing its closing `]`",
 	},
 

@@ -1319,15 +1319,15 @@ W と C1 / C2、各 artifact ID、論理位置と Wiki 内の原文識別を証�
 | FM003 | warning (--strict: error) | [[SPEC_yaml_front_matter]] | プレーンスカラー値の inline comment により意図した値が切り詰められる可能性がある |
 | FM004 | error | [[SPEC_yaml_front_matter]] | 既知の front matter フィールドに型違反がある |
 | P001 | error | §8 | 構文不正（汎用トークンエラー） |
-| P002 | error | §11 | artifact 集合内で識別子が期待される位置に無い |
-| P003 | error | §11 | artifact 集合内でカンマの後に識別子が無い |
-| P004 | error | §9 | `->` の後に artifact 式が無い |
-| P005 | error | §9 | artifact の後に `>>` または `>>?` が無い |
-| P006 | error | §9 | プロセス識別子が期待される位置に無い |
-| P007 | error | §10 | チェーン中の `->` の後に artifact 式が無い |
-| P008 | error | §10 | チェーン継続でプロセス識別子が無い |
-| P010 | error | §10 | チェーン継続で artifact 式が無い |
-| P011 | error | §11 | artifact 集合を閉じる `]` が無い |
+| P002 | error | §8 | artifact 集合内で識別子が期待される位置に無い |
+| P003 | error | §8 | artifact 集合内でカンマの後に識別子が無い |
+| P004 | error | §8 | `->` の後に artifact 式が無い |
+| P005 | error | §8 | artifact の後に `>>` または `>>?` が無い |
+| P006 | error | §8 | プロセス識別子が期待される位置に無い |
+| P007 | error | §8 | チェーン中の `->` の後に artifact 式が無い |
+| P008 | error | §8 | チェーン継続でプロセス識別子が無い |
+| P010 | error | §8 | チェーン継続で artifact 式が無い |
+| P011 | error | §8 | artifact 集合を閉じる `]` が無い |
 | V001 | error | [[SPEC_single_producer_constraint]] | 同一 Artifact を複数 Process が生成 |
 | V002 | warning (--strict: error) | [[SPEC_process_completeness_constraint]] | Process に入力が無い |
 | V003 | warning (--strict: error) | [[SPEC_process_completeness_constraint]] | Process に出力が無い |
@@ -1380,6 +1380,7 @@ W と C1 / C2、各 artifact ID、論理位置と Wiki 内の原文識別を証�
 | N003 | warning | [[SPEC_duplicate_edge_constraint]] | 同一 edge が重複記述されている |
 | N004 | error | [[SPEC_group_node_id_collision]] | group ID が同一ファイルの Artifact / Process ID として宣言・使用されている |
 
+P 系コードは §8 の構文規則への違反を表す。
 P009 は実装に存在しない（欠番）。V013 は #310 で撤廃された（`location:` を Process に指定することは現在許可されている）。
 
 循環を検出するコード（V006 / V010 / V019 / V022 / V025 / V027）は、独立した循環ごとに1件を報告する。
