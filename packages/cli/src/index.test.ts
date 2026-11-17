@@ -4921,11 +4921,26 @@ describe("explain", () => {
 		expect(r.stdout).toContain("§15.7");
 	});
 
-	it("works for a P-family (parser) code", async () => {
-		const r = await run(["explain", "P004"]);
+	it.each([
+		["P001", ">>"],
+		["P002", "[] >> p"],
+		["P003", "[a,] >> p"],
+		["P004", "p ->"],
+		["P005", "this is not valid"],
+		["P006", "a >> -> b"],
+		["P007", "a >> p ->"],
+		["P008", "a >> p -> b >> -> c"],
+		["P010", "a >> p -> b >> q ->"],
+		["P011", "[a >> p"],
+	])("points %s from malformed input to the syntax grammar", async (code, source) => {
+		const checked = await run(["check", "-"], withStdin(source));
+		expect(checked.exitCode).toBe(1);
+		expect(checked.stderr).toContain(`[${code}]`);
+		const r = await run(["explain", code]);
 		expect(r.exitCode).toBe(0);
-		expect(r.stdout).toContain("P004 (error):");
-		expect(r.stdout).toContain("§9");
+		expect(r.stdout).toContain(`${code} (error):`);
+		expect(r.stdout).toContain("Defined in: spec §8\n");
+		expect(r.stdout).toContain("references/spec.md §8");
 	});
 
 	it("works for an FM-family (front matter) code", async () => {
@@ -4943,7 +4958,7 @@ describe("explain", () => {
 
 	it("prints only the section number when the section has no spec ID", async () => {
 		const r = await run(["explain", "P004"]);
-		expect(r.stdout).toContain("Defined in: spec §9\n");
+		expect(r.stdout).toContain("Defined in: spec §8\n");
 	});
 
 	it("points to the spec.md full text as a fallback", async () => {
