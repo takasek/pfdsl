@@ -32,35 +32,4 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           REPOSITORY: ${{ github.repository }}
-        run: |
-          export GIT_TERMINAL_PROMPT=0
-          export GIT_CONFIG_COUNT=1
-          export GIT_CONFIG_KEY_0=http.https://github.com/.extraheader
-          export GIT_CONFIG_VALUE_0="AUTHORIZATION: basic $(printf 'x-access-token:%s' "$GH_TOKEN" | base64 -w0)"
-          git clone "https://github.com/${REPOSITORY}.wiki.git" "$RUNNER_TEMP/roadmap-wiki"
-          wiki_revision=$(git -C "$RUNNER_TEMP/roadmap-wiki" rev-parse HEAD)
-          export WIKI_REVISION="$wiki_revision"
-          node --input-type=module <<'NODE'
-          import { execFileSync } from 'node:child_process';
-          import { writeFileSync } from 'node:fs';
-          import { join } from 'node:path';
-          const repository = process.env.REPOSITORY;
-          const root = process.env.GITHUB_WORKSPACE;
-          const wiki = join(process.env.RUNNER_TEMP, 'roadmap-wiki');
-          const wikiSource = `https://github.com/${repository}.wiki.git`;
-          const repositorySource = `https://github.com/${repository}.git`;
-          const revision = (cwd) => execFileSync('git', ['-C', cwd, 'rev-parse', 'HEAD'], { encoding: 'utf8' }).trim();
-          const wikiRevision = process.env.WIKI_REVISION;
-          const repositoryRevision = revision(root);
-          const config = {
-            roadmapSource: {
-              adapter: 'local-git', source: wikiSource, revision: wikiRevision,
-              documentId: 'roadmap.pfdsl', companionId: 'roadmap.md', logicalPath: 'roadmap.pfdsl',
-              basis: { source: wikiSource, revision: wikiRevision },
-            },
-            localSources: { [wikiSource]: wiki, [repositorySource]: root },
-          };
-          writeFileSync(join(process.env.RUNNER_TEMP, 'roadmap-source.json'), JSON.stringify(config));
-          console.log(`Wiki input revision: ${wikiRevision}; implementation revision: ${repositoryRevision}`);
-          NODE
-          node scripts/wiki-roadmap-generate.mjs --wiki "$RUNNER_TEMP/roadmap-wiki" --repository "$REPOSITORY" --expected-revision "$wiki_revision" --source-config "$RUNNER_TEMP/roadmap-source.json" --publish
+        run: node scripts/wiki-roadmap-run.mjs --wiki "$RUNNER_TEMP/roadmap-wiki" --repository "$REPOSITORY" --repository-root "$GITHUB_WORKSPACE" --publish

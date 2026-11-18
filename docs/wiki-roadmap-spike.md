@@ -384,8 +384,12 @@ Issue artifacts は、複雑な一つの Issue の内部依存を任意に示す
 `wiki-roadmap-generate.yml` は workflow 実行の `github.sha` を checkout し、過去の固定版も取得するため `fetch-depth: 0` を指定する。
 Wiki を clone した後、その HEAD を一度固定し、同じ版を取得設定・モデルの basis・`--expected-revision` に渡す。
 実装の固定 commit と Wiki の入力 commit は run のログで確認する。
-一時的な `roadmap-source.json` を生成し、既存の `--source-config` へ渡す。
-この JSON は runner の絶対パスを含むため生成物や Wiki へ公開せず、生成 receipt は既存の処理でローカルパスを除いた参照先・固定版と各 location の結果を保持する。
+実装 checkout の版と、参照先として使う本体 checkout の版を区別し、既存図を再利用する場合は receipt の入力版と今回取得した Wiki 版も分けて表示する。
+workflow は `scripts/wiki-roadmap-run.mjs` を1回呼ぶ。
+この通常の Node スクリプトが clone・入力版固定・参照設定・検証／生成・必要な場合の通常 push を行い、既存の生成器と公開処理を再利用する。
+参照設定は同じプロセス内で渡し、一時 JSON の受渡しや YAML 内への JavaScript の埋込みは行わない。
+ローカルパスを含む設定は Wiki へ公開せず、生成 receipt は既存の処理でローカルパスを除いた参照先・固定版と各 location の結果を保持する。
+`--publish` を省略すると新しい clone へ生成するところまでで止まり、公開しない。
 
 登録する source は対象 repo の次の2つだけである。
 
@@ -403,11 +407,12 @@ Wiki は既存の編集／公開コマンドで更新できるが、手元から
 本体を指す `baseRef` / `ref` を追加しても、Wiki 内の preset を本体側へ探しに行かない。
 本体をモデルの basis とする設定や、全体 roadmap の採用設定は、別の明示した切替準備として扱う。
 
-ローカルの回帰試験は workflow 内の設定生成コードを実行し、実 Git と実 CLI で次を確認する。
+ローカルの回帰試験は workflow と同じ `wiki-roadmap-run.mjs` の入口を実行する。
+Git の通信だけを fixture 内の bare remote へ向け、clone・取得版固定・設定・実 CLI による検証／描画・生成物 commit・通常 push までを通して次を確認する。
 
 - 同じ本体ファイルに対し、モデル既定と artifact 上書きが異なる固定 commit を選び、参照検査の記録へそれぞれの版が残る。
 - 未登録 source、未取得 commit、不正 PFD では生成が失敗し、直前の index と SVG の bytes を保持する。
-- 明示参照先のない旧原稿は Wiki にだけ存在する preset を使える。生成物だけを commit した後の再実行は `unchanged` となる。
+- 明示参照先のない旧原稿は Wiki にだけ存在する preset を使える。生成物の公開後に新しい clone から再実行すると `unchanged` となり、remote の版も変わらない。
 
 これらはローカルの Actions 設定／Git／CLI 接続試験であり、この変更を使った実 Actions や実 Wiki の受入結果ではない。
 実 Wiki は `dfccf24ff8877841c992587bd96086dd86c9d640` の試験原稿を読取確認しただけで、参照宣言の追加や公開は行っていない。

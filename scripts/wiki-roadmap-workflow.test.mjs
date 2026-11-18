@@ -1,6 +1,13 @@
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import {
+	chmodSync,
+	mkdirSync,
+	mkdtempSync,
+	readFileSync,
+	rmSync,
+	writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { test } from "node:test";
@@ -11,9 +18,6 @@ const workflow = parse(
 		new URL("../.github/workflows/wiki-roadmap-generate.yml", import.meta.url),
 		"utf8",
 	),
-);
-const step = workflow.jobs.generate.steps.find(
-	(item) => item.name === "Generate and publish the trial pair",
 );
 const git = (cwd, ...args) =>
 	execFileSync("git", ["-C", cwd, ...args], {
@@ -55,55 +59,53 @@ function setup(t) {
 		'statusStyles: {todo: {fillcolor: "#ffffff"}}\n',
 	);
 	commit(wiki);
-	return { root, wiki, temp, older, current };
-}
-function configure({ root, wiki, temp }) {
-	const source = step.run.match(
-		/node --input-type=module <<'NODE'\n([\s\S]*?)\nNODE/,
+	const remote = join(temp, "wiki.git");
+	git(temp, "clone", "--bare", wiki, remote);
+	const globalConfig = join(temp, "gitconfig");
+	writeFileSync(globalConfig, "");
+	const bin = join(temp, "bin");
+	mkdirSync(bin);
+	// Redirect only Git transport to a real local bare remote; all other Git operations are unchanged.
+	const realGit = execFileSync("which", ["git"], { encoding: "utf8" }).trim();
+	const shim = join(bin, "git");
+	writeFileSync(
+		shim,
+		`#!/usr/bin/env node\nconst {spawnSync}=require('node:child_process');\nconst args=process.argv.slice(2);\nif(args.some(arg=>['clone','fetch','push'].includes(arg))) args.unshift('-c', 'url.'+process.env.PFDSL_TEST_REMOTE+'.insteadOf=https://github.com/takasek/pfdsl.wiki.git');\nconst result=spawnSync(${JSON.stringify(realGit)},args,{stdio:'inherit'});\nprocess.exit(result.status??1);\n`,
 	);
-	assert.ok(source, "the workflow must prepare its explicit reference sources");
-	execFileSync(process.execPath, ["--input-type=module", "-e", source[1]], {
-		env: {
-			...process.env,
-			REPOSITORY: "takasek/pfdsl",
-			GITHUB_WORKSPACE: root,
-			RUNNER_TEMP: temp,
-			WIKI_REVISION: git(wiki, "rev-parse", "HEAD"),
+	chmodSync(shim, 0o755);
+	return { root, wiki, temp, remote, globalConfig, bin, older, current };
+}
+function generate(fixture, { publish = true } = {}) {
+	const { root, wiki, temp, remote, globalConfig, bin } = fixture;
+	git(wiki, "push", remote, "main");
+	const clone = join(mkdtempSync(join(temp, "runner-")), "wiki");
+	const out = execFileSync(
+		process.execPath,
+		[
+			resolve("scripts/wiki-roadmap-run.mjs"),
+			"--wiki",
+			clone,
+			"--repository",
+			"takasek/pfdsl",
+			"--repository-root",
+			root,
+			...(publish ? ["--publish"] : []),
+		],
+		{
+			encoding: "utf8",
+			stdio: "pipe",
+			env: {
+				...process.env,
+				PATH: `${bin}:${process.env.PATH}`,
+				PFDSL_TEST_REMOTE: remote,
+				GIT_CONFIG_GLOBAL: globalConfig,
+				GIT_CONFIG_NOSYSTEM: "1",
+				GH_TOKEN: "fixture-token",
+			},
 		},
-		encoding: "utf8",
-	});
-	const config = join(temp, "roadmap-source.json");
-	const settings = JSON.parse(readFileSync(config, "utf8"));
-	assert.equal(settings.roadmapSource.revision, git(wiki, "rev-parse", "HEAD"));
-	assert.equal(
-		settings.roadmapSource.basis.revision,
-		settings.roadmapSource.revision,
 	);
-	assert.match(step.run, /--expected-revision/);
-	assert.match(
-		step.run,
-		/--source-config "\$RUNNER_TEMP\/roadmap-source.json"/,
-	);
-	return config;
-}
-function generate({ wiki }, config) {
-	return JSON.parse(
-		execFileSync(
-			process.execPath,
-			[
-				resolve("scripts/wiki-roadmap-generate.mjs"),
-				"--wiki",
-				wiki,
-				"--repository",
-				"takasek/pfdsl",
-				"--source-config",
-				config,
-				"--expected-revision",
-				git(wiki, "rev-parse", "HEAD"),
-			],
-			{ encoding: "utf8", stdio: "pipe" },
-		),
-	);
+	assert.doesNotMatch(out, /fixture-token/);
+	return { ...JSON.parse(out), wiki: clone };
 }
 function receipt(wiki) {
 	return JSON.parse(
@@ -143,9 +145,20 @@ test("the Actions configuration resolves model defaults and artifact overrides a
 			),
 	);
 	commit(wiki);
-	const config = configure(fixture);
-	assert.equal(generate(fixture, config).status, "generated");
-	const record = receipt(wiki);
+	const generated = generate(fixture);
+	assert.equal(generated.status, "published");
+	assert.equal(generated.referenceRepositoryRevision, current);
+	assert.equal(
+		generated.implementationRevision,
+		git(resolve("."), "rev-parse", "HEAD"),
+	);
+	assert.equal(git(fixture.remote, "rev-parse", "main"), generated.revision);
+	assert.equal(
+		git(fixture.remote, "show", "main:roadmap.pfdsl"),
+		readFileSync(join(wiki, "roadmap.pfdsl"), "utf8").trim(),
+	);
+	const record = receipt(generated.wiki);
+	assert.equal(record.wikiRevision, generated.inputWikiRevision);
 	const checks = record.referenceChecks.flatMap((item) => item.results);
 	for (const [id, revision] of [
 		["request", current],
@@ -162,8 +175,10 @@ test("the Actions configuration resolves model defaults and artifact overrides a
 		"https://github.com/takasek/pfdsl.wiki.git",
 	);
 	const before = ["roadmap.index.md", "roadmap.svg"].map((file) =>
-		readFileSync(join(wiki, file)),
+		readFileSync(join(generated.wiki, file)),
 	);
+	git(wiki, "fetch", fixture.remote, "main");
+	git(wiki, "merge", "--ff-only", "FETCH_HEAD");
 	for (const invalid of [
 		original.replace(
 			"artifact:",
@@ -177,17 +192,35 @@ test("the Actions configuration resolves model defaults and artifact overrides a
 	]) {
 		writeFileSync(join(wiki, "roadmap.pfdsl"), invalid);
 		commit(wiki);
-		assert.throws(() => generate(fixture, configure(fixture)));
+		assert.throws(() => generate(fixture));
 		for (const [index, file] of ["roadmap.index.md", "roadmap.svg"].entries())
-			assert.deepEqual(readFileSync(join(wiki, file)), before[index]);
+			assert.deepEqual(
+				execFileSync("git", ["-C", fixture.remote, "show", `main:${file}`]),
+				before[index],
+			);
 	}
 });
 
 test("the Actions configuration preserves a legacy Wiki-only preset and reuses output-only revisions", (t) => {
 	const fixture = setup(t);
-	assert.equal(generate(fixture, configure(fixture)).status, "generated");
-	commit(fixture.wiki);
-	assert.equal(generate(fixture, configure(fixture)).status, "unchanged");
+	const first = generate(fixture);
+	assert.equal(first.status, "published");
+	git(fixture.wiki, "fetch", fixture.remote, "main");
+	git(fixture.wiki, "merge", "--ff-only", "FETCH_HEAD");
+	const revision = git(fixture.remote, "rev-parse", "main");
+	const next = generate(fixture);
+	assert.equal(next.status, "unchanged");
+	assert.equal(
+		next.inputWikiRevision,
+		first.inputWikiRevision,
+		"a reused diagram retains its receipt's input revision",
+	);
+	assert.equal(
+		next.acquiredWikiRevision,
+		revision,
+		"the newly acquired output commit is reported separately",
+	);
+	assert.equal(git(fixture.remote, "rev-parse", "main"), revision);
 	assert.equal(
 		readFileSync(join(fixture.wiki, "roadmap.pfdsl"), "utf8"),
 		original,
