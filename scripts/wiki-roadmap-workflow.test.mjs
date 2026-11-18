@@ -19,6 +19,9 @@ const workflow = parse(
 		"utf8",
 	),
 );
+const step = workflow.jobs.generate.steps.find(
+	(item) => item.name === "Generate and publish the trial pair",
+);
 const git = (cwd, ...args) =>
 	execFileSync("git", ["-C", cwd, ...args], {
 		encoding: "utf8",
@@ -224,5 +227,31 @@ test("the Actions configuration preserves a legacy Wiki-only preset and reuses o
 	assert.equal(
 		readFileSync(join(fixture.wiki, "roadmap.pfdsl"), "utf8"),
 		original,
+	);
+});
+
+test("the workflow calls the same standalone runner exercised by the Git integration tests", () => {
+	assert.equal(
+		step.run.trim(),
+		'node scripts/wiki-roadmap-run.mjs --wiki "$RUNNER_TEMP/roadmap-wiki" --repository "$REPOSITORY" --repository-root "$GITHUB_WORKSPACE" --publish',
+	);
+});
+
+test("the standalone runner can generate without publishing and rejects unknown flags before cloning", (t) => {
+	const fixture = setup(t);
+	const before = git(fixture.remote, "rev-parse", "main");
+	const result = generate(fixture, { publish: false });
+	assert.equal(result.status, "generated");
+	assert.match(readFileSync(join(result.wiki, "roadmap.svg"), "utf8"), /<svg/);
+	assert.equal(git(fixture.remote, "rev-parse", "main"), before);
+	const script = resolve("scripts/wiki-roadmap-run.mjs");
+	assert.match(
+		execFileSync(process.execPath, [script, "--help"], { encoding: "utf8" }),
+		/Usage:/,
+	);
+	assert.throws(
+		() =>
+			execFileSync(process.execPath, [script, "--publsh"], { stdio: "pipe" }),
+		/Unknown option/,
 	);
 });
