@@ -17,7 +17,7 @@
 
 import { GEN_INSTALL_TRIGGER } from "./gen-install-trigger.mjs";
 import {
-	GEN_INSTALL_OUTPUT,
+	GEN_INSTALL_OUTPUTS,
 	GEN_SKILL_MD_OUTPUT,
 	genPluginDriftPathspecs,
 } from "./gen-plugin-outputs.mjs";
@@ -124,7 +124,7 @@ export function buildGates({ stagedPresent }) {
 			requireDist: [],
 			commands: regenerateThenCheck(
 				["node", ["scripts/gen-install.mjs"]],
-				[GEN_INSTALL_OUTPUT],
+				GEN_INSTALL_OUTPUTS,
 			),
 			hint: ".claude/skills/pfd-ops/install is stale (or was hand-edited). Run 'make gen-install' and re-stage.",
 		},

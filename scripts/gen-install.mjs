@@ -11,6 +11,7 @@ import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { genInstall } from "./lib/gen-install.mjs";
+import { INSTALL_INVENTORY_RELATIVE } from "./lib/install-templates.mjs";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -21,7 +22,8 @@ function printGroup(title, items) {
 }
 
 try {
-	const { changed, unchanged, removed } = genInstall(root);
+	const { changed, unchanged, removed, inventoryChanged } = genInstall(root);
+	if (inventoryChanged) console.log(`Updated ${INSTALL_INVENTORY_RELATIVE}`);
 	printGroup("Changed:", changed);
 	printGroup("Removed:", removed);
 	if (changed.length === 0 && removed.length === 0) {

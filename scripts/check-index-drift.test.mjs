@@ -307,6 +307,28 @@ it("a single allowlist edit adds and removes install payloads in all four harnes
 		}
 		git(root, "add", "--all", "--", ".", ":(exclude)node_modules");
 		writeFileSync(join(root, allowlist), original);
+		const codexRoots = [
+			".agents/skills/pfd-ops",
+			"plugin/pfdsl-codex/skills/pfd-ops",
+		];
+		const distributed = "scripts/pfdsl/distributed.txt";
+		const inventory = (output) =>
+			JSON.parse(textAt(root, `${output}/install-files.json`));
+		const generateCodex = () =>
+			execFileSync(process.execPath, ["scripts/gen-codex-assets.mjs"], {
+				cwd: root,
+			});
+		generateCodex();
+		for (const output of codexRoots) {
+			assert.ok(!inventory(output).includes(distributed), output);
+			assert.throws(() => textAt(root, `${output}/install/${distributed}`), {
+				code: "ENOENT",
+			});
+		}
+		assert.ok(
+			inventory(roots[0]).includes(distributed),
+			"Codex-only generation leaves the Claude mirror untouched",
+		);
 		execFileSync(
 			process.execPath,
 			["scripts/gen-plugin-dist-independent.mjs"],
@@ -317,4 +339,20 @@ it("a single allowlist edit adds and removes install payloads in all four harnes
 				() => textAt(root, `${output}/install/scripts/pfdsl/distributed.txt`),
 				{ code: "ENOENT" },
 			);
+		writeFileSync(
+			join(root, allowlist),
+			original.replace(
+				"INSTALL_TEMPLATE_PATHS = [",
+				`INSTALL_TEMPLATE_PATHS = [\n\t"${distributed}",`,
+			),
+		);
+		generateCodex();
+		for (const output of codexRoots) {
+			assert.ok(inventory(output).includes(distributed), output);
+			assert.equal(
+				textAt(root, `${output}/install/${distributed}`),
+				"Distributed payload.\n",
+			);
+		}
+		assert.ok(!inventory(roots[0]).includes(distributed));
 	}));

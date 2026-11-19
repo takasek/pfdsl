@@ -68,6 +68,54 @@ export function listInstallFiles(installDir) {
 	return results.sort();
 }
 
+// The generator writes this release's inventory outside install/ so a missing
+// payload cannot announce its own retirement by disappearing from the walk.
+function listBundledInstallFiles(installDir) {
+	if (!isDirectory(installDir)) {
+		throw new Error(
+			`Missing install source directory: ${installDir}. Restore the complete pfd-ops distribution and retry.`,
+		);
+	}
+	const inventory = join(dirname(installDir), "install-files.json");
+	let expected;
+	try {
+		expected = JSON.parse(readFileSync(inventory, "utf8"));
+	} catch (error) {
+		throw new Error(
+			`Cannot read install inventory ${inventory}: ${error.message}`,
+		);
+	}
+	if (
+		!Array.isArray(expected) ||
+		!expected.every((path) => typeof path === "string")
+	) {
+		throw new Error(
+			`Invalid install inventory: ${inventory}. Expected an array of paths.`,
+		);
+	}
+	const files = listInstallFiles(installDir);
+	const actual = new Set(files);
+	const declared = new Set(expected);
+	for (const path of expected) {
+		if (
+			!actual.has(path) ||
+			!statSync(join(installDir, path), { throwIfNoEntry: false })?.isFile()
+		) {
+			throw new Error(
+				`Missing install source: ${join(installDir, path)}. Restore the complete pfd-ops distribution and retry.`,
+			);
+		}
+	}
+	for (const path of files) {
+		if (!declared.has(path)) {
+			throw new Error(
+				`Unexpected install source: ${join(installDir, path)}. Restore the complete pfd-ops distribution and retry.`,
+			);
+		}
+	}
+	return files;
+}
+
 // Used only for values that must persist across runs (the deploy manifest) —
 // a plain byte comparison can't be used there since the canonical file it
 // would compare against may no longer exist by the time of a later check.
@@ -315,7 +363,7 @@ export function classifyTarget(skillRoot, targetRoot) {
  */
 export function checkInstallSync(skillRoot, targetRoot) {
 	const installDir = resolve(skillRoot, "install");
-	const files = listInstallFiles(installDir);
+	const files = listBundledInstallFiles(installDir);
 	const results = files.map((rel) => {
 		const targetPath = join(targetRoot, rel);
 		if (!existsSync(targetPath)) {
@@ -374,7 +422,7 @@ export function deployInstall(
 	{ overwriteLocalEdits = false, deleteEditedOrphans = false } = {},
 ) {
 	const installDir = resolve(skillRoot, "install");
-	const files = listInstallFiles(installDir);
+	const files = listBundledInstallFiles(installDir);
 	const copied = [];
 	const skipped = [];
 	const previousEntries = readManifest(targetRoot);
@@ -1033,5 +1081,8 @@ if (
 	process.argv[1] &&
 	fileURLToPath(import.meta.url) === realpathSync(process.argv[1])
 ) {
-	main();
+	main().catch((error) => {
+		console.error(error.message);
+		process.exitCode = 1;
+	});
 }

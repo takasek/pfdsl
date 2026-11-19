@@ -36,6 +36,17 @@ function installPath(root, relPath) {
 }
 
 describe("genInstall", () => {
+	it("publishes the inventory with the standalone mirror as templates are added and retired", () => {
+		const inventory = join(tmp, ".claude/skills/pfd-ops/install-files.json");
+		writeFile(tmp, "a.txt", "a");
+		writeFile(tmp, "b.txt", "b");
+		for (const paths of [["a.txt"], ["a.txt", "b.txt"], ["b.txt"], []]) {
+			genInstall(tmp, paths);
+			assert.deepEqual(JSON.parse(readFileSync(inventory, "utf8")), paths);
+			assert.equal(statSync(installPath(tmp, "")).isDirectory(), true);
+		}
+	});
+
 	it("copies a listed source into the mirror", () => {
 		writeFile(tmp, "a.txt", "hello");
 

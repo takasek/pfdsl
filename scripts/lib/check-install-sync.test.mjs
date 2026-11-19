@@ -4,10 +4,12 @@ import { createHash } from "node:crypto";
 import {
 	chmodSync,
 	copyFileSync,
+	cpSync,
 	existsSync,
 	mkdirSync,
 	mkdtempSync,
 	readFileSync,
+	renameSync,
 	rmSync,
 	statSync,
 	symlinkSync,
@@ -48,12 +50,32 @@ function writeFile(root, relPath, content) {
 	writeFileSync(full, content);
 }
 
+// Publish the fixture's file list when making a complete release. Tests that
+// simulate a damaged distribution change the filesystem without publishing.
+function writeInventory(skillRoot) {
+	writeFile(
+		skillRoot,
+		"install-files.json",
+		JSON.stringify(listInstallFiles(join(skillRoot, "install"))),
+	);
+}
+
+function writeBundledFile(skillRoot, path, contents) {
+	writeFile(join(skillRoot, "install"), path, contents);
+	writeInventory(skillRoot);
+}
+
+function retireBundledFile(skillRoot, path) {
+	rmSync(join(skillRoot, "install", path));
+	writeInventory(skillRoot);
+}
+
 // Shared fixture for checkInstallSync/deployInstall tests: a skill root with
 // a two-file install/ tree (one top-level file, one nested).
 function makeSkillRoot() {
 	const skillRoot = join(tmp, "skill");
-	writeFile(join(skillRoot, "install"), "a.txt", "canonical-a");
-	writeFile(join(skillRoot, "install"), "sub/b.txt", "canonical-b");
+	writeBundledFile(skillRoot, "a.txt", "canonical-a");
+	writeBundledFile(skillRoot, "sub/b.txt", "canonical-b");
 	return skillRoot;
 }
 
@@ -135,7 +157,7 @@ describe("checkInstallSync", () => {
 		deployInstall(skillRoot, targetRoot);
 
 		// Simulate a future pfdsl release dropping sub/b.txt from canonical install/.
-		rmSync(join(skillRoot, "install", "sub", "b.txt"));
+		retireBundledFile(skillRoot, "sub/b.txt");
 
 		const { results } = checkInstallSync(skillRoot, targetRoot);
 		const byPath = Object.fromEntries(results.map((r) => [r.path, r.status]));
@@ -183,14 +205,10 @@ describe("checkInstallSync rename candidates", () => {
 	// needs carrying over (#603).
 	function deployThenRename(targetRoot, from, to, { newContent } = {}) {
 		const skillRoot = join(tmp, "skill-rename");
-		writeFile(join(skillRoot, "install"), from, "canonical-original");
+		writeBundledFile(skillRoot, from, "canonical-original");
 		deployInstall(skillRoot, targetRoot);
-		rmSync(join(skillRoot, "install", ...from.split("/")));
-		writeFile(
-			join(skillRoot, "install"),
-			to,
-			newContent ?? "canonical-original",
-		);
+		retireBundledFile(skillRoot, from);
+		writeBundledFile(skillRoot, to, newContent ?? "canonical-original");
 		return skillRoot;
 	}
 
@@ -298,7 +316,7 @@ describe("deployInstall", () => {
 		const targetRoot = join(tmp, "target-upgrade");
 		deployInstall(skillRoot, targetRoot);
 		const previous = readManifest(targetRoot);
-		writeFile(join(skillRoot, "install"), "a.txt", "new-canonical");
+		writeBundledFile(skillRoot, "a.txt", "new-canonical");
 		const result = deployInstall(skillRoot, targetRoot);
 		assert.deepEqual(result.skipped, []);
 		assert.equal(
@@ -317,7 +335,7 @@ describe("deployInstall", () => {
 		deployInstall(skillRoot, targetRoot);
 		const previous = readManifest(targetRoot);
 		writeFile(targetRoot, "a.txt", "local-edit");
-		writeFile(join(skillRoot, "install"), "a.txt", "new-canonical");
+		writeBundledFile(skillRoot, "a.txt", "new-canonical");
 		for (let n = 0; n < 2; n++) {
 			assert.deepEqual(deployInstall(skillRoot, targetRoot).skipped, ["a.txt"]);
 			assert.equal(
@@ -352,9 +370,9 @@ describe("deployInstall", () => {
 		const targetRoot = join(tmp, "target-converged");
 		deployInstall(skillRoot, targetRoot);
 		writeFile(targetRoot, "a.txt", "new-canonical");
-		writeFile(join(skillRoot, "install"), "a.txt", "new-canonical");
+		writeBundledFile(skillRoot, "a.txt", "new-canonical");
 		assert.deepEqual(deployInstall(skillRoot, targetRoot).skipped, []);
-		writeFile(join(skillRoot, "install"), "a.txt", "next-canonical");
+		writeBundledFile(skillRoot, "a.txt", "next-canonical");
 		assert.deepEqual(deployInstall(skillRoot, targetRoot).skipped, []);
 		assert.equal(
 			readFileSync(join(targetRoot, "a.txt"), "utf8"),
@@ -418,7 +436,7 @@ describe("deployInstall", () => {
 		deployInstall(skillRoot, targetRoot);
 		writeFile(targetRoot, "a.txt", "locally-edited");
 		writeFile(targetRoot, "sub/b.txt", "locally-edited-before-drop");
-		rmSync(join(skillRoot, "install", "sub", "b.txt"));
+		retireBundledFile(skillRoot, "sub/b.txt");
 
 		const { copied, skipped, removed } = deployInstall(skillRoot, targetRoot, {
 			deleteEditedOrphans: true,
@@ -438,7 +456,7 @@ describe("deployInstall", () => {
 		deployInstall(skillRoot, targetRoot);
 		writeFile(targetRoot, "a.txt", "locally-edited");
 		writeFile(targetRoot, "sub/b.txt", "locally-edited-before-drop");
-		rmSync(join(skillRoot, "install", "sub", "b.txt"));
+		retireBundledFile(skillRoot, "sub/b.txt");
 
 		const { copied, removed, orphanSkipped } = deployInstall(
 			skillRoot,
@@ -458,7 +476,7 @@ describe("deployInstall", () => {
 		const targetRoot = join(tmp, "target-orphan-cleanup");
 		deployInstall(skillRoot, targetRoot);
 
-		rmSync(join(skillRoot, "install", "sub", "b.txt"));
+		retireBundledFile(skillRoot, "sub/b.txt");
 		const { removed, orphanSkipped } = deployInstall(skillRoot, targetRoot);
 
 		assert.deepEqual(removed, ["sub/b.txt"]);
@@ -472,7 +490,7 @@ describe("deployInstall", () => {
 		deployInstall(skillRoot, targetRoot);
 		writeFile(targetRoot, "sub/b.txt", "locally-edited-before-drop");
 
-		rmSync(join(skillRoot, "install", "sub", "b.txt"));
+		retireBundledFile(skillRoot, "sub/b.txt");
 		const first = deployInstall(skillRoot, targetRoot);
 		assert.deepEqual(first.removed, []);
 		assert.deepEqual(first.orphanSkipped, ["sub/b.txt"]);
@@ -719,11 +737,7 @@ describe("CLI output", () => {
 
 	it("does not offer adoption when the target is the upstream repo", () => {
 		const skillRoot = join(tmp, "skill-upstream-adopt");
-		writeFile(
-			join(skillRoot, "install"),
-			"scripts/lib/fixture-tool.mjs",
-			"cached\n",
-		);
+		writeBundledFile(skillRoot, "scripts/lib/fixture-tool.mjs", "cached\n");
 		const target = makeUpstreamTarget("target-upstream-adopt");
 
 		const { stdout } = runCli(skillRoot, target);
@@ -733,11 +747,7 @@ describe("CLI output", () => {
 
 	it("does not offer a refresh deploy when the target is the upstream repo", () => {
 		const skillRoot = join(tmp, "skill-upstream-drift");
-		writeFile(
-			join(skillRoot, "install"),
-			"scripts/lib/fixture-tool.mjs",
-			"cached\n",
-		);
+		writeBundledFile(skillRoot, "scripts/lib/fixture-tool.mjs", "cached\n");
 		const target = makeUpstreamTarget("target-upstream-drift");
 		writeFile(target, "scripts/lib/fixture-tool.mjs", "newer than the cache\n");
 
@@ -749,11 +759,7 @@ describe("CLI output", () => {
 
 	it("refuses an explicit --deploy into the upstream repo without writing anything", () => {
 		const skillRoot = join(tmp, "skill-upstream-deploy");
-		writeFile(
-			join(skillRoot, "install"),
-			"scripts/lib/fixture-tool.mjs",
-			"cached\n",
-		);
+		writeBundledFile(skillRoot, "scripts/lib/fixture-tool.mjs", "cached\n");
 		const target = makeUpstreamTarget("target-upstream-deploy");
 		writeFile(target, "scripts/lib/fixture-tool.mjs", "newer than the cache\n");
 
@@ -777,11 +783,7 @@ describe("CLI output", () => {
 
 	it("refuses to deploy and names both claimants when canonical is ambiguous", () => {
 		const skillRoot = join(tmp, "skill-ambiguous");
-		writeFile(
-			join(skillRoot, "install"),
-			"scripts/lib/fixture-tool.mjs",
-			"cached\n",
-		);
+		writeBundledFile(skillRoot, "scripts/lib/fixture-tool.mjs", "cached\n");
 		const target = makeUpstreamTarget(
 			"target-ambiguous",
 			UPSTREAM_MARKERS.slice(0, 1),
@@ -805,11 +807,7 @@ describe("CLI output", () => {
 		// not to update or re-run some other copy of this script.
 		const target = makeUpstreamTarget("target-upstream-local");
 		const skillRoot = join(target, ".claude/skills/pfd-ops");
-		writeFile(
-			join(skillRoot, "install"),
-			"scripts/lib/fixture-tool.mjs",
-			"mirror\n",
-		);
+		writeBundledFile(skillRoot, "scripts/lib/fixture-tool.mjs", "mirror\n");
 		writeFile(
 			target,
 			"scripts/lib/fixture-tool.mjs",
@@ -825,11 +823,7 @@ describe("CLI output", () => {
 	it("exits zero for a repo-local upstream run whose mirror is in sync", () => {
 		const target = makeUpstreamTarget("target-upstream-local-clean");
 		const skillRoot = join(target, ".claude/skills/pfd-ops");
-		writeFile(
-			join(skillRoot, "install"),
-			"scripts/lib/fixture-tool.mjs",
-			"mirror\n",
-		);
+		writeBundledFile(skillRoot, "scripts/lib/fixture-tool.mjs", "mirror\n");
 		writeFile(target, "scripts/lib/fixture-tool.mjs", "mirror\n");
 
 		const { status, stdout } = runCli(skillRoot, target);
@@ -842,7 +836,7 @@ describe("CLI output", () => {
 		const target = join(tmp, "target-adopter-differences");
 		enableGithubIssues(target);
 		deployInstall(skillRoot, target);
-		writeFile(join(skillRoot, "install"), "a.txt", "new-canonical-a");
+		writeBundledFile(skillRoot, "a.txt", "new-canonical-a");
 		writeFile(target, "sub/b.txt", "user-edit-b");
 
 		const { status, stdout } = runCli(skillRoot, target);
@@ -856,11 +850,7 @@ describe("CLI output", () => {
 	it("still deploys into an ordinary adopting repo", () => {
 		// The guard has to leave the case it was never about untouched.
 		const skillRoot = join(tmp, "skill-adopter-still-works");
-		writeFile(
-			join(skillRoot, "install"),
-			"scripts/lib/fixture-tool.mjs",
-			"canonical\n",
-		);
+		writeBundledFile(skillRoot, "scripts/lib/fixture-tool.mjs", "canonical\n");
 		const target = join(tmp, "target-adopter-still-works");
 		enableGithubIssues(target);
 		mkdirSync(target, { recursive: true });
@@ -905,15 +895,15 @@ describe("CLI output", () => {
 		const skillRoot = join(tmp, "skill-cli");
 		const targetRoot = join(tmp, "target-cli");
 		enableGithubIssues(targetRoot);
-		writeFile(
-			join(skillRoot, "install"),
+		writeBundledFile(
+			skillRoot,
 			"scripts/lib/fixture-tool.mjs",
 			"canonical-original",
 		);
 		deployInstall(skillRoot, targetRoot);
-		rmSync(join(skillRoot, "install", "scripts", "lib", "fixture-tool.mjs"));
-		writeFile(
-			join(skillRoot, "install"),
+		retireBundledFile(skillRoot, "scripts/lib/fixture-tool.mjs");
+		writeBundledFile(
+			skillRoot,
 			"scripts/pfdsl/lib/fixture-tool.mjs",
 			"canonical-rewritten",
 		);
@@ -938,8 +928,8 @@ describe("CLI output", () => {
 		const skillRoot = join(tmp, "skill-cli-order");
 		const targetRoot = join(tmp, "target-cli-order");
 		enableGithubIssues(targetRoot);
-		writeFile(
-			join(skillRoot, "install"),
+		writeBundledFile(
+			skillRoot,
 			"scripts/lib/fixture-tool.mjs",
 			"canonical-original",
 		);
@@ -949,9 +939,9 @@ describe("CLI output", () => {
 			"scripts/lib/fixture-tool.mjs",
 			"canonical-original\nlocal tweak\n",
 		);
-		rmSync(join(skillRoot, "install", "scripts", "lib", "fixture-tool.mjs"));
-		writeFile(
-			join(skillRoot, "install"),
+		retireBundledFile(skillRoot, "scripts/lib/fixture-tool.mjs");
+		writeBundledFile(
+			skillRoot,
 			"scripts/pfdsl/lib/fixture-tool.mjs",
 			"canonical-rewritten",
 		);
@@ -983,26 +973,22 @@ describe("CLI output", () => {
 		const skillRoot = join(tmp, "skill-cli-copied");
 		const targetRoot = join(tmp, "target-cli-copied");
 		enableGithubIssues(targetRoot);
-		writeFile(
-			join(skillRoot, "install"),
+		writeBundledFile(
+			skillRoot,
 			"scripts/lib/fixture-tool.mjs",
 			"canonical-original",
 		);
-		writeFile(
-			join(skillRoot, "install"),
-			"unrelated.txt",
-			"canonical-unrelated",
-		);
+		writeBundledFile(skillRoot, "unrelated.txt", "canonical-unrelated");
 		deployInstall(skillRoot, targetRoot);
 		writeFile(
 			targetRoot,
 			"scripts/lib/fixture-tool.mjs",
 			"canonical-original\nlocal tweak\n",
 		);
-		rmSync(join(skillRoot, "install", "scripts", "lib", "fixture-tool.mjs"));
+		retireBundledFile(skillRoot, "scripts/lib/fixture-tool.mjs");
 		rmSync(join(targetRoot, "unrelated.txt"));
-		writeFile(
-			join(skillRoot, "install"),
+		writeBundledFile(
+			skillRoot,
 			"scripts/pfdsl/lib/fixture-tool.mjs",
 			"canonical-rewritten",
 		);
@@ -1019,7 +1005,7 @@ describe("CLI output", () => {
 	it("exits non-zero with a migration message when given the retired --force", () => {
 		const skillRoot = join(tmp, "skill-cli-force");
 		const targetRoot = join(tmp, "target-cli-force");
-		writeFile(join(skillRoot, "install"), "a.txt", "canonical-a");
+		writeBundledFile(skillRoot, "a.txt", "canonical-a");
 		mkdirSync(targetRoot, { recursive: true });
 
 		const result = runCli(skillRoot, targetRoot, ["--deploy", "--force"]);
@@ -1169,6 +1155,7 @@ describe("applied migration state", () => {
 		const pluginRoot = join(tmp, name);
 		const skillRoot = join(pluginRoot, "skills", "pfd-ops");
 		mkdirSync(join(skillRoot, "install"), { recursive: true });
+		writeInventory(skillRoot);
 		mkdirSync(join(skillRoot, "scripts"), { recursive: true });
 		copyFileSync(
 			scriptPath,
@@ -1650,6 +1637,86 @@ describe("applied migration state", () => {
 	});
 
 	describe("--deploy", () => {
+		it("requires the source directory even when the release retires the last file", () => {
+			const plugin = makeInstalledPlugin("retire-last");
+			writeBundledFile(plugin.skillRoot, "last.txt", "installed");
+			const target = makeAdopter("retire-last-adopter", {
+				githubIssues: { enabled: true },
+			});
+			const deploy = () => run(plugin, target, ["--deploy"]);
+			assert.equal(deploy().status, 0);
+			const manifest = join(target, ".claude/pfd-ops-install-manifest.json");
+			const before = readFileSync(manifest);
+			retireBundledFile(plugin.skillRoot, "last.txt");
+			const install = join(plugin.skillRoot, "install");
+			const backup = join(tmp, "empty-install");
+			renameSync(install, backup);
+			const result = deploy();
+			assert.notEqual(result.status, 0, result.stdout);
+			assert.ok(result.stderr.includes(install), result.stderr);
+			assert.equal(readFileSync(join(target, "last.txt"), "utf8"), "installed");
+			assert.deepEqual(readFileSync(manifest), before);
+			renameSync(backup, install);
+			assert.equal(deploy().status, 0);
+			assert.equal(existsSync(join(target, "last.txt")), false);
+			assert.deepEqual(readManifest(target), []);
+		});
+
+		it("preserves a deployment through source loss and retry, then applies a release retiring a file", () => {
+			const plugin = { skillRoot: join(tmp, "plugin/skills/pfd-ops") };
+			cpSync(join(repoRoot, "plugin/pfdsl/skills/pfd-ops"), plugin.skillRoot, {
+				recursive: true,
+			});
+			const target = makeAdopter("adopter", {
+				githubIssues: { enabled: true },
+			});
+			const deploy = () => run(plugin, target, ["--deploy"]);
+			assert.equal(deploy().status, 0);
+			const managed = readManifest(target).map((entry) => entry.path);
+			const [retired, edited] = managed;
+			assert.ok(edited, "the initial deployment needs at least two files");
+			const snapshot = () =>
+				[...managed, ".claude/pfd-ops-install-manifest.json"].map((path) =>
+					readFileSync(join(target, path)),
+				);
+			const before = snapshot();
+
+			const install = join(plugin.skillRoot, "install");
+			const inventory = join(plugin.skillRoot, "install-files.json");
+			for (const source of [install, join(install, retired), inventory]) {
+				const backup = join(tmp, "held-source");
+				renameSync(source, backup);
+				for (const result of [deploy(), run(plugin, target)]) {
+					assert.notEqual(result.status, 0, result.stdout);
+					assert.match(result.stderr, /install/i);
+					assert.ok(result.stderr.includes(source), result.stderr);
+					assert.deepEqual(snapshot(), before);
+				}
+				renameSync(backup, source);
+				assert.equal(run(plugin, target).status, 0);
+				assert.equal(deploy().status, 0);
+				assert.deepEqual(snapshot(), before);
+			}
+
+			rmSync(join(install, retired));
+			writeFileSync(
+				inventory,
+				JSON.stringify(managed.filter((path) => path !== retired)),
+			);
+			writeFile(target, edited, "local customization");
+			const upgraded = deploy();
+			assert.equal(upgraded.status, 1, upgraded.stderr);
+			assert.equal(existsSync(join(target, retired)), false);
+			assert.equal(
+				readFileSync(join(target, edited), "utf8"),
+				"local customization",
+			);
+			assert.deepEqual(
+				readManifest(target).map((entry) => entry.path),
+				managed.filter((path) => path !== retired),
+			);
+		});
+
 		it("does not warn about deployment history when no manifest exists", () => {
 			const plugin = makeInstalledPlugin("fresh-optional", { claude: "0.2.0" });
 			const target = makeAdopter("fresh-optional");
@@ -1660,7 +1727,7 @@ describe("applied migration state", () => {
 
 		it("preserves legacy files and the manifest on repeated disabled deployments", () => {
 			const plugin = makeInstalledPlugin("optional", { claude: "0.2.0" });
-			writeFile(join(plugin.skillRoot, "install"), "old.txt", "old");
+			writeBundledFile(plugin.skillRoot, "old.txt", "old");
 			for (const [i, config] of [
 				undefined,
 				{ sweepCompletedChains: { enabled: true } },
@@ -1743,8 +1810,8 @@ describe("applied migration state", () => {
 		});
 
 		function withInstallFile(plugin) {
-			writeFile(
-				join(plugin.skillRoot, "install"),
+			writeBundledFile(
+				plugin.skillRoot,
 				"scripts/fixture-tool.mjs",
 				"canonical\n",
 			);

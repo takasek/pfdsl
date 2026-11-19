@@ -6,7 +6,11 @@
 // and the generated install/ tree itself (so a hand-edit to the generated
 // side is caught and overwritten too).
 
-import { INSTALL_TEMPLATE_PATHS } from "./install-templates.mjs";
+import {
+	INSTALL_DIR_RELATIVE,
+	INSTALL_INVENTORY_RELATIVE,
+	INSTALL_TEMPLATE_PATHS,
+} from "./install-templates.mjs";
 
 const escapeDots = (s) => s.replace(/\./g, "\\.");
 
@@ -16,7 +20,8 @@ const GEN_INSTALL_TRIGGER_PATTERN = [
 	"scripts/lib/gen-install\\.mjs",
 	"scripts/lib/relative-imports\\.mjs",
 	"scripts/gen-install\\.mjs",
-	"^\\.claude/skills/pfd-ops/install/",
+	`^${escapeDots(INSTALL_DIR_RELATIVE)}/`,
+	`^${escapeDots(INSTALL_INVENTORY_RELATIVE)}$`,
 ].join("|");
 
 export const GEN_INSTALL_TRIGGER = new RegExp(GEN_INSTALL_TRIGGER_PATTERN);

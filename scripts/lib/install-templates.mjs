@@ -8,6 +8,10 @@
 // Adding a path here is a deliberate "yes, distribute this" decision, and
 // scripts/lib/install-templates.test.mjs asserts it stays in sync with what
 // actually exists under .claude/skills/pfd-ops/install/.
+export const INSTALL_DIR_RELATIVE = ".claude/skills/pfd-ops/install";
+export const INSTALL_INVENTORY_RELATIVE =
+	".claude/skills/pfd-ops/install-files.json";
+
 export const INSTALL_TEMPLATE_PATHS = [
 	".github/workflows/pfdsl-sweep-completed-chains.yml",
 	"scripts/pfdsl/audit-issues-flow.mjs",

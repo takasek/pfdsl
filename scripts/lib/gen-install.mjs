@@ -16,14 +16,17 @@ import {
 	rmdirSync,
 	rmSync,
 	statSync,
+	writeFileSync,
 } from "node:fs";
-import { dirname, join, posix } from "node:path";
+import { basename, dirname, join, posix } from "node:path";
 
 import { listInstallFiles } from "../harness-template/skills/pfd-ops/scripts/check-install-sync.mjs";
-import { INSTALL_TEMPLATE_PATHS } from "./install-templates.mjs";
+import {
+	INSTALL_DIR_RELATIVE,
+	INSTALL_INVENTORY_RELATIVE,
+	INSTALL_TEMPLATE_PATHS,
+} from "./install-templates.mjs";
 import { extractRelativeImports } from "./relative-imports.mjs";
-
-export const INSTALL_DIR_RELATIVE = ".claude/skills/pfd-ops/install";
 
 function filesEqual(pathA, pathB) {
 	return readFileSync(pathA).equals(readFileSync(pathB));
@@ -39,19 +42,22 @@ function removeEmptyDirectories(directory, keepRoot = true) {
 }
 
 /**
- * Regenerate .claude/skills/pfd-ops/install/** under root from the
- * repo-root-relative sources in templatePaths. A listed source that does not
+ * Generate the selected repo-root-relative sources and their release inventory
+ * together for a pfd-ops skill. A listed source that does not
  * exist is a hard error, raised before any file under install/ is touched,
  * so a missing template never leaves install/ partially regenerated. Any
  * file under install/ that isn't in templatePaths is removed. Never touches
  * the git index.
  * @param {string} root repo root (absolute path)
  * @param {string[]} [templatePaths] defaults to the real distribution list
- * @returns {{ changed: string[], unchanged: string[], removed: string[] }}
+ * @param {string} [installDir] output payload directory; defaults to the Claude repository mirror
+ * @returns {{ changed: string[], unchanged: string[], removed: string[], inventoryChanged: boolean }}
  */
-export function genInstall(root, templatePaths = INSTALL_TEMPLATE_PATHS) {
-	const installDir = join(root, INSTALL_DIR_RELATIVE);
-
+export function genInstall(
+	root,
+	templatePaths = INSTALL_TEMPLATE_PATHS,
+	installDir = join(root, INSTALL_DIR_RELATIVE),
+) {
 	// Validate every source exists before writing anything.
 	for (const rel of templatePaths) {
 		const src = join(root, rel);
@@ -78,6 +84,7 @@ export function genInstall(root, templatePaths = INSTALL_TEMPLATE_PATHS) {
 
 	const changed = [];
 	const unchanged = [];
+	mkdirSync(installDir, { recursive: true });
 	for (const rel of templatePaths) {
 		const src = join(root, rel);
 		const dest = join(installDir, rel);
@@ -95,18 +102,27 @@ export function genInstall(root, templatePaths = INSTALL_TEMPLATE_PATHS) {
 	// Anything under install/ that isn't a listed template is stale — remove
 	// it so dropping a template from the list actually deletes its mirror.
 	const removed = [];
-	if (existsSync(installDir)) {
-		for (const rel of listInstallFiles(installDir)) {
-			if (templateSet.has(rel)) continue;
-			rmSync(join(installDir, rel), { force: true });
-			removed.push(rel);
-		}
-		removeEmptyDirectories(installDir);
+	for (const rel of listInstallFiles(installDir)) {
+		if (templateSet.has(rel)) continue;
+		rmSync(join(installDir, rel), { force: true });
+		removed.push(rel);
 	}
+	removeEmptyDirectories(installDir);
+
+	const inventoryPath = join(
+		dirname(installDir),
+		basename(INSTALL_INVENTORY_RELATIVE),
+	);
+	const inventory = `${JSON.stringify(templatePaths, null, "\t")}\n`;
+	const inventoryChanged =
+		!existsSync(inventoryPath) ||
+		readFileSync(inventoryPath, "utf8") !== inventory;
+	if (inventoryChanged) writeFileSync(inventoryPath, inventory);
 
 	return {
 		changed: changed.sort(),
 		unchanged: unchanged.sort(),
 		removed: removed.sort(),
+		inventoryChanged,
 	};
 }

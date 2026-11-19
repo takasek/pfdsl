@@ -13,7 +13,7 @@ import { describe, it } from "node:test";
 
 import { buildGates } from "./drift-gates.mjs";
 import {
-	GEN_INSTALL_OUTPUT,
+	GEN_INSTALL_OUTPUTS,
 	GEN_SKILL_MD_OUTPUT,
 	genPluginDriftPathspecs,
 } from "./gen-plugin-outputs.mjs";
@@ -131,7 +131,7 @@ describe("buildGates", () => {
 			genPluginDriftPathspecs("pre-commit"),
 		);
 		assert.deepEqual(diffed("gen-plugin-skill-md"), [GEN_SKILL_MD_OUTPUT]);
-		assert.deepEqual(diffed("gen-install"), [GEN_INSTALL_OUTPUT]);
+		assert.deepEqual(diffed("gen-install"), GEN_INSTALL_OUTPUTS);
 	});
 
 	it("fires readme-cli for the npm-page README, which the generator also writes", () => {

@@ -4,6 +4,7 @@ on:
   push:
     paths:
       - '.claude/skills/pfd-ops/install/**'
+      - '.claude/skills/pfd-ops/install-files.json'
       - '.github/workflows/**'
       - 'scripts/**'
   # Required checks must report on every PR, including unrelated changes.
@@ -45,7 +46,7 @@ jobs:
       - name: Check pfd-ops/install was generated from its repo-root sources
         run: |
           node scripts/gen-install.mjs
-          if ! node scripts/check-generated-drift.mjs -- .claude/skills/pfd-ops/install; then
+          if ! node scripts/check-generated-drift.mjs -- .claude/skills/pfd-ops/install .claude/skills/pfd-ops/install-files.json; then
             echo ""
             echo "Fix: .claude/skills/pfd-ops/install/ is generated. Edit the repo-root source and run 'make gen-install'."
             exit 1
