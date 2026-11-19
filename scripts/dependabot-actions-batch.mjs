@@ -117,17 +117,18 @@ export function updateWorkflowPinExpectations(source, pins) {
 	return result;
 }
 
-function run(file, args, options = {}) {
-	return execFileSync(file, args, {
+export function run(file, args, { capture = false, ...options } = {}) {
+	const output = execFileSync(file, args, {
 		encoding: "utf8",
-		stdio: ["ignore", "pipe", "inherit"],
+		stdio: ["ignore", capture ? "pipe" : "inherit", "inherit"],
 		maxBuffer: 32 * 1024 * 1024,
 		...options,
-	}).trim();
+	});
+	return output?.trim() ?? "";
 }
 
 function ghJson(args) {
-	return JSON.parse(run("gh", args));
+	return JSON.parse(run("gh", args, { capture: true }));
 }
 
 function allPages(route) {
@@ -218,12 +219,16 @@ export function createFinalPr(
 }
 
 function assertNoOrphanBranch() {
-	const refs = run("git", [
-		"ls-remote",
-		"--heads",
-		"origin",
-		"refs/heads/automation/dependabot-actions-*",
-	]);
+	const refs = run(
+		"git",
+		[
+			"ls-remote",
+			"--heads",
+			"origin",
+			"refs/heads/automation/dependabot-actions-*",
+		],
+		{ capture: true },
+	);
 	for (const line of refs.split("\n").filter(Boolean)) {
 		const branch = line.split("\trefs/heads/")[1];
 		if (!branch) throw new Error("Invalid batch branch ref");
@@ -302,7 +307,9 @@ function main() {
 	});
 	const branch = batchBranchName(batch.pulls);
 	const remoteExists = Boolean(
-		run("git", ["ls-remote", "--heads", "origin", `refs/heads/${branch}`]),
+		run("git", ["ls-remote", "--heads", "origin", `refs/heads/${branch}`], {
+			capture: true,
+		}),
 	);
 	const noToken = { ...process.env, GH_TOKEN: "", GITHUB_TOKEN: "" };
 	if (remoteExists) throw new Error(`Batch branch already exists: ${branch}`);
@@ -317,7 +324,7 @@ function main() {
 	}
 	const base = ghJson(["api", `repos/${repository}/git/ref/heads/main`]).object
 		.sha;
-	if (run("git", ["rev-parse", "HEAD"]) !== base)
+	if (run("git", ["rev-parse", "HEAD"], { capture: true }) !== base)
 		throw new Error("main advanced since checkout");
 	run("git", ["switch", "-c", branch]);
 	run("git", ["config", "user.name", "dependabot-actions-batch[bot]"]);
@@ -333,7 +340,10 @@ function main() {
 			"origin",
 			`refs/pull/${pull.number}/head`,
 		]);
-		if (run("git", ["rev-parse", "FETCH_HEAD"]) !== pull.head.sha)
+		if (
+			run("git", ["rev-parse", "FETCH_HEAD"], { capture: true }) !==
+			pull.head.sha
+		)
 			throw new Error(`PR #${pull.number} changed during fetch`);
 		run(
 			"git",
@@ -359,7 +369,7 @@ function main() {
 	run("make", ["gen-plugin"], { env: noToken });
 	run("make", ["test"], { env: noToken });
 	run("git", ["add", "-A"]);
-	if (run("git", ["diff", "--cached", "--name-only"])) {
+	if (run("git", ["diff", "--cached", "--name-only"], { capture: true })) {
 		run(
 			"git",
 			[

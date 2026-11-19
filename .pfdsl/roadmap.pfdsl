@@ -211,7 +211,7 @@ artifact:
   artifact_reference_adoption_version:
     label: Wiki 運用で参照先を解決できる採用版
     description: 実装を含む採用版と配布形態を固定する。公開が必要なら既存の公開工程へ接続し、公開の承認を別途得る
-    status: todo
+    status: wip
     criteria: Wiki 運用で使う版と配布形態が特定され、その版に参照先解決の実装が含まれ、モデル既定と artifact 上書きの解決をその版で検証した証拠がある
   wiki_roadmap_ready_for_cutover:
     label: 正本切替の準備が整った Wiki 連携 (#1519)

@@ -124,13 +124,13 @@
 <g id="node5" class="node">
 <title>artifact_reference_adoption_version</title>
 <g id="a_node5"><a xlink:title="Wiki 運用で参照先を解決できる採用版&#10;&#10;実装を含む採用版と配布形態を固定する。公開が必要なら既存の公開工程へ接続し、公開の承認を別途得る&#10;criteria: Wiki 運用で使う版と配布形態が特定され、その版に参照先解決の実装が含まれ、モデル既定と artifact 上書きの解決をその版で検証した証拠がある">
-<polygon fill="#f8f9fa" stroke="black" points="1018.03,-719.6 744.43,-719.6 744.43,-661.2 1018.03,-661.2 1018.03,-719.6"/>
+<polygon fill="#fff3cd" stroke="black" points="1018.03,-719.6 744.43,-719.6 744.43,-661.2 1018.03,-661.2 1018.03,-719.6"/>
 <text xml:space="preserve" text-anchor="middle" x="881.23" y="-703" font-family="Times,serif" font-size="14.00">artifact_reference_adoption_version</text>
 <text xml:space="preserve" text-anchor="middle" x="881.23" y="-686.2" font-family="Times,serif" font-size="14.00">Wiki 運用で参照先を</text>
 <text xml:space="preserve" text-anchor="middle" x="881.23" y="-669.4" font-family="Times,serif" font-size="14.00">解決できる採用版</text>
 </a>
 </g>
-<text xml:space="preserve" text-anchor="middle" x="731.98" y="-648.6" font-family="Times,serif" font-size="14.00">todo</text>
+<text xml:space="preserve" text-anchor="middle" x="733.93" y="-648.6" font-family="Times,serif" font-size="14.00">wip</text>
 </g>
 <!-- switch_wiki_roadmap_source -->
 <g id="node50" class="node">
