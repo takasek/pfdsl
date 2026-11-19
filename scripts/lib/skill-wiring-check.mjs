@@ -118,7 +118,7 @@ export function artifactReachesProcess(edges, sourceArtifact, targetProcess) {
 
 /**
  * The distributed hand-written artifacts missing from one or both of the edges
- * that model them. `location` may be a scalar path or (per spec.md §15.8) an
+ * that model them. `location` may be a scalar path or (per spec.md [[SPEC_location_command_constraint]]) an
  * array of them — an artifact counts as bundled if any one of its locations
  * is, since a single bundled entry is enough to need the wiring this checks.
  *

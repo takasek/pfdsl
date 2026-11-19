@@ -15,7 +15,7 @@ export type PfdType = (typeof PFD_TYPE_VALUES)[number];
 
 /**
  * Whether a file is a roadmap as far as the roadmap-only operations are
- * concerned (§15.14): an omitted `type:` reads as roadmap, so only an explicit
+ * concerned ([[SPEC_type_constraint]]): an omitted `type:` reads as roadmap, so only an explicit
  * other kind is excluded. Callers ask this rather than restating the condition,
  * so they cannot drift apart on what "roadmap" means.
  */

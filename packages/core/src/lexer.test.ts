@@ -129,7 +129,7 @@ describe("lex", () => {
 		expect(err?.severity).toBe("error");
 	});
 
-	describe("bare-id forbidden characters split tokens (spec §4.1)", () => {
+	describe("bare-id forbidden characters split tokens (spec.md's bare-id rules)", () => {
 		it("semicolon splits IDs", () => {
 			expect(types("a;b")).toEqual(["ID", "SEMICOLON", "ID", "EOF"]);
 		});
@@ -160,7 +160,7 @@ describe("lex", () => {
 	});
 });
 
-describe("bare ids start with a letter, a number or _ (spec §4.1)", () => {
+describe("bare ids start with a letter, a number or _ (spec.md's bare-id rules)", () => {
 	it.each(["-x", "---", "-処理"])("rejects a bare %s", (id) => {
 		const { diagnostics } = lex(`a >> ${id} -> b\n`);
 		expect(diagnostics.map((d) => d.code)).toContain("L002");

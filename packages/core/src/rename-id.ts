@@ -61,7 +61,7 @@ export function renameId(
 	// are the child file's own ids and are never touched. Otherwise, when
 	// `oldId` is a normal input/output of a subflow process, a
 	// `{ <newId>: <oldId> }` entry is added: an unmapped boundary artifact is
-	// matched to the child by identical id (spec §2.9.3), and the entry keeps
+	// matched to the child by identical id (spec [[SPEC_subflow_expansion]]), and the entry keeps
 	// that match after the rename.
 	for (const [pid, meta] of Object.entries(frontmatter?.process ?? {})) {
 		const boundaryNode = doc.getIn(["process", pid, "boundary"], true);

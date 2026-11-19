@@ -39,7 +39,7 @@ describe("findOccurrencesInText", () => {
 	});
 
 	it("finds a strict reference and labels it 'strict-ref'", () => {
-		const text = "see [[SPEC_foo]] here";
+		const text = "see [[SPEC_foo]] here"; // spec-ref-literal: synthetic specification fixture
 		const occ = findOccurrencesInText("SPEC_foo", "spec.md", text);
 		assert.equal(occ.length, 1);
 		assert.equal(occ[0].kind, "strict-ref");
@@ -63,7 +63,7 @@ describe("findOccurrencesInText", () => {
 		const text = [
 			"[[SPEC_foo?]] forward",
 			"## Def (SPEC_foo)",
-			"strict [[SPEC_foo]]",
+			"strict [[SPEC_foo]]", // spec-ref-literal: synthetic specification fixture
 		].join("\n");
 		const occ = findOccurrencesInText("SPEC_foo", "spec.md", text);
 		assert.deepEqual(
@@ -77,7 +77,7 @@ describe("findOccurrencesInText", () => {
 	});
 
 	it("ignores occurrences of other slugs", () => {
-		const text = "## Other (SPEC_bar)\n[[SPEC_bar]]";
+		const text = "## Other (SPEC_bar)\n[[SPEC_bar]]"; // spec-ref-literal: synthetic specification fixture
 		assert.deepEqual(findOccurrencesInText("SPEC_foo", "spec.md", text), []);
 	});
 
@@ -112,12 +112,12 @@ describe("formatOccurrences", () => {
 				kind: "strict-ref",
 				file: "spec.md",
 				line: 9,
-				text: "see [[SPEC_foo]]",
+				text: "see [[SPEC_foo]]", // spec-ref-literal: synthetic specification fixture
 			},
 		];
 		assert.equal(
 			formatOccurrences(occurrences),
-			"spec.md:2: definition ## Heading (SPEC_foo)\nspec.md:9: strict-ref see [[SPEC_foo]]",
+			"spec.md:2: definition ## Heading (SPEC_foo)\nspec.md:9: strict-ref see [[SPEC_foo]]", // spec-ref-literal: synthetic specification fixture
 		);
 	});
 

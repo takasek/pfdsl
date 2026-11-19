@@ -63,7 +63,7 @@ describe("runMintCheck", () => {
 	it("aggregates occurrences across multiple files", () => {
 		const texts = {
 			"a.md": "## Def (SPEC_foo)",
-			"b.md": "see [[SPEC_foo]]",
+			"b.md": "see [[SPEC_foo]]", // spec-ref-literal: synthetic specification fixture
 		};
 		const result = runMintCheck({
 			slugArg: "foo",

@@ -6,7 +6,7 @@ import type { RuleContext } from "./context.js";
 const PFD_TYPE_SET: ReadonlySet<string> = new Set(PFD_TYPE_VALUES);
 
 /**
- * W003: status must not run backwards along an edge (§15.6). If a process
+ * W003: status must not run backwards along an edge ([[SPEC_status_style_constraint]]). If a process
  * produces something `done`, an input it consumed cannot still be unfinished.
  * Only inputs with a declared status count — an undeclared one states nothing.
  * Feedback inputs are exempt: they close a loop rather than feed the output.
@@ -36,7 +36,7 @@ export function statusMonotonicity(ctx: RuleContext): Diagnostic[] {
 }
 
 /**
- * W007: outside a roadmap, an artifact carries no progress of its own (§15.15).
+ * W007: outside a roadmap, an artifact carries no progress of its own ([[SPEC_non_roadmap_status_constraint]]).
  * The same id can appear in several diagrams, so status lives in one of them —
  * a flow file that declares it lets two diagrams claim different states for
  * the same thing. Exempts files with no `type:`: an omitted kind declares
@@ -59,7 +59,7 @@ export function flowStatusAbsence(ctx: RuleContext): Diagnostic[] {
 	return diagnostics;
 }
 
-/** V031: `type:` must name a known PFD kind (§15.14). */
+/** V031: `type:` must name a known PFD kind ([[SPEC_type_constraint]]). */
 export function pfdType(ctx: RuleContext): Diagnostic[] {
 	const type = ctx.fm?.type;
 	if (type === undefined || PFD_TYPE_SET.has(String(type))) return [];
@@ -76,7 +76,7 @@ export function pfdType(ctx: RuleContext): Diagnostic[] {
 /**
  * V035: in a roadmap, every artifact id that appears on an edge must carry a
  * frontmatter declaration, and that declaration must carry a `status:`
- * (§15.16). Scoped to `ctx.nodesWithEdges`, not all of `ctx.nodeKinds`
+ * ([[SPEC_roadmap_artifact_declaration_and_status]]). Scoped to `ctx.nodesWithEdges`, not all of `ctx.nodeKinds`
  * (which also holds ids declared in frontmatter but never used on any edge,
  * e.g. a `future:` artifact parked for later — those are not this rule's
  * concern, and the diagnostic's own wording says "appears on an edge"). An
@@ -123,7 +123,7 @@ export function roadmapUndeclaredArtifact(ctx: RuleContext): Diagnostic[] {
 }
 
 /**
- * W006: the ready gate treats a file with no `type:` as a roadmap (§15.14).
+ * W006: the ready gate treats a file with no `type:` as a roadmap ([[SPEC_type_constraint]]).
  * Say so, rather than acting on an assumption the author never wrote down.
  */
 export function readyGateTypeOmitted(ctx: RuleContext): Diagnostic[] {

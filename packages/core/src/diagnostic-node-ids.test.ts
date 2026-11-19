@@ -8,7 +8,7 @@ import { buildRuleContext } from "./rules/context.js";
 import type { Frontmatter } from "./types/index.js";
 import { RULES } from "./validator.js";
 
-// Fixed inputs and targets follow the Wave 3 item 2 design table and spec §15–16.
+// Fixed inputs and targets follow the Wave 3 item 2 design table and the specification's constraints and diagnostic code table.
 // Deliberately bypass YAML shape validation to exercise every rule's own branch.
 const cases: readonly [
 	string,

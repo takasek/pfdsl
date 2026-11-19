@@ -64,7 +64,7 @@ describe("pfdsl skill: reading references/spec.md by section number", () => {
 
 // SKILL.md is the only frontmatter reference most readers open. A reader
 // who takes `boundary:` for a complete table is surprised when an unmapped
-// ID is matched by identity and raises V033 / V034 (spec §15.11).
+// ID is matched by identity and raises V033 / V034 (spec [[SPEC_subflow_boundary_constraint]]).
 describe("pfdsl skill: the boundary: field comment", () => {
 	it("says unmapped boundary IDs are matched to the child by identity", () => {
 		const line = skill.split("\n").find((l) => /^\s*boundary:/.test(l));

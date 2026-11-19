@@ -49,7 +49,7 @@ function declares(section: object | undefined, id: string): boolean {
  * `id`'s kind in this file, or the kind it clashes with when it is a local
  * group id that is also an artifact/process id — declared in frontmatter,
  * used in a body edge, or an isolated body node (an artifact unless
- * declared otherwise, §5.1.3). `nodeKinds` holds one kind per id, so the
+ * declared otherwise, the default Artifact inference rule). `nodeKinds` holds one kind per id, so the
  * clash is read from the sections and the body instead.
  */
 function resolveKind(

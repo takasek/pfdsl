@@ -22,7 +22,7 @@ export {
  * a change in an unmodeled area (the check scripts, historically) and a change
  * someone judged irrelevant both come out as the same silent "N/A".
  *
- * `resolveLocation` is injected rather than written here because spec §15.8
+ * `resolveLocation` is injected rather than written here because spec [[SPEC_location_command_constraint]]
  * owns what a `location:` resolves to (the file's own directory, or the
  * frontmatter's `basePath` when it has one) and @pfdsl/core already implements
  * it — a second reading of that rule here would be free to drift from the one
@@ -436,7 +436,7 @@ export function diffNewTerminals(beforeTerminals, afterTerminals) {
  * `pfdsl graph edges --json` payload (#671).
  *
  * Feedback (`>>?`) edges are deliberately excluded: `graph io`'s `terminals`
- * is the spec's **audit-terminal** (§15.11), which ignores feedback
+ * is the **audit-terminal** in spec.md's 終端成果物 section, which ignores feedback
  * consumption, so counting a sibling's feedback edge as consumption would
  * classify the same artifact differently depending on which file its
  * feedback consumer happens to sit in.
@@ -469,7 +469,7 @@ export function parseInputConsumedArtifacts(edgesJson) {
  * i.e. where "same id means the same artifact" holds (#671).
  *
  * This is a convention of *this repo's* operational PFD set, not a spec rule
- * — spec §2.9.1 keeps ids file-local precisely so that unrelated graphs may
+ * — spec [[SPEC_file_local_id_scope]] keeps ids file-local precisely so that unrelated graphs may
  * reuse a name. `docs/samples/` is the counterexample that forces the list to
  * exist rather than composing every directory: its diagrams are mutually
  * unrelated tutorials that reuse `spec` / `code` freely, so composing them

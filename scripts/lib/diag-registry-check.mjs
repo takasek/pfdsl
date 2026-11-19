@@ -1,5 +1,5 @@
 /**
- * Pure functions for diffing spec.md's §16 diagnostic code table against the
+ * Pure functions for diffing spec.md's diagnostic code table against the
  * DIAGNOSTIC_REGISTRY exported by @pfdsl/core. Network/FS I/O and the core
  * import live in the main script; this module stays testable without a build.
  */
@@ -14,7 +14,7 @@ const SEVERITY_LABELS = {
 
 /**
  * Parses the `| コード | severity | 定義節 | 条件 |` markdown table out of
- * spec.md's §16. Returns a map of code -> normalized severities array.
+ * spec.md's diagnostic code table. Returns a map of code -> normalized severities array.
  * Throws if a severity cell doesn't match a known label.
  *
  * @param {string} specText
@@ -26,7 +26,7 @@ export function parseSpecDiagTable(specText) {
 		const severities = SEVERITY_LABELS[severityCell];
 		if (!severities) {
 			throw new Error(
-				`spec.md §16 table: unrecognized severity "${severityCell}" for code ${code}`,
+				`spec.md diagnostic code table: unrecognized severity "${severityCell}" for code ${code}`,
 			);
 		}
 		result[code] = severities;
@@ -40,7 +40,7 @@ function specDiagRows(specText) {
 		/^\|\s*コード\s*\|\s*severity\s*\|/.test(l),
 	);
 	if (headerIdx === -1) {
-		throw new Error("§16 diagnostic code table header not found in spec.md");
+		throw new Error("Diagnostic code table header not found in spec.md");
 	}
 
 	const result = [];
@@ -187,39 +187,39 @@ export function evaluateDiagRegistryDiff({
 	if (missingInSpec.length > 0) {
 		failed = true;
 		stderrLines.push(
-			`Codes emitted by core but missing from spec.md §16 table: ${missingInSpec.join(", ")}`,
+			`Codes emitted by core but missing from spec.md diagnostic code table: ${missingInSpec.join(", ")}`,
 		);
 	}
 	if (staleInSpec.length > 0) {
 		failed = true;
 		stderrLines.push(
-			`Codes in spec.md §16 table but not emitted by core (stale): ${staleInSpec.join(", ")}`,
+			`Codes in spec.md diagnostic code table but not emitted by core (stale): ${staleInSpec.join(", ")}`,
 		);
 	}
 	if (severityMismatches.length > 0) {
 		failed = true;
 		stderrLines.push(
-			`Severity mismatch between spec.md §16 table and core registry: ${severityMismatches.join(", ")}`,
+			`Severity mismatch between spec.md diagnostic code table and core registry: ${severityMismatches.join(", ")}`,
 		);
 	}
 
 	if (sectionMismatches.length > 0) {
 		failed = true;
 		stderrLines.push(
-			`Section mismatch between spec.md §16 table and core registry: ${sectionMismatches.join(", ")}`,
+			`Section mismatch between spec.md diagnostic code table and core registry: ${sectionMismatches.join(", ")}`,
 		);
 	}
 
 	if (specIdMismatches.length > 0) {
 		failed = true;
 		stderrLines.push(
-			`Spec ID mismatch between spec.md §16 table and core registry: ${specIdMismatches.join(", ")}`,
+			`Spec ID mismatch between spec.md diagnostic code table and core registry: ${specIdMismatches.join(", ")}`,
 		);
 	}
 
 	if (failed) {
 		stderrLines.push(
-			"\ncheck-diag-registry: FAILED. Update docs/spec/spec.md §16 and/or packages/core/src/diagnostics-registry.ts to match.",
+			"\ncheck-diag-registry: FAILED. Update the diagnostic code table in docs/spec/spec.md and/or packages/core/src/diagnostics-registry.ts to match.",
 		);
 		return { exitCode: 1, stdoutLines: [], stderrLines };
 	}

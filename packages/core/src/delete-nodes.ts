@@ -189,7 +189,7 @@ function planStatement(
 			if (!touched) return { kind: "keep" };
 
 			// A chain is a sequence of links (artifact-role -> process ->
-			// artifact-role, per §9's semantics — the same translation
+			// artifact-role, per spec.md's operator semantics — the same translation
 			// normalizer.ts applies to build the graph). Deleting an id can
 			// sever a link at either end (the process itself, or the role on
 			// either side going empty); this walks the segments once, fusing

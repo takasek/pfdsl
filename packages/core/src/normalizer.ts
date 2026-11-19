@@ -210,7 +210,7 @@ export function normalize(
 			case "node-decl": {
 				const id = stmt.id.value;
 				declaredNodes.add(id);
-				// kind: front matter優先、なければArtifact既定（§5.1.3）
+				// kind: front matter優先、なければArtifact既定（spec.md「推論規則」の未確定ID）
 				if (!nodeKinds.has(id)) nodeKinds.set(id, "artifact");
 				else if (nodeKinds.get(id) === "group")
 					reportGroupClash(id, "artifact");

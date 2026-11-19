@@ -4,7 +4,7 @@ import type { RuleContext } from "./context.js";
 import { inputFeedbackConflictPairs } from "./edge-kinds.js";
 
 /**
- * V010: the primary graph must be acyclic (§16). Feedback edges are exempt —
+ * V010: the primary graph must be acyclic (spec.md's diagnostic code table, V010). Feedback edges are exempt —
  * looping an artifact back into an earlier process is what they are for.
  *
  * One diagnostic per back edge, since a back edge is exactly what closes a
@@ -66,7 +66,7 @@ export function primaryGraphCycle(ctx: RuleContext): Diagnostic[] {
 
 /**
  * V011: under --strict, a feedback edge `A >>? P` is a reverse cycle when A can
- * already reach P through ordinary edges (§15.3). A feedback artifact from an
+ * already reach P through ordinary edges ([[SPEC_feedback_validity_constraint]]). A feedback artifact from an
  * unrelated subgraph is legitimate and stays silent.
  */
 export function strictFeedback(ctx: RuleContext): Diagnostic[] {
@@ -110,7 +110,7 @@ export function strictFeedback(ctx: RuleContext): Diagnostic[] {
 	return diagnostics;
 }
 
-/** V025: a group's `parent:` chain must not close on itself (§2.8.4). */
+/** V025: a group's `parent:` chain must not close on itself ([[SPEC_group_constraints]]). */
 export function groupParentCycle(ctx: RuleContext): Diagnostic[] {
 	const diagnostics: Diagnostic[] = [];
 	const groupMeta = ctx.fm?.group ?? {};

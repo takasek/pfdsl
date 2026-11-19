@@ -20,6 +20,7 @@ import {
 import { resolve } from "node:path";
 import { buildExamplesMd } from "./examples-index.mjs";
 import { resolveCompanions } from "./sample-companions.mjs";
+import { stripSpecReferenceAnnotations } from "./skill-header.mjs";
 import { currentSpecVersion } from "./spec-history-check.mjs";
 
 function buildExamplesIndexMd(dir) {
@@ -59,7 +60,7 @@ export function writeSkillRefs(root, outDir) {
 		`<!-- DO NOT EDIT — snapshot distributed with pfdsl skill. Authoritative source: https://github.com/takasek/pfdsl/blob/main/${src} -->\n\n`;
 	writeFileSync(
 		resolve(refsDir, "spec.md"),
-		baseHeader("docs/spec/spec.md") + specSrc,
+		baseHeader("docs/spec/spec.md") + stripSpecReferenceAnnotations(specSrc),
 	);
 	console.log("references/spec.md ← docs/spec/spec.md");
 
@@ -71,7 +72,8 @@ export function writeSkillRefs(root, outDir) {
 	);
 	writeFileSync(
 		resolve(refsDir, "review-perspectives.md"),
-		baseHeader("docs/review-perspectives.md") + promptsSrc,
+		baseHeader("docs/review-perspectives.md") +
+			stripSpecReferenceAnnotations(promptsSrc),
 	);
 	console.log(
 		"references/review-perspectives.md ← docs/review-perspectives.md",
@@ -85,7 +87,8 @@ export function writeSkillRefs(root, outDir) {
 	);
 	writeFileSync(
 		resolve(refsDir, "quality-guide.md"),
-		baseHeader("docs/quality-guide.md") + qualityGuideSrc,
+		baseHeader("docs/quality-guide.md") +
+			stripSpecReferenceAnnotations(qualityGuideSrc),
 	);
 	console.log("references/quality-guide.md ← docs/quality-guide.md");
 

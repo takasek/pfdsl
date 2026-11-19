@@ -493,7 +493,7 @@ function refuseWith(
 }
 
 /**
- * Refuse an operation that only a roadmap may take part in (§15.14). `subject`
+ * Refuse an operation that only a roadmap may take part in ([[SPEC_type_constraint]]). `subject`
  * names what is being refused and opens the message. An omitted `type:` reads
  * as roadmap, so only an explicit other kind is turned away — the callers all
  * defer to `isRoadmapType` for that, rather than each restating the condition.
@@ -1868,7 +1868,7 @@ export function runMetaSet(
 	const failed = failIfErrors(unreadable, file, opts.json, opts.color);
 	if (failed) return failed;
 
-	// Progress belongs to the roadmap (§15.15), so writing status into a file
+	// Progress belongs to the roadmap ([[SPEC_non_roadmap_status_constraint]]), so writing status into a file
 	// that declares another kind would have the CLI produce the state W007
 	// reports. An omitted type is read as roadmap, same as the ready gate.
 	if (field === "status") {
@@ -2005,7 +2005,7 @@ export interface RenameOptions {
  *
  * Core `rename` resolves `<old>`'s kind and refuses what this one file
  * shows. This command adds what needs other files, for a file on disk: a
- * group `<old>` or `<new>` an `extends:` preset declares (§2.9.4), and
+ * group `<old>` or `<new>` an `extends:` preset declares ([[SPEC_extends_inheritance]]), and
  * inherited child-parent relationships the local rewrite cannot update.
  * The local result is re-validated before it is emitted or written;
  * unrelated dependency errors remain the responsibility of `check`.
@@ -2635,7 +2635,7 @@ export function runMetaList(
 /**
  * Fields whose values may also be declared in a frontmatter section of their
  * own, where declaring is optional and a node may use an undeclared value
- * (spec §2.7.2 / §2.8). `meta values` seeds those declarations at a count of
+ * (spec [[SPEC_tags_field]] / [[SPEC_group_definition]]). `meta values` seeds those declarations at a count of
  * 0, so a declared-but-unused value appears in the table instead of being
  * absent from it. The section name differs from the field name for `tags`,
  * which is why this is a table rather than an identity.
@@ -2737,7 +2737,7 @@ export interface CheckLinksMissing {
 	resolved: string;
 }
 
-/** URL (contains "://") or glob (contains *, ?, or {) elements are not checkable file paths (spec §15.8). */
+/** URL (contains "://") or glob (contains *, ?, or {) elements are not checkable file paths (spec [[SPEC_location_command_constraint]]). */
 function isLocationCheckable(element: string): boolean {
 	return !isUrlLike(element) && !/[*?{]/.test(element);
 }
@@ -3275,7 +3275,7 @@ export interface GraphOrphansOptions {
 // already on it.
 export type { GraphOrphan };
 
-/** Nodes wired to nothing — no primary edge and no feedback edge (§518). */
+/** Nodes wired to nothing — no primary edge and no feedback edge (#518). */
 export function runGraphOrphans(
 	file: string,
 	opts: GraphOrphansOptions = {},
@@ -3406,7 +3406,7 @@ export interface StatusGapsResult {
  * The tag a flow artifact carries to say "this one is an individually tracked
  * deliverable, so the roadmap must have a chain that builds it". The selector
  * used to be `status: todo`, but a flow file may not carry status at all
- * (W007, §15.15) — that selector could only match files already in violation.
+ * (W007, [[SPEC_non_roadmap_status_constraint]]) — that selector could only match files already in violation.
  * An opt-in tag also keeps the check quiet by default: comparing every flow id
  * against the roadmap flags 42 of this repo's own 47 workflow artifacts, which
  * are process byproducts nobody ever meant to track one by one.
@@ -3557,7 +3557,7 @@ export async function runRender(
 	const referenceNotice =
 		context !== undefined || hasExplicitReferences(frontmatter);
 
-	// Resolve extends-inherited statusStyles/tag/group (§2.9.4) so presets
+	// Resolve extends-inherited statusStyles/tag/group ([[SPEC_extends_inheritance]]) so presets
 	// shared across files actually affect rendering, not just `check`.
 	// Legacy stdin has no base file; an explicit context supplies a logical position.
 	let effectiveFrontmatter = frontmatter;
@@ -3842,18 +3842,18 @@ What is rewritten depends on <old>'s kind:
     file's own ids and are never touched). If <old> is a normal input/output
     of a subflow process whose boundary: does not already map it, a
     boundary: { <new>: <old> } entry is added so the child file's id set
-    still matches by identity (spec §2.9.3) — the child file itself is
+    still matches by identity (spec [[SPEC_subflow_expansion]]) — the child file itself is
     never read or written.
   - group: the group's own declaration key, every other group's parent:
     reference, and every artifact's/process's group: field. The body never
-    references groups (spec §2.8), so only the frontmatter changes.
+    references groups (spec [[SPEC_group_definition]]), so only the frontmatter changes.
 
 <old> must be this file's own id: a group only if it has a local group:
 declaration (own-property, not the derived node-kind table — an id
 declared as both a group and an artifact/process is invalid and refused,
 not disambiguated by a --kind flag). <new> must not already exist as an
 artifact, process, or group id — locally, or as a group inherited via
-extends: (§2.9.4). A group only partially overridden from a preset (also
+extends: ([[SPEC_extends_inheritance]]). A group only partially overridden from a preset (also
 defined there) is refused: rename it at the preset instead.
 
 A frontmatter using YAML anchors, aliases or merge keys (<<) anywhere is
@@ -4112,8 +4112,8 @@ keys are collections, or whose keys become the same name when read, must be
 rewritten with one scalar YAML key before editing.
 
 Setting status requires a roadmap file: an explicit type: other than roadmap
-is refused (spec §2.10/§15.14), since progress belongs to the roadmap — a file
-that carries status under another kind is also reported by check (W007, §15.15).
+is refused (spec [[SPEC_type_field]]/[[SPEC_type_constraint]]), since progress belongs to the roadmap — a file
+that carries status under another kind is also reported by check (W007, [[SPEC_non_roadmap_status_constraint]]).
 Other fields are writable on any kind.
 When setting status on a roadmap file, reports which processes became newly
 ready after the change (once, after all writes).
@@ -4137,7 +4137,7 @@ Exit codes:
 const HELP_CHECK_LINKS = `${helpUsage("meta check-links", "<file>", META_CHECK_LINKS_OPTIONS)}
 
 Verify that every artifact/process \`location:\` file path exists on disk
-(dead-link detection). Each location element is classified per spec §15.8:
+(dead-link detection). Each location element is classified per spec [[SPEC_location_command_constraint]]:
 a "://" element is a URL and is skipped; a *, ?, or { element is a glob
 and is skipped; everything else is resolved (basePath-aware, same as
 \`meta get\`'s location.resolved) and checked with a filesystem existence
@@ -4177,7 +4177,7 @@ and \`meta set\` round-trip). The resolved filesystem path is a separate
 read-only derived field, \`location.resolved\`, which is added to the output
 automatically right after \`location\` whenever \`location\` is in the output
 (explicitly requested or via an omitted field positional) and the node has
-a location. Each location element is classified per spec §15.8: an element
+a location. Each location element is classified per spec [[SPEC_location_command_constraint]]: an element
 containing "://" is a URL and is passed through unchanged; everything else
 (paths and globs) is resolved against the file's basePath. A scalar
 location yields a scalar location.resolved; an array yields an array.
@@ -4291,8 +4291,8 @@ own and counts under \`(object)\`. Values are printed in the same order ids
 are elsewhere.
 
 \`group\` and \`tags\` may also be declared in a frontmatter section of their
-own, and declaring is optional — a node may use an undeclared value (§2.7.2,
-§2.8). A declared value no node uses is printed with a count of 0, so the
+own, and declaring is optional — a node may use an undeclared value ([[SPEC_tags_field]],
+[[SPEC_group_definition]]). A declared value no node uses is printed with a count of 0, so the
 table covers both what is declared and what is used.
 
 A field no node sets prints \`<field>: (no values)\`; this is not an error.
@@ -4513,7 +4513,7 @@ Omitting type: on the roadmap file is treated as roadmap and allowed, with a war
 The tag is opt-in: tag the flow artifacts that are individually tracked
 deliverables. Comparing every flow artifact id instead would flag the routine
 byproducts a process diagram is mostly made of. Flow files carry no status
-(W007, spec §15.15), so status cannot be the selector here.
+(W007, spec [[SPEC_non_roadmap_status_constraint]]), so status cannot be the selector here.
 If nothing carries the tag, this check has no target and says so rather than
 reporting a pass.
 

@@ -14,9 +14,10 @@ const TABLE_HEADER =
 	"| コード | severity | 定義節 | 条件 |\n|---|---|---|---|\n";
 
 describe("diagnostic definition sections", () => {
-	it("matches a literal §15.11 section", () => {
+	it("matches a literal numbered section", () => {
+		// spec-ref-literal: synthetic specification fixture
 		const sections = parseSpecDiagSections(
-			`${TABLE_HEADER}| V001 | error | §15.11 | rule |\n`,
+			`${TABLE_HEADER}| V001 | error | §15.11 | rule |\n`, // spec-ref-literal: synthetic specification fixture
 		);
 		assert.deepEqual(sections, { V001: "15.11" });
 		assert.deepEqual(
@@ -26,7 +27,7 @@ describe("diagnostic definition sections", () => {
 	});
 	it("resolves a SPEC id to its numbered heading", () => {
 		const sections = parseSpecDiagSections(
-			`### 15.11. Rule (SPEC_x) (explanation)\n\n${TABLE_HEADER}| V001 | error | [[SPEC_x]] | rule |\n`,
+			`### 15.11. Rule (SPEC_x) (explanation)\n\n${TABLE_HEADER}| V001 | error | [[SPEC_x]] | rule |\n`, // spec-ref-literal: specification reference syntax example
 		);
 		assert.deepEqual(sections, { V001: "15.11" });
 		assert.deepEqual(
@@ -36,7 +37,7 @@ describe("diagnostic definition sections", () => {
 	});
 	it("resolves a SPEC id defined on an indented CommonMark heading", () => {
 		const sections = parseSpecDiagSections(
-			`   ### 15.11 Rule (SPEC_x)\n\n${TABLE_HEADER}| V001 | error | [[SPEC_x]] | rule |\n`,
+			`   ### 15.11 Rule (SPEC_x)\n\n${TABLE_HEADER}| V001 | error | [[SPEC_x]] | rule |\n`, // spec-ref-literal: specification reference syntax example
 		);
 		assert.deepEqual(sections, { V001: "15.11" });
 	});
@@ -51,7 +52,7 @@ describe("diagnostic definition sections", () => {
 	});
 	it("reports unresolved ids, including definitions inside code", () => {
 		const sections = parseSpecDiagSections(
-			`\`\`\`\n## 15.11 Rule (SPEC_x)\n\`\`\`\n${TABLE_HEADER}| V001 | error | [[SPEC_x]] | rule |\n`,
+			`\`\`\`\n## 15.11 Rule (SPEC_x)\n\`\`\`\n${TABLE_HEADER}| V001 | error | [[SPEC_x]] | rule |\n`, // spec-ref-literal: specification reference syntax example
 		);
 		assert.deepEqual(sections, { V001: null });
 		assert.deepEqual(
@@ -80,7 +81,7 @@ describe("diagnostic spec IDs", () => {
 	it("reads the ID from a reference cell and null from a literal section", () => {
 		assert.deepEqual(
 			specIds(
-				"| V001 | error | [[SPEC_x]] | rule |\n| V002 | error | §9 | rule |\n",
+				"| V001 | error | [[SPEC_x]] | rule |\n| V002 | error | §9 | rule |\n", // spec-ref-literal: specification reference syntax example
 			),
 			{ V001: "SPEC_x", V002: null },
 		);
@@ -136,8 +137,8 @@ describe("parseSpecDiagTable", () => {
 	it("parses plain error/warning rows", () => {
 		const text =
 			TABLE_HEADER +
-			"| V001 | error | §15.1 | 同一 Artifact を複数 Process が生成 |\n" +
-			"| W001 | warning | §15.5 | parts メンバーが edge に参加していない |\n";
+			"| V001 | error | §15.1 | 同一 Artifact を複数 Process が生成 |\n" + // spec-ref-literal: synthetic specification fixture
+			"| W001 | warning | §15.5 | parts メンバーが edge に参加していない |\n"; // spec-ref-literal: synthetic specification fixture
 		assert.deepEqual(parseSpecDiagTable(text), {
 			V001: ["error"],
 			W001: ["warning"],
@@ -147,7 +148,7 @@ describe("parseSpecDiagTable", () => {
 	it("normalizes the strict dual-severity label", () => {
 		const text =
 			TABLE_HEADER +
-			"| W002 | warning (--strict: error) | §15.7 | produced Artifact に `criteria:` が未設定 |\n";
+			"| W002 | warning (--strict: error) | §15.7 | produced Artifact に `criteria:` が未設定 |\n"; // spec-ref-literal: synthetic specification fixture
 		assert.deepEqual(parseSpecDiagTable(text), {
 			W002: ["warning", "error"],
 		});
@@ -156,13 +157,14 @@ describe("parseSpecDiagTable", () => {
 	it("stops at the first non-table line after the header", () => {
 		const text =
 			TABLE_HEADER +
-			"| V001 | error | §15.1 | condition |\n" +
+			"| V001 | error | §15.1 | condition |\n" + // spec-ref-literal: synthetic specification fixture
 			"\n" +
-			"| V999 | error | §99 | should not be picked up |\n";
+			"| V999 | error | §99 | should not be picked up |\n"; // spec-ref-literal: synthetic specification fixture
 		assert.deepEqual(parseSpecDiagTable(text), { V001: ["error"] });
 	});
 
-	it("throws when the §16 table header is absent", () => {
+	it("throws when the diagnostic table header is absent", () => {
+		// spec-ref-literal: synthetic specification fixture
 		assert.throws(
 			() => parseSpecDiagTable("no table here"),
 			/table header not found/,
@@ -170,7 +172,7 @@ describe("parseSpecDiagTable", () => {
 	});
 
 	it("throws on an unrecognized severity label", () => {
-		const text = `${TABLE_HEADER}| V001 | oops | §15.1 | condition |\n`;
+		const text = `${TABLE_HEADER}| V001 | oops | §15.1 | condition |\n`; // spec-ref-literal: synthetic specification fixture
 		assert.throws(() => parseSpecDiagTable(text), /unrecognized severity/);
 	});
 });
@@ -248,7 +250,7 @@ describe("evaluateDiagRegistryDiff", () => {
 		assert.equal(result.exitCode, 1);
 		assert.match(
 			result.stderrLines[0],
-			/missing from spec\.md §16 table: V999/,
+			/missing from spec\.md diagnostic code table: V999/,
 		);
 	});
 

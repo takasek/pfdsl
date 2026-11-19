@@ -29,7 +29,7 @@ describe("findNumberedSectionIds", () => {
 	});
 	it("finds bare references to an indented numbered heading", () => {
 		assert.deepEqual(
-			findBareSectionReferences("   ### 15.1 X (SPEC_a)\n\nsee §15.1"),
+			findBareSectionReferences("   ### 15.1 X (SPEC_a)\n\nsee §15.1"), // spec-ref-literal: synthetic specification fixture
 			[{ line: 3, section: "15.1", id: "SPEC_a" }],
 		);
 	});
@@ -38,7 +38,7 @@ describe("findNumberedSectionIds", () => {
 describe("findBareSectionReferences", () => {
 	it("matches exact numbered sections and sentence-final punctuation", () => {
 		const text =
-			"## 2.3. Rule (SPEC_x)\n§2.3。 § 2.3. §2.30 §2.3.1\n### 15.1 A (SPEC_a)\n§15.11 §15.1";
+			"## 2.3. Rule (SPEC_x)\n§2.3。 § 2.3. §2.30 §2.3.1\n### 15.1 A (SPEC_a)\n§15.11 §15.1"; // spec-ref-literal: synthetic specification fixture
 		assert.deepEqual(findBareSectionReferences(text), [
 			{ line: 2, section: "2.3", id: "SPEC_x" },
 			{ line: 2, section: "2.3", id: "SPEC_x" },
@@ -47,7 +47,7 @@ describe("findBareSectionReferences", () => {
 	});
 	it("ignores code, unnumbered headings, and unlabelled child sections", () => {
 		const text =
-			"## 2.7 Rule (SPEC_x)\n§2.7.5 `§2.7`\n```\n§2.7\n## 3 Code (SPEC_code)\n```\n## 4 No id\n## Other (SPEC_y)\n§3 §4";
+			"## 2.7 Rule (SPEC_x)\n§2.7.5 `§2.7`\n```\n§2.7\n## 3 Code (SPEC_code)\n```\n## 4 No id\n## Other (SPEC_y)\n§3 §4"; // spec-ref-literal: synthetic specification fixture
 		assert.deepEqual(findBareSectionReferences(text), []);
 	});
 });
@@ -96,7 +96,7 @@ describe("HTML exclusion", () => {
 	// paragraphs, and rejects invisible HTML-comment markers. References in
 	// HTML are still checked, so a stale or mistyped one cannot hide there.
 	it("ignores a definition inside an HTML comment but checks its reference", () => {
-		const text = "<!-- (SPEC_x) [[SPEC_x]] -->";
+		const text = "<!-- (SPEC_x) [[SPEC_x]] -->"; // spec-ref-literal: specification reference syntax example
 		assert.deepEqual(findSpecIdDefinitions(text), []);
 		assert.deepEqual(findStrictRefs(text), [{ line: 1, id: "SPEC_x" }]);
 	});
@@ -107,7 +107,7 @@ describe("HTML exclusion", () => {
 	});
 	it("checks references and bare section references inside an HTML block", () => {
 		const text =
-			"## 2.3 Rule (SPEC_x)\n\n<details>\n[[SPEC_typo]] §2.3\n</details>";
+			"## 2.3 Rule (SPEC_x)\n\n<details>\n[[SPEC_typo]] §2.3\n</details>"; // spec-ref-literal: synthetic specification fixture
 		assert.deepEqual(findStrictRefs(text), [{ line: 4, id: "SPEC_typo" }]);
 		assert.deepEqual(findBareSectionReferences(text), [
 			{ line: 4, section: "2.3", id: "SPEC_x" },
@@ -123,7 +123,7 @@ describe("HTML exclusion", () => {
 describe("parsed code exclusion", () => {
 	it("keeps SPEC markers in separate table cells outside code spans", () => {
 		const text =
-			"| a | b |\n| --- | --- |\n| ` | (SPEC_real) [[SPEC_real]] |\n| ` | text |";
+			"| a | b |\n| --- | --- |\n| ` | (SPEC_real) [[SPEC_real]] |\n| ` | text |"; // spec-ref-literal: synthetic specification fixture
 		assert.deepEqual(findSpecIdDefinitions(text), [
 			{ line: 3, id: "SPEC_real" },
 		]);
@@ -131,7 +131,7 @@ describe("parsed code exclusion", () => {
 	});
 	it("ignores multiline code examples while preserving real marker line numbers", () => {
 		const text =
-			"😀 `example\r\n(SPEC_quoted) [[SPEC_quoted]]\r\n` (SPEC_real) [[SPEC_real]]\r\n";
+			"😀 `example\r\n(SPEC_quoted) [[SPEC_quoted]]\r\n` (SPEC_real) [[SPEC_real]]\r\n"; // spec-ref-literal: synthetic specification fixture
 		assert.deepEqual(findSpecIdDefinitions(text), [
 			{ line: 3, id: "SPEC_real" },
 		]);
@@ -255,7 +255,7 @@ describe("findSpecIdDefinitions", () => {
 
 describe("findStrictRefs", () => {
 	it("finds a single strict reference", () => {
-		const text = "line one\n[[SPEC_multifile_cross_ref]]\nline three";
+		const text = "line one\n[[SPEC_multifile_cross_ref]]\nline three"; // spec-ref-literal: synthetic specification fixture
 		const hits = findStrictRefs(text);
 		assert.equal(hits.length, 1);
 		assert.equal(hits[0].line, 2);
@@ -268,7 +268,7 @@ describe("findStrictRefs", () => {
 	});
 
 	it("finds multiple strict references on the same line", () => {
-		const text = "[[SPEC_foo]] [[SPEC_bar]]";
+		const text = "[[SPEC_foo]] [[SPEC_bar]]"; // spec-ref-literal: synthetic specification fixture
 		const hits = findStrictRefs(text);
 		assert.deepEqual(
 			hits.map((h) => h.id),
@@ -279,9 +279,9 @@ describe("findStrictRefs", () => {
 	it("ignores strict references inside a fenced code block", () => {
 		const text = [
 			"```",
-			"[[SPEC_inside_fence]]",
+			"[[SPEC_inside_fence]]", // spec-ref-literal: synthetic specification fixture
 			"```",
-			"[[SPEC_outside_fence]]",
+			"[[SPEC_outside_fence]]", // spec-ref-literal: synthetic specification fixture
 		].join("\n");
 		const hits = findStrictRefs(text);
 		assert.equal(hits.length, 1);
@@ -289,18 +289,18 @@ describe("findStrictRefs", () => {
 	});
 
 	it("ignores strict references inside an inline code span", () => {
-		const text = "See `[[SPEC_inline_example]]` for the syntax.";
+		const text = "See `[[SPEC_inline_example]]` for the syntax."; // spec-ref-literal: synthetic specification fixture
 		assert.deepEqual(findStrictRefs(text), []);
 	});
 
 	it("ignores strict references inside a double-backtick inline code span", () => {
-		const text = "See ``[[SPEC_double_backtick]]`` for the syntax.";
+		const text = "See ``[[SPEC_double_backtick]]`` for the syntax."; // spec-ref-literal: synthetic specification fixture
 		assert.deepEqual(findStrictRefs(text), []);
 	});
 
 	it("handles single and double backtick spans mixed on the same line", () => {
 		const text =
-			"`[[SPEC_single]]` then ``[[SPEC_double]]`` then [[SPEC_real]] is a ref.";
+			"`[[SPEC_single]]` then ``[[SPEC_double]]`` then [[SPEC_real]] is a ref."; // spec-ref-literal: synthetic specification fixture
 		const hits = findStrictRefs(text);
 		assert.equal(hits.length, 1);
 		assert.equal(hits[0].id, "SPEC_real");

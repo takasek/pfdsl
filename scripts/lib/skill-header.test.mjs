@@ -1,7 +1,22 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
-import { injectGeneratedHeader, SKILL_HEADER } from "./skill-header.mjs";
+import {
+	injectGeneratedHeader,
+	SKILL_HEADER,
+	stripSpecReferenceAnnotations,
+} from "./skill-header.mjs";
+
+describe("distributed skill annotations", () => {
+	it("removes checker annotations while preserving examples, other comments and line endings", () => {
+		const input =
+			"Example §8<!-- spec-ref-literal: lookup example -->。\r\n<!-- ordinary comment -->\r\n"; // spec-ref-literal: source annotation removal fixture
+		assert.equal(
+			stripSpecReferenceAnnotations(input),
+			"Example §8。\r\n<!-- ordinary comment -->\r\n", // spec-ref-literal: literal example remains in the shipped content
+		);
+	});
+});
 
 describe("injectGeneratedHeader", () => {
 	it("inserts the header inside the frontmatter, leaving the rest byte-identical", () => {

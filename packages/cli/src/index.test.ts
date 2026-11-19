@@ -3707,7 +3707,7 @@ req >> design -> spec
 		expect(r.stderr).toContain("stdin");
 	});
 
-	// Status is the roadmap's to carry (§15.14, §15.15). ready / blocked /
+	// Status is the roadmap's to carry ([[SPEC_type_constraint]], [[SPEC_non_roadmap_status_constraint]]). ready / blocked /
 	// status gaps already refuse an explicit non-roadmap type; meta set did not,
 	// so the CLI itself could write the state W007 reports (#923).
 	const flowBase = (type: string) => `---
@@ -4182,7 +4182,7 @@ req >> design -> spec
 	});
 
 	// The guard also catches semantically invalid writes: revises pointing at
-	// the node itself is V017 (spec §15.9), introduced only by the rewrite.
+	// the node itself is V017 (spec [[SPEC_revises_constraint]]), introduced only by the rewrite.
 	const selfRevises = `---
 artifact:
   spec:
@@ -4910,7 +4910,7 @@ describe("explain", () => {
 		expect(r.exitCode).toBe(0);
 		expect(r.stdout).toContain("V021 (error):");
 		expect(r.stdout.toLowerCase()).toContain("subflow");
-		expect(r.stdout).toContain("§15.11");
+		expect(r.stdout).toContain("§15.11"); // spec-ref-literal: asserts the registry-derived explain output
 	});
 
 	it("prints a strict-mode severity label for a two-severity code", async () => {
@@ -4918,7 +4918,7 @@ describe("explain", () => {
 		expect(r.exitCode).toBe(0);
 		expect(r.stdout).toContain("W002 (warning");
 		expect(r.stdout).toContain("--strict");
-		expect(r.stdout).toContain("§15.7");
+		expect(r.stdout).toContain("§15.7"); // spec-ref-literal: asserts the registry-derived explain output
 	});
 
 	it.each([
@@ -4939,8 +4939,8 @@ describe("explain", () => {
 		const r = await run(["explain", code]);
 		expect(r.exitCode).toBe(0);
 		expect(r.stdout).toContain(`${code} (error):`);
-		expect(r.stdout).toContain("Defined in: spec §8\n");
-		expect(r.stdout).toContain("references/spec.md §8");
+		expect(r.stdout).toContain("Defined in: spec §8\n"); // spec-ref-literal: asserts the registry-derived explain output
+		expect(r.stdout).toContain("references/spec.md §8"); // spec-ref-literal: asserts the registry-derived explain output
 	});
 
 	it("works for an FM-family (front matter) code", async () => {
@@ -4952,13 +4952,13 @@ describe("explain", () => {
 	it("prints the stable spec ID next to the section when the section has one", async () => {
 		const r = await run(["explain", "V021"]);
 		expect(r.stdout).toContain(
-			"Defined in: spec §15.11 (SPEC_subflow_boundary_constraint)\n",
+			"Defined in: spec §15.11 (SPEC_subflow_boundary_constraint)\n", // spec-ref-literal: asserts the registry-derived explain output
 		);
 	});
 
 	it("prints only the section number when the section has no spec ID", async () => {
 		const r = await run(["explain", "P004"]);
-		expect(r.stdout).toContain("Defined in: spec §8\n");
+		expect(r.stdout).toContain("Defined in: spec §8\n"); // spec-ref-literal: asserts the registry-derived explain output
 	});
 
 	it("points to the spec.md full text as a fallback", async () => {
@@ -4969,7 +4969,7 @@ describe("explain", () => {
 	it("names the skill's spec before the upstream repository path", async () => {
 		const r = await run(["explain", "V021"]);
 		expect(r.stdout).toContain(
-			"Full text: references/spec.md §15.11 in the pfdsl skill (docs/spec/spec.md in the pfdsl repository)",
+			"Full text: references/spec.md §15.11 in the pfdsl skill (docs/spec/spec.md in the pfdsl repository)", // spec-ref-literal: asserts the registry-derived explain output
 		);
 	});
 
@@ -5065,7 +5065,7 @@ spec >> build -> code
 		);
 	});
 
-	it("passes URL location elements through unresolved while resolving path elements (§15.8)", async () => {
+	it("passes URL location elements through unresolved while resolving path elements ([[SPEC_location_command_constraint]])", async () => {
 		const f = join(dir, "get-location-url-mix.pfdsl");
 		writeFileSync(
 			f,
@@ -5680,7 +5680,7 @@ spec >> write -> docs
 	});
 
 	// `group` and `tag` both have optional frontmatter declaration sections
-	// (spec §2.7.2 / §2.8), and a declared value no node uses is exactly what
+	// (spec [[SPEC_tags_field]] / [[SPEC_group_definition]]), and a declared value no node uses is exactly what
 	// a reader looking for the vocabulary wants to see — as a count of 0,
 	// rather than as a separate list needing its own rule.
 	it("includes a declared but unused group as a count of zero", async () => {

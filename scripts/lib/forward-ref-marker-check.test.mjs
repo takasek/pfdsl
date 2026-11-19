@@ -95,7 +95,7 @@ describe("findForwardRefMarkers", () => {
 	});
 
 	it("does not match a strict reference without the trailing '?' (out of scope, #328)", () => {
-		const text = "line one\n[[SPEC_multifile_cross_ref]]\nline three";
+		const text = "line one\n[[SPEC_multifile_cross_ref]]\nline three"; // spec-ref-literal: synthetic specification fixture
 		assert.deepEqual(findForwardRefMarkers(text), []);
 	});
 

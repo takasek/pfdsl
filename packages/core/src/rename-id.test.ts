@@ -298,7 +298,7 @@ order >> work -> fulfilled
 	});
 });
 
-describe("renameId subflow boundary preservation (spec §2.9.3)", () => {
+describe("renameId subflow boundary preservation (spec [[SPEC_subflow_expansion]])", () => {
 	it("adds a boundary: {new: old} entry when the renamed artifact is a normal input with no existing boundary map", () => {
 		const src = `---
 artifact:
@@ -494,7 +494,7 @@ process:
 
 // The product of the ways an id can be spelled, the body position it can
 // occupy, and whether it is frontmatter-declared or body-only — checked
-// against the invariant from spec §9/§15.11 rather than the implementation:
+// against spec.md's operator semantics and [[SPEC_subflow_boundary_constraint]] rather than the implementation:
 // re-analyzing the output after a rename gives exactly the original edge
 // list with old→new substituted, the same node kinds, and old nowhere.
 describe("renameId invariant across id spellings, positions, and declared vs body-only", () => {
