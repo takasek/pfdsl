@@ -18,7 +18,7 @@ import {
 	statSync,
 	writeFileSync,
 } from "node:fs";
-import { dirname, join, posix } from "node:path";
+import { basename, dirname, join, posix } from "node:path";
 
 import { listInstallFiles } from "../harness-template/skills/pfd-ops/scripts/check-install-sync.mjs";
 import {
@@ -42,19 +42,22 @@ function removeEmptyDirectories(directory, keepRoot = true) {
 }
 
 /**
- * Regenerate .claude/skills/pfd-ops/install/** under root from the
- * repo-root-relative sources in templatePaths. A listed source that does not
+ * Generate the selected repo-root-relative sources and their release inventory
+ * together for a pfd-ops skill. A listed source that does not
  * exist is a hard error, raised before any file under install/ is touched,
  * so a missing template never leaves install/ partially regenerated. Any
  * file under install/ that isn't in templatePaths is removed. Never touches
  * the git index.
  * @param {string} root repo root (absolute path)
  * @param {string[]} [templatePaths] defaults to the real distribution list
+ * @param {string} [installDir] output payload directory; defaults to the Claude repository mirror
  * @returns {{ changed: string[], unchanged: string[], removed: string[], inventoryChanged: boolean }}
  */
-export function genInstall(root, templatePaths = INSTALL_TEMPLATE_PATHS) {
-	const installDir = join(root, INSTALL_DIR_RELATIVE);
-
+export function genInstall(
+	root,
+	templatePaths = INSTALL_TEMPLATE_PATHS,
+	installDir = join(root, INSTALL_DIR_RELATIVE),
+) {
 	// Validate every source exists before writing anything.
 	for (const rel of templatePaths) {
 		const src = join(root, rel);
@@ -106,7 +109,10 @@ export function genInstall(root, templatePaths = INSTALL_TEMPLATE_PATHS) {
 	}
 	removeEmptyDirectories(installDir);
 
-	const inventoryPath = join(root, INSTALL_INVENTORY_RELATIVE);
+	const inventoryPath = join(
+		dirname(installDir),
+		basename(INSTALL_INVENTORY_RELATIVE),
+	);
 	const inventory = `${JSON.stringify(templatePaths, null, "\t")}\n`;
 	const inventoryChanged =
 		!existsSync(inventoryPath) ||

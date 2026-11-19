@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // Generates the Codex-specific repository and plugin assets from the
-// maintained Claude sources. Run this directly for only the Codex outputs;
+// maintained harness and install sources. Run this directly for only the Codex outputs;
 // scripts/gen-plugin-dist-independent.mjs invokes the same assembly together
 // with the Claude plugin mirrors.
 

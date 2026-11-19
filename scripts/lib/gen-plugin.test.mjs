@@ -1812,6 +1812,7 @@ describe("assembleCodexAssets", () => {
 					calls.push(["cpSync", source, destination, options]),
 				decodeHarnessCapabilities: () => decodedHarnessCapabilities,
 				existsSync: () => false,
+				genInstall: (...args) => calls.push(["genInstall", ...args]),
 				mkdirSync: (path) => calls.push(["mkdirSync", path]),
 				newRunId: () => "test-run",
 				readFileSync: (path) => {
@@ -2370,7 +2371,6 @@ describe("assembleCodexAssets", () => {
 			].sort(),
 		);
 
-		const copied = calls.filter(([kind]) => kind === "cpSync");
 		assert.equal(
 			calls.some(
 				([kind, path]) =>
@@ -2379,11 +2379,14 @@ describe("assembleCodexAssets", () => {
 			),
 			true,
 		);
-		assert.equal(
-			copied.some(([, , path]) =>
-				path.includes(".agents/skills.codex-tmp-test-run/pfd-ops"),
-			),
-			true,
+		assert.deepEqual(
+			calls
+				.filter(([kind]) => kind === "genInstall")
+				.map(([, , , installDir]) => installDir),
+			[
+				"/repo/.agents/skills.codex-tmp-test-run/pfd-ops/install",
+				"/repo/plugin/pfdsl-codex/skills.codex-tmp-test-run/pfd-ops/install",
+			],
 		);
 		const staged = calls.filter(([kind]) => kind === "writeFileSync");
 		assert.equal(
@@ -2745,16 +2748,20 @@ describe("Codex generated consumers", () => {
 				recursive: true,
 			});
 			cpSync(join(repoRoot, "AGENTS.md"), join(fixtureRoot, "AGENTS.md"));
-			const installRoot = join(fixtureRoot, ".claude/skills/pfd-ops/install");
-			writeFileSync(join(installRoot, "README.md"), "# Install\n");
-			const futureHook = join(fixtureRoot, "hooks/pfd-ops/install/future.mjs");
-			mkdirSync(dirname(futureHook), { recursive: true });
-			writeFileSync(futureHook, "export default {};\n");
-
 			const capabilities = structuredClone(decodedHarnessCapabilities);
 			const pfdOps = capabilities.find(
 				(record) => record.id === "skill:pfd-ops",
 			);
+			for (const file of pfdOps.source.installFiles) {
+				const path = file.slice("install/".length);
+				mkdirSync(dirname(join(fixtureRoot, path)), { recursive: true });
+				cpSync(join(repoRoot, path), join(fixtureRoot, path));
+			}
+			writeFileSync(join(fixtureRoot, "README.md"), "# Install\n");
+			const futureHook = join(fixtureRoot, "hooks/pfd-ops/install/future.mjs");
+			mkdirSync(dirname(futureHook), { recursive: true });
+			writeFileSync(futureHook, "export default {};\n");
+
 			pfdOps.source.installFiles.push("install/README.md");
 			const codexPluginRoot = join(fixtureRoot, "plugin/pfdsl-codex");
 			assembleCodexAssets({

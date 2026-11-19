@@ -92,8 +92,9 @@ dist 非依存の手動再生成は `scripts/gen-plugin-dist-independent.mjs` �
 `scripts/gen-skill.mjs` はローカルビルドの CLI help と `packages/cli/package.json` の version を SKILL.md に埋め込み、`packages/core/src/types/frontmatter.ts` とテンプレートのフィールドも照合する。
 CLI help・version だけが変わっても生成内容が変わるため、ビルドの前提だけでなくデータ入力として配線する。
 
-- **gen_install（`scripts/lib/install-templates.mjs` の明示リスト）**: repo ルートの配布ソースから `install/` ミラーを一方向で再生成する。生成の向きは repo ルート → `install/` → `plugin/` の一本のみ（#547 で双方向 sync を廃止）
-- **plugin root assembly（`scripts/gen-plugin.mjs`）**: `pnpm -r build && make gen-plugin` が、中立テンプレートの source topology と schemaを中立capability recordへdecodeして四target contractを検証し、その同じrecord objectから両ハーネスの出力を生成する。pfdsl skillの中立な生成正本は`generated/skills/pfdsl`であり、`.claude/skills/pfdsl`はそこへの生成symlinkなので手編集しない。組み立て前に専有rootをsnapshotして空から再構築するため、生成をやめた追跡済みファイルはGitの削除差分になり、生成失敗時は元のrootへ戻る。再構築でignore対象を含む未追跡ファイルが失われる場合は生成を失敗させる。dist非依存の経路では中立skillの`SKILL.md`だけを保持する。Claude Code adapterはplugin tree・manifestを`plugin/pfdsl/`へidentity互換に組み立て、repo-rootの`.claude-plugin/marketplace.json`も更新する。Codex adapterは生成済みClaude rootやmanifestを読まず、repositoryの`AGENTS.md`・`.agents/`・`.codex/`とnative skill tree・manifest・hooksを`plugin/pfdsl-codex/`へ生成する。公式Codex validator/runtimeはplugin rootの`skills/`を固定するため、二つのrootを混在させない。内部でgen_installを実行するため、pluginが古い`install/`から組まれることはない
+- `make gen-install` は `scripts/lib/install-templates.mjs` の明示リストから Claude Code のリポジトリ用スキルに `install/` を生成し、同じ版で配布する相対パスを隣の `install-files.json` に書く。Claude Code プラグインの組み立てでは両方をコピーする。
+- Codex の単独生成（`node scripts/gen-codex-assets.mjs`）と全体生成は、同じ明示リストに由来する capability の `installFiles` と repo ルートの配布ソースを使う。`genInstall` が repository・plugin の各スキルに配布ファイルと版別目録を一緒に生成する。
+- **plugin root assembly（`scripts/gen-plugin.mjs`）**: `pnpm -r build && make gen-plugin` が、中立テンプレートの source topology と schemaを中立capability recordへdecodeして四target contractを検証し、その同じrecord objectから両ハーネスの出力を生成する。pfdsl skillの中立な生成正本は`generated/skills/pfdsl`であり、`.claude/skills/pfdsl`はそこへの生成symlinkなので手編集しない。組み立て前に専有rootをsnapshotして空から再構築するため、生成をやめた追跡済みファイルはGitの削除差分になり、生成失敗時は元のrootへ戻る。再構築でignore対象を含む未追跡ファイルが失われる場合は生成を失敗させる。dist非依存の経路では中立skillの`SKILL.md`だけを保持する。Claude Code adapterはplugin tree・manifestを`plugin/pfdsl/`へidentity互換に組み立て、repo-rootの`.claude-plugin/marketplace.json`も更新する。Codex adapterは生成済みClaude rootやmanifestを読まず、repositoryの`AGENTS.md`・`.agents/`・`.codex/`とnative skill tree・manifest・hooksを`plugin/pfdsl-codex/`へ生成する。公式Codex validator/runtimeはplugin rootの`skills/`を固定するため、二つのrootを混在させない。両 adapter はその回の配布宣言から採用テンプレートと版別目録を生成する。
 
 復元未完時には両 generator CLI が primary error を先に表示し、snapshot の保存理由と recovery path を続ける。
 再試行と `check-generated-drift.mjs` は `plugin/.pfdsl-gen-txn-*` の残留を専用診断で示すが、active transaction や cleanup 失敗もあり得るため、全件を rollback failure と断定しない。
@@ -161,7 +162,8 @@ VSIXのローカル検証・アップロードと、公開済みpluginのmarketp
 
 `decode_harness_capabilities` はテンプレート・inventory・toolchainに加え、実行時のGit ignore判定素材を読む。
 repository内のignore規則だけでなくGit indexとclone固有のinfo/excludeも回答に影響するため、`.gitignore`だけの決定論的な入力とみなさない。
-`check_install_sync` は配置済みファイルと同梱canonical、採用先の設定スナップショットにある `appliedMigration` と実行中pluginのidentityを比較する。
+`check_install_sync` は配布元の `install/` と `install-files.json` を先に検査し、一覧と実体が一致した版だけを採用先との比較に使う。
+続いて配置済みファイルと同梱canonical、採用先の設定スナップショットにある `appliedMigration` と実行中pluginのidentityを比較する。
 上流mainとの差は取得・通知しない。
 旧呼出しとの互換で `--upstream` を付けても追加の処理は無い（ADR-0043）。
 
@@ -178,7 +180,8 @@ Intentional exclusionを選ぶtargetには、空でない理由と利用者へ�
 Claude outputをCodexの期待値に使わず、Codex outputをClaudeの期待値に使わない。各probeは対象targetのrootだけをfixtureとして読み、兄弟rootが無い状態でも成功しなければならない。
 - **`deploy_install_layer` のコピー元は plugin 同梱 canonical**: `check-install-sync.mjs --deploy` は `<skill root>/install/` から採用リポルートへコピーする。ローカル編集された配置済みファイルは hash 不一致として skip・警告され、`--overwrite-local-edits` でのみ上書きされる（ADR-0028）。canonical から消えた旧ファイルは、ローカル編集が無ければフラグ無しで削除され、編集を抱えている場合のみ独立した `--delete-edited-orphans` を要する（#603。単一 `--force` は掃除の意図で渡したときに新パスのカスタマイズまで巻き戻した）。canonical 側のリネームで新旧パスが `missing` / `orphaned` に分かれた場合は `Possible renames` として対で報告され、旧パスのローカル編集を新パスへ引き継ぐ手掛かりになる。
 このコピーの向きが成立するのは target が採用リポの場合だけなので、実行のたび target の役割を上流マーカーで分類し、上流リポ・canonical 不明と判定した回は `--deploy` を案内も実行もしない（#971）。
-更新時のローカル編集判定は前回配置の manifest hash と現ファイルを比較する。
+配布元ディレクトリや目録、配布予定のファイルが欠けたときは、配置済みの全ファイルと前回配置の manifest を保持して非成功で終了する。配布元の復元後は通常の検査・配置を再試行できる。
+正規に廃止されたファイルは新版の目録からも外れる。更新時のローカル編集判定は前回配置の manifest hash と現ファイルを比較する。
 前回と同じファイルは通常更新し、新 canonical と既に同一のファイルも新 hash へ収束する。
 skip したファイルの旧記録は維持し、未記録の相違ファイルは manifest に追加しない。
 実行依存は配置とは別に準備するため、deploy 出力から GitHub Issues バックエンド reference の「依存の準備と初回監査」へ案内する。

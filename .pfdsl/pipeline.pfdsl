@@ -214,7 +214,7 @@ artifact:
   ops_install_sources:
     label: pfd-ops 配布ソース（repo ルート）
     description: "採用リポへ配る読取専用の監査スクリプト、CLI prune を呼ぶ完了チェーン回収アダプタ、その起動に使う GitHub Actions workflow の一次情報。保持規則と検証は packages/cli の prune が担い、配布アダプタに複製しない。手書きで repo ルート側に実体があり、このリポ自身の運用にも同じ実体を使う。配布対象は scripts/lib/install-templates.mjs の明示リストが決める"
-    location: [ "scripts/pfdsl/", ".github/workflows/pfdsl-sweep-completed-chains.yml" ]
+    location: [ "scripts/pfdsl/", ".github/workflows/pfdsl-sweep-completed-chains.yml", "scripts/lib/install-templates.mjs" ]
     group: gen_sources
   claude_harness_sources:
     label: 中立のハーネス生成入力
@@ -277,10 +277,12 @@ artifact:
     group: repo_generated
     tags: [ c, gen ]
   ops_install_templates:
-    label: pfd-ops 採用テンプレート（install/）
-    description: "採用リポへ配置されるテンプレート一式。make gen-installがrepoルートのソースから一方向で再生成する生成物であり手編集しない。内容の一次情報はpipeline.pfdslのops_install_sources"
-    criteria: repo ルートのソースから make gen-install で再生成でき、check-pfd-ops-sync.yml が生成物一致と identity の両方で通過する
-    location: ".claude/skills/pfd-ops/install/"
+    label: pfd-ops 採用テンプレートと版別目録
+    description: >
+      Claude Code のリポジトリ用スキルに生成する install/ と、同じ階層の install-files.json。
+      目録はこの版で配布するファイルの相対パスを列挙し、採用リポへの配置前に配布元の欠損を検出するために使う。
+    criteria: make gen-install が明示リストからファイルと目録を再生成し、check-pfd-ops-sync.yml が両方の生成結果と配布ファイルの内容を照合する
+    location: [ ".claude/skills/pfd-ops/install/", ".claude/skills/pfd-ops/install-files.json" ]
     group: repo_generated
     tags: [ f2, gen ]
   claude_adapter_output:
@@ -545,10 +547,14 @@ process:
     location: "scripts/gen-skill.mjs"
     tags: [ gen ]
   gen_install:
-    label: install/ 生成
-    description: "repo ルートの明示配布許可一覧から pfd-ops スキルの install/ ミラーを一方向で再生成する。skill の installFiles 宣言も同じ一覧から導出し、開発用ファイルを配布しない。生成の向きは repo ルートのソース → install/ → Claude・Codex の repository・plugin の4配布先のみ。gen_plugin が内部で実行するため古い install/ から組まれることはない。同一性検査は pre-commit・終端では index、push・release では公開対象の HEAD の隔離コピーで生成し、元の作業ツリーを変更せずに出力契約を照合する。CI の check-pfd-ops-sync.yml も一致を強制する"
+    label: 採用テンプレートと版別目録の生成
+    description: >
+      repo ルートの明示リストに従って配布ファイルを install/ にコピーし、同じパス一覧を隣の install-files.json に書く。
+      make gen-install は Claude Code のリポジトリ用スキルを更新し、gen_plugin はこの出力を Claude Code プラグインへ同梱する。
+      同一性検査は pre-commit・終端では index、push・release では公開対象の HEAD の隔離コピーで生成して出力を照合する。
+      CI では check-pfd-ops-sync.yml が一致を検査する。
     command: make gen-install
-    location: "scripts/lib/install-templates.mjs"
+    location: "scripts/lib/gen-install.mjs"
     tags: [ gen, g ]
   decode_harness_capabilities:
     label: ハーネスsource decode・contract検証
@@ -558,13 +564,18 @@ process:
     tags: [ gen, g ]
   gen_plugin:
     label: Claude Code plugin root 組み立て
-    description: "make gen-pluginのClaude Code adapter。組み立て前に生成専用のplugin rootとrepository assetsをsnapshotして空にし、生成をやめた旧ファイルが残らないよう毎回再構築する。失敗時はsnapshotから復元し、復元未完ならsnapshotを保持して両CLI入口がprimary errorと保存理由・pathを表示する。再試行とdrift検査も残留transactionを報告し、削除はしない。dist非依存の再生成では中立pfdsl skillのSKILL.mdだけを保持する。再構築でignore対象を含む未追跡ファイルが失われる場合は失敗させる。contract検証済みのharness_capability_modelと中立生成済みpfdsl skill、install mirrorから、Claude Code skill tree、Markdown command、Markdown agent、hooks・manifestをplugin/pfdsl/へidentity互換に組み立て、repo-rootのmarketplace記述も更新する。marketplace記述は前世代claude_adapter_outputのrepo-root .claude-plugin/marketplace.jsonを読み、descriptionだけを置換してowner・source.ref等を保持する。あわせてclaude-repository mappingのskill・command・agentを中立正本から描画し、配布対象外のpfd-implementerもリポジトリへ生成する。ルート指示文書CLAUDE.mdはAGENTS.mdと同じmustacheテンプレートから描画する。全Claude root writeの後、manifest自身を除く全bundleファイルのdigestをファイル単位で.claude-plugin/bundle-manifest.sha256へ記録する。集約値は読み手が計算する（#971, #1264, #1267）"
+    description: "make gen-pluginのClaude Code adapter。組み立て前に生成専用のplugin rootとrepository assetsをsnapshotして空にし、生成をやめた旧ファイルが残らないよう毎回再構築する。失敗時はsnapshotから復元し、復元未完ならsnapshotを保持して両CLI入口がprimary errorと保存理由・pathを表示する。再試行とdrift検査も残留transactionを報告し、削除はしない。dist非依存の再生成では中立pfdsl skillのSKILL.mdだけを保持する。再構築でignore対象を含む未追跡ファイルが失われる場合は失敗させる。contract検証済みのharness_capability_modelと中立生成済みpfdsl skill、install/ と版別目録から、Claude Code skill tree、Markdown command、Markdown agent、hooks・manifestをplugin/pfdsl/へidentity互換に組み立て、repo-rootのmarketplace記述も更新する。marketplace記述は前世代claude_adapter_outputのrepo-root .claude-plugin/marketplace.jsonを読み、descriptionだけを置換してowner・source.ref等を保持する。あわせてclaude-repository mappingのskill・command・agentを中立正本から描画し、配布対象外のpfd-implementerもリポジトリへ生成する。ルート指示文書CLAUDE.mdはAGENTS.mdと同じmustacheテンプレートから描画する。全Claude root writeの後、manifest自身を除く全bundleファイルのdigestをファイル単位で.claude-plugin/bundle-manifest.sha256へ記録する。集約値は読み手が計算する（#971, #1264, #1267）"
     command: make gen-plugin
     location: "scripts/gen-plugin.mjs"
     tags: [ gen, g ]
   assemble_codex_plugin:
     label: Codex plugin root 組み立て
-    description: "make gen-pluginのCodex adapter。Claude adapterと同一objectのharness_capability_model、中立生成済みpfdsl skill、install mirrorを入力に、stageTargetSkillTreeが中立正本からdecodeしたCodex本文とliteral payloadを描画し、repoルート由来のinstall/ミラーを含むnative skill treeをrepositoryとpluginへ生成し、command由来skill、hooks、manifestもplugin/pfdsl-codex/へ生成する。Codex SKILL.mdのsummaryはmetadata.summaryへ移し、plugin descriptionは元のsemantic.summaryを消費する。生成済みClaude rootとmanifestは読まない。Codex command名が同名skillと衝突するとsource-command-接頭辞を付け、repository Codex assetsとともにatomicに置換する"
+    description: >
+      make gen-plugin と単独入口 scripts/gen-codex-assets.mjs が使う Codex adapter。
+      harness_capability_model の installFiles に従い、gen_install と同じ生成器で repo ルートの配布ソースから repository・plugin の各スキルに install/ と版別目録を作る。
+      中立生成済み pfdsl skill と、decode 済みの Codex 本文・literal payload・command・hooks・manifest を組み立て、repository の Codex assets と plugin/pfdsl-codex/ を atomic に置換する。
+      SKILL.md の summary は metadata.summary へ移し、plugin description は semantic.summary を使う。
+      command 名が同名 skill と衝突するときは source-command- を付ける。
     command: make gen-plugin
     location: "scripts/lib/gen-plugin.mjs"
     tags: [ gen, g ]
@@ -641,13 +652,13 @@ process:
     tags: [ g ]
   deploy_install_layer:
     label: L3 GitHub Issuesプリセット実配置
-    description: "/pfd-init ステップ3.5。plugin同梱install/を採用リポルートへコピーする。前回配置のmanifest hashと一致するファイルは通常更新し、新canonicalと同一のファイルも記録を更新する。それ以外の既存ファイルは旧記録を保持して警告し、--overwrite-local-edits指定時のみ上書きする。未記録の相違ファイルは未記録のまま保護する。canonicalから消えた旧ファイルはローカル編集が無ければフラグ無しで削除され、編集を抱える場合のみ--delete-edited-orphansを要する。canonical側のリネームは新旧パスの対をPossible renamesとして報告する。出力で依存準備と初回監査の手順を案内する実行中のpluginが.pfdsl/config.jsonのappliedMigrationの記録より古い場合は、配置前に停止する。"
+    description: "/pfd-init ステップ3.5。plugin 同梱の install/ と版別目録を照合してから、採用リポルートへコピーする。配布元が欠損していれば、配置済みのファイルと manifest に書き込む前に停止する。前回配置のmanifest hashと一致するファイルは通常更新し、新canonicalと同一のファイルも記録を更新する。それ以外の既存ファイルは旧記録を保持して警告し、--overwrite-local-edits指定時のみ上書きする。未記録の相違ファイルは未記録のまま保護する。canonicalから消えた旧ファイルはローカル編集が無ければフラグ無しで削除され、編集を抱える場合のみ--delete-edited-orphansを要する。canonical側のリネームは新旧パスの対をPossible renamesとして報告する。出力で依存準備と初回監査の手順を案内する。実行中のpluginが.pfdsl/config.jsonのappliedMigrationの記録より古い場合は、配置前に停止する。"
     command: node ${CLAUDE_PLUGIN_ROOT}/skills/pfd-ops/scripts/check-install-sync.mjs --deploy
     location: "scripts/harness-template/skills/pfd-ops/scripts/check-install-sync.mjs"
     tags: [ g ]
   check_install_sync:
     label: 配置鮮度セルフチェック
-    description: "pfd-ops発火時に同梱canonicalと配置済みファイルをhash照合しdriftを警告する。missingな新パスとorphanedな旧パスが同一ファイルのリネームとみなせる場合はPossible renamesとして対で報告する。実行のたびtargetの役割を上流マーカーで分類し、上流リポ・canonical不明と判定した場合は--deployを案内せず明示指定でも書き換え前に停止する（#971）。上流mainとの差は取得・通知しない。check-pfd-ops-sync.ymlは採用リポへ配布されなくなり、この経路が採用リポ唯一の安全網（ADR-0028）。採用リポと分類したtargetでは、.pfdsl/config.json のappliedMigration（ADR-0043）を実行中pluginの版・bundle hashと照合し、未記録・新しい版・同版で内容差を移行ガイドへの案内つきで通知する。pluginが記録より古い場合だけ--deployと--record-migrationを書き換え前に拒否する。appliedMigrationを書くのは、移行を適用した人が明示的に実行する--record-migrationだけで、照合は書かない。"
+    description: "pfd-ops 発火時に GitHub Issues の採用宣言を確認し、install/ と install-files.json が揃い、目録のファイル集合が実体と一致することを確認する。欠損時は理由を示して非成功で終わる。揃っていれば配置済みファイルの内容を比較し、差異を報告する。missingな新パスとorphanedな旧パスが同一ファイルのリネームとみなせる場合はPossible renamesとして対で報告する。実行のたびtargetの役割を上流マーカーで分類し、上流リポ・canonical不明と判定した場合は--deployを案内せず明示指定でも書き換え前に停止する（#971）。上流mainとの差は取得・通知しない。check-pfd-ops-sync.ymlは採用リポへ配布されなくなり、この経路が採用リポ唯一の安全網（ADR-0028）。採用リポと分類したtargetでは、.pfdsl/config.json のappliedMigration（ADR-0043）を実行中pluginの版・bundle hashと照合し、未記録・新しい版・同版で内容差を移行ガイドへの案内つきで通知する。pluginが記録より古い場合だけ--deployと--record-migrationを書き換え前に拒否する。appliedMigrationを書くのは、移行を適用した人が明示的に実行する--record-migrationだけで、照合は書かない。"
     command: node ${CLAUDE_PLUGIN_ROOT}/skills/pfd-ops/scripts/check-install-sync.mjs
     location: "scripts/harness-template/skills/pfd-ops/scripts/check-install-sync.mjs"
     tags: [ g ]
@@ -692,7 +703,7 @@ ops_install_sources >> gen_install -> ops_install_templates
 claude_adapter_output >>? gen_plugin
 [harness_capability_model, ops_install_templates, pfdsl_skill] >> gen_plugin -> [claude_adapter_output, claude_repo_assets]
 
-[harness_capability_model, ops_install_templates, pfdsl_skill] >> assemble_codex_plugin -> [codex_adapter_output, codex_repo_assets]
+[harness_capability_model, ops_install_sources, pfdsl_skill] >> assemble_codex_plugin -> [codex_adapter_output, codex_repo_assets]
 
 [claude_adapter_output, claude_repo_assets, codex_adapter_output, codex_repo_assets] >> check_plugin_drift -> [claude_plugin_dist, codex_plugin_dist, verified_claude_repo_assets, verified_codex_repo_assets]
 
