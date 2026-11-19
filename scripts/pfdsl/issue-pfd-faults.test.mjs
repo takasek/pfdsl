@@ -9,18 +9,30 @@ const hash = (s) => createHash("sha256").update(s).digest("hex");
 const id = (n) => `00000000-0000-4000-8000-${String(n).padStart(12, "0")}`;
 const body = (model = "a >> p -> b\n") =>
 	`<!-- pfdsl:issue-pfd source id=${id(1)} op=${id(2)} base=0 -->\n\n\`\`\`pfdsl\n${model}\`\`\`\n`;
+const visibleSvg = (html) =>
+	html
+		?.replace(/<!--[\s\S]*?(?:-->|$)/g, "")
+		.match(/<svg\b[^>]*\/>|<svg\b[\s\S]*?<\/svg\s*>/)?.[0] ?? null;
 
 function memoryFs() {
 	const files = new Map();
+	const modes = new Map();
 	const dirs = new Set(["/", "/fault"]);
 	const writes = [];
 	let fault,
+		faultHits = 0,
 		crashed = false;
 	function mutate(name, args, apply) {
-		const event = { name, path: resolve(args[0]), value: args[1] };
+		const event = {
+			name,
+			path: resolve(args[0]),
+			value: args[1],
+			options: args[2],
+		};
 		writes.push(event);
 		if (crashed) throw new Error("process interrupted");
 		const hit = fault?.(event, writes.length);
+		if (hit === "before" || hit === "crash") faultHits++;
 		if (hit === "before") throw new Error("local write failed");
 		const result = apply();
 		if (hit === "crash") {
@@ -30,6 +42,14 @@ function memoryFs() {
 		return result;
 	}
 	const fs = {
+		statSync(p) {
+			if (!files.has(resolve(p)))
+				throw Object.assign(new Error("ENOENT"), { code: "ENOENT" });
+			return { mode: modes.get(resolve(p)) ?? 0o644 };
+		},
+		chmodSync(...args) {
+			return mutate("chmod", args, () => modes.set(resolve(args[0]), args[1]));
+		},
 		existsSync: (p) => files.has(resolve(p)) || dirs.has(resolve(p)),
 		readFileSync(p) {
 			if (!files.has(resolve(p)))
@@ -56,31 +76,44 @@ function memoryFs() {
 				if (args[2]?.flag === "wx" && files.has(p))
 					throw Object.assign(new Error("exists"), { code: "EEXIST" });
 				files.set(p, String(args[1]));
+				if (!modes.has(p)) modes.set(p, (args[2]?.mode ?? 0o666) & ~0o022);
 			});
 		},
 		renameSync(...args) {
 			return mutate("rename", args, () => {
 				files.set(resolve(args[1]), fs.readFileSync(args[0]));
+				modes.set(resolve(args[1]), modes.get(resolve(args[0])) ?? 0o644);
 				files.delete(resolve(args[0]));
+				modes.delete(resolve(args[0]));
 			});
 		},
 		rmSync(...args) {
 			return mutate("rm", args, () => {
 				files.delete(resolve(args[0]));
+				modes.delete(resolve(args[0]));
 			});
 		},
 	};
 	return {
 		fs,
 		files,
+		modes,
 		writes,
+		get faultHits() {
+			return faultHits;
+		},
+		get interrupted() {
+			return crashed;
+		},
 		arm(fn) {
 			fault = fn;
 			writes.length = 0;
+			faultHits = 0;
 		},
 		recover() {
 			fault = undefined;
 			crashed = false;
+			faultHits = 0;
 			for (const p of files.keys())
 				if (p.endsWith(".issue-pfd.lock")) files.delete(p);
 		},
@@ -89,7 +122,12 @@ function memoryFs() {
 
 function fixture() {
 	const local = memoryFs();
-	globalThis.__issuePfdFaultFs = local.fs;
+	const invocations = [],
+		origins = new Map(),
+		intents = new Map(),
+		expectedDefaults = new Map();
+	const stateCache = new Map();
+	let active;
 	const records = new Map([
 		[
 			1,
@@ -114,14 +152,38 @@ function fixture() {
 			});
 	}
 	async function call(method, args, action) {
+		if (active) {
+			assertBase(f, active.work);
+			if (
+				method === "PATCH" &&
+				records.get(args.artifact)?.artifact.type === "embedded_html" &&
+				active.expectedDiagram === undefined
+			) {
+				const candidates = [...records.values()].filter(
+					(r) => r.artifact.type === "embedded_html",
+				);
+				if (candidates.length === 1)
+					active.expectedDiagram = candidates[0].artifact.number;
+			}
+			if (
+				["POST", "PATCH"].includes(method) &&
+				(args.type === "generic" ||
+					records.get(args.artifact)?.artifact.type === "generic")
+			)
+				assert.ok(
+					!active.retired,
+					"I10 an applied restore base retires publication even without a retired flag",
+				);
+		}
 		tick++;
-		const entry = { method, ...args, tick };
+		const entry = { method, ...args, tick, invocation: active };
 		calls.push(entry);
 		let mode = rule?.(entry);
 		if (unavailableRead && method === "GET") {
 			unavailableRead = false;
 			mode = "unavailable-before";
 		}
+		entry.fault = mode;
 		const error = () =>
 			mode?.includes("unavailable")
 				? new GitHubUnavailableError(method)
@@ -138,6 +200,8 @@ function fixture() {
 				throw error();
 			}
 			result = action();
+			entry.response = structuredClone(result);
+			if (method === "POST") entry.destination = result.number;
 			if (mode === "unavailable-after" && ["POST", "PATCH"].includes(method))
 				unavailableRead = true;
 			else if (["after", "unavailable-after"].includes(mode)) throw error();
@@ -171,16 +235,33 @@ function fixture() {
 				return records.get(args.artifact).artifact;
 			}),
 	};
-	const cli = async () => ({
-		exitCode: 0,
-		stdout: "<svg></svg>",
-		stderr: "",
-		cliVersion: "test",
-	});
+	const cli = async () => {
+		assertBase(f, active?.work);
+		return {
+			exitCode: 0,
+			stdout: "<svg></svg>",
+			stderr: "",
+			cliVersion: "test",
+		};
+	};
 	const repo = { host: "github.com", owner: "o", repo: "r" };
 	const runner = api.createIssuePfd({
 		github,
-		fs: local.fs,
+		fs: {
+			...local.fs,
+			writeFileSync(path, value, ...args) {
+				if (String(value).startsWith("{")) {
+					const state = JSON.parse(value);
+					if (state.schema === 2)
+						for (const op of state.operations)
+							if (op.body !== undefined && !intents.has(op.id)) {
+								intents.set(op.id, op.body);
+								origins.set(op.id, active);
+							}
+				}
+				return local.fs.writeFileSync(path, value, ...args);
+			},
+		},
 		root: "/fault",
 		repository: () => repo,
 		cli,
@@ -191,6 +272,10 @@ function fixture() {
 		...local,
 		records,
 		calls,
+		invocations,
+		origins,
+		intents,
+		expectedDefaults,
 		add,
 		cli,
 		repo,
@@ -204,12 +289,18 @@ function fixture() {
 		state(dir = "A") {
 			return JSON.parse(local.fs.readFileSync(`/fault/${dir}/issue-pfd.json`));
 		},
+		viewState(dir = "A") {
+			const raw = local.fs.readFileSync(`/fault/${dir}/issue-pfd.json`);
+			if (stateCache.get(dir)?.raw !== raw)
+				stateCache.set(dir, { raw, state: JSON.parse(raw) });
+			return stateCache.get(dir).state;
+		},
 		edit(text = "b >> p -> c\n", dir = "A") {
 			local.files.set(`/fault/${dir}/model.pfdsl`, text);
 		},
 		async run(command, opts = {}) {
 			const { work = "A", ...rest } = opts;
-			return runner.run({
+			const options = {
 				command,
 				issue: 7,
 				artifact: 1,
@@ -218,12 +309,164 @@ function fixture() {
 					command,
 				),
 				...rest,
-			});
+			};
+			const prior = local.files.has(`/fault/${work}/issue-pfd.json`)
+				? f.viewState(work)
+				: null;
+			const candidates = [...records.values()]
+				.filter((r) => r.artifact.type === "embedded_html")
+				.map((r) => r.artifact.number);
+			const invocation = {
+				command: options.command,
+				work,
+				calls: calls.length,
+				writes: local.writes.length,
+				locked: local.files.has(`/fault/${work}/.issue-pfd.lock`),
+				model: local.files.get(`/fault/${work}/model.pfdsl`),
+				outputMode:
+					options.out && local.files.has(options.out)
+						? local.fs.statSync(options.out).mode & 0o7777
+						: 0o600,
+				expectedDiagram:
+					options.diagram ??
+					(["publish", "restore"].includes(options.command)
+						? (expectedDefaults.get(work) ?? prior?.diagram)
+						: undefined) ??
+					(candidates.length === 1 ? candidates[0] : undefined),
+				retired:
+					prior?.retired ||
+					prior?.operations.some(
+						(op) =>
+							op.stage === "source" &&
+							op.kind === "restore" &&
+							op.status === "applied" &&
+							op.artifact === prior.artifact &&
+							op.version === prior.base?.version,
+					),
+			};
+			invocations.push(invocation);
+			active = invocation;
+			let result, failure;
+			try {
+				result = await runner.run(options);
+				return result;
+			} catch (error) {
+				failure = error;
+				throw error;
+			} finally {
+				active = undefined;
+				if (local.files.has(`/fault/${work}/issue-pfd.json`)) {
+					const state = f.viewState(work);
+					for (const op of state.operations)
+						if (!origins.has(op.id)) origins.set(op.id, invocation);
+					const applied = state.operations.filter(
+						(op) =>
+							op.stage === "diagram" &&
+							op.status === "applied" &&
+							prior?.operations.find((old) => old.id === op.id)?.status !==
+								"applied",
+					);
+					if (applied.length)
+						expectedDefaults.set(work, applied.at(-1).artifact);
+					const commandCalls = calls.slice(invocation.calls);
+					const sourceReads = commandCalls.filter(
+						(c) => c.method === "GET" && c.artifact === prior?.artifact,
+					);
+					if (
+						options.write &&
+						prior?.base &&
+						!local.interrupted &&
+						local.faultHits === 0 &&
+						!invocation.locked &&
+						failure?.exitCode !== 3 &&
+						["host", "owner", "repo"].every(
+							(key) => prior[key] === repo[key],
+						) &&
+						!sourceReads.some(
+							(c) =>
+								c.fault ||
+								c.response?.versions[0].version !== prior.base.version ||
+								hash(c.response?.versions[0].body.replaceAll("\r\n", "\n")) !==
+									prior.base.sourceBodySha256,
+						) &&
+						prior.operations.some(
+							(op) =>
+								op.stage === "diagram" &&
+								["sent", "unknown"].includes(op.status),
+						) &&
+						["publish", "restore"].includes(options.command) &&
+						!invocation.retired &&
+						!prior?.operations.some(
+							(op) =>
+								op.stage === "source" &&
+								["sent", "unknown"].includes(op.status) &&
+								!op.abandoned,
+						) &&
+						(options.command === "restore" ||
+							invocation.model !== api.parseSource(prior.base.body).model)
+					)
+						assert.ok(
+							calls
+								.slice(invocation.calls)
+								.some(
+									(c) => c.method === "PATCH" && c.artifact === state.artifact,
+								),
+							"I11 ambiguous diagram unknown must not block source publication",
+						);
+					if (!local.interrupted && local.faultHits === 0) {
+						assertBase(f, work);
+						assertDefaults(f);
+					}
+					for (const op of applied) {
+						const html = records
+							.get(op.artifact)
+							?.versions.find((v) => v.version === op.version)?.body;
+						const stamp = api.readStamp(html);
+						if (stamp?.result === "rendered")
+							assert.ok(
+								visibleSvg(html) !== null,
+								"I12 applied diagram requires an SVG outside HTML comments",
+							);
+					}
+				}
+				if (result?.classification === "current") {
+					const html = calls
+						.slice(invocation.calls)
+						.findLast(
+							(c) => c.method === "GET" && c.artifact === result.diagram,
+						)?.response?.versions[0].body;
+					assert.ok(
+						visibleSvg(html) !== null,
+						"I12 current requires an SVG outside HTML comments",
+					);
+				}
+				if (result?.skipped === "current diagram")
+					assert.ok(
+						visibleSvg(records.get(result.diagram)?.versions[0].body) !== null,
+						"I12 reused diagram requires an SVG outside HTML comments",
+					);
+				if (options.command === "show" && options.out) {
+					const mutations = local.writes.slice(invocation.writes);
+					for (const e of mutations.filter((e) => e.name === "write"))
+						assert.equal(
+							e.options?.mode,
+							0o600,
+							"I13 show temporary files start private",
+						);
+					if (local.files.has(options.out))
+						assert.equal(
+							local.fs.statSync(options.out).mode & 0o7777,
+							invocation.outputMode,
+							"I13 show replacement preserves the previous mode",
+						);
+				}
+			}
 		},
 		async attempt(command, opts) {
 			try {
 				return { result: await f.run(command, opts) };
 			} catch (error) {
+				if (error instanceof assert.AssertionError) throw error;
 				return { error };
 			}
 		},
@@ -240,7 +483,29 @@ function fixture() {
 }
 
 // Oracles derived from the design guarantee table, independently of run results.
+function assertBase(f, work) {
+	for (const dir of work ? [work] : ["A", "B"])
+		if (f.files.has(`/fault/${dir}/issue-pfd.json`)) {
+			const state = f.viewState(dir);
+			if (state.base)
+				assert.equal(
+					f.files.get(`/fault/${dir}/base.pfdsl`),
+					api.parseSource(state.base.body).model,
+					"I8 viewer base equals authoritative state at command boundary",
+				);
+		}
+}
+function assertDefaults(f) {
+	for (const [dir, expected] of f.expectedDefaults)
+		assert.equal(
+			f.viewState(dir).diagram,
+			expected,
+			"I9 applied diagram destination becomes the default",
+		);
+}
 function evidence(f) {
+	assertBase(f);
+	assertDefaults(f);
 	const sourceCounts = new Map();
 	for (const record of f.records.values())
 		if (record.artifact.type === "generic") {
@@ -262,15 +527,20 @@ function evidence(f) {
 				);
 				const sent = f.calls.find(
 					(c) =>
+						c.invocation === f.origins.get(op.id) &&
 						c.body &&
 						(op.stage === "source"
 							? c.body.includes(`op=${op.id}`)
-							: hash(c.body) === op.bodySha256),
+							: c.type === "embedded_html" ||
+								f.records.get(c.artifact)?.artifact.type === "embedded_html"),
 				);
-				assert.ok(sent, "I4 sent digest equals the actual transmitted bytes");
+				assert.ok(
+					f.intents.has(op.id),
+					"I4 compacted operation has a recorded intent",
+				);
 				assert.equal(
 					op.bodySha256,
-					hash(sent.body),
+					hash(sent?.body ?? f.intents.get(op.id)),
 					"I4 sent digest is preserved by reconciliation",
 				);
 			}
@@ -297,18 +567,25 @@ function evidence(f) {
 						"I1 earliest own operation must report overwritten predecessor",
 					);
 			} else if (op.artifact) {
+				const origin = f.origins.get(op.id);
 				const sent = f.calls.find(
 					(c) =>
+						c.invocation === origin &&
 						c.method === "PATCH" &&
-						c.body &&
-						hash(c.body) === (op.bodySha256 ?? hash(op.body)),
+						f.records.get(c.artifact)?.artifact.type === "embedded_html",
 				);
-				if (sent)
+				if (sent) {
+					assert.equal(
+						sent.artifact,
+						origin.expectedDiagram,
+						"I6 actual diagram request matches command destination",
+					);
 					assert.equal(
 						op.artifact,
 						sent.artifact,
 						"I6 reconcile only the sent-to diagram",
 					);
+				}
 			}
 		}
 	}
@@ -425,7 +702,8 @@ const remoteModes = [
 	"unavailable-after",
 ];
 test("guarantee-table product: two actors, web edits, delayed writes, recovery and abandonment", async (t) => {
-	let cases = 0;
+	let cases = 0,
+		reached = 0;
 	for (const tail of [
 		"status",
 		"publish",
@@ -433,7 +711,7 @@ test("guarantee-table product: two actors, web edits, delayed writes, recovery a
 		"publish-diagram",
 		"abandon",
 	])
-		for (const web of ["none", "retain", "break"])
+		for (const web of ["none", "retain", "break", "comment-svg"])
 			for (const mode of remoteModes) {
 				const baseline = fixture();
 				await baseline.run("pull");
@@ -447,11 +725,27 @@ test("guarantee-table product: two actors, web edits, delayed writes, recovery a
 					await f.run("pull");
 					await f.run("pull", { work: "B" });
 					f.edit();
-					let n = 0;
-					f.rule(() => (++n === position ? mode : undefined));
+					let n = 0,
+						hit = false;
+					f.rule(() => {
+						if (++n === position) {
+							hit = true;
+							return mode;
+						}
+					});
 					await f.attempt("publish");
 					f.rule(undefined);
-					if (web !== "none")
+					if (web === "comment-svg") {
+						for (const r of f.records.values())
+							if (r.artifact.type === "embedded_html")
+								f.add(
+									r.artifact.number,
+									r.versions[0].body.replace(
+										"<svg></svg>",
+										"<!-- <svg></svg> -->",
+									),
+								);
+					} else if (web !== "none")
 						f.add(
 							1,
 							web === "retain"
@@ -512,10 +806,13 @@ test("guarantee-table product: two actors, web edits, delayed writes, recovery a
 						throw error;
 					}
 					cases++;
+					if (hit) reached++;
 				}
 			}
 	assert.ok(cases >= 500);
-	t.diagnostic(`${cases} remote fault / operation-tail / web-edit cases`);
+	t.diagnostic(
+		`${cases} remote fault / operation-tail / web-edit cases; injection reached ${reached}`,
+	);
 });
 
 const entries = [
@@ -529,14 +826,55 @@ const entries = [
 	"resolve",
 	"render",
 	"show",
+	"show-private",
+	"show-shared",
+	"restore-applied",
+	"ambiguous-diagram",
+	"diagram-switch",
+	"comment-repair",
 ];
 async function prepareEntry(command) {
 	const f = fixture();
 	f.files.set("/fault/input.pfdsl", "a >> p -> b\n");
-	if (!["create", "pull", "show"].includes(command)) {
+	if (
+		!["create", "pull", "show", "show-private", "show-shared"].includes(command)
+	) {
 		f.add(1, body("second >> p -> b\n"));
 		await f.run("pull");
 		if (command === "diagram-patch") await f.run("publish-diagram");
+		if (["diagram-switch", "comment-repair"].includes(command)) {
+			await f.run("publish-diagram");
+			if (command === "diagram-switch") {
+				const copy = structuredClone(f.records.get(2));
+				copy.artifact.number = 3;
+				f.records.set(3, copy);
+				await f.run("publish-diagram", { diagram: 2 });
+				await f.run("publish-diagram", { diagram: 3 });
+				evidence(f); // Identical bytes sent to #2 then #3 are valid.
+				f.edit();
+			} else
+				f.add(
+					2,
+					f.records
+						.get(2)
+						.versions[0].body.replace("<svg></svg>", "<!-- <svg></svg> -->"),
+				);
+		}
+		if (command === "restore-applied") {
+			await f.run("restore", { version: 1 });
+			const state = f.state();
+			delete state.retired;
+			f.files.set("/fault/A/issue-pfd.json", JSON.stringify(state));
+		}
+		if (command === "ambiguous-diagram") {
+			f.rule((c) => (c.method === "POST" ? "after" : undefined));
+			await f.attempt("publish-diagram");
+			f.rule(undefined);
+			const copy = structuredClone(f.records.get(2));
+			copy.artifact.number = 3;
+			f.records.set(3, copy);
+			f.edit();
+		}
 		if (["publish", "status", "resolve"].includes(command)) f.edit();
 		if (["status", "resolve"].includes(command)) {
 			f.rule((c) =>
@@ -547,128 +885,209 @@ async function prepareEntry(command) {
 		}
 	}
 	f.arm(undefined);
+	if (command === "show-private") {
+		f.files.set("/fault/output", "private backup");
+		f.modes.set("/fault/output", 0o600);
+	}
+	if (command === "show-shared") {
+		f.files.set("/fault/output", "shared backup");
+		f.modes.set("/fault/output", 0o640);
+	}
 	f.opts = {
+		...(["show-private", "show-shared"].includes(command)
+			? { command: "show" }
+			: {}),
+		...([
+			"restore-applied",
+			"ambiguous-diagram",
+			"diagram-switch",
+			"comment-repair",
+		].includes(command)
+			? { command: "publish", write: true }
+			: {}),
+		...(command === "diagram-switch" ? { diagram: 2 } : {}),
 		...(command === "diagram-patch"
 			? { command: "publish-diagram", write: true }
 			: {}),
-		version: ["restore", "show"].includes(command) ? 1 : undefined,
+		version: ["restore", "show", "show-private", "show-shared"].includes(
+			command,
+		)
+			? 1
+			: undefined,
 		file: "/fault/input.pfdsl",
-		out: ["render", "show"].includes(command) ? "/fault/output" : undefined,
+		out: ["render", "show", "show-private", "show-shared"].includes(command)
+			? "/fault/output"
+			: undefined,
 		abandon: command === "resolve" ? f.state().operations[0].id : undefined,
 	};
 	return f;
 }
 
 test("all entry GitHub boundaries: fault at every call, then recovery without resending", async (t) => {
-	let cases = 0;
+	let cases = 0,
+		reached = 0;
 	for (const command of entries) {
-		const baseline = await prepareEntry(command);
-		const start = baseline.calls.length;
-		await baseline.attempt(command, baseline.opts);
-		if (command === "diagram-patch")
-			assert.ok(
-				baseline.calls
-					.slice(start)
-					.some((c) => c.method === "PATCH" && c.artifact === 2),
-				"existing diagram PATCH route must execute",
-			);
-		for (
-			let position = 1;
-			position <= baseline.calls.length - start;
-			position++
-		)
-			for (const mode of remoteModes) {
-				const f = await prepareEntry(command);
-				let n = 0;
-				f.rule(() => (++n === position ? mode : undefined));
-				await f.attempt(command, f.opts);
-				f.rule(undefined);
-				await f.drain();
-				await f.attempt("status", {
-					artifact: undefined,
-					dir: f.files.has("/fault/A/issue-pfd.json") ? "/fault/A" : undefined,
-				});
-				if (command === "create") await f.attempt("create", f.opts);
-				await f.attempt("status", {
-					artifact: undefined,
-					dir: f.files.has("/fault/A/issue-pfd.json") ? "/fault/A" : undefined,
-				});
-				try {
-					evidence(f);
-				} catch (error) {
-					error.message += ` [${command}/call${position}/${mode}]`;
-					throw error;
-				}
-				cases++;
-			}
-	}
-	t.diagnostic(`${cases} all-entry remote call-boundary cases`);
-});
-
-test("local write product: each write seam before failure and interruption, then recovery", async (t) => {
-	let cases = 0;
-	for (const command of entries) {
-		const baseline = await prepareEntry(command);
-		await baseline.attempt(command, baseline.opts);
-		assert.ok(
-			baseline.writes.length > 0,
-			`${command} must exercise its local mutation seams`,
-		);
-		t.diagnostic(`${command}: ${baseline.writes.length} local mutation seams`);
-		for (let point = 1; point <= baseline.writes.length; point++)
-			for (const mode of ["before", "crash"])
-				for (const remote of ["none", ...remoteModes]) {
+		await t.test(command, async () => {
+			const baseline = await prepareEntry(command);
+			const start = baseline.calls.length;
+			await baseline.attempt(command, baseline.opts);
+			if (command === "diagram-patch")
+				assert.ok(
+					baseline.calls
+						.slice(start)
+						.some((c) => c.method === "PATCH" && c.artifact === 2),
+					"existing diagram PATCH route must execute",
+				);
+			for (
+				let position = 1;
+				position <= baseline.calls.length - start;
+				position++
+			)
+				for (const mode of remoteModes) {
 					const f = await prepareEntry(command);
-					const opts = f.opts;
-					f.arm((_, n) => (n === point ? mode : undefined));
-					let injected = false;
-					f.rule((c) => {
-						if (!injected && ["POST", "PATCH"].includes(c.method)) {
-							injected = true;
-							return remote;
+					let n = 0,
+						hit = false;
+					f.rule(() => {
+						if (++n === position) {
+							hit = true;
+							return mode;
 						}
 					});
-					await f.attempt(command, opts);
-					f.recover();
+					await f.attempt(command, f.opts);
 					f.rule(undefined);
-					const local = f.files.get("/fault/A/model.pfdsl");
-					const before = f.sourceWrites().length;
-					await f.attempt("status");
-					await f.attempt(command === "create" ? "create" : "publish", opts);
-					await f.attempt("status");
-					if (
-						command === "restore" &&
-						f.records.get(1).versions.some((v) => /base=2/.test(v.body))
-					)
-						assert.equal(
-							f.sourceWrites().length,
-							before,
-							"I3 restore recovery cannot resend the old working copy",
-						);
-					if (command !== "restore" && local !== undefined)
-						assert.equal(
-							f.files.get("/fault/A/model.pfdsl"),
-							local,
-							`I3 no recovery deletes unpublished edits [${command}/write${point}/${mode}/${remote}]`,
-						);
+					await f.drain();
+					await f.attempt("status", {
+						artifact: undefined,
+						dir: f.files.has("/fault/A/issue-pfd.json")
+							? "/fault/A"
+							: undefined,
+					});
+					if (command === "diagram-switch") {
+						f.edit("next >> p -> b\n");
+						await f.attempt("publish");
+					}
+					if (command === "create") await f.attempt("create", f.opts);
+					await f.attempt("status", {
+						artifact: undefined,
+						dir: f.files.has("/fault/A/issue-pfd.json")
+							? "/fault/A"
+							: undefined,
+					});
 					try {
 						evidence(f);
 					} catch (error) {
-						error.message += ` [${command}/write${point}/${mode}/${remote}]`;
+						error.message += ` [${command}/call${position}/${mode}]`;
 						throw error;
 					}
 					cases++;
+					if (hit) reached++;
 				}
+		});
 	}
-	t.diagnostic(`${cases} local seam / interruption / remote-fault cases`);
+	t.diagnostic(
+		`${cases} all-entry remote call-boundary cases; injection reached ${reached}`,
+	);
+});
+
+test("local write product: each write seam before failure and interruption, then recovery", async (t) => {
+	let cases = 0,
+		localReached = 0,
+		remoteReached = 0,
+		bothReached = 0,
+		remoteRequested = 0;
+	for (const command of entries) {
+		await t.test(command, async () => {
+			const baseline = await prepareEntry(command);
+			const callsBefore = baseline.calls.length;
+			await baseline.attempt(command, baseline.opts);
+			assert.ok(
+				baseline.writes.length > 0,
+				`${command} must exercise its local mutation seams`,
+			);
+			t.diagnostic(
+				`${command}: ${baseline.writes.length} local mutation seams`,
+			);
+			const crossModes = baseline.calls
+				.slice(callsBefore)
+				.some((c) => ["POST", "PATCH"].includes(c.method))
+				? ["none", ...remoteModes]
+				: ["none"];
+			for (let point = 1; point <= baseline.writes.length; point++)
+				for (const mode of ["before", "crash"])
+					for (const remote of crossModes) {
+						const f = await prepareEntry(command);
+						const opts = f.opts;
+						let hit = false;
+						f.arm((_, n) => {
+							if (n === point) {
+								hit = true;
+								return mode;
+							}
+						});
+						let injected = false;
+						f.rule((c) => {
+							if (!injected && ["POST", "PATCH"].includes(c.method)) {
+								injected = true;
+								return remote;
+							}
+						});
+						await f.attempt(command, opts);
+						f.recover();
+						f.rule(undefined);
+						const local = f.files.get("/fault/A/model.pfdsl");
+						const before = f.sourceWrites().length;
+						await f.attempt("status");
+						await f.attempt(
+							command === "create" ? "create" : "publish",
+							command === "create" ? opts : {},
+						);
+						await f.attempt("status");
+						if (
+							command === "restore" &&
+							f.records.get(1).versions.some((v) => /base=2/.test(v.body))
+						)
+							assert.equal(
+								f.sourceWrites().length,
+								before,
+								"I3 restore recovery cannot resend the old working copy",
+							);
+						if (command !== "restore" && local !== undefined)
+							assert.equal(
+								f.files.get("/fault/A/model.pfdsl"),
+								local,
+								`I3 no recovery deletes unpublished edits [${command}/write${point}/${mode}/${remote}]`,
+							);
+						try {
+							evidence(f);
+						} catch (error) {
+							error.message += ` [${command}/write${point}/${mode}/${remote}]`;
+							throw error;
+						}
+						cases++;
+						if (hit) localReached++;
+						if (remote !== "none") {
+							remoteRequested++;
+							if (injected) remoteReached++;
+							if (hit && injected) bothReached++;
+						}
+					}
+		});
+	}
+	t.diagnostic(
+		`${cases} local seam / interruption / remote-fault cases; local reached ${localReached}; remote requested ${remoteRequested}, reached ${remoteReached}; both reached ${bothReached}`,
+	);
 });
 
 test("I5 current requires SVG presence and all three actual hashes", async () => {
+	const real =
+		"<svg><!-- keep SVG bytes, including </svg> in comments --><svg/></svg>";
+	assert.equal(api.svgElement(`<!-- <svg></svg> -->${real}`), real);
 	for (const field of [
 		"modelSha256",
 		"sourceBodySha256",
 		"svgSha256",
 		"absent-svg",
+		"comment-svg",
 	]) {
 		const f = fixture();
 		await f.run("pull");
@@ -676,9 +1095,14 @@ test("I5 current requires SVG presence and all three actual hashes", async () =>
 		const r = f.records.get(2);
 		const stamp = api.readStamp(r.versions[0].body);
 		r.versions[0].body =
-			field === "absent-svg"
-				? api.diagramBody({ ...stamp, svgSha256: hash("") }, "")
-				: api.diagramBody({ ...stamp, [field]: "0".repeat(64) }, "<svg></svg>");
+			field === "comment-svg"
+				? api.diagramBody(stamp, "<!-- <svg></svg> -->")
+				: field === "absent-svg"
+					? api.diagramBody({ ...stamp, svgSha256: hash("") }, "")
+					: api.diagramBody(
+							{ ...stamp, [field]: "0".repeat(64) },
+							"<svg></svg>",
+						);
 		assert.notEqual(
 			(await f.run("status")).classification,
 			"current",
@@ -964,7 +1388,7 @@ test("I4 compaction waits for artifact and version, even for a terminal operatio
 	}
 });
 
-test("unknown POST with multiple diagrams requires explicit destination without changing saved publication target", async () => {
+test("unknown POST with multiple diagrams requires explicit destination and adopts its confirmed target", async () => {
 	const f = fixture();
 	await f.run("pull");
 	f.rule((c) => (c.method === "POST" ? "after" : undefined));
@@ -973,7 +1397,6 @@ test("unknown POST with multiple diagrams requires explicit destination without 
 	const duplicate = structuredClone(f.records.get(2));
 	duplicate.artifact.number = 3;
 	f.records.set(3, duplicate);
-	const before = f.state().diagram;
 	const ambiguous = await f.attempt("status");
 	assert.match(
 		ambiguous.error?.message ?? ambiguous.result?.diagnostic ?? "",
@@ -982,5 +1405,5 @@ test("unknown POST with multiple diagrams requires explicit destination without 
 	assert.equal(f.state().operations.at(-1).status, "unknown");
 	await f.run("status", { diagram: 2 });
 	assert.equal(f.state().operations.at(-1).artifact, 2);
-	assert.equal(f.state().diagram, before);
+	assert.equal(f.state().diagram, 2);
 });

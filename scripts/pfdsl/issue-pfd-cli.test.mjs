@@ -2,12 +2,14 @@ import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import {
+	chmodSync,
 	cpSync,
 	mkdirSync,
 	mkdtempSync,
 	readdirSync,
 	readFileSync,
 	rmSync,
+	statSync,
 	writeFileSync,
 } from "node:fs";
 import { resolve } from "node:path";
@@ -37,7 +39,7 @@ function processFixture(t) {
 	);
 	writeFileSync(
 		resolve(scripts, "lib/github-ops.mjs"),
-		`export class GitHubUnavailableError extends Error { constructor(operation) { super('GitHub operation unavailable: ' + operation); this.operation = operation; } }\nexport const isGitHubUnavailableError = error => error instanceof GitHubUnavailableError;\nexport const GITHUB_UNAVAILABLE_EXIT_CODE = 2;\nexport function createGitHubOps() { return { getArtifact: async () => { if (process.env.PFDSL_TEST_MODE === 'raw') return { artifact: {number: 1}, versions: [{version: 1, body: 'broken\\r\\nraw\\r\\n'}] }; if (process.env.PFDSL_TEST_MODE === 'unavailable') throw new GitHubUnavailableError('getArtifact'); throw new Error('offline'); }, createArtifact: async () => { throw new GitHubUnavailableError('createArtifact'); } }; }\n`,
+		`export class GitHubUnavailableError extends Error { constructor(operation) { super('GitHub operation unavailable: ' + operation); this.operation = operation; } }\nexport const isGitHubUnavailableError = error => error instanceof GitHubUnavailableError;\nexport const GITHUB_UNAVAILABLE_EXIT_CODE = 2;\nexport function createGitHubOps() { return { getArtifact: async () => { if (['raw', 'empty'].includes(process.env.PFDSL_TEST_MODE)) return { artifact: {number: 1}, versions: [{version: 1, body: process.env.PFDSL_TEST_MODE === 'empty' ? '' : 'broken\\r\\nraw\\r\\n'}] }; if (process.env.PFDSL_TEST_MODE === 'unavailable') throw new GitHubUnavailableError('getArtifact'); throw new Error('offline'); }, createArtifact: async () => { throw new GitHubUnavailableError('createArtifact'); } }; }\n`,
 	);
 	mkdirSync(resolve(dir, ".pfdsl"));
 	writeFileSync(
@@ -114,12 +116,26 @@ test("show CLI process emits exact raw bytes without requiring a compatible CLI"
 		resolve(f.dir, "cli.mjs"),
 		"throw new Error('CLI must not run');\n",
 	);
-	const result = f.invoke(
-		["show", "7", "--artifact", "1", "--version", "1"],
-		"raw",
-	);
-	assert.equal(result.status, 0, result.stderr);
-	assert.equal(result.stdout, "broken\r\nraw\r\n");
+	for (const mode of ["raw", "empty"]) {
+		const result = f.invoke(
+			["show", "7", "--artifact", "1", "--version", "1"],
+			mode,
+		);
+		assert.equal(result.status, 0, result.stderr);
+		assert.equal(result.stdout, mode === "empty" ? "" : "broken\r\nraw\r\n");
+	}
+	for (const mode of [0o600, 0o640]) {
+		const out = resolve(f.dir, "backup.md");
+		writeFileSync(out, "previous backup");
+		chmodSync(out, mode);
+		const result = f.invoke(
+			["show", "7", "--artifact", "1", "--version", "1", "--out", out],
+			"raw",
+		);
+		assert.equal(result.status, 0, result.stderr);
+		assert.equal(statSync(out).mode & 0o7777, mode);
+		assert.equal(readFileSync(out, "utf8"), "broken\r\nraw\r\n");
+	}
 });
 
 test("guide commands match help grammar and explain context, recovery and abandonment", async () => {

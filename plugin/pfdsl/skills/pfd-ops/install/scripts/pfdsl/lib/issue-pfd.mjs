@@ -99,7 +99,23 @@ const unescapeHtml = (text) =>
 		.replaceAll("&lt;", "<")
 		.replaceAll("&amp;", "&");
 export function svgElement(body) {
-	return body?.match(/<svg\b[^>]*\/>|<svg\b[\s\S]*?<\/svg\s*>/)?.[0] ?? null;
+	let start,
+		depth = 0;
+	for (const token of body?.matchAll(
+		/<!--[\s\S]*?(?:-->|$)|<\/?svg\b[^>]*>/g,
+	) ?? []) {
+		if (token[0].startsWith("<!--")) continue;
+		if (token[0].startsWith("</")) {
+			if (depth > 0 && --depth === 0)
+				return body.slice(start, token.index + token[0].length);
+		} else {
+			if (depth === 0) start = token.index;
+			if (token[0].endsWith("/>")) {
+				if (depth === 0) return token[0];
+			} else depth++;
+		}
+	}
+	return null;
 }
 
 export function diagramBody(stamp, output, sourceUrl = "") {
@@ -195,6 +211,8 @@ export function createIssuePfd({
 		renameSync,
 		rmSync,
 		writeFileSync,
+		statSync,
+		chmodSync,
 	} = fs;
 	function ensureEmpty(dir, locked = false) {
 		if (
@@ -438,6 +456,7 @@ export function createIssuePfd({
 						);
 						update(op, "artifact", match.record.artifact.number);
 						update(op, "version", selectedVersion(match.record).version);
+						if (op.status === "applied") update(state, "diagram", op.artifact);
 						update(
 							op,
 							"observedBodySha256",
@@ -495,11 +514,7 @@ export function createIssuePfd({
 			} catch (error) {
 				update(op, "status", "unknown");
 				if (changed) persist(dir, state, baseChanged);
-				if (
-					op.stage !== "diagram" ||
-					/Multiple diagram candidates/.test(error.message)
-				)
-					throw error;
+				if (op.stage !== "diagram") throw error;
 			}
 			changed = compactOperation(op) || changed;
 			reports.push({
@@ -755,7 +770,17 @@ export function createIssuePfd({
 			)
 		)
 			return { dryRun: true, operations: state.operations };
-		if (state.retired)
+		if (
+			state.retired ||
+			state.operations.some(
+				(op) =>
+					op.stage === "source" &&
+					op.kind === "restore" &&
+					op.status === "applied" &&
+					op.artifact === state.artifact &&
+					op.version === state.base?.version,
+			)
+		)
 			throw new Error(
 				"Working directory retired after restore; preserve local edits and pull into a new empty directory.",
 			);
@@ -1043,8 +1068,12 @@ export function createIssuePfd({
 						dirname(resolve(opts.out)),
 						`.issue-pfd-${uuid()}.tmp`,
 					);
+					const mode = existsSync(opts.out)
+						? statSync(opts.out).mode & 0o7777
+						: 0o600;
 					try {
-						writeFileSync(temp, version.body, { flag: "wx" });
+						writeFileSync(temp, version.body, { flag: "wx", mode: 0o600 });
+						if (mode !== 0o600) chmodSync(temp, mode);
 						renameSync(temp, opts.out);
 					} finally {
 						rmSync(temp, { force: true });
@@ -1175,8 +1204,18 @@ export function createIssuePfd({
 		const needsLock =
 			opts.write ||
 			["pull", "resolve", "render"].includes(opts.command) ||
-			(opts.command === "status" && stateDir);
+			(stateDir && opts.command !== "show");
 		const execute = async () => {
+			if (stateDir && opts.command !== "show") {
+				const state = readState(opts.dir);
+				assertRepository(state);
+				if (state.base) {
+					const path = resolve(opts.dir, "base.pfdsl");
+					const model = parseSource(state.base.body).model;
+					if (!existsSync(path) || readFileSync(path, "utf8") !== model)
+						writeFileSync(path, model);
+				}
+			}
 			const result = await dispatch(opts);
 			if (
 				opts.dir &&
