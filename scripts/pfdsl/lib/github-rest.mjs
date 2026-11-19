@@ -130,6 +130,79 @@ function authHeaders({ token }) {
 	};
 }
 
+const artifactPath = (owner, repo, issue, artifact) =>
+	`https://api.github.com/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/issues/${issue}/artifacts${artifact === undefined ? "" : `/${artifact}`}`;
+
+export async function fetchIssueArtifacts(
+	owner,
+	repo,
+	token,
+	issue,
+	fetchImpl = proxyAwareFetch,
+) {
+	return fetchAllPages(
+		fetchImpl,
+		(page) => `${artifactPath(owner, repo, issue)}?per_page=100&page=${page}`,
+		token,
+	);
+}
+
+export async function fetchIssueArtifact(
+	owner,
+	repo,
+	token,
+	issue,
+	artifact,
+	fetchImpl = proxyAwareFetch,
+) {
+	const response = await request(
+		fetchImpl,
+		artifactPath(owner, repo, issue, artifact),
+		{ headers: authHeaders({ token }) },
+	);
+	return response.json();
+}
+
+export async function createIssueArtifact(
+	owner,
+	repo,
+	token,
+	issue,
+	fields,
+	fetchImpl = proxyAwareFetch,
+) {
+	const response = await request(fetchImpl, artifactPath(owner, repo, issue), {
+		method: "POST",
+		headers: { ...authHeaders({ token }), "Content-Type": "application/json" },
+		body: JSON.stringify(fields),
+	});
+	return response.json();
+}
+
+export async function updateIssueArtifact(
+	owner,
+	repo,
+	token,
+	issue,
+	artifact,
+	fields,
+	fetchImpl = proxyAwareFetch,
+) {
+	const response = await request(
+		fetchImpl,
+		artifactPath(owner, repo, issue, artifact),
+		{
+			method: "PATCH",
+			headers: {
+				...authHeaders({ token }),
+				"Content-Type": "application/json",
+			},
+			body: JSON.stringify(fields),
+		},
+	);
+	return response.json();
+}
+
 /**
  * @param {typeof fetch} fetchImpl
  * @param {string} url
@@ -138,9 +211,11 @@ function authHeaders({ token }) {
 async function request(fetchImpl, url, init) {
 	const res = await fetchImpl(url, init);
 	if (!res.ok) {
-		throw new Error(
+		const error = new Error(
 			`GitHub REST API ${init?.method ?? "GET"} ${url} failed: ${res.status} ${await res.text()}`,
 		);
+		error.httpStatus = res.status;
+		throw error;
 	}
 	return res;
 }

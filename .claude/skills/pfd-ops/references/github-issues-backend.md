@@ -6,6 +6,8 @@ PFD の作業項目を GitHub Issues で管理する流儀。pfdsl 固有では�
 
 ## 規約
 
+一つの Issue 内の任意の PFD は [Issue artifact PFD の運用](issue-artifact-pfd.md) に従う。
+
 - **一次情報**: GitHub Issue 本体。着手時は本文とコメントを両方取得する。`gh` があれば `gh issue view <number> --json body,comments`、`gh` の無い環境（Claude Code Remote 等）では GitHub MCP server の issue 読取ツールや REST API など、同じ本文とコメントを返す手段を使う。ページ分割される手段ではコメントを全ページ取得する。`roadmap.pfdsl` は依存構造のみ管理する
 - **アダプタ自身の書込み**: アダプタが外部へ書く場合は、自ら書いた内容を読み戻して照合する。
 - **作業項目の参照**: 対応は [`work-cycle.md`「作業項目と process の対応」](work-cycle.md#作業項目と-process-の対応) に従う。process の `location:` には issue の URL（`https://<host>/<owner>/<repo>/issues/<number>`）を置く。host・repository・issue 番号を合わせて項目を識別し、別 repository の同番号や pull request の URL を同じ issue とみなさない。監査・GitHub 取得・着手時の照合は、`GH_REPO=[HOST/]OWNER/REPO`、`gh repo set-default` の保存設定、`origin` の順で同じ対象を選ぶ。fork の親 repository は自動推測しない。`GH_REPO` の host 省略時は `GH_HOST`、未設定なら `github.com` を使う。SSH remote は `ssh -G` の hostname を Web host とし、`ssh.github.com` は `github.com` に変換し、SSH 接続 port は引き継がない。SSH を解決できない場合は `GH_REPO` で明示する。別 repository の issue URL は照合から除外して advisory を表示し、その参照先の存在や分類は検査しない。HTTP fallback は引き続き public GitHub のみを対象とする。

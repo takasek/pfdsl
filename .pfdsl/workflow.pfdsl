@@ -262,14 +262,15 @@ artifact:
   ops_skill_l3:
     label: PFD運用スキル（バックエンドプリセット層）
     description: >-
-      採用リポが作業項目バックエンドとして選択できる L3 プリセット群の規約本文。GitHub Issues 版 = references/github-issues-backend.md、ファイルベース・トラッカー版 = references/file-based-tracker-backend.md。
+      採用リポが作業項目バックエンドとして選択できる L3 プリセット群の規約本文。GitHub Issues 版 = references/github-issues-backend.md（Issue artifacts で Issue 単位の PFD を扱う付属手順 references/issue-artifact-pfd.md を含む）、ファイルベース・トラッカー版 = references/file-based-tracker-backend.md。
       上流が配布する選択肢の集合であり、採用リポはどちらか一方を選ぶか、どちらも採用しない。このリポは GitHub Issues 版を採用しており、develop が読むのはその版である。
       手書き（生成対象外）で、retro_skill の監査結果がこの層の規約改訂に還流する。
       GitHub Issues 版の採用リポが実際に配置するファイル群は pipeline.pfdsl の ops_install_templates 側で、ファイルベース・トラッカー版は実配置を要しない
     criteria: >-
       ../scripts/harness-template/skills/pfd-ops/references/github-issues-backend.md に、採用リポが GitHub Issues バックエンドを採用するのに必要な規約（ラベル判定・status 更新と完了チェーン回収）が記述され、実行者の設計記録・外部書込み手順・PR 本文規約を持たない。
-      ../scripts/harness-template/skills/pfd-ops/references/file-based-tracker-backend.md に、採用リポがリポ内ファイルで作業項目を管理するのに必要な規約（一次情報ファイル・作業項目の参照形式・flow 分類・status 同期・完了規則と完了契約）が記述され、対応の共通契約は work-cycle.md を参照し、GitHub Issues 版の install テンプレートを要求しない
-    location: [ "scripts/harness-template/skills/pfd-ops/references/github-issues-backend.md", "scripts/harness-template/skills/pfd-ops/references/file-based-tracker-backend.md" ]
+      ../scripts/harness-template/skills/pfd-ops/references/file-based-tracker-backend.md に、採用リポがリポ内ファイルで作業項目を管理するのに必要な規約（一次情報ファイル・作業項目の参照形式・flow 分類・status 同期・完了規則と完了契約）が記述され、対応の共通契約は work-cycle.md を参照し、GitHub Issues 版の install テンプレートを要求しない。
+      ../scripts/harness-template/skills/pfd-ops/references/issue-artifact-pfd.md に、GitHub Issues 版の採用リポが Issue artifacts で Issue 単位の PFD を登録・取得・公開・復旧する手順と、競合時の挙動・保証できない経路・必要な権限と CLI の要求版が記述される
+    location: [ "scripts/harness-template/skills/pfd-ops/references/github-issues-backend.md", "scripts/harness-template/skills/pfd-ops/references/file-based-tracker-backend.md", "scripts/harness-template/skills/pfd-ops/references/issue-artifact-pfd.md" ]
     group: generation
     tags: [ distilled_skill ]
   retro_skill:

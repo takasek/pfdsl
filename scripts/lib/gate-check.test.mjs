@@ -1246,6 +1246,8 @@ describe("collectModeledLocations", () => {
 			// Both backend presets are maintained as one L3 artifact, whichever of
 			// them this repo adopts (#1227).
 			["references/file-based-tracker-backend.md", "ops_skill_l3"],
+			// The Issue artifacts procedure is part of the GitHub Issues preset (#1610).
+			["references/issue-artifact-pfd.md", "ops_skill_l3"],
 		];
 		const skillRoot = resolve(root, "scripts/harness-template/skills/pfd-ops");
 		const actualFiles = [
