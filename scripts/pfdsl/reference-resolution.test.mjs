@@ -19,23 +19,10 @@ test("reference acceptance with the published 0.2.0 and candidate CLIs", async (
 	const dir = mkdtempSync(join(tmpdir(), "pfdsl-reference-distribution-"));
 	t.after(() => rmSync(dir, { recursive: true, force: true }));
 
-	const install = spawnSync(
-		"npm",
-		[
-			"install",
-			"--prefix",
-			dir,
-			"--no-save",
-			"--no-package-lock",
-			"--ignore-scripts",
-			"--no-audit",
-			"--no-fund",
-			"@pfdsl/cli@0.2.0",
-		],
-		{ cwd: dir, encoding: "utf8" },
+	const published = join(
+		root,
+		"scripts/__fixtures__/published-cli/node_modules/@pfdsl/cli/dist/cli.js",
 	);
-	assert.equal(install.status, 0, install.stderr);
-	const published = join(dir, "node_modules/@pfdsl/cli/dist/cli.js");
 	const candidate = join(root, "packages/cli/dist/cli.js");
 	const run = (cli, args) =>
 		spawnSync(process.execPath, [cli, ...args], { cwd: dir, encoding: "utf8" });

@@ -1,4 +1,5 @@
 packages:
   - 'packages/*'
+  - 'scripts/__fixtures__/published-cli'
 patchedDependencies:
   monaco-editor@0.57.0: patches/monaco-editor@0.57.0.patch

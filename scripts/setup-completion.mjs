@@ -30,6 +30,7 @@ export const SETUP_INPUTS = [
 	"package.json",
 	"pnpm-lock.yaml",
 	"pnpm-workspace.yaml",
+	"scripts/__fixtures__/published-cli/package.json",
 	"scripts/lib/shell-parser-tool.mjs",
 ];
 

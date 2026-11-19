@@ -605,6 +605,7 @@ describe("setup completion sentinel", () => {
 			"package.json",
 			"pnpm-lock.yaml",
 			"pnpm-workspace.yaml",
+			"scripts/__fixtures__/published-cli/package.json",
 			"scripts/hooks/pre-commit-shim",
 			"scripts/lib/cli-entrypoint.mjs",
 			"scripts/lib/repo-skill-link.mjs",
@@ -653,6 +654,7 @@ describe("setup completion sentinel", () => {
 			inputs.filter((path) => path.endsWith("package.json")),
 			[
 				"package.json",
+				"scripts/__fixtures__/published-cli/package.json",
 				"packages/alpha/package.json",
 				"packages/zeta/package.json",
 			],
@@ -665,6 +667,7 @@ describe("setup completion sentinel", () => {
 		for (const path of [
 			".npmrc",
 			".pnpmfile.cjs",
+			"scripts/__fixtures__/published-cli/package.json",
 			"packages/alpha/package.json",
 		]) {
 			writeFileSync(
