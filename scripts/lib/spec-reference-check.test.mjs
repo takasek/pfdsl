@@ -9,6 +9,42 @@ const source = (file, text) => ({ file, text });
 const definitions = [{ file: "docs/spec/spec.md", id: "SPEC_rule", line: 1 }];
 
 describe("external specification references", () => {
+	it("resolves distributed inputs only against their bundled specification", () => {
+		const docsDefinitions = [
+			...definitions,
+			{ file: "docs/adr/0027.md", id: "SPEC_repo_only", line: 1 },
+		];
+		for (const file of [
+			"scripts/skill-template/SKILL.md",
+			"packages/cli/src/index.ts",
+			"docs/quality-guide.md",
+			"docs/review-perspectives.md",
+			"scripts/harness-template/skills/pfd-ops/SKILL.md",
+			"scripts/harness-template/commands/pfd-cycle.md",
+		]) {
+			const r = checkExternalSpecReferences(
+				[source(file, "[[SPEC_rule]] [[SPEC_repo_only]]")], // spec-ref-literal: bundled versus repository-only definitions
+				docsDefinitions,
+			);
+			assert.equal(r.violations.length, 1, file);
+			assert.match(r.violations[0], /SPEC_repo_only.*docs\/spec\/spec\.md/);
+		}
+		for (const file of [
+			".pfdsl/bindings/pfd-ops.md",
+			"scripts/root-instructions-template/INSTRUCTIONS.md",
+			"scripts/repo-agent-template/pfd-implementer.md",
+		]) {
+			assert.deepEqual(
+				checkExternalSpecReferences(
+					[source(file, "[[SPEC_repo_only]]")], // spec-ref-literal: repository-only inputs can use the docs corpus
+					docsDefinitions,
+				).violations,
+				[],
+				file,
+			);
+		}
+	});
+
 	it("detects a numbered citation even if it still names an existing, different rule", () => {
 		const r = checkExternalSpecReferences(
 			[source("packages/core/src/rule.ts", "/** Check the rule (§15.17). */")], // spec-ref-literal: numbered citation under test

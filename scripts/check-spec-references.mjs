@@ -3,7 +3,7 @@
 // No arguments: inspect tracked authoring inputs. Explicit files let callers
 // validate a draft without enrolling it in the tracked source corpus.
 import { readFileSync } from "node:fs";
-import { dirname, resolve } from "node:path";
+import { dirname, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
 import { gitLsFiles } from "./lib/run-exec.mjs";
@@ -19,7 +19,9 @@ try {
 	const tracked = gitLsFiles([], { cwd: root });
 	const definitionFiles = tracked.filter((file) => /^docs\/.*\.md$/.test(file));
 	const definitions = definitionFiles.flatMap((file) =>
-		findSpecIdDefinitions(readFileSync(resolve(root, file), "utf8")),
+		findSpecIdDefinitions(readFileSync(resolve(root, file), "utf8")).map(
+			(definition) => ({ ...definition, file }),
+		),
 	);
 	const files = positionals.length
 		? positionals
@@ -29,7 +31,9 @@ try {
 			"No specification definitions or reference sources to check.",
 		);
 	const sources = files.map((file) => ({
-		file,
+		file: positionals.length
+			? relative(root, resolve(file)).split(sep).join("/")
+			: file,
 		text: readFileSync(positionals.length ? file : resolve(root, file), "utf8"),
 	}));
 	const result = checkExternalSpecReferences(sources, definitions);

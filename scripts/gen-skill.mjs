@@ -11,7 +11,10 @@ import { fileURLToPath } from "node:url";
 import { writeSkillRefs } from "./lib/gen-skill-refs.mjs";
 import { renderCliSection } from "./lib/skill-cli-section.mjs";
 import { findMissingFields } from "./lib/skill-field-drift.mjs";
-import { injectGeneratedHeader } from "./lib/skill-header.mjs";
+import {
+	injectGeneratedHeader,
+	stripSpecReferenceAnnotations,
+} from "./lib/skill-header.mjs";
 import { parseSkillOutDir } from "./lib/skill-out-dir.mjs";
 import { findUnresolvedTemplateTokens } from "./lib/template-tokens.mjs";
 
@@ -73,7 +76,9 @@ if (!cliVersion) {
 	process.exit(1);
 }
 
-const skillMd = injectGeneratedHeader(templateSrc)
+const skillMd = injectGeneratedHeader(
+	stripSpecReferenceAnnotations(templateSrc),
+)
 	.replace(/\{\{specVersion\}\}/g, specVersion)
 	.replace(/\{\{cliVersion\}\}/g, cliVersion)
 	.replace("{{cliCommands}}", renderCliSection(helpOutput));

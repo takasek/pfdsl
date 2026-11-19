@@ -45,6 +45,7 @@ pfdsl スキル本文の CLI プリフライトは採用リポ向けに `pfdsl` 
 このリポの現行参照は `node scripts/check-spec-references.mjs` で検査する。
 `make check-docs` もこの検査を含む。
 対象はコード・テスト・スキルの入力元、ルートとdocs直下の現行Markdown、運用companionとbindingであり、具体的な選択は `selectSpecReferenceSources` が持つ。
+スキル・CLIなどの配布元は同梱される `docs/spec/spec.md` の定義だけに解決し、リポジトリ内資料は `docs/` 全体の定義に解決する。
 ADR・版履歴・統合済みproposal・監査やレビューの証拠・過去計画・生成コピーは現在の仕様に合わせて書き換えない。
 
 このリポの現行参照では既存の仕様IDを使い、IDのない対象は可変な節番号を外して見出し名や規則の要点で示す。

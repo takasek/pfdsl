@@ -53,6 +53,8 @@ spec >> P -> impl
 
 See the [status, tags and style rules](docs/spec/spec.md) ([[SPEC_status_tags_style_mapping]]) for details.
 
+`[[SPEC_…]]` denotes a specification ID. Search for the ID in the linked file to find its definition.
+
 ## `index:` field (external tool numbering)
 
 Artifacts and processes accept an optional `index:` integer. `pfdsl reindex` auto-assigns values in topological order; external tools (e.g. pfd-tools) read them as `D{index}` / `P{index}`. See the [metadata rules](docs/spec/spec.md) ([[SPEC_id_metadata]]) for constraints.
