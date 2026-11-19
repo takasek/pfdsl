@@ -73,6 +73,12 @@ pfdsl meta check-links extracted.pfdsl --reference-context context.json --json
 `check` and `render` perform static analysis and report reference resolution as not checked when explicit references or an external context are present.
 `meta get` and `graph describe` return raw `location` values alongside their resolved paths; they fail when a requested derived path cannot be resolved or inspected within its selected snapshot.
 `meta check-links --json` records the model origin, logical path, target bindings, selected fixed revisions, and each location's result.
+For explicit references or an external context, run the context-bearing link check above with the CLI you intend to use.
+Require exit 0 and a `referenceResolution.results` entry for each required path with its ID, location, expected source, adapter-pinned `fixedRevision`, and `result: "exists"`. For artifacts with an explicit or inherited reference, also match `reference.revision` to the expected selector.
+For example, `input` above should report `project`, selector `main`, and `C1` for `docs/plan.md`, while `output` should report `develop` and `C2` for the same path.
+For a location without an explicit or inherited reference, verify the source and fixed revision against the context's `basis` even when the model declares no references at all. In this example, `review` uses `project` at `C0`.
+`exists` covers directories as well as files. When the artifact requires a regular file, check the file type at the reported `value` in the same pinned snapshot.
+The published `@pfdsl/cli@0.2.0` and a reference-capable build can print the same version. The published package rejects `--reference-context` and can return `{"ok":true,"missing":[]}` for a file beside the model when the option is omitted. Treat either outcome as unverified and repeat the check with a capable build and the pinned context.
 URL and glob results are explicitly skipped and do not establish artifact existence or satisfy its acceptance criteria.
 Artifacts without locations can establish target identity, but that does not establish completion.
 

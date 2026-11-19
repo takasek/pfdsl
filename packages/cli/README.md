@@ -69,6 +69,8 @@ npm install -g @pfdsl/cli
 
 Run `pfdsl --help` or `pfdsl <command> --help` for full usage and exit codes.
 
+When a model uses `baseRef`, an artifact `ref`, or a pinned external context, verify its locations with the [reference resolution and acceptance guide](https://github.com/takasek/pfdsl/blob/main/docs/reference-resolution.md).
+
 ## Creating node definitions
 
 `meta create` creates a frontmatter entry for an artifact or process already present in the graph body.
