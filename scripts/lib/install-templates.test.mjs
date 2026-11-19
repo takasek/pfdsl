@@ -5,6 +5,7 @@
 // versa — both are silent-drift failure modes #547 exists to prevent.
 
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { describe, it } from "node:test";
 import { fileURLToPath } from "node:url";
@@ -16,6 +17,22 @@ const root = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 const installDir = resolve(root, ".claude/skills/pfd-ops/install");
 
 describe("INSTALL_TEMPLATE_PATHS", () => {
+	it("ships the release's expected install paths with every pfd-ops distribution", () => {
+		for (const skills of [
+			".claude/skills",
+			".agents/skills",
+			"plugin/pfdsl/skills",
+			"plugin/pfdsl-codex/skills",
+		]) {
+			const file = resolve(root, skills, "pfd-ops/install-files.json");
+			assert.deepEqual(
+				JSON.parse(readFileSync(file, "utf8")),
+				INSTALL_TEMPLATE_PATHS,
+				file,
+			);
+		}
+	});
+
 	it("matches exactly what exists under .claude/skills/pfd-ops/install/", () => {
 		assert.deepEqual(
 			[...INSTALL_TEMPLATE_PATHS].sort(),

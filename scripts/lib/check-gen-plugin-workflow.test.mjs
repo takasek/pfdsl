@@ -4,7 +4,7 @@ import { dirname, resolve } from "node:path";
 import { describe, it } from "node:test";
 import { fileURLToPath } from "node:url";
 import { parse } from "yaml";
-import { GEN_INSTALL_OUTPUT } from "./gen-plugin-outputs.mjs";
+import { GEN_INSTALL_OUTPUTS } from "./gen-plugin-outputs.mjs";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 
@@ -63,7 +63,7 @@ describe("check-gen-plugin workflow", () => {
 
 	it("checks untracked outputs in the install workflow", () => {
 		const cases = [
-			[".github/workflows/check-pfd-ops-sync.yml", [GEN_INSTALL_OUTPUT]],
+			[".github/workflows/check-pfd-ops-sync.yml", GEN_INSTALL_OUTPUTS],
 		];
 
 		for (const [workflowPath, expectedPaths] of cases) {

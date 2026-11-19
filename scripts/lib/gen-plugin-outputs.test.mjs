@@ -7,7 +7,6 @@ import {
 	pluginGenerationSnapshotTargets,
 } from "./gen-plugin.mjs";
 import {
-	GEN_INSTALL_OUTPUT,
 	GEN_PLUGIN_OUTPUTS,
 	GEN_SKILL_MD_OUTPUT,
 	genPluginDriftPathspecs,
@@ -57,7 +56,11 @@ describe("gen-plugin output contract", () => {
 	it("leaves install/ to the CI workflow that regenerates it with gen-install", () => {
 		assert.deepEqual(
 			sorted(genPluginDriftPathspecs("ci")),
-			sorted([...EVERY_GEN_PLUGIN_OUTPUT, `:(exclude)${GEN_INSTALL_OUTPUT}`]),
+			sorted([
+				...EVERY_GEN_PLUGIN_OUTPUT,
+				":(exclude).claude/skills/pfd-ops/install",
+				":(exclude).claude/skills/pfd-ops/install-files.json",
+			]),
 		);
 	});
 
@@ -66,7 +69,8 @@ describe("gen-plugin output contract", () => {
 			sorted(genPluginDriftPathspecs("pre-commit")),
 			sorted([
 				...EVERY_GEN_PLUGIN_OUTPUT,
-				`:(exclude)${GEN_INSTALL_OUTPUT}`,
+				":(exclude).claude/skills/pfd-ops/install",
+				":(exclude).claude/skills/pfd-ops/install-files.json",
 				`:(exclude)${GEN_SKILL_MD_OUTPUT}`,
 			]),
 		);

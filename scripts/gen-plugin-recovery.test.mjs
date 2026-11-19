@@ -16,6 +16,8 @@ import { dirname, join, resolve } from "node:path";
 import { describe, it } from "node:test";
 import { fileURLToPath } from "node:url";
 
+import { GEN_INSTALL_OUTPUTS } from "./lib/gen-plugin-outputs.mjs";
+
 const repo = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 
 describe("generator recovery diagnostics", () => {
@@ -148,7 +150,7 @@ describe("generator recovery diagnostics", () => {
 						".agents",
 						".codex",
 						".claude-plugin",
-						".claude/skills/pfd-ops/install",
+						...GEN_INSTALL_OUTPUTS,
 					],
 					{ cwd: root },
 				);

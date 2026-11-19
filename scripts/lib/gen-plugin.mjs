@@ -44,6 +44,10 @@ import {
 	GENERATED_SKILLS,
 } from "./harness-inventory.mjs";
 import { decodeHarnessSources } from "./harness-source-decoder.mjs";
+import {
+	INSTALL_DIR_RELATIVE,
+	INSTALL_INVENTORY_RELATIVE,
+} from "./install-templates.mjs";
 import { renderRootInstructions } from "./root-instructions.mjs";
 
 const CODEX_ASSEMBLY_LOCK_DIRECTORY = ".codex-assets-assembly.lock";
@@ -532,11 +536,18 @@ function stageTargetSkillTree({
 			if (record.kind === "skill") {
 				if (record.semantic.variants) {
 					writeHarnessSkill(record, "codex", output, deps);
-					for (const file of record.source.installFiles ?? [])
+					if (record.source.installFiles) {
+						deps.mkdirSync(resolve(output, "install"), { recursive: true });
 						deps.cpSync(
-							resolve(root, ".claude/skills/pfd-ops", file),
-							resolve(output, file),
+							resolve(root, INSTALL_INVENTORY_RELATIVE),
+							resolve(output, basename(INSTALL_INVENTORY_RELATIVE)),
 						);
+						for (const file of record.source.installFiles)
+							deps.cpSync(
+								resolve(root, ".claude/skills/pfd-ops", file),
+								resolve(output, file),
+							);
+					}
 					observeRecordOutputs(observed, record);
 					continue;
 				}
@@ -1375,9 +1386,8 @@ export function assemblePluginDistIndependent({
 		const trackedDeps = {
 			...deps,
 			genInstall(installRoot, ...args) {
-				actualWrites.add(
-					resolve(installRoot, ".claude/skills/pfd-ops/install"),
-				);
+				actualWrites.add(resolve(installRoot, INSTALL_DIR_RELATIVE));
+				actualWrites.add(resolve(installRoot, INSTALL_INVENTORY_RELATIVE));
 				return deps.genInstall(installRoot, ...args);
 			},
 			mkdirSync(path, ...args) {

@@ -38,6 +38,10 @@ describe("GEN_INSTALL_TRIGGER", () => {
 
 	it("matches a hand-edit to the generated install/ tree", () => {
 		assert.equal(
+			GEN_INSTALL_TRIGGER.test(".claude/skills/pfd-ops/install-files.json"),
+			true,
+		);
+		assert.equal(
 			GEN_INSTALL_TRIGGER.test(
 				".claude/skills/pfd-ops/install/scripts/pfdsl/lib/gh-compat.mjs",
 			),
