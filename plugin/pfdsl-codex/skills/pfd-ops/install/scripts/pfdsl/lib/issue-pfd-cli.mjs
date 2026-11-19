@@ -55,7 +55,7 @@ export function formatIssuePfdHelp(command) {
 		"Defaults: create, publish, publish-diagram and restore are dry runs unless --write is supplied.",
 		"pull creates local state; render and show --out write local output; resolve records abandonment.",
 		"check/render reference context is generated automatically; do not pass a context JSON.",
-		"restore requires a clean model.pfdsl; save unpublished edits before restoring.",
+		"restore requires a clean model.pfdsl after reconciliation; save unpublished edits first. Applied restore retires the directory: publish/restore require a fresh pull; model.pfdsl is preserved.",
 		"",
 		"Exit codes: 0 success/help; 1 model or operation failure; 2 invalid arguments or unavailable GitHub transport; 3 incompatible CLI environment.",
 	].join("\n");
@@ -104,6 +104,8 @@ export function parseIssuePfdArgs(args) {
 		throw new Error("restore requires --version");
 	if (command === "show" && (!values.artifact || !values.version))
 		throw new Error("show requires --artifact and --version");
+	if (values.out !== undefined && values.out.length === 0)
+		throw new Error("--out must not be empty");
 	if (command === "resolve" && !values.abandon)
 		throw new Error("resolve requires --abandon <op>");
 	if (

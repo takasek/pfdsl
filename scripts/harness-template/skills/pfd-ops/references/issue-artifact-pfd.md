@@ -212,7 +212,10 @@ HTTP 4xx など不受理が確定した場合と、GitHub 通信経路がなく�
 原稿の操作が unknown の間は新しい原稿を公開しない。
 create・publish・restore・status --dir・publish-diagram --dir・resolve で操作記録を照合し、後から見つかった操作の結果を報告する。
 render はファイルへ描画するだけで操作記録を照合しない。
-図の unknown は原稿の公開や restore を止めず、現在の図の刻印が同じ原稿版・同じ sourceBodySha256 なら applied、より新しい原稿版なら superseded として閉じる。
+図の unknown は原稿の公開や restore を止めず、送信先の図の刻印が原稿版・sourceBodySha256・modelSha256・result と一致し、rendered なら SVG 実体の hash も一致するときだけ applied として閉じる。
+送信先により新しい原稿版の図があれば superseded として閉じる。
+図の POST の応答を失い候補が複数ある場合は、status または publish-diagram の --diagram で送り先を選ぶ。
+照合だけで保存済みの公開先を別の図へ切り替えることはない。
 図がまだ無く、図の create が unknown の場合だけは重複作成を避けて新しい図を作らず、status と publish-diagram による確認を促す。
 この場合でも先に原稿が公開できていればその基底は保持する。
 自動再送と自動 merge はしない。
@@ -226,6 +229,8 @@ node scripts/pfdsl/issue-pfd.mjs resolve issue-123 --abandon <operation-uuid>
 放棄は原稿の unknown による新規公開の停止を解除する操作であり、未適用を確定する操作ではない。
 放棄した操作も記録に残し、以後の照合で成立が分かれば上書きの有無を報告する。
 create の途中失敗は同じ --dir で再実行し、sourceId と操作記録・刻印で再接続する。
+以前の create 試行が確定した失敗でない限り、新しい POST は送らない。
+放棄した create も後から成立し得るため、この制限の対象になる。
 要求済み artifact が見つからなければ再作成せず停止する。
 通信経路がなく未送信と記録された create は、認証を整えた後に同じ --dir から再実行できる。
 必要なら履歴を確認し、未公開編集と操作記録を保全して別の空ディレクトリへ pull する。
@@ -258,8 +263,10 @@ node scripts/pfdsl/issue-pfd.mjs restore issue-123 --version 2 --write
 restore は現在版を取得してその版を操作の基底とし、過去版の散文と原稿を新しい公開操作として書き、図も再生成する。
 通常の publish と同じ操作 ID と上書き検出を通り、過去の版も履歴に残る。
 現在版のフェンスが壊れて新しく pull できない場合も、既存の作業ディレクトリから過去の正常版を復旧できる。
-restore は model.pfdsl が基底のモデルと一致するときだけ実行できる。
+restore は操作記録を照合した後の基底と model.pfdsl が一致するときだけ実行できる。
 未公開の編集がある場合は書かずに停止するため、編集を別の場所へ退避してから実行する。
-成功したら model.pfdsl も復元したモデルへ揃え、直後の未編集の publish が復元を取り消さないようにする。
-処理中に追加された手元編集は保持するので、次に公開する内容を確認する。
+原稿の復元が applied になったら作業ディレクトリを retired として記録し、以降の publish と restore を拒否する。
+model.pfdsl は書き換えず、処理中に追加された手元編集も保持する。
+復元後は新しい空のディレクトリへ pull し、退避した編集を確認してから作業を続ける。
+図の公開だけが失敗した場合は publish-diagram で再生成できる。
 gh 2.103 以上の `gh issue artifact edit --restore-version` も使えるが、この入口の上書き検出の対象外であり、実行後は図を再生成して新しく pull する。

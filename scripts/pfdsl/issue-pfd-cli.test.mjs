@@ -151,6 +151,8 @@ test("guide commands match help grammar and explain context, recovery and abando
 	assert.match(guide, /diff issue-123\/base.pfdsl issue-123\/model.pfdsl/);
 	assert.match(guide, /\*\*.*要求を取り消さない.*\*\*/);
 	assert.match(guide, /現在のモデル hash が図の入力モデルと一致する/);
+	assert.match(guide, /retired.*publish.*restore.*拒否/);
+	assert.match(formatIssuePfdHelp("restore"), /retires.*fresh pull/);
 	assert.match(
 		guide,
 		/create.*publish.*restore.*status.*publish-diagram.*resolve.*照合/,
@@ -244,6 +246,19 @@ test("argument parser validates command-specific options and positive version nu
 	);
 	assert.throws(() => parseIssuePfdArgs(["status", "7", "--write"]), /--write/);
 	assert.throws(() => parseIssuePfdArgs(["render", "work"]), /--out/);
+	assert.throws(
+		() =>
+			parseIssuePfdArgs([
+				"show",
+				"7",
+				"--artifact",
+				"1",
+				"--version",
+				"1",
+				"--out=",
+			]),
+		/--out/,
+	);
 	assert.throws(() => parseIssuePfdArgs(["unknown"]), /command/);
 	assert.equal(
 		parseIssuePfdArgs(["restore", "work", "--version", "2", "--write"]).version,

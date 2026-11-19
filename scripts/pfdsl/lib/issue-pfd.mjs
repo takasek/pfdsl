@@ -1,14 +1,6 @@
 import { createHash, randomUUID } from "node:crypto";
-import {
-	existsSync,
-	mkdirSync,
-	readdirSync,
-	readFileSync,
-	renameSync,
-	rmSync,
-	writeFileSync,
-} from "node:fs";
-import { resolve } from "node:path";
+import * as nodeFs from "node:fs";
+import { dirname, resolve } from "node:path";
 import { isGitHubUnavailableError } from "./github-ops.mjs";
 
 const lf = (text) => text.replaceAll("\r\n", "\n");
@@ -160,32 +152,6 @@ export function referenceContext({ state, version, dir, model }) {
 }
 const sourceUrl = (state) =>
 	`https://${state.host}/${state.owner}/${state.repo}/issues/${state.issue}/artifacts/${state.artifact}`;
-function ensureEmpty(dir, locked = false) {
-	if (
-		existsSync(dir) &&
-		readdirSync(dir).some((name) => !locked || name !== ".issue-pfd.lock")
-	)
-		throw new Error(`pull/create requires an empty directory: ${dir}`);
-}
-function saveState(dir, state) {
-	const temp = resolve(dir, `.issue-pfd-${randomUUID()}.tmp`);
-	try {
-		writeFileSync(temp, `${JSON.stringify(state, null, 2)}\n`, { flag: "wx" });
-		renameSync(temp, resolve(dir, "issue-pfd.json"));
-	} finally {
-		rmSync(temp, { force: true });
-	}
-}
-function readState(dir) {
-	const state = JSON.parse(
-		readFileSync(resolve(dir, "issue-pfd.json"), "utf8"),
-	);
-	if (state.schema !== 2)
-		throw new Error(
-			"Unsupported issue-pfd state schema; preserve local edits and pull into a new directory",
-		);
-	return state;
-}
 function selectedVersion(record, version) {
 	const versions = [...record.versions].sort((a, b) => b.version - a.version);
 	const result =
@@ -211,40 +177,78 @@ function setBase(state, version) {
 		suffix: parsed.suffix,
 	});
 }
-async function withLock(dir, command, action) {
-	const path = resolve(dir, ".issue-pfd.lock");
-	try {
-		writeFileSync(
-			path,
-			JSON.stringify({
-				pid: process.pid,
-				command,
-				startedAt: new Date().toISOString(),
-			}),
-			{ flag: "wx" },
-		);
-	} catch (error) {
-		if (error.code !== "EEXIST") throw error;
-		throw new Error(
-			`Directory lock is held: ${path}; owner: ${readFileSync(path, "utf8")}`,
-		);
-	}
-	try {
-		return await action();
-	} finally {
-		rmSync(path);
-	}
-}
-
 /** GitHub and CLI are injected. Directory state is the only local authority. */
 export function createIssuePfd({
 	github,
+	fs = nodeFs,
 	repository,
 	cli,
 	root = process.cwd(),
 	uuid = randomUUID,
 	now = () => new Date().toISOString(),
 }) {
+	const {
+		existsSync,
+		mkdirSync,
+		readdirSync,
+		readFileSync,
+		renameSync,
+		rmSync,
+		writeFileSync,
+	} = fs;
+	function ensureEmpty(dir, locked = false) {
+		if (
+			existsSync(dir) &&
+			readdirSync(dir).some((name) => !locked || name !== ".issue-pfd.lock")
+		)
+			throw new Error(`pull/create requires an empty directory: ${dir}`);
+	}
+	function saveState(dir, state) {
+		const temp = resolve(dir, `.issue-pfd-${uuid()}.tmp`);
+		try {
+			writeFileSync(temp, `${JSON.stringify(state, null, 2)}\n`, {
+				flag: "wx",
+			});
+			renameSync(temp, resolve(dir, "issue-pfd.json"));
+		} finally {
+			rmSync(temp, { force: true });
+		}
+	}
+	function readState(dir) {
+		const state = JSON.parse(
+			readFileSync(resolve(dir, "issue-pfd.json"), "utf8"),
+		);
+		if (state.schema !== 2)
+			throw new Error(
+				"Unsupported issue-pfd state schema; preserve local edits and pull into a new directory",
+			);
+		return state;
+	}
+	async function withLock(dir, command, action) {
+		const path = resolve(dir, ".issue-pfd.lock");
+		try {
+			writeFileSync(
+				path,
+				JSON.stringify({
+					pid: process.pid,
+					command,
+					startedAt: new Date().toISOString(),
+				}),
+				{ flag: "wx" },
+			);
+		} catch (error) {
+			if (error.code !== "EEXIST") throw error;
+			throw new Error(
+				`Directory lock is held: ${path}; owner: ${readFileSync(path, "utf8")}`,
+			);
+		}
+		try {
+			return await action();
+		} finally {
+			rmSync(path);
+		}
+	}
+
 	const get = (issue, artifact) => github.getArtifact({ issue, artifact });
 	function assertRepository(state) {
 		const actual = repository();
@@ -355,6 +359,8 @@ export function createIssuePfd({
 	function compactOperation(op) {
 		if (
 			op.body === undefined ||
+			!Number.isSafeInteger(op.artifact) ||
+			!Number.isSafeInteger(op.version) ||
 			!["applied", "superseded", "overwrote"].includes(op.status)
 		)
 			return false;
@@ -369,10 +375,9 @@ export function createIssuePfd({
 		}
 		return changed;
 	}
-	async function reconcile(dir, state) {
+	async function reconcile(dir, state, diagram) {
 		let changed = false;
 		let baseChanged = false;
-		let modelReplacement;
 		const update = (object, key, value) => {
 			if (object[key] !== value) {
 				object[key] = value;
@@ -390,19 +395,36 @@ export function createIssuePfd({
 			try {
 				if (op.stage === "diagram") {
 					const target = readStamp(op.body);
-					const found = (
-						await diagrams(state.issue, state.sourceId, state.artifact)
-					).filter(
-						(x) =>
-							op.artifact === undefined ||
-							x.record.artifact.number === op.artifact,
-					);
+					let found;
+					if (op.artifact !== undefined) {
+						const record = await get(state.issue, op.artifact);
+						const stamp = readStamp(selectedVersion(record).body);
+						found =
+							stamp?.sourceId === state.sourceId &&
+							stamp.sourceArtifact === state.artifact
+								? [{ record, stamp }]
+								: [];
+					} else {
+						found = await diagrams(state.issue, state.sourceId, state.artifact);
+						if (diagram !== undefined)
+							found = found.filter((x) => x.record.artifact.number === diagram);
+						if (found.length > 1)
+							throw new Error(
+								"Multiple diagram candidates; select --diagram to identify the POST destination",
+							);
+					}
 					const match = found
 						.filter(
 							(x) =>
 								target &&
 								((x.stamp.sourceVersion === target.sourceVersion &&
-									x.stamp.sourceBodySha256 === target.sourceBodySha256) ||
+									x.stamp.sourceBodySha256 === target.sourceBodySha256 &&
+									x.stamp.modelSha256 === target.modelSha256 &&
+									x.stamp.result === target.result &&
+									(target.result !== "rendered" ||
+										(svgElement(selectedVersion(x.record).body) !== null &&
+											sha256(svgElement(selectedVersion(x.record).body)) ===
+												x.stamp.svgSha256))) ||
 									x.stamp.sourceVersion > target.sourceVersion),
 						)
 						.sort((a, b) => b.stamp.sourceVersion - a.stamp.sourceVersion)[0];
@@ -418,15 +440,14 @@ export function createIssuePfd({
 						update(op, "version", selectedVersion(match.record).version);
 						update(
 							op,
-							"bodySha256",
+							"observedBodySha256",
 							sha256(selectedVersion(match.record).body),
 						);
-						update(state, "diagram", match.record.artifact.number);
 					} else update(op, "status", "unknown");
 				} else {
 					let record;
-					if (state.artifact !== null)
-						record = await get(state.issue, state.artifact);
+					if (op.artifact !== undefined || state.artifact !== null)
+						record = await get(state.issue, op.artifact ?? state.artifact);
 					else {
 						const found = (await sources(state.issue)).filter(
 							(x) => sourceIdentity(x) === state.sourceId,
@@ -463,17 +484,7 @@ export function createIssuePfd({
 						} else {
 							update(op, "status", "applied");
 							if ((state.base?.version ?? 0) <= op.baseVersion) {
-								if (op.kind === "restore" && state.base) {
-									const current = readFileSync(
-										resolve(dir, "model.pfdsl"),
-										"utf8",
-									);
-									if (lf(current) === parseSource(state.base.body).model)
-										modelReplacement = {
-											before: current,
-											after: parseSource(op.body).model,
-										};
-								}
+								if (op.kind === "restore") update(state, "retired", true);
 								setBase(state, { ...version, body: op.body });
 								baseChanged = true;
 								changed = true;
@@ -484,7 +495,11 @@ export function createIssuePfd({
 			} catch (error) {
 				update(op, "status", "unknown");
 				if (changed) persist(dir, state, baseChanged);
-				if (op.stage !== "diagram") throw error;
+				if (
+					op.stage !== "diagram" ||
+					/Multiple diagram candidates/.test(error.message)
+				)
+					throw error;
 			}
 			changed = compactOperation(op) || changed;
 			reports.push({
@@ -497,12 +512,6 @@ export function createIssuePfd({
 			});
 		}
 		if (changed) persist(dir, state, baseChanged);
-		if (
-			modelReplacement &&
-			readFileSync(resolve(dir, "model.pfdsl"), "utf8") ===
-				modelReplacement.before
-		)
-			writeFileSync(resolve(dir, "model.pfdsl"), modelReplacement.after);
 		return reports;
 	}
 	function requireResolved(state, reports) {
@@ -523,6 +532,8 @@ export function createIssuePfd({
 			);
 	}
 	async function sendSource(dir, state, op, create = false) {
+		op.bodySha256 = sha256(op.body);
+		if (!create) op.artifact = state.artifact;
 		state.operations.push(op);
 		persist(dir, state);
 		try {
@@ -666,6 +677,8 @@ export function createIssuePfd({
 				status: "sent",
 				baseVersion: selected.version.version,
 				body: generated.body,
+				bodySha256: sha256(generated.body),
+				...(existing ? { artifact: existing.record.artifact.number } : {}),
 			};
 			state.operations.push(op);
 			persist(dir, state);
@@ -704,7 +717,7 @@ export function createIssuePfd({
 				);
 			if (op) {
 				op.version = readbackVersion.version;
-				op.bodySha256 = sha256(readback);
+				op.observedBodySha256 = sha256(readback);
 			}
 		} catch (error) {
 			if (op) {
@@ -730,15 +743,9 @@ export function createIssuePfd({
 	async function publish(opts) {
 		const state = readState(opts.dir);
 		assertRepository(state);
-		if (
-			opts.command === "restore" &&
-			lf(readFileSync(resolve(opts.dir, "model.pfdsl"), "utf8")) !==
-				parseSource(state.base.body).model
-		)
-			throw new Error(
-				"Save unpublished edits outside this working directory before restore; model.pfdsl must match its base model. Nothing was published.",
-			);
-		if (opts.write) requireResolved(state, await reconcile(opts.dir, state));
+
+		if (opts.write)
+			requireResolved(state, await reconcile(opts.dir, state, opts.diagram));
 		else if (
 			state.operations.some(
 				(op) =>
@@ -748,6 +755,18 @@ export function createIssuePfd({
 			)
 		)
 			return { dryRun: true, operations: state.operations };
+		if (state.retired)
+			throw new Error(
+				"Working directory retired after restore; preserve local edits and pull into a new empty directory.",
+			);
+		if (
+			opts.command === "restore" &&
+			lf(readFileSync(resolve(opts.dir, "model.pfdsl"), "utf8")) !==
+				parseSource(state.base.body).model
+		)
+			throw new Error(
+				"Save unpublished edits outside this working directory before restore; model.pfdsl must match its base model. Nothing was published.",
+			);
 		const raw =
 			opts.command === "restore"
 				? selectedVersion(await get(state.issue, state.artifact), opts.version)
@@ -816,7 +835,7 @@ export function createIssuePfd({
 			if (state.issue !== opts.issue || state.operations[0]?.kind !== "create")
 				throw new Error("Directory is not a create for this issue");
 			if (!opts.write) return { dryRun: true, operations: state.operations };
-			const reports = await reconcile(opts.dir, state);
+			const reports = await reconcile(opts.dir, state, opts.diagram);
 			try {
 				requireResolved(state, reports);
 			} catch (error) {
@@ -851,7 +870,15 @@ export function createIssuePfd({
 			const failed = [...state.operations]
 				.reverse()
 				.find((op) => op.stage === "source" && op.status === "failed");
-			if (!failed)
+			if (
+				!failed ||
+				state.operations.some(
+					(op) =>
+						op.stage === "source" &&
+						op.kind === "create" &&
+						op.status !== "failed",
+				)
+			)
 				throw new Error(
 					"Create result unknown; will not recreate without a definite rejection",
 				);
@@ -873,6 +900,18 @@ export function createIssuePfd({
 				},
 				true,
 			);
+		}
+		if (state.diagram === null) {
+			const recovered = state.operations.findLast(
+				(op) =>
+					op.stage === "diagram" &&
+					op.status === "applied" &&
+					op.artifact !== undefined,
+			);
+			if (recovered) {
+				state.diagram = recovered.artifact;
+				persist(opts.dir, state);
+			}
 		}
 		if (state.diagram !== null)
 			return { artifact: state.artifact, diagram: state.diagram };
@@ -897,7 +936,7 @@ export function createIssuePfd({
 			)
 				throw new Error("State target does not match status target");
 			try {
-				reports = await reconcile(opts.dir, state);
+				reports = await reconcile(opts.dir, state, opts.diagram);
 			} catch (error) {
 				if (isGitHubUnavailableError(error)) throw error;
 				return { classification: "unavailable", diagnostic: error.message };
@@ -964,8 +1003,9 @@ export function createIssuePfd({
 		if (!stamp) classification = "missing";
 		else if (
 			stamp.result === "rendered" &&
-			sha256(svgElement(selectedVersion(diagram.record).body) ?? "") !==
-				stamp.svgSha256
+			(svgElement(selectedVersion(diagram.record).body) === null ||
+				sha256(svgElement(selectedVersion(diagram.record).body)) !==
+					stamp.svgSha256)
 		)
 			classification = "stale";
 		else if (
@@ -999,7 +1039,16 @@ export function createIssuePfd({
 				const record = await get(opts.issue, opts.artifact);
 				const version = selectedVersion(record, opts.version);
 				if (opts.out) {
-					writeFileSync(opts.out, version.body);
+					const temp = resolve(
+						dirname(resolve(opts.out)),
+						`.issue-pfd-${uuid()}.tmp`,
+					);
+					try {
+						writeFileSync(temp, version.body, { flag: "wx" });
+						renameSync(temp, opts.out);
+					} finally {
+						rmSync(temp, { force: true });
+					}
 					return {
 						artifact: opts.artifact,
 						version: version.version,
@@ -1056,7 +1105,10 @@ export function createIssuePfd({
 					context: referenceContext({ state, model, dir: opts.dir }),
 				});
 				if (result.exitCode !== 0) throw new Error(diagnostic(result));
-				if (opts.command === "render") writeFileSync(opts.out, result.stdout);
+				if (opts.command === "render") {
+					writeFileSync(opts.out, result.stdout);
+					return { out: opts.out };
+				}
 				return { output: result.stdout };
 			}
 			case "publish-diagram": {
@@ -1070,7 +1122,10 @@ export function createIssuePfd({
 					)
 						throw new Error("State target does not match diagram target");
 					if (opts.write)
-						requireResolved(state, await reconcile(opts.dir, state));
+						requireResolved(
+							state,
+							await reconcile(opts.dir, state, opts.diagram),
+						);
 					opts = { ...opts, artifact: state.artifact };
 				}
 				return publishDiagram(
@@ -1119,7 +1174,6 @@ export function createIssuePfd({
 			opts.dir && existsSync(resolve(opts.dir, "issue-pfd.json"));
 		const needsLock =
 			opts.write ||
-			(opts.command === "show" && opts.out) ||
 			["pull", "resolve", "render"].includes(opts.command) ||
 			(opts.command === "status" && stateDir);
 		const execute = async () => {

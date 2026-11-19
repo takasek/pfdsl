@@ -675,13 +675,14 @@ test("restore publishes historical prose and model as a new operation based on t
 	assert.match(f.state().base.body, /Notes/);
 	assert.equal(
 		readFileSync(resolve(f.dir, "model.pfdsl"), "utf8"),
-		"a >> p -> b\n",
+		"new >> p -> b\n",
 	);
+	assert.equal(f.state().retired, true);
 	const sourceWrites = f.calls.filter(
 		(x) => x[0] === "PATCH" && x[1] === 1,
 	).length;
 	const callsBeforePublish = structuredClone(f.calls);
-	await f.run("publish", { write: true });
+	await assert.rejects(f.run("publish", { write: true }), /retired.*pull/i);
 	assert.deepEqual(f.calls, callsBeforePublish);
 	assert.equal(
 		f.calls.filter((x) => x[0] === "PATCH" && x[1] === 1).length,
@@ -811,7 +812,10 @@ test("diagram PATCH absent from history does not block a new source and becomes 
 	);
 	const closed = f.state().operations.find((op) => op.id === unknown.id);
 	assert.equal(closed.body, undefined);
-	assert.match(closed.bodySha256, /^[0-9a-f]{64}$/);
+	assert.equal(
+		closed.bodySha256,
+		createHash("sha256").update(unknown.body).digest("hex"),
+	);
 	assert.ok(closed.artifact);
 	assert.ok(closed.version);
 });
@@ -948,7 +952,16 @@ test("terminal operations discard bodies while unresolved and overwritten source
 	await f.run("publish", { write: true });
 	for (const op of f.state().operations) {
 		assert.equal(op.body, undefined);
-		assert.match(op.bodySha256, /^[0-9a-f]{64}$/);
+		assert.equal(
+			op.bodySha256,
+			createHash("sha256")
+				.update(
+					f.records
+						.get(op.artifact)
+						.versions.find((v) => v.version === op.version).body,
+				)
+				.digest("hex"),
+		);
 		assert.ok(op.artifact);
 		assert.ok(op.version);
 	}
