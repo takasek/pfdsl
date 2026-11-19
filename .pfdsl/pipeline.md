@@ -162,8 +162,8 @@ VSIXのローカル検証・アップロードと、公開済みpluginのmarketp
 
 `decode_harness_capabilities` はテンプレート・inventory・toolchainに加え、実行時のGit ignore判定素材を読む。
 repository内のignore規則だけでなくGit indexとclone固有のinfo/excludeも回答に影響するため、`.gitignore`だけの決定論的な入力とみなさない。
-`check_install_sync` は配布元の `install/` と `install-files.json` を先に検査し、一覧と実体が一致した版だけを採用先との比較に使う。
-続いて配置済みファイルと同梱canonical、採用先の設定スナップショットにある `appliedMigration` と実行中pluginのidentityを比較する。
+採用リポでは、`check_install_sync` がまず設定の `appliedMigration` と実行中のプラグインの版・bundle hash を照合する。
+GitHub Issues を有効にしている場合は、配置済みファイルとの比較や再配置の書き込みに先立ち、配布元の `install/` と版別目録 `install-files.json` のファイル一覧が一致することを確認する。
 上流mainとの差は取得・通知しない。
 旧呼出しとの互換で `--upstream` を付けても追加の処理は無い（ADR-0043）。
 
