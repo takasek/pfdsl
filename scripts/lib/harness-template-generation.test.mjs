@@ -209,6 +209,68 @@ it("rebuilds missing Claude outputs from canonical templates and stays byte-stab
 	}
 });
 
+it("omits upstream checker annotations from harness Markdown in both plugin variants", () => {
+	const root = fixture();
+	try {
+		const inputs = [
+			"scripts/harness-template/skills/pfd-ops/SKILL.md",
+			"scripts/harness-template/skills/pfd-ops/references/architecture.md",
+			"scripts/harness-template/commands/pfd-cycle.md",
+			"scripts/harness-template/agents/pfd-lens.md",
+		];
+		for (const input of inputs) {
+			const path = join(root, input);
+			writeFileSync(
+				path,
+				readFileSync(path, "utf8") +
+					"\nLiteral §8<!-- spec-ref-literal: harness fixture -->。\n<!-- ordinary -->\n", // spec-ref-literal: annotation removal fixture
+			);
+		}
+		const payload = "scripts/plugin-version-check.mjs";
+		const payloadSource = join(
+			root,
+			"scripts/harness-template/skills/pfd-ops",
+			payload,
+		);
+		const payloadComment =
+			"// <!-- spec-ref-literal: JavaScript payload fixture -->\n";
+		writeFileSync(
+			payloadSource,
+			readFileSync(payloadSource, "utf8") + payloadComment,
+		);
+		generate(root);
+		for (const output of [
+			"plugin/pfdsl/skills/pfd-ops/SKILL.md",
+			"plugin/pfdsl/skills/pfd-ops/references/architecture.md",
+			"plugin/pfdsl/commands/pfd-cycle.md",
+			"plugin/pfdsl/agents/pfd-lens.md",
+			"plugin/pfdsl-codex/skills/pfd-ops/SKILL.md",
+			"plugin/pfdsl-codex/skills/pfd-ops/references/architecture.md",
+			"plugin/pfdsl-codex/skills/pfd-cycle/SKILL.md",
+			".codex/agents/pfd-lens.toml",
+		]) {
+			const text = readFileSync(join(root, output), "utf8");
+			assert.doesNotMatch(text, /<!--\s*spec-ref-literal:/, output);
+			assert.ok(text.includes("Literal §8。"), output); // spec-ref-literal: literal example must remain
+			assert.ok(text.includes("<!-- ordinary -->"), output);
+		}
+		for (const input of inputs)
+			assert.match(
+				readFileSync(join(root, input), "utf8"),
+				/<!-- spec-ref-literal:/,
+			);
+		for (const plugin of ["pfdsl", "pfdsl-codex"])
+			assert.ok(
+				readFileSync(
+					join(root, `plugin/${plugin}/skills/pfd-ops/${payload}`),
+					"utf8",
+				).includes(payloadComment),
+			);
+	} finally {
+		rmSync(root, { recursive: true, force: true });
+	}
+});
+
 it("rejects canonical closure and omitted-branch tag errors, while leaving literal payload examples intact", () => {
 	const root = fixture();
 	try {

@@ -8,6 +8,7 @@ import {
 	SOURCE_EXCLUSIONS,
 } from "./harness-inventory.mjs";
 import { renderHarnessTemplate } from "./harness-template.mjs";
+import { stripSpecReferenceAnnotations } from "./skill-header.mjs";
 
 const CLAUDE_ROOT_FILES = new Set(["settings.json"]);
 const CLAUDE_ROOT_DIRECTORIES = new Set(["agents", "commands", "skills"]);
@@ -510,15 +511,14 @@ function readAndValidateDeclaredSources(root, contract, fs) {
 					const contents = Object.fromEntries(
 						source.files.map((file) => {
 							const text = fs.readFileSync(resolve(path, file), "utf-8");
+							const rendered = source.templates.includes(file)
+								? renderHarnessTemplate(text, target, `${source.path}/${file}`)
+								: text;
 							return [
 								file,
-								source.templates.includes(file)
-									? renderHarnessTemplate(
-											text,
-											target,
-											`${source.path}/${file}`,
-										)
-									: text,
+								file.endsWith(".md")
+									? stripSpecReferenceAnnotations(rendered)
+									: rendered,
 							];
 						}),
 					);
@@ -530,10 +530,12 @@ function readAndValidateDeclaredSources(root, contract, fs) {
 					validateSkill(path, parsed.frontmatter);
 					variants[target] = { ...parsed, contents };
 				} else {
-					const markdown = renderHarnessTemplate(
-						fs.readFileSync(path, "utf-8"),
-						target,
-						source.path,
+					const markdown = stripSpecReferenceAnnotations(
+						renderHarnessTemplate(
+							fs.readFileSync(path, "utf-8"),
+							target,
+							source.path,
+						),
 					);
 					const parsed = parseFrontmatter(path, source.encoding, markdown);
 					if (capability.kind === "command")

@@ -59,6 +59,31 @@ afterEach(() => {
 });
 
 describe("writeSkillRefs", () => {
+	it("omits upstream checker annotations from copied references without changing sources", () => {
+		for (const name of ["spec/spec", "review-perspectives", "quality-guide"]) {
+			const path = join(fixtureRoot, `docs/${name}.md`);
+			writeFileSync(
+				path,
+				readFileSync(path, "utf8") +
+					"Literal §8<!-- spec-ref-literal: reference fixture -->。\n<!-- ordinary -->\n", // spec-ref-literal: annotation removal fixture
+			);
+		}
+		writeSkillRefs(fixtureRoot, outDir);
+		for (const name of ["spec", "review-perspectives", "quality-guide"]) {
+			const content = readFileSync(
+				join(outDir, `references/${name}.md`),
+				"utf8",
+			);
+			assert.doesNotMatch(content, /<!--\s*spec-ref-literal:/);
+			assert.match(content, /Literal §8。\n<!-- ordinary -->/); // spec-ref-literal: literal example must remain
+			const source = join(
+				fixtureRoot,
+				`docs/${name === "spec" ? "spec/spec" : name}.md`,
+			);
+			assert.match(readFileSync(source, "utf8"), /<!-- spec-ref-literal:/);
+		}
+	});
+
 	it("returns the spec version extracted from docs/spec/spec.md", () => {
 		const specVersion = writeSkillRefs(fixtureRoot, outDir);
 		assert.equal(specVersion, "v9.9.9");
