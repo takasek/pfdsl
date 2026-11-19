@@ -2,10 +2,12 @@ import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import {
 	existsSync,
+	linkSync,
 	mkdtempSync,
 	readdirSync,
 	readFileSync,
 	rmSync,
+	statSync,
 	writeFileSync,
 } from "node:fs";
 import { resolve } from "node:path";
@@ -157,6 +159,35 @@ test("hash uses UTF-8 model lines including LF and normalizes CRLF", () => {
 		/exactly one/,
 	);
 });
+
+test("base repair replaces its inode and preserves a hardlinked unpublished model", async (t) => {
+	const f = fixture(t);
+	await f.run("pull");
+	const model = resolve(f.dir, "model.pfdsl"),
+		base = resolve(f.dir, "base.pfdsl");
+	rmSync(base);
+	linkSync(model, base);
+	f.edit("draft >> p -> b\n");
+	assert.equal(statSync(model).ino, statSync(base).ino);
+	await f.run("status");
+	assert.equal(readFileSync(model, "utf8"), "draft >> p -> b\n");
+	assert.equal(readFileSync(base, "utf8"), "a >> p -> b\n");
+	assert.notEqual(statSync(model).ino, statSync(base).ino);
+});
+
+for (const name of ["model.pfdsl", "base.pfdsl", "issue-pfd.json"]) {
+	test(`pull never replaces ${name} created while awaiting GitHub`, async (t) => {
+		const f = fixture(t);
+		const path = resolve(f.dir, name),
+			text = "editor-owned bytes\n";
+		f.onGet(() => {
+			f.onGet(undefined);
+			writeFileSync(path, text, { flag: "wx" });
+		});
+		await assert.rejects(f.run("pull"));
+		assert.equal(readFileSync(path, "utf8"), text);
+	});
+}
 
 test("pull refuses nonempty directories and selects --version", async (t) => {
 	const f = fixture(t);

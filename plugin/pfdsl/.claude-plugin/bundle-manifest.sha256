@@ -48,7 +48,7 @@ bd56665f0aa2b4dea012fcbc71beda3cbc68afa19d9433a85945f54c64a5f1b0  skills/pfd-ops
 
 5e9bddea1e223cd8e48a5c6350c647b7cecbb10419341583bc153d515045dd68  skills/pfd-ops/install/scripts/pfdsl/lib/issue-pfd-cli.mjs
 
-abda264cb9e734be8960afe0379d5417ad9ea2b603b17c5d38aa0973ccd40402  skills/pfd-ops/install/scripts/pfdsl/lib/issue-pfd.mjs
+867ae880b0ca8b8e79e962e4f4be2f29bdadde68b5e2d0c515f49e997080af5f  skills/pfd-ops/install/scripts/pfdsl/lib/issue-pfd.mjs
 
 f4cec2445f10cde6e900c6f46dd192048d5a794b8f36e7aeeca5f925a17bfa33  skills/pfd-ops/install/scripts/pfdsl/lib/issues-flow-audit.mjs
 
@@ -68,7 +68,7 @@ eef482bd28f051b3e2429f0ddb39fd2736a386383610f4a0fa054d4ab7f6ce6b  skills/pfd-ops
 
 462063bdbefe8e3036f94925dbb3083b00151249b1a20f1ff590b36b6317ab72  skills/pfd-ops/references/github-issues-backend.md
 
-5d7d6f8a129b7c528db3ea0968b7e0bf948e6eab740bd2aee8929e38ee5d9e9b  skills/pfd-ops/references/issue-artifact-pfd.md
+2986f861b88f20fd869a6bf25c567980b0b561be33773ffd12bc0b1f4246dd97  skills/pfd-ops/references/issue-artifact-pfd.md
 
 228d188162d8c94214b0cef02400f68da2aa0f213e6ed319a0dd79ea74c9d095  skills/pfd-ops/references/scaffold/bindings/pfd-knowledge-audit.md
 

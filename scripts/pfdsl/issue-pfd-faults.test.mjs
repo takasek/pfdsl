@@ -9,19 +9,33 @@ const hash = (s) => createHash("sha256").update(s).digest("hex");
 const id = (n) => `00000000-0000-4000-8000-${String(n).padStart(12, "0")}`;
 const body = (model = "a >> p -> b\n") =>
 	`<!-- pfdsl:issue-pfd source id=${id(1)} op=${id(2)} base=0 -->\n\n\`\`\`pfdsl\n${model}\`\`\`\n`;
-const visibleSvg = (html) =>
-	html
+const visibleSvg = (html) => {
+	const visible = html
 		?.replace(/<!--[\s\S]*?(?:-->|$)/g, "")
-		.match(/<svg\b[^>]*\/>|<svg\b[\s\S]*?<\/svg\s*>/)?.[0] ?? null;
+		.replace(
+			/<(template|script|style|textarea|title|xmp|iframe|noembed|noframes|noscript)\b[^>]*>[\s\S]*?<\/\1\s*>/gi,
+			"",
+		);
+	const matches = [
+		...(visible?.matchAll(/<svg\b[^>]*\/>|<svg\b[\s\S]*?<\/svg\s*>/g) ?? []),
+	];
+	return matches.length === 1 ? matches[0][0] : null;
+};
 
 function memoryFs() {
 	const files = new Map();
 	const modes = new Map();
 	const dirs = new Set(["/", "/fault"]);
 	const writes = [];
+	const aliases = new Map();
+	function detach(path) {
+		aliases.get(path)?.delete(path);
+		aliases.delete(path);
+	}
 	let fault,
 		faultHits = 0,
 		crashed = false;
+	let mutationObserver;
 	function mutate(name, args, apply) {
 		const event = {
 			name,
@@ -31,6 +45,7 @@ function memoryFs() {
 		};
 		writes.push(event);
 		if (crashed) throw new Error("process interrupted");
+		mutationObserver?.(event);
 		const hit = fault?.(event, writes.length);
 		if (hit === "before" || hit === "crash") faultHits++;
 		if (hit === "before") throw new Error("local write failed");
@@ -42,6 +57,21 @@ function memoryFs() {
 		return result;
 	}
 	const fs = {
+		linkSync(...args) {
+			return mutate("link", args, () => {
+				const from = resolve(args[0]),
+					to = resolve(args[1]);
+				if (files.has(to))
+					throw Object.assign(new Error("exists"), { code: "EEXIST" });
+				const text = fs.readFileSync(from),
+					group = aliases.get(from) ?? new Set([from]);
+				group.add(to);
+				aliases.set(from, group);
+				aliases.set(to, group);
+				files.set(to, text);
+				modes.set(to, modes.get(from) ?? 0o644);
+			});
+		},
 		statSync(p) {
 			if (!files.has(resolve(p)))
 				throw Object.assign(new Error("ENOENT"), { code: "ENOENT" });
@@ -75,20 +105,30 @@ function memoryFs() {
 				const p = resolve(args[0]);
 				if (args[2]?.flag === "wx" && files.has(p))
 					throw Object.assign(new Error("exists"), { code: "EEXIST" });
-				files.set(p, String(args[1]));
+				for (const target of aliases.get(p) ?? [p])
+					files.set(target, String(args[1]));
 				if (!modes.has(p)) modes.set(p, (args[2]?.mode ?? 0o666) & ~0o022);
 			});
 		},
 		renameSync(...args) {
 			return mutate("rename", args, () => {
+				detach(resolve(args[1]));
 				files.set(resolve(args[1]), fs.readFileSync(args[0]));
 				modes.set(resolve(args[1]), modes.get(resolve(args[0])) ?? 0o644);
 				files.delete(resolve(args[0]));
+				const group = aliases.get(resolve(args[0]));
+				if (group) {
+					group.delete(resolve(args[0]));
+					group.add(resolve(args[1]));
+					aliases.set(resolve(args[1]), group);
+					aliases.delete(resolve(args[0]));
+				}
 				modes.delete(resolve(args[0]));
 			});
 		},
 		rmSync(...args) {
 			return mutate("rm", args, () => {
+				detach(resolve(args[0]));
 				files.delete(resolve(args[0]));
 				modes.delete(resolve(args[0]));
 			});
@@ -99,6 +139,10 @@ function memoryFs() {
 		files,
 		modes,
 		writes,
+		aliases,
+		observeMutation(fn) {
+			mutationObserver = fn;
+		},
 		get faultHits() {
 			return faultHits;
 		},
@@ -127,7 +171,8 @@ function fixture() {
 		intents = new Map(),
 		expectedDefaults = new Map();
 	const stateCache = new Map();
-	let active;
+	const protectedFiles = new Map();
+	let active, observer;
 	const records = new Map([
 		[
 			1,
@@ -152,6 +197,19 @@ function fixture() {
 			});
 	}
 	async function call(method, args, action) {
+		if (method === "POST" && args.type === "generic") {
+			const sourceId = args.body.match(/source id=([a-f0-9-]+)/)?.[1];
+			assert.ok(
+				![...records.values()].some(
+					(record) =>
+						record.artifact.type === "generic" &&
+						record.versions.some((version) =>
+							version.body.includes(`source id=${sourceId} `),
+						),
+				),
+				"I16 source POST cannot duplicate an existing sourceId after backup recovery",
+			);
+		}
 		if (active) {
 			assertBase(f, active.work);
 			if (
@@ -178,6 +236,7 @@ function fixture() {
 		tick++;
 		const entry = { method, ...args, tick, invocation: active };
 		calls.push(entry);
+		observer?.(entry);
 		let mode = rule?.(entry);
 		if (unavailableRead && method === "GET") {
 			unavailableRead = false;
@@ -273,6 +332,26 @@ function fixture() {
 		records,
 		calls,
 		invocations,
+		protectedFiles,
+		observe(fn) {
+			observer = fn;
+		},
+		protect(path, text) {
+			local.files.set(path, text);
+			protectedFiles.set(path, text);
+		},
+		backup() {
+			return { files: new Map(local.files), modes: new Map(local.modes) };
+		},
+		restoreBackup(snapshot) {
+			local.files.clear();
+			local.modes.clear();
+			local.aliases.clear();
+			expectedDefaults.clear();
+			stateCache.clear();
+			for (const [p, value] of snapshot.files) local.files.set(p, value);
+			for (const [p, value] of snapshot.modes) local.modes.set(p, value);
+		},
 		origins,
 		intents,
 		expectedDefaults,
@@ -355,6 +434,12 @@ function fixture() {
 				throw error;
 			} finally {
 				active = undefined;
+				for (const [path, text] of protectedFiles)
+					assert.equal(
+						local.files.get(path),
+						text,
+						"I14 commands never replace or delete user-owned files or linked draft bytes",
+					);
 				if (local.files.has(`/fault/${work}/issue-pfd.json`)) {
 					const state = f.viewState(work);
 					for (const op of state.operations)
@@ -424,7 +509,8 @@ function fixture() {
 						const stamp = api.readStamp(html);
 						if (stamp?.result === "rendered")
 							assert.ok(
-								visibleSvg(html) !== null,
+								visibleSvg(html) !== null &&
+									hash(visibleSvg(html)) === stamp.svgSha256,
 								"I12 applied diagram requires an SVG outside HTML comments",
 							);
 					}
@@ -436,13 +522,20 @@ function fixture() {
 							(c) => c.method === "GET" && c.artifact === result.diagram,
 						)?.response?.versions[0].body;
 					assert.ok(
-						visibleSvg(html) !== null,
+						visibleSvg(html) !== null &&
+							hash(visibleSvg(html)) === api.readStamp(html).svgSha256,
 						"I12 current requires an SVG outside HTML comments",
 					);
 				}
 				if (result?.skipped === "current diagram")
 					assert.ok(
-						visibleSvg(records.get(result.diagram)?.versions[0].body) !== null,
+						visibleSvg(records.get(result.diagram)?.versions[0].body) !==
+							null &&
+							hash(
+								visibleSvg(records.get(result.diagram)?.versions[0].body),
+							) ===
+								api.readStamp(records.get(result.diagram)?.versions[0].body)
+									.svgSha256,
 						"I12 reused diagram requires an SVG outside HTML comments",
 					);
 				if (options.command === "show" && options.out) {
@@ -832,16 +925,107 @@ const entries = [
 	"ambiguous-diagram",
 	"diagram-switch",
 	"comment-repair",
+	"template-repair",
+	"script-repair",
+	"duplicate-svg-repair",
+	"backup-create",
+	"linked-base",
+	"pull-model-race",
+	"pull-base-race",
+	"pull-state-race",
+	"pull-model-commit-race",
+	"pull-base-commit-race",
+	"pull-state-commit-race",
 ];
 async function prepareEntry(command) {
 	const f = fixture();
 	f.files.set("/fault/input.pfdsl", "a >> p -> b\n");
+	if (command.startsWith("pull-")) {
+		let saved = false;
+		const name = command.startsWith("pull-model")
+			? "model.pfdsl"
+			: command.startsWith("pull-base")
+				? "base.pfdsl"
+				: "issue-pfd.json";
+		const save = () => {
+			if (!saved) {
+				saved = true;
+				const text =
+					name === "issue-pfd.json"
+						? JSON.stringify({
+								schema: 2,
+								host: "github.com",
+								owner: "saved",
+								repo: "work",
+								artifact: 1,
+								issue: 7,
+								sourceId: id(1),
+								operations: [],
+								base: null,
+								diagram: null,
+							})
+						: "unpublished >> p -> saved\n";
+				f.protect(`/fault/A/${name}`, text);
+			}
+		};
+		if (command.includes("commit"))
+			f.observeMutation((event) => {
+				if (event.name === "link" && event.value === `/fault/A/${name}`) save();
+			});
+		else
+			f.observe((call) => {
+				if (call.method === "GET") save();
+			});
+	}
+	if (command === "backup-create") {
+		f.rule((c) =>
+			c.method === "POST" && c.type === "generic" ? "4xx" : undefined,
+		);
+		await f.attempt("create", { file: "/fault/input.pfdsl" });
+		const backup = f.backup();
+		f.rule(undefined);
+		await f.run("create", { file: "/fault/input.pfdsl" });
+		f.restoreBackup(backup);
+	}
 	if (
-		!["create", "pull", "show", "show-private", "show-shared"].includes(command)
+		![
+			"create",
+			"pull",
+			"show",
+			"show-private",
+			"show-shared",
+			"backup-create",
+		].includes(command) &&
+		!command.startsWith("pull-")
 	) {
 		f.add(1, body("second >> p -> b\n"));
 		await f.run("pull");
 		if (command === "diagram-patch") await f.run("publish-diagram");
+		if (command === "linked-base") {
+			f.fs.rmSync("/fault/A/base.pfdsl");
+			f.fs.linkSync("/fault/A/model.pfdsl", "/fault/A/base.pfdsl");
+			f.fs.writeFileSync("/fault/A/model.pfdsl", "draft >> p -> b\n");
+			f.protect("/fault/A/model.pfdsl", "draft >> p -> b\n");
+		}
+		if (
+			["template-repair", "script-repair", "duplicate-svg-repair"].includes(
+				command,
+			)
+		) {
+			await f.run("publish-diagram");
+			const html = f.records.get(2).versions[0].body;
+			const svg = "<svg></svg>",
+				old = "<svg>old</svg>";
+			f.add(
+				2,
+				html.replace(
+					svg,
+					command === "duplicate-svg-repair"
+						? svg + old
+						: `<${command === "template-repair" ? "template" : "script"}>${svg}</${command === "template-repair" ? "template" : "script"}>${old}`,
+				),
+			);
+		}
 		if (["diagram-switch", "comment-repair"].includes(command)) {
 			await f.run("publish-diagram");
 			if (command === "diagram-switch") {
@@ -894,6 +1078,14 @@ async function prepareEntry(command) {
 		f.modes.set("/fault/output", 0o640);
 	}
 	f.opts = {
+		...(command.startsWith("pull-") ? { command: "pull" } : {}),
+		...(command === "backup-create" ? { command: "create", write: true } : {}),
+		...(command === "linked-base" ? { command: "status" } : {}),
+		...(["template-repair", "script-repair", "duplicate-svg-repair"].includes(
+			command,
+		)
+			? { command: "publish", write: true }
+			: {}),
 		...(["show-private", "show-shared"].includes(command)
 			? { command: "show" }
 			: {}),
@@ -931,6 +1123,12 @@ test("all entry GitHub boundaries: fault at every call, then recovery without re
 			const baseline = await prepareEntry(command);
 			const start = baseline.calls.length;
 			await baseline.attempt(command, baseline.opts);
+			if (command.startsWith("pull-"))
+				assert.equal(
+					baseline.protectedFiles.size,
+					1,
+					"pull race must reach the simulated editor save",
+				);
 			if (command === "diagram-patch")
 				assert.ok(
 					baseline.calls
@@ -1080,8 +1278,49 @@ test("local write product: each write seam before failure and interruption, then
 
 test("I5 current requires SVG presence and all three actual hashes", async () => {
 	const real =
-		"<svg><!-- keep SVG bytes, including </svg> in comments --><svg/></svg>";
+		"<svg><!-- keep SVG bytes, including </svg> in comments --></svg>";
 	assert.equal(api.svgElement(`<!-- <svg></svg> -->${real}`), real);
+	for (const html of [
+		"<svg/><svg/>",
+		"<svg><svg/></svg>",
+		"<template><svg/></template>",
+		"<script>const fake = '<svg/>';</script>",
+		"<textarea><svg/></textarea>",
+	])
+		assert.equal(
+			api.svgElement(html),
+			null,
+			"I15 exactly one body SVG outside non-rendered containers",
+		);
+	for (const tag of [
+		"template",
+		"script",
+		"style",
+		"textarea",
+		"title",
+		"xmp",
+		"iframe",
+		"noembed",
+		"noframes",
+		"noscript",
+	])
+		assert.equal(
+			api.svgElement(`<${tag}><svg>hidden</svg></${tag}>${real}`),
+			real,
+			"I15 ignore inert content before counting body SVGs",
+		);
+	for (const tag of ["script", "style", "textarea", "title", "xmp", "iframe"])
+		assert.equal(
+			api.svgElement(
+				`${real}<${tag}>hidden</${tag} data-x=">"><svg>extra</svg>`,
+			),
+			null,
+			"I15 raw-text end tags cannot hide an extra body SVG",
+		);
+	assert.equal(
+		api.svgElement(`<div title="<svg>attribute text</svg>"></div>${real}`),
+		real,
+	);
 	for (const field of [
 		"modelSha256",
 		"sourceBodySha256",

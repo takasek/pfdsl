@@ -99,23 +99,99 @@ const unescapeHtml = (text) =>
 		.replaceAll("&lt;", "<")
 		.replaceAll("&amp;", "&");
 export function svgElement(body) {
-	let start,
-		depth = 0;
-	for (const token of body?.matchAll(
-		/<!--[\s\S]*?(?:-->|$)|<\/?svg\b[^>]*>/g,
-	) ?? []) {
-		if (token[0].startsWith("<!--")) continue;
-		if (token[0].startsWith("</")) {
-			if (depth > 0 && --depth === 0)
-				return body.slice(start, token.index + token[0].length);
+	if (typeof body !== "string") return null;
+	const rawText = new Set([
+		"script",
+		"style",
+		"textarea",
+		"title",
+		"xmp",
+		"iframe",
+		"noembed",
+		"noframes",
+		"noscript",
+	]);
+	let cursor = 0,
+		template = 0,
+		count = 0,
+		start,
+		openSvg = false,
+		svg;
+	while (cursor < body.length) {
+		const at = body.indexOf("<", cursor);
+		if (at < 0) break;
+		const rest = body.slice(at);
+		if (rest.startsWith("<!--")) {
+			const end = /--!?>/.exec(rest.slice(4));
+			if (!end) return null;
+			cursor = at + 4 + end.index + end[0].length;
+			continue;
+		}
+		if (rest.startsWith("<![CDATA[")) {
+			const end = rest.indexOf("]]>", 9);
+			if (!openSvg || end < 0) return null;
+			cursor = at + end + 3;
+			continue;
+		}
+		if (rest.startsWith("<!") || rest.startsWith("<?")) {
+			const declaration =
+				/^(?:<!(?:[^"'<>]|"[^"]*"|'[^']*')*>|<\?xml\s+[^<>]*\?>)/i.exec(rest);
+			if (!declaration) return null;
+			cursor = at + declaration[0].length;
+			continue;
+		}
+		const token =
+			/^<\/?([a-z][\w:-]*)(?=[\s/>])(?:[^"'<>]|"[^"]*"|'[^']*')*>/i.exec(rest);
+		if (!token) return null;
+		cursor = at + token[0].length;
+		const name = token[1].toLowerCase(),
+			close = token[0].startsWith("</");
+		if (!close && rawText.has(name)) {
+			const end = new RegExp(
+				`</${name}(?=[\\s/>])(?:[^"'<>]|"[^"]*"|'[^']*')*>`,
+				"ig",
+			);
+			end.lastIndex = cursor;
+			const match = end.exec(body);
+			if (!match) return null;
+			cursor = end.lastIndex;
+			continue;
+		}
+		if (name === "template") {
+			if (openSvg) return null;
+			if (close) {
+				if (template === 0) return null;
+				template--;
+			} else template++;
+			continue;
+		}
+		if (template > 0) continue;
+		// These unsupported parsing contexts never occur in CLI-generated diagrams.
+		if (
+			[
+				"select",
+				"option",
+				"optgroup",
+				"object",
+				"math",
+				"foreignobject",
+				"plaintext",
+			].includes(name)
+		)
+			return null;
+		if (name !== "svg") continue;
+		if (close) {
+			if (!openSvg) return null;
+			svg = body.slice(start, cursor);
+			openSvg = false;
 		} else {
-			if (depth === 0) start = token.index;
-			if (token[0].endsWith("/>")) {
-				if (depth === 0) return token[0];
-			} else depth++;
+			if (++count !== 1) return null;
+			start = at;
+			if (token[0].endsWith("/>")) svg = token[0];
+			else openSvg = true;
 		}
 	}
-	return null;
+	return count === 1 && !openSvg && template === 0 ? (svg ?? null) : null;
 }
 
 export function diagramBody(stamp, output, sourceUrl = "") {
@@ -213,6 +289,7 @@ export function createIssuePfd({
 		writeFileSync,
 		statSync,
 		chmodSync,
+		linkSync,
 	} = fs;
 	function ensureEmpty(dir, locked = false) {
 		if (
@@ -221,16 +298,27 @@ export function createIssuePfd({
 		)
 			throw new Error(`pull/create requires an empty directory: ${dir}`);
 	}
-	function saveState(dir, state) {
-		const temp = resolve(dir, `.issue-pfd-${uuid()}.tmp`);
+	function saveFile(path, body, exclusive = false) {
+		const temp = resolve(dirname(path), `.issue-pfd-${uuid()}.tmp`);
+		const mode =
+			!exclusive && existsSync(path) ? statSync(path).mode & 0o7777 : 0o600;
+		let created = false;
 		try {
-			writeFileSync(temp, `${JSON.stringify(state, null, 2)}\n`, {
-				flag: "wx",
-			});
-			renameSync(temp, resolve(dir, "issue-pfd.json"));
+			writeFileSync(temp, body, { flag: "wx", mode: 0o600 });
+			created = true;
+			if (mode !== 0o600) chmodSync(temp, mode);
+			if (exclusive) linkSync(temp, path);
+			else renameSync(temp, path);
 		} finally {
-			rmSync(temp, { force: true });
+			if (created) rmSync(temp, { force: true });
 		}
+	}
+	function saveState(dir, state, exclusive = false) {
+		saveFile(
+			resolve(dir, "issue-pfd.json"),
+			`${JSON.stringify(state, null, 2)}\n`,
+			exclusive,
+		);
 	}
 	function readState(dir) {
 		const state = JSON.parse(
@@ -273,14 +361,11 @@ export function createIssuePfd({
 		if (["host", "owner", "repo"].some((key) => state[key] !== actual[key]))
 			throw new Error("Repository mismatch; refusing to write");
 	}
-	function persist(dir, state, baseChanged = false) {
+	function persist(dir, state, baseChanged = false, exclusive = false) {
 		assertRepository(state);
-		saveState(dir, state);
+		saveState(dir, state, exclusive);
 		if (baseChanged && state.base)
-			writeFileSync(
-				resolve(dir, "base.pfdsl"),
-				parseSource(state.base.body).model,
-			);
+			saveFile(resolve(dir, "base.pfdsl"), parseSource(state.base.body).model);
 	}
 	function sourceIdentity(record) {
 		for (const version of [...record.versions].sort(
@@ -547,13 +632,25 @@ export function createIssuePfd({
 			);
 	}
 	async function sendSource(dir, state, op, create = false) {
+		const initial = create && state.operations.length === 0;
 		op.bodySha256 = sha256(op.body);
 		if (!create) op.artifact = state.artifact;
 		state.operations.push(op);
-		persist(dir, state);
+		persist(dir, state, false, initial);
+		let sent = !create;
 		try {
 			assertRepository(state);
-			if (create)
+			if (create) {
+				const existing = (await sources(state.issue)).filter((record) =>
+					record.versions.some(
+						(version) => marker(version.body)?.sourceId === state.sourceId,
+					),
+				);
+				if (existing.length)
+					throw new Error(
+						`SourceId already exists in artifacts ${existing.map((record) => record.artifact.number).join(", ")}; refusing another POST. Preserve this directory and pull into a new empty directory with --artifact.`,
+					);
+				sent = true;
 				state.artifact = (
 					await github.createArtifact({
 						issue: state.issue,
@@ -562,7 +659,7 @@ export function createIssuePfd({
 						body: op.body,
 					})
 				).number;
-			else
+			} else
 				await github.updateArtifact({
 					issue: state.issue,
 					artifact: state.artifact,
@@ -570,6 +667,7 @@ export function createIssuePfd({
 				});
 		} catch (error) {
 			op.status =
+				!sent ||
 				isGitHubUnavailableError(error) ||
 				(error.httpStatus >= 400 && error.httpStatus < 500)
 					? "failed"
@@ -875,7 +973,7 @@ export function createIssuePfd({
 			const id = uuid();
 			const prefix = `<!-- pfdsl:issue-pfd source id=${state.sourceId} op=${id} base=0 -->\n\n\`\`\`pfdsl\n`;
 			const body = sourceBody(prefix, lf(opts.input), "```\n");
-			writeFileSync(resolve(opts.dir, "model.pfdsl"), opts.input);
+			saveFile(resolve(opts.dir, "model.pfdsl"), opts.input, true);
 			await sendSource(
 				opts.dir,
 				state,
@@ -1116,8 +1214,9 @@ export function createIssuePfd({
 				const diagram = await selectDiagram(state, opts.diagram);
 				state.diagram = diagram?.record.artifact.number ?? null;
 				assertRepository(state);
-				writeFileSync(resolve(opts.dir, "model.pfdsl"), parsed.model);
-				persist(opts.dir, state, true);
+				saveFile(resolve(opts.dir, "model.pfdsl"), parsed.model, true);
+				saveFile(resolve(opts.dir, "base.pfdsl"), parsed.model, true);
+				saveState(opts.dir, state, true);
 				return {
 					artifact: state.artifact,
 					sourceVersion: state.base.version,
@@ -1135,7 +1234,7 @@ export function createIssuePfd({
 				});
 				if (result.exitCode !== 0) throw new Error(diagnostic(result));
 				if (opts.command === "render") {
-					writeFileSync(opts.out, result.stdout);
+					saveFile(opts.out, result.stdout);
 					return { out: opts.out };
 				}
 				return { output: result.stdout };
@@ -1213,7 +1312,7 @@ export function createIssuePfd({
 					const path = resolve(opts.dir, "base.pfdsl");
 					const model = parseSource(state.base.body).model;
 					if (!existsSync(path) || readFileSync(path, "utf8") !== model)
-						writeFileSync(path, model);
+						saveFile(path, model);
 				}
 			}
 			const result = await dispatch(opts);

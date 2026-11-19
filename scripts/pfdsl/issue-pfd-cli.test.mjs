@@ -15,7 +15,11 @@ import {
 import { resolve } from "node:path";
 import { test } from "node:test";
 import { fileURLToPath } from "node:url";
-import { createIssuePfd, referenceContext } from "./lib/issue-pfd.mjs";
+import {
+	createIssuePfd,
+	referenceContext,
+	svgElement,
+} from "./lib/issue-pfd.mjs";
 import {
 	createIssuePfdCli,
 	formatIssuePfdHelp,
@@ -39,7 +43,7 @@ function processFixture(t) {
 	);
 	writeFileSync(
 		resolve(scripts, "lib/github-ops.mjs"),
-		`export class GitHubUnavailableError extends Error { constructor(operation) { super('GitHub operation unavailable: ' + operation); this.operation = operation; } }\nexport const isGitHubUnavailableError = error => error instanceof GitHubUnavailableError;\nexport const GITHUB_UNAVAILABLE_EXIT_CODE = 2;\nexport function createGitHubOps() { return { getArtifact: async () => { if (['raw', 'empty'].includes(process.env.PFDSL_TEST_MODE)) return { artifact: {number: 1}, versions: [{version: 1, body: process.env.PFDSL_TEST_MODE === 'empty' ? '' : 'broken\\r\\nraw\\r\\n'}] }; if (process.env.PFDSL_TEST_MODE === 'unavailable') throw new GitHubUnavailableError('getArtifact'); throw new Error('offline'); }, createArtifact: async () => { throw new GitHubUnavailableError('createArtifact'); } }; }\n`,
+		`export class GitHubUnavailableError extends Error { constructor(operation) { super('GitHub operation unavailable: ' + operation); this.operation = operation; } }\nexport const isGitHubUnavailableError = error => error instanceof GitHubUnavailableError;\nexport const GITHUB_UNAVAILABLE_EXIT_CODE = 2;\nexport function createGitHubOps() { return { listArtifacts: async () => [], getArtifact: async () => { if (['raw', 'empty'].includes(process.env.PFDSL_TEST_MODE)) return { artifact: {number: 1}, versions: [{version: 1, body: process.env.PFDSL_TEST_MODE === 'empty' ? '' : 'broken\\r\\nraw\\r\\n'}] }; if (process.env.PFDSL_TEST_MODE === 'unavailable') throw new GitHubUnavailableError('getArtifact'); throw new Error('offline'); }, createArtifact: async () => { throw new GitHubUnavailableError('createArtifact'); } }; }\n`,
 	);
 	mkdirSync(resolve(dir, ".pfdsl"));
 	writeFileSync(
@@ -353,6 +357,16 @@ test("real CLI accepts public and local contexts and rejects extends in each", a
 			});
 			assert.equal(valid.exitCode, 0, valid.stderr);
 		}
+		const rendered = await cli({
+			command: "render",
+			model,
+			context: contexts[0],
+		});
+		assert.equal(rendered.exitCode, 0, rendered.stderr);
+		assert.ok(
+			svgElement(rendered.stdout),
+			"real CLI output contains exactly one eligible SVG",
+		);
 		const fencedModel = "---\ntitle: |\n  ```\n---\na >> p -> b\n";
 		const fenced = await cli({
 			command: "check",
