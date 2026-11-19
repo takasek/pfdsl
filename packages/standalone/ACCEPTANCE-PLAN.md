@@ -529,6 +529,7 @@ PNGの64megapixel超も黙って縮小しないことを確認する。
 MのAllの保存開始後にtab切替／closeを行い、結果一覧へ元文書名・版・各形式の実保存pathまたは失敗理由が残り、明示Dismissまで読めることを確認する。
 Mで保存先移動がpublication後に検出された場合は、書込み済みだがpath未確認の説明と実diskを照合し、成功pathとして扱わない。
 Vは既存export chooserの取消、Puppeteer不在によるbinary変換失敗、読取専用PNGによる書込失敗を試し、Output channelと通知の形式別結果・実保存pathを実diskと照合する。
+VのAllでは、TSVだけが既存の宛先と、部分成功後のSVGに追記した宛先で、確認に出るファイル名を照合する。取消時は新規ファイルがなく既存の内容がバイト一致し、Replaceを選んだときだけ置換されることを確かめる。
 M専用のnative保存境界や結果panelをVへ要求しない。
 期待：成功／警告／失敗と保存fileが一致し、部分成功fileを捨てず、source/dirty/Undoを変えない。
 状態：M/V各未実施。記録：未記入。不在の故障APIを前提にしない。
