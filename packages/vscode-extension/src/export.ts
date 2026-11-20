@@ -1,3 +1,6 @@
+import { randomUUID } from "node:crypto";
+import { constants } from "node:fs";
+import { copyFile } from "node:fs/promises";
 import {
 	computeExportSources,
 	computeNormalizedEdgesOutput,
@@ -15,6 +18,63 @@ import { exportStem } from "./export-logic.js";
 import { requireActivePfdslEditor } from "./utils.js";
 
 const outputChannel = vscode.window.createOutputChannel("PFDSL");
+
+function displayPath(uri: vscode.Uri): string {
+	return uri.scheme === "file" ? uri.fsPath : uri.toString();
+}
+
+function fileNotFound(error: unknown): boolean {
+	return (
+		error instanceof Error && "code" in error && error.code === "FileNotFound"
+	);
+}
+
+async function createOutput(uri: vscode.Uri, bytes: Uint8Array): Promise<void> {
+	// Stage the bytes before creating the visible output. VS Code's writeFile
+	// has no exclusive-create flag for providers.
+	const directory = uri.path.slice(0, uri.path.lastIndexOf("/") + 1);
+	const staging = uri.with({
+		path: `${directory}.pfdsl-${randomUUID()}.tmp`,
+	});
+	let moved = false;
+	try {
+		await vscode.workspace.fs.writeFile(staging, bytes);
+		if (uri.scheme === "file" && !vscode.env.remoteName) {
+			await copyFile(staging.fsPath, uri.fsPath, constants.COPYFILE_EXCL);
+		} else {
+			await vscode.workspace.fs.rename(staging, uri, { overwrite: false });
+			moved = true;
+		}
+	} finally {
+		if (!moved) {
+			try {
+				await vscode.workspace.fs.delete(staging);
+			} catch (error) {
+				if (!fileNotFound(error)) {
+					vscode.window.showWarningMessage(
+						`Could not remove temporary export file ${displayPath(staging)}: ${error}`,
+					);
+				}
+			}
+		}
+	}
+}
+
+async function existingOutputs(
+	targets: Iterable<vscode.Uri>,
+): Promise<Set<vscode.Uri>> {
+	const existing = new Set<vscode.Uri>();
+	for (const uri of targets) {
+		try {
+			await vscode.workspace.fs.stat(uri);
+			existing.add(uri);
+		} catch (error) {
+			if (fileNotFound(error)) continue;
+			throw new Error(`Cannot inspect ${displayPath(uri)}: ${error}`);
+		}
+	}
+	return existing;
+}
 
 export function registerExport(
 	context: vscode.ExtensionContext,
@@ -59,24 +119,35 @@ export function registerExport(
 			);
 			const base = doc.uri.path.replace(/\.pfdsl$/, "");
 
-			async function writeFile(
-				path: string,
-				content: string | Uint8Array,
-			): Promise<void> {
-				await vscode.workspace.fs.writeFile(
-					vscode.Uri.file(path),
-					typeof content === "string" ? Buffer.from(content, "utf8") : content,
-				);
-			}
-
 			if (pick.description === "all") {
-				const dirUri = await vscode.window.showSaveDialog({
-					defaultUri: vscode.Uri.file(`${base}.dot`),
+				const selected = await vscode.window.showSaveDialog({
+					defaultUri: doc.uri.with({ path: `${base}.dot` }),
 					filters: { DOT: ["dot"] },
 					title: "Save base path (extensions added automatically)",
 				});
-				if (!dirUri) return;
-				const stem = exportStem(dirUri.fsPath);
+				if (!selected) return;
+				const stem = exportStem(selected.path);
+				const targets = new Map(
+					exportFormats.map(
+						(format) =>
+							[format, selected.with({ path: `${stem}.${format}` })] as const,
+					),
+				);
+				let existing: Set<vscode.Uri>;
+				try {
+					existing = await existingOutputs(targets.values());
+				} catch (error) {
+					vscode.window.showErrorMessage(String(error));
+					return;
+				}
+				if (existing.size > 0) {
+					const choice = await vscode.window.showWarningMessage(
+						"Replace the following export files?",
+						{ modal: true, detail: [...existing].map(displayPath).join("\n") },
+						"Replace",
+					);
+					if (choice !== "Replace") return;
+				}
 
 				let svg: Promise<string> | undefined;
 				const results = await runExports(
@@ -91,9 +162,13 @@ export function registerExport(
 							: svgToBinary(content, format);
 					},
 					async (format, bytes) => {
-						const path = `${stem}.${format}`;
-						await writeFile(path, bytes);
-						return path;
+						const target = targets.get(format)!;
+						if (existing.has(target)) {
+							await vscode.workspace.fs.writeFile(target, bytes);
+						} else {
+							await createOutput(target, bytes);
+						}
+						return displayPath(target);
 					},
 				);
 				const message = results
