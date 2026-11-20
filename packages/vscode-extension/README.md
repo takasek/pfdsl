@@ -9,7 +9,7 @@ VSCode language support for [PFDSL](https://github.com/takasek/pfdsl), a DSL for
 - **Hover** — metadata for artifacts and processes (label, owner, status, tags, parts)
 - **Format Document** (`pfdsl.format`) — canonical edge-list formatting
 - **Live preview** (`pfdsl.preview`) — SVG rendered via Graphviz Wasm, refreshes on edit; open with the preview icon in the editor title bar
-- **Export** (`pfdsl.export`) — save as `.dot` or `.svg`
+- **Export** (`pfdsl.export`) — save DOT, SVG, PDF, PNG, or TSV. Choose **All** to export all five formats. If files already exist, review their names and choose **Replace** to continue. Cancel to keep all files as they are.
 - **Show Normalized Edges** (`pfdsl.normalize`) — canonical edge list in the Output panel
 
 ## Usage
