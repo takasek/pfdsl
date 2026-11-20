@@ -19,7 +19,7 @@ test("desktop pull requests run the native export test on macOS as a required st
 	const build = job.steps.findIndex((step) => step.run === "pnpm -r build");
 	const nativeExport = job.steps.findIndex(
 		(step) =>
-			step.run?.trim().split("\n").at(-1) ===
+			step.run?.trim() ===
 			"node --test --test-reporter=tap packages/standalone/test/native-export.test.mjs",
 	);
 	assert.notEqual(build, -1, "the workspace packages must be built");
