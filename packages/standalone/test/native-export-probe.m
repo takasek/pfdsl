@@ -8,6 +8,7 @@ extern void pfdsl_create_pdf(const char *, double, double, void *, void (*)(void
 @property NSString *svg;
 @property NSString *pdfPath;
 @property NSString *pngPath;
+@property NSArray<NSString *> *queries;
 @property NSMutableDictionary *result;
 @property BOOL pdfDone;
 @property BOOL pngDone;
@@ -36,6 +37,11 @@ static void pdf_complete(void *context, const unsigned char *bytes, size_t lengt
   PDFDocument *document = [[PDFDocument alloc] initWithData:data];
   NSRect bounds = [[document pageAtIndex:0] boundsForBox:kPDFDisplayBoxMediaBox];
   probe.result[@"pdfPages"] = @(document.pageCount); probe.result[@"pdfWidth"] = @(bounds.size.width); probe.result[@"pdfHeight"] = @(bounds.size.height); probe.result[@"pdfText"] = document.string ?: @"";
+  NSMutableDictionary *matches = [NSMutableDictionary dictionary];
+  for (NSString *query in probe.queries) {
+   matches[query] = [[document findString:query withOptions:0] valueForKey:@"string"];
+  }
+  probe.result[@"matches"] = matches;
   NSImage *thumbnail = [[document pageAtIndex:0] thumbnailOfSize:NSMakeSize(962,722) forBox:kPDFDisplayBoxMediaBox];
   NSBitmapImageRep *bitmap = [NSBitmapImageRep imageRepWithData:thumbnail.TIFFRepresentation];
   [[bitmap representationUsingType:NSBitmapImageFileTypePNG properties:@{}] writeToFile:[probe.pdfPath stringByAppendingString:@".png"] atomically:YES];
@@ -44,13 +50,16 @@ static void pdf_complete(void *context, const unsigned char *bytes, size_t lengt
 }
 int main(int argc, const char **argv) {
  @autoreleasepool {
-  if (argc != 8) return 2;
+  if (argc < 8) return 2;
   [NSApplication sharedApplication]; [NSApp setActivationPolicy:NSApplicationActivationPolicyProhibited];
   ExportProbe *probe = [ExportProbe new]; probe.result = [NSMutableDictionary dictionary];
   probe.svg = [NSString stringWithContentsOfFile:@(argv[1]) encoding:NSUTF8StringEncoding error:nil];
   NSString *html = [NSString stringWithContentsOfFile:@(argv[2]) encoding:NSUTF8StringEncoding error:nil];
   NSString *script = [NSString stringWithContentsOfFile:@(argv[3]) encoding:NSUTF8StringEncoding error:nil];
   probe.pdfPath = @(argv[6]); probe.pngPath = @(argv[7]);
+  NSMutableArray *queries = [NSMutableArray array];
+  for (int i = 8; i < argc; ++i) [queries addObject:@(argv[i])];
+  probe.queries = queries;
   pfdsl_create_pdf(html.UTF8String, atof(argv[4]), atof(argv[5]), (__bridge void *)probe, pdf_complete);
   WKWebViewConfiguration *configuration = [WKWebViewConfiguration new]; configuration.websiteDataStore = WKWebsiteDataStore.nonPersistentDataStore;
   [configuration.userContentController addUserScript:[[WKUserScript alloc] initWithSource:script injectionTime:WKUserScriptInjectionTimeAtDocumentEnd forMainFrameOnly:YES]];

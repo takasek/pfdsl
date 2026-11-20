@@ -16,6 +16,29 @@ import { renderDotToSvg } from "@pfdsl/preview-engine";
 import { build } from "esbuild";
 import { processSnapshot } from "../src/processing.ts";
 
+const minimalPfd =
+	"---\nartifact:\n  draft: { label: 日本語の原稿 }\n  report: { label: 日本語の成果物 }\nprocess:\n  write: { label: 日報を書く }\n---\ndraft >> write -> report\n";
+const manuscripts = new Map([
+	["minimal", minimalPfd],
+	["mixed", minimalPfd.replace("日本語の原稿", "简体中文资料")],
+	["literal-radical", minimalPfd.replace("日本語の成果物", "日⽇")],
+	[
+		"han-only",
+		minimalPfd
+			.replace("日本語の原稿", "草稿")
+			.replace("日本語の成果物", "日常運用知見")
+			.replace("日報を書く", "記録"),
+	],
+]);
+const queriesByFile = new Map([
+	["minimal", ["日本語の成果物"]],
+	["mixed", ["日本語の成果物", "简体中文资料"]],
+	["literal-radical", ["日⽇"]],
+	["han-only", ["日常運用知見"]],
+	["docs/samples/pfdsl_implementation_flow.pfdsl", ["日常運用知見"]],
+	["docs/samples/05-label-cjk.pfdsl", ["紙のアンケート"]],
+]);
+
 test("product WebKit PDF and browser canvas preserve dimensions and Japanese text", {
 	skip: process.platform !== "darwin",
 	timeout: 180000,
@@ -142,6 +165,7 @@ test("product WebKit PDF and browser canvas preserve dimensions and Japanese tex
 		const files = globSync("docs/samples/*.pfdsl", { cwd: repository })
 			.sort()
 			.concat([
+				...manuscripts.keys(),
 				".pfdsl/roadmap.pfdsl",
 				".pfdsl/workflow.pfdsl",
 				".pfdsl/pipeline.pfdsl",
@@ -151,7 +175,7 @@ test("product WebKit PDF and browser canvas preserve dimensions and Japanese tex
 			await t.test(relative, async () => {
 				const path = join(repository, relative);
 				const prepared = await processSnapshot(
-					readFileSync(path, "utf8"),
+					manuscripts.get(relative) ?? readFileSync(path, "utf8"),
 					path,
 					async (file) => {
 						try {
@@ -187,6 +211,7 @@ test("product WebKit PDF and browser canvas preserve dimensions and Japanese tex
 					/^kind\tid\tlabel/,
 				);
 				const input = preparePdf(graphSvg, width, height);
+				const queries = queriesByFile.get(relative) ?? [];
 				const output = spawnSync(
 					executable,
 					[
@@ -197,6 +222,7 @@ test("product WebKit PDF and browser canvas preserve dimensions and Japanese tex
 						String(input.height),
 						pdf,
 						png,
+						...queries,
 					],
 					{ encoding: "utf8", timeout: 40000 },
 				);
@@ -209,6 +235,23 @@ test("product WebKit PDF and browser canvas preserve dimensions and Japanese tex
 				assert.equal(result.pdfPages, 1);
 				assert.equal(result.pdfWidth, Math.ceil(width * 0.75));
 				assert.equal(result.pdfHeight, Math.ceil(height * 0.75));
+				for (const query of queries) {
+					assert.ok(result.pdfText.includes(query), query);
+					assert.deepEqual(result.matches[query], [query]);
+				}
+				if (queries.length && process.env.PFDSL_MUPDF_PYTHON) {
+					const extracted = spawnSync(
+						process.env.PFDSL_MUPDF_PYTHON,
+						[
+							join(root, "test/native-export-text.py"),
+							pdf,
+							relative,
+							...queries,
+						],
+						{ encoding: "utf8" },
+					);
+					assert.equal(extracted.status, 0, extracted.stderr);
+				}
 				const header = readFileSync(png);
 				assert.equal(header.readUInt32BE(16), Math.ceil(width));
 				assert.equal(header.readUInt32BE(20), Math.ceil(height));
