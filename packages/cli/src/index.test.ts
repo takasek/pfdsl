@@ -453,6 +453,36 @@ describe("command metadata parse surface (#1050)", () => {
 });
 
 describe("check", () => {
+	it("reports FM002 at the original file coordinates in JSON and text", async () => {
+		const source = [
+			"---",
+			"title: Trial",
+			"type: workflow",
+			"artifact:",
+			"  out:",
+			"    label: draft: complete",
+			"---",
+			"a >> make -> out",
+			"",
+		].join("\r\n");
+		const json = await run(["check", "-", "--json"], withStdin(source));
+		expect(json.exitCode).toBe(1);
+		expect(JSON.parse(json.stdout).diagnostics).toEqual([
+			expect.objectContaining({
+				code: "FM002",
+				severity: "error",
+				range: {
+					start: { line: 6, column: 12, offset: source.indexOf("draft:") },
+					end: { line: 6, column: 13, offset: source.indexOf("draft:") + 1 },
+				},
+			}),
+		]);
+		const cli = await run(["check", "-", "--no-color"], withStdin(source));
+		expect(cli.exitCode).toBe(1);
+		expect(cli.stderr).toMatch(/^-:6:12: error \[FM002\]:/);
+		expect(cli.stderr).not.toContain("at line 5, column 12");
+	});
+
 	it("check --json retains nodeIds while text and exit codes stay unchanged", async () => {
 		const source = "p -> a\nq -> a\nr -> a\n";
 		const json = await run(["check", "-", "--json"], withStdin(source));

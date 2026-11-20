@@ -10,6 +10,79 @@ describe("loadFrontmatter", () => {
 		expect(result.diagnostics).toHaveLength(0);
 	});
 
+	describe.each([
+		{ name: "LF", newline: "\n" },
+		{ name: "CRLF", newline: "\r\n" },
+	])("FM002 source ranges with $name", ({ newline }) => {
+		it.each([
+			{ fields: "title: draft: complete\ntype: workflow", line: 2, column: 8 },
+			{
+				fields:
+					"title: Trial\ntype: workflow\nartifact:\n  out:\n    label: draft: complete",
+				line: 6,
+				column: 12,
+			},
+		])("locates the malformed value on line $line", ({
+			fields,
+			line,
+			column,
+		}) => {
+			const source = [
+				"---",
+				...fields.split("\n"),
+				"---",
+				"a >> make -> out",
+				"",
+			].join(newline);
+			const offset = source.indexOf("draft:");
+			const { diagnostics } = loadFrontmatter(source);
+			expect(diagnostics).toHaveLength(1);
+			expect(diagnostics[0]).toMatchObject({
+				code: "FM002",
+				severity: "error",
+				message: expect.stringContaining(
+					`\n${source.split(newline)[line - 1]}\n${" ".repeat(column - 1)}^`,
+				),
+				range: {
+					start: { line, column, offset },
+					end: { line, column: column + 1, offset: offset + 1 },
+				},
+			});
+			const fixed = source.replace("draft: complete", '"draft: complete"');
+			expect(loadFrontmatter(fixed).diagnostics).toEqual([]);
+		});
+
+		it("keeps a missing closing bracket at the end of the YAML text", () => {
+			const source = ["---", "title: [", "---", "a >> make -> out", ""].join(
+				newline,
+			);
+			const position = { line: 2, column: 9, offset: source.indexOf("[") + 1 };
+			expect(loadFrontmatter(source).diagnostics[0]).toMatchObject({
+				code: "FM002",
+				severity: "error",
+				range: { start: position, end: position },
+			});
+		});
+
+		it("marks the fallback for an unresolved alias without a parser position", () => {
+			const source = [
+				"---",
+				"title: Trial",
+				"extra: *missing",
+				"---",
+				"a >> make -> out",
+				"",
+			].join(newline);
+			const position = { line: 2, column: 1, offset: source.indexOf("title") };
+			expect(loadFrontmatter(source).diagnostics[0]).toMatchObject({
+				code: "FM002",
+				severity: "error",
+				message: expect.stringContaining("source position unavailable"),
+				range: { start: position, end: position },
+			});
+		});
+	});
+
 	// A CRLF file's last frontmatter line used to keep its \r, because the
 	// slice dropped exactly one character before the closing fence (#636). The
 	// value silently gained a \r, so a last-line `status: done` failed V007.

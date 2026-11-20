@@ -79,8 +79,14 @@ export function registerDiff(
 			const otherResult = analyze(otherContent);
 			const fatal = otherResult.diagnostics.find((d) => d.severity === "error");
 			if (fatal) {
+				const { start, end } = fatal.range;
+				// A zero-width FM002 range may be the fallback for an unknown position.
+				const location =
+					fatal.code === "FM002" && end.offset > start.offset
+						? ` at ${start.line}:${start.column}`
+						: "";
 				vscode.window.showErrorMessage(
-					`PFDSL: Parse error in comparison target: ${fatal.message}`,
+					`PFDSL: Parse error in comparison target${location}: ${fatal.message}`,
 				);
 				return;
 			}

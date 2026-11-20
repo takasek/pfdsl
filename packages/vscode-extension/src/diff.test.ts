@@ -65,6 +65,45 @@ beforeEach(() => {
 
 describe("registered diff command", () => {
 	it.each([
+		{
+			comparison: source("todo", "draft: complete").replaceAll("\n", "\r\n"),
+			notification: "comparison target at 8:12: Invalid YAML",
+		},
+		{
+			comparison: "---\ntitle: Trial\nextra: *missing\n---\na >> make -> out\n",
+			notification:
+				"comparison target: Invalid YAML in front matter: Unresolved alias (the anchor must be set before the alias): missing (source position unavailable)",
+		},
+	])("reports FM002 for a comparison target with $notification", async ({
+		comparison,
+		notification,
+	}) => {
+		host.window.activeTextEditor = {
+			document: {
+				uri: { fsPath: "/repo/main.pfdsl" },
+				languageId: "pfdsl",
+			},
+		} as vscode.TextEditor;
+		host.window.showQuickPick.mockResolvedValue({ id: "git" });
+		host.window.showInputBox.mockResolvedValue("HEAD~1");
+		host.spawnSync.mockReturnValue({
+			status: 0,
+			stdout: comparison,
+		});
+		const postDiff = vi.fn<[DiffReport | null], void>();
+		registerDiff(
+			{ subscriptions: [] } as unknown as vscode.ExtensionContext,
+			postDiff,
+		);
+
+		await host.commands.get("pfdsl.diff")!();
+		expect(host.window.showErrorMessage).toHaveBeenCalledWith(
+			expect.stringContaining(notification),
+		);
+		expect(postDiff).not.toHaveBeenCalled();
+	});
+
+	it.each([
 		"file",
 		"git",
 	])("reports metadata-only changes when comparing with %s", async (mode) => {
