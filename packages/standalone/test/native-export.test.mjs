@@ -135,54 +135,10 @@ test("product WebKit PDF and browser canvas preserve dimensions and Japanese tex
 				pdf,
 				png,
 			],
-			{
-				encoding: "utf8",
-				timeout: 40000,
-				env: { ...process.env, PFDSL_TRACE_PDF: "1" },
-			},
+			{ encoding: "utf8", timeout: 40000 },
 		);
 		assert.equal(probe.status, 0, `${probe.stderr}\n${probe.stdout}`);
 		const result = JSON.parse(probe.stdout.trim().split("\n").at(-1));
-		t.diagnostic(probe.stderr);
-		for (const [name, html] of [
-			["root-ja", initial.html.replace("<html>", '<html lang="ja">')],
-			["text-ja", initial.html.replace("<text ", '<text lang="ja" ')],
-			[
-				"span-ja",
-				initial.html.replace(
-					"日本語の成果物",
-					'<tspan lang="ja">日本語の成果物</tspan>',
-				),
-			],
-			[
-				"font",
-				initial.html.replace(
-					"日本語の成果物",
-					'<tspan font-family="Hiragino Sans">日</tspan>本語の成果物',
-				),
-			],
-		]) {
-			writeFileSync(join(temporary, "input.html"), html);
-			const variant = spawnSync(
-				executable,
-				[
-					join(temporary, "input.svg"),
-					join(temporary, "input.html"),
-					join(temporary, "png.js"),
-					String(initial.width),
-					String(initial.height),
-					pdf,
-					png,
-					"日本語の成果物",
-				],
-				{
-					encoding: "utf8",
-					timeout: 40000,
-					env: { ...process.env, PFDSL_TRACE_PDF: "1" },
-				},
-			);
-			t.diagnostic(`${name}: ${variant.stderr} ${variant.stdout}`);
-		}
 		assert.equal(result.pdfPages, 1);
 		assert.ok(Math.abs(result.pdfWidth - 481) <= 0.1, JSON.stringify(result));
 		assert.ok(Math.abs(result.pdfHeight - 361) <= 0.1, JSON.stringify(result));

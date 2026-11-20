@@ -43,7 +43,6 @@ static NSString *substitutedCharacters(NSCountedSet *source, NSCountedSet *print
 @implementation PFDPDFJob
 - (void)finish:(NSData *)data error:(NSString *)error {
     if (self.finished) return;
-    if (getenv("PFDSL_TRACE_PDF")) NSLog(@"PDF finish data=%lu error=%@ retry=%d", (unsigned long)data.length, error, self.originalPDF != nil);
     self.finished = YES;
     if (error && self.originalPDF) { data = self.originalPDF; error = nil; }
     self.callback(self.context, data.bytes, data.length, error.UTF8String);
@@ -55,32 +54,35 @@ static NSString *substitutedCharacters(NSCountedSet *source, NSCountedSet *print
 
 - (void)retryPDF:(NSData *)original characters:(NSString *)missing source:(NSCountedSet *)source printed:(NSCountedSet *)printed configuration:(WKPDFConfiguration *)configuration {
     self.originalPDF = original;
-    // Select a different WebKit fallback for the missing member of each pair.
-    // Keep literal radicals in their own run when the two occur in one label.
+    // On macOS 15, a language hint on SVG text does not change this mapping.
+    // Choose a system font only for the missing character and its combining marks.
     NSString *script = @"const wanted = new Set(characters);"
+                        "const split = new RegExp('([' + characters + ']\\\\p{M}*)', 'gu');"
                         "const texts = document.createTreeWalker(document.querySelector('svg'), NodeFilter.SHOW_TEXT);"
                         "const runs = []; while (texts.nextNode()) {"
                         "  const n = texts.currentNode;"
                         "  if (n.parentElement.closest('text') && Array.from(n.data).some(c => wanted.has(c))) runs.push(n);"
                         "}"
                         "for (const n of runs) {"
-                        "  const parts = n.data.split(/([\\u2f00-\\u2fd5]+)/u);"
+                        "  const family = getComputedStyle(n.parentElement).fontFamily;"
+                        "  const serif = family.split(',').some(f => f.trim().toLowerCase() === 'serif');"
+                        "  const parts = n.data.split(split);"
                         "  n.replaceWith(...parts.map(part => {"
-                        "    if (!Array.from(part).some(c => wanted.has(c))) return document.createTextNode(part);"
+                        "    if (!wanted.has(part[0])) return document.createTextNode(part);"
                         "    const span = document.createElementNS('http://www.w3.org/2000/svg', 'tspan');"
-                        "    span.setAttribute('lang', /^[\\u2f00-\\u2fd5]/u.test(part) ? 'zh-Hans' : 'ja');"
+                        "    const radical = /^[\\u2f00-\\u2fd5]/u.test(part);"
+                        "    span.style.fontFamily = radical ? (serif ? 'Songti SC' : 'PingFang SC')"
+                        "                                    : (serif ? 'Hiragino Mincho ProN' : 'Hiragino Sans');"
                         "    span.textContent = part; return span;"
                         "  }));"
                         "}"
                         "document.documentElement.getBoundingClientRect(); await document.fonts.ready;";
     [self.view callAsyncJavaScript:script arguments:@{@"characters": missing} inFrame:nil inContentWorld:WKContentWorld.pageWorld completionHandler:^(id value, NSError *error) {
-        if (getenv("PFDSL_TRACE_PDF")) NSLog(@"PDF retry script error=%@", error);
         if (self.finished) return;
         if (error) { [self finish:original error:nil]; return; }
         [self.view createPDFWithConfiguration:configuration completionHandler:^(NSData *candidate, NSError *error) {
             if (self.finished) return;
             NSString *text = candidate ? [[PDFDocument alloc] initWithData:candidate].string : nil;
-            if (getenv("PFDSL_TRACE_PDF")) NSLog(@"PDF retry text=%@ error=%@", text, error);
             NSCountedSet *counts = text ? characterCounts(text) : nil;
             for (NSUInteger i = 0; i < missing.length; ++i) {
                 NSNumber *code = @([missing characterAtIndex:i]);
@@ -114,14 +116,12 @@ static NSString *substitutedCharacters(NSCountedSet *source, NSCountedSet *print
             if (self.finished) return;
             if (data && !error && labels.length) {
                 NSString *text = [[PDFDocument alloc] initWithData:data].string;
-                if (getenv("PFDSL_TRACE_PDF")) NSLog(@"PDF initial original=%@ extracted=%@", labels, text);
                 NSCharacterSet *radicals = [NSCharacterSet characterSetWithRange:NSMakeRange(0x2F00, 214)];
                 if (text && ([text rangeOfCharacterFromSet:radicals].location != NSNotFound ||
                              [labels rangeOfCharacterFromSet:radicals].location != NSNotFound)) {
                     NSCountedSet *source = characterCounts(labels);
                     NSCountedSet *printed = characterCounts(text);
                     NSString *missing = substitutedCharacters(source, printed);
-                    if (getenv("PFDSL_TRACE_PDF")) NSLog(@"PDF missing=%@", missing);
                     if (missing.length) {
                         [self retryPDF:data characters:missing source:source printed:printed configuration:configuration];
                         return;
