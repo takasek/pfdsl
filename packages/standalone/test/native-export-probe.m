@@ -36,6 +36,16 @@ static void pdf_complete(void *context, const unsigned char *bytes, size_t lengt
   PDFDocument *document = [[PDFDocument alloc] initWithData:data];
   NSRect bounds = [[document pageAtIndex:0] boundsForBox:kPDFDisplayBoxMediaBox];
   probe.result[@"pdfPages"] = @(document.pageCount); probe.result[@"pdfWidth"] = @(bounds.size.width); probe.result[@"pdfHeight"] = @(bounds.size.height); probe.result[@"pdfText"] = document.string ?: @"";
+  const char *queryBytes = getenv("PFDSL_EXPORT_TEST_QUERY");
+  if (queryBytes) {
+   NSString *query = [NSString stringWithUTF8String:queryBytes];
+   NSString *radical = [query stringByReplacingOccurrencesOfString:@"日" withString:@"⽇"];
+   probe.result[@"selectionText"] = document.selectionForEntireDocument.string ?: @"";
+   probe.result[@"searchQuery"] = query;
+   probe.result[@"searchIdeograph"] = @([document findString:query withOptions:0].count);
+   if (![radical isEqualToString:query])
+    probe.result[@"searchRadical"] = @([document findString:radical withOptions:0].count);
+  }
   NSImage *thumbnail = [[document pageAtIndex:0] thumbnailOfSize:NSMakeSize(962,722) forBox:kPDFDisplayBoxMediaBox];
   NSBitmapImageRep *bitmap = [NSBitmapImageRep imageRepWithData:thumbnail.TIFFRepresentation];
   [[bitmap representationUsingType:NSBitmapImageFileTypePNG properties:@{}] writeToFile:[probe.pdfPath stringByAppendingString:@".png"] atomically:YES];
