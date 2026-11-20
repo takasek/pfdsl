@@ -13,10 +13,14 @@ with pymupdf.open(pdf) as document:
 
     if case == "minimal":
         assert (page.rect.width, page.rect.height) == (306, 51), page.rect
-        (label,) = page.search_for("日本語の成果物")
+        query = "日本語の成果物"
+        assert text.count(query) == 1, text
+        fragments = page.search_for(query)
+        assert fragments, query
         # The minimal graph has three stroked nodes. The output label must
         # fit inside one of them after WebKit chooses its fallback font.
         assert any(
-            shape["type"] == "s" and shape["rect"].contains(label)
+            shape["type"] == "s"
+            and all(shape["rect"].contains(fragment) for fragment in fragments)
             for shape in page.get_drawings()
-        ), label
+        ), fragments
