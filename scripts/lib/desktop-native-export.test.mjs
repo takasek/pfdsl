@@ -28,6 +28,7 @@ test("desktop pull requests run the native export test on macOS as a required st
 		"the native export test must run after the build",
 	);
 	const step = job.steps[nativeExport];
+	assert.equal(step.env?.CARGO, "cargo", "use the same Cargo as the Rust step");
 	assert.equal(step.if, undefined);
 	assert.equal(step["continue-on-error"], undefined);
 });
