@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
+import { once } from "node:events";
 import {
 	existsSync,
 	mkdtempSync,
@@ -7,6 +8,7 @@ import {
 	rmSync,
 	writeFileSync,
 } from "node:fs";
+import { createServer } from "node:net";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
@@ -19,6 +21,7 @@ function fixture(
 		extra = "",
 		assertion = "assert.equal(value, 'good')",
 		skipped = false,
+		setup = "",
 	} = {},
 ) {
 	const cwd = mkdtempSync(join(tmpdir(), "mutation-check-test-"));
@@ -30,6 +33,7 @@ function fixture(
 import assert from 'node:assert/strict';
 import { readFileSync, writeFileSync, existsSync } from 'node:fs';
 import { describe, it } from 'node:test';
+${setup}
 const value = readFileSync('value.txt', 'utf8').trim();
 describe('contract', () => {
   it${skipped ? ".skip" : ""}('detects bad value', () => { ${assertion}; });
@@ -63,6 +67,108 @@ async function verify(t, options, change = () => {}) {
 		"restores the exact original bytes",
 	);
 	return { result, cwd, config };
+}
+
+const runWatchdogMs = 30_000;
+const timeoutTest = { timeout: 3 * runWatchdogMs + 5_000 };
+
+async function runUntilTimeout(t, assertion, { failGroupStop = false } = {}) {
+	const sockets = new Set();
+	const server = createServer((socket) => {
+		sockets.add(socket);
+		socket.once("close", () => sockets.delete(socket));
+	});
+	const done = new AbortController();
+	const signal = AbortSignal.any([t.signal, done.signal]);
+	try {
+		server.listen(0, "127.0.0.1");
+		await once(server, "listening", { signal });
+		const { cwd, config } = fixture(t, {
+			assertion,
+			setup: `
+import { spawn } from 'node:child_process';
+import { once } from 'node:events';
+function waitForTimeout(lateWrite) {
+  const worker = spawn(process.execPath, ['timeout-worker.mjs', lateWrite], {
+    stdio: 'ignore',
+  });
+  return once(worker, 'exit').then(([code, signal]) => {
+    assert.equal(code, 0, signal);
+  });
+}
+`,
+		});
+		// Start the writer as a regular descendant in the runner's process
+		// group. It can survive a leader-only kill independently of node:test.
+		writeFileSync(
+			join(cwd, "timeout-worker.mjs"),
+			`
+import { writeFileSync } from 'node:fs';
+import { connect } from 'node:net';
+const socket = connect(${server.address().port}, '127.0.0.1');
+socket.once('data', () => {
+  writeFileSync('value.txt', process.argv[2]);
+  socket.end();
+});
+`,
+		);
+		config.timeoutMs = runWatchdogMs;
+		const schedule = globalThis.setTimeout;
+		let expire;
+		// Keep a real watchdog for stalled runs. Trigger it once the fixture
+		// connects so ordinary Node startup does not determine the test stage.
+		const timer = t.mock.method(
+			globalThis,
+			"setTimeout",
+			(callback, ms, ...args) => {
+				if (ms === config.timeoutMs) expire = () => callback(...args);
+				return schedule(callback, ms, ...args);
+			},
+		);
+		const connected = once(server, "connection", { signal });
+		const run = checkMutation(config, { cwd });
+		try {
+			const [worker] = await Promise.race([
+				connected,
+				run.then((result) => assert.fail(JSON.stringify(result))),
+			]);
+			assert.ok(expire, "The worker connected without an execution watchdog");
+			const closed = once(worker, "close", { signal });
+			let bytesAtGroupStop;
+			const originalKill = process.kill;
+			const kill = t.mock.method(process, "kill", (pid, signal) => {
+				if (pid < 0 && signal === "SIGKILL") {
+					bytesAtGroupStop = readFileSync(join(cwd, "value.txt"));
+					if (failGroupStop)
+						throw Object.assign(new Error("Injected group-stop failure"), {
+							code: "EPERM",
+						});
+				}
+				return originalKill.call(process, pid, signal);
+			});
+			try {
+				expire();
+			} finally {
+				kill.mock.restore();
+			}
+			const [result] = await Promise.all([
+				run.then((result) => {
+					// The failed stop must retain the backup before the writer changes
+					// the target. Otherwise the independent-edit check could mask it.
+					if (failGroupStop) worker.end("write");
+					return result;
+				}),
+				closed,
+			]);
+			return { result, cwd, bytesAtGroupStop };
+		} finally {
+			timer.mock.restore();
+		}
+	} finally {
+		done.abort();
+		server.close();
+		for (const socket of sockets) socket.destroy();
+	}
 }
 
 test("A: only the named test fails and restoration is green", async (t) => {
@@ -164,17 +270,22 @@ if (value === 'good') assert.equal(existsSync('marker'), false);
 	assert.equal(result.restored.exitCode, 1);
 });
 
-test("a timed out mutated test restores the file and reports an error", async (t) => {
-	const { result } = await verify(
-		t,
-		{ assertion: "if (value === 'bad') { while (true) {} }" },
-		(config) => {
-			config.timeoutMs = 1000;
-		},
-	);
-	assert.equal(result.status, "error");
-	assert.equal(result.restored.exitCode, 0);
-});
+test(
+	"a timed out mutated test restores the file and reports an error",
+	timeoutTest,
+	async (t) => {
+		const { result, cwd } = await runUntilTimeout(
+			t,
+			"if (value === 'bad') return waitForTimeout('late mutation write')",
+		);
+		const detail = JSON.stringify(result);
+		assert.equal(result.status, "error", detail);
+		assert.equal(result.baseline?.success, true, detail);
+		assert.equal(result.mutated?.error, "Test execution timed out", detail);
+		assert.equal(result.restored?.success, true, detail);
+		assert.equal(readFileSync(join(cwd, "value.txt"), "utf8"), "good\r\n");
+	},
+);
 
 test("existing recovery data is never overwritten", async (t) => {
 	const { result, cwd } = await verify(t, {}, (_, dir) => {
@@ -267,42 +378,55 @@ test("a suite with no tests cannot identify an executed expected test", async (t
 	assert.equal(result.status, "ineffective");
 });
 
-test("timeout stops workers before restoring the original file", async (t) => {
-	const { cwd, config } = fixture(t, {
-		assertion:
-			"if (value === 'bad') setTimeout(() => writeFileSync('value.txt', 'late worker write'), 2500); assert.equal(value, 'good')",
-	});
-	config.timeoutMs = 1000;
-	const result = await checkMutation(config, { cwd });
-	assert.equal(result.status, "error");
-	assert.equal(result.restored?.success, true, JSON.stringify(result));
-	await new Promise((resolve) => setTimeout(resolve, 2800));
-	assert.equal(readFileSync(join(cwd, "value.txt"), "utf8"), "good\r\n");
-});
+test(
+	"timeout stops workers before restoring the original file",
+	timeoutTest,
+	async (t) => {
+		const { result, cwd, bytesAtGroupStop } = await runUntilTimeout(
+			t,
+			`if (value === 'bad') {
+  waitForTimeout('late worker write');
+  assert.fail('mutation');
+}`,
+		);
+		const detail = JSON.stringify(result);
+		assert.equal(result.status, "error", detail);
+		assert.equal(result.mutated?.error, "Test execution timed out", detail);
+		assert.equal(result.restored?.success, true, detail);
+		assert.deepEqual(bytesAtGroupStop, Buffer.from("bad\r\n"), detail);
+		assert.equal(readFileSync(join(cwd, "value.txt"), "utf8"), "good\r\n");
+	},
+);
 
-test("a failed group stop during restored verification retains recovery bytes", async (t) => {
-	const { cwd, config } = fixture(t, {
-		assertion: `if (value === 'bad') { writeFileSync('marker', 'mutated'); assert.fail('mutation'); }
-if (existsSync('marker')) setTimeout(() => writeFileSync('value.txt', 'late restored-worker write'), 2500);`,
-	});
-	config.timeoutMs = 1000;
-	const originalKill = process.kill;
-	process.kill = (pid, signal) => {
-		if (pid < 0)
-			throw Object.assign(new Error("Injected group-stop failure"), {
-				code: "EPERM",
-			});
-		return originalKill.call(process, pid, signal);
-	};
-	let result;
-	try {
-		result = await checkMutation(config, { cwd });
-	} finally {
-		process.kill = originalKill;
-	}
-	// The intentionally unkillable worker must finish before fixture cleanup.
-	await new Promise((resolve) => setTimeout(resolve, 2800));
-	assert.equal(result.status, "error");
-	assert.equal(result.restored.unsafeToRestore, true);
-	assert.equal(readFileSync(result.backup, "utf8"), "good\r\n");
-});
+test(
+	"a failed group stop during restored verification retains recovery bytes",
+	timeoutTest,
+	async (t) => {
+		const { result, cwd, bytesAtGroupStop } = await runUntilTimeout(
+			t,
+			`if (value === 'bad') { writeFileSync('marker', 'mutated'); assert.fail('mutation'); }
+assert.equal(value, 'good');
+if (existsSync('marker')) return waitForTimeout('late restored-worker write');`,
+			{ failGroupStop: true },
+		);
+		const detail = JSON.stringify(result);
+		assert.equal(result.status, "error", detail);
+		assert.equal(result.baseline?.success, true, detail);
+		assert.equal(result.mutated?.error, undefined, detail);
+		assert.equal(result.mutated?.exitCode, 1, detail);
+		assert.equal(result.restored?.error, "Injected group-stop failure", detail);
+		assert.equal(result.restored?.unsafeToRestore, true, detail);
+		assert.equal(
+			result.reason,
+			"Restored test workers may still be running; original bytes retained in backup",
+			detail,
+		);
+		assert.deepEqual(bytesAtGroupStop, Buffer.from("good\r\n"), detail);
+		assert.equal(
+			readFileSync(join(cwd, "value.txt"), "utf8"),
+			"late restored-worker write",
+		);
+		assert.ok(result.backup, detail);
+		assert.equal(readFileSync(result.backup, "utf8"), "good\r\n");
+	},
+);
