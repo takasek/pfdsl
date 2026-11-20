@@ -112,6 +112,8 @@ merge後のmainから参照と取得先を確認し、Claude Code marketplaceと
 tag内のmarketplaceは公開前のpinを保持しており、配布先を選ぶ正本はmainの`.claude-plugin/marketplace.json`である。
 - **push_libraries_release_tag / publish_libraries**: `make release-libs COMMIT=<SHA>` が明示commitの`lib-v*` tagをpushし、`publish-libraries.yml`がそのcommitからcore → graphviz-exporter → preview-engineの順でnpm publishする。
 CLI・librariesとも手動再開はrelease tagを指定し、workflowはbranch指定を拒否してeventのSHAをcheckoutする。
+両workflowのpublish jobは`npm-publish` environmentに属し、そのdeployment policyは`v*`と`lib-v*`のtagだけを許可する。
+npm側のtrusted publisherもこのenvironmentを要求するため、branch上で書き換えたworkflowからはpublishできない。
 - **package_vscode_release / verify_vsix / upload_vsix**: `make vscode-package COMMIT=<SHA>`は明示commitから未検証`.vsix`を生成し、成功後に`vscode-v*` tagをpushする。
 1回の実行が正常完了したときの`.vsix` candidateとremote tagを同じprocessの複数出力とし、tagに対応するpublish workflowは置かない。
 人がcandidateをローカルインストールして拡張の起動を確認した後、検証済み`.vsix`をmarketplace.visualstudio.comへアップロードする。

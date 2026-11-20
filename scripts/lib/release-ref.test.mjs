@@ -81,4 +81,26 @@ describe("validateReleaseRef", () => {
 			assert.match(source, /refs\/tags\/\$RELEASE_TAG/);
 		}
 	});
+
+	it("binds every npm publish job to the tag-restricted npm-publish environment", () => {
+		const root = resolve(fileURLToPath(new URL("../..", import.meta.url)));
+		for (const workflow of ["publish-cli.yml", "publish-libraries.yml"]) {
+			const source = readFileSync(
+				resolve(root, ".github/workflows", workflow),
+				"utf8",
+			);
+			const jobs = source.split(/\n(?= {2}[\w-]+:\n)/).slice(1);
+			const publishJobs = jobs.filter((job) =>
+				/publish --provenance/.test(job),
+			);
+			assert.ok(publishJobs.length > 0, `${workflow} has no publish job`);
+			for (const job of publishJobs) {
+				assert.match(
+					job,
+					/\n {4}environment: npm-publish\n/,
+					`${workflow} job ${job.split(":")[0].trim()} lacks the npm-publish environment`,
+				);
+			}
+		}
+	});
 });
