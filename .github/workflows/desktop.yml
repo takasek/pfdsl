@@ -204,9 +204,24 @@ jobs:
       - run: pnpm -r build
       - run: cargo +stable test --manifest-path packages/standalone/src-tauri/Cargo.toml --locked --lib
       - name: Test native PDF and PNG export
+        id: native-export
         env:
           CARGO: cargo
-        run: node --test --test-reporter=tap packages/standalone/test/native-export.test.mjs
+          PFDSL_EXPORT_TEST_EVIDENCE: ${{ runner.temp }}/pfdsl-native-export-evidence
+        run: |
+          mkdir -p "$PFDSL_EXPORT_TEST_EVIDENCE"
+          node --test --test-reporter=tap packages/standalone/test/native-export.test.mjs
+      - name: Collect failed native export fixture for diagnosis
+        if: failure() && steps.native-export.outcome == 'failure' && github.event.pull_request.number == 1631
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: native-export-fixture-1625-${{ github.run_attempt }}
+          path: |
+            ${{ runner.temp }}/pfdsl-native-export-evidence/input.svg
+            ${{ runner.temp }}/pfdsl-native-export-evidence/input.html
+            ${{ runner.temp }}/pfdsl-native-export-evidence/output.pdf
+            ${{ runner.temp }}/pfdsl-native-export-evidence/result.json
+          retention-days: 1
       # Native unit tests run on the runner architecture; this compiles the Apple Silicon app.
       # Neither check substitutes for the GUI/IME acceptance on a real Apple Silicon Mac.
       - run: pnpm --filter @pfdsl/standalone tauri build --target aarch64-apple-darwin --bundles app

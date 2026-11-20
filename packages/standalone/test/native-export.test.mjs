@@ -101,6 +101,7 @@ test("product WebKit PDF and browser canvas preserve dimensions and Japanese tex
 		assert.equal(compile.status, 0, compile.stderr);
 		const pdf = join(temporary, "output.pdf"),
 			png = join(temporary, "output.png");
+		const evidence = process.env.PFDSL_EXPORT_TEST_EVIDENCE;
 		const probe = spawnSync(
 			executable,
 			[
@@ -112,10 +113,28 @@ test("product WebKit PDF and browser canvas preserve dimensions and Japanese tex
 				pdf,
 				png,
 			],
-			{ encoding: "utf8", timeout: 40000 },
+			{
+				encoding: "utf8",
+				timeout: 40000,
+				env: evidence
+					? { ...process.env, PFDSL_EXPORT_TEST_MEASURE_TEXT: "1" }
+					: process.env,
+			},
 		);
 		assert.equal(probe.status, 0, `${probe.stderr}\n${probe.stdout}`);
 		const result = JSON.parse(probe.stdout.trim().split("\n").at(-1));
+		// Keep evidence from the built-in fixture even if a later assertion fails.
+		if (evidence) {
+			for (const name of ["input.svg", "input.html", "output.pdf"])
+				writeFileSync(
+					join(evidence, name),
+					readFileSync(join(temporary, name)),
+				);
+			writeFileSync(
+				join(evidence, "result.json"),
+				JSON.stringify(result, null, 2),
+			);
+		}
 		assert.equal(result.pdfPages, 1);
 		assert.ok(Math.abs(result.pdfWidth - 481) <= 0.1, JSON.stringify(result));
 		assert.ok(Math.abs(result.pdfHeight - 361) <= 0.1, JSON.stringify(result));
@@ -126,18 +145,12 @@ test("product WebKit PDF and browser canvas preserve dimensions and Japanese tex
 		const header = readFileSync(png);
 		assert.equal(header.readUInt32BE(16), 641);
 		assert.equal(header.readUInt32BE(20), 481);
-		// Optional evidence destination is a local test output directory, never part of the product interface.
-		if (process.env.PFDSL_EXPORT_TEST_EVIDENCE) {
-			for (const name of ["output.pdf", "output.pdf.png", "output.png"])
+		if (evidence)
+			for (const name of ["output.pdf.png", "output.png"])
 				writeFileSync(
-					join(process.env.PFDSL_EXPORT_TEST_EVIDENCE, name),
+					join(evidence, name),
 					readFileSync(join(temporary, name)),
 				);
-			writeFileSync(
-				join(process.env.PFDSL_EXPORT_TEST_EVIDENCE, "result.json"),
-				JSON.stringify(result, null, 2),
-			);
-		}
 		const repository = fileURLToPath(new URL("../../../", import.meta.url));
 		const files = globSync("docs/samples/*.pfdsl", { cwd: repository })
 			.sort()
