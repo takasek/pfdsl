@@ -86,20 +86,32 @@ async function runUntilTimeout(t, assertion, { failGroupStop = false } = {}) {
 		const { cwd, config } = fixture(t, {
 			assertion,
 			setup: `
-import { connect } from 'node:net';
+import { spawn } from 'node:child_process';
+import { once } from 'node:events';
 function waitForTimeout(lateWrite) {
-  return new Promise((resolve, reject) => {
-    const socket = connect(${server.address().port}, '127.0.0.1');
-    socket.on('error', reject);
-    socket.once('data', () => {
-      writeFileSync('value.txt', lateWrite);
-      socket.end();
-    });
-    socket.once('close', resolve);
+  const worker = spawn(process.execPath, ['timeout-worker.mjs', lateWrite], {
+    stdio: 'ignore',
+  });
+  return once(worker, 'exit').then(([code, signal]) => {
+    assert.equal(code, 0, signal);
   });
 }
 `,
 		});
+		// Start the writer as a regular descendant in the runner's process
+		// group. It can survive a leader-only kill independently of node:test.
+		writeFileSync(
+			join(cwd, "timeout-worker.mjs"),
+			`
+import { writeFileSync } from 'node:fs';
+import { connect } from 'node:net';
+const socket = connect(${server.address().port}, '127.0.0.1');
+socket.once('data', () => {
+  writeFileSync('value.txt', process.argv[2]);
+  socket.end();
+});
+`,
+		);
 		config.timeoutMs = runWatchdogMs;
 		const schedule = globalThis.setTimeout;
 		let expire;
@@ -139,8 +151,15 @@ function waitForTimeout(lateWrite) {
 			} finally {
 				kill.mock.restore();
 			}
-			if (failGroupStop) worker.end("write");
-			const [result] = await Promise.all([run, closed]);
+			const [result] = await Promise.all([
+				run.then((result) => {
+					// The failed stop must retain the backup before the writer changes
+					// the target. Otherwise the independent-edit check could mask it.
+					if (failGroupStop) worker.end("write");
+					return result;
+				}),
+				closed,
+			]);
 			return { result, cwd, bytesAtGroupStop };
 		} finally {
 			timer.mock.restore();
@@ -397,6 +416,11 @@ if (existsSync('marker')) return waitForTimeout('late restored-worker write');`,
 		assert.equal(result.mutated?.exitCode, 1, detail);
 		assert.equal(result.restored?.error, "Injected group-stop failure", detail);
 		assert.equal(result.restored?.unsafeToRestore, true, detail);
+		assert.equal(
+			result.reason,
+			"Restored test workers may still be running; original bytes retained in backup",
+			detail,
+		);
 		assert.deepEqual(bytesAtGroupStop, Buffer.from("good\r\n"), detail);
 		assert.equal(
 			readFileSync(join(cwd, "value.txt"), "utf8"),
