@@ -9,6 +9,7 @@ import {
 	type Node,
 	parseDocument,
 	visit,
+	YAMLParseError,
 } from "yaml";
 import type { $ZodIssue } from "zod/v4/core";
 import en from "zod/v4/locales/en.js";
@@ -22,8 +23,34 @@ import type {
 	Diagnostic,
 	Frontmatter,
 	LoadResult,
+	Position,
 	Range,
 } from "./types/index.js";
+
+function positionAt(source: string, offset: number): Position {
+	const before = source.slice(0, offset);
+	return {
+		line: before.split("\n").length,
+		column: offset - before.lastIndexOf("\n"),
+		offset,
+	};
+}
+
+// Preview and comparison notifications also display diagnostics without their range.
+function yamlErrorExcerpt(source: string, { start, end }: Range): string {
+	const lineStart = start.offset - start.column + 1;
+	const nextNewline = source.indexOf("\n", start.offset);
+	const line = source
+		.slice(lineStart, nextNewline === -1 ? source.length : nextNewline)
+		.replace(/\r$/, "");
+	const column = start.column - 1;
+	const from = Math.max(0, column - 40);
+	const to = Math.min(line.length, from + 80);
+	const excerpt = `${from > 0 ? "…" : ""}${line.slice(from, to)}${to < line.length ? "…" : ""}`;
+	const indent = line.slice(from, column).replace(/[^\t]/g, " ");
+	const width = Math.max(1, Math.min(end.offset - lineStart, to) - column);
+	return `:\n\n${excerpt}\n${from > 0 ? " " : ""}${indent}${"^".repeat(width)}\n`;
+}
 
 /**
  * Locate artifact and process declaration keys using YAML node ranges,
@@ -80,14 +107,6 @@ function frontmatterTypeDiagnostics(
 		}
 		return { node, alias };
 	}
-	function position(offset: number) {
-		const before = source.slice(0, offset);
-		return {
-			line: before.split("\n").length,
-			column: offset - before.lastIndexOf("\n"),
-			offset,
-		};
-	}
 	const diagnostics: Diagnostic[] = invalidIdKeys(document).map(
 		({ section, node }) => {
 			const start = yamlOffset + (node?.range?.[0] ?? 0);
@@ -96,7 +115,10 @@ function frontmatterTypeDiagnostics(
 				severity: "error",
 				code: "FM004",
 				message: `Invalid front matter ID key in '${section}': expected a YAML string; quote numeric, boolean and null-like IDs`,
-				range: { start: position(start), end: position(end) },
+				range: {
+					start: positionAt(source, start),
+					end: positionAt(source, end),
+				},
 			};
 		},
 	);
@@ -137,7 +159,10 @@ function frontmatterTypeDiagnostics(
 				severity: "error",
 				code: "FM004",
 				message: `Invalid front matter field '${path.join(".") || "<root>"}': ${issue.message}`,
-				range: { start: position(start), end: position(end) },
+				range: {
+					start: positionAt(source, start),
+					end: positionAt(source, end),
+				},
 			});
 		}
 	return diagnostics;
@@ -201,9 +226,10 @@ export function loadFrontmatterModel(
 	// up on the last line's value — a last-line `status: done` then failed V007
 	// (#636). Earlier lines were fine, since the yaml parser handles \r\n inside
 	// the text it is given.
+	const yamlOffset = firstNl + 1;
 	const yamlText =
-		closingLineStart > firstNl + 1
-			? source.slice(firstNl + 1, closingLineStart - 1).replace(/\r$/, "")
+		closingLineStart > yamlOffset
+			? source.slice(yamlOffset, closingLineStart - 1).replace(/\r$/, "")
 			: "";
 	const body =
 		closingLineEnd === source.length ? "" : source.slice(closingLineEnd + 1);
@@ -213,7 +239,8 @@ export function loadFrontmatterModel(
 	let frontmatter: Frontmatter | null = null;
 	let parsed: unknown = null;
 	let yamlValid = true;
-	const yamlDocument = parseDocument(yamlText);
+	// Consumers display the range in PFD source coordinates.
+	const yamlDocument = parseDocument(yamlText, { prettyErrors: false });
 
 	try {
 		// Do not coerce invalid declaration keys or lose colliding entries.
@@ -222,14 +249,23 @@ export function loadFrontmatterModel(
 	} catch (e) {
 		yamlValid = false;
 		const msg = e instanceof Error ? e.message : String(e);
+		const pos =
+			e instanceof YAMLParseError && e.pos[0] >= 0 ? e.pos : undefined;
+		// Missing-token errors can extend one character past the YAML text.
+		const start = yamlOffset + Math.min(pos?.[0] ?? 0, yamlText.length);
+		const end = yamlOffset + Math.min(pos?.[1] ?? 0, yamlText.length);
+		const range = {
+			start: positionAt(source, start),
+			end: positionAt(source, end),
+		};
+		const detail = pos
+			? yamlErrorExcerpt(source, range)
+			: " (source position unavailable)";
 		diagnostics.push({
 			severity: "error",
 			code: "FM002",
-			message: `Invalid YAML in front matter: ${msg}`,
-			range: {
-				start: { line: 2, column: 1, offset: 4 },
-				end: { line: 2, column: 1, offset: 4 },
-			},
+			message: `Invalid YAML in front matter: ${msg}${detail}`,
+			range,
 		});
 	}
 
@@ -238,7 +274,7 @@ export function loadFrontmatterModel(
 			yamlDocument,
 			parsed,
 			source,
-			firstNl + 1,
+			yamlOffset,
 		);
 		diagnostics.push(...typeDiagnostics);
 		// Like malformed YAML, invalid typed metadata must not reach consumers.
