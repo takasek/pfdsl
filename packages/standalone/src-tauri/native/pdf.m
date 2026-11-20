@@ -43,6 +43,7 @@ static NSString *substitutedCharacters(NSCountedSet *source, NSCountedSet *print
 @implementation PFDPDFJob
 - (void)finish:(NSData *)data error:(NSString *)error {
     if (self.finished) return;
+    if (getenv("PFDSL_TRACE_PDF")) NSLog(@"PDF finish data=%lu error=%@ retry=%d", (unsigned long)data.length, error, self.originalPDF != nil);
     self.finished = YES;
     if (error && self.originalPDF) { data = self.originalPDF; error = nil; }
     self.callback(self.context, data.bytes, data.length, error.UTF8String);
@@ -73,11 +74,13 @@ static NSString *substitutedCharacters(NSCountedSet *source, NSCountedSet *print
                         "}"
                         "document.documentElement.getBoundingClientRect(); await document.fonts.ready;";
     [self.view callAsyncJavaScript:script arguments:@{@"characters": missing} inFrame:nil inContentWorld:WKContentWorld.pageWorld completionHandler:^(id value, NSError *error) {
+        if (getenv("PFDSL_TRACE_PDF")) NSLog(@"PDF retry script error=%@", error);
         if (self.finished) return;
         if (error) { [self finish:original error:nil]; return; }
         [self.view createPDFWithConfiguration:configuration completionHandler:^(NSData *candidate, NSError *error) {
             if (self.finished) return;
             NSString *text = candidate ? [[PDFDocument alloc] initWithData:candidate].string : nil;
+            if (getenv("PFDSL_TRACE_PDF")) NSLog(@"PDF retry text=%@ error=%@", text, error);
             NSCountedSet *counts = text ? characterCounts(text) : nil;
             for (NSUInteger i = 0; i < missing.length; ++i) {
                 NSNumber *code = @([missing characterAtIndex:i]);
@@ -111,12 +114,14 @@ static NSString *substitutedCharacters(NSCountedSet *source, NSCountedSet *print
             if (self.finished) return;
             if (data && !error && labels.length) {
                 NSString *text = [[PDFDocument alloc] initWithData:data].string;
+                if (getenv("PFDSL_TRACE_PDF")) NSLog(@"PDF initial original=%@ extracted=%@", labels, text);
                 NSCharacterSet *radicals = [NSCharacterSet characterSetWithRange:NSMakeRange(0x2F00, 214)];
                 if (text && ([text rangeOfCharacterFromSet:radicals].location != NSNotFound ||
                              [labels rangeOfCharacterFromSet:radicals].location != NSNotFound)) {
                     NSCountedSet *source = characterCounts(labels);
                     NSCountedSet *printed = characterCounts(text);
                     NSString *missing = substitutedCharacters(source, printed);
+                    if (getenv("PFDSL_TRACE_PDF")) NSLog(@"PDF missing=%@", missing);
                     if (missing.length) {
                         [self retryPDF:data characters:missing source:source printed:printed configuration:configuration];
                         return;
