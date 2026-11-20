@@ -91,7 +91,7 @@ statusStyles:
 
 Specification v0.0.30 defines artifact reference targets: document-level `baseRef: { source, revision }` and artifact-level `ref` replacing that whole mapping.
 They select the artifact's reference target; they do not change process locations or command working directories.
-The CLI supports caller-supplied pinned snapshots through `--reference-context <file>` on check, render, meta get/list/check-links, and graph describe. Static check/render success does not establish reference existence; meta check-links records per-location results, while URLs and globs remain skipped. Do not interpret an older CLI accepting these fields as support, or switch an external roadmap to authoritative use before verifying the chosen implementation version.
+Reference-capable builds accept `--reference-context <file>` on check, render, meta get/list/check-links, and graph describe. For explicit references or an externally acquired model with a pinned context, use the snapshot check below.
 
 ## CLI
 
@@ -100,6 +100,16 @@ The CLI supports caller-supplied pinned snapshots through `--reference-context <
 - **`pfdsl` not found?** Check `package.json` first — if the repo already depends on `@pfdsl/cli`, the CLI is there and every command below runs as `npx pfdsl <cmd>`. Confirm with `npx pfdsl --version`. Do not treat a bare `pfdsl` that fails to resolve as "missing" until this branch is ruled out.
 - **Genuinely absent, or below `0.2.0`?** Do **not** run the commands below against it. Substitute a version-pinned `npx @pfdsl/cli@0.2.0 <cmd>` for each `pfdsl <cmd>` below — pinned, not `@latest`, to keep the version deterministic. If the pinned package cannot be obtained, report the required version and the fetch error; do not continue with an older CLI.
 - **Want a persistent global installation?** The user can install or update with `npm install -g @pfdsl/cli@latest`. A global installation is optional and does not replace the version check above.
+
+**Snapshot check.** The published `@pfdsl/cli@0.2.0` can pass a local link check on a same-name file beside the model. A build that supports pinned references can report that same version. When a model declares `baseRef` or an artifact `ref`, or an adapter supplies an external context, run the selected CLI with the model and that pinned context.
+
+```sh
+pfdsl meta check-links model.pfdsl --reference-context context.json --json
+```
+
+Require exit 0 and inspect `referenceResolution.results`. For each required path, match its `id`, `location`, `source`, and the adapter's immutable `fixedRevision`. For artifacts with an explicit or inherited reference, also match `reference.revision` to the selected revision. For unqualified locations in an external context, match the source and fixed revision of the context's `basis`.
+
+`result: "exists"` confirms that the path exists in the selected snapshot. A directory also qualifies. If the artifact requires a regular file, check the file type at the reported `value` in the same snapshot. A skipped URL or glob, a resolved target without a location, or successful static `check` or `render` provides no path evidence. If the option is unknown or the evidence is absent, leave those locations unverified until you can repeat the check with a capable build and the pinned context.
 
 ```bash
 pfdsl check <file|-> [--reference-context <file>] [--strict] [--hints] [--json] [--no-color]   # Validate a .pfdsl file (- = stdin)
@@ -139,7 +149,7 @@ PFD はタスクリストではなく成果物の変換グラフ。
 - **書いた後の点検**: 同じ `graph io` で、終端が全て意図した納品物か、外部入力に生成元を持つべきものが混ざっていないかを確認。あわせて各プロセスが「この入力だけで出力を作れるか」を見る。`graph orphans` はエッジを一切持たないノード（配線忘れ）を検出する — graph io の外部入力・終端はそれぞれ片側のみの欠落なので、両方欠落した本当に浮いたノードは別途これで見る。`>>?` だけで繋がるノードと group は配線済みとして扱われるため出ない
 - **`terminal artifacts:` が空でもグラフ破損ではない**: `externalStakeholders` を宣言した artifact は外部消費者を持つとみなされ、終端一覧から外れる。最終納品物にこのフィールドを付けると終端行は空になる — グラフが壊れたのではなく、監査対象が `external-stakeholder terminals:` の行（`--json` では `externalTerminals` キー）へ移っただけ。点検の中身は「そのフィールドが妥当か（手段成果物に誤って付けていないか）」
 - roadmap と flow ファイルが併存する構成では `status gaps <roadmap> <flow>...` で、flow 側の個別追跡対象と roadmap の整合を点検する。選別子は `tags:` に `roadmap-tracked` を含むこと — flow ファイルは status を書かない（W007）ため status は選別子にならず、逆に全 artifact を突き合わせると図の大半を占める運用上の副産物まで並ぶ。**タグを付けた artifact が1件も無ければこの検査は何も見ずに緑になる**。対象0件のときは CLI 自身が「何も検証しなかった」と言うので、合格文と読み違えない。roadmap 内の artifact を status で絞り込む場合は `status list <file> --status <s[,s...]>`、着手不可なプロセスがなぜ止まっているか見るなら `status blocked <file>`
-- 明示的な `baseRef` / `ref` がないローカル `location:` は `meta check-links <file>` で参照先ファイルの実在を確認できる（URL・glob は自動的にスキップされる）。明示参照先は、対応版と取得コンテキストで検証する。旧CLIのローカル検査成功で代用しない
+- 明示参照も外部コンテキストもない原稿のローカル `location:` は `meta check-links <file>` で確認する（URL・glob はスキップ）。`baseRef` / `ref` または外部コンテキストがある原稿には CLI 節の snapshot check を使う
 - 図の視覚確認が必要なときだけ `render --format dot` を使う（大きい図では dot 全読より graph io が安い）
 - ノードの変更・削除前の影響範囲調査は `graph impact <file> <id>`（下流の全消費者）・`graph depends-on <file> <id>`（上流の全生産者）・`graph neighbors <file> <id>`（直接の前後のみ）を使う。grep での手繰りより網羅的。`neighbors` だけは `>>?` の隣接も返し、text では `(feedback)`、`--json` では各隣接の `kind` で区別できる — 還流の付け替え漏れはここで見る。`impact` / `depends-on` / `path` は primary のみを辿る
 - 隣接がどちらの種別かは隣接ごとに調べなくてよい。エッジは必ず artifact と process の間を走るので、ある1ノードの隣接は全て自分と逆の種別になる。`neighbors` / `describe` はそれを各リストに一度だけ書く（text は `successors (artifact): ...`、`--json` は `neighborKind`）

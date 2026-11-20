@@ -1,0 +1,7 @@
+{
+	"name": "pfdsl-published-cli-fixture",
+	"private": true,
+	"devDependencies": {
+		"@pfdsl/cli": "0.2.0"
+	}
+}
