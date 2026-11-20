@@ -200,9 +200,18 @@ jobs:
           node-version: 24
           cache: pnpm
       - run: rustup toolchain install stable --profile minimal --target aarch64-apple-darwin
+      - name: Prepare independent PDF text extraction
+        run: |
+          python3 -m venv "$RUNNER_TEMP/pdf-text"
+          "$RUNNER_TEMP/pdf-text/bin/python" -m pip install --only-binary=:all: PyMuPDF==1.26.7
+          echo "PFDSL_MUPDF_PYTHON=$RUNNER_TEMP/pdf-text/bin/python" >> "$GITHUB_ENV"
       - run: pnpm install --frozen-lockfile
       - run: pnpm -r build
       - run: cargo +stable test --manifest-path packages/standalone/src-tauri/Cargo.toml --locked --lib
+      - name: Test native PDF and PNG export
+        env:
+          CARGO: cargo
+        run: node --test --test-reporter=tap packages/standalone/test/native-export.test.mjs
       # Native unit tests run on the runner architecture; this compiles the Apple Silicon app.
       # Neither check substitutes for the GUI/IME acceptance on a real Apple Silicon Mac.
       - run: pnpm --filter @pfdsl/standalone tauri build --target aarch64-apple-darwin --bundles app

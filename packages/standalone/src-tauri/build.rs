@@ -7,6 +7,7 @@ fn main() {
             .compile("pfdsl_native_pdf");
         println!("cargo:rustc-link-lib=framework=WebKit");
         println!("cargo:rustc-link-lib=framework=AppKit");
+        println!("cargo:rustc-link-lib=framework=PDFKit");
         println!("cargo:rerun-if-changed=native/pdf.m");
     }
     tauri_build::build()
