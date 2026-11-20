@@ -204,37 +204,9 @@ jobs:
       - run: pnpm -r build
       - run: cargo +stable test --manifest-path packages/standalone/src-tauri/Cargo.toml --locked --lib
       - name: Test native PDF and PNG export
-        id: native-export
         env:
           CARGO: cargo
         run: node --test --test-reporter=tap packages/standalone/test/native-export.test.mjs
-      - name: Compare language and font in diagnostic export fixtures
-        id: native-export-diagnostics
-        if: ${{ !cancelled() && (steps.native-export.outcome == 'success' || steps.native-export.outcome == 'failure') && github.event.pull_request.number == 1631 }}
-        continue-on-error: true
-        env:
-          CARGO: cargo
-          PFDSL_EXPORT_TEST_EVIDENCE: ${{ runner.temp }}/pfdsl-native-export-evidence
-        run: |
-          mkdir -p "$PFDSL_EXPORT_TEST_EVIDENCE"
-          node --test --test-reporter=tap packages/standalone/test/native-export.test.mjs
-      - name: Collect native export fixtures for diagnosis
-        if: ${{ !cancelled() && (steps.native-export-diagnostics.outcome == 'success' || steps.native-export-diagnostics.outcome == 'failure') }}
-        continue-on-error: true
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        with:
-          name: native-export-language-1625-${{ github.run_attempt }}
-          path: |
-            ${{ runner.temp }}/pfdsl-native-export-evidence/input.svg
-            ${{ runner.temp }}/pfdsl-native-export-evidence/input.html
-            ${{ runner.temp }}/pfdsl-native-export-evidence/output.pdf
-            ${{ runner.temp }}/pfdsl-native-export-evidence/result.json
-            ${{ runner.temp }}/pfdsl-native-export-evidence/*/source.pfdsl
-            ${{ runner.temp }}/pfdsl-native-export-evidence/*/input.svg
-            ${{ runner.temp }}/pfdsl-native-export-evidence/*/input.html
-            ${{ runner.temp }}/pfdsl-native-export-evidence/*/output.pdf
-            ${{ runner.temp }}/pfdsl-native-export-evidence/*/result.json
-          retention-days: 1
       # Native unit tests run on the runner architecture; this compiles the Apple Silicon app.
       # Neither check substitutes for the GUI/IME acceptance on a real Apple Silicon Mac.
       - run: pnpm --filter @pfdsl/standalone tauri build --target aarch64-apple-darwin --bundles app

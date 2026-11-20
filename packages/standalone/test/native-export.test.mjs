@@ -2,7 +2,6 @@ import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import {
 	globSync,
-	mkdirSync,
 	mkdtempSync,
 	readFileSync,
 	rmSync,
@@ -102,117 +101,21 @@ test("product WebKit PDF and browser canvas preserve dimensions and Japanese tex
 		assert.equal(compile.status, 0, compile.stderr);
 		const pdf = join(temporary, "output.pdf"),
 			png = join(temporary, "output.png");
-		const evidence = process.env.PFDSL_EXPORT_TEST_EVIDENCE;
-		const repository = fileURLToPath(new URL("../../../", import.meta.url));
-		const runProbe = (input, pdfPath, pngPath, query) =>
-			spawnSync(
-				executable,
-				[
-					join(temporary, "input.svg"),
-					join(temporary, "input.html"),
-					join(temporary, "png.js"),
-					String(input.width),
-					String(input.height),
-					pdfPath,
-					pngPath,
-				],
-				{
-					encoding: "utf8",
-					timeout: 40000,
-					env: query
-						? { ...process.env, PFDSL_EXPORT_TEST_QUERY: query }
-						: process.env,
-				},
-			);
-		const probe = runProbe(
-			initial,
-			pdf,
-			png,
-			evidence ? "日本語の成果物" : undefined,
+		const probe = spawnSync(
+			executable,
+			[
+				join(temporary, "input.svg"),
+				join(temporary, "input.html"),
+				join(temporary, "png.js"),
+				String(initial.width),
+				String(initial.height),
+				pdf,
+				png,
+			],
+			{ encoding: "utf8", timeout: 40000 },
 		);
 		assert.equal(probe.status, 0, `${probe.stderr}\n${probe.stdout}`);
 		const result = JSON.parse(probe.stdout.trim().split("\n").at(-1));
-		// Keep evidence from the built-in fixture even if a later assertion fails.
-		if (evidence) {
-			for (const name of ["input.svg", "input.html", "output.pdf"])
-				writeFileSync(
-					join(evidence, name),
-					readFileSync(join(temporary, name)),
-				);
-			writeFileSync(
-				join(evidence, "result.json"),
-				JSON.stringify(result, null, 2),
-			);
-			const small =
-				"---\nartifact:\n  draft: { label: 日本語の原稿 }\n  report: { label: 日本語の成果物 }\nprocess:\n  write: { label: 日報を書く }\n---\ndraft >> write -> report\n";
-			const chinese = "简体中文资料";
-			const mixed = small.replace("日本語の原稿", chinese);
-			const cases = [
-				{ name: "small-unset", source: small },
-				{ name: "small-ja", source: small, lang: "ja" },
-				{ name: "small-font", source: small, font: "Hiragino Sans" },
-				{ name: "mixed-unset", source: mixed, additionalQuery: chinese },
-				{
-					name: "mixed-ja",
-					source: mixed,
-					lang: "ja",
-					additionalQuery: chinese,
-				},
-			];
-			for (const { name, source, lang, font, additionalQuery } of cases) {
-				await t.test(`diagnostic PFD export: ${name}`, async () => {
-					const prepared = await processSnapshot(
-						source,
-						join(temporary, "manuscript.pfdsl"),
-						async () => null,
-					);
-					assert.equal(prepared.message.type, "render", name);
-					const { dot } = computeExportSources(
-						prepared.model.graph,
-						prepared.frontmatter,
-					);
-					const standardSvg = await renderDotToSvg(dot);
-					if (font) assert.match(standardSvg, /font-family="Times,serif"/);
-					const graphSvg = font
-						? standardSvg.replaceAll(
-								'font-family="Times,serif"',
-								`font-family="${font},Times,serif"`,
-							)
-						: standardSvg;
-					const [, , width, height] = graphSvg
-						.match(/viewBox="([^"]+)"/)[1]
-						.split(/\s+/)
-						.map(Number);
-					const input = preparePdf(graphSvg, width, height);
-					if (lang) {
-						const inputHtml = join(temporary, "input.html");
-						const html = readFileSync(inputHtml, "utf8");
-						assert.match(html, /<html>/);
-						writeFileSync(
-							inputHtml,
-							html.replace("<html>", `<html lang="${lang}">`),
-						);
-					}
-					const folder = join(evidence, name);
-					mkdirSync(folder);
-					for (const filename of ["input.svg", "input.html"])
-						writeFileSync(
-							join(folder, filename),
-							readFileSync(join(temporary, filename)),
-						);
-					writeFileSync(join(folder, "source.pfdsl"), source);
-					const output = runProbe(
-						input,
-						join(folder, "output.pdf"),
-						join(temporary, `${name}.png`),
-						["日本語の成果物", additionalQuery].filter(Boolean).join("\n"),
-					);
-					const json = output.stdout?.trim().split("\n").at(-1);
-					if (json) writeFileSync(join(folder, "result.json"), json);
-					assert.equal(output.status, 0, `${output.stderr}\n${output.stdout}`);
-				});
-			}
-		}
 		assert.equal(result.pdfPages, 1);
 		assert.ok(Math.abs(result.pdfWidth - 481) <= 0.1, JSON.stringify(result));
 		assert.ok(Math.abs(result.pdfHeight - 361) <= 0.1, JSON.stringify(result));
@@ -223,12 +126,19 @@ test("product WebKit PDF and browser canvas preserve dimensions and Japanese tex
 		const header = readFileSync(png);
 		assert.equal(header.readUInt32BE(16), 641);
 		assert.equal(header.readUInt32BE(20), 481);
-		if (evidence)
-			for (const name of ["output.pdf.png", "output.png"])
+		// Optional evidence destination is a local test output directory, never part of the product interface.
+		if (process.env.PFDSL_EXPORT_TEST_EVIDENCE) {
+			for (const name of ["output.pdf", "output.pdf.png", "output.png"])
 				writeFileSync(
-					join(evidence, name),
+					join(process.env.PFDSL_EXPORT_TEST_EVIDENCE, name),
 					readFileSync(join(temporary, name)),
 				);
+			writeFileSync(
+				join(process.env.PFDSL_EXPORT_TEST_EVIDENCE, "result.json"),
+				JSON.stringify(result, null, 2),
+			);
+		}
+		const repository = fileURLToPath(new URL("../../../", import.meta.url));
 		const files = globSync("docs/samples/*.pfdsl", { cwd: repository })
 			.sort()
 			.concat([
