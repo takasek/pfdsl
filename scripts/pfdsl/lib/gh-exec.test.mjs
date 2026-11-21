@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
+import { createHash } from "node:crypto";
 import {
 	chmodSync,
 	mkdirSync,
@@ -88,6 +89,51 @@ describe("execGh", () => {
 				execGh(["api", "/repos/o/r/issues/7/artifacts/1"]),
 				(error) => error.code === "ENOBUFS",
 			);
+		} finally {
+			if (savedRepo === undefined) delete process.env.GH_REPO;
+			else process.env.GH_REPO = savedRepo;
+		}
+	});
+
+	it("artifact bodies above the argument size limit reach gh through stdin", async () => {
+		originalPath = process.env.PATH;
+		fakePath = fakePathWithGh("exit 1");
+		// The fake gh reports what it received: its argv and a digest of stdin.
+		writeFileSync(
+			join(fakePath, "echo.cjs"),
+			`const input = JSON.parse(require('node:fs').readFileSync(0, 'utf8'));
+const digest = require('node:crypto').createHash('sha256').update(input.body).digest('hex');
+process.stdout.write(JSON.stringify({ number: 1, argv: process.argv.slice(2), length: input.body.length, digest }));`,
+		);
+		writeFileSync(
+			join(fakePath, "gh"),
+			`#!/bin/sh\nexec '${process.execPath}' '${join(fakePath, "echo.cjs")}' "$@"\n`,
+			{ mode: 0o755 },
+		);
+		const savedRepo = process.env.GH_REPO;
+		process.env.GH_REPO = "github.com/o/r";
+		process.env.PATH = fakePath;
+		try {
+			const ops = createGitHubOps({ cwd: process.cwd() });
+			// Larger than both Linux's per-argument limit and macOS's ARG_MAX.
+			const body = "x".repeat(1536 * 1024);
+			for (const result of [
+				await ops.createArtifact({
+					issue: 7,
+					type: "embedded_html",
+					name: "diagram",
+					body,
+				}),
+				await ops.updateArtifact({ issue: 7, artifact: 1, body }),
+			]) {
+				assert.equal(result.length, body.length);
+				assert.equal(
+					result.digest,
+					createHash("sha256").update(body).digest("hex"),
+				);
+				assert.deepEqual(result.argv.slice(-2), ["--input", "-"]);
+				assert.ok(result.argv.every((arg) => arg.length < 1024));
+			}
 		} finally {
 			if (savedRepo === undefined) delete process.env.GH_REPO;
 			else process.env.GH_REPO = savedRepo;

@@ -32,7 +32,7 @@ function ghInstalled(cwd, env) {
 
 /**
  * @param {string[]} args - the same argv you'd pass to execFileSync("gh", args)
- * @param {{cwd?: string, repository?: () => {host: string, owner: string, repo: string}, maxBuffer?: number}} [opts]
+ * @param {{cwd?: string, repository?: () => {host: string, owner: string, repo: string}, maxBuffer?: number, input?: string}} [opts] - `input` is written to gh's stdin (e.g. for `gh api --input -`).
  * @returns {Promise<string>}
  */
 export async function execGh(args, opts = {}) {
@@ -63,6 +63,7 @@ export async function execGh(args, opts = {}) {
 			encoding: "utf-8",
 			env,
 			...(opts.maxBuffer === undefined ? {} : { maxBuffer: opts.maxBuffer }),
+			...(opts.input === undefined ? {} : { input: opts.input }),
 		});
 	} catch (error) {
 		if (error.code === "ENOBUFS") {

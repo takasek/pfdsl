@@ -174,14 +174,22 @@ export function createGitHubOps({
 		const path = `/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/issues/${issue}/artifacts${artifact === undefined ? "" : `/${artifact}`}`;
 		const args = ["api", "--hostname", host, "--method", method, path];
 		if (paginate) args.push("--paginate", "--slurp");
-		for (const [key, value] of Object.entries(fields ?? {})) {
-			if (value !== undefined) args.push("--raw-field", `${key}=${value}`);
-		}
+		// Send the payload as JSON on stdin: artifact bodies (rendered SVG)
+		// can exceed the OS per-argument size limit as a --raw-field value.
+		const payload = Object.fromEntries(
+			Object.entries(fields ?? {}).filter(([, value]) => value !== undefined),
+		);
+		const input = fields ? JSON.stringify(payload) : undefined;
+		if (input !== undefined) args.push("--input", "-");
 		let output;
 		try {
 			output = await runGh(
 				args,
-				method === "GET" ? { maxBuffer: 256 * 1024 * 1024 } : {},
+				method === "GET"
+					? { maxBuffer: 256 * 1024 * 1024 }
+					: input === undefined
+						? {}
+						: { input },
 			);
 		} catch (error) {
 			const status = String(error.stderr ?? "").match(

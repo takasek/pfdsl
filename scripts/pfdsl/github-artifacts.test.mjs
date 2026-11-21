@@ -89,10 +89,12 @@ test("artifact named operations use gh api and HTTP with identical results and p
 			],
 		]) {
 			const ghCalls = [];
+			const ghInputs = [];
 			const httpCalls = [];
 			const gh = createGitHubOps({
-				execGhImpl: async (argv) => {
+				execGhImpl: async (argv, opts) => {
 					ghCalls.push(argv);
+					ghInputs.push(opts?.input);
 					return JSON.stringify(
 						method === "listArtifacts" ? [response] : response,
 					);
@@ -123,12 +125,15 @@ test("artifact named operations use gh api and HTTP with identical results and p
 			assert.equal(httpCalls[0].init.method ?? "GET", verb);
 			if (args.body) {
 				assert.equal(JSON.parse(httpCalls[0].init.body).body, args.body);
-				assert.ok(ghCalls[0].includes(`body=${args.body}`));
-				assert.equal(
-					ghCalls[0][ghCalls[0].indexOf(`body=${args.body}`) - 1],
-					"--raw-field",
-				);
-			}
+				// The body travels on stdin as JSON: argv has an OS size limit
+				// (E2BIG near 128 KiB per argument on Linux).
+				assert.equal(ghCalls[0][ghCalls[0].indexOf("--input") + 1], "-");
+				assert.ok(!ghCalls[0].some((arg) => arg.includes(args.body)));
+				const sent = JSON.parse(ghInputs[0]);
+				assert.equal(sent.body, args.body);
+				if (args.type) assert.equal(sent.type, args.type);
+				if (args.name) assert.equal(sent.name, args.name);
+			} else assert.equal(ghInputs[0], undefined);
 		}
 		for (const status of [403, 500]) {
 			const gh = createGitHubOps({
