@@ -14,6 +14,7 @@ const activeCanonicalPaths = [
 	".claude/skills/pfd-ops/references/architecture.md",
 	".claude/skills/pfd-ops/references/file-based-tracker-backend.md",
 	".claude/skills/pfd-ops/references/github-issues-backend.md",
+	".claude/skills/pfd-ops/references/issue-artifact-pfd.md",
 	".claude/skills/pfd-ops/references/work-cycle.md",
 	".claude/skills/pfd-retro/SKILL.md",
 	".claude/skills/pfd-ecosystem/SKILL.md",
@@ -59,6 +60,22 @@ function namedOpsBindingReferences(markdown, sourcePath) {
 }
 
 describe("pfd-ops entry routing", () => {
+	it("routes from each distributed GitHub backend to the Issue artifact guide", () => {
+		for (const base of [
+			"scripts/harness-template/skills/pfd-ops",
+			".claude/skills/pfd-ops",
+			".agents/skills/pfd-ops",
+			"plugin/pfdsl/skills/pfd-ops",
+			"plugin/pfdsl-codex/skills/pfd-ops",
+		]) {
+			assert.match(
+				read(`${base}/references/github-issues-backend.md`),
+				/\[[^\]]+\]\(issue-artifact-pfd\.md\)/,
+				base,
+			);
+			assert.ok(read(`${base}/references/issue-artifact-pfd.md`).length > 0);
+		}
+	});
 	it("keeps work-cycle CLI arguments and graph result keys", () => {
 		assert.ok(workCycle.includes("status ready <roadmap.pfdsl> --json"));
 		assert.match(workCycle, /\bterminals\b/);

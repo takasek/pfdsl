@@ -16,14 +16,18 @@
 import { isGhUnavailableError } from "./gh-compat.mjs";
 import { execGh } from "./gh-exec.mjs";
 import {
+	createIssueArtifact,
 	fetchAllIssues,
 	fetchAllLabels,
+	fetchIssueArtifact,
+	fetchIssueArtifacts,
 	fetchIssueView,
 	fetchOpenPrs,
 	fetchPullRequestView,
 	mapLabelsResponse,
 	requireGitHubViewFields,
 	addIssueLabel as restAddIssueLabel,
+	updateIssueArtifact,
 } from "./github-rest.mjs";
 import { proxyAwareFetch } from "./proxy-fetch.mjs";
 import { resolveRepository } from "./repository-identity.mjs";
@@ -95,7 +99,7 @@ function normalizeIssueViewComments(issue) {
 /**
  * @param {object} opts
  * @param {string} [opts.cwd]
- * @param {(args: string[], opts: {cwd: string, repository: Function}) => Promise<string>} [opts.execGhImpl]
+ * @param {(args: string[], opts: {cwd: string, repository: Function, maxBuffer?: number}) => Promise<string>} [opts.execGhImpl]
  * @param {typeof fetch} [opts.fetchImpl]
  * @returns {Record<string, Function>}
  */
@@ -104,7 +108,8 @@ export function createGitHubOps({
 	execGhImpl = execGh,
 	fetchImpl = proxyAwareFetch,
 } = {}) {
-	const runGh = (args) => execGhImpl(args, { cwd, repository });
+	const runGh = (args, options = {}) =>
+		execGhImpl(args, { cwd, repository, ...options });
 
 	// `cwd` is fixed for this instance, so the repo it names is too. Resolving
 	// it once keeps a gate-check run that walks several issues from spawning
@@ -158,7 +163,81 @@ export function createGitHubOps({
 		);
 	}
 
+	async function artifactApi(
+		method,
+		issue,
+		artifact,
+		fields,
+		paginate = false,
+	) {
+		const { host, owner, repo } = repository();
+		const path = `/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/issues/${issue}/artifacts${artifact === undefined ? "" : `/${artifact}`}`;
+		const args = ["api", "--hostname", host, "--method", method, path];
+		if (paginate) args.push("--paginate", "--slurp");
+		for (const [key, value] of Object.entries(fields ?? {})) {
+			if (value !== undefined) args.push("--raw-field", `${key}=${value}`);
+		}
+		let output;
+		try {
+			output = await runGh(
+				args,
+				method === "GET" ? { maxBuffer: 256 * 1024 * 1024 } : {},
+			);
+		} catch (error) {
+			const status = String(error.stderr ?? "").match(
+				/\(HTTP ([45]\d\d)\)\s*$/,
+			);
+			if (status) error.httpStatus = Number(status[1]);
+			throw error;
+		}
+		const value = JSON.parse(output);
+		return paginate ? value.flat() : value;
+	}
+
 	return {
+		listArtifacts: ({ issue }) =>
+			withFallback(
+				"listArtifacts",
+				() => artifactApi("GET", issue, undefined, undefined, true),
+				({ owner, repo, token }) =>
+					fetchIssueArtifacts(owner, repo, token, issue, fetchImpl),
+			),
+		getArtifact: ({ issue, artifact }) =>
+			withFallback(
+				"getArtifact",
+				() => artifactApi("GET", issue, artifact),
+				({ owner, repo, token }) =>
+					fetchIssueArtifact(owner, repo, token, issue, artifact, fetchImpl),
+			),
+		createArtifact: ({ issue, type, name, body }) =>
+			withFallback(
+				"createArtifact",
+				() => artifactApi("POST", issue, undefined, { type, name, body }),
+				({ owner, repo, token }) =>
+					createIssueArtifact(
+						owner,
+						repo,
+						token,
+						issue,
+						{ type, name, body },
+						fetchImpl,
+					),
+			),
+		updateArtifact: ({ issue, artifact, name, body }) =>
+			withFallback(
+				"updateArtifact",
+				() => artifactApi("PATCH", issue, artifact, { name, body }),
+				({ owner, repo, token }) =>
+					updateIssueArtifact(
+						owner,
+						repo,
+						token,
+						issue,
+						artifact,
+						{ name, body },
+						fetchImpl,
+					),
+			),
 		/** @returns {Promise<{name: string, description: string}[]>} */
 		listLabels: () =>
 			withListFallback(
