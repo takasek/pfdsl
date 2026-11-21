@@ -75,7 +75,10 @@ function memoryFs() {
 		statSync(p) {
 			if (!files.has(resolve(p)))
 				throw Object.assign(new Error("ENOENT"), { code: "ENOENT" });
-			return { mode: modes.get(resolve(p)) ?? 0o644 };
+			return { mode: modes.get(resolve(p)) ?? 0o644, isFile: () => true };
+		},
+		lstatSync(p) {
+			return fs.statSync(p);
 		},
 		chmodSync(...args) {
 			return mutate("chmod", args, () => modes.set(resolve(args[0]), args[1]));
@@ -308,6 +311,10 @@ function fixture() {
 		github,
 		fs: {
 			...local.fs,
+			readFileSync(path, encoding) {
+				const value = local.fs.readFileSync(path);
+				return encoding === undefined ? Buffer.from(value) : value;
+			},
 			writeFileSync(path, value, ...args) {
 				if (String(value).startsWith("{")) {
 					const state = JSON.parse(value);

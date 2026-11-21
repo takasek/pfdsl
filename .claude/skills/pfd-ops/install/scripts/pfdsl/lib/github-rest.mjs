@@ -173,10 +173,17 @@ export async function createIssueArtifact(
 ) {
 	const response = await request(fetchImpl, artifactPath(owner, repo, issue), {
 		method: "POST",
+		redirect: "manual",
 		headers: { ...authHeaders({ token }), "Content-Type": "application/json" },
 		body: JSON.stringify(fields),
 	});
-	return response.json();
+	return requireArtifactNumber(await response.json());
+}
+
+export function requireArtifactNumber(artifact) {
+	if (!Number.isSafeInteger(artifact?.number) || artifact.number <= 0)
+		throw new Error("GitHub create response has no positive artifact number");
+	return artifact;
 }
 
 export async function updateIssueArtifact(
@@ -193,6 +200,7 @@ export async function updateIssueArtifact(
 		artifactPath(owner, repo, issue, artifact),
 		{
 			method: "PATCH",
+			redirect: "manual",
 			headers: {
 				...authHeaders({ token }),
 				"Content-Type": "application/json",
@@ -211,8 +219,14 @@ export async function updateIssueArtifact(
 async function request(fetchImpl, url, init) {
 	const res = await fetchImpl(url, init);
 	if (!res.ok) {
+		let body;
+		try {
+			body = await res.text();
+		} catch (error) {
+			body = `Could not read response body: ${error.message}`;
+		}
 		const error = new Error(
-			`GitHub REST API ${init?.method ?? "GET"} ${url} failed: ${res.status} ${await res.text()}`,
+			`GitHub REST API ${init?.method ?? "GET"} ${url} failed: ${res.status} ${body}`,
 		);
 		error.httpStatus = res.status;
 		throw error;

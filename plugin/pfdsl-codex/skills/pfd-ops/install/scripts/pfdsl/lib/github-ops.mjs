@@ -25,6 +25,7 @@ import {
 	fetchOpenPrs,
 	fetchPullRequestView,
 	mapLabelsResponse,
+	requireArtifactNumber,
 	requireGitHubViewFields,
 	addIssueLabel as restAddIssueLabel,
 	updateIssueArtifact,
@@ -183,14 +184,10 @@ export function createGitHubOps({
 		if (input !== undefined) args.push("--input", "-");
 		let output;
 		try {
-			output = await runGh(
-				args,
-				method === "GET"
-					? { maxBuffer: 256 * 1024 * 1024 }
-					: input === undefined
-						? {}
-						: { input },
-			);
+			output = await runGh(args, {
+				maxBuffer: 256 * 1024 * 1024,
+				...(input === undefined ? {} : { input }),
+			});
 		} catch (error) {
 			const status = String(error.stderr ?? "").match(
 				/\(HTTP ([45]\d\d)\)\s*$/,
@@ -199,6 +196,7 @@ export function createGitHubOps({
 			throw error;
 		}
 		const value = JSON.parse(output);
+		if (method === "POST") return requireArtifactNumber(value);
 		return paginate ? value.flat() : value;
 	}
 

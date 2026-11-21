@@ -17,6 +17,10 @@ import {
 } from "./lib/issue-pfd-cli.mjs";
 import { resolveRepository } from "./lib/repository-identity.mjs";
 
+process.stdout.on("error", (error) => {
+	if (error.code !== "EPIPE") throw error;
+});
+
 const root = realpathSync(
 	resolve(dirname(fileURLToPath(import.meta.url)), "../.."),
 );

@@ -288,9 +288,32 @@ export function createIssuePfd({
 		rmSync,
 		writeFileSync,
 		statSync,
+		lstatSync,
 		chmodSync,
 		linkSync,
 	} = fs;
+	function readModel(path) {
+		const bytes = readFileSync(path);
+		try {
+			// Preserve an existing BOM; decoding must not alter valid input bytes.
+			return new TextDecoder("utf-8", { fatal: true, ignoreBOM: true }).decode(
+				bytes,
+			);
+		} catch (cause) {
+			throw new Error(`Invalid UTF-8 in local PFD: ${path}`, { cause });
+		}
+	}
+	function requireRegularOutput(path) {
+		let stat;
+		try {
+			stat = lstatSync(path);
+		} catch (error) {
+			if (error.code === "ENOENT") return;
+			throw error;
+		}
+		if (!stat.isFile())
+			throw new Error(`Output must be a regular file: ${path}`);
+	}
 	function ensureEmpty(dir, locked = false) {
 		if (
 			existsSync(dir) &&
@@ -419,13 +442,18 @@ export function createIssuePfd({
 		return found;
 	}
 	async function selectDiagram(state, diagram) {
-		const found = await diagrams(state.issue, state.sourceId, state.artifact);
 		if (diagram !== undefined) {
-			const chosen = found.find((x) => x.record.artifact.number === diagram);
-			if (!chosen)
+			const record = await get(state.issue, diagram);
+			const stamp = readStamp(selectedVersion(record).body);
+			if (
+				record.artifact.type !== "embedded_html" ||
+				stamp?.sourceId !== state.sourceId ||
+				stamp.sourceArtifact !== state.artifact
+			)
 				throw new Error(`Diagram ${diagram} does not match this source`);
-			return chosen;
+			return { record, stamp };
 		}
+		const found = await diagrams(state.issue, state.sourceId, state.artifact);
 		if (found.length > 1)
 			throw new Error(
 				`Multiple diagrams (${found.map((x) => x.record.artifact.number).join(", ")}); select --diagram`,
@@ -508,9 +536,10 @@ export function createIssuePfd({
 								? [{ record, stamp }]
 								: [];
 					} else {
-						found = await diagrams(state.issue, state.sourceId, state.artifact);
-						if (diagram !== undefined)
-							found = found.filter((x) => x.record.artifact.number === diagram);
+						found =
+							diagram === undefined
+								? await diagrams(state.issue, state.sourceId, state.artifact)
+								: [await selectDiagram(state, diagram)];
 						if (found.length > 1)
 							throw new Error(
 								"Multiple diagram candidates; select --diagram to identify the POST destination",
@@ -668,6 +697,7 @@ export function createIssuePfd({
 		} catch (error) {
 			op.status =
 				!sent ||
+				error.unsent === true ||
 				isGitHubUnavailableError(error) ||
 				(error.httpStatus >= 400 && error.httpStatus < 500)
 					? "failed"
@@ -837,6 +867,7 @@ export function createIssuePfd({
 				op.status =
 					!accepted &&
 					(isGitHubUnavailableError(error) ||
+						error.unsent === true ||
 						(error.httpStatus >= 400 && error.httpStatus < 500))
 						? "failed"
 						: "unknown";
@@ -884,7 +915,7 @@ export function createIssuePfd({
 			);
 		if (
 			opts.command === "restore" &&
-			lf(readFileSync(resolve(opts.dir, "model.pfdsl"), "utf8")) !==
+			lf(readModel(resolve(opts.dir, "model.pfdsl"))) !==
 				parseSource(state.base.body).model
 		)
 			throw new Error(
@@ -894,7 +925,7 @@ export function createIssuePfd({
 			opts.command === "restore"
 				? selectedVersion(await get(state.issue, state.artifact), opts.version)
 						.body
-				: readFileSync(resolve(opts.dir, "model.pfdsl"), "utf8");
+				: readModel(resolve(opts.dir, "model.pfdsl"));
 		const restored = opts.command === "restore" ? parseSource(raw) : null;
 		const model = restored ? restored.model : raw;
 		if (model && !model.endsWith("\n"))
@@ -1162,6 +1193,7 @@ export function createIssuePfd({
 				const record = await get(opts.issue, opts.artifact);
 				const version = selectedVersion(record, opts.version);
 				if (opts.out) {
+					requireRegularOutput(opts.out);
 					const temp = resolve(
 						dirname(resolve(opts.out)),
 						`.issue-pfd-${uuid()}.tmp`,
@@ -1172,6 +1204,7 @@ export function createIssuePfd({
 					try {
 						writeFileSync(temp, version.body, { flag: "wx", mode: 0o600 });
 						if (mode !== 0o600) chmodSync(temp, mode);
+						requireRegularOutput(opts.out);
 						renameSync(temp, opts.out);
 					} finally {
 						rmSync(temp, { force: true });
@@ -1226,14 +1259,17 @@ export function createIssuePfd({
 			case "check":
 			case "render": {
 				const state = readState(opts.dir);
-				const model = readFileSync(resolve(opts.dir, "model.pfdsl"), "utf8");
+				const model = readModel(resolve(opts.dir, "model.pfdsl"));
+				if (opts.command === "render") requireRegularOutput(opts.out);
 				const result = await cli({
 					command: opts.command,
+					out: opts.out,
 					model,
 					context: referenceContext({ state, model, dir: opts.dir }),
 				});
 				if (result.exitCode !== 0) throw new Error(diagnostic(result));
 				if (opts.command === "render") {
+					requireRegularOutput(opts.out);
 					saveFile(opts.out, result.stdout);
 					return { out: opts.out };
 				}
@@ -1291,7 +1327,7 @@ export function createIssuePfd({
 			!existsSync(resolve(opts.dir, "issue-pfd.json"))
 		) {
 			ensureEmpty(opts.dir);
-			const input = readFileSync(opts.file, "utf8");
+			const input = readModel(opts.file);
 			if (input && !input.endsWith("\n"))
 				throw new Error("Source model must end with LF");
 			await checkLocal(input, opts.dir);

@@ -66,6 +66,15 @@ export async function execGh(args, opts = {}) {
 			...(opts.input === undefined ? {} : { input: opts.input }),
 		});
 	} catch (error) {
+		// No child was created: the OS proves that nothing could be sent.
+		// ENOBUFS and signals happen after launch and must remain uncertain.
+		if (
+			(error.pid === 0 ||
+				(error.pid === undefined && /^spawn/.test(error.syscall ?? ""))) &&
+			error.code !== "ENOBUFS" &&
+			!error.signal
+		)
+			error.unsent = true;
 		if (error.code === "ENOBUFS") {
 			const limit = opts.maxBuffer ?? 1024 * 1024;
 			const target =
@@ -90,9 +99,12 @@ export async function execGh(args, opts = {}) {
 			}
 			const installed = ghInstalled(cwd, env);
 			if (installed)
-				throw new Error(`installed gh CLI could not start: ${error.message}`, {
-					cause: error,
-				});
+				throw Object.assign(
+					new Error(`installed gh CLI could not start: ${error.message}`, {
+						cause: error,
+					}),
+					{ unsent: error.unsent === true },
+				);
 		}
 		throw error;
 	}

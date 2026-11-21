@@ -83,6 +83,7 @@ describe("execGh", () => {
 				execGh(["api", "/repos/o/r/issues/7/artifacts/1"], { maxBuffer: 1024 }),
 				(error) =>
 					error.code === "ENOBUFS" &&
+					error.unsent !== true &&
 					/1024.*\/repos\/o\/r\/issues\/7\/artifacts\/1/.test(error.message),
 			);
 			await assert.rejects(
@@ -103,7 +104,7 @@ describe("execGh", () => {
 			join(fakePath, "echo.cjs"),
 			`const input = JSON.parse(require('node:fs').readFileSync(0, 'utf8'));
 const digest = require('node:crypto').createHash('sha256').update(input.body).digest('hex');
-process.stdout.write(JSON.stringify({ number: 1, argv: process.argv.slice(2), length: input.body.length, digest }));`,
+process.stdout.write(JSON.stringify({ number: 1, body: input.body, argv: process.argv.slice(2), length: input.body.length, digest }));`,
 		);
 		writeFileSync(
 			join(fakePath, "gh"),
@@ -126,6 +127,7 @@ process.stdout.write(JSON.stringify({ number: 1, argv: process.argv.slice(2), le
 				}),
 				await ops.updateArtifact({ issue: 7, artifact: 1, body }),
 			]) {
+				assert.equal(result.body, body);
 				assert.equal(result.length, body.length);
 				assert.equal(
 					result.digest,
@@ -138,6 +140,30 @@ process.stdout.write(JSON.stringify({ number: 1, argv: process.argv.slice(2), le
 			if (savedRepo === undefined) delete process.env.GH_REPO;
 			else process.env.GH_REPO = savedRepo;
 		}
+	});
+
+	it("pre-spawn E2BIG is unsent while executed failures are not", async () => {
+		originalPath = process.env.PATH;
+		fakePath = fakePathWithGh("exit 17");
+		process.env.PATH = fakePath;
+		const opts = {
+			repository: () => ({ host: "github.com", owner: "o", repo: "r" }),
+		};
+		await assert.rejects(
+			execGh(["x".repeat(4 * 1024 * 1024)], opts),
+			(error) => error.code === "E2BIG" && error.unsent === true,
+		);
+		await assert.rejects(
+			execGh(["api"], opts),
+			(error) => error.status === 17 && error.unsent !== true,
+		);
+		writeFileSync(join(fakePath, "gh"), "#!/bin/sh\nkill -KILL $$\n", {
+			mode: 0o755,
+		});
+		await assert.rejects(
+			execGh(["api"], opts),
+			(error) => error.signal === "SIGKILL" && error.unsent !== true,
+		);
 	});
 
 	for (const [remote, expected] of [
@@ -241,7 +267,9 @@ process.stdout.write(JSON.stringify({ number: 1, argv: process.argv.slice(2), le
 		await assert.rejects(
 			() => execGh(["label", "list"]),
 			(error) =>
-				error.code !== "ENOENT" && /could not start/.test(error.message),
+				error.code !== "ENOENT" &&
+				error.unsent === true &&
+				/could not start/.test(error.message),
 		);
 	});
 

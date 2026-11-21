@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { spawnSync } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import {
 	chmodSync,
@@ -43,7 +43,7 @@ function processFixture(t) {
 	);
 	writeFileSync(
 		resolve(scripts, "lib/github-ops.mjs"),
-		`export class GitHubUnavailableError extends Error { constructor(operation) { super('GitHub operation unavailable: ' + operation); this.operation = operation; } }\nexport const isGitHubUnavailableError = error => error instanceof GitHubUnavailableError;\nexport const GITHUB_UNAVAILABLE_EXIT_CODE = 2;\nexport function createGitHubOps() { return { listArtifacts: async () => [], getArtifact: async () => { if (['raw', 'empty'].includes(process.env.PFDSL_TEST_MODE)) return { artifact: {number: 1}, versions: [{version: 1, body: process.env.PFDSL_TEST_MODE === 'empty' ? '' : 'broken\\r\\nraw\\r\\n'}] }; if (process.env.PFDSL_TEST_MODE === 'unavailable') throw new GitHubUnavailableError('getArtifact'); throw new Error('offline'); }, createArtifact: async () => { throw new GitHubUnavailableError('createArtifact'); } }; }\n`,
+		`export class GitHubUnavailableError extends Error { constructor(operation) { super('GitHub operation unavailable: ' + operation); this.operation = operation; } }\nexport const isGitHubUnavailableError = error => error instanceof GitHubUnavailableError;\nexport const GITHUB_UNAVAILABLE_EXIT_CODE = 2;\nexport function createGitHubOps() { return { listArtifacts: async () => [], getArtifact: async () => { if (['raw', 'empty', 'huge'].includes(process.env.PFDSL_TEST_MODE)) return { artifact: {number: 1}, versions: [{version: 1, body: process.env.PFDSL_TEST_MODE === 'huge' ? 'x'.repeat(4 * 1024 * 1024) : process.env.PFDSL_TEST_MODE === 'empty' ? '' : 'broken\\r\\nraw\\r\\n'}] }; if (process.env.PFDSL_TEST_MODE === 'unavailable') throw new GitHubUnavailableError('getArtifact'); throw new Error('offline'); }, createArtifact: async () => { throw new GitHubUnavailableError('createArtifact'); } }; }\n`,
 	);
 	mkdirSync(resolve(dir, ".pfdsl"));
 	writeFileSync(
@@ -55,22 +55,72 @@ function processFixture(t) {
 		cli,
 		"console.log(process.argv.includes('--help') ? 'check --reference-context <file>' : 'pfdsl fixture');\n",
 	);
-	const invoke = (args, mode) =>
-		spawnSync(process.execPath, [resolve(scripts, "issue-pfd.mjs"), ...args], {
-			cwd: dir,
-			env: {
-				...process.env,
-				GH_REPO: "github.com/o/r",
-				GH_TOKEN: "",
-				GITHUB_TOKEN: "",
-				PFDSL_CLI: cli,
-				PFDSL_TEST_MODE: mode,
-				TMPDIR: dir,
+	const invoke = (args, mode, asynchronous = false) =>
+		(asynchronous ? spawn : spawnSync)(
+			process.execPath,
+			[resolve(scripts, "issue-pfd.mjs"), ...args],
+			{
+				cwd: dir,
+				env: {
+					...process.env,
+					GH_REPO: "github.com/o/r",
+					GH_TOKEN: "",
+					GITHUB_TOKEN: "",
+					PFDSL_CLI: cli,
+					PFDSL_TEST_MODE: mode,
+					TMPDIR: dir,
+				},
+				encoding: "utf8",
 			},
-			encoding: "utf8",
-		});
+		);
 	return { dir, invoke };
 }
+
+test("show producer exits quietly when its actual stdout reader closes early", async (t) => {
+	const f = processFixture(t);
+	const child = f.invoke(
+		["show", "7", "--artifact", "1", "--version", "1"],
+		"huge",
+		true,
+	);
+	let stderr = "";
+	let read = false;
+	child.stderr.setEncoding("utf8");
+	child.stderr.on("data", (data) => {
+		stderr += data;
+	});
+	child.stdout.once("data", () => {
+		read = true;
+		child.stdout.destroy();
+	});
+	const [code, signal] = await new Promise((accept, reject) => {
+		child.on("error", reject);
+		child.on("close", (...result) => accept(result));
+	});
+	assert.equal(read, true);
+	assert.equal(signal, null, stderr);
+	assert.equal(code, 0, stderr);
+	assert.equal(stderr, "");
+});
+
+test("create process rejects invalid UTF-8 instead of silently replacing bytes", (t) => {
+	const f = processFixture(t);
+	const input = resolve(f.dir, "invalid.pfdsl");
+	writeFileSync(
+		input,
+		Buffer.concat([
+			Buffer.from("a >> p -> b\n# "),
+			Buffer.from([255]),
+			Buffer.from("\n"),
+		]),
+	);
+	const result = f.invoke(
+		["create", "7", input, "--dir", resolve(f.dir, "work"), "--write"],
+		"unavailable",
+	);
+	assert.equal(result.status, 1, result.stderr);
+	assert.match(result.stderr, /Invalid UTF-8/);
+});
 
 test("CLI process distinguishes unavailable transport from ordinary unavailable status", (t) => {
 	const f = processFixture(t);

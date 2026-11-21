@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import {
 	existsSync,
@@ -46,17 +47,20 @@ function fixture(t) {
 	let repo = identity;
 	let invalid = false;
 	let onGet;
+	let onList;
 	const add = (number, body) =>
 		records.get(number).versions.unshift({
 			version: records.get(number).versions[0].version + 1,
 			body,
 		});
 	const github = {
-		listArtifacts: async () =>
-			[...records.values()].map((x) => ({
+		listArtifacts: async () => {
+			await onList?.();
+			return [...records.values()].map((x) => ({
 				...x.artifact,
 				body: x.versions[0].body,
-			})),
+			}));
+		},
 		getArtifact: async ({ artifact }) => {
 			const result = structuredClone(records.get(artifact));
 			await onGet?.(artifact);
@@ -127,6 +131,7 @@ function fixture(t) {
 		setRepo: (x) => (repo = x),
 		setInvalid: () => (invalid = true),
 		onGet: (x) => (onGet = x),
+		onList: (x) => (onList = x),
 		beforePatch: (x) => (beforePatch = x),
 		afterPatch: (x) => (afterPatch = x),
 		afterCreate: (x) => (afterCreate = x),
@@ -141,6 +146,102 @@ function fixture(t) {
 				.map((x) => [x, readFileSync(resolve(dir, x), "utf8")]),
 	};
 }
+
+test("explicit diagram GET ignores unrelated broken artifacts and validates type", async (t) => {
+	const f = fixture(t);
+	await f.run("pull");
+	await f.run("publish-diagram", { write: true });
+	const diagram = f.records.get(2);
+	f.records.set(9, {
+		...structuredClone(diagram),
+		artifact: { ...diagram.artifact, number: 9 },
+	});
+	const seen = [];
+	f.onList(() => {
+		throw new Error("unrelated listing failed");
+	});
+	f.onGet((number) => {
+		seen.push(number);
+		if (number === 9) throw Error("unrelated history failed");
+	});
+	assert.equal(
+		(await f.run("status", { artifact: 1, diagram: 2 })).classification,
+		"current",
+	);
+	assert.ok(seen.includes(2));
+	assert.ok(!seen.includes(9));
+	diagram.artifact.type = "generic";
+	await assert.rejects(
+		f.run("status", { artifact: 1, diagram: 2 }),
+		/does not match/,
+	);
+});
+
+for (const command of ["publish", "check", "render", "restore", "create"])
+	test(`${command} rejects invalid UTF-8 before validation and publication`, async (t) => {
+		const f = fixture(t);
+		await f.run("pull");
+		const invalid = Buffer.concat([
+			Buffer.from("a >> p -> b\n# "),
+			Buffer.from([255]),
+			Buffer.from("\n"),
+		]);
+		f.edit(invalid);
+		const file = resolve(f.root, "input.pfdsl");
+		writeFileSync(file, invalid);
+		const before = f.cliCalls.length;
+		await assert.rejects(
+			f.run(command, {
+				write: true,
+				version: 1,
+				file,
+				dir: command === "create" ? resolve(f.root, "new") : f.dir,
+				out: resolve(f.root, "out.svg"),
+			}),
+			/UTF-8/,
+		);
+		assert.equal(f.cliCalls.length, before);
+		assert.deepEqual(f.calls, []);
+	});
+
+for (const command of ["show", "render"])
+	test(`${command} rejects non-regular output without replacing it`, async (t) => {
+		const f = fixture(t);
+		await f.run("pull");
+		const fifo = resolve(f.root, "output.fifo");
+		execFileSync("mkfifo", [fifo]);
+		await assert.rejects(
+			f.run(command, { artifact: 1, version: 1, out: fifo }),
+			/regular file/,
+		);
+		assert.ok(statSync(fifo).isFIFO());
+		await assert.rejects(
+			f.run(command, { artifact: 1, version: 1, out: f.root }),
+			/regular file/,
+		);
+	});
+
+for (const stage of ["source", "diagram"])
+	test(`unsent ${stage} launch failure is failed and retryable`, async (t) => {
+		const f = fixture(t);
+		await f.run("pull");
+		if (stage === "source") f.edit();
+		const command = stage === "source" ? "publish" : "publish-diagram";
+		const fail = () => {
+			throw Object.assign(Error("spawn E2BIG"), {
+				unsent: true,
+				code: "E2BIG",
+			});
+		};
+		if (stage === "source") f.beforePatch(fail);
+		else f.beforeCreate(fail);
+		await assert.rejects(f.run(command, { write: true }), /E2BIG/);
+		assert.equal(f.state().operations.at(-1).status, "failed");
+		f.beforePatch(undefined);
+		f.beforeCreate(undefined);
+		await f.run(command, { write: true });
+		assert.equal(f.state().operations.at(-1).status, "applied");
+	});
 
 test("hash uses UTF-8 model lines including LF and normalizes CRLF", () => {
 	const parsed = parseSource(source("あ >> p -> b\n").replaceAll("\n", "\r\n"));

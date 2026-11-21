@@ -2,6 +2,32 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { createGitHubOps } from "./lib/github-ops.mjs";
 
+test("gh create requires a positive safe artifact number", async () => {
+	const saved = process.env.GH_REPO;
+	process.env.GH_REPO = "github.com/o/r";
+	try {
+		for (const number of [
+			undefined,
+			0,
+			-1,
+			"1",
+			1.5,
+			Number.MAX_SAFE_INTEGER + 1,
+		]) {
+			const ops = createGitHubOps({
+				execGhImpl: async () => JSON.stringify({ number }),
+			});
+			await assert.rejects(
+				ops.createArtifact({ issue: 7, type: "generic", body: "x" }),
+				/artifact.*number/i,
+			);
+		}
+	} finally {
+		if (saved === undefined) delete process.env.GH_REPO;
+		else process.env.GH_REPO = saved;
+	}
+});
+
 test("artifact gh status uses only the trailing response status", async () => {
 	const saved = process.env.GH_REPO;
 	process.env.GH_REPO = "github.com/o/r";

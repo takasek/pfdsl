@@ -49,7 +49,7 @@ describe("proxyAwareFetch", () => {
 		// is that the *in-process* fetch stub was never reached, proving the
 		// call was delegated to a subprocess rather than served in-process.
 		try {
-			await proxyAwareFetch("https://api.github.com/x");
+			await proxyAwareFetch("data:application/json,%7B%7D");
 		} catch {
 			// network outcome is irrelevant to this assertion
 		}

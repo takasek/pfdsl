@@ -6,9 +6,16 @@
 
 import { readFileSync } from "node:fs";
 
-const { url, method, headers, body } = JSON.parse(readFileSync(0, "utf-8"));
-const res = await fetch(url, { method, headers, body });
-const bodyText = await res.text();
+const { url, method, headers, body, redirect } = JSON.parse(
+	readFileSync(0, "utf-8"),
+);
+const res = await fetch(url, { method, headers, body, redirect });
+let bodyText, bodyError;
+try {
+	bodyText = await res.text();
+} catch (error) {
+	bodyError = error.message;
+}
 process.stdout.write(
-	JSON.stringify({ ok: res.ok, status: res.status, bodyText }),
+	JSON.stringify({ ok: res.ok, status: res.status, bodyText, bodyError }),
 );

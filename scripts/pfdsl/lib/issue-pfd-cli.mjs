@@ -145,7 +145,7 @@ export function createIssuePfdCli({
 	env = process.env,
 }) {
 	const candidates = env.PFDSL_CLI
-		? [env.PFDSL_CLI]
+		? [resolve(env.PFDSL_CLI)]
 		: [
 				resolve(root, "packages/cli/dist/cli.js"),
 				resolve(root, "node_modules/@pfdsl/cli/dist/cli.js"),
@@ -155,7 +155,21 @@ export function createIssuePfdCli({
 		throw new IssuePfdEnvironmentError(
 			"Could not resolve pfdsl CLI; build the repository, install @pfdsl/cli, or set PFDSL_CLI to its JavaScript entry point",
 		);
-	const invoke = async ({ command, model, context }) => {
+	const maxBuffer = 32 * 1024 * 1024;
+	function requireExit(result, target) {
+		const signal = result.signal ? ` (${result.signal})` : "";
+		if (result.error)
+			throw new IssuePfdEnvironmentError(
+				result.error.code === "ENOBUFS"
+					? `${target}: CLI response exceeded ${maxBuffer} bytes${signal}`
+					: `${target}: ${result.error.message}${signal}`,
+			);
+		if (result.signal || !Number.isInteger(result.status))
+			throw new IssuePfdEnvironmentError(
+				`${target}: CLI terminated ${result.signal ? `by ${result.signal}` : "without an exit code"}`,
+			);
+	}
+	const invoke = async ({ command, model, context, out }) => {
 		await invoke.preflight();
 		const cliVersion = invoke.cliVersion;
 		const dir = mkdtempSync(resolve(temporaryRoot, ".issue-pfd-cli-"));
@@ -175,13 +189,12 @@ export function createIssuePfdCli({
 			const result = spawn(process.execPath, args, {
 				cwd: root,
 				encoding: "utf8",
-				maxBuffer: 32 * 1024 * 1024,
+				maxBuffer,
 				env,
 			});
-			if (result.error)
-				throw new IssuePfdEnvironmentError(result.error.message);
+			requireExit(result, `${command} ${out ?? file}`);
 			return {
-				exitCode: result.status ?? 1,
+				exitCode: result.status,
 				stdout: result.stdout ?? "",
 				stderr: result.stderr ?? "",
 				cliVersion,
@@ -197,6 +210,7 @@ export function createIssuePfdCli({
 				encoding: "utf8",
 				env,
 			});
+			requireExit(help, `${cli} check --help`);
 			if (
 				help.error ||
 				help.status !== 0 ||
@@ -211,6 +225,7 @@ export function createIssuePfdCli({
 				encoding: "utf8",
 				env,
 			});
+			requireExit(result, `${cli} --version`);
 			if (result.error || result.status !== 0)
 				throw new IssuePfdEnvironmentError(
 					`Cannot determine CLI version: ${result.error?.message ?? result.stderr}`,

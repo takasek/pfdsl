@@ -1,4 +1,4 @@
-import { execFileSync, spawnSync } from "node:child_process";
+import { execFileSync, spawn, spawnSync } from "node:child_process";
 import { join, resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import { isDistStale } from "../../../scripts/lib/dist-freshness.mjs";
@@ -141,17 +141,41 @@ describe("dist/cli.js smoke", () => {
 			expect(result.status, result.stderr).toBe(0);
 			expect(result.stdout.length).toBeGreaterThan(64 * 1024);
 			expect(result.stdout.trimEnd().endsWith("</svg>")).toBe(true);
-			// A reader that closes early (like `| head`) still ends quietly.
-			const early = spawnSync(
-				"/bin/sh",
-				[
-					"-c",
-					`'${process.execPath}' '${distCli}' render - --format svg | head -c 10 >/dev/null`,
-				],
-				{ input: src, encoding: "utf8" },
+		},
+	);
+
+	it.skipIf(!distIsCurrent)(
+		"the CLI producer exits quietly after its stdout reader closes",
+		async () => {
+			const child = spawn(process.execPath, [distCli, "fmt", "-"], {
+				stdio: ["pipe", "pipe", "pipe"],
+			});
+			let stderr = "";
+			let read = false;
+			child.stderr.setEncoding("utf8");
+			child.stderr.on("data", (data) => {
+				stderr += data;
+			});
+			child.stdout.once("data", () => {
+				read = true;
+				child.stdout.destroy();
+			});
+			const closed = new Promise<{
+				code: number | null;
+				signal: NodeJS.Signals | null;
+			}>((accept, reject) => {
+				child.on("error", reject);
+				child.on("close", (code, signal) => accept({ code, signal }));
+			});
+			// Exceed even large pipe buffers without paying Graphviz's layout cost.
+			child.stdin.end(
+				`---\ntitle: "${"x".repeat(4 * 1024 * 1024)}"\n---\na >> p -> b\n`,
 			);
-			expect(early.status).toBe(0);
-			expect(early.stderr).not.toContain("EPIPE");
+			const result = await closed;
+			expect(read, stderr).toBe(true);
+			expect(result.signal, stderr).toBeNull();
+			expect(result.code, stderr).toBe(0);
+			expect(stderr).toBe("");
 		},
 	);
 });
