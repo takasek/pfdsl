@@ -123,4 +123,35 @@ describe("dist/cli.js smoke", () => {
 			).toBe(true);
 		},
 	);
+
+	it.skipIf(!distIsCurrent)(
+		"writes output larger than a pipe buffer completely before exiting",
+		() => {
+			// A piped stdout is written asynchronously, so exiting right after
+			// write() dropped everything past the first 64 KiB.
+			const src = Array.from(
+				{ length: 200 },
+				(_, i) => `a${i} >> p${i} -> b${i}\n`,
+			).join("");
+			const result = spawnSync(
+				process.execPath,
+				[distCli, "render", "-", "--format", "svg"],
+				{ input: src, encoding: "utf8", maxBuffer: 64 * 1024 * 1024 },
+			);
+			expect(result.status, result.stderr).toBe(0);
+			expect(result.stdout.length).toBeGreaterThan(64 * 1024);
+			expect(result.stdout.trimEnd().endsWith("</svg>")).toBe(true);
+			// A reader that closes early (like `| head`) still ends quietly.
+			const early = spawnSync(
+				"/bin/sh",
+				[
+					"-c",
+					`'${process.execPath}' '${distCli}' render - --format svg | head -c 10 >/dev/null`,
+				],
+				{ input: src, encoding: "utf8" },
+			);
+			expect(early.status).toBe(0);
+			expect(early.stderr).not.toContain("EPIPE");
+		},
+	);
 });
