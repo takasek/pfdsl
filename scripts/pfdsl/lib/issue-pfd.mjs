@@ -1,6 +1,9 @@
 import { createHash, randomUUID } from "node:crypto";
 import * as nodeFs from "node:fs";
 import { dirname, resolve } from "node:path";
+import { fromMarkdown } from "mdast-util-from-markdown";
+import { micromark } from "micromark";
+import { html, parse, parseFragment } from "parse5";
 import { isGitHubUnavailableError } from "./github-ops.mjs";
 
 const lf = (text) => text.replaceAll("\r\n", "\n");
@@ -21,6 +24,33 @@ function marker(body) {
 		: null;
 }
 
+function renderedFenceLines(text) {
+	// Mark compiler-created code elements with their source line. The unique
+	// attribute distinguishes them from code elements authored as raw HTML.
+	const attribute = `data-pfdsl-fence-${randomUUID()}`;
+	const markup = micromark(text, {
+		// This HTML is parsed locally and never displayed or executed.
+		allowDangerousHtml: true,
+		htmlExtensions: [
+			{
+				exit: {
+					codeFencedFenceInfo(token) {
+						this.resume();
+						this.tag(` ${attribute}="${token.start.line}"`);
+					},
+				},
+			},
+		],
+	});
+	const lines = new Set();
+	for (const node of htmlDescendants(parseFragment(markup))) {
+		if (node.tagName !== "code" || node.parentNode.tagName !== "pre") continue;
+		const source = node.attrs.find(({ name }) => name === attribute);
+		if (source) lines.add(Number(source.value));
+	}
+	return lines;
+}
+
 /** Extract Markdown only; the existing CLI owns all PFD semantics. */
 export function parseSource(body) {
 	const text = lf(body);
@@ -29,41 +59,50 @@ export function parseSource(body) {
 		throw new Error(
 			"Missing or invalid issue-pfd source marker on the first line",
 		);
-	let fence;
-	let offset = 0;
-	const blocks = [];
-	for (const line of text.split(/(?<=\n)/)) {
-		if (fence) {
-			const close = line.match(/^ {0,3}(`{3,}|~{3,})[ \t]*\n?$/);
-			if (
-				close &&
-				close[1][0] === fence.char &&
-				close[1].length >= fence.length
-			) {
-				if (fence.pfdsl) blocks.push({ start: fence.start, end: offset });
-				fence = undefined;
-			}
-		} else {
-			const open = line.match(/^ {0,3}(`{3,}|~{3,})([^\n]*)\n?$/);
-			if (open)
-				fence = {
-					char: open[1][0],
-					length: open[1].length,
-					pfdsl: open[2].trim() === "pfdsl",
-					start: offset + line.length,
-				};
-		}
-		offset += line.length;
-	}
-	if (blocks.length !== 1 || fence?.pfdsl)
+	const candidates = fromMarkdown(text).children.filter(
+		(node) =>
+			node.type === "code" && node.lang === "pfdsl" && node.meta === null,
+	);
+	// Raw HTML can span multiple Markdown blocks in the compiled document.
+	const lines = candidates.length ? renderedFenceLines(text) : new Set();
+	const blocks = candidates.filter((node) =>
+		lines.has(node.position.start.line),
+	);
+	if (blocks.length !== 1)
 		throw new Error("Source must contain exactly one closed pfdsl fence");
-	const { start, end } = blocks[0];
+	const { start: opening, end: closing } = blocks[0].position;
+	const openEnd = text.indexOf("\n", opening.offset);
+	const start = openEnd + 1;
+	const end = text.lastIndexOf("\n", closing.offset - 1) + 1;
+	// CommonMark also accepts an unclosed fence. Check the two delimiter lines
+	// at the parser's offsets, then keep the source bytes the AST value would trim.
+	const openFence = /^(`{3,}|~{3,})[ \t]*pfdsl[ \t]*$/.exec(
+		text.slice(opening.offset, openEnd),
+	)?.[1];
+	const closeFence = /^ {0,3}(`{3,}|~{3,})[ \t]*$/.exec(
+		text.slice(end, closing.offset),
+	)?.[1];
+	if (
+		openEnd < 0 ||
+		end < start ||
+		!openFence ||
+		!closeFence ||
+		openFence[0] !== closeFence[0] ||
+		closeFence.length < openFence.length
+	)
+		throw new Error("Source must contain exactly one closed pfdsl fence");
 	return {
 		...identity,
 		prefix: text.slice(0, start),
 		model: text.slice(start, end),
 		suffix: text.slice(end),
 	};
+}
+
+const SOURCE_SELECTION_ERROR = "ISSUE_PFD_SOURCE_SELECTION";
+
+class SourceSelectionError extends Error {
+	code = SOURCE_SELECTION_ERROR;
 }
 
 function sourceBody(prefix, model, suffix) {
@@ -91,107 +130,48 @@ const escapeHtml = (text) =>
 		.replaceAll(">", "&gt;")
 		.replaceAll('"', "&quot;")
 		.replaceAll("'", "&#39;");
-const unescapeHtml = (text) =>
-	text
-		.replaceAll("&quot;", '"')
-		.replaceAll("&#39;", "'")
-		.replaceAll("&gt;", ">")
-		.replaceAll("&lt;", "<")
-		.replaceAll("&amp;", "&");
-export function svgElement(body) {
-	if (typeof body !== "string") return null;
-	const rawText = new Set([
-		"script",
-		"style",
-		"textarea",
-		"title",
-		"xmp",
-		"iframe",
-		"noembed",
-		"noframes",
-		"noscript",
-	]);
-	let cursor = 0,
-		template = 0,
-		count = 0,
-		start,
-		openSvg = false,
-		svg;
-	while (cursor < body.length) {
-		const at = body.indexOf("<", cursor);
-		if (at < 0) break;
-		const rest = body.slice(at);
-		if (rest.startsWith("<!--")) {
-			const end = /--!?>/.exec(rest.slice(4));
-			if (!end) return null;
-			cursor = at + 4 + end.index + end[0].length;
-			continue;
-		}
-		if (rest.startsWith("<![CDATA[")) {
-			const end = rest.indexOf("]]>", 9);
-			if (!openSvg || end < 0) return null;
-			cursor = at + end + 3;
-			continue;
-		}
-		if (rest.startsWith("<!") || rest.startsWith("<?")) {
-			const declaration =
-				/^(?:<!(?:[^"'<>]|"[^"]*"|'[^']*')*>|<\?xml\s+[^<>]*\?>)/i.exec(rest);
-			if (!declaration) return null;
-			cursor = at + declaration[0].length;
-			continue;
-		}
-		const token =
-			/^<\/?([a-z][\w:-]*)(?=[\s/>])(?:[^"'<>]|"[^"]*"|'[^']*')*>/i.exec(rest);
-		if (!token) return null;
-		cursor = at + token[0].length;
-		const name = token[1].toLowerCase(),
-			close = token[0].startsWith("</");
-		if (!close && rawText.has(name)) {
-			const end = new RegExp(
-				`</${name}(?=[\\s/>])(?:[^"'<>]|"[^"]*"|'[^']*')*>`,
-				"ig",
-			);
-			end.lastIndex = cursor;
-			const match = end.exec(body);
-			if (!match) return null;
-			cursor = end.lastIndex;
-			continue;
-		}
-		if (name === "template") {
-			if (openSvg) return null;
-			if (close) {
-				if (template === 0) return null;
-				template--;
-			} else template++;
-			continue;
-		}
-		if (template > 0) continue;
-		// These unsupported parsing contexts never occur in CLI-generated diagrams.
-		if (
-			[
-				"select",
-				"option",
-				"optgroup",
-				"object",
-				"math",
-				"foreignobject",
-				"plaintext",
-			].includes(name)
-		)
-			return null;
-		if (name !== "svg") continue;
-		if (close) {
-			if (!openSvg) return null;
-			svg = body.slice(start, cursor);
-			openSvg = false;
-		} else {
-			if (++count !== 1) return null;
-			start = at;
-			if (token[0].endsWith("/>")) svg = token[0];
-			else openSvg = true;
+function htmlElement(parent, tagName) {
+	return parent?.childNodes.find((node) => node.tagName === tagName);
+}
+
+function* htmlDescendants(parent) {
+	const pending = [...(parent?.childNodes ?? [])];
+	while (pending.length) {
+		const node = pending.pop();
+		if (!node.tagName) continue;
+		yield node;
+		// Template contents are a separate document fragment, outside childNodes.
+		for (const child of node.childNodes) pending.push(child);
+	}
+}
+
+function diagramDocument(body) {
+	return typeof body === "string"
+		? htmlElement(parse(body, { sourceCodeLocationInfo: true }), "html")
+		: null;
+}
+
+function svgFromDocument(document, body) {
+	let svg = null;
+	for (const node of htmlDescendants(htmlElement(document, "body"))) {
+		if (node.tagName === "svg" && node.namespaceURI === html.NS.SVG) {
+			if (svg !== null) return null;
+			const { startTag, endTag } = node.sourceCodeLocation;
+			svg = body.slice(startTag.startOffset, (endTag ?? startTag).endOffset);
+			if (!endTag) {
+				// If the parser uses this closing tag, the opening tag was not self-closing.
+				const fragment = parseFragment(`${svg}</svg>`, {
+					sourceCodeLocationInfo: true,
+				});
+				if (htmlElement(fragment, "svg").sourceCodeLocation.endTag) return null;
+			}
 		}
 	}
-	return count === 1 && !openSvg && template === 0 ? (svg ?? null) : null;
+	return svg;
+}
+
+export function svgElement(body) {
+	return svgFromDocument(diagramDocument(body), body);
 }
 
 export function diagramBody(stamp, output, sourceUrl = "") {
@@ -199,11 +179,19 @@ export function diagramBody(stamp, output, sourceUrl = "") {
 	return `<!doctype html>\n<html><head><meta charset="utf-8"><meta name="pfdsl-issue-pfd" content="${json}"><title>Issue PFD</title></head><body>\n<h1>Issue PFD: ${stamp.result}</h1><p>Generated from source v${stamp.sourceVersion}: <a href="${escapeHtml(sourceUrl)}">${escapeHtml(sourceUrl)}</a></p><pre>${escapeHtml(JSON.stringify(stamp, null, 2))}</pre>\n${stamp.result === "rendered" ? output : `<h2>PFD generation ${stamp.result}</h2><pre>${escapeHtml(output)}</pre>`}\n</body></html>\n`;
 }
 
-export function readStamp(body) {
-	const match = body?.match(/<meta name="pfdsl-issue-pfd" content="([^"]*)">/);
-	if (!match) return null;
+function stampFromDocument(document) {
+	const head = htmlElement(document, "head");
+	const meta = head?.childNodes.find(
+		(node) =>
+			node.tagName === "meta" &&
+			node.attrs.some(
+				({ name, value }) => name === "name" && value === "pfdsl-issue-pfd",
+			),
+	);
+	const content = meta?.attrs.find(({ name }) => name === "content")?.value;
+	if (content === undefined) return null;
 	try {
-		const value = JSON.parse(unescapeHtml(match[1]));
+		const value = JSON.parse(content);
 		if (
 			value.schema !== 2 ||
 			typeof value.sourceId !== "string" ||
@@ -226,6 +214,21 @@ export function readStamp(body) {
 	} catch {
 		return null;
 	}
+}
+
+export function readStamp(body) {
+	return stampFromDocument(diagramDocument(body));
+}
+
+function readDiagram(body) {
+	const document = diagramDocument(body);
+	const stamp = stampFromDocument(document);
+	const svg =
+		stamp?.result === "rendered" ? svgFromDocument(document, body) : null;
+	return {
+		stamp,
+		hasMatchingSvg: svg !== null && sha256(svg) === stamp.svgSha256,
+	};
 }
 
 export function referenceContext({ state, version, dir, model }) {
@@ -415,14 +418,14 @@ export function createIssuePfd({
 		else {
 			const found = await sources(opts.issue);
 			if (found.length !== 1)
-				throw new Error(
+				throw new SourceSelectionError(
 					`Found ${found.length} source artifacts (${found.map((x) => x.artifact.number).join(", ")}); select --artifact`,
 				);
 			[record] = found;
 		}
 		const sourceId = sourceIdentity(record);
 		if (!sourceId)
-			throw new Error(
+			throw new SourceSelectionError(
 				"No PFD source identity in artifact history; select --artifact with an existing PFD source",
 			);
 		return { record, version: selectedVersion(record, opts.version), sourceId };
@@ -432,26 +435,28 @@ export function createIssuePfd({
 		for (const item of await github.listArtifacts({ issue })) {
 			if (item.type !== "embedded_html") continue;
 			const record = await get(issue, item.number);
-			const stamp = readStamp(selectedVersion(record).body);
+			const parsed = readDiagram(selectedVersion(record).body);
+			const { stamp } = parsed;
 			if (
 				stamp?.sourceId === sourceId &&
 				stamp.sourceArtifact === sourceArtifact
 			)
-				found.push({ record, stamp });
+				found.push({ record, ...parsed });
 		}
 		return found;
 	}
 	async function selectDiagram(state, diagram) {
 		if (diagram !== undefined) {
 			const record = await get(state.issue, diagram);
-			const stamp = readStamp(selectedVersion(record).body);
+			const parsed = readDiagram(selectedVersion(record).body);
+			const { stamp } = parsed;
 			if (
 				record.artifact.type !== "embedded_html" ||
 				stamp?.sourceId !== state.sourceId ||
 				stamp.sourceArtifact !== state.artifact
 			)
 				throw new Error(`Diagram ${diagram} does not match this source`);
-			return { record, stamp };
+			return { record, ...parsed };
 		}
 		const found = await diagrams(state.issue, state.sourceId, state.artifact);
 		if (found.length > 1)
@@ -529,11 +534,12 @@ export function createIssuePfd({
 					let found;
 					if (op.artifact !== undefined) {
 						const record = await get(state.issue, op.artifact);
-						const stamp = readStamp(selectedVersion(record).body);
+						const parsed = readDiagram(selectedVersion(record).body);
+						const { stamp } = parsed;
 						found =
 							stamp?.sourceId === state.sourceId &&
 							stamp.sourceArtifact === state.artifact
-								? [{ record, stamp }]
+								? [{ record, ...parsed }]
 								: [];
 					} else {
 						found =
@@ -553,10 +559,7 @@ export function createIssuePfd({
 									x.stamp.sourceBodySha256 === target.sourceBodySha256 &&
 									x.stamp.modelSha256 === target.modelSha256 &&
 									x.stamp.result === target.result &&
-									(target.result !== "rendered" ||
-										(svgElement(selectedVersion(x.record).body) !== null &&
-											sha256(svgElement(selectedVersion(x.record).body)) ===
-												x.stamp.svgSha256))) ||
+									(target.result !== "rendered" || x.hasMatchingSvg)) ||
 									x.stamp.sourceVersion > target.sourceVersion),
 						)
 						.sort((a, b) => b.stamp.sourceVersion - a.stamp.sourceVersion)[0];
@@ -779,8 +782,7 @@ export function createIssuePfd({
 				"cliVersion",
 				"svgSha256",
 			].every((key) => existing.stamp[key] === generated.stamp[key]) &&
-			sha256(svgElement(selectedVersion(existing.record).body) ?? "") ===
-				existing.stamp.svgSha256
+			existing.hasMatchingSvg
 		) {
 			if (dir) {
 				if (state.diagram !== existing.record.artifact.number) {
@@ -849,11 +851,10 @@ export function createIssuePfd({
 			if (op) op.artifact = artifact;
 			const readbackVersion = selectedVersion(await get(state.issue, artifact));
 			const readback = readbackVersion.body;
+			const observed = readDiagram(readback);
 			if (
-				JSON.stringify(readStamp(readback)) !==
-					JSON.stringify(generated.stamp) ||
-				(generated.stamp.result === "rendered" &&
-					sha256(svgElement(readback) ?? "") !== generated.stamp.svgSha256)
+				JSON.stringify(observed.stamp) !== JSON.stringify(generated.stamp) ||
+				(generated.stamp.result === "rendered" && !observed.hasMatchingSvg)
 			)
 				throw new Error(
 					"Diagram readback mismatch; run status and publish-diagram again",
@@ -1101,8 +1102,10 @@ export function createIssuePfd({
 		try {
 			selected = await selectSource(opts);
 		} catch (error) {
-			if (isGitHubUnavailableError(error)) throw error;
-			if (/select --artifact|No PFD source identity/.test(error.message))
+			if (
+				isGitHubUnavailableError(error) ||
+				error.code === SOURCE_SELECTION_ERROR
+			)
 				throw error;
 			return { classification: "unavailable", diagnostic: error.message };
 		}
@@ -1137,13 +1140,8 @@ export function createIssuePfd({
 			parsed = parseSource(selected.version.body);
 		} catch {
 			const lastGood = diagram?.record.versions
-				.map((v) => ({ stamp: readStamp(v.body), svg: svgElement(v.body) }))
-				.filter(
-					({ stamp, svg }) =>
-						stamp?.result === "rendered" &&
-						svg !== null &&
-						sha256(svg) === stamp.svgSha256,
-				)
+				.map((v) => readDiagram(v.body))
+				.filter(({ hasMatchingSvg }) => hasMatchingSvg)
 				.map(({ stamp }) => stamp)
 				.sort((a, b) => b.sourceVersion - a.sourceVersion)[0];
 			return {
@@ -1155,12 +1153,7 @@ export function createIssuePfd({
 		const stamp = diagram?.stamp;
 		let classification;
 		if (!stamp) classification = "missing";
-		else if (
-			stamp.result === "rendered" &&
-			(svgElement(selectedVersion(diagram.record).body) === null ||
-				sha256(svgElement(selectedVersion(diagram.record).body)) !==
-					stamp.svgSha256)
-		)
+		else if (stamp.result === "rendered" && !diagram.hasMatchingSvg)
 			classification = "stale";
 		else if (
 			stamp.sourceVersion === selected.version.version &&

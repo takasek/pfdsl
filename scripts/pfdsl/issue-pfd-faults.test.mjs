@@ -1287,9 +1287,15 @@ test("I5 current requires SVG presence and all three actual hashes", async () =>
 	const real =
 		"<svg><!-- keep SVG bytes, including </svg> in comments --></svg>";
 	assert.equal(api.svgElement(`<!-- <svg></svg> -->${real}`), real);
+	assert.equal(
+		api.svgElement('<svg data-label="X"/>'),
+		'<svg data-label="X"/>',
+	);
 	for (const html of [
 		"<svg/><svg/>",
 		"<svg><svg/></svg>",
+		"<svg data-label=X/>",
+		"<frameset></frameset>",
 		"<template><svg/></template>",
 		"<script>const fake = '<svg/>';</script>",
 		"<textarea><svg/></textarea>",

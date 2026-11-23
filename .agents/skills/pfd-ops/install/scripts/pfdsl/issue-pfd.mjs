@@ -9,7 +9,6 @@ import {
 	GITHUB_UNAVAILABLE_EXIT_CODE,
 	isGitHubUnavailableError,
 } from "./lib/github-ops.mjs";
-import { createIssuePfd } from "./lib/issue-pfd.mjs";
 import {
 	createIssuePfdCli,
 	formatIssuePfdHelp,
@@ -37,6 +36,7 @@ if (options.help) {
 }
 requireGitHubIssues(root, "issue-pfd");
 try {
+	const { createIssuePfd } = await import("./lib/issue-pfd.mjs");
 	const runner = createIssuePfd({
 		root,
 		github: createGitHubOps({ cwd: root }),

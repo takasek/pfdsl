@@ -46,6 +46,7 @@ function fixture(t) {
 	let clock = 0;
 	let repo = identity;
 	let invalid = false;
+	let svg = "<svg></svg>";
 	let onGet;
 	let onList;
 	const add = (number, body) =>
@@ -95,7 +96,7 @@ function fixture(t) {
 			cliCalls.push(input);
 			return {
 				exitCode: invalid ? 1 : 0,
-				stdout: input.command === "render" ? "<svg></svg>" : "ok",
+				stdout: input.command === "render" ? svg : "ok",
 				stderr: invalid ? "Invalid model" : "",
 				cliVersion: "1.2.3",
 			};
@@ -130,6 +131,7 @@ function fixture(t) {
 		cliCalls,
 		setRepo: (x) => (repo = x),
 		setInvalid: () => (invalid = true),
+		setSvg: (output) => (svg = output),
 		onGet: (x) => (onGet = x),
 		onList: (x) => (onList = x),
 		beforePatch: (x) => (beforePatch = x),
@@ -259,6 +261,33 @@ test("hash uses UTF-8 model lines including LF and normalizes CRLF", () => {
 		() => parseSource(`${source()}\`\`\`pfdsl\nx\n\`\`\`\n`),
 		/exactly one/,
 	);
+});
+
+test("source extraction uses top-level Markdown code blocks and preserves the original slice", () => {
+	const comment = "<!--\n```pfdsl\nhidden\n```\n-->\n";
+	const marker = source().split("\n")[0];
+	assert.throws(() => parseSource(`${marker}\n${comment}`), /exactly one/);
+
+	const model = "  あ >> p -> b\n\n";
+	const prefix = `${marker}\n${comment}\n> \`\`\`pfdsl\n> quoted example\n> \`\`\`\n\n  ~~~~pfdsl\n`;
+	const suffix = "  ~~~~~\t\nAfter\n";
+	assert.deepEqual(
+		{ ...parseSource(prefix + model + suffix) },
+		{ sourceId: id, op: id, base: 0, prefix, model, suffix },
+	);
+	assert.throws(() => parseSource(prefix + model), /exactly one/);
+});
+
+test("source extraction ignores a fence swallowed by a rendered HTML comment", () => {
+	const marker = source().split("\n")[0];
+	const hidden = "<!-- note --> <!--\n\n```pfdsl\nhidden\n```\n\n<div> -->\n";
+	assert.throws(() => parseSource(`${marker}\n${hidden}`), /exactly one/);
+
+	const visible = `${marker}\n${hidden}\n`;
+	const fenced = "```pfdsl\na >> p -> b\n```\n";
+	const parsed = parseSource(visible + fenced);
+	assert.equal(parsed.model, "a >> p -> b\n");
+	assert.equal(parsed.prefix + parsed.model + parsed.suffix, visible + fenced);
 });
 
 test("base repair replaces its inode and preserves a hardlinked unpublished model", async (t) => {
@@ -753,6 +782,20 @@ test("status checks actual SVG bytes and rejects a diagram with only SVG removed
 	assert.equal((await f.run("status")).classification, "stale");
 });
 
+test("publish-diagram preserves and verifies SVG with a self-closing title", async (t) => {
+	const f = fixture(t);
+	const svg = "<svg><title/></svg>";
+	f.setSvg(svg);
+	const published = await f.run("publish-diagram", { write: true });
+	assert.equal(published.result, "rendered");
+	assert.equal(
+		published.svgSha256,
+		createHash("sha256").update(svg).digest("hex"),
+	);
+	assert.ok(f.records.get(2).versions[0].body.includes(svg));
+	assert.equal((await f.run("status")).classification, "current");
+});
+
 test("status returns changed-during-check when source changes while reading diagram", async (t) => {
 	const f = fixture(t);
 	await f.run("publish-diagram", { write: true });
@@ -774,6 +817,28 @@ test("unavailable source never reports an old diagram as current", async (t) => 
 	const result = await f.run("status");
 	assert.equal(result.classification, "unavailable");
 	assert.match(result.diagnostic, /offline/);
+});
+
+test("status distinguishes source selection from a read failure with the same diagnostic", async (t) => {
+	const f = fixture(t);
+	const message =
+		"No PFD source identity in artifact history; select --artifact with an existing PFD source";
+	const options = { artifact: 1 };
+	f.onGet(() => {
+		throw new Error(message);
+	});
+	assert.deepEqual(await f.run("status", options), {
+		classification: "unavailable",
+		diagnostic: message,
+	});
+
+	f.onGet(undefined);
+	f.records.get(1).versions[0].body = "A regular artifact";
+	await assert.rejects(f.run("status", options), {
+		code: "ISSUE_PFD_SOURCE_SELECTION",
+		message,
+	});
+	await assert.rejects(f.run("status"), /Found 0 source artifacts/);
 });
 
 test("directory lock reports its owner and prevents concurrent write operations", async (t) => {

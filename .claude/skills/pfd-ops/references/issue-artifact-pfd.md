@@ -9,7 +9,16 @@
 ## 環境と対象
 
 `.pfdsl/config.json` の `githubIssues.enabled` が真偽値の true で、pfd-ops の install 配置を済ませたリポジトリで使う。
-Node.js 18 以上と、`--reference-context` を持つ pfdsl CLI が必要である。
+Node.js 18.3 以上と、`--reference-context` を持つ pfdsl CLI が必要である。
+この入口を利用する採用リポには、Markdown の解析・変換用の `mdast-util-from-markdown@2.1.0`・`micromark@4.0.3` と、HTML 解析用の `parse5@7.3.0` を開発依存として用意する。
+`package.json` がある場合はそのリポの package manager を使う（npm なら `npm install --save-dev mdast-util-from-markdown@2.1.0 micromark@4.0.3 parse5@7.3.0`）。
+`package.json` がない場合は、GitHub Issues バックエンドの依存準備と同様に `node_modules` が Git の除外対象であることを確認し、以前に用意した未保存依存も同じインストールに含める。
+
+```sh
+npm install --prefix . --no-save --package-lock=false --ignore-scripts yaml@2.8.3 mdast-util-from-markdown@2.1.0 micromark@4.0.3 parse5@7.3.0
+```
+
+CLI も未保存依存として用意している場合は、同じコマンドに `@pfdsl/cli` を加える。
 公開済みの @pfdsl/cli 0.2.0 はこのオプションを持たない。
 対応版が公開されるまでは、上流の対応ビルドを `PFDSL_CLI` で指定する。
 同じ 0.2.0 と表示される対応ビルドもあるため、版文字列だけでは判定しない。
@@ -75,7 +84,9 @@ applied・superseded・overwrote になった図操作は artifact 番号・版�
 
 原稿の先頭には次のマーカーを置く。
 id は PFD の sourceId、op はこの入口の公開操作ごとの UUID、base は公開時の基底版で、作成時は0である。
-原稿にはちょうど一つの pfdsl フェンスを置き、前後の散文は companion として自由に編集できる。
+原稿には Markdown の最上位に明示的に閉じた `pfdsl` フェンスをちょうど一つ置き、前後の Markdown は companion として自由に編集できる。
+HTML コメント、引用、リスト、別のコードブロック内に置いたフェンスは原稿の集計から除外する。
+HTML 変換後にもコード要素として残るフェンスだけを数える。
 公開時は散文の位置を保ち、原稿自身に Markdown フェンスが含まれる場合は外側のフェンスを長くする。
 
 ```text
@@ -161,8 +172,8 @@ CLI の検証・描画失敗には failed、マーカーやフェンスの不正
 modelSha256 は原稿全文を LF に正規化し、開始フェンスの次行から終了フェンス直前までの UTF-8 バイト列から計算し、各行末の LF を含む。
 sourceBodySha256 は LF に正規化した原稿全文、svgSha256 は実際に埋め込んだ SVG 要素の文字列そのものから計算する。
 status は原稿→図→原稿の順に読み、SVG の実体も hash と照合する。
-HTML コメントや template・script・textarea 等の表示対象ではない内容を除き、SVG 要素がちょうど1つで、そのバイト列の hash が刻印に一致する場合だけ対応する図とみなす。
-SVG が0個・複数の場合や、扱えない HTML 文脈では stale として再生成する。
+HTML パーサーが本文で認識した SVG 要素がちょうど1つで、その原文の hash が刻印と一致する場合だけ対応する図とみなす。
+SVG が0個・複数の場合や hash が違う場合は stale として再生成する。
 
 | status | 意味 |
 | --- | --- |
