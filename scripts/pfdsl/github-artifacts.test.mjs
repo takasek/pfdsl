@@ -137,17 +137,13 @@ test("artifact named operations use gh api and HTTP with identical results and p
 			});
 			assert.deepEqual(await gh[method](args), response);
 			assert.deepEqual(await http[method](args), response);
+			const expectedPath = `/repos/o/r/issues/${args.issue}/artifacts${args.artifact === undefined ? "" : `/${args.artifact}`}`;
 			assert.equal(ghCalls[0][0], "api");
-			assert.ok(
-				ghCalls[0].includes(
-					`/repos/o/r/issues/7/artifacts${args.artifact ? "/3" : ""}`,
-				),
-			);
+			assert.ok(ghCalls[0].includes(expectedPath));
 			assert.ok(ghCalls[0].includes(verb));
-			assert.match(
-				httpCalls[0].url,
-				/api.github.com\/repos\/o\/r\/issues\/7\/artifacts/,
-			);
+			const url = new URL(httpCalls[0].url);
+			assert.equal(url.origin, "https://api.github.com");
+			assert.equal(url.pathname, expectedPath);
 			assert.equal(httpCalls[0].init.method ?? "GET", verb);
 			if (args.body) {
 				assert.equal(JSON.parse(httpCalls[0].init.body).body, args.body);

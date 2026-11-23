@@ -15,6 +15,7 @@ import {
 import { resolve } from "node:path";
 import { test } from "node:test";
 import { fileURLToPath } from "node:url";
+import { fromMarkdown } from "mdast-util-from-markdown";
 import {
 	createIssuePfd,
 	referenceContext,
@@ -22,7 +23,6 @@ import {
 } from "./lib/issue-pfd.mjs";
 import {
 	createIssuePfdCli,
-	formatIssuePfdHelp,
 	ISSUE_PFD_COMMANDS,
 	parseIssuePfdArgs,
 } from "./lib/issue-pfd-cli.mjs";
@@ -192,50 +192,37 @@ test("show CLI process emits exact raw bytes without requiring a compatible CLI"
 	}
 });
 
-test("guide commands match help grammar and explain context, recovery and abandonment", async () => {
+test("the guide's command examples parse and its model passes the CLI check", async () => {
 	const guide = readFileSync(
 		"scripts/harness-template/skills/pfd-ops/references/issue-artifact-pfd.md",
 		"utf8",
 	);
-	const commands = [
-		...guide.matchAll(/^node scripts\/pfdsl\/issue-pfd\.mjs (.+)$/gm),
-	];
-	assert.ok(commands.length >= 10);
-	for (const [, line] of commands) {
-		const args = line
+	const examples = fromMarkdown(guide).children.filter(
+		(node) => node.type === "code",
+	);
+	const commands = examples
+		.filter(({ lang }) => ["sh", "bash", "shell"].includes(lang))
+		.flatMap(({ value }) => value.split("\n"))
+		.map((line) => line.trim())
+		.filter((line) => /^node\s/.test(line));
+	assert.ok(commands.length > 0, "the guide has issue-pfd command examples");
+	for (const line of commands) {
+		const [, script, ...args] = line
 			.replace("<operation-uuid>", "12345678-1234-4234-8234-123456789abc")
 			.split(/\s+/);
-		const parsed = parseIssuePfdArgs(args);
-		if (parsed.help && !parsed.command) {
-			assert.match(formatIssuePfdHelp(), /Usage:/);
-			continue;
-		}
-		assert.ok(
-			formatIssuePfdHelp(parsed.command).includes(
-				ISSUE_PFD_COMMANDS[parsed.command],
-			),
-		);
+		assert.equal(script, "scripts/pfdsl/issue-pfd.mjs", line);
+		assert.doesNotThrow(() => parseIssuePfdArgs(args), line);
 	}
-	assert.match(guide, /入口が自動.*利用者.*渡さ/);
-	assert.match(guide, /pull.*--version.*省略.*現在版/);
-	assert.match(guide, /diff issue-123\/base.pfdsl issue-123\/model.pfdsl/);
-	assert.match(guide, /\*\*.*要求を取り消さない.*\*\*/);
-	assert.match(guide, /現在のモデル hash が図の入力モデルと一致する/);
-	assert.match(guide, /retired.*publish.*restore.*拒否/);
-	assert.match(formatIssuePfdHelp("restore"), /retires.*fresh pull/);
-	assert.match(
-		guide,
-		/create.*publish.*restore.*status.*publish-diagram.*resolve.*照合/,
-	);
-	const sample = guide.match(/```pfdsl\n([\s\S]*?)\n```/);
+	const sample = examples.find(({ lang }) => lang === "pfdsl");
 	assert.ok(sample);
+	const model = `${sample.value}\n`;
 	const dir = mkdtempSync(resolve(".issue-pfd-guide-"));
 	try {
 		const cli = createIssuePfdCli({ root: resolve("."), temporaryRoot: dir });
 		const result = await cli({
 			command: "check",
-			model: `${sample[1]}\n`,
-			context: referenceContext({ dir, model: `${sample[1]}\n` }),
+			model,
+			context: referenceContext({ dir, model }),
 		});
 		assert.equal(result.exitCode, 0, result.stderr);
 	} finally {

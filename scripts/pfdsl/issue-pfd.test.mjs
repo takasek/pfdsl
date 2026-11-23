@@ -9,6 +9,7 @@ import {
 	readFileSync,
 	rmSync,
 	statSync,
+	utimesSync,
 	writeFileSync,
 } from "node:fs";
 import { resolve } from "node:path";
@@ -20,13 +21,15 @@ import {
 	modelHash,
 	parseSource,
 	readStamp,
+	svgElement,
 } from "./lib/issue-pfd.mjs";
+import { createIssuePfdCli } from "./lib/issue-pfd-cli.mjs";
 
 const identity = { host: "github.com", owner: "o", repo: "r" };
 const id = "12345678-1234-4234-8234-123456789abc";
 const source = (model = "a >> p -> b\n", prose = "Notes\n") =>
 	`<!-- pfdsl:issue-pfd source id=${id} op=${id} base=0 -->\n${prose}\`\`\`pfdsl\n${model}\`\`\`\nAfter\n`;
-function fixture(t) {
+function fixture(t, cli) {
 	const root = mkdtempSync(resolve(".issue-pfd-test-"));
 	t.after(() => rmSync(root, { recursive: true, force: true }));
 	const records = new Map([
@@ -92,15 +95,17 @@ function fixture(t) {
 		now: () => new Date(1700000000000 + clock++).toISOString(),
 		github,
 		repository: () => repo,
-		cli: async (input) => {
-			cliCalls.push(input);
-			return {
-				exitCode: invalid ? 1 : 0,
-				stdout: input.command === "render" ? svg : "ok",
-				stderr: invalid ? "Invalid model" : "",
-				cliVersion: "1.2.3",
-			};
-		},
+		cli:
+			cli ??
+			(async (input) => {
+				cliCalls.push(input);
+				return {
+					exitCode: invalid ? 1 : 0,
+					stdout: input.command === "render" ? svg : "ok",
+					stderr: invalid ? "Invalid model" : "",
+					cliVersion: "1.2.3",
+				};
+			}),
 	});
 	const dir = resolve(root, "work");
 	const run = (command, opts = {}) =>
@@ -796,6 +801,23 @@ test("publish-diagram preserves and verifies SVG with a self-closing title", asy
 	assert.equal((await f.run("status")).classification, "current");
 });
 
+test("publish-diagram renders the requested historical source version", async (t) => {
+	const cli = createIssuePfdCli({ root: resolve(".") });
+	const f = fixture(t, cli);
+	f.add(1, source("request >> review -> historical_approval\n"));
+	f.add(1, source("request >> review -> current_approval\n"));
+
+	const published = await f.run("publish-diagram", { version: 2, write: true });
+
+	assert.equal(published.result, "rendered");
+	assert.equal(published.sourceVersion, 2);
+	const body = f.records.get(published.diagram).versions[0].body;
+	const svg = svgElement(body);
+	assert.ok(svg);
+	assert.match(svg, /historical_approval/);
+	assert.doesNotMatch(svg, /current_approval/);
+});
+
 test("status returns changed-during-check when source changes while reading diagram", async (t) => {
 	const f = fixture(t);
 	await f.run("publish-diagram", { write: true });
@@ -1170,22 +1192,21 @@ test("terminal operations discard bodies while unresolved and overwritten source
 	assert.equal(typeof f.state().operations.at(-1).body, "string");
 });
 
-test("status with terminal operations does not serialize unchanged state", async (t) => {
+test("status with terminal operations leaves the state file untouched", async (t) => {
 	const f = fixture(t);
 	await f.run("pull");
 	f.edit();
 	await f.run("publish", { write: true });
-	const stringify = JSON.stringify;
-	let serializations = 0;
-	JSON.stringify = (value, ...args) => {
-		if (value?.schema === 2 && Array.isArray(value.operations))
-			serializations++;
-		return stringify(value, ...args);
-	};
-	try {
-		await f.run("status");
-		assert.equal(serializations, 0);
-	} finally {
-		JSON.stringify = stringify;
-	}
+	const path = resolve(f.dir, "issue-pfd.json");
+	const oldTime = new Date("2000-01-01T00:00:00Z");
+	utimesSync(path, oldTime, oldTime);
+	const before = statSync(path);
+	const contents = readFileSync(path);
+
+	assert.equal((await f.run("status")).classification, "current");
+
+	const after = statSync(path);
+	assert.equal(after.ino, before.ino);
+	assert.equal(after.mtimeMs, before.mtimeMs);
+	assert.deepEqual(readFileSync(path), contents);
 });
