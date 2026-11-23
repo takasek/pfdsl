@@ -25,12 +25,18 @@ importers:
       mdast-util-gfm-table:
         specifier: ^2.0.0
         version: 2.0.0
+      micromark:
+        specifier: ^4.0.3
+        version: 4.0.3
       micromark-extension-gfm-table:
         specifier: ^2.0.0
         version: 2.1.2
       mustache:
         specifier: ^4.2.0
         version: 4.2.0
+      parse5:
+        specifier: ^7.3.0
+        version: 7.3.0
       typescript:
         specifier: ^5.4.0
         version: 5.9.3

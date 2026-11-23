@@ -32,7 +32,7 @@ function ghInstalled(cwd, env) {
 
 /**
  * @param {string[]} args - the same argv you'd pass to execFileSync("gh", args)
- * @param {{cwd?: string, repository?: () => {host: string, owner: string, repo: string}}} [opts]
+ * @param {{cwd?: string, repository?: () => {host: string, owner: string, repo: string}, maxBuffer?: number, input?: string}} [opts] - `input` is written to gh's stdin (e.g. for `gh api --input -`).
  * @returns {Promise<string>}
  */
 export async function execGh(args, opts = {}) {
@@ -58,8 +58,35 @@ export async function execGh(args, opts = {}) {
 			}
 		: process.env;
 	try {
-		return execFileSync("gh", args, { cwd, encoding: "utf-8", env });
+		return execFileSync("gh", args, {
+			cwd,
+			encoding: "utf-8",
+			env,
+			...(opts.maxBuffer === undefined ? {} : { maxBuffer: opts.maxBuffer }),
+			...(opts.input === undefined ? {} : { input: opts.input }),
+		});
 	} catch (error) {
+		// No child was created: the OS proves that nothing could be sent.
+		// ENOBUFS and signals happen after launch and must remain uncertain.
+		if (
+			(error.pid === 0 ||
+				(error.pid === undefined && /^spawn/.test(error.syscall ?? ""))) &&
+			error.code !== "ENOBUFS" &&
+			!error.signal
+		)
+			error.unsent = true;
+		if (error.code === "ENOBUFS") {
+			const limit = opts.maxBuffer ?? 1024 * 1024;
+			const target =
+				args.find((arg) => arg.startsWith("/repos/")) ??
+				args.slice(0, 2).join(" ");
+			throw Object.assign(
+				new Error(`gh response exceeded ${limit} bytes for ${target}`, {
+					cause: error,
+				}),
+				{ code: "ENOBUFS", maxBuffer: limit },
+			);
+		}
 		if (error.code === "ENOENT") {
 			// spawn uses ENOENT for a deleted cwd too; it is a caller failure.
 			try {
@@ -72,9 +99,12 @@ export async function execGh(args, opts = {}) {
 			}
 			const installed = ghInstalled(cwd, env);
 			if (installed)
-				throw new Error(`installed gh CLI could not start: ${error.message}`, {
-					cause: error,
-				});
+				throw Object.assign(
+					new Error(`installed gh CLI could not start: ${error.message}`, {
+						cause: error,
+					}),
+					{ unsent: error.unsent === true },
+				);
 		}
 		throw error;
 	}

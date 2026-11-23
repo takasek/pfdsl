@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
+import { createHash } from "node:crypto";
 import {
 	chmodSync,
 	mkdirSync,
@@ -13,6 +14,7 @@ import { join } from "node:path";
 import { afterEach, describe, it } from "node:test";
 
 import { execGh } from "./gh-exec.mjs";
+import { createGitHubOps } from "./github-ops.mjs";
 
 // A real `gh` binary may live anywhere on PATH depending on the environment
 // (absent on this maintainer's Mac, but preinstalled at /usr/bin/gh on
@@ -46,6 +48,123 @@ function fakePathWithGh(script) {
 describe("execGh", () => {
 	let originalPath;
 	let fakePath;
+
+	it("artifact version history above one MiB crosses the real gh execution boundary", async () => {
+		originalPath = process.env.PATH;
+		fakePath = fakePathWithGh("exit 1");
+		const payload = {
+			artifact: { number: 1 },
+			versions: Array.from({ length: 20 }, (_, i) => ({
+				version: 20 - i,
+				body: "x".repeat(60 * 1024),
+			})),
+		};
+		const data = join(fakePath, "history.json");
+		writeFileSync(data, JSON.stringify(payload));
+		writeFileSync(
+			join(fakePath, "emit.cjs"),
+			`process.stdout.write(require('node:fs').readFileSync(${JSON.stringify(data)}));`,
+		);
+		writeFileSync(
+			join(fakePath, "gh"),
+			`#!/bin/sh\nexec '${process.execPath}' '${join(fakePath, "emit.cjs")}'\n`,
+			{ mode: 0o755 },
+		);
+		const savedRepo = process.env.GH_REPO;
+		process.env.GH_REPO = "github.com/o/r";
+		process.env.PATH = fakePath;
+		try {
+			const ops = createGitHubOps({ cwd: process.cwd() });
+			assert.deepEqual(
+				await ops.getArtifact({ issue: 7, artifact: 1 }),
+				payload,
+			);
+			await assert.rejects(
+				execGh(["api", "/repos/o/r/issues/7/artifacts/1"], { maxBuffer: 1024 }),
+				(error) =>
+					error.code === "ENOBUFS" &&
+					error.unsent !== true &&
+					/1024.*\/repos\/o\/r\/issues\/7\/artifacts\/1/.test(error.message),
+			);
+			await assert.rejects(
+				execGh(["api", "/repos/o/r/issues/7/artifacts/1"]),
+				(error) => error.code === "ENOBUFS",
+			);
+		} finally {
+			if (savedRepo === undefined) delete process.env.GH_REPO;
+			else process.env.GH_REPO = savedRepo;
+		}
+	});
+
+	it("artifact bodies above the argument size limit reach gh through stdin", async () => {
+		originalPath = process.env.PATH;
+		fakePath = fakePathWithGh("exit 1");
+		// The fake gh reports what it received: its argv and a digest of stdin.
+		writeFileSync(
+			join(fakePath, "echo.cjs"),
+			`const input = JSON.parse(require('node:fs').readFileSync(0, 'utf8'));
+const digest = require('node:crypto').createHash('sha256').update(input.body).digest('hex');
+process.stdout.write(JSON.stringify({ number: 1, body: input.body, argv: process.argv.slice(2), length: input.body.length, digest }));`,
+		);
+		writeFileSync(
+			join(fakePath, "gh"),
+			`#!/bin/sh\nexec '${process.execPath}' '${join(fakePath, "echo.cjs")}' "$@"\n`,
+			{ mode: 0o755 },
+		);
+		const savedRepo = process.env.GH_REPO;
+		process.env.GH_REPO = "github.com/o/r";
+		process.env.PATH = fakePath;
+		try {
+			const ops = createGitHubOps({ cwd: process.cwd() });
+			// Larger than both Linux's per-argument limit and macOS's ARG_MAX.
+			const body = "x".repeat(1536 * 1024);
+			for (const result of [
+				await ops.createArtifact({
+					issue: 7,
+					type: "embedded_html",
+					name: "diagram",
+					body,
+				}),
+				await ops.updateArtifact({ issue: 7, artifact: 1, body }),
+			]) {
+				assert.equal(result.body, body);
+				assert.equal(result.length, body.length);
+				assert.equal(
+					result.digest,
+					createHash("sha256").update(body).digest("hex"),
+				);
+				assert.deepEqual(result.argv.slice(-2), ["--input", "-"]);
+				assert.ok(result.argv.every((arg) => arg.length < 1024));
+			}
+		} finally {
+			if (savedRepo === undefined) delete process.env.GH_REPO;
+			else process.env.GH_REPO = savedRepo;
+		}
+	});
+
+	it("pre-spawn E2BIG is unsent while executed failures are not", async () => {
+		originalPath = process.env.PATH;
+		fakePath = fakePathWithGh("exit 17");
+		process.env.PATH = fakePath;
+		const opts = {
+			repository: () => ({ host: "github.com", owner: "o", repo: "r" }),
+		};
+		await assert.rejects(
+			execGh(["x".repeat(4 * 1024 * 1024)], opts),
+			(error) => error.code === "E2BIG" && error.unsent === true,
+		);
+		await assert.rejects(
+			execGh(["api"], opts),
+			(error) => error.status === 17 && error.unsent !== true,
+		);
+		writeFileSync(join(fakePath, "gh"), "#!/bin/sh\nkill -KILL $$\n", {
+			mode: 0o755,
+		});
+		await assert.rejects(
+			execGh(["api"], opts),
+			(error) => error.signal === "SIGKILL" && error.unsent !== true,
+		);
+	});
 
 	for (const [remote, expected] of [
 		["https://github.com/acme/widget.git", "github.com/acme/widget"],
@@ -148,7 +267,9 @@ describe("execGh", () => {
 		await assert.rejects(
 			() => execGh(["label", "list"]),
 			(error) =>
-				error.code !== "ENOENT" && /could not start/.test(error.message),
+				error.code !== "ENOENT" &&
+				error.unsent === true &&
+				/could not start/.test(error.message),
 		);
 	});
 

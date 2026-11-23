@@ -1,4 +1,4 @@
-import { execFileSync, spawnSync } from "node:child_process";
+import { execFileSync, spawn, spawnSync } from "node:child_process";
 import { join, resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import { isDistStale } from "../../../scripts/lib/dist-freshness.mjs";
@@ -121,6 +121,61 @@ describe("dist/cli.js smoke", () => {
 					(d) => d.code === "W002",
 				),
 			).toBe(true);
+		},
+	);
+
+	it.skipIf(!distIsCurrent)(
+		"writes output larger than a pipe buffer completely before exiting",
+		() => {
+			// A piped stdout is written asynchronously, so exiting right after
+			// write() dropped everything past the first 64 KiB.
+			const src = Array.from(
+				{ length: 200 },
+				(_, i) => `a${i} >> p${i} -> b${i}\n`,
+			).join("");
+			const result = spawnSync(
+				process.execPath,
+				[distCli, "render", "-", "--format", "svg"],
+				{ input: src, encoding: "utf8", maxBuffer: 64 * 1024 * 1024 },
+			);
+			expect(result.status, result.stderr).toBe(0);
+			expect(result.stdout.length).toBeGreaterThan(64 * 1024);
+			expect(result.stdout.trimEnd().endsWith("</svg>")).toBe(true);
+		},
+	);
+
+	it.skipIf(!distIsCurrent)(
+		"the CLI producer exits quietly after its stdout reader closes",
+		async () => {
+			const child = spawn(process.execPath, [distCli, "fmt", "-"], {
+				stdio: ["pipe", "pipe", "pipe"],
+			});
+			let stderr = "";
+			let read = false;
+			child.stderr.setEncoding("utf8");
+			child.stderr.on("data", (data) => {
+				stderr += data;
+			});
+			child.stdout.once("data", () => {
+				read = true;
+				child.stdout.destroy();
+			});
+			const closed = new Promise<{
+				code: number | null;
+				signal: NodeJS.Signals | null;
+			}>((accept, reject) => {
+				child.on("error", reject);
+				child.on("close", (code, signal) => accept({ code, signal }));
+			});
+			// Exceed even large pipe buffers without paying Graphviz's layout cost.
+			child.stdin.end(
+				`---\ntitle: "${"x".repeat(4 * 1024 * 1024)}"\n---\na >> p -> b\n`,
+			);
+			const result = await closed;
+			expect(read, stderr).toBe(true);
+			expect(result.signal, stderr).toBeNull();
+			expect(result.code, stderr).toBe(0);
+			expect(stderr).toBe("");
 		},
 	);
 });

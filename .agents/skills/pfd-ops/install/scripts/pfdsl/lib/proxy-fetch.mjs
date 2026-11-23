@@ -30,6 +30,7 @@ export async function proxyAwareFetch(url, init = {}) {
 		method: init.method ?? "GET",
 		headers: init.headers ?? {},
 		body: init.body,
+		redirect: init.redirect,
 	};
 	const out = execFileSync(
 		process.execPath,
@@ -40,11 +41,15 @@ export async function proxyAwareFetch(url, init = {}) {
 			maxBuffer: 64 * 1024 * 1024,
 		},
 	);
-	const { ok, status, bodyText } = JSON.parse(out);
+	const { ok, status, bodyText, bodyError } = JSON.parse(out);
+	const text = async () => {
+		if (bodyError) throw new Error(bodyError);
+		return bodyText;
+	};
 	return {
 		ok,
 		status,
-		json: async () => JSON.parse(bodyText),
-		text: async () => bodyText,
+		json: async () => JSON.parse(await text()),
+		text,
 	};
 }

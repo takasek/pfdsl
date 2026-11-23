@@ -26,6 +26,7 @@ const SKILL_SOURCE_FILES = Object.freeze({
 		"references/architecture.md",
 		"references/file-based-tracker-backend.md",
 		"references/github-issues-backend.md",
+		"references/issue-artifact-pfd.md",
 		"references/scaffold/bindings/pfd-ops.md",
 		"references/scaffold/bindings/pfd-knowledge-audit.md",
 		"references/scaffold/bindings/pfd-retro-patterns/sample-pattern.md",
