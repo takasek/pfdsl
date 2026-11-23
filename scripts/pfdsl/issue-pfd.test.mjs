@@ -819,26 +819,26 @@ test("unavailable source never reports an old diagram as current", async (t) => 
 	assert.match(result.diagnostic, /offline/);
 });
 
-test("status distinguishes source selection from a read failure with the same diagnostic", async (t) => {
+test("status reports a read failure even if the diagnostic mentions select --artifact", async (t) => {
 	const f = fixture(t);
-	const message =
-		"No PFD source identity in artifact history; select --artifact with an existing PFD source";
-	const options = { artifact: 1 };
+	const message = "The source could not be read; select --artifact to retry";
 	f.onGet(() => {
 		throw new Error(message);
 	});
-	assert.deepEqual(await f.run("status", options), {
+	assert.deepEqual(await f.run("status", { artifact: 1 }), {
 		classification: "unavailable",
 		diagnostic: message,
 	});
+});
 
-	f.onGet(undefined);
+test("status rejects a missing PFD source with its error code", async (t) => {
+	const f = fixture(t);
 	f.records.get(1).versions[0].body = "A regular artifact";
-	await assert.rejects(f.run("status", options), {
-		code: "ISSUE_PFD_SOURCE_SELECTION",
-		message,
-	});
-	await assert.rejects(f.run("status"), /Found 0 source artifacts/);
+	for (const options of [{ artifact: 1 }, {}]) {
+		await assert.rejects(f.run("status", options), {
+			code: "ISSUE_PFD_SOURCE_SELECTION",
+		});
+	}
 });
 
 test("directory lock reports its owner and prevents concurrent write operations", async (t) => {
